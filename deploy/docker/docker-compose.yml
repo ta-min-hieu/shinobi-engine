@@ -1,0 +1,36 @@
+# Môi trường Development (DOCKER.md §5). `docker compose up` dựng DB + cache.
+# Server chưa có Dockerfile ở Phase 0 — thêm ở Phase 2/3 khi server chạy được.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: kage
+      POSTGRES_USER: kage
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD trong .env}
+    # ⚠️ UTF-8 collation từ đầu — tiếng Việt (DATABASE.md §1). Sửa sau rất khó.
+    command: >
+      postgres -c lc_collate=en_US.UTF-8 -c lc_ctype=en_US.UTF-8
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kage"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  cache:
+    # ⏳ Redis hay Valkey — chờ ADR-005. Dùng Valkey (BSD) làm mặc định tạm.
+    image: valkey/valkey:8
+    command: ["valkey-server", "--requirepass", "${CACHE_PASSWORD:?set CACHE_PASSWORD}"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

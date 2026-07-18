@@ -1,0 +1,474 @@
+Đây là cách mình sẽ làm nếu là Technical Director của dự án. Bộ tài liệu này đủ để Claude (hoặc bất kỳ AI nào) phát triển dự án trong nhiều năm mà không bị lệch kiến trúc.
+
+📚 00. Governance (Quản trị dự án)
+00.1 KAGE-CONSTITUTION.md ⭐⭐⭐⭐⭐
+
+Hiến pháp của toàn bộ dự án.
+
+Nội dung
+Vision
+Mission
+Project Philosophy
+Core Principles
+Engineering Principles
+Architecture Principles
+Performance Principles
+Security Principles
+Development Workflow
+Definition of Done
+Definition of Ready
+AI Rules
+Review Rules
+Refactoring Rules
+Decision Making
+ADR Rules
+00.2 CLAUDE.md ⭐⭐⭐⭐⭐
+
+Quy định AI phải làm việc như thế nào.
+
+Nội dung
+Vai trò AI
+Workflow bắt buộc
+Khi nào được code
+Khi nào phải hỏi
+Khi nào phải tạo ADR
+Quy tắc refactor
+Quy tắc review
+Quy tắc benchmark
+Quy tắc tạo test
+Quy tắc sửa bug
+Quy tắc tạo tài liệu
+📚 01. Architecture
+01.1 ARCHITECTURE.md ⭐⭐⭐⭐⭐
+
+Tài liệu quan trọng nhất.
+
+Nội dung
+Vision
+C4 Model
+Context Diagram
+Container Diagram
+Component Diagram
+Deployment Diagram
+Architecture Layers
+Module Dependencies
+Domain Boundaries
+Event Flow
+Data Flow
+Rendering Flow
+Networking Flow
+Scalability
+Fault Tolerance
+Future Evolution
+01.2 REPOSITORY-STRUCTURE.md
+Nội dung
+Multi Module
+Gradle Structure
+Feature-first
+Package Rules
+Naming Rules
+Dependency Rules
+01.3 TECHNOLOGY-STACK.md
+Nội dung
+Java 25
+Gradle
+libGDX
+LWJGL3
+Ashley (giai đoạn đầu)
+Netty
+PostgreSQL
+Redis
+Docker
+Kubernetes
+GitHub Actions
+Micrometer
+Grafana
+Prometheus
+OpenTelemetry
+JMH
+
+Mỗi công nghệ đều có:
+
+Vì sao chọn
+Ưu điểm
+Nhược điểm
+Khi nào thay thế
+ADR liên quan
+01.4 ADR/
+
+Ví dụ
+
+ADR-001-Why-Java25.md
+
+ADR-002-Why-libGDX.md
+
+ADR-003-Why-Netty.md
+
+ADR-004-Why-PostgreSQL.md
+
+ADR-005-Why-Redis.md
+
+ADR-006-Why-ECS.md
+
+ADR-007-Why-Plugin-System.md
+
+ADR-008-Why-EventDriven.md
+📚 02. Coding Standards
+CODING-STANDARDS.md
+Java Convention
+Naming
+Formatting
+Packages
+Imports
+Exceptions
+Logging
+Comments
+JavaDoc
+Records
+Sealed Classes
+Pattern Matching
+Streams
+Virtual Threads
+Immutable Rules
+Collection Rules
+JAVA-GUIDELINES.md
+Java 25 Best Practices
+Effective Java
+Memory
+Concurrency
+GC
+Performance
+Loom
+FFM API
+Vector API
+CODE-REVIEW.md
+Checklist
+Anti-pattern
+Smell
+Complexity
+Performance
+Security
+Readability
+📚 03. Engine
+ENGINE.md
+Engine Architecture
+Engine Lifecycle
+Update Loop
+Render Loop
+Module System
+Service Registry
+Resource Manager
+Platform Layer
+ECS.md
+ECS Principles
+Entity
+Component
+System
+Family
+Scheduler
+Event
+Performance
+Future Migration
+RENDERING.md
+Camera
+Viewport
+SpriteBatch
+TextureAtlas
+Shader
+Lighting
+Animation
+Particle
+Batch
+Culling
+PHYSICS.md
+Box2D
+Collision
+Layers
+Sensors
+Physics Tick
+Gameplay Integration
+AI.md
+FSM
+Behavior Tree
+GOAP
+Pathfinding
+Navigation
+NPC AI
+Monster AI
+Boss AI
+📚 04. Client
+CLIENT.md
+Desktop
+Android
+Launcher
+Asset Loading
+UI
+Input
+Scene
+Camera
+Rendering
+Audio
+UI.md
+Scene2D
+Widget
+Theme
+Responsive
+Localization
+Accessibility
+RESOURCE.md
+AssetManager
+TexturePacker
+Font
+Audio
+Cache
+Version
+Patch
+📚 05. Server
+SERVER.md
+Gateway
+Login
+World
+Map
+Chat
+Guild
+Mail
+Ranking
+Scheduler
+Tick
+NETWORK.md
+TCP
+UDP
+Netty Pipeline
+Packet
+Opcode
+Compression
+Encryption
+Heartbeat
+Reconnect
+Validation
+DATABASE.md
+PostgreSQL
+Redis
+Flyway
+Repository
+Cache
+Transactions
+Index
+Partition
+GAMEPLAY.md
+Character
+Inventory
+Quest
+Guild
+Mail
+Trade
+NPC
+Skill
+Combat
+Monster
+Boss
+Dungeon
+PvP
+📚 06. Plugin
+PLUGIN.md
+Plugin API
+Lifecycle
+Events
+Dependencies
+Version
+Sandbox
+Distribution
+SCRIPTING.md
+Lua hoặc GraalJS (chọn một, không nên hỗ trợ cả hai ngay từ đầu)
+Quest
+NPC
+Skill
+Dialogue
+Boss
+Event
+Sandbox
+Hot Reload
+📚 07. Infrastructure
+DOCKER.md
+Dockerfile
+Compose
+Multi-stage Build
+Dev
+Test
+Production
+KUBERNETES.md
+Deployment
+Service
+ConfigMap
+Secret
+Ingress
+HPA
+Rolling Update
+CI-CD.md
+GitHub Actions
+Build
+Test
+Lint
+Docker
+Publish
+Deploy
+Rollback
+OBSERVABILITY.md
+Metrics
+Logs
+Tracing
+Grafana
+Prometheus
+OpenTelemetry
+Alerts
+📚 08. Security
+SECURITY.md
+Authentication
+Authorization
+Packet Validation
+Replay Protection
+Flood Protection
+Anti Cheat
+Audit Log
+OWASP.md
+Dependency Check
+Secret Scan
+SAST
+DAST
+📚 09. Performance
+PERFORMANCE.md
+CPU
+Memory
+GC
+Rendering
+Network
+Database
+Redis
+ECS
+Physics
+AI
+JVM.md
+G1GC
+ZGC
+Shenandoah
+JVM Flags
+JFR
+Async Profiler
+BENCHMARK.md
+JMH
+FPS
+TPS
+Memory
+GC
+Network
+Database
+Packet
+📚 10. Quality
+TESTING.md
+Unit Test
+Integration Test
+Contract Test
+Performance Test
+Load Test
+Soak Test
+STATIC-ANALYSIS.md
+Spotless
+Checkstyle
+PMD
+SpotBugs
+Error Prone
+SonarQube
+📚 11. Process
+GIT-WORKFLOW.md
+Git Flow
+Branch
+Merge
+Tag
+Release
+Hotfix
+DOCUMENTATION.md
+README
+Diagrams
+JavaDoc
+ADR
+RFC
+ROADMAP.md
+Phase 0
+Repository
+Constitution
+CI/CD
+Docker
+Phase 1
+Engine Core
+ECS
+Rendering
+Phase 2
+Network
+Gateway
+Login
+Phase 3
+Character
+Map
+Movement
+Phase 4
+Combat
+Skill
+Monster
+Phase 5
+Inventory
+Equipment
+Shop
+Phase 6
+Quest
+NPC
+Dialogue
+Phase 7
+Guild
+Party
+Mail
+Trade
+Phase 8
+Dungeon
+Boss
+PvP
+Phase 9
+Optimization
+Phase 10
+Release
+📚 12. DevTools
+EDITOR.md
+Map Editor
+NPC Editor
+Quest Editor
+Skill Editor
+Item Editor
+Animation Editor
+ADMIN.md
+Dashboard
+GM Commands
+Monitoring
+Logs
+Player Management
+LAUNCHER.md
+Auto Update
+Patch
+Version
+CDN
+Rollback
+⭐ Khuyến nghị cuối cùng
+
+Mình có một đề xuất quan trọng: đừng bắt Claude viết toàn bộ tài liệu ngay từ đầu.
+
+Hãy yêu cầu Claude làm theo quy trình sau cho mỗi file:
+
+Phân tích mục đích của tài liệu.
+Đề xuất bố cục (TOC) và giải thích ngắn gọn từng mục.
+Chờ bạn duyệt bố cục.
+Sau khi duyệt, mới viết chi tiết từng chương.
+Mỗi chương kết thúc bằng:
+Các quyết định kỹ thuật (Technical Decisions)
+Danh sách ADR cần tạo
+Các tài liệu liên quan
+Việc cần làm tiếp theo
+
+Quy trình này giúp tài liệu nhất quán, dễ chỉnh sửa và tránh việc AI viết lan man hoặc mâu thuẫn giữa các file. Đây cũng là cách nhiều đội kỹ thuật áp dụng khi xây dựng tài liệu kiến trúc cho các dự án lớn.

@@ -1,0 +1,79 @@
+# libs.versions.toml — NGUỒN VERSION DUY NHẤT của dự án (TECHNOLOGY-STACK.md §3)
+#
+# ✅ = đã verify trên web (07/2026).  ⚠️ = baseline chưa verify — để Dependabot chốt.
+# Đổi version ở đây, không hardcode trong build.gradle.kts.
+
+[versions]
+# --- Runtime ---
+java = "25"                       # ✅ Temurin 25 (LTS) — ADR-001
+
+# --- Client (libGDX) ---
+libgdx = "1.14.2"                 # ✅ latest 05/2026 (ADR-002 ghi 1.13.x — đã cũ)
+
+# --- Server ---
+netty = "4.1.136.Final"           # ✅ latest 4.1.x 07/2026 — ADR-003
+protobuf = "4.35.1"               # ✅ latest 06/2026
+hikaricp = "7.0.2"                # ⚠️ verify — HikariCP (ADR-004)
+postgresql = "42.7.9"             # ⚠️ verify — JDBC driver
+slf4j = "2.0.17"                  # ⚠️ verify
+logback = "1.5.19"                # ⚠️ verify
+
+# --- Test ---
+junit = "5.14.4"                  # ✅ junit-bom latest 04/2026
+assertj = "3.27.6"                # ⚠️ verify
+mockito = "5.20.0"                # ⚠️ verify
+testcontainers = "1.21.3"         # ⚠️ verify
+archunit = "1.4.2"                # ✅ latest 04/2026 — ADR-011
+
+# --- Static analysis (tool versions) ---
+checkstyle = "10.21.0"            # ⚠️ verify — tool version, dùng trong quality convention
+pmd = "7.10.0"                    # ⚠️ verify — tool version
+errorprone = "2.42.0"             # ⚠️ verify — Error Prone core
+
+# --- Gradle plugins ---
+spotless = "7.2.1"                # ⚠️ verify — Gradle 9 compatible
+spotbugsPlugin = "6.5.9"          # ✅ SpotBugs Gradle plugin 07/2026
+errorpronePlugin = "4.3.0"        # ⚠️ verify — net.ltgt.errorprone
+protobufPlugin = "0.9.5"          # ⚠️ verify — com.google.protobuf Gradle plugin
+
+[libraries]
+# --- libGDX ---
+gdx-core = { module = "com.badlogicgames.gdx:gdx", version.ref = "libgdx" }
+gdx-backend-lwjgl3 = { module = "com.badlogicgames.gdx:gdx-backend-lwjgl3", version.ref = "libgdx" }
+gdx-box2d = { module = "com.badlogicgames.gdx:gdx-box2d", version.ref = "libgdx" }
+gdx-freetype = { module = "com.badlogicgames.gdx:gdx-freetype", version.ref = "libgdx" }
+# ⚠️ Ashley ECS: chỉ engine-ecs được dùng (ADR-006). ArchUnit chặn nơi khác.
+gdx-ashley = { module = "com.badlogicgames.ashley:ashley", version = "1.7.4" }  # ⚠️ verify
+
+# --- Server ---
+netty-all = { module = "io.netty:netty-all", version.ref = "netty" }
+protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
+hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+
+# --- Logging ---
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+
+# --- Test ---
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }              # version từ BOM
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
+mockito-junit = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito" }
+archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+testcontainers-junit = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
+testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
+errorprone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }
+
+[bundles]
+gdx-desktop = ["gdx-core", "gdx-backend-lwjgl3", "gdx-box2d", "gdx-freetype"]
+test-unit = ["junit-jupiter", "assertj-core"]
+test-integration = ["testcontainers-junit", "testcontainers-postgresql"]
+
+[plugins]
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+spotbugs = { id = "com.github.spotbugs", version.ref = "spotbugsPlugin" }
+errorprone = { id = "net.ltgt.errorprone", version.ref = "errorpronePlugin" }
+protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }

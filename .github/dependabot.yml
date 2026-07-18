@@ -1,0 +1,18 @@
+# Dependabot — tự chốt/nâng các version ⚠️ chưa verify trong libs.versions.toml (OWASP.md §1).
+version: 2
+updates:
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: "gradle"
+    directory: "/build-logic"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

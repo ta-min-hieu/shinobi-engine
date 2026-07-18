@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<!--
+  Checkstyle cho Project Kage — thực thi CODING-STANDARDS.md.
+  Chỉ giữ rule THẬT SỰ quan trọng (bug/kiến trúc/naming), style vụn để Spotless lo.
+  Tránh rule quá nghiêm gây "đội ngũ tắt gate" (STATIC-ANALYSIS §11).
+-->
+<module name="Checker">
+    <property name="charset" value="UTF-8"/>
+    <property name="severity" value="error"/>
+    <property name="fileExtensions" value="java"/>
+
+    <!-- Cấm wildcard import (CODING-STANDARDS §23) -->
+    <module name="RegexpSingleline">
+        <property name="format" value="^import .*\.\*;$"/>
+        <property name="message" value="Cấm wildcard import — liệt kê rõ từng import (CODING-STANDARDS §23)."/>
+    </module>
+
+    <!-- Cấm tên hậu tố vô nghĩa Manager/Helper/Util/Info/Data (CODING-STANDARDS §2, REPOSITORY-STRUCTURE §5).
+         Chỉ cảnh báo qua tên class kết thúc bằng các hậu tố này. -->
+    <module name="RegexpSingleline">
+        <property name="format" value="\b(class|interface|record|enum)\s+\w*(Manager|Helper|Util|Utils|Info|Data)\b"/>
+        <property name="message" value="Hậu tố Manager/Helper/Util/Info/Data thường vô nghĩa — đặt tên theo trách nhiệm thật (CODING-STANDARDS §2). Nếu thật sự phản ánh trách nhiệm, suppress có lý do."/>
+    </module>
+
+    <module name="LineLength">
+        <property name="max" value="120"/>
+        <property name="ignorePattern" value="^\s*//.*https?://"/>
+    </module>
+
+    <module name="TreeWalker">
+        <!-- Import -->
+        <module name="UnusedImports"/>
+        <module name="RedundantImport"/>
+
+        <!-- Naming (CODING-STANDARDS §2) -->
+        <module name="TypeName"/>
+        <module name="MethodName"/>
+        <module name="ConstantName"/>
+        <module name="PackageName">
+            <property name="format" value="^dev\.kage(\.[a-z][a-z0-9]*)+$"/>
+        </module>
+
+        <!-- Method size (CODING-STANDARDS §4) -->
+        <module name="MethodLength">
+            <property name="max" value="50"/>
+        </module>
+        <module name="ParameterNumber">
+            <property name="max" value="4"/>
+        </module>
+
+        <!-- Bug-prone -->
+        <module name="EmptyCatchBlock">
+            <property name="exceptionVariableName" value="expected|ignored"/>
+        </module>
+        <module name="EqualsHashCode"/>
+        <module name="MissingSwitchDefault"/>
+        <module name="FallThrough"/>
+        <module name="SimplifyBooleanExpression"/>
+        <module name="SimplifyBooleanReturn"/>
+
+        <!-- Cho phép suppress có lý do qua annotation -->
+        <module name="SuppressWarningsHolder"/>
+    </module>
+
+    <module name="SuppressWarningsFilter"/>
+</module>

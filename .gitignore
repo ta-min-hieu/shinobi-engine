@@ -1,0 +1,40 @@
+# Build (khớp cả build-logic/build/ và mọi module/build/)
+build/
+.gradle/
+**/bin/
+out/
+
+# Gradle wrapper jar ĐƯỢC commit (không ignore): gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Java
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+
+# Secrets / local
+local.properties
+*.env
+.env
+secrets/
+
+# Asset nguồn KHÔNG đóng gói vào build (RESOURCE.md §2)
+# assets/raw/ và assets/hyperlap2d-projects/ dùng Git LFS, không ignore.
+
+# Protobuf generated (sinh lúc build, không commit — TECHNOLOGY-STACK.md §5)
+**/generated/
+**/generated-sources/
