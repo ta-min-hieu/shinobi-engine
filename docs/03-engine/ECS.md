@@ -37,6 +37,8 @@ Family    = Bộ lọc entity theo Component
 
 ⚠️ **Vì sao không giữ tham chiếu Entity**: entity bị huỷ → tham chiếu treo → dùng object đã chết. Giữ ID + tra cứu → phát hiện được entity không còn tồn tại.
 
+⚠️ **Phát hiện thật khi triển khai Phase 1**: Ashley (từ ~1.4 trở đi, gồm 1.7.4 đang dùng) **không expose ID số nguyên trên `Entity`** nữa (khác các bản rất cũ ~1.3.x). `engine-ecs` phải tự cấp `id` (long, tăng dần) lúc `EcsWorld.createEntity()` — độc lập hoàn toàn với Ashley. Đây là lý do thật, cụ thể để không bao giờ dùng ID nội bộ của Ashley: **nó không tồn tại để dùng.**
+
 ---
 
 ## 3. Component

@@ -5,9 +5,11 @@ plugins {
 }
 dependencies {
     implementation(project(":client:client-core"))
-    // implementation(libs.gdx.backend.lwjgl3) — thêm ở Phase 1.
+    implementation("com.badlogicgames.gdx:gdx-backend-lwjgl3:1.14.2")
+    // Native binary bắt buộc cho LWJGL3 chạy — TOML không hỗ trợ classifier trực tiếp nên áp
+    // dụng bằng variantOf (gradle/libs.versions.toml giải thích lý do).
+    implementation(variantOf(libs.gdx.platform) { classifier("natives-desktop") })
 }
 application {
-    // Class chưa tồn tại — tạo ở Phase 1. `build` không cần class này, chỉ `run` cần.
     mainClass.set("dev.kage.client.desktop.DesktopLauncher")
 }

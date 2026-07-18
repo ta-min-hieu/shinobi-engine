@@ -40,10 +40,15 @@ protobufPlugin = "0.9.5"          # ⚠️ verify — com.google.protobuf Gradle
 # --- libGDX ---
 gdx-core = { module = "com.badlogicgames.gdx:gdx", version.ref = "libgdx" }
 gdx-backend-lwjgl3 = { module = "com.badlogicgames.gdx:gdx-backend-lwjgl3", version.ref = "libgdx" }
-gdx-box2d = { module = "com.badlogicgames.gdx:gdx-box2d", version.ref = "libgdx" }
+# Native binary cho LWJGL3 desktop. TOML không có key "classifier" — áp dụng bằng
+# variantOf(libs.gdx.platform) { classifier("natives-desktop") } ở nơi khai báo dependency
+# (client-desktop/build.gradle.kts). Thiếu native = app crash LÚC CHẠY, không lúc compile.
+gdx-platform = { module = "com.badlogicgames.gdx:gdx-platform", version.ref = "libgdx" }
 gdx-freetype = { module = "com.badlogicgames.gdx:gdx-freetype", version.ref = "libgdx" }
+gdx-freetype-platform = { module = "com.badlogicgames.gdx:gdx-freetype-platform", version.ref = "libgdx" }
+gdx-box2d = { module = "com.badlogicgames.gdx:gdx-box2d", version.ref = "libgdx" }
 # ⚠️ Ashley ECS: chỉ engine-ecs được dùng (ADR-006). ArchUnit chặn nơi khác.
-gdx-ashley = { module = "com.badlogicgames.ashley:ashley", version = "1.7.4" }  # ⚠️ verify
+gdx-ashley = { module = "com.badlogicgames.ashley:ashley", version = "1.7.4" }  # ✅ latest (verified 07/2026)
 
 # --- Server ---
 netty-all = { module = "io.netty:netty-all", version.ref = "netty" }
