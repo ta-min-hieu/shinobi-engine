@@ -20,4 +20,5 @@ dependencies {
     testImplementation(project(":server:server-gateway"))
     testImplementation(project(":server:server-world"))
     testImplementation(project(":server:server-database"))
+    testImplementation(project(":server:server-features:feature-account"))
 }

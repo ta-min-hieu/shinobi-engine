@@ -1,6 +1,7 @@
 package dev.kage.server.gateway;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import dev.kage.account.api.AccountFacade;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.ErrorResponse;
@@ -12,21 +13,30 @@ import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import java.util.UUID;
+import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Xử lý packet hệ thống (Ping/Connect) TRỰC TIẾP trên Netty EventLoop — chấp nhận được vì đây là
- * logic RẺ, không chạm DB, không block (SERVER.md §2). Từ Phase 3 trở đi, Command chạm
- * gameplay/DB PHẢI enqueue vào server-world, KHÔNG xử lý inline ở đây.
+ * Xử lý packet hệ thống (Ping/Connect) trên Netty EventLoop — nhưng CHỈ phần rẻ (decode,
+ * validate rẻ, enqueue); phần chạm DB/Redis đẩy sang {@code authExecutor} (Virtual Thread,
+ * SERVER.md §2). Từ Phase 3 trở đi, Command chạm gameplay/DB PHẢI enqueue vào server-world
+ * hoặc Virtual Thread, KHÔNG BAO GIỜ chạy inline chặn EventLoop.
  *
- * <p>⚠️ Phase 2: CONNECT_REQUEST luôn thành công (feature-account chưa tồn tại — Phase 3). Chỉ
- * để verify framing + handshake hoạt động, KHÔNG PHẢI auth thật (SECURITY.md, ADR-017 chưa chốt).
+ * <p>{@code handleConnect} gọi {@link AccountFacade} (ADR-017 ✅ Accepted) — đăng nhập thật bằng
+ * username, tự tạo account nếu chưa có (dự án cá nhân, chưa cần mật khẩu ở bước này).
  */
 final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCodec.Frame> {
 
     private static final Logger LOG = LoggerFactory.getLogger(GatewayChannelHandler.class);
+
+    private final AccountFacade accountFacade;
+    private final Executor authExecutor;
+
+    GatewayChannelHandler(AccountFacade accountFacade, Executor authExecutor) {
+        this.accountFacade = accountFacade;
+        this.authExecutor = authExecutor;
+    }
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, PacketCodec.Frame frame) {
@@ -60,15 +70,35 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleConnect(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         var request = ConnectRequest.parseFrom(payload);
-        // ⚠️ Không validate token thật — xem javadoc lớp này. Đọc field để chắc parse đúng schema.
-        LOG.info("Kết nối mới: tokenLength={} (chưa validate — Phase 2 stub)", request.getToken().length());
+        var username = request.getUsername();
+        var sequenceId = header.sequenceId();
 
-        var sessionId = UUID.randomUUID().toString();
-        var response = ConnectResponse.newBuilder()
-                .setSuccess(true)
-                .setSessionId(sessionId)
-                .build();
-        send(ctx, Opcode.OPCODE_CONNECT_RESPONSE_VALUE, header.sequenceId(), response.toByteArray());
+        // Đăng nhập chạm Redis/PostgreSQL (qua AccountFacade) — I/O chặn, KHÔNG được chạy trên
+        // Netty EventLoop (SERVER.md §2 — "Cấm: Query DB, logic nặng, chờ lock"). Đẩy sang Virtual
+        // Thread; ctx.writeAndFlush an toàn gọi từ thread khác EventLoop (Netty tự chuyển task).
+        authExecutor.execute(() -> handleConnectBlocking(ctx, sequenceId, username));
+    }
+
+    // PMD AvoidCatchingGenericException: đúng ý — đây là ranh giới I/O bất đồng bộ, PHẢI trả lời
+    // client dù lỗi gì xảy ra (DB down, Redis down, username không hợp lệ...), nếu không client
+    // treo chờ response không bao giờ tới. Không thể liệt kê hết loại lỗi từ AccountFacade.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private void handleConnectBlocking(ChannelHandlerContext ctx, int sequenceId, String username) {
+        try {
+            var result = accountFacade.login(username);
+            var response = ConnectResponse.newBuilder()
+                    .setSuccess(true)
+                    .setSessionId(result.sessionToken())
+                    .setAccountId(result.accountId())
+                    .build();
+            send(ctx, Opcode.OPCODE_CONNECT_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        } catch (IllegalArgumentException e) {
+            LOG.warn("Đăng nhập thất bại: username không hợp lệ", e);
+            sendError(ctx, sequenceId, 400, "error.invalid_username");
+        } catch (RuntimeException e) {
+            LOG.error("Đăng nhập thất bại: lỗi không mong đợi", e);
+            sendError(ctx, sequenceId, 500, "error.login_failed");
+        }
     }
 
     private void sendError(ChannelHandlerContext ctx, int relatedSequenceId, int errorCode, String errorKey) {

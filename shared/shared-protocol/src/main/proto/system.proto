@@ -20,17 +20,21 @@ message PongResponse {
 }
 
 // Command: Client -> Server, mở phiên (OPCODE_CONNECT_REQUEST).
-// ⚠️ Phase 2: KHÔNG có validate thật (feature-account chưa tồn tại, tới Phase 3). Server luôn
-// chấp nhận và cấp session_id — chỉ để verify pipeline framing + handshake hoạt động.
+// Phase 3 (ADR-017 ✅ Accepted): đăng nhập bằng username, dự án cá nhân nên chưa cần mật khẩu ở
+// bước này — feature-account tự tạo account nếu username chưa tồn tại. `token` giữ nguyên field 1
+// (không đổi số field đang dùng — shared/CLAUDE.md) dự phòng cho luồng resume-session-bằng-token
+// thật sau này; hiện chưa dùng.
 message ConnectRequest {
-  string token = 1; // placeholder — cơ chế token thật chưa chốt (ADR-017, SECURITY.md §3)
+  string token = 1; // dự phòng cho resume session bằng token — CHƯA DÙNG ở bước username-only này
+  string username = 2; // Điều 24: đăng nhập/tự-tạo account qua feature-account, không lấy trực tiếp
 }
 
 // Response: Server -> Client (OPCODE_CONNECT_RESPONSE).
 message ConnectResponse {
   bool success = 1;
-  string session_id = 2;
+  string session_id = 2; // = session token thật (ADR-017: opaque random 256-bit, sliding TTL 24h)
   string error_key = 3; // rỗng nếu success=true (NETWORK.md §107: key i18n, không message cứng)
+  int64 account_id = 4;
 }
 
 // Response lỗi dùng chung mọi Command (NETWORK.md §107). Client hiển thị theo error_key + ngôn

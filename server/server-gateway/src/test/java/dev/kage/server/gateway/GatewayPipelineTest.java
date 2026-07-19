@@ -3,6 +3,12 @@ package dev.kage.server.gateway;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import dev.kage.account.api.AccountFacade;
+import dev.kage.account.application.LoginOrCreateAccountUseCase;
+import dev.kage.account.domain.Account;
+import dev.kage.account.domain.AccountPort;
+import dev.kage.account.domain.SessionPort;
+import dev.kage.account.domain.Transaction;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.Opcode;
@@ -16,6 +22,11 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -47,7 +58,7 @@ class GatewayPipelineTest {
     @Test
     void shouldReplyConnectResponse_toConnectRequest() throws InvalidProtocolBufferException {
         var channel = newPipeline();
-        var request = ConnectRequest.newBuilder().setToken("bat-ky-token-nao").build();
+        var request = ConnectRequest.newBuilder().setUsername("kagehero").build();
         var header = new PacketHeader(Opcode.OPCODE_CONNECT_REQUEST_VALUE, ProtocolVersion.CURRENT, 1);
 
         writeInboundFrame(channel, header, request.toByteArray());
@@ -57,6 +68,7 @@ class GatewayPipelineTest {
         var connectResponse = ConnectResponse.parseFrom(response.payload());
         assertThat(connectResponse.getSuccess()).isTrue();
         assertThat(connectResponse.getSessionId()).isNotBlank();
+        assertThat(connectResponse.getAccountId()).isPositive();
     }
 
     @Test
@@ -72,12 +84,51 @@ class GatewayPipelineTest {
 
     private static EmbeddedChannel newPipeline() {
         // ⚠️ Phải khớp CHÍNH XÁC pipeline thật trong GatewayBootstrap — lệch ở đây là test giả.
+        // AccountFacade THẬT (không mock), chỉ Port bên dưới là Fake (TESTING.md §4) — cùng kiểu
+        // Fake với LoginOrCreateAccountUseCaseTest ở feature-account. Executor chạy ĐỒNG BỘ
+        // (Runnable::run) — handleConnect thật đẩy việc login sang authExecutor (Virtual Thread ở
+        // production, SERVER.md §2); test cần đồng bộ để readOutboundFrame không bị race.
+        var useCase = new LoginOrCreateAccountUseCase(
+                new FakeAccountPort(), new FakeSessionPort(), action -> action.accept(null));
+        var accountFacade = new AccountFacade(useCase);
         return new EmbeddedChannel(
                 new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
                 new LengthFieldPrepender(4),
                 new PacketFrameDecoder(),
                 new PacketFrameEncoder(),
-                new GatewayChannelHandler());
+                new GatewayChannelHandler(accountFacade, Runnable::run));
+    }
+
+    /** Fake = implementation in-memory THẬT (TESTING.md §4), không Mockito. */
+    static final class FakeAccountPort implements AccountPort {
+        private final Map<String, Account> byUsername = new HashMap<>();
+        private final AtomicLong nextId = new AtomicLong(1);
+
+        @Override
+        public Account findOrCreate(Transaction tx, String username) {
+            return byUsername.computeIfAbsent(username, u -> new Account(nextId.getAndIncrement(), u, Instant.now()));
+        }
+    }
+
+    static final class FakeSessionPort implements SessionPort {
+        private final Map<String, Long> tokens = new HashMap<>();
+
+        @Override
+        public String issue(long accountId) {
+            var token = "fake-token-" + accountId;
+            tokens.put(token, accountId);
+            return token;
+        }
+
+        @Override
+        public Optional<Long> validateAndRenew(String token) {
+            return Optional.ofNullable(tokens.get(token));
+        }
+
+        @Override
+        public void revoke(String token) {
+            tokens.remove(token);
+        }
     }
 
     private static void writeInboundFrame(EmbeddedChannel channel, PacketHeader header, byte[] payload) {

@@ -16,6 +16,9 @@ out/
 .classpath
 .project
 
+# Claude Code session state (không phải code dự án)
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db

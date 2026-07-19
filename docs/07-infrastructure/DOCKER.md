@@ -124,6 +124,31 @@ volumes:
 
 ---
 
+## 5.5. Testcontainers trên Windows — 2 lỗi thật đã gặp (Phase 3)
+
+⚠️ Khi chạy `./gradlew test` cho `server-database` trên máy dev Windows + Docker Desktop, hai lỗi
+thật đã gặp và cách sửa:
+
+**1. `Could not find a valid Docker environment`** — Testcontainers không tự nhận named pipe của
+Docker Desktop hiện đại. Sửa: tạo `~/.testcontainers.properties`:
+```properties
+docker.client.strategy=org.testcontainers.dockerclient.EnvironmentAndSystemPropertyClientProviderStrategy
+docker.host=npipe\:////./pipe/dockerDesktopLinuxEngine
+```
+⚠️ Đúng **4 dấu `/`** sau `npipe\:` — thiếu sẽ ra lỗi khác (`socket file does not exist`). Lấy đúng
+tên pipe bằng `docker context inspect desktop-linux` nếu tên khác trên máy khác.
+
+**2. `BadRequestException (Status 400)` khi gọi `/v1.32/info`** — Testcontainers **1.21.3** dùng
+API version cũ (1.32), Docker 29+ yêu cầu tối thiểu 1.40, trả 400 với JSON gần như rỗng (dễ nhầm
+là lỗi kết nối). Sửa triệt để: nâng `testcontainers = "2.0.5"` (`gradle/libs.versions.toml`) — bản
+2.x tự thương lượng API version. **Đổi tên artifact kèm theo** (2.0 thêm tiền tố `testcontainers-`
+cho mọi module con): `org.testcontainers:junit-jupiter` → `testcontainers-junit-jupiter`,
+`org.testcontainers:postgresql` → `testcontainers-postgresql`; import `PostgreSQLContainer` cũng
+đổi package `org.testcontainers.containers` → `org.testcontainers.postgresql`, và class không còn
+generic (`PostgreSQLContainer`, không phải `PostgreSQLContainer<?>`).
+
+---
+
 ## 6. Môi trường
 
 | Môi trường | Compose file | Đặc điểm |

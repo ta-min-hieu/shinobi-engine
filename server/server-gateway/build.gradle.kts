@@ -1,10 +1,16 @@
 // server-gateway — Netty entrypoint. MODULE DUY NHẤT được import io.netty.* (Điều 23, ADR-003).
+//
+// Phụ thuộc server-database CHỈ để gọi ServerDatabaseBootstrap.wireAccountFacade() trong
+// GatewayBootstrap.main() (composition root) — không bao giờ import java.sql/Jedis trực tiếp,
+// ArchUnit vẫn enforce đúng theo package (dev.kage.server.database), không theo Gradle module.
 plugins {
     id("kage.quality-conventions")
     application
 }
 dependencies {
     implementation(project(":shared:shared-protocol"))
+    implementation(project(":server:server-features:feature-account"))
+    implementation(project(":server:server-database"))
     implementation("io.netty:netty-all:4.1.136.Final")
     implementation("org.slf4j:slf4j-api:2.0.18")
     // Binding thật (Logback) — không có binding = log biến mất im lặng, không chấp nhận được

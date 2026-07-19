@@ -2,6 +2,12 @@ package dev.kage.server.gateway;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.kage.account.api.AccountFacade;
+import dev.kage.account.application.LoginOrCreateAccountUseCase;
+import dev.kage.account.domain.Account;
+import dev.kage.account.domain.AccountPort;
+import dev.kage.account.domain.SessionPort;
+import dev.kage.account.domain.Transaction;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
@@ -11,6 +17,11 @@ import dev.kage.protocol.wire.ProtocolVersion;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,8 +42,46 @@ class GatewayServerIntegrationTest {
     @BeforeEach
     void startServer() throws InterruptedException {
         // port 0 = OS tự cấp cổng trống — tránh đụng cổng khi nhiều test chạy song song.
-        server = new GatewayServer(0);
+        // AccountFacade THẬT với Fake Port (không server-database thật) — test này chỉ verify
+        // ping/pong qua socket thật, không chạm CONNECT_REQUEST, nhưng GatewayServer luôn cần
+        // AccountFacade để khởi tạo (constructor thay đổi từ Phase 3, xem GatewayServer).
+        server = new GatewayServer(0, fakeAccountFacade());
         server.start();
+    }
+
+    private static AccountFacade fakeAccountFacade() {
+        var accountPort = new AccountPort() {
+            private final Map<String, Account> byUsername = new HashMap<>();
+            private final AtomicLong nextId = new AtomicLong(1);
+
+            @Override
+            public Account findOrCreate(Transaction tx, String username) {
+                return byUsername.computeIfAbsent(
+                        username, u -> new Account(nextId.getAndIncrement(), u, Instant.now()));
+            }
+        };
+        var sessionPort = new SessionPort() {
+            private final Map<String, Long> tokens = new HashMap<>();
+
+            @Override
+            public String issue(long accountId) {
+                var token = "fake-token-" + accountId;
+                tokens.put(token, accountId);
+                return token;
+            }
+
+            @Override
+            public Optional<Long> validateAndRenew(String token) {
+                return Optional.ofNullable(tokens.get(token));
+            }
+
+            @Override
+            public void revoke(String token) {
+                tokens.remove(token);
+            }
+        };
+        var useCase = new LoginOrCreateAccountUseCase(accountPort, sessionPort, action -> action.accept(null));
+        return new AccountFacade(useCase);
     }
 
     @AfterEach

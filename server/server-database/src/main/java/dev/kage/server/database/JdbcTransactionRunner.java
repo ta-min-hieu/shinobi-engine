@@ -1,0 +1,56 @@
+package dev.kage.server.database;
+
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.function.Consumer;
+import javax.sql.DataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Logic transaction JDBC dùng chung (mở → autocommit=false → chạy → commit; lỗi → rollback).
+ *
+ * <p>Mỗi feature tự định nghĩa {@code TransactionRunner}/{@code Transaction} riêng trong
+ * {@code domain/} (docs/templates/feature-module — domain không phụ thuộc module khác), nên
+ * class này KHÔNG implement trực tiếp interface của feature nào — mỗi feature viết một
+ * {@code Jdbc<Feature>TransactionRunner} mỏng gọi vào đây, bọc {@link Connection} bằng đúng
+ * marker type {@code Transaction} của feature đó. Xem {@code account.JdbcAccountTransactionRunner}.
+ */
+public final class JdbcTransactionRunner {
+
+    private static final Logger LOG = LoggerFactory.getLogger(JdbcTransactionRunner.class);
+
+    private JdbcTransactionRunner() {
+    }
+
+    public static void run(DataSource dataSource, Consumer<Connection> action) {
+        try (Connection connection = dataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            runAction(connection, action);
+        } catch (SQLException e) {
+            throw new DatabaseAccessException("Lỗi transaction JDBC", e);
+        }
+    }
+
+    // PMD AvoidCatchingGenericException: đúng ý — transaction PHẢI rollback khi action ném BẤT KỲ
+    // RuntimeException nào (không thể liệt kê hết loại exception nghiệp vụ của caller). Đây là
+    // ranh giới transaction, không phải nơi xử lý lỗi nghiệp vụ cụ thể — rethrow ngay sau rollback.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private static void runAction(Connection connection, Consumer<Connection> action) throws SQLException {
+        try {
+            action.accept(connection);
+            connection.commit();
+        } catch (RuntimeException e) {
+            rollbackQuietly(connection);
+            throw e;
+        }
+    }
+
+    private static void rollbackQuietly(Connection connection) {
+        try {
+            connection.rollback();
+        } catch (SQLException e) {
+            LOG.error("Rollback thất bại", e);
+        }
+    }
+}

@@ -40,8 +40,11 @@ include(":client:client-desktop")
 include(":server:server-gateway")
 include(":server:server-world")
 include(":server:server-database")
-// server-features/feature-*: THÊM từ docs/templates/feature-module/ khi tới Phase 5–7.
-//   Không scaffold 11 module rỗng trước (Điều 9 / YAGNI). Xem server/server-features/README.md.
+// server-features/feature-*: THÊM từ docs/templates/feature-module/ khi tới đúng Phase (theo
+//   ROADMAP.md, không phải comment cũ dưới đây — feature-account/feature-character = Phase 3,
+//   feature-inventory/feature-shop = Phase 5, phần còn lại = Phase 6-7). Không scaffold 11 module
+//   rỗng trước (Điều 9 / YAGNI). Xem server/server-features/README.md.
+include(":server:server-features:feature-account")
 
 // ---- quality ----
 include(":quality:architecture-tests")   // ArchUnit (ADR-011) — enforce dependency rule

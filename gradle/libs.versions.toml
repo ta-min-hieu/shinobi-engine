@@ -15,6 +15,8 @@ netty = "4.1.136.Final"           # ✅ latest 4.1.x 07/2026 — ADR-003
 protobuf = "4.35.1"               # ✅ latest 06/2026
 hikaricp = "7.0.2"                # ⚠️ verify — HikariCP (ADR-004)
 postgresql = "42.7.9"             # ⚠️ verify — JDBC driver
+flyway = "12.11.0"                 # ✅ latest 07/2026 — ADR-013
+jedis = "7.1.0"                    # ✅ latest 07/2026 — Redis client (ADR-005)
 slf4j = "2.0.18"                  # ✅ verified 07/2026 (transitive qua logback-classic)
 logback = "1.5.31"                # ✅ latest 02/2026
 
@@ -22,7 +24,7 @@ logback = "1.5.31"                # ✅ latest 02/2026
 junit = "5.14.4"                  # ✅ junit-bom latest 04/2026
 assertj = "3.27.6"                # ⚠️ verify
 mockito = "5.20.0"                # ⚠️ verify
-testcontainers = "1.21.3"         # ⚠️ verify
+testcontainers = "2.0.5"          # ✅ latest 07/2026 — 1.21.3 không tương thích Docker 29 API (min 1.40, xem PostgresAccountAdapterIntegrationTest)
 archunit = "1.4.2"                # ✅ latest 04/2026 — ADR-011
 
 # --- Static analysis (tool versions) ---
@@ -55,6 +57,9 @@ netty-all = { module = "io.netty:netty-all", version.ref = "netty" }
 protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
 hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
+flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
+jedis = { module = "redis.clients:jedis", version.ref = "jedis" }
 
 # --- Logging ---
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
@@ -68,8 +73,8 @@ assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 mockito-junit = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito" }
 archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
-testcontainers-junit = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
-testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
+testcontainers-junit = { module = "org.testcontainers:testcontainers-junit-jupiter", version.ref = "testcontainers" }
+testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql", version.ref = "testcontainers" }
 errorprone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }
 
 [bundles]
