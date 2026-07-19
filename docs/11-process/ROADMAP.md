@@ -157,7 +157,7 @@ graph LR
 | **Metric `kage.tick.duration`** | [OBSERVABILITY.md §3.1](../07-infrastructure/OBSERVABILITY.md) |
 | Test bảo mật: authz, replay | [TESTING.md §7](../10-quality/TESTING.md) |
 
-**ADR cần trước Phase 3**: ADR-005 (Redis/Valkey) · ADR-013 (Flyway/Liquibase) · ADR-017 (auth token) · 🔴 **ADR-025 (idempotency)**
+**ADR cần trước Phase 3**: ✅ ADR-005 (Redis — đã chốt) · ✅ ADR-013 (Flyway — đã chốt) · ⏳ ADR-017 (auth token) · 🔴 **⏳ ADR-025 (idempotency)**
 
 **Exit Criteria:**
 - [ ] 2 client kết nối cùng server, thấy nhau di chuyển

@@ -9,7 +9,7 @@
 | Liên quan | [ADR-004](../01-architecture/adr/ADR-004-Why-PostgreSQL.md), [ADR-005](../01-architecture/adr/ADR-005-Why-Redis.md) |
 
 > Tài liệu này mô tả schema ở mức **khái niệm (ERD-level)**, không phải migration script thật.
-> Migration thật nằm trong `server-database`, chạy qua Flyway/Liquibase (⏳ ADR-013), có version + rollback (Điều 40).
+> Migration thật nằm trong `server-database`, chạy qua Flyway ([ADR-013](../01-architecture/adr/ADR-013-Flyway-vs-Liquibase.md) ✅ Accepted), có version + rollback (Điều 40).
 
 ---
 
@@ -151,9 +151,9 @@ transactionManager.inTransaction(tx -> {
 
 ---
 
-## 6. Redis / Valkey
+## 6. Redis
 
-⏳ Chưa chốt Redis hay Valkey ([ADR-005](../01-architecture/adr/ADR-005-Why-Redis.md)).
+Dùng Redis ([ADR-005](../01-architecture/adr/ADR-005-Why-Redis.md) ✅ Accepted).
 
 **Ràng buộc bắt buộc bất kể chọn bên nào**: chỉ dùng **lệnh chuẩn**, **không** dùng Redis Stack module độc quyền (RedisJSON, RediSearch) → giữ chi phí đổi ≈ 0.
 
@@ -218,7 +218,7 @@ transactionManager.inTransaction(tx -> {
 
 ## 10. Migration
 
-Điều 40. Công cụ: Flyway hoặc Liquibase (⏳ ADR-013).
+Điều 40. Công cụ: Flyway ([ADR-013](../01-architecture/adr/ADR-013-Flyway-vs-Liquibase.md) ✅ Accepted).
 
 | Quy tắc | Chi tiết |
 |---|---|
@@ -289,8 +289,8 @@ private static final String FIND_INVENTORY = """
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
 | **ADR-010** | Single-realm + `realm_id` dự phòng (§2.1) | ✅ Accepted |
-| **ADR-013** | Flyway vs Liquibase (§10) | 🟡 Chặn Phase 3 |
-| **ADR-005** | Redis vs Valkey (§6) | 🔴 Chặn Phase 3 |
+| **ADR-013** | Flyway vs Liquibase (§10) | ✅ Accepted (Flyway) |
+| **ADR-005** | Dùng Redis làm cache (§6) | ✅ Accepted |
 
 ## Tài liệu liên quan
 

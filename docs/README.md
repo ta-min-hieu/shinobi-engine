@@ -1,6 +1,6 @@
 # Project Kage — Documentation
 
-2D anime ninja MMORPG (cùng thể loại Ninja School Online) bằng **Java 25 + libGDX + HyperLap2D** (client) và **Netty + PostgreSQL + Redis/Valkey** (server). Kiến trúc Hybrid: Clean/Hexagonal cho nghiệp vụ, ECS + Data-Oriented cho gameplay realtime, Event-Driven giữa các hệ thống.
+2D anime ninja MMORPG (cùng thể loại Ninja School Online) bằng **Java 25 + libGDX + HyperLap2D** (client) và **Netty + PostgreSQL + Redis** (server). Kiến trúc Hybrid: Clean/Hexagonal cho nghiệp vụ, ECS + Data-Oriented cho gameplay realtime, Event-Driven giữa các hệ thống.
 
 > **Dự án hiện là 100% tài liệu — chưa có dòng code nào.** Bộ docs này là bước "Thiết kế" trong workflow ([Điều 35](00-governance/KAGE-CONSTITUTION.md)). Bước tiếp theo hợp lệ: [Roadmap Phase 0](11-process/ROADMAP.md), và chỉ khi chủ dự án cho phép.
 
@@ -109,6 +109,13 @@
 
 Chỉ còn **ADR-011** (ArchUnit enforce) — là việc kỹ thuật *trong* Phase 0, không chặn khởi động. **→ Dự án đủ điều kiện mở Phase 0.**
 
+### ✅ Đã chốt (2026-07-19) — không còn chặn Phase 3
+
+| Quyết định | ADR |
+|---|---|
+| **Redis** (Redis 8 quay lại AGPLv3, OSI-approved từ 5/2025) | ✅ [ADR-005](01-architecture/adr/ADR-005-Why-Redis.md) |
+| **Flyway** (SQL tường minh, khớp ADR-004) | ✅ [ADR-013](01-architecture/adr/ADR-013-Flyway-vs-Liquibase.md) |
+
 ### 🔴 Chặn Phase 2–4
 
 | # | Quyết định | ADR | Nguồn |
@@ -117,8 +124,6 @@ Chỉ còn **ADR-011** (ArchUnit enforce) — là việc kỹ thuật *trong* Ph
 | 2 | **Công thức damage/derived stats** | — (game designer) | [GDD §6](13-game-design/GAME-DESIGN-DOCUMENT.md) |
 | 3 | **Idempotency** cho Command có side-effect (lỗ hổng duplicate) | ADR-025 | [SECURITY.md §6](08-security/SECURITY.md) |
 | 4 | **Auth token**: session+Redis vs JWT (khuyến nghị session) | ADR-017 | [SECURITY.md §3](08-security/SECURITY.md) |
-| 5 | **Redis vs Valkey** (khuyến nghị Valkey — license) | ADR-005 | [ADR-005](01-architecture/adr/ADR-005-Why-Redis.md) |
-| 6 | **Flyway vs Liquibase** | ADR-013 | [DATABASE.md §10](05-server/DATABASE.md) |
 
 ### 🟡 Chặn Phase sau
 

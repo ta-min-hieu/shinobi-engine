@@ -80,9 +80,9 @@ Các số phiên bản trong tài liệu này là **baseline đề xuất tại 
 | **Netty** | 4.1.x (LTS) | Network I/O | Zero-copy, buffer pooling → ít GC pressure; production-proven | API phức tạp; dễ block EventLoop nếu không hiểu | Nếu Virtual Thread I/O model chứng minh đủ tốt cho game server | [ADR-003](adr/ADR-003-Why-Netty.md) |
 | **Protobuf** | 3.25+ / 4.x | Packet serialization | Nhỏ gọn, schema có version, sinh code đa ngôn ngữ | Cần bước codegen; khó debug bằng mắt | Nếu cần human-readable → cân nhắc cho admin API riêng, không cho game packet | — |
 | **PostgreSQL** | 16 / 17 | Source of truth | JSONB mạnh, ACID, license permissive | Vận hành phức tạp hơn MySQL | Không thay. Cần scale ghi → sharding, không đổi RDBMS | [ADR-004](adr/ADR-004-Why-PostgreSQL.md) |
-| **Redis 7.x** *hoặc* **Valkey** | — | Cache, session, leaderboard, pub/sub | Chuẩn ngành, sorted set hợp leaderboard | ⚠️ **Redis đổi license (SSPL) từ 2024** — xung đột mục tiêu Open Source | **Chưa chốt** — Valkey là fork BSD tương thích API | [ADR-005](adr/ADR-005-Why-Redis.md) ⏳ |
+| **Redis 8.x** | — | Cache, session, leaderboard, pub/sub | Chuẩn ngành, sorted set hợp leaderboard; **AGPLv3 — OSI-approved từ bản 8 (5/2025)** | Network copyleft nếu phân phối lại bản sửa đổi (không ảnh hưởng self-host nguyên bản) | Không thay | [ADR-005](adr/ADR-005-Why-Redis.md) ✅ |
 | **HikariCP** | mới nhất | Connection pool | Nhanh nhất, ít allocation, chuẩn de-facto | — | Không thay | — |
-| **Flyway** *hoặc* **Liquibase** | — | DB migration | Cần version + rollback (Điều 40) | — | **Chưa chốt** — phải chọn 1, không dùng cả hai | ⏳ Cần ADR-013 |
+| **Flyway** | — | DB migration | Cần version + rollback (Điều 40); SQL tường minh khớp ADR-004 | Không có rollback tự động ở bản Community | Không thay | [ADR-013](adr/ADR-013-Flyway-vs-Liquibase.md) ✅ |
 
 ---
 
@@ -169,12 +169,12 @@ Mọi dependency mới **ngoài** danh sách trên phải ghi vào đây (Điề
 
 | # | Vấn đề | Đang chặn gì | ADR |
 |---|---|---|---|
-| 1 | **Redis vs Valkey** (license) | Mọi code chạm cache/session | [ADR-005](adr/ADR-005-Why-Redis.md) — Proposed |
-| 2 | **Flyway vs Liquibase** | `server-database` migration | ❌ Cần ADR-013 |
-| 3 | **Kubernetes hay chỉ Docker Compose** | [KUBERNETES.md](../07-infrastructure/KUBERNETES.md), deploy/ | ❌ Cần ADR-014 |
-| 4 | **Ashley vs ECS tự viết** | Không chặn MVP; đánh giá lại Phase 9 | [ADR-006](adr/ADR-006-Why-ECS.md) — Accepted tạm |
-| 5 | **Micrometer vs OpenTelemetry** ranh giới | [OBSERVABILITY.md](../07-infrastructure/OBSERVABILITY.md) | ❌ Cần ADR-015 |
-| 6 | **Lua vs GraalJS** cho scripting | [SCRIPTING.md](../06-plugin/SCRIPTING.md) | ❌ Cần ADR-016 |
+| 1 | **Kubernetes hay chỉ Docker Compose** | [KUBERNETES.md](../07-infrastructure/KUBERNETES.md), deploy/ | ❌ Cần ADR-014 |
+| 2 | **Ashley vs ECS tự viết** | Không chặn MVP; đánh giá lại Phase 9 | [ADR-006](adr/ADR-006-Why-ECS.md) — Accepted tạm |
+| 3 | **Micrometer vs OpenTelemetry** ranh giới | [OBSERVABILITY.md](../07-infrastructure/OBSERVABILITY.md) | ❌ Cần ADR-015 |
+| 4 | **Lua vs GraalJS** cho scripting | [SCRIPTING.md](../06-plugin/SCRIPTING.md) | ❌ Cần ADR-016 |
+
+**Đã chốt (2026-07-19):** Redis ([ADR-005](adr/ADR-005-Why-Redis.md) ✅), Flyway ([ADR-013](adr/ADR-013-Flyway-vs-Liquibase.md) ✅).
 
 **Không code chạm các thành phần trên khi ADR chưa Accepted** (Điều 37).
 
@@ -198,10 +198,8 @@ Mọi dependency mới **ngoài** danh sách trên phải ghi vào đây (Điề
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
 | **ADR-016** | Lua vs GraalJS cho scripting | Cao — chặn Phase 2 |
-| **ADR-013** | Flyway vs Liquibase | Cao — chặn Phase 3 |
 | **ADR-014** | Kubernetes hay Docker Compose | Thấp — chặn Phase 9 |
 | **ADR-015** | Micrometer vs OpenTelemetry | Trung bình — chặn Phase 9 |
-| **ADR-005** | Redis vs Valkey — chuyển Proposed → Accepted | Cao — chặn Phase 3 |
 
 ## Tài liệu liên quan
 
@@ -213,5 +211,5 @@ Mọi dependency mới **ngoài** danh sách trên phải ghi vào đây (Điề
 ## Việc cần làm tiếp theo
 
 1. **Verify toàn bộ số version §2–§8** bằng cách kiểm tra release thật trước khi viết `libs.versions.toml`.
-2. Chốt ADR-005 (Redis/Valkey) và ADR-016 (Lua/GraalJS) — hai thứ chặn sớm nhất.
+2. Chốt ADR-016 (Lua/GraalJS) — còn chặn sớm nhất (ADR-005 Redis, ADR-013 Flyway đã Accepted 2026-07-19).
 3. Phase 0: dựng `libs.versions.toml` từ các version **đã verify**, không từ tài liệu này.

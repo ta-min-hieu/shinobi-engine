@@ -21,13 +21,13 @@ services:
       - pgdata:/var/lib/postgresql/data
 
   cache:
-    # ⏳ Redis hay Valkey — chờ ADR-005. Dùng Valkey (BSD) làm mặc định tạm.
-    image: valkey/valkey:8
-    command: ["valkey-server", "--requirepass", "${CACHE_PASSWORD:?set CACHE_PASSWORD}"]
+    # Redis 8.x — AGPLv3, OSI-approved (ADR-005, Accepted 2026-07-19).
+    image: redis:8
+    command: ["redis-server", "--requirepass", "${CACHE_PASSWORD:?set CACHE_PASSWORD}"]
     ports:
       - "6379:6379"
     healthcheck:
-      test: ["CMD", "valkey-cli", "ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10

@@ -93,7 +93,7 @@ graph TB
 
     subgraph Data["💾 Lưu trữ"]
         PG[("PostgreSQL<br/>source of truth")]
-        RD[("Redis / Valkey<br/>cache · session<br/>pub-sub")]
+        RD[("Redis<br/>cache · session<br/>pub-sub")]
     end
 
     CCore <-->|"TCP · length-prefixed<br/>Protobuf payload"| GW
@@ -418,7 +418,7 @@ Kiến trúc này cố tình để ngỏ các điểm thay thế sau:
 | Thay gì | Thay được nhờ | Điều kiện kích hoạt |
 |---|---|---|
 | Ashley ECS → Kage ECS tự viết | `engine-ecs` bọc kín, gameplay không import `com.badlogic.ashley.*` | Benchmark Phase 9 cho thấy bottleneck — [ADR-006](adr/ADR-006-Why-ECS.md) |
-| Redis → Valkey | Adapter trong `server-database`, API tương thích | Quyết định license — [ADR-005](adr/ADR-005-Why-Redis.md) |
+| Redis → Valkey | Adapter trong `server-database`, API tương thích | Phân phối/host bản Redis sửa đổi cho bên thứ ba (network copyleft AGPLv3) — [ADR-005](adr/ADR-005-Why-Redis.md) ✅ Accepted (Redis) |
 | TCP → TCP + UDP cho movement | `server-gateway` cô lập transport | Đo được latency movement không đạt |
 | 1 world → nhiều world shard | World không giữ state toàn cục, chỉ giữ map của mình | §14 bước 2 |
 | Thêm nền tảng (iOS/Web) | `client-core` platform-agnostic, launcher tách riêng | Sau khi Android ổn định |

@@ -97,10 +97,10 @@ services:
       - pgdata:/var/lib/postgresql/data
 
   cache:
-    # ⏳ Redis hay Valkey — chờ ADR-005
-    image: valkey/valkey:8
+    # Redis 8.x — AGPLv3, OSI-approved (ADR-005 ✅ Accepted)
+    image: redis:8
     healthcheck:
-      test: ["CMD", "valkey-cli", "ping"]
+      test: ["CMD", "redis-cli", "ping"]
 
   server:
     build:
@@ -204,14 +204,13 @@ ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 | 9 | `depends_on` + healthcheck bắt buộc | Server crash nếu DB chưa sẵn sàng | Accepted |
 | 10 | **MVP: gateway + world cùng 1 image** | Điều 9 — tách khi cần ([ARCHITECTURE.md §14](../01-architecture/ARCHITECTURE.md)) | Accepted |
 | 11 | MVP: map data vào image | Đơn giản | Accepted |
-| 12 | Image cache: Redis hay Valkey | Chờ ADR-005 | ⏳ |
+| 12 | Image cache: Redis | [ADR-005](../01-architecture/adr/ADR-005-Why-Redis.md) | ✅ |
 
 ## ADR cần tạo
 
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
 | **ADR-019** | GC flags cho container (§7) | 🟢 Chặn Phase 9 |
-| **ADR-005** | Redis vs Valkey → image nào ở compose | 🔴 Chặn Phase 3 |
 
 ## Tài liệu liên quan
 

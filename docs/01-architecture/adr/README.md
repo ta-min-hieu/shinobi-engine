@@ -35,14 +35,17 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-002](ADR-002-Why-libGDX.md) | Chọn libGDX làm nền tảng Client Engine | ✅ Accepted | — |
 | [ADR-003](ADR-003-Why-Netty.md) | Chọn Netty làm nền tảng Network I/O | ✅ Accepted | — |
 | [ADR-004](ADR-004-Why-PostgreSQL.md) | Chọn PostgreSQL, không dùng ORM | ✅ Accepted | — |
-| [ADR-005](ADR-005-Why-Redis.md) | Redis hay Valkey? | ⏳ **Proposed** | **Phase 3** — mọi code chạm cache/session |
+| [ADR-005](ADR-005-Why-Redis.md) | Dùng Redis làm in-memory cache/session store | ✅ Accepted | — |
 | [ADR-006](ADR-006-Why-ECS.md) | Dùng ECS, khởi đầu bằng Ashley | ✅ Accepted *(có điều kiện)* | Đánh giá lại cuối Phase 9 |
 | [ADR-007](ADR-007-Why-Plugin-System.md) | Xây dựng Plugin System | ⏳ **Proposed** | Sau Phase 6 — MVP (chốt phạm vi) |
 | [ADR-008](ADR-008-Why-EventDriven.md) | Dùng Event-Driven giữa hệ thống gameplay | ✅ Accepted | — |
 | [ADR-009](ADR-009-Why-No-Spring-Boot.md) | Không dùng Spring Boot cho Game Server | ✅ Accepted | — |
 | [ADR-010](ADR-010-Realm-Model.md) | Single-realm ở MVP, giữ sẵn `realm_id` | ✅ Accepted | — |
 | [ADR-012](ADR-012-Package-Root.md) | Package root `dev.kage` | ✅ Accepted | — |
+| [ADR-013](ADR-013-Flyway-vs-Liquibase.md) | Dùng Flyway làm công cụ migration DB | ✅ Accepted | — |
+| [ADR-017](ADR-017-Auth-Token.md) | Auth token: JWT hay session token tự phát hành? | ⏳ **Proposed** | **Phase 3** — mọi xác thực Command |
 | [ADR-018](ADR-018-Tick-Rate.md) | Tick rate **60Hz** | ✅ Accepted | — |
+| [ADR-025](ADR-025-Idempotency.md) | Idempotency cho Command có side-effect | ⏳ **Proposed** | **Phase 3** — 🔴 chặn Trade (lỗ hổng duplicate hiện tại) |
 
 ---
 
@@ -53,19 +56,18 @@ Tổng hợp từ toàn bộ tài liệu. **Không code chạm các vùng này k
 | ADR | Nội dung | Ưu tiên | Chặn | Nguồn |
 |---|---|---|---|---|
 | **ADR-011** | Cơ chế enforce dependency rule bằng Gradle | 🔴 Cao | **Phase 0** | [ARCHITECTURE.md §8](../ARCHITECTURE.md) |
-| **ADR-013** | Flyway vs Liquibase | 🟡 Trung bình | Phase 3 | [TECHNOLOGY-STACK.md §5](../TECHNOLOGY-STACK.md) |
 | **ADR-014** | Kubernetes hay chỉ Docker Compose | 🟢 Thấp | Phase 9 | [KUBERNETES.md](../../07-infrastructure/KUBERNETES.md) |
 | **ADR-015** | Micrometer vs OpenTelemetry (ranh giới) | 🟡 Trung bình | Phase 9 | [OBSERVABILITY.md](../../07-infrastructure/OBSERVABILITY.md) |
 | **ADR-016** | **Lua vs GraalJS** cho scripting | 🔴 Cao | Phase 2 | [SCRIPTING.md](../../06-plugin/SCRIPTING.md) |
-| **ADR-017** | Auth token: JWT vs session token tự phát hành | 🟡 Trung bình | Phase 3 | [SECURITY.md](../../08-security/SECURITY.md) |
 | **ADR-019** | Chọn GC (G1 vs ZGC vs Shenandoah) | 🟢 Thấp | Phase 9 | [JVM.md](../../09-performance/JVM.md) |
 | **ADR-020** | Viewport strategy (ảnh hưởng công bằng PvP) | 🟡 Trung bình | Phase 1 | [RENDERING.md §3](../../03-engine/RENDERING.md) |
 | **ADR-021** | Box2D vs AABB tự viết cho chuyển động nhân vật | 🟢 Thấp | Chờ dữ liệu Phase 3 | [PHYSICS.md §10](../../03-engine/PHYSICS.md) |
 | **ADR-022** | gdx-ai hay tự viết FSM/pathfinding | 🟡 Trung bình | Phase 2 | [AI.md §5](../../03-engine/AI.md) |
 | **ADR-023** | Mobile input scheme (joystick ảo / tap-to-move) | 🟡 Trung bình | Phase 2 nếu mobile-first | [CLIENT.md §5](../../04-client/CLIENT.md) |
 | **ADR-024** | Asset distribution: đóng gói / patch / CDN | 🟢 Thấp | Phase 10 | [RESOURCE.md §10](../../04-client/RESOURCE.md) |
-| **ADR-025** | **Idempotency cho Command có side-effect** | 🔴 Cao — lỗ hổng duplicate | **Phase 3** | [SECURITY.md §6](../../08-security/SECURITY.md) |
 | **ADR-026** | Dungeon instance model (cùng process hay riêng) | 🟢 Thấp | Phase 8 | [GAMEPLAY.md §6](../../05-server/GAMEPLAY.md) |
+
+> ADR-013 (✅ Accepted), ADR-017, ADR-025 đã có bản nháp — xem bảng "Danh sách ADR" ở trên, không còn nằm ở đây.
 
 ---
 
