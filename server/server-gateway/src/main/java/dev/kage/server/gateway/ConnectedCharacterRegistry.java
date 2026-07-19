@@ -6,6 +6,7 @@ import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.ServerShuttingDownEvent;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
@@ -49,6 +50,14 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** Vị trí đã biết của MỘT nhân vật, hoặc {@code null} nếu chưa từng di chuyển kể từ khi vào world. */
     PositionSnapshot lastKnownPosition(long characterId) {
         return lastKnownPosition.get(characterId);
+    }
+
+    /** SERVER.md §10 bước 2 — báo MỌI connection đã chọn nhân vật TRƯỚC khi đóng kết nối. */
+    void broadcastShuttingDown() {
+        var event = ServerShuttingDownEvent.newBuilder().build();
+        byte[] payload = event.toByteArray();
+        contextsByCharacterId.values()
+                .forEach(ctx -> send(ctx, Opcode.OPCODE_SERVER_SHUTTING_DOWN_EVENT_VALUE, 0, payload));
     }
 
     @Override

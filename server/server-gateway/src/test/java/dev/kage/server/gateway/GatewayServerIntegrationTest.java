@@ -61,6 +61,7 @@ class GatewayServerIntegrationTest {
 
     private GatewayServer server;
     private WorldFacade worldFacade;
+    private CharacterPort characterPort;
 
     @BeforeEach
     void startServer() throws InterruptedException {
@@ -114,8 +115,8 @@ class GatewayServerIntegrationTest {
         return new AccountFacade(useCase);
     }
 
-    private static CharacterFacade fakeCharacterFacade() {
-        var characterPort = new CharacterPort() {
+    private CharacterFacade fakeCharacterFacade() {
+        characterPort = new CharacterPort() {
             private final List<Character> characters = new ArrayList<>();
             private final AtomicLong nextId = new AtomicLong(1);
             private final Map<Long, PositionSnapshot> positions = new HashMap<>();
@@ -171,6 +172,38 @@ class GatewayServerIntegrationTest {
     void stopServer() {
         server.stop();
         worldFacade.stop();
+    }
+
+    @Test
+    @Timeout(15)
+    void shouldSavePosition_whenServerShutsDownWhileClientConnected() throws Exception {
+        // PHÁT HIỆN THẬT (xem javadoc GatewayServer#stop): bản trước tắt authExecutor TRƯỚC khi
+        // đóng channel — channelInactive lúc shutdown bị RejectedExecutionException âm thầm, mất
+        // vị trí cuối. Test này verify trực tiếp qua Fake Port, không chỉ đọc code.
+        try (var socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(5000);
+            var in = new DataInputStream(socket.getInputStream());
+            long characterId = connectCreateAndSelect(socket, in, "shutdowntest");
+
+            var moveCommand = MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
+            sendFrame(socket, Opcode.OPCODE_MOVE_COMMAND_VALUE, 10, moveCommand.toByteArray());
+            readUntilOpcode(in, Opcode.OPCODE_MOVE_RESPONSE_VALUE); // xác nhận world đã bắt đầu di chuyển
+
+            Thread.sleep(200); // để vài tick 60Hz chạy — x phải > 0 lúc này nếu đang di chuyển thật
+
+            // MoveCommand thứ 2 (dừng lại) — MoveResponse trả về là vị trí HIỆN TẠI, dùng làm giá
+            // trị kỳ vọng để so sánh với DB sau khi tắt server (không đoán khoảng cách đã đi).
+            var stopCommand = MoveCommand.newBuilder().setDirX(0f).setDirY(0f).build();
+            sendFrame(socket, Opcode.OPCODE_MOVE_COMMAND_VALUE, 11, stopCommand.toByteArray());
+            var stopResponse =
+                    MoveResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_MOVE_RESPONSE_VALUE).payload());
+            assertThat(stopResponse.getX()).isGreaterThan(0f); // sanity: di chuyển thật đã xảy ra
+
+            server.stop(); // KHÔNG đợi @AfterEach — test tự gọi để verify NGAY sau khi trả về
+
+            var savedPosition = characterPort.loadPosition(characterId);
+            assertThat(savedPosition.x()).isEqualTo(stopResponse.getX());
+        }
     }
 
     @Test

@@ -38,6 +38,11 @@ public final class GatewayServer {
     // Chờ auth đang xử lý dở xong trước khi đóng DB lúc shutdown (SERVER.md §10 bước 3-4).
     private static final int AUTH_SHUTDOWN_TIMEOUT_SECONDS = 10;
 
+    // "Quiet period" mặc định của Netty (2s) nhắm vào traffic production đang settle — không cần
+    // thiết ở quy mô cá nhân, chỉ làm chậm test/shutdown vô ích. Timeout là mức trần an toàn.
+    private static final long EVENT_LOOP_QUIET_PERIOD_MILLIS = 100;
+    private static final long EVENT_LOOP_SHUTDOWN_TIMEOUT_MILLIS = 5000;
+
     private final int requestedPort;
     private final AccountFacade accountFacade;
     private final CharacterFacade characterFacade;
@@ -100,23 +105,33 @@ public final class GatewayServer {
 
     /**
      * Graceful shutdown (SERVER.md §10) — không kill -9. Thứ tự: (1) ngừng nhận kết nối mới,
-     * (2) chờ auth đang xử lý dở xong (đang chạm DB — đóng đột ngột giữa chừng = lỗi nửa vời),
-     * (3) đóng event loop. Caller ({@link GatewayBootstrap}) đóng DB/Redis SAU khi hàm này trả về.
+     * (2) báo người chơi đang kết nối, (3) đóng event loop — TRIGGER {@code channelInactive} cho
+     * mọi channel, nơi lưu vị trí cuối chạy (SERVER.md §8/§10 bước 4) — rồi (4) mới tắt
+     * {@code authExecutor}. Caller ({@link GatewayBootstrap}) đóng DB/Redis SAU khi hàm này trả về.
+     *
+     * <p>⚠️ PHÁT HIỆN THẬT: bản trước tắt {@code authExecutor} TRƯỚC khi đóng event loop —
+     * {@code channelInactive} (chạy lúc event loop đóng channel) cố enqueue lưu vị trí vào 1
+     * executor ĐÃ shutdown, bị {@code RejectedExecutionException} âm thầm. Đảo thứ tự đúng lại.
      */
     public void stop() {
         LOG.info("Đang tắt server-gateway...");
         if (serverChannel != null) {
             serverChannel.close();
         }
+        worldGateway.registry().broadcastShuttingDown();
+        awaitGracefully(workerGroup);
+        awaitGracefully(bossGroup);
         if (authExecutor != null) {
             authExecutor.shutdown();
             awaitAuthExecutorTermination();
         }
-        if (workerGroup != null) {
-            workerGroup.shutdownGracefully();
-        }
-        if (bossGroup != null) {
-            bossGroup.shutdownGracefully();
+    }
+
+    private static void awaitGracefully(EventLoopGroup group) {
+        if (group != null) {
+            group.shutdownGracefully(
+                            EVENT_LOOP_QUIET_PERIOD_MILLIS, EVENT_LOOP_SHUTDOWN_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+                    .awaitUninterruptibly();
         }
     }
 

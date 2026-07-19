@@ -44,3 +44,10 @@ message ErrorResponse {
   string error_key = 2;
   uint32 related_sequence_id = 3;
 }
+
+// Event: Server -> Client (OPCODE_SERVER_SHUTTING_DOWN_EVENT). Gửi cho MỌI connection đã chọn
+// nhân vật NGAY TRƯỚC khi đóng kết nối lúc graceful shutdown (SERVER.md §10 bước 2) — client nên
+// hiểu đây là bảo trì có chủ đích, không phải mất kết nối bất thường (không cần backoff reconnect
+// ngay). Không có field — chỉ là tín hiệu, chưa có cơ chế đếm ngược 30s (follow-up).
+message ServerShuttingDownEvent {
+}
