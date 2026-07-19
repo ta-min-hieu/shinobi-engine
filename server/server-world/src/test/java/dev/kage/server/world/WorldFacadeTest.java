@@ -1,5 +1,7 @@
 package dev.kage.server.world;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -85,6 +87,29 @@ class WorldFacadeTest {
 
         awaitTrue(() -> sink.accepted.stream().anyMatch(a -> a.characterId() == 1L && a.sequenceId() == 42));
         awaitTrue(() -> sink.moved.stream().anyMatch(m -> m.target() == 2L && m.moved() == 1L));
+    }
+
+    @Test
+    void shouldClampExtremeDirection_soClientCannotSpeedHack() {
+        // Chống speed-hack BẰNG THIẾT KẾ (GAMEPLAY.md §12, movement.proto): client gửi hướng
+        // "gian lận" cực lớn — nếu server không chuẩn hoá về unit vector trước khi nhân
+        // MOVE_SPEED_MPS, nhân vật sẽ bay xa gấp hàng trăm lần chỉ trong 1 tick.
+        world.start();
+        world.attachCharacter(1L, 0f, 0f);
+        world.attachCharacter(2L, 0f, 0f);
+        awaitTrue(() -> sink.spawned.size() >= 2);
+
+        world.enqueueMoveCommand(1L, 1, 1000f, 0f);
+
+        awaitTrue(() -> sink.moved.stream().anyMatch(m -> m.target() == 2L && m.moved() == 1L));
+        var firstMoved = sink.moved.stream()
+                .filter(m -> m.target() == 2L && m.moved() == 1L)
+                .findFirst()
+                .orElseThrow();
+
+        // Không clamp: dirX=1000 → 1000 world unit/tick ngay tick đầu. Có clamp đúng: tối đa
+        // MOVE_SPEED_MPS (5f) unit/giây — cách biên rất xa nên không flaky theo tốc độ máy chạy test.
+        assertThat(firstMoved.x()).isLessThan(2f);
     }
 
     @Test

@@ -28,6 +28,7 @@ import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import java.time.Duration;
 import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,10 +51,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private static final Logger LOG = LoggerFactory.getLogger(GatewayChannelHandler.class);
 
+    // NETWORK.md §13 (đề xuất, chưa verify): MoveCommand ≤ tick rate (30/giây).
+    private static final int MAX_MOVE_COMMANDS_PER_SECOND = 30;
+
     private final AccountFacade accountFacade;
     private final CharacterFacade characterFacade;
     private final WorldGateway worldGateway;
     private final Executor authExecutor;
+    // Per-connection (handler đã là state per-connection, xem javadoc lớp) — không cần đồng bộ
+    // hoá, chỉ được đọc/ghi trên Netty EventLoop của CHÍNH connection này.
+    private final RateLimiter moveCommandRateLimiter =
+            new RateLimiter(MAX_MOVE_COMMANDS_PER_SECOND, Duration.ofSeconds(1));
 
     // handleConnect/handleSelectCharacter set giá trị này từ Virtual Thread; channelRead0 của
     // packet TIẾP THEO có thể chạy trên EventLoop trước khi Virtual Thread đó xong (Netty không
@@ -257,6 +265,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         var characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        // NETWORK.md §13: vượt ngưỡng 1 window → drop packet + log (KHÔNG trả ErrorResponse — im
+        // lặng, tránh cho client gian lận biết chính xác ngưỡng để dò); vượt liên tục → ngắt kết nối.
+        if (!moveCommandRateLimiter.tryAcquire()) {
+            LOG.warn("MoveCommand vượt rate limit: characterId={}", characterId);
+            if (moveCommandRateLimiter.shouldDisconnect()) {
+                LOG.warn("MoveCommand vượt rate limit liên tục — ngắt kết nối: characterId={}", characterId);
+                ctx.close();
+            }
             return;
         }
         worldGateway.facade().enqueueMoveCommand(characterId, sequenceId, command.getDirX(), command.getDirY());
