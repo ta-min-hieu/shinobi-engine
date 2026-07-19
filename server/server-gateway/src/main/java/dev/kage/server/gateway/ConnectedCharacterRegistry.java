@@ -1,9 +1,12 @@
 package dev.kage.server.gateway;
 
 import dev.kage.character.domain.PositionSnapshot;
+import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
+import dev.kage.protocol.MonsterDespawnedEvent;
+import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.ServerShuttingDownEvent;
@@ -109,6 +112,51 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 .setY(y)
                 .build();
         send(ctx, Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    @Override
+    public void onMonsterSpawned(long targetCharacterId, WorldOutboundSink.MonsterSnapshot monster) {
+        var ctx = contextsByCharacterId.get(targetCharacterId);
+        if (ctx == null) {
+            return;
+        }
+        var event = MonsterSpawnedEvent.newBuilder()
+                .setMonsterId(monster.monsterId())
+                .setMonsterCode(monster.monsterCode())
+                .setX(monster.x())
+                .setY(monster.y())
+                .setCurrentHp(monster.currentHp())
+                .setMaxHp(monster.maxHp())
+                .build();
+        send(ctx, Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    @Override
+    public void onMonsterDespawned(long targetCharacterId, long monsterId) {
+        var ctx = contextsByCharacterId.get(targetCharacterId);
+        if (ctx == null) {
+            return;
+        }
+        var event = MonsterDespawnedEvent.newBuilder().setMonsterId(monsterId).build();
+        send(ctx, Opcode.OPCODE_MONSTER_DESPAWNED_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    @Override
+    public void onAttackResult(long targetCharacterId, WorldOutboundSink.AttackOutcome outcome) {
+        var ctx = contextsByCharacterId.get(targetCharacterId);
+        if (ctx == null) {
+            return;
+        }
+        var event = AttackResultEvent.newBuilder()
+                .setAttackerEntityId(outcome.attackerEntityId())
+                .setTargetEntityId(outcome.targetEntityId())
+                .setDamage(outcome.damage())
+                .setIsCrit(outcome.crit())
+                .setIsMiss(outcome.miss())
+                .setTargetCurrentHp(outcome.targetCurrentHp())
+                .setTargetDied(outcome.targetDied())
+                .build();
+        send(ctx, Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE, 0, event.toByteArray());
     }
 
     private static void send(ChannelHandlerContext ctx, int opcode, int sequenceId, byte[] payload) {

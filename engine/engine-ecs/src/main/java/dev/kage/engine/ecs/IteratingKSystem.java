@@ -3,9 +3,17 @@ package dev.kage.engine.ecs;
 /**
  * Base class cho System xử lý mọi Entity thuộc một Family, mỗi tick (ECS.md §4).
  *
- * <p>Chỉ file này bên trong package {@code dev.kage.engine.ecs} tạo Ashley
- * {@code IteratingSystem} thật — subclass ở server-world/client-core/feature-* chỉ thấy
- * {@link KEntity}, không bao giờ thấy {@code com.badlogic.ashley.core.Entity}.
+ * <p>⚠️ PHÁT HIỆN THẬT (Phase 4): KHÔNG đăng ký qua {@code Engine.addSystem(EntitySystem)} của
+ * Ashley — {@code Engine.addSystem} coi 2 system CÙNG {@code getClass()} là "cùng 1 system, thay
+ * thế cái cũ". Nếu mỗi {@code IteratingKSystem} bọc qua 1 lớp adapter DÙNG CHUNG (như bản trước
+ * dùng), Ashley thấy TẤT CẢ adapter là "cùng class" → đăng ký system thứ 2 ÂM THẦM GỠ system thứ
+ * nhất khỏi engine (không lỗi, không log — chỉ đơn giản dừng chạy). Lỗi này VÔ HÌNH suốt Phase
+ * 1-3 vì chỉ bao giờ có ĐÚNG 1 System (MovementSystem) — Phase 4 là lần đầu có 2 System cùng lúc
+ * (MovementSystem + CombatSystem) mới lộ ra.
+ *
+ * <p>{@link EcsWorld} KHÔNG dùng {@code Engine.addSystem}/{@code Engine.update} của Ashley cho
+ * các System này nữa — tự lặp qua {@code Engine.getEntitiesFor(Family)} (không phụ thuộc
+ * {@code getClass()}, an toàn với bao nhiêu System cũng được) và gọi thẳng {@link #processEntity}.
  *
  * <pre>{@code
  * public final class MovementSystem extends IteratingKSystem {
@@ -27,37 +35,21 @@ package dev.kage.engine.ecs;
  */
 public abstract class IteratingKSystem {
 
-    private final AshleyAdapter ashleySystem;
-    private EcsWorld world;
+    private final Family family;
 
     protected IteratingKSystem(Family family) {
-        this.ashleySystem = new AshleyAdapter(family.raw(), this);
+        this.family = family;
     }
 
-    /** System không giữ state của entity — state ở Component (ECS.md §4). */
+    /**
+     * System không giữ state của entity — state ở Component (ECS.md §4). Cần gì từ
+     * {@code EcsWorld}/nơi khác thì nhận qua constructor injection tường minh (engine/CLAUDE.md
+     * — cấm kiểu Service Locator), không phải tra ngược từ System.
+     */
     protected abstract void processEntity(KEntity entity, float deltaTime);
 
-    /** Chỉ EcsWorld gọi lúc addSystem — không phải Service Locator (ENGINE.md §6). */
-    void bind(EcsWorld world) {
-        this.world = world;
-    }
-
-    com.badlogic.ashley.systems.IteratingSystem ashleySystem() {
-        return ashleySystem;
-    }
-
-    private static final class AshleyAdapter extends com.badlogic.ashley.systems.IteratingSystem {
-        private final IteratingKSystem outer;
-
-        AshleyAdapter(com.badlogic.ashley.core.Family family, IteratingKSystem outer) {
-            super(family);
-            this.outer = outer;
-        }
-
-        @Override
-        protected void processEntity(com.badlogic.ashley.core.Entity entity, float deltaTime) {
-            // Không "new KEntity" mỗi lần — EcsWorld cache wrapper theo entity (Điều 31).
-            outer.processEntity(outer.world.wrap(entity), deltaTime);
-        }
+    /** Chỉ EcsWorld cần Family gốc để tự lặp qua {@code Engine.getEntitiesFor} mỗi tick. */
+    Family family() {
+        return family;
     }
 }

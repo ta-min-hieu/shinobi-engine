@@ -23,4 +23,11 @@ sealed interface WorldCommand {
     /** Ý định di chuyển — {@code dirX/dirY} là hướng CHƯA chuẩn hoá, world tự clamp + nhân tốc độ. */
     record MoveIntentCommand(long characterId, int sequenceId, float dirX, float dirY) implements WorldCommand {
     }
+
+    /**
+     * Chọn mục tiêu chiến đấu (GDD §6 "Auto-target đánh thường") — server tự động đánh khi hết
+     * cooldown, KHÔNG phải lệnh "đánh 1 nhát" (xem {@code CombatSystem}).
+     */
+    record SetTargetCommand(long characterId, long targetEntityId) implements WorldCommand {
+    }
 }

@@ -16,18 +16,21 @@ import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.character.domain.PositionSnapshot;
+import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
 import dev.kage.protocol.CreateCharacterResponse;
+import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
 import dev.kage.protocol.SelectCharacterRequest;
+import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
@@ -289,6 +292,40 @@ class GatewayServerIntegrationTest {
                     readUntilOpcode(inB, Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE).payload());
             assertThat(movedSeenByB.getCharacterId()).isEqualTo(characterA);
             assertThat(movedSeenByB.getX()).isGreaterThan(0f);
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void clientShouldDamageMonster_overRealSockets() throws Exception {
+        // Verify Phase 4 lát cắt 1 qua chính giao thức dây: di chuyển tới gần quái bù nhìn (spawn
+        // cố định (5,5), WorldFacade) → SetTargetCommand → nhận AttackResultEvent thật.
+        try (var socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(5000);
+            var in = new DataInputStream(socket.getInputStream());
+            long characterId = connectCreateAndSelect(socket, in, "atk" + UUID.randomUUID().toString().substring(0, 6));
+
+            // Nhân vật mới spawn (0,0) — quái ở (5,5), cách ~7.07m, đã trong AoI (15m) nên
+            // MonsterSpawnedEvent tới ngay, nhưng CHƯA trong tầm đánh (2m) — phải di chuyển lại gần.
+            var monsterSpawned = MonsterSpawnedEvent.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE).payload());
+            long monsterId = monsterSpawned.getMonsterId();
+
+            // Hướng chéo (0.7071, 0.7071) — chuẩn hoá, giống hệt client thật gửi (server tự nhân
+            // tốc độ, movement.proto). ~1.2s ở 5 m/s đưa nhân vật vào trong tầm đánh (còn cách quái ~1m).
+            var moveCommand = MoveCommand.newBuilder().setDirX(0.7071f).setDirY(0.7071f).build();
+            sendFrame(socket, Opcode.OPCODE_MOVE_COMMAND_VALUE, 10, moveCommand.toByteArray());
+            Thread.sleep(1200);
+            var stopCommand = MoveCommand.newBuilder().setDirX(0f).setDirY(0f).build();
+            sendFrame(socket, Opcode.OPCODE_MOVE_COMMAND_VALUE, 11, stopCommand.toByteArray());
+
+            var setTarget = SetTargetCommand.newBuilder().setTargetEntityId(monsterId).build();
+            sendFrame(socket, Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, 12, setTarget.toByteArray());
+
+            var attackResult = AttackResultEvent.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE).payload());
+            assertThat(attackResult.getAttackerEntityId()).isEqualTo(characterId);
+            assertThat(attackResult.getTargetEntityId()).isEqualTo(monsterId);
         }
     }
 

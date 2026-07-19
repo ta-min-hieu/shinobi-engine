@@ -6,8 +6,13 @@ import dev.kage.engine.ecs.KEntity;
 import dev.kage.engine.ecs.component.PositionComponent;
 import dev.kage.engine.ecs.component.VelocityComponent;
 import dev.kage.engine.ecs.system.MovementSystem;
+import dev.kage.server.world.component.AttackCooldownComponent;
 import dev.kage.server.world.component.CharacterIdComponent;
+import dev.kage.server.world.component.HealthComponent;
+import dev.kage.server.world.component.MonsterComponent;
+import dev.kage.server.world.component.TargetComponent;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -20,10 +25,11 @@ import org.slf4j.LoggerFactory;
  * single-thread riêng (Platform Thread, KHÔNG Virtual Thread — /CLAUDE.md §6). Đây là API DUY
  * NHẤT server-gateway được gọi vào server-world (module này không biết Netty/DB).
  *
- * <p>{@link #attachCharacter}, {@link #detachCharacter}, {@link #enqueueMoveCommand} được gọi từ
- * Netty EventLoop hoặc Virtual Thread của gateway — CHỈ enqueue (rẻ, thread-safe), không bao giờ
- * chạm {@link EcsWorld} trực tiếp (SERVER.md §2: "Virtual Thread cấm sửa ECS state trực tiếp").
- * Việc thật xảy ra ở đầu tick kế tiếp trên {@link #tickLoop}, đúng pseudocode SERVER.md §3.
+ * <p>{@link #attachCharacter}, {@link #detachCharacter}, {@link #enqueueMoveCommand},
+ * {@link #setTarget} được gọi từ Netty EventLoop hoặc Virtual Thread của gateway — CHỈ enqueue
+ * (rẻ, thread-safe), không bao giờ chạm {@link EcsWorld} trực tiếp (SERVER.md §2: "Virtual
+ * Thread cấm sửa ECS state trực tiếp"). Việc thật xảy ra ở đầu tick kế tiếp trên {@link #tickLoop},
+ * đúng pseudocode SERVER.md §3.
  */
 public final class WorldFacade {
 
@@ -33,15 +39,25 @@ public final class WorldFacade {
             ComponentMapper.getFor(PositionComponent.class);
     private static final ComponentMapper<VelocityComponent> VELOCITY =
             ComponentMapper.getFor(VelocityComponent.class);
+    private static final ComponentMapper<TargetComponent> TARGET = ComponentMapper.getFor(TargetComponent.class);
+
+    // Quái bù nhìn tập luyện — lát cắt 1 Phase 4, hardcode 1 quái, chưa có monster_template DB.
+    private static final String TRAINING_DUMMY_CODE = "training_dummy";
+    private static final float TRAINING_DUMMY_SPAWN_X = 5f;
+    private static final float TRAINING_DUMMY_SPAWN_Y = 5f;
 
     private final WorldOutboundSink outboundSink;
     private final Queue<WorldCommand> inbox = new ConcurrentLinkedQueue<>();
     private final EcsWorld ecsWorld = new EcsWorld();
     private final AreaOfInterestTracker aoiTracker;
+    private final CombatSystem combatSystem;
 
-    // Chỉ tick thread được đọc/ghi map này (không đồng bộ hoá) — đúng ranh giới "ECS state chỉ
-    // sửa trên tick thread" (SERVER.md §2).
+    // Chỉ tick thread được đọc/ghi các map/field này (không đồng bộ hoá) — đúng ranh giới "ECS
+    // state chỉ sửa trên tick thread" (SERVER.md §2).
     private final Map<Long, KEntity> entitiesByCharacterId = new HashMap<>();
+    private final Map<Long, KEntity> entitiesByMonsterId = new HashMap<>();
+    private long nextMonsterId = -1; // ID quái luôn ÂM — không đụng characterId (luôn DƯƠNG, DB auto-increment).
+    private float monsterRespawnCountdownSeconds = -1f; // < 0 = quái đang sống, không đếm ngược.
 
     private volatile boolean running;
     private Thread tickThread;
@@ -49,7 +65,9 @@ public final class WorldFacade {
     public WorldFacade(WorldOutboundSink outboundSink) {
         this.outboundSink = outboundSink;
         this.aoiTracker = new AreaOfInterestTracker(outboundSink);
+        this.combatSystem = new CombatSystem(this::lookupEntity);
         ecsWorld.addSystem(new MovementSystem());
+        ecsWorld.addSystem(combatSystem);
     }
 
     /** Bắt đầu tick loop trên thread riêng — gọi 1 lần lúc khởi động server. */
@@ -84,14 +102,22 @@ public final class WorldFacade {
         inbox.add(new WorldCommand.MoveIntentCommand(characterId, sequenceId, dirX, dirY));
     }
 
+    /** GDD §6 "Auto-target đánh thường" — server tự đánh {@code targetEntityId} khi hết cooldown. */
+    public void setTarget(long characterId, long targetEntityId) {
+        inbox.add(new WorldCommand.SetTargetCommand(characterId, targetEntityId));
+    }
+
     private void tickLoop() {
+        spawnTrainingDummy();
         long fixedDtNanos = (long) (WorldConstants.FIXED_DT * 1_000_000_000L);
         while (running) {
             long start = System.nanoTime();
 
             drainInbox();
             ecsWorld.update(WorldConstants.FIXED_DT);
-            aoiTracker.sync(entitiesByCharacterId);
+            handleCombatResults(combatSystem.drainResults());
+            tickMonsterRespawn(WorldConstants.FIXED_DT);
+            aoiTracker.sync(entitiesByCharacterId, entitiesByMonsterId);
 
             long elapsed = System.nanoTime() - start;
             long sleepNanos = fixedDtNanos - elapsed;
@@ -110,6 +136,7 @@ public final class WorldFacade {
                 case WorldCommand.AttachCharacterCommand c -> handleAttach(c.characterId(), c.spawnX(), c.spawnY());
                 case WorldCommand.DetachCharacterCommand c -> handleDetach(c.characterId());
                 case WorldCommand.MoveIntentCommand c -> handleMoveIntent(c);
+                case WorldCommand.SetTargetCommand c -> handleSetTarget(c.characterId(), c.targetEntityId());
             }
         }
     }
@@ -131,6 +158,13 @@ public final class WorldFacade {
         var characterIdComponent = new CharacterIdComponent();
         characterIdComponent.characterId = characterId;
         entity.add(characterIdComponent);
+
+        var health = new HealthComponent();
+        health.current = CombatConstants.CHARACTER_MAX_HP; // placeholder — chưa đọc character_stat DB thật
+        health.max = CombatConstants.CHARACTER_MAX_HP;
+        entity.add(health);
+        entity.add(new TargetComponent());
+        entity.add(new AttackCooldownComponent());
 
         entitiesByCharacterId.put(characterId, entity);
         aoiTracker.onAttach(characterId);
@@ -157,9 +191,94 @@ public final class WorldFacade {
         var velocity = VELOCITY.get(entity);
         velocity.x = direction[0] * WorldConstants.MOVE_SPEED_MPS;
         velocity.y = direction[1] * WorldConstants.MOVE_SPEED_MPS;
+        System.out.println("DEBUG handleMoveIntent char=" + intent.characterId() + " velocity.x=" + velocity.x);
 
         var position = POSITION.get(entity);
         outboundSink.onMoveAccepted(intent.characterId(), intent.sequenceId(), position.x, position.y);
+    }
+
+    private void handleSetTarget(long characterId, long targetEntityId) {
+        var entity = entitiesByCharacterId.get(characterId);
+        if (entity == null) {
+            return;
+        }
+        if (targetEntityId == characterId || lookupEntity(targetEntityId) == null) {
+            return; // không tự nhắm chính mình; mục tiêu không tồn tại — bỏ qua an toàn.
+        }
+        TARGET.get(entity).targetEntityId = targetEntityId;
+    }
+
+    private void handleCombatResults(List<CombatSystem.AttackOutcome> results) {
+        for (var outcome : results) {
+            var sinkOutcome = new WorldOutboundSink.AttackOutcome(
+                    outcome.attackerEntityId(),
+                    outcome.targetEntityId(),
+                    outcome.damage(),
+                    outcome.crit(),
+                    outcome.miss(),
+                    outcome.targetCurrentHp(),
+                    outcome.targetDied());
+
+            var observers = aoiTracker.observersOf(outcome.targetEntityId());
+            observers.add(outcome.attackerEntityId()); // người đánh luôn thấy kết quả đòn của chính mình.
+            for (long observerId : observers) {
+                outboundSink.onAttackResult(observerId, sinkOutcome);
+            }
+            if (outcome.targetDied() && outcome.targetEntityId() < 0) {
+                handleMonsterDeath(outcome.targetEntityId());
+            }
+        }
+    }
+
+    private void handleMonsterDeath(long monsterId) {
+        var entity = entitiesByMonsterId.remove(monsterId);
+        if (entity == null) {
+            return; // đã xử lý (nhiều đòn hạ gục cùng tick — CombatSystem tự chặn đòn thứ 2, xem javadoc).
+        }
+        aoiTracker.onMonsterDetach(monsterId);
+        ecsWorld.removeEntity(entity);
+        monsterRespawnCountdownSeconds = CombatConstants.MONSTER_RESPAWN_SECONDS;
+    }
+
+    private void tickMonsterRespawn(float deltaTime) {
+        if (monsterRespawnCountdownSeconds < 0f) {
+            return; // quái đang sống — không đếm ngược.
+        }
+        monsterRespawnCountdownSeconds -= deltaTime;
+        if (monsterRespawnCountdownSeconds <= 0f) {
+            monsterRespawnCountdownSeconds = -1f;
+            spawnTrainingDummy();
+        }
+    }
+
+    private void spawnTrainingDummy() {
+        var entity = ecsWorld.createEntity();
+
+        var position = new PositionComponent();
+        position.x = TRAINING_DUMMY_SPAWN_X;
+        position.y = TRAINING_DUMMY_SPAWN_Y;
+        position.prevX = position.x;
+        position.prevY = position.y;
+        entity.add(position);
+
+        var health = new HealthComponent();
+        health.current = CombatConstants.MONSTER_MAX_HP;
+        health.max = CombatConstants.MONSTER_MAX_HP;
+        entity.add(health);
+
+        var monster = new MonsterComponent();
+        monster.monsterCode = TRAINING_DUMMY_CODE;
+        entity.add(monster);
+
+        long monsterId = nextMonsterId--;
+        entitiesByMonsterId.put(monsterId, entity);
+        // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
+        // không cần thông báo thủ công (giống hệt attach nhân vật, xem AreaOfInterestTracker).
+    }
+
+    /** Tra KEntity theo entity ID — DƯƠNG = nhân vật, ÂM = quái (combat.proto). */
+    private KEntity lookupEntity(long entityId) {
+        return entityId > 0 ? entitiesByCharacterId.get(entityId) : entitiesByMonsterId.get(entityId);
     }
 
     /** Server SỞ HỮU tốc độ — client chỉ gửi hướng, clamp về unit vector chặn speed-hack. */

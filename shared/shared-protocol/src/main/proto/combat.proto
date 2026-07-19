@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// Packet Combat (NETWORK.md §4, dải 400-499). Phase 4 lát cắt 1 — chỉ đánh thường tự động
+// (GDD §6 "Auto-target đánh thường"), CHƯA có UseSkillCommand (chờ ADR-016, script sandbox).
+//
+// ID mục tiêu (target_entity_id / attacker_entity_id / monster_id) dùng CHUNG 1 không gian long
+// cho cả nhân vật lẫn quái, KHÔNG trùng nhau: characterId luôn DƯƠNG (DB auto-increment từ 1),
+// monster instance ID cấp ÂM (server-world tự cấp, từ -1 giảm dần). Không cần field "loại entity"
+// riêng — chỉ cần biết dấu. 0 = chưa chọn mục tiêu (không phải ID thật nào).
+
+// Command: Client -> Server (OPCODE_SET_TARGET_COMMAND). Người chơi CHỌN mục tiêu — server tự
+// động đánh theo ATK_SPEED khi còn trong tầm (GDD §6), KHÔNG phải lệnh "đánh 1 nhát". Không gửi
+// damage/cooldown — chỉ gửi Ý ĐỊNH (SECURITY.md §4), server tự tính tất cả.
+message SetTargetCommand {
+  int64 target_entity_id = 1;
+}
+
+// Event: Server -> Client (OPCODE_ATTACK_RESULT_EVENT). Kết quả 1 đòn đánh THẬT (đã né/bạo
+// kích/giảm giáp — GDD §6) — gửi cho MỌI nhân vật đang thấy mục tiêu trong AoI (SERVER.md §6),
+// không chỉ người tấn công.
+message AttackResultEvent {
+  int64 attacker_entity_id = 1;
+  int64 target_entity_id = 2;
+  int32 damage = 3;
+  bool is_crit = 4;
+  bool is_miss = 5;
+  int32 target_current_hp = 6;
+  bool target_died = 7;
+}
+
+// Event: Server -> Client (OPCODE_MONSTER_SPAWNED_EVENT). Quái VỪA vào AoI (spawn lần đầu hoặc
+// hồi sinh) — client tạo entity render. Mẫu y hệt CharacterSpawnedEvent (movement.proto).
+message MonsterSpawnedEvent {
+  int64 monster_id = 1;
+  string monster_code = 2;
+  float x = 3;
+  float y = 4;
+  int32 current_hp = 5;
+  int32 max_hp = 6;
+}
+
+// Event: Server -> Client (OPCODE_MONSTER_DESPAWNED_EVENT). Quái VỪA chết hoặc rời AoI — client
+// xoá entity render.
+message MonsterDespawnedEvent {
+  int64 monster_id = 1;
+}

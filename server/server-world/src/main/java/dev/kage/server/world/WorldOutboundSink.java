@@ -26,4 +26,31 @@ public interface WorldOutboundSink {
 
     /** Nhân vật {@code movedCharacterId} (đã ở trong AoI từ trước) vừa đổi vị trí. */
     void onCharacterMoved(long targetCharacterId, long movedCharacterId, float x, float y);
+
+    /** Quái {@code monsterId} VỪA vào AoI của {@code targetCharacterId} (spawn lần đầu hoặc hồi sinh). */
+    void onMonsterSpawned(long targetCharacterId, MonsterSnapshot monster);
+
+    /** Quái {@code monsterId} VỪA rời AoI của {@code targetCharacterId} (chết hoặc ra xa). */
+    void onMonsterDespawned(long targetCharacterId, long monsterId);
+
+    /**
+     * Kết quả 1 đòn đánh thường THẬT (đã né/bạo kích/giảm giáp — GDD §6) — gửi cho MỌI nhân vật
+     * đang thấy mục tiêu trong AoI, không chỉ người tấn công.
+     */
+    void onAttackResult(long targetCharacterId, AttackOutcome outcome);
+
+    /** Ảnh chụp trạng thái quái lúc phát {@link #onMonsterSpawned} — gộp tham số (STATIC-ANALYSIS.md). */
+    record MonsterSnapshot(long monsterId, String monsterCode, float x, float y, int currentHp, int maxHp) {
+    }
+
+    /** Kết quả 1 đòn đánh — gộp tham số cho {@link #onAttackResult} (STATIC-ANALYSIS.md). */
+    record AttackOutcome(
+            long attackerEntityId,
+            long targetEntityId,
+            int damage,
+            boolean crit,
+            boolean miss,
+            int targetCurrentHp,
+            boolean targetDied) {
+    }
 }

@@ -23,6 +23,7 @@ import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
 import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.SelectCharacterResponse;
+import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
@@ -94,6 +95,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 handleSelectCharacter(ctx, header, frame.payload());
             } else if (header.opcode() == Opcode.OPCODE_MOVE_COMMAND_VALUE) {
                 handleMoveCommand(ctx, header, frame.payload());
+            } else if (header.opcode() == Opcode.OPCODE_SET_TARGET_COMMAND_VALUE) {
+                handleSetTargetCommand(ctx, header, frame.payload());
             } else {
                 sendError(ctx, header.sequenceId(), 404, "error.unknown_opcode");
             }
@@ -278,6 +281,22 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             return;
         }
         worldGateway.facade().enqueueMoveCommand(characterId, sequenceId, command.getDirX(), command.getDirY());
+    }
+
+    // SetTargetCommand KHÔNG chạm DB — chỉ enqueue vào server-world (rẻ, thread-safe), xử lý
+    // thẳng trên EventLoop giống handleMoveCommand. GDD §6 "Auto-target": đây KHÔNG phải lệnh
+    // "đánh 1 nhát" nên không cần rate limit riêng như MoveCommand (tần suất thấp — người chơi
+    // chọn mục tiêu, không lặp lại mỗi tick).
+    private void handleSetTargetCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = SetTargetCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        worldGateway.facade().setTarget(characterId, command.getTargetEntityId());
     }
 
     /**
