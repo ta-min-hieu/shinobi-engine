@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// Nguồn chân lý của bảng opcode (NETWORK.md §104). Dải số cố định theo domain — tránh đụng độ
+// khi nhiều người/AI thêm packet song song. Chỉ cấp phát tuần tự TRONG dải của domain, không
+// bao giờ tái sử dụng số đã cấp (kể cả khi packet đó bị xoá sau này — Điều 37 tinh thần ADR).
+//
+//   0–99      System (handshake, heartbeat, error)     ← Phase 2 dùng dải này
+//   100–199   Account / Login                          ← Phase 3
+//   200–299   Character                                ← Phase 3
+//   300–399   Movement / World                          ← Phase 3
+//   400–499   Combat / Skill                            ← Phase 4
+//   500–599   Inventory / Equipment                     ← Phase 5
+//   600–699   Quest                                     ← Phase 6
+//   700–799   Guild                                     ← Phase 7
+//   800–899   Chat                                      ← Phase 6-7
+//   900–999   Mail                                      ← Phase 6-7
+//   1000–1099 Shop / Auction                            ← Phase 5, 8
+//   1100–1199 Friend                                    ← Phase 6-7
+//   1200–1299 Ranking                                   ← Phase 8
+enum Opcode {
+  OPCODE_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho packet thật.
+
+  // --- System (0-99) ---
+  OPCODE_PING = 1;
+  OPCODE_PONG = 2;
+  OPCODE_CONNECT_REQUEST = 3;
+  OPCODE_CONNECT_RESPONSE = 4;
+  OPCODE_ERROR = 5;
+}

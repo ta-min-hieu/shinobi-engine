@@ -18,6 +18,13 @@ checkstyle {
     isIgnoreFailures = false  // vi phạm = build fail (Điều 41)
 }
 
+// ⚠️ PHÁT HIỆN THẬT: rule MethodName của bản main cấm dấu "_", nhưng TESTING.md §10 khuyến
+// nghị đúng quy ước "shouldX_whenY" cho TÊN TEST (mô tả hành vi rõ hơn thuần camelCase). Test
+// task dùng config riêng (checkstyle-test.xml) chỉ khác đúng 1 rule đó — không nới lỏng gì khác.
+tasks.named<Checkstyle>("checkstyleTest") {
+    configFile = rootProject.file("config/checkstyle/checkstyle-test.xml")
+}
+
 pmd {
     toolVersion = "7.10.0"    // ⚠️ sync
     isConsoleOutput = true

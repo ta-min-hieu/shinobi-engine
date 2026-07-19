@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// Packet hệ thống — handshake, heartbeat, lỗi (NETWORK.md §101, §107, §108). Payload PROTOBUF;
+// opcode/protocolVersion/sequenceId nằm ở HEADER (không phải protobuf — xem PacketHeader.java).
+
+// Command: Client -> Server, cần Response (OPCODE_PING).
+message PingCommand {
+  int64 client_timestamp_ms = 1;
+}
+
+// Response: Server -> Client, khớp Ping qua sequenceId ở header (OPCODE_PONG).
+message PongResponse {
+  int64 client_timestamp_ms = 1; // echo lại để client tự tính round-trip time
+  int64 server_timestamp_ms = 2;
+}
+
+// Command: Client -> Server, mở phiên (OPCODE_CONNECT_REQUEST).
+// ⚠️ Phase 2: KHÔNG có validate thật (feature-account chưa tồn tại, tới Phase 3). Server luôn
+// chấp nhận và cấp session_id — chỉ để verify pipeline framing + handshake hoạt động.
+message ConnectRequest {
+  string token = 1; // placeholder — cơ chế token thật chưa chốt (ADR-017, SECURITY.md §3)
+}
+
+// Response: Server -> Client (OPCODE_CONNECT_RESPONSE).
+message ConnectResponse {
+  bool success = 1;
+  string session_id = 2;
+  string error_key = 3; // rỗng nếu success=true (NETWORK.md §107: key i18n, không message cứng)
+}
+
+// Response lỗi dùng chung mọi Command (NETWORK.md §107). Client hiển thị theo error_key + ngôn
+// ngữ hiện tại — server không hardcode message hiển thị.
+message ErrorResponse {
+  uint32 error_code = 1;
+  string error_key = 2;
+  uint32 related_sequence_id = 3;
+}
