@@ -233,7 +233,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // Đăng ký connection NÀY để world outbound (spawn/move/despawn — SERVER.md §6) tìm
             // đúng channel; attachCharacter chỉ enqueue, entity ECS thật tạo ở tick kế tiếp.
             worldGateway.registry().register(characterId, ctx);
-            worldGateway.facade().attachCharacter(characterId);
+            var spawn = characterFacade.loadPosition(characterId);
+            worldGateway.facade().attachCharacter(characterId, spawn.x(), spawn.y());
             var response = SelectCharacterResponse.newBuilder().setSuccess(true).build();
             send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
         } catch (CharacterNotFoundException e) {
@@ -305,8 +306,18 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // để bia đỡ đạn đứng lại trong world).
         var characterId = boundCharacterId;
         if (characterId != null) {
+            // Đọc vị trí cuối TRƯỚC unregister() (unregister xoá luôn khỏi lastKnownPosition —
+            // đọc ở đây trên EventLoop, rẻ, không phải I/O, không tra lại sau trên authExecutor
+            // vì lúc đó có thể đã bị unregister() xoá mất — xem javadoc CharacterPositionPersister#save).
+            var lastPosition = worldGateway.registry().lastKnownPosition(characterId);
             worldGateway.registry().unregister(characterId);
             worldGateway.facade().detachCharacter(characterId);
+            // SERVER.md §8: logout là 1 trong 3 mốc bắt buộc ghi vị trí. savePosition chạm DB
+            // (blocking) — không được chạy trên EventLoop, đẩy sang authExecutor.
+            if (lastPosition != null) {
+                authExecutor.execute(
+                        () -> worldGateway.positionPersister().save(characterId, lastPosition.x(), lastPosition.y()));
+            }
         }
     }
 

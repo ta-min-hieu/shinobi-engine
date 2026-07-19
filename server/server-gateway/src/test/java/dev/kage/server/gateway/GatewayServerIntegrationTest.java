@@ -15,6 +15,7 @@ import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.NewCharacter;
+import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.ConnectRequest;
@@ -34,6 +35,7 @@ import dev.kage.server.world.WorldFacade;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -66,11 +68,14 @@ class GatewayServerIntegrationTest {
         // AccountFacade/CharacterFacade THẬT với Fake Port (không server-database thật) — test
         // này chỉ verify ping/pong qua socket thật, không chạm Connect/Character, nhưng
         // GatewayServer luôn cần cả 2 Facade để khởi tạo (xem GatewayServer).
+        var characterFacade = fakeCharacterFacade();
         var characterRegistry = new ConnectedCharacterRegistry();
         worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
-        var worldGateway = new WorldGateway(worldFacade, characterRegistry);
-        server = new GatewayServer(0, fakeAccountFacade(), fakeCharacterFacade(), worldGateway);
+        var positionPersister =
+                new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
+        var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
+        server = new GatewayServer(0, fakeAccountFacade(), characterFacade, worldGateway);
         server.start();
     }
 
@@ -113,6 +118,17 @@ class GatewayServerIntegrationTest {
         var characterPort = new CharacterPort() {
             private final List<Character> characters = new ArrayList<>();
             private final AtomicLong nextId = new AtomicLong(1);
+            private final Map<Long, PositionSnapshot> positions = new HashMap<>();
+
+            @Override
+            public PositionSnapshot loadPosition(long characterId) {
+                return positions.getOrDefault(characterId, new PositionSnapshot(0f, 0f));
+            }
+
+            @Override
+            public void savePosition(long characterId, float x, float y) {
+                positions.put(characterId, new PositionSnapshot(x, y));
+            }
 
             @Override
             public List<Character> listByAccount(long accountId) {
@@ -148,7 +164,7 @@ class GatewayServerIntegrationTest {
         var createUseCase = new CreateCharacterUseCase(characterPort, action -> action.accept(null));
         var listUseCase = new ListCharactersUseCase(characterPort);
         var selectUseCase = new SelectCharacterUseCase(characterPort);
-        return new CharacterFacade(createUseCase, listUseCase, selectUseCase);
+        return new CharacterFacade(createUseCase, listUseCase, selectUseCase, characterPort);
     }
 
     @AfterEach

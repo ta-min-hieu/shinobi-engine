@@ -20,11 +20,6 @@ final class WorldConstants {
     /** Bán kính Area of Interest — placeholder, đo lại ở Phase 3/9 (SERVER.md §6, §11). */
     static final float AOI_RADIUS_METERS = 15f;
 
-    /** Điểm spawn mặc định — chưa có persistence vị trí ở lát cắt này (SERVER.md §8, follow-up). */
-    static final float SPAWN_X = 0f;
-
-    static final float SPAWN_Y = 0f;
-
     private WorldConstants() {
     }
 }

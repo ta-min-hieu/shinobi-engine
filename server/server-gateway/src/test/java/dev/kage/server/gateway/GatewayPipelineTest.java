@@ -17,6 +17,7 @@ import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
+import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
@@ -37,6 +38,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -221,15 +223,18 @@ class GatewayPipelineTest {
         var createCharacterUseCase = new CreateCharacterUseCase(characterPort, action -> action.accept(null));
         var listCharactersUseCase = new ListCharactersUseCase(characterPort);
         var selectCharacterUseCase = new SelectCharacterUseCase(characterPort);
-        var characterFacade =
-                new CharacterFacade(createCharacterUseCase, listCharactersUseCase, selectCharacterUseCase);
+        var characterFacade = new CharacterFacade(
+                createCharacterUseCase, listCharactersUseCase, selectCharacterUseCase, characterPort);
 
         // WorldFacade KHÔNG start() ở đây — test này không verify movement/AoI, chỉ cần
         // attachCharacter() (gọi trong handleSelectCharacterBlocking) không ném lỗi khi enqueue
-        // vào hàng đợi chưa có ai drain (không tạo/rò rỉ thread tick cho mỗi test).
+        // vào hàng đợi chưa có ai drain (không tạo/rò rỉ thread tick cho mỗi test). Tương tự,
+        // positionPersister không start() — save() (nếu bị gọi) chạy trực tiếp, không cần scheduler.
         var characterRegistry = new ConnectedCharacterRegistry();
         var worldFacade = new WorldFacade(characterRegistry);
-        var worldGateway = new WorldGateway(worldFacade, characterRegistry);
+        var positionPersister =
+                new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
+        var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
 
         return new EmbeddedChannel(
                 new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
@@ -274,6 +279,17 @@ class GatewayPipelineTest {
     static final class FakeCharacterPort implements CharacterPort {
         private final List<Character> characters = new ArrayList<>();
         private final AtomicLong nextId = new AtomicLong(1);
+        private final Map<Long, PositionSnapshot> positions = new HashMap<>();
+
+        @Override
+        public PositionSnapshot loadPosition(long characterId) {
+            return positions.getOrDefault(characterId, new PositionSnapshot(0f, 0f));
+        }
+
+        @Override
+        public void savePosition(long characterId, float x, float y) {
+            positions.put(characterId, new PositionSnapshot(x, y));
+        }
 
         @Override
         public List<Character> listByAccount(long accountId) {

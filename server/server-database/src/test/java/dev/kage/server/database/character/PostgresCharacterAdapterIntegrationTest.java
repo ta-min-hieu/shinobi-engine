@@ -105,4 +105,33 @@ class PostgresCharacterAdapterIntegrationTest {
         assertThat(adapter.countByAccount(freshAccountId)).isEqualTo(1);
         assertThat(adapter.listByAccount(freshAccountId)).extracting(Character::name).containsExactly("ListHero");
     }
+
+    @Test
+    void shouldDefaultToOrigin_whenPositionNeverSaved() {
+        var adapter = new PostgresCharacterAdapter(dataSource);
+        var transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
+        var newCharacter = new NewCharacter(accountId, "PosDefault", Faction.HOA, UUID.randomUUID().toString());
+        var holder = new Character[1];
+        transactionRunner.inTransaction(tx -> holder[0] = adapter.create(tx, newCharacter));
+
+        var position = adapter.loadPosition(holder[0].id());
+
+        assertThat(position.x()).isEqualTo(0f);
+        assertThat(position.y()).isEqualTo(0f);
+    }
+
+    @Test
+    void shouldPersistPosition_acrossSaveAndLoad() {
+        var adapter = new PostgresCharacterAdapter(dataSource);
+        var transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
+        var newCharacter = new NewCharacter(accountId, "PosSaved", Faction.HOA, UUID.randomUUID().toString());
+        var holder = new Character[1];
+        transactionRunner.inTransaction(tx -> holder[0] = adapter.create(tx, newCharacter));
+
+        adapter.savePosition(holder[0].id(), 12.5f, -3.25f);
+        var position = adapter.loadPosition(holder[0].id());
+
+        assertThat(position.x()).isEqualTo(12.5f);
+        assertThat(position.y()).isEqualTo(-3.25f);
+    }
 }

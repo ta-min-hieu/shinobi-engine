@@ -8,8 +8,12 @@ package dev.kage.server.world;
  */
 sealed interface WorldCommand {
 
-    /** Gán entity ECS mới cho {@code characterId} — gọi sau khi SelectCharacter thành công. */
-    record AttachCharacterCommand(long characterId) implements WorldCommand {
+    /**
+     * Gán entity ECS mới cho {@code characterId} — gọi sau khi SelectCharacter thành công.
+     * {@code spawnX/spawnY} là vị trí đã LƯU lần cuối (feature-character.PositionSnapshot,
+     * SERVER.md §8) — KHÔNG luôn là (0,0), chỉ nhân vật chưa từng lưu vị trí mới ở đó.
+     */
+    record AttachCharacterCommand(long characterId, float spawnX, float spawnY) implements WorldCommand {
     }
 
     /** Xoá entity ECS của {@code characterId} — gọi khi mất kết nối. */

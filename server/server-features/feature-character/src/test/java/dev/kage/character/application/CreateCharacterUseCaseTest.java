@@ -7,11 +7,14 @@ import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
+import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.character.domain.Transaction;
 import dev.kage.character.domain.TransactionRunner;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
@@ -21,6 +24,17 @@ class CreateCharacterUseCaseTest {
     static final class FakeCharacterPort implements CharacterPort {
         final List<Character> characters = new ArrayList<>();
         final AtomicLong nextId = new AtomicLong(1);
+        final Map<Long, PositionSnapshot> positions = new HashMap<>();
+
+        @Override
+        public PositionSnapshot loadPosition(long characterId) {
+            return positions.getOrDefault(characterId, new PositionSnapshot(0f, 0f));
+        }
+
+        @Override
+        public void savePosition(long characterId, float x, float y) {
+            positions.put(characterId, new PositionSnapshot(x, y));
+        }
 
         @Override
         public List<Character> listByAccount(long accountId) {

@@ -67,8 +67,8 @@ class WorldFacadeTest {
     void shouldSpawnBothCharactersToEachOther_whenBothAttachAtSameSpawnPoint() {
         world.start();
 
-        world.attachCharacter(1L);
-        world.attachCharacter(2L);
+        world.attachCharacter(1L, 0f, 0f);
+        world.attachCharacter(2L, 0f, 0f);
 
         awaitTrue(() -> sink.spawned.stream().anyMatch(s -> s.target() == 1L && s.spawned() == 2L));
         awaitTrue(() -> sink.spawned.stream().anyMatch(s -> s.target() == 2L && s.spawned() == 1L));
@@ -77,8 +77,8 @@ class WorldFacadeTest {
     @Test
     void shouldAcceptMoveAndBroadcastPositionToNearbyCharacter() {
         world.start();
-        world.attachCharacter(1L);
-        world.attachCharacter(2L);
+        world.attachCharacter(1L, 0f, 0f);
+        world.attachCharacter(2L, 0f, 0f);
         awaitTrue(() -> sink.spawned.size() >= 2);
 
         world.enqueueMoveCommand(1L, 42, 1f, 0f);
@@ -90,8 +90,8 @@ class WorldFacadeTest {
     @Test
     void shouldDespawnForRemainingCharacter_whenOneDetaches() {
         world.start();
-        world.attachCharacter(1L);
-        world.attachCharacter(2L);
+        world.attachCharacter(1L, 0f, 0f);
+        world.attachCharacter(2L, 0f, 0f);
         awaitTrue(() -> sink.spawned.size() >= 2);
 
         world.detachCharacter(1L);

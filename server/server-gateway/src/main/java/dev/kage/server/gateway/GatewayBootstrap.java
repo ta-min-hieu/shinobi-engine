@@ -2,6 +2,7 @@ package dev.kage.server.gateway;
 
 import dev.kage.server.database.ServerDatabaseBootstrap;
 import dev.kage.server.world.WorldFacade;
+import java.time.Duration;
 
 /**
  * Entrypoint {@code main()} mỏng — logic thật ở {@link GatewayServer} (tách ra để test end-to-end
@@ -14,6 +15,10 @@ import dev.kage.server.world.WorldFacade;
 public final class GatewayBootstrap {
 
     private static final int PORT = 7777;
+
+    // SERVER.md §8 gợi ý "định kỳ 5 phút" cho dữ liệu tái tạo được (vị trí, HP) — chưa đo, đủ cho
+    // lát cắt persistence này (tinh chỉnh 1 chỗ khi có số liệu thật, giống MOVE_SPEED_MPS/AOI_RADIUS).
+    private static final Duration POSITION_SAVE_INTERVAL = Duration.ofMinutes(5);
 
     private GatewayBootstrap() {
     }
@@ -28,15 +33,21 @@ public final class GatewayBootstrap {
         var characterRegistry = new ConnectedCharacterRegistry();
         var worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
-        var worldGateway = new WorldGateway(worldFacade, characterRegistry);
+        var positionPersister =
+                new CharacterPositionPersister(characterFacade, characterRegistry, POSITION_SAVE_INTERVAL);
+        positionPersister.start();
+        var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
 
         var server = new GatewayServer(PORT, accountFacade, characterFacade, worldGateway);
         server.start();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             // Thứ tự SERVER.md §10: ngừng nhận kết nối mới trước (server.stop() đóng channel),
-            // rồi mới dừng world tick + đóng DB.
+            // rồi mới dừng world tick + đóng DB. positionPersister dừng SAU worldFacade — vòng
+            // quét định kỳ cuối cùng vẫn nên chạy trước khi tắt hẳn (không mất vị trí ai đó vừa
+            // logout đúng lúc server tắt).
             server.stop();
             worldFacade.stop();
+            positionPersister.stop();
             databaseBootstrap.shutdown();
         }, "gateway-shutdown"));
         server.awaitTermination();

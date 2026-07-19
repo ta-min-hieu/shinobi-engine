@@ -48,7 +48,7 @@ public final class ServerDatabaseBootstrap {
         var createUseCase = new CreateCharacterUseCase(characterPort, transactionRunner);
         var listUseCase = new ListCharactersUseCase(characterPort);
         var selectUseCase = new SelectCharacterUseCase(characterPort);
-        return new CharacterFacade(createUseCase, listUseCase, selectUseCase);
+        return new CharacterFacade(createUseCase, listUseCase, selectUseCase, characterPort);
     }
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */

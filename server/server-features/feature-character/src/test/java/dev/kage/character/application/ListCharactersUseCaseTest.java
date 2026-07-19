@@ -6,6 +6,7 @@ import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
+import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.character.domain.Transaction;
 import java.time.Instant;
 import java.util.List;
@@ -37,6 +38,16 @@ class ListCharactersUseCaseTest {
 
         @Override
         public Character create(Transaction tx, NewCharacter newCharacter) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public PositionSnapshot loadPosition(long characterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public void savePosition(long characterId, float x, float y) {
             throw new UnsupportedOperationException("không dùng trong test này");
         }
     }

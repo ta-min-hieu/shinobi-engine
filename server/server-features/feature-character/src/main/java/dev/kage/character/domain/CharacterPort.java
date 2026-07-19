@@ -20,4 +20,10 @@ public interface CharacterPort {
      * trước đó phải khiến adapter ném lỗi (unique constraint), KHÔNG tạo nhân vật lần 2.
      */
     Character create(Transaction tx, NewCharacter newCharacter);
+
+    /** Vị trí đã lưu lần cuối (SERVER.md §8) — điểm spawn khi chọn nhân vật vào world. */
+    PositionSnapshot loadPosition(long characterId);
+
+    /** Ghi đè vị trí — gọi ĐỊNH KỲ + lúc logout (SERVER.md §8), KHÔNG mỗi tick. */
+    void savePosition(long characterId, float x, float y);
 }

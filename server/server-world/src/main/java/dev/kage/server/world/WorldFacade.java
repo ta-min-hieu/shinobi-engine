@@ -72,8 +72,8 @@ public final class WorldFacade {
         }
     }
 
-    public void attachCharacter(long characterId) {
-        inbox.add(new WorldCommand.AttachCharacterCommand(characterId));
+    public void attachCharacter(long characterId, float spawnX, float spawnY) {
+        inbox.add(new WorldCommand.AttachCharacterCommand(characterId, spawnX, spawnY));
     }
 
     public void detachCharacter(long characterId) {
@@ -107,22 +107,22 @@ public final class WorldFacade {
         WorldCommand command;
         while ((command = inbox.poll()) != null) {
             switch (command) {
-                case WorldCommand.AttachCharacterCommand c -> handleAttach(c.characterId());
+                case WorldCommand.AttachCharacterCommand c -> handleAttach(c.characterId(), c.spawnX(), c.spawnY());
                 case WorldCommand.DetachCharacterCommand c -> handleDetach(c.characterId());
                 case WorldCommand.MoveIntentCommand c -> handleMoveIntent(c);
             }
         }
     }
 
-    private void handleAttach(long characterId) {
+    private void handleAttach(long characterId, float spawnX, float spawnY) {
         if (entitiesByCharacterId.containsKey(characterId)) {
             return; // đã attach — bỏ qua an toàn thay vì tạo entity trùng.
         }
         var entity = ecsWorld.createEntity();
 
         var position = new PositionComponent();
-        position.x = WorldConstants.SPAWN_X;
-        position.y = WorldConstants.SPAWN_Y;
+        position.x = spawnX;
+        position.y = spawnY;
         position.prevX = position.x;
         position.prevY = position.y;
         entity.add(position);

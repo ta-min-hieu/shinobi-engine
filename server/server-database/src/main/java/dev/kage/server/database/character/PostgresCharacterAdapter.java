@@ -5,6 +5,7 @@ import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.IdempotencyKeyReusedException;
 import dev.kage.character.domain.NewCharacter;
+import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.character.domain.Transaction;
 import dev.kage.server.database.DatabaseAccessException;
 import java.sql.Connection;
@@ -70,6 +71,14 @@ public final class PostgresCharacterAdapter implements CharacterPort {
 
     private static final String EXISTS_BY_NAME = """
             SELECT 1 FROM character WHERE name = ?
+            """;
+
+    private static final String LOAD_POSITION = """
+            SELECT pos_x, pos_y FROM character WHERE id = ?
+            """;
+
+    private static final String SAVE_POSITION = """
+            UPDATE character SET pos_x = ?, pos_y = ? WHERE id = ?
             """;
 
     @Override
@@ -175,6 +184,35 @@ public final class PostgresCharacterAdapter implements CharacterPort {
             statement.setInt(6, STARTING_HP);
             statement.setInt(7, STARTING_CHI);
             statement.executeUpdate();
+        }
+    }
+
+    @Override
+    public PositionSnapshot loadPosition(long characterId) {
+        try (var connection = dataSource.getConnection();
+                var statement = connection.prepareStatement(LOAD_POSITION)) {
+            statement.setLong(1, characterId);
+            try (ResultSet rs = statement.executeQuery()) {
+                if (!rs.next()) {
+                    throw new DatabaseAccessException("Nhân vật không tồn tại: characterId=" + characterId, null);
+                }
+                return new PositionSnapshot(rs.getFloat("pos_x"), rs.getFloat("pos_y"));
+            }
+        } catch (SQLException e) {
+            throw new DatabaseAccessException("Lỗi đọc vị trí nhân vật: characterId=" + characterId, e);
+        }
+    }
+
+    @Override
+    public void savePosition(long characterId, float x, float y) {
+        try (var connection = dataSource.getConnection();
+                var statement = connection.prepareStatement(SAVE_POSITION)) {
+            statement.setFloat(1, x);
+            statement.setFloat(2, y);
+            statement.setLong(3, characterId);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new DatabaseAccessException("Lỗi lưu vị trí nhân vật: characterId=" + characterId, e);
         }
     }
 

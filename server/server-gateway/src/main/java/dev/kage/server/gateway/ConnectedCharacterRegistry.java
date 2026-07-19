@@ -1,5 +1,6 @@
 package dev.kage.server.gateway;
 
+import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
@@ -26,6 +27,10 @@ import java.util.concurrent.ConcurrentHashMap;
 final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     private final Map<Long, ChannelHandlerContext> contextsByCharacterId = new ConcurrentHashMap<>();
+    // Vị trí MỚI NHẤT của CHÍNH nhân vật (không phải nhân vật khác) — nguồn cho
+    // CharacterPositionPersister lưu định kỳ + lúc logout (SERVER.md §8), cập nhật mỗi lần
+    // onMoveAccepted (server-world xác nhận lệnh di chuyển của connection này).
+    private final Map<Long, PositionSnapshot> lastKnownPosition = new ConcurrentHashMap<>();
 
     void register(long characterId, ChannelHandlerContext ctx) {
         contextsByCharacterId.put(characterId, ctx);
@@ -33,10 +38,22 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     void unregister(long characterId) {
         contextsByCharacterId.remove(characterId);
+        lastKnownPosition.remove(characterId);
+    }
+
+    /** Bản chụp vị trí đã biết của MỌI nhân vật đang kết nối — dùng cho lưu định kỳ (quét hết). */
+    Map<Long, PositionSnapshot> snapshotPositions() {
+        return Map.copyOf(lastKnownPosition);
+    }
+
+    /** Vị trí đã biết của MỘT nhân vật, hoặc {@code null} nếu chưa từng di chuyển kể từ khi vào world. */
+    PositionSnapshot lastKnownPosition(long characterId) {
+        return lastKnownPosition.get(characterId);
     }
 
     @Override
     public void onMoveAccepted(long characterId, int sequenceId, float x, float y) {
+        lastKnownPosition.put(characterId, new PositionSnapshot(x, y));
         var ctx = contextsByCharacterId.get(characterId);
         if (ctx == null) {
             return; // đã ngắt kết nối giữa lúc lệnh còn trong hàng đợi world — bỏ qua an toàn.
