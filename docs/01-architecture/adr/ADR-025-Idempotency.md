@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ⏳ **Proposed — CHƯA CHỐT, đang chặn Phase 3 (🔴 lỗ hổng duplicate hiện tại)** |
+| Status | ✅ **Accepted** |
 | Date | 2026-07-19 |
 | Deciders | Chủ dự án |
 | Related | [SECURITY.md §6](../../08-security/SECURITY.md) (Replay Protection), [NETWORK.md §5](../../05-server/NETWORK.md) (Request/Response Correlation), [GAMEPLAY.md §8](../../05-server/GAMEPLAY.md) (Trade), [GAMEPLAY.md §11](../../05-server/GAMEPLAY.md) (Mail), [ROADMAP.md](../../11-process/ROADMAP.md) dòng "Không mở Trade nếu ADR-025 chưa Accepted" |
@@ -21,9 +21,7 @@
 
 ## Decision
 
-**Đề xuất:** mọi Command được đánh dấu **có side-effect** (`BuyItemCommand`, `TradeConfirmCommand`, `MailClaimCommand`, và các Command tương tự cần Transaction+audit theo GAMEPLAY.md) mang theo một **`idempotencyKey`** do client sinh (UUID v4), giữ nguyên khi client tự retry cùng một hành động, sinh mới khi người chơi bắt đầu một hành động mới. Server enforce duy nhất mỗi key ở tầng **DB** (unique constraint/bảng riêng, trong cùng transaction với side-effect thật) cho các Command đã bắt buộc Transaction+audit (GAMEPLAY.md — trade, shop, mail-item, cường hoá); Redis chỉ dùng làm cache tăng tốc phát hiện trùng ở fast-path, **không phải nguồn chân lý** cho việc chống trùng (nhất quán với ràng buộc đã Accepted ở ADR-005: Redis không bao giờ là nơi duy nhất chứa dữ liệu quan trọng).
-
-*(Đề xuất, chưa Accepted — AI không tự chốt Status, theo [adr/README.md Quy tắc #5](README.md).)*
+Mọi Command được đánh dấu **có side-effect** (`BuyItemCommand`, `TradeConfirmCommand`, `MailClaimCommand`, và các Command tương tự cần Transaction+audit theo GAMEPLAY.md) mang theo một **`idempotencyKey`** do client sinh (UUID v4), giữ nguyên khi client tự retry cùng một hành động, sinh mới khi người chơi bắt đầu một hành động mới. Server enforce duy nhất mỗi key ở tầng **DB** (unique constraint/bảng riêng, trong cùng transaction với side-effect thật) cho các Command đã bắt buộc Transaction+audit (GAMEPLAY.md — trade, shop, mail-item, cường hoá); Redis chỉ dùng làm cache tăng tốc phát hiện trùng ở fast-path, **không phải nguồn chân lý** cho việc chống trùng (nhất quán với ràng buộc đã Accepted ở ADR-005: Redis không bao giờ là nơi duy nhất chứa dữ liệu quan trọng).
 
 ## Alternatives Considered
 
@@ -49,11 +47,9 @@
 
 **Module bị ảnh hưởng:** `shared-protocol` (thêm field `idempotencyKey`), mọi `feature-*` có Command side-effect (`feature-inventory`, tương lai `feature-trade`/`feature-shop`/`feature-mail`), `server-database` (bảng/constraint idempotency, Redis cache layer).
 
-## Khuyến nghị (chờ chủ dự án quyết)
+## Lý do chốt
 
-**Đề xuất: `idempotencyKey` do client sinh, enforce ở DB trong cùng transaction, Redis chỉ là cache.** Đây là cách duy nhất trong các phương án xét ở trên vừa giải quyết đúng gốc vấn đề (client không biết retry có bị trùng hay không) vừa nhất quán với các ràng buộc đã Accepted khác (transaction bắt buộc, Redis không phải nguồn chân lý).
-
-**Cần chủ dự án trả lời:** đồng ý thêm field `idempotencyKey` vào Command có side-effect (thay đổi protocol, cần xác nhận theo CLAUDE.md §4) không? Nếu đồng ý, việc phân loại "Command nào cần key" có thể làm dần ở Phase 3 mà không cần quay lại ADR này.
+Chủ dự án xác nhận 2026-07-19: đồng ý thêm field `idempotencyKey` vào Command có side-effect (đổi định dạng protocol, xác nhận theo CLAUDE.md §4). Đây là cách duy nhất trong các phương án xét ở trên vừa giải quyết đúng gốc vấn đề (client không biết retry có bị trùng hay không) vừa nhất quán với các ràng buộc đã Accepted khác (transaction bắt buộc, Redis không phải nguồn chân lý). Việc phân loại "Command nào cần key" sẽ làm dần ở Phase 3 khi viết `feature-*` cụ thể, không cần quay lại ADR này.
 
 ## Revisit Trigger
 

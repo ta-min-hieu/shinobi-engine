@@ -157,7 +157,7 @@ graph LR
 | **Metric `kage.tick.duration`** | [OBSERVABILITY.md §3.1](../07-infrastructure/OBSERVABILITY.md) |
 | Test bảo mật: authz, replay | [TESTING.md §7](../10-quality/TESTING.md) |
 
-**ADR cần trước Phase 3**: ✅ ADR-005 (Redis — đã chốt) · ✅ ADR-013 (Flyway — đã chốt) · ⏳ ADR-017 (auth token) · 🔴 **⏳ ADR-025 (idempotency)**
+**ADR cần trước Phase 3**: ✅ ADR-005 (Redis) · ✅ ADR-013 (Flyway) · ✅ ADR-017 (auth token) · ✅ **ADR-025 (idempotency)** — cả 4 đã Accepted 2026-07-19, Phase 3 đủ điều kiện mở.
 
 **Exit Criteria:**
 - [ ] 2 client kết nối cùng server, thấy nhau di chuyển
@@ -233,7 +233,7 @@ graph LR
 | Party | Cần cho dungeon |
 | ⚠️ **Trade** | [GAMEPLAY.md §8](../05-server/GAMEPLAY.md) — **hệ thống nguy hiểm nhất**: transaction + audit + 2-phase confirm + khoá item + idempotency |
 
-⚠️ **Không mở Trade nếu ADR-025 (idempotency) chưa Accepted.**
+⚠️ **Không mở Trade nếu ADR-025 (idempotency) chưa Accepted.** (✅ Đã Accepted 2026-07-19 — điều kiện thoả, nhưng vẫn phải triển khai `idempotencyKey` thật trước khi Trade thật sự mở, không phải chỉ cần ADR tồn tại.)
 
 ---
 

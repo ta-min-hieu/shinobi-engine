@@ -1,8 +1,8 @@
-# ADR-017: Auth token — JWT hay session token tự phát hành?
+# ADR-017: Auth token — session token tự phát hành + Redis
 
 | | |
 |---|---|
-| Status | ⏳ **Proposed — CHƯA CHỐT, đang chặn Phase 3** |
+| Status | ✅ **Accepted** |
 | Date | 2026-07-19 |
 | Deciders | Chủ dự án |
 | Related | [SECURITY.md §3](../../08-security/SECURITY.md), [SECURITY.md §4](../../08-security/SECURITY.md) (IDOR), [NETWORK.md §14](../../05-server/NETWORK.md), [ADR-005](ADR-005-Why-Redis.md) ✅ Accepted (phụ thuộc Redis) |
@@ -19,9 +19,11 @@ Game cần khả năng **ban / đăng xuất cưỡng chế tức thì** — m�
 
 ## Decision
 
-**Đề xuất: Session token tự phát hành (opaque, random) + lưu ở Redis (ADR-005), không dùng JWT.**
+Dùng **session token tự phát hành** (opaque, random 256-bit) lưu ở Redis (ADR-005), không dùng JWT.
 
-*(Đề xuất, chưa Accepted — AI không tự chốt Status, theo [adr/README.md Quy tắc #5](README.md).)*
+Tham số khởi điểm (chỉnh được ở Phase 3 mà không cần ADR mới, xem mục Consequences):
+- **Sliding TTL 24h**, tự gia hạn mỗi request xác thực thành công.
+- Entropy tối thiểu 256-bit từ `SecureRandom`, encode base64url.
 
 ## Alternatives Considered
 
@@ -43,20 +45,14 @@ Game cần khả năng **ban / đăng xuất cưỡng chế tức thì** — m�
 - Không có Redis khả dụng thì không xác thực được request nào (đây vốn đã là ràng buộc đã ghi ở ADR-005: mất Redis = mất session, không mất dữ liệu — chấp nhận được, nhưng nghĩa là auth có single point of failure vận hành, cần Redis HA ở production).
 - Mỗi request cần auth tốn 1 round-trip Redis — chấp nhận được ở quy mô hiện tại, cần đo lại nếu tải auth cao bất thường (ví dụ HTTP API riêng cho web/launcher, không chỉ qua Gateway socket).
 
-**Chi tiết còn để ngỏ, không thuộc phạm vi quyết định kiến trúc của ADR này (tham số triển khai, chỉnh được ở Phase 3 mà không cần ADR mới):**
-- Thời hạn (TTL) mặc định: đề xuất khởi điểm **sliding TTL 24h**, tự gia hạn mỗi request đã xác thực thành công (không cần refresh token riêng, vì token có thể thu hồi tức thì nên không cần giới hạn thời gian sống ngắn để giảm rủi ro lộ token — rủi ro đó đã được xử lý bằng khả năng thu hồi).
-- Độ dài/entropy: tối thiểu 256-bit random từ `SecureRandom`, encode base64url — đủ để chống đoán/brute-force.
+**Tham số triển khai (không cần refresh token riêng — token thu hồi tức thì nên không cần giới hạn sống ngắn để giảm rủi ro lộ token, rủi ro đó đã xử lý bằng khả năng thu hồi):**
 - Không tái sử dụng cơ chế này cho login ban đầu (username/password → token) — đó vẫn qua TLS + Argon2id/bcrypt như SECURITY.md §3 đã Accepted, không đổi.
 
 **Module bị ảnh hưởng:** `feature-account` (phát hành/thu hồi token), `server-gateway` (verify token ở `ConnectRequest`), `server-database` (Redis adapter, theo ADR-005).
 
-## Khuyến nghị (chờ chủ dự án quyết)
+## Lý do chốt
 
-**Đề xuất: Session token tự phát hành + Redis**, đúng hướng SECURITY.md §3 đã gợi ý sẵn. Lý do cốt lõi: MMORPG có kinh tế trong game bắt buộc phải ban được ngay, JWT không đáp ứng được yêu cầu này mà không tự phá vỡ lợi thế "stateless" của chính nó.
-
-**Cần chủ dự án trả lời:**
-1. Đồng ý đánh đổi "1 round-trip Redis mỗi request auth" để lấy khả năng ban tức thì không? (Khuyến nghị: có — chi phí thấp, lợi ích vận hành cao cho game PvP.)
-2. TTL 24h sliding có hợp lý không, hay cần chính sách khác (ví dụ TTL ngắn hơn cho thiết bị chưa "tin cậy")? — có thể quyết định riêng sau, không chặn Accept ADR này vì đây là tham số, không phải kiến trúc.
+Chủ dự án xác nhận 2026-07-19: đồng ý đánh đổi "1 round-trip Redis mỗi request auth" để lấy khả năng ban tức thì — chi phí thấp, lợi ích vận hành cao cho game PvP có kinh tế trong game. TTL 24h sliding là tham số khởi điểm hợp lý, có thể điều chỉnh sau ở Phase 3 mà không cần ADR mới.
 
 ## Revisit Trigger
 

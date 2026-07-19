@@ -43,9 +43,9 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-010](ADR-010-Realm-Model.md) | Single-realm ở MVP, giữ sẵn `realm_id` | ✅ Accepted | — |
 | [ADR-012](ADR-012-Package-Root.md) | Package root `dev.kage` | ✅ Accepted | — |
 | [ADR-013](ADR-013-Flyway-vs-Liquibase.md) | Dùng Flyway làm công cụ migration DB | ✅ Accepted | — |
-| [ADR-017](ADR-017-Auth-Token.md) | Auth token: JWT hay session token tự phát hành? | ⏳ **Proposed** | **Phase 3** — mọi xác thực Command |
+| [ADR-017](ADR-017-Auth-Token.md) | Auth token: session token tự phát hành + Redis | ✅ Accepted | — |
 | [ADR-018](ADR-018-Tick-Rate.md) | Tick rate **60Hz** | ✅ Accepted | — |
-| [ADR-025](ADR-025-Idempotency.md) | Idempotency cho Command có side-effect | ⏳ **Proposed** | **Phase 3** — 🔴 chặn Trade (lỗ hổng duplicate hiện tại) |
+| [ADR-025](ADR-025-Idempotency.md) | Idempotency cho Command có side-effect | ✅ Accepted | — |
 
 ---
 
@@ -67,7 +67,7 @@ Tổng hợp từ toàn bộ tài liệu. **Không code chạm các vùng này k
 | **ADR-024** | Asset distribution: đóng gói / patch / CDN | 🟢 Thấp | Phase 10 | [RESOURCE.md §10](../../04-client/RESOURCE.md) |
 | **ADR-026** | Dungeon instance model (cùng process hay riêng) | 🟢 Thấp | Phase 8 | [GAMEPLAY.md §6](../../05-server/GAMEPLAY.md) |
 
-> ADR-013 (✅ Accepted), ADR-017, ADR-025 đã có bản nháp — xem bảng "Danh sách ADR" ở trên, không còn nằm ở đây.
+> ADR-013, ADR-017, ADR-025 đã Accepted (2026-07-19) — xem bảng "Danh sách ADR" ở trên, không còn nằm ở đây.
 
 ---
 

@@ -111,7 +111,7 @@
 | Tắt máy êm | Graceful Shutdown | Lưu state trước |
 | Giới hạn tần suất | Rate Limiting | — |
 | Bảo vệ replay | Replay Protection | Cần idempotency |
-| Tính bất biến thao tác | Idempotency | ⚠️ ADR-025 |
+| Tính bất biến thao tác | Idempotency | ✅ ADR-025 |
 
 ---
 

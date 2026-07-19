@@ -115,6 +115,10 @@ Chỉ còn **ADR-011** (ArchUnit enforce) — là việc kỹ thuật *trong* Ph
 |---|---|
 | **Redis** (Redis 8 quay lại AGPLv3, OSI-approved từ 5/2025) | ✅ [ADR-005](01-architecture/adr/ADR-005-Why-Redis.md) |
 | **Flyway** (SQL tường minh, khớp ADR-004) | ✅ [ADR-013](01-architecture/adr/ADR-013-Flyway-vs-Liquibase.md) |
+| **Auth token**: session token tự phát hành + Redis (không JWT) | ✅ [ADR-017](01-architecture/adr/ADR-017-Auth-Token.md) |
+| **Idempotency** cho Command có side-effect (`idempotencyKey` + enforce DB) | ✅ [ADR-025](01-architecture/adr/ADR-025-Idempotency.md) |
+
+Toàn bộ 4 ADR chặn Phase 3 đã Accepted — **Phase 3 đủ điều kiện mở**, còn lại: công thức damage (chặn Phase 4, chờ game designer) và ADR-016 (Lua vs GraalJS, chặn Phase 2 nếu chạm scripting).
 
 ### 🔴 Chặn Phase 2–4
 
@@ -122,8 +126,6 @@ Chỉ còn **ADR-011** (ArchUnit enforce) — là việc kỹ thuật *trong* Ph
 |---|---|---|---|
 | 1 | **Lua vs GraalJS** (khuyến nghị Lua — GraalJS cần đổi runtime) | ADR-016 | [SCRIPTING.md §3](06-plugin/SCRIPTING.md) |
 | 2 | **Công thức damage/derived stats** | — (game designer) | [GDD §6](13-game-design/GAME-DESIGN-DOCUMENT.md) |
-| 3 | **Idempotency** cho Command có side-effect (lỗ hổng duplicate) | ADR-025 | [SECURITY.md §6](08-security/SECURITY.md) |
-| 4 | **Auth token**: session+Redis vs JWT (khuyến nghị session) | ADR-017 | [SECURITY.md §3](08-security/SECURITY.md) |
 
 ### 🟡 Chặn Phase sau
 

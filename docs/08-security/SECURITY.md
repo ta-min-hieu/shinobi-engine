@@ -54,16 +54,14 @@ Ai tấn công, tấn công cái gì:
 
 ⚠️ **Không hash mật khẩu ở client rồi gửi hash.** Nhiều người tưởng an toàn hơn — thực ra hash đó trở thành mật khẩu, ai chặn được là đăng nhập được. TLS đã lo việc bảo vệ đường truyền.
 
-### Token — chưa chốt
+### Token — ✅ chốt session token + Redis (ADR-017)
 
 | | JWT | Session token tự phát hành |
 |---|---|---|
 | Ưu | Stateless, không cần tra DB | **Thu hồi được ngay** (ban user, đăng xuất) |
 | Nhược | ⚠️ **Không thu hồi được** cho tới khi hết hạn | Cần tra Redis mỗi request |
 
-**Đề xuất: session token + Redis.** Lý do: game cần **ban tức thì**. JWT không thu hồi được nghĩa là ban một người chơi rồi họ vẫn chơi tiếp tới khi token hết hạn.
-
-⏳ **ADR-017**.
+**Chốt: session token + Redis, sliding TTL 24h.** Lý do: game cần **ban tức thì**. JWT không thu hồi được nghĩa là ban một người chơi rồi họ vẫn chơi tiếp tới khi token hết hạn. Chi tiết: [ADR-017](../01-architecture/adr/ADR-017-Auth-Token.md).
 
 ---
 
@@ -127,10 +125,10 @@ Kẻ tấn công ghi lại packet hợp lệ rồi gửi lại nhiều lần.
 | Cách chặn | Chi tiết |
 |---|---|
 | `sequenceId` tăng dần | Server từ chối sequenceId ≤ cái đã thấy |
-| **Idempotency key** cho Command có side-effect | ⚠️ **Chưa thiết kế** — [ADR-025](../01-architecture/adr/README.md) |
+| **Idempotency key** cho Command có side-effect | ✅ `idempotencyKey` client sinh + enforce ở DB trong transaction — [ADR-025](../01-architecture/adr/ADR-025-Idempotency.md) Accepted |
 | TLS | Chặn replay từ ngoài (nhưng không chặn client tự replay) |
 
-⚠️ **Đây là lỗ hổng hiện tại của thiết kế.** Không có idempotency, replay `BuyItemCommand`/trade có thể duplicate. **ADR-025 chặn Phase 3.**
+✅ **ADR-025 đã Accepted (2026-07-19).** Thiết kế đã có hướng đóng lỗ hổng duplicate — việc còn lại là triển khai `idempotencyKey` thật khi viết Command side-effect (`BuyItemCommand`, trade, mail-claim...) ở Phase 3, không phải thiết kế lại từ đầu.
 
 ---
 
@@ -285,7 +283,7 @@ Bật **secret scanning** ([OWASP.md](OWASP.md)).
 | 1 | **Argon2id/bcrypt** cho mật khẩu | MD5/SHA thuần = không an toàn | Accepted |
 | 2 | **Không hash mật khẩu ở client** | Hash trở thành mật khẩu | Accepted |
 | 3 | **`characterId` lấy từ SESSION, không từ packet** | Chống IDOR | Accepted — quan trọng nhất |
-| 4 | **Session token + Redis**, không JWT (đề xuất) | Game cần ban tức thì | ⏳ ADR-017 |
+| 4 | **Session token + Redis**, không JWT | Game cần ban tức thì | ✅ Accepted — ADR-017 |
 | 5 | Rate limit theo **account/session** trước, IP là lớp cuối | NAT chung IP ở VN | Accepted |
 | 6 | **Không anti-cheat phía client** | Dễ bypass; Server Authority đã đủ | Accepted |
 | 7 | **Chống bot: ngoài scope MVP** | Bot chơi đúng luật — khó về bản chất | Accepted — trung thực |
@@ -294,14 +292,11 @@ Bật **secret scanning** ([OWASP.md](OWASP.md)).
 | 10 | Chat render **text thuần**, không HTML | XSS | Accepted |
 | 11 | **Secret đã commit → rotate** | Git history vĩnh viễn | Accepted |
 | 12 | **Redis phải có password + không expose** | Lỗ hổng phổ biến | Accepted |
-| 13 | **Replay protection chưa đủ** | Thiếu idempotency | ⏳ **Lỗ hổng hiện tại — ADR-025** |
+| 13 | **Idempotency key + enforce DB** cho Command side-effect | Đóng lỗ hổng replay/duplicate | ✅ Accepted — ADR-025 |
 
 ## ADR cần tạo
 
-| ADR | Nội dung | Ưu tiên |
-|---|---|---|
-| **ADR-017** | Auth token: session+Redis vs JWT (§3) | 🔴 Chặn Phase 3 |
-| **ADR-025** | **Idempotency** (§6) — lỗ hổng duplicate hiện tại | 🔴 **Chặn Phase 3** |
+Không còn — ADR-017, ADR-025 đã Accepted 2026-07-19. Xem [adr/README.md](../01-architecture/adr/README.md).
 
 ## Tài liệu liên quan
 
@@ -314,7 +309,7 @@ Bật **secret scanning** ([OWASP.md](OWASP.md)).
 
 ## Việc cần làm tiếp theo
 
-1. 🔴 **ADR-025 (idempotency)** — lỗ hổng duplicate là rủi ro nghiêm trọng nhất hiện tại của thiết kế.
+1. Phase 3: triển khai `idempotencyKey` thật (ADR-025) khi viết Command side-effect đầu tiên (`BuyItemCommand` hoặc tương đương) — ADR đã Accepted, còn lại là code.
 2. Phase 3: §4 (lấy characterId từ session) — làm sai từ đầu là lỗ hổng IDOR toàn hệ thống.
 3. Phase 3: audit log (§9) **cùng lúc** với trade/gold, không để sau.
 4. Phase 0: Redis password + không expose (§14).

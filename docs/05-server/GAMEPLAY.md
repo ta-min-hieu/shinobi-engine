@@ -246,7 +246,7 @@ Chi tiết: [SECURITY.md](../08-security/SECURITY.md). Ở tầng gameplay:
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
 | **ADR-016** | Lua vs GraalJS — chặn §4, §9 | 🔴 Chặn Phase 2 |
-| **ADR-025** | Idempotency — chặn §8 trade | 🔴 Chặn Phase 3 |
+| **ADR-025** | Idempotency — chặn §8 trade | ✅ Accepted |
 | **ADR-026** | Dungeon instance model (§6) | 🟢 Chặn Phase 8 |
 
 ## Tài liệu liên quan

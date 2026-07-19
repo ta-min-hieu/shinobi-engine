@@ -251,7 +251,7 @@ sequenceDiagram
     end
 ```
 
-⚠️ **Chi tiết cơ chế token chưa chốt** — JWT hay session token tự phát hành? Thời hạn? Refresh? → **ADR-017**, xem [SECURITY.md](../08-security/SECURITY.md).
+Cơ chế token: session token tự phát hành + Redis, sliding TTL 24h — **ADR-017** ✅ Accepted, xem [SECURITY.md](../08-security/SECURITY.md).
 
 ---
 
@@ -278,8 +278,8 @@ sequenceDiagram
 
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
-| **ADR-017** | **Auth token**: JWT vs session token tự phát hành (§14) | 🔴 Chặn Phase 3 |
-| **ADR-025** | Idempotency strategy cho Command có side-effect (§5, §12) | 🔴 Chặn Phase 3 — liên quan tiền/item |
+| **ADR-017** | **Auth token**: session token tự phát hành (§14) | ✅ Accepted |
+| **ADR-025** | Idempotency strategy cho Command có side-effect (§5, §12) | ✅ Accepted |
 
 ## Tài liệu liên quan
 
@@ -291,7 +291,7 @@ sequenceDiagram
 
 ## Việc cần làm tiếp theo
 
-1. **ADR-025 (idempotency)** — đây là lỗ hổng thiết kế hiện tại. Không có nó, retry một `BuyItemCommand` có thể trừ tiền 2 lần.
-2. **ADR-017 (auth token)** trước Phase 3.
+1. ~~ADR-025 (idempotency)~~ — ✅ Accepted 2026-07-19. Việc còn lại: triển khai `idempotencyKey` thật khi viết Command side-effect ở Phase 3.
+2. ~~ADR-017 (auth token)~~ — ✅ Accepted 2026-07-19.
 3. Phase 3: dựng `opcode_registry.proto` làm nguồn chân lý thật cho §4.
 4. Phase 9: đo băng thông → quyết định §8 (nén) dựa trên số liệu.
