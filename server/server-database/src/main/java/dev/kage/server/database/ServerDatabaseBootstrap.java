@@ -5,6 +5,7 @@ import dev.kage.account.application.LoginOrCreateAccountUseCase;
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.application.CreateCharacterUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
+import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
@@ -46,7 +47,8 @@ public final class ServerDatabaseBootstrap {
         var transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
         var createUseCase = new CreateCharacterUseCase(characterPort, transactionRunner);
         var listUseCase = new ListCharactersUseCase(characterPort);
-        return new CharacterFacade(createUseCase, listUseCase);
+        var selectUseCase = new SelectCharacterUseCase(characterPort);
+        return new CharacterFacade(createUseCase, listUseCase, selectUseCase);
     }
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */

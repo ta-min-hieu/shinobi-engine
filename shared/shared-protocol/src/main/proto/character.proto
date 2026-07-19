@@ -48,3 +48,17 @@ message CreateCharacterResponse {
   CharacterSummary character = 2;
   string error_key = 3; // rỗng nếu success=true (NETWORK.md §107)
 }
+
+// Command: Client -> Server (OPCODE_SELECT_CHARACTER_REQUEST). Chọn nhân vật để vào world — server
+// verify character_id thuộc account đã đăng nhập (session), gắn characterId vào connection
+// (SECURITY.md §4, chống IDOR). KHÔNG phải Movement/World (300-399) — đây vẫn là hành động thuộc
+// domain Character.
+message SelectCharacterRequest {
+  int64 character_id = 1;
+}
+
+// Response: Server -> Client (OPCODE_SELECT_CHARACTER_RESPONSE).
+message SelectCharacterResponse {
+  bool success = 1;
+  string error_key = 2; // rỗng nếu success=true (NETWORK.md §107)
+}

@@ -12,8 +12,10 @@ import dev.kage.account.domain.Transaction;
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.application.CreateCharacterUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
+import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
+import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
@@ -24,6 +26,8 @@ import dev.kage.protocol.ListCharactersResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
+import dev.kage.protocol.SelectCharacterRequest;
+import dev.kage.protocol.SelectCharacterResponse;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
@@ -137,6 +141,46 @@ class GatewayPipelineTest {
         assertThat(listResponse.getCharactersList()).extracting(c -> c.getName()).containsExactly("KageHero");
     }
 
+    @Test
+    void shouldSelectCharacter_afterCreatingIt() throws InvalidProtocolBufferException {
+        var channel = newPipeline();
+        connect(channel, "selecttest1");
+        var characterId = createCharacter(channel, "SelectHero", 2);
+
+        var request = SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, ProtocolVersion.CURRENT, 3),
+                request.toByteArray());
+        var responseFrame = readOutboundFrame(channel);
+
+        assertThat(responseFrame.header().opcode()).isEqualTo(Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE);
+        var response = SelectCharacterResponse.parseFrom(responseFrame.payload());
+        assertThat(response.getSuccess()).isTrue();
+    }
+
+    @Test
+    void shouldRejectSelectCharacter_whenBelongsToDifferentAccount() throws InvalidProtocolBufferException {
+        var characterPort = new FakeCharacterPort();
+        // Nhân vật thuộc account KHÁC — không tạo được qua chính kết nối test này (login luôn tạo
+        // đúng account của username đang dùng) — seed thẳng vào Fake Port để mô phỏng đúng kịch
+        // bản IDOR mà SECURITY.md §4 mô tả.
+        var otherAccountCharacter =
+                characterPort.create(null, new NewCharacter(999L, "OtherHero", Faction.HOA, "seed-idem"));
+
+        var channel = newPipeline(characterPort);
+        connect(channel, "selecttest2");
+
+        var request = SelectCharacterRequest.newBuilder().setCharacterId(otherAccountCharacter.id()).build();
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, ProtocolVersion.CURRENT, 2),
+                request.toByteArray());
+        var responseFrame = readOutboundFrame(channel);
+
+        assertThat(responseFrame.header().opcode()).isEqualTo(Opcode.OPCODE_ERROR_VALUE);
+    }
+
     private static void connect(EmbeddedChannel channel, String username) {
         var request = ConnectRequest.newBuilder().setUsername(username).build();
         var header = new PacketHeader(Opcode.OPCODE_CONNECT_REQUEST_VALUE, ProtocolVersion.CURRENT, 1);
@@ -144,20 +188,40 @@ class GatewayPipelineTest {
         readOutboundFrame(channel); // tiêu thụ ConnectResponse — caller không kiểm tra lại nội dung
     }
 
+    private static long createCharacter(EmbeddedChannel channel, String name, int sequenceId)
+            throws InvalidProtocolBufferException {
+        var request = CreateCharacterRequest.newBuilder()
+                .setName(name)
+                .setIdempotencyKey(UUID.randomUUID().toString())
+                .build();
+        var header =
+                new PacketHeader(Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, ProtocolVersion.CURRENT, sequenceId);
+        writeInboundFrame(channel, header, request.toByteArray());
+        var response = CreateCharacterResponse.parseFrom(readOutboundFrame(channel).payload());
+        return response.getCharacter().getId();
+    }
+
     private static EmbeddedChannel newPipeline() {
+        return newPipeline(new FakeCharacterPort());
+    }
+
+    private static EmbeddedChannel newPipeline(FakeCharacterPort characterPort) {
         // ⚠️ Phải khớp CHÍNH XÁC pipeline thật trong GatewayBootstrap — lệch ở đây là test giả.
         // AccountFacade/CharacterFacade THẬT (không mock), chỉ Port bên dưới là Fake (TESTING.md
         // §4) — cùng kiểu Fake với *UseCaseTest ở feature-account/feature-character. Executor
         // chạy ĐỒNG BỘ (Runnable::run) — handler thật đẩy việc chạm DB sang authExecutor (Virtual
         // Thread ở production, SERVER.md §2); test cần đồng bộ để readOutboundFrame không bị race.
+        // characterPort truyền vào từ ngoài để test seed sẵn dữ liệu (VD nhân vật account khác,
+        // xem shouldRejectSelectCharacter_whenBelongsToDifferentAccount).
         var loginUseCase = new LoginOrCreateAccountUseCase(
                 new FakeAccountPort(), new FakeSessionPort(), action -> action.accept(null));
         var accountFacade = new AccountFacade(loginUseCase);
 
-        var characterPort = new FakeCharacterPort();
         var createCharacterUseCase = new CreateCharacterUseCase(characterPort, action -> action.accept(null));
         var listCharactersUseCase = new ListCharactersUseCase(characterPort);
-        var characterFacade = new CharacterFacade(createCharacterUseCase, listCharactersUseCase);
+        var selectCharacterUseCase = new SelectCharacterUseCase(characterPort);
+        var characterFacade =
+                new CharacterFacade(createCharacterUseCase, listCharactersUseCase, selectCharacterUseCase);
 
         return new EmbeddedChannel(
                 new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),

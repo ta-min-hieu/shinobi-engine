@@ -2,6 +2,7 @@ package dev.kage.character.api;
 
 import dev.kage.character.application.CreateCharacterUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
+import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.character.domain.Character;
 import java.util.List;
 
@@ -13,10 +14,15 @@ public final class CharacterFacade {
 
     private final CreateCharacterUseCase createCharacterUseCase;
     private final ListCharactersUseCase listCharactersUseCase;
+    private final SelectCharacterUseCase selectCharacterUseCase;
 
-    public CharacterFacade(CreateCharacterUseCase createCharacterUseCase, ListCharactersUseCase listCharactersUseCase) {
+    public CharacterFacade(
+            CreateCharacterUseCase createCharacterUseCase,
+            ListCharactersUseCase listCharactersUseCase,
+            SelectCharacterUseCase selectCharacterUseCase) {
         this.createCharacterUseCase = createCharacterUseCase;
         this.listCharactersUseCase = listCharactersUseCase;
+        this.selectCharacterUseCase = selectCharacterUseCase;
     }
 
     public Character createCharacter(long accountId, String name, String idempotencyKey) {
@@ -25,5 +31,9 @@ public final class CharacterFacade {
 
     public List<Character> listCharacters(long accountId) {
         return listCharactersUseCase.execute(accountId);
+    }
+
+    public Character selectCharacter(long accountId, long characterId) {
+        return selectCharacterUseCase.execute(accountId, characterId);
     }
 }

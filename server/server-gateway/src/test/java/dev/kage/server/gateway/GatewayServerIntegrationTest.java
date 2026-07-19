@@ -11,6 +11,7 @@ import dev.kage.account.domain.Transaction;
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.application.CreateCharacterUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
+import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.NewCharacter;
@@ -130,7 +131,8 @@ class GatewayServerIntegrationTest {
         };
         var createUseCase = new CreateCharacterUseCase(characterPort, action -> action.accept(null));
         var listUseCase = new ListCharactersUseCase(characterPort);
-        return new CharacterFacade(createUseCase, listUseCase);
+        var selectUseCase = new SelectCharacterUseCase(characterPort);
+        return new CharacterFacade(createUseCase, listUseCase, selectUseCase);
     }
 
     @AfterEach
