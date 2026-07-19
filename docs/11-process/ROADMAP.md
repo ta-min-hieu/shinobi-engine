@@ -182,7 +182,7 @@ graph LR
 | Monster spawn + drop table | [GAMEPLAY.md §5](../05-server/GAMEPLAY.md) |
 | Random **chỉ ở server** | [ENGINE.md §10](../03-engine/ENGINE.md) |
 
-**Chặn**: 🔴 **GDD phải có công thức damage cụ thể** ([GAMEPLAY.md §3](../05-server/GAMEPLAY.md))
+**Chặn**: ✅ Đã hết — công thức damage đã chốt ([GAME-DESIGN-DOCUMENT.md §5–6](../13-game-design/GAME-DESIGN-DOCUMENT.md#5-nhân-vật--tiến-trình), 2026-07-19; placeholder, cần playtest cân bằng — không phải lý do trì hoãn mở Phase 4).
 
 **Exit Criteria:**
 - [ ] Đánh quái, quái chết, rơi đồ
@@ -331,5 +331,5 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **12 ADR Accepted** (gồm
 
 1. ✅ 3 ADR chặn Phase 0 đã chốt (010/012/018). **Có thể mở Phase 0.**
 2. Đầu Phase 0: chốt/triển khai **ADR-011** (ArchUnit) như hạng mục kỹ thuật.
-3. 🔴 **GDD bổ sung công thức damage** — chặn Phase 4.
+3. ✅ **GDD đã bổ sung công thức damage** (2026-07-19) — Phase 4 hết bị chặn về mặt game design.
 4. Trả lời các câu hỏi mở còn lại ở [docs/README.md](../README.md).

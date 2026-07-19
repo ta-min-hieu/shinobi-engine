@@ -74,7 +74,11 @@ Response + Event cho các client liên quan (trong AoI)
 
 **Server giữ mọi thứ**: cooldown, Khí, vị trí, HP. Client chỉ có bản sao để hiển thị.
 
-⚠️ **Chưa chốt**: công thức damage cụ thể. Là quyết định **game design**, không phải kỹ thuật — cần GDD bổ sung trước Phase 4.
+**Công thức damage**: đã chốt (placeholder, cần playtest) — xem [GAME-DESIGN-DOCUMENT.md §5–6](../13-game-design/GAME-DESIGN-DOCUMENT.md#5-nhân-vật--tiến-trình). Toàn bộ hệ số derive/damage/Lực Chiến nằm ở `CombatConstants` ([CODING-STANDARDS.md §18](../02-coding-standards/CODING-STANDARDS.md)), không hardcode rải rác trong `CombatSystem`.
+
+⚠️ **Roll ngẫu nhiên** (né/trúng, bạo kích) — như mọi random ảnh hưởng gameplay, **chỉ sinh ở server** ([ENGINE.md §10](../03-engine/ENGINE.md)), không bao giờ ở client dù chỉ để dự đoán UI.
+
+⚠️ **Lực Chiến** (GDD §5) chỉ là giá trị hiển thị/xếp hạng tính SAU khi đã có đủ chỉ số dẫn xuất — không bao giờ dùng ngược lại để tính damage hay bất kỳ quyết định gameplay nào khác (một chiều: stat → Lực Chiến, không có chiều ngược).
 
 ---
 
@@ -237,7 +241,7 @@ Chi tiết: [SECURITY.md](../08-security/SECURITY.md). Ở tầng gameplay:
 | 6 | **Transaction + audit bắt buộc** cho: cường hoá, trade, mail item, shop | Mất/duplicate item = phá kinh tế | Accepted |
 | 7 | Inventory phải **chừa chỗ khoá item** cho trade sau này | Thêm sau = refactor lớn | Accepted |
 | 8 | Quest index theo loại sự kiện, không quét tuyến tính | Hiệu năng | Accepted — đo Phase 6 |
-| 9 | **Công thức damage chưa có** | Là quyết định game design | ⏳ **Chặn Phase 4** |
+| 9 | Công thức damage đã chốt (GDD §5-6): giảm giáp/kháng kiểu LMHT (diminishing returns) + `DEF`/`RES` tách vật lý/phép | Là quyết định game design | Accepted (placeholder, playtest) |
 | 10 | Dungeon instance: cùng process hay riêng? | Ảnh hưởng scaling | ⏳ Chặn Phase 8 |
 | 11 | Chống bot: **ngoài scope MVP** | Trung thực về giới hạn | Accepted |
 
@@ -259,6 +263,7 @@ Chi tiết: [SECURITY.md](../08-security/SECURITY.md). Ở tầng gameplay:
 
 ## Việc cần làm tiếp theo
 
-1. 🔴 **GDD cần bổ sung công thức damage cụ thể** (§3) — đang chặn Phase 4. Đây là việc của game designer, không phải kỹ sư.
+1. ✅ Công thức damage đã chốt (GDD §5-6) — **Phase 4 hết bị chặn**, có thể bắt đầu code `CombatSystem`/`CombatConstants`.
 2. Chốt ADR-016 (script engine) trước Phase 2.
 3. Phase 5: thiết kế inventory **có chỗ cho khoá item** (§7) dù trade là Post-MVP.
+4. Phase 4+: playtest cân bằng toàn bộ hệ số derive/damage/Lực Chiến (GDD §5-6) — hiện là placeholder.

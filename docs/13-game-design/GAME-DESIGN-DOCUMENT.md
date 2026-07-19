@@ -74,9 +74,39 @@ Chọn hệ ở **Lv10**. Đổi hệ 1 lần miễn phí trước Lv30, sau đ�
 ### Chỉ số
 
 Cơ bản: `STR · AGI · INT · VIT · Khí`
-Dẫn xuất (⚠️ **server tính** — [GAMEPLAY.md §2](../05-server/GAMEPLAY.md)): `ATK, DEF, HIT, DODGE, CRIT, CRIT_DMG, ATK_SPEED, MOVE_SPEED`
+Dẫn xuất (⚠️ **server tính** — [GAMEPLAY.md §2](../05-server/GAMEPLAY.md)): `ATK, SKILL_DMG, DEF, RES, HIT, DODGE, CRIT, CRIT_DMG, ATK_SPEED, MOVE_SPEED`
 
-Công thức derive ở `CombatConstants` — không hardcode.
+`DEF` (giáp, chống vật lý) và `RES` (kháng phép) tách riêng — kiểu AD/AP của LMHT/Liên Quân: đòn đánh thường (STR/AGI) đi qua `DEF`, skill hệ phái (INT) đi qua `RES`. Build "tank giáp" khác "tank phép".
+
+**Công thức derive** (đặt ở `CombatConstants`, KHÔNG hardcode rải rác — [CODING-STANDARDS.md §18](../02-coding-standards/CODING-STANDARDS.md)). ⚠️ Hệ số dưới đây là **placeholder — chưa cân bằng, chỉnh qua playtest** (cùng tinh thần hệ số khắc chế §4):
+
+| Chỉ số | Công thức |
+|---|---|
+| `ATK` (sức mạnh vật lý) | `STR × 2 + AGI × 1` |
+| `SKILL_DMG` (sức mạnh phép) | `INT × 2.5` |
+| `DEF` (giáp) | `VIT × 1.5 + STR × 0.5` |
+| `RES` (kháng phép) | `VIT × 1.0 + INT × 0.5` |
+| `HIT%` | `90 + AGI × 0.1`, kẹp 50–100% |
+| `DODGE%` | `AGI × 0.15`, kẹp 0–30% (tránh né 100%) |
+| `CRIT%` | `AGI × 0.1`, kẹp 0–50% |
+| `CRIT_DMG` | 150% cố định ở MVP (trang bị cộng thêm — Post-MVP) |
+| `ATK_SPEED` | base + bonus nhỏ theo `AGI` |
+| `MOVE_SPEED` | hằng số server-world riêng (`WorldConstants`, chưa gắn theo stat nhân vật — Phase 3) |
+
+### Lực Chiến (Combat Power)
+
+Chỉ số **tổng hợp để hiển thị UI/xếp hạng** (kiểu Gunny) — **KHÔNG BAO GIỜ dùng để tính damage thật** (damage luôn tính từ chỉ số riêng ở §6, Điều 15 — đây là giá trị 1 chiều, chỉ đọc). Đặt ở `CombatConstants`, hệ số placeholder:
+
+```
+LucChien = HP × 1 + Chi × 0.5
+         + (ATK + SKILL_DMG) × 3.5
+         + (DEF + RES) × 3
+         + CRIT% × 100 × 2
+         + DODGE% × 100 × 1.5
+         + HIT% × 100 × 0.5
+         + ATK_SPEED_bonus% × 100 × 1.5
+         + Level × 50
+```
 
 ### Level & Chuyển sinh
 
@@ -115,7 +145,27 @@ Real-time side-view. Auto-target đánh thường; skill chủ động bằng ph
 
 ⚠️ Toàn bộ combat **server tính** (Điều 15). Vi phạm = bug nghiêm trọng.
 
-⚠️ **Công thức damage cụ thể CHƯA CÓ** — là quyết định game design, **chặn Phase 4** ([GAMEPLAY.md §3](../05-server/GAMEPLAY.md)).
+### Công thức damage
+
+Chỉ số + hệ số derive ở [§5](#5-nhân-vật--tiến-trình). Pipeline 1 đòn đánh/skill, theo thứ tự:
+
+1. **Né**: `roll(clamp(attacker.HIT − defender.DODGE, 50%, 100%))` — trượt → 0 damage, dừng ở đây.
+2. **Damage thô**: `attacker.ATK` (đòn vật lý) hoặc `attacker.SKILL_DMG` (skill hệ phái) × hệ số riêng của skill + bonus cố định (định nghĩa ở `skill_template`, không hardcode — GAMEPLAY.md §4).
+3. **Bạo kích**: `roll(attacker.CRIT%)` — trúng → nhân thêm `attacker.CRIT_DMG`.
+4. **Giảm giáp/kháng** — công thức kiểu LMHT/Liên Quân, diminishing returns (giáp càng cao, hiệu quả biên càng giảm; xuyên giáp bù lại):
+   ```
+   effectiveDEF = max(0, DEF × (1 − %xuyên_giáp) − xuyên_giáp_thẳng)
+   mitigation   = 100 / (100 + effectiveDEF)
+   ```
+   (damage phép tính y hệt, thay `DEF` bằng `RES`)
+5. **Hệ khắc chế** (§4): nhân thêm `1.15` (khắc) / `0.85` (bị khắc) / `1.0` (trung lập).
+
+```
+finalDamage = rawDamage × mitigation × elementMultiplier
+```
+(`rawDamage` ở bước 2 đã nhân `CRIT_DMG` nếu bạo kích ở bước 3.)
+
+⚠️ Toàn bộ hệ số trên là **placeholder — chưa cân bằng qua playtest** (Phase 4+, cùng tinh thần §4). Không phải quyết định cuối cùng, nhưng đủ cụ thể để bắt đầu code `CombatSystem` ([GAMEPLAY.md §3](../05-server/GAMEPLAY.md)).
 
 ---
 
@@ -128,7 +178,7 @@ Real-time side-view. Auto-target đánh thường; skill chủ động bằng ph
 | Mail | Gửi item/tiền, phí chống spam gold-selling |
 | Chat | Thế giới/Bang/Party/Riêng/Khu vực; rate-limit + filter |
 | Auction | Giao dịch liên instance, thuế (gold sink) |
-| Ranking | Level/PvP/boss damage/guild; cập nhật định kỳ |
+| Ranking | Level/PvP/boss damage/guild/**Lực Chiến** (§5); cập nhật định kỳ |
 
 ---
 
@@ -190,7 +240,7 @@ Các câu này **chưa có quyết định**, chặn các Phase tương ứng:
 
 | # | Câu hỏi | Chặn | ADR |
 |---|---|---|---|
-| 1 | **Công thức damage/derived stats** cụ thể | Phase 4 | — (việc game designer) |
+| 1 | ~~Công thức damage/derived stats cụ thể~~ → xem §5–6 (placeholder, playtest sau) | Phase 4 | — |
 | 2 | Desktop-first hay mobile-first | Input, UI, launcher | ADR-023 |
 | 3 | ~~Single-realm hay multi-realm~~ → single-realm + `realm_id` | Schema, scaling | ✅ [ADR-010](../01-architecture/adr/ADR-010-Realm-Model.md) |
 | 4 | i18n: chỉ tiếng Việt hay có tiếng Anh ở MVP | UI | — |
@@ -212,9 +262,11 @@ Mỗi câu trả lời → cập nhật tài liệu này hoặc tạo ADR.
 | 3 | Mount/cosmetic **không** cộng chỉ số chiến đấu | Accepted |
 | 4 | MVP: **1 hệ (Hỏa)** trước, nhân ra sau | Accepted |
 | 5 | Không Pay-to-Win | Accepted (nếu có monetization) |
-| 6 | **Công thức damage chưa có** | ⏳ **Chặn Phase 4** |
-| 7 | Hệ số cân bằng là số tham khảo, chờ playtest | ⏳ Phase 4+ |
-| 8 | 8 open questions §12 | ⏳ |
+| 6 | `DEF`/`RES` tách riêng (vật lý/phép, kiểu AD/AP LMHT) — không dùng 1 DEF chung | Accepted |
+| 7 | Giảm giáp/kháng theo công thức diminishing returns kiểu LMHT (`100/(100+DEF)`) + xuyên giáp | Accepted (placeholder, playtest) |
+| 8 | **Lực Chiến** (Combat Power) — chỉ hiển thị/xếp hạng, KHÔNG dùng tính damage thật | Accepted |
+| 9 | Hệ số cân bằng (derive stat, damage, Lực Chiến) là số tham khảo, chờ playtest | ⏳ Phase 4+ |
+| 10 | 7 open questions còn lại §12 | ⏳ |
 
 ## ADR cần tạo
 
@@ -231,5 +283,5 @@ Xem §12 — ✅ ADR-010, ADR-012 đã chốt; còn ADR-020, ADR-023.
 ## Việc cần làm tiếp theo
 
 1. ✅ §12 câu 3 (realm) và câu 5 (package) đã chốt.
-2. 🔴 **Bổ sung công thức damage — chặn Phase 4** (việc game designer).
-3. Playtest cân bằng hệ số §4 từ Phase 4.
+2. ✅ §12 câu 1 (công thức damage/derived stats/Lực Chiến) đã chốt — Phase 4 hết bị chặn. Cập nhật [GAMEPLAY.md §3](../05-server/GAMEPLAY.md) và [ROADMAP.md](../11-process/ROADMAP.md) khớp theo.
+3. Playtest cân bằng hệ số §4 (khắc chế) + §5-6 (derive stat, damage, Lực Chiến) từ Phase 4 — TOÀN BỘ hệ số hiện tại là placeholder.

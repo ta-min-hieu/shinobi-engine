@@ -118,14 +118,13 @@ Chỉ còn **ADR-011** (ArchUnit enforce) — là việc kỹ thuật *trong* Ph
 | **Auth token**: session token tự phát hành + Redis (không JWT) | ✅ [ADR-017](01-architecture/adr/ADR-017-Auth-Token.md) |
 | **Idempotency** cho Command có side-effect (`idempotencyKey` + enforce DB) | ✅ [ADR-025](01-architecture/adr/ADR-025-Idempotency.md) |
 
-Toàn bộ 4 ADR chặn Phase 3 đã Accepted — **Phase 3 đủ điều kiện mở**, còn lại: công thức damage (chặn Phase 4, chờ game designer) và ADR-016 (Lua vs GraalJS, chặn Phase 2 nếu chạm scripting).
+Toàn bộ 4 ADR chặn Phase 3 đã Accepted — **Phase 3 đủ điều kiện mở**. Công thức damage/derived stats đã chốt (2026-07-19, [GDD §5–6](13-game-design/GAME-DESIGN-DOCUMENT.md#5-nhân-vật--tiến-trình)) — **Phase 4 hết bị chặn về game design**, còn lại ADR-016 (Lua vs GraalJS, chặn nếu Phase 4 chạm script sandbox).
 
-### 🔴 Chặn Phase 2–4
+### 🔴 Chặn Phase 4 (script sandbox)
 
 | # | Quyết định | ADR | Nguồn |
 |---|---|---|---|
 | 1 | **Lua vs GraalJS** (khuyến nghị Lua — GraalJS cần đổi runtime) | ADR-016 | [SCRIPTING.md §3](06-plugin/SCRIPTING.md) |
-| 2 | **Công thức damage/derived stats** | — (game designer) | [GDD §6](13-game-design/GAME-DESIGN-DOCUMENT.md) |
 
 ### 🟡 Chặn Phase sau
 
