@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// Packet Movement/World (NETWORK.md §4, dải 300-399). characterId lấy từ session gắn với
+// connection (server-gateway), KHÔNG có field characterId trong MoveCommand — đúng
+// "characterId từ session, không từ packet" (SECURITY.md §4, chống IDOR).
+//
+// Server SỞ HỮU tốc độ di chuyển — client CHỈ gửi hướng đã chuẩn hoá (dir_x, dir_y trong
+// [-1,1]), KHÔNG BAO GIỜ gửi tốc độ hay vị trí tuyệt đối. Server tự nhân hướng với hằng số
+// tốc độ (server-world WorldConstants.MOVE_SPEED_MPS) — chặn speed-hack/teleport BẰNG THIẾT
+// KẾ, không cần kiểm tra khoảng cách/tick hậu kỳ (GAMEPLAY.md §12, SECURITY.md §8).
+
+// Command: Client -> Server (OPCODE_MOVE_COMMAND). Gửi khi hướng di chuyển đổi (nhấn/nhả phím),
+// KHÔNG gửi liên tục mỗi frame.
+message MoveCommand {
+  float dir_x = 1;
+  float dir_y = 2;
+}
+
+// Response: Server -> Client (OPCODE_MOVE_RESPONSE). Vị trí THẬT của CHÍNH nhân vật gửi lệnh —
+// dùng cho reconciliation phía client (CLIENT.md §6). Khớp sequenceId với MoveCommand tương ứng.
+message MoveResponse {
+  float x = 1;
+  float y = 2;
+}
+
+// Event: Server -> Client (OPCODE_CHARACTER_MOVED_EVENT). Vị trí nhân vật KHÁC trong AoI
+// (SERVER.md §6) — không gửi Event này cho chính nhân vật đó (nó đã có MoveResponse).
+message CharacterMovedEvent {
+  int64 character_id = 1;
+  float x = 2;
+  float y = 3;
+}
+
+// Event: Server -> Client (OPCODE_CHARACTER_SPAWNED_EVENT). Nhân vật khác VỪA vào AoI (kết nối
+// mới hoặc đi tới gần) — client tạo entity render cho nó.
+message CharacterSpawnedEvent {
+  int64 character_id = 1;
+  float x = 2;
+  float y = 3;
+}
+
+// Event: Server -> Client (OPCODE_CHARACTER_DESPAWNED_EVENT). Nhân vật khác VỪA rời AoI (ngắt
+// kết nối hoặc đi xa) — client xoá entity render tương ứng.
+message CharacterDespawnedEvent {
+  int64 character_id = 1;
+}

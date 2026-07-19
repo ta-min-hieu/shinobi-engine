@@ -41,16 +41,23 @@ public final class GatewayServer {
     private final int requestedPort;
     private final AccountFacade accountFacade;
     private final CharacterFacade characterFacade;
+    private final WorldGateway worldGateway;
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private ExecutorService authExecutor;
     private Channel serverChannel;
 
-    /** @param port 0 = để hệ điều hành tự cấp cổng trống (dùng trong test, xem {@link #port()}). */
-    public GatewayServer(int port, AccountFacade accountFacade, CharacterFacade characterFacade) {
+    /**
+     * @param port 0 = để hệ điều hành tự cấp cổng trống (dùng trong test, xem {@link #port()}).
+     * @param worldGateway {@code registry()} đã đăng ký làm {@code WorldOutboundSink} của
+     *     {@code facade()} TRƯỚC khi truyền vào đây (composition root — {@code GatewayBootstrap}).
+     */
+    public GatewayServer(
+            int port, AccountFacade accountFacade, CharacterFacade characterFacade, WorldGateway worldGateway) {
         this.requestedPort = port;
         this.accountFacade = accountFacade;
         this.characterFacade = characterFacade;
+        this.worldGateway = worldGateway;
     }
 
     public void start() throws InterruptedException {
@@ -73,7 +80,8 @@ public final class GatewayServer {
                                 .addLast(new LengthFieldPrepender(LENGTH_FIELD_LENGTH))
                                 .addLast(new PacketFrameDecoder())
                                 .addLast(new PacketFrameEncoder())
-                                .addLast(new GatewayChannelHandler(accountFacade, characterFacade, authExecutor));
+                                .addLast(new GatewayChannelHandler(
+                                        accountFacade, characterFacade, worldGateway, authExecutor));
                     }
                 });
 

@@ -15,12 +15,22 @@ import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.NewCharacter;
+import dev.kage.protocol.CharacterMovedEvent;
+import dev.kage.protocol.CharacterSpawnedEvent;
+import dev.kage.protocol.ConnectRequest;
+import dev.kage.protocol.ConnectResponse;
+import dev.kage.protocol.CreateCharacterRequest;
+import dev.kage.protocol.CreateCharacterResponse;
+import dev.kage.protocol.MoveCommand;
+import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
+import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
+import dev.kage.server.world.WorldFacade;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
@@ -30,6 +40,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,6 +58,7 @@ import org.junit.jupiter.api.Timeout;
 class GatewayServerIntegrationTest {
 
     private GatewayServer server;
+    private WorldFacade worldFacade;
 
     @BeforeEach
     void startServer() throws InterruptedException {
@@ -54,7 +66,11 @@ class GatewayServerIntegrationTest {
         // AccountFacade/CharacterFacade THẬT với Fake Port (không server-database thật) — test
         // này chỉ verify ping/pong qua socket thật, không chạm Connect/Character, nhưng
         // GatewayServer luôn cần cả 2 Facade để khởi tạo (xem GatewayServer).
-        server = new GatewayServer(0, fakeAccountFacade(), fakeCharacterFacade());
+        var characterRegistry = new ConnectedCharacterRegistry();
+        worldFacade = new WorldFacade(characterRegistry);
+        worldFacade.start();
+        var worldGateway = new WorldGateway(worldFacade, characterRegistry);
+        server = new GatewayServer(0, fakeAccountFacade(), fakeCharacterFacade(), worldGateway);
         server.start();
     }
 
@@ -138,6 +154,7 @@ class GatewayServerIntegrationTest {
     @AfterEach
     void stopServer() {
         server.stop();
+        worldFacade.stop();
     }
 
     @Test
@@ -181,6 +198,91 @@ class GatewayServerIntegrationTest {
             assertThat(pongA.getClientTimestampMs()).isEqualTo(111L);
             assertThat(pongB.getClientTimestampMs()).isEqualTo(222L);
         }
+    }
+
+    @Test
+    @Timeout(15)
+    void twoClientsShouldSeeEachOtherMove_overRealSockets() throws Exception {
+        // Verify đúng Phase 3 Exit Criteria (ROADMAP.md): "2 client kết nối cùng server, thấy
+        // nhau di chuyển" — qua chính giao thức dây (socket thật), không chỉ nội bộ WorldFacade.
+        try (var socketA = new Socket("127.0.0.1", server.port());
+                var socketB = new Socket("127.0.0.1", server.port())) {
+            socketA.setSoTimeout(5000);
+            socketB.setSoTimeout(5000);
+            var inA = new DataInputStream(socketA.getInputStream());
+            var inB = new DataInputStream(socketB.getInputStream());
+
+            // Account.username giới hạn 3-20 ký tự — không dùng UUID đầy đủ được.
+            var suffix = UUID.randomUUID().toString().substring(0, 8);
+            long characterA = connectCreateAndSelect(socketA, inA, "a" + suffix);
+            long characterB = connectCreateAndSelect(socketB, inB, "b" + suffix);
+
+            // Cả 2 spawn cùng điểm (0,0) — vào AoI của nhau ngay tick kế tiếp sau khi attach.
+            var spawnSeenByA = CharacterSpawnedEvent.parseFrom(
+                    readUntilOpcode(inA, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload());
+            assertThat(spawnSeenByA.getCharacterId()).isEqualTo(characterB);
+            var spawnSeenByB = CharacterSpawnedEvent.parseFrom(
+                    readUntilOpcode(inB, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload());
+            assertThat(spawnSeenByB.getCharacterId()).isEqualTo(characterA);
+
+            // A di chuyển — chỉ gửi HƯỚNG (movement.proto), server tự nhân tốc độ.
+            var moveCommand = MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
+            sendFrame(socketA, Opcode.OPCODE_MOVE_COMMAND_VALUE, 10, moveCommand.toByteArray());
+
+            // A tự nhận MoveResponse (reconciliation, CLIENT.md §6) khớp sequenceId đã gửi.
+            var moveResponseFrame = readUntilOpcode(inA, Opcode.OPCODE_MOVE_RESPONSE_VALUE);
+            assertThat(moveResponseFrame.header().sequenceId()).isEqualTo(10);
+            var moveResponse = MoveResponse.parseFrom(moveResponseFrame.payload());
+            assertThat(moveResponse.getX()).isGreaterThanOrEqualTo(0f);
+
+            // B nhận CharacterMovedEvent về A (AoI — SERVER.md §6), vị trí đã đổi khỏi (0,0).
+            var movedSeenByB = CharacterMovedEvent.parseFrom(
+                    readUntilOpcode(inB, Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE).payload());
+            assertThat(movedSeenByB.getCharacterId()).isEqualTo(characterA);
+            assertThat(movedSeenByB.getX()).isGreaterThan(0f);
+        }
+    }
+
+    private static long connectCreateAndSelect(Socket socket, DataInputStream in, String username)
+            throws Exception {
+        var connectRequest = ConnectRequest.newBuilder().setUsername(username).build();
+        sendFrame(socket, Opcode.OPCODE_CONNECT_REQUEST_VALUE, 1, connectRequest.toByteArray());
+        ConnectResponse.parseFrom(readFrame(in).payload());
+
+        // Character.validateName: chỉ chữ/số, KHÔNG dấu gạch ngang (feature-character/CLAUDE.md).
+        var createRequest = CreateCharacterRequest.newBuilder()
+                .setName("Hero" + UUID.randomUUID().toString().replace("-", "").substring(0, 8))
+                .setIdempotencyKey(UUID.randomUUID().toString())
+                .build();
+        sendFrame(socket, Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, 2, createRequest.toByteArray());
+        var createResponse = CreateCharacterResponse.parseFrom(readFrame(in).payload());
+        long characterId = createResponse.getCharacter().getId();
+
+        var selectRequest = SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
+        sendFrame(socket, Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, 3, selectRequest.toByteArray());
+        readFrame(in); // SelectCharacterResponse — nội dung đã verify ở GatewayPipelineTest
+
+        return characterId;
+    }
+
+    private static void sendFrame(Socket socket, int opcode, int sequenceId, byte[] payload) throws Exception {
+        var out = new DataOutputStream(socket.getOutputStream());
+        var header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
+        byte[] frame = PacketCodec.encodeFrame(header, payload);
+        out.writeInt(frame.length);
+        out.write(frame);
+        out.flush();
+    }
+
+    /** AoI Event tới bất kỳ lúc nào giữa các Response khác — đọc tới khi thấy đúng opcode cần. */
+    private static PacketCodec.Frame readUntilOpcode(DataInputStream in, int expectedOpcode) throws Exception {
+        for (int attempt = 0; attempt < 1000; attempt++) {
+            var frame = readFrame(in);
+            if (frame.header().opcode() == expectedOpcode) {
+                return frame;
+            }
+        }
+        throw new AssertionError("Không thấy opcode " + expectedOpcode + " sau 1000 frame");
     }
 
     private static void sendPing(Socket socket, int sequenceId, long clientTimestampMs) throws Exception {

@@ -7,9 +7,11 @@ services:
       POSTGRES_DB: kage
       POSTGRES_USER: kage
       POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD trong .env}
-    # ⚠️ UTF-8 collation từ đầu — tiếng Việt (DATABASE.md §1). Sửa sau rất khó.
-    command: >
-      postgres -c lc_collate=en_US.UTF-8 -c lc_ctype=en_US.UTF-8
+      # ⚠️ PHÁT HIỆN THẬT: lc_collate/lc_ctype là tham số lúc initdb (tạo cluster), KHÔNG phải
+      # GUC runtime — `postgres -c lc_collate=...` bị postgres:17 từ chối thẳng lúc khởi động
+      # ("FATAL: unrecognized configuration parameter"). Phải truyền qua POSTGRES_INITDB_ARGS để
+      # image tự chuyển cho initdb (UTF-8 collation từ đầu — tiếng Việt, DATABASE.md §1).
+      POSTGRES_INITDB_ARGS: "--locale=en_US.UTF-8"
     ports:
       - "5432:5432"
     healthcheck:

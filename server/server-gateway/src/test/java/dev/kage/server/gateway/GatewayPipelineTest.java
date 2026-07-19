@@ -31,6 +31,7 @@ import dev.kage.protocol.SelectCharacterResponse;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
+import dev.kage.server.world.WorldFacade;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -223,12 +224,19 @@ class GatewayPipelineTest {
         var characterFacade =
                 new CharacterFacade(createCharacterUseCase, listCharactersUseCase, selectCharacterUseCase);
 
+        // WorldFacade KHÔNG start() ở đây — test này không verify movement/AoI, chỉ cần
+        // attachCharacter() (gọi trong handleSelectCharacterBlocking) không ném lỗi khi enqueue
+        // vào hàng đợi chưa có ai drain (không tạo/rò rỉ thread tick cho mỗi test).
+        var characterRegistry = new ConnectedCharacterRegistry();
+        var worldFacade = new WorldFacade(characterRegistry);
+        var worldGateway = new WorldGateway(worldFacade, characterRegistry);
+
         return new EmbeddedChannel(
                 new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
                 new LengthFieldPrepender(4),
                 new PacketFrameDecoder(),
                 new PacketFrameEncoder(),
-                new GatewayChannelHandler(accountFacade, characterFacade, Runnable::run));
+                new GatewayChannelHandler(accountFacade, characterFacade, worldGateway, Runnable::run));
     }
 
     /** Fake = implementation in-memory THẬT (TESTING.md §4), không Mockito. */

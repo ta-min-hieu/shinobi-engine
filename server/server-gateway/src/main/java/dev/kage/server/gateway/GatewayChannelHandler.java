@@ -17,6 +17,7 @@ import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.Faction;
 import dev.kage.protocol.ListCharactersRequest;
 import dev.kage.protocol.ListCharactersResponse;
+import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
@@ -51,6 +52,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private final AccountFacade accountFacade;
     private final CharacterFacade characterFacade;
+    private final WorldGateway worldGateway;
     private final Executor authExecutor;
 
     // handleConnect/handleSelectCharacter set giá trị này từ Virtual Thread; channelRead0 của
@@ -59,9 +61,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private volatile Long boundAccountId;
     private volatile Long boundCharacterId;
 
-    GatewayChannelHandler(AccountFacade accountFacade, CharacterFacade characterFacade, Executor authExecutor) {
+    GatewayChannelHandler(
+            AccountFacade accountFacade, CharacterFacade characterFacade, WorldGateway worldGateway,
+            Executor authExecutor) {
         this.accountFacade = accountFacade;
         this.characterFacade = characterFacade;
+        this.worldGateway = worldGateway;
         this.authExecutor = authExecutor;
     }
 
@@ -79,6 +84,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 handleCreateCharacter(ctx, header, frame.payload());
             } else if (header.opcode() == Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE) {
                 handleSelectCharacter(ctx, header, frame.payload());
+            } else if (header.opcode() == Opcode.OPCODE_MOVE_COMMAND_VALUE) {
+                handleMoveCommand(ctx, header, frame.payload());
             } else {
                 sendError(ctx, header.sequenceId(), 404, "error.unknown_opcode");
             }
@@ -223,6 +230,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         try {
             characterFacade.selectCharacter(accountId, characterId);
             boundCharacterId = characterId;
+            // Đăng ký connection NÀY để world outbound (spawn/move/despawn — SERVER.md §6) tìm
+            // đúng channel; attachCharacter chỉ enqueue, entity ECS thật tạo ở tick kế tiếp.
+            worldGateway.registry().register(characterId, ctx);
+            worldGateway.facade().attachCharacter(characterId);
             var response = SelectCharacterResponse.newBuilder().setSuccess(true).build();
             send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
         } catch (CharacterNotFoundException e) {
@@ -235,12 +246,24 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
     }
 
+    // MoveCommand KHÔNG chạm DB/Redis — chỉ enqueue vào server-world (rẻ, thread-safe), nên xử
+    // lý thẳng trên EventLoop, không cần authExecutor (SERVER.md §2: "EventLoop được: decode,
+    // validate rẻ, enqueue").
+    private void handleMoveCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = MoveCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        worldGateway.facade().enqueueMoveCommand(characterId, sequenceId, command.getDirX(), command.getDirY());
+    }
+
     /**
      * {@code characterId} đã chọn cho connection này, hoặc {@code null} nếu chưa chọn. Package-
-     * private — lát cắt server-world/movement kế tiếp (ROADMAP Phase 3) sẽ đọc giá trị này khi
-     * enqueue Command gameplay vào server-world (characterId từ session, không từ packet —
-     * SECURITY.md §4). Chưa có caller thật ở lát cắt này, nhưng đây là API tự nhiên của field,
-     * không phải suppress PMD tuỳ tiện.
+     * private — dùng trong test (SECURITY.md §4: characterId từ session, không từ packet).
      */
     Long boundCharacterId() {
         return boundCharacterId;
@@ -273,6 +296,18 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void send(ChannelHandlerContext ctx, int opcode, int sequenceId, byte[] payload) {
         var header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
         ctx.writeAndFlush(new PacketCodec.Frame(header, payload));
+    }
+
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) {
+        // Mất kết nối (đóng chủ động, timeout, hay lỗi — exceptionCaught cũng dẫn tới sự kiện
+        // này) — dọn entity ECS + AoI của nhân vật này (SERVER.md §9: 1 kết nối chết không được
+        // để bia đỡ đạn đứng lại trong world).
+        var characterId = boundCharacterId;
+        if (characterId != null) {
+            worldGateway.registry().unregister(characterId);
+            worldGateway.facade().detachCharacter(characterId);
+        }
     }
 
     @Override
