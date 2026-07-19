@@ -45,6 +45,7 @@ include(":server:server-database")
 //   feature-inventory/feature-shop = Phase 5, phần còn lại = Phase 6-7). Không scaffold 11 module
 //   rỗng trước (Điều 9 / YAGNI). Xem server/server-features/README.md.
 include(":server:server-features:feature-account")
+include(":server:server-features:feature-character")
 
 // ---- quality ----
 include(":quality:architecture-tests")   // ArchUnit (ADR-011) — enforce dependency rule

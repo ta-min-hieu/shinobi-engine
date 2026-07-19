@@ -20,8 +20,9 @@ public final class GatewayBootstrap {
     public static void main(String[] args) throws InterruptedException {
         var databaseBootstrap = new ServerDatabaseBootstrap();
         var accountFacade = databaseBootstrap.wireAccountFacade();
+        var characterFacade = databaseBootstrap.wireCharacterFacade();
 
-        var server = new GatewayServer(PORT, accountFacade);
+        var server = new GatewayServer(PORT, accountFacade, characterFacade);
         server.start();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             server.stop();

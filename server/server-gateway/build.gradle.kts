@@ -10,6 +10,7 @@ plugins {
 dependencies {
     implementation(project(":shared:shared-protocol"))
     implementation(project(":server:server-features:feature-account"))
+    implementation(project(":server:server-features:feature-character"))
     implementation(project(":server:server-database"))
     implementation("io.netty:netty-all:4.1.136.Final")
     implementation("org.slf4j:slf4j-api:2.0.18")

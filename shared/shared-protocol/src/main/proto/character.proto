@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// Packet Character (NETWORK.md §4, dải 200-299). accountId lấy từ session gắn với connection
+// (server-gateway), KHÔNG có field nào trong Request mang accountId — đúng "characterId/accountId
+// từ session, không từ packet" (SECURITY.md §4, chống IDOR).
+
+// MVP chỉ có Hỏa chơi được (GDD §11) — "chọn hệ ở Lv10" (GDD §4) là Post-MVP khi có đủ 5 hệ; nhân
+// vật mới tạo mặc định FACTION_HOA, không có bước chọn hệ lúc tạo.
+enum Faction {
+  FACTION_UNSPECIFIED = 0;
+  FACTION_HOA = 1;
+  // FACTION_THUY/PHONG/LOI/THO = 2-5 — thêm khi Post-MVP mở thêm hệ, KHÔNG tái sử dụng số.
+}
+
+message CharacterSummary {
+  int64 id = 1;
+  string name = 2;
+  Faction faction = 3;
+  int32 level = 4;
+}
+
+// Command: Client -> Server (OPCODE_LIST_CHARACTERS_REQUEST). Không field — accountId từ session.
+message ListCharactersRequest {
+}
+
+// Response: Server -> Client (OPCODE_LIST_CHARACTERS_RESPONSE).
+message ListCharactersResponse {
+  repeated CharacterSummary characters = 1;
+}
+
+// Command: Client -> Server (OPCODE_CREATE_CHARACTER_REQUEST).
+message CreateCharacterRequest {
+  string name = 1;
+  // ADR-025 (idempotency, Accepted) — UUID v4 client sinh, giữ nguyên khi tự retry cùng 1 hành
+  // động, sinh mới khi người chơi bắt đầu hành động MỚI. Command side-effect đầu tiên của dự án
+  // dùng field này — server enforce unique ở DB trong cùng transaction (DATABASE.md idempotency_key).
+  string idempotency_key = 2;
+}
+
+// Response: Server -> Client (OPCODE_CREATE_CHARACTER_RESPONSE).
+message CreateCharacterResponse {
+  bool success = 1;
+  CharacterSummary character = 2;
+  string error_key = 3; // rỗng nếu success=true (NETWORK.md §107)
+}

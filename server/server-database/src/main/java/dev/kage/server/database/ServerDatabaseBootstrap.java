@@ -2,8 +2,13 @@ package dev.kage.server.database;
 
 import dev.kage.account.api.AccountFacade;
 import dev.kage.account.application.LoginOrCreateAccountUseCase;
+import dev.kage.character.api.CharacterFacade;
+import dev.kage.character.application.CreateCharacterUseCase;
+import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
+import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
+import dev.kage.server.database.character.PostgresCharacterAdapter;
 import dev.kage.server.database.session.RedisClientFactory;
 import dev.kage.server.database.session.RedisConfig;
 import dev.kage.server.database.session.RedisSessionAdapter;
@@ -12,9 +17,10 @@ import redis.clients.jedis.JedisPool;
 
 /**
  * Composition root — nơi DUY NHẤT lắp ráp Facade thật (Adapter + UseCase + TransactionRunner)
- * từ cấu hình môi trường. {@code server-gateway} chỉ gọi {@link #wireAccountFacade()}, không bao
- * giờ thấy {@link DataSource}/{@link JedisPool} trực tiếp (Điều 23 — server-gateway không biết
- * DB; gọi qua đây không vi phạm vì server-gateway không tự import java.sql/Jedis).
+ * từ cấu hình môi trường. {@code server-gateway} chỉ gọi {@link #wireAccountFacade()}/{@link
+ * #wireCharacterFacade()}, không bao giờ thấy {@link DataSource}/{@link JedisPool} trực tiếp
+ * (Điều 23 — server-gateway không biết DB; gọi qua đây không vi phạm vì server-gateway không tự
+ * import java.sql/Jedis).
  */
 public final class ServerDatabaseBootstrap {
 
@@ -33,6 +39,14 @@ public final class ServerDatabaseBootstrap {
         var transactionManager = new JdbcAccountTransactionRunner(dataSource);
         var useCase = new LoginOrCreateAccountUseCase(accountPort, sessionPort, transactionManager);
         return new AccountFacade(useCase);
+    }
+
+    public CharacterFacade wireCharacterFacade() {
+        var characterPort = new PostgresCharacterAdapter(dataSource);
+        var transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
+        var createUseCase = new CreateCharacterUseCase(characterPort, transactionRunner);
+        var listUseCase = new ListCharactersUseCase(characterPort);
+        return new CharacterFacade(createUseCase, listUseCase);
     }
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */

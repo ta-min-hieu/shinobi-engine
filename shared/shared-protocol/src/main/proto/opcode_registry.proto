@@ -5,9 +5,12 @@ package kage.protocol;
 option java_package = "dev.kage.protocol";
 option java_multiple_files = true;
 
-// Nguồn chân lý của bảng opcode (NETWORK.md §104). Dải số cố định theo domain — tránh đụng độ
+// Nguồn chân lý của bảng opcode (NETWORK.md §4). Dải số cố định theo domain — tránh đụng độ
 // khi nhiều người/AI thêm packet song song. Chỉ cấp phát tuần tự TRONG dải của domain, không
 // bao giờ tái sử dụng số đã cấp (kể cả khi packet đó bị xoá sau này — Điều 37 tinh thần ADR).
+//
+// ⚠️ PHÁT HIỆN THẬT (Phase 3): file này trước đây tên opcode.proto — NETWORK.md §4 nói nguồn
+// chân lý PHẢI là opcode_registry.proto, đã đổi tên khớp lại đúng lúc thêm dải Character.
 //
 //   0–99      System (handshake, heartbeat, error)     ← Phase 2 dùng dải này
 //   100–199   Account / Login                          ← Phase 3
@@ -31,4 +34,10 @@ enum Opcode {
   OPCODE_CONNECT_REQUEST = 3;
   OPCODE_CONNECT_RESPONSE = 4;
   OPCODE_ERROR = 5;
+
+  // --- Character (200-299) ---
+  OPCODE_LIST_CHARACTERS_REQUEST = 200;
+  OPCODE_LIST_CHARACTERS_RESPONSE = 201;
+  OPCODE_CREATE_CHARACTER_REQUEST = 202;
+  OPCODE_CREATE_CHARACTER_RESPONSE = 203;
 }

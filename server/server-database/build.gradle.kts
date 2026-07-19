@@ -12,6 +12,7 @@ plugins {
 dependencies {
     api(project(":shared:shared-common"))
     implementation(project(":server:server-features:feature-account"))
+    implementation(project(":server:server-features:feature-character"))
 
     implementation(libs.hikaricp)
     implementation(libs.postgresql)

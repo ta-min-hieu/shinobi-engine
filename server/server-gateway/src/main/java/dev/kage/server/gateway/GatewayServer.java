@@ -1,6 +1,7 @@
 package dev.kage.server.gateway;
 
 import dev.kage.account.api.AccountFacade;
+import dev.kage.character.api.CharacterFacade;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
@@ -39,15 +40,17 @@ public final class GatewayServer {
 
     private final int requestedPort;
     private final AccountFacade accountFacade;
+    private final CharacterFacade characterFacade;
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private ExecutorService authExecutor;
     private Channel serverChannel;
 
     /** @param port 0 = để hệ điều hành tự cấp cổng trống (dùng trong test, xem {@link #port()}). */
-    public GatewayServer(int port, AccountFacade accountFacade) {
+    public GatewayServer(int port, AccountFacade accountFacade, CharacterFacade characterFacade) {
         this.requestedPort = port;
         this.accountFacade = accountFacade;
+        this.characterFacade = characterFacade;
     }
 
     public void start() throws InterruptedException {
@@ -70,7 +73,7 @@ public final class GatewayServer {
                                 .addLast(new LengthFieldPrepender(LENGTH_FIELD_LENGTH))
                                 .addLast(new PacketFrameDecoder())
                                 .addLast(new PacketFrameEncoder())
-                                .addLast(new GatewayChannelHandler(accountFacade, authExecutor));
+                                .addLast(new GatewayChannelHandler(accountFacade, characterFacade, authExecutor));
                     }
                 });
 

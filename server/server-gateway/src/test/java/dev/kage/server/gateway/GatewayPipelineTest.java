@@ -9,8 +9,18 @@ import dev.kage.account.domain.Account;
 import dev.kage.account.domain.AccountPort;
 import dev.kage.account.domain.SessionPort;
 import dev.kage.account.domain.Transaction;
+import dev.kage.character.api.CharacterFacade;
+import dev.kage.character.application.CreateCharacterUseCase;
+import dev.kage.character.application.ListCharactersUseCase;
+import dev.kage.character.domain.Character;
+import dev.kage.character.domain.CharacterPort;
+import dev.kage.character.domain.NewCharacter;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
+import dev.kage.protocol.CreateCharacterRequest;
+import dev.kage.protocol.CreateCharacterResponse;
+import dev.kage.protocol.ListCharactersRequest;
+import dev.kage.protocol.ListCharactersResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
@@ -23,9 +33,12 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
@@ -82,21 +95,76 @@ class GatewayPipelineTest {
         assertThat(response.header().opcode()).isEqualTo(Opcode.OPCODE_ERROR_VALUE);
     }
 
+    @Test
+    void shouldRejectListCharacters_whenNotConnectedYet() {
+        var channel = newPipeline();
+        var header = new PacketHeader(Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE, ProtocolVersion.CURRENT, 1);
+
+        writeInboundFrame(channel, header, ListCharactersRequest.newBuilder().build().toByteArray());
+        var response = readOutboundFrame(channel);
+
+        // accountId gắn vào CONNECTION lúc Connect thành công (xem GatewayChannelHandler) — chưa
+        // Connect thì chưa có accountId, phải từ chối chứ không đọc packet.
+        assertThat(response.header().opcode()).isEqualTo(Opcode.OPCODE_ERROR_VALUE);
+    }
+
+    @Test
+    void shouldCreateThenListCharacter_afterConnect() throws InvalidProtocolBufferException {
+        var channel = newPipeline();
+        connect(channel, "kagehero2");
+
+        var createRequest = CreateCharacterRequest.newBuilder()
+                .setName("KageHero")
+                .setIdempotencyKey(UUID.randomUUID().toString())
+                .build();
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, ProtocolVersion.CURRENT, 2),
+                createRequest.toByteArray());
+        var createResponseFrame = readOutboundFrame(channel);
+        assertThat(createResponseFrame.header().opcode()).isEqualTo(Opcode.OPCODE_CREATE_CHARACTER_RESPONSE_VALUE);
+        var createResponse = CreateCharacterResponse.parseFrom(createResponseFrame.payload());
+        assertThat(createResponse.getSuccess()).isTrue();
+        assertThat(createResponse.getCharacter().getName()).isEqualTo("KageHero");
+
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE, ProtocolVersion.CURRENT, 3),
+                ListCharactersRequest.newBuilder().build().toByteArray());
+        var listResponseFrame = readOutboundFrame(channel);
+        assertThat(listResponseFrame.header().opcode()).isEqualTo(Opcode.OPCODE_LIST_CHARACTERS_RESPONSE_VALUE);
+        var listResponse = ListCharactersResponse.parseFrom(listResponseFrame.payload());
+        assertThat(listResponse.getCharactersList()).extracting(c -> c.getName()).containsExactly("KageHero");
+    }
+
+    private static void connect(EmbeddedChannel channel, String username) {
+        var request = ConnectRequest.newBuilder().setUsername(username).build();
+        var header = new PacketHeader(Opcode.OPCODE_CONNECT_REQUEST_VALUE, ProtocolVersion.CURRENT, 1);
+        writeInboundFrame(channel, header, request.toByteArray());
+        readOutboundFrame(channel); // tiêu thụ ConnectResponse — caller không kiểm tra lại nội dung
+    }
+
     private static EmbeddedChannel newPipeline() {
         // ⚠️ Phải khớp CHÍNH XÁC pipeline thật trong GatewayBootstrap — lệch ở đây là test giả.
-        // AccountFacade THẬT (không mock), chỉ Port bên dưới là Fake (TESTING.md §4) — cùng kiểu
-        // Fake với LoginOrCreateAccountUseCaseTest ở feature-account. Executor chạy ĐỒNG BỘ
-        // (Runnable::run) — handleConnect thật đẩy việc login sang authExecutor (Virtual Thread ở
-        // production, SERVER.md §2); test cần đồng bộ để readOutboundFrame không bị race.
-        var useCase = new LoginOrCreateAccountUseCase(
+        // AccountFacade/CharacterFacade THẬT (không mock), chỉ Port bên dưới là Fake (TESTING.md
+        // §4) — cùng kiểu Fake với *UseCaseTest ở feature-account/feature-character. Executor
+        // chạy ĐỒNG BỘ (Runnable::run) — handler thật đẩy việc chạm DB sang authExecutor (Virtual
+        // Thread ở production, SERVER.md §2); test cần đồng bộ để readOutboundFrame không bị race.
+        var loginUseCase = new LoginOrCreateAccountUseCase(
                 new FakeAccountPort(), new FakeSessionPort(), action -> action.accept(null));
-        var accountFacade = new AccountFacade(useCase);
+        var accountFacade = new AccountFacade(loginUseCase);
+
+        var characterPort = new FakeCharacterPort();
+        var createCharacterUseCase = new CreateCharacterUseCase(characterPort, action -> action.accept(null));
+        var listCharactersUseCase = new ListCharactersUseCase(characterPort);
+        var characterFacade = new CharacterFacade(createCharacterUseCase, listCharactersUseCase);
+
         return new EmbeddedChannel(
                 new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
                 new LengthFieldPrepender(4),
                 new PacketFrameDecoder(),
                 new PacketFrameEncoder(),
-                new GatewayChannelHandler(accountFacade, Runnable::run));
+                new GatewayChannelHandler(accountFacade, characterFacade, Runnable::run));
     }
 
     /** Fake = implementation in-memory THẬT (TESTING.md §4), không Mockito. */
@@ -128,6 +196,42 @@ class GatewayPipelineTest {
         @Override
         public void revoke(String token) {
             tokens.remove(token);
+        }
+    }
+
+    static final class FakeCharacterPort implements CharacterPort {
+        private final List<Character> characters = new ArrayList<>();
+        private final AtomicLong nextId = new AtomicLong(1);
+
+        @Override
+        public List<Character> listByAccount(long accountId) {
+            return characters.stream().filter(c -> c.accountId() == accountId).toList();
+        }
+
+        @Override
+        public int countByAccount(long accountId) {
+            return listByAccount(accountId).size();
+        }
+
+        @Override
+        public boolean existsByName(String name) {
+            return characters.stream().anyMatch(c -> c.name().equals(name));
+        }
+
+        @Override
+        public Character create(dev.kage.character.domain.Transaction tx, NewCharacter newCharacter) {
+            var character = new Character(
+                    nextId.getAndIncrement(),
+                    newCharacter.accountId(),
+                    1,
+                    newCharacter.name(),
+                    newCharacter.faction(),
+                    1,
+                    0,
+                    0,
+                    Instant.now());
+            characters.add(character);
+            return character;
         }
     }
 

@@ -2,9 +2,20 @@ package dev.kage.server.gateway;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import dev.kage.account.api.AccountFacade;
+import dev.kage.character.api.CharacterFacade;
+import dev.kage.character.application.CharacterLimitExceededException;
+import dev.kage.character.application.DuplicateCharacterNameException;
+import dev.kage.character.domain.Character;
+import dev.kage.character.domain.IdempotencyKeyReusedException;
+import dev.kage.protocol.CharacterSummary;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
+import dev.kage.protocol.CreateCharacterRequest;
+import dev.kage.protocol.CreateCharacterResponse;
 import dev.kage.protocol.ErrorResponse;
+import dev.kage.protocol.Faction;
+import dev.kage.protocol.ListCharactersRequest;
+import dev.kage.protocol.ListCharactersResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
@@ -18,23 +29,35 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Xử lý packet hệ thống (Ping/Connect) trên Netty EventLoop — nhưng CHỈ phần rẻ (decode,
- * validate rẻ, enqueue); phần chạm DB/Redis đẩy sang {@code authExecutor} (Virtual Thread,
- * SERVER.md §2). Từ Phase 3 trở đi, Command chạm gameplay/DB PHẢI enqueue vào server-world
- * hoặc Virtual Thread, KHÔNG BAO GIỜ chạy inline chặn EventLoop.
+ * Xử lý packet hệ thống + Character trên Netty EventLoop — nhưng CHỈ phần rẻ (decode, validate
+ * rẻ, enqueue); phần chạm DB/Redis đẩy sang {@code authExecutor} (Virtual Thread, SERVER.md §2).
+ * Từ Phase 3 trở đi, Command chạm gameplay/DB PHẢI enqueue vào server-world hoặc Virtual Thread,
+ * KHÔNG BAO GIỜ chạy inline chặn EventLoop.
  *
  * <p>{@code handleConnect} gọi {@link AccountFacade} (ADR-017 ✅ Accepted) — đăng nhập thật bằng
  * username, tự tạo account nếu chưa có (dự án cá nhân, chưa cần mật khẩu ở bước này).
+ *
+ * <p>Handler này được {@code new} một lần MỖI kết nối (xem {@code GatewayServer.start()}), nên
+ * vốn dĩ đã là state per-connection — {@link #boundAccountId} tận dụng đúng điều đó: sau đăng
+ * nhập thành công, accountId gắn vào CONNECTION này, không phải đọc lại từ packet ở Command sau
+ * (đúng tinh thần "characterId/accountId từ session, không từ packet" — SECURITY.md §4).
  */
 final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCodec.Frame> {
 
     private static final Logger LOG = LoggerFactory.getLogger(GatewayChannelHandler.class);
 
     private final AccountFacade accountFacade;
+    private final CharacterFacade characterFacade;
     private final Executor authExecutor;
 
-    GatewayChannelHandler(AccountFacade accountFacade, Executor authExecutor) {
+    // handleConnect set giá trị này từ Virtual Thread; channelRead0 của packet TIẾP THEO có thể
+    // chạy trên EventLoop trước khi Virtual Thread đó xong (Netty không chờ) — cần volatile để
+    // đảm bảo visibility giữa 2 thread.
+    private volatile Long boundAccountId;
+
+    GatewayChannelHandler(AccountFacade accountFacade, CharacterFacade characterFacade, Executor authExecutor) {
         this.accountFacade = accountFacade;
+        this.characterFacade = characterFacade;
         this.authExecutor = authExecutor;
     }
 
@@ -46,6 +69,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 handlePing(ctx, header, frame.payload());
             } else if (header.opcode() == Opcode.OPCODE_CONNECT_REQUEST_VALUE) {
                 handleConnect(ctx, header, frame.payload());
+            } else if (header.opcode() == Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE) {
+                handleListCharacters(ctx, header, frame.payload());
+            } else if (header.opcode() == Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE) {
+                handleCreateCharacter(ctx, header, frame.payload());
             } else {
                 sendError(ctx, header.sequenceId(), 404, "error.unknown_opcode");
             }
@@ -86,6 +113,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleConnectBlocking(ChannelHandlerContext ctx, int sequenceId, String username) {
         try {
             var result = accountFacade.login(username);
+            boundAccountId = result.accountId();
             var response = ConnectResponse.newBuilder()
                     .setSuccess(true)
                     .setSessionId(result.sessionToken())
@@ -99,6 +127,89 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             LOG.error("Đăng nhập thất bại: lỗi không mong đợi", e);
             sendError(ctx, sequenceId, 500, "error.login_failed");
         }
+    }
+
+    private void handleListCharacters(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ListCharactersRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        var sequenceId = header.sequenceId();
+        var accountId = boundAccountId;
+        if (accountId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleListCharactersBlocking(ctx, sequenceId, accountId));
+    }
+
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private void handleListCharactersBlocking(ChannelHandlerContext ctx, int sequenceId, long accountId) {
+        try {
+            var characters = characterFacade.listCharacters(accountId);
+            var response = ListCharactersResponse.newBuilder()
+                    .addAllCharacters(characters.stream().map(GatewayChannelHandler::toProto).toList())
+                    .build();
+            send(ctx, Opcode.OPCODE_LIST_CHARACTERS_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        } catch (RuntimeException e) {
+            LOG.error("Liệt kê nhân vật thất bại", e);
+            sendError(ctx, sequenceId, 500, "error.list_characters_failed");
+        }
+    }
+
+    private void handleCreateCharacter(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var request = CreateCharacterRequest.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var accountId = boundAccountId;
+        if (accountId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleCreateCharacterBlocking(ctx, sequenceId, accountId, request));
+    }
+
+    // PMD AvoidCatchingGenericException: ranh giới I/O bất đồng bộ, phải trả lời dù lỗi gì.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private void handleCreateCharacterBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long accountId, CreateCharacterRequest request) {
+        try {
+            var character = characterFacade.createCharacter(
+                    accountId, request.getName(), request.getIdempotencyKey());
+            var response = CreateCharacterResponse.newBuilder()
+                    .setSuccess(true)
+                    .setCharacter(toProto(character))
+                    .build();
+            send(ctx, Opcode.OPCODE_CREATE_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        } catch (IllegalArgumentException e) {
+            LOG.warn("Tạo nhân vật thất bại: tên không hợp lệ", e);
+            sendError(ctx, sequenceId, 400, "error.invalid_character_name");
+        } catch (CharacterLimitExceededException e) {
+            LOG.warn("Tạo nhân vật thất bại: vượt giới hạn", e);
+            sendError(ctx, sequenceId, 409, "error.character_limit_exceeded");
+        } catch (DuplicateCharacterNameException e) {
+            LOG.warn("Tạo nhân vật thất bại: tên trùng", e);
+            sendError(ctx, sequenceId, 409, "error.duplicate_character_name");
+        } catch (IdempotencyKeyReusedException e) {
+            LOG.warn("Tạo nhân vật thất bại: idempotencyKey đã dùng", e);
+            sendError(ctx, sequenceId, 409, "error.duplicate_request");
+        } catch (RuntimeException e) {
+            LOG.error("Tạo nhân vật thất bại: lỗi không mong đợi", e);
+            sendError(ctx, sequenceId, 500, "error.create_character_failed");
+        }
+    }
+
+    private static CharacterSummary toProto(Character character) {
+        return CharacterSummary.newBuilder()
+                .setId(character.id())
+                .setName(character.name())
+                .setFaction(toProtoFaction(character.faction()))
+                .setLevel(character.level())
+                .build();
+    }
+
+    private static Faction toProtoFaction(dev.kage.character.domain.Faction faction) {
+        return switch (faction) {
+            case HOA -> Faction.FACTION_HOA;
+        };
     }
 
     private void sendError(ChannelHandlerContext ctx, int relatedSequenceId, int errorCode, String errorKey) {

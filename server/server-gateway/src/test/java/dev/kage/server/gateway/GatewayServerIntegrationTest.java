@@ -8,6 +8,12 @@ import dev.kage.account.domain.Account;
 import dev.kage.account.domain.AccountPort;
 import dev.kage.account.domain.SessionPort;
 import dev.kage.account.domain.Transaction;
+import dev.kage.character.api.CharacterFacade;
+import dev.kage.character.application.CreateCharacterUseCase;
+import dev.kage.character.application.ListCharactersUseCase;
+import dev.kage.character.domain.Character;
+import dev.kage.character.domain.CharacterPort;
+import dev.kage.character.domain.NewCharacter;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
@@ -18,7 +24,9 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
@@ -42,10 +50,10 @@ class GatewayServerIntegrationTest {
     @BeforeEach
     void startServer() throws InterruptedException {
         // port 0 = OS tự cấp cổng trống — tránh đụng cổng khi nhiều test chạy song song.
-        // AccountFacade THẬT với Fake Port (không server-database thật) — test này chỉ verify
-        // ping/pong qua socket thật, không chạm CONNECT_REQUEST, nhưng GatewayServer luôn cần
-        // AccountFacade để khởi tạo (constructor thay đổi từ Phase 3, xem GatewayServer).
-        server = new GatewayServer(0, fakeAccountFacade());
+        // AccountFacade/CharacterFacade THẬT với Fake Port (không server-database thật) — test
+        // này chỉ verify ping/pong qua socket thật, không chạm Connect/Character, nhưng
+        // GatewayServer luôn cần cả 2 Facade để khởi tạo (xem GatewayServer).
+        server = new GatewayServer(0, fakeAccountFacade(), fakeCharacterFacade());
         server.start();
     }
 
@@ -82,6 +90,47 @@ class GatewayServerIntegrationTest {
         };
         var useCase = new LoginOrCreateAccountUseCase(accountPort, sessionPort, action -> action.accept(null));
         return new AccountFacade(useCase);
+    }
+
+    private static CharacterFacade fakeCharacterFacade() {
+        var characterPort = new CharacterPort() {
+            private final List<Character> characters = new ArrayList<>();
+            private final AtomicLong nextId = new AtomicLong(1);
+
+            @Override
+            public List<Character> listByAccount(long accountId) {
+                return characters.stream().filter(c -> c.accountId() == accountId).toList();
+            }
+
+            @Override
+            public int countByAccount(long accountId) {
+                return listByAccount(accountId).size();
+            }
+
+            @Override
+            public boolean existsByName(String name) {
+                return characters.stream().anyMatch(c -> c.name().equals(name));
+            }
+
+            @Override
+            public Character create(dev.kage.character.domain.Transaction tx, NewCharacter newCharacter) {
+                var character = new Character(
+                        nextId.getAndIncrement(),
+                        newCharacter.accountId(),
+                        1,
+                        newCharacter.name(),
+                        newCharacter.faction(),
+                        1,
+                        0,
+                        0,
+                        Instant.now());
+                characters.add(character);
+                return character;
+            }
+        };
+        var createUseCase = new CreateCharacterUseCase(characterPort, action -> action.accept(null));
+        var listUseCase = new ListCharactersUseCase(characterPort);
+        return new CharacterFacade(createUseCase, listUseCase);
     }
 
     @AfterEach
