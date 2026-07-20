@@ -6,11 +6,13 @@ import dev.kage.engine.ecs.KEntity;
 import dev.kage.engine.ecs.component.PositionComponent;
 import dev.kage.engine.ecs.component.VelocityComponent;
 import dev.kage.engine.ecs.system.MovementSystem;
+import dev.kage.server.world.component.AiStateComponent;
 import dev.kage.server.world.component.AttackCooldownComponent;
 import dev.kage.server.world.component.CharacterIdComponent;
 import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterComponent;
+import dev.kage.server.world.component.MonsterIdComponent;
 import dev.kage.server.world.component.TargetComponent;
 import java.util.HashMap;
 import java.util.List;
@@ -67,6 +69,10 @@ public final class WorldFacade {
         this.outboundSink = outboundSink;
         this.aoiTracker = new AreaOfInterestTracker(outboundSink);
         this.combatSystem = new CombatSystem(this::lookupEntity);
+        // Thứ tự ĐÚNG ECS.md §6 (InputCommandSystem -> AISystem -> MovementSystem -> ... ->
+        // CombatSystem): AI set vận tốc/mục tiêu trước, Movement tích luỹ vị trí, Combat mới xét
+        // tầm đánh — đổi thứ tự = đổi behavior (engine/CLAUDE.md).
+        ecsWorld.addSystem(new AiSystem(entitiesByCharacterId::values, this::lookupEntity));
         ecsWorld.addSystem(new MovementSystem());
         ecsWorld.addSystem(combatSystem);
     }
@@ -255,6 +261,7 @@ public final class WorldFacade {
 
     private void spawnTrainingDummy() {
         var entity = ecsWorld.createEntity();
+        long monsterId = nextMonsterId--;
 
         var position = new PositionComponent();
         position.x = TRAINING_DUMMY_SPAWN_X;
@@ -262,6 +269,7 @@ public final class WorldFacade {
         position.prevX = position.x;
         position.prevY = position.y;
         entity.add(position);
+        entity.add(new VelocityComponent()); // AiSystem set vận tốc theo FSM (AI.md §3)
 
         var health = new HealthComponent();
         health.current = CombatConstants.MONSTER_MAX_HP;
@@ -273,7 +281,17 @@ public final class WorldFacade {
         entity.add(monster);
         entity.add(toComponent(CombatConstants.MONSTER_STATS));
 
-        long monsterId = nextMonsterId--;
+        var monsterIdComponent = new MonsterIdComponent();
+        monsterIdComponent.monsterId = monsterId;
+        entity.add(monsterIdComponent);
+
+        var aiState = new AiStateComponent();
+        aiState.spawnX = TRAINING_DUMMY_SPAWN_X;
+        aiState.spawnY = TRAINING_DUMMY_SPAWN_Y;
+        entity.add(aiState);
+        entity.add(new TargetComponent()); // AiSystem ghi khi Chase/Attack; CombatSystem đọc để đánh trả
+        entity.add(new AttackCooldownComponent());
+
         entitiesByMonsterId.put(monsterId, entity);
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
         // không cần thông báo thủ công (giống hệt attach nhân vật, xem AreaOfInterestTracker).

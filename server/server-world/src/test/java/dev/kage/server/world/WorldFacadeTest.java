@@ -41,6 +41,9 @@ class WorldFacadeTest {
     private record MonsterDespawned(long target, long monsterId) {
     }
 
+    private record MonsterMoved(long target, long monsterId, float x, float y) {
+    }
+
     private record AttackResult(
             long target, long attacker, long defender, int damage, boolean crit, boolean miss, int hp,
             boolean died) {
@@ -53,6 +56,7 @@ class WorldFacadeTest {
         final List<Accepted> accepted = new CopyOnWriteArrayList<>();
         final List<MonsterSpawned> monsterSpawned = new CopyOnWriteArrayList<>();
         final List<MonsterDespawned> monsterDespawned = new CopyOnWriteArrayList<>();
+        final List<MonsterMoved> monsterMoved = new CopyOnWriteArrayList<>();
         final List<AttackResult> attackResults = new CopyOnWriteArrayList<>();
 
         @Override
@@ -85,6 +89,11 @@ class WorldFacadeTest {
         @Override
         public void onMonsterDespawned(long targetCharacterId, long monsterId) {
             monsterDespawned.add(new MonsterDespawned(targetCharacterId, monsterId));
+        }
+
+        @Override
+        public void onMonsterMoved(long targetCharacterId, long monsterId, float x, float y) {
+            monsterMoved.add(new MonsterMoved(targetCharacterId, monsterId, x, y));
         }
 
         @Override
@@ -232,6 +241,38 @@ class WorldFacadeTest {
         // Đúng thiết kế: tối đa ~1-2 đòn trong 1.2s dù gửi 500 lệnh — KHÔNG phải 500 đòn (sẽ xảy
         // ra nếu SetTargetCommand vô tình reset/rút ngắn cooldown).
         assertThat(attacksLandedOnMonster).isLessThanOrEqualTo(2);
+    }
+
+    @Test
+    void shouldChaseAndAttackBack_whenCharacterEntersAggroRange() {
+        // AI.md §3: quái Idle -> Chase khi phát hiện người chơi (AiConstants.AGGRO_RADIUS_METERS
+        // = 6m), rồi -> Attack khi vào tầm đánh. KHÔNG gọi world.setTarget — nhân vật đứng yên,
+        // hoàn toàn thụ động, để chứng minh CHÍNH quái chủ động đuổi + đánh, không phải do người
+        // chơi tấn công trước.
+        world.start();
+        world.attachCharacter(1L, 5f, 9f, DEFAULT_STATS); // cách quái (5,5) 4m — trong aggro, ngoài tầm đánh
+        awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
+        long monsterId = sink.monsterSpawned.get(0).monsterId();
+
+        awaitTrue(() -> sink.monsterMoved.stream().anyMatch(m -> m.monsterId() == monsterId));
+        awaitTrue(() -> sink.attackResults.stream().anyMatch(a -> a.attacker() == monsterId));
+    }
+
+    @Test
+    void shouldNotAggro_whenCharacterOutsideAggroRange() {
+        world.start();
+        // Cách quái (5,5) đúng 20m — ngoài AiConstants.AGGRO_RADIUS_METERS (6m) NHƯNG vẫn trong
+        // WorldConstants.AOI_RADIUS_METERS (15f)... KHÔNG, 20m cũng ngoài AOI nên sẽ không thấy
+        // quái spawn — dùng khoảng cách 10m: ngoài aggro (6m), trong AOI (15m) để verify KHÔNG bị
+        // đuổi dù thấy quái trên màn hình.
+        world.attachCharacter(1L, 5f, 15f, DEFAULT_STATS);
+        awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
+
+        sleepQuietly(500); // đủ lâu để AiSystem chạy nhiều tick nếu (sai) có aggro
+
+        // defender() = ai BỊ đánh (không phải target() — đó là người NHẬN broadcast, có thể là
+        // chính người quan sát trận đánh của người khác). Không quái nào đánh nhân vật 1 cả.
+        assertThat(sink.attackResults.stream().anyMatch(a -> a.defender() == 1L)).isFalse();
     }
 
     /** Poll với timeout thay vì {@code Thread.sleep} cố định — tick loop chạy real-time 60Hz. */

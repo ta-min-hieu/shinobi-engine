@@ -9,6 +9,7 @@ import dev.kage.server.world.component.AttackCooldownComponent;
 import dev.kage.server.world.component.CharacterIdComponent;
 import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
+import dev.kage.server.world.component.MonsterIdComponent;
 import dev.kage.server.world.component.TargetComponent;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,9 +18,10 @@ import java.util.function.LongFunction;
 /**
  * Đánh thường TỰ ĐỘNG (GDD §6 "Auto-target đánh thường") — không phải {@code UseSkillCommand}
  * (chờ ADR-016 script sandbox, lát cắt sau). Entity có {@link TargetComponent} +
- * {@link AttackCooldownComponent} (hiện chỉ nhân vật người chơi — quái bù nhìn không có 2
- * component này nên không tự đánh trả, xem {@code WorldFacade}) tự đánh mục tiêu khi hết cooldown
- * và còn trong tầm, theo pipeline damage đã chốt ({@link CombatConstants#resolveAttack}).
+ * {@link AttackCooldownComponent} (cả nhân vật lẫn quái đều có sẵn từ lúc spawn — xem
+ * {@code WorldFacade}; {@code AiSystem} là bên GHI {@code targetEntityId} cho quái theo FSM,
+ * AI.md §3) tự đánh mục tiêu khi hết cooldown, còn target hợp lệ (khác 0) và còn trong tầm, theo
+ * pipeline damage đã chốt ({@link CombatConstants#resolveAttack}).
  *
  * <p>KHÔNG gọi thẳng {@code WorldOutboundSink} — theo đúng pattern {@code WorldFacade} gọi sink
  * SAU khi cả tick chạy xong; kết quả tích trong hàng đợi nội bộ, {@link #drainResults()} lấy ra
@@ -35,6 +37,8 @@ final class CombatSystem extends IteratingKSystem {
             ComponentMapper.getFor(AttackCooldownComponent.class);
     private static final ComponentMapper<CharacterIdComponent> CHARACTER_ID =
             ComponentMapper.getFor(CharacterIdComponent.class);
+    private static final ComponentMapper<MonsterIdComponent> MONSTER_ID =
+            ComponentMapper.getFor(MonsterIdComponent.class);
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
     private static final ComponentMapper<CombatStatsComponent> COMBAT_STATS =
             ComponentMapper.getFor(CombatStatsComponent.class);
@@ -102,7 +106,7 @@ final class CombatSystem extends IteratingKSystem {
                 toStats(COMBAT_STATS.get(attacker)), toStats(COMBAT_STATS.get(target)));
         targetHealth.current = Math.max(0, targetHealth.current - result.damage());
 
-        long attackerId = CHARACTER_ID.get(attacker).characterId;
+        long attackerId = entityId(attacker);
         pendingResults.add(new AttackOutcome(
                 attackerId,
                 targetEntityId,
@@ -111,6 +115,11 @@ final class CombatSystem extends IteratingKSystem {
                 result.miss(),
                 targetHealth.current,
                 targetHealth.isDead()));
+    }
+
+    /** ID nghiệp vụ THẬT của entity (dương = characterId, âm = monsterId) — attacker có thể là 1 trong 2. */
+    private static long entityId(KEntity entity) {
+        return CHARACTER_ID.has(entity) ? CHARACTER_ID.get(entity).characterId : MONSTER_ID.get(entity).monsterId;
     }
 
     /** Component ECS (mutable) → record bất biến {@code resolveAttack} cần (giữ pipeline thuần). */

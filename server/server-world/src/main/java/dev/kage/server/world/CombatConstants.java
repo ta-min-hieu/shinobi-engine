@@ -37,10 +37,9 @@ final class CombatConstants {
     private static final float MAX_CRIT_PERCENT = 0.5f;
     private static final int MIN_DAMAGE_FLOOR = 1; // tránh damage=0 vô nghĩa khi giáp rất cao
 
-    // Quái bù nhìn KHÔNG tự đánh trả (lát cắt này chưa có AI) — atk=0 vô hại nếu logic sau này
-    // vô tình cho nó tấn công, không phải cách chặn chính (Family không gồm quái vì không có
-    // Target/AttackCooldown — xem CombatSystem).
-    static final CombatStats MONSTER_STATS = new CombatStats(0, 5, 0.90f, 0f, 0f, CRIT_DAMAGE_MULTIPLIER);
+    // Quái bù nhìn TỰ ĐÁNH TRẢ khi bị AiSystem đưa vào Attack (AI.md §3) — atk placeholder, chưa
+    // có monster_template DB-driven (lát cắt sau mới per-loại-quái).
+    static final CombatStats MONSTER_STATS = new CombatStats(8, 5, 0.90f, 0f, 0f, CRIT_DAMAGE_MULTIPLIER);
 
     static final float ATTACK_INTERVAL_SECONDS = 1f; // ATK_SPEED placeholder — 1 đòn/giây
     static final float ATTACK_RANGE_METERS = 2f;

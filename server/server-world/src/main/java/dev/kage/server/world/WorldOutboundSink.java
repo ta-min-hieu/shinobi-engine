@@ -33,6 +33,9 @@ public interface WorldOutboundSink {
     /** Quái {@code monsterId} VỪA rời AoI của {@code targetCharacterId} (chết hoặc ra xa). */
     void onMonsterDespawned(long targetCharacterId, long monsterId);
 
+    /** Quái {@code monsterId} (đã ở trong AoI từ trước) vừa đổi vị trí (AI.md §3 — Patrol/Chase/Return). */
+    void onMonsterMoved(long targetCharacterId, long monsterId, float x, float y);
+
     /**
      * Kết quả 1 đòn đánh thường THẬT (đã né/bạo kích/giảm giáp — GDD §6) — gửi cho MỌI nhân vật
      * đang thấy mục tiêu trong AoI, không chỉ người tấn công.

@@ -6,6 +6,7 @@ import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.MonsterDespawnedEvent;
+import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.Opcode;
@@ -139,6 +140,16 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         }
         var event = MonsterDespawnedEvent.newBuilder().setMonsterId(monsterId).build();
         send(ctx, Opcode.OPCODE_MONSTER_DESPAWNED_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    @Override
+    public void onMonsterMoved(long targetCharacterId, long monsterId, float x, float y) {
+        var ctx = contextsByCharacterId.get(targetCharacterId);
+        if (ctx == null) {
+            return;
+        }
+        var event = MonsterMovedEvent.newBuilder().setMonsterId(monsterId).setX(x).setY(y).build();
+        send(ctx, Opcode.OPCODE_MONSTER_MOVED_EVENT_VALUE, 0, event.toByteArray());
     }
 
     @Override

@@ -127,9 +127,9 @@ final class AreaOfInterestTracker {
         } else if (!within && wasVisible) {
             visibleTo.get(characterId).remove(monsterId);
             sink.onMonsterDespawned(characterId, monsterId);
+        } else if (within) {
+            notifyMonsterMovedIfChanged(characterId, monsterId, monsterPos);
         }
-        // Không cần nhánh "còn trong tầm, đã thấy" — quái bù nhìn đứng yên, không có sự kiện
-        // "moved" cho quái ở lát cắt này (khác nhân vật, luôn có thể di chuyển).
     }
 
     private void enterView(long a, PositionComponent posA, long b, PositionComponent posB) {
@@ -149,6 +149,12 @@ final class AreaOfInterestTracker {
     private void notifyMovedIfChanged(long targetCharacterId, long movedCharacterId, PositionComponent moved) {
         if (moved.x != moved.prevX || moved.y != moved.prevY) {
             sink.onCharacterMoved(targetCharacterId, movedCharacterId, moved.x, moved.y);
+        }
+    }
+
+    private void notifyMonsterMovedIfChanged(long targetCharacterId, long monsterId, PositionComponent moved) {
+        if (moved.x != moved.prevX || moved.y != moved.prevY) {
+            sink.onMonsterMoved(targetCharacterId, monsterId, moved.x, moved.y);
         }
     }
 

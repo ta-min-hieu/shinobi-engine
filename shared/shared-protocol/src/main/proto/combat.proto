@@ -49,3 +49,12 @@ message MonsterSpawnedEvent {
 message MonsterDespawnedEvent {
   int64 monster_id = 1;
 }
+
+// Event: Server -> Client (OPCODE_MONSTER_MOVED_EVENT). Quái ĐÃ ở trong AoI từ trước vừa đổi vị
+// trí (AI.md §3 — Patrol/Chase/Return khiến quái di chuyển, khác lát cắt 1 khi quái đứng yên).
+// Mẫu y hệt CharacterMovedEvent (movement.proto).
+message MonsterMovedEvent {
+  int64 monster_id = 1;
+  float x = 2;
+  float y = 3;
+}
