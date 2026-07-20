@@ -134,4 +134,21 @@ class PostgresCharacterAdapterIntegrationTest {
         assertThat(position.x()).isEqualTo(12.5f);
         assertThat(position.y()).isEqualTo(-3.25f);
     }
+
+    @Test
+    void shouldLoadStartingStats_afterCreate() {
+        var adapter = new PostgresCharacterAdapter(dataSource);
+        var transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
+        var newCharacter = new NewCharacter(accountId, "StatHero", Faction.HOA, UUID.randomUUID().toString());
+        var holder = new Character[1];
+        transactionRunner.inTransaction(tx -> holder[0] = adapter.create(tx, newCharacter));
+
+        var stats = adapter.loadStats(holder[0].id());
+
+        // Số liệu khởi điểm PLACEHOLDER (V2 migration comment + PostgresCharacterAdapter.STARTING_STAT).
+        assertThat(stats.str()).isEqualTo(10);
+        assertThat(stats.agi()).isEqualTo(10);
+        assertThat(stats.intelligence()).isEqualTo(10);
+        assertThat(stats.vit()).isEqualTo(10);
+    }
 }

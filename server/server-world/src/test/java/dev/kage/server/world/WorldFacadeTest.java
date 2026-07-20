@@ -19,6 +19,10 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(10)
 class WorldFacadeTest {
 
+    // STR/AGI/INT/VIT giả định cho test — không verify số liệu chỉ số cụ thể ở file này (đã có
+    // PostgresCharacterAdapterIntegrationTest cho việc đó), chỉ cần attach thành công.
+    private static final CharacterBaseStats DEFAULT_STATS = new CharacterBaseStats(10, 10, 10, 10);
+
     private record Spawned(long target, long spawned, float x, float y) {
     }
 
@@ -103,8 +107,8 @@ class WorldFacadeTest {
     void shouldSpawnBothCharactersToEachOther_whenBothAttachAtSameSpawnPoint() {
         world.start();
 
-        world.attachCharacter(1L, 0f, 0f);
-        world.attachCharacter(2L, 0f, 0f);
+        world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
+        world.attachCharacter(2L, 0f, 0f, DEFAULT_STATS);
 
         awaitTrue(() -> sink.spawned.stream().anyMatch(s -> s.target() == 1L && s.spawned() == 2L));
         awaitTrue(() -> sink.spawned.stream().anyMatch(s -> s.target() == 2L && s.spawned() == 1L));
@@ -113,8 +117,8 @@ class WorldFacadeTest {
     @Test
     void shouldAcceptMoveAndBroadcastPositionToNearbyCharacter() {
         world.start();
-        world.attachCharacter(1L, 0f, 0f);
-        world.attachCharacter(2L, 0f, 0f);
+        world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
+        world.attachCharacter(2L, 0f, 0f, DEFAULT_STATS);
         awaitTrue(() -> sink.spawned.size() >= 2);
 
         world.enqueueMoveCommand(1L, 42, 1f, 0f);
@@ -129,8 +133,8 @@ class WorldFacadeTest {
         // "gian lận" cực lớn — nếu server không chuẩn hoá về unit vector trước khi nhân
         // MOVE_SPEED_MPS, nhân vật sẽ bay xa gấp hàng trăm lần chỉ trong 1 tick.
         world.start();
-        world.attachCharacter(1L, 0f, 0f);
-        world.attachCharacter(2L, 0f, 0f);
+        world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
+        world.attachCharacter(2L, 0f, 0f, DEFAULT_STATS);
         awaitTrue(() -> sink.spawned.size() >= 2);
 
         world.enqueueMoveCommand(1L, 1, 1000f, 0f);
@@ -149,8 +153,8 @@ class WorldFacadeTest {
     @Test
     void shouldDespawnForRemainingCharacter_whenOneDetaches() {
         world.start();
-        world.attachCharacter(1L, 0f, 0f);
-        world.attachCharacter(2L, 0f, 0f);
+        world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
+        world.attachCharacter(2L, 0f, 0f, DEFAULT_STATS);
         awaitTrue(() -> sink.spawned.size() >= 2);
 
         world.detachCharacter(1L);
@@ -162,7 +166,7 @@ class WorldFacadeTest {
     void shouldSpawnTrainingDummy_toCharacterNearby() {
         world.start();
 
-        world.attachCharacter(1L, 5f, 6f); // gần quái bù nhìn (spawn cố định (5,5), WorldFacade)
+        world.attachCharacter(1L, 5f, 6f, DEFAULT_STATS); // gần quái bù nhìn (spawn cố định (5,5), WorldFacade)
 
         awaitTrue(
                 () -> sink.monsterSpawned.stream()
@@ -172,7 +176,7 @@ class WorldFacadeTest {
     @Test
     void shouldDealDamageAndEventuallyKillMonster_whenTargetSet() {
         world.start();
-        world.attachCharacter(1L, 5f, 6f); // cách quái (5,5) đúng 1m — trong tầm đánh (2m)
+        world.attachCharacter(1L, 5f, 6f, DEFAULT_STATS); // cách quái (5,5) đúng 1m — trong tầm đánh (2m)
         awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
         long monsterId = sink.monsterSpawned.get(0).monsterId();
 
@@ -187,7 +191,7 @@ class WorldFacadeTest {
     @Timeout(20) // > CombatConstants.MONSTER_RESPAWN_SECONDS (10s) — ghi đè @Timeout(10) của lớp.
     void shouldRespawnMonster_afterDeathDelay() {
         world.start();
-        world.attachCharacter(1L, 5f, 6f);
+        world.attachCharacter(1L, 5f, 6f, DEFAULT_STATS);
         awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
         long firstMonsterId = sink.monsterSpawned.get(0).monsterId();
 
@@ -213,7 +217,7 @@ class WorldFacadeTest {
         // gửi cooldown/thời điểm đánh; gửi SetTargetCommand dồn dập không được rút ngắn khoảng
         // cách giữa các đòn đánh thật (ATTACK_INTERVAL_SECONDS server giữ tuyệt đối).
         world.start();
-        world.attachCharacter(1L, 5f, 6f);
+        world.attachCharacter(1L, 5f, 6f, DEFAULT_STATS);
         awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
         long monsterId = sink.monsterSpawned.get(0).monsterId();
 

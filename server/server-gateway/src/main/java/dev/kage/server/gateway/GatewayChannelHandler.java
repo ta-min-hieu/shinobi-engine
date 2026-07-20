@@ -27,6 +27,7 @@ import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
+import dev.kage.server.world.CharacterBaseStats;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import java.time.Duration;
@@ -245,7 +246,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // đúng channel; attachCharacter chỉ enqueue, entity ECS thật tạo ở tick kế tiếp.
             worldGateway.registry().register(characterId, ctx);
             var spawn = characterFacade.loadPosition(characterId);
-            worldGateway.facade().attachCharacter(characterId, spawn.x(), spawn.y());
+            var stats = characterFacade.loadStats(characterId);
+            var baseStats = new CharacterBaseStats(stats.str(), stats.agi(), stats.intelligence(), stats.vit());
+            worldGateway.facade().attachCharacter(characterId, spawn.x(), spawn.y(), baseStats);
             var response = SelectCharacterResponse.newBuilder().setSuccess(true).build();
             send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
         } catch (CharacterNotFoundException e) {

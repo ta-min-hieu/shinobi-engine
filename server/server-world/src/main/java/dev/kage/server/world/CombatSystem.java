@@ -7,6 +7,7 @@ import dev.kage.engine.ecs.KEntity;
 import dev.kage.engine.ecs.component.PositionComponent;
 import dev.kage.server.world.component.AttackCooldownComponent;
 import dev.kage.server.world.component.CharacterIdComponent;
+import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.TargetComponent;
 import java.util.ArrayList;
@@ -35,6 +36,8 @@ final class CombatSystem extends IteratingKSystem {
     private static final ComponentMapper<CharacterIdComponent> CHARACTER_ID =
             ComponentMapper.getFor(CharacterIdComponent.class);
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
+    private static final ComponentMapper<CombatStatsComponent> COMBAT_STATS =
+            ComponentMapper.getFor(CombatStatsComponent.class);
 
     /** Kết quả 1 đòn đánh đã xảy ra thật trong tick này — {@code WorldFacade} drain để phát AoI. */
     record AttackOutcome(
@@ -90,11 +93,13 @@ final class CombatSystem extends IteratingKSystem {
         }
 
         cooldown.remainingSeconds = CombatConstants.ATTACK_INTERVAL_SECONDS;
-        resolveAndRecordAttack(entity, target.targetEntityId, targetHealth);
+        resolveAndRecordAttack(entity, targetEntity, target.targetEntityId, targetHealth);
     }
 
-    private void resolveAndRecordAttack(KEntity attacker, long targetEntityId, HealthComponent targetHealth) {
-        var result = CombatConstants.resolveAttack(CombatConstants.CHARACTER_STATS, CombatConstants.MONSTER_STATS);
+    private void resolveAndRecordAttack(
+            KEntity attacker, KEntity target, long targetEntityId, HealthComponent targetHealth) {
+        var result = CombatConstants.resolveAttack(
+                toStats(COMBAT_STATS.get(attacker)), toStats(COMBAT_STATS.get(target)));
         targetHealth.current = Math.max(0, targetHealth.current - result.damage());
 
         long attackerId = CHARACTER_ID.get(attacker).characterId;
@@ -106,6 +111,12 @@ final class CombatSystem extends IteratingKSystem {
                 result.miss(),
                 targetHealth.current,
                 targetHealth.isDead()));
+    }
+
+    /** Component ECS (mutable) → record bất biến {@code resolveAttack} cần (giữ pipeline thuần). */
+    private static CombatConstants.CombatStats toStats(CombatStatsComponent c) {
+        return new CombatConstants.CombatStats(
+                c.atk, c.def, c.hitPercent, c.dodgePercent, c.critPercent, c.critDamageMultiplier);
     }
 
     private static double distance(PositionComponent a, PositionComponent b) {

@@ -5,6 +5,7 @@ import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
+import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.PositionSnapshot;
 import java.util.List;
 
@@ -51,5 +52,9 @@ public final class CharacterFacade {
 
     public void savePosition(long characterId, float x, float y) {
         characterPort.savePosition(characterId, x, y);
+    }
+
+    public CharacterStats loadStats(long characterId) {
+        return characterPort.loadStats(characterId);
     }
 }

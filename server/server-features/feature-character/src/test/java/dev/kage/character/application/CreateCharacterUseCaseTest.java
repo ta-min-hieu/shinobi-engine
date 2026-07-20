@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
+import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.character.domain.PositionSnapshot;
@@ -34,6 +35,11 @@ class CreateCharacterUseCaseTest {
         @Override
         public void savePosition(long characterId, float x, float y) {
             positions.put(characterId, new PositionSnapshot(x, y));
+        }
+
+        @Override
+        public CharacterStats loadStats(long characterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
         }
 
         @Override

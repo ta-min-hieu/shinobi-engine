@@ -8,6 +8,7 @@ import dev.kage.engine.ecs.component.VelocityComponent;
 import dev.kage.engine.ecs.system.MovementSystem;
 import dev.kage.server.world.component.AttackCooldownComponent;
 import dev.kage.server.world.component.CharacterIdComponent;
+import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterComponent;
 import dev.kage.server.world.component.TargetComponent;
@@ -90,8 +91,8 @@ public final class WorldFacade {
         }
     }
 
-    public void attachCharacter(long characterId, float spawnX, float spawnY) {
-        inbox.add(new WorldCommand.AttachCharacterCommand(characterId, spawnX, spawnY));
+    public void attachCharacter(long characterId, float spawnX, float spawnY, CharacterBaseStats baseStats) {
+        inbox.add(new WorldCommand.AttachCharacterCommand(characterId, spawnX, spawnY, baseStats));
     }
 
     public void detachCharacter(long characterId) {
@@ -133,7 +134,8 @@ public final class WorldFacade {
         WorldCommand command;
         while ((command = inbox.poll()) != null) {
             switch (command) {
-                case WorldCommand.AttachCharacterCommand c -> handleAttach(c.characterId(), c.spawnX(), c.spawnY());
+                case WorldCommand.AttachCharacterCommand c ->
+                        handleAttach(c.characterId(), c.spawnX(), c.spawnY(), c.baseStats());
                 case WorldCommand.DetachCharacterCommand c -> handleDetach(c.characterId());
                 case WorldCommand.MoveIntentCommand c -> handleMoveIntent(c);
                 case WorldCommand.SetTargetCommand c -> handleSetTarget(c.characterId(), c.targetEntityId());
@@ -141,7 +143,7 @@ public final class WorldFacade {
         }
     }
 
-    private void handleAttach(long characterId, float spawnX, float spawnY) {
+    private void handleAttach(long characterId, float spawnX, float spawnY, CharacterBaseStats baseStats) {
         if (entitiesByCharacterId.containsKey(characterId)) {
             return; // đã attach — bỏ qua an toàn thay vì tạo entity trùng.
         }
@@ -160,9 +162,10 @@ public final class WorldFacade {
         entity.add(characterIdComponent);
 
         var health = new HealthComponent();
-        health.current = CombatConstants.CHARACTER_MAX_HP; // placeholder — chưa đọc character_stat DB thật
+        health.current = CombatConstants.CHARACTER_MAX_HP; // placeholder — GDD chưa chốt công thức HP tối đa
         health.max = CombatConstants.CHARACTER_MAX_HP;
         entity.add(health);
+        entity.add(toComponent(CombatConstants.deriveCombatStats(baseStats)));
         entity.add(new TargetComponent());
         entity.add(new AttackCooldownComponent());
 
@@ -191,7 +194,6 @@ public final class WorldFacade {
         var velocity = VELOCITY.get(entity);
         velocity.x = direction[0] * WorldConstants.MOVE_SPEED_MPS;
         velocity.y = direction[1] * WorldConstants.MOVE_SPEED_MPS;
-        System.out.println("DEBUG handleMoveIntent char=" + intent.characterId() + " velocity.x=" + velocity.x);
 
         var position = POSITION.get(entity);
         outboundSink.onMoveAccepted(intent.characterId(), intent.sequenceId(), position.x, position.y);
@@ -269,11 +271,24 @@ public final class WorldFacade {
         var monster = new MonsterComponent();
         monster.monsterCode = TRAINING_DUMMY_CODE;
         entity.add(monster);
+        entity.add(toComponent(CombatConstants.MONSTER_STATS));
 
         long monsterId = nextMonsterId--;
         entitiesByMonsterId.put(monsterId, entity);
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
         // không cần thông báo thủ công (giống hệt attach nhân vật, xem AreaOfInterestTracker).
+    }
+
+    /** {@code CombatConstants.CombatStats} (record, không mutable) → component ECS (mutable). */
+    private static CombatStatsComponent toComponent(CombatConstants.CombatStats stats) {
+        var component = new CombatStatsComponent();
+        component.atk = stats.atk();
+        component.def = stats.def();
+        component.hitPercent = stats.hitPercent();
+        component.dodgePercent = stats.dodgePercent();
+        component.critPercent = stats.critPercent();
+        component.critDamageMultiplier = stats.critDamageMultiplier();
+        return component;
     }
 
     /** Tra KEntity theo entity ID — DƯƠNG = nhân vật, ÂM = quái (combat.proto). */

@@ -2,6 +2,7 @@ package dev.kage.server.database.character;
 
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
+import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.IdempotencyKeyReusedException;
 import dev.kage.character.domain.NewCharacter;
@@ -79,6 +80,10 @@ public final class PostgresCharacterAdapter implements CharacterPort {
 
     private static final String SAVE_POSITION = """
             UPDATE character SET pos_x = ?, pos_y = ? WHERE id = ?
+            """;
+
+    private static final String LOAD_STATS = """
+            SELECT str, agi, int_, vit FROM character_stat WHERE character_id = ?
             """;
 
     @Override
@@ -213,6 +218,22 @@ public final class PostgresCharacterAdapter implements CharacterPort {
             statement.executeUpdate();
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi lưu vị trí nhân vật: characterId=" + characterId, e);
+        }
+    }
+
+    @Override
+    public CharacterStats loadStats(long characterId) {
+        try (var connection = dataSource.getConnection();
+                var statement = connection.prepareStatement(LOAD_STATS)) {
+            statement.setLong(1, characterId);
+            try (ResultSet rs = statement.executeQuery()) {
+                if (!rs.next()) {
+                    throw new DatabaseAccessException("Nhân vật không có chỉ số: characterId=" + characterId, null);
+                }
+                return new CharacterStats(rs.getInt("str"), rs.getInt("agi"), rs.getInt("int_"), rs.getInt("vit"));
+            }
+        } catch (SQLException e) {
+            throw new DatabaseAccessException("Lỗi đọc chỉ số nhân vật: characterId=" + characterId, e);
         }
     }
 

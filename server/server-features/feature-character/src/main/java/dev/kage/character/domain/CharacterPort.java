@@ -26,4 +26,7 @@ public interface CharacterPort {
 
     /** Ghi đè vị trí — gọi ĐỊNH KỲ + lúc logout (SERVER.md §8), KHÔNG mỗi tick. */
     void savePosition(long characterId, float x, float y);
+
+    /** Chỉ số nền — server-world derive thành ATK/DEF/... lúc attach vào world (GDD §5). */
+    CharacterStats loadStats(long characterId);
 }

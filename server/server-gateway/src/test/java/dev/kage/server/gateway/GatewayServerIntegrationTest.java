@@ -14,6 +14,7 @@ import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
+import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.protocol.AttackResultEvent;
@@ -132,6 +133,13 @@ class GatewayServerIntegrationTest {
             @Override
             public void savePosition(long characterId, float x, float y) {
                 positions.put(characterId, new PositionSnapshot(x, y));
+            }
+
+            // Số liệu khởi điểm PLACEHOLDER (khớp PostgresCharacterAdapter.STARTING_STAT) — test
+            // socket thật ở file này verify pipeline combat, không verify số liệu chỉ số cụ thể.
+            @Override
+            public CharacterStats loadStats(long characterId) {
+                return new CharacterStats(10, 10, 10, 10);
             }
 
             @Override

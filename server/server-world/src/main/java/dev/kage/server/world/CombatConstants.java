@@ -8,9 +8,9 @@ import java.util.concurrent.ThreadLocalRandom;
  * ở {@link WorldConstants}). Đặt tập trung ở 1 nơi — không hardcode rải rác trong
  * {@link CombatSystem} (CODING-STANDARDS.md §18).
  *
- * <p>⚠️ Lát cắt 1 Phase 4: {@link #CHARACTER_STATS} là số CỐ ĐỊNH cho MỌI nhân vật — CHƯA đọc
- * {@code character_stat} thật từ DB rồi derive theo công thức GDD §5 (STR·AGI·INT·VIT → ATK/DEF).
- * Đó là việc lớn riêng (feature-character chưa có Port nào đọc stats), để lát cắt sau.
+ * <p>{@link #deriveCombatStats} tính ATK/DEF/HIT%/DODGE%/CRIT% THẬT từ {@code character_stat} DB
+ * (qua {@link CharacterBaseStats}, gateway truyền vào lúc attach) theo công thức GDD §5. Quái vẫn
+ * dùng {@link #MONSTER_STATS} cố định — chưa có {@code monster_template} DB-driven (lát cắt sau).
  *
  * <p>Chỉ có đánh thường (vật lý, ATK vs DEF) — chưa có SKILL_DMG/RES (đó là cho
  * {@code UseSkillCommand}, chờ ADR-016 script sandbox) và hệ số khắc chế cố định 1.0 (quái chưa
@@ -27,24 +27,41 @@ final class CombatConstants {
     record AttackResult(boolean miss, boolean crit, int damage) {
     }
 
-    static final CombatStats CHARACTER_STATS = new CombatStats(20, 10, 0.95f, 0.05f, 0.10f, 1.5f);
-    static final int CHARACTER_MAX_HP = 100;
+    static final int CHARACTER_MAX_HP = 100; // placeholder — GDD chưa chốt công thức HP tối đa
+
+    // Hệ số derive GDD §5 — placeholder, chưa playtest.
+    private static final float CRIT_DAMAGE_MULTIPLIER = 1.5f; // 150% cố định ở MVP
+    private static final float MIN_HIT_PERCENT = 0.5f;
+    private static final float MAX_HIT_PERCENT = 1.0f;
+    private static final float MAX_DODGE_PERCENT = 0.3f;
+    private static final float MAX_CRIT_PERCENT = 0.5f;
+    private static final int MIN_DAMAGE_FLOOR = 1; // tránh damage=0 vô nghĩa khi giáp rất cao
 
     // Quái bù nhìn KHÔNG tự đánh trả (lát cắt này chưa có AI) — atk=0 vô hại nếu logic sau này
     // vô tình cho nó tấn công, không phải cách chặn chính (Family không gồm quái vì không có
     // Target/AttackCooldown — xem CombatSystem).
-    static final CombatStats MONSTER_STATS = new CombatStats(0, 5, 0.90f, 0f, 0f, 1.5f);
+    static final CombatStats MONSTER_STATS = new CombatStats(0, 5, 0.90f, 0f, 0f, CRIT_DAMAGE_MULTIPLIER);
 
     static final float ATTACK_INTERVAL_SECONDS = 1f; // ATK_SPEED placeholder — 1 đòn/giây
     static final float ATTACK_RANGE_METERS = 2f;
     static final int MONSTER_MAX_HP = 50;
     static final float MONSTER_RESPAWN_SECONDS = 10f;
 
-    private static final float MIN_HIT_PERCENT = 0.5f;
-    private static final float MAX_HIT_PERCENT = 1.0f;
-    private static final int MIN_DAMAGE_FLOOR = 1; // tránh damage=0 vô nghĩa khi giáp rất cao
-
     private CombatConstants() {
+    }
+
+    /**
+     * Derive ATK/DEF/HIT%/DODGE%/CRIT% từ STR/AGI/VIT (GAME-DESIGN-DOCUMENT.md §5, bảng "Công
+     * thức derive"). CHƯA derive SKILL_DMG/RES — chưa có nơi tiêu thụ (đó là cho skill, chờ
+     * ADR-016), derive mà không dùng được thì không kiểm chứng được là đúng.
+     */
+    static CombatStats deriveCombatStats(CharacterBaseStats baseStats) {
+        int atk = (baseStats.str() * 2) + baseStats.agi();
+        int def = Math.round((baseStats.vit() * 1.5f) + (baseStats.str() * 0.5f));
+        float hitPercent = clamp((90f + (baseStats.agi() * 0.1f)) / 100f, MIN_HIT_PERCENT, MAX_HIT_PERCENT);
+        float dodgePercent = clamp((baseStats.agi() * 0.15f) / 100f, 0f, MAX_DODGE_PERCENT);
+        float critPercent = clamp((baseStats.agi() * 0.1f) / 100f, 0f, MAX_CRIT_PERCENT);
+        return new CombatStats(atk, def, hitPercent, dodgePercent, critPercent, CRIT_DAMAGE_MULTIPLIER);
     }
 
     /**
