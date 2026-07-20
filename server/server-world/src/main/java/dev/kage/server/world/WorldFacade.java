@@ -43,6 +43,7 @@ public final class WorldFacade {
     private static final ComponentMapper<VelocityComponent> VELOCITY =
             ComponentMapper.getFor(VelocityComponent.class);
     private static final ComponentMapper<TargetComponent> TARGET = ComponentMapper.getFor(TargetComponent.class);
+    private static final ComponentMapper<MonsterComponent> MONSTER = ComponentMapper.getFor(MonsterComponent.class);
 
     // Quái bù nhìn tập luyện — lát cắt 1 Phase 4, hardcode 1 quái, chưa có monster_template DB.
     private static final String TRAINING_DUMMY_CODE = "training_dummy";
@@ -233,19 +234,26 @@ public final class WorldFacade {
                 outboundSink.onAttackResult(observerId, sinkOutcome);
             }
             if (outcome.targetDied() && outcome.targetEntityId() < 0) {
-                handleMonsterDeath(outcome.targetEntityId());
+                handleMonsterDeath(outcome.targetEntityId(), outcome.attackerEntityId());
             }
         }
     }
 
-    private void handleMonsterDeath(long monsterId) {
+    private void handleMonsterDeath(long monsterId, long killerEntityId) {
         var entity = entitiesByMonsterId.remove(monsterId);
         if (entity == null) {
             return; // đã xử lý (nhiều đòn hạ gục cùng tick — CombatSystem tự chặn đòn thứ 2, xem javadoc).
         }
+        String monsterCode = MONSTER.get(entity).monsterCode; // đọc TRƯỚC removeEntity — sau đó component mất.
         aoiTracker.onMonsterDetach(monsterId);
         ecsWorld.removeEntity(entity);
         monsterRespawnCountdownSeconds = CombatConstants.MONSTER_RESPAWN_SECONDS;
+
+        // killerEntityId ÂM nghĩa là quái khác hạ gục quái này — chưa từng xảy ra (quái không nhắm
+        // quái, xem AiSystem) nhưng chặn phòng thủ, rơi đồ chỉ dành cho NGƯỜI CHƠI.
+        if (killerEntityId > 0) {
+            outboundSink.onMonsterKilled(killerEntityId, monsterCode);
+        }
     }
 
     private void tickMonsterRespawn(float deltaTime) {

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.google.protobuf.InvalidProtocolBufferException;
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.MonsterDespawnedEvent;
+import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SetTargetCommand;
@@ -86,5 +87,18 @@ class CombatPacketsTest {
         var parsed = MonsterDespawnedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getMonsterId()).isEqualTo(-1L);
+    }
+
+    @Test
+    void shouldRoundTripMonsterMovedEvent() throws InvalidProtocolBufferException {
+        var event = MonsterMovedEvent.newBuilder().setMonsterId(-1L).setX(6.5f).setY(4f).build();
+        var header = new PacketHeader(Opcode.OPCODE_MONSTER_MOVED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
+
+        byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
+        var parsed = MonsterMovedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+
+        assertThat(parsed.getMonsterId()).isEqualTo(-1L);
+        assertThat(parsed.getX()).isEqualTo(6.5f);
+        assertThat(parsed.getY()).isEqualTo(4f);
     }
 }

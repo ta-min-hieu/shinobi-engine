@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// Packet Inventory / Equipment (NETWORK.md §4, dải 500-599). Lát cắt này CHỈ có sự kiện "nhận
+// item từ rơi đồ" (GAMEPLAY.md §5) — chưa có InventoryAddItemCommand/MoveItem/Equip (Phase 5 thật,
+// xem feature-inventory/CLAUDE.md "Mở sớm hơn ROADMAP dự kiến").
+
+// Event: Server -> Client (OPCODE_ITEM_GRANTED_EVENT). Item THẬT SỰ đã cộng vào túi đồ (đã qua
+// kiểm tra túi đầy ở feature-inventory) — KHÔNG phải "quái rơi gì", chỉ gửi khi thêm thành công.
+// item_template_id (không phải code) — client CHƯA có catalog item để tra tên/icon (Phase 5 thật),
+// gửi ID thật khớp cột item_template.id, giống CharacterSpawnedEvent gửi characterId thay vì tên.
+message ItemGrantedEvent {
+  int64 item_template_id = 1;
+  int32 quantity = 2;
+}

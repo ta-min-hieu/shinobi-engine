@@ -37,6 +37,13 @@ public interface WorldOutboundSink {
     void onMonsterMoved(long targetCharacterId, long monsterId, float x, float y);
 
     /**
+     * Quái {@code monsterCode} VỪA bị {@code killerCharacterId} hạ gục — server-world không biết
+     * DB/inventory (server/CLAUDE.md), nên chỉ báo SỰ KIỆN; việc roll rơi đồ + cộng vào túi thật
+     * xảy ra ở gateway (nơi có {@code InventoryFacade}, GAMEPLAY.md §5).
+     */
+    void onMonsterKilled(long killerCharacterId, String monsterCode);
+
+    /**
      * Kết quả 1 đòn đánh thường THẬT (đã né/bạo kích/giảm giáp — GDD §6) — gửi cho MỌI nhân vật
      * đang thấy mục tiêu trong AoI, không chỉ người tấn công.
      */

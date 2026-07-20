@@ -17,6 +17,13 @@ import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.character.domain.PositionSnapshot;
+import dev.kage.inventory.api.InventoryFacade;
+import dev.kage.inventory.application.AddItemUseCase;
+import dev.kage.inventory.application.GrantLootUseCase;
+import dev.kage.inventory.domain.DropTableEntry;
+import dev.kage.inventory.domain.DropTablePort;
+import dev.kage.inventory.domain.Inventory;
+import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
@@ -66,6 +73,7 @@ class GatewayServerIntegrationTest {
     private GatewayServer server;
     private WorldFacade worldFacade;
     private CharacterPort characterPort;
+    private ConnectedCharacterRegistry characterRegistry;
 
     @BeforeEach
     void startServer() throws InterruptedException {
@@ -74,7 +82,7 @@ class GatewayServerIntegrationTest {
         // này chỉ verify ping/pong qua socket thật, không chạm Connect/Character, nhưng
         // GatewayServer luôn cần cả 2 Facade để khởi tạo (xem GatewayServer).
         var characterFacade = fakeCharacterFacade();
-        var characterRegistry = new ConnectedCharacterRegistry();
+        characterRegistry = new ConnectedCharacterRegistry(fakeInventoryFacade());
         worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
         var positionPersister =
@@ -179,10 +187,31 @@ class GatewayServerIntegrationTest {
         return new CharacterFacade(createUseCase, listUseCase, selectUseCase, characterPort);
     }
 
+    // worldFacade.start() chạy tick thật ở file này, nhưng không test nào hạ gục quái tới chết
+    // (chỉ verify đòn đánh đầu tiên) — Fake rỗng vẫn đủ, không rơi vào nhánh grantLoot thật.
+    private InventoryFacade fakeInventoryFacade() {
+        InventoryPort inventoryPort = new InventoryPort() {
+            @Override
+            public Optional<Inventory> findByCharacter(long characterId) {
+                return Optional.of(new Inventory(characterId, 20, List.of()));
+            }
+
+            @Override
+            public void save(dev.kage.inventory.domain.Transaction tx, Inventory inventory) {
+                // không dùng trong test này
+            }
+        };
+        DropTablePort dropTablePort = dropTableCode -> List.<DropTableEntry>of();
+        var addItemUseCase = new AddItemUseCase(inventoryPort, action -> action.accept(null));
+        var grantLootUseCase = new GrantLootUseCase(dropTablePort, inventoryPort, action -> action.accept(null));
+        return new InventoryFacade(addItemUseCase, grantLootUseCase);
+    }
+
     @AfterEach
     void stopServer() {
         server.stop();
         worldFacade.stop();
+        characterRegistry.stop();
     }
 
     @Test

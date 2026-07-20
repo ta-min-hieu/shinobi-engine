@@ -185,10 +185,10 @@ graph LR
 **Chặn**: ✅ Đã hết — công thức damage đã chốt ([GAME-DESIGN-DOCUMENT.md §5–6](../13-game-design/GAME-DESIGN-DOCUMENT.md#5-nhân-vật--tiến-trình), 2026-07-19; placeholder, cần playtest cân bằng — không phải lý do trì hoãn mở Phase 4).
 
 **Exit Criteria:**
-- [ ] Đánh quái, quái chết, rơi đồ
-- [ ] Damage hack / cooldown hack bị từ chối
-- [ ] Unit test cho CombatSystem, SkillSystem
-- [ ] Script sandbox: test escape pass
+- [x] Đánh quái, quái chết, rơi đồ — combat+AI (`47c63dd`/`e014c6c`), rơi đồ thật vào túi đồ (mở sớm feature-inventory, 2026-07-20)
+- [x] Damage hack / cooldown hack bị từ chối — chặn bằng thiết kế (client chỉ gửi ý định), test `shouldNotBypassAttackCooldown_bySpammingSetTargetCommand`
+- [ ] Unit test cho CombatSystem, SkillSystem — CombatSystem tested (qua WorldFacadeTest), SkillSystem chưa tồn tại
+- [ ] Script sandbox: test escape pass — chờ ADR-016
 
 ---
 

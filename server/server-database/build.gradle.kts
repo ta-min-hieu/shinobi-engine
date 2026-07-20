@@ -13,6 +13,7 @@ dependencies {
     api(project(":shared:shared-common"))
     implementation(project(":server:server-features:feature-account"))
     implementation(project(":server:server-features:feature-character"))
+    implementation(project(":server:server-features:feature-inventory"))
 
     implementation(libs.hikaricp)
     implementation(libs.postgresql)

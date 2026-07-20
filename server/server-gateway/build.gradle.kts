@@ -11,6 +11,7 @@ dependencies {
     implementation(project(":shared:shared-protocol"))
     implementation(project(":server:server-features:feature-account"))
     implementation(project(":server:server-features:feature-character"))
+    implementation(project(":server:server-features:feature-inventory"))
     implementation(project(":server:server-world"))
     implementation(project(":server:server-database"))
     implementation("io.netty:netty-all:4.1.136.Final")

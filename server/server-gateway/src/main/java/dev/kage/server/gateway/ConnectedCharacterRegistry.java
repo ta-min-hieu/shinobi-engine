@@ -1,10 +1,12 @@
 package dev.kage.server.gateway;
 
 import dev.kage.character.domain.PositionSnapshot;
+import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
+import dev.kage.protocol.ItemGrantedEvent;
 import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
@@ -18,6 +20,8 @@ import dev.kage.server.world.WorldOutboundSink;
 import io.netty.channel.ChannelHandlerContext;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Sổ đăng ký {@code characterId -> ChannelHandlerContext} + implementation THẬT của
@@ -31,11 +35,20 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
+    private final InventoryFacade inventoryFacade;
     private final Map<Long, ChannelHandlerContext> contextsByCharacterId = new ConcurrentHashMap<>();
     // Vị trí MỚI NHẤT của CHÍNH nhân vật (không phải nhân vật khác) — nguồn cho
     // CharacterPositionPersister lưu định kỳ + lúc logout (SERVER.md §8), cập nhật mỗi lần
     // onMoveAccepted (server-world xác nhận lệnh di chuyển của connection này).
     private final Map<Long, PositionSnapshot> lastKnownPosition = new ConcurrentHashMap<>();
+    // onMonsterKilled bị gọi TRÊN world tick thread (WorldOutboundSink javadoc) — grantLoot chạm
+    // DB (blocking), CẤM chạy trực tiếp ở đó (server/CLAUDE.md: Game Tick cấm blocking I/O). Đẩy
+    // sang Virtual Thread riêng, cùng pattern authExecutor của GatewayChannelHandler.
+    private final ExecutorService lootExecutor = Executors.newVirtualThreadPerTaskExecutor();
+
+    ConnectedCharacterRegistry(InventoryFacade inventoryFacade) {
+        this.inventoryFacade = inventoryFacade;
+    }
 
     void register(long characterId, ChannelHandlerContext ctx) {
         contextsByCharacterId.put(characterId, ctx);
@@ -168,6 +181,31 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 .setTargetDied(outcome.targetDied())
                 .build();
         send(ctx, Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    @Override
+    public void onMonsterKilled(long killerCharacterId, String monsterCode) {
+        lootExecutor.execute(() -> grantLootBlocking(killerCharacterId, monsterCode));
+    }
+
+    private void grantLootBlocking(long killerCharacterId, String monsterCode) {
+        var granted = inventoryFacade.grantLoot(killerCharacterId, monsterCode);
+        var ctx = contextsByCharacterId.get(killerCharacterId);
+        if (ctx == null) {
+            return; // đã ngắt kết nối giữa lúc roll loot — item đã lưu DB thật, chỉ mất thông báo.
+        }
+        for (var stack : granted) {
+            var event = ItemGrantedEvent.newBuilder()
+                    .setItemTemplateId(stack.itemTemplateId())
+                    .setQuantity(stack.quantity())
+                    .build();
+            send(ctx, Opcode.OPCODE_ITEM_GRANTED_EVENT_VALUE, 0, event.toByteArray());
+        }
+    }
+
+    /** Dừng {@link #lootExecutor} (SERVER.md §10 graceful shutdown) — gọi sau khi world tick dừng. */
+    void stop() {
+        lootExecutor.shutdown();
     }
 
     private static void send(ChannelHandlerContext ctx, int opcode, int sequenceId, byte[] payload) {

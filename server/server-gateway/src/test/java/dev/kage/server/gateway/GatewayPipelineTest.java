@@ -19,6 +19,13 @@ import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.character.domain.PositionSnapshot;
+import dev.kage.inventory.api.InventoryFacade;
+import dev.kage.inventory.application.AddItemUseCase;
+import dev.kage.inventory.application.GrantLootUseCase;
+import dev.kage.inventory.domain.DropTableEntry;
+import dev.kage.inventory.domain.DropTablePort;
+import dev.kage.inventory.domain.Inventory;
+import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
@@ -209,6 +216,26 @@ class GatewayPipelineTest {
         return newPipeline(new FakeCharacterPort());
     }
 
+    // WorldFacade không start() ở test này (xem newPipeline) nên onMonsterKilled không bao giờ
+    // thật sự bị gọi — Fake rỗng chỉ để thoả constructor, không kiểm tra hành vi ở đây.
+    private static InventoryFacade fakeInventoryFacade() {
+        InventoryPort inventoryPort = new InventoryPort() {
+            @Override
+            public Optional<Inventory> findByCharacter(long characterId) {
+                return Optional.of(new Inventory(characterId, 20, List.of()));
+            }
+
+            @Override
+            public void save(dev.kage.inventory.domain.Transaction tx, Inventory inventory) {
+                // không dùng trong test này
+            }
+        };
+        DropTablePort dropTablePort = dropTableCode -> List.<DropTableEntry>of();
+        var addItemUseCase = new AddItemUseCase(inventoryPort, action -> action.accept(null));
+        var grantLootUseCase = new GrantLootUseCase(dropTablePort, inventoryPort, action -> action.accept(null));
+        return new InventoryFacade(addItemUseCase, grantLootUseCase);
+    }
+
     private static EmbeddedChannel newPipeline(FakeCharacterPort characterPort) {
         // ⚠️ Phải khớp CHÍNH XÁC pipeline thật trong GatewayBootstrap — lệch ở đây là test giả.
         // AccountFacade/CharacterFacade THẬT (không mock), chỉ Port bên dưới là Fake (TESTING.md
@@ -231,7 +258,7 @@ class GatewayPipelineTest {
         // attachCharacter() (gọi trong handleSelectCharacterBlocking) không ném lỗi khi enqueue
         // vào hàng đợi chưa có ai drain (không tạo/rò rỉ thread tick cho mỗi test). Tương tự,
         // positionPersister không start() — save() (nếu bị gọi) chạy trực tiếp, không cần scheduler.
-        var characterRegistry = new ConnectedCharacterRegistry();
+        var characterRegistry = new ConnectedCharacterRegistry(fakeInventoryFacade());
         var worldFacade = new WorldFacade(characterRegistry);
         var positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));

@@ -44,6 +44,9 @@ class WorldFacadeTest {
     private record MonsterMoved(long target, long monsterId, float x, float y) {
     }
 
+    private record MonsterKilled(long killerCharacterId, String monsterCode) {
+    }
+
     private record AttackResult(
             long target, long attacker, long defender, int damage, boolean crit, boolean miss, int hp,
             boolean died) {
@@ -57,6 +60,7 @@ class WorldFacadeTest {
         final List<MonsterSpawned> monsterSpawned = new CopyOnWriteArrayList<>();
         final List<MonsterDespawned> monsterDespawned = new CopyOnWriteArrayList<>();
         final List<MonsterMoved> monsterMoved = new CopyOnWriteArrayList<>();
+        final List<MonsterKilled> monsterKilled = new CopyOnWriteArrayList<>();
         final List<AttackResult> attackResults = new CopyOnWriteArrayList<>();
 
         @Override
@@ -94,6 +98,11 @@ class WorldFacadeTest {
         @Override
         public void onMonsterMoved(long targetCharacterId, long monsterId, float x, float y) {
             monsterMoved.add(new MonsterMoved(targetCharacterId, monsterId, x, y));
+        }
+
+        @Override
+        public void onMonsterKilled(long killerCharacterId, String monsterCode) {
+            monsterKilled.add(new MonsterKilled(killerCharacterId, monsterCode));
         }
 
         @Override
@@ -194,6 +203,9 @@ class WorldFacadeTest {
         awaitTrue(() -> sink.monsterDespawned.stream().anyMatch(d -> d.target() == 1L && d.monsterId() == monsterId));
         // Đòn hạ gục PHẢI có targetDied=true — không chỉ despawn suông không rõ lý do.
         assertThat(sink.attackResults.stream().anyMatch(a -> a.defender() == monsterId && a.died())).isTrue();
+        // Server-world báo ĐÚNG người hạ gục — gateway dùng cái này để roll rơi đồ (GAMEPLAY.md §5).
+        assertThat(sink.monsterKilled)
+                .containsExactly(new MonsterKilled(1L, "training_dummy"));
     }
 
     @Test

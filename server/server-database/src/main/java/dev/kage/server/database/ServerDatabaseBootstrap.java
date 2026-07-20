@@ -6,10 +6,16 @@ import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.application.CreateCharacterUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
+import dev.kage.inventory.api.InventoryFacade;
+import dev.kage.inventory.application.AddItemUseCase;
+import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
+import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
+import dev.kage.server.database.inventory.PostgresDropTableAdapter;
+import dev.kage.server.database.inventory.PostgresInventoryAdapter;
 import dev.kage.server.database.session.RedisClientFactory;
 import dev.kage.server.database.session.RedisConfig;
 import dev.kage.server.database.session.RedisSessionAdapter;
@@ -49,6 +55,15 @@ public final class ServerDatabaseBootstrap {
         var listUseCase = new ListCharactersUseCase(characterPort);
         var selectUseCase = new SelectCharacterUseCase(characterPort);
         return new CharacterFacade(createUseCase, listUseCase, selectUseCase, characterPort);
+    }
+
+    public InventoryFacade wireInventoryFacade() {
+        var inventoryPort = new PostgresInventoryAdapter(dataSource);
+        var dropTablePort = new PostgresDropTableAdapter(dataSource);
+        var transactionRunner = new JdbcInventoryTransactionRunner(dataSource);
+        var addItemUseCase = new AddItemUseCase(inventoryPort, transactionRunner);
+        var grantLootUseCase = new GrantLootUseCase(dropTablePort, inventoryPort, transactionRunner);
+        return new InventoryFacade(addItemUseCase, grantLootUseCase);
     }
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */

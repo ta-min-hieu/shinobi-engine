@@ -46,6 +46,9 @@ include(":server:server-database")
 //   rỗng trước (Điều 9 / YAGNI). Xem server/server-features/README.md.
 include(":server:server-features:feature-account")
 include(":server:server-features:feature-character")
+// feature-inventory mở sớm hơn ROADMAP dự kiến (Phase 5) — quyết định của chủ dự án cho lát cắt
+// "rơi đồ thật vào túi đồ" ở Phase 4, xem kage_phase4_state trong memory AI.
+include(":server:server-features:feature-inventory")
 
 // ---- quality ----
 include(":quality:architecture-tests")   // ArchUnit (ADR-011) — enforce dependency rule
