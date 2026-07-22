@@ -199,7 +199,7 @@ graph LR
 | `feature-inventory` | [GAMEPLAY.md §7](../05-server/GAMEPLAY.md) |
 | ⚠️ **Transaction + audit log** cho cường hoá | [DATABASE.md §5](../05-server/DATABASE.md) |
 | ⚠️ **Chừa chỗ khoá item** (cho trade Phase 7) | [GAMEPLAY.md §7](../05-server/GAMEPLAY.md) |
-| Chỉ số dẫn xuất tính lại khi đổi trang bị | [GAMEPLAY.md §2](../05-server/GAMEPLAY.md) |
+| ✅ Chỉ số dẫn xuất tính lại khi đổi trang bị (`c731cd5`, 2026-07-22 — chỉ ATK, mở rộng khi có item cần chỉ số khác) | [GAMEPLAY.md §2](../05-server/GAMEPLAY.md) |
 | `feature-shop` | — |
 | **Metric `kage.gold.total`** | [OBSERVABILITY.md §3.5](../07-infrastructure/OBSERVABILITY.md) |
 
