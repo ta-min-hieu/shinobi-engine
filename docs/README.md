@@ -150,5 +150,5 @@ Tất cả tài liệu ở `Status: Draft`. Chuyển `Approved` chỉ khi chủ 
 
 **Việc cần làm tiếp theo của cả bộ docs:**
 1. ✅ Phase 0–4 đã code xong + đạt Exit Criteria (checklist thật ở [ROADMAP.md](11-process/ROADMAP.md)) — không còn "chỉ có docs".
-2. ⚠️ **Khoảng trống thật**: ArchUnit (ý định của ADR-011) đã CODE VÀ CHẠY THẬT từ Phase 0 (`quality/architecture-tests`, 8 rule) nhưng file `ADR-011` **chưa từng được viết** — ADR Index vẫn liệt nó ở mục "ADR cần tạo". Nên viết ADR-011 ghi lại quyết định đã thực thi trong code, tránh tình trạng "code đi trước ADR" kéo dài.
+2. ✅ [ADR-011](01-architecture/adr/ADR-011-Enforce-Dependency-Rules.md) (ArchUnit) đã viết (2026-07-22) — ghi lại quyết định đã chạy thật từ Phase 0. Status vẫn `⏳ Proposed`, chờ chủ dự án xác nhận `Accepted` (AI không tự đặt, Điều 37).
 3. Chốt dần các quyết định "🟡 Chặn Phase sau" (§ trên) theo tiến độ — Phase 5 hiện không bị ADR nào chặn.

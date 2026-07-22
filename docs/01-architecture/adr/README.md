@@ -41,6 +41,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-008](ADR-008-Why-EventDriven.md) | Dùng Event-Driven giữa hệ thống gameplay | ✅ Accepted | — |
 | [ADR-009](ADR-009-Why-No-Spring-Boot.md) | Không dùng Spring Boot cho Game Server | ✅ Accepted | — |
 | [ADR-010](ADR-010-Realm-Model.md) | Single-realm ở MVP, giữ sẵn `realm_id` | ✅ Accepted | — |
+| [ADR-011](ADR-011-Enforce-Dependency-Rules.md) | Dùng ArchUnit thực thi luật dependency bằng máy | ⏳ **Proposed** *(code đã chạy thật từ Phase 0 — chờ xác nhận)* | — |
 | [ADR-012](ADR-012-Package-Root.md) | Package root `dev.kage` | ✅ Accepted | — |
 | [ADR-013](ADR-013-Flyway-vs-Liquibase.md) | Dùng Flyway làm công cụ migration DB | ✅ Accepted | — |
 | [ADR-016](ADR-016-Scripting-Engine.md) | Dùng GraalJS làm scripting engine | ✅ Accepted | — |
@@ -56,7 +57,6 @@ Tổng hợp từ toàn bộ tài liệu. **Không code chạm các vùng này k
 
 | ADR | Nội dung | Ưu tiên | Chặn | Nguồn |
 |---|---|---|---|---|
-| **ADR-011** | Cơ chế enforce dependency rule bằng Gradle | 🔴 Cao | **Phase 0** | [ARCHITECTURE.md §8](../ARCHITECTURE.md) |
 | **ADR-014** | Kubernetes hay chỉ Docker Compose | 🟢 Thấp | Phase 9 | [KUBERNETES.md](../../07-infrastructure/KUBERNETES.md) |
 | **ADR-015** | Micrometer vs OpenTelemetry (ranh giới) | 🟡 Trung bình | Phase 9 | [OBSERVABILITY.md](../../07-infrastructure/OBSERVABILITY.md) |
 | **ADR-019** | Chọn GC (G1 vs ZGC vs Shenandoah) | 🟢 Thấp | Phase 9 | [JVM.md](../../09-performance/JVM.md) |
@@ -74,10 +74,10 @@ Tổng hợp từ toàn bộ tài liệu. **Không code chạm các vùng này k
 ## Ba ADR chặn Phase 0 — trạng thái
 
 1. ✅ **ADR-012** — package root `dev.kage`. Đã chốt.
-2. ⏳ **ADR-011** — enforce dependency rule. **Còn lại — cần chốt/triển khai ngay đầu Phase 0** (đây là công việc kỹ thuật của Phase 0, không phải quyết định của chủ dự án: chọn ArchUnit + cấu hình rule).
+2. ⏳ **ADR-011** — enforce dependency rule bằng ArchUnit. **Code đã chạy thật từ Phase 0** (`quality/architecture-tests`, 8 rule); file ADR viết ngày 2026-07-22, chờ chủ dự án xác nhận Accepted (không chặn gì — chỉ là việc ghi lại quyết định đã thực thi).
 3. ✅ **ADR-010** — single-realm + `realm_id` dự phòng. Đã chốt.
 
-→ **Chỉ còn ADR-011**, và nó là việc làm *trong* Phase 0 (viết ArchUnit test) chứ không chặn *khởi động* Phase 0. Dự án đã đủ điều kiện mở Phase 0.
+→ Dự án đã đủ điều kiện mở Phase 0 từ lâu; Phase 0-4 đã xong ([ROADMAP.md](../../11-process/ROADMAP.md)). ADR-011 là việc giấy tờ còn treo, không chặn gì đang chạy.
 
 ---
 
