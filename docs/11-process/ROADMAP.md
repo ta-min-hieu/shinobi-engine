@@ -204,7 +204,7 @@ graph LR
 | **Metric `kage.gold.total`** | [OBSERVABILITY.md §3.5](../07-infrastructure/OBSERVABILITY.md) |
 
 **Exit Criteria:**
-- [ ] Nhặt đồ, mặc đồ, cường hoá, mua bán
+- [ ] Nhặt đồ, mặc đồ, cường hoá, mua bán — nhặt đồ ✅ (`ae69f4f`, Phase 4), mặc đồ ✅ (`b84afe5`/`3b2e84e`, 2026-07-22, kể cả sửa nền tảng ID item ổn định cho `Inventory`); cường hoá/mua bán chưa làm
 - [ ] Audit log ghi đủ
 - [ ] Test: không duplicate item qua transaction fail
 
