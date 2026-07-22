@@ -66,13 +66,12 @@ JDBC theo package `dev.kage.server.database`, không theo Gradle module).
 - **`PostgresEquipmentAdapter.save()` VẪN "xoá hết ghi lại"** (khác `PostgresInventoryAdapter`) —
   AN TOÀN ở đây vì không bảng nào tham chiếu ngược `equipment_slot` theo ID (bảng còn không có cột
   `id`, PK là `(character_id, slot_type)`), tối đa 7 dòng/nhân vật.
-- **CHƯA nối protocol/gateway** (`EquipItemCommand`/`UnequipItemCommand` chưa tồn tại) — domain/
-  application/infrastructure đã xong và test thật (kể cả Postgres qua Testcontainers), nhưng để
-  client thật gọi được cần thêm: (1) opcode + packet mới (dải 500-599), (2) cách client biết
-  `inventory_item.id` thật của item nó đang có (`ItemGrantedEvent` hiện chỉ gửi
-  `item_template_id`+`quantity`, KHÔNG gửi `id` — vì `insertItem()` hiện discard giá trị
-  `RETURNING id`, chưa có consumer nào cần). Đây là việc của lát cắt sau, không phải thiếu sót của
-  lát cắt này.
+- ✅ **Đã nối protocol/gateway** (cùng ngày, lát cắt tiếp theo): `EquipItemCommand`/
+  `UnequipItemCommand`/`*Response` (opcode 501-504, `inventory.proto`) + `GatewayChannelHandler`
+  handler thật (Virtual Thread, giống `handleSelectCharacterCommand`) + verify qua socket thật
+  (`GatewayServerIntegrationTest`). Điều kiện tiên quyết đã sửa: `InventoryPort.save()` giờ TRẢ VỀ
+  `Inventory` đã lưu (id thật) thay vì `void` — `GrantLootUseCase` dùng giá trị này để trả ID thật
+  về client qua `ItemGrantedEvent.item_id` (field mới, không đổi field cũ).
 
 ## Cứng
 

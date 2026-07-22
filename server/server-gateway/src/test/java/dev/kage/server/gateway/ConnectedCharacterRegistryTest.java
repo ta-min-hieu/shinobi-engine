@@ -83,9 +83,10 @@ class ConnectedCharacterRegistryTest {
             }
 
             @Override
-            public void save(dev.kage.inventory.domain.Transaction tx, Inventory inventory) {
+            public Inventory save(dev.kage.inventory.domain.Transaction tx, Inventory inventory) {
                 // không cần verify save() ở test này — WorldFacadeTest/PostgresInventoryAdapter
                 // IntegrationTest đã phủ persistence, test này chỉ verify event gửi đúng.
+                return inventory;
             }
         };
         DropTablePort dropTablePort =

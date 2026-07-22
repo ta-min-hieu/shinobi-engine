@@ -42,8 +42,9 @@ class GrantLootUseCaseTest {
         }
 
         @Override
-        public void save(Transaction tx, Inventory inv) {
+        public Inventory save(Transaction tx, Inventory inv) {
             this.saved = inv;
+            return inv; // Fake: không mô phỏng gán ID thật (đó là việc PostgresInventoryAdapter, test riêng)
         }
     }
 
@@ -78,6 +79,37 @@ class GrantLootUseCaseTest {
 
         assertThat(granted).isEmpty();
         assertThat(inventoryPort.saved).isNull(); // không rơi gì -> không cần lưu
+    }
+
+    @Test
+    void shouldReturnRealIdFromSavedInventory_notThePrePersistPlaceholder() {
+        // Đúng mục đích của lát cắt "trả ID thật về client": granted phải lấy từ Inventory mà
+        // save() TRẢ VỀ (có id thật), không phải item id=0 (NEW_ITEM_ID) lúc add() vào bộ nhớ.
+        var entries = List.of(new DropTableEntry(100L, 100, 2, 2));
+        var dropTablePort = new FakeDropTablePort(entries);
+        var inventory = new Inventory(1L, 10, List.of());
+        InventoryPort inventoryPort = new InventoryPort() {
+            @Override
+            public Optional<Inventory> findByCharacter(long characterId) {
+                return Optional.of(inventory);
+            }
+
+            @Override
+            public Inventory save(Transaction tx, Inventory inv) {
+                // Mô phỏng DB gán ID thật (999L) cho item mới, giống PostgresInventoryAdapter thật.
+                var withRealId = inv.items().stream()
+                        .map(stack -> new ItemStack(999L, stack.itemTemplateId(), stack.quantity(), stack.enhanceLevel()))
+                        .toList();
+                return new Inventory(inv.characterId(), inv.capacity(), withRealId);
+            }
+        };
+        var useCase = new GrantLootUseCase(dropTablePort, inventoryPort, DIRECT_TX);
+
+        var granted = useCase.execute(1L, "any_code");
+
+        assertThat(granted).hasSize(1);
+        assertThat(granted.get(0).id()).isEqualTo(999L);
+        assertThat(granted.get(0).isPersisted()).isTrue();
     }
 
     @Test

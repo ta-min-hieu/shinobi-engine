@@ -36,6 +36,9 @@ import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
 import dev.kage.protocol.CreateCharacterResponse;
+import dev.kage.protocol.EquipItemCommand;
+import dev.kage.protocol.EquipItemResponse;
+import dev.kage.protocol.EquipmentSlot;
 import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.MoveResponse;
@@ -44,6 +47,8 @@ import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
 import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.SetTargetCommand;
+import dev.kage.protocol.UnequipItemCommand;
+import dev.kage.protocol.UnequipItemResponse;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
@@ -87,13 +92,15 @@ class GatewayServerIntegrationTest {
         // này chỉ verify ping/pong qua socket thật, không chạm Connect/Character, nhưng
         // GatewayServer luôn cần cả 2 Facade để khởi tạo (xem GatewayServer).
         var characterFacade = fakeCharacterFacade();
-        characterRegistry = new ConnectedCharacterRegistry(fakeInventoryFacade());
+        var inventoryFacade = fakeInventoryFacade();
+        characterRegistry = new ConnectedCharacterRegistry(inventoryFacade);
         worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
         var positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
-        server = new GatewayServer(0, fakeAccountFacade(), characterFacade, worldGateway);
+        var facades = new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade);
+        server = new GatewayServer(0, facades, worldGateway);
         server.start();
     }
 
@@ -202,8 +209,8 @@ class GatewayServerIntegrationTest {
             }
 
             @Override
-            public void save(dev.kage.inventory.domain.Transaction tx, Inventory inventory) {
-                // không dùng trong test này
+            public Inventory save(dev.kage.inventory.domain.Transaction tx, Inventory inventory) {
+                return inventory; // không dùng trong test này
             }
         };
         DropTablePort dropTablePort = dropTableCode -> List.<DropTableEntry>of();
@@ -383,6 +390,51 @@ class GatewayServerIntegrationTest {
                     readUntilOpcode(in, Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE).payload());
             assertThat(attackResult.getAttackerEntityId()).isEqualTo(characterId);
             assertThat(attackResult.getTargetEntityId()).isEqualTo(monsterId);
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void clientShouldReceiveEquipItemResponse_overRealSockets() throws Exception {
+        // Phase 5 lát cắt "mặc đồ": verify qua chính giao thức dây, không chỉ Facade trong bộ nhớ.
+        // fakeInventoryFacade() ở file này luôn trả túi đồ RỖNG (Fake, không DB thật) nên item
+        // itemId=1 chắc chắn KHÔNG tồn tại — test đúng nhánh ITEM_NOT_FOUND, verify handler mới
+        // (opcode dispatch, decode protobuf, chạy trên authExecutor, encode response) hoạt động
+        // đúng dây thật, không phải nhánh "mặc thành công" (cái đó PostgresInventoryAdapter/
+        // PostgresEquipmentAdapterIntegrationTest + EquipItemUseCaseTest đã phủ ở tầng dưới).
+        try (var socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(5000);
+            var in = new DataInputStream(socket.getInputStream());
+            connectCreateAndSelect(socket, in, "equip" + UUID.randomUUID().toString().substring(0, 6));
+
+            var equipCommand = EquipItemCommand.newBuilder()
+                    .setItemId(1L)
+                    .setSlot(EquipmentSlot.EQUIPMENT_SLOT_WEAPON)
+                    .build();
+            sendFrame(socket, Opcode.OPCODE_EQUIP_ITEM_COMMAND_VALUE, 10, equipCommand.toByteArray());
+
+            var response = EquipItemResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_EQUIP_ITEM_RESPONSE_VALUE).payload());
+            assertThat(response.getSuccess()).isFalse();
+            assertThat(response.getErrorKey()).isEqualTo("error.item_not_found");
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void clientShouldReceiveUnequipItemResponse_overRealSockets() throws Exception {
+        try (var socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(5000);
+            var in = new DataInputStream(socket.getInputStream());
+            connectCreateAndSelect(socket, in, "unequip" + UUID.randomUUID().toString().substring(0, 6));
+
+            var unequipCommand = UnequipItemCommand.newBuilder().setSlot(EquipmentSlot.EQUIPMENT_SLOT_WEAPON).build();
+            sendFrame(socket, Opcode.OPCODE_UNEQUIP_ITEM_COMMAND_VALUE, 10, unequipCommand.toByteArray());
+
+            var response = UnequipItemResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_UNEQUIP_ITEM_RESPONSE_VALUE).payload());
+            assertThat(response.getSuccess()).isFalse(); // slot rỗng — không có gì để gỡ
+            assertThat(response.getErrorKey()).isEqualTo("error.slot_not_equipped");
         }
     }
 

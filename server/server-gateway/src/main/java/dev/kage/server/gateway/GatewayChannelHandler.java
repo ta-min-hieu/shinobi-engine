@@ -8,11 +8,16 @@ import dev.kage.character.application.CharacterNotFoundException;
 import dev.kage.character.application.DuplicateCharacterNameException;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.IdempotencyKeyReusedException;
+import dev.kage.inventory.api.InventoryFacade;
+import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.protocol.CharacterSummary;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
 import dev.kage.protocol.CreateCharacterResponse;
+import dev.kage.protocol.EquipItemCommand;
+import dev.kage.protocol.EquipItemResponse;
+import dev.kage.protocol.EquipmentSlot;
 import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.Faction;
 import dev.kage.protocol.ListCharactersRequest;
@@ -24,6 +29,8 @@ import dev.kage.protocol.PongResponse;
 import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.SelectCharacterResponse;
 import dev.kage.protocol.SetTargetCommand;
+import dev.kage.protocol.UnequipItemCommand;
+import dev.kage.protocol.UnequipItemResponse;
 import dev.kage.protocol.UseSkillCommand;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
@@ -69,6 +76,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private final AccountFacade accountFacade;
     private final CharacterFacade characterFacade;
+    private final InventoryFacade inventoryFacade;
     private final WorldGateway worldGateway;
     private final Executor authExecutor;
     // Per-connection (handler đã là state per-connection, xem javadoc lớp) — không cần đồng bộ
@@ -92,13 +100,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, this::handleSelectCharacter,
             Opcode.OPCODE_MOVE_COMMAND_VALUE, this::handleMoveCommand,
             Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, this::handleSetTargetCommand,
-            Opcode.OPCODE_USE_SKILL_COMMAND_VALUE, this::handleUseSkillCommand);
+            Opcode.OPCODE_USE_SKILL_COMMAND_VALUE, this::handleUseSkillCommand,
+            Opcode.OPCODE_EQUIP_ITEM_COMMAND_VALUE, this::handleEquipItemCommand,
+            Opcode.OPCODE_UNEQUIP_ITEM_COMMAND_VALUE, this::handleUnequipItemCommand);
 
-    GatewayChannelHandler(
-            AccountFacade accountFacade, CharacterFacade characterFacade, WorldGateway worldGateway,
-            Executor authExecutor) {
-        this.accountFacade = accountFacade;
-        this.characterFacade = characterFacade;
+    GatewayChannelHandler(GatewayFacades facades, WorldGateway worldGateway, Executor authExecutor) {
+        this.accountFacade = facades.accountFacade();
+        this.characterFacade = facades.characterFacade();
+        this.inventoryFacade = facades.inventoryFacade();
         this.worldGateway = worldGateway;
         this.authExecutor = authExecutor;
     }
@@ -327,6 +336,87 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             return;
         }
         worldGateway.facade().useSkill(characterId, command.getSkillCode(), command.getTargetEntityId());
+    }
+
+    // EquipItemCommand chạm DB (feature-inventory) — Virtual Thread, giống handleSelectCharacter.
+    private void handleEquipItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = EquipItemCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleEquipItemBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleEquipItemBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, EquipItemCommand command) {
+        var slot = toDomainSlot(command.getSlot());
+        if (slot == null) {
+            sendError(ctx, sequenceId, 400, "error.invalid_equipment_slot");
+            return;
+        }
+        var result = inventoryFacade.equipItem(characterId, command.getItemId(), slot);
+        var response = EquipItemResponse.newBuilder()
+                .setSuccess(result == InventoryFacade.EquipResult.OK)
+                .setErrorKey(toErrorKey(result))
+                .build();
+        send(ctx, Opcode.OPCODE_EQUIP_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    // UnequipItemCommand chạm DB (feature-inventory) — Virtual Thread, giống handleEquipItemCommand.
+    private void handleUnequipItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = UnequipItemCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleUnequipItemBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleUnequipItemBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, UnequipItemCommand command) {
+        var slot = toDomainSlot(command.getSlot());
+        if (slot == null) {
+            sendError(ctx, sequenceId, 400, "error.invalid_equipment_slot");
+            return;
+        }
+        var result = inventoryFacade.unequipItem(characterId, slot);
+        var response = UnequipItemResponse.newBuilder()
+                .setSuccess(result == InventoryFacade.UnequipResult.OK)
+                .setErrorKey(result == InventoryFacade.UnequipResult.OK ? "" : "error.slot_not_equipped")
+                .build();
+        send(ctx, Opcode.OPCODE_UNEQUIP_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    // Bảng tra thay switch 8 nhánh (PMD CyclomaticComplexity — cùng lý do đổi channelRead0 sang
+    // Map ở trên). UNSPECIFIED/UNRECOGNIZED cố ý KHÔNG có trong map — get() trả null, đúng ý nghĩa
+    // "slot không hợp lệ".
+    private static final Map<EquipmentSlot, EquipmentSlotType> SLOT_MAPPING = Map.of(
+            EquipmentSlot.EQUIPMENT_SLOT_WEAPON, EquipmentSlotType.WEAPON,
+            EquipmentSlot.EQUIPMENT_SLOT_ARMOR, EquipmentSlotType.ARMOR,
+            EquipmentSlot.EQUIPMENT_SLOT_HELMET, EquipmentSlotType.HELMET,
+            EquipmentSlot.EQUIPMENT_SLOT_GLOVE, EquipmentSlotType.GLOVE,
+            EquipmentSlot.EQUIPMENT_SLOT_BOOT, EquipmentSlotType.BOOT,
+            EquipmentSlot.EQUIPMENT_SLOT_ACCESSORY_1, EquipmentSlotType.ACCESSORY_1,
+            EquipmentSlot.EQUIPMENT_SLOT_ACCESSORY_2, EquipmentSlotType.ACCESSORY_2);
+
+    /** {@code null} nếu client gửi giá trị enum không hợp lệ (VD {@code UNSPECIFIED}/{@code UNRECOGNIZED}). */
+    private static EquipmentSlotType toDomainSlot(EquipmentSlot slot) {
+        return SLOT_MAPPING.get(slot);
+    }
+
+    private static String toErrorKey(InventoryFacade.EquipResult result) {
+        return switch (result) {
+            case OK -> "";
+            case ITEM_NOT_FOUND -> "error.item_not_found";
+            case WRONG_SLOT -> "error.wrong_equipment_slot";
+        };
     }
 
     /**

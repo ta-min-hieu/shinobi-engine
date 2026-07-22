@@ -215,9 +215,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
             return; // đã ngắt kết nối giữa lúc roll loot — item đã lưu DB thật, chỉ mất thông báo.
         }
         for (var stack : granted) {
+            // ID thật (GrantLootUseCase đã trả về từ Inventory đã lưu) — client cần để mặc đồ (EquipItemCommand).
             var event = ItemGrantedEvent.newBuilder()
                     .setItemTemplateId(stack.itemTemplateId())
                     .setQuantity(stack.quantity())
+                    .setItemId(stack.id())
                     .build();
             send(ctx, Opcode.OPCODE_ITEM_GRANTED_EVENT_VALUE, 0, event.toByteArray());
         }

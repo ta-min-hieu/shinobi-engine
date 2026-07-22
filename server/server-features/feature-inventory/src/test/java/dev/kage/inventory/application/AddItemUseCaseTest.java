@@ -28,8 +28,9 @@ class AddItemUseCaseTest {
         }
 
         @Override
-        public void save(Transaction tx, Inventory inv) {
+        public Inventory save(Transaction tx, Inventory inv) {
             this.saved = inv;
+            return inv;
         }
     }
 

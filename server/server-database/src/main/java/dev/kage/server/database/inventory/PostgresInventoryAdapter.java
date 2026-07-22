@@ -83,11 +83,12 @@ public final class PostgresInventoryAdapter implements InventoryPort {
     }
 
     @Override
-    public void save(Transaction tx, Inventory inventory) {
+    public Inventory save(Transaction tx, Inventory inventory) {
         var connection = ((JdbcTransaction) tx).connection();
         try {
             deleteRemovedItems(connection, inventory);
-            upsertItems(connection, inventory);
+            List<ItemStack> savedItems = upsertItems(connection, inventory);
+            return new Inventory(inventory.characterId(), inventory.capacity(), savedItems);
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi lưu túi đồ: characterId=" + inventory.characterId(), e);
         }
@@ -126,17 +127,26 @@ public final class PostgresInventoryAdapter implements InventoryPort {
         }
     }
 
-    /** Item đã có id thật → UPDATE tại chỗ (giữ nguyên id); item mới ({@code id == NEW_ITEM_ID}) → INSERT. */
-    private static void upsertItems(Connection connection, Inventory inventory) throws SQLException {
+    /**
+     * Item đã có id thật → UPDATE tại chỗ (giữ nguyên id); item mới ({@code id == NEW_ITEM_ID}) →
+     * INSERT, gán id thật từ {@code RETURNING id}. Trả về danh sách ĐÃ LƯU, CÙNG THỨ TỰ với
+     * {@code inventory.items()} — caller (VD {@code GrantLootUseCase}) dựa vào thứ tự này để tra
+     * lại ID thật của item mình vừa thêm (xem {@link InventoryPort#save}).
+     */
+    private static List<ItemStack> upsertItems(Connection connection, Inventory inventory) throws SQLException {
         List<ItemStack> items = inventory.items();
+        var saved = new ArrayList<ItemStack>(items.size());
         for (int slotIndex = 0; slotIndex < items.size(); slotIndex++) {
             var stack = items.get(slotIndex);
             if (stack.isPersisted()) {
                 updateItem(connection, stack, slotIndex);
+                saved.add(stack);
             } else {
-                insertItem(connection, inventory.characterId(), stack, slotIndex);
+                long realId = insertItem(connection, inventory.characterId(), stack, slotIndex);
+                saved.add(new ItemStack(realId, stack.itemTemplateId(), stack.quantity(), stack.enhanceLevel()));
             }
         }
+        return saved;
     }
 
     private static void updateItem(Connection connection, ItemStack stack, int slotIndex) throws SQLException {
@@ -149,7 +159,7 @@ public final class PostgresInventoryAdapter implements InventoryPort {
         }
     }
 
-    private static void insertItem(Connection connection, long characterId, ItemStack stack, int slotIndex)
+    private static long insertItem(Connection connection, long characterId, ItemStack stack, int slotIndex)
             throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(INSERT_ITEM)) {
             statement.setLong(1, characterId);
@@ -158,7 +168,8 @@ public final class PostgresInventoryAdapter implements InventoryPort {
             statement.setInt(4, stack.enhanceLevel());
             statement.setInt(5, slotIndex);
             try (ResultSet rs = statement.executeQuery()) {
-                rs.next(); // RETURNING id — chưa có UseCase nào cần ID ngay sau khi thêm (YAGNI)
+                rs.next();
+                return rs.getLong(1); // RETURNING id
             }
         }
     }

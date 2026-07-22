@@ -18,7 +18,12 @@ public interface InventoryPort {
 
     /**
      * Lưu inventory trong transaction đang mở.
+     *
      * @param tx transaction bắt buộc — thao tác có giá trị phải nguyên tử (DATABASE.md §5)
+     * @return Inventory ĐÃ LƯU với {@code ItemStack.id} THẬT cho item mới (adapter gán qua
+     *     {@code RETURNING id}) — item truyền vào có {@code id == ItemStack.NEW_ITEM_ID} không
+     *     mang ID thật, caller cần ID thật (VD báo cho client biết để sau này mặc đồ) phải dùng
+     *     giá trị trả về này, không phải tham số {@code inventory} đầu vào.
      */
-    void save(Transaction tx, Inventory inventory);
+    Inventory save(Transaction tx, Inventory inventory);
 }

@@ -1,7 +1,5 @@
 package dev.kage.server.gateway;
 
-import dev.kage.account.api.AccountFacade;
-import dev.kage.character.api.CharacterFacade;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
@@ -44,8 +42,7 @@ public final class GatewayServer {
     private static final long EVENT_LOOP_SHUTDOWN_TIMEOUT_MILLIS = 5000;
 
     private final int requestedPort;
-    private final AccountFacade accountFacade;
-    private final CharacterFacade characterFacade;
+    private final GatewayFacades facades;
     private final WorldGateway worldGateway;
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
@@ -57,11 +54,9 @@ public final class GatewayServer {
      * @param worldGateway {@code registry()} đã đăng ký làm {@code WorldOutboundSink} của
      *     {@code facade()} TRƯỚC khi truyền vào đây (composition root — {@code GatewayBootstrap}).
      */
-    public GatewayServer(
-            int port, AccountFacade accountFacade, CharacterFacade characterFacade, WorldGateway worldGateway) {
+    public GatewayServer(int port, GatewayFacades facades, WorldGateway worldGateway) {
         this.requestedPort = port;
-        this.accountFacade = accountFacade;
-        this.characterFacade = characterFacade;
+        this.facades = facades;
         this.worldGateway = worldGateway;
     }
 
@@ -85,8 +80,7 @@ public final class GatewayServer {
                                 .addLast(new LengthFieldPrepender(LENGTH_FIELD_LENGTH))
                                 .addLast(new PacketFrameDecoder())
                                 .addLast(new PacketFrameEncoder())
-                                .addLast(new GatewayChannelHandler(
-                                        accountFacade, characterFacade, worldGateway, authExecutor));
+                                .addLast(new GatewayChannelHandler(facades, worldGateway, authExecutor));
                     }
                 });
 

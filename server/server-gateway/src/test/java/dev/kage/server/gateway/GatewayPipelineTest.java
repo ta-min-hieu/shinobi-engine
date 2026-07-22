@@ -231,8 +231,8 @@ class GatewayPipelineTest {
             }
 
             @Override
-            public void save(dev.kage.inventory.domain.Transaction tx, Inventory inventory) {
-                // không dùng trong test này
+            public Inventory save(dev.kage.inventory.domain.Transaction tx, Inventory inventory) {
+                return inventory; // không dùng trong test này
             }
         };
         DropTablePort dropTablePort = dropTableCode -> List.<DropTableEntry>of();
@@ -278,7 +278,8 @@ class GatewayPipelineTest {
         // attachCharacter() (gọi trong handleSelectCharacterBlocking) không ném lỗi khi enqueue
         // vào hàng đợi chưa có ai drain (không tạo/rò rỉ thread tick cho mỗi test). Tương tự,
         // positionPersister không start() — save() (nếu bị gọi) chạy trực tiếp, không cần scheduler.
-        var characterRegistry = new ConnectedCharacterRegistry(fakeInventoryFacade());
+        var inventoryFacade = fakeInventoryFacade();
+        var characterRegistry = new ConnectedCharacterRegistry(inventoryFacade);
         var worldFacade = new WorldFacade(characterRegistry);
         var positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
@@ -289,7 +290,9 @@ class GatewayPipelineTest {
                 new LengthFieldPrepender(4),
                 new PacketFrameDecoder(),
                 new PacketFrameEncoder(),
-                new GatewayChannelHandler(accountFacade, characterFacade, worldGateway, Runnable::run));
+                new GatewayChannelHandler(
+                        new GatewayFacades(accountFacade, characterFacade, inventoryFacade), worldGateway,
+                        Runnable::run));
     }
 
     /** Fake = implementation in-memory THẬT (TESTING.md §4), không Mockito. */

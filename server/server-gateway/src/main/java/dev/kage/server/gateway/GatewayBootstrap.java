@@ -39,7 +39,8 @@ public final class GatewayBootstrap {
         positionPersister.start();
         var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
 
-        var server = new GatewayServer(PORT, accountFacade, characterFacade, worldGateway);
+        var facades = new GatewayFacades(accountFacade, characterFacade, inventoryFacade);
+        var server = new GatewayServer(PORT, facades, worldGateway);
         server.start();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             // Thứ tự SERVER.md §10: ngừng nhận kết nối mới trước (server.stop() đóng channel),

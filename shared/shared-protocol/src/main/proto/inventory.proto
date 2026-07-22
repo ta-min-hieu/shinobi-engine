@@ -5,9 +5,9 @@ package kage.protocol;
 option java_package = "dev.kage.protocol";
 option java_multiple_files = true;
 
-// Packet Inventory / Equipment (NETWORK.md §4, dải 500-599). Lát cắt này CHỈ có sự kiện "nhận
-// item từ rơi đồ" (GAMEPLAY.md §5) — chưa có InventoryAddItemCommand/MoveItem/Equip (Phase 5 thật,
-// xem feature-inventory/CLAUDE.md "Mở sớm hơn ROADMAP dự kiến").
+// Packet Inventory / Equipment (NETWORK.md §4, dải 500-599). Phase 5 lát cắt 1 "mặc đồ"
+// (feature-inventory/CLAUDE.md, DATABASE.md §2.2) thêm EquipItemCommand/UnequipItemCommand —
+// item_id là inventory_item.id THẬT (feature-inventory: Inventory/ItemStack giờ có ID ổn định).
 
 // Event: Server -> Client (OPCODE_ITEM_GRANTED_EVENT). Item THẬT SỰ đã cộng vào túi đồ (đã qua
 // kiểm tra túi đầy ở feature-inventory) — KHÔNG phải "quái rơi gì", chỉ gửi khi thêm thành công.
@@ -16,4 +16,43 @@ option java_multiple_files = true;
 message ItemGrantedEvent {
   int64 item_template_id = 1;
   int32 quantity = 2;
+  int64 item_id = 3; // inventory_item.id THẬT — client cần để tham chiếu lúc mặc đồ (EquipItemCommand)
+}
+
+// 7 slot trang bị (DATABASE.md §2.2) — khớp dev.kage.inventory.domain.EquipmentSlotType.
+enum EquipmentSlot {
+  EQUIPMENT_SLOT_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho lệnh thật.
+  EQUIPMENT_SLOT_WEAPON = 1;
+  EQUIPMENT_SLOT_ARMOR = 2;
+  EQUIPMENT_SLOT_HELMET = 3;
+  EQUIPMENT_SLOT_GLOVE = 4;
+  EQUIPMENT_SLOT_BOOT = 5;
+  EQUIPMENT_SLOT_ACCESSORY_1 = 6;
+  EQUIPMENT_SLOT_ACCESSORY_2 = 7;
+}
+
+// Command: Client -> Server (OPCODE_EQUIP_ITEM_COMMAND). Mặc item_id (ID thật, KHÔNG phải vị trí
+// trong túi) vào slot — server tự kiểm tra item thuộc đúng nhân vật + đúng loại slot, KHÔNG tin
+// client (Điều 24).
+message EquipItemCommand {
+  int64 item_id = 1;
+  EquipmentSlot slot = 2;
+}
+
+// Response: Server -> Client (OPCODE_EQUIP_ITEM_RESPONSE).
+message EquipItemResponse {
+  bool success = 1;
+  string error_key = 2; // rỗng nếu success=true (NETWORK.md §107)
+}
+
+// Command: Client -> Server (OPCODE_UNEQUIP_ITEM_COMMAND). Gỡ trang bị khỏi slot — item vẫn còn
+// trong túi đồ, không bị xoá.
+message UnequipItemCommand {
+  EquipmentSlot slot = 1;
+}
+
+// Response: Server -> Client (OPCODE_UNEQUIP_ITEM_RESPONSE).
+message UnequipItemResponse {
+  bool success = 1;
+  string error_key = 2;
 }

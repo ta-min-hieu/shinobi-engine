@@ -36,7 +36,8 @@ class EquipItemUseCaseTest {
         }
 
         @Override
-        public void save(Transaction tx, Inventory inventory) {
+        public Inventory save(Transaction tx, Inventory inventory) {
+            return inventory;
         }
     }
 

@@ -43,6 +43,10 @@ public final class Inventory {
         return characterId;
     }
 
+    public int capacity() {
+        return capacity;
+    }
+
     public List<ItemStack> items() {
         return List.copyOf(items); // không lộ mutable list ra ngoài
     }
