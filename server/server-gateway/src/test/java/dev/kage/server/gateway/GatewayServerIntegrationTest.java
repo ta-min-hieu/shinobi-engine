@@ -19,11 +19,16 @@ import dev.kage.character.domain.NewCharacter;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.application.AddItemUseCase;
+import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
+import dev.kage.inventory.application.UnequipItemUseCase;
 import dev.kage.inventory.domain.DropTableEntry;
 import dev.kage.inventory.domain.DropTablePort;
+import dev.kage.inventory.domain.Equipment;
+import dev.kage.inventory.domain.EquipmentPort;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
+import dev.kage.inventory.domain.ItemTemplatePort;
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
@@ -204,7 +209,22 @@ class GatewayServerIntegrationTest {
         DropTablePort dropTablePort = dropTableCode -> List.<DropTableEntry>of();
         var addItemUseCase = new AddItemUseCase(inventoryPort, action -> action.accept(null));
         var grantLootUseCase = new GrantLootUseCase(dropTablePort, inventoryPort, action -> action.accept(null));
-        return new InventoryFacade(addItemUseCase, grantLootUseCase);
+        // Equip/unequip không dùng trong test này — fake tối thiểu để compile.
+        ItemTemplatePort itemTemplatePort = itemTemplateId -> Optional.empty();
+        EquipmentPort equipmentPort = new EquipmentPort() {
+            @Override
+            public Optional<Equipment> findByCharacter(long characterId) {
+                return Optional.of(new Equipment(characterId, Map.of()));
+            }
+
+            @Override
+            public void save(dev.kage.inventory.domain.Transaction tx, Equipment equipment) {
+            }
+        };
+        var equipItemUseCase = new EquipItemUseCase(
+                inventoryPort, itemTemplatePort, equipmentPort, action -> action.accept(null));
+        var unequipItemUseCase = new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
+        return new InventoryFacade(addItemUseCase, grantLootUseCase, equipItemUseCase, unequipItemUseCase);
     }
 
     @AfterEach

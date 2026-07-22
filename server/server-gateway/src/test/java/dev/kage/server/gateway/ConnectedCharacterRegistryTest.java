@@ -5,11 +5,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.google.protobuf.InvalidProtocolBufferException;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.application.AddItemUseCase;
+import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
+import dev.kage.inventory.application.UnequipItemUseCase;
 import dev.kage.inventory.domain.DropTableEntry;
 import dev.kage.inventory.domain.DropTablePort;
+import dev.kage.inventory.domain.Equipment;
+import dev.kage.inventory.domain.EquipmentPort;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
+import dev.kage.inventory.domain.ItemTemplatePort;
+import dev.kage.inventory.domain.Transaction;
 import dev.kage.protocol.ItemGrantedEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.wire.PacketCodec;
@@ -18,6 +24,7 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -85,7 +92,22 @@ class ConnectedCharacterRegistryTest {
                 dropTableCode -> List.of(new DropTableEntry(100L, dropChancePercent, 2, 2));
         var addItemUseCase = new AddItemUseCase(inventoryPort, action -> action.accept(null));
         var grantLootUseCase = new GrantLootUseCase(dropTablePort, inventoryPort, action -> action.accept(null));
-        return new InventoryFacade(addItemUseCase, grantLootUseCase);
+        // Equip/unequip không dùng trong test này (chỉ verify grantLoot) — fake tối thiểu để compile.
+        ItemTemplatePort itemTemplatePort = itemTemplateId -> Optional.empty();
+        EquipmentPort equipmentPort = new EquipmentPort() {
+            @Override
+            public Optional<Equipment> findByCharacter(long characterId) {
+                return Optional.of(new Equipment(characterId, Map.of()));
+            }
+
+            @Override
+            public void save(Transaction tx, Equipment equipment) {
+            }
+        };
+        var equipItemUseCase = new EquipItemUseCase(
+                inventoryPort, itemTemplatePort, equipmentPort, action -> action.accept(null));
+        var unequipItemUseCase = new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
+        return new InventoryFacade(addItemUseCase, grantLootUseCase, equipItemUseCase, unequipItemUseCase);
     }
 
     /** onMonsterKilled đẩy việc sang Virtual Thread riêng (lootExecutor) — poll thay vì đọc ngay. */

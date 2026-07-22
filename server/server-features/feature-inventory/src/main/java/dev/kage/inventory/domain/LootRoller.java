@@ -22,7 +22,7 @@ public final class LootRoller {
                 int quantity = entry.minQuantity() == entry.maxQuantity()
                         ? entry.minQuantity()
                         : ThreadLocalRandom.current().nextInt(entry.minQuantity(), entry.maxQuantity() + 1);
-                drops.add(new ItemStack(entry.itemTemplateId(), quantity, 0));
+                drops.add(ItemStack.newItem(entry.itemTemplateId(), quantity, 0));
             }
         }
         return drops;

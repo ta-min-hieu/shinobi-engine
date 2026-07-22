@@ -12,7 +12,7 @@ class InventoryTest {
     void shouldAddItem_whenBelowCapacity() {
         var inventory = new Inventory(1L, 5, List.of());
 
-        var result = inventory.add(new ItemStack(100L, 1, 0));
+        var result = inventory.add(ItemStack.newItem(100L, 1, 0));
 
         assertThat(result).isInstanceOf(Inventory.Added.class);
         assertThat(inventory.items()).hasSize(1);
@@ -21,9 +21,9 @@ class InventoryTest {
 
     @Test
     void shouldRejectAdd_whenAtCapacity() {
-        var inventory = new Inventory(1L, 1, List.of(new ItemStack(100L, 1, 0)));
+        var inventory = new Inventory(1L, 1, List.of(ItemStack.newItem(100L, 1, 0)));
 
-        var result = inventory.add(new ItemStack(200L, 1, 0));
+        var result = inventory.add(ItemStack.newItem(200L, 1, 0));
 
         assertThat(result).isInstanceOf(Inventory.Full.class);
         assertThat(inventory.items()).hasSize(1); // không thêm item mới khi đầy
@@ -32,11 +32,20 @@ class InventoryTest {
 
     @Test
     void shouldRejectItemStack_whenQuantityNotPositive() {
-        assertThatThrownBy(() -> new ItemStack(100L, 0, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ItemStack.newItem(100L, 0, 0)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void shouldRejectDropTableEntry_whenMaxQuantityBelowMin() {
         assertThatThrownBy(() -> new DropTableEntry(100L, 50, 5, 2)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void shouldFindItem_byRealId() {
+        var stack = new ItemStack(42L, 100L, 1, 0);
+        var inventory = new Inventory(1L, 5, List.of(stack));
+
+        assertThat(inventory.findItem(42L)).contains(stack);
+        assertThat(inventory.findItem(999L)).isEmpty();
     }
 }

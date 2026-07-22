@@ -41,7 +41,7 @@ class AddItemUseCaseTest {
         var port = new FakeInventoryPort(inv);
         var useCase = new AddItemUseCase(port, DIRECT_TX);
 
-        var result = useCase.execute(1L, new ItemStack(100L, 1, 0));
+        var result = useCase.execute(1L, ItemStack.newItem(100L, 1, 0));
 
         assertThat(result).isEqualTo(AddItemUseCase.AddItemResult.OK);
         assertThat(port.saved).isNotNull();
@@ -49,11 +49,11 @@ class AddItemUseCaseTest {
 
     @Test
     void shouldReturnFull_whenBagIsFull() {
-        var full = new Inventory(1L, 1, List.of(new ItemStack(100L, 1, 0)));
+        var full = new Inventory(1L, 1, List.of(ItemStack.newItem(100L, 1, 0)));
         var port = new FakeInventoryPort(full);
         var useCase = new AddItemUseCase(port, DIRECT_TX);
 
-        var result = useCase.execute(1L, new ItemStack(101L, 1, 0));
+        var result = useCase.execute(1L, ItemStack.newItem(101L, 1, 0));
 
         assertThat(result).isEqualTo(AddItemUseCase.AddItemResult.FULL);
         assertThat(port.saved).isNull(); // túi đầy → không lưu

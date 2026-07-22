@@ -1,22 +1,32 @@
 package dev.kage.inventory.api;
 
 import dev.kage.inventory.application.AddItemUseCase;
+import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
+import dev.kage.inventory.application.UnequipItemUseCase;
+import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.ItemStack;
 import java.util.List;
 
 /**
  * API công khai của {@code feature-inventory} — module khác (server-gateway) CHỈ gọi qua đây,
- * không bao giờ đọc bảng {@code inventory_item}/{@code drop_table*} trực tiếp (Điều 24).
+ * không bao giờ đọc bảng {@code inventory_item}/{@code equipment_slot}/{@code drop_table*} trực
+ * tiếp (Điều 24).
  */
 public final class InventoryFacade {
 
     private final AddItemUseCase addItemUseCase;
     private final GrantLootUseCase grantLootUseCase;
+    private final EquipItemUseCase equipItemUseCase;
+    private final UnequipItemUseCase unequipItemUseCase;
 
-    public InventoryFacade(AddItemUseCase addItemUseCase, GrantLootUseCase grantLootUseCase) {
+    public InventoryFacade(
+            AddItemUseCase addItemUseCase, GrantLootUseCase grantLootUseCase, EquipItemUseCase equipItemUseCase,
+            UnequipItemUseCase unequipItemUseCase) {
         this.addItemUseCase = addItemUseCase;
         this.grantLootUseCase = grantLootUseCase;
+        this.equipItemUseCase = equipItemUseCase;
+        this.unequipItemUseCase = unequipItemUseCase;
     }
 
     /**
@@ -42,5 +52,29 @@ public final class InventoryFacade {
         return grantLootUseCase.execute(characterId, dropTableCode);
     }
 
+    /**
+     * Mặc item {@code itemId} (ID thật của {@code inventory_item}, không phải vị trí) vào
+     * {@code targetSlot} — server tự kiểm tra item thuộc đúng nhân vật + đúng loại slot.
+     */
+    public EquipResult equipItem(long characterId, long itemId, EquipmentSlotType targetSlot) {
+        return switch (equipItemUseCase.execute(characterId, itemId, targetSlot)) {
+            case OK -> EquipResult.OK;
+            case ITEM_NOT_FOUND -> EquipResult.ITEM_NOT_FOUND;
+            case WRONG_SLOT -> EquipResult.WRONG_SLOT;
+        };
+    }
+
+    /** Gỡ trang bị khỏi {@code slot} — item vẫn còn trong túi đồ, không bị xoá. */
+    public UnequipResult unequipItem(long characterId, EquipmentSlotType slot) {
+        return switch (unequipItemUseCase.execute(characterId, slot)) {
+            case OK -> UnequipResult.OK;
+            case NOT_EQUIPPED -> UnequipResult.NOT_EQUIPPED;
+        };
+    }
+
     public enum Result { OK, FULL }
+
+    public enum EquipResult { OK, ITEM_NOT_FOUND, WRONG_SLOT }
+
+    public enum UnequipResult { OK, NOT_EQUIPPED }
 }

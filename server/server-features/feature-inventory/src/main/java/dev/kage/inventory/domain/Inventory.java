@@ -2,6 +2,7 @@ package dev.kage.inventory.domain;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Túi đồ của một nhân vật. Aggregate root — mọi thay đổi item đi qua đây.
@@ -31,6 +32,11 @@ public final class Inventory {
 
     public boolean isFull() {
         return items.size() >= capacity;
+    }
+
+    /** Tìm item theo {@code ItemStack.id} THẬT (không phải vị trí) — dùng khi mặc đồ (Phase 5). */
+    public Optional<ItemStack> findItem(long itemId) {
+        return items.stream().filter(stack -> stack.id() == itemId).findFirst();
     }
 
     public long characterId() {

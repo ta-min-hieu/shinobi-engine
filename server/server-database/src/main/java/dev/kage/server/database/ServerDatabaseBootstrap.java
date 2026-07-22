@@ -8,14 +8,18 @@ import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.application.AddItemUseCase;
+import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
+import dev.kage.inventory.application.UnequipItemUseCase;
 import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
 import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
 import dev.kage.server.database.inventory.PostgresDropTableAdapter;
+import dev.kage.server.database.inventory.PostgresEquipmentAdapter;
 import dev.kage.server.database.inventory.PostgresInventoryAdapter;
+import dev.kage.server.database.inventory.PostgresItemTemplateAdapter;
 import dev.kage.server.database.session.RedisClientFactory;
 import dev.kage.server.database.session.RedisConfig;
 import dev.kage.server.database.session.RedisSessionAdapter;
@@ -60,10 +64,15 @@ public final class ServerDatabaseBootstrap {
     public InventoryFacade wireInventoryFacade() {
         var inventoryPort = new PostgresInventoryAdapter(dataSource);
         var dropTablePort = new PostgresDropTableAdapter(dataSource);
+        var itemTemplatePort = new PostgresItemTemplateAdapter(dataSource);
+        var equipmentPort = new PostgresEquipmentAdapter(dataSource);
         var transactionRunner = new JdbcInventoryTransactionRunner(dataSource);
         var addItemUseCase = new AddItemUseCase(inventoryPort, transactionRunner);
         var grantLootUseCase = new GrantLootUseCase(dropTablePort, inventoryPort, transactionRunner);
-        return new InventoryFacade(addItemUseCase, grantLootUseCase);
+        var equipItemUseCase =
+                new EquipItemUseCase(inventoryPort, itemTemplatePort, equipmentPort, transactionRunner);
+        var unequipItemUseCase = new UnequipItemUseCase(equipmentPort, transactionRunner);
+        return new InventoryFacade(addItemUseCase, grantLootUseCase, equipItemUseCase, unequipItemUseCase);
     }
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */

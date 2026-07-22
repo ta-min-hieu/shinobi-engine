@@ -92,12 +92,16 @@ class PostgresInventoryAdapterIntegrationTest {
         long characterId = createFreshCharacter("InvPersist");
         var adapter = new PostgresInventoryAdapter(dataSource);
         var transactionRunner = new JdbcInventoryTransactionRunner(dataSource);
-        var inventory = new Inventory(characterId, 20, List.of(new ItemStack(1L, 3, 0)));
+        var inventory = new Inventory(characterId, 20, List.of(ItemStack.newItem(1L, 3, 0)));
 
         transactionRunner.inTransaction(tx -> adapter.save(tx, inventory));
         var reloaded = adapter.findByCharacter(characterId).orElseThrow();
 
-        assertThat(reloaded.items()).containsExactly(new ItemStack(1L, 3, 0));
+        assertThat(reloaded.items()).hasSize(1);
+        var reloadedStack = reloaded.items().get(0);
+        assertThat(reloadedStack.itemTemplateId()).isEqualTo(1L);
+        assertThat(reloadedStack.quantity()).isEqualTo(3);
+        assertThat(reloadedStack.isPersisted()).isTrue(); // id thật đã được DB gán qua RETURNING id
     }
 
     @Test
@@ -105,15 +109,39 @@ class PostgresInventoryAdapterIntegrationTest {
         long characterId = createFreshCharacter("InvReplace");
         var adapter = new PostgresInventoryAdapter(dataSource);
         var transactionRunner = new JdbcInventoryTransactionRunner(dataSource);
-        var first = new Inventory(characterId, 20, List.of(new ItemStack(1L, 1, 0), new ItemStack(1L, 2, 0)));
+        var first = new Inventory(
+                characterId, 20, List.of(ItemStack.newItem(1L, 1, 0), ItemStack.newItem(1L, 2, 0)));
         transactionRunner.inTransaction(tx -> adapter.save(tx, first));
 
-        var second = new Inventory(characterId, 20, List.of(new ItemStack(1L, 9, 0)));
+        var second = new Inventory(characterId, 20, List.of(ItemStack.newItem(1L, 9, 0)));
         transactionRunner.inTransaction(tx -> adapter.save(tx, second));
         var reloaded = adapter.findByCharacter(characterId).orElseThrow();
 
-        // save() = xoá hết + ghi lại (feature-inventory/CLAUDE.md) — KHÔNG cộng dồn 2 lần save.
-        assertThat(reloaded.items()).containsExactly(new ItemStack(1L, 9, 0));
+        // 2 item CŨ (không còn trong "second") bị xoá thật, item mới được thêm — không cộng dồn.
+        assertThat(reloaded.items()).hasSize(1);
+        assertThat(reloaded.items().get(0).quantity()).isEqualTo(9);
+    }
+
+    @Test
+    void shouldPreserveItemId_whenSavingAlreadyPersistedItem() {
+        // Đúng vấn đề lát cắt "mặc đồ" cần sửa: ID KHÔNG được đổi giữa các lần save khi item vẫn
+        // còn đó — equipment_slot.inventory_item_id tham chiếu ID này, đổi ID ngầm sẽ làm gãy
+        // tham chiếu mà không ai biết.
+        long characterId = createFreshCharacter("InvStableId");
+        var adapter = new PostgresInventoryAdapter(dataSource);
+        var transactionRunner = new JdbcInventoryTransactionRunner(dataSource);
+        transactionRunner.inTransaction(
+                tx -> adapter.save(tx, new Inventory(characterId, 20, List.of(ItemStack.newItem(1L, 1, 0)))));
+        var afterFirstSave = adapter.findByCharacter(characterId).orElseThrow();
+        long realId = afterFirstSave.items().get(0).id();
+
+        // Load lại, đổi quantity (giữ nguyên id thật), save lần 2.
+        var mutated = new ItemStack(realId, 1L, 5, 0);
+        transactionRunner.inTransaction(
+                tx -> adapter.save(tx, new Inventory(characterId, 20, List.of(mutated))));
+        var afterSecondSave = adapter.findByCharacter(characterId).orElseThrow();
+
+        assertThat(afterSecondSave.items()).containsExactly(mutated); // id KHÔNG đổi, chỉ quantity đổi
     }
 
     @Test

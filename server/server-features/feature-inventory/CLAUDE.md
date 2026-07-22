@@ -6,10 +6,11 @@
 
 ```
 api/            InventoryFacade          ← module khác (server-gateway) CHỈ gọi qua đây
-application/    AddItemUseCase · GrantLootUseCase
-domain/         Inventory (aggregate) · ItemStack (VO) · DropTableEntry (VO)
-                InventoryPort · DropTablePort · Transaction · TransactionRunner
-                CharacterInventoryNotFoundException
+application/    AddItemUseCase · GrantLootUseCase · EquipItemUseCase · UnequipItemUseCase
+domain/         Inventory (aggregate) · Equipment (aggregate RIÊNG) · ItemStack (VO)
+                DropTableEntry (VO) · ItemTemplate (VO, chỉ mang equipSlot — YAGNI)
+                InventoryPort · EquipmentPort · DropTablePort · ItemTemplatePort
+                Transaction · TransactionRunner · CharacterInventoryNotFoundException
 ```
 
 Chiều: `api → application → domain`. **`domain/` không import gì bên ngoài** — không có
@@ -38,6 +39,40 @@ JDBC theo package `dev.kage.server.database`, không theo Gradle module).
   cho tương lai nhưng CHƯA dùng ở lát cắt này.
 - **Túi đầy → item bị "mất"** (không rơi xuống đất) ở `GrantLootUseCase` — chưa có ground-item/mail
   hệ thống để trả lại đồ khi túi đầy. Ghi rõ, không giấu — không phải hành vi cuối cùng.
+
+### Phase 5 lát cắt đầu (2026-07-22): "mặc đồ" — sửa nền tảng ID + Equipment aggregate mới
+
+- **`ItemStack` giờ có `id` THẬT** (`inventory_item.id` qua `RETURNING id`) — trước đó KHÔNG có
+  định danh ổn định nào (chỉ `slot_index`, tính lại mỗi lần save). Phát hiện khi làm "mặc đồ": cần
+  tham chiếu ĐÚNG 1 item cụ thể (`equipment_slot.inventory_item_id`), dừng lại hỏi chủ dự án theo
+  CLAUDE.md §4 (phát hiện vấn đề thiết kế → mô tả + đề xuất, không tự sửa) — chủ dự án chọn "sửa
+  nền tảng" thay vì né tránh bằng cách gộp equip vào 1 cột trên `inventory_item`.
+- **`PostgresInventoryAdapter.save()` đổi từ "xoá hết ghi lại" sang UPSERT thật** (insert/update/
+  delete theo `ItemStack.id`) — `ItemStack.isPersisted()` (`id != 0`) phân biệt item mới (INSERT,
+  `RETURNING id`) với item đã có (UPDATE tại chỗ, giữ nguyên id). Xoá thật chỉ xảy ra với id đã tồn
+  tại DB nhưng không còn trong `inventory.items()` — CHƯA có UseCase nào thật sự xoá item (chưa
+  cần test nhánh đó kỹ, chỉ có ở mức domain).
+- **`ItemStack.newItem(itemTemplateId, quantity, enhanceLevel)`** — factory cho item CHƯA lưu
+  (`id = ItemStack.NEW_ITEM_ID = 0`), dùng thay constructor trực tiếp khi tạo item mới (rơi đồ,
+  nhặt đồ). Constructor 4-tham số đầy đủ (`id` thật) dùng khi tái tạo từ DB hoặc biết ID sẵn.
+- **`Equipment` là aggregate RIÊNG với `Inventory`** (không phải field trên `ItemStack`) — đúng
+  DATABASE.md §2.2 (bảng `equipment_slot` riêng, `inventory_item_id` FK). Chỉ giữ tham chiếu ID,
+  KHÔNG copy dữ liệu item. `EquipItemUseCase` điều phối 3 Port (Inventory đọc item thuộc về ai +
+  itemTemplateId, ItemTemplate đọc đúng slot, Equipment ghi) — validate "đúng slot" nằm ở
+  UseCase (cần `ItemTemplatePort`), KHÔNG nằm ở `Equipment.equip()` (domain thuần, không biết
+  item_template).
+- **`ItemTemplate` (VO) chỉ mang `equipSlot`** — chưa mang `nameKey`/`maxStack` dù DATABASE.md liệt
+  đủ cột, vì chưa UseCase nào cần đọc lại 2 trường đó (YAGNI, thêm khi có nhu cầu thật).
+- **`PostgresEquipmentAdapter.save()` VẪN "xoá hết ghi lại"** (khác `PostgresInventoryAdapter`) —
+  AN TOÀN ở đây vì không bảng nào tham chiếu ngược `equipment_slot` theo ID (bảng còn không có cột
+  `id`, PK là `(character_id, slot_type)`), tối đa 7 dòng/nhân vật.
+- **CHƯA nối protocol/gateway** (`EquipItemCommand`/`UnequipItemCommand` chưa tồn tại) — domain/
+  application/infrastructure đã xong và test thật (kể cả Postgres qua Testcontainers), nhưng để
+  client thật gọi được cần thêm: (1) opcode + packet mới (dải 500-599), (2) cách client biết
+  `inventory_item.id` thật của item nó đang có (`ItemGrantedEvent` hiện chỉ gửi
+  `item_template_id`+`quantity`, KHÔNG gửi `id` — vì `insertItem()` hiện discard giá trị
+  `RETURNING id`, chưa có consumer nào cần). Đây là việc của lát cắt sau, không phải thiếu sót của
+  lát cắt này.
 
 ## Cứng
 

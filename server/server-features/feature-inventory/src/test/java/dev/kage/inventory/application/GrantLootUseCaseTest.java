@@ -61,9 +61,9 @@ class GrantLootUseCaseTest {
 
         var granted = useCase.execute(1L, "any_code");
 
-        assertThat(granted).containsExactly(new ItemStack(100L, 2, 0));
+        assertThat(granted).containsExactly(ItemStack.newItem(100L, 2, 0));
         assertThat(inventoryPort.saved).isNotNull();
-        assertThat(inventoryPort.saved.items()).containsExactly(new ItemStack(100L, 2, 0));
+        assertThat(inventoryPort.saved.items()).containsExactly(ItemStack.newItem(100L, 2, 0));
     }
 
     @Test
