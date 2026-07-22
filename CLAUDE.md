@@ -8,16 +8,19 @@
 
 ## 0. Trạng thái dự án (đọc trước tiên)
 
-**Phase 0 — Foundation đã được mở** (2026-07-18). 3 quyết định chặn Phase 0 đã chốt:
+**Phase 0-4 đã xong Exit Criteria** (Foundation → Engine Core → Network → Character/Map/Movement →
+Combat/Skill/Monster, xem checklist thật ở [ROADMAP.md](docs/11-process/ROADMAP.md)). Đang mở
+**Phase 5 — Inventory · Equipment · Shop**. Không code sang Phase 6+ (quest, guild...) khi Phase 5
+chưa đạt Exit Criteria — cùng nguyên tắc áp dụng cho mọi phase trước đó.
+
+3 quyết định nền tảng chốt từ Phase 0 (không đổi trừ khi có ADR revisit):
 - Package root: **`dev.kage`** ([ADR-012](docs/01-architecture/adr/ADR-012-Package-Root.md))
 - **Single-realm** + cột `realm_id` dự phòng ([ADR-010](docs/01-architecture/adr/ADR-010-Realm-Model.md))
 - Tick rate: **60Hz** — `FIXED_DT = 1/60s` ([ADR-018](docs/01-architecture/adr/ADR-018-Tick-Rate.md))
 
-Được phép scaffold theo [Roadmap Phase 0](docs/11-process/ROADMAP.md) + [REPOSITORY-STRUCTURE §1](docs/01-architecture/REPOSITORY-STRUCTURE.md). Hạng mục kỹ thuật quan trọng nhất của Phase 0: **ArchUnit (ADR-011)** theo [CI-CD §4](docs/07-infrastructure/CI-CD.md).
+Quyết định mới nhất: **GraalJS** làm scripting engine ([ADR-016](docs/01-architecture/adr/ADR-016-Scripting-Engine.md), Accepted 2026-07-20) — sandbox hiện ở mức `CONSTRAINED`-equivalent, CHƯA phải `ISOLATED`/`UNTRUSTED` thật (artifact `js-isolate-community` lỗi đóng gói upstream — xem ADR-016 "Kiểm chứng thêm khi code" trước khi build thêm trên giả định sandbox đã full-strength). Toàn bộ ADR Accepted: [adr/README.md](docs/01-architecture/adr/README.md).
 
 ⚠️ **Trước khi ghi `libs.versions.toml`: verify phiên bản thư viện thật** (Java 25, libGDX, Netty...), không copy số từ docs ([TECHNOLOGY-STACK](docs/01-architecture/TECHNOLOGY-STACK.md)).
-
-Vẫn giữ nguyên: không code sang Phase 1+ (engine, gameplay) khi Phase 0 chưa đạt Exit Criteria.
 
 ---
 

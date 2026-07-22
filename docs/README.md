@@ -2,7 +2,7 @@
 
 2D anime ninja MMORPG (cùng thể loại Ninja School Online) bằng **Java 25 + libGDX + HyperLap2D** (client) và **Netty + PostgreSQL + Redis** (server). Kiến trúc Hybrid: Clean/Hexagonal cho nghiệp vụ, ECS + Data-Oriented cho gameplay realtime, Event-Driven giữa các hệ thống.
 
-> **Dự án hiện là 100% tài liệu — chưa có dòng code nào.** Bộ docs này là bước "Thiết kế" trong workflow ([Điều 35](00-governance/KAGE-CONSTITUTION.md)). Bước tiếp theo hợp lệ: [Roadmap Phase 0](11-process/ROADMAP.md), và chỉ khi chủ dự án cho phép.
+> **Cập nhật 2026-07-22**: Phase 0–4 đã code xong, đạt Exit Criteria ([ROADMAP.md](11-process/ROADMAP.md)) — foundation, engine core, network, character/map/movement, combat/skill/monster (kể cả script sandbox GraalJS thật, [ADR-016](01-architecture/adr/ADR-016-Scripting-Engine.md)). Đang ở **Phase 5 — Inventory · Equipment · Shop**. Bộ docs này vẫn là nguồn thiết kế gốc ([Điều 35](00-governance/KAGE-CONSTITUTION.md)) — code phải khớp docs, lệch thì báo cáo mâu thuẫn (§14 [/CLAUDE.md](../CLAUDE.md)), không tự chọn bên nào.
 
 ---
 
@@ -118,13 +118,13 @@ Chỉ còn **ADR-011** (ArchUnit enforce) — là việc kỹ thuật *trong* Ph
 | **Auth token**: session token tự phát hành + Redis (không JWT) | ✅ [ADR-017](01-architecture/adr/ADR-017-Auth-Token.md) |
 | **Idempotency** cho Command có side-effect (`idempotencyKey` + enforce DB) | ✅ [ADR-025](01-architecture/adr/ADR-025-Idempotency.md) |
 
-Toàn bộ 4 ADR chặn Phase 3 đã Accepted — **Phase 3 đủ điều kiện mở**. Công thức damage/derived stats đã chốt (2026-07-19, [GDD §5–6](13-game-design/GAME-DESIGN-DOCUMENT.md#5-nhân-vật--tiến-trình)) — **Phase 4 hết bị chặn về game design**, còn lại ADR-016 (Lua vs GraalJS, chặn nếu Phase 4 chạm script sandbox).
+Toàn bộ 4 ADR chặn Phase 3 đã Accepted — **Phase 3 đủ điều kiện mở**. Công thức damage/derived stats đã chốt (2026-07-19, [GDD §5–6](13-game-design/GAME-DESIGN-DOCUMENT.md#5-nhân-vật--tiến-trình)) — **Phase 4 hết bị chặn về game design**.
 
-### 🔴 Chặn Phase 4 (script sandbox)
+### ✅ Đã chốt (2026-07-20) — không còn chặn Phase 4 (script sandbox)
 
-| # | Quyết định | ADR | Nguồn |
-|---|---|---|---|
-| 1 | **Lua vs GraalJS** (khuyến nghị Lua — GraalJS cần đổi runtime) | ADR-016 | [SCRIPTING.md §3](06-plugin/SCRIPTING.md) |
+| Quyết định | ADR |
+|---|---|
+| **GraalJS** làm scripting engine (chạy trên Temurin JDK 25 hiện có, không đổi ADR-001) | ✅ [ADR-016](01-architecture/adr/ADR-016-Scripting-Engine.md) |
 
 ### 🟡 Chặn Phase sau
 
@@ -149,6 +149,6 @@ Toàn bộ 4 ADR chặn Phase 3 đã Accepted — **Phase 3 đủ điều kiện
 Tất cả tài liệu ở `Status: Draft`. Chuyển `Approved` chỉ khi chủ dự án xác nhận — AI không tự xác nhận thay chủ dự án ([Điều 45](00-governance/KAGE-CONSTITUTION.md)).
 
 **Việc cần làm tiếp theo của cả bộ docs:**
-1. ✅ 3 quyết định chặn Phase 0 đã chốt (ADR-010/012/018, 2026-07-18). **Sẵn sàng mở [Roadmap Phase 0](11-process/ROADMAP.md).**
-2. Đầu Phase 0: triển khai ADR-011 (ArchUnit) như hạng mục kỹ thuật.
-3. Chốt dần các quyết định "🔴 Chặn Phase 2–4" theo tiến độ.
+1. ✅ Phase 0–4 đã code xong + đạt Exit Criteria (checklist thật ở [ROADMAP.md](11-process/ROADMAP.md)) — không còn "chỉ có docs".
+2. ⚠️ **Khoảng trống thật**: ArchUnit (ý định của ADR-011) đã CODE VÀ CHẠY THẬT từ Phase 0 (`quality/architecture-tests`, 8 rule) nhưng file `ADR-011` **chưa từng được viết** — ADR Index vẫn liệt nó ở mục "ADR cần tạo". Nên viết ADR-011 ghi lại quyết định đã thực thi trong code, tránh tình trạng "code đi trước ADR" kéo dài.
+3. Chốt dần các quyết định "🟡 Chặn Phase sau" (§ trên) theo tiến độ — Phase 5 hiện không bị ADR nào chặn.
