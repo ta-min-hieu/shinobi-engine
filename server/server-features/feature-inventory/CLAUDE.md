@@ -5,10 +5,11 @@
 ## Cấu trúc (Clean Arch)
 
 ```
-api/            InventoryFacade          ← module khác (server-gateway) CHỈ gọi qua đây
+api/            InventoryFacade · EquipmentUseCases (gộp tham số, tránh vượt 4 — Checkstyle)
 application/    AddItemUseCase · GrantLootUseCase · EquipItemUseCase · UnequipItemUseCase
+                ComputeEquipmentBonusUseCase (đọc thuần, tổng bonusAtk từ mọi item đang mặc)
 domain/         Inventory (aggregate) · Equipment (aggregate RIÊNG) · ItemStack (VO)
-                DropTableEntry (VO) · ItemTemplate (VO, chỉ mang equipSlot — YAGNI)
+                DropTableEntry (VO) · ItemTemplate (VO, equipSlot + bonusAtk) · EquipmentBonus (VO)
                 InventoryPort · EquipmentPort · DropTablePort · ItemTemplatePort
                 Transaction · TransactionRunner · CharacterInventoryNotFoundException
 ```
@@ -72,6 +73,26 @@ JDBC theo package `dev.kage.server.database`, không theo Gradle module).
   (`GatewayServerIntegrationTest`). Điều kiện tiên quyết đã sửa: `InventoryPort.save()` giờ TRẢ VỀ
   `Inventory` đã lưu (id thật) thay vì `void` — `GrantLootUseCase` dùng giá trị này để trả ID thật
   về client qua `ItemGrantedEvent.item_id` (field mới, không đổi field cũ).
+
+### Phase 5 lát cắt 3 (cùng ngày): trang bị thật sự cộng chỉ số chiến đấu
+
+- **`ItemTemplate.bonusAtk`** (chỉ ATK ở lát cắt này — GDD §5 còn SKILL_DMG/DEF/RES/..., thêm khi
+  có item thật cần, tránh field không ai dùng) + **`EquipmentBonus`** VO (tổng cộng dồn, LUÔN tính
+  lại từ đầu qua `ComputeEquipmentBonusUseCase`, không cộng dồn delta — tránh trôi số nếu equip/gỡ
+  đồ nhiều lần hoặc gọi sai thứ tự).
+- **`ComputeEquipmentBonusUseCase`** đọc thuần: duyệt `Equipment.slots()` → tra từng item trong
+  `Inventory` → tra `ItemTemplate` → cộng dồn `bonusAtk`. Item/template lệch (hiếm, dữ liệu không
+  nhất quán) → bỏ qua an toàn, không ném lỗi (không được để 1 dòng lệch làm hỏng toàn bộ tính chỉ số).
+- **`GatewayChannelHandler` là nơi NỐI feature-inventory ↔ server-world** — server-world không tự
+  biết feature-inventory tồn tại (Điều 23, module boundary). Gọi `computeEquipmentBonus` +
+  `WorldFacade.applyEquipmentBonus` ở 3 chỗ: lúc chọn nhân vật (attach — nếu không, mặc đồ từ
+  phiên trước sẽ "biến mất" lúc đăng nhập lại), lúc mặc đồ thành công, lúc gỡ đồ thành công.
+- **`WorldFacade` giữ `CharacterBaseStats` gốc** (map `baseStatsByCharacterId`, song song
+  `entitiesByCharacterId`) — `applyEquipmentBonus` LUÔN derive lại từ nền + cộng bonus mới, không
+  cộng dồn vào giá trị ATK hiện có (tránh drift nếu bị gọi nhiều lần/không đúng thứ tự).
+- Không đổi `WorldFacade.attachCharacter`'s signature (vẫn 4 tham số) để tránh phá ~15 chỗ gọi đã
+  có trong `WorldFacadeTest` — bonus áp dụng bằng lệnh RIÊNG (`applyEquipmentBonus`) ngay sau attach,
+  không gộp vào tham số attach.
 
 ## Cứng
 

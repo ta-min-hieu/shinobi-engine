@@ -1,9 +1,11 @@
 package dev.kage.inventory.api;
 
 import dev.kage.inventory.application.AddItemUseCase;
+import dev.kage.inventory.application.ComputeEquipmentBonusUseCase;
 import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
+import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.ItemStack;
 import java.util.List;
@@ -19,14 +21,15 @@ public final class InventoryFacade {
     private final GrantLootUseCase grantLootUseCase;
     private final EquipItemUseCase equipItemUseCase;
     private final UnequipItemUseCase unequipItemUseCase;
+    private final ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase;
 
     public InventoryFacade(
-            AddItemUseCase addItemUseCase, GrantLootUseCase grantLootUseCase, EquipItemUseCase equipItemUseCase,
-            UnequipItemUseCase unequipItemUseCase) {
+            AddItemUseCase addItemUseCase, GrantLootUseCase grantLootUseCase, EquipmentUseCases equipmentUseCases) {
         this.addItemUseCase = addItemUseCase;
         this.grantLootUseCase = grantLootUseCase;
-        this.equipItemUseCase = equipItemUseCase;
-        this.unequipItemUseCase = unequipItemUseCase;
+        this.equipItemUseCase = equipmentUseCases.equipItemUseCase();
+        this.unequipItemUseCase = equipmentUseCases.unequipItemUseCase();
+        this.computeEquipmentBonusUseCase = equipmentUseCases.computeEquipmentBonusUseCase();
     }
 
     /**
@@ -70,6 +73,15 @@ public final class InventoryFacade {
             case OK -> UnequipResult.OK;
             case NOT_EQUIPPED -> UnequipResult.NOT_EQUIPPED;
         };
+    }
+
+    /**
+     * Tổng chỉ số cộng thêm từ TOÀN BỘ trang bị đang mặc (GAMEPLAY.md §2) — gọi lại sau
+     * {@link #equipItem}/{@link #unequipItem} thành công VÀ lúc attach nhân vật vào world (server-
+     * gateway nối sang {@code WorldFacade.applyEquipmentBonus}, server-world không tự biết module này).
+     */
+    public EquipmentBonus computeEquipmentBonus(long characterId) {
+        return computeEquipmentBonusUseCase.execute(characterId);
     }
 
     public enum Result { OK, FULL }

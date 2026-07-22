@@ -13,7 +13,7 @@ import javax.sql.DataSource;
 public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
 
     private static final String FIND_BY_ID = """
-            SELECT id, equip_slot FROM item_template WHERE id = ?
+            SELECT id, equip_slot, bonus_atk FROM item_template WHERE id = ?
             """;
 
     private final DataSource dataSource;
@@ -33,7 +33,8 @@ public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
                 }
                 String equipSlot = rs.getString("equip_slot");
                 return Optional.of(new ItemTemplate(
-                        rs.getLong("id"), equipSlot == null ? null : EquipmentSlotType.valueOf(equipSlot)));
+                        rs.getLong("id"), equipSlot == null ? null : EquipmentSlotType.valueOf(equipSlot),
+                        rs.getInt("bonus_atk")));
             }
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi đọc item_template: itemTemplateId=" + itemTemplateId, e);

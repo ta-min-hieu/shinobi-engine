@@ -17,8 +17,10 @@ import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.character.domain.PositionSnapshot;
+import dev.kage.inventory.api.EquipmentUseCases;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.application.AddItemUseCase;
+import dev.kage.inventory.application.ComputeEquipmentBonusUseCase;
 import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
@@ -231,7 +233,11 @@ class GatewayServerIntegrationTest {
         var equipItemUseCase = new EquipItemUseCase(
                 inventoryPort, itemTemplatePort, equipmentPort, action -> action.accept(null));
         var unequipItemUseCase = new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
-        return new InventoryFacade(addItemUseCase, grantLootUseCase, equipItemUseCase, unequipItemUseCase);
+        var computeEquipmentBonusUseCase =
+                new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
+        var equipmentUseCases =
+                new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
+        return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases);
     }
 
     @AfterEach

@@ -270,6 +270,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             var stats = characterFacade.loadStats(characterId);
             var baseStats = new CharacterBaseStats(stats.str(), stats.agi(), stats.intelligence(), stats.vit());
             worldGateway.facade().attachCharacter(characterId, spawn.x(), spawn.y(), baseStats);
+            // GAMEPLAY.md §2 "tính lại chỉ số dẫn xuất khi đổi trang bị" — áp dụng NGAY lúc attach,
+            // không chỉ lúc equip/unequip sau đó, nếu không nhân vật mặc đồ từ phiên trước sẽ mất
+            // bonus khi đăng nhập lại (server-world không tự biết feature-inventory).
+            var equipmentBonus = inventoryFacade.computeEquipmentBonus(characterId);
+            worldGateway.facade().applyEquipmentBonus(characterId, equipmentBonus.bonusAtk());
             var response = SelectCharacterResponse.newBuilder().setSuccess(true).build();
             send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
         } catch (CharacterNotFoundException e) {
@@ -359,6 +364,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             return;
         }
         var result = inventoryFacade.equipItem(characterId, command.getItemId(), slot);
+        if (result == InventoryFacade.EquipResult.OK) {
+            // GAMEPLAY.md §2 — mặc đồ xong phải tính lại chỉ số dẫn xuất NGAY, không đợi lần
+            // attach kế tiếp (server-world không tự biết trang bị vừa đổi).
+            var equipmentBonus = inventoryFacade.computeEquipmentBonus(characterId);
+            worldGateway.facade().applyEquipmentBonus(characterId, equipmentBonus.bonusAtk());
+        }
         var response = EquipItemResponse.newBuilder()
                 .setSuccess(result == InventoryFacade.EquipResult.OK)
                 .setErrorKey(toErrorKey(result))
@@ -387,6 +398,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             return;
         }
         var result = inventoryFacade.unequipItem(characterId, slot);
+        if (result == InventoryFacade.UnequipResult.OK) {
+            var equipmentBonus = inventoryFacade.computeEquipmentBonus(characterId);
+            worldGateway.facade().applyEquipmentBonus(characterId, equipmentBonus.bonusAtk());
+        }
         var response = UnequipItemResponse.newBuilder()
                 .setSuccess(result == InventoryFacade.UnequipResult.OK)
                 .setErrorKey(result == InventoryFacade.UnequipResult.OK ? "" : "error.slot_not_equipped")

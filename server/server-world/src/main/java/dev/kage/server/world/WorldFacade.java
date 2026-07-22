@@ -46,6 +46,8 @@ public final class WorldFacade {
             ComponentMapper.getFor(VelocityComponent.class);
     private static final ComponentMapper<TargetComponent> TARGET = ComponentMapper.getFor(TargetComponent.class);
     private static final ComponentMapper<MonsterComponent> MONSTER = ComponentMapper.getFor(MonsterComponent.class);
+    private static final ComponentMapper<CombatStatsComponent> COMBAT_STATS =
+            ComponentMapper.getFor(CombatStatsComponent.class);
 
     // Quái bù nhìn tập luyện — lát cắt 1 Phase 4, hardcode 1 quái, chưa có monster_template DB.
     private static final String TRAINING_DUMMY_CODE = "training_dummy";
@@ -63,6 +65,10 @@ public final class WorldFacade {
     // state chỉ sửa trên tick thread" (SERVER.md §2).
     private final Map<Long, KEntity> entitiesByCharacterId = new HashMap<>();
     private final Map<Long, KEntity> entitiesByMonsterId = new HashMap<>();
+    // Chỉ số NỀN (STR/AGI/INT/VIT) gốc — cần giữ lại để applyEquipmentBonus tính lại ATK từ đầu
+    // (base + bonus trang bị hiện tại) mỗi lần, KHÔNG cộng dồn bonus cũ (equip/gỡ đồ nhiều lần
+    // không được làm ATK trôi dần sai).
+    private final Map<Long, CharacterBaseStats> baseStatsByCharacterId = new HashMap<>();
     private long nextMonsterId = -1; // ID quái luôn ÂM — không đụng characterId (luôn DƯƠNG, DB auto-increment).
     private float monsterRespawnCountdownSeconds = -1f; // < 0 = quái đang sống, không đếm ngược.
 
@@ -127,6 +133,17 @@ public final class WorldFacade {
         inbox.add(new WorldCommand.UseSkillCommand(characterId, skillCode, targetEntityId));
     }
 
+    /**
+     * GAMEPLAY.md §2/§7 "tính lại chỉ số dẫn xuất khi đổi trang bị" — gọi lại MỖI lần trang bị đổi
+     * (mặc/gỡ đồ) VÀ ngay sau khi attach (lúc chọn nhân vật, cùng lúc chỉ số nền được gửi vào —
+     * {@code GatewayChannelHandler} chịu trách nhiệm gọi đúng lúc, server-world không tự biết
+     * feature-inventory). {@code bonusAtk} là TỔNG cộng dồn hiện tại từ MỌI item đang mặc (không
+     * phải delta) — feature-inventory tính lại từ đầu mỗi lần, tránh trôi số nếu gọi sai thứ tự.
+     */
+    public void applyEquipmentBonus(long characterId, int bonusAtk) {
+        inbox.add(new WorldCommand.ApplyEquipmentBonusCommand(characterId, bonusAtk));
+    }
+
     private void tickLoop() {
         spawnTrainingDummy();
         long fixedDtNanos = (long) (WorldConstants.FIXED_DT * 1_000_000_000L);
@@ -161,6 +178,8 @@ public final class WorldFacade {
                 case WorldCommand.SetTargetCommand c -> handleSetTarget(c.characterId(), c.targetEntityId());
                 case WorldCommand.UseSkillCommand c ->
                         handleUseSkill(c.characterId(), c.skillCode(), c.targetEntityId());
+                case WorldCommand.ApplyEquipmentBonusCommand c ->
+                        handleApplyEquipmentBonus(c.characterId(), c.bonusAtk());
             }
         }
     }
@@ -198,11 +217,13 @@ public final class WorldFacade {
         entity.add(chi);
 
         entitiesByCharacterId.put(characterId, entity);
+        baseStatsByCharacterId.put(characterId, baseStats);
         aoiTracker.onAttach(characterId);
     }
 
     private void handleDetach(long characterId) {
         var entity = entitiesByCharacterId.remove(characterId);
+        baseStatsByCharacterId.remove(characterId);
         if (entity == null) {
             return;
         }
@@ -247,6 +268,17 @@ public final class WorldFacade {
             return; // không tự nhắm chính mình; mục tiêu không tồn tại — bỏ qua an toàn (giống handleSetTarget).
         }
         skillSystem.tryCast(characterId, skillCode, targetEntityId);
+    }
+
+    private void handleApplyEquipmentBonus(long characterId, int bonusAtk) {
+        var entity = entitiesByCharacterId.get(characterId);
+        var baseStats = baseStatsByCharacterId.get(characterId);
+        if (entity == null || baseStats == null) {
+            return; // chưa attach xong hoặc đã detach giữa lúc lệnh còn trong hàng đợi — bỏ qua an toàn.
+        }
+        var combatStats = COMBAT_STATS.get(entity);
+        var derived = CombatConstants.deriveCombatStats(baseStats);
+        combatStats.atk = derived.atk() + bonusAtk; // LUÔN tính lại từ nền, không cộng dồn (xem javadoc)
     }
 
     private void handleCombatResults(List<CombatSystem.AttackOutcome> results) {

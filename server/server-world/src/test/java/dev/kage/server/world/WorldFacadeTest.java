@@ -310,6 +310,25 @@ class WorldFacadeTest {
     }
 
     @Test
+    void shouldOneShotMonster_whenEquipmentBonusMakesAttackLethal() {
+        // GAMEPLAY.md §2/§7 "tính lại chỉ số dẫn xuất khi đổi trang bị". DEFAULT_STATS (10,10,10,10)
+        // → ATK=30, không đủ 1 đòn hạ quái 50 HP (shouldDealDamageAndEventuallyKillMonster đã
+        // chứng minh cần "eventually", nhiều đòn). Cộng bonus lớn (200) → đòn đầu tiên trúng phải
+        // hạ gục ngay — verify applyEquipmentBonus thật sự thay đổi combat, không chỉ set field suông.
+        world.start();
+        world.attachCharacter(1L, 5f, 6f, DEFAULT_STATS);
+        awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
+        long monsterId = sink.monsterSpawned.get(0).monsterId();
+
+        world.applyEquipmentBonus(1L, 200);
+        world.setTarget(1L, monsterId);
+
+        // HIT% placeholder ~91% — chờ đòn trúng đầu tiên, không giả định đòn đầu chắc chắn trúng.
+        awaitTrue(() -> sink.attackResults.stream()
+                .anyMatch(a -> a.defender() == monsterId && !a.miss() && a.died()));
+    }
+
+    @Test
     void shouldChaseAndAttackBack_whenCharacterEntersAggroRange() {
         // AI.md §3: quái Idle -> Chase khi phát hiện người chơi (AiConstants.AGGRO_RADIUS_METERS
         // = 6m), rồi -> Attack khi vào tầm đánh. KHÔNG gọi world.setTarget — nhân vật đứng yên,

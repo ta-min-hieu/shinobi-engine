@@ -80,7 +80,7 @@ class EquipItemUseCaseTest {
         var inventoryPort = new FakeInventoryPort(new Inventory(
                 CHARACTER_ID, 20, List.of(new ItemStack(WEAPON_ITEM_ID, WEAPON_TEMPLATE_ID, 1, 0))));
         var templatePort = new FakeItemTemplatePort(
-                Map.of(WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON)));
+                Map.of(WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 5)));
         var equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
         var useCase = new EquipItemUseCase(inventoryPort, templatePort, equipmentPort, DIRECT_TX);
 
@@ -109,7 +109,7 @@ class EquipItemUseCaseTest {
         var inventoryPort = new FakeInventoryPort(new Inventory(
                 CHARACTER_ID, 20, List.of(new ItemStack(WEAPON_ITEM_ID, WEAPON_TEMPLATE_ID, 1, 0))));
         var templatePort = new FakeItemTemplatePort(
-                Map.of(WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON)));
+                Map.of(WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 5)));
         var equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
         var useCase = new EquipItemUseCase(inventoryPort, templatePort, equipmentPort, DIRECT_TX);
 

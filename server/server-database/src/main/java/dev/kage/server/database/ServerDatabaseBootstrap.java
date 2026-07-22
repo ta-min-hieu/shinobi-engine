@@ -6,8 +6,10 @@ import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.application.CreateCharacterUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
+import dev.kage.inventory.api.EquipmentUseCases;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.application.AddItemUseCase;
+import dev.kage.inventory.application.ComputeEquipmentBonusUseCase;
 import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
@@ -72,7 +74,11 @@ public final class ServerDatabaseBootstrap {
         var equipItemUseCase =
                 new EquipItemUseCase(inventoryPort, itemTemplatePort, equipmentPort, transactionRunner);
         var unequipItemUseCase = new UnequipItemUseCase(equipmentPort, transactionRunner);
-        return new InventoryFacade(addItemUseCase, grantLootUseCase, equipItemUseCase, unequipItemUseCase);
+        var computeEquipmentBonusUseCase =
+                new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
+        var equipmentUseCases =
+                new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
+        return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases);
     }
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */

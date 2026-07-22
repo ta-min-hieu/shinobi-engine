@@ -98,7 +98,8 @@ class GrantLootUseCaseTest {
             public Inventory save(Transaction tx, Inventory inv) {
                 // Mô phỏng DB gán ID thật (999L) cho item mới, giống PostgresInventoryAdapter thật.
                 var withRealId = inv.items().stream()
-                        .map(stack -> new ItemStack(999L, stack.itemTemplateId(), stack.quantity(), stack.enhanceLevel()))
+                        .map(stack -> new ItemStack(
+                                999L, stack.itemTemplateId(), stack.quantity(), stack.enhanceLevel()))
                         .toList();
                 return new Inventory(inv.characterId(), inv.capacity(), withRealId);
             }

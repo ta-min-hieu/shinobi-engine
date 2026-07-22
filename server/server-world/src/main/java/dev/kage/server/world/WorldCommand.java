@@ -40,4 +40,11 @@ sealed interface WorldCommand {
      */
     record UseSkillCommand(long characterId, String skillCode, long targetEntityId) implements WorldCommand {
     }
+
+    /**
+     * Tính lại chỉ số dẫn xuất theo trang bị (GAMEPLAY.md §2/§7) — {@code bonusAtk} là TỔNG cộng
+     * dồn hiện tại từ mọi item đang mặc, gateway (feature-inventory) tự tính lại từ đầu mỗi lần.
+     */
+    record ApplyEquipmentBonusCommand(long characterId, int bonusAtk) implements WorldCommand {
+    }
 }

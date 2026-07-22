@@ -3,8 +3,10 @@ package dev.kage.server.gateway;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import dev.kage.inventory.api.EquipmentUseCases;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.application.AddItemUseCase;
+import dev.kage.inventory.application.ComputeEquipmentBonusUseCase;
 import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
@@ -108,7 +110,11 @@ class ConnectedCharacterRegistryTest {
         var equipItemUseCase = new EquipItemUseCase(
                 inventoryPort, itemTemplatePort, equipmentPort, action -> action.accept(null));
         var unequipItemUseCase = new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
-        return new InventoryFacade(addItemUseCase, grantLootUseCase, equipItemUseCase, unequipItemUseCase);
+        var computeEquipmentBonusUseCase =
+                new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
+        var equipmentUseCases =
+                new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
+        return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases);
     }
 
     /** onMonsterKilled đẩy việc sang Virtual Thread riêng (lootExecutor) — poll thay vì đọc ngay. */
