@@ -24,6 +24,7 @@ import dev.kage.protocol.PongResponse;
 import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.SelectCharacterResponse;
 import dev.kage.protocol.SetTargetCommand;
+import dev.kage.protocol.UseSkillCommand;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
@@ -31,6 +32,7 @@ import dev.kage.server.world.CharacterBaseStats;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import java.time.Duration;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +55,15 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private static final Logger LOG = LoggerFactory.getLogger(GatewayChannelHandler.class);
 
+    /**
+     * Bảng tra opcode -> handler thay if-else dài (PMD CyclomaticComplexity — mỗi opcode mới thêm
+     * vào {@code channelRead0} lại tăng độ phức tạp, {@code UseSkillCommand} là giọt nước tràn ly).
+     */
+    private interface PacketHandler {
+        void handle(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+                throws InvalidProtocolBufferException;
+    }
+
     // NETWORK.md §13 (đề xuất, chưa verify): MoveCommand ≤ tick rate (30/giây).
     private static final int MAX_MOVE_COMMANDS_PER_SECOND = 30;
 
@@ -71,6 +82,18 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private volatile Long boundAccountId;
     private volatile Long boundCharacterId;
 
+    // Bind sau khi field khác đã gán xong (field initializer chạy tuần tự trong <init>) — method
+    // reference chỉ CHỤP this, không gọi ngay, nên thứ tự khai báo so với constructor không quan trọng.
+    private final Map<Integer, PacketHandler> handlers = Map.of(
+            Opcode.OPCODE_PING_VALUE, this::handlePing,
+            Opcode.OPCODE_CONNECT_REQUEST_VALUE, this::handleConnect,
+            Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE, this::handleListCharacters,
+            Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, this::handleCreateCharacter,
+            Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, this::handleSelectCharacter,
+            Opcode.OPCODE_MOVE_COMMAND_VALUE, this::handleMoveCommand,
+            Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, this::handleSetTargetCommand,
+            Opcode.OPCODE_USE_SKILL_COMMAND_VALUE, this::handleUseSkillCommand);
+
     GatewayChannelHandler(
             AccountFacade accountFacade, CharacterFacade characterFacade, WorldGateway worldGateway,
             Executor authExecutor) {
@@ -83,24 +106,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, PacketCodec.Frame frame) {
         var header = frame.header();
+        var handler = handlers.get(header.opcode());
         try {
-            if (header.opcode() == Opcode.OPCODE_PING_VALUE) {
-                handlePing(ctx, header, frame.payload());
-            } else if (header.opcode() == Opcode.OPCODE_CONNECT_REQUEST_VALUE) {
-                handleConnect(ctx, header, frame.payload());
-            } else if (header.opcode() == Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE) {
-                handleListCharacters(ctx, header, frame.payload());
-            } else if (header.opcode() == Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE) {
-                handleCreateCharacter(ctx, header, frame.payload());
-            } else if (header.opcode() == Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE) {
-                handleSelectCharacter(ctx, header, frame.payload());
-            } else if (header.opcode() == Opcode.OPCODE_MOVE_COMMAND_VALUE) {
-                handleMoveCommand(ctx, header, frame.payload());
-            } else if (header.opcode() == Opcode.OPCODE_SET_TARGET_COMMAND_VALUE) {
-                handleSetTargetCommand(ctx, header, frame.payload());
-            } else {
+            if (handler == null) {
                 sendError(ctx, header.sequenceId(), 404, "error.unknown_opcode");
+                return;
             }
+            handler.handle(ctx, header, frame.payload());
         } catch (InvalidProtocolBufferException e) {
             // Fail fast ở MỨC PACKET (Điều 16) — không làm sập kết nối vì 1 payload hỏng.
             LOG.warn("Payload protobuf không hợp lệ: opcode={}, sequenceId={}",
@@ -300,6 +312,21 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             return;
         }
         worldGateway.facade().setTarget(characterId, command.getTargetEntityId());
+    }
+
+    // UseSkillCommand KHÔNG chạm DB — chỉ enqueue vào server-world, xử lý thẳng trên EventLoop
+    // giống handleSetTargetCommand. Cooldown skill tự giới hạn tần suất thật (SkillSystem) nên
+    // không cần rate limit riêng — spam quá cooldown chỉ là no-op, không ảnh hưởng gameplay.
+    private void handleUseSkillCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = UseSkillCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        worldGateway.facade().useSkill(characterId, command.getSkillCode(), command.getTargetEntityId());
     }
 
     /**

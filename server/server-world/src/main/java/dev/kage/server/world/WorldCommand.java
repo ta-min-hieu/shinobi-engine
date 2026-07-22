@@ -33,4 +33,11 @@ sealed interface WorldCommand {
      */
     record SetTargetCommand(long characterId, long targetEntityId) implements WorldCommand {
     }
+
+    /**
+     * Dùng skill nhắm mục tiêu (GAMEPLAY.md §3-4) — {@code skillCode} do client gửi, server tự
+     * kiểm tra có tồn tại/cooldown/Khí/tầm (xem {@code SkillSystem}), KHÔNG tin client.
+     */
+    record UseSkillCommand(long characterId, String skillCode, long targetEntityId) implements WorldCommand {
+    }
 }

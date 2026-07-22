@@ -9,10 +9,12 @@ import dev.kage.engine.ecs.system.MovementSystem;
 import dev.kage.server.world.component.AiStateComponent;
 import dev.kage.server.world.component.AttackCooldownComponent;
 import dev.kage.server.world.component.CharacterIdComponent;
+import dev.kage.server.world.component.ChiComponent;
 import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterComponent;
 import dev.kage.server.world.component.MonsterIdComponent;
+import dev.kage.server.world.component.SkillCooldownComponent;
 import dev.kage.server.world.component.TargetComponent;
 import java.util.HashMap;
 import java.util.List;
@@ -55,6 +57,7 @@ public final class WorldFacade {
     private final EcsWorld ecsWorld = new EcsWorld();
     private final AreaOfInterestTracker aoiTracker;
     private final CombatSystem combatSystem;
+    private final SkillSystem skillSystem;
 
     // Chỉ tick thread được đọc/ghi các map/field này (không đồng bộ hoá) — đúng ranh giới "ECS
     // state chỉ sửa trên tick thread" (SERVER.md §2).
@@ -70,12 +73,16 @@ public final class WorldFacade {
         this.outboundSink = outboundSink;
         this.aoiTracker = new AreaOfInterestTracker(outboundSink);
         this.combatSystem = new CombatSystem(this::lookupEntity);
+        this.skillSystem = new SkillSystem(this::lookupEntity);
         // Thứ tự ĐÚNG ECS.md §6 (InputCommandSystem -> AISystem -> MovementSystem -> ... ->
         // CombatSystem): AI set vận tốc/mục tiêu trước, Movement tích luỹ vị trí, Combat mới xét
-        // tầm đánh — đổi thứ tự = đổi behavior (engine/CLAUDE.md).
+        // tầm đánh — đổi thứ tự = đổi behavior (engine/CLAUDE.md). SkillSystem chỉ đếm ngược
+        // cooldown mỗi tick (tryCast là lệnh rời rạc, gọi trực tiếp từ drainInbox) — thứ tự với
+        // CombatSystem không quan trọng.
         ecsWorld.addSystem(new AiSystem(entitiesByCharacterId::values, this::lookupEntity));
         ecsWorld.addSystem(new MovementSystem());
         ecsWorld.addSystem(combatSystem);
+        ecsWorld.addSystem(skillSystem);
     }
 
     /** Bắt đầu tick loop trên thread riêng — gọi 1 lần lúc khởi động server. */
@@ -115,6 +122,11 @@ public final class WorldFacade {
         inbox.add(new WorldCommand.SetTargetCommand(characterId, targetEntityId));
     }
 
+    /** GAMEPLAY.md §3-4 — dùng skill nhắm mục tiêu, server tự kiểm tra mọi điều kiện ({@code SkillSystem}). */
+    public void useSkill(long characterId, String skillCode, long targetEntityId) {
+        inbox.add(new WorldCommand.UseSkillCommand(characterId, skillCode, targetEntityId));
+    }
+
     private void tickLoop() {
         spawnTrainingDummy();
         long fixedDtNanos = (long) (WorldConstants.FIXED_DT * 1_000_000_000L);
@@ -124,6 +136,7 @@ public final class WorldFacade {
             drainInbox();
             ecsWorld.update(WorldConstants.FIXED_DT);
             handleCombatResults(combatSystem.drainResults());
+            handleSkillResults(skillSystem.drainResults());
             tickMonsterRespawn(WorldConstants.FIXED_DT);
             aoiTracker.sync(entitiesByCharacterId, entitiesByMonsterId);
 
@@ -146,6 +159,8 @@ public final class WorldFacade {
                 case WorldCommand.DetachCharacterCommand c -> handleDetach(c.characterId());
                 case WorldCommand.MoveIntentCommand c -> handleMoveIntent(c);
                 case WorldCommand.SetTargetCommand c -> handleSetTarget(c.characterId(), c.targetEntityId());
+                case WorldCommand.UseSkillCommand c ->
+                        handleUseSkill(c.characterId(), c.skillCode(), c.targetEntityId());
             }
         }
     }
@@ -175,6 +190,12 @@ public final class WorldFacade {
         entity.add(toComponent(CombatConstants.deriveCombatStats(baseStats)));
         entity.add(new TargetComponent());
         entity.add(new AttackCooldownComponent());
+        entity.add(new SkillCooldownComponent());
+
+        var chi = new ChiComponent();
+        chi.current = SkillConstants.CHARACTER_MAX_CHI; // placeholder — chưa nối character_stat.current_chi DB
+        chi.max = SkillConstants.CHARACTER_MAX_CHI;
+        entity.add(chi);
 
         entitiesByCharacterId.put(characterId, entity);
         aoiTracker.onAttach(characterId);
@@ -217,6 +238,17 @@ public final class WorldFacade {
         TARGET.get(entity).targetEntityId = targetEntityId;
     }
 
+    private void handleUseSkill(long characterId, String skillCode, long targetEntityId) {
+        var caster = entitiesByCharacterId.get(characterId);
+        if (caster == null) {
+            return;
+        }
+        if (targetEntityId == characterId || lookupEntity(targetEntityId) == null) {
+            return; // không tự nhắm chính mình; mục tiêu không tồn tại — bỏ qua an toàn (giống handleSetTarget).
+        }
+        skillSystem.tryCast(characterId, skillCode, targetEntityId);
+    }
+
     private void handleCombatResults(List<CombatSystem.AttackOutcome> results) {
         for (var outcome : results) {
             var sinkOutcome = new WorldOutboundSink.AttackOutcome(
@@ -232,6 +264,29 @@ public final class WorldFacade {
             observers.add(outcome.attackerEntityId()); // người đánh luôn thấy kết quả đòn của chính mình.
             for (long observerId : observers) {
                 outboundSink.onAttackResult(observerId, sinkOutcome);
+            }
+            if (outcome.targetDied() && outcome.targetEntityId() < 0) {
+                handleMonsterDeath(outcome.targetEntityId(), outcome.attackerEntityId());
+            }
+        }
+    }
+
+    private void handleSkillResults(List<SkillSystem.SkillOutcome> results) {
+        for (var outcome : results) {
+            var sinkOutcome = new WorldOutboundSink.SkillOutcome(
+                    outcome.skillCode(),
+                    outcome.attackerEntityId(),
+                    outcome.targetEntityId(),
+                    outcome.damage(),
+                    outcome.crit(),
+                    outcome.miss(),
+                    outcome.targetCurrentHp(),
+                    outcome.targetDied());
+
+            var observers = aoiTracker.observersOf(outcome.targetEntityId());
+            observers.add(outcome.attackerEntityId()); // người dùng skill luôn thấy kết quả của chính mình.
+            for (long observerId : observers) {
+                outboundSink.onSkillResult(observerId, sinkOutcome);
             }
             if (outcome.targetDied() && outcome.targetEntityId() < 0) {
                 handleMonsterDeath(outcome.targetEntityId(), outcome.attackerEntityId());
@@ -309,7 +364,9 @@ public final class WorldFacade {
     private static CombatStatsComponent toComponent(CombatConstants.CombatStats stats) {
         var component = new CombatStatsComponent();
         component.atk = stats.atk();
+        component.skillDmg = stats.skillDmg();
         component.def = stats.def();
+        component.res = stats.res();
         component.hitPercent = stats.hitPercent();
         component.dodgePercent = stats.dodgePercent();
         component.critPercent = stats.critPercent();

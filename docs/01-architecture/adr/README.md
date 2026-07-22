@@ -43,6 +43,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-010](ADR-010-Realm-Model.md) | Single-realm ở MVP, giữ sẵn `realm_id` | ✅ Accepted | — |
 | [ADR-012](ADR-012-Package-Root.md) | Package root `dev.kage` | ✅ Accepted | — |
 | [ADR-013](ADR-013-Flyway-vs-Liquibase.md) | Dùng Flyway làm công cụ migration DB | ✅ Accepted | — |
+| [ADR-016](ADR-016-Scripting-Engine.md) | Dùng GraalJS làm scripting engine | ✅ Accepted | — |
 | [ADR-017](ADR-017-Auth-Token.md) | Auth token: session token tự phát hành + Redis | ✅ Accepted | — |
 | [ADR-018](ADR-018-Tick-Rate.md) | Tick rate **60Hz** | ✅ Accepted | — |
 | [ADR-025](ADR-025-Idempotency.md) | Idempotency cho Command có side-effect | ✅ Accepted | — |
@@ -58,7 +59,6 @@ Tổng hợp từ toàn bộ tài liệu. **Không code chạm các vùng này k
 | **ADR-011** | Cơ chế enforce dependency rule bằng Gradle | 🔴 Cao | **Phase 0** | [ARCHITECTURE.md §8](../ARCHITECTURE.md) |
 | **ADR-014** | Kubernetes hay chỉ Docker Compose | 🟢 Thấp | Phase 9 | [KUBERNETES.md](../../07-infrastructure/KUBERNETES.md) |
 | **ADR-015** | Micrometer vs OpenTelemetry (ranh giới) | 🟡 Trung bình | Phase 9 | [OBSERVABILITY.md](../../07-infrastructure/OBSERVABILITY.md) |
-| **ADR-016** | **Lua vs GraalJS** cho scripting | 🔴 Cao | Phase 2 | [SCRIPTING.md](../../06-plugin/SCRIPTING.md) |
 | **ADR-019** | Chọn GC (G1 vs ZGC vs Shenandoah) | 🟢 Thấp | Phase 9 | [JVM.md](../../09-performance/JVM.md) |
 | **ADR-020** | Viewport strategy (ảnh hưởng công bằng PvP) | 🟡 Trung bình | Phase 1 | [RENDERING.md §3](../../03-engine/RENDERING.md) |
 | **ADR-021** | Box2D vs AABB tự viết cho chuyển động nhân vật | 🟢 Thấp | Chờ dữ liệu Phase 3 | [PHYSICS.md §10](../../03-engine/PHYSICS.md) |
@@ -67,7 +67,7 @@ Tổng hợp từ toàn bộ tài liệu. **Không code chạm các vùng này k
 | **ADR-024** | Asset distribution: đóng gói / patch / CDN | 🟢 Thấp | Phase 10 | [RESOURCE.md §10](../../04-client/RESOURCE.md) |
 | **ADR-026** | Dungeon instance model (cùng process hay riêng) | 🟢 Thấp | Phase 8 | [GAMEPLAY.md §6](../../05-server/GAMEPLAY.md) |
 
-> ADR-013, ADR-017, ADR-025 đã Accepted (2026-07-19) — xem bảng "Danh sách ADR" ở trên, không còn nằm ở đây.
+> ADR-013, ADR-017, ADR-025 đã Accepted (2026-07-19), ADR-016 đã Accepted (2026-07-20) — xem bảng "Danh sách ADR" ở trên, không còn nằm ở đây.
 
 ---
 

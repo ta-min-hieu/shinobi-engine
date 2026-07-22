@@ -9,6 +9,8 @@ import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SetTargetCommand;
+import dev.kage.protocol.SkillResultEvent;
+import dev.kage.protocol.UseSkillCommand;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -100,5 +102,46 @@ class CombatPacketsTest {
         assertThat(parsed.getMonsterId()).isEqualTo(-1L);
         assertThat(parsed.getX()).isEqualTo(6.5f);
         assertThat(parsed.getY()).isEqualTo(4f);
+    }
+
+    @Test
+    void shouldRoundTripUseSkillCommand() throws InvalidProtocolBufferException {
+        var command = UseSkillCommand.newBuilder().setSkillCode("fireball").setTargetEntityId(-1L).build();
+        var header = new PacketHeader(Opcode.OPCODE_USE_SKILL_COMMAND_VALUE, ProtocolVersion.CURRENT, 7);
+
+        byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
+        var decoded = PacketCodec.decodeFrame(frameBytes);
+        var parsed = UseSkillCommand.parseFrom(decoded.payload());
+
+        assertThat(decoded.header()).isEqualTo(header);
+        assertThat(parsed.getSkillCode()).isEqualTo("fireball");
+        assertThat(parsed.getTargetEntityId()).isEqualTo(-1L);
+    }
+
+    @Test
+    void shouldRoundTripSkillResultEvent() throws InvalidProtocolBufferException {
+        var event = SkillResultEvent.newBuilder()
+                .setSkillCode("fireball")
+                .setAttackerEntityId(1L)
+                .setTargetEntityId(-1L)
+                .setDamage(20)
+                .setIsCrit(false)
+                .setIsMiss(false)
+                .setTargetCurrentHp(30)
+                .setTargetDied(false)
+                .build();
+        var header = new PacketHeader(Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
+
+        byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
+        var parsed = SkillResultEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+
+        assertThat(parsed.getSkillCode()).isEqualTo("fireball");
+        assertThat(parsed.getAttackerEntityId()).isEqualTo(1L);
+        assertThat(parsed.getTargetEntityId()).isEqualTo(-1L);
+        assertThat(parsed.getDamage()).isEqualTo(20);
+        assertThat(parsed.getIsCrit()).isFalse();
+        assertThat(parsed.getIsMiss()).isFalse();
+        assertThat(parsed.getTargetCurrentHp()).isEqualTo(30);
+        assertThat(parsed.getTargetDied()).isFalse();
     }
 }

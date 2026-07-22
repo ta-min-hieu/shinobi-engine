@@ -130,7 +130,7 @@ graph LR
 | Round-trip protocol test | [TESTING.md §6](../10-quality/TESTING.md) |
 | ⚠️ Netty leak detector `paranoid` | [JVM.md §8](../09-performance/JVM.md) |
 
-**ADR cần trước Phase 2**: ADR-016 (Lua vs GraalJS) · ADR-022 (gdx-ai) · ADR-023 (mobile input, nếu mobile-first)
+**ADR cần trước Phase 2**: ADR-022 (gdx-ai) · ADR-023 (mobile input, nếu mobile-first). ADR-016 (scripting — GraalJS) đã Accepted 2026-07-20.
 
 **Exit Criteria:**
 - [ ] Client kết nối server, ping/pong hoạt động
@@ -187,8 +187,8 @@ graph LR
 **Exit Criteria:**
 - [x] Đánh quái, quái chết, rơi đồ — combat+AI (`47c63dd`/`e014c6c`), rơi đồ thật vào túi đồ (mở sớm feature-inventory, 2026-07-20)
 - [x] Damage hack / cooldown hack bị từ chối — chặn bằng thiết kế (client chỉ gửi ý định), test `shouldNotBypassAttackCooldown_bySpammingSetTargetCommand`
-- [ ] Unit test cho CombatSystem, SkillSystem — CombatSystem tested (qua WorldFacadeTest), SkillSystem chưa tồn tại
-- [ ] Script sandbox: test escape pass — chờ ADR-016
+- [x] Unit test cho CombatSystem, SkillSystem — cả 2 tested qua `WorldFacadeTest` (`SkillSystem` thêm 2026-07-22, skill "fireball" thật)
+- [x] Script sandbox: test escape pass — `ScriptSandboxTest.shouldRejectJavaTypeAccess_whenScriptTriesToEscapeSandbox` (GraalJS, [ADR-016](../01-architecture/adr/ADR-016-Scripting-Engine.md)); sandbox đang ở mức CONSTRAINED-equivalent, chưa phải ISOLATED/UNTRUSTED thật (xem ADR-016 "Kiểm chứng thêm khi code")
 
 ---
 

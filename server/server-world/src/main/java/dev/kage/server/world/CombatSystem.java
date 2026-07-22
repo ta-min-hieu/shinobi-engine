@@ -17,7 +17,7 @@ import java.util.function.LongFunction;
 
 /**
  * Đánh thường TỰ ĐỘNG (GDD §6 "Auto-target đánh thường") — không phải {@code UseSkillCommand}
- * (chờ ADR-016 script sandbox, lát cắt sau). Entity có {@link TargetComponent} +
+ * (script sandbox GraalJS theo ADR-016, lát cắt sau). Entity có {@link TargetComponent} +
  * {@link AttackCooldownComponent} (cả nhân vật lẫn quái đều có sẵn từ lúc spawn — xem
  * {@code WorldFacade}; {@code AiSystem} là bên GHI {@code targetEntityId} cho quái theo FSM,
  * AI.md §3) tự đánh mục tiêu khi hết cooldown, còn target hợp lệ (khác 0) và còn trong tầm, theo
@@ -103,7 +103,7 @@ final class CombatSystem extends IteratingKSystem {
     private void resolveAndRecordAttack(
             KEntity attacker, KEntity target, long targetEntityId, HealthComponent targetHealth) {
         var result = CombatConstants.resolveAttack(
-                toStats(COMBAT_STATS.get(attacker)), toStats(COMBAT_STATS.get(target)));
+                CombatConstants.toStats(COMBAT_STATS.get(attacker)), CombatConstants.toStats(COMBAT_STATS.get(target)));
         targetHealth.current = Math.max(0, targetHealth.current - result.damage());
 
         long attackerId = entityId(attacker);
@@ -120,12 +120,6 @@ final class CombatSystem extends IteratingKSystem {
     /** ID nghiệp vụ THẬT của entity (dương = characterId, âm = monsterId) — attacker có thể là 1 trong 2. */
     private static long entityId(KEntity entity) {
         return CHARACTER_ID.has(entity) ? CHARACTER_ID.get(entity).characterId : MONSTER_ID.get(entity).monsterId;
-    }
-
-    /** Component ECS (mutable) → record bất biến {@code resolveAttack} cần (giữ pipeline thuần). */
-    private static CombatConstants.CombatStats toStats(CombatStatsComponent c) {
-        return new CombatConstants.CombatStats(
-                c.atk, c.def, c.hitPercent, c.dodgePercent, c.critPercent, c.critDamageMultiplier);
     }
 
     private static double distance(PositionComponent a, PositionComponent b) {

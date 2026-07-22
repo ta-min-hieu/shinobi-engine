@@ -92,7 +92,7 @@ Response + Event cho các client liên quan (trong AoI)
 
 **Phân định**: Java lo *cơ chế*, Script lo *nội dung*, DB lo *tham số*.
 
-⏳ Phụ thuộc ADR-016 (Lua vs GraalJS).
+Engine scripting đã chốt: [ADR-016](../01-architecture/adr/ADR-016-Scripting-Engine.md) — GraalJS.
 
 ---
 
@@ -249,7 +249,6 @@ Chi tiết: [SECURITY.md](../08-security/SECURITY.md). Ở tầng gameplay:
 
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
-| **ADR-016** | Lua vs GraalJS — chặn §4, §9 | 🔴 Chặn Phase 2 |
 | **ADR-025** | Idempotency — chặn §8 trade | ✅ Accepted |
 | **ADR-026** | Dungeon instance model (§6) | 🟢 Chặn Phase 8 |
 
@@ -264,6 +263,7 @@ Chi tiết: [SECURITY.md](../08-security/SECURITY.md). Ở tầng gameplay:
 ## Việc cần làm tiếp theo
 
 1. ✅ Công thức damage đã chốt (GDD §5-6) — **Phase 4 hết bị chặn**, có thể bắt đầu code `CombatSystem`/`CombatConstants`.
-2. Chốt ADR-016 (script engine) trước Phase 2.
-3. Phase 5: thiết kế inventory **có chỗ cho khoá item** (§7) dù trade là Post-MVP.
-4. Phase 4+: playtest cân bằng toàn bộ hệ số derive/damage/Lực Chiến (GDD §5-6) — hiện là placeholder.
+2. ✅ ADR-016 (script engine — GraalJS) đã Accepted.
+3. ✅ `UseSkillCommand` thật (2026-07-22) — `SkillSystem` + script GraalJS thật (`fireball.js`), SKILL_DMG/RES derive + tiêu thụ. CHỈ 1 skill hardcode, chưa có `skill_template`/`character_skill` DB (giống `monster_template`) — nối DB thật + nhiều skill là việc lát cắt sau.
+4. Phase 5: thiết kế inventory **có chỗ cho khoá item** (§7) dù trade là Post-MVP.
+5. Phase 4+: playtest cân bằng toàn bộ hệ số derive/damage/Lực Chiến (GDD §5-6) — hiện là placeholder.

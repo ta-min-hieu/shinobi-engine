@@ -94,7 +94,7 @@ Selector (Boss)
 | Java (gdx-ai) | Nhanh; type-safe | Sửa boss = rebuild + redeploy |
 | Script (Lua/JS) | Designer tự chỉnh; hot-reload | Chậm hơn; cần sandbox |
 
-**Đề xuất**: **Script** — vì Điều 27 cấm hardcode Boss, và số boss ít nên chi phí script không đáng kể. Phụ thuộc ADR-016 (Lua vs GraalJS).
+**Đề xuất**: **Script** — vì Điều 27 cấm hardcode Boss, và số boss ít nên chi phí script không đáng kể. Engine đã chốt [ADR-016](../01-architecture/adr/ADR-016-Scripting-Engine.md) — GraalJS.
 
 ---
 
@@ -205,7 +205,7 @@ Theo Điều 27, hành vi AI **không hardcode**:
 | 6 | Navigation data là **một phần của map data**, không tính runtime | Rẻ hơn | Accepted |
 | 7 | AI thiết kế để **cho phép time-slicing** ngay từ đầu | Không giả định chạy mỗi tick | Accepted |
 | 8 | Tham số AI là **config**, không phải code | Điều 27 | Accepted |
-| 9 | Boss AI dùng **Script** (đề xuất) | Điều 27; số boss ít nên chi phí script không đáng | ⏳ Phụ thuộc ADR-016 |
+| 9 | Boss AI dùng **Script** (GraalJS) | Điều 27; số boss ít nên chi phí script không đáng | Accepted — [ADR-016](../01-architecture/adr/ADR-016-Scripting-Engine.md) |
 | 10 | **Không dùng gdx-ai cho FSM** | Bảo trì chậm; FSM tự viết < 100 dòng | ⏳ Cần ADR-022 |
 
 ## ADR cần tạo
@@ -213,7 +213,6 @@ Theo Điều 27, hành vi AI **không hardcode**:
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
 | **ADR-022** | Dùng gdx-ai hay tự viết FSM/pathfinding (§5) | 🟡 Chặn Phase 2 |
-| **ADR-016** | Lua vs GraalJS — chặn §4, §10 (Boss script) | 🔴 Chặn Phase 2 |
 
 ## Tài liệu liên quan
 

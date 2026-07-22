@@ -5,8 +5,10 @@ package kage.protocol;
 option java_package = "dev.kage.protocol";
 option java_multiple_files = true;
 
-// Packet Combat (NETWORK.md §4, dải 400-499). Phase 4 lát cắt 1 — chỉ đánh thường tự động
-// (GDD §6 "Auto-target đánh thường"), CHƯA có UseSkillCommand (chờ ADR-016, script sandbox).
+// Packet Combat (NETWORK.md §4, dải 400-499). Phase 4 lát cắt 1 — đánh thường tự động
+// (GDD §6 "Auto-target đánh thường"). Lát cắt 6 (2026-07-22) thêm UseSkillCommand/SkillResultEvent
+// — script sandbox GraalJS thật (ADR-016), CHỈ 1 skill hardcode ("fireball", SkillConstants),
+// chưa có skill_template/character_skill DB (giống monster_template — chưa DB-driven).
 //
 // ID mục tiêu (target_entity_id / attacker_entity_id / monster_id) dùng CHUNG 1 không gian long
 // cho cả nhân vật lẫn quái, KHÔNG trùng nhau: characterId luôn DƯƠNG (DB auto-increment từ 1),
@@ -57,4 +59,27 @@ message MonsterMovedEvent {
   int64 monster_id = 1;
   float x = 2;
   float y = 3;
+}
+
+// Command: Client -> Server (OPCODE_USE_SKILL_COMMAND). Dùng kỹ năng nhắm mục tiêu (GAMEPLAY.md
+// §3-4) — server tự kiểm tra skill có tồn tại/cooldown/đủ Khí/trong tầm, KHÔNG tin client. Sai bất
+// kỳ điều kiện nào → bị bỏ qua ÂM THẦM (giống SetTargetCommand) — không trả lỗi cụ thể, tránh lộ
+// ngưỡng cho client gian lận dò (SECURITY.md).
+message UseSkillCommand {
+  string skill_code = 1;
+  int64 target_entity_id = 2;
+}
+
+// Event: Server -> Client (OPCODE_SKILL_RESULT_EVENT). Kết quả 1 lần dùng skill THẬT — cùng hình
+// dạng AttackResultEvent, thêm skill_code để client phát đúng hiệu ứng/animation (khác đòn đánh
+// thường). Gửi cho MỌI nhân vật đang thấy mục tiêu trong AoI, không chỉ người dùng skill.
+message SkillResultEvent {
+  string skill_code = 1;
+  int64 attacker_entity_id = 2;
+  int64 target_entity_id = 3;
+  int32 damage = 4;
+  bool is_crit = 5;
+  bool is_miss = 6;
+  int32 target_current_hp = 7;
+  bool target_died = 8;
 }

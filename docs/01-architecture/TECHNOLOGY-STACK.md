@@ -83,6 +83,7 @@ Các số phiên bản trong tài liệu này là **baseline đề xuất tại 
 | **Redis 8.x** | — | Cache, session, leaderboard, pub/sub | Chuẩn ngành, sorted set hợp leaderboard; **AGPLv3 — OSI-approved từ bản 8 (5/2025)** | Network copyleft nếu phân phối lại bản sửa đổi (không ảnh hưởng self-host nguyên bản) | Không thay | [ADR-005](adr/ADR-005-Why-Redis.md) ✅ |
 | **HikariCP** | mới nhất | Connection pool | Nhanh nhất, ít allocation, chuẩn de-facto | — | Không thay | — |
 | **Flyway** | — | DB migration | Cần version + rollback (Điều 40); SQL tường minh khớp ADR-004 | Không có rollback tự động ở bản Community | Không thay | [ADR-013](adr/ADR-013-Flyway-vs-Liquibase.md) ✅ |
+| **GraalJS** (`org.graalvm.polyglot:js`) | — (verify trước khi ghi `libs.versions.toml`) | Scripting engine (quest/dialogue/boss/skill) | Sandbox dựng sẵn (`SandboxPolicy.ISOLATED`/`UNTRUSTED`), bảo trì tích cực; chạy trên Temurin JDK 25 hiện có, không cần đổi runtime | Không chạy Graal Compiler → hiệu năng interpreter-mode (chấp nhận được vì script không ở hot path) | Nếu benchmark thật cho thấy không đủ nhanh | [ADR-016](adr/ADR-016-Scripting-Engine.md) ✅ |
 
 ---
 
@@ -172,9 +173,8 @@ Mọi dependency mới **ngoài** danh sách trên phải ghi vào đây (Điề
 | 1 | **Kubernetes hay chỉ Docker Compose** | [KUBERNETES.md](../07-infrastructure/KUBERNETES.md), deploy/ | ❌ Cần ADR-014 |
 | 2 | **Ashley vs ECS tự viết** | Không chặn MVP; đánh giá lại Phase 9 | [ADR-006](adr/ADR-006-Why-ECS.md) — Accepted tạm |
 | 3 | **Micrometer vs OpenTelemetry** ranh giới | [OBSERVABILITY.md](../07-infrastructure/OBSERVABILITY.md) | ❌ Cần ADR-015 |
-| 4 | **Lua vs GraalJS** cho scripting | [SCRIPTING.md](../06-plugin/SCRIPTING.md) | ❌ Cần ADR-016 |
 
-**Đã chốt (2026-07-19):** Redis ([ADR-005](adr/ADR-005-Why-Redis.md) ✅), Flyway ([ADR-013](adr/ADR-013-Flyway-vs-Liquibase.md) ✅).
+**Đã chốt (2026-07-19):** Redis ([ADR-005](adr/ADR-005-Why-Redis.md) ✅), Flyway ([ADR-013](adr/ADR-013-Flyway-vs-Liquibase.md) ✅). **Đã chốt (2026-07-20):** GraalJS ([ADR-016](adr/ADR-016-Scripting-Engine.md) ✅).
 
 **Không code chạm các thành phần trên khi ADR chưa Accepted** (Điều 37).
 
@@ -192,12 +192,12 @@ Mọi dependency mới **ngoài** danh sách trên phải ghi vào đây (Điề
 | 6 | Không Spring Boot | Accepted — [ADR-009](adr/ADR-009-Why-No-Spring-Boot.md) |
 | 7 | Box2D không dùng cho combat | Accepted |
 | 8 | Mọi số version phải verify trước khi vào `libs.versions.toml` | Accepted |
+| 9 | GraalJS làm scripting engine | Accepted — [ADR-016](adr/ADR-016-Scripting-Engine.md) |
 
 ## ADR cần tạo
 
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
-| **ADR-016** | Lua vs GraalJS cho scripting | Cao — chặn Phase 2 |
 | **ADR-014** | Kubernetes hay Docker Compose | Thấp — chặn Phase 9 |
 | **ADR-015** | Micrometer vs OpenTelemetry | Trung bình — chặn Phase 9 |
 
@@ -210,6 +210,5 @@ Mọi dependency mới **ngoài** danh sách trên phải ghi vào đây (Điề
 
 ## Việc cần làm tiếp theo
 
-1. **Verify toàn bộ số version §2–§8** bằng cách kiểm tra release thật trước khi viết `libs.versions.toml`.
-2. Chốt ADR-016 (Lua/GraalJS) — còn chặn sớm nhất (ADR-005 Redis, ADR-013 Flyway đã Accepted 2026-07-19).
-3. Phase 0: dựng `libs.versions.toml` từ các version **đã verify**, không từ tài liệu này.
+1. **Verify toàn bộ số version §2–§8** bằng cách kiểm tra release thật trước khi viết `libs.versions.toml`, kể cả `org.graalvm.polyglot:js` (ADR-016).
+2. Phase 0: dựng `libs.versions.toml` từ các version **đã verify**, không từ tài liệu này.

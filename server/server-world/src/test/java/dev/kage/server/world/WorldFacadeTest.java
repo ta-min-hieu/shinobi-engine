@@ -52,6 +52,11 @@ class WorldFacadeTest {
             boolean died) {
     }
 
+    private record SkillResult(
+            long target, String skillCode, long attacker, long defender, int damage, boolean crit, boolean miss,
+            int hp, boolean died) {
+    }
+
     private static final class RecordingSink implements WorldOutboundSink {
         final List<Spawned> spawned = new CopyOnWriteArrayList<>();
         final List<Moved> moved = new CopyOnWriteArrayList<>();
@@ -62,6 +67,7 @@ class WorldFacadeTest {
         final List<MonsterMoved> monsterMoved = new CopyOnWriteArrayList<>();
         final List<MonsterKilled> monsterKilled = new CopyOnWriteArrayList<>();
         final List<AttackResult> attackResults = new CopyOnWriteArrayList<>();
+        final List<SkillResult> skillResults = new CopyOnWriteArrayList<>();
 
         @Override
         public void onMoveAccepted(long characterId, int sequenceId, float x, float y) {
@@ -110,6 +116,14 @@ class WorldFacadeTest {
             attackResults.add(new AttackResult(
                     targetCharacterId, outcome.attackerEntityId(), outcome.targetEntityId(), outcome.damage(),
                     outcome.crit(), outcome.miss(), outcome.targetCurrentHp(), outcome.targetDied()));
+        }
+
+        @Override
+        public void onSkillResult(long targetCharacterId, WorldOutboundSink.SkillOutcome outcome) {
+            skillResults.add(new SkillResult(
+                    targetCharacterId, outcome.skillCode(), outcome.attackerEntityId(), outcome.targetEntityId(),
+                    outcome.damage(), outcome.crit(), outcome.miss(), outcome.targetCurrentHp(),
+                    outcome.targetDied()));
         }
     }
 
@@ -256,6 +270,46 @@ class WorldFacadeTest {
     }
 
     @Test
+    @Timeout(15) // vài lần thử cast, mỗi lần chờ hết cooldown 3s (SkillConstants) — dài hơn @Timeout(10) mặc định.
+    void shouldDealSkillDamage_withScriptComputedAmount_whenSkillCast() {
+        // Lát cắt 6: UseSkillCommand thật, damage tính bởi script GraalJS (fireball.js, ADR-016) —
+        // không phải Java hardcode. HIT% placeholder ~91% với DEFAULT_STATS nên thử vài lần thay vì
+        // giả định trúng ngay lần đầu (tránh test bị flaky vì roll né/trúng thật, ENGINE.md §10).
+        world.start();
+        world.attachCharacter(1L, 5f, 6f, DEFAULT_STATS); // cách quái (5,5) 1m — trong tầm skill (5m)
+        awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
+        long monsterId = sink.monsterSpawned.get(0).monsterId();
+
+        castUntilHit(monsterId);
+
+        var hit = sink.skillResults.stream()
+                .filter(r -> r.defender() == monsterId && !r.miss())
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Không lần cast fireball nào trúng sau nhiều lần thử"));
+        assertThat(hit.skillCode()).isEqualTo("fireball");
+        assertThat(hit.attacker()).isEqualTo(1L);
+        assertThat(hit.damage()).isGreaterThan(0);
+    }
+
+    @Test
+    void shouldRespectSkillCooldown_whenSpammingUseSkillCommand() {
+        // Chống cooldown hack giống SetTargetCommand: gửi dồn dập UseSkillCommand KHÔNG được cast
+        // nhiều hơn 1 lần trong lúc còn cooldown (SkillConstants.FIREBALL_COOLDOWN_SECONDS = 3s).
+        world.start();
+        world.attachCharacter(1L, 5f, 6f, DEFAULT_STATS);
+        awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
+        long monsterId = sink.monsterSpawned.get(0).monsterId();
+
+        for (int i = 0; i < 200; i++) {
+            world.useSkill(1L, "fireball", monsterId); // spam — không phải input hợp lệ của UI thật nào
+        }
+        sleepQuietly(500); // << 3s cooldown — chỉ đủ thời gian cho ĐÚNG 1 lần cast thật xử lý xong
+
+        long castsLanded = sink.skillResults.stream().filter(r -> r.defender() == monsterId).count();
+        assertThat(castsLanded).isLessThanOrEqualTo(1);
+    }
+
+    @Test
     void shouldChaseAndAttackBack_whenCharacterEntersAggroRange() {
         // AI.md §3: quái Idle -> Chase khi phát hiện người chơi (AiConstants.AGGRO_RADIUS_METERS
         // = 6m), rồi -> Attack khi vào tầm đánh. KHÔNG gọi world.setTarget — nhân vật đứng yên,
@@ -306,6 +360,17 @@ class WorldFacadeTest {
             }
         }
         throw new AssertionError("Điều kiện không đúng sau " + timeout + " chờ tick loop");
+    }
+
+    /** Cast fireball tối đa vài lần, mỗi lần chờ hết cooldown, tới khi trúng 1 lần hoặc hết lượt thử. */
+    private void castUntilHit(long monsterId) {
+        for (int attempt = 0; attempt < 3; attempt++) {
+            world.useSkill(1L, "fireball", monsterId);
+            sleepQuietly(3200); // > FIREBALL_COOLDOWN_SECONDS (3s) — đợi cooldown xong trước lần thử tiếp
+            if (sink.skillResults.stream().anyMatch(r -> r.defender() == monsterId && !r.miss())) {
+                return;
+            }
+        }
     }
 
     private static void sleepQuietly(long millis) {

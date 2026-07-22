@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | Version | 1.0.0 |
-| Status | Draft — ⏳ **chưa chốt engine (ADR-016)** |
+| Status | ✅ Engine đã chốt: **GraalJS** ([ADR-016](../01-architecture/adr/ADR-016-Scripting-Engine.md)) |
 | Luật gốc | [Hiến pháp Điều 27](../00-governance/KAGE-CONSTITUTION.md) |
 
 > Điều 27: Quest · NPC · Dialogue · Cutscene · Event · Festival **không hardcode**. Phải hỗ trợ scripting, và **script phải có sandbox**.
@@ -42,6 +42,8 @@
 
 ## 3. Lua vs GraalJS — phân tích
 
+> ✅ **Đã chốt: GraalJS** ([ADR-016](../01-architecture/adr/ADR-016-Scripting-Engine.md)). Phần dưới đây giữ lại nguyên phân tích ban đầu (giá trị lịch sử — vì sao từng cân nhắc cả hai), nhưng **kết luận "GraalJS cần GraalVM" ở cuối mục này đã lỗi thời** — xem ADR-016 mục "Kiểm chứng 2 vấn đề kỹ thuật" để biết vì sao (GraalJS chạy được trên Temurin JDK 25 tiêu chuẩn qua `org.graalvm.polyglot:js`, không cần đổi JDK distribution, ADR-001 không bị động tới).
+
 File recommend nói đúng: **chọn MỘT, không hỗ trợ cả hai ngay từ đầu.** Hai script engine = hai sandbox, hai bộ binding API, hai chỗ để bug.
 
 | Tiêu chí | **LuaJ / Lua** | **GraalJS** |
@@ -62,18 +64,16 @@ File recommend nói đúng: **chọn MỘT, không hỗ trợ cả hai ngay từ
 
 Nhưng [ADR-001](../01-architecture/adr/ADR-001-Why-Java25.md) đã chốt **Temurin JDK 25**. Chọn GraalJS = phải đổi runtime sang GraalVM = **mở lại ADR-001**.
 
-### Khuyến nghị: **Lua (LuaJ)**
+### Quyết định cuối: **GraalJS** ([ADR-016](../01-architecture/adr/ADR-016-Scripting-Engine.md))
 
-| Lý do | Chi tiết |
+Khuyến nghị ban đầu của tài liệu này là Lua (LuaJ) — lý do lịch sử giữ nguyên ở bảng trên. Khi thực sự kiểm chứng (không chỉ so sánh lý thuyết), 2 phát hiện đã đảo ngược kết luận — xem đầy đủ ở ADR-016:
+
+| Phát hiện | Ảnh hưởng |
 |---|---|
-| **Không phá ADR-001** | LuaJ chạy trên Temurin bình thường |
-| **Designer học được** | Lua là ngôn ngữ script game phổ biến nhất, cú pháp đơn giản |
-| **Đủ nhanh** | Script chạy theo sự kiện, không trong hot path (§2) → hiệu năng không phải yếu tố quyết định |
-| **Nhẹ** | Quan trọng khi có hàng nghìn quest instance |
+| **LuaJ thực chất không còn bảo trì** — bản MIT gần nhất 3.0.2 là tháng 3/2019, không có sandbox policy dựng sẵn | Ưu điểm "designer học được / nhẹ" không bù được rủi ro phải tự vá lỗ hổng sandbox trên một engine ngừng phát triển |
+| **"GraalJS cần GraalVM" không còn đúng** — chạy được trên Temurin JDK 25 tiêu chuẩn qua `org.graalvm.polyglot:js`, không cần đổi JDK distribution | Rào cản chính khiến từng nghiêng về Lua không tồn tại — ADR-001 không bị động tới |
 
-**Rủi ro phải chấp nhận**: LuaJ bảo trì chậm; sandbox phải tự cấu hình cẩn thận (§4).
-
-⏳ **Cần chủ dự án quyết định** — đây là khuyến nghị, chưa phải quyết định (Điều 45).
+**Rủi ro phải chấp nhận**: cú pháp JS phức tạp hơn Lua cho designer không rành lập trình; không chạy Graal Compiler nên hiệu năng ở mức interpreter (chấp nhận được vì script không ở hot path, §2/§7).
 
 ---
 
@@ -85,36 +85,35 @@ Script là nơi **nguy hiểm nhất** của hệ thống: nếu script thoát s
 
 | ❌ Script KHÔNG được | Vì sao |
 |---|---|
-| `os.execute`, `io.open` | Chạy lệnh hệ thống, đọc/ghi file tuỳ ý |
-| `require` module tuỳ ý | Nạp code ngoài |
-| Truy cập class Java qua reflection | Thoát sandbox hoàn toàn |
-| Mở socket | Kênh liên lạc ngoài |
+| `require`/import module tuỳ ý ngoài whitelist | Nạp code ngoài |
+| Truy cập class Java qua `Java.type`/reflection | Thoát sandbox hoàn toàn |
+| Mở socket, đọc/ghi file | Chạy lệnh hệ thống, kênh liên lạc ngoài |
 | Vòng lặp vô hạn | Treo tick thread |
 | Cấp phát bộ nhớ không giới hạn | OOM server |
 
-**Cấu hình sandbox bắt buộc:**
+**Cấu hình sandbox bắt buộc** (GraalJS `SandboxPolicy.ISOLATED`/`UNTRUSTED` — [ADR-016](../01-architecture/adr/ADR-016-Scripting-Engine.md)):
 
 ```
-1. Whitelist thư viện Lua: chỉ string, table, math cơ bản
-   → LOẠI BỎ: os, io, debug, package, load, loadstring, dofile
-2. Giới hạn số instruction mỗi lần chạy (instruction hook)
+1. SandboxPolicy.UNTRUSTED: tắt hoàn toàn host access mặc định
+   → không cho phép Java.type, Java interop, class loading từ script
+2. Giới hạn CPU/statement count qua ResourceLimits
    → chống vòng lặp vô hạn
-3. Giới hạn bộ nhớ
-4. Timeout mỗi lần gọi script
-5. API host: WHITELIST tường minh, không expose object Java thô
+3. Giới hạn bộ nhớ qua ResourceLimits
+4. Timeout mỗi lần gọi script (Context.close(true) khi vượt)
+5. API host: WHITELIST tường minh qua Value/ProxyObject, không expose object Java thô
 ```
 
 ⚠️ **Điểm chết người**: expose một object Java cho script mà object đó có method trả về object khác → script đi từ đó tới `Class` → tới `ClassLoader` → **thoát sandbox**. 
 
 → **Chỉ expose API dạng dữ liệu thuần (number/string/table), không expose object Java.**
 
-```lua
--- ✅ An toàn — API dạng dữ liệu
-quest.give_item(character_id, "sword_01", 1)
+```js
+// ✅ An toàn — API dạng dữ liệu
+quest.give_item(character_id, "sword_01", 1);
 
--- ❌ Nguy hiểm — expose object Java
-local inv = quest.get_inventory(character_id)   -- trả về object Java?
-inv:getClass():getClassLoader()                  -- → thoát sandbox
+// ❌ Nguy hiểm — expose object Java thô cho script
+const inv = quest.get_inventory(character_id);   // trả về object Java?
+inv.getClass().getClassLoader();                  // → thoát sandbox
 ```
 
 ---
@@ -123,32 +122,32 @@ inv:getClass():getClassLoader()                  -- → thoát sandbox
 
 **Nguyên tắc**: API dạng hàm, tham số/kết quả là dữ liệu thuần.
 
-```lua
--- quest/kill_10_wolves.lua
-quest = {
-    id = "kill_10_wolves",
-    name_key = "quest.kill_10_wolves.name",
+```js
+// quest/kill_10_wolves.js
+const quest = {
+    id: "kill_10_wolves",
+    name_key: "quest.kill_10_wolves.name",
 
-    on_accept = function(ctx)
-        ctx:set_progress("killed", 0)
-    end,
+    on_accept(ctx) {
+        ctx.set_progress("killed", 0);
+    },
 
-    on_event = function(ctx, event)
-        if event.type == "monster_killed" and event.monster_code == "wolf" then
-            local n = ctx:get_progress("killed") + 1
-            ctx:set_progress("killed", n)
-            if n >= 10 then ctx:complete() end
-        end
-    end,
+    on_event(ctx, event) {
+        if (event.type === "monster_killed" && event.monster_code === "wolf") {
+            const n = ctx.get_progress("killed") + 1;
+            ctx.set_progress("killed", n);
+            if (n >= 10) ctx.complete();
+        }
+    },
 
-    on_complete = function(ctx)
-        ctx:give_exp(500)
-        ctx:give_item("herb_01", 3)
-    end
-}
+    on_complete(ctx) {
+        ctx.give_exp(500);
+        ctx.give_item("herb_01", 3);
+    }
+};
 ```
 
-`ctx` là **facade an toàn** — chỉ expose hàm được whitelist, không expose object Java.
+`ctx` là **facade an toàn** — chỉ expose hàm được whitelist qua `ProxyObject`, không expose object Java.
 
 ---
 
@@ -217,7 +216,7 @@ Không phải thứ gì "không hardcode" cũng cần script.
 | # | Quyết định | Lý do | Trạng thái |
 |---|---|---|---|
 | 1 | **Chọn MỘT script engine**, không hỗ trợ cả hai | Hai sandbox = hai chỗ có lỗ hổng | Accepted |
-| 2 | **Khuyến nghị Lua (LuaJ)** | Không phá ADR-001 (GraalJS cần GraalVM); designer dễ học; đủ nhanh vì script không ở hot path | ⏳ **Đề xuất — chờ ADR-016** |
+| 2 | **GraalJS** | Sandbox dựng sẵn (`SandboxPolicy`); bảo trì tích cực; chạy trên Temurin JDK 25 hiện có, không phá ADR-001 | ✅ Accepted — [ADR-016](../01-architecture/adr/ADR-016-Scripting-Engine.md) |
 | 3 | Script chạy **server-side** | Điều 15 | Accepted |
 | 4 | Script chạy **theo sự kiện**, không mỗi tick | Hiệu năng | Accepted |
 | 5 | **Sandbox bắt buộc**: whitelist thư viện, giới hạn instruction/memory/timeout | Điều 27 | Accepted |
@@ -226,14 +225,6 @@ Không phải thứ gì "không hardcode" cũng cần script.
 | 8 | **Validate toàn bộ script lúc khởi động** | Fail fast, không đợi người chơi phát hiện | Accepted |
 | 9 | Config trước, Script sau — không script hoá thứ chỉ cần config | Điều 9 | Accepted |
 | 10 | Hot reload: dev ✅, production cẩn thận | State cũ vs code mới | ⏳ Thiết kế Phase 6 |
-
-## ADR cần tạo
-
-| ADR | Nội dung | Ưu tiên |
-|---|---|---|
-| **ADR-016** | **Lua vs GraalJS** — khuyến nghị Lua vì lý do §3 | 🔴 **Chặn Phase 2** |
-
-⚠️ Nếu chọn GraalJS → **phải mở lại [ADR-001](../01-architecture/adr/ADR-001-Why-Java25.md)** vì cần đổi Temurin → GraalVM. Đó là quyết định lớn hơn nhiều so với "chọn ngôn ngữ script".
 
 ## Tài liệu liên quan
 
@@ -245,6 +236,6 @@ Không phải thứ gì "không hardcode" cũng cần script.
 
 ## Việc cần làm tiếp theo
 
-1. 🔴 **Chốt ADR-016 trước Phase 2** (theo [ROADMAP](../11-process/ROADMAP.md)) — quyết định sớm dù script chỉ dùng từ Phase 4 (skill) và Phase 6 (quest), vì nó ảnh hưởng thiết kế `engine-scripting`.
+1. Thêm `org.graalvm.polyglot:js` vào `libs.versions.toml` — **verify version thật trước khi ghi** (CLAUDE.md §"gen code hiệu quả").
 2. Khi triển khai: **thiết kế sandbox trước, API sau** (§4) — retrofit sandbox vào API đã expose object Java là không thể.
 3. Phase 4: làm §8 (validate lúc khởi động) ngay từ script đầu tiên.

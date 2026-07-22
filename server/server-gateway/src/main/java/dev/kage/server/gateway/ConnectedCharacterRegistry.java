@@ -13,6 +13,7 @@ import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.ServerShuttingDownEvent;
+import dev.kage.protocol.SkillResultEvent;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
@@ -181,6 +182,25 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 .setTargetDied(outcome.targetDied())
                 .build();
         send(ctx, Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    @Override
+    public void onSkillResult(long targetCharacterId, WorldOutboundSink.SkillOutcome outcome) {
+        var ctx = contextsByCharacterId.get(targetCharacterId);
+        if (ctx == null) {
+            return;
+        }
+        var event = SkillResultEvent.newBuilder()
+                .setSkillCode(outcome.skillCode())
+                .setAttackerEntityId(outcome.attackerEntityId())
+                .setTargetEntityId(outcome.targetEntityId())
+                .setDamage(outcome.damage())
+                .setIsCrit(outcome.crit())
+                .setIsMiss(outcome.miss())
+                .setTargetCurrentHp(outcome.targetCurrentHp())
+                .setTargetDied(outcome.targetDied())
+                .build();
+        send(ctx, Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE, 0, event.toByteArray());
     }
 
     @Override

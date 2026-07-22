@@ -11,7 +11,9 @@ import dev.kage.engine.ecs.Component;
  */
 public final class CombatStatsComponent implements Component {
     public int atk;
+    public int skillDmg;
     public int def;
+    public int res;
     public float hitPercent;
     public float dodgePercent;
     public float critPercent;

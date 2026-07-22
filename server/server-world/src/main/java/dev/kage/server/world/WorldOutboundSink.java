@@ -49,12 +49,30 @@ public interface WorldOutboundSink {
      */
     void onAttackResult(long targetCharacterId, AttackOutcome outcome);
 
+    /**
+     * Kết quả 1 lần dùng skill THẬT (đã né/bạo kích/kháng phép — GAMEPLAY.md §3-4) — gửi cho MỌI
+     * nhân vật đang thấy mục tiêu trong AoI, không chỉ người dùng skill.
+     */
+    void onSkillResult(long targetCharacterId, SkillOutcome outcome);
+
     /** Ảnh chụp trạng thái quái lúc phát {@link #onMonsterSpawned} — gộp tham số (STATIC-ANALYSIS.md). */
     record MonsterSnapshot(long monsterId, String monsterCode, float x, float y, int currentHp, int maxHp) {
     }
 
     /** Kết quả 1 đòn đánh — gộp tham số cho {@link #onAttackResult} (STATIC-ANALYSIS.md). */
     record AttackOutcome(
+            long attackerEntityId,
+            long targetEntityId,
+            int damage,
+            boolean crit,
+            boolean miss,
+            int targetCurrentHp,
+            boolean targetDied) {
+    }
+
+    /** Kết quả 1 lần dùng skill — gộp tham số cho {@link #onSkillResult} (STATIC-ANALYSIS.md). */
+    record SkillOutcome(
+            String skillCode,
             long attackerEntityId,
             long targetEntityId,
             int damage,
