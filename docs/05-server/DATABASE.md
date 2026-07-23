@@ -33,7 +33,7 @@
 |---|---|---|
 | `account` | `id, username, password_hash, email, created_at, status` | `status`: ACTIVE/BANNED/SUSPENDED. **Bcrypt/Argon2**, không bao giờ plaintext |
 | `character` | `id, account_id, realm_id, name, faction, level, exp, rebirth_count, created_at` | `realm_id` mặc định 1 (§ dưới). `faction` = 1 trong 5 hệ ([GDD](../13-game-design/GAME-DESIGN-DOCUMENT.md)). MVP chỉ dùng 1 giá trị faction nhưng **cột phải có sẵn** |
-| `character_stat` | `character_id (PK/FK), str, agi, int_, vit, current_hp, current_chi` | **Tách khỏi `character`** vì ghi/đọc tần suất cao hơn nhiều |
+| `character_stat` | `character_id (PK/FK), str, agi, int_, vit, current_hp, current_chi, gold` | **Tách khỏi `character`** vì ghi/đọc tần suất cao hơn nhiều. `gold` thêm ở migration V7 (2026-07-23, nền tảng cường hoá — GAMEPLAY.md §7) |
 
 ✅ **`realm_id` — CÓ** ([ADR-010](../01-architecture/adr/ADR-010-Realm-Model.md)): bảng `character` (và các bảng dữ liệu nhân vật cấp cao) có cột `realm_id` (mặc định = 1). MVP chạy single-realm nhưng schema sẵn sàng multi-realm, không cần migration sau. ⚠️ **Không hardcode "realm = 1"** — đọc từ dữ liệu/config.
 
@@ -79,7 +79,7 @@
 
 | Bảng | Cột chính | Ghi chú |
 |---|---|---|
-| `audit_log` | `id, character_id, action, detail_json, created_at` | ⚠️ **Bắt buộc** cho: trade, gold, item, cường hoá. Không có audit = không điều tra được gian lận/mất đồ |
+| `audit_log` | `id, character_id, action, detail_json, created_at` | ⚠️ **Bắt buộc** cho: trade, gold, item, cường hoá. Không có audit = không điều tra được gian lận/mất đồ. ✅ Migrate V7 (2026-07-23), `detail_json` là `TEXT` (chưa có thư viện JSON, cùng lý do `drop_table_entry`) |
 
 ---
 

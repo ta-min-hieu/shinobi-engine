@@ -48,4 +48,21 @@ class InventoryTest {
         assertThat(inventory.findItem(42L)).contains(stack);
         assertThat(inventory.findItem(999L)).isEmpty();
     }
+
+    @Test
+    void shouldReplaceItem_whenIdMatchesExistingItem() {
+        var inventory = new Inventory(1L, 5, List.of(new ItemStack(42L, 100L, 1, 3)));
+
+        inventory.replaceItem(new ItemStack(42L, 100L, 1, 4));
+
+        assertThat(inventory.findItem(42L)).contains(new ItemStack(42L, 100L, 1, 4));
+    }
+
+    @Test
+    void shouldRejectReplaceItem_whenIdDoesNotExist() {
+        var inventory = new Inventory(1L, 5, List.of());
+
+        assertThatThrownBy(() -> inventory.replaceItem(new ItemStack(42L, 100L, 1, 4)))
+                .isInstanceOf(IllegalStateException.class);
+    }
 }

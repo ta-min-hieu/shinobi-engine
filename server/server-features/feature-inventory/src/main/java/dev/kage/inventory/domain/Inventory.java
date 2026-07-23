@@ -39,6 +39,21 @@ public final class Inventory {
         return items.stream().filter(stack -> stack.id() == itemId).findFirst();
     }
 
+    /**
+     * Thay 1 item đã có (cùng {@code ItemStack.id}) bằng phiên bản mới — dùng khi cường hoá đổi
+     * {@code enhanceLevel} (Phase 5 §7). {@code updated} phải trỏ ĐÚNG item đã tồn tại (gọi sau
+     * {@link #findItem}), không dùng để thêm item mới (dùng {@link #add} cho việc đó).
+     */
+    public void replaceItem(ItemStack updated) {
+        for (int i = 0; i < items.size(); i++) {
+            if (items.get(i).id() == updated.id()) {
+                items.set(i, updated);
+                return;
+            }
+        }
+        throw new IllegalStateException("Item không tồn tại trong túi đồ: id=" + updated.id());
+    }
+
     public long characterId() {
         return characterId;
     }

@@ -94,6 +94,47 @@ JDBC theo package `dev.kage.server.database`, không theo Gradle module).
   có trong `WorldFacadeTest` — bonus áp dụng bằng lệnh RIÊNG (`applyEquipmentBonus`) ngay sau attach,
   không gộp vào tham số attach.
 
+### Phase 5 lát cắt 4 (2026-07-23): "cường hoá" — nền tảng gold + audit_log + EnhanceItemUseCase
+
+- **`GoldPort`/`AuditPort` mới, định nghĩa trong `feature-inventory/domain`** dù gold vật lý nằm ở
+  `character_stat` (thuộc feature-character) và `audit_log` về nguyên tắc dùng chung nhiều feature
+  (trade, shop). Lý do: `EnhanceItemUseCase` cần trừ gold + đổi `enhance_level` + ghi audit NGUYÊN
+  TỬ trong 1 transaction — `CharacterFacade` không nhận `Transaction` chia sẻ giữa 2 feature (mỗi
+  feature tự định nghĩa `Transaction`/`TransactionRunner` riêng, xem feature-account/feature-character
+  CLAUDE.md). Cùng tinh thần "domain không import domain feature khác": adapter thật
+  (`PostgresGoldAdapter`, `PostgresAuditAdapter`) nằm ở `server-database` — module hạ tầng dùng
+  chung, được phép đụng `character_stat`/`audit_log` mà KHÔNG vi phạm "feature đọc bảng DB feature
+  khác" (rule đó áp cho application/domain layer, không áp cho adapter layer ở `server-database`).
+  Feature khác cần audit (trade Phase 7+) sẽ khai báo `AuditPort` RIÊNG của nó, không tái dùng
+  interface này — như `TransactionRunner` đã lặp lại ở mỗi feature.
+- **`GoldPort.deductGold` là 1 UPDATE có điều kiện** (`WHERE gold >= amount`), KHÔNG đọc-rồi-ghi —
+  tránh race giữa 2 request cường hoá đồng thời của cùng 1 nhân vật (dù hiện tại mỗi nhân vật chỉ
+  xử lý tuần tự qua 1 Virtual Thread ở gateway, làm đúng ngay từ đầu rẻ hơn sửa sau).
+- **`character_stat.gold`** (không phải `character.gold`) — character_stat vốn tách riêng vì tần
+  suất ghi/đọc cao (lý do gốc ở V2), gold cũng đổi liên tục (cường hoá, sau này là shop) nên cùng
+  lý do đó. Migration V7.
+- **`EnhancementTable`** (domain, static, giống `LootRoller`) — bảng tỉ lệ thành công/chi phí gold
+  theo cấp, ĐỀ XUẤT của AI được chủ dự án duyệt (GDD chưa có số cụ thể, chỉ nói "giảm dần") — xem
+  GAMEPLAY.md §7.1 cho bảng đầy đủ + rationale duyệt.
+- **Chưa có "Bảo Vệ"** (item/flag chống rớt cấp từ +10, GDD nhắc tới) — quyết định CHỦ ĐỘNG của chủ
+  dự án để lát cắt sau, KHÔNG phải thiếu sót. `EnhanceResult` đã chừa sẵn `FAILED_NO_DROP` (dưới
+  +10, thất bại không mất gì ngoài gold) và `FAILED_DROPPED` (từ +10, thất bại rớt 1 cấp thật) để
+  thêm Bảo Vệ sau không cần đổi enum.
+- **Random cường hoá dùng `ThreadLocalRandom` trực tiếp trong `EnhanceItemUseCase`** (không qua
+  domain riêng như `LootRoller`) — chỉ 1 lần roll thành/bại mỗi lệnh gọi, không đủ phức tạp để tách
+  class riêng (khác `LootRoller` phải roll NHIỀU entry độc lập).
+- **`Inventory.replaceItem(ItemStack)`** (mới) — thay 1 item đã tồn tại (cùng `id`) bằng bản ghi
+  mới, dùng khi đổi `enhanceLevel`. Ném `IllegalStateException` nếu `id` không tồn tại (lỗi lập
+  trình, không phải luồng bình thường — khác `findItem` trả `Optional`).
+- **`InventoryFacade` giờ có 4 tham số constructor** (`addItemUseCase`, `grantLootUseCase`,
+  `equipmentUseCases`, `enhanceItemUseCase`) — CHẠM giới hạn 4 của Checkstyle `ParameterNumber`,
+  KHÔNG gộp thêm được nữa. UseCase tiếp theo (`feature-shop` cùng Phase 5) phải gộp vào 1 record
+  kiểu `EquipmentUseCases`, không thêm tham số thứ 5 trực tiếp.
+- ⚠️ **Chưa nối protocol/gateway** cho cường hoá (opcode, `EnhanceItemCommand`) — lát cắt này CHỈ có
+  domain + application + adapter + test (Postgres + fake port), theo đúng thứ tự đã dùng cho "mặc
+  đồ" (nền tảng trước, protocol/gateway sau). Opcode tiếp theo trong dải Inventory/Equipment
+  (500-599, `inventory.proto`) là 505+.
+
 ## Cứng
 
 ✅ Quy tắc nghiệp vụ ở `domain/` (túi đầy = `Inventory.add()`, không phải UseCase)

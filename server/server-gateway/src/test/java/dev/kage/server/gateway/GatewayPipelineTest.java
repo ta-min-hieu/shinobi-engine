@@ -23,13 +23,16 @@ import dev.kage.inventory.api.EquipmentUseCases;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.application.AddItemUseCase;
 import dev.kage.inventory.application.ComputeEquipmentBonusUseCase;
+import dev.kage.inventory.application.EnhanceItemUseCase;
 import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
+import dev.kage.inventory.domain.AuditPort;
 import dev.kage.inventory.domain.DropTableEntry;
 import dev.kage.inventory.domain.DropTablePort;
 import dev.kage.inventory.domain.Equipment;
 import dev.kage.inventory.domain.EquipmentPort;
+import dev.kage.inventory.domain.GoldPort;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.inventory.domain.ItemTemplatePort;
@@ -259,7 +262,12 @@ class GatewayPipelineTest {
                 new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
         var equipmentUseCases =
                 new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
-        return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases);
+        // Cường hoá không dùng trong test này — fake tối thiểu để compile.
+        GoldPort goldPort = (tx, characterId, amount) -> true;
+        AuditPort auditPort = (tx, characterId, action, detailJson) -> { };
+        var enhanceItemUseCase =
+                new EnhanceItemUseCase(inventoryPort, goldPort, auditPort, action -> action.accept(null));
+        return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
     }
 
     private static EmbeddedChannel newPipeline(FakeCharacterPort characterPort) {

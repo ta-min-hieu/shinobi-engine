@@ -197,16 +197,16 @@ graph LR
 | Việc | Nguồn |
 |---|---|
 | `feature-inventory` | [GAMEPLAY.md §7](../05-server/GAMEPLAY.md) |
-| ⚠️ **Transaction + audit log** cho cường hoá | [DATABASE.md §5](../05-server/DATABASE.md) |
+| ✅ **Transaction + audit log** cho cường hoá (`EnhanceItemUseCase`, 2026-07-23 — logic + DB xong, ⚠️ protocol/gateway CHƯA nối) | [DATABASE.md §5](../05-server/DATABASE.md) |
 | ⚠️ **Chừa chỗ khoá item** (cho trade Phase 7) | [GAMEPLAY.md §7](../05-server/GAMEPLAY.md) |
 | ✅ Chỉ số dẫn xuất tính lại khi đổi trang bị (`c731cd5`, 2026-07-22 — chỉ ATK, mở rộng khi có item cần chỉ số khác) | [GAMEPLAY.md §2](../05-server/GAMEPLAY.md) |
 | `feature-shop` | — |
 | **Metric `kage.gold.total`** | [OBSERVABILITY.md §3.5](../07-infrastructure/OBSERVABILITY.md) |
 
 **Exit Criteria:**
-- [ ] Nhặt đồ, mặc đồ, cường hoá, mua bán — nhặt đồ ✅ (`ae69f4f`, Phase 4), mặc đồ ✅ (`b84afe5`/`3b2e84e`, 2026-07-22, kể cả sửa nền tảng ID item ổn định cho `Inventory`); cường hoá/mua bán chưa làm
-- [ ] Audit log ghi đủ
-- [ ] Test: không duplicate item qua transaction fail
+- [ ] Nhặt đồ, mặc đồ, cường hoá, mua bán — nhặt đồ ✅ (`ae69f4f`, Phase 4), mặc đồ ✅ (`b84afe5`/`3b2e84e`, 2026-07-22, kể cả sửa nền tảng ID item ổn định cho `Inventory`); cường hoá ⚠️ logic+DB xong (2026-07-23, gold ở `character_stat` migration V7), CHƯA nối protocol/gateway nên chưa chơi được thật; mua bán chưa làm
+- [ ] Audit log ghi đủ — ✅ `audit_log` (migration V7) + ghi cho cường hoá; trade/shop sẽ ghi khi tới lượt
+- [ ] Test: không duplicate item qua transaction fail — ✅ cường hoá có test Postgres thật (trừ gold + đổi cấp + audit cùng transaction, không đủ gold thì không đổi gì)
 
 ---
 

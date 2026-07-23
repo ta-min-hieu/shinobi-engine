@@ -131,9 +131,44 @@ Clean Architecture ([REPOSITORY-STRUCTURE.md §4](../01-architecture/REPOSITORY-
 | `AddItemUseCase` | Kiểm tra túi đầy, stack |
 | `MoveItemUseCase` | Kiểm tra slot hợp lệ |
 | `EquipItemUseCase` | Kiểm tra level/faction yêu cầu → **tính lại chỉ số dẫn xuất** (§2) |
-| `EnhanceItemUseCase` | ⚠️ **Transaction bắt buộc** — tốn nguyên liệu + đổi enhance_level |
+| `EnhanceItemUseCase` | ✅ **Đã code** (2026-07-23) — ⚠️ **Transaction bắt buộc** — tốn gold + đổi enhance_level |
 
-⚠️ **Cường hoá là nơi dễ mất tài sản nhất**: trừ nguyên liệu thành công nhưng ghi `enhance_level` thất bại = người chơi mất đồ. **Bắt buộc transaction** ([DATABASE.md §5](DATABASE.md)) + **audit log**.
+⚠️ **Cường hoá là nơi dễ mất tài sản nhất**: trừ gold thành công nhưng ghi `enhance_level` thất bại = người chơi mất tài sản. **Bắt buộc transaction** ([DATABASE.md §5](DATABASE.md)) + **audit log** (`audit_log`, migration V7).
+
+### 7.1 Cường hoá — tỉ lệ thành công + chi phí gold (+0→+15)
+
+GDD chỉ ghi "tỉ lệ giảm dần, có Bảo Vệ chống rớt cấp từ +10" mà không có số cụ thể — bảng dưới là
+**đề xuất khởi điểm đã được chủ dự án duyệt** (2026-07-23), chỉnh cân bằng trực tiếp ở
+`EnhancementTable` (feature-inventory) khi cần, không cần đổi `EnhanceItemUseCase`:
+
+| Cấp hiện tại | Tỉ lệ thành công | Gold cost | Thất bại |
+|---|---|---|---|
+| +0→+1 | 95% | 100 | Không mất cấp |
+| +1→+2 | 90% | 200 | Không mất cấp |
+| +2→+3 | 85% | 350 | Không mất cấp |
+| +3→+4 | 80% | 550 | Không mất cấp |
+| +4→+5 | 70% | 800 | Không mất cấp |
+| +5→+6 | 60% | 1200 | Không mất cấp |
+| +6→+7 | 50% | 1700 | Không mất cấp |
+| +7→+8 | 40% | 2300 | Không mất cấp |
+| +8→+9 | 30% | 3000 | Không mất cấp |
+| +9→+10 | 20% | 4000 | Không mất cấp |
+| +10→+11 | 15% | 5500 | **Rớt 1 cấp** |
+| +11→+12 | 12% | 7500 | **Rớt 1 cấp** |
+| +12→+13 | 10% | 10000 | **Rớt 1 cấp** |
+| +13→+14 | 8% | 14000 | **Rớt 1 cấp** |
+| +14→+15 | 5% | 20000 | **Rớt 1 cấp** |
+
+⚠️ **"Bảo Vệ" (item/flag chống rớt cấp từ +10) CHƯA CODE** — lát cắt hiện tại (2026-07-23) chỉ có
+rớt cấp thật khi thất bại từ +10 trở lên (`EnhanceResult.FAILED_DROPPED`), chưa có cách chống. Chừa
+sẵn 2 nhánh fail riêng (`FAILED_NO_DROP`/`FAILED_DROPPED`) để lát cắt sau thêm Bảo Vệ không cần đổi
+enum kết quả.
+
+**Gold**: cột `character_stat.gold` (migration V7) — đặt ở `character_stat` (không phải
+`character`) vì bảng này vốn đã tách riêng do tần suất ghi/đọc cao (DATABASE.md §2.1), và gold đổi
+liên tục mỗi lần cường hoá/mua bán. `feature-inventory` trừ gold qua `GoldPort` riêng (không gọi
+`CharacterFacade`) vì cần trừ NGUYÊN TỬ trong cùng transaction với đổi `enhance_level` — xem
+feature-inventory/CLAUDE.md.
 
 ---
 
