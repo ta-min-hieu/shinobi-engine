@@ -61,6 +61,13 @@ public interface WorldOutboundSink {
      */
     void onSkillResult(long targetCharacterId, SkillOutcome outcome);
 
+    /**
+     * Tin nhắn chat kênh Khu vực (GAMEPLAY.md §10) — gửi cho {@code targetCharacterId} (1 quan sát
+     * viên AoI của {@code senderCharacterId}, gồm cả chính người gửi). Nội dung tin (đã validate ở
+     * {@code feature-chat}) đi kèm nguyên văn — server-world không biết {@code ChatFacade}.
+     */
+    void onAreaChatMessage(long targetCharacterId, long senderCharacterId, String senderName, String body);
+
     /** Ảnh chụp trạng thái quái lúc phát {@link #onMonsterSpawned} — gộp tham số (STATIC-ANALYSIS.md). */
     record MonsterSnapshot(long monsterId, String monsterCode, float x, float y, int currentHp, int maxHp) {
     }

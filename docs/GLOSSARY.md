@@ -87,6 +87,7 @@
 | Đấu giá | Auction House | Post-MVP |
 | Thư | Mail | — |
 | Bạn bè | Friend | — |
+| Trò chuyện | Chat | Kênh: Thế giới/Bang hội/Party/Riêng tư/Khu vực (GAMEPLAY.md §10) |
 | Nhiệm vụ | Quest | MAIN/DAILY/GUILD/EVENT |
 | Đối thoại | Dialogue | Script |
 | Sự kiện mùa | Festival Event | Feature Flag |

@@ -383,6 +383,17 @@ nguyên tắc "open_shop" đã dùng ở §9.2) → `AcceptQuestResponse`.
 
 ⚠️ **Chat là vector tấn công**: XSS (nếu client render HTML), spam, lừa đảo, quảng cáo gold-selling. Xử lý ở [SECURITY.md](../08-security/SECURITY.md).
 
+⚠️ **Quyết định phạm vi lát cắt 6 (2026-07-23, cùng chủ dự án)**: kênh Bang hội/Party **dời sang
+Phase 7** cùng lúc `feature-guild`/party thật được code — chưa có dữ liệu thành viên guild/party
+thì 2 kênh này không thể chạy đúng. Lát cắt 6 chỉ làm Thế giới/Riêng tư/Khu vực. Xem ROADMAP.md
+Phase 6/7 — bảng ở trên vẫn mô tả đích đến cuối cùng (Phase 7), không phải phạm vi lát cắt 6.
+
+✅ **Đã code (2026-07-23)** — `feature-chat` (validate + audit) + định tuyến ở `server-gateway`/
+`server-world`: Thế giới = broadcast `ConnectedCharacterRegistry`; Riêng tư = tra tên qua
+`CharacterFacade` rồi đẩy 1 kết nối; Khu vực = `WorldFacade.enqueueAreaChatMessage` (phải qua tick
+thread vì cần đọc `AreaOfInterestTracker`, không thread-safe ngoài tick). Rate limit + lọc từ cấm
+placeholder đã có, xem feature-chat/CLAUDE.md.
+
 ---
 
 ## 11. Guild / Friend / Mail

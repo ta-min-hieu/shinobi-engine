@@ -40,6 +40,8 @@ import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.BuyItemResponse;
 import dev.kage.protocol.BuyOutcome;
+import dev.kage.protocol.ChatChannel;
+import dev.kage.protocol.ChatMessageEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.ClaimQuestRewardCommand;
@@ -71,6 +73,9 @@ import dev.kage.protocol.SellOutcome;
 import dev.kage.protocol.SendFriendRequestCommand;
 import dev.kage.protocol.SendFriendRequestOutcome;
 import dev.kage.protocol.SendFriendRequestResponse;
+import dev.kage.protocol.SendChatMessageCommand;
+import dev.kage.protocol.SendChatMessageOutcome;
+import dev.kage.protocol.SendChatMessageResponse;
 import dev.kage.protocol.SendMailCommand;
 import dev.kage.protocol.SendMailOutcome;
 import dev.kage.protocol.SendMailResponse;
@@ -127,13 +132,14 @@ class GatewayServerIntegrationTest {
         var questFacade = fakeQuestFacade();
         var friendFacade = fakeFriendFacade();
         var mailFacade = fakeMailFacade();
+        var chatFacade = fakeChatFacade();
         characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
         worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
         var positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
-        var socialFacades = new SocialFacades(friendFacade, mailFacade);
+        var socialFacades = new SocialFacades(friendFacade, mailFacade, chatFacade);
         var contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
         var facades = new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
         server = new GatewayServer(0, facades, worldGateway);
@@ -483,6 +489,12 @@ class GatewayServerIntegrationTest {
         var claimMailUseCase = new dev.kage.mail.application.ClaimMailUseCase(mailPorts, mailTx);
         var deleteMailUseCase = new dev.kage.mail.application.DeleteMailUseCase(mailRepositoryPort);
         return new dev.kage.mail.api.MailFacade(sendMailUseCase, listMailUseCase, claimMailUseCase, deleteMailUseCase);
+    }
+
+    // Chat không dùng trong test này — fake tối thiểu để compile (cùng convention fakeMailFacade).
+    private dev.kage.chat.api.ChatFacade fakeChatFacade() {
+        dev.kage.chat.domain.ChatAuditPort chatAuditPort = (characterId, action, detailJson) -> { };
+        return new dev.kage.chat.api.ChatFacade(new dev.kage.chat.application.SendChatMessageUseCase(chatAuditPort));
     }
 
     @AfterEach
@@ -848,6 +860,41 @@ class GatewayServerIntegrationTest {
             var response =
                     SendMailResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE).payload());
             assertThat(response.getOutcome()).isEqualTo(SendMailOutcome.SEND_MAIL_OUTCOME_RECIPIENT_NOT_FOUND);
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void twoClientsShouldSeeWorldChatMessage_overRealSockets() throws Exception {
+        // World chat = broadcast toàn server, KHÔNG cần AoI/cùng vị trí — verify dây thật (opcode
+        // dispatch → decode → Virtual Thread → ChatFacade.sendMessage → ConnectedCharacterRegistry
+        // .broadcastToAll → encode) cho CẢ người gửi (tự thấy tin của mình) lẫn người khác.
+        try (var socketA = new Socket("127.0.0.1", server.port());
+                var socketB = new Socket("127.0.0.1", server.port())) {
+            socketA.setSoTimeout(5000);
+            socketB.setSoTimeout(5000);
+            var inA = new DataInputStream(socketA.getInputStream());
+            var inB = new DataInputStream(socketB.getInputStream());
+            var suffix = UUID.randomUUID().toString().substring(0, 8);
+            connectCreateAndSelect(socketA, inA, "wa" + suffix);
+            connectCreateAndSelect(socketB, inB, "wb" + suffix);
+
+            var command = SendChatMessageCommand.newBuilder()
+                    .setChannel(ChatChannel.CHAT_CHANNEL_WORLD)
+                    .setBody("xin chào thế giới")
+                    .build();
+            sendFrame(socketA, Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE, 10, command.toByteArray());
+
+            var ackResponse = SendChatMessageResponse.parseFrom(
+                    readUntilOpcode(inA, Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE).payload());
+            assertThat(ackResponse.getOutcome()).isEqualTo(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_OK);
+
+            var eventSeenByA =
+                    ChatMessageEvent.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE).payload());
+            assertThat(eventSeenByA.getBody()).isEqualTo("xin chào thế giới");
+            var eventSeenByB =
+                    ChatMessageEvent.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE).payload());
+            assertThat(eventSeenByB.getBody()).isEqualTo("xin chào thế giới");
         }
     }
 

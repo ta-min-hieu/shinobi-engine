@@ -17,6 +17,7 @@ dependencies {
     implementation(project(":server:server-features:feature-quest"))
     implementation(project(":server:server-features:feature-friend"))
     implementation(project(":server:server-features:feature-mail"))
+    implementation(project(":server:server-features:feature-chat"))
     implementation(project(":server:server-world"))
     implementation(project(":server:server-database"))
     implementation("io.netty:netty-all:4.1.136.Final")

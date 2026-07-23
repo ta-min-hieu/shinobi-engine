@@ -6,6 +6,8 @@ import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.application.CreateCharacterUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
+import dev.kage.chat.api.ChatFacade;
+import dev.kage.chat.application.SendChatMessageUseCase;
 import dev.kage.dialogue.api.DialogueFacade;
 import dev.kage.dialogue.application.GetDialogueNodeUseCase;
 import dev.kage.friend.api.FriendFacade;
@@ -40,6 +42,7 @@ import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
+import dev.kage.server.database.chat.PostgresChatAuditAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcTemplateAdapter;
 import dev.kage.server.database.friend.PostgresFriendAdapter;
 import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
@@ -192,6 +195,11 @@ public final class ServerDatabaseBootstrap {
         var claimMailUseCase = new ClaimMailUseCase(ports, transactionRunner);
         var deleteMailUseCase = new DeleteMailUseCase(repositoryPort);
         return new MailFacade(sendMailUseCase, listMailUseCase, claimMailUseCase, deleteMailUseCase);
+    }
+
+    public ChatFacade wireChatFacade() {
+        var auditPort = new PostgresChatAuditAdapter(dataSource);
+        return new ChatFacade(new SendChatMessageUseCase(auditPort));
     }
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */

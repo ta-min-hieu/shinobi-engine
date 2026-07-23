@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// Packet Chat (NETWORK.md §4, dải 800-899). Phase 6 lát cắt 6 — CHỈ Thế giới/Riêng tư/Khu vực.
+// Bang hội/Party DỜI Phase 7 cùng feature-guild/party thật (quyết định 2026-07-23, ROADMAP.md).
+
+enum ChatChannel {
+  CHAT_CHANNEL_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho packet thật.
+  CHAT_CHANNEL_WORLD = 1;
+  CHAT_CHANNEL_PRIVATE = 2;
+  CHAT_CHANNEL_AREA = 3;
+}
+
+// Command: Client -> Server (OPCODE_SEND_CHAT_MESSAGE_COMMAND). target_name CHỈ có ý nghĩa khi
+// channel = CHAT_CHANNEL_PRIVATE (server-gateway tự tra CharacterFacade.findByName).
+message SendChatMessageCommand {
+  ChatChannel channel = 1;
+  string target_name = 2;
+  string body = 3;
+}
+
+enum SendChatMessageOutcome {
+  SEND_CHAT_MESSAGE_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  SEND_CHAT_MESSAGE_OUTCOME_OK = 1;
+  SEND_CHAT_MESSAGE_OUTCOME_MESSAGE_BLANK = 2;
+  SEND_CHAT_MESSAGE_OUTCOME_MESSAGE_TOO_LONG = 3;
+  SEND_CHAT_MESSAGE_OUTCOME_CONTAINS_BANNED_WORD = 4;
+  SEND_CHAT_MESSAGE_OUTCOME_TARGET_NOT_FOUND = 5; // PRIVATE: tên không tồn tại
+  SEND_CHAT_MESSAGE_OUTCOME_TARGET_OFFLINE = 6; // PRIVATE: tồn tại nhưng không online lúc gửi
+  SEND_CHAT_MESSAGE_OUTCOME_RATE_LIMITED = 7;
+}
+
+// Response: Server -> Client (OPCODE_SEND_CHAT_MESSAGE_RESPONSE).
+message SendChatMessageResponse {
+  SendChatMessageOutcome outcome = 1;
+}
+
+// Đẩy cho người nhận (World: toàn server; Riêng tư: 1 người; Khu vực: quan sát viên AoI, gồm cả
+// người gửi để tự thấy tin của mình).
+message ChatMessageEvent {
+  ChatChannel channel = 1;
+  int64 sender_id = 2;
+  string sender_name = 3;
+  string body = 4;
+}

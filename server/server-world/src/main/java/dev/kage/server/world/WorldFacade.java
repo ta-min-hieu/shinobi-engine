@@ -162,6 +162,11 @@ public final class WorldFacade {
         inbox.add(new WorldCommand.ApplyEquipmentBonusCommand(characterId, bonusAtk));
     }
 
+    /** GAMEPLAY.md §10 — chat kênh Khu vực, cần {@code aoiTracker} nên phải qua tick thread. */
+    public void enqueueAreaChatMessage(long characterId, String senderName, String body) {
+        inbox.add(new WorldCommand.AreaChatMessageCommand(characterId, senderName, body));
+    }
+
     private void tickLoop() {
         spawnTrainingDummy();
         spawnNpc(); // NPC tĩnh, không chết/hồi sinh — spawn 1 lần duy nhất, khác quái.
@@ -199,6 +204,8 @@ public final class WorldFacade {
                         handleUseSkill(c.characterId(), c.skillCode(), c.targetEntityId());
                 case WorldCommand.ApplyEquipmentBonusCommand c ->
                         handleApplyEquipmentBonus(c.characterId(), c.bonusAtk());
+                case WorldCommand.AreaChatMessageCommand c ->
+                        handleAreaChatMessage(c.characterId(), c.senderName(), c.body());
             }
         }
     }
@@ -287,6 +294,17 @@ public final class WorldFacade {
             return; // không tự nhắm chính mình; mục tiêu không tồn tại — bỏ qua an toàn (giống handleSetTarget).
         }
         skillSystem.tryCast(characterId, skillCode, targetEntityId);
+    }
+
+    private void handleAreaChatMessage(long characterId, String senderName, String body) {
+        if (!entitiesByCharacterId.containsKey(characterId)) {
+            return; // đã ngắt kết nối giữa lúc lệnh còn trong hàng đợi — bỏ qua an toàn.
+        }
+        var observers = aoiTracker.observersOf(characterId);
+        observers.add(characterId); // người gửi luôn thấy tin nhắn của chính mình.
+        for (long observerId : observers) {
+            outboundSink.onAreaChatMessage(observerId, characterId, senderName, body);
+        }
     }
 
     private void handleApplyEquipmentBonus(long characterId, int bonusAtk) {

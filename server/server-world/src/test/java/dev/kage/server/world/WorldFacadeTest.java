@@ -63,6 +63,9 @@ class WorldFacadeTest {
             int hp, boolean died) {
     }
 
+    private record AreaChatMessage(long target, long senderCharacterId, String senderName, String body) {
+    }
+
     private static final class RecordingSink implements WorldOutboundSink {
         final List<Spawned> spawned = new CopyOnWriteArrayList<>();
         final List<Moved> moved = new CopyOnWriteArrayList<>();
@@ -76,6 +79,7 @@ class WorldFacadeTest {
         final List<NpcDespawned> npcDespawned = new CopyOnWriteArrayList<>();
         final List<AttackResult> attackResults = new CopyOnWriteArrayList<>();
         final List<SkillResult> skillResults = new CopyOnWriteArrayList<>();
+        final List<AreaChatMessage> areaChatMessages = new CopyOnWriteArrayList<>();
 
         @Override
         public void onMoveAccepted(long characterId, int sequenceId, float x, float y) {
@@ -142,6 +146,11 @@ class WorldFacadeTest {
                     targetCharacterId, outcome.skillCode(), outcome.attackerEntityId(), outcome.targetEntityId(),
                     outcome.damage(), outcome.crit(), outcome.miss(), outcome.targetCurrentHp(),
                     outcome.targetDied()));
+        }
+
+        @Override
+        public void onAreaChatMessage(long targetCharacterId, long senderCharacterId, String senderName, String body) {
+            areaChatMessages.add(new AreaChatMessage(targetCharacterId, senderCharacterId, senderName, body));
         }
     }
 
@@ -389,6 +398,21 @@ class WorldFacadeTest {
 
         awaitTrue(() -> sink.monsterMoved.stream().anyMatch(m -> m.monsterId() == monsterId));
         awaitTrue(() -> sink.attackResults.stream().anyMatch(a -> a.attacker() == monsterId));
+    }
+
+    @Test
+    void shouldBroadcastAreaChatMessage_toNearbyCharacterAndBackToSender() {
+        world.start();
+        world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
+        world.attachCharacter(2L, 0f, 0f, DEFAULT_STATS); // cùng vị trí — chắc chắn trong AOI nhau
+        awaitTrue(() -> sink.spawned.size() >= 2);
+
+        world.enqueueAreaChatMessage(1L, "Naruto", "xin chào khu vực");
+
+        awaitTrue(() -> sink.areaChatMessages.stream()
+                .anyMatch(m -> m.target() == 2L && m.senderCharacterId() == 1L && m.body().equals("xin chào khu vực")));
+        awaitTrue(() -> sink.areaChatMessages.stream()
+                .anyMatch(m -> m.target() == 1L && m.senderCharacterId() == 1L)); // người gửi tự thấy tin của mình
     }
 
     @Test

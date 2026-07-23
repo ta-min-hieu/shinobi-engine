@@ -47,4 +47,12 @@ sealed interface WorldCommand {
      */
     record ApplyEquipmentBonusCommand(long characterId, int bonusAtk) implements WorldCommand {
     }
+
+    /**
+     * Chat kênh Khu vực (GAMEPLAY.md §10, Phase 6 lát cắt 6) — CHỈ kênh này cần world tick (đọc
+     * {@code AreaOfInterestTracker}, không thread-safe ngoài tick thread); World/Riêng tư gateway
+     * tự định tuyến thẳng qua {@code ConnectedCharacterRegistry}, không đi qua hàng đợi này.
+     */
+    record AreaChatMessageCommand(long characterId, String senderName, String body) implements WorldCommand {
+    }
 }

@@ -6,6 +6,8 @@ import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
+import dev.kage.protocol.ChatChannel;
+import dev.kage.protocol.ChatMessageEvent;
 import dev.kage.protocol.ItemGrantedEvent;
 import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
@@ -102,6 +104,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         byte[] payload = event.toByteArray();
         contextsByCharacterId.values()
                 .forEach(ctx -> send(ctx, Opcode.OPCODE_SERVER_SHUTTING_DOWN_EVENT_VALUE, 0, payload));
+    }
+
+    /** Đẩy 1 packet cho MỌI connection đang kết nối — dùng cho kênh chat Thế giới (GAMEPLAY.md §10). */
+    void broadcastToAll(int opcode, byte[] payload) {
+        contextsByCharacterId.values().forEach(ctx -> send(ctx, opcode, 0, payload));
     }
 
     @Override
@@ -252,6 +259,21 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 .setTargetDied(outcome.targetDied())
                 .build();
         send(ctx, Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    @Override
+    public void onAreaChatMessage(long targetCharacterId, long senderCharacterId, String senderName, String body) {
+        var ctx = contextsByCharacterId.get(targetCharacterId);
+        if (ctx == null) {
+            return;
+        }
+        var event = ChatMessageEvent.newBuilder()
+                .setChannel(ChatChannel.CHAT_CHANNEL_AREA)
+                .setSenderId(senderCharacterId)
+                .setSenderName(senderName)
+                .setBody(body)
+                .build();
+        send(ctx, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
     }
 
     @Override

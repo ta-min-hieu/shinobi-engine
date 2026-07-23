@@ -466,6 +466,12 @@ class GatewayPipelineTest {
         return new dev.kage.mail.api.MailFacade(sendMailUseCase, listMailUseCase, claimMailUseCase, deleteMailUseCase);
     }
 
+    // Chat không dùng trong test này — fake tối thiểu để compile (cùng convention fakeMailFacade).
+    private static dev.kage.chat.api.ChatFacade fakeChatFacade() {
+        dev.kage.chat.domain.ChatAuditPort chatAuditPort = (characterId, action, detailJson) -> { };
+        return new dev.kage.chat.api.ChatFacade(new dev.kage.chat.application.SendChatMessageUseCase(chatAuditPort));
+    }
+
     private static EmbeddedChannel newPipeline(FakeCharacterPort characterPort) {
         // ⚠️ Phải khớp CHÍNH XÁC pipeline thật trong GatewayBootstrap — lệch ở đây là test giả.
         // AccountFacade/CharacterFacade THẬT (không mock), chỉ Port bên dưới là Fake (TESTING.md
@@ -494,6 +500,7 @@ class GatewayPipelineTest {
         var questFacade = fakeQuestFacade();
         var friendFacade = fakeFriendFacade();
         var mailFacade = fakeMailFacade();
+        var chatFacade = fakeChatFacade();
         var characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
         var worldFacade = new WorldFacade(characterRegistry);
         var positionPersister =
@@ -509,7 +516,7 @@ class GatewayPipelineTest {
                         new GatewayFacades(
                                 accountFacade, characterFacade, inventoryFacade,
                                 new ContentFacades(shopFacade, dialogueFacade, questFacade,
-                                        new SocialFacades(friendFacade, mailFacade))),
+                                        new SocialFacades(friendFacade, mailFacade, chatFacade))),
                         worldGateway, Runnable::run));
     }
 

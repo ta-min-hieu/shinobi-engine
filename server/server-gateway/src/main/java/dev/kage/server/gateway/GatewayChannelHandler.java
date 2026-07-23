@@ -8,6 +8,7 @@ import dev.kage.character.application.CharacterNotFoundException;
 import dev.kage.character.application.DuplicateCharacterNameException;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.IdempotencyKeyReusedException;
+import dev.kage.chat.api.ChatFacade;
 import dev.kage.dialogue.api.DialogueFacade;
 import dev.kage.dialogue.domain.DialogueNode;
 import dev.kage.friend.api.FriendFacade;
@@ -23,6 +24,8 @@ import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.BuyItemResponse;
 import dev.kage.protocol.BuyOutcome;
 import dev.kage.protocol.CharacterSummary;
+import dev.kage.protocol.ChatChannel;
+import dev.kage.protocol.ChatMessageEvent;
 import dev.kage.protocol.ClaimMailCommand;
 import dev.kage.protocol.ClaimMailOutcome;
 import dev.kage.protocol.ClaimMailResponse;
@@ -66,6 +69,9 @@ import dev.kage.protocol.MailView;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.NewMailEvent;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.SendChatMessageCommand;
+import dev.kage.protocol.SendChatMessageOutcome;
+import dev.kage.protocol.SendChatMessageResponse;
 import dev.kage.protocol.PendingFriendRequestView;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
@@ -103,6 +109,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -145,12 +152,18 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final QuestFacade questFacade;
     private final FriendFacade friendFacade;
     private final MailFacade mailFacade;
+    private final ChatFacade chatFacade;
     private final WorldGateway worldGateway;
     private final Executor authExecutor;
     // Per-connection (handler đã là state per-connection, xem javadoc lớp) — không cần đồng bộ
     // hoá, chỉ được đọc/ghi trên Netty EventLoop của CHÍNH connection này.
     private final RateLimiter moveCommandRateLimiter =
             new RateLimiter(MAX_MOVE_COMMANDS_PER_SECOND, Duration.ofSeconds(1));
+    // NETWORK.md §13 (đề xuất, chưa verify) — World nghiêm ngặt nhất (toàn server thấy), Khu vực
+    // lỏng nhất (chỉ người gần thấy), Riêng tư ở giữa, khớp bảng GAMEPLAY.md §10.
+    private final RateLimiter chatWorldRateLimiter = new RateLimiter(5, Duration.ofSeconds(10));
+    private final RateLimiter chatPrivateRateLimiter = new RateLimiter(10, Duration.ofSeconds(10));
+    private final RateLimiter chatAreaRateLimiter = new RateLimiter(15, Duration.ofSeconds(10));
 
     // handleConnect/handleSelectCharacter set giá trị này từ Virtual Thread; channelRead0 của
     // packet TIẾP THEO có thể chạy trên EventLoop trước khi Virtual Thread đó xong (Netty không
@@ -189,7 +202,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_SEND_MAIL_COMMAND_VALUE, this::handleSendMailCommand),
             Map.entry(Opcode.OPCODE_LIST_MAIL_REQUEST_VALUE, this::handleListMailRequest),
             Map.entry(Opcode.OPCODE_CLAIM_MAIL_COMMAND_VALUE, this::handleClaimMailCommand),
-            Map.entry(Opcode.OPCODE_DELETE_MAIL_COMMAND_VALUE, this::handleDeleteMailCommand));
+            Map.entry(Opcode.OPCODE_DELETE_MAIL_COMMAND_VALUE, this::handleDeleteMailCommand),
+            Map.entry(Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE, this::handleSendChatMessageCommand));
 
     GatewayChannelHandler(GatewayFacades facades, WorldGateway worldGateway, Executor authExecutor) {
         this.accountFacade = facades.accountFacade();
@@ -200,6 +214,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.questFacade = facades.contentFacades().questFacade();
         this.friendFacade = facades.contentFacades().socialFacades().friendFacade();
         this.mailFacade = facades.contentFacades().socialFacades().mailFacade();
+        this.chatFacade = facades.contentFacades().socialFacades().chatFacade();
         this.worldGateway = worldGateway;
         this.authExecutor = authExecutor;
     }
@@ -1027,6 +1042,117 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private static DeleteMailOutcome toProtoOutcome(MailFacade.DeleteResult result) {
         return DELETE_MAIL_OUTCOME_MAPPING.get(result);
+    }
+
+    private void handleSendChatMessageCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = SendChatMessageCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        var rateLimiter = chatRateLimiterFor(command.getChannel());
+        if (!rateLimiter.tryAcquire()) {
+            var response = SendChatMessageResponse.newBuilder()
+                    .setOutcome(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_RATE_LIMITED)
+                    .build();
+            send(ctx, Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            if (rateLimiter.shouldDisconnect()) {
+                LOG.warn("Chat vượt rate limit liên tục — ngắt kết nối: characterId={}", characterId);
+                ctx.close();
+            }
+            return;
+        }
+        authExecutor.execute(() -> handleSendChatMessageBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private RateLimiter chatRateLimiterFor(ChatChannel channel) {
+        return switch (channel) {
+            case CHAT_CHANNEL_PRIVATE -> chatPrivateRateLimiter;
+            case CHAT_CHANNEL_AREA -> chatAreaRateLimiter;
+            default -> chatWorldRateLimiter; // WORLD/UNSPECIFIED/UNRECOGNIZED — nghiêm ngặt nhất.
+        };
+    }
+
+    private void handleSendChatMessageBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, SendChatMessageCommand command) {
+        var domainChannelOpt = toDomainChannel(command.getChannel());
+        if (domainChannelOpt.isEmpty()) {
+            sendError(ctx, sequenceId, 400, "error.invalid_chat_channel");
+            return;
+        }
+        var domainChannel = domainChannelOpt.get();
+        Character target = null;
+        if (domainChannel == dev.kage.chat.domain.ChatChannel.PRIVATE) {
+            var found = characterFacade.findByName(command.getTargetName());
+            if (found.isEmpty()) {
+                sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_TARGET_NOT_FOUND);
+                return;
+            }
+            target = found.get();
+            if (!worldGateway.registry().isOnline(target.id())) {
+                sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_TARGET_OFFLINE);
+                return;
+            }
+        }
+        var result = chatFacade.sendMessage(characterId, domainChannel, command.getBody());
+        sendChatOutcome(ctx, sequenceId, toProtoOutcome(result));
+        if (result != ChatFacade.SendResult.OK) {
+            return;
+        }
+        var senderName = characterFacade.findById(characterId).map(Character::name).orElse("");
+        switch (domainChannel) {
+            case WORLD -> {
+                var event = ChatMessageEvent.newBuilder()
+                        .setChannel(ChatChannel.CHAT_CHANNEL_WORLD)
+                        .setSenderId(characterId)
+                        .setSenderName(senderName)
+                        .setBody(command.getBody())
+                        .build();
+                worldGateway.registry().broadcastToAll(Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, event.toByteArray());
+            }
+            case PRIVATE -> {
+                var event = ChatMessageEvent.newBuilder()
+                        .setChannel(ChatChannel.CHAT_CHANNEL_PRIVATE)
+                        .setSenderId(characterId)
+                        .setSenderName(senderName)
+                        .setBody(command.getBody())
+                        .build();
+                worldGateway.registry().sendToCharacterIfOnline(
+                        target.id(), Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
+            }
+            case AREA -> worldGateway.facade().enqueueAreaChatMessage(characterId, senderName, command.getBody());
+            default -> throw new IllegalStateException("ChatChannel không xử lý: " + domainChannel);
+        }
+    }
+
+    private void sendChatOutcome(ChannelHandlerContext ctx, int sequenceId, SendChatMessageOutcome outcome) {
+        var response = SendChatMessageResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private static Optional<dev.kage.chat.domain.ChatChannel> toDomainChannel(ChatChannel channel) {
+        return switch (channel) {
+            case CHAT_CHANNEL_WORLD -> Optional.of(dev.kage.chat.domain.ChatChannel.WORLD);
+            case CHAT_CHANNEL_PRIVATE -> Optional.of(dev.kage.chat.domain.ChatChannel.PRIVATE);
+            case CHAT_CHANNEL_AREA -> Optional.of(dev.kage.chat.domain.ChatChannel.AREA);
+            default -> Optional.empty();
+        };
+    }
+
+    private static final Map<ChatFacade.SendResult, SendChatMessageOutcome> SEND_CHAT_MESSAGE_OUTCOME_MAPPING =
+            Map.of(
+                    ChatFacade.SendResult.OK, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_OK,
+                    ChatFacade.SendResult.MESSAGE_BLANK, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_MESSAGE_BLANK,
+                    ChatFacade.SendResult.MESSAGE_TOO_LONG,
+                    SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_MESSAGE_TOO_LONG,
+                    ChatFacade.SendResult.CONTAINS_BANNED_WORD,
+                    SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_CONTAINS_BANNED_WORD);
+
+    private static SendChatMessageOutcome toProtoOutcome(ChatFacade.SendResult result) {
+        return SEND_CHAT_MESSAGE_OUTCOME_MAPPING.get(result);
     }
 
     private static DialogueNodeResponse toResponse(DialogueNode node) {
