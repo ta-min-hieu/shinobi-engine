@@ -17,6 +17,11 @@ import dev.kage.inventory.application.EnhancePorts;
 import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
+import dev.kage.quest.api.QuestFacade;
+import dev.kage.quest.application.AcceptQuestUseCase;
+import dev.kage.quest.application.ClaimQuestRewardUseCase;
+import dev.kage.quest.application.ProcessMonsterKilledUseCase;
+import dev.kage.quest.application.QuestRewardPorts;
 import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
@@ -29,6 +34,12 @@ import dev.kage.server.database.inventory.PostgresEquipmentAdapter;
 import dev.kage.server.database.inventory.PostgresGoldAdapter;
 import dev.kage.server.database.inventory.PostgresInventoryAdapter;
 import dev.kage.server.database.inventory.PostgresItemTemplateAdapter;
+import dev.kage.server.database.quest.JdbcQuestTransactionRunner;
+import dev.kage.server.database.quest.PostgresQuestAuditAdapter;
+import dev.kage.server.database.quest.PostgresQuestExpAdapter;
+import dev.kage.server.database.quest.PostgresQuestInventoryGrantAdapter;
+import dev.kage.server.database.quest.PostgresQuestProgressAdapter;
+import dev.kage.server.database.quest.PostgresQuestTemplateAdapter;
 import dev.kage.server.database.session.RedisClientFactory;
 import dev.kage.server.database.session.RedisConfig;
 import dev.kage.server.database.session.RedisSessionAdapter;
@@ -119,6 +130,22 @@ public final class ServerDatabaseBootstrap {
         var npcTemplatePort = new PostgresNpcTemplateAdapter(dataSource);
         var getDialogueNodeUseCase = new GetDialogueNodeUseCase(npcTemplatePort);
         return new DialogueFacade(getDialogueNodeUseCase);
+    }
+
+    public QuestFacade wireQuestFacade() {
+        var progressPort = new PostgresQuestProgressAdapter(dataSource);
+        var templatePort = new PostgresQuestTemplateAdapter(dataSource);
+        var expPort = new PostgresQuestExpAdapter();
+        var inventoryGrantPort = new PostgresQuestInventoryGrantAdapter(dataSource);
+        var auditPort = new PostgresQuestAuditAdapter();
+        var transactionRunner = new JdbcQuestTransactionRunner(dataSource);
+        var acceptQuestUseCase = new AcceptQuestUseCase(progressPort, templatePort, transactionRunner);
+        var processMonsterKilledUseCase =
+                new ProcessMonsterKilledUseCase(progressPort, templatePort, transactionRunner);
+        var rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
+        var claimQuestRewardUseCase =
+                new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, transactionRunner);
+        return new QuestFacade(acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
     }
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */

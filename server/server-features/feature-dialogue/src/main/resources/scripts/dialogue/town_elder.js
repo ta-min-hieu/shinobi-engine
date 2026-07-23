@@ -4,12 +4,14 @@
 //
 // text_key/label_key là khoá i18n (client tự tra bản dịch), KHÔNG phải text hiển thị thẳng.
 // action của option là 1 trong: tên node khác trong cây này (điều hướng), "open_shop" (mở cửa
-// hàng toàn cục — GAMEPLAY.md §7.2), "end" (kết thúc hội thoại).
+// hàng toàn cục — GAMEPLAY.md §7.2), "end" (kết thúc hội thoại), "accept_quest:<code>" (nhận quest
+// — GAMEPLAY.md §9.3, gateway gọi QuestFacade.acceptQuest, feature-dialogue không biết feature-quest).
 ({
     start: {
         text_key: "dialogue.town_elder.greeting",
         options: [
             { label_key: "dialogue.option.ask_about_town", action: "about_town" },
+            { label_key: "dialogue.option.accept_quest_kill_dummies", action: "accept_quest:kill_training_dummies" },
             { label_key: "dialogue.option.open_shop", action: "open_shop" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]

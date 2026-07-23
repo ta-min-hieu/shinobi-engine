@@ -14,11 +14,14 @@ import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.NpcDespawnedEvent;
 import dev.kage.protocol.NpcSpawnedEvent;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.QuestStatus;
+import dev.kage.protocol.QuestStatusChangedEvent;
 import dev.kage.protocol.ServerShuttingDownEvent;
 import dev.kage.protocol.SkillResultEvent;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
+import dev.kage.quest.api.QuestFacade;
 import dev.kage.server.world.WorldOutboundSink;
 import io.netty.channel.ChannelHandlerContext;
 import java.util.Map;
@@ -39,6 +42,7 @@ import java.util.concurrent.Executors;
 final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     private final InventoryFacade inventoryFacade;
+    private final QuestFacade questFacade;
     private final Map<Long, ChannelHandlerContext> contextsByCharacterId = new ConcurrentHashMap<>();
     // Vị trí MỚI NHẤT của CHÍNH nhân vật (không phải nhân vật khác) — nguồn cho
     // CharacterPositionPersister lưu định kỳ + lúc logout (SERVER.md §8), cập nhật mỗi lần
@@ -49,8 +53,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     // sang Virtual Thread riêng, cùng pattern authExecutor của GatewayChannelHandler.
     private final ExecutorService lootExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
-    ConnectedCharacterRegistry(InventoryFacade inventoryFacade) {
+    ConnectedCharacterRegistry(InventoryFacade inventoryFacade, QuestFacade questFacade) {
         this.inventoryFacade = inventoryFacade;
+        this.questFacade = questFacade;
     }
 
     void register(long characterId, ChannelHandlerContext ctx) {
@@ -233,6 +238,10 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     @Override
     public void onMonsterKilled(long killerCharacterId, String monsterCode) {
         lootExecutor.execute(() -> grantLootBlocking(killerCharacterId, monsterCode));
+        // Cạnh grantLoot, KHÔNG qua EventBus (engine-ecs) — 1 nguồn duy nhất chưa tới ngưỡng đáng
+        // kích hoạt pub-sub thật (feature-quest/CLAUDE.md). Virtual Thread RIÊNG cho quest, không
+        // chặn nhau với lootExecutor nếu 1 trong 2 chạm DB chậm.
+        lootExecutor.execute(() -> processQuestBlocking(killerCharacterId, monsterCode));
     }
 
     private void grantLootBlocking(long killerCharacterId, String monsterCode) {
@@ -250,6 +259,31 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                     .build();
             send(ctx, Opcode.OPCODE_ITEM_GRANTED_EVENT_VALUE, 0, event.toByteArray());
         }
+    }
+
+    private void processQuestBlocking(long killerCharacterId, String monsterCode) {
+        var statusChange = questFacade.onMonsterKilled(killerCharacterId, monsterCode);
+        if (statusChange.isEmpty()) {
+            return; // không có quest IN_PROGRESS liên quan, hoặc chưa hoàn thành — không báo gì.
+        }
+        var ctx = contextsByCharacterId.get(killerCharacterId);
+        if (ctx == null) {
+            return; // đã ngắt kết nối — tiến độ đã lưu DB thật, chỉ mất thông báo.
+        }
+        var event = QuestStatusChangedEvent.newBuilder()
+                .setQuestCode(statusChange.get().questCode())
+                .setStatus(toProtoStatus(statusChange.get().status()))
+                .build();
+        send(ctx, Opcode.OPCODE_QUEST_STATUS_CHANGED_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    private static final Map<dev.kage.quest.domain.QuestStatus, QuestStatus> QUEST_STATUS_MAPPING = Map.of(
+            dev.kage.quest.domain.QuestStatus.IN_PROGRESS, QuestStatus.QUEST_STATUS_IN_PROGRESS,
+            dev.kage.quest.domain.QuestStatus.COMPLETED, QuestStatus.QUEST_STATUS_COMPLETED,
+            dev.kage.quest.domain.QuestStatus.CLAIMED, QuestStatus.QUEST_STATUS_CLAIMED);
+
+    private static QuestStatus toProtoStatus(dev.kage.quest.domain.QuestStatus status) {
+        return QUEST_STATUS_MAPPING.get(status);
     }
 
     /** Dừng {@link #lootExecutor} (SERVER.md §10 graceful shutdown) — gọi sau khi world tick dừng. */

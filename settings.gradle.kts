@@ -51,6 +51,7 @@ include(":server:server-features:feature-character")
 include(":server:server-features:feature-inventory")
 include(":server:server-features:feature-shop")
 include(":server:server-features:feature-dialogue")
+include(":server:server-features:feature-quest")
 
 // ---- quality ----
 include(":quality:architecture-tests")   // ArchUnit (ADR-011) — enforce dependency rule

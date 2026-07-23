@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// Packet Quest (NETWORK.md §4, dải 600-699 dùng chung với NPC/Dialogue). Phase 6 lát cắt 3 — nội
+// dung quest (điều kiện hoàn thành, thưởng) là SCRIPT thật (Điều 27, GAMEPLAY.md §9.3), Java chỉ
+// truyền tải kết quả. progress_json KHÔNG xuất hiện trong bất kỳ packet nào ở lát cắt này (chuỗi
+// đục với Java, script tự quản — client hiện tại không cần hiển thị tiến độ chi tiết, chỉ cần biết
+// trạng thái đổi).
+
+// Không có OPCODE_ACCEPT_QUEST_COMMAND riêng — nhận quest đi qua
+// SelectDialogueOptionCommand (dialogue.proto) với action="accept_quest:<code>", GATEWAY gọi
+// QuestFacade.acceptQuest rồi trả response này (feature-dialogue không biết feature-quest tồn tại).
+
+enum AcceptQuestOutcome {
+  ACCEPT_QUEST_OUTCOME_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho kết quả thật.
+  ACCEPT_QUEST_OUTCOME_OK = 1;
+  ACCEPT_QUEST_OUTCOME_QUEST_NOT_FOUND = 2;
+  ACCEPT_QUEST_OUTCOME_ALREADY_ACCEPTED = 3;
+}
+
+// Response: Server -> Client (OPCODE_ACCEPT_QUEST_RESPONSE).
+message AcceptQuestResponse {
+  AcceptQuestOutcome outcome = 1;
+}
+
+enum QuestStatus {
+  QUEST_STATUS_UNSPECIFIED = 0;
+  QUEST_STATUS_IN_PROGRESS = 1;
+  QUEST_STATUS_COMPLETED = 2;
+  QUEST_STATUS_CLAIMED = 3;
+}
+
+// Event: Server -> Client (OPCODE_QUEST_STATUS_CHANGED_EVENT). Chỉ phát khi quest VỪA chuyển
+// COMPLETED (không phát cho mỗi lần tiến độ tăng — GAMEPLAY.md §9.3, tránh quá tải World tick).
+message QuestStatusChangedEvent {
+  string quest_code = 1;
+  QuestStatus status = 2;
+}
+
+// Command: Client -> Server (OPCODE_CLAIM_QUEST_REWARD_COMMAND). Đứng riêng, KHÔNG qua dialogue ở
+// lát cắt này (kiểm soát phạm vi — có thể gắn vào dialogue "trả nhiệm vụ" ở lát cắt sau).
+message ClaimQuestRewardCommand {
+  string quest_code = 1;
+}
+
+enum ClaimQuestRewardOutcome {
+  CLAIM_QUEST_REWARD_OUTCOME_UNSPECIFIED = 0;
+  CLAIM_QUEST_REWARD_OUTCOME_OK = 1;
+  CLAIM_QUEST_REWARD_OUTCOME_QUEST_NOT_FOUND = 2;
+  CLAIM_QUEST_REWARD_OUTCOME_NOT_ACCEPTED = 3;
+  CLAIM_QUEST_REWARD_OUTCOME_NOT_COMPLETED_YET = 4;
+}
+
+message ItemRewardView {
+  string item_template_code = 1;
+  int32 quantity = 2;
+}
+
+// Response: Server -> Client (OPCODE_CLAIM_QUEST_REWARD_RESPONSE).
+message ClaimQuestRewardResponse {
+  ClaimQuestRewardOutcome outcome = 1;
+  int64 exp_granted = 2;
+  repeated ItemRewardView items_granted = 3;
+}

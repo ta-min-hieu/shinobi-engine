@@ -42,6 +42,9 @@ import dev.kage.protocol.BuyItemResponse;
 import dev.kage.protocol.BuyOutcome;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
+import dev.kage.protocol.ClaimQuestRewardCommand;
+import dev.kage.protocol.ClaimQuestRewardOutcome;
+import dev.kage.protocol.ClaimQuestRewardResponse;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
@@ -115,13 +118,14 @@ class GatewayServerIntegrationTest {
         var inventoryFacade = fakeInventoryFacade();
         var shopFacade = fakeShopFacade();
         var dialogueFacade = fakeDialogueFacade();
-        characterRegistry = new ConnectedCharacterRegistry(inventoryFacade);
+        var questFacade = fakeQuestFacade();
+        characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
         worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
         var positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
-        var contentFacades = new ContentFacades(shopFacade, dialogueFacade);
+        var contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade);
         var facades = new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
         server = new GatewayServer(0, facades, worldGateway);
         server.start();
@@ -334,6 +338,35 @@ class GatewayServerIntegrationTest {
         dev.kage.dialogue.domain.NpcTemplatePort npcTemplatePort = npcCode -> Optional.empty();
         var useCase = new dev.kage.dialogue.application.GetDialogueNodeUseCase(npcTemplatePort);
         return new dev.kage.dialogue.api.DialogueFacade(useCase);
+    }
+
+    // Quest không dùng trong test này — fake tối thiểu để compile (cùng convention fakeDialogueFacade).
+    private dev.kage.quest.api.QuestFacade fakeQuestFacade() {
+        dev.kage.quest.domain.QuestProgressPort progressPort = new dev.kage.quest.domain.QuestProgressPort() {
+            @Override
+            public Optional<dev.kage.quest.domain.QuestProgress> find(long characterId, long questTemplateId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public void save(dev.kage.quest.domain.Transaction tx, dev.kage.quest.domain.QuestProgress progress) {
+            }
+        };
+        dev.kage.quest.domain.QuestTemplatePort templatePort = questCode -> Optional.empty();
+        dev.kage.quest.domain.ExpPort expPort = (tx, characterId, amount) -> { };
+        dev.kage.quest.domain.QuestInventoryGrantPort inventoryGrantPort =
+                (tx, characterId, itemTemplateCode, quantity) -> true;
+        dev.kage.quest.domain.AuditPort auditPort = (tx, characterId, action, detailJson) -> { };
+        dev.kage.quest.domain.TransactionRunner tx = action -> action.accept(null);
+
+        var acceptQuestUseCase = new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx);
+        var processMonsterKilledUseCase =
+                new dev.kage.quest.application.ProcessMonsterKilledUseCase(progressPort, templatePort, tx);
+        var rewardPorts = new dev.kage.quest.application.QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
+        var claimQuestRewardUseCase = new dev.kage.quest.application.ClaimQuestRewardUseCase(
+                progressPort, templatePort, rewardPorts, tx);
+        return new dev.kage.quest.api.QuestFacade(
+                acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
     }
 
     @AfterEach
@@ -634,6 +667,26 @@ class GatewayServerIntegrationTest {
 
             var response = ErrorResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_ERROR_VALUE).payload());
             assertThat(response.getErrorKey()).isEqualTo("error.npc_not_found");
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void clientShouldReceiveClaimQuestRewardResponse_overRealSockets() throws Exception {
+        // fakeQuestFacade()'s QuestTemplatePort luôn trả rỗng — verify đúng nhánh QUEST_NOT_FOUND
+        // (kiểm tra template TRƯỚC progress, xem ClaimQuestRewardUseCase.execute).
+        try (var socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(5000);
+            var in = new DataInputStream(socket.getInputStream());
+            connectCreateAndSelect(socket, in, "quest" + UUID.randomUUID().toString().substring(0, 6));
+
+            var command = ClaimQuestRewardCommand.newBuilder().setQuestCode("kill_training_dummies").build();
+            sendFrame(socket, Opcode.OPCODE_CLAIM_QUEST_REWARD_COMMAND_VALUE, 10, command.toByteArray());
+
+            var response = ClaimQuestRewardResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_CLAIM_QUEST_REWARD_RESPONSE_VALUE).payload());
+            assertThat(response.getOutcome())
+                    .isEqualTo(ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_QUEST_NOT_FOUND);
         }
     }
 

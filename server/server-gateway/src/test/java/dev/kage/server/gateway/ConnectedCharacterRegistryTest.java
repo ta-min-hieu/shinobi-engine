@@ -26,6 +26,16 @@ import dev.kage.inventory.domain.Transaction;
 import dev.kage.protocol.ItemGrantedEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.wire.PacketCodec;
+import dev.kage.quest.api.QuestFacade;
+import dev.kage.quest.application.AcceptQuestUseCase;
+import dev.kage.quest.application.ClaimQuestRewardUseCase;
+import dev.kage.quest.application.ProcessMonsterKilledUseCase;
+import dev.kage.quest.application.QuestRewardPorts;
+import dev.kage.quest.domain.ExpPort;
+import dev.kage.quest.domain.QuestInventoryGrantPort;
+import dev.kage.quest.domain.QuestProgress;
+import dev.kage.quest.domain.QuestProgressPort;
+import dev.kage.quest.domain.QuestTemplatePort;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.time.Duration;
@@ -48,6 +58,32 @@ class ConnectedCharacterRegistryTest {
 
     private ConnectedCharacterRegistry registry;
 
+    // Quest không dùng trong test này (chỉ verify grantLoot) — fake tối thiểu để compile.
+    private static QuestFacade fakeQuestFacade() {
+        QuestProgressPort progressPort = new QuestProgressPort() {
+            @Override
+            public Optional<QuestProgress> find(long characterId, long questTemplateId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public void save(dev.kage.quest.domain.Transaction tx, QuestProgress progress) {
+            }
+        };
+        QuestTemplatePort templatePort = questCode -> Optional.empty();
+        ExpPort expPort = (tx, characterId, amount) -> { };
+        QuestInventoryGrantPort inventoryGrantPort = (tx, characterId, itemTemplateCode, quantity) -> true;
+        dev.kage.quest.domain.AuditPort auditPort = (tx, characterId, action, detailJson) -> { };
+        dev.kage.quest.domain.TransactionRunner tx = action -> action.accept(null);
+
+        var acceptQuestUseCase = new AcceptQuestUseCase(progressPort, templatePort, tx);
+        var processMonsterKilledUseCase = new ProcessMonsterKilledUseCase(progressPort, templatePort, tx);
+        var rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
+        var claimQuestRewardUseCase =
+                new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx);
+        return new QuestFacade(acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
+    }
+
     @AfterEach
     void stopRegistry() {
         if (registry != null) {
@@ -57,7 +93,8 @@ class ConnectedCharacterRegistryTest {
 
     @Test
     void shouldSendItemGrantedEvent_whenLootRolledSuccessfully() throws InvalidProtocolBufferException {
-        registry = new ConnectedCharacterRegistry(fakeInventoryFacade(100)); // 100% -> tất định, không flaky
+        // 100% -> tất định, không flaky
+        registry = new ConnectedCharacterRegistry(fakeInventoryFacade(100), fakeQuestFacade());
         var channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
         registry.register(1L, channel.pipeline().firstContext());
 
@@ -72,7 +109,8 @@ class ConnectedCharacterRegistryTest {
 
     @Test
     void shouldSendNothing_whenLootNeverDrops() {
-        registry = new ConnectedCharacterRegistry(fakeInventoryFacade(0)); // 0% -> tất định không rơi gì
+        // 0% -> tất định không rơi gì
+        registry = new ConnectedCharacterRegistry(fakeInventoryFacade(0), fakeQuestFacade());
         var channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
         registry.register(1L, channel.pipeline().firstContext());
 

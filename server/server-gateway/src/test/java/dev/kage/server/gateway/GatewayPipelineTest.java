@@ -340,6 +340,35 @@ class GatewayPipelineTest {
         return new dev.kage.dialogue.api.DialogueFacade(useCase);
     }
 
+    // Quest không dùng trong test này — fake tối thiểu để compile (cùng convention fakeDialogueFacade).
+    private static dev.kage.quest.api.QuestFacade fakeQuestFacade() {
+        dev.kage.quest.domain.QuestProgressPort progressPort = new dev.kage.quest.domain.QuestProgressPort() {
+            @Override
+            public Optional<dev.kage.quest.domain.QuestProgress> find(long characterId, long questTemplateId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public void save(dev.kage.quest.domain.Transaction tx, dev.kage.quest.domain.QuestProgress progress) {
+            }
+        };
+        dev.kage.quest.domain.QuestTemplatePort templatePort = questCode -> Optional.empty();
+        dev.kage.quest.domain.ExpPort expPort = (tx, characterId, amount) -> { };
+        dev.kage.quest.domain.QuestInventoryGrantPort inventoryGrantPort =
+                (tx, characterId, itemTemplateCode, quantity) -> true;
+        dev.kage.quest.domain.AuditPort auditPort = (tx, characterId, action, detailJson) -> { };
+        dev.kage.quest.domain.TransactionRunner tx = action -> action.accept(null);
+
+        var acceptQuestUseCase = new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx);
+        var processMonsterKilledUseCase =
+                new dev.kage.quest.application.ProcessMonsterKilledUseCase(progressPort, templatePort, tx);
+        var rewardPorts = new dev.kage.quest.application.QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
+        var claimQuestRewardUseCase = new dev.kage.quest.application.ClaimQuestRewardUseCase(
+                progressPort, templatePort, rewardPorts, tx);
+        return new dev.kage.quest.api.QuestFacade(
+                acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
+    }
+
     private static EmbeddedChannel newPipeline(FakeCharacterPort characterPort) {
         // ⚠️ Phải khớp CHÍNH XÁC pipeline thật trong GatewayBootstrap — lệch ở đây là test giả.
         // AccountFacade/CharacterFacade THẬT (không mock), chỉ Port bên dưới là Fake (TESTING.md
@@ -365,7 +394,8 @@ class GatewayPipelineTest {
         var inventoryFacade = fakeInventoryFacade();
         var shopFacade = fakeShopFacade();
         var dialogueFacade = fakeDialogueFacade();
-        var characterRegistry = new ConnectedCharacterRegistry(inventoryFacade);
+        var questFacade = fakeQuestFacade();
+        var characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
         var worldFacade = new WorldFacade(characterRegistry);
         var positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
@@ -379,7 +409,7 @@ class GatewayPipelineTest {
                 new GatewayChannelHandler(
                         new GatewayFacades(
                                 accountFacade, characterFacade, inventoryFacade,
-                                new ContentFacades(shopFacade, dialogueFacade)),
+                                new ContentFacades(shopFacade, dialogueFacade, questFacade)),
                         worldGateway, Runnable::run));
     }
 

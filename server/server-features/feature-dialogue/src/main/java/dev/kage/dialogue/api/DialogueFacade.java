@@ -46,12 +46,21 @@ public final class DialogueFacade {
         if (DialogueOption.ACTION_END.equals(option.action())) {
             return new SelectOptionResult.Ended();
         }
+        if (option.action().startsWith(DialogueOption.ACTION_ACCEPT_QUEST_PREFIX)) {
+            String questCode = option.action().substring(DialogueOption.ACTION_ACCEPT_QUEST_PREFIX.length());
+            return new SelectOptionResult.AcceptQuest(questCode);
+        }
         return getDialogueNodeUseCase.execute(npcCode, option.action())
                 .<SelectOptionResult>map(SelectOptionResult.Node::new)
                 .orElseGet(SelectOptionResult.NotFound::new);
     }
 
-    /** Kết quả chọn lựa chọn — {@code Node} khi dẫn tới node khác, còn lại là hành động đặc biệt. */
+    /**
+     * Kết quả chọn lựa chọn — {@code Node} khi dẫn tới node khác, {@code AcceptQuest} khi action
+     * là {@code accept_quest:<code>} (feature-dialogue KHÔNG tự gọi feature-quest — chỉ trả
+     * {@code questCode}, GATEWAY mới là nơi gọi {@code QuestFacade.acceptQuest}, giữ 2 feature
+     * tách biệt, cùng cách "open_shop" được gateway xử lý thay vì DialogueFacade tự gọi ShopFacade).
+     */
     public sealed interface SelectOptionResult {
         record Node(DialogueNode node) implements SelectOptionResult {
         }
@@ -63,6 +72,9 @@ public final class DialogueFacade {
         }
 
         record NotFound() implements SelectOptionResult {
+        }
+
+        record AcceptQuest(String questCode) implements SelectOptionResult {
         }
     }
 }

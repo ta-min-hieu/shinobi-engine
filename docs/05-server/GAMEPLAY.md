@@ -318,6 +318,55 @@ rõ ở đây — cần một cơ chế đọc snapshot vị trí an toàn xuyê
 `GatewayFacades` đổi `shopFacade` thành `ContentFacades(shopFacade, dialogueFacade)` (thêm
 `dialogueFacade` trực tiếp sẽ vượt 4 tham số Checkstyle `ParameterNumber`).
 
+### 9.3 Quest — lát cắt 3: 1 quest DB-driven đầy đủ (✅ Đã code, 2026-07-23)
+
+3 quyết định chốt cùng chủ dự án qua `AskUserQuestion` trước khi code: (1) nối trực tiếp vào
+callback `onMonsterKilled` có sẵn (Phase 4, `WorldOutboundSink`/`ConnectedCharacterRegistry`) —
+**không** kích hoạt `EventBus`/`Event` (ADR-008, tồn tại từ Phase 0 nhưng chưa dùng ở đâu — vẫn để
+yên, quest là consumer thứ 2 gắn thẳng vào cùng callback, không phải lý do để tổng quát hoá pub/sub
+sớm); (2) làm trọn 1 quest thật xuyên suốt (nhận → theo dõi → hoàn thành → nhận thưởng), không chỉ
+shell; (3) nhận quest bắt buộc qua dialogue NPC (`town_elder`), không thêm packet
+`AcceptQuestCommand` riêng.
+
+**Module mới `feature-quest`** (Clean Arch, theo đúng mẫu feature-dialogue/feature-shop): `domain/`
+khai `QuestTemplatePort`/`QuestProgressPort`/`ExpPort`/`QuestInventoryGrantPort`/`AuditPort` (Port
+riêng của feature-quest, KHÔNG gọi qua Facade feature khác — 2 adapter `ExpPort`/
+`QuestInventoryGrantPort` chạy trong `server-database` cùng 1 transaction với ghi `progress_json`,
+đúng mẫu `GoldPort` Phase 5 cường hoá).
+
+**Vòng đời quest** (`character_quest_progress`, PK `(character_id, quest_template_id)`, không có
+dòng = NOT_STARTED):
+
+```mermaid
+graph LR
+    A["Dialogue: accept_quest:code"] -->|AcceptQuestUseCase| B["IN_PROGRESS<br/>on_accept hook"]
+    B -->|onMonsterKilled → ProcessMonsterKilledUseCase<br/>on_event hook| B
+    B -->|effects.completed| C["COMPLETED"]
+    C -->|ClaimQuestRewardCommand → ClaimQuestRewardUseCase<br/>on_claim hook| D["CLAIMED"]
+```
+
+**Script gọi NGƯỢC vào Java** (khác dialogue — script quest KHÔNG trả cấu trúc cho Java đọc, script
+tự gọi callback `ctx.save_progress(json)`/`ctx.complete()`/`ctx.give_exp(n)`/`ctx.give_item(code,qty)`
+truyền qua `ProxyExecutable` trong `hostApi`; Java đọc lại 1 object Java thuần
+(`QuestScriptRunner.MutableEffects`) sau khi `eval()` xong — không cần overload extractor của
+dialogue vì không đọc `Value` trả về). `progress_json` là **chuỗi đục với Java** — script tự
+`JSON.stringify`/`JSON.parse` (GraalJS có sẵn, xác nhận bằng test thật trước khi chọn cách này,
+tránh phải thêm thư viện JSON phía Java — sẽ phải dừng hỏi theo CLAUDE.md §4). Chi tiết đầy đủ +
+lý do từng quyết định: `feature-quest/CLAUDE.md`.
+
+⚠️ **`ProcessMonsterKilledUseCase.TRACKED_QUEST_CODE` hardcode 1 quest** (`kill_training_dummies`)
+— placeholder có chủ đích cho lát cắt này (đúng cảnh báo hiệu năng đã ghi ở đầu §9: "cần index
+quest theo loại sự kiện, không quét tuyến tính"). Khi có quest thứ 2 PHẢI tổng quát hoá tra cứu này
+trước khi thêm quest mới, không copy-paste thêm hardcode.
+
+**Protocol** (opcode 606-609, dải Quest/NPC/Dialogue 600-699, `quest.proto`): không có
+`AcceptQuestCommand` — nhận quest đi qua `SelectDialogueOptionCommand` với action
+`accept_quest:<code>` (dialogue resolve thành `SelectOptionResult.AcceptQuest`, gateway gọi
+`QuestFacade.acceptQuest`, KHÔNG phải `DialogueFacade` tự gọi — giữ 2 module không biết nhau, cùng
+nguyên tắc "open_shop" đã dùng ở §9.2) → `AcceptQuestResponse`.
+`QuestStatusChangedEvent{quest_code, status}` phát khi hoàn thành (không phát mỗi lần tick tiến độ).
+`ClaimQuestRewardCommand{quest_code}` → `ClaimQuestRewardResponse{outcome, exp_granted, items_granted[]}`.
+
 ---
 
 ## 10. Chat

@@ -216,7 +216,7 @@ graph LR
 |---|---|
 | ✅ NPC tĩnh lát cắt 1 (2026-07-23 — hiện qua AoI, chưa dialogue) | [GAMEPLAY.md §9.1](../05-server/GAMEPLAY.md) |
 | ✅ Dialogue NPC lát cắt 2 (2026-07-23 — `feature-dialogue` mới, node/nhánh + mở shop qua dialogue) | [GAMEPLAY.md §9.2](../05-server/GAMEPLAY.md) |
-| `feature-quest` + script (lát cắt 3 — chưa làm) | [GAMEPLAY.md §9](../05-server/GAMEPLAY.md) |
+| ✅ `feature-quest` + script lát cắt 3 (2026-07-23 — nhận qua dialogue → theo dõi → hoàn thành → nhận thưởng, đầy đủ) | [GAMEPLAY.md §9.3](../05-server/GAMEPLAY.md) |
 | Validate mọi script lúc khởi động | [SCRIPTING.md §8](../06-plugin/SCRIPTING.md) |
 | Chat + Friend + Mail (lát cắt 4 — chưa làm) | [GAMEPLAY.md §10–11](../05-server/GAMEPLAY.md) |
 

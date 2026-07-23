@@ -56,7 +56,7 @@ class DialogueIntegrationTest {
         var node = result.get();
         assertThat(node.textKey()).isEqualTo("dialogue.town_elder.greeting");
         assertThat(node.options()).extracting("action")
-                .containsExactly("about_town", "open_shop", "end");
+                .containsExactly("about_town", "accept_quest:kill_training_dummies", "open_shop", "end");
     }
 
     @Test

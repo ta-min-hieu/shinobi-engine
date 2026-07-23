@@ -12,10 +12,15 @@ import dev.kage.dialogue.api.DialogueFacade;
 import dev.kage.dialogue.domain.DialogueNode;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.EquipmentSlotType;
+import dev.kage.protocol.AcceptQuestOutcome;
+import dev.kage.protocol.AcceptQuestResponse;
 import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.BuyItemResponse;
 import dev.kage.protocol.BuyOutcome;
 import dev.kage.protocol.CharacterSummary;
+import dev.kage.protocol.ClaimQuestRewardCommand;
+import dev.kage.protocol.ClaimQuestRewardOutcome;
+import dev.kage.protocol.ClaimQuestRewardResponse;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
@@ -31,6 +36,7 @@ import dev.kage.protocol.EquipItemResponse;
 import dev.kage.protocol.EquipmentSlot;
 import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.Faction;
+import dev.kage.protocol.ItemRewardView;
 import dev.kage.protocol.ListCharactersRequest;
 import dev.kage.protocol.ListCharactersResponse;
 import dev.kage.protocol.ListShopItemsRequest;
@@ -54,6 +60,7 @@ import dev.kage.protocol.UseSkillCommand;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
+import dev.kage.quest.api.QuestFacade;
 import dev.kage.server.world.CharacterBaseStats;
 import dev.kage.shop.api.ShopFacade;
 import io.netty.channel.ChannelHandlerContext;
@@ -99,6 +106,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final InventoryFacade inventoryFacade;
     private final ShopFacade shopFacade;
     private final DialogueFacade dialogueFacade;
+    private final QuestFacade questFacade;
     private final WorldGateway worldGateway;
     private final Executor authExecutor;
     // Per-connection (handler đã là state per-connection, xem javadoc lớp) — không cần đồng bộ
@@ -131,7 +139,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, this::handleBuyItemCommand),
             Map.entry(Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, this::handleSellItemCommand),
             Map.entry(Opcode.OPCODE_TALK_TO_NPC_COMMAND_VALUE, this::handleTalkToNpcCommand),
-            Map.entry(Opcode.OPCODE_SELECT_DIALOGUE_OPTION_COMMAND_VALUE, this::handleSelectDialogueOptionCommand));
+            Map.entry(Opcode.OPCODE_SELECT_DIALOGUE_OPTION_COMMAND_VALUE, this::handleSelectDialogueOptionCommand),
+            Map.entry(Opcode.OPCODE_CLAIM_QUEST_REWARD_COMMAND_VALUE, this::handleClaimQuestRewardCommand));
 
     GatewayChannelHandler(GatewayFacades facades, WorldGateway worldGateway, Executor authExecutor) {
         this.accountFacade = facades.accountFacade();
@@ -139,6 +148,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.inventoryFacade = facades.inventoryFacade();
         this.shopFacade = facades.contentFacades().shopFacade();
         this.dialogueFacade = facades.contentFacades().dialogueFacade();
+        this.questFacade = facades.contentFacades().questFacade();
         this.worldGateway = worldGateway;
         this.authExecutor = authExecutor;
     }
@@ -590,11 +600,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleSelectDialogueOptionBlocking(ctx, sequenceId, command));
+        authExecutor.execute(() -> handleSelectDialogueOptionBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleSelectDialogueOptionBlocking(
-            ChannelHandlerContext ctx, int sequenceId, SelectDialogueOptionCommand command) {
+            ChannelHandlerContext ctx, int sequenceId, long characterId, SelectDialogueOptionCommand command) {
         var result = dialogueFacade.selectOption(
                 command.getNpcCode(), command.getCurrentNodeId(), command.getOptionIndex());
         switch (result) {
@@ -608,7 +618,62 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     DialogueEndedResponse.newBuilder().build().toByteArray());
             case DialogueFacade.SelectOptionResult.NotFound ignored ->
                     sendError(ctx, sequenceId, 404, "error.dialogue_option_not_found");
+            case DialogueFacade.SelectOptionResult.AcceptQuest r -> {
+                var acceptResult = questFacade.acceptQuest(characterId, r.questCode());
+                var response = AcceptQuestResponse.newBuilder().setOutcome(toProtoOutcome(acceptResult)).build();
+                send(ctx, Opcode.OPCODE_ACCEPT_QUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            }
         }
+    }
+
+    private static final Map<QuestFacade.AcceptResult, AcceptQuestOutcome> ACCEPT_QUEST_OUTCOME_MAPPING = Map.of(
+            QuestFacade.AcceptResult.OK, AcceptQuestOutcome.ACCEPT_QUEST_OUTCOME_OK,
+            QuestFacade.AcceptResult.QUEST_NOT_FOUND, AcceptQuestOutcome.ACCEPT_QUEST_OUTCOME_QUEST_NOT_FOUND,
+            QuestFacade.AcceptResult.ALREADY_ACCEPTED, AcceptQuestOutcome.ACCEPT_QUEST_OUTCOME_ALREADY_ACCEPTED);
+
+    private static AcceptQuestOutcome toProtoOutcome(QuestFacade.AcceptResult result) {
+        return ACCEPT_QUEST_OUTCOME_MAPPING.get(result);
+    }
+
+    private void handleClaimQuestRewardCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = ClaimQuestRewardCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleClaimQuestRewardBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleClaimQuestRewardBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, ClaimQuestRewardCommand command) {
+        var result = questFacade.claimReward(characterId, command.getQuestCode());
+        var responseBuilder = ClaimQuestRewardResponse.newBuilder()
+                .setOutcome(toProtoOutcome(result.outcome()))
+                .setExpGranted(result.expGranted());
+        for (var item : result.itemsGranted()) {
+            responseBuilder.addItemsGranted(ItemRewardView.newBuilder()
+                    .setItemTemplateCode(item.itemTemplateCode())
+                    .setQuantity(item.quantity())
+                    .build());
+        }
+        send(ctx, Opcode.OPCODE_CLAIM_QUEST_REWARD_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+    }
+
+    private static final Map<QuestFacade.ClaimOutcome, ClaimQuestRewardOutcome> CLAIM_QUEST_REWARD_OUTCOME_MAPPING =
+            Map.of(
+                    QuestFacade.ClaimOutcome.OK, ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_OK,
+                    QuestFacade.ClaimOutcome.QUEST_NOT_FOUND,
+                    ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_QUEST_NOT_FOUND,
+                    QuestFacade.ClaimOutcome.NOT_ACCEPTED,
+                    ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_NOT_ACCEPTED,
+                    QuestFacade.ClaimOutcome.NOT_COMPLETED_YET,
+                    ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_NOT_COMPLETED_YET);
+
+    private static ClaimQuestRewardOutcome toProtoOutcome(QuestFacade.ClaimOutcome outcome) {
+        return CLAIM_QUEST_REWARD_OUTCOME_MAPPING.get(outcome);
     }
 
     private static DialogueNodeResponse toResponse(DialogueNode node) {
