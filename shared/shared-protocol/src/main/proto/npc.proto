@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// Packet NPC (NETWORK.md §4, dải 600-699 dùng chung với Quest). Phase 6 lát cắt 1 — NPC TĨNH
+// (không AI, không di chuyển, không combat), chỉ hiện qua AoI giống quái/nhân vật. Chưa có
+// NpcMovedEvent (khác MonsterMovedEvent) vì NPC không bao giờ đổi vị trí ở lát cắt này.
+
+// Event: Server -> Client (OPCODE_NPC_SPAWNED_EVENT). NPC VỪA vào AoI của nhân vật.
+message NpcSpawnedEvent {
+  int64 npc_id = 1;
+  string npc_code = 2;
+  float x = 3;
+  float y = 4;
+}
+
+// Event: Server -> Client (OPCODE_NPC_DESPAWNED_EVENT). NPC VỪA rời AoI (nhân vật đi xa — NPC
+// tĩnh không tự "chết" như quái).
+message NpcDespawnedEvent {
+  int64 npc_id = 1;
+}

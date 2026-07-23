@@ -11,6 +11,8 @@ import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.MoveResponse;
+import dev.kage.protocol.NpcDespawnedEvent;
+import dev.kage.protocol.NpcSpawnedEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.ServerShuttingDownEvent;
 import dev.kage.protocol.SkillResultEvent;
@@ -164,6 +166,31 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         }
         var event = MonsterMovedEvent.newBuilder().setMonsterId(monsterId).setX(x).setY(y).build();
         send(ctx, Opcode.OPCODE_MONSTER_MOVED_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    @Override
+    public void onNpcSpawned(long targetCharacterId, WorldOutboundSink.NpcSnapshot npc) {
+        var ctx = contextsByCharacterId.get(targetCharacterId);
+        if (ctx == null) {
+            return;
+        }
+        var event = NpcSpawnedEvent.newBuilder()
+                .setNpcId(npc.npcId())
+                .setNpcCode(npc.npcCode())
+                .setX(npc.x())
+                .setY(npc.y())
+                .build();
+        send(ctx, Opcode.OPCODE_NPC_SPAWNED_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    @Override
+    public void onNpcDespawned(long targetCharacterId, long npcId) {
+        var ctx = contextsByCharacterId.get(targetCharacterId);
+        if (ctx == null) {
+            return;
+        }
+        var event = NpcDespawnedEvent.newBuilder().setNpcId(npcId).build();
+        send(ctx, Opcode.OPCODE_NPC_DESPAWNED_EVENT_VALUE, 0, event.toByteArray());
     }
 
     @Override

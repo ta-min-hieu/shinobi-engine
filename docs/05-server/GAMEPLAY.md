@@ -247,6 +247,35 @@ graph LR
 
 ⚠️ **Hiệu năng**: mỗi lần giết quái → kiểm tra mọi quest đang làm? Với 1000 người chơi × 20 quest = tốn. → Cần index quest theo loại sự kiện, không quét tuyến tính. **Đo ở Phase 6.**
 
+### 9.1 NPC — lát cắt 1: NPC tĩnh hiển thị (✅ Đã code, 2026-07-23)
+
+Chốt cùng chủ dự án trước khi code (CLAUDE.md §4 — không schema/kiến trúc nào có sẵn cho NPC):
+thứ tự lát cắt **NPC → Dialogue → Quest → Chat/Friend/Mail**; NPC là **ECS component tĩnh trong
+`server-world`** (giống Monster nhưng KHÔNG AI/combat), không phải module Clean Arch riêng.
+"1 Bí Cảnh mẫu" GDD từng liệt vào MVP đã xác nhận là **Phase 8** thật (Dungeon), không phải Phase
+6 — sửa GDD §11 khớp lại ROADMAP.
+
+**Lát cắt 1** hoàn toàn hardcode (chưa `npc_template` DB, cùng lý do `training_dummy` chưa đọc
+`monster_template`): 1 NPC tĩnh (`NpcComponent`/`NpcIdComponent`, chỉ `PositionComponent` — KHÔNG
+`VelocityComponent`/`HealthComponent`/AI), hiện qua AoI giống quái/nhân vật
+(`NpcSpawnedEvent`/`NpcDespawnedEvent`, opcode 600-601, dải dùng chung với Quest). Chưa có tương
+tác/dialogue nào — chỉ chứng minh NPC hiện ra đúng qua AoI.
+
+⚠️ **Bug thật bắt được lúc code** (không phải đoán trước): `AreaOfInterestTracker.visibleTo` dùng
+**CHUNG 1 `Set<Long>`** lưu "mọi ID nhân vật này đang thấy" bất kể loại entity (nhân vật/quái/NPC).
+NPC id và monster id đều ÂM và ban đầu dùng 2 bộ đếm độc lập cùng bắt đầu ở -1 → **trùng số** →
+quái vừa được thêm vào set "đang thấy" thì NPC (trùng ID, ngoài tầm nhìn) xoá luôn ngay trong CÙNG
+tick, khiến quái không bao giờ được xem là "đã thấy từ trước" → `MonsterMovedEvent` không bao giờ
+phát, phá cả `shouldChaseAndAttackBack_whenCharacterEntersAggroRange` (test đã xanh từ Phase 4).
+**Sửa**: DÙNG CHUNG 1 bộ đếm (`nextMonsterOrNpcId`) cho cả quái lẫn NPC — đảm bảo không bao giờ
+trùng ID giữa 2 loại entity khác nhau, dù có bao nhiêu loại "entity ÂM" nữa sau này cũng phải dùng
+chung bộ đếm này, không tự thêm bộ đếm riêng.
+
+`AreaOfInterestTracker.sync()` thêm cặp (nhân vật, NPC) — bản sao cấu trúc gần giống
+(nhân vật, quái) lần thứ 3 (`syncCharacterPair`/`syncCharacterMonsterPair`/`syncCharacterNpcPair`).
+CHƯA tổng quát hoá (mỗi loại có payload snapshot khác nhau, tổng quát sớm phải sửa code đã test kỹ)
+— tới loại entity thứ 4 cần AoI mới bắt buộc tổng quát hoá (rule of three).
+
 ---
 
 ## 10. Chat

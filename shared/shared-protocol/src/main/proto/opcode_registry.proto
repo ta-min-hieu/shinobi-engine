@@ -18,7 +18,9 @@ option java_multiple_files = true;
 //   300–399   Movement / World                          ← Phase 3
 //   400–499   Combat / Skill                            ← Phase 4
 //   500–599   Inventory / Equipment                     ← Phase 5
-//   600–699   Quest                                     ← Phase 6
+//   600–699   Quest / NPC / Dialogue                     ← Phase 6 (NPC/Dialogue dùng chung dải
+//             Quest — cùng cách Monster spawn/despawn dùng chung dải Combat/Skill thay vì xin
+//             dải riêng, xem feature-quest/CLAUDE.md khi module đó tồn tại)
 //   700–799   Guild                                     ← Phase 7
 //   800–899   Chat                                      ← Phase 6-7
 //   900–999   Mail                                      ← Phase 6-7
@@ -68,6 +70,10 @@ enum Opcode {
   OPCODE_UNEQUIP_ITEM_RESPONSE = 504;
   OPCODE_ENHANCE_ITEM_COMMAND = 505;
   OPCODE_ENHANCE_ITEM_RESPONSE = 506;
+
+  // --- Quest / NPC / Dialogue (600-699) ---
+  OPCODE_NPC_SPAWNED_EVENT = 600;
+  OPCODE_NPC_DESPAWNED_EVENT = 601;
 
   // --- Shop (1000-1099) ---
   OPCODE_LIST_SHOP_ITEMS_REQUEST = 1000;

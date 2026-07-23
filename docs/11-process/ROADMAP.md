@@ -214,10 +214,11 @@ graph LR
 
 | Việc | Nguồn |
 |---|---|
-| `feature-quest` + script | [GAMEPLAY.md §9](../05-server/GAMEPLAY.md) |
+| ✅ NPC tĩnh lát cắt 1 (2026-07-23 — hiện qua AoI, chưa dialogue) | [GAMEPLAY.md §9.1](../05-server/GAMEPLAY.md) |
+| Dialogue NPC (lát cắt 2 — chưa làm) | — |
+| `feature-quest` + script (lát cắt 3 — chưa làm) | [GAMEPLAY.md §9](../05-server/GAMEPLAY.md) |
 | Validate mọi script lúc khởi động | [SCRIPTING.md §8](../06-plugin/SCRIPTING.md) |
-| Dialogue NPC | — |
-| Chat + Friend + Mail | [GAMEPLAY.md §10–11](../05-server/GAMEPLAY.md) |
+| Chat + Friend + Mail (lát cắt 4 — chưa làm) | [GAMEPLAY.md §10–11](../05-server/GAMEPLAY.md) |
 
 **Exit Criteria — đây là MVP:**
 - [ ] Chơi được: tạo nhân vật → nhận quest → đánh quái → nhặt đồ → cường hoá → hoàn thành quest

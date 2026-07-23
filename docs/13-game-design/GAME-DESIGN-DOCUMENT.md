@@ -225,12 +225,12 @@ Chống scope creep (Điều 9). MVP = **hết [Phase 6](../11-process/ROADMAP.m
 **Có trong MVP:**
 - 1 hệ phái đầy đủ (đề xuất: **Hỏa**) — verify toàn pipeline trước khi nhân ra 4 hệ
 - Lv1–30, không Chuyển Sinh
-- PvE cơ bản (quái + 1 Bí Cảnh mẫu)
+- PvE cơ bản (quái ngoài trời — **không Bí Cảnh**, xem dưới)
 - Trang bị + cường hoá (không Ngọc)
 - Chat + Friend + Mail cơ bản
 - 1 hub + 1 map luyện cấp
 
-**Post-MVP:** PvP xếp hạng, Battlefield, Chiếm lãnh địa · Guild đầy đủ · 4 hệ còn lại · Auction, Ranking toàn cục · Mount, Pet evolve, Festival · Trade.
+**Post-MVP:** PvP xếp hạng, Battlefield, Chiếm lãnh địa · Guild đầy đủ · 4 hệ còn lại · Auction, Ranking toàn cục · Mount, Pet evolve, Festival · Trade · **Bí Cảnh** (Dungeon instance, ROADMAP xếp Phase 8 — mục này trước đây liệt vào MVP nhầm, sửa lại 2026-07-23 để khớp ROADMAP, xác nhận cùng chủ dự án).
 
 ---
 

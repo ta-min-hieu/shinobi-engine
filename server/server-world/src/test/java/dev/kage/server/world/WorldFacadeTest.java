@@ -47,6 +47,12 @@ class WorldFacadeTest {
     private record MonsterKilled(long killerCharacterId, String monsterCode) {
     }
 
+    private record NpcSpawned(long target, long npcId, String code, float x, float y) {
+    }
+
+    private record NpcDespawned(long target, long npcId) {
+    }
+
     private record AttackResult(
             long target, long attacker, long defender, int damage, boolean crit, boolean miss, int hp,
             boolean died) {
@@ -66,6 +72,8 @@ class WorldFacadeTest {
         final List<MonsterDespawned> monsterDespawned = new CopyOnWriteArrayList<>();
         final List<MonsterMoved> monsterMoved = new CopyOnWriteArrayList<>();
         final List<MonsterKilled> monsterKilled = new CopyOnWriteArrayList<>();
+        final List<NpcSpawned> npcSpawned = new CopyOnWriteArrayList<>();
+        final List<NpcDespawned> npcDespawned = new CopyOnWriteArrayList<>();
         final List<AttackResult> attackResults = new CopyOnWriteArrayList<>();
         final List<SkillResult> skillResults = new CopyOnWriteArrayList<>();
 
@@ -109,6 +117,16 @@ class WorldFacadeTest {
         @Override
         public void onMonsterKilled(long killerCharacterId, String monsterCode) {
             monsterKilled.add(new MonsterKilled(killerCharacterId, monsterCode));
+        }
+
+        @Override
+        public void onNpcSpawned(long targetCharacterId, WorldOutboundSink.NpcSnapshot npc) {
+            npcSpawned.add(new NpcSpawned(targetCharacterId, npc.npcId(), npc.npcCode(), npc.x(), npc.y()));
+        }
+
+        @Override
+        public void onNpcDespawned(long targetCharacterId, long npcId) {
+            npcDespawned.add(new NpcDespawned(targetCharacterId, npcId));
         }
 
         @Override
@@ -203,6 +221,36 @@ class WorldFacadeTest {
         awaitTrue(
                 () -> sink.monsterSpawned.stream()
                         .anyMatch(m -> m.target() == 1L && m.code().equals("training_dummy")));
+    }
+
+    @Test
+    void shouldSpawnNpc_toCharacterNearby() {
+        world.start();
+
+        world.attachCharacter(1L, -5f, -6f, DEFAULT_STATS); // gần NPC mẫu (spawn cố định (-5,-5))
+
+        awaitTrue(
+                () -> sink.npcSpawned.stream()
+                        .anyMatch(n -> n.target() == 1L && n.code().equals("town_elder")));
+    }
+
+    @Test
+    void shouldDespawnNpc_whenCharacterMovesAway() {
+        // KHÔNG dùng detachCharacter để test nhánh này — onDetach() không báo despawn quái/NPC
+        // cho CHÍNH nhân vật rời đi (nó không còn kết nối để nhận nữa), chỉ báo nhân vật khác về
+        // sự rời đi đó. Despawn NPC chỉ phát sinh qua nhánh "ra khỏi AOI_RADIUS" thật trong
+        // syncCharacterNpcPair — phải di chuyển thật xa NPC (khác quái, NPC không tự đứng yên chờ
+        // rồi hồi sinh gần hơn).
+        world.start();
+        world.attachCharacter(1L, -5f, -6f, DEFAULT_STATS); // gần NPC mẫu (spawn cố định (-5,-5))
+        awaitTrue(() -> sink.npcSpawned.stream().anyMatch(n -> n.target() == 1L));
+        long npcId = sink.npcSpawned.get(0).npcId();
+
+        world.enqueueMoveCommand(1L, 1, 1f, 1f); // đi xa dần theo hướng (1,1), MOVE_SPEED_MPS=5f
+
+        awaitTrue(
+                () -> sink.npcDespawned.stream().anyMatch(d -> d.target() == 1L && d.npcId() == npcId),
+                Duration.ofSeconds(8)); // > AOI_RADIUS_METERS(15f)/MOVE_SPEED_MPS(5f) ≈ 3s + đệm jitter
     }
 
     @Test

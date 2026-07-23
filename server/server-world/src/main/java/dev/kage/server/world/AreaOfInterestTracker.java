@@ -5,6 +5,7 @@ import dev.kage.engine.ecs.KEntity;
 import dev.kage.engine.ecs.component.PositionComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterComponent;
+import dev.kage.server.world.component.NpcComponent;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -12,8 +13,9 @@ import java.util.Set;
 
 /**
  * Area of Interest (SERVER.md §6 — "bắt buộc, không phải tối ưu, ngay từ Phase 3"). Diff cặp
- * (nhân vật, nhân vật) VÀ (nhân vật, quái) trong bán kính {@link WorldConstants#AOI_RADIUS_METERS}
- * giữa 2 tick, phát spawn/moved/despawned qua {@link WorldOutboundSink}.
+ * (nhân vật, nhân vật), (nhân vật, quái) VÀ (nhân vật, NPC) trong bán kính
+ * {@link WorldConstants#AOI_RADIUS_METERS} giữa 2 tick, phát spawn/moved/despawned qua
+ * {@link WorldOutboundSink}.
  *
  * <p>KHÔNG phải {@code IteratingKSystem}: AoI so sánh CẶP entity (O(n²)), không xử lý độc lập
  * từng entity như model iterate-1-entity của {@code IteratingKSystem} — dùng class thường, gọi
@@ -22,6 +24,13 @@ import java.util.Set;
  *
  * <p>O(n²) chấp nhận được ở quy mô nhỏ lát cắt này; spatial grid là việc tối ưu Phase 9 nếu số
  * liệu đo thật đòi hỏi (Điều 30 — đo trước, không tối ưu sớm).
+ *
+ * <p>⚠️ {@code syncCharacterPair}/{@code syncCharacterMonsterPair}/{@code syncCharacterNpcPair} là
+ * BẢN SAO cấu trúc gần giống nhau (3 lần) — CHƯA tổng quát hoá thành 1 hàm chung vì mỗi loại có
+ * payload snapshot khác nhau (HP quái, không HP NPC, 2 chiều với nhân vật khác) và tổng quát hoá
+ * sớm sẽ phải sửa code đã test kỹ (giống lý do KHÔNG đổi {@code WorldFacade.attachCharacter}'s
+ * signature ở Phase 5 GAMEPLAY.md §2). Nếu có loại entity thứ 4 cần AoI, ĐÓ là lúc bắt buộc tổng
+ * quát hoá (rule of three).
  */
 final class AreaOfInterestTracker {
 
@@ -29,6 +38,7 @@ final class AreaOfInterestTracker {
             ComponentMapper.getFor(PositionComponent.class);
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
     private static final ComponentMapper<MonsterComponent> MONSTER = ComponentMapper.getFor(MonsterComponent.class);
+    private static final ComponentMapper<NpcComponent> NPC = ComponentMapper.getFor(NpcComponent.class);
 
     private final WorldOutboundSink sink;
     // characterId -> tập ID (nhân vật DƯƠNG hoặc quái ÂM) mà nhân vật đó ĐANG thấy. Quái không có
@@ -79,7 +89,9 @@ final class AreaOfInterestTracker {
         return observers;
     }
 
-    void sync(Map<Long, KEntity> entitiesByCharacterId, Map<Long, KEntity> entitiesByMonsterId) {
+    void sync(
+            Map<Long, KEntity> entitiesByCharacterId, Map<Long, KEntity> entitiesByMonsterId,
+            Map<Long, KEntity> entitiesByNpcId) {
         var characterIds = entitiesByCharacterId.keySet().toArray(new Long[0]);
         for (int i = 0; i < characterIds.length; i++) {
             for (int j = i + 1; j < characterIds.length; j++) {
@@ -89,6 +101,9 @@ final class AreaOfInterestTracker {
         for (long characterId : characterIds) {
             for (long monsterId : entitiesByMonsterId.keySet()) {
                 syncCharacterMonsterPair(entitiesByCharacterId, entitiesByMonsterId, characterId, monsterId);
+            }
+            for (long npcId : entitiesByNpcId.keySet()) {
+                syncCharacterNpcPair(entitiesByCharacterId, entitiesByNpcId, characterId, npcId);
             }
         }
     }
@@ -129,6 +144,26 @@ final class AreaOfInterestTracker {
             sink.onMonsterDespawned(characterId, monsterId);
         } else if (within) {
             notifyMonsterMovedIfChanged(characterId, monsterId, monsterPos);
+        }
+    }
+
+    /** NPC tĩnh — không có nhánh "trong tầm nhìn, đã đổi vị trí" như {@code syncCharacterMonsterPair}. */
+    private void syncCharacterNpcPair(
+            Map<Long, KEntity> entitiesByCharacterId, Map<Long, KEntity> entitiesByNpcId, long characterId,
+            long npcId) {
+        var charPos = POSITION.get(entitiesByCharacterId.get(characterId));
+        var npcEntity = entitiesByNpcId.get(npcId);
+        var npcPos = POSITION.get(npcEntity);
+        boolean within = distance(charPos, npcPos) <= WorldConstants.AOI_RADIUS_METERS;
+        boolean wasVisible = visibleTo.get(characterId).contains(npcId);
+
+        if (within && !wasVisible) {
+            visibleTo.get(characterId).add(npcId);
+            var npc = NPC.get(npcEntity);
+            sink.onNpcSpawned(characterId, new WorldOutboundSink.NpcSnapshot(npcId, npc.npcCode, npcPos.x, npcPos.y));
+        } else if (!within && wasVisible) {
+            visibleTo.get(characterId).remove(npcId);
+            sink.onNpcDespawned(characterId, npcId);
         }
     }
 

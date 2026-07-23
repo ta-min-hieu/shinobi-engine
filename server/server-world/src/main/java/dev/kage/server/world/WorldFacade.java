@@ -14,6 +14,8 @@ import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterComponent;
 import dev.kage.server.world.component.MonsterIdComponent;
+import dev.kage.server.world.component.NpcComponent;
+import dev.kage.server.world.component.NpcIdComponent;
 import dev.kage.server.world.component.SkillCooldownComponent;
 import dev.kage.server.world.component.TargetComponent;
 import java.util.HashMap;
@@ -54,6 +56,12 @@ public final class WorldFacade {
     private static final float TRAINING_DUMMY_SPAWN_X = 5f;
     private static final float TRAINING_DUMMY_SPAWN_Y = 5f;
 
+    // NPC tĩnh mẫu — lát cắt 1 Phase 6, hardcode 1 NPC, chưa có npc_template DB (cùng lý do
+    // TRAINING_DUMMY chưa đọc monster_template). Vị trí khác quái để dễ phân biệt lúc test bằng tay.
+    private static final String SAMPLE_NPC_CODE = "town_elder";
+    private static final float SAMPLE_NPC_SPAWN_X = -5f;
+    private static final float SAMPLE_NPC_SPAWN_Y = -5f;
+
     private final WorldOutboundSink outboundSink;
     private final Queue<WorldCommand> inbox = new ConcurrentLinkedQueue<>();
     private final EcsWorld ecsWorld = new EcsWorld();
@@ -65,11 +73,21 @@ public final class WorldFacade {
     // state chỉ sửa trên tick thread" (SERVER.md §2).
     private final Map<Long, KEntity> entitiesByCharacterId = new HashMap<>();
     private final Map<Long, KEntity> entitiesByMonsterId = new HashMap<>();
+    private final Map<Long, KEntity> entitiesByNpcId = new HashMap<>();
     // Chỉ số NỀN (STR/AGI/INT/VIT) gốc — cần giữ lại để applyEquipmentBonus tính lại ATK từ đầu
     // (base + bonus trang bị hiện tại) mỗi lần, KHÔNG cộng dồn bonus cũ (equip/gỡ đồ nhiều lần
     // không được làm ATK trôi dần sai).
     private final Map<Long, CharacterBaseStats> baseStatsByCharacterId = new HashMap<>();
-    private long nextMonsterId = -1; // ID quái luôn ÂM — không đụng characterId (luôn DƯƠNG, DB auto-increment).
+    // ID quái/NPC luôn ÂM — không đụng characterId (luôn DƯƠNG, DB auto-increment). DÙNG CHUNG 1
+    // bộ đếm cho CẢ quái lẫn NPC (KHÔNG phải 2 bộ đếm riêng) — PHÁT HIỆN THẬT (Phase 6 lát cắt 1):
+    // 2 bộ đếm riêng cùng bắt đầu ở -1 khiến quái và NPC có thể trùng ID số; `AreaOfInterestTracker`
+    // dùng CHUNG 1 `Set<Long>` (`visibleTo`) để lưu "mọi ID nhân vật này đang thấy" bất kể loại
+    // entity, nên 2 entity khác loại nhưng trùng ID sẽ GHI ĐÈ lẫn nhau trong set đó — quái vừa
+    // được thêm vào "đang thấy" thì NPC (ID trùng số, ngoài tầm nhìn) lại xoá luôn ngay trong CÙNG
+    // tick, khiến quái không bao giờ được coi là "đã thấy từ trước" nên không bao giờ phát
+    // MonsterMovedEvent. Bắt bằng test thật (`shouldChaseAndAttackBack_whenCharacterEntersAggroRange`
+    // đột nhiên treo vô hạn chờ MonsterMovedEvent sau khi thêm NPC), không phải đoán trước.
+    private long nextMonsterOrNpcId = -1;
     private float monsterRespawnCountdownSeconds = -1f; // < 0 = quái đang sống, không đếm ngược.
 
     private volatile boolean running;
@@ -146,6 +164,7 @@ public final class WorldFacade {
 
     private void tickLoop() {
         spawnTrainingDummy();
+        spawnNpc(); // NPC tĩnh, không chết/hồi sinh — spawn 1 lần duy nhất, khác quái.
         long fixedDtNanos = (long) (WorldConstants.FIXED_DT * 1_000_000_000L);
         while (running) {
             long start = System.nanoTime();
@@ -155,7 +174,7 @@ public final class WorldFacade {
             handleCombatResults(combatSystem.drainResults());
             handleSkillResults(skillSystem.drainResults());
             tickMonsterRespawn(WorldConstants.FIXED_DT);
-            aoiTracker.sync(entitiesByCharacterId, entitiesByMonsterId);
+            aoiTracker.sync(entitiesByCharacterId, entitiesByMonsterId, entitiesByNpcId);
 
             long elapsed = System.nanoTime() - start;
             long sleepNanos = fixedDtNanos - elapsed;
@@ -356,7 +375,7 @@ public final class WorldFacade {
 
     private void spawnTrainingDummy() {
         var entity = ecsWorld.createEntity();
-        long monsterId = nextMonsterId--;
+        long monsterId = nextMonsterOrNpcId--;
 
         var position = new PositionComponent();
         position.x = TRAINING_DUMMY_SPAWN_X;
@@ -390,6 +409,32 @@ public final class WorldFacade {
         entitiesByMonsterId.put(monsterId, entity);
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
         // không cần thông báo thủ công (giống hệt attach nhân vật, xem AreaOfInterestTracker).
+    }
+
+    private void spawnNpc() {
+        var entity = ecsWorld.createEntity();
+        long npcId = nextMonsterOrNpcId--;
+
+        var position = new PositionComponent();
+        position.x = SAMPLE_NPC_SPAWN_X;
+        position.y = SAMPLE_NPC_SPAWN_Y;
+        position.prevX = position.x;
+        position.prevY = position.y;
+        entity.add(position);
+        // KHÔNG VelocityComponent/HealthComponent/AiStateComponent — NPC tĩnh, không di chuyển,
+        // không combat (khác spawnTrainingDummy).
+
+        var npc = new NpcComponent();
+        npc.npcCode = SAMPLE_NPC_CODE;
+        entity.add(npc);
+
+        var npcIdComponent = new NpcIdComponent();
+        npcIdComponent.npcId = npcId;
+        entity.add(npcIdComponent);
+
+        entitiesByNpcId.put(npcId, entity);
+        // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi NpcSpawnedEvent —
+        // không cần thông báo thủ công (giống hệt quái/nhân vật, xem AreaOfInterestTracker).
     }
 
     /** {@code CombatConstants.CombatStats} (record, không mutable) → component ECS (mutable). */

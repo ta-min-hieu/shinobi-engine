@@ -43,6 +43,12 @@ public interface WorldOutboundSink {
      */
     void onMonsterKilled(long killerCharacterId, String monsterCode);
 
+    /** NPC {@code npc.npcId()} VỪA vào AoI của {@code targetCharacterId} (Phase 6 §9 — NPC tĩnh). */
+    void onNpcSpawned(long targetCharacterId, NpcSnapshot npc);
+
+    /** NPC {@code npcId} VỪA rời AoI của {@code targetCharacterId} (đi xa — NPC không "chết"). */
+    void onNpcDespawned(long targetCharacterId, long npcId);
+
     /**
      * Kết quả 1 đòn đánh thường THẬT (đã né/bạo kích/giảm giáp — GDD §6) — gửi cho MỌI nhân vật
      * đang thấy mục tiêu trong AoI, không chỉ người tấn công.
@@ -57,6 +63,10 @@ public interface WorldOutboundSink {
 
     /** Ảnh chụp trạng thái quái lúc phát {@link #onMonsterSpawned} — gộp tham số (STATIC-ANALYSIS.md). */
     record MonsterSnapshot(long monsterId, String monsterCode, float x, float y, int currentHp, int maxHp) {
+    }
+
+    /** Ảnh chụp NPC lúc phát {@link #onNpcSpawned} — không có HP (NPC không combat, khác quái). */
+    record NpcSnapshot(long npcId, String npcCode, float x, float y) {
     }
 
     /** Kết quả 1 đòn đánh — gộp tham số cho {@link #onAttackResult} (STATIC-ANALYSIS.md). */
