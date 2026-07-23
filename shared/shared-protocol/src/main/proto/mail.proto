@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// Packet Thư (NETWORK.md §4, dải 900-999). Phase 6 lát cắt 5. Gửi thư KHÔNG mất gold ở MVP này
+// (feature-mail/CLAUDE.md). recipient_name (không phải ID) — server-gateway tự tra
+// CharacterFacade.findByName trước khi gọi MailFacade, cùng lý do SendFriendRequestCommand.
+
+message MailAttachmentView {
+  int64 item_template_id = 1;
+  int32 quantity = 2;
+}
+
+// Command: Client -> Server (OPCODE_SEND_MAIL_COMMAND).
+message SendMailCommand {
+  string recipient_name = 1;
+  string subject = 2;
+  string body = 3;
+  int64 gold_amount = 4;
+  repeated MailAttachmentView attachments = 5;
+}
+
+enum SendMailOutcome {
+  SEND_MAIL_OUTCOME_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho kết quả thật.
+  SEND_MAIL_OUTCOME_OK = 1;
+  SEND_MAIL_OUTCOME_RECIPIENT_NOT_FOUND = 2;
+}
+
+// Response: Server -> Client (OPCODE_SEND_MAIL_RESPONSE).
+message SendMailResponse {
+  SendMailOutcome outcome = 1;
+  int64 mail_id = 2;
+}
+
+message ListMailRequest {
+}
+
+// has_sender=false nghĩa là thư hệ thống (sender_id không có ý nghĩa lúc đó) — wire dùng cờ riêng
+// thay vì sentinel số 0, khớp cách domain.Mail dùng Long null (feature-mail/CLAUDE.md).
+message MailView {
+  int64 mail_id = 1;
+  bool has_sender = 2;
+  int64 sender_id = 3;
+  string subject = 4;
+  string body = 5;
+  int64 gold_amount = 6;
+  repeated MailAttachmentView attachments = 7;
+  bool claimed = 8;
+}
+
+message ListMailResponse {
+  repeated MailView mails = 1;
+}
+
+// Command: Client -> Server (OPCODE_CLAIM_MAIL_COMMAND).
+message ClaimMailCommand {
+  int64 mail_id = 1;
+}
+
+enum ClaimMailOutcome {
+  CLAIM_MAIL_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  CLAIM_MAIL_OUTCOME_OK = 1;
+  CLAIM_MAIL_OUTCOME_NOT_FOUND = 2;
+  CLAIM_MAIL_OUTCOME_ALREADY_CLAIMED = 3;
+  CLAIM_MAIL_OUTCOME_INVENTORY_FULL = 4;
+}
+
+// Response: Server -> Client (OPCODE_CLAIM_MAIL_RESPONSE).
+message ClaimMailResponse {
+  ClaimMailOutcome outcome = 1;
+}
+
+// Command: Client -> Server (OPCODE_DELETE_MAIL_COMMAND).
+message DeleteMailCommand {
+  int64 mail_id = 1;
+}
+
+enum DeleteMailOutcome {
+  DELETE_MAIL_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  DELETE_MAIL_OUTCOME_OK = 1;
+  DELETE_MAIL_OUTCOME_NOT_FOUND = 2;
+  DELETE_MAIL_OUTCOME_MUST_CLAIM_FIRST = 3;
+}
+
+// Response: Server -> Client (OPCODE_DELETE_MAIL_RESPONSE).
+message DeleteMailResponse {
+  DeleteMailOutcome outcome = 1;
+}
+
+// Đẩy cho người nhận NẾU đang online lúc gửi — client tự gọi lại ListMailRequest để lấy nội dung
+// đầy đủ (giống cách FriendOnlineEvent chỉ báo, không mang toàn bộ dữ liệu).
+message NewMailEvent {
+  int64 mail_id = 1;
+}

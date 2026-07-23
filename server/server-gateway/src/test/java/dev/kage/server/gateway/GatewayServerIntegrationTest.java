@@ -71,6 +71,9 @@ import dev.kage.protocol.SellOutcome;
 import dev.kage.protocol.SendFriendRequestCommand;
 import dev.kage.protocol.SendFriendRequestOutcome;
 import dev.kage.protocol.SendFriendRequestResponse;
+import dev.kage.protocol.SendMailCommand;
+import dev.kage.protocol.SendMailOutcome;
+import dev.kage.protocol.SendMailResponse;
 import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.TalkToNpcCommand;
 import dev.kage.protocol.UnequipItemCommand;
@@ -123,13 +126,15 @@ class GatewayServerIntegrationTest {
         var dialogueFacade = fakeDialogueFacade();
         var questFacade = fakeQuestFacade();
         var friendFacade = fakeFriendFacade();
+        var mailFacade = fakeMailFacade();
         characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
         worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
         var positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
-        var contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, friendFacade);
+        var socialFacades = new SocialFacades(friendFacade, mailFacade);
+        var contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
         var facades = new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
         server = new GatewayServer(0, facades, worldGateway);
         server.start();
@@ -429,6 +434,55 @@ class GatewayServerIntegrationTest {
                 new dev.kage.friend.application.ListFriendsUseCase(friendPort),
                 new dev.kage.friend.application.ListPendingFriendRequestsUseCase(friendPort));
         return new dev.kage.friend.api.FriendFacade(useCases);
+    }
+
+    // Mail không dùng trong test này — fake tối thiểu để compile (cùng convention fakeFriendFacade).
+    private dev.kage.mail.api.MailFacade fakeMailFacade() {
+        dev.kage.mail.domain.MailRepositoryPort mailRepositoryPort = new dev.kage.mail.domain.MailRepositoryPort() {
+            @Override
+            public dev.kage.mail.domain.Mail send(
+                    dev.kage.mail.domain.Transaction tx, dev.kage.mail.domain.NewMail newMail) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public Optional<dev.kage.mail.domain.Mail> findById(long mailId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public Optional<dev.kage.mail.domain.Mail> findByIdForUpdate(
+                    dev.kage.mail.domain.Transaction tx, long mailId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public List<dev.kage.mail.domain.Mail> listForRecipient(long recipientId) {
+                return List.of();
+            }
+
+            @Override
+            public boolean markClaimed(dev.kage.mail.domain.Transaction tx, long mailId, long recipientId) {
+                return false;
+            }
+
+            @Override
+            public boolean delete(long mailId, long recipientId) {
+                return false;
+            }
+        };
+        dev.kage.mail.domain.GoldPort mailGoldPort = (tx, characterId, amount) -> { };
+        dev.kage.mail.domain.InventoryGatewayPort mailInventoryGatewayPort =
+                (tx, characterId, itemTemplateId, quantity) -> true;
+        dev.kage.mail.domain.AuditPort mailAuditPort = (tx, characterId, action, detailJson) -> { };
+        dev.kage.mail.domain.TransactionRunner mailTx = action -> action.accept(null);
+        var sendMailUseCase = new dev.kage.mail.application.SendMailUseCase(mailRepositoryPort, mailTx);
+        var listMailUseCase = new dev.kage.mail.application.ListMailUseCase(mailRepositoryPort);
+        var mailPorts = new dev.kage.mail.application.MailPorts(
+                mailRepositoryPort, mailGoldPort, mailInventoryGatewayPort, mailAuditPort);
+        var claimMailUseCase = new dev.kage.mail.application.ClaimMailUseCase(mailPorts, mailTx);
+        var deleteMailUseCase = new dev.kage.mail.application.DeleteMailUseCase(mailRepositoryPort);
+        return new dev.kage.mail.api.MailFacade(sendMailUseCase, listMailUseCase, claimMailUseCase, deleteMailUseCase);
     }
 
     @AfterEach
@@ -770,6 +824,30 @@ class GatewayServerIntegrationTest {
                     readUntilOpcode(in, Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE).payload());
             assertThat(response.getOutcome())
                     .isEqualTo(SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_TARGET_NOT_FOUND);
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void clientShouldReceiveSendMailResponse_overRealSockets() throws Exception {
+        // Cùng lý do clientShouldReceiveSendFriendRequestResponse_overRealSockets: tên người nhận
+        // bất kỳ chắc chắn không tồn tại, verify đúng nhánh RECIPIENT_NOT_FOUND — nhánh này KHÔNG
+        // chạm tới fakeMailFacade()'s MailRepositoryPort (ném exception nếu bị gọi thật).
+        try (var socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(5000);
+            var in = new DataInputStream(socket.getInputStream());
+            connectCreateAndSelect(socket, in, "mail" + UUID.randomUUID().toString().substring(0, 6));
+
+            var command = SendMailCommand.newBuilder()
+                    .setRecipientName("khong_ton_tai")
+                    .setSubject("s")
+                    .setBody("b")
+                    .build();
+            sendFrame(socket, Opcode.OPCODE_SEND_MAIL_COMMAND_VALUE, 10, command.toByteArray());
+
+            var response =
+                    SendMailResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE).payload());
+            assertThat(response.getOutcome()).isEqualTo(SendMailOutcome.SEND_MAIL_OUTCOME_RECIPIENT_NOT_FOUND);
         }
     }
 

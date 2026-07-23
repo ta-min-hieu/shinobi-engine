@@ -13,6 +13,7 @@ import dev.kage.dialogue.domain.DialogueNode;
 import dev.kage.friend.api.FriendFacade;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.EquipmentSlotType;
+import dev.kage.mail.api.MailFacade;
 import dev.kage.protocol.AcceptFriendRequestCommand;
 import dev.kage.protocol.AcceptFriendRequestOutcome;
 import dev.kage.protocol.AcceptFriendRequestResponse;
@@ -22,6 +23,9 @@ import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.BuyItemResponse;
 import dev.kage.protocol.BuyOutcome;
 import dev.kage.protocol.CharacterSummary;
+import dev.kage.protocol.ClaimMailCommand;
+import dev.kage.protocol.ClaimMailOutcome;
+import dev.kage.protocol.ClaimMailResponse;
 import dev.kage.protocol.ClaimQuestRewardCommand;
 import dev.kage.protocol.ClaimQuestRewardOutcome;
 import dev.kage.protocol.ClaimQuestRewardResponse;
@@ -29,6 +33,9 @@ import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
 import dev.kage.protocol.CreateCharacterResponse;
+import dev.kage.protocol.DeleteMailCommand;
+import dev.kage.protocol.DeleteMailOutcome;
+import dev.kage.protocol.DeleteMailResponse;
 import dev.kage.protocol.DialogueEndedResponse;
 import dev.kage.protocol.DialogueNodeResponse;
 import dev.kage.protocol.DialogueOptionView;
@@ -48,11 +55,16 @@ import dev.kage.protocol.ListCharactersRequest;
 import dev.kage.protocol.ListCharactersResponse;
 import dev.kage.protocol.ListFriendsRequest;
 import dev.kage.protocol.ListFriendsResponse;
+import dev.kage.protocol.ListMailRequest;
+import dev.kage.protocol.ListMailResponse;
 import dev.kage.protocol.ListPendingFriendRequestsRequest;
 import dev.kage.protocol.ListPendingFriendRequestsResponse;
 import dev.kage.protocol.ListShopItemsRequest;
 import dev.kage.protocol.ListShopItemsResponse;
+import dev.kage.protocol.MailAttachmentView;
+import dev.kage.protocol.MailView;
 import dev.kage.protocol.MoveCommand;
+import dev.kage.protocol.NewMailEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PendingFriendRequestView;
 import dev.kage.protocol.PingCommand;
@@ -72,6 +84,9 @@ import dev.kage.protocol.SellOutcome;
 import dev.kage.protocol.SendFriendRequestCommand;
 import dev.kage.protocol.SendFriendRequestOutcome;
 import dev.kage.protocol.SendFriendRequestResponse;
+import dev.kage.protocol.SendMailCommand;
+import dev.kage.protocol.SendMailOutcome;
+import dev.kage.protocol.SendMailResponse;
 import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.ShopListingView;
 import dev.kage.protocol.TalkToNpcCommand;
@@ -129,6 +144,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final DialogueFacade dialogueFacade;
     private final QuestFacade questFacade;
     private final FriendFacade friendFacade;
+    private final MailFacade mailFacade;
     private final WorldGateway worldGateway;
     private final Executor authExecutor;
     // Per-connection (handler đã là state per-connection, xem javadoc lớp) — không cần đồng bộ
@@ -169,7 +185,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_REMOVE_FRIEND_COMMAND_VALUE, this::handleRemoveFriendCommand),
             Map.entry(Opcode.OPCODE_LIST_FRIENDS_REQUEST_VALUE, this::handleListFriendsRequest),
             Map.entry(Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_REQUEST_VALUE,
-                    this::handleListPendingFriendRequestsRequest));
+                    this::handleListPendingFriendRequestsRequest),
+            Map.entry(Opcode.OPCODE_SEND_MAIL_COMMAND_VALUE, this::handleSendMailCommand),
+            Map.entry(Opcode.OPCODE_LIST_MAIL_REQUEST_VALUE, this::handleListMailRequest),
+            Map.entry(Opcode.OPCODE_CLAIM_MAIL_COMMAND_VALUE, this::handleClaimMailCommand),
+            Map.entry(Opcode.OPCODE_DELETE_MAIL_COMMAND_VALUE, this::handleDeleteMailCommand));
 
     GatewayChannelHandler(GatewayFacades facades, WorldGateway worldGateway, Executor authExecutor) {
         this.accountFacade = facades.accountFacade();
@@ -178,7 +198,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.shopFacade = facades.contentFacades().shopFacade();
         this.dialogueFacade = facades.contentFacades().dialogueFacade();
         this.questFacade = facades.contentFacades().questFacade();
-        this.friendFacade = facades.contentFacades().friendFacade();
+        this.friendFacade = facades.contentFacades().socialFacades().friendFacade();
+        this.mailFacade = facades.contentFacades().socialFacades().mailFacade();
         this.worldGateway = worldGateway;
         this.authExecutor = authExecutor;
     }
@@ -876,6 +897,136 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         send(ctx, Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_RESPONSE_VALUE, sequenceId,
                 responseBuilder.build().toByteArray());
+    }
+
+    private void handleSendMailCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = SendMailCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleSendMailBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleSendMailBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, SendMailCommand command) {
+        var recipient = characterFacade.findByName(command.getRecipientName());
+        if (recipient.isEmpty()) {
+            var response = SendMailResponse.newBuilder()
+                    .setOutcome(SendMailOutcome.SEND_MAIL_OUTCOME_RECIPIENT_NOT_FOUND)
+                    .build();
+            send(ctx, Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            return;
+        }
+        var attachments = command.getAttachmentsList().stream()
+                .map(a -> new MailFacade.AttachmentRequest(a.getItemTemplateId(), a.getQuantity()))
+                .toList();
+        var request = new MailFacade.SendMailRequest(
+                characterId, recipient.get().id(), command.getSubject(), command.getBody(), command.getGoldAmount(),
+                attachments);
+        long mailId = mailFacade.sendMail(request);
+        var response = SendMailResponse.newBuilder()
+                .setOutcome(SendMailOutcome.SEND_MAIL_OUTCOME_OK)
+                .setMailId(mailId)
+                .build();
+        send(ctx, Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        var event = NewMailEvent.newBuilder().setMailId(mailId).build();
+        worldGateway.registry().sendToCharacterIfOnline(
+                recipient.get().id(), Opcode.OPCODE_NEW_MAIL_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    private void handleListMailRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ListMailRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleListMailBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleListMailBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        var responseBuilder = ListMailResponse.newBuilder();
+        for (var mail : mailFacade.listMail(characterId)) {
+            var viewBuilder = MailView.newBuilder()
+                    .setMailId(mail.mailId())
+                    .setHasSender(mail.senderId() != null)
+                    .setSenderId(mail.senderId() == null ? 0 : mail.senderId())
+                    .setSubject(mail.subject())
+                    .setBody(mail.body())
+                    .setGoldAmount(mail.goldAmount())
+                    .setClaimed(mail.claimed());
+            for (var attachment : mail.attachments()) {
+                viewBuilder.addAttachments(MailAttachmentView.newBuilder()
+                        .setItemTemplateId(attachment.itemTemplateId())
+                        .setQuantity(attachment.quantity())
+                        .build());
+            }
+            responseBuilder.addMails(viewBuilder.build());
+        }
+        send(ctx, Opcode.OPCODE_LIST_MAIL_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+    }
+
+    private void handleClaimMailCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = ClaimMailCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleClaimMailBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleClaimMailBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, ClaimMailCommand command) {
+        var result = mailFacade.claimMail(command.getMailId(), characterId);
+        var response = ClaimMailResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        send(ctx, Opcode.OPCODE_CLAIM_MAIL_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private static final Map<MailFacade.ClaimResult, ClaimMailOutcome> CLAIM_MAIL_OUTCOME_MAPPING = Map.of(
+            MailFacade.ClaimResult.OK, ClaimMailOutcome.CLAIM_MAIL_OUTCOME_OK,
+            MailFacade.ClaimResult.NOT_FOUND, ClaimMailOutcome.CLAIM_MAIL_OUTCOME_NOT_FOUND,
+            MailFacade.ClaimResult.ALREADY_CLAIMED, ClaimMailOutcome.CLAIM_MAIL_OUTCOME_ALREADY_CLAIMED,
+            MailFacade.ClaimResult.INVENTORY_FULL, ClaimMailOutcome.CLAIM_MAIL_OUTCOME_INVENTORY_FULL);
+
+    private static ClaimMailOutcome toProtoOutcome(MailFacade.ClaimResult result) {
+        return CLAIM_MAIL_OUTCOME_MAPPING.get(result);
+    }
+
+    private void handleDeleteMailCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = DeleteMailCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleDeleteMailBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleDeleteMailBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, DeleteMailCommand command) {
+        var result = mailFacade.deleteMail(command.getMailId(), characterId);
+        var response = DeleteMailResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        send(ctx, Opcode.OPCODE_DELETE_MAIL_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private static final Map<MailFacade.DeleteResult, DeleteMailOutcome> DELETE_MAIL_OUTCOME_MAPPING = Map.of(
+            MailFacade.DeleteResult.OK, DeleteMailOutcome.DELETE_MAIL_OUTCOME_OK,
+            MailFacade.DeleteResult.NOT_FOUND, DeleteMailOutcome.DELETE_MAIL_OUTCOME_NOT_FOUND,
+            MailFacade.DeleteResult.MUST_CLAIM_FIRST, DeleteMailOutcome.DELETE_MAIL_OUTCOME_MUST_CLAIM_FIRST);
+
+    private static DeleteMailOutcome toProtoOutcome(MailFacade.DeleteResult result) {
+        return DELETE_MAIL_OUTCOME_MAPPING.get(result);
     }
 
     private static DialogueNodeResponse toResponse(DialogueNode node) {

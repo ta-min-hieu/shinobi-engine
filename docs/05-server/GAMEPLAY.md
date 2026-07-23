@@ -391,7 +391,7 @@ nguyên tắc "open_shop" đã dùng ở §9.2) → `AcceptQuestResponse`.
 |---|---|---|
 | Guild | Shell (tạo/tham gia) | Dời sang **Phase 7** cùng `feature-guild` thật (quyết định 2026-07-23, không phải Phase 6 — xem ROADMAP.md) |
 | Friend | ✅ Đã code (2026-07-23) | `feature-friend`, trạng thái online qua `ConnectedCharacterRegistry` in-memory (KHÔNG qua Redis — xem feature-friend/CLAUDE.md, quyết định tránh trùng lặp hạ tầng ở single-instance) |
-| Mail | Chưa làm (lát cắt 5) | ⚠️ Mail có item = **transaction** khi nhận |
+| Mail | ✅ Đã code (2026-07-23) | `feature-mail` — gửi/xem/nhận/xoá; nhận gold+item đính kèm chạy trong 1 transaction (khoá dòng + kiểm `claimed_at` + cấp thưởng + đánh dấu + audit), verify rollback thật bằng Postgres (Testcontainers) |
 
 ⚠️ **Mail đính kèm item** là con đường duplicate item kinh điển: nhận item nhưng không đánh dấu mail đã nhận → nhận lại được. **Transaction bắt buộc.**
 

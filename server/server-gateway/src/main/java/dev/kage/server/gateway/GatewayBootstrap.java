@@ -32,6 +32,7 @@ public final class GatewayBootstrap {
         var dialogueFacade = databaseBootstrap.wireDialogueFacade();
         var questFacade = databaseBootstrap.wireQuestFacade();
         var friendFacade = databaseBootstrap.wireFriendFacade();
+        var mailFacade = databaseBootstrap.wireMailFacade();
 
         // characterRegistry là WorldOutboundSink thật — PHẢI tồn tại trước WorldFacade vì
         // WorldFacade cần sink lúc construct (SERVER.md §2: kết quả tick đi qua outbound queue).
@@ -43,7 +44,8 @@ public final class GatewayBootstrap {
         positionPersister.start();
         var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
 
-        var contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, friendFacade);
+        var socialFacades = new SocialFacades(friendFacade, mailFacade);
+        var contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
         var facades = new GatewayFacades(accountFacade, characterFacade, inventoryFacade, contentFacades);
         var server = new GatewayServer(PORT, facades, worldGateway);
         server.start();

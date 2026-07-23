@@ -25,6 +25,12 @@ import dev.kage.inventory.application.EnhancePorts;
 import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
+import dev.kage.mail.api.MailFacade;
+import dev.kage.mail.application.ClaimMailUseCase;
+import dev.kage.mail.application.DeleteMailUseCase;
+import dev.kage.mail.application.ListMailUseCase;
+import dev.kage.mail.application.MailPorts;
+import dev.kage.mail.application.SendMailUseCase;
 import dev.kage.quest.api.QuestFacade;
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
@@ -43,6 +49,11 @@ import dev.kage.server.database.inventory.PostgresEquipmentAdapter;
 import dev.kage.server.database.inventory.PostgresGoldAdapter;
 import dev.kage.server.database.inventory.PostgresInventoryAdapter;
 import dev.kage.server.database.inventory.PostgresItemTemplateAdapter;
+import dev.kage.server.database.mail.JdbcMailTransactionRunner;
+import dev.kage.server.database.mail.PostgresMailAuditAdapter;
+import dev.kage.server.database.mail.PostgresMailGoldAdapter;
+import dev.kage.server.database.mail.PostgresMailInventoryGatewayAdapter;
+import dev.kage.server.database.mail.PostgresMailRepositoryAdapter;
 import dev.kage.server.database.quest.JdbcQuestTransactionRunner;
 import dev.kage.server.database.quest.PostgresQuestAuditAdapter;
 import dev.kage.server.database.quest.PostgresQuestExpAdapter;
@@ -167,6 +178,20 @@ public final class ServerDatabaseBootstrap {
                 new ListFriendsUseCase(friendPort),
                 new ListPendingFriendRequestsUseCase(friendPort));
         return new FriendFacade(useCases);
+    }
+
+    public MailFacade wireMailFacade() {
+        var repositoryPort = new PostgresMailRepositoryAdapter(dataSource);
+        var goldPort = new PostgresMailGoldAdapter();
+        var inventoryGatewayPort = new PostgresMailInventoryGatewayAdapter(dataSource);
+        var auditPort = new PostgresMailAuditAdapter();
+        var transactionRunner = new JdbcMailTransactionRunner(dataSource);
+        var sendMailUseCase = new SendMailUseCase(repositoryPort, transactionRunner);
+        var listMailUseCase = new ListMailUseCase(repositoryPort);
+        var ports = new MailPorts(repositoryPort, goldPort, inventoryGatewayPort, auditPort);
+        var claimMailUseCase = new ClaimMailUseCase(ports, transactionRunner);
+        var deleteMailUseCase = new DeleteMailUseCase(repositoryPort);
+        return new MailFacade(sendMailUseCase, listMailUseCase, claimMailUseCase, deleteMailUseCase);
     }
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */

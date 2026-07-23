@@ -417,6 +417,55 @@ class GatewayPipelineTest {
         return new dev.kage.friend.api.FriendFacade(useCases);
     }
 
+    // Mail không dùng trong test này — fake tối thiểu để compile (cùng convention fakeFriendFacade).
+    private static dev.kage.mail.api.MailFacade fakeMailFacade() {
+        dev.kage.mail.domain.MailRepositoryPort mailRepositoryPort = new dev.kage.mail.domain.MailRepositoryPort() {
+            @Override
+            public dev.kage.mail.domain.Mail send(
+                    dev.kage.mail.domain.Transaction tx, dev.kage.mail.domain.NewMail newMail) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public Optional<dev.kage.mail.domain.Mail> findById(long mailId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public Optional<dev.kage.mail.domain.Mail> findByIdForUpdate(
+                    dev.kage.mail.domain.Transaction tx, long mailId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public List<dev.kage.mail.domain.Mail> listForRecipient(long recipientId) {
+                return List.of();
+            }
+
+            @Override
+            public boolean markClaimed(dev.kage.mail.domain.Transaction tx, long mailId, long recipientId) {
+                return false;
+            }
+
+            @Override
+            public boolean delete(long mailId, long recipientId) {
+                return false;
+            }
+        };
+        dev.kage.mail.domain.GoldPort mailGoldPort = (tx, characterId, amount) -> { };
+        dev.kage.mail.domain.InventoryGatewayPort mailInventoryGatewayPort =
+                (tx, characterId, itemTemplateId, quantity) -> true;
+        dev.kage.mail.domain.AuditPort mailAuditPort = (tx, characterId, action, detailJson) -> { };
+        dev.kage.mail.domain.TransactionRunner mailTx = action -> action.accept(null);
+        var sendMailUseCase = new dev.kage.mail.application.SendMailUseCase(mailRepositoryPort, mailTx);
+        var listMailUseCase = new dev.kage.mail.application.ListMailUseCase(mailRepositoryPort);
+        var mailPorts = new dev.kage.mail.application.MailPorts(
+                mailRepositoryPort, mailGoldPort, mailInventoryGatewayPort, mailAuditPort);
+        var claimMailUseCase = new dev.kage.mail.application.ClaimMailUseCase(mailPorts, mailTx);
+        var deleteMailUseCase = new dev.kage.mail.application.DeleteMailUseCase(mailRepositoryPort);
+        return new dev.kage.mail.api.MailFacade(sendMailUseCase, listMailUseCase, claimMailUseCase, deleteMailUseCase);
+    }
+
     private static EmbeddedChannel newPipeline(FakeCharacterPort characterPort) {
         // ⚠️ Phải khớp CHÍNH XÁC pipeline thật trong GatewayBootstrap — lệch ở đây là test giả.
         // AccountFacade/CharacterFacade THẬT (không mock), chỉ Port bên dưới là Fake (TESTING.md
@@ -444,6 +493,7 @@ class GatewayPipelineTest {
         var dialogueFacade = fakeDialogueFacade();
         var questFacade = fakeQuestFacade();
         var friendFacade = fakeFriendFacade();
+        var mailFacade = fakeMailFacade();
         var characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
         var worldFacade = new WorldFacade(characterRegistry);
         var positionPersister =
@@ -458,7 +508,8 @@ class GatewayPipelineTest {
                 new GatewayChannelHandler(
                         new GatewayFacades(
                                 accountFacade, characterFacade, inventoryFacade,
-                                new ContentFacades(shopFacade, dialogueFacade, questFacade, friendFacade)),
+                                new ContentFacades(shopFacade, dialogueFacade, questFacade,
+                                        new SocialFacades(friendFacade, mailFacade))),
                         worldGateway, Runnable::run));
     }
 

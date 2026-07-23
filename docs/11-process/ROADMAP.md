@@ -34,7 +34,7 @@ graph LR
     P3 --> P4["4· Combat<br/>Skill · Monster"]
     P4 --> P5["5· Inventory<br/>Equipment · Shop"]
     P5 --> P6["6· Quest<br/>NPC · Dialogue"]
-    P6 --> P7["7· Guild · Party<br/>Mail · Trade"]
+    P6 --> P7["7· Guild · Party<br/>Trade"]
     P7 --> P8["8· Dungeon<br/>Boss · PvP"]
     P8 --> P9["9· Optimization"]
     P9 --> P10["10· Release"]
@@ -219,7 +219,7 @@ graph LR
 | ✅ `feature-quest` + script lát cắt 3 (2026-07-23 — nhận qua dialogue → theo dõi → hoàn thành → nhận thưởng, đầy đủ) | [GAMEPLAY.md §9.3](../05-server/GAMEPLAY.md) |
 | Validate mọi script lúc khởi động | [SCRIPTING.md §8](../06-plugin/SCRIPTING.md) |
 | ✅ `feature-friend` lát cắt 4 (2026-07-23 — gửi/chấp nhận/từ chối/huỷ kết bạn theo tên + trạng thái online qua `ConnectedCharacterRegistry`, chơi được thật qua socket) | [GAMEPLAY.md §11](../05-server/GAMEPLAY.md) |
-| Mail (lát cắt 5 — chưa làm) | [GAMEPLAY.md §11](../05-server/GAMEPLAY.md) |
+| ✅ `feature-mail` lát cắt 5 (2026-07-23 — gửi/xem/nhận/xoá thư, gold+item đính kèm nhận NGUYÊN TỬ trong 1 transaction chống duplicate, chơi được thật qua socket + Postgres thật) | [GAMEPLAY.md §11](../05-server/GAMEPLAY.md) |
 | Chat: World/Riêng tư/Khu vực (lát cắt 6 — chưa làm; Bang hội/Party dời Phase 7 cùng Guild/Party thật) | [GAMEPLAY.md §10](../05-server/GAMEPLAY.md) |
 
 **Exit Criteria — đây là MVP:**
@@ -228,7 +228,10 @@ graph LR
 
 ---
 
-## Phase 7 — Guild · Party · Mail · Trade
+## Phase 7 — Guild · Party · Trade
+
+> Mail đã làm ở Phase 6 lát cắt 5 (feature-mail) — tiêu đề Phase này KHÔNG còn Mail (sửa
+> 2026-07-23, khớp lại với bảng công việc bên dưới chưa từng liệt Mail).
 
 | Việc | Ghi chú |
 |---|---|
