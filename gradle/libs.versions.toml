@@ -11,7 +11,7 @@ java = "25"                       # ✅ Temurin 25 (LTS) — ADR-001
 libgdx = "1.14.2"                 # ✅ latest 05/2026 (ADR-002 ghi 1.13.x — đã cũ)
 
 # --- Server ---
-netty = "4.1.136.Final"           # ✅ latest 4.1.x 07/2026 — ADR-003
+netty = "4.2.16.Final"           # ✅ latest 4.1.x 07/2026 — ADR-003
 protobuf = "4.35.1"               # ✅ latest 06/2026
 hikaricp = "7.0.2"                # ⚠️ verify — HikariCP (ADR-004)
 postgresql = "42.7.9"             # ⚠️ verify — JDBC driver
