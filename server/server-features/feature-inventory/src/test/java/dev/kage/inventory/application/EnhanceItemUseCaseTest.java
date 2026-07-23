@@ -3,10 +3,12 @@ package dev.kage.inventory.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.kage.inventory.domain.AuditPort;
+import dev.kage.inventory.domain.EnhancementTable;
 import dev.kage.inventory.domain.GoldPort;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.inventory.domain.ItemStack;
+import dev.kage.inventory.domain.ItemTemplatePort;
 import dev.kage.inventory.domain.Transaction;
 import java.util.List;
 import java.util.Optional;
@@ -17,6 +19,8 @@ class EnhanceItemUseCaseTest {
     private static final long CHARACTER_ID = 1L;
     private static final long ITEM_ID = 42L;
     private static final long TEMPLATE_ID = 100L;
+    private static final long PROTECTION_TEMPLATE_ID = 900L;
+    private static final long PROTECTION_ITEM_ID = 901L;
 
     static final class FakeInventoryPort implements InventoryPort {
         private final Inventory existing;
@@ -65,16 +69,43 @@ class EnhanceItemUseCaseTest {
         }
     }
 
+    /** {@code hasProtectionCharm=true} nghĩa là túi CÓ seed 1 item template {@code PROTECTION_TEMPLATE_ID}. */
+    static final class FakeItemTemplatePort implements ItemTemplatePort {
+        private final boolean hasProtectionCharm;
+
+        FakeItemTemplatePort(boolean hasProtectionCharm) {
+            this.hasProtectionCharm = hasProtectionCharm;
+        }
+
+        @Override
+        public Optional<dev.kage.inventory.domain.ItemTemplate> findById(long itemTemplateId) {
+            throw new UnsupportedOperationException("Test này không cần findById");
+        }
+
+        @Override
+        public Optional<Long> findIdByCode(String code) {
+            return hasProtectionCharm && code.equals(EnhancementTable.PROTECTION_CHARM_CODE)
+                    ? Optional.of(PROTECTION_TEMPLATE_ID) : Optional.empty();
+        }
+    }
+
     private static final dev.kage.inventory.domain.TransactionRunner DIRECT_TX = action -> action.accept(null);
+
+    private static EnhanceItemUseCase newUseCase(
+            FakeInventoryPort inventoryPort, FakeGoldPort goldPort, FakeAuditPort auditPort,
+            FakeItemTemplatePort itemTemplatePort) {
+        var ports = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
+        return new EnhanceItemUseCase(ports, DIRECT_TX);
+    }
 
     @Test
     void shouldReturnItemNotFound_whenItemDoesNotBelongToCharacter() {
         var inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of()));
         var goldPort = new FakeGoldPort(true);
         var auditPort = new FakeAuditPort();
-        var useCase = new EnhanceItemUseCase(inventoryPort, goldPort, auditPort, DIRECT_TX);
+        var useCase = newUseCase(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false));
 
-        var result = useCase.execute(CHARACTER_ID, 999L);
+        var result = useCase.execute(CHARACTER_ID, 999L, false);
 
         assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.ITEM_NOT_FOUND);
         assertThat(goldPort.deductCalled).isFalse();
@@ -87,9 +118,9 @@ class EnhanceItemUseCaseTest {
         var inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(maxedItem)));
         var goldPort = new FakeGoldPort(true);
         var auditPort = new FakeAuditPort();
-        var useCase = new EnhanceItemUseCase(inventoryPort, goldPort, auditPort, DIRECT_TX);
+        var useCase = newUseCase(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false));
 
-        var result = useCase.execute(CHARACTER_ID, ITEM_ID);
+        var result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
 
         assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.MAX_LEVEL);
         assertThat(goldPort.deductCalled).isFalse();
@@ -101,9 +132,9 @@ class EnhanceItemUseCaseTest {
         var inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item)));
         var goldPort = new FakeGoldPort(false); // không đủ gold
         var auditPort = new FakeAuditPort();
-        var useCase = new EnhanceItemUseCase(inventoryPort, goldPort, auditPort, DIRECT_TX);
+        var useCase = newUseCase(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false));
 
-        var result = useCase.execute(CHARACTER_ID, ITEM_ID);
+        var result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
 
         assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.INSUFFICIENT_GOLD);
         assertThat(inventoryPort.saved).isNull(); // không đổi enhance_level khi không trả được tiền
@@ -119,9 +150,9 @@ class EnhanceItemUseCaseTest {
         var inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item)));
         var goldPort = new FakeGoldPort(true);
         var auditPort = new FakeAuditPort();
-        var useCase = new EnhanceItemUseCase(inventoryPort, goldPort, auditPort, DIRECT_TX);
+        var useCase = newUseCase(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false));
 
-        var result = useCase.execute(CHARACTER_ID, ITEM_ID);
+        var result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
 
         assertThat(result).isIn(
                 EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP);
@@ -132,18 +163,20 @@ class EnhanceItemUseCaseTest {
     }
 
     @Test
-    void shouldDropOneLevel_onFailure_whenAtOrAboveDropThreshold() {
+    void shouldDropOneLevel_onFailure_whenAtOrAboveDropThresholdAndNoProtectionRequested() {
         // currentLevel=15... nhưng 15 là MAX nên dùng 14 (rate 5%, gần chắc chắn fail) để test
         // nhánh FAILED_DROPPED mà không cần mock random — chạy đủ nhiều lần để bắt được ít nhất
-        // 1 lần fail (thống kê, cùng cách LootRollerTest đã dùng).
+        // 1 lần fail (thống kê, cùng cách LootRollerTest đã dùng). useProtection=false nên dù túi
+        // không có Bảo Vệ cũng không quan trọng.
         boolean sawDropped = false;
         boolean sawSuccess = false;
         for (int i = 0; i < 200 && !(sawDropped && sawSuccess); i++) {
             var item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 14);
             var inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item)));
-            var useCase = new EnhanceItemUseCase(inventoryPort, new FakeGoldPort(true), new FakeAuditPort(), DIRECT_TX);
+            var useCase = newUseCase(
+                    inventoryPort, new FakeGoldPort(true), new FakeAuditPort(), new FakeItemTemplatePort(false));
 
-            var result = useCase.execute(CHARACTER_ID, ITEM_ID);
+            var result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
             if (result == EnhanceItemUseCase.EnhanceResult.FAILED_DROPPED) {
                 sawDropped = true;
                 assertThat(inventoryPort.saved.findItem(ITEM_ID).orElseThrow().enhanceLevel()).isEqualTo(13);
@@ -153,5 +186,66 @@ class EnhanceItemUseCaseTest {
             }
         }
         assertThat(sawDropped).isTrue();
+    }
+
+    @Test
+    void shouldConsumeProtectionAndKeepLevel_onFailure_whenProtectionRequestedAndOwned() {
+        boolean sawProtected = false;
+        for (int i = 0; i < 200 && !sawProtected; i++) {
+            var item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 14);
+            var charm = new ItemStack(PROTECTION_ITEM_ID, PROTECTION_TEMPLATE_ID, 1, 0);
+            var inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item, charm)));
+            var useCase = newUseCase(
+                    inventoryPort, new FakeGoldPort(true), new FakeAuditPort(), new FakeItemTemplatePort(true));
+
+            var result = useCase.execute(CHARACTER_ID, ITEM_ID, true);
+            if (result == EnhanceItemUseCase.EnhanceResult.FAILED_PROTECTED) {
+                sawProtected = true;
+                assertThat(inventoryPort.saved.findItem(ITEM_ID).orElseThrow().enhanceLevel()).isEqualTo(14);
+                // Bảo Vệ đã tiêu — quantity 1 nên dòng bị XOÁ hẳn khỏi túi.
+                assertThat(inventoryPort.saved.findByTemplate(PROTECTION_TEMPLATE_ID)).isEmpty();
+            }
+        }
+        assertThat(sawProtected).isTrue();
+    }
+
+    @Test
+    void shouldStillDropLevel_whenProtectionRequestedButNotOwned() {
+        boolean sawDropped = false;
+        for (int i = 0; i < 200 && !sawDropped; i++) {
+            var item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 14);
+            var inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item)));
+            // FakeItemTemplatePort(true) tra được template id, nhưng túi KHÔNG có item nào khớp.
+            var useCase = newUseCase(
+                    inventoryPort, new FakeGoldPort(true), new FakeAuditPort(), new FakeItemTemplatePort(true));
+
+            var result = useCase.execute(CHARACTER_ID, ITEM_ID, true);
+            if (result == EnhanceItemUseCase.EnhanceResult.FAILED_DROPPED) {
+                sawDropped = true;
+                assertThat(inventoryPort.saved.findItem(ITEM_ID).orElseThrow().enhanceLevel()).isEqualTo(13);
+            }
+        }
+        assertThat(sawDropped).isTrue();
+    }
+
+    @Test
+    void shouldNotConsumeProtection_whenSuccessDespiteUseProtectionTrue() {
+        // Tỉ lệ +14→+15 chỉ 5% (gần chắc chắn fail) — dùng +0→+1 (95%, gần chắc chắn thành công)
+        // để verify Bảo Vệ KHÔNG bị tiêu dù client bật cờ, vì roll ra thành công.
+        boolean sawSuccess = false;
+        for (int i = 0; i < 200 && !sawSuccess; i++) {
+            var item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 0);
+            var charm = new ItemStack(PROTECTION_ITEM_ID, PROTECTION_TEMPLATE_ID, 1, 0);
+            var inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item, charm)));
+            var useCase = newUseCase(
+                    inventoryPort, new FakeGoldPort(true), new FakeAuditPort(), new FakeItemTemplatePort(true));
+
+            var result = useCase.execute(CHARACTER_ID, ITEM_ID, true);
+            if (result == EnhanceItemUseCase.EnhanceResult.SUCCESS) {
+                sawSuccess = true;
+                assertThat(inventoryPort.saved.findByTemplate(PROTECTION_TEMPLATE_ID)).isPresent();
+            }
+        }
+        assertThat(sawSuccess).isTrue();
     }
 }

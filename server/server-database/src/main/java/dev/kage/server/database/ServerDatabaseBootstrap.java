@@ -11,6 +11,7 @@ import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.application.AddItemUseCase;
 import dev.kage.inventory.application.ComputeEquipmentBonusUseCase;
 import dev.kage.inventory.application.EnhanceItemUseCase;
+import dev.kage.inventory.application.EnhancePorts;
 import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
@@ -93,7 +94,8 @@ public final class ServerDatabaseBootstrap {
                 new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
         var equipmentUseCases =
                 new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
-        var enhanceItemUseCase = new EnhanceItemUseCase(inventoryPort, goldPort, auditPort, transactionRunner);
+        var enhancePorts = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
+        var enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, transactionRunner);
         return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
     }
 

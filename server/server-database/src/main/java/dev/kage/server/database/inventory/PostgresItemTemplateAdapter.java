@@ -16,6 +16,10 @@ public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
             SELECT id, equip_slot, bonus_atk FROM item_template WHERE id = ?
             """;
 
+    private static final String FIND_ID_BY_CODE = """
+            SELECT id FROM item_template WHERE code = ?
+            """;
+
     private final DataSource dataSource;
 
     public PostgresItemTemplateAdapter(DataSource dataSource) {
@@ -38,6 +42,19 @@ public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
             }
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi đọc item_template: itemTemplateId=" + itemTemplateId, e);
+        }
+    }
+
+    @Override
+    public Optional<Long> findIdByCode(String code) {
+        try (var connection = dataSource.getConnection();
+                var statement = connection.prepareStatement(FIND_ID_BY_CODE)) {
+            statement.setString(1, code);
+            try (ResultSet rs = statement.executeQuery()) {
+                return rs.next() ? Optional.of(rs.getLong("id")) : Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new DatabaseAccessException("Lỗi tra item_template theo code: code=" + code, e);
         }
     }
 }

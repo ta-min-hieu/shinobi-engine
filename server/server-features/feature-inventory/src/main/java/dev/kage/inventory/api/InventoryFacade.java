@@ -92,14 +92,15 @@ public final class InventoryFacade {
 
     /**
      * Cường hoá item {@code itemId} (ID thật, không phải vị trí) — tốn gold, tỉ lệ thành công giảm
-     * dần theo cấp (GAMEPLAY.md §7). Từ +10 trở lên, thất bại rớt 1 cấp ({@code FAILED_DROPPED}) —
-     * chưa có "Bảo Vệ" chống rớt cấp (lát cắt sau).
+     * dần theo cấp (GAMEPLAY.md §7). Từ +10 trở lên, thất bại rớt 1 cấp ({@code FAILED_DROPPED})
+     * TRỪ KHI {@code useProtection=true} VÀ đủ "Bảo Vệ" trong túi ({@code FAILED_PROTECTED}, §7.1).
      */
-    public EnhanceResult enhanceItem(long characterId, long itemId) {
-        return switch (enhanceItemUseCase.execute(characterId, itemId)) {
+    public EnhanceResult enhanceItem(long characterId, long itemId, boolean useProtection) {
+        return switch (enhanceItemUseCase.execute(characterId, itemId, useProtection)) {
             case SUCCESS -> EnhanceResult.SUCCESS;
             case FAILED_NO_DROP -> EnhanceResult.FAILED_NO_DROP;
             case FAILED_DROPPED -> EnhanceResult.FAILED_DROPPED;
+            case FAILED_PROTECTED -> EnhanceResult.FAILED_PROTECTED;
             case ITEM_NOT_FOUND -> EnhanceResult.ITEM_NOT_FOUND;
             case MAX_LEVEL -> EnhanceResult.MAX_LEVEL;
             case INSUFFICIENT_GOLD -> EnhanceResult.INSUFFICIENT_GOLD;
@@ -112,5 +113,7 @@ public final class InventoryFacade {
 
     public enum UnequipResult { OK, NOT_EQUIPPED }
 
-    public enum EnhanceResult { SUCCESS, FAILED_NO_DROP, FAILED_DROPPED, ITEM_NOT_FOUND, MAX_LEVEL, INSUFFICIENT_GOLD }
+    public enum EnhanceResult {
+        SUCCESS, FAILED_NO_DROP, FAILED_DROPPED, FAILED_PROTECTED, ITEM_NOT_FOUND, MAX_LEVEL, INSUFFICIENT_GOLD
+    }
 }

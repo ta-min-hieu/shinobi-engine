@@ -444,7 +444,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleEnhanceItemBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, EnhanceItemCommand command) {
-        var result = inventoryFacade.enhanceItem(characterId, command.getItemId());
+        var result = inventoryFacade.enhanceItem(characterId, command.getItemId(), command.getUseProtection());
         var response = EnhanceItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
         send(ctx, Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
@@ -454,6 +454,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             InventoryFacade.EnhanceResult.SUCCESS, EnhanceOutcome.ENHANCE_OUTCOME_SUCCESS,
             InventoryFacade.EnhanceResult.FAILED_NO_DROP, EnhanceOutcome.ENHANCE_OUTCOME_FAILED_NO_DROP,
             InventoryFacade.EnhanceResult.FAILED_DROPPED, EnhanceOutcome.ENHANCE_OUTCOME_FAILED_DROPPED,
+            InventoryFacade.EnhanceResult.FAILED_PROTECTED, EnhanceOutcome.ENHANCE_OUTCOME_FAILED_PROTECTED,
             InventoryFacade.EnhanceResult.ITEM_NOT_FOUND, EnhanceOutcome.ENHANCE_OUTCOME_ITEM_NOT_FOUND,
             InventoryFacade.EnhanceResult.MAX_LEVEL, EnhanceOutcome.ENHANCE_OUTCOME_MAX_LEVEL,
             InventoryFacade.EnhanceResult.INSUFFICIENT_GOLD, EnhanceOutcome.ENHANCE_OUTCOME_INSUFFICIENT_GOLD);

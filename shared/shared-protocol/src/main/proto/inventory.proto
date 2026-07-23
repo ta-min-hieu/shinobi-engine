@@ -64,17 +64,21 @@ enum EnhanceOutcome {
   ENHANCE_OUTCOME_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho kết quả thật.
   ENHANCE_OUTCOME_SUCCESS = 1;
   ENHANCE_OUTCOME_FAILED_NO_DROP = 2; // thất bại, KHÔNG mất cấp (dưới +10)
-  ENHANCE_OUTCOME_FAILED_DROPPED = 3; // thất bại, RỚT 1 cấp (từ +10, chưa có "Bảo Vệ")
+  ENHANCE_OUTCOME_FAILED_DROPPED = 3; // thất bại, RỚT 1 cấp (từ +10, không dùng/không có Bảo Vệ)
   ENHANCE_OUTCOME_ITEM_NOT_FOUND = 4;
   ENHANCE_OUTCOME_MAX_LEVEL = 5; // đã +15, không cường hoá thêm được
   ENHANCE_OUTCOME_INSUFFICIENT_GOLD = 6;
+  ENHANCE_OUTCOME_FAILED_PROTECTED = 7; // thất bại từ +10, Bảo Vệ đã tiêu để chặn rớt cấp (§7.1)
 }
 
 // Command: Client -> Server (OPCODE_ENHANCE_ITEM_COMMAND). item_id là inventory_item.id THẬT
 // (không phải vị trí) — server tự tính chi phí/tỉ lệ theo enhance_level hiện tại của item, KHÔNG
-// tin số liệu từ client (Điều 24, GAMEPLAY.md §7.1).
+// tin số liệu từ client (Điều 24, GAMEPLAY.md §7.1). use_protection: người chơi CHỦ ĐỘNG chọn có
+// tiêu "Bảo Vệ" hay không mỗi lần gọi — server chỉ thật sự tiêu khi roll THẤT BẠI ở +10 trở lên VÀ
+// còn Bảo Vệ trong túi, không tiêu nếu thành công hoặc thất bại dưới +10 dù cờ này = true.
 message EnhanceItemCommand {
   int64 item_id = 1;
+  bool use_protection = 2;
 }
 
 // Response: Server -> Client (OPCODE_ENHANCE_ITEM_RESPONSE).

@@ -52,6 +52,11 @@ class EquipItemUseCaseTest {
         public Optional<ItemTemplate> findById(long itemTemplateId) {
             return Optional.ofNullable(templates.get(itemTemplateId));
         }
+
+        @Override
+        public Optional<Long> findIdByCode(String code) {
+            throw new UnsupportedOperationException("Test này không cần tra theo code");
+        }
     }
 
     static final class FakeEquipmentPort implements EquipmentPort {

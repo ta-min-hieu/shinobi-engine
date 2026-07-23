@@ -1,12 +1,11 @@
 package dev.kage.inventory.application;
 
-import dev.kage.inventory.domain.AuditPort;
 import dev.kage.inventory.domain.EnhancementTable;
-import dev.kage.inventory.domain.GoldPort;
-import dev.kage.inventory.domain.InventoryPort;
+import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.Transaction;
 import dev.kage.inventory.domain.TransactionRunner;
+import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -15,28 +14,24 @@ import java.util.concurrent.atomic.AtomicReference;
  * ({@link EnhancementTable}), TRỪ GOLD + ĐỔI CẤP + GHI AUDIT trong 1 transaction (DATABASE.md §5:
  * trừ gold thành công nhưng ghi cấp thất bại = mất tài sản thật).
  *
- * <p>⚠️ Chưa có "Bảo Vệ" (item/flag chống rớt cấp) — từ
- * {@link EnhancementTable#DROP_ON_FAIL_FROM_LEVEL} trở lên, thất bại LUÔN rớt 1 cấp
- * ({@link EnhanceResult#FAILED_DROPPED}). Quyết định của chủ dự án cho lát cắt này (chừa chỗ bằng
- * 2 nhánh fail riêng, code Bảo Vệ ở lát cắt sau).
+ * <p>"Bảo Vệ" (GAMEPLAY.md §7.1): từ {@link EnhancementTable#DROP_ON_FAIL_FROM_LEVEL} trở lên,
+ * nếu {@code useProtection=true} VÀ người chơi có item {@link EnhancementTable#PROTECTION_CHARM_CODE}
+ * trong túi, thất bại KHÔNG rớt cấp mà tiêu 1 Bảo Vệ ({@link EnhanceResult#FAILED_PROTECTED}).
+ * Chỉ tiêu khi THẤT BẠI THẬT (roll xong mới biết) — thành công hay thất bại dưới +10 không đụng
+ * tới Bảo Vệ dù client có bật cờ hay không.
  */
 public final class EnhanceItemUseCase {
 
-    private final InventoryPort inventoryPort;
-    private final GoldPort goldPort;
-    private final AuditPort auditPort;
+    private final EnhancePorts ports;
     private final TransactionRunner tx;
 
-    public EnhanceItemUseCase(
-            InventoryPort inventoryPort, GoldPort goldPort, AuditPort auditPort, TransactionRunner tx) {
-        this.inventoryPort = inventoryPort;
-        this.goldPort = goldPort;
-        this.auditPort = auditPort;
+    public EnhanceItemUseCase(EnhancePorts ports, TransactionRunner tx) {
+        this.ports = ports;
         this.tx = tx;
     }
 
-    public EnhanceResult execute(long characterId, long itemId) {
-        var inventory = inventoryPort.findByCharacter(characterId)
+    public EnhanceResult execute(long characterId, long itemId, boolean useProtection) {
+        var inventory = ports.inventoryPort().findByCharacter(characterId)
                 .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
         var item = inventory.findItem(itemId).orElse(null);
         if (item == null) {
@@ -53,27 +48,42 @@ public final class EnhanceItemUseCase {
 
         var resultHolder = new AtomicReference<EnhanceResult>();
         tx.inTransaction((Transaction t) -> {
-            if (!goldPort.deductGold(t, characterId, cost)) {
+            if (!ports.goldPort().deductGold(t, characterId, cost)) {
                 resultHolder.set(EnhanceResult.INSUFFICIENT_GOLD);
                 return;
             }
-            var outcome = resolveOutcome(currentLevel, rolledSuccess);
+            var protectionCharge = findProtectionCharge(inventory, currentLevel, rolledSuccess, useProtection);
+            var outcome = resolveOutcome(currentLevel, rolledSuccess, protectionCharge.isPresent());
             inventory.replaceItem(new ItemStack(item.id(), item.itemTemplateId(), item.quantity(), outcome.toLevel()));
-            inventoryPort.save(t, inventory);
-            auditPort.log(t, characterId, "ENHANCE_ITEM", detailJson(itemId, cost, outcome));
+            protectionCharge.ifPresent(charge -> inventory.consumeOne(charge.id()));
+            ports.inventoryPort().save(t, inventory);
+            ports.auditPort().log(t, characterId, "ENHANCE_ITEM", detailJson(itemId, cost, outcome));
             resultHolder.set(outcome.result());
         });
         return resultHolder.get();
     }
 
-    private static EnhanceOutcome resolveOutcome(int currentLevel, boolean rolledSuccess) {
+    /** {@code Optional.empty()} nếu không cần/không dùng/không có Bảo Vệ — không tiêu gì cả. */
+    private Optional<ItemStack> findProtectionCharge(
+            Inventory inventory, int currentLevel, boolean rolledSuccess, boolean useProtection) {
+        if (!useProtection || rolledSuccess || currentLevel < EnhancementTable.DROP_ON_FAIL_FROM_LEVEL) {
+            return Optional.empty();
+        }
+        return ports.itemTemplatePort().findIdByCode(EnhancementTable.PROTECTION_CHARM_CODE)
+                .flatMap(inventory::findByTemplate);
+    }
+
+    private static EnhanceOutcome resolveOutcome(int currentLevel, boolean rolledSuccess, boolean protectionUsed) {
         if (rolledSuccess) {
             return new EnhanceOutcome(currentLevel, currentLevel + 1, EnhanceResult.SUCCESS);
         }
-        if (currentLevel >= EnhancementTable.DROP_ON_FAIL_FROM_LEVEL) {
-            return new EnhanceOutcome(currentLevel, currentLevel - 1, EnhanceResult.FAILED_DROPPED);
+        if (currentLevel < EnhancementTable.DROP_ON_FAIL_FROM_LEVEL) {
+            return new EnhanceOutcome(currentLevel, currentLevel, EnhanceResult.FAILED_NO_DROP);
         }
-        return new EnhanceOutcome(currentLevel, currentLevel, EnhanceResult.FAILED_NO_DROP);
+        if (protectionUsed) {
+            return new EnhanceOutcome(currentLevel, currentLevel, EnhanceResult.FAILED_PROTECTED);
+        }
+        return new EnhanceOutcome(currentLevel, currentLevel - 1, EnhanceResult.FAILED_DROPPED);
     }
 
     private static String detailJson(long itemId, long cost, EnhanceOutcome outcome) {
@@ -84,5 +94,7 @@ public final class EnhanceItemUseCase {
     private record EnhanceOutcome(int fromLevel, int toLevel, EnhanceResult result) {
     }
 
-    public enum EnhanceResult { SUCCESS, FAILED_NO_DROP, FAILED_DROPPED, ITEM_NOT_FOUND, MAX_LEVEL, INSUFFICIENT_GOLD }
+    public enum EnhanceResult {
+        SUCCESS, FAILED_NO_DROP, FAILED_DROPPED, FAILED_PROTECTED, ITEM_NOT_FOUND, MAX_LEVEL, INSUFFICIENT_GOLD
+    }
 }

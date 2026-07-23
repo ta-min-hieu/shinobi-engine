@@ -7,6 +7,8 @@ import dev.kage.character.domain.Character;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.inventory.application.EnhanceItemUseCase;
+import dev.kage.inventory.application.EnhancePorts;
+import dev.kage.inventory.domain.EnhancementTable;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.server.database.DatabaseConfig;
@@ -138,8 +140,21 @@ class EnhanceItemUseCaseIntegrationTest {
         var inventoryPort = new PostgresInventoryAdapter(dataSource);
         var goldPort = new PostgresGoldAdapter();
         var auditPort = new PostgresAuditAdapter();
+        var itemTemplatePort = new PostgresItemTemplateAdapter(dataSource);
         var tx = new JdbcInventoryTransactionRunner(dataSource);
-        return new EnhanceItemUseCase(inventoryPort, goldPort, auditPort, tx);
+        var ports = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
+        return new EnhanceItemUseCase(ports, tx);
+    }
+
+    private static void grantProtectionCharm(long characterId) {
+        var protectionTemplateId = findItemTemplateIdByCode(EnhancementTable.PROTECTION_CHARM_CODE);
+        var inventoryAdapter = new PostgresInventoryAdapter(dataSource);
+        var inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
+        var existing = inventoryAdapter.findByCharacter(characterId).orElseThrow();
+        var items = new java.util.ArrayList<>(existing.items());
+        items.add(ItemStack.newItem(protectionTemplateId, 1, 0));
+        var updated = new Inventory(characterId, 20, items);
+        inventoryTx.inTransaction(tx -> inventoryAdapter.save(tx, updated));
     }
 
     @Test
@@ -149,7 +164,7 @@ class EnhanceItemUseCaseIntegrationTest {
         long realItemId = persistOneItem(characterId, woodenSwordId);
         grantGold(characterId, 0); // không đủ trả 100 gold cường hoá +0->+1
 
-        var result = newUseCase().execute(characterId, realItemId);
+        var result = newUseCase().execute(characterId, realItemId, false);
 
         assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.INSUFFICIENT_GOLD);
         assertThat(readGold(characterId)).isZero(); // không bị trừ gì
@@ -163,7 +178,7 @@ class EnhanceItemUseCaseIntegrationTest {
         long realItemId = persistOneItem(characterId, woodenSwordId);
         grantGold(characterId, 100); // đúng giá cường hoá +0->+1
 
-        var result = newUseCase().execute(characterId, realItemId);
+        var result = newUseCase().execute(characterId, realItemId, false);
 
         assertThat(result).isIn(
                 EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP);
@@ -183,9 +198,66 @@ class EnhanceItemUseCaseIntegrationTest {
         long realItemId = inventoryAdapter.findByCharacter(characterId).orElseThrow().items().get(0).id();
         grantGold(characterId, 1_000_000);
 
-        var result = newUseCase().execute(characterId, realItemId);
+        var result = newUseCase().execute(characterId, realItemId, false);
 
         assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.MAX_LEVEL);
         assertThat(readGold(characterId)).isEqualTo(1_000_000); // không trừ gold
+    }
+
+    @Test
+    void shouldConsumeProtectionAndKeepLevel_whenFailAtOrAboveThresholdAndProtectionOwned() {
+        // Cấp 14 (+14->+15) có tỉ lệ thất bại 95% (EnhancementTable) — gần chắc chắn thất bại ngay,
+        // vẫn lặp vài lần cho chắc (thống kê, không mock random, cùng tinh thần LootRollerTest).
+        boolean sawProtected = false;
+        for (int i = 0; i < 20 && !sawProtected; i++) {
+            long characterId = createFreshCharacter("EnhProtect" + i);
+            long woodenSwordId = findItemTemplateIdByCode("wooden_sword");
+            var inventoryAdapter = new PostgresInventoryAdapter(dataSource);
+            var inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
+            inventoryTx.inTransaction(tx -> inventoryAdapter.save(
+                    tx, new Inventory(characterId, 20, List.of(ItemStack.newItem(woodenSwordId, 1, 14)))));
+            long realItemId = inventoryAdapter.findByCharacter(characterId).orElseThrow().items().get(0).id();
+            grantProtectionCharm(characterId);
+            grantGold(characterId, EnhancementTable.goldCost(14));
+
+            var result = newUseCase().execute(characterId, realItemId, true);
+
+            if (result == EnhanceItemUseCase.EnhanceResult.FAILED_PROTECTED) {
+                sawProtected = true;
+                var finalItem = inventoryAdapter.findByCharacter(characterId).orElseThrow().findItem(realItemId);
+                assertThat(finalItem).isPresent().get()
+                        .extracting(ItemStack::enhanceLevel).isEqualTo(14); // KHÔNG rớt cấp
+                var protectionTemplateId = findItemTemplateIdByCode(EnhancementTable.PROTECTION_CHARM_CODE);
+                assertThat(inventoryAdapter.findByCharacter(characterId).orElseThrow()
+                        .findByTemplate(protectionTemplateId)).isEmpty(); // Bảo Vệ đã tiêu
+                assertThat(countAuditLogRows(characterId, "ENHANCE_ITEM")).isEqualTo(1);
+            }
+        }
+        assertThat(sawProtected).isTrue();
+    }
+
+    @Test
+    void shouldStillDropLevel_whenProtectionRequestedButNoneOwned() {
+        boolean sawDropped = false;
+        for (int i = 0; i < 20 && !sawDropped; i++) {
+            long characterId = createFreshCharacter("EnhNoCharm" + i);
+            long woodenSwordId = findItemTemplateIdByCode("wooden_sword");
+            var inventoryAdapter = new PostgresInventoryAdapter(dataSource);
+            var inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
+            inventoryTx.inTransaction(tx -> inventoryAdapter.save(
+                    tx, new Inventory(characterId, 20, List.of(ItemStack.newItem(woodenSwordId, 1, 14)))));
+            long realItemId = inventoryAdapter.findByCharacter(characterId).orElseThrow().items().get(0).id();
+            // KHÔNG gọi grantProtectionCharm — túi không có Bảo Vệ dù client bật cờ useProtection.
+            grantGold(characterId, EnhancementTable.goldCost(14));
+
+            var result = newUseCase().execute(characterId, realItemId, true);
+
+            if (result == EnhanceItemUseCase.EnhanceResult.FAILED_DROPPED) {
+                sawDropped = true;
+                var finalItem = inventoryAdapter.findByCharacter(characterId).orElseThrow().findItem(realItemId);
+                assertThat(finalItem).isPresent().get().extracting(ItemStack::enhanceLevel).isEqualTo(13);
+            }
+        }
+        assertThat(sawDropped).isTrue();
     }
 }

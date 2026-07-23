@@ -159,11 +159,6 @@ GDD chỉ ghi "tỉ lệ giảm dần, có Bảo Vệ chống rớt cấp từ +
 | +13→+14 | 8% | 14000 | **Rớt 1 cấp** |
 | +14→+15 | 5% | 20000 | **Rớt 1 cấp** |
 
-⚠️ **"Bảo Vệ" (item/flag chống rớt cấp từ +10) CHƯA CODE** — lát cắt hiện tại (2026-07-23) chỉ có
-rớt cấp thật khi thất bại từ +10 trở lên (`EnhanceResult.FAILED_DROPPED`), chưa có cách chống. Chừa
-sẵn 2 nhánh fail riêng (`FAILED_NO_DROP`/`FAILED_DROPPED`) để lát cắt sau thêm Bảo Vệ không cần đổi
-enum kết quả.
-
 **Gold**: cột `character_stat.gold` (migration V7) — đặt ở `character_stat` (không phải
 `character`) vì bảng này vốn đã tách riêng do tần suất ghi/đọc cao (DATABASE.md §2.1), và gold đổi
 liên tục mỗi lần cường hoá/mua bán. `feature-inventory` trừ gold qua `GoldPort` riêng (không gọi
@@ -171,9 +166,23 @@ liên tục mỗi lần cường hoá/mua bán. `feature-inventory` trừ gold q
 feature-inventory/CLAUDE.md.
 
 ✅ **Protocol/gateway đã nối** (2026-07-23) — `EnhanceItemCommand`/`EnhanceItemResponse` (opcode
-505-506, `inventory.proto`), `EnhanceOutcome` enum riêng (6 giá trị) thay vì `bool success` như
+505-506, `inventory.proto`), `EnhanceOutcome` enum riêng (7 giá trị) thay vì `bool success` như
 Equip/Unequip vì cường hoá có nhiều kết quả có ý nghĩa khác nhau với client (đặc biệt
 `FAILED_DROPPED` phải cảnh báo khác `FAILED_NO_DROP`).
+
+✅ **"Bảo Vệ" chống rớt cấp — Đã code (2026-07-23)**. 3 quyết định chốt cùng chủ dự án:
+1. **Mua ở shop** — item tiêu hao mới `enhance_protection_charm` (migration V9), seed vào
+   `shop_item` (buy 3000/sell 500, PLACEHOLDER giống mọi giá shop khác).
+2. **Client chủ động chọn dùng** — `EnhanceItemCommand.use_protection` (bool, field mới, additive)
+   thay vì server tự động tiêu Bảo Vệ nếu có — người chơi có thể muốn để dành.
+3. **Chỉ tiêu khi THẤT BẠI THẬT** — server roll kết quả trước; nếu thành công hoặc thất bại dưới
+   +10, Bảo Vệ KHÔNG bị đụng tới dù client có bật cờ. Chỉ khi roll thất bại VÀ đang ở +10 trở lên
+   VÀ còn Bảo Vệ trong túi mới tiêu 1 cái, giữ nguyên cấp thay vì rớt (`EnhanceResult.FAILED_PROTECTED`).
+
+Tra `item_template.id` của Bảo Vệ qua `ItemTemplatePort.findIdByCode("enhance_protection_charm")`
+(mới, tổng quát) thay vì hardcode ID số (ID phụ thuộc thứ tự seed). `EnhanceItemUseCase` giờ cần
+thêm `ItemTemplatePort` — bundle vào `EnhancePorts` (record) để không vượt 4 tham số constructor
+(Checkstyle `ParameterNumber`).
 
 ### 7.2 Mua bán (Shop) — ✅ Đã code (2026-07-23)
 

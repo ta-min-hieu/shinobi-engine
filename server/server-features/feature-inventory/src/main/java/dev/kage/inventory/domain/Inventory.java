@@ -40,6 +40,15 @@ public final class Inventory {
     }
 
     /**
+     * Tìm 1 stack theo {@code itemTemplateId} (dòng ĐẦU TIÊN khớp nếu có nhiều dòng cùng loại) —
+     * dùng để tìm "Bảo Vệ" chống rớt cấp trong túi mà không cần biết trước {@code ItemStack.id}
+     * thật (Phase 5 §7.1).
+     */
+    public Optional<ItemStack> findByTemplate(long itemTemplateId) {
+        return items.stream().filter(stack -> stack.itemTemplateId() == itemTemplateId).findFirst();
+    }
+
+    /**
      * Thay 1 item đã có (cùng {@code ItemStack.id}) bằng phiên bản mới — dùng khi cường hoá đổi
      * {@code enhanceLevel} (Phase 5 §7). {@code updated} phải trỏ ĐÚNG item đã tồn tại (gọi sau
      * {@link #findItem}), không dùng để thêm item mới (dùng {@link #add} cho việc đó).
@@ -52,6 +61,28 @@ public final class Inventory {
             }
         }
         throw new IllegalStateException("Item không tồn tại trong túi đồ: id=" + updated.id());
+    }
+
+    /**
+     * Tiêu 1 đơn vị của item {@code itemId} — về 0 thì XOÁ hẳn dòng, còn lại thì giảm
+     * {@code quantity}. Dùng khi tiêu "Bảo Vệ" cường hoá (Phase 5 §7.1) — cùng hợp đồng lỗi với
+     * {@link #replaceItem}: {@code itemId} phải trỏ ĐÚNG item đã tồn tại (gọi sau
+     * {@link #findByTemplate}/{@link #findItem}).
+     */
+    public void consumeOne(long itemId) {
+        for (int i = 0; i < items.size(); i++) {
+            var stack = items.get(i);
+            if (stack.id() == itemId) {
+                if (stack.quantity() <= 1) {
+                    items.remove(i);
+                } else {
+                    items.set(i, new ItemStack(stack.id(), stack.itemTemplateId(), stack.quantity() - 1,
+                            stack.enhanceLevel()));
+                }
+                return;
+            }
+        }
+        throw new IllegalStateException("Item không tồn tại trong túi đồ: id=" + itemId);
     }
 
     public long characterId() {

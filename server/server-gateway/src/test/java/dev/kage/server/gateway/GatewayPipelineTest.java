@@ -24,6 +24,7 @@ import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.application.AddItemUseCase;
 import dev.kage.inventory.application.ComputeEquipmentBonusUseCase;
 import dev.kage.inventory.application.EnhanceItemUseCase;
+import dev.kage.inventory.application.EnhancePorts;
 import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
@@ -35,6 +36,7 @@ import dev.kage.inventory.domain.EquipmentPort;
 import dev.kage.inventory.domain.GoldPort;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
+import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
@@ -244,7 +246,17 @@ class GatewayPipelineTest {
         var addItemUseCase = new AddItemUseCase(inventoryPort, action -> action.accept(null));
         var grantLootUseCase = new GrantLootUseCase(dropTablePort, inventoryPort, action -> action.accept(null));
         // Equip/unequip không dùng trong test này — fake tối thiểu để compile.
-        ItemTemplatePort itemTemplatePort = itemTemplateId -> Optional.empty();
+        ItemTemplatePort itemTemplatePort = new ItemTemplatePort() {
+            @Override
+            public Optional<ItemTemplate> findById(long itemTemplateId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<Long> findIdByCode(String code) {
+                return Optional.empty();
+            }
+        };
         EquipmentPort equipmentPort = new EquipmentPort() {
             @Override
             public Optional<Equipment> findByCharacter(long characterId) {
@@ -265,8 +277,8 @@ class GatewayPipelineTest {
         // Cường hoá không dùng trong test này — fake tối thiểu để compile.
         GoldPort goldPort = (tx, characterId, amount) -> true;
         AuditPort auditPort = (tx, characterId, action, detailJson) -> { };
-        var enhanceItemUseCase =
-                new EnhanceItemUseCase(inventoryPort, goldPort, auditPort, action -> action.accept(null));
+        var enhancePorts = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
+        var enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
         return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
     }
 

@@ -155,6 +155,40 @@ JDBC theo package `dev.kage.server.database`, không theo Gradle module).
   tầng dưới (`EnhanceItemUseCaseTest` với Fake Port, `EnhanceItemUseCaseIntegrationTest` với
   Postgres thật) — cùng cách chia tầng test đã dùng cho equip/unequip.
 
+### Phase 5 lát cắt 7 (2026-07-23): "Bảo Vệ" chống rớt cấp
+
+3 quyết định chốt cùng chủ dự án qua `AskUserQuestion` (GDD chỉ nói "có Bảo Vệ" không có cơ chế cụ
+thể — CLAUDE.md §4): (1) mua ở shop (item tiêu hao mới, migration V9), không rơi từ quái; (2)
+client chủ động gửi cờ `use_protection` mỗi lần cường hoá, không tự động dùng; (3) chỉ tiêu khi
+THẤT BẠI THẬT (server roll trước, mới biết có cần tiêu hay không) — thành công hoặc thất bại dưới
++10 không đụng Bảo Vệ dù cờ có bật.
+
+- **`ItemTemplatePort.findIdByCode(String code)`** (mới, tổng quát — không chỉ dành riêng Bảo Vệ) —
+  tra `item_template.id` theo khoá nghiệp vụ ổn định thay vì hardcode ID số (ID phụ thuộc thứ tự
+  seed, dễ vỡ khi thêm/xoá seed data). `EnhancementTable.PROTECTION_CHARM_CODE` giữ hằng số code.
+- **`Inventory.findByTemplate(itemTemplateId)`** (mới) — tìm 1 stack theo template thay vì theo id
+  thật (khác `findItem`), dùng để tìm Bảo Vệ trong túi mà không biết trước `ItemStack.id`.
+  **`Inventory.consumeOne(itemId)`** (mới) — tiêu 1 đơn vị, xoá hẳn dòng nếu về 0, cùng hợp đồng lỗi
+  với `replaceItem` (`IllegalStateException` nếu `itemId` không tồn tại — lỗi lập trình, gọi sau
+  `findByTemplate`/`findItem` nên luôn phải tồn tại).
+- **`EnhanceItemUseCase` giờ cần 4 Port** (`InventoryPort`/`GoldPort`/`AuditPort`/`ItemTemplatePort`,
+  thêm `ItemTemplatePort` để tra Bảo Vệ) — CHẠM giới hạn 4 tham số Checkstyle, bundle vào
+  `EnhancePorts` record (mới, cùng tinh thần `ShopPorts`/`EquipmentUseCases`).
+- **Thứ tự trong transaction**: roll kết quả TRƯỚC (ngoài transaction, không đổi gì) → trong
+  transaction: trừ gold (rẻ, no-op nếu không đủ) → nếu thất bại+≥+10+`useProtection=true`, tìm Bảo
+  Vệ qua `findByTemplate` → nếu có, tiêu bằng `consumeOne` + giữ nguyên cấp
+  (`FAILED_PROTECTED`); nếu không có, rớt cấp thật (`FAILED_DROPPED`) như cũ.
+- **`EnhanceResult` thêm `FAILED_PROTECTED`** (7 giá trị) — không đổi nghĩa 6 giá trị cũ, chỉ thêm
+  nhánh mới. Protocol: `EnhanceItemCommand.use_protection` (field mới, additive) +
+  `EnhanceOutcome.ENHANCE_OUTCOME_FAILED_PROTECTED` (giá trị enum mới, additive) — không đổi field/
+  giá trị cũ nào (shared/CLAUDE.md).
+- **Migration V9**: seed `item_template` mới (`enhance_protection_charm`, không mang được — `equip_slot`
+  NULL) + 1 dòng `shop_item` (buy 3000/sell 500, PLACEHOLDER cùng tinh thần V8).
+- Mọi nơi implement `ItemTemplatePort` bằng lambda (functional interface cũ, giờ có 2 method) phải
+  đổi sang anonymous class — vỡ compile ở `ComputeEquipmentBonusUseCaseTest` +
+  3 file fake ở `server-gateway/src/test` (`GatewayPipelineTest`/`GatewayServerIntegrationTest`/
+  `ConnectedCharacterRegistryTest`), đã sửa hết cùng lát cắt này.
+
 ## Cứng
 
 ✅ Quy tắc nghiệp vụ ở `domain/` (túi đầy = `Inventory.add()`, không phải UseCase)

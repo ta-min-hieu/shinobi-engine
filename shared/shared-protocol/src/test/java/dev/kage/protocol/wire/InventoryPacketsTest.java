@@ -88,13 +88,14 @@ class InventoryPacketsTest {
 
     @Test
     void shouldRoundTripEnhanceItemCommand() throws InvalidProtocolBufferException {
-        var command = EnhanceItemCommand.newBuilder().setItemId(42L).build();
+        var command = EnhanceItemCommand.newBuilder().setItemId(42L).setUseProtection(true).build();
         var header = new PacketHeader(Opcode.OPCODE_ENHANCE_ITEM_COMMAND_VALUE, ProtocolVersion.CURRENT, 4);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
         var parsed = EnhanceItemCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getItemId()).isEqualTo(42L);
+        assertThat(parsed.getUseProtection()).isTrue();
     }
 
     @Test
@@ -108,5 +109,18 @@ class InventoryPacketsTest {
         var parsed = EnhanceItemResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(EnhanceOutcome.ENHANCE_OUTCOME_FAILED_DROPPED);
+    }
+
+    @Test
+    void shouldRoundTripEnhanceItemResponse_withProtectedOutcome() throws InvalidProtocolBufferException {
+        var response = EnhanceItemResponse.newBuilder()
+                .setOutcome(EnhanceOutcome.ENHANCE_OUTCOME_FAILED_PROTECTED)
+                .build();
+        var header = new PacketHeader(Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE, ProtocolVersion.CURRENT, 4);
+
+        byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
+        var parsed = EnhanceItemResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+
+        assertThat(parsed.getOutcome()).isEqualTo(EnhanceOutcome.ENHANCE_OUTCOME_FAILED_PROTECTED);
     }
 }
