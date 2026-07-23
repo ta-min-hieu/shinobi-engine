@@ -31,7 +31,7 @@ archunit = "1.4.2"                # ✅ latest 04/2026 — ADR-011
 # --- Static analysis (tool versions) ---
 checkstyle = "10.21.0"            # ⚠️ verify — tool version, dùng trong quality convention
 pmd = "7.10.0"                    # ⚠️ verify — tool version
-errorprone = "2.42.0"             # ⚠️ verify — Error Prone core
+errorprone = "2.50.0"             # ⚠️ verify — Error Prone core
 
 # --- Gradle plugins ---
 spotless = "7.2.1"                # ⚠️ verify — Gradle 9 compatible
