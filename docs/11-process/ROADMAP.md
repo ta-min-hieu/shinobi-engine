@@ -200,13 +200,13 @@ graph LR
 | ✅ **Transaction + audit log** cho cường hoá (`EnhanceItemUseCase`, 2026-07-23 — logic + DB + protocol/gateway xong end-to-end) | [DATABASE.md §5](../05-server/DATABASE.md) |
 | ⚠️ **Chừa chỗ khoá item** (cho trade Phase 7) | [GAMEPLAY.md §7](../05-server/GAMEPLAY.md) |
 | ✅ Chỉ số dẫn xuất tính lại khi đổi trang bị (`c731cd5`, 2026-07-22 — chỉ ATK, mở rộng khi có item cần chỉ số khác) | [GAMEPLAY.md §2](../05-server/GAMEPLAY.md) |
-| `feature-shop` | — |
+| ✅ `feature-shop` (mua/bán, 2026-07-23 — module riêng, logic + DB (V8 `shop_item`) + protocol/gateway xong end-to-end) | [GAMEPLAY.md §7.2](../05-server/GAMEPLAY.md) |
 | **Metric `kage.gold.total`** | [OBSERVABILITY.md §3.5](../07-infrastructure/OBSERVABILITY.md) |
 
 **Exit Criteria:**
-- [ ] Nhặt đồ, mặc đồ, cường hoá, mua bán — nhặt đồ ✅ (`ae69f4f`, Phase 4), mặc đồ ✅ (`b84afe5`/`3b2e84e`, 2026-07-22, kể cả sửa nền tảng ID item ổn định cho `Inventory`); cường hoá ✅ chơi được thật qua socket (2026-07-23, gold ở `character_stat` migration V7, opcode 505-506); mua bán chưa làm
-- [ ] Audit log ghi đủ — ✅ `audit_log` (migration V7) + ghi cho cường hoá; trade/shop sẽ ghi khi tới lượt
-- [ ] Test: không duplicate item qua transaction fail — ✅ cường hoá có test Postgres thật (trừ gold + đổi cấp + audit cùng transaction, không đủ gold thì không đổi gì)
+- [x] Nhặt đồ, mặc đồ, cường hoá, mua bán — nhặt đồ ✅ (`ae69f4f`, Phase 4), mặc đồ ✅ (`b84afe5`/`3b2e84e`, 2026-07-22, kể cả sửa nền tảng ID item ổn định cho `Inventory`); cường hoá ✅ chơi được thật qua socket (2026-07-23, gold ở `character_stat` migration V7, opcode 505-506); mua bán ✅ chơi được thật qua socket (2026-07-23, `shop_item` migration V8, opcode 1000-1005)
+- [x] Audit log ghi đủ — ✅ `audit_log` (migration V7) + ghi cho cường hoá VÀ mua/bán (`SHOP_BUY`/`SHOP_SELL`); trade sẽ ghi khi tới lượt (Phase 7)
+- [x] Test: không duplicate item qua transaction fail — ✅ cường hoá có test Postgres thật (trừ gold + đổi cấp + audit cùng transaction, không đủ gold thì không đổi gì); mua/bán có test Postgres thật (rollback gold khi túi đầy lúc mua, khoá dòng `FOR UPDATE` khi bán)
 
 ---
 

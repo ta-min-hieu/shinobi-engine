@@ -35,6 +35,9 @@ import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.inventory.domain.ItemTemplatePort;
 import dev.kage.protocol.AttackResultEvent;
+import dev.kage.protocol.BuyItemCommand;
+import dev.kage.protocol.BuyItemResponse;
+import dev.kage.protocol.BuyOutcome;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.ConnectRequest;
@@ -47,6 +50,8 @@ import dev.kage.protocol.EnhanceOutcome;
 import dev.kage.protocol.EquipItemCommand;
 import dev.kage.protocol.EquipItemResponse;
 import dev.kage.protocol.EquipmentSlot;
+import dev.kage.protocol.ListShopItemsRequest;
+import dev.kage.protocol.ListShopItemsResponse;
 import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.MoveResponse;
@@ -54,6 +59,9 @@ import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
 import dev.kage.protocol.SelectCharacterRequest;
+import dev.kage.protocol.SellItemCommand;
+import dev.kage.protocol.SellItemResponse;
+import dev.kage.protocol.SellOutcome;
 import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.UnequipItemCommand;
 import dev.kage.protocol.UnequipItemResponse;
@@ -101,13 +109,14 @@ class GatewayServerIntegrationTest {
         // GatewayServer luôn cần cả 2 Facade để khởi tạo (xem GatewayServer).
         var characterFacade = fakeCharacterFacade();
         var inventoryFacade = fakeInventoryFacade();
+        var shopFacade = fakeShopFacade();
         characterRegistry = new ConnectedCharacterRegistry(inventoryFacade);
         worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
         var positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
-        var facades = new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade);
+        var facades = new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, shopFacade);
         server = new GatewayServer(0, facades, worldGateway);
         server.start();
     }
@@ -249,6 +258,58 @@ class GatewayServerIntegrationTest {
         var enhanceItemUseCase =
                 new EnhanceItemUseCase(inventoryPort, goldPort, auditPort, action -> action.accept(null));
         return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
+    }
+
+    // Shop dùng trong 1 test socket thật (list rỗng) — catalog Fake trả rỗng, phần còn lại tối
+    // thiểu để compile, cùng convention fakeInventoryFacade().
+    private dev.kage.shop.api.ShopFacade fakeShopFacade() {
+        dev.kage.shop.domain.ShopCatalogPort catalogPort = new dev.kage.shop.domain.ShopCatalogPort() {
+            @Override
+            public Optional<dev.kage.shop.domain.ShopListing> findListing(long itemTemplateId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public List<dev.kage.shop.domain.ShopListing> findAll() {
+                return List.of();
+            }
+        };
+        dev.kage.shop.domain.GoldPort shopGoldPort = new dev.kage.shop.domain.GoldPort() {
+            @Override
+            public boolean deductGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {
+                return true;
+            }
+
+            @Override
+            public void creditGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {
+            }
+        };
+        dev.kage.shop.domain.InventoryGatewayPort inventoryGatewayPort =
+                new dev.kage.shop.domain.InventoryGatewayPort() {
+            @Override
+            public Optional<dev.kage.shop.domain.OwnedItem> findItem(long characterId, long itemId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public boolean grantItem(
+                    dev.kage.shop.domain.Transaction tx, long characterId, long itemTemplateId, int quantity) {
+                return true;
+            }
+
+            @Override
+            public boolean removeQuantity(
+                    dev.kage.shop.domain.Transaction tx, long characterId, long itemId, int quantity) {
+                return true;
+            }
+        };
+        dev.kage.shop.domain.AuditPort shopAuditPort = (tx, characterId, action, detailJson) -> { };
+        var ports = new dev.kage.shop.application.ShopPorts(
+                catalogPort, shopGoldPort, inventoryGatewayPort, shopAuditPort);
+        var listShopItemsUseCase = new dev.kage.shop.application.ListShopItemsUseCase(catalogPort);
+        var buyItemUseCase = new dev.kage.shop.application.BuyItemUseCase(ports, action -> action.accept(null));
+        var sellItemUseCase = new dev.kage.shop.application.SellItemUseCase(ports, action -> action.accept(null));
+        return new dev.kage.shop.api.ShopFacade(listShopItemsUseCase, buyItemUseCase, sellItemUseCase);
     }
 
     @AfterEach
@@ -474,6 +535,63 @@ class GatewayServerIntegrationTest {
             var response = EnhanceItemResponse.parseFrom(
                     readUntilOpcode(in, Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE).payload());
             assertThat(response.getOutcome()).isEqualTo(EnhanceOutcome.ENHANCE_OUTCOME_ITEM_NOT_FOUND);
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void clientShouldReceiveEmptyShopListing_overRealSockets() throws Exception {
+        // fakeShopFacade() luôn trả catalog RỖNG (Fake, không DB thật) — verify dây thật (opcode
+        // dispatch → decode → Virtual Thread → encode response), không phải nội dung catalog thật
+        // (đã phủ ở ShopIntegrationTest tầng dưới).
+        try (var socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(5000);
+            var in = new DataInputStream(socket.getInputStream());
+            connectCreateAndSelect(socket, in, "shoplist" + UUID.randomUUID().toString().substring(0, 6));
+
+            var request = ListShopItemsRequest.newBuilder().build();
+            sendFrame(socket, Opcode.OPCODE_LIST_SHOP_ITEMS_REQUEST_VALUE, 10, request.toByteArray());
+
+            var response = ListShopItemsResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE).payload());
+            assertThat(response.getListingsList()).isEmpty();
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void clientShouldReceiveBuyItemResponse_overRealSockets() throws Exception {
+        // Cùng lý do clientShouldReceiveEnhanceItemResponse_overRealSockets: catalog rỗng nên
+        // itemTemplateId=1 chắc chắn không có trong shop — verify đúng nhánh ITEM_NOT_IN_SHOP.
+        try (var socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(5000);
+            var in = new DataInputStream(socket.getInputStream());
+            connectCreateAndSelect(socket, in, "buy" + UUID.randomUUID().toString().substring(0, 6));
+
+            var command = BuyItemCommand.newBuilder().setItemTemplateId(1L).setQuantity(1).build();
+            sendFrame(socket, Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, 10, command.toByteArray());
+
+            var response = BuyItemResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_BUY_ITEM_RESPONSE_VALUE).payload());
+            assertThat(response.getOutcome()).isEqualTo(BuyOutcome.BUY_OUTCOME_ITEM_NOT_IN_SHOP);
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void clientShouldReceiveSellItemResponse_overRealSockets() throws Exception {
+        // fakeShopFacade().findItem() luôn trả rỗng — verify đúng nhánh ITEM_NOT_FOUND.
+        try (var socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(5000);
+            var in = new DataInputStream(socket.getInputStream());
+            connectCreateAndSelect(socket, in, "sell" + UUID.randomUUID().toString().substring(0, 6));
+
+            var command = SellItemCommand.newBuilder().setItemId(1L).setQuantity(1).build();
+            sendFrame(socket, Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, 10, command.toByteArray());
+
+            var response = SellItemResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE).payload());
+            assertThat(response.getOutcome()).isEqualTo(SellOutcome.SELL_OUTCOME_ITEM_NOT_FOUND);
         }
     }
 

@@ -270,6 +270,57 @@ class GatewayPipelineTest {
         return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
     }
 
+    // Shop không dùng trong test này — fake tối thiểu để compile (cùng convention fakeInventoryFacade).
+    private static dev.kage.shop.api.ShopFacade fakeShopFacade() {
+        dev.kage.shop.domain.ShopCatalogPort catalogPort = new dev.kage.shop.domain.ShopCatalogPort() {
+            @Override
+            public Optional<dev.kage.shop.domain.ShopListing> findListing(long itemTemplateId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public List<dev.kage.shop.domain.ShopListing> findAll() {
+                return List.of();
+            }
+        };
+        dev.kage.shop.domain.GoldPort shopGoldPort = new dev.kage.shop.domain.GoldPort() {
+            @Override
+            public boolean deductGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {
+                return true;
+            }
+
+            @Override
+            public void creditGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {
+            }
+        };
+        dev.kage.shop.domain.InventoryGatewayPort inventoryGatewayPort =
+                new dev.kage.shop.domain.InventoryGatewayPort() {
+            @Override
+            public Optional<dev.kage.shop.domain.OwnedItem> findItem(long characterId, long itemId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public boolean grantItem(
+                    dev.kage.shop.domain.Transaction tx, long characterId, long itemTemplateId, int quantity) {
+                return true;
+            }
+
+            @Override
+            public boolean removeQuantity(
+                    dev.kage.shop.domain.Transaction tx, long characterId, long itemId, int quantity) {
+                return true;
+            }
+        };
+        dev.kage.shop.domain.AuditPort shopAuditPort = (tx, characterId, action, detailJson) -> { };
+        var ports = new dev.kage.shop.application.ShopPorts(
+                catalogPort, shopGoldPort, inventoryGatewayPort, shopAuditPort);
+        var listShopItemsUseCase = new dev.kage.shop.application.ListShopItemsUseCase(catalogPort);
+        var buyItemUseCase = new dev.kage.shop.application.BuyItemUseCase(ports, action -> action.accept(null));
+        var sellItemUseCase = new dev.kage.shop.application.SellItemUseCase(ports, action -> action.accept(null));
+        return new dev.kage.shop.api.ShopFacade(listShopItemsUseCase, buyItemUseCase, sellItemUseCase);
+    }
+
     private static EmbeddedChannel newPipeline(FakeCharacterPort characterPort) {
         // ⚠️ Phải khớp CHÍNH XÁC pipeline thật trong GatewayBootstrap — lệch ở đây là test giả.
         // AccountFacade/CharacterFacade THẬT (không mock), chỉ Port bên dưới là Fake (TESTING.md
@@ -293,6 +344,7 @@ class GatewayPipelineTest {
         // vào hàng đợi chưa có ai drain (không tạo/rò rỉ thread tick cho mỗi test). Tương tự,
         // positionPersister không start() — save() (nếu bị gọi) chạy trực tiếp, không cần scheduler.
         var inventoryFacade = fakeInventoryFacade();
+        var shopFacade = fakeShopFacade();
         var characterRegistry = new ConnectedCharacterRegistry(inventoryFacade);
         var worldFacade = new WorldFacade(characterRegistry);
         var positionPersister =
@@ -305,7 +357,7 @@ class GatewayPipelineTest {
                 new PacketFrameDecoder(),
                 new PacketFrameEncoder(),
                 new GatewayChannelHandler(
-                        new GatewayFacades(accountFacade, characterFacade, inventoryFacade), worldGateway,
+                        new GatewayFacades(accountFacade, characterFacade, inventoryFacade, shopFacade), worldGateway,
                         Runnable::run));
     }
 

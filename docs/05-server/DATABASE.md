@@ -81,6 +81,12 @@
 |---|---|---|
 | `audit_log` | `id, character_id, action, detail_json, created_at` | ⚠️ **Bắt buộc** cho: trade, gold, item, cường hoá. Không có audit = không điều tra được gian lận/mất đồ. ✅ Migrate V7 (2026-07-23), `detail_json` là `TEXT` (chưa có thư viện JSON, cùng lý do `drop_table_entry`) |
 
+### 2.8 Shop
+
+| Bảng | Cột chính | Ghi chú |
+|---|---|---|
+| `shop_item` | `item_template_id (PK, FK item_template), buy_price, sell_price` | **Tĩnh** — danh mục shop toàn cục (chưa gắn NPC/vị trí). `buy_price`/`sell_price` độc lập nhau, không phải % cố định. ✅ Migrate V8 (2026-07-23) |
+
 ---
 
 ## 3. ERD
@@ -140,8 +146,8 @@ transactionManager.inTransaction(tx -> {
 | Thao tác | Vì sao |
 |---|---|
 | Trade giữa 2 người chơi | Mất một nửa = mất item thật |
-| Mua/bán ở shop | Trừ tiền nhưng không nhận item = mất tiền |
-| Cường hoá | Tốn nguyên liệu nhưng không lên cấp |
+| Mua/bán ở shop | Trừ tiền nhưng không nhận item = mất tiền — ✅ `BuyItemUseCase`/`SellItemUseCase` (2026-07-23) |
+| Cường hoá | Tốn nguyên liệu nhưng không lên cấp — ✅ `EnhanceItemUseCase` (2026-07-23) |
 | Chuyển gold | Hiển nhiên |
 | Nhận thưởng quest | Đánh dấu xong nhưng không nhận thưởng |
 

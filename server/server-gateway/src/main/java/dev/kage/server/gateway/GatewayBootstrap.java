@@ -28,6 +28,7 @@ public final class GatewayBootstrap {
         var accountFacade = databaseBootstrap.wireAccountFacade();
         var characterFacade = databaseBootstrap.wireCharacterFacade();
         var inventoryFacade = databaseBootstrap.wireInventoryFacade();
+        var shopFacade = databaseBootstrap.wireShopFacade();
 
         // characterRegistry là WorldOutboundSink thật — PHẢI tồn tại trước WorldFacade vì
         // WorldFacade cần sink lúc construct (SERVER.md §2: kết quả tick đi qua outbound queue).
@@ -39,7 +40,7 @@ public final class GatewayBootstrap {
         positionPersister.start();
         var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
 
-        var facades = new GatewayFacades(accountFacade, characterFacade, inventoryFacade);
+        var facades = new GatewayFacades(accountFacade, characterFacade, inventoryFacade, shopFacade);
         var server = new GatewayServer(PORT, facades, worldGateway);
         server.start();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

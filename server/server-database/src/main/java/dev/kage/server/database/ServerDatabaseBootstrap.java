@@ -28,6 +28,16 @@ import dev.kage.server.database.inventory.PostgresItemTemplateAdapter;
 import dev.kage.server.database.session.RedisClientFactory;
 import dev.kage.server.database.session.RedisConfig;
 import dev.kage.server.database.session.RedisSessionAdapter;
+import dev.kage.server.database.shop.JdbcShopTransactionRunner;
+import dev.kage.server.database.shop.PostgresShopAuditAdapter;
+import dev.kage.server.database.shop.PostgresShopCatalogAdapter;
+import dev.kage.server.database.shop.PostgresShopGoldAdapter;
+import dev.kage.server.database.shop.PostgresShopInventoryGatewayAdapter;
+import dev.kage.shop.api.ShopFacade;
+import dev.kage.shop.application.BuyItemUseCase;
+import dev.kage.shop.application.ListShopItemsUseCase;
+import dev.kage.shop.application.SellItemUseCase;
+import dev.kage.shop.application.ShopPorts;
 import javax.sql.DataSource;
 import redis.clients.jedis.JedisPool;
 
@@ -85,6 +95,19 @@ public final class ServerDatabaseBootstrap {
                 new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
         var enhanceItemUseCase = new EnhanceItemUseCase(inventoryPort, goldPort, auditPort, transactionRunner);
         return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
+    }
+
+    public ShopFacade wireShopFacade() {
+        var catalogPort = new PostgresShopCatalogAdapter(dataSource);
+        var goldPort = new PostgresShopGoldAdapter();
+        var inventoryGatewayPort = new PostgresShopInventoryGatewayAdapter(dataSource);
+        var auditPort = new PostgresShopAuditAdapter();
+        var transactionRunner = new JdbcShopTransactionRunner(dataSource);
+        var ports = new ShopPorts(catalogPort, goldPort, inventoryGatewayPort, auditPort);
+        var listShopItemsUseCase = new ListShopItemsUseCase(catalogPort);
+        var buyItemUseCase = new BuyItemUseCase(ports, transactionRunner);
+        var sellItemUseCase = new SellItemUseCase(ports, transactionRunner);
+        return new ShopFacade(listShopItemsUseCase, buyItemUseCase, sellItemUseCase);
     }
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */

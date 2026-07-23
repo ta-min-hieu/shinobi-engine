@@ -175,6 +175,34 @@ feature-inventory/CLAUDE.md.
 Equip/Unequip vì cường hoá có nhiều kết quả có ý nghĩa khác nhau với client (đặc biệt
 `FAILED_DROPPED` phải cảnh báo khác `FAILED_NO_DROP`).
 
+### 7.2 Mua bán (Shop) — ✅ Đã code (2026-07-23)
+
+`feature-shop` — module RIÊNG (không nằm trong feature-inventory) vì NETWORK.md §4 đã chừa dải
+opcode riêng (1000-1099 "Shop / Auction") từ Phase 3. Shop TOÀN CỤC, chưa gắn NPC/vị trí — Phase 6
+mới có NPC/Dialogue, lúc đó mới ràng buộc "đứng gần NPC mới mua được".
+
+**Quyết định chốt cùng chủ dự án (2026-07-23)**:
+- Danh mục lưu ở bảng `shop_item` (migration V8), KHÔNG phải bảng tra cứu tĩnh trong code (khác
+  `EnhancementTable`) — catalog có thể vài chục/trăm item, sửa giá không nên cần build lại.
+- `buy_price`/`sell_price` ĐỘC LẬP nhau (không phải % cố định của nhau) — tự cân bằng từng item.
+- Có bán lại (sell) ở MVP này, không hoãn qua lát cắt sau.
+
+**Kiến trúc**: Y HỆT cường hoá — `feature-shop` tự khai báo `GoldPort`/`InventoryGatewayPort` riêng
+(bản sao ý tưởng của `dev.kage.inventory.domain.GoldPort`) vì mua/bán cần đổi gold + đổi item
+NGUYÊN TỬ trong CÙNG transaction (DATABASE.md §5 — "trừ tiền nhưng không nhận item = mất tiền"),
+`InventoryFacade` không nhận `Transaction` chia sẻ giữa 2 feature nên không gọi qua đó được. Adapter
+thật (`server-database`) viết SQL riêng cho `inventory_item` thay vì tái dùng `Inventory` aggregate
+của feature-inventory — bắc cầu 2 loại `Transaction` khác nhau tốn hơn trùng lặp 2 câu SQL nhỏ (đếm
+số dòng + INSERT/UPDATE/DELETE). Xem feature-shop/CLAUDE.md.
+
+**Mua** (`BuyItemUseCase`): trừ gold TRƯỚC (rẻ, no-op nếu không đủ) → cộng item — túi đầy thì ném
+exception nội bộ để rollback CẢ phần gold đã trừ (không được "trừ tiền nhưng không nhận item").
+**Bán** (`SellItemUseCase`): bớt item TRƯỚC (điều kiện, khoá dòng bằng `SELECT ... FOR UPDATE`) →
+cộng gold — cộng gold không có nhánh thất bại nên không cần rollback thủ công.
+
+✅ **Protocol/gateway đã nối cùng lát cắt** — `ListShopItemsRequest/Response`,
+`BuyItemCommand/Response`, `SellItemCommand/Response` (opcode 1000-1005, `shop.proto`).
+
 ---
 
 ## 8. Trade

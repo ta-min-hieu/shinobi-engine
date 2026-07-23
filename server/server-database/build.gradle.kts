@@ -14,6 +14,7 @@ dependencies {
     implementation(project(":server:server-features:feature-account"))
     implementation(project(":server:server-features:feature-character"))
     implementation(project(":server:server-features:feature-inventory"))
+    implementation(project(":server:server-features:feature-shop"))
 
     implementation(libs.hikaricp)
     implementation(libs.postgresql)

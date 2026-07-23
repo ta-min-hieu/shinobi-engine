@@ -10,6 +10,9 @@ import dev.kage.character.domain.Character;
 import dev.kage.character.domain.IdempotencyKeyReusedException;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.EquipmentSlotType;
+import dev.kage.protocol.BuyItemCommand;
+import dev.kage.protocol.BuyItemResponse;
+import dev.kage.protocol.BuyOutcome;
 import dev.kage.protocol.CharacterSummary;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
@@ -25,13 +28,19 @@ import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.Faction;
 import dev.kage.protocol.ListCharactersRequest;
 import dev.kage.protocol.ListCharactersResponse;
+import dev.kage.protocol.ListShopItemsRequest;
+import dev.kage.protocol.ListShopItemsResponse;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
 import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.SelectCharacterResponse;
+import dev.kage.protocol.SellItemCommand;
+import dev.kage.protocol.SellItemResponse;
+import dev.kage.protocol.SellOutcome;
 import dev.kage.protocol.SetTargetCommand;
+import dev.kage.protocol.ShopListingView;
 import dev.kage.protocol.UnequipItemCommand;
 import dev.kage.protocol.UnequipItemResponse;
 import dev.kage.protocol.UseSkillCommand;
@@ -39,6 +48,7 @@ import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
 import dev.kage.server.world.CharacterBaseStats;
+import dev.kage.shop.api.ShopFacade;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import java.time.Duration;
@@ -80,6 +90,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final AccountFacade accountFacade;
     private final CharacterFacade characterFacade;
     private final InventoryFacade inventoryFacade;
+    private final ShopFacade shopFacade;
     private final WorldGateway worldGateway;
     private final Executor authExecutor;
     // Per-connection (handler đã là state per-connection, xem javadoc lớp) — không cần đồng bộ
@@ -107,12 +118,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_USE_SKILL_COMMAND_VALUE, this::handleUseSkillCommand),
             Map.entry(Opcode.OPCODE_EQUIP_ITEM_COMMAND_VALUE, this::handleEquipItemCommand),
             Map.entry(Opcode.OPCODE_UNEQUIP_ITEM_COMMAND_VALUE, this::handleUnequipItemCommand),
-            Map.entry(Opcode.OPCODE_ENHANCE_ITEM_COMMAND_VALUE, this::handleEnhanceItemCommand));
+            Map.entry(Opcode.OPCODE_ENHANCE_ITEM_COMMAND_VALUE, this::handleEnhanceItemCommand),
+            Map.entry(Opcode.OPCODE_LIST_SHOP_ITEMS_REQUEST_VALUE, this::handleListShopItemsRequest),
+            Map.entry(Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, this::handleBuyItemCommand),
+            Map.entry(Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, this::handleSellItemCommand));
 
     GatewayChannelHandler(GatewayFacades facades, WorldGateway worldGateway, Executor authExecutor) {
         this.accountFacade = facades.accountFacade();
         this.characterFacade = facades.characterFacade();
         this.inventoryFacade = facades.inventoryFacade();
+        this.shopFacade = facades.shopFacade();
         this.worldGateway = worldGateway;
         this.authExecutor = authExecutor;
     }
@@ -445,6 +460,88 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private static EnhanceOutcome toProtoOutcome(InventoryFacade.EnhanceResult result) {
         return ENHANCE_OUTCOME_MAPPING.get(result);
+    }
+
+    private void handleListShopItemsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ListShopItemsRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleListShopItemsBlocking(ctx, sequenceId));
+    }
+
+    private void handleListShopItemsBlocking(ChannelHandlerContext ctx, int sequenceId) {
+        var listings = shopFacade.listItems().stream()
+                .map(listing -> ShopListingView.newBuilder()
+                        .setItemTemplateId(listing.itemTemplateId())
+                        .setBuyPrice(listing.buyPrice())
+                        .setSellPrice(listing.sellPrice())
+                        .build())
+                .toList();
+        var response = ListShopItemsResponse.newBuilder().addAllListings(listings).build();
+        send(ctx, Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private void handleBuyItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = BuyItemCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleBuyItemBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleBuyItemBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, BuyItemCommand command) {
+        var result = shopFacade.buyItem(characterId, command.getItemTemplateId(), command.getQuantity());
+        var response = BuyItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        send(ctx, Opcode.OPCODE_BUY_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private static final Map<ShopFacade.BuyResult, BuyOutcome> BUY_OUTCOME_MAPPING = Map.of(
+            ShopFacade.BuyResult.OK, BuyOutcome.BUY_OUTCOME_OK,
+            ShopFacade.BuyResult.ITEM_NOT_IN_SHOP, BuyOutcome.BUY_OUTCOME_ITEM_NOT_IN_SHOP,
+            ShopFacade.BuyResult.INSUFFICIENT_GOLD, BuyOutcome.BUY_OUTCOME_INSUFFICIENT_GOLD,
+            ShopFacade.BuyResult.INVENTORY_FULL, BuyOutcome.BUY_OUTCOME_INVENTORY_FULL);
+
+    private static BuyOutcome toProtoOutcome(ShopFacade.BuyResult result) {
+        return BUY_OUTCOME_MAPPING.get(result);
+    }
+
+    private void handleSellItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = SellItemCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleSellItemBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleSellItemBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, SellItemCommand command) {
+        var result = shopFacade.sellItem(characterId, command.getItemId(), command.getQuantity());
+        var response = SellItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        send(ctx, Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private static final Map<ShopFacade.SellResult, SellOutcome> SELL_OUTCOME_MAPPING = Map.of(
+            ShopFacade.SellResult.OK, SellOutcome.SELL_OUTCOME_OK,
+            ShopFacade.SellResult.ITEM_NOT_FOUND, SellOutcome.SELL_OUTCOME_ITEM_NOT_FOUND,
+            ShopFacade.SellResult.ITEM_NOT_SELLABLE, SellOutcome.SELL_OUTCOME_ITEM_NOT_SELLABLE,
+            ShopFacade.SellResult.INSUFFICIENT_QUANTITY, SellOutcome.SELL_OUTCOME_INSUFFICIENT_QUANTITY);
+
+    private static SellOutcome toProtoOutcome(ShopFacade.SellResult result) {
+        return SELL_OUTCOME_MAPPING.get(result);
     }
 
     // Bảng tra thay switch 8 nhánh (PMD CyclomaticComplexity — cùng lý do đổi channelRead0 sang
