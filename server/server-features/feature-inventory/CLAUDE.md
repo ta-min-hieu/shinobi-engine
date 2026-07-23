@@ -130,10 +130,30 @@ JDBC theo package `dev.kage.server.database`, không theo Gradle module).
   `equipmentUseCases`, `enhanceItemUseCase`) — CHẠM giới hạn 4 của Checkstyle `ParameterNumber`,
   KHÔNG gộp thêm được nữa. UseCase tiếp theo (`feature-shop` cùng Phase 5) phải gộp vào 1 record
   kiểu `EquipmentUseCases`, không thêm tham số thứ 5 trực tiếp.
-- ⚠️ **Chưa nối protocol/gateway** cho cường hoá (opcode, `EnhanceItemCommand`) — lát cắt này CHỈ có
-  domain + application + adapter + test (Postgres + fake port), theo đúng thứ tự đã dùng cho "mặc
-  đồ" (nền tảng trước, protocol/gateway sau). Opcode tiếp theo trong dải Inventory/Equipment
-  (500-599, `inventory.proto`) là 505+.
+- ⚠️ **Lát cắt này (4) chỉ có domain + application + adapter + test** (Postgres + fake port) — chưa
+  nối protocol/gateway, theo đúng thứ tự đã dùng cho "mặc đồ" (nền tảng trước, protocol/gateway sau).
+
+### Phase 5 lát cắt 5 (2026-07-23, cùng ngày): nối protocol/gateway cho cường hoá
+
+- **`EnhanceItemCommand`/`EnhanceItemResponse`** (opcode 505-506, `inventory.proto`) — response
+  dùng **enum `EnhanceOutcome` riêng (6 giá trị)**, KHÔNG tái dùng pattern `bool success` +
+  `error_key` của Equip/Unequip. Lý do: cường hoá có 3 kết quả "lệnh chạy đúng nhưng khác ý nghĩa
+  gameplay" (`SUCCESS`/`FAILED_NO_DROP`/`FAILED_DROPPED`) mà client PHẢI phân biệt được (đặc biệt
+  `FAILED_DROPPED` cần cảnh báo "mất 1 cấp!" khác hẳn `FAILED_NO_DROP`) — 1 bool không đủ diễn tả,
+  3 kết quả lỗi còn lại (`ITEM_NOT_FOUND`/`MAX_LEVEL`/`INSUFFICIENT_GOLD`) gộp chung enum luôn cho
+  gọn thay vì tách response riêng.
+- **`GatewayChannelHandler.handlers` đổi từ `Map.of` sang `Map.ofEntries`** — thêm opcode thứ 11 thì
+  vượt quá 10 overload cố định của `Map.of(...)` (JDK chỉ có bản 0..10 cặp), `Map.ofEntries` không
+  giới hạn số cặp, cùng ngữ nghĩa bất biến.
+- **`ENHANCE_OUTCOME_MAPPING`** (bảng tra `InventoryFacade.EnhanceResult` → `EnhanceOutcome`) — cùng
+  pattern `SLOT_MAPPING` đã dùng cho equip (tránh switch 6 nhánh chạm PMD CyclomaticComplexity).
+  Không có `toErrorKey`/`sendError` cho lỗi nghiệp vụ ở đây — tất cả 6 kết quả đi qua
+  `EnhanceItemResponse.outcome`, kể cả các nhánh trước đây equip coi là "lỗi 400/401 gửi qua
+  `sendError`" cho slot sai (khác equip vì cường hoá không có khái niệm "slot" để validate sớm).
+- **Test real-socket** (`GatewayServerIntegrationTest`) chỉ verify nhánh `ITEM_NOT_FOUND` (Fake
+  `InventoryPort` trong test này luôn trả túi rỗng) — nhánh thành công/thất bại/rớt cấp đã phủ ở
+  tầng dưới (`EnhanceItemUseCaseTest` với Fake Port, `EnhanceItemUseCaseIntegrationTest` với
+  Postgres thật) — cùng cách chia tầng test đã dùng cho equip/unequip.
 
 ## Cứng
 

@@ -41,6 +41,9 @@ import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
 import dev.kage.protocol.CreateCharacterResponse;
+import dev.kage.protocol.EnhanceItemCommand;
+import dev.kage.protocol.EnhanceItemResponse;
+import dev.kage.protocol.EnhanceOutcome;
 import dev.kage.protocol.EquipItemCommand;
 import dev.kage.protocol.EquipItemResponse;
 import dev.kage.protocol.EquipmentSlot;
@@ -449,6 +452,28 @@ class GatewayServerIntegrationTest {
                     readUntilOpcode(in, Opcode.OPCODE_UNEQUIP_ITEM_RESPONSE_VALUE).payload());
             assertThat(response.getSuccess()).isFalse(); // slot rỗng — không có gì để gỡ
             assertThat(response.getErrorKey()).isEqualTo("error.slot_not_equipped");
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void clientShouldReceiveEnhanceItemResponse_overRealSockets() throws Exception {
+        // Cùng lý do với clientShouldReceiveEquipItemResponse_overRealSockets: fakeInventoryFacade()
+        // luôn trả túi đồ RỖNG (Fake, không DB thật) nên itemId=1 chắc chắn không tồn tại — test
+        // đúng nhánh ITEM_NOT_FOUND, verify dây thật (opcode dispatch → decode → Virtual Thread →
+        // encode response), không phải nhánh cường hoá thành công (đã phủ ở EnhanceItemUseCaseTest/
+        // EnhanceItemUseCaseIntegrationTest ở tầng dưới).
+        try (var socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(5000);
+            var in = new DataInputStream(socket.getInputStream());
+            connectCreateAndSelect(socket, in, "enhance" + UUID.randomUUID().toString().substring(0, 6));
+
+            var enhanceCommand = EnhanceItemCommand.newBuilder().setItemId(1L).build();
+            sendFrame(socket, Opcode.OPCODE_ENHANCE_ITEM_COMMAND_VALUE, 10, enhanceCommand.toByteArray());
+
+            var response = EnhanceItemResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE).payload());
+            assertThat(response.getOutcome()).isEqualTo(EnhanceOutcome.ENHANCE_OUTCOME_ITEM_NOT_FOUND);
         }
     }
 

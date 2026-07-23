@@ -56,3 +56,28 @@ message UnequipItemResponse {
   bool success = 1;
   string error_key = 2;
 }
+
+// Cường hoá (GAMEPLAY.md §7.1, Phase 5 lát cắt 5) có NHIỀU hơn 2 kết quả có ý nghĩa khác nhau với
+// client (VD FAILED_DROPPED phải báo "mất 1 cấp!" khác hẳn FAILED_NO_DROP) — không đủ diễn tả bằng
+// bool success + error_key như Equip/Unequip, nên dùng enum riêng thay vì tái dùng pattern đó.
+enum EnhanceOutcome {
+  ENHANCE_OUTCOME_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho kết quả thật.
+  ENHANCE_OUTCOME_SUCCESS = 1;
+  ENHANCE_OUTCOME_FAILED_NO_DROP = 2; // thất bại, KHÔNG mất cấp (dưới +10)
+  ENHANCE_OUTCOME_FAILED_DROPPED = 3; // thất bại, RỚT 1 cấp (từ +10, chưa có "Bảo Vệ")
+  ENHANCE_OUTCOME_ITEM_NOT_FOUND = 4;
+  ENHANCE_OUTCOME_MAX_LEVEL = 5; // đã +15, không cường hoá thêm được
+  ENHANCE_OUTCOME_INSUFFICIENT_GOLD = 6;
+}
+
+// Command: Client -> Server (OPCODE_ENHANCE_ITEM_COMMAND). item_id là inventory_item.id THẬT
+// (không phải vị trí) — server tự tính chi phí/tỉ lệ theo enhance_level hiện tại của item, KHÔNG
+// tin số liệu từ client (Điều 24, GAMEPLAY.md §7.1).
+message EnhanceItemCommand {
+  int64 item_id = 1;
+}
+
+// Response: Server -> Client (OPCODE_ENHANCE_ITEM_RESPONSE).
+message EnhanceItemResponse {
+  EnhanceOutcome outcome = 1;
+}

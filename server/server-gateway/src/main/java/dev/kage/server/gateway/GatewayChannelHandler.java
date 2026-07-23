@@ -15,6 +15,9 @@ import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
 import dev.kage.protocol.CreateCharacterResponse;
+import dev.kage.protocol.EnhanceItemCommand;
+import dev.kage.protocol.EnhanceItemResponse;
+import dev.kage.protocol.EnhanceOutcome;
 import dev.kage.protocol.EquipItemCommand;
 import dev.kage.protocol.EquipItemResponse;
 import dev.kage.protocol.EquipmentSlot;
@@ -92,17 +95,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     // Bind sau khi field khác đã gán xong (field initializer chạy tuần tự trong <init>) — method
     // reference chỉ CHỤP this, không gọi ngay, nên thứ tự khai báo so với constructor không quan trọng.
-    private final Map<Integer, PacketHandler> handlers = Map.of(
-            Opcode.OPCODE_PING_VALUE, this::handlePing,
-            Opcode.OPCODE_CONNECT_REQUEST_VALUE, this::handleConnect,
-            Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE, this::handleListCharacters,
-            Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, this::handleCreateCharacter,
-            Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, this::handleSelectCharacter,
-            Opcode.OPCODE_MOVE_COMMAND_VALUE, this::handleMoveCommand,
-            Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, this::handleSetTargetCommand,
-            Opcode.OPCODE_USE_SKILL_COMMAND_VALUE, this::handleUseSkillCommand,
-            Opcode.OPCODE_EQUIP_ITEM_COMMAND_VALUE, this::handleEquipItemCommand,
-            Opcode.OPCODE_UNEQUIP_ITEM_COMMAND_VALUE, this::handleUnequipItemCommand);
+    // Map.ofEntries thay Map.of (11 cặp vượt quá 10 overload cố định của Map.of) — cùng ngữ nghĩa.
+    private final Map<Integer, PacketHandler> handlers = Map.ofEntries(
+            Map.entry(Opcode.OPCODE_PING_VALUE, this::handlePing),
+            Map.entry(Opcode.OPCODE_CONNECT_REQUEST_VALUE, this::handleConnect),
+            Map.entry(Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE, this::handleListCharacters),
+            Map.entry(Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, this::handleCreateCharacter),
+            Map.entry(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, this::handleSelectCharacter),
+            Map.entry(Opcode.OPCODE_MOVE_COMMAND_VALUE, this::handleMoveCommand),
+            Map.entry(Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, this::handleSetTargetCommand),
+            Map.entry(Opcode.OPCODE_USE_SKILL_COMMAND_VALUE, this::handleUseSkillCommand),
+            Map.entry(Opcode.OPCODE_EQUIP_ITEM_COMMAND_VALUE, this::handleEquipItemCommand),
+            Map.entry(Opcode.OPCODE_UNEQUIP_ITEM_COMMAND_VALUE, this::handleUnequipItemCommand),
+            Map.entry(Opcode.OPCODE_ENHANCE_ITEM_COMMAND_VALUE, this::handleEnhanceItemCommand));
 
     GatewayChannelHandler(GatewayFacades facades, WorldGateway worldGateway, Executor authExecutor) {
         this.accountFacade = facades.accountFacade();
@@ -407,6 +412,39 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 .setErrorKey(result == InventoryFacade.UnequipResult.OK ? "" : "error.slot_not_equipped")
                 .build();
         send(ctx, Opcode.OPCODE_UNEQUIP_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    // EnhanceItemCommand chạm DB (feature-inventory) — Virtual Thread, giống handleEquipItemCommand.
+    private void handleEnhanceItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = EnhanceItemCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleEnhanceItemBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleEnhanceItemBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, EnhanceItemCommand command) {
+        var result = inventoryFacade.enhanceItem(characterId, command.getItemId());
+        var response = EnhanceItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        send(ctx, Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    // Bảng tra thay switch 6 nhánh (PMD CyclomaticComplexity — cùng lý do SLOT_MAPPING bên dưới).
+    private static final Map<InventoryFacade.EnhanceResult, EnhanceOutcome> ENHANCE_OUTCOME_MAPPING = Map.of(
+            InventoryFacade.EnhanceResult.SUCCESS, EnhanceOutcome.ENHANCE_OUTCOME_SUCCESS,
+            InventoryFacade.EnhanceResult.FAILED_NO_DROP, EnhanceOutcome.ENHANCE_OUTCOME_FAILED_NO_DROP,
+            InventoryFacade.EnhanceResult.FAILED_DROPPED, EnhanceOutcome.ENHANCE_OUTCOME_FAILED_DROPPED,
+            InventoryFacade.EnhanceResult.ITEM_NOT_FOUND, EnhanceOutcome.ENHANCE_OUTCOME_ITEM_NOT_FOUND,
+            InventoryFacade.EnhanceResult.MAX_LEVEL, EnhanceOutcome.ENHANCE_OUTCOME_MAX_LEVEL,
+            InventoryFacade.EnhanceResult.INSUFFICIENT_GOLD, EnhanceOutcome.ENHANCE_OUTCOME_INSUFFICIENT_GOLD);
+
+    private static EnhanceOutcome toProtoOutcome(InventoryFacade.EnhanceResult result) {
+        return ENHANCE_OUTCOME_MAPPING.get(result);
     }
 
     // Bảng tra thay switch 8 nhánh (PMD CyclomaticComplexity — cùng lý do đổi channelRead0 sang

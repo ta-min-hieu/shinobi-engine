@@ -170,6 +170,11 @@ liên tục mỗi lần cường hoá/mua bán. `feature-inventory` trừ gold q
 `CharacterFacade`) vì cần trừ NGUYÊN TỬ trong cùng transaction với đổi `enhance_level` — xem
 feature-inventory/CLAUDE.md.
 
+✅ **Protocol/gateway đã nối** (2026-07-23) — `EnhanceItemCommand`/`EnhanceItemResponse` (opcode
+505-506, `inventory.proto`), `EnhanceOutcome` enum riêng (6 giá trị) thay vì `bool success` như
+Equip/Unequip vì cường hoá có nhiều kết quả có ý nghĩa khác nhau với client (đặc biệt
+`FAILED_DROPPED` phải cảnh báo khác `FAILED_NO_DROP`).
+
 ---
 
 ## 8. Trade

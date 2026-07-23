@@ -3,6 +3,9 @@ package dev.kage.protocol.wire;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import dev.kage.protocol.EnhanceItemCommand;
+import dev.kage.protocol.EnhanceItemResponse;
+import dev.kage.protocol.EnhanceOutcome;
 import dev.kage.protocol.EquipItemCommand;
 import dev.kage.protocol.EquipItemResponse;
 import dev.kage.protocol.EquipmentSlot;
@@ -81,5 +84,29 @@ class InventoryPacketsTest {
         var parsed = UnequipItemResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getSuccess()).isTrue();
+    }
+
+    @Test
+    void shouldRoundTripEnhanceItemCommand() throws InvalidProtocolBufferException {
+        var command = EnhanceItemCommand.newBuilder().setItemId(42L).build();
+        var header = new PacketHeader(Opcode.OPCODE_ENHANCE_ITEM_COMMAND_VALUE, ProtocolVersion.CURRENT, 4);
+
+        byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
+        var parsed = EnhanceItemCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+
+        assertThat(parsed.getItemId()).isEqualTo(42L);
+    }
+
+    @Test
+    void shouldRoundTripEnhanceItemResponse() throws InvalidProtocolBufferException {
+        var response = EnhanceItemResponse.newBuilder()
+                .setOutcome(EnhanceOutcome.ENHANCE_OUTCOME_FAILED_DROPPED)
+                .build();
+        var header = new PacketHeader(Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE, ProtocolVersion.CURRENT, 4);
+
+        byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
+        var parsed = EnhanceItemResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+
+        assertThat(parsed.getOutcome()).isEqualTo(EnhanceOutcome.ENHANCE_OUTCOME_FAILED_DROPPED);
     }
 }
