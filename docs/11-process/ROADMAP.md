@@ -217,14 +217,22 @@ graph LR
 | ✅ NPC tĩnh lát cắt 1 (2026-07-23 — hiện qua AoI, chưa dialogue) | [GAMEPLAY.md §9.1](../05-server/GAMEPLAY.md) |
 | ✅ Dialogue NPC lát cắt 2 (2026-07-23 — `feature-dialogue` mới, node/nhánh + mở shop qua dialogue) | [GAMEPLAY.md §9.2](../05-server/GAMEPLAY.md) |
 | ✅ `feature-quest` + script lát cắt 3 (2026-07-23 — nhận qua dialogue → theo dõi → hoàn thành → nhận thưởng, đầy đủ) | [GAMEPLAY.md §9.3](../05-server/GAMEPLAY.md) |
-| Validate mọi script lúc khởi động | [SCRIPTING.md §8](../06-plugin/SCRIPTING.md) |
+| ✅ Validate mọi script lúc khởi động (2026-07-23 — `ScriptSandbox.validateSyntax` (parse-only) + `ScriptValidator` mới ở `engine-scripting`; `GatewayBootstrap` gom script_ref quest+dialogue từ DB (`QuestTemplatePort`/`NpcTemplatePort` thêm `listAll*ScriptRefs`) + hằng số skill (`WorldFacade.listSkillScriptResources`), validate TRƯỚC khi world tick/server nhận kết nối) | [SCRIPTING.md §8](../06-plugin/SCRIPTING.md) |
 | ✅ `feature-friend` lát cắt 4 (2026-07-23 — gửi/chấp nhận/từ chối/huỷ kết bạn theo tên + trạng thái online qua `ConnectedCharacterRegistry`, chơi được thật qua socket) | [GAMEPLAY.md §11](../05-server/GAMEPLAY.md) |
 | ✅ `feature-mail` lát cắt 5 (2026-07-23 — gửi/xem/nhận/xoá thư, gold+item đính kèm nhận NGUYÊN TỬ trong 1 transaction chống duplicate, chơi được thật qua socket + Postgres thật) | [GAMEPLAY.md §11](../05-server/GAMEPLAY.md) |
 | ✅ `feature-chat` lát cắt 6 (2026-07-23 — kênh Thế giới/Riêng tư/Khu vực chơi được thật qua socket; Khu vực tích hợp world tick thật qua `AreaOfInterestTracker`; Bang hội/Party dời Phase 7 cùng Guild/Party thật) | [GAMEPLAY.md §10](../05-server/GAMEPLAY.md) |
 
 **Exit Criteria — đây là MVP:**
-- [ ] Chơi được: tạo nhân vật → nhận quest → đánh quái → nhặt đồ → cường hoá → hoàn thành quest
-- [ ] Toàn bộ Definition of Done (Điều 34)
+- [x] Chơi được: tạo nhân vật → nhận quest → đánh quái → nhặt đồ → cường hoá → hoàn thành quest —
+      verify bằng `MvpLoopIntegrationTest` (server-database, 2026-07-23): xâu chuỗi CÙNG 1 nhân vật
+      qua toàn bộ UseCase thật (Postgres thật, không mock) theo ĐÚNG thứ tự người chơi thật trải
+      qua. Combat/AI/loot qua Netty thật đã verify riêng ở `WorldFacadeTest`/
+      `GatewayServerIntegrationTest` — test này ghép nối các mảnh đã chứng minh riêng lẻ thành 1
+      hành trình liền mạch, không lặp lại đã test.
+- [x] Toàn bộ Definition of Done (Điều 34) — compile/test/checkstyle xanh xuyên suốt (bao gồm build
+      đầy đủ `./gradlew build` + ArchUnit); JavaDoc cho API công khai mới; tài liệu (ROADMAP/
+      GAMEPLAY/SCRIPTING/GLOSSARY) đã cập nhật khớp code; không vi phạm ranh giới kiến trúc
+      (ArchUnit xanh); không thêm dependency mới ngoài TECHNOLOGY-STACK.md.
 
 ---
 

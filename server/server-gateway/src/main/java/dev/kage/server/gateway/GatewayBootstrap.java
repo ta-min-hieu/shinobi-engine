@@ -1,8 +1,11 @@
 package dev.kage.server.gateway;
 
+import dev.kage.engine.scripting.ScriptSandbox;
+import dev.kage.engine.scripting.ScriptValidator;
 import dev.kage.server.database.ServerDatabaseBootstrap;
 import dev.kage.server.world.WorldFacade;
 import java.time.Duration;
+import java.util.ArrayList;
 
 /**
  * Entrypoint {@code main()} mỏng — logic thật ở {@link GatewayServer} (tách ra để test end-to-end
@@ -15,6 +18,10 @@ import java.time.Duration;
 public final class GatewayBootstrap {
 
     private static final int PORT = 7777;
+
+    // Chỉ dùng để PARSE (validateSyntax), không thực thi — giới hạn statement không có ý nghĩa ở
+    // đây (khác ScriptSandbox dùng lúc gameplay thật), giữ số dương bất kỳ cho hợp constructor.
+    private static final long SCRIPT_VALIDATION_STATEMENT_LIMIT = 1L;
 
     // SERVER.md §8 gợi ý "định kỳ 5 phút" cho dữ liệu tái tạo được (vị trí, HP) — chưa đo, đủ cho
     // lát cắt persistence này (tinh chỉnh 1 chỗ khi có số liệu thật, giống MOVE_SPEED_MPS/AOI_RADIUS).
@@ -34,6 +41,13 @@ public final class GatewayBootstrap {
         var friendFacade = databaseBootstrap.wireFriendFacade();
         var mailFacade = databaseBootstrap.wireMailFacade();
         var chatFacade = databaseBootstrap.wireChatFacade();
+
+        // SCRIPTING.md §8 — fail fast lúc khởi động, KHÔNG đợi người chơi phát hiện lỗi cú pháp
+        // script. Gom script_ref từ DB (quest/dialogue) + hằng số Java (skill, chưa DB-driven).
+        var scriptRefs = new ArrayList<String>();
+        scriptRefs.addAll(databaseBootstrap.listContentScriptRefs());
+        scriptRefs.addAll(WorldFacade.listSkillScriptResources());
+        new ScriptValidator(new ScriptSandbox(SCRIPT_VALIDATION_STATEMENT_LIMIT)).validateAll(scriptRefs);
 
         // characterRegistry là WorldOutboundSink thật — PHẢI tồn tại trước WorldFacade vì
         // WorldFacade cần sink lúc construct (SERVER.md §2: kết quả tick đi qua outbound queue).

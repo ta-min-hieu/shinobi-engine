@@ -5,6 +5,8 @@ import dev.kage.quest.domain.QuestTemplatePort;
 import dev.kage.server.database.DatabaseAccessException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import javax.sql.DataSource;
 
@@ -13,6 +15,10 @@ public final class PostgresQuestTemplateAdapter implements QuestTemplatePort {
 
     private static final String FIND_BY_CODE = """
             SELECT id, script_ref FROM quest_template WHERE code = ?
+            """;
+
+    private static final String LIST_ALL_SCRIPT_REFS = """
+            SELECT DISTINCT script_ref FROM quest_template
             """;
 
     private final DataSource dataSource;
@@ -34,6 +40,21 @@ public final class PostgresQuestTemplateAdapter implements QuestTemplatePort {
             }
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi đọc quest_template: questCode=" + questCode, e);
+        }
+    }
+
+    @Override
+    public List<String> listAllScriptRefs() {
+        try (var connection = dataSource.getConnection();
+                var statement = connection.prepareStatement(LIST_ALL_SCRIPT_REFS);
+                ResultSet rs = statement.executeQuery()) {
+            var result = new ArrayList<String>();
+            while (rs.next()) {
+                result.add(rs.getString("script_ref"));
+            }
+            return result;
+        } catch (SQLException e) {
+            throw new DatabaseAccessException("Lỗi liệt kê script_ref quest_template", e);
         }
     }
 }

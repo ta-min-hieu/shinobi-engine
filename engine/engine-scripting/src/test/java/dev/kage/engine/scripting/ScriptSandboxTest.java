@@ -55,4 +55,24 @@ class ScriptSandboxTest {
 
         assertThat(text).isEqualTo("hello:2");
     }
+
+    @Test
+    void validateSyntaxShouldPass_whenScriptWellFormed() {
+        sandbox.validateSyntax("function on_accept(ctx) { return 1 + 1; }", "test.js");
+        // Không ném gì — pass.
+    }
+
+    @Test
+    void validateSyntaxShouldThrow_whenScriptHasSyntaxError() {
+        assertThatThrownBy(() -> sandbox.validateSyntax("function on_accept(ctx) { return 1 +", "broken.js"))
+                .isInstanceOf(ScriptExecutionException.class);
+    }
+
+    @Test
+    void validateSyntaxShouldNotExecuteScript_onlyParse() {
+        // Nếu validateSyntax lỡ CHẠY script thay vì chỉ parse, while(true) sẽ treo test này —
+        // dùng chính kịch bản shouldStopInfiniteLoop_viaStatementLimit để chứng minh KHÔNG chạy.
+        sandbox.validateSyntax("while (true) {}", "infinite.js");
+        // Không ném gì, không treo — pass.
+    }
 }

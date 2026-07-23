@@ -73,4 +73,13 @@ class DialogueIntegrationTest {
 
         assertThat(result).isEmpty();
     }
+
+    @Test
+    void shouldListDialogueScriptRef_forStartupValidation() {
+        // SCRIPTING.md §8 — validate lúc khởi động cần liệt kê ĐÚNG dialogue_script_ref đang tham
+        // chiếu thật trong DB (V10 seed), không phải danh sách tự khai trong code.
+        var scriptRefs = new PostgresNpcTemplateAdapter(dataSource).listAllDialogueScriptRefs();
+
+        assertThat(scriptRefs).contains("/scripts/dialogue/town_elder.js");
+    }
 }

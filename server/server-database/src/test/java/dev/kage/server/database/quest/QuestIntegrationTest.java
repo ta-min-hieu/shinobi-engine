@@ -157,6 +157,15 @@ class QuestIntegrationTest {
     }
 
     @Test
+    void shouldListScriptRef_forStartupValidation() {
+        // SCRIPTING.md §8 — validate lúc khởi động cần liệt kê ĐÚNG script_ref đang tham chiếu
+        // thật trong DB (V11 seed), không phải danh sách tự khai trong code.
+        var scriptRefs = new PostgresQuestTemplateAdapter(dataSource).listAllScriptRefs();
+
+        assertThat(scriptRefs).contains("/scripts/quest/kill_training_dummies.js");
+    }
+
+    @Test
     void shouldRejectDoubleAccept() {
         long characterId = createFreshCharacter("QuestPlayer2");
         newAcceptUseCase().execute(characterId, QUEST_CODE);

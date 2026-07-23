@@ -1,5 +1,6 @@
 package dev.kage.engine.scripting;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.function.Function;
 import org.graalvm.polyglot.Context;
@@ -8,6 +9,7 @@ import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.PolyglotAccess;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.ResourceLimits;
+import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.io.IOAccess;
 import org.graalvm.polyglot.proxy.ProxyObject;
@@ -73,6 +75,23 @@ public final class ScriptSandbox {
             return extractor.apply(result); // PHẢI chạy ở đây — context vẫn còn mở.
         } catch (PolyglotException e) {
             throw new ScriptExecutionException("Script thất bại: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Parse (KHÔNG chạy) {@code script} — chỉ bắt lỗi cú pháp, không tốn chi phí thực thi. Dùng
+     * cho validate toàn bộ script lúc khởi động (SCRIPTING.md §8 "Fail fast lúc khởi động là bắt
+     * buộc"), KHÔNG dùng lúc gameplay thật (đó là việc của {@link #eval}).
+     *
+     * @param scriptName tên hiển thị trong thông báo lỗi (VD đường dẫn resource) — GraalJS dùng
+     *     giá trị này làm {@code Source} name, không ảnh hưởng kết quả parse.
+     * @throws ScriptExecutionException nếu {@code script} có lỗi cú pháp
+     */
+    public void validateSyntax(String script, String scriptName) {
+        try (Context context = buildContext()) {
+            context.parse(Source.newBuilder("js", script, scriptName).build());
+        } catch (PolyglotException | IOException e) {
+            throw new ScriptExecutionException("Script lỗi cú pháp: " + scriptName, e);
         }
     }
 

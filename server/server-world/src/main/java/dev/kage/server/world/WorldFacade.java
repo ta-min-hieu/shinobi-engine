@@ -93,6 +93,15 @@ public final class WorldFacade {
     private volatile boolean running;
     private Thread tickThread;
 
+    /**
+     * Toàn bộ resource script skill (hardcode, chưa DB-driven — xem {@link SkillConstants}) —
+     * dùng cho validate script lúc khởi động (SCRIPTING.md §8). {@code static} vì đây là config
+     * cố định, không phụ thuộc instance {@link WorldFacade} nào.
+     */
+    public static List<String> listSkillScriptResources() {
+        return List.of(SkillConstants.FIREBALL_SCRIPT_RESOURCE);
+    }
+
     public WorldFacade(WorldOutboundSink outboundSink) {
         this.outboundSink = outboundSink;
         this.aoiTracker = new AreaOfInterestTracker(outboundSink);

@@ -76,6 +76,8 @@ import dev.kage.shop.application.BuyItemUseCase;
 import dev.kage.shop.application.ListShopItemsUseCase;
 import dev.kage.shop.application.SellItemUseCase;
 import dev.kage.shop.application.ShopPorts;
+import java.util.ArrayList;
+import java.util.List;
 import javax.sql.DataSource;
 import redis.clients.jedis.JedisPool;
 
@@ -134,6 +136,19 @@ public final class ServerDatabaseBootstrap {
         var enhancePorts = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
         var enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, transactionRunner);
         return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
+    }
+
+    /**
+     * Toàn bộ {@code script_ref} quest+dialogue đang được DB tham chiếu — dùng cho validate script
+     * lúc khởi động (SCRIPTING.md §8), KHÔNG dùng trong gameplay. Tự dựng adapter riêng (không tái
+     * dùng adapter đã wire trong {@link #wireQuestFacade()}/{@link #wireDialogueFacade()}) vì đây
+     * là bước validate CHẠY TRƯỚC lúc facade gameplay được cần tới, gọi độc lập từ composition root.
+     */
+    public List<String> listContentScriptRefs() {
+        var refs = new ArrayList<String>();
+        refs.addAll(new PostgresQuestTemplateAdapter(dataSource).listAllScriptRefs());
+        refs.addAll(new PostgresNpcTemplateAdapter(dataSource).listAllDialogueScriptRefs());
+        return refs;
     }
 
     public ShopFacade wireShopFacade() {

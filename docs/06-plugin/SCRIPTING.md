@@ -236,6 +236,11 @@ Không phải thứ gì "không hardcode" cũng cần script.
 
 ## Việc cần làm tiếp theo
 
-1. Thêm `org.graalvm.polyglot:js` vào `libs.versions.toml` — **verify version thật trước khi ghi** (CLAUDE.md §"gen code hiệu quả").
-2. Khi triển khai: **thiết kế sandbox trước, API sau** (§4) — retrofit sandbox vào API đã expose object Java là không thể.
-3. Phase 4: làm §8 (validate lúc khởi động) ngay từ script đầu tiên.
+1. ✅ Thêm `org.graalvm.polyglot:js` vào `libs.versions.toml` (Phase 4).
+2. ✅ Sandbox thiết kế trước, API sau (§4) — `ScriptSandbox` (Phase 4).
+3. ✅ §8 "Validate lúc khởi động" đã làm (2026-07-23, Phase 6) — `ScriptSandbox.validateSyntax`
+   (parse-only, `Context.parse`) + `ScriptValidator` (`engine-scripting`), gọi từ
+   `GatewayBootstrap` TRƯỚC khi world tick/server nhận kết nối. Danh sách script gom từ 2 nguồn:
+   DB (`QuestTemplatePort.listAllScriptRefs`/`NpcTemplatePort.listAllDialogueScriptRefs` — tự
+   động khớp thực tế, không cần khai tay) + hằng số Java (`WorldFacade.listSkillScriptResources`,
+   vì skill chưa DB-driven). Xem `ScriptValidatorTest`/`ScriptSandboxTest` (engine-scripting).

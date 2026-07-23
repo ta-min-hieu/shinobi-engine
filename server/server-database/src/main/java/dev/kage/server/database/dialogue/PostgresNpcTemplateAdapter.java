@@ -4,6 +4,8 @@ import dev.kage.dialogue.domain.NpcTemplatePort;
 import dev.kage.server.database.DatabaseAccessException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import javax.sql.DataSource;
 
@@ -12,6 +14,10 @@ public final class PostgresNpcTemplateAdapter implements NpcTemplatePort {
 
     private static final String FIND_DIALOGUE_SCRIPT_REF_BY_CODE = """
             SELECT dialogue_script_ref FROM npc_template WHERE code = ?
+            """;
+
+    private static final String LIST_ALL_DIALOGUE_SCRIPT_REFS = """
+            SELECT DISTINCT dialogue_script_ref FROM npc_template WHERE dialogue_script_ref IS NOT NULL
             """;
 
     private final DataSource dataSource;
@@ -30,6 +36,21 @@ public final class PostgresNpcTemplateAdapter implements NpcTemplatePort {
             }
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi đọc npc_template: npcCode=" + npcCode, e);
+        }
+    }
+
+    @Override
+    public List<String> listAllDialogueScriptRefs() {
+        try (var connection = dataSource.getConnection();
+                var statement = connection.prepareStatement(LIST_ALL_DIALOGUE_SCRIPT_REFS);
+                ResultSet rs = statement.executeQuery()) {
+            var result = new ArrayList<String>();
+            while (rs.next()) {
+                result.add(rs.getString("dialogue_script_ref"));
+            }
+            return result;
+        } catch (SQLException e) {
+            throw new DatabaseAccessException("Lỗi liệt kê dialogue_script_ref npc_template", e);
         }
     }
 }
