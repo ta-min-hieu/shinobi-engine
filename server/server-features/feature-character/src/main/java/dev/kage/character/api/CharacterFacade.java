@@ -8,6 +8,7 @@ import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.PositionSnapshot;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * API công khai của {@code feature-character} — module khác (server-gateway) CHỈ gọi qua đây,
@@ -56,5 +57,15 @@ public final class CharacterFacade {
 
     public CharacterStats loadStats(long characterId) {
         return characterPort.loadStats(characterId);
+    }
+
+    /** Tra nhân vật theo tên — dùng cho kết bạn/gửi thư theo tên (feature-friend, feature-mail). */
+    public Optional<Character> findByName(String name) {
+        return characterPort.findByName(name);
+    }
+
+    /** Tra nhân vật theo ID — dùng để hiển thị tên (danh sách bạn bè, người gửi thư/chat riêng). */
+    public Optional<Character> findById(long characterId) {
+        return characterPort.findById(characterId);
     }
 }

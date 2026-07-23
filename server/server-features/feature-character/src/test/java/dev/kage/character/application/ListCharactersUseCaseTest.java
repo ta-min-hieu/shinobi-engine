@@ -11,6 +11,7 @@ import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.character.domain.Transaction;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class ListCharactersUseCaseTest {
@@ -35,6 +36,16 @@ class ListCharactersUseCaseTest {
         @Override
         public boolean existsByName(String name) {
             return characters.stream().anyMatch(c -> c.name().equals(name));
+        }
+
+        @Override
+        public Optional<Character> findByName(String name) {
+            return characters.stream().filter(c -> c.name().equals(name)).findFirst();
+        }
+
+        @Override
+        public Optional<Character> findById(long characterId) {
+            return characters.stream().filter(c -> c.id() == characterId).findFirst();
         }
 
         @Override

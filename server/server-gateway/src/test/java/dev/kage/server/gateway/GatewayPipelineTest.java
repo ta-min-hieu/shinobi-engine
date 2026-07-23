@@ -369,6 +369,54 @@ class GatewayPipelineTest {
                 acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
     }
 
+    // Friend không dùng trong test này — fake tối thiểu để compile (cùng convention fakeQuestFacade).
+    private static dev.kage.friend.api.FriendFacade fakeFriendFacade() {
+        dev.kage.friend.domain.FriendPort friendPort = new dev.kage.friend.domain.FriendPort() {
+            @Override
+            public Optional<dev.kage.friend.domain.Friendship> findBetween(long characterIdA, long characterIdB) {
+                return Optional.empty();
+            }
+
+            @Override
+            public dev.kage.friend.domain.Friendship sendRequest(long requesterId, long addresseeId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public boolean accept(long friendshipId, long addresseeId) {
+                return false;
+            }
+
+            @Override
+            public boolean reject(long friendshipId, long addresseeId) {
+                return false;
+            }
+
+            @Override
+            public boolean remove(long characterId, long friendCharacterId) {
+                return false;
+            }
+
+            @Override
+            public List<dev.kage.friend.domain.Friendship> listAccepted(long characterId) {
+                return List.of();
+            }
+
+            @Override
+            public List<dev.kage.friend.domain.Friendship> listPendingIncoming(long characterId) {
+                return List.of();
+            }
+        };
+        var useCases = new dev.kage.friend.application.FriendUseCases(
+                new dev.kage.friend.application.SendFriendRequestUseCase(friendPort),
+                new dev.kage.friend.application.AcceptFriendRequestUseCase(friendPort),
+                new dev.kage.friend.application.RejectFriendRequestUseCase(friendPort),
+                new dev.kage.friend.application.RemoveFriendUseCase(friendPort),
+                new dev.kage.friend.application.ListFriendsUseCase(friendPort),
+                new dev.kage.friend.application.ListPendingFriendRequestsUseCase(friendPort));
+        return new dev.kage.friend.api.FriendFacade(useCases);
+    }
+
     private static EmbeddedChannel newPipeline(FakeCharacterPort characterPort) {
         // ⚠️ Phải khớp CHÍNH XÁC pipeline thật trong GatewayBootstrap — lệch ở đây là test giả.
         // AccountFacade/CharacterFacade THẬT (không mock), chỉ Port bên dưới là Fake (TESTING.md
@@ -395,6 +443,7 @@ class GatewayPipelineTest {
         var shopFacade = fakeShopFacade();
         var dialogueFacade = fakeDialogueFacade();
         var questFacade = fakeQuestFacade();
+        var friendFacade = fakeFriendFacade();
         var characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
         var worldFacade = new WorldFacade(characterRegistry);
         var positionPersister =
@@ -409,7 +458,7 @@ class GatewayPipelineTest {
                 new GatewayChannelHandler(
                         new GatewayFacades(
                                 accountFacade, characterFacade, inventoryFacade,
-                                new ContentFacades(shopFacade, dialogueFacade, questFacade)),
+                                new ContentFacades(shopFacade, dialogueFacade, questFacade, friendFacade)),
                         worldGateway, Runnable::run));
     }
 
@@ -480,6 +529,16 @@ class GatewayPipelineTest {
         @Override
         public boolean existsByName(String name) {
             return characters.stream().anyMatch(c -> c.name().equals(name));
+        }
+
+        @Override
+        public Optional<Character> findByName(String name) {
+            return characters.stream().filter(c -> c.name().equals(name)).findFirst();
+        }
+
+        @Override
+        public Optional<Character> findById(long characterId) {
+            return characters.stream().filter(c -> c.id() == characterId).findFirst();
         }
 
         @Override

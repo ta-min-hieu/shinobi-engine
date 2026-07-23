@@ -218,7 +218,9 @@ graph LR
 | ✅ Dialogue NPC lát cắt 2 (2026-07-23 — `feature-dialogue` mới, node/nhánh + mở shop qua dialogue) | [GAMEPLAY.md §9.2](../05-server/GAMEPLAY.md) |
 | ✅ `feature-quest` + script lát cắt 3 (2026-07-23 — nhận qua dialogue → theo dõi → hoàn thành → nhận thưởng, đầy đủ) | [GAMEPLAY.md §9.3](../05-server/GAMEPLAY.md) |
 | Validate mọi script lúc khởi động | [SCRIPTING.md §8](../06-plugin/SCRIPTING.md) |
-| Chat + Friend + Mail (lát cắt 4 — chưa làm) | [GAMEPLAY.md §10–11](../05-server/GAMEPLAY.md) |
+| ✅ `feature-friend` lát cắt 4 (2026-07-23 — gửi/chấp nhận/từ chối/huỷ kết bạn theo tên + trạng thái online qua `ConnectedCharacterRegistry`, chơi được thật qua socket) | [GAMEPLAY.md §11](../05-server/GAMEPLAY.md) |
+| Mail (lát cắt 5 — chưa làm) | [GAMEPLAY.md §11](../05-server/GAMEPLAY.md) |
+| Chat: World/Riêng tư/Khu vực (lát cắt 6 — chưa làm; Bang hội/Party dời Phase 7 cùng Guild/Party thật) | [GAMEPLAY.md §10](../05-server/GAMEPLAY.md) |
 
 **Exit Criteria — đây là MVP:**
 - [ ] Chơi được: tạo nhân vật → nhận quest → đánh quái → nhặt đồ → cường hoá → hoàn thành quest

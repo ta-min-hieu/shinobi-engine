@@ -10,8 +10,12 @@ import dev.kage.character.domain.Character;
 import dev.kage.character.domain.IdempotencyKeyReusedException;
 import dev.kage.dialogue.api.DialogueFacade;
 import dev.kage.dialogue.domain.DialogueNode;
+import dev.kage.friend.api.FriendFacade;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.EquipmentSlotType;
+import dev.kage.protocol.AcceptFriendRequestCommand;
+import dev.kage.protocol.AcceptFriendRequestOutcome;
+import dev.kage.protocol.AcceptFriendRequestResponse;
 import dev.kage.protocol.AcceptQuestOutcome;
 import dev.kage.protocol.AcceptQuestResponse;
 import dev.kage.protocol.BuyItemCommand;
@@ -36,21 +40,38 @@ import dev.kage.protocol.EquipItemResponse;
 import dev.kage.protocol.EquipmentSlot;
 import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.Faction;
+import dev.kage.protocol.FriendOfflineEvent;
+import dev.kage.protocol.FriendOnlineEvent;
+import dev.kage.protocol.FriendView;
 import dev.kage.protocol.ItemRewardView;
 import dev.kage.protocol.ListCharactersRequest;
 import dev.kage.protocol.ListCharactersResponse;
+import dev.kage.protocol.ListFriendsRequest;
+import dev.kage.protocol.ListFriendsResponse;
+import dev.kage.protocol.ListPendingFriendRequestsRequest;
+import dev.kage.protocol.ListPendingFriendRequestsResponse;
 import dev.kage.protocol.ListShopItemsRequest;
 import dev.kage.protocol.ListShopItemsResponse;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.PendingFriendRequestView;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
+import dev.kage.protocol.RejectFriendRequestCommand;
+import dev.kage.protocol.RejectFriendRequestOutcome;
+import dev.kage.protocol.RejectFriendRequestResponse;
+import dev.kage.protocol.RemoveFriendCommand;
+import dev.kage.protocol.RemoveFriendOutcome;
+import dev.kage.protocol.RemoveFriendResponse;
 import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.SelectCharacterResponse;
 import dev.kage.protocol.SelectDialogueOptionCommand;
 import dev.kage.protocol.SellItemCommand;
 import dev.kage.protocol.SellItemResponse;
 import dev.kage.protocol.SellOutcome;
+import dev.kage.protocol.SendFriendRequestCommand;
+import dev.kage.protocol.SendFriendRequestOutcome;
+import dev.kage.protocol.SendFriendRequestResponse;
 import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.ShopListingView;
 import dev.kage.protocol.TalkToNpcCommand;
@@ -107,6 +128,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final ShopFacade shopFacade;
     private final DialogueFacade dialogueFacade;
     private final QuestFacade questFacade;
+    private final FriendFacade friendFacade;
     private final WorldGateway worldGateway;
     private final Executor authExecutor;
     // Per-connection (handler đã là state per-connection, xem javadoc lớp) — không cần đồng bộ
@@ -140,7 +162,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, this::handleSellItemCommand),
             Map.entry(Opcode.OPCODE_TALK_TO_NPC_COMMAND_VALUE, this::handleTalkToNpcCommand),
             Map.entry(Opcode.OPCODE_SELECT_DIALOGUE_OPTION_COMMAND_VALUE, this::handleSelectDialogueOptionCommand),
-            Map.entry(Opcode.OPCODE_CLAIM_QUEST_REWARD_COMMAND_VALUE, this::handleClaimQuestRewardCommand));
+            Map.entry(Opcode.OPCODE_CLAIM_QUEST_REWARD_COMMAND_VALUE, this::handleClaimQuestRewardCommand),
+            Map.entry(Opcode.OPCODE_SEND_FRIEND_REQUEST_COMMAND_VALUE, this::handleSendFriendRequestCommand),
+            Map.entry(Opcode.OPCODE_ACCEPT_FRIEND_REQUEST_COMMAND_VALUE, this::handleAcceptFriendRequestCommand),
+            Map.entry(Opcode.OPCODE_REJECT_FRIEND_REQUEST_COMMAND_VALUE, this::handleRejectFriendRequestCommand),
+            Map.entry(Opcode.OPCODE_REMOVE_FRIEND_COMMAND_VALUE, this::handleRemoveFriendCommand),
+            Map.entry(Opcode.OPCODE_LIST_FRIENDS_REQUEST_VALUE, this::handleListFriendsRequest),
+            Map.entry(Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_REQUEST_VALUE,
+                    this::handleListPendingFriendRequestsRequest));
 
     GatewayChannelHandler(GatewayFacades facades, WorldGateway worldGateway, Executor authExecutor) {
         this.accountFacade = facades.accountFacade();
@@ -149,6 +178,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.shopFacade = facades.contentFacades().shopFacade();
         this.dialogueFacade = facades.contentFacades().dialogueFacade();
         this.questFacade = facades.contentFacades().questFacade();
+        this.friendFacade = facades.contentFacades().friendFacade();
         this.worldGateway = worldGateway;
         this.authExecutor = authExecutor;
     }
@@ -318,6 +348,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             worldGateway.facade().applyEquipmentBonus(characterId, equipmentBonus.bonusAtk());
             var response = SelectCharacterResponse.newBuilder().setSuccess(true).build();
             send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            // Đang trên authExecutor (Virtual Thread) rồi — friendFacade.listFriends chạm DB, an
+            // toàn gọi thẳng, không cần đẩy thêm 1 lớp executor nữa (khác channelInactive bên dưới).
+            notifyFriendsPresenceChanged(characterId, true);
         } catch (CharacterNotFoundException e) {
             // Cùng lỗi dù nhân vật không tồn tại hay thuộc account khác (fail secure — SECURITY.md §4).
             LOG.warn("Chọn nhân vật thất bại: không tìm thấy", e);
@@ -676,6 +709,175 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         return CLAIM_QUEST_REWARD_OUTCOME_MAPPING.get(outcome);
     }
 
+    private void handleSendFriendRequestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = SendFriendRequestCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleSendFriendRequestBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleSendFriendRequestBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, SendFriendRequestCommand command) {
+        var target = characterFacade.findByName(command.getTargetName());
+        if (target.isEmpty()) {
+            var response = SendFriendRequestResponse.newBuilder()
+                    .setOutcome(SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_TARGET_NOT_FOUND)
+                    .build();
+            send(ctx, Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            return;
+        }
+        var result = friendFacade.sendRequest(characterId, target.get().id());
+        var response = SendFriendRequestResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        send(ctx, Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private static final Map<FriendFacade.SendRequestResult, SendFriendRequestOutcome>
+            SEND_FRIEND_REQUEST_OUTCOME_MAPPING = Map.of(
+                    FriendFacade.SendRequestResult.OK,
+                    SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_OK,
+                    FriendFacade.SendRequestResult.CANNOT_FRIEND_SELF,
+                    SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_CANNOT_FRIEND_SELF,
+                    FriendFacade.SendRequestResult.ALREADY_FRIENDS,
+                    SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_ALREADY_FRIENDS,
+                    FriendFacade.SendRequestResult.REQUEST_ALREADY_PENDING,
+                    SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_REQUEST_ALREADY_PENDING);
+
+    private static SendFriendRequestOutcome toProtoOutcome(FriendFacade.SendRequestResult result) {
+        return SEND_FRIEND_REQUEST_OUTCOME_MAPPING.get(result);
+    }
+
+    private void handleAcceptFriendRequestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = AcceptFriendRequestCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleAcceptFriendRequestBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleAcceptFriendRequestBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, AcceptFriendRequestCommand command) {
+        var result = friendFacade.accept(command.getFriendshipId(), characterId);
+        var outcome = result == FriendFacade.AcceptResult.OK
+                ? AcceptFriendRequestOutcome.ACCEPT_FRIEND_REQUEST_OUTCOME_OK
+                : AcceptFriendRequestOutcome.ACCEPT_FRIEND_REQUEST_OUTCOME_NOT_FOUND;
+        var response = AcceptFriendRequestResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_ACCEPT_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private void handleRejectFriendRequestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = RejectFriendRequestCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleRejectFriendRequestBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleRejectFriendRequestBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, RejectFriendRequestCommand command) {
+        var result = friendFacade.reject(command.getFriendshipId(), characterId);
+        var outcome = result == FriendFacade.RejectResult.OK
+                ? RejectFriendRequestOutcome.REJECT_FRIEND_REQUEST_OUTCOME_OK
+                : RejectFriendRequestOutcome.REJECT_FRIEND_REQUEST_OUTCOME_NOT_FOUND;
+        var response = RejectFriendRequestResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_REJECT_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private void handleRemoveFriendCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = RemoveFriendCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleRemoveFriendBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleRemoveFriendBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, RemoveFriendCommand command) {
+        var target = characterFacade.findByName(command.getTargetName());
+        if (target.isEmpty()) {
+            var response = RemoveFriendResponse.newBuilder()
+                    .setOutcome(RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_TARGET_NOT_FOUND)
+                    .build();
+            send(ctx, Opcode.OPCODE_REMOVE_FRIEND_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            return;
+        }
+        var result = friendFacade.remove(characterId, target.get().id());
+        var outcome = result == FriendFacade.RemoveResult.OK
+                ? RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_OK
+                : RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_NOT_FRIENDS;
+        var response = RemoveFriendResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_REMOVE_FRIEND_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private void handleListFriendsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ListFriendsRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleListFriendsBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleListFriendsBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        var responseBuilder = ListFriendsResponse.newBuilder();
+        for (long friendId : friendFacade.listFriends(characterId)) {
+            // findByName/findById chạm DB mỗi bạn — chấp nhận N+1 ở quy mô danh sách bạn bè MVP
+            // (vài chục), không phải đường nóng mỗi tick (khác AoI/combat).
+            var name = characterFacade.findById(friendId).map(Character::name).orElse("");
+            responseBuilder.addFriends(FriendView.newBuilder()
+                    .setCharacterId(friendId)
+                    .setName(name)
+                    .setOnline(worldGateway.registry().isOnline(friendId))
+                    .build());
+        }
+        send(ctx, Opcode.OPCODE_LIST_FRIENDS_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+    }
+
+    private void handleListPendingFriendRequestsRequest(
+            ChannelHandlerContext ctx, PacketHeader header, byte[] payload) throws InvalidProtocolBufferException {
+        ListPendingFriendRequestsRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleListPendingFriendRequestsBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleListPendingFriendRequestsBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        var responseBuilder = ListPendingFriendRequestsResponse.newBuilder();
+        for (var pending : friendFacade.listPendingRequests(characterId)) {
+            var requesterName = characterFacade.findById(pending.requesterId()).map(Character::name).orElse("");
+            responseBuilder.addRequests(PendingFriendRequestView.newBuilder()
+                    .setFriendshipId(pending.friendshipId())
+                    .setRequesterId(pending.requesterId())
+                    .setRequesterName(requesterName)
+                    .build());
+        }
+        send(ctx, Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_RESPONSE_VALUE, sequenceId,
+                responseBuilder.build().toByteArray());
+    }
+
     private static DialogueNodeResponse toResponse(DialogueNode node) {
         var builder = DialogueNodeResponse.newBuilder()
                 .setNodeId(node.nodeId())
@@ -770,6 +972,25 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 authExecutor.execute(
                         () -> worldGateway.positionPersister().save(characterId, lastPosition.x(), lastPosition.y()));
             }
+            // channelInactive chạy trên EventLoop — friendFacade.listFriends chạm DB (blocking),
+            // PHẢI đẩy sang authExecutor, không được gọi thẳng ở đây (server/CLAUDE.md: EventLoop
+            // cấm query DB), cùng lý do savePosition ở trên.
+            authExecutor.execute(() -> notifyFriendsPresenceChanged(characterId, false));
+        }
+    }
+
+    /** Báo cho bạn bè ĐANG online của {@code characterId} rằng người này vừa vào/thoát world. */
+    private void notifyFriendsPresenceChanged(long characterId, boolean online) {
+        var friendIds = friendFacade.listFriends(characterId);
+        if (friendIds.isEmpty()) {
+            return;
+        }
+        int opcode = online ? Opcode.OPCODE_FRIEND_ONLINE_EVENT_VALUE : Opcode.OPCODE_FRIEND_OFFLINE_EVENT_VALUE;
+        byte[] payload = online
+                ? FriendOnlineEvent.newBuilder().setCharacterId(characterId).build().toByteArray()
+                : FriendOfflineEvent.newBuilder().setCharacterId(characterId).build().toByteArray();
+        for (long friendId : friendIds) {
+            worldGateway.registry().sendToCharacterIfOnline(friendId, opcode, 0, payload);
         }
     }
 

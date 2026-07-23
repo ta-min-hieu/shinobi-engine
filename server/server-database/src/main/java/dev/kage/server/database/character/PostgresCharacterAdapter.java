@@ -18,6 +18,7 @@ import java.sql.Types;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import javax.sql.DataSource;
 
@@ -74,6 +75,16 @@ public final class PostgresCharacterAdapter implements CharacterPort {
             SELECT 1 FROM character WHERE name = ?
             """;
 
+    private static final String FIND_BY_NAME = """
+            SELECT id, account_id, realm_id, name, faction, level, exp, rebirth_count, created_at
+              FROM character WHERE name = ?
+            """;
+
+    private static final String FIND_BY_ID = """
+            SELECT id, account_id, realm_id, name, faction, level, exp, rebirth_count, created_at
+              FROM character WHERE id = ?
+            """;
+
     private static final String LOAD_POSITION = """
             SELECT pos_x, pos_y FROM character WHERE id = ?
             """;
@@ -127,6 +138,32 @@ public final class PostgresCharacterAdapter implements CharacterPort {
             }
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi kiểm tra tên nhân vật: " + name, e);
+        }
+    }
+
+    @Override
+    public Optional<Character> findByName(String name) {
+        try (var connection = dataSource.getConnection();
+                var statement = connection.prepareStatement(FIND_BY_NAME)) {
+            statement.setString(1, name);
+            try (ResultSet rs = statement.executeQuery()) {
+                return rs.next() ? Optional.of(mapRow(rs)) : Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new DatabaseAccessException("Lỗi tra nhân vật theo tên: " + name, e);
+        }
+    }
+
+    @Override
+    public Optional<Character> findById(long characterId) {
+        try (var connection = dataSource.getConnection();
+                var statement = connection.prepareStatement(FIND_BY_ID)) {
+            statement.setLong(1, characterId);
+            try (ResultSet rs = statement.executeQuery()) {
+                return rs.next() ? Optional.of(mapRow(rs)) : Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new DatabaseAccessException("Lỗi tra nhân vật theo ID: " + characterId, e);
         }
     }
 

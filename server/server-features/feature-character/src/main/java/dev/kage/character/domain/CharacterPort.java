@@ -1,6 +1,7 @@
 package dev.kage.character.domain;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Port — DB-agnostic, không SQL/PostgreSQL ở đây (Điều 23). Implementation thật ({@code
@@ -14,6 +15,19 @@ public interface CharacterPort {
 
     /** Tên đã trùng (bất kỳ account nào — UNIQUE toàn server, DATABASE.md §2.1) → Optional rỗng. */
     boolean existsByName(String name);
+
+    /**
+     * Tra nhân vật theo tên — dùng cho kết bạn/gửi thư theo tên (feature-friend/feature-mail
+     * không được đọc bảng {@code character} trực tiếp, server-gateway gọi qua {@code
+     * CharacterFacade} để đổi tên thành {@code characterId} trước khi gọi feature khác).
+     */
+    Optional<Character> findByName(String name);
+
+    /**
+     * Tra nhân vật theo ID — dùng để hiển thị TÊN khi gateway chỉ có {@code characterId} (danh
+     * sách bạn bè, người gửi thư/chat riêng...). Chiều ngược lại {@link #findByName}.
+     */
+    Optional<Character> findById(long characterId);
 
     /**
      * Tạo nhân vật mới + ghi {@code idempotencyKey} trong CÙNG transaction (ADR-025) — key đã dùng

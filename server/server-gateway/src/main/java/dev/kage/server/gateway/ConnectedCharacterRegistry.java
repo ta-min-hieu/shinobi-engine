@@ -67,6 +67,25 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         lastKnownPosition.remove(characterId);
     }
 
+    /**
+     * Đang kết nối không — dùng để hiển thị trạng thái online (feature-friend) mà KHÔNG cần thêm
+     * registry Redis riêng ở single-instance hiện tại (feature-friend/CLAUDE.md).
+     */
+    boolean isOnline(long characterId) {
+        return contextsByCharacterId.containsKey(characterId);
+    }
+
+    /**
+     * Đẩy 1 packet cho ĐÚNG 1 nhân vật khác nếu đang online — no-op an toàn nếu offline (đã ngắt
+     * kết nối). Dùng cho push per-player không gắn AoI/broadcast (bạn online, thư mới...).
+     */
+    void sendToCharacterIfOnline(long characterId, int opcode, int sequenceId, byte[] payload) {
+        var ctx = contextsByCharacterId.get(characterId);
+        if (ctx != null) {
+            send(ctx, opcode, sequenceId, payload);
+        }
+    }
+
     /** Bản chụp vị trí đã biết của MỌI nhân vật đang kết nối — dùng cho lưu định kỳ (quét hết). */
     Map<Long, PositionSnapshot> snapshotPositions() {
         return Map.copyOf(lastKnownPosition);

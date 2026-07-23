@@ -68,6 +68,9 @@ import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.SellItemCommand;
 import dev.kage.protocol.SellItemResponse;
 import dev.kage.protocol.SellOutcome;
+import dev.kage.protocol.SendFriendRequestCommand;
+import dev.kage.protocol.SendFriendRequestOutcome;
+import dev.kage.protocol.SendFriendRequestResponse;
 import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.TalkToNpcCommand;
 import dev.kage.protocol.UnequipItemCommand;
@@ -119,13 +122,14 @@ class GatewayServerIntegrationTest {
         var shopFacade = fakeShopFacade();
         var dialogueFacade = fakeDialogueFacade();
         var questFacade = fakeQuestFacade();
+        var friendFacade = fakeFriendFacade();
         characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
         worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
         var positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
-        var contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade);
+        var contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, friendFacade);
         var facades = new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
         server = new GatewayServer(0, facades, worldGateway);
         server.start();
@@ -202,6 +206,16 @@ class GatewayServerIntegrationTest {
             @Override
             public boolean existsByName(String name) {
                 return characters.stream().anyMatch(c -> c.name().equals(name));
+            }
+
+            @Override
+            public Optional<Character> findByName(String name) {
+                return characters.stream().filter(c -> c.name().equals(name)).findFirst();
+            }
+
+            @Override
+            public Optional<Character> findById(long characterId) {
+                return characters.stream().filter(c -> c.id() == characterId).findFirst();
             }
 
             @Override
@@ -367,6 +381,54 @@ class GatewayServerIntegrationTest {
                 progressPort, templatePort, rewardPorts, tx);
         return new dev.kage.quest.api.QuestFacade(
                 acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
+    }
+
+    // Friend không dùng trong test này — fake tối thiểu để compile (cùng convention fakeQuestFacade).
+    private dev.kage.friend.api.FriendFacade fakeFriendFacade() {
+        dev.kage.friend.domain.FriendPort friendPort = new dev.kage.friend.domain.FriendPort() {
+            @Override
+            public Optional<dev.kage.friend.domain.Friendship> findBetween(long characterIdA, long characterIdB) {
+                return Optional.empty();
+            }
+
+            @Override
+            public dev.kage.friend.domain.Friendship sendRequest(long requesterId, long addresseeId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public boolean accept(long friendshipId, long addresseeId) {
+                return false;
+            }
+
+            @Override
+            public boolean reject(long friendshipId, long addresseeId) {
+                return false;
+            }
+
+            @Override
+            public boolean remove(long characterId, long friendCharacterId) {
+                return false;
+            }
+
+            @Override
+            public List<dev.kage.friend.domain.Friendship> listAccepted(long characterId) {
+                return List.of();
+            }
+
+            @Override
+            public List<dev.kage.friend.domain.Friendship> listPendingIncoming(long characterId) {
+                return List.of();
+            }
+        };
+        var useCases = new dev.kage.friend.application.FriendUseCases(
+                new dev.kage.friend.application.SendFriendRequestUseCase(friendPort),
+                new dev.kage.friend.application.AcceptFriendRequestUseCase(friendPort),
+                new dev.kage.friend.application.RejectFriendRequestUseCase(friendPort),
+                new dev.kage.friend.application.RemoveFriendUseCase(friendPort),
+                new dev.kage.friend.application.ListFriendsUseCase(friendPort),
+                new dev.kage.friend.application.ListPendingFriendRequestsUseCase(friendPort));
+        return new dev.kage.friend.api.FriendFacade(useCases);
     }
 
     @AfterEach
@@ -687,6 +749,27 @@ class GatewayServerIntegrationTest {
                     readUntilOpcode(in, Opcode.OPCODE_CLAIM_QUEST_REWARD_RESPONSE_VALUE).payload());
             assertThat(response.getOutcome())
                     .isEqualTo(ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_QUEST_NOT_FOUND);
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void clientShouldReceiveSendFriendRequestResponse_overRealSockets() throws Exception {
+        // FakeCharacterPort chỉ chứa nhân vật vừa tạo ở kết nối NÀY — tên bất kỳ khác chắc chắn
+        // không tồn tại, verify đúng nhánh TARGET_NOT_FOUND (dây thật: opcode dispatch → decode →
+        // Virtual Thread → CharacterFacade.findByName → encode response).
+        try (var socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(5000);
+            var in = new DataInputStream(socket.getInputStream());
+            connectCreateAndSelect(socket, in, "friend" + UUID.randomUUID().toString().substring(0, 6));
+
+            var command = SendFriendRequestCommand.newBuilder().setTargetName("khong_ton_tai").build();
+            sendFrame(socket, Opcode.OPCODE_SEND_FRIEND_REQUEST_COMMAND_VALUE, 10, command.toByteArray());
+
+            var response = SendFriendRequestResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE).payload());
+            assertThat(response.getOutcome())
+                    .isEqualTo(SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_TARGET_NOT_FOUND);
         }
     }
 

@@ -8,6 +8,14 @@ import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.dialogue.api.DialogueFacade;
 import dev.kage.dialogue.application.GetDialogueNodeUseCase;
+import dev.kage.friend.api.FriendFacade;
+import dev.kage.friend.application.AcceptFriendRequestUseCase;
+import dev.kage.friend.application.FriendUseCases;
+import dev.kage.friend.application.ListFriendsUseCase;
+import dev.kage.friend.application.ListPendingFriendRequestsUseCase;
+import dev.kage.friend.application.RejectFriendRequestUseCase;
+import dev.kage.friend.application.RemoveFriendUseCase;
+import dev.kage.friend.application.SendFriendRequestUseCase;
 import dev.kage.inventory.api.EquipmentUseCases;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.application.AddItemUseCase;
@@ -27,6 +35,7 @@ import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcTemplateAdapter;
+import dev.kage.server.database.friend.PostgresFriendAdapter;
 import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
 import dev.kage.server.database.inventory.PostgresAuditAdapter;
 import dev.kage.server.database.inventory.PostgresDropTableAdapter;
@@ -146,6 +155,18 @@ public final class ServerDatabaseBootstrap {
         var claimQuestRewardUseCase =
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, transactionRunner);
         return new QuestFacade(acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
+    }
+
+    public FriendFacade wireFriendFacade() {
+        var friendPort = new PostgresFriendAdapter(dataSource);
+        var useCases = new FriendUseCases(
+                new SendFriendRequestUseCase(friendPort),
+                new AcceptFriendRequestUseCase(friendPort),
+                new RejectFriendRequestUseCase(friendPort),
+                new RemoveFriendUseCase(friendPort),
+                new ListFriendsUseCase(friendPort),
+                new ListPendingFriendRequestsUseCase(friendPort));
+        return new FriendFacade(useCases);
     }
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */

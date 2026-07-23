@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// Packet Bạn bè (NETWORK.md §4, dải 1100-1199). Phase 6 lát cắt 4. Trạng thái online KHÔNG lưu DB
+// (feature-friend/CLAUDE.md) — server-gateway tự ghép `online` khi build FriendView từ
+// ConnectedCharacterRegistry, KHÔNG phải field do feature-friend trả về.
+
+// Client gửi TÊN nhân vật (không phải ID) — server-gateway tự tra CharacterFacade.findByName
+// TRƯỚC khi gọi FriendFacade (Điều 24, feature-friend không biết tên, chỉ biết characterId).
+message SendFriendRequestCommand {
+  string target_name = 1;
+}
+
+enum SendFriendRequestOutcome {
+  SEND_FRIEND_REQUEST_OUTCOME_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho kết quả thật.
+  SEND_FRIEND_REQUEST_OUTCOME_OK = 1;
+  SEND_FRIEND_REQUEST_OUTCOME_TARGET_NOT_FOUND = 2;
+  SEND_FRIEND_REQUEST_OUTCOME_CANNOT_FRIEND_SELF = 3;
+  SEND_FRIEND_REQUEST_OUTCOME_ALREADY_FRIENDS = 4;
+  SEND_FRIEND_REQUEST_OUTCOME_REQUEST_ALREADY_PENDING = 5;
+}
+
+message SendFriendRequestResponse {
+  SendFriendRequestOutcome outcome = 1;
+}
+
+message AcceptFriendRequestCommand {
+  int64 friendship_id = 1;
+}
+
+enum AcceptFriendRequestOutcome {
+  ACCEPT_FRIEND_REQUEST_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  ACCEPT_FRIEND_REQUEST_OUTCOME_OK = 1;
+  ACCEPT_FRIEND_REQUEST_OUTCOME_NOT_FOUND = 2;
+}
+
+message AcceptFriendRequestResponse {
+  AcceptFriendRequestOutcome outcome = 1;
+}
+
+message RejectFriendRequestCommand {
+  int64 friendship_id = 1;
+}
+
+enum RejectFriendRequestOutcome {
+  REJECT_FRIEND_REQUEST_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  REJECT_FRIEND_REQUEST_OUTCOME_OK = 1;
+  REJECT_FRIEND_REQUEST_OUTCOME_NOT_FOUND = 2;
+}
+
+message RejectFriendRequestResponse {
+  RejectFriendRequestOutcome outcome = 1;
+}
+
+// target_name (không phải ID) — cùng lý do SendFriendRequestCommand ở trên.
+message RemoveFriendCommand {
+  string target_name = 1;
+}
+
+enum RemoveFriendOutcome {
+  REMOVE_FRIEND_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  REMOVE_FRIEND_OUTCOME_OK = 1;
+  REMOVE_FRIEND_OUTCOME_TARGET_NOT_FOUND = 2;
+  REMOVE_FRIEND_OUTCOME_NOT_FRIENDS = 3;
+}
+
+message RemoveFriendResponse {
+  RemoveFriendOutcome outcome = 1;
+}
+
+message ListFriendsRequest {
+}
+
+// online do gateway tự ghép (ConnectedCharacterRegistry), KHÔNG phải dữ liệu từ feature-friend.
+message FriendView {
+  int64 character_id = 1;
+  string name = 2;
+  bool online = 3;
+}
+
+message ListFriendsResponse {
+  repeated FriendView friends = 1;
+}
+
+message ListPendingFriendRequestsRequest {
+}
+
+message PendingFriendRequestView {
+  int64 friendship_id = 1;
+  int64 requester_id = 2;
+  string requester_name = 3;
+}
+
+message ListPendingFriendRequestsResponse {
+  repeated PendingFriendRequestView requests = 1;
+}
+
+// Đẩy cho bạn bè ĐANG online khi characterId (người vừa login/logout) đổi trạng thái — server tự
+// tra danh sách bạn bè của characterId rồi lọc người đang online, không phải nhân vật tự gửi.
+message FriendOnlineEvent {
+  int64 character_id = 1;
+}
+
+message FriendOfflineEvent {
+  int64 character_id = 1;
+}
