@@ -50,6 +50,7 @@ include(":server:server-features:feature-character")
 // "rơi đồ thật vào túi đồ" ở Phase 4, xem kage_phase4_state trong memory AI.
 include(":server:server-features:feature-inventory")
 include(":server:server-features:feature-shop")
+include(":server:server-features:feature-dialogue")
 
 // ---- quality ----
 include(":quality:architecture-tests")   // ArchUnit (ADR-011) — enforce dependency rule

@@ -52,6 +52,7 @@ import dev.kage.protocol.EnhanceOutcome;
 import dev.kage.protocol.EquipItemCommand;
 import dev.kage.protocol.EquipItemResponse;
 import dev.kage.protocol.EquipmentSlot;
+import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.ListShopItemsRequest;
 import dev.kage.protocol.ListShopItemsResponse;
 import dev.kage.protocol.MonsterSpawnedEvent;
@@ -65,6 +66,7 @@ import dev.kage.protocol.SellItemCommand;
 import dev.kage.protocol.SellItemResponse;
 import dev.kage.protocol.SellOutcome;
 import dev.kage.protocol.SetTargetCommand;
+import dev.kage.protocol.TalkToNpcCommand;
 import dev.kage.protocol.UnequipItemCommand;
 import dev.kage.protocol.UnequipItemResponse;
 import dev.kage.protocol.wire.PacketCodec;
@@ -112,13 +114,15 @@ class GatewayServerIntegrationTest {
         var characterFacade = fakeCharacterFacade();
         var inventoryFacade = fakeInventoryFacade();
         var shopFacade = fakeShopFacade();
+        var dialogueFacade = fakeDialogueFacade();
         characterRegistry = new ConnectedCharacterRegistry(inventoryFacade);
         worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
         var positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
-        var facades = new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, shopFacade);
+        var contentFacades = new ContentFacades(shopFacade, dialogueFacade);
+        var facades = new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
         server = new GatewayServer(0, facades, worldGateway);
         server.start();
     }
@@ -322,6 +326,14 @@ class GatewayServerIntegrationTest {
         var buyItemUseCase = new dev.kage.shop.application.BuyItemUseCase(ports, action -> action.accept(null));
         var sellItemUseCase = new dev.kage.shop.application.SellItemUseCase(ports, action -> action.accept(null));
         return new dev.kage.shop.api.ShopFacade(listShopItemsUseCase, buyItemUseCase, sellItemUseCase);
+    }
+
+    // Dialogue dùng trong 1 test socket thật (NPC không tồn tại) — Fake port luôn trả rỗng, phần
+    // còn lại tối thiểu để compile, cùng convention fakeShopFacade().
+    private dev.kage.dialogue.api.DialogueFacade fakeDialogueFacade() {
+        dev.kage.dialogue.domain.NpcTemplatePort npcTemplatePort = npcCode -> Optional.empty();
+        var useCase = new dev.kage.dialogue.application.GetDialogueNodeUseCase(npcTemplatePort);
+        return new dev.kage.dialogue.api.DialogueFacade(useCase);
     }
 
     @AfterEach
@@ -604,6 +616,24 @@ class GatewayServerIntegrationTest {
             var response = SellItemResponse.parseFrom(
                     readUntilOpcode(in, Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE).payload());
             assertThat(response.getOutcome()).isEqualTo(SellOutcome.SELL_OUTCOME_ITEM_NOT_FOUND);
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void clientShouldReceiveErrorResponse_whenTalkingToUnknownNpc_overRealSockets() throws Exception {
+        // fakeDialogueFacade()'s NpcTemplatePort luôn trả rỗng — verify đúng lỗi 404 (không có
+        // opcode DialogueNodeResponse riêng cho nhánh này, sendError dùng chung OPCODE_ERROR).
+        try (var socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(5000);
+            var in = new DataInputStream(socket.getInputStream());
+            connectCreateAndSelect(socket, in, "npc" + UUID.randomUUID().toString().substring(0, 6));
+
+            var command = TalkToNpcCommand.newBuilder().setNpcCode("town_elder").build();
+            sendFrame(socket, Opcode.OPCODE_TALK_TO_NPC_COMMAND_VALUE, 10, command.toByteArray());
+
+            var response = ErrorResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_ERROR_VALUE).payload());
+            assertThat(response.getErrorKey()).isEqualTo("error.npc_not_found");
         }
     }
 

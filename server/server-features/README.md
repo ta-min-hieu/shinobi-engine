@@ -8,6 +8,7 @@ Mỗi feature được tạo **từ template** khi tới phase của nó, không
 |---|---|
 | feature-account, feature-character | 3 |
 | feature-inventory, feature-shop | 5 |
+| feature-dialogue | 6 (mở sớm hơn dự kiến — lát cắt 2 "NPC → Dialogue → Quest" cần trước feature-quest) |
 | feature-quest | 6 |
 | feature-guild, feature-mail, feature-friend, feature-chat | 6–7 |
 | feature-auction, feature-ranking | 8 |

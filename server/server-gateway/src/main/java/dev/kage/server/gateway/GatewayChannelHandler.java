@@ -8,6 +8,8 @@ import dev.kage.character.application.CharacterNotFoundException;
 import dev.kage.character.application.DuplicateCharacterNameException;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.IdempotencyKeyReusedException;
+import dev.kage.dialogue.api.DialogueFacade;
+import dev.kage.dialogue.domain.DialogueNode;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.protocol.BuyItemCommand;
@@ -18,6 +20,9 @@ import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
 import dev.kage.protocol.CreateCharacterResponse;
+import dev.kage.protocol.DialogueEndedResponse;
+import dev.kage.protocol.DialogueNodeResponse;
+import dev.kage.protocol.DialogueOptionView;
 import dev.kage.protocol.EnhanceItemCommand;
 import dev.kage.protocol.EnhanceItemResponse;
 import dev.kage.protocol.EnhanceOutcome;
@@ -36,11 +41,13 @@ import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
 import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.SelectCharacterResponse;
+import dev.kage.protocol.SelectDialogueOptionCommand;
 import dev.kage.protocol.SellItemCommand;
 import dev.kage.protocol.SellItemResponse;
 import dev.kage.protocol.SellOutcome;
 import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.ShopListingView;
+import dev.kage.protocol.TalkToNpcCommand;
 import dev.kage.protocol.UnequipItemCommand;
 import dev.kage.protocol.UnequipItemResponse;
 import dev.kage.protocol.UseSkillCommand;
@@ -91,6 +98,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final CharacterFacade characterFacade;
     private final InventoryFacade inventoryFacade;
     private final ShopFacade shopFacade;
+    private final DialogueFacade dialogueFacade;
     private final WorldGateway worldGateway;
     private final Executor authExecutor;
     // Per-connection (handler đã là state per-connection, xem javadoc lớp) — không cần đồng bộ
@@ -121,13 +129,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_ENHANCE_ITEM_COMMAND_VALUE, this::handleEnhanceItemCommand),
             Map.entry(Opcode.OPCODE_LIST_SHOP_ITEMS_REQUEST_VALUE, this::handleListShopItemsRequest),
             Map.entry(Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, this::handleBuyItemCommand),
-            Map.entry(Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, this::handleSellItemCommand));
+            Map.entry(Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, this::handleSellItemCommand),
+            Map.entry(Opcode.OPCODE_TALK_TO_NPC_COMMAND_VALUE, this::handleTalkToNpcCommand),
+            Map.entry(Opcode.OPCODE_SELECT_DIALOGUE_OPTION_COMMAND_VALUE, this::handleSelectDialogueOptionCommand));
 
     GatewayChannelHandler(GatewayFacades facades, WorldGateway worldGateway, Executor authExecutor) {
         this.accountFacade = facades.accountFacade();
         this.characterFacade = facades.characterFacade();
         this.inventoryFacade = facades.inventoryFacade();
-        this.shopFacade = facades.shopFacade();
+        this.shopFacade = facades.contentFacades().shopFacade();
+        this.dialogueFacade = facades.contentFacades().dialogueFacade();
         this.worldGateway = worldGateway;
         this.authExecutor = authExecutor;
     }
@@ -476,6 +487,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleListShopItemsBlocking(ChannelHandlerContext ctx, int sequenceId) {
+        send(ctx, Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE, sequenceId, buildShopListingsResponse().toByteArray());
+    }
+
+    /** Gộp lại — dùng cả cho {@code ListShopItemsRequest} thật lẫn nhánh action="open_shop" của dialogue. */
+    private ListShopItemsResponse buildShopListingsResponse() {
         var listings = shopFacade.listItems().stream()
                 .map(listing -> ShopListingView.newBuilder()
                         .setItemTemplateId(listing.itemTemplateId())
@@ -483,8 +499,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         .setSellPrice(listing.sellPrice())
                         .build())
                 .toList();
-        var response = ListShopItemsResponse.newBuilder().addAllListings(listings).build();
-        send(ctx, Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        return ListShopItemsResponse.newBuilder().addAllListings(listings).build();
     }
 
     private void handleBuyItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -543,6 +558,70 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private static SellOutcome toProtoOutcome(ShopFacade.SellResult result) {
         return SELL_OUTCOME_MAPPING.get(result);
+    }
+
+    private void handleTalkToNpcCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = TalkToNpcCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleTalkToNpcBlocking(ctx, sequenceId, command));
+    }
+
+    private void handleTalkToNpcBlocking(ChannelHandlerContext ctx, int sequenceId, TalkToNpcCommand command) {
+        var node = dialogueFacade.startDialogue(command.getNpcCode());
+        if (node.isEmpty()) {
+            sendError(ctx, sequenceId, 404, "error.npc_not_found");
+            return;
+        }
+        send(ctx, Opcode.OPCODE_DIALOGUE_NODE_RESPONSE_VALUE, sequenceId, toResponse(node.get()).toByteArray());
+    }
+
+    private void handleSelectDialogueOptionCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = SelectDialogueOptionCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleSelectDialogueOptionBlocking(ctx, sequenceId, command));
+    }
+
+    private void handleSelectDialogueOptionBlocking(
+            ChannelHandlerContext ctx, int sequenceId, SelectDialogueOptionCommand command) {
+        var result = dialogueFacade.selectOption(
+                command.getNpcCode(), command.getCurrentNodeId(), command.getOptionIndex());
+        switch (result) {
+            case DialogueFacade.SelectOptionResult.Node r -> send(
+                    ctx, Opcode.OPCODE_DIALOGUE_NODE_RESPONSE_VALUE, sequenceId, toResponse(r.node()).toByteArray());
+            case DialogueFacade.SelectOptionResult.OpenShop ignored -> send(
+                    ctx, Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE, sequenceId,
+                    buildShopListingsResponse().toByteArray());
+            case DialogueFacade.SelectOptionResult.Ended ignored -> send(
+                    ctx, Opcode.OPCODE_DIALOGUE_ENDED_RESPONSE_VALUE, sequenceId,
+                    DialogueEndedResponse.newBuilder().build().toByteArray());
+            case DialogueFacade.SelectOptionResult.NotFound ignored ->
+                    sendError(ctx, sequenceId, 404, "error.dialogue_option_not_found");
+        }
+    }
+
+    private static DialogueNodeResponse toResponse(DialogueNode node) {
+        var builder = DialogueNodeResponse.newBuilder()
+                .setNodeId(node.nodeId())
+                .setTextKey(node.textKey());
+        for (var option : node.options()) {
+            builder.addOptions(DialogueOptionView.newBuilder()
+                    .setLabelKey(option.labelKey())
+                    .setAction(option.action())
+                    .build());
+        }
+        return builder.build();
     }
 
     // Bảng tra thay switch 8 nhánh (PMD CyclomaticComplexity — cùng lý do đổi channelRead0 sang

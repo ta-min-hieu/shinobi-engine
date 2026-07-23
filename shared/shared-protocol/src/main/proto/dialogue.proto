@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// Packet Dialogue (NETWORK.md §4, dải 600-699 dùng chung với Quest/NPC). Phase 6 lát cắt 2 —
+// nội dung dialogue là SCRIPT thật (Điều 27, GAMEPLAY.md §9.2), Java chỉ truyền tải kết quả đã
+// trích xuất. npc_code (không phải npc_id) — client đã biết mã này từ NpcSpawnedEvent (npc.proto),
+// server không cần tra lại ECS xuyên thread để xác định NPC (server-world chỉ đọc/ghi trên tick
+// thread — GAMEPLAY.md §9.2 ghi rõ lý do không kiểm tra khoảng cách thật ở lát cắt này).
+
+// Command: Client -> Server (OPCODE_TALK_TO_NPC_COMMAND). Bắt đầu hội thoại — luôn trả node "start".
+message TalkToNpcCommand {
+  string npc_code = 1;
+}
+
+// Response: Server -> Client (OPCODE_DIALOGUE_NODE_RESPONSE).
+message DialogueNodeResponse {
+  string node_id = 1;
+  string text_key = 2;
+  repeated DialogueOptionView options = 3;
+}
+
+message DialogueOptionView {
+  string label_key = 1;
+  string action = 2; // node_id kế tiếp, hoặc "open_shop"/"end" — chỉ để client hiển thị, KHÔNG
+                      // gửi lại trường này khi chọn (xem SelectDialogueOptionCommand.option_index).
+}
+
+// Command: Client -> Server (OPCODE_SELECT_DIALOGUE_OPTION_COMMAND). option_index là VỊ TRÍ
+// trong node hiện tại — server tự tra lại action thật từ script theo index, KHÔNG tin client gửi
+// thẳng action (Điều 24, DialogueFacade.selectOption).
+message SelectDialogueOptionCommand {
+  string npc_code = 1;
+  string current_node_id = 2;
+  int32 option_index = 3;
+}
+
+// Response: Server -> Client (OPCODE_DIALOGUE_ENDED_RESPONSE). action="end" — không còn node nào
+// nữa, client tự đóng UI hội thoại. action="open_shop" KHÔNG dùng response này — server gửi thẳng
+// OPCODE_LIST_SHOP_ITEMS_RESPONSE (shop.proto) tái dùng luôn, không cần packet mới.
+message DialogueEndedResponse {
+}

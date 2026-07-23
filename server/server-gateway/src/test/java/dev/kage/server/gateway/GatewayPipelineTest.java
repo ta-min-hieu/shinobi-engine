@@ -333,6 +333,13 @@ class GatewayPipelineTest {
         return new dev.kage.shop.api.ShopFacade(listShopItemsUseCase, buyItemUseCase, sellItemUseCase);
     }
 
+    // Dialogue không dùng trong test này — fake tối thiểu để compile (cùng convention fakeShopFacade).
+    private static dev.kage.dialogue.api.DialogueFacade fakeDialogueFacade() {
+        dev.kage.dialogue.domain.NpcTemplatePort npcTemplatePort = npcCode -> Optional.empty();
+        var useCase = new dev.kage.dialogue.application.GetDialogueNodeUseCase(npcTemplatePort);
+        return new dev.kage.dialogue.api.DialogueFacade(useCase);
+    }
+
     private static EmbeddedChannel newPipeline(FakeCharacterPort characterPort) {
         // ⚠️ Phải khớp CHÍNH XÁC pipeline thật trong GatewayBootstrap — lệch ở đây là test giả.
         // AccountFacade/CharacterFacade THẬT (không mock), chỉ Port bên dưới là Fake (TESTING.md
@@ -357,6 +364,7 @@ class GatewayPipelineTest {
         // positionPersister không start() — save() (nếu bị gọi) chạy trực tiếp, không cần scheduler.
         var inventoryFacade = fakeInventoryFacade();
         var shopFacade = fakeShopFacade();
+        var dialogueFacade = fakeDialogueFacade();
         var characterRegistry = new ConnectedCharacterRegistry(inventoryFacade);
         var worldFacade = new WorldFacade(characterRegistry);
         var positionPersister =
@@ -369,8 +377,10 @@ class GatewayPipelineTest {
                 new PacketFrameDecoder(),
                 new PacketFrameEncoder(),
                 new GatewayChannelHandler(
-                        new GatewayFacades(accountFacade, characterFacade, inventoryFacade, shopFacade), worldGateway,
-                        Runnable::run));
+                        new GatewayFacades(
+                                accountFacade, characterFacade, inventoryFacade,
+                                new ContentFacades(shopFacade, dialogueFacade)),
+                        worldGateway, Runnable::run));
     }
 
     /** Fake = implementation in-memory THẬT (TESTING.md §4), không Mockito. */

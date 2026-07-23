@@ -6,6 +6,8 @@ import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.application.CreateCharacterUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
+import dev.kage.dialogue.api.DialogueFacade;
+import dev.kage.dialogue.application.GetDialogueNodeUseCase;
 import dev.kage.inventory.api.EquipmentUseCases;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.application.AddItemUseCase;
@@ -19,6 +21,7 @@ import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
+import dev.kage.server.database.dialogue.PostgresNpcTemplateAdapter;
 import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
 import dev.kage.server.database.inventory.PostgresAuditAdapter;
 import dev.kage.server.database.inventory.PostgresDropTableAdapter;
@@ -110,6 +113,12 @@ public final class ServerDatabaseBootstrap {
         var buyItemUseCase = new BuyItemUseCase(ports, transactionRunner);
         var sellItemUseCase = new SellItemUseCase(ports, transactionRunner);
         return new ShopFacade(listShopItemsUseCase, buyItemUseCase, sellItemUseCase);
+    }
+
+    public DialogueFacade wireDialogueFacade() {
+        var npcTemplatePort = new PostgresNpcTemplateAdapter(dataSource);
+        var getDialogueNodeUseCase = new GetDialogueNodeUseCase(npcTemplatePort);
+        return new DialogueFacade(getDialogueNodeUseCase);
     }
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */

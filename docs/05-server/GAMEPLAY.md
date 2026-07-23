@@ -276,6 +276,48 @@ chung bộ đếm này, không tự thêm bộ đếm riêng.
 CHƯA tổng quát hoá (mỗi loại có payload snapshot khác nhau, tổng quát sớm phải sửa code đã test kỹ)
 — tới loại entity thứ 4 cần AoI mới bắt buộc tổng quát hoá (rule of three).
 
+### 9.2 Dialogue — lát cắt 2: hội thoại NPC + mở shop qua dialogue (✅ Đã code, 2026-07-23)
+
+3 quyết định chốt cùng chủ dự án qua `AskUserQuestion` trước khi code: (1) xây cấu trúc node/nhánh
+đầy đủ ngay (không chỉ 1 câu chào đơn), (2) thêm bảng `npc_template` thật (id, code, name_key,
+`dialogue_script_ref`) — migration V10, (3) gắn luôn "Mở cửa hàng" vào dialogue (tái dùng
+`ListShopItemsResponse` có sẵn từ Phase 5, không tạo packet mới cho nhánh này).
+
+**Module mới `feature-dialogue`** (Clean Arch, khác NPC hiển thị thuần — dialogue có DB access +
+chạy script nên xứng đáng ranh giới riêng, dù `server-features/README.md` chưa liệt kê module này
+trước đó — quyết định cùng chủ dự án, không tự ý thêm module).
+
+**Điều 27 + SCRIPTING.md §2**: "Dialogue NPC" nằm thẳng cột Script — KHÔNG có lựa chọn config/
+hardcode nào, kể cả câu chào đơn giản nhất. Script (`town_elder.js`, feature-dialogue resources)
+trả về TOÀN BỘ cây node (object literal, key = nodeId); Java trích đúng 1 node cần dùng mỗi lần gọi
+qua `GetDialogueNodeUseCase` (không giữ state giữa các lần gọi — script tự chứa dữ liệu).
+
+⚠️ **Bug hạ tầng thật bắt được TRƯỚC khi viết feature-dialogue** (test thật, không đoán trước):
+`ScriptSandbox.eval(script, hostApi)` (Phase 4, dùng cho skill damage) trả về `Value` sau khi
+`Context` ĐÃ ĐÓNG (try-with-resources đóng context trước khi return) — gọi `getMember`/
+`getArrayElement` trên `Value` đó ném `IllegalStateException` NGAY, chỉ scalar (`asDouble`/
+`asString`...) sống sót. Dialogue cần trả object có cấu trúc (text + list option) nên bắt buộc
+overload mới `ScriptSandbox.eval(script, hostApi, extractor)` — `extractor` chạy TRONG lúc
+`Context` còn mở, xác nhận bằng test thật ở `engine-scripting` trước khi dùng (không giả định).
+
+**Protocol** (opcode 602-605, dải Quest/NPC/Dialogue 600-699, `dialogue.proto`):
+`TalkToNpcCommand{npc_code}` → `DialogueNodeResponse{node_id, text_key, options[]}`;
+`SelectDialogueOptionCommand{npc_code, current_node_id, option_index}` → 1 trong 3: node khác
+(`DialogueNodeResponse`), mở shop (`ListShopItemsResponse` tái dùng thẳng, KHÔNG packet mới), hoặc
+kết thúc (`DialogueEndedResponse`, rỗng). **`option_index` là VỊ TRÍ, không phải chuỗi `action`** —
+server luôn tự tra lại action thật từ script theo index (Điều 24, không tin client tự khai).
+
+⚠️ **Chưa kiểm tra khoảng cách thật** (đứng gần NPC) — client gửi thẳng `npc_code` (đã biết từ
+`NpcSpawnedEvent`, npc.proto), server KHÔNG tra vị trí NPC qua ECS (server-world chỉ đọc/ghi trên
+tick thread — đọc xuyên thread từ Netty EventLoop/Virtual Thread sẽ vỡ ranh giới đó). Chấp nhận
+được ở lát cắt này vì dialogue không có giá trị kinh tế thật (đọc text sớm không phải khai thác),
+và mở shop qua dialogue chỉ là lối tắt UX — `BuyItemUseCase`/`SellItemUseCase` (Phase 5) vẫn y
+nguyên, KHÔNG thêm ràng buộc vị trí thật. Thêm kiểm tra khoảng cách thật là việc CHỦ ĐỘNG hoãn, ghi
+rõ ở đây — cần một cơ chế đọc snapshot vị trí an toàn xuyên thread (chưa có) nếu sau này cần.
+
+`GatewayFacades` đổi `shopFacade` thành `ContentFacades(shopFacade, dialogueFacade)` (thêm
+`dialogueFacade` trực tiếp sẽ vượt 4 tham số Checkstyle `ParameterNumber`).
+
 ---
 
 ## 10. Chat

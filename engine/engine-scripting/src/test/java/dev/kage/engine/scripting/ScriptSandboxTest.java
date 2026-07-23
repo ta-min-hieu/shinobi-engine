@@ -36,4 +36,23 @@ class ScriptSandboxTest {
         assertThatThrownBy(() -> sandbox.eval("while (true) {}", Map.of()))
                 .isInstanceOf(ScriptExecutionException.class);
     }
+
+    @Test
+    void shouldRejectMemberAccess_onPlainEvalResult_afterContextClosed() {
+        // PHÁT HIỆN THẬT (không đoán trước): Value trả về từ eval(script, hostApi) KHÔNG dùng
+        // được cho object/array navigation — Context đã đóng trước khi caller nhận Value (try-
+        // with-resources). Chỉ scalar (asInt/asDouble/asString) sống sót — xem test khác ở trên.
+        Value result = sandbox.eval("({a: 1})", Map.of());
+        assertThatThrownBy(() -> result.getMember("a")).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void shouldExtractStructuredResult_whenExtractorRunsBeforeContextCloses() {
+        String text = sandbox.eval(
+                "({text: 'hello', options: ['a', 'b']})",
+                Map.of(),
+                value -> value.getMember("text").asString() + ":" + value.getMember("options").getArraySize());
+
+        assertThat(text).isEqualTo("hello:2");
+    }
 }

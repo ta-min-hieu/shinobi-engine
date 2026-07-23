@@ -1,6 +1,7 @@
 package dev.kage.engine.scripting;
 
 import java.util.Map;
+import java.util.function.Function;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.EnvironmentAccess;
 import org.graalvm.polyglot.HostAccess;
@@ -49,12 +50,27 @@ public final class ScriptSandbox {
      * cú pháp, vượt giới hạn tài nguyên, hoặc cố thoát sandbox.
      */
     public Value eval(String script, Map<String, Object> hostApi) {
+        return eval(script, hostApi, Function.identity());
+    }
+
+    /**
+     * Như {@link #eval(String, Map)} nhưng {@code extractor} chạy TRONG lúc {@link Context} còn
+     * mở, trước khi bị đóng — bắt buộc dùng cách này nếu script trả về giá trị CÓ CẤU TRÚC (object/
+     * array), không phải scalar (số/chuỗi/boolean). PHÁT HIỆN THẬT: gọi {@code Value.getMember}/
+     * {@code getArrayElement} trên {@link Value} trả về từ {@link #eval(String, Map)} SAU KHI
+     * {@link Context} đã đóng (try-with-resources đóng context trước khi trả kết quả về caller)
+     * ném {@link IllegalStateException} — chỉ scalar (VD {@code asDouble()}) sống sót qua việc đóng
+     * context, không phải điều hiển nhiên, xác nhận bằng test thật trước khi thêm overload này
+     * (không đoán trước).
+     */
+    public <T> T eval(String script, Map<String, Object> hostApi, Function<Value, T> extractor) {
         try (Context context = buildContext()) {
             Value bindings = context.getBindings("js");
             for (Map.Entry<String, Object> entry : hostApi.entrySet()) {
                 bindings.putMember(entry.getKey(), toProxy(entry.getValue()));
             }
-            return context.eval("js", script);
+            Value result = context.eval("js", script);
+            return extractor.apply(result); // PHẢI chạy ở đây — context vẫn còn mở.
         } catch (PolyglotException e) {
             throw new ScriptExecutionException("Script thất bại: " + e.getMessage(), e);
         }

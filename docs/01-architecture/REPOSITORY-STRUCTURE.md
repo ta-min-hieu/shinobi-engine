@@ -51,6 +51,7 @@ shinobi-engine/
 │       ├── feature-account/
 │       ├── feature-character/
 │       ├── feature-inventory/
+│       ├── feature-dialogue/
 │       ├── feature-guild/
 │       ├── feature-quest/
 │       ├── feature-shop/
