@@ -21,6 +21,7 @@ dependencies {
     implementation(project(":server:server-features:feature-mail"))
     implementation(project(":server:server-features:feature-chat"))
     implementation(project(":server:server-features:feature-guild"))
+    implementation(project(":server:server-features:feature-party"))
 
     implementation(libs.hikaricp)
     implementation(libs.postgresql)

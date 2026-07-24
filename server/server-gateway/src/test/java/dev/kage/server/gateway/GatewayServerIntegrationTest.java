@@ -134,13 +134,14 @@ class GatewayServerIntegrationTest {
         var mailFacade = fakeMailFacade();
         var chatFacade = fakeChatFacade();
         var guildFacade = fakeGuildFacade();
+        var partyFacade = fakePartyFacade();
         characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
         worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
         var positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
-        var socialFacades = new SocialFacades(friendFacade, mailFacade, chatFacade, guildFacade);
+        var socialFacades = new SocialFacades(friendFacade, mailFacade, chatFacade, guildFacade, partyFacade);
         var contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
         var facades = new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
         server = new GatewayServer(0, facades, worldGateway);
@@ -578,6 +579,72 @@ class GatewayServerIntegrationTest {
                 new dev.kage.guild.application.ListPendingGuildJoinRequestsUseCase(guildPort),
                 new dev.kage.guild.application.FindMyGuildUseCase(guildPort));
         return new dev.kage.guild.api.GuildFacade(useCases);
+    }
+
+    // Party không dùng trong test này — fake tối thiểu để compile (cùng convention fakeGuildFacade).
+    private dev.kage.party.api.PartyFacade fakePartyFacade() {
+        dev.kage.party.domain.PartyPort partyPort = new dev.kage.party.domain.PartyPort() {
+            @Override
+            public Optional<dev.kage.party.domain.PartyMember> findMembershipOf(long characterId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public List<dev.kage.party.domain.PartyMember> listMembers(long partyId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public dev.kage.party.domain.Party createParty(long leaderCharacterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public Optional<dev.kage.party.domain.PartyInvite> findPendingInviteOfInvitee(long characterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public List<dev.kage.party.domain.PartyInvite> listPendingInvitesOfInvitee(long characterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public dev.kage.party.domain.PartyInvite invite(long partyId, long inviteeCharacterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public AcceptResult acceptInvite(long inviteId, long characterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public boolean rejectInvite(long inviteId, long characterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public LeaveResult leaveParty(long characterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+        };
+        var useCases = new dev.kage.party.application.PartyUseCases(
+                new dev.kage.party.application.CreatePartyUseCase(partyPort),
+                new dev.kage.party.application.InvitePartyMemberUseCase(partyPort),
+                new dev.kage.party.application.AcceptPartyInviteUseCase(partyPort),
+                new dev.kage.party.application.RejectPartyInviteUseCase(partyPort),
+                new dev.kage.party.application.LeavePartyUseCase(partyPort),
+                new dev.kage.party.application.KickPartyMemberUseCase(partyPort),
+                new dev.kage.party.application.ListPartyMembersUseCase(partyPort),
+                new dev.kage.party.application.ListPendingPartyInvitesUseCase(partyPort),
+                new dev.kage.party.application.FindMyPartyUseCase(partyPort));
+        return new dev.kage.party.api.PartyFacade(useCases);
     }
 
     @AfterEach

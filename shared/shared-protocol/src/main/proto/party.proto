@@ -1,0 +1,146 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// Packet Party (NETWORK.md §4, dải 1300-1399). Phase 7 lát cắt 2 — chỉ thành viên (tạo/mời/chấp
+// nhận-từ chối/rời/kick) + kênh chat Party (xem chat.proto). Chia EXP KHÔNG có ở đây — chưa có cơ
+// chế cấp EXP từ giết quái solo (feature-party/CLAUDE.md), ngoài phạm vi lát cắt này.
+
+// Luồng gia nhập: MỜI + CHẤP NHẬN (giống friend.proto, khác guild.proto "xin gia nhập") — leader
+// mời trực tiếp theo tên nhân vật.
+
+message CreatePartyCommand {
+}
+
+enum CreatePartyOutcome {
+  CREATE_PARTY_OUTCOME_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho kết quả thật.
+  CREATE_PARTY_OUTCOME_OK = 1;
+  CREATE_PARTY_OUTCOME_ALREADY_IN_PARTY = 2;
+}
+
+message CreatePartyResponse {
+  CreatePartyOutcome outcome = 1;
+  int64 party_id = 2; // chỉ có ý nghĩa khi outcome = OK
+}
+
+// target_name (không phải ID) — server-gateway tự tra CharacterFacade.findByName TRƯỚC khi gọi
+// PartyFacade.invite, cùng lý do SendFriendRequestCommand ở friend.proto.
+message InvitePartyMemberCommand {
+  string target_name = 1;
+}
+
+enum InvitePartyMemberOutcome {
+  INVITE_PARTY_MEMBER_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  INVITE_PARTY_MEMBER_OUTCOME_OK = 1;
+  INVITE_PARTY_MEMBER_OUTCOME_NOT_LEADER = 2;
+  INVITE_PARTY_MEMBER_OUTCOME_CANNOT_INVITE_SELF = 3;
+  INVITE_PARTY_MEMBER_OUTCOME_TARGET_ALREADY_IN_PARTY = 4;
+  INVITE_PARTY_MEMBER_OUTCOME_PARTY_FULL = 5;
+  INVITE_PARTY_MEMBER_OUTCOME_INVITE_ALREADY_PENDING = 6;
+  INVITE_PARTY_MEMBER_OUTCOME_TARGET_NOT_FOUND = 7; // tên không tồn tại (character)
+}
+
+message InvitePartyMemberResponse {
+  InvitePartyMemberOutcome outcome = 1;
+}
+
+message AcceptPartyInviteCommand {
+  int64 invite_id = 1;
+}
+
+enum AcceptPartyInviteOutcome {
+  ACCEPT_PARTY_INVITE_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  ACCEPT_PARTY_INVITE_OUTCOME_OK = 1;
+  ACCEPT_PARTY_INVITE_OUTCOME_NOT_FOUND = 2;
+  ACCEPT_PARTY_INVITE_OUTCOME_ALREADY_IN_PARTY = 3;
+  ACCEPT_PARTY_INVITE_OUTCOME_PARTY_FULL = 4;
+}
+
+message AcceptPartyInviteResponse {
+  AcceptPartyInviteOutcome outcome = 1;
+}
+
+message RejectPartyInviteCommand {
+  int64 invite_id = 1;
+}
+
+enum RejectPartyInviteOutcome {
+  REJECT_PARTY_INVITE_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  REJECT_PARTY_INVITE_OUTCOME_OK = 1;
+  REJECT_PARTY_INVITE_OUTCOME_NOT_FOUND = 2;
+}
+
+message RejectPartyInviteResponse {
+  RejectPartyInviteOutcome outcome = 1;
+}
+
+// Dùng chung cho CẢ leader lẫn member thường — leader rời tự động thăng thành viên vào sớm nhất
+// (feature-party/CLAUDE.md), không có DisbandPartyCommand riêng như guild.proto.
+message LeavePartyCommand {
+}
+
+enum LeavePartyOutcome {
+  LEAVE_PARTY_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  LEAVE_PARTY_OUTCOME_OK = 1;
+  LEAVE_PARTY_OUTCOME_NOT_IN_PARTY = 2;
+}
+
+message LeavePartyResponse {
+  LeavePartyOutcome outcome = 1;
+}
+
+// target_name (không phải ID) — cùng lý do InvitePartyMemberCommand ở trên.
+message KickPartyMemberCommand {
+  string target_name = 1;
+}
+
+enum KickPartyMemberOutcome {
+  KICK_PARTY_MEMBER_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  KICK_PARTY_MEMBER_OUTCOME_OK = 1;
+  KICK_PARTY_MEMBER_OUTCOME_CANNOT_KICK_SELF = 2;
+  KICK_PARTY_MEMBER_OUTCOME_TARGET_NOT_FOUND = 3; // tên không tồn tại (character)
+  KICK_PARTY_MEMBER_OUTCOME_NOT_FOUND = 4; // không phải leader, HOẶC target không phải thành viên cùng party
+}
+
+message KickPartyMemberResponse {
+  KickPartyMemberOutcome outcome = 1;
+}
+
+message ListPartyMembersRequest {
+}
+
+// online do gateway tự ghép (ConnectedCharacterRegistry), KHÔNG phải dữ liệu từ feature-party.
+message PartyMemberView {
+  int64 character_id = 1;
+  string name = 2;
+  bool is_leader = 3;
+  bool online = 4;
+}
+
+message ListPartyMembersResponse {
+  repeated PartyMemberView members = 1;
+}
+
+message ListPendingPartyInvitesRequest {
+}
+
+message PendingPartyInviteView {
+  int64 invite_id = 1;
+  int64 party_id = 2;
+}
+
+message ListPendingPartyInvitesResponse {
+  repeated PendingPartyInviteView invites = 1;
+}
+
+message GetMyPartyRequest {
+}
+
+message GetMyPartyResponse {
+  bool in_party = 1;
+  int64 party_id = 2; // chỉ có ý nghĩa khi in_party = true
+  bool is_leader = 3;
+}

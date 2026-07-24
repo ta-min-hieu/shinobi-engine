@@ -8,13 +8,15 @@ option java_multiple_files = true;
 // Packet Chat (NETWORK.md §4, dải 800-899). Phase 6 lát cắt 6 làm Thế giới/Riêng tư/Khu vực.
 // Bang hội thêm ở Phase 7 lát cắt 1 (feature-guild thật, quyết định 2026-07-23, ROADMAP.md) —
 // người nhận là thành viên ĐANG online của bang người gửi (server-gateway tự tra
-// GuildFacade.listMembers SAU KHI gửi OK, cùng cách Khu vực tự tra AoI). Party chưa có ở đây.
+// GuildFacade.listMembers SAU KHI gửi OK, cùng cách Khu vực tự tra AoI). Party thêm ở Phase 7 lát
+// cắt 2 (feature-party thật, 2026-07-24) — cùng cơ chế, tra PartyFacade.listMembers.
 enum ChatChannel {
   CHAT_CHANNEL_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho packet thật.
   CHAT_CHANNEL_WORLD = 1;
   CHAT_CHANNEL_PRIVATE = 2;
   CHAT_CHANNEL_AREA = 3;
   CHAT_CHANNEL_GUILD = 4;
+  CHAT_CHANNEL_PARTY = 5;
 }
 
 // Command: Client -> Server (OPCODE_SEND_CHAT_MESSAGE_COMMAND). target_name CHỈ có ý nghĩa khi
@@ -35,6 +37,7 @@ enum SendChatMessageOutcome {
   SEND_CHAT_MESSAGE_OUTCOME_TARGET_OFFLINE = 6; // PRIVATE: tồn tại nhưng không online lúc gửi
   SEND_CHAT_MESSAGE_OUTCOME_RATE_LIMITED = 7;
   SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_GUILD = 8; // GUILD: người gửi chưa vào bang nào
+  SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_PARTY = 9; // PARTY: người gửi chưa vào party nào
 }
 
 // Response: Server -> Client (OPCODE_SEND_CHAT_MESSAGE_RESPONSE).

@@ -16,6 +16,7 @@ import dev.kage.guild.api.GuildFacade;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.mail.api.MailFacade;
+import dev.kage.party.api.PartyFacade;
 import dev.kage.protocol.AcceptFriendRequestCommand;
 import dev.kage.protocol.AcceptFriendRequestOutcome;
 import dev.kage.protocol.AcceptFriendRequestResponse;
@@ -85,6 +86,10 @@ import dev.kage.protocol.ListPendingFriendRequestsRequest;
 import dev.kage.protocol.ListPendingFriendRequestsResponse;
 import dev.kage.protocol.ListPendingGuildJoinRequestsRequest;
 import dev.kage.protocol.ListPendingGuildJoinRequestsResponse;
+import dev.kage.protocol.ListPartyMembersRequest;
+import dev.kage.protocol.ListPartyMembersResponse;
+import dev.kage.protocol.ListPendingPartyInvitesRequest;
+import dev.kage.protocol.ListPendingPartyInvitesResponse;
 import dev.kage.protocol.ListShopItemsRequest;
 import dev.kage.protocol.ListShopItemsResponse;
 import dev.kage.protocol.MailAttachmentView;
@@ -93,6 +98,28 @@ import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.NewMailEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PendingGuildJoinRequestView;
+import dev.kage.protocol.PendingPartyInviteView;
+import dev.kage.protocol.GetMyPartyRequest;
+import dev.kage.protocol.GetMyPartyResponse;
+import dev.kage.protocol.CreatePartyCommand;
+import dev.kage.protocol.CreatePartyOutcome;
+import dev.kage.protocol.CreatePartyResponse;
+import dev.kage.protocol.InvitePartyMemberCommand;
+import dev.kage.protocol.InvitePartyMemberOutcome;
+import dev.kage.protocol.InvitePartyMemberResponse;
+import dev.kage.protocol.AcceptPartyInviteCommand;
+import dev.kage.protocol.AcceptPartyInviteOutcome;
+import dev.kage.protocol.AcceptPartyInviteResponse;
+import dev.kage.protocol.RejectPartyInviteCommand;
+import dev.kage.protocol.RejectPartyInviteOutcome;
+import dev.kage.protocol.RejectPartyInviteResponse;
+import dev.kage.protocol.LeavePartyCommand;
+import dev.kage.protocol.LeavePartyOutcome;
+import dev.kage.protocol.LeavePartyResponse;
+import dev.kage.protocol.KickPartyMemberCommand;
+import dev.kage.protocol.KickPartyMemberOutcome;
+import dev.kage.protocol.KickPartyMemberResponse;
+import dev.kage.protocol.PartyMemberView;
 import dev.kage.protocol.SendChatMessageCommand;
 import dev.kage.protocol.SendChatMessageOutcome;
 import dev.kage.protocol.SendChatMessageResponse;
@@ -138,6 +165,7 @@ import dev.kage.shop.api.ShopFacade;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
@@ -184,6 +212,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final MailFacade mailFacade;
     private final ChatFacade chatFacade;
     private final GuildFacade guildFacade;
+    private final PartyFacade partyFacade;
     private final WorldGateway worldGateway;
     private final Executor authExecutor;
     // Per-connection (handler đã là state per-connection, xem javadoc lớp) — không cần đồng bộ
@@ -197,6 +226,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final RateLimiter chatAreaRateLimiter = new RateLimiter(15, Duration.ofSeconds(10));
     // GAMEPLAY.md §10: Bang hội = "Vừa", giữa World (nghiêm ngặt nhất) và Area (lỏng nhất).
     private final RateLimiter chatGuildRateLimiter = new RateLimiter(10, Duration.ofSeconds(10));
+    // GAMEPLAY.md §10: Party = "Lỏng", cùng mức Area (party nhỏ, ít rủi ro spam hơn World/Guild).
+    private final RateLimiter chatPartyRateLimiter = new RateLimiter(15, Duration.ofSeconds(10));
 
     // handleConnect/handleSelectCharacter set giá trị này từ Virtual Thread; channelRead0 của
     // packet TIẾP THEO có thể chạy trên EventLoop trước khi Virtual Thread đó xong (Netty không
@@ -249,7 +280,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_LIST_GUILD_MEMBERS_REQUEST_VALUE, this::handleListGuildMembersRequest),
             Map.entry(Opcode.OPCODE_LIST_PENDING_GUILD_JOIN_REQUESTS_REQUEST_VALUE,
                     this::handleListPendingGuildJoinRequestsRequest),
-            Map.entry(Opcode.OPCODE_GET_MY_GUILD_REQUEST_VALUE, this::handleGetMyGuildRequest));
+            Map.entry(Opcode.OPCODE_GET_MY_GUILD_REQUEST_VALUE, this::handleGetMyGuildRequest),
+            Map.entry(Opcode.OPCODE_CREATE_PARTY_COMMAND_VALUE, this::handleCreatePartyCommand),
+            Map.entry(Opcode.OPCODE_INVITE_PARTY_MEMBER_COMMAND_VALUE, this::handleInvitePartyMemberCommand),
+            Map.entry(Opcode.OPCODE_ACCEPT_PARTY_INVITE_COMMAND_VALUE, this::handleAcceptPartyInviteCommand),
+            Map.entry(Opcode.OPCODE_REJECT_PARTY_INVITE_COMMAND_VALUE, this::handleRejectPartyInviteCommand),
+            Map.entry(Opcode.OPCODE_LEAVE_PARTY_COMMAND_VALUE, this::handleLeavePartyCommand),
+            Map.entry(Opcode.OPCODE_KICK_PARTY_MEMBER_COMMAND_VALUE, this::handleKickPartyMemberCommand),
+            Map.entry(Opcode.OPCODE_LIST_PARTY_MEMBERS_REQUEST_VALUE, this::handleListPartyMembersRequest),
+            Map.entry(Opcode.OPCODE_LIST_PENDING_PARTY_INVITES_REQUEST_VALUE,
+                    this::handleListPendingPartyInvitesRequest),
+            Map.entry(Opcode.OPCODE_GET_MY_PARTY_REQUEST_VALUE, this::handleGetMyPartyRequest));
 
     GatewayChannelHandler(GatewayFacades facades, WorldGateway worldGateway, Executor authExecutor) {
         this.accountFacade = facades.accountFacade();
@@ -262,6 +303,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.mailFacade = facades.contentFacades().socialFacades().mailFacade();
         this.chatFacade = facades.contentFacades().socialFacades().chatFacade();
         this.guildFacade = facades.contentFacades().socialFacades().guildFacade();
+        this.partyFacade = facades.contentFacades().socialFacades().partyFacade();
         this.worldGateway = worldGateway;
         this.authExecutor = authExecutor;
     }
@@ -1230,6 +1272,244 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         send(ctx, Opcode.OPCODE_GET_MY_GUILD_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
     }
 
+    private void handleCreatePartyCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        CreatePartyCommand.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleCreatePartyBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleCreatePartyBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        var result = partyFacade.createParty(characterId);
+        var outcome = result.outcome() == PartyFacade.CreateOutcome.OK
+                ? CreatePartyOutcome.CREATE_PARTY_OUTCOME_OK
+                : CreatePartyOutcome.CREATE_PARTY_OUTCOME_ALREADY_IN_PARTY;
+        var responseBuilder = CreatePartyResponse.newBuilder().setOutcome(outcome);
+        if (result.partyId() != null) {
+            responseBuilder.setPartyId(result.partyId());
+        }
+        send(ctx, Opcode.OPCODE_CREATE_PARTY_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+    }
+
+    private void handleInvitePartyMemberCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = InvitePartyMemberCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleInvitePartyMemberBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleInvitePartyMemberBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, InvitePartyMemberCommand command) {
+        var target = characterFacade.findByName(command.getTargetName());
+        if (target.isEmpty()) {
+            var response = InvitePartyMemberResponse.newBuilder()
+                    .setOutcome(InvitePartyMemberOutcome.INVITE_PARTY_MEMBER_OUTCOME_TARGET_NOT_FOUND)
+                    .build();
+            send(ctx, Opcode.OPCODE_INVITE_PARTY_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            return;
+        }
+        var result = partyFacade.invite(characterId, target.get().id());
+        var response =
+                InvitePartyMemberResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        send(ctx, Opcode.OPCODE_INVITE_PARTY_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private static final Map<PartyFacade.InviteResult, InvitePartyMemberOutcome> INVITE_PARTY_MEMBER_OUTCOME_MAPPING =
+            Map.of(
+                    PartyFacade.InviteResult.OK, InvitePartyMemberOutcome.INVITE_PARTY_MEMBER_OUTCOME_OK,
+                    PartyFacade.InviteResult.NOT_LEADER,
+                    InvitePartyMemberOutcome.INVITE_PARTY_MEMBER_OUTCOME_NOT_LEADER,
+                    PartyFacade.InviteResult.CANNOT_INVITE_SELF,
+                    InvitePartyMemberOutcome.INVITE_PARTY_MEMBER_OUTCOME_CANNOT_INVITE_SELF,
+                    PartyFacade.InviteResult.TARGET_ALREADY_IN_PARTY,
+                    InvitePartyMemberOutcome.INVITE_PARTY_MEMBER_OUTCOME_TARGET_ALREADY_IN_PARTY,
+                    PartyFacade.InviteResult.PARTY_FULL,
+                    InvitePartyMemberOutcome.INVITE_PARTY_MEMBER_OUTCOME_PARTY_FULL,
+                    PartyFacade.InviteResult.INVITE_ALREADY_PENDING,
+                    InvitePartyMemberOutcome.INVITE_PARTY_MEMBER_OUTCOME_INVITE_ALREADY_PENDING);
+
+    private static InvitePartyMemberOutcome toProtoOutcome(PartyFacade.InviteResult result) {
+        return INVITE_PARTY_MEMBER_OUTCOME_MAPPING.get(result);
+    }
+
+    private void handleAcceptPartyInviteCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = AcceptPartyInviteCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleAcceptPartyInviteBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleAcceptPartyInviteBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, AcceptPartyInviteCommand command) {
+        var result = partyFacade.acceptInvite(command.getInviteId(), characterId);
+        var outcome = switch (result) {
+            case OK -> AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_OK;
+            case NOT_FOUND -> AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_NOT_FOUND;
+            case ALREADY_IN_PARTY -> AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_ALREADY_IN_PARTY;
+            case PARTY_FULL -> AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_PARTY_FULL;
+        };
+        var response = AcceptPartyInviteResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_ACCEPT_PARTY_INVITE_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private void handleRejectPartyInviteCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = RejectPartyInviteCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleRejectPartyInviteBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleRejectPartyInviteBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, RejectPartyInviteCommand command) {
+        var result = partyFacade.rejectInvite(command.getInviteId(), characterId);
+        var outcome = result == PartyFacade.RejectResult.OK
+                ? RejectPartyInviteOutcome.REJECT_PARTY_INVITE_OUTCOME_OK
+                : RejectPartyInviteOutcome.REJECT_PARTY_INVITE_OUTCOME_NOT_FOUND;
+        var response = RejectPartyInviteResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_REJECT_PARTY_INVITE_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private void handleLeavePartyCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        LeavePartyCommand.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleLeavePartyBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleLeavePartyBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        var outcome = partyFacade.leaveParty(characterId) == PartyFacade.LeaveResult.OK
+                ? LeavePartyOutcome.LEAVE_PARTY_OUTCOME_OK
+                : LeavePartyOutcome.LEAVE_PARTY_OUTCOME_NOT_IN_PARTY;
+        var response = LeavePartyResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_LEAVE_PARTY_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private void handleKickPartyMemberCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = KickPartyMemberCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleKickPartyMemberBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleKickPartyMemberBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, KickPartyMemberCommand command) {
+        var target = characterFacade.findByName(command.getTargetName());
+        if (target.isEmpty()) {
+            var response = KickPartyMemberResponse.newBuilder()
+                    .setOutcome(KickPartyMemberOutcome.KICK_PARTY_MEMBER_OUTCOME_TARGET_NOT_FOUND)
+                    .build();
+            send(ctx, Opcode.OPCODE_KICK_PARTY_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            return;
+        }
+        var result = partyFacade.kickMember(characterId, target.get().id());
+        var outcome = switch (result) {
+            case OK -> KickPartyMemberOutcome.KICK_PARTY_MEMBER_OUTCOME_OK;
+            case CANNOT_KICK_SELF -> KickPartyMemberOutcome.KICK_PARTY_MEMBER_OUTCOME_CANNOT_KICK_SELF;
+            case NOT_FOUND -> KickPartyMemberOutcome.KICK_PARTY_MEMBER_OUTCOME_NOT_FOUND;
+        };
+        var response = KickPartyMemberResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_KICK_PARTY_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private void handleListPartyMembersRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ListPartyMembersRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleListPartyMembersBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleListPartyMembersBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        var responseBuilder = ListPartyMembersResponse.newBuilder();
+        for (var member : partyFacade.listMembers(characterId)) {
+            var name = characterFacade.findById(member.characterId()).map(Character::name).orElse("");
+            responseBuilder.addMembers(PartyMemberView.newBuilder()
+                    .setCharacterId(member.characterId())
+                    .setName(name)
+                    .setIsLeader(member.isLeader())
+                    .setOnline(worldGateway.registry().isOnline(member.characterId()))
+                    .build());
+        }
+        send(ctx, Opcode.OPCODE_LIST_PARTY_MEMBERS_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+    }
+
+    private void handleListPendingPartyInvitesRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ListPendingPartyInvitesRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleListPendingPartyInvitesBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleListPendingPartyInvitesBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        var responseBuilder = ListPendingPartyInvitesResponse.newBuilder();
+        for (var pending : partyFacade.listPendingInvites(characterId)) {
+            responseBuilder.addInvites(PendingPartyInviteView.newBuilder()
+                    .setInviteId(pending.inviteId())
+                    .setPartyId(pending.partyId())
+                    .build());
+        }
+        send(ctx, Opcode.OPCODE_LIST_PENDING_PARTY_INVITES_RESPONSE_VALUE, sequenceId,
+                responseBuilder.build().toByteArray());
+    }
+
+    private void handleGetMyPartyRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        GetMyPartyRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleGetMyPartyBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleGetMyPartyBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        var myParty = partyFacade.findMyParty(characterId);
+        var responseBuilder = GetMyPartyResponse.newBuilder().setInParty(myParty.isPresent());
+        myParty.ifPresent(party -> responseBuilder.setPartyId(party.partyId()).setIsLeader(party.isLeader()));
+        send(ctx, Opcode.OPCODE_GET_MY_PARTY_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+    }
+
     private void handleSendMailCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         var command = SendMailCommand.parseFrom(payload);
@@ -1389,6 +1669,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case CHAT_CHANNEL_PRIVATE -> chatPrivateRateLimiter;
             case CHAT_CHANNEL_AREA -> chatAreaRateLimiter;
             case CHAT_CHANNEL_GUILD -> chatGuildRateLimiter;
+            case CHAT_CHANNEL_PARTY -> chatPartyRateLimiter;
             default -> chatWorldRateLimiter; // WORLD/UNSPECIFIED/UNRECOGNIZED — nghiêm ngặt nhất.
         };
     }
@@ -1416,6 +1697,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         if (domainChannel == dev.kage.chat.domain.ChatChannel.GUILD && guildFacade.findMyGuild(characterId).isEmpty()) {
             sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_GUILD);
+            return;
+        }
+        if (domainChannel == dev.kage.chat.domain.ChatChannel.PARTY && partyFacade.findMyParty(characterId).isEmpty()) {
+            sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_PARTY);
             return;
         }
         var result = chatFacade.sendMessage(characterId, domainChannel, command.getBody());
@@ -1455,22 +1740,27 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         ctx.target().id(), Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
             }
             case AREA -> worldGateway.facade().enqueueAreaChatMessage(ctx.characterId(), ctx.senderName(), ctx.body());
-            case GUILD -> {
-                var event = ChatMessageEvent.newBuilder()
-                        .setChannel(ChatChannel.CHAT_CHANNEL_GUILD)
-                        .setSenderId(ctx.characterId())
-                        .setSenderName(ctx.senderName())
-                        .setBody(ctx.body())
-                        .build();
-                // Broadcast cho MỌI thành viên đang online (gồm cả người gửi, cùng cách AREA tự
-                // thấy tin của mình) — không cần AoI/tick thread, guild membership không phải dữ
-                // liệu world-tick (feature-guild/CLAUDE.md).
-                for (var member : guildFacade.listMembers(ctx.characterId())) {
-                    worldGateway.registry().sendToCharacterIfOnline(
-                            member.characterId(), Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
-                }
-            }
+            // GUILD/PARTY: broadcast cho MỌI thành viên đang online (gồm cả người gửi, cùng cách
+            // AREA tự thấy tin của mình) — không cần AoI/tick thread, guild/party membership
+            // không phải dữ liệu world-tick (feature-guild, feature-party/CLAUDE.md).
+            case GUILD -> broadcastToGroup(ChatChannel.CHAT_CHANNEL_GUILD, ctx,
+                    guildFacade.listMembers(ctx.characterId()).stream().map(m -> m.characterId()).toList());
+            case PARTY -> broadcastToGroup(ChatChannel.CHAT_CHANNEL_PARTY, ctx,
+                    partyFacade.listMembers(ctx.characterId()).stream().map(m -> m.characterId()).toList());
             default -> throw new IllegalStateException("ChatChannel không xử lý: " + domainChannel);
+        }
+    }
+
+    private void broadcastToGroup(ChatChannel protoChannel, ChatRouteContext ctx, List<Long> memberCharacterIds) {
+        var event = ChatMessageEvent.newBuilder()
+                .setChannel(protoChannel)
+                .setSenderId(ctx.characterId())
+                .setSenderName(ctx.senderName())
+                .setBody(ctx.body())
+                .build();
+        for (long memberCharacterId : memberCharacterIds) {
+            worldGateway.registry().sendToCharacterIfOnline(
+                    memberCharacterId, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
         }
     }
 
@@ -1485,6 +1775,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case CHAT_CHANNEL_PRIVATE -> Optional.of(dev.kage.chat.domain.ChatChannel.PRIVATE);
             case CHAT_CHANNEL_AREA -> Optional.of(dev.kage.chat.domain.ChatChannel.AREA);
             case CHAT_CHANNEL_GUILD -> Optional.of(dev.kage.chat.domain.ChatChannel.GUILD);
+            case CHAT_CHANNEL_PARTY -> Optional.of(dev.kage.chat.domain.ChatChannel.PARTY);
             default -> Optional.empty();
         };
     }

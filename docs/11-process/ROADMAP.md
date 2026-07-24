@@ -244,7 +244,7 @@ graph LR
 | Việc | Ghi chú |
 |---|---|
 | ✅ `feature-guild` lát cắt 1 (2026-07-24 — thành viên: tạo/xin gia nhập/leader duyệt-từ chối/rời/kick/giải tán + kênh chat Bang hội, chơi được thật qua socket + Postgres thật) | Kho bang, nhiệm vụ bang dời lát cắt sau |
-| Party | Cần cho dungeon |
+| ✅ `feature-party` lát cắt 2 (2026-07-24 — thành viên: tạo/mời/chấp nhận-từ chối/rời (tự động chuyển leader)/kick + kênh chat Party, sức chứa tối đa 5, chơi được thật qua socket + Postgres thật) | Chia EXP dời tới khi Combat/Character có cơ chế cấp EXP từ giết quái thật (chưa tồn tại, phát hiện lúc lát cắt này) |
 | ⚠️ **Trade** | [GAMEPLAY.md §8](../05-server/GAMEPLAY.md) — **hệ thống nguy hiểm nhất**: transaction + audit + 2-phase confirm + khoá item + idempotency |
 
 **Quyết định lát cắt 1 (2026-07-24, cùng chủ dự án qua `AskUserQuestion` trước khi code)**: thứ tự
@@ -252,6 +252,14 @@ Guild → Party → Trade (Trade nguy hiểm nhất, hoãn tới khi có kinh ng
 thống khác); luồng gia nhập = **xin gia nhập + leader duyệt** (khác feature-friend là mời trực
 tiếp); phạm vi lát cắt 1 = chỉ thành viên + kênh chat Bang hội, kho bang/nhiệm vụ bang dời lát cắt
 sau (cùng cách Quest tách khỏi Dialogue ở Phase 6). Chi tiết đầy đủ: feature-guild/CLAUDE.md.
+
+**Quyết định lát cắt 2 (2026-07-24, cùng chủ dự án qua `AskUserQuestion` trước khi code)**: luồng
+gia nhập party = **mời + chấp nhận** (NGƯỢC hướng guild, giống feature-friend — party rủ người
+quen); phạm vi = chỉ thành viên + kênh chat Party, **KHÔNG chia EXP** — phát hiện thật lúc code:
+giết quái solo hiện KHÔNG cấp EXP trực tiếp (chỉ có qua `ClaimQuestRewardUseCase`), không có công
+thức EXP/quái hay level-up nào tồn tại, nên "chia EXP party" cần thiết kế Combat/Character
+progression trước, ngoài phạm vi lát cắt này; leader rời **tự động thăng** thành viên vào sớm nhất
+(khác guild phải giải tán). Chi tiết đầy đủ: feature-party/CLAUDE.md.
 
 ⚠️ **Không mở Trade nếu ADR-025 (idempotency) chưa Accepted.** (✅ Đã Accepted 2026-07-19 — điều kiện thoả, nhưng vẫn phải triển khai `idempotencyKey` thật trước khi Trade thật sự mở, không phải chỉ cần ADR tồn tại.)
 

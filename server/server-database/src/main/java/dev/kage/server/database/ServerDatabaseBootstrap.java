@@ -40,6 +40,17 @@ import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
 import dev.kage.mail.api.MailFacade;
+import dev.kage.party.api.PartyFacade;
+import dev.kage.party.application.AcceptPartyInviteUseCase;
+import dev.kage.party.application.CreatePartyUseCase;
+import dev.kage.party.application.FindMyPartyUseCase;
+import dev.kage.party.application.InvitePartyMemberUseCase;
+import dev.kage.party.application.KickPartyMemberUseCase;
+import dev.kage.party.application.LeavePartyUseCase;
+import dev.kage.party.application.ListPartyMembersUseCase;
+import dev.kage.party.application.ListPendingPartyInvitesUseCase;
+import dev.kage.party.application.PartyUseCases;
+import dev.kage.party.application.RejectPartyInviteUseCase;
 import dev.kage.mail.application.ClaimMailUseCase;
 import dev.kage.mail.application.DeleteMailUseCase;
 import dev.kage.mail.application.ListMailUseCase;
@@ -58,6 +69,7 @@ import dev.kage.server.database.chat.PostgresChatAuditAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcTemplateAdapter;
 import dev.kage.server.database.friend.PostgresFriendAdapter;
 import dev.kage.server.database.guild.PostgresGuildAdapter;
+import dev.kage.server.database.party.PostgresPartyAdapter;
 import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
 import dev.kage.server.database.inventory.PostgresAuditAdapter;
 import dev.kage.server.database.inventory.PostgresDropTableAdapter;
@@ -239,6 +251,21 @@ public final class ServerDatabaseBootstrap {
                 new ListPendingGuildJoinRequestsUseCase(guildPort),
                 new FindMyGuildUseCase(guildPort));
         return new GuildFacade(useCases);
+    }
+
+    public PartyFacade wirePartyFacade() {
+        var partyPort = new PostgresPartyAdapter(dataSource);
+        var useCases = new PartyUseCases(
+                new CreatePartyUseCase(partyPort),
+                new InvitePartyMemberUseCase(partyPort),
+                new AcceptPartyInviteUseCase(partyPort),
+                new RejectPartyInviteUseCase(partyPort),
+                new LeavePartyUseCase(partyPort),
+                new KickPartyMemberUseCase(partyPort),
+                new ListPartyMembersUseCase(partyPort),
+                new ListPendingPartyInvitesUseCase(partyPort),
+                new FindMyPartyUseCase(partyPort));
+        return new PartyFacade(useCases);
     }
 
     public ChatFacade wireChatFacade() {

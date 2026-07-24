@@ -88,7 +88,8 @@ Dải số cố định theo domain — tránh đụng độ khi nhiều ngườ
 | 1000–1099 | Shop / Auction |
 | 1100–1199 | Friend |
 | 1200–1299 | Ranking |
-| 1300+ | Dự trữ — không dùng khi chưa cập nhật bảng này |
+| 1300–1399 | Party |
+| 1400+ | Dự trữ — không dùng khi chưa cập nhật bảng này |
 
 **Nguồn chân lý thật**: `shared-protocol/src/main/proto/opcode_registry.proto`. Tài liệu này là bản tóm tắt — **lệch nhau thì file `.proto` thắng**.
 
