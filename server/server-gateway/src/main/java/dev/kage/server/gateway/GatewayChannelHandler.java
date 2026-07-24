@@ -17,6 +17,7 @@ import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.mail.api.MailFacade;
 import dev.kage.party.api.PartyFacade;
+import dev.kage.trade.api.TradeFacade;
 import dev.kage.protocol.AcceptFriendRequestCommand;
 import dev.kage.protocol.AcceptFriendRequestOutcome;
 import dev.kage.protocol.AcceptFriendRequestResponse;
@@ -152,6 +153,29 @@ import dev.kage.protocol.SendMailOutcome;
 import dev.kage.protocol.SendMailResponse;
 import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.ShopListingView;
+import dev.kage.protocol.RequestTradeCommand;
+import dev.kage.protocol.RequestTradeOutcome;
+import dev.kage.protocol.RequestTradeResponse;
+import dev.kage.protocol.AcceptTradeRequestCommand;
+import dev.kage.protocol.AcceptTradeRequestOutcome;
+import dev.kage.protocol.AcceptTradeRequestResponse;
+import dev.kage.protocol.CancelTradeCommand;
+import dev.kage.protocol.CancelTradeOutcome;
+import dev.kage.protocol.CancelTradeResponse;
+import dev.kage.protocol.SetTradeOfferCommand;
+import dev.kage.protocol.SetTradeOfferOutcome;
+import dev.kage.protocol.SetTradeOfferResponse;
+import dev.kage.protocol.ConfirmTradeCommand;
+import dev.kage.protocol.ConfirmTradeOutcome;
+import dev.kage.protocol.ConfirmTradeResponse;
+import dev.kage.protocol.GetTradeStatusRequest;
+import dev.kage.protocol.GetTradeStatusResponse;
+import dev.kage.protocol.TradeOfferItemView;
+import dev.kage.protocol.TradePhase;
+import dev.kage.protocol.TradeRequestedEvent;
+import dev.kage.protocol.TradeUpdatedEvent;
+import dev.kage.protocol.TradeClosedEvent;
+import dev.kage.protocol.TradeCloseReason;
 import dev.kage.protocol.TalkToNpcCommand;
 import dev.kage.protocol.UnequipItemCommand;
 import dev.kage.protocol.UnequipItemResponse;
@@ -213,6 +237,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final ChatFacade chatFacade;
     private final GuildFacade guildFacade;
     private final PartyFacade partyFacade;
+    private final TradeFacade tradeFacade;
     private final WorldGateway worldGateway;
     private final Executor authExecutor;
     // Per-connection (handler đã là state per-connection, xem javadoc lớp) — không cần đồng bộ
@@ -290,7 +315,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_LIST_PARTY_MEMBERS_REQUEST_VALUE, this::handleListPartyMembersRequest),
             Map.entry(Opcode.OPCODE_LIST_PENDING_PARTY_INVITES_REQUEST_VALUE,
                     this::handleListPendingPartyInvitesRequest),
-            Map.entry(Opcode.OPCODE_GET_MY_PARTY_REQUEST_VALUE, this::handleGetMyPartyRequest));
+            Map.entry(Opcode.OPCODE_GET_MY_PARTY_REQUEST_VALUE, this::handleGetMyPartyRequest),
+            Map.entry(Opcode.OPCODE_REQUEST_TRADE_COMMAND_VALUE, this::handleRequestTradeCommand),
+            Map.entry(Opcode.OPCODE_ACCEPT_TRADE_REQUEST_COMMAND_VALUE, this::handleAcceptTradeRequestCommand),
+            Map.entry(Opcode.OPCODE_CANCEL_TRADE_COMMAND_VALUE, this::handleCancelTradeCommand),
+            Map.entry(Opcode.OPCODE_SET_TRADE_OFFER_COMMAND_VALUE, this::handleSetTradeOfferCommand),
+            Map.entry(Opcode.OPCODE_CONFIRM_TRADE_COMMAND_VALUE, this::handleConfirmTradeCommand),
+            Map.entry(Opcode.OPCODE_GET_TRADE_STATUS_REQUEST_VALUE, this::handleGetTradeStatusRequest));
 
     GatewayChannelHandler(GatewayFacades facades, WorldGateway worldGateway, Executor authExecutor) {
         this.accountFacade = facades.accountFacade();
@@ -304,6 +335,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.chatFacade = facades.contentFacades().socialFacades().chatFacade();
         this.guildFacade = facades.contentFacades().socialFacades().guildFacade();
         this.partyFacade = facades.contentFacades().socialFacades().partyFacade();
+        this.tradeFacade = facades.contentFacades().socialFacades().tradeFacade();
         this.worldGateway = worldGateway;
         this.authExecutor = authExecutor;
     }
@@ -1512,6 +1544,246 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         var responseBuilder = GetMyPartyResponse.newBuilder().setInParty(myParty.isPresent());
         myParty.ifPresent(party -> responseBuilder.setPartyId(party.partyId()).setIsLeader(party.isLeader()));
         send(ctx, Opcode.OPCODE_GET_MY_PARTY_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+    }
+
+    private void handleRequestTradeCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = RequestTradeCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleRequestTradeBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleRequestTradeBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, RequestTradeCommand command) {
+        var target = characterFacade.findByName(command.getTargetName());
+        if (target.isEmpty()) {
+            var response = RequestTradeResponse.newBuilder()
+                    .setOutcome(RequestTradeOutcome.REQUEST_TRADE_OUTCOME_TARGET_NOT_FOUND)
+                    .build();
+            send(ctx, Opcode.OPCODE_REQUEST_TRADE_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            return;
+        }
+        var result = tradeFacade.requestTrade(characterId, target.get().id());
+        var responseBuilder = RequestTradeResponse.newBuilder().setOutcome(toProtoOutcome(result.outcome()));
+        if (result.sessionId() != null) {
+            responseBuilder.setSessionId(result.sessionId());
+        }
+        send(ctx, Opcode.OPCODE_REQUEST_TRADE_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+        if (result.outcome() == TradeFacade.RequestOutcome.OK) {
+            var senderName = characterFacade.findById(characterId).map(Character::name).orElse("");
+            var event = TradeRequestedEvent.newBuilder()
+                    .setSessionId(result.sessionId())
+                    .setFromCharacterId(characterId)
+                    .setFromName(senderName)
+                    .build();
+            worldGateway.registry().sendToCharacterIfOnline(
+                    target.get().id(), Opcode.OPCODE_TRADE_REQUESTED_EVENT_VALUE, 0, event.toByteArray());
+        }
+    }
+
+    private static final Map<TradeFacade.RequestOutcome, RequestTradeOutcome> REQUEST_TRADE_OUTCOME_MAPPING = Map.of(
+            TradeFacade.RequestOutcome.OK, RequestTradeOutcome.REQUEST_TRADE_OUTCOME_OK,
+            TradeFacade.RequestOutcome.CANNOT_TRADE_SELF, RequestTradeOutcome.REQUEST_TRADE_OUTCOME_CANNOT_TRADE_SELF,
+            TradeFacade.RequestOutcome.ALREADY_IN_TRADE, RequestTradeOutcome.REQUEST_TRADE_OUTCOME_ALREADY_IN_TRADE,
+            TradeFacade.RequestOutcome.TARGET_ALREADY_IN_TRADE,
+            RequestTradeOutcome.REQUEST_TRADE_OUTCOME_TARGET_ALREADY_IN_TRADE);
+
+    private static RequestTradeOutcome toProtoOutcome(TradeFacade.RequestOutcome outcome) {
+        return REQUEST_TRADE_OUTCOME_MAPPING.get(outcome);
+    }
+
+    private void handleAcceptTradeRequestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = AcceptTradeRequestCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleAcceptTradeRequestBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleAcceptTradeRequestBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, AcceptTradeRequestCommand command) {
+        var result = tradeFacade.acceptRequest(command.getSessionId(), characterId);
+        var outcome = result == TradeFacade.AcceptResult.OK
+                ? AcceptTradeRequestOutcome.ACCEPT_TRADE_REQUEST_OUTCOME_OK
+                : AcceptTradeRequestOutcome.ACCEPT_TRADE_REQUEST_OUTCOME_NOT_FOUND;
+        var response = AcceptTradeRequestResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_ACCEPT_TRADE_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        if (result == TradeFacade.AcceptResult.OK) {
+            notifyCounterpart(characterId, command.getSessionId());
+        }
+    }
+
+    private void handleCancelTradeCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = CancelTradeCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleCancelTradeBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleCancelTradeBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, CancelTradeCommand command) {
+        var statusBefore = tradeFacade.getStatus(characterId);
+        var result = tradeFacade.cancel(command.getSessionId(), characterId);
+        var outcome = result == TradeFacade.CancelResult.OK
+                ? CancelTradeOutcome.CANCEL_TRADE_OUTCOME_OK
+                : CancelTradeOutcome.CANCEL_TRADE_OUTCOME_NOT_FOUND;
+        var response = CancelTradeResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_CANCEL_TRADE_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        if (result == TradeFacade.CancelResult.OK && statusBefore.isPresent()) {
+            var event = TradeClosedEvent.newBuilder()
+                    .setSessionId(command.getSessionId())
+                    .setReason(TradeCloseReason.TRADE_CLOSE_REASON_CANCELLED)
+                    .build();
+            worldGateway.registry().sendToCharacterIfOnline(
+                    statusBefore.get().counterpartCharacterId(), Opcode.OPCODE_TRADE_CLOSED_EVENT_VALUE, 0,
+                    event.toByteArray());
+        }
+    }
+
+    private void handleSetTradeOfferCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = SetTradeOfferCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleSetTradeOfferBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleSetTradeOfferBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, SetTradeOfferCommand command) {
+        var items = command.getItemsList().stream()
+                .map(i -> new TradeFacade.OfferItemInput(i.getItemId(), i.getQuantity()))
+                .toList();
+        var result = tradeFacade.setOffer(command.getSessionId(), characterId, command.getGoldAmount(), items);
+        var outcome = result == TradeFacade.SetOfferResult.OK
+                ? SetTradeOfferOutcome.SET_TRADE_OFFER_OUTCOME_OK
+                : SetTradeOfferOutcome.SET_TRADE_OFFER_OUTCOME_NOT_FOUND;
+        var response = SetTradeOfferResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_SET_TRADE_OFFER_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        if (result == TradeFacade.SetOfferResult.OK) {
+            notifyCounterpart(characterId, command.getSessionId());
+        }
+    }
+
+    private void handleConfirmTradeCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = ConfirmTradeCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleConfirmTradeBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleConfirmTradeBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, ConfirmTradeCommand command) {
+        var statusBefore = tradeFacade.getStatus(characterId);
+        var result = tradeFacade.confirm(command.getSessionId(), characterId, command.getIdempotencyKey());
+        var outcome = switch (result) {
+            case OK -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_OK;
+            case EXECUTED -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_EXECUTED;
+            case NOT_FOUND -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_NOT_FOUND;
+            case OFFER_INVALID -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_OFFER_INVALID;
+            case DUPLICATE_REQUEST -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_DUPLICATE_REQUEST;
+        };
+        var response = ConfirmTradeResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_CONFIRM_TRADE_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        if (statusBefore.isEmpty()) {
+            return;
+        }
+        long counterpartId = statusBefore.get().counterpartCharacterId();
+        if (result == TradeFacade.ConfirmResult.EXECUTED) {
+            var event = TradeClosedEvent.newBuilder()
+                    .setSessionId(command.getSessionId())
+                    .setReason(TradeCloseReason.TRADE_CLOSE_REASON_EXECUTED)
+                    .build();
+            worldGateway.registry().sendToCharacterIfOnline(
+                    counterpartId, Opcode.OPCODE_TRADE_CLOSED_EVENT_VALUE, 0, event.toByteArray());
+        } else if (result == TradeFacade.ConfirmResult.OK || result == TradeFacade.ConfirmResult.OFFER_INVALID) {
+            var event = TradeUpdatedEvent.newBuilder().setSessionId(command.getSessionId()).build();
+            worldGateway.registry().sendToCharacterIfOnline(
+                    counterpartId, Opcode.OPCODE_TRADE_UPDATED_EVENT_VALUE, 0, event.toByteArray());
+        }
+    }
+
+    /** Đẩy {@code TradeUpdatedEvent} cho đối phương của {@code characterId} trong phiên hiện tại. */
+    private void notifyCounterpart(long characterId, long sessionId) {
+        var status = tradeFacade.getStatus(characterId);
+        if (status.isEmpty()) {
+            return;
+        }
+        var event = TradeUpdatedEvent.newBuilder().setSessionId(sessionId).build();
+        worldGateway.registry().sendToCharacterIfOnline(
+                status.get().counterpartCharacterId(), Opcode.OPCODE_TRADE_UPDATED_EVENT_VALUE, 0,
+                event.toByteArray());
+    }
+
+    private void handleGetTradeStatusRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        GetTradeStatusRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleGetTradeStatusBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleGetTradeStatusBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        var statusOpt = tradeFacade.getStatus(characterId);
+        var responseBuilder = GetTradeStatusResponse.newBuilder().setInTrade(statusOpt.isPresent());
+        statusOpt.ifPresent(status -> {
+            var counterpartName =
+                    characterFacade.findById(status.counterpartCharacterId()).map(Character::name).orElse("");
+            responseBuilder
+                    .setSessionId(status.sessionId())
+                    .setPhase(status.phase() == TradeFacade.TradePhase.PENDING_ACCEPT
+                            ? TradePhase.TRADE_PHASE_PENDING_ACCEPT
+                            : TradePhase.TRADE_PHASE_OPEN)
+                    .setCounterpartCharacterId(status.counterpartCharacterId())
+                    .setCounterpartName(counterpartName)
+                    .setIsRequester(status.isRequester())
+                    .setMyGoldOffer(status.myGoldOffer())
+                    .setTheirGoldOffer(status.theirGoldOffer())
+                    .setMyConfirmed(status.myConfirmed())
+                    .setTheirConfirmed(status.theirConfirmed());
+            for (var item : status.myItems()) {
+                responseBuilder.addMyItems(toProtoOfferItemView(item));
+            }
+            for (var item : status.theirItems()) {
+                responseBuilder.addTheirItems(toProtoOfferItemView(item));
+            }
+        });
+        send(ctx, Opcode.OPCODE_GET_TRADE_STATUS_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+    }
+
+    private static TradeOfferItemView toProtoOfferItemView(TradeFacade.OfferItemView item) {
+        return TradeOfferItemView.newBuilder()
+                .setItemId(item.itemId())
+                .setItemTemplateId(item.itemTemplateId())
+                .setQuantity(item.quantity())
+                .setEnhanceLevel(item.enhanceLevel())
+                .build();
     }
 
     private void handleSendMailCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)

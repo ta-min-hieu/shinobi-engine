@@ -1,0 +1,161 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// Packet Trade (NETWORK.md §4, dải 1400-1499). Phase 7 lát cắt 3 — "hệ thống nguy hiểm nhất"
+// (GAMEPLAY.md §8). KHÔNG khoá item lúc chào — xác thực lại TOÀN BỘ ngay lúc thi hành
+// (ConfirmTradeCommand khi cả 2 bên đã confirm), xem feature-trade/CLAUDE.md.
+
+// target_name (không phải ID) — server-gateway tự tra CharacterFacade.findByName TRƯỚC khi gọi
+// TradeFacade.requestTrade, cùng lý do SendFriendRequestCommand ở friend.proto.
+message RequestTradeCommand {
+  string target_name = 1;
+}
+
+enum RequestTradeOutcome {
+  REQUEST_TRADE_OUTCOME_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho kết quả thật.
+  REQUEST_TRADE_OUTCOME_OK = 1;
+  REQUEST_TRADE_OUTCOME_CANNOT_TRADE_SELF = 2;
+  REQUEST_TRADE_OUTCOME_ALREADY_IN_TRADE = 3;
+  REQUEST_TRADE_OUTCOME_TARGET_ALREADY_IN_TRADE = 4;
+  REQUEST_TRADE_OUTCOME_TARGET_NOT_FOUND = 5; // tên không tồn tại (character)
+}
+
+message RequestTradeResponse {
+  RequestTradeOutcome outcome = 1;
+  int64 session_id = 2; // chỉ có ý nghĩa khi outcome = OK
+}
+
+message AcceptTradeRequestCommand {
+  int64 session_id = 1;
+}
+
+enum AcceptTradeRequestOutcome {
+  ACCEPT_TRADE_REQUEST_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  ACCEPT_TRADE_REQUEST_OUTCOME_OK = 1;
+  ACCEPT_TRADE_REQUEST_OUTCOME_NOT_FOUND = 2;
+}
+
+message AcceptTradeRequestResponse {
+  AcceptTradeRequestOutcome outcome = 1;
+}
+
+// Dùng chung cho CẢ từ chối (còn PENDING_ACCEPT) lẫn huỷ giữa chừng (đang OPEN) — xem
+// feature-trade/CLAUDE.md, không có DisbandTrade/kick riêng vì trade luôn đúng 2 người.
+message CancelTradeCommand {
+  int64 session_id = 1;
+}
+
+enum CancelTradeOutcome {
+  CANCEL_TRADE_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  CANCEL_TRADE_OUTCOME_OK = 1;
+  CANCEL_TRADE_OUTCOME_NOT_FOUND = 2;
+}
+
+message CancelTradeResponse {
+  CancelTradeOutcome outcome = 1;
+}
+
+message TradeOfferItemInput {
+  int64 item_id = 1; // inventory_item.id THẬT — server tự xác thực sở hữu lúc THI HÀNH, không lúc chào.
+  int32 quantity = 2;
+}
+
+// Đặt lại TOÀN BỘ lời chào của MÌNH (gold + item) — thay hẳn lời chào cũ, KHÔNG cộng dồn. Sửa lời
+// chào SAU KHI đối phương đã confirm sẽ reset CẢ 2 cờ confirmed (chống lừa đảo, GAMEPLAY.md §8).
+message SetTradeOfferCommand {
+  int64 session_id = 1;
+  int64 gold_amount = 2;
+  repeated TradeOfferItemInput items = 3;
+}
+
+enum SetTradeOfferOutcome {
+  SET_TRADE_OFFER_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  SET_TRADE_OFFER_OUTCOME_OK = 1;
+  SET_TRADE_OFFER_OUTCOME_NOT_FOUND = 2;
+}
+
+message SetTradeOfferResponse {
+  SetTradeOfferOutcome outcome = 1;
+}
+
+// idempotency_key (ADR-025) — Command DUY NHẤT ở feature-trade có thể kích hoạt hiệu ứng thật
+// (chuyển gold/item, khi CẢ 2 bên đã confirm). UUID v4 client tự sinh, giữ nguyên khi tự retry.
+message ConfirmTradeCommand {
+  int64 session_id = 1;
+  string idempotency_key = 2;
+}
+
+enum ConfirmTradeOutcome {
+  CONFIRM_TRADE_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  CONFIRM_TRADE_OUTCOME_OK = 1; // đã confirm, đang chờ đối phương
+  CONFIRM_TRADE_OUTCOME_EXECUTED = 2; // cả 2 đã confirm, giao dịch đã thi hành xong
+  CONFIRM_TRADE_OUTCOME_NOT_FOUND = 3;
+  CONFIRM_TRADE_OUTCOME_OFFER_INVALID = 4; // xác thực lại lúc thi hành thất bại (item/gold không còn đủ)
+  CONFIRM_TRADE_OUTCOME_DUPLICATE_REQUEST = 5; // ADR-025: idempotency_key đã dùng trước đó
+}
+
+message ConfirmTradeResponse {
+  ConfirmTradeOutcome outcome = 1;
+}
+
+message GetTradeStatusRequest {
+}
+
+enum TradePhase {
+  TRADE_PHASE_UNSPECIFIED = 0; // KHÔNG dùng cho trạng thái thật.
+  TRADE_PHASE_PENDING_ACCEPT = 1;
+  TRADE_PHASE_OPEN = 2;
+}
+
+// itemTemplateId=0/enhanceLevel=0 nếu item đã bị bán/gửi/xoá giữa chừng (tham chiếu mềm, xem
+// feature-trade/CLAUDE.md).
+message TradeOfferItemView {
+  int64 item_id = 1;
+  int64 item_template_id = 2;
+  int32 quantity = 3;
+  int32 enhance_level = 4;
+}
+
+message GetTradeStatusResponse {
+  bool in_trade = 1;
+  int64 session_id = 2; // chỉ có ý nghĩa khi in_trade = true
+  TradePhase phase = 3;
+  int64 counterpart_character_id = 4;
+  string counterpart_name = 5;
+  bool is_requester = 6;
+  int64 my_gold_offer = 7;
+  repeated TradeOfferItemView my_items = 8;
+  int64 their_gold_offer = 9;
+  repeated TradeOfferItemView their_items = 10;
+  bool my_confirmed = 11;
+  bool their_confirmed = 12;
+}
+
+// Đẩy cho target khi có yêu cầu trade mới — client tự quyết định hỏi Accept/Cancel.
+message TradeRequestedEvent {
+  int64 session_id = 1;
+  int64 from_character_id = 2;
+  string from_name = 3;
+}
+
+// Đẩy cho ĐỐI PHƯƠNG khi phiên trade đổi trạng thái (accept/đổi lời chào/1 bên confirm) — client
+// tự gọi lại GetTradeStatusRequest để lấy trạng thái mới nhất, KHÔNG mang state đầy đủ trong event.
+message TradeUpdatedEvent {
+  int64 session_id = 1;
+}
+
+enum TradeCloseReason {
+  TRADE_CLOSE_REASON_UNSPECIFIED = 0; // KHÔNG dùng cho lý do thật.
+  TRADE_CLOSE_REASON_CANCELLED = 1;
+  TRADE_CLOSE_REASON_EXECUTED = 2;
+}
+
+// Đẩy cho ĐỐI PHƯƠNG khi phiên trade kết thúc (huỷ/từ chối/thi hành xong) — client đóng cửa sổ trade.
+message TradeClosedEvent {
+  int64 session_id = 1;
+  TradeCloseReason reason = 2;
+}

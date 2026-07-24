@@ -218,15 +218,20 @@ cộng gold — cộng gold không có nhánh thất bại nên không cần rol
 
 ⚠️ **Hệ thống nguy hiểm nhất của MMORPG.** Mọi lỗi ở đây = duplicate item = phá kinh tế server.
 
-| Yêu cầu | Vì sao |
-|---|---|
-| **Transaction** cho toàn bộ giao dịch | Mất một nửa = mất item |
-| **Audit log** mọi giao dịch | Điều tra gian lận |
-| **Cả hai bên xác nhận** (2-phase confirm) | Chống lừa đảo |
-| **Khoá item khi đang trade** | Chống trade cùng item cho 2 người |
-| **Idempotency** | Chống retry duplicate ([NETWORK.md §5](NETWORK.md)) |
+| Yêu cầu | Vì sao | Cách đạt được (✅ Đã code 2026-07-24, Phase 7 lát cắt 3) |
+|---|---|---|
+| **Transaction** cho toàn bộ giao dịch | Mất một nửa = mất item | `ConfirmTradeUseCase` — 1 transaction duy nhất chuyển CẢ gold lẫn item 2 chiều |
+| **Audit log** mọi giao dịch | Điều tra gian lận | `TRADE_EXECUTED` ghi cho CẢ 2 bên trong CÙNG transaction |
+| **Cả hai bên xác nhận** (2-phase confirm) | Chống lừa đảo | Sửa lời chào (`SetTradeOfferCommand`) SAU KHI 1 bên đã confirm sẽ reset CẢ 2 cờ confirmed |
+| **Khoá item khi đang trade** | Chống trade cùng item cho 2 người | KHÔNG khoá lúc chào — xác thực lại TOÀN BỘ (khoá dòng FOR UPDATE + kiểm sở hữu/số lượng) NGAY LÚC THI HÀNH, cùng đạt mục đích "không bao giờ duplicate" với ít blast radius hơn (không đụng feature-inventory/feature-shop đã xong) |
+| **Idempotency** | Chống retry duplicate ([NETWORK.md §5](NETWORK.md)) | `ConfirmTradeCommand.idempotency_key` (ADR-025), bảng `idempotency_key` dùng chung |
 
-**Post-MVP**, nhưng ghi ở đây vì thiết kế inventory (§7) phải **chừa chỗ** cho khoá item.
+Chi tiết đầy đủ + lý do từng quyết định (kể cả tách stack cho phép, không escrow gold/item lúc
+chào, `trade_offer_item.item_id` cố tình KHÔNG có FK): `feature-trade/CLAUDE.md`.
+
+⚠️ **Phát hiện lúc code (2026-07-24)**: ADR-025 nêu tên `BuyItemCommand`/`SellItemCommand`/
+`ClaimMailCommand` cần `idempotencyKey` nhưng chỉ `CreateCharacterCommand` thật sự có — đã vá cả
+3 Command này trong cùng đợt (xem commit "ADR-025 retrofit").
 
 ---
 

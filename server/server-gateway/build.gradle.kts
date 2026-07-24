@@ -20,6 +20,7 @@ dependencies {
     implementation(project(":server:server-features:feature-chat"))
     implementation(project(":server:server-features:feature-guild"))
     implementation(project(":server:server-features:feature-party"))
+    implementation(project(":server:server-features:feature-trade"))
     implementation(project(":server:server-world"))
     implementation(project(":server:server-database"))
     implementation(project(":engine:engine-scripting"))

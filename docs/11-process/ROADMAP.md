@@ -245,7 +245,7 @@ graph LR
 |---|---|
 | ✅ `feature-guild` lát cắt 1 (2026-07-24 — thành viên: tạo/xin gia nhập/leader duyệt-từ chối/rời/kick/giải tán + kênh chat Bang hội, chơi được thật qua socket + Postgres thật) | Kho bang, nhiệm vụ bang dời lát cắt sau |
 | ✅ `feature-party` lát cắt 2 (2026-07-24 — thành viên: tạo/mời/chấp nhận-từ chối/rời (tự động chuyển leader)/kick + kênh chat Party, sức chứa tối đa 5, chơi được thật qua socket + Postgres thật) | Chia EXP dời tới khi Combat/Character có cơ chế cấp EXP từ giết quái thật (chưa tồn tại, phát hiện lúc lát cắt này) |
-| ⚠️ **Trade** | [GAMEPLAY.md §8](../05-server/GAMEPLAY.md) — **hệ thống nguy hiểm nhất**: transaction + audit + 2-phase confirm + khoá item + idempotency |
+| ✅ `feature-trade` lát cắt 3 (2026-07-24 — yêu cầu trade/chấp nhận/huỷ/đặt lời chào (gold+item, cho phép tách stack)/xác nhận 2 chiều, chơi được thật qua socket + Postgres thật — verify cả rollback gold+item khi item bị bán mất giữa chừng) | [GAMEPLAY.md §8](../05-server/GAMEPLAY.md) — **hệ thống nguy hiểm nhất**: transaction + audit + 2-phase confirm + xác thực lại lúc thi hành (thay khoá lúc chào) + idempotency |
 
 **Quyết định lát cắt 1 (2026-07-24, cùng chủ dự án qua `AskUserQuestion` trước khi code)**: thứ tự
 Guild → Party → Trade (Trade nguy hiểm nhất, hoãn tới khi có kinh nghiệm 2-phase confirm từ hệ
@@ -262,6 +262,15 @@ progression trước, ngoài phạm vi lát cắt này; leader rời **tự đ�
 (khác guild phải giải tán). Chi tiết đầy đủ: feature-party/CLAUDE.md.
 
 ⚠️ **Không mở Trade nếu ADR-025 (idempotency) chưa Accepted.** (✅ Đã Accepted 2026-07-19 — điều kiện thoả, nhưng vẫn phải triển khai `idempotencyKey` thật trước khi Trade thật sự mở, không phải chỉ cần ADR tồn tại.)
+
+**Quyết định lát cắt 3 (2026-07-24, cùng chủ dự án qua `AskUserQuestion` trước khi code)**: (1)
+"khoá item khi đang trade" đạt được bằng **xác thực lại toàn bộ ngay lúc thi hành** (khoá dòng FOR
+UPDATE + kiểm sở hữu/số lượng/gold trong `ConfirmTradeUseCase`), KHÔNG thêm cột `locked` hay sửa
+feature-inventory/feature-shop — cùng đảm bảo không bao giờ duplicate với blast radius nhỏ hơn
+nhiều; (2) **cho phép tách stack** (chào 1 phần số lượng của 1 dòng inventory_item); (3) tranh thủ
+vá luôn lỗ hổng `idempotencyKey` còn thiếu ở `BuyItemCommand`/`SellItemCommand`/`ClaimMailCommand`
+(phát hiện khi rà ADR-025 trước lúc code Trade) trong cùng đợt. **Phase 7 đóng — cả 3 hệ thống
+(Guild/Party/Trade) đã hoàn thành.** Chi tiết đầy đủ: feature-trade/CLAUDE.md.
 
 ---
 

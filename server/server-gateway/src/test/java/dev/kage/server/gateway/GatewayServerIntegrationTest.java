@@ -135,13 +135,15 @@ class GatewayServerIntegrationTest {
         var chatFacade = fakeChatFacade();
         var guildFacade = fakeGuildFacade();
         var partyFacade = fakePartyFacade();
+        var tradeFacade = fakeTradeFacade();
         characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
         worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
         var positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
-        var socialFacades = new SocialFacades(friendFacade, mailFacade, chatFacade, guildFacade, partyFacade);
+        var socialFacades =
+                new SocialFacades(friendFacade, mailFacade, chatFacade, guildFacade, partyFacade, tradeFacade);
         var contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
         var facades = new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
         server = new GatewayServer(0, facades, worldGateway);
@@ -647,6 +649,92 @@ class GatewayServerIntegrationTest {
                 new dev.kage.party.application.ListPendingPartyInvitesUseCase(partyPort),
                 new dev.kage.party.application.FindMyPartyUseCase(partyPort));
         return new dev.kage.party.api.PartyFacade(useCases);
+    }
+
+    // Trade không dùng trong test này — fake tối thiểu để compile (cùng convention fakePartyFacade).
+    private dev.kage.trade.api.TradeFacade fakeTradeFacade() {
+        dev.kage.trade.domain.TradeSessionPort sessionPort = new dev.kage.trade.domain.TradeSessionPort() {
+            @Override
+            public Optional<dev.kage.trade.domain.TradeSession> findActiveSessionOfCharacter(long characterId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public dev.kage.trade.domain.TradeSession createRequest(long requesterCharacterId, long targetCharacterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public boolean acceptRequest(long sessionId, long characterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public boolean deleteSessionIfParticipant(long sessionId, long characterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public boolean replaceOffer(long sessionId, long characterId, long goldAmount,
+                    List<dev.kage.trade.domain.OfferedItemInput> items) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public Optional<dev.kage.trade.domain.TradeSessionSnapshot> findSnapshot(long sessionId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public Optional<dev.kage.trade.domain.TradeSessionSnapshot> lockForExecution(
+                    dev.kage.trade.domain.Transaction tx, long sessionId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public void setConfirmed(dev.kage.trade.domain.Transaction tx, long sessionId, long characterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public void deleteSession(dev.kage.trade.domain.Transaction tx, long sessionId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+        };
+        dev.kage.trade.domain.TradeInventoryPort inventoryPort = new dev.kage.trade.domain.TradeInventoryPort() {
+            @Override
+            public Optional<dev.kage.trade.domain.OwnedItemSnapshot> findItemById(long itemId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public TransferOutcome transferItem(dev.kage.trade.domain.Transaction tx, TransferRequest request) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+        };
+        dev.kage.trade.domain.TradeGoldPort goldPort = new dev.kage.trade.domain.TradeGoldPort() {
+            @Override
+            public boolean deductGold(dev.kage.trade.domain.Transaction tx, long characterId, long amount) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public void creditGold(dev.kage.trade.domain.Transaction tx, long characterId, long amount) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+        };
+        dev.kage.trade.domain.TradeAuditPort auditPort = (tx, characterId, action, detailJson) -> { };
+        dev.kage.trade.domain.IdempotencyPort idempotencyPort = (tx, idempotencyKey) -> { };
+        var ports = new dev.kage.trade.application.TradePorts(
+                sessionPort, inventoryPort, goldPort, auditPort, idempotencyPort);
+        var useCases = new dev.kage.trade.application.TradeUseCases(
+                new dev.kage.trade.application.RequestTradeUseCase(sessionPort),
+                new dev.kage.trade.application.AcceptTradeRequestUseCase(sessionPort),
+                new dev.kage.trade.application.CancelTradeUseCase(sessionPort),
+                new dev.kage.trade.application.SetTradeOfferUseCase(sessionPort),
+                new dev.kage.trade.application.ConfirmTradeUseCase(ports, action -> action.accept(null)),
+                new dev.kage.trade.application.GetTradeStatusUseCase(sessionPort, inventoryPort));
+        return new dev.kage.trade.api.TradeFacade(useCases);
     }
 
     @AfterEach

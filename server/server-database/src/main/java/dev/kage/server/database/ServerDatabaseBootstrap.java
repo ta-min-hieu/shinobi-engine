@@ -51,6 +51,15 @@ import dev.kage.party.application.ListPartyMembersUseCase;
 import dev.kage.party.application.ListPendingPartyInvitesUseCase;
 import dev.kage.party.application.PartyUseCases;
 import dev.kage.party.application.RejectPartyInviteUseCase;
+import dev.kage.trade.api.TradeFacade;
+import dev.kage.trade.application.AcceptTradeRequestUseCase;
+import dev.kage.trade.application.CancelTradeUseCase;
+import dev.kage.trade.application.ConfirmTradeUseCase;
+import dev.kage.trade.application.GetTradeStatusUseCase;
+import dev.kage.trade.application.RequestTradeUseCase;
+import dev.kage.trade.application.SetTradeOfferUseCase;
+import dev.kage.trade.application.TradePorts;
+import dev.kage.trade.application.TradeUseCases;
 import dev.kage.mail.application.ClaimMailUseCase;
 import dev.kage.mail.application.DeleteMailUseCase;
 import dev.kage.mail.application.ListMailUseCase;
@@ -70,6 +79,12 @@ import dev.kage.server.database.dialogue.PostgresNpcTemplateAdapter;
 import dev.kage.server.database.friend.PostgresFriendAdapter;
 import dev.kage.server.database.guild.PostgresGuildAdapter;
 import dev.kage.server.database.party.PostgresPartyAdapter;
+import dev.kage.server.database.trade.JdbcTradeTransactionRunner;
+import dev.kage.server.database.trade.PostgresTradeAuditAdapter;
+import dev.kage.server.database.trade.PostgresTradeGoldAdapter;
+import dev.kage.server.database.trade.PostgresTradeIdempotencyAdapter;
+import dev.kage.server.database.trade.PostgresTradeInventoryAdapter;
+import dev.kage.server.database.trade.PostgresTradeSessionAdapter;
 import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
 import dev.kage.server.database.inventory.PostgresAuditAdapter;
 import dev.kage.server.database.inventory.PostgresDropTableAdapter;
@@ -270,6 +285,24 @@ public final class ServerDatabaseBootstrap {
                 new ListPendingPartyInvitesUseCase(partyPort),
                 new FindMyPartyUseCase(partyPort));
         return new PartyFacade(useCases);
+    }
+
+    public TradeFacade wireTradeFacade() {
+        var sessionPort = new PostgresTradeSessionAdapter(dataSource);
+        var inventoryPort = new PostgresTradeInventoryAdapter(dataSource);
+        var goldPort = new PostgresTradeGoldAdapter();
+        var auditPort = new PostgresTradeAuditAdapter();
+        var idempotencyPort = new PostgresTradeIdempotencyAdapter();
+        var transactionRunner = new JdbcTradeTransactionRunner(dataSource);
+        var ports = new TradePorts(sessionPort, inventoryPort, goldPort, auditPort, idempotencyPort);
+        var useCases = new TradeUseCases(
+                new RequestTradeUseCase(sessionPort),
+                new AcceptTradeRequestUseCase(sessionPort),
+                new CancelTradeUseCase(sessionPort),
+                new SetTradeOfferUseCase(sessionPort),
+                new ConfirmTradeUseCase(ports, transactionRunner),
+                new GetTradeStatusUseCase(sessionPort, inventoryPort));
+        return new TradeFacade(useCases);
     }
 
     public ChatFacade wireChatFacade() {

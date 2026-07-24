@@ -32,17 +32,7 @@ public final class GatewayBootstrap {
 
     public static void main(String[] args) throws InterruptedException {
         var databaseBootstrap = new ServerDatabaseBootstrap();
-        var accountFacade = databaseBootstrap.wireAccountFacade();
-        var characterFacade = databaseBootstrap.wireCharacterFacade();
-        var inventoryFacade = databaseBootstrap.wireInventoryFacade();
-        var shopFacade = databaseBootstrap.wireShopFacade();
-        var dialogueFacade = databaseBootstrap.wireDialogueFacade();
-        var questFacade = databaseBootstrap.wireQuestFacade();
-        var friendFacade = databaseBootstrap.wireFriendFacade();
-        var mailFacade = databaseBootstrap.wireMailFacade();
-        var chatFacade = databaseBootstrap.wireChatFacade();
-        var guildFacade = databaseBootstrap.wireGuildFacade();
-        var partyFacade = databaseBootstrap.wirePartyFacade();
+        var facades = wireFacades(databaseBootstrap);
 
         // SCRIPTING.md §8 — fail fast lúc khởi động, KHÔNG đợi người chơi phát hiện lỗi cú pháp
         // script. Gom script_ref từ DB (quest/dialogue) + hằng số Java (skill, chưa DB-driven).
@@ -53,17 +43,15 @@ public final class GatewayBootstrap {
 
         // characterRegistry là WorldOutboundSink thật — PHẢI tồn tại trước WorldFacade vì
         // WorldFacade cần sink lúc construct (SERVER.md §2: kết quả tick đi qua outbound queue).
-        var characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
+        var characterRegistry =
+                new ConnectedCharacterRegistry(facades.inventoryFacade(), facades.contentFacades().questFacade());
         var worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
         var positionPersister =
-                new CharacterPositionPersister(characterFacade, characterRegistry, POSITION_SAVE_INTERVAL);
+                new CharacterPositionPersister(facades.characterFacade(), characterRegistry, POSITION_SAVE_INTERVAL);
         positionPersister.start();
         var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
 
-        var socialFacades = new SocialFacades(friendFacade, mailFacade, chatFacade, guildFacade, partyFacade);
-        var contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
-        var facades = new GatewayFacades(accountFacade, characterFacade, inventoryFacade, contentFacades);
         var server = new GatewayServer(PORT, facades, worldGateway);
         server.start();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -78,5 +66,26 @@ public final class GatewayBootstrap {
             databaseBootstrap.shutdown();
         }, "gateway-shutdown"));
         server.awaitTermination();
+    }
+
+    /** Tách khỏi {@code main()} để giữ dưới giới hạn Checkstyle MethodLength — càng thêm facade, dòng càng dài. */
+    private static GatewayFacades wireFacades(ServerDatabaseBootstrap databaseBootstrap) {
+        var accountFacade = databaseBootstrap.wireAccountFacade();
+        var characterFacade = databaseBootstrap.wireCharacterFacade();
+        var inventoryFacade = databaseBootstrap.wireInventoryFacade();
+        var shopFacade = databaseBootstrap.wireShopFacade();
+        var dialogueFacade = databaseBootstrap.wireDialogueFacade();
+        var questFacade = databaseBootstrap.wireQuestFacade();
+        var friendFacade = databaseBootstrap.wireFriendFacade();
+        var mailFacade = databaseBootstrap.wireMailFacade();
+        var chatFacade = databaseBootstrap.wireChatFacade();
+        var guildFacade = databaseBootstrap.wireGuildFacade();
+        var partyFacade = databaseBootstrap.wirePartyFacade();
+        var tradeFacade = databaseBootstrap.wireTradeFacade();
+
+        var socialFacades =
+                new SocialFacades(friendFacade, mailFacade, chatFacade, guildFacade, partyFacade, tradeFacade);
+        var contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
+        return new GatewayFacades(accountFacade, characterFacade, inventoryFacade, contentFacades);
     }
 }
