@@ -118,7 +118,7 @@ Engine scripting đã chốt: [ADR-016](../01-architecture/adr/ADR-016-Scripting
 | Dungeon instance | Mỗi party 1 instance riêng | Post-MVP |
 | World Boss | Toàn server, damage ranking | Post-MVP |
 
-⚠️ **Dungeon instance là quyết định kiến trúc chưa giải quyết**: mỗi instance là một "world" riêng trong cùng process, hay process riêng? Ảnh hưởng [ARCHITECTURE.md §14](../01-architecture/ARCHITECTURE.md) scaling. Cần ADR khi tới Phase 8.
+✅ **Dungeon instance model đã chốt** ([ADR-026](../01-architecture/adr/ADR-026-Dungeon-Instance-Model.md), Accepted 2026-07-24): cùng process, mỗi instance là 1 World/ECS riêng trong cùng JVM — không phải OS process riêng. Khớp Bước 0 của [ARCHITECTURE.md §14](../01-architecture/ARCHITECTURE.md) (chưa scale ngang khi chưa có số liệu).
 
 ---
 
@@ -465,7 +465,7 @@ Chi tiết: [SECURITY.md](../08-security/SECURITY.md). Ở tầng gameplay:
 | 7 | Inventory phải **chừa chỗ khoá item** cho trade sau này | Thêm sau = refactor lớn | Accepted |
 | 8 | Quest index theo loại sự kiện, không quét tuyến tính | Hiệu năng | Accepted — đo Phase 6 |
 | 9 | Công thức damage đã chốt (GDD §5-6): giảm giáp/kháng kiểu LMHT (diminishing returns) + `DEF`/`RES` tách vật lý/phép | Là quyết định game design | Accepted (placeholder, playtest) |
-| 10 | Dungeon instance: cùng process hay riêng? | Ảnh hưởng scaling | ⏳ Chặn Phase 8 |
+| 10 | Dungeon instance: cùng process, World riêng trong 1 JVM | Ảnh hưởng scaling | Accepted (ADR-026) |
 | 11 | Chống bot: **ngoài scope MVP** | Trung thực về giới hạn | Accepted |
 
 ## ADR cần tạo
@@ -473,7 +473,7 @@ Chi tiết: [SECURITY.md](../08-security/SECURITY.md). Ở tầng gameplay:
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
 | **ADR-025** | Idempotency — chặn §8 trade | ✅ Accepted |
-| **ADR-026** | Dungeon instance model (§6) | 🟢 Chặn Phase 8 |
+| **ADR-026** | Dungeon instance model (§6) | ✅ Accepted |
 
 ## Tài liệu liên quan
 

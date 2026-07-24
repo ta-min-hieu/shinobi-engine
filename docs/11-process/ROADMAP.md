@@ -278,10 +278,12 @@ vá luôn lỗ hổng `idempotencyKey` còn thiếu ở `BuyItemCommand`/`SellIt
 
 | Việc | Nguồn |
 |---|---|
-| Dungeon instance | ⏳ **ADR-026** — cùng process hay riêng? |
+| Dungeon instance | ✅ **ADR-026** Accepted 2026-07-24 — cùng process, World riêng trong 1 JVM ([ADR-026](../01-architecture/adr/ADR-026-Dungeon-Instance-Model.md)) |
 | Boss AI (Behavior Tree / Script) | [AI.md §4](../03-engine/AI.md) |
 | PvP arena + battlefield | [GDD](../13-game-design/GAME-DESIGN-DOCUMENT.md) |
 | 4 hệ phái còn lại | — |
+
+**ADR cần trước Phase 8**: ✅ ADR-026 Accepted 2026-07-24 — Phase 8 đủ điều kiện mở.
 
 ---
 
@@ -355,7 +357,7 @@ Closed Beta → Open Beta → Release Candidate → Production → Hotfix
 
 ## ADR cần tạo
 
-Xem [ADR Index](../01-architecture/adr/README.md) — **12 ADR Accepted** (gồm 010/012/018 chốt 2026-07-18); **14 đang chờ** (011, 013–017, 019–026).
+Xem [ADR Index](../01-architecture/adr/README.md) — **16 ADR Accepted** (gồm 010/012/018 chốt 2026-07-18, ADR-026 chốt 2026-07-24); **10 đang chờ** (007, 011 Proposed; 014–015, 019–024 chưa viết).
 
 ## Tài liệu liên quan
 
@@ -369,4 +371,5 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **12 ADR Accepted** (gồm
 1. ✅ 3 ADR chặn Phase 0 đã chốt (010/012/018). **Có thể mở Phase 0.**
 2. Đầu Phase 0: chốt/triển khai **ADR-011** (ArchUnit) như hạng mục kỹ thuật.
 3. ✅ **GDD đã bổ sung công thức damage** (2026-07-19) — Phase 4 hết bị chặn về mặt game design.
-4. Trả lời các câu hỏi mở còn lại ở [docs/README.md](../README.md).
+4. ✅ **ADR-026 Accepted** (2026-07-24) — dungeon instance model chốt (cùng process, World riêng). **Phase 8 đủ điều kiện mở.**
+5. Trả lời các câu hỏi mở còn lại ở [docs/README.md](../README.md).

@@ -126,6 +126,12 @@ Toàn bộ 4 ADR chặn Phase 3 đã Accepted — **Phase 3 đủ điều kiện
 |---|---|
 | **GraalJS** làm scripting engine (chạy trên Temurin JDK 25 hiện có, không đổi ADR-001) | ✅ [ADR-016](01-architecture/adr/ADR-016-Scripting-Engine.md) |
 
+### ✅ Đã chốt (2026-07-24) — không còn chặn Phase 8
+
+| Quyết định | ADR |
+|---|---|
+| **Dungeon instance model**: cùng process, World riêng trong 1 JVM (không phải OS process riêng) | ✅ [ADR-026](01-architecture/adr/ADR-026-Dungeon-Instance-Model.md) |
+
 ### 🟡 Chặn Phase sau
 
 | # | Quyết định | ADR |
@@ -137,7 +143,6 @@ Toàn bộ 4 ADR chặn Phase 3 đã Accepted — **Phase 3 đủ điều kiện
 | 11 | Kubernetes hay Docker Compose | ADR-014 |
 | 12 | Chọn GC (ZGC khuyến nghị) | ADR-019 |
 | 13 | Phạm vi Plugin (hoặc bỏ hẳn) | ADR-007 |
-| 14 | Dungeon instance model | ADR-026 |
 | 15 | Asset distribution / CDN | ADR-024 |
 | 16 | i18n: có tiếng Anh ở MVP không | — |
 | 17 | Mô hình kinh doanh | — |

@@ -48,6 +48,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-017](ADR-017-Auth-Token.md) | Auth token: session token tự phát hành + Redis | ✅ Accepted | — |
 | [ADR-018](ADR-018-Tick-Rate.md) | Tick rate **60Hz** | ✅ Accepted | — |
 | [ADR-025](ADR-025-Idempotency.md) | Idempotency cho Command có side-effect | ✅ Accepted | — |
+| [ADR-026](ADR-026-Dungeon-Instance-Model.md) | Dungeon instance model: cùng process, World riêng trong 1 JVM | ✅ Accepted | — |
 
 ---
 
@@ -65,9 +66,8 @@ Tổng hợp từ toàn bộ tài liệu. **Không code chạm các vùng này k
 | **ADR-022** | gdx-ai hay tự viết FSM/pathfinding | 🟡 Trung bình | Phase 2 | [AI.md §5](../../03-engine/AI.md) |
 | **ADR-023** | Mobile input scheme (joystick ảo / tap-to-move) | 🟡 Trung bình | Phase 2 nếu mobile-first | [CLIENT.md §5](../../04-client/CLIENT.md) |
 | **ADR-024** | Asset distribution: đóng gói / patch / CDN | 🟢 Thấp | Phase 10 | [RESOURCE.md §10](../../04-client/RESOURCE.md) |
-| **ADR-026** | Dungeon instance model (cùng process hay riêng) | 🟢 Thấp | Phase 8 | [GAMEPLAY.md §6](../../05-server/GAMEPLAY.md) |
 
-> ADR-013, ADR-017, ADR-025 đã Accepted (2026-07-19), ADR-016 đã Accepted (2026-07-20) — xem bảng "Danh sách ADR" ở trên, không còn nằm ở đây.
+> ADR-013, ADR-017, ADR-025 đã Accepted (2026-07-19), ADR-016 đã Accepted (2026-07-20), ADR-026 đã Accepted (2026-07-24) — xem bảng "Danh sách ADR" ở trên, không còn nằm ở đây.
 
 ---
 
