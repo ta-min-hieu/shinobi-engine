@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.kage.shop.domain.AuditPort;
 import dev.kage.shop.domain.GoldPort;
+import dev.kage.shop.domain.IdempotencyKeyReusedException;
+import dev.kage.shop.domain.IdempotencyPort;
 import dev.kage.shop.domain.InventoryGatewayPort;
 import dev.kage.shop.domain.OwnedItem;
 import dev.kage.shop.domain.ShopCatalogPort;
@@ -92,12 +94,30 @@ class SellItemUseCaseTest {
         }
     }
 
+    static final class FakeIdempotencyPort implements IdempotencyPort {
+        private final java.util.Set<String> usedKeys = new java.util.HashSet<>();
+
+        @Override
+        public void recordOrThrow(Transaction tx, String idempotencyKey) {
+            if (!usedKeys.add(idempotencyKey)) {
+                throw new IdempotencyKeyReusedException(idempotencyKey);
+            }
+        }
+    }
+
     private static final TransactionRunner DIRECT_TX = action -> action.accept(null);
+    private static final String IDEMPOTENCY_KEY = "key-1";
 
     private static SellItemUseCase newUseCase(
             ShopCatalogPort catalogPort, FakeInventoryGatewayPort inventoryGatewayPort, FakeGoldPort goldPort,
             FakeAuditPort auditPort) {
-        var ports = new ShopPorts(catalogPort, goldPort, inventoryGatewayPort, auditPort);
+        return newUseCase(catalogPort, inventoryGatewayPort, goldPort, auditPort, new FakeIdempotencyPort());
+    }
+
+    private static SellItemUseCase newUseCase(
+            ShopCatalogPort catalogPort, FakeInventoryGatewayPort inventoryGatewayPort, FakeGoldPort goldPort,
+            FakeAuditPort auditPort, FakeIdempotencyPort idempotencyPort) {
+        var ports = new ShopPorts(catalogPort, goldPort, inventoryGatewayPort, auditPort, idempotencyPort);
         return new SellItemUseCase(ports, DIRECT_TX);
     }
 
@@ -109,7 +129,7 @@ class SellItemUseCaseTest {
         var auditPort = new FakeAuditPort();
         var useCase = newUseCase(catalogPort, inventoryGatewayPort, goldPort, auditPort);
 
-        var result = useCase.execute(CHARACTER_ID, ITEM_ID, 1);
+        var result = useCase.execute(CHARACTER_ID, ITEM_ID, 1, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(SellItemUseCase.SellResult.ITEM_NOT_FOUND);
         assertThat(goldPort.creditCalled).isFalse();
@@ -124,7 +144,7 @@ class SellItemUseCaseTest {
         var auditPort = new FakeAuditPort();
         var useCase = newUseCase(catalogPort, inventoryGatewayPort, goldPort, auditPort);
 
-        var result = useCase.execute(CHARACTER_ID, ITEM_ID, 1);
+        var result = useCase.execute(CHARACTER_ID, ITEM_ID, 1, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(SellItemUseCase.SellResult.ITEM_NOT_SELLABLE);
         assertThat(inventoryGatewayPort.removeCalled).isFalse();
@@ -139,7 +159,7 @@ class SellItemUseCaseTest {
         var auditPort = new FakeAuditPort();
         var useCase = newUseCase(catalogPort, inventoryGatewayPort, goldPort, auditPort);
 
-        var result = useCase.execute(CHARACTER_ID, ITEM_ID, 5);
+        var result = useCase.execute(CHARACTER_ID, ITEM_ID, 5, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(SellItemUseCase.SellResult.INSUFFICIENT_QUANTITY);
         assertThat(goldPort.creditCalled).isFalse();
@@ -155,11 +175,27 @@ class SellItemUseCaseTest {
         var auditPort = new FakeAuditPort();
         var useCase = newUseCase(catalogPort, inventoryGatewayPort, goldPort, auditPort);
 
-        var result = useCase.execute(CHARACTER_ID, ITEM_ID, 3);
+        var result = useCase.execute(CHARACTER_ID, ITEM_ID, 3, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(SellItemUseCase.SellResult.OK);
         assertThat(goldPort.creditedAmount).isEqualTo(6); // 2 * 3
         assertThat(auditPort.loggedAction).isEqualTo("SHOP_SELL");
+    }
+
+    @Test
+    void shouldReturnDuplicateRequest_whenIdempotencyKeyReused() {
+        var owned = new OwnedItem(ITEM_ID, TEMPLATE_ID, 3);
+        var catalogPort = new FakeCatalogPort(new ShopListing(TEMPLATE_ID, 5, 2));
+        var inventoryGatewayPort = new FakeInventoryGatewayPort(owned, true);
+        var goldPort = new FakeGoldPort();
+        var auditPort = new FakeAuditPort();
+        var idempotencyPort = new FakeIdempotencyPort();
+        var useCase = newUseCase(catalogPort, inventoryGatewayPort, goldPort, auditPort, idempotencyPort);
+        useCase.execute(CHARACTER_ID, ITEM_ID, 1, IDEMPOTENCY_KEY);
+
+        var result = useCase.execute(CHARACTER_ID, ITEM_ID, 1, IDEMPOTENCY_KEY);
+
+        assertThat(result).isEqualTo(SellItemUseCase.SellResult.DUPLICATE_REQUEST);
     }
 
     @Test
@@ -168,7 +204,7 @@ class SellItemUseCaseTest {
         var useCase = newUseCase(
                 catalogPort, new FakeInventoryGatewayPort(null, true), new FakeGoldPort(), new FakeAuditPort());
 
-        assertThatThrownBy(() -> useCase.execute(CHARACTER_ID, ITEM_ID, 0))
+        assertThatThrownBy(() -> useCase.execute(CHARACTER_ID, ITEM_ID, 0, IDEMPOTENCY_KEY))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

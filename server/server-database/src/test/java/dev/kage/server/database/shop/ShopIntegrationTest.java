@@ -158,7 +158,12 @@ class ShopIntegrationTest {
                 new PostgresShopCatalogAdapter(dataSource),
                 new PostgresShopGoldAdapter(),
                 new PostgresShopInventoryGatewayAdapter(dataSource),
-                new PostgresShopAuditAdapter());
+                new PostgresShopAuditAdapter(),
+                new PostgresShopIdempotencyAdapter());
+    }
+
+    private static String newIdempotencyKey() {
+        return UUID.randomUUID().toString();
     }
 
     private static BuyItemUseCase newBuyUseCase() {
@@ -174,7 +179,7 @@ class ShopIntegrationTest {
         long characterId = createFreshCharacter("BuyRich");
         grantGold(characterId, 100);
 
-        var result = newBuyUseCase().execute(characterId, kunaiTemplateId, 2); // 2 * 5 = 10 gold
+        var result = newBuyUseCase().execute(characterId, kunaiTemplateId, 2, newIdempotencyKey()); // 2*5=10 gold
 
         assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.OK);
         assertThat(readGold(characterId)).isEqualTo(90);
@@ -186,7 +191,7 @@ class ShopIntegrationTest {
         long characterId = createFreshCharacter("BuyPoor");
         grantGold(characterId, 1);
 
-        var result = newBuyUseCase().execute(characterId, kunaiTemplateId, 2); // cần 10 gold
+        var result = newBuyUseCase().execute(characterId, kunaiTemplateId, 2, newIdempotencyKey()); // cần 10 gold
 
         assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.INSUFFICIENT_GOLD);
         assertThat(readGold(characterId)).isEqualTo(1); // không đổi
@@ -198,7 +203,7 @@ class ShopIntegrationTest {
         long characterId = createFreshCharacter("BuyUnknown");
         grantGold(characterId, 1_000_000);
 
-        var result = newBuyUseCase().execute(characterId, 999_999L, 1);
+        var result = newBuyUseCase().execute(characterId, 999_999L, 1, newIdempotencyKey());
 
         assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.ITEM_NOT_IN_SHOP);
         assertThat(readGold(characterId)).isEqualTo(1_000_000); // không đổi
@@ -210,7 +215,7 @@ class ShopIntegrationTest {
         fillInventoryToCapacity(characterId);
         grantGold(characterId, 1_000_000);
 
-        var result = newBuyUseCase().execute(characterId, kunaiTemplateId, 1);
+        var result = newBuyUseCase().execute(characterId, kunaiTemplateId, 1, newIdempotencyKey());
 
         assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.INVENTORY_FULL);
         // KHÔNG được "trừ tiền nhưng không nhận item" (DATABASE.md §5) — rollback toàn bộ.
@@ -224,7 +229,7 @@ class ShopIntegrationTest {
         long itemId = persistOneItem(characterId, kunaiTemplateId, 3);
         grantGold(characterId, 0);
 
-        var result = newSellUseCase().execute(characterId, itemId, 3); // 3 * 2 = 6 gold
+        var result = newSellUseCase().execute(characterId, itemId, 3, newIdempotencyKey()); // 3*2=6 gold
 
         assertThat(result).isEqualTo(SellItemUseCase.SellResult.OK);
         assertThat(readGold(characterId)).isEqualTo(6);
@@ -237,7 +242,7 @@ class ShopIntegrationTest {
         long itemId = persistOneItem(characterId, kunaiTemplateId, 1);
         grantGold(characterId, 0);
 
-        var result = newSellUseCase().execute(characterId, itemId, 5); // chỉ có 1
+        var result = newSellUseCase().execute(characterId, itemId, 5, newIdempotencyKey()); // chỉ có 1
 
         assertThat(result).isEqualTo(SellItemUseCase.SellResult.INSUFFICIENT_QUANTITY);
         assertThat(readGold(characterId)).isZero();
@@ -252,10 +257,38 @@ class ShopIntegrationTest {
         long unlistedTemplateId = insertUnlistedItemTemplate();
         long itemId = persistOneItem(characterId, unlistedTemplateId, 1);
 
-        var result = newSellUseCase().execute(characterId, itemId, 1);
+        var result = newSellUseCase().execute(characterId, itemId, 1, newIdempotencyKey());
 
         assertThat(result).isEqualTo(SellItemUseCase.SellResult.ITEM_NOT_SELLABLE);
         assertThat(countInventoryRows(characterId)).isEqualTo(1); // không đổi
+    }
+
+    @Test
+    void shouldRejectDuplicateBuy_whenIdempotencyKeyReused() {
+        long characterId = createFreshCharacter("BuyDupe");
+        grantGold(characterId, 100);
+        var key = newIdempotencyKey();
+        newBuyUseCase().execute(characterId, kunaiTemplateId, 1, key);
+
+        var result = newBuyUseCase().execute(characterId, kunaiTemplateId, 1, key);
+
+        assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.DUPLICATE_REQUEST);
+        assertThat(readGold(characterId)).isEqualTo(95); // chỉ trừ 1 lần (5 gold), KHÔNG lặp lại
+        assertThat(countInventoryRows(characterId)).isEqualTo(1); // KHÔNG cấp item lần 2
+    }
+
+    @Test
+    void shouldRejectDuplicateSell_whenIdempotencyKeyReused() {
+        long characterId = createFreshCharacter("SellDupe");
+        long itemId = persistOneItem(characterId, kunaiTemplateId, 5);
+        grantGold(characterId, 0);
+        var key = newIdempotencyKey();
+        newSellUseCase().execute(characterId, itemId, 1, key);
+
+        var result = newSellUseCase().execute(characterId, itemId, 1, key);
+
+        assertThat(result).isEqualTo(SellItemUseCase.SellResult.DUPLICATE_REQUEST);
+        assertThat(readGold(characterId)).isEqualTo(2); // chỉ cộng 1 lần (2 gold), KHÔNG lặp lại
     }
 
     private static long insertUnlistedItemTemplate() {

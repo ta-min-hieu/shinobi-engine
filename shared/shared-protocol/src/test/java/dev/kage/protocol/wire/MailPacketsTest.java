@@ -100,13 +100,17 @@ class MailPacketsTest {
 
     @Test
     void shouldRoundTripClaimMailCommand() throws InvalidProtocolBufferException {
-        var command = ClaimMailCommand.newBuilder().setMailId(9L).build();
+        var command = ClaimMailCommand.newBuilder()
+                .setMailId(9L)
+                .setIdempotencyKey("33333333-3333-3333-3333-333333333333")
+                .build();
         var header = new PacketHeader(Opcode.OPCODE_CLAIM_MAIL_COMMAND_VALUE, ProtocolVersion.CURRENT, 3);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
         var parsed = ClaimMailCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getMailId()).isEqualTo(9L);
+        assertThat(parsed.getIdempotencyKey()).isEqualTo("33333333-3333-3333-3333-333333333333");
     }
 
     @Test

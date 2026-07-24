@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.kage.mail.domain.AuditPort;
 import dev.kage.mail.domain.GoldPort;
+import dev.kage.mail.domain.IdempotencyKeyReusedException;
+import dev.kage.mail.domain.IdempotencyPort;
 import dev.kage.mail.domain.InventoryGatewayPort;
 import dev.kage.mail.domain.Mail;
 import dev.kage.mail.domain.MailAttachment;
@@ -18,16 +20,18 @@ import org.junit.jupiter.api.Test;
 
 class ClaimMailUseCaseTest {
 
+    private static final String IDEMPOTENCY_KEY = "key-1";
+
     @Test
     void shouldReturnNotFound_whenMailDoesNotExist() {
         var repositoryPort = new FakeMailRepositoryPort();
         var goldPort = new FakeGoldPort();
         var inventoryGatewayPort = new FakeInventoryGatewayPort(true);
         var auditPort = new FakeAuditPort();
-        var ports = new MailPorts(repositoryPort, goldPort, inventoryGatewayPort, auditPort);
+        var ports = new MailPorts(repositoryPort, goldPort, inventoryGatewayPort, auditPort, new FakeIdempotencyPort());
         var useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
 
-        var result = useCase.execute(999, 5);
+        var result = useCase.execute(999, 5, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.NOT_FOUND);
     }
@@ -36,11 +40,11 @@ class ClaimMailUseCaseTest {
     void shouldReturnNotFound_whenRecipientMismatch() {
         var repositoryPort = new FakeMailRepositoryPort();
         repositoryPort.mails.add(new Mail(1, null, 5, "s", "b", 0, List.of(), null, Instant.now()));
-        var ports = new MailPorts(
-                repositoryPort, new FakeGoldPort(), new FakeInventoryGatewayPort(true), new FakeAuditPort());
+        var ports = new MailPorts(repositoryPort, new FakeGoldPort(), new FakeInventoryGatewayPort(true),
+                new FakeAuditPort(), new FakeIdempotencyPort());
         var useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
 
-        var result = useCase.execute(1, 999); // 999 không phải recipient thật (5)
+        var result = useCase.execute(1, 999, IDEMPOTENCY_KEY); // 999 không phải recipient thật (5)
 
         assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.NOT_FOUND);
     }
@@ -49,11 +53,11 @@ class ClaimMailUseCaseTest {
     void shouldReturnAlreadyClaimed_whenClaimedAtSet() {
         var repositoryPort = new FakeMailRepositoryPort();
         repositoryPort.mails.add(new Mail(1, null, 5, "s", "b", 0, List.of(), Instant.now(), Instant.now()));
-        var ports = new MailPorts(
-                repositoryPort, new FakeGoldPort(), new FakeInventoryGatewayPort(true), new FakeAuditPort());
+        var ports = new MailPorts(repositoryPort, new FakeGoldPort(), new FakeInventoryGatewayPort(true),
+                new FakeAuditPort(), new FakeIdempotencyPort());
         var useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
 
-        var result = useCase.execute(1, 5);
+        var result = useCase.execute(1, 5, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.ALREADY_CLAIMED);
     }
@@ -66,10 +70,10 @@ class ClaimMailUseCaseTest {
         var goldPort = new FakeGoldPort();
         var inventoryGatewayPort = new FakeInventoryGatewayPort(true);
         var auditPort = new FakeAuditPort();
-        var ports = new MailPorts(repositoryPort, goldPort, inventoryGatewayPort, auditPort);
+        var ports = new MailPorts(repositoryPort, goldPort, inventoryGatewayPort, auditPort, new FakeIdempotencyPort());
         var useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
 
-        var result = useCase.execute(1, 5);
+        var result = useCase.execute(1, 5, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.OK);
         assertThat(goldPort.creditedAmount).isEqualTo(50);
@@ -90,15 +94,31 @@ class ClaimMailUseCaseTest {
         var goldPort = new FakeGoldPort();
         var inventoryGatewayPort = new FakeInventoryGatewayPort(false);
         var auditPort = new FakeAuditPort();
-        var ports = new MailPorts(repositoryPort, goldPort, inventoryGatewayPort, auditPort);
+        var ports = new MailPorts(repositoryPort, goldPort, inventoryGatewayPort, auditPort, new FakeIdempotencyPort());
         var useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
 
-        var result = useCase.execute(1, 5);
+        var result = useCase.execute(1, 5, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.INVENTORY_FULL);
         assertThat(goldPort.creditedAmount).isEqualTo(50); // đã gọi Port (rollback thật là việc của DB)
         assertThat(repositoryPort.markClaimedCalled).isFalse();
         assertThat(auditPort.loggedAction).isNull();
+    }
+
+    @Test
+    void shouldReturnDuplicateRequest_whenIdempotencyKeyReused() {
+        var repositoryPort = new FakeMailRepositoryPort();
+        repositoryPort.mails.add(
+                new Mail(1, 7L, 5, "s", "b", 50, List.of(new MailAttachment(1, 2)), null, Instant.now()));
+        var idempotencyPort = new FakeIdempotencyPort();
+        var ports = new MailPorts(repositoryPort, new FakeGoldPort(), new FakeInventoryGatewayPort(true),
+                new FakeAuditPort(), idempotencyPort);
+        var useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
+        useCase.execute(1, 5, IDEMPOTENCY_KEY);
+
+        var result = useCase.execute(1, 5, IDEMPOTENCY_KEY);
+
+        assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.DUPLICATE_REQUEST);
     }
 
     static final class FakeMailRepositoryPort implements MailRepositoryPort {
@@ -175,6 +195,17 @@ class ClaimMailUseCaseTest {
         @Override
         public void log(Transaction tx, long characterId, String action, String detailJson) {
             loggedAction = action;
+        }
+    }
+
+    static final class FakeIdempotencyPort implements IdempotencyPort {
+        private final java.util.Set<String> usedKeys = new java.util.HashSet<>();
+
+        @Override
+        public void recordOrThrow(Transaction tx, String idempotencyKey) {
+            if (!usedKeys.add(idempotencyKey)) {
+                throw new IdempotencyKeyReusedException(idempotencyKey);
+            }
         }
     }
 }

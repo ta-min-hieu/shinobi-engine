@@ -144,8 +144,13 @@ class MailIntegrationTest {
                 new PostgresMailRepositoryAdapter(dataSource),
                 new PostgresMailGoldAdapter(),
                 new PostgresMailInventoryGatewayAdapter(dataSource),
-                new PostgresMailAuditAdapter());
+                new PostgresMailAuditAdapter(),
+                new PostgresMailIdempotencyAdapter());
         return new ClaimMailUseCase(ports, new JdbcMailTransactionRunner(dataSource));
+    }
+
+    private static String newIdempotencyKey() {
+        return UUID.randomUUID().toString();
     }
 
     @Test
@@ -171,7 +176,7 @@ class MailIntegrationTest {
                 null, recipientId, "Thưởng", "Thưởng quest", 50, List.of(new MailAttachment(kunaiTemplateId, 2)));
         var mail = newSendUseCase().execute(newMail);
 
-        var result = newClaimUseCase().execute(mail.id(), recipientId);
+        var result = newClaimUseCase().execute(mail.id(), recipientId, newIdempotencyKey());
 
         assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.OK);
         assertThat(readGold(recipientId)).isEqualTo(50);
@@ -183,12 +188,25 @@ class MailIntegrationTest {
         long recipientId = createFreshCharacter("MailRecv3");
         var mail = newSendUseCase().execute(new NewMail(null, recipientId, "T", "B", 10, List.of()));
         var claimUseCase = newClaimUseCase();
-        claimUseCase.execute(mail.id(), recipientId);
+        claimUseCase.execute(mail.id(), recipientId, newIdempotencyKey());
 
-        var secondResult = claimUseCase.execute(mail.id(), recipientId);
+        var secondResult = claimUseCase.execute(mail.id(), recipientId, newIdempotencyKey());
 
         assertThat(secondResult).isEqualTo(ClaimMailUseCase.ClaimOutcome.ALREADY_CLAIMED);
         assertThat(readGold(recipientId)).isEqualTo(10); // không cộng lần 2
+    }
+
+    @Test
+    void shouldRejectDuplicateClaim_whenIdempotencyKeyReused() {
+        long recipientId = createFreshCharacter("MailRecv6");
+        var mail = newSendUseCase().execute(new NewMail(null, recipientId, "T", "B", 10, List.of()));
+        var key = newIdempotencyKey();
+        newClaimUseCase().execute(mail.id(), recipientId, key);
+
+        var result = newClaimUseCase().execute(mail.id(), recipientId, key);
+
+        assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.DUPLICATE_REQUEST);
+        assertThat(readGold(recipientId)).isEqualTo(10); // chỉ cộng 1 lần, KHÔNG lặp lại
     }
 
     @Test
@@ -198,7 +216,7 @@ class MailIntegrationTest {
         var newMail = new NewMail(null, recipientId, "T", "B", 999, List.of(new MailAttachment(kunaiTemplateId, 1)));
         var mail = newSendUseCase().execute(newMail);
 
-        var result = newClaimUseCase().execute(mail.id(), recipientId);
+        var result = newClaimUseCase().execute(mail.id(), recipientId, newIdempotencyKey());
 
         assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.INVENTORY_FULL);
         // KHÔNG được "nhận gold nhưng mất item" (DATABASE.md §5) — rollback toàn bộ.
@@ -217,7 +235,7 @@ class MailIntegrationTest {
         var beforeClaim = deleteUseCase.execute(mail.id(), recipientId);
         assertThat(beforeClaim).isEqualTo(DeleteMailUseCase.Result.MUST_CLAIM_FIRST);
 
-        newClaimUseCase().execute(mail.id(), recipientId);
+        newClaimUseCase().execute(mail.id(), recipientId, newIdempotencyKey());
         var afterClaim = deleteUseCase.execute(mail.id(), recipientId);
         assertThat(afterClaim).isEqualTo(DeleteMailUseCase.Result.OK);
     }

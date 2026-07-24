@@ -33,13 +33,18 @@ enum BuyOutcome {
   BUY_OUTCOME_ITEM_NOT_IN_SHOP = 2;
   BUY_OUTCOME_INSUFFICIENT_GOLD = 3;
   BUY_OUTCOME_INVENTORY_FULL = 4;
+  BUY_OUTCOME_DUPLICATE_REQUEST = 5; // ADR-025: idempotency_key đã dùng trước đó (client tự retry)
 }
 
 // Command: Client -> Server (OPCODE_BUY_ITEM_COMMAND). Server tự tra buy_price theo
 // item_template_id hiện tại trong shop_item, KHÔNG tin giá/tổng tiền từ client.
+// idempotency_key (ADR-025, thêm 2026-07-24): UUID v4 client tự sinh, giữ nguyên khi tự retry
+// cùng 1 lần mua — server enforce unique ở bảng idempotency_key trong CÙNG transaction với hiệu
+// ứng thật (trừ gold + cộng item), chống mua trùng khi client mất kết nối trước khi nhận response.
 message BuyItemCommand {
   int64 item_template_id = 1;
   int32 quantity = 2;
+  string idempotency_key = 3;
 }
 
 // Response: Server -> Client (OPCODE_BUY_ITEM_RESPONSE).
@@ -53,14 +58,16 @@ enum SellOutcome {
   SELL_OUTCOME_ITEM_NOT_FOUND = 2;
   SELL_OUTCOME_ITEM_NOT_SELLABLE = 3;
   SELL_OUTCOME_INSUFFICIENT_QUANTITY = 4;
+  SELL_OUTCOME_DUPLICATE_REQUEST = 5; // ADR-025: idempotency_key đã dùng trước đó (client tự retry)
 }
 
 // Command: Client -> Server (OPCODE_SELL_ITEM_COMMAND). item_id là inventory_item.id THẬT (không
 // phải vị trí) — server tự tính tiền theo sell_price hiện tại trong shop_item, KHÔNG tin số liệu
-// từ client (Điều 24).
+// từ client (Điều 24). idempotency_key: xem BuyItemCommand ở trên (ADR-025).
 message SellItemCommand {
   int64 item_id = 1;
   int32 quantity = 2;
+  string idempotency_key = 3;
 }
 
 // Response: Server -> Client (OPCODE_SELL_ITEM_RESPONSE).

@@ -55,12 +55,14 @@ public final class MailFacade {
                 .toList();
     }
 
-    public ClaimResult claimMail(long mailId, long characterId) {
-        return switch (claimMailUseCase.execute(mailId, characterId)) {
+    /** {@code idempotencyKey} (ADR-025) — client sinh UUID, giữ nguyên khi tự retry. */
+    public ClaimResult claimMail(long mailId, long characterId, String idempotencyKey) {
+        return switch (claimMailUseCase.execute(mailId, characterId, idempotencyKey)) {
             case OK -> ClaimResult.OK;
             case NOT_FOUND -> ClaimResult.NOT_FOUND;
             case ALREADY_CLAIMED -> ClaimResult.ALREADY_CLAIMED;
             case INVENTORY_FULL -> ClaimResult.INVENTORY_FULL;
+            case DUPLICATE_REQUEST -> ClaimResult.DUPLICATE_REQUEST;
         };
     }
 
@@ -72,7 +74,7 @@ public final class MailFacade {
         };
     }
 
-    public enum ClaimResult { OK, NOT_FOUND, ALREADY_CLAIMED, INVENTORY_FULL }
+    public enum ClaimResult { OK, NOT_FOUND, ALREADY_CLAIMED, INVENTORY_FULL, DUPLICATE_REQUEST }
 
     public enum DeleteResult { OK, NOT_FOUND, MUST_CLAIM_FIRST }
 

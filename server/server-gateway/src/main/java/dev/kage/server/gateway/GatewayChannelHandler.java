@@ -684,7 +684,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleBuyItemBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, BuyItemCommand command) {
-        var result = shopFacade.buyItem(characterId, command.getItemTemplateId(), command.getQuantity());
+        var result = shopFacade.buyItem(
+                characterId, command.getItemTemplateId(), command.getQuantity(), command.getIdempotencyKey());
         var response = BuyItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
         send(ctx, Opcode.OPCODE_BUY_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
@@ -693,7 +694,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             ShopFacade.BuyResult.OK, BuyOutcome.BUY_OUTCOME_OK,
             ShopFacade.BuyResult.ITEM_NOT_IN_SHOP, BuyOutcome.BUY_OUTCOME_ITEM_NOT_IN_SHOP,
             ShopFacade.BuyResult.INSUFFICIENT_GOLD, BuyOutcome.BUY_OUTCOME_INSUFFICIENT_GOLD,
-            ShopFacade.BuyResult.INVENTORY_FULL, BuyOutcome.BUY_OUTCOME_INVENTORY_FULL);
+            ShopFacade.BuyResult.INVENTORY_FULL, BuyOutcome.BUY_OUTCOME_INVENTORY_FULL,
+            ShopFacade.BuyResult.DUPLICATE_REQUEST, BuyOutcome.BUY_OUTCOME_DUPLICATE_REQUEST);
 
     private static BuyOutcome toProtoOutcome(ShopFacade.BuyResult result) {
         return BUY_OUTCOME_MAPPING.get(result);
@@ -713,7 +715,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSellItemBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, SellItemCommand command) {
-        var result = shopFacade.sellItem(characterId, command.getItemId(), command.getQuantity());
+        var result = shopFacade.sellItem(
+                characterId, command.getItemId(), command.getQuantity(), command.getIdempotencyKey());
         var response = SellItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
         send(ctx, Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
@@ -722,7 +725,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             ShopFacade.SellResult.OK, SellOutcome.SELL_OUTCOME_OK,
             ShopFacade.SellResult.ITEM_NOT_FOUND, SellOutcome.SELL_OUTCOME_ITEM_NOT_FOUND,
             ShopFacade.SellResult.ITEM_NOT_SELLABLE, SellOutcome.SELL_OUTCOME_ITEM_NOT_SELLABLE,
-            ShopFacade.SellResult.INSUFFICIENT_QUANTITY, SellOutcome.SELL_OUTCOME_INSUFFICIENT_QUANTITY);
+            ShopFacade.SellResult.INSUFFICIENT_QUANTITY, SellOutcome.SELL_OUTCOME_INSUFFICIENT_QUANTITY,
+            ShopFacade.SellResult.DUPLICATE_REQUEST, SellOutcome.SELL_OUTCOME_DUPLICATE_REQUEST);
 
     private static SellOutcome toProtoOutcome(ShopFacade.SellResult result) {
         return SELL_OUTCOME_MAPPING.get(result);
@@ -1597,7 +1601,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleClaimMailBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, ClaimMailCommand command) {
-        var result = mailFacade.claimMail(command.getMailId(), characterId);
+        var result = mailFacade.claimMail(command.getMailId(), characterId, command.getIdempotencyKey());
         var response = ClaimMailResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
         send(ctx, Opcode.OPCODE_CLAIM_MAIL_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
@@ -1606,7 +1610,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             MailFacade.ClaimResult.OK, ClaimMailOutcome.CLAIM_MAIL_OUTCOME_OK,
             MailFacade.ClaimResult.NOT_FOUND, ClaimMailOutcome.CLAIM_MAIL_OUTCOME_NOT_FOUND,
             MailFacade.ClaimResult.ALREADY_CLAIMED, ClaimMailOutcome.CLAIM_MAIL_OUTCOME_ALREADY_CLAIMED,
-            MailFacade.ClaimResult.INVENTORY_FULL, ClaimMailOutcome.CLAIM_MAIL_OUTCOME_INVENTORY_FULL);
+            MailFacade.ClaimResult.INVENTORY_FULL, ClaimMailOutcome.CLAIM_MAIL_OUTCOME_INVENTORY_FULL,
+            MailFacade.ClaimResult.DUPLICATE_REQUEST, ClaimMailOutcome.CLAIM_MAIL_OUTCOME_DUPLICATE_REQUEST);
 
     private static ClaimMailOutcome toProtoOutcome(MailFacade.ClaimResult result) {
         return CLAIM_MAIL_OUTCOME_MAPPING.get(result);

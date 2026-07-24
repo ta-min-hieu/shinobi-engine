@@ -28,27 +28,32 @@ public final class ShopFacade {
         return listShopItemsUseCase.execute();
     }
 
-    /** Mua {@code quantity} item template {@code itemTemplateId} — trừ gold, cộng vào túi đồ. */
-    public BuyResult buyItem(long characterId, long itemTemplateId, int quantity) {
-        return switch (buyItemUseCase.execute(characterId, itemTemplateId, quantity)) {
+    /**
+     * Mua {@code quantity} item template {@code itemTemplateId} — trừ gold, cộng vào túi đồ.
+     * {@code idempotencyKey} (ADR-025) — client sinh UUID, giữ nguyên khi tự retry.
+     */
+    public BuyResult buyItem(long characterId, long itemTemplateId, int quantity, String idempotencyKey) {
+        return switch (buyItemUseCase.execute(characterId, itemTemplateId, quantity, idempotencyKey)) {
             case OK -> BuyResult.OK;
             case ITEM_NOT_IN_SHOP -> BuyResult.ITEM_NOT_IN_SHOP;
             case INSUFFICIENT_GOLD -> BuyResult.INSUFFICIENT_GOLD;
             case INVENTORY_FULL -> BuyResult.INVENTORY_FULL;
+            case DUPLICATE_REQUEST -> BuyResult.DUPLICATE_REQUEST;
         };
     }
 
     /** Bán {@code quantity} của item {@code itemId} (ID thật trong túi đồ) — cộng gold. */
-    public SellResult sellItem(long characterId, long itemId, int quantity) {
-        return switch (sellItemUseCase.execute(characterId, itemId, quantity)) {
+    public SellResult sellItem(long characterId, long itemId, int quantity, String idempotencyKey) {
+        return switch (sellItemUseCase.execute(characterId, itemId, quantity, idempotencyKey)) {
             case OK -> SellResult.OK;
             case ITEM_NOT_FOUND -> SellResult.ITEM_NOT_FOUND;
             case ITEM_NOT_SELLABLE -> SellResult.ITEM_NOT_SELLABLE;
             case INSUFFICIENT_QUANTITY -> SellResult.INSUFFICIENT_QUANTITY;
+            case DUPLICATE_REQUEST -> SellResult.DUPLICATE_REQUEST;
         };
     }
 
-    public enum BuyResult { OK, ITEM_NOT_IN_SHOP, INSUFFICIENT_GOLD, INVENTORY_FULL }
+    public enum BuyResult { OK, ITEM_NOT_IN_SHOP, INSUFFICIENT_GOLD, INVENTORY_FULL, DUPLICATE_REQUEST }
 
-    public enum SellResult { OK, ITEM_NOT_FOUND, ITEM_NOT_SELLABLE, INSUFFICIENT_QUANTITY }
+    public enum SellResult { OK, ITEM_NOT_FOUND, ITEM_NOT_SELLABLE, INSUFFICIENT_QUANTITY, DUPLICATE_REQUEST }
 }

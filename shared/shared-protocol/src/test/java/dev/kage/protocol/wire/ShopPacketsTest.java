@@ -49,7 +49,11 @@ class ShopPacketsTest {
 
     @Test
     void shouldRoundTripBuyItemCommand() throws InvalidProtocolBufferException {
-        var command = BuyItemCommand.newBuilder().setItemTemplateId(1L).setQuantity(3).build();
+        var command = BuyItemCommand.newBuilder()
+                .setItemTemplateId(1L)
+                .setQuantity(3)
+                .setIdempotencyKey("11111111-1111-1111-1111-111111111111")
+                .build();
         var header = new PacketHeader(Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
@@ -57,6 +61,7 @@ class ShopPacketsTest {
 
         assertThat(parsed.getItemTemplateId()).isEqualTo(1L);
         assertThat(parsed.getQuantity()).isEqualTo(3);
+        assertThat(parsed.getIdempotencyKey()).isEqualTo("11111111-1111-1111-1111-111111111111");
     }
 
     @Test
@@ -72,7 +77,11 @@ class ShopPacketsTest {
 
     @Test
     void shouldRoundTripSellItemCommand() throws InvalidProtocolBufferException {
-        var command = SellItemCommand.newBuilder().setItemId(42L).setQuantity(2).build();
+        var command = SellItemCommand.newBuilder()
+                .setItemId(42L)
+                .setQuantity(2)
+                .setIdempotencyKey("22222222-2222-2222-2222-222222222222")
+                .build();
         var header = new PacketHeader(Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, ProtocolVersion.CURRENT, 5);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
@@ -80,6 +89,7 @@ class ShopPacketsTest {
 
         assertThat(parsed.getItemId()).isEqualTo(42L);
         assertThat(parsed.getQuantity()).isEqualTo(2);
+        assertThat(parsed.getIdempotencyKey()).isEqualTo("22222222-2222-2222-2222-222222222222");
     }
 
     @Test

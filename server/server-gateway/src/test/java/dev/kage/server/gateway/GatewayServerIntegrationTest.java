@@ -351,8 +351,9 @@ class GatewayServerIntegrationTest {
             }
         };
         dev.kage.shop.domain.AuditPort shopAuditPort = (tx, characterId, action, detailJson) -> { };
+        dev.kage.shop.domain.IdempotencyPort shopIdempotencyPort = (tx, idempotencyKey) -> { };
         var ports = new dev.kage.shop.application.ShopPorts(
-                catalogPort, shopGoldPort, inventoryGatewayPort, shopAuditPort);
+                catalogPort, shopGoldPort, inventoryGatewayPort, shopAuditPort, shopIdempotencyPort);
         var listShopItemsUseCase = new dev.kage.shop.application.ListShopItemsUseCase(catalogPort);
         var buyItemUseCase = new dev.kage.shop.application.BuyItemUseCase(ports, action -> action.accept(null));
         var sellItemUseCase = new dev.kage.shop.application.SellItemUseCase(ports, action -> action.accept(null));
@@ -483,11 +484,12 @@ class GatewayServerIntegrationTest {
         dev.kage.mail.domain.InventoryGatewayPort mailInventoryGatewayPort =
                 (tx, characterId, itemTemplateId, quantity) -> true;
         dev.kage.mail.domain.AuditPort mailAuditPort = (tx, characterId, action, detailJson) -> { };
+        dev.kage.mail.domain.IdempotencyPort mailIdempotencyPort = (tx, idempotencyKey) -> { };
         dev.kage.mail.domain.TransactionRunner mailTx = action -> action.accept(null);
         var sendMailUseCase = new dev.kage.mail.application.SendMailUseCase(mailRepositoryPort, mailTx);
         var listMailUseCase = new dev.kage.mail.application.ListMailUseCase(mailRepositoryPort);
         var mailPorts = new dev.kage.mail.application.MailPorts(
-                mailRepositoryPort, mailGoldPort, mailInventoryGatewayPort, mailAuditPort);
+                mailRepositoryPort, mailGoldPort, mailInventoryGatewayPort, mailAuditPort, mailIdempotencyPort);
         var claimMailUseCase = new dev.kage.mail.application.ClaimMailUseCase(mailPorts, mailTx);
         var deleteMailUseCase = new dev.kage.mail.application.DeleteMailUseCase(mailRepositoryPort);
         return new dev.kage.mail.api.MailFacade(sendMailUseCase, listMailUseCase, claimMailUseCase, deleteMailUseCase);

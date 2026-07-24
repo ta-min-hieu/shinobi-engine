@@ -55,9 +55,13 @@ message ListMailResponse {
   repeated MailView mails = 1;
 }
 
-// Command: Client -> Server (OPCODE_CLAIM_MAIL_COMMAND).
+// Command: Client -> Server (OPCODE_CLAIM_MAIL_COMMAND). idempotency_key (ADR-025, thêm
+// 2026-07-24): UUID v4 client tự sinh, giữ nguyên khi tự retry cùng 1 lần nhận — server enforce
+// unique ở bảng idempotency_key trong CÙNG transaction với hiệu ứng thật (cộng gold + cấp item +
+// đánh dấu claimed), chống nhận trùng khi client mất kết nối trước khi nhận response.
 message ClaimMailCommand {
   int64 mail_id = 1;
+  string idempotency_key = 2;
 }
 
 enum ClaimMailOutcome {
@@ -66,6 +70,7 @@ enum ClaimMailOutcome {
   CLAIM_MAIL_OUTCOME_NOT_FOUND = 2;
   CLAIM_MAIL_OUTCOME_ALREADY_CLAIMED = 3;
   CLAIM_MAIL_OUTCOME_INVENTORY_FULL = 4;
+  CLAIM_MAIL_OUTCOME_DUPLICATE_REQUEST = 5; // ADR-025: idempotency_key đã dùng trước đó
 }
 
 // Response: Server -> Client (OPCODE_CLAIM_MAIL_RESPONSE).
