@@ -18,6 +18,18 @@ import dev.kage.friend.application.ListPendingFriendRequestsUseCase;
 import dev.kage.friend.application.RejectFriendRequestUseCase;
 import dev.kage.friend.application.RemoveFriendUseCase;
 import dev.kage.friend.application.SendFriendRequestUseCase;
+import dev.kage.guild.api.GuildFacade;
+import dev.kage.guild.application.ApproveGuildJoinRequestUseCase;
+import dev.kage.guild.application.CreateGuildUseCase;
+import dev.kage.guild.application.DisbandGuildUseCase;
+import dev.kage.guild.application.FindMyGuildUseCase;
+import dev.kage.guild.application.GuildUseCases;
+import dev.kage.guild.application.KickGuildMemberUseCase;
+import dev.kage.guild.application.LeaveGuildUseCase;
+import dev.kage.guild.application.ListGuildMembersUseCase;
+import dev.kage.guild.application.ListPendingGuildJoinRequestsUseCase;
+import dev.kage.guild.application.RejectGuildJoinRequestUseCase;
+import dev.kage.guild.application.SendGuildJoinRequestUseCase;
 import dev.kage.inventory.api.EquipmentUseCases;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.application.AddItemUseCase;
@@ -45,6 +57,7 @@ import dev.kage.server.database.character.PostgresCharacterAdapter;
 import dev.kage.server.database.chat.PostgresChatAuditAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcTemplateAdapter;
 import dev.kage.server.database.friend.PostgresFriendAdapter;
+import dev.kage.server.database.guild.PostgresGuildAdapter;
 import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
 import dev.kage.server.database.inventory.PostgresAuditAdapter;
 import dev.kage.server.database.inventory.PostgresDropTableAdapter;
@@ -210,6 +223,22 @@ public final class ServerDatabaseBootstrap {
         var claimMailUseCase = new ClaimMailUseCase(ports, transactionRunner);
         var deleteMailUseCase = new DeleteMailUseCase(repositoryPort);
         return new MailFacade(sendMailUseCase, listMailUseCase, claimMailUseCase, deleteMailUseCase);
+    }
+
+    public GuildFacade wireGuildFacade() {
+        var guildPort = new PostgresGuildAdapter(dataSource);
+        var useCases = new GuildUseCases(
+                new CreateGuildUseCase(guildPort),
+                new SendGuildJoinRequestUseCase(guildPort),
+                new ApproveGuildJoinRequestUseCase(guildPort),
+                new RejectGuildJoinRequestUseCase(guildPort),
+                new LeaveGuildUseCase(guildPort),
+                new DisbandGuildUseCase(guildPort),
+                new KickGuildMemberUseCase(guildPort),
+                new ListGuildMembersUseCase(guildPort),
+                new ListPendingGuildJoinRequestsUseCase(guildPort),
+                new FindMyGuildUseCase(guildPort));
+        return new GuildFacade(useCases);
     }
 
     public ChatFacade wireChatFacade() {

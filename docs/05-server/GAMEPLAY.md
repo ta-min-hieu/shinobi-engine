@@ -394,13 +394,19 @@ Phase 6/7 — bảng ở trên vẫn mô tả đích đến cuối cùng (Phase 
 thread vì cần đọc `AreaOfInterestTracker`, không thread-safe ngoài tick). Rate limit + lọc từ cấm
 placeholder đã có, xem feature-chat/CLAUDE.md.
 
+✅ **Kênh Bang hội — Đã code (2026-07-24, Phase 7 lát cắt 1)** — `ChatChannel.GUILD` thêm cùng lúc
+`feature-guild` thật được code. Định tuyến: gateway gọi `GuildFacade.findMyGuild` để chặn người
+gửi chưa vào bang (`SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_GUILD`), sau đó `GuildFacade.listMembers` để
+lấy danh sách nhận, broadcast qua `ConnectedCharacterRegistry` — không cần AoI/tick thread (giống
+World/Riêng tư, guild membership không phải dữ liệu world-tick). Party vẫn CHƯA có.
+
 ---
 
 ## 11. Guild / Friend / Mail
 
 | Hệ thống | MVP | Ghi chú |
 |---|---|---|
-| Guild | Shell (tạo/tham gia) | Dời sang **Phase 7** cùng `feature-guild` thật (quyết định 2026-07-23, không phải Phase 6 — xem ROADMAP.md) |
+| Guild | ✅ Đã code (2026-07-24, Phase 7 lát cắt 1) | `feature-guild` — tạo/xin gia nhập/leader duyệt-từ chối/rời/kick/giải tán + kênh chat Bang hội (xem §10). Kho bang + nhiệm vụ bang dời lát cắt sau (xem feature-guild/CLAUDE.md) |
 | Friend | ✅ Đã code (2026-07-23) | `feature-friend`, trạng thái online qua `ConnectedCharacterRegistry` in-memory (KHÔNG qua Redis — xem feature-friend/CLAUDE.md, quyết định tránh trùng lặp hạ tầng ở single-instance) |
 | Mail | ✅ Đã code (2026-07-23) | `feature-mail` — gửi/xem/nhận/xoá; nhận gold+item đính kèm chạy trong 1 transaction (khoá dòng + kiểm `claimed_at` + cấp thưởng + đánh dấu + audit), verify rollback thật bằng Postgres (Testcontainers) |
 

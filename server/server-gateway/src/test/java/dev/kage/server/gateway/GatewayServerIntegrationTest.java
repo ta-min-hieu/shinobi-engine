@@ -133,13 +133,14 @@ class GatewayServerIntegrationTest {
         var friendFacade = fakeFriendFacade();
         var mailFacade = fakeMailFacade();
         var chatFacade = fakeChatFacade();
+        var guildFacade = fakeGuildFacade();
         characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
         worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
         var positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
-        var socialFacades = new SocialFacades(friendFacade, mailFacade, chatFacade);
+        var socialFacades = new SocialFacades(friendFacade, mailFacade, chatFacade, guildFacade);
         var contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
         var facades = new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
         server = new GatewayServer(0, facades, worldGateway);
@@ -495,6 +496,88 @@ class GatewayServerIntegrationTest {
     private dev.kage.chat.api.ChatFacade fakeChatFacade() {
         dev.kage.chat.domain.ChatAuditPort chatAuditPort = (characterId, action, detailJson) -> { };
         return new dev.kage.chat.api.ChatFacade(new dev.kage.chat.application.SendChatMessageUseCase(chatAuditPort));
+    }
+
+    // Guild không dùng trong test này — fake tối thiểu để compile (cùng convention fakeChatFacade).
+    private dev.kage.guild.api.GuildFacade fakeGuildFacade() {
+        dev.kage.guild.domain.GuildPort guildPort = new dev.kage.guild.domain.GuildPort() {
+            @Override
+            public Optional<dev.kage.guild.domain.Guild> findByName(String name) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public Optional<dev.kage.guild.domain.Guild> findById(long guildId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public Optional<dev.kage.guild.domain.GuildMember> findMembershipOf(long characterId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public List<dev.kage.guild.domain.GuildMember> listMembers(long guildId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public dev.kage.guild.domain.Guild createGuild(String name, long leaderCharacterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public boolean disbandGuild(long leaderCharacterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public boolean leaveGuild(long characterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public Optional<dev.kage.guild.domain.GuildJoinRequest> findPendingRequestOfCharacter(long characterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public List<dev.kage.guild.domain.GuildJoinRequest> listPendingRequests(long guildId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public dev.kage.guild.domain.GuildJoinRequest sendJoinRequest(long guildId, long characterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public ApproveResult approveJoinRequest(long requestId, long leaderCharacterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public boolean rejectJoinRequest(long requestId, long leaderCharacterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+        };
+        var useCases = new dev.kage.guild.application.GuildUseCases(
+                new dev.kage.guild.application.CreateGuildUseCase(guildPort),
+                new dev.kage.guild.application.SendGuildJoinRequestUseCase(guildPort),
+                new dev.kage.guild.application.ApproveGuildJoinRequestUseCase(guildPort),
+                new dev.kage.guild.application.RejectGuildJoinRequestUseCase(guildPort),
+                new dev.kage.guild.application.LeaveGuildUseCase(guildPort),
+                new dev.kage.guild.application.DisbandGuildUseCase(guildPort),
+                new dev.kage.guild.application.KickGuildMemberUseCase(guildPort),
+                new dev.kage.guild.application.ListGuildMembersUseCase(guildPort),
+                new dev.kage.guild.application.ListPendingGuildJoinRequestsUseCase(guildPort),
+                new dev.kage.guild.application.FindMyGuildUseCase(guildPort));
+        return new dev.kage.guild.api.GuildFacade(useCases);
     }
 
     @AfterEach

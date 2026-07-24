@@ -41,6 +41,7 @@ public final class GatewayBootstrap {
         var friendFacade = databaseBootstrap.wireFriendFacade();
         var mailFacade = databaseBootstrap.wireMailFacade();
         var chatFacade = databaseBootstrap.wireChatFacade();
+        var guildFacade = databaseBootstrap.wireGuildFacade();
 
         // SCRIPTING.md §8 — fail fast lúc khởi động, KHÔNG đợi người chơi phát hiện lỗi cú pháp
         // script. Gom script_ref từ DB (quest/dialogue) + hằng số Java (skill, chưa DB-driven).
@@ -59,7 +60,7 @@ public final class GatewayBootstrap {
         positionPersister.start();
         var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
 
-        var socialFacades = new SocialFacades(friendFacade, mailFacade, chatFacade);
+        var socialFacades = new SocialFacades(friendFacade, mailFacade, chatFacade, guildFacade);
         var contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
         var facades = new GatewayFacades(accountFacade, characterFacade, inventoryFacade, contentFacades);
         var server = new GatewayServer(PORT, facades, worldGateway);

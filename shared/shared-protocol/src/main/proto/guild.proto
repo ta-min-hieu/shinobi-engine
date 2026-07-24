@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// Packet Bang hội (NETWORK.md §4, dải 700-799). Phase 7 lát cắt 1 — chỉ thành viên (tạo/xin gia
+// nhập/duyệt/từ chối/rời/kick/giải tán) + kênh chat "Bang hội" (xem chat.proto). Kho bang + nhiệm
+// vụ bang KHÔNG có ở đây (dời lát cắt sau, xem feature-guild/CLAUDE.md).
+
+// Luồng gia nhập: XIN GIA NHẬP + LEADER DUYỆT (khác friend.proto là mời trực tiếp) — quyết định
+// cùng chủ dự án 2026-07-23.
+
+message CreateGuildCommand {
+  string name = 1;
+}
+
+enum CreateGuildOutcome {
+  CREATE_GUILD_OUTCOME_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho kết quả thật.
+  CREATE_GUILD_OUTCOME_OK = 1;
+  CREATE_GUILD_OUTCOME_ALREADY_IN_GUILD = 2;
+  CREATE_GUILD_OUTCOME_NAME_TAKEN = 3;
+}
+
+message CreateGuildResponse {
+  CreateGuildOutcome outcome = 1;
+  int64 guild_id = 2; // chỉ có ý nghĩa khi outcome = OK
+}
+
+// Xin gia nhập theo TÊN BANG (không phải ID) — cùng lý do target_name ở friend.proto.
+message SendGuildJoinRequestCommand {
+  string guild_name = 1;
+}
+
+enum SendGuildJoinRequestOutcome {
+  SEND_GUILD_JOIN_REQUEST_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  SEND_GUILD_JOIN_REQUEST_OUTCOME_OK = 1;
+  SEND_GUILD_JOIN_REQUEST_OUTCOME_ALREADY_IN_GUILD = 2;
+  SEND_GUILD_JOIN_REQUEST_OUTCOME_GUILD_NOT_FOUND = 3;
+  SEND_GUILD_JOIN_REQUEST_OUTCOME_REQUEST_ALREADY_PENDING = 4;
+}
+
+message SendGuildJoinRequestResponse {
+  SendGuildJoinRequestOutcome outcome = 1;
+}
+
+message ApproveGuildJoinRequestCommand {
+  int64 request_id = 1;
+}
+
+enum ApproveGuildJoinRequestOutcome {
+  APPROVE_GUILD_JOIN_REQUEST_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  APPROVE_GUILD_JOIN_REQUEST_OUTCOME_OK = 1;
+  APPROVE_GUILD_JOIN_REQUEST_OUTCOME_NOT_FOUND = 2;
+  APPROVE_GUILD_JOIN_REQUEST_OUTCOME_TARGET_ALREADY_IN_GUILD = 3;
+}
+
+message ApproveGuildJoinRequestResponse {
+  ApproveGuildJoinRequestOutcome outcome = 1;
+}
+
+message RejectGuildJoinRequestCommand {
+  int64 request_id = 1;
+}
+
+enum RejectGuildJoinRequestOutcome {
+  REJECT_GUILD_JOIN_REQUEST_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  REJECT_GUILD_JOIN_REQUEST_OUTCOME_OK = 1;
+  REJECT_GUILD_JOIN_REQUEST_OUTCOME_NOT_FOUND = 2;
+}
+
+message RejectGuildJoinRequestResponse {
+  RejectGuildJoinRequestOutcome outcome = 1;
+}
+
+message LeaveGuildCommand {
+}
+
+enum LeaveGuildOutcome {
+  LEAVE_GUILD_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  LEAVE_GUILD_OUTCOME_OK = 1;
+  LEAVE_GUILD_OUTCOME_NOT_IN_GUILD = 2;
+  LEAVE_GUILD_OUTCOME_LEADER_CANNOT_LEAVE = 3;
+}
+
+message LeaveGuildResponse {
+  LeaveGuildOutcome outcome = 1;
+}
+
+message DisbandGuildCommand {
+}
+
+enum DisbandGuildOutcome {
+  DISBAND_GUILD_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  DISBAND_GUILD_OUTCOME_OK = 1;
+  DISBAND_GUILD_OUTCOME_NOT_LEADER = 2;
+}
+
+message DisbandGuildResponse {
+  DisbandGuildOutcome outcome = 1;
+}
+
+// target_name (không phải ID) — server-gateway tự tra CharacterFacade.findByName TRƯỚC khi gọi
+// GuildFacade.kickMember, cùng lý do RemoveFriendCommand ở friend.proto.
+message KickGuildMemberCommand {
+  string target_name = 1;
+}
+
+enum KickGuildMemberOutcome {
+  KICK_GUILD_MEMBER_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  KICK_GUILD_MEMBER_OUTCOME_OK = 1;
+  KICK_GUILD_MEMBER_OUTCOME_CANNOT_KICK_SELF = 2;
+  KICK_GUILD_MEMBER_OUTCOME_TARGET_NOT_FOUND = 3; // tên không tồn tại (character)
+  KICK_GUILD_MEMBER_OUTCOME_NOT_FOUND = 4; // không phải leader, HOẶC target không phải thành viên cùng bang
+}
+
+message KickGuildMemberResponse {
+  KickGuildMemberOutcome outcome = 1;
+}
+
+message ListGuildMembersRequest {
+}
+
+// online do gateway tự ghép (ConnectedCharacterRegistry), KHÔNG phải dữ liệu từ feature-guild.
+message GuildMemberView {
+  int64 character_id = 1;
+  string name = 2;
+  bool is_leader = 3;
+  bool online = 4;
+}
+
+message ListGuildMembersResponse {
+  repeated GuildMemberView members = 1;
+}
+
+message ListPendingGuildJoinRequestsRequest {
+}
+
+message PendingGuildJoinRequestView {
+  int64 request_id = 1;
+  int64 character_id = 2;
+  string character_name = 3;
+}
+
+message ListPendingGuildJoinRequestsResponse {
+  repeated PendingGuildJoinRequestView requests = 1;
+}
+
+message GetMyGuildRequest {
+}
+
+message GetMyGuildResponse {
+  bool in_guild = 1;
+  int64 guild_id = 2; // chỉ có ý nghĩa khi in_guild = true
+  string guild_name = 3;
+  bool is_leader = 4;
+}

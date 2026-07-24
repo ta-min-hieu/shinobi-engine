@@ -12,6 +12,7 @@ import dev.kage.chat.api.ChatFacade;
 import dev.kage.dialogue.api.DialogueFacade;
 import dev.kage.dialogue.domain.DialogueNode;
 import dev.kage.friend.api.FriendFacade;
+import dev.kage.guild.api.GuildFacade;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.mail.api.MailFacade;
@@ -20,6 +21,9 @@ import dev.kage.protocol.AcceptFriendRequestOutcome;
 import dev.kage.protocol.AcceptFriendRequestResponse;
 import dev.kage.protocol.AcceptQuestOutcome;
 import dev.kage.protocol.AcceptQuestResponse;
+import dev.kage.protocol.ApproveGuildJoinRequestCommand;
+import dev.kage.protocol.ApproveGuildJoinRequestOutcome;
+import dev.kage.protocol.ApproveGuildJoinRequestResponse;
 import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.BuyItemResponse;
 import dev.kage.protocol.BuyOutcome;
@@ -36,12 +40,18 @@ import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
 import dev.kage.protocol.CreateCharacterResponse;
+import dev.kage.protocol.CreateGuildCommand;
+import dev.kage.protocol.CreateGuildOutcome;
+import dev.kage.protocol.CreateGuildResponse;
 import dev.kage.protocol.DeleteMailCommand;
 import dev.kage.protocol.DeleteMailOutcome;
 import dev.kage.protocol.DeleteMailResponse;
 import dev.kage.protocol.DialogueEndedResponse;
 import dev.kage.protocol.DialogueNodeResponse;
 import dev.kage.protocol.DialogueOptionView;
+import dev.kage.protocol.DisbandGuildCommand;
+import dev.kage.protocol.DisbandGuildOutcome;
+import dev.kage.protocol.DisbandGuildResponse;
 import dev.kage.protocol.EnhanceItemCommand;
 import dev.kage.protocol.EnhanceItemResponse;
 import dev.kage.protocol.EnhanceOutcome;
@@ -53,15 +63,28 @@ import dev.kage.protocol.Faction;
 import dev.kage.protocol.FriendOfflineEvent;
 import dev.kage.protocol.FriendOnlineEvent;
 import dev.kage.protocol.FriendView;
+import dev.kage.protocol.GetMyGuildRequest;
+import dev.kage.protocol.GetMyGuildResponse;
+import dev.kage.protocol.GuildMemberView;
 import dev.kage.protocol.ItemRewardView;
+import dev.kage.protocol.KickGuildMemberCommand;
+import dev.kage.protocol.KickGuildMemberOutcome;
+import dev.kage.protocol.KickGuildMemberResponse;
+import dev.kage.protocol.LeaveGuildCommand;
+import dev.kage.protocol.LeaveGuildOutcome;
+import dev.kage.protocol.LeaveGuildResponse;
 import dev.kage.protocol.ListCharactersRequest;
 import dev.kage.protocol.ListCharactersResponse;
 import dev.kage.protocol.ListFriendsRequest;
 import dev.kage.protocol.ListFriendsResponse;
+import dev.kage.protocol.ListGuildMembersRequest;
+import dev.kage.protocol.ListGuildMembersResponse;
 import dev.kage.protocol.ListMailRequest;
 import dev.kage.protocol.ListMailResponse;
 import dev.kage.protocol.ListPendingFriendRequestsRequest;
 import dev.kage.protocol.ListPendingFriendRequestsResponse;
+import dev.kage.protocol.ListPendingGuildJoinRequestsRequest;
+import dev.kage.protocol.ListPendingGuildJoinRequestsResponse;
 import dev.kage.protocol.ListShopItemsRequest;
 import dev.kage.protocol.ListShopItemsResponse;
 import dev.kage.protocol.MailAttachmentView;
@@ -69,6 +92,7 @@ import dev.kage.protocol.MailView;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.NewMailEvent;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.PendingGuildJoinRequestView;
 import dev.kage.protocol.SendChatMessageCommand;
 import dev.kage.protocol.SendChatMessageOutcome;
 import dev.kage.protocol.SendChatMessageResponse;
@@ -78,6 +102,9 @@ import dev.kage.protocol.PongResponse;
 import dev.kage.protocol.RejectFriendRequestCommand;
 import dev.kage.protocol.RejectFriendRequestOutcome;
 import dev.kage.protocol.RejectFriendRequestResponse;
+import dev.kage.protocol.RejectGuildJoinRequestCommand;
+import dev.kage.protocol.RejectGuildJoinRequestOutcome;
+import dev.kage.protocol.RejectGuildJoinRequestResponse;
 import dev.kage.protocol.RemoveFriendCommand;
 import dev.kage.protocol.RemoveFriendOutcome;
 import dev.kage.protocol.RemoveFriendResponse;
@@ -90,6 +117,9 @@ import dev.kage.protocol.SellOutcome;
 import dev.kage.protocol.SendFriendRequestCommand;
 import dev.kage.protocol.SendFriendRequestOutcome;
 import dev.kage.protocol.SendFriendRequestResponse;
+import dev.kage.protocol.SendGuildJoinRequestCommand;
+import dev.kage.protocol.SendGuildJoinRequestOutcome;
+import dev.kage.protocol.SendGuildJoinRequestResponse;
 import dev.kage.protocol.SendMailCommand;
 import dev.kage.protocol.SendMailOutcome;
 import dev.kage.protocol.SendMailResponse;
@@ -153,6 +183,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final FriendFacade friendFacade;
     private final MailFacade mailFacade;
     private final ChatFacade chatFacade;
+    private final GuildFacade guildFacade;
     private final WorldGateway worldGateway;
     private final Executor authExecutor;
     // Per-connection (handler đã là state per-connection, xem javadoc lớp) — không cần đồng bộ
@@ -164,6 +195,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final RateLimiter chatWorldRateLimiter = new RateLimiter(5, Duration.ofSeconds(10));
     private final RateLimiter chatPrivateRateLimiter = new RateLimiter(10, Duration.ofSeconds(10));
     private final RateLimiter chatAreaRateLimiter = new RateLimiter(15, Duration.ofSeconds(10));
+    // GAMEPLAY.md §10: Bang hội = "Vừa", giữa World (nghiêm ngặt nhất) và Area (lỏng nhất).
+    private final RateLimiter chatGuildRateLimiter = new RateLimiter(10, Duration.ofSeconds(10));
 
     // handleConnect/handleSelectCharacter set giá trị này từ Virtual Thread; channelRead0 của
     // packet TIẾP THEO có thể chạy trên EventLoop trước khi Virtual Thread đó xong (Netty không
@@ -203,7 +236,20 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_LIST_MAIL_REQUEST_VALUE, this::handleListMailRequest),
             Map.entry(Opcode.OPCODE_CLAIM_MAIL_COMMAND_VALUE, this::handleClaimMailCommand),
             Map.entry(Opcode.OPCODE_DELETE_MAIL_COMMAND_VALUE, this::handleDeleteMailCommand),
-            Map.entry(Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE, this::handleSendChatMessageCommand));
+            Map.entry(Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE, this::handleSendChatMessageCommand),
+            Map.entry(Opcode.OPCODE_CREATE_GUILD_COMMAND_VALUE, this::handleCreateGuildCommand),
+            Map.entry(Opcode.OPCODE_SEND_GUILD_JOIN_REQUEST_COMMAND_VALUE, this::handleSendGuildJoinRequestCommand),
+            Map.entry(Opcode.OPCODE_APPROVE_GUILD_JOIN_REQUEST_COMMAND_VALUE,
+                    this::handleApproveGuildJoinRequestCommand),
+            Map.entry(Opcode.OPCODE_REJECT_GUILD_JOIN_REQUEST_COMMAND_VALUE,
+                    this::handleRejectGuildJoinRequestCommand),
+            Map.entry(Opcode.OPCODE_LEAVE_GUILD_COMMAND_VALUE, this::handleLeaveGuildCommand),
+            Map.entry(Opcode.OPCODE_DISBAND_GUILD_COMMAND_VALUE, this::handleDisbandGuildCommand),
+            Map.entry(Opcode.OPCODE_KICK_GUILD_MEMBER_COMMAND_VALUE, this::handleKickGuildMemberCommand),
+            Map.entry(Opcode.OPCODE_LIST_GUILD_MEMBERS_REQUEST_VALUE, this::handleListGuildMembersRequest),
+            Map.entry(Opcode.OPCODE_LIST_PENDING_GUILD_JOIN_REQUESTS_REQUEST_VALUE,
+                    this::handleListPendingGuildJoinRequestsRequest),
+            Map.entry(Opcode.OPCODE_GET_MY_GUILD_REQUEST_VALUE, this::handleGetMyGuildRequest));
 
     GatewayChannelHandler(GatewayFacades facades, WorldGateway worldGateway, Executor authExecutor) {
         this.accountFacade = facades.accountFacade();
@@ -215,6 +261,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.friendFacade = facades.contentFacades().socialFacades().friendFacade();
         this.mailFacade = facades.contentFacades().socialFacades().mailFacade();
         this.chatFacade = facades.contentFacades().socialFacades().chatFacade();
+        this.guildFacade = facades.contentFacades().socialFacades().guildFacade();
         this.worldGateway = worldGateway;
         this.authExecutor = authExecutor;
     }
@@ -914,6 +961,275 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 responseBuilder.build().toByteArray());
     }
 
+    private void handleCreateGuildCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = CreateGuildCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleCreateGuildBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleCreateGuildBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, CreateGuildCommand command) {
+        var result = guildFacade.createGuild(characterId, command.getName());
+        var responseBuilder = CreateGuildResponse.newBuilder().setOutcome(toProtoOutcome(result.outcome()));
+        if (result.guildId() != null) {
+            responseBuilder.setGuildId(result.guildId());
+        }
+        send(ctx, Opcode.OPCODE_CREATE_GUILD_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+    }
+
+    private static final Map<GuildFacade.CreateOutcome, CreateGuildOutcome> CREATE_GUILD_OUTCOME_MAPPING = Map.of(
+            GuildFacade.CreateOutcome.OK, CreateGuildOutcome.CREATE_GUILD_OUTCOME_OK,
+            GuildFacade.CreateOutcome.ALREADY_IN_GUILD, CreateGuildOutcome.CREATE_GUILD_OUTCOME_ALREADY_IN_GUILD,
+            GuildFacade.CreateOutcome.NAME_TAKEN, CreateGuildOutcome.CREATE_GUILD_OUTCOME_NAME_TAKEN);
+
+    private static CreateGuildOutcome toProtoOutcome(GuildFacade.CreateOutcome outcome) {
+        return CREATE_GUILD_OUTCOME_MAPPING.get(outcome);
+    }
+
+    private void handleSendGuildJoinRequestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = SendGuildJoinRequestCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleSendGuildJoinRequestBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleSendGuildJoinRequestBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, SendGuildJoinRequestCommand command) {
+        var result = guildFacade.sendJoinRequest(characterId, command.getGuildName());
+        var response = SendGuildJoinRequestResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        send(ctx, Opcode.OPCODE_SEND_GUILD_JOIN_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private static final Map<GuildFacade.SendJoinRequestResult, SendGuildJoinRequestOutcome>
+            SEND_GUILD_JOIN_REQUEST_OUTCOME_MAPPING = Map.of(
+                    GuildFacade.SendJoinRequestResult.OK,
+                    SendGuildJoinRequestOutcome.SEND_GUILD_JOIN_REQUEST_OUTCOME_OK,
+                    GuildFacade.SendJoinRequestResult.ALREADY_IN_GUILD,
+                    SendGuildJoinRequestOutcome.SEND_GUILD_JOIN_REQUEST_OUTCOME_ALREADY_IN_GUILD,
+                    GuildFacade.SendJoinRequestResult.GUILD_NOT_FOUND,
+                    SendGuildJoinRequestOutcome.SEND_GUILD_JOIN_REQUEST_OUTCOME_GUILD_NOT_FOUND,
+                    GuildFacade.SendJoinRequestResult.REQUEST_ALREADY_PENDING,
+                    SendGuildJoinRequestOutcome.SEND_GUILD_JOIN_REQUEST_OUTCOME_REQUEST_ALREADY_PENDING);
+
+    private static SendGuildJoinRequestOutcome toProtoOutcome(GuildFacade.SendJoinRequestResult result) {
+        return SEND_GUILD_JOIN_REQUEST_OUTCOME_MAPPING.get(result);
+    }
+
+    private void handleApproveGuildJoinRequestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = ApproveGuildJoinRequestCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleApproveGuildJoinRequestBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleApproveGuildJoinRequestBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, ApproveGuildJoinRequestCommand command) {
+        var result = guildFacade.approveJoinRequest(command.getRequestId(), characterId);
+        var response = ApproveGuildJoinRequestResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        send(ctx, Opcode.OPCODE_APPROVE_GUILD_JOIN_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private static final Map<GuildFacade.ApproveResult, ApproveGuildJoinRequestOutcome>
+            APPROVE_GUILD_JOIN_REQUEST_OUTCOME_MAPPING = Map.of(
+                    GuildFacade.ApproveResult.OK, ApproveGuildJoinRequestOutcome.APPROVE_GUILD_JOIN_REQUEST_OUTCOME_OK,
+                    GuildFacade.ApproveResult.NOT_FOUND,
+                    ApproveGuildJoinRequestOutcome.APPROVE_GUILD_JOIN_REQUEST_OUTCOME_NOT_FOUND,
+                    GuildFacade.ApproveResult.TARGET_ALREADY_IN_GUILD,
+                    ApproveGuildJoinRequestOutcome.APPROVE_GUILD_JOIN_REQUEST_OUTCOME_TARGET_ALREADY_IN_GUILD);
+
+    private static ApproveGuildJoinRequestOutcome toProtoOutcome(GuildFacade.ApproveResult result) {
+        return APPROVE_GUILD_JOIN_REQUEST_OUTCOME_MAPPING.get(result);
+    }
+
+    private void handleRejectGuildJoinRequestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = RejectGuildJoinRequestCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleRejectGuildJoinRequestBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleRejectGuildJoinRequestBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, RejectGuildJoinRequestCommand command) {
+        var result = guildFacade.rejectJoinRequest(command.getRequestId(), characterId);
+        var outcome = result == GuildFacade.RejectResult.OK
+                ? RejectGuildJoinRequestOutcome.REJECT_GUILD_JOIN_REQUEST_OUTCOME_OK
+                : RejectGuildJoinRequestOutcome.REJECT_GUILD_JOIN_REQUEST_OUTCOME_NOT_FOUND;
+        var response = RejectGuildJoinRequestResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_REJECT_GUILD_JOIN_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private void handleLeaveGuildCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        LeaveGuildCommand.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleLeaveGuildBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleLeaveGuildBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        var outcome = switch (guildFacade.leaveGuild(characterId)) {
+            case OK -> LeaveGuildOutcome.LEAVE_GUILD_OUTCOME_OK;
+            case NOT_IN_GUILD -> LeaveGuildOutcome.LEAVE_GUILD_OUTCOME_NOT_IN_GUILD;
+            case LEADER_CANNOT_LEAVE -> LeaveGuildOutcome.LEAVE_GUILD_OUTCOME_LEADER_CANNOT_LEAVE;
+        };
+        var response = LeaveGuildResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_LEAVE_GUILD_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private void handleDisbandGuildCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        DisbandGuildCommand.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleDisbandGuildBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleDisbandGuildBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        var outcome = guildFacade.disbandGuild(characterId) == GuildFacade.DisbandResult.OK
+                ? DisbandGuildOutcome.DISBAND_GUILD_OUTCOME_OK
+                : DisbandGuildOutcome.DISBAND_GUILD_OUTCOME_NOT_LEADER;
+        var response = DisbandGuildResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_DISBAND_GUILD_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private void handleKickGuildMemberCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = KickGuildMemberCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleKickGuildMemberBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleKickGuildMemberBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, KickGuildMemberCommand command) {
+        var target = characterFacade.findByName(command.getTargetName());
+        if (target.isEmpty()) {
+            var response = KickGuildMemberResponse.newBuilder()
+                    .setOutcome(KickGuildMemberOutcome.KICK_GUILD_MEMBER_OUTCOME_TARGET_NOT_FOUND)
+                    .build();
+            send(ctx, Opcode.OPCODE_KICK_GUILD_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            return;
+        }
+        var result = guildFacade.kickMember(characterId, target.get().id());
+        var outcome = switch (result) {
+            case OK -> KickGuildMemberOutcome.KICK_GUILD_MEMBER_OUTCOME_OK;
+            case CANNOT_KICK_SELF -> KickGuildMemberOutcome.KICK_GUILD_MEMBER_OUTCOME_CANNOT_KICK_SELF;
+            case NOT_FOUND -> KickGuildMemberOutcome.KICK_GUILD_MEMBER_OUTCOME_NOT_FOUND;
+        };
+        var response = KickGuildMemberResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_KICK_GUILD_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private void handleListGuildMembersRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ListGuildMembersRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleListGuildMembersBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleListGuildMembersBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        var responseBuilder = ListGuildMembersResponse.newBuilder();
+        for (var member : guildFacade.listMembers(characterId)) {
+            // findById chạm DB mỗi thành viên — chấp nhận N+1 ở quy mô 1 bang MVP (vài chục),
+            // cùng lý do ListFriendsResponse.
+            var name = characterFacade.findById(member.characterId()).map(Character::name).orElse("");
+            responseBuilder.addMembers(GuildMemberView.newBuilder()
+                    .setCharacterId(member.characterId())
+                    .setName(name)
+                    .setIsLeader(member.isLeader())
+                    .setOnline(worldGateway.registry().isOnline(member.characterId()))
+                    .build());
+        }
+        send(ctx, Opcode.OPCODE_LIST_GUILD_MEMBERS_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+    }
+
+    private void handleListPendingGuildJoinRequestsRequest(
+            ChannelHandlerContext ctx, PacketHeader header, byte[] payload) throws InvalidProtocolBufferException {
+        ListPendingGuildJoinRequestsRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleListPendingGuildJoinRequestsBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleListPendingGuildJoinRequestsBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        var responseBuilder = ListPendingGuildJoinRequestsResponse.newBuilder();
+        for (var pending : guildFacade.listPendingJoinRequests(characterId)) {
+            var name = characterFacade.findById(pending.characterId()).map(Character::name).orElse("");
+            responseBuilder.addRequests(PendingGuildJoinRequestView.newBuilder()
+                    .setRequestId(pending.requestId())
+                    .setCharacterId(pending.characterId())
+                    .setCharacterName(name)
+                    .build());
+        }
+        send(ctx, Opcode.OPCODE_LIST_PENDING_GUILD_JOIN_REQUESTS_RESPONSE_VALUE, sequenceId,
+                responseBuilder.build().toByteArray());
+    }
+
+    private void handleGetMyGuildRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        GetMyGuildRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleGetMyGuildBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleGetMyGuildBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        var myGuild = guildFacade.findMyGuild(characterId);
+        var responseBuilder = GetMyGuildResponse.newBuilder().setInGuild(myGuild.isPresent());
+        myGuild.ifPresent(guild -> responseBuilder
+                .setGuildId(guild.guildId())
+                .setGuildName(guild.guildName())
+                .setIsLeader(guild.isLeader()));
+        send(ctx, Opcode.OPCODE_GET_MY_GUILD_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+    }
+
     private void handleSendMailCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         var command = SendMailCommand.parseFrom(payload);
@@ -1072,6 +1388,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         return switch (channel) {
             case CHAT_CHANNEL_PRIVATE -> chatPrivateRateLimiter;
             case CHAT_CHANNEL_AREA -> chatAreaRateLimiter;
+            case CHAT_CHANNEL_GUILD -> chatGuildRateLimiter;
             default -> chatWorldRateLimiter; // WORLD/UNSPECIFIED/UNRECOGNIZED — nghiêm ngặt nhất.
         };
     }
@@ -1097,33 +1414,62 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 return;
             }
         }
+        if (domainChannel == dev.kage.chat.domain.ChatChannel.GUILD && guildFacade.findMyGuild(characterId).isEmpty()) {
+            sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_GUILD);
+            return;
+        }
         var result = chatFacade.sendMessage(characterId, domainChannel, command.getBody());
         sendChatOutcome(ctx, sequenceId, toProtoOutcome(result));
         if (result != ChatFacade.SendResult.OK) {
             return;
         }
         var senderName = characterFacade.findById(characterId).map(Character::name).orElse("");
+        routeChatMessage(domainChannel, new ChatRouteContext(characterId, senderName, target, command.getBody()));
+    }
+
+    /** Gói tham số cho {@link #routeChatMessage} — tránh vượt 4 tham số Checkstyle {@code ParameterNumber}. */
+    private record ChatRouteContext(long characterId, String senderName, Character target, String body) {
+    }
+
+    /** Định tuyến người nhận SAU KHI {@code ChatFacade.sendMessage} đã trả OK — tách khỏi
+     * {@code handleSendChatMessageBlocking} để giữ method đó dưới giới hạn Checkstyle MethodLength. */
+    private void routeChatMessage(dev.kage.chat.domain.ChatChannel domainChannel, ChatRouteContext ctx) {
         switch (domainChannel) {
             case WORLD -> {
                 var event = ChatMessageEvent.newBuilder()
                         .setChannel(ChatChannel.CHAT_CHANNEL_WORLD)
-                        .setSenderId(characterId)
-                        .setSenderName(senderName)
-                        .setBody(command.getBody())
+                        .setSenderId(ctx.characterId())
+                        .setSenderName(ctx.senderName())
+                        .setBody(ctx.body())
                         .build();
                 worldGateway.registry().broadcastToAll(Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, event.toByteArray());
             }
             case PRIVATE -> {
                 var event = ChatMessageEvent.newBuilder()
                         .setChannel(ChatChannel.CHAT_CHANNEL_PRIVATE)
-                        .setSenderId(characterId)
-                        .setSenderName(senderName)
-                        .setBody(command.getBody())
+                        .setSenderId(ctx.characterId())
+                        .setSenderName(ctx.senderName())
+                        .setBody(ctx.body())
                         .build();
                 worldGateway.registry().sendToCharacterIfOnline(
-                        target.id(), Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
+                        ctx.target().id(), Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
             }
-            case AREA -> worldGateway.facade().enqueueAreaChatMessage(characterId, senderName, command.getBody());
+            case AREA -> worldGateway.facade().enqueueAreaChatMessage(ctx.characterId(), ctx.senderName(), ctx.body());
+            case GUILD -> {
+                var event = ChatMessageEvent.newBuilder()
+                        .setChannel(ChatChannel.CHAT_CHANNEL_GUILD)
+                        .setSenderId(ctx.characterId())
+                        .setSenderName(ctx.senderName())
+                        .setBody(ctx.body())
+                        .build();
+                // Broadcast cho MỌI thành viên đang online (gồm cả người gửi, cùng cách AREA tự
+                // thấy tin của mình) — không cần AoI/tick thread, guild membership không phải dữ
+                // liệu world-tick (feature-guild/CLAUDE.md).
+                for (var member : guildFacade.listMembers(ctx.characterId())) {
+                    worldGateway.registry().sendToCharacterIfOnline(
+                            member.characterId(), Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
+                }
+            }
             default -> throw new IllegalStateException("ChatChannel không xử lý: " + domainChannel);
         }
     }
@@ -1138,6 +1484,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case CHAT_CHANNEL_WORLD -> Optional.of(dev.kage.chat.domain.ChatChannel.WORLD);
             case CHAT_CHANNEL_PRIVATE -> Optional.of(dev.kage.chat.domain.ChatChannel.PRIVATE);
             case CHAT_CHANNEL_AREA -> Optional.of(dev.kage.chat.domain.ChatChannel.AREA);
+            case CHAT_CHANNEL_GUILD -> Optional.of(dev.kage.chat.domain.ChatChannel.GUILD);
             default -> Optional.empty();
         };
     }

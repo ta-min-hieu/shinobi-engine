@@ -16,9 +16,10 @@ Chiều: `api → application → domain`. **`domain/` không import gì bên ng
 
 ## Quyết định MVP (2026-07-23, Phase 6 lát cắt 6)
 
-- **Kênh Bang hội/Party DỜI Phase 7** cùng lúc `feature-guild`/party thật được code — chưa có dữ
-  liệu thành viên thì 2 kênh này không thể hoạt động đúng (quyết định cùng chủ dự án trước khi bắt
-  đầu lát cắt này, xem ROADMAP.md Phase 6/7). `ChatChannel` chỉ có `WORLD`/`PRIVATE`/`AREA`.
+- **Kênh Bang hội** thêm ở Phase 7 lát cắt 1 cùng `feature-guild` thật (`ChatChannel.GUILD`) — định
+  tuyến vẫn KHÔNG thuộc feature-chat (xem mục dưới), gateway tự gọi `GuildFacade.listMembers` sau
+  khi gửi OK. **Party vẫn CHƯA có** (dời tới khi `feature-party` thật được code, xem ROADMAP.md
+  Phase 7).
 - **Không lưu lịch sử chat** — không có bảng riêng. Mỗi tin nhắn HỢP LỆ ghi 1 dòng `audit_log`
   (action `CHAT_MESSAGE`) làm dấu vết cho báo cáo (GAMEPLAY.md §10), KHÔNG xây UI xem báo cáo.
 - **Định tuyến người nhận KHÔNG thuộc feature này** — World (toàn server), Riêng tư (1 người,

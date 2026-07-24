@@ -243,9 +243,15 @@ graph LR
 
 | Việc | Ghi chú |
 |---|---|
-| `feature-guild` | Kho bang, nhiệm vụ bang |
+| ✅ `feature-guild` lát cắt 1 (2026-07-24 — thành viên: tạo/xin gia nhập/leader duyệt-từ chối/rời/kick/giải tán + kênh chat Bang hội, chơi được thật qua socket + Postgres thật) | Kho bang, nhiệm vụ bang dời lát cắt sau |
 | Party | Cần cho dungeon |
 | ⚠️ **Trade** | [GAMEPLAY.md §8](../05-server/GAMEPLAY.md) — **hệ thống nguy hiểm nhất**: transaction + audit + 2-phase confirm + khoá item + idempotency |
+
+**Quyết định lát cắt 1 (2026-07-24, cùng chủ dự án qua `AskUserQuestion` trước khi code)**: thứ tự
+Guild → Party → Trade (Trade nguy hiểm nhất, hoãn tới khi có kinh nghiệm 2-phase confirm từ hệ
+thống khác); luồng gia nhập = **xin gia nhập + leader duyệt** (khác feature-friend là mời trực
+tiếp); phạm vi lát cắt 1 = chỉ thành viên + kênh chat Bang hội, kho bang/nhiệm vụ bang dời lát cắt
+sau (cùng cách Quest tách khỏi Dialogue ở Phase 6). Chi tiết đầy đủ: feature-guild/CLAUDE.md.
 
 ⚠️ **Không mở Trade nếu ADR-025 (idempotency) chưa Accepted.** (✅ Đã Accepted 2026-07-19 — điều kiện thoả, nhưng vẫn phải triển khai `idempotencyKey` thật trước khi Trade thật sự mở, không phải chỉ cần ADR tồn tại.)
 
