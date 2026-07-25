@@ -10,6 +10,7 @@ import dev.kage.server.world.component.CharacterIdComponent;
 import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterIdComponent;
+import dev.kage.server.world.component.StatusEffectComponent;
 import dev.kage.server.world.component.TargetComponent;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +43,8 @@ final class CombatSystem extends IteratingKSystem {
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
     private static final ComponentMapper<CombatStatsComponent> COMBAT_STATS =
             ComponentMapper.getFor(CombatStatsComponent.class);
+    private static final ComponentMapper<StatusEffectComponent> STATUS_EFFECT =
+            ComponentMapper.getFor(StatusEffectComponent.class);
 
     /** Kết quả 1 đòn đánh đã xảy ra thật trong tick này — {@code WorldFacade} drain để phát AoI. */
     record AttackOutcome(
@@ -79,6 +82,9 @@ final class CombatSystem extends IteratingKSystem {
         if (cooldown.remainingSeconds > 0f) {
             return;
         }
+        if (StatusEffects.isStunned(STATUS_EFFECT.get(entity))) {
+            return; // bị stun (Phase 8, hệ Thủy) — không đánh thường tick này, cooldown giữ nguyên <=0.
+        }
 
         TargetComponent target = TARGET.get(entity);
         if (target.targetEntityId == 0L) {
@@ -102,15 +108,19 @@ final class CombatSystem extends IteratingKSystem {
 
     private void resolveAndRecordAttack(
             KEntity attacker, KEntity target, long targetEntityId, HealthComponent targetHealth) {
-        CombatConstants.AttackResult result = CombatConstants.resolveAttack(
-                CombatConstants.toStats(COMBAT_STATS.get(attacker)), CombatConstants.toStats(COMBAT_STATS.get(target)));
-        targetHealth.current = Math.max(0, targetHealth.current - result.damage());
+        CombatConstants.CombatStats attackerStats = StatusEffects.applyModifiers(
+                CombatConstants.toStats(COMBAT_STATS.get(attacker)), STATUS_EFFECT.get(attacker));
+        CombatConstants.CombatStats defenderStats = StatusEffects.applyModifiers(
+                CombatConstants.toStats(COMBAT_STATS.get(target)), STATUS_EFFECT.get(target));
+        CombatConstants.AttackResult result = CombatConstants.resolveAttack(attackerStats, defenderStats);
+        int damageAfterShield = StatusEffects.absorbWithShield(STATUS_EFFECT.get(target), result.damage());
+        targetHealth.current = Math.max(0, targetHealth.current - damageAfterShield);
 
         long attackerId = entityId(attacker);
         pendingResults.add(new AttackOutcome(
                 attackerId,
                 targetEntityId,
-                result.damage(),
+                damageAfterShield, // damage THẬT trừ vào HP (sau khiên) — client thấy đúng số đã hấp thụ
                 result.crit(),
                 result.miss(),
                 targetHealth.current,

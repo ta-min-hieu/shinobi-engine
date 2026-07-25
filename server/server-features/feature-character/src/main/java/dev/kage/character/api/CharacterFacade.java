@@ -1,11 +1,14 @@
 package dev.kage.character.api;
 
+import dev.kage.character.application.CharacterUseCases;
 import dev.kage.character.application.CreateCharacterUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
+import dev.kage.character.application.SelectFactionUseCase;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.CharacterStats;
+import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.PositionSnapshot;
 import java.util.List;
 import java.util.Optional;
@@ -19,19 +22,17 @@ public final class CharacterFacade {
     private final CreateCharacterUseCase createCharacterUseCase;
     private final ListCharactersUseCase listCharactersUseCase;
     private final SelectCharacterUseCase selectCharacterUseCase;
+    private final SelectFactionUseCase selectFactionUseCase;
     // loadPosition/savePosition không có nghiệp vụ nào ngoài delegation thuần (characterId đã
     // được validate từ session ở gateway, không cần UseCase riêng chỉ để gọi thẳng Port — 3
     // UseCase còn lại có validate/orchestrate thật, đây thì không).
     private final CharacterPort characterPort;
 
-    public CharacterFacade(
-            CreateCharacterUseCase createCharacterUseCase,
-            ListCharactersUseCase listCharactersUseCase,
-            SelectCharacterUseCase selectCharacterUseCase,
-            CharacterPort characterPort) {
-        this.createCharacterUseCase = createCharacterUseCase;
-        this.listCharactersUseCase = listCharactersUseCase;
-        this.selectCharacterUseCase = selectCharacterUseCase;
+    public CharacterFacade(CharacterUseCases useCases, CharacterPort characterPort) {
+        this.createCharacterUseCase = useCases.createCharacterUseCase();
+        this.listCharactersUseCase = useCases.listCharactersUseCase();
+        this.selectCharacterUseCase = useCases.selectCharacterUseCase();
+        this.selectFactionUseCase = useCases.selectFactionUseCase();
         this.characterPort = characterPort;
     }
 
@@ -45,6 +46,11 @@ public final class CharacterFacade {
 
     public Character selectCharacter(long accountId, long characterId) {
         return selectCharacterUseCase.execute(accountId, characterId);
+    }
+
+    /** GDD §4 "chọn hệ ở Lv10" (Phase 8) — {@code characterId} gateway đã verify sở hữu qua session. */
+    public Character selectFaction(long characterId, Faction faction) {
+        return selectFactionUseCase.execute(characterId, faction);
     }
 
     public PositionSnapshot loadPosition(long characterId) {

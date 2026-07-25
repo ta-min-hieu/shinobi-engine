@@ -83,6 +83,19 @@ class CreateCharacterUseCaseTest {
             characters.add(character);
             return character;
         }
+
+        @Override
+        public void updateFaction(long characterId, Faction faction) {
+            for (int i = 0; i < characters.size(); i++) {
+                Character c = characters.get(i);
+                if (c.id() == characterId) {
+                    characters.set(i, new Character(
+                            c.id(), c.accountId(), c.realmId(), c.name(), faction,
+                            c.level(), c.exp(), c.rebirthCount(), c.createdAt()));
+                    return;
+                }
+            }
+        }
     }
 
     static final TransactionRunner DIRECT_TX = action -> action.accept(null);

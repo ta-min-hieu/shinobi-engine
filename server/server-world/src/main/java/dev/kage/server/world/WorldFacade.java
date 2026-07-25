@@ -10,6 +10,7 @@ import dev.kage.server.world.component.AiStateComponent;
 import dev.kage.server.world.component.AttackCooldownComponent;
 import dev.kage.server.world.component.BossAiComponent;
 import dev.kage.server.world.component.CharacterIdComponent;
+import dev.kage.server.world.component.CharacterLevelComponent;
 import dev.kage.server.world.component.ChiComponent;
 import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
@@ -18,6 +19,7 @@ import dev.kage.server.world.component.MonsterIdComponent;
 import dev.kage.server.world.component.NpcComponent;
 import dev.kage.server.world.component.NpcIdComponent;
 import dev.kage.server.world.component.SkillCooldownComponent;
+import dev.kage.server.world.component.StatusEffectComponent;
 import dev.kage.server.world.component.TargetComponent;
 import java.util.HashMap;
 import java.util.List;
@@ -52,6 +54,8 @@ public final class WorldFacade {
     private static final ComponentMapper<MonsterComponent> MONSTER = ComponentMapper.getFor(MonsterComponent.class);
     private static final ComponentMapper<CombatStatsComponent> COMBAT_STATS =
             ComponentMapper.getFor(CombatStatsComponent.class);
+    private static final ComponentMapper<StatusEffectComponent> STATUS_EFFECT =
+            ComponentMapper.getFor(StatusEffectComponent.class);
 
     // Quái bù nhìn tập luyện — lát cắt 1 Phase 4, hardcode 1 quái, chưa có monster_template DB.
     private static final String TRAINING_DUMMY_CODE = "training_dummy";
@@ -109,7 +113,7 @@ public final class WorldFacade {
      * cố định, không phụ thuộc instance {@link WorldFacade} nào.
      */
     public static List<String> listSkillScriptResources() {
-        return List.of(SkillConstants.FIREBALL_SCRIPT_RESOURCE);
+        return SkillRegistry.allScriptResources();
     }
 
     /**
@@ -147,6 +151,10 @@ public final class WorldFacade {
         ecsWorld.addSystem(combatSystem);
         ecsWorld.addSystem(skillSystem);
         ecsWorld.addSystem(bossAiSystem);
+        // Đếm ngược buff/debuff (Phase 8, 4 hệ phái) — không phụ thuộc thứ tự với Combat/Skill vì
+        // chỉ mutate remainingSeconds/magnitude tại chỗ, các System khác ĐỌC StatusEffectComponent
+        // lúc resolve riêng (StatusEffects helper), không qua processEntity của System này.
+        ecsWorld.addSystem(new StatusEffectSystem());
     }
 
     /** Bắt đầu tick loop trên thread riêng — gọi 1 lần lúc khởi động server. */
@@ -305,6 +313,10 @@ public final class WorldFacade {
         entity.add(new TargetComponent());
         entity.add(new AttackCooldownComponent());
         entity.add(new SkillCooldownComponent());
+        entity.add(new StatusEffectComponent());
+        CharacterLevelComponent levelComponent = new CharacterLevelComponent();
+        levelComponent.level = baseStats.level();
+        entity.add(levelComponent);
 
         ChiComponent chi = new ChiComponent();
         chi.current = SkillConstants.CHARACTER_MAX_CHI; // placeholder — chưa nối character_stat.current_chi DB
@@ -334,10 +346,18 @@ public final class WorldFacade {
             return;
         }
 
-        float[] direction = clampDirection(intent.dirX(), intent.dirY());
         VelocityComponent velocity = VELOCITY.get(entity);
-        velocity.x = direction[0] * WorldConstants.MOVE_SPEED_MPS;
-        velocity.y = direction[1] * WorldConstants.MOVE_SPEED_MPS;
+        if (StatusEffects.isStunned(STATUS_EFFECT.get(entity))) {
+            // Bị stun (Phase 8, hệ Thủy) — không di chuyển, nhưng VẪN ack lệnh (client cần reconcile
+            // sequenceId dù bị từ chối, khác các lệnh "âm thầm bỏ qua" không cần phản hồi).
+            velocity.x = 0f;
+            velocity.y = 0f;
+        } else {
+            float[] direction = clampDirection(intent.dirX(), intent.dirY());
+            float speed = WorldConstants.MOVE_SPEED_MPS * StatusEffects.moveSpeedMultiplier(STATUS_EFFECT.get(entity));
+            velocity.x = direction[0] * speed;
+            velocity.y = direction[1] * speed;
+        }
 
         PositionComponent position = POSITION.get(entity);
         outboundSink.onMoveAccepted(intent.characterId(), intent.sequenceId(), position.x, position.y);
@@ -355,13 +375,12 @@ public final class WorldFacade {
     }
 
     private void handleUseSkill(long characterId, String skillCode, long targetEntityId) {
-        KEntity caster = entitiesByCharacterId.get(characterId);
-        if (caster == null) {
+        if (!entitiesByCharacterId.containsKey(characterId)) {
             return;
         }
-        if (targetEntityId == characterId || lookupEntity(targetEntityId) == null) {
-            return; // không tự nhắm chính mình; mục tiêu không tồn tại — bỏ qua an toàn (giống handleSetTarget).
-        }
+        // KHÔNG chặn targetEntityId == characterId ở đây nữa (Phase 8) — skill SELF/ALLY (buff/
+        // khiên/heal) hợp lệ khi tự nhắm chính mình; SkillSystem.tryCast tự validate đầy đủ theo
+        // SkillTargetKind của TỪNG skill (kể cả chặn ENEMY tự nhắm chính mình).
         skillSystem.tryCast(characterId, skillCode, targetEntityId);
     }
 
@@ -433,7 +452,8 @@ public final class WorldFacade {
                     outcome.crit(),
                     outcome.miss(),
                     outcome.targetCurrentHp(),
-                    outcome.targetDied());
+                    outcome.targetDied(),
+                    outcome.effectKind());
 
             Set<Long> observers = aoiTracker.observersOf(outcome.targetEntityId());
             observers.add(outcome.attackerEntityId()); // người dùng skill luôn thấy kết quả của chính mình.
@@ -465,7 +485,8 @@ public final class WorldFacade {
                     outcome.crit(),
                     outcome.miss(),
                     outcome.targetCurrentHp(),
-                    outcome.targetDied());
+                    outcome.targetDied(),
+                    SkillEffectKind.DAMAGE); // boss chỉ có chiêu damage ở lát cắt này (chưa heal/khiên/buff).
 
             Set<Long> observers = aoiTracker.observersOf(outcome.targetEntityId());
             observers.add(outcome.attackerEntityId()); // boss "thấy" đòn của chính nó, giống người dùng skill.
@@ -547,6 +568,7 @@ public final class WorldFacade {
         entity.add(aiState);
         entity.add(new TargetComponent()); // AiSystem ghi khi Chase/Attack; CombatSystem đọc để đánh trả
         entity.add(new AttackCooldownComponent());
+        entity.add(new StatusEffectComponent());
 
         entitiesByMonsterId.put(monsterId, entity);
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
@@ -585,6 +607,7 @@ public final class WorldFacade {
         entity.add(aiState);
         entity.add(new TargetComponent()); // AiSystem ghi khi Chase/Attack; CombatSystem đọc để đánh trả
         entity.add(new AttackCooldownComponent());
+        entity.add(new StatusEffectComponent());
         entity.add(new BossAiComponent()); // BossAiSystem đọc/ghi — cooldown chiêu đặc biệt + cờ enrage
 
         entitiesByMonsterId.put(monsterId, entity);
@@ -629,6 +652,7 @@ public final class WorldFacade {
         component.dodgePercent = stats.dodgePercent();
         component.critPercent = stats.critPercent();
         component.critDamageMultiplier = stats.critDamageMultiplier();
+        component.element = stats.element();
         return component;
     }
 

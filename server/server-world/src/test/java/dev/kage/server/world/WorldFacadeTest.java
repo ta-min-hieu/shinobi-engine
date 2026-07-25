@@ -21,7 +21,13 @@ class WorldFacadeTest {
 
     // STR/AGI/INT/VIT giả định cho test — không verify số liệu chỉ số cụ thể ở file này (đã có
     // PostgresCharacterAdapterIntegrationTest cho việc đó), chỉ cần attach thành công.
-    private static final CharacterBaseStats DEFAULT_STATS = new CharacterBaseStats(10, 10, 10, 10);
+    private static final CharacterBaseStats DEFAULT_STATS = new CharacterBaseStats(10, 10, 10, 10, Element.HOA, 1);
+    // Phase 8 (4 hệ phái mới) — cùng STR/AGI/INT/VIT với DEFAULT_STATS, chỉ khác Element, để so
+    // sánh công bằng (không lẫn khác biệt do chỉ số nền) giữa các hệ trong test khắc chế/skill mới.
+    private static final CharacterBaseStats THUY_STATS = new CharacterBaseStats(10, 10, 10, 10, Element.THUY, 1);
+    private static final CharacterBaseStats PHONG_STATS = new CharacterBaseStats(10, 10, 10, 10, Element.PHONG, 1);
+    private static final CharacterBaseStats THO_STATS = new CharacterBaseStats(10, 10, 10, 10, Element.THO, 1);
+    private static final CharacterBaseStats LOI_STATS = new CharacterBaseStats(10, 10, 10, 10, Element.LOI, 1);
 
     private record Spawned(long target, long spawned, float x, float y) {
     }
@@ -60,7 +66,7 @@ class WorldFacadeTest {
 
     private record SkillResult(
             long target, String skillCode, long attacker, long defender, int damage, boolean crit, boolean miss,
-            int hp, boolean died) {
+            int hp, boolean died, SkillEffectKind effectKind) {
     }
 
     private record AreaChatMessage(long target, long senderCharacterId, String senderName, String body) {
@@ -145,7 +151,7 @@ class WorldFacadeTest {
             skillResults.add(new SkillResult(
                     targetCharacterId, outcome.skillCode(), outcome.attackerEntityId(), outcome.targetEntityId(),
                     outcome.damage(), outcome.crit(), outcome.miss(), outcome.targetCurrentHp(),
-                    outcome.targetDied()));
+                    outcome.targetDied(), outcome.effectKind()));
         }
 
         @Override
@@ -454,6 +460,165 @@ class WorldFacadeTest {
 
         long castsLanded = sink.skillResults.stream().filter(r -> r.defender() == monsterId).count();
         assertThat(castsLanded).isLessThanOrEqualTo(1);
+    }
+
+    @Test
+    @Timeout(15)
+    void shouldDealMoreDamage_whenAttackerElementCountersDefenderElement() {
+        // GDD §4/§6 khắc chế nguyên tố — Hỏa khắc Phong (×1.15) nhưng trung lập với Lôi (×1.0).
+        // Dùng đánh thường (không phải skill) để tránh nhánh "đòn kết liễu" của fireball.js (dựa
+        // theo %HP mục tiêu) làm nhiễu phép so sánh. DEF của Phong/Lôi bằng nhau (không hệ nào có
+        // passive +DEF ở lát cắt này) nên chênh lệch damage CHỈ có thể tới từ hệ số khắc chế.
+        world.start();
+        world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS); // Hỏa
+        world.attachCharacter(2L, 1f, 0f, PHONG_STATS); // bị Hỏa khắc
+        world.attachCharacter(3L, -1f, 0f, LOI_STATS); // trung lập với Hỏa
+        awaitTrue(() -> sink.spawned.size() >= 6); // 3 nhân vật thấy nhau đủ 2 chiều
+
+        world.setTarget(1L, 2L);
+        awaitTrue(() -> sink.attackResults.stream().anyMatch(a -> a.defender() == 2L && !a.miss()));
+        int damageVsPhong = sink.attackResults.stream()
+                .filter(a -> a.defender() == 2L && !a.miss())
+                .findFirst()
+                .orElseThrow()
+                .damage();
+
+        world.setTarget(1L, 3L);
+        awaitTrue(() -> sink.attackResults.stream().anyMatch(a -> a.defender() == 3L && !a.miss()));
+        int damageVsLoi = sink.attackResults.stream()
+                .filter(a -> a.defender() == 3L && !a.miss())
+                .findFirst()
+                .orElseThrow()
+                .damage();
+
+        assertThat(damageVsPhong).isGreaterThan(damageVsLoi);
+    }
+
+    @Test
+    @Timeout(15)
+    void shouldHealAlly_whenHealSkillCast() {
+        // Thủy "hồi phục" THẬT (GDD §4) — đứng gần quái bù nhìn để bị đánh trước (HP tụt dưới max
+        // mới đo được hiệu quả heal), rồi tự cast thuy_hoi_phuc nhắm CHÍNH MÌNH (ALLY, GDD cho
+        // phép heal bản thân).
+        world.start();
+        world.attachCharacter(1L, 5f, 9f, THUY_STATS); // trong tầm aggro quái bù nhìn (xem shouldChaseAndAttackBack)
+        awaitTrue(() -> sink.attackResults.stream()
+                .anyMatch(a -> a.defender() == 1L && !a.miss() && a.hp() < CombatConstants.CHARACTER_MAX_HP));
+
+        world.useSkill(1L, "thuy_hoi_phuc", 1L);
+
+        awaitTrue(() -> sink.skillResults.stream().anyMatch(
+                r -> "thuy_hoi_phuc".equals(r.skillCode()) && r.effectKind() == SkillEffectKind.HEAL
+                        && r.damage() > 0));
+    }
+
+    @Test
+    @Timeout(15)
+    void shouldAbsorbDamageWithShield_beforeReducingHp() {
+        // Thổ "khiên" THẬT (GDD §4) — cast khiên TRƯỚC khi quái kịp đánh (đứng trong tầm aggro
+        // nhưng ngoài tầm đánh lúc cast, xem AiConstants), pool khiên (~60, xem tho_khien_da.js)
+        // lớn hơn NHIỀU 1 đòn quái bù nhìn placeholder (~5-8 sau giảm giáp) nên đòn KHÔNG TRƯỢT
+        // đầu tiên phải bị hấp thụ HẾT — HP nhân vật còn NGUYÊN ở CHARACTER_MAX_HP.
+        world.start();
+        world.attachCharacter(1L, 5f, 9f, THO_STATS);
+        awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
+
+        world.useSkill(1L, "tho_khien_da", 1L);
+        awaitTrue(() -> sink.skillResults.stream()
+                .anyMatch(r -> "tho_khien_da".equals(r.skillCode()) && r.effectKind() == SkillEffectKind.SHIELD));
+
+        awaitTrue(() -> sink.attackResults.stream().anyMatch(a -> a.defender() == 1L && !a.miss()));
+        AttackResult firstHit = sink.attackResults.stream()
+                .filter(a -> a.defender() == 1L && !a.miss())
+                .findFirst()
+                .orElseThrow();
+        assertThat(firstHit.hp()).isEqualTo(CombatConstants.CHARACTER_MAX_HP);
+    }
+
+    @Test
+    @Timeout(15)
+    void shouldBlockMonsterAttack_whileStunnedByDebuffSkill() {
+        // Lôi "khống chế đơn mục tiêu" (loi_dien_giat, choáng 2.5s — dài hơn hẳn 1 chu kỳ
+        // ATTACK_INTERVAL_SECONDS=1s bình thường, đủ để phân biệt "bị chặn vì stun" với "chỉ đang
+        // chờ cooldown tự nhiên"). Đứng NGAY trong tầm đánh để quái tự aggro + đánh trả trước.
+        world.start();
+        world.attachCharacter(1L, 5f, 6f, LOI_STATS);
+        awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
+        long monsterId = sink.monsterSpawned.get(0).monsterId();
+
+        awaitTrue(() -> sink.attackResults.stream().anyMatch(a -> a.attacker() == monsterId));
+        long attacksBeforeStun =
+                sink.attackResults.stream().filter(a -> a.attacker() == monsterId).count();
+
+        world.useSkill(1L, "loi_dien_giat", monsterId);
+        awaitTrue(() -> sink.skillResults.stream()
+                .anyMatch(r -> "loi_dien_giat".equals(r.skillCode()) && r.effectKind() == SkillEffectKind.DEBUFF));
+
+        // > 1 chu kỳ ATTACK_INTERVAL_SECONDS (1s) bình thường NHƯNG < thời lượng choáng (2.5s) —
+        // không bị stun thì quái đã kịp đánh thêm ít nhất 1 lần trong khoảng này.
+        sleepQuietly(1800);
+
+        long attacksAfterStun =
+                sink.attackResults.stream().filter(a -> a.attacker() == monsterId).count();
+        assertThat(attacksAfterStun).isEqualTo(attacksBeforeStun);
+    }
+
+    @Test
+    @Timeout(15)
+    void shouldReduceMoveDistance_whenTargetSlowedByDebuffSkill() {
+        // Thủy "khống chế" THẬT (thuy_phong_toa, SLOW -40%) — nhắm nhân vật KHÁC (ENEMY target,
+        // đơn giản hoá PvP-style thay vì cần quái di chuyển bằng MoveCommand). Không bị slow: 5
+        // m/s (MOVE_SPEED_MPS) × 1s = 5m. Bị slow 40%: 3 m/s × 1s = 3m — ngưỡng 4m đủ phân biệt kể
+        // cả dưới jitter tick loop thật.
+        world.start();
+        world.attachCharacter(1L, 0f, 0f, THUY_STATS);
+        world.attachCharacter(2L, 3f, 0f, LOI_STATS); // trong tầm skill Thủy (5m)
+        awaitTrue(() -> sink.spawned.size() >= 2);
+
+        world.useSkill(1L, "thuy_phong_toa", 2L);
+        awaitTrue(() -> sink.skillResults.stream()
+                .anyMatch(r -> "thuy_phong_toa".equals(r.skillCode()) && r.effectKind() == SkillEffectKind.DEBUFF));
+
+        world.enqueueMoveCommand(2L, 1, 1f, 0f);
+        sleepQuietly(1000);
+
+        Moved lastMoved = sink.moved.stream()
+                .filter(m -> m.target() == 1L && m.moved() == 2L)
+                .reduce((first, second) -> second)
+                .orElseThrow();
+        assertThat(lastMoved.x()).isLessThan(3f + 4f);
+    }
+
+    @Test
+    @Timeout(15)
+    void shouldSilentlyRejectSkill_whenCasterWrongFaction() {
+        // Chống dùng skill hệ khác (SkillSystem.tryCast, SECURITY.md) — nhân vật Hỏa gửi skillCode
+        // của hệ Thủy, server phải bỏ qua ÂM THẦM, không có SkillResultEvent nào phát sinh.
+        world.start();
+        world.attachCharacter(1L, 5f, 6f, DEFAULT_STATS); // Hỏa
+        awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
+        long monsterId = sink.monsterSpawned.get(0).monsterId();
+
+        world.useSkill(1L, "thuy_song_du", monsterId);
+        sleepQuietly(500);
+
+        assertThat(sink.skillResults.stream().anyMatch(r -> "thuy_song_du".equals(r.skillCode()))).isFalse();
+    }
+
+    @Test
+    @Timeout(15)
+    void shouldSilentlyRejectUltimate_whenBelowRequiredLevel() {
+        // GDD §5 "Tuyệt Kỹ Lv50" — DEFAULT_STATS/THUY_STATS ở test này đều level=1, phải bị chặn
+        // ÂM THẦM (CharacterLevelComponent < SkillConstants.ULTIMATE_REQUIRED_LEVEL).
+        world.start();
+        world.attachCharacter(1L, 5f, 6f, THUY_STATS);
+        awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
+        long monsterId = sink.monsterSpawned.get(0).monsterId();
+
+        world.useSkill(1L, "thuy_thuy_trieu", monsterId);
+        sleepQuietly(500);
+
+        assertThat(sink.skillResults.stream().anyMatch(r -> "thuy_thuy_trieu".equals(r.skillCode()))).isFalse();
     }
 
     @Test

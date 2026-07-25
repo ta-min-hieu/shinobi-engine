@@ -87,7 +87,11 @@ public interface WorldOutboundSink {
             boolean targetDied) {
     }
 
-    /** Kết quả 1 lần dùng skill — gộp tham số cho {@link #onSkillResult} (STATIC-ANALYSIS.md). */
+    /**
+     * Kết quả 1 lần dùng skill — gộp tham số cho {@link #onSkillResult} (STATIC-ANALYSIS.md).
+     * {@code damage} là "độ lớn" dùng chung mọi {@code effectKind} (lượng heal/khiên khi không phải
+     * {@link SkillEffectKind#DAMAGE} — xem {@code combat.proto SkillResultEvent}).
+     */
     record SkillOutcome(
             String skillCode,
             long attackerEntityId,
@@ -96,6 +100,7 @@ public interface WorldOutboundSink {
             boolean crit,
             boolean miss,
             int targetCurrentHp,
-            boolean targetDied) {
+            boolean targetDied,
+            SkillEffectKind effectKind) {
     }
 }

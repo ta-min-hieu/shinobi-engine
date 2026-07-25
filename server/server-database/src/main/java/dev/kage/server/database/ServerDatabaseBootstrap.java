@@ -3,9 +3,11 @@ package dev.kage.server.database;
 import dev.kage.account.api.AccountFacade;
 import dev.kage.account.application.LoginOrCreateAccountUseCase;
 import dev.kage.character.api.CharacterFacade;
+import dev.kage.character.application.CharacterUseCases;
 import dev.kage.character.application.CreateCharacterUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
+import dev.kage.character.application.SelectFactionUseCase;
 import dev.kage.chat.api.ChatFacade;
 import dev.kage.chat.application.SendChatMessageUseCase;
 import dev.kage.dialogue.api.DialogueFacade;
@@ -156,7 +158,10 @@ public final class ServerDatabaseBootstrap {
         CreateCharacterUseCase createUseCase = new CreateCharacterUseCase(characterPort, transactionRunner);
         ListCharactersUseCase listUseCase = new ListCharactersUseCase(characterPort);
         SelectCharacterUseCase selectUseCase = new SelectCharacterUseCase(characterPort);
-        return new CharacterFacade(createUseCase, listUseCase, selectUseCase, characterPort);
+        SelectFactionUseCase selectFactionUseCase = new SelectFactionUseCase(characterPort);
+        CharacterUseCases useCases =
+                new CharacterUseCases(createUseCase, listUseCase, selectUseCase, selectFactionUseCase);
+        return new CharacterFacade(useCases, characterPort);
     }
 
     public InventoryFacade wireInventoryFacade() {

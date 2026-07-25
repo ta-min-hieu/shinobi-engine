@@ -9,12 +9,15 @@ import dev.kage.account.domain.AccountPort;
 import dev.kage.account.domain.SessionPort;
 import dev.kage.account.domain.Transaction;
 import dev.kage.character.api.CharacterFacade;
+import dev.kage.character.application.CharacterUseCases;
 import dev.kage.character.application.CreateCharacterUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
+import dev.kage.character.application.SelectFactionUseCase;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.CharacterStats;
+import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.inventory.api.EquipmentUseCases;
@@ -261,11 +264,27 @@ class GatewayServerIntegrationTest {
                 characters.add(character);
                 return character;
             }
+
+            @Override
+            public void updateFaction(long characterId, Faction faction) {
+                for (int i = 0; i < characters.size(); i++) {
+                    Character c = characters.get(i);
+                    if (c.id() == characterId) {
+                        characters.set(i, new Character(
+                                c.id(), c.accountId(), c.realmId(), c.name(), faction,
+                                c.level(), c.exp(), c.rebirthCount(), c.createdAt()));
+                        return;
+                    }
+                }
+            }
         };
         CreateCharacterUseCase createUseCase = new CreateCharacterUseCase(characterPort, action -> action.accept(null));
         ListCharactersUseCase listUseCase = new ListCharactersUseCase(characterPort);
         SelectCharacterUseCase selectUseCase = new SelectCharacterUseCase(characterPort);
-        return new CharacterFacade(createUseCase, listUseCase, selectUseCase, characterPort);
+        SelectFactionUseCase selectFactionUseCase = new SelectFactionUseCase(characterPort);
+        CharacterUseCases useCases =
+                new CharacterUseCases(createUseCase, listUseCase, selectUseCase, selectFactionUseCase);
+        return new CharacterFacade(useCases, characterPort);
     }
 
     // worldFacade.start() chạy tick thật ở file này, nhưng không test nào hạ gục quái tới chết

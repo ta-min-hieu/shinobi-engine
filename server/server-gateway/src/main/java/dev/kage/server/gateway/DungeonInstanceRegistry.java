@@ -1,10 +1,12 @@
 package dev.kage.server.gateway;
 
 import dev.kage.character.api.CharacterFacade;
+import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.server.world.CharacterBaseStats;
+import dev.kage.server.world.Element;
 import dev.kage.server.world.WorldFacade;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -160,7 +162,10 @@ final class DungeonInstanceRegistry {
 
     private CharacterBaseStats loadBaseStats(long characterId) {
         CharacterStats stats = characterFacade.loadStats(characterId);
-        return new CharacterBaseStats(stats.str(), stats.agi(), stats.intelligence(), stats.vit());
+        Optional<Character> character = characterFacade.findById(characterId);
+        Element element = character.map(c -> FactionMapping.toElement(c.faction())).orElse(Element.NONE);
+        int level = character.map(Character::level).orElse(1);
+        return new CharacterBaseStats(stats.str(), stats.agi(), stats.intelligence(), stats.vit(), element, level);
     }
 
     /** 1 dungeon World đang chạy cho 1 party — {@code characterIds} mutable (thành viên vào/ra lẻ tẻ). */

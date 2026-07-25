@@ -281,7 +281,7 @@ vá luôn lỗ hổng `idempotencyKey` còn thiếu ở `BuyItemCommand`/`SellIt
 | ✅ Dungeon instance lát cắt 1 (2026-07-25 — hạ tầng: party cùng vào 1 World riêng qua `EnterDungeonCommand`/`ExitDungeonCommand`, tick độc lập world chính, cách ly lỗi tick, chơi được thật qua socket) | [ADR-026](../01-architecture/adr/ADR-026-Dungeon-Instance-Model.md) |
 | ✅ Boss AI lát cắt 2 (2026-07-25 — script GraalJS quyết định pha/chiêu (`BossAiSystem`), tái dùng `ScriptSandbox` từ Phase 4, boss tự spawn trong dungeon, loot thật qua `drop_table` có sẵn, chơi được thật qua socket) | [AI.md §4](../03-engine/AI.md) |
 | PvP arena + battlefield | [GDD](../13-game-design/GAME-DESIGN-DOCUMENT.md) |
-| 4 hệ phái còn lại | — |
+| ✅ 4 hệ phái còn lại lát cắt 3 (2026-07-25 — Thủy/Phong/Lôi/Thổ chơi được thật qua socket: khắc chế nguyên tố, status-effect framework mới (slow/stun/shield/buff/debuff), 16 skill script mới + passive, chọn hệ Lv10) | [GDD §4](../13-game-design/GAME-DESIGN-DOCUMENT.md) |
 
 **ADR cần trước Phase 8**: ✅ ADR-026 Accepted 2026-07-24 — Phase 8 đủ điều kiện mở.
 
@@ -332,6 +332,57 @@ chiêu đặc biệt TÁI DÙNG nguyên `SkillResultEvent`/`onSkillResult` đã 
    viết test socket thật cho boss đấu solo. Sửa: `handleCombatResults`/`handleSkillResults`/
    `handleBossResults` đều thêm `targetEntityId` (nếu dương, tức nhân vật) vào observers — mục
    tiêu luôn thấy đòn nhắm vào mình, cùng nguyên tắc đã áp dụng cho attacker.
+
+**Quyết định lát cắt 3 (2026-07-25, cùng chủ dự án qua `AskUserQuestion` trước khi code, 4 vòng)**:
+(1) đúng theo GDD §4 là **Thủy, Phong, Lôi, Thổ** — không phải Kim/Mộc (đã xác nhận `Faction.java`
+ghi chú sẵn đúng 4 tên này); (2) mỗi hệ mới làm **đầy đủ theo GDD §5** (3 active + 2 passive + 1
+Tuyệt Kỹ/hệ) — Hỏa GIỮ NGUYÊN 1 active hiện có, hoàn thiện nốt là việc lát cắt sau (cùng tinh thần
+Party hoãn chia EXP); (3) **hệ số khắc chế nguyên tố** (GDD §6, ×1.15/×0.85, hardcode 1.0 từ Phase 4)
+làm luôn; (4) 3 skill active/hệ cần **cơ chế thật** (hồi máu/khống chế/khiên) — không chỉ đổi công
+thức damage-nuke, đây là quyết định lớn nhất: cần xây MỚI 1 hệ thống status-effect (chưa từng có
+trong engine); (5) chọn hệ **đúng GDD** — `SelectFactionUseCase` gate `level>=10`, dùng field
+`level` có sẵn ở `Character` dù chưa có cơ chế cộng EXP-giết-quái (người chơi cày Lv10 qua quest).
+
+Chi tiết kỹ thuật (6 phần, làm tuần tự vì phần sau phụ thuộc phần trước):
+1. **Faction enum + protocol**: `Faction.java` thêm `THUY/PHONG/LOI/THO`; `character.proto` dùng
+   đúng số enum đã giữ chỗ sẵn (2-5) từ trước.
+2. **Element + khắc chế**: `server-world` tự có bản sao `Element` (không import feature-character,
+   đúng ranh giới module — cùng pattern `CharacterBaseStats`); `ElementCounterTable` mã hoá chu
+   trình khắc Hỏa→Phong→Thổ→Thủy→Hỏa, Lôi/NONE trung lập tuyệt đối; nhân vào bước cuối pipeline
+   damage (`CombatConstants.resolveAttack`/`resolveSkillAttack`).
+3. **Status-effect framework (mới)**: `StatusEffectComponent` (mảng 4 slot CỐ ĐỊNH, tránh boxing
+   `Map<String,Float>` trong game loop — /CLAUDE.md §6) + `StatusEffectType`
+   (MOVE_SPEED_MOD/STUN/SHIELD/DEF_MOD/RES_MOD/CRIT_MOD) + `StatusEffectSystem` (đếm ngược, pattern
+   y hệt `SkillSystem.processEntity`) + helper `StatusEffects` (đọc/ghi tập trung, dùng chung
+   `CombatSystem`/`SkillSystem`/`AiSystem`/`WorldFacade.handleMoveIntent`). SLOW/buff tốc độ áp
+   dụng CẢ cho quái đuổi theo (`AiSystem.moveToward`), không chỉ nhân vật gửi `MoveCommand`.
+4. **Skill registry**: thay `SkillConstants` hardcode 1 skill bằng `SkillRegistry`
+   (`Map<String,SkillDefinition>`) + `SkillTargetKind` (ENEMY/SELF/ALLY) + `SkillCooldownComponent`
+   đổi từ 1 `float` sang `float[4]` (index = slot trong hệ, KHÔNG dùng Map tránh boxing) +
+   `CharacterLevelComponent` mới (gate Tuyệt Kỹ Lv50). Script đổi hợp đồng trả về: KHÔNG còn scalar
+   đơn thuần, phải trả object `{effect, value, stat?, duration?, armor_pierce?}` — tái dùng đúng
+   pattern `BossAiSystem` đã làm cho `sample_boss.js` (Value.getMember qua extractor
+   `ScriptSandbox.eval`). `fireball.js` (Hỏa, Phase 4) cũng đổi theo hợp đồng mới cho nhất quán.
+5. **16 skill script mới** (4 hệ × [3 active + 1 Tuyệt Kỹ], passive KHÔNG dùng script — chỉ số cộng
+   thẳng, Điều 27 chỉ bắt buộc script cho nội dung skill) + `combat.proto` thêm `EffectKind` enum
+   (DAMAGE/HEAL/SHIELD/BUFF/DEBUFF) vào `SkillResultEvent` (additive, không đổi field cũ).
+6. **Chọn hệ Lv10**: `SelectFactionUseCase` (feature-character) + `CharacterPort.updateFaction` (1
+   UPDATE đơn, không cần Transaction — không có ghi phụ nào cùng nguyên tử ở lát cắt này) +
+   `SelectFactionRequest/Response` (opcode 206/207, characterId từ session như `UseSkillCommand`,
+   KHÔNG có field character_id trong packet).
+
+**Scope cut có chủ đích** (ghi lại để không lẫn với "quên làm"): (a) Hỏa vẫn chỉ có 1 skill active —
+hoàn thiện nốt 2 active/2 passive/Tuyệt Kỹ là việc lát cắt sau; (b) "Đá Chuyển Hệ" sau lần đổi hệ
+miễn phí đầu tiên (GDD §4) CHƯA enforce — `SelectFactionUseCase` chỉ gate `level>=10`, chưa đếm số
+lần đổi/tốn item (cần thêm cột DB + item ở feature-inventory, để dành lát cắt sau).
+
+**1 bug thật phát hiện khi viết test E2E** (không phải đoán trước): `WorldFacade.handleUseSkill` có
+guard cũ từ Phase 4 (`targetEntityId == characterId` → bỏ qua) chặn NHẦM mọi skill SELF/ALLY mới
+(heal/buff/khiên tự thân) — guard này đúng cho `fireball` (chỉ có ENEMY-target) nhưng sai hoàn toàn
+với thiết kế đa-loại-mục-tiêu mới. Phát hiện qua `shouldHealAlly_whenHealSkillCast`/
+`shouldAbsorbDamageWithShield_beforeReducingHp` treo timeout dù logic `SkillSystem.tryCast` đúng.
+Sửa: bỏ guard tự nhắm ở `WorldFacade`, chuyển validate vào `SkillSystem.tryCast` (chặn tự nhắm CHỈ
+với `SkillTargetKind.ENEMY`, cho phép SELF/ALLY tự nhắm có chủ đích).
 
 ---
 
@@ -420,4 +471,6 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **16 ADR Accepted** (gồm
 2. Đầu Phase 0: chốt/triển khai **ADR-011** (ArchUnit) như hạng mục kỹ thuật.
 3. ✅ **GDD đã bổ sung công thức damage** (2026-07-19) — Phase 4 hết bị chặn về mặt game design.
 4. ✅ **ADR-026 Accepted** (2026-07-24) — dungeon instance model chốt (cùng process, World riêng). **Phase 8 đủ điều kiện mở.**
-5. Trả lời các câu hỏi mở còn lại ở [docs/README.md](../README.md).
+5. ✅ **4 hệ phái còn lại xong** (2026-07-25) — chỉ còn PvP arena/battlefield để đóng Phase 8 hoàn
+   toàn (5/5 hệ phái đã chơi được; PvP là hạng mục riêng, chưa chọn làm).
+6. Trả lời các câu hỏi mở còn lại ở [docs/README.md](../README.md).

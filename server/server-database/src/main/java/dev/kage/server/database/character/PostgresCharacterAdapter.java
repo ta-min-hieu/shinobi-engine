@@ -97,6 +97,10 @@ public final class PostgresCharacterAdapter implements CharacterPort {
             SELECT str, agi, int_, vit FROM character_stat WHERE character_id = ?
             """;
 
+    private static final String UPDATE_FACTION = """
+            UPDATE character SET faction = ? WHERE id = ?
+            """;
+
     @Override
     public List<Character> listByAccount(long accountId) {
         try (Connection connection = dataSource.getConnection();
@@ -255,6 +259,18 @@ public final class PostgresCharacterAdapter implements CharacterPort {
             statement.executeUpdate();
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi lưu vị trí nhân vật: characterId=" + characterId, e);
+        }
+    }
+
+    @Override
+    public void updateFaction(long characterId, Faction faction) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(UPDATE_FACTION)) {
+            statement.setString(1, faction.name());
+            statement.setLong(2, characterId);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new DatabaseAccessException("Lỗi đổi hệ phái: characterId=" + characterId, e);
         }
     }
 

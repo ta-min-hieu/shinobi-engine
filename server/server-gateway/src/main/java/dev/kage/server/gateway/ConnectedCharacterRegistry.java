@@ -4,6 +4,7 @@ import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.protocol.AttackResultEvent;
+import dev.kage.protocol.EffectKind;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
@@ -272,8 +273,19 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 .setIsMiss(outcome.miss())
                 .setTargetCurrentHp(outcome.targetCurrentHp())
                 .setTargetDied(outcome.targetDied())
+                .setEffectKind(toProtoEffectKind(outcome.effectKind()))
                 .build();
         send(ctx, Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    private static EffectKind toProtoEffectKind(dev.kage.server.world.SkillEffectKind effectKind) {
+        return switch (effectKind) {
+            case DAMAGE -> EffectKind.EFFECT_KIND_DAMAGE;
+            case HEAL -> EffectKind.EFFECT_KIND_HEAL;
+            case SHIELD -> EffectKind.EFFECT_KIND_SHIELD;
+            case BUFF -> EffectKind.EFFECT_KIND_BUFF;
+            case DEBUFF -> EffectKind.EFFECT_KIND_DEBUFF;
+        };
     }
 
     @Override

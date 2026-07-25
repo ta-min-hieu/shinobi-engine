@@ -10,6 +10,7 @@ import dev.kage.server.world.component.AiState;
 import dev.kage.server.world.component.AiStateComponent;
 import dev.kage.server.world.component.CharacterIdComponent;
 import dev.kage.server.world.component.HealthComponent;
+import dev.kage.server.world.component.StatusEffectComponent;
 import dev.kage.server.world.component.TargetComponent;
 import java.util.Collection;
 import java.util.concurrent.ThreadLocalRandom;
@@ -41,6 +42,8 @@ final class AiSystem extends IteratingKSystem {
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
     private static final ComponentMapper<CharacterIdComponent> CHARACTER_ID =
             ComponentMapper.getFor(CharacterIdComponent.class);
+    private static final ComponentMapper<StatusEffectComponent> STATUS_EFFECT =
+            ComponentMapper.getFor(StatusEffectComponent.class);
 
     private final Supplier<Collection<KEntity>> characterEntities;
     private final LongFunction<KEntity> entityLookup;
@@ -60,6 +63,14 @@ final class AiSystem extends IteratingKSystem {
 
     @Override
     protected void processEntity(KEntity entity, float deltaTime) {
+        if (STATUS_EFFECT.has(entity) && StatusEffects.isStunned(STATUS_EFFECT.get(entity))) {
+            // Bị stun (Phase 8, hệ Lôi/Thủy) — đứng yên, không tiến FSM (giữ nguyên state/timer,
+            // tiếp tục đúng chỗ đang dở khi hết choáng).
+            VelocityComponent velocity = VELOCITY.get(entity);
+            velocity.x = 0f;
+            velocity.y = 0f;
+            return;
+        }
         AiStateComponent ai = AI_STATE.get(entity);
         switch (ai.state) {
             case IDLE -> tickIdle(entity, ai, deltaTime);
@@ -216,8 +227,12 @@ final class AiSystem extends IteratingKSystem {
             velocity.y = 0f;
             return;
         }
-        velocity.x = (dx / length) * speed;
-        velocity.y = (dy / length) * speed;
+        // Phase 8 (hệ Thủy "khống chế") — SLOW/buff tốc độ áp dụng cho CẢ quái, không chỉ nhân vật
+        // (khác WorldFacade.handleMoveIntent chỉ có nhân vật gửi MoveCommand).
+        float effectiveSpeed =
+                speed * (STATUS_EFFECT.has(entity) ? StatusEffects.moveSpeedMultiplier(STATUS_EFFECT.get(entity)) : 1f);
+        velocity.x = (dx / length) * effectiveSpeed;
+        velocity.y = (dy / length) * effectiveSpeed;
     }
 
     private static double distance(float x1, float y1, float x2, float y2) {

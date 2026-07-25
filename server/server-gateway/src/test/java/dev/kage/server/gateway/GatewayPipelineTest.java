@@ -10,9 +10,11 @@ import dev.kage.account.domain.AccountPort;
 import dev.kage.account.domain.SessionPort;
 import dev.kage.account.domain.Transaction;
 import dev.kage.character.api.CharacterFacade;
+import dev.kage.character.application.CharacterUseCases;
 import dev.kage.character.application.CreateCharacterUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
+import dev.kage.character.application.SelectFactionUseCase;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.CharacterStats;
@@ -49,6 +51,8 @@ import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
 import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.SelectCharacterResponse;
+import dev.kage.protocol.SelectFactionRequest;
+import dev.kage.protocol.SelectFactionResponse;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
@@ -203,6 +207,73 @@ class GatewayPipelineTest {
         PacketCodec.Frame responseFrame = readOutboundFrame(channel);
 
         assertThat(responseFrame.header().opcode()).isEqualTo(Opcode.OPCODE_ERROR_VALUE);
+    }
+
+    @Test
+    void shouldSelectFaction_whenCharacterLevelAtLeastTen() throws InvalidProtocolBufferException {
+        FakeCharacterPort characterPort = new FakeCharacterPort();
+        EmbeddedChannel channel = newPipeline(characterPort);
+        connect(channel, "factiontest1");
+        long characterId = createCharacter(channel, "FactionHero", 2);
+        bumpLevel(characterPort, characterId, 10); // chưa có cơ chế lên cấp giữa phiên — seed thẳng
+
+        selectCharacter(channel, characterId, 3);
+
+        SelectFactionRequest request = SelectFactionRequest.newBuilder()
+                .setFaction(dev.kage.protocol.Faction.FACTION_THUY)
+                .build();
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_SELECT_FACTION_REQUEST_VALUE, ProtocolVersion.CURRENT, 4),
+                request.toByteArray());
+        PacketCodec.Frame responseFrame = readOutboundFrame(channel);
+
+        assertThat(responseFrame.header().opcode()).isEqualTo(Opcode.OPCODE_SELECT_FACTION_RESPONSE_VALUE);
+        SelectFactionResponse response = SelectFactionResponse.parseFrom(responseFrame.payload());
+        assertThat(response.getSuccess()).isTrue();
+        assertThat(characterPort.findById(characterId).orElseThrow().faction()).isEqualTo(Faction.THUY);
+    }
+
+    @Test
+    void shouldRejectSelectFaction_whenCharacterLevelBelowTen() throws InvalidProtocolBufferException {
+        FakeCharacterPort characterPort = new FakeCharacterPort();
+        EmbeddedChannel channel = newPipeline(characterPort);
+        connect(channel, "factiontest2");
+        long characterId = createCharacter(channel, "LowLevelHero", 2); // level=1 mặc định (CreateCharacterUseCase)
+        selectCharacter(channel, characterId, 3);
+
+        SelectFactionRequest request = SelectFactionRequest.newBuilder()
+                .setFaction(dev.kage.protocol.Faction.FACTION_THUY)
+                .build();
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_SELECT_FACTION_REQUEST_VALUE, ProtocolVersion.CURRENT, 4),
+                request.toByteArray());
+        PacketCodec.Frame responseFrame = readOutboundFrame(channel);
+
+        assertThat(responseFrame.header().opcode()).isEqualTo(Opcode.OPCODE_ERROR_VALUE);
+        assertThat(characterPort.findById(characterId).orElseThrow().faction()).isEqualTo(Faction.HOA); // không đổi
+    }
+
+    // Chưa có cơ chế cộng EXP/lên cấp giữa phiên thật (chỉ qua ClaimQuestRewardUseCase, ngoài phạm
+    // vi test này) — seed thẳng level vào Fake Port để test được nhánh "đủ Lv10" (SelectFactionUseCase).
+    private static void bumpLevel(FakeCharacterPort characterPort, long characterId, int level) {
+        Character character = characterPort.findById(characterId).orElseThrow();
+        int index = characterPort.characters.indexOf(character);
+        characterPort.characters.set(index, new Character(character.id(), character.accountId(),
+                character.realmId(), character.name(), character.faction(), level, character.exp(),
+                character.rebirthCount(), character.createdAt()));
+    }
+
+    private static void selectCharacter(EmbeddedChannel channel, long characterId, int sequenceId)
+            throws InvalidProtocolBufferException {
+        SelectCharacterRequest request = SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, ProtocolVersion.CURRENT, sequenceId),
+                request.toByteArray());
+        SelectCharacterResponse response = SelectCharacterResponse.parseFrom(readOutboundFrame(channel).payload());
+        assertThat(response.getSuccess()).as("setup: select character phải thành công trước khi test").isTrue();
     }
 
     private static void connect(EmbeddedChannel channel, String username) {
@@ -739,8 +810,10 @@ class GatewayPipelineTest {
                 new CreateCharacterUseCase(characterPort, action -> action.accept(null));
         ListCharactersUseCase listCharactersUseCase = new ListCharactersUseCase(characterPort);
         SelectCharacterUseCase selectCharacterUseCase = new SelectCharacterUseCase(characterPort);
-        CharacterFacade characterFacade = new CharacterFacade(
-                createCharacterUseCase, listCharactersUseCase, selectCharacterUseCase, characterPort);
+        SelectFactionUseCase selectFactionUseCase = new SelectFactionUseCase(characterPort);
+        CharacterUseCases useCases = new CharacterUseCases(
+                createCharacterUseCase, listCharactersUseCase, selectCharacterUseCase, selectFactionUseCase);
+        CharacterFacade characterFacade = new CharacterFacade(useCases, characterPort);
 
         // WorldFacade KHÔNG start() ở đây — test này không verify movement/AoI, chỉ cần
         // attachCharacter() (gọi trong handleSelectCharacterBlocking) không ném lỗi khi enqueue
@@ -873,6 +946,19 @@ class GatewayPipelineTest {
                     Instant.now());
             characters.add(character);
             return character;
+        }
+
+        @Override
+        public void updateFaction(long characterId, Faction faction) {
+            for (int i = 0; i < characters.size(); i++) {
+                Character c = characters.get(i);
+                if (c.id() == characterId) {
+                    characters.set(i, new Character(
+                            c.id(), c.accountId(), c.realmId(), c.name(), faction,
+                            c.level(), c.exp(), c.rebirthCount(), c.createdAt()));
+                    return;
+                }
+            }
         }
     }
 

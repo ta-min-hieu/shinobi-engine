@@ -9,12 +9,15 @@ option java_multiple_files = true;
 // (server-gateway), KHÔNG có field nào trong Request mang accountId — đúng "characterId/accountId
 // từ session, không từ packet" (SECURITY.md §4, chống IDOR).
 
-// MVP chỉ có Hỏa chơi được (GDD §11) — "chọn hệ ở Lv10" (GDD §4) là Post-MVP khi có đủ 5 hệ; nhân
-// vật mới tạo mặc định FACTION_HOA, không có bước chọn hệ lúc tạo.
+// Nhân vật mới tạo mặc định FACTION_HOA (CreateCharacterUseCase), không có bước chọn hệ lúc tạo.
+// 4 hệ còn lại chọn qua SelectFactionRequest khi đủ Lv10 (GDD §4, Phase 8).
 enum Faction {
   FACTION_UNSPECIFIED = 0;
   FACTION_HOA = 1;
-  // FACTION_THUY/PHONG/LOI/THO = 2-5 — thêm khi Post-MVP mở thêm hệ, KHÔNG tái sử dụng số.
+  FACTION_THUY = 2;
+  FACTION_PHONG = 3;
+  FACTION_LOI = 4;
+  FACTION_THO = 5;
 }
 
 message CharacterSummary {
@@ -61,4 +64,17 @@ message SelectCharacterRequest {
 message SelectCharacterResponse {
   bool success = 1;
   string error_key = 2; // rỗng nếu success=true (NETWORK.md §107)
+}
+
+// Command: Client -> Server (OPCODE_SELECT_FACTION_REQUEST). Chọn/đổi hệ phái khi nhân vật đủ
+// Lv10 (GDD §4) — characterId lấy từ session (đã bound lúc SelectCharacterRequest), KHÔNG có field
+// character_id trong Request (chống IDOR, khác SelectCharacterRequest vì lúc này đã trong world).
+message SelectFactionRequest {
+  Faction faction = 1;
+}
+
+// Response: Server -> Client (OPCODE_SELECT_FACTION_RESPONSE).
+message SelectFactionResponse {
+  bool success = 1;
+  string error_key = 2; // rỗng nếu success=true (NETWORK.md §107) — vd "error.level_too_low"
 }

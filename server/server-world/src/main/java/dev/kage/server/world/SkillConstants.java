@@ -25,6 +25,9 @@ final class SkillConstants {
     // (SCRIPTING.md §4, ScriptSandbox.statementLimit), không phải giới hạn "vừa đủ" cần tinh chỉnh.
     static final long SCRIPT_MAX_STATEMENTS = 10_000L;
 
+    // GDD §5 "Tuyệt Kỹ Lv50" — gate ở SkillSystem.tryCast qua CharacterLevelComponent.
+    static final int ULTIMATE_REQUIRED_LEVEL = 50;
+
     private SkillConstants() {
     }
 }

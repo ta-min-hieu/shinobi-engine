@@ -7,6 +7,7 @@ import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.application.CharacterLimitExceededException;
 import dev.kage.character.application.CharacterNotFoundException;
 import dev.kage.character.application.DuplicateCharacterNameException;
+import dev.kage.character.application.FactionSelectionLevelTooLowException;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.IdempotencyKeyReusedException;
@@ -150,6 +151,8 @@ import dev.kage.protocol.RemoveFriendResponse;
 import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.SelectCharacterResponse;
 import dev.kage.protocol.SelectDialogueOptionCommand;
+import dev.kage.protocol.SelectFactionRequest;
+import dev.kage.protocol.SelectFactionResponse;
 import dev.kage.protocol.SellItemCommand;
 import dev.kage.protocol.SellItemResponse;
 import dev.kage.protocol.SellOutcome;
@@ -281,6 +284,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE, this::handleListCharacters),
             Map.entry(Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, this::handleCreateCharacter),
             Map.entry(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, this::handleSelectCharacter),
+            Map.entry(Opcode.OPCODE_SELECT_FACTION_REQUEST_VALUE, this::handleSelectFactionRequest),
             Map.entry(Opcode.OPCODE_MOVE_COMMAND_VALUE, this::handleMoveCommand),
             Map.entry(Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, this::handleSetTargetCommand),
             Map.entry(Opcode.OPCODE_USE_SKILL_COMMAND_VALUE, this::handleUseSkillCommand),
@@ -503,15 +507,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleSelectCharacterBlocking(
             ChannelHandlerContext ctx, int sequenceId, long accountId, long characterId) {
         try {
-            characterFacade.selectCharacter(accountId, characterId);
+            Character character = characterFacade.selectCharacter(accountId, characterId);
             boundCharacterId = characterId;
             // Đăng ký connection NÀY để world outbound (spawn/move/despawn — SERVER.md §6) tìm
             // đúng channel; attachCharacter chỉ enqueue, entity ECS thật tạo ở tick kế tiếp.
             worldGateway.registry().register(characterId, ctx);
             PositionSnapshot spawn = characterFacade.loadPosition(characterId);
             CharacterStats stats = characterFacade.loadStats(characterId);
-            CharacterBaseStats baseStats =
-                    new CharacterBaseStats(stats.str(), stats.agi(), stats.intelligence(), stats.vit());
+            CharacterBaseStats baseStats = new CharacterBaseStats(
+                    stats.str(), stats.agi(), stats.intelligence(), stats.vit(),
+                    FactionMapping.toElement(character.faction()), character.level());
             worldGateway.facade().attachCharacter(characterId, spawn.x(), spawn.y(), baseStats);
             // GAMEPLAY.md §2 "tính lại chỉ số dẫn xuất khi đổi trang bị" — áp dụng NGAY lúc attach,
             // không chỉ lúc equip/unequip sau đó, nếu không nhân vật mặc đồ từ phiên trước sẽ mất
@@ -530,6 +535,45 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         } catch (RuntimeException e) {
             LOG.error("Chọn nhân vật thất bại: lỗi không mong đợi", e);
             sendError(ctx, sequenceId, 500, "error.select_character_failed");
+        }
+    }
+
+    // SelectFactionRequest chạm DB (findById + UPDATE) — cần authExecutor, cùng pattern
+    // handleCreateCharacter/handleSelectCharacter. characterId từ boundCharacterId (session, ĐÃ
+    // bound ở SelectCharacterRequest) — KHÔNG có field character_id trong packet (Điều 24).
+    private void handleSelectFactionRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        SelectFactionRequest request = SelectFactionRequest.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        if (request.getFaction() == Faction.FACTION_UNSPECIFIED || request.getFaction() == Faction.UNRECOGNIZED) {
+            sendError(ctx, sequenceId, 400, "error.invalid_faction");
+            return;
+        }
+        authExecutor.execute(() -> handleSelectFactionBlocking(ctx, sequenceId, characterId, request));
+    }
+
+    // PMD AvoidCatchingGenericException: ranh giới I/O bất đồng bộ, phải trả lời dù lỗi gì.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private void handleSelectFactionBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, SelectFactionRequest request) {
+        try {
+            characterFacade.selectFaction(characterId, toDomainFaction(request.getFaction()));
+            SelectFactionResponse response = SelectFactionResponse.newBuilder().setSuccess(true).build();
+            send(ctx, Opcode.OPCODE_SELECT_FACTION_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        } catch (CharacterNotFoundException e) {
+            LOG.warn("Chọn hệ phái thất bại: không tìm thấy nhân vật", e);
+            sendError(ctx, sequenceId, 404, "error.character_not_found");
+        } catch (FactionSelectionLevelTooLowException e) {
+            LOG.warn("Chọn hệ phái thất bại: chưa đủ cấp", e);
+            sendError(ctx, sequenceId, 400, "error.level_too_low");
+        } catch (RuntimeException e) {
+            LOG.error("Chọn hệ phái thất bại: lỗi không mong đợi", e);
+            sendError(ctx, sequenceId, 500, "error.select_faction_failed");
         }
     }
 
@@ -2219,6 +2263,20 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private static Faction toProtoFaction(dev.kage.character.domain.Faction faction) {
         return switch (faction) {
             case HOA -> Faction.FACTION_HOA;
+            case THUY -> Faction.FACTION_THUY;
+            case PHONG -> Faction.FACTION_PHONG;
+            case LOI -> Faction.FACTION_LOI;
+            case THO -> Faction.FACTION_THO;
+        };
+    }
+
+    private static dev.kage.character.domain.Faction toDomainFaction(Faction faction) {
+        return switch (faction) {
+            case FACTION_HOA, FACTION_UNSPECIFIED, UNRECOGNIZED -> dev.kage.character.domain.Faction.HOA;
+            case FACTION_THUY -> dev.kage.character.domain.Faction.THUY;
+            case FACTION_PHONG -> dev.kage.character.domain.Faction.PHONG;
+            case FACTION_LOI -> dev.kage.character.domain.Faction.LOI;
+            case FACTION_THO -> dev.kage.character.domain.Faction.THO;
         };
     }
 

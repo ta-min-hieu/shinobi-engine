@@ -70,9 +70,24 @@ message UseSkillCommand {
   int64 target_entity_id = 2;
 }
 
+// Phase 8 (4 hệ phái) — skill không còn chỉ gây damage (Thủy/Thổ có heal/khiên/buff/debuff thật).
+// UNSPECIFIED coi như DAMAGE (tương thích ngược với fireball/boss cũ, không set field này).
+enum EffectKind {
+  EFFECT_KIND_UNSPECIFIED = 0;
+  EFFECT_KIND_DAMAGE = 1;
+  EFFECT_KIND_HEAL = 2;
+  EFFECT_KIND_SHIELD = 3;
+  EFFECT_KIND_BUFF = 4;
+  EFFECT_KIND_DEBUFF = 5;
+}
+
 // Event: Server -> Client (OPCODE_SKILL_RESULT_EVENT). Kết quả 1 lần dùng skill THẬT — cùng hình
 // dạng AttackResultEvent, thêm skill_code để client phát đúng hiệu ứng/animation (khác đòn đánh
 // thường). Gửi cho MỌI nhân vật đang thấy mục tiêu trong AoI, không chỉ người dùng skill.
+//
+// `damage` là "độ lớn" DÙNG CHUNG cho mọi effect_kind, không chỉ damage thật: lượng heal
+// (EFFECT_KIND_HEAL), lượng khiên (EFFECT_KIND_SHIELD) — is_crit/is_miss chỉ có ý nghĩa khi
+// effect_kind=DAMAGE (Phase 8 4 hệ phái).
 message SkillResultEvent {
   string skill_code = 1;
   int64 attacker_entity_id = 2;
@@ -82,4 +97,5 @@ message SkillResultEvent {
   bool is_miss = 6;
   int32 target_current_hp = 7;
   bool target_died = 8;
+  EffectKind effect_kind = 9;
 }

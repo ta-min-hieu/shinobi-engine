@@ -43,4 +43,11 @@ public interface CharacterPort {
 
     /** Chỉ số nền — server-world derive thành ATK/DEF/... lúc attach vào world (GDD §5). */
     CharacterStats loadStats(long characterId);
+
+    /**
+     * Ghi đè hệ phái (GDD §4 "chọn hệ ở Lv10", Phase 8) — 1 câu UPDATE đơn, không cần
+     * {@link Transaction} (khác {@link #create}, không có ghi phụ nào trong cùng nguyên tử ở lát
+     * cắt này — xem {@code SelectFactionUseCase} "Scope cut").
+     */
+    void updateFaction(long characterId, Faction faction);
 }
