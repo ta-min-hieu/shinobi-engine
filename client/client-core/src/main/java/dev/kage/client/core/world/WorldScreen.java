@@ -116,7 +116,7 @@ public final class WorldScreen implements GameScreen {
     }
 
     private void onMoveResponse(MoveResponse response) {
-        var pos = POSITION.get(localPlayer);
+        PositionComponent pos = POSITION.get(localPlayer);
         float dx = response.getX() - pos.x;
         float dy = response.getY() - pos.y;
         if (Math.sqrt((dx * dx) + (dy * dy)) > WorldConstants.RECONCILE_SNAP_THRESHOLD) {
@@ -133,8 +133,8 @@ public final class WorldScreen implements GameScreen {
         if (remoteCharacters.containsKey(event.getCharacterId())) {
             return; // đã có — bỏ qua an toàn thay vì tạo entity trùng.
         }
-        var entity = world.createEntity();
-        var pos = new PositionComponent();
+        KEntity entity = world.createEntity();
+        PositionComponent pos = new PositionComponent();
         pos.x = event.getX();
         pos.y = event.getY();
         pos.prevX = pos.x;
@@ -144,11 +144,11 @@ public final class WorldScreen implements GameScreen {
     }
 
     private void onCharacterMoved(CharacterMovedEvent event) {
-        var entity = remoteCharacters.get(event.getCharacterId());
+        KEntity entity = remoteCharacters.get(event.getCharacterId());
         if (entity == null) {
             return; // Moved tới trước Spawned (hiếm qua TCP, nhưng an toàn bỏ qua thay vì crash).
         }
-        var pos = POSITION.get(entity);
+        PositionComponent pos = POSITION.get(entity);
         pos.x = event.getX();
         pos.y = event.getY();
         pos.prevX = pos.x;
@@ -156,7 +156,7 @@ public final class WorldScreen implements GameScreen {
     }
 
     private void onCharacterDespawned(CharacterDespawnedEvent event) {
-        var entity = remoteCharacters.remove(event.getCharacterId());
+        KEntity entity = remoteCharacters.remove(event.getCharacterId());
         if (entity != null) {
             world.removeEntity(entity);
         }
@@ -183,7 +183,7 @@ public final class WorldScreen implements GameScreen {
         float normalizedDirX = length > 1f ? dirX / length : dirX;
         float normalizedDirY = length > 1f ? dirY / length : dirY;
 
-        var velocity = VELOCITY.get(localPlayer);
+        VelocityComponent velocity = VELOCITY.get(localPlayer);
         velocity.x = normalizedDirX * WorldConstants.MOVE_SPEED_MPS;
         velocity.y = normalizedDirY * WorldConstants.MOVE_SPEED_MPS;
 
@@ -196,7 +196,7 @@ public final class WorldScreen implements GameScreen {
 
     private void sendMoveCommand(float dirX, float dirY) {
         try {
-            var command = MoveCommand.newBuilder().setDirX(dirX).setDirY(dirY).build();
+            MoveCommand command = MoveCommand.newBuilder().setDirX(dirX).setDirY(dirY).build();
             connection.send(Opcode.OPCODE_MOVE_COMMAND_VALUE, connection.nextSequenceId(), command.toByteArray());
         } catch (IOException e) {
             // Mất kết nối tạm thời — bình thường (GameConnection tự reconnect), hướng mới nhất sẽ
@@ -218,7 +218,7 @@ public final class WorldScreen implements GameScreen {
         drawInterpolated(localPlayer, alpha);
 
         shapeRenderer.setColor(Color.SKY);
-        for (var entity : remoteCharacters.values()) {
+        for (KEntity entity : remoteCharacters.values()) {
             drawInterpolated(entity, alpha);
         }
 
@@ -226,7 +226,7 @@ public final class WorldScreen implements GameScreen {
     }
 
     private void drawInterpolated(KEntity entity, float alpha) {
-        var pos = POSITION.get(entity);
+        PositionComponent pos = POSITION.get(entity);
         float renderX = pos.prevX + ((pos.x - pos.prevX) * alpha);
         float renderY = pos.prevY + ((pos.y - pos.prevY) * alpha);
         shapeRenderer.rect(

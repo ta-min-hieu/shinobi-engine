@@ -82,14 +82,15 @@ class EquipItemUseCaseTest {
 
     @Test
     void shouldEquip_whenItemBelongsToCharacterAndMatchesSlot() {
-        var inventoryPort = new FakeInventoryPort(new Inventory(
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(new Inventory(
                 CHARACTER_ID, 20, List.of(new ItemStack(WEAPON_ITEM_ID, WEAPON_TEMPLATE_ID, 1, 0))));
-        var templatePort = new FakeItemTemplatePort(
+        FakeItemTemplatePort templatePort = new FakeItemTemplatePort(
                 Map.of(WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 5)));
-        var equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
-        var useCase = new EquipItemUseCase(inventoryPort, templatePort, equipmentPort, DIRECT_TX);
+        FakeEquipmentPort equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
+        EquipItemUseCase useCase = new EquipItemUseCase(inventoryPort, templatePort, equipmentPort, DIRECT_TX);
 
-        var result = useCase.execute(CHARACTER_ID, WEAPON_ITEM_ID, EquipmentSlotType.WEAPON);
+        EquipItemUseCase.EquipItemResult result =
+                useCase.execute(CHARACTER_ID, WEAPON_ITEM_ID, EquipmentSlotType.WEAPON);
 
         assertThat(result).isEqualTo(EquipItemUseCase.EquipItemResult.OK);
         assertThat(equipmentPort.saved.equippedItemId(EquipmentSlotType.WEAPON)).contains(WEAPON_ITEM_ID);
@@ -97,12 +98,12 @@ class EquipItemUseCaseTest {
 
     @Test
     void shouldRejectEquip_whenItemDoesNotBelongToCharacter() {
-        var inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of())); // túi rỗng
-        var templatePort = new FakeItemTemplatePort(Map.of());
-        var equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
-        var useCase = new EquipItemUseCase(inventoryPort, templatePort, equipmentPort, DIRECT_TX);
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of())); // túi rỗng
+        FakeItemTemplatePort templatePort = new FakeItemTemplatePort(Map.of());
+        FakeEquipmentPort equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
+        EquipItemUseCase useCase = new EquipItemUseCase(inventoryPort, templatePort, equipmentPort, DIRECT_TX);
 
-        var result = useCase.execute(CHARACTER_ID, 999L, EquipmentSlotType.WEAPON);
+        EquipItemUseCase.EquipItemResult result = useCase.execute(CHARACTER_ID, 999L, EquipmentSlotType.WEAPON);
 
         assertThat(result).isEqualTo(EquipItemUseCase.EquipItemResult.ITEM_NOT_FOUND);
         assertThat(equipmentPort.saved).isNull();
@@ -111,14 +112,15 @@ class EquipItemUseCaseTest {
     @Test
     void shouldRejectEquip_whenItemDoesNotMatchTargetSlot() {
         // Item là WEAPON nhưng người chơi cố mặc vào slot ARMOR — server tự kiểm tra, không tin client.
-        var inventoryPort = new FakeInventoryPort(new Inventory(
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(new Inventory(
                 CHARACTER_ID, 20, List.of(new ItemStack(WEAPON_ITEM_ID, WEAPON_TEMPLATE_ID, 1, 0))));
-        var templatePort = new FakeItemTemplatePort(
+        FakeItemTemplatePort templatePort = new FakeItemTemplatePort(
                 Map.of(WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 5)));
-        var equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
-        var useCase = new EquipItemUseCase(inventoryPort, templatePort, equipmentPort, DIRECT_TX);
+        FakeEquipmentPort equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
+        EquipItemUseCase useCase = new EquipItemUseCase(inventoryPort, templatePort, equipmentPort, DIRECT_TX);
 
-        var result = useCase.execute(CHARACTER_ID, WEAPON_ITEM_ID, EquipmentSlotType.ARMOR);
+        EquipItemUseCase.EquipItemResult result =
+                useCase.execute(CHARACTER_ID, WEAPON_ITEM_ID, EquipmentSlotType.ARMOR);
 
         assertThat(result).isEqualTo(EquipItemUseCase.EquipItemResult.WRONG_SLOT);
         assertThat(equipmentPort.saved).isNull();

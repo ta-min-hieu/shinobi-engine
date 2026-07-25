@@ -34,119 +34,131 @@ class FriendPacketsTest {
 
     @Test
     void shouldRoundTripSendFriendRequestCommand() throws InvalidProtocolBufferException {
-        var command = SendFriendRequestCommand.newBuilder().setTargetName("naruto").build();
-        var header = new PacketHeader(Opcode.OPCODE_SEND_FRIEND_REQUEST_COMMAND_VALUE, ProtocolVersion.CURRENT, 1);
+        SendFriendRequestCommand command = SendFriendRequestCommand.newBuilder().setTargetName("naruto").build();
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_SEND_FRIEND_REQUEST_COMMAND_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsed = SendFriendRequestCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SendFriendRequestCommand parsed =
+                SendFriendRequestCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getTargetName()).isEqualTo("naruto");
     }
 
     @Test
     void shouldRoundTripSendFriendRequestResponse() throws InvalidProtocolBufferException {
-        var response = SendFriendRequestResponse.newBuilder()
+        SendFriendRequestResponse response = SendFriendRequestResponse.newBuilder()
                 .setOutcome(SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_ALREADY_FRIENDS)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = SendFriendRequestResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SendFriendRequestResponse parsed =
+                SendFriendRequestResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_ALREADY_FRIENDS);
     }
 
     @Test
     void shouldRoundTripAcceptFriendRequestCommand() throws InvalidProtocolBufferException {
-        var command = AcceptFriendRequestCommand.newBuilder().setFriendshipId(7L).build();
-        var header = new PacketHeader(Opcode.OPCODE_ACCEPT_FRIEND_REQUEST_COMMAND_VALUE, ProtocolVersion.CURRENT, 2);
+        AcceptFriendRequestCommand command = AcceptFriendRequestCommand.newBuilder().setFriendshipId(7L).build();
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_ACCEPT_FRIEND_REQUEST_COMMAND_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsed = AcceptFriendRequestCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        AcceptFriendRequestCommand parsed =
+                AcceptFriendRequestCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getFriendshipId()).isEqualTo(7L);
     }
 
     @Test
     void shouldRoundTripAcceptFriendRequestResponse() throws InvalidProtocolBufferException {
-        var response = AcceptFriendRequestResponse.newBuilder()
+        AcceptFriendRequestResponse response = AcceptFriendRequestResponse.newBuilder()
                 .setOutcome(AcceptFriendRequestOutcome.ACCEPT_FRIEND_REQUEST_OUTCOME_NOT_FOUND)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_ACCEPT_FRIEND_REQUEST_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_ACCEPT_FRIEND_REQUEST_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = AcceptFriendRequestResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        AcceptFriendRequestResponse parsed =
+                AcceptFriendRequestResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(AcceptFriendRequestOutcome.ACCEPT_FRIEND_REQUEST_OUTCOME_NOT_FOUND);
     }
 
     @Test
     void shouldRoundTripRejectFriendRequestCommand() throws InvalidProtocolBufferException {
-        var command = RejectFriendRequestCommand.newBuilder().setFriendshipId(9L).build();
-        var header = new PacketHeader(Opcode.OPCODE_REJECT_FRIEND_REQUEST_COMMAND_VALUE, ProtocolVersion.CURRENT, 3);
+        RejectFriendRequestCommand command = RejectFriendRequestCommand.newBuilder().setFriendshipId(9L).build();
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_REJECT_FRIEND_REQUEST_COMMAND_VALUE, ProtocolVersion.CURRENT, 3);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsed = RejectFriendRequestCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        RejectFriendRequestCommand parsed =
+                RejectFriendRequestCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getFriendshipId()).isEqualTo(9L);
     }
 
     @Test
     void shouldRoundTripRejectFriendRequestResponse() throws InvalidProtocolBufferException {
-        var response = RejectFriendRequestResponse.newBuilder()
+        RejectFriendRequestResponse response = RejectFriendRequestResponse.newBuilder()
                 .setOutcome(RejectFriendRequestOutcome.REJECT_FRIEND_REQUEST_OUTCOME_OK)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_REJECT_FRIEND_REQUEST_RESPONSE_VALUE, ProtocolVersion.CURRENT, 3);
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_REJECT_FRIEND_REQUEST_RESPONSE_VALUE, ProtocolVersion.CURRENT, 3);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = RejectFriendRequestResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        RejectFriendRequestResponse parsed =
+                RejectFriendRequestResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(RejectFriendRequestOutcome.REJECT_FRIEND_REQUEST_OUTCOME_OK);
     }
 
     @Test
     void shouldRoundTripRemoveFriendCommand() throws InvalidProtocolBufferException {
-        var command = RemoveFriendCommand.newBuilder().setTargetName("sasuke").build();
-        var header = new PacketHeader(Opcode.OPCODE_REMOVE_FRIEND_COMMAND_VALUE, ProtocolVersion.CURRENT, 4);
+        RemoveFriendCommand command = RemoveFriendCommand.newBuilder().setTargetName("sasuke").build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_REMOVE_FRIEND_COMMAND_VALUE, ProtocolVersion.CURRENT, 4);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsed = RemoveFriendCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        RemoveFriendCommand parsed = RemoveFriendCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getTargetName()).isEqualTo("sasuke");
     }
 
     @Test
     void shouldRoundTripRemoveFriendResponse() throws InvalidProtocolBufferException {
-        var response = RemoveFriendResponse.newBuilder()
+        RemoveFriendResponse response = RemoveFriendResponse.newBuilder()
                 .setOutcome(RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_NOT_FRIENDS)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_REMOVE_FRIEND_RESPONSE_VALUE, ProtocolVersion.CURRENT, 4);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_REMOVE_FRIEND_RESPONSE_VALUE, ProtocolVersion.CURRENT, 4);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = RemoveFriendResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        RemoveFriendResponse parsed = RemoveFriendResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_NOT_FRIENDS);
     }
 
     @Test
     void shouldRoundTripListFriendsRequest() throws InvalidProtocolBufferException {
-        var request = ListFriendsRequest.newBuilder().build();
-        var header = new PacketHeader(Opcode.OPCODE_LIST_FRIENDS_REQUEST_VALUE, ProtocolVersion.CURRENT, 5);
+        ListFriendsRequest request = ListFriendsRequest.newBuilder().build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_LIST_FRIENDS_REQUEST_VALUE, ProtocolVersion.CURRENT, 5);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, request.toByteArray());
-        var parsed = ListFriendsRequest.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ListFriendsRequest parsed = ListFriendsRequest.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed).isEqualTo(request);
     }
 
     @Test
     void shouldRoundTripListFriendsResponse() throws InvalidProtocolBufferException {
-        var friend = FriendView.newBuilder().setCharacterId(3L).setName("naruto").setOnline(true).build();
-        var response = ListFriendsResponse.newBuilder().addFriends(friend).build();
-        var header = new PacketHeader(Opcode.OPCODE_LIST_FRIENDS_RESPONSE_VALUE, ProtocolVersion.CURRENT, 5);
+        FriendView friend = FriendView.newBuilder().setCharacterId(3L).setName("naruto").setOnline(true).build();
+        ListFriendsResponse response = ListFriendsResponse.newBuilder().addFriends(friend).build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_LIST_FRIENDS_RESPONSE_VALUE, ProtocolVersion.CURRENT, 5);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = ListFriendsResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ListFriendsResponse parsed = ListFriendsResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getFriendsList()).hasSize(1);
         assertThat(parsed.getFriends(0).getCharacterId()).isEqualTo(3L);
@@ -156,29 +168,32 @@ class FriendPacketsTest {
 
     @Test
     void shouldRoundTripListPendingFriendRequestsRequest() throws InvalidProtocolBufferException {
-        var request = ListPendingFriendRequestsRequest.newBuilder().build();
-        var header =
+        ListPendingFriendRequestsRequest request = ListPendingFriendRequestsRequest.newBuilder().build();
+        PacketHeader header =
                 new PacketHeader(Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_REQUEST_VALUE, ProtocolVersion.CURRENT, 6);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, request.toByteArray());
-        var parsed = ListPendingFriendRequestsRequest.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ListPendingFriendRequestsRequest parsed =
+                ListPendingFriendRequestsRequest.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed).isEqualTo(request);
     }
 
     @Test
     void shouldRoundTripListPendingFriendRequestsResponse() throws InvalidProtocolBufferException {
-        var pending = PendingFriendRequestView.newBuilder()
+        PendingFriendRequestView pending = PendingFriendRequestView.newBuilder()
                 .setFriendshipId(1L)
                 .setRequesterId(2L)
                 .setRequesterName("sasuke")
                 .build();
-        var response = ListPendingFriendRequestsResponse.newBuilder().addRequests(pending).build();
-        var header =
+        ListPendingFriendRequestsResponse response =
+                ListPendingFriendRequestsResponse.newBuilder().addRequests(pending).build();
+        PacketHeader header =
                 new PacketHeader(Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_RESPONSE_VALUE, ProtocolVersion.CURRENT, 6);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = ListPendingFriendRequestsResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ListPendingFriendRequestsResponse parsed =
+                ListPendingFriendRequestsResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getRequestsList()).hasSize(1);
         assertThat(parsed.getRequests(0).getFriendshipId()).isEqualTo(1L);
@@ -188,22 +203,22 @@ class FriendPacketsTest {
 
     @Test
     void shouldRoundTripFriendOnlineEvent() throws InvalidProtocolBufferException {
-        var event = FriendOnlineEvent.newBuilder().setCharacterId(11L).build();
-        var header = new PacketHeader(Opcode.OPCODE_FRIEND_ONLINE_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
+        FriendOnlineEvent event = FriendOnlineEvent.newBuilder().setCharacterId(11L).build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_FRIEND_ONLINE_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        var parsed = FriendOnlineEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        FriendOnlineEvent parsed = FriendOnlineEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getCharacterId()).isEqualTo(11L);
     }
 
     @Test
     void shouldRoundTripFriendOfflineEvent() throws InvalidProtocolBufferException {
-        var event = FriendOfflineEvent.newBuilder().setCharacterId(12L).build();
-        var header = new PacketHeader(Opcode.OPCODE_FRIEND_OFFLINE_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
+        FriendOfflineEvent event = FriendOfflineEvent.newBuilder().setCharacterId(12L).build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_FRIEND_OFFLINE_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        var parsed = FriendOfflineEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        FriendOfflineEvent parsed = FriendOfflineEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getCharacterId()).isEqualTo(12L);
     }

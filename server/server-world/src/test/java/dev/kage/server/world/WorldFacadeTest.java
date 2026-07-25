@@ -199,7 +199,7 @@ class WorldFacadeTest {
         world.enqueueMoveCommand(1L, 1, 1000f, 0f);
 
         awaitTrue(() -> sink.moved.stream().anyMatch(m -> m.target() == 2L && m.moved() == 1L));
-        var firstMoved = sink.moved.stream()
+        Moved firstMoved = sink.moved.stream()
                 .filter(m -> m.target() == 2L && m.moved() == 1L)
                 .findFirst()
                 .orElseThrow();
@@ -247,8 +247,8 @@ class WorldFacadeTest {
     void shouldNotSpawnTrainingDummyOrNpc_whenCreatedForDungeonInstance() {
         // ADR-026 — dungeon instance (spawnOverworldContent=false) khởi động RỖNG, khác world
         // chính. Dùng WorldFacade RIÊNG (không phải field `world` dùng chung ở các test khác).
-        var dungeonSink = new RecordingSink();
-        var dungeonWorld = new WorldFacade(dungeonSink, false);
+        RecordingSink dungeonSink = new RecordingSink();
+        WorldFacade dungeonWorld = new WorldFacade(dungeonSink, false);
         try {
             dungeonWorld.start();
             // Toạ độ giống hệt quái bù nhìn (5,5)/NPC mẫu (-5,-5) của world chính NẾU có spawn —
@@ -271,8 +271,8 @@ class WorldFacadeTest {
         // test shouldNotSpawnTrainingDummyOrNpc...). Verify CẢ 2 chiêu đặc biệt (heavy_strike <70%
         // HP, enrage <30% HP) xuất hiện thật trước khi boss chết, và chết KHÔNG kích hoạt respawn
         // kiểu training dummy (PHÁT HIỆN THẬT lát cắt này — xem WorldFacade.handleMonsterDeath).
-        var dungeonSink = new RecordingSink();
-        var dungeonWorld = new WorldFacade(dungeonSink, false);
+        RecordingSink dungeonSink = new RecordingSink();
+        WorldFacade dungeonWorld = new WorldFacade(dungeonSink, false);
         try {
             dungeonWorld.start();
             dungeonWorld.spawnBoss();
@@ -309,8 +309,8 @@ class WorldFacadeTest {
         // lịch spawnTrainingDummy() sau MONSTER_RESPAWN_SECONDS — sai nội dung, sai world. Hạ gục
         // nhanh bằng applyEquipmentBonus (cùng pattern shouldOneShotMonster_...) để tách biệt
         // khỏi kịch bản nhiều pha ở test trên, tránh @Timeout dài gấp đôi không cần thiết.
-        var dungeonSink = new RecordingSink();
-        var dungeonWorld = new WorldFacade(dungeonSink, false);
+        RecordingSink dungeonSink = new RecordingSink();
+        WorldFacade dungeonWorld = new WorldFacade(dungeonSink, false);
         try {
             dungeonWorld.start();
             dungeonWorld.spawnBoss();
@@ -386,7 +386,7 @@ class WorldFacadeTest {
                 () -> sink.monsterSpawned.stream()
                         .anyMatch(m -> m.target() == 1L && m.monsterId() != firstMonsterId),
                 Duration.ofSeconds(15));
-        var respawned = sink.monsterSpawned.stream()
+        MonsterSpawned respawned = sink.monsterSpawned.stream()
                 .filter(m -> m.monsterId() != firstMonsterId)
                 .findFirst()
                 .orElseThrow();
@@ -429,7 +429,7 @@ class WorldFacadeTest {
 
         castUntilHit(monsterId);
 
-        var hit = sink.skillResults.stream()
+        SkillResult hit = sink.skillResults.stream()
                 .filter(r -> r.defender() == monsterId && !r.miss())
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Không lần cast fireball nào trúng sau nhiều lần thử"));
@@ -528,7 +528,7 @@ class WorldFacadeTest {
     }
 
     private static void awaitTrue(Supplier<Boolean> condition, Duration timeout) {
-        var deadline = Instant.now().plus(timeout);
+        Instant deadline = Instant.now().plus(timeout);
         while (Instant.now().isBefore(deadline)) {
             if (Boolean.TRUE.equals(condition.get())) {
                 return;

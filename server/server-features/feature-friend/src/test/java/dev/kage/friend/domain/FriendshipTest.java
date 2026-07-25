@@ -16,28 +16,28 @@ class FriendshipTest {
 
     @Test
     void otherPartyShouldReturnAddressee_whenCalledByRequester() {
-        var friendship = new Friendship(1, 5, 7, FriendshipStatus.ACCEPTED, Instant.now(), Instant.now());
+        Friendship friendship = new Friendship(1, 5, 7, FriendshipStatus.ACCEPTED, Instant.now(), Instant.now());
 
         assertThat(friendship.otherParty(5)).isEqualTo(7);
     }
 
     @Test
     void otherPartyShouldReturnRequester_whenCalledByAddressee() {
-        var friendship = new Friendship(1, 5, 7, FriendshipStatus.ACCEPTED, Instant.now(), Instant.now());
+        Friendship friendship = new Friendship(1, 5, 7, FriendshipStatus.ACCEPTED, Instant.now(), Instant.now());
 
         assertThat(friendship.otherParty(7)).isEqualTo(5);
     }
 
     @Test
     void otherPartyShouldReject_whenCharacterNotInvolved() {
-        var friendship = new Friendship(1, 5, 7, FriendshipStatus.ACCEPTED, Instant.now(), Instant.now());
+        Friendship friendship = new Friendship(1, 5, 7, FriendshipStatus.ACCEPTED, Instant.now(), Instant.now());
 
         assertThatThrownBy(() -> friendship.otherParty(99)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void involvesShouldMatchEitherSide() {
-        var friendship = new Friendship(1, 5, 7, FriendshipStatus.ACCEPTED, Instant.now(), Instant.now());
+        Friendship friendship = new Friendship(1, 5, 7, FriendshipStatus.ACCEPTED, Instant.now(), Instant.now());
 
         assertThat(friendship.involves(5)).isTrue();
         assertThat(friendship.involves(7)).isTrue();

@@ -4,8 +4,10 @@ import dev.kage.trade.domain.IdempotencyKeyReusedException;
 import dev.kage.trade.domain.Transaction;
 import dev.kage.trade.domain.TradeInventoryPort;
 import dev.kage.trade.domain.TradeInventoryPort.TransferOutcome;
+import dev.kage.trade.domain.TradeOfferItem;
 import dev.kage.trade.domain.TradeSessionSnapshot;
 import dev.kage.trade.domain.TransactionRunner;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -28,16 +30,16 @@ public final class ConfirmTradeUseCase {
     }
 
     public Result execute(long sessionId, long characterId, String idempotencyKey) {
-        var resultHolder = new AtomicReference<Result>();
+        AtomicReference<Result> resultHolder = new AtomicReference<Result>();
         try {
             tx.inTransaction((Transaction t) -> {
                 ports.idempotencyPort().recordOrThrow(t, idempotencyKey);
-                var snapshotOpt = ports.sessionPort().lockForExecution(t, sessionId);
+                Optional<TradeSessionSnapshot> snapshotOpt = ports.sessionPort().lockForExecution(t, sessionId);
                 if (snapshotOpt.isEmpty() || !snapshotOpt.get().involves(characterId)) {
                     resultHolder.set(Result.NOT_FOUND);
                     return;
                 }
-                var snapshot = snapshotOpt.get();
+                TradeSessionSnapshot snapshot = snapshotOpt.get();
                 ports.sessionPort().setConfirmed(t, sessionId, characterId);
                 boolean requesterConfirmed =
                         snapshot.requesterConfirmed() || characterId == snapshot.requesterCharacterId();
@@ -74,11 +76,11 @@ public final class ConfirmTradeUseCase {
         if (snapshot.targetGold() > 0) {
             ports.goldPort().creditGold(t, requesterId, snapshot.targetGold());
         }
-        for (var item : snapshot.itemsOffered(requesterId)) {
+        for (TradeOfferItem item : snapshot.itemsOffered(requesterId)) {
             transferOrAbort(t,
                     new TradeInventoryPort.TransferRequest(requesterId, targetId, item.itemId(), item.quantity()));
         }
-        for (var item : snapshot.itemsOffered(targetId)) {
+        for (TradeOfferItem item : snapshot.itemsOffered(targetId)) {
             transferOrAbort(t,
                     new TradeInventoryPort.TransferRequest(targetId, requesterId, item.itemId(), item.quantity()));
         }
@@ -92,7 +94,7 @@ public final class ConfirmTradeUseCase {
     }
 
     private void logAudit(Transaction t, TradeSessionSnapshot snapshot) {
-        var detail = "{\"sessionId\":%d,\"counterpartId\":%d}";
+        String detail = "{\"sessionId\":%d,\"counterpartId\":%d}";
         ports.auditPort().log(t, snapshot.requesterCharacterId(), "TRADE_EXECUTED",
                 detail.formatted(snapshot.id(), snapshot.targetCharacterId()));
         ports.auditPort().log(t, snapshot.targetCharacterId(), "TRADE_EXECUTED",

@@ -23,11 +23,11 @@ public final class EventBus {
 
     @SuppressWarnings("unchecked")
     public <T extends Event> void publish(T event) {
-        var list = listeners.get(event.getClass());
+        List<Consumer<?>> list = listeners.get(event.getClass());
         if (list == null) {
             return;
         }
-        for (var listener : list) {
+        for (Consumer<?> listener : list) {
             ((Consumer<T>) listener).accept(event);
         }
     }

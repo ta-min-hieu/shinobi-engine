@@ -67,26 +67,26 @@ final class CombatSystem extends IteratingKSystem {
         if (pendingResults.isEmpty()) {
             return List.of();
         }
-        var results = List.copyOf(pendingResults);
+        List<AttackOutcome> results = List.copyOf(pendingResults);
         pendingResults.clear();
         return results;
     }
 
     @Override
     protected void processEntity(KEntity entity, float deltaTime) {
-        var cooldown = COOLDOWN.get(entity);
+        AttackCooldownComponent cooldown = COOLDOWN.get(entity);
         cooldown.remainingSeconds -= deltaTime;
         if (cooldown.remainingSeconds > 0f) {
             return;
         }
 
-        var target = TARGET.get(entity);
+        TargetComponent target = TARGET.get(entity);
         if (target.targetEntityId == 0L) {
             return; // chưa chọn mục tiêu
         }
 
-        var targetEntity = entityLookup.apply(target.targetEntityId);
-        var targetHealth = targetEntity == null ? null : HEALTH.get(targetEntity);
+        KEntity targetEntity = entityLookup.apply(target.targetEntityId);
+        HealthComponent targetHealth = targetEntity == null ? null : HEALTH.get(targetEntity);
         if (targetHealth == null || targetHealth.isDead()) {
             target.targetEntityId = 0L; // mục tiêu đã biến mất/chết — bỏ chọn, chờ chọn lại
             return;
@@ -102,7 +102,7 @@ final class CombatSystem extends IteratingKSystem {
 
     private void resolveAndRecordAttack(
             KEntity attacker, KEntity target, long targetEntityId, HealthComponent targetHealth) {
-        var result = CombatConstants.resolveAttack(
+        CombatConstants.AttackResult result = CombatConstants.resolveAttack(
                 CombatConstants.toStats(COMBAT_STATS.get(attacker)), CombatConstants.toStats(COMBAT_STATS.get(target)));
         targetHealth.current = Math.max(0, targetHealth.current - result.damage());
 

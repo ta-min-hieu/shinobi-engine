@@ -8,10 +8,10 @@ class RequestTradeUseCaseTest {
 
     @Test
     void shouldCreatePendingRequest() {
-        var port = new FakeTradeSessionPort();
-        var useCase = new RequestTradeUseCase(port);
+        FakeTradeSessionPort port = new FakeTradeSessionPort();
+        RequestTradeUseCase useCase = new RequestTradeUseCase(port);
 
-        var result = useCase.execute(1, 5);
+        RequestTradeUseCase.Result result = useCase.execute(1, 5);
 
         assertThat(result.outcome()).isEqualTo(RequestTradeUseCase.Outcome.OK);
         assertThat(port.findActiveSessionOfCharacter(1)).isPresent();
@@ -20,31 +20,31 @@ class RequestTradeUseCaseTest {
 
     @Test
     void shouldRejectSelfTrade() {
-        var useCase = new RequestTradeUseCase(new FakeTradeSessionPort());
+        RequestTradeUseCase useCase = new RequestTradeUseCase(new FakeTradeSessionPort());
 
-        var result = useCase.execute(1, 1);
+        RequestTradeUseCase.Result result = useCase.execute(1, 1);
 
         assertThat(result.outcome()).isEqualTo(RequestTradeUseCase.Outcome.CANNOT_TRADE_SELF);
     }
 
     @Test
     void shouldReject_whenRequesterAlreadyInTrade() {
-        var port = new FakeTradeSessionPort();
+        FakeTradeSessionPort port = new FakeTradeSessionPort();
         port.createRequest(1, 5);
-        var useCase = new RequestTradeUseCase(port);
+        RequestTradeUseCase useCase = new RequestTradeUseCase(port);
 
-        var result = useCase.execute(1, 7);
+        RequestTradeUseCase.Result result = useCase.execute(1, 7);
 
         assertThat(result.outcome()).isEqualTo(RequestTradeUseCase.Outcome.ALREADY_IN_TRADE);
     }
 
     @Test
     void shouldReject_whenTargetAlreadyInTrade() {
-        var port = new FakeTradeSessionPort();
+        FakeTradeSessionPort port = new FakeTradeSessionPort();
         port.createRequest(5, 7);
-        var useCase = new RequestTradeUseCase(port);
+        RequestTradeUseCase useCase = new RequestTradeUseCase(port);
 
-        var result = useCase.execute(1, 5);
+        RequestTradeUseCase.Result result = useCase.execute(1, 5);
 
         assertThat(result.outcome()).isEqualTo(RequestTradeUseCase.Outcome.TARGET_ALREADY_IN_TRADE);
     }

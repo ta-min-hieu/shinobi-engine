@@ -27,21 +27,21 @@ class GetDialogueNodeUseCaseTest {
 
     @Test
     void shouldReturnEmpty_whenNpcCodeUnknown() {
-        var useCase = new GetDialogueNodeUseCase(new FakeNpcTemplatePort(TEST_SCRIPT_REF));
+        GetDialogueNodeUseCase useCase = new GetDialogueNodeUseCase(new FakeNpcTemplatePort(TEST_SCRIPT_REF));
 
-        var result = useCase.execute("unknown_npc", DialogueNode.START_NODE_ID);
+        Optional<DialogueNode> result = useCase.execute("unknown_npc", DialogueNode.START_NODE_ID);
 
         assertThat(result).isEmpty();
     }
 
     @Test
     void shouldReturnStartNode_withOptions() {
-        var useCase = new GetDialogueNodeUseCase(new FakeNpcTemplatePort(TEST_SCRIPT_REF));
+        GetDialogueNodeUseCase useCase = new GetDialogueNodeUseCase(new FakeNpcTemplatePort(TEST_SCRIPT_REF));
 
-        var result = useCase.execute("known_npc", DialogueNode.START_NODE_ID);
+        Optional<DialogueNode> result = useCase.execute("known_npc", DialogueNode.START_NODE_ID);
 
         assertThat(result).isPresent();
-        var node = result.get();
+        DialogueNode node = result.get();
         assertThat(node.nodeId()).isEqualTo("start");
         assertThat(node.textKey()).isEqualTo("dialogue.test.greeting");
         assertThat(node.options()).hasSize(2);
@@ -52,9 +52,9 @@ class GetDialogueNodeUseCaseTest {
 
     @Test
     void shouldReturnSecondNode_whenNavigatingByNodeId() {
-        var useCase = new GetDialogueNodeUseCase(new FakeNpcTemplatePort(TEST_SCRIPT_REF));
+        GetDialogueNodeUseCase useCase = new GetDialogueNodeUseCase(new FakeNpcTemplatePort(TEST_SCRIPT_REF));
 
-        var result = useCase.execute("known_npc", "more");
+        Optional<DialogueNode> result = useCase.execute("known_npc", "more");
 
         assertThat(result).isPresent();
         assertThat(result.get().textKey()).isEqualTo("dialogue.test.more");
@@ -63,16 +63,17 @@ class GetDialogueNodeUseCaseTest {
 
     @Test
     void shouldReturnEmpty_whenNodeIdDoesNotExistInScript() {
-        var useCase = new GetDialogueNodeUseCase(new FakeNpcTemplatePort(TEST_SCRIPT_REF));
+        GetDialogueNodeUseCase useCase = new GetDialogueNodeUseCase(new FakeNpcTemplatePort(TEST_SCRIPT_REF));
 
-        var result = useCase.execute("known_npc", "no_such_node");
+        Optional<DialogueNode> result = useCase.execute("known_npc", "no_such_node");
 
         assertThat(result).isEmpty();
     }
 
     @Test
     void shouldReturnEmpty_whenScriptRefDoesNotExistOnClasspath() {
-        var useCase = new GetDialogueNodeUseCase(new FakeNpcTemplatePort("/scripts/dialogue/does_not_exist.js"));
+        GetDialogueNodeUseCase useCase =
+                new GetDialogueNodeUseCase(new FakeNpcTemplatePort("/scripts/dialogue/does_not_exist.js"));
 
         // loadScript ném IllegalStateException (không tìm thấy resource) — hành vi hiện tại là
         // để lỗi lập trình này lộ ra ngay (fail fast), không nuốt thành Optional.empty() im lặng.

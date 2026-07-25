@@ -42,7 +42,7 @@ final class FakePartyPort implements PartyPort {
 
     @Override
     public Party createParty(long leaderCharacterId) {
-        var party = new Party(nextPartyId.getAndIncrement(), leaderCharacterId, Instant.now());
+        Party party = new Party(nextPartyId.getAndIncrement(), leaderCharacterId, Instant.now());
         partiesById.put(party.id(), party);
         members.add(new PartyMember(party.id(), leaderCharacterId, PartyRole.LEADER, Instant.now()));
         return party;
@@ -63,14 +63,15 @@ final class FakePartyPort implements PartyPort {
         if (invites.stream().anyMatch(i -> i.partyId() == partyId && i.inviteeCharacterId() == inviteeCharacterId)) {
             throw new DuplicatePartyInviteException(partyId, inviteeCharacterId);
         }
-        var invite = new PartyInvite(nextInviteId.getAndIncrement(), partyId, inviteeCharacterId, Instant.now());
+        PartyInvite invite =
+                new PartyInvite(nextInviteId.getAndIncrement(), partyId, inviteeCharacterId, Instant.now());
         invites.add(invite);
         return invite;
     }
 
     @Override
     public AcceptResult acceptInvite(long inviteId, long characterId) {
-        var invite = invites.stream()
+        Optional<PartyInvite> invite = invites.stream()
                 .filter(i -> i.id() == inviteId && i.inviteeCharacterId() == characterId)
                 .findFirst();
         if (invite.isEmpty()) {
@@ -91,7 +92,7 @@ final class FakePartyPort implements PartyPort {
 
     @Override
     public boolean rejectInvite(long inviteId, long characterId) {
-        var invite = invites.stream()
+        Optional<PartyInvite> invite = invites.stream()
                 .filter(i -> i.id() == inviteId && i.inviteeCharacterId() == characterId)
                 .findFirst();
         invite.ifPresent(invites::remove);
@@ -100,7 +101,7 @@ final class FakePartyPort implements PartyPort {
 
     @Override
     public LeaveResult leaveParty(long characterId) {
-        var membership = findMembershipOf(characterId);
+        Optional<PartyMember> membership = findMembershipOf(characterId);
         if (membership.isEmpty()) {
             return LeaveResult.NOT_IN_PARTY;
         }
@@ -109,7 +110,7 @@ final class FakePartyPort implements PartyPort {
         if (membership.get().role() != PartyRole.LEADER) {
             return LeaveResult.OK;
         }
-        var remaining = listMembers(partyId).stream()
+        Optional<PartyMember> remaining = listMembers(partyId).stream()
                 .sorted(Comparator.comparing(PartyMember::joinedAt))
                 .findFirst();
         if (remaining.isEmpty()) {
@@ -124,7 +125,7 @@ final class FakePartyPort implements PartyPort {
 
     @Override
     public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
-        var leaderMembership = members.stream()
+        Optional<PartyMember> leaderMembership = members.stream()
                 .filter(m -> m.characterId() == leaderCharacterId && m.role() == PartyRole.LEADER)
                 .findFirst();
         if (leaderMembership.isEmpty()) {

@@ -20,7 +20,7 @@ public final class ServiceRegistry {
     }
 
     public <T> T get(Class<T> type) {
-        var instance = services.get(type);
+        Object instance = services.get(type);
         if (instance == null) {
             // Fail fast (Điều 16) — thiếu service lúc khởi động phải nổ ngay, không NPE mù mờ về sau.
             throw new IllegalStateException("Service chưa đăng ký: " + type.getName());

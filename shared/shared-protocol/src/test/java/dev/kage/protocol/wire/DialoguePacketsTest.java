@@ -19,27 +19,28 @@ class DialoguePacketsTest {
 
     @Test
     void shouldRoundTripTalkToNpcCommand() throws InvalidProtocolBufferException {
-        var command = TalkToNpcCommand.newBuilder().setNpcCode("town_elder").build();
-        var header = new PacketHeader(Opcode.OPCODE_TALK_TO_NPC_COMMAND_VALUE, ProtocolVersion.CURRENT, 1);
+        TalkToNpcCommand command = TalkToNpcCommand.newBuilder().setNpcCode("town_elder").build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_TALK_TO_NPC_COMMAND_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsed = TalkToNpcCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        TalkToNpcCommand parsed = TalkToNpcCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getNpcCode()).isEqualTo("town_elder");
     }
 
     @Test
     void shouldRoundTripDialogueNodeResponse() throws InvalidProtocolBufferException {
-        var option = DialogueOptionView.newBuilder().setLabelKey("dialogue.option.bye").setAction("end").build();
-        var response = DialogueNodeResponse.newBuilder()
+        DialogueOptionView option =
+                DialogueOptionView.newBuilder().setLabelKey("dialogue.option.bye").setAction("end").build();
+        DialogueNodeResponse response = DialogueNodeResponse.newBuilder()
                 .setNodeId("start")
                 .setTextKey("dialogue.town_elder.greeting")
                 .addOptions(option)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_DIALOGUE_NODE_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_DIALOGUE_NODE_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = DialogueNodeResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        DialogueNodeResponse parsed = DialogueNodeResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getNodeId()).isEqualTo("start");
         assertThat(parsed.getTextKey()).isEqualTo("dialogue.town_elder.greeting");
@@ -50,15 +51,17 @@ class DialoguePacketsTest {
 
     @Test
     void shouldRoundTripSelectDialogueOptionCommand() throws InvalidProtocolBufferException {
-        var command = SelectDialogueOptionCommand.newBuilder()
+        SelectDialogueOptionCommand command = SelectDialogueOptionCommand.newBuilder()
                 .setNpcCode("town_elder")
                 .setCurrentNodeId("start")
                 .setOptionIndex(1)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_SELECT_DIALOGUE_OPTION_COMMAND_VALUE, ProtocolVersion.CURRENT, 2);
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_SELECT_DIALOGUE_OPTION_COMMAND_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsed = SelectDialogueOptionCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SelectDialogueOptionCommand parsed =
+                SelectDialogueOptionCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getNpcCode()).isEqualTo("town_elder");
         assertThat(parsed.getCurrentNodeId()).isEqualTo("start");
@@ -67,11 +70,11 @@ class DialoguePacketsTest {
 
     @Test
     void shouldRoundTripDialogueEndedResponse() throws InvalidProtocolBufferException {
-        var response = DialogueEndedResponse.newBuilder().build();
-        var header = new PacketHeader(Opcode.OPCODE_DIALOGUE_ENDED_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
+        DialogueEndedResponse response = DialogueEndedResponse.newBuilder().build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_DIALOGUE_ENDED_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = DialogueEndedResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        DialogueEndedResponse parsed = DialogueEndedResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed).isEqualTo(response);
     }

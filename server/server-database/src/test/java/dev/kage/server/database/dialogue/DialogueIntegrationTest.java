@@ -8,6 +8,8 @@ import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.PostgresDataSourceFactory;
 import java.time.Duration;
+import java.util.List;
+import java.util.Optional;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -34,7 +36,7 @@ class DialogueIntegrationTest {
 
     @BeforeAll
     static void migrate() {
-        var config = new DatabaseConfig(
+        DatabaseConfig config = new DatabaseConfig(
                 POSTGRES.getHost(),
                 POSTGRES.getMappedPort(POSTGRES_PORT),
                 POSTGRES.getDatabaseName(),
@@ -50,10 +52,10 @@ class DialogueIntegrationTest {
 
     @Test
     void shouldReturnStartNode_forSeededTownElder() {
-        var result = newUseCase().execute("town_elder", DialogueNode.START_NODE_ID);
+        Optional<DialogueNode> result = newUseCase().execute("town_elder", DialogueNode.START_NODE_ID);
 
         assertThat(result).isPresent();
-        var node = result.get();
+        DialogueNode node = result.get();
         assertThat(node.textKey()).isEqualTo("dialogue.town_elder.greeting");
         assertThat(node.options()).extracting("action")
                 .containsExactly("about_town", "accept_quest:kill_training_dummies", "open_shop", "end");
@@ -61,7 +63,7 @@ class DialogueIntegrationTest {
 
     @Test
     void shouldReturnAboutTownNode_whenNavigating() {
-        var result = newUseCase().execute("town_elder", "about_town");
+        Optional<DialogueNode> result = newUseCase().execute("town_elder", "about_town");
 
         assertThat(result).isPresent();
         assertThat(result.get().textKey()).isEqualTo("dialogue.town_elder.about_town");
@@ -69,7 +71,7 @@ class DialogueIntegrationTest {
 
     @Test
     void shouldReturnEmpty_forUnknownNpcCode() {
-        var result = newUseCase().execute("no_such_npc", DialogueNode.START_NODE_ID);
+        Optional<DialogueNode> result = newUseCase().execute("no_such_npc", DialogueNode.START_NODE_ID);
 
         assertThat(result).isEmpty();
     }
@@ -78,7 +80,7 @@ class DialogueIntegrationTest {
     void shouldListDialogueScriptRef_forStartupValidation() {
         // SCRIPTING.md §8 — validate lúc khởi động cần liệt kê ĐÚNG dialogue_script_ref đang tham
         // chiếu thật trong DB (V10 seed), không phải danh sách tự khai trong code.
-        var scriptRefs = new PostgresNpcTemplateAdapter(dataSource).listAllDialogueScriptRefs();
+        List<String> scriptRefs = new PostgresNpcTemplateAdapter(dataSource).listAllDialogueScriptRefs();
 
         assertThat(scriptRefs).contains("/scripts/dialogue/town_elder.js");
     }

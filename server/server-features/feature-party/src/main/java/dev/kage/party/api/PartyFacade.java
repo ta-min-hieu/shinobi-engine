@@ -1,6 +1,7 @@
 package dev.kage.party.api;
 
 import dev.kage.party.application.AcceptPartyInviteUseCase;
+import dev.kage.party.application.CreatePartyUseCase;
 import dev.kage.party.application.KickPartyMemberUseCase;
 import dev.kage.party.application.LeavePartyUseCase;
 import dev.kage.party.application.PartyUseCases;
@@ -23,8 +24,8 @@ public final class PartyFacade {
     }
 
     public CreateResult createParty(long characterId) {
-        var result = useCases.createPartyUseCase().execute(characterId);
-        var outcome = result.outcome() == dev.kage.party.application.CreatePartyUseCase.Outcome.OK
+        CreatePartyUseCase.Result result = useCases.createPartyUseCase().execute(characterId);
+        CreateOutcome outcome = result.outcome() == dev.kage.party.application.CreatePartyUseCase.Outcome.OK
                 ? CreateOutcome.OK
                 : CreateOutcome.ALREADY_IN_PARTY;
         Long partyId = result.party() == null ? null : result.party().id();

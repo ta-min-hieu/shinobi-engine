@@ -15,11 +15,11 @@ class RemoveFriendUseCaseTest {
 
     @Test
     void shouldRemove_whenAcceptedFriendshipExists() {
-        var port = new FakeFriendPort();
+        FakeFriendPort port = new FakeFriendPort();
         port.friendships.add(new Friendship(1, 5, 7, FriendshipStatus.ACCEPTED, Instant.now(), Instant.now()));
-        var useCase = new RemoveFriendUseCase(port);
+        RemoveFriendUseCase useCase = new RemoveFriendUseCase(port);
 
-        var result = useCase.execute(5, 7);
+        RemoveFriendUseCase.Result result = useCase.execute(5, 7);
 
         assertThat(result).isEqualTo(RemoveFriendUseCase.Result.OK);
         assertThat(port.friendships).isEmpty();
@@ -27,9 +27,9 @@ class RemoveFriendUseCaseTest {
 
     @Test
     void shouldReject_whenNotFriends() {
-        var useCase = new RemoveFriendUseCase(new FakeFriendPort());
+        RemoveFriendUseCase useCase = new RemoveFriendUseCase(new FakeFriendPort());
 
-        var result = useCase.execute(5, 7);
+        RemoveFriendUseCase.Result result = useCase.execute(5, 7);
 
         assertThat(result).isEqualTo(RemoveFriendUseCase.Result.NOT_FOUND);
     }

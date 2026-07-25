@@ -3,6 +3,7 @@ package dev.kage.server.database.mail;
 import dev.kage.mail.domain.AuditPort;
 import dev.kage.mail.domain.Transaction;
 import dev.kage.server.database.DatabaseAccessException;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -17,7 +18,7 @@ public final class PostgresMailAuditAdapter implements AuditPort {
 
     @Override
     public void log(Transaction tx, long characterId, String action, String detailJson) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try (PreparedStatement statement = connection.prepareStatement(INSERT_AUDIT_LOG)) {
             statement.setLong(1, characterId);
             statement.setString(2, action);

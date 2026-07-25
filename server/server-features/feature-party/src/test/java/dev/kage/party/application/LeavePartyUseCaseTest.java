@@ -2,6 +2,7 @@ package dev.kage.party.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.kage.party.domain.Party;
 import dev.kage.party.domain.PartyRole;
 import org.junit.jupiter.api.Test;
 
@@ -9,12 +10,12 @@ class LeavePartyUseCaseTest {
 
     @Test
     void shouldLeave_whenMemberIsRegular() {
-        var port = new FakePartyPort();
-        var party = port.createParty(1);
+        FakePartyPort port = new FakePartyPort();
+        Party party = port.createParty(1);
         port.acceptInvite(port.invite(party.id(), 5).id(), 5);
-        var useCase = new LeavePartyUseCase(port);
+        LeavePartyUseCase useCase = new LeavePartyUseCase(port);
 
-        var result = useCase.execute(5);
+        LeavePartyUseCase.Result result = useCase.execute(5);
 
         assertThat(result).isEqualTo(LeavePartyUseCase.Result.OK);
         assertThat(port.findMembershipOf(5)).isEmpty();
@@ -23,20 +24,20 @@ class LeavePartyUseCaseTest {
 
     @Test
     void shouldReject_whenCharacterNotInAnyParty() {
-        var useCase = new LeavePartyUseCase(new FakePartyPort());
+        LeavePartyUseCase useCase = new LeavePartyUseCase(new FakePartyPort());
 
         assertThat(useCase.execute(5)).isEqualTo(LeavePartyUseCase.Result.NOT_IN_PARTY);
     }
 
     @Test
     void shouldPromoteEarliestRemainingMember_whenLeaderLeaves() {
-        var port = new FakePartyPort();
-        var party = port.createParty(1);
+        FakePartyPort port = new FakePartyPort();
+        Party party = port.createParty(1);
         port.acceptInvite(port.invite(party.id(), 5).id(), 5);
         port.acceptInvite(port.invite(party.id(), 7).id(), 7);
-        var useCase = new LeavePartyUseCase(port);
+        LeavePartyUseCase useCase = new LeavePartyUseCase(port);
 
-        var result = useCase.execute(1);
+        LeavePartyUseCase.Result result = useCase.execute(1);
 
         assertThat(result).isEqualTo(LeavePartyUseCase.Result.OK);
         assertThat(port.findMembershipOf(1)).isEmpty();
@@ -46,11 +47,11 @@ class LeavePartyUseCaseTest {
 
     @Test
     void shouldDissolveParty_whenLastMemberLeaves() {
-        var port = new FakePartyPort();
+        FakePartyPort port = new FakePartyPort();
         port.createParty(1);
-        var useCase = new LeavePartyUseCase(port);
+        LeavePartyUseCase useCase = new LeavePartyUseCase(port);
 
-        var result = useCase.execute(1);
+        LeavePartyUseCase.Result result = useCase.execute(1);
 
         assertThat(result).isEqualTo(LeavePartyUseCase.Result.OK);
         assertThat(port.findMembershipOf(1)).isEmpty();

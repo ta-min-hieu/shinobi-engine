@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.LockSupport;
 import org.slf4j.Logger;
@@ -282,9 +283,9 @@ public final class WorldFacade {
         if (entitiesByCharacterId.containsKey(characterId)) {
             return; // đã attach — bỏ qua an toàn thay vì tạo entity trùng.
         }
-        var entity = ecsWorld.createEntity();
+        KEntity entity = ecsWorld.createEntity();
 
-        var position = new PositionComponent();
+        PositionComponent position = new PositionComponent();
         position.x = spawnX;
         position.y = spawnY;
         position.prevX = position.x;
@@ -292,11 +293,11 @@ public final class WorldFacade {
         entity.add(position);
         entity.add(new VelocityComponent());
 
-        var characterIdComponent = new CharacterIdComponent();
+        CharacterIdComponent characterIdComponent = new CharacterIdComponent();
         characterIdComponent.characterId = characterId;
         entity.add(characterIdComponent);
 
-        var health = new HealthComponent();
+        HealthComponent health = new HealthComponent();
         health.current = CombatConstants.CHARACTER_MAX_HP; // placeholder — GDD chưa chốt công thức HP tối đa
         health.max = CombatConstants.CHARACTER_MAX_HP;
         entity.add(health);
@@ -305,7 +306,7 @@ public final class WorldFacade {
         entity.add(new AttackCooldownComponent());
         entity.add(new SkillCooldownComponent());
 
-        var chi = new ChiComponent();
+        ChiComponent chi = new ChiComponent();
         chi.current = SkillConstants.CHARACTER_MAX_CHI; // placeholder — chưa nối character_stat.current_chi DB
         chi.max = SkillConstants.CHARACTER_MAX_CHI;
         entity.add(chi);
@@ -316,7 +317,7 @@ public final class WorldFacade {
     }
 
     private void handleDetach(long characterId) {
-        var entity = entitiesByCharacterId.remove(characterId);
+        KEntity entity = entitiesByCharacterId.remove(characterId);
         baseStatsByCharacterId.remove(characterId);
         if (entity == null) {
             return;
@@ -326,7 +327,7 @@ public final class WorldFacade {
     }
 
     private void handleMoveIntent(WorldCommand.MoveIntentCommand intent) {
-        var entity = entitiesByCharacterId.get(intent.characterId());
+        KEntity entity = entitiesByCharacterId.get(intent.characterId());
         if (entity == null) {
             // Race hiếm: MoveCommand tới trước khi AttachCharacterCommand cùng batch được xử lý
             // xong — bỏ qua an toàn, client sẽ gửi lại lệnh tiếp theo khi hướng đổi lần sau.
@@ -334,16 +335,16 @@ public final class WorldFacade {
         }
 
         float[] direction = clampDirection(intent.dirX(), intent.dirY());
-        var velocity = VELOCITY.get(entity);
+        VelocityComponent velocity = VELOCITY.get(entity);
         velocity.x = direction[0] * WorldConstants.MOVE_SPEED_MPS;
         velocity.y = direction[1] * WorldConstants.MOVE_SPEED_MPS;
 
-        var position = POSITION.get(entity);
+        PositionComponent position = POSITION.get(entity);
         outboundSink.onMoveAccepted(intent.characterId(), intent.sequenceId(), position.x, position.y);
     }
 
     private void handleSetTarget(long characterId, long targetEntityId) {
-        var entity = entitiesByCharacterId.get(characterId);
+        KEntity entity = entitiesByCharacterId.get(characterId);
         if (entity == null) {
             return;
         }
@@ -354,7 +355,7 @@ public final class WorldFacade {
     }
 
     private void handleUseSkill(long characterId, String skillCode, long targetEntityId) {
-        var caster = entitiesByCharacterId.get(characterId);
+        KEntity caster = entitiesByCharacterId.get(characterId);
         if (caster == null) {
             return;
         }
@@ -368,7 +369,7 @@ public final class WorldFacade {
         if (!entitiesByCharacterId.containsKey(characterId)) {
             return; // đã ngắt kết nối giữa lúc lệnh còn trong hàng đợi — bỏ qua an toàn.
         }
-        var observers = aoiTracker.observersOf(characterId);
+        Set<Long> observers = aoiTracker.observersOf(characterId);
         observers.add(characterId); // người gửi luôn thấy tin nhắn của chính mình.
         for (long observerId : observers) {
             outboundSink.onAreaChatMessage(observerId, characterId, senderName, body);
@@ -376,19 +377,19 @@ public final class WorldFacade {
     }
 
     private void handleApplyEquipmentBonus(long characterId, int bonusAtk) {
-        var entity = entitiesByCharacterId.get(characterId);
-        var baseStats = baseStatsByCharacterId.get(characterId);
+        KEntity entity = entitiesByCharacterId.get(characterId);
+        CharacterBaseStats baseStats = baseStatsByCharacterId.get(characterId);
         if (entity == null || baseStats == null) {
             return; // chưa attach xong hoặc đã detach giữa lúc lệnh còn trong hàng đợi — bỏ qua an toàn.
         }
-        var combatStats = COMBAT_STATS.get(entity);
-        var derived = CombatConstants.deriveCombatStats(baseStats);
+        CombatStatsComponent combatStats = COMBAT_STATS.get(entity);
+        CombatConstants.CombatStats derived = CombatConstants.deriveCombatStats(baseStats);
         combatStats.atk = derived.atk() + bonusAtk; // LUÔN tính lại từ nền, không cộng dồn (xem javadoc)
     }
 
     private void handleCombatResults(List<CombatSystem.AttackOutcome> results) {
-        for (var outcome : results) {
-            var sinkOutcome = new WorldOutboundSink.AttackOutcome(
+        for (CombatSystem.AttackOutcome outcome : results) {
+            WorldOutboundSink.AttackOutcome sinkOutcome = new WorldOutboundSink.AttackOutcome(
                     outcome.attackerEntityId(),
                     outcome.targetEntityId(),
                     outcome.damage(),
@@ -397,7 +398,7 @@ public final class WorldFacade {
                     outcome.targetCurrentHp(),
                     outcome.targetDied());
 
-            var observers = aoiTracker.observersOf(outcome.targetEntityId());
+            Set<Long> observers = aoiTracker.observersOf(outcome.targetEntityId());
             observers.add(outcome.attackerEntityId()); // người đánh luôn thấy kết quả đòn của chính mình.
             // PHÁT HIỆN THẬT (Phase 8 lát cắt 2, viết test E2E thật mới lộ ra): khi mục tiêu là
             // NHÂN VẬT (dương), mục tiêu cũng phải LUÔN thấy đòn nhắm vào mình, không chỉ dựa vào
@@ -423,8 +424,8 @@ public final class WorldFacade {
     }
 
     private void handleSkillResults(List<SkillSystem.SkillOutcome> results) {
-        for (var outcome : results) {
-            var sinkOutcome = new WorldOutboundSink.SkillOutcome(
+        for (SkillSystem.SkillOutcome outcome : results) {
+            WorldOutboundSink.SkillOutcome sinkOutcome = new WorldOutboundSink.SkillOutcome(
                     outcome.skillCode(),
                     outcome.attackerEntityId(),
                     outcome.targetEntityId(),
@@ -434,7 +435,7 @@ public final class WorldFacade {
                     outcome.targetCurrentHp(),
                     outcome.targetDied());
 
-            var observers = aoiTracker.observersOf(outcome.targetEntityId());
+            Set<Long> observers = aoiTracker.observersOf(outcome.targetEntityId());
             observers.add(outcome.attackerEntityId()); // người dùng skill luôn thấy kết quả của chính mình.
             // Chỉ target dương (nhân vật) — xem giải thích đầy đủ ở handleCombatResults.
             if (outcome.targetEntityId() > 0) {
@@ -455,8 +456,8 @@ public final class WorldFacade {
      * hoặc {@code "enrage"}, client phân biệt qua đó nếu cần hiệu ứng riêng sau này.
      */
     private void handleBossResults(List<BossAiSystem.BossActionOutcome> results) {
-        for (var outcome : results) {
-            var sinkOutcome = new WorldOutboundSink.SkillOutcome(
+        for (BossAiSystem.BossActionOutcome outcome : results) {
+            WorldOutboundSink.SkillOutcome sinkOutcome = new WorldOutboundSink.SkillOutcome(
                     outcome.actionCode(),
                     outcome.attackerEntityId(),
                     outcome.targetEntityId(),
@@ -466,7 +467,7 @@ public final class WorldFacade {
                     outcome.targetCurrentHp(),
                     outcome.targetDied());
 
-            var observers = aoiTracker.observersOf(outcome.targetEntityId());
+            Set<Long> observers = aoiTracker.observersOf(outcome.targetEntityId());
             observers.add(outcome.attackerEntityId()); // boss "thấy" đòn của chính nó, giống người dùng skill.
             // Chỉ target dương (nhân vật) — xem giải thích đầy đủ ở handleCombatResults.
             if (outcome.targetEntityId() > 0) {
@@ -482,7 +483,7 @@ public final class WorldFacade {
     }
 
     private void handleMonsterDeath(long monsterId, long killerEntityId) {
-        var entity = entitiesByMonsterId.remove(monsterId);
+        KEntity entity = entitiesByMonsterId.remove(monsterId);
         if (entity == null) {
             return; // đã xử lý (nhiều đòn hạ gục cùng tick — CombatSystem tự chặn đòn thứ 2, xem javadoc).
         }
@@ -515,10 +516,10 @@ public final class WorldFacade {
     }
 
     private void spawnTrainingDummy() {
-        var entity = ecsWorld.createEntity();
+        KEntity entity = ecsWorld.createEntity();
         long monsterId = nextMonsterOrNpcId--;
 
-        var position = new PositionComponent();
+        PositionComponent position = new PositionComponent();
         position.x = TRAINING_DUMMY_SPAWN_X;
         position.y = TRAINING_DUMMY_SPAWN_Y;
         position.prevX = position.x;
@@ -526,21 +527,21 @@ public final class WorldFacade {
         entity.add(position);
         entity.add(new VelocityComponent()); // AiSystem set vận tốc theo FSM (AI.md §3)
 
-        var health = new HealthComponent();
+        HealthComponent health = new HealthComponent();
         health.current = CombatConstants.MONSTER_MAX_HP;
         health.max = CombatConstants.MONSTER_MAX_HP;
         entity.add(health);
 
-        var monster = new MonsterComponent();
+        MonsterComponent monster = new MonsterComponent();
         monster.monsterCode = TRAINING_DUMMY_CODE;
         entity.add(monster);
         entity.add(toComponent(CombatConstants.MONSTER_STATS));
 
-        var monsterIdComponent = new MonsterIdComponent();
+        MonsterIdComponent monsterIdComponent = new MonsterIdComponent();
         monsterIdComponent.monsterId = monsterId;
         entity.add(monsterIdComponent);
 
-        var aiState = new AiStateComponent();
+        AiStateComponent aiState = new AiStateComponent();
         aiState.spawnX = TRAINING_DUMMY_SPAWN_X;
         aiState.spawnY = TRAINING_DUMMY_SPAWN_Y;
         entity.add(aiState);
@@ -553,10 +554,10 @@ public final class WorldFacade {
     }
 
     private void spawnBossEntity() {
-        var entity = ecsWorld.createEntity();
+        KEntity entity = ecsWorld.createEntity();
         long monsterId = nextMonsterOrNpcId--;
 
-        var position = new PositionComponent();
+        PositionComponent position = new PositionComponent();
         position.x = BOSS_SPAWN_X;
         position.y = BOSS_SPAWN_Y;
         position.prevX = position.x;
@@ -564,21 +565,21 @@ public final class WorldFacade {
         entity.add(position);
         entity.add(new VelocityComponent()); // AiSystem set vận tốc theo FSM (AI.md §3)
 
-        var health = new HealthComponent();
+        HealthComponent health = new HealthComponent();
         health.current = CombatConstants.BOSS_MAX_HP;
         health.max = CombatConstants.BOSS_MAX_HP;
         entity.add(health);
 
-        var monster = new MonsterComponent();
+        MonsterComponent monster = new MonsterComponent();
         monster.monsterCode = BossConstants.BOSS_CODE;
         entity.add(monster);
         entity.add(toComponent(CombatConstants.BOSS_STATS));
 
-        var monsterIdComponent = new MonsterIdComponent();
+        MonsterIdComponent monsterIdComponent = new MonsterIdComponent();
         monsterIdComponent.monsterId = monsterId;
         entity.add(monsterIdComponent);
 
-        var aiState = new AiStateComponent();
+        AiStateComponent aiState = new AiStateComponent();
         aiState.spawnX = BOSS_SPAWN_X;
         aiState.spawnY = BOSS_SPAWN_Y;
         entity.add(aiState);
@@ -592,10 +593,10 @@ public final class WorldFacade {
     }
 
     private void spawnNpc() {
-        var entity = ecsWorld.createEntity();
+        KEntity entity = ecsWorld.createEntity();
         long npcId = nextMonsterOrNpcId--;
 
-        var position = new PositionComponent();
+        PositionComponent position = new PositionComponent();
         position.x = SAMPLE_NPC_SPAWN_X;
         position.y = SAMPLE_NPC_SPAWN_Y;
         position.prevX = position.x;
@@ -604,11 +605,11 @@ public final class WorldFacade {
         // KHÔNG VelocityComponent/HealthComponent/AiStateComponent — NPC tĩnh, không di chuyển,
         // không combat (khác spawnTrainingDummy).
 
-        var npc = new NpcComponent();
+        NpcComponent npc = new NpcComponent();
         npc.npcCode = SAMPLE_NPC_CODE;
         entity.add(npc);
 
-        var npcIdComponent = new NpcIdComponent();
+        NpcIdComponent npcIdComponent = new NpcIdComponent();
         npcIdComponent.npcId = npcId;
         entity.add(npcIdComponent);
 
@@ -619,7 +620,7 @@ public final class WorldFacade {
 
     /** {@code CombatConstants.CombatStats} (record, không mutable) → component ECS (mutable). */
     private static CombatStatsComponent toComponent(CombatConstants.CombatStats stats) {
-        var component = new CombatStatsComponent();
+        CombatStatsComponent component = new CombatStatsComponent();
         component.atk = stats.atk();
         component.skillDmg = stats.skillDmg();
         component.def = stats.def();

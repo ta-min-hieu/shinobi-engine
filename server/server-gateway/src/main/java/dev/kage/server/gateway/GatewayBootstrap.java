@@ -1,9 +1,21 @@
 package dev.kage.server.gateway;
 
+import dev.kage.account.api.AccountFacade;
+import dev.kage.character.api.CharacterFacade;
+import dev.kage.chat.api.ChatFacade;
+import dev.kage.dialogue.api.DialogueFacade;
 import dev.kage.engine.scripting.ScriptSandbox;
 import dev.kage.engine.scripting.ScriptValidator;
+import dev.kage.friend.api.FriendFacade;
+import dev.kage.guild.api.GuildFacade;
+import dev.kage.inventory.api.InventoryFacade;
+import dev.kage.mail.api.MailFacade;
+import dev.kage.party.api.PartyFacade;
+import dev.kage.quest.api.QuestFacade;
 import dev.kage.server.database.ServerDatabaseBootstrap;
 import dev.kage.server.world.WorldFacade;
+import dev.kage.shop.api.ShopFacade;
+import dev.kage.trade.api.TradeFacade;
 import java.time.Duration;
 import java.util.ArrayList;
 
@@ -31,12 +43,12 @@ public final class GatewayBootstrap {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        var databaseBootstrap = new ServerDatabaseBootstrap();
-        var facades = wireFacades(databaseBootstrap);
+        ServerDatabaseBootstrap databaseBootstrap = new ServerDatabaseBootstrap();
+        GatewayFacades facades = wireFacades(databaseBootstrap);
 
         // SCRIPTING.md §8 — fail fast lúc khởi động, KHÔNG đợi người chơi phát hiện lỗi cú pháp
         // script. Gom script_ref từ DB (quest/dialogue) + hằng số Java (skill, chưa DB-driven).
-        var scriptRefs = new ArrayList<String>();
+        ArrayList<String> scriptRefs = new ArrayList<String>();
         scriptRefs.addAll(databaseBootstrap.listContentScriptRefs());
         scriptRefs.addAll(WorldFacade.listSkillScriptResources());
         scriptRefs.addAll(WorldFacade.listBossScriptResources());
@@ -44,19 +56,20 @@ public final class GatewayBootstrap {
 
         // characterRegistry là WorldOutboundSink thật — PHẢI tồn tại trước WorldFacade vì
         // WorldFacade cần sink lúc construct (SERVER.md §2: kết quả tick đi qua outbound queue).
-        var characterRegistry =
+        ConnectedCharacterRegistry characterRegistry =
                 new ConnectedCharacterRegistry(facades.inventoryFacade(), facades.contentFacades().questFacade());
-        var worldFacade = new WorldFacade(characterRegistry);
+        WorldFacade worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
-        var positionPersister =
+        CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(facades.characterFacade(), characterRegistry, POSITION_SAVE_INTERVAL);
         positionPersister.start();
-        var dungeonInstanceRegistry = new DungeonInstanceRegistry(
+        DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
                 characterRegistry, facades.characterFacade(), facades.contentFacades().socialFacades().partyFacade(),
                 worldFacade);
-        var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister, dungeonInstanceRegistry);
+        WorldGateway worldGateway =
+                new WorldGateway(worldFacade, characterRegistry, positionPersister, dungeonInstanceRegistry);
 
-        var server = new GatewayServer(PORT, facades, worldGateway);
+        GatewayServer server = new GatewayServer(PORT, facades, worldGateway);
         server.start();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             // Thứ tự SERVER.md §10: ngừng nhận kết nối mới trước (server.stop() đóng channel),
@@ -76,22 +89,22 @@ public final class GatewayBootstrap {
 
     /** Tách khỏi {@code main()} để giữ dưới giới hạn Checkstyle MethodLength — càng thêm facade, dòng càng dài. */
     private static GatewayFacades wireFacades(ServerDatabaseBootstrap databaseBootstrap) {
-        var accountFacade = databaseBootstrap.wireAccountFacade();
-        var characterFacade = databaseBootstrap.wireCharacterFacade();
-        var inventoryFacade = databaseBootstrap.wireInventoryFacade();
-        var shopFacade = databaseBootstrap.wireShopFacade();
-        var dialogueFacade = databaseBootstrap.wireDialogueFacade();
-        var questFacade = databaseBootstrap.wireQuestFacade();
-        var friendFacade = databaseBootstrap.wireFriendFacade();
-        var mailFacade = databaseBootstrap.wireMailFacade();
-        var chatFacade = databaseBootstrap.wireChatFacade();
-        var guildFacade = databaseBootstrap.wireGuildFacade();
-        var partyFacade = databaseBootstrap.wirePartyFacade();
-        var tradeFacade = databaseBootstrap.wireTradeFacade();
+        AccountFacade accountFacade = databaseBootstrap.wireAccountFacade();
+        CharacterFacade characterFacade = databaseBootstrap.wireCharacterFacade();
+        InventoryFacade inventoryFacade = databaseBootstrap.wireInventoryFacade();
+        ShopFacade shopFacade = databaseBootstrap.wireShopFacade();
+        DialogueFacade dialogueFacade = databaseBootstrap.wireDialogueFacade();
+        QuestFacade questFacade = databaseBootstrap.wireQuestFacade();
+        FriendFacade friendFacade = databaseBootstrap.wireFriendFacade();
+        MailFacade mailFacade = databaseBootstrap.wireMailFacade();
+        ChatFacade chatFacade = databaseBootstrap.wireChatFacade();
+        GuildFacade guildFacade = databaseBootstrap.wireGuildFacade();
+        PartyFacade partyFacade = databaseBootstrap.wirePartyFacade();
+        TradeFacade tradeFacade = databaseBootstrap.wireTradeFacade();
 
-        var socialFacades =
+        SocialFacades socialFacades =
                 new SocialFacades(friendFacade, mailFacade, chatFacade, guildFacade, partyFacade, tradeFacade);
-        var contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
+        ContentFacades contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
         return new GatewayFacades(accountFacade, characterFacade, inventoryFacade, contentFacades);
     }
 }

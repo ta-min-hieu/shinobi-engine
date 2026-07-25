@@ -2,6 +2,7 @@ package dev.kage.server.gateway;
 
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.inventory.api.InventoryFacade;
+import dev.kage.inventory.domain.ItemStack;
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
@@ -26,7 +27,9 @@ import dev.kage.protocol.wire.ProtocolVersion;
 import dev.kage.quest.api.QuestFacade;
 import dev.kage.server.world.WorldOutboundSink;
 import io.netty.channel.ChannelHandlerContext;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -82,7 +85,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
      * kết nối). Dùng cho push per-player không gắn AoI/broadcast (bạn online, thư mới...).
      */
     void sendToCharacterIfOnline(long characterId, int opcode, int sequenceId, byte[] payload) {
-        var ctx = contextsByCharacterId.get(characterId);
+        ChannelHandlerContext ctx = contextsByCharacterId.get(characterId);
         if (ctx != null) {
             send(ctx, opcode, sequenceId, payload);
         }
@@ -100,7 +103,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     /** SERVER.md §10 bước 2 — báo MỌI connection đã chọn nhân vật TRƯỚC khi đóng kết nối. */
     void broadcastShuttingDown() {
-        var event = ServerShuttingDownEvent.newBuilder().build();
+        ServerShuttingDownEvent event = ServerShuttingDownEvent.newBuilder().build();
         byte[] payload = event.toByteArray();
         contextsByCharacterId.values()
                 .forEach(ctx -> send(ctx, Opcode.OPCODE_SERVER_SHUTTING_DOWN_EVENT_VALUE, 0, payload));
@@ -126,21 +129,21 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
      * băng" đúng ở toạ độ thật cuối cùng — không cần cờ "đang ở dungeon" nào thêm.
      */
     void sendMoveResponseWithoutTrackingPosition(long characterId, int sequenceId, float x, float y) {
-        var ctx = contextsByCharacterId.get(characterId);
+        ChannelHandlerContext ctx = contextsByCharacterId.get(characterId);
         if (ctx == null) {
             return; // đã ngắt kết nối giữa lúc lệnh còn trong hàng đợi world — bỏ qua an toàn.
         }
-        var response = MoveResponse.newBuilder().setX(x).setY(y).build();
+        MoveResponse response = MoveResponse.newBuilder().setX(x).setY(y).build();
         send(ctx, Opcode.OPCODE_MOVE_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
     @Override
     public void onCharacterSpawned(long targetCharacterId, long spawnedCharacterId, float x, float y) {
-        var ctx = contextsByCharacterId.get(targetCharacterId);
+        ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
         if (ctx == null) {
             return;
         }
-        var event = CharacterSpawnedEvent.newBuilder()
+        CharacterSpawnedEvent event = CharacterSpawnedEvent.newBuilder()
                 .setCharacterId(spawnedCharacterId)
                 .setX(x)
                 .setY(y)
@@ -150,11 +153,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     @Override
     public void onCharacterDespawned(long targetCharacterId, long despawnedCharacterId) {
-        var ctx = contextsByCharacterId.get(targetCharacterId);
+        ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
         if (ctx == null) {
             return;
         }
-        var event = CharacterDespawnedEvent.newBuilder()
+        CharacterDespawnedEvent event = CharacterDespawnedEvent.newBuilder()
                 .setCharacterId(despawnedCharacterId)
                 .build();
         send(ctx, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE, 0, event.toByteArray());
@@ -162,11 +165,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     @Override
     public void onCharacterMoved(long targetCharacterId, long movedCharacterId, float x, float y) {
-        var ctx = contextsByCharacterId.get(targetCharacterId);
+        ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
         if (ctx == null) {
             return;
         }
-        var event = CharacterMovedEvent.newBuilder()
+        CharacterMovedEvent event = CharacterMovedEvent.newBuilder()
                 .setCharacterId(movedCharacterId)
                 .setX(x)
                 .setY(y)
@@ -176,11 +179,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     @Override
     public void onMonsterSpawned(long targetCharacterId, WorldOutboundSink.MonsterSnapshot monster) {
-        var ctx = contextsByCharacterId.get(targetCharacterId);
+        ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
         if (ctx == null) {
             return;
         }
-        var event = MonsterSpawnedEvent.newBuilder()
+        MonsterSpawnedEvent event = MonsterSpawnedEvent.newBuilder()
                 .setMonsterId(monster.monsterId())
                 .setMonsterCode(monster.monsterCode())
                 .setX(monster.x())
@@ -193,31 +196,31 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     @Override
     public void onMonsterDespawned(long targetCharacterId, long monsterId) {
-        var ctx = contextsByCharacterId.get(targetCharacterId);
+        ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
         if (ctx == null) {
             return;
         }
-        var event = MonsterDespawnedEvent.newBuilder().setMonsterId(monsterId).build();
+        MonsterDespawnedEvent event = MonsterDespawnedEvent.newBuilder().setMonsterId(monsterId).build();
         send(ctx, Opcode.OPCODE_MONSTER_DESPAWNED_EVENT_VALUE, 0, event.toByteArray());
     }
 
     @Override
     public void onMonsterMoved(long targetCharacterId, long monsterId, float x, float y) {
-        var ctx = contextsByCharacterId.get(targetCharacterId);
+        ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
         if (ctx == null) {
             return;
         }
-        var event = MonsterMovedEvent.newBuilder().setMonsterId(monsterId).setX(x).setY(y).build();
+        MonsterMovedEvent event = MonsterMovedEvent.newBuilder().setMonsterId(monsterId).setX(x).setY(y).build();
         send(ctx, Opcode.OPCODE_MONSTER_MOVED_EVENT_VALUE, 0, event.toByteArray());
     }
 
     @Override
     public void onNpcSpawned(long targetCharacterId, WorldOutboundSink.NpcSnapshot npc) {
-        var ctx = contextsByCharacterId.get(targetCharacterId);
+        ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
         if (ctx == null) {
             return;
         }
-        var event = NpcSpawnedEvent.newBuilder()
+        NpcSpawnedEvent event = NpcSpawnedEvent.newBuilder()
                 .setNpcId(npc.npcId())
                 .setNpcCode(npc.npcCode())
                 .setX(npc.x())
@@ -228,21 +231,21 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     @Override
     public void onNpcDespawned(long targetCharacterId, long npcId) {
-        var ctx = contextsByCharacterId.get(targetCharacterId);
+        ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
         if (ctx == null) {
             return;
         }
-        var event = NpcDespawnedEvent.newBuilder().setNpcId(npcId).build();
+        NpcDespawnedEvent event = NpcDespawnedEvent.newBuilder().setNpcId(npcId).build();
         send(ctx, Opcode.OPCODE_NPC_DESPAWNED_EVENT_VALUE, 0, event.toByteArray());
     }
 
     @Override
     public void onAttackResult(long targetCharacterId, WorldOutboundSink.AttackOutcome outcome) {
-        var ctx = contextsByCharacterId.get(targetCharacterId);
+        ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
         if (ctx == null) {
             return;
         }
-        var event = AttackResultEvent.newBuilder()
+        AttackResultEvent event = AttackResultEvent.newBuilder()
                 .setAttackerEntityId(outcome.attackerEntityId())
                 .setTargetEntityId(outcome.targetEntityId())
                 .setDamage(outcome.damage())
@@ -256,11 +259,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     @Override
     public void onSkillResult(long targetCharacterId, WorldOutboundSink.SkillOutcome outcome) {
-        var ctx = contextsByCharacterId.get(targetCharacterId);
+        ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
         if (ctx == null) {
             return;
         }
-        var event = SkillResultEvent.newBuilder()
+        SkillResultEvent event = SkillResultEvent.newBuilder()
                 .setSkillCode(outcome.skillCode())
                 .setAttackerEntityId(outcome.attackerEntityId())
                 .setTargetEntityId(outcome.targetEntityId())
@@ -275,11 +278,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     @Override
     public void onAreaChatMessage(long targetCharacterId, long senderCharacterId, String senderName, String body) {
-        var ctx = contextsByCharacterId.get(targetCharacterId);
+        ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
         if (ctx == null) {
             return;
         }
-        var event = ChatMessageEvent.newBuilder()
+        ChatMessageEvent event = ChatMessageEvent.newBuilder()
                 .setChannel(ChatChannel.CHAT_CHANNEL_AREA)
                 .setSenderId(senderCharacterId)
                 .setSenderName(senderName)
@@ -298,14 +301,14 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     }
 
     private void grantLootBlocking(long killerCharacterId, String monsterCode) {
-        var granted = inventoryFacade.grantLoot(killerCharacterId, monsterCode);
-        var ctx = contextsByCharacterId.get(killerCharacterId);
+        List<ItemStack> granted = inventoryFacade.grantLoot(killerCharacterId, monsterCode);
+        ChannelHandlerContext ctx = contextsByCharacterId.get(killerCharacterId);
         if (ctx == null) {
             return; // đã ngắt kết nối giữa lúc roll loot — item đã lưu DB thật, chỉ mất thông báo.
         }
-        for (var stack : granted) {
+        for (ItemStack stack : granted) {
             // ID thật (GrantLootUseCase đã trả về từ Inventory đã lưu) — client cần để mặc đồ (EquipItemCommand).
-            var event = ItemGrantedEvent.newBuilder()
+            ItemGrantedEvent event = ItemGrantedEvent.newBuilder()
                     .setItemTemplateId(stack.itemTemplateId())
                     .setQuantity(stack.quantity())
                     .setItemId(stack.id())
@@ -315,15 +318,16 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     }
 
     private void processQuestBlocking(long killerCharacterId, String monsterCode) {
-        var statusChange = questFacade.onMonsterKilled(killerCharacterId, monsterCode);
+        Optional<QuestFacade.QuestStatusChange> statusChange =
+                questFacade.onMonsterKilled(killerCharacterId, monsterCode);
         if (statusChange.isEmpty()) {
             return; // không có quest IN_PROGRESS liên quan, hoặc chưa hoàn thành — không báo gì.
         }
-        var ctx = contextsByCharacterId.get(killerCharacterId);
+        ChannelHandlerContext ctx = contextsByCharacterId.get(killerCharacterId);
         if (ctx == null) {
             return; // đã ngắt kết nối — tiến độ đã lưu DB thật, chỉ mất thông báo.
         }
-        var event = QuestStatusChangedEvent.newBuilder()
+        QuestStatusChangedEvent event = QuestStatusChangedEvent.newBuilder()
                 .setQuestCode(statusChange.get().questCode())
                 .setStatus(toProtoStatus(statusChange.get().status()))
                 .build();
@@ -345,7 +349,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     }
 
     private static void send(ChannelHandlerContext ctx, int opcode, int sequenceId, byte[] payload) {
-        var header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
+        PacketHeader header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
         ctx.writeAndFlush(new PacketCodec.Frame(header, payload));
     }
 }

@@ -50,21 +50,26 @@ class ProcessMonsterKilledUseCaseTest {
 
     @Test
     void shouldReturnEmpty_whenCharacterHasNoProgressRow() {
-        var progressPort = new FakeQuestProgressPort(null);
-        var useCase = new ProcessMonsterKilledUseCase(progressPort, new FakeQuestTemplatePort(), DIRECT_TX);
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(null);
+        ProcessMonsterKilledUseCase useCase =
+                new ProcessMonsterKilledUseCase(progressPort, new FakeQuestTemplatePort(), DIRECT_TX);
 
-        var result = useCase.execute(CHARACTER_ID, "training_dummy");
+        Optional<ProcessMonsterKilledUseCase.QuestStatusChange> result =
+                useCase.execute(CHARACTER_ID, "training_dummy");
 
         assertThat(result).isEmpty();
     }
 
     @Test
     void shouldTickProgress_butNotCompleteYet_onFirstKill() {
-        var existing = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.IN_PROGRESS, "{\"counter\":0}");
-        var progressPort = new FakeQuestProgressPort(existing);
-        var useCase = new ProcessMonsterKilledUseCase(progressPort, new FakeQuestTemplatePort(), DIRECT_TX);
+        QuestProgress existing =
+                new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.IN_PROGRESS, "{\"counter\":0}");
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(existing);
+        ProcessMonsterKilledUseCase useCase =
+                new ProcessMonsterKilledUseCase(progressPort, new FakeQuestTemplatePort(), DIRECT_TX);
 
-        var result = useCase.execute(CHARACTER_ID, "training_dummy");
+        Optional<ProcessMonsterKilledUseCase.QuestStatusChange> result =
+                useCase.execute(CHARACTER_ID, "training_dummy");
 
         assertThat(result).isEmpty(); // chưa hoàn thành (test_fixture.js cần counter>=2)
         assertThat(progressPort.saved.status()).isEqualTo(QuestStatus.IN_PROGRESS);
@@ -73,11 +78,14 @@ class ProcessMonsterKilledUseCaseTest {
 
     @Test
     void shouldCompleteAndReturnStatusChange_whenThresholdReached() {
-        var existing = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.IN_PROGRESS, "{\"counter\":1}");
-        var progressPort = new FakeQuestProgressPort(existing);
-        var useCase = new ProcessMonsterKilledUseCase(progressPort, new FakeQuestTemplatePort(), DIRECT_TX);
+        QuestProgress existing =
+                new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.IN_PROGRESS, "{\"counter\":1}");
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(existing);
+        ProcessMonsterKilledUseCase useCase =
+                new ProcessMonsterKilledUseCase(progressPort, new FakeQuestTemplatePort(), DIRECT_TX);
 
-        var result = useCase.execute(CHARACTER_ID, "training_dummy");
+        Optional<ProcessMonsterKilledUseCase.QuestStatusChange> result =
+                useCase.execute(CHARACTER_ID, "training_dummy");
 
         assertThat(result).isPresent();
         assertThat(result.get().questCode()).isEqualTo(TRACKED_QUEST_CODE);
@@ -87,11 +95,13 @@ class ProcessMonsterKilledUseCaseTest {
 
     @Test
     void shouldReturnEmpty_whenAlreadyCompleted() {
-        var existing = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.COMPLETED, "{\"counter\":2}");
-        var progressPort = new FakeQuestProgressPort(existing);
-        var useCase = new ProcessMonsterKilledUseCase(progressPort, new FakeQuestTemplatePort(), DIRECT_TX);
+        QuestProgress existing = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.COMPLETED, "{\"counter\":2}");
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(existing);
+        ProcessMonsterKilledUseCase useCase =
+                new ProcessMonsterKilledUseCase(progressPort, new FakeQuestTemplatePort(), DIRECT_TX);
 
-        var result = useCase.execute(CHARACTER_ID, "training_dummy");
+        Optional<ProcessMonsterKilledUseCase.QuestStatusChange> result =
+                useCase.execute(CHARACTER_ID, "training_dummy");
 
         assertThat(result).isEmpty();
         assertThat(progressPort.saved).isNull(); // không đụng gì khi đã COMPLETED
@@ -99,11 +109,14 @@ class ProcessMonsterKilledUseCaseTest {
 
     @Test
     void shouldIgnoreUnrelatedMonster() {
-        var existing = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.IN_PROGRESS, "{\"counter\":0}");
-        var progressPort = new FakeQuestProgressPort(existing);
-        var useCase = new ProcessMonsterKilledUseCase(progressPort, new FakeQuestTemplatePort(), DIRECT_TX);
+        QuestProgress existing =
+                new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.IN_PROGRESS, "{\"counter\":0}");
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(existing);
+        ProcessMonsterKilledUseCase useCase =
+                new ProcessMonsterKilledUseCase(progressPort, new FakeQuestTemplatePort(), DIRECT_TX);
 
-        var result = useCase.execute(CHARACTER_ID, "some_other_monster");
+        Optional<ProcessMonsterKilledUseCase.QuestStatusChange> result =
+                useCase.execute(CHARACTER_ID, "some_other_monster");
 
         assertThat(result).isEmpty();
         assertThat(progressPort.saved.progressJson()).isEqualTo("{\"counter\":0}"); // không tăng đếm

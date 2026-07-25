@@ -47,14 +47,14 @@ public final class QuestFacade {
     }
 
     public ClaimResult claimReward(long characterId, String questCode) {
-        var result = claimQuestRewardUseCase.execute(characterId, questCode);
-        var outcome = switch (result.outcome()) {
+        ClaimQuestRewardUseCase.ClaimResult result = claimQuestRewardUseCase.execute(characterId, questCode);
+        ClaimOutcome outcome = switch (result.outcome()) {
             case OK -> ClaimOutcome.OK;
             case QUEST_NOT_FOUND -> ClaimOutcome.QUEST_NOT_FOUND;
             case NOT_ACCEPTED -> ClaimOutcome.NOT_ACCEPTED;
             case NOT_COMPLETED_YET -> ClaimOutcome.NOT_COMPLETED_YET;
         };
-        var items = result.itemsGranted().stream()
+        List<ItemReward> items = result.itemsGranted().stream()
                 .map(item -> new ItemReward(item.itemTemplateCode(), item.quantity()))
                 .toList();
         return new ClaimResult(outcome, result.expGranted(), items);

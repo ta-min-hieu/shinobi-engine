@@ -22,7 +22,7 @@ public final class PacketCodec {
     }
 
     public static byte[] encodeFrame(PacketHeader header, byte[] payload) {
-        var buffer = ByteBuffer.allocate(HEADER_SIZE + payload.length);
+        ByteBuffer buffer = ByteBuffer.allocate(HEADER_SIZE + payload.length);
         buffer.putShort((short) header.opcode());
         buffer.put((byte) header.protocolVersion());
         buffer.putInt(header.sequenceId());
@@ -35,7 +35,7 @@ public final class PacketCodec {
             throw new IllegalArgumentException(
                     "Frame quá ngắn để chứa header (" + HEADER_SIZE + " byte): " + frame.length);
         }
-        var buffer = ByteBuffer.wrap(frame);
+        ByteBuffer buffer = ByteBuffer.wrap(frame);
         int opcode = Short.toUnsignedInt(buffer.getShort());
         int protocolVersion = Byte.toUnsignedInt(buffer.get());
         int sequenceId = buffer.getInt();

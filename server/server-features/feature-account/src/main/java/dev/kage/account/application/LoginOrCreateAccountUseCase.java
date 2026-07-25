@@ -25,11 +25,11 @@ public final class LoginOrCreateAccountUseCase {
     }
 
     public LoginResult execute(String username) {
-        var accountHolder = new AtomicReference<Account>();
+        AtomicReference<Account> accountHolder = new AtomicReference<Account>();
         transactionManager.inTransaction(tx -> accountHolder.set(accountPort.findOrCreate(tx, username)));
 
-        var account = accountHolder.get();
-        var sessionToken = sessionPort.issue(account.id());
+        Account account = accountHolder.get();
+        String sessionToken = sessionPort.issue(account.id());
         return new LoginResult(account.id(), account.username(), sessionToken);
     }
 }

@@ -2,25 +2,28 @@ package dev.kage.party.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.kage.party.domain.Party;
+import dev.kage.party.domain.PartyMember;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ListPartyMembersUseCaseTest {
 
     @Test
     void shouldListAllMembers_includingLeader() {
-        var port = new FakePartyPort();
-        var party = port.createParty(1);
+        FakePartyPort port = new FakePartyPort();
+        Party party = port.createParty(1);
         port.acceptInvite(port.invite(party.id(), 5).id(), 5);
-        var useCase = new ListPartyMembersUseCase(port);
+        ListPartyMembersUseCase useCase = new ListPartyMembersUseCase(port);
 
-        var members = useCase.execute(5);
+        List<PartyMember> members = useCase.execute(5);
 
         assertThat(members).extracting(m -> m.characterId()).containsExactlyInAnyOrder(1L, 5L);
     }
 
     @Test
     void shouldReturnEmpty_whenNotInAnyParty() {
-        var useCase = new ListPartyMembersUseCase(new FakePartyPort());
+        ListPartyMembersUseCase useCase = new ListPartyMembersUseCase(new FakePartyPort());
 
         assertThat(useCase.execute(5)).isEmpty();
     }

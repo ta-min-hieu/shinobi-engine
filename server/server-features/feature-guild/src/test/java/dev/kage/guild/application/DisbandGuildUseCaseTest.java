@@ -2,18 +2,19 @@ package dev.kage.guild.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.kage.guild.domain.Guild;
 import org.junit.jupiter.api.Test;
 
 class DisbandGuildUseCaseTest {
 
     @Test
     void shouldDisband_andRemoveAllMembers_whenCallerIsLeader() {
-        var port = new FakeGuildPort();
-        var guild = port.createGuild("Konoha", 1);
+        FakeGuildPort port = new FakeGuildPort();
+        Guild guild = port.createGuild("Konoha", 1);
         port.approveJoinRequest(port.sendJoinRequest(guild.id(), 5).id(), 1);
-        var useCase = new DisbandGuildUseCase(port);
+        DisbandGuildUseCase useCase = new DisbandGuildUseCase(port);
 
-        var result = useCase.execute(1);
+        DisbandGuildUseCase.Result result = useCase.execute(1);
 
         assertThat(result).isEqualTo(DisbandGuildUseCase.Result.OK);
         assertThat(port.findById(guild.id())).isEmpty();
@@ -23,12 +24,12 @@ class DisbandGuildUseCaseTest {
 
     @Test
     void shouldReject_whenCallerIsNotLeader() {
-        var port = new FakeGuildPort();
-        var guild = port.createGuild("Konoha", 1);
+        FakeGuildPort port = new FakeGuildPort();
+        Guild guild = port.createGuild("Konoha", 1);
         port.approveJoinRequest(port.sendJoinRequest(guild.id(), 5).id(), 1);
-        var useCase = new DisbandGuildUseCase(port);
+        DisbandGuildUseCase useCase = new DisbandGuildUseCase(port);
 
-        var result = useCase.execute(5);
+        DisbandGuildUseCase.Result result = useCase.execute(5);
 
         assertThat(result).isEqualTo(DisbandGuildUseCase.Result.NOT_LEADER);
         assertThat(port.findById(guild.id())).isPresent();
@@ -36,7 +37,7 @@ class DisbandGuildUseCaseTest {
 
     @Test
     void shouldReject_whenCharacterNotInAnyGuild() {
-        var useCase = new DisbandGuildUseCase(new FakeGuildPort());
+        DisbandGuildUseCase useCase = new DisbandGuildUseCase(new FakeGuildPort());
 
         assertThat(useCase.execute(1)).isEqualTo(DisbandGuildUseCase.Result.NOT_LEADER);
     }

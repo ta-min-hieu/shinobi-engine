@@ -3,6 +3,7 @@ package dev.kage.server.database.mail;
 import dev.kage.mail.domain.GoldPort;
 import dev.kage.mail.domain.Transaction;
 import dev.kage.server.database.DatabaseAccessException;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
@@ -18,7 +19,7 @@ public final class PostgresMailGoldAdapter implements GoldPort {
 
     @Override
     public void creditGold(Transaction tx, long characterId, long amount) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try (PreparedStatement statement = connection.prepareStatement(CREDIT)) {
             statement.setLong(1, amount);
             statement.setLong(2, characterId);

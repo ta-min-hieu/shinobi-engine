@@ -3,6 +3,7 @@ package dev.kage.inventory.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.kage.inventory.domain.Equipment;
+import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.EquipmentPort;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.Inventory;
@@ -64,30 +65,33 @@ class ComputeEquipmentBonusUseCaseTest {
 
     @Test
     void shouldSumBonusAtk_fromAllEquippedItems() {
-        var weapon = new ItemStack(1L, 100L, 1, 0);
-        var armor = new ItemStack(2L, 200L, 1, 0);
-        var inventoryPort = fakeInventoryPort(List.of(weapon, armor));
-        var equipmentPort = fakeEquipmentPort(Map.of(EquipmentSlotType.WEAPON, 1L, EquipmentSlotType.ARMOR, 2L));
-        var itemTemplatePort = fakeItemTemplatePort(itemTemplateId -> switch ((int) itemTemplateId) {
+        ItemStack weapon = new ItemStack(1L, 100L, 1, 0);
+        ItemStack armor = new ItemStack(2L, 200L, 1, 0);
+        InventoryPort inventoryPort = fakeInventoryPort(List.of(weapon, armor));
+        EquipmentPort equipmentPort =
+                fakeEquipmentPort(Map.of(EquipmentSlotType.WEAPON, 1L, EquipmentSlotType.ARMOR, 2L));
+        ItemTemplatePort itemTemplatePort = fakeItemTemplatePort(itemTemplateId -> switch ((int) itemTemplateId) {
             case 100 -> Optional.of(new ItemTemplate(100L, EquipmentSlotType.WEAPON, 5));
             case 200 -> Optional.of(new ItemTemplate(200L, EquipmentSlotType.ARMOR, 3));
             default -> Optional.empty();
         });
-        var useCase = new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
+        ComputeEquipmentBonusUseCase useCase =
+                new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
 
-        var bonus = useCase.execute(CHARACTER_ID);
+        EquipmentBonus bonus = useCase.execute(CHARACTER_ID);
 
         assertThat(bonus.bonusAtk()).isEqualTo(8);
     }
 
     @Test
     void shouldReturnZero_whenNothingEquipped() {
-        var inventoryPort = fakeInventoryPort(List.of());
-        var equipmentPort = fakeEquipmentPort(Map.of());
-        var itemTemplatePort = fakeItemTemplatePort(itemTemplateId -> Optional.empty());
-        var useCase = new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
+        InventoryPort inventoryPort = fakeInventoryPort(List.of());
+        EquipmentPort equipmentPort = fakeEquipmentPort(Map.of());
+        ItemTemplatePort itemTemplatePort = fakeItemTemplatePort(itemTemplateId -> Optional.empty());
+        ComputeEquipmentBonusUseCase useCase =
+                new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
 
-        var bonus = useCase.execute(CHARACTER_ID);
+        EquipmentBonus bonus = useCase.execute(CHARACTER_ID);
 
         assertThat(bonus.bonusAtk()).isZero();
     }
@@ -96,12 +100,13 @@ class ComputeEquipmentBonusUseCaseTest {
     void shouldSkipStaleReference_whenEquippedItemNoLongerInInventory() {
         // equipment_slot trỏ tới item ĐÃ không còn trong túi (dữ liệu lệch hiếm gặp) — bỏ qua an
         // toàn thay vì ném lỗi, không được để 1 dòng lệch làm hỏng toàn bộ tính chỉ số.
-        var inventoryPort = fakeInventoryPort(List.of());
-        var equipmentPort = fakeEquipmentPort(Map.of(EquipmentSlotType.WEAPON, 999L));
-        var itemTemplatePort = fakeItemTemplatePort(itemTemplateId -> Optional.empty());
-        var useCase = new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
+        InventoryPort inventoryPort = fakeInventoryPort(List.of());
+        EquipmentPort equipmentPort = fakeEquipmentPort(Map.of(EquipmentSlotType.WEAPON, 999L));
+        ItemTemplatePort itemTemplatePort = fakeItemTemplatePort(itemTemplateId -> Optional.empty());
+        ComputeEquipmentBonusUseCase useCase =
+                new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
 
-        var bonus = useCase.execute(CHARACTER_ID);
+        EquipmentBonus bonus = useCase.execute(CHARACTER_ID);
 
         assertThat(bonus.bonusAtk()).isZero();
     }

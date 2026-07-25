@@ -1,7 +1,9 @@
 package dev.kage.guild.application;
 
 import dev.kage.guild.domain.DuplicateGuildJoinRequestException;
+import dev.kage.guild.domain.Guild;
 import dev.kage.guild.domain.GuildPort;
+import java.util.Optional;
 
 /**
  * Xin gia nhập bang theo tên — leader duyệt/từ chối sau (quyết định cùng chủ dự án 2026-07-23,
@@ -20,7 +22,7 @@ public final class SendGuildJoinRequestUseCase {
         if (port.findMembershipOf(characterId).isPresent()) {
             return Result.ALREADY_IN_GUILD;
         }
-        var guild = port.findByName(guildName);
+        Optional<Guild> guild = port.findByName(guildName);
         if (guild.isEmpty()) {
             return Result.GUILD_NOT_FOUND;
         }

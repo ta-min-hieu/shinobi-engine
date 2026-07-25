@@ -28,8 +28,8 @@ public final class MovementSystem extends IteratingSystem {
 
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
-        var pos = posMapper.get(entity);
-        var vel = velMapper.get(entity);
+        PositionComponent pos = posMapper.get(entity);
+        VelocityComponent vel = velMapper.get(entity);
 
         // ❌ KHÔNG new object ở đây (Điều 31) — ghi thẳng vào field Component.
         pos.prevX = pos.x;                 // lưu vị trí trước cho interpolation ([RENDERING §7])

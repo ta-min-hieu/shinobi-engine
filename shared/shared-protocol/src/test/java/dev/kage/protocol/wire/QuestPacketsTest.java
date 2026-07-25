@@ -22,27 +22,29 @@ class QuestPacketsTest {
 
     @Test
     void shouldRoundTripAcceptQuestResponse() throws InvalidProtocolBufferException {
-        var response = AcceptQuestResponse.newBuilder()
+        AcceptQuestResponse response = AcceptQuestResponse.newBuilder()
                 .setOutcome(AcceptQuestOutcome.ACCEPT_QUEST_OUTCOME_ALREADY_ACCEPTED)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_ACCEPT_QUEST_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_ACCEPT_QUEST_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = AcceptQuestResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        AcceptQuestResponse parsed = AcceptQuestResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(AcceptQuestOutcome.ACCEPT_QUEST_OUTCOME_ALREADY_ACCEPTED);
     }
 
     @Test
     void shouldRoundTripQuestStatusChangedEvent() throws InvalidProtocolBufferException {
-        var event = QuestStatusChangedEvent.newBuilder()
+        QuestStatusChangedEvent event = QuestStatusChangedEvent.newBuilder()
                 .setQuestCode("kill_training_dummies")
                 .setStatus(QuestStatus.QUEST_STATUS_COMPLETED)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_QUEST_STATUS_CHANGED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_QUEST_STATUS_CHANGED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        var parsed = QuestStatusChangedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        QuestStatusChangedEvent parsed =
+                QuestStatusChangedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getQuestCode()).isEqualTo("kill_training_dummies");
         assertThat(parsed.getStatus()).isEqualTo(QuestStatus.QUEST_STATUS_COMPLETED);
@@ -50,27 +52,32 @@ class QuestPacketsTest {
 
     @Test
     void shouldRoundTripClaimQuestRewardCommand() throws InvalidProtocolBufferException {
-        var command = ClaimQuestRewardCommand.newBuilder().setQuestCode("kill_training_dummies").build();
-        var header = new PacketHeader(Opcode.OPCODE_CLAIM_QUEST_REWARD_COMMAND_VALUE, ProtocolVersion.CURRENT, 2);
+        ClaimQuestRewardCommand command =
+                ClaimQuestRewardCommand.newBuilder().setQuestCode("kill_training_dummies").build();
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_CLAIM_QUEST_REWARD_COMMAND_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsed = ClaimQuestRewardCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ClaimQuestRewardCommand parsed =
+                ClaimQuestRewardCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getQuestCode()).isEqualTo("kill_training_dummies");
     }
 
     @Test
     void shouldRoundTripClaimQuestRewardResponse() throws InvalidProtocolBufferException {
-        var itemReward = ItemRewardView.newBuilder().setItemTemplateCode("kunai").setQuantity(5).build();
-        var response = ClaimQuestRewardResponse.newBuilder()
+        ItemRewardView itemReward = ItemRewardView.newBuilder().setItemTemplateCode("kunai").setQuantity(5).build();
+        ClaimQuestRewardResponse response = ClaimQuestRewardResponse.newBuilder()
                 .setOutcome(ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_OK)
                 .setExpGranted(500L)
                 .addItemsGranted(itemReward)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_CLAIM_QUEST_REWARD_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_CLAIM_QUEST_REWARD_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = ClaimQuestRewardResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ClaimQuestRewardResponse parsed =
+                ClaimQuestRewardResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_OK);
         assertThat(parsed.getExpGranted()).isEqualTo(500L);

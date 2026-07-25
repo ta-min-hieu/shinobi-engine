@@ -1,6 +1,7 @@
 package dev.kage.guild.api;
 
 import dev.kage.guild.application.ApproveGuildJoinRequestUseCase;
+import dev.kage.guild.application.CreateGuildUseCase;
 import dev.kage.guild.application.DisbandGuildUseCase;
 import dev.kage.guild.application.GuildUseCases;
 import dev.kage.guild.application.KickGuildMemberUseCase;
@@ -25,8 +26,8 @@ public final class GuildFacade {
     }
 
     public CreateResult createGuild(long characterId, String name) {
-        var result = useCases.createGuildUseCase().execute(characterId, name);
-        var outcome = switch (result.outcome()) {
+        CreateGuildUseCase.Result result = useCases.createGuildUseCase().execute(characterId, name);
+        CreateOutcome outcome = switch (result.outcome()) {
             case OK -> CreateOutcome.OK;
             case ALREADY_IN_GUILD -> CreateOutcome.ALREADY_IN_GUILD;
             case NAME_TAKEN -> CreateOutcome.NAME_TAKEN;

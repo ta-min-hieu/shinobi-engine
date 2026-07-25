@@ -1,8 +1,11 @@
 package dev.kage.mail.application;
 
 import dev.kage.mail.domain.IdempotencyKeyReusedException;
+import dev.kage.mail.domain.Mail;
+import dev.kage.mail.domain.MailAttachment;
 import dev.kage.mail.domain.Transaction;
 import dev.kage.mail.domain.TransactionRunner;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -23,16 +26,16 @@ public final class ClaimMailUseCase {
     }
 
     public ClaimOutcome execute(long mailId, long recipientId, String idempotencyKey) {
-        var resultHolder = new AtomicReference<ClaimOutcome>();
+        AtomicReference<ClaimOutcome> resultHolder = new AtomicReference<ClaimOutcome>();
         try {
             tx.inTransaction((Transaction t) -> {
                 ports.idempotencyPort().recordOrThrow(t, idempotencyKey);
-                var mailOpt = ports.repositoryPort().findByIdForUpdate(t, mailId);
+                Optional<Mail> mailOpt = ports.repositoryPort().findByIdForUpdate(t, mailId);
                 if (mailOpt.isEmpty() || mailOpt.get().recipientId() != recipientId) {
                     resultHolder.set(ClaimOutcome.NOT_FOUND);
                     return;
                 }
-                var mail = mailOpt.get();
+                Mail mail = mailOpt.get();
                 if (mail.isClaimed()) {
                     resultHolder.set(ClaimOutcome.ALREADY_CLAIMED);
                     return;
@@ -40,7 +43,7 @@ public final class ClaimMailUseCase {
                 if (mail.goldAmount() > 0) {
                     ports.goldPort().creditGold(t, recipientId, mail.goldAmount());
                 }
-                for (var attachment : mail.attachments()) {
+                for (MailAttachment attachment : mail.attachments()) {
                     boolean granted = ports.inventoryGatewayPort()
                             .grantItem(t, recipientId, attachment.itemTemplateId(), attachment.quantity());
                     if (!granted) {
@@ -54,7 +57,7 @@ public final class ClaimMailUseCase {
                     // thể xảy ra (FOR UPDATE khoá dòng), nhưng giữ nhánh phòng thủ thay vì giả định.
                     throw new MailTransactionAbortedException();
                 }
-                var detail = "{\"mailId\":%d,\"goldAmount\":%d,\"itemCount\":%d}"
+                String detail = "{\"mailId\":%d,\"goldAmount\":%d,\"itemCount\":%d}"
                         .formatted(mailId, mail.goldAmount(), mail.attachments().size());
                 ports.auditPort().log(t, recipientId, "MAIL_CLAIM", detail);
                 resultHolder.set(ClaimOutcome.OK);

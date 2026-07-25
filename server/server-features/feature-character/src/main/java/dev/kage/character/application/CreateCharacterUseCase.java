@@ -31,8 +31,8 @@ public final class CreateCharacterUseCase {
             throw new DuplicateCharacterNameException(name);
         }
 
-        var newCharacter = new NewCharacter(accountId, name, Faction.HOA, idempotencyKey);
-        var holder = new AtomicReference<Character>();
+        NewCharacter newCharacter = new NewCharacter(accountId, name, Faction.HOA, idempotencyKey);
+        AtomicReference<Character> holder = new AtomicReference<Character>();
         transactionRunner.inTransaction(tx -> holder.set(characterPort.create(tx, newCharacter)));
         return holder.get();
     }

@@ -35,6 +35,9 @@ import dev.kage.server.database.quest.PostgresQuestExpAdapter;
 import dev.kage.server.database.quest.PostgresQuestInventoryGrantAdapter;
 import dev.kage.server.database.quest.PostgresQuestProgressAdapter;
 import dev.kage.server.database.quest.PostgresQuestTemplateAdapter;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -86,7 +89,7 @@ class MvpLoopIntegrationTest {
 
     @BeforeAll
     static void migrate() {
-        var config = new DatabaseConfig(
+        DatabaseConfig config = new DatabaseConfig(
                 POSTGRES.getHost(),
                 POSTGRES.getMappedPort(POSTGRES_PORT),
                 POSTGRES.getDatabaseName(),
@@ -95,28 +98,29 @@ class MvpLoopIntegrationTest {
         dataSource = PostgresDataSourceFactory.create(config);
         FlywayMigrator.migrate(dataSource);
 
-        var accountAdapter = new PostgresAccountAdapter();
-        var accountTx = new JdbcAccountTransactionRunner(dataSource);
-        var accountHolder = new Account[1];
+        PostgresAccountAdapter accountAdapter = new PostgresAccountAdapter();
+        JdbcAccountTransactionRunner accountTx = new JdbcAccountTransactionRunner(dataSource);
+        Account[] accountHolder = new Account[1];
         accountTx.inTransaction(tx -> accountHolder[0] = accountAdapter.findOrCreate(tx, "mvplooptester"));
         accountId = accountHolder[0].id();
         woodenSwordTemplateId = findItemTemplateIdByCode("wooden_sword");
     }
 
     private static long createFreshCharacter(String name) {
-        var characterAdapter = new PostgresCharacterAdapter(dataSource);
-        var characterTx = new JdbcCharacterTransactionRunner(dataSource);
-        var newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
-        var holder = new Character[1];
+        PostgresCharacterAdapter characterAdapter = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner characterTx = new JdbcCharacterTransactionRunner(dataSource);
+        NewCharacter newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
+        Character[] holder = new Character[1];
         characterTx.inTransaction(tx -> holder[0] = characterAdapter.create(tx, newCharacter));
         return holder[0].id();
     }
 
     private static long findItemTemplateIdByCode(String code) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement("SELECT id FROM item_template WHERE code = ?")) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
+                        connection.prepareStatement("SELECT id FROM item_template WHERE code = ?")) {
             statement.setString(1, code);
-            try (var rs = statement.executeQuery()) {
+            try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
                 return rs.getLong(1);
             }
@@ -126,8 +130,8 @@ class MvpLoopIntegrationTest {
     }
 
     private static void grantGold(long characterId, long amount) {
-        try (var connection = dataSource.getConnection();
-                var statement =
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
                         connection.prepareStatement("UPDATE character_stat SET gold = ? WHERE character_id = ?")) {
             statement.setLong(1, amount);
             statement.setLong(2, characterId);
@@ -138,10 +142,10 @@ class MvpLoopIntegrationTest {
     }
 
     private static long readExp(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement("SELECT exp FROM character WHERE id = ?")) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement("SELECT exp FROM character WHERE id = ?")) {
             statement.setLong(1, characterId);
-            try (var rs = statement.executeQuery()) {
+            try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
                 return rs.getLong(1);
             }
@@ -163,7 +167,7 @@ class MvpLoopIntegrationTest {
     }
 
     private static ClaimQuestRewardUseCase newClaimQuestRewardUseCase() {
-        var rewardPorts = new QuestRewardPorts(
+        QuestRewardPorts rewardPorts = new QuestRewardPorts(
                 new PostgresQuestExpAdapter(), new PostgresQuestInventoryGrantAdapter(dataSource),
                 new PostgresQuestAuditAdapter());
         return new ClaimQuestRewardUseCase(
@@ -189,7 +193,7 @@ class MvpLoopIntegrationTest {
     }
 
     private static EnhanceItemUseCase newEnhanceItemUseCase() {
-        var ports = new EnhancePorts(
+        EnhancePorts ports = new EnhancePorts(
                 new PostgresInventoryAdapter(dataSource), new PostgresGoldAdapter(), new PostgresAuditAdapter(),
                 new PostgresItemTemplateAdapter(dataSource));
         return new EnhanceItemUseCase(ports, new JdbcInventoryTransactionRunner(dataSource));
@@ -201,7 +205,7 @@ class MvpLoopIntegrationTest {
         long characterId = createFreshCharacter("MvpLoopHero");
 
         // 2. Nhận quest.
-        var acceptResult = newAcceptQuestUseCase().execute(characterId, QUEST_CODE);
+        AcceptQuestUseCase.AcceptResult acceptResult = newAcceptQuestUseCase().execute(characterId, QUEST_CODE);
         assertThat(acceptResult).isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
 
         // 3. Đánh quái nhiều lần — mỗi lần giết, production code gọi CẢ GrantLootUseCase lẫn
@@ -211,7 +215,8 @@ class MvpLoopIntegrationTest {
         Optional<ProcessMonsterKilledUseCase.QuestStatusChange> statusChange = Optional.empty();
         for (int i = 0; i < SIMULATED_KILLS_FOR_LOOT; i++) {
             allLoot.addAll(newGrantLootUseCase().execute(characterId, "training_dummy"));
-            var change = newProcessMonsterKilledUseCase().execute(characterId, "training_dummy");
+            Optional<ProcessMonsterKilledUseCase.QuestStatusChange> change =
+                    newProcessMonsterKilledUseCase().execute(characterId, "training_dummy");
             if (change.isPresent()) {
                 statusChange = change;
             }
@@ -228,23 +233,27 @@ class MvpLoopIntegrationTest {
         // 6. Mặc đồ — training_dummy không rơi vũ khí (chỉ kunai, không equip_slot), grant thẳng
         // wooden_sword để verify mặc đồ + cường hoá (đúng cách EnhanceItemUseCaseIntegrationTest
         // đã làm, KHÔNG phải hạn chế của test này).
-        var addResult = newAddItemUseCase().execute(characterId, ItemStack.newItem(woodenSwordTemplateId, 1, 0));
+        AddItemUseCase.AddItemResult addResult =
+                newAddItemUseCase().execute(characterId, ItemStack.newItem(woodenSwordTemplateId, 1, 0));
         assertThat(addResult).isEqualTo(AddItemUseCase.AddItemResult.OK);
         long swordItemId = new PostgresInventoryAdapter(dataSource).findByCharacter(characterId).orElseThrow()
                 .findByTemplate(woodenSwordTemplateId).orElseThrow().id();
 
-        var equipResult = newEquipItemUseCase().execute(characterId, swordItemId, EquipmentSlotType.WEAPON);
+        EquipItemUseCase.EquipItemResult equipResult =
+                newEquipItemUseCase().execute(characterId, swordItemId, EquipmentSlotType.WEAPON);
         assertThat(equipResult).isEqualTo(EquipItemUseCase.EquipItemResult.OK);
 
         // 7. Cường hoá vũ khí vừa mặc.
         grantGold(characterId, 100); // đúng giá cường hoá +0->+1
-        var enhanceResult = newEnhanceItemUseCase().execute(characterId, swordItemId, false);
+        EnhanceItemUseCase.EnhanceResult enhanceResult =
+                newEnhanceItemUseCase().execute(characterId, swordItemId, false);
         assertThat(enhanceResult).isIn(
                 EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP);
 
         // 8. Nhận thưởng hoàn thành quest.
         long expBefore = readExp(characterId);
-        var claimResult = newClaimQuestRewardUseCase().execute(characterId, QUEST_CODE);
+        ClaimQuestRewardUseCase.ClaimResult claimResult =
+                newClaimQuestRewardUseCase().execute(characterId, QUEST_CODE);
         assertThat(claimResult.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
         assertThat(readExp(characterId)).isEqualTo(expBefore + claimResult.expGranted());
     }

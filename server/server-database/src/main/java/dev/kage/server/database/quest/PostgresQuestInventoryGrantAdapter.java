@@ -43,7 +43,7 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
 
     @Override
     public boolean grantItemByCode(Transaction tx, long characterId, String itemTemplateCode, int quantity) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try {
             Long itemTemplateId = findItemTemplateId(connection, itemTemplateCode);
             if (itemTemplateId == null) {

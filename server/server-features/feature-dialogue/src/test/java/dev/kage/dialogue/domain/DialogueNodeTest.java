@@ -22,7 +22,7 @@ class DialogueNodeTest {
 
     @Test
     void shouldAllowEmptyOptions_terminalNode() {
-        var node = new DialogueNode("start", "dialogue.greeting", List.of());
+        DialogueNode node = new DialogueNode("start", "dialogue.greeting", List.of());
 
         assertThat(node.options()).isEmpty();
     }

@@ -23,23 +23,25 @@ class ShopPacketsTest {
 
     @Test
     void shouldRoundTripListShopItemsRequest() throws InvalidProtocolBufferException {
-        var request = ListShopItemsRequest.newBuilder().build();
-        var header = new PacketHeader(Opcode.OPCODE_LIST_SHOP_ITEMS_REQUEST_VALUE, ProtocolVersion.CURRENT, 1);
+        ListShopItemsRequest request = ListShopItemsRequest.newBuilder().build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_LIST_SHOP_ITEMS_REQUEST_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, request.toByteArray());
-        var parsed = ListShopItemsRequest.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ListShopItemsRequest parsed = ListShopItemsRequest.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed).isEqualTo(request);
     }
 
     @Test
     void shouldRoundTripListShopItemsResponse() throws InvalidProtocolBufferException {
-        var listing = ShopListingView.newBuilder().setItemTemplateId(1L).setBuyPrice(5L).setSellPrice(2L).build();
-        var response = ListShopItemsResponse.newBuilder().addListings(listing).build();
-        var header = new PacketHeader(Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
+        ShopListingView listing =
+                ShopListingView.newBuilder().setItemTemplateId(1L).setBuyPrice(5L).setSellPrice(2L).build();
+        ListShopItemsResponse response = ListShopItemsResponse.newBuilder().addListings(listing).build();
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = ListShopItemsResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ListShopItemsResponse parsed = ListShopItemsResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getListingsList()).hasSize(1);
         assertThat(parsed.getListings(0).getItemTemplateId()).isEqualTo(1L);
@@ -49,15 +51,15 @@ class ShopPacketsTest {
 
     @Test
     void shouldRoundTripBuyItemCommand() throws InvalidProtocolBufferException {
-        var command = BuyItemCommand.newBuilder()
+        BuyItemCommand command = BuyItemCommand.newBuilder()
                 .setItemTemplateId(1L)
                 .setQuantity(3)
                 .setIdempotencyKey("11111111-1111-1111-1111-111111111111")
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, ProtocolVersion.CURRENT, 2);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsed = BuyItemCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        BuyItemCommand parsed = BuyItemCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getItemTemplateId()).isEqualTo(1L);
         assertThat(parsed.getQuantity()).isEqualTo(3);
@@ -66,26 +68,27 @@ class ShopPacketsTest {
 
     @Test
     void shouldRoundTripBuyItemResponse() throws InvalidProtocolBufferException {
-        var response = BuyItemResponse.newBuilder().setOutcome(BuyOutcome.BUY_OUTCOME_INSUFFICIENT_GOLD).build();
-        var header = new PacketHeader(Opcode.OPCODE_BUY_ITEM_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
+        BuyItemResponse response =
+                BuyItemResponse.newBuilder().setOutcome(BuyOutcome.BUY_OUTCOME_INSUFFICIENT_GOLD).build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_BUY_ITEM_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = BuyItemResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        BuyItemResponse parsed = BuyItemResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(BuyOutcome.BUY_OUTCOME_INSUFFICIENT_GOLD);
     }
 
     @Test
     void shouldRoundTripSellItemCommand() throws InvalidProtocolBufferException {
-        var command = SellItemCommand.newBuilder()
+        SellItemCommand command = SellItemCommand.newBuilder()
                 .setItemId(42L)
                 .setQuantity(2)
                 .setIdempotencyKey("22222222-2222-2222-2222-222222222222")
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, ProtocolVersion.CURRENT, 5);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, ProtocolVersion.CURRENT, 5);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsed = SellItemCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SellItemCommand parsed = SellItemCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getItemId()).isEqualTo(42L);
         assertThat(parsed.getQuantity()).isEqualTo(2);
@@ -94,11 +97,11 @@ class ShopPacketsTest {
 
     @Test
     void shouldRoundTripSellItemResponse() throws InvalidProtocolBufferException {
-        var response = SellItemResponse.newBuilder().setOutcome(SellOutcome.SELL_OUTCOME_OK).build();
-        var header = new PacketHeader(Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE, ProtocolVersion.CURRENT, 5);
+        SellItemResponse response = SellItemResponse.newBuilder().setOutcome(SellOutcome.SELL_OUTCOME_OK).build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE, ProtocolVersion.CURRENT, 5);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = SellItemResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SellItemResponse parsed = SellItemResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(SellOutcome.SELL_OUTCOME_OK);
     }

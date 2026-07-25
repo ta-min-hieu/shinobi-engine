@@ -3,6 +3,8 @@ package dev.kage.server.database.shop;
 import dev.kage.server.database.DatabaseAccessException;
 import dev.kage.shop.domain.ShopCatalogPort;
 import dev.kage.shop.domain.ShopListing;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -29,8 +31,8 @@ public final class PostgresShopCatalogAdapter implements ShopCatalogPort {
 
     @Override
     public Optional<ShopListing> findListing(long itemTemplateId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_BY_TEMPLATE)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_BY_TEMPLATE)) {
             statement.setLong(1, itemTemplateId);
             try (ResultSet rs = statement.executeQuery()) {
                 if (!rs.next()) {
@@ -45,10 +47,10 @@ public final class PostgresShopCatalogAdapter implements ShopCatalogPort {
 
     @Override
     public List<ShopListing> findAll() {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_ALL);
-                var rs = statement.executeQuery()) {
-            var listings = new ArrayList<ShopListing>();
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_ALL);
+                ResultSet rs = statement.executeQuery()) {
+            ArrayList<ShopListing> listings = new ArrayList<ShopListing>();
             while (rs.next()) {
                 listings.add(toListing(rs));
             }

@@ -15,11 +15,11 @@ class RejectFriendRequestUseCaseTest {
 
     @Test
     void shouldDeletePendingRequest_whenAddressedToCaller() {
-        var port = new FakeFriendPort();
+        FakeFriendPort port = new FakeFriendPort();
         port.friendships.add(new Friendship(1, 5, 7, FriendshipStatus.PENDING, Instant.now(), null));
-        var useCase = new RejectFriendRequestUseCase(port);
+        RejectFriendRequestUseCase useCase = new RejectFriendRequestUseCase(port);
 
-        var result = useCase.execute(1, 7);
+        RejectFriendRequestUseCase.Result result = useCase.execute(1, 7);
 
         assertThat(result).isEqualTo(RejectFriendRequestUseCase.Result.OK);
         assertThat(port.friendships).isEmpty();
@@ -27,9 +27,9 @@ class RejectFriendRequestUseCaseTest {
 
     @Test
     void shouldReject_whenFriendshipDoesNotExist() {
-        var useCase = new RejectFriendRequestUseCase(new FakeFriendPort());
+        RejectFriendRequestUseCase useCase = new RejectFriendRequestUseCase(new FakeFriendPort());
 
-        var result = useCase.execute(999, 7);
+        RejectFriendRequestUseCase.Result result = useCase.execute(999, 7);
 
         assertThat(result).isEqualTo(RejectFriendRequestUseCase.Result.NOT_FOUND);
     }

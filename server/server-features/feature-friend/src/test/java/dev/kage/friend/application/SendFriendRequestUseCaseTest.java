@@ -17,41 +17,41 @@ class SendFriendRequestUseCaseTest {
 
     @Test
     void shouldReject_whenRequestingSelf() {
-        var useCase = new SendFriendRequestUseCase(new FakeFriendPort());
+        SendFriendRequestUseCase useCase = new SendFriendRequestUseCase(new FakeFriendPort());
 
-        var result = useCase.execute(5, 5);
+        SendFriendRequestUseCase.Result result = useCase.execute(5, 5);
 
         assertThat(result).isEqualTo(SendFriendRequestUseCase.Result.CANNOT_FRIEND_SELF);
     }
 
     @Test
     void shouldReject_whenAlreadyFriends() {
-        var port = new FakeFriendPort();
+        FakeFriendPort port = new FakeFriendPort();
         port.friendships.add(new Friendship(1, 5, 7, FriendshipStatus.ACCEPTED, Instant.now(), Instant.now()));
-        var useCase = new SendFriendRequestUseCase(port);
+        SendFriendRequestUseCase useCase = new SendFriendRequestUseCase(port);
 
-        var result = useCase.execute(5, 7);
+        SendFriendRequestUseCase.Result result = useCase.execute(5, 7);
 
         assertThat(result).isEqualTo(SendFriendRequestUseCase.Result.ALREADY_FRIENDS);
     }
 
     @Test
     void shouldReject_whenRequestAlreadyPending() {
-        var port = new FakeFriendPort();
+        FakeFriendPort port = new FakeFriendPort();
         port.friendships.add(new Friendship(1, 5, 7, FriendshipStatus.PENDING, Instant.now(), null));
-        var useCase = new SendFriendRequestUseCase(port);
+        SendFriendRequestUseCase useCase = new SendFriendRequestUseCase(port);
 
-        var result = useCase.execute(5, 7);
+        SendFriendRequestUseCase.Result result = useCase.execute(5, 7);
 
         assertThat(result).isEqualTo(SendFriendRequestUseCase.Result.REQUEST_ALREADY_PENDING);
     }
 
     @Test
     void shouldCreatePendingRequest_whenNoExistingRelationship() {
-        var port = new FakeFriendPort();
-        var useCase = new SendFriendRequestUseCase(port);
+        FakeFriendPort port = new FakeFriendPort();
+        SendFriendRequestUseCase useCase = new SendFriendRequestUseCase(port);
 
-        var result = useCase.execute(5, 7);
+        SendFriendRequestUseCase.Result result = useCase.execute(5, 7);
 
         assertThat(result).isEqualTo(SendFriendRequestUseCase.Result.OK);
         assertThat(port.friendships).hasSize(1);
@@ -75,7 +75,7 @@ class SendFriendRequestUseCaseTest {
             if (findBetween(requesterId, addresseeId).isPresent()) {
                 throw new DuplicateFriendRequestException(requesterId, addresseeId);
             }
-            var friendship = new Friendship(
+            Friendship friendship = new Friendship(
                     nextId.getAndIncrement(), requesterId, addresseeId, FriendshipStatus.PENDING, Instant.now(), null);
             friendships.add(friendship);
             return friendship;

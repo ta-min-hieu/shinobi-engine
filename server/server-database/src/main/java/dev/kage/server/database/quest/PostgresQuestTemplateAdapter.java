@@ -3,6 +3,8 @@ package dev.kage.server.database.quest;
 import dev.kage.quest.domain.QuestTemplate;
 import dev.kage.quest.domain.QuestTemplatePort;
 import dev.kage.server.database.DatabaseAccessException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -29,8 +31,8 @@ public final class PostgresQuestTemplateAdapter implements QuestTemplatePort {
 
     @Override
     public Optional<QuestTemplate> findByCode(String questCode) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_BY_CODE)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_BY_CODE)) {
             statement.setString(1, questCode);
             try (ResultSet rs = statement.executeQuery()) {
                 if (!rs.next()) {
@@ -45,10 +47,10 @@ public final class PostgresQuestTemplateAdapter implements QuestTemplatePort {
 
     @Override
     public List<String> listAllScriptRefs() {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(LIST_ALL_SCRIPT_REFS);
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(LIST_ALL_SCRIPT_REFS);
                 ResultSet rs = statement.executeQuery()) {
-            var result = new ArrayList<String>();
+            ArrayList<String> result = new ArrayList<String>();
             while (rs.next()) {
                 result.add(rs.getString("script_ref"));
             }

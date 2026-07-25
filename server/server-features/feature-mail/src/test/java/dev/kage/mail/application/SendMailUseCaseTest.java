@@ -18,10 +18,10 @@ class SendMailUseCaseTest {
 
     @Test
     void shouldCreateMail_withAttachments() {
-        var port = new FakeMailRepositoryPort();
-        var useCase = new SendMailUseCase(port, action -> action.accept(null));
+        FakeMailRepositoryPort port = new FakeMailRepositoryPort();
+        SendMailUseCase useCase = new SendMailUseCase(port, action -> action.accept(null));
 
-        var created = useCase.execute(
+        Mail created = useCase.execute(
                 new NewMail(7L, 5, "Chào", "Nội dung", 100, List.of(new MailAttachment(1, 3))));
 
         assertThat(created.senderId()).isEqualTo(7L);
@@ -33,10 +33,10 @@ class SendMailUseCaseTest {
 
     @Test
     void shouldAllowNullSenderId_forSystemMail() {
-        var port = new FakeMailRepositoryPort();
-        var useCase = new SendMailUseCase(port, action -> action.accept(null));
+        FakeMailRepositoryPort port = new FakeMailRepositoryPort();
+        SendMailUseCase useCase = new SendMailUseCase(port, action -> action.accept(null));
 
-        var created = useCase.execute(new NewMail(null, 5, "Đền bù", "Xin lỗi", 0, List.of()));
+        Mail created = useCase.execute(new NewMail(null, 5, "Đền bù", "Xin lỗi", 0, List.of()));
 
         assertThat(created.senderId()).isNull();
     }
@@ -48,7 +48,7 @@ class SendMailUseCaseTest {
 
         @Override
         public Mail send(Transaction tx, NewMail newMail) {
-            var mail = new Mail(
+            Mail mail = new Mail(
                     nextId.getAndIncrement(), newMail.senderId(), newMail.recipientId(), newMail.subject(),
                     newMail.body(), newMail.goldAmount(), newMail.attachments(), null, Instant.now());
             stored.add(mail);

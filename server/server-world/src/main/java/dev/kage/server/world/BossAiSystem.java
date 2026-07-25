@@ -87,14 +87,14 @@ final class BossAiSystem extends IteratingKSystem {
         if (pendingResults.isEmpty()) {
             return List.of();
         }
-        var results = List.copyOf(pendingResults);
+        List<BossActionOutcome> results = List.copyOf(pendingResults);
         pendingResults.clear();
         return results;
     }
 
     @Override
     protected void processEntity(KEntity entity, float deltaTime) {
-        var bossAi = BOSS_AI.get(entity);
+        BossAiComponent bossAi = BOSS_AI.get(entity);
         if (bossAi.heavyStrikeCooldownSeconds > 0f) {
             bossAi.heavyStrikeCooldownSeconds -= deltaTime;
         }
@@ -107,15 +107,15 @@ final class BossAiSystem extends IteratingKSystem {
         if (AI_STATE.get(entity).state != AiState.ATTACK) {
             return; // chưa vào tầm/chưa có mục tiêu hợp lệ — AiSystem lo phần này.
         }
-        var target = TARGET.get(entity);
-        var targetEntity = entityLookup.apply(target.targetEntityId);
+        TargetComponent target = TARGET.get(entity);
+        KEntity targetEntity = entityLookup.apply(target.targetEntityId);
         long targetEntityId = target.targetEntityId;
-        var targetHealth = targetEntity == null ? null : HEALTH.get(targetEntity);
+        HealthComponent targetHealth = targetEntity == null ? null : HEALTH.get(targetEntity);
         if (targetHealth == null || targetHealth.isDead()) {
             return;
         }
 
-        var decision = evalScript(
+        ScriptDecision decision = evalScript(
                 healthPercent(HEALTH.get(entity)), bossAi.enraged,
                 bossAi.heavyStrikeCooldownSeconds <= 0f, CombatConstants.toStats(COMBAT_STATS.get(entity)).atk());
         applyDecision(entity, targetEntity, targetEntityId, decision);
@@ -129,7 +129,7 @@ final class BossAiSystem extends IteratingKSystem {
         if ("basic_attack".equals(decision.action())) {
             return; // đánh thường vẫn chạy độc lập qua CombatSystem — không làm gì thêm ở đây.
         }
-        var bossAi = BOSS_AI.get(entity);
+        BossAiComponent bossAi = BOSS_AI.get(entity);
         if ("enrage".equals(decision.action())) {
             bossAi.enraged = true;
         } else if (!"heavy_strike".equals(decision.action())) {
@@ -137,10 +137,11 @@ final class BossAiSystem extends IteratingKSystem {
         }
         bossAi.heavyStrikeCooldownSeconds = BossConstants.HEAVY_STRIKE_COOLDOWN_SECONDS;
 
-        var attackerStats = CombatConstants.toStats(COMBAT_STATS.get(entity));
-        var defenderStats = CombatConstants.toStats(COMBAT_STATS.get(targetEntity));
-        var result = CombatConstants.resolveSkillAttack(attackerStats, defenderStats, decision.rawDamage());
-        var targetHealth = HEALTH.get(targetEntity);
+        CombatConstants.CombatStats attackerStats = CombatConstants.toStats(COMBAT_STATS.get(entity));
+        CombatConstants.CombatStats defenderStats = CombatConstants.toStats(COMBAT_STATS.get(targetEntity));
+        CombatConstants.AttackResult result =
+                CombatConstants.resolveSkillAttack(attackerStats, defenderStats, decision.rawDamage());
+        HealthComponent targetHealth = HEALTH.get(targetEntity);
         targetHealth.current = Math.max(0, targetHealth.current - result.damage());
 
         pendingResults.add(new BossActionOutcome(
@@ -156,7 +157,7 @@ final class BossAiSystem extends IteratingKSystem {
 
     private ScriptDecision evalScript(
             double hpPercent, boolean alreadyEnraged, boolean heavyStrikeReady, double baseAtk) {
-        var ctx = Map.<String, Object>of(
+        Map<String, Object> ctx = Map.<String, Object>of(
                 "hp_percent", hpPercent,
                 "already_enraged", alreadyEnraged,
                 "heavy_strike_ready", heavyStrikeReady,

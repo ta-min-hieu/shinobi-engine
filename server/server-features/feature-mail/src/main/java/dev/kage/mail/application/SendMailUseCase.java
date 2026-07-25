@@ -23,7 +23,7 @@ public final class SendMailUseCase {
     }
 
     public Mail execute(NewMail newMail) {
-        var resultHolder = new AtomicReference<Mail>();
+        AtomicReference<Mail> resultHolder = new AtomicReference<Mail>();
         tx.inTransaction((Transaction t) -> resultHolder.set(port.send(t, newMail)));
         return resultHolder.get();
     }

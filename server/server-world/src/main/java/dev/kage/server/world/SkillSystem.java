@@ -79,14 +79,14 @@ final class SkillSystem extends IteratingKSystem {
         if (pendingResults.isEmpty()) {
             return List.of();
         }
-        var results = List.copyOf(pendingResults);
+        List<SkillOutcome> results = List.copyOf(pendingResults);
         pendingResults.clear();
         return results;
     }
 
     @Override
     protected void processEntity(KEntity entity, float deltaTime) {
-        var cooldown = COOLDOWN.get(entity);
+        SkillCooldownComponent cooldown = COOLDOWN.get(entity);
         if (cooldown.remainingSeconds > 0f) {
             cooldown.remainingSeconds -= deltaTime;
         }
@@ -102,23 +102,23 @@ final class SkillSystem extends IteratingKSystem {
         if (!SkillConstants.FIREBALL_SKILL_CODE.equals(skillCode)) {
             return; // chỉ 1 skill hardcode ở lát cắt này (SkillConstants)
         }
-        var caster = entityLookup.apply(casterId);
+        KEntity caster = entityLookup.apply(casterId);
         if (caster == null || !COOLDOWN.has(caster)) {
             return;
         }
-        var cooldown = COOLDOWN.get(caster);
+        SkillCooldownComponent cooldown = COOLDOWN.get(caster);
         if (cooldown.remainingSeconds > 0f) {
             return;
         }
-        var chi = CHI.get(caster);
+        ChiComponent chi = CHI.get(caster);
         if (chi.current < SkillConstants.FIREBALL_CHI_COST) {
             return;
         }
-        var target = entityLookup.apply(targetEntityId);
+        KEntity target = entityLookup.apply(targetEntityId);
         if (target == null) {
             return;
         }
-        var targetHealth = HEALTH.get(target);
+        HealthComponent targetHealth = HEALTH.get(target);
         if (targetHealth.isDead()) {
             return;
         }
@@ -129,10 +129,11 @@ final class SkillSystem extends IteratingKSystem {
         cooldown.remainingSeconds = SkillConstants.FIREBALL_COOLDOWN_SECONDS;
         chi.current -= SkillConstants.FIREBALL_CHI_COST;
 
-        var attackerStats = CombatConstants.toStats(COMBAT_STATS.get(caster));
-        var defenderStats = CombatConstants.toStats(COMBAT_STATS.get(target));
+        CombatConstants.CombatStats attackerStats = CombatConstants.toStats(COMBAT_STATS.get(caster));
+        CombatConstants.CombatStats defenderStats = CombatConstants.toStats(COMBAT_STATS.get(target));
         double scriptDamage = computeScriptDamage(attackerStats, targetHealth);
-        var result = CombatConstants.resolveSkillAttack(attackerStats, defenderStats, scriptDamage);
+        CombatConstants.AttackResult result =
+                CombatConstants.resolveSkillAttack(attackerStats, defenderStats, scriptDamage);
         targetHealth.current = Math.max(0, targetHealth.current - result.damage());
 
         pendingResults.add(new SkillOutcome(
@@ -148,7 +149,7 @@ final class SkillSystem extends IteratingKSystem {
 
     private double computeScriptDamage(CombatConstants.CombatStats attacker, HealthComponent targetHealth) {
         double targetHpPercent = targetHealth.max <= 0 ? 0.0 : (double) targetHealth.current / targetHealth.max;
-        var ctx = Map.<String, Object>of(
+        Map<String, Object> ctx = Map.<String, Object>of(
                 "skill_dmg", (double) attacker.skillDmg(),
                 "target_hp_percent", targetHpPercent);
         try {

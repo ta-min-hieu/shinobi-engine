@@ -18,6 +18,9 @@ import dev.kage.server.database.inventory.PostgresInventoryAdapter;
 import dev.kage.shop.application.BuyItemUseCase;
 import dev.kage.shop.application.SellItemUseCase;
 import dev.kage.shop.application.ShopPorts;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -52,7 +55,7 @@ class ShopIntegrationTest {
 
     @BeforeAll
     static void migrate() {
-        var config = new DatabaseConfig(
+        DatabaseConfig config = new DatabaseConfig(
                 POSTGRES.getHost(),
                 POSTGRES.getMappedPort(POSTGRES_PORT),
                 POSTGRES.getDatabaseName(),
@@ -61,9 +64,9 @@ class ShopIntegrationTest {
         dataSource = PostgresDataSourceFactory.create(config);
         FlywayMigrator.migrate(dataSource);
 
-        var accountAdapter = new PostgresAccountAdapter();
-        var accountTx = new JdbcAccountTransactionRunner(dataSource);
-        var accountHolder = new Account[1];
+        PostgresAccountAdapter accountAdapter = new PostgresAccountAdapter();
+        JdbcAccountTransactionRunner accountTx = new JdbcAccountTransactionRunner(dataSource);
+        Account[] accountHolder = new Account[1];
         accountTx.inTransaction(tx -> accountHolder[0] = accountAdapter.findOrCreate(tx, "shoptester"));
         accountId = accountHolder[0].id();
         kunaiTemplateId = findItemTemplateIdByCode("kunai");
@@ -71,17 +74,17 @@ class ShopIntegrationTest {
     }
 
     private static long createFreshCharacter(String name) {
-        var characterAdapter = new PostgresCharacterAdapter(dataSource);
-        var characterTx = new JdbcCharacterTransactionRunner(dataSource);
-        var newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
-        var holder = new Character[1];
+        PostgresCharacterAdapter characterAdapter = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner characterTx = new JdbcCharacterTransactionRunner(dataSource);
+        NewCharacter newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
+        Character[] holder = new Character[1];
         characterTx.inTransaction(tx -> holder[0] = characterAdapter.create(tx, newCharacter));
         return holder[0].id();
     }
 
     private static void grantGold(long characterId, long amount) {
-        try (var connection = dataSource.getConnection();
-                var statement =
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
                         connection.prepareStatement("UPDATE character_stat SET gold = ? WHERE character_id = ?")) {
             statement.setLong(1, amount);
             statement.setLong(2, characterId);
@@ -92,11 +95,11 @@ class ShopIntegrationTest {
     }
 
     private static long readGold(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement =
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
                         connection.prepareStatement("SELECT gold FROM character_stat WHERE character_id = ?")) {
             statement.setLong(1, characterId);
-            try (var rs = statement.executeQuery()) {
+            try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
                 return rs.getLong(1);
             }
@@ -106,11 +109,11 @@ class ShopIntegrationTest {
     }
 
     private static int countInventoryRows(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement =
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
                         connection.prepareStatement("SELECT COUNT(*) FROM inventory_item WHERE character_id = ?")) {
             statement.setLong(1, characterId);
-            try (var rs = statement.executeQuery()) {
+            try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
                 return rs.getInt(1);
             }
@@ -120,10 +123,11 @@ class ShopIntegrationTest {
     }
 
     private static long findItemTemplateIdByCode(String code) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement("SELECT id FROM item_template WHERE code = ?")) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
+                        connection.prepareStatement("SELECT id FROM item_template WHERE code = ?")) {
             statement.setString(1, code);
-            try (var rs = statement.executeQuery()) {
+            try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
                 return rs.getLong(1);
             }
@@ -134,20 +138,21 @@ class ShopIntegrationTest {
 
     /** Điền túi đồ tới đầy (DEFAULT_CAPACITY=20) — dùng để test nhánh {@code INVENTORY_FULL}. */
     private static void fillInventoryToCapacity(long characterId) {
-        var inventoryAdapter = new PostgresInventoryAdapter(dataSource);
-        var inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
-        var stacks = new ArrayList<dev.kage.inventory.domain.ItemStack>();
+        PostgresInventoryAdapter inventoryAdapter = new PostgresInventoryAdapter(dataSource);
+        JdbcInventoryTransactionRunner inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
+        ArrayList<dev.kage.inventory.domain.ItemStack> stacks = new ArrayList<dev.kage.inventory.domain.ItemStack>();
         for (int i = 0; i < 20; i++) {
             stacks.add(dev.kage.inventory.domain.ItemStack.newItem(kunaiTemplateId, 1, 0));
         }
-        var inventory = new dev.kage.inventory.domain.Inventory(characterId, 20, List.copyOf(stacks));
+        dev.kage.inventory.domain.Inventory inventory =
+                new dev.kage.inventory.domain.Inventory(characterId, 20, List.copyOf(stacks));
         inventoryTx.inTransaction(tx -> inventoryAdapter.save(tx, inventory));
     }
 
     private static long persistOneItem(long characterId, long itemTemplateId, int quantity) {
-        var inventoryAdapter = new PostgresInventoryAdapter(dataSource);
-        var inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
-        var inventory = new dev.kage.inventory.domain.Inventory(characterId, 20,
+        PostgresInventoryAdapter inventoryAdapter = new PostgresInventoryAdapter(dataSource);
+        JdbcInventoryTransactionRunner inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
+        dev.kage.inventory.domain.Inventory inventory = new dev.kage.inventory.domain.Inventory(characterId, 20,
                 List.of(dev.kage.inventory.domain.ItemStack.newItem(itemTemplateId, quantity, 0)));
         inventoryTx.inTransaction(tx -> inventoryAdapter.save(tx, inventory));
         return inventoryAdapter.findByCharacter(characterId).orElseThrow().items().get(0).id();
@@ -179,7 +184,8 @@ class ShopIntegrationTest {
         long characterId = createFreshCharacter("BuyRich");
         grantGold(characterId, 100);
 
-        var result = newBuyUseCase().execute(characterId, kunaiTemplateId, 2, newIdempotencyKey()); // 2*5=10 gold
+        BuyItemUseCase.BuyResult result =
+                newBuyUseCase().execute(characterId, kunaiTemplateId, 2, newIdempotencyKey()); // 2*5=10 gold
 
         assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.OK);
         assertThat(readGold(characterId)).isEqualTo(90);
@@ -191,7 +197,8 @@ class ShopIntegrationTest {
         long characterId = createFreshCharacter("BuyPoor");
         grantGold(characterId, 1);
 
-        var result = newBuyUseCase().execute(characterId, kunaiTemplateId, 2, newIdempotencyKey()); // cần 10 gold
+        BuyItemUseCase.BuyResult result =
+                newBuyUseCase().execute(characterId, kunaiTemplateId, 2, newIdempotencyKey()); // cần 10 gold
 
         assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.INSUFFICIENT_GOLD);
         assertThat(readGold(characterId)).isEqualTo(1); // không đổi
@@ -203,7 +210,7 @@ class ShopIntegrationTest {
         long characterId = createFreshCharacter("BuyUnknown");
         grantGold(characterId, 1_000_000);
 
-        var result = newBuyUseCase().execute(characterId, 999_999L, 1, newIdempotencyKey());
+        BuyItemUseCase.BuyResult result = newBuyUseCase().execute(characterId, 999_999L, 1, newIdempotencyKey());
 
         assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.ITEM_NOT_IN_SHOP);
         assertThat(readGold(characterId)).isEqualTo(1_000_000); // không đổi
@@ -215,7 +222,7 @@ class ShopIntegrationTest {
         fillInventoryToCapacity(characterId);
         grantGold(characterId, 1_000_000);
 
-        var result = newBuyUseCase().execute(characterId, kunaiTemplateId, 1, newIdempotencyKey());
+        BuyItemUseCase.BuyResult result = newBuyUseCase().execute(characterId, kunaiTemplateId, 1, newIdempotencyKey());
 
         assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.INVENTORY_FULL);
         // KHÔNG được "trừ tiền nhưng không nhận item" (DATABASE.md §5) — rollback toàn bộ.
@@ -229,7 +236,8 @@ class ShopIntegrationTest {
         long itemId = persistOneItem(characterId, kunaiTemplateId, 3);
         grantGold(characterId, 0);
 
-        var result = newSellUseCase().execute(characterId, itemId, 3, newIdempotencyKey()); // 3*2=6 gold
+        SellItemUseCase.SellResult result =
+                newSellUseCase().execute(characterId, itemId, 3, newIdempotencyKey()); // 3*2=6 gold
 
         assertThat(result).isEqualTo(SellItemUseCase.SellResult.OK);
         assertThat(readGold(characterId)).isEqualTo(6);
@@ -242,7 +250,8 @@ class ShopIntegrationTest {
         long itemId = persistOneItem(characterId, kunaiTemplateId, 1);
         grantGold(characterId, 0);
 
-        var result = newSellUseCase().execute(characterId, itemId, 5, newIdempotencyKey()); // chỉ có 1
+        SellItemUseCase.SellResult result =
+                newSellUseCase().execute(characterId, itemId, 5, newIdempotencyKey()); // chỉ có 1
 
         assertThat(result).isEqualTo(SellItemUseCase.SellResult.INSUFFICIENT_QUANTITY);
         assertThat(readGold(characterId)).isZero();
@@ -257,7 +266,7 @@ class ShopIntegrationTest {
         long unlistedTemplateId = insertUnlistedItemTemplate();
         long itemId = persistOneItem(characterId, unlistedTemplateId, 1);
 
-        var result = newSellUseCase().execute(characterId, itemId, 1, newIdempotencyKey());
+        SellItemUseCase.SellResult result = newSellUseCase().execute(characterId, itemId, 1, newIdempotencyKey());
 
         assertThat(result).isEqualTo(SellItemUseCase.SellResult.ITEM_NOT_SELLABLE);
         assertThat(countInventoryRows(characterId)).isEqualTo(1); // không đổi
@@ -267,10 +276,10 @@ class ShopIntegrationTest {
     void shouldRejectDuplicateBuy_whenIdempotencyKeyReused() {
         long characterId = createFreshCharacter("BuyDupe");
         grantGold(characterId, 100);
-        var key = newIdempotencyKey();
+        String key = newIdempotencyKey();
         newBuyUseCase().execute(characterId, kunaiTemplateId, 1, key);
 
-        var result = newBuyUseCase().execute(characterId, kunaiTemplateId, 1, key);
+        BuyItemUseCase.BuyResult result = newBuyUseCase().execute(characterId, kunaiTemplateId, 1, key);
 
         assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.DUPLICATE_REQUEST);
         assertThat(readGold(characterId)).isEqualTo(95); // chỉ trừ 1 lần (5 gold), KHÔNG lặp lại
@@ -282,22 +291,22 @@ class ShopIntegrationTest {
         long characterId = createFreshCharacter("SellDupe");
         long itemId = persistOneItem(characterId, kunaiTemplateId, 5);
         grantGold(characterId, 0);
-        var key = newIdempotencyKey();
+        String key = newIdempotencyKey();
         newSellUseCase().execute(characterId, itemId, 1, key);
 
-        var result = newSellUseCase().execute(characterId, itemId, 1, key);
+        SellItemUseCase.SellResult result = newSellUseCase().execute(characterId, itemId, 1, key);
 
         assertThat(result).isEqualTo(SellItemUseCase.SellResult.DUPLICATE_REQUEST);
         assertThat(readGold(characterId)).isEqualTo(2); // chỉ cộng 1 lần (2 gold), KHÔNG lặp lại
     }
 
     private static long insertUnlistedItemTemplate() {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(
                         "INSERT INTO item_template (code, name_key, max_stack) VALUES (?, ?, 99) RETURNING id")) {
             statement.setString(1, "unlisted_" + UUID.randomUUID().toString().substring(0, 8));
             statement.setString(2, "item.unlisted.name");
-            try (var rs = statement.executeQuery()) {
+            try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
                 return rs.getLong(1);
             }

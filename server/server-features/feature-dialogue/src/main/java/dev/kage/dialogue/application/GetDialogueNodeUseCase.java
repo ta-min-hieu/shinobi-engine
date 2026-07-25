@@ -43,7 +43,7 @@ public final class GetDialogueNodeUseCase {
     }
 
     public Optional<DialogueNode> execute(String npcCode, String nodeId) {
-        var scriptRef = npcTemplatePort.findDialogueScriptRefByCode(npcCode);
+        Optional<String> scriptRef = npcTemplatePort.findDialogueScriptRefByCode(npcCode);
         if (scriptRef.isEmpty()) {
             return Optional.empty();
         }
@@ -64,7 +64,7 @@ public final class GetDialogueNodeUseCase {
         }
         String textKey = node.getMember("text_key").asString();
         Value optionsValue = node.getMember("options");
-        var options = new ArrayList<DialogueOption>();
+        ArrayList<DialogueOption> options = new ArrayList<DialogueOption>();
         long size = optionsValue.getArraySize();
         for (long i = 0; i < size; i++) {
             Value option = optionsValue.getArrayElement(i);

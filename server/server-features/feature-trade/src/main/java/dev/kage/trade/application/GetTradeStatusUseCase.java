@@ -1,7 +1,9 @@
 package dev.kage.trade.application;
 
 import dev.kage.trade.domain.TradeInventoryPort;
+import dev.kage.trade.domain.TradeSession;
 import dev.kage.trade.domain.TradeSessionPort;
+import dev.kage.trade.domain.TradeSessionSnapshot;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,16 +24,16 @@ public final class GetTradeStatusUseCase {
     }
 
     public Optional<Result> execute(long characterId) {
-        var membership = sessionPort.findActiveSessionOfCharacter(characterId);
+        Optional<TradeSession> membership = sessionPort.findActiveSessionOfCharacter(characterId);
         if (membership.isEmpty()) {
             return Optional.empty();
         }
-        var snapshotOpt = sessionPort.findSnapshot(membership.get().id());
+        Optional<TradeSessionSnapshot> snapshotOpt = sessionPort.findSnapshot(membership.get().id());
         if (snapshotOpt.isEmpty()) {
             return Optional.empty();
         }
-        var snapshot = snapshotOpt.get();
-        var resolvedItems = snapshot.items().stream()
+        TradeSessionSnapshot snapshot = snapshotOpt.get();
+        List<ResolvedOfferItem> resolvedItems = snapshot.items().stream()
                 .map(item -> inventoryPort.findItemById(item.itemId())
                         .map(owned -> new ResolvedOfferItem(
                                 item.offeringCharacterId(), item.itemId(), owned.itemTemplateId(),

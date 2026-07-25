@@ -12,11 +12,12 @@ class ServerShuttingDownEventTest {
 
     @Test
     void shouldRoundTripServerShuttingDownEvent() throws InvalidProtocolBufferException {
-        var event = ServerShuttingDownEvent.newBuilder().build();
-        var header = new PacketHeader(Opcode.OPCODE_SERVER_SHUTTING_DOWN_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
+        ServerShuttingDownEvent event = ServerShuttingDownEvent.newBuilder().build();
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_SERVER_SHUTTING_DOWN_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        var decoded = PacketCodec.decodeFrame(frameBytes);
+        PacketCodec.Frame decoded = PacketCodec.decodeFrame(frameBytes);
 
         assertThat(decoded.header()).isEqualTo(header);
         assertThat(ServerShuttingDownEvent.parseFrom(decoded.payload())).isNotNull();

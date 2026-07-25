@@ -133,36 +133,37 @@ class GatewayServerIntegrationTest {
         // AccountFacade/CharacterFacade THẬT với Fake Port (không server-database thật) — test
         // này chỉ verify ping/pong qua socket thật, không chạm Connect/Character, nhưng
         // GatewayServer luôn cần cả 2 Facade để khởi tạo (xem GatewayServer).
-        var characterFacade = fakeCharacterFacade();
-        var inventoryFacade = fakeInventoryFacade();
-        var shopFacade = fakeShopFacade();
-        var dialogueFacade = fakeDialogueFacade();
-        var questFacade = fakeQuestFacade();
-        var friendFacade = fakeFriendFacade();
-        var mailFacade = fakeMailFacade();
-        var chatFacade = fakeChatFacade();
-        var guildFacade = fakeGuildFacade();
+        CharacterFacade characterFacade = fakeCharacterFacade();
+        InventoryFacade inventoryFacade = fakeInventoryFacade();
+        dev.kage.shop.api.ShopFacade shopFacade = fakeShopFacade();
+        dev.kage.dialogue.api.DialogueFacade dialogueFacade = fakeDialogueFacade();
+        dev.kage.quest.api.QuestFacade questFacade = fakeQuestFacade();
+        dev.kage.friend.api.FriendFacade friendFacade = fakeFriendFacade();
+        dev.kage.mail.api.MailFacade mailFacade = fakeMailFacade();
+        dev.kage.chat.api.ChatFacade chatFacade = fakeChatFacade();
+        dev.kage.guild.api.GuildFacade guildFacade = fakeGuildFacade();
         partyFacade = fakePartyFacade();
-        var tradeFacade = fakeTradeFacade();
+        dev.kage.trade.api.TradeFacade tradeFacade = fakeTradeFacade();
         characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
         worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
-        var positionPersister =
+        CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
-        var dungeonInstanceRegistry =
+        DungeonInstanceRegistry dungeonInstanceRegistry =
                 new DungeonInstanceRegistry(characterRegistry, characterFacade, partyFacade, worldFacade);
-        var worldGateway =
+        WorldGateway worldGateway =
                 new WorldGateway(worldFacade, characterRegistry, positionPersister, dungeonInstanceRegistry);
-        var socialFacades =
+        SocialFacades socialFacades =
                 new SocialFacades(friendFacade, mailFacade, chatFacade, guildFacade, partyFacade, tradeFacade);
-        var contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
-        var facades = new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
+        ContentFacades contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
+        GatewayFacades facades =
+                new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
         server = new GatewayServer(0, facades, worldGateway);
         server.start();
     }
 
     private static AccountFacade fakeAccountFacade() {
-        var accountPort = new AccountPort() {
+        AccountPort accountPort = new AccountPort() {
             private final Map<String, Account> byUsername = new HashMap<>();
             private final AtomicLong nextId = new AtomicLong(1);
 
@@ -172,12 +173,12 @@ class GatewayServerIntegrationTest {
                         username, u -> new Account(nextId.getAndIncrement(), u, Instant.now()));
             }
         };
-        var sessionPort = new SessionPort() {
+        SessionPort sessionPort = new SessionPort() {
             private final Map<String, Long> tokens = new HashMap<>();
 
             @Override
             public String issue(long accountId) {
-                var token = "fake-token-" + accountId;
+                String token = "fake-token-" + accountId;
                 tokens.put(token, accountId);
                 return token;
             }
@@ -192,7 +193,8 @@ class GatewayServerIntegrationTest {
                 tokens.remove(token);
             }
         };
-        var useCase = new LoginOrCreateAccountUseCase(accountPort, sessionPort, action -> action.accept(null));
+        LoginOrCreateAccountUseCase useCase =
+                new LoginOrCreateAccountUseCase(accountPort, sessionPort, action -> action.accept(null));
         return new AccountFacade(useCase);
     }
 
@@ -246,7 +248,7 @@ class GatewayServerIntegrationTest {
 
             @Override
             public Character create(dev.kage.character.domain.Transaction tx, NewCharacter newCharacter) {
-                var character = new Character(
+                Character character = new Character(
                         nextId.getAndIncrement(),
                         newCharacter.accountId(),
                         1,
@@ -260,9 +262,9 @@ class GatewayServerIntegrationTest {
                 return character;
             }
         };
-        var createUseCase = new CreateCharacterUseCase(characterPort, action -> action.accept(null));
-        var listUseCase = new ListCharactersUseCase(characterPort);
-        var selectUseCase = new SelectCharacterUseCase(characterPort);
+        CreateCharacterUseCase createUseCase = new CreateCharacterUseCase(characterPort, action -> action.accept(null));
+        ListCharactersUseCase listUseCase = new ListCharactersUseCase(characterPort);
+        SelectCharacterUseCase selectUseCase = new SelectCharacterUseCase(characterPort);
         return new CharacterFacade(createUseCase, listUseCase, selectUseCase, characterPort);
     }
 
@@ -281,8 +283,9 @@ class GatewayServerIntegrationTest {
             }
         };
         DropTablePort dropTablePort = dropTableCode -> List.<DropTableEntry>of();
-        var addItemUseCase = new AddItemUseCase(inventoryPort, action -> action.accept(null));
-        var grantLootUseCase = new GrantLootUseCase(dropTablePort, inventoryPort, action -> action.accept(null));
+        AddItemUseCase addItemUseCase = new AddItemUseCase(inventoryPort, action -> action.accept(null));
+        GrantLootUseCase grantLootUseCase =
+                new GrantLootUseCase(dropTablePort, inventoryPort, action -> action.accept(null));
         // Equip/unequip không dùng trong test này — fake tối thiểu để compile.
         ItemTemplatePort itemTemplatePort = new ItemTemplatePort() {
             @Override
@@ -305,18 +308,20 @@ class GatewayServerIntegrationTest {
             public void save(dev.kage.inventory.domain.Transaction tx, Equipment equipment) {
             }
         };
-        var equipItemUseCase = new EquipItemUseCase(
+        EquipItemUseCase equipItemUseCase = new EquipItemUseCase(
                 inventoryPort, itemTemplatePort, equipmentPort, action -> action.accept(null));
-        var unequipItemUseCase = new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
-        var computeEquipmentBonusUseCase =
+        UnequipItemUseCase unequipItemUseCase =
+                new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
+        ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase =
                 new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
-        var equipmentUseCases =
+        EquipmentUseCases equipmentUseCases =
                 new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
         // Cường hoá không dùng trong test này — fake tối thiểu để compile.
         GoldPort goldPort = (tx, characterId, amount) -> true;
         AuditPort auditPort = (tx, characterId, action, detailJson) -> { };
-        var enhancePorts = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
-        var enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
+        EnhancePorts enhancePorts = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
+        EnhanceItemUseCase enhanceItemUseCase =
+                new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
         return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
     }
 
@@ -365,11 +370,14 @@ class GatewayServerIntegrationTest {
         };
         dev.kage.shop.domain.AuditPort shopAuditPort = (tx, characterId, action, detailJson) -> { };
         dev.kage.shop.domain.IdempotencyPort shopIdempotencyPort = (tx, idempotencyKey) -> { };
-        var ports = new dev.kage.shop.application.ShopPorts(
+        dev.kage.shop.application.ShopPorts ports = new dev.kage.shop.application.ShopPorts(
                 catalogPort, shopGoldPort, inventoryGatewayPort, shopAuditPort, shopIdempotencyPort);
-        var listShopItemsUseCase = new dev.kage.shop.application.ListShopItemsUseCase(catalogPort);
-        var buyItemUseCase = new dev.kage.shop.application.BuyItemUseCase(ports, action -> action.accept(null));
-        var sellItemUseCase = new dev.kage.shop.application.SellItemUseCase(ports, action -> action.accept(null));
+        dev.kage.shop.application.ListShopItemsUseCase listShopItemsUseCase =
+                new dev.kage.shop.application.ListShopItemsUseCase(catalogPort);
+        dev.kage.shop.application.BuyItemUseCase buyItemUseCase =
+                new dev.kage.shop.application.BuyItemUseCase(ports, action -> action.accept(null));
+        dev.kage.shop.application.SellItemUseCase sellItemUseCase =
+                new dev.kage.shop.application.SellItemUseCase(ports, action -> action.accept(null));
         return new dev.kage.shop.api.ShopFacade(listShopItemsUseCase, buyItemUseCase, sellItemUseCase);
     }
 
@@ -377,7 +385,8 @@ class GatewayServerIntegrationTest {
     // còn lại tối thiểu để compile, cùng convention fakeShopFacade().
     private dev.kage.dialogue.api.DialogueFacade fakeDialogueFacade() {
         dev.kage.dialogue.domain.NpcTemplatePort npcTemplatePort = npcCode -> Optional.empty();
-        var useCase = new dev.kage.dialogue.application.GetDialogueNodeUseCase(npcTemplatePort);
+        dev.kage.dialogue.application.GetDialogueNodeUseCase useCase =
+                new dev.kage.dialogue.application.GetDialogueNodeUseCase(npcTemplatePort);
         return new dev.kage.dialogue.api.DialogueFacade(useCase);
     }
 
@@ -400,12 +409,15 @@ class GatewayServerIntegrationTest {
         dev.kage.quest.domain.AuditPort auditPort = (tx, characterId, action, detailJson) -> { };
         dev.kage.quest.domain.TransactionRunner tx = action -> action.accept(null);
 
-        var acceptQuestUseCase = new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx);
-        var processMonsterKilledUseCase =
+        dev.kage.quest.application.AcceptQuestUseCase acceptQuestUseCase =
+                new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx);
+        dev.kage.quest.application.ProcessMonsterKilledUseCase processMonsterKilledUseCase =
                 new dev.kage.quest.application.ProcessMonsterKilledUseCase(progressPort, templatePort, tx);
-        var rewardPorts = new dev.kage.quest.application.QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
-        var claimQuestRewardUseCase = new dev.kage.quest.application.ClaimQuestRewardUseCase(
-                progressPort, templatePort, rewardPorts, tx);
+        dev.kage.quest.application.QuestRewardPorts rewardPorts =
+                new dev.kage.quest.application.QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
+        dev.kage.quest.application.ClaimQuestRewardUseCase claimQuestRewardUseCase =
+                new dev.kage.quest.application.ClaimQuestRewardUseCase(
+                        progressPort, templatePort, rewardPorts, tx);
         return new dev.kage.quest.api.QuestFacade(
                 acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
     }
@@ -448,7 +460,7 @@ class GatewayServerIntegrationTest {
                 return List.of();
             }
         };
-        var useCases = new dev.kage.friend.application.FriendUseCases(
+        dev.kage.friend.application.FriendUseCases useCases = new dev.kage.friend.application.FriendUseCases(
                 new dev.kage.friend.application.SendFriendRequestUseCase(friendPort),
                 new dev.kage.friend.application.AcceptFriendRequestUseCase(friendPort),
                 new dev.kage.friend.application.RejectFriendRequestUseCase(friendPort),
@@ -499,12 +511,16 @@ class GatewayServerIntegrationTest {
         dev.kage.mail.domain.AuditPort mailAuditPort = (tx, characterId, action, detailJson) -> { };
         dev.kage.mail.domain.IdempotencyPort mailIdempotencyPort = (tx, idempotencyKey) -> { };
         dev.kage.mail.domain.TransactionRunner mailTx = action -> action.accept(null);
-        var sendMailUseCase = new dev.kage.mail.application.SendMailUseCase(mailRepositoryPort, mailTx);
-        var listMailUseCase = new dev.kage.mail.application.ListMailUseCase(mailRepositoryPort);
-        var mailPorts = new dev.kage.mail.application.MailPorts(
+        dev.kage.mail.application.SendMailUseCase sendMailUseCase =
+                new dev.kage.mail.application.SendMailUseCase(mailRepositoryPort, mailTx);
+        dev.kage.mail.application.ListMailUseCase listMailUseCase =
+                new dev.kage.mail.application.ListMailUseCase(mailRepositoryPort);
+        dev.kage.mail.application.MailPorts mailPorts = new dev.kage.mail.application.MailPorts(
                 mailRepositoryPort, mailGoldPort, mailInventoryGatewayPort, mailAuditPort, mailIdempotencyPort);
-        var claimMailUseCase = new dev.kage.mail.application.ClaimMailUseCase(mailPorts, mailTx);
-        var deleteMailUseCase = new dev.kage.mail.application.DeleteMailUseCase(mailRepositoryPort);
+        dev.kage.mail.application.ClaimMailUseCase claimMailUseCase =
+                new dev.kage.mail.application.ClaimMailUseCase(mailPorts, mailTx);
+        dev.kage.mail.application.DeleteMailUseCase deleteMailUseCase =
+                new dev.kage.mail.application.DeleteMailUseCase(mailRepositoryPort);
         return new dev.kage.mail.api.MailFacade(sendMailUseCase, listMailUseCase, claimMailUseCase, deleteMailUseCase);
     }
 
@@ -582,7 +598,7 @@ class GatewayServerIntegrationTest {
                 throw new UnsupportedOperationException("không dùng ở test này");
             }
         };
-        var useCases = new dev.kage.guild.application.GuildUseCases(
+        dev.kage.guild.application.GuildUseCases useCases = new dev.kage.guild.application.GuildUseCases(
                 new dev.kage.guild.application.CreateGuildUseCase(guildPort),
                 new dev.kage.guild.application.SendGuildJoinRequestUseCase(guildPort),
                 new dev.kage.guild.application.ApproveGuildJoinRequestUseCase(guildPort),
@@ -627,9 +643,10 @@ class GatewayServerIntegrationTest {
             @Override
             public dev.kage.party.domain.Party createParty(long leaderCharacterId) {
                 long partyId = nextPartyId.getAndIncrement();
-                var party = new dev.kage.party.domain.Party(partyId, leaderCharacterId, Instant.now());
+                dev.kage.party.domain.Party party =
+                        new dev.kage.party.domain.Party(partyId, leaderCharacterId, Instant.now());
                 partiesById.put(partyId, party);
-                var leader = new dev.kage.party.domain.PartyMember(
+                dev.kage.party.domain.PartyMember leader = new dev.kage.party.domain.PartyMember(
                         partyId, leaderCharacterId, dev.kage.party.domain.PartyRole.LEADER, Instant.now());
                 membersByPartyId.put(partyId, new ArrayList<>(List.of(leader)));
                 return party;
@@ -652,7 +669,7 @@ class GatewayServerIntegrationTest {
             @Override
             public dev.kage.party.domain.PartyInvite invite(long partyId, long inviteeCharacterId) {
                 long inviteId = nextInviteId.getAndIncrement();
-                var invite = new dev.kage.party.domain.PartyInvite(
+                dev.kage.party.domain.PartyInvite invite = new dev.kage.party.domain.PartyInvite(
                         inviteId, partyId, inviteeCharacterId, Instant.now());
                 invitesById.put(inviteId, invite);
                 return invite;
@@ -660,12 +677,12 @@ class GatewayServerIntegrationTest {
 
             @Override
             public AcceptResult acceptInvite(long inviteId, long characterId) {
-                var invite = invitesById.get(inviteId);
+                dev.kage.party.domain.PartyInvite invite = invitesById.get(inviteId);
                 if (invite == null || invite.inviteeCharacterId() != characterId) {
                     return AcceptResult.NOT_FOUND;
                 }
                 invitesById.remove(inviteId);
-                var member = new dev.kage.party.domain.PartyMember(
+                dev.kage.party.domain.PartyMember member = new dev.kage.party.domain.PartyMember(
                         invite.partyId(), characterId, dev.kage.party.domain.PartyRole.MEMBER, Instant.now());
                 membersByPartyId.computeIfAbsent(invite.partyId(), id -> new ArrayList<>()).add(member);
                 return AcceptResult.OK;
@@ -673,7 +690,7 @@ class GatewayServerIntegrationTest {
 
             @Override
             public boolean rejectInvite(long inviteId, long characterId) {
-                var invite = invitesById.get(inviteId);
+                dev.kage.party.domain.PartyInvite invite = invitesById.get(inviteId);
                 if (invite == null || invite.inviteeCharacterId() != characterId) {
                     return false;
                 }
@@ -683,7 +700,7 @@ class GatewayServerIntegrationTest {
 
             @Override
             public LeaveResult leaveParty(long characterId) {
-                var membership = findMembershipOf(characterId);
+                Optional<dev.kage.party.domain.PartyMember> membership = findMembershipOf(characterId);
                 if (membership.isEmpty()) {
                     return LeaveResult.NOT_IN_PARTY;
                 }
@@ -696,7 +713,7 @@ class GatewayServerIntegrationTest {
                 throw new UnsupportedOperationException("không dùng ở test này");
             }
         };
-        var useCases = new dev.kage.party.application.PartyUseCases(
+        dev.kage.party.application.PartyUseCases useCases = new dev.kage.party.application.PartyUseCases(
                 new dev.kage.party.application.CreatePartyUseCase(partyPort),
                 new dev.kage.party.application.InvitePartyMemberUseCase(partyPort),
                 new dev.kage.party.application.AcceptPartyInviteUseCase(partyPort),
@@ -783,9 +800,9 @@ class GatewayServerIntegrationTest {
         };
         dev.kage.trade.domain.TradeAuditPort auditPort = (tx, characterId, action, detailJson) -> { };
         dev.kage.trade.domain.IdempotencyPort idempotencyPort = (tx, idempotencyKey) -> { };
-        var ports = new dev.kage.trade.application.TradePorts(
+        dev.kage.trade.application.TradePorts ports = new dev.kage.trade.application.TradePorts(
                 sessionPort, inventoryPort, goldPort, auditPort, idempotencyPort);
-        var useCases = new dev.kage.trade.application.TradeUseCases(
+        dev.kage.trade.application.TradeUseCases useCases = new dev.kage.trade.application.TradeUseCases(
                 new dev.kage.trade.application.RequestTradeUseCase(sessionPort),
                 new dev.kage.trade.application.AcceptTradeRequestUseCase(sessionPort),
                 new dev.kage.trade.application.CancelTradeUseCase(sessionPort),
@@ -808,12 +825,12 @@ class GatewayServerIntegrationTest {
         // PHÁT HIỆN THẬT (xem javadoc GatewayServer#stop): bản trước tắt authExecutor TRƯỚC khi
         // đóng channel — channelInactive lúc shutdown bị RejectedExecutionException âm thầm, mất
         // vị trí cuối. Test này verify trực tiếp qua Fake Port, không chỉ đọc code.
-        try (var socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
-            var in = new DataInputStream(socket.getInputStream());
+            DataInputStream in = new DataInputStream(socket.getInputStream());
             long characterId = connectCreateAndSelect(socket, in, "shutdowntest");
 
-            var moveCommand = MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
+            MoveCommand moveCommand = MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
             sendFrame(socket, Opcode.OPCODE_MOVE_COMMAND_VALUE, 10, moveCommand.toByteArray());
             readUntilOpcode(in, Opcode.OPCODE_MOVE_RESPONSE_VALUE); // xác nhận world đã bắt đầu di chuyển
 
@@ -821,15 +838,15 @@ class GatewayServerIntegrationTest {
 
             // MoveCommand thứ 2 (dừng lại) — MoveResponse trả về là vị trí HIỆN TẠI, dùng làm giá
             // trị kỳ vọng để so sánh với DB sau khi tắt server (không đoán khoảng cách đã đi).
-            var stopCommand = MoveCommand.newBuilder().setDirX(0f).setDirY(0f).build();
+            MoveCommand stopCommand = MoveCommand.newBuilder().setDirX(0f).setDirY(0f).build();
             sendFrame(socket, Opcode.OPCODE_MOVE_COMMAND_VALUE, 11, stopCommand.toByteArray());
-            var stopResponse =
+            MoveResponse stopResponse =
                     MoveResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_MOVE_RESPONSE_VALUE).payload());
             assertThat(stopResponse.getX()).isGreaterThan(0f); // sanity: di chuyển thật đã xảy ra
 
             server.stop(); // KHÔNG đợi @AfterEach — test tự gọi để verify NGAY sau khi trả về
 
-            var savedPosition = characterPort.loadPosition(characterId);
+            PositionSnapshot savedPosition = characterPort.loadPosition(characterId);
             assertThat(savedPosition.x()).isEqualTo(stopResponse.getX());
         }
     }
@@ -837,23 +854,23 @@ class GatewayServerIntegrationTest {
     @Test
     @Timeout(10)
     void clientShouldReceivePong_overRealSocket() throws Exception {
-        try (var socket = new Socket("127.0.0.1", server.port())) {
-            var out = new DataOutputStream(socket.getOutputStream());
-            var in = new DataInputStream(socket.getInputStream());
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+            DataInputStream in = new DataInputStream(socket.getInputStream());
 
-            var ping = PingCommand.newBuilder().setClientTimestampMs(999L).build();
-            var header = new PacketHeader(Opcode.OPCODE_PING_VALUE, ProtocolVersion.CURRENT, 1);
+            PingCommand ping = PingCommand.newBuilder().setClientTimestampMs(999L).build();
+            PacketHeader header = new PacketHeader(Opcode.OPCODE_PING_VALUE, ProtocolVersion.CURRENT, 1);
             byte[] frame = PacketCodec.encodeFrame(header, ping.toByteArray());
             out.writeInt(frame.length);
             out.write(frame);
             out.flush();
 
-            var decoded = readFrame(in);
+            PacketCodec.Frame decoded = readFrame(in);
 
             assertThat(decoded.header().opcode()).isEqualTo(Opcode.OPCODE_PONG_VALUE);
             assertThat(decoded.header().sequenceId()).isEqualTo(1);
 
-            var pong = PongResponse.parseFrom(decoded.payload());
+            PongResponse pong = PongResponse.parseFrom(decoded.payload());
             assertThat(pong.getClientTimestampMs()).isEqualTo(999L);
         }
     }
@@ -861,14 +878,14 @@ class GatewayServerIntegrationTest {
     @Test
     @Timeout(10)
     void serverShouldAcceptMultipleConnectionsConcurrently() throws Exception {
-        try (var socketA = new Socket("127.0.0.1", server.port());
-                var socketB = new Socket("127.0.0.1", server.port())) {
+        try (Socket socketA = new Socket("127.0.0.1", server.port());
+                Socket socketB = new Socket("127.0.0.1", server.port())) {
             sendPing(socketA, 1, 111L);
             sendPing(socketB, 1, 222L);
 
-            var pongA = PongResponse.parseFrom(
+            PongResponse pongA = PongResponse.parseFrom(
                     readFrame(new DataInputStream(socketA.getInputStream())).payload());
-            var pongB = PongResponse.parseFrom(
+            PongResponse pongB = PongResponse.parseFrom(
                     readFrame(new DataInputStream(socketB.getInputStream())).payload());
 
             // Mỗi kết nối nhận ĐÚNG pong của mình — không lẫn giữa các connection (SERVER.md §1).
@@ -882,38 +899,38 @@ class GatewayServerIntegrationTest {
     void twoClientsShouldSeeEachOtherMove_overRealSockets() throws Exception {
         // Verify đúng Phase 3 Exit Criteria (ROADMAP.md): "2 client kết nối cùng server, thấy
         // nhau di chuyển" — qua chính giao thức dây (socket thật), không chỉ nội bộ WorldFacade.
-        try (var socketA = new Socket("127.0.0.1", server.port());
-                var socketB = new Socket("127.0.0.1", server.port())) {
+        try (Socket socketA = new Socket("127.0.0.1", server.port());
+                Socket socketB = new Socket("127.0.0.1", server.port())) {
             socketA.setSoTimeout(5000);
             socketB.setSoTimeout(5000);
-            var inA = new DataInputStream(socketA.getInputStream());
-            var inB = new DataInputStream(socketB.getInputStream());
+            DataInputStream inA = new DataInputStream(socketA.getInputStream());
+            DataInputStream inB = new DataInputStream(socketB.getInputStream());
 
             // Account.username giới hạn 3-20 ký tự — không dùng UUID đầy đủ được.
-            var suffix = UUID.randomUUID().toString().substring(0, 8);
+            String suffix = UUID.randomUUID().toString().substring(0, 8);
             long characterA = connectCreateAndSelect(socketA, inA, "a" + suffix);
             long characterB = connectCreateAndSelect(socketB, inB, "b" + suffix);
 
             // Cả 2 spawn cùng điểm (0,0) — vào AoI của nhau ngay tick kế tiếp sau khi attach.
-            var spawnSeenByA = CharacterSpawnedEvent.parseFrom(
+            CharacterSpawnedEvent spawnSeenByA = CharacterSpawnedEvent.parseFrom(
                     readUntilOpcode(inA, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload());
             assertThat(spawnSeenByA.getCharacterId()).isEqualTo(characterB);
-            var spawnSeenByB = CharacterSpawnedEvent.parseFrom(
+            CharacterSpawnedEvent spawnSeenByB = CharacterSpawnedEvent.parseFrom(
                     readUntilOpcode(inB, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload());
             assertThat(spawnSeenByB.getCharacterId()).isEqualTo(characterA);
 
             // A di chuyển — chỉ gửi HƯỚNG (movement.proto), server tự nhân tốc độ.
-            var moveCommand = MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
+            MoveCommand moveCommand = MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
             sendFrame(socketA, Opcode.OPCODE_MOVE_COMMAND_VALUE, 10, moveCommand.toByteArray());
 
             // A tự nhận MoveResponse (reconciliation, CLIENT.md §6) khớp sequenceId đã gửi.
-            var moveResponseFrame = readUntilOpcode(inA, Opcode.OPCODE_MOVE_RESPONSE_VALUE);
+            PacketCodec.Frame moveResponseFrame = readUntilOpcode(inA, Opcode.OPCODE_MOVE_RESPONSE_VALUE);
             assertThat(moveResponseFrame.header().sequenceId()).isEqualTo(10);
-            var moveResponse = MoveResponse.parseFrom(moveResponseFrame.payload());
+            MoveResponse moveResponse = MoveResponse.parseFrom(moveResponseFrame.payload());
             assertThat(moveResponse.getX()).isGreaterThanOrEqualTo(0f);
 
             // B nhận CharacterMovedEvent về A (AoI — SERVER.md §6), vị trí đã đổi khỏi (0,0).
-            var movedSeenByB = CharacterMovedEvent.parseFrom(
+            CharacterMovedEvent movedSeenByB = CharacterMovedEvent.parseFrom(
                     readUntilOpcode(inB, Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE).payload());
             assertThat(movedSeenByB.getCharacterId()).isEqualTo(characterA);
             assertThat(movedSeenByB.getX()).isGreaterThan(0f);
@@ -928,17 +945,17 @@ class GatewayServerIntegrationTest {
     void partyShouldEnterAndExitDungeonAsSeparateWorld_overRealSockets() throws Exception {
         // Phase 8 lát cắt 1 (ADR-026): "cả party cùng vào 1 World riêng, tick độc lập world
         // chính" — verify qua chính giao thức dây, không chỉ nội bộ DungeonInstanceRegistry.
-        try (var socketA = new Socket("127.0.0.1", server.port());
-                var socketB = new Socket("127.0.0.1", server.port());
-                var socketC = new Socket("127.0.0.1", server.port())) {
+        try (Socket socketA = new Socket("127.0.0.1", server.port());
+                Socket socketB = new Socket("127.0.0.1", server.port());
+                Socket socketC = new Socket("127.0.0.1", server.port())) {
             socketA.setSoTimeout(5000);
             socketB.setSoTimeout(5000);
             socketC.setSoTimeout(5000);
-            var inA = new DataInputStream(socketA.getInputStream());
-            var inB = new DataInputStream(socketB.getInputStream());
-            var inC = new DataInputStream(socketC.getInputStream());
+            DataInputStream inA = new DataInputStream(socketA.getInputStream());
+            DataInputStream inB = new DataInputStream(socketB.getInputStream());
+            DataInputStream inC = new DataInputStream(socketC.getInputStream());
 
-            var suffix = UUID.randomUUID().toString().substring(0, 8);
+            String suffix = UUID.randomUUID().toString().substring(0, 8);
             long characterA = connectCreateAndSelect(socketA, inA, "da" + suffix);
             long characterB = connectCreateAndSelect(socketB, inB, "db" + suffix);
             long characterC = connectCreateAndSelect(socketC, inC, "dc" + suffix);
@@ -948,26 +965,27 @@ class GatewayServerIntegrationTest {
             // trung verify cơ chế dungeon). C KHÔNG vào party — ở lại world chính làm chứng nhân.
             partyFacade.createParty(characterA);
             partyFacade.invite(characterA, characterB);
-            var inviteId = partyFacade.listPendingInvites(characterB).get(0).inviteId();
+            long inviteId = partyFacade.listPendingInvites(characterB).get(0).inviteId();
             partyFacade.acceptInvite(inviteId, characterB);
 
             // A gửi EnterDungeonCommand — kéo THEO CẢ B (cùng party, đang online) vào CHUNG 1 instance.
-            var enterCommand = EnterDungeonCommand.newBuilder().setDungeonCode("sample_dungeon").build();
+            EnterDungeonCommand enterCommand =
+                    EnterDungeonCommand.newBuilder().setDungeonCode("sample_dungeon").build();
             sendFrame(socketA, Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, 20, enterCommand.toByteArray());
-            var enterResponseA = EnterDungeonResponse.parseFrom(
+            EnterDungeonResponse enterResponseA = EnterDungeonResponse.parseFrom(
                     readUntilOpcode(inA, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE).payload());
             assertThat(enterResponseA.getOutcome()).isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
 
             // B gửi lại CŨNG EnterDungeonCommand — đã bị A kéo vào sẵn, outcome phải là ALREADY_IN_DUNGEON.
             sendFrame(socketB, Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, 20, enterCommand.toByteArray());
-            var enterResponseB = EnterDungeonResponse.parseFrom(
+            EnterDungeonResponse enterResponseB = EnterDungeonResponse.parseFrom(
                     readUntilOpcode(inB, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE).payload());
             assertThat(enterResponseB.getOutcome())
                     .isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_ALREADY_IN_DUNGEON);
 
             // C (world chính) phải thấy CẢ A lẫn B despawn — chứng minh 2 người đã RỜI world chính
             // thật (không chỉ "coi như" rời), vì AoI world chính không còn giữ entity của họ nữa.
-            var despawnedIds = new java.util.HashSet<Long>();
+            java.util.HashSet<Long> despawnedIds = new java.util.HashSet<Long>();
             despawnedIds.add(CharacterDespawnedEvent.parseFrom(
                     readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE).payload())
                     .getCharacterId());
@@ -978,25 +996,25 @@ class GatewayServerIntegrationTest {
 
             // A di chuyển TRONG dungeon — B (cùng instance) phải thấy, chứng minh 2 người đang
             // tick chung 1 World riêng (không phải world chính, đã verify despawn ở trên).
-            var moveCommand = MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
+            MoveCommand moveCommand = MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
             sendFrame(socketA, Opcode.OPCODE_MOVE_COMMAND_VALUE, 21, moveCommand.toByteArray());
-            var moveResponseFrame = readUntilOpcode(inA, Opcode.OPCODE_MOVE_RESPONSE_VALUE);
+            PacketCodec.Frame moveResponseFrame = readUntilOpcode(inA, Opcode.OPCODE_MOVE_RESPONSE_VALUE);
             assertThat(moveResponseFrame.header().sequenceId()).isEqualTo(21);
 
-            var movedSeenByB = CharacterMovedEvent.parseFrom(
+            CharacterMovedEvent movedSeenByB = CharacterMovedEvent.parseFrom(
                     readUntilOpcode(inB, Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE).payload());
             assertThat(movedSeenByB.getCharacterId()).isEqualTo(characterA);
             assertThat(movedSeenByB.getX()).isGreaterThan(0f);
 
             // A rời dungeon — về ĐÚNG vị trí thật trước khi vào (0,0), C (world chính) thấy A
             // spawn lại — chứng minh A đã quay về world chính thành công.
-            var exitCommand = ExitDungeonCommand.newBuilder().build();
+            ExitDungeonCommand exitCommand = ExitDungeonCommand.newBuilder().build();
             sendFrame(socketA, Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE, 22, exitCommand.toByteArray());
-            var exitResponseA = ExitDungeonResponse.parseFrom(
+            ExitDungeonResponse exitResponseA = ExitDungeonResponse.parseFrom(
                     readUntilOpcode(inA, Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE).payload());
             assertThat(exitResponseA.getOutcome()).isEqualTo(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK);
 
-            var spawnSeenByC = CharacterSpawnedEvent.parseFrom(
+            CharacterSpawnedEvent spawnSeenByC = CharacterSpawnedEvent.parseFrom(
                     readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload());
             assertThat(spawnSeenByC.getCharacterId()).isEqualTo(characterA);
             assertThat(spawnSeenByC.getX()).isEqualTo(0f);
@@ -1004,7 +1022,7 @@ class GatewayServerIntegrationTest {
 
             // B rời nốt — dungeon instance rỗng, World của nó tự dừng (DungeonInstanceRegistry).
             sendFrame(socketB, Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE, 22, exitCommand.toByteArray());
-            var exitResponseB = ExitDungeonResponse.parseFrom(
+            ExitDungeonResponse exitResponseB = ExitDungeonResponse.parseFrom(
                     readUntilOpcode(inB, Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE).payload());
             assertThat(exitResponseB.getOutcome()).isEqualTo(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK);
         }
@@ -1019,26 +1037,27 @@ class GatewayServerIntegrationTest {
         // (DungeonInstanceRegistry.createInstance gọi spawnBoss() sau start()). Verify qua chính
         // giao thức dây: boss xuất hiện, đánh xuyên nhiều pha (heavy_strike/enrage — SkillResultEvent
         // TÁI DÙNG, không opcode riêng), chết → MonsterDespawnedEvent.
-        try (var socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(10000);
-            var in = new DataInputStream(socket.getInputStream());
+            DataInputStream in = new DataInputStream(socket.getInputStream());
 
             long characterId = connectCreateAndSelect(
                     socket, in, "boss" + UUID.randomUUID().toString().substring(0, 6));
             partyFacade.createParty(characterId); // party 1 người — đủ điều kiện vào dungeon.
 
-            var enterCommand = EnterDungeonCommand.newBuilder().setDungeonCode("sample_dungeon").build();
+            EnterDungeonCommand enterCommand =
+                    EnterDungeonCommand.newBuilder().setDungeonCode("sample_dungeon").build();
             sendFrame(socket, Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, 30, enterCommand.toByteArray());
-            var enterResponse = EnterDungeonResponse.parseFrom(
+            EnterDungeonResponse enterResponse = EnterDungeonResponse.parseFrom(
                     readUntilOpcode(in, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE).payload());
             assertThat(enterResponse.getOutcome()).isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
 
-            var bossSpawned = MonsterSpawnedEvent.parseFrom(
+            MonsterSpawnedEvent bossSpawned = MonsterSpawnedEvent.parseFrom(
                     readUntilOpcode(in, Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE).payload());
             assertThat(bossSpawned.getMonsterCode()).isEqualTo("sample_boss");
             long bossId = bossSpawned.getMonsterId();
 
-            var setTarget = SetTargetCommand.newBuilder().setTargetEntityId(bossId).build();
+            SetTargetCommand setTarget = SetTargetCommand.newBuilder().setTargetEntityId(bossId).build();
             sendFrame(socket, Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, 31, setTarget.toByteArray());
 
             // Boss phải dùng ÍT NHẤT 1 chiêu đặc biệt trước khi chết — đọc frame liên tục, phân
@@ -1046,16 +1065,18 @@ class GatewayServerIntegrationTest {
             boolean sawSpecialAction = false;
             boolean bossDied = false;
             for (int i = 0; i < 5000 && !bossDied; i++) {
-                var frame = readFrame(in);
+                PacketCodec.Frame frame = readFrame(in);
                 if (frame.header().opcode() == Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE) {
-                    var skillResult = dev.kage.protocol.SkillResultEvent.parseFrom(frame.payload());
+                    dev.kage.protocol.SkillResultEvent skillResult =
+                            dev.kage.protocol.SkillResultEvent.parseFrom(frame.payload());
                     if (("heavy_strike".equals(skillResult.getSkillCode())
                             || "enrage".equals(skillResult.getSkillCode()))
                             && skillResult.getAttackerEntityId() == bossId) {
                         sawSpecialAction = true;
                     }
                 } else if (frame.header().opcode() == Opcode.OPCODE_MONSTER_DESPAWNED_EVENT_VALUE) {
-                    var despawned = dev.kage.protocol.MonsterDespawnedEvent.parseFrom(frame.payload());
+                    dev.kage.protocol.MonsterDespawnedEvent despawned =
+                            dev.kage.protocol.MonsterDespawnedEvent.parseFrom(frame.payload());
                     if (despawned.getMonsterId() == bossId) {
                         bossDied = true;
                     }
@@ -1071,26 +1092,26 @@ class GatewayServerIntegrationTest {
     void clientShouldDamageMonster_overRealSockets() throws Exception {
         // Verify Phase 4 lát cắt 1 qua chính giao thức dây: di chuyển tới gần quái bù nhìn (spawn
         // cố định (5,5), WorldFacade) → SetTargetCommand → nhận AttackResultEvent thật.
-        try (var socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
-            var in = new DataInputStream(socket.getInputStream());
+            DataInputStream in = new DataInputStream(socket.getInputStream());
             long characterId = connectCreateAndSelect(socket, in, "atk" + UUID.randomUUID().toString().substring(0, 6));
 
             // Nhân vật mới spawn (0,0) — quái ở (5,5), cách ~7.07m, đã trong AoI (15m) nên
             // MonsterSpawnedEvent tới ngay, nhưng CHƯA trong tầm đánh (2m) — phải di chuyển lại gần.
-            var monsterSpawned = MonsterSpawnedEvent.parseFrom(
+            MonsterSpawnedEvent monsterSpawned = MonsterSpawnedEvent.parseFrom(
                     readUntilOpcode(in, Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE).payload());
             long monsterId = monsterSpawned.getMonsterId();
 
             // Hướng chéo (0.7071, 0.7071) — chuẩn hoá, giống hệt client thật gửi (server tự nhân
             // tốc độ, movement.proto). ~1.2s ở 5 m/s đưa nhân vật vào trong tầm đánh (còn cách quái ~1m).
-            var moveCommand = MoveCommand.newBuilder().setDirX(0.7071f).setDirY(0.7071f).build();
+            MoveCommand moveCommand = MoveCommand.newBuilder().setDirX(0.7071f).setDirY(0.7071f).build();
             sendFrame(socket, Opcode.OPCODE_MOVE_COMMAND_VALUE, 10, moveCommand.toByteArray());
             Thread.sleep(1200);
-            var stopCommand = MoveCommand.newBuilder().setDirX(0f).setDirY(0f).build();
+            MoveCommand stopCommand = MoveCommand.newBuilder().setDirX(0f).setDirY(0f).build();
             sendFrame(socket, Opcode.OPCODE_MOVE_COMMAND_VALUE, 11, stopCommand.toByteArray());
 
-            var setTarget = SetTargetCommand.newBuilder().setTargetEntityId(monsterId).build();
+            SetTargetCommand setTarget = SetTargetCommand.newBuilder().setTargetEntityId(monsterId).build();
             sendFrame(socket, Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, 12, setTarget.toByteArray());
 
             // PHÁT HIỆN THẬT (Phase 8 lát cắt 2): quái giờ đánh trả CŨNG tới được client (trước đây
@@ -1115,18 +1136,18 @@ class GatewayServerIntegrationTest {
         // (opcode dispatch, decode protobuf, chạy trên authExecutor, encode response) hoạt động
         // đúng dây thật, không phải nhánh "mặc thành công" (cái đó PostgresInventoryAdapter/
         // PostgresEquipmentAdapterIntegrationTest + EquipItemUseCaseTest đã phủ ở tầng dưới).
-        try (var socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
-            var in = new DataInputStream(socket.getInputStream());
+            DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(socket, in, "equip" + UUID.randomUUID().toString().substring(0, 6));
 
-            var equipCommand = EquipItemCommand.newBuilder()
+            EquipItemCommand equipCommand = EquipItemCommand.newBuilder()
                     .setItemId(1L)
                     .setSlot(EquipmentSlot.EQUIPMENT_SLOT_WEAPON)
                     .build();
             sendFrame(socket, Opcode.OPCODE_EQUIP_ITEM_COMMAND_VALUE, 10, equipCommand.toByteArray());
 
-            var response = EquipItemResponse.parseFrom(
+            EquipItemResponse response = EquipItemResponse.parseFrom(
                     readUntilOpcode(in, Opcode.OPCODE_EQUIP_ITEM_RESPONSE_VALUE).payload());
             assertThat(response.getSuccess()).isFalse();
             assertThat(response.getErrorKey()).isEqualTo("error.item_not_found");
@@ -1136,15 +1157,16 @@ class GatewayServerIntegrationTest {
     @Test
     @Timeout(15)
     void clientShouldReceiveUnequipItemResponse_overRealSockets() throws Exception {
-        try (var socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
-            var in = new DataInputStream(socket.getInputStream());
+            DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(socket, in, "unequip" + UUID.randomUUID().toString().substring(0, 6));
 
-            var unequipCommand = UnequipItemCommand.newBuilder().setSlot(EquipmentSlot.EQUIPMENT_SLOT_WEAPON).build();
+            UnequipItemCommand unequipCommand =
+                    UnequipItemCommand.newBuilder().setSlot(EquipmentSlot.EQUIPMENT_SLOT_WEAPON).build();
             sendFrame(socket, Opcode.OPCODE_UNEQUIP_ITEM_COMMAND_VALUE, 10, unequipCommand.toByteArray());
 
-            var response = UnequipItemResponse.parseFrom(
+            UnequipItemResponse response = UnequipItemResponse.parseFrom(
                     readUntilOpcode(in, Opcode.OPCODE_UNEQUIP_ITEM_RESPONSE_VALUE).payload());
             assertThat(response.getSuccess()).isFalse(); // slot rỗng — không có gì để gỡ
             assertThat(response.getErrorKey()).isEqualTo("error.slot_not_equipped");
@@ -1159,15 +1181,15 @@ class GatewayServerIntegrationTest {
         // đúng nhánh ITEM_NOT_FOUND, verify dây thật (opcode dispatch → decode → Virtual Thread →
         // encode response), không phải nhánh cường hoá thành công (đã phủ ở EnhanceItemUseCaseTest/
         // EnhanceItemUseCaseIntegrationTest ở tầng dưới).
-        try (var socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
-            var in = new DataInputStream(socket.getInputStream());
+            DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(socket, in, "enhance" + UUID.randomUUID().toString().substring(0, 6));
 
-            var enhanceCommand = EnhanceItemCommand.newBuilder().setItemId(1L).build();
+            EnhanceItemCommand enhanceCommand = EnhanceItemCommand.newBuilder().setItemId(1L).build();
             sendFrame(socket, Opcode.OPCODE_ENHANCE_ITEM_COMMAND_VALUE, 10, enhanceCommand.toByteArray());
 
-            var response = EnhanceItemResponse.parseFrom(
+            EnhanceItemResponse response = EnhanceItemResponse.parseFrom(
                     readUntilOpcode(in, Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE).payload());
             assertThat(response.getOutcome()).isEqualTo(EnhanceOutcome.ENHANCE_OUTCOME_ITEM_NOT_FOUND);
         }
@@ -1179,15 +1201,15 @@ class GatewayServerIntegrationTest {
         // fakeShopFacade() luôn trả catalog RỖNG (Fake, không DB thật) — verify dây thật (opcode
         // dispatch → decode → Virtual Thread → encode response), không phải nội dung catalog thật
         // (đã phủ ở ShopIntegrationTest tầng dưới).
-        try (var socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
-            var in = new DataInputStream(socket.getInputStream());
+            DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(socket, in, "shoplist" + UUID.randomUUID().toString().substring(0, 6));
 
-            var request = ListShopItemsRequest.newBuilder().build();
+            ListShopItemsRequest request = ListShopItemsRequest.newBuilder().build();
             sendFrame(socket, Opcode.OPCODE_LIST_SHOP_ITEMS_REQUEST_VALUE, 10, request.toByteArray());
 
-            var response = ListShopItemsResponse.parseFrom(
+            ListShopItemsResponse response = ListShopItemsResponse.parseFrom(
                     readUntilOpcode(in, Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE).payload());
             assertThat(response.getListingsList()).isEmpty();
         }
@@ -1198,15 +1220,15 @@ class GatewayServerIntegrationTest {
     void clientShouldReceiveBuyItemResponse_overRealSockets() throws Exception {
         // Cùng lý do clientShouldReceiveEnhanceItemResponse_overRealSockets: catalog rỗng nên
         // itemTemplateId=1 chắc chắn không có trong shop — verify đúng nhánh ITEM_NOT_IN_SHOP.
-        try (var socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
-            var in = new DataInputStream(socket.getInputStream());
+            DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(socket, in, "buy" + UUID.randomUUID().toString().substring(0, 6));
 
-            var command = BuyItemCommand.newBuilder().setItemTemplateId(1L).setQuantity(1).build();
+            BuyItemCommand command = BuyItemCommand.newBuilder().setItemTemplateId(1L).setQuantity(1).build();
             sendFrame(socket, Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, 10, command.toByteArray());
 
-            var response = BuyItemResponse.parseFrom(
+            BuyItemResponse response = BuyItemResponse.parseFrom(
                     readUntilOpcode(in, Opcode.OPCODE_BUY_ITEM_RESPONSE_VALUE).payload());
             assertThat(response.getOutcome()).isEqualTo(BuyOutcome.BUY_OUTCOME_ITEM_NOT_IN_SHOP);
         }
@@ -1216,15 +1238,15 @@ class GatewayServerIntegrationTest {
     @Timeout(15)
     void clientShouldReceiveSellItemResponse_overRealSockets() throws Exception {
         // fakeShopFacade().findItem() luôn trả rỗng — verify đúng nhánh ITEM_NOT_FOUND.
-        try (var socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
-            var in = new DataInputStream(socket.getInputStream());
+            DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(socket, in, "sell" + UUID.randomUUID().toString().substring(0, 6));
 
-            var command = SellItemCommand.newBuilder().setItemId(1L).setQuantity(1).build();
+            SellItemCommand command = SellItemCommand.newBuilder().setItemId(1L).setQuantity(1).build();
             sendFrame(socket, Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, 10, command.toByteArray());
 
-            var response = SellItemResponse.parseFrom(
+            SellItemResponse response = SellItemResponse.parseFrom(
                     readUntilOpcode(in, Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE).payload());
             assertThat(response.getOutcome()).isEqualTo(SellOutcome.SELL_OUTCOME_ITEM_NOT_FOUND);
         }
@@ -1235,15 +1257,15 @@ class GatewayServerIntegrationTest {
     void clientShouldReceiveErrorResponse_whenTalkingToUnknownNpc_overRealSockets() throws Exception {
         // fakeDialogueFacade()'s NpcTemplatePort luôn trả rỗng — verify đúng lỗi 404 (không có
         // opcode DialogueNodeResponse riêng cho nhánh này, sendError dùng chung OPCODE_ERROR).
-        try (var socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
-            var in = new DataInputStream(socket.getInputStream());
+            DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(socket, in, "npc" + UUID.randomUUID().toString().substring(0, 6));
 
-            var command = TalkToNpcCommand.newBuilder().setNpcCode("town_elder").build();
+            TalkToNpcCommand command = TalkToNpcCommand.newBuilder().setNpcCode("town_elder").build();
             sendFrame(socket, Opcode.OPCODE_TALK_TO_NPC_COMMAND_VALUE, 10, command.toByteArray());
 
-            var response = ErrorResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_ERROR_VALUE).payload());
+            ErrorResponse response = ErrorResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_ERROR_VALUE).payload());
             assertThat(response.getErrorKey()).isEqualTo("error.npc_not_found");
         }
     }
@@ -1253,15 +1275,16 @@ class GatewayServerIntegrationTest {
     void clientShouldReceiveClaimQuestRewardResponse_overRealSockets() throws Exception {
         // fakeQuestFacade()'s QuestTemplatePort luôn trả rỗng — verify đúng nhánh QUEST_NOT_FOUND
         // (kiểm tra template TRƯỚC progress, xem ClaimQuestRewardUseCase.execute).
-        try (var socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
-            var in = new DataInputStream(socket.getInputStream());
+            DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(socket, in, "quest" + UUID.randomUUID().toString().substring(0, 6));
 
-            var command = ClaimQuestRewardCommand.newBuilder().setQuestCode("kill_training_dummies").build();
+            ClaimQuestRewardCommand command =
+                    ClaimQuestRewardCommand.newBuilder().setQuestCode("kill_training_dummies").build();
             sendFrame(socket, Opcode.OPCODE_CLAIM_QUEST_REWARD_COMMAND_VALUE, 10, command.toByteArray());
 
-            var response = ClaimQuestRewardResponse.parseFrom(
+            ClaimQuestRewardResponse response = ClaimQuestRewardResponse.parseFrom(
                     readUntilOpcode(in, Opcode.OPCODE_CLAIM_QUEST_REWARD_RESPONSE_VALUE).payload());
             assertThat(response.getOutcome())
                     .isEqualTo(ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_QUEST_NOT_FOUND);
@@ -1274,15 +1297,16 @@ class GatewayServerIntegrationTest {
         // FakeCharacterPort chỉ chứa nhân vật vừa tạo ở kết nối NÀY — tên bất kỳ khác chắc chắn
         // không tồn tại, verify đúng nhánh TARGET_NOT_FOUND (dây thật: opcode dispatch → decode →
         // Virtual Thread → CharacterFacade.findByName → encode response).
-        try (var socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
-            var in = new DataInputStream(socket.getInputStream());
+            DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(socket, in, "friend" + UUID.randomUUID().toString().substring(0, 6));
 
-            var command = SendFriendRequestCommand.newBuilder().setTargetName("khong_ton_tai").build();
+            SendFriendRequestCommand command =
+                    SendFriendRequestCommand.newBuilder().setTargetName("khong_ton_tai").build();
             sendFrame(socket, Opcode.OPCODE_SEND_FRIEND_REQUEST_COMMAND_VALUE, 10, command.toByteArray());
 
-            var response = SendFriendRequestResponse.parseFrom(
+            SendFriendRequestResponse response = SendFriendRequestResponse.parseFrom(
                     readUntilOpcode(in, Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE).payload());
             assertThat(response.getOutcome())
                     .isEqualTo(SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_TARGET_NOT_FOUND);
@@ -1295,19 +1319,19 @@ class GatewayServerIntegrationTest {
         // Cùng lý do clientShouldReceiveSendFriendRequestResponse_overRealSockets: tên người nhận
         // bất kỳ chắc chắn không tồn tại, verify đúng nhánh RECIPIENT_NOT_FOUND — nhánh này KHÔNG
         // chạm tới fakeMailFacade()'s MailRepositoryPort (ném exception nếu bị gọi thật).
-        try (var socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
-            var in = new DataInputStream(socket.getInputStream());
+            DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(socket, in, "mail" + UUID.randomUUID().toString().substring(0, 6));
 
-            var command = SendMailCommand.newBuilder()
+            SendMailCommand command = SendMailCommand.newBuilder()
                     .setRecipientName("khong_ton_tai")
                     .setSubject("s")
                     .setBody("b")
                     .build();
             sendFrame(socket, Opcode.OPCODE_SEND_MAIL_COMMAND_VALUE, 10, command.toByteArray());
 
-            var response =
+            SendMailResponse response =
                     SendMailResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE).payload());
             assertThat(response.getOutcome()).isEqualTo(SendMailOutcome.SEND_MAIL_OUTCOME_RECIPIENT_NOT_FOUND);
         }
@@ -1319,30 +1343,30 @@ class GatewayServerIntegrationTest {
         // World chat = broadcast toàn server, KHÔNG cần AoI/cùng vị trí — verify dây thật (opcode
         // dispatch → decode → Virtual Thread → ChatFacade.sendMessage → ConnectedCharacterRegistry
         // .broadcastToAll → encode) cho CẢ người gửi (tự thấy tin của mình) lẫn người khác.
-        try (var socketA = new Socket("127.0.0.1", server.port());
-                var socketB = new Socket("127.0.0.1", server.port())) {
+        try (Socket socketA = new Socket("127.0.0.1", server.port());
+                Socket socketB = new Socket("127.0.0.1", server.port())) {
             socketA.setSoTimeout(5000);
             socketB.setSoTimeout(5000);
-            var inA = new DataInputStream(socketA.getInputStream());
-            var inB = new DataInputStream(socketB.getInputStream());
-            var suffix = UUID.randomUUID().toString().substring(0, 8);
+            DataInputStream inA = new DataInputStream(socketA.getInputStream());
+            DataInputStream inB = new DataInputStream(socketB.getInputStream());
+            String suffix = UUID.randomUUID().toString().substring(0, 8);
             connectCreateAndSelect(socketA, inA, "wa" + suffix);
             connectCreateAndSelect(socketB, inB, "wb" + suffix);
 
-            var command = SendChatMessageCommand.newBuilder()
+            SendChatMessageCommand command = SendChatMessageCommand.newBuilder()
                     .setChannel(ChatChannel.CHAT_CHANNEL_WORLD)
                     .setBody("xin chào thế giới")
                     .build();
             sendFrame(socketA, Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE, 10, command.toByteArray());
 
-            var ackResponse = SendChatMessageResponse.parseFrom(
+            SendChatMessageResponse ackResponse = SendChatMessageResponse.parseFrom(
                     readUntilOpcode(inA, Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE).payload());
             assertThat(ackResponse.getOutcome()).isEqualTo(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_OK);
 
-            var eventSeenByA =
+            ChatMessageEvent eventSeenByA =
                     ChatMessageEvent.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE).payload());
             assertThat(eventSeenByA.getBody()).isEqualTo("xin chào thế giới");
-            var eventSeenByB =
+            ChatMessageEvent eventSeenByB =
                     ChatMessageEvent.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE).payload());
             assertThat(eventSeenByB.getBody()).isEqualTo("xin chào thế giới");
         }
@@ -1350,20 +1374,20 @@ class GatewayServerIntegrationTest {
 
     private static long connectCreateAndSelect(Socket socket, DataInputStream in, String username)
             throws Exception {
-        var connectRequest = ConnectRequest.newBuilder().setUsername(username).build();
+        ConnectRequest connectRequest = ConnectRequest.newBuilder().setUsername(username).build();
         sendFrame(socket, Opcode.OPCODE_CONNECT_REQUEST_VALUE, 1, connectRequest.toByteArray());
         ConnectResponse.parseFrom(readFrame(in).payload());
 
         // Character.validateName: chỉ chữ/số, KHÔNG dấu gạch ngang (feature-character/CLAUDE.md).
-        var createRequest = CreateCharacterRequest.newBuilder()
+        CreateCharacterRequest createRequest = CreateCharacterRequest.newBuilder()
                 .setName("Hero" + UUID.randomUUID().toString().replace("-", "").substring(0, 8))
                 .setIdempotencyKey(UUID.randomUUID().toString())
                 .build();
         sendFrame(socket, Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, 2, createRequest.toByteArray());
-        var createResponse = CreateCharacterResponse.parseFrom(readFrame(in).payload());
+        CreateCharacterResponse createResponse = CreateCharacterResponse.parseFrom(readFrame(in).payload());
         long characterId = createResponse.getCharacter().getId();
 
-        var selectRequest = SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
+        SelectCharacterRequest selectRequest = SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
         sendFrame(socket, Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, 3, selectRequest.toByteArray());
         readFrame(in); // SelectCharacterResponse — nội dung đã verify ở GatewayPipelineTest
 
@@ -1371,8 +1395,8 @@ class GatewayServerIntegrationTest {
     }
 
     private static void sendFrame(Socket socket, int opcode, int sequenceId, byte[] payload) throws Exception {
-        var out = new DataOutputStream(socket.getOutputStream());
-        var header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
+        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+        PacketHeader header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
         byte[] frame = PacketCodec.encodeFrame(header, payload);
         out.writeInt(frame.length);
         out.write(frame);
@@ -1382,7 +1406,7 @@ class GatewayServerIntegrationTest {
     /** AoI Event tới bất kỳ lúc nào giữa các Response khác — đọc tới khi thấy đúng opcode cần. */
     private static PacketCodec.Frame readUntilOpcode(DataInputStream in, int expectedOpcode) throws Exception {
         for (int attempt = 0; attempt < 1000; attempt++) {
-            var frame = readFrame(in);
+            PacketCodec.Frame frame = readFrame(in);
             if (frame.header().opcode() == expectedOpcode) {
                 return frame;
             }
@@ -1391,9 +1415,9 @@ class GatewayServerIntegrationTest {
     }
 
     private static void sendPing(Socket socket, int sequenceId, long clientTimestampMs) throws Exception {
-        var out = new DataOutputStream(socket.getOutputStream());
-        var ping = PingCommand.newBuilder().setClientTimestampMs(clientTimestampMs).build();
-        var header = new PacketHeader(Opcode.OPCODE_PING_VALUE, ProtocolVersion.CURRENT, sequenceId);
+        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+        PingCommand ping = PingCommand.newBuilder().setClientTimestampMs(clientTimestampMs).build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_PING_VALUE, ProtocolVersion.CURRENT, sequenceId);
         byte[] frame = PacketCodec.encodeFrame(header, ping.toByteArray());
         out.writeInt(frame.length);
         out.write(frame);

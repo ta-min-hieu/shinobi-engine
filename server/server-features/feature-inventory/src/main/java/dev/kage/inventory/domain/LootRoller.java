@@ -16,8 +16,8 @@ public final class LootRoller {
     }
 
     public static List<ItemStack> roll(List<DropTableEntry> entries) {
-        var drops = new ArrayList<ItemStack>();
-        for (var entry : entries) {
+        ArrayList<ItemStack> drops = new ArrayList<ItemStack>();
+        for (DropTableEntry entry : entries) {
             if (ThreadLocalRandom.current().nextInt(100) < entry.dropChancePercent()) {
                 int quantity = entry.minQuantity() == entry.maxQuantity()
                         ? entry.minQuantity()

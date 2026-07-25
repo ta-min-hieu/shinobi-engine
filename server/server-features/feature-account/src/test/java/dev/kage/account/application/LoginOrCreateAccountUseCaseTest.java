@@ -33,7 +33,7 @@ class LoginOrCreateAccountUseCaseTest {
 
         @Override
         public String issue(long accountId) {
-            var token = "fake-token-" + accountId;
+            String token = "fake-token-" + accountId;
             tokens.put(token, accountId);
             return token;
         }
@@ -53,11 +53,11 @@ class LoginOrCreateAccountUseCaseTest {
 
     @Test
     void shouldCreateNewAccount_whenUsernameNotSeenBefore() {
-        var accountPort = new FakeAccountPort();
-        var sessionPort = new FakeSessionPort();
-        var useCase = new LoginOrCreateAccountUseCase(accountPort, sessionPort, DIRECT_TX);
+        FakeAccountPort accountPort = new FakeAccountPort();
+        FakeSessionPort sessionPort = new FakeSessionPort();
+        LoginOrCreateAccountUseCase useCase = new LoginOrCreateAccountUseCase(accountPort, sessionPort, DIRECT_TX);
 
-        var result = useCase.execute("kagehero");
+        LoginResult result = useCase.execute("kagehero");
 
         assertThat(result.username()).isEqualTo("kagehero");
         assertThat(result.accountId()).isPositive();
@@ -67,12 +67,12 @@ class LoginOrCreateAccountUseCaseTest {
 
     @Test
     void shouldReuseExistingAccount_whenUsernameAlreadyExists() {
-        var accountPort = new FakeAccountPort();
-        var sessionPort = new FakeSessionPort();
-        var useCase = new LoginOrCreateAccountUseCase(accountPort, sessionPort, DIRECT_TX);
+        FakeAccountPort accountPort = new FakeAccountPort();
+        FakeSessionPort sessionPort = new FakeSessionPort();
+        LoginOrCreateAccountUseCase useCase = new LoginOrCreateAccountUseCase(accountPort, sessionPort, DIRECT_TX);
 
-        var first = useCase.execute("kagehero");
-        var second = useCase.execute("kagehero");
+        LoginResult first = useCase.execute("kagehero");
+        LoginResult second = useCase.execute("kagehero");
 
         assertThat(second.accountId()).isEqualTo(first.accountId());
         assertThat(accountPort.byUsername).hasSize(1);
@@ -82,9 +82,9 @@ class LoginOrCreateAccountUseCaseTest {
 
     @Test
     void shouldRejectInvalidUsername_viaAccountCompactConstructor() {
-        var accountPort = new FakeAccountPort();
-        var sessionPort = new FakeSessionPort();
-        var useCase = new LoginOrCreateAccountUseCase(accountPort, sessionPort, DIRECT_TX);
+        FakeAccountPort accountPort = new FakeAccountPort();
+        FakeSessionPort sessionPort = new FakeSessionPort();
+        LoginOrCreateAccountUseCase useCase = new LoginOrCreateAccountUseCase(accountPort, sessionPort, DIRECT_TX);
 
         assertThatThrownBy(() -> useCase.execute("a")).isInstanceOf(IllegalArgumentException.class);
     }

@@ -15,11 +15,11 @@ class AcceptFriendRequestUseCaseTest {
 
     @Test
     void shouldAccept_whenPendingRequestAddressedToCaller() {
-        var port = new FakeFriendPort();
+        FakeFriendPort port = new FakeFriendPort();
         port.friendships.add(new Friendship(1, 5, 7, FriendshipStatus.PENDING, Instant.now(), null));
-        var useCase = new AcceptFriendRequestUseCase(port);
+        AcceptFriendRequestUseCase useCase = new AcceptFriendRequestUseCase(port);
 
-        var result = useCase.execute(1, 7);
+        AcceptFriendRequestUseCase.Result result = useCase.execute(1, 7);
 
         assertThat(result).isEqualTo(AcceptFriendRequestUseCase.Result.OK);
         assertThat(port.friendships.get(0).status()).isEqualTo(FriendshipStatus.ACCEPTED);
@@ -27,20 +27,20 @@ class AcceptFriendRequestUseCaseTest {
 
     @Test
     void shouldReject_whenCallerIsNotTheAddressee() {
-        var port = new FakeFriendPort();
+        FakeFriendPort port = new FakeFriendPort();
         port.friendships.add(new Friendship(1, 5, 7, FriendshipStatus.PENDING, Instant.now(), null));
-        var useCase = new AcceptFriendRequestUseCase(port);
+        AcceptFriendRequestUseCase useCase = new AcceptFriendRequestUseCase(port);
 
-        var result = useCase.execute(1, 5);
+        AcceptFriendRequestUseCase.Result result = useCase.execute(1, 5);
 
         assertThat(result).isEqualTo(AcceptFriendRequestUseCase.Result.NOT_FOUND);
     }
 
     @Test
     void shouldReject_whenFriendshipDoesNotExist() {
-        var useCase = new AcceptFriendRequestUseCase(new FakeFriendPort());
+        AcceptFriendRequestUseCase useCase = new AcceptFriendRequestUseCase(new FakeFriendPort());
 
-        var result = useCase.execute(999, 7);
+        AcceptFriendRequestUseCase.Result result = useCase.execute(999, 7);
 
         assertThat(result).isEqualTo(AcceptFriendRequestUseCase.Result.NOT_FOUND);
     }
@@ -61,7 +61,7 @@ class AcceptFriendRequestUseCaseTest {
         @Override
         public boolean accept(long friendshipId, long addresseeId) {
             for (int i = 0; i < friendships.size(); i++) {
-                var f = friendships.get(i);
+                Friendship f = friendships.get(i);
                 boolean matches = f.id() == friendshipId
                         && f.addresseeId() == addresseeId
                         && f.status() == FriendshipStatus.PENDING;

@@ -37,10 +37,11 @@ class UnequipItemUseCaseTest {
 
     @Test
     void shouldUnequip_whenSlotOccupied() {
-        var equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of(EquipmentSlotType.WEAPON, 42L)));
-        var useCase = new UnequipItemUseCase(equipmentPort, DIRECT_TX);
+        FakeEquipmentPort equipmentPort =
+                new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of(EquipmentSlotType.WEAPON, 42L)));
+        UnequipItemUseCase useCase = new UnequipItemUseCase(equipmentPort, DIRECT_TX);
 
-        var result = useCase.execute(CHARACTER_ID, EquipmentSlotType.WEAPON);
+        UnequipItemUseCase.UnequipItemResult result = useCase.execute(CHARACTER_ID, EquipmentSlotType.WEAPON);
 
         assertThat(result).isEqualTo(UnequipItemUseCase.UnequipItemResult.OK);
         assertThat(equipmentPort.saved.equippedItemId(EquipmentSlotType.WEAPON)).isEmpty();
@@ -48,10 +49,10 @@ class UnequipItemUseCaseTest {
 
     @Test
     void shouldReportNotEquipped_whenSlotAlreadyEmpty_andNotSave() {
-        var equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
-        var useCase = new UnequipItemUseCase(equipmentPort, DIRECT_TX);
+        FakeEquipmentPort equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
+        UnequipItemUseCase useCase = new UnequipItemUseCase(equipmentPort, DIRECT_TX);
 
-        var result = useCase.execute(CHARACTER_ID, EquipmentSlotType.WEAPON);
+        UnequipItemUseCase.UnequipItemResult result = useCase.execute(CHARACTER_ID, EquipmentSlotType.WEAPON);
 
         assertThat(result).isEqualTo(UnequipItemUseCase.UnequipItemResult.NOT_EQUIPPED);
         assertThat(equipmentPort.saved).isNull(); // không đổi gì → không cần lưu

@@ -7,6 +7,9 @@ import dev.kage.account.domain.Account;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.PostgresDataSourceFactory;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import javax.sql.DataSource;
@@ -34,7 +37,7 @@ class PostgresAccountAdapterIntegrationTest {
 
     @BeforeAll
     static void migrate() {
-        var config = new DatabaseConfig(
+        DatabaseConfig config = new DatabaseConfig(
                 POSTGRES.getHost(),
                 POSTGRES.getMappedPort(POSTGRES_PORT),
                 POSTGRES.getDatabaseName(),
@@ -48,9 +51,9 @@ class PostgresAccountAdapterIntegrationTest {
 
     @Test
     void shouldCreateAccount_whenUsernameNotSeenBefore() {
-        var adapter = new PostgresAccountAdapter();
-        var transactionManager = new JdbcAccountTransactionRunner(dataSource);
-        var holder = new Account[1];
+        PostgresAccountAdapter adapter = new PostgresAccountAdapter();
+        JdbcAccountTransactionRunner transactionManager = new JdbcAccountTransactionRunner(dataSource);
+        Account[] holder = new Account[1];
 
         transactionManager.inTransaction(tx -> holder[0] = adapter.findOrCreate(tx, "newplayer"));
 
@@ -60,10 +63,10 @@ class PostgresAccountAdapterIntegrationTest {
 
     @Test
     void shouldReturnSameAccount_whenUsernameAlreadyExists() {
-        var adapter = new PostgresAccountAdapter();
-        var transactionManager = new JdbcAccountTransactionRunner(dataSource);
-        var firstHolder = new Account[1];
-        var secondHolder = new Account[1];
+        PostgresAccountAdapter adapter = new PostgresAccountAdapter();
+        JdbcAccountTransactionRunner transactionManager = new JdbcAccountTransactionRunner(dataSource);
+        Account[] firstHolder = new Account[1];
+        Account[] secondHolder = new Account[1];
 
         transactionManager.inTransaction(tx -> firstHolder[0] = adapter.findOrCreate(tx, "repeatplayer"));
         transactionManager.inTransaction(tx -> secondHolder[0] = adapter.findOrCreate(tx, "repeatplayer"));
@@ -73,8 +76,8 @@ class PostgresAccountAdapterIntegrationTest {
 
     @Test
     void shouldRollback_whenActionThrows() throws SQLException {
-        var adapter = new PostgresAccountAdapter();
-        var transactionManager = new JdbcAccountTransactionRunner(dataSource);
+        PostgresAccountAdapter adapter = new PostgresAccountAdapter();
+        JdbcAccountTransactionRunner transactionManager = new JdbcAccountTransactionRunner(dataSource);
 
         assertThatThrownBy(() -> transactionManager.inTransaction(tx -> {
                     adapter.findOrCreate(tx, "rollbackplayer");
@@ -84,10 +87,11 @@ class PostgresAccountAdapterIntegrationTest {
 
         // Kiểm tra trực tiếp bằng SQL thô — findOrCreate() sẽ TẠO MỚI nếu chưa tồn tại nên
         // không dùng lại được để verify; phải SELECT COUNT thẳng để chắc rollback thật sự xảy ra.
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement("SELECT COUNT(*) FROM account WHERE username = ?")) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
+                        connection.prepareStatement("SELECT COUNT(*) FROM account WHERE username = ?")) {
             statement.setString(1, "rollbackplayer");
-            try (var resultSet = statement.executeQuery()) {
+            try (ResultSet resultSet = statement.executeQuery()) {
                 resultSet.next();
                 assertThat(resultSet.getInt(1)).as("rollback phải xoá row chưa commit").isZero();
             }

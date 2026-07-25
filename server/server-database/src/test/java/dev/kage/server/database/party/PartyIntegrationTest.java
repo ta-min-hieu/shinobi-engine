@@ -9,6 +9,8 @@ import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.party.domain.DuplicatePartyInviteException;
 import dev.kage.party.domain.Party;
+import dev.kage.party.domain.PartyInvite;
+import dev.kage.party.domain.PartyMember;
 import dev.kage.party.domain.PartyPort;
 import dev.kage.party.domain.PartyRole;
 import dev.kage.server.database.DatabaseConfig;
@@ -47,7 +49,7 @@ class PartyIntegrationTest {
 
     @BeforeAll
     static void migrate() {
-        var config = new DatabaseConfig(
+        DatabaseConfig config = new DatabaseConfig(
                 POSTGRES.getHost(),
                 POSTGRES.getMappedPort(POSTGRES_PORT),
                 POSTGRES.getDatabaseName(),
@@ -56,18 +58,18 @@ class PartyIntegrationTest {
         dataSource = PostgresDataSourceFactory.create(config);
         FlywayMigrator.migrate(dataSource);
 
-        var accountAdapter = new PostgresAccountAdapter();
-        var accountTx = new JdbcAccountTransactionRunner(dataSource);
-        var accountHolder = new Account[1];
+        PostgresAccountAdapter accountAdapter = new PostgresAccountAdapter();
+        JdbcAccountTransactionRunner accountTx = new JdbcAccountTransactionRunner(dataSource);
+        Account[] accountHolder = new Account[1];
         accountTx.inTransaction(tx -> accountHolder[0] = accountAdapter.findOrCreate(tx, "partytester"));
         accountId = accountHolder[0].id();
     }
 
     private static long createFreshCharacter(String name) {
-        var characterAdapter = new PostgresCharacterAdapter(dataSource);
-        var characterTx = new JdbcCharacterTransactionRunner(dataSource);
-        var newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
-        var holder = new Character[1];
+        PostgresCharacterAdapter characterAdapter = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner characterTx = new JdbcCharacterTransactionRunner(dataSource);
+        NewCharacter newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
+        Character[] holder = new Character[1];
         characterTx.inTransaction(tx -> holder[0] = characterAdapter.create(tx, newCharacter));
         return holder[0].id();
     }
@@ -79,11 +81,11 @@ class PartyIntegrationTest {
     @Test
     void shouldCreateParty_andMakeCreatorLeaderMember() {
         long leader = createFreshCharacter("PartyLeader1");
-        var adapter = newAdapter();
+        PostgresPartyAdapter adapter = newAdapter();
 
-        var party = adapter.createParty(leader);
+        Party party = adapter.createParty(leader);
 
-        var membership = adapter.findMembershipOf(leader).orElseThrow();
+        PartyMember membership = adapter.findMembershipOf(leader).orElseThrow();
         assertThat(membership.partyId()).isEqualTo(party.id());
         assertThat(membership.role()).isEqualTo(PartyRole.LEADER);
     }
@@ -92,11 +94,11 @@ class PartyIntegrationTest {
     void shouldAcceptInvite_andAddMemberAtomically() {
         long leader = createFreshCharacter("PartyLeader2");
         long invitee = createFreshCharacter("PartyInvitee1");
-        var adapter = newAdapter();
-        var party = adapter.createParty(leader);
-        var invite = adapter.invite(party.id(), invitee);
+        PostgresPartyAdapter adapter = newAdapter();
+        Party party = adapter.createParty(leader);
+        PartyInvite invite = adapter.invite(party.id(), invitee);
 
-        var result = adapter.acceptInvite(invite.id(), invitee);
+        PartyPort.AcceptResult result = adapter.acceptInvite(invite.id(), invitee);
 
         assertThat(result).isEqualTo(PartyPort.AcceptResult.OK);
         assertThat(adapter.findMembershipOf(invitee)).isPresent();
@@ -108,11 +110,11 @@ class PartyIntegrationTest {
         long leader = createFreshCharacter("PartyLeader3");
         long invitee = createFreshCharacter("PartyInvitee2");
         long stranger = createFreshCharacter("PartyStranger1");
-        var adapter = newAdapter();
-        var party = adapter.createParty(leader);
-        var invite = adapter.invite(party.id(), invitee);
+        PostgresPartyAdapter adapter = newAdapter();
+        Party party = adapter.createParty(leader);
+        PartyInvite invite = adapter.invite(party.id(), invitee);
 
-        var result = adapter.acceptInvite(invite.id(), stranger);
+        PartyPort.AcceptResult result = adapter.acceptInvite(invite.id(), stranger);
 
         assertThat(result).isEqualTo(PartyPort.AcceptResult.NOT_FOUND);
         assertThat(adapter.findMembershipOf(invitee)).isEmpty();
@@ -122,8 +124,8 @@ class PartyIntegrationTest {
     void shouldRejectDuplicateInvite_sameParty() {
         long leader = createFreshCharacter("PartyLeader4");
         long invitee = createFreshCharacter("PartyInvitee3");
-        var adapter = newAdapter();
-        var party = adapter.createParty(leader);
+        PostgresPartyAdapter adapter = newAdapter();
+        Party party = adapter.createParty(leader);
         adapter.invite(party.id(), invitee);
 
         assertThatThrownBy(() -> adapter.invite(party.id(), invitee))
@@ -134,12 +136,12 @@ class PartyIntegrationTest {
     void shouldReturnAlreadyInParty_andDropStaleInvite_whenInviteeJoinedElsewhereMeanwhile() {
         long leaderA = createFreshCharacter("PartyLeader5");
         long invitee = createFreshCharacter("PartyInvitee4");
-        var adapter = newAdapter();
-        var partyA = adapter.createParty(leaderA);
-        var invite = adapter.invite(partyA.id(), invitee);
+        PostgresPartyAdapter adapter = newAdapter();
+        Party partyA = adapter.createParty(leaderA);
+        PartyInvite invite = adapter.invite(partyA.id(), invitee);
         adapter.createParty(invitee); // invitee tự tạo party khác trong lúc lời mời còn PENDING
 
-        var result = adapter.acceptInvite(invite.id(), invitee);
+        PartyPort.AcceptResult result = adapter.acceptInvite(invite.id(), invitee);
 
         assertThat(result).isEqualTo(PartyPort.AcceptResult.ALREADY_IN_PARTY);
         assertThat(adapter.findPendingInviteOfInvitee(invitee)).isEmpty();
@@ -148,16 +150,16 @@ class PartyIntegrationTest {
     @Test
     void shouldRejectAccept_whenPartyAlreadyAtMaxCapacity() {
         long leader = createFreshCharacter("PartyLeader6");
-        var adapter = newAdapter();
-        var party = adapter.createParty(leader);
+        PostgresPartyAdapter adapter = newAdapter();
+        Party party = adapter.createParty(leader);
         for (int i = 0; i < Party.MAX_MEMBERS - 1; i++) {
             long memberId = createFreshCharacter("PartyFill" + i);
             adapter.acceptInvite(adapter.invite(party.id(), memberId).id(), memberId);
         }
         long lateInvitee = createFreshCharacter("PartyLateInv1");
-        var lateInvite = adapter.invite(party.id(), lateInvitee);
+        PartyInvite lateInvite = adapter.invite(party.id(), lateInvitee);
 
-        var result = adapter.acceptInvite(lateInvite.id(), lateInvitee);
+        PartyPort.AcceptResult result = adapter.acceptInvite(lateInvite.id(), lateInvitee);
 
         assertThat(result).isEqualTo(PartyPort.AcceptResult.PARTY_FULL);
         assertThat(adapter.listMembers(party.id())).hasSize(Party.MAX_MEMBERS);
@@ -168,12 +170,12 @@ class PartyIntegrationTest {
         long leader = createFreshCharacter("PartyLeader7");
         long memberA = createFreshCharacter("PartyMemberA1");
         long memberB = createFreshCharacter("PartyMemberB1");
-        var adapter = newAdapter();
-        var party = adapter.createParty(leader);
+        PostgresPartyAdapter adapter = newAdapter();
+        Party party = adapter.createParty(leader);
         adapter.acceptInvite(adapter.invite(party.id(), memberA).id(), memberA);
         adapter.acceptInvite(adapter.invite(party.id(), memberB).id(), memberB);
 
-        var result = adapter.leaveParty(leader);
+        PartyPort.LeaveResult result = adapter.leaveParty(leader);
 
         assertThat(result).isEqualTo(PartyPort.LeaveResult.OK);
         assertThat(adapter.findMembershipOf(leader)).isEmpty();
@@ -184,10 +186,10 @@ class PartyIntegrationTest {
     @Test
     void shouldDissolveParty_whenLastMemberLeaves() {
         long leader = createFreshCharacter("PartyLeader8");
-        var adapter = newAdapter();
+        PostgresPartyAdapter adapter = newAdapter();
         adapter.createParty(leader);
 
-        var result = adapter.leaveParty(leader);
+        PartyPort.LeaveResult result = adapter.leaveParty(leader);
 
         assertThat(result).isEqualTo(PartyPort.LeaveResult.OK);
         assertThat(adapter.findMembershipOf(leader)).isEmpty();
@@ -197,8 +199,8 @@ class PartyIntegrationTest {
     void shouldKickMember_whenCallerIsLeader() {
         long leader = createFreshCharacter("PartyLeader9");
         long member = createFreshCharacter("PartyMemberC1");
-        var adapter = newAdapter();
-        var party = adapter.createParty(leader);
+        PostgresPartyAdapter adapter = newAdapter();
+        Party party = adapter.createParty(leader);
         adapter.acceptInvite(adapter.invite(party.id(), member).id(), member);
 
         boolean kicked = adapter.kickMember(leader, member);

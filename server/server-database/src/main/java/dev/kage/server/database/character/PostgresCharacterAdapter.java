@@ -99,11 +99,11 @@ public final class PostgresCharacterAdapter implements CharacterPort {
 
     @Override
     public List<Character> listByAccount(long accountId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(LIST_BY_ACCOUNT)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(LIST_BY_ACCOUNT)) {
             statement.setLong(1, accountId);
             try (ResultSet rs = statement.executeQuery()) {
-                var result = new ArrayList<Character>();
+                ArrayList<Character> result = new ArrayList<Character>();
                 while (rs.next()) {
                     result.add(mapRow(rs));
                 }
@@ -116,8 +116,8 @@ public final class PostgresCharacterAdapter implements CharacterPort {
 
     @Override
     public int countByAccount(long accountId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(COUNT_BY_ACCOUNT)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(COUNT_BY_ACCOUNT)) {
             statement.setLong(1, accountId);
             try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
@@ -130,8 +130,8 @@ public final class PostgresCharacterAdapter implements CharacterPort {
 
     @Override
     public boolean existsByName(String name) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(EXISTS_BY_NAME)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(EXISTS_BY_NAME)) {
             statement.setString(1, name);
             try (ResultSet rs = statement.executeQuery()) {
                 return rs.next();
@@ -143,8 +143,8 @@ public final class PostgresCharacterAdapter implements CharacterPort {
 
     @Override
     public Optional<Character> findByName(String name) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_BY_NAME)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_BY_NAME)) {
             statement.setString(1, name);
             try (ResultSet rs = statement.executeQuery()) {
                 return rs.next() ? Optional.of(mapRow(rs)) : Optional.empty();
@@ -156,8 +156,8 @@ public final class PostgresCharacterAdapter implements CharacterPort {
 
     @Override
     public Optional<Character> findById(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_BY_ID)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_BY_ID)) {
             statement.setLong(1, characterId);
             try (ResultSet rs = statement.executeQuery()) {
                 return rs.next() ? Optional.of(mapRow(rs)) : Optional.empty();
@@ -169,7 +169,7 @@ public final class PostgresCharacterAdapter implements CharacterPort {
 
     @Override
     public Character create(Transaction tx, NewCharacter newCharacter) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try {
             insertIdempotencyKey(connection, newCharacter.idempotencyKey());
             long characterId = insertCharacter(connection, newCharacter);
@@ -231,8 +231,8 @@ public final class PostgresCharacterAdapter implements CharacterPort {
 
     @Override
     public PositionSnapshot loadPosition(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(LOAD_POSITION)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(LOAD_POSITION)) {
             statement.setLong(1, characterId);
             try (ResultSet rs = statement.executeQuery()) {
                 if (!rs.next()) {
@@ -247,8 +247,8 @@ public final class PostgresCharacterAdapter implements CharacterPort {
 
     @Override
     public void savePosition(long characterId, float x, float y) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(SAVE_POSITION)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(SAVE_POSITION)) {
             statement.setFloat(1, x);
             statement.setFloat(2, y);
             statement.setLong(3, characterId);
@@ -260,8 +260,8 @@ public final class PostgresCharacterAdapter implements CharacterPort {
 
     @Override
     public CharacterStats loadStats(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(LOAD_STATS)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(LOAD_STATS)) {
             statement.setLong(1, characterId);
             try (ResultSet rs = statement.executeQuery()) {
                 if (!rs.next()) {

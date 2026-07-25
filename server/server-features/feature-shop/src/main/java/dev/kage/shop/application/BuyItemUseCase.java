@@ -32,7 +32,7 @@ public final class BuyItemUseCase {
         }
         long totalCost = listing.buyPrice() * quantity;
 
-        var resultHolder = new AtomicReference<BuyResult>();
+        AtomicReference<BuyResult> resultHolder = new AtomicReference<BuyResult>();
         try {
             tx.inTransaction((Transaction t) -> {
                 ports.idempotencyPort().recordOrThrow(t, idempotencyKey);
@@ -43,7 +43,7 @@ public final class BuyItemUseCase {
                 if (!ports.inventoryGatewayPort().grantItem(t, characterId, itemTemplateId, quantity)) {
                     throw new ShopTransactionAbortedException();
                 }
-                var detail = "{\"itemTemplateId\":%d,\"quantity\":%d,\"goldCost\":%d}"
+                String detail = "{\"itemTemplateId\":%d,\"quantity\":%d,\"goldCost\":%d}"
                         .formatted(itemTemplateId, quantity, totalCost);
                 ports.auditPort().log(t, characterId, "SHOP_BUY", detail);
                 resultHolder.set(BuyResult.OK);

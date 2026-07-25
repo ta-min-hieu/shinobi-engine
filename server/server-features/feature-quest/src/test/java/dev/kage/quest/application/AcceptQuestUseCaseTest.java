@@ -50,20 +50,21 @@ class AcceptQuestUseCaseTest {
 
     @Test
     void shouldReturnQuestNotFound_whenCodeUnknown() {
-        var useCase = new AcceptQuestUseCase(new FakeQuestProgressPort(null), new FakeQuestTemplatePort(), DIRECT_TX);
+        AcceptQuestUseCase useCase =
+                new AcceptQuestUseCase(new FakeQuestProgressPort(null), new FakeQuestTemplatePort(), DIRECT_TX);
 
-        var result = useCase.execute(CHARACTER_ID, "unknown_code");
+        AcceptQuestUseCase.AcceptResult result = useCase.execute(CHARACTER_ID, "unknown_code");
 
         assertThat(result).isEqualTo(AcceptQuestUseCase.AcceptResult.QUEST_NOT_FOUND);
     }
 
     @Test
     void shouldReturnAlreadyAccepted_whenProgressRowExists() {
-        var existing = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.IN_PROGRESS, "{}");
-        var progressPort = new FakeQuestProgressPort(existing);
-        var useCase = new AcceptQuestUseCase(progressPort, new FakeQuestTemplatePort(), DIRECT_TX);
+        QuestProgress existing = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.IN_PROGRESS, "{}");
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(existing);
+        AcceptQuestUseCase useCase = new AcceptQuestUseCase(progressPort, new FakeQuestTemplatePort(), DIRECT_TX);
 
-        var result = useCase.execute(CHARACTER_ID, QUEST_CODE);
+        AcceptQuestUseCase.AcceptResult result = useCase.execute(CHARACTER_ID, QUEST_CODE);
 
         assertThat(result).isEqualTo(AcceptQuestUseCase.AcceptResult.ALREADY_ACCEPTED);
         assertThat(progressPort.saved).isNull(); // không ghi đè tiến độ đã có
@@ -71,10 +72,10 @@ class AcceptQuestUseCaseTest {
 
     @Test
     void shouldSaveInitialProgress_whenAccepted() {
-        var progressPort = new FakeQuestProgressPort(null);
-        var useCase = new AcceptQuestUseCase(progressPort, new FakeQuestTemplatePort(), DIRECT_TX);
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(null);
+        AcceptQuestUseCase useCase = new AcceptQuestUseCase(progressPort, new FakeQuestTemplatePort(), DIRECT_TX);
 
-        var result = useCase.execute(CHARACTER_ID, QUEST_CODE);
+        AcceptQuestUseCase.AcceptResult result = useCase.execute(CHARACTER_ID, QUEST_CODE);
 
         assertThat(result).isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
         assertThat(progressPort.saved).isNotNull();

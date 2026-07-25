@@ -119,19 +119,19 @@ class BuyItemUseCaseTest {
     private static BuyItemUseCase newUseCase(
             ShopCatalogPort catalogPort, FakeGoldPort goldPort, FakeInventoryGatewayPort inventoryGatewayPort,
             FakeAuditPort auditPort, FakeIdempotencyPort idempotencyPort) {
-        var ports = new ShopPorts(catalogPort, goldPort, inventoryGatewayPort, auditPort, idempotencyPort);
+        ShopPorts ports = new ShopPorts(catalogPort, goldPort, inventoryGatewayPort, auditPort, idempotencyPort);
         return new BuyItemUseCase(ports, DIRECT_TX);
     }
 
     @Test
     void shouldRejectBuy_whenItemNotInShop() {
-        var catalogPort = new FakeCatalogPort(null);
-        var goldPort = new FakeGoldPort(true);
-        var inventoryGatewayPort = new FakeInventoryGatewayPort(true);
-        var auditPort = new FakeAuditPort();
-        var useCase = newUseCase(catalogPort, goldPort, inventoryGatewayPort, auditPort);
+        FakeCatalogPort catalogPort = new FakeCatalogPort(null);
+        FakeGoldPort goldPort = new FakeGoldPort(true);
+        FakeInventoryGatewayPort inventoryGatewayPort = new FakeInventoryGatewayPort(true);
+        FakeAuditPort auditPort = new FakeAuditPort();
+        BuyItemUseCase useCase = newUseCase(catalogPort, goldPort, inventoryGatewayPort, auditPort);
 
-        var result = useCase.execute(CHARACTER_ID, TEMPLATE_ID, 1, IDEMPOTENCY_KEY);
+        BuyItemUseCase.BuyResult result = useCase.execute(CHARACTER_ID, TEMPLATE_ID, 1, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.ITEM_NOT_IN_SHOP);
         assertThat(goldPort.deductCalled).isFalse();
@@ -140,13 +140,13 @@ class BuyItemUseCaseTest {
 
     @Test
     void shouldRejectBuy_whenGoldPortRefusesDeduction() {
-        var catalogPort = new FakeCatalogPort(new ShopListing(TEMPLATE_ID, 5, 2));
-        var goldPort = new FakeGoldPort(false);
-        var inventoryGatewayPort = new FakeInventoryGatewayPort(true);
-        var auditPort = new FakeAuditPort();
-        var useCase = newUseCase(catalogPort, goldPort, inventoryGatewayPort, auditPort);
+        FakeCatalogPort catalogPort = new FakeCatalogPort(new ShopListing(TEMPLATE_ID, 5, 2));
+        FakeGoldPort goldPort = new FakeGoldPort(false);
+        FakeInventoryGatewayPort inventoryGatewayPort = new FakeInventoryGatewayPort(true);
+        FakeAuditPort auditPort = new FakeAuditPort();
+        BuyItemUseCase useCase = newUseCase(catalogPort, goldPort, inventoryGatewayPort, auditPort);
 
-        var result = useCase.execute(CHARACTER_ID, TEMPLATE_ID, 3, IDEMPOTENCY_KEY);
+        BuyItemUseCase.BuyResult result = useCase.execute(CHARACTER_ID, TEMPLATE_ID, 3, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.INSUFFICIENT_GOLD);
         assertThat(goldPort.deductedAmount).isEqualTo(15); // 5 * 3
@@ -156,13 +156,13 @@ class BuyItemUseCaseTest {
 
     @Test
     void shouldRollbackAndReturnInventoryFull_whenGrantFails() {
-        var catalogPort = new FakeCatalogPort(new ShopListing(TEMPLATE_ID, 5, 2));
-        var goldPort = new FakeGoldPort(true);
-        var inventoryGatewayPort = new FakeInventoryGatewayPort(false); // túi đầy
-        var auditPort = new FakeAuditPort();
-        var useCase = newUseCase(catalogPort, goldPort, inventoryGatewayPort, auditPort);
+        FakeCatalogPort catalogPort = new FakeCatalogPort(new ShopListing(TEMPLATE_ID, 5, 2));
+        FakeGoldPort goldPort = new FakeGoldPort(true);
+        FakeInventoryGatewayPort inventoryGatewayPort = new FakeInventoryGatewayPort(false); // túi đầy
+        FakeAuditPort auditPort = new FakeAuditPort();
+        BuyItemUseCase useCase = newUseCase(catalogPort, goldPort, inventoryGatewayPort, auditPort);
 
-        var result = useCase.execute(CHARACTER_ID, TEMPLATE_ID, 1, IDEMPOTENCY_KEY);
+        BuyItemUseCase.BuyResult result = useCase.execute(CHARACTER_ID, TEMPLATE_ID, 1, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.INVENTORY_FULL);
         assertThat(goldPort.deductCalled).isTrue(); // đã thử trừ (rollback ở tầng transaction thật)
@@ -171,13 +171,13 @@ class BuyItemUseCaseTest {
 
     @Test
     void shouldSucceed_whenEnoughGoldAndRoomInInventory() {
-        var catalogPort = new FakeCatalogPort(new ShopListing(TEMPLATE_ID, 5, 2));
-        var goldPort = new FakeGoldPort(true);
-        var inventoryGatewayPort = new FakeInventoryGatewayPort(true);
-        var auditPort = new FakeAuditPort();
-        var useCase = newUseCase(catalogPort, goldPort, inventoryGatewayPort, auditPort);
+        FakeCatalogPort catalogPort = new FakeCatalogPort(new ShopListing(TEMPLATE_ID, 5, 2));
+        FakeGoldPort goldPort = new FakeGoldPort(true);
+        FakeInventoryGatewayPort inventoryGatewayPort = new FakeInventoryGatewayPort(true);
+        FakeAuditPort auditPort = new FakeAuditPort();
+        BuyItemUseCase useCase = newUseCase(catalogPort, goldPort, inventoryGatewayPort, auditPort);
 
-        var result = useCase.execute(CHARACTER_ID, TEMPLATE_ID, 2, IDEMPOTENCY_KEY);
+        BuyItemUseCase.BuyResult result = useCase.execute(CHARACTER_ID, TEMPLATE_ID, 2, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.OK);
         assertThat(auditPort.loggedAction).isEqualTo("SHOP_BUY");
@@ -185,23 +185,23 @@ class BuyItemUseCaseTest {
 
     @Test
     void shouldReturnDuplicateRequest_whenIdempotencyKeyReused() {
-        var catalogPort = new FakeCatalogPort(new ShopListing(TEMPLATE_ID, 5, 2));
-        var goldPort = new FakeGoldPort(true);
-        var inventoryGatewayPort = new FakeInventoryGatewayPort(true);
-        var auditPort = new FakeAuditPort();
-        var idempotencyPort = new FakeIdempotencyPort();
-        var useCase = newUseCase(catalogPort, goldPort, inventoryGatewayPort, auditPort, idempotencyPort);
+        FakeCatalogPort catalogPort = new FakeCatalogPort(new ShopListing(TEMPLATE_ID, 5, 2));
+        FakeGoldPort goldPort = new FakeGoldPort(true);
+        FakeInventoryGatewayPort inventoryGatewayPort = new FakeInventoryGatewayPort(true);
+        FakeAuditPort auditPort = new FakeAuditPort();
+        FakeIdempotencyPort idempotencyPort = new FakeIdempotencyPort();
+        BuyItemUseCase useCase = newUseCase(catalogPort, goldPort, inventoryGatewayPort, auditPort, idempotencyPort);
         useCase.execute(CHARACTER_ID, TEMPLATE_ID, 1, IDEMPOTENCY_KEY);
 
-        var result = useCase.execute(CHARACTER_ID, TEMPLATE_ID, 1, IDEMPOTENCY_KEY);
+        BuyItemUseCase.BuyResult result = useCase.execute(CHARACTER_ID, TEMPLATE_ID, 1, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.DUPLICATE_REQUEST);
     }
 
     @Test
     void shouldRejectNonPositiveQuantity() {
-        var catalogPort = new FakeCatalogPort(new ShopListing(TEMPLATE_ID, 5, 2));
-        var useCase = newUseCase(catalogPort, new FakeGoldPort(true), new FakeInventoryGatewayPort(true),
+        FakeCatalogPort catalogPort = new FakeCatalogPort(new ShopListing(TEMPLATE_ID, 5, 2));
+        BuyItemUseCase useCase = newUseCase(catalogPort, new FakeGoldPort(true), new FakeInventoryGatewayPort(true),
                 new FakeAuditPort());
 
         org.assertj.core.api.Assertions.assertThatThrownBy(

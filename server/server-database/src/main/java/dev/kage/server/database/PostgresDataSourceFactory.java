@@ -29,7 +29,7 @@ public final class PostgresDataSourceFactory {
     }
 
     public static DataSource create(DatabaseConfig config) {
-        var hikariConfig = new HikariConfig();
+        HikariConfig hikariConfig = new HikariConfig();
         hikariConfig.setJdbcUrl(config.jdbcUrl());
         hikariConfig.setUsername(config.user());
         hikariConfig.setPassword(config.password());

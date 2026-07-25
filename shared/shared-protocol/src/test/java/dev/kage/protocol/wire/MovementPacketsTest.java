@@ -19,12 +19,12 @@ class MovementPacketsTest {
 
     @Test
     void shouldRoundTripMoveCommand() throws InvalidProtocolBufferException {
-        var command = MoveCommand.newBuilder().setDirX(1f).setDirY(-0.5f).build();
-        var header = new PacketHeader(Opcode.OPCODE_MOVE_COMMAND_VALUE, ProtocolVersion.CURRENT, 7);
+        MoveCommand command = MoveCommand.newBuilder().setDirX(1f).setDirY(-0.5f).build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_MOVE_COMMAND_VALUE, ProtocolVersion.CURRENT, 7);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var decoded = PacketCodec.decodeFrame(frameBytes);
-        var parsed = MoveCommand.parseFrom(decoded.payload());
+        PacketCodec.Frame decoded = PacketCodec.decodeFrame(frameBytes);
+        MoveCommand parsed = MoveCommand.parseFrom(decoded.payload());
 
         assertThat(decoded.header()).isEqualTo(header);
         assertThat(parsed.getDirX()).isEqualTo(1f);
@@ -33,11 +33,11 @@ class MovementPacketsTest {
 
     @Test
     void shouldRoundTripMoveResponse() throws InvalidProtocolBufferException {
-        var response = MoveResponse.newBuilder().setX(12.5f).setY(-3f).build();
-        var header = new PacketHeader(Opcode.OPCODE_MOVE_RESPONSE_VALUE, ProtocolVersion.CURRENT, 7);
+        MoveResponse response = MoveResponse.newBuilder().setX(12.5f).setY(-3f).build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_MOVE_RESPONSE_VALUE, ProtocolVersion.CURRENT, 7);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = MoveResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        MoveResponse parsed = MoveResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getX()).isEqualTo(12.5f);
         assertThat(parsed.getY()).isEqualTo(-3f);
@@ -45,15 +45,15 @@ class MovementPacketsTest {
 
     @Test
     void shouldRoundTripCharacterMovedEvent() throws InvalidProtocolBufferException {
-        var event = CharacterMovedEvent.newBuilder()
+        CharacterMovedEvent event = CharacterMovedEvent.newBuilder()
                 .setCharacterId(99L)
                 .setX(1f)
                 .setY(2f)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        var parsed = CharacterMovedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        CharacterMovedEvent parsed = CharacterMovedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getCharacterId()).isEqualTo(99L);
         assertThat(parsed.getX()).isEqualTo(1f);
@@ -62,15 +62,15 @@ class MovementPacketsTest {
 
     @Test
     void shouldRoundTripCharacterSpawnedEvent() throws InvalidProtocolBufferException {
-        var event = CharacterSpawnedEvent.newBuilder()
+        CharacterSpawnedEvent event = CharacterSpawnedEvent.newBuilder()
                 .setCharacterId(5L)
                 .setX(3f)
                 .setY(4f)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        var parsed = CharacterSpawnedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        CharacterSpawnedEvent parsed = CharacterSpawnedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getCharacterId()).isEqualTo(5L);
         assertThat(parsed.getX()).isEqualTo(3f);
@@ -79,11 +79,13 @@ class MovementPacketsTest {
 
     @Test
     void shouldRoundTripCharacterDespawnedEvent() throws InvalidProtocolBufferException {
-        var event = CharacterDespawnedEvent.newBuilder().setCharacterId(5L).build();
-        var header = new PacketHeader(Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
+        CharacterDespawnedEvent event = CharacterDespawnedEvent.newBuilder().setCharacterId(5L).build();
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        var parsed = CharacterDespawnedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        CharacterDespawnedEvent parsed =
+                CharacterDespawnedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getCharacterId()).isEqualTo(5L);
     }

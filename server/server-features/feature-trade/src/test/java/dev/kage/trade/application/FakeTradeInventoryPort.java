@@ -34,7 +34,7 @@ final class FakeTradeInventoryPort implements TradeInventoryPort {
 
     @Override
     public TransferOutcome transferItem(Transaction tx, TransferRequest request) {
-        var current = items.get(request.itemId());
+        OwnedItemSnapshot current = items.get(request.itemId());
         if (current == null || current.characterId() != request.fromCharacterId()) {
             return TransferOutcome.ITEM_NOT_OWNED;
         }

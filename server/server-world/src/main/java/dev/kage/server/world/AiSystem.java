@@ -60,7 +60,7 @@ final class AiSystem extends IteratingKSystem {
 
     @Override
     protected void processEntity(KEntity entity, float deltaTime) {
-        var ai = AI_STATE.get(entity);
+        AiStateComponent ai = AI_STATE.get(entity);
         switch (ai.state) {
             case IDLE -> tickIdle(entity, ai, deltaTime);
             case PATROL -> tickPatrol(entity, ai, deltaTime);
@@ -72,11 +72,11 @@ final class AiSystem extends IteratingKSystem {
     }
 
     private void tickIdle(KEntity entity, AiStateComponent ai, float deltaTime) {
-        var velocity = VELOCITY.get(entity);
+        VelocityComponent velocity = VELOCITY.get(entity);
         velocity.x = 0f;
         velocity.y = 0f;
 
-        var nearestPlayer = findNearestCharacterInRange(POSITION.get(entity), AiConstants.AGGRO_RADIUS_METERS);
+        KEntity nearestPlayer = findNearestCharacterInRange(POSITION.get(entity), AiConstants.AGGRO_RADIUS_METERS);
         if (nearestPlayer != null) {
             startChasing(ai, TARGET.get(entity), nearestPlayer);
             return;
@@ -89,10 +89,10 @@ final class AiSystem extends IteratingKSystem {
     }
 
     private void tickPatrol(KEntity entity, AiStateComponent ai, float deltaTime) {
-        var position = POSITION.get(entity);
-        var velocity = VELOCITY.get(entity);
+        PositionComponent position = POSITION.get(entity);
+        VelocityComponent velocity = VELOCITY.get(entity);
 
-        var nearestPlayer = findNearestCharacterInRange(position, AiConstants.AGGRO_RADIUS_METERS);
+        KEntity nearestPlayer = findNearestCharacterInRange(position, AiConstants.AGGRO_RADIUS_METERS);
         if (nearestPlayer != null) {
             startChasing(ai, TARGET.get(entity), nearestPlayer);
             return;
@@ -112,23 +112,23 @@ final class AiSystem extends IteratingKSystem {
     }
 
     private void tickChase(KEntity entity, AiStateComponent ai) {
-        var target = TARGET.get(entity);
-        var targetEntity = entityLookup.apply(target.targetEntityId);
+        TargetComponent target = TARGET.get(entity);
+        KEntity targetEntity = entityLookup.apply(target.targetEntityId);
         if (targetEntity == null || HEALTH.get(targetEntity).isDead()) {
             startReturning(ai, target, VELOCITY.get(entity));
             return;
         }
 
-        var position = POSITION.get(entity);
+        PositionComponent position = POSITION.get(entity);
         if (distance(position.x, position.y, ai.spawnX, ai.spawnY) > AiConstants.LEASH_RADIUS_METERS) {
             startReturning(ai, target, VELOCITY.get(entity));
             return;
         }
 
-        var targetPosition = POSITION.get(targetEntity);
+        PositionComponent targetPosition = POSITION.get(targetEntity);
         if (distance(position.x, position.y, targetPosition.x, targetPosition.y)
                 <= CombatConstants.ATTACK_RANGE_METERS) {
-            var velocity = VELOCITY.get(entity);
+            VelocityComponent velocity = VELOCITY.get(entity);
             velocity.x = 0f;
             velocity.y = 0f;
             ai.state = AiState.ATTACK;
@@ -140,15 +140,15 @@ final class AiSystem extends IteratingKSystem {
     private void tickAttack(KEntity entity, AiStateComponent ai) {
         // Damage thật do CombatSystem xử lý (quái có đủ Target+AttackCooldown) — ở đây chỉ theo
         // dõi mục tiêu còn hợp lệ/còn trong tầm hay không.
-        var target = TARGET.get(entity);
-        var targetEntity = entityLookup.apply(target.targetEntityId);
+        TargetComponent target = TARGET.get(entity);
+        KEntity targetEntity = entityLookup.apply(target.targetEntityId);
         if (targetEntity == null || HEALTH.get(targetEntity).isDead()) {
             startReturning(ai, target, VELOCITY.get(entity));
             return;
         }
 
-        var position = POSITION.get(entity);
-        var targetPosition = POSITION.get(targetEntity);
+        PositionComponent position = POSITION.get(entity);
+        PositionComponent targetPosition = POSITION.get(targetEntity);
         if (distance(position.x, position.y, targetPosition.x, targetPosition.y)
                 > CombatConstants.ATTACK_RANGE_METERS) {
             ai.state = AiState.CHASE;
@@ -156,9 +156,9 @@ final class AiSystem extends IteratingKSystem {
     }
 
     private void tickReturn(KEntity entity, AiStateComponent ai) {
-        var position = POSITION.get(entity);
+        PositionComponent position = POSITION.get(entity);
         if (distance(position.x, position.y, ai.spawnX, ai.spawnY) <= AiConstants.ARRIVAL_THRESHOLD_METERS) {
-            var velocity = VELOCITY.get(entity);
+            VelocityComponent velocity = VELOCITY.get(entity);
             velocity.x = 0f;
             velocity.y = 0f;
             position.x = ai.spawnX; // chốt đúng điểm spawn — tránh trôi dần qua nhiều lần Return
@@ -194,8 +194,8 @@ final class AiSystem extends IteratingKSystem {
     private KEntity findNearestCharacterInRange(PositionComponent position, float range) {
         KEntity nearest = null;
         double nearestDistance = range;
-        for (var character : characterEntities.get()) {
-            var characterPosition = POSITION.get(character);
+        for (KEntity character : characterEntities.get()) {
+            PositionComponent characterPosition = POSITION.get(character);
             double d = distance(position.x, position.y, characterPosition.x, characterPosition.y);
             if (d <= nearestDistance) {
                 nearest = character;
@@ -206,8 +206,8 @@ final class AiSystem extends IteratingKSystem {
     }
 
     private static void moveToward(KEntity entity, float toX, float toY, float speed) {
-        var position = POSITION.get(entity);
-        var velocity = VELOCITY.get(entity);
+        PositionComponent position = POSITION.get(entity);
+        VelocityComponent velocity = VELOCITY.get(entity);
         float dx = toX - position.x;
         float dy = toY - position.y;
         float length = (float) Math.sqrt((dx * dx) + (dy * dy));

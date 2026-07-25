@@ -71,10 +71,10 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
 
     @Override
     public Mail send(Transaction tx, NewMail newMail) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try {
             long mailId = insertMail(connection, newMail);
-            for (var attachment : newMail.attachments()) {
+            for (MailAttachment attachment : newMail.attachments()) {
                 insertMailItem(connection, mailId, attachment);
             }
             return new Mail(
@@ -116,8 +116,8 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
 
     @Override
     public Optional<Mail> findById(long mailId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_BY_ID)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_BY_ID)) {
             statement.setLong(1, mailId);
             try (ResultSet rs = statement.executeQuery()) {
                 if (!rs.next()) {
@@ -132,8 +132,8 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
 
     @Override
     public Optional<Mail> findByIdForUpdate(Transaction tx, long mailId) {
-        var connection = ((JdbcTransaction) tx).connection();
-        try (var statement = connection.prepareStatement(FIND_BY_ID_FOR_UPDATE)) {
+        Connection connection = ((JdbcTransaction) tx).connection();
+        try (PreparedStatement statement = connection.prepareStatement(FIND_BY_ID_FOR_UPDATE)) {
             statement.setLong(1, mailId);
             try (ResultSet rs = statement.executeQuery()) {
                 if (!rs.next()) {
@@ -148,11 +148,11 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
 
     @Override
     public List<Mail> listForRecipient(long recipientId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(LIST_BY_RECIPIENT)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(LIST_BY_RECIPIENT)) {
             statement.setLong(1, recipientId);
             try (ResultSet rs = statement.executeQuery()) {
-                var result = new ArrayList<Mail>();
+                ArrayList<Mail> result = new ArrayList<Mail>();
                 while (rs.next()) {
                     result.add(mapRow(connection, rs));
                 }
@@ -165,8 +165,8 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
 
     @Override
     public boolean markClaimed(Transaction tx, long mailId, long recipientId) {
-        var connection = ((JdbcTransaction) tx).connection();
-        try (var statement = connection.prepareStatement(MARK_CLAIMED)) {
+        Connection connection = ((JdbcTransaction) tx).connection();
+        try (PreparedStatement statement = connection.prepareStatement(MARK_CLAIMED)) {
             statement.setTimestamp(1, Timestamp.from(Instant.now()));
             statement.setLong(2, mailId);
             statement.setLong(3, recipientId);
@@ -178,12 +178,12 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
 
     @Override
     public boolean delete(long mailId, long recipientId) {
-        try (var connection = dataSource.getConnection()) {
-            try (var deleteItems = connection.prepareStatement(DELETE_MAIL_ITEMS)) {
+        try (Connection connection = dataSource.getConnection()) {
+            try (PreparedStatement deleteItems = connection.prepareStatement(DELETE_MAIL_ITEMS)) {
                 deleteItems.setLong(1, mailId);
                 deleteItems.executeUpdate();
             }
-            try (var deleteMail = connection.prepareStatement(DELETE_MAIL)) {
+            try (PreparedStatement deleteMail = connection.prepareStatement(DELETE_MAIL)) {
                 deleteMail.setLong(1, mailId);
                 deleteMail.setLong(2, recipientId);
                 return deleteMail.executeUpdate() > 0;
@@ -196,7 +196,7 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
     private static Mail mapRow(Connection connection, ResultSet rs) throws SQLException {
         long mailId = rs.getLong("id");
         Long senderIdObj = rs.getObject("sender_id", Long.class);
-        var claimedAtTs = rs.getTimestamp("claimed_at");
+        Timestamp claimedAtTs = rs.getTimestamp("claimed_at");
         return new Mail(
                 mailId,
                 senderIdObj,
@@ -210,10 +210,10 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
     }
 
     private static List<MailAttachment> findAttachments(Connection connection, long mailId) throws SQLException {
-        try (var statement = connection.prepareStatement(FIND_ATTACHMENTS_BY_MAIL)) {
+        try (PreparedStatement statement = connection.prepareStatement(FIND_ATTACHMENTS_BY_MAIL)) {
             statement.setLong(1, mailId);
             try (ResultSet rs = statement.executeQuery()) {
-                var result = new ArrayList<MailAttachment>();
+                ArrayList<MailAttachment> result = new ArrayList<MailAttachment>();
                 while (rs.next()) {
                     result.add(new MailAttachment(rs.getLong("item_template_id"), rs.getInt("quantity")));
                 }

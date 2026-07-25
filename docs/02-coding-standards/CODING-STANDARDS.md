@@ -100,12 +100,14 @@ Tên method mô tả **hành động**, không mô tả cách làm.
 - Khai báo **gần nơi sử dụng**, không khai báo sớm.
 - **Không reuse** biến cho nhiều mục đích.
 - **Ưu tiên `final`** — mặc định final, bỏ final khi thật sự cần đổi.
-- `var` được phép **khi kiểu hiển nhiên từ vế phải**:
+- **Cấm `var`** cho local variable, kể cả khi kiểu "hiển nhiên" từ vế phải. Luôn ghi rõ kiểu tường minh — kiểu tường minh giúp đọc code không cần chạy type-inference trong đầu, và không đổi ý nghĩa âm thầm khi vế phải đổi kiểu do refactor.
 
 ```java
-var players = new ArrayList<Player>();          // ✅ rõ ràng
-var result = service.process(input);            // ❌ kiểu gì? — viết rõ kiểu
+List<Player> players = new ArrayList<>();       // ✅ luôn ghi kiểu tường minh
+var players = new ArrayList<Player>();          // ❌ cấm, kể cả khi "rõ ràng"
 ```
+
+  Ngoại lệ **duy nhất**: `var` bắt buộc về mặt cú pháp Java (ví dụ: biến giữ instance của anonymous class có kiểu giao (intersection type) không thể đặt tên tường minh). Enforcement: Checkstyle chặn `var` — xem `config/checkstyle/checkstyle.xml`.
 
 ---
 

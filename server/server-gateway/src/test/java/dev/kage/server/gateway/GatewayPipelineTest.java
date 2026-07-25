@@ -79,33 +79,33 @@ class GatewayPipelineTest {
 
     @Test
     void shouldReplyPongToPing_withSameSequenceId() throws InvalidProtocolBufferException {
-        var channel = newPipeline();
-        var ping = PingCommand.newBuilder().setClientTimestampMs(123L).build();
-        var header = new PacketHeader(Opcode.OPCODE_PING_VALUE, ProtocolVersion.CURRENT, 7);
+        EmbeddedChannel channel = newPipeline();
+        PingCommand ping = PingCommand.newBuilder().setClientTimestampMs(123L).build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_PING_VALUE, ProtocolVersion.CURRENT, 7);
 
         writeInboundFrame(channel, header, ping.toByteArray());
-        var response = readOutboundFrame(channel);
+        PacketCodec.Frame response = readOutboundFrame(channel);
 
         // Response PHẢI khớp sequenceId của Command (NETWORK.md §105 request/response correlation).
         assertThat(response.header().opcode()).isEqualTo(Opcode.OPCODE_PONG_VALUE);
         assertThat(response.header().sequenceId()).isEqualTo(7);
 
-        var pong = PongResponse.parseFrom(response.payload());
+        PongResponse pong = PongResponse.parseFrom(response.payload());
         assertThat(pong.getClientTimestampMs()).isEqualTo(123L);
         assertThat(pong.getServerTimestampMs()).isGreaterThan(0);
     }
 
     @Test
     void shouldReplyConnectResponse_toConnectRequest() throws InvalidProtocolBufferException {
-        var channel = newPipeline();
-        var request = ConnectRequest.newBuilder().setUsername("kagehero").build();
-        var header = new PacketHeader(Opcode.OPCODE_CONNECT_REQUEST_VALUE, ProtocolVersion.CURRENT, 1);
+        EmbeddedChannel channel = newPipeline();
+        ConnectRequest request = ConnectRequest.newBuilder().setUsername("kagehero").build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_CONNECT_REQUEST_VALUE, ProtocolVersion.CURRENT, 1);
 
         writeInboundFrame(channel, header, request.toByteArray());
-        var response = readOutboundFrame(channel);
+        PacketCodec.Frame response = readOutboundFrame(channel);
 
         assertThat(response.header().opcode()).isEqualTo(Opcode.OPCODE_CONNECT_RESPONSE_VALUE);
-        var connectResponse = ConnectResponse.parseFrom(response.payload());
+        ConnectResponse connectResponse = ConnectResponse.parseFrom(response.payload());
         assertThat(connectResponse.getSuccess()).isTrue();
         assertThat(connectResponse.getSessionId()).isNotBlank();
         assertThat(connectResponse.getAccountId()).isPositive();
@@ -113,22 +113,22 @@ class GatewayPipelineTest {
 
     @Test
     void shouldReplyError_forUnknownOpcode() {
-        var channel = newPipeline();
-        var header = new PacketHeader(9999, ProtocolVersion.CURRENT, 5);
+        EmbeddedChannel channel = newPipeline();
+        PacketHeader header = new PacketHeader(9999, ProtocolVersion.CURRENT, 5);
 
         writeInboundFrame(channel, header, new byte[0]);
-        var response = readOutboundFrame(channel);
+        PacketCodec.Frame response = readOutboundFrame(channel);
 
         assertThat(response.header().opcode()).isEqualTo(Opcode.OPCODE_ERROR_VALUE);
     }
 
     @Test
     void shouldRejectListCharacters_whenNotConnectedYet() {
-        var channel = newPipeline();
-        var header = new PacketHeader(Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE, ProtocolVersion.CURRENT, 1);
+        EmbeddedChannel channel = newPipeline();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE, ProtocolVersion.CURRENT, 1);
 
         writeInboundFrame(channel, header, ListCharactersRequest.newBuilder().build().toByteArray());
-        var response = readOutboundFrame(channel);
+        PacketCodec.Frame response = readOutboundFrame(channel);
 
         // accountId gắn vào CONNECTION lúc Connect thành công (xem GatewayChannelHandler) — chưa
         // Connect thì chưa có accountId, phải từ chối chứ không đọc packet.
@@ -137,10 +137,10 @@ class GatewayPipelineTest {
 
     @Test
     void shouldCreateThenListCharacter_afterConnect() throws InvalidProtocolBufferException {
-        var channel = newPipeline();
+        EmbeddedChannel channel = newPipeline();
         connect(channel, "kagehero2");
 
-        var createRequest = CreateCharacterRequest.newBuilder()
+        CreateCharacterRequest createRequest = CreateCharacterRequest.newBuilder()
                 .setName("KageHero")
                 .setIdempotencyKey(UUID.randomUUID().toString())
                 .build();
@@ -148,9 +148,9 @@ class GatewayPipelineTest {
                 channel,
                 new PacketHeader(Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, ProtocolVersion.CURRENT, 2),
                 createRequest.toByteArray());
-        var createResponseFrame = readOutboundFrame(channel);
+        PacketCodec.Frame createResponseFrame = readOutboundFrame(channel);
         assertThat(createResponseFrame.header().opcode()).isEqualTo(Opcode.OPCODE_CREATE_CHARACTER_RESPONSE_VALUE);
-        var createResponse = CreateCharacterResponse.parseFrom(createResponseFrame.payload());
+        CreateCharacterResponse createResponse = CreateCharacterResponse.parseFrom(createResponseFrame.payload());
         assertThat(createResponse.getSuccess()).isTrue();
         assertThat(createResponse.getCharacter().getName()).isEqualTo("KageHero");
 
@@ -158,69 +158,70 @@ class GatewayPipelineTest {
                 channel,
                 new PacketHeader(Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE, ProtocolVersion.CURRENT, 3),
                 ListCharactersRequest.newBuilder().build().toByteArray());
-        var listResponseFrame = readOutboundFrame(channel);
+        PacketCodec.Frame listResponseFrame = readOutboundFrame(channel);
         assertThat(listResponseFrame.header().opcode()).isEqualTo(Opcode.OPCODE_LIST_CHARACTERS_RESPONSE_VALUE);
-        var listResponse = ListCharactersResponse.parseFrom(listResponseFrame.payload());
+        ListCharactersResponse listResponse = ListCharactersResponse.parseFrom(listResponseFrame.payload());
         assertThat(listResponse.getCharactersList()).extracting(c -> c.getName()).containsExactly("KageHero");
     }
 
     @Test
     void shouldSelectCharacter_afterCreatingIt() throws InvalidProtocolBufferException {
-        var channel = newPipeline();
+        EmbeddedChannel channel = newPipeline();
         connect(channel, "selecttest1");
-        var characterId = createCharacter(channel, "SelectHero", 2);
+        long characterId = createCharacter(channel, "SelectHero", 2);
 
-        var request = SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
+        SelectCharacterRequest request = SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
         writeInboundFrame(
                 channel,
                 new PacketHeader(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, ProtocolVersion.CURRENT, 3),
                 request.toByteArray());
-        var responseFrame = readOutboundFrame(channel);
+        PacketCodec.Frame responseFrame = readOutboundFrame(channel);
 
         assertThat(responseFrame.header().opcode()).isEqualTo(Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE);
-        var response = SelectCharacterResponse.parseFrom(responseFrame.payload());
+        SelectCharacterResponse response = SelectCharacterResponse.parseFrom(responseFrame.payload());
         assertThat(response.getSuccess()).isTrue();
     }
 
     @Test
     void shouldRejectSelectCharacter_whenBelongsToDifferentAccount() throws InvalidProtocolBufferException {
-        var characterPort = new FakeCharacterPort();
+        FakeCharacterPort characterPort = new FakeCharacterPort();
         // Nhân vật thuộc account KHÁC — không tạo được qua chính kết nối test này (login luôn tạo
         // đúng account của username đang dùng) — seed thẳng vào Fake Port để mô phỏng đúng kịch
         // bản IDOR mà SECURITY.md §4 mô tả.
-        var otherAccountCharacter =
+        Character otherAccountCharacter =
                 characterPort.create(null, new NewCharacter(999L, "OtherHero", Faction.HOA, "seed-idem"));
 
-        var channel = newPipeline(characterPort);
+        EmbeddedChannel channel = newPipeline(characterPort);
         connect(channel, "selecttest2");
 
-        var request = SelectCharacterRequest.newBuilder().setCharacterId(otherAccountCharacter.id()).build();
+        SelectCharacterRequest request =
+                SelectCharacterRequest.newBuilder().setCharacterId(otherAccountCharacter.id()).build();
         writeInboundFrame(
                 channel,
                 new PacketHeader(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, ProtocolVersion.CURRENT, 2),
                 request.toByteArray());
-        var responseFrame = readOutboundFrame(channel);
+        PacketCodec.Frame responseFrame = readOutboundFrame(channel);
 
         assertThat(responseFrame.header().opcode()).isEqualTo(Opcode.OPCODE_ERROR_VALUE);
     }
 
     private static void connect(EmbeddedChannel channel, String username) {
-        var request = ConnectRequest.newBuilder().setUsername(username).build();
-        var header = new PacketHeader(Opcode.OPCODE_CONNECT_REQUEST_VALUE, ProtocolVersion.CURRENT, 1);
+        ConnectRequest request = ConnectRequest.newBuilder().setUsername(username).build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_CONNECT_REQUEST_VALUE, ProtocolVersion.CURRENT, 1);
         writeInboundFrame(channel, header, request.toByteArray());
         readOutboundFrame(channel); // tiêu thụ ConnectResponse — caller không kiểm tra lại nội dung
     }
 
     private static long createCharacter(EmbeddedChannel channel, String name, int sequenceId)
             throws InvalidProtocolBufferException {
-        var request = CreateCharacterRequest.newBuilder()
+        CreateCharacterRequest request = CreateCharacterRequest.newBuilder()
                 .setName(name)
                 .setIdempotencyKey(UUID.randomUUID().toString())
                 .build();
-        var header =
+        PacketHeader header =
                 new PacketHeader(Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, ProtocolVersion.CURRENT, sequenceId);
         writeInboundFrame(channel, header, request.toByteArray());
-        var response = CreateCharacterResponse.parseFrom(readOutboundFrame(channel).payload());
+        CreateCharacterResponse response = CreateCharacterResponse.parseFrom(readOutboundFrame(channel).payload());
         return response.getCharacter().getId();
     }
 
@@ -243,8 +244,9 @@ class GatewayPipelineTest {
             }
         };
         DropTablePort dropTablePort = dropTableCode -> List.<DropTableEntry>of();
-        var addItemUseCase = new AddItemUseCase(inventoryPort, action -> action.accept(null));
-        var grantLootUseCase = new GrantLootUseCase(dropTablePort, inventoryPort, action -> action.accept(null));
+        AddItemUseCase addItemUseCase = new AddItemUseCase(inventoryPort, action -> action.accept(null));
+        GrantLootUseCase grantLootUseCase =
+                new GrantLootUseCase(dropTablePort, inventoryPort, action -> action.accept(null));
         // Equip/unequip không dùng trong test này — fake tối thiểu để compile.
         ItemTemplatePort itemTemplatePort = new ItemTemplatePort() {
             @Override
@@ -267,18 +269,20 @@ class GatewayPipelineTest {
             public void save(dev.kage.inventory.domain.Transaction tx, Equipment equipment) {
             }
         };
-        var equipItemUseCase = new EquipItemUseCase(
+        EquipItemUseCase equipItemUseCase = new EquipItemUseCase(
                 inventoryPort, itemTemplatePort, equipmentPort, action -> action.accept(null));
-        var unequipItemUseCase = new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
-        var computeEquipmentBonusUseCase =
+        UnequipItemUseCase unequipItemUseCase =
+                new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
+        ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase =
                 new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
-        var equipmentUseCases =
+        EquipmentUseCases equipmentUseCases =
                 new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
         // Cường hoá không dùng trong test này — fake tối thiểu để compile.
         GoldPort goldPort = (tx, characterId, amount) -> true;
         AuditPort auditPort = (tx, characterId, action, detailJson) -> { };
-        var enhancePorts = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
-        var enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
+        EnhancePorts enhancePorts = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
+        EnhanceItemUseCase enhanceItemUseCase =
+                new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
         return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
     }
 
@@ -326,18 +330,22 @@ class GatewayPipelineTest {
         };
         dev.kage.shop.domain.AuditPort shopAuditPort = (tx, characterId, action, detailJson) -> { };
         dev.kage.shop.domain.IdempotencyPort shopIdempotencyPort = (tx, idempotencyKey) -> { };
-        var ports = new dev.kage.shop.application.ShopPorts(
+        dev.kage.shop.application.ShopPorts ports = new dev.kage.shop.application.ShopPorts(
                 catalogPort, shopGoldPort, inventoryGatewayPort, shopAuditPort, shopIdempotencyPort);
-        var listShopItemsUseCase = new dev.kage.shop.application.ListShopItemsUseCase(catalogPort);
-        var buyItemUseCase = new dev.kage.shop.application.BuyItemUseCase(ports, action -> action.accept(null));
-        var sellItemUseCase = new dev.kage.shop.application.SellItemUseCase(ports, action -> action.accept(null));
+        dev.kage.shop.application.ListShopItemsUseCase listShopItemsUseCase =
+                new dev.kage.shop.application.ListShopItemsUseCase(catalogPort);
+        dev.kage.shop.application.BuyItemUseCase buyItemUseCase =
+                new dev.kage.shop.application.BuyItemUseCase(ports, action -> action.accept(null));
+        dev.kage.shop.application.SellItemUseCase sellItemUseCase =
+                new dev.kage.shop.application.SellItemUseCase(ports, action -> action.accept(null));
         return new dev.kage.shop.api.ShopFacade(listShopItemsUseCase, buyItemUseCase, sellItemUseCase);
     }
 
     // Dialogue không dùng trong test này — fake tối thiểu để compile (cùng convention fakeShopFacade).
     private static dev.kage.dialogue.api.DialogueFacade fakeDialogueFacade() {
         dev.kage.dialogue.domain.NpcTemplatePort npcTemplatePort = npcCode -> Optional.empty();
-        var useCase = new dev.kage.dialogue.application.GetDialogueNodeUseCase(npcTemplatePort);
+        dev.kage.dialogue.application.GetDialogueNodeUseCase useCase =
+                new dev.kage.dialogue.application.GetDialogueNodeUseCase(npcTemplatePort);
         return new dev.kage.dialogue.api.DialogueFacade(useCase);
     }
 
@@ -360,12 +368,15 @@ class GatewayPipelineTest {
         dev.kage.quest.domain.AuditPort auditPort = (tx, characterId, action, detailJson) -> { };
         dev.kage.quest.domain.TransactionRunner tx = action -> action.accept(null);
 
-        var acceptQuestUseCase = new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx);
-        var processMonsterKilledUseCase =
+        dev.kage.quest.application.AcceptQuestUseCase acceptQuestUseCase =
+                new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx);
+        dev.kage.quest.application.ProcessMonsterKilledUseCase processMonsterKilledUseCase =
                 new dev.kage.quest.application.ProcessMonsterKilledUseCase(progressPort, templatePort, tx);
-        var rewardPorts = new dev.kage.quest.application.QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
-        var claimQuestRewardUseCase = new dev.kage.quest.application.ClaimQuestRewardUseCase(
-                progressPort, templatePort, rewardPorts, tx);
+        dev.kage.quest.application.QuestRewardPorts rewardPorts =
+                new dev.kage.quest.application.QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
+        dev.kage.quest.application.ClaimQuestRewardUseCase claimQuestRewardUseCase =
+                new dev.kage.quest.application.ClaimQuestRewardUseCase(
+                        progressPort, templatePort, rewardPorts, tx);
         return new dev.kage.quest.api.QuestFacade(
                 acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
     }
@@ -408,7 +419,7 @@ class GatewayPipelineTest {
                 return List.of();
             }
         };
-        var useCases = new dev.kage.friend.application.FriendUseCases(
+        dev.kage.friend.application.FriendUseCases useCases = new dev.kage.friend.application.FriendUseCases(
                 new dev.kage.friend.application.SendFriendRequestUseCase(friendPort),
                 new dev.kage.friend.application.AcceptFriendRequestUseCase(friendPort),
                 new dev.kage.friend.application.RejectFriendRequestUseCase(friendPort),
@@ -459,12 +470,16 @@ class GatewayPipelineTest {
         dev.kage.mail.domain.AuditPort mailAuditPort = (tx, characterId, action, detailJson) -> { };
         dev.kage.mail.domain.IdempotencyPort mailIdempotencyPort = (tx, idempotencyKey) -> { };
         dev.kage.mail.domain.TransactionRunner mailTx = action -> action.accept(null);
-        var sendMailUseCase = new dev.kage.mail.application.SendMailUseCase(mailRepositoryPort, mailTx);
-        var listMailUseCase = new dev.kage.mail.application.ListMailUseCase(mailRepositoryPort);
-        var mailPorts = new dev.kage.mail.application.MailPorts(
+        dev.kage.mail.application.SendMailUseCase sendMailUseCase =
+                new dev.kage.mail.application.SendMailUseCase(mailRepositoryPort, mailTx);
+        dev.kage.mail.application.ListMailUseCase listMailUseCase =
+                new dev.kage.mail.application.ListMailUseCase(mailRepositoryPort);
+        dev.kage.mail.application.MailPorts mailPorts = new dev.kage.mail.application.MailPorts(
                 mailRepositoryPort, mailGoldPort, mailInventoryGatewayPort, mailAuditPort, mailIdempotencyPort);
-        var claimMailUseCase = new dev.kage.mail.application.ClaimMailUseCase(mailPorts, mailTx);
-        var deleteMailUseCase = new dev.kage.mail.application.DeleteMailUseCase(mailRepositoryPort);
+        dev.kage.mail.application.ClaimMailUseCase claimMailUseCase =
+                new dev.kage.mail.application.ClaimMailUseCase(mailPorts, mailTx);
+        dev.kage.mail.application.DeleteMailUseCase deleteMailUseCase =
+                new dev.kage.mail.application.DeleteMailUseCase(mailRepositoryPort);
         return new dev.kage.mail.api.MailFacade(sendMailUseCase, listMailUseCase, claimMailUseCase, deleteMailUseCase);
     }
 
@@ -542,7 +557,7 @@ class GatewayPipelineTest {
                 throw new UnsupportedOperationException("không dùng ở test này");
             }
         };
-        var useCases = new dev.kage.guild.application.GuildUseCases(
+        dev.kage.guild.application.GuildUseCases useCases = new dev.kage.guild.application.GuildUseCases(
                 new dev.kage.guild.application.CreateGuildUseCase(guildPort),
                 new dev.kage.guild.application.SendGuildJoinRequestUseCase(guildPort),
                 new dev.kage.guild.application.ApproveGuildJoinRequestUseCase(guildPort),
@@ -609,7 +624,7 @@ class GatewayPipelineTest {
                 throw new UnsupportedOperationException("không dùng ở test này");
             }
         };
-        var useCases = new dev.kage.party.application.PartyUseCases(
+        dev.kage.party.application.PartyUseCases useCases = new dev.kage.party.application.PartyUseCases(
                 new dev.kage.party.application.CreatePartyUseCase(partyPort),
                 new dev.kage.party.application.InvitePartyMemberUseCase(partyPort),
                 new dev.kage.party.application.AcceptPartyInviteUseCase(partyPort),
@@ -696,9 +711,9 @@ class GatewayPipelineTest {
         };
         dev.kage.trade.domain.TradeAuditPort auditPort = (tx, characterId, action, detailJson) -> { };
         dev.kage.trade.domain.IdempotencyPort idempotencyPort = (tx, idempotencyKey) -> { };
-        var ports = new dev.kage.trade.application.TradePorts(
+        dev.kage.trade.application.TradePorts ports = new dev.kage.trade.application.TradePorts(
                 sessionPort, inventoryPort, goldPort, auditPort, idempotencyPort);
-        var useCases = new dev.kage.trade.application.TradeUseCases(
+        dev.kage.trade.application.TradeUseCases useCases = new dev.kage.trade.application.TradeUseCases(
                 new dev.kage.trade.application.RequestTradeUseCase(sessionPort),
                 new dev.kage.trade.application.AcceptTradeRequestUseCase(sessionPort),
                 new dev.kage.trade.application.CancelTradeUseCase(sessionPort),
@@ -716,37 +731,38 @@ class GatewayPipelineTest {
         // Thread ở production, SERVER.md §2); test cần đồng bộ để readOutboundFrame không bị race.
         // characterPort truyền vào từ ngoài để test seed sẵn dữ liệu (VD nhân vật account khác,
         // xem shouldRejectSelectCharacter_whenBelongsToDifferentAccount).
-        var loginUseCase = new LoginOrCreateAccountUseCase(
+        LoginOrCreateAccountUseCase loginUseCase = new LoginOrCreateAccountUseCase(
                 new FakeAccountPort(), new FakeSessionPort(), action -> action.accept(null));
-        var accountFacade = new AccountFacade(loginUseCase);
+        AccountFacade accountFacade = new AccountFacade(loginUseCase);
 
-        var createCharacterUseCase = new CreateCharacterUseCase(characterPort, action -> action.accept(null));
-        var listCharactersUseCase = new ListCharactersUseCase(characterPort);
-        var selectCharacterUseCase = new SelectCharacterUseCase(characterPort);
-        var characterFacade = new CharacterFacade(
+        CreateCharacterUseCase createCharacterUseCase =
+                new CreateCharacterUseCase(characterPort, action -> action.accept(null));
+        ListCharactersUseCase listCharactersUseCase = new ListCharactersUseCase(characterPort);
+        SelectCharacterUseCase selectCharacterUseCase = new SelectCharacterUseCase(characterPort);
+        CharacterFacade characterFacade = new CharacterFacade(
                 createCharacterUseCase, listCharactersUseCase, selectCharacterUseCase, characterPort);
 
         // WorldFacade KHÔNG start() ở đây — test này không verify movement/AoI, chỉ cần
         // attachCharacter() (gọi trong handleSelectCharacterBlocking) không ném lỗi khi enqueue
         // vào hàng đợi chưa có ai drain (không tạo/rò rỉ thread tick cho mỗi test). Tương tự,
         // positionPersister không start() — save() (nếu bị gọi) chạy trực tiếp, không cần scheduler.
-        var inventoryFacade = fakeInventoryFacade();
-        var shopFacade = fakeShopFacade();
-        var dialogueFacade = fakeDialogueFacade();
-        var questFacade = fakeQuestFacade();
-        var friendFacade = fakeFriendFacade();
-        var mailFacade = fakeMailFacade();
-        var chatFacade = fakeChatFacade();
-        var guildFacade = fakeGuildFacade();
-        var partyFacade = fakePartyFacade();
-        var tradeFacade = fakeTradeFacade();
-        var characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
-        var worldFacade = new WorldFacade(characterRegistry);
-        var positionPersister =
+        InventoryFacade inventoryFacade = fakeInventoryFacade();
+        dev.kage.shop.api.ShopFacade shopFacade = fakeShopFacade();
+        dev.kage.dialogue.api.DialogueFacade dialogueFacade = fakeDialogueFacade();
+        dev.kage.quest.api.QuestFacade questFacade = fakeQuestFacade();
+        dev.kage.friend.api.FriendFacade friendFacade = fakeFriendFacade();
+        dev.kage.mail.api.MailFacade mailFacade = fakeMailFacade();
+        dev.kage.chat.api.ChatFacade chatFacade = fakeChatFacade();
+        dev.kage.guild.api.GuildFacade guildFacade = fakeGuildFacade();
+        dev.kage.party.api.PartyFacade partyFacade = fakePartyFacade();
+        dev.kage.trade.api.TradeFacade tradeFacade = fakeTradeFacade();
+        ConnectedCharacterRegistry characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
+        WorldFacade worldFacade = new WorldFacade(characterRegistry);
+        CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
-        var dungeonInstanceRegistry =
+        DungeonInstanceRegistry dungeonInstanceRegistry =
                 new DungeonInstanceRegistry(characterRegistry, characterFacade, partyFacade, worldFacade);
-        var worldGateway =
+        WorldGateway worldGateway =
                 new WorldGateway(worldFacade, characterRegistry, positionPersister, dungeonInstanceRegistry);
 
         return new EmbeddedChannel(
@@ -780,7 +796,7 @@ class GatewayPipelineTest {
 
         @Override
         public String issue(long accountId) {
-            var token = "fake-token-" + accountId;
+            String token = "fake-token-" + accountId;
             tokens.put(token, accountId);
             return token;
         }
@@ -845,7 +861,7 @@ class GatewayPipelineTest {
 
         @Override
         public Character create(dev.kage.character.domain.Transaction tx, NewCharacter newCharacter) {
-            var character = new Character(
+            Character character = new Character(
                     nextId.getAndIncrement(),
                     newCharacter.accountId(),
                     1,

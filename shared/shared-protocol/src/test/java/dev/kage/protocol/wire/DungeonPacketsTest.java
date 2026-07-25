@@ -20,34 +20,39 @@ class DungeonPacketsTest {
 
     @Test
     void shouldRoundTripEnterDungeonCommandAndResponse() throws InvalidProtocolBufferException {
-        var command = EnterDungeonCommand.newBuilder().setDungeonCode("sample_dungeon").build();
-        var header = new PacketHeader(Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, ProtocolVersion.CURRENT, 1);
+        EnterDungeonCommand command = EnterDungeonCommand.newBuilder().setDungeonCode("sample_dungeon").build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, ProtocolVersion.CURRENT, 1);
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsedCommand = EnterDungeonCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        EnterDungeonCommand parsedCommand =
+                EnterDungeonCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
         assertThat(parsedCommand.getDungeonCode()).isEqualTo("sample_dungeon");
 
-        var response = EnterDungeonResponse.newBuilder()
+        EnterDungeonResponse response = EnterDungeonResponse.newBuilder()
                 .setOutcome(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_PARTY_MEMBER_OFFLINE)
                 .build();
-        var responseHeader = new PacketHeader(Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
+        PacketHeader responseHeader =
+                new PacketHeader(Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
         byte[] responseBytes = PacketCodec.encodeFrame(responseHeader, response.toByteArray());
-        var parsedResponse = EnterDungeonResponse.parseFrom(PacketCodec.decodeFrame(responseBytes).payload());
+        EnterDungeonResponse parsedResponse =
+                EnterDungeonResponse.parseFrom(PacketCodec.decodeFrame(responseBytes).payload());
         assertThat(parsedResponse.getOutcome())
                 .isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_PARTY_MEMBER_OFFLINE);
     }
 
     @Test
     void shouldRoundTripExitDungeonCommandAndResponse() throws InvalidProtocolBufferException {
-        var command = ExitDungeonCommand.newBuilder().build();
-        var header = new PacketHeader(Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE, ProtocolVersion.CURRENT, 2);
+        ExitDungeonCommand command = ExitDungeonCommand.newBuilder().build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE, ProtocolVersion.CURRENT, 2);
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
         assertThat(ExitDungeonCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload())).isEqualTo(command);
 
-        var response =
+        ExitDungeonResponse response =
                 ExitDungeonResponse.newBuilder().setOutcome(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK).build();
-        var responseHeader = new PacketHeader(Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
+        PacketHeader responseHeader =
+                new PacketHeader(Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
         byte[] responseBytes = PacketCodec.encodeFrame(responseHeader, response.toByteArray());
-        var parsedResponse = ExitDungeonResponse.parseFrom(PacketCodec.decodeFrame(responseBytes).payload());
+        ExitDungeonResponse parsedResponse =
+                ExitDungeonResponse.parseFrom(PacketCodec.decodeFrame(responseBytes).payload());
         assertThat(parsedResponse.getOutcome()).isEqualTo(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK);
     }
 }

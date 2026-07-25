@@ -67,7 +67,7 @@ public final class GatewayServer {
         // (SERVER.md §2). Không giới hạn ECS state nào ở đây nên không cần enqueue vào server-world.
         authExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
-        var bootstrap = new ServerBootstrap();
+        ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.group(bossGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
                 .option(ChannelOption.SO_BACKLOG, 128)

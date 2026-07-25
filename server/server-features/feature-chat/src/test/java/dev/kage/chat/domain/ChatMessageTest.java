@@ -14,7 +14,7 @@ class ChatMessageTest {
 
     @Test
     void shouldRejectBodyLongerThanMax() {
-        var tooLong = "a".repeat(ChatMessage.MAX_BODY_LENGTH + 1);
+        String tooLong = "a".repeat(ChatMessage.MAX_BODY_LENGTH + 1);
 
         assertThatThrownBy(() -> new ChatMessage(1, ChatChannel.WORLD, tooLong))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -22,7 +22,7 @@ class ChatMessageTest {
 
     @Test
     void shouldAcceptBodyAtMaxLength() {
-        var atMax = "a".repeat(ChatMessage.MAX_BODY_LENGTH);
+        String atMax = "a".repeat(ChatMessage.MAX_BODY_LENGTH);
 
         new ChatMessage(1, ChatChannel.WORLD, atMax);
     }

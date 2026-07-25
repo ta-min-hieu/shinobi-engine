@@ -16,11 +16,11 @@ class ListMailUseCaseTest {
 
     @Test
     void shouldReturnAllMailForRecipient() {
-        var port = new FakeMailRepositoryPort();
+        FakeMailRepositoryPort port = new FakeMailRepositoryPort();
         port.mails.add(new Mail(1, null, 5, "s1", "b1", 0, List.of(), null, Instant.now()));
-        var useCase = new ListMailUseCase(port);
+        ListMailUseCase useCase = new ListMailUseCase(port);
 
-        var result = useCase.execute(5);
+        List<Mail> result = useCase.execute(5);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).subject()).isEqualTo("s1");

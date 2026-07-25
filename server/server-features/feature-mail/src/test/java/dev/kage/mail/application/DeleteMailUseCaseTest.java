@@ -16,11 +16,11 @@ class DeleteMailUseCaseTest {
 
     @Test
     void shouldDelete_whenMailHasNoReward() {
-        var port = new FakeMailRepositoryPort();
+        FakeMailRepositoryPort port = new FakeMailRepositoryPort();
         port.mails.add(new Mail(1, null, 5, "s", "b", 0, List.of(), null, Instant.now()));
-        var useCase = new DeleteMailUseCase(port);
+        DeleteMailUseCase useCase = new DeleteMailUseCase(port);
 
-        var result = useCase.execute(1, 5);
+        DeleteMailUseCase.Result result = useCase.execute(1, 5);
 
         assertThat(result).isEqualTo(DeleteMailUseCase.Result.OK);
         assertThat(port.deletedCalled).isTrue();
@@ -28,22 +28,22 @@ class DeleteMailUseCaseTest {
 
     @Test
     void shouldDelete_whenAlreadyClaimed() {
-        var port = new FakeMailRepositoryPort();
+        FakeMailRepositoryPort port = new FakeMailRepositoryPort();
         port.mails.add(new Mail(1, null, 5, "s", "b", 50, List.of(), Instant.now(), Instant.now()));
-        var useCase = new DeleteMailUseCase(port);
+        DeleteMailUseCase useCase = new DeleteMailUseCase(port);
 
-        var result = useCase.execute(1, 5);
+        DeleteMailUseCase.Result result = useCase.execute(1, 5);
 
         assertThat(result).isEqualTo(DeleteMailUseCase.Result.OK);
     }
 
     @Test
     void shouldRejectDelete_whenUnclaimedAndHasReward() {
-        var port = new FakeMailRepositoryPort();
+        FakeMailRepositoryPort port = new FakeMailRepositoryPort();
         port.mails.add(new Mail(1, null, 5, "s", "b", 50, List.of(), null, Instant.now()));
-        var useCase = new DeleteMailUseCase(port);
+        DeleteMailUseCase useCase = new DeleteMailUseCase(port);
 
-        var result = useCase.execute(1, 5);
+        DeleteMailUseCase.Result result = useCase.execute(1, 5);
 
         assertThat(result).isEqualTo(DeleteMailUseCase.Result.MUST_CLAIM_FIRST);
         assertThat(port.deletedCalled).isFalse();
@@ -51,11 +51,11 @@ class DeleteMailUseCaseTest {
 
     @Test
     void shouldRejectDelete_whenNotFoundOrRecipientMismatch() {
-        var port = new FakeMailRepositoryPort();
+        FakeMailRepositoryPort port = new FakeMailRepositoryPort();
         port.mails.add(new Mail(1, null, 5, "s", "b", 0, List.of(), null, Instant.now()));
-        var useCase = new DeleteMailUseCase(port);
+        DeleteMailUseCase useCase = new DeleteMailUseCase(port);
 
-        var result = useCase.execute(1, 999);
+        DeleteMailUseCase.Result result = useCase.execute(1, 999);
 
         assertThat(result).isEqualTo(DeleteMailUseCase.Result.NOT_FOUND);
     }

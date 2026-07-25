@@ -3,6 +3,7 @@ package dev.kage.server.database.quest;
 import dev.kage.quest.domain.ExpPort;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.server.database.DatabaseAccessException;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
@@ -15,7 +16,7 @@ public final class PostgresQuestExpAdapter implements ExpPort {
 
     @Override
     public void grantExp(Transaction tx, long characterId, long amount) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try (PreparedStatement statement = connection.prepareStatement(GRANT_EXP)) {
             statement.setLong(1, amount);
             statement.setLong(2, characterId);

@@ -9,8 +9,10 @@ import dev.kage.guild.domain.GuildPort;
 import dev.kage.guild.domain.GuildRole;
 import dev.kage.server.database.DatabaseAccessException;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Savepoint;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -102,8 +104,8 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     @Override
     public Optional<Guild> findByName(String name) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_BY_NAME)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_BY_NAME)) {
             statement.setString(1, name);
             try (ResultSet rs = statement.executeQuery()) {
                 return rs.next() ? Optional.of(mapGuild(rs)) : Optional.empty();
@@ -115,8 +117,8 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     @Override
     public Optional<Guild> findById(long guildId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_BY_ID)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_BY_ID)) {
             statement.setLong(1, guildId);
             try (ResultSet rs = statement.executeQuery()) {
                 return rs.next() ? Optional.of(mapGuild(rs)) : Optional.empty();
@@ -128,8 +130,8 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     @Override
     public Optional<GuildMember> findMembershipOf(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_MEMBERSHIP)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_MEMBERSHIP)) {
             statement.setLong(1, characterId);
             try (ResultSet rs = statement.executeQuery()) {
                 return rs.next() ? Optional.of(mapMember(rs)) : Optional.empty();
@@ -141,10 +143,10 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     @Override
     public List<GuildMember> listMembers(long guildId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(LIST_MEMBERS)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(LIST_MEMBERS)) {
             statement.setLong(1, guildId);
-            var result = new ArrayList<GuildMember>();
+            ArrayList<GuildMember> result = new ArrayList<GuildMember>();
             try (ResultSet rs = statement.executeQuery()) {
                 while (rs.next()) {
                     result.add(mapMember(rs));
@@ -158,12 +160,12 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     @Override
     public Guild createGuild(String name, long leaderCharacterId) {
-        try (var connection = dataSource.getConnection()) {
+        try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
-                var now = Instant.now();
+                Instant now = Instant.now();
                 long guildId;
-                try (var insertGuild = connection.prepareStatement(INSERT_GUILD)) {
+                try (PreparedStatement insertGuild = connection.prepareStatement(INSERT_GUILD)) {
                     insertGuild.setString(1, name);
                     insertGuild.setLong(2, leaderCharacterId);
                     insertGuild.setTimestamp(3, Timestamp.from(now));
@@ -172,7 +174,7 @@ public final class PostgresGuildAdapter implements GuildPort {
                         guildId = rs.getLong(1);
                     }
                 }
-                try (var insertMember = connection.prepareStatement(INSERT_MEMBER)) {
+                try (PreparedStatement insertMember = connection.prepareStatement(INSERT_MEMBER)) {
                     insertMember.setLong(1, guildId);
                     insertMember.setLong(2, leaderCharacterId);
                     insertMember.setString(3, GuildRole.LEADER.name());
@@ -197,8 +199,8 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     @Override
     public boolean disbandGuild(long leaderCharacterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(DISBAND)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(DISBAND)) {
             statement.setLong(1, leaderCharacterId);
             return statement.executeUpdate() > 0;
         } catch (SQLException e) {
@@ -208,8 +210,8 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     @Override
     public boolean leaveGuild(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(LEAVE)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(LEAVE)) {
             statement.setLong(1, characterId);
             return statement.executeUpdate() > 0;
         } catch (SQLException e) {
@@ -219,8 +221,8 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     @Override
     public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(KICK)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(KICK)) {
             statement.setLong(1, targetCharacterId);
             statement.setLong(2, leaderCharacterId);
             return statement.executeUpdate() > 0;
@@ -233,8 +235,8 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     @Override
     public Optional<GuildJoinRequest> findPendingRequestOfCharacter(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_PENDING_REQUEST_OF_CHARACTER)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_PENDING_REQUEST_OF_CHARACTER)) {
             statement.setLong(1, characterId);
             try (ResultSet rs = statement.executeQuery()) {
                 return rs.next() ? Optional.of(mapJoinRequest(rs)) : Optional.empty();
@@ -246,10 +248,10 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     @Override
     public List<GuildJoinRequest> listPendingRequests(long guildId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(LIST_PENDING_REQUESTS)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(LIST_PENDING_REQUESTS)) {
             statement.setLong(1, guildId);
-            var result = new ArrayList<GuildJoinRequest>();
+            ArrayList<GuildJoinRequest> result = new ArrayList<GuildJoinRequest>();
             try (ResultSet rs = statement.executeQuery()) {
                 while (rs.next()) {
                     result.add(mapJoinRequest(rs));
@@ -263,11 +265,11 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     @Override
     public GuildJoinRequest sendJoinRequest(long guildId, long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(INSERT_JOIN_REQUEST)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(INSERT_JOIN_REQUEST)) {
             statement.setLong(1, guildId);
             statement.setLong(2, characterId);
-            var now = Instant.now();
+            Instant now = Instant.now();
             statement.setTimestamp(3, Timestamp.from(now));
             try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
@@ -284,15 +286,15 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     @Override
     public ApproveResult approveJoinRequest(long requestId, long leaderCharacterId) {
-        try (var connection = dataSource.getConnection()) {
+        try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
-                var approval = selectForApproval(connection, requestId);
+                Optional<PendingApproval> approval = selectForApproval(connection, requestId);
                 if (approval.isEmpty() || approval.get().guildLeaderCharacterId() != leaderCharacterId) {
                     connection.rollback();
                     return ApproveResult.NOT_FOUND;
                 }
-                var result = tryInsertMemberOrDropStaleRequest(connection, requestId, approval.get());
+                ApproveResult result = tryInsertMemberOrDropStaleRequest(connection, requestId, approval.get());
                 connection.commit();
                 return result;
             } catch (SQLException e) {
@@ -308,7 +310,7 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     private static Optional<PendingApproval> selectForApproval(Connection connection, long requestId)
             throws SQLException {
-        try (var select = connection.prepareStatement(SELECT_JOIN_REQUEST_FOR_APPROVAL)) {
+        try (PreparedStatement select = connection.prepareStatement(SELECT_JOIN_REQUEST_FOR_APPROVAL)) {
             select.setLong(1, requestId);
             try (ResultSet rs = select.executeQuery()) {
                 if (!rs.next()) {
@@ -327,8 +329,8 @@ public final class PostgresGuildAdapter implements GuildPort {
         // "current transaction is aborted" nếu không rollback về savepoint trước (phát hiện thật
         // bằng Testcontainers, không phải đoán trước — xem GuildIntegrationTest
         // #shouldDropStaleRequest...).
-        var savepoint = connection.setSavepoint();
-        try (var insertMember = connection.prepareStatement(INSERT_MEMBER)) {
+        Savepoint savepoint = connection.setSavepoint();
+        try (PreparedStatement insertMember = connection.prepareStatement(INSERT_MEMBER)) {
             insertMember.setLong(1, approval.guildId());
             insertMember.setLong(2, approval.characterId());
             insertMember.setString(3, GuildRole.MEMBER.name());
@@ -349,7 +351,7 @@ public final class PostgresGuildAdapter implements GuildPort {
     }
 
     private static void deleteJoinRequest(Connection connection, long requestId) throws SQLException {
-        try (var delete = connection.prepareStatement(DELETE_JOIN_REQUEST)) {
+        try (PreparedStatement delete = connection.prepareStatement(DELETE_JOIN_REQUEST)) {
             delete.setLong(1, requestId);
             delete.executeUpdate();
         }
@@ -357,8 +359,8 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     @Override
     public boolean rejectJoinRequest(long requestId, long leaderCharacterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(REJECT_JOIN_REQUEST)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(REJECT_JOIN_REQUEST)) {
             statement.setLong(1, requestId);
             statement.setLong(2, leaderCharacterId);
             return statement.executeUpdate() > 0;

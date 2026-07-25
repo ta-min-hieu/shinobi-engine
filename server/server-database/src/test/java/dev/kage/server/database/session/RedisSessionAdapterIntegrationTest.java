@@ -3,6 +3,7 @@ package dev.kage.server.database.session;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -28,11 +29,11 @@ class RedisSessionAdapterIntegrationTest {
 
     @Test
     void shouldValidateIssuedToken_andReturnAccountId() {
-        try (var jedisPool = jedisPool()) {
-            var adapter = new RedisSessionAdapter(jedisPool);
+        try (JedisPool jedisPool = jedisPool()) {
+            RedisSessionAdapter adapter = new RedisSessionAdapter(jedisPool);
 
-            var token = adapter.issue(42L);
-            var result = adapter.validateAndRenew(token);
+            String token = adapter.issue(42L);
+            Optional<Long> result = adapter.validateAndRenew(token);
 
             assertThat(result).contains(42L);
         }
@@ -40,10 +41,10 @@ class RedisSessionAdapterIntegrationTest {
 
     @Test
     void shouldReturnEmpty_whenTokenNeverIssued() {
-        try (var jedisPool = jedisPool()) {
-            var adapter = new RedisSessionAdapter(jedisPool);
+        try (JedisPool jedisPool = jedisPool()) {
+            RedisSessionAdapter adapter = new RedisSessionAdapter(jedisPool);
 
-            var result = adapter.validateAndRenew("token-khong-ton-tai");
+            Optional<Long> result = adapter.validateAndRenew("token-khong-ton-tai");
 
             assertThat(result).isEmpty();
         }
@@ -51,9 +52,9 @@ class RedisSessionAdapterIntegrationTest {
 
     @Test
     void shouldInvalidateImmediately_afterRevoke() {
-        try (var jedisPool = jedisPool()) {
-            var adapter = new RedisSessionAdapter(jedisPool);
-            var token = adapter.issue(7L);
+        try (JedisPool jedisPool = jedisPool()) {
+            RedisSessionAdapter adapter = new RedisSessionAdapter(jedisPool);
+            String token = adapter.issue(7L);
 
             adapter.revoke(token);
 
@@ -65,11 +66,11 @@ class RedisSessionAdapterIntegrationTest {
 
     @Test
     void shouldIssueDifferentTokens_forDifferentSessions() {
-        try (var jedisPool = jedisPool()) {
-            var adapter = new RedisSessionAdapter(jedisPool);
+        try (JedisPool jedisPool = jedisPool()) {
+            RedisSessionAdapter adapter = new RedisSessionAdapter(jedisPool);
 
-            var tokenA = adapter.issue(1L);
-            var tokenB = adapter.issue(2L);
+            String tokenA = adapter.issue(1L);
+            String tokenB = adapter.issue(2L);
 
             assertThat(tokenA).isNotEqualTo(tokenB);
             assertThat(adapter.validateAndRenew(tokenA)).contains(1L);

@@ -55,7 +55,7 @@ final class FakeGuildPort implements GuildPort {
         if (findByName(name).isPresent()) {
             throw new DuplicateGuildNameException(name);
         }
-        var guild = new Guild(nextGuildId.getAndIncrement(), name, leaderCharacterId, Instant.now());
+        Guild guild = new Guild(nextGuildId.getAndIncrement(), name, leaderCharacterId, Instant.now());
         guildsById.put(guild.id(), guild);
         members.add(new GuildMember(guild.id(), leaderCharacterId, GuildRole.LEADER, Instant.now()));
         return guild;
@@ -63,7 +63,7 @@ final class FakeGuildPort implements GuildPort {
 
     @Override
     public boolean disbandGuild(long leaderCharacterId) {
-        var guild = guildsById.values().stream()
+        Optional<Guild> guild = guildsById.values().stream()
                 .filter(g -> g.leaderCharacterId() == leaderCharacterId)
                 .findFirst();
         if (guild.isEmpty()) {
@@ -83,7 +83,7 @@ final class FakeGuildPort implements GuildPort {
 
     @Override
     public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
-        var leaderMembership = members.stream()
+        Optional<GuildMember> leaderMembership = members.stream()
                 .filter(m -> m.characterId() == leaderCharacterId && m.role() == GuildRole.LEADER)
                 .findFirst();
         if (leaderMembership.isEmpty()) {
@@ -109,18 +109,19 @@ final class FakeGuildPort implements GuildPort {
         if (joinRequests.stream().anyMatch(r -> r.guildId() == guildId && r.characterId() == characterId)) {
             throw new DuplicateGuildJoinRequestException(guildId, characterId);
         }
-        var request = new GuildJoinRequest(nextRequestId.getAndIncrement(), guildId, characterId, Instant.now());
+        GuildJoinRequest request =
+                new GuildJoinRequest(nextRequestId.getAndIncrement(), guildId, characterId, Instant.now());
         joinRequests.add(request);
         return request;
     }
 
     @Override
     public ApproveResult approveJoinRequest(long requestId, long leaderCharacterId) {
-        var request = joinRequests.stream().filter(r -> r.id() == requestId).findFirst();
+        Optional<GuildJoinRequest> request = joinRequests.stream().filter(r -> r.id() == requestId).findFirst();
         if (request.isEmpty()) {
             return ApproveResult.NOT_FOUND;
         }
-        var guild = guildsById.get(request.get().guildId());
+        Guild guild = guildsById.get(request.get().guildId());
         if (guild == null || guild.leaderCharacterId() != leaderCharacterId) {
             return ApproveResult.NOT_FOUND;
         }
@@ -136,11 +137,11 @@ final class FakeGuildPort implements GuildPort {
 
     @Override
     public boolean rejectJoinRequest(long requestId, long leaderCharacterId) {
-        var request = joinRequests.stream().filter(r -> r.id() == requestId).findFirst();
+        Optional<GuildJoinRequest> request = joinRequests.stream().filter(r -> r.id() == requestId).findFirst();
         if (request.isEmpty()) {
             return false;
         }
-        var guild = guildsById.get(request.get().guildId());
+        Guild guild = guildsById.get(request.get().guildId());
         if (guild == null || guild.leaderCharacterId() != leaderCharacterId) {
             return false;
         }

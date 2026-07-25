@@ -56,12 +56,12 @@ final class AreaOfInterestTracker {
 
     /** Gọi lúc detach — báo despawn cho mọi nhân vật đang thấy {@code characterId}. */
     void onDetach(long characterId) {
-        var wasVisibleTo = visibleTo.remove(characterId);
+        Set<Long> wasVisibleTo = visibleTo.remove(characterId);
         if (wasVisibleTo == null) {
             return;
         }
         for (long otherId : wasVisibleTo) {
-            var otherVisible = visibleTo.get(otherId);
+            Set<Long> otherVisible = visibleTo.get(otherId);
             if (otherVisible != null) {
                 otherVisible.remove(characterId);
             }
@@ -71,7 +71,7 @@ final class AreaOfInterestTracker {
 
     /** Gọi lúc quái chết/bị xoá — báo despawn cho MỌI nhân vật đang thấy nó (quét tuyến tính, đủ ở quy mô này). */
     void onMonsterDetach(long monsterId) {
-        for (var entry : visibleTo.entrySet()) {
+        for (Map.Entry<Long, Set<Long>> entry : visibleTo.entrySet()) {
             if (entry.getValue().remove(monsterId)) {
                 sink.onMonsterDespawned(entry.getKey(), monsterId);
             }
@@ -80,8 +80,8 @@ final class AreaOfInterestTracker {
 
     /** Nhân vật hiện đang thấy {@code entityId} (nhân vật hoặc quái) — dùng để phát AttackResultEvent đúng người. */
     Set<Long> observersOf(long entityId) {
-        var observers = new HashSet<Long>();
-        for (var entry : visibleTo.entrySet()) {
+        HashSet<Long> observers = new HashSet<Long>();
+        for (Map.Entry<Long, Set<Long>> entry : visibleTo.entrySet()) {
             if (entry.getValue().contains(entityId)) {
                 observers.add(entry.getKey());
             }
@@ -92,7 +92,7 @@ final class AreaOfInterestTracker {
     void sync(
             Map<Long, KEntity> entitiesByCharacterId, Map<Long, KEntity> entitiesByMonsterId,
             Map<Long, KEntity> entitiesByNpcId) {
-        var characterIds = entitiesByCharacterId.keySet().toArray(new Long[0]);
+        Long[] characterIds = entitiesByCharacterId.keySet().toArray(new Long[0]);
         for (int i = 0; i < characterIds.length; i++) {
             for (int j = i + 1; j < characterIds.length; j++) {
                 syncCharacterPair(entitiesByCharacterId, characterIds[i], characterIds[j]);
@@ -109,8 +109,8 @@ final class AreaOfInterestTracker {
     }
 
     private void syncCharacterPair(Map<Long, KEntity> entitiesByCharacterId, long a, long b) {
-        var posA = POSITION.get(entitiesByCharacterId.get(a));
-        var posB = POSITION.get(entitiesByCharacterId.get(b));
+        PositionComponent posA = POSITION.get(entitiesByCharacterId.get(a));
+        PositionComponent posB = POSITION.get(entitiesByCharacterId.get(b));
         boolean within = distance(posA, posB) <= WorldConstants.AOI_RADIUS_METERS;
         boolean wasVisible = visibleTo.get(a).contains(b);
 
@@ -127,16 +127,16 @@ final class AreaOfInterestTracker {
     private void syncCharacterMonsterPair(
             Map<Long, KEntity> entitiesByCharacterId, Map<Long, KEntity> entitiesByMonsterId, long characterId,
             long monsterId) {
-        var charPos = POSITION.get(entitiesByCharacterId.get(characterId));
-        var monsterEntity = entitiesByMonsterId.get(monsterId);
-        var monsterPos = POSITION.get(monsterEntity);
+        PositionComponent charPos = POSITION.get(entitiesByCharacterId.get(characterId));
+        KEntity monsterEntity = entitiesByMonsterId.get(monsterId);
+        PositionComponent monsterPos = POSITION.get(monsterEntity);
         boolean within = distance(charPos, monsterPos) <= WorldConstants.AOI_RADIUS_METERS;
         boolean wasVisible = visibleTo.get(characterId).contains(monsterId);
 
         if (within && !wasVisible) {
             visibleTo.get(characterId).add(monsterId);
-            var health = HEALTH.get(monsterEntity);
-            var monster = MONSTER.get(monsterEntity);
+            HealthComponent health = HEALTH.get(monsterEntity);
+            MonsterComponent monster = MONSTER.get(monsterEntity);
             sink.onMonsterSpawned(characterId, new WorldOutboundSink.MonsterSnapshot(
                     monsterId, monster.monsterCode, monsterPos.x, monsterPos.y, health.current, health.max));
         } else if (!within && wasVisible) {
@@ -151,15 +151,15 @@ final class AreaOfInterestTracker {
     private void syncCharacterNpcPair(
             Map<Long, KEntity> entitiesByCharacterId, Map<Long, KEntity> entitiesByNpcId, long characterId,
             long npcId) {
-        var charPos = POSITION.get(entitiesByCharacterId.get(characterId));
-        var npcEntity = entitiesByNpcId.get(npcId);
-        var npcPos = POSITION.get(npcEntity);
+        PositionComponent charPos = POSITION.get(entitiesByCharacterId.get(characterId));
+        KEntity npcEntity = entitiesByNpcId.get(npcId);
+        PositionComponent npcPos = POSITION.get(npcEntity);
         boolean within = distance(charPos, npcPos) <= WorldConstants.AOI_RADIUS_METERS;
         boolean wasVisible = visibleTo.get(characterId).contains(npcId);
 
         if (within && !wasVisible) {
             visibleTo.get(characterId).add(npcId);
-            var npc = NPC.get(npcEntity);
+            NpcComponent npc = NPC.get(npcEntity);
             sink.onNpcSpawned(characterId, new WorldOutboundSink.NpcSnapshot(npcId, npc.npcCode, npcPos.x, npcPos.y));
         } else if (!within && wasVisible) {
             visibleTo.get(characterId).remove(npcId);

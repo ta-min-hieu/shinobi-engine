@@ -20,7 +20,7 @@ public final class ProfanityFilter {
     }
 
     public static boolean containsBannedWord(String text) {
-        var lower = text.toLowerCase(Locale.ROOT);
+        String lower = text.toLowerCase(Locale.ROOT);
         return BANNED_WORDS.stream().anyMatch(lower::contains);
     }
 }

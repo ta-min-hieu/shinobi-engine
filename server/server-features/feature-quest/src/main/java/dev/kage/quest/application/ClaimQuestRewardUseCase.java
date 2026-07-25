@@ -3,6 +3,7 @@ package dev.kage.quest.application;
 import dev.kage.quest.domain.QuestProgress;
 import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestStatus;
+import dev.kage.quest.domain.QuestTemplate;
 import dev.kage.quest.domain.QuestTemplatePort;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.quest.domain.TransactionRunner;
@@ -31,11 +32,11 @@ public final class ClaimQuestRewardUseCase {
     }
 
     public ClaimResult execute(long characterId, String questCode) {
-        var template = templatePort.findByCode(questCode).orElse(null);
+        QuestTemplate template = templatePort.findByCode(questCode).orElse(null);
         if (template == null) {
             return ClaimResult.notFound();
         }
-        var progress = progressPort.find(characterId, template.id()).orElse(null);
+        QuestProgress progress = progressPort.find(characterId, template.id()).orElse(null);
         if (progress == null) {
             return ClaimResult.notAccepted();
         }
@@ -43,19 +44,20 @@ public final class ClaimQuestRewardUseCase {
             return ClaimResult.notCompletedYet();
         }
 
-        var effects = scriptRunner.runClaim(template.scriptRef(), progress.progressJson());
+        QuestScriptRunner.HookEffects effects = scriptRunner.runClaim(template.scriptRef(), progress.progressJson());
         tx.inTransaction((Transaction t) -> {
             rewardPorts.expPort().grantExp(t, characterId, effects.expGranted());
-            for (var itemGrant : effects.itemGrants()) {
+            for (QuestScriptRunner.ItemGrant itemGrant : effects.itemGrants()) {
                 rewardPorts.inventoryGrantPort().grantItemByCode(
                         t, characterId, itemGrant.itemTemplateCode(), itemGrant.quantity());
             }
             rewardPorts.auditPort().log(t, characterId, "QUEST_CLAIM", detailJson(questCode, effects));
-            var claimed = new QuestProgress(characterId, template.id(), QuestStatus.CLAIMED, progress.progressJson());
+            QuestProgress claimed =
+                    new QuestProgress(characterId, template.id(), QuestStatus.CLAIMED, progress.progressJson());
             progressPort.save(t, claimed);
         });
 
-        var items = effects.itemGrants().stream()
+        List<ClaimResult.ItemReward> items = effects.itemGrants().stream()
                 .map(g -> new ClaimResult.ItemReward(g.itemTemplateCode(), g.quantity()))
                 .toList();
         return ClaimResult.ok(effects.expGranted(), items);

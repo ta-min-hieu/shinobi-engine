@@ -18,9 +18,14 @@ import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
@@ -49,7 +54,7 @@ class EnhanceItemUseCaseIntegrationTest {
 
     @BeforeAll
     static void migrate() {
-        var config = new DatabaseConfig(
+        DatabaseConfig config = new DatabaseConfig(
                 POSTGRES.getHost(),
                 POSTGRES.getMappedPort(POSTGRES_PORT),
                 POSTGRES.getDatabaseName(),
@@ -58,25 +63,25 @@ class EnhanceItemUseCaseIntegrationTest {
         dataSource = PostgresDataSourceFactory.create(config);
         FlywayMigrator.migrate(dataSource);
 
-        var accountAdapter = new PostgresAccountAdapter();
-        var accountTx = new JdbcAccountTransactionRunner(dataSource);
-        var accountHolder = new Account[1];
+        PostgresAccountAdapter accountAdapter = new PostgresAccountAdapter();
+        JdbcAccountTransactionRunner accountTx = new JdbcAccountTransactionRunner(dataSource);
+        Account[] accountHolder = new Account[1];
         accountTx.inTransaction(tx -> accountHolder[0] = accountAdapter.findOrCreate(tx, "enhancetester"));
         accountId = accountHolder[0].id();
     }
 
     private static long createFreshCharacter(String name) {
-        var characterAdapter = new PostgresCharacterAdapter(dataSource);
-        var characterTx = new JdbcCharacterTransactionRunner(dataSource);
-        var newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
-        var holder = new Character[1];
+        PostgresCharacterAdapter characterAdapter = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner characterTx = new JdbcCharacterTransactionRunner(dataSource);
+        NewCharacter newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
+        Character[] holder = new Character[1];
         characterTx.inTransaction(tx -> holder[0] = characterAdapter.create(tx, newCharacter));
         return holder[0].id();
     }
 
     private static void grantGold(long characterId, long amount) {
-        try (var connection = dataSource.getConnection();
-                var statement =
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
                         connection.prepareStatement("UPDATE character_stat SET gold = ? WHERE character_id = ?")) {
             statement.setLong(1, amount);
             statement.setLong(2, characterId);
@@ -87,11 +92,11 @@ class EnhanceItemUseCaseIntegrationTest {
     }
 
     private static long readGold(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement =
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
                         connection.prepareStatement("SELECT gold FROM character_stat WHERE character_id = ?")) {
             statement.setLong(1, characterId);
-            try (var rs = statement.executeQuery()) {
+            try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
                 return rs.getLong(1);
             }
@@ -101,12 +106,12 @@ class EnhanceItemUseCaseIntegrationTest {
     }
 
     private static int countAuditLogRows(long characterId, String action) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(
                         "SELECT COUNT(*) FROM audit_log WHERE character_id = ? AND action = ?")) {
             statement.setLong(1, characterId);
             statement.setString(2, action);
-            try (var rs = statement.executeQuery()) {
+            try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
                 return rs.getInt(1);
             }
@@ -116,10 +121,11 @@ class EnhanceItemUseCaseIntegrationTest {
     }
 
     private static long findItemTemplateIdByCode(String code) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement("SELECT id FROM item_template WHERE code = ?")) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
+                        connection.prepareStatement("SELECT id FROM item_template WHERE code = ?")) {
             statement.setString(1, code);
-            try (var rs = statement.executeQuery()) {
+            try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
                 return rs.getLong(1);
             }
@@ -129,31 +135,31 @@ class EnhanceItemUseCaseIntegrationTest {
     }
 
     private static long persistOneItem(long characterId, long itemTemplateId) {
-        var inventoryAdapter = new PostgresInventoryAdapter(dataSource);
-        var inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
-        var inventory = new Inventory(characterId, 20, List.of(ItemStack.newItem(itemTemplateId, 1, 0)));
+        PostgresInventoryAdapter inventoryAdapter = new PostgresInventoryAdapter(dataSource);
+        JdbcInventoryTransactionRunner inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
+        Inventory inventory = new Inventory(characterId, 20, List.of(ItemStack.newItem(itemTemplateId, 1, 0)));
         inventoryTx.inTransaction(tx -> inventoryAdapter.save(tx, inventory));
         return inventoryAdapter.findByCharacter(characterId).orElseThrow().items().get(0).id();
     }
 
     private static EnhanceItemUseCase newUseCase() {
-        var inventoryPort = new PostgresInventoryAdapter(dataSource);
-        var goldPort = new PostgresGoldAdapter();
-        var auditPort = new PostgresAuditAdapter();
-        var itemTemplatePort = new PostgresItemTemplateAdapter(dataSource);
-        var tx = new JdbcInventoryTransactionRunner(dataSource);
-        var ports = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
+        PostgresInventoryAdapter inventoryPort = new PostgresInventoryAdapter(dataSource);
+        PostgresGoldAdapter goldPort = new PostgresGoldAdapter();
+        PostgresAuditAdapter auditPort = new PostgresAuditAdapter();
+        PostgresItemTemplateAdapter itemTemplatePort = new PostgresItemTemplateAdapter(dataSource);
+        JdbcInventoryTransactionRunner tx = new JdbcInventoryTransactionRunner(dataSource);
+        EnhancePorts ports = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
         return new EnhanceItemUseCase(ports, tx);
     }
 
     private static void grantProtectionCharm(long characterId) {
-        var protectionTemplateId = findItemTemplateIdByCode(EnhancementTable.PROTECTION_CHARM_CODE);
-        var inventoryAdapter = new PostgresInventoryAdapter(dataSource);
-        var inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
-        var existing = inventoryAdapter.findByCharacter(characterId).orElseThrow();
-        var items = new java.util.ArrayList<>(existing.items());
+        long protectionTemplateId = findItemTemplateIdByCode(EnhancementTable.PROTECTION_CHARM_CODE);
+        PostgresInventoryAdapter inventoryAdapter = new PostgresInventoryAdapter(dataSource);
+        JdbcInventoryTransactionRunner inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
+        Inventory existing = inventoryAdapter.findByCharacter(characterId).orElseThrow();
+        ArrayList<ItemStack> items = new java.util.ArrayList<>(existing.items());
         items.add(ItemStack.newItem(protectionTemplateId, 1, 0));
-        var updated = new Inventory(characterId, 20, items);
+        Inventory updated = new Inventory(characterId, 20, items);
         inventoryTx.inTransaction(tx -> inventoryAdapter.save(tx, updated));
     }
 
@@ -164,7 +170,7 @@ class EnhanceItemUseCaseIntegrationTest {
         long realItemId = persistOneItem(characterId, woodenSwordId);
         grantGold(characterId, 0); // không đủ trả 100 gold cường hoá +0->+1
 
-        var result = newUseCase().execute(characterId, realItemId, false);
+        EnhanceItemUseCase.EnhanceResult result = newUseCase().execute(characterId, realItemId, false);
 
         assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.INSUFFICIENT_GOLD);
         assertThat(readGold(characterId)).isZero(); // không bị trừ gì
@@ -178,7 +184,7 @@ class EnhanceItemUseCaseIntegrationTest {
         long realItemId = persistOneItem(characterId, woodenSwordId);
         grantGold(characterId, 100); // đúng giá cường hoá +0->+1
 
-        var result = newUseCase().execute(characterId, realItemId, false);
+        EnhanceItemUseCase.EnhanceResult result = newUseCase().execute(characterId, realItemId, false);
 
         assertThat(result).isIn(
                 EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP);
@@ -190,15 +196,15 @@ class EnhanceItemUseCaseIntegrationTest {
     void shouldRejectEnhance_whenItemAlreadyAtMaxLevel() {
         long characterId = createFreshCharacter("EnhanceMaxed");
         long woodenSwordId = findItemTemplateIdByCode("wooden_sword");
-        var inventoryAdapter = new PostgresInventoryAdapter(dataSource);
-        var inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
-        var maxedInventory = new Inventory(
+        PostgresInventoryAdapter inventoryAdapter = new PostgresInventoryAdapter(dataSource);
+        JdbcInventoryTransactionRunner inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
+        Inventory maxedInventory = new Inventory(
                 characterId, 20, List.of(ItemStack.newItem(woodenSwordId, 1, ItemStack.MAX_ENHANCE)));
         inventoryTx.inTransaction(tx -> inventoryAdapter.save(tx, maxedInventory));
         long realItemId = inventoryAdapter.findByCharacter(characterId).orElseThrow().items().get(0).id();
         grantGold(characterId, 1_000_000);
 
-        var result = newUseCase().execute(characterId, realItemId, false);
+        EnhanceItemUseCase.EnhanceResult result = newUseCase().execute(characterId, realItemId, false);
 
         assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.MAX_LEVEL);
         assertThat(readGold(characterId)).isEqualTo(1_000_000); // không trừ gold
@@ -212,22 +218,23 @@ class EnhanceItemUseCaseIntegrationTest {
         for (int i = 0; i < 20 && !sawProtected; i++) {
             long characterId = createFreshCharacter("EnhProtect" + i);
             long woodenSwordId = findItemTemplateIdByCode("wooden_sword");
-            var inventoryAdapter = new PostgresInventoryAdapter(dataSource);
-            var inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
+            PostgresInventoryAdapter inventoryAdapter = new PostgresInventoryAdapter(dataSource);
+            JdbcInventoryTransactionRunner inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
             inventoryTx.inTransaction(tx -> inventoryAdapter.save(
                     tx, new Inventory(characterId, 20, List.of(ItemStack.newItem(woodenSwordId, 1, 14)))));
             long realItemId = inventoryAdapter.findByCharacter(characterId).orElseThrow().items().get(0).id();
             grantProtectionCharm(characterId);
             grantGold(characterId, EnhancementTable.goldCost(14));
 
-            var result = newUseCase().execute(characterId, realItemId, true);
+            EnhanceItemUseCase.EnhanceResult result = newUseCase().execute(characterId, realItemId, true);
 
             if (result == EnhanceItemUseCase.EnhanceResult.FAILED_PROTECTED) {
                 sawProtected = true;
-                var finalItem = inventoryAdapter.findByCharacter(characterId).orElseThrow().findItem(realItemId);
+                Optional<ItemStack> finalItem =
+                        inventoryAdapter.findByCharacter(characterId).orElseThrow().findItem(realItemId);
                 assertThat(finalItem).isPresent().get()
                         .extracting(ItemStack::enhanceLevel).isEqualTo(14); // KHÔNG rớt cấp
-                var protectionTemplateId = findItemTemplateIdByCode(EnhancementTable.PROTECTION_CHARM_CODE);
+                long protectionTemplateId = findItemTemplateIdByCode(EnhancementTable.PROTECTION_CHARM_CODE);
                 assertThat(inventoryAdapter.findByCharacter(characterId).orElseThrow()
                         .findByTemplate(protectionTemplateId)).isEmpty(); // Bảo Vệ đã tiêu
                 assertThat(countAuditLogRows(characterId, "ENHANCE_ITEM")).isEqualTo(1);
@@ -242,19 +249,20 @@ class EnhanceItemUseCaseIntegrationTest {
         for (int i = 0; i < 20 && !sawDropped; i++) {
             long characterId = createFreshCharacter("EnhNoCharm" + i);
             long woodenSwordId = findItemTemplateIdByCode("wooden_sword");
-            var inventoryAdapter = new PostgresInventoryAdapter(dataSource);
-            var inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
+            PostgresInventoryAdapter inventoryAdapter = new PostgresInventoryAdapter(dataSource);
+            JdbcInventoryTransactionRunner inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
             inventoryTx.inTransaction(tx -> inventoryAdapter.save(
                     tx, new Inventory(characterId, 20, List.of(ItemStack.newItem(woodenSwordId, 1, 14)))));
             long realItemId = inventoryAdapter.findByCharacter(characterId).orElseThrow().items().get(0).id();
             // KHÔNG gọi grantProtectionCharm — túi không có Bảo Vệ dù client bật cờ useProtection.
             grantGold(characterId, EnhancementTable.goldCost(14));
 
-            var result = newUseCase().execute(characterId, realItemId, true);
+            EnhanceItemUseCase.EnhanceResult result = newUseCase().execute(characterId, realItemId, true);
 
             if (result == EnhanceItemUseCase.EnhanceResult.FAILED_DROPPED) {
                 sawDropped = true;
-                var finalItem = inventoryAdapter.findByCharacter(characterId).orElseThrow().findItem(realItemId);
+                Optional<ItemStack> finalItem =
+                        inventoryAdapter.findByCharacter(characterId).orElseThrow().findItem(realItemId);
                 assertThat(finalItem).isPresent().get().extracting(ItemStack::enhanceLevel).isEqualTo(13);
             }
         }

@@ -31,10 +31,10 @@ public final class MailFacade {
 
     /** Gửi thư — LUÔN thành công (recipientId đã được gateway xác nhận tồn tại trước khi gọi). */
     public long sendMail(SendMailRequest request) {
-        var domainAttachments = request.attachments().stream()
+        List<MailAttachment> domainAttachments = request.attachments().stream()
                 .map(a -> new MailAttachment(a.itemTemplateId(), a.quantity()))
                 .toList();
-        var newMail = new NewMail(
+        NewMail newMail = new NewMail(
                 request.senderId(), request.recipientId(), request.subject(), request.body(), request.goldAmount(),
                 domainAttachments);
         return sendMailUseCase.execute(newMail).id();

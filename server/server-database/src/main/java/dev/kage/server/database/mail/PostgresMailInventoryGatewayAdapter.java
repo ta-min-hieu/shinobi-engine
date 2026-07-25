@@ -36,7 +36,7 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
 
     @Override
     public boolean grantItem(Transaction tx, long characterId, long itemTemplateId, int quantity) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try {
             int existingCount = countItems(connection, characterId);
             if (existingCount >= DEFAULT_CAPACITY) {

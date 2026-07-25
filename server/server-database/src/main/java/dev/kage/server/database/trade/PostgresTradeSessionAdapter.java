@@ -9,6 +9,7 @@ import dev.kage.trade.domain.TradeSessionPort;
 import dev.kage.trade.domain.TradeSessionSnapshot;
 import dev.kage.trade.domain.TradeStatus;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -98,8 +99,8 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
 
     @Override
     public Optional<TradeSession> findActiveSessionOfCharacter(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_ACTIVE_OF_CHARACTER)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_ACTIVE_OF_CHARACTER)) {
             statement.setLong(1, characterId);
             statement.setLong(2, characterId);
             try (ResultSet rs = statement.executeQuery()) {
@@ -112,11 +113,11 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
 
     @Override
     public TradeSession createRequest(long requesterCharacterId, long targetCharacterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(INSERT_SESSION)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(INSERT_SESSION)) {
             statement.setLong(1, requesterCharacterId);
             statement.setLong(2, targetCharacterId);
-            var now = Instant.now();
+            Instant now = Instant.now();
             statement.setTimestamp(3, Timestamp.from(now));
             try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
@@ -131,8 +132,8 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
 
     @Override
     public boolean acceptRequest(long sessionId, long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(ACCEPT_REQUEST)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(ACCEPT_REQUEST)) {
             statement.setLong(1, sessionId);
             statement.setLong(2, characterId);
             return statement.executeUpdate() > 0;
@@ -143,8 +144,8 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
 
     @Override
     public boolean deleteSessionIfParticipant(long sessionId, long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(DELETE_IF_PARTICIPANT)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(DELETE_IF_PARTICIPANT)) {
             statement.setLong(1, sessionId);
             statement.setLong(2, characterId);
             statement.setLong(3, characterId);
@@ -156,7 +157,7 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
 
     @Override
     public boolean replaceOffer(long sessionId, long characterId, long goldAmount, List<OfferedItemInput> items) {
-        try (var connection = dataSource.getConnection()) {
+        try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
                 boolean ok = replaceOfferInTransaction(
@@ -186,7 +187,7 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
             throws SQLException {
         long requesterId;
         long targetId;
-        try (var select = connection.prepareStatement(SELECT_SESSION_FOR_OFFER)) {
+        try (PreparedStatement select = connection.prepareStatement(SELECT_SESSION_FOR_OFFER)) {
             select.setLong(1, request.sessionId());
             try (ResultSet rs = select.executeQuery()) {
                 if (!rs.next() || !"OPEN".equals(rs.getString("status"))) {
@@ -200,13 +201,13 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
         if (characterId != requesterId && characterId != targetId) {
             return false;
         }
-        try (var delete = connection.prepareStatement(DELETE_OFFER_ITEMS_OF_CHARACTER)) {
+        try (PreparedStatement delete = connection.prepareStatement(DELETE_OFFER_ITEMS_OF_CHARACTER)) {
             delete.setLong(1, request.sessionId());
             delete.setLong(2, characterId);
             delete.executeUpdate();
         }
-        try (var insert = connection.prepareStatement(INSERT_OFFER_ITEM)) {
-            for (var item : request.items()) {
+        try (PreparedStatement insert = connection.prepareStatement(INSERT_OFFER_ITEM)) {
+            for (OfferedItemInput item : request.items()) {
                 insert.setLong(1, request.sessionId());
                 insert.setLong(2, characterId);
                 insert.setLong(3, item.itemId());
@@ -220,7 +221,7 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
         String updateGoldSql = characterId == requesterId
                 ? UPDATE_REQUESTER_GOLD_AND_RESET_CONFIRM
                 : UPDATE_TARGET_GOLD_AND_RESET_CONFIRM;
-        try (var updateGold = connection.prepareStatement(updateGoldSql)) {
+        try (PreparedStatement updateGold = connection.prepareStatement(updateGoldSql)) {
             updateGold.setLong(1, request.goldAmount());
             updateGold.setLong(2, request.sessionId());
             updateGold.executeUpdate();
@@ -230,7 +231,7 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
 
     @Override
     public Optional<TradeSessionSnapshot> findSnapshot(long sessionId) {
-        try (var connection = dataSource.getConnection()) {
+        try (Connection connection = dataSource.getConnection()) {
             return readSnapshot(connection, sessionId, SELECT_SESSION);
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi tra trạng thái trade: sessionId=" + sessionId, e);
@@ -239,7 +240,7 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
 
     @Override
     public Optional<TradeSessionSnapshot> lockForExecution(Transaction tx, long sessionId) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try {
             return readSnapshot(connection, sessionId, SELECT_SESSION_FOR_UPDATE);
         } catch (SQLException e) {
@@ -256,7 +257,7 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
         long targetGold;
         boolean requesterConfirmed;
         boolean targetConfirmed;
-        try (var select = connection.prepareStatement(sql)) {
+        try (PreparedStatement select = connection.prepareStatement(sql)) {
             select.setLong(1, sessionId);
             try (ResultSet rs = select.executeQuery()) {
                 if (!rs.next()) {
@@ -271,8 +272,8 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
                 targetConfirmed = rs.getBoolean("target_confirmed");
             }
         }
-        var items = new ArrayList<TradeOfferItem>();
-        try (var select = connection.prepareStatement(SELECT_OFFER_ITEMS)) {
+        ArrayList<TradeOfferItem> items = new ArrayList<TradeOfferItem>();
+        try (PreparedStatement select = connection.prepareStatement(SELECT_OFFER_ITEMS)) {
             select.setLong(1, sessionId);
             try (ResultSet rs = select.executeQuery()) {
                 while (rs.next()) {
@@ -289,8 +290,8 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
 
     @Override
     public void setConfirmed(Transaction tx, long sessionId, long characterId) {
-        var connection = ((JdbcTransaction) tx).connection();
-        try (var statement = connection.prepareStatement(SET_CONFIRMED)) {
+        Connection connection = ((JdbcTransaction) tx).connection();
+        try (PreparedStatement statement = connection.prepareStatement(SET_CONFIRMED)) {
             statement.setLong(1, characterId);
             statement.setLong(2, characterId);
             statement.setLong(3, sessionId);
@@ -302,8 +303,8 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
 
     @Override
     public void deleteSession(Transaction tx, long sessionId) {
-        var connection = ((JdbcTransaction) tx).connection();
-        try (var statement = connection.prepareStatement(DELETE_SESSION)) {
+        Connection connection = ((JdbcTransaction) tx).connection();
+        try (PreparedStatement statement = connection.prepareStatement(DELETE_SESSION)) {
             statement.setLong(1, sessionId);
             statement.executeUpdate();
         } catch (SQLException e) {

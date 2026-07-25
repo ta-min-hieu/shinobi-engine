@@ -55,8 +55,8 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
 
     @Override
     public Optional<OwnedItemSnapshot> findItemById(long itemId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_BY_ID)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_BY_ID)) {
             statement.setLong(1, itemId);
             try (ResultSet rs = statement.executeQuery()) {
                 return rs.next() ? Optional.of(mapRow(rs)) : Optional.empty();
@@ -68,9 +68,9 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
 
     @Override
     public TransferOutcome transferItem(Transaction tx, TransferRequest request) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try {
-            var current = selectForUpdate(connection, request.itemId());
+            Optional<OwnedItemSnapshot> current = selectForUpdate(connection, request.itemId());
             if (current.isEmpty() || current.get().characterId() != request.fromCharacterId()) {
                 return TransferOutcome.ITEM_NOT_OWNED;
             }

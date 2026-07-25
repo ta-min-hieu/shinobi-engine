@@ -70,7 +70,7 @@ class CreateCharacterUseCaseTest {
 
         @Override
         public Character create(Transaction tx, NewCharacter newCharacter) {
-            var character = new Character(
+            Character character = new Character(
                     nextId.getAndIncrement(),
                     newCharacter.accountId(),
                     1,
@@ -89,10 +89,10 @@ class CreateCharacterUseCaseTest {
 
     @Test
     void shouldCreateCharacter_whenValidAndUnderLimit() {
-        var port = new FakeCharacterPort();
-        var useCase = new CreateCharacterUseCase(port, DIRECT_TX);
+        FakeCharacterPort port = new FakeCharacterPort();
+        CreateCharacterUseCase useCase = new CreateCharacterUseCase(port, DIRECT_TX);
 
-        var character = useCase.execute(1L, "KageHero", "idem-1");
+        Character character = useCase.execute(1L, "KageHero", "idem-1");
 
         assertThat(character.name()).isEqualTo("KageHero");
         assertThat(character.faction()).isEqualTo(Faction.HOA);
@@ -101,8 +101,8 @@ class CreateCharacterUseCaseTest {
 
     @Test
     void shouldRejectDuplicateName() {
-        var port = new FakeCharacterPort();
-        var useCase = new CreateCharacterUseCase(port, DIRECT_TX);
+        FakeCharacterPort port = new FakeCharacterPort();
+        CreateCharacterUseCase useCase = new CreateCharacterUseCase(port, DIRECT_TX);
         useCase.execute(1L, "KageHero", "idem-1");
 
         assertThatThrownBy(() -> useCase.execute(2L, "KageHero", "idem-2"))
@@ -112,8 +112,8 @@ class CreateCharacterUseCaseTest {
 
     @Test
     void shouldRejectWhenAccountReachedCharacterLimit() {
-        var port = new FakeCharacterPort();
-        var useCase = new CreateCharacterUseCase(port, DIRECT_TX);
+        FakeCharacterPort port = new FakeCharacterPort();
+        CreateCharacterUseCase useCase = new CreateCharacterUseCase(port, DIRECT_TX);
         for (int i = 0; i < CreateCharacterUseCase.MAX_CHARACTERS_PER_ACCOUNT; i++) {
             useCase.execute(1L, "Hero" + i, "idem-" + i);
         }
@@ -125,8 +125,8 @@ class CreateCharacterUseCaseTest {
 
     @Test
     void shouldRejectInvalidName_beforeTouchingPort() {
-        var port = new FakeCharacterPort();
-        var useCase = new CreateCharacterUseCase(port, DIRECT_TX);
+        FakeCharacterPort port = new FakeCharacterPort();
+        CreateCharacterUseCase useCase = new CreateCharacterUseCase(port, DIRECT_TX);
 
         assertThatThrownBy(() -> useCase.execute(1L, "A", "idem-1")).isInstanceOf(IllegalArgumentException.class);
         assertThat(port.characters).isEmpty();

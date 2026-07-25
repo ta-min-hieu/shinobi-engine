@@ -21,12 +21,12 @@ class CombatPacketsTest {
 
     @Test
     void shouldRoundTripSetTargetCommand() throws InvalidProtocolBufferException {
-        var command = SetTargetCommand.newBuilder().setTargetEntityId(-1L).build();
-        var header = new PacketHeader(Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, ProtocolVersion.CURRENT, 5);
+        SetTargetCommand command = SetTargetCommand.newBuilder().setTargetEntityId(-1L).build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, ProtocolVersion.CURRENT, 5);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var decoded = PacketCodec.decodeFrame(frameBytes);
-        var parsed = SetTargetCommand.parseFrom(decoded.payload());
+        PacketCodec.Frame decoded = PacketCodec.decodeFrame(frameBytes);
+        SetTargetCommand parsed = SetTargetCommand.parseFrom(decoded.payload());
 
         assertThat(decoded.header()).isEqualTo(header);
         assertThat(parsed.getTargetEntityId()).isEqualTo(-1L);
@@ -34,7 +34,7 @@ class CombatPacketsTest {
 
     @Test
     void shouldRoundTripAttackResultEvent() throws InvalidProtocolBufferException {
-        var event = AttackResultEvent.newBuilder()
+        AttackResultEvent event = AttackResultEvent.newBuilder()
                 .setAttackerEntityId(1L)
                 .setTargetEntityId(-1L)
                 .setDamage(12)
@@ -43,10 +43,10 @@ class CombatPacketsTest {
                 .setTargetCurrentHp(38)
                 .setTargetDied(false)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        var parsed = AttackResultEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        AttackResultEvent parsed = AttackResultEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getAttackerEntityId()).isEqualTo(1L);
         assertThat(parsed.getTargetEntityId()).isEqualTo(-1L);
@@ -59,7 +59,7 @@ class CombatPacketsTest {
 
     @Test
     void shouldRoundTripMonsterSpawnedEvent() throws InvalidProtocolBufferException {
-        var event = MonsterSpawnedEvent.newBuilder()
+        MonsterSpawnedEvent event = MonsterSpawnedEvent.newBuilder()
                 .setMonsterId(-1L)
                 .setMonsterCode("training_dummy")
                 .setX(5f)
@@ -67,10 +67,10 @@ class CombatPacketsTest {
                 .setCurrentHp(50)
                 .setMaxHp(50)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        var parsed = MonsterSpawnedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        MonsterSpawnedEvent parsed = MonsterSpawnedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getMonsterId()).isEqualTo(-1L);
         assertThat(parsed.getMonsterCode()).isEqualTo("training_dummy");
@@ -82,22 +82,22 @@ class CombatPacketsTest {
 
     @Test
     void shouldRoundTripMonsterDespawnedEvent() throws InvalidProtocolBufferException {
-        var event = MonsterDespawnedEvent.newBuilder().setMonsterId(-1L).build();
-        var header = new PacketHeader(Opcode.OPCODE_MONSTER_DESPAWNED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
+        MonsterDespawnedEvent event = MonsterDespawnedEvent.newBuilder().setMonsterId(-1L).build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_MONSTER_DESPAWNED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        var parsed = MonsterDespawnedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        MonsterDespawnedEvent parsed = MonsterDespawnedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getMonsterId()).isEqualTo(-1L);
     }
 
     @Test
     void shouldRoundTripMonsterMovedEvent() throws InvalidProtocolBufferException {
-        var event = MonsterMovedEvent.newBuilder().setMonsterId(-1L).setX(6.5f).setY(4f).build();
-        var header = new PacketHeader(Opcode.OPCODE_MONSTER_MOVED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
+        MonsterMovedEvent event = MonsterMovedEvent.newBuilder().setMonsterId(-1L).setX(6.5f).setY(4f).build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_MONSTER_MOVED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        var parsed = MonsterMovedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        MonsterMovedEvent parsed = MonsterMovedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getMonsterId()).isEqualTo(-1L);
         assertThat(parsed.getX()).isEqualTo(6.5f);
@@ -106,12 +106,12 @@ class CombatPacketsTest {
 
     @Test
     void shouldRoundTripUseSkillCommand() throws InvalidProtocolBufferException {
-        var command = UseSkillCommand.newBuilder().setSkillCode("fireball").setTargetEntityId(-1L).build();
-        var header = new PacketHeader(Opcode.OPCODE_USE_SKILL_COMMAND_VALUE, ProtocolVersion.CURRENT, 7);
+        UseSkillCommand command = UseSkillCommand.newBuilder().setSkillCode("fireball").setTargetEntityId(-1L).build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_USE_SKILL_COMMAND_VALUE, ProtocolVersion.CURRENT, 7);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var decoded = PacketCodec.decodeFrame(frameBytes);
-        var parsed = UseSkillCommand.parseFrom(decoded.payload());
+        PacketCodec.Frame decoded = PacketCodec.decodeFrame(frameBytes);
+        UseSkillCommand parsed = UseSkillCommand.parseFrom(decoded.payload());
 
         assertThat(decoded.header()).isEqualTo(header);
         assertThat(parsed.getSkillCode()).isEqualTo("fireball");
@@ -120,7 +120,7 @@ class CombatPacketsTest {
 
     @Test
     void shouldRoundTripSkillResultEvent() throws InvalidProtocolBufferException {
-        var event = SkillResultEvent.newBuilder()
+        SkillResultEvent event = SkillResultEvent.newBuilder()
                 .setSkillCode("fireball")
                 .setAttackerEntityId(1L)
                 .setTargetEntityId(-1L)
@@ -130,10 +130,10 @@ class CombatPacketsTest {
                 .setTargetCurrentHp(30)
                 .setTargetDied(false)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        var parsed = SkillResultEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SkillResultEvent parsed = SkillResultEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getSkillCode()).isEqualTo("fireball");
         assertThat(parsed.getAttackerEntityId()).isEqualTo(1L);

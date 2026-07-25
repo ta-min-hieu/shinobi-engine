@@ -43,8 +43,8 @@ public final class PostgresEquipmentAdapter implements EquipmentPort {
 
     @Override
     public Optional<Equipment> findByCharacter(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_BY_CHARACTER)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_BY_CHARACTER)) {
             statement.setLong(1, characterId);
             try (ResultSet rs = statement.executeQuery()) {
                 Map<EquipmentSlotType, Long> slots = new EnumMap<>(EquipmentSlotType.class);
@@ -61,7 +61,7 @@ public final class PostgresEquipmentAdapter implements EquipmentPort {
 
     @Override
     public void save(Transaction tx, Equipment equipment) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try {
             deleteExisting(connection, equipment.characterId());
             insertSlots(connection, equipment);
@@ -83,7 +83,7 @@ public final class PostgresEquipmentAdapter implements EquipmentPort {
             return;
         }
         try (PreparedStatement statement = connection.prepareStatement(INSERT_SLOT)) {
-            for (var entry : slots.entrySet()) {
+            for (Map.Entry<EquipmentSlotType, Long> entry : slots.entrySet()) {
                 statement.setLong(1, equipment.characterId());
                 statement.setString(2, entry.getKey().name());
                 statement.setLong(3, entry.getValue());

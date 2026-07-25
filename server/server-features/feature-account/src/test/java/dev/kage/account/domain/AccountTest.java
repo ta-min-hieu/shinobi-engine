@@ -28,7 +28,7 @@ class AccountTest {
 
     @Test
     void shouldAcceptUsername_whenAlphanumericWithUnderscore() {
-        var account = new Account(1L, "kage_hero_1", Instant.now());
+        Account account = new Account(1L, "kage_hero_1", Instant.now());
 
         assertThat(account.username()).isEqualTo("kage_hero_1");
     }

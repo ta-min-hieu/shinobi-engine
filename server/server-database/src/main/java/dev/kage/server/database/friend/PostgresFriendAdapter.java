@@ -5,6 +5,7 @@ import dev.kage.friend.domain.FriendPort;
 import dev.kage.friend.domain.Friendship;
 import dev.kage.friend.domain.FriendshipStatus;
 import dev.kage.server.database.DatabaseAccessException;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -69,8 +70,8 @@ public final class PostgresFriendAdapter implements FriendPort {
 
     @Override
     public Optional<Friendship> findBetween(long characterIdA, long characterIdB) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_BETWEEN)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_BETWEEN)) {
             statement.setLong(1, characterIdA);
             statement.setLong(2, characterIdB);
             statement.setLong(3, characterIdB);
@@ -86,11 +87,11 @@ public final class PostgresFriendAdapter implements FriendPort {
 
     @Override
     public Friendship sendRequest(long requesterId, long addresseeId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(INSERT_REQUEST)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(INSERT_REQUEST)) {
             statement.setLong(1, requesterId);
             statement.setLong(2, addresseeId);
-            var now = Instant.now();
+            Instant now = Instant.now();
             statement.setTimestamp(3, Timestamp.from(now));
             try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
@@ -107,8 +108,8 @@ public final class PostgresFriendAdapter implements FriendPort {
 
     @Override
     public boolean accept(long friendshipId, long addresseeId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(ACCEPT)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(ACCEPT)) {
             statement.setTimestamp(1, Timestamp.from(Instant.now()));
             statement.setLong(2, friendshipId);
             statement.setLong(3, addresseeId);
@@ -120,8 +121,8 @@ public final class PostgresFriendAdapter implements FriendPort {
 
     @Override
     public boolean reject(long friendshipId, long addresseeId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(REJECT)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(REJECT)) {
             statement.setLong(1, friendshipId);
             statement.setLong(2, addresseeId);
             return statement.executeUpdate() > 0;
@@ -132,8 +133,8 @@ public final class PostgresFriendAdapter implements FriendPort {
 
     @Override
     public boolean remove(long characterId, long friendCharacterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(REMOVE)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(REMOVE)) {
             statement.setLong(1, characterId);
             statement.setLong(2, friendCharacterId);
             statement.setLong(3, friendCharacterId);
@@ -147,8 +148,8 @@ public final class PostgresFriendAdapter implements FriendPort {
 
     @Override
     public List<Friendship> listAccepted(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(LIST_ACCEPTED)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(LIST_ACCEPTED)) {
             statement.setLong(1, characterId);
             statement.setLong(2, characterId);
             return mapRows(statement);
@@ -159,8 +160,8 @@ public final class PostgresFriendAdapter implements FriendPort {
 
     @Override
     public List<Friendship> listPendingIncoming(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(LIST_PENDING_INCOMING)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(LIST_PENDING_INCOMING)) {
             statement.setLong(1, characterId);
             return mapRows(statement);
         } catch (SQLException e) {
@@ -170,7 +171,7 @@ public final class PostgresFriendAdapter implements FriendPort {
 
     private static List<Friendship> mapRows(PreparedStatement statement) throws SQLException {
         try (ResultSet rs = statement.executeQuery()) {
-            var result = new ArrayList<Friendship>();
+            ArrayList<Friendship> result = new ArrayList<Friendship>();
             while (rs.next()) {
                 result.add(mapRow(rs));
             }
@@ -179,7 +180,7 @@ public final class PostgresFriendAdapter implements FriendPort {
     }
 
     private static Friendship mapRow(ResultSet rs) throws SQLException {
-        var respondedAt = rs.getTimestamp("responded_at");
+        Timestamp respondedAt = rs.getTimestamp("responded_at");
         return new Friendship(
                 rs.getLong("id"),
                 rs.getLong("requester_id"),

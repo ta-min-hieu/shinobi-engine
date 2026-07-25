@@ -1,12 +1,14 @@
 package dev.kage.server.gateway;
 
 import dev.kage.character.api.CharacterFacade;
+import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.server.world.CharacterBaseStats;
 import dev.kage.server.world.WorldFacade;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -54,7 +56,7 @@ final class DungeonInstanceRegistry {
 
     /** {@code WorldFacade} nhân vật này đang ở TRONG (dungeon), rỗng nếu đang ở world chính. */
     Optional<WorldFacade> worldFacadeFor(long characterId) {
-        var instance = instanceByCharacterId.get(characterId);
+        DungeonInstance instance = instanceByCharacterId.get(characterId);
         return instance == null ? Optional.empty() : Optional.of(instance.facade());
     }
 
@@ -65,20 +67,20 @@ final class DungeonInstanceRegistry {
         if (instanceByCharacterId.containsKey(requestingCharacterId)) {
             return EnterOutcome.ALREADY_IN_DUNGEON;
         }
-        var myParty = partyFacade.findMyParty(requestingCharacterId);
+        Optional<PartyFacade.MyPartyView> myParty = partyFacade.findMyParty(requestingCharacterId);
         if (myParty.isEmpty()) {
             return EnterOutcome.NOT_IN_PARTY;
         }
-        var members = partyFacade.listMembers(requestingCharacterId);
-        for (var member : members) {
+        List<PartyFacade.MemberView> members = partyFacade.listMembers(requestingCharacterId);
+        for (PartyFacade.MemberView member : members) {
             if (!registry.isOnline(member.characterId())) {
                 return EnterOutcome.PARTY_MEMBER_OFFLINE;
             }
         }
 
         long partyId = myParty.get().partyId();
-        var instance = instancesByPartyId.computeIfAbsent(partyId, id -> createInstance(id));
-        for (var member : members) {
+        DungeonInstance instance = instancesByPartyId.computeIfAbsent(partyId, id -> createInstance(id));
+        for (PartyFacade.MemberView member : members) {
             if (!instanceByCharacterId.containsKey(member.characterId())) {
                 moveCharacterIntoDungeon(member.characterId(), instance);
             }
@@ -87,13 +89,13 @@ final class DungeonInstanceRegistry {
     }
 
     ExitOutcome exitDungeon(long characterId) {
-        var instance = instanceByCharacterId.get(characterId);
+        DungeonInstance instance = instanceByCharacterId.get(characterId);
         if (instance == null) {
             return ExitOutcome.NOT_IN_DUNGEON;
         }
         instance.facade().detachCharacter(characterId);
-        var baseStats = loadBaseStats(characterId);
-        var returnPosition = returnPositionByCharacterId.remove(characterId);
+        CharacterBaseStats baseStats = loadBaseStats(characterId);
+        PositionSnapshot returnPosition = returnPositionByCharacterId.remove(characterId);
         mainWorldFacade.attachCharacter(characterId, returnPosition.x(), returnPosition.y(), baseStats);
         leaveInstance(characterId, instance);
         return ExitOutcome.OK;
@@ -105,7 +107,7 @@ final class DungeonInstanceRegistry {
      * nhân vật không ở dungeon nào — caller tự xử lý detach world chính như bình thường.
      */
     boolean handleDisconnectIfInDungeon(long characterId) {
-        var instance = instanceByCharacterId.get(characterId);
+        DungeonInstance instance = instanceByCharacterId.get(characterId);
         if (instance == null) {
             return false;
         }
@@ -124,7 +126,7 @@ final class DungeonInstanceRegistry {
     }
 
     private DungeonInstance createInstance(long partyId) {
-        var dungeonFacade = new WorldFacade(new DungeonOutboundSink(registry), false);
+        WorldFacade dungeonFacade = new WorldFacade(new DungeonOutboundSink(registry), false);
         dungeonFacade.start();
         // Phase 8 lát cắt 2 — NƠI DUY NHẤT "dungeon" và "boss" được nối với nhau; WorldFacade vẫn
         // không biết khái niệm "dungeon" (chỉ biết "có ai bảo spawn boss hay không").
@@ -133,8 +135,8 @@ final class DungeonInstanceRegistry {
     }
 
     private void moveCharacterIntoDungeon(long characterId, DungeonInstance instance) {
-        var baseStats = loadBaseStats(characterId);
-        var returnPosition = registry.lastKnownPosition(characterId);
+        CharacterBaseStats baseStats = loadBaseStats(characterId);
+        PositionSnapshot returnPosition = registry.lastKnownPosition(characterId);
         if (returnPosition == null) {
             returnPosition = characterFacade.loadPosition(characterId);
         }
@@ -157,7 +159,7 @@ final class DungeonInstanceRegistry {
     }
 
     private CharacterBaseStats loadBaseStats(long characterId) {
-        var stats = characterFacade.loadStats(characterId);
+        CharacterStats stats = characterFacade.loadStats(characterId);
         return new CharacterBaseStats(stats.str(), stats.agi(), stats.intelligence(), stats.vit());
     }
 

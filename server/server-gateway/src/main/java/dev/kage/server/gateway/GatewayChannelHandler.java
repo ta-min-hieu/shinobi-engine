@@ -2,18 +2,23 @@ package dev.kage.server.gateway;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import dev.kage.account.api.AccountFacade;
+import dev.kage.account.application.LoginResult;
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.application.CharacterLimitExceededException;
 import dev.kage.character.application.CharacterNotFoundException;
 import dev.kage.character.application.DuplicateCharacterNameException;
 import dev.kage.character.domain.Character;
+import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.IdempotencyKeyReusedException;
+import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.chat.api.ChatFacade;
 import dev.kage.dialogue.api.DialogueFacade;
 import dev.kage.dialogue.domain.DialogueNode;
+import dev.kage.dialogue.domain.DialogueOption;
 import dev.kage.friend.api.FriendFacade;
 import dev.kage.guild.api.GuildFacade;
 import dev.kage.inventory.api.InventoryFacade;
+import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.mail.api.MailFacade;
 import dev.kage.party.api.PartyFacade;
@@ -351,8 +356,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, PacketCodec.Frame frame) {
-        var header = frame.header();
-        var handler = handlers.get(header.opcode());
+        PacketHeader header = frame.header();
+        PacketHandler handler = handlers.get(header.opcode());
         try {
             if (handler == null) {
                 sendError(ctx, header.sequenceId(), 404, "error.unknown_opcode");
@@ -369,8 +374,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handlePing(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var ping = PingCommand.parseFrom(payload);
-        var pong = PongResponse.newBuilder()
+        PingCommand ping = PingCommand.parseFrom(payload);
+        PongResponse pong = PongResponse.newBuilder()
                 .setClientTimestampMs(ping.getClientTimestampMs())
                 .setServerTimestampMs(System.currentTimeMillis())
                 .build();
@@ -379,9 +384,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleConnect(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var request = ConnectRequest.parseFrom(payload);
-        var username = request.getUsername();
-        var sequenceId = header.sequenceId();
+        ConnectRequest request = ConnectRequest.parseFrom(payload);
+        String username = request.getUsername();
+        int sequenceId = header.sequenceId();
 
         // Đăng nhập chạm Redis/PostgreSQL (qua AccountFacade) — I/O chặn, KHÔNG được chạy trên
         // Netty EventLoop (SERVER.md §2 — "Cấm: Query DB, logic nặng, chờ lock"). Đẩy sang Virtual
@@ -395,9 +400,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void handleConnectBlocking(ChannelHandlerContext ctx, int sequenceId, String username) {
         try {
-            var result = accountFacade.login(username);
+            LoginResult result = accountFacade.login(username);
             boundAccountId = result.accountId();
-            var response = ConnectResponse.newBuilder()
+            ConnectResponse response = ConnectResponse.newBuilder()
                     .setSuccess(true)
                     .setSessionId(result.sessionToken())
                     .setAccountId(result.accountId())
@@ -415,8 +420,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleListCharacters(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         ListCharactersRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
-        var sequenceId = header.sequenceId();
-        var accountId = boundAccountId;
+        int sequenceId = header.sequenceId();
+        Long accountId = boundAccountId;
         if (accountId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -427,8 +432,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void handleListCharactersBlocking(ChannelHandlerContext ctx, int sequenceId, long accountId) {
         try {
-            var characters = characterFacade.listCharacters(accountId);
-            var response = ListCharactersResponse.newBuilder()
+            List<Character> characters = characterFacade.listCharacters(accountId);
+            ListCharactersResponse response = ListCharactersResponse.newBuilder()
                     .addAllCharacters(characters.stream().map(GatewayChannelHandler::toProto).toList())
                     .build();
             send(ctx, Opcode.OPCODE_LIST_CHARACTERS_RESPONSE_VALUE, sequenceId, response.toByteArray());
@@ -440,9 +445,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleCreateCharacter(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var request = CreateCharacterRequest.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var accountId = boundAccountId;
+        CreateCharacterRequest request = CreateCharacterRequest.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long accountId = boundAccountId;
         if (accountId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -455,9 +460,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleCreateCharacterBlocking(
             ChannelHandlerContext ctx, int sequenceId, long accountId, CreateCharacterRequest request) {
         try {
-            var character = characterFacade.createCharacter(
+            Character character = characterFacade.createCharacter(
                     accountId, request.getName(), request.getIdempotencyKey());
-            var response = CreateCharacterResponse.newBuilder()
+            CreateCharacterResponse response = CreateCharacterResponse.newBuilder()
                     .setSuccess(true)
                     .setCharacter(toProto(character))
                     .build();
@@ -482,14 +487,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSelectCharacter(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var request = SelectCharacterRequest.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var accountId = boundAccountId;
+        SelectCharacterRequest request = SelectCharacterRequest.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long accountId = boundAccountId;
         if (accountId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        var characterId = request.getCharacterId();
+        long characterId = request.getCharacterId();
         authExecutor.execute(() -> handleSelectCharacterBlocking(ctx, sequenceId, accountId, characterId));
     }
 
@@ -503,16 +508,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // Đăng ký connection NÀY để world outbound (spawn/move/despawn — SERVER.md §6) tìm
             // đúng channel; attachCharacter chỉ enqueue, entity ECS thật tạo ở tick kế tiếp.
             worldGateway.registry().register(characterId, ctx);
-            var spawn = characterFacade.loadPosition(characterId);
-            var stats = characterFacade.loadStats(characterId);
-            var baseStats = new CharacterBaseStats(stats.str(), stats.agi(), stats.intelligence(), stats.vit());
+            PositionSnapshot spawn = characterFacade.loadPosition(characterId);
+            CharacterStats stats = characterFacade.loadStats(characterId);
+            CharacterBaseStats baseStats =
+                    new CharacterBaseStats(stats.str(), stats.agi(), stats.intelligence(), stats.vit());
             worldGateway.facade().attachCharacter(characterId, spawn.x(), spawn.y(), baseStats);
             // GAMEPLAY.md §2 "tính lại chỉ số dẫn xuất khi đổi trang bị" — áp dụng NGAY lúc attach,
             // không chỉ lúc equip/unequip sau đó, nếu không nhân vật mặc đồ từ phiên trước sẽ mất
             // bonus khi đăng nhập lại (server-world không tự biết feature-inventory).
-            var equipmentBonus = inventoryFacade.computeEquipmentBonus(characterId);
+            EquipmentBonus equipmentBonus = inventoryFacade.computeEquipmentBonus(characterId);
             worldGateway.facade().applyEquipmentBonus(characterId, equipmentBonus.bonusAtk());
-            var response = SelectCharacterResponse.newBuilder().setSuccess(true).build();
+            SelectCharacterResponse response = SelectCharacterResponse.newBuilder().setSuccess(true).build();
             send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
             // Đang trên authExecutor (Virtual Thread) rồi — friendFacade.listFriends chạm DB, an
             // toàn gọi thẳng, không cần đẩy thêm 1 lớp executor nữa (khác channelInactive bên dưới).
@@ -542,9 +548,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // validate rẻ, enqueue").
     private void handleMoveCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = MoveCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        MoveCommand command = MoveCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -569,9 +575,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // chọn mục tiêu, không lặp lại mỗi tick).
     private void handleSetTargetCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = SetTargetCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        SetTargetCommand command = SetTargetCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -584,9 +590,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // không cần rate limit riêng — spam quá cooldown chỉ là no-op, không ảnh hưởng gameplay.
     private void handleUseSkillCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = UseSkillCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        UseSkillCommand command = UseSkillCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -597,9 +603,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // EquipItemCommand chạm DB (feature-inventory) — Virtual Thread, giống handleSelectCharacter.
     private void handleEquipItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = EquipItemCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        EquipItemCommand command = EquipItemCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -609,19 +615,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleEquipItemBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, EquipItemCommand command) {
-        var slot = toDomainSlot(command.getSlot());
+        EquipmentSlotType slot = toDomainSlot(command.getSlot());
         if (slot == null) {
             sendError(ctx, sequenceId, 400, "error.invalid_equipment_slot");
             return;
         }
-        var result = inventoryFacade.equipItem(characterId, command.getItemId(), slot);
+        InventoryFacade.EquipResult result = inventoryFacade.equipItem(characterId, command.getItemId(), slot);
         if (result == InventoryFacade.EquipResult.OK) {
             // GAMEPLAY.md §2 — mặc đồ xong phải tính lại chỉ số dẫn xuất NGAY, không đợi lần
             // attach kế tiếp (server-world không tự biết trang bị vừa đổi).
-            var equipmentBonus = inventoryFacade.computeEquipmentBonus(characterId);
+            EquipmentBonus equipmentBonus = inventoryFacade.computeEquipmentBonus(characterId);
             currentWorldFacade(characterId).applyEquipmentBonus(characterId, equipmentBonus.bonusAtk());
         }
-        var response = EquipItemResponse.newBuilder()
+        EquipItemResponse response = EquipItemResponse.newBuilder()
                 .setSuccess(result == InventoryFacade.EquipResult.OK)
                 .setErrorKey(toErrorKey(result))
                 .build();
@@ -631,9 +637,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // UnequipItemCommand chạm DB (feature-inventory) — Virtual Thread, giống handleEquipItemCommand.
     private void handleUnequipItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = UnequipItemCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        UnequipItemCommand command = UnequipItemCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -643,17 +649,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleUnequipItemBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, UnequipItemCommand command) {
-        var slot = toDomainSlot(command.getSlot());
+        EquipmentSlotType slot = toDomainSlot(command.getSlot());
         if (slot == null) {
             sendError(ctx, sequenceId, 400, "error.invalid_equipment_slot");
             return;
         }
-        var result = inventoryFacade.unequipItem(characterId, slot);
+        InventoryFacade.UnequipResult result = inventoryFacade.unequipItem(characterId, slot);
         if (result == InventoryFacade.UnequipResult.OK) {
-            var equipmentBonus = inventoryFacade.computeEquipmentBonus(characterId);
+            EquipmentBonus equipmentBonus = inventoryFacade.computeEquipmentBonus(characterId);
             currentWorldFacade(characterId).applyEquipmentBonus(characterId, equipmentBonus.bonusAtk());
         }
-        var response = UnequipItemResponse.newBuilder()
+        UnequipItemResponse response = UnequipItemResponse.newBuilder()
                 .setSuccess(result == InventoryFacade.UnequipResult.OK)
                 .setErrorKey(result == InventoryFacade.UnequipResult.OK ? "" : "error.slot_not_equipped")
                 .build();
@@ -663,9 +669,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // EnhanceItemCommand chạm DB (feature-inventory) — Virtual Thread, giống handleEquipItemCommand.
     private void handleEnhanceItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = EnhanceItemCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        EnhanceItemCommand command = EnhanceItemCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -675,8 +681,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleEnhanceItemBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, EnhanceItemCommand command) {
-        var result = inventoryFacade.enhanceItem(characterId, command.getItemId(), command.getUseProtection());
-        var response = EnhanceItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        InventoryFacade.EnhanceResult result =
+                inventoryFacade.enhanceItem(characterId, command.getItemId(), command.getUseProtection());
+        EnhanceItemResponse response = EnhanceItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
         send(ctx, Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -697,8 +704,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleListShopItemsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         ListShopItemsRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -712,7 +719,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     /** Gộp lại — dùng cả cho {@code ListShopItemsRequest} thật lẫn nhánh action="open_shop" của dialogue. */
     private ListShopItemsResponse buildShopListingsResponse() {
-        var listings = shopFacade.listItems().stream()
+        List<ShopListingView> listings = shopFacade.listItems().stream()
                 .map(listing -> ShopListingView.newBuilder()
                         .setItemTemplateId(listing.itemTemplateId())
                         .setBuyPrice(listing.buyPrice())
@@ -724,9 +731,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleBuyItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = BuyItemCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        BuyItemCommand command = BuyItemCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -736,9 +743,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleBuyItemBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, BuyItemCommand command) {
-        var result = shopFacade.buyItem(
+        ShopFacade.BuyResult result = shopFacade.buyItem(
                 characterId, command.getItemTemplateId(), command.getQuantity(), command.getIdempotencyKey());
-        var response = BuyItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        BuyItemResponse response = BuyItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
         send(ctx, Opcode.OPCODE_BUY_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -755,9 +762,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSellItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = SellItemCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        SellItemCommand command = SellItemCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -767,9 +774,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSellItemBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, SellItemCommand command) {
-        var result = shopFacade.sellItem(
+        ShopFacade.SellResult result = shopFacade.sellItem(
                 characterId, command.getItemId(), command.getQuantity(), command.getIdempotencyKey());
-        var response = SellItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        SellItemResponse response = SellItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
         send(ctx, Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -786,9 +793,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleTalkToNpcCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = TalkToNpcCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        TalkToNpcCommand command = TalkToNpcCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -797,7 +804,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleTalkToNpcBlocking(ChannelHandlerContext ctx, int sequenceId, TalkToNpcCommand command) {
-        var node = dialogueFacade.startDialogue(command.getNpcCode());
+        Optional<DialogueNode> node = dialogueFacade.startDialogue(command.getNpcCode());
         if (node.isEmpty()) {
             sendError(ctx, sequenceId, 404, "error.npc_not_found");
             return;
@@ -807,9 +814,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSelectDialogueOptionCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = SelectDialogueOptionCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        SelectDialogueOptionCommand command = SelectDialogueOptionCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -819,7 +826,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSelectDialogueOptionBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, SelectDialogueOptionCommand command) {
-        var result = dialogueFacade.selectOption(
+        DialogueFacade.SelectOptionResult result = dialogueFacade.selectOption(
                 command.getNpcCode(), command.getCurrentNodeId(), command.getOptionIndex());
         switch (result) {
             case DialogueFacade.SelectOptionResult.Node r -> send(
@@ -833,8 +840,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case DialogueFacade.SelectOptionResult.NotFound ignored ->
                     sendError(ctx, sequenceId, 404, "error.dialogue_option_not_found");
             case DialogueFacade.SelectOptionResult.AcceptQuest r -> {
-                var acceptResult = questFacade.acceptQuest(characterId, r.questCode());
-                var response = AcceptQuestResponse.newBuilder().setOutcome(toProtoOutcome(acceptResult)).build();
+                QuestFacade.AcceptResult acceptResult = questFacade.acceptQuest(characterId, r.questCode());
+                AcceptQuestResponse response =
+                        AcceptQuestResponse.newBuilder().setOutcome(toProtoOutcome(acceptResult)).build();
                 send(ctx, Opcode.OPCODE_ACCEPT_QUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
             }
         }
@@ -851,9 +859,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleClaimQuestRewardCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = ClaimQuestRewardCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        ClaimQuestRewardCommand command = ClaimQuestRewardCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -863,11 +871,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleClaimQuestRewardBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, ClaimQuestRewardCommand command) {
-        var result = questFacade.claimReward(characterId, command.getQuestCode());
-        var responseBuilder = ClaimQuestRewardResponse.newBuilder()
+        QuestFacade.ClaimResult result = questFacade.claimReward(characterId, command.getQuestCode());
+        ClaimQuestRewardResponse.Builder responseBuilder = ClaimQuestRewardResponse.newBuilder()
                 .setOutcome(toProtoOutcome(result.outcome()))
                 .setExpGranted(result.expGranted());
-        for (var item : result.itemsGranted()) {
+        for (QuestFacade.ItemReward item : result.itemsGranted()) {
             responseBuilder.addItemsGranted(ItemRewardView.newBuilder()
                     .setItemTemplateCode(item.itemTemplateCode())
                     .setQuantity(item.quantity())
@@ -892,9 +900,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSendFriendRequestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = SendFriendRequestCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        SendFriendRequestCommand command = SendFriendRequestCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -904,16 +912,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSendFriendRequestBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, SendFriendRequestCommand command) {
-        var target = characterFacade.findByName(command.getTargetName());
+        Optional<Character> target = characterFacade.findByName(command.getTargetName());
         if (target.isEmpty()) {
-            var response = SendFriendRequestResponse.newBuilder()
+            SendFriendRequestResponse response = SendFriendRequestResponse.newBuilder()
                     .setOutcome(SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_TARGET_NOT_FOUND)
                     .build();
             send(ctx, Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
-        var result = friendFacade.sendRequest(characterId, target.get().id());
-        var response = SendFriendRequestResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        FriendFacade.SendRequestResult result = friendFacade.sendRequest(characterId, target.get().id());
+        SendFriendRequestResponse response =
+                SendFriendRequestResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
         send(ctx, Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -934,9 +943,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleAcceptFriendRequestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = AcceptFriendRequestCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        AcceptFriendRequestCommand command = AcceptFriendRequestCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -946,19 +955,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleAcceptFriendRequestBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, AcceptFriendRequestCommand command) {
-        var result = friendFacade.accept(command.getFriendshipId(), characterId);
-        var outcome = result == FriendFacade.AcceptResult.OK
+        FriendFacade.AcceptResult result = friendFacade.accept(command.getFriendshipId(), characterId);
+        AcceptFriendRequestOutcome outcome = result == FriendFacade.AcceptResult.OK
                 ? AcceptFriendRequestOutcome.ACCEPT_FRIEND_REQUEST_OUTCOME_OK
                 : AcceptFriendRequestOutcome.ACCEPT_FRIEND_REQUEST_OUTCOME_NOT_FOUND;
-        var response = AcceptFriendRequestResponse.newBuilder().setOutcome(outcome).build();
+        AcceptFriendRequestResponse response = AcceptFriendRequestResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_ACCEPT_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
     private void handleRejectFriendRequestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = RejectFriendRequestCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        RejectFriendRequestCommand command = RejectFriendRequestCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -968,19 +977,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleRejectFriendRequestBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, RejectFriendRequestCommand command) {
-        var result = friendFacade.reject(command.getFriendshipId(), characterId);
-        var outcome = result == FriendFacade.RejectResult.OK
+        FriendFacade.RejectResult result = friendFacade.reject(command.getFriendshipId(), characterId);
+        RejectFriendRequestOutcome outcome = result == FriendFacade.RejectResult.OK
                 ? RejectFriendRequestOutcome.REJECT_FRIEND_REQUEST_OUTCOME_OK
                 : RejectFriendRequestOutcome.REJECT_FRIEND_REQUEST_OUTCOME_NOT_FOUND;
-        var response = RejectFriendRequestResponse.newBuilder().setOutcome(outcome).build();
+        RejectFriendRequestResponse response = RejectFriendRequestResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_REJECT_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
     private void handleRemoveFriendCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = RemoveFriendCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        RemoveFriendCommand command = RemoveFriendCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -990,27 +999,27 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleRemoveFriendBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, RemoveFriendCommand command) {
-        var target = characterFacade.findByName(command.getTargetName());
+        Optional<Character> target = characterFacade.findByName(command.getTargetName());
         if (target.isEmpty()) {
-            var response = RemoveFriendResponse.newBuilder()
+            RemoveFriendResponse response = RemoveFriendResponse.newBuilder()
                     .setOutcome(RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_TARGET_NOT_FOUND)
                     .build();
             send(ctx, Opcode.OPCODE_REMOVE_FRIEND_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
-        var result = friendFacade.remove(characterId, target.get().id());
-        var outcome = result == FriendFacade.RemoveResult.OK
+        FriendFacade.RemoveResult result = friendFacade.remove(characterId, target.get().id());
+        RemoveFriendOutcome outcome = result == FriendFacade.RemoveResult.OK
                 ? RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_OK
                 : RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_NOT_FRIENDS;
-        var response = RemoveFriendResponse.newBuilder().setOutcome(outcome).build();
+        RemoveFriendResponse response = RemoveFriendResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_REMOVE_FRIEND_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
     private void handleListFriendsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         ListFriendsRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1019,11 +1028,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleListFriendsBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        var responseBuilder = ListFriendsResponse.newBuilder();
+        ListFriendsResponse.Builder responseBuilder = ListFriendsResponse.newBuilder();
         for (long friendId : friendFacade.listFriends(characterId)) {
             // findByName/findById chạm DB mỗi bạn — chấp nhận N+1 ở quy mô danh sách bạn bè MVP
             // (vài chục), không phải đường nóng mỗi tick (khác AoI/combat).
-            var name = characterFacade.findById(friendId).map(Character::name).orElse("");
+            String name = characterFacade.findById(friendId).map(Character::name).orElse("");
             responseBuilder.addFriends(FriendView.newBuilder()
                     .setCharacterId(friendId)
                     .setName(name)
@@ -1036,8 +1045,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleListPendingFriendRequestsRequest(
             ChannelHandlerContext ctx, PacketHeader header, byte[] payload) throws InvalidProtocolBufferException {
         ListPendingFriendRequestsRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1046,9 +1055,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleListPendingFriendRequestsBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        var responseBuilder = ListPendingFriendRequestsResponse.newBuilder();
-        for (var pending : friendFacade.listPendingRequests(characterId)) {
-            var requesterName = characterFacade.findById(pending.requesterId()).map(Character::name).orElse("");
+        ListPendingFriendRequestsResponse.Builder responseBuilder = ListPendingFriendRequestsResponse.newBuilder();
+        for (FriendFacade.PendingRequestView pending : friendFacade.listPendingRequests(characterId)) {
+            String requesterName = characterFacade.findById(pending.requesterId()).map(Character::name).orElse("");
             responseBuilder.addRequests(PendingFriendRequestView.newBuilder()
                     .setFriendshipId(pending.friendshipId())
                     .setRequesterId(pending.requesterId())
@@ -1061,9 +1070,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleCreateGuildCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = CreateGuildCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        CreateGuildCommand command = CreateGuildCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1073,8 +1082,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleCreateGuildBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, CreateGuildCommand command) {
-        var result = guildFacade.createGuild(characterId, command.getName());
-        var responseBuilder = CreateGuildResponse.newBuilder().setOutcome(toProtoOutcome(result.outcome()));
+        GuildFacade.CreateResult result = guildFacade.createGuild(characterId, command.getName());
+        CreateGuildResponse.Builder responseBuilder =
+                CreateGuildResponse.newBuilder().setOutcome(toProtoOutcome(result.outcome()));
         if (result.guildId() != null) {
             responseBuilder.setGuildId(result.guildId());
         }
@@ -1092,9 +1102,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSendGuildJoinRequestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = SendGuildJoinRequestCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        SendGuildJoinRequestCommand command = SendGuildJoinRequestCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1104,8 +1114,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSendGuildJoinRequestBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, SendGuildJoinRequestCommand command) {
-        var result = guildFacade.sendJoinRequest(characterId, command.getGuildName());
-        var response = SendGuildJoinRequestResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        GuildFacade.SendJoinRequestResult result = guildFacade.sendJoinRequest(characterId, command.getGuildName());
+        SendGuildJoinRequestResponse response =
+                SendGuildJoinRequestResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
         send(ctx, Opcode.OPCODE_SEND_GUILD_JOIN_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1126,9 +1137,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleApproveGuildJoinRequestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = ApproveGuildJoinRequestCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        ApproveGuildJoinRequestCommand command = ApproveGuildJoinRequestCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1138,8 +1149,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleApproveGuildJoinRequestBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, ApproveGuildJoinRequestCommand command) {
-        var result = guildFacade.approveJoinRequest(command.getRequestId(), characterId);
-        var response = ApproveGuildJoinRequestResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        GuildFacade.ApproveResult result = guildFacade.approveJoinRequest(command.getRequestId(), characterId);
+        ApproveGuildJoinRequestResponse response =
+                ApproveGuildJoinRequestResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
         send(ctx, Opcode.OPCODE_APPROVE_GUILD_JOIN_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1157,9 +1169,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleRejectGuildJoinRequestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = RejectGuildJoinRequestCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        RejectGuildJoinRequestCommand command = RejectGuildJoinRequestCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1169,19 +1181,20 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleRejectGuildJoinRequestBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, RejectGuildJoinRequestCommand command) {
-        var result = guildFacade.rejectJoinRequest(command.getRequestId(), characterId);
-        var outcome = result == GuildFacade.RejectResult.OK
+        GuildFacade.RejectResult result = guildFacade.rejectJoinRequest(command.getRequestId(), characterId);
+        RejectGuildJoinRequestOutcome outcome = result == GuildFacade.RejectResult.OK
                 ? RejectGuildJoinRequestOutcome.REJECT_GUILD_JOIN_REQUEST_OUTCOME_OK
                 : RejectGuildJoinRequestOutcome.REJECT_GUILD_JOIN_REQUEST_OUTCOME_NOT_FOUND;
-        var response = RejectGuildJoinRequestResponse.newBuilder().setOutcome(outcome).build();
+        RejectGuildJoinRequestResponse response =
+                RejectGuildJoinRequestResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_REJECT_GUILD_JOIN_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
     private void handleLeaveGuildCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         LeaveGuildCommand.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1190,20 +1203,20 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleLeaveGuildBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        var outcome = switch (guildFacade.leaveGuild(characterId)) {
+        LeaveGuildOutcome outcome = switch (guildFacade.leaveGuild(characterId)) {
             case OK -> LeaveGuildOutcome.LEAVE_GUILD_OUTCOME_OK;
             case NOT_IN_GUILD -> LeaveGuildOutcome.LEAVE_GUILD_OUTCOME_NOT_IN_GUILD;
             case LEADER_CANNOT_LEAVE -> LeaveGuildOutcome.LEAVE_GUILD_OUTCOME_LEADER_CANNOT_LEAVE;
         };
-        var response = LeaveGuildResponse.newBuilder().setOutcome(outcome).build();
+        LeaveGuildResponse response = LeaveGuildResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_LEAVE_GUILD_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
     private void handleDisbandGuildCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         DisbandGuildCommand.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1212,18 +1225,18 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleDisbandGuildBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        var outcome = guildFacade.disbandGuild(characterId) == GuildFacade.DisbandResult.OK
+        DisbandGuildOutcome outcome = guildFacade.disbandGuild(characterId) == GuildFacade.DisbandResult.OK
                 ? DisbandGuildOutcome.DISBAND_GUILD_OUTCOME_OK
                 : DisbandGuildOutcome.DISBAND_GUILD_OUTCOME_NOT_LEADER;
-        var response = DisbandGuildResponse.newBuilder().setOutcome(outcome).build();
+        DisbandGuildResponse response = DisbandGuildResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_DISBAND_GUILD_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
     private void handleKickGuildMemberCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = KickGuildMemberCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        KickGuildMemberCommand command = KickGuildMemberCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1233,29 +1246,29 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleKickGuildMemberBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, KickGuildMemberCommand command) {
-        var target = characterFacade.findByName(command.getTargetName());
+        Optional<Character> target = characterFacade.findByName(command.getTargetName());
         if (target.isEmpty()) {
-            var response = KickGuildMemberResponse.newBuilder()
+            KickGuildMemberResponse response = KickGuildMemberResponse.newBuilder()
                     .setOutcome(KickGuildMemberOutcome.KICK_GUILD_MEMBER_OUTCOME_TARGET_NOT_FOUND)
                     .build();
             send(ctx, Opcode.OPCODE_KICK_GUILD_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
-        var result = guildFacade.kickMember(characterId, target.get().id());
-        var outcome = switch (result) {
+        GuildFacade.KickResult result = guildFacade.kickMember(characterId, target.get().id());
+        KickGuildMemberOutcome outcome = switch (result) {
             case OK -> KickGuildMemberOutcome.KICK_GUILD_MEMBER_OUTCOME_OK;
             case CANNOT_KICK_SELF -> KickGuildMemberOutcome.KICK_GUILD_MEMBER_OUTCOME_CANNOT_KICK_SELF;
             case NOT_FOUND -> KickGuildMemberOutcome.KICK_GUILD_MEMBER_OUTCOME_NOT_FOUND;
         };
-        var response = KickGuildMemberResponse.newBuilder().setOutcome(outcome).build();
+        KickGuildMemberResponse response = KickGuildMemberResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_KICK_GUILD_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
     private void handleListGuildMembersRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         ListGuildMembersRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1264,11 +1277,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleListGuildMembersBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        var responseBuilder = ListGuildMembersResponse.newBuilder();
-        for (var member : guildFacade.listMembers(characterId)) {
+        ListGuildMembersResponse.Builder responseBuilder = ListGuildMembersResponse.newBuilder();
+        for (GuildFacade.MemberView member : guildFacade.listMembers(characterId)) {
             // findById chạm DB mỗi thành viên — chấp nhận N+1 ở quy mô 1 bang MVP (vài chục),
             // cùng lý do ListFriendsResponse.
-            var name = characterFacade.findById(member.characterId()).map(Character::name).orElse("");
+            String name = characterFacade.findById(member.characterId()).map(Character::name).orElse("");
             responseBuilder.addMembers(GuildMemberView.newBuilder()
                     .setCharacterId(member.characterId())
                     .setName(name)
@@ -1282,8 +1295,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleListPendingGuildJoinRequestsRequest(
             ChannelHandlerContext ctx, PacketHeader header, byte[] payload) throws InvalidProtocolBufferException {
         ListPendingGuildJoinRequestsRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1293,9 +1306,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleListPendingGuildJoinRequestsBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        var responseBuilder = ListPendingGuildJoinRequestsResponse.newBuilder();
-        for (var pending : guildFacade.listPendingJoinRequests(characterId)) {
-            var name = characterFacade.findById(pending.characterId()).map(Character::name).orElse("");
+        ListPendingGuildJoinRequestsResponse.Builder responseBuilder =
+                ListPendingGuildJoinRequestsResponse.newBuilder();
+        for (GuildFacade.PendingJoinRequestView pending : guildFacade.listPendingJoinRequests(characterId)) {
+            String name = characterFacade.findById(pending.characterId()).map(Character::name).orElse("");
             responseBuilder.addRequests(PendingGuildJoinRequestView.newBuilder()
                     .setRequestId(pending.requestId())
                     .setCharacterId(pending.characterId())
@@ -1309,8 +1323,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleGetMyGuildRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         GetMyGuildRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1319,8 +1333,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleGetMyGuildBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        var myGuild = guildFacade.findMyGuild(characterId);
-        var responseBuilder = GetMyGuildResponse.newBuilder().setInGuild(myGuild.isPresent());
+        Optional<GuildFacade.MyGuildView> myGuild = guildFacade.findMyGuild(characterId);
+        GetMyGuildResponse.Builder responseBuilder = GetMyGuildResponse.newBuilder().setInGuild(myGuild.isPresent());
         myGuild.ifPresent(guild -> responseBuilder
                 .setGuildId(guild.guildId())
                 .setGuildName(guild.guildName())
@@ -1331,8 +1345,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleCreatePartyCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         CreatePartyCommand.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1341,11 +1355,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleCreatePartyBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        var result = partyFacade.createParty(characterId);
-        var outcome = result.outcome() == PartyFacade.CreateOutcome.OK
+        PartyFacade.CreateResult result = partyFacade.createParty(characterId);
+        CreatePartyOutcome outcome = result.outcome() == PartyFacade.CreateOutcome.OK
                 ? CreatePartyOutcome.CREATE_PARTY_OUTCOME_OK
                 : CreatePartyOutcome.CREATE_PARTY_OUTCOME_ALREADY_IN_PARTY;
-        var responseBuilder = CreatePartyResponse.newBuilder().setOutcome(outcome);
+        CreatePartyResponse.Builder responseBuilder = CreatePartyResponse.newBuilder().setOutcome(outcome);
         if (result.partyId() != null) {
             responseBuilder.setPartyId(result.partyId());
         }
@@ -1354,9 +1368,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleInvitePartyMemberCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = InvitePartyMemberCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        InvitePartyMemberCommand command = InvitePartyMemberCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1366,16 +1380,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleInvitePartyMemberBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, InvitePartyMemberCommand command) {
-        var target = characterFacade.findByName(command.getTargetName());
+        Optional<Character> target = characterFacade.findByName(command.getTargetName());
         if (target.isEmpty()) {
-            var response = InvitePartyMemberResponse.newBuilder()
+            InvitePartyMemberResponse response = InvitePartyMemberResponse.newBuilder()
                     .setOutcome(InvitePartyMemberOutcome.INVITE_PARTY_MEMBER_OUTCOME_TARGET_NOT_FOUND)
                     .build();
             send(ctx, Opcode.OPCODE_INVITE_PARTY_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
-        var result = partyFacade.invite(characterId, target.get().id());
-        var response =
+        PartyFacade.InviteResult result = partyFacade.invite(characterId, target.get().id());
+        InvitePartyMemberResponse response =
                 InvitePartyMemberResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
         send(ctx, Opcode.OPCODE_INVITE_PARTY_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
@@ -1400,9 +1414,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleAcceptPartyInviteCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = AcceptPartyInviteCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        AcceptPartyInviteCommand command = AcceptPartyInviteCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1412,22 +1426,22 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleAcceptPartyInviteBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, AcceptPartyInviteCommand command) {
-        var result = partyFacade.acceptInvite(command.getInviteId(), characterId);
-        var outcome = switch (result) {
+        PartyFacade.AcceptResult result = partyFacade.acceptInvite(command.getInviteId(), characterId);
+        AcceptPartyInviteOutcome outcome = switch (result) {
             case OK -> AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_OK;
             case NOT_FOUND -> AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_NOT_FOUND;
             case ALREADY_IN_PARTY -> AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_ALREADY_IN_PARTY;
             case PARTY_FULL -> AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_PARTY_FULL;
         };
-        var response = AcceptPartyInviteResponse.newBuilder().setOutcome(outcome).build();
+        AcceptPartyInviteResponse response = AcceptPartyInviteResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_ACCEPT_PARTY_INVITE_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
     private void handleRejectPartyInviteCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = RejectPartyInviteCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        RejectPartyInviteCommand command = RejectPartyInviteCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1437,19 +1451,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleRejectPartyInviteBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, RejectPartyInviteCommand command) {
-        var result = partyFacade.rejectInvite(command.getInviteId(), characterId);
-        var outcome = result == PartyFacade.RejectResult.OK
+        PartyFacade.RejectResult result = partyFacade.rejectInvite(command.getInviteId(), characterId);
+        RejectPartyInviteOutcome outcome = result == PartyFacade.RejectResult.OK
                 ? RejectPartyInviteOutcome.REJECT_PARTY_INVITE_OUTCOME_OK
                 : RejectPartyInviteOutcome.REJECT_PARTY_INVITE_OUTCOME_NOT_FOUND;
-        var response = RejectPartyInviteResponse.newBuilder().setOutcome(outcome).build();
+        RejectPartyInviteResponse response = RejectPartyInviteResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_REJECT_PARTY_INVITE_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
     private void handleLeavePartyCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         LeavePartyCommand.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1458,18 +1472,18 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleLeavePartyBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        var outcome = partyFacade.leaveParty(characterId) == PartyFacade.LeaveResult.OK
+        LeavePartyOutcome outcome = partyFacade.leaveParty(characterId) == PartyFacade.LeaveResult.OK
                 ? LeavePartyOutcome.LEAVE_PARTY_OUTCOME_OK
                 : LeavePartyOutcome.LEAVE_PARTY_OUTCOME_NOT_IN_PARTY;
-        var response = LeavePartyResponse.newBuilder().setOutcome(outcome).build();
+        LeavePartyResponse response = LeavePartyResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_LEAVE_PARTY_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
     private void handleKickPartyMemberCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = KickPartyMemberCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        KickPartyMemberCommand command = KickPartyMemberCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1479,29 +1493,29 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleKickPartyMemberBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, KickPartyMemberCommand command) {
-        var target = characterFacade.findByName(command.getTargetName());
+        Optional<Character> target = characterFacade.findByName(command.getTargetName());
         if (target.isEmpty()) {
-            var response = KickPartyMemberResponse.newBuilder()
+            KickPartyMemberResponse response = KickPartyMemberResponse.newBuilder()
                     .setOutcome(KickPartyMemberOutcome.KICK_PARTY_MEMBER_OUTCOME_TARGET_NOT_FOUND)
                     .build();
             send(ctx, Opcode.OPCODE_KICK_PARTY_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
-        var result = partyFacade.kickMember(characterId, target.get().id());
-        var outcome = switch (result) {
+        PartyFacade.KickResult result = partyFacade.kickMember(characterId, target.get().id());
+        KickPartyMemberOutcome outcome = switch (result) {
             case OK -> KickPartyMemberOutcome.KICK_PARTY_MEMBER_OUTCOME_OK;
             case CANNOT_KICK_SELF -> KickPartyMemberOutcome.KICK_PARTY_MEMBER_OUTCOME_CANNOT_KICK_SELF;
             case NOT_FOUND -> KickPartyMemberOutcome.KICK_PARTY_MEMBER_OUTCOME_NOT_FOUND;
         };
-        var response = KickPartyMemberResponse.newBuilder().setOutcome(outcome).build();
+        KickPartyMemberResponse response = KickPartyMemberResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_KICK_PARTY_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
     private void handleListPartyMembersRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         ListPartyMembersRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1510,9 +1524,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleListPartyMembersBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        var responseBuilder = ListPartyMembersResponse.newBuilder();
-        for (var member : partyFacade.listMembers(characterId)) {
-            var name = characterFacade.findById(member.characterId()).map(Character::name).orElse("");
+        ListPartyMembersResponse.Builder responseBuilder = ListPartyMembersResponse.newBuilder();
+        for (PartyFacade.MemberView member : partyFacade.listMembers(characterId)) {
+            String name = characterFacade.findById(member.characterId()).map(Character::name).orElse("");
             responseBuilder.addMembers(PartyMemberView.newBuilder()
                     .setCharacterId(member.characterId())
                     .setName(name)
@@ -1526,8 +1540,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleListPendingPartyInvitesRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         ListPendingPartyInvitesRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1536,8 +1550,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleListPendingPartyInvitesBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        var responseBuilder = ListPendingPartyInvitesResponse.newBuilder();
-        for (var pending : partyFacade.listPendingInvites(characterId)) {
+        ListPendingPartyInvitesResponse.Builder responseBuilder = ListPendingPartyInvitesResponse.newBuilder();
+        for (PartyFacade.PendingInviteView pending : partyFacade.listPendingInvites(characterId)) {
             responseBuilder.addInvites(PendingPartyInviteView.newBuilder()
                     .setInviteId(pending.inviteId())
                     .setPartyId(pending.partyId())
@@ -1550,8 +1564,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleGetMyPartyRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         GetMyPartyRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1560,8 +1574,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleGetMyPartyBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        var myParty = partyFacade.findMyParty(characterId);
-        var responseBuilder = GetMyPartyResponse.newBuilder().setInParty(myParty.isPresent());
+        Optional<PartyFacade.MyPartyView> myParty = partyFacade.findMyParty(characterId);
+        GetMyPartyResponse.Builder responseBuilder = GetMyPartyResponse.newBuilder().setInParty(myParty.isPresent());
         myParty.ifPresent(party -> responseBuilder.setPartyId(party.partyId()).setIsLeader(party.isLeader()));
         send(ctx, Opcode.OPCODE_GET_MY_PARTY_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
     }
@@ -1570,9 +1584,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // Virtual Thread, giống handleGetMyPartyRequest.
     private void handleEnterDungeonCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = EnterDungeonCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        EnterDungeonCommand command = EnterDungeonCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1582,15 +1596,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleEnterDungeonBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, EnterDungeonCommand command) {
-        var outcome = worldGateway.dungeonInstanceRegistry().enterDungeon(characterId, command.getDungeonCode());
-        var protoOutcome = switch (outcome) {
+        DungeonInstanceRegistry.EnterOutcome outcome =
+                worldGateway.dungeonInstanceRegistry().enterDungeon(characterId, command.getDungeonCode());
+        EnterDungeonOutcome protoOutcome = switch (outcome) {
             case OK -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK;
             case NOT_IN_PARTY -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_NOT_IN_PARTY;
             case PARTY_MEMBER_OFFLINE -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_PARTY_MEMBER_OFFLINE;
             case ALREADY_IN_DUNGEON -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_ALREADY_IN_DUNGEON;
             case UNKNOWN_DUNGEON -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_UNKNOWN_DUNGEON;
         };
-        var response = EnterDungeonResponse.newBuilder().setOutcome(protoOutcome).build();
+        EnterDungeonResponse response = EnterDungeonResponse.newBuilder().setOutcome(protoOutcome).build();
         send(ctx, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1598,8 +1613,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleExitDungeonCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         ExitDungeonCommand.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1608,19 +1623,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleExitDungeonBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        var outcome = worldGateway.dungeonInstanceRegistry().exitDungeon(characterId);
-        var protoOutcome = outcome == DungeonInstanceRegistry.ExitOutcome.OK
+        DungeonInstanceRegistry.ExitOutcome outcome = worldGateway.dungeonInstanceRegistry().exitDungeon(characterId);
+        ExitDungeonOutcome protoOutcome = outcome == DungeonInstanceRegistry.ExitOutcome.OK
                 ? ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK
                 : ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_NOT_IN_DUNGEON;
-        var response = ExitDungeonResponse.newBuilder().setOutcome(protoOutcome).build();
+        ExitDungeonResponse response = ExitDungeonResponse.newBuilder().setOutcome(protoOutcome).build();
         send(ctx, Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
     private void handleRequestTradeCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = RequestTradeCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        RequestTradeCommand command = RequestTradeCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1630,23 +1645,24 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleRequestTradeBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, RequestTradeCommand command) {
-        var target = characterFacade.findByName(command.getTargetName());
+        Optional<Character> target = characterFacade.findByName(command.getTargetName());
         if (target.isEmpty()) {
-            var response = RequestTradeResponse.newBuilder()
+            RequestTradeResponse response = RequestTradeResponse.newBuilder()
                     .setOutcome(RequestTradeOutcome.REQUEST_TRADE_OUTCOME_TARGET_NOT_FOUND)
                     .build();
             send(ctx, Opcode.OPCODE_REQUEST_TRADE_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
-        var result = tradeFacade.requestTrade(characterId, target.get().id());
-        var responseBuilder = RequestTradeResponse.newBuilder().setOutcome(toProtoOutcome(result.outcome()));
+        TradeFacade.RequestResult result = tradeFacade.requestTrade(characterId, target.get().id());
+        RequestTradeResponse.Builder responseBuilder =
+                RequestTradeResponse.newBuilder().setOutcome(toProtoOutcome(result.outcome()));
         if (result.sessionId() != null) {
             responseBuilder.setSessionId(result.sessionId());
         }
         send(ctx, Opcode.OPCODE_REQUEST_TRADE_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
         if (result.outcome() == TradeFacade.RequestOutcome.OK) {
-            var senderName = characterFacade.findById(characterId).map(Character::name).orElse("");
-            var event = TradeRequestedEvent.newBuilder()
+            String senderName = characterFacade.findById(characterId).map(Character::name).orElse("");
+            TradeRequestedEvent event = TradeRequestedEvent.newBuilder()
                     .setSessionId(result.sessionId())
                     .setFromCharacterId(characterId)
                     .setFromName(senderName)
@@ -1669,9 +1685,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleAcceptTradeRequestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = AcceptTradeRequestCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        AcceptTradeRequestCommand command = AcceptTradeRequestCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1681,11 +1697,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleAcceptTradeRequestBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, AcceptTradeRequestCommand command) {
-        var result = tradeFacade.acceptRequest(command.getSessionId(), characterId);
-        var outcome = result == TradeFacade.AcceptResult.OK
+        TradeFacade.AcceptResult result = tradeFacade.acceptRequest(command.getSessionId(), characterId);
+        AcceptTradeRequestOutcome outcome = result == TradeFacade.AcceptResult.OK
                 ? AcceptTradeRequestOutcome.ACCEPT_TRADE_REQUEST_OUTCOME_OK
                 : AcceptTradeRequestOutcome.ACCEPT_TRADE_REQUEST_OUTCOME_NOT_FOUND;
-        var response = AcceptTradeRequestResponse.newBuilder().setOutcome(outcome).build();
+        AcceptTradeRequestResponse response = AcceptTradeRequestResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_ACCEPT_TRADE_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
         if (result == TradeFacade.AcceptResult.OK) {
             notifyCounterpart(characterId, command.getSessionId());
@@ -1694,9 +1710,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleCancelTradeCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = CancelTradeCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        CancelTradeCommand command = CancelTradeCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1706,15 +1722,15 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleCancelTradeBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, CancelTradeCommand command) {
-        var statusBefore = tradeFacade.getStatus(characterId);
-        var result = tradeFacade.cancel(command.getSessionId(), characterId);
-        var outcome = result == TradeFacade.CancelResult.OK
+        Optional<TradeFacade.TradeStatusView> statusBefore = tradeFacade.getStatus(characterId);
+        TradeFacade.CancelResult result = tradeFacade.cancel(command.getSessionId(), characterId);
+        CancelTradeOutcome outcome = result == TradeFacade.CancelResult.OK
                 ? CancelTradeOutcome.CANCEL_TRADE_OUTCOME_OK
                 : CancelTradeOutcome.CANCEL_TRADE_OUTCOME_NOT_FOUND;
-        var response = CancelTradeResponse.newBuilder().setOutcome(outcome).build();
+        CancelTradeResponse response = CancelTradeResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_CANCEL_TRADE_RESPONSE_VALUE, sequenceId, response.toByteArray());
         if (result == TradeFacade.CancelResult.OK && statusBefore.isPresent()) {
-            var event = TradeClosedEvent.newBuilder()
+            TradeClosedEvent event = TradeClosedEvent.newBuilder()
                     .setSessionId(command.getSessionId())
                     .setReason(TradeCloseReason.TRADE_CLOSE_REASON_CANCELLED)
                     .build();
@@ -1726,9 +1742,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSetTradeOfferCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = SetTradeOfferCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        SetTradeOfferCommand command = SetTradeOfferCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1738,14 +1754,15 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSetTradeOfferBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, SetTradeOfferCommand command) {
-        var items = command.getItemsList().stream()
+        List<TradeFacade.OfferItemInput> items = command.getItemsList().stream()
                 .map(i -> new TradeFacade.OfferItemInput(i.getItemId(), i.getQuantity()))
                 .toList();
-        var result = tradeFacade.setOffer(command.getSessionId(), characterId, command.getGoldAmount(), items);
-        var outcome = result == TradeFacade.SetOfferResult.OK
+        TradeFacade.SetOfferResult result =
+                tradeFacade.setOffer(command.getSessionId(), characterId, command.getGoldAmount(), items);
+        SetTradeOfferOutcome outcome = result == TradeFacade.SetOfferResult.OK
                 ? SetTradeOfferOutcome.SET_TRADE_OFFER_OUTCOME_OK
                 : SetTradeOfferOutcome.SET_TRADE_OFFER_OUTCOME_NOT_FOUND;
-        var response = SetTradeOfferResponse.newBuilder().setOutcome(outcome).build();
+        SetTradeOfferResponse response = SetTradeOfferResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_SET_TRADE_OFFER_RESPONSE_VALUE, sequenceId, response.toByteArray());
         if (result == TradeFacade.SetOfferResult.OK) {
             notifyCounterpart(characterId, command.getSessionId());
@@ -1754,9 +1771,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleConfirmTradeCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = ConfirmTradeCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        ConfirmTradeCommand command = ConfirmTradeCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1766,30 +1783,31 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleConfirmTradeBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, ConfirmTradeCommand command) {
-        var statusBefore = tradeFacade.getStatus(characterId);
-        var result = tradeFacade.confirm(command.getSessionId(), characterId, command.getIdempotencyKey());
-        var outcome = switch (result) {
+        Optional<TradeFacade.TradeStatusView> statusBefore = tradeFacade.getStatus(characterId);
+        TradeFacade.ConfirmResult result =
+                tradeFacade.confirm(command.getSessionId(), characterId, command.getIdempotencyKey());
+        ConfirmTradeOutcome outcome = switch (result) {
             case OK -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_OK;
             case EXECUTED -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_EXECUTED;
             case NOT_FOUND -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_NOT_FOUND;
             case OFFER_INVALID -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_OFFER_INVALID;
             case DUPLICATE_REQUEST -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_DUPLICATE_REQUEST;
         };
-        var response = ConfirmTradeResponse.newBuilder().setOutcome(outcome).build();
+        ConfirmTradeResponse response = ConfirmTradeResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_CONFIRM_TRADE_RESPONSE_VALUE, sequenceId, response.toByteArray());
         if (statusBefore.isEmpty()) {
             return;
         }
         long counterpartId = statusBefore.get().counterpartCharacterId();
         if (result == TradeFacade.ConfirmResult.EXECUTED) {
-            var event = TradeClosedEvent.newBuilder()
+            TradeClosedEvent event = TradeClosedEvent.newBuilder()
                     .setSessionId(command.getSessionId())
                     .setReason(TradeCloseReason.TRADE_CLOSE_REASON_EXECUTED)
                     .build();
             worldGateway.registry().sendToCharacterIfOnline(
                     counterpartId, Opcode.OPCODE_TRADE_CLOSED_EVENT_VALUE, 0, event.toByteArray());
         } else if (result == TradeFacade.ConfirmResult.OK || result == TradeFacade.ConfirmResult.OFFER_INVALID) {
-            var event = TradeUpdatedEvent.newBuilder().setSessionId(command.getSessionId()).build();
+            TradeUpdatedEvent event = TradeUpdatedEvent.newBuilder().setSessionId(command.getSessionId()).build();
             worldGateway.registry().sendToCharacterIfOnline(
                     counterpartId, Opcode.OPCODE_TRADE_UPDATED_EVENT_VALUE, 0, event.toByteArray());
         }
@@ -1797,11 +1815,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     /** Đẩy {@code TradeUpdatedEvent} cho đối phương của {@code characterId} trong phiên hiện tại. */
     private void notifyCounterpart(long characterId, long sessionId) {
-        var status = tradeFacade.getStatus(characterId);
+        Optional<TradeFacade.TradeStatusView> status = tradeFacade.getStatus(characterId);
         if (status.isEmpty()) {
             return;
         }
-        var event = TradeUpdatedEvent.newBuilder().setSessionId(sessionId).build();
+        TradeUpdatedEvent event = TradeUpdatedEvent.newBuilder().setSessionId(sessionId).build();
         worldGateway.registry().sendToCharacterIfOnline(
                 status.get().counterpartCharacterId(), Opcode.OPCODE_TRADE_UPDATED_EVENT_VALUE, 0,
                 event.toByteArray());
@@ -1810,8 +1828,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleGetTradeStatusRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         GetTradeStatusRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1820,10 +1838,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleGetTradeStatusBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        var statusOpt = tradeFacade.getStatus(characterId);
-        var responseBuilder = GetTradeStatusResponse.newBuilder().setInTrade(statusOpt.isPresent());
+        Optional<TradeFacade.TradeStatusView> statusOpt = tradeFacade.getStatus(characterId);
+        GetTradeStatusResponse.Builder responseBuilder =
+                GetTradeStatusResponse.newBuilder().setInTrade(statusOpt.isPresent());
         statusOpt.ifPresent(status -> {
-            var counterpartName =
+            String counterpartName =
                     characterFacade.findById(status.counterpartCharacterId()).map(Character::name).orElse("");
             responseBuilder
                     .setSessionId(status.sessionId())
@@ -1837,10 +1856,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setTheirGoldOffer(status.theirGoldOffer())
                     .setMyConfirmed(status.myConfirmed())
                     .setTheirConfirmed(status.theirConfirmed());
-            for (var item : status.myItems()) {
+            for (TradeFacade.OfferItemView item : status.myItems()) {
                 responseBuilder.addMyItems(toProtoOfferItemView(item));
             }
-            for (var item : status.theirItems()) {
+            for (TradeFacade.OfferItemView item : status.theirItems()) {
                 responseBuilder.addTheirItems(toProtoOfferItemView(item));
             }
         });
@@ -1858,9 +1877,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSendMailCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = SendMailCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        SendMailCommand command = SendMailCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1870,27 +1889,27 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSendMailBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, SendMailCommand command) {
-        var recipient = characterFacade.findByName(command.getRecipientName());
+        Optional<Character> recipient = characterFacade.findByName(command.getRecipientName());
         if (recipient.isEmpty()) {
-            var response = SendMailResponse.newBuilder()
+            SendMailResponse response = SendMailResponse.newBuilder()
                     .setOutcome(SendMailOutcome.SEND_MAIL_OUTCOME_RECIPIENT_NOT_FOUND)
                     .build();
             send(ctx, Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
-        var attachments = command.getAttachmentsList().stream()
+        List<MailFacade.AttachmentRequest> attachments = command.getAttachmentsList().stream()
                 .map(a -> new MailFacade.AttachmentRequest(a.getItemTemplateId(), a.getQuantity()))
                 .toList();
-        var request = new MailFacade.SendMailRequest(
+        MailFacade.SendMailRequest request = new MailFacade.SendMailRequest(
                 characterId, recipient.get().id(), command.getSubject(), command.getBody(), command.getGoldAmount(),
                 attachments);
         long mailId = mailFacade.sendMail(request);
-        var response = SendMailResponse.newBuilder()
+        SendMailResponse response = SendMailResponse.newBuilder()
                 .setOutcome(SendMailOutcome.SEND_MAIL_OUTCOME_OK)
                 .setMailId(mailId)
                 .build();
         send(ctx, Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE, sequenceId, response.toByteArray());
-        var event = NewMailEvent.newBuilder().setMailId(mailId).build();
+        NewMailEvent event = NewMailEvent.newBuilder().setMailId(mailId).build();
         worldGateway.registry().sendToCharacterIfOnline(
                 recipient.get().id(), Opcode.OPCODE_NEW_MAIL_EVENT_VALUE, 0, event.toByteArray());
     }
@@ -1898,8 +1917,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleListMailRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         ListMailRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1908,9 +1927,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleListMailBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        var responseBuilder = ListMailResponse.newBuilder();
-        for (var mail : mailFacade.listMail(characterId)) {
-            var viewBuilder = MailView.newBuilder()
+        ListMailResponse.Builder responseBuilder = ListMailResponse.newBuilder();
+        for (MailFacade.MailView mail : mailFacade.listMail(characterId)) {
+            MailView.Builder viewBuilder = MailView.newBuilder()
                     .setMailId(mail.mailId())
                     .setHasSender(mail.senderId() != null)
                     .setSenderId(mail.senderId() == null ? 0 : mail.senderId())
@@ -1918,7 +1937,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setBody(mail.body())
                     .setGoldAmount(mail.goldAmount())
                     .setClaimed(mail.claimed());
-            for (var attachment : mail.attachments()) {
+            for (MailFacade.AttachmentView attachment : mail.attachments()) {
                 viewBuilder.addAttachments(MailAttachmentView.newBuilder()
                         .setItemTemplateId(attachment.itemTemplateId())
                         .setQuantity(attachment.quantity())
@@ -1931,9 +1950,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleClaimMailCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = ClaimMailCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        ClaimMailCommand command = ClaimMailCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1943,8 +1962,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleClaimMailBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, ClaimMailCommand command) {
-        var result = mailFacade.claimMail(command.getMailId(), characterId, command.getIdempotencyKey());
-        var response = ClaimMailResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        MailFacade.ClaimResult result =
+                mailFacade.claimMail(command.getMailId(), characterId, command.getIdempotencyKey());
+        ClaimMailResponse response = ClaimMailResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
         send(ctx, Opcode.OPCODE_CLAIM_MAIL_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1961,9 +1981,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleDeleteMailCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = DeleteMailCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        DeleteMailCommand command = DeleteMailCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
@@ -1973,8 +1993,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleDeleteMailBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, DeleteMailCommand command) {
-        var result = mailFacade.deleteMail(command.getMailId(), characterId);
-        var response = DeleteMailResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        MailFacade.DeleteResult result = mailFacade.deleteMail(command.getMailId(), characterId);
+        DeleteMailResponse response = DeleteMailResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
         send(ctx, Opcode.OPCODE_DELETE_MAIL_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1989,16 +2009,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSendChatMessageCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        var command = SendChatMessageCommand.parseFrom(payload);
-        var sequenceId = header.sequenceId();
-        var characterId = boundCharacterId;
+        SendChatMessageCommand command = SendChatMessageCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        var rateLimiter = chatRateLimiterFor(command.getChannel());
+        RateLimiter rateLimiter = chatRateLimiterFor(command.getChannel());
         if (!rateLimiter.tryAcquire()) {
-            var response = SendChatMessageResponse.newBuilder()
+            SendChatMessageResponse response = SendChatMessageResponse.newBuilder()
                     .setOutcome(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_RATE_LIMITED)
                     .build();
             send(ctx, Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE, sequenceId, response.toByteArray());
@@ -2023,15 +2043,15 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSendChatMessageBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, SendChatMessageCommand command) {
-        var domainChannelOpt = toDomainChannel(command.getChannel());
+        Optional<dev.kage.chat.domain.ChatChannel> domainChannelOpt = toDomainChannel(command.getChannel());
         if (domainChannelOpt.isEmpty()) {
             sendError(ctx, sequenceId, 400, "error.invalid_chat_channel");
             return;
         }
-        var domainChannel = domainChannelOpt.get();
+        dev.kage.chat.domain.ChatChannel domainChannel = domainChannelOpt.get();
         Character target = null;
         if (domainChannel == dev.kage.chat.domain.ChatChannel.PRIVATE) {
-            var found = characterFacade.findByName(command.getTargetName());
+            Optional<Character> found = characterFacade.findByName(command.getTargetName());
             if (found.isEmpty()) {
                 sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_TARGET_NOT_FOUND);
                 return;
@@ -2050,12 +2070,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_PARTY);
             return;
         }
-        var result = chatFacade.sendMessage(characterId, domainChannel, command.getBody());
+        ChatFacade.SendResult result = chatFacade.sendMessage(characterId, domainChannel, command.getBody());
         sendChatOutcome(ctx, sequenceId, toProtoOutcome(result));
         if (result != ChatFacade.SendResult.OK) {
             return;
         }
-        var senderName = characterFacade.findById(characterId).map(Character::name).orElse("");
+        String senderName = characterFacade.findById(characterId).map(Character::name).orElse("");
         routeChatMessage(domainChannel, new ChatRouteContext(characterId, senderName, target, command.getBody()));
     }
 
@@ -2068,7 +2088,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void routeChatMessage(dev.kage.chat.domain.ChatChannel domainChannel, ChatRouteContext ctx) {
         switch (domainChannel) {
             case WORLD -> {
-                var event = ChatMessageEvent.newBuilder()
+                ChatMessageEvent event = ChatMessageEvent.newBuilder()
                         .setChannel(ChatChannel.CHAT_CHANNEL_WORLD)
                         .setSenderId(ctx.characterId())
                         .setSenderName(ctx.senderName())
@@ -2077,7 +2097,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 worldGateway.registry().broadcastToAll(Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, event.toByteArray());
             }
             case PRIVATE -> {
-                var event = ChatMessageEvent.newBuilder()
+                ChatMessageEvent event = ChatMessageEvent.newBuilder()
                         .setChannel(ChatChannel.CHAT_CHANNEL_PRIVATE)
                         .setSenderId(ctx.characterId())
                         .setSenderName(ctx.senderName())
@@ -2100,7 +2120,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void broadcastToGroup(ChatChannel protoChannel, ChatRouteContext ctx, List<Long> memberCharacterIds) {
-        var event = ChatMessageEvent.newBuilder()
+        ChatMessageEvent event = ChatMessageEvent.newBuilder()
                 .setChannel(protoChannel)
                 .setSenderId(ctx.characterId())
                 .setSenderName(ctx.senderName())
@@ -2113,7 +2133,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void sendChatOutcome(ChannelHandlerContext ctx, int sequenceId, SendChatMessageOutcome outcome) {
-        var response = SendChatMessageResponse.newBuilder().setOutcome(outcome).build();
+        SendChatMessageResponse response = SendChatMessageResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -2142,10 +2162,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private static DialogueNodeResponse toResponse(DialogueNode node) {
-        var builder = DialogueNodeResponse.newBuilder()
+        DialogueNodeResponse.Builder builder = DialogueNodeResponse.newBuilder()
                 .setNodeId(node.nodeId())
                 .setTextKey(node.textKey());
-        for (var option : node.options()) {
+        for (DialogueOption option : node.options()) {
             builder.addOptions(DialogueOptionView.newBuilder()
                     .setLabelKey(option.labelKey())
                     .setAction(option.action())
@@ -2203,7 +2223,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void sendError(ChannelHandlerContext ctx, int relatedSequenceId, int errorCode, String errorKey) {
-        var error = ErrorResponse.newBuilder()
+        ErrorResponse error = ErrorResponse.newBuilder()
                 .setErrorCode(errorCode)
                 .setErrorKey(errorKey)
                 .setRelatedSequenceId(relatedSequenceId)
@@ -2212,7 +2232,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void send(ChannelHandlerContext ctx, int opcode, int sequenceId, byte[] payload) {
-        var header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
+        PacketHeader header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
         ctx.writeAndFlush(new PacketCodec.Frame(header, payload));
     }
 
@@ -2221,12 +2241,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // Mất kết nối (đóng chủ động, timeout, hay lỗi — exceptionCaught cũng dẫn tới sự kiện
         // này) — dọn entity ECS + AoI của nhân vật này (SERVER.md §9: 1 kết nối chết không được
         // để bia đỡ đạn đứng lại trong world).
-        var characterId = boundCharacterId;
+        Long characterId = boundCharacterId;
         if (characterId != null) {
             // Đọc vị trí cuối TRƯỚC unregister() (unregister xoá luôn khỏi lastKnownPosition —
             // đọc ở đây trên EventLoop, rẻ, không phải I/O, không tra lại sau trên authExecutor
             // vì lúc đó có thể đã bị unregister() xoá mất — xem javadoc CharacterPositionPersister#save).
-            var lastPosition = worldGateway.registry().lastKnownPosition(characterId);
+            PositionSnapshot lastPosition = worldGateway.registry().lastKnownPosition(characterId);
             worldGateway.registry().unregister(characterId);
             // Phase 8 lát cắt 1 (ADR-026): nếu đang ở dungeon, detach khỏi ĐÚNG dungeon World +
             // dọn bookkeeping instance (dừng luôn World nếu rỗng) — KHÔNG re-attach world chính
@@ -2249,7 +2269,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     /** Báo cho bạn bè ĐANG online của {@code characterId} rằng người này vừa vào/thoát world. */
     private void notifyFriendsPresenceChanged(long characterId, boolean online) {
-        var friendIds = friendFacade.listFriends(characterId);
+        List<Long> friendIds = friendFacade.listFriends(characterId);
         if (friendIds.isEmpty()) {
             return;
         }

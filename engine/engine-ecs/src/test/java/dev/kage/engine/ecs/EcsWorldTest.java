@@ -35,17 +35,17 @@ class EcsWorldTest {
 
     @Test
     void shouldRunAllRegisteredSystems_whenMultipleSystemsShareAFamilyComponent() {
-        var world = new EcsWorld();
-        var marker = new MarkerSystem();
+        EcsWorld world = new EcsWorld();
+        MarkerSystem marker = new MarkerSystem();
         world.addSystem(new MovementSystem());
         world.addSystem(marker);
 
-        var entity = world.createEntity();
-        var position = new PositionComponent();
+        KEntity entity = world.createEntity();
+        PositionComponent position = new PositionComponent();
         entity.add(position);
         entity.add(new VelocityComponent());
         POSITION.get(entity).x = 0f;
-        var velocity = ComponentMapper.getFor(VelocityComponent.class).get(entity);
+        VelocityComponent velocity = ComponentMapper.getFor(VelocityComponent.class).get(entity);
         velocity.x = 10f;
 
         world.update(1f);

@@ -15,11 +15,11 @@ class ListPendingFriendRequestsUseCaseTest {
 
     @Test
     void shouldReturnOnlyRequestsAddressedToCaller() {
-        var port = new FakeFriendPort();
+        FakeFriendPort port = new FakeFriendPort();
         port.friendships.add(new Friendship(1, 7, 5, FriendshipStatus.PENDING, Instant.now(), null));
-        var useCase = new ListPendingFriendRequestsUseCase(port);
+        ListPendingFriendRequestsUseCase useCase = new ListPendingFriendRequestsUseCase(port);
 
-        var result = useCase.execute(5);
+        List<Friendship> result = useCase.execute(5);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).requesterId()).isEqualTo(7);

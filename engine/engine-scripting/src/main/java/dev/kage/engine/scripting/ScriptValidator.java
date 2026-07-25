@@ -25,7 +25,7 @@ public final class ScriptValidator {
      * @throws ScriptExecutionException nếu bất kỳ script nào lỗi cú pháp
      */
     public void validateAll(List<String> scriptRefs) {
-        for (var scriptRef : scriptRefs) {
+        for (String scriptRef : scriptRefs) {
             sandbox.validateSyntax(loadScript(scriptRef), scriptRef);
         }
     }

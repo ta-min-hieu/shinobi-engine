@@ -9,18 +9,18 @@ class FindMyPartyUseCaseTest {
 
     @Test
     void shouldReturnPartyInfo_whenCharacterIsLeader() {
-        var port = new FakePartyPort();
+        FakePartyPort port = new FakePartyPort();
         port.createParty(1);
-        var useCase = new FindMyPartyUseCase(port);
+        FindMyPartyUseCase useCase = new FindMyPartyUseCase(port);
 
-        var result = useCase.execute(1).orElseThrow();
+        FindMyPartyUseCase.Result result = useCase.execute(1).orElseThrow();
 
         assertThat(result.myRole()).isEqualTo(PartyRole.LEADER);
     }
 
     @Test
     void shouldReturnEmpty_whenNotInAnyParty() {
-        var useCase = new FindMyPartyUseCase(new FakePartyPort());
+        FindMyPartyUseCase useCase = new FindMyPartyUseCase(new FakePartyPort());
 
         assertThat(useCase.execute(1)).isEmpty();
     }

@@ -71,7 +71,7 @@ public final class Inventory {
      */
     public void consumeOne(long itemId) {
         for (int i = 0; i < items.size(); i++) {
-            var stack = items.get(i);
+            ItemStack stack = items.get(i);
             if (stack.id() == itemId) {
                 if (stack.quantity() <= 1) {
                     items.remove(i);

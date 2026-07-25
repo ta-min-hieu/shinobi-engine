@@ -45,7 +45,7 @@ class PostgresInventoryAdapterIntegrationTest {
 
     @BeforeAll
     static void migrate() {
-        var config = new DatabaseConfig(
+        DatabaseConfig config = new DatabaseConfig(
                 POSTGRES.getHost(),
                 POSTGRES.getMappedPort(POSTGRES_PORT),
                 POSTGRES.getDatabaseName(),
@@ -54,9 +54,9 @@ class PostgresInventoryAdapterIntegrationTest {
         dataSource = PostgresDataSourceFactory.create(config);
         FlywayMigrator.migrate(dataSource);
 
-        var accountAdapter = new PostgresAccountAdapter();
-        var accountTx = new JdbcAccountTransactionRunner(dataSource);
-        var accountHolder = new Account[1];
+        PostgresAccountAdapter accountAdapter = new PostgresAccountAdapter();
+        JdbcAccountTransactionRunner accountTx = new JdbcAccountTransactionRunner(dataSource);
+        Account[] accountHolder = new Account[1];
         accountTx.inTransaction(tx -> accountHolder[0] = accountAdapter.findOrCreate(tx, "inventorytester"));
         accountId = accountHolder[0].id();
     }
@@ -68,10 +68,10 @@ class PostgresInventoryAdapterIntegrationTest {
      * {@code shouldReturnEmptyInventory_...} thấy túi KHÔNG rỗng).
      */
     private static long createFreshCharacter(String name) {
-        var characterAdapter = new PostgresCharacterAdapter(dataSource);
-        var characterTx = new JdbcCharacterTransactionRunner(dataSource);
-        var newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
-        var holder = new Character[1];
+        PostgresCharacterAdapter characterAdapter = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner characterTx = new JdbcCharacterTransactionRunner(dataSource);
+        NewCharacter newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
+        Character[] holder = new Character[1];
         characterTx.inTransaction(tx -> holder[0] = characterAdapter.create(tx, newCharacter));
         return holder[0].id();
     }
@@ -79,9 +79,9 @@ class PostgresInventoryAdapterIntegrationTest {
     @Test
     void shouldReturnEmptyInventory_whenNeverSaved() {
         long characterId = createFreshCharacter("InvEmpty");
-        var adapter = new PostgresInventoryAdapter(dataSource);
+        PostgresInventoryAdapter adapter = new PostgresInventoryAdapter(dataSource);
 
-        var inventory = adapter.findByCharacter(characterId).orElseThrow();
+        Inventory inventory = adapter.findByCharacter(characterId).orElseThrow();
 
         assertThat(inventory.items()).isEmpty();
         assertThat(inventory.isFull()).isFalse();
@@ -90,15 +90,15 @@ class PostgresInventoryAdapterIntegrationTest {
     @Test
     void shouldPersistItems_acrossSaveAndLoad() {
         long characterId = createFreshCharacter("InvPersist");
-        var adapter = new PostgresInventoryAdapter(dataSource);
-        var transactionRunner = new JdbcInventoryTransactionRunner(dataSource);
-        var inventory = new Inventory(characterId, 20, List.of(ItemStack.newItem(1L, 3, 0)));
+        PostgresInventoryAdapter adapter = new PostgresInventoryAdapter(dataSource);
+        JdbcInventoryTransactionRunner transactionRunner = new JdbcInventoryTransactionRunner(dataSource);
+        Inventory inventory = new Inventory(characterId, 20, List.of(ItemStack.newItem(1L, 3, 0)));
 
         transactionRunner.inTransaction(tx -> adapter.save(tx, inventory));
-        var reloaded = adapter.findByCharacter(characterId).orElseThrow();
+        Inventory reloaded = adapter.findByCharacter(characterId).orElseThrow();
 
         assertThat(reloaded.items()).hasSize(1);
-        var reloadedStack = reloaded.items().get(0);
+        ItemStack reloadedStack = reloaded.items().get(0);
         assertThat(reloadedStack.itemTemplateId()).isEqualTo(1L);
         assertThat(reloadedStack.quantity()).isEqualTo(3);
         assertThat(reloadedStack.isPersisted()).isTrue(); // id thật đã được DB gán qua RETURNING id
@@ -107,15 +107,15 @@ class PostgresInventoryAdapterIntegrationTest {
     @Test
     void shouldReplaceItems_onSecondSave() {
         long characterId = createFreshCharacter("InvReplace");
-        var adapter = new PostgresInventoryAdapter(dataSource);
-        var transactionRunner = new JdbcInventoryTransactionRunner(dataSource);
-        var first = new Inventory(
+        PostgresInventoryAdapter adapter = new PostgresInventoryAdapter(dataSource);
+        JdbcInventoryTransactionRunner transactionRunner = new JdbcInventoryTransactionRunner(dataSource);
+        Inventory first = new Inventory(
                 characterId, 20, List.of(ItemStack.newItem(1L, 1, 0), ItemStack.newItem(1L, 2, 0)));
         transactionRunner.inTransaction(tx -> adapter.save(tx, first));
 
-        var second = new Inventory(characterId, 20, List.of(ItemStack.newItem(1L, 9, 0)));
+        Inventory second = new Inventory(characterId, 20, List.of(ItemStack.newItem(1L, 9, 0)));
         transactionRunner.inTransaction(tx -> adapter.save(tx, second));
-        var reloaded = adapter.findByCharacter(characterId).orElseThrow();
+        Inventory reloaded = adapter.findByCharacter(characterId).orElseThrow();
 
         // 2 item CŨ (không còn trong "second") bị xoá thật, item mới được thêm — không cộng dồn.
         assertThat(reloaded.items()).hasSize(1);
@@ -128,25 +128,25 @@ class PostgresInventoryAdapterIntegrationTest {
         // còn đó — equipment_slot.inventory_item_id tham chiếu ID này, đổi ID ngầm sẽ làm gãy
         // tham chiếu mà không ai biết.
         long characterId = createFreshCharacter("InvStableId");
-        var adapter = new PostgresInventoryAdapter(dataSource);
-        var transactionRunner = new JdbcInventoryTransactionRunner(dataSource);
+        PostgresInventoryAdapter adapter = new PostgresInventoryAdapter(dataSource);
+        JdbcInventoryTransactionRunner transactionRunner = new JdbcInventoryTransactionRunner(dataSource);
         transactionRunner.inTransaction(
                 tx -> adapter.save(tx, new Inventory(characterId, 20, List.of(ItemStack.newItem(1L, 1, 0)))));
-        var afterFirstSave = adapter.findByCharacter(characterId).orElseThrow();
+        Inventory afterFirstSave = adapter.findByCharacter(characterId).orElseThrow();
         long realId = afterFirstSave.items().get(0).id();
 
         // Load lại, đổi quantity (giữ nguyên id thật), save lần 2.
-        var mutated = new ItemStack(realId, 1L, 5, 0);
+        ItemStack mutated = new ItemStack(realId, 1L, 5, 0);
         transactionRunner.inTransaction(
                 tx -> adapter.save(tx, new Inventory(characterId, 20, List.of(mutated))));
-        var afterSecondSave = adapter.findByCharacter(characterId).orElseThrow();
+        Inventory afterSecondSave = adapter.findByCharacter(characterId).orElseThrow();
 
         assertThat(afterSecondSave.items()).containsExactly(mutated); // id KHÔNG đổi, chỉ quantity đổi
     }
 
     @Test
     void shouldFindSeededDropTableEntries_forTrainingDummy() {
-        var adapter = new PostgresDropTableAdapter(dataSource);
+        PostgresDropTableAdapter adapter = new PostgresDropTableAdapter(dataSource);
 
         List<DropTableEntry> entries = adapter.findEntries("training_dummy");
 
@@ -156,7 +156,7 @@ class PostgresInventoryAdapterIntegrationTest {
 
     @Test
     void shouldReturnEmptyList_forUnknownDropTableCode() {
-        var adapter = new PostgresDropTableAdapter(dataSource);
+        PostgresDropTableAdapter adapter = new PostgresDropTableAdapter(dataSource);
 
         assertThat(adapter.findEntries("does_not_exist")).isEmpty();
     }

@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.kage.account.domain.Account;
 import dev.kage.character.domain.Character;
+import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.IdempotencyKeyReusedException;
 import dev.kage.character.domain.NewCharacter;
+import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.PostgresDataSourceFactory;
@@ -41,7 +43,7 @@ class PostgresCharacterAdapterIntegrationTest {
 
     @BeforeAll
     static void migrateAndCreateAccount() {
-        var config = new DatabaseConfig(
+        DatabaseConfig config = new DatabaseConfig(
                 POSTGRES.getHost(),
                 POSTGRES.getMappedPort(POSTGRES_PORT),
                 POSTGRES.getDatabaseName(),
@@ -51,19 +53,19 @@ class PostgresCharacterAdapterIntegrationTest {
         FlywayMigrator.migrate(dataSource);
 
         // character.account_id có FK tới account — cần 1 account thật trước khi test character.
-        var accountAdapter = new PostgresAccountAdapter();
-        var accountTx = new JdbcAccountTransactionRunner(dataSource);
-        var holder = new Account[1];
+        PostgresAccountAdapter accountAdapter = new PostgresAccountAdapter();
+        JdbcAccountTransactionRunner accountTx = new JdbcAccountTransactionRunner(dataSource);
+        Account[] holder = new Account[1];
         accountTx.inTransaction(tx -> holder[0] = accountAdapter.findOrCreate(tx, "charactertester"));
         accountId = holder[0].id();
     }
 
     @Test
     void shouldCreateCharacter_withStatRow() {
-        var adapter = new PostgresCharacterAdapter(dataSource);
-        var transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
-        var newCharacter = new NewCharacter(accountId, "KageHero1", Faction.HOA, UUID.randomUUID().toString());
-        var holder = new Character[1];
+        PostgresCharacterAdapter adapter = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
+        NewCharacter newCharacter = new NewCharacter(accountId, "KageHero1", Faction.HOA, UUID.randomUUID().toString());
+        Character[] holder = new Character[1];
 
         transactionRunner.inTransaction(tx -> holder[0] = adapter.create(tx, newCharacter));
 
@@ -75,13 +77,13 @@ class PostgresCharacterAdapterIntegrationTest {
 
     @Test
     void shouldRejectSecondCreate_whenIdempotencyKeyReused() {
-        var adapter = new PostgresCharacterAdapter(dataSource);
-        var transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
-        var idempotencyKey = UUID.randomUUID().toString();
-        var firstCharacter = new NewCharacter(accountId, "IdemFirst", Faction.HOA, idempotencyKey);
+        PostgresCharacterAdapter adapter = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
+        String idempotencyKey = UUID.randomUUID().toString();
+        NewCharacter firstCharacter = new NewCharacter(accountId, "IdemFirst", Faction.HOA, idempotencyKey);
         transactionRunner.inTransaction(tx -> adapter.create(tx, firstCharacter));
 
-        var secondCharacter = new NewCharacter(accountId, "IdemSecond", Faction.HOA, idempotencyKey);
+        NewCharacter secondCharacter = new NewCharacter(accountId, "IdemSecond", Faction.HOA, idempotencyKey);
         assertThatThrownBy(() -> transactionRunner.inTransaction(tx -> adapter.create(tx, secondCharacter)))
                 .isInstanceOf(IdempotencyKeyReusedException.class);
 
@@ -91,15 +93,16 @@ class PostgresCharacterAdapterIntegrationTest {
 
     @Test
     void shouldListAndCountCharactersOfAccount() {
-        var adapter = new PostgresCharacterAdapter(dataSource);
-        var transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
-        var freshAccountAdapter = new PostgresAccountAdapter();
-        var accountTx = new JdbcAccountTransactionRunner(dataSource);
-        var accountHolder = new Account[1];
+        PostgresCharacterAdapter adapter = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
+        PostgresAccountAdapter freshAccountAdapter = new PostgresAccountAdapter();
+        JdbcAccountTransactionRunner accountTx = new JdbcAccountTransactionRunner(dataSource);
+        Account[] accountHolder = new Account[1];
         accountTx.inTransaction(tx -> accountHolder[0] = freshAccountAdapter.findOrCreate(tx, "listtester"));
         long freshAccountId = accountHolder[0].id();
 
-        var newCharacter = new NewCharacter(freshAccountId, "ListHero", Faction.HOA, UUID.randomUUID().toString());
+        NewCharacter newCharacter =
+                new NewCharacter(freshAccountId, "ListHero", Faction.HOA, UUID.randomUUID().toString());
         transactionRunner.inTransaction(tx -> adapter.create(tx, newCharacter));
 
         assertThat(adapter.countByAccount(freshAccountId)).isEqualTo(1);
@@ -108,13 +111,14 @@ class PostgresCharacterAdapterIntegrationTest {
 
     @Test
     void shouldDefaultToOrigin_whenPositionNeverSaved() {
-        var adapter = new PostgresCharacterAdapter(dataSource);
-        var transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
-        var newCharacter = new NewCharacter(accountId, "PosDefault", Faction.HOA, UUID.randomUUID().toString());
-        var holder = new Character[1];
+        PostgresCharacterAdapter adapter = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
+        NewCharacter newCharacter =
+                new NewCharacter(accountId, "PosDefault", Faction.HOA, UUID.randomUUID().toString());
+        Character[] holder = new Character[1];
         transactionRunner.inTransaction(tx -> holder[0] = adapter.create(tx, newCharacter));
 
-        var position = adapter.loadPosition(holder[0].id());
+        PositionSnapshot position = adapter.loadPosition(holder[0].id());
 
         assertThat(position.x()).isEqualTo(0f);
         assertThat(position.y()).isEqualTo(0f);
@@ -122,14 +126,14 @@ class PostgresCharacterAdapterIntegrationTest {
 
     @Test
     void shouldPersistPosition_acrossSaveAndLoad() {
-        var adapter = new PostgresCharacterAdapter(dataSource);
-        var transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
-        var newCharacter = new NewCharacter(accountId, "PosSaved", Faction.HOA, UUID.randomUUID().toString());
-        var holder = new Character[1];
+        PostgresCharacterAdapter adapter = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
+        NewCharacter newCharacter = new NewCharacter(accountId, "PosSaved", Faction.HOA, UUID.randomUUID().toString());
+        Character[] holder = new Character[1];
         transactionRunner.inTransaction(tx -> holder[0] = adapter.create(tx, newCharacter));
 
         adapter.savePosition(holder[0].id(), 12.5f, -3.25f);
-        var position = adapter.loadPosition(holder[0].id());
+        PositionSnapshot position = adapter.loadPosition(holder[0].id());
 
         assertThat(position.x()).isEqualTo(12.5f);
         assertThat(position.y()).isEqualTo(-3.25f);
@@ -137,13 +141,13 @@ class PostgresCharacterAdapterIntegrationTest {
 
     @Test
     void shouldLoadStartingStats_afterCreate() {
-        var adapter = new PostgresCharacterAdapter(dataSource);
-        var transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
-        var newCharacter = new NewCharacter(accountId, "StatHero", Faction.HOA, UUID.randomUUID().toString());
-        var holder = new Character[1];
+        PostgresCharacterAdapter adapter = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
+        NewCharacter newCharacter = new NewCharacter(accountId, "StatHero", Faction.HOA, UUID.randomUUID().toString());
+        Character[] holder = new Character[1];
         transactionRunner.inTransaction(tx -> holder[0] = adapter.create(tx, newCharacter));
 
-        var stats = adapter.loadStats(holder[0].id());
+        CharacterStats stats = adapter.loadStats(holder[0].id());
 
         // Số liệu khởi điểm PLACEHOLDER (V2 migration comment + PostgresCharacterAdapter.STARTING_STAT).
         assertThat(stats.str()).isEqualTo(10);

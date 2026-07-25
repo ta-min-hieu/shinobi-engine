@@ -23,42 +23,42 @@ class MailTest {
 
     @Test
     void isClaimedShouldBeFalse_whenClaimedAtIsNull() {
-        var mail = new Mail(1, null, 5, "s", "b", 0, List.of(), null, Instant.now());
+        Mail mail = new Mail(1, null, 5, "s", "b", 0, List.of(), null, Instant.now());
 
         assertThat(mail.isClaimed()).isFalse();
     }
 
     @Test
     void isClaimedShouldBeTrue_whenClaimedAtIsSet() {
-        var mail = new Mail(1, null, 5, "s", "b", 0, List.of(), Instant.now(), Instant.now());
+        Mail mail = new Mail(1, null, 5, "s", "b", 0, List.of(), Instant.now(), Instant.now());
 
         assertThat(mail.isClaimed()).isTrue();
     }
 
     @Test
     void hasRewardShouldBeTrue_whenGoldPresent() {
-        var mail = new Mail(1, null, 5, "s", "b", 10, List.of(), null, Instant.now());
+        Mail mail = new Mail(1, null, 5, "s", "b", 10, List.of(), null, Instant.now());
 
         assertThat(mail.hasReward()).isTrue();
     }
 
     @Test
     void hasRewardShouldBeTrue_whenAttachmentPresent() {
-        var mail = new Mail(1, null, 5, "s", "b", 0, List.of(new MailAttachment(1, 1)), null, Instant.now());
+        Mail mail = new Mail(1, null, 5, "s", "b", 0, List.of(new MailAttachment(1, 1)), null, Instant.now());
 
         assertThat(mail.hasReward()).isTrue();
     }
 
     @Test
     void hasRewardShouldBeFalse_whenNoGoldOrAttachment() {
-        var mail = new Mail(1, null, 5, "s", "b", 0, List.of(), null, Instant.now());
+        Mail mail = new Mail(1, null, 5, "s", "b", 0, List.of(), null, Instant.now());
 
         assertThat(mail.hasReward()).isFalse();
     }
 
     @Test
     void senderIdShouldAllowNull_forSystemMail() {
-        var mail = new Mail(1, null, 5, "s", "b", 0, List.of(), null, Instant.now());
+        Mail mail = new Mail(1, null, 5, "s", "b", 0, List.of(), null, Instant.now());
 
         assertThat(mail.senderId()).isNull();
     }

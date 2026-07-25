@@ -70,7 +70,7 @@ public final class GameConnection {
     }
 
     public boolean isConnected() {
-        var current = socket;
+        Socket current = socket;
         return current != null && current.isConnected() && !current.isClosed();
     }
 
@@ -80,11 +80,11 @@ public final class GameConnection {
     }
 
     public void send(int opcode, int sequenceId, byte[] payload) throws IOException {
-        var stream = out;
+        DataOutputStream stream = out;
         if (stream == null) {
             throw new IOException("Chưa kết nối tới server");
         }
-        var header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
+        PacketHeader header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
         byte[] frame = PacketCodec.encodeFrame(header, payload);
         synchronized (stream) {
             stream.writeInt(frame.length);
@@ -124,7 +124,7 @@ public final class GameConnection {
     }
 
     private void doConnect() throws IOException {
-        var newSocket = new Socket(host, port);
+        Socket newSocket = new Socket(host, port);
         socket = newSocket;
         out = new DataOutputStream(newSocket.getOutputStream());
         LOG.info("Đã kết nối tới {}:{}", host, port);
@@ -132,7 +132,7 @@ public final class GameConnection {
     }
 
     private void readLoop() throws IOException {
-        var in = new DataInputStream(socket.getInputStream());
+        DataInputStream in = new DataInputStream(socket.getInputStream());
         while (running.get()) {
             int length = in.readInt(); // ném IOException khi mất kết nối — vòng lặp tự thoát
             byte[] frameBytes = new byte[length];
@@ -145,7 +145,7 @@ public final class GameConnection {
         heartbeatThread = new Thread(() -> {
             while (running.get() && isConnected()) {
                 try {
-                    var ping = PingCommand.newBuilder()
+                    PingCommand ping = PingCommand.newBuilder()
                             .setClientTimestampMs(System.currentTimeMillis())
                             .build();
                     send(Opcode.OPCODE_PING_VALUE, nextSequenceId(), ping.toByteArray());
@@ -165,7 +165,7 @@ public final class GameConnection {
 
     private void closeQuietly() {
         try {
-            var current = socket;
+            Socket current = socket;
             if (current != null) {
                 current.close();
             }

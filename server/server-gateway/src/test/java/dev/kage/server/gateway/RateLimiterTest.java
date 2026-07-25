@@ -22,8 +22,8 @@ class RateLimiterTest {
 
     @Test
     void shouldAllowUpToLimit_withinSameWindow() {
-        var clock = new FakeClock();
-        var limiter = new RateLimiter(3, Duration.ofSeconds(1), clock::asLong);
+        FakeClock clock = new FakeClock();
+        RateLimiter limiter = new RateLimiter(3, Duration.ofSeconds(1), clock::asLong);
 
         assertThat(limiter.tryAcquire()).isTrue();
         assertThat(limiter.tryAcquire()).isTrue();
@@ -32,8 +32,8 @@ class RateLimiterTest {
 
     @Test
     void shouldRejectBeyondLimit_withinSameWindow() {
-        var clock = new FakeClock();
-        var limiter = new RateLimiter(3, Duration.ofSeconds(1), clock::asLong);
+        FakeClock clock = new FakeClock();
+        RateLimiter limiter = new RateLimiter(3, Duration.ofSeconds(1), clock::asLong);
         limiter.tryAcquire();
         limiter.tryAcquire();
         limiter.tryAcquire();
@@ -43,8 +43,8 @@ class RateLimiterTest {
 
     @Test
     void shouldAllowAgain_afterWindowRotates() {
-        var clock = new FakeClock();
-        var limiter = new RateLimiter(3, Duration.ofSeconds(1), clock::asLong);
+        FakeClock clock = new FakeClock();
+        RateLimiter limiter = new RateLimiter(3, Duration.ofSeconds(1), clock::asLong);
         limiter.tryAcquire();
         limiter.tryAcquire();
         limiter.tryAcquire();
@@ -57,8 +57,8 @@ class RateLimiterTest {
 
     @Test
     void shouldNotSignalDisconnect_forSingleBurst() {
-        var clock = new FakeClock();
-        var limiter = new RateLimiter(1, Duration.ofSeconds(1), clock::asLong);
+        FakeClock clock = new FakeClock();
+        RateLimiter limiter = new RateLimiter(1, Duration.ofSeconds(1), clock::asLong);
         limiter.tryAcquire();
         limiter.tryAcquire(); // vượt ngưỡng đúng 1 window — chỉ là burst ngắn
 
@@ -67,8 +67,8 @@ class RateLimiterTest {
 
     @Test
     void shouldSignalDisconnect_afterSustainedViolationAcrossManyWindows() {
-        var clock = new FakeClock();
-        var limiter = new RateLimiter(1, Duration.ofSeconds(1), clock::asLong);
+        FakeClock clock = new FakeClock();
+        RateLimiter limiter = new RateLimiter(1, Duration.ofSeconds(1), clock::asLong);
 
         // Vượt ngưỡng LIÊN TỤC nhiều window — mô phỏng client cố tình spam, không phải 1 burst
         // ngẫu nhiên (NETWORK.md §13: "vượt liên tục → ngắt kết nối").
@@ -83,8 +83,8 @@ class RateLimiterTest {
 
     @Test
     void shouldResetConsecutiveCount_whenAWindowStaysUnderLimit() {
-        var clock = new FakeClock();
-        var limiter = new RateLimiter(1, Duration.ofSeconds(1), clock::asLong);
+        FakeClock clock = new FakeClock();
+        RateLimiter limiter = new RateLimiter(1, Duration.ofSeconds(1), clock::asLong);
 
         for (int window = 0; window < 4; window++) {
             limiter.tryAcquire();

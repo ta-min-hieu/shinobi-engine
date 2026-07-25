@@ -24,8 +24,8 @@ public final class MovementSystem extends IteratingKSystem {
 
     @Override
     protected void processEntity(KEntity entity, float deltaTime) {
-        var pos = POSITION.get(entity);
-        var vel = VELOCITY.get(entity);
+        PositionComponent pos = POSITION.get(entity);
+        VelocityComponent vel = VELOCITY.get(entity);
 
         pos.prevX = pos.x;
         pos.prevY = pos.y;

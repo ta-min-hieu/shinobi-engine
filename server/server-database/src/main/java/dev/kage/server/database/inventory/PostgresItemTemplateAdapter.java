@@ -4,6 +4,8 @@ import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
 import dev.kage.server.database.DatabaseAccessException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Optional;
@@ -28,8 +30,8 @@ public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
 
     @Override
     public Optional<ItemTemplate> findById(long itemTemplateId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_BY_ID)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_BY_ID)) {
             statement.setLong(1, itemTemplateId);
             try (ResultSet rs = statement.executeQuery()) {
                 if (!rs.next()) {
@@ -47,8 +49,8 @@ public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
 
     @Override
     public Optional<Long> findIdByCode(String code) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_ID_BY_CODE)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_ID_BY_CODE)) {
             statement.setString(1, code);
             try (ResultSet rs = statement.executeQuery()) {
                 return rs.next() ? Optional.of(rs.getLong("id")) : Optional.empty();

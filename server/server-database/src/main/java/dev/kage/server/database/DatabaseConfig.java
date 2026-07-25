@@ -12,8 +12,8 @@ public record DatabaseConfig(String host, int port, String database, String user
     private static final String DEFAULT_USER = "kage";
 
     public static DatabaseConfig fromEnvironment() {
-        var portValue = System.getenv("DB_PORT");
-        var passwordValue = System.getenv("DB_PASSWORD");
+        String portValue = System.getenv("DB_PORT");
+        String passwordValue = System.getenv("DB_PASSWORD");
         if (passwordValue == null || passwordValue.isBlank()) {
             throw new IllegalStateException("Thiếu biến môi trường bắt buộc: DB_PASSWORD");
         }

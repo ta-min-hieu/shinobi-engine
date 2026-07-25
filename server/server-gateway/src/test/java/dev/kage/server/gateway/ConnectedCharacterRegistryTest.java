@@ -76,10 +76,11 @@ class ConnectedCharacterRegistryTest {
         dev.kage.quest.domain.AuditPort auditPort = (tx, characterId, action, detailJson) -> { };
         dev.kage.quest.domain.TransactionRunner tx = action -> action.accept(null);
 
-        var acceptQuestUseCase = new AcceptQuestUseCase(progressPort, templatePort, tx);
-        var processMonsterKilledUseCase = new ProcessMonsterKilledUseCase(progressPort, templatePort, tx);
-        var rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
-        var claimQuestRewardUseCase =
+        AcceptQuestUseCase acceptQuestUseCase = new AcceptQuestUseCase(progressPort, templatePort, tx);
+        ProcessMonsterKilledUseCase processMonsterKilledUseCase =
+                new ProcessMonsterKilledUseCase(progressPort, templatePort, tx);
+        QuestRewardPorts rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
+        ClaimQuestRewardUseCase claimQuestRewardUseCase =
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx);
         return new QuestFacade(acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
     }
@@ -95,13 +96,13 @@ class ConnectedCharacterRegistryTest {
     void shouldSendItemGrantedEvent_whenLootRolledSuccessfully() throws InvalidProtocolBufferException {
         // 100% -> tất định, không flaky
         registry = new ConnectedCharacterRegistry(fakeInventoryFacade(100), fakeQuestFacade());
-        var channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
         registry.register(1L, channel.pipeline().firstContext());
 
         registry.onMonsterKilled(1L, "training_dummy");
 
-        var frame = awaitOutboundFrame(channel);
-        var event = ItemGrantedEvent.parseFrom(frame.payload());
+        PacketCodec.Frame frame = awaitOutboundFrame(channel);
+        ItemGrantedEvent event = ItemGrantedEvent.parseFrom(frame.payload());
         assertThat(frame.header().opcode()).isEqualTo(Opcode.OPCODE_ITEM_GRANTED_EVENT_VALUE);
         assertThat(event.getItemTemplateId()).isEqualTo(100L);
         assertThat(event.getQuantity()).isEqualTo(2);
@@ -111,7 +112,7 @@ class ConnectedCharacterRegistryTest {
     void shouldSendNothing_whenLootNeverDrops() {
         // 0% -> tất định không rơi gì
         registry = new ConnectedCharacterRegistry(fakeInventoryFacade(0), fakeQuestFacade());
-        var channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
         registry.register(1L, channel.pipeline().firstContext());
 
         registry.onMonsterKilled(1L, "training_dummy");
@@ -136,8 +137,9 @@ class ConnectedCharacterRegistryTest {
         };
         DropTablePort dropTablePort =
                 dropTableCode -> List.of(new DropTableEntry(100L, dropChancePercent, 2, 2));
-        var addItemUseCase = new AddItemUseCase(inventoryPort, action -> action.accept(null));
-        var grantLootUseCase = new GrantLootUseCase(dropTablePort, inventoryPort, action -> action.accept(null));
+        AddItemUseCase addItemUseCase = new AddItemUseCase(inventoryPort, action -> action.accept(null));
+        GrantLootUseCase grantLootUseCase =
+                new GrantLootUseCase(dropTablePort, inventoryPort, action -> action.accept(null));
         // Equip/unequip không dùng trong test này (chỉ verify grantLoot) — fake tối thiểu để compile.
         ItemTemplatePort itemTemplatePort = new ItemTemplatePort() {
             @Override
@@ -160,24 +162,26 @@ class ConnectedCharacterRegistryTest {
             public void save(Transaction tx, Equipment equipment) {
             }
         };
-        var equipItemUseCase = new EquipItemUseCase(
+        EquipItemUseCase equipItemUseCase = new EquipItemUseCase(
                 inventoryPort, itemTemplatePort, equipmentPort, action -> action.accept(null));
-        var unequipItemUseCase = new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
-        var computeEquipmentBonusUseCase =
+        UnequipItemUseCase unequipItemUseCase =
+                new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
+        ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase =
                 new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
-        var equipmentUseCases =
+        EquipmentUseCases equipmentUseCases =
                 new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
         // Cường hoá không dùng trong test này — fake tối thiểu để compile.
         GoldPort goldPort = (tx, characterId, amount) -> true;
         AuditPort auditPort = (tx, characterId, action, detailJson) -> { };
-        var enhancePorts = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
-        var enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
+        EnhancePorts enhancePorts = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
+        EnhanceItemUseCase enhanceItemUseCase =
+                new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
         return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
     }
 
     /** onMonsterKilled đẩy việc sang Virtual Thread riêng (lootExecutor) — poll thay vì đọc ngay. */
     private static PacketCodec.Frame awaitOutboundFrame(EmbeddedChannel channel) {
-        var deadline = Instant.now().plus(Duration.ofSeconds(4));
+        Instant deadline = Instant.now().plus(Duration.ofSeconds(4));
         while (Instant.now().isBefore(deadline)) {
             Object message = channel.readOutbound();
             if (message instanceof PacketCodec.Frame frame) {

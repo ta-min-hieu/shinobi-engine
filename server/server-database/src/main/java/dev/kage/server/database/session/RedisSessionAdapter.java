@@ -5,6 +5,7 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Optional;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 
 /**
@@ -29,10 +30,10 @@ public final class RedisSessionAdapter implements SessionPort {
 
     @Override
     public String issue(long accountId) {
-        var tokenBytes = new byte[TOKEN_ENTROPY_BYTES];
+        byte[] tokenBytes = new byte[TOKEN_ENTROPY_BYTES];
         secureRandom.nextBytes(tokenBytes);
-        var token = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
-        try (var jedis = jedisPool.getResource()) {
+        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
+        try (Jedis jedis = jedisPool.getResource()) {
             jedis.setex(KEY_PREFIX + token, SESSION_TTL.toSeconds(), Long.toString(accountId));
         }
         return token;
@@ -40,9 +41,9 @@ public final class RedisSessionAdapter implements SessionPort {
 
     @Override
     public Optional<Long> validateAndRenew(String token) {
-        var key = KEY_PREFIX + token;
-        try (var jedis = jedisPool.getResource()) {
-            var value = jedis.get(key);
+        String key = KEY_PREFIX + token;
+        try (Jedis jedis = jedisPool.getResource()) {
+            String value = jedis.get(key);
             if (value == null) {
                 return Optional.empty();
             }
@@ -53,7 +54,7 @@ public final class RedisSessionAdapter implements SessionPort {
 
     @Override
     public void revoke(String token) {
-        try (var jedis = jedisPool.getResource()) {
+        try (Jedis jedis = jedisPool.getResource()) {
             jedis.del(KEY_PREFIX + token);
         }
     }

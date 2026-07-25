@@ -21,11 +21,11 @@ class GameConnectionReconnectTest {
     @Timeout(15)
     void shouldReconnect_afterServerAppearsOnSamePort() throws Exception {
         int port;
-        try (var probe = new ServerSocket(0)) {
+        try (ServerSocket probe = new ServerSocket(0)) {
             port = probe.getLocalPort();
         }
 
-        var connection = new GameConnection("127.0.0.1", port);
+        GameConnection connection = new GameConnection("127.0.0.1", port);
         try {
             // Lần đầu: CHƯA có server nào lắng nghe -> connection phải TỰ THỬ LẠI, không throw/chết
             // (attempt đầu fail gần như tức thì, rồi vào backoff 1s — NETWORK.md §10).
@@ -36,7 +36,7 @@ class GameConnectionReconnectTest {
                     .isFalse();
 
             // Mở server thật trên ĐÚNG port đó -> connection (đang trong backoff loop) phải tự bắt được.
-            try (var serverSocket = new ServerSocket(port)) {
+            try (ServerSocket serverSocket = new ServerSocket(port)) {
                 serverSocket.setSoTimeout(8_000);
                 Socket accepted = serverSocket.accept();
                 assertThat(accepted).as("GameConnection phải tự kết nối lại khi server xuất hiện").isNotNull();

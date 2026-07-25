@@ -25,8 +25,8 @@ package dev.kage.engine.ecs;
  *     }
  *
  *     protected void processEntity(KEntity entity, float deltaTime) {
- *         var pos = POS.get(entity);
- *         var vel = VEL.get(entity);
+ *         PositionComponent pos = POS.get(entity);
+ *         VelocityComponent vel = VEL.get(entity);
  *         pos.x += vel.x * deltaTime;
  *         pos.y += vel.y * deltaTime;
  *     }

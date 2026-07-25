@@ -10,6 +10,7 @@ import dev.kage.inventory.domain.Equipment;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.ItemStack;
+import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.PostgresDataSourceFactory;
@@ -17,6 +18,9 @@ import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.List;
@@ -48,7 +52,7 @@ class PostgresEquipmentAdapterIntegrationTest {
 
     @BeforeAll
     static void migrate() {
-        var config = new DatabaseConfig(
+        DatabaseConfig config = new DatabaseConfig(
                 POSTGRES.getHost(),
                 POSTGRES.getMappedPort(POSTGRES_PORT),
                 POSTGRES.getDatabaseName(),
@@ -57,18 +61,18 @@ class PostgresEquipmentAdapterIntegrationTest {
         dataSource = PostgresDataSourceFactory.create(config);
         FlywayMigrator.migrate(dataSource);
 
-        var accountAdapter = new PostgresAccountAdapter();
-        var accountTx = new JdbcAccountTransactionRunner(dataSource);
-        var accountHolder = new Account[1];
+        PostgresAccountAdapter accountAdapter = new PostgresAccountAdapter();
+        JdbcAccountTransactionRunner accountTx = new JdbcAccountTransactionRunner(dataSource);
+        Account[] accountHolder = new Account[1];
         accountTx.inTransaction(tx -> accountHolder[0] = accountAdapter.findOrCreate(tx, "equiptester"));
         accountId = accountHolder[0].id();
     }
 
     private static long createFreshCharacter(String name) {
-        var characterAdapter = new PostgresCharacterAdapter(dataSource);
-        var characterTx = new JdbcCharacterTransactionRunner(dataSource);
-        var newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
-        var holder = new Character[1];
+        PostgresCharacterAdapter characterAdapter = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner characterTx = new JdbcCharacterTransactionRunner(dataSource);
+        NewCharacter newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
+        Character[] holder = new Character[1];
         characterTx.inTransaction(tx -> holder[0] = characterAdapter.create(tx, newCharacter));
         return holder[0].id();
     }
@@ -76,19 +80,19 @@ class PostgresEquipmentAdapterIntegrationTest {
     @Test
     void shouldReturnEmptyEquipment_whenNeverEquippedAnything() {
         long characterId = createFreshCharacter("EquipEmpty");
-        var adapter = new PostgresEquipmentAdapter(dataSource);
+        PostgresEquipmentAdapter adapter = new PostgresEquipmentAdapter(dataSource);
 
-        var equipment = adapter.findByCharacter(characterId).orElseThrow();
+        Equipment equipment = adapter.findByCharacter(characterId).orElseThrow();
 
         assertThat(equipment.slots()).isEmpty();
     }
 
     @Test
     void shouldFindSeededWoodenSword_asWeaponEquippable() {
-        var itemTemplateAdapter = new PostgresItemTemplateAdapter(dataSource);
-        var woodenSwordId = findItemTemplateIdByCode("wooden_sword"); // seed V5
+        PostgresItemTemplateAdapter itemTemplateAdapter = new PostgresItemTemplateAdapter(dataSource);
+        long woodenSwordId = findItemTemplateIdByCode("wooden_sword"); // seed V5
 
-        var template = itemTemplateAdapter.findById(woodenSwordId).orElseThrow();
+        ItemTemplate template = itemTemplateAdapter.findById(woodenSwordId).orElseThrow();
 
         assertThat(template.equipSlot()).isEqualTo(EquipmentSlotType.WEAPON);
         assertThat(template.isEquippable()).isTrue();
@@ -100,12 +104,12 @@ class PostgresEquipmentAdapterIntegrationTest {
         long woodenSwordId = findItemTemplateIdByCode("wooden_sword");
         long realItemId = persistOneItem(characterId, woodenSwordId);
 
-        var equipmentAdapter = new PostgresEquipmentAdapter(dataSource);
-        var equipmentTx = new JdbcInventoryTransactionRunner(dataSource);
-        var equipment = new Equipment(characterId, Map.of(EquipmentSlotType.WEAPON, realItemId));
+        PostgresEquipmentAdapter equipmentAdapter = new PostgresEquipmentAdapter(dataSource);
+        JdbcInventoryTransactionRunner equipmentTx = new JdbcInventoryTransactionRunner(dataSource);
+        Equipment equipment = new Equipment(characterId, Map.of(EquipmentSlotType.WEAPON, realItemId));
         equipmentTx.inTransaction(tx -> equipmentAdapter.save(tx, equipment));
 
-        var reloaded = equipmentAdapter.findByCharacter(characterId).orElseThrow();
+        Equipment reloaded = equipmentAdapter.findByCharacter(characterId).orElseThrow();
 
         assertThat(reloaded.equippedItemId(EquipmentSlotType.WEAPON)).contains(realItemId);
     }
@@ -116,33 +120,34 @@ class PostgresEquipmentAdapterIntegrationTest {
         long woodenSwordId = findItemTemplateIdByCode("wooden_sword");
         long realItemId = persistOneItem(characterId, woodenSwordId);
 
-        var equipmentAdapter = new PostgresEquipmentAdapter(dataSource);
-        var equipmentTx = new JdbcInventoryTransactionRunner(dataSource);
-        var equipped = new Equipment(characterId, Map.of(EquipmentSlotType.WEAPON, realItemId));
+        PostgresEquipmentAdapter equipmentAdapter = new PostgresEquipmentAdapter(dataSource);
+        JdbcInventoryTransactionRunner equipmentTx = new JdbcInventoryTransactionRunner(dataSource);
+        Equipment equipped = new Equipment(characterId, Map.of(EquipmentSlotType.WEAPON, realItemId));
         equipmentTx.inTransaction(tx -> equipmentAdapter.save(tx, equipped));
 
-        var reloaded = equipmentAdapter.findByCharacter(characterId).orElseThrow();
+        Equipment reloaded = equipmentAdapter.findByCharacter(characterId).orElseThrow();
         reloaded.unequip(EquipmentSlotType.WEAPON);
         equipmentTx.inTransaction(tx -> equipmentAdapter.save(tx, reloaded));
 
-        var afterUnequip = equipmentAdapter.findByCharacter(characterId).orElseThrow();
+        Equipment afterUnequip = equipmentAdapter.findByCharacter(characterId).orElseThrow();
         assertThat(afterUnequip.slots()).isEmpty();
     }
 
     /** Thêm 1 item thật vào túi, trả về {@code inventory_item.id} thật (RETURNING id) để test equip. */
     private static long persistOneItem(long characterId, long itemTemplateId) {
-        var inventoryAdapter = new PostgresInventoryAdapter(dataSource);
-        var inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
-        var inventory = new Inventory(characterId, 20, List.of(ItemStack.newItem(itemTemplateId, 1, 0)));
+        PostgresInventoryAdapter inventoryAdapter = new PostgresInventoryAdapter(dataSource);
+        JdbcInventoryTransactionRunner inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
+        Inventory inventory = new Inventory(characterId, 20, List.of(ItemStack.newItem(itemTemplateId, 1, 0)));
         inventoryTx.inTransaction(tx -> inventoryAdapter.save(tx, inventory));
         return inventoryAdapter.findByCharacter(characterId).orElseThrow().items().get(0).id();
     }
 
     private static long findItemTemplateIdByCode(String code) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement("SELECT id FROM item_template WHERE code = ?")) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
+                        connection.prepareStatement("SELECT id FROM item_template WHERE code = ?")) {
             statement.setString(1, code);
-            try (var rs = statement.executeQuery()) {
+            try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
                 return rs.getLong(1);
             }

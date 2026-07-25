@@ -8,6 +8,7 @@ import dev.kage.character.domain.Character;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.friend.domain.DuplicateFriendRequestException;
+import dev.kage.friend.domain.Friendship;
 import dev.kage.friend.domain.FriendshipStatus;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
@@ -17,6 +18,7 @@ import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
 import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
@@ -44,7 +46,7 @@ class FriendIntegrationTest {
 
     @BeforeAll
     static void migrate() {
-        var config = new DatabaseConfig(
+        DatabaseConfig config = new DatabaseConfig(
                 POSTGRES.getHost(),
                 POSTGRES.getMappedPort(POSTGRES_PORT),
                 POSTGRES.getDatabaseName(),
@@ -53,18 +55,18 @@ class FriendIntegrationTest {
         dataSource = PostgresDataSourceFactory.create(config);
         FlywayMigrator.migrate(dataSource);
 
-        var accountAdapter = new PostgresAccountAdapter();
-        var accountTx = new JdbcAccountTransactionRunner(dataSource);
-        var accountHolder = new Account[1];
+        PostgresAccountAdapter accountAdapter = new PostgresAccountAdapter();
+        JdbcAccountTransactionRunner accountTx = new JdbcAccountTransactionRunner(dataSource);
+        Account[] accountHolder = new Account[1];
         accountTx.inTransaction(tx -> accountHolder[0] = accountAdapter.findOrCreate(tx, "friendtester"));
         accountId = accountHolder[0].id();
     }
 
     private static long createFreshCharacter(String name) {
-        var characterAdapter = new PostgresCharacterAdapter(dataSource);
-        var characterTx = new JdbcCharacterTransactionRunner(dataSource);
-        var newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
-        var holder = new Character[1];
+        PostgresCharacterAdapter characterAdapter = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner characterTx = new JdbcCharacterTransactionRunner(dataSource);
+        NewCharacter newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
+        Character[] holder = new Character[1];
         characterTx.inTransaction(tx -> holder[0] = characterAdapter.create(tx, newCharacter));
         return holder[0].id();
     }
@@ -77,9 +79,9 @@ class FriendIntegrationTest {
     void shouldCreatePendingRequest_andFindItFromEitherSide() {
         long a = createFreshCharacter("FriendA1");
         long b = createFreshCharacter("FriendB1");
-        var adapter = newAdapter();
+        PostgresFriendAdapter adapter = newAdapter();
 
-        var created = adapter.sendRequest(a, b);
+        Friendship created = adapter.sendRequest(a, b);
 
         assertThat(created.status()).isEqualTo(FriendshipStatus.PENDING);
         assertThat(adapter.findBetween(a, b)).isPresent();
@@ -90,7 +92,7 @@ class FriendIntegrationTest {
     void shouldRejectDuplicateRequest_sameDirection() {
         long a = createFreshCharacter("FriendA2");
         long b = createFreshCharacter("FriendB2");
-        var adapter = newAdapter();
+        PostgresFriendAdapter adapter = newAdapter();
         adapter.sendRequest(a, b);
 
         assertThatThrownBy(() -> adapter.sendRequest(a, b))
@@ -101,8 +103,8 @@ class FriendIntegrationTest {
     void shouldAcceptRequest_andAppearInListAccepted() {
         long a = createFreshCharacter("FriendA3");
         long b = createFreshCharacter("FriendB3");
-        var adapter = newAdapter();
-        var created = adapter.sendRequest(a, b);
+        PostgresFriendAdapter adapter = newAdapter();
+        Friendship created = adapter.sendRequest(a, b);
 
         boolean accepted = adapter.accept(created.id(), b);
 
@@ -115,8 +117,8 @@ class FriendIntegrationTest {
     void shouldRejectAccept_whenCallerIsNotTheAddressee() {
         long a = createFreshCharacter("FriendA4");
         long b = createFreshCharacter("FriendB4");
-        var adapter = newAdapter();
-        var created = adapter.sendRequest(a, b);
+        PostgresFriendAdapter adapter = newAdapter();
+        Friendship created = adapter.sendRequest(a, b);
 
         boolean accepted = adapter.accept(created.id(), a); // a là requester, không phải addressee
 
@@ -128,8 +130,8 @@ class FriendIntegrationTest {
     void shouldDeleteRow_whenRejected() {
         long a = createFreshCharacter("FriendA5");
         long b = createFreshCharacter("FriendB5");
-        var adapter = newAdapter();
-        var created = adapter.sendRequest(a, b);
+        PostgresFriendAdapter adapter = newAdapter();
+        Friendship created = adapter.sendRequest(a, b);
 
         boolean rejected = adapter.reject(created.id(), b);
 
@@ -141,8 +143,8 @@ class FriendIntegrationTest {
     void shouldDeleteRow_whenRemoved() {
         long a = createFreshCharacter("FriendA6");
         long b = createFreshCharacter("FriendB6");
-        var adapter = newAdapter();
-        var created = adapter.sendRequest(a, b);
+        PostgresFriendAdapter adapter = newAdapter();
+        Friendship created = adapter.sendRequest(a, b);
         adapter.accept(created.id(), b);
 
         boolean removed = adapter.remove(a, b);
@@ -156,12 +158,12 @@ class FriendIntegrationTest {
         long a = createFreshCharacter("FriendA7");
         long b = createFreshCharacter("FriendB7");
         long c = createFreshCharacter("FriendC7");
-        var adapter = newAdapter();
+        PostgresFriendAdapter adapter = newAdapter();
         adapter.sendRequest(a, b); // b nhận
         adapter.sendRequest(c, b); // b nhận thêm 1 cái nữa
         adapter.sendRequest(b, c); // c nhận (không liên quan tới b's incoming)
 
-        var pending = adapter.listPendingIncoming(b);
+        List<Friendship> pending = adapter.listPendingIncoming(b);
 
         assertThat(pending).hasSize(2);
         assertThat(pending).extracting(f -> f.requesterId()).containsExactlyInAnyOrder(a, c);

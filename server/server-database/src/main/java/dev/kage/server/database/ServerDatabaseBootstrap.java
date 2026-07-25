@@ -142,41 +142,42 @@ public final class ServerDatabaseBootstrap {
     }
 
     public AccountFacade wireAccountFacade() {
-        var accountPort = new PostgresAccountAdapter();
-        var sessionPort = new RedisSessionAdapter(jedisPool);
-        var transactionManager = new JdbcAccountTransactionRunner(dataSource);
-        var useCase = new LoginOrCreateAccountUseCase(accountPort, sessionPort, transactionManager);
+        PostgresAccountAdapter accountPort = new PostgresAccountAdapter();
+        RedisSessionAdapter sessionPort = new RedisSessionAdapter(jedisPool);
+        JdbcAccountTransactionRunner transactionManager = new JdbcAccountTransactionRunner(dataSource);
+        LoginOrCreateAccountUseCase useCase =
+                new LoginOrCreateAccountUseCase(accountPort, sessionPort, transactionManager);
         return new AccountFacade(useCase);
     }
 
     public CharacterFacade wireCharacterFacade() {
-        var characterPort = new PostgresCharacterAdapter(dataSource);
-        var transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
-        var createUseCase = new CreateCharacterUseCase(characterPort, transactionRunner);
-        var listUseCase = new ListCharactersUseCase(characterPort);
-        var selectUseCase = new SelectCharacterUseCase(characterPort);
+        PostgresCharacterAdapter characterPort = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
+        CreateCharacterUseCase createUseCase = new CreateCharacterUseCase(characterPort, transactionRunner);
+        ListCharactersUseCase listUseCase = new ListCharactersUseCase(characterPort);
+        SelectCharacterUseCase selectUseCase = new SelectCharacterUseCase(characterPort);
         return new CharacterFacade(createUseCase, listUseCase, selectUseCase, characterPort);
     }
 
     public InventoryFacade wireInventoryFacade() {
-        var inventoryPort = new PostgresInventoryAdapter(dataSource);
-        var dropTablePort = new PostgresDropTableAdapter(dataSource);
-        var itemTemplatePort = new PostgresItemTemplateAdapter(dataSource);
-        var equipmentPort = new PostgresEquipmentAdapter(dataSource);
-        var goldPort = new PostgresGoldAdapter();
-        var auditPort = new PostgresAuditAdapter();
-        var transactionRunner = new JdbcInventoryTransactionRunner(dataSource);
-        var addItemUseCase = new AddItemUseCase(inventoryPort, transactionRunner);
-        var grantLootUseCase = new GrantLootUseCase(dropTablePort, inventoryPort, transactionRunner);
-        var equipItemUseCase =
+        PostgresInventoryAdapter inventoryPort = new PostgresInventoryAdapter(dataSource);
+        PostgresDropTableAdapter dropTablePort = new PostgresDropTableAdapter(dataSource);
+        PostgresItemTemplateAdapter itemTemplatePort = new PostgresItemTemplateAdapter(dataSource);
+        PostgresEquipmentAdapter equipmentPort = new PostgresEquipmentAdapter(dataSource);
+        PostgresGoldAdapter goldPort = new PostgresGoldAdapter();
+        PostgresAuditAdapter auditPort = new PostgresAuditAdapter();
+        JdbcInventoryTransactionRunner transactionRunner = new JdbcInventoryTransactionRunner(dataSource);
+        AddItemUseCase addItemUseCase = new AddItemUseCase(inventoryPort, transactionRunner);
+        GrantLootUseCase grantLootUseCase = new GrantLootUseCase(dropTablePort, inventoryPort, transactionRunner);
+        EquipItemUseCase equipItemUseCase =
                 new EquipItemUseCase(inventoryPort, itemTemplatePort, equipmentPort, transactionRunner);
-        var unequipItemUseCase = new UnequipItemUseCase(equipmentPort, transactionRunner);
-        var computeEquipmentBonusUseCase =
+        UnequipItemUseCase unequipItemUseCase = new UnequipItemUseCase(equipmentPort, transactionRunner);
+        ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase =
                 new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
-        var equipmentUseCases =
+        EquipmentUseCases equipmentUseCases =
                 new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
-        var enhancePorts = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
-        var enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, transactionRunner);
+        EnhancePorts enhancePorts = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
+        EnhanceItemUseCase enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, transactionRunner);
         return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
     }
 
@@ -187,51 +188,51 @@ public final class ServerDatabaseBootstrap {
      * là bước validate CHẠY TRƯỚC lúc facade gameplay được cần tới, gọi độc lập từ composition root.
      */
     public List<String> listContentScriptRefs() {
-        var refs = new ArrayList<String>();
+        ArrayList<String> refs = new ArrayList<String>();
         refs.addAll(new PostgresQuestTemplateAdapter(dataSource).listAllScriptRefs());
         refs.addAll(new PostgresNpcTemplateAdapter(dataSource).listAllDialogueScriptRefs());
         return refs;
     }
 
     public ShopFacade wireShopFacade() {
-        var catalogPort = new PostgresShopCatalogAdapter(dataSource);
-        var goldPort = new PostgresShopGoldAdapter();
-        var inventoryGatewayPort = new PostgresShopInventoryGatewayAdapter(dataSource);
-        var auditPort = new PostgresShopAuditAdapter();
-        var idempotencyPort = new PostgresShopIdempotencyAdapter();
-        var transactionRunner = new JdbcShopTransactionRunner(dataSource);
-        var ports = new ShopPorts(catalogPort, goldPort, inventoryGatewayPort, auditPort, idempotencyPort);
-        var listShopItemsUseCase = new ListShopItemsUseCase(catalogPort);
-        var buyItemUseCase = new BuyItemUseCase(ports, transactionRunner);
-        var sellItemUseCase = new SellItemUseCase(ports, transactionRunner);
+        PostgresShopCatalogAdapter catalogPort = new PostgresShopCatalogAdapter(dataSource);
+        PostgresShopGoldAdapter goldPort = new PostgresShopGoldAdapter();
+        PostgresShopInventoryGatewayAdapter inventoryGatewayPort = new PostgresShopInventoryGatewayAdapter(dataSource);
+        PostgresShopAuditAdapter auditPort = new PostgresShopAuditAdapter();
+        PostgresShopIdempotencyAdapter idempotencyPort = new PostgresShopIdempotencyAdapter();
+        JdbcShopTransactionRunner transactionRunner = new JdbcShopTransactionRunner(dataSource);
+        ShopPorts ports = new ShopPorts(catalogPort, goldPort, inventoryGatewayPort, auditPort, idempotencyPort);
+        ListShopItemsUseCase listShopItemsUseCase = new ListShopItemsUseCase(catalogPort);
+        BuyItemUseCase buyItemUseCase = new BuyItemUseCase(ports, transactionRunner);
+        SellItemUseCase sellItemUseCase = new SellItemUseCase(ports, transactionRunner);
         return new ShopFacade(listShopItemsUseCase, buyItemUseCase, sellItemUseCase);
     }
 
     public DialogueFacade wireDialogueFacade() {
-        var npcTemplatePort = new PostgresNpcTemplateAdapter(dataSource);
-        var getDialogueNodeUseCase = new GetDialogueNodeUseCase(npcTemplatePort);
+        PostgresNpcTemplateAdapter npcTemplatePort = new PostgresNpcTemplateAdapter(dataSource);
+        GetDialogueNodeUseCase getDialogueNodeUseCase = new GetDialogueNodeUseCase(npcTemplatePort);
         return new DialogueFacade(getDialogueNodeUseCase);
     }
 
     public QuestFacade wireQuestFacade() {
-        var progressPort = new PostgresQuestProgressAdapter(dataSource);
-        var templatePort = new PostgresQuestTemplateAdapter(dataSource);
-        var expPort = new PostgresQuestExpAdapter();
-        var inventoryGrantPort = new PostgresQuestInventoryGrantAdapter(dataSource);
-        var auditPort = new PostgresQuestAuditAdapter();
-        var transactionRunner = new JdbcQuestTransactionRunner(dataSource);
-        var acceptQuestUseCase = new AcceptQuestUseCase(progressPort, templatePort, transactionRunner);
-        var processMonsterKilledUseCase =
+        PostgresQuestProgressAdapter progressPort = new PostgresQuestProgressAdapter(dataSource);
+        PostgresQuestTemplateAdapter templatePort = new PostgresQuestTemplateAdapter(dataSource);
+        PostgresQuestExpAdapter expPort = new PostgresQuestExpAdapter();
+        PostgresQuestInventoryGrantAdapter inventoryGrantPort = new PostgresQuestInventoryGrantAdapter(dataSource);
+        PostgresQuestAuditAdapter auditPort = new PostgresQuestAuditAdapter();
+        JdbcQuestTransactionRunner transactionRunner = new JdbcQuestTransactionRunner(dataSource);
+        AcceptQuestUseCase acceptQuestUseCase = new AcceptQuestUseCase(progressPort, templatePort, transactionRunner);
+        ProcessMonsterKilledUseCase processMonsterKilledUseCase =
                 new ProcessMonsterKilledUseCase(progressPort, templatePort, transactionRunner);
-        var rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
-        var claimQuestRewardUseCase =
+        QuestRewardPorts rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
+        ClaimQuestRewardUseCase claimQuestRewardUseCase =
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, transactionRunner);
         return new QuestFacade(acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
     }
 
     public FriendFacade wireFriendFacade() {
-        var friendPort = new PostgresFriendAdapter(dataSource);
-        var useCases = new FriendUseCases(
+        PostgresFriendAdapter friendPort = new PostgresFriendAdapter(dataSource);
+        FriendUseCases useCases = new FriendUseCases(
                 new SendFriendRequestUseCase(friendPort),
                 new AcceptFriendRequestUseCase(friendPort),
                 new RejectFriendRequestUseCase(friendPort),
@@ -242,23 +243,23 @@ public final class ServerDatabaseBootstrap {
     }
 
     public MailFacade wireMailFacade() {
-        var repositoryPort = new PostgresMailRepositoryAdapter(dataSource);
-        var goldPort = new PostgresMailGoldAdapter();
-        var inventoryGatewayPort = new PostgresMailInventoryGatewayAdapter(dataSource);
-        var auditPort = new PostgresMailAuditAdapter();
-        var idempotencyPort = new PostgresMailIdempotencyAdapter();
-        var transactionRunner = new JdbcMailTransactionRunner(dataSource);
-        var sendMailUseCase = new SendMailUseCase(repositoryPort, transactionRunner);
-        var listMailUseCase = new ListMailUseCase(repositoryPort);
-        var ports = new MailPorts(repositoryPort, goldPort, inventoryGatewayPort, auditPort, idempotencyPort);
-        var claimMailUseCase = new ClaimMailUseCase(ports, transactionRunner);
-        var deleteMailUseCase = new DeleteMailUseCase(repositoryPort);
+        PostgresMailRepositoryAdapter repositoryPort = new PostgresMailRepositoryAdapter(dataSource);
+        PostgresMailGoldAdapter goldPort = new PostgresMailGoldAdapter();
+        PostgresMailInventoryGatewayAdapter inventoryGatewayPort = new PostgresMailInventoryGatewayAdapter(dataSource);
+        PostgresMailAuditAdapter auditPort = new PostgresMailAuditAdapter();
+        PostgresMailIdempotencyAdapter idempotencyPort = new PostgresMailIdempotencyAdapter();
+        JdbcMailTransactionRunner transactionRunner = new JdbcMailTransactionRunner(dataSource);
+        SendMailUseCase sendMailUseCase = new SendMailUseCase(repositoryPort, transactionRunner);
+        ListMailUseCase listMailUseCase = new ListMailUseCase(repositoryPort);
+        MailPorts ports = new MailPorts(repositoryPort, goldPort, inventoryGatewayPort, auditPort, idempotencyPort);
+        ClaimMailUseCase claimMailUseCase = new ClaimMailUseCase(ports, transactionRunner);
+        DeleteMailUseCase deleteMailUseCase = new DeleteMailUseCase(repositoryPort);
         return new MailFacade(sendMailUseCase, listMailUseCase, claimMailUseCase, deleteMailUseCase);
     }
 
     public GuildFacade wireGuildFacade() {
-        var guildPort = new PostgresGuildAdapter(dataSource);
-        var useCases = new GuildUseCases(
+        PostgresGuildAdapter guildPort = new PostgresGuildAdapter(dataSource);
+        GuildUseCases useCases = new GuildUseCases(
                 new CreateGuildUseCase(guildPort),
                 new SendGuildJoinRequestUseCase(guildPort),
                 new ApproveGuildJoinRequestUseCase(guildPort),
@@ -273,8 +274,8 @@ public final class ServerDatabaseBootstrap {
     }
 
     public PartyFacade wirePartyFacade() {
-        var partyPort = new PostgresPartyAdapter(dataSource);
-        var useCases = new PartyUseCases(
+        PostgresPartyAdapter partyPort = new PostgresPartyAdapter(dataSource);
+        PartyUseCases useCases = new PartyUseCases(
                 new CreatePartyUseCase(partyPort),
                 new InvitePartyMemberUseCase(partyPort),
                 new AcceptPartyInviteUseCase(partyPort),
@@ -288,14 +289,14 @@ public final class ServerDatabaseBootstrap {
     }
 
     public TradeFacade wireTradeFacade() {
-        var sessionPort = new PostgresTradeSessionAdapter(dataSource);
-        var inventoryPort = new PostgresTradeInventoryAdapter(dataSource);
-        var goldPort = new PostgresTradeGoldAdapter();
-        var auditPort = new PostgresTradeAuditAdapter();
-        var idempotencyPort = new PostgresTradeIdempotencyAdapter();
-        var transactionRunner = new JdbcTradeTransactionRunner(dataSource);
-        var ports = new TradePorts(sessionPort, inventoryPort, goldPort, auditPort, idempotencyPort);
-        var useCases = new TradeUseCases(
+        PostgresTradeSessionAdapter sessionPort = new PostgresTradeSessionAdapter(dataSource);
+        PostgresTradeInventoryAdapter inventoryPort = new PostgresTradeInventoryAdapter(dataSource);
+        PostgresTradeGoldAdapter goldPort = new PostgresTradeGoldAdapter();
+        PostgresTradeAuditAdapter auditPort = new PostgresTradeAuditAdapter();
+        PostgresTradeIdempotencyAdapter idempotencyPort = new PostgresTradeIdempotencyAdapter();
+        JdbcTradeTransactionRunner transactionRunner = new JdbcTradeTransactionRunner(dataSource);
+        TradePorts ports = new TradePorts(sessionPort, inventoryPort, goldPort, auditPort, idempotencyPort);
+        TradeUseCases useCases = new TradeUseCases(
                 new RequestTradeUseCase(sessionPort),
                 new AcceptTradeRequestUseCase(sessionPort),
                 new CancelTradeUseCase(sessionPort),
@@ -306,7 +307,7 @@ public final class ServerDatabaseBootstrap {
     }
 
     public ChatFacade wireChatFacade() {
-        var auditPort = new PostgresChatAuditAdapter(dataSource);
+        PostgresChatAuditAdapter auditPort = new PostgresChatAuditAdapter(dataSource);
         return new ChatFacade(new SendChatMessageUseCase(auditPort));
     }
 

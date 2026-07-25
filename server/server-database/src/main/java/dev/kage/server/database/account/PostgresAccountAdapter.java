@@ -4,6 +4,7 @@ import dev.kage.account.domain.Account;
 import dev.kage.account.domain.AccountPort;
 import dev.kage.account.domain.Transaction;
 import dev.kage.server.database.DatabaseAccessException;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -31,7 +32,7 @@ public final class PostgresAccountAdapter implements AccountPort {
 
     @Override
     public Account findOrCreate(Transaction tx, String username) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try {
             try (PreparedStatement upsert = connection.prepareStatement(UPSERT)) {
                 upsert.setString(1, username);

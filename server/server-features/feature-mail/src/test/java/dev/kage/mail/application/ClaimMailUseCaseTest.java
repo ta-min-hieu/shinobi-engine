@@ -24,56 +24,59 @@ class ClaimMailUseCaseTest {
 
     @Test
     void shouldReturnNotFound_whenMailDoesNotExist() {
-        var repositoryPort = new FakeMailRepositoryPort();
-        var goldPort = new FakeGoldPort();
-        var inventoryGatewayPort = new FakeInventoryGatewayPort(true);
-        var auditPort = new FakeAuditPort();
-        var ports = new MailPorts(repositoryPort, goldPort, inventoryGatewayPort, auditPort, new FakeIdempotencyPort());
-        var useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
+        FakeMailRepositoryPort repositoryPort = new FakeMailRepositoryPort();
+        FakeGoldPort goldPort = new FakeGoldPort();
+        FakeInventoryGatewayPort inventoryGatewayPort = new FakeInventoryGatewayPort(true);
+        FakeAuditPort auditPort = new FakeAuditPort();
+        MailPorts ports =
+                new MailPorts(repositoryPort, goldPort, inventoryGatewayPort, auditPort, new FakeIdempotencyPort());
+        ClaimMailUseCase useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
 
-        var result = useCase.execute(999, 5, IDEMPOTENCY_KEY);
+        ClaimMailUseCase.ClaimOutcome result = useCase.execute(999, 5, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.NOT_FOUND);
     }
 
     @Test
     void shouldReturnNotFound_whenRecipientMismatch() {
-        var repositoryPort = new FakeMailRepositoryPort();
+        FakeMailRepositoryPort repositoryPort = new FakeMailRepositoryPort();
         repositoryPort.mails.add(new Mail(1, null, 5, "s", "b", 0, List.of(), null, Instant.now()));
-        var ports = new MailPorts(repositoryPort, new FakeGoldPort(), new FakeInventoryGatewayPort(true),
+        MailPorts ports = new MailPorts(repositoryPort, new FakeGoldPort(), new FakeInventoryGatewayPort(true),
                 new FakeAuditPort(), new FakeIdempotencyPort());
-        var useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
+        ClaimMailUseCase useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
 
-        var result = useCase.execute(1, 999, IDEMPOTENCY_KEY); // 999 không phải recipient thật (5)
+        // 999 không phải recipient thật (5)
+        ClaimMailUseCase.ClaimOutcome result = useCase.execute(1, 999, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.NOT_FOUND);
     }
 
     @Test
     void shouldReturnAlreadyClaimed_whenClaimedAtSet() {
-        var repositoryPort = new FakeMailRepositoryPort();
+        FakeMailRepositoryPort repositoryPort = new FakeMailRepositoryPort();
         repositoryPort.mails.add(new Mail(1, null, 5, "s", "b", 0, List.of(), Instant.now(), Instant.now()));
-        var ports = new MailPorts(repositoryPort, new FakeGoldPort(), new FakeInventoryGatewayPort(true),
+        MailPorts ports = new MailPorts(repositoryPort, new FakeGoldPort(), new FakeInventoryGatewayPort(true),
                 new FakeAuditPort(), new FakeIdempotencyPort());
-        var useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
+        ClaimMailUseCase useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
 
-        var result = useCase.execute(1, 5, IDEMPOTENCY_KEY);
+        ClaimMailUseCase.ClaimOutcome result = useCase.execute(1, 5, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.ALREADY_CLAIMED);
     }
 
     @Test
     void shouldCreditGoldGrantItemsMarkClaimedAndAudit_whenSuccessful() {
-        var repositoryPort = new FakeMailRepositoryPort();
+        FakeMailRepositoryPort repositoryPort = new FakeMailRepositoryPort();
         repositoryPort.mails.add(
                 new Mail(1, 7L, 5, "s", "b", 50, List.of(new MailAttachment(1, 2)), null, Instant.now()));
-        var goldPort = new FakeGoldPort();
-        var inventoryGatewayPort = new FakeInventoryGatewayPort(true);
-        var auditPort = new FakeAuditPort();
-        var ports = new MailPorts(repositoryPort, goldPort, inventoryGatewayPort, auditPort, new FakeIdempotencyPort());
-        var useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
+        FakeGoldPort goldPort = new FakeGoldPort();
+        FakeInventoryGatewayPort inventoryGatewayPort = new FakeInventoryGatewayPort(true);
+        FakeAuditPort auditPort = new FakeAuditPort();
+        MailPorts ports =
+                new MailPorts(repositoryPort, goldPort, inventoryGatewayPort, auditPort, new FakeIdempotencyPort());
+        ClaimMailUseCase useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
 
-        var result = useCase.execute(1, 5, IDEMPOTENCY_KEY);
+        ClaimMailUseCase.ClaimOutcome result = useCase.execute(1, 5, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.OK);
         assertThat(goldPort.creditedAmount).isEqualTo(50);
@@ -88,16 +91,17 @@ class ClaimMailUseCaseTest {
         // rollback thật, đó là việc của JdbcTransactionRunner — Postgres thật verify ở
         // MailIntegrationTest), NHƯNG markClaimed/audit KHÔNG BAO GIỜ được gọi tới — cùng cách
         // BuyItemUseCaseTest verify shouldRollbackAndReturnInventoryFull_whenGrantFails.
-        var repositoryPort = new FakeMailRepositoryPort();
+        FakeMailRepositoryPort repositoryPort = new FakeMailRepositoryPort();
         repositoryPort.mails.add(
                 new Mail(1, 7L, 5, "s", "b", 50, List.of(new MailAttachment(1, 2)), null, Instant.now()));
-        var goldPort = new FakeGoldPort();
-        var inventoryGatewayPort = new FakeInventoryGatewayPort(false);
-        var auditPort = new FakeAuditPort();
-        var ports = new MailPorts(repositoryPort, goldPort, inventoryGatewayPort, auditPort, new FakeIdempotencyPort());
-        var useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
+        FakeGoldPort goldPort = new FakeGoldPort();
+        FakeInventoryGatewayPort inventoryGatewayPort = new FakeInventoryGatewayPort(false);
+        FakeAuditPort auditPort = new FakeAuditPort();
+        MailPorts ports =
+                new MailPorts(repositoryPort, goldPort, inventoryGatewayPort, auditPort, new FakeIdempotencyPort());
+        ClaimMailUseCase useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
 
-        var result = useCase.execute(1, 5, IDEMPOTENCY_KEY);
+        ClaimMailUseCase.ClaimOutcome result = useCase.execute(1, 5, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.INVENTORY_FULL);
         assertThat(goldPort.creditedAmount).isEqualTo(50); // đã gọi Port (rollback thật là việc của DB)
@@ -107,16 +111,16 @@ class ClaimMailUseCaseTest {
 
     @Test
     void shouldReturnDuplicateRequest_whenIdempotencyKeyReused() {
-        var repositoryPort = new FakeMailRepositoryPort();
+        FakeMailRepositoryPort repositoryPort = new FakeMailRepositoryPort();
         repositoryPort.mails.add(
                 new Mail(1, 7L, 5, "s", "b", 50, List.of(new MailAttachment(1, 2)), null, Instant.now()));
-        var idempotencyPort = new FakeIdempotencyPort();
-        var ports = new MailPorts(repositoryPort, new FakeGoldPort(), new FakeInventoryGatewayPort(true),
+        FakeIdempotencyPort idempotencyPort = new FakeIdempotencyPort();
+        MailPorts ports = new MailPorts(repositoryPort, new FakeGoldPort(), new FakeInventoryGatewayPort(true),
                 new FakeAuditPort(), idempotencyPort);
-        var useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
+        ClaimMailUseCase useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
         useCase.execute(1, 5, IDEMPOTENCY_KEY);
 
-        var result = useCase.execute(1, 5, IDEMPOTENCY_KEY);
+        ClaimMailUseCase.ClaimOutcome result = useCase.execute(1, 5, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.DUPLICATE_REQUEST);
     }
@@ -149,7 +153,7 @@ class ClaimMailUseCaseTest {
         public boolean markClaimed(Transaction tx, long mailId, long recipientId) {
             markClaimedCalled = true;
             for (int i = 0; i < mails.size(); i++) {
-                var m = mails.get(i);
+                Mail m = mails.get(i);
                 if (m.id() == mailId && m.recipientId() == recipientId && !m.isClaimed()) {
                     mails.set(i, new Mail(m.id(), m.senderId(), m.recipientId(), m.subject(), m.body(),
                             m.goldAmount(), m.attachments(), Instant.now(), m.createdAt()));

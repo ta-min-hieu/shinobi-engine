@@ -2,8 +2,10 @@ package dev.kage.party.application;
 
 import dev.kage.party.domain.DuplicatePartyInviteException;
 import dev.kage.party.domain.Party;
+import dev.kage.party.domain.PartyMember;
 import dev.kage.party.domain.PartyPort;
 import dev.kage.party.domain.PartyRole;
+import java.util.Optional;
 
 /**
  * Leader mời 1 nhân vật theo ID đã resolve từ tên ở gateway (cùng lý do feature-friend — mời trực
@@ -21,7 +23,7 @@ public final class InvitePartyMemberUseCase {
         if (leaderCharacterId == targetCharacterId) {
             return Result.CANNOT_INVITE_SELF;
         }
-        var leaderMembership = port.findMembershipOf(leaderCharacterId);
+        Optional<PartyMember> leaderMembership = port.findMembershipOf(leaderCharacterId);
         if (leaderMembership.isEmpty() || leaderMembership.get().role() != PartyRole.LEADER) {
             return Result.NOT_LEADER;
         }

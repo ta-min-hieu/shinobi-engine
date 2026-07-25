@@ -5,6 +5,7 @@ import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestStatus;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.server.database.DatabaseAccessException;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -37,16 +38,16 @@ public final class PostgresQuestProgressAdapter implements QuestProgressPort {
 
     @Override
     public Optional<QuestProgress> find(long characterId, long questTemplateId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND)) {
             statement.setLong(1, characterId);
             statement.setLong(2, questTemplateId);
             try (ResultSet rs = statement.executeQuery()) {
                 if (!rs.next()) {
                     return Optional.empty();
                 }
-                var status = QuestStatus.valueOf(rs.getString("status"));
-                var progressJson = rs.getString("progress_json");
+                QuestStatus status = QuestStatus.valueOf(rs.getString("status"));
+                String progressJson = rs.getString("progress_json");
                 return Optional.of(new QuestProgress(characterId, questTemplateId, status, progressJson));
             }
         } catch (SQLException e) {
@@ -57,7 +58,7 @@ public final class PostgresQuestProgressAdapter implements QuestProgressPort {
 
     @Override
     public void save(Transaction tx, QuestProgress progress) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try (PreparedStatement statement = connection.prepareStatement(UPSERT)) {
             statement.setLong(1, progress.characterId());
             statement.setLong(2, progress.questTemplateId());

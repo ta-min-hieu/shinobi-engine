@@ -66,11 +66,11 @@ public final class PostgresInventoryAdapter implements InventoryPort {
 
     @Override
     public Optional<Inventory> findByCharacter(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_BY_CHARACTER)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_BY_CHARACTER)) {
             statement.setLong(1, characterId);
             try (ResultSet rs = statement.executeQuery()) {
-                var items = new ArrayList<ItemStack>();
+                ArrayList<ItemStack> items = new ArrayList<ItemStack>();
                 while (rs.next()) {
                     items.add(new ItemStack(rs.getLong("id"), rs.getLong("item_template_id"),
                             rs.getInt("quantity"), rs.getInt("enhance_level")));
@@ -84,7 +84,7 @@ public final class PostgresInventoryAdapter implements InventoryPort {
 
     @Override
     public Inventory save(Transaction tx, Inventory inventory) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try {
             deleteRemovedItems(connection, inventory);
             List<ItemStack> savedItems = upsertItems(connection, inventory);
@@ -118,7 +118,7 @@ public final class PostgresInventoryAdapter implements InventoryPort {
         try (PreparedStatement statement = connection.prepareStatement(SELECT_EXISTING_IDS)) {
             statement.setLong(1, characterId);
             try (ResultSet rs = statement.executeQuery()) {
-                var ids = new HashSet<Long>();
+                HashSet<Long> ids = new HashSet<Long>();
                 while (rs.next()) {
                     ids.add(rs.getLong("id"));
                 }
@@ -135,9 +135,9 @@ public final class PostgresInventoryAdapter implements InventoryPort {
      */
     private static List<ItemStack> upsertItems(Connection connection, Inventory inventory) throws SQLException {
         List<ItemStack> items = inventory.items();
-        var saved = new ArrayList<ItemStack>(items.size());
+        ArrayList<ItemStack> saved = new ArrayList<ItemStack>(items.size());
         for (int slotIndex = 0; slotIndex < items.size(); slotIndex++) {
-            var stack = items.get(slotIndex);
+            ItemStack stack = items.get(slotIndex);
             if (stack.isPersisted()) {
                 updateItem(connection, stack, slotIndex);
                 saved.add(stack);

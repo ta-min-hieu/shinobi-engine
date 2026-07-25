@@ -49,7 +49,7 @@ final class FakeTradeSessionPort implements TradeSessionPort {
 
     @Override
     public TradeSession createRequest(long requesterCharacterId, long targetCharacterId) {
-        var state = new MutableState();
+        MutableState state = new MutableState();
         state.id = nextSessionId.getAndIncrement();
         state.requesterCharacterId = requesterCharacterId;
         state.targetCharacterId = targetCharacterId;
@@ -61,7 +61,7 @@ final class FakeTradeSessionPort implements TradeSessionPort {
 
     @Override
     public boolean acceptRequest(long sessionId, long characterId) {
-        var state = sessions.get(sessionId);
+        MutableState state = sessions.get(sessionId);
         if (state == null || state.targetCharacterId != characterId || state.status != TradeStatus.PENDING_ACCEPT) {
             return false;
         }
@@ -71,7 +71,7 @@ final class FakeTradeSessionPort implements TradeSessionPort {
 
     @Override
     public boolean deleteSessionIfParticipant(long sessionId, long characterId) {
-        var state = sessions.get(sessionId);
+        MutableState state = sessions.get(sessionId);
         if (state == null || (state.requesterCharacterId != characterId && state.targetCharacterId != characterId)) {
             return false;
         }
@@ -81,13 +81,13 @@ final class FakeTradeSessionPort implements TradeSessionPort {
 
     @Override
     public boolean replaceOffer(long sessionId, long characterId, long goldAmount, List<OfferedItemInput> items) {
-        var state = sessions.get(sessionId);
+        MutableState state = sessions.get(sessionId);
         if (state == null || state.status != TradeStatus.OPEN
                 || (state.requesterCharacterId != characterId && state.targetCharacterId != characterId)) {
             return false;
         }
         state.items.removeIf(i -> i.offeringCharacterId() == characterId);
-        for (var item : items) {
+        for (OfferedItemInput item : items) {
             state.items.add(new TradeOfferItem(
                     nextOfferItemId.getAndIncrement(), sessionId, characterId, item.itemId(), item.quantity()));
         }
@@ -103,7 +103,7 @@ final class FakeTradeSessionPort implements TradeSessionPort {
 
     @Override
     public Optional<TradeSessionSnapshot> findSnapshot(long sessionId) {
-        var state = sessions.get(sessionId);
+        MutableState state = sessions.get(sessionId);
         return state == null ? Optional.empty() : Optional.of(toSnapshot(state));
     }
 
@@ -114,7 +114,7 @@ final class FakeTradeSessionPort implements TradeSessionPort {
 
     @Override
     public void setConfirmed(Transaction tx, long sessionId, long characterId) {
-        var state = sessions.get(sessionId);
+        MutableState state = sessions.get(sessionId);
         if (state == null) {
             return;
         }

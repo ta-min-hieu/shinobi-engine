@@ -39,22 +39,23 @@ public final class NetworkBootstrap {
             throws IOException, TimeoutException {
         awaitConnected(connection);
 
-        var connectRequest = ConnectRequest.newBuilder().setUsername(username).build();
-        var connectPayload = sendAndAwait(
+        ConnectRequest connectRequest = ConnectRequest.newBuilder().setUsername(username).build();
+        byte[] connectPayload = sendAndAwait(
                 connection, Opcode.OPCODE_CONNECT_REQUEST_VALUE, Opcode.OPCODE_CONNECT_RESPONSE_VALUE,
                 connectRequest.toByteArray());
-        var connectResponse = ConnectResponse.parseFrom(connectPayload);
+        ConnectResponse connectResponse = ConnectResponse.parseFrom(connectPayload);
         if (!connectResponse.getSuccess()) {
             throw new IOException("Đăng nhập thất bại cho username: " + username);
         }
 
         long characterId = findOrCreateCharacter(connection, username);
 
-        var selectRequest = SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
-        var selectPayload = sendAndAwait(
+        SelectCharacterRequest selectRequest =
+                SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
+        byte[] selectPayload = sendAndAwait(
                 connection, Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE,
                 Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, selectRequest.toByteArray());
-        var selectResponse = SelectCharacterResponse.parseFrom(selectPayload);
+        SelectCharacterResponse selectResponse = SelectCharacterResponse.parseFrom(selectPayload);
         if (!selectResponse.getSuccess()) {
             throw new IOException("Chọn nhân vật thất bại: characterId=" + characterId);
         }
@@ -62,25 +63,25 @@ public final class NetworkBootstrap {
     }
 
     private static long findOrCreateCharacter(GameConnection connection, String username) throws IOException {
-        var listPayload = sendAndAwait(
+        byte[] listPayload = sendAndAwait(
                 connection, Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE,
                 Opcode.OPCODE_LIST_CHARACTERS_RESPONSE_VALUE,
                 ListCharactersRequest.newBuilder().build().toByteArray());
-        var listResponse = ListCharactersResponse.parseFrom(listPayload);
+        ListCharactersResponse listResponse = ListCharactersResponse.parseFrom(listPayload);
         if (listResponse.getCharactersCount() > 0) {
             return listResponse.getCharacters(0).getId();
         }
 
         // Character.validateName: chỉ chữ/số (feature-character/CLAUDE.md) — lọc username.
-        var characterName = username.replaceAll("[^a-zA-Z0-9]", "");
-        var createRequest = CreateCharacterRequest.newBuilder()
+        String characterName = username.replaceAll("[^a-zA-Z0-9]", "");
+        CreateCharacterRequest createRequest = CreateCharacterRequest.newBuilder()
                 .setName(characterName)
                 .setIdempotencyKey(UUID.randomUUID().toString())
                 .build();
-        var createPayload = sendAndAwait(
+        byte[] createPayload = sendAndAwait(
                 connection, Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE,
                 Opcode.OPCODE_CREATE_CHARACTER_RESPONSE_VALUE, createRequest.toByteArray());
-        var createResponse = CreateCharacterResponse.parseFrom(createPayload);
+        CreateCharacterResponse createResponse = CreateCharacterResponse.parseFrom(createPayload);
         if (!createResponse.getSuccess()) {
             throw new IOException("Tạo nhân vật thất bại cho username: " + username);
         }
@@ -88,7 +89,7 @@ public final class NetworkBootstrap {
     }
 
     private static void awaitConnected(GameConnection connection) throws TimeoutException {
-        var deadline = Instant.now().plus(CONNECT_TIMEOUT);
+        Instant deadline = Instant.now().plus(CONNECT_TIMEOUT);
         while (Instant.now().isBefore(deadline)) {
             if (connection.isConnected()) {
                 return;
@@ -104,7 +105,7 @@ public final class NetworkBootstrap {
         int sequenceId = connection.nextSequenceId();
         connection.send(requestOpcode, sequenceId, payload);
 
-        var deadline = Instant.now().plus(STEP_TIMEOUT);
+        Instant deadline = Instant.now().plus(STEP_TIMEOUT);
         while (Instant.now().isBefore(deadline)) {
             PacketCodec.Frame frame = connection.pollInbound();
             if (frame == null) {

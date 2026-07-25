@@ -1,6 +1,7 @@
 package dev.kage.engine.ecs;
 
 import com.badlogic.ashley.core.PooledEngine;
+import com.badlogic.ashley.utils.ImmutableArray;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -29,15 +30,15 @@ public final class EcsWorld {
     private final List<IteratingKSystem> systems = new ArrayList<>();
 
     public KEntity createEntity() {
-        var raw = ashleyEngine.createEntity();
-        var handle = new KEntity(raw, nextId.getAndIncrement());
+        com.badlogic.ashley.core.Entity raw = ashleyEngine.createEntity();
+        KEntity handle = new KEntity(raw, nextId.getAndIncrement());
         handles.put(raw, handle);
         ashleyEngine.addEntity(raw);
         return handle;
     }
 
     public void removeEntity(KEntity entity) {
-        var raw = entity.raw();
+        com.badlogic.ashley.core.Entity raw = entity.raw();
         ashleyEngine.removeEntity(raw);
         handles.remove(raw);
     }
@@ -48,8 +49,9 @@ public final class EcsWorld {
 
     /** Fixed-timestep update — gọi từ KageEngine.fixedUpdate() với delta cố định (ENGINE.md §4). */
     public void update(float fixedDeltaTime) {
-        for (var system : systems) {
-            var entities = ashleyEngine.getEntitiesFor(system.family().raw());
+        for (IteratingKSystem system : systems) {
+            ImmutableArray<com.badlogic.ashley.core.Entity> entities =
+                    ashleyEngine.getEntitiesFor(system.family().raw());
             for (int i = 0; i < entities.size(); i++) {
                 system.processEntity(wrap(entities.get(i)), fixedDeltaTime);
             }
@@ -62,7 +64,7 @@ public final class EcsWorld {
      * mọi entity PHẢI được tạo qua {@link #createEntity()}, wrap() chỉ tra cứu wrapper có sẵn.
      */
     KEntity wrap(com.badlogic.ashley.core.Entity raw) {
-        var handle = handles.get(raw);
+        KEntity handle = handles.get(raw);
         if (handle == null) {
             throw new IllegalStateException(
                     "Entity không có KEntity handle — mọi entity phải tạo qua EcsWorld.createEntity()");

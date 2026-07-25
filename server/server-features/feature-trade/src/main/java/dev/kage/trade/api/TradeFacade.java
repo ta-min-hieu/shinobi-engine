@@ -1,6 +1,7 @@
 package dev.kage.trade.api;
 
 import dev.kage.trade.application.ConfirmTradeUseCase;
+import dev.kage.trade.application.RequestTradeUseCase;
 import dev.kage.trade.application.TradeUseCases;
 import dev.kage.trade.domain.OfferedItemInput;
 import dev.kage.trade.domain.TradeStatus;
@@ -21,8 +22,8 @@ public final class TradeFacade {
     }
 
     public RequestResult requestTrade(long characterId, long targetCharacterId) {
-        var result = useCases.requestTradeUseCase().execute(characterId, targetCharacterId);
-        var outcome = switch (result.outcome()) {
+        RequestTradeUseCase.Result result = useCases.requestTradeUseCase().execute(characterId, targetCharacterId);
+        RequestOutcome outcome = switch (result.outcome()) {
             case OK -> RequestOutcome.OK;
             case CANNOT_TRADE_SELF -> RequestOutcome.CANNOT_TRADE_SELF;
             case ALREADY_IN_TRADE -> RequestOutcome.ALREADY_IN_TRADE;
@@ -47,7 +48,8 @@ public final class TradeFacade {
     }
 
     public SetOfferResult setOffer(long sessionId, long characterId, long goldAmount, List<OfferItemInput> items) {
-        var domainItems = items.stream().map(i -> new OfferedItemInput(i.itemId(), i.quantity())).toList();
+        List<OfferedItemInput> domainItems =
+                items.stream().map(i -> new OfferedItemInput(i.itemId(), i.quantity())).toList();
         return switch (useCases.setTradeOfferUseCase().execute(sessionId, characterId, goldAmount, domainItems)) {
             case dev.kage.trade.application.SetTradeOfferUseCase.Result.OK -> SetOfferResult.OK;
             case dev.kage.trade.application.SetTradeOfferUseCase.Result.NOT_FOUND -> SetOfferResult.NOT_FOUND;
@@ -72,15 +74,15 @@ public final class TradeFacade {
             long theirGold = isRequester ? r.targetGold() : r.requesterGold();
             boolean myConfirmed = isRequester ? r.requesterConfirmed() : r.targetConfirmed();
             boolean theirConfirmed = isRequester ? r.targetConfirmed() : r.requesterConfirmed();
-            var myItems = r.items().stream()
+            List<OfferItemView> myItems = r.items().stream()
                     .filter(i -> i.offeringCharacterId() == characterId)
                     .map(i -> new OfferItemView(i.itemId(), i.itemTemplateId(), i.quantity(), i.enhanceLevel()))
                     .toList();
-            var theirItems = r.items().stream()
+            List<OfferItemView> theirItems = r.items().stream()
                     .filter(i -> i.offeringCharacterId() != characterId)
                     .map(i -> new OfferItemView(i.itemId(), i.itemTemplateId(), i.quantity(), i.enhanceLevel()))
                     .toList();
-            var phase = r.status() == TradeStatus.PENDING_ACCEPT ? TradePhase.PENDING_ACCEPT : TradePhase.OPEN;
+            TradePhase phase = r.status() == TradeStatus.PENDING_ACCEPT ? TradePhase.PENDING_ACCEPT : TradePhase.OPEN;
             return new TradeStatusView(
                     r.sessionId(), phase, counterpartId, isRequester, myGold, myItems, theirGold, theirItems,
                     myConfirmed, theirConfirmed);

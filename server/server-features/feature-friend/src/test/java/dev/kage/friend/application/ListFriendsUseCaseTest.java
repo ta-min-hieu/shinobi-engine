@@ -15,19 +15,19 @@ class ListFriendsUseCaseTest {
 
     @Test
     void shouldReturnOtherPartyIds_regardlessOfRequesterDirection() {
-        var port = new FakeFriendPort();
+        FakeFriendPort port = new FakeFriendPort();
         port.friendships.add(new Friendship(1, 5, 7, FriendshipStatus.ACCEPTED, Instant.now(), Instant.now()));
         port.friendships.add(new Friendship(2, 9, 5, FriendshipStatus.ACCEPTED, Instant.now(), Instant.now()));
-        var useCase = new ListFriendsUseCase(port);
+        ListFriendsUseCase useCase = new ListFriendsUseCase(port);
 
-        var result = useCase.execute(5);
+        List<Long> result = useCase.execute(5);
 
         assertThat(result).containsExactlyInAnyOrder(7L, 9L);
     }
 
     @Test
     void shouldReturnEmpty_whenNoFriends() {
-        var useCase = new ListFriendsUseCase(new FakeFriendPort());
+        ListFriendsUseCase useCase = new ListFriendsUseCase(new FakeFriendPort());
 
         assertThat(useCase.execute(5)).isEmpty();
     }

@@ -26,26 +26,26 @@ public final class DesktopLauncher {
     }
 
     public static void main(String[] args) throws Exception {
-        var username = args.length > 0 ? args[0] : "player" + ThreadLocalRandom.current().nextInt(1000, 9999);
+        String username = args.length > 0 ? args[0] : "player" + ThreadLocalRandom.current().nextInt(1000, 9999);
 
-        var connection = new GameConnection(GATEWAY_HOST, GATEWAY_PORT);
+        GameConnection connection = new GameConnection(GATEWAY_HOST, GATEWAY_PORT);
         connection.start();
         // Chưa có màn hình Login/CharacterSelect Scene2D thật (NetworkBootstrap javadoc) — nếu
         // handshake lỗi (server chưa chạy, username không hợp lệ...), thoát thẳng với stack
         // trace thay vì UI báo lỗi, đủ cho lát cắt dev/test hiện tại.
         long characterId = NetworkBootstrap.connectAndSelectCharacter(connection, username);
 
-        var config = new Lwjgl3ApplicationConfiguration();
+        Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
         config.setTitle("Project Kage — " + username + " (characterId=" + characterId + ")");
         config.setWindowedMode(1280, 720);
         config.useVsync(true);
         // Foreground FPS không giới hạn tick logic — logic luôn cố định 60Hz (ENGINE.md §4).
         config.setForegroundFPS(144);
 
-        var platform = new DesktopPlatformAdapter();
-        var inputMapper = new DesktopInputMapper();
+        DesktopPlatformAdapter platform = new DesktopPlatformAdapter();
+        DesktopInputMapper inputMapper = new DesktopInputMapper();
 
-        var engine = new KageEngine(
+        KageEngine engine = new KageEngine(
                 platform,
                 kageEngine -> new WorldScreen(kageEngine.services().get(EcsWorld.class), inputMapper, connection));
 

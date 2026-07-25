@@ -10,9 +10,9 @@ class InventoryTest {
 
     @Test
     void shouldAddItem_whenBelowCapacity() {
-        var inventory = new Inventory(1L, 5, List.of());
+        Inventory inventory = new Inventory(1L, 5, List.of());
 
-        var result = inventory.add(ItemStack.newItem(100L, 1, 0));
+        Inventory.AddResult result = inventory.add(ItemStack.newItem(100L, 1, 0));
 
         assertThat(result).isInstanceOf(Inventory.Added.class);
         assertThat(inventory.items()).hasSize(1);
@@ -21,9 +21,9 @@ class InventoryTest {
 
     @Test
     void shouldRejectAdd_whenAtCapacity() {
-        var inventory = new Inventory(1L, 1, List.of(ItemStack.newItem(100L, 1, 0)));
+        Inventory inventory = new Inventory(1L, 1, List.of(ItemStack.newItem(100L, 1, 0)));
 
-        var result = inventory.add(ItemStack.newItem(200L, 1, 0));
+        Inventory.AddResult result = inventory.add(ItemStack.newItem(200L, 1, 0));
 
         assertThat(result).isInstanceOf(Inventory.Full.class);
         assertThat(inventory.items()).hasSize(1); // không thêm item mới khi đầy
@@ -42,8 +42,8 @@ class InventoryTest {
 
     @Test
     void shouldFindItem_byRealId() {
-        var stack = new ItemStack(42L, 100L, 1, 0);
-        var inventory = new Inventory(1L, 5, List.of(stack));
+        ItemStack stack = new ItemStack(42L, 100L, 1, 0);
+        Inventory inventory = new Inventory(1L, 5, List.of(stack));
 
         assertThat(inventory.findItem(42L)).contains(stack);
         assertThat(inventory.findItem(999L)).isEmpty();
@@ -51,7 +51,7 @@ class InventoryTest {
 
     @Test
     void shouldReplaceItem_whenIdMatchesExistingItem() {
-        var inventory = new Inventory(1L, 5, List.of(new ItemStack(42L, 100L, 1, 3)));
+        Inventory inventory = new Inventory(1L, 5, List.of(new ItemStack(42L, 100L, 1, 3)));
 
         inventory.replaceItem(new ItemStack(42L, 100L, 1, 4));
 
@@ -60,7 +60,7 @@ class InventoryTest {
 
     @Test
     void shouldRejectReplaceItem_whenIdDoesNotExist() {
-        var inventory = new Inventory(1L, 5, List.of());
+        Inventory inventory = new Inventory(1L, 5, List.of());
 
         assertThatThrownBy(() -> inventory.replaceItem(new ItemStack(42L, 100L, 1, 4)))
                 .isInstanceOf(IllegalStateException.class);

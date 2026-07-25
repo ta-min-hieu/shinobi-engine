@@ -8,6 +8,7 @@ import dev.kage.party.domain.PartyPort;
 import dev.kage.party.domain.PartyRole;
 import dev.kage.server.database.DatabaseAccessException;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -114,8 +115,8 @@ public final class PostgresPartyAdapter implements PartyPort {
 
     @Override
     public Optional<PartyMember> findMembershipOf(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_MEMBERSHIP)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_MEMBERSHIP)) {
             statement.setLong(1, characterId);
             try (ResultSet rs = statement.executeQuery()) {
                 return rs.next() ? Optional.of(mapMember(rs)) : Optional.empty();
@@ -127,10 +128,10 @@ public final class PostgresPartyAdapter implements PartyPort {
 
     @Override
     public List<PartyMember> listMembers(long partyId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(LIST_MEMBERS)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(LIST_MEMBERS)) {
             statement.setLong(1, partyId);
-            var result = new ArrayList<PartyMember>();
+            ArrayList<PartyMember> result = new ArrayList<PartyMember>();
             try (ResultSet rs = statement.executeQuery()) {
                 while (rs.next()) {
                     result.add(mapMember(rs));
@@ -144,12 +145,12 @@ public final class PostgresPartyAdapter implements PartyPort {
 
     @Override
     public Party createParty(long leaderCharacterId) {
-        try (var connection = dataSource.getConnection()) {
+        try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
-                var now = Instant.now();
+                Instant now = Instant.now();
                 long partyId;
-                try (var insertParty = connection.prepareStatement(INSERT_PARTY)) {
+                try (PreparedStatement insertParty = connection.prepareStatement(INSERT_PARTY)) {
                     insertParty.setLong(1, leaderCharacterId);
                     insertParty.setTimestamp(2, Timestamp.from(now));
                     try (ResultSet rs = insertParty.executeQuery()) {
@@ -173,8 +174,8 @@ public final class PostgresPartyAdapter implements PartyPort {
 
     @Override
     public Optional<PartyInvite> findPendingInviteOfInvitee(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_PENDING_INVITE_OF_INVITEE)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_PENDING_INVITE_OF_INVITEE)) {
             statement.setLong(1, characterId);
             try (ResultSet rs = statement.executeQuery()) {
                 return rs.next() ? Optional.of(mapInvite(rs)) : Optional.empty();
@@ -186,10 +187,10 @@ public final class PostgresPartyAdapter implements PartyPort {
 
     @Override
     public List<PartyInvite> listPendingInvitesOfInvitee(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(LIST_PENDING_INVITES_OF_INVITEE)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(LIST_PENDING_INVITES_OF_INVITEE)) {
             statement.setLong(1, characterId);
-            var result = new ArrayList<PartyInvite>();
+            ArrayList<PartyInvite> result = new ArrayList<PartyInvite>();
             try (ResultSet rs = statement.executeQuery()) {
                 while (rs.next()) {
                     result.add(mapInvite(rs));
@@ -203,11 +204,11 @@ public final class PostgresPartyAdapter implements PartyPort {
 
     @Override
     public PartyInvite invite(long partyId, long inviteeCharacterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(INSERT_INVITE)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(INSERT_INVITE)) {
             statement.setLong(1, partyId);
             statement.setLong(2, inviteeCharacterId);
-            var now = Instant.now();
+            Instant now = Instant.now();
             statement.setTimestamp(3, Timestamp.from(now));
             try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
@@ -224,10 +225,10 @@ public final class PostgresPartyAdapter implements PartyPort {
 
     @Override
     public AcceptResult acceptInvite(long inviteId, long characterId) {
-        try (var connection = dataSource.getConnection()) {
+        try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
-                var result = acceptInviteInTransaction(connection, inviteId, characterId);
+                AcceptResult result = acceptInviteInTransaction(connection, inviteId, characterId);
                 connection.commit();
                 return result;
             } catch (SQLException e) {
@@ -244,7 +245,7 @@ public final class PostgresPartyAdapter implements PartyPort {
     private static AcceptResult acceptInviteInTransaction(Connection connection, long inviteId, long characterId)
             throws SQLException {
         long partyId;
-        try (var select = connection.prepareStatement(SELECT_INVITE_FOR_ACCEPT)) {
+        try (PreparedStatement select = connection.prepareStatement(SELECT_INVITE_FOR_ACCEPT)) {
             select.setLong(1, inviteId);
             select.setLong(2, characterId);
             try (ResultSet rs = select.executeQuery()) {
@@ -254,7 +255,7 @@ public final class PostgresPartyAdapter implements PartyPort {
                 partyId = rs.getLong("party_id");
             }
         }
-        try (var lockParty = connection.prepareStatement(LOCK_PARTY)) {
+        try (PreparedStatement lockParty = connection.prepareStatement(LOCK_PARTY)) {
             lockParty.setLong(1, partyId);
             lockParty.executeQuery();
         }
@@ -272,7 +273,7 @@ public final class PostgresPartyAdapter implements PartyPort {
     }
 
     private static boolean isAlreadyMember(Connection connection, long characterId) throws SQLException {
-        try (var statement = connection.prepareStatement(FIND_MEMBERSHIP)) {
+        try (PreparedStatement statement = connection.prepareStatement(FIND_MEMBERSHIP)) {
             statement.setLong(1, characterId);
             try (ResultSet rs = statement.executeQuery()) {
                 return rs.next();
@@ -281,7 +282,7 @@ public final class PostgresPartyAdapter implements PartyPort {
     }
 
     private static int countMembers(Connection connection, long partyId) throws SQLException {
-        try (var statement = connection.prepareStatement(COUNT_MEMBERS)) {
+        try (PreparedStatement statement = connection.prepareStatement(COUNT_MEMBERS)) {
             statement.setLong(1, partyId);
             try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
@@ -295,7 +296,7 @@ public final class PostgresPartyAdapter implements PartyPort {
     }
 
     private static void insertMember(Connection connection, NewMember member) throws SQLException {
-        try (var statement = connection.prepareStatement(INSERT_MEMBER)) {
+        try (PreparedStatement statement = connection.prepareStatement(INSERT_MEMBER)) {
             statement.setLong(1, member.partyId());
             statement.setLong(2, member.characterId());
             statement.setString(3, member.role().name());
@@ -305,7 +306,7 @@ public final class PostgresPartyAdapter implements PartyPort {
     }
 
     private static void deleteInvite(Connection connection, long inviteId) throws SQLException {
-        try (var statement = connection.prepareStatement(DELETE_INVITE)) {
+        try (PreparedStatement statement = connection.prepareStatement(DELETE_INVITE)) {
             statement.setLong(1, inviteId);
             statement.executeUpdate();
         }
@@ -313,8 +314,8 @@ public final class PostgresPartyAdapter implements PartyPort {
 
     @Override
     public boolean rejectInvite(long inviteId, long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(REJECT_INVITE)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(REJECT_INVITE)) {
             statement.setLong(1, inviteId);
             statement.setLong(2, characterId);
             return statement.executeUpdate() > 0;
@@ -325,10 +326,10 @@ public final class PostgresPartyAdapter implements PartyPort {
 
     @Override
     public LeaveResult leaveParty(long characterId) {
-        try (var connection = dataSource.getConnection()) {
+        try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
-                var result = leavePartyInTransaction(connection, characterId);
+                LeaveResult result = leavePartyInTransaction(connection, characterId);
                 connection.commit();
                 return result;
             } catch (SQLException e) {
@@ -345,7 +346,7 @@ public final class PostgresPartyAdapter implements PartyPort {
     private static LeaveResult leavePartyInTransaction(Connection connection, long characterId) throws SQLException {
         long partyId;
         PartyRole role;
-        try (var select = connection.prepareStatement(SELECT_MEMBERSHIP_FOR_UPDATE)) {
+        try (PreparedStatement select = connection.prepareStatement(SELECT_MEMBERSHIP_FOR_UPDATE)) {
             select.setLong(1, characterId);
             try (ResultSet rs = select.executeQuery()) {
                 if (!rs.next()) {
@@ -355,11 +356,11 @@ public final class PostgresPartyAdapter implements PartyPort {
                 role = PartyRole.valueOf(rs.getString("role"));
             }
         }
-        try (var lockParty = connection.prepareStatement(LOCK_PARTY)) {
+        try (PreparedStatement lockParty = connection.prepareStatement(LOCK_PARTY)) {
             lockParty.setLong(1, partyId);
             lockParty.executeQuery();
         }
-        try (var delete = connection.prepareStatement(DELETE_MEMBER)) {
+        try (PreparedStatement delete = connection.prepareStatement(DELETE_MEMBER)) {
             delete.setLong(1, partyId);
             delete.setLong(2, characterId);
             delete.executeUpdate();
@@ -373,7 +374,7 @@ public final class PostgresPartyAdapter implements PartyPort {
 
     private static void promoteNextLeaderOrDissolve(Connection connection, long partyId) throws SQLException {
         Long nextLeaderId = null;
-        try (var select = connection.prepareStatement(FIND_EARLIEST_REMAINING_MEMBER)) {
+        try (PreparedStatement select = connection.prepareStatement(FIND_EARLIEST_REMAINING_MEMBER)) {
             select.setLong(1, partyId);
             try (ResultSet rs = select.executeQuery()) {
                 if (rs.next()) {
@@ -382,18 +383,18 @@ public final class PostgresPartyAdapter implements PartyPort {
             }
         }
         if (nextLeaderId == null) {
-            try (var deleteParty = connection.prepareStatement(DELETE_PARTY)) {
+            try (PreparedStatement deleteParty = connection.prepareStatement(DELETE_PARTY)) {
                 deleteParty.setLong(1, partyId);
                 deleteParty.executeUpdate();
             }
             return;
         }
-        try (var promote = connection.prepareStatement(PROMOTE_TO_LEADER)) {
+        try (PreparedStatement promote = connection.prepareStatement(PROMOTE_TO_LEADER)) {
             promote.setLong(1, partyId);
             promote.setLong(2, nextLeaderId);
             promote.executeUpdate();
         }
-        try (var updateLeader = connection.prepareStatement(UPDATE_PARTY_LEADER)) {
+        try (PreparedStatement updateLeader = connection.prepareStatement(UPDATE_PARTY_LEADER)) {
             updateLeader.setLong(1, nextLeaderId);
             updateLeader.setLong(2, partyId);
             updateLeader.executeUpdate();
@@ -402,8 +403,8 @@ public final class PostgresPartyAdapter implements PartyPort {
 
     @Override
     public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(KICK)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(KICK)) {
             statement.setLong(1, targetCharacterId);
             statement.setLong(2, leaderCharacterId);
             return statement.executeUpdate() > 0;

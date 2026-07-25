@@ -15,11 +15,11 @@ class PacketCodecTest {
 
     @Test
     void shouldRoundTripHeaderAndRawPayload() {
-        var header = new PacketHeader(42, ProtocolVersion.CURRENT, 12345);
+        PacketHeader header = new PacketHeader(42, ProtocolVersion.CURRENT, 12345);
         byte[] payload = {1, 2, 3, 4, 5};
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, payload);
-        var decoded = PacketCodec.decodeFrame(frameBytes);
+        PacketCodec.Frame decoded = PacketCodec.decodeFrame(frameBytes);
 
         // ⚠️ KHÔNG assertThat(decoded).isEqualTo(...) — Frame chứa byte[], equals() mặc định
         // của record so sánh THAM CHIẾU mảng (xem javadoc PacketCodec.Frame). So riêng từng field;
@@ -30,12 +30,12 @@ class PacketCodecTest {
 
     @Test
     void shouldRoundTripRealProtobufPayload() throws InvalidProtocolBufferException {
-        var ping = PingCommand.newBuilder().setClientTimestampMs(1_700_000_000_000L).build();
-        var header = new PacketHeader(1, ProtocolVersion.CURRENT, 1);
+        PingCommand ping = PingCommand.newBuilder().setClientTimestampMs(1_700_000_000_000L).build();
+        PacketHeader header = new PacketHeader(1, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, ping.toByteArray());
-        var decoded = PacketCodec.decodeFrame(frameBytes);
-        var parsedPing = PingCommand.parseFrom(decoded.payload());
+        PacketCodec.Frame decoded = PacketCodec.decodeFrame(frameBytes);
+        PingCommand parsedPing = PingCommand.parseFrom(decoded.payload());
 
         assertThat(decoded.header()).isEqualTo(header);
         assertThat(parsedPing.getClientTimestampMs()).isEqualTo(1_700_000_000_000L);

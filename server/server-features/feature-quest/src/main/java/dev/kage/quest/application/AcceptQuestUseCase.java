@@ -3,6 +3,7 @@ package dev.kage.quest.application;
 import dev.kage.quest.domain.QuestProgress;
 import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestStatus;
+import dev.kage.quest.domain.QuestTemplate;
 import dev.kage.quest.domain.QuestTemplatePort;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.quest.domain.TransactionRunner;
@@ -22,7 +23,7 @@ public final class AcceptQuestUseCase {
     }
 
     public AcceptResult execute(long characterId, String questCode) {
-        var template = templatePort.findByCode(questCode).orElse(null);
+        QuestTemplate template = templatePort.findByCode(questCode).orElse(null);
         if (template == null) {
             return AcceptResult.QUEST_NOT_FOUND;
         }
@@ -30,7 +31,7 @@ public final class AcceptQuestUseCase {
             return AcceptResult.ALREADY_ACCEPTED;
         }
 
-        var effects = scriptRunner.runAccept(template.scriptRef());
+        QuestScriptRunner.HookEffects effects = scriptRunner.runAccept(template.scriptRef());
         tx.inTransaction((Transaction t) -> progressPort.save(
                 t, new QuestProgress(characterId, template.id(), QuestStatus.IN_PROGRESS, effects.progressJson())));
         return AcceptResult.OK;

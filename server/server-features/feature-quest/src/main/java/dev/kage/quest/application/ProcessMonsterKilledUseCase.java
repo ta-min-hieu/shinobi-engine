@@ -3,6 +3,7 @@ package dev.kage.quest.application;
 import dev.kage.quest.domain.QuestProgress;
 import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestStatus;
+import dev.kage.quest.domain.QuestTemplate;
 import dev.kage.quest.domain.QuestTemplatePort;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.quest.domain.TransactionRunner;
@@ -37,18 +38,18 @@ public final class ProcessMonsterKilledUseCase {
 
     /** {@code Optional.empty()} nếu nhân vật không có quest này IN_PROGRESS HOẶC chưa hoàn thành. */
     public Optional<QuestStatusChange> execute(long characterId, String monsterCode) {
-        var template = templatePort.findByCode(TRACKED_QUEST_CODE).orElse(null);
+        QuestTemplate template = templatePort.findByCode(TRACKED_QUEST_CODE).orElse(null);
         if (template == null) {
             return Optional.empty();
         }
-        var progress = progressPort.find(characterId, template.id()).orElse(null);
+        QuestProgress progress = progressPort.find(characterId, template.id()).orElse(null);
         if (progress == null || progress.status() != QuestStatus.IN_PROGRESS) {
             return Optional.empty();
         }
 
-        var effects = scriptRunner.runEvent(
+        QuestScriptRunner.HookEffects effects = scriptRunner.runEvent(
                 template.scriptRef(), progress.progressJson(), MONSTER_KILLED_EVENT_TYPE, monsterCode);
-        var newStatus = effects.completed() ? QuestStatus.COMPLETED : QuestStatus.IN_PROGRESS;
+        QuestStatus newStatus = effects.completed() ? QuestStatus.COMPLETED : QuestStatus.IN_PROGRESS;
         tx.inTransaction((Transaction t) -> progressPort.save(
                 t, new QuestProgress(characterId, template.id(), newStatus, effects.progressJson())));
 

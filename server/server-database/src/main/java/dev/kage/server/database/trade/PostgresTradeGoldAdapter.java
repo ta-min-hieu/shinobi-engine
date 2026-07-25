@@ -3,6 +3,7 @@ package dev.kage.server.database.trade;
 import dev.kage.server.database.DatabaseAccessException;
 import dev.kage.trade.domain.Transaction;
 import dev.kage.trade.domain.TradeGoldPort;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
@@ -22,7 +23,7 @@ public final class PostgresTradeGoldAdapter implements TradeGoldPort {
 
     @Override
     public boolean deductGold(Transaction tx, long characterId, long amount) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try (PreparedStatement statement = connection.prepareStatement(DEDUCT_IF_ENOUGH)) {
             statement.setLong(1, amount);
             statement.setLong(2, characterId);
@@ -35,7 +36,7 @@ public final class PostgresTradeGoldAdapter implements TradeGoldPort {
 
     @Override
     public void creditGold(Transaction tx, long characterId, long amount) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try (PreparedStatement statement = connection.prepareStatement(CREDIT)) {
             statement.setLong(1, amount);
             statement.setLong(2, characterId);

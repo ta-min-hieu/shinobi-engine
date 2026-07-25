@@ -36,7 +36,7 @@ public final class SellItemUseCase {
         }
         long totalCredit = listing.sellPrice() * quantity;
 
-        var resultHolder = new AtomicReference<SellResult>();
+        AtomicReference<SellResult> resultHolder = new AtomicReference<SellResult>();
         try {
             tx.inTransaction((Transaction t) -> {
                 ports.idempotencyPort().recordOrThrow(t, idempotencyKey);
@@ -45,7 +45,7 @@ public final class SellItemUseCase {
                     return;
                 }
                 ports.goldPort().creditGold(t, characterId, totalCredit);
-                var detail = "{\"itemId\":%d,\"quantity\":%d,\"goldEarned\":%d}"
+                String detail = "{\"itemId\":%d,\"quantity\":%d,\"goldEarned\":%d}"
                         .formatted(itemId, quantity, totalCredit);
                 ports.auditPort().log(t, characterId, "SHOP_SELL", detail);
                 resultHolder.set(SellResult.OK);

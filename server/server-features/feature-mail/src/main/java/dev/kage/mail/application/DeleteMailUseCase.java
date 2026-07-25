@@ -1,6 +1,8 @@
 package dev.kage.mail.application;
 
+import dev.kage.mail.domain.Mail;
 import dev.kage.mail.domain.MailRepositoryPort;
+import java.util.Optional;
 
 /**
  * Xoá thư — CẤM xoá thư CHƯA nhận mà còn gold/item đính kèm (mất thưởng âm thầm), phải nhận
@@ -15,11 +17,11 @@ public final class DeleteMailUseCase {
     }
 
     public Result execute(long mailId, long characterId) {
-        var mailOpt = port.findById(mailId);
+        Optional<Mail> mailOpt = port.findById(mailId);
         if (mailOpt.isEmpty() || mailOpt.get().recipientId() != characterId) {
             return Result.NOT_FOUND;
         }
-        var mail = mailOpt.get();
+        Mail mail = mailOpt.get();
         if (!mail.isClaimed() && mail.hasReward()) {
             return Result.MUST_CLAIM_FIRST;
         }

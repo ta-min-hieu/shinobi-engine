@@ -54,13 +54,13 @@ class GrantLootUseCaseTest {
     void shouldGrantItem_whenEntryAlwaysDrops() {
         // dropChancePercent=100 -> luôn rơi, tránh flaky theo random thật (LootRoller dùng
         // ThreadLocalRandom, không mock được — chọn tỉ lệ chắc chắn thay vì Fake random).
-        var entries = List.of(new DropTableEntry(100L, 100, 2, 2));
-        var dropTablePort = new FakeDropTablePort(entries);
-        var inventory = new Inventory(1L, 10, List.of());
-        var inventoryPort = new FakeInventoryPort(inventory);
-        var useCase = new GrantLootUseCase(dropTablePort, inventoryPort, DIRECT_TX);
+        List<DropTableEntry> entries = List.of(new DropTableEntry(100L, 100, 2, 2));
+        FakeDropTablePort dropTablePort = new FakeDropTablePort(entries);
+        Inventory inventory = new Inventory(1L, 10, List.of());
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(inventory);
+        GrantLootUseCase useCase = new GrantLootUseCase(dropTablePort, inventoryPort, DIRECT_TX);
 
-        var granted = useCase.execute(1L, "any_code");
+        List<ItemStack> granted = useCase.execute(1L, "any_code");
 
         assertThat(granted).containsExactly(ItemStack.newItem(100L, 2, 0));
         assertThat(inventoryPort.saved).isNotNull();
@@ -69,13 +69,13 @@ class GrantLootUseCaseTest {
 
     @Test
     void shouldGrantNothing_whenEntryNeverDrops() {
-        var entries = List.of(new DropTableEntry(100L, 0, 1, 1));
-        var dropTablePort = new FakeDropTablePort(entries);
-        var inventory = new Inventory(1L, 10, List.of());
-        var inventoryPort = new FakeInventoryPort(inventory);
-        var useCase = new GrantLootUseCase(dropTablePort, inventoryPort, DIRECT_TX);
+        List<DropTableEntry> entries = List.of(new DropTableEntry(100L, 0, 1, 1));
+        FakeDropTablePort dropTablePort = new FakeDropTablePort(entries);
+        Inventory inventory = new Inventory(1L, 10, List.of());
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(inventory);
+        GrantLootUseCase useCase = new GrantLootUseCase(dropTablePort, inventoryPort, DIRECT_TX);
 
-        var granted = useCase.execute(1L, "any_code");
+        List<ItemStack> granted = useCase.execute(1L, "any_code");
 
         assertThat(granted).isEmpty();
         assertThat(inventoryPort.saved).isNull(); // không rơi gì -> không cần lưu
@@ -85,9 +85,9 @@ class GrantLootUseCaseTest {
     void shouldReturnRealIdFromSavedInventory_notThePrePersistPlaceholder() {
         // Đúng mục đích của lát cắt "trả ID thật về client": granted phải lấy từ Inventory mà
         // save() TRẢ VỀ (có id thật), không phải item id=0 (NEW_ITEM_ID) lúc add() vào bộ nhớ.
-        var entries = List.of(new DropTableEntry(100L, 100, 2, 2));
-        var dropTablePort = new FakeDropTablePort(entries);
-        var inventory = new Inventory(1L, 10, List.of());
+        List<DropTableEntry> entries = List.of(new DropTableEntry(100L, 100, 2, 2));
+        FakeDropTablePort dropTablePort = new FakeDropTablePort(entries);
+        Inventory inventory = new Inventory(1L, 10, List.of());
         InventoryPort inventoryPort = new InventoryPort() {
             @Override
             public Optional<Inventory> findByCharacter(long characterId) {
@@ -97,16 +97,16 @@ class GrantLootUseCaseTest {
             @Override
             public Inventory save(Transaction tx, Inventory inv) {
                 // Mô phỏng DB gán ID thật (999L) cho item mới, giống PostgresInventoryAdapter thật.
-                var withRealId = inv.items().stream()
+                List<ItemStack> withRealId = inv.items().stream()
                         .map(stack -> new ItemStack(
                                 999L, stack.itemTemplateId(), stack.quantity(), stack.enhanceLevel()))
                         .toList();
                 return new Inventory(inv.characterId(), inv.capacity(), withRealId);
             }
         };
-        var useCase = new GrantLootUseCase(dropTablePort, inventoryPort, DIRECT_TX);
+        GrantLootUseCase useCase = new GrantLootUseCase(dropTablePort, inventoryPort, DIRECT_TX);
 
-        var granted = useCase.execute(1L, "any_code");
+        List<ItemStack> granted = useCase.execute(1L, "any_code");
 
         assertThat(granted).hasSize(1);
         assertThat(granted.get(0).id()).isEqualTo(999L);
@@ -117,15 +117,15 @@ class GrantLootUseCaseTest {
     void shouldLoseItem_whenBagFullMidway() {
         // Túi CHỈ CÒN 1 chỗ trống, 2 entry cùng luôn rơi -> item thứ 2 bị mất (feature-inventory/
         // CLAUDE.md ghi rõ đây là hạn chế tạm thời, chưa có ground-item để trả lại).
-        var entries = List.of(
+        List<DropTableEntry> entries = List.of(
                 new DropTableEntry(100L, 100, 1, 1),
                 new DropTableEntry(200L, 100, 1, 1));
-        var dropTablePort = new FakeDropTablePort(entries);
-        var inventory = new Inventory(1L, 1, List.of());
-        var inventoryPort = new FakeInventoryPort(inventory);
-        var useCase = new GrantLootUseCase(dropTablePort, inventoryPort, DIRECT_TX);
+        FakeDropTablePort dropTablePort = new FakeDropTablePort(entries);
+        Inventory inventory = new Inventory(1L, 1, List.of());
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(inventory);
+        GrantLootUseCase useCase = new GrantLootUseCase(dropTablePort, inventoryPort, DIRECT_TX);
 
-        var granted = useCase.execute(1L, "any_code");
+        List<ItemStack> granted = useCase.execute(1L, "any_code");
 
         assertThat(granted).hasSize(1);
     }

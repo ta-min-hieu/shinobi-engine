@@ -4,6 +4,7 @@ import dev.kage.mail.domain.IdempotencyKeyReusedException;
 import dev.kage.mail.domain.IdempotencyPort;
 import dev.kage.mail.domain.Transaction;
 import dev.kage.server.database.DatabaseAccessException;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -27,7 +28,7 @@ public final class PostgresMailIdempotencyAdapter implements IdempotencyPort {
 
     @Override
     public void recordOrThrow(Transaction tx, String idempotencyKey) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try (PreparedStatement statement = connection.prepareStatement(INSERT_IDEMPOTENCY_KEY)) {
             statement.setObject(1, UUID.fromString(idempotencyKey), Types.OTHER);
             statement.setTimestamp(2, Timestamp.from(Instant.now()));

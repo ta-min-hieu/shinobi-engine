@@ -8,10 +8,10 @@ class CreateGuildUseCaseTest {
 
     @Test
     void shouldCreateGuild_andMakeCreatorLeader() {
-        var port = new FakeGuildPort();
-        var useCase = new CreateGuildUseCase(port);
+        FakeGuildPort port = new FakeGuildPort();
+        CreateGuildUseCase useCase = new CreateGuildUseCase(port);
 
-        var result = useCase.execute(5, "Konoha");
+        CreateGuildUseCase.Result result = useCase.execute(5, "Konoha");
 
         assertThat(result.outcome()).isEqualTo(CreateGuildUseCase.Outcome.OK);
         assertThat(result.guild().name()).isEqualTo("Konoha");
@@ -20,22 +20,22 @@ class CreateGuildUseCaseTest {
 
     @Test
     void shouldReject_whenCharacterAlreadyInGuild() {
-        var port = new FakeGuildPort();
+        FakeGuildPort port = new FakeGuildPort();
         port.createGuild("Konoha", 5);
-        var useCase = new CreateGuildUseCase(port);
+        CreateGuildUseCase useCase = new CreateGuildUseCase(port);
 
-        var result = useCase.execute(5, "Suna");
+        CreateGuildUseCase.Result result = useCase.execute(5, "Suna");
 
         assertThat(result.outcome()).isEqualTo(CreateGuildUseCase.Outcome.ALREADY_IN_GUILD);
     }
 
     @Test
     void shouldReject_whenNameAlreadyTaken() {
-        var port = new FakeGuildPort();
+        FakeGuildPort port = new FakeGuildPort();
         port.createGuild("Konoha", 5);
-        var useCase = new CreateGuildUseCase(port);
+        CreateGuildUseCase useCase = new CreateGuildUseCase(port);
 
-        var result = useCase.execute(7, "Konoha");
+        CreateGuildUseCase.Result result = useCase.execute(7, "Konoha");
 
         assertThat(result.outcome()).isEqualTo(CreateGuildUseCase.Outcome.NAME_TAKEN);
     }

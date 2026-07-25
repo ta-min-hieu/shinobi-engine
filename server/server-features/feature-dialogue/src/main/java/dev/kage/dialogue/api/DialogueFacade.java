@@ -3,6 +3,7 @@ package dev.kage.dialogue.api;
 import dev.kage.dialogue.application.GetDialogueNodeUseCase;
 import dev.kage.dialogue.domain.DialogueNode;
 import dev.kage.dialogue.domain.DialogueOption;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -28,11 +29,11 @@ public final class DialogueFacade {
      * script theo index, không tin client tự khai — Điều 24).
      */
     public SelectOptionResult selectOption(String npcCode, String currentNodeId, int optionIndex) {
-        var currentNode = getDialogueNodeUseCase.execute(npcCode, currentNodeId);
+        Optional<DialogueNode> currentNode = getDialogueNodeUseCase.execute(npcCode, currentNodeId);
         if (currentNode.isEmpty()) {
             return new SelectOptionResult.NotFound();
         }
-        var options = currentNode.get().options();
+        List<DialogueOption> options = currentNode.get().options();
         if (optionIndex < 0 || optionIndex >= options.size()) {
             return new SelectOptionResult.NotFound();
         }

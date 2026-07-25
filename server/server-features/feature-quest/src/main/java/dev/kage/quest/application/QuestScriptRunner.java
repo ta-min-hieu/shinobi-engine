@@ -55,7 +55,7 @@ final class QuestScriptRunner {
     }
 
     HookEffects runEvent(String scriptRef, String currentProgressJson, String eventType, String monsterCode) {
-        var event = Map.<String, Object>of("type", eventType, "monster_code", monsterCode);
+        Map<String, Object> event = Map.<String, Object>of("type", eventType, "monster_code", monsterCode);
         return run(scriptRef, "on_event", currentProgressJson, event);
     }
 
@@ -65,9 +65,9 @@ final class QuestScriptRunner {
 
     private HookEffects run(String scriptRef, String hookName, String currentProgressJson, Map<String, Object> event) {
         String source = scriptSourceCache.computeIfAbsent(scriptRef, QuestScriptRunner::loadScript);
-        var effects = new MutableEffects();
+        MutableEffects effects = new MutableEffects();
 
-        var ctx = new HashMap<String, Object>();
+        HashMap<String, Object> ctx = new HashMap<String, Object>();
         ctx.put("progress_json", currentProgressJson);
         ctx.put("save_progress", (ProxyExecutable) args -> {
             effects.progressJson = args[0].asString();
@@ -86,7 +86,8 @@ final class QuestScriptRunner {
             return null;
         });
 
-        var hostApi = Map.of("ctx", (Object) ctx, "event", (Object) (event == null ? Map.of() : event));
+        Map<String, Object> hostApi =
+                Map.of("ctx", (Object) ctx, "event", (Object) (event == null ? Map.of() : event));
         String wrapped = "var quest = " + source + "; quest." + hookName + "(ctx, event);";
         try {
             scriptSandbox.eval(wrapped, hostApi);
@@ -96,7 +97,7 @@ final class QuestScriptRunner {
         }
 
         String resultProgressJson = effects.progressJson != null ? effects.progressJson : currentProgressJson;
-        var itemGrants = List.copyOf(effects.itemGrants);
+        List<ItemGrant> itemGrants = List.copyOf(effects.itemGrants);
         return new HookEffects(resultProgressJson, effects.completed, effects.expGranted, itemGrants);
     }
 

@@ -9,11 +9,11 @@ class FindMyGuildUseCaseTest {
 
     @Test
     void shouldReturnGuildInfo_whenCharacterIsLeader() {
-        var port = new FakeGuildPort();
+        FakeGuildPort port = new FakeGuildPort();
         port.createGuild("Konoha", 1);
-        var useCase = new FindMyGuildUseCase(port);
+        FindMyGuildUseCase useCase = new FindMyGuildUseCase(port);
 
-        var result = useCase.execute(1).orElseThrow();
+        FindMyGuildUseCase.Result result = useCase.execute(1).orElseThrow();
 
         assertThat(result.guildName()).isEqualTo("Konoha");
         assertThat(result.myRole()).isEqualTo(GuildRole.LEADER);
@@ -21,7 +21,7 @@ class FindMyGuildUseCaseTest {
 
     @Test
     void shouldReturnEmpty_whenNotInAnyGuild() {
-        var useCase = new FindMyGuildUseCase(new FakeGuildPort());
+        FindMyGuildUseCase useCase = new FindMyGuildUseCase(new FakeGuildPort());
 
         assertThat(useCase.execute(1)).isEmpty();
     }

@@ -71,20 +71,20 @@ class ListCharactersUseCaseTest {
 
     @Test
     void shouldReturnOnlyCharactersOfGivenAccount() {
-        var characterOfAccount1 = new Character(1L, 1L, 1, "HeroOne", Faction.HOA, 1, 0, 0, Instant.now());
-        var characterOfAccount2 = new Character(2L, 2L, 1, "HeroTwo", Faction.HOA, 1, 0, 0, Instant.now());
-        var port = new FakeCharacterPort(List.of(characterOfAccount1, characterOfAccount2));
-        var useCase = new ListCharactersUseCase(port);
+        Character characterOfAccount1 = new Character(1L, 1L, 1, "HeroOne", Faction.HOA, 1, 0, 0, Instant.now());
+        Character characterOfAccount2 = new Character(2L, 2L, 1, "HeroTwo", Faction.HOA, 1, 0, 0, Instant.now());
+        FakeCharacterPort port = new FakeCharacterPort(List.of(characterOfAccount1, characterOfAccount2));
+        ListCharactersUseCase useCase = new ListCharactersUseCase(port);
 
-        var result = useCase.execute(1L);
+        List<Character> result = useCase.execute(1L);
 
         assertThat(result).containsExactly(characterOfAccount1);
     }
 
     @Test
     void shouldReturnEmptyList_whenAccountHasNoCharacters() {
-        var port = new FakeCharacterPort(List.of());
-        var useCase = new ListCharactersUseCase(port);
+        FakeCharacterPort port = new FakeCharacterPort(List.of());
+        ListCharactersUseCase useCase = new ListCharactersUseCase(port);
 
         assertThat(useCase.execute(1L)).isEmpty();
     }

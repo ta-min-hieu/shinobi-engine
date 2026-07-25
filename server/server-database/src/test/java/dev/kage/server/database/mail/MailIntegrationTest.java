@@ -11,6 +11,7 @@ import dev.kage.mail.application.DeleteMailUseCase;
 import dev.kage.mail.application.ListMailUseCase;
 import dev.kage.mail.application.MailPorts;
 import dev.kage.mail.application.SendMailUseCase;
+import dev.kage.mail.domain.Mail;
 import dev.kage.mail.domain.MailAttachment;
 import dev.kage.mail.domain.NewMail;
 import dev.kage.server.database.DatabaseConfig;
@@ -22,6 +23,9 @@ import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
 import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
 import dev.kage.server.database.inventory.PostgresInventoryAdapter;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -55,7 +59,7 @@ class MailIntegrationTest {
 
     @BeforeAll
     static void migrate() {
-        var config = new DatabaseConfig(
+        DatabaseConfig config = new DatabaseConfig(
                 POSTGRES.getHost(),
                 POSTGRES.getMappedPort(POSTGRES_PORT),
                 POSTGRES.getDatabaseName(),
@@ -64,28 +68,29 @@ class MailIntegrationTest {
         dataSource = PostgresDataSourceFactory.create(config);
         FlywayMigrator.migrate(dataSource);
 
-        var accountAdapter = new PostgresAccountAdapter();
-        var accountTx = new JdbcAccountTransactionRunner(dataSource);
-        var accountHolder = new Account[1];
+        PostgresAccountAdapter accountAdapter = new PostgresAccountAdapter();
+        JdbcAccountTransactionRunner accountTx = new JdbcAccountTransactionRunner(dataSource);
+        Account[] accountHolder = new Account[1];
         accountTx.inTransaction(tx -> accountHolder[0] = accountAdapter.findOrCreate(tx, "mailtester"));
         accountId = accountHolder[0].id();
         kunaiTemplateId = findItemTemplateIdByCode("kunai");
     }
 
     private static long createFreshCharacter(String name) {
-        var characterAdapter = new PostgresCharacterAdapter(dataSource);
-        var characterTx = new JdbcCharacterTransactionRunner(dataSource);
-        var newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
-        var holder = new Character[1];
+        PostgresCharacterAdapter characterAdapter = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner characterTx = new JdbcCharacterTransactionRunner(dataSource);
+        NewCharacter newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
+        Character[] holder = new Character[1];
         characterTx.inTransaction(tx -> holder[0] = characterAdapter.create(tx, newCharacter));
         return holder[0].id();
     }
 
     private static long findItemTemplateIdByCode(String code) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement("SELECT id FROM item_template WHERE code = ?")) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
+                        connection.prepareStatement("SELECT id FROM item_template WHERE code = ?")) {
             statement.setString(1, code);
-            try (var rs = statement.executeQuery()) {
+            try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
                 return rs.getLong(1);
             }
@@ -95,11 +100,11 @@ class MailIntegrationTest {
     }
 
     private static long readGold(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement =
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
                         connection.prepareStatement("SELECT gold FROM character_stat WHERE character_id = ?")) {
             statement.setLong(1, characterId);
-            try (var rs = statement.executeQuery()) {
+            try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
                 return rs.getLong(1);
             }
@@ -109,11 +114,11 @@ class MailIntegrationTest {
     }
 
     private static int countInventoryRows(long characterId) {
-        try (var connection = dataSource.getConnection();
-                var statement =
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
                         connection.prepareStatement("SELECT COUNT(*) FROM inventory_item WHERE character_id = ?")) {
             statement.setLong(1, characterId);
-            try (var rs = statement.executeQuery()) {
+            try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
                 return rs.getInt(1);
             }
@@ -124,13 +129,14 @@ class MailIntegrationTest {
 
     /** Điền túi đồ tới đầy (DEFAULT_CAPACITY=20) — dùng để test nhánh {@code INVENTORY_FULL}. */
     private static void fillInventoryToCapacity(long characterId) {
-        var inventoryAdapter = new PostgresInventoryAdapter(dataSource);
-        var inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
-        var stacks = new ArrayList<dev.kage.inventory.domain.ItemStack>();
+        PostgresInventoryAdapter inventoryAdapter = new PostgresInventoryAdapter(dataSource);
+        JdbcInventoryTransactionRunner inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
+        ArrayList<dev.kage.inventory.domain.ItemStack> stacks = new ArrayList<dev.kage.inventory.domain.ItemStack>();
         for (int i = 0; i < 20; i++) {
             stacks.add(dev.kage.inventory.domain.ItemStack.newItem(kunaiTemplateId, 1, 0));
         }
-        var inventory = new dev.kage.inventory.domain.Inventory(characterId, 20, List.copyOf(stacks));
+        dev.kage.inventory.domain.Inventory inventory =
+                new dev.kage.inventory.domain.Inventory(characterId, 20, List.copyOf(stacks));
         inventoryTx.inTransaction(tx -> inventoryAdapter.save(tx, inventory));
     }
 
@@ -140,7 +146,7 @@ class MailIntegrationTest {
     }
 
     private static ClaimMailUseCase newClaimUseCase() {
-        var ports = new MailPorts(
+        MailPorts ports = new MailPorts(
                 new PostgresMailRepositoryAdapter(dataSource),
                 new PostgresMailGoldAdapter(),
                 new PostgresMailInventoryGatewayAdapter(dataSource),
@@ -157,11 +163,11 @@ class MailIntegrationTest {
     void shouldSendMail_withGoldAndItemAttachment() {
         long recipientId = createFreshCharacter("MailRecv1");
 
-        var newMail = new NewMail(
+        NewMail newMail = new NewMail(
                 null, recipientId, "Chào mừng", "Quà tân thủ", 100, List.of(new MailAttachment(kunaiTemplateId, 5)));
-        var created = newSendUseCase().execute(newMail);
+        Mail created = newSendUseCase().execute(newMail);
 
-        var listed = new ListMailUseCase(new PostgresMailRepositoryAdapter(dataSource)).execute(recipientId);
+        List<Mail> listed = new ListMailUseCase(new PostgresMailRepositoryAdapter(dataSource)).execute(recipientId);
         assertThat(listed).hasSize(1);
         assertThat(listed.get(0).id()).isEqualTo(created.id());
         assertThat(listed.get(0).goldAmount()).isEqualTo(100);
@@ -172,11 +178,11 @@ class MailIntegrationTest {
     @Test
     void shouldClaimMail_creditGoldGrantItemAndMarkClaimed() {
         long recipientId = createFreshCharacter("MailRecv2");
-        var newMail = new NewMail(
+        NewMail newMail = new NewMail(
                 null, recipientId, "Thưởng", "Thưởng quest", 50, List.of(new MailAttachment(kunaiTemplateId, 2)));
-        var mail = newSendUseCase().execute(newMail);
+        Mail mail = newSendUseCase().execute(newMail);
 
-        var result = newClaimUseCase().execute(mail.id(), recipientId, newIdempotencyKey());
+        ClaimMailUseCase.ClaimOutcome result = newClaimUseCase().execute(mail.id(), recipientId, newIdempotencyKey());
 
         assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.OK);
         assertThat(readGold(recipientId)).isEqualTo(50);
@@ -186,11 +192,11 @@ class MailIntegrationTest {
     @Test
     void shouldRejectDoubleClaim() {
         long recipientId = createFreshCharacter("MailRecv3");
-        var mail = newSendUseCase().execute(new NewMail(null, recipientId, "T", "B", 10, List.of()));
-        var claimUseCase = newClaimUseCase();
+        Mail mail = newSendUseCase().execute(new NewMail(null, recipientId, "T", "B", 10, List.of()));
+        ClaimMailUseCase claimUseCase = newClaimUseCase();
         claimUseCase.execute(mail.id(), recipientId, newIdempotencyKey());
 
-        var secondResult = claimUseCase.execute(mail.id(), recipientId, newIdempotencyKey());
+        ClaimMailUseCase.ClaimOutcome secondResult = claimUseCase.execute(mail.id(), recipientId, newIdempotencyKey());
 
         assertThat(secondResult).isEqualTo(ClaimMailUseCase.ClaimOutcome.ALREADY_CLAIMED);
         assertThat(readGold(recipientId)).isEqualTo(10); // không cộng lần 2
@@ -199,11 +205,11 @@ class MailIntegrationTest {
     @Test
     void shouldRejectDuplicateClaim_whenIdempotencyKeyReused() {
         long recipientId = createFreshCharacter("MailRecv6");
-        var mail = newSendUseCase().execute(new NewMail(null, recipientId, "T", "B", 10, List.of()));
-        var key = newIdempotencyKey();
+        Mail mail = newSendUseCase().execute(new NewMail(null, recipientId, "T", "B", 10, List.of()));
+        String key = newIdempotencyKey();
         newClaimUseCase().execute(mail.id(), recipientId, key);
 
-        var result = newClaimUseCase().execute(mail.id(), recipientId, key);
+        ClaimMailUseCase.ClaimOutcome result = newClaimUseCase().execute(mail.id(), recipientId, key);
 
         assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.DUPLICATE_REQUEST);
         assertThat(readGold(recipientId)).isEqualTo(10); // chỉ cộng 1 lần, KHÔNG lặp lại
@@ -213,30 +219,32 @@ class MailIntegrationTest {
     void shouldRollbackGold_whenClaimAndInventoryFull() {
         long recipientId = createFreshCharacter("MailRecv4");
         fillInventoryToCapacity(recipientId);
-        var newMail = new NewMail(null, recipientId, "T", "B", 999, List.of(new MailAttachment(kunaiTemplateId, 1)));
-        var mail = newSendUseCase().execute(newMail);
+        NewMail newMail =
+                new NewMail(null, recipientId, "T", "B", 999, List.of(new MailAttachment(kunaiTemplateId, 1)));
+        Mail mail = newSendUseCase().execute(newMail);
 
-        var result = newClaimUseCase().execute(mail.id(), recipientId, newIdempotencyKey());
+        ClaimMailUseCase.ClaimOutcome result = newClaimUseCase().execute(mail.id(), recipientId, newIdempotencyKey());
 
         assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.INVENTORY_FULL);
         // KHÔNG được "nhận gold nhưng mất item" (DATABASE.md §5) — rollback toàn bộ.
         assertThat(readGold(recipientId)).isZero();
         assertThat(countInventoryRows(recipientId)).isEqualTo(20);
-        var stillUnclaimed = new ListMailUseCase(new PostgresMailRepositoryAdapter(dataSource)).execute(recipientId);
+        List<Mail> stillUnclaimed =
+                new ListMailUseCase(new PostgresMailRepositoryAdapter(dataSource)).execute(recipientId);
         assertThat(stillUnclaimed.get(0).isClaimed()).isFalse();
     }
 
     @Test
     void shouldRejectDeleteUnclaimedMailWithReward_thenAllowAfterClaim() {
         long recipientId = createFreshCharacter("MailRecv5");
-        var mail = newSendUseCase().execute(new NewMail(null, recipientId, "T", "B", 10, List.of()));
-        var deleteUseCase = new DeleteMailUseCase(new PostgresMailRepositoryAdapter(dataSource));
+        Mail mail = newSendUseCase().execute(new NewMail(null, recipientId, "T", "B", 10, List.of()));
+        DeleteMailUseCase deleteUseCase = new DeleteMailUseCase(new PostgresMailRepositoryAdapter(dataSource));
 
-        var beforeClaim = deleteUseCase.execute(mail.id(), recipientId);
+        DeleteMailUseCase.Result beforeClaim = deleteUseCase.execute(mail.id(), recipientId);
         assertThat(beforeClaim).isEqualTo(DeleteMailUseCase.Result.MUST_CLAIM_FIRST);
 
         newClaimUseCase().execute(mail.id(), recipientId, newIdempotencyKey());
-        var afterClaim = deleteUseCase.execute(mail.id(), recipientId);
+        DeleteMailUseCase.Result afterClaim = deleteUseCase.execute(mail.id(), recipientId);
         assertThat(afterClaim).isEqualTo(DeleteMailUseCase.Result.OK);
     }
 }

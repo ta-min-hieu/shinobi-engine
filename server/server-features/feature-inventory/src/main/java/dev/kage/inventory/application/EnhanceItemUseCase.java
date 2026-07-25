@@ -31,9 +31,9 @@ public final class EnhanceItemUseCase {
     }
 
     public EnhanceResult execute(long characterId, long itemId, boolean useProtection) {
-        var inventory = ports.inventoryPort().findByCharacter(characterId)
+        Inventory inventory = ports.inventoryPort().findByCharacter(characterId)
                 .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
-        var item = inventory.findItem(itemId).orElse(null);
+        ItemStack item = inventory.findItem(itemId).orElse(null);
         if (item == null) {
             return EnhanceResult.ITEM_NOT_FOUND;
         }
@@ -46,14 +46,15 @@ public final class EnhanceItemUseCase {
         int successRate = EnhancementTable.successRatePercent(currentLevel);
         boolean rolledSuccess = ThreadLocalRandom.current().nextInt(100) < successRate;
 
-        var resultHolder = new AtomicReference<EnhanceResult>();
+        AtomicReference<EnhanceResult> resultHolder = new AtomicReference<EnhanceResult>();
         tx.inTransaction((Transaction t) -> {
             if (!ports.goldPort().deductGold(t, characterId, cost)) {
                 resultHolder.set(EnhanceResult.INSUFFICIENT_GOLD);
                 return;
             }
-            var protectionCharge = findProtectionCharge(inventory, currentLevel, rolledSuccess, useProtection);
-            var outcome = resolveOutcome(currentLevel, rolledSuccess, protectionCharge.isPresent());
+            Optional<ItemStack> protectionCharge =
+                    findProtectionCharge(inventory, currentLevel, rolledSuccess, useProtection);
+            EnhanceOutcome outcome = resolveOutcome(currentLevel, rolledSuccess, protectionCharge.isPresent());
             inventory.replaceItem(new ItemStack(item.id(), item.itemTemplateId(), item.quantity(), outcome.toLevel()));
             protectionCharge.ifPresent(charge -> inventory.consumeOne(charge.id()));
             ports.inventoryPort().save(t, inventory);

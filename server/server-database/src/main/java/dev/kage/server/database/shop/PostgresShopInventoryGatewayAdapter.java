@@ -56,8 +56,8 @@ public final class PostgresShopInventoryGatewayAdapter implements InventoryGatew
 
     @Override
     public Optional<OwnedItem> findItem(long characterId, long itemId) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_ITEM)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_ITEM)) {
             statement.setLong(1, itemId);
             statement.setLong(2, characterId);
             try (ResultSet rs = statement.executeQuery()) {
@@ -74,7 +74,7 @@ public final class PostgresShopInventoryGatewayAdapter implements InventoryGatew
 
     @Override
     public boolean grantItem(Transaction tx, long characterId, long itemTemplateId, int quantity) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try {
             int existingCount = countItems(connection, characterId);
             if (existingCount >= DEFAULT_CAPACITY) {
@@ -95,7 +95,7 @@ public final class PostgresShopInventoryGatewayAdapter implements InventoryGatew
 
     @Override
     public boolean removeQuantity(Transaction tx, long characterId, long itemId, int quantity) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try {
             int currentQuantity = selectQuantityForUpdate(connection, characterId, itemId);
             if (currentQuantity < quantity) {

@@ -1,7 +1,9 @@
 package dev.kage.guild.application;
 
+import dev.kage.guild.domain.GuildMember;
 import dev.kage.guild.domain.GuildPort;
 import dev.kage.guild.domain.GuildRole;
+import java.util.Optional;
 
 /** Leader giải tán bang — CASCADE xoá toàn bộ thành viên + đơn xin gia nhập đang chờ. */
 public final class DisbandGuildUseCase {
@@ -13,7 +15,7 @@ public final class DisbandGuildUseCase {
     }
 
     public Result execute(long characterId) {
-        var membership = port.findMembershipOf(characterId);
+        Optional<GuildMember> membership = port.findMembershipOf(characterId);
         if (membership.isEmpty() || membership.get().role() != GuildRole.LEADER) {
             return Result.NOT_LEADER;
         }

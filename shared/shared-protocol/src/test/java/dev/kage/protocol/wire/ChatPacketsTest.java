@@ -19,15 +19,16 @@ class ChatPacketsTest {
 
     @Test
     void shouldRoundTripSendChatMessageCommand() throws InvalidProtocolBufferException {
-        var command = SendChatMessageCommand.newBuilder()
+        SendChatMessageCommand command = SendChatMessageCommand.newBuilder()
                 .setChannel(ChatChannel.CHAT_CHANNEL_PRIVATE)
                 .setTargetName("sasuke")
                 .setBody("chào bạn")
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE, ProtocolVersion.CURRENT, 1);
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsed = SendChatMessageCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SendChatMessageCommand parsed = SendChatMessageCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getChannel()).isEqualTo(ChatChannel.CHAT_CHANNEL_PRIVATE);
         assertThat(parsed.getTargetName()).isEqualTo("sasuke");
@@ -36,29 +37,31 @@ class ChatPacketsTest {
 
     @Test
     void shouldRoundTripSendChatMessageResponse() throws InvalidProtocolBufferException {
-        var response = SendChatMessageResponse.newBuilder()
+        SendChatMessageResponse response = SendChatMessageResponse.newBuilder()
                 .setOutcome(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_RATE_LIMITED)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = SendChatMessageResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SendChatMessageResponse parsed =
+                SendChatMessageResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_RATE_LIMITED);
     }
 
     @Test
     void shouldRoundTripChatMessageEvent() throws InvalidProtocolBufferException {
-        var event = ChatMessageEvent.newBuilder()
+        ChatMessageEvent event = ChatMessageEvent.newBuilder()
                 .setChannel(ChatChannel.CHAT_CHANNEL_WORLD)
                 .setSenderId(7L)
                 .setSenderName("naruto")
                 .setBody("xin chào thế giới")
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        var parsed = ChatMessageEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ChatMessageEvent parsed = ChatMessageEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getChannel()).isEqualTo(ChatChannel.CHAT_CHANNEL_WORLD);
         assertThat(parsed.getSenderId()).isEqualTo(7L);

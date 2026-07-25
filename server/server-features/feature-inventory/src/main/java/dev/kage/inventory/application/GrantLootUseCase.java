@@ -1,5 +1,6 @@
 package dev.kage.inventory.application;
 
+import dev.kage.inventory.domain.DropTableEntry;
 import dev.kage.inventory.domain.DropTablePort;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
@@ -37,21 +38,21 @@ public final class GrantLootUseCase {
      *     (`EquipItemCommand`).
      */
     public List<ItemStack> execute(long characterId, String dropTableCode) {
-        var entries = dropTablePort.findEntries(dropTableCode);
-        var drops = LootRoller.roll(entries);
+        List<DropTableEntry> entries = dropTablePort.findEntries(dropTableCode);
+        List<ItemStack> drops = LootRoller.roll(entries);
         if (drops.isEmpty()) {
             return List.of();
         }
 
-        var inventory = inventoryPort.findByCharacter(characterId)
+        Inventory inventory = inventoryPort.findByCharacter(characterId)
                 .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
 
         // Inventory.add() luôn APPEND (xem javadoc) — vị trí cuối cùng ngay sau add() chính là vị
         // trí của item đó trong Inventory đã lưu trả về (save() giữ nguyên thứ tự), nên nhớ INDEX
         // là đủ để tra lại đúng item, không cần so khớp itemTemplateId/quantity (có thể trùng nhau
         // giữa 2 lần rơi khác nhau, dễ tra nhầm).
-        var addedIndexes = new ArrayList<Integer>();
-        for (var stack : drops) {
+        ArrayList<Integer> addedIndexes = new ArrayList<Integer>();
+        for (ItemStack stack : drops) {
             if (inventory.add(stack) instanceof Inventory.Added) {
                 addedIndexes.add(inventory.items().size() - 1);
             }
@@ -60,11 +61,11 @@ public final class GrantLootUseCase {
             return List.of();
         }
 
-        var savedHolder = new AtomicReference<Inventory>();
+        AtomicReference<Inventory> savedHolder = new AtomicReference<Inventory>();
         tx.inTransaction((Transaction t) -> savedHolder.set(inventoryPort.save(t, inventory)));
-        var savedItems = savedHolder.get().items();
+        List<ItemStack> savedItems = savedHolder.get().items();
 
-        var granted = new ArrayList<ItemStack>(addedIndexes.size());
+        ArrayList<ItemStack> granted = new ArrayList<ItemStack>(addedIndexes.size());
         for (int index : addedIndexes) {
             granted.add(savedItems.get(index));
         }

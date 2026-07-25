@@ -3,6 +3,8 @@ package dev.kage.server.database.inventory;
 import dev.kage.inventory.domain.DropTableEntry;
 import dev.kage.inventory.domain.DropTablePort;
 import dev.kage.server.database.DatabaseAccessException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -30,11 +32,11 @@ public final class PostgresDropTableAdapter implements DropTablePort {
 
     @Override
     public List<DropTableEntry> findEntries(String dropTableCode) {
-        try (var connection = dataSource.getConnection();
-                var statement = connection.prepareStatement(FIND_ENTRIES)) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(FIND_ENTRIES)) {
             statement.setString(1, dropTableCode);
             try (ResultSet rs = statement.executeQuery()) {
-                var entries = new ArrayList<DropTableEntry>();
+                ArrayList<DropTableEntry> entries = new ArrayList<DropTableEntry>();
                 while (rs.next()) {
                     entries.add(new DropTableEntry(
                             rs.getLong("item_template_id"), rs.getInt("drop_chance_percent"),

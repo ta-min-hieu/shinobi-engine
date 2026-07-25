@@ -22,10 +22,10 @@ public final class AddItemUseCase {
     }
 
     public AddItemResult execute(long characterId, ItemStack stack) {
-        var inventory = inventoryPort.findByCharacter(characterId)
+        Inventory inventory = inventoryPort.findByCharacter(characterId)
                 .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
 
-        var result = inventory.add(stack); // quy tắc nghiệp vụ ở domain
+        Inventory.AddResult result = inventory.add(stack); // quy tắc nghiệp vụ ở domain
         if (result instanceof Inventory.Full) {
             return AddItemResult.FULL;
         }

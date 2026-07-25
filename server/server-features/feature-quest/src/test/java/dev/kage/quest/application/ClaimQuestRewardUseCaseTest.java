@@ -84,52 +84,52 @@ class ClaimQuestRewardUseCaseTest {
     private static ClaimQuestRewardUseCase newUseCase(
             QuestProgressPort progressPort, FakeExpPort expPort, FakeInventoryGrantPort inventoryGrantPort,
             FakeAuditPort auditPort) {
-        var rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
+        QuestRewardPorts rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
         return new ClaimQuestRewardUseCase(progressPort, new FakeQuestTemplatePort(), rewardPorts, DIRECT_TX);
     }
 
     @Test
     void shouldReturnQuestNotFound_whenCodeUnknown() {
-        var useCase = newUseCase(
+        ClaimQuestRewardUseCase useCase = newUseCase(
                 new FakeQuestProgressPort(null), new FakeExpPort(), new FakeInventoryGrantPort(), new FakeAuditPort());
 
-        var result = useCase.execute(CHARACTER_ID, "unknown_code");
+        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, "unknown_code");
 
         assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.QUEST_NOT_FOUND);
     }
 
     @Test
     void shouldReturnNotAccepted_whenNoProgressRow() {
-        var useCase = newUseCase(
+        ClaimQuestRewardUseCase useCase = newUseCase(
                 new FakeQuestProgressPort(null), new FakeExpPort(), new FakeInventoryGrantPort(), new FakeAuditPort());
 
-        var result = useCase.execute(CHARACTER_ID, QUEST_CODE);
+        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE);
 
         assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.NOT_ACCEPTED);
     }
 
     @Test
     void shouldReturnNotCompletedYet_whenStillInProgress() {
-        var progress = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.IN_PROGRESS, "{}");
-        var useCase = newUseCase(
+        QuestProgress progress = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.IN_PROGRESS, "{}");
+        ClaimQuestRewardUseCase useCase = newUseCase(
                 new FakeQuestProgressPort(progress), new FakeExpPort(), new FakeInventoryGrantPort(),
                 new FakeAuditPort());
 
-        var result = useCase.execute(CHARACTER_ID, QUEST_CODE);
+        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE);
 
         assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.NOT_COMPLETED_YET);
     }
 
     @Test
     void shouldGrantRewardsAndMarkClaimed_whenCompleted() {
-        var progress = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.COMPLETED, "{\"counter\":2}");
-        var progressPort = new FakeQuestProgressPort(progress);
-        var expPort = new FakeExpPort();
-        var inventoryGrantPort = new FakeInventoryGrantPort();
-        var auditPort = new FakeAuditPort();
-        var useCase = newUseCase(progressPort, expPort, inventoryGrantPort, auditPort);
+        QuestProgress progress = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.COMPLETED, "{\"counter\":2}");
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(progress);
+        FakeExpPort expPort = new FakeExpPort();
+        FakeInventoryGrantPort inventoryGrantPort = new FakeInventoryGrantPort();
+        FakeAuditPort auditPort = new FakeAuditPort();
+        ClaimQuestRewardUseCase useCase = newUseCase(progressPort, expPort, inventoryGrantPort, auditPort);
 
-        var result = useCase.execute(CHARACTER_ID, QUEST_CODE);
+        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE);
 
         assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
         assertThat(result.expGranted()).isEqualTo(100L);

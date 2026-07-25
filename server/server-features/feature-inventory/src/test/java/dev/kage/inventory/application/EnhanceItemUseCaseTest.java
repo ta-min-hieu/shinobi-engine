@@ -94,18 +94,18 @@ class EnhanceItemUseCaseTest {
     private static EnhanceItemUseCase newUseCase(
             FakeInventoryPort inventoryPort, FakeGoldPort goldPort, FakeAuditPort auditPort,
             FakeItemTemplatePort itemTemplatePort) {
-        var ports = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
+        EnhancePorts ports = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
         return new EnhanceItemUseCase(ports, DIRECT_TX);
     }
 
     @Test
     void shouldReturnItemNotFound_whenItemDoesNotBelongToCharacter() {
-        var inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of()));
-        var goldPort = new FakeGoldPort(true);
-        var auditPort = new FakeAuditPort();
-        var useCase = newUseCase(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false));
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of()));
+        FakeGoldPort goldPort = new FakeGoldPort(true);
+        FakeAuditPort auditPort = new FakeAuditPort();
+        EnhanceItemUseCase useCase = newUseCase(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false));
 
-        var result = useCase.execute(CHARACTER_ID, 999L, false);
+        EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, 999L, false);
 
         assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.ITEM_NOT_FOUND);
         assertThat(goldPort.deductCalled).isFalse();
@@ -114,13 +114,13 @@ class EnhanceItemUseCaseTest {
 
     @Test
     void shouldReturnMaxLevel_whenItemAlreadyAtMaxEnhance() {
-        var maxedItem = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, ItemStack.MAX_ENHANCE);
-        var inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(maxedItem)));
-        var goldPort = new FakeGoldPort(true);
-        var auditPort = new FakeAuditPort();
-        var useCase = newUseCase(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false));
+        ItemStack maxedItem = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, ItemStack.MAX_ENHANCE);
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(maxedItem)));
+        FakeGoldPort goldPort = new FakeGoldPort(true);
+        FakeAuditPort auditPort = new FakeAuditPort();
+        EnhanceItemUseCase useCase = newUseCase(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false));
 
-        var result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
+        EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
 
         assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.MAX_LEVEL);
         assertThat(goldPort.deductCalled).isFalse();
@@ -128,13 +128,13 @@ class EnhanceItemUseCaseTest {
 
     @Test
     void shouldReturnInsufficientGold_whenGoldPortRefusesDeduction() {
-        var item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 0);
-        var inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item)));
-        var goldPort = new FakeGoldPort(false); // không đủ gold
-        var auditPort = new FakeAuditPort();
-        var useCase = newUseCase(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false));
+        ItemStack item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 0);
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item)));
+        FakeGoldPort goldPort = new FakeGoldPort(false); // không đủ gold
+        FakeAuditPort auditPort = new FakeAuditPort();
+        EnhanceItemUseCase useCase = newUseCase(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false));
 
-        var result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
+        EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
 
         assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.INSUFFICIENT_GOLD);
         assertThat(inventoryPort.saved).isNull(); // không đổi enhance_level khi không trả được tiền
@@ -146,13 +146,13 @@ class EnhanceItemUseCaseTest {
         // Tỉ lệ thành công +0→+1 là 95% (EnhancementTable) — không mock random, chỉ verify BẤT
         // KỂ thành công hay thất bại thì gold đã bị trừ và audit đã ghi (cùng tinh thần LootRoller:
         // verify hành vi, không ép định tất định 1 kết quả random cụ thể).
-        var item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 0);
-        var inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item)));
-        var goldPort = new FakeGoldPort(true);
-        var auditPort = new FakeAuditPort();
-        var useCase = newUseCase(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false));
+        ItemStack item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 0);
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item)));
+        FakeGoldPort goldPort = new FakeGoldPort(true);
+        FakeAuditPort auditPort = new FakeAuditPort();
+        EnhanceItemUseCase useCase = newUseCase(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false));
 
-        var result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
+        EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
 
         assertThat(result).isIn(
                 EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP);
@@ -171,12 +171,12 @@ class EnhanceItemUseCaseTest {
         boolean sawDropped = false;
         boolean sawSuccess = false;
         for (int i = 0; i < 200 && !(sawDropped && sawSuccess); i++) {
-            var item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 14);
-            var inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item)));
-            var useCase = newUseCase(
+            ItemStack item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 14);
+            FakeInventoryPort inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item)));
+            EnhanceItemUseCase useCase = newUseCase(
                     inventoryPort, new FakeGoldPort(true), new FakeAuditPort(), new FakeItemTemplatePort(false));
 
-            var result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
+            EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
             if (result == EnhanceItemUseCase.EnhanceResult.FAILED_DROPPED) {
                 sawDropped = true;
                 assertThat(inventoryPort.saved.findItem(ITEM_ID).orElseThrow().enhanceLevel()).isEqualTo(13);
@@ -192,13 +192,14 @@ class EnhanceItemUseCaseTest {
     void shouldConsumeProtectionAndKeepLevel_onFailure_whenProtectionRequestedAndOwned() {
         boolean sawProtected = false;
         for (int i = 0; i < 200 && !sawProtected; i++) {
-            var item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 14);
-            var charm = new ItemStack(PROTECTION_ITEM_ID, PROTECTION_TEMPLATE_ID, 1, 0);
-            var inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item, charm)));
-            var useCase = newUseCase(
+            ItemStack item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 14);
+            ItemStack charm = new ItemStack(PROTECTION_ITEM_ID, PROTECTION_TEMPLATE_ID, 1, 0);
+            FakeInventoryPort inventoryPort =
+                    new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item, charm)));
+            EnhanceItemUseCase useCase = newUseCase(
                     inventoryPort, new FakeGoldPort(true), new FakeAuditPort(), new FakeItemTemplatePort(true));
 
-            var result = useCase.execute(CHARACTER_ID, ITEM_ID, true);
+            EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, true);
             if (result == EnhanceItemUseCase.EnhanceResult.FAILED_PROTECTED) {
                 sawProtected = true;
                 assertThat(inventoryPort.saved.findItem(ITEM_ID).orElseThrow().enhanceLevel()).isEqualTo(14);
@@ -213,13 +214,13 @@ class EnhanceItemUseCaseTest {
     void shouldStillDropLevel_whenProtectionRequestedButNotOwned() {
         boolean sawDropped = false;
         for (int i = 0; i < 200 && !sawDropped; i++) {
-            var item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 14);
-            var inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item)));
+            ItemStack item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 14);
+            FakeInventoryPort inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item)));
             // FakeItemTemplatePort(true) tra được template id, nhưng túi KHÔNG có item nào khớp.
-            var useCase = newUseCase(
+            EnhanceItemUseCase useCase = newUseCase(
                     inventoryPort, new FakeGoldPort(true), new FakeAuditPort(), new FakeItemTemplatePort(true));
 
-            var result = useCase.execute(CHARACTER_ID, ITEM_ID, true);
+            EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, true);
             if (result == EnhanceItemUseCase.EnhanceResult.FAILED_DROPPED) {
                 sawDropped = true;
                 assertThat(inventoryPort.saved.findItem(ITEM_ID).orElseThrow().enhanceLevel()).isEqualTo(13);
@@ -234,13 +235,14 @@ class EnhanceItemUseCaseTest {
         // để verify Bảo Vệ KHÔNG bị tiêu dù client bật cờ, vì roll ra thành công.
         boolean sawSuccess = false;
         for (int i = 0; i < 200 && !sawSuccess; i++) {
-            var item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 0);
-            var charm = new ItemStack(PROTECTION_ITEM_ID, PROTECTION_TEMPLATE_ID, 1, 0);
-            var inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item, charm)));
-            var useCase = newUseCase(
+            ItemStack item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 0);
+            ItemStack charm = new ItemStack(PROTECTION_ITEM_ID, PROTECTION_TEMPLATE_ID, 1, 0);
+            FakeInventoryPort inventoryPort =
+                    new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item, charm)));
+            EnhanceItemUseCase useCase = newUseCase(
                     inventoryPort, new FakeGoldPort(true), new FakeAuditPort(), new FakeItemTemplatePort(true));
 
-            var result = useCase.execute(CHARACTER_ID, ITEM_ID, true);
+            EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, true);
             if (result == EnhanceItemUseCase.EnhanceResult.SUCCESS) {
                 sawSuccess = true;
                 assertThat(inventoryPort.saved.findByTemplate(PROTECTION_TEMPLATE_ID)).isPresent();

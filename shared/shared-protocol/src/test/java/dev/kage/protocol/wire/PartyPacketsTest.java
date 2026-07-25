@@ -40,66 +40,75 @@ class PartyPacketsTest {
 
     @Test
     void shouldRoundTripCreatePartyCommandAndResponse() throws InvalidProtocolBufferException {
-        var command = CreatePartyCommand.newBuilder().build();
-        var header = new PacketHeader(Opcode.OPCODE_CREATE_PARTY_COMMAND_VALUE, ProtocolVersion.CURRENT, 1);
+        CreatePartyCommand command = CreatePartyCommand.newBuilder().build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_CREATE_PARTY_COMMAND_VALUE, ProtocolVersion.CURRENT, 1);
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
         assertThat(CreatePartyCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload())).isEqualTo(command);
 
-        var response = CreatePartyResponse.newBuilder()
+        CreatePartyResponse response = CreatePartyResponse.newBuilder()
                 .setOutcome(CreatePartyOutcome.CREATE_PARTY_OUTCOME_OK)
                 .setPartyId(4L)
                 .build();
-        var responseHeader = new PacketHeader(Opcode.OPCODE_CREATE_PARTY_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
+        PacketHeader responseHeader =
+                new PacketHeader(Opcode.OPCODE_CREATE_PARTY_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
         byte[] responseBytes = PacketCodec.encodeFrame(responseHeader, response.toByteArray());
-        var parsed = CreatePartyResponse.parseFrom(PacketCodec.decodeFrame(responseBytes).payload());
+        CreatePartyResponse parsed = CreatePartyResponse.parseFrom(PacketCodec.decodeFrame(responseBytes).payload());
         assertThat(parsed.getOutcome()).isEqualTo(CreatePartyOutcome.CREATE_PARTY_OUTCOME_OK);
         assertThat(parsed.getPartyId()).isEqualTo(4L);
     }
 
     @Test
     void shouldRoundTripInvitePartyMemberCommand() throws InvalidProtocolBufferException {
-        var command = InvitePartyMemberCommand.newBuilder().setTargetName("naruto").build();
-        var header = new PacketHeader(Opcode.OPCODE_INVITE_PARTY_MEMBER_COMMAND_VALUE, ProtocolVersion.CURRENT, 2);
+        InvitePartyMemberCommand command = InvitePartyMemberCommand.newBuilder().setTargetName("naruto").build();
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_INVITE_PARTY_MEMBER_COMMAND_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsed = InvitePartyMemberCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        InvitePartyMemberCommand parsed =
+                InvitePartyMemberCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getTargetName()).isEqualTo("naruto");
     }
 
     @Test
     void shouldRoundTripInvitePartyMemberResponse() throws InvalidProtocolBufferException {
-        var response = InvitePartyMemberResponse.newBuilder()
+        InvitePartyMemberResponse response = InvitePartyMemberResponse.newBuilder()
                 .setOutcome(InvitePartyMemberOutcome.INVITE_PARTY_MEMBER_OUTCOME_PARTY_FULL)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_INVITE_PARTY_MEMBER_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_INVITE_PARTY_MEMBER_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = InvitePartyMemberResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        InvitePartyMemberResponse parsed =
+                InvitePartyMemberResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(InvitePartyMemberOutcome.INVITE_PARTY_MEMBER_OUTCOME_PARTY_FULL);
     }
 
     @Test
     void shouldRoundTripAcceptPartyInviteCommand() throws InvalidProtocolBufferException {
-        var command = AcceptPartyInviteCommand.newBuilder().setInviteId(9L).build();
-        var header = new PacketHeader(Opcode.OPCODE_ACCEPT_PARTY_INVITE_COMMAND_VALUE, ProtocolVersion.CURRENT, 3);
+        AcceptPartyInviteCommand command = AcceptPartyInviteCommand.newBuilder().setInviteId(9L).build();
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_ACCEPT_PARTY_INVITE_COMMAND_VALUE, ProtocolVersion.CURRENT, 3);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsed = AcceptPartyInviteCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        AcceptPartyInviteCommand parsed =
+                AcceptPartyInviteCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getInviteId()).isEqualTo(9L);
     }
 
     @Test
     void shouldRoundTripAcceptPartyInviteResponse() throws InvalidProtocolBufferException {
-        var response = AcceptPartyInviteResponse.newBuilder()
+        AcceptPartyInviteResponse response = AcceptPartyInviteResponse.newBuilder()
                 .setOutcome(AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_ALREADY_IN_PARTY)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_ACCEPT_PARTY_INVITE_RESPONSE_VALUE, ProtocolVersion.CURRENT, 3);
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_ACCEPT_PARTY_INVITE_RESPONSE_VALUE, ProtocolVersion.CURRENT, 3);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = AcceptPartyInviteResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        AcceptPartyInviteResponse parsed =
+                AcceptPartyInviteResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome())
                 .isEqualTo(AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_ALREADY_IN_PARTY);
@@ -107,57 +116,65 @@ class PartyPacketsTest {
 
     @Test
     void shouldRoundTripRejectPartyInviteCommandAndResponse() throws InvalidProtocolBufferException {
-        var command = RejectPartyInviteCommand.newBuilder().setInviteId(11L).build();
-        var header = new PacketHeader(Opcode.OPCODE_REJECT_PARTY_INVITE_COMMAND_VALUE, ProtocolVersion.CURRENT, 4);
+        RejectPartyInviteCommand command = RejectPartyInviteCommand.newBuilder().setInviteId(11L).build();
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_REJECT_PARTY_INVITE_COMMAND_VALUE, ProtocolVersion.CURRENT, 4);
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsed = RejectPartyInviteCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        RejectPartyInviteCommand parsed =
+                RejectPartyInviteCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
         assertThat(parsed.getInviteId()).isEqualTo(11L);
 
-        var response = RejectPartyInviteResponse.newBuilder()
+        RejectPartyInviteResponse response = RejectPartyInviteResponse.newBuilder()
                 .setOutcome(RejectPartyInviteOutcome.REJECT_PARTY_INVITE_OUTCOME_OK)
                 .build();
-        var responseHeader =
+        PacketHeader responseHeader =
                 new PacketHeader(Opcode.OPCODE_REJECT_PARTY_INVITE_RESPONSE_VALUE, ProtocolVersion.CURRENT, 4);
         byte[] responseBytes = PacketCodec.encodeFrame(responseHeader, response.toByteArray());
-        var parsedResponse = RejectPartyInviteResponse.parseFrom(PacketCodec.decodeFrame(responseBytes).payload());
+        RejectPartyInviteResponse parsedResponse =
+                RejectPartyInviteResponse.parseFrom(PacketCodec.decodeFrame(responseBytes).payload());
         assertThat(parsedResponse.getOutcome()).isEqualTo(RejectPartyInviteOutcome.REJECT_PARTY_INVITE_OUTCOME_OK);
     }
 
     @Test
     void shouldRoundTripLeavePartyCommandAndResponse() throws InvalidProtocolBufferException {
-        var command = LeavePartyCommand.newBuilder().build();
-        var header = new PacketHeader(Opcode.OPCODE_LEAVE_PARTY_COMMAND_VALUE, ProtocolVersion.CURRENT, 5);
+        LeavePartyCommand command = LeavePartyCommand.newBuilder().build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_LEAVE_PARTY_COMMAND_VALUE, ProtocolVersion.CURRENT, 5);
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
         assertThat(LeavePartyCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload())).isEqualTo(command);
 
-        var response =
+        LeavePartyResponse response =
                 LeavePartyResponse.newBuilder().setOutcome(LeavePartyOutcome.LEAVE_PARTY_OUTCOME_NOT_IN_PARTY).build();
-        var responseHeader = new PacketHeader(Opcode.OPCODE_LEAVE_PARTY_RESPONSE_VALUE, ProtocolVersion.CURRENT, 5);
+        PacketHeader responseHeader =
+                new PacketHeader(Opcode.OPCODE_LEAVE_PARTY_RESPONSE_VALUE, ProtocolVersion.CURRENT, 5);
         byte[] responseBytes = PacketCodec.encodeFrame(responseHeader, response.toByteArray());
-        var parsedResponse = LeavePartyResponse.parseFrom(PacketCodec.decodeFrame(responseBytes).payload());
+        LeavePartyResponse parsedResponse =
+                LeavePartyResponse.parseFrom(PacketCodec.decodeFrame(responseBytes).payload());
         assertThat(parsedResponse.getOutcome()).isEqualTo(LeavePartyOutcome.LEAVE_PARTY_OUTCOME_NOT_IN_PARTY);
     }
 
     @Test
     void shouldRoundTripKickPartyMemberCommand() throws InvalidProtocolBufferException {
-        var command = KickPartyMemberCommand.newBuilder().setTargetName("sasuke").build();
-        var header = new PacketHeader(Opcode.OPCODE_KICK_PARTY_MEMBER_COMMAND_VALUE, ProtocolVersion.CURRENT, 6);
+        KickPartyMemberCommand command = KickPartyMemberCommand.newBuilder().setTargetName("sasuke").build();
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_KICK_PARTY_MEMBER_COMMAND_VALUE, ProtocolVersion.CURRENT, 6);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsed = KickPartyMemberCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        KickPartyMemberCommand parsed = KickPartyMemberCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getTargetName()).isEqualTo("sasuke");
     }
 
     @Test
     void shouldRoundTripKickPartyMemberResponse() throws InvalidProtocolBufferException {
-        var response = KickPartyMemberResponse.newBuilder()
+        KickPartyMemberResponse response = KickPartyMemberResponse.newBuilder()
                 .setOutcome(KickPartyMemberOutcome.KICK_PARTY_MEMBER_OUTCOME_CANNOT_KICK_SELF)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_KICK_PARTY_MEMBER_RESPONSE_VALUE, ProtocolVersion.CURRENT, 6);
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_KICK_PARTY_MEMBER_RESPONSE_VALUE, ProtocolVersion.CURRENT, 6);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = KickPartyMemberResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        KickPartyMemberResponse parsed =
+                KickPartyMemberResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(KickPartyMemberOutcome.KICK_PARTY_MEMBER_OUTCOME_CANNOT_KICK_SELF);
     }
@@ -165,17 +182,19 @@ class PartyPacketsTest {
     @Test
     void shouldRoundTripListPartyMembersResponse() throws InvalidProtocolBufferException {
         ListPartyMembersRequest.newBuilder().build();
-        var member = PartyMemberView.newBuilder()
+        PartyMemberView member = PartyMemberView.newBuilder()
                 .setCharacterId(3L)
                 .setName("naruto")
                 .setIsLeader(true)
                 .setOnline(true)
                 .build();
-        var response = ListPartyMembersResponse.newBuilder().addMembers(member).build();
-        var header = new PacketHeader(Opcode.OPCODE_LIST_PARTY_MEMBERS_RESPONSE_VALUE, ProtocolVersion.CURRENT, 7);
+        ListPartyMembersResponse response = ListPartyMembersResponse.newBuilder().addMembers(member).build();
+        PacketHeader header =
+                new PacketHeader(Opcode.OPCODE_LIST_PARTY_MEMBERS_RESPONSE_VALUE, ProtocolVersion.CURRENT, 7);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = ListPartyMembersResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ListPartyMembersResponse parsed =
+                ListPartyMembersResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getMembersList()).hasSize(1);
         assertThat(parsed.getMembers(0).getCharacterId()).isEqualTo(3L);
@@ -187,13 +206,15 @@ class PartyPacketsTest {
     @Test
     void shouldRoundTripListPendingPartyInvitesResponse() throws InvalidProtocolBufferException {
         ListPendingPartyInvitesRequest.newBuilder().build();
-        var pending = PendingPartyInviteView.newBuilder().setInviteId(1L).setPartyId(2L).build();
-        var response = ListPendingPartyInvitesResponse.newBuilder().addInvites(pending).build();
-        var header =
+        PendingPartyInviteView pending = PendingPartyInviteView.newBuilder().setInviteId(1L).setPartyId(2L).build();
+        ListPendingPartyInvitesResponse response =
+                ListPendingPartyInvitesResponse.newBuilder().addInvites(pending).build();
+        PacketHeader header =
                 new PacketHeader(Opcode.OPCODE_LIST_PENDING_PARTY_INVITES_RESPONSE_VALUE, ProtocolVersion.CURRENT, 8);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = ListPendingPartyInvitesResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ListPendingPartyInvitesResponse parsed =
+                ListPendingPartyInvitesResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getInvitesList()).hasSize(1);
         assertThat(parsed.getInvites(0).getInviteId()).isEqualTo(1L);
@@ -203,15 +224,15 @@ class PartyPacketsTest {
     @Test
     void shouldRoundTripGetMyPartyResponse() throws InvalidProtocolBufferException {
         GetMyPartyRequest.newBuilder().build();
-        var response = GetMyPartyResponse.newBuilder()
+        GetMyPartyResponse response = GetMyPartyResponse.newBuilder()
                 .setInParty(true)
                 .setPartyId(5L)
                 .setIsLeader(false)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_GET_MY_PARTY_RESPONSE_VALUE, ProtocolVersion.CURRENT, 9);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_GET_MY_PARTY_RESPONSE_VALUE, ProtocolVersion.CURRENT, 9);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = GetMyPartyResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        GetMyPartyResponse parsed = GetMyPartyResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getInParty()).isTrue();
         assertThat(parsed.getPartyId()).isEqualTo(5L);

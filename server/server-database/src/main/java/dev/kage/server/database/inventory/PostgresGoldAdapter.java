@@ -3,6 +3,7 @@ package dev.kage.server.database.inventory;
 import dev.kage.inventory.domain.GoldPort;
 import dev.kage.inventory.domain.Transaction;
 import dev.kage.server.database.DatabaseAccessException;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
@@ -18,7 +19,7 @@ public final class PostgresGoldAdapter implements GoldPort {
 
     @Override
     public boolean deductGold(Transaction tx, long characterId, long amount) {
-        var connection = ((JdbcTransaction) tx).connection();
+        Connection connection = ((JdbcTransaction) tx).connection();
         try (PreparedStatement statement = connection.prepareStatement(DEDUCT_IF_ENOUGH)) {
             statement.setLong(1, amount);
             statement.setLong(2, characterId);

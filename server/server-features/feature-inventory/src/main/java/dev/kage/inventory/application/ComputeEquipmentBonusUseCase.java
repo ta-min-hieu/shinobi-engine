@@ -1,8 +1,12 @@
 package dev.kage.inventory.application;
 
+import dev.kage.inventory.domain.Equipment;
 import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.EquipmentPort;
+import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
+import dev.kage.inventory.domain.ItemStack;
+import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
 
 /**
@@ -25,18 +29,18 @@ public final class ComputeEquipmentBonusUseCase {
     }
 
     public EquipmentBonus execute(long characterId) {
-        var equipment = equipmentPort.findByCharacter(characterId)
+        Equipment equipment = equipmentPort.findByCharacter(characterId)
                 .orElseThrow(() -> new IllegalStateException("EquipmentPort phải luôn trả Optional có giá trị"));
-        var inventory = inventoryPort.findByCharacter(characterId)
+        Inventory inventory = inventoryPort.findByCharacter(characterId)
                 .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
 
         int totalBonusAtk = 0;
         for (long itemId : equipment.slots().values()) {
-            var item = inventory.findItem(itemId).orElse(null);
+            ItemStack item = inventory.findItem(itemId).orElse(null);
             if (item == null) {
                 continue; // dữ liệu lệch hiếm gặp (item bị xoá khỏi túi nhưng equipment_slot chưa dọn) — bỏ qua an toàn
             }
-            var template = itemTemplatePort.findById(item.itemTemplateId()).orElse(null);
+            ItemTemplate template = itemTemplatePort.findById(item.itemTemplateId()).orElse(null);
             if (template == null) {
                 continue;
             }

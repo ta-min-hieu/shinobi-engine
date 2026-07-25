@@ -28,18 +28,18 @@ class MailPacketsTest {
 
     @Test
     void shouldRoundTripSendMailCommand() throws InvalidProtocolBufferException {
-        var attachment = MailAttachmentView.newBuilder().setItemTemplateId(1L).setQuantity(3).build();
-        var command = SendMailCommand.newBuilder()
+        MailAttachmentView attachment = MailAttachmentView.newBuilder().setItemTemplateId(1L).setQuantity(3).build();
+        SendMailCommand command = SendMailCommand.newBuilder()
                 .setRecipientName("naruto")
                 .setSubject("Chào")
                 .setBody("Nội dung")
                 .setGoldAmount(100)
                 .addAttachments(attachment)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_SEND_MAIL_COMMAND_VALUE, ProtocolVersion.CURRENT, 1);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_SEND_MAIL_COMMAND_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsed = SendMailCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SendMailCommand parsed = SendMailCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getRecipientName()).isEqualTo("naruto");
         assertThat(parsed.getGoldAmount()).isEqualTo(100);
@@ -49,33 +49,33 @@ class MailPacketsTest {
 
     @Test
     void shouldRoundTripSendMailResponse() throws InvalidProtocolBufferException {
-        var response = SendMailResponse.newBuilder()
+        SendMailResponse response = SendMailResponse.newBuilder()
                 .setOutcome(SendMailOutcome.SEND_MAIL_OUTCOME_RECIPIENT_NOT_FOUND)
                 .setMailId(0)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = SendMailResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SendMailResponse parsed = SendMailResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(SendMailOutcome.SEND_MAIL_OUTCOME_RECIPIENT_NOT_FOUND);
     }
 
     @Test
     void shouldRoundTripListMailRequest() throws InvalidProtocolBufferException {
-        var request = ListMailRequest.newBuilder().build();
-        var header = new PacketHeader(Opcode.OPCODE_LIST_MAIL_REQUEST_VALUE, ProtocolVersion.CURRENT, 2);
+        ListMailRequest request = ListMailRequest.newBuilder().build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_LIST_MAIL_REQUEST_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, request.toByteArray());
-        var parsed = ListMailRequest.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ListMailRequest parsed = ListMailRequest.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed).isEqualTo(request);
     }
 
     @Test
     void shouldRoundTripListMailResponse() throws InvalidProtocolBufferException {
-        var attachment = MailAttachmentView.newBuilder().setItemTemplateId(2L).setQuantity(1).build();
-        var mailView = MailView.newBuilder()
+        MailAttachmentView attachment = MailAttachmentView.newBuilder().setItemTemplateId(2L).setQuantity(1).build();
+        MailView mailView = MailView.newBuilder()
                 .setMailId(5L)
                 .setHasSender(true)
                 .setSenderId(7L)
@@ -85,11 +85,11 @@ class MailPacketsTest {
                 .addAttachments(attachment)
                 .setClaimed(false)
                 .build();
-        var response = ListMailResponse.newBuilder().addMails(mailView).build();
-        var header = new PacketHeader(Opcode.OPCODE_LIST_MAIL_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
+        ListMailResponse response = ListMailResponse.newBuilder().addMails(mailView).build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_LIST_MAIL_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = ListMailResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ListMailResponse parsed = ListMailResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getMailsList()).hasSize(1);
         assertThat(parsed.getMails(0).getMailId()).isEqualTo(5L);
@@ -100,14 +100,14 @@ class MailPacketsTest {
 
     @Test
     void shouldRoundTripClaimMailCommand() throws InvalidProtocolBufferException {
-        var command = ClaimMailCommand.newBuilder()
+        ClaimMailCommand command = ClaimMailCommand.newBuilder()
                 .setMailId(9L)
                 .setIdempotencyKey("33333333-3333-3333-3333-333333333333")
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_CLAIM_MAIL_COMMAND_VALUE, ProtocolVersion.CURRENT, 3);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_CLAIM_MAIL_COMMAND_VALUE, ProtocolVersion.CURRENT, 3);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsed = ClaimMailCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ClaimMailCommand parsed = ClaimMailCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getMailId()).isEqualTo(9L);
         assertThat(parsed.getIdempotencyKey()).isEqualTo("33333333-3333-3333-3333-333333333333");
@@ -115,48 +115,48 @@ class MailPacketsTest {
 
     @Test
     void shouldRoundTripClaimMailResponse() throws InvalidProtocolBufferException {
-        var response = ClaimMailResponse.newBuilder()
+        ClaimMailResponse response = ClaimMailResponse.newBuilder()
                 .setOutcome(ClaimMailOutcome.CLAIM_MAIL_OUTCOME_INVENTORY_FULL)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_CLAIM_MAIL_RESPONSE_VALUE, ProtocolVersion.CURRENT, 3);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_CLAIM_MAIL_RESPONSE_VALUE, ProtocolVersion.CURRENT, 3);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = ClaimMailResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ClaimMailResponse parsed = ClaimMailResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(ClaimMailOutcome.CLAIM_MAIL_OUTCOME_INVENTORY_FULL);
     }
 
     @Test
     void shouldRoundTripDeleteMailCommand() throws InvalidProtocolBufferException {
-        var command = DeleteMailCommand.newBuilder().setMailId(11L).build();
-        var header = new PacketHeader(Opcode.OPCODE_DELETE_MAIL_COMMAND_VALUE, ProtocolVersion.CURRENT, 4);
+        DeleteMailCommand command = DeleteMailCommand.newBuilder().setMailId(11L).build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_DELETE_MAIL_COMMAND_VALUE, ProtocolVersion.CURRENT, 4);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        var parsed = DeleteMailCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        DeleteMailCommand parsed = DeleteMailCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getMailId()).isEqualTo(11L);
     }
 
     @Test
     void shouldRoundTripDeleteMailResponse() throws InvalidProtocolBufferException {
-        var response = DeleteMailResponse.newBuilder()
+        DeleteMailResponse response = DeleteMailResponse.newBuilder()
                 .setOutcome(DeleteMailOutcome.DELETE_MAIL_OUTCOME_MUST_CLAIM_FIRST)
                 .build();
-        var header = new PacketHeader(Opcode.OPCODE_DELETE_MAIL_RESPONSE_VALUE, ProtocolVersion.CURRENT, 4);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_DELETE_MAIL_RESPONSE_VALUE, ProtocolVersion.CURRENT, 4);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        var parsed = DeleteMailResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        DeleteMailResponse parsed = DeleteMailResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(DeleteMailOutcome.DELETE_MAIL_OUTCOME_MUST_CLAIM_FIRST);
     }
 
     @Test
     void shouldRoundTripNewMailEvent() throws InvalidProtocolBufferException {
-        var event = NewMailEvent.newBuilder().setMailId(13L).build();
-        var header = new PacketHeader(Opcode.OPCODE_NEW_MAIL_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
+        NewMailEvent event = NewMailEvent.newBuilder().setMailId(13L).build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_NEW_MAIL_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        var parsed = NewMailEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        NewMailEvent parsed = NewMailEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getMailId()).isEqualTo(13L);
     }

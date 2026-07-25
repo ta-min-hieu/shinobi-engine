@@ -28,8 +28,8 @@ public final class SendChatMessageUseCase {
         if (ProfanityFilter.containsBannedWord(body)) {
             return Result.CONTAINS_BANNED_WORD;
         }
-        var message = new ChatMessage(senderId, channel, body);
-        var detail = "{\"channel\":\"%s\"}".formatted(message.channel());
+        ChatMessage message = new ChatMessage(senderId, channel, body);
+        String detail = "{\"channel\":\"%s\"}".formatted(message.channel());
         auditPort.log(senderId, "CHAT_MESSAGE", detail);
         return Result.OK;
     }

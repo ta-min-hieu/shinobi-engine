@@ -10,7 +10,7 @@ class CharacterTest {
 
     @Test
     void shouldAcceptName_whenValidVietnameseCharacters() {
-        var character = new Character(1L, 1L, 1, "KageHero", Faction.HOA, 1, 0, 0, Instant.now());
+        Character character = new Character(1L, 1L, 1, "KageHero", Faction.HOA, 1, 0, 0, Instant.now());
 
         assertThat(character.name()).isEqualTo("KageHero");
     }

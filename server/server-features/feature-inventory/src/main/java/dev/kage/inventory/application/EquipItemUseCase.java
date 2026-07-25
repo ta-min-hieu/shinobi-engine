@@ -1,8 +1,12 @@
 package dev.kage.inventory.application;
 
+import dev.kage.inventory.domain.Equipment;
 import dev.kage.inventory.domain.EquipmentPort;
 import dev.kage.inventory.domain.EquipmentSlotType;
+import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
+import dev.kage.inventory.domain.ItemStack;
+import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
 import dev.kage.inventory.domain.Transaction;
 import dev.kage.inventory.domain.TransactionRunner;
@@ -31,22 +35,22 @@ public final class EquipItemUseCase {
     }
 
     public EquipItemResult execute(long characterId, long itemId, EquipmentSlotType targetSlot) {
-        var inventory = inventoryPort.findByCharacter(characterId)
+        Inventory inventory = inventoryPort.findByCharacter(characterId)
                 .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
-        var item = inventory.findItem(itemId).orElse(null);
+        ItemStack item = inventory.findItem(itemId).orElse(null);
         if (item == null) {
             // item không tồn tại HOẶC không thuộc characterId này — cùng lỗi (fail secure, SECURITY.md §4)
             return EquipItemResult.ITEM_NOT_FOUND;
         }
 
-        var template = itemTemplatePort.findById(item.itemTemplateId())
+        ItemTemplate template = itemTemplatePort.findById(item.itemTemplateId())
                 .orElseThrow(() -> new IllegalStateException(
                         "item_template không tồn tại cho itemTemplateId=" + item.itemTemplateId()));
         if (template.equipSlot() != targetSlot) {
             return EquipItemResult.WRONG_SLOT;
         }
 
-        var equipment = equipmentPort.findByCharacter(characterId)
+        Equipment equipment = equipmentPort.findByCharacter(characterId)
                 .orElseThrow(() -> new IllegalStateException("EquipmentPort phải luôn trả Optional có giá trị"));
         equipment.equip(targetSlot, itemId);
         tx.inTransaction((Transaction t) -> equipmentPort.save(t, equipment));

@@ -17,7 +17,7 @@ class ScriptValidatorTest {
 
     @Test
     void shouldThrowScriptExecutionException_whenAnyScriptHasSyntaxError() {
-        var scripts = List.of("/scripts/valid_fixture.js", "/scripts/broken_fixture.js");
+        List<String> scripts = List.of("/scripts/valid_fixture.js", "/scripts/broken_fixture.js");
 
         assertThatThrownBy(() -> validator.validateAll(scripts)).isInstanceOf(ScriptExecutionException.class);
     }

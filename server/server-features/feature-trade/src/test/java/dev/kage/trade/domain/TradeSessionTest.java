@@ -16,7 +16,7 @@ class TradeSessionTest {
 
     @Test
     void shouldReportInvolvement() {
-        var session = new TradeSession(1, 5, 7, TradeStatus.OPEN, Instant.now());
+        TradeSession session = new TradeSession(1, 5, 7, TradeStatus.OPEN, Instant.now());
 
         assertThat(session.involves(5)).isTrue();
         assertThat(session.involves(7)).isTrue();
