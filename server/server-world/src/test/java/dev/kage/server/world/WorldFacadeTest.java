@@ -244,6 +244,27 @@ class WorldFacadeTest {
     }
 
     @Test
+    void shouldNotSpawnTrainingDummyOrNpc_whenCreatedForDungeonInstance() {
+        // ADR-026 — dungeon instance (spawnOverworldContent=false) khởi động RỖNG, khác world
+        // chính. Dùng WorldFacade RIÊNG (không phải field `world` dùng chung ở các test khác).
+        var dungeonSink = new RecordingSink();
+        var dungeonWorld = new WorldFacade(dungeonSink, false);
+        try {
+            dungeonWorld.start();
+            // Toạ độ giống hệt quái bù nhìn (5,5)/NPC mẫu (-5,-5) của world chính NẾU có spawn —
+            // nhưng đủ gần nhau (trong AOI_RADIUS_METERS) để xác nhận world vẫn tick/AoI bình thường.
+            dungeonWorld.attachCharacter(1L, 5f, 5f, DEFAULT_STATS);
+            dungeonWorld.attachCharacter(2L, -5f, -5f, DEFAULT_STATS);
+
+            awaitTrue(() -> dungeonSink.spawned.size() >= 2); // world vẫn tick + AoI hoạt động bình thường
+            assertThat(dungeonSink.monsterSpawned).isEmpty();
+            assertThat(dungeonSink.npcSpawned).isEmpty();
+        } finally {
+            dungeonWorld.stop();
+        }
+    }
+
+    @Test
     void shouldDespawnNpc_whenCharacterMovesAway() {
         // KHÔNG dùng detachCharacter để test nhánh này — onDetach() không báo despawn quái/NPC
         // cho CHÍNH nhân vật rời đi (nó không còn kết nối để nhận nữa), chỉ báo nhân vật khác về

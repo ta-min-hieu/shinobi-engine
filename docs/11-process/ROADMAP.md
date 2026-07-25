@@ -278,12 +278,28 @@ vá luôn lỗ hổng `idempotencyKey` còn thiếu ở `BuyItemCommand`/`SellIt
 
 | Việc | Nguồn |
 |---|---|
-| Dungeon instance | ✅ **ADR-026** Accepted 2026-07-24 — cùng process, World riêng trong 1 JVM ([ADR-026](../01-architecture/adr/ADR-026-Dungeon-Instance-Model.md)) |
+| ✅ Dungeon instance lát cắt 1 (2026-07-25 — hạ tầng: party cùng vào 1 World riêng qua `EnterDungeonCommand`/`ExitDungeonCommand`, tick độc lập world chính, cách ly lỗi tick, chơi được thật qua socket) | [ADR-026](../01-architecture/adr/ADR-026-Dungeon-Instance-Model.md) |
 | Boss AI (Behavior Tree / Script) | [AI.md §4](../03-engine/AI.md) |
 | PvP arena + battlefield | [GDD](../13-game-design/GAME-DESIGN-DOCUMENT.md) |
 | 4 hệ phái còn lại | — |
 
 **ADR cần trước Phase 8**: ✅ ADR-026 Accepted 2026-07-24 — Phase 8 đủ điều kiện mở.
+
+**Quyết định lát cắt 1 (2026-07-24, cùng chủ dự án qua `AskUserQuestion` trước khi code)**: bắt đầu
+Phase 8 bằng hạ tầng dungeon instance (không phải Boss AI hay 4 hệ phái) vì dọn đường cho mọi lát
+cắt sau. Phạm vi: map trống (không quái/NPC), chỉ chứng minh cơ chế tách World hoạt động thật —
+CHƯA có Boss AI hay loot đặc biệt. **Không tạo module `feature-dungeon` mới** ở lát cắt này — chưa
+có dữ liệu nghiệp vụ nào cần persist (không cooldown, không reward, không dungeon template DB);
+logic "cả party cùng vào" đặt thẳng ở `server-gateway` (`DungeonInstanceRegistry`, compose
+`PartyFacade`/`CharacterFacade` sẵn có, giống pattern `SocialFacades`) thay vì Clean Architecture
+đầy đủ cho một thứ chưa có business rule nào. Khi lát cắt sau cần dữ liệu thật (cooldown, reward,
+dungeon template) mới tách `feature-dungeon` theo đúng template. Chi tiết kỹ thuật: `WorldFacade`
+thêm overload constructor `spawnOverworldContent=false` (dungeon world khởi động rỗng, tái dùng
+combat/skill/AI/AoI có sẵn) + bọc tick loop trong try/catch (cách ly lỗi ADR-026 yêu cầu, đồng thời
+vá 1 bug tiềm ẩn có sẵn ở world chính: exception không bắt trước đây sẽ âm thầm giết tick thread).
+`DungeonOutboundSink` đảm bảo toạ độ dungeon không ghi đè vị trí thật lúc `CharacterPositionPersister`
+lưu định kỳ (không cần cờ "đang ở dungeon" — vị trí tự "đóng băng" vì world chính hết gọi
+`onMoveAccepted` cho nhân vật đã rời).
 
 ---
 

@@ -114,11 +114,13 @@ Engine scripting đã chốt: [ADR-016](../01-architecture/adr/ADR-016-Scripting
 
 | Việc | Cách | Trạng thái |
 |---|---|---|
-| Boss AI nhiều pha | Behavior Tree hoặc Script ([AI.md §4](../03-engine/AI.md)) | Post-MVP |
-| Dungeon instance | Mỗi party 1 instance riêng | Post-MVP |
-| World Boss | Toàn server, damage ranking | Post-MVP |
+| Boss AI nhiều pha | Behavior Tree hoặc Script ([AI.md §4](../03-engine/AI.md)) | Phase 8 lát cắt sau |
+| ✅ Dungeon instance lát cắt 1 (2026-07-25) | Mỗi party 1 instance riêng — `EnterDungeonCommand`/`ExitDungeonCommand` (opcode 1500-1503), `DungeonInstanceRegistry` (server-gateway) | Hạ tầng xong — map trống, chưa có Boss/loot |
+| World Boss | Toàn server, damage ranking | Phase 8 lát cắt sau |
 
 ✅ **Dungeon instance model đã chốt** ([ADR-026](../01-architecture/adr/ADR-026-Dungeon-Instance-Model.md), Accepted 2026-07-24): cùng process, mỗi instance là 1 World/ECS riêng trong cùng JVM — không phải OS process riêng. Khớp Bước 0 của [ARCHITECTURE.md §14](../01-architecture/ARCHITECTURE.md) (chưa scale ngang khi chưa có số liệu).
+
+✅ **Lát cắt 1 (hạ tầng) đã code xong** (2026-07-25, chi tiết ở [ROADMAP.md Phase 8](../11-process/ROADMAP.md)): party gửi `EnterDungeonCommand` kéo theo CẢ party (đang online) vào chung 1 dungeon World rỗng; `ExitDungeonCommand` trả về world chính đúng vị trí trước khi vào. Verify thật qua socket (`GatewayServerIntegrationTest.partyShouldEnterAndExitDungeonAsSeparateWorld_overRealSockets`) — không chỉ nội bộ. **Không có `feature-dungeon` module** — chưa có dữ liệu nghiệp vụ nào cần persist ở lát cắt này.
 
 ---
 

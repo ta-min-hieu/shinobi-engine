@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// Packet Dungeon (NETWORK.md §4, dải 1500-1599). Phase 8 lát cắt 1 — hạ tầng instance (ADR-026):
+// cả party cùng vào 1 World riêng, tick độc lập world chính. CHƯA có Boss AI/loot đặc biệt — dungeon
+// lát cắt này là map trống, chỉ chứng minh cơ chế tách world hoạt động thật. KHÔNG có
+// idempotencyKey — vào/ra dungeon không sinh hiệu ứng kinh tế trùng lặp được (ADR-025 chỉ áp dụng
+// Command có side-effect tài chính/vật phẩm).
+
+// dungeon_code cho phép nhiều dungeon về sau — lát cắt này chỉ có 1 giá trị hợp lệ (server hardcode).
+message EnterDungeonCommand {
+  string dungeon_code = 1;
+}
+
+enum EnterDungeonOutcome {
+  ENTER_DUNGEON_OUTCOME_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho kết quả thật.
+  ENTER_DUNGEON_OUTCOME_OK = 1;
+  ENTER_DUNGEON_OUTCOME_NOT_IN_PARTY = 2;
+  ENTER_DUNGEON_OUTCOME_PARTY_MEMBER_OFFLINE = 3;
+  ENTER_DUNGEON_OUTCOME_ALREADY_IN_DUNGEON = 4;
+  ENTER_DUNGEON_OUTCOME_UNKNOWN_DUNGEON = 5;
+}
+
+message EnterDungeonResponse {
+  EnterDungeonOutcome outcome = 1;
+}
+
+// Rời dungeon hiện tại — không cần tham số, server tự tra nhân vật đang ở instance nào.
+message ExitDungeonCommand {
+}
+
+enum ExitDungeonOutcome {
+  EXIT_DUNGEON_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  EXIT_DUNGEON_OUTCOME_OK = 1;
+  EXIT_DUNGEON_OUTCOME_NOT_IN_DUNGEON = 2;
+}
+
+message ExitDungeonResponse {
+  ExitDungeonOutcome outcome = 1;
+}

@@ -744,7 +744,10 @@ class GatewayPipelineTest {
         var worldFacade = new WorldFacade(characterRegistry);
         var positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
-        var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
+        var dungeonInstanceRegistry =
+                new DungeonInstanceRegistry(characterRegistry, characterFacade, partyFacade, worldFacade);
+        var worldGateway =
+                new WorldGateway(worldFacade, characterRegistry, positionPersister, dungeonInstanceRegistry);
 
         return new EmbeddedChannel(
                 new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),

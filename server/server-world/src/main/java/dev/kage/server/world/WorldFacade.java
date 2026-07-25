@@ -92,6 +92,7 @@ public final class WorldFacade {
 
     private volatile boolean running;
     private Thread tickThread;
+    private final boolean spawnOverworldContent;
 
     /**
      * Toàn bộ resource script skill (hardcode, chưa DB-driven — xem {@link SkillConstants}) —
@@ -103,7 +104,18 @@ public final class WorldFacade {
     }
 
     public WorldFacade(WorldOutboundSink outboundSink) {
+        this(outboundSink, true);
+    }
+
+    /**
+     * {@code spawnOverworldContent = false} — World khởi động RỖNG (không quái bù nhìn, không NPC
+     * tĩnh), dùng cho dungeon instance (ADR-026: mỗi instance là 1 World riêng cùng process). Hệ
+     * thống combat/skill/AI/AoI vẫn đầy đủ — lát cắt Boss AI sau chỉ cần gọi 1 hàm spawn mới, không
+     * cần sửa lại World.
+     */
+    public WorldFacade(WorldOutboundSink outboundSink, boolean spawnOverworldContent) {
         this.outboundSink = outboundSink;
+        this.spawnOverworldContent = spawnOverworldContent;
         this.aoiTracker = new AreaOfInterestTracker(outboundSink);
         this.combatSystem = new CombatSystem(this::lookupEntity);
         this.skillSystem = new SkillSystem(this::lookupEntity);
@@ -177,18 +189,15 @@ public final class WorldFacade {
     }
 
     private void tickLoop() {
-        spawnTrainingDummy();
-        spawnNpc(); // NPC tĩnh, không chết/hồi sinh — spawn 1 lần duy nhất, khác quái.
+        if (spawnOverworldContent) {
+            spawnTrainingDummy();
+            spawnNpc(); // NPC tĩnh, không chết/hồi sinh — spawn 1 lần duy nhất, khác quái.
+        }
         long fixedDtNanos = (long) (WorldConstants.FIXED_DT * 1_000_000_000L);
         while (running) {
             long start = System.nanoTime();
 
-            drainInbox();
-            ecsWorld.update(WorldConstants.FIXED_DT);
-            handleCombatResults(combatSystem.drainResults());
-            handleSkillResults(skillSystem.drainResults());
-            tickMonsterRespawn(WorldConstants.FIXED_DT);
-            aoiTracker.sync(entitiesByCharacterId, entitiesByMonsterId, entitiesByNpcId);
+            tickOnce();
 
             long elapsed = System.nanoTime() - start;
             long sleepNanos = fixedDtNanos - elapsed;
@@ -197,6 +206,26 @@ public final class WorldFacade {
             } else {
                 LOG.warn("World tick quá hạn: {}ms", elapsed / 1_000_000);
             }
+        }
+    }
+
+    /**
+     * Cách ly lỗi (ADR-026): 1 exception trong tick KHÔNG được âm thầm giết {@link #tickThread} —
+     * trước đây không bắt, tick lỗi 1 lần là World đóng băng vĩnh viễn không ai biết. Log rồi tick
+     * tiếp, cùng tinh thần {@code CharacterPositionPersister.savePositionSafely} (1 lỗi không dừng
+     * cả vòng lặp).
+     */
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private void tickOnce() {
+        try {
+            drainInbox();
+            ecsWorld.update(WorldConstants.FIXED_DT);
+            handleCombatResults(combatSystem.drainResults());
+            handleSkillResults(skillSystem.drainResults());
+            tickMonsterRespawn(WorldConstants.FIXED_DT);
+            aoiTracker.sync(entitiesByCharacterId, entitiesByMonsterId, entitiesByNpcId);
+        } catch (RuntimeException e) {
+            LOG.error("Lỗi trong World tick — bỏ qua tick này, KHÔNG dừng tick loop", e);
         }
     }
 

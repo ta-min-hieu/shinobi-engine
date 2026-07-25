@@ -57,6 +57,12 @@ import dev.kage.protocol.DisbandGuildResponse;
 import dev.kage.protocol.EnhanceItemCommand;
 import dev.kage.protocol.EnhanceItemResponse;
 import dev.kage.protocol.EnhanceOutcome;
+import dev.kage.protocol.EnterDungeonCommand;
+import dev.kage.protocol.EnterDungeonOutcome;
+import dev.kage.protocol.EnterDungeonResponse;
+import dev.kage.protocol.ExitDungeonCommand;
+import dev.kage.protocol.ExitDungeonOutcome;
+import dev.kage.protocol.ExitDungeonResponse;
 import dev.kage.protocol.EquipItemCommand;
 import dev.kage.protocol.EquipItemResponse;
 import dev.kage.protocol.EquipmentSlot;
@@ -185,6 +191,7 @@ import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
 import dev.kage.quest.api.QuestFacade;
 import dev.kage.server.world.CharacterBaseStats;
+import dev.kage.server.world.WorldFacade;
 import dev.kage.shop.api.ShopFacade;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -321,7 +328,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_CANCEL_TRADE_COMMAND_VALUE, this::handleCancelTradeCommand),
             Map.entry(Opcode.OPCODE_SET_TRADE_OFFER_COMMAND_VALUE, this::handleSetTradeOfferCommand),
             Map.entry(Opcode.OPCODE_CONFIRM_TRADE_COMMAND_VALUE, this::handleConfirmTradeCommand),
-            Map.entry(Opcode.OPCODE_GET_TRADE_STATUS_REQUEST_VALUE, this::handleGetTradeStatusRequest));
+            Map.entry(Opcode.OPCODE_GET_TRADE_STATUS_REQUEST_VALUE, this::handleGetTradeStatusRequest),
+            Map.entry(Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, this::handleEnterDungeonCommand),
+            Map.entry(Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE, this::handleExitDungeonCommand));
 
     GatewayChannelHandler(GatewayFacades facades, WorldGateway worldGateway, Executor authExecutor) {
         this.accountFacade = facades.accountFacade();
@@ -518,6 +527,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
     }
 
+    /**
+     * World nhân vật này ĐANG THẬT SỰ ở trong — dungeon nếu đã {@code EnterDungeonCommand}, world
+     * chính nếu không (Phase 8 lát cắt 1, ADR-026). Mọi lệnh gameplay per-tick (move/target/skill/
+     * chat) phải qua đây thay vì gọi thẳng {@code worldGateway.facade()}, nếu không lệnh của nhân
+     * vật trong dungeon sẽ lạc vào world chính (nơi entity của họ đã bị detach).
+     */
+    private WorldFacade currentWorldFacade(long characterId) {
+        return worldGateway.dungeonInstanceRegistry().worldFacadeFor(characterId).orElse(worldGateway.facade());
+    }
+
     // MoveCommand KHÔNG chạm DB/Redis — chỉ enqueue vào server-world (rẻ, thread-safe), nên xử
     // lý thẳng trên EventLoop, không cần authExecutor (SERVER.md §2: "EventLoop được: decode,
     // validate rẻ, enqueue").
@@ -540,7 +559,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             }
             return;
         }
-        worldGateway.facade().enqueueMoveCommand(characterId, sequenceId, command.getDirX(), command.getDirY());
+        currentWorldFacade(characterId)
+                .enqueueMoveCommand(characterId, sequenceId, command.getDirX(), command.getDirY());
     }
 
     // SetTargetCommand KHÔNG chạm DB — chỉ enqueue vào server-world (rẻ, thread-safe), xử lý
@@ -556,7 +576,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        worldGateway.facade().setTarget(characterId, command.getTargetEntityId());
+        currentWorldFacade(characterId).setTarget(characterId, command.getTargetEntityId());
     }
 
     // UseSkillCommand KHÔNG chạm DB — chỉ enqueue vào server-world, xử lý thẳng trên EventLoop
@@ -571,7 +591,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        worldGateway.facade().useSkill(characterId, command.getSkillCode(), command.getTargetEntityId());
+        currentWorldFacade(characterId).useSkill(characterId, command.getSkillCode(), command.getTargetEntityId());
     }
 
     // EquipItemCommand chạm DB (feature-inventory) — Virtual Thread, giống handleSelectCharacter.
@@ -599,7 +619,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // GAMEPLAY.md §2 — mặc đồ xong phải tính lại chỉ số dẫn xuất NGAY, không đợi lần
             // attach kế tiếp (server-world không tự biết trang bị vừa đổi).
             var equipmentBonus = inventoryFacade.computeEquipmentBonus(characterId);
-            worldGateway.facade().applyEquipmentBonus(characterId, equipmentBonus.bonusAtk());
+            currentWorldFacade(characterId).applyEquipmentBonus(characterId, equipmentBonus.bonusAtk());
         }
         var response = EquipItemResponse.newBuilder()
                 .setSuccess(result == InventoryFacade.EquipResult.OK)
@@ -631,7 +651,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         var result = inventoryFacade.unequipItem(characterId, slot);
         if (result == InventoryFacade.UnequipResult.OK) {
             var equipmentBonus = inventoryFacade.computeEquipmentBonus(characterId);
-            worldGateway.facade().applyEquipmentBonus(characterId, equipmentBonus.bonusAtk());
+            currentWorldFacade(characterId).applyEquipmentBonus(characterId, equipmentBonus.bonusAtk());
         }
         var response = UnequipItemResponse.newBuilder()
                 .setSuccess(result == InventoryFacade.UnequipResult.OK)
@@ -1546,6 +1566,56 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         send(ctx, Opcode.OPCODE_GET_MY_PARTY_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
     }
 
+    // EnterDungeonCommand chạm PartyFacade/CharacterFacade (DB) qua DungeonInstanceRegistry —
+    // Virtual Thread, giống handleGetMyPartyRequest.
+    private void handleEnterDungeonCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        var command = EnterDungeonCommand.parseFrom(payload);
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleEnterDungeonBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleEnterDungeonBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, EnterDungeonCommand command) {
+        var outcome = worldGateway.dungeonInstanceRegistry().enterDungeon(characterId, command.getDungeonCode());
+        var protoOutcome = switch (outcome) {
+            case OK -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK;
+            case NOT_IN_PARTY -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_NOT_IN_PARTY;
+            case PARTY_MEMBER_OFFLINE -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_PARTY_MEMBER_OFFLINE;
+            case ALREADY_IN_DUNGEON -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_ALREADY_IN_DUNGEON;
+            case UNKNOWN_DUNGEON -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_UNKNOWN_DUNGEON;
+        };
+        var response = EnterDungeonResponse.newBuilder().setOutcome(protoOutcome).build();
+        send(ctx, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    // ExitDungeonCommand chạm CharacterFacade (DB) qua DungeonInstanceRegistry — Virtual Thread.
+    private void handleExitDungeonCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ExitDungeonCommand.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        var sequenceId = header.sequenceId();
+        var characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleExitDungeonBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleExitDungeonBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        var outcome = worldGateway.dungeonInstanceRegistry().exitDungeon(characterId);
+        var protoOutcome = outcome == DungeonInstanceRegistry.ExitOutcome.OK
+                ? ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK
+                : ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_NOT_IN_DUNGEON;
+        var response = ExitDungeonResponse.newBuilder().setOutcome(protoOutcome).build();
+        send(ctx, Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
     private void handleRequestTradeCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         var command = RequestTradeCommand.parseFrom(payload);
@@ -2016,7 +2086,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 worldGateway.registry().sendToCharacterIfOnline(
                         ctx.target().id(), Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
             }
-            case AREA -> worldGateway.facade().enqueueAreaChatMessage(ctx.characterId(), ctx.senderName(), ctx.body());
+            case AREA -> currentWorldFacade(ctx.characterId())
+                    .enqueueAreaChatMessage(ctx.characterId(), ctx.senderName(), ctx.body());
             // GUILD/PARTY: broadcast cho MỌI thành viên đang online (gồm cả người gửi, cùng cách
             // AREA tự thấy tin của mình) — không cần AoI/tick thread, guild/party membership
             // không phải dữ liệu world-tick (feature-guild, feature-party/CLAUDE.md).
@@ -2157,7 +2228,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // vì lúc đó có thể đã bị unregister() xoá mất — xem javadoc CharacterPositionPersister#save).
             var lastPosition = worldGateway.registry().lastKnownPosition(characterId);
             worldGateway.registry().unregister(characterId);
-            worldGateway.facade().detachCharacter(characterId);
+            // Phase 8 lát cắt 1 (ADR-026): nếu đang ở dungeon, detach khỏi ĐÚNG dungeon World +
+            // dọn bookkeeping instance (dừng luôn World nếu rỗng) — KHÔNG re-attach world chính
+            // (đã ngắt kết nối). false = không ở dungeon nào, detach world chính như trước giờ.
+            if (!worldGateway.dungeonInstanceRegistry().handleDisconnectIfInDungeon(characterId)) {
+                worldGateway.facade().detachCharacter(characterId);
+            }
             // SERVER.md §8: logout là 1 trong 3 mốc bắt buộc ghi vị trí. savePosition chạm DB
             // (blocking) — không được chạy trên EventLoop, đẩy sang authExecutor.
             if (lastPosition != null) {

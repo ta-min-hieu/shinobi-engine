@@ -42,6 +42,7 @@ import dev.kage.protocol.BuyItemResponse;
 import dev.kage.protocol.BuyOutcome;
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ChatMessageEvent;
+import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.ClaimQuestRewardCommand;
@@ -54,6 +55,12 @@ import dev.kage.protocol.CreateCharacterResponse;
 import dev.kage.protocol.EnhanceItemCommand;
 import dev.kage.protocol.EnhanceItemResponse;
 import dev.kage.protocol.EnhanceOutcome;
+import dev.kage.protocol.EnterDungeonCommand;
+import dev.kage.protocol.EnterDungeonOutcome;
+import dev.kage.protocol.EnterDungeonResponse;
+import dev.kage.protocol.ExitDungeonCommand;
+import dev.kage.protocol.ExitDungeonOutcome;
+import dev.kage.protocol.ExitDungeonResponse;
 import dev.kage.protocol.EquipItemCommand;
 import dev.kage.protocol.EquipItemResponse;
 import dev.kage.protocol.EquipmentSlot;
@@ -118,6 +125,7 @@ class GatewayServerIntegrationTest {
     private WorldFacade worldFacade;
     private CharacterPort characterPort;
     private ConnectedCharacterRegistry characterRegistry;
+    private dev.kage.party.api.PartyFacade partyFacade;
 
     @BeforeEach
     void startServer() throws InterruptedException {
@@ -134,14 +142,17 @@ class GatewayServerIntegrationTest {
         var mailFacade = fakeMailFacade();
         var chatFacade = fakeChatFacade();
         var guildFacade = fakeGuildFacade();
-        var partyFacade = fakePartyFacade();
+        partyFacade = fakePartyFacade();
         var tradeFacade = fakeTradeFacade();
         characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
         worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
         var positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
-        var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
+        var dungeonInstanceRegistry =
+                new DungeonInstanceRegistry(characterRegistry, characterFacade, partyFacade, worldFacade);
+        var worldGateway =
+                new WorldGateway(worldFacade, characterRegistry, positionPersister, dungeonInstanceRegistry);
         var socialFacades =
                 new SocialFacades(friendFacade, mailFacade, chatFacade, guildFacade, partyFacade, tradeFacade);
         var contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
@@ -586,51 +597,98 @@ class GatewayServerIntegrationTest {
     }
 
     // Party không dùng trong test này — fake tối thiểu để compile (cùng convention fakeGuildFacade).
+    /**
+     * KHÔNG throw {@code UnsupportedOperationException} (khác các fake facade khác trong file này)
+     * — implementation in-memory THẬT, đủ cho kịch bản dungeon (Phase 8 lát cắt 1): tạo party,
+     * mời, chấp nhận, tra thành viên. Không cần khoá dòng {@code FOR UPDATE} như
+     * {@code PostgresPartyAdapter} — test này single-thread, không có race thật cần chống.
+     */
     private dev.kage.party.api.PartyFacade fakePartyFacade() {
         dev.kage.party.domain.PartyPort partyPort = new dev.kage.party.domain.PartyPort() {
+            private final Map<Long, dev.kage.party.domain.Party> partiesById = new HashMap<>();
+            private final Map<Long, List<dev.kage.party.domain.PartyMember>> membersByPartyId = new HashMap<>();
+            private final Map<Long, dev.kage.party.domain.PartyInvite> invitesById = new HashMap<>();
+            private final AtomicLong nextPartyId = new AtomicLong(1);
+            private final AtomicLong nextInviteId = new AtomicLong(1);
+
             @Override
             public Optional<dev.kage.party.domain.PartyMember> findMembershipOf(long characterId) {
-                return Optional.empty();
+                return membersByPartyId.values().stream()
+                        .flatMap(List::stream)
+                        .filter(m -> m.characterId() == characterId)
+                        .findFirst();
             }
 
             @Override
             public List<dev.kage.party.domain.PartyMember> listMembers(long partyId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
+                return List.copyOf(membersByPartyId.getOrDefault(partyId, List.of()));
             }
 
             @Override
             public dev.kage.party.domain.Party createParty(long leaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
+                long partyId = nextPartyId.getAndIncrement();
+                var party = new dev.kage.party.domain.Party(partyId, leaderCharacterId, Instant.now());
+                partiesById.put(partyId, party);
+                var leader = new dev.kage.party.domain.PartyMember(
+                        partyId, leaderCharacterId, dev.kage.party.domain.PartyRole.LEADER, Instant.now());
+                membersByPartyId.put(partyId, new ArrayList<>(List.of(leader)));
+                return party;
             }
 
             @Override
             public Optional<dev.kage.party.domain.PartyInvite> findPendingInviteOfInvitee(long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
+                return invitesById.values().stream()
+                        .filter(i -> i.inviteeCharacterId() == characterId)
+                        .findFirst();
             }
 
             @Override
             public List<dev.kage.party.domain.PartyInvite> listPendingInvitesOfInvitee(long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
+                return invitesById.values().stream()
+                        .filter(i -> i.inviteeCharacterId() == characterId)
+                        .toList();
             }
 
             @Override
             public dev.kage.party.domain.PartyInvite invite(long partyId, long inviteeCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
+                long inviteId = nextInviteId.getAndIncrement();
+                var invite = new dev.kage.party.domain.PartyInvite(
+                        inviteId, partyId, inviteeCharacterId, Instant.now());
+                invitesById.put(inviteId, invite);
+                return invite;
             }
 
             @Override
             public AcceptResult acceptInvite(long inviteId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
+                var invite = invitesById.get(inviteId);
+                if (invite == null || invite.inviteeCharacterId() != characterId) {
+                    return AcceptResult.NOT_FOUND;
+                }
+                invitesById.remove(inviteId);
+                var member = new dev.kage.party.domain.PartyMember(
+                        invite.partyId(), characterId, dev.kage.party.domain.PartyRole.MEMBER, Instant.now());
+                membersByPartyId.computeIfAbsent(invite.partyId(), id -> new ArrayList<>()).add(member);
+                return AcceptResult.OK;
             }
 
             @Override
             public boolean rejectInvite(long inviteId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
+                var invite = invitesById.get(inviteId);
+                if (invite == null || invite.inviteeCharacterId() != characterId) {
+                    return false;
+                }
+                invitesById.remove(inviteId);
+                return true;
             }
 
             @Override
             public LeaveResult leaveParty(long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
+                var membership = findMembershipOf(characterId);
+                if (membership.isEmpty()) {
+                    return LeaveResult.NOT_IN_PARTY;
+                }
+                membersByPartyId.get(membership.get().partyId()).removeIf(m -> m.characterId() == characterId);
+                return LeaveResult.OK;
             }
 
             @Override
@@ -859,6 +917,96 @@ class GatewayServerIntegrationTest {
                     readUntilOpcode(inB, Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE).payload());
             assertThat(movedSeenByB.getCharacterId()).isEqualTo(characterA);
             assertThat(movedSeenByB.getX()).isGreaterThan(0f);
+        }
+    }
+
+    @Test
+    // 20s (khác 15s mặc định file này) — kịch bản này có nhiều round-trip hơn hẳn (3 socket, party
+    // setup, 2 lần enter, 2 despawn, move, exit×2), cần thêm dư địa dưới tải máy chạy test nặng
+    // (VD ngay sau loạt test Testcontainers khác trong `./gradlew build`).
+    @Timeout(20)
+    void partyShouldEnterAndExitDungeonAsSeparateWorld_overRealSockets() throws Exception {
+        // Phase 8 lát cắt 1 (ADR-026): "cả party cùng vào 1 World riêng, tick độc lập world
+        // chính" — verify qua chính giao thức dây, không chỉ nội bộ DungeonInstanceRegistry.
+        try (var socketA = new Socket("127.0.0.1", server.port());
+                var socketB = new Socket("127.0.0.1", server.port());
+                var socketC = new Socket("127.0.0.1", server.port())) {
+            socketA.setSoTimeout(5000);
+            socketB.setSoTimeout(5000);
+            socketC.setSoTimeout(5000);
+            var inA = new DataInputStream(socketA.getInputStream());
+            var inB = new DataInputStream(socketB.getInputStream());
+            var inC = new DataInputStream(socketC.getInputStream());
+
+            var suffix = UUID.randomUUID().toString().substring(0, 8);
+            long characterA = connectCreateAndSelect(socketA, inA, "da" + suffix);
+            long characterB = connectCreateAndSelect(socketB, inB, "db" + suffix);
+            long characterC = connectCreateAndSelect(socketC, inC, "dc" + suffix);
+
+            // Party A+B qua PartyFacade trực tiếp (đã có test riêng cho luồng mời/chấp nhận qua
+            // socket ở feature-party — test này chỉ cần TIỀN ĐIỀU KIỆN "A+B cùng party" để tập
+            // trung verify cơ chế dungeon). C KHÔNG vào party — ở lại world chính làm chứng nhân.
+            partyFacade.createParty(characterA);
+            partyFacade.invite(characterA, characterB);
+            var inviteId = partyFacade.listPendingInvites(characterB).get(0).inviteId();
+            partyFacade.acceptInvite(inviteId, characterB);
+
+            // A gửi EnterDungeonCommand — kéo THEO CẢ B (cùng party, đang online) vào CHUNG 1 instance.
+            var enterCommand = EnterDungeonCommand.newBuilder().setDungeonCode("sample_dungeon").build();
+            sendFrame(socketA, Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, 20, enterCommand.toByteArray());
+            var enterResponseA = EnterDungeonResponse.parseFrom(
+                    readUntilOpcode(inA, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE).payload());
+            assertThat(enterResponseA.getOutcome()).isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
+
+            // B gửi lại CŨNG EnterDungeonCommand — đã bị A kéo vào sẵn, outcome phải là ALREADY_IN_DUNGEON.
+            sendFrame(socketB, Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, 20, enterCommand.toByteArray());
+            var enterResponseB = EnterDungeonResponse.parseFrom(
+                    readUntilOpcode(inB, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE).payload());
+            assertThat(enterResponseB.getOutcome())
+                    .isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_ALREADY_IN_DUNGEON);
+
+            // C (world chính) phải thấy CẢ A lẫn B despawn — chứng minh 2 người đã RỜI world chính
+            // thật (không chỉ "coi như" rời), vì AoI world chính không còn giữ entity của họ nữa.
+            var despawnedIds = new java.util.HashSet<Long>();
+            despawnedIds.add(CharacterDespawnedEvent.parseFrom(
+                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE).payload())
+                    .getCharacterId());
+            despawnedIds.add(CharacterDespawnedEvent.parseFrom(
+                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE).payload())
+                    .getCharacterId());
+            assertThat(despawnedIds).containsExactlyInAnyOrder(characterA, characterB);
+
+            // A di chuyển TRONG dungeon — B (cùng instance) phải thấy, chứng minh 2 người đang
+            // tick chung 1 World riêng (không phải world chính, đã verify despawn ở trên).
+            var moveCommand = MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
+            sendFrame(socketA, Opcode.OPCODE_MOVE_COMMAND_VALUE, 21, moveCommand.toByteArray());
+            var moveResponseFrame = readUntilOpcode(inA, Opcode.OPCODE_MOVE_RESPONSE_VALUE);
+            assertThat(moveResponseFrame.header().sequenceId()).isEqualTo(21);
+
+            var movedSeenByB = CharacterMovedEvent.parseFrom(
+                    readUntilOpcode(inB, Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE).payload());
+            assertThat(movedSeenByB.getCharacterId()).isEqualTo(characterA);
+            assertThat(movedSeenByB.getX()).isGreaterThan(0f);
+
+            // A rời dungeon — về ĐÚNG vị trí thật trước khi vào (0,0), C (world chính) thấy A
+            // spawn lại — chứng minh A đã quay về world chính thành công.
+            var exitCommand = ExitDungeonCommand.newBuilder().build();
+            sendFrame(socketA, Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE, 22, exitCommand.toByteArray());
+            var exitResponseA = ExitDungeonResponse.parseFrom(
+                    readUntilOpcode(inA, Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE).payload());
+            assertThat(exitResponseA.getOutcome()).isEqualTo(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK);
+
+            var spawnSeenByC = CharacterSpawnedEvent.parseFrom(
+                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload());
+            assertThat(spawnSeenByC.getCharacterId()).isEqualTo(characterA);
+            assertThat(spawnSeenByC.getX()).isEqualTo(0f);
+            assertThat(spawnSeenByC.getY()).isEqualTo(0f);
+
+            // B rời nốt — dungeon instance rỗng, World của nó tự dừng (DungeonInstanceRegistry).
+            sendFrame(socketB, Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE, 22, exitCommand.toByteArray());
+            var exitResponseB = ExitDungeonResponse.parseFrom(
+                    readUntilOpcode(inB, Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE).payload());
+            assertThat(exitResponseB.getOutcome()).isEqualTo(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK);
         }
     }
 

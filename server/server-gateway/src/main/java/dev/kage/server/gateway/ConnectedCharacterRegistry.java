@@ -114,6 +114,18 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     @Override
     public void onMoveAccepted(long characterId, int sequenceId, float x, float y) {
         lastKnownPosition.put(characterId, new PositionSnapshot(x, y));
+        sendMoveResponseWithoutTrackingPosition(characterId, sequenceId, x, y);
+    }
+
+    /**
+     * Gửi {@code MoveResponse} KHÔNG ghi {@code lastKnownPosition} — dùng bởi
+     * {@code DungeonOutboundSink} (Phase 8 lát cắt 1, ADR-026): toạ độ trong dungeon là không gian
+     * riêng của instance đó, ghi vào đây sẽ làm {@code CharacterPositionPersister} lưu NHẦM toạ độ
+     * dungeon thành vị trí thật của nhân vật. Nhờ world chính không còn gọi {@link #onMoveAccepted}
+     * cho nhân vật đã {@code detachCharacter} (đang ở dungeon), {@code lastKnownPosition} tự "đóng
+     * băng" đúng ở toạ độ thật cuối cùng — không cần cờ "đang ở dungeon" nào thêm.
+     */
+    void sendMoveResponseWithoutTrackingPosition(long characterId, int sequenceId, float x, float y) {
         var ctx = contextsByCharacterId.get(characterId);
         if (ctx == null) {
             return; // đã ngắt kết nối giữa lúc lệnh còn trong hàng đợi world — bỏ qua an toàn.

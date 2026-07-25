@@ -50,7 +50,10 @@ public final class GatewayBootstrap {
         var positionPersister =
                 new CharacterPositionPersister(facades.characterFacade(), characterRegistry, POSITION_SAVE_INTERVAL);
         positionPersister.start();
-        var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister);
+        var dungeonInstanceRegistry = new DungeonInstanceRegistry(
+                characterRegistry, facades.characterFacade(), facades.contentFacades().socialFacades().partyFacade(),
+                worldFacade);
+        var worldGateway = new WorldGateway(worldFacade, characterRegistry, positionPersister, dungeonInstanceRegistry);
 
         var server = new GatewayServer(PORT, facades, worldGateway);
         server.start();
@@ -58,9 +61,11 @@ public final class GatewayBootstrap {
             // Thứ tự SERVER.md §10: ngừng nhận kết nối mới trước (server.stop() đóng channel),
             // rồi mới dừng world tick + đóng DB. positionPersister dừng SAU worldFacade — vòng
             // quét định kỳ cuối cùng vẫn nên chạy trước khi tắt hẳn (không mất vị trí ai đó vừa
-            // logout đúng lúc server tắt).
+            // logout đúng lúc server tắt). dungeonInstanceRegistry dừng CÙNG lúc worldFacade (mọi
+            // World, chính lẫn dungeon, dừng trước khi đóng DB).
             server.stop();
             worldFacade.stop();
+            dungeonInstanceRegistry.stopAll();
             characterRegistry.stop();
             positionPersister.stop();
             databaseBootstrap.shutdown();
