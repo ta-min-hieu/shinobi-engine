@@ -1,0 +1,67 @@
+# CLAUDE.md — feature-pvp
+
+> Kế thừa [server/CLAUDE.md](../../CLAUDE.md). Auto-load khi sửa `feature-pvp/**`.
+
+## Cấu trúc (Clean Arch)
+
+```
+api/            PvpFacade (+ RecordDuelResultUseCase.DuelSettlement/GetPvpRatingUseCase.RatingView
+                 — type của UseCase, KHÔNG cần bundle riêng vì chỉ 2 UseCase, dưới giới hạn 4 tham số)
+application/    RecordDuelResultUseCase · GetPvpRatingUseCase
+domain/         PvpRating (aggregate) · PvpRatingPort · EloRating (thuần tính toán, không chạm Port)
+```
+
+Chiều: `api → application → domain`. **`domain/` không import gì bên ngoài** — adapter thật
+(`PostgresPvpRatingAdapter`) nằm ở `server-database`.
+
+## Quyết định MVP (2026-07-25, Phase 8 lát cắt 4)
+
+Chốt cùng chủ dự án qua `AskUserQuestion` trước khi code: phạm vi = **Arena 1v1 + MMR/ranking cơ
+bản** (không phải Battlefield 5v5 hay Chiếm Lãnh Địa guild war — 2 hạng mục PvP còn lại của GDD §6
+để dành lát cắt sau, cùng tinh thần Boss AI hoãn "summon minion").
+
+- **Module này CHỈ lo phần cần PERSIST (rating/wins/losses)**. Vòng đời trận đấu (thách đấu, tạo
+  World riêng, kết thúc trận) KHÔNG có dữ liệu nghiệp vụ nào cần lưu — đặt thẳng ở
+  `server-gateway` (`ArenaInstanceRegistry`), giống hệt lý do `DungeonInstanceRegistry` KHÔNG phải
+  `feature-dungeon` (ADR-026, ROADMAP Phase 8 lát cắt 1). Khi lát cắt sau cần lưu lịch sử trận đấu/
+  season, đó là lúc mở rộng module này.
+- **Elo cổ điển, K=32 cố định, KHÔNG season/decay** — `EloRating` thuần Java, test được không cần
+  Port/DB. Điểm khởi điểm 1000 cho nhân vật CHƯA từng đấu (không tạo dòng DB lúc tạo nhân vật, chỉ
+  tạo lúc trận đầu tiên kết thúc — tránh ghi rác cho nhân vật không bao giờ đấu).
+- **`recordMatchResult` là UPSERT nguyên tử cho CẢ 2 người** (winner + loser), không phải 2 lời gọi
+  Port riêng — tránh 1 bên ghi thành công, bên kia lỗi giữa chừng làm rating lệch nhau.
+- **Cách ly PvP KHÔNG sửa `CombatSystem`/`SkillSystem`** — trận đấu diễn ra trong 1 `WorldFacade`
+  instance riêng (ADR-026, giống dungeon) chỉ chứa đúng 2 người, nên "chỉ đánh được đối thủ" là hệ
+  quả TỰ NHIÊN của cách ly instance, không cần thêm cờ team/faction ở tầng combat.
+  ⚠️ **Lỗ hổng CŨ, KHÔNG PHẢI do lát cắt này gây ra, KHÔNG sửa ở đây** (ngoài phạm vi): nhân vật
+  world CHÍNH về lý thuyết vẫn có thể `SetTargetCommand`/`UseSkillCommand` nhắm ID nhân vật khác
+  (dương) — `CombatSystem`/`SkillSystem` không chặn theo sign, chỉ chặn tự nhắm chính mình
+  (`WorldFacadeTest.shouldDealMoreDamage_whenAttackerElementCountersDefenderElement` dựa vào đúng
+  hành vi này để test khắc chế nguyên tố bằng 3 nhân vật thay vì quái). Không có UI nào ở client
+  hiện tại phơi bày đường này ở world chính; nếu sau này client cho phép chọn nhân vật khác làm
+  target ngoài Arena, cần ADR riêng cho cơ chế "an toàn/safe-zone" thật.
+- **Forfeit (`ExitDuelCommand`) tính THUA thật** (mất điểm) — khác `ExitDungeonCommand` (không mất
+  gì). Disconnect giữa trận cũng tính THUA cho người mất kết nối (không được "trốn thua").
+- **Thách đấu là request-based (giống Trade), KHÔNG cần gần nhau/cùng map** — challenge theo TÊN
+  (`ChallengeDuelCommand.target_name`, gateway tự resolve qua `CharacterFacade.findByName` TRƯỚC
+  khi gọi `ArenaInstanceRegistry`, cùng pattern `RequestTradeCommand`). Chỉ 1 thách đấu ĐẾN đang
+  chờ tại 1 thời điểm cho mỗi người (thách đấu mới khi đang có thách đấu chờ → outcome riêng),
+  hoàn toàn trong bộ nhớ (không bảng DB nào cho challenge, ephemeral như Trade session).
+- **Không giới hạn rating khi ghép trận** (không phải matchmaking tự động — người chơi tự chọn đối
+  thủ qua tên) — MMR ở lát cắt này CHỈ là con số hiển thị/xếp hạng, chưa dùng để ghép trận tự động.
+
+## Cứng
+
+✅ Validate nghiệp vụ ở `application/`, trước khi chạm Port
+✅ Port là interface trong `domain/`; Adapter implement ở `server-database`
+✅ `EloRating` không phụ thuộc `PvpRatingPort` — test thuần domain, không cần Fake
+✅ Module khác gọi qua `PvpFacade`, không đọc bảng `pvp_rating` trực tiếp
+
+❌ SQL/JDBC/Redis client trong module này (Điều 23 — enforce bằng ArchUnit)
+❌ `domain/` biết PostgreSQL
+❌ Vòng đời trận đấu (challenge/world instance) — thuộc `server-gateway`, KHÔNG kéo vào module này
+
+## Test
+
+`domain/` test không mock (`EloRatingTest`/`PvpRatingTest`). `application/` test với
+`FakePvpRatingPort` (không Mockito).

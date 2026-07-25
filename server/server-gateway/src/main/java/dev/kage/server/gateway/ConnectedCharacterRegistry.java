@@ -303,6 +303,16 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         send(ctx, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
     }
 
+    /**
+     * World CHÍNH không có cơ chế tử vong nhân vật (xem javadoc {@code WorldOutboundSink}) — no-op
+     * có chủ đích. {@code ArenaOutboundSink} (Phase 8 lát cắt 4) override method này để chốt kết
+     * quả trận đấu; world chính KHÔNG đi qua nhánh đó.
+     */
+    @Override
+    public void onCharacterDefeated(long defeatedCharacterId, long killerEntityId) {
+        // Không làm gì — xem javadoc phía trên.
+    }
+
     @Override
     public void onMonsterKilled(long killerCharacterId, String monsterCode) {
         lootExecutor.execute(() -> grantLootBlocking(killerCharacterId, monsterCode));

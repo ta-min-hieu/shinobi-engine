@@ -68,6 +68,15 @@ public interface WorldOutboundSink {
      */
     void onAreaChatMessage(long targetCharacterId, long senderCharacterId, String senderName, String body);
 
+    /**
+     * {@code defeatedCharacterId} (nhân vật, luôn DƯƠNG) vừa bị {@code killerEntityId} hạ gục —
+     * world CHÍNH chưa có cơ chế tử vong nhân vật (no-op ở {@code ConnectedCharacterRegistry}), chỉ
+     * có ý nghĩa THẬT trong Arena instance (Phase 8 lát cắt 4, {@code ArenaOutboundSink} chốt kết
+     * quả trận đấu). server-world không biết khái niệm "Arena" — chỉ báo SỰ KIỆN, giống
+     * {@link #onMonsterKilled} không biết inventory.
+     */
+    void onCharacterDefeated(long defeatedCharacterId, long killerEntityId);
+
     /** Ảnh chụp trạng thái quái lúc phát {@link #onMonsterSpawned} — gộp tham số (STATIC-ANALYSIS.md). */
     record MonsterSnapshot(long monsterId, String monsterCode, float x, float y, int currentHp, int maxHp) {
     }

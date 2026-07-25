@@ -794,6 +794,23 @@ class GatewayPipelineTest {
         return new dev.kage.trade.api.TradeFacade(useCases);
     }
 
+    // Pvp không dùng trong test này — fake tối thiểu để compile (cùng convention fakeTradeFacade).
+    private static dev.kage.pvp.api.PvpFacade fakePvpFacade() {
+        dev.kage.pvp.domain.PvpRatingPort ratingPort = new dev.kage.pvp.domain.PvpRatingPort() {
+            @Override
+            public Optional<dev.kage.pvp.domain.PvpRating> findByCharacterId(long characterId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public void recordMatchResult(
+                    long winnerCharacterId, int winnerNewRating, long loserCharacterId, int loserNewRating) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+        };
+        return new dev.kage.pvp.api.PvpFacade(ratingPort);
+    }
+
     private static EmbeddedChannel newPipeline(FakeCharacterPort characterPort) {
         // ⚠️ Phải khớp CHÍNH XÁC pipeline thật trong GatewayBootstrap — lệch ở đây là test giả.
         // AccountFacade/CharacterFacade THẬT (không mock), chỉ Port bên dưới là Fake (TESTING.md
@@ -829,14 +846,17 @@ class GatewayPipelineTest {
         dev.kage.guild.api.GuildFacade guildFacade = fakeGuildFacade();
         dev.kage.party.api.PartyFacade partyFacade = fakePartyFacade();
         dev.kage.trade.api.TradeFacade tradeFacade = fakeTradeFacade();
+        dev.kage.pvp.api.PvpFacade pvpFacade = fakePvpFacade();
         ConnectedCharacterRegistry characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
         WorldFacade worldFacade = new WorldFacade(characterRegistry);
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         DungeonInstanceRegistry dungeonInstanceRegistry =
                 new DungeonInstanceRegistry(characterRegistry, characterFacade, partyFacade, worldFacade);
-        WorldGateway worldGateway =
-                new WorldGateway(worldFacade, characterRegistry, positionPersister, dungeonInstanceRegistry);
+        ArenaInstanceRegistry arenaInstanceRegistry =
+                new ArenaInstanceRegistry(characterRegistry, characterFacade, pvpFacade, worldFacade);
+        WorldGateway worldGateway = new WorldGateway(
+                worldFacade, characterRegistry, positionPersister, dungeonInstanceRegistry, arenaInstanceRegistry);
 
         return new EmbeddedChannel(
                 new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
@@ -849,7 +869,7 @@ class GatewayPipelineTest {
                                 new ContentFacades(shopFacade, dialogueFacade, questFacade,
                                         new SocialFacades(
                                                 friendFacade, mailFacade, chatFacade, guildFacade, partyFacade,
-                                                tradeFacade))),
+                                                tradeFacade, pvpFacade))),
                         worldGateway, Runnable::run));
     }
 

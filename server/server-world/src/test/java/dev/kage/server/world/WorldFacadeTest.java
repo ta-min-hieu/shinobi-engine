@@ -72,6 +72,9 @@ class WorldFacadeTest {
     private record AreaChatMessage(long target, long senderCharacterId, String senderName, String body) {
     }
 
+    private record CharacterDefeated(long defeatedCharacterId, long killerEntityId) {
+    }
+
     private static final class RecordingSink implements WorldOutboundSink {
         final List<Spawned> spawned = new CopyOnWriteArrayList<>();
         final List<Moved> moved = new CopyOnWriteArrayList<>();
@@ -86,6 +89,7 @@ class WorldFacadeTest {
         final List<AttackResult> attackResults = new CopyOnWriteArrayList<>();
         final List<SkillResult> skillResults = new CopyOnWriteArrayList<>();
         final List<AreaChatMessage> areaChatMessages = new CopyOnWriteArrayList<>();
+        final List<CharacterDefeated> characterDefeated = new CopyOnWriteArrayList<>();
 
         @Override
         public void onMoveAccepted(long characterId, int sequenceId, float x, float y) {
@@ -157,6 +161,11 @@ class WorldFacadeTest {
         @Override
         public void onAreaChatMessage(long targetCharacterId, long senderCharacterId, String senderName, String body) {
             areaChatMessages.add(new AreaChatMessage(targetCharacterId, senderCharacterId, senderName, body));
+        }
+
+        @Override
+        public void onCharacterDefeated(long defeatedCharacterId, long killerEntityId) {
+            characterDefeated.add(new CharacterDefeated(defeatedCharacterId, killerEntityId));
         }
     }
 
@@ -492,6 +501,35 @@ class WorldFacadeTest {
                 .damage();
 
         assertThat(damageVsPhong).isGreaterThan(damageVsLoi);
+    }
+
+    @Test
+    @Timeout(10)
+    void shouldFireCharacterDefeated_whenCharacterKillsAnotherCharacter() {
+        // Phase 8 lát cắt 4 (Arena) — WorldOutboundSink#onCharacterDefeated là hạ tầng dùng chung
+        // cho duel (ArenaOutboundSink chốt kết quả trận đấu); world CHÍNH không có UI nào phơi bày
+        // đường này (xem feature-pvp/CLAUDE.md), test trực tiếp bằng setTarget như test khắc chế
+        // nguyên tố ở trên.
+        world.start();
+        world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
+        world.attachCharacter(2L, 1f, 0f, DEFAULT_STATS);
+        awaitTrue(() -> sink.spawned.size() >= 2);
+
+        world.applyEquipmentBonus(1L, 1000); // đủ lớn để hạ gục CHARACTER_MAX_HP ngay đòn đầu.
+        world.setTarget(1L, 2L);
+
+        awaitTrue(() -> sink.characterDefeated.stream().anyMatch(d -> d.defeatedCharacterId() == 2L));
+        CharacterDefeated defeat = sink.characterDefeated.stream()
+                .filter(d -> d.defeatedCharacterId() == 2L)
+                .findFirst()
+                .orElseThrow();
+        assertThat(defeat.killerEntityId()).isEqualTo(1L);
+
+        // Đòn hạ gục chỉ bắn ĐÚNG 1 lần (CombatSystem tự bỏ chọn target sau khi thấy mục tiêu đã
+        // chết — xem javadoc WorldFacade#handleCombatResults) dù nhân vật vẫn còn attach trong World.
+        sleepQuietly(1200);
+        assertThat(sink.characterDefeated.stream().filter(d -> d.defeatedCharacterId() == 2L).count())
+                .isEqualTo(1);
     }
 
     @Test

@@ -438,6 +438,11 @@ public final class WorldFacade {
             }
             if (outcome.targetDied() && outcome.targetEntityId() < 0) {
                 handleMonsterDeath(outcome.targetEntityId(), outcome.attackerEntityId());
+            } else if (outcome.targetDied() && outcome.targetEntityId() > 0) {
+                // Phase 8 lát cắt 4 (Arena) — chỉ có ý nghĩa thật trong duel instance, xem javadoc
+                // WorldOutboundSink#onCharacterDefeated. CombatSystem tự chặn đòn lặp lại (target
+                // đã chết → attacker tự bỏ chọn target ở lần xử lý kế), nên chỉ bắn đúng 1 lần.
+                outboundSink.onCharacterDefeated(outcome.targetEntityId(), outcome.attackerEntityId());
             }
         }
     }
@@ -466,6 +471,9 @@ public final class WorldFacade {
             }
             if (outcome.targetDied() && outcome.targetEntityId() < 0) {
                 handleMonsterDeath(outcome.targetEntityId(), outcome.attackerEntityId());
+            } else if (outcome.targetDied() && outcome.targetEntityId() > 0) {
+                // Xem giải thích đầy đủ ở handleCombatResults — cùng lý do, khác nguồn đòn (skill).
+                outboundSink.onCharacterDefeated(outcome.targetEntityId(), outcome.attackerEntityId());
             }
         }
     }

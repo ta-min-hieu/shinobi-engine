@@ -87,10 +87,12 @@ Dải số cố định theo domain — tránh đụng độ khi nhiều ngườ
 | 900–999 | Mail |
 | 1000–1099 | Shop / Auction |
 | 1100–1199 | Friend |
-| 1200–1299 | Ranking |
+| 1200–1299 | Ranking (Phase 8: chỉ `GetPvpRating`, chưa có bảng xếp hạng toàn server) |
 | 1300–1399 | Party |
 | 1400–1499 | Trade |
-| 1500+ | Dự trữ — không dùng khi chưa cập nhật bảng này |
+| 1500–1599 | Dungeon |
+| 1600–1699 | Arena (PvP 1v1, Phase 8) |
+| 1700+ | Dự trữ — không dùng khi chưa cập nhật bảng này |
 
 **Nguồn chân lý thật**: `shared-protocol/src/main/proto/opcode_registry.proto`. Tài liệu này là bản tóm tắt — **lệch nhau thì file `.proto` thắng**.
 

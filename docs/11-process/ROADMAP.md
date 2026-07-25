@@ -280,8 +280,9 @@ vá luôn lỗ hổng `idempotencyKey` còn thiếu ở `BuyItemCommand`/`SellIt
 |---|---|
 | ✅ Dungeon instance lát cắt 1 (2026-07-25 — hạ tầng: party cùng vào 1 World riêng qua `EnterDungeonCommand`/`ExitDungeonCommand`, tick độc lập world chính, cách ly lỗi tick, chơi được thật qua socket) | [ADR-026](../01-architecture/adr/ADR-026-Dungeon-Instance-Model.md) |
 | ✅ Boss AI lát cắt 2 (2026-07-25 — script GraalJS quyết định pha/chiêu (`BossAiSystem`), tái dùng `ScriptSandbox` từ Phase 4, boss tự spawn trong dungeon, loot thật qua `drop_table` có sẵn, chơi được thật qua socket) | [AI.md §4](../03-engine/AI.md) |
-| PvP arena + battlefield | [GDD](../13-game-design/GAME-DESIGN-DOCUMENT.md) |
 | ✅ 4 hệ phái còn lại lát cắt 3 (2026-07-25 — Thủy/Phong/Lôi/Thổ chơi được thật qua socket: khắc chế nguyên tố, status-effect framework mới (slow/stun/shield/buff/debuff), 16 skill script mới + passive, chọn hệ Lv10) | [GDD §4](../13-game-design/GAME-DESIGN-DOCUMENT.md) |
+| ✅ Arena 1v1 + MMR cơ bản lát cắt 4 (2026-07-25 — thách đấu theo tên (`ChallengeDuelCommand`, giống Trade) → World riêng 2 người (ADR-026) → hạ gục/bỏ cuộc chốt Elo (K=32, module mới `feature-pvp`), chơi được thật qua socket) | [GDD §6](../13-game-design/GAME-DESIGN-DOCUMENT.md) |
+| Battlefield 5v5 + Chiếm Lãnh Địa (guild war) | [GDD §6](../13-game-design/GAME-DESIGN-DOCUMENT.md) |
 
 **ADR cần trước Phase 8**: ✅ ADR-026 Accepted 2026-07-24 — Phase 8 đủ điều kiện mở.
 
@@ -384,6 +385,42 @@ với thiết kế đa-loại-mục-tiêu mới. Phát hiện qua `shouldHealAll
 Sửa: bỏ guard tự nhắm ở `WorldFacade`, chuyển validate vào `SkillSystem.tryCast` (chặn tự nhắm CHỈ
 với `SkillTargetKind.ENEMY`, cho phép SELF/ALLY tự nhắm có chủ đích).
 
+**Quyết định lát cắt 4 (2026-07-25, cùng chủ dự án qua `AskUserQuestion` trước khi code)**: phạm vi
+PvP là **Arena 1v1 + MMR/rating cơ bản** (không phải Battlefield 5v5 hay Chiếm Lãnh Địa — 2 hạng
+mục còn lại của GDD §6 để dành lát cắt sau, cùng tinh thần các lát cắt trước hoãn phần lớn/phức
+tạp). Đóng luôn Phase 8 — cả 4 hạng mục lát cắt đã xong, chỉ Battlefield/Chiếm Lãnh Địa (post-MVP,
+GDD §11) còn lại, không mở phase mới cho 2 hạng mục đó ngay.
+
+Chi tiết kỹ thuật:
+1. **Module mới `feature-pvp`** (Clean Architecture đầy đủ) CHỈ lo phần cần persist (rating/wins/
+   losses, bảng `pvp_rating` mới, V18) — vòng đời trận đấu (thách đấu, tạo World riêng) KHÔNG có dữ
+   liệu nghiệp vụ cần lưu nên đặt ở `server-gateway` (`ArenaInstanceRegistry`), Y HỆT lý do
+   `DungeonInstanceRegistry` không phải `feature-dungeon` (ADR-026, lát cắt 1). `EloRating` (K=32
+   cố định, KHÔNG season/decay) là hàm thuần Java trong `domain/`, test được không cần Port/DB.
+2. **Thách đấu theo TÊN, request-based giống Trade** (không phải giống Party) — `ChallengeDuelCommand`
+   đẩy `DuelChallengeReceivedEvent` real-time cho target (không polling như Party invite), vì đấu
+   là hành động tương tác thời gian thực giống trade, không phải lời mời có thể trả lời sau.
+3. **Cách ly PvP hoàn toàn bằng World instance riêng** (ADR-026, giống dungeon) — CHỈ 2 người trong
+   instance đó nên "chỉ đánh được đối thủ" là hệ quả TỰ NHIÊN, KHÔNG sửa `CombatSystem`/`SkillSystem`
+   thêm cờ team/faction nào. Do đó cũng KHÔNG sửa được 1 lỗ hổng CŨ (có từ Phase 4, không phải do
+   lát cắt này): world CHÍNH về lý thuyết vẫn cho phép 1 nhân vật `SetTargetCommand`/`UseSkillCommand`
+   nhắm ID nhân vật khác (không chặn theo dấu, chỉ chặn tự nhắm chính mình) —
+   `WorldFacadeTest.shouldDealMoreDamage_whenAttackerElementCountersDefenderElement` dựa ĐÚNG vào
+   hành vi này để test khắc chế nguyên tố bằng 3 nhân vật thay vì quái. Không có UI nào ở client
+   hiện tại phơi bày đường này ở world chính — ghi nhận là giới hạn đã biết (feature-pvp/CLAUDE.md),
+   không phải phạm vi lát cắt này.
+4. **`WorldOutboundSink` thêm `onCharacterDefeated`** (world CHÍNH vẫn chưa có cơ chế tử vong nhân
+   vật, cùng hiện trạng Boss AI lát cắt 2 — no-op ở `ConnectedCharacterRegistry`) — chỉ
+   `ArenaOutboundSink` (mới) override để chốt kết quả trận đấu thật.
+5. **Forfeit (`ExitDuelCommand`) và mất kết nối giữa trận đều tính THUA thật** (mất điểm Elo) —
+   khác `ExitDungeonCommand` (không mất gì). `ArenaInstanceRegistry.settleDuel` gọi
+   `WorldFacade.stop()` (join tick thread) + ghi DB — PHẢI dispatch sang Virtual Thread riêng khi
+   gọi từ tick thread của CHÍNH duel instance (tránh self-join deadlock), khác khi gọi từ
+   `authExecutor` (forfeit chủ động, an toàn gọi thẳng).
+6. **Opcode**: dải mới **1600-1699 "Arena"** (Challenge/Accept/Decline/Exit + 4 Event) + dùng nốt
+   dải **1200-1299 "Ranking"** đã dự trữ từ trước cho `GetPvpRatingRequest/Response` (rating cá
+   nhân — bảng xếp hạng toàn server vẫn chưa làm, để dành lát cắt PvP ranking/season sau nếu có).
+
 ---
 
 ## Phase 9 — Optimization
@@ -471,6 +508,8 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **16 ADR Accepted** (gồm
 2. Đầu Phase 0: chốt/triển khai **ADR-011** (ArchUnit) như hạng mục kỹ thuật.
 3. ✅ **GDD đã bổ sung công thức damage** (2026-07-19) — Phase 4 hết bị chặn về mặt game design.
 4. ✅ **ADR-026 Accepted** (2026-07-24) — dungeon instance model chốt (cùng process, World riêng). **Phase 8 đủ điều kiện mở.**
-5. ✅ **4 hệ phái còn lại xong** (2026-07-25) — chỉ còn PvP arena/battlefield để đóng Phase 8 hoàn
-   toàn (5/5 hệ phái đã chơi được; PvP là hạng mục riêng, chưa chọn làm).
-6. Trả lời các câu hỏi mở còn lại ở [docs/README.md](../README.md).
+5. ✅ **4 hệ phái còn lại xong** (2026-07-25) — 5/5 hệ phái đã chơi được.
+6. ✅ **Arena 1v1 + MMR cơ bản xong** (2026-07-25) — Phase 8 ĐÓNG (4/4 lát cắt: dungeon, boss AI,
+   4 hệ phái, Arena). Battlefield 5v5 + Chiếm Lãnh Địa (GDD §6) để dành mở phase/lát cắt riêng sau,
+   không nằm trong Phase 8.
+7. Trả lời các câu hỏi mở còn lại ở [docs/README.md](../README.md).

@@ -23,7 +23,12 @@ import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.mail.api.MailFacade;
 import dev.kage.party.api.PartyFacade;
+import dev.kage.pvp.api.PvpFacade;
+import dev.kage.pvp.application.GetPvpRatingUseCase;
 import dev.kage.trade.api.TradeFacade;
+import dev.kage.protocol.AcceptDuelCommand;
+import dev.kage.protocol.AcceptDuelOutcome;
+import dev.kage.protocol.AcceptDuelResponse;
 import dev.kage.protocol.AcceptFriendRequestCommand;
 import dev.kage.protocol.AcceptFriendRequestOutcome;
 import dev.kage.protocol.AcceptFriendRequestResponse;
@@ -35,6 +40,9 @@ import dev.kage.protocol.ApproveGuildJoinRequestResponse;
 import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.BuyItemResponse;
 import dev.kage.protocol.BuyOutcome;
+import dev.kage.protocol.ChallengeDuelCommand;
+import dev.kage.protocol.ChallengeDuelOutcome;
+import dev.kage.protocol.ChallengeDuelResponse;
 import dev.kage.protocol.CharacterSummary;
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ChatMessageEvent;
@@ -57,15 +65,24 @@ import dev.kage.protocol.DeleteMailResponse;
 import dev.kage.protocol.DialogueEndedResponse;
 import dev.kage.protocol.DialogueNodeResponse;
 import dev.kage.protocol.DialogueOptionView;
+import dev.kage.protocol.DeclineDuelCommand;
+import dev.kage.protocol.DeclineDuelOutcome;
+import dev.kage.protocol.DeclineDuelResponse;
 import dev.kage.protocol.DisbandGuildCommand;
 import dev.kage.protocol.DisbandGuildOutcome;
 import dev.kage.protocol.DisbandGuildResponse;
+import dev.kage.protocol.DuelChallengeDeclinedEvent;
+import dev.kage.protocol.DuelChallengeReceivedEvent;
+import dev.kage.protocol.DuelStartedEvent;
 import dev.kage.protocol.EnhanceItemCommand;
 import dev.kage.protocol.EnhanceItemResponse;
 import dev.kage.protocol.EnhanceOutcome;
 import dev.kage.protocol.EnterDungeonCommand;
 import dev.kage.protocol.EnterDungeonOutcome;
 import dev.kage.protocol.EnterDungeonResponse;
+import dev.kage.protocol.ExitDuelCommand;
+import dev.kage.protocol.ExitDuelOutcome;
+import dev.kage.protocol.ExitDuelResponse;
 import dev.kage.protocol.ExitDungeonCommand;
 import dev.kage.protocol.ExitDungeonOutcome;
 import dev.kage.protocol.ExitDungeonResponse;
@@ -79,6 +96,8 @@ import dev.kage.protocol.FriendOnlineEvent;
 import dev.kage.protocol.FriendView;
 import dev.kage.protocol.GetMyGuildRequest;
 import dev.kage.protocol.GetMyGuildResponse;
+import dev.kage.protocol.GetPvpRatingRequest;
+import dev.kage.protocol.GetPvpRatingResponse;
 import dev.kage.protocol.GuildMemberView;
 import dev.kage.protocol.ItemRewardView;
 import dev.kage.protocol.KickGuildMemberCommand;
@@ -253,6 +272,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final GuildFacade guildFacade;
     private final PartyFacade partyFacade;
     private final TradeFacade tradeFacade;
+    private final PvpFacade pvpFacade;
     private final WorldGateway worldGateway;
     private final Executor authExecutor;
     // Per-connection (handler đã là state per-connection, xem javadoc lớp) — không cần đồng bộ
@@ -339,7 +359,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_CONFIRM_TRADE_COMMAND_VALUE, this::handleConfirmTradeCommand),
             Map.entry(Opcode.OPCODE_GET_TRADE_STATUS_REQUEST_VALUE, this::handleGetTradeStatusRequest),
             Map.entry(Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, this::handleEnterDungeonCommand),
-            Map.entry(Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE, this::handleExitDungeonCommand));
+            Map.entry(Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE, this::handleExitDungeonCommand),
+            Map.entry(Opcode.OPCODE_CHALLENGE_DUEL_COMMAND_VALUE, this::handleChallengeDuelCommand),
+            Map.entry(Opcode.OPCODE_ACCEPT_DUEL_COMMAND_VALUE, this::handleAcceptDuelCommand),
+            Map.entry(Opcode.OPCODE_DECLINE_DUEL_COMMAND_VALUE, this::handleDeclineDuelCommand),
+            Map.entry(Opcode.OPCODE_EXIT_DUEL_COMMAND_VALUE, this::handleExitDuelCommand),
+            Map.entry(Opcode.OPCODE_GET_PVP_RATING_REQUEST_VALUE, this::handleGetPvpRatingRequest));
 
     GatewayChannelHandler(GatewayFacades facades, WorldGateway worldGateway, Executor authExecutor) {
         this.accountFacade = facades.accountFacade();
@@ -354,6 +379,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.guildFacade = facades.contentFacades().socialFacades().guildFacade();
         this.partyFacade = facades.contentFacades().socialFacades().partyFacade();
         this.tradeFacade = facades.contentFacades().socialFacades().tradeFacade();
+        this.pvpFacade = facades.contentFacades().socialFacades().pvpFacade();
         this.worldGateway = worldGateway;
         this.authExecutor = authExecutor;
     }
@@ -578,13 +604,18 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     /**
-     * World nhân vật này ĐANG THẬT SỰ ở trong — dungeon nếu đã {@code EnterDungeonCommand}, world
-     * chính nếu không (Phase 8 lát cắt 1, ADR-026). Mọi lệnh gameplay per-tick (move/target/skill/
-     * chat) phải qua đây thay vì gọi thẳng {@code worldGateway.facade()}, nếu không lệnh của nhân
-     * vật trong dungeon sẽ lạc vào world chính (nơi entity của họ đã bị detach).
+     * World nhân vật này ĐANG THẬT SỰ ở trong — dungeon nếu đã {@code EnterDungeonCommand}, duel
+     * Arena nếu đang đấu (Phase 8 lát cắt 4), world chính nếu không cái nào (Phase 8 lát cắt 1,
+     * ADR-026). Mọi lệnh gameplay per-tick (move/target/skill/chat) phải qua đây thay vì gọi thẳng
+     * {@code worldGateway.facade()}, nếu không lệnh của nhân vật trong dungeon/duel sẽ lạc vào
+     * world chính (nơi entity của họ đã bị detach). 1 nhân vật không bao giờ ở CẢ 2 instance cùng
+     * lúc (xem giới hạn CHỦ Ý ở {@code ArenaInstanceRegistry} javadoc) nên thứ tự kiểm tra không
+     * quan trọng ở lát cắt này.
      */
     private WorldFacade currentWorldFacade(long characterId) {
-        return worldGateway.dungeonInstanceRegistry().worldFacadeFor(characterId).orElse(worldGateway.facade());
+        return worldGateway.dungeonInstanceRegistry().worldFacadeFor(characterId)
+                .or(() -> worldGateway.arenaInstanceRegistry().worldFacadeFor(characterId))
+                .orElse(worldGateway.facade());
     }
 
     // MoveCommand KHÔNG chạm DB/Redis — chỉ enqueue vào server-world (rẻ, thread-safe), nên xử
@@ -1675,6 +1706,182 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         send(ctx, Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
+    // ChallengeDuelCommand chạm CharacterFacade (tra tên) qua ArenaInstanceRegistry — Virtual
+    // Thread, giống handleRequestTradeCommand (cùng pattern "resolve tên TRƯỚC khi gọi facade").
+    private void handleChallengeDuelCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ChallengeDuelCommand command = ChallengeDuelCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleChallengeDuelBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleChallengeDuelBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, ChallengeDuelCommand command) {
+        Optional<Character> target = characterFacade.findByName(command.getTargetName());
+        if (target.isEmpty()) {
+            ChallengeDuelResponse response = ChallengeDuelResponse.newBuilder()
+                    .setOutcome(ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_TARGET_NOT_FOUND)
+                    .build();
+            send(ctx, Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            return;
+        }
+        ArenaInstanceRegistry.ChallengeResult result =
+                worldGateway.arenaInstanceRegistry().challengeDuel(characterId, target.get().id());
+        ChallengeDuelResponse.Builder responseBuilder =
+                ChallengeDuelResponse.newBuilder().setOutcome(toProtoOutcome(result.outcome()));
+        if (result.outcome() == ArenaInstanceRegistry.ChallengeOutcome.OK) {
+            responseBuilder.setChallengeId(result.challengeId());
+        }
+        send(ctx, Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+        if (result.outcome() == ArenaInstanceRegistry.ChallengeOutcome.OK) {
+            String challengerName = characterFacade.findById(characterId).map(Character::name).orElse("");
+            DuelChallengeReceivedEvent event = DuelChallengeReceivedEvent.newBuilder()
+                    .setChallengeId(result.challengeId())
+                    .setChallengerCharacterId(characterId)
+                    .setChallengerName(challengerName)
+                    .build();
+            worldGateway.registry().sendToCharacterIfOnline(
+                    target.get().id(), Opcode.OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT_VALUE, 0, event.toByteArray());
+        }
+    }
+
+    private static final Map<ArenaInstanceRegistry.ChallengeOutcome, ChallengeDuelOutcome>
+            CHALLENGE_DUEL_OUTCOME_MAPPING = Map.of(
+                    ArenaInstanceRegistry.ChallengeOutcome.OK, ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_OK,
+                    ArenaInstanceRegistry.ChallengeOutcome.CANNOT_CHALLENGE_SELF,
+                    ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_CANNOT_CHALLENGE_SELF,
+                    ArenaInstanceRegistry.ChallengeOutcome.ALREADY_IN_DUEL,
+                    ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_ALREADY_IN_DUEL,
+                    ArenaInstanceRegistry.ChallengeOutcome.TARGET_ALREADY_IN_DUEL,
+                    ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_TARGET_ALREADY_IN_DUEL,
+                    ArenaInstanceRegistry.ChallengeOutcome.TARGET_OFFLINE,
+                    ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_TARGET_OFFLINE);
+
+    private static ChallengeDuelOutcome toProtoOutcome(ArenaInstanceRegistry.ChallengeOutcome outcome) {
+        return CHALLENGE_DUEL_OUTCOME_MAPPING.get(outcome);
+    }
+
+    private void handleAcceptDuelCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        AcceptDuelCommand command = AcceptDuelCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleAcceptDuelBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleAcceptDuelBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, AcceptDuelCommand command) {
+        ArenaInstanceRegistry.AcceptResult result =
+                worldGateway.arenaInstanceRegistry().acceptDuel(characterId, command.getChallengeId());
+        AcceptDuelOutcome outcome = result.outcome() == ArenaInstanceRegistry.AcceptOutcome.OK
+                ? AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_OK
+                : AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_NOT_FOUND;
+        AcceptDuelResponse response = AcceptDuelResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_ACCEPT_DUEL_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        if (result.outcome() != ArenaInstanceRegistry.AcceptOutcome.OK) {
+            return;
+        }
+        long challengerCharacterId = result.challengerCharacterId();
+        String challengerName = characterFacade.findById(challengerCharacterId).map(Character::name).orElse("");
+        String accepterName = characterFacade.findById(characterId).map(Character::name).orElse("");
+        DuelStartedEvent eventForAccepter = DuelStartedEvent.newBuilder()
+                .setOpponentCharacterId(challengerCharacterId)
+                .setOpponentName(challengerName)
+                .build();
+        send(ctx, Opcode.OPCODE_DUEL_STARTED_EVENT_VALUE, 0, eventForAccepter.toByteArray());
+        DuelStartedEvent eventForChallenger = DuelStartedEvent.newBuilder()
+                .setOpponentCharacterId(characterId)
+                .setOpponentName(accepterName)
+                .build();
+        worldGateway.registry().sendToCharacterIfOnline(
+                challengerCharacterId, Opcode.OPCODE_DUEL_STARTED_EVENT_VALUE, 0, eventForChallenger.toByteArray());
+    }
+
+    private void handleDeclineDuelCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        DeclineDuelCommand command = DeclineDuelCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleDeclineDuelBlocking(ctx, sequenceId, characterId, command));
+    }
+
+    private void handleDeclineDuelBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, DeclineDuelCommand command) {
+        ArenaInstanceRegistry.DeclineResult result =
+                worldGateway.arenaInstanceRegistry().declineDuel(characterId, command.getChallengeId());
+        DeclineDuelOutcome outcome = result.outcome() == ArenaInstanceRegistry.DeclineOutcome.OK
+                ? DeclineDuelOutcome.DECLINE_DUEL_OUTCOME_OK
+                : DeclineDuelOutcome.DECLINE_DUEL_OUTCOME_NOT_FOUND;
+        DeclineDuelResponse response = DeclineDuelResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_DECLINE_DUEL_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        if (result.outcome() == ArenaInstanceRegistry.DeclineOutcome.OK) {
+            DuelChallengeDeclinedEvent event =
+                    DuelChallengeDeclinedEvent.newBuilder().setChallengeId(command.getChallengeId()).build();
+            worldGateway.registry().sendToCharacterIfOnline(
+                    result.challengerCharacterId(), Opcode.OPCODE_DUEL_CHALLENGE_DECLINED_EVENT_VALUE, 0,
+                    event.toByteArray());
+        }
+    }
+
+    // ExitDuelCommand (bỏ cuộc giữa chừng) chạm PvpFacade (DB, ghi rating THUA) qua
+    // ArenaInstanceRegistry — Virtual Thread. DuelResultEvent cho CẢ 2 người do
+    // ArenaInstanceRegistry tự gửi (settleDuel), handler này chỉ trả ExitDuelResponse.
+    private void handleExitDuelCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ExitDuelCommand.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleExitDuelBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleExitDuelBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        ArenaInstanceRegistry.ExitResult result = worldGateway.arenaInstanceRegistry().forfeitDuel(characterId);
+        ExitDuelOutcome outcome = result.outcome() == ArenaInstanceRegistry.ExitOutcome.OK
+                ? ExitDuelOutcome.EXIT_DUEL_OUTCOME_OK
+                : ExitDuelOutcome.EXIT_DUEL_OUTCOME_NOT_IN_DUEL;
+        ExitDuelResponse response = ExitDuelResponse.newBuilder().setOutcome(outcome).build();
+        send(ctx, Opcode.OPCODE_EXIT_DUEL_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private void handleGetPvpRatingRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        GetPvpRatingRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleGetPvpRatingBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleGetPvpRatingBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        GetPvpRatingUseCase.RatingView view = pvpFacade.findRating(characterId);
+        GetPvpRatingResponse response = GetPvpRatingResponse.newBuilder()
+                .setRating(view.rating())
+                .setWins(view.wins())
+                .setLosses(view.losses())
+                .build();
+        send(ctx, Opcode.OPCODE_GET_PVP_RATING_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
     private void handleRequestTradeCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         RequestTradeCommand command = RequestTradeCommand.parseFrom(payload);
@@ -2308,8 +2515,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             worldGateway.registry().unregister(characterId);
             // Phase 8 lát cắt 1 (ADR-026): nếu đang ở dungeon, detach khỏi ĐÚNG dungeon World +
             // dọn bookkeeping instance (dừng luôn World nếu rỗng) — KHÔNG re-attach world chính
-            // (đã ngắt kết nối). false = không ở dungeon nào, detach world chính như trước giờ.
-            if (!worldGateway.dungeonInstanceRegistry().handleDisconnectIfInDungeon(characterId)) {
+            // (đã ngắt kết nối). Lát cắt 4: tương tự cho duel Arena — người mất kết nối tính THUA
+            // (forfeit ngầm, ArenaInstanceRegistry tự chốt rating). false ở CẢ 2 = không ở dungeon
+            // lẫn duel nào, detach world chính như trước giờ.
+            boolean handledElsewhere = worldGateway.dungeonInstanceRegistry().handleDisconnectIfInDungeon(characterId)
+                    || worldGateway.arenaInstanceRegistry().handleDisconnectIfInDuel(characterId);
+            if (!handledElsewhere) {
                 worldGateway.facade().detachCharacter(characterId);
             }
             // SERVER.md §8: logout là 1 trong 3 mốc bắt buộc ghi vị trí. savePosition chạm DB

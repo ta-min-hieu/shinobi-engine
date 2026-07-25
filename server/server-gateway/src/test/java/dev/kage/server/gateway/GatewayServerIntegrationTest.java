@@ -39,10 +39,16 @@ import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
+import dev.kage.protocol.AcceptDuelCommand;
+import dev.kage.protocol.AcceptDuelOutcome;
+import dev.kage.protocol.AcceptDuelResponse;
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.BuyItemResponse;
 import dev.kage.protocol.BuyOutcome;
+import dev.kage.protocol.ChallengeDuelCommand;
+import dev.kage.protocol.ChallengeDuelOutcome;
+import dev.kage.protocol.ChallengeDuelResponse;
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ChatMessageEvent;
 import dev.kage.protocol.CharacterDespawnedEvent;
@@ -55,12 +61,22 @@ import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
 import dev.kage.protocol.CreateCharacterResponse;
+import dev.kage.protocol.DeclineDuelCommand;
+import dev.kage.protocol.DeclineDuelOutcome;
+import dev.kage.protocol.DeclineDuelResponse;
+import dev.kage.protocol.DuelChallengeDeclinedEvent;
+import dev.kage.protocol.DuelChallengeReceivedEvent;
+import dev.kage.protocol.DuelResultEvent;
+import dev.kage.protocol.DuelStartedEvent;
 import dev.kage.protocol.EnhanceItemCommand;
 import dev.kage.protocol.EnhanceItemResponse;
 import dev.kage.protocol.EnhanceOutcome;
 import dev.kage.protocol.EnterDungeonCommand;
 import dev.kage.protocol.EnterDungeonOutcome;
 import dev.kage.protocol.EnterDungeonResponse;
+import dev.kage.protocol.ExitDuelCommand;
+import dev.kage.protocol.ExitDuelOutcome;
+import dev.kage.protocol.ExitDuelResponse;
 import dev.kage.protocol.ExitDungeonCommand;
 import dev.kage.protocol.ExitDungeonOutcome;
 import dev.kage.protocol.ExitDungeonResponse;
@@ -68,6 +84,8 @@ import dev.kage.protocol.EquipItemCommand;
 import dev.kage.protocol.EquipItemResponse;
 import dev.kage.protocol.EquipmentSlot;
 import dev.kage.protocol.ErrorResponse;
+import dev.kage.protocol.GetPvpRatingRequest;
+import dev.kage.protocol.GetPvpRatingResponse;
 import dev.kage.protocol.ListShopItemsRequest;
 import dev.kage.protocol.ListShopItemsResponse;
 import dev.kage.protocol.MonsterSpawnedEvent;
@@ -129,6 +147,7 @@ class GatewayServerIntegrationTest {
     private CharacterPort characterPort;
     private ConnectedCharacterRegistry characterRegistry;
     private dev.kage.party.api.PartyFacade partyFacade;
+    private dev.kage.pvp.api.PvpFacade pvpFacade;
 
     @BeforeEach
     void startServer() throws InterruptedException {
@@ -147,6 +166,7 @@ class GatewayServerIntegrationTest {
         dev.kage.guild.api.GuildFacade guildFacade = fakeGuildFacade();
         partyFacade = fakePartyFacade();
         dev.kage.trade.api.TradeFacade tradeFacade = fakeTradeFacade();
+        pvpFacade = fakePvpFacade();
         characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
         worldFacade = new WorldFacade(characterRegistry);
         worldFacade.start();
@@ -154,10 +174,12 @@ class GatewayServerIntegrationTest {
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         DungeonInstanceRegistry dungeonInstanceRegistry =
                 new DungeonInstanceRegistry(characterRegistry, characterFacade, partyFacade, worldFacade);
-        WorldGateway worldGateway =
-                new WorldGateway(worldFacade, characterRegistry, positionPersister, dungeonInstanceRegistry);
-        SocialFacades socialFacades =
-                new SocialFacades(friendFacade, mailFacade, chatFacade, guildFacade, partyFacade, tradeFacade);
+        ArenaInstanceRegistry arenaInstanceRegistry =
+                new ArenaInstanceRegistry(characterRegistry, characterFacade, pvpFacade, worldFacade);
+        WorldGateway worldGateway = new WorldGateway(
+                worldFacade, characterRegistry, positionPersister, dungeonInstanceRegistry, arenaInstanceRegistry);
+        SocialFacades socialFacades = new SocialFacades(
+                friendFacade, mailFacade, chatFacade, guildFacade, partyFacade, tradeFacade, pvpFacade);
         ContentFacades contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
         GatewayFacades facades =
                 new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
@@ -831,6 +853,36 @@ class GatewayServerIntegrationTest {
         return new dev.kage.trade.api.TradeFacade(useCases);
     }
 
+    // Fake THẬT (không throw) — test Arena ở file này verify trọn vẹn luồng thách đấu/rating thật
+    // qua socket, khác fakeTradeFacade (Trade không test ở đây, chỉ cần compile).
+    private dev.kage.pvp.api.PvpFacade fakePvpFacade() {
+        dev.kage.pvp.domain.PvpRatingPort ratingPort = new dev.kage.pvp.domain.PvpRatingPort() {
+            private final Map<Long, dev.kage.pvp.domain.PvpRating> ratingsByCharacterId = new HashMap<>();
+
+            @Override
+            public Optional<dev.kage.pvp.domain.PvpRating> findByCharacterId(long characterId) {
+                return Optional.ofNullable(ratingsByCharacterId.get(characterId));
+            }
+
+            @Override
+            public void recordMatchResult(
+                    long winnerCharacterId, int winnerNewRating, long loserCharacterId, int loserNewRating) {
+                upsert(winnerCharacterId, winnerNewRating, 1, 0);
+                upsert(loserCharacterId, loserNewRating, 0, 1);
+            }
+
+            private void upsert(long characterId, int newRating, int winsDelta, int lossesDelta) {
+                dev.kage.pvp.domain.PvpRating existing = ratingsByCharacterId.get(characterId);
+                int wins = (existing == null ? 0 : existing.wins()) + winsDelta;
+                int losses = (existing == null ? 0 : existing.losses()) + lossesDelta;
+                ratingsByCharacterId.put(
+                        characterId, new dev.kage.pvp.domain.PvpRating(characterId, newRating, wins, losses,
+                                Instant.now()));
+            }
+        };
+        return new dev.kage.pvp.api.PvpFacade(ratingPort);
+    }
+
     @AfterEach
     void stopServer() {
         server.stop();
@@ -1103,6 +1155,210 @@ class GatewayServerIntegrationTest {
             }
             assertThat(bossDied).as("boss phải chết trong thời gian chờ").isTrue();
             assertThat(sawSpecialAction).as("boss phải dùng heavy_strike hoặc enrage trước khi chết").isTrue();
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void shouldDeclineDuelChallenge_overRealSockets() throws Exception {
+        // Phase 8 lát cắt 4 — challenger phải nhận DuelChallengeDeclinedEvent khi bị từ chối,
+        // KHÔNG có DuelStartedEvent nào phát ra (không World riêng nào được tạo).
+        try (Socket socketA = new Socket("127.0.0.1", server.port());
+                Socket socketB = new Socket("127.0.0.1", server.port())) {
+            socketA.setSoTimeout(5000);
+            socketB.setSoTimeout(5000);
+            DataInputStream inA = new DataInputStream(socketA.getInputStream());
+            DataInputStream inB = new DataInputStream(socketB.getInputStream());
+
+            String suffix = UUID.randomUUID().toString().substring(0, 8);
+            connectCreateAndSelectNamed(socketA, inA, "duA" + suffix);
+            CreatedCharacter characterB = connectCreateAndSelectNamed(socketB, inB, "duB" + suffix);
+
+            ChallengeDuelCommand challenge =
+                    ChallengeDuelCommand.newBuilder().setTargetName(characterB.name()).build();
+            sendFrame(socketA, Opcode.OPCODE_CHALLENGE_DUEL_COMMAND_VALUE, 40, challenge.toByteArray());
+            ChallengeDuelResponse challengeResponse = ChallengeDuelResponse.parseFrom(
+                    readUntilOpcode(inA, Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE).payload());
+            assertThat(challengeResponse.getOutcome()).isEqualTo(ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_OK);
+            long challengeId = challengeResponse.getChallengeId();
+
+            DuelChallengeReceivedEvent received = DuelChallengeReceivedEvent.parseFrom(
+                    readUntilOpcode(inB, Opcode.OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT_VALUE).payload());
+            assertThat(received.getChallengeId()).isEqualTo(challengeId);
+
+            DeclineDuelCommand decline = DeclineDuelCommand.newBuilder().setChallengeId(challengeId).build();
+            sendFrame(socketB, Opcode.OPCODE_DECLINE_DUEL_COMMAND_VALUE, 41, decline.toByteArray());
+            DeclineDuelResponse declineResponse = DeclineDuelResponse.parseFrom(
+                    readUntilOpcode(inB, Opcode.OPCODE_DECLINE_DUEL_RESPONSE_VALUE).payload());
+            assertThat(declineResponse.getOutcome()).isEqualTo(DeclineDuelOutcome.DECLINE_DUEL_OUTCOME_OK);
+
+            DuelChallengeDeclinedEvent declinedEvent = DuelChallengeDeclinedEvent.parseFrom(
+                    readUntilOpcode(inA, Opcode.OPCODE_DUEL_CHALLENGE_DECLINED_EVENT_VALUE).payload());
+            assertThat(declinedEvent.getChallengeId()).isEqualTo(challengeId);
+
+            // Thách đấu cũ đã bị dọn — chấp nhận lại (challengeId cũ) phải NOT_FOUND.
+            AcceptDuelCommand lateAccept = AcceptDuelCommand.newBuilder().setChallengeId(challengeId).build();
+            sendFrame(socketB, Opcode.OPCODE_ACCEPT_DUEL_COMMAND_VALUE, 42, lateAccept.toByteArray());
+            AcceptDuelResponse lateAcceptResponse = AcceptDuelResponse.parseFrom(
+                    readUntilOpcode(inB, Opcode.OPCODE_ACCEPT_DUEL_RESPONSE_VALUE).payload());
+            assertThat(lateAcceptResponse.getOutcome()).isEqualTo(AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_NOT_FOUND);
+        }
+    }
+
+    @Test
+    @Timeout(30)
+    void shouldFightDuelToDeathAndUpdateRating_overRealSockets() throws Exception {
+        // Phase 8 lát cắt 4 — chấp nhận thách đấu đưa CẢ 2 vào 1 World riêng (ADR-026, giống
+        // dungeon), đánh tới khi 1 người chết → DuelResultEvent cho CẢ 2 + rating cập nhật qua
+        // GetPvpRatingRequest (Elo, K=32: thắng +16, thua -16 khi cùng rating khởi điểm 1000).
+        try (Socket socketA = new Socket("127.0.0.1", server.port());
+                Socket socketB = new Socket("127.0.0.1", server.port());
+                Socket socketC = new Socket("127.0.0.1", server.port())) {
+            socketA.setSoTimeout(10000);
+            socketB.setSoTimeout(10000);
+            socketC.setSoTimeout(10000);
+            DataInputStream inA = new DataInputStream(socketA.getInputStream());
+            DataInputStream inB = new DataInputStream(socketB.getInputStream());
+            DataInputStream inC = new DataInputStream(socketC.getInputStream());
+
+            String suffix = UUID.randomUUID().toString().substring(0, 8);
+            CreatedCharacter createdA = connectCreateAndSelectNamed(socketA, inA, "fdA" + suffix);
+            CreatedCharacter createdB = connectCreateAndSelectNamed(socketB, inB, "fdB" + suffix);
+            long characterA = createdA.characterId();
+            long characterB = createdB.characterId();
+            // C KHÔNG tham gia trận — ở lại world chính làm chứng nhân (verify A/B đã RỜI world
+            // chính thật, cùng cách partyShouldEnterAndExitDungeonAsSeparateWorld_overRealSockets).
+            connectCreateAndSelect(socketC, inC, "fdC" + suffix);
+
+            ChallengeDuelCommand challenge =
+                    ChallengeDuelCommand.newBuilder().setTargetName(createdB.name()).build();
+            sendFrame(socketA, Opcode.OPCODE_CHALLENGE_DUEL_COMMAND_VALUE, 40, challenge.toByteArray());
+            ChallengeDuelResponse challengeResponse = ChallengeDuelResponse.parseFrom(
+                    readUntilOpcode(inA, Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE).payload());
+            assertThat(challengeResponse.getOutcome()).isEqualTo(ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_OK);
+            long challengeId = challengeResponse.getChallengeId();
+            DuelChallengeReceivedEvent received = DuelChallengeReceivedEvent.parseFrom(
+                    readUntilOpcode(inB, Opcode.OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT_VALUE).payload());
+            assertThat(received.getChallengerCharacterId()).isEqualTo(characterA);
+
+            AcceptDuelCommand accept = AcceptDuelCommand.newBuilder().setChallengeId(challengeId).build();
+            sendFrame(socketB, Opcode.OPCODE_ACCEPT_DUEL_COMMAND_VALUE, 41, accept.toByteArray());
+            AcceptDuelResponse acceptResponse = AcceptDuelResponse.parseFrom(
+                    readUntilOpcode(inB, Opcode.OPCODE_ACCEPT_DUEL_RESPONSE_VALUE).payload());
+            assertThat(acceptResponse.getOutcome()).isEqualTo(AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_OK);
+
+            DuelStartedEvent startedForB = DuelStartedEvent.parseFrom(
+                    readUntilOpcode(inB, Opcode.OPCODE_DUEL_STARTED_EVENT_VALUE).payload());
+            assertThat(startedForB.getOpponentCharacterId()).isEqualTo(characterA);
+            DuelStartedEvent startedForA = DuelStartedEvent.parseFrom(
+                    readUntilOpcode(inA, Opcode.OPCODE_DUEL_STARTED_EVENT_VALUE).payload());
+            assertThat(startedForA.getOpponentCharacterId()).isEqualTo(characterB);
+
+            // C (world chính) phải thấy CẢ A lẫn B despawn — chứng minh cách ly instance thật.
+            java.util.HashSet<Long> despawnedIds = new java.util.HashSet<Long>();
+            despawnedIds.add(CharacterDespawnedEvent.parseFrom(
+                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE).payload())
+                    .getCharacterId());
+            despawnedIds.add(CharacterDespawnedEvent.parseFrom(
+                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE).payload())
+                    .getCharacterId());
+            assertThat(despawnedIds).containsExactlyInAnyOrder(characterA, characterB);
+
+            // Cùng chỉ số nền — cả 2 tự đánh nhau tới khi 1 người chết (CombatConstants.CHARACTER_MAX_HP=100).
+            SetTargetCommand targetB = SetTargetCommand.newBuilder().setTargetEntityId(characterB).build();
+            sendFrame(socketA, Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, 42, targetB.toByteArray());
+            SetTargetCommand targetA = SetTargetCommand.newBuilder().setTargetEntityId(characterA).build();
+            sendFrame(socketB, Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, 42, targetA.toByteArray());
+
+            DuelResultEvent resultForA = DuelResultEvent.parseFrom(
+                    readUntilOpcode(inA, Opcode.OPCODE_DUEL_RESULT_EVENT_VALUE).payload());
+            DuelResultEvent resultForB = DuelResultEvent.parseFrom(
+                    readUntilOpcode(inB, Opcode.OPCODE_DUEL_RESULT_EVENT_VALUE).payload());
+            assertThat(resultForA).isEqualTo(resultForB);
+            assertThat(java.util.Set.of(resultForA.getWinnerCharacterId(), resultForA.getLoserCharacterId()))
+                    .containsExactlyInAnyOrder(characterA, characterB);
+            // Cùng rating khởi điểm 1000 — thắng +16, thua -16 (EloRating K=32, xem feature-pvp).
+            assertThat(resultForA.getWinnerNewRating()).isEqualTo(1016);
+            assertThat(resultForA.getLoserNewRating()).isEqualTo(984);
+
+            // C phải thấy CẢ A lẫn B spawn lại — chứng minh cả 2 đã quay về world chính thật.
+            java.util.HashSet<Long> respawnedIds = new java.util.HashSet<Long>();
+            respawnedIds.add(CharacterSpawnedEvent.parseFrom(
+                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload())
+                    .getCharacterId());
+            respawnedIds.add(CharacterSpawnedEvent.parseFrom(
+                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload())
+                    .getCharacterId());
+            assertThat(respawnedIds).containsExactlyInAnyOrder(characterA, characterB);
+
+            long winnerCharacterId = resultForA.getWinnerCharacterId();
+            Socket winnerSocket = winnerCharacterId == characterA ? socketA : socketB;
+            DataInputStream winnerIn = winnerCharacterId == characterA ? inA : inB;
+            GetPvpRatingRequest ratingRequest = GetPvpRatingRequest.newBuilder().build();
+            sendFrame(winnerSocket, Opcode.OPCODE_GET_PVP_RATING_REQUEST_VALUE, 43, ratingRequest.toByteArray());
+            GetPvpRatingResponse ratingResponse = GetPvpRatingResponse.parseFrom(
+                    readUntilOpcode(winnerIn, Opcode.OPCODE_GET_PVP_RATING_RESPONSE_VALUE).payload());
+            assertThat(ratingResponse.getRating()).isEqualTo(1016);
+            assertThat(ratingResponse.getWins()).isEqualTo(1);
+            assertThat(ratingResponse.getLosses()).isZero();
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void shouldForfeitDuel_overRealSockets() throws Exception {
+        // Phase 8 lát cắt 4 — bỏ cuộc giữa chừng tính THUA thật (khác ExitDungeonCommand), đối
+        // phương thắng NGAY không cần hạ gục.
+        try (Socket socketA = new Socket("127.0.0.1", server.port());
+                Socket socketB = new Socket("127.0.0.1", server.port())) {
+            socketA.setSoTimeout(5000);
+            socketB.setSoTimeout(5000);
+            DataInputStream inA = new DataInputStream(socketA.getInputStream());
+            DataInputStream inB = new DataInputStream(socketB.getInputStream());
+
+            String suffix = UUID.randomUUID().toString().substring(0, 8);
+            long characterA = connectCreateAndSelect(socketA, inA, "foA" + suffix);
+            CreatedCharacter createdB = connectCreateAndSelectNamed(socketB, inB, "foB" + suffix);
+
+            ChallengeDuelCommand challenge =
+                    ChallengeDuelCommand.newBuilder().setTargetName(createdB.name()).build();
+            sendFrame(socketA, Opcode.OPCODE_CHALLENGE_DUEL_COMMAND_VALUE, 40, challenge.toByteArray());
+            long challengeId = ChallengeDuelResponse.parseFrom(
+                    readUntilOpcode(inA, Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE).payload())
+                    .getChallengeId();
+            readUntilOpcode(inB, Opcode.OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT_VALUE);
+
+            AcceptDuelCommand accept = AcceptDuelCommand.newBuilder().setChallengeId(challengeId).build();
+            sendFrame(socketB, Opcode.OPCODE_ACCEPT_DUEL_COMMAND_VALUE, 41, accept.toByteArray());
+            readUntilOpcode(inB, Opcode.OPCODE_ACCEPT_DUEL_RESPONSE_VALUE);
+            readUntilOpcode(inA, Opcode.OPCODE_DUEL_STARTED_EVENT_VALUE);
+            readUntilOpcode(inB, Opcode.OPCODE_DUEL_STARTED_EVENT_VALUE);
+
+            // A bỏ cuộc — B thắng NGAY dù chưa đánh đòn nào. ArenaInstanceRegistry.forfeitDuel chốt
+            // rating + gửi DuelResultEvent NGAY TRONG lúc xử lý lệnh (đồng bộ trên authExecutor) —
+            // DuelResultEvent tới A TRƯỚC ExitDuelResponse (khác Trade: Response luôn tới actor
+            // trước Event, ở đây CẢ 2 đều gửi cho A nên đọc đúng thứ tự thật, không phải quy ước
+            // ngược lại).
+            ExitDuelCommand exitCommand = ExitDuelCommand.newBuilder().build();
+            sendFrame(socketA, Opcode.OPCODE_EXIT_DUEL_COMMAND_VALUE, 42, exitCommand.toByteArray());
+
+            DuelResultEvent resultForA = DuelResultEvent.parseFrom(
+                    readUntilOpcode(inA, Opcode.OPCODE_DUEL_RESULT_EVENT_VALUE).payload());
+            assertThat(resultForA.getLoserCharacterId()).isEqualTo(characterA);
+
+            ExitDuelResponse exitResponse = ExitDuelResponse.parseFrom(
+                    readUntilOpcode(inA, Opcode.OPCODE_EXIT_DUEL_RESPONSE_VALUE).payload());
+            assertThat(exitResponse.getOutcome()).isEqualTo(ExitDuelOutcome.EXIT_DUEL_OUTCOME_OK);
+
+            DuelResultEvent resultForB = DuelResultEvent.parseFrom(
+                    readUntilOpcode(inB, Opcode.OPCODE_DUEL_RESULT_EVENT_VALUE).payload());
+            assertThat(resultForB.getWinnerCharacterId()).isNotEqualTo(characterA);
+
+            // A bỏ cuộc lần 2 (không còn ở duel nào) — NOT_IN_DUEL.
+            sendFrame(socketA, Opcode.OPCODE_EXIT_DUEL_COMMAND_VALUE, 43, exitCommand.toByteArray());
+            ExitDuelResponse secondExit = ExitDuelResponse.parseFrom(
+                    readUntilOpcode(inA, Opcode.OPCODE_EXIT_DUEL_RESPONSE_VALUE).payload());
+            assertThat(secondExit.getOutcome()).isEqualTo(ExitDuelOutcome.EXIT_DUEL_OUTCOME_NOT_IN_DUEL);
         }
     }
 
@@ -1389,6 +1645,37 @@ class GatewayServerIntegrationTest {
                     ChatMessageEvent.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE).payload());
             assertThat(eventSeenByB.getBody()).isEqualTo("xin chào thế giới");
         }
+    }
+
+    /** Tên nhân vật THẬT (sinh ngẫu nhiên "Hero...") — KHÁC {@code username} tài khoản. */
+    private record CreatedCharacter(long characterId, String name) {
+    }
+
+    /**
+     * Như {@link #connectCreateAndSelect} nhưng trả thêm tên nhân vật THẬT — cần cho
+     * {@code ChallengeDuelCommand.target_name} (server tra theo tên nhân vật, không phải username
+     * tài khoản, xem javadoc {@code CreatedCharacter}).
+     */
+    private static CreatedCharacter connectCreateAndSelectNamed(Socket socket, DataInputStream in, String username)
+            throws Exception {
+        ConnectRequest connectRequest = ConnectRequest.newBuilder().setUsername(username).build();
+        sendFrame(socket, Opcode.OPCODE_CONNECT_REQUEST_VALUE, 1, connectRequest.toByteArray());
+        ConnectResponse.parseFrom(readFrame(in).payload());
+
+        CreateCharacterRequest createRequest = CreateCharacterRequest.newBuilder()
+                .setName("Hero" + UUID.randomUUID().toString().replace("-", "").substring(0, 8))
+                .setIdempotencyKey(UUID.randomUUID().toString())
+                .build();
+        sendFrame(socket, Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, 2, createRequest.toByteArray());
+        CreateCharacterResponse createResponse = CreateCharacterResponse.parseFrom(readFrame(in).payload());
+        long characterId = createResponse.getCharacter().getId();
+        String name = createResponse.getCharacter().getName();
+
+        SelectCharacterRequest selectRequest = SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
+        sendFrame(socket, Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, 3, selectRequest.toByteArray());
+        readFrame(in); // SelectCharacterResponse — nội dung đã verify ở GatewayPipelineTest
+
+        return new CreatedCharacter(characterId, name);
     }
 
     private static long connectCreateAndSelect(Socket socket, DataInputStream in, String username)

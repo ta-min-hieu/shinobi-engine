@@ -53,6 +53,7 @@ import dev.kage.party.application.ListPartyMembersUseCase;
 import dev.kage.party.application.ListPendingPartyInvitesUseCase;
 import dev.kage.party.application.PartyUseCases;
 import dev.kage.party.application.RejectPartyInviteUseCase;
+import dev.kage.pvp.api.PvpFacade;
 import dev.kage.trade.api.TradeFacade;
 import dev.kage.trade.application.AcceptTradeRequestUseCase;
 import dev.kage.trade.application.CancelTradeUseCase;
@@ -81,6 +82,7 @@ import dev.kage.server.database.dialogue.PostgresNpcTemplateAdapter;
 import dev.kage.server.database.friend.PostgresFriendAdapter;
 import dev.kage.server.database.guild.PostgresGuildAdapter;
 import dev.kage.server.database.party.PostgresPartyAdapter;
+import dev.kage.server.database.pvp.PostgresPvpRatingAdapter;
 import dev.kage.server.database.trade.JdbcTradeTransactionRunner;
 import dev.kage.server.database.trade.PostgresTradeAuditAdapter;
 import dev.kage.server.database.trade.PostgresTradeGoldAdapter;
@@ -291,6 +293,10 @@ public final class ServerDatabaseBootstrap {
                 new ListPendingPartyInvitesUseCase(partyPort),
                 new FindMyPartyUseCase(partyPort));
         return new PartyFacade(useCases);
+    }
+
+    public PvpFacade wirePvpFacade() {
+        return new PvpFacade(new PostgresPvpRatingAdapter(dataSource));
     }
 
     public TradeFacade wireTradeFacade() {

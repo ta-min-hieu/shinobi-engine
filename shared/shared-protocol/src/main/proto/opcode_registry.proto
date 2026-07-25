@@ -29,6 +29,8 @@ option java_multiple_files = true;
 //   1200–1299 Ranking                                   ← Phase 8
 //   1300–1399 Party                                     ← Phase 7
 //   1400–1499 Trade                                     ← Phase 7
+//   1500–1599 Dungeon                                   ← Phase 8
+//   1600–1699 Arena (PvP 1v1)                           ← Phase 8
 enum Opcode {
   OPCODE_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho packet thật.
 
@@ -186,9 +188,27 @@ enum Opcode {
   OPCODE_TRADE_UPDATED_EVENT = 1413;
   OPCODE_TRADE_CLOSED_EVENT = 1414;
 
+  // --- Ranking (1200-1299) ---
+  OPCODE_GET_PVP_RATING_REQUEST = 1200;
+  OPCODE_GET_PVP_RATING_RESPONSE = 1201;
+
   // --- Dungeon (1500-1599) ---
   OPCODE_ENTER_DUNGEON_COMMAND = 1500;
   OPCODE_ENTER_DUNGEON_RESPONSE = 1501;
   OPCODE_EXIT_DUNGEON_COMMAND = 1502;
   OPCODE_EXIT_DUNGEON_RESPONSE = 1503;
+
+  // --- Arena / PvP 1v1 (1600-1699) ---
+  OPCODE_CHALLENGE_DUEL_COMMAND = 1600;
+  OPCODE_CHALLENGE_DUEL_RESPONSE = 1601;
+  OPCODE_ACCEPT_DUEL_COMMAND = 1602;
+  OPCODE_ACCEPT_DUEL_RESPONSE = 1603;
+  OPCODE_DECLINE_DUEL_COMMAND = 1604;
+  OPCODE_DECLINE_DUEL_RESPONSE = 1605;
+  OPCODE_EXIT_DUEL_COMMAND = 1606;
+  OPCODE_EXIT_DUEL_RESPONSE = 1607;
+  OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT = 1608;
+  OPCODE_DUEL_CHALLENGE_DECLINED_EVENT = 1609;
+  OPCODE_DUEL_STARTED_EVENT = 1610;
+  OPCODE_DUEL_RESULT_EVENT = 1611;
 }

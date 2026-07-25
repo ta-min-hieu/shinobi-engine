@@ -23,6 +23,7 @@ dependencies {
     implementation(project(":server:server-features:feature-guild"))
     implementation(project(":server:server-features:feature-party"))
     implementation(project(":server:server-features:feature-trade"))
+    implementation(project(":server:server-features:feature-pvp"))
 
     implementation(libs.hikaricp)
     implementation(libs.postgresql)

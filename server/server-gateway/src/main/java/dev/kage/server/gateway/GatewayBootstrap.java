@@ -11,6 +11,7 @@ import dev.kage.guild.api.GuildFacade;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.mail.api.MailFacade;
 import dev.kage.party.api.PartyFacade;
+import dev.kage.pvp.api.PvpFacade;
 import dev.kage.quest.api.QuestFacade;
 import dev.kage.server.database.ServerDatabaseBootstrap;
 import dev.kage.server.world.WorldFacade;
@@ -66,8 +67,11 @@ public final class GatewayBootstrap {
         DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
                 characterRegistry, facades.characterFacade(), facades.contentFacades().socialFacades().partyFacade(),
                 worldFacade);
-        WorldGateway worldGateway =
-                new WorldGateway(worldFacade, characterRegistry, positionPersister, dungeonInstanceRegistry);
+        ArenaInstanceRegistry arenaInstanceRegistry = new ArenaInstanceRegistry(
+                characterRegistry, facades.characterFacade(), facades.contentFacades().socialFacades().pvpFacade(),
+                worldFacade);
+        WorldGateway worldGateway = new WorldGateway(
+                worldFacade, characterRegistry, positionPersister, dungeonInstanceRegistry, arenaInstanceRegistry);
 
         GatewayServer server = new GatewayServer(PORT, facades, worldGateway);
         server.start();
@@ -75,11 +79,12 @@ public final class GatewayBootstrap {
             // Thứ tự SERVER.md §10: ngừng nhận kết nối mới trước (server.stop() đóng channel),
             // rồi mới dừng world tick + đóng DB. positionPersister dừng SAU worldFacade — vòng
             // quét định kỳ cuối cùng vẫn nên chạy trước khi tắt hẳn (không mất vị trí ai đó vừa
-            // logout đúng lúc server tắt). dungeonInstanceRegistry dừng CÙNG lúc worldFacade (mọi
-            // World, chính lẫn dungeon, dừng trước khi đóng DB).
+            // logout đúng lúc server tắt). dungeonInstanceRegistry/arenaInstanceRegistry dừng CÙNG
+            // lúc worldFacade (mọi World, chính lẫn dungeon/duel, dừng trước khi đóng DB).
             server.stop();
             worldFacade.stop();
             dungeonInstanceRegistry.stopAll();
+            arenaInstanceRegistry.stopAll();
             characterRegistry.stop();
             positionPersister.stop();
             databaseBootstrap.shutdown();
@@ -101,9 +106,10 @@ public final class GatewayBootstrap {
         GuildFacade guildFacade = databaseBootstrap.wireGuildFacade();
         PartyFacade partyFacade = databaseBootstrap.wirePartyFacade();
         TradeFacade tradeFacade = databaseBootstrap.wireTradeFacade();
+        PvpFacade pvpFacade = databaseBootstrap.wirePvpFacade();
 
-        SocialFacades socialFacades =
-                new SocialFacades(friendFacade, mailFacade, chatFacade, guildFacade, partyFacade, tradeFacade);
+        SocialFacades socialFacades = new SocialFacades(
+                friendFacade, mailFacade, chatFacade, guildFacade, partyFacade, tradeFacade, pvpFacade);
         ContentFacades contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
         return new GatewayFacades(accountFacade, characterFacade, inventoryFacade, contentFacades);
     }

@@ -82,4 +82,9 @@ final class DungeonOutboundSink implements WorldOutboundSink {
     public void onAreaChatMessage(long targetCharacterId, long senderCharacterId, String senderName, String body) {
         registry.onAreaChatMessage(targetCharacterId, senderCharacterId, senderName, body);
     }
+
+    @Override
+    public void onCharacterDefeated(long defeatedCharacterId, long killerEntityId) {
+        registry.onCharacterDefeated(defeatedCharacterId, killerEntityId);
+    }
 }

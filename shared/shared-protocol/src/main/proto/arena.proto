@@ -1,0 +1,109 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// Packet Arena (NETWORK.md §4, dải 1600-1699). Phase 8 lát cắt 4 — PvP Arena 1v1 + MMR/rating cơ
+// bản (GDD §6). Thách đấu bằng TÊN (giống RequestTradeCommand/SendFriendRequestCommand) — server
+// tự tra CharacterFacade.findByName TRƯỚC khi gọi ArenaInstanceRegistry. Trận đấu diễn ra trong 1
+// World instance riêng (ADR-026, cùng cơ chế dungeon) — CHỈ 2 người trong instance đó, không cần
+// team/faction check ở CombatSystem vì cách ly instance đã đủ (xem feature-pvp/CLAUDE.md).
+
+message ChallengeDuelCommand {
+  string target_name = 1;
+}
+
+enum ChallengeDuelOutcome {
+  CHALLENGE_DUEL_OUTCOME_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho kết quả thật.
+  CHALLENGE_DUEL_OUTCOME_OK = 1;
+  CHALLENGE_DUEL_OUTCOME_CANNOT_CHALLENGE_SELF = 2;
+  CHALLENGE_DUEL_OUTCOME_ALREADY_IN_DUEL = 3;
+  CHALLENGE_DUEL_OUTCOME_TARGET_ALREADY_IN_DUEL = 4;
+  CHALLENGE_DUEL_OUTCOME_TARGET_NOT_FOUND = 5; // tên không tồn tại (character)
+  CHALLENGE_DUEL_OUTCOME_TARGET_OFFLINE = 6;
+}
+
+message ChallengeDuelResponse {
+  ChallengeDuelOutcome outcome = 1;
+  int64 challenge_id = 2; // chỉ có ý nghĩa khi outcome = OK
+}
+
+message AcceptDuelCommand {
+  int64 challenge_id = 1;
+}
+
+enum AcceptDuelOutcome {
+  ACCEPT_DUEL_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  ACCEPT_DUEL_OUTCOME_OK = 1;
+  ACCEPT_DUEL_OUTCOME_NOT_FOUND = 2;
+}
+
+message AcceptDuelResponse {
+  AcceptDuelOutcome outcome = 1;
+}
+
+message DeclineDuelCommand {
+  int64 challenge_id = 1;
+}
+
+enum DeclineDuelOutcome {
+  DECLINE_DUEL_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  DECLINE_DUEL_OUTCOME_OK = 1;
+  DECLINE_DUEL_OUTCOME_NOT_FOUND = 2;
+}
+
+message DeclineDuelResponse {
+  DeclineDuelOutcome outcome = 1;
+}
+
+// Bỏ cuộc giữa chừng — tính THUA thật (mất điểm MMR), khác ExitDungeonCommand (không mất gì).
+// Không tham số — server tự tra nhân vật đang ở trận nào.
+message ExitDuelCommand {
+}
+
+enum ExitDuelOutcome {
+  EXIT_DUEL_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  EXIT_DUEL_OUTCOME_OK = 1;
+  EXIT_DUEL_OUTCOME_NOT_IN_DUEL = 2;
+}
+
+message ExitDuelResponse {
+  ExitDuelOutcome outcome = 1;
+}
+
+// Đẩy cho target khi có thách đấu mới — client tự quyết định hỏi Accept/Decline.
+message DuelChallengeReceivedEvent {
+  int64 challenge_id = 1;
+  int64 challenger_character_id = 2;
+  string challenger_name = 3;
+}
+
+// Đẩy cho challenger khi bị từ chối.
+message DuelChallengeDeclinedEvent {
+  int64 challenge_id = 1;
+}
+
+// Đẩy cho CẢ 2 người khi trận đấu bắt đầu thật (đã vào World riêng) — client chuyển màn hình Arena.
+message DuelStartedEvent {
+  int64 opponent_character_id = 1;
+  string opponent_name = 2;
+}
+
+// Đẩy cho CẢ 2 người khi trận đấu kết thúc (hạ gục hoặc bỏ cuộc) — kèm rating mới sau khi tính Elo.
+message DuelResultEvent {
+  int64 winner_character_id = 1;
+  int64 loser_character_id = 2;
+  int32 winner_new_rating = 3;
+  int32 loser_new_rating = 4;
+}
+
+message GetPvpRatingRequest {
+}
+
+message GetPvpRatingResponse {
+  int32 rating = 1;
+  int32 wins = 2;
+  int32 losses = 3;
+}
