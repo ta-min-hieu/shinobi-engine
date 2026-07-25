@@ -126,6 +126,9 @@ final class DungeonInstanceRegistry {
     private DungeonInstance createInstance(long partyId) {
         var dungeonFacade = new WorldFacade(new DungeonOutboundSink(registry), false);
         dungeonFacade.start();
+        // Phase 8 lát cắt 2 — NƠI DUY NHẤT "dungeon" và "boss" được nối với nhau; WorldFacade vẫn
+        // không biết khái niệm "dungeon" (chỉ biết "có ai bảo spawn boss hay không").
+        dungeonFacade.spawnBoss();
         return new DungeonInstance(partyId, dungeonFacade);
     }
 

@@ -45,6 +45,24 @@ final class CombatConstants {
     // cast skill ở lát cắt này; res placeholder cùng độ lớn với def (làm mục tiêu hợp lệ cho skill).
     static final CombatStats MONSTER_STATS = new CombatStats(8, 0, 5, 3, 0.90f, 0f, 0f, CRIT_DAMAGE_MULTIPLIER);
 
+    // Boss (Phase 8 lát cắt 2, BossAiSystem) — def/res cao hơn MONSTER_STATS (boss "trâu" hơn),
+    // atk dùng làm ctx.base_atk cho script sample_boss.js tính damage chiêu đặc biệt (script
+    // KHÔNG dùng skillDmg — boss là hệ vật lý ở lát cắt này, chưa gán hệ phái).
+    //
+    // ⚠️ atk CỐ Ý thấp (không "cân bằng boss thật") — PHÁT HIỆN THẬT (test thời gian thực nhiều
+    // pha): CHARACTER_MAX_HP=100 là hằng số CỐ ĐỊNH toàn cục; atk cao hơn khiến nhân vật test chết
+    // TRƯỚC khi boss chết (AiSystem đưa boss về RETURN khi mục tiêu chết → BossAiSystem vĩnh viễn
+    // không còn quyết định gì, dù CombatSystem của nhân vật đã chết vẫn tiếp tục đánh trả — bug có
+    // sẵn, ngoài phạm vi lát cắt này). Giữ atk thấp để trận đấu 1-boss-1-nhân-vật luôn có người
+    // thắng đúng phía (nhân vật) trong lúc chưa có cơ chế tử vong nhân vật.
+    static final CombatStats BOSS_STATS = new CombatStats(3, 0, 10, 8, 0.95f, 0f, 0.05f, CRIT_DAMAGE_MULTIPLIER);
+    // Đủ lớn để MỖI pha (đặc biệt pha enrage <30% HP) có vài giây thời gian thực trước khi boss
+    // chết — PHÁT HIỆN THẬT: 180 quá thấp, đòn hạ gục thường rơi ĐÚNG vào lúc vừa chạm ngưỡng 30%,
+    // BossAiSystem (throttle 0.5s) không kịp có cơ hội quyết định trước khi entity bị xoá. Vẫn đủ
+    // nhỏ để trận đấu thời gian thực xong trong ~12s (test thật, không mock tick) — cùng lý do
+    // MONSTER_RESPAWN_SECONDS chọn nhỏ cho test, không phải số cân bằng gameplay.
+    static final int BOSS_MAX_HP = 320;
+
     static final float ATTACK_INTERVAL_SECONDS = 1f; // ATK_SPEED placeholder — 1 đòn/giây
     static final float ATTACK_RANGE_METERS = 2f;
     static final int MONSTER_MAX_HP = 50;

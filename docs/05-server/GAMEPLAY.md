@@ -114,13 +114,15 @@ Engine scripting đã chốt: [ADR-016](../01-architecture/adr/ADR-016-Scripting
 
 | Việc | Cách | Trạng thái |
 |---|---|---|
-| Boss AI nhiều pha | Behavior Tree hoặc Script ([AI.md §4](../03-engine/AI.md)) | Phase 8 lát cắt sau |
-| ✅ Dungeon instance lát cắt 1 (2026-07-25) | Mỗi party 1 instance riêng — `EnterDungeonCommand`/`ExitDungeonCommand` (opcode 1500-1503), `DungeonInstanceRegistry` (server-gateway) | Hạ tầng xong — map trống, chưa có Boss/loot |
+| ✅ Boss AI lát cắt 2 (2026-07-25) | Script GraalJS ([AI.md §4](../03-engine/AI.md)) — `BossAiSystem` mô hình theo `SkillSystem` | 2 pha đặc biệt (`heavy_strike` <70% HP, `enrage` <30% HP) — chưa summon minion |
+| ✅ Dungeon instance lát cắt 1 (2026-07-25) | Mỗi party 1 instance riêng — `EnterDungeonCommand`/`ExitDungeonCommand` (opcode 1500-1503), `DungeonInstanceRegistry` (server-gateway) | Hạ tầng xong, boss tự spawn khi tạo instance |
 | World Boss | Toàn server, damage ranking | Phase 8 lát cắt sau |
 
 ✅ **Dungeon instance model đã chốt** ([ADR-026](../01-architecture/adr/ADR-026-Dungeon-Instance-Model.md), Accepted 2026-07-24): cùng process, mỗi instance là 1 World/ECS riêng trong cùng JVM — không phải OS process riêng. Khớp Bước 0 của [ARCHITECTURE.md §14](../01-architecture/ARCHITECTURE.md) (chưa scale ngang khi chưa có số liệu).
 
 ✅ **Lát cắt 1 (hạ tầng) đã code xong** (2026-07-25, chi tiết ở [ROADMAP.md Phase 8](../11-process/ROADMAP.md)): party gửi `EnterDungeonCommand` kéo theo CẢ party (đang online) vào chung 1 dungeon World rỗng; `ExitDungeonCommand` trả về world chính đúng vị trí trước khi vào. Verify thật qua socket (`GatewayServerIntegrationTest.partyShouldEnterAndExitDungeonAsSeparateWorld_overRealSockets`) — không chỉ nội bộ. **Không có `feature-dungeon` module** — chưa có dữ liệu nghiệp vụ nào cần persist ở lát cắt này.
+
+✅ **Lát cắt 2 (Boss AI) đã code xong** (2026-07-25, chi tiết ở [ROADMAP.md Phase 8](../11-process/ROADMAP.md)): boss (`sample_boss`) tự spawn khi dungeon instance được tạo (`DungeonInstanceRegistry.createInstance` gọi `WorldFacade.spawnBoss()`), quyết định pha/chiêu qua script GraalJS (`sample_boss.js`, tái dùng `ScriptSandbox` từ Phase 4). Loot tái dùng nguyên `drop_table`/`GrantLootUseCase` có sẵn (chỉ thêm migration seed). Verify thật qua socket (`GatewayServerIntegrationTest.partyShouldFightBossInDungeon_overRealSockets`). Phát hiện + vá 1 lỗ hổng AoI có sẵn từ Phase 4 (không riêng Boss AI): nhân vật chơi SOLO không nhận được `AttackResultEvent`/`SkillResultEvent` khi quái/boss đánh trả — xem ROADMAP.md Phase 8 "Quyết định lát cắt 2" để biết chi tiết.
 
 ---
 

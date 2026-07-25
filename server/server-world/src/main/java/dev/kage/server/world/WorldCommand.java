@@ -55,4 +55,12 @@ sealed interface WorldCommand {
      */
     record AreaChatMessageCommand(long characterId, String senderName, String body) implements WorldCommand {
     }
+
+    /**
+     * Spawn 1 boss hardcode ({@code BossConstants.BOSS_CODE}, Phase 8 lát cắt 2) — gọi từ
+     * {@code DungeonInstanceRegistry} ngay sau khi tạo dungeon World, KHÔNG phải lệnh từ client
+     * (world-command nội bộ, giống mọi command khác ở đây).
+     */
+    record SpawnBossCommand() implements WorldCommand {
+    }
 }

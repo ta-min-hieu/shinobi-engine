@@ -265,6 +265,75 @@ class WorldFacadeTest {
     }
 
     @Test
+    @Timeout(30) // Trận đấu boss thời gian thực ~12-13s (BOSS_MAX_HP=320) — dài hơn @Timeout(10) lớp.
+    void shouldFightThroughAllPhases_whenBossEngaged() {
+        // Phase 8 lát cắt 2 — boss trong dungeon instance (spawnOverworldContent=false, giống
+        // test shouldNotSpawnTrainingDummyOrNpc...). Verify CẢ 2 chiêu đặc biệt (heavy_strike <70%
+        // HP, enrage <30% HP) xuất hiện thật trước khi boss chết, và chết KHÔNG kích hoạt respawn
+        // kiểu training dummy (PHÁT HIỆN THẬT lát cắt này — xem WorldFacade.handleMonsterDeath).
+        var dungeonSink = new RecordingSink();
+        var dungeonWorld = new WorldFacade(dungeonSink, false);
+        try {
+            dungeonWorld.start();
+            dungeonWorld.spawnBoss();
+            // Attach TRƯỚC khi chờ monsterSpawned — AoI chỉ báo spawn khi có NHÂN VẬT ở gần để
+            // thông báo (aoiTracker.sync() so cặp nhân vật-quái, không tự báo quái "mồ côi" không
+            // ai quan sát). Spawn cách boss (3,0) đúng 1m — trong tầm đánh (2m) VÀ tầm aggro (6m).
+            dungeonWorld.attachCharacter(1L, 3f, 1f, DEFAULT_STATS);
+            awaitTrue(() -> dungeonSink.monsterSpawned.stream().anyMatch(m -> m.code().equals("sample_boss")));
+            long bossId = dungeonSink.monsterSpawned.get(0).monsterId();
+
+            dungeonWorld.setTarget(1L, bossId);
+
+            awaitTrue(
+                    () -> dungeonSink.monsterDespawned.stream().anyMatch(d -> d.monsterId() == bossId),
+                    Duration.ofSeconds(25));
+
+            assertThat(dungeonSink.skillResults.stream().anyMatch(r -> "heavy_strike".equals(r.skillCode())))
+                    .as("boss phải dùng heavy_strike khi HP < 70%%")
+                    .isTrue();
+            assertThat(dungeonSink.skillResults.stream().anyMatch(r -> "enrage".equals(r.skillCode())))
+                    .as("boss phải dùng enrage khi HP < 30%%")
+                    .isTrue();
+            assertThat(dungeonSink.monsterKilled).containsExactly(new MonsterKilled(1L, "sample_boss"));
+        } finally {
+            dungeonWorld.stop();
+        }
+    }
+
+    @Test
+    @Timeout(15) // > CombatConstants.MONSTER_RESPAWN_SECONDS (10s) — chờ xác nhận KHÔNG respawn.
+    void shouldNotRespawnBoss_afterDeathInDungeon() {
+        // PHÁT HIỆN THẬT (Phase 8 lát cắt 2): trước khi thêm guard `spawnOverworldContent` ở
+        // WorldFacade.handleMonsterDeath, MỌI cái chết quái (kể cả boss trong dungeon) đều lên
+        // lịch spawnTrainingDummy() sau MONSTER_RESPAWN_SECONDS — sai nội dung, sai world. Hạ gục
+        // nhanh bằng applyEquipmentBonus (cùng pattern shouldOneShotMonster_...) để tách biệt
+        // khỏi kịch bản nhiều pha ở test trên, tránh @Timeout dài gấp đôi không cần thiết.
+        var dungeonSink = new RecordingSink();
+        var dungeonWorld = new WorldFacade(dungeonSink, false);
+        try {
+            dungeonWorld.start();
+            dungeonWorld.spawnBoss();
+            dungeonWorld.attachCharacter(1L, 3f, 1f, DEFAULT_STATS);
+            awaitTrue(() -> dungeonSink.monsterSpawned.stream().anyMatch(m -> m.code().equals("sample_boss")));
+            long bossId = dungeonSink.monsterSpawned.get(0).monsterId();
+
+            dungeonWorld.applyEquipmentBonus(1L, 1000); // đủ lớn để hạ gục BOSS_MAX_HP (320) ngay đòn đầu.
+            dungeonWorld.setTarget(1L, bossId);
+
+            awaitTrue(() -> dungeonSink.monsterDespawned.stream().anyMatch(d -> d.monsterId() == bossId));
+
+            // Chờ đủ lâu hơn MONSTER_RESPAWN_SECONDS (10s, hằng số dùng chung với world chính) rồi
+            // xác nhận KHÔNG có spawn thứ 2 — khác awaitTrue (chờ 1 điều kiện TRỞ THÀNH true), ở
+            // đây phải chờ HẾT deadline rồi mới kết luận được "không xảy ra".
+            sleepUninterruptibly(Duration.ofSeconds(11));
+            assertThat(dungeonSink.monsterSpawned).hasSize(1);
+        } finally {
+            dungeonWorld.stop();
+        }
+    }
+
+    @Test
     void shouldDespawnNpc_whenCharacterMovesAway() {
         // KHÔNG dùng detachCharacter để test nhánh này — onDetach() không báo despawn quái/NPC
         // cho CHÍNH nhân vật rời đi (nó không còn kết nối để nhận nữa), chỉ báo nhân vật khác về
@@ -472,6 +541,16 @@ class WorldFacadeTest {
             }
         }
         throw new AssertionError("Điều kiện không đúng sau " + timeout + " chờ tick loop");
+    }
+
+    /** Chờ ĐỦ {@code duration} (không dừng sớm) — dùng để xác nhận 1 điều KHÔNG xảy ra, khác {@link #awaitTrue}. */
+    private static void sleepUninterruptibly(Duration duration) {
+        try {
+            Thread.sleep(duration.toMillis());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted khi chờ xác nhận không có spawn mới", e);
+        }
     }
 
     /** Cast fireball tối đa vài lần, mỗi lần chờ hết cooldown, tới khi trúng 1 lần hoặc hết lượt thử. */

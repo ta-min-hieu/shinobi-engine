@@ -8,6 +8,7 @@ import dev.kage.engine.ecs.component.VelocityComponent;
 import dev.kage.engine.ecs.system.MovementSystem;
 import dev.kage.server.world.component.AiStateComponent;
 import dev.kage.server.world.component.AttackCooldownComponent;
+import dev.kage.server.world.component.BossAiComponent;
 import dev.kage.server.world.component.CharacterIdComponent;
 import dev.kage.server.world.component.ChiComponent;
 import dev.kage.server.world.component.CombatStatsComponent;
@@ -62,12 +63,19 @@ public final class WorldFacade {
     private static final float SAMPLE_NPC_SPAWN_X = -5f;
     private static final float SAMPLE_NPC_SPAWN_Y = -5f;
 
+    // Boss mẫu (Phase 8 lát cắt 2) — spawn trong tầm AiConstants.AGGRO_RADIUS_METERS (6m) tính từ
+    // điểm vào dungeon (DungeonInstanceRegistry.DUNGEON_ENTRY_SPAWN, 0,0) để party aggro ngay khi
+    // tới gần, không cần cơ chế "instant aggro lúc mở dungeon" riêng.
+    private static final float BOSS_SPAWN_X = 3f;
+    private static final float BOSS_SPAWN_Y = 0f;
+
     private final WorldOutboundSink outboundSink;
     private final Queue<WorldCommand> inbox = new ConcurrentLinkedQueue<>();
     private final EcsWorld ecsWorld = new EcsWorld();
     private final AreaOfInterestTracker aoiTracker;
     private final CombatSystem combatSystem;
     private final SkillSystem skillSystem;
+    private final BossAiSystem bossAiSystem;
 
     // Chỉ tick thread được đọc/ghi các map/field này (không đồng bộ hoá) — đúng ranh giới "ECS
     // state chỉ sửa trên tick thread" (SERVER.md §2).
@@ -103,6 +111,14 @@ public final class WorldFacade {
         return List.of(SkillConstants.FIREBALL_SCRIPT_RESOURCE);
     }
 
+    /**
+     * Toàn bộ resource script boss (hardcode, chưa DB-driven — xem {@link BossConstants}) — dùng
+     * cho validate script lúc khởi động (SCRIPTING.md §8), cùng lý do {@link #listSkillScriptResources}.
+     */
+    public static List<String> listBossScriptResources() {
+        return List.of(BossConstants.BOSS_SCRIPT_RESOURCE);
+    }
+
     public WorldFacade(WorldOutboundSink outboundSink) {
         this(outboundSink, true);
     }
@@ -119,15 +135,17 @@ public final class WorldFacade {
         this.aoiTracker = new AreaOfInterestTracker(outboundSink);
         this.combatSystem = new CombatSystem(this::lookupEntity);
         this.skillSystem = new SkillSystem(this::lookupEntity);
+        this.bossAiSystem = new BossAiSystem(this::lookupEntity);
         // Thứ tự ĐÚNG ECS.md §6 (InputCommandSystem -> AISystem -> MovementSystem -> ... ->
         // CombatSystem): AI set vận tốc/mục tiêu trước, Movement tích luỹ vị trí, Combat mới xét
-        // tầm đánh — đổi thứ tự = đổi behavior (engine/CLAUDE.md). SkillSystem chỉ đếm ngược
-        // cooldown mỗi tick (tryCast là lệnh rời rạc, gọi trực tiếp từ drainInbox) — thứ tự với
-        // CombatSystem không quan trọng.
+        // tầm đánh — đổi thứ tự = đổi behavior (engine/CLAUDE.md). SkillSystem/BossAiSystem chỉ
+        // đếm ngược cooldown mỗi tick (hành động thật là lệnh rời rạc/điều kiện nội bộ, không phải
+        // hành vi lặp mỗi tick như đánh thường) — thứ tự với CombatSystem không quan trọng.
         ecsWorld.addSystem(new AiSystem(entitiesByCharacterId::values, this::lookupEntity));
         ecsWorld.addSystem(new MovementSystem());
         ecsWorld.addSystem(combatSystem);
         ecsWorld.addSystem(skillSystem);
+        ecsWorld.addSystem(bossAiSystem);
     }
 
     /** Bắt đầu tick loop trên thread riêng — gọi 1 lần lúc khởi động server. */
@@ -188,6 +206,16 @@ public final class WorldFacade {
         inbox.add(new WorldCommand.AreaChatMessageCommand(characterId, senderName, body));
     }
 
+    /**
+     * Spawn 1 boss hardcode (Phase 8 lát cắt 2, {@link BossConstants#BOSS_CODE}) — gọi bởi
+     * {@code DungeonInstanceRegistry} ngay sau khi tạo dungeon World mới. World chính KHÔNG tự
+     * gọi hàm này (giữ đúng ranh giới lát cắt 1: server-world không biết khái niệm "dungeon", chỉ
+     * biết "có ai bảo spawn boss hay không").
+     */
+    public void spawnBoss() {
+        inbox.add(new WorldCommand.SpawnBossCommand());
+    }
+
     private void tickLoop() {
         if (spawnOverworldContent) {
             spawnTrainingDummy();
@@ -222,6 +250,7 @@ public final class WorldFacade {
             ecsWorld.update(WorldConstants.FIXED_DT);
             handleCombatResults(combatSystem.drainResults());
             handleSkillResults(skillSystem.drainResults());
+            handleBossResults(bossAiSystem.drainResults());
             tickMonsterRespawn(WorldConstants.FIXED_DT);
             aoiTracker.sync(entitiesByCharacterId, entitiesByMonsterId, entitiesByNpcId);
         } catch (RuntimeException e) {
@@ -244,6 +273,7 @@ public final class WorldFacade {
                         handleApplyEquipmentBonus(c.characterId(), c.bonusAtk());
                 case WorldCommand.AreaChatMessageCommand c ->
                         handleAreaChatMessage(c.characterId(), c.senderName(), c.body());
+                case WorldCommand.SpawnBossCommand ignored -> spawnBossEntity();
             }
         }
     }
@@ -369,6 +399,20 @@ public final class WorldFacade {
 
             var observers = aoiTracker.observersOf(outcome.targetEntityId());
             observers.add(outcome.attackerEntityId()); // người đánh luôn thấy kết quả đòn của chính mình.
+            // PHÁT HIỆN THẬT (Phase 8 lát cắt 2, viết test E2E thật mới lộ ra): khi mục tiêu là
+            // NHÂN VẬT (dương), mục tiêu cũng phải LUÔN thấy đòn nhắm vào mình, không chỉ dựa vào
+            // observersOf() — observersOf chỉ tìm được nhân vật nào đó KHÁC đang "thấy" mục tiêu
+            // qua AoI (visibleTo chỉ khớp cặp NHÂN VẬT-NHÂN VẬT — xem AreaOfInterestTracker). Nhân
+            // vật chơi SOLO (không ai khác gần đó) không có ai "vouch" cho mình trong visibleTo,
+            // nên khi QUÁI đánh lại (attacker âm, không phải client thật) sự kiện bị rơi mất hoàn
+            // toàn. CHỈ áp dụng khi target dương (nhân vật) — target âm (quái) đã được
+            // observersOf() tìm đúng nhân vật đang đánh nó rồi (nhân vật luôn thấy quái nó nhắm
+            // tới), thêm quá tay ở đây sẽ tạo observerId "quái" giả (không phải client thật, vô hại
+            // ở production vì ConnectedCharacterRegistry tự no-op ID lạ, nhưng gây trùng lặp giả
+            // trong test đơn vị dùng sink ghi thẳng không lọc).
+            if (outcome.targetEntityId() > 0) {
+                observers.add(outcome.targetEntityId());
+            }
             for (long observerId : observers) {
                 outboundSink.onAttackResult(observerId, sinkOutcome);
             }
@@ -392,12 +436,48 @@ public final class WorldFacade {
 
             var observers = aoiTracker.observersOf(outcome.targetEntityId());
             observers.add(outcome.attackerEntityId()); // người dùng skill luôn thấy kết quả của chính mình.
+            // Chỉ target dương (nhân vật) — xem giải thích đầy đủ ở handleCombatResults.
+            if (outcome.targetEntityId() > 0) {
+                observers.add(outcome.targetEntityId());
+            }
             for (long observerId : observers) {
                 outboundSink.onSkillResult(observerId, sinkOutcome);
             }
             if (outcome.targetDied() && outcome.targetEntityId() < 0) {
                 handleMonsterDeath(outcome.targetEntityId(), outcome.attackerEntityId());
             }
+        }
+    }
+
+    /**
+     * Chiêu đặc biệt của boss (Phase 8 lát cắt 2) — TÁI DÙNG nguyên {@code SkillOutcome}/
+     * {@code onSkillResult} đã có (KHÔNG đổi protocol): {@code skillCode} là {@code "heavy_strike"}
+     * hoặc {@code "enrage"}, client phân biệt qua đó nếu cần hiệu ứng riêng sau này.
+     */
+    private void handleBossResults(List<BossAiSystem.BossActionOutcome> results) {
+        for (var outcome : results) {
+            var sinkOutcome = new WorldOutboundSink.SkillOutcome(
+                    outcome.actionCode(),
+                    outcome.attackerEntityId(),
+                    outcome.targetEntityId(),
+                    outcome.damage(),
+                    outcome.crit(),
+                    outcome.miss(),
+                    outcome.targetCurrentHp(),
+                    outcome.targetDied());
+
+            var observers = aoiTracker.observersOf(outcome.targetEntityId());
+            observers.add(outcome.attackerEntityId()); // boss "thấy" đòn của chính nó, giống người dùng skill.
+            // Chỉ target dương (nhân vật) — xem giải thích đầy đủ ở handleCombatResults.
+            if (outcome.targetEntityId() > 0) {
+                observers.add(outcome.targetEntityId());
+            }
+            for (long observerId : observers) {
+                outboundSink.onSkillResult(observerId, sinkOutcome);
+            }
+            // targetEntityId của chiêu boss luôn DƯƠNG (nhân vật) — không nhánh handleMonsterDeath
+            // như handleCombatResults/handleSkillResults (chưa có cơ chế tử vong nhân vật, cùng
+            // hiện trạng đánh thường của quái qua AiSystem/CombatSystem, ngoài phạm vi lát cắt này).
         }
     }
 
@@ -409,7 +489,12 @@ public final class WorldFacade {
         String monsterCode = MONSTER.get(entity).monsterCode; // đọc TRƯỚC removeEntity — sau đó component mất.
         aoiTracker.onMonsterDetach(monsterId);
         ecsWorld.removeEntity(entity);
-        monsterRespawnCountdownSeconds = CombatConstants.MONSTER_RESPAWN_SECONDS;
+        // Chỉ world chính hồi sinh quái bù nhìn — dungeon (spawnOverworldContent=false) không có
+        // khái niệm training dummy; PHÁT HIỆN THẬT (Phase 8 lát cắt 2): thiếu guard này, boss chết
+        // trong dungeon sẽ vô tình lên lịch spawnTrainingDummy() (sai nội dung, sai world).
+        if (spawnOverworldContent) {
+            monsterRespawnCountdownSeconds = CombatConstants.MONSTER_RESPAWN_SECONDS;
+        }
 
         // killerEntityId ÂM nghĩa là quái khác hạ gục quái này — chưa từng xảy ra (quái không nhắm
         // quái, xem AiSystem) nhưng chặn phòng thủ, rơi đồ chỉ dành cho NGƯỜI CHƠI.
@@ -465,6 +550,45 @@ public final class WorldFacade {
         entitiesByMonsterId.put(monsterId, entity);
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
         // không cần thông báo thủ công (giống hệt attach nhân vật, xem AreaOfInterestTracker).
+    }
+
+    private void spawnBossEntity() {
+        var entity = ecsWorld.createEntity();
+        long monsterId = nextMonsterOrNpcId--;
+
+        var position = new PositionComponent();
+        position.x = BOSS_SPAWN_X;
+        position.y = BOSS_SPAWN_Y;
+        position.prevX = position.x;
+        position.prevY = position.y;
+        entity.add(position);
+        entity.add(new VelocityComponent()); // AiSystem set vận tốc theo FSM (AI.md §3)
+
+        var health = new HealthComponent();
+        health.current = CombatConstants.BOSS_MAX_HP;
+        health.max = CombatConstants.BOSS_MAX_HP;
+        entity.add(health);
+
+        var monster = new MonsterComponent();
+        monster.monsterCode = BossConstants.BOSS_CODE;
+        entity.add(monster);
+        entity.add(toComponent(CombatConstants.BOSS_STATS));
+
+        var monsterIdComponent = new MonsterIdComponent();
+        monsterIdComponent.monsterId = monsterId;
+        entity.add(monsterIdComponent);
+
+        var aiState = new AiStateComponent();
+        aiState.spawnX = BOSS_SPAWN_X;
+        aiState.spawnY = BOSS_SPAWN_Y;
+        entity.add(aiState);
+        entity.add(new TargetComponent()); // AiSystem ghi khi Chase/Attack; CombatSystem đọc để đánh trả
+        entity.add(new AttackCooldownComponent());
+        entity.add(new BossAiComponent()); // BossAiSystem đọc/ghi — cooldown chiêu đặc biệt + cờ enrage
+
+        entitiesByMonsterId.put(monsterId, entity);
+        // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
+        // không cần thông báo thủ công (giống hệt spawnTrainingDummy).
     }
 
     private void spawnNpc() {

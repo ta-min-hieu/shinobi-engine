@@ -231,4 +231,5 @@ Theo Điều 27, hành vi AI **không hardcode**:
 
 1. Chốt **ADR-022** (gdx-ai hay tự viết) trước Phase 2.
 2. Phase 4: làm FSM đơn giản nhất chạy được — **không** làm A*, **không** làm Behavior Tree cho tới khi có boss thật (Phase 8).
-3. Phase 9: đo chi phí AI, áp dụng §9 time-slicing **nếu** số liệu cho thấy cần.
+3. ✅ Phase 8 lát cắt 2 (2026-07-25): Boss AI bằng script GraalJS đã code xong (`BossAiSystem`, 2 pha `heavy_strike`/`enrage`) — xem [ROADMAP.md Phase 8](../11-process/ROADMAP.md). Summon minion (Phase 2 trong sơ đồ §4) để dành lát cắt sau.
+4. Phase 9: đo chi phí AI, áp dụng §9 time-slicing **nếu** số liệu cho thấy cần.

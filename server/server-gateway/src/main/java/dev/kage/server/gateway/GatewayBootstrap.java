@@ -39,6 +39,7 @@ public final class GatewayBootstrap {
         var scriptRefs = new ArrayList<String>();
         scriptRefs.addAll(databaseBootstrap.listContentScriptRefs());
         scriptRefs.addAll(WorldFacade.listSkillScriptResources());
+        scriptRefs.addAll(WorldFacade.listBossScriptResources());
         new ScriptValidator(new ScriptSandbox(SCRIPT_VALIDATION_STATEMENT_LIMIT)).validateAll(scriptRefs);
 
         // characterRegistry là WorldOutboundSink thật — PHẢI tồn tại trước WorldFacade vì

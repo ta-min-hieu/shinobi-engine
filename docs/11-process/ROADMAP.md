@@ -279,7 +279,7 @@ vá luôn lỗ hổng `idempotencyKey` còn thiếu ở `BuyItemCommand`/`SellIt
 | Việc | Nguồn |
 |---|---|
 | ✅ Dungeon instance lát cắt 1 (2026-07-25 — hạ tầng: party cùng vào 1 World riêng qua `EnterDungeonCommand`/`ExitDungeonCommand`, tick độc lập world chính, cách ly lỗi tick, chơi được thật qua socket) | [ADR-026](../01-architecture/adr/ADR-026-Dungeon-Instance-Model.md) |
-| Boss AI (Behavior Tree / Script) | [AI.md §4](../03-engine/AI.md) |
+| ✅ Boss AI lát cắt 2 (2026-07-25 — script GraalJS quyết định pha/chiêu (`BossAiSystem`), tái dùng `ScriptSandbox` từ Phase 4, boss tự spawn trong dungeon, loot thật qua `drop_table` có sẵn, chơi được thật qua socket) | [AI.md §4](../03-engine/AI.md) |
 | PvP arena + battlefield | [GDD](../13-game-design/GAME-DESIGN-DOCUMENT.md) |
 | 4 hệ phái còn lại | — |
 
@@ -300,6 +300,38 @@ vá 1 bug tiềm ẩn có sẵn ở world chính: exception không bắt trướ
 `DungeonOutboundSink` đảm bảo toạ độ dungeon không ghi đè vị trí thật lúc `CharacterPositionPersister`
 lưu định kỳ (không cần cờ "đang ở dungeon" — vị trí tự "đóng băng" vì world chính hết gọi
 `onMoveAccepted` cho nhân vật đã rời).
+
+**Quyết định lát cắt 2 (2026-07-25, cùng chủ dự án qua `AskUserQuestion` trước khi code)**: chọn
+Boss AI làm lát cắt kế tiếp (thay vì 4 hệ phái còn lại hay PvP arena) để dungeon thành tính năng
+chơi được đầy đủ, không chỉ hạ tầng. Trước khi code, phát hiện + sửa mâu thuẫn tài liệu: `AI.md §4`
+còn ghi "chưa chốt Java hay Script cho Boss AI" dù bảng Technical Decisions #9 đã Accepted "Script
+(GraalJS)" — xác nhận lại qua `AskUserQuestion`, chốt **Script**, sửa `AI.md §4` khớp bảng (commit
+`bf10543`). Phạm vi thu hẹp có chủ đích: chỉ 2 pha đặc biệt (`heavy_strike` <70% HP, `enrage` <30%
+HP, mỗi pha chỉ dùng 1 script quyết định action+damage) — **KHÔNG làm "summon minions"** (AI.md §4
+liệt ở Phase 2, nhưng spawn entity động + AI riêng + dọn dẹp khi boss chết là hạng mục lớn riêng,
+để dành lát cắt sau, cùng tinh thần Party hoãn chia EXP/Dungeon lát cắt 1 hoãn Boss).
+
+Chi tiết kỹ thuật: `BossAiSystem` (mới) mô hình lặp lại chính xác `SkillSystem` — script GraalJS
+(`sample_boss.js`) quyết định hành động dựa trên %HP/cooldown, Java lo cơ chế (cooldown, miss/crit/
+RES qua `CombatConstants.resolveSkillAttack` có sẵn). Boss vẫn có đủ `AiStateComponent`/
+`TargetComponent` như quái thường — `AiSystem`/`CombatSystem` KHÔNG bị sửa, `BossAiSystem` chỉ cộng
+thêm quyết định "dùng chiêu đặc biệt ngay bây giờ không" khi boss đang `AiState.ATTACK`. Kết quả
+chiêu đặc biệt TÁI DÙNG nguyên `SkillResultEvent`/`onSkillResult` đã có (KHÔNG đổi protocol) —
+`skillCode` = `"heavy_strike"`/`"enrage"`. Loot boss tái dùng nguyên hạ tầng `drop_table`/
+`GrantLootUseCase` có từ Phase 4 (chỉ thêm 1 migration seed dữ liệu, không code Java mới).
+
+**2 bug thật phát hiện khi viết test E2E qua socket thật** (không phải đoán trước):
+1. `handleMonsterDeath` gọi `spawnTrainingDummy()` vô điều kiện sau MỌI cái chết quái — boss chết
+   trong dungeon sẽ vô tình spawn nhầm training dummy. Sửa: bọc dòng respawn trong
+   `if (spawnOverworldContent)`.
+2. **Lỗ hổng AoI có sẵn từ Phase 4, không phải riêng Boss AI**: `observersOf(targetEntityId)` chỉ
+   tìm được nhân vật KHÁC đang thấy mục tiêu qua `visibleTo` (khớp cặp NHÂN VẬT-NHÂN VẬT) — nhân
+   vật chơi SOLO không có ai "vouch" cho mình, nên khi QUÁI/boss đánh trả, `AttackResultEvent`/
+   `SkillResultEvent` bị rơi mất hoàn toàn, không bao giờ tới client. Không bị bắt ở
+   `WorldFacadeTest` (dùng sink ghi thẳng không lọc theo "có phải client thật") — chỉ lộ ra khi
+   viết test socket thật cho boss đấu solo. Sửa: `handleCombatResults`/`handleSkillResults`/
+   `handleBossResults` đều thêm `targetEntityId` (nếu dương, tức nhân vật) vào observers — mục
+   tiêu luôn thấy đòn nhắm vào mình, cùng nguyên tắc đã áp dụng cho attacker.
 
 ---
 

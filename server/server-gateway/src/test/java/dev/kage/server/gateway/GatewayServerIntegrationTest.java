@@ -1011,6 +1011,62 @@ class GatewayServerIntegrationTest {
     }
 
     @Test
+    // 35s — trận đấu boss thời gian thực ~12-13s (BOSS_MAX_HP=320, cùng lý do WorldFacadeTest)
+    // cộng chi phí gateway/socket thật, hơn hẳn 20s của test dungeon lát cắt 1.
+    @Timeout(35)
+    void partyShouldFightBossInDungeon_overRealSockets() throws Exception {
+        // Phase 8 lát cắt 2 — boss tự spawn khi dungeon instance được tạo
+        // (DungeonInstanceRegistry.createInstance gọi spawnBoss() sau start()). Verify qua chính
+        // giao thức dây: boss xuất hiện, đánh xuyên nhiều pha (heavy_strike/enrage — SkillResultEvent
+        // TÁI DÙNG, không opcode riêng), chết → MonsterDespawnedEvent.
+        try (var socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(10000);
+            var in = new DataInputStream(socket.getInputStream());
+
+            long characterId = connectCreateAndSelect(
+                    socket, in, "boss" + UUID.randomUUID().toString().substring(0, 6));
+            partyFacade.createParty(characterId); // party 1 người — đủ điều kiện vào dungeon.
+
+            var enterCommand = EnterDungeonCommand.newBuilder().setDungeonCode("sample_dungeon").build();
+            sendFrame(socket, Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, 30, enterCommand.toByteArray());
+            var enterResponse = EnterDungeonResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE).payload());
+            assertThat(enterResponse.getOutcome()).isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
+
+            var bossSpawned = MonsterSpawnedEvent.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE).payload());
+            assertThat(bossSpawned.getMonsterCode()).isEqualTo("sample_boss");
+            long bossId = bossSpawned.getMonsterId();
+
+            var setTarget = SetTargetCommand.newBuilder().setTargetEntityId(bossId).build();
+            sendFrame(socket, Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, 31, setTarget.toByteArray());
+
+            // Boss phải dùng ÍT NHẤT 1 chiêu đặc biệt trước khi chết — đọc frame liên tục, phân
+            // loại theo opcode, dừng khi thấy 1 trong 2 (hoặc boss chết trước, coi như thất bại).
+            boolean sawSpecialAction = false;
+            boolean bossDied = false;
+            for (int i = 0; i < 5000 && !bossDied; i++) {
+                var frame = readFrame(in);
+                if (frame.header().opcode() == Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE) {
+                    var skillResult = dev.kage.protocol.SkillResultEvent.parseFrom(frame.payload());
+                    if (("heavy_strike".equals(skillResult.getSkillCode())
+                            || "enrage".equals(skillResult.getSkillCode()))
+                            && skillResult.getAttackerEntityId() == bossId) {
+                        sawSpecialAction = true;
+                    }
+                } else if (frame.header().opcode() == Opcode.OPCODE_MONSTER_DESPAWNED_EVENT_VALUE) {
+                    var despawned = dev.kage.protocol.MonsterDespawnedEvent.parseFrom(frame.payload());
+                    if (despawned.getMonsterId() == bossId) {
+                        bossDied = true;
+                    }
+                }
+            }
+            assertThat(bossDied).as("boss phải chết trong thời gian chờ").isTrue();
+            assertThat(sawSpecialAction).as("boss phải dùng heavy_strike hoặc enrage trước khi chết").isTrue();
+        }
+    }
+
+    @Test
     @Timeout(15)
     void clientShouldDamageMonster_overRealSockets() throws Exception {
         // Verify Phase 4 lát cắt 1 qua chính giao thức dây: di chuyển tới gần quái bù nhìn (spawn
@@ -1037,9 +1093,15 @@ class GatewayServerIntegrationTest {
             var setTarget = SetTargetCommand.newBuilder().setTargetEntityId(monsterId).build();
             sendFrame(socket, Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, 12, setTarget.toByteArray());
 
-            var attackResult = AttackResultEvent.parseFrom(
-                    readUntilOpcode(in, Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE).payload());
-            assertThat(attackResult.getAttackerEntityId()).isEqualTo(characterId);
+            // PHÁT HIỆN THẬT (Phase 8 lát cắt 2): quái giờ đánh trả CŨNG tới được client (trước đây
+            // bị rơi mất với nhân vật chơi solo — xem WorldFacade.handleCombatResults) — 2 chiều
+            // đòn (nhân vật→quái, quái→nhân vật) có thể tới theo BẤT KỲ thứ tự nào, lọc đúng đòn
+            // của NHÂN VẬT thay vì giả định đòn ĐẦU TIÊN luôn là của nó.
+            AttackResultEvent attackResult;
+            do {
+                attackResult = AttackResultEvent.parseFrom(
+                        readUntilOpcode(in, Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE).payload());
+            } while (attackResult.getAttackerEntityId() != characterId);
             assertThat(attackResult.getTargetEntityId()).isEqualTo(monsterId);
         }
     }
