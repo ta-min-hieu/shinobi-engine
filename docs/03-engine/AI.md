@@ -87,14 +87,19 @@ Selector (Boss)
    └─ Action: Basic attack pattern
 ```
 
-**Chưa chốt**: viết Behavior Tree bằng **Java** hay bằng **Script**?
+✅ **Đã chốt** (xác nhận lại 2026-07-25, khớp Technical Decisions #9 — bản trước đây của mục này còn
+ghi "chưa chốt" dù bảng quyết định đã Accepted, đã sửa cho khớp): Behavior Tree viết bằng
+**Script**, không phải Java thuần/gdx-ai.
 
 | | Ưu | Nhược |
 |---|---|---|
-| Java (gdx-ai) | Nhanh; type-safe | Sửa boss = rebuild + redeploy |
-| Script (Lua/JS) | Designer tự chỉnh; hot-reload | Chậm hơn; cần sandbox |
+| Java (gdx-ai) | Nhanh; type-safe | Sửa boss = rebuild + redeploy; trái Điều 27 (hardcode boss) |
+| Script (JS) | Designer tự chỉnh; hot-reload; đúng Điều 27 | Chậm hơn; cần sandbox |
 
-**Đề xuất**: **Script** — vì Điều 27 cấm hardcode Boss, và số boss ít nên chi phí script không đáng kể. Engine đã chốt [ADR-016](../01-architecture/adr/ADR-016-Scripting-Engine.md) — GraalJS.
+**Lý do chọn Script**: Điều 27 cấm hardcode Boss, và số boss ít nên chi phí script không đáng kể.
+Engine đã chốt [ADR-016](../01-architecture/adr/ADR-016-Scripting-Engine.md) — GraalJS, hạ tầng
+`ScriptSandbox` đã có thật từ Phase 4 (`SkillSystem` dùng để tính damage skill) — Boss AI tái dùng
+NGUYÊN hạ tầng đó, không xây engine script mới.
 
 ---
 
