@@ -226,6 +226,8 @@ entity.add(new PendingRemovalComponent());
 
 → Đây chính là lý do [ADR-006](../01-architecture/adr/ADR-006-Why-ECS.md) đặt Revisit Trigger ở Phase 9. **Không tự lừa mình rằng dùng Ashley = đã đạt DOD.**
 
+✅ **Đã đo bằng JMH thật (2026-07-26)** — xem [ADR-006 "Ghi chú — đánh giá lại Phase 9"](../01-architecture/adr/ADR-006-Why-ECS.md#ghi-chú--đánh-giá-lại-phase-9-2026-07-26): Revisit Trigger CHƯA kích hoạt (5000 entity chỉ ăn 3.66% ngân sách ECS), nhưng chi phí/entity tăng KHÔNG tuyến tính khi entity tăng — tín hiệu theo dõi cho tương lai, không phải hành động ngay.
+
 **Ngân sách hiệu năng** (**60Hz → 16.6ms/tick** — [ADR-018](../01-architecture/adr/ADR-018-Tick-Rate.md)):
 
 | Hạng mục | Ngân sách |

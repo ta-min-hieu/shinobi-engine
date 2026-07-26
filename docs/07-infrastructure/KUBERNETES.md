@@ -2,13 +2,17 @@
 
 | | |
 |---|---|
-| Status | 🚧 **STUB — chưa viết chi tiết, CÓ CHỦ ĐÍCH** |
-| Blocked by | [ADR-014](../01-architecture/adr/README.md) (chưa tạo). *(ADR-010 đã chốt single-realm → càng ít lý do cần K8s ở MVP)* |
-| Sẽ viết khi | [Roadmap Phase 9](../11-process/ROADMAP.md) — và **chỉ khi** ADR-014 kết luận là cần K8s |
+| Status | ⛔ **Deprecated** — [ADR-014](../01-architecture/adr/ADR-014-Kubernetes-vs-Docker-Compose.md) (2026-07-26) kết luận **không dùng Kubernetes**, dùng Docker Compose + VM đơn |
+| Related | [ADR-014](../01-architecture/adr/ADR-014-Kubernetes-vs-Docker-Compose.md), [DOCKER.md](DOCKER.md) — thứ đang dùng thật |
 
 ---
 
-## Vì sao tài liệu này cố tình chưa viết
+⚠️ **Kết luận cuối**: ADR-014 đã chốt **không dùng K8s** — lý do đầy đủ nằm ở ADR-014 (dự án cá nhân,
+một người vận hành, single-realm theo ADR-010, chưa có số liệu tải nào chứng minh cần scale ngang).
+Đúng như §"Kết quả hợp lệ" bên dưới đã dự đoán trước khi có kết luận — tài liệu này **không viết chi
+tiết**, giữ nguyên STUB cho tới khi có lý do thật sự để revisit (xem Revisit Trigger ở ADR-014).
+
+## Vì sao tài liệu này cố tình chưa viết (giữ lại — vẫn đúng bối cảnh lúc quyết định)
 
 Viết chi tiết Kubernetes bây giờ sẽ là **bịa đặt**, vì:
 
@@ -27,11 +31,12 @@ Viết chi tiết Kubernetes bây giờ sẽ là **bịa đặt**, vì:
 
 ---
 
-## Bố cục dự kiến (TOC)
+## Bố cục dự kiến (TOC) — chỉ dùng nếu ADR-014 bị supersede sau này
 
-Khi ADR-014 kết luận **cần** K8s, tài liệu này sẽ gồm:
+Nếu tương lai xuất hiện ADR mới `Supersedes ADR-014` kết luận **cần** K8s (theo Revisit Trigger ở
+ADR-014), tài liệu này sẽ gồm:
 
-1. **Vì sao K8s** — dẫn chiếu ADR-014, số liệu chứng minh Docker Compose không đủ
+1. **Vì sao K8s** — dẫn chiếu ADR supersede, số liệu chứng minh Docker Compose không đủ
 2. **Deployment** — game server là stateful, dùng `StatefulSet` hay `Deployment`?
 3. **Service** — làm sao route người chơi tới đúng world instance giữ map của họ
 4. **ConfigMap** — cấu hình gameplay vs cấu hình hạ tầng
@@ -45,29 +50,27 @@ Khi ADR-014 kết luận **cần** K8s, tài liệu này sẽ gồm:
 
 ---
 
-## Câu hỏi phải trả lời trước khi viết (Definition of Ready)
+## Câu hỏi phải trả lời trước khi viết (Definition of Ready) — đã trả lời, để lại làm hồ sơ
 
 - [x] **ADR-010** đã chốt: single-realm (multi-realm chỉ khi tải Phase 9 cần)
-- [ ] **ADR-014** chốt: có thật sự cần K8s, hay Docker Compose + 1 VM là đủ?
-- [ ] Có số liệu tải thật từ [Phase 9 — Optimization](../11-process/ROADMAP.md) chứng minh cần scale?
-- [ ] Đội ngũ có ai vận hành được K8s không? (K8s vận hành sai còn tệ hơn không dùng)
-- [ ] PostgreSQL/Redis tự host hay dùng managed service?
-- [ ] Ngân sách hạ tầng bao nhiêu? (K8s tốn hơn 1 VM đáng kể)
-- [ ] Rolling update chấp nhận đá người chơi không? Hay cần cửa sổ bảo trì?
+- [x] **ADR-014** chốt: **không** cần K8s — Docker Compose + 1 VM là đủ
+- [x] Không có số liệu tải nào chứng minh cần scale ngang tại thời điểm quyết định (chưa Phase 9 load test)
+- [x] Không có ai ngoài chủ dự án vận hành hạ tầng → K8s vận hành sai còn tệ hơn không dùng
+- [ ] PostgreSQL/Redis tự host hay dùng managed service — vẫn để ngỏ, không cần K8s để trả lời câu này
+- [x] Ngân sách hạ tầng ưu tiên thấp nhất có thể ở giai đoạn chưa có người chơi thật
+- [x] Rolling update qua Docker Compose chấp nhận cửa sổ bảo trì ngắn (không cần zero-downtime của K8s)
 
 ---
 
-## Kết quả hợp lệ: "không dùng Kubernetes"
+## Kết quả: "không dùng Kubernetes" — ✅ đã xảy ra đúng như dự đoán
 
-⚠️ **Đây không phải thất bại.**
+Rất nhiều game server thành công chạy trên vài VM với Docker Compose + systemd. [ADR-014](../01-architecture/adr/ADR-014-Kubernetes-vs-Docker-Compose.md) kết luận:
 
-Rất nhiều game server thành công chạy trên vài VM với Docker Compose + systemd. Nếu ADR-014 kết luận:
+> "Docker Compose trên 1 VM là đủ cho quy mô hiện tại — không dùng Kubernetes."
 
-> "1 VM + Docker Compose + backup tự động là đủ cho quy mô hiện tại"
+→ tài liệu này giữ **Deprecated**, đúng quyết định theo Điều 9 (Simplicity).
 
-→ thì tài liệu này sẽ được đánh dấu **Deprecated**, và đó là quyết định đúng theo Điều 9.
-
-**Không** dùng K8s vì "công ty khác dùng" hay "nghe chuyên nghiệp hơn".
+**Không** dùng K8s vì "công ty khác dùng" hay "nghe chuyên nghiệp hơn" — quyết định dựa trên: một người vận hành, single-realm, chưa có bằng chứng cần scale.
 
 ---
 
@@ -81,6 +84,5 @@ Rất nhiều game server thành công chạy trên vài VM với Docker Compose
 
 ## Việc cần làm tiếp theo
 
-1. **Không làm gì với tài liệu này cho tới Phase 9 bắt đầu.**
-2. Phase 9: thu thập số liệu tải thật.
-3. Dựa trên số liệu → viết ADR-014 → nếu Accepted thì mới viết tài liệu này theo TOC ở trên.
+1. **Không làm gì với tài liệu này** trừ khi Revisit Trigger ở [ADR-014](../01-architecture/adr/ADR-014-Kubernetes-vs-Docker-Compose.md) xảy ra thật.
+2. Nếu Revisit Trigger xảy ra (số liệu tải thật chứng minh 1 VM không đủ, hoặc multi-realm) → viết ADR mới `Supersedes ADR-014`, rồi mới viết tài liệu này theo TOC ở trên.

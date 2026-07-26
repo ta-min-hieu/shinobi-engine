@@ -63,7 +63,8 @@ shinobi-engine/
 │
 ├── tools/
 │   ├── asset-pipeline/             # CLI export/pack/validate asset
-│   └── content-editor/             # Editor quest/item/skill (Phase xa — xem EDITOR.md)
+│   ├── content-editor/             # Editor quest/item/skill (Phase xa — xem EDITOR.md)
+│   └── load-test/                  # Client giả lập qua socket thật (BENCHMARK.md §5, Phase 9 lát cắt 2)
 │
 ├── assets/
 │   ├── hyperlap2d-projects/        # Project gốc — KHÔNG đóng gói vào game

@@ -17,6 +17,8 @@ import dev.kage.server.database.ServerDatabaseBootstrap;
 import dev.kage.server.world.WorldFacade;
 import dev.kage.shop.api.ShopFacade;
 import dev.kage.trade.api.TradeFacade;
+import io.micrometer.prometheusmetrics.PrometheusConfig;
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import java.time.Duration;
 import java.util.ArrayList;
 
@@ -31,6 +33,11 @@ import java.util.ArrayList;
 public final class GatewayBootstrap {
 
     private static final int PORT = 7777;
+
+    // Metrics scrape endpoint (ADR-015, Phase 9 lát cắt 1) — cổng riêng biệt cổng game protocol,
+    // chưa có config file (MVP, cùng tinh thần PORT ở trên — tinh chỉnh khi cần thật).
+    private static final int METRICS_PORT = 9404;
+    private static final String WORLD_TAG_MAIN = "main";
 
     // Chỉ dùng để PARSE (validateSyntax), không thực thi — giới hạn statement không có ý nghĩa ở
     // đây (khác ScriptSandbox dùng lúc gameplay thật), giữ số dương bất kỳ cho hợp constructor.
@@ -59,8 +66,8 @@ public final class GatewayBootstrap {
         // WorldFacade cần sink lúc construct (SERVER.md §2: kết quả tick đi qua outbound queue).
         ConnectedCharacterRegistry characterRegistry =
                 new ConnectedCharacterRegistry(facades.inventoryFacade(), facades.contentFacades().questFacade());
-        WorldFacade worldFacade = new WorldFacade(characterRegistry);
-        worldFacade.start();
+        WorldContext worldContext = startWorld(characterRegistry);
+        WorldFacade worldFacade = worldContext.worldFacade();
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(facades.characterFacade(), characterRegistry, POSITION_SAVE_INTERVAL);
         positionPersister.start();
@@ -87,9 +94,29 @@ public final class GatewayBootstrap {
             arenaInstanceRegistry.stopAll();
             characterRegistry.stop();
             positionPersister.stop();
+            worldContext.metricsHttpServer().stop();
             databaseBootstrap.shutdown();
         }, "gateway-shutdown"));
         server.awaitTermination();
+    }
+
+    /** Gộp {@link WorldFacade} + {@link MetricsHttpServer} — cả hai sinh ra CÙNG lúc trong {@link #startWorld}. */
+    private record WorldContext(WorldFacade worldFacade, MetricsHttpServer metricsHttpServer) {
+    }
+
+    /**
+     * Tách khỏi {@code main()} để giữ dưới giới hạn Checkstyle MethodLength (cùng lý do
+     * {@link #wireFacades}) — dựng Micrometer registry + endpoint scrape (ADR-015) TRƯỚC
+     * {@link WorldFacade} vì {@link MicrometerTickMetricsPort} cần registry lúc construct World.
+     */
+    private static WorldContext startWorld(ConnectedCharacterRegistry characterRegistry) {
+        PrometheusMeterRegistry meterRegistry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
+        MetricsHttpServer metricsHttpServer = new MetricsHttpServer(METRICS_PORT, meterRegistry);
+        metricsHttpServer.start();
+        WorldFacade worldFacade = new WorldFacade(
+                characterRegistry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG_MAIN));
+        worldFacade.start();
+        return new WorldContext(worldFacade, metricsHttpServer);
     }
 
     /** Tách khỏi {@code main()} để giữ dưới giới hạn Checkstyle MethodLength — càng thêm facade, dòng càng dài. */

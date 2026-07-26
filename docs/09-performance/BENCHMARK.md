@@ -115,18 +115,64 @@ Từ [Phase 9 — Optimization](../11-process/ROADMAP.md).
 | Tăng dần tải | 10 → 50 → 100 → 500... tìm điểm gãy |
 | Chạy đủ lâu | ⚠️ **≥ 2 giờ** — leak và GC drift chỉ lộ theo thời gian |
 
+✅ **Công cụ: `tools:load-test`** (Phase 9 lát cắt 2, 2026-07-26) — client Java tự viết, nói qua ĐÚNG
+socket TCP + protobuf thật (không HTTP, không tool ngoài như k6/Gatling/JMeter — protocol game là
+binary custom, tool HTTP chuẩn không dùng được mà không viết plugin riêng, tốn công hơn tự viết
+client tái dùng thẳng `shared-protocol`, Điều 9). Ramp dần `initialClients → maxClients`, mỗi client
+giả lập move+combat(auto-target)+chat+ping thật, đo packet latency p50/p95/p99 phía client SONG SONG
+với `kage.tick.duration` phía server thật (scrape `/metrics`, Phase 9 lát cắt 1). Chạy:
+`./gradlew :tools:load-test:run --args="--maxClients=200 --durationSeconds=7200"` nhắm vào server
+đang chạy sẵn (không tự khởi động `GatewayBootstrap` — đo server production-like).
+
 **Đo gì:**
 
-| Metric | Ngưỡng |
-|---|---|
-| **Tick time p99** | ≤ ngân sách ([SERVER.md §11](../05-server/SERVER.md)) |
-| Packet latency p50/p95/p99 | — |
-| GC pause p99 | [JVM.md §7](JVM.md) |
-| **Heap sau major GC** | ⚠️ Tăng đều = leak |
-| DB pool pending | Phải = 0 |
-| CPU / RAM | — |
+| Metric | Ngưỡng | Đo bằng |
+|---|---|---|
+| **Tick time p99** | ≤ ngân sách ([SERVER.md §11](../05-server/SERVER.md)) | `tools:load-test` (scrape `/metrics`) |
+| Packet latency p50/p95/p99 | — | `tools:load-test` (client-side) |
+| GC pause p99 | [JVM.md §7](JVM.md) | JFR (bật sẵn từ Phase 0) — ngoài phạm vi `tools:load-test` |
+| **Heap sau major GC** | ⚠️ Tăng đều = leak | JFR/GC log — ngoài phạm vi `tools:load-test` |
+| DB pool pending | Phải = 0 | ⏳ chưa có metric (HikariCP — lát cắt sau) |
+| CPU / RAM | — | OS-level, ngoài phạm vi `tools:load-test` |
 
 ⚠️ **Soak test (chạy dài) quan trọng hơn peak test.** Server chịu 500 người trong 5 phút nhưng leak sau 6 giờ = vẫn sập ở production.
+
+✅ **Soak test thật đã chạy** (2026-07-26, Phase 9 lát cắt 3) — 80 client 2h14, `-XX:+UseZGC`: tick
+p99 luôn dưới 16.6ms (dao động 2-10ms), heap Live phẳng 39M suốt 34 chu kỳ GC (~1h33, không leak),
+GC STW pause tối đa 0.052ms. Chi tiết + 2 bug phát hiện trong `tools:load-test`:
+[ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md), [ROADMAP.md Phase 9 lát cắt 3](../11-process/ROADMAP.md).
+
+### 5.1 Ước tính hạ tầng (Capacity Planning)
+
+⏳ **Sơ bộ** (2026-07-26, Phase 9 lát cắt 5) — dựa trên 2 lần chạy `tools:load-test` nhắm vào
+`server-gateway` thật (Postgres/Redis thật qua Docker), kịch bản **xấu nhất**: mọi người chơi giả
+lập tụ 1 điểm, cùng đánh 1 quái bù nhìn (chỉ có nội dung này tồn tại trong game lúc đo — chưa có
+skill/inventory/shop/quest/dungeon trong kịch bản tải). Hành vi mỗi client: di chuyển + auto-attack
+(70%/chu kỳ, đánh thường 1 giây/đòn — `CombatConstants.ATTACK_INTERVAL_SECONDS`) + chat (3%) + ping
+(30%), chu kỳ ~0.6-1.5s.
+
+**Công thức** (N = số người chơi đồng thời):
+
+```
+RAM (MB)        = 368 + 0.78 × N        — ✅ đáng tin (2 điểm đo ổn định lâu: N=100→446MB, N=500→759.6MB)
+CPU (lõi)        = 0.02 + 0.00275 × N    — ✅ đáng tin (cùng 2 điểm đo)
+Băng thông nhận  = 0.097 × N^1.483 KB/s  — ⚠️ trung bình (không tuyến tính — AoI broadcast; khớp 2 điểm đo, điểm giữa nhiễu)
+Băng thông gửi   = 0.35 × N KB/s         — ✅ khá (gần tuyến tính, ít bị AoI ảnh hưởng)
+```
+
+| N | RAM | CPU | Băng thông (ra/vào) |
+|---|---|---|---|
+| 100 | 446MB ✅ đo thật | 0.29 lõi ✅ đo thật | 90 / 35 KB/s ✅ đo thật |
+| 500 | 759.6MB ✅ đo thật | 1.39 lõi ✅ đo thật | 980 / 175 KB/s ✅ đo thật |
+| 1000 | ~1.15GB ⚠️ ngoại suy | ~2.77 ⚠️ ngoại suy | ~2.8MB/s / ~350KB/s ⚠️ ngoại suy |
+
+⚠️ **Điều kiện áp dụng** — RAM/CPU dùng an toàn cho MỌI kịch bản (tụ đông hay rải đều, vì tính theo
+đầu người chơi); **băng thông chỉ đúng cho kịch bản xấu nhất** (world boss/sự kiện dồn 1 chỗ) — chơi
+rải nhiều map sẽ thấp hơn nhiều vì AoI chỉ broadcast trong bán kính gần. Ngoài khoảng 100-500 (đã đo
+thật) là ngoại suy — **phải load test thật ở đúng quy mô** trước khi chốt hạ tầng cho N lớn hơn
+nhiều (Điều 30, không đoán). Disk I/O chưa đo được đáng tin (Windows perf counter method có vấn đề
+— cần polling liên tục cùng 1 session, không phải gọi rời rạc); dự kiến rất thấp về mặt kiến trúc
+(state ở RAM/ECS, ghi DB qua network không phải đĩa cục bộ).
 
 ---
 
@@ -247,6 +293,9 @@ Không có — đây là quy trình, không phải quyết định kiến trúc.
 
 ## Việc cần làm tiếp theo
 
-1. Phase 1: dựng JMH harness cho `engine-ecs` — có sẵn hạ tầng đo trước khi cần.
-2. Phase 9: load test + soak test theo §5 → chốt [ADR-006](../01-architecture/adr/ADR-006-Why-ECS.md) (Ashley) và [ADR-019](../01-architecture/adr/README.md) (GC).
-3. Lập `benchmarks/results/baseline.json` ngay lần đo đầu tiên.
+1. ✅ Phase 9 (2026-07-26, trễ hơn dự kiến — không phải Phase 1): dựng JMH harness cho `engine-ecs`
+   (`me.champeau.jmh`, `EcsWorldUpdateBenchmark`).
+2. ✅ Phase 9: load test + soak test theo §5 → [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md)
+   (GC, Proposed) + [ADR-006](../01-architecture/adr/ADR-006-Why-ECS.md) (Ashley, Revisit Trigger
+   đánh giá lại — CHƯA kích hoạt, giữ nguyên Ashley).
+3. ✅ Kết quả đầu tiên đã ghi vào `benchmarks/results/engine-ecs-jmh-result.json`.

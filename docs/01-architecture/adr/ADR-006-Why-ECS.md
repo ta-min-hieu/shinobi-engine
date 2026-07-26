@@ -66,3 +66,31 @@ Bối cảnh: MMORPG cần update hàng nghìn entity 30–60 lần/giây. Mô h
 - Cần tính năng ECS mà Ashley không hỗ trợ và không thể workaround.
 
 Nếu thay → tạo ADR mới (`Supersedes ADR-006`), ứng viên: Artemis-odb hoặc Kage ECS tự viết. **Không sửa ADR này.**
+
+## Ghi chú — đánh giá lại Phase 9 (2026-07-26)
+
+Revisit Trigger yêu cầu "Benchmark cho thấy ECS update > 4ms/tick với số entity mục tiêu của 1 map
+đông người" — đã đo bằng JMH thật (`engine-ecs/src/jmh`, `EcsWorldUpdateBenchmark`, proxy
+`MovementSystem` — chỉ đo cơ chế lặp/`ComponentMapper` cốt lõi mà ADR này lo ngại, KHÔNG bao gồm
+AI/Combat/Skill/Boss/StatusEffect System thật vì các System đó ở `server-world`, phụ thuộc ngược
+vào `engine-ecs`, không benchmark được từ trong module này):
+
+| Entity | `EcsWorld.update()` (avg) | So ngân sách 4ms |
+|---|---|---|
+| 100 (≈ soak test 2026-07-26, ~82 nhân vật thật) | 1.271 µs | 0.03% |
+| 500 | 4.842 µs | 0.12% |
+| 1000 | 18.009 µs | 0.45% |
+| 5000 | 146.560 µs | 3.66% |
+
+**Kết luận: Revisit Trigger CHƯA kích hoạt** — kể cả ở 5000 entity (gấp ~60 lần quy mô 1 map thật
+hiện tại), cơ chế Ashley chỉ ăn 3.66% ngân sách ECS. Ước tính thô cần **hàng chục nghìn entity**
+mới chạm 4ms — vượt xa quy mô 1 map MVP hiện có.
+
+⚠️ **Xu hướng đáng ghi lại** (không phải lý do đổi ECS bây giờ): chi phí/entity KHÔNG tuyến tính —
+tăng ~3x khi entity tăng 10 lần (500→5000: 0.0097µs/entity → 0.0293µs/entity) — nhất quán với lo
+ngại đã ghi ở Alternatives (Ashley không archetype-based). Đây là tín hiệu **theo dõi cho tương
+lai** nếu game mở rộng sang bản đồ hàng nghìn entity đồng thời (chưa có kế hoạch), không phải lý do
+hành động bây giờ (Điều 9).
+
+**Quyết định giữ nguyên: tiếp tục dùng Ashley.** Không tạo ADR `Supersedes` vì không đổi quyết định.
+Số liệu đầy đủ: [ECS.md §9](../../03-engine/ECS.md), `benchmarks/results/engine-ecs-jmh-result.json`.

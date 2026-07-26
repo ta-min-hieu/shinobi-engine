@@ -27,6 +27,10 @@ dependencies {
     implementation(project(":engine:engine-scripting"))
     implementation("io.netty:netty-all:4.1.136.Final")
     implementation("org.slf4j:slf4j-api:2.0.18")
+    // Metrics (ADR-015) — MODULE DUY NHẤT được import io.micrometer.* (server-world dùng qua
+    // TickMetricsPort, cùng lý do chỉ gateway biết Netty).
+    implementation(libs.micrometer.core)
+    implementation(libs.micrometer.registry.prometheus)
     // Binding thật (Logback) — không có binding = log biến mất im lặng, không chấp nhận được
     // cho server (LOGGING/OBSERVABILITY §5 — JSON structured log ở production, text ở dev).
     runtimeOnly("ch.qos.logback:logback-classic:1.5.31")

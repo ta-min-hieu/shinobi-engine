@@ -75,6 +75,7 @@ public final class WorldFacade {
     private static final float BOSS_SPAWN_Y = 0f;
 
     private final WorldOutboundSink outboundSink;
+    private final TickMetricsPort tickMetricsPort;
     private final Queue<WorldCommand> inbox = new ConcurrentLinkedQueue<>();
     private final EcsWorld ecsWorld = new EcsWorld();
     private final AreaOfInterestTracker aoiTracker;
@@ -135,8 +136,19 @@ public final class WorldFacade {
      * cần sửa lại World.
      */
     public WorldFacade(WorldOutboundSink outboundSink, boolean spawnOverworldContent) {
+        this(outboundSink, spawnOverworldContent, TickMetricsPort.NO_OP);
+    }
+
+    /**
+     * {@code tickMetricsPort} đo {@code kage.tick.duration} (ADR-015, Phase 9 lát cắt 1) — chỉ
+     * World chính truyền implementation thật (Micrometer, xem {@code GatewayBootstrap}); dungeon/
+     * arena instance vẫn dùng {@link TickMetricsPort#NO_OP} qua overload trên (scope cut lát cắt
+     * này — capacity planning ưu tiên World chính trước, xem ROADMAP.md Phase 9).
+     */
+    public WorldFacade(WorldOutboundSink outboundSink, boolean spawnOverworldContent, TickMetricsPort tickMetricsPort) {
         this.outboundSink = outboundSink;
         this.spawnOverworldContent = spawnOverworldContent;
+        this.tickMetricsPort = tickMetricsPort;
         this.aoiTracker = new AreaOfInterestTracker(outboundSink);
         this.combatSystem = new CombatSystem(this::lookupEntity);
         this.skillSystem = new SkillSystem(this::lookupEntity);
@@ -237,6 +249,7 @@ public final class WorldFacade {
             tickOnce();
 
             long elapsed = System.nanoTime() - start;
+            tickMetricsPort.recordTickDuration(elapsed);
             long sleepNanos = fixedDtNanos - elapsed;
             if (sleepNanos > 0) {
                 LockSupport.parkNanos(sleepNanos);

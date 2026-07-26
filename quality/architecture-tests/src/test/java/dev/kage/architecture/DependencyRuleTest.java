@@ -48,6 +48,13 @@ class DependencyRuleTest {
                     .because("Chỉ server-database chạm Redis/Valkey client (Điều 23)");
 
     @ArchTest
+    static final ArchRule chi_server_gateway_dung_micrometer =
+            noClasses()
+                    .that().resideOutsideOfPackage("..server.gateway..")
+                    .should().dependOnClassesThat().resideInAnyPackage("io.micrometer..")
+                    .because("Chỉ server-gateway biết Micrometer (ADR-015) — server-world dùng qua TickMetricsPort");
+
+    @ArchTest
     static final ArchRule domain_khong_import_infrastructure =
             noClasses()
                     .that().resideInAPackage("..domain..")

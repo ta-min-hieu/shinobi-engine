@@ -132,6 +132,19 @@ Toàn bộ 4 ADR chặn Phase 3 đã Accepted — **Phase 3 đủ điều kiện
 |---|---|
 | **Dungeon instance model**: cùng process, World riêng trong 1 JVM (không phải OS process riêng) | ✅ [ADR-026](01-architecture/adr/ADR-026-Dungeon-Instance-Model.md) |
 
+### ✅ Đã chốt (2026-07-26) — không còn chặn Phase 9
+
+| Quyết định | ADR |
+|---|---|
+| **Micrometer cho Metrics, OpenTelemetry cho Tracing** | ✅ [ADR-015](01-architecture/adr/ADR-015-Micrometer-vs-OpenTelemetry.md) |
+| **Docker Compose + VM đơn, không dùng Kubernetes** | ✅ [ADR-014](01-architecture/adr/ADR-014-Kubernetes-vs-Docker-Compose.md) |
+
+### ⏳ Proposed (2026-07-26) — số liệu thật đã có, chờ chủ dự án xác nhận
+
+| Quyết định | ADR |
+|---|---|
+| **ZGC cho server** — soak test 2h14 thật: pause max 0.052ms, không leak | ⏳ [ADR-019](01-architecture/adr/ADR-019-GC-Choice.md) |
+
 ### 🟡 Chặn Phase sau
 
 | # | Quyết định | ADR |
@@ -139,9 +152,6 @@ Toàn bộ 4 ADR chặn Phase 3 đã Accepted — **Phase 3 đủ điều kiện
 | 7 | **Desktop-first hay mobile-first** (ảnh hưởng input/UI/launcher) | ADR-023 |
 | 8 | Viewport strategy — công bằng PvP (chặn Phase 1) | ADR-020 |
 | 9 | gdx-ai hay tự viết FSM | ADR-022 |
-| 10 | Micrometer vs OpenTelemetry ranh giới | ADR-015 |
-| 11 | Kubernetes hay Docker Compose | ADR-014 |
-| 12 | Chọn GC (ZGC khuyến nghị) | ADR-019 |
 | 13 | Phạm vi Plugin (hoặc bỏ hẳn) | ADR-007 |
 | 15 | Asset distribution / CDN | ADR-024 |
 | 16 | i18n: có tiếng Anh ở MVP không | — |

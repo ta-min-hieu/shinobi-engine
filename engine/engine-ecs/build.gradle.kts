@@ -2,6 +2,18 @@
 // KHÔNG phụ thuộc engine-core (server không được kéo theo rendering — ENGINE.md §9).
 plugins {
     id("kage.quality-conventions")
+    alias(libs.plugins.jmh)
+}
+jmh {
+    jmhVersion.set(libs.versions.jmh)
+    // BENCHMARK.md §3 mẫu chuẩn dự án — Fork 2 JVM riêng (tránh nhiễu), warmup 5x1s, đo 10x1s.
+    fork.set(2)
+    warmupIterations.set(5)
+    warmup.set("1s")
+    iterations.set(10)
+    timeOnIteration.set("1s")
+    resultsFile.set(rootProject.file("benchmarks/results/engine-ecs-jmh-result.json"))
+    resultFormat.set("JSON")
 }
 dependencies {
     api(project(":shared:shared-common"))

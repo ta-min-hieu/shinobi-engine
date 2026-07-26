@@ -65,3 +65,4 @@ include(":quality:architecture-tests")   // ArchUnit (ADR-011) — enforce depen
 
 // ---- tools ----
 // tools:asset-pipeline: THÊM ở Phase 1 (RESOURCE.md). Không scaffold trước.
+include(":tools:load-test")   // BENCHMARK.md §5 — Phase 9 lát cắt 2, client giả lập qua socket thật

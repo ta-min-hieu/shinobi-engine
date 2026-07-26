@@ -44,9 +44,12 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-011](ADR-011-Enforce-Dependency-Rules.md) | Dùng ArchUnit thực thi luật dependency bằng máy | ⏳ **Proposed** *(code đã chạy thật từ Phase 0 — chờ xác nhận)* | — |
 | [ADR-012](ADR-012-Package-Root.md) | Package root `dev.kage` | ✅ Accepted | — |
 | [ADR-013](ADR-013-Flyway-vs-Liquibase.md) | Dùng Flyway làm công cụ migration DB | ✅ Accepted | — |
+| [ADR-014](ADR-014-Kubernetes-vs-Docker-Compose.md) | Docker Compose + VM đơn, không dùng Kubernetes | ✅ Accepted | — |
+| [ADR-015](ADR-015-Micrometer-vs-OpenTelemetry.md) | Micrometer cho Metrics, OpenTelemetry cho Tracing | ✅ Accepted | — |
 | [ADR-016](ADR-016-Scripting-Engine.md) | Dùng GraalJS làm scripting engine | ✅ Accepted | — |
 | [ADR-017](ADR-017-Auth-Token.md) | Auth token: session token tự phát hành + Redis | ✅ Accepted | — |
 | [ADR-018](ADR-018-Tick-Rate.md) | Tick rate **60Hz** | ✅ Accepted | — |
+| [ADR-019](ADR-019-GC-Choice.md) | Dùng ZGC cho server production | ⏳ **Proposed** *(số liệu thật đã có, chờ xác nhận)* | — |
 | [ADR-025](ADR-025-Idempotency.md) | Idempotency cho Command có side-effect | ✅ Accepted | — |
 | [ADR-026](ADR-026-Dungeon-Instance-Model.md) | Dungeon instance model: cùng process, World riêng trong 1 JVM | ✅ Accepted | — |
 
@@ -58,16 +61,13 @@ Tổng hợp từ toàn bộ tài liệu. **Không code chạm các vùng này k
 
 | ADR | Nội dung | Ưu tiên | Chặn | Nguồn |
 |---|---|---|---|---|
-| **ADR-014** | Kubernetes hay chỉ Docker Compose | 🟢 Thấp | Phase 9 | [KUBERNETES.md](../../07-infrastructure/KUBERNETES.md) |
-| **ADR-015** | Micrometer vs OpenTelemetry (ranh giới) | 🟡 Trung bình | Phase 9 | [OBSERVABILITY.md](../../07-infrastructure/OBSERVABILITY.md) |
-| **ADR-019** | Chọn GC (G1 vs ZGC vs Shenandoah) | 🟢 Thấp | Phase 9 | [JVM.md](../../09-performance/JVM.md) |
 | **ADR-020** | Viewport strategy (ảnh hưởng công bằng PvP) | 🟡 Trung bình | Phase 1 | [RENDERING.md §3](../../03-engine/RENDERING.md) |
 | **ADR-021** | Box2D vs AABB tự viết cho chuyển động nhân vật | 🟢 Thấp | Chờ dữ liệu Phase 3 | [PHYSICS.md §10](../../03-engine/PHYSICS.md) |
 | **ADR-022** | gdx-ai hay tự viết FSM/pathfinding | 🟡 Trung bình | Phase 2 | [AI.md §5](../../03-engine/AI.md) |
 | **ADR-023** | Mobile input scheme (joystick ảo / tap-to-move) | 🟡 Trung bình | Phase 2 nếu mobile-first | [CLIENT.md §5](../../04-client/CLIENT.md) |
 | **ADR-024** | Asset distribution: đóng gói / patch / CDN | 🟢 Thấp | Phase 10 | [RESOURCE.md §10](../../04-client/RESOURCE.md) |
 
-> ADR-013, ADR-017, ADR-025 đã Accepted (2026-07-19), ADR-016 đã Accepted (2026-07-20), ADR-026 đã Accepted (2026-07-24) — xem bảng "Danh sách ADR" ở trên, không còn nằm ở đây.
+> ADR-013, ADR-017, ADR-025 đã Accepted (2026-07-19), ADR-016 đã Accepted (2026-07-20), ADR-026 đã Accepted (2026-07-24), ADR-014/ADR-015 đã Accepted (2026-07-26), ADR-019 đã viết Proposed (2026-07-26, chờ Accepted) — xem bảng "Danh sách ADR" ở trên, không còn nằm ở đây.
 
 ---
 

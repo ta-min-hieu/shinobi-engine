@@ -39,9 +39,9 @@
 
 **Không** dùng OpenTelemetry Metrics. **Không** dùng Micrometer Tracing.
 
-⏳ Cần **ADR-015** chốt — đây là khuyến nghị.
+✅ **Chốt** — [ADR-015](../01-architecture/adr/ADR-015-Micrometer-vs-OpenTelemetry.md) (2026-07-26), đúng phân định trên.
 
-**Lựa chọn thay thế**: dùng OpenTelemetry cho **cả ba** (chuẩn hoá một vendor). Đơn giản hơn về mặt khái niệm, nhưng OTel Metrics cho JVM chưa trưởng thành bằng Micrometer.
+**Lựa chọn thay thế đã cân nhắc và không chọn**: dùng OpenTelemetry cho **cả ba** (chuẩn hoá một vendor) — đơn giản hơn về mặt khái niệm, nhưng OTel Metrics cho JVM chưa trưởng thành bằng Micrometer (lý do đầy đủ ở ADR-015).
 
 ---
 
@@ -51,7 +51,7 @@
 
 | Metric | Kiểu | Vì sao |
 |---|---|---|
-| `kage.tick.duration` | Timer | ⚠️ **Metric quan trọng nhất.** p50/p95/**p99** |
+| `kage.tick.duration` | Timer | ⚠️ **Metric quan trọng nhất.** p50/p95/**p99** — ✅ **implemented 2026-07-26** (Phase 9 lát cắt 1): `WorldFacade.tickLoop` ghi qua `TickMetricsPort`/`MicrometerTickMetricsPort`, scrape ở `GET /metrics` (cổng 9404, `MetricsHttpServer`), tag `world` cố định (chỉ `"main"` — dungeon/arena chưa đo, xem ROADMAP.md Phase 9) |
 | `kage.tick.overrun.count` | Counter | Tick vượt ngân sách ([SERVER.md §3](../05-server/SERVER.md)) |
 | `kage.players.online` | Gauge | — |
 | `kage.entities.count` | Gauge | Theo map |
@@ -225,7 +225,7 @@ Command từ client
 
 | # | Quyết định | Lý do | Trạng thái |
 |---|---|---|---|
-| 1 | **Micrometer cho Metrics, OpenTelemetry cho Tracing** — không chồng lấn | Hai hệ metrics = số liệu lệch, không ai tin | ⏳ **Đề xuất — ADR-015** |
+| 1 | **Micrometer cho Metrics, OpenTelemetry cho Tracing** — không chồng lấn | Hai hệ metrics = số liệu lệch, không ai tin | Accepted — [ADR-015](../01-architecture/adr/ADR-015-Micrometer-vs-OpenTelemetry.md) |
 | 2 | **Đo p99, không phải trung bình** | Trung bình che giật của 1% người chơi | Accepted |
 | 3 | ⚠️ **Không dùng ID làm tag metric** | Cardinality nổ → Prometheus OOM | Accepted |
 | 4 | JSON structured log ở production | Máy parse được | Accepted |
@@ -236,12 +236,6 @@ Command từ client
 | 9 | Health check tự implement, không Spring Actuator | [ADR-009](../01-architecture/adr/ADR-009-Why-No-Spring-Boot.md) | Accepted |
 | 10 | **Ngưỡng alert chưa có** — phải đo baseline Phase 9 | Ngưỡng bừa = alert fatigue | ⏳ |
 | 11 | Alert không hành động được → **không tạo** | Nhiễu làm hỏng cả hệ thống alert | Accepted |
-
-## ADR cần tạo
-
-| ADR | Nội dung | Ưu tiên |
-|---|---|---|
-| **ADR-015** | **Micrometer vs OpenTelemetry** — ranh giới §2 | 🟡 Chặn Phase 9 |
 
 ## Tài liệu liên quan
 
@@ -254,7 +248,7 @@ Command từ client
 
 ## Việc cần làm tiếp theo
 
-1. **Chốt ADR-015** trước Phase 9.
+1. ✅ **ADR-015 đã chốt** (2026-07-26).
 2. Phase 3: thêm `kage.tick.duration` **sớm nhất có thể** — đây là metric duy nhất mà không có nó thì không biết server có khoẻ không.
 3. Phase 9: đo **baseline** trước, đặt ngưỡng alert sau (§8).
 4. Phase 5: `kage.gold.total` (§3.5) — trước khi có shop/gold, và bắt buộc trước trade (Phase 7).

@@ -103,8 +103,8 @@ Các số phiên bản trong tài liệu này là **baseline đề xuất tại 
 | Thành phần | Vai trò | Vì sao | Khi nào dùng |
 |---|---|---|---|
 | **SLF4J + Logback** | Logging facade + impl | Chuẩn de-facto; JSON structured log cho production | Phase 0 |
-| **Micrometer** | Metrics facade | Không lock-in backend metrics | Phase 3 |
-| **Prometheus** | Metrics storage | Pull model hợp game server | Phase 9 |
+| **Micrometer** | Metrics facade | Không lock-in backend metrics | Phase 3 dự kiến — ✅ thực tế wiring ở Phase 9 lát cắt 1 (2026-07-26), Phase 3 chỉ liệt kê trong bảng, chưa code |
+| **Prometheus** | Metrics storage | Pull model hợp game server | ✅ scrape endpoint thật từ Phase 9 lát cắt 1 (`GET /metrics`, cổng 9404) |
 | **Grafana** | Dashboard | Chuẩn ngành | Phase 9 |
 | **OpenTelemetry** | Tracing | Trace xuyên gateway→world→feature→DB | Phase 9 — khi có nhiều service |
 
@@ -170,11 +170,9 @@ Mọi dependency mới **ngoài** danh sách trên phải ghi vào đây (Điề
 
 | # | Vấn đề | Đang chặn gì | ADR |
 |---|---|---|---|
-| 1 | **Kubernetes hay chỉ Docker Compose** | [KUBERNETES.md](../07-infrastructure/KUBERNETES.md), deploy/ | ❌ Cần ADR-014 |
-| 2 | **Ashley vs ECS tự viết** | Không chặn MVP; đánh giá lại Phase 9 | [ADR-006](adr/ADR-006-Why-ECS.md) — Accepted tạm |
-| 3 | **Micrometer vs OpenTelemetry** ranh giới | [OBSERVABILITY.md](../07-infrastructure/OBSERVABILITY.md) | ❌ Cần ADR-015 |
+| 1 | **Ashley vs ECS tự viết** | Không chặn MVP; đánh giá lại Phase 9 | [ADR-006](adr/ADR-006-Why-ECS.md) — Accepted tạm |
 
-**Đã chốt (2026-07-19):** Redis ([ADR-005](adr/ADR-005-Why-Redis.md) ✅), Flyway ([ADR-013](adr/ADR-013-Flyway-vs-Liquibase.md) ✅). **Đã chốt (2026-07-20):** GraalJS ([ADR-016](adr/ADR-016-Scripting-Engine.md) ✅).
+**Đã chốt (2026-07-19):** Redis ([ADR-005](adr/ADR-005-Why-Redis.md) ✅), Flyway ([ADR-013](adr/ADR-013-Flyway-vs-Liquibase.md) ✅). **Đã chốt (2026-07-20):** GraalJS ([ADR-016](adr/ADR-016-Scripting-Engine.md) ✅). **Đã chốt (2026-07-26):** Docker Compose không K8s ([ADR-014](adr/ADR-014-Kubernetes-vs-Docker-Compose.md) ✅), Micrometer/OTel ranh giới ([ADR-015](adr/ADR-015-Micrometer-vs-OpenTelemetry.md) ✅).
 
 **Không code chạm các thành phần trên khi ADR chưa Accepted** (Điều 37).
 
@@ -193,13 +191,8 @@ Mọi dependency mới **ngoài** danh sách trên phải ghi vào đây (Điề
 | 7 | Box2D không dùng cho combat | Accepted |
 | 8 | Mọi số version phải verify trước khi vào `libs.versions.toml` | Accepted |
 | 9 | GraalJS làm scripting engine | Accepted — [ADR-016](adr/ADR-016-Scripting-Engine.md) |
-
-## ADR cần tạo
-
-| ADR | Nội dung | Ưu tiên |
-|---|---|---|
-| **ADR-014** | Kubernetes hay Docker Compose | Thấp — chặn Phase 9 |
-| **ADR-015** | Micrometer vs OpenTelemetry | Trung bình — chặn Phase 9 |
+| 10 | Docker Compose + VM đơn, không Kubernetes | Accepted — [ADR-014](adr/ADR-014-Kubernetes-vs-Docker-Compose.md) |
+| 11 | Micrometer (Metrics) + OpenTelemetry (Tracing) | Accepted — [ADR-015](adr/ADR-015-Micrometer-vs-OpenTelemetry.md) |
 
 ## Tài liệu liên quan
 

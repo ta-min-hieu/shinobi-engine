@@ -163,7 +163,7 @@ jobs:
 
 ## 8. Deploy
 
-⏳ **Chưa chốt** — phụ thuộc ADR-014 ([KUBERNETES.md](KUBERNETES.md)).
+✅ **Chốt** — [ADR-014](../01-architecture/adr/ADR-014-Kubernetes-vs-Docker-Compose.md) (2026-07-26): Docker Compose trên VM đơn, không dùng Kubernetes ([KUBERNETES.md](KUBERNETES.md) giữ Deprecated).
 
 **Nguyên tắc bất kể chọn gì** (Điều 40 + [ROADMAP.md](../11-process/ROADMAP.md)):
 
@@ -232,14 +232,13 @@ Chi tiết: [GIT-WORKFLOW.md](../11-process/GIT-WORKFLOW.md).
 | 7 | **Không auto-deploy Production** | Deploy = đá người chơi | Accepted |
 | 8 | Nightly build **không cache** | Cache che lỗi | Accepted |
 | 9 | Secret đã commit → **rotate**, không chỉ xoá | Lịch sử git đọc được | Accepted |
-| 10 | Deploy target chưa chốt | Chờ ADR-014 | ⏳ |
+| 10 | Deploy target: Docker Compose + VM đơn | [ADR-014](../01-architecture/adr/ADR-014-Kubernetes-vs-Docker-Compose.md) | Accepted |
 
 ## ADR cần tạo
 
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
 | **ADR-011** | **ArchUnit rules cụ thể** (§4) — quan trọng nhất | 🔴 **Chặn Phase 0** |
-| **ADR-014** | Deploy target (§8) | 🟢 Chặn Phase 9 |
 
 ## Tài liệu liên quan
 

@@ -155,7 +155,7 @@ generic (`PostgreSQLContainer`, không phải `PostgreSQLContainer<?>`).
 |---|---|---|
 | **Development** | `docker-compose.yml` | Volume persist; log DEBUG; TLS tắt (tường minh) |
 | **Test/CI** | `docker-compose.ci.yml` | Không volume (sạch mỗi lần); nhanh nhất có thể |
-| **Production** | ⏳ Chưa chốt | Phụ thuộc ADR-014 (K8s hay không) |
+| **Production** | `docker-compose.prod.yml` (mới, khi viết) | [ADR-014](../01-architecture/adr/ADR-014-Kubernetes-vs-Docker-Compose.md) ✅ — không K8s, chạy trên VM đơn cùng cơ chế Compose |
 
 ---
 

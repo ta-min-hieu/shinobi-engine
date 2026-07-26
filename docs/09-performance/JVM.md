@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | Version | 1.0.0 |
-| Status | Draft — ⏳ **chọn GC chờ ADR-019** |
+| Status | Draft — ✅ **ADR-019 đề xuất ZGC** (2026-07-26, số liệu thật từ soak test — chờ chủ dự án xác nhận Accepted) |
 | Liên quan | [PERFORMANCE.md](PERFORMANCE.md), [JAVA-GUIDELINES.md](../02-coding-standards/JAVA-GUIDELINES.md) |
 
 ---
@@ -43,9 +43,11 @@ Game server: GC pause 200ms → 12 tick bị bỏ (@60Hz) → toàn bộ ngườ
 
 **Shenandoah** — tương tự ZGC; ZGC được Oracle đầu tư mạnh hơn.
 
-### Khuyến nghị: **ZGC** (chờ số liệu xác nhận)
+### Khuyến nghị: **ZGC** — ✅ xác nhận bằng số liệu thật
 
-⏳ **ADR-019** — phải đo ở Phase 9 mới chốt được. Đây là **khuyến nghị dựa trên đặc tính**, không phải kết luận từ số liệu của dự án này.
+✅ **[ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md)** (2026-07-26) — soak test 2h14 thật, 80
+client đồng thời: STW pause tối đa đo được **0.052ms** (không phải ước lượng), heap Live giữ
+nguyên 39M suốt 34 chu kỳ GC liên tiếp (không leak). Không còn là "khuyến nghị dựa trên đặc tính".
 
 ---
 
@@ -54,9 +56,11 @@ Game server: GC pause 200ms → 12 tick bị bỏ (@60Hz) → toàn bộ ngườ
 ⚠️ **CHƯA VERIFY** — là điểm khởi đầu để đo, không phải cấu hình cuối.
 
 ```bash
-# --- GC (chờ ADR-019) ---
+# --- GC (ADR-019 ✅ — ZGC) ---
 -XX:+UseZGC
--XX:+ZGenerational              # ZGC thế hệ mới — cần verify hỗ trợ ở Java 25
+# ⚠️ PHÁT HIỆN THẬT (2026-07-26, verify trên JDK 25): -XX:+ZGenerational KHÔNG còn hợp lệ — JDK in
+# cảnh báo "Ignoring option ZGenerational; support was removed in 24.0". Từ JDK 24, ZGC thế hệ là
+# chế độ DUY NHẤT khi bật -XX:+UseZGC, không cần (và không còn) flag riêng. KHÔNG thêm flag này.
 
 # --- Bộ nhớ ---
 -XX:MaxRAMPercentage=75.0       # Container: chừa chỗ cho native (DOCKER.md §7)
@@ -199,7 +203,7 @@ Client khác server:
 
 | | Server | Client |
 |---|---|---|
-| GC | ZGC (chờ ADR-019) | ⚠️ **Không kiểm soát được** trên Android |
+| GC | ZGC ([ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md) ✅) | ⚠️ **Không kiểm soát được** trên Android |
 | Heap | Lớn | Nhỏ (mobile) |
 | JFR | ✅ | Chỉ khi debug |
 
@@ -213,7 +217,7 @@ Client khác server:
 
 | # | Quyết định | Lý do | Trạng thái |
 |---|---|---|---|
-| 1 | **ZGC (khuyến nghị)** cho server | Pause < 1ms; đánh đổi throughput 10% đáng cho game | ⏳ **ADR-019 — chờ số liệu Phase 9** |
+| 1 | **ZGC** cho server | Pause đo thật 0.052ms max (soak test 2h14, 80 client); heap Live không tăng suốt 34 chu kỳ GC | ✅ [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md) — Proposed, chờ Accepted |
 | 2 | **JFR bật ở production** | Overhead 1%; có dữ liệu khi sự cố | Accepted |
 | 3 | `MaxRAMPercentage=75`, **không `-Xmx` cố định** | Chừa chỗ native; image chạy nhiều cấu hình | Accepted |
 | 4 | `ExitOnOutOfMemoryError` | Chết hẳn > sống dở | Accepted |
@@ -222,12 +226,6 @@ Client khác server:
 | 7 | Netty leak detector: `paranoid` ở dev | Quên `release()` là lỗi phổ biến nhất | Accepted |
 | 8 | **Android dùng ART — mọi thứ về GC ở đây không áp dụng** | Trung thực về giới hạn | Accepted |
 | 9 | Flags §3 **chưa verify** | Điểm khởi đầu để đo | ⏳ |
-
-## ADR cần tạo
-
-| ADR | Nội dung | Ưu tiên |
-|---|---|---|
-| **ADR-019** | **Chọn GC** — cần số liệu Phase 9 | 🟢 Chặn Phase 9 |
 
 ## Tài liệu liên quan
 
@@ -239,6 +237,7 @@ Client khác server:
 
 ## Việc cần làm tiếp theo
 
-1. Phase 0: bật JFR + GC log ngay — **thu thập dữ liệu từ đầu**, không đợi có vấn đề.
-2. Phase 9: đo G1 vs ZGC **trên workload thật** → chốt ADR-019. Không chốt dựa trên tài liệu này.
-3. Phase 2: bật Netty leak detector `paranoid` ở dev (§8).
+1. ✅ Phase 0: bật JFR + GC log ngay — đã dùng thật lúc soak test 2026-07-26.
+2. ✅ Phase 9: đo ZGC **trên workload thật** (soak 2h14, 80 client) → [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md) Proposed. Chưa đo G1 thực nghiệm trên chính dự án (xem Revisit Trigger ADR-019) — quyết định dựa trên số liệu ZGC thật + đặc tính G1 đã biết rộng rãi.
+3. ✅ Phase 2: bật Netty leak detector `paranoid` ở dev (§8).
+4. Chủ dự án xác nhận ADR-019 Accepted.

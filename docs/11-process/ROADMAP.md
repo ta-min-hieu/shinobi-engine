@@ -432,9 +432,9 @@ Chi tiết kỹ thuật:
 | 🔴 **Load test + Soak test ≥ 2h** | [BENCHMARK.md §5](../09-performance/BENCHMARK.md) |
 | Đo & cập nhật **toàn bộ ngân sách** | [PERFORMANCE.md §2](../09-performance/PERFORMANCE.md) |
 | 🔴 **Đánh giá lại ADR-006 (Ashley)** | [ECS.md §9](../03-engine/ECS.md) |
-| Chốt ADR-019 (GC) | [JVM.md §2](../09-performance/JVM.md) |
+| ✅ **ADR-019 (GC) — Proposed** (2026-07-26, soak test thật 2h14, 80 client, chờ Accepted) | [JVM.md §2](../09-performance/JVM.md), [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md) |
 | Prometheus + Grafana + Alerts + Tracing | [OBSERVABILITY.md §10](../07-infrastructure/OBSERVABILITY.md) |
-| Chốt ADR-015, ADR-014 | — |
+| ✅ ADR-015, ADR-014 đã chốt (2026-07-26, trước khi mở lát cắt code) | [ADR-015](../01-architecture/adr/ADR-015-Micrometer-vs-OpenTelemetry.md), [ADR-014](../01-architecture/adr/ADR-014-Kubernetes-vs-Docker-Compose.md) |
 
 **Exit Criteria:**
 - [ ] Tick p99 ≤ ngân sách dưới tải mục tiêu
@@ -442,6 +442,99 @@ Chi tiết kỹ thuật:
 - [ ] Observability đầy đủ (Điều 44)
 
 ⚠️ **Phase 9 không đóng nếu chưa có observability** — Điều 44: không có Observability thì Production không hoàn chỉnh.
+
+**Quyết định lát cắt 1 (2026-07-26)**: sau khi chốt ADR-014/ADR-015 (thảo luận trực tiếp, không cần
+số liệu), lát cắt code đầu tiên của Phase 9 là **wiring Micrometer + `kage.tick.duration`** — đây là
+metric ROADMAP/OBSERVABILITY.md §3.1 tự gọi là "quan trọng nhất, không có nó thì không biết server
+có khoẻ không", và đã bị bỏ sót từ Phase 3 (liệt kê trong bảng "Việc" nhưng chưa từng code). Chọn
+mục này trước load/soak test vì load test mà không đo được gì thì vô nghĩa — cần công cụ quan sát
+trước khi tạo tải.
+
+Chi tiết kỹ thuật: `TickMetricsPort` (mới, `server-world`) — Port giống `WorldOutboundSink`, giữ
+đúng ranh giới "gameplay không import Micrometer trực tiếp" (server/CLAUDE.md); implementation thật
+`MicrometerTickMetricsPort` + `MetricsHttpServer` (`GET /metrics`, cổng 9404, dùng
+`com.sun.net.httpserver` có sẵn trong JDK thay vì dựng pipeline Netty HTTP riêng chỉ cho 1 endpoint
+scrape — Điều 9) chỉ tồn tại ở `server-gateway` (ArchUnit rule mới
+`chi_server_gateway_dung_micrometer` chặn nơi khác import `io.micrometer.*`, cùng pattern
+Netty/JDBC/Redis). Tag `world` là nhãn CỐ ĐỊNH (`"main"`), KHÔNG phải ID instance
+(OBSERVABILITY.md §2 "không dùng ID làm tag — cardinality nổ").
+
+**Scope cut có chủ đích**: World chính có metric thật; **dungeon/arena instance CHƯA đo** (vẫn dùng
+`TickMetricsPort.NO_OP` qua overload constructor cũ của `WorldFacade`) — capacity planning ưu tiên
+World chính trước (nơi luôn có người chơi), dungeon/arena là instance ngắn hạn theo party/trận đấu,
+để dành lát cắt sau nếu cần. Cũng CHƯA làm: `kage.gold.total`, `kage.tick.overrun.count`,
+`kage.players.online`, Grafana dashboard, Alerts, Tracing (OpenTelemetry) — đây là lát cắt đầu tiên,
+chỉ 1 metric xuyên suốt từ code tới scrape endpoint thật (verify bằng `MetricsHttpServerTest`, HTTP
+thật, không mock).
+
+**Quyết định lát cắt 2 (2026-07-26)**: chọn load/soak test tooling trước Grafana/Alerts/Tracing —
+đo trước, làm đẹp sau (Điều 30). Module mới **`tools:load-test`** (BENCHMARK.md §5) — quyết định KHÔNG
+dùng tool ngoài (k6/Gatling/JMeter): protocol game là TCP + protobuf custom (KHÔNG HTTP), nên mọi
+tool chuẩn cần viết plugin/protocol extension riêng — chi phí đó cao hơn tự viết 1 client Java tái
+dùng thẳng `shared-protocol` (đã có sẵn từ `GatewayServerIntegrationTest`, chỉ khác chạy N client
+song song bằng Virtual Thread thay vì 1 client trong 1 test case), đúng Điều 9 (không phát minh lại
+những gì không cần, nhưng cũng không kéo dependency ngoài chỉ để né viết ~500 dòng Java). Client giả
+lập nói ĐÚNG giao thức dây (không gọi tắt API nội bộ) — move+combat(auto-target)+chat+ping thật, đo
+packet latency phía client + `kage.tick.duration` phía server (scrape lát cắt 1) trong CÙNG 1 dòng
+report định kỳ. Verify thật: chạy server thật (Postgres/Redis Docker tạm, cổng khác cổng dev thường
+dùng để không đụng môi trường khác đang chạy trên máy) + 10 client 20 giây — 0 lỗi, latency/tick đều
+lên số thật (không phải chạy `./gradlew test` giả lập).
+
+**Scope cut có chủ đích**: KHÔNG đo GC pause/heap/CPU/RAM trong tool này — JFR (bật sẵn từ Phase 0,
+JVM.md) đã lo phần đó, dùng song song lúc chạy soak thật, không cần trùng lặp trong `tools:load-test`.
+KHÔNG có DB pool pending metric (HikariCP chưa expose qua Micrometer — lát cắt sau nếu cần). Tool chỉ
+nhắm vào World chính qua map/dummy có sẵn — CHƯA giả lập dungeon/PvP/trade trong kịch bản tải.
+
+**Lát cắt 5 (2026-07-26) — Capacity planning theo yêu cầu chủ dự án**: thêm bộ đếm băng thông thật
+(`bytesSent`/`bytesReceived`) vào `SimulatedPlayer`/`LoadTestRunner` (đo tại tầng ứng dụng, tách
+biệt hoàn toàn traffic Postgres/Redis vì không chung socket). Chạy 2 lần: (1) soak 2h14 lát cắt 3
+cho số RAM/CPU đáng tin (2 điểm ổn định lâu: 100 và 500 client); (2) 1 lần đo nhanh 100→500 (1
+phút/mức, sau pre-warm 4 phút) cho tick time + băng thông ở cả 5 mức — phát hiện: 1 phút/mức KHÔNG
+đủ để ZGC hết pha Warmup (heap phải leo qua nhiều ngưỡng %capacity trước khi vào Proactive, mất
+~15 phút bất kể tải), nên RAM/CPU ở lần đo nhanh này KHÔNG dùng — chỉ tick time + băng thông (ít bị
+ảnh hưởng bởi GC warmup) mới đáng tin từ lần chạy đó. Kết quả tổng hợp thành công thức tại
+[BENCHMARK.md §5.1](../09-performance/BENCHMARK.md). Thử đo Disk I/O qua
+`Win32_PerfFormattedData_PerfProc_Process` (CIM) — THẤT BẠI, PHÁT HIỆN THẬT: counter "PerSecond" của
+WMI/CIM cần polling LIÊN TỤC cùng 1 session để tính delta đúng, gọi `Get-CimInstance` rời rạc mỗi
+lần cho số liệu chủ yếu 0 kèm đỉnh giả — không dùng được, để lại làm việc cần sửa nếu cần Disk I/O
+thật sau này.
+
+**Quyết định lát cắt 3 (2026-07-26)**: chạy soak test thật 2h14 (80 client đồng thời, `server-gateway`
+thật + Postgres/Redis thật qua Docker, `-XX:+UseZGC` + JFR + GC log bật đủ) để lấy số liệu chốt
+ADR-019. Kết quả: **ZGC STW pause tối đa đo được 0.052ms**, heap Live giữ nguyên 39M suốt 34 chu kỳ
+GC liên tiếp (~1h33 phút, không leak), tick p99 luôn dưới ngân sách 16.6ms (dao động 2-10ms tuỳ
+thời điểm). Viết [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md) — Status **Proposed**, chờ
+chủ dự án Accepted (AI không tự chốt, adr/README.md quy tắc #5).
+
+**2 bug thật phát hiện VÀ SỬA trong `tools:load-test`** khi soak test lần đầu chạy hỏng ngay (không
+phải đoán trước — cả hai phát hiện qua log thật):
+1. `SimulatedPlayer.playOneCycle` sleep throttle nằm cuối khối `try` — 1 lỗi socket (bình thường
+   khi nhiều client tụ 1 điểm) khiến vòng lặp gọi lại NGAY LẬP TỨC không throttle → busy-loop thật,
+   60 client sinh >20 triệu lỗi trong <5 phút. Đối chiếu server.log xác nhận server hoàn toàn khoẻ
+   mạnh suốt lúc đó — lỗi 100% phía client tool. Sửa: sleep chuyển vào `finally`.
+2. Tần suất chat giả lập (20%/cycle) vượt `RateLimiter` World chat (5 lần/10s, `GatewayChannelHandler`)
+   → server ngắt kết nối ~1 client/phút ĐÚNG THEO THIẾT KẾ chống spam, nhưng client bị ngắt không rút
+   lui, cứ lỗi lặp lại vô thời hạn suốt phần đời còn lại của soak test → lỗi cộng dồn tăng dần đều
+   dù server khoẻ mạnh (dễ nhầm là leak nếu chỉ nhìn số lỗi, không đối chiếu log server). Sửa: giảm
+   tần suất chat 20→3%, thêm `MAX_CONSECUTIVE_FAILURES=5` (client bỏ cuộc thay vì spin mãi).
+
+Server không có bug nào bị phát hiện trong suốt soak test — cả 2 sự cố đều ở công cụ đo. Server vẫn
+chạy LIÊN TỤC suốt cả 3 lần thử (không restart giữa chừng khi sửa lỗi client) để giữ nguyên lịch sử
+GC/heap — chỉ lần thứ 3 (sau khi sửa cả 2 bug) mới cho số liệu sạch dùng trong ADR-019.
+
+**Phát hiện phụ**: `-XX:+ZGenerational` (JVM.md §3) đã bị JDK gỡ từ bản 24 — generational giờ là
+chế độ ZGC duy nhất, không cần flag riêng. JVM.md đã sửa.
+
+**Quyết định lát cắt 4 (2026-07-26)**: đánh giá lại ADR-006 (Ashley ECS) bằng JMH thật thay vì suy
+đoán — dựng harness `me.champeau.jmh` cho `engine-ecs` (trễ hơn ROADMAP dự kiến ban đầu ở Phase 1,
+làm luôn ở đây vì đây mới là lúc thật sự cần). Benchmark `EcsWorldUpdateBenchmark` dùng
+`MovementSystem` làm proxy (chỉ có system này sẵn trong `engine-ecs` — AI/Combat/Skill/Boss/
+StatusEffect System đều ở `server-world`, phụ thuộc ngược, không benchmark được từ trong module).
+Kết quả: 100→5000 entity, `EcsWorld.update()` từ 1.271µs→146.560µs — kể cả ở 5000 entity (~60 lần
+quy mô 1 map thật) chỉ ăn 3.66% ngân sách ECS 4ms. **Revisit Trigger ADR-006 CHƯA kích hoạt** — giữ
+nguyên Ashley, không tạo ADR `Supersedes`. Chi phí/entity tăng không tuyến tính (~3x khi entity tăng
+10 lần) — ghi nhận làm tín hiệu theo dõi tương lai, không phải lý do đổi ECS bây giờ (Điều 9). Chi
+tiết: [ADR-006 "Ghi chú — đánh giá lại Phase 9"](../01-architecture/adr/ADR-006-Why-ECS.md).
 
 ---
 
@@ -512,4 +605,23 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **16 ADR Accepted** (gồm
 6. ✅ **Arena 1v1 + MMR cơ bản xong** (2026-07-25) — Phase 8 ĐÓNG (4/4 lát cắt: dungeon, boss AI,
    4 hệ phái, Arena). Battlefield 5v5 + Chiếm Lãnh Địa (GDD §6) để dành mở phase/lát cắt riêng sau,
    không nằm trong Phase 8.
-7. Trả lời các câu hỏi mở còn lại ở [docs/README.md](../README.md).
+7. ✅ **ADR-014 + ADR-015 Accepted** (2026-07-26, quyết định qua thảo luận trực tiếp với chủ dự án,
+   không cần chờ số liệu Phase 9) — Docker Compose + VM đơn (không K8s), Micrometer cho Metrics +
+   OpenTelemetry cho Tracing. **ADR-019 (GC) vẫn phải chờ số liệu load/soak test thật** — không thể
+   chốt bằng thảo luận, đây là lát cắt kế tiếp của Phase 9.
+8. ✅ **Phase 9 lát cắt 1 xong** (2026-07-26) — `kage.tick.duration` đo thật qua Micrometer, scrape
+   được ở `GET /metrics` (World chính).
+9. ✅ **Phase 9 lát cắt 2 xong** (2026-07-26) — `tools:load-test` chạy thật, verify bằng server thật
+   + 10 client 20 giây (0 lỗi).
+10. ✅ **Phase 9 lát cắt 3 xong** (2026-07-26) — soak test thật 2h14 (80 client), ADR-019 viết
+    Proposed với số liệu thật (ZGC pause max 0.052ms, không leak). 2 bug thật phát hiện+sửa trong
+    `tools:load-test` (không phải trong server). Cụm tick-stall bất thường (~800ms dồn trong 2.5s,
+    1 lần duy nhất lúc 12:02, không tái diễn, không rõ nguyên nhân từ log) — ghi nhận, không chặn.
+11. ✅ **Phase 9 lát cắt 4 xong** (2026-07-26) — JMH harness `engine-ecs` + benchmark thật, ADR-006
+    Revisit Trigger đánh giá lại: CHƯA kích hoạt, giữ nguyên Ashley.
+12. ✅ **Phase 9 lát cắt 5 xong** (2026-07-26) — công thức ước tính hạ tầng (RAM/CPU/băng thông theo
+    N người chơi), xem [BENCHMARK.md §5.1](../09-performance/BENCHMARK.md).
+13. Còn lại trước khi đóng Phase 9: chủ dự án xác nhận ADR-019 Accepted; mở rộng observability
+    (Grafana dashboard, Alerts, `kage.gold.total`, Tracing) — CHƯA làm, chỉ có `kage.tick.duration`
+    (lát cắt 1) — **Điều 44 chặn đóng Phase 9 nếu thiếu phần này**.
+14. Trả lời các câu hỏi mở còn lại ở [docs/README.md](../README.md).

@@ -20,6 +20,7 @@ jedis = "7.1.0"                    # ✅ latest 07/2026 — Redis client (ADR-00
 graaljs = "25.1.3"                 # ✅ latest 07/2026 (org.graalvm.polyglot:js, published ~07/2026) — ADR-016
 slf4j = "2.0.18"                  # ✅ verified 07/2026 (transitive qua logback-classic)
 logback = "1.5.31"                # ✅ latest 02/2026
+micrometer = "1.16.0"             # ✅ latest 07/2026 — ADR-015 (Metrics, Prometheus registry)
 
 # --- Test ---
 junit = "5.14.4"                  # ✅ junit-bom latest 04/2026
@@ -38,6 +39,8 @@ spotless = "7.2.1"                # ⚠️ verify — Gradle 9 compatible
 spotbugsPlugin = "6.5.9"          # ✅ SpotBugs Gradle plugin 07/2026
 errorpronePlugin = "4.3.0"        # ⚠️ verify — net.ltgt.errorprone
 protobufPlugin = "0.10.0"         # ✅ latest 07/2026 — com.google.protobuf Gradle plugin
+jmhPlugin = "0.7.3"                # ✅ latest (verified 07/2026, no release since 01/2025) — me.champeau.jmh
+jmh = "1.37"                       # ✅ latest — org.openjdk.jmh core (BENCHMARK.md §2-3)
 
 [libraries]
 # --- libGDX ---
@@ -71,6 +74,10 @@ graaljs-js = { module = "org.graalvm.polyglot:js", version.ref = "graaljs" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 
+# --- Observability (ADR-015) ---
+micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
+micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus", version.ref = "micrometer" }
+
 # --- Test ---
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }              # version từ BOM
@@ -93,3 +100,4 @@ spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 spotbugs = { id = "com.github.spotbugs", version.ref = "spotbugsPlugin" }
 errorprone = { id = "net.ltgt.errorprone", version.ref = "errorpronePlugin" }
 protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }
+jmh = { id = "me.champeau.jmh", version.ref = "jmhPlugin" }
