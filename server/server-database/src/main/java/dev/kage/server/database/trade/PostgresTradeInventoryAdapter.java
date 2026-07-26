@@ -1,11 +1,10 @@
 package dev.kage.server.database.trade;
 
-import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 import dev.kage.trade.domain.OwnedItemSnapshot;
 import dev.kage.trade.domain.Transaction;
 import dev.kage.trade.domain.TradeInventoryPort;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Optional;
@@ -55,96 +54,56 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
 
     @Override
     public Optional<OwnedItemSnapshot> findItemById(long itemId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(FIND_BY_ID)) {
-            statement.setLong(1, itemId);
-            try (ResultSet rs = statement.executeQuery()) {
-                return rs.next() ? Optional.of(mapRow(rs)) : Optional.empty();
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi tra item: itemId=" + itemId, e);
-        }
+        return JdbcOperations.queryOne(dataSource, FIND_BY_ID, PostgresTradeInventoryAdapter::mapRow, itemId);
     }
 
     @Override
     public TransferOutcome transferItem(Transaction tx, TransferRequest request) {
         Connection connection = ((JdbcTransaction) tx).connection();
-        try {
-            Optional<OwnedItemSnapshot> current = selectForUpdate(connection, request.itemId());
-            if (current.isEmpty() || current.get().characterId() != request.fromCharacterId()) {
-                return TransferOutcome.ITEM_NOT_OWNED;
-            }
-            if (current.get().quantity() < request.quantity()) {
-                return TransferOutcome.INSUFFICIENT_QUANTITY;
-            }
-            boolean isWholeRow = current.get().quantity() == request.quantity();
-            if (!isWholeRow && countItems(connection, request.toCharacterId()) >= DEFAULT_CAPACITY) {
-                return TransferOutcome.RECIPIENT_INVENTORY_FULL;
-            }
-            if (isWholeRow) {
-                updateOwner(connection, request.itemId(), request.toCharacterId());
-            } else {
-                decrementQuantity(connection, request.itemId(), request.quantity());
-                insertRow(connection, request, current.get());
-            }
-            return TransferOutcome.OK;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi chuyển item: itemId=" + request.itemId(), e);
+        Optional<OwnedItemSnapshot> current = selectForUpdate(connection, request.itemId());
+        if (current.isEmpty() || current.get().characterId() != request.fromCharacterId()) {
+            return TransferOutcome.ITEM_NOT_OWNED;
         }
+        if (current.get().quantity() < request.quantity()) {
+            return TransferOutcome.INSUFFICIENT_QUANTITY;
+        }
+        boolean isWholeRow = current.get().quantity() == request.quantity();
+        if (!isWholeRow && countItems(connection, request.toCharacterId()) >= DEFAULT_CAPACITY) {
+            return TransferOutcome.RECIPIENT_INVENTORY_FULL;
+        }
+        if (isWholeRow) {
+            JdbcOperations.update(connection, UPDATE_OWNER, request.toCharacterId(), request.itemId());
+        } else {
+            JdbcOperations.update(connection, DECREMENT_QUANTITY, request.quantity(), request.itemId());
+            insertRow(connection, request, current.get());
+        }
+        return TransferOutcome.OK;
     }
 
-    private static Optional<OwnedItemSnapshot> selectForUpdate(Connection connection, long itemId)
-            throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(SELECT_FOR_UPDATE)) {
-            statement.setLong(1, itemId);
-            try (ResultSet rs = statement.executeQuery()) {
-                if (!rs.next()) {
-                    return Optional.empty();
-                }
-                return Optional.of(new OwnedItemSnapshot(
+    private static Optional<OwnedItemSnapshot> selectForUpdate(Connection connection, long itemId) {
+        return JdbcOperations.queryOne(
+                connection,
+                SELECT_FOR_UPDATE,
+                rs -> new OwnedItemSnapshot(
                         itemId, rs.getLong("character_id"), rs.getLong("item_template_id"), rs.getInt("quantity"),
-                        rs.getInt("enhance_level")));
-            }
-        }
+                        rs.getInt("enhance_level")),
+                itemId);
     }
 
-    private static int countItems(Connection connection, long characterId) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(COUNT_ITEMS)) {
-            statement.setLong(1, characterId);
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return rs.getInt(1);
-            }
-        }
+    private static int countItems(Connection connection, long characterId) {
+        return JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId).orElse(0);
     }
 
-    private static void updateOwner(Connection connection, long itemId, long newOwnerCharacterId)
-            throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(UPDATE_OWNER)) {
-            statement.setLong(1, newOwnerCharacterId);
-            statement.setLong(2, itemId);
-            statement.executeUpdate();
-        }
-    }
-
-    private static void decrementQuantity(Connection connection, long itemId, int quantity) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(DECREMENT_QUANTITY)) {
-            statement.setInt(1, quantity);
-            statement.setLong(2, itemId);
-            statement.executeUpdate();
-        }
-    }
-
-    private static void insertRow(Connection connection, TransferRequest request, OwnedItemSnapshot original)
-            throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(INSERT_ROW)) {
-            statement.setLong(1, request.toCharacterId());
-            statement.setLong(2, original.itemTemplateId());
-            statement.setInt(3, request.quantity());
-            statement.setInt(4, original.enhanceLevel());
-            statement.setInt(5, countItems(connection, request.toCharacterId())); // nối vào cuối danh sách hiện có
-            statement.executeUpdate();
-        }
+    private static void insertRow(Connection connection, TransferRequest request, OwnedItemSnapshot original) {
+        // slot_index — nối vào cuối danh sách hiện có.
+        JdbcOperations.update(
+                connection,
+                INSERT_ROW,
+                request.toCharacterId(),
+                original.itemTemplateId(),
+                request.quantity(),
+                original.enhanceLevel(),
+                countItems(connection, request.toCharacterId()));
     }
 
     private static OwnedItemSnapshot mapRow(ResultSet rs) throws SQLException {

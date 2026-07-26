@@ -7,13 +7,13 @@ import dev.kage.party.domain.PartyMember;
 import dev.kage.party.domain.PartyPort;
 import dev.kage.party.domain.PartyRole;
 import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import javax.sql.DataSource;
@@ -23,6 +23,12 @@ import javax.sql.DataSource;
  * {@code party_invite} (V15). {@link #createParty}, {@link #acceptInvite}, {@link #leaveParty}
  * chạm nhiều bảng nguyên tử bằng transaction thủ công (KHÔNG {@code TransactionRunner} riêng —
  * xem javadoc {@link PartyPort}).
+ *
+ * <p>3 method đó (và mọi helper riêng bên trong) CỐ Ý không dùng {@link JdbcOperations} — dựa vào
+ * {@link SQLException} checked bắt đúng chỗ để rollback/lock đúng thứ tự (giống lý do ở
+ * {@code PostgresGuildAdapter}: {@code JdbcOperations} bọc exception thành unchecked, nhảy qua mất
+ * khối {@code catch (SQLException e)} đang chờ). Method đọc/ghi đơn giản còn lại dùng
+ * {@code JdbcOperations} như adapter khác.
  */
 public final class PostgresPartyAdapter implements PartyPort {
 
@@ -115,32 +121,12 @@ public final class PostgresPartyAdapter implements PartyPort {
 
     @Override
     public Optional<PartyMember> findMembershipOf(long characterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(FIND_MEMBERSHIP)) {
-            statement.setLong(1, characterId);
-            try (ResultSet rs = statement.executeQuery()) {
-                return rs.next() ? Optional.of(mapMember(rs)) : Optional.empty();
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi tra thành viên party: characterId=" + characterId, e);
-        }
+        return JdbcOperations.queryOne(dataSource, FIND_MEMBERSHIP, PostgresPartyAdapter::mapMember, characterId);
     }
 
     @Override
     public List<PartyMember> listMembers(long partyId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(LIST_MEMBERS)) {
-            statement.setLong(1, partyId);
-            ArrayList<PartyMember> result = new ArrayList<PartyMember>();
-            try (ResultSet rs = statement.executeQuery()) {
-                while (rs.next()) {
-                    result.add(mapMember(rs));
-                }
-            }
-            return result;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi liệt kê thành viên party: partyId=" + partyId, e);
-        }
+        return JdbcOperations.query(dataSource, LIST_MEMBERS, PostgresPartyAdapter::mapMember, partyId);
     }
 
     @Override
@@ -174,34 +160,17 @@ public final class PostgresPartyAdapter implements PartyPort {
 
     @Override
     public Optional<PartyInvite> findPendingInviteOfInvitee(long characterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(FIND_PENDING_INVITE_OF_INVITEE)) {
-            statement.setLong(1, characterId);
-            try (ResultSet rs = statement.executeQuery()) {
-                return rs.next() ? Optional.of(mapInvite(rs)) : Optional.empty();
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi tra lời mời party: characterId=" + characterId, e);
-        }
+        return JdbcOperations.queryOne(
+                dataSource, FIND_PENDING_INVITE_OF_INVITEE, PostgresPartyAdapter::mapInvite, characterId);
     }
 
     @Override
     public List<PartyInvite> listPendingInvitesOfInvitee(long characterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(LIST_PENDING_INVITES_OF_INVITEE)) {
-            statement.setLong(1, characterId);
-            ArrayList<PartyInvite> result = new ArrayList<PartyInvite>();
-            try (ResultSet rs = statement.executeQuery()) {
-                while (rs.next()) {
-                    result.add(mapInvite(rs));
-                }
-            }
-            return result;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi liệt kê lời mời party: characterId=" + characterId, e);
-        }
+        return JdbcOperations.query(
+                dataSource, LIST_PENDING_INVITES_OF_INVITEE, PostgresPartyAdapter::mapInvite, characterId);
     }
 
+    // Bẫy unique_violation → DuplicatePartyInviteException là logic nghiệp vụ đặc thù.
     @Override
     public PartyInvite invite(long partyId, long inviteeCharacterId) {
         try (Connection connection = dataSource.getConnection();
@@ -314,14 +283,7 @@ public final class PostgresPartyAdapter implements PartyPort {
 
     @Override
     public boolean rejectInvite(long inviteId, long characterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(REJECT_INVITE)) {
-            statement.setLong(1, inviteId);
-            statement.setLong(2, characterId);
-            return statement.executeUpdate() > 0;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi từ chối lời mời party: inviteId=" + inviteId, e);
-        }
+        return JdbcOperations.update(dataSource, REJECT_INVITE, inviteId, characterId) > 0;
     }
 
     @Override
@@ -403,16 +365,7 @@ public final class PostgresPartyAdapter implements PartyPort {
 
     @Override
     public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(KICK)) {
-            statement.setLong(1, targetCharacterId);
-            statement.setLong(2, leaderCharacterId);
-            return statement.executeUpdate() > 0;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException(
-                    "Lỗi kick thành viên party: leaderCharacterId=" + leaderCharacterId
-                            + ", targetCharacterId=" + targetCharacterId, e);
-        }
+        return JdbcOperations.update(dataSource, KICK, targetCharacterId, leaderCharacterId) > 0;
     }
 
     private static PartyMember mapMember(ResultSet rs) throws SQLException {

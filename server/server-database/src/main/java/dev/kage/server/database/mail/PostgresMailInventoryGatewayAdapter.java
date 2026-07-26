@@ -2,11 +2,8 @@ package dev.kage.server.database.mail;
 
 import dev.kage.mail.domain.InventoryGatewayPort;
 import dev.kage.mail.domain.Transaction;
-import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import javax.sql.DataSource;
 
 /**
@@ -37,31 +34,13 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
     @Override
     public boolean grantItem(Transaction tx, long characterId, long itemTemplateId, int quantity) {
         Connection connection = ((JdbcTransaction) tx).connection();
-        try {
-            int existingCount = countItems(connection, characterId);
-            if (existingCount >= DEFAULT_CAPACITY) {
-                return false;
-            }
-            try (PreparedStatement statement = connection.prepareStatement(INSERT_ITEM)) {
-                statement.setLong(1, characterId);
-                statement.setLong(2, itemTemplateId);
-                statement.setInt(3, quantity);
-                statement.setInt(4, existingCount); // slot_index — nối vào cuối danh sách hiện có
-                statement.executeUpdate();
-            }
-            return true;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi cộng item từ thư: characterId=" + characterId, e);
+        int existingCount =
+                JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId).orElse(0);
+        if (existingCount >= DEFAULT_CAPACITY) {
+            return false;
         }
-    }
-
-    private static int countItems(Connection connection, long characterId) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(COUNT_ITEMS)) {
-            statement.setLong(1, characterId);
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return rs.getInt(1);
-            }
-        }
+        // slot_index — nối vào cuối danh sách hiện có.
+        JdbcOperations.update(connection, INSERT_ITEM, characterId, itemTemplateId, quantity, existingCount);
+        return true;
     }
 }

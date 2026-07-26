@@ -8,6 +8,7 @@ import dev.kage.guild.domain.GuildMember;
 import dev.kage.guild.domain.GuildPort;
 import dev.kage.guild.domain.GuildRole;
 import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -15,7 +16,6 @@ import java.sql.SQLException;
 import java.sql.Savepoint;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import javax.sql.DataSource;
@@ -25,6 +25,12 @@ import javax.sql.DataSource;
  * {@code guild_join_request} (V14). {@link #createGuild} và {@link #approveJoinRequest} chạm 2
  * bảng nguyên tử bằng transaction thủ công trên 1 connection (KHÔNG {@code TransactionRunner}
  * riêng — xem javadoc {@link GuildPort}, cả 2 bảng đều thuộc feature này).
+ *
+ * <p>2 method đó (và các helper riêng của chúng) CỐ Ý không dùng {@link JdbcOperations} — chúng tự
+ * quản lý commit/rollback/savepoint dựa vào {@link SQLException} checked bắt được tại đúng chỗ;
+ * {@code JdbcOperations} bọc {@link SQLException} thành unchecked ngay bên trong, sẽ nhảy qua mất
+ * khối {@code catch (SQLException e)} đang chờ rollback đúng chỗ. Phần đọc/ghi đơn giản còn lại
+ * (không cần transaction thủ công) vẫn dùng {@code JdbcOperations} như các adapter khác.
  */
 public final class PostgresGuildAdapter implements GuildPort {
 
@@ -104,58 +110,22 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     @Override
     public Optional<Guild> findByName(String name) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(FIND_BY_NAME)) {
-            statement.setString(1, name);
-            try (ResultSet rs = statement.executeQuery()) {
-                return rs.next() ? Optional.of(mapGuild(rs)) : Optional.empty();
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi tra bang theo tên: " + name, e);
-        }
+        return JdbcOperations.queryOne(dataSource, FIND_BY_NAME, PostgresGuildAdapter::mapGuild, name);
     }
 
     @Override
     public Optional<Guild> findById(long guildId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(FIND_BY_ID)) {
-            statement.setLong(1, guildId);
-            try (ResultSet rs = statement.executeQuery()) {
-                return rs.next() ? Optional.of(mapGuild(rs)) : Optional.empty();
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi tra bang theo id: " + guildId, e);
-        }
+        return JdbcOperations.queryOne(dataSource, FIND_BY_ID, PostgresGuildAdapter::mapGuild, guildId);
     }
 
     @Override
     public Optional<GuildMember> findMembershipOf(long characterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(FIND_MEMBERSHIP)) {
-            statement.setLong(1, characterId);
-            try (ResultSet rs = statement.executeQuery()) {
-                return rs.next() ? Optional.of(mapMember(rs)) : Optional.empty();
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi tra thành viên bang: characterId=" + characterId, e);
-        }
+        return JdbcOperations.queryOne(dataSource, FIND_MEMBERSHIP, PostgresGuildAdapter::mapMember, characterId);
     }
 
     @Override
     public List<GuildMember> listMembers(long guildId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(LIST_MEMBERS)) {
-            statement.setLong(1, guildId);
-            ArrayList<GuildMember> result = new ArrayList<GuildMember>();
-            try (ResultSet rs = statement.executeQuery()) {
-                while (rs.next()) {
-                    result.add(mapMember(rs));
-                }
-            }
-            return result;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi liệt kê thành viên bang: guildId=" + guildId, e);
-        }
+        return JdbcOperations.query(dataSource, LIST_MEMBERS, PostgresGuildAdapter::mapMember, guildId);
     }
 
     @Override
@@ -164,23 +134,8 @@ public final class PostgresGuildAdapter implements GuildPort {
             connection.setAutoCommit(false);
             try {
                 Instant now = Instant.now();
-                long guildId;
-                try (PreparedStatement insertGuild = connection.prepareStatement(INSERT_GUILD)) {
-                    insertGuild.setString(1, name);
-                    insertGuild.setLong(2, leaderCharacterId);
-                    insertGuild.setTimestamp(3, Timestamp.from(now));
-                    try (ResultSet rs = insertGuild.executeQuery()) {
-                        rs.next();
-                        guildId = rs.getLong(1);
-                    }
-                }
-                try (PreparedStatement insertMember = connection.prepareStatement(INSERT_MEMBER)) {
-                    insertMember.setLong(1, guildId);
-                    insertMember.setLong(2, leaderCharacterId);
-                    insertMember.setString(3, GuildRole.LEADER.name());
-                    insertMember.setTimestamp(4, Timestamp.from(now));
-                    insertMember.executeUpdate();
-                }
+                long guildId = insertGuild(connection, name, leaderCharacterId, now);
+                insertMember(connection, new NewMember(guildId, leaderCharacterId, GuildRole.LEADER, now));
                 connection.commit();
                 return new Guild(guildId, name, leaderCharacterId, now);
             } catch (SQLException e) {
@@ -197,72 +152,60 @@ public final class PostgresGuildAdapter implements GuildPort {
         }
     }
 
+    private static long insertGuild(Connection connection, String name, long leaderCharacterId, Instant now)
+            throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(INSERT_GUILD)) {
+            statement.setString(1, name);
+            statement.setLong(2, leaderCharacterId);
+            statement.setTimestamp(3, Timestamp.from(now));
+            try (ResultSet rs = statement.executeQuery()) {
+                rs.next();
+                return rs.getLong(1);
+            }
+        }
+    }
+
+    /** Gói tham số cho {@link #insertMember} — tránh vượt 4 tham số Checkstyle {@code ParameterNumber}. */
+    private record NewMember(long guildId, long characterId, GuildRole role, Instant joinedAt) {
+    }
+
+    private static void insertMember(Connection connection, NewMember member) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(INSERT_MEMBER)) {
+            statement.setLong(1, member.guildId());
+            statement.setLong(2, member.characterId());
+            statement.setString(3, member.role().name());
+            statement.setTimestamp(4, Timestamp.from(member.joinedAt()));
+            statement.executeUpdate();
+        }
+    }
+
     @Override
     public boolean disbandGuild(long leaderCharacterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(DISBAND)) {
-            statement.setLong(1, leaderCharacterId);
-            return statement.executeUpdate() > 0;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi giải tán bang: leaderCharacterId=" + leaderCharacterId, e);
-        }
+        return JdbcOperations.update(dataSource, DISBAND, leaderCharacterId) > 0;
     }
 
     @Override
     public boolean leaveGuild(long characterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(LEAVE)) {
-            statement.setLong(1, characterId);
-            return statement.executeUpdate() > 0;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi rời bang: characterId=" + characterId, e);
-        }
+        return JdbcOperations.update(dataSource, LEAVE, characterId) > 0;
     }
 
     @Override
     public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(KICK)) {
-            statement.setLong(1, targetCharacterId);
-            statement.setLong(2, leaderCharacterId);
-            return statement.executeUpdate() > 0;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException(
-                    "Lỗi kick thành viên: leaderCharacterId=" + leaderCharacterId
-                            + ", targetCharacterId=" + targetCharacterId, e);
-        }
+        return JdbcOperations.update(dataSource, KICK, targetCharacterId, leaderCharacterId) > 0;
     }
 
     @Override
     public Optional<GuildJoinRequest> findPendingRequestOfCharacter(long characterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(FIND_PENDING_REQUEST_OF_CHARACTER)) {
-            statement.setLong(1, characterId);
-            try (ResultSet rs = statement.executeQuery()) {
-                return rs.next() ? Optional.of(mapJoinRequest(rs)) : Optional.empty();
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi tra đơn xin gia nhập: characterId=" + characterId, e);
-        }
+        return JdbcOperations.queryOne(
+                dataSource, FIND_PENDING_REQUEST_OF_CHARACTER, PostgresGuildAdapter::mapJoinRequest, characterId);
     }
 
     @Override
     public List<GuildJoinRequest> listPendingRequests(long guildId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(LIST_PENDING_REQUESTS)) {
-            statement.setLong(1, guildId);
-            ArrayList<GuildJoinRequest> result = new ArrayList<GuildJoinRequest>();
-            try (ResultSet rs = statement.executeQuery()) {
-                while (rs.next()) {
-                    result.add(mapJoinRequest(rs));
-                }
-            }
-            return result;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi liệt kê đơn xin gia nhập: guildId=" + guildId, e);
-        }
+        return JdbcOperations.query(dataSource, LIST_PENDING_REQUESTS, PostgresGuildAdapter::mapJoinRequest, guildId);
     }
 
+    // Bẫy unique_violation → DuplicateGuildJoinRequestException là logic nghiệp vụ đặc thù.
     @Override
     public GuildJoinRequest sendJoinRequest(long guildId, long characterId) {
         try (Connection connection = dataSource.getConnection();
@@ -330,12 +273,10 @@ public final class PostgresGuildAdapter implements GuildPort {
         // bằng Testcontainers, không phải đoán trước — xem GuildIntegrationTest
         // #shouldDropStaleRequest...).
         Savepoint savepoint = connection.setSavepoint();
-        try (PreparedStatement insertMember = connection.prepareStatement(INSERT_MEMBER)) {
-            insertMember.setLong(1, approval.guildId());
-            insertMember.setLong(2, approval.characterId());
-            insertMember.setString(3, GuildRole.MEMBER.name());
-            insertMember.setTimestamp(4, Timestamp.from(Instant.now()));
-            insertMember.executeUpdate();
+        try {
+            insertMember(
+                    connection,
+                    new NewMember(approval.guildId(), approval.characterId(), GuildRole.MEMBER, Instant.now()));
         } catch (SQLException e) {
             if (!UNIQUE_VIOLATION_SQLSTATE.equals(e.getSQLState())) {
                 throw e;
@@ -359,14 +300,7 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     @Override
     public boolean rejectJoinRequest(long requestId, long leaderCharacterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(REJECT_JOIN_REQUEST)) {
-            statement.setLong(1, requestId);
-            statement.setLong(2, leaderCharacterId);
-            return statement.executeUpdate() > 0;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi từ chối đơn xin gia nhập: requestId=" + requestId, e);
-        }
+        return JdbcOperations.update(dataSource, REJECT_JOIN_REQUEST, requestId, leaderCharacterId) > 0;
     }
 
     private static Guild mapGuild(ResultSet rs) throws SQLException {

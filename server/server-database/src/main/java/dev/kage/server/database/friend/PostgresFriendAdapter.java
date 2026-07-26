@@ -5,13 +5,13 @@ import dev.kage.friend.domain.FriendPort;
 import dev.kage.friend.domain.Friendship;
 import dev.kage.friend.domain.FriendshipStatus;
 import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import javax.sql.DataSource;
@@ -70,28 +70,25 @@ public final class PostgresFriendAdapter implements FriendPort {
 
     @Override
     public Optional<Friendship> findBetween(long characterIdA, long characterIdB) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(FIND_BETWEEN)) {
-            statement.setLong(1, characterIdA);
-            statement.setLong(2, characterIdB);
-            statement.setLong(3, characterIdB);
-            statement.setLong(4, characterIdA);
-            try (ResultSet rs = statement.executeQuery()) {
-                return rs.next() ? Optional.of(mapRow(rs)) : Optional.empty();
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException(
-                    "Lỗi tra quan hệ bạn bè: " + characterIdA + ", " + characterIdB, e);
-        }
+        return JdbcOperations.queryOne(
+                dataSource,
+                FIND_BETWEEN,
+                PostgresFriendAdapter::mapRow,
+                characterIdA,
+                characterIdB,
+                characterIdB,
+                characterIdA);
     }
 
+    // Bẫy unique_violation → DuplicateFriendRequestException là logic nghiệp vụ đặc thù, không đưa
+    // vào JdbcOperations dùng chung.
     @Override
     public Friendship sendRequest(long requesterId, long addresseeId) {
+        Instant now = Instant.now();
         try (Connection connection = dataSource.getConnection();
                 PreparedStatement statement = connection.prepareStatement(INSERT_REQUEST)) {
             statement.setLong(1, requesterId);
             statement.setLong(2, addresseeId);
-            Instant now = Instant.now();
             statement.setTimestamp(3, Timestamp.from(now));
             try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
@@ -101,82 +98,35 @@ public final class PostgresFriendAdapter implements FriendPort {
             if (UNIQUE_VIOLATION_SQLSTATE.equals(e.getSQLState())) {
                 throw new DuplicateFriendRequestException(requesterId, addresseeId);
             }
-            throw new DatabaseAccessException(
-                    "Lỗi gửi lời mời kết bạn: " + requesterId + " -> " + addresseeId, e);
+            throw new DatabaseAccessException("Lỗi gửi lời mời kết bạn: " + requesterId + " -> " + addresseeId, e);
         }
     }
 
     @Override
     public boolean accept(long friendshipId, long addresseeId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(ACCEPT)) {
-            statement.setTimestamp(1, Timestamp.from(Instant.now()));
-            statement.setLong(2, friendshipId);
-            statement.setLong(3, addresseeId);
-            return statement.executeUpdate() > 0;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi chấp nhận kết bạn: friendshipId=" + friendshipId, e);
-        }
+        return JdbcOperations.update(dataSource, ACCEPT, Timestamp.from(Instant.now()), friendshipId, addresseeId) > 0;
     }
 
     @Override
     public boolean reject(long friendshipId, long addresseeId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(REJECT)) {
-            statement.setLong(1, friendshipId);
-            statement.setLong(2, addresseeId);
-            return statement.executeUpdate() > 0;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi từ chối kết bạn: friendshipId=" + friendshipId, e);
-        }
+        return JdbcOperations.update(dataSource, REJECT, friendshipId, addresseeId) > 0;
     }
 
     @Override
     public boolean remove(long characterId, long friendCharacterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(REMOVE)) {
-            statement.setLong(1, characterId);
-            statement.setLong(2, friendCharacterId);
-            statement.setLong(3, friendCharacterId);
-            statement.setLong(4, characterId);
-            return statement.executeUpdate() > 0;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException(
-                    "Lỗi huỷ kết bạn: " + characterId + ", " + friendCharacterId, e);
-        }
+        return JdbcOperations.update(
+                        dataSource, REMOVE, characterId, friendCharacterId, friendCharacterId, characterId)
+                > 0;
     }
 
     @Override
     public List<Friendship> listAccepted(long characterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(LIST_ACCEPTED)) {
-            statement.setLong(1, characterId);
-            statement.setLong(2, characterId);
-            return mapRows(statement);
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi liệt kê bạn bè: characterId=" + characterId, e);
-        }
+        return JdbcOperations.query(dataSource, LIST_ACCEPTED, PostgresFriendAdapter::mapRow, characterId, characterId);
     }
 
     @Override
     public List<Friendship> listPendingIncoming(long characterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(LIST_PENDING_INCOMING)) {
-            statement.setLong(1, characterId);
-            return mapRows(statement);
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi liệt kê lời mời kết bạn: characterId=" + characterId, e);
-        }
-    }
-
-    private static List<Friendship> mapRows(PreparedStatement statement) throws SQLException {
-        try (ResultSet rs = statement.executeQuery()) {
-            ArrayList<Friendship> result = new ArrayList<Friendship>();
-            while (rs.next()) {
-                result.add(mapRow(rs));
-            }
-            return result;
-        }
+        return JdbcOperations.query(dataSource, LIST_PENDING_INCOMING, PostgresFriendAdapter::mapRow, characterId);
     }
 
     private static Friendship mapRow(ResultSet rs) throws SQLException {

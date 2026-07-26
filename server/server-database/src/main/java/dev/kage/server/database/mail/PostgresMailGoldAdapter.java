@@ -2,10 +2,8 @@ package dev.kage.server.database.mail;
 
 import dev.kage.mail.domain.GoldPort;
 import dev.kage.mail.domain.Transaction;
-import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
 
 /**
  * Hiện thực {@link GoldPort} trên PostgreSQL — gold vật lý ở {@code character_stat.gold} (V7).
@@ -20,13 +18,6 @@ public final class PostgresMailGoldAdapter implements GoldPort {
     @Override
     public void creditGold(Transaction tx, long characterId, long amount) {
         Connection connection = ((JdbcTransaction) tx).connection();
-        try (PreparedStatement statement = connection.prepareStatement(CREDIT)) {
-            statement.setLong(1, amount);
-            statement.setLong(2, characterId);
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new DatabaseAccessException(
-                    "Lỗi cộng gold từ thư: characterId=" + characterId + ", amount=" + amount, e);
-        }
+        JdbcOperations.update(connection, CREDIT, amount, characterId);
     }
 }

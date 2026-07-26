@@ -3,17 +3,18 @@ package dev.kage.server.database.account;
 import dev.kage.account.domain.Account;
 import dev.kage.account.domain.AccountPort;
 import dev.kage.account.domain.Transaction;
-import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
 
 /**
  * Hiện thực {@link AccountPort} trên PostgreSQL. SQL chỉ tồn tại ở đây (Điều 24 + DATABASE.md
- * §11). Luôn {@link PreparedStatement}, không nối chuỗi (SECURITY.md §11).
+ * §11). Luôn {@link java.sql.PreparedStatement} qua {@link JdbcOperations}, không nối chuỗi
+ * (SECURITY.md §11).
  */
 public final class PostgresAccountAdapter implements AccountPort {
 
@@ -33,28 +34,13 @@ public final class PostgresAccountAdapter implements AccountPort {
     @Override
     public Account findOrCreate(Transaction tx, String username) {
         Connection connection = ((JdbcTransaction) tx).connection();
-        try {
-            try (PreparedStatement upsert = connection.prepareStatement(UPSERT)) {
-                upsert.setString(1, username);
-                upsert.setTimestamp(2, Timestamp.from(Instant.now()));
-                try (ResultSet rs = upsert.executeQuery()) {
-                    if (rs.next()) {
-                        return mapRow(rs);
-                    }
-                }
-            }
-            try (PreparedStatement select = connection.prepareStatement(FIND_BY_USERNAME)) {
-                select.setString(1, username);
-                try (ResultSet rs = select.executeQuery()) {
-                    if (rs.next()) {
-                        return mapRow(rs);
-                    }
-                    throw new IllegalStateException("Upsert conflict nhưng không tìm lại được: " + username);
-                }
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi truy vấn account: " + username, e);
+        List<Account> upserted = JdbcOperations.query(
+                connection, UPSERT, PostgresAccountAdapter::mapRow, username, Timestamp.from(Instant.now()));
+        if (!upserted.isEmpty()) {
+            return upserted.get(0);
         }
+        return JdbcOperations.queryOne(connection, FIND_BY_USERNAME, PostgresAccountAdapter::mapRow, username)
+                .orElseThrow(() -> new IllegalStateException("Upsert conflict nhưng không tìm lại được: " + username));
     }
 
     private static Account mapRow(ResultSet rs) throws SQLException {

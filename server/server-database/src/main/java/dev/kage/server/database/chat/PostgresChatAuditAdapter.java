@@ -1,10 +1,7 @@
 package dev.kage.server.database.chat;
 
 import dev.kage.chat.domain.ChatAuditPort;
-import dev.kage.server.database.DatabaseAccessException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
+import dev.kage.server.database.JdbcOperations;
 import java.sql.Timestamp;
 import java.time.Instant;
 import javax.sql.DataSource;
@@ -24,16 +21,7 @@ public final class PostgresChatAuditAdapter implements ChatAuditPort {
 
     @Override
     public void log(long characterId, String action, String detailJson) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(INSERT_AUDIT_LOG)) {
-            statement.setLong(1, characterId);
-            statement.setString(2, action);
-            statement.setString(3, detailJson);
-            statement.setTimestamp(4, Timestamp.from(Instant.now()));
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new DatabaseAccessException(
-                    "Lỗi ghi audit_log: characterId=" + characterId + ", action=" + action, e);
-        }
+        JdbcOperations.update(
+                dataSource, INSERT_AUDIT_LOG, characterId, action, detailJson, Timestamp.from(Instant.now()));
     }
 }

@@ -2,10 +2,8 @@ package dev.kage.server.database.quest;
 
 import dev.kage.quest.domain.AuditPort;
 import dev.kage.quest.domain.Transaction;
-import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 
@@ -19,15 +17,7 @@ public final class PostgresQuestAuditAdapter implements AuditPort {
     @Override
     public void log(Transaction tx, long characterId, String action, String detailJson) {
         Connection connection = ((JdbcTransaction) tx).connection();
-        try (PreparedStatement statement = connection.prepareStatement(INSERT_AUDIT_LOG)) {
-            statement.setLong(1, characterId);
-            statement.setString(2, action);
-            statement.setString(3, detailJson);
-            statement.setTimestamp(4, Timestamp.from(Instant.now()));
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new DatabaseAccessException(
-                    "Lỗi ghi audit_log: characterId=" + characterId + ", action=" + action, e);
-        }
+        JdbcOperations.update(
+                connection, INSERT_AUDIT_LOG, characterId, action, detailJson, Timestamp.from(Instant.now()));
     }
 }

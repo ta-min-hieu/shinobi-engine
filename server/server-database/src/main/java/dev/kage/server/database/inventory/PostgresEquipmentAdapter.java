@@ -4,12 +4,11 @@ import dev.kage.inventory.domain.Equipment;
 import dev.kage.inventory.domain.EquipmentPort;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.Transaction;
-import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.sql.DataSource;
@@ -43,53 +42,38 @@ public final class PostgresEquipmentAdapter implements EquipmentPort {
 
     @Override
     public Optional<Equipment> findByCharacter(long characterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(FIND_BY_CHARACTER)) {
-            statement.setLong(1, characterId);
-            try (ResultSet rs = statement.executeQuery()) {
-                Map<EquipmentSlotType, Long> slots = new EnumMap<>(EquipmentSlotType.class);
-                while (rs.next()) {
-                    slots.put(
-                            EquipmentSlotType.valueOf(rs.getString("slot_type")), rs.getLong("inventory_item_id"));
-                }
-                return Optional.of(new Equipment(characterId, slots));
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi đọc trang bị: characterId=" + characterId, e);
+        List<SlotRow> rows = JdbcOperations.query(
+                dataSource,
+                FIND_BY_CHARACTER,
+                rs -> new SlotRow(
+                        EquipmentSlotType.valueOf(rs.getString("slot_type")), rs.getLong("inventory_item_id")),
+                characterId);
+        Map<EquipmentSlotType, Long> slots = new EnumMap<EquipmentSlotType, Long>(EquipmentSlotType.class);
+        for (SlotRow row : rows) {
+            slots.put(row.slotType(), row.inventoryItemId());
         }
+        return Optional.of(new Equipment(characterId, slots));
     }
 
     @Override
     public void save(Transaction tx, Equipment equipment) {
         Connection connection = ((JdbcTransaction) tx).connection();
-        try {
-            deleteExisting(connection, equipment.characterId());
-            insertSlots(connection, equipment);
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi lưu trang bị: characterId=" + equipment.characterId(), e);
-        }
+        JdbcOperations.update(connection, DELETE_BY_CHARACTER, equipment.characterId());
+        insertSlots(connection, equipment);
     }
 
-    private static void deleteExisting(Connection connection, long characterId) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(DELETE_BY_CHARACTER)) {
-            statement.setLong(1, characterId);
-            statement.executeUpdate();
-        }
-    }
-
-    private static void insertSlots(Connection connection, Equipment equipment) throws SQLException {
+    private static void insertSlots(Connection connection, Equipment equipment) {
         Map<EquipmentSlotType, Long> slots = equipment.slots();
         if (slots.isEmpty()) {
             return;
         }
-        try (PreparedStatement statement = connection.prepareStatement(INSERT_SLOT)) {
-            for (Map.Entry<EquipmentSlotType, Long> entry : slots.entrySet()) {
-                statement.setLong(1, equipment.characterId());
-                statement.setString(2, entry.getKey().name());
-                statement.setLong(3, entry.getValue());
-                statement.addBatch();
-            }
-            statement.executeBatch();
+        List<Object[]> batchParams = new ArrayList<Object[]>();
+        for (Map.Entry<EquipmentSlotType, Long> entry : slots.entrySet()) {
+            batchParams.add(new Object[] {equipment.characterId(), entry.getKey().name(), entry.getValue()});
         }
+        JdbcOperations.batchUpdate(connection, INSERT_SLOT, batchParams);
+    }
+
+    private record SlotRow(EquipmentSlotType slotType, long inventoryItemId) {
     }
 }

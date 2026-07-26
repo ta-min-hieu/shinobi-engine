@@ -4,9 +4,8 @@ import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.Transaction;
-import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -19,7 +18,8 @@ import javax.sql.DataSource;
 
 /**
  * Hiện thực {@link InventoryPort} trên PostgreSQL. SQL chỉ tồn tại ở đây (Điều 24 + DATABASE.md
- * §11). Luôn {@link PreparedStatement}, không nối chuỗi (SECURITY.md §11).
+ * §11). Luôn {@link java.sql.PreparedStatement} qua {@link JdbcOperations}, không nối chuỗi
+ * (SECURITY.md §11).
  *
  * <p>Không có bảng "inventory" riêng — {@link #findByCharacter} LUÔN trả {@code Optional} có giá
  * trị, lắp từ các dòng {@code inventory_item} hiện có (feature-inventory/CLAUDE.md).
@@ -66,36 +66,26 @@ public final class PostgresInventoryAdapter implements InventoryPort {
 
     @Override
     public Optional<Inventory> findByCharacter(long characterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(FIND_BY_CHARACTER)) {
-            statement.setLong(1, characterId);
-            try (ResultSet rs = statement.executeQuery()) {
-                ArrayList<ItemStack> items = new ArrayList<ItemStack>();
-                while (rs.next()) {
-                    items.add(new ItemStack(rs.getLong("id"), rs.getLong("item_template_id"),
-                            rs.getInt("quantity"), rs.getInt("enhance_level")));
-                }
-                return Optional.of(new Inventory(characterId, DEFAULT_CAPACITY, items));
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi đọc túi đồ: characterId=" + characterId, e);
-        }
+        List<ItemStack> items = JdbcOperations.query(
+                dataSource, FIND_BY_CHARACTER, PostgresInventoryAdapter::mapItemStack, characterId);
+        return Optional.of(new Inventory(characterId, DEFAULT_CAPACITY, items));
     }
 
     @Override
     public Inventory save(Transaction tx, Inventory inventory) {
         Connection connection = ((JdbcTransaction) tx).connection();
-        try {
-            deleteRemovedItems(connection, inventory);
-            List<ItemStack> savedItems = upsertItems(connection, inventory);
-            return new Inventory(inventory.characterId(), inventory.capacity(), savedItems);
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi lưu túi đồ: characterId=" + inventory.characterId(), e);
-        }
+        deleteRemovedItems(connection, inventory);
+        List<ItemStack> savedItems = upsertItems(connection, inventory);
+        return new Inventory(inventory.characterId(), inventory.capacity(), savedItems);
+    }
+
+    private static ItemStack mapItemStack(ResultSet rs) throws SQLException {
+        return new ItemStack(
+                rs.getLong("id"), rs.getLong("item_template_id"), rs.getInt("quantity"), rs.getInt("enhance_level"));
     }
 
     /** Item đã tồn tại DB (có id) nhưng KHÔNG còn trong {@code inventory.items()} — đã bị gỡ, xoá thật. */
-    private static void deleteRemovedItems(Connection connection, Inventory inventory) throws SQLException {
+    private static void deleteRemovedItems(Connection connection, Inventory inventory) {
         Set<Long> existingIds = selectExistingIds(connection, inventory.characterId());
         Set<Long> keptIds = inventory.items().stream()
                 .filter(ItemStack::isPersisted)
@@ -105,26 +95,14 @@ public final class PostgresInventoryAdapter implements InventoryPort {
         if (existingIds.isEmpty()) {
             return;
         }
-        try (PreparedStatement statement = connection.prepareStatement(DELETE_ITEM)) {
-            for (long id : existingIds) {
-                statement.setLong(1, id);
-                statement.addBatch();
-            }
-            statement.executeBatch();
-        }
+        List<Object[]> batchParams =
+                existingIds.stream().map(id -> new Object[] {id}).collect(Collectors.toList());
+        JdbcOperations.batchUpdate(connection, DELETE_ITEM, batchParams);
     }
 
-    private static Set<Long> selectExistingIds(Connection connection, long characterId) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(SELECT_EXISTING_IDS)) {
-            statement.setLong(1, characterId);
-            try (ResultSet rs = statement.executeQuery()) {
-                HashSet<Long> ids = new HashSet<Long>();
-                while (rs.next()) {
-                    ids.add(rs.getLong("id"));
-                }
-                return ids;
-            }
-        }
+    private static Set<Long> selectExistingIds(Connection connection, long characterId) {
+        List<Long> ids = JdbcOperations.query(connection, SELECT_EXISTING_IDS, rs -> rs.getLong("id"), characterId);
+        return new HashSet<Long>(ids);
     }
 
     /**
@@ -133,7 +111,7 @@ public final class PostgresInventoryAdapter implements InventoryPort {
      * {@code inventory.items()} — caller (VD {@code GrantLootUseCase}) dựa vào thứ tự này để tra
      * lại ID thật của item mình vừa thêm (xem {@link InventoryPort#save}).
      */
-    private static List<ItemStack> upsertItems(Connection connection, Inventory inventory) throws SQLException {
+    private static List<ItemStack> upsertItems(Connection connection, Inventory inventory) {
         List<ItemStack> items = inventory.items();
         ArrayList<ItemStack> saved = new ArrayList<ItemStack>(items.size());
         for (int slotIndex = 0; slotIndex < items.size(); slotIndex++) {
@@ -149,28 +127,13 @@ public final class PostgresInventoryAdapter implements InventoryPort {
         return saved;
     }
 
-    private static void updateItem(Connection connection, ItemStack stack, int slotIndex) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(UPDATE_ITEM)) {
-            statement.setInt(1, stack.quantity());
-            statement.setInt(2, stack.enhanceLevel());
-            statement.setInt(3, slotIndex);
-            statement.setLong(4, stack.id());
-            statement.executeUpdate();
-        }
+    private static void updateItem(Connection connection, ItemStack stack, int slotIndex) {
+        JdbcOperations.update(connection, UPDATE_ITEM, stack.quantity(), stack.enhanceLevel(), slotIndex, stack.id());
     }
 
-    private static long insertItem(Connection connection, long characterId, ItemStack stack, int slotIndex)
-            throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(INSERT_ITEM)) {
-            statement.setLong(1, characterId);
-            statement.setLong(2, stack.itemTemplateId());
-            statement.setInt(3, stack.quantity());
-            statement.setInt(4, stack.enhanceLevel());
-            statement.setInt(5, slotIndex);
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return rs.getLong(1); // RETURNING id
-            }
-        }
+    private static long insertItem(Connection connection, long characterId, ItemStack stack, int slotIndex) {
+        return JdbcOperations.insertReturningId(
+                connection, INSERT_ITEM, characterId, stack.itemTemplateId(), stack.quantity(), stack.enhanceLevel(),
+                slotIndex);
     }
 }

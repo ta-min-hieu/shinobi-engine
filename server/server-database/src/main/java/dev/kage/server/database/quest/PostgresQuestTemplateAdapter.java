@@ -2,12 +2,7 @@ package dev.kage.server.database.quest;
 
 import dev.kage.quest.domain.QuestTemplate;
 import dev.kage.quest.domain.QuestTemplatePort;
-import dev.kage.server.database.DatabaseAccessException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
+import dev.kage.server.database.JdbcOperations;
 import java.util.List;
 import java.util.Optional;
 import javax.sql.DataSource;
@@ -31,32 +26,15 @@ public final class PostgresQuestTemplateAdapter implements QuestTemplatePort {
 
     @Override
     public Optional<QuestTemplate> findByCode(String questCode) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(FIND_BY_CODE)) {
-            statement.setString(1, questCode);
-            try (ResultSet rs = statement.executeQuery()) {
-                if (!rs.next()) {
-                    return Optional.empty();
-                }
-                return Optional.of(new QuestTemplate(rs.getLong("id"), rs.getString("script_ref")));
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi đọc quest_template: questCode=" + questCode, e);
-        }
+        return JdbcOperations.queryOne(
+                dataSource,
+                FIND_BY_CODE,
+                rs -> new QuestTemplate(rs.getLong("id"), rs.getString("script_ref")),
+                questCode);
     }
 
     @Override
     public List<String> listAllScriptRefs() {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(LIST_ALL_SCRIPT_REFS);
-                ResultSet rs = statement.executeQuery()) {
-            ArrayList<String> result = new ArrayList<String>();
-            while (rs.next()) {
-                result.add(rs.getString("script_ref"));
-            }
-            return result;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi liệt kê script_ref quest_template", e);
-        }
+        return JdbcOperations.query(dataSource, LIST_ALL_SCRIPT_REFS, rs -> rs.getString("script_ref"));
     }
 }

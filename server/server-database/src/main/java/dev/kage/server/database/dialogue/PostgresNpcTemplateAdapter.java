@@ -1,12 +1,7 @@
 package dev.kage.server.database.dialogue;
 
 import dev.kage.dialogue.domain.NpcTemplatePort;
-import dev.kage.server.database.DatabaseAccessException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
+import dev.kage.server.database.JdbcOperations;
 import java.util.List;
 import java.util.Optional;
 import javax.sql.DataSource;
@@ -30,29 +25,13 @@ public final class PostgresNpcTemplateAdapter implements NpcTemplatePort {
 
     @Override
     public Optional<String> findDialogueScriptRefByCode(String npcCode) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(FIND_DIALOGUE_SCRIPT_REF_BY_CODE)) {
-            statement.setString(1, npcCode);
-            try (ResultSet rs = statement.executeQuery()) {
-                return rs.next() ? Optional.of(rs.getString("dialogue_script_ref")) : Optional.empty();
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi đọc npc_template: npcCode=" + npcCode, e);
-        }
+        return JdbcOperations.queryOne(
+                dataSource, FIND_DIALOGUE_SCRIPT_REF_BY_CODE, rs -> rs.getString("dialogue_script_ref"), npcCode);
     }
 
     @Override
     public List<String> listAllDialogueScriptRefs() {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(LIST_ALL_DIALOGUE_SCRIPT_REFS);
-                ResultSet rs = statement.executeQuery()) {
-            ArrayList<String> result = new ArrayList<String>();
-            while (rs.next()) {
-                result.add(rs.getString("dialogue_script_ref"));
-            }
-            return result;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi liệt kê dialogue_script_ref npc_template", e);
-        }
+        return JdbcOperations.query(
+                dataSource, LIST_ALL_DIALOGUE_SCRIPT_REFS, rs -> rs.getString("dialogue_script_ref"));
     }
 }

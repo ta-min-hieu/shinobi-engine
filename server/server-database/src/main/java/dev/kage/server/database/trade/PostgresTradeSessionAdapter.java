@@ -1,6 +1,7 @@
 package dev.kage.server.database.trade;
 
 import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 import dev.kage.trade.domain.OfferedItemInput;
 import dev.kage.trade.domain.Transaction;
 import dev.kage.trade.domain.TradeOfferItem;
@@ -14,7 +15,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import javax.sql.DataSource;
@@ -24,6 +24,10 @@ import javax.sql.DataSource;
  * trade_offer_item} (V16). {@link #replaceOffer} chạm 2 bảng nguyên tử bằng transaction thủ công
  * trên 1 connection (KHÔNG {@code TransactionRunner} riêng — cả 2 bảng đều thuộc feature này,
  * cùng lý do {@code GuildPort}/{@code PartyPort} không cần).
+ *
+ * <p>{@link #replaceOffer}/{@link #replaceOfferInTransaction} CỐ Ý không dùng
+ * {@link JdbcOperations} — cùng lý do {@code PostgresGuildAdapter}/{@code PostgresPartyAdapter}:
+ * dựa vào {@link SQLException} checked bắt đúng chỗ để rollback đúng lúc.
  */
 public final class PostgresTradeSessionAdapter implements TradeSessionPort {
 
@@ -99,60 +103,30 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
 
     @Override
     public Optional<TradeSession> findActiveSessionOfCharacter(long characterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(FIND_ACTIVE_OF_CHARACTER)) {
-            statement.setLong(1, characterId);
-            statement.setLong(2, characterId);
-            try (ResultSet rs = statement.executeQuery()) {
-                return rs.next() ? Optional.of(mapSession(rs)) : Optional.empty();
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi tra phiên trade: characterId=" + characterId, e);
-        }
+        return JdbcOperations.queryOne(
+                dataSource,
+                FIND_ACTIVE_OF_CHARACTER,
+                PostgresTradeSessionAdapter::mapSession,
+                characterId,
+                characterId);
     }
 
     @Override
     public TradeSession createRequest(long requesterCharacterId, long targetCharacterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(INSERT_SESSION)) {
-            statement.setLong(1, requesterCharacterId);
-            statement.setLong(2, targetCharacterId);
-            Instant now = Instant.now();
-            statement.setTimestamp(3, Timestamp.from(now));
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return new TradeSession(
-                        rs.getLong(1), requesterCharacterId, targetCharacterId, TradeStatus.PENDING_ACCEPT, now);
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException(
-                    "Lỗi tạo yêu cầu trade: requesterCharacterId=" + requesterCharacterId, e);
-        }
+        Instant now = Instant.now();
+        long sessionId = JdbcOperations.insertReturningId(
+                dataSource, INSERT_SESSION, requesterCharacterId, targetCharacterId, Timestamp.from(now));
+        return new TradeSession(sessionId, requesterCharacterId, targetCharacterId, TradeStatus.PENDING_ACCEPT, now);
     }
 
     @Override
     public boolean acceptRequest(long sessionId, long characterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(ACCEPT_REQUEST)) {
-            statement.setLong(1, sessionId);
-            statement.setLong(2, characterId);
-            return statement.executeUpdate() > 0;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi chấp nhận trade: sessionId=" + sessionId, e);
-        }
+        return JdbcOperations.update(dataSource, ACCEPT_REQUEST, sessionId, characterId) > 0;
     }
 
     @Override
     public boolean deleteSessionIfParticipant(long sessionId, long characterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(DELETE_IF_PARTICIPANT)) {
-            statement.setLong(1, sessionId);
-            statement.setLong(2, characterId);
-            statement.setLong(3, characterId);
-            return statement.executeUpdate() > 0;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi huỷ trade: sessionId=" + sessionId, e);
-        }
+        return JdbcOperations.update(dataSource, DELETE_IF_PARTICIPANT, sessionId, characterId, characterId) > 0;
     }
 
     @Override
@@ -241,75 +215,56 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
     @Override
     public Optional<TradeSessionSnapshot> lockForExecution(Transaction tx, long sessionId) {
         Connection connection = ((JdbcTransaction) tx).connection();
-        try {
-            return readSnapshot(connection, sessionId, SELECT_SESSION_FOR_UPDATE);
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi khoá phiên trade để thi hành: sessionId=" + sessionId, e);
-        }
+        return readSnapshot(connection, sessionId, SELECT_SESSION_FOR_UPDATE);
     }
 
-    private static Optional<TradeSessionSnapshot> readSnapshot(Connection connection, long sessionId, String sql)
-            throws SQLException {
-        long requesterId;
-        long targetId;
-        TradeStatus status;
-        long requesterGold;
-        long targetGold;
-        boolean requesterConfirmed;
-        boolean targetConfirmed;
-        try (PreparedStatement select = connection.prepareStatement(sql)) {
-            select.setLong(1, sessionId);
-            try (ResultSet rs = select.executeQuery()) {
-                if (!rs.next()) {
-                    return Optional.empty();
-                }
-                requesterId = rs.getLong("requester_character_id");
-                targetId = rs.getLong("target_character_id");
-                status = TradeStatus.valueOf(rs.getString("status"));
-                requesterGold = rs.getLong("requester_gold");
-                targetGold = rs.getLong("target_gold");
-                requesterConfirmed = rs.getBoolean("requester_confirmed");
-                targetConfirmed = rs.getBoolean("target_confirmed");
-            }
+    private static Optional<TradeSessionSnapshot> readSnapshot(Connection connection, long sessionId, String sql) {
+        Optional<SessionRow> row =
+                JdbcOperations.queryOne(connection, sql, PostgresTradeSessionAdapter::mapSessionRow, sessionId);
+        if (row.isEmpty()) {
+            return Optional.empty();
         }
-        ArrayList<TradeOfferItem> items = new ArrayList<TradeOfferItem>();
-        try (PreparedStatement select = connection.prepareStatement(SELECT_OFFER_ITEMS)) {
-            select.setLong(1, sessionId);
-            try (ResultSet rs = select.executeQuery()) {
-                while (rs.next()) {
-                    items.add(new TradeOfferItem(
-                            rs.getLong("id"), rs.getLong("session_id"), rs.getLong("offering_character_id"),
-                            rs.getLong("item_id"), rs.getInt("quantity")));
-                }
-            }
-        }
+        List<TradeOfferItem> items = JdbcOperations.query(
+                connection, SELECT_OFFER_ITEMS, PostgresTradeSessionAdapter::mapOfferItem, sessionId);
+        SessionRow r = row.get();
         return Optional.of(new TradeSessionSnapshot(
-                sessionId, requesterId, targetId, status, requesterGold, targetGold, requesterConfirmed,
-                targetConfirmed, items));
+                sessionId, r.requesterId(), r.targetId(), r.status(), r.requesterGold(), r.targetGold(),
+                r.requesterConfirmed(), r.targetConfirmed(), items));
+    }
+
+    /** Kết quả SELECT 1 dòng {@code trade_session} — record header không tính Checkstyle {@code ParameterNumber}. */
+    private record SessionRow(
+            long requesterId, long targetId, TradeStatus status, long requesterGold, long targetGold,
+            boolean requesterConfirmed, boolean targetConfirmed) {
+    }
+
+    private static SessionRow mapSessionRow(ResultSet rs) throws SQLException {
+        return new SessionRow(
+                rs.getLong("requester_character_id"),
+                rs.getLong("target_character_id"),
+                TradeStatus.valueOf(rs.getString("status")),
+                rs.getLong("requester_gold"),
+                rs.getLong("target_gold"),
+                rs.getBoolean("requester_confirmed"),
+                rs.getBoolean("target_confirmed"));
+    }
+
+    private static TradeOfferItem mapOfferItem(ResultSet rs) throws SQLException {
+        return new TradeOfferItem(
+                rs.getLong("id"), rs.getLong("session_id"), rs.getLong("offering_character_id"),
+                rs.getLong("item_id"), rs.getInt("quantity"));
     }
 
     @Override
     public void setConfirmed(Transaction tx, long sessionId, long characterId) {
         Connection connection = ((JdbcTransaction) tx).connection();
-        try (PreparedStatement statement = connection.prepareStatement(SET_CONFIRMED)) {
-            statement.setLong(1, characterId);
-            statement.setLong(2, characterId);
-            statement.setLong(3, sessionId);
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi đánh dấu confirmed: sessionId=" + sessionId, e);
-        }
+        JdbcOperations.update(connection, SET_CONFIRMED, characterId, characterId, sessionId);
     }
 
     @Override
     public void deleteSession(Transaction tx, long sessionId) {
         Connection connection = ((JdbcTransaction) tx).connection();
-        try (PreparedStatement statement = connection.prepareStatement(DELETE_SESSION)) {
-            statement.setLong(1, sessionId);
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi xoá phiên trade: sessionId=" + sessionId, e);
-        }
+        JdbcOperations.update(connection, DELETE_SESSION, sessionId);
     }
 
     private static TradeSession mapSession(ResultSet rs) throws SQLException {

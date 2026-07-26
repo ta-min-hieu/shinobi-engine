@@ -2,11 +2,9 @@ package dev.kage.server.database.quest;
 
 import dev.kage.quest.domain.QuestInventoryGrantPort;
 import dev.kage.quest.domain.Transaction;
-import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.util.Optional;
 import javax.sql.DataSource;
 
 /**
@@ -44,44 +42,17 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
     @Override
     public boolean grantItemByCode(Transaction tx, long characterId, String itemTemplateCode, int quantity) {
         Connection connection = ((JdbcTransaction) tx).connection();
-        try {
-            Long itemTemplateId = findItemTemplateId(connection, itemTemplateCode);
-            if (itemTemplateId == null) {
-                return false;
-            }
-            int existingCount = countItems(connection, characterId);
-            if (existingCount >= DEFAULT_CAPACITY) {
-                return false;
-            }
-            try (PreparedStatement statement = connection.prepareStatement(INSERT_ITEM)) {
-                statement.setLong(1, characterId);
-                statement.setLong(2, itemTemplateId);
-                statement.setInt(3, quantity);
-                statement.setInt(4, existingCount);
-                statement.executeUpdate();
-            }
-            return true;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi cấp item thưởng quest: characterId=" + characterId, e);
+        Optional<Long> itemTemplateId = JdbcOperations.queryOne(
+                connection, FIND_ITEM_TEMPLATE_ID_BY_CODE, rs -> rs.getLong("id"), itemTemplateCode);
+        if (itemTemplateId.isEmpty()) {
+            return false;
         }
-    }
-
-    private static Long findItemTemplateId(Connection connection, String code) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(FIND_ITEM_TEMPLATE_ID_BY_CODE)) {
-            statement.setString(1, code);
-            try (ResultSet rs = statement.executeQuery()) {
-                return rs.next() ? rs.getLong("id") : null;
-            }
+        int existingCount =
+                JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId).orElse(0);
+        if (existingCount >= DEFAULT_CAPACITY) {
+            return false;
         }
-    }
-
-    private static int countItems(Connection connection, long characterId) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(COUNT_ITEMS)) {
-            statement.setLong(1, characterId);
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return rs.getInt(1);
-            }
-        }
+        JdbcOperations.update(connection, INSERT_ITEM, characterId, itemTemplateId.get(), quantity, existingCount);
+        return true;
     }
 }

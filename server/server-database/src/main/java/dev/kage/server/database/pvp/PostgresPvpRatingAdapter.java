@@ -3,6 +3,7 @@ package dev.kage.server.database.pvp;
 import dev.kage.pvp.domain.PvpRating;
 import dev.kage.pvp.domain.PvpRatingPort;
 import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -16,7 +17,9 @@ import javax.sql.DataSource;
  * Hiện thực {@link PvpRatingPort} trên PostgreSQL — bảng {@code pvp_rating} (V18).
  * {@link #recordMatchResult} ghi CẢ 2 dòng (thắng+thua) nguyên tử bằng transaction thủ công trên 1
  * connection (KHÔNG {@code TransactionRunner} riêng — chỉ 1 bảng, không xuyên feature khác, cùng
- * lý do {@code PostgresGuildAdapter}).
+ * lý do {@code PostgresGuildAdapter}). {@link #upsert} CỐ Ý không dùng {@link JdbcOperations} —
+ * cùng lý do các adapter transaction-thủ-công khác: cần {@link SQLException} checked để rollback
+ * đúng chỗ.
  */
 public final class PostgresPvpRatingAdapter implements PvpRatingPort {
 
@@ -44,15 +47,8 @@ public final class PostgresPvpRatingAdapter implements PvpRatingPort {
 
     @Override
     public Optional<PvpRating> findByCharacterId(long characterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(FIND_BY_CHARACTER_ID)) {
-            statement.setLong(1, characterId);
-            try (ResultSet rs = statement.executeQuery()) {
-                return rs.next() ? Optional.of(mapRating(rs)) : Optional.empty();
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi tra pvp rating: characterId=" + characterId, e);
-        }
+        return JdbcOperations.queryOne(
+                dataSource, FIND_BY_CHARACTER_ID, PostgresPvpRatingAdapter::mapRating, characterId);
     }
 
     @Override

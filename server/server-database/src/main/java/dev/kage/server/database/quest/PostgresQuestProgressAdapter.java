@@ -4,11 +4,8 @@ import dev.kage.quest.domain.QuestProgress;
 import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestStatus;
 import dev.kage.quest.domain.Transaction;
-import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Optional;
@@ -38,37 +35,28 @@ public final class PostgresQuestProgressAdapter implements QuestProgressPort {
 
     @Override
     public Optional<QuestProgress> find(long characterId, long questTemplateId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(FIND)) {
-            statement.setLong(1, characterId);
-            statement.setLong(2, questTemplateId);
-            try (ResultSet rs = statement.executeQuery()) {
-                if (!rs.next()) {
-                    return Optional.empty();
-                }
-                QuestStatus status = QuestStatus.valueOf(rs.getString("status"));
-                String progressJson = rs.getString("progress_json");
-                return Optional.of(new QuestProgress(characterId, questTemplateId, status, progressJson));
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException(
-                    "Lỗi đọc character_quest_progress: characterId=" + characterId, e);
-        }
+        return JdbcOperations.queryOne(
+                dataSource,
+                FIND,
+                rs -> new QuestProgress(
+                        characterId,
+                        questTemplateId,
+                        QuestStatus.valueOf(rs.getString("status")),
+                        rs.getString("progress_json")),
+                characterId,
+                questTemplateId);
     }
 
     @Override
     public void save(Transaction tx, QuestProgress progress) {
         Connection connection = ((JdbcTransaction) tx).connection();
-        try (PreparedStatement statement = connection.prepareStatement(UPSERT)) {
-            statement.setLong(1, progress.characterId());
-            statement.setLong(2, progress.questTemplateId());
-            statement.setString(3, progress.status().name());
-            statement.setString(4, progress.progressJson());
-            statement.setTimestamp(5, Timestamp.from(Instant.now()));
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new DatabaseAccessException(
-                    "Lỗi lưu character_quest_progress: characterId=" + progress.characterId(), e);
-        }
+        JdbcOperations.update(
+                connection,
+                UPSERT,
+                progress.characterId(),
+                progress.questTemplateId(),
+                progress.status().name(),
+                progress.progressJson(),
+                Timestamp.from(Instant.now()));
     }
 }

@@ -6,12 +6,12 @@ import dev.kage.mail.domain.MailRepositoryPort;
 import dev.kage.mail.domain.NewMail;
 import dev.kage.mail.domain.Transaction;
 import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.sql.Types;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,8 +20,14 @@ import javax.sql.DataSource;
 
 /**
  * Hiện thực {@link MailRepositoryPort} trên PostgreSQL — bảng {@code mail}/{@code mail_item} (V13).
- * SQL chỉ tồn tại ở đây (Điều 24). {@code sender_id} dùng {@code setNull}/{@code getObject} vì
- * {@code Long} nullable (thư hệ thống, xem javadoc {@link dev.kage.mail.domain.Mail}).
+ * SQL chỉ tồn tại ở đây (Điều 24). {@code sender_id} là {@code Long} nullable (thư hệ thống, xem
+ * javadoc {@link dev.kage.mail.domain.Mail}) — {@link JdbcOperations} bind {@code null} qua
+ * {@code setObject} chung, đã verify bằng {@code MailIntegrationTest} (thư hệ thống sender null).
+ *
+ * <p>{@link #findById}, {@link #findByIdForUpdate}, {@link #listForRecipient} giữ nguyên vòng lặp
+ * {@link ResultSet} thủ công (không qua {@code JdbcOperations.query}) vì {@link #mapRow} cần
+ * {@link Connection} để truy vấn lồng {@link #findAttachments} — không khớp chữ ký
+ * {@code RowMapper<T>} (chỉ nhận {@link ResultSet}).
  */
 public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
 
@@ -72,46 +78,29 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
     @Override
     public Mail send(Transaction tx, NewMail newMail) {
         Connection connection = ((JdbcTransaction) tx).connection();
-        try {
-            long mailId = insertMail(connection, newMail);
-            for (MailAttachment attachment : newMail.attachments()) {
-                insertMailItem(connection, mailId, attachment);
-            }
-            return new Mail(
-                    mailId, newMail.senderId(), newMail.recipientId(), newMail.subject(), newMail.body(),
-                    newMail.goldAmount(), newMail.attachments(), null, Instant.now());
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi gửi thư: recipientId=" + newMail.recipientId(), e);
+        long mailId = insertMail(connection, newMail);
+        for (MailAttachment attachment : newMail.attachments()) {
+            insertMailItem(connection, mailId, attachment);
         }
+        return new Mail(
+                mailId, newMail.senderId(), newMail.recipientId(), newMail.subject(), newMail.body(),
+                newMail.goldAmount(), newMail.attachments(), null, Instant.now());
     }
 
-    private static long insertMail(Connection connection, NewMail newMail) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(INSERT_MAIL)) {
-            if (newMail.senderId() == null) {
-                statement.setNull(1, Types.BIGINT);
-            } else {
-                statement.setLong(1, newMail.senderId());
-            }
-            statement.setLong(2, newMail.recipientId());
-            statement.setString(3, newMail.subject());
-            statement.setString(4, newMail.body());
-            statement.setLong(5, newMail.goldAmount());
-            statement.setTimestamp(6, Timestamp.from(Instant.now()));
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return rs.getLong(1);
-            }
-        }
+    private static long insertMail(Connection connection, NewMail newMail) {
+        return JdbcOperations.insertReturningId(
+                connection,
+                INSERT_MAIL,
+                newMail.senderId(),
+                newMail.recipientId(),
+                newMail.subject(),
+                newMail.body(),
+                newMail.goldAmount(),
+                Timestamp.from(Instant.now()));
     }
 
-    private static void insertMailItem(Connection connection, long mailId, MailAttachment attachment)
-            throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(INSERT_MAIL_ITEM)) {
-            statement.setLong(1, mailId);
-            statement.setLong(2, attachment.itemTemplateId());
-            statement.setInt(3, attachment.quantity());
-            statement.executeUpdate();
-        }
+    private static void insertMailItem(Connection connection, long mailId, MailAttachment attachment) {
+        JdbcOperations.update(connection, INSERT_MAIL_ITEM, mailId, attachment.itemTemplateId(), attachment.quantity());
     }
 
     @Override
@@ -166,28 +155,14 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
     @Override
     public boolean markClaimed(Transaction tx, long mailId, long recipientId) {
         Connection connection = ((JdbcTransaction) tx).connection();
-        try (PreparedStatement statement = connection.prepareStatement(MARK_CLAIMED)) {
-            statement.setTimestamp(1, Timestamp.from(Instant.now()));
-            statement.setLong(2, mailId);
-            statement.setLong(3, recipientId);
-            return statement.executeUpdate() > 0;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi đánh dấu đã nhận thư: mailId=" + mailId, e);
-        }
+        return JdbcOperations.update(connection, MARK_CLAIMED, Timestamp.from(Instant.now()), mailId, recipientId) > 0;
     }
 
     @Override
     public boolean delete(long mailId, long recipientId) {
         try (Connection connection = dataSource.getConnection()) {
-            try (PreparedStatement deleteItems = connection.prepareStatement(DELETE_MAIL_ITEMS)) {
-                deleteItems.setLong(1, mailId);
-                deleteItems.executeUpdate();
-            }
-            try (PreparedStatement deleteMail = connection.prepareStatement(DELETE_MAIL)) {
-                deleteMail.setLong(1, mailId);
-                deleteMail.setLong(2, recipientId);
-                return deleteMail.executeUpdate() > 0;
-            }
+            JdbcOperations.update(connection, DELETE_MAIL_ITEMS, mailId);
+            return JdbcOperations.update(connection, DELETE_MAIL, mailId, recipientId) > 0;
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi xoá thư: mailId=" + mailId, e);
         }
@@ -209,16 +184,11 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
                 rs.getTimestamp("created_at").toInstant());
     }
 
-    private static List<MailAttachment> findAttachments(Connection connection, long mailId) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(FIND_ATTACHMENTS_BY_MAIL)) {
-            statement.setLong(1, mailId);
-            try (ResultSet rs = statement.executeQuery()) {
-                ArrayList<MailAttachment> result = new ArrayList<MailAttachment>();
-                while (rs.next()) {
-                    result.add(new MailAttachment(rs.getLong("item_template_id"), rs.getInt("quantity")));
-                }
-                return result;
-            }
-        }
+    private static List<MailAttachment> findAttachments(Connection connection, long mailId) {
+        return JdbcOperations.query(
+                connection,
+                FIND_ATTACHMENTS_BY_MAIL,
+                rs -> new MailAttachment(rs.getLong("item_template_id"), rs.getInt("quantity")),
+                mailId);
     }
 }

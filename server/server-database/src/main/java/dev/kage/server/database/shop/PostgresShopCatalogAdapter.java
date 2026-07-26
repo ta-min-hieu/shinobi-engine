@@ -1,13 +1,10 @@
 package dev.kage.server.database.shop;
 
-import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 import dev.kage.shop.domain.ShopCatalogPort;
 import dev.kage.shop.domain.ShopListing;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import javax.sql.DataSource;
@@ -31,33 +28,13 @@ public final class PostgresShopCatalogAdapter implements ShopCatalogPort {
 
     @Override
     public Optional<ShopListing> findListing(long itemTemplateId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(FIND_BY_TEMPLATE)) {
-            statement.setLong(1, itemTemplateId);
-            try (ResultSet rs = statement.executeQuery()) {
-                if (!rs.next()) {
-                    return Optional.empty();
-                }
-                return Optional.of(toListing(rs));
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi đọc shop_item: itemTemplateId=" + itemTemplateId, e);
-        }
+        return JdbcOperations.queryOne(
+                dataSource, FIND_BY_TEMPLATE, PostgresShopCatalogAdapter::toListing, itemTemplateId);
     }
 
     @Override
     public List<ShopListing> findAll() {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(FIND_ALL);
-                ResultSet rs = statement.executeQuery()) {
-            ArrayList<ShopListing> listings = new ArrayList<ShopListing>();
-            while (rs.next()) {
-                listings.add(toListing(rs));
-            }
-            return listings;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi đọc danh mục shop_item", e);
-        }
+        return JdbcOperations.query(dataSource, FIND_ALL, PostgresShopCatalogAdapter::toListing);
     }
 
     private static ShopListing toListing(ResultSet rs) throws SQLException {
