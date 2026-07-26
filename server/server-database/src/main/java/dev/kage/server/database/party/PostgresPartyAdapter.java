@@ -9,7 +9,6 @@ import dev.kage.party.domain.PartyRole;
 import dev.kage.server.database.DatabaseAccessException;
 import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -22,18 +21,13 @@ import javax.sql.DataSource;
  * Hiện thực {@link PartyPort} trên PostgreSQL — bảng {@code party}/{@code party_member}/
  * {@code party_invite} (V15). {@link #createParty}, {@link #acceptInvite}, {@link #leaveParty}
  * chạm nhiều bảng nguyên tử bằng transaction thủ công (KHÔNG {@code TransactionRunner} riêng —
- * xem javadoc {@link PartyPort}).
- *
- * <p>3 method đó (và mọi helper riêng bên trong) CỐ Ý không dùng {@link JdbcOperations} — dựa vào
- * {@link SQLException} checked bắt đúng chỗ để rollback/lock đúng thứ tự (giống lý do ở
- * {@code PostgresGuildAdapter}: {@code JdbcOperations} bọc exception thành unchecked, nhảy qua mất
- * khối {@code catch (SQLException e)} đang chờ). Method đọc/ghi đơn giản còn lại dùng
- * {@code JdbcOperations} như adapter khác.
+ * xem javadoc {@link PartyPort}). Khác {@code PostgresGuildAdapter}: không có case nào cần bắt
+ * {@code unique_violation} GIỮA transaction rồi tiếp tục (party check "đã ở party khác" bằng SELECT
+ * trước khi insert, không dựa vào catch conflict) — nên toàn bộ statement trong 3 method này VẪN
+ * dùng {@link JdbcOperations} được, chỉ cần catch thêm {@link RuntimeException} ở transaction
+ * boundary để rollback đúng trước khi rethrow (JdbcOperations bọc SQLException thành unchecked).
  */
 public final class PostgresPartyAdapter implements PartyPort {
-
-    // Mã lỗi Postgres cho unique_violation (SQLState).
-    private static final String UNIQUE_VIOLATION_SQLSTATE = "23505";
 
     private static final String FIND_MEMBERSHIP = """
             SELECT party_id, character_id, role, joined_at FROM party_member WHERE character_id = ?
@@ -129,27 +123,27 @@ public final class PostgresPartyAdapter implements PartyPort {
         return JdbcOperations.query(dataSource, LIST_MEMBERS, PostgresPartyAdapter::mapMember, partyId);
     }
 
+    // PMD AvoidCatchingGenericException: đúng ý — ranh giới transaction PHẢI rollback khi action
+    // ném BẤT KỲ RuntimeException nào (VD DatabaseAccessException từ JdbcOperations), cùng tinh
+    // thần JdbcTransactionRunner.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     @Override
     public Party createParty(long leaderCharacterId) {
         try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
                 Instant now = Instant.now();
-                long partyId;
-                try (PreparedStatement insertParty = connection.prepareStatement(INSERT_PARTY)) {
-                    insertParty.setLong(1, leaderCharacterId);
-                    insertParty.setTimestamp(2, Timestamp.from(now));
-                    try (ResultSet rs = insertParty.executeQuery()) {
-                        rs.next();
-                        partyId = rs.getLong(1);
-                    }
-                }
+                long partyId = JdbcOperations.insertReturningId(
+                        connection, INSERT_PARTY, leaderCharacterId, Timestamp.from(now));
                 insertMember(connection, new NewMember(partyId, leaderCharacterId, PartyRole.LEADER, now));
                 connection.commit();
                 return new Party(partyId, leaderCharacterId, now);
             } catch (SQLException e) {
                 connection.rollback();
                 throw new DatabaseAccessException("Lỗi tạo party: leaderCharacterId=" + leaderCharacterId, e);
+            } catch (RuntimeException e) {
+                connection.rollback();
+                throw e;
             } finally {
                 connection.setAutoCommit(true);
             }
@@ -170,28 +164,25 @@ public final class PostgresPartyAdapter implements PartyPort {
                 dataSource, LIST_PENDING_INVITES_OF_INVITEE, PostgresPartyAdapter::mapInvite, characterId);
     }
 
-    // Bẫy unique_violation → DuplicatePartyInviteException là logic nghiệp vụ đặc thù.
     @Override
     public PartyInvite invite(long partyId, long inviteeCharacterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(INSERT_INVITE)) {
-            statement.setLong(1, partyId);
-            statement.setLong(2, inviteeCharacterId);
-            Instant now = Instant.now();
-            statement.setTimestamp(3, Timestamp.from(now));
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return new PartyInvite(rs.getLong(1), partyId, inviteeCharacterId, now);
-            }
+        Instant now = Instant.now();
+        try (Connection connection = dataSource.getConnection()) {
+            long id = JdbcOperations.insertReturningIdOrThrow(
+                    connection,
+                    INSERT_INVITE,
+                    () -> new DuplicatePartyInviteException(partyId, inviteeCharacterId),
+                    partyId,
+                    inviteeCharacterId,
+                    Timestamp.from(now));
+            return new PartyInvite(id, partyId, inviteeCharacterId, now);
         } catch (SQLException e) {
-            if (UNIQUE_VIOLATION_SQLSTATE.equals(e.getSQLState())) {
-                throw new DuplicatePartyInviteException(partyId, inviteeCharacterId);
-            }
             throw new DatabaseAccessException(
                     "Lỗi mời party: partyId=" + partyId + ", inviteeCharacterId=" + inviteeCharacterId, e);
         }
     }
 
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     @Override
     public AcceptResult acceptInvite(long inviteId, long characterId) {
         try (Connection connection = dataSource.getConnection()) {
@@ -203,6 +194,9 @@ public final class PostgresPartyAdapter implements PartyPort {
             } catch (SQLException e) {
                 connection.rollback();
                 throw new DatabaseAccessException("Lỗi chấp nhận lời mời party: inviteId=" + inviteId, e);
+            } catch (RuntimeException e) {
+                connection.rollback();
+                throw e;
             } finally {
                 connection.setAutoCommit(true);
             }
@@ -211,74 +205,50 @@ public final class PostgresPartyAdapter implements PartyPort {
         }
     }
 
-    private static AcceptResult acceptInviteInTransaction(Connection connection, long inviteId, long characterId)
-            throws SQLException {
-        long partyId;
-        try (PreparedStatement select = connection.prepareStatement(SELECT_INVITE_FOR_ACCEPT)) {
-            select.setLong(1, inviteId);
-            select.setLong(2, characterId);
-            try (ResultSet rs = select.executeQuery()) {
-                if (!rs.next()) {
-                    return AcceptResult.NOT_FOUND;
-                }
-                partyId = rs.getLong("party_id");
-            }
+    private static AcceptResult acceptInviteInTransaction(Connection connection, long inviteId, long characterId) {
+        Optional<Long> partyId = JdbcOperations.queryOne(
+                connection, SELECT_INVITE_FOR_ACCEPT, rs -> rs.getLong("party_id"), inviteId, characterId);
+        if (partyId.isEmpty()) {
+            return AcceptResult.NOT_FOUND;
         }
-        try (PreparedStatement lockParty = connection.prepareStatement(LOCK_PARTY)) {
-            lockParty.setLong(1, partyId);
-            lockParty.executeQuery();
-        }
+        JdbcOperations.query(connection, LOCK_PARTY, rs -> Boolean.TRUE, partyId.get());
         if (isAlreadyMember(connection, characterId)) {
             deleteInvite(connection, inviteId);
             return AcceptResult.ALREADY_IN_PARTY;
         }
-        if (countMembers(connection, partyId) >= Party.MAX_MEMBERS) {
+        if (countMembers(connection, partyId.get()) >= Party.MAX_MEMBERS) {
             deleteInvite(connection, inviteId);
             return AcceptResult.PARTY_FULL;
         }
-        insertMember(connection, new NewMember(partyId, characterId, PartyRole.MEMBER, Instant.now()));
+        insertMember(connection, new NewMember(partyId.get(), characterId, PartyRole.MEMBER, Instant.now()));
         deleteInvite(connection, inviteId);
         return AcceptResult.OK;
     }
 
-    private static boolean isAlreadyMember(Connection connection, long characterId) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(FIND_MEMBERSHIP)) {
-            statement.setLong(1, characterId);
-            try (ResultSet rs = statement.executeQuery()) {
-                return rs.next();
-            }
-        }
+    private static boolean isAlreadyMember(Connection connection, long characterId) {
+        return !JdbcOperations.query(connection, FIND_MEMBERSHIP, rs -> Boolean.TRUE, characterId).isEmpty();
     }
 
-    private static int countMembers(Connection connection, long partyId) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(COUNT_MEMBERS)) {
-            statement.setLong(1, partyId);
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return rs.getInt(1);
-            }
-        }
+    private static int countMembers(Connection connection, long partyId) {
+        return JdbcOperations.queryOne(connection, COUNT_MEMBERS, rs -> rs.getInt(1), partyId).orElse(0);
     }
 
     /** Gói tham số cho {@link #insertMember} — tránh vượt 4 tham số Checkstyle {@code ParameterNumber}. */
     private record NewMember(long partyId, long characterId, PartyRole role, Instant joinedAt) {
     }
 
-    private static void insertMember(Connection connection, NewMember member) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(INSERT_MEMBER)) {
-            statement.setLong(1, member.partyId());
-            statement.setLong(2, member.characterId());
-            statement.setString(3, member.role().name());
-            statement.setTimestamp(4, Timestamp.from(member.joinedAt()));
-            statement.executeUpdate();
-        }
+    private static void insertMember(Connection connection, NewMember member) {
+        JdbcOperations.update(
+                connection,
+                INSERT_MEMBER,
+                member.partyId(),
+                member.characterId(),
+                member.role().name(),
+                Timestamp.from(member.joinedAt()));
     }
 
-    private static void deleteInvite(Connection connection, long inviteId) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(DELETE_INVITE)) {
-            statement.setLong(1, inviteId);
-            statement.executeUpdate();
-        }
+    private static void deleteInvite(Connection connection, long inviteId) {
+        JdbcOperations.update(connection, DELETE_INVITE, inviteId);
     }
 
     @Override
@@ -286,6 +256,7 @@ public final class PostgresPartyAdapter implements PartyPort {
         return JdbcOperations.update(dataSource, REJECT_INVITE, inviteId, characterId) > 0;
     }
 
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     @Override
     public LeaveResult leaveParty(long characterId) {
         try (Connection connection = dataSource.getConnection()) {
@@ -297,6 +268,9 @@ public final class PostgresPartyAdapter implements PartyPort {
             } catch (SQLException e) {
                 connection.rollback();
                 throw new DatabaseAccessException("Lỗi rời party: characterId=" + characterId, e);
+            } catch (RuntimeException e) {
+                connection.rollback();
+                throw e;
             } finally {
                 connection.setAutoCommit(true);
             }
@@ -305,62 +279,37 @@ public final class PostgresPartyAdapter implements PartyPort {
         }
     }
 
-    private static LeaveResult leavePartyInTransaction(Connection connection, long characterId) throws SQLException {
-        long partyId;
-        PartyRole role;
-        try (PreparedStatement select = connection.prepareStatement(SELECT_MEMBERSHIP_FOR_UPDATE)) {
-            select.setLong(1, characterId);
-            try (ResultSet rs = select.executeQuery()) {
-                if (!rs.next()) {
-                    return LeaveResult.NOT_IN_PARTY;
-                }
-                partyId = rs.getLong("party_id");
-                role = PartyRole.valueOf(rs.getString("role"));
-            }
+    private static LeaveResult leavePartyInTransaction(Connection connection, long characterId) {
+        Optional<MembershipRow> membership = JdbcOperations.queryOne(
+                connection,
+                SELECT_MEMBERSHIP_FOR_UPDATE,
+                rs -> new MembershipRow(rs.getLong("party_id"), PartyRole.valueOf(rs.getString("role"))),
+                characterId);
+        if (membership.isEmpty()) {
+            return LeaveResult.NOT_IN_PARTY;
         }
-        try (PreparedStatement lockParty = connection.prepareStatement(LOCK_PARTY)) {
-            lockParty.setLong(1, partyId);
-            lockParty.executeQuery();
-        }
-        try (PreparedStatement delete = connection.prepareStatement(DELETE_MEMBER)) {
-            delete.setLong(1, partyId);
-            delete.setLong(2, characterId);
-            delete.executeUpdate();
-        }
-        if (role != PartyRole.LEADER) {
+        long partyId = membership.get().partyId();
+        JdbcOperations.query(connection, LOCK_PARTY, rs -> Boolean.TRUE, partyId);
+        JdbcOperations.update(connection, DELETE_MEMBER, partyId, characterId);
+        if (membership.get().role() != PartyRole.LEADER) {
             return LeaveResult.OK;
         }
         promoteNextLeaderOrDissolve(connection, partyId);
         return LeaveResult.OK;
     }
 
-    private static void promoteNextLeaderOrDissolve(Connection connection, long partyId) throws SQLException {
-        Long nextLeaderId = null;
-        try (PreparedStatement select = connection.prepareStatement(FIND_EARLIEST_REMAINING_MEMBER)) {
-            select.setLong(1, partyId);
-            try (ResultSet rs = select.executeQuery()) {
-                if (rs.next()) {
-                    nextLeaderId = rs.getLong("character_id");
-                }
-            }
-        }
-        if (nextLeaderId == null) {
-            try (PreparedStatement deleteParty = connection.prepareStatement(DELETE_PARTY)) {
-                deleteParty.setLong(1, partyId);
-                deleteParty.executeUpdate();
-            }
+    private record MembershipRow(long partyId, PartyRole role) {
+    }
+
+    private static void promoteNextLeaderOrDissolve(Connection connection, long partyId) {
+        Optional<Long> nextLeaderId = JdbcOperations.queryOne(
+                connection, FIND_EARLIEST_REMAINING_MEMBER, rs -> rs.getLong("character_id"), partyId);
+        if (nextLeaderId.isEmpty()) {
+            JdbcOperations.update(connection, DELETE_PARTY, partyId);
             return;
         }
-        try (PreparedStatement promote = connection.prepareStatement(PROMOTE_TO_LEADER)) {
-            promote.setLong(1, partyId);
-            promote.setLong(2, nextLeaderId);
-            promote.executeUpdate();
-        }
-        try (PreparedStatement updateLeader = connection.prepareStatement(UPDATE_PARTY_LEADER)) {
-            updateLeader.setLong(1, nextLeaderId);
-            updateLeader.setLong(2, partyId);
-            updateLeader.executeUpdate();
-        }
+        JdbcOperations.update(connection, PROMOTE_TO_LEADER, partyId, nextLeaderId.get());
+        JdbcOperations.update(connection, UPDATE_PARTY_LEADER, nextLeaderId.get(), partyId);
     }
 
     @Override

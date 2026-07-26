@@ -5,7 +5,6 @@ import dev.kage.pvp.domain.PvpRatingPort;
 import dev.kage.server.database.DatabaseAccessException;
 import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -17,9 +16,10 @@ import javax.sql.DataSource;
  * Hiện thực {@link PvpRatingPort} trên PostgreSQL — bảng {@code pvp_rating} (V18).
  * {@link #recordMatchResult} ghi CẢ 2 dòng (thắng+thua) nguyên tử bằng transaction thủ công trên 1
  * connection (KHÔNG {@code TransactionRunner} riêng — chỉ 1 bảng, không xuyên feature khác, cùng
- * lý do {@code PostgresGuildAdapter}). {@link #upsert} CỐ Ý không dùng {@link JdbcOperations} —
- * cùng lý do các adapter transaction-thủ-công khác: cần {@link SQLException} checked để rollback
- * đúng chỗ.
+ * lý do {@code PostgresGuildAdapter}). Không có case cần bắt {@code unique_violation} giữa
+ * transaction rồi tiếp tục nên {@link #upsert} vẫn dùng {@link JdbcOperations} được —
+ * {@link #recordMatchResult} chỉ cần catch thêm {@link RuntimeException} ở ranh giới transaction để
+ * rollback đúng trước khi rethrow.
  */
 public final class PostgresPvpRatingAdapter implements PvpRatingPort {
 
@@ -51,6 +51,10 @@ public final class PostgresPvpRatingAdapter implements PvpRatingPort {
                 dataSource, FIND_BY_CHARACTER_ID, PostgresPvpRatingAdapter::mapRating, characterId);
     }
 
+    // PMD AvoidCatchingGenericException: đúng ý — ranh giới transaction PHẢI rollback khi action
+    // ném BẤT KỲ RuntimeException nào (VD DatabaseAccessException từ JdbcOperations), cùng tinh
+    // thần JdbcTransactionRunner.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     @Override
     public void recordMatchResult(
             long winnerCharacterId, int winnerNewRating, long loserCharacterId, int loserNewRating) {
@@ -65,6 +69,9 @@ public final class PostgresPvpRatingAdapter implements PvpRatingPort {
                 throw new DatabaseAccessException(
                         "Lỗi ghi kết quả trận đấu: winnerCharacterId=" + winnerCharacterId
                                 + ", loserCharacterId=" + loserCharacterId, e);
+            } catch (RuntimeException e) {
+                connection.rollback();
+                throw e;
             } finally {
                 connection.setAutoCommit(true);
             }
@@ -79,15 +86,15 @@ public final class PostgresPvpRatingAdapter implements PvpRatingPort {
     private record RatingDelta(int newRating, int winsDelta, int lossesDelta) {
     }
 
-    private static void upsert(Connection connection, long characterId, RatingDelta delta) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(UPSERT_RATING)) {
-            statement.setLong(1, characterId);
-            statement.setInt(2, delta.newRating());
-            statement.setInt(3, delta.winsDelta());
-            statement.setInt(4, delta.lossesDelta());
-            statement.setTimestamp(5, Timestamp.from(Instant.now()));
-            statement.executeUpdate();
-        }
+    private static void upsert(Connection connection, long characterId, RatingDelta delta) {
+        JdbcOperations.update(
+                connection,
+                UPSERT_RATING,
+                characterId,
+                delta.newRating(),
+                delta.winsDelta(),
+                delta.lossesDelta(),
+                Timestamp.from(Instant.now()));
     }
 
     private static PvpRating mapRating(ResultSet rs) throws SQLException {

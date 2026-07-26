@@ -128,6 +128,11 @@ public final class PostgresGuildAdapter implements GuildPort {
         return JdbcOperations.query(dataSource, LIST_MEMBERS, PostgresGuildAdapter::mapMember, guildId);
     }
 
+    // PMD AvoidCatchingGenericException: đúng ý — transaction PHẢI rollback khi action ném BẤT KỲ
+    // RuntimeException nào (VD DuplicateGuildNameException từ insertGuild qua JdbcOperations).
+    // Ranh giới transaction, không phải nơi xử lý lỗi nghiệp vụ cụ thể — rethrow ngay sau rollback,
+    // cùng tinh thần JdbcTransactionRunner.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     @Override
     public Guild createGuild(String name, long leaderCharacterId) {
         try (Connection connection = dataSource.getConnection()) {
@@ -140,10 +145,10 @@ public final class PostgresGuildAdapter implements GuildPort {
                 return new Guild(guildId, name, leaderCharacterId, now);
             } catch (SQLException e) {
                 connection.rollback();
-                if (UNIQUE_VIOLATION_SQLSTATE.equals(e.getSQLState())) {
-                    throw new DuplicateGuildNameException(name);
-                }
                 throw new DatabaseAccessException("Lỗi tạo bang: " + name, e);
+            } catch (RuntimeException e) {
+                connection.rollback();
+                throw e;
             } finally {
                 connection.setAutoCommit(true);
             }
@@ -152,31 +157,28 @@ public final class PostgresGuildAdapter implements GuildPort {
         }
     }
 
-    private static long insertGuild(Connection connection, String name, long leaderCharacterId, Instant now)
-            throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(INSERT_GUILD)) {
-            statement.setString(1, name);
-            statement.setLong(2, leaderCharacterId);
-            statement.setTimestamp(3, Timestamp.from(now));
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return rs.getLong(1);
-            }
-        }
+    private static long insertGuild(Connection connection, String name, long leaderCharacterId, Instant now) {
+        return JdbcOperations.insertReturningIdOrThrow(
+                connection,
+                INSERT_GUILD,
+                () -> new DuplicateGuildNameException(name),
+                name,
+                leaderCharacterId,
+                Timestamp.from(now));
     }
 
     /** Gói tham số cho {@link #insertMember} — tránh vượt 4 tham số Checkstyle {@code ParameterNumber}. */
     private record NewMember(long guildId, long characterId, GuildRole role, Instant joinedAt) {
     }
 
-    private static void insertMember(Connection connection, NewMember member) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(INSERT_MEMBER)) {
-            statement.setLong(1, member.guildId());
-            statement.setLong(2, member.characterId());
-            statement.setString(3, member.role().name());
-            statement.setTimestamp(4, Timestamp.from(member.joinedAt()));
-            statement.executeUpdate();
-        }
+    private static void insertMember(Connection connection, NewMember member) {
+        JdbcOperations.update(
+                connection,
+                INSERT_MEMBER,
+                member.guildId(),
+                member.characterId(),
+                member.role().name(),
+                Timestamp.from(member.joinedAt()));
     }
 
     @Override
@@ -205,23 +207,19 @@ public final class PostgresGuildAdapter implements GuildPort {
         return JdbcOperations.query(dataSource, LIST_PENDING_REQUESTS, PostgresGuildAdapter::mapJoinRequest, guildId);
     }
 
-    // Bẫy unique_violation → DuplicateGuildJoinRequestException là logic nghiệp vụ đặc thù.
     @Override
     public GuildJoinRequest sendJoinRequest(long guildId, long characterId) {
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(INSERT_JOIN_REQUEST)) {
-            statement.setLong(1, guildId);
-            statement.setLong(2, characterId);
-            Instant now = Instant.now();
-            statement.setTimestamp(3, Timestamp.from(now));
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return new GuildJoinRequest(rs.getLong(1), guildId, characterId, now);
-            }
+        Instant now = Instant.now();
+        try (Connection connection = dataSource.getConnection()) {
+            long id = JdbcOperations.insertReturningIdOrThrow(
+                    connection,
+                    INSERT_JOIN_REQUEST,
+                    () -> new DuplicateGuildJoinRequestException(guildId, characterId),
+                    guildId,
+                    characterId,
+                    Timestamp.from(now));
+            return new GuildJoinRequest(id, guildId, characterId, now);
         } catch (SQLException e) {
-            if (UNIQUE_VIOLATION_SQLSTATE.equals(e.getSQLState())) {
-                throw new DuplicateGuildJoinRequestException(guildId, characterId);
-            }
             throw new DatabaseAccessException(
                     "Lỗi gửi đơn xin gia nhập: guildId=" + guildId + ", characterId=" + characterId, e);
         }
@@ -265,6 +263,9 @@ public final class PostgresGuildAdapter implements GuildPort {
         }
     }
 
+    // Raw JDBC CỐ Ý ở đây (không JdbcOperations.update dùng chung với insertMember): cần bắt
+    // SQLException CHECKED ngay tại chỗ để rollback(savepoint) rồi TIẾP TỤC transaction (dọn rác +
+    // trả TARGET_ALREADY_IN_GUILD) — JdbcOperations bọc thành unchecked sẽ mất đúng điểm bắt này.
     private static ApproveResult tryInsertMemberOrDropStaleRequest(
             Connection connection, long requestId, PendingApproval approval) throws SQLException {
         // SAVEPOINT bắt buộc: sau lỗi unique_violation, Postgres đánh dấu CẢ transaction là
@@ -273,10 +274,12 @@ public final class PostgresGuildAdapter implements GuildPort {
         // bằng Testcontainers, không phải đoán trước — xem GuildIntegrationTest
         // #shouldDropStaleRequest...).
         Savepoint savepoint = connection.setSavepoint();
-        try {
-            insertMember(
-                    connection,
-                    new NewMember(approval.guildId(), approval.characterId(), GuildRole.MEMBER, Instant.now()));
+        try (PreparedStatement statement = connection.prepareStatement(INSERT_MEMBER)) {
+            statement.setLong(1, approval.guildId());
+            statement.setLong(2, approval.characterId());
+            statement.setString(3, GuildRole.MEMBER.name());
+            statement.setTimestamp(4, Timestamp.from(Instant.now()));
+            statement.executeUpdate();
         } catch (SQLException e) {
             if (!UNIQUE_VIOLATION_SQLSTATE.equals(e.getSQLState())) {
                 throw e;

@@ -7,7 +7,6 @@ import dev.kage.friend.domain.FriendshipStatus;
 import dev.kage.server.database.DatabaseAccessException;
 import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -22,9 +21,6 @@ import javax.sql.DataSource;
  * đã giải thích (không có gold/item cần nguyên tử hoá xuyên nhiều bảng).
  */
 public final class PostgresFriendAdapter implements FriendPort {
-
-    // Mã lỗi Postgres cho unique_violation (SQLState).
-    private static final String UNIQUE_VIOLATION_SQLSTATE = "23505";
 
     private static final String FIND_BETWEEN = """
             SELECT id, requester_id, addressee_id, status, created_at, responded_at FROM friendship
@@ -80,24 +76,19 @@ public final class PostgresFriendAdapter implements FriendPort {
                 characterIdA);
     }
 
-    // Bẫy unique_violation → DuplicateFriendRequestException là logic nghiệp vụ đặc thù, không đưa
-    // vào JdbcOperations dùng chung.
     @Override
     public Friendship sendRequest(long requesterId, long addresseeId) {
         Instant now = Instant.now();
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(INSERT_REQUEST)) {
-            statement.setLong(1, requesterId);
-            statement.setLong(2, addresseeId);
-            statement.setTimestamp(3, Timestamp.from(now));
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return new Friendship(rs.getLong(1), requesterId, addresseeId, FriendshipStatus.PENDING, now, null);
-            }
+        try (Connection connection = dataSource.getConnection()) {
+            long id = JdbcOperations.insertReturningIdOrThrow(
+                    connection,
+                    INSERT_REQUEST,
+                    () -> new DuplicateFriendRequestException(requesterId, addresseeId),
+                    requesterId,
+                    addresseeId,
+                    Timestamp.from(now));
+            return new Friendship(id, requesterId, addresseeId, FriendshipStatus.PENDING, now, null);
         } catch (SQLException e) {
-            if (UNIQUE_VIOLATION_SQLSTATE.equals(e.getSQLState())) {
-                throw new DuplicateFriendRequestException(requesterId, addresseeId);
-            }
             throw new DatabaseAccessException("Lỗi gửi lời mời kết bạn: " + requesterId + " -> " + addresseeId, e);
         }
     }

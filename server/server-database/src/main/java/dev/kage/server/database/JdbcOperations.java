@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 import javax.sql.DataSource;
 
 /**
@@ -23,6 +24,9 @@ import javax.sql.DataSource;
  * đơn lẻ ngoài transaction (VD {@code findByX}).
  */
 public final class JdbcOperations {
+
+    // Mã lỗi Postgres cho unique_violation (SQLState) — dùng bởi updateOrThrow/insertReturningIdOrThrow.
+    private static final String UNIQUE_VIOLATION_SQLSTATE = "23505";
 
     private JdbcOperations() {
     }
@@ -73,6 +77,39 @@ public final class JdbcOperations {
             return statement.executeUpdate();
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi update: " + sql, e);
+        }
+    }
+
+    /**
+     * {@code INSERT} đơn — bắt {@code unique_violation} (idempotency-key/duplicate-request insert),
+     * ném {@code onUniqueViolation.get()} thay vì {@link DatabaseAccessException} chung. Pattern lặp
+     * lại y hệt ở mọi idempotency-key adapter + {@code sendRequest}/{@code sendJoinRequest}/
+     * {@code invite} (friend/guild/party) trước khi có method này.
+     */
+    public static void updateOrThrow(
+            Connection connection, String sql, Supplier<RuntimeException> onUniqueViolation, Object... params) {
+        try (PreparedStatement statement = prepare(connection, sql, params)) {
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            if (UNIQUE_VIOLATION_SQLSTATE.equals(e.getSQLState())) {
+                throw onUniqueViolation.get();
+            }
+            throw new DatabaseAccessException("Lỗi update: " + sql, e);
+        }
+    }
+
+    /** Như {@link #updateOrThrow} nhưng cho {@code INSERT ... RETURNING id}. */
+    public static long insertReturningIdOrThrow(
+            Connection connection, String sql, Supplier<RuntimeException> onUniqueViolation, Object... params) {
+        try (PreparedStatement statement = prepare(connection, sql, params);
+                ResultSet resultSet = statement.executeQuery()) {
+            resultSet.next();
+            return resultSet.getLong(1);
+        } catch (SQLException e) {
+            if (UNIQUE_VIOLATION_SQLSTATE.equals(e.getSQLState())) {
+                throw onUniqueViolation.get();
+            }
+            throw new DatabaseAccessException("Lỗi insert: " + sql, e);
         }
     }
 

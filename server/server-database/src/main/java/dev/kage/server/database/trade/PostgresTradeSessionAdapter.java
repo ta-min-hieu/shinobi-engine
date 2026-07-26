@@ -10,24 +10,24 @@ import dev.kage.trade.domain.TradeSessionPort;
 import dev.kage.trade.domain.TradeSessionSnapshot;
 import dev.kage.trade.domain.TradeStatus;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import javax.sql.DataSource;
 
 /**
  * Hiện thực {@link TradeSessionPort} trên PostgreSQL — bảng {@code trade_session}/{@code
  * trade_offer_item} (V16). {@link #replaceOffer} chạm 2 bảng nguyên tử bằng transaction thủ công
  * trên 1 connection (KHÔNG {@code TransactionRunner} riêng — cả 2 bảng đều thuộc feature này,
- * cùng lý do {@code GuildPort}/{@code PartyPort} không cần).
- *
- * <p>{@link #replaceOffer}/{@link #replaceOfferInTransaction} CỐ Ý không dùng
- * {@link JdbcOperations} — cùng lý do {@code PostgresGuildAdapter}/{@code PostgresPartyAdapter}:
- * dựa vào {@link SQLException} checked bắt đúng chỗ để rollback đúng lúc.
+ * cùng lý do {@code GuildPort}/{@code PartyPort} không cần). Không có case cần bắt
+ * {@code unique_violation} giữa transaction rồi tiếp tục (khác {@code PostgresGuildAdapter}) nên
+ * {@link #replaceOfferInTransaction} vẫn dùng {@link JdbcOperations} được — {@link #replaceOffer}
+ * chỉ cần catch thêm {@link RuntimeException} ở ranh giới transaction để rollback đúng trước khi
+ * rethrow.
  */
 public final class PostgresTradeSessionAdapter implements TradeSessionPort {
 
@@ -129,6 +129,10 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
         return JdbcOperations.update(dataSource, DELETE_IF_PARTICIPANT, sessionId, characterId, characterId) > 0;
     }
 
+    // PMD AvoidCatchingGenericException: đúng ý — ranh giới transaction PHẢI rollback khi action
+    // ném BẤT KỲ RuntimeException nào (VD DatabaseAccessException từ JdbcOperations), cùng tinh
+    // thần JdbcTransactionRunner.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     @Override
     public boolean replaceOffer(long sessionId, long characterId, long goldAmount, List<OfferedItemInput> items) {
         try (Connection connection = dataSource.getConnection()) {
@@ -145,6 +149,9 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
             } catch (SQLException e) {
                 connection.rollback();
                 throw new DatabaseAccessException("Lỗi đặt lời chào trade: sessionId=" + sessionId, e);
+            } catch (RuntimeException e) {
+                connection.rollback();
+                throw e;
             } finally {
                 connection.setAutoCommit(true);
             }
@@ -157,49 +164,35 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
     private record OfferRequest(long sessionId, long characterId, long goldAmount, List<OfferedItemInput> items) {
     }
 
-    private static boolean replaceOfferInTransaction(Connection connection, OfferRequest request)
-            throws SQLException {
-        long requesterId;
-        long targetId;
-        try (PreparedStatement select = connection.prepareStatement(SELECT_SESSION_FOR_OFFER)) {
-            select.setLong(1, request.sessionId());
-            try (ResultSet rs = select.executeQuery()) {
-                if (!rs.next() || !"OPEN".equals(rs.getString("status"))) {
-                    return false;
-                }
-                requesterId = rs.getLong("requester_character_id");
-                targetId = rs.getLong("target_character_id");
-            }
+    private record SessionForOfferRow(long requesterId, long targetId, String status) {
+    }
+
+    private static boolean replaceOfferInTransaction(Connection connection, OfferRequest request) {
+        Optional<SessionForOfferRow> session = JdbcOperations.queryOne(
+                connection,
+                SELECT_SESSION_FOR_OFFER,
+                rs -> new SessionForOfferRow(
+                        rs.getLong("requester_character_id"), rs.getLong("target_character_id"),
+                        rs.getString("status")),
+                request.sessionId());
+        if (session.isEmpty() || !"OPEN".equals(session.get().status())) {
+            return false;
         }
+        long requesterId = session.get().requesterId();
+        long targetId = session.get().targetId();
         long characterId = request.characterId();
         if (characterId != requesterId && characterId != targetId) {
             return false;
         }
-        try (PreparedStatement delete = connection.prepareStatement(DELETE_OFFER_ITEMS_OF_CHARACTER)) {
-            delete.setLong(1, request.sessionId());
-            delete.setLong(2, characterId);
-            delete.executeUpdate();
-        }
-        try (PreparedStatement insert = connection.prepareStatement(INSERT_OFFER_ITEM)) {
-            for (OfferedItemInput item : request.items()) {
-                insert.setLong(1, request.sessionId());
-                insert.setLong(2, characterId);
-                insert.setLong(3, item.itemId());
-                insert.setInt(4, item.quantity());
-                insert.addBatch();
-            }
-            if (!request.items().isEmpty()) {
-                insert.executeBatch();
-            }
-        }
+        JdbcOperations.update(connection, DELETE_OFFER_ITEMS_OF_CHARACTER, request.sessionId(), characterId);
+        List<Object[]> batchParams = request.items().stream()
+                .map(item -> new Object[] {request.sessionId(), characterId, item.itemId(), item.quantity()})
+                .collect(Collectors.toList());
+        JdbcOperations.batchUpdate(connection, INSERT_OFFER_ITEM, batchParams);
         String updateGoldSql = characterId == requesterId
                 ? UPDATE_REQUESTER_GOLD_AND_RESET_CONFIRM
                 : UPDATE_TARGET_GOLD_AND_RESET_CONFIRM;
-        try (PreparedStatement updateGold = connection.prepareStatement(updateGoldSql)) {
-            updateGold.setLong(1, request.goldAmount());
-            updateGold.setLong(2, request.sessionId());
-            updateGold.executeUpdate();
-        }
+        JdbcOperations.update(connection, updateGoldSql, request.goldAmount(), request.sessionId());
         return true;
     }
 

@@ -15,7 +15,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.sql.Types;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -33,9 +32,6 @@ import javax.sql.DataSource;
  * connection của transaction đang mở (bắt buộc, để cùng transaction với ghi character/character_stat).
  */
 public final class PostgresCharacterAdapter implements CharacterPort {
-
-    // Mã lỗi Postgres cho unique_violation (SQLState) — dùng để phát hiện idempotencyKey trùng.
-    private static final String UNIQUE_VIOLATION_SQLSTATE = "23505";
 
     // Số liệu khởi điểm — PLACEHOLDER, GDD chưa chốt (feature-character/CLAUDE.md).
     private static final int STARTING_STAT = 10;
@@ -161,20 +157,13 @@ public final class PostgresCharacterAdapter implements CharacterPort {
                 Instant.now());
     }
 
-    // UUID + Types.OTHER và bẫy unique_violation → IdempotencyKeyReusedException là logic nghiệp
-    // vụ đặc thù, KHÔNG đưa vào JdbcOperations dùng chung (helper chỉ lo boilerplate, không lo dịch
-    // lỗi domain-specific).
     private static void insertIdempotencyKey(Connection connection, String idempotencyKey) {
-        try (PreparedStatement statement = connection.prepareStatement(INSERT_IDEMPOTENCY_KEY)) {
-            statement.setObject(1, UUID.fromString(idempotencyKey), Types.OTHER);
-            statement.setTimestamp(2, Timestamp.from(Instant.now()));
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            if (UNIQUE_VIOLATION_SQLSTATE.equals(e.getSQLState())) {
-                throw new IdempotencyKeyReusedException(idempotencyKey);
-            }
-            throw new DatabaseAccessException("Lỗi ghi idempotency key: " + idempotencyKey, e);
-        }
+        JdbcOperations.updateOrThrow(
+                connection,
+                INSERT_IDEMPOTENCY_KEY,
+                () -> new IdempotencyKeyReusedException(idempotencyKey),
+                UUID.fromString(idempotencyKey),
+                Timestamp.from(Instant.now()));
     }
 
     @Override
