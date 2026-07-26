@@ -104,6 +104,10 @@ public final class WorldFacade {
     private long nextMonsterOrNpcId = -1;
     private float monsterRespawnCountdownSeconds = -1f; // < 0 = quái đang sống, không đếm ngược.
 
+    // AoI sync chạy chậm hơn tick loop (WorldConstants.AOI_SYNC_INTERVAL_TICKS) — chỉ đếm tick,
+    // KHÔNG dùng đồng hồ thật (đơn giản, không trôi lệch tích luỹ như Timer/Duration).
+    private long tickCounter;
+
     private volatile boolean running;
     private Thread tickThread;
     private final boolean spawnOverworldContent;
@@ -274,7 +278,13 @@ public final class WorldFacade {
             handleSkillResults(skillSystem.drainResults());
             handleBossResults(bossAiSystem.drainResults());
             tickMonsterRespawn(WorldConstants.FIXED_DT);
-            aoiTracker.sync(entitiesByCharacterId, entitiesByMonsterId, entitiesByNpcId);
+            // O(n²) — chạy chậm hơn tick loop (WorldConstants.AOI_SYNC_INTERVAL_TICKS), xem
+            // javadoc AreaOfInterestTracker + WorldConstants.AOI_SYNC_RATE_HZ. Combat/skill/boss
+            // result ở trên KHÔNG bị ảnh hưởng — vẫn phát ngay mỗi tick qua observersOf().
+            tickCounter++;
+            if (tickCounter % WorldConstants.AOI_SYNC_INTERVAL_TICKS == 0) {
+                aoiTracker.sync(entitiesByCharacterId, entitiesByMonsterId, entitiesByNpcId);
+            }
         } catch (RuntimeException e) {
             LOG.error("Lỗi trong World tick — bỏ qua tick này, KHÔNG dừng tick loop", e);
         }

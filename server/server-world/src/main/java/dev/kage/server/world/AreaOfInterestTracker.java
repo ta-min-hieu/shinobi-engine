@@ -44,6 +44,15 @@ final class AreaOfInterestTracker {
     // characterId -> tập ID (nhân vật DƯƠNG hoặc quái ÂM) mà nhân vật đó ĐANG thấy. Quái không có
     // entry riêng ở đây — quái không phải "observer", không ai đứng sau nó để nhận Event.
     private final Map<Long, Set<Long>> visibleTo = new HashMap<>();
+    // entityId (nhân vật HOẶC quái) -> {x, y} tại lần sync() GẦN NHẤT — PHẢI tách khỏi
+    // PositionComponent.prevX/prevY (MovementSystem ghi đè field đó MỖI tick 60Hz, phục vụ nội suy
+    // vẽ phía client, không phải "vị trí lúc AoI phát lần cuối"). Từ khi sync() tách khỏi tick loop
+    // (WorldConstants.AOI_SYNC_INTERVAL_TICKS), so sánh với prevX/prevY chỉ bắt được chuyển động
+    // của ĐÚNG 1 tick ngay trước lúc sync — nhân vật dừng lại đúng lúc không phải tick sync sẽ
+    // KHÔNG BAO GIỜ được báo vị trí cuối cho người xung quanh (prevX==x mãi mãi sau khi đứng yên).
+    // float[2] cấp phát 1 LẦN lúc thấy entity lần đầu, ghi đè tại chỗ mỗi sync() — không boxing,
+    // không cấp phát lặp lại (Điều 31).
+    private final Map<Long, float[]> lastSyncedPosition = new HashMap<>();
 
     AreaOfInterestTracker(WorldOutboundSink sink) {
         this.sink = sink;
@@ -56,6 +65,7 @@ final class AreaOfInterestTracker {
 
     /** Gọi lúc detach — báo despawn cho mọi nhân vật đang thấy {@code characterId}. */
     void onDetach(long characterId) {
+        lastSyncedPosition.remove(characterId);
         Set<Long> wasVisibleTo = visibleTo.remove(characterId);
         if (wasVisibleTo == null) {
             return;
@@ -71,6 +81,7 @@ final class AreaOfInterestTracker {
 
     /** Gọi lúc quái chết/bị xoá — báo despawn cho MỌI nhân vật đang thấy nó (quét tuyến tính, đủ ở quy mô này). */
     void onMonsterDetach(long monsterId) {
+        lastSyncedPosition.remove(monsterId);
         for (Map.Entry<Long, Set<Long>> entry : visibleTo.entrySet()) {
             if (entry.getValue().remove(monsterId)) {
                 sink.onMonsterDespawned(entry.getKey(), monsterId);
@@ -106,6 +117,25 @@ final class AreaOfInterestTracker {
                 syncCharacterNpcPair(entitiesByCharacterId, entitiesByNpcId, characterId, npcId);
             }
         }
+        // PHẢI chạy SAU 2 vòng trên (mọi so sánh "đã đổi vị trí" ở lượt sync() này đọc giá trị CŨ
+        // trước khi bị ghi đè ở đây) — xem javadoc lastSyncedPosition.
+        refreshLastSyncedPositions(entitiesByCharacterId, entitiesByMonsterId);
+    }
+
+    private void refreshLastSyncedPositions(
+            Map<Long, KEntity> entitiesByCharacterId, Map<Long, KEntity> entitiesByMonsterId) {
+        for (Map.Entry<Long, KEntity> entry : entitiesByCharacterId.entrySet()) {
+            snapshotPosition(entry.getKey(), POSITION.get(entry.getValue()));
+        }
+        for (Map.Entry<Long, KEntity> entry : entitiesByMonsterId.entrySet()) {
+            snapshotPosition(entry.getKey(), POSITION.get(entry.getValue()));
+        }
+    }
+
+    private void snapshotPosition(long entityId, PositionComponent pos) {
+        float[] snapshot = lastSyncedPosition.computeIfAbsent(entityId, unusedKey -> new float[2]);
+        snapshot[0] = pos.x;
+        snapshot[1] = pos.y;
     }
 
     private void syncCharacterPair(Map<Long, KEntity> entitiesByCharacterId, long a, long b) {
@@ -182,15 +212,21 @@ final class AreaOfInterestTracker {
     }
 
     private void notifyMovedIfChanged(long targetCharacterId, long movedCharacterId, PositionComponent moved) {
-        if (moved.x != moved.prevX || moved.y != moved.prevY) {
+        if (movedSinceLastSync(movedCharacterId, moved)) {
             sink.onCharacterMoved(targetCharacterId, movedCharacterId, moved.x, moved.y);
         }
     }
 
     private void notifyMonsterMovedIfChanged(long targetCharacterId, long monsterId, PositionComponent moved) {
-        if (moved.x != moved.prevX || moved.y != moved.prevY) {
+        if (movedSinceLastSync(monsterId, moved)) {
             sink.onMonsterMoved(targetCharacterId, monsterId, moved.x, moved.y);
         }
+    }
+
+    /** So với vị trí lúc {@link #sync} gần nhất — KHÔNG phải {@code prevX/prevY} (xem javadoc {@link #lastSyncedPosition}). */
+    private boolean movedSinceLastSync(long entityId, PositionComponent current) {
+        float[] snapshot = lastSyncedPosition.get(entityId);
+        return snapshot == null || current.x != snapshot[0] || current.y != snapshot[1];
     }
 
     private static double distance(PositionComponent a, PositionComponent b) {

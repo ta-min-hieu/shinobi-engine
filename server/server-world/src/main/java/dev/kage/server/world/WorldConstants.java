@@ -20,6 +20,15 @@ final class WorldConstants {
     /** Bán kính Area of Interest — placeholder, đo lại ở Phase 3/9 (SERVER.md §6, §11). */
     static final float AOI_RADIUS_METERS = 15f;
 
+    // AoI sync TÁCH khỏi TICK_RATE (ADR-018 §Consequences/§Revisit Trigger: "giữ logic 60Hz, hạ
+    // snapshot rate") — người chơi không phân biệt được vị trí người khác cập nhật mỗi 16ms hay
+    // 50ms, nhưng AreaOfInterestTracker.sync() là O(n²)/tick nên tần suất ảnh hưởng trực tiếp tới
+    // CPU. Load test thật N=1000/2000 (Phase 9, 2026-07) cho thấy đây là điểm nghẽn CPU chính —
+    // tick p99 vượt ngân sách 16.6ms đã ở N=1000. 20Hz theo yêu cầu chủ dự án (chủ dự án: "10-20
+    // lần 1 giây là quá nhiều rồi" cho việc phát hiện vào/ra tầm nhìn).
+    static final float AOI_SYNC_RATE_HZ = 20f;
+    static final int AOI_SYNC_INTERVAL_TICKS = Math.round(TICK_RATE / AOI_SYNC_RATE_HZ);
+
     private WorldConstants() {
     }
 }
