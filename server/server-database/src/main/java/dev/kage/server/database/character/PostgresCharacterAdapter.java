@@ -111,7 +111,7 @@ public final class PostgresCharacterAdapter implements CharacterPort {
 
     @Override
     public boolean existsByName(String name) {
-        return !JdbcOperations.query(dataSource, EXISTS_BY_NAME, rs -> Boolean.TRUE, name).isEmpty();
+        return JdbcOperations.queryOne(dataSource, EXISTS_BY_NAME, rs -> Boolean.TRUE, name).isPresent();
     }
 
     @Override

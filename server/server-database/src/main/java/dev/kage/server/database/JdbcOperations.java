@@ -73,8 +73,8 @@ public final class JdbcOperations {
 
     /** {@code UPDATE}/{@code DELETE} đơn — trả số dòng bị ảnh hưởng. */
     public static int update(Connection connection, String sql, Object... params) {
-        try (PreparedStatement statement = prepare(connection, sql, params)) {
-            return statement.executeUpdate();
+        try {
+            return executeUpdate(connection, sql, params);
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi update: " + sql, e);
         }
@@ -88,28 +88,26 @@ public final class JdbcOperations {
      */
     public static void updateOrThrow(
             Connection connection, String sql, Supplier<RuntimeException> onUniqueViolation, Object... params) {
-        try (PreparedStatement statement = prepare(connection, sql, params)) {
-            statement.executeUpdate();
+        try {
+            executeUpdate(connection, sql, params);
         } catch (SQLException e) {
-            if (UNIQUE_VIOLATION_SQLSTATE.equals(e.getSQLState())) {
-                throw onUniqueViolation.get();
-            }
-            throw new DatabaseAccessException("Lỗi update: " + sql, e);
+            throw translateUniqueViolation(sql, onUniqueViolation, e, "Lỗi update: ");
+        }
+    }
+
+    private static int executeUpdate(Connection connection, String sql, Object... params) throws SQLException {
+        try (PreparedStatement statement = prepare(connection, sql, params)) {
+            return statement.executeUpdate();
         }
     }
 
     /** Như {@link #updateOrThrow} nhưng cho {@code INSERT ... RETURNING id}. */
     public static long insertReturningIdOrThrow(
             Connection connection, String sql, Supplier<RuntimeException> onUniqueViolation, Object... params) {
-        try (PreparedStatement statement = prepare(connection, sql, params);
-                ResultSet resultSet = statement.executeQuery()) {
-            resultSet.next();
-            return resultSet.getLong(1);
+        try {
+            return executeInsertReturningId(connection, sql, params);
         } catch (SQLException e) {
-            if (UNIQUE_VIOLATION_SQLSTATE.equals(e.getSQLState())) {
-                throw onUniqueViolation.get();
-            }
-            throw new DatabaseAccessException("Lỗi insert: " + sql, e);
+            throw translateUniqueViolation(sql, onUniqueViolation, e, "Lỗi insert: ");
         }
     }
 
@@ -124,12 +122,41 @@ public final class JdbcOperations {
 
     /** {@code INSERT ... RETURNING id} — trả id vừa sinh. SQL phải có mệnh đề {@code RETURNING}. */
     public static long insertReturningId(Connection connection, String sql, Object... params) {
+        try {
+            return executeInsertReturningId(connection, sql, params);
+        } catch (SQLException e) {
+            throw new DatabaseAccessException("Lỗi insert: " + sql, e);
+        }
+    }
+
+    private static long executeInsertReturningId(Connection connection, String sql, Object... params)
+            throws SQLException {
         try (PreparedStatement statement = prepare(connection, sql, params);
                 ResultSet resultSet = statement.executeQuery()) {
             resultSet.next();
             return resultSet.getLong(1);
+        }
+    }
+
+    private static RuntimeException translateUniqueViolation(
+            String sql, Supplier<RuntimeException> onUniqueViolation, SQLException e, String messagePrefix) {
+        if (UNIQUE_VIOLATION_SQLSTATE.equals(e.getSQLState())) {
+            return onUniqueViolation.get();
+        }
+        return new DatabaseAccessException(messagePrefix + sql, e);
+    }
+
+    /**
+     * Chạy {@code SELECT ... FOR UPDATE} để khoá dòng, bỏ qua kết quả trả về — Postgres áp khoá
+     * ngay lúc {@code executeQuery()} chạy, không cần lặp {@link ResultSet}. Tránh dùng
+     * {@link #query} (trả {@code List}) chỉ để khoá dòng rồi vứt kết quả.
+     */
+    public static void lock(Connection connection, String sql, Object... params) {
+        try (PreparedStatement statement = prepare(connection, sql, params)) {
+            // ResultSet không cần đọc — statement.close() tự đóng nó theo spec JDBC.
+            statement.executeQuery();
         } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi insert: " + sql, e);
+            throw new DatabaseAccessException("Lỗi khoá dòng: " + sql, e);
         }
     }
 

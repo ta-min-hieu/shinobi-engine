@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import javax.sql.DataSource;
 
 /**
@@ -79,9 +80,7 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
     public Mail send(Transaction tx, NewMail newMail) {
         Connection connection = ((JdbcTransaction) tx).connection();
         long mailId = insertMail(connection, newMail);
-        for (MailAttachment attachment : newMail.attachments()) {
-            insertMailItem(connection, mailId, attachment);
-        }
+        insertMailItems(connection, mailId, newMail.attachments());
         return new Mail(
                 mailId, newMail.senderId(), newMail.recipientId(), newMail.subject(), newMail.body(),
                 newMail.goldAmount(), newMail.attachments(), null, Instant.now());
@@ -99,8 +98,11 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
                 Timestamp.from(Instant.now()));
     }
 
-    private static void insertMailItem(Connection connection, long mailId, MailAttachment attachment) {
-        JdbcOperations.update(connection, INSERT_MAIL_ITEM, mailId, attachment.itemTemplateId(), attachment.quantity());
+    private static void insertMailItems(Connection connection, long mailId, List<MailAttachment> attachments) {
+        List<Object[]> batchParams = attachments.stream()
+                .map(attachment -> new Object[] {mailId, attachment.itemTemplateId(), attachment.quantity()})
+                .collect(Collectors.toList());
+        JdbcOperations.batchUpdate(connection, INSERT_MAIL_ITEM, batchParams);
     }
 
     @Override

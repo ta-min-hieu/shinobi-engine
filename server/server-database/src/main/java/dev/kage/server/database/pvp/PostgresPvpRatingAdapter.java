@@ -2,8 +2,8 @@ package dev.kage.server.database.pvp;
 
 import dev.kage.pvp.domain.PvpRating;
 import dev.kage.pvp.domain.PvpRatingPort;
-import dev.kage.server.database.DatabaseAccessException;
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.JdbcTransactionRunner;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -14,12 +14,9 @@ import javax.sql.DataSource;
 
 /**
  * Hiện thực {@link PvpRatingPort} trên PostgreSQL — bảng {@code pvp_rating} (V18).
- * {@link #recordMatchResult} ghi CẢ 2 dòng (thắng+thua) nguyên tử bằng transaction thủ công trên 1
- * connection (KHÔNG {@code TransactionRunner} riêng — chỉ 1 bảng, không xuyên feature khác, cùng
- * lý do {@code PostgresGuildAdapter}). Không có case cần bắt {@code unique_violation} giữa
- * transaction rồi tiếp tục nên {@link #upsert} vẫn dùng {@link JdbcOperations} được —
- * {@link #recordMatchResult} chỉ cần catch thêm {@link RuntimeException} ở ranh giới transaction để
- * rollback đúng trước khi rethrow.
+ * {@link #recordMatchResult} ghi CẢ 2 dòng (thắng+thua) nguyên tử — "commit khi xong / rollback khi
+ * lỗi" thuần tuý, không trả giá trị, nên dùng {@link JdbcTransactionRunner#run} có sẵn thay vì tự
+ * lặp lại khung transaction thủ công.
  */
 public final class PostgresPvpRatingAdapter implements PvpRatingPort {
 
@@ -51,35 +48,13 @@ public final class PostgresPvpRatingAdapter implements PvpRatingPort {
                 dataSource, FIND_BY_CHARACTER_ID, PostgresPvpRatingAdapter::mapRating, characterId);
     }
 
-    // PMD AvoidCatchingGenericException: đúng ý — ranh giới transaction PHẢI rollback khi action
-    // ném BẤT KỲ RuntimeException nào (VD DatabaseAccessException từ JdbcOperations), cùng tinh
-    // thần JdbcTransactionRunner.
-    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     @Override
     public void recordMatchResult(
             long winnerCharacterId, int winnerNewRating, long loserCharacterId, int loserNewRating) {
-        try (Connection connection = dataSource.getConnection()) {
-            connection.setAutoCommit(false);
-            try {
-                upsert(connection, winnerCharacterId, new RatingDelta(winnerNewRating, 1, 0));
-                upsert(connection, loserCharacterId, new RatingDelta(loserNewRating, 0, 1));
-                connection.commit();
-            } catch (SQLException e) {
-                connection.rollback();
-                throw new DatabaseAccessException(
-                        "Lỗi ghi kết quả trận đấu: winnerCharacterId=" + winnerCharacterId
-                                + ", loserCharacterId=" + loserCharacterId, e);
-            } catch (RuntimeException e) {
-                connection.rollback();
-                throw e;
-            } finally {
-                connection.setAutoCommit(true);
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException(
-                    "Lỗi ghi kết quả trận đấu: winnerCharacterId=" + winnerCharacterId
-                            + ", loserCharacterId=" + loserCharacterId, e);
-        }
+        JdbcTransactionRunner.run(dataSource, connection -> {
+            upsert(connection, winnerCharacterId, new RatingDelta(winnerNewRating, 1, 0));
+            upsert(connection, loserCharacterId, new RatingDelta(loserNewRating, 0, 1));
+        });
     }
 
     /** Gộp tham số UPSERT — tránh vượt giới hạn 4 tham số/method (STATIC-ANALYSIS.md). */

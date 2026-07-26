@@ -8,6 +8,7 @@ import dev.kage.party.domain.PartyPort;
 import dev.kage.party.domain.PartyRole;
 import dev.kage.server.database.DatabaseAccessException;
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.JdbcTransactionRunner;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -20,12 +21,9 @@ import javax.sql.DataSource;
 /**
  * Hiện thực {@link PartyPort} trên PostgreSQL — bảng {@code party}/{@code party_member}/
  * {@code party_invite} (V15). {@link #createParty}, {@link #acceptInvite}, {@link #leaveParty}
- * chạm nhiều bảng nguyên tử bằng transaction thủ công (KHÔNG {@code TransactionRunner} riêng —
- * xem javadoc {@link PartyPort}). Khác {@code PostgresGuildAdapter}: không có case nào cần bắt
- * {@code unique_violation} GIỮA transaction rồi tiếp tục (party check "đã ở party khác" bằng SELECT
- * trước khi insert, không dựa vào catch conflict) — nên toàn bộ statement trong 3 method này VẪN
- * dùng {@link JdbcOperations} được, chỉ cần catch thêm {@link RuntimeException} ở transaction
- * boundary để rollback đúng trước khi rethrow (JdbcOperations bọc SQLException thành unchecked).
+ * chạm nhiều bảng nguyên tử — cả 3 đều "commit khi xong / rollback+rethrow khi lỗi" thuần tuý
+ * (không có nhánh rollback-mà-không-throw) nên dùng chung {@link JdbcTransactionRunner#call}
+ * thay vì tự lặp lại khung transaction thủ công.
  */
 public final class PostgresPartyAdapter implements PartyPort {
 
@@ -123,33 +121,15 @@ public final class PostgresPartyAdapter implements PartyPort {
         return JdbcOperations.query(dataSource, LIST_MEMBERS, PostgresPartyAdapter::mapMember, partyId);
     }
 
-    // PMD AvoidCatchingGenericException: đúng ý — ranh giới transaction PHẢI rollback khi action
-    // ném BẤT KỲ RuntimeException nào (VD DatabaseAccessException từ JdbcOperations), cùng tinh
-    // thần JdbcTransactionRunner.
-    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     @Override
     public Party createParty(long leaderCharacterId) {
-        try (Connection connection = dataSource.getConnection()) {
-            connection.setAutoCommit(false);
-            try {
-                Instant now = Instant.now();
-                long partyId = JdbcOperations.insertReturningId(
-                        connection, INSERT_PARTY, leaderCharacterId, Timestamp.from(now));
-                insertMember(connection, new NewMember(partyId, leaderCharacterId, PartyRole.LEADER, now));
-                connection.commit();
-                return new Party(partyId, leaderCharacterId, now);
-            } catch (SQLException e) {
-                connection.rollback();
-                throw new DatabaseAccessException("Lỗi tạo party: leaderCharacterId=" + leaderCharacterId, e);
-            } catch (RuntimeException e) {
-                connection.rollback();
-                throw e;
-            } finally {
-                connection.setAutoCommit(true);
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi tạo party: leaderCharacterId=" + leaderCharacterId, e);
-        }
+        return JdbcTransactionRunner.call(dataSource, connection -> {
+            Instant now = Instant.now();
+            long partyId = JdbcOperations.insertReturningId(
+                    connection, INSERT_PARTY, leaderCharacterId, Timestamp.from(now));
+            insertMember(connection, new NewMember(partyId, leaderCharacterId, PartyRole.LEADER, now));
+            return new Party(partyId, leaderCharacterId, now);
+        });
     }
 
     @Override
@@ -182,27 +162,10 @@ public final class PostgresPartyAdapter implements PartyPort {
         }
     }
 
-    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     @Override
     public AcceptResult acceptInvite(long inviteId, long characterId) {
-        try (Connection connection = dataSource.getConnection()) {
-            connection.setAutoCommit(false);
-            try {
-                AcceptResult result = acceptInviteInTransaction(connection, inviteId, characterId);
-                connection.commit();
-                return result;
-            } catch (SQLException e) {
-                connection.rollback();
-                throw new DatabaseAccessException("Lỗi chấp nhận lời mời party: inviteId=" + inviteId, e);
-            } catch (RuntimeException e) {
-                connection.rollback();
-                throw e;
-            } finally {
-                connection.setAutoCommit(true);
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi chấp nhận lời mời party: inviteId=" + inviteId, e);
-        }
+        return JdbcTransactionRunner.call(
+                dataSource, connection -> acceptInviteInTransaction(connection, inviteId, characterId));
     }
 
     private static AcceptResult acceptInviteInTransaction(Connection connection, long inviteId, long characterId) {
@@ -211,7 +174,7 @@ public final class PostgresPartyAdapter implements PartyPort {
         if (partyId.isEmpty()) {
             return AcceptResult.NOT_FOUND;
         }
-        JdbcOperations.query(connection, LOCK_PARTY, rs -> Boolean.TRUE, partyId.get());
+        JdbcOperations.lock(connection, LOCK_PARTY, partyId.get());
         if (isAlreadyMember(connection, characterId)) {
             deleteInvite(connection, inviteId);
             return AcceptResult.ALREADY_IN_PARTY;
@@ -226,7 +189,7 @@ public final class PostgresPartyAdapter implements PartyPort {
     }
 
     private static boolean isAlreadyMember(Connection connection, long characterId) {
-        return !JdbcOperations.query(connection, FIND_MEMBERSHIP, rs -> Boolean.TRUE, characterId).isEmpty();
+        return JdbcOperations.queryOne(connection, FIND_MEMBERSHIP, rs -> Boolean.TRUE, characterId).isPresent();
     }
 
     private static int countMembers(Connection connection, long partyId) {
@@ -256,27 +219,9 @@ public final class PostgresPartyAdapter implements PartyPort {
         return JdbcOperations.update(dataSource, REJECT_INVITE, inviteId, characterId) > 0;
     }
 
-    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     @Override
     public LeaveResult leaveParty(long characterId) {
-        try (Connection connection = dataSource.getConnection()) {
-            connection.setAutoCommit(false);
-            try {
-                LeaveResult result = leavePartyInTransaction(connection, characterId);
-                connection.commit();
-                return result;
-            } catch (SQLException e) {
-                connection.rollback();
-                throw new DatabaseAccessException("Lỗi rời party: characterId=" + characterId, e);
-            } catch (RuntimeException e) {
-                connection.rollback();
-                throw e;
-            } finally {
-                connection.setAutoCommit(true);
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi rời party: characterId=" + characterId, e);
-        }
+        return JdbcTransactionRunner.call(dataSource, connection -> leavePartyInTransaction(connection, characterId));
     }
 
     private static LeaveResult leavePartyInTransaction(Connection connection, long characterId) {
@@ -289,7 +234,7 @@ public final class PostgresPartyAdapter implements PartyPort {
             return LeaveResult.NOT_IN_PARTY;
         }
         long partyId = membership.get().partyId();
-        JdbcOperations.query(connection, LOCK_PARTY, rs -> Boolean.TRUE, partyId);
+        JdbcOperations.lock(connection, LOCK_PARTY, partyId);
         JdbcOperations.update(connection, DELETE_MEMBER, partyId, characterId);
         if (membership.get().role() != PartyRole.LEADER) {
             return LeaveResult.OK;

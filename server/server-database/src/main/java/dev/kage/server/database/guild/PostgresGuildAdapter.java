@@ -9,6 +9,7 @@ import dev.kage.guild.domain.GuildPort;
 import dev.kage.guild.domain.GuildRole;
 import dev.kage.server.database.DatabaseAccessException;
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.JdbcTransactionRunner;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -24,13 +25,15 @@ import javax.sql.DataSource;
  * Hiện thực {@link GuildPort} trên PostgreSQL — bảng {@code guild}/{@code guild_member}/
  * {@code guild_join_request} (V14). {@link #createGuild} và {@link #approveJoinRequest} chạm 2
  * bảng nguyên tử bằng transaction thủ công trên 1 connection (KHÔNG {@code TransactionRunner}
- * riêng — xem javadoc {@link GuildPort}, cả 2 bảng đều thuộc feature này).
+ * riêng của feature — xem javadoc {@link GuildPort}, cả 2 bảng đều thuộc feature này).
  *
- * <p>2 method đó (và các helper riêng của chúng) CỐ Ý không dùng {@link JdbcOperations} — chúng tự
- * quản lý commit/rollback/savepoint dựa vào {@link SQLException} checked bắt được tại đúng chỗ;
- * {@code JdbcOperations} bọc {@link SQLException} thành unchecked ngay bên trong, sẽ nhảy qua mất
- * khối {@code catch (SQLException e)} đang chờ rollback đúng chỗ. Phần đọc/ghi đơn giản còn lại
- * (không cần transaction thủ công) vẫn dùng {@code JdbcOperations} như các adapter khác.
+ * <p>{@link #createGuild} dùng {@link JdbcTransactionRunner#call} (bản trả giá trị dùng chung —
+ * đơn giản "commit khi xong, rollback+rethrow khi lỗi", không có nhánh rollback-mà-không-throw).
+ * {@link #approveJoinRequest} PHẢI tự quản lý transaction thủ công riêng (không qua
+ * {@code JdbcTransactionRunner}): có nhánh trả {@code NOT_FOUND} kèm rollback mà KHÔNG throw, và
+ * {@link #tryInsertMemberOrDropStaleRequest} cần bắt {@link SQLException} checked giữa transaction
+ * để rollback về savepoint rồi tiếp tục — 2 nhu cầu {@code JdbcTransactionRunner}/
+ * {@link JdbcOperations} không phục vụ được.
  */
 public final class PostgresGuildAdapter implements GuildPort {
 
@@ -128,33 +131,14 @@ public final class PostgresGuildAdapter implements GuildPort {
         return JdbcOperations.query(dataSource, LIST_MEMBERS, PostgresGuildAdapter::mapMember, guildId);
     }
 
-    // PMD AvoidCatchingGenericException: đúng ý — transaction PHẢI rollback khi action ném BẤT KỲ
-    // RuntimeException nào (VD DuplicateGuildNameException từ insertGuild qua JdbcOperations).
-    // Ranh giới transaction, không phải nơi xử lý lỗi nghiệp vụ cụ thể — rethrow ngay sau rollback,
-    // cùng tinh thần JdbcTransactionRunner.
-    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     @Override
     public Guild createGuild(String name, long leaderCharacterId) {
-        try (Connection connection = dataSource.getConnection()) {
-            connection.setAutoCommit(false);
-            try {
-                Instant now = Instant.now();
-                long guildId = insertGuild(connection, name, leaderCharacterId, now);
-                insertMember(connection, new NewMember(guildId, leaderCharacterId, GuildRole.LEADER, now));
-                connection.commit();
-                return new Guild(guildId, name, leaderCharacterId, now);
-            } catch (SQLException e) {
-                connection.rollback();
-                throw new DatabaseAccessException("Lỗi tạo bang: " + name, e);
-            } catch (RuntimeException e) {
-                connection.rollback();
-                throw e;
-            } finally {
-                connection.setAutoCommit(true);
-            }
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi tạo bang: " + name, e);
-        }
+        return JdbcTransactionRunner.call(dataSource, connection -> {
+            Instant now = Instant.now();
+            long guildId = insertGuild(connection, name, leaderCharacterId, now);
+            insertMember(connection, new NewMember(guildId, leaderCharacterId, GuildRole.LEADER, now));
+            return new Guild(guildId, name, leaderCharacterId, now);
+        });
     }
 
     private static long insertGuild(Connection connection, String name, long leaderCharacterId, Instant now) {
