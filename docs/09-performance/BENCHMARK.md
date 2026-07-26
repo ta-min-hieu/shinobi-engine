@@ -151,6 +151,9 @@ skill/inventory/shop/quest/dungeon trong kịch bản tải). Hành vi mỗi cli
 (70%/chu kỳ, đánh thường 1 giây/đòn — `CombatConstants.ATTACK_INTERVAL_SECONDS`) + chat (3%) + ping
 (30%), chu kỳ ~0.6-1.5s.
 
+**Máy đo**: Intel Core i9-14900HX (24 lõi thật / 32 luồng logic — số "CPU" trong công thức bên dưới
+là luồng logic, khớp `CPUs: 32 total` trong gc.log), 32GB RAM, Windows.
+
 **Công thức** (N = số người chơi đồng thời):
 
 ```
@@ -173,6 +176,15 @@ thật) là ngoại suy — **phải load test thật ở đúng quy mô** trư�
 nhiều (Điều 30, không đoán). Disk I/O chưa đo được đáng tin (Windows perf counter method có vấn đề
 — cần polling liên tục cùng 1 session, không phải gọi rời rạc); dự kiến rất thấp về mặt kiến trúc
 (state ở RAM/ECS, ghi DB qua network không phải đĩa cục bộ).
+
+⚠️ **KHÔNG gọi số ngoại suy là "an toàn"** (2026-07-26, phản hồi thật khi chủ dự án hỏi "5000 người
+có an toàn không?"): công thức CPU fit từ 2 điểm (100, 500) có thể ĐÁNH GIÁ THẤP chi phí thật ở N
+lớn — cùng cơ chế AoI broadcast làm băng thông không tuyến tính (§ trên) rất có thể cũng làm CPU
+không tuyến tính (mã hoá protobuf + ghi Netty cho mỗi gói broadcast cũng tốn CPU, không chỉ băng
+thông), chỉ là 2 điểm đo chưa đủ đông để hiện tượng đó lộ ra ở CPU như đã lộ ở băng thông. Thêm
+nữa: DB connection pool (10 connection) và hành vi throttle nhiệt của máy laptop chạy tải cao liên
+tục nhiều giờ đều CHƯA được đo ở quy mô lớn. Ngoại suy 10x vùng đã test (500→5000) chỉ nên dùng để
+**lên kế hoạch sơ bộ**, không phải căn cứ để tuyên bố "an toàn".
 
 ---
 
