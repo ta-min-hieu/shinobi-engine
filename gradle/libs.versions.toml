@@ -35,7 +35,7 @@ pmd = "7.10.0"                    # ⚠️ verify — tool version
 errorprone = "2.42.0"             # ⚠️ verify — Error Prone core
 
 # --- Gradle plugins ---
-spotless = "7.2.1"                # ⚠️ verify — Gradle 9 compatible
+spotless = "8.8.0"                # ⚠️ verify — Gradle 9 compatible
 spotbugsPlugin = "6.5.9"          # ✅ SpotBugs Gradle plugin 07/2026
 errorpronePlugin = "4.3.0"        # ⚠️ verify — net.ltgt.errorprone
 protobufPlugin = "0.10.0"         # ✅ latest 07/2026 — com.google.protobuf Gradle plugin
