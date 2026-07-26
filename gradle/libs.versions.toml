@@ -37,7 +37,7 @@ errorprone = "2.42.0"             # ⚠️ verify — Error Prone core
 # --- Gradle plugins ---
 spotless = "7.2.1"                # ⚠️ verify — Gradle 9 compatible
 spotbugsPlugin = "6.5.9"          # ✅ SpotBugs Gradle plugin 07/2026
-errorpronePlugin = "4.3.0"        # ⚠️ verify — net.ltgt.errorprone
+errorpronePlugin = "5.1.0"        # ⚠️ verify — net.ltgt.errorprone
 protobufPlugin = "0.10.0"         # ✅ latest 07/2026 — com.google.protobuf Gradle plugin
 jmhPlugin = "0.7.3"                # ✅ latest (verified 07/2026, no release since 01/2025) — me.champeau.jmh
 jmh = "1.37"                       # ✅ latest — org.openjdk.jmh core (BENCHMARK.md §2-3)
