@@ -67,18 +67,19 @@ public final class GatewayBootstrap {
         ConnectedCharacterRegistry characterRegistry =
                 new ConnectedCharacterRegistry(facades.inventoryFacade(), facades.contentFacades().questFacade());
         WorldContext worldContext = startWorld(characterRegistry);
-        WorldFacade worldFacade = worldContext.worldFacade();
+        MainWorldChannelRegistry mainWorldChannels = worldContext.mainWorldChannels();
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(facades.characterFacade(), characterRegistry, POSITION_SAVE_INTERVAL);
         positionPersister.start();
         DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
                 characterRegistry, facades.characterFacade(), facades.contentFacades().socialFacades().partyFacade(),
-                worldFacade);
+                mainWorldChannels);
         ArenaInstanceRegistry arenaInstanceRegistry = new ArenaInstanceRegistry(
                 characterRegistry, facades.characterFacade(), facades.contentFacades().socialFacades().pvpFacade(),
-                worldFacade);
+                mainWorldChannels);
         WorldGateway worldGateway = new WorldGateway(
-                worldFacade, characterRegistry, positionPersister, dungeonInstanceRegistry, arenaInstanceRegistry);
+                mainWorldChannels, characterRegistry, positionPersister, dungeonInstanceRegistry,
+                arenaInstanceRegistry);
 
         GatewayServer server = new GatewayServer(PORT, facades, worldGateway);
         server.start();
@@ -89,7 +90,7 @@ public final class GatewayBootstrap {
             // logout đúng lúc server tắt). dungeonInstanceRegistry/arenaInstanceRegistry dừng CÙNG
             // lúc worldFacade (mọi World, chính lẫn dungeon/duel, dừng trước khi đóng DB).
             server.stop();
-            worldFacade.stop();
+            mainWorldChannels.stopAll();
             dungeonInstanceRegistry.stopAll();
             arenaInstanceRegistry.stopAll();
             characterRegistry.stop();
@@ -100,23 +101,31 @@ public final class GatewayBootstrap {
         server.awaitTermination();
     }
 
-    /** Gộp {@link WorldFacade} + {@link MetricsHttpServer} — cả hai sinh ra CÙNG lúc trong {@link #startWorld}. */
-    private record WorldContext(WorldFacade worldFacade, MetricsHttpServer metricsHttpServer) {
+    /**
+     * Gộp {@link MainWorldChannelRegistry} + {@link MetricsHttpServer} — cả hai sinh ra CÙNG lúc
+     * trong {@link #startWorld}.
+     */
+    private record WorldContext(MainWorldChannelRegistry mainWorldChannels, MetricsHttpServer metricsHttpServer) {
     }
 
     /**
      * Tách khỏi {@code main()} để giữ dưới giới hạn Checkstyle MethodLength (cùng lý do
      * {@link #wireFacades}) — dựng Micrometer registry + endpoint scrape (ADR-015) TRƯỚC
      * {@link WorldFacade} vì {@link MicrometerTickMetricsPort} cần registry lúc construct World.
+     * Khu vực (channel) #1 của {@link MainWorldChannelRegistry} là {@link WorldFacade} DUY NHẤT
+     * mang {@code TickMetricsPort} thật (tag "main") — khu vực mở thêm sau (Phase 9 lát cắt 6) dùng
+     * {@code NO_OP}, xem javadoc {@link MainWorldChannelRegistry}.
      */
     private static WorldContext startWorld(ConnectedCharacterRegistry characterRegistry) {
         PrometheusMeterRegistry meterRegistry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
         MetricsHttpServer metricsHttpServer = new MetricsHttpServer(METRICS_PORT, meterRegistry);
         metricsHttpServer.start();
-        WorldFacade worldFacade = new WorldFacade(
+        WorldFacade firstChannelFacade = new WorldFacade(
                 characterRegistry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG_MAIN));
-        worldFacade.start();
-        return new WorldContext(worldFacade, metricsHttpServer);
+        firstChannelFacade.start();
+        MainWorldChannelRegistry mainWorldChannels =
+                new MainWorldChannelRegistry(characterRegistry, firstChannelFacade);
+        return new WorldContext(mainWorldChannels, metricsHttpServer);
     }
 
     /** Tách khỏi {@code main()} để giữ dưới giới hạn Checkstyle MethodLength — càng thêm facade, dòng càng dài. */

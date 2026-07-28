@@ -46,7 +46,7 @@ final class ArenaInstanceRegistry {
     private final ConnectedCharacterRegistry registry;
     private final CharacterFacade characterFacade;
     private final PvpFacade pvpFacade;
-    private final WorldFacade mainWorldFacade;
+    private final MainWorldChannelRegistry mainWorldChannels;
 
     // Khoá theo characterId ĐANG BỊ thách đấu — chỉ 1 thách đấu ĐẾN đang chờ tại 1 thời điểm/người
     // (thách đấu mới ghi đè thách đấu cũ, ephemeral hoàn toàn trong bộ nhớ, giống trade session).
@@ -62,11 +62,11 @@ final class ArenaInstanceRegistry {
 
     ArenaInstanceRegistry(
             ConnectedCharacterRegistry registry, CharacterFacade characterFacade, PvpFacade pvpFacade,
-            WorldFacade mainWorldFacade) {
+            MainWorldChannelRegistry mainWorldChannels) {
         this.registry = registry;
         this.characterFacade = characterFacade;
         this.pvpFacade = pvpFacade;
-        this.mainWorldFacade = mainWorldFacade;
+        this.mainWorldChannels = mainWorldChannels;
     }
 
     /** {@code WorldFacade} nhân vật này đang ở TRONG (duel), rỗng nếu đang ở world chính. */
@@ -200,7 +200,7 @@ final class ArenaInstanceRegistry {
         }
         returnPositionByCharacterId.put(characterId, returnPosition);
 
-        mainWorldFacade.detachCharacter(characterId);
+        mainWorldChannels.detachCharacter(characterId);
         instance.facade().attachCharacter(characterId, spawnX, DUEL_SPAWN_Y, baseStats);
         instanceByCharacterId.put(characterId, instance);
     }
@@ -239,7 +239,7 @@ final class ArenaInstanceRegistry {
     private void reattachToMainWorld(long characterId) {
         CharacterBaseStats baseStats = loadBaseStats(characterId);
         PositionSnapshot returnPosition = returnPositionByCharacterId.remove(characterId);
-        mainWorldFacade.attachCharacter(characterId, returnPosition.x(), returnPosition.y(), baseStats);
+        mainWorldChannels.attachCharacter(characterId, returnPosition.x(), returnPosition.y(), baseStats);
     }
 
     private static long opponentOf(long characterId, DuelInstance instance) {

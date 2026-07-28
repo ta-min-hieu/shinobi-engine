@@ -186,6 +186,126 @@ nữa: DB connection pool (10 connection) và hành vi throttle nhiệt của m�
 tục nhiều giờ đều CHƯA được đo ở quy mô lớn. Ngoại suy 10x vùng đã test (500→5000) chỉ nên dùng để
 **lên kế hoạch sơ bộ**, không phải căn cứ để tuyên bố "an toàn".
 
+### 5.2 AoI spatial-grid sharding (Phase 9, 2026-07-28)
+
+⏳ **Đo thật, lát cắt tiếp theo sau lát cắt 20Hz** (commit `2198e76` + thay đổi CHƯA commit trong
+phiên này — `AreaOfInterestTracker` chuyển từ quét O(n²) toàn world sang lưới spatial hashing, xem
+javadoc class). Máy đo: **cùng máy §5.1** (Intel i9-14900HX, 32GB RAM, Windows), JDK
+`loom-ea-25-loom+1-11`, `-XX:+UseZGC` (ADR-019). Kịch bản: `tools:load-test` mặc định — **kịch bản
+XẤU NHẤT có chủ đích** (mọi client giả lập tụ 1 điểm luyện tập duy nhất hiện có trong game, không
+phải trải rộng nhiều khu vực — game CHƯA có nội dung multi-zone để test kịch bản trải rộng thật).
+
+**Trước (commit `2198e76`, chỉ tách 20Hz, chưa sharding) — N=1000, giữ tải ~60s:**
+
+| Metric | Giá trị đo thật |
+|---|---|
+| Tick p99 (ổn định) | 67–83ms (ngân sách 16.6ms — **vượt ~4-5×**) |
+| Lỗi client | 0 |
+| HikariCP (pool 10) | Backlog tới ~1790 request chờ lúc ramp connect — không gây lỗi client (kịp trong timeout 5s) |
+
+**Trước — N=2000, giữ tải:** **sập hẳn** — tick p99 leo 20ms→33ms→7.78s→8.59s theo thời gian giữ
+tải, tick tối đa đo được **10.76s** (~650× ngân sách), lỗi client leo thang KHÔNG dừng (95→401→1360→
+→3553 tới lúc dừng test, chưa thấy chững lại — vòng lặp lỗi tự nuôi lỗi). Server **không crash,
+không leak** — hồi phục về tick ~0.03ms ngay khi tải dừng (xác nhận đây là nghẽn tính toán, không
+phải rò rỉ hay hỏng state).
+
+**Sau (spatial-grid sharding, cùng máy/JVM/kịch bản) — N=1000:**
+
+| Metric | Giá trị đo thật | So với trước |
+|---|---|---|
+| Tick p99 (ổn định) | 56–58ms | ↓ ~20-30% — vẫn vượt ngân sách, cải thiện KHIÊM TỐN |
+| Lỗi client | 0 | bằng |
+
+**Sau — N=2000:**
+
+| Metric | Giá trị đo thật | So với trước |
+|---|---|---|
+| Tick p99 đỉnh | ~2.08–2.55s | ↓ ~3.4× (từ 8.59s) — vẫn vượt ngân sách rất xa |
+| Tick tối đa | ~3.73s (gauge) | ↓ ~2.9× (từ 10.76s) |
+| Lỗi client | Chững ở 177, KHÔNG leo thang tiếp | ↓ ~20× (từ 3553, đang leo không dừng) |
+| Throughput (packet xử lý/10s) | ~36.000–43.000 | Cao hơn nhiều lần so với lúc trước sập xuống còn ~900-3800/10s |
+
+⚠️ **Diễn giải trung thực (Điều 30, KHÔNG phóng đại)**: cải thiện N=2000 là THẬT và đáng kể (lỗi
+giảm ~20×, hệ thống chuyển từ "sập theo cấp số nhân" sang "quá tải nhưng ổn định"), nhưng **N=2000
+tụ 1 điểm vẫn KHÔNG đạt ngân sách** — đúng như dự đoán trong javadoc `AreaOfInterestTracker`: lưới
+spatial hashing chỉ giảm chi phí khi entity TRẢI RỘNG hơn 1 ô lưới; khi toàn bộ N tụ trong 1-2 ô
+(đúng kịch bản test hiện có, vì game chỉ có 1 điểm luyện tập), thuật toán bên trong ô đó vẫn xấp xỉ
+O(n²), chỉ khác là có thêm chi phí dựng lưới. **Chưa verify được kịch bản THẬT SỰ trải rộng** (N
+tổng 1000-2000 nhưng ≤50/khu vực theo giả định mật độ của dự án) — cần multi-zone/multi-spawn-point
+thật trong game content để đo, hoặc benchmark tổng hợp mức World (ngoài phạm vi lát cắt này).
+
+**Việc chưa làm / follow-up thật sự cần** (2 mục còn lại sau §5.3 bên dưới):
+1. ✅ **Chính sách giới hạn số người/khu vực — ĐÃ CODE, xem §5.3.**
+2. HikariCP `maximumPoolSize=10` là điểm nghẽn phụ lúc burst connect (chưa gây lỗi ở N=1000/2000
+   nhưng backlog hàng nghìn request — đáng tăng trước khi test N lớn hơn hoặc test soak dài).
+3. Multi-zone THẬT trong game content (nhiều điểm luyện tập/map vật lý khác nhau) vẫn chưa tồn tại
+   — `MainWorldChannelRegistry` (§5.3) giải quyết bài toán mật độ bằng CHANNEL (nhiều bản sao World
+   song song), không phải bằng cách chia nhỏ bản đồ vật lý; cả 2 hướng đều hợp lệ, chưa cần làm
+   thêm hướng kia trừ khi có lý do gameplay cụ thể (Điều 9).
+
+### 5.3 Giới hạn người/khu vực — `MainWorldChannelRegistry` (Phase 9 lát cắt 7, 2026-07-28)
+
+✅ **Đo thật, giải quyết dứt điểm khoảng trống nêu ở §5.2** — theo yêu cầu chủ dự án: mỗi khu vực
+(channel) tối đa **20 người mặc định** (`MainWorldChannelRegistry.DEFAULT_CAPACITY`), khu vực đặc
+biệt tối đa **50 người** (`SPECIAL_CAPACITY`, chưa có map nào dùng — hook sẵn cho sau); khu vực mới
+tự mở khi tổng người ĐẠT 80% tổng sức chứa hiện tại (`AUTO_OPEN_UTILIZATION_THRESHOLD`). Mỗi khu
+vực là 1 {@code WorldFacade} riêng — cùng kỹ thuật `DungeonInstanceRegistry`/`ArenaInstanceRegistry`
+đã có (ADR-026: World riêng cùng process), áp dụng cho MAP CHÍNH thay vì dungeon/duel. Chat Thế
+giới/Bang/Party/Riêng/Bạn bè/Mail KHÔNG bị ảnh hưởng (định tuyến qua `ConnectedCharacterRegistry`
+dùng chung mọi khu vực, kiến trúc sẵn có từ trước) — chỉ AoI (di chuyển/combat) + chat Khu vực cục
+bộ theo channel, đúng ý nghĩa "khu vực" vốn có.
+
+⚠️ **Diễn giải đúng "25 khu mặc định/map" trong yêu cầu gốc**: KHÔNG tạo sẵn 25 khu vực rỗng lúc
+khởi động (tốn tick thread cho world trống) — khu vực mở **lazy** từ #1, đúng tiền lệ
+`DungeonInstance`/`DuelInstance` (chỉ tạo khi cần, đóng khi rỗng — trừ #1, luôn giữ). Số "25" chỉ
+dùng làm mốc tham chiếu capacity-planning, không phải số khu vực khởi tạo cứng. Đây là diễn giải
+của AI, CHƯA xác nhận lại với chủ dự án — nếu cần pre-warm nhiều khu vực từ đầu, đó là 1 dòng đổi.
+
+**2 bug thật phát hiện+sửa khi làm lát cắt này** (không phải trong logic capacity, mà trong cách
+nối dây):
+1. `MainWorldChannelRegistry` ban đầu dùng `HashMap`/`ArrayList` thường — bị gọi đồng thời từ NHIỀU
+   thread (`authExecutor` của `GatewayChannelHandler`/`DungeonInstanceRegistry` VÀ
+   `ArenaInstanceRegistry.settlementExecutor` khi settle duel xong) → race điều kiện thật, gây
+   `GatewayServerIntegrationTest` treo ngẫu nhiên (`shouldFightDuelToDeathAndUpdateRating_overRealSockets`,
+   `partyShouldEnterAndExitDungeonAsSeparateWorld_overRealSockets`). Sửa: `synchronized` trên toàn
+   bộ method đọc/ghi state (cùng lý do `ArenaInstanceRegistry` tự dùng `ConcurrentHashMap`).
+2. 2 test trên VẪN treo sau khi sửa race — nguyên nhân THẬT KHÁC: test gửi lệnh rời world chính
+   (enter dungeon/duel) ngay sau khi nhân vật chứng nhân (C) kết nối, KHÔNG đợi AoI `sync()` (20Hz,
+   §5.2) chạy ít nhất 1 lần để thiết lập quan hệ "C đang thấy A/B" — nếu detach xảy ra TRƯỚC lượt
+   sync() đầu tiên, `visibleTo` của A/B vẫn rỗng nên KHÔNG có ai để báo despawn (không phải lỗi
+   despawn, mà quan hệ AoI chưa từng được thiết lập). Đây là lỗ hổng đồng bộ hoá CÓ SẴN từ khi AoI
+   sync tách khỏi 60Hz (lát cắt 1), chỉ hiếm khi lộ ra vì 3 round-trip TCP thật (connect/create/select)
+   thường đủ chậm để sync() kịp chạy — bị lộ rõ khi máy chạy nhiều vòng test liên tục dưới tải nặng
+   (đúng kịch bản mà comment sẵn có trong test đã cảnh báo). Sửa: 2 test thêm bước đợi C THẬT SỰ
+   thấy A/B spawn (đọc `CharacterSpawnedEvent`) trước khi cho A/B rời world chính — làm test tất
+   định thay vì dựa vào may rủi thời gian.
+
+Verify: toàn bộ `server-gateway:test` (39 test, gồm `GatewayServerIntegrationTest`
+`GatewayPipelineTest`) PASS ổn định qua nhiều lần chạy lại sau khi sửa cả 2 bug.
+
+**Số liệu trước/sau — cùng máy/JVM/kịch bản §5.2, DB Postgres XOÁ SẠCH giữa các lần đo (tránh lẫn
+account cũ chạm giới hạn 4 nhân vật/account):**
+
+| N | Trước (chỉ 20Hz, `2198e76`) | + spatial-grid sharding (§5.2) | + giới hạn người/khu vực (lát cắt này) |
+|---|---|---|---|
+| 1000 tick p99 (ổn định) | 67–83ms | 56–58ms | **0.82–1.57ms** |
+| 2000 tick p99 (đỉnh/ổn định) | 8.59s (đỉnh) | 2.08–2.55s (đỉnh) | **0.98–3.15ms** (ổn định suốt) |
+| 2000 tick tối đa | 10.76s | ~3.73s | **28.6ms** (1 đỉnh đơn lẻ, phần còn lại <5ms) |
+| 2000 lỗi client | 3553, đang leo | 177, hết leo | **0** |
+
+✅ **Cả N=1000 và N=2000 đều trong ngân sách 16.6ms** (trừ 1 đỉnh 28.6ms đơn lẻ ở N=2000, ~1.7×
+ngân sách — không lặp lại, không kèm lỗi client). Đây là kết quả trực tiếp của việc tách 2000 người
+thành nhiều khu vực ≤20 người thay vì để AoI phải xử lý 2000 người trong 1 World — xác nhận đúng lý
+do sharding + giới hạn mật độ ở tầng gameplay BỔ SUNG cho nhau (không phải giải pháp thay thế nhau):
+spatial-grid tối ưu CÁCH TÍNH trong 1 World; giới hạn người/khu vực đảm bảo 1 World KHÔNG BAO GIỜ
+phải chứa quá đông người để cách tính đó có ý nghĩa.
+
+**Việc chưa làm / follow-up còn lại**:
+1. HikariCP `maximumPoolSize=10` — vẫn chưa tăng, chưa gây lỗi ở quy mô đã test.
+2. Chưa xác nhận lại với chủ dự án cách diễn giải "25 khu mặc định" (lazy vs pre-warm) nêu trên.
+3. `SPECIAL_CAPACITY=50` chưa có nơi nào trong game gán/dùng (chưa có khái niệm "map đặc biệt") —
+   hook đã sẵn, chờ nội dung game thật cần tới.
+
 ---
 
 ## 6. Khi nào chạy

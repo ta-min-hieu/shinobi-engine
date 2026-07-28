@@ -143,7 +143,7 @@ import org.junit.jupiter.api.Timeout;
 class GatewayServerIntegrationTest {
 
     private GatewayServer server;
-    private WorldFacade worldFacade;
+    private MainWorldChannelRegistry mainWorldChannels;
     private CharacterPort characterPort;
     private ConnectedCharacterRegistry characterRegistry;
     private dev.kage.party.api.PartyFacade partyFacade;
@@ -168,16 +168,18 @@ class GatewayServerIntegrationTest {
         dev.kage.trade.api.TradeFacade tradeFacade = fakeTradeFacade();
         pvpFacade = fakePvpFacade();
         characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
-        worldFacade = new WorldFacade(characterRegistry);
-        worldFacade.start();
+        WorldFacade firstChannelFacade = new WorldFacade(characterRegistry);
+        firstChannelFacade.start();
+        mainWorldChannels = new MainWorldChannelRegistry(characterRegistry, firstChannelFacade);
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         DungeonInstanceRegistry dungeonInstanceRegistry =
-                new DungeonInstanceRegistry(characterRegistry, characterFacade, partyFacade, worldFacade);
+                new DungeonInstanceRegistry(characterRegistry, characterFacade, partyFacade, mainWorldChannels);
         ArenaInstanceRegistry arenaInstanceRegistry =
-                new ArenaInstanceRegistry(characterRegistry, characterFacade, pvpFacade, worldFacade);
+                new ArenaInstanceRegistry(characterRegistry, characterFacade, pvpFacade, mainWorldChannels);
         WorldGateway worldGateway = new WorldGateway(
-                worldFacade, characterRegistry, positionPersister, dungeonInstanceRegistry, arenaInstanceRegistry);
+                mainWorldChannels, characterRegistry, positionPersister, dungeonInstanceRegistry,
+                arenaInstanceRegistry);
         SocialFacades socialFacades = new SocialFacades(
                 friendFacade, mailFacade, chatFacade, guildFacade, partyFacade, tradeFacade, pvpFacade);
         ContentFacades contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
@@ -886,7 +888,7 @@ class GatewayServerIntegrationTest {
     @AfterEach
     void stopServer() {
         server.stop();
-        worldFacade.stop();
+        mainWorldChannels.stopAll();
         characterRegistry.stop();
     }
 
@@ -1030,6 +1032,20 @@ class GatewayServerIntegrationTest {
             long characterA = connectCreateAndSelect(socketA, inA, "da" + suffix);
             long characterB = connectCreateAndSelect(socketB, inB, "db" + suffix);
             long characterC = connectCreateAndSelect(socketC, inC, "dc" + suffix);
+
+            // AoI sync() chạy 20Hz (tách khỏi tick 60Hz, WorldConstants.AOI_SYNC_RATE_HZ) — PHẢI
+            // đợi C thật sự THẤY A/B spawn (bằng chứng sync() đã chạy ít nhất 1 lần từ lúc C attach)
+            // trước khi cho A/B rời world chính, nếu không assertion "C thấy A/B despawn" bên dưới
+            // có thể đợi mãi: nếu sync() CHƯA từng chạy, {@code visibleTo} của A/B vẫn RỖNG lúc
+            // detach nên KHÔNG có ai để báo despawn (không phải lỗi despawn, mà chưa từng "spawn").
+            java.util.HashSet<Long> spawnedSeenByC = new java.util.HashSet<Long>();
+            spawnedSeenByC.add(CharacterSpawnedEvent.parseFrom(
+                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload())
+                    .getCharacterId());
+            spawnedSeenByC.add(CharacterSpawnedEvent.parseFrom(
+                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload())
+                    .getCharacterId());
+            assertThat(spawnedSeenByC).containsExactlyInAnyOrder(characterA, characterB);
 
             // Party A+B qua PartyFacade trực tiếp (đã có test riêng cho luồng mời/chấp nhận qua
             // socket ở feature-party — test này chỉ cần TIỀN ĐIỀU KIỆN "A+B cùng party" để tập
@@ -1229,6 +1245,17 @@ class GatewayServerIntegrationTest {
             // C KHÔNG tham gia trận — ở lại world chính làm chứng nhân (verify A/B đã RỜI world
             // chính thật, cùng cách partyShouldEnterAndExitDungeonAsSeparateWorld_overRealSockets).
             connectCreateAndSelect(socketC, inC, "fdC" + suffix);
+
+            // AoI sync() 20Hz — đợi C thật sự THẤY A/B spawn trước khi để họ vào duel, cùng lý do
+            // partyShouldEnterAndExitDungeonAsSeparateWorld_overRealSockets (xem comment ở đó).
+            java.util.HashSet<Long> spawnedSeenByC = new java.util.HashSet<Long>();
+            spawnedSeenByC.add(CharacterSpawnedEvent.parseFrom(
+                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload())
+                    .getCharacterId());
+            spawnedSeenByC.add(CharacterSpawnedEvent.parseFrom(
+                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload())
+                    .getCharacterId());
+            assertThat(spawnedSeenByC).containsExactlyInAnyOrder(characterA, characterB);
 
             ChallengeDuelCommand challenge =
                     ChallengeDuelCommand.newBuilder().setTargetName(createdB.name()).build();
@@ -1711,13 +1738,15 @@ class GatewayServerIntegrationTest {
 
     /** AoI Event tới bất kỳ lúc nào giữa các Response khác — đọc tới khi thấy đúng opcode cần. */
     private static PacketCodec.Frame readUntilOpcode(DataInputStream in, int expectedOpcode) throws Exception {
+        java.util.Map<Integer, Integer> seen = new java.util.HashMap<>();
         for (int attempt = 0; attempt < 1000; attempt++) {
             PacketCodec.Frame frame = readFrame(in);
             if (frame.header().opcode() == expectedOpcode) {
                 return frame;
             }
+            seen.merge(frame.header().opcode(), 1, Integer::sum);
         }
-        throw new AssertionError("Không thấy opcode " + expectedOpcode + " sau 1000 frame");
+        throw new AssertionError("Không thấy opcode " + expectedOpcode + " sau 1000 frame, đã thấy: " + seen);
     }
 
     private static void sendPing(Socket socket, int sequenceId, long clientTimestampMs) throws Exception {

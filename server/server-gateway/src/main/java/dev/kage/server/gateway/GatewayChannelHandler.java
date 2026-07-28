@@ -543,12 +543,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             CharacterBaseStats baseStats = new CharacterBaseStats(
                     stats.str(), stats.agi(), stats.intelligence(), stats.vit(),
                     FactionMapping.toElement(character.faction()), character.level());
-            worldGateway.facade().attachCharacter(characterId, spawn.x(), spawn.y(), baseStats);
+            // Phase 9 lát cắt 6: định tuyến vào khu vực (channel) còn chỗ thay vì thẳng 1 World
+            // duy nhất — MainWorldChannelRegistry tự mở thêm khu vực nếu cần (giới hạn người/khu
+            // vực chặn AoI phình theo TỔNG N toàn map, xem javadoc class đó).
+            WorldFacade channelFacade =
+                    worldGateway.mainWorldChannels().attachCharacter(characterId, spawn.x(), spawn.y(), baseStats);
             // GAMEPLAY.md §2 "tính lại chỉ số dẫn xuất khi đổi trang bị" — áp dụng NGAY lúc attach,
             // không chỉ lúc equip/unequip sau đó, nếu không nhân vật mặc đồ từ phiên trước sẽ mất
             // bonus khi đăng nhập lại (server-world không tự biết feature-inventory).
             EquipmentBonus equipmentBonus = inventoryFacade.computeEquipmentBonus(characterId);
-            worldGateway.facade().applyEquipmentBonus(characterId, equipmentBonus.bonusAtk());
+            channelFacade.applyEquipmentBonus(characterId, equipmentBonus.bonusAtk());
             SelectCharacterResponse response = SelectCharacterResponse.newBuilder().setSuccess(true).build();
             send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
             // Đang trên authExecutor (Virtual Thread) rồi — friendFacade.listFriends chạm DB, an
@@ -605,17 +609,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     /**
      * World nhân vật này ĐANG THẬT SỰ ở trong — dungeon nếu đã {@code EnterDungeonCommand}, duel
-     * Arena nếu đang đấu (Phase 8 lát cắt 4), world chính nếu không cái nào (Phase 8 lát cắt 1,
-     * ADR-026). Mọi lệnh gameplay per-tick (move/target/skill/chat) phải qua đây thay vì gọi thẳng
-     * {@code worldGateway.facade()}, nếu không lệnh của nhân vật trong dungeon/duel sẽ lạc vào
-     * world chính (nơi entity của họ đã bị detach). 1 nhân vật không bao giờ ở CẢ 2 instance cùng
-     * lúc (xem giới hạn CHỦ Ý ở {@code ArenaInstanceRegistry} javadoc) nên thứ tự kiểm tra không
-     * quan trọng ở lát cắt này.
+     * Arena nếu đang đấu (Phase 8 lát cắt 4), khu vực (channel) map chính họ đang được định tuyến
+     * vào nếu không cái nào (Phase 8 lát cắt 1 ADR-026 + Phase 9 lát cắt 6 nhiều khu vực). Mọi lệnh
+     * gameplay per-tick (move/target/skill/chat) phải qua đây thay vì gọi thẳng 1 World cố định,
+     * nếu không lệnh của nhân vật trong dungeon/duel/khu vực khác sẽ lạc vào World sai (nơi entity
+     * của họ đã bị detach). 1 nhân vật không bao giờ ở quá 1 trong 3 chỗ này cùng lúc (xem giới hạn
+     * CHỦ Ý ở {@code ArenaInstanceRegistry} javadoc) nên thứ tự kiểm tra không quan trọng.
      */
     private WorldFacade currentWorldFacade(long characterId) {
         return worldGateway.dungeonInstanceRegistry().worldFacadeFor(characterId)
                 .or(() -> worldGateway.arenaInstanceRegistry().worldFacadeFor(characterId))
-                .orElse(worldGateway.facade());
+                .or(() -> worldGateway.mainWorldChannels().worldFacadeFor(characterId))
+                .orElseThrow(() -> new IllegalStateException(
+                        "Nhân vật online nhưng không thuộc World nào — characterId=" + characterId));
     }
 
     // MoveCommand KHÔNG chạm DB/Redis — chỉ enqueue vào server-world (rẻ, thread-safe), nên xử
@@ -2521,7 +2527,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             boolean handledElsewhere = worldGateway.dungeonInstanceRegistry().handleDisconnectIfInDungeon(characterId)
                     || worldGateway.arenaInstanceRegistry().handleDisconnectIfInDuel(characterId);
             if (!handledElsewhere) {
-                worldGateway.facade().detachCharacter(characterId);
+                worldGateway.mainWorldChannels().detachCharacter(characterId);
             }
             // SERVER.md §8: logout là 1 trong 3 mốc bắt buộc ghi vị trí. savePosition chạm DB
             // (blocking) — không được chạy trên EventLoop, đẩy sang authExecutor.

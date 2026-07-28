@@ -848,15 +848,18 @@ class GatewayPipelineTest {
         dev.kage.trade.api.TradeFacade tradeFacade = fakeTradeFacade();
         dev.kage.pvp.api.PvpFacade pvpFacade = fakePvpFacade();
         ConnectedCharacterRegistry characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
-        WorldFacade worldFacade = new WorldFacade(characterRegistry);
+        WorldFacade firstChannelFacade = new WorldFacade(characterRegistry);
+        MainWorldChannelRegistry mainWorldChannels =
+                new MainWorldChannelRegistry(characterRegistry, firstChannelFacade);
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         DungeonInstanceRegistry dungeonInstanceRegistry =
-                new DungeonInstanceRegistry(characterRegistry, characterFacade, partyFacade, worldFacade);
+                new DungeonInstanceRegistry(characterRegistry, characterFacade, partyFacade, mainWorldChannels);
         ArenaInstanceRegistry arenaInstanceRegistry =
-                new ArenaInstanceRegistry(characterRegistry, characterFacade, pvpFacade, worldFacade);
+                new ArenaInstanceRegistry(characterRegistry, characterFacade, pvpFacade, mainWorldChannels);
         WorldGateway worldGateway = new WorldGateway(
-                worldFacade, characterRegistry, positionPersister, dungeonInstanceRegistry, arenaInstanceRegistry);
+                mainWorldChannels, characterRegistry, positionPersister, dungeonInstanceRegistry,
+                arenaInstanceRegistry);
 
         return new EmbeddedChannel(
                 new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),

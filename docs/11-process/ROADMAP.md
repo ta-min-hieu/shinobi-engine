@@ -536,6 +536,42 @@ nguyên Ashley, không tạo ADR `Supersedes`. Chi phí/entity tăng không tuy�
 10 lần) — ghi nhận làm tín hiệu theo dõi tương lai, không phải lý do đổi ECS bây giờ (Điều 9). Chi
 tiết: [ADR-006 "Ghi chú — đánh giá lại Phase 9"](../01-architecture/adr/ADR-006-Why-ECS.md).
 
+**Lát cắt 6 (2026-07-28)** — quyết định lát cắt 1 (tách AoI sync 20Hz) KHÔNG đủ: load test thật
+N=1000/2000 lại (sau lát cắt 3) cho thấy N=1000 vẫn 67-83ms tick p99 (vượt ngân sách), N=2000 SẬP
+hẳn (tick tối đa 10.76s, lỗi client leo thang không dừng). Thay `AreaOfInterestTracker` từ quét
+O(n²) toàn world sang **spatial-grid sharding** (lưới ô cạnh = `AOI_RADIUS_METERS`, quét 3×3 ô lân
+cận — đúng kỹ thuật spatial hashing tiêu chuẩn, không đổi tập kết quả AoI, chỉ đổi cách tìm ứng
+viên). Verify: toàn bộ test hiện có (`WorldFacadeTest`, `GatewayServerIntegrationTest`,
+`GatewayPipelineTest`) PASS — không đổi behavior. Đo lại cùng kịch bản: N=1000 cải thiện khiêm tốn
+(~20-30%, tick p99 67-83ms→56-58ms); N=2000 cải thiện thật nhưng CHƯA đạt ngân sách (lỗi client
+3553→177 và hết leo thang, tick tối đa 10.76s→~3.7s) — số liệu đầy đủ + diễn giải trung thực (kịch
+bản test hiện có là TỤ 1 ĐIỂM, đúng trường hợp sharding giúp ÍT NHẤT) tại
+[BENCHMARK.md §5.2](../09-performance/BENCHMARK.md). 2 việc follow-up phát hiện, CHƯA làm: chính
+sách giới hạn người/khu vực ở tầng gameplay (mới là giả định dùng để diễn giải số liệu, chưa
+enforce), và HikariCP `maximumPoolSize=10` backlog hàng nghìn request lúc burst connect (chưa gây
+lỗi nhưng đáng tăng trước khi test N lớn hơn).
+
+**Lát cắt 7 (2026-07-28, cùng ngày, theo yêu cầu chủ dự án)** — code chính sách giới hạn người/khu
+vực còn để trống ở lát cắt 6: `server-gateway.MainWorldChannelRegistry` — mỗi khu vực (channel,
+1 `WorldFacade` riêng, cùng kỹ thuật `DungeonInstanceRegistry`/`ArenaInstanceRegistry` nhưng áp
+dụng cho MAP CHÍNH) tối đa 20 người mặc định, 50 người khu vực đặc biệt (hook sẵn, chưa map nào
+dùng), tự mở khu vực mới khi tổng người đạt 80% tổng sức chứa. Khu vực mở LAZY từ #1 (không pre-warm
+25 khu vực rỗng — diễn giải của AI cho "25 khu mặc định" trong yêu cầu gốc, CHƯA xác nhận lại với
+chủ dự án). 2 bug thật phát hiện+sửa: (1) race điều kiện — registry bị gọi từ nhiều thread
+(`authExecutor` VÀ `ArenaInstanceRegistry.settlementExecutor`) mà dùng `HashMap`/`ArrayList` thường,
+gây `GatewayServerIntegrationTest` treo ngẫu nhiên — sửa bằng `synchronized`; (2) sau khi sửa (1),
+2 test đó VẪN treo — nguyên nhân THẬT: lỗ hổng đồng bộ hoá CÓ SẴN từ lát cắt 1 (test rời world
+chính trước khi AoI `sync()` 20Hz kịp chạy lần đầu, nên `visibleTo` rỗng, không ai để báo despawn)
+— chỉ hiếm khi lộ ra, bị lộ rõ dưới tải nặng lúc chạy lại nhiều lần liên tục. Sửa bằng cách cho 2
+test đợi xác nhận AoI spawn thật trước khi tiếp tục (tất định, không dựa may rủi thời gian). Đo lại
+N=1000/2000 (DB xoá sạch, cùng máy/JVM/kịch bản lát cắt 6): **N=1000 tick p99 67-83ms→0.82-1.57ms,
+N=2000 tick p99 8.59s (đỉnh)→0.98-3.15ms (ổn định suốt), lỗi client 3553→0** — cả 2 mức trong ngân
+sách 16.6ms (trừ 1 đỉnh đơn lẻ 28.6ms ở N=2000, không lặp lại). Xác nhận spatial-grid sharding (lát
+cắt 6) + giới hạn người/khu vực (lát cắt này) BỔ SUNG nhau, không thay thế nhau. Chi tiết đầy đủ:
+[BENCHMARK.md §5.3](../09-performance/BENCHMARK.md). Còn lại CHƯA làm: HikariCP pool size, xác nhận
+lại cách diễn giải "25 khu mặc định" (lazy vs pre-warm) với chủ dự án, multi-zone THẬT trong game
+content (channel giải quyết mật độ, không thay thế nhu cầu nội dung bản đồ đa khu vực nếu cần sau).
+
 ---
 
 ## Phase 10 — Release
@@ -625,3 +661,16 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **16 ADR Accepted** (gồm
     (Grafana dashboard, Alerts, `kage.gold.total`, Tracing) — CHƯA làm, chỉ có `kage.tick.duration`
     (lát cắt 1) — **Điều 44 chặn đóng Phase 9 nếu thiếu phần này**.
 14. Trả lời các câu hỏi mở còn lại ở [docs/README.md](../README.md).
+15. ✅ **Phase 9 lát cắt 6 xong** (2026-07-28) — AoI spatial-grid sharding, đo lại N=1000/2000 thật
+    (số liệu [BENCHMARK.md §5.2](../09-performance/BENCHMARK.md)). N=2000 tụ 1 điểm vẫn CHƯA đạt
+    ngân sách dù cải thiện rõ — còn 2 việc chưa làm: chính sách giới hạn người/khu vực ở tầng
+    gameplay (chỉ là giả định dùng để diễn giải số liệu, chưa code), tăng HikariCP
+    `maximumPoolSize` (backlog hàng nghìn request lúc burst connect, chưa gây lỗi client nhưng
+    đáng sửa trước khi test N lớn hơn 2000).
+16. ✅ **Phase 9 lát cắt 7 xong** (2026-07-28) — `MainWorldChannelRegistry` (giới hạn 20/50 người
+    mỗi khu vực, tự mở khu vực mới ở 80% sức chứa) giải quyết dứt điểm khoảng trống lát cắt 6:
+    N=1000/2000 đo lại đều TRONG ngân sách 16.6ms, lỗi client N=2000 3553→0 (số liệu
+    [BENCHMARK.md §5.3](../09-performance/BENCHMARK.md)). 2 bug thật phát hiện+sửa (race điều kiện
+    + lỗ hổng đồng bộ hoá test có sẵn từ lát cắt 1, xem BENCHMARK.md §5.3 chi tiết). Còn lại: HikariCP
+    pool size, xác nhận lại cách diễn giải "25 khu mặc định" với chủ dự án, multi-zone thật trong
+    game content.

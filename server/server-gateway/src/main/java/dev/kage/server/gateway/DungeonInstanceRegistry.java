@@ -41,7 +41,7 @@ final class DungeonInstanceRegistry {
     private final ConnectedCharacterRegistry registry;
     private final CharacterFacade characterFacade;
     private final PartyFacade partyFacade;
-    private final WorldFacade mainWorldFacade;
+    private final MainWorldChannelRegistry mainWorldChannels;
 
     private final Map<Long, DungeonInstance> instancesByPartyId = new HashMap<>();
     private final Map<Long, DungeonInstance> instanceByCharacterId = new HashMap<>();
@@ -49,11 +49,11 @@ final class DungeonInstanceRegistry {
 
     DungeonInstanceRegistry(
             ConnectedCharacterRegistry registry, CharacterFacade characterFacade, PartyFacade partyFacade,
-            WorldFacade mainWorldFacade) {
+            MainWorldChannelRegistry mainWorldChannels) {
         this.registry = registry;
         this.characterFacade = characterFacade;
         this.partyFacade = partyFacade;
-        this.mainWorldFacade = mainWorldFacade;
+        this.mainWorldChannels = mainWorldChannels;
     }
 
     /** {@code WorldFacade} nhân vật này đang ở TRONG (dungeon), rỗng nếu đang ở world chính. */
@@ -98,7 +98,7 @@ final class DungeonInstanceRegistry {
         instance.facade().detachCharacter(characterId);
         CharacterBaseStats baseStats = loadBaseStats(characterId);
         PositionSnapshot returnPosition = returnPositionByCharacterId.remove(characterId);
-        mainWorldFacade.attachCharacter(characterId, returnPosition.x(), returnPosition.y(), baseStats);
+        mainWorldChannels.attachCharacter(characterId, returnPosition.x(), returnPosition.y(), baseStats);
         leaveInstance(characterId, instance);
         return ExitOutcome.OK;
     }
@@ -144,7 +144,7 @@ final class DungeonInstanceRegistry {
         }
         returnPositionByCharacterId.put(characterId, returnPosition);
 
-        mainWorldFacade.detachCharacter(characterId);
+        mainWorldChannels.detachCharacter(characterId);
         instance.facade().attachCharacter(characterId, DUNGEON_ENTRY_SPAWN_X, DUNGEON_ENTRY_SPAWN_Y, baseStats);
         instance.characterIds().add(characterId);
         instanceByCharacterId.put(characterId, instance);
