@@ -27,7 +27,9 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.locks.LockSupport;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,6 +78,9 @@ public final class WorldFacade {
 
     private final WorldOutboundSink outboundSink;
     private final TickMetricsPort tickMetricsPort;
+    // Method reference tạo 1 LẦN — tránh allocation trên tick thread (Điều 31, cùng lý do
+    // combatSystem/skillSystem không new lại mỗi tick).
+    private final EcsWorld.SystemTimingListener systemTimingListener;
     private final Queue<WorldCommand> inbox = new ConcurrentLinkedQueue<>();
     private final EcsWorld ecsWorld = new EcsWorld();
     private final AreaOfInterestTracker aoiTracker;
@@ -109,7 +114,15 @@ public final class WorldFacade {
     private long tickCounter;
 
     private volatile boolean running;
-    private Thread tickThread;
+    // Thay "1 OS thread riêng/World" (Phase 9, xem WorldTickScheduler javadoc) — pool CỐ ĐỊNH dùng
+    // chung, số thread không tăng theo số kênh/dungeon/duel đang chạy.
+    private ScheduledFuture<?> tickFuture;
+    // scheduleAtFixedRate tự đảm bảo KHÔNG chồng lấn 2 lần chạy CÙNG task, nên lock này gần như
+    // không bao giờ bị tranh chấp lúc chạy bình thường — chỉ dùng để stop() CHỜ ĐÚNG lần tick đang
+    // chạy dở (nếu có) xong hẳn trước khi trả về, mirror lại đúng ngữ nghĩa "interrupt + join" cũ.
+    private final Lock tickLock = new ReentrantLock();
+    private boolean contentSpawned;
+    private long fixedDtNanos;
     private final boolean spawnOverworldContent;
 
     /**
@@ -153,6 +166,7 @@ public final class WorldFacade {
         this.outboundSink = outboundSink;
         this.spawnOverworldContent = spawnOverworldContent;
         this.tickMetricsPort = tickMetricsPort;
+        this.systemTimingListener = tickMetricsPort::recordSystemDuration;
         this.aoiTracker = new AreaOfInterestTracker(outboundSink);
         this.combatSystem = new CombatSystem(this::lookupEntity);
         this.skillSystem = new SkillSystem(this::lookupEntity);
@@ -173,23 +187,24 @@ public final class WorldFacade {
         ecsWorld.addSystem(new StatusEffectSystem());
     }
 
-    /** Bắt đầu tick loop trên thread riêng — gọi 1 lần lúc khởi động server. */
+    /** Bắt đầu lịch tick trên {@link WorldTickScheduler} — gọi 1 lần lúc khởi động server. */
     public void start() {
         running = true;
-        tickThread = new Thread(this::tickLoop, "world-tick");
-        tickThread.start();
+        fixedDtNanos = (long) (WorldConstants.FIXED_DT * 1_000_000_000L);
+        tickFuture = WorldTickScheduler.scheduleAtFixedRate(this::tickTask, fixedDtNanos);
     }
 
-    /** Dừng tick loop (SERVER.md §10 — graceful shutdown, không {@code kill -9}). */
+    /** Dừng tick (SERVER.md §10 — graceful shutdown, không {@code kill -9}). */
     public void stop() {
         running = false;
-        if (tickThread != null) {
-            tickThread.interrupt();
-            try {
-                tickThread.join();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+        if (tickFuture != null) {
+            tickFuture.cancel(false);
+            // Khoá rồi nhả ngay: nếu 1 lần tick đang chạy dở (giữ tickLock trong tickTask), dòng
+            // này CHẶN tới khi lần đó xong hẳn — đảm bảo stop() chỉ trả về sau khi World đã dừng
+            // tick THẬT SỰ, đúng ngữ nghĩa đồng bộ mà ArenaInstanceRegistry/DungeonInstanceRegistry
+            // đang phụ thuộc (gọi stop() rồi coi World là đã ngừng hẳn ngay sau đó).
+            tickLock.lock();
+            tickLock.unlock();
         }
     }
 
@@ -241,26 +256,44 @@ public final class WorldFacade {
         inbox.add(new WorldCommand.SpawnBossCommand());
     }
 
-    private void tickLoop() {
-        if (spawnOverworldContent) {
-            spawnTrainingDummy();
-            spawnNpc(); // NPC tĩnh, không chết/hồi sinh — spawn 1 lần duy nhất, khác quái.
+    /**
+     * Chạy trên {@link WorldTickScheduler} — có thể bị pool thread KHÁC NHAU chạy mỗi lần gọi
+     * (khác thread cố định của mô hình cũ), nhưng {@code scheduleAtFixedRate} tự đảm bảo không bao
+     * giờ có 2 lần gọi CÙNG task chồng lấn, nên vẫn giữ đúng bất biến "chỉ 1 thread chạm ECS state
+     * tại 1 thời điểm" (SERVER.md §3).
+     *
+     * <p>⚠️ Bọc {@code Throwable} (không chỉ {@code RuntimeException} như {@link #tickOnce()} đã tự
+     * bắt bên trong) — {@code scheduleAtFixedRate} âm thầm NGỪNG lặp lại vĩnh viễn, không log gì,
+     * nếu Runnable để lọt exception ra ngoài (xem javadoc {@link WorldTickScheduler}). Đây là lưới
+     * an toàn tầng ngoài cùng, không thay thế cách ly lỗi đã có trong {@code tickOnce()}.
+     */
+    @SuppressWarnings("PMD.AvoidCatchingThrowable")
+    private void tickTask() {
+        if (!running) {
+            return; // cancel(false) không huỷ lần đã dispatch dở — bỏ qua an toàn nếu lỡ chạy tới đây.
         }
-        long fixedDtNanos = (long) (WorldConstants.FIXED_DT * 1_000_000_000L);
-        while (running) {
+        tickLock.lock();
+        try {
+            if (!contentSpawned) {
+                contentSpawned = true;
+                if (spawnOverworldContent) {
+                    spawnTrainingDummy();
+                    spawnNpc(); // NPC tĩnh, không chết/hồi sinh — spawn 1 lần duy nhất, khác quái.
+                }
+            }
+
             long start = System.nanoTime();
-
             tickOnce();
-
             long elapsed = System.nanoTime() - start;
             tickMetricsPort.recordTickDuration(elapsed);
-            long sleepNanos = fixedDtNanos - elapsed;
-            if (sleepNanos > 0) {
-                LockSupport.parkNanos(sleepNanos);
-            } else {
+            if (elapsed > fixedDtNanos) {
                 LOG.warn("World tick quá hạn: {}ms", elapsed / 1_000_000);
                 tickMetricsPort.recordTickOverrun();
             }
+        } catch (Throwable t) {
+            LOG.error("Lỗi nghiêm trọng ngoài tickOnce() trong World tick — world này dừng tick", t);
+        } finally {
+            tickLock.unlock();
         }
     }
 
@@ -274,7 +307,8 @@ public final class WorldFacade {
     private void tickOnce() {
         try {
             drainInbox();
-            ecsWorld.update(WorldConstants.FIXED_DT);
+            ecsWorld.update(WorldConstants.FIXED_DT, systemTimingListener);
+            tickMetricsPort.recordEntityCount(ecsWorld.entityCount());
             handleCombatResults(combatSystem.drainResults());
             handleSkillResults(skillSystem.drainResults());
             handleBossResults(bossAiSystem.drainResults());

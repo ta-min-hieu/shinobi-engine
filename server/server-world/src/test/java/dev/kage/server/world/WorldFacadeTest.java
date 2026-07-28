@@ -12,9 +12,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * Verify vòng lặp tick thật (60Hz, thread riêng) của {@link WorldFacade} — không mock tick loop
- * vì đây chính là hành vi cần test (ROADMAP Phase 3: "2 client thấy nhau di chuyển"; Phase 4 lát
- * cắt 1: "đánh quái, quái chết").
+ * Verify vòng lặp tick thật (60Hz, qua {@link WorldTickScheduler}) của {@link WorldFacade} — không
+ * mock tick loop vì đây chính là hành vi cần test (ROADMAP Phase 3: "2 client thấy nhau di
+ * chuyển"; Phase 4 lát cắt 1: "đánh quái, quái chết").
  */
 @Timeout(10)
 class WorldFacadeTest {
@@ -199,6 +199,73 @@ class WorldFacadeTest {
 
         awaitTrue(() -> sink.accepted.stream().anyMatch(a -> a.characterId() == 1L && a.sequenceId() == 42));
         awaitTrue(() -> sink.moved.stream().anyMatch(m -> m.target() == 2L && m.moved() == 1L));
+    }
+
+    /**
+     * WorldTickScheduler (Phase 9 — thay "1 OS thread riêng/World" bằng pool CỐ ĐỊNH dùng chung):
+     * số World khởi tạo ở đây CỐ TÌNH vượt xa số lõi CPU thông thường để xác nhận
+     * {@code scheduleAtFixedRate} dùng chung không làm ĐÓI World nào — mọi World đều phải tự xử lý
+     * được lệnh move của chính nó (đi qua {@code drainInbox()} trong tick), không chỉ 1 vài World
+     * đầu tiên chiếm hết pool.
+     */
+    @Test
+    @Timeout(15)
+    void shouldTickManyWorldsConcurrently_onSharedPoolWithoutStarvation() {
+        int worldCount = 32;
+        List<RecordingSink> sinks = new java.util.ArrayList<>();
+        List<WorldFacade> worlds = new java.util.ArrayList<>();
+        try {
+            for (int i = 0; i < worldCount; i++) {
+                RecordingSink extraSink = new RecordingSink();
+                WorldFacade extraWorld = new WorldFacade(extraSink, false);
+                extraWorld.start();
+                sinks.add(extraSink);
+                worlds.add(extraWorld);
+            }
+            for (int i = 0; i < worldCount; i++) {
+                worlds.get(i).attachCharacter(1000L + i, 0f, 0f, DEFAULT_STATS);
+                worlds.get(i).enqueueMoveCommand(1000L + i, 1, 1f, 0f);
+            }
+            for (int i = 0; i < worldCount; i++) {
+                int idx = i;
+                awaitTrue(() -> sinks.get(idx).accepted.stream()
+                        .anyMatch(a -> a.characterId() == 1000L + idx && a.sequenceId() == 1));
+            }
+        } finally {
+            worlds.forEach(WorldFacade::stop);
+        }
+    }
+
+    /**
+     * {@code stop()} một World không được ảnh hưởng World khác đang chạy chung pool — mirror lại
+     * đúng ngữ nghĩa "interrupt + join thread riêng" cũ, giờ dựa trên "cancel + khoá" (xem
+     * {@code WorldFacade.stop()}).
+     */
+    @Test
+    void shouldNotAffectOtherWorlds_whenStoppingOneWorldOnSharedPool() {
+        RecordingSink sinkA = new RecordingSink();
+        RecordingSink sinkB = new RecordingSink();
+        WorldFacade worldA = new WorldFacade(sinkA, false);
+        WorldFacade worldB = new WorldFacade(sinkB, false);
+        try {
+            worldA.start();
+            worldB.start();
+            worldA.attachCharacter(2001L, 0f, 0f, DEFAULT_STATS);
+            worldB.attachCharacter(2002L, 0f, 0f, DEFAULT_STATS);
+            worldA.enqueueMoveCommand(2001L, 1, 1f, 0f);
+            worldB.enqueueMoveCommand(2002L, 1, 1f, 0f);
+            awaitTrue(() -> sinkA.accepted.stream().anyMatch(a -> a.characterId() == 2001L));
+            awaitTrue(() -> sinkB.accepted.stream().anyMatch(a -> a.characterId() == 2002L));
+
+            worldA.stop();
+            int acceptedCountBeforeWait = sinkB.accepted.size();
+            worldB.enqueueMoveCommand(2002L, 2, 0f, 1f);
+            awaitTrue(() -> sinkB.accepted.stream().anyMatch(a -> a.characterId() == 2002L && a.sequenceId() == 2));
+            assertThat(sinkB.accepted.size()).isGreaterThan(acceptedCountBeforeWait);
+        } finally {
+            worldA.stop();
+            worldB.stop();
+        }
     }
 
     @Test
