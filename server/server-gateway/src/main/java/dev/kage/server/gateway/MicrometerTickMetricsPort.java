@@ -1,6 +1,7 @@
 package dev.kage.server.gateway;
 
 import dev.kage.server.world.TickMetricsPort;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.util.concurrent.TimeUnit;
@@ -8,12 +9,14 @@ import java.util.concurrent.TimeUnit;
 /**
  * Implementation thật của {@link TickMetricsPort} (ADR-015) — {@code kage.tick.duration}, metric
  * đầu tiên của Phase 9 (OBSERVABILITY.md §3.1: "metric duy nhất mà không có nó thì không biết
- * server có khoẻ không"). {@code Timer} tạo 1 LẦN lúc construct, {@link #recordTickDuration} chỉ
- * ghi số đo — không allocation, an toàn gọi mỗi tick trên tick thread (/CLAUDE.md §6).
+ * server có khoẻ không") + {@code kage.tick.overrun.count} (Phase 9 lát cắt 8). Cả {@code Timer}
+ * và {@code Counter} tạo 1 LẦN lúc construct, các phương thức {@code record*} chỉ ghi số đo —
+ * không allocation, an toàn gọi mỗi tick trên tick thread (/CLAUDE.md §6).
  */
 final class MicrometerTickMetricsPort implements TickMetricsPort {
 
     private final Timer tickTimer;
+    private final Counter tickOverrunCounter;
 
     /**
      * {@code worldTag} là nhãn CỐ ĐỊNH ("main"/"dungeon"/"arena"), KHÔNG phải ID instance —
@@ -26,10 +29,19 @@ final class MicrometerTickMetricsPort implements TickMetricsPort {
                 .tag("world", worldTag)
                 .publishPercentiles(0.5, 0.95, 0.99)
                 .register(registry);
+        this.tickOverrunCounter = Counter.builder("kage.tick.overrun.count")
+                .description("Số lần 1 tick vượt ngân sách FIXED_DT (SERVER.md §3)")
+                .tag("world", worldTag)
+                .register(registry);
     }
 
     @Override
     public void recordTickDuration(long durationNanos) {
         tickTimer.record(durationNanos, TimeUnit.NANOSECONDS);
+    }
+
+    @Override
+    public void recordTickOverrun() {
+        tickOverrunCounter.increment();
     }
 }

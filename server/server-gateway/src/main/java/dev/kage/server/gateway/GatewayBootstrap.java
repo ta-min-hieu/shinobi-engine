@@ -17,6 +17,7 @@ import dev.kage.server.database.ServerDatabaseBootstrap;
 import dev.kage.server.world.WorldFacade;
 import dev.kage.shop.api.ShopFacade;
 import dev.kage.trade.api.TradeFacade;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import java.time.Duration;
@@ -66,7 +67,7 @@ public final class GatewayBootstrap {
         // WorldFacade cần sink lúc construct (SERVER.md §2: kết quả tick đi qua outbound queue).
         ConnectedCharacterRegistry characterRegistry =
                 new ConnectedCharacterRegistry(facades.inventoryFacade(), facades.contentFacades().questFacade());
-        WorldContext worldContext = startWorld(characterRegistry);
+        WorldContext worldContext = startWorld(characterRegistry, databaseBootstrap);
         MainWorldChannelRegistry mainWorldChannels = worldContext.mainWorldChannels();
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(facades.characterFacade(), characterRegistry, POSITION_SAVE_INTERVAL);
@@ -116,10 +117,22 @@ public final class GatewayBootstrap {
      * mang {@code TickMetricsPort} thật (tag "main") — khu vực mở thêm sau (Phase 9 lát cắt 6) dùng
      * {@code NO_OP}, xem javadoc {@link MainWorldChannelRegistry}.
      */
-    private static WorldContext startWorld(ConnectedCharacterRegistry characterRegistry) {
+    private static WorldContext startWorld(
+            ConnectedCharacterRegistry characterRegistry, ServerDatabaseBootstrap databaseBootstrap) {
         PrometheusMeterRegistry meterRegistry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
-        MetricsHttpServer metricsHttpServer = new MetricsHttpServer(METRICS_PORT, meterRegistry);
+        MetricsHttpServer metricsHttpServer =
+                new MetricsHttpServer(METRICS_PORT, meterRegistry, databaseBootstrap::isReady);
         metricsHttpServer.start();
+        // OBSERVABILITY.md §3.1 kage.players.online + §3.5 kage.gold.total — Gauge đọc thẳng
+        // state hiện có lúc scrape (weak reference qua Gauge.builder, không polling thủ công,
+        // không allocation mỗi tick). kage.gold.total chạm DB mỗi lần scrape — chấp nhận được
+        // (query SUM 1 bảng, không phải hot path tick/EventLoop, server/CLAUDE.md chỉ cấm 2 chỗ đó).
+        Gauge.builder("kage.players.online", characterRegistry, ConnectedCharacterRegistry::onlineCount)
+                .description("Tổng số nhân vật đang kết nối")
+                .register(meterRegistry);
+        Gauge.builder("kage.gold.total", databaseBootstrap, ServerDatabaseBootstrap::totalGold)
+                .description("Tổng gold toàn server — tăng đột biến là dấu hiệu duplicate (OBSERVABILITY.md §3.5)")
+                .register(meterRegistry);
         WorldFacade firstChannelFacade = new WorldFacade(
                 characterRegistry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG_MAIN));
         firstChannelFacade.start();

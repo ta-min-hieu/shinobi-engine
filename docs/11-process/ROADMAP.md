@@ -572,6 +572,25 @@ cắt 6) + giới hạn người/khu vực (lát cắt này) BỔ SUNG nhau, kh�
 lại cách diễn giải "25 khu mặc định" (lazy vs pre-warm) với chủ dự án, multi-zone THẬT trong game
 content (channel giải quyết mật độ, không thay thế nhu cầu nội dung bản đồ đa khu vực nếu cần sau).
 
+**Lát cắt 7.5 (2026-07-28, cùng ngày)** — ✅ tăng HikariCP `maximumPoolSize` 10→20, dựa trên backlog
+thật đo được ở lát cắt 6-7 (~1790 request chờ lúc burst connect N=1000). Vẫn là khởi điểm hợp lý,
+chưa phải số đã tune kỹ (chưa có `kage.db.pool.pending` metric để verify hết backlog ở N lớn hơn).
+
+**Lát cắt 8 (2026-07-28, cùng ngày, chủ dự án chọn "chỉ code thuần, không thêm dependency")** — thêm
+phần observability KHÔNG cần Grafana/Alertmanager/OpenTelemetry (những thứ đó cần dependency/hạ
+tầng mới, hỏi trước khi thêm — CLAUDE.md §4): `kage.tick.overrun.count` (mở rộng `TickMetricsPort`,
+cùng chỗ log WARN "World tick quá hạn"), `kage.players.online` (Gauge đọc `ConnectedCharacterRegistry
+.onlineCount()`), `kage.gold.total` (Gauge đọc `ServerDatabaseBootstrap.totalGold()`, query
+`SUM(gold) FROM character_stat` — OBSERVABILITY.md §3.5 gọi đây là "metric chống gian lận", đáng lẽ
+phải có từ Phase 7 trade nhưng bị bỏ sót), `/health/live` + `/health/ready` (dùng chung
+`MetricsHttpServer`/cổng 9404 sẵn có, `/health/ready` kiểm tra DB qua `SELECT 1`). Verify: 165 test
+(`server-world`+`server-gateway`+`server-database`) PASS, ArchUnit `chi_server_gateway_dung_micrometer`
+vẫn PASS (Micrometer vẫn chỉ ở `server-gateway`). Chi tiết: [OBSERVABILITY.md §3, §7](../07-infrastructure/OBSERVABILITY.md).
+Còn lại CHƯA làm (liệt kê đầy đủ ở OBSERVABILITY.md "Việc cần làm tiếp theo"): `kage.entities.count`,
+`kage.ecs.system.duration`, metric network/business còn lại, `kage.db.pool.*` (cần port riêng qua
+ranh giới Điều 23), JSON structured log, và toàn bộ Grafana/Alerts/Tracing (chặn đóng Phase 9 theo
+Điều 44, nhưng cần quyết định hạ tầng/dependency trước).
+
 ---
 
 ## Phase 10 — Release
@@ -671,6 +690,13 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **16 ADR Accepted** (gồm
     mỗi khu vực, tự mở khu vực mới ở 80% sức chứa) giải quyết dứt điểm khoảng trống lát cắt 6:
     N=1000/2000 đo lại đều TRONG ngân sách 16.6ms, lỗi client N=2000 3553→0 (số liệu
     [BENCHMARK.md §5.3](../09-performance/BENCHMARK.md)). 2 bug thật phát hiện+sửa (race điều kiện
-    + lỗ hổng đồng bộ hoá test có sẵn từ lát cắt 1, xem BENCHMARK.md §5.3 chi tiết). Còn lại: HikariCP
-    pool size, xác nhận lại cách diễn giải "25 khu mặc định" với chủ dự án, multi-zone thật trong
-    game content.
+    + lỗ hổng đồng bộ hoá test có sẵn từ lát cắt 1, xem BENCHMARK.md §5.3 chi tiết).
+17. ✅ **Phase 9 lát cắt 7.5 xong** (2026-07-28) — HikariCP `maximumPoolSize` 10→20 dựa trên backlog
+    thật đo được.
+18. ✅ **Phase 9 lát cắt 8 xong** (2026-07-28) — `kage.tick.overrun.count`/`kage.players.online`/
+    `kage.gold.total` + `/health/live`/`/health/ready`, thuần code không thêm dependency (chủ dự án
+    chọn hướng này khi được hỏi). 165 test PASS. Còn lại CHƯA làm cho observability: metric network/
+    business còn lại, `kage.db.pool.*`, JSON log, và Grafana/Alerts/Tracing (cần quyết định
+    dependency/hạ tầng mới trước — xem [OBSERVABILITY.md](../07-infrastructure/OBSERVABILITY.md)
+    "Việc cần làm tiếp theo"). Vẫn CHƯA xác nhận lại cách diễn giải "25 khu mặc định" (lazy vs
+    pre-warm) với chủ dự án, và multi-zone thật trong game content vẫn chưa có.

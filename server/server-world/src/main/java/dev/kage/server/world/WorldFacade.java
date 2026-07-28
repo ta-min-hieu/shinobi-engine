@@ -259,6 +259,7 @@ public final class WorldFacade {
                 LockSupport.parkNanos(sleepNanos);
             } else {
                 LOG.warn("World tick quá hạn: {}ms", elapsed / 1_000_000);
+                tickMetricsPort.recordTickOverrun();
             }
         }
     }

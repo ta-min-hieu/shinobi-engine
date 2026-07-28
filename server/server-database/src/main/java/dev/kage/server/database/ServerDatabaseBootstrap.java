@@ -201,6 +201,29 @@ public final class ServerDatabaseBootstrap {
         return refs;
     }
 
+    /**
+     * Tổng gold TOÀN SERVER (OBSERVABILITY.md §3.5 {@code kage.gold.total} — "metric chống gian
+     * lận": tổng tăng đột biến = nghi duplicate). Query trực tiếp thay vì qua 1 feature Facade cụ
+     * thể vì đây là số liệu TỔNG HỢP xuyên suốt mọi nhân vật, không thuộc nghiệp vụ riêng của
+     * shop/mail/trade/inventory (4 module đó chỉ CHẠM gold của 1 nhân vật/giao dịch, không tổng).
+     */
+    public long totalGold() {
+        return JdbcOperations.queryOne(dataSource, "SELECT COALESCE(SUM(gold), 0) FROM character_stat",
+                resultSet -> resultSet.getLong(1)).orElse(0L);
+    }
+
+    // PMD AvoidCatchingGenericException: health check PHẢI trả false cho MỌI lỗi DB (mất kết nối,
+    // timeout, driver lỗi...), không riêng SQLException — health/ready không được crash vì lý do đó.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    public boolean isReady() {
+        try {
+            JdbcOperations.queryOne(dataSource, "SELECT 1", resultSet -> resultSet.getInt(1));
+            return true;
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
     public ShopFacade wireShopFacade() {
         PostgresShopCatalogAdapter catalogPort = new PostgresShopCatalogAdapter(dataSource);
         PostgresShopGoldAdapter goldPort = new PostgresShopGoldAdapter();

@@ -81,6 +81,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         return contextsByCharacterId.containsKey(characterId);
     }
 
+    /** Tổng số nhân vật đang kết nối (OBSERVABILITY.md §3.1 {@code kage.players.online}). */
+    int onlineCount() {
+        return contextsByCharacterId.size();
+    }
+
     /**
      * Đẩy 1 packet cho ĐÚNG 1 nhân vật khác nếu đang online — no-op an toàn nếu offline (đã ngắt
      * kết nối). Dùng cho push per-player không gắn AoI/broadcast (bạn online, thư mới...).

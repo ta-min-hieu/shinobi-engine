@@ -52,10 +52,10 @@
 | Metric | Kiểu | Vì sao |
 |---|---|---|
 | `kage.tick.duration` | Timer | ⚠️ **Metric quan trọng nhất.** p50/p95/**p99** — ✅ **implemented 2026-07-26** (Phase 9 lát cắt 1): `WorldFacade.tickLoop` ghi qua `TickMetricsPort`/`MicrometerTickMetricsPort`, scrape ở `GET /metrics` (cổng 9404, `MetricsHttpServer`), tag `world` cố định (chỉ `"main"` — dungeon/arena chưa đo, xem ROADMAP.md Phase 9) |
-| `kage.tick.overrun.count` | Counter | Tick vượt ngân sách ([SERVER.md §3](../05-server/SERVER.md)) |
-| `kage.players.online` | Gauge | — |
-| `kage.entities.count` | Gauge | Theo map |
-| `kage.ecs.system.duration` | Timer (tag: system) | System nào ăn ngân sách |
+| `kage.tick.overrun.count` | Counter | Tick vượt ngân sách ([SERVER.md §3](../05-server/SERVER.md)) — ✅ **implemented 2026-07-28** (Phase 9 lát cắt 8), cùng chỗ log WARN "World tick quá hạn" |
+| `kage.players.online` | Gauge | ✅ **implemented 2026-07-28** — `ConnectedCharacterRegistry.onlineCount()` |
+| `kage.entities.count` | Gauge | Theo map — ⏳ chưa làm |
+| `kage.ecs.system.duration` | Timer (tag: system) | System nào ăn ngân sách — ⏳ chưa làm |
 
 ⚠️ **Phải đo p99, không phải trung bình.** Tick trung bình 10ms nhưng p99 = 60ms nghĩa là **1% người chơi bị giật liên tục** — trung bình che mất điều đó.
 
@@ -84,9 +84,9 @@
 
 | Metric | Vì sao |
 |---|---|
-| `kage.login.success` / `failed` | Phát hiện tấn công brute-force |
-| `kage.item.enhance` (tag: result) | Tỉ lệ thành công có khớp thiết kế? |
-| `kage.gold.total` | ⚠️ Phát hiện lạm phát / duplicate gold |
+| `kage.login.success` / `failed` | Phát hiện tấn công brute-force — ⏳ chưa làm |
+| `kage.item.enhance` (tag: result) | Tỉ lệ thành công có khớp thiết kế? — ⏳ chưa làm |
+| `kage.gold.total` | ⚠️ Phát hiện lạm phát / duplicate gold — ✅ **implemented 2026-07-28** (Phase 9 lát cắt 8): `ServerDatabaseBootstrap.totalGold()` (`SELECT SUM(gold) FROM character_stat`), Gauge đọc lúc scrape |
 
 ⚠️ **`kage.gold.total` là metric chống gian lận**: tổng gold toàn server tăng đột biến = có người duplicate. Không có metric này = phát hiện sau khi kinh tế đã sập.
 
@@ -167,10 +167,18 @@ Command từ client
 
 ## 7. Health Check
 
-| Endpoint | Trả lời |
-|---|---|
-| `/health/live` | Process còn sống? (orchestrator restart nếu không) |
-| `/health/ready` | Sẵn sàng nhận người chơi? (DB kết nối được? script load xong?) |
+✅ **Implemented 2026-07-28** (Phase 9 lát cắt 8) — `MetricsHttpServer` (cổng 9404, dùng chung với
+`/metrics`, Điều 9 — không dựng thêm process/cổng riêng chỉ để tách health check).
+
+| Endpoint | Trả lời | Điều kiện |
+|---|---|---|
+| `/health/live` | Process còn sống? (orchestrator restart nếu không) | Luôn 200 — chạy tới được handler này đã là câu trả lời |
+| `/health/ready` | Sẵn sàng nhận người chơi? (DB kết nối được?) | 200 nếu `ServerDatabaseBootstrap.isReady()` (`SELECT 1`) OK, 503 nếu không |
+
+⚠️ "Script load xong" (bản gốc mục này) KHÔNG cần kiểm tra ở `/health/ready` — script validation
+đã chạy fail-fast TRƯỚC lúc server nghe cổng (`GatewayBootstrap.main`, ném exception nếu lỗi —
+process không tồn tại để trả `/health/ready` nếu bước đó thất bại), nên tới lúc handler này chạy
+được, phần đó chắc chắn đã qua.
 
 ⚠️ **Phân biệt quan trọng**: server đang chạy nhưng DB chết → `live` = OK (đừng restart, restart không giúp), `ready` = FAIL (đừng gửi người chơi mới vào).
 
@@ -249,6 +257,18 @@ Command từ client
 ## Việc cần làm tiếp theo
 
 1. ✅ **ADR-015 đã chốt** (2026-07-26).
-2. Phase 3: thêm `kage.tick.duration` **sớm nhất có thể** — đây là metric duy nhất mà không có nó thì không biết server có khoẻ không.
-3. Phase 9: đo **baseline** trước, đặt ngưỡng alert sau (§8).
-4. Phase 5: `kage.gold.total` (§3.5) — trước khi có shop/gold, và bắt buộc trước trade (Phase 7).
+2. ✅ Phase 9 lát cắt 1: `kage.tick.duration` — xong 2026-07-26.
+3. Phase 9: đo **baseline** trước, đặt ngưỡng alert sau (§8) — CHƯA làm (chỉ tick p99 có baseline
+   thật, xem BENCHMARK.md §5.2-5.3; các alert khác ở §8 vẫn ⏳ chưa verify ngưỡng).
+4. ✅ Phase 9 lát cắt 8 (2026-07-28, trễ hơn Phase 5/7 dự kiến ban đầu — làm ở Phase 9 vì đây mới là
+   lúc quay lại đóng khoảng trống observability): `kage.gold.total`, `kage.tick.overrun.count`,
+   `kage.players.online`, `/health/live`, `/health/ready` — pure code, KHÔNG thêm dependency mới.
+5. **CHƯA làm, cần quyết định hạ tầng/dependency trước khi code** (chủ dự án đã xác nhận 2026-07-28:
+   ưu tiên phần code thuần trước, phần này để sau): Grafana dashboard (§9), Alertmanager/alert rules
+   thật (§8, cần ngưỡng đã đo), OpenTelemetry tracing (§6, CHƯA có dependency `opentelemetry-*` nào
+   trong `libs.versions.toml` — thêm vào là 🛑 theo CLAUDE.md §4, cần hỏi trước).
+6. **CHƯA làm, pure code nhưng chưa ưu tiên** (nhiều call site hơn, invasive hơn nhóm lát cắt 8):
+   `kage.entities.count`, `kage.ecs.system.duration`, `kage.packet.received`/`sent`,
+   `kage.connection.active`, `kage.ratelimit.rejected`, `kage.login.success`/`failed`,
+   `kage.item.enhance`, `kage.db.pool.active`/`pending` (cần port riêng qua ranh giới Điều 23 —
+   `server-gateway` không được thấy `DataSource` trực tiếp), JSON structured log cho production (§5.1).
