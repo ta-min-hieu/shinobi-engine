@@ -301,7 +301,9 @@ spatial-grid tối ưu CÁCH TÍNH trong 1 World; giới hạn người/khu vự
 phải chứa quá đông người để cách tính đó có ý nghĩa.
 
 **Việc chưa làm / follow-up còn lại**:
-1. HikariCP `maximumPoolSize=10` — vẫn chưa tăng, chưa gây lỗi ở quy mô đã test.
+1. ✅ HikariCP `maximumPoolSize` 10→20 (2026-07-28, cùng ngày) — dựa trên backlog thật đo được ở
+   trên; vẫn là khởi điểm hợp lý, chưa phải số đã tune kỹ (chưa có DB pool pending metric qua
+   Micrometer để đo lại có còn backlog ở N lớn hơn không — mục "DB pool pending" §5 vẫn ⏳).
 2. Chưa xác nhận lại với chủ dự án cách diễn giải "25 khu mặc định" (lazy vs pre-warm) nêu trên.
 3. `SPECIAL_CAPACITY=50` chưa có nơi nào trong game gán/dùng (chưa có khái niệm "map đặc biệt") —
    hook đã sẵn, chờ nội dung game thật cần tới.

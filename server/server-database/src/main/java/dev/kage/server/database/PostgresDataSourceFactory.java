@@ -8,8 +8,15 @@ import javax.sql.DataSource;
 /** Dựng connection pool HikariCP (ADR-004) từ {@link DatabaseConfig}. */
 public final class PostgresDataSourceFactory {
 
-    // Chưa đo (BENCHMARK.md — Phase 9) — khởi điểm hợp lý cho 1 world instance, chỉnh sau khi có số liệu.
-    private static final int DEFAULT_MAX_POOL_SIZE = 10;
+    // Đo thật (Phase 9 lát cắt 6-7, 2026-07-28, BENCHMARK.md §5.2-5.3): pool=10 backlog tới ~1790
+    // request chờ lúc burst tạo nhân vật ở N=1000 (mỗi client mới làm vài round-trip DB tuần tự:
+    // tạo account/nhân vật/chọn nhân vật) — CHƯA gây lỗi client trong các lần đo (kịp trong socket
+    // timeout 5s) nhưng là rủi ro thật khi N lớn hơn hoặc soak dài. Tăng lên 20 — vẫn là khởi điểm
+    // hợp lý dựa trên bằng chứng thật (không phải số cuối cùng đã tune kỹ), an toàn so với
+    // max_connections mặc định của Postgres (100, deploy/docker/docker-compose.yml không override).
+    // Chỉnh tiếp nếu N lớn hơn vẫn thấy backlog (HikariCP `leakDetectionThreshold`/pool metrics —
+    // chưa expose qua Micrometer, xem BENCHMARK.md §5.2 "Việc chưa làm").
+    private static final int DEFAULT_MAX_POOL_SIZE = 20;
 
     static {
         // ⚠️ PHÁT HIỆN THẬT: pgjdbc lấy TimeZone.getDefault() của JVM gửi cho PostgreSQL lúc
