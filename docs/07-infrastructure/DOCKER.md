@@ -247,6 +247,10 @@ ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 
 ## Việc cần làm tiếp theo
 
-1. Phase 0: dựng `docker-compose.yml` — dev environment 1 lệnh là thứ đáng làm sớm nhất.
+1. ✅ Phase 0: dựng `docker-compose.yml` — dev environment 1 lệnh (postgres + cache).
 2. ⚠️ **Đảm bảo UTF-8 collation ở §5** — dễ quên, rất khó sửa sau ([DATABASE.md §1](../05-server/DATABASE.md)).
-3. Phase 9: chốt GC flags §7 sau khi đo.
+3. Phase 9: chốt GC flags §7 sau khi đo (✅ ADR-019 Accepted, xem JVM.md §3).
+4. ✅ **Phase 9 lát cắt 10 (2026-07-28)** — thêm 4 service vào `docker-compose.yml`: `prometheus`,
+   `alertmanager`, `grafana`, `jaeger` (chi tiết đầy đủ ở [OBSERVABILITY.md](OBSERVABILITY.md) §6-10).
+   `server-gateway` vẫn CHƯA có `server.Dockerfile` thật (§1 sơ đồ trên chỉ là kế hoạch) — Prometheus
+   scrape server chạy native trên host qua `host.docker.internal:9404`.

@@ -212,6 +212,16 @@ public final class ServerDatabaseBootstrap {
                 resultSet -> resultSet.getLong(1)).orElse(0L);
     }
 
+    /** OBSERVABILITY.md §3.3 {@code kage.db.pool.active} — số connection đang được dùng thật. */
+    public int poolActiveConnections() {
+        return PostgresDataSourceFactory.activeConnections(dataSource);
+    }
+
+    /** OBSERVABILITY.md §3.3 {@code kage.db.pool.pending} — số thread đang chờ pool có chỗ trống. */
+    public int poolPendingThreads() {
+        return PostgresDataSourceFactory.pendingThreads(dataSource);
+    }
+
     // PMD AvoidCatchingGenericException: health check PHẢI trả false cho MỌI lỗi DB (mất kết nối,
     // timeout, driver lỗi...), không riêng SQLException — health/ready không được crash vì lý do đó.
     @SuppressWarnings("PMD.AvoidCatchingGenericException")

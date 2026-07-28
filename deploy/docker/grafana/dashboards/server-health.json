@@ -1,0 +1,77 @@
+{
+  "title": "Kage - Server Health",
+  "uid": "kage-server-health",
+  "schemaVersion": 39,
+  "refresh": "10s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Tick duration p50/p95/p99 (World main)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "targets": [
+        {"expr": "kage_tick_duration_seconds{world=\"main\",quantile=\"0.5\"}", "legendFormat": "p50", "refId": "A"},
+        {"expr": "kage_tick_duration_seconds{world=\"main\",quantile=\"0.95\"}", "legendFormat": "p95", "refId": "B"},
+        {"expr": "kage_tick_duration_seconds{world=\"main\",quantile=\"0.99\"}", "legendFormat": "p99", "refId": "C"}
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Tick overrun rate (World main)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "rate(kage_tick_overrun_count_total{world=\"main\"}[5m])", "legendFormat": "overrun/s", "refId": "A"}
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Players online",
+      "type": "stat",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "kage_players_online", "refId": "A"}]
+    },
+    {
+      "id": 4,
+      "title": "Entities count (World main)",
+      "type": "timeseries",
+      "gridPos": {"h": 6, "w": 9, "x": 6, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "kage_entities_count{world=\"main\"}", "refId": "A"}]
+    },
+    {
+      "id": 5,
+      "title": "ECS System duration max (by System)",
+      "type": "timeseries",
+      "gridPos": {"h": 6, "w": 9, "x": 15, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "targets": [
+        {"expr": "kage_ecs_system_duration_seconds_max{world=\"main\"}", "legendFormat": "{{system}}", "refId": "A"}
+      ]
+    },
+    {
+      "id": 6,
+      "title": "JVM GC pause max",
+      "type": "timeseries",
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 14},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "targets": [{"expr": "jvm_gc_pause_seconds_max", "legendFormat": "{{action}}/{{cause}}", "refId": "A"}]
+    },
+    {
+      "id": 7,
+      "title": "JVM memory used",
+      "type": "timeseries",
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 14},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": []},
+      "targets": [{"expr": "jvm_memory_used_bytes", "legendFormat": "{{area}}/{{id}}", "refId": "A"}]
+    }
+  ]
+}

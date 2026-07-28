@@ -1,0 +1,19 @@
+# OBSERVABILITY.md §9 — Grafana đọc metric từ Prometheus + trace từ Jaeger (docker-compose service
+# cùng tên). apiVersion 1 = định dạng provisioning chuẩn của Grafana.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+
+  - name: Jaeger
+    uid: jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    editable: false

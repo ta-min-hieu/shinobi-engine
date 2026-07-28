@@ -31,9 +31,18 @@ dependencies {
     // TickMetricsPort, cùng lý do chỉ gateway biết Netty).
     implementation(libs.micrometer.core)
     implementation(libs.micrometer.registry.prometheus)
+    // Tracing (ADR-015, Phase 9 lát cắt 9 quan sát lớn) — MODULE DUY NHẤT import io.opentelemetry.*,
+    // cùng lý do server-gateway là module duy nhất import io.micrometer.*.
+    implementation(platform(libs.opentelemetry.bom))
+    implementation(libs.opentelemetry.api)
+    implementation(libs.opentelemetry.sdk)
+    implementation(libs.opentelemetry.exporter.otlp)
     // Binding thật (Logback) — không có binding = log biến mất im lặng, không chấp nhận được
     // cho server (LOGGING/OBSERVABILITY §5 — JSON structured log ở production, text ở dev).
-    runtimeOnly("ch.qos.logback:logback-classic:1.5.31")
+    // `implementation` (không phải `runtimeOnly`) — JsonLogEncoder (Phase 9 lát cắt 9) tự viết,
+    // KHÔNG dùng logstash-logback-encoder (thư viện ngoài không có trong TECHNOLOGY-STACK.md), nên
+    // cần API Logback lúc COMPILE, không chỉ lúc chạy.
+    implementation("ch.qos.logback:logback-classic:1.5.31")
 }
 application {
     mainClass.set("dev.kage.server.gateway.GatewayBootstrap")

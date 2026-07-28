@@ -432,7 +432,7 @@ Chi tiết kỹ thuật:
 | 🔴 **Load test + Soak test ≥ 2h** | [BENCHMARK.md §5](../09-performance/BENCHMARK.md) |
 | Đo & cập nhật **toàn bộ ngân sách** | [PERFORMANCE.md §2](../09-performance/PERFORMANCE.md) |
 | 🔴 **Đánh giá lại ADR-006 (Ashley)** | [ECS.md §9](../03-engine/ECS.md) |
-| ✅ **ADR-019 (GC) — Proposed** (2026-07-26, soak test thật 2h14, 80 client, chờ Accepted) | [JVM.md §2](../09-performance/JVM.md), [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md) |
+| ✅ **ADR-019 (GC) — Accepted** (2026-07-28, soak test thật 2h14, 80 client) | [JVM.md §2](../09-performance/JVM.md), [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md) |
 | Prometheus + Grafana + Alerts + Tracing | [OBSERVABILITY.md §10](../07-infrastructure/OBSERVABILITY.md) |
 | ✅ ADR-015, ADR-014 đã chốt (2026-07-26, trước khi mở lát cắt code) | [ADR-015](../01-architecture/adr/ADR-015-Micrometer-vs-OpenTelemetry.md), [ADR-014](../01-architecture/adr/ADR-014-Kubernetes-vs-Docker-Compose.md) |
 
@@ -503,8 +503,8 @@ thật sau này.
 thật + Postgres/Redis thật qua Docker, `-XX:+UseZGC` + JFR + GC log bật đủ) để lấy số liệu chốt
 ADR-019. Kết quả: **ZGC STW pause tối đa đo được 0.052ms**, heap Live giữ nguyên 39M suốt 34 chu kỳ
 GC liên tiếp (~1h33 phút, không leak), tick p99 luôn dưới ngân sách 16.6ms (dao động 2-10ms tuỳ
-thời điểm). Viết [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md) — Status **Proposed**, chờ
-chủ dự án Accepted (AI không tự chốt, adr/README.md quy tắc #5).
+thời điểm). Viết [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md) — Status **Accepted** (2026-07-28,
+chủ dự án xác nhận; AI không tự chốt, adr/README.md quy tắc #5).
 
 **2 bug thật phát hiện VÀ SỬA trong `tools:load-test`** khi soak test lần đầu chạy hỏng ngay (không
 phải đoán trước — cả hai phát hiện qua log thật):
@@ -676,9 +676,10 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **16 ADR Accepted** (gồm
     Revisit Trigger đánh giá lại: CHƯA kích hoạt, giữ nguyên Ashley.
 12. ✅ **Phase 9 lát cắt 5 xong** (2026-07-26) — công thức ước tính hạ tầng (RAM/CPU/băng thông theo
     N người chơi), xem [BENCHMARK.md §5.1](../09-performance/BENCHMARK.md).
-13. Còn lại trước khi đóng Phase 9: chủ dự án xác nhận ADR-019 Accepted; mở rộng observability
-    (Grafana dashboard, Alerts, `kage.gold.total`, Tracing) — CHƯA làm, chỉ có `kage.tick.duration`
-    (lát cắt 1) — **Điều 44 chặn đóng Phase 9 nếu thiếu phần này**.
+13. ✅ **ADR-019 Accepted** (2026-07-28, chủ dự án xác nhận). Còn lại trước khi đóng Phase 9: mở rộng
+    observability (Grafana dashboard, Alerts, Tracing) — xem tiến độ ở
+    [OBSERVABILITY.md](../07-infrastructure/OBSERVABILITY.md) — **Điều 44 chặn đóng Phase 9 nếu
+    thiếu phần này**.
 14. Trả lời các câu hỏi mở còn lại ở [docs/README.md](../README.md).
 15. ✅ **Phase 9 lát cắt 6 xong** (2026-07-28) — AoI spatial-grid sharding, đo lại N=1000/2000 thật
     (số liệu [BENCHMARK.md §5.2](../09-performance/BENCHMARK.md)). N=2000 tụ 1 điểm vẫn CHƯA đạt
@@ -700,3 +701,27 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **16 ADR Accepted** (gồm
     dependency/hạ tầng mới trước — xem [OBSERVABILITY.md](../07-infrastructure/OBSERVABILITY.md)
     "Việc cần làm tiếp theo"). Vẫn CHƯA xác nhận lại cách diễn giải "25 khu mặc định" (lazy vs
     pre-warm) với chủ dự án, và multi-zone thật trong game content vẫn chưa có.
+19. ✅ **Phase 9 lát cắt 9 xong** (2026-07-28) — toàn bộ metric "pure code" còn lại:
+    `kage.entities.count`, `kage.ecs.system.duration` (per-System Timer, `EcsWorld.update` overload
+    mới nhận `SystemTimingListener`), `kage.packet.received`/`sent`, `kage.connection.active`,
+    `kage.ratelimit.rejected`, `kage.login.success`/`failed`, `kage.item.enhance`,
+    `kage.db.pool.active`/`pending` (đọc `HikariPoolMXBean` qua `ServerDatabaseBootstrap`), JSON
+    structured log production (`JsonLogEncoder` tự viết, không thêm dependency ngoài — chỉ đổi
+    `logback-classic` từ `runtimeOnly` sang `implementation` để compile được). Toàn bộ test (120
+    file, 0 lỗi) + checkstyle PASS. Chi tiết: [OBSERVABILITY.md](../07-infrastructure/OBSERVABILITY.md)
+    §3/§5.1.
+20. ✅ **Phase 9 lát cắt 10 xong (2026-07-28, chủ dự án bật đèn xanh cùng phiên)** — Observability
+    lớn: `opentelemetry-bom` 1.63.0 mới thêm vào `libs.versions.toml` (verify thật, ADR-015 đã
+    Accepted trước đó chỉ mới chốt Micrometer/OTel PHÂN ĐỊNH, chưa code); `GatewayTracing` (OTel SDK
+    thật, OTLP/HTTP export tới Jaeger, sampling 1%) + span `gateway.command` (mọi opcode) + span sâu
+    đại diện `feature.inventory.enhance`. JVM metric binder (GC/memory/thread) bind vào registry —
+    đóng khoảng trống `jvm.gc.pause` (không cần dependency mới). `docker-compose.yml` thêm
+    `prometheus`/`alertmanager`/`grafana`/`jaeger`, verify thật bằng `docker compose config` +
+    `docker compose up`. 5 dashboard Grafana thật (Server Health/Network/Database/Business/
+    Anti-cheat) + alert rules Prometheus (2/6 ngưỡng có baseline thật — tick p99, GC pause; 2 còn
+    lại đánh dấu [NGƯỠNG CHƯA VERIFY]). Phát hiện thật: Micrometer đổi `kage.gold.total` thành
+    `kage_gold` khi scrape (KHÔNG PHẢI `kage_gold_total`) — xác nhận bằng dump `registry.scrape()`
+    thật trước khi viết PromQL. Chi tiết: [OBSERVABILITY.md](../07-infrastructure/OBSERVABILITY.md).
+    **Phase 9 Exit Criteria observability giờ ĐỦ (Điều 44)** — CHƯA làm (ngoài phạm vi, không phải
+    thiếu sót): tracing sâu cho ~50 opcode còn lại, nhánh sampling "100% Command chậm", kênh thông
+    báo Alertmanager thật (Slack/email), `server.Dockerfile` (server-gateway vẫn chạy native).

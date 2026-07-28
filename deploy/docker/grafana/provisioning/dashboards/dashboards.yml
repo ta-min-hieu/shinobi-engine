@@ -1,0 +1,13 @@
+# OBSERVABILITY.md §9 — tự nạp mọi dashboard JSON trong deploy/docker/grafana/dashboards/ lúc
+# container khởi động, không cần import tay qua UI.
+apiVersion: 1
+
+providers:
+  - name: kage-dashboards
+    orgId: 1
+    folder: "Kage"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards

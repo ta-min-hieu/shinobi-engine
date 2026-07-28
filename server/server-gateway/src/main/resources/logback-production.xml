@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OBSERVABILITY.md §5.1 — JSON structured log cho production, đọc bằng máy được (DOCKER.md §9: log
+  ra stdout, container ephemeral). KHÔNG phải cấu hình mặc định — kích hoạt bằng:
+
+      java -Dlogback.configurationFile=logback-production.xml -jar server-gateway.jar
+
+  `./gradlew run` (dev) không set flag này nên tiếp tục dùng cấu hình mặc định của Logback (console
+  human-readable, không phải file này) — đúng OBSERVABILITY.md §5.1 "Development: human-readable".
+-->
+<configuration>
+    <appender name="STDOUT_JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="dev.kage.server.gateway.logging.JsonLogEncoder"/>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT_JSON"/>
+    </root>
+</configuration>

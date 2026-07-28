@@ -44,6 +44,7 @@ public final class GatewayServer {
     private final int requestedPort;
     private final GatewayFacades facades;
     private final WorldGateway worldGateway;
+    private final GatewayObservability observability;
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private ExecutorService authExecutor;
@@ -54,10 +55,12 @@ public final class GatewayServer {
      * @param worldGateway {@code registry()} đã đăng ký làm {@code WorldOutboundSink} của
      *     {@code facade()} TRƯỚC khi truyền vào đây (composition root — {@code GatewayBootstrap}).
      */
-    public GatewayServer(int port, GatewayFacades facades, WorldGateway worldGateway) {
+    public GatewayServer(
+            int port, GatewayFacades facades, WorldGateway worldGateway, GatewayObservability observability) {
         this.requestedPort = port;
         this.facades = facades;
         this.worldGateway = worldGateway;
+        this.observability = observability;
     }
 
     public void start() throws InterruptedException {
@@ -80,7 +83,7 @@ public final class GatewayServer {
                                 .addLast(new LengthFieldPrepender(LENGTH_FIELD_LENGTH))
                                 .addLast(new PacketFrameDecoder())
                                 .addLast(new PacketFrameEncoder())
-                                .addLast(new GatewayChannelHandler(facades, worldGateway, authExecutor));
+                                .addLast(new GatewayChannelHandler(facades, worldGateway, authExecutor, observability));
                     }
                 });
 

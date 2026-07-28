@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ⏳ **Proposed** — số liệu thật đã có (soak test 2026-07-26), chờ chủ dự án xác nhận Accepted |
+| Status | ✅ **Accepted** (2026-07-28) — số liệu thật đã có (soak test 2026-07-26), chủ dự án xác nhận |
 | Date | 2026-07-26 |
 | Deciders | Chủ dự án (qua kết quả soak test — xem "Ghi chú" cuối file) |
 | Related | [JVM.md](../../09-performance/JVM.md), [BENCHMARK.md §5](../../09-performance/BENCHMARK.md), [PERFORMANCE.md](../../09-performance/PERFORMANCE.md), [ROADMAP.md — Phase 9](../../11-process/ROADMAP.md) |
@@ -70,7 +70,8 @@ công cụ đo, không phải phía đo đạc. Lần chạy thứ ba (sau khi s
 dùng trong ADR này, chạy liên tục ~2h14 không restart server giữa chừng (giữ nguyên lịch sử GC/heap
 để soak test có ý nghĩa thật).
 
-**AI không tự đặt Status = Accepted** (adr/README.md quy tắc #5) — cần chủ dự án xác nhận.
+**AI không tự đặt Status = Accepted** (adr/README.md quy tắc #5) — chủ dự án đã xác nhận Accepted
+2026-07-28.
 
 ## Revisit Trigger
 

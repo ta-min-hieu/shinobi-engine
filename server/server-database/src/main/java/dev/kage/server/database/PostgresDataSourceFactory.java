@@ -2,6 +2,8 @@ package dev.kage.server.database;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.HikariPoolMXBean;
+import java.util.Optional;
 import java.util.TimeZone;
 import javax.sql.DataSource;
 
@@ -52,5 +54,26 @@ public final class PostgresDataSourceFactory {
         if (dataSource instanceof HikariDataSource hikariDataSource) {
             hikariDataSource.close();
         }
+    }
+
+    /**
+     * OBSERVABILITY.md §3.3 {@code kage.db.pool.active}/{@code pending} — đọc trực tiếp
+     * {@link HikariPoolMXBean}, không cần Micrometer trong module này (Điều 23, cùng cách
+     * {@link ServerDatabaseBootstrap#totalGold()} trả {@code long} thuần thay vì {@code Gauge}).
+     */
+    public static int activeConnections(DataSource dataSource) {
+        return poolMxBean(dataSource).map(HikariPoolMXBean::getActiveConnections).orElse(0);
+    }
+
+    /** Số thread đang CHỜ có connection — {@code > 0} kéo dài nghĩa là pool quá nhỏ (OBSERVABILITY.md §3.3). */
+    public static int pendingThreads(DataSource dataSource) {
+        return poolMxBean(dataSource).map(HikariPoolMXBean::getThreadsAwaitingConnection).orElse(0);
+    }
+
+    private static Optional<HikariPoolMXBean> poolMxBean(DataSource dataSource) {
+        if (dataSource instanceof HikariDataSource hikariDataSource) {
+            return Optional.of(hikariDataSource.getHikariPoolMXBean());
+        }
+        return Optional.empty();
     }
 }

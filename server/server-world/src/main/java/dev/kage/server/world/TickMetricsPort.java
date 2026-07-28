@@ -20,6 +20,14 @@ public interface TickMetricsPort {
         @Override
         public void recordTickOverrun() {
         }
+
+        @Override
+        public void recordSystemDuration(String systemName, long durationNanos) {
+        }
+
+        @Override
+        public void recordEntityCount(int count) {
+        }
     };
 
     /** {@code durationNanos} là thời gian {@link WorldFacade#tickOnce} vừa chạy xong mất bao lâu. */
@@ -31,4 +39,15 @@ public interface TickMetricsPort {
      * {@link WorldFacade#tickLoop}, nhưng là Counter đếm được/dashboard được thay vì chỉ đọc log.
      */
     void recordTickOverrun();
+
+    /**
+     * {@code systemName} = {@code getClass().getSimpleName()} của 1 {@code IteratingKSystem}
+     * (OBSERVABILITY.md §3.1 {@code kage.ecs.system.duration}) — tập tên CỐ ĐỊNH, biết trước lúc
+     * construct (xem {@code WorldFacade} constructor thêm System nào), nên implementation phía
+     * gateway được phép pre-build Timer cho từng tên, không tạo mới trên tick thread (Điều 31).
+     */
+    void recordSystemDuration(String systemName, long durationNanos);
+
+    /** OBSERVABILITY.md §3.1 {@code kage.entities.count} — tổng entity ECS đang sống lúc tick vừa xong. */
+    void recordEntityCount(int count);
 }

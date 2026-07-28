@@ -217,7 +217,7 @@ Client khác server:
 
 | # | Quyết định | Lý do | Trạng thái |
 |---|---|---|---|
-| 1 | **ZGC** cho server | Pause đo thật 0.052ms max (soak test 2h14, 80 client); heap Live không tăng suốt 34 chu kỳ GC | ✅ [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md) — Proposed, chờ Accepted |
+| 1 | **ZGC** cho server | Pause đo thật 0.052ms max (soak test 2h14, 80 client); heap Live không tăng suốt 34 chu kỳ GC | ✅ [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md) — Accepted |
 | 2 | **JFR bật ở production** | Overhead 1%; có dữ liệu khi sự cố | Accepted |
 | 3 | `MaxRAMPercentage=75`, **không `-Xmx` cố định** | Chừa chỗ native; image chạy nhiều cấu hình | Accepted |
 | 4 | `ExitOnOutOfMemoryError` | Chết hẳn > sống dở | Accepted |
@@ -238,6 +238,6 @@ Client khác server:
 ## Việc cần làm tiếp theo
 
 1. ✅ Phase 0: bật JFR + GC log ngay — đã dùng thật lúc soak test 2026-07-26.
-2. ✅ Phase 9: đo ZGC **trên workload thật** (soak 2h14, 80 client) → [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md) Proposed. Chưa đo G1 thực nghiệm trên chính dự án (xem Revisit Trigger ADR-019) — quyết định dựa trên số liệu ZGC thật + đặc tính G1 đã biết rộng rãi.
+2. ✅ Phase 9: đo ZGC **trên workload thật** (soak 2h14, 80 client) → [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md) Accepted (2026-07-28). Chưa đo G1 thực nghiệm trên chính dự án (xem Revisit Trigger ADR-019) — quyết định dựa trên số liệu ZGC thật + đặc tính G1 đã biết rộng rãi.
 3. ✅ Phase 2: bật Netty leak detector `paranoid` ở dev (§8).
 4. Chủ dự án xác nhận ADR-019 Accepted.

@@ -139,11 +139,11 @@ Toàn bộ 4 ADR chặn Phase 3 đã Accepted — **Phase 3 đủ điều kiện
 | **Micrometer cho Metrics, OpenTelemetry cho Tracing** | ✅ [ADR-015](01-architecture/adr/ADR-015-Micrometer-vs-OpenTelemetry.md) |
 | **Docker Compose + VM đơn, không dùng Kubernetes** | ✅ [ADR-014](01-architecture/adr/ADR-014-Kubernetes-vs-Docker-Compose.md) |
 
-### ⏳ Proposed (2026-07-26) — số liệu thật đã có, chờ chủ dự án xác nhận
+### ✅ Đã chốt (2026-07-28) — không còn chặn Phase 9
 
 | Quyết định | ADR |
 |---|---|
-| **ZGC cho server** — soak test 2h14 thật: pause max 0.052ms, không leak | ⏳ [ADR-019](01-architecture/adr/ADR-019-GC-Choice.md) |
+| **ZGC cho server** — soak test 2h14 thật: pause max 0.052ms, không leak | ✅ [ADR-019](01-architecture/adr/ADR-019-GC-Choice.md) |
 
 ### 🟡 Chặn Phase sau
 

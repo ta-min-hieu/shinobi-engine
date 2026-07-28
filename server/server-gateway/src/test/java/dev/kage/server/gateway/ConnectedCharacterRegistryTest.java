@@ -36,6 +36,7 @@ import dev.kage.quest.domain.QuestInventoryGrantPort;
 import dev.kage.quest.domain.QuestProgress;
 import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestTemplatePort;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.time.Duration;
@@ -95,7 +96,8 @@ class ConnectedCharacterRegistryTest {
     @Test
     void shouldSendItemGrantedEvent_whenLootRolledSuccessfully() throws InvalidProtocolBufferException {
         // 100% -> tất định, không flaky
-        registry = new ConnectedCharacterRegistry(fakeInventoryFacade(100), fakeQuestFacade());
+        registry = new ConnectedCharacterRegistry(
+                fakeInventoryFacade(100), fakeQuestFacade(), new GatewayNetworkMetrics(new SimpleMeterRegistry()));
         EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
         registry.register(1L, channel.pipeline().firstContext());
 
@@ -111,7 +113,8 @@ class ConnectedCharacterRegistryTest {
     @Test
     void shouldSendNothing_whenLootNeverDrops() {
         // 0% -> tất định không rơi gì
-        registry = new ConnectedCharacterRegistry(fakeInventoryFacade(0), fakeQuestFacade());
+        registry = new ConnectedCharacterRegistry(
+                fakeInventoryFacade(0), fakeQuestFacade(), new GatewayNetworkMetrics(new SimpleMeterRegistry()));
         EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
         registry.register(1L, channel.pipeline().firstContext());
 

@@ -847,7 +847,11 @@ class GatewayPipelineTest {
         dev.kage.party.api.PartyFacade partyFacade = fakePartyFacade();
         dev.kage.trade.api.TradeFacade tradeFacade = fakeTradeFacade();
         dev.kage.pvp.api.PvpFacade pvpFacade = fakePvpFacade();
-        ConnectedCharacterRegistry characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
+        GatewayNetworkMetrics networkMetrics =
+                new GatewayNetworkMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
+        GatewayObservability observability = new GatewayObservability(networkMetrics, GatewayTracing.disabled());
+        ConnectedCharacterRegistry characterRegistry =
+                new ConnectedCharacterRegistry(inventoryFacade, questFacade, networkMetrics);
         WorldFacade firstChannelFacade = new WorldFacade(characterRegistry);
         MainWorldChannelRegistry mainWorldChannels =
                 new MainWorldChannelRegistry(characterRegistry, firstChannelFacade);
@@ -873,7 +877,7 @@ class GatewayPipelineTest {
                                         new SocialFacades(
                                                 friendFacade, mailFacade, chatFacade, guildFacade, partyFacade,
                                                 tradeFacade, pvpFacade))),
-                        worldGateway, Runnable::run));
+                        worldGateway, Runnable::run, observability));
     }
 
     /** Fake = implementation in-memory THẬT (TESTING.md §4), không Mockito. */

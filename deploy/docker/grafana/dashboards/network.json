@@ -1,0 +1,47 @@
+{
+  "title": "Kage - Network",
+  "uid": "kage-network",
+  "schemaVersion": 39,
+  "refresh": "10s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Packet received rate (by opcode)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "sum(rate(kage_packet_received_total[5m])) by (opcode)", "legendFormat": "{{opcode}}", "refId": "A"}
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Packet sent rate (by opcode)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "sum(rate(kage_packet_sent_total[5m])) by (opcode)", "legendFormat": "{{opcode}}", "refId": "A"}
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Connection active",
+      "type": "stat",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "kage_connection_active", "refId": "A"}]
+    },
+    {
+      "id": 4,
+      "title": "Rate limit rejected (by scope)",
+      "type": "timeseries",
+      "gridPos": {"h": 6, "w": 18, "x": 6, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "sum(rate(kage_ratelimit_rejected_total[5m])) by (scope)", "legendFormat": "{{scope}}", "refId": "A"}
+      ]
+    }
+  ]
+}

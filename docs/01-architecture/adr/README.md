@@ -49,7 +49,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-016](ADR-016-Scripting-Engine.md) | Dùng GraalJS làm scripting engine | ✅ Accepted | — |
 | [ADR-017](ADR-017-Auth-Token.md) | Auth token: session token tự phát hành + Redis | ✅ Accepted | — |
 | [ADR-018](ADR-018-Tick-Rate.md) | Tick rate **60Hz** | ✅ Accepted | — |
-| [ADR-019](ADR-019-GC-Choice.md) | Dùng ZGC cho server production | ⏳ **Proposed** *(số liệu thật đã có, chờ xác nhận)* | — |
+| [ADR-019](ADR-019-GC-Choice.md) | Dùng ZGC cho server production | ✅ Accepted | — |
 | [ADR-025](ADR-025-Idempotency.md) | Idempotency cho Command có side-effect | ✅ Accepted | — |
 | [ADR-026](ADR-026-Dungeon-Instance-Model.md) | Dungeon instance model: cùng process, World riêng trong 1 JVM | ✅ Accepted | — |
 
@@ -67,7 +67,7 @@ Tổng hợp từ toàn bộ tài liệu. **Không code chạm các vùng này k
 | **ADR-023** | Mobile input scheme (joystick ảo / tap-to-move) | 🟡 Trung bình | Phase 2 nếu mobile-first | [CLIENT.md §5](../../04-client/CLIENT.md) |
 | **ADR-024** | Asset distribution: đóng gói / patch / CDN | 🟢 Thấp | Phase 10 | [RESOURCE.md §10](../../04-client/RESOURCE.md) |
 
-> ADR-013, ADR-017, ADR-025 đã Accepted (2026-07-19), ADR-016 đã Accepted (2026-07-20), ADR-026 đã Accepted (2026-07-24), ADR-014/ADR-015 đã Accepted (2026-07-26), ADR-019 đã viết Proposed (2026-07-26, chờ Accepted) — xem bảng "Danh sách ADR" ở trên, không còn nằm ở đây.
+> ADR-013, ADR-017, ADR-025 đã Accepted (2026-07-19), ADR-016 đã Accepted (2026-07-20), ADR-026 đã Accepted (2026-07-24), ADR-014/ADR-015 đã Accepted (2026-07-26), ADR-019 đã Accepted (2026-07-28) — xem bảng "Danh sách ADR" ở trên, không còn nằm ở đây.
 
 ---
 

@@ -222,6 +222,10 @@ import dev.kage.server.world.WorldFacade;
 import dev.kage.shop.api.ShopFacade;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.Scope;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -275,6 +279,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final PvpFacade pvpFacade;
     private final WorldGateway worldGateway;
     private final Executor authExecutor;
+    private final GatewayNetworkMetrics networkMetrics;
+    private final GatewayTracing tracing;
     // Per-connection (handler đã là state per-connection, xem javadoc lớp) — không cần đồng bộ
     // hoá, chỉ được đọc/ghi trên Netty EventLoop của CHÍNH connection này.
     private final RateLimiter moveCommandRateLimiter =
@@ -366,7 +372,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_EXIT_DUEL_COMMAND_VALUE, this::handleExitDuelCommand),
             Map.entry(Opcode.OPCODE_GET_PVP_RATING_REQUEST_VALUE, this::handleGetPvpRatingRequest));
 
-    GatewayChannelHandler(GatewayFacades facades, WorldGateway worldGateway, Executor authExecutor) {
+    GatewayChannelHandler(
+            GatewayFacades facades, WorldGateway worldGateway, Executor authExecutor,
+            GatewayObservability observability) {
         this.accountFacade = facades.accountFacade();
         this.characterFacade = facades.characterFacade();
         this.inventoryFacade = facades.inventoryFacade();
@@ -382,13 +390,27 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.pvpFacade = facades.contentFacades().socialFacades().pvpFacade();
         this.worldGateway = worldGateway;
         this.authExecutor = authExecutor;
+        this.networkMetrics = observability.networkMetrics();
+        this.tracing = observability.tracing();
     }
 
     @Override
+    public void channelActive(ChannelHandlerContext ctx) {
+        networkMetrics.connectionOpened();
+    }
+
+    // javac [try]: `scope` không đọc trong thân try — ĐÚNG Ý, try-with-resources chỉ dùng để đảm
+    // bảo Scope.close() gọi đúng lúc (OTel Context propagation), không cần đọc biến đó.
+    @SuppressWarnings("try")
+    @Override
     protected void channelRead0(ChannelHandlerContext ctx, PacketCodec.Frame frame) {
         PacketHeader header = frame.header();
+        networkMetrics.recordPacketReceived(header.opcode());
         PacketHandler handler = handlers.get(header.opcode());
-        try {
+        // OBSERVABILITY.md §6 — span "gateway.command" bao decode+validate+dispatch, 1 chỗ trung
+        // tâm áp dụng cho MỌI opcode (không retrofit sâu hơn từng handler — xem javadoc GatewayTracing).
+        Span span = tracing.startCommandSpan(opcodeNameForTracing(header.opcode()));
+        try (Scope scope = span.makeCurrent()) {
             if (handler == null) {
                 sendError(ctx, header.sequenceId(), 404, "error.unknown_opcode");
                 return;
@@ -398,8 +420,18 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // Fail fast ở MỨC PACKET (Điều 16) — không làm sập kết nối vì 1 payload hỏng.
             LOG.warn("Payload protobuf không hợp lệ: opcode={}, sequenceId={}",
                     header.opcode(), header.sequenceId(), e);
+            span.recordException(e);
+            span.setStatus(StatusCode.ERROR);
             sendError(ctx, header.sequenceId(), 400, "error.invalid_payload");
+        } finally {
+            span.end();
         }
+    }
+
+    /** {@code opcode} lạ (packet giả mạo) gộp vào 1 tag "unknown" — cùng lý do {@code GatewayNetworkMetrics}. */
+    private static String opcodeNameForTracing(int opcode) {
+        Opcode value = Opcode.forNumber(opcode);
+        return value != null ? value.name() : "unknown";
     }
 
     private void handlePing(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -438,10 +470,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setAccountId(result.accountId())
                     .build();
             send(ctx, Opcode.OPCODE_CONNECT_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            networkMetrics.recordLoginSuccess();
         } catch (IllegalArgumentException e) {
+            networkMetrics.recordLoginFailed();
             LOG.warn("Đăng nhập thất bại: username không hợp lệ", e);
             sendError(ctx, sequenceId, 400, "error.invalid_username");
         } catch (RuntimeException e) {
+            networkMetrics.recordLoginFailed();
             LOG.error("Đăng nhập thất bại: lỗi không mong đợi", e);
             sendError(ctx, sequenceId, 500, "error.login_failed");
         }
@@ -639,6 +674,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // NETWORK.md §13: vượt ngưỡng 1 window → drop packet + log (KHÔNG trả ErrorResponse — im
         // lặng, tránh cho client gian lận biết chính xác ngưỡng để dò); vượt liên tục → ngắt kết nối.
         if (!moveCommandRateLimiter.tryAcquire()) {
+            networkMetrics.recordRateLimitRejected("move");
             LOG.warn("MoveCommand vượt rate limit: characterId={}", characterId);
             if (moveCommandRateLimiter.shouldDisconnect()) {
                 LOG.warn("MoveCommand vượt rate limit liên tục — ngắt kết nối: characterId={}", characterId);
@@ -757,15 +793,36 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleEnhanceItemBlocking(ctx, sequenceId, characterId, command));
+        // Context.current() PHẢI chụp NGAY ở đây (còn trên EventLoop, bên trong span "gateway.command"
+        // của channelRead0) — Virtual Thread chạy handleEnhanceItemBlocking không tự thấy context đó.
+        // Gộp characterId/command/tracingContext vào 1 record — tránh vượt Checkstyle ParameterNumber
+        // (max 4) mà không cần đổi field instance (per-connection nhưng có thể pipeline nhiều lệnh).
+        EnhanceItemRequest request = new EnhanceItemRequest(sequenceId, characterId, command, Context.current());
+        authExecutor.execute(() -> handleEnhanceItemBlocking(ctx, request));
     }
 
-    private void handleEnhanceItemBlocking(
-            ChannelHandlerContext ctx, int sequenceId, long characterId, EnhanceItemCommand command) {
-        InventoryFacade.EnhanceResult result =
-                inventoryFacade.enhanceItem(characterId, command.getItemId(), command.getUseProtection());
-        EnhanceItemResponse response = EnhanceItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
-        send(ctx, Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    private record EnhanceItemRequest(
+            int sequenceId, long characterId, EnhanceItemCommand command, Context tracingContext) {
+    }
+
+    /**
+     * Luồng ĐẠI DIỆN duy nhất được retrofit span con sâu (feature + DB gộp làm 1, xem javadoc
+     * {@link GatewayTracing}) khớp ví dụ đầy đủ OBSERVABILITY.md §6 — CHƯA làm cho ~50 opcode còn
+     * lại (phạm vi lát cắt 9, không phải thiếu sót).
+     */
+    @SuppressWarnings("try") // xem javadoc @SuppressWarnings("try") ở channelRead0
+    private void handleEnhanceItemBlocking(ChannelHandlerContext ctx, EnhanceItemRequest request) {
+        Span span = tracing.startChildSpan("feature.inventory.enhance", request.tracingContext());
+        try (Scope scope = span.makeCurrent()) {
+            InventoryFacade.EnhanceResult result = inventoryFacade.enhanceItem(
+                    request.characterId(), request.command().getItemId(), request.command().getUseProtection());
+            networkMetrics.recordEnhanceResult(result.name());
+            span.setAttribute("result", result.name());
+            EnhanceItemResponse response = EnhanceItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+            send(ctx, Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE, request.sequenceId(), response.toByteArray());
+        } finally {
+            span.end();
+        }
     }
 
     // Bảng tra thay switch 6 nhánh (PMD CyclomaticComplexity — cùng lý do SLOT_MAPPING bên dưới).
@@ -2275,6 +2332,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         RateLimiter rateLimiter = chatRateLimiterFor(command.getChannel());
         if (!rateLimiter.tryAcquire()) {
+            networkMetrics.recordRateLimitRejected("chat_" + command.getChannel().name());
             SendChatMessageResponse response = SendChatMessageResponse.newBuilder()
                     .setOutcome(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_RATE_LIMITED)
                     .build();
@@ -2503,12 +2561,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void send(ChannelHandlerContext ctx, int opcode, int sequenceId, byte[] payload) {
+        networkMetrics.recordPacketSent(opcode);
         PacketHeader header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
         ctx.writeAndFlush(new PacketCodec.Frame(header, payload));
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
+        networkMetrics.connectionClosed();
         // Mất kết nối (đóng chủ động, timeout, hay lỗi — exceptionCaught cũng dẫn tới sự kiện
         // này) — dọn entity ECS + AoI của nhân vật này (SERVER.md §9: 1 kết nối chết không được
         // để bia đỡ đạn đứng lại trong world).

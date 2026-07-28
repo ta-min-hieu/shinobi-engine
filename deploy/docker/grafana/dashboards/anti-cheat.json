@@ -1,0 +1,37 @@
+{
+  "title": "Kage - Anti-cheat",
+  "uid": "kage-anti-cheat",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": {"from": "now-6h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Rate limit rejected (by scope) — spam/bot detection",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "sum(rate(kage_ratelimit_rejected_total[5m])) by (scope)", "legendFormat": "{{scope}}", "refId": "A"}
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Login failed rate — brute-force detection",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "rate(kage_login_failed_total[5m])", "legendFormat": "failed/s", "refId": "A"}]
+    },
+    {
+      "id": 3,
+      "title": "Gold total growth rate (1h) — duplicate detection",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "increase(kage_gold[1h])", "legendFormat": "tăng gold/giờ", "refId": "A"}
+      ]
+    }
+  ]
+}

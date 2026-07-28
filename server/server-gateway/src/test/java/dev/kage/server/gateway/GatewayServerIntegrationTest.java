@@ -167,7 +167,10 @@ class GatewayServerIntegrationTest {
         partyFacade = fakePartyFacade();
         dev.kage.trade.api.TradeFacade tradeFacade = fakeTradeFacade();
         pvpFacade = fakePvpFacade();
-        characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade);
+        GatewayNetworkMetrics networkMetrics =
+                new GatewayNetworkMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
+        GatewayObservability observability = new GatewayObservability(networkMetrics, GatewayTracing.disabled());
+        characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade, networkMetrics);
         WorldFacade firstChannelFacade = new WorldFacade(characterRegistry);
         firstChannelFacade.start();
         mainWorldChannels = new MainWorldChannelRegistry(characterRegistry, firstChannelFacade);
@@ -185,7 +188,7 @@ class GatewayServerIntegrationTest {
         ContentFacades contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
         GatewayFacades facades =
                 new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
-        server = new GatewayServer(0, facades, worldGateway);
+        server = new GatewayServer(0, facades, worldGateway, observability);
         server.start();
     }
 

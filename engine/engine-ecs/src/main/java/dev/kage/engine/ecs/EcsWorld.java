@@ -47,14 +47,39 @@ public final class EcsWorld {
         systems.add(system);
     }
 
+    /** Tổng số entity đang sống — OBSERVABILITY.md §3.1 {@code kage.entities.count}. */
+    public int entityCount() {
+        return ashleyEngine.getEntities().size();
+    }
+
+    /**
+     * Đo thời gian mỗi System xử lý xong toàn bộ entity của nó trong 1 lần {@link #update} —
+     * OBSERVABILITY.md §3.1 {@code kage.ecs.system.duration}. Định nghĩa ở {@code engine-ecs} (không
+     * phải {@code server-world}) vì đây là nơi DUY NHẤT biết danh sách System thật đang chạy;
+     * {@code server-world} chỉ implement listener này qua {@code TickMetricsPort} (Điều 23 — không
+     * import Micrometer trực tiếp ở đây).
+     */
+    public interface SystemTimingListener {
+        SystemTimingListener NO_OP = (systemName, durationNanos) -> { };
+
+        void onSystemUpdated(String systemName, long durationNanos);
+    }
+
     /** Fixed-timestep update — gọi từ KageEngine.fixedUpdate() với delta cố định (ENGINE.md §4). */
     public void update(float fixedDeltaTime) {
+        update(fixedDeltaTime, SystemTimingListener.NO_OP);
+    }
+
+    /** Như {@link #update(float)} nhưng báo thời gian từng System qua {@code listener} mỗi lần gọi. */
+    public void update(float fixedDeltaTime, SystemTimingListener listener) {
         for (IteratingKSystem system : systems) {
+            long start = System.nanoTime();
             ImmutableArray<com.badlogic.ashley.core.Entity> entities =
                     ashleyEngine.getEntitiesFor(system.family().raw());
             for (int i = 0; i < entities.size(); i++) {
                 system.processEntity(wrap(entities.get(i)), fixedDeltaTime);
             }
+            listener.onSystemUpdated(system.getClass().getSimpleName(), System.nanoTime() - start);
         }
     }
 

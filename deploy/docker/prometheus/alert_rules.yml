@@ -1,0 +1,65 @@
+# OBSERVABILITY.md §8 — alert rules thật, dựa trên tên metric THẬT scrape ra (xác nhận bằng cách
+# dump registry.scrape() lúc viết file này, KHÔNG đoán từ tên Micrometer dotted). ⚠️ PHÁT HIỆN THẬT:
+# Micrometer/Prometheus registry chuyển "kage.gold.total" thành "kage_gold" (KHÔNG PHẢI
+# "kage_gold_total" — hậu tố ".total" bị coi là marker Counter "_total" nên bị strip cho Gauge,
+# không cộng lại) — nếu viết PromQL theo tên dotted + "_total" máy móc sẽ SAI. quantile percentile
+# (kage_tick_duration_seconds) là Summary tính phía client (Micrometer), KHÔNG dùng
+# histogram_quantile() — dùng label {quantile="0.99"} trực tiếp, đúng thiết kế đã ghi ở
+# MicrometerTickMetricsPort javadoc.
+#
+# Ngưỡng đánh dấu [NGƯỠNG CHƯA VERIFY] là số PLACEHOLDER — OBSERVABILITY.md §8 tự ghi rõ "chưa có,
+# phải đo baseline trước, đặt bừa = alert fatigue". Chỉ 2 ngưỡng có số liệu thật đo được: tick p99
+# 16.6ms (60Hz, ADR-018) và GC pause (ADR-019 đo thật 0.052ms max ở tải 80 client — 100ms vẫn còn
+# rất rộng so với số đã đo, coi là ngưỡng an toàn tạm thời, không phải baseline chính xác).
+groups:
+  - name: kage-server-gateway
+    rules:
+      - alert: TickP99OverBudget
+        expr: kage_tick_duration_seconds{world="main",quantile="0.99"} > 0.0166
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tick p99 vượt ngân sách 16.6ms (60Hz, ADR-018)"
+          description: "World '{{ $labels.world }}' tick p99 = {{ $value }}s, liên tục 5 phút."
+
+      - alert: ServerDown
+        expr: up{job="kage-server-gateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Không scrape được server-gateway (down hoặc mất kết nối tới host.docker.internal:9404)"
+
+      - alert: DbPoolExhausted
+        expr: kage_db_pool_pending > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HikariCP có thread đang chờ connection liên tục — pool quá nhỏ (BENCHMARK.md §5.2)"
+
+      # [NGƯỠNG CHƯA VERIFY] 20%/giờ là số PLACEHOLDER — chưa đo baseline tăng trưởng gold thật.
+      - alert: GoldTotalSpike
+        expr: (increase(kage_gold[1h]) / kage_gold) > 0.20
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "[NGƯỠNG CHƯA VERIFY] Tổng gold toàn server tăng >20%/giờ — nghi duplicate (OBSERVABILITY.md §3.5)"
+
+      - alert: GcPauseHigh
+        expr: jvm_gc_pause_seconds_max > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GC pause tối đa > 100ms (ADR-019 đo thật ZGC max 0.052ms ở tải 80 client — 100ms là ngưỡng an toàn tạm, không phải baseline chính xác)"
+
+      # [NGƯỠNG CHƯA VERIFY] 10 lần/phút là số PLACEHOLDER — chưa đo baseline login thật.
+      - alert: LoginFailedSpike
+        expr: increase(kage_login_failed_total[1m]) > 10
+        labels:
+          severity: warning
+        annotations:
+          summary: "[NGƯỠNG CHƯA VERIFY] Đăng nhập thất bại tăng vọt — nghi brute-force"

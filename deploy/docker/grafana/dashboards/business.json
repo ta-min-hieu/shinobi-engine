@@ -1,0 +1,46 @@
+{
+  "title": "Kage - Business",
+  "uid": "kage-business",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": {"from": "now-6h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Login success / failed rate",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "rate(kage_login_success_total[5m])", "legendFormat": "success", "refId": "A"},
+        {"expr": "rate(kage_login_failed_total[5m])", "legendFormat": "failed", "refId": "B"}
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Item enhance outcome rate (by result)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "sum(rate(kage_item_enhance_total[5m])) by (result)", "legendFormat": "{{result}}", "refId": "A"}
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Gold total (toàn server) — kage_gold, KHÔNG PHẢI kage_gold_total (xem alert_rules.yml)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "kage_gold", "legendFormat": "gold total", "refId": "A"}]
+    },
+    {
+      "id": 4,
+      "title": "Players online",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "kage_players_online", "refId": "A"}]
+    }
+  ]
+}

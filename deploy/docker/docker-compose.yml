@@ -34,5 +34,54 @@ services:
       timeout: 3s
       retries: 10
 
+  prometheus:
+    # OBSERVABILITY.md §9-10 (Phase 9 lát cắt 9). Scrape server-gateway thật chạy NATIVE trên host
+    # (chưa có Dockerfile, xem docker-compose.yml đầu file) — cần thấy cổng host qua
+    # host.docker.internal (Docker Desktop Windows/Mac có sẵn; Linux cần extra_hosts bên dưới).
+    image: prom/prometheus:v3.8.1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+
+  alertmanager:
+    image: prom/alertmanager:v0.32.1
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+
+  grafana:
+    # AGPLv3 (grafana/grafana) — chấp nhận được, cùng tiền lệ Redis AGPLv3 (ADR-005, dự án cá
+    # nhân ưu tiên miễn phí hơn thuần OSI).
+    image: grafana/grafana:13.1.1
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD trong .env}
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - jaeger
+
+  jaeger:
+    # OBSERVABILITY.md §6 (Tracing, ADR-015) — all-in-one: nhận OTLP/HTTP (4318) + UI (16686),
+    # đủ cho dự án cá nhân single-instance, không cần Collector/Storage backend riêng.
+    image: jaegertracing/all-in-one:1.76.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+      - "4318:4318"
+
 volumes:
   pgdata:
+  prometheus-data:
+  grafana-data:

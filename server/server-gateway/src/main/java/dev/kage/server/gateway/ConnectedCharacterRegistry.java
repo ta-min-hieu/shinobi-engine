@@ -49,6 +49,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     private final InventoryFacade inventoryFacade;
     private final QuestFacade questFacade;
+    private final GatewayNetworkMetrics networkMetrics;
     private final Map<Long, ChannelHandlerContext> contextsByCharacterId = new ConcurrentHashMap<>();
     // Vị trí MỚI NHẤT của CHÍNH nhân vật (không phải nhân vật khác) — nguồn cho
     // CharacterPositionPersister lưu định kỳ + lúc logout (SERVER.md §8), cập nhật mỗi lần
@@ -59,9 +60,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     // sang Virtual Thread riêng, cùng pattern authExecutor của GatewayChannelHandler.
     private final ExecutorService lootExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
-    ConnectedCharacterRegistry(InventoryFacade inventoryFacade, QuestFacade questFacade) {
+    ConnectedCharacterRegistry(
+            InventoryFacade inventoryFacade, QuestFacade questFacade, GatewayNetworkMetrics networkMetrics) {
         this.inventoryFacade = inventoryFacade;
         this.questFacade = questFacade;
+        this.networkMetrics = networkMetrics;
     }
 
     void register(long characterId, ChannelHandlerContext ctx) {
@@ -375,7 +378,8 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         lootExecutor.shutdown();
     }
 
-    private static void send(ChannelHandlerContext ctx, int opcode, int sequenceId, byte[] payload) {
+    private void send(ChannelHandlerContext ctx, int opcode, int sequenceId, byte[] payload) {
+        networkMetrics.recordPacketSent(opcode);
         PacketHeader header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
         ctx.writeAndFlush(new PacketCodec.Frame(header, payload));
     }

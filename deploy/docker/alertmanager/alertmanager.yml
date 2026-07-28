@@ -1,0 +1,13 @@
+# OBSERVABILITY.md §8 — Alertmanager nhận + gom alert từ Prometheus (deploy/docker/prometheus/
+# alert_rules.yml). Dự án cá nhân, CHƯA có kênh thông báo thật (Slack/email/PagerDuty) — receiver
+# "null" nghĩa là alert được NHẬN và có thể xem ở UI (http://localhost:9093) nhưng KHÔNG gửi đi
+# đâu cả. Thêm route thật khi có kênh thông báo thật cần dùng — không bịa webhook giả ở đây.
+route:
+  receiver: "null"
+  group_by: ["alertname"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: "null"
