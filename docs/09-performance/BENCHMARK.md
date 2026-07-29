@@ -348,22 +348,20 @@ kiến trúc cũ (1 thread OS/kênh) thì N=2000 lẽ ra đã cần ~100-125 thr
 | 1000 | 0.06–0.72ms (2 lần đo lặp lại, 1 lần có đỉnh khởi động 950ms) | 0 (lần 2) / 149 (lần 1) |
 | 2000 | 0.06–0.72ms | 856 |
 
-⚠️ **Caveat PHẢI đọc trước khi so `p99` này với §5.3**: `MicrometerTickMetricsPort` thật (nguồn của
-số `/metrics` bên trên) **CHỈ gắn vào kênh #1** (tag `"main"`) — mọi kênh mở thêm sau (kênh #2, #3...
-tới ~50-125 kênh ở N lớn) dùng `TickMetricsPort.NO_OP` (xem javadoc `GatewayBootstrap.startWorld` +
-`MainWorldChannelRegistry`). Nghĩa là **con số p99 bên trên chỉ phản ánh 1 kênh trong số ~50-125
-kênh đang chạy**, KHÔNG phải toàn hệ thống — khác với số p99 ở §5.3 (đo TRƯỚC khi channel sharding
-tồn tại, lúc đó chỉ có 1 World nên p99 = toàn hệ thống thật). **Không kết luận "nhanh hơn §5.3"** từ
+⚠️ **Caveat PHẢI đọc trước khi so `p99` này với §5.3** (✅ ĐÃ VÁ — xem §5.5 bên dưới, giữ nguyên đoạn
+này làm hồ sơ lịch sử): tại thời điểm đo ở trên, `MicrometerTickMetricsPort` thật **CHỈ gắn vào kênh
+#1** (tag `"main"`) — mọi kênh mở thêm sau (kênh #2, #3... tới ~50-125 kênh ở N lớn) dùng
+`TickMetricsPort.NO_OP`. Nghĩa là **con số p99 ở bảng trên chỉ phản ánh 1 kênh trong số ~50-125 kênh
+đang chạy**, KHÔNG phải toàn hệ thống — khác với số p99 ở §5.3 (đo TRƯỚC khi channel sharding tồn
+tại, lúc đó chỉ có 1 World nên p99 = toàn hệ thống thật). **Không kết luận "nhanh hơn §5.3"** từ
 bảng này — đó là so sánh sai đối tượng đo (1 kênh nay vs toàn hệ thống trước).
 
-**Tín hiệu CHÉO kênh duy nhất có được** (log `WARN "World tick quá hạn"`, bắn ra ở MỌI kênh kể cả
-NO_OP — xem `WorldFacade.tickTask()`): **31 lần overrun** (tick > 16.6ms) trong suốt ~5 phút tải
+**Tín hiệu CHÉO kênh duy nhất có được lúc đó** (log `WARN "World tick quá hạn"`, bắn ra ở MỌI kênh kể
+cả NO_OP — xem `WorldFacade.tickTask()`): **31 lần overrun** (tick > 16.6ms) trong suốt ~5 phút tải
 thật (2 lần N=1000 + 1 lần N=2000, tổng hàng triệu lượt tick trên ~50-125 World cộng lại) — lớn nhất
 đo được **95ms** (~5.7× ngân sách), phần lớn 22–57ms, đều xảy ra đúng lúc burst connect (ramp tức
 thời `initialClients=maxClients`, không ramp dần). Tỉ lệ overrun cực nhỏ (~0.002% số lượt tick ước
-tính) và không kèm crash — nhưng đây là bằng chứng gián tiếp DUY NHẤT về hiệu năng của các kênh
-NO_OP; **chưa có số liệu p99 thật cho toàn bộ ~50-125 kênh** (lỗ hổng quan sát có từ §5.3, chưa phải
-lát cắt này giải quyết — theo dõi thêm nếu cần độ tin cậy cao hơn).
+tính) và không kèm crash.
 
 **RAM/CPU đo qua Windows (`Get-Process`, lấy mẫu 5s/lần suốt thời gian giữ tải) — LẦN ĐẦU đo bằng
 công cụ OS-level thay vì suy luận (khoảng trống §5.1 nêu rõ chưa từng làm việc này):**
@@ -410,6 +408,45 @@ boss, mở server) là kịch bản cần tối ưu.
 đều không cho thấy regression. RAM/CPU đo được có giá trị tham khảo nhưng **CHƯA đủ sạch** (confound
 `-Xmx`/leak-detection cho RAM, thiếu tách bạch sharding-vs-pool cho CPU) để thay thế công thức §5.1 —
 đây là việc CHƯA xong, không phải đã xong.
+
+### 5.5 Vá lỗ hổng đo p99 toàn hệ thống (2026-07-29, cùng ngày)
+
+✅ **Đã vá lỗ hổng nêu ở §5.4** — mọi khu vực map chính giờ mang `TickMetricsPort` THẬT (không còn
+`NO_OP`), cùng tag `"main"`. Cách làm: `MainWorldChannelRegistry` nhận thêm `MeterRegistry` qua
+constructor, `openChannel()` tạo `new MicrometerTickMetricsPort(meterRegistry, "main")` cho MỖI khu
+vực mở thêm thay vì `TickMetricsPort.NO_OP`. Dựa trên hành vi CHUẨN của Micrometer: `Timer`/`Counter`
+đăng ký (`register()`) nhiều lần với CÙNG tên+tag sẽ trả về CÙNG 1 đối tượng dùng chung — không tạo
+bản sao, không đổi cardinality (vẫn đúng tag CỐ ĐỊNH `"main"`, KHÔNG dùng ID khu vực làm tag,
+OBSERVABILITY.md). Vì vậy `kage.tick.duration`/`kage.tick.overrun.count`/`kage.ecs.system.duration`
+từ NAY phản ánh ĐÚNG toàn bộ khu vực map chính, không chỉ khu vực #1.
+
+⚠️ **Ngoại lệ CÓ CHỦ Ý, chưa vá**: `kage.entities.count` là `Gauge` bọc 1 `AtomicInteger` — khác
+`Timer`/`Counter`, Micrometer KHÔNG gộp nhiều `Gauge` cùng tag (đăng ký sau chỉ trả lại `Gauge` đã có,
+không đổi đối tượng nó đọc) — metric này vẫn CHỈ phản ánh khu vực #1, y hệt trước khi vá. Không sửa
+trong lát cắt này (Điều 9 — phạm vi yêu cầu là lỗ hổng đo p99, không phải toàn bộ observability); nếu
+cần số entity tổng đúng, cần lát cắt riêng (cộng dồn thủ công qua `MainWorldChannelRegistry.channels`,
+giống cách `totalPlayers()` đã làm — không đi qua `TickMetricsPort`).
+
+**Verify — cả 2 bước đều đo thật, không chỉ đọc code:**
+
+1. `server-gateway:test`+`server-world:test` (89 test, `--rerun`, xanh 100%) + `checkstyleMain`/
+   `checkstyleTest` sạch. 2 file test (`GatewayPipelineTest`, `GatewayServerIntegrationTest`) cập
+   nhật constructor `MainWorldChannelRegistry` (thêm `SimpleMeterRegistry` dùng chung với
+   `GatewayNetworkMetrics` đã có sẵn trong 2 test đó).
+2. **Đo thật qua gateway đang chạy** (cùng máy/JDK, DB xoá sạch tránh lẫn account cũ chạm giới hạn 4
+   nhân vật — bài học rút ra khi lần đầu chạy lại verify này bị 100% lỗi `CharacterLimitExceededException`
+   do volume Postgres cũ từ §5.4 chưa xoá): 200 client thật (`tools:load-test`, `initialClients=
+   maxClients=200`) → auto-open ra ~13 khu vực (`kage.players.online`=199). Đếm
+   `kage_tick_duration_seconds_count{world="main"}` tăng **782 lần/giây** trong cửa sổ đo 10s — khớp
+   ĐÚNG với ~13 khu vực × 60Hz (782/60 ≈ 13.04), so với **60/giây cố định TRƯỚC khi vá** (bằng chứng
+   trực tiếp: chạy lại y hệt kịch bản này TRƯỚC khi đổi constructor, tick count không đổi dù N tăng).
+   `kage_tick_overrun_count_total{world="main"}` cũng tăng (19 lần trong lượt đo ngắn) — trước đây
+   con số này gần như luôn 0 vì hầu hết khu vực là `NO_OP`.
+
+**Kết luận**: `/metrics` giờ là số liệu THẬT cho toàn bộ khu vực map chính, không còn cần đọc log
+`WARN` làm tín hiệu gián tiếp như §5.4 phải làm. §5.1's công thức capacity-planning cũ và caveat RAM/
+CPU ở §5.4 KHÔNG đổi (lỗ hổng đã vá là lỗ hổng QUAN SÁT, không phải lỗ hổng HIỆU NĂNG — không có bằng
+chứng mới nào về RAM/CPU/tick timing thật ở N=1000/2000 từ lát cắt này).
 
 ---
 

@@ -200,7 +200,7 @@ public final class GatewayBootstrap {
                 characterRegistry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG_MAIN));
         firstChannelFacade.start();
         MainWorldChannelRegistry mainWorldChannels =
-                new MainWorldChannelRegistry(characterRegistry, firstChannelFacade);
+                new MainWorldChannelRegistry(characterRegistry, firstChannelFacade, meterRegistry);
         return new WorldContext(mainWorldChannels, metricsHttpServer);
     }
 

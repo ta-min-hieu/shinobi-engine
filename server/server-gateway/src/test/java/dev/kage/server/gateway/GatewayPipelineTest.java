@@ -847,14 +847,15 @@ class GatewayPipelineTest {
         dev.kage.party.api.PartyFacade partyFacade = fakePartyFacade();
         dev.kage.trade.api.TradeFacade tradeFacade = fakeTradeFacade();
         dev.kage.pvp.api.PvpFacade pvpFacade = fakePvpFacade();
-        GatewayNetworkMetrics networkMetrics =
-                new GatewayNetworkMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
+        io.micrometer.core.instrument.simple.SimpleMeterRegistry meterRegistry =
+                new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        GatewayNetworkMetrics networkMetrics = new GatewayNetworkMetrics(meterRegistry);
         GatewayObservability observability = new GatewayObservability(networkMetrics, GatewayTracing.disabled());
         ConnectedCharacterRegistry characterRegistry =
                 new ConnectedCharacterRegistry(inventoryFacade, questFacade, networkMetrics);
         WorldFacade firstChannelFacade = new WorldFacade(characterRegistry);
         MainWorldChannelRegistry mainWorldChannels =
-                new MainWorldChannelRegistry(characterRegistry, firstChannelFacade);
+                new MainWorldChannelRegistry(characterRegistry, firstChannelFacade, meterRegistry);
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         DungeonInstanceRegistry dungeonInstanceRegistry =

@@ -1,8 +1,8 @@
 package dev.kage.server.gateway;
 
 import dev.kage.server.world.CharacterBaseStats;
-import dev.kage.server.world.TickMetricsPort;
 import dev.kage.server.world.WorldFacade;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -39,10 +39,20 @@ import java.util.Set;
  * toàn bộ registry, không phụ thuộc {@code WorldFacade} nào). CHỈ tầm nhìn AoI (di chuyển/combat) +
  * {@code CHAT_CHANNEL_AREA} (chat khu vực) là cục bộ theo khu vực — đúng ý nghĩa "khu vực" vốn có.
  *
- * <p>⚠️ Metrics: CHỈ khu vực #1 có {@code TickMetricsPort} thật — khu vực mở thêm dùng
- * {@link TickMetricsPort#NO_OP}, cùng scope-cut đã áp dụng cho dungeon/arena instance
- * (OBSERVABILITY.md: KHÔNG dùng ID làm tag vì số khu vực co giãn không có trần cố định — tránh nổ
- * cardinality). Nếu cần đo riêng từng khu vực, đó là việc của lát cắt observability sau.
+ * <p>⚠️ Metrics (sửa lại — trước đây CHỈ khu vực #1 có {@code TickMetricsPort} thật, phát hiện lúc
+ * load-test lại {@code WorldTickScheduler}, BENCHMARK.md §5.4, khi thấy p99 {@code /metrics} không
+ * đại diện được ~50-125 khu vực đang chạy thật): MỌI khu vực (kể cả khu mở thêm ở {@link
+ * #openChannel}) giờ mang {@link MicrometerTickMetricsPort} thật, CÙNG tag {@code "main"} — KHÔNG
+ * dùng ID khu vực làm tag (OBSERVABILITY.md: tránh nổ cardinality, số khu vực co giãn không trần).
+ * Micrometer gộp {@code Timer}/{@code Counter} có cùng tên+tag từ nhiều lần {@code register()} vào
+ * ĐÚNG 1 đối tượng dùng chung — {@code kage.tick.duration}/{@code kage.tick.overrun.count}/
+ * {@code kage.ecs.system.duration} nhờ vậy phản ánh ĐÚNG toàn bộ khu vực main map, không chỉ #1.
+ * ⚠️ {@code kage.entities.count} là NGOẠI LỆ — nó là {@code Gauge} bọc 1 {@code AtomicInteger} CỦA
+ * TỪNG instance; Micrometer KHÔNG gộp nhiều Gauge cùng tag (lần {@code register()} sau chỉ trả về
+ * Gauge đã có, không đổi đối tượng nó đọc) — {@code kage.entities.count} vẫn CHỈ phản ánh khu vực
+ * #1, y hệt trước khi sửa. Đây là giới hạn CÓ CHỦ ĐÍCH của lần sửa này (Điều 9 — không mở rộng
+ * phạm vi ngoài p99/overrun đã yêu cầu); muốn số entity tổng đúng cần lát cắt riêng (vd. tự cộng dồn
+ * qua {@link #channels} giống {@link #totalPlayers()}, không qua {@code TickMetricsPort}).
  *
  * <p>⚠️ Diễn giải "25 khu mặc định/map" (yêu cầu gốc): KHÔNG tạo sẵn 25 khu vực rỗng lúc khởi động
  * (tốn 25 tick thread cho world gần như trống — ngược precedent {@code DungeonInstance}/
@@ -58,16 +68,23 @@ final class MainWorldChannelRegistry {
     static final int SPECIAL_CAPACITY = 50;
     private static final double AUTO_OPEN_UTILIZATION_THRESHOLD = 0.8;
 
+    /** Tag CỐ ĐỊNH cho mọi khu vực map chính — xem javadoc lớp "Metrics" ở trên. */
+    private static final String WORLD_TAG = "main";
+
     private final ConnectedCharacterRegistry registry;
+    private final MeterRegistry meterRegistry;
     private final List<Channel> channels = new ArrayList<>();
     private final Map<Long, Channel> channelByCharacterId = new HashMap<>();
 
     /**
      * {@code firstChannelFacade} PHẢI đã {@code start()} — {@code GatewayBootstrap} dựng nó cùng
-     * {@code TickMetricsPort} thật.
+     * {@code TickMetricsPort} thật. {@code meterRegistry} dùng để gắn {@code TickMetricsPort} thật
+     * cho MỌI khu vực mở thêm sau ({@link #openChannel}) — xem javadoc lớp "Metrics".
      */
-    MainWorldChannelRegistry(ConnectedCharacterRegistry registry, WorldFacade firstChannelFacade) {
+    MainWorldChannelRegistry(
+            ConnectedCharacterRegistry registry, WorldFacade firstChannelFacade, MeterRegistry meterRegistry) {
         this.registry = registry;
+        this.meterRegistry = meterRegistry;
         channels.add(new Channel(firstChannelFacade, DEFAULT_CAPACITY));
     }
 
@@ -154,7 +171,7 @@ final class MainWorldChannelRegistry {
     }
 
     private Channel openChannel(int capacity) {
-        WorldFacade facade = new WorldFacade(registry, true, TickMetricsPort.NO_OP);
+        WorldFacade facade = new WorldFacade(registry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG));
         facade.start();
         Channel channel = new Channel(facade, capacity);
         channels.add(channel);
