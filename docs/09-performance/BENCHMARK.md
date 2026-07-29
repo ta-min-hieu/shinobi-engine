@@ -186,6 +186,70 @@ nữa: DB connection pool (10 connection) và hành vi throttle nhiệt của m�
 tục nhiều giờ đều CHƯA được đo ở quy mô lớn. Ngoại suy 10x vùng đã test (500→5000) chỉ nên dùng để
 **lên kế hoạch sơ bộ**, không phải căn cứ để tuyên bố "an toàn".
 
+---
+
+⚠️ **CẬP NHẬT 2026-07-29 — công thức trên (đo 2026-07-26) ĐÃ LỖI THỜI, giữ lại làm hồ sơ lịch sử,
+KHÔNG dùng để lên kế hoạch nữa.** Lý do lỗi thời rộng hơn những gì §5.2/§5.3/§5.8/§5.9 từng nêu (đã
+loại trừ sharding và tracing là nguyên nhân, xem 2 mục đó) — bản chất là công thức gốc đo TRƯỚC hàng
+loạt thay đổi kiến trúc+nội dung của Phase 9 (AoI 20Hz, spatial-grid, channel sharding,
+`WorldTickScheduler`, toàn bộ observability/tracing) VÀ trước rất nhiều nội dung gameplay (skill/
+inventory/quest/dungeon/PvP) được thêm từ Phase 4-8. **Đo lại từ đầu**, cùng máy/JDK, kịch bản xấu
+nhất giống hệt (tụ 1 điểm), nhưng với code+nội dung game HIỆN TẠI (commit `a93be8a`), N=100/500/1000
+đo bằng `./gradlew run` (cấu hình mặc định thật — không ép `-Xmx`, tracing bật, sharding bật —
+BENCHMARK.md §5.7 đã chứng minh KHÔNG được ép `-Xmx`), N=2000 tái dùng số đã đo cẩn thận ở §5.4
+(cửa sổ đo N=2000 lần này bị lệch do lấy mẫu trễ, không đáng tin, không dùng).
+
+**Đo RAM đổi phương pháp** — thay vì đọc WorkingSet (bị confound bởi heap tự phình, xem §5.4/§5.7),
+dùng `jcmd <pid> GC.run` ép full GC rồi `jcmd <pid> GC.heap_info` đọc ĐÚNG heap Java sống (không lẫn
+off-heap/native) — không cần ép `-Xmx` nên không gây regression pause như §5.7 phát hiện.
+
+**Công thức MỚI** (N = số người chơi đồng thời, đo 2026-07-29):
+
+```
+RAM sống (Java heap, sau GC.run) = ~110-144MB, GẦN NHƯ PHẲNG — KHÔNG tuyến tính theo N trong khoảng
+                                    100-2000 (xem bảng bên dưới) — thay đổi bản chất nhất so với công
+                                    thức cũ: dữ liệu ECS mỗi người chơi quá nhẹ (Component chỉ chứa
+                                    dữ liệu, ECS.md §3.1) để RAM sống trở thành hàm rõ rệt của N; chi
+                                    phí RAM THẬT (nếu có) nằm ở off-heap (Netty buffer/connection) —
+                                    CHƯA đo tách bạch phần này.
+CPU (lõi)                        = KHÔNG fit được 1 đường thẳng đáng tin — xem bảng, độ dốc giữa các
+                                    cặp điểm không đều (100→500: +0.0026/người; 500→1000: +0.0091/
+                                    người; 1000→2000 dùng lại số §5.4 KHÔNG cùng buổi đo, chỉ tham
+                                    khảo). KHÔNG đưa ra công thức tuyến tính mới để tránh lặp lại
+                                    đúng sai lầm "ngoại suy quá tự tin" mà công thức cũ mắc phải.
+```
+
+| N | RAM sống (Java heap) | CPU | Băng thông client (gửi/nhận) | Lỗi client |
+|---|---|---|---|---|
+| 100 | 144MB ✅ đo thật | 0.26 lõi ✅ đo thật | 9.5 / 47 KB/s ✅ đo thật | 0 |
+| 500 | 122MB ✅ đo thật | 1.57 lõi ✅ đo thật | 46 / 800 KB/s ✅ đo thật | 0 |
+| 1000 | 110MB ✅ đo thật | 6.12 lõi ✅ đo thật | 90 / 2870 KB/s ✅ đo thật | 0 |
+| 2000 | 144MB ✅ đo thật (§5.1 mới) | ~7.3 lõi ⚠️ số cũ §5.4, không cùng buổi đo | ~168 / ~11100 KB/s ✅ đo thật | 66 |
+
+⚠️ **"Băng thông client (gửi/nhận)"** là góc nhìn CLIENT (gửi = client→server, nhận = server→client)
+— NGƯỢC hướng với cột "Băng thông (ra/vào)" ở bảng công thức CŨ phía trên (đo từ góc nhìn SERVER: ra
+= server gửi = client nhận; vào = server nhận = client gửi). Đã đối chiếu kỹ trước khi so sánh —
+**"nhận" (client nhận, broadcast AoI) khớp khá tốt với ngoại suy công thức CŨ** (2870KB/s đo thật so
+với ~2800KB/s công thức cũ dự đoán cho N=1000 — dù công thức cũ CHƯA hề đo ở N=1000 thật, chỉ ngoại
+suy); nhưng **"gửi" (client gửi lên server) THẤP HƠN HẲN so với ngoại suy** (90KB/s đo thật so với
+~350KB/s dự đoán, ~N=1000) — hành vi client gửi ít dữ liệu hơn so với lúc công thức cũ được thiết kế,
+CHƯA điều tra nguyên nhân cụ thể (Điều 9 — ngoài phạm vi lần đo lại này).
+
+⚠️ **Phát hiện THẬT quan trọng nhất của lần đo lại này**: RAM sống KHÔNG tăng theo N như công thức cũ
+giả định (368+0.78×N) — **gần như phẳng 110-144MB xuyên suốt N=100→2000**. Việc "RAM tăng theo đầu
+người" trong công thức cũ nhiều khả năng đo WorkingSet (bị lẫn overhead cố định + đệm chưa dọn, cùng
+lỗi mà §5.4/§5.7 lần này phát hiện) chứ không phải heap sống thật tăng theo N. **CPU vẫn tăng theo N
+rõ rệt** (0.26→1.57→6.12 lõi, KHÔNG tuyến tính — độ dốc tăng dần, không giảm) — đây mới là trục cần
+capacity-planning thật, không phải RAM.
+
+**Việc CHƯA làm** (Điều 30): (1) chưa đo lại N=2000 trong CÙNG 1 buổi (số 7.3 lõi/144MB tái dùng từ
+§5.4/lần đo lỡ, không hoàn toàn cùng điều kiện dù cùng máy/code); (2) chưa tách bạch RAM off-heap
+(Netty buffer/connection) — có thể đây mới là trục RAM thật sự đáng lo, không phải Java heap; (3)
+chưa biết nguyên nhân "gửi" thấp hơn ngoại suy cũ; (4) độ dốc CPU không đều giữa các cặp điểm (N=100-500
+vs N=500-1000) nghĩa là CHƯA CÓ công thức ngoại suy an toàn cho N>2000 — **PHẢI đo thật trước khi trả
+lời "N người có an toàn không"**, đúng nguyên tắc §5.1 gốc đã nêu, giờ càng đúng hơn vì đã biết quan
+hệ không tuyến tính rõ ràng hơn.
+
 ### 5.2 AoI spatial-grid sharding (Phase 9, 2026-07-28)
 
 ⏳ **Đo thật, lát cắt tiếp theo sau lát cắt 20Hz** (commit `2198e76` + thay đổi CHƯA commit trong
