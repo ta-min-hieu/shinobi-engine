@@ -295,6 +295,19 @@ nhiêu % là Netty buffer thật so với native allocation khác (HikariCP driv
 runtime nếu có script chạy) — cần NMT `detail` level (`-XX:NativeMemoryTracking=detail`, tốn overhead
 hơn `summary`) nếu cần độ chính xác cao hơn.
 
+⚠️ **Thử thêm điểm N=2000 (cùng ngày, cùng buổi) — KẾT QUẢ KHÔNG DÙNG ĐƯỢC, ghi lại lý do thay vì
+xoá bỏ (Điều 30, minh bạch cả lần đo hỏng).** Chạy tiếp N=1000 rồi N=2000 trên CÙNG process (không
+restart, giữ 1 baseline) để có 3 điểm N=0/1000/2000 nhất quán. N=1000 tái xác nhận tốt (GC +215MB,
+Other +256MB — khớp lần đo trước, đáng tin). N=2000 bị hỏng vì TIMING: burst-connect tức thời
+(`initialClients=maxClients`, không ramp) khiến `client=2000` (mục tiêu đã spawn) và load test kết
+thúc NHANH HƠN dự kiến trong lúc đang chờ ổn định — lúc chụp `jcmd` thì `kage_players_online` đã về
+0 (client đã ngắt hết). Số đọc được ("Other" 262842KB≈256.7MB, HẦU NHƯ KHÔNG đổi so với N=1000) do đó
+KHÔNG đại diện cho N=2000 thật — `kage_players_online` đo được cao nhất trong lúc test là **1353**
+(không phải 2000, do lỗi connect + đo không đúng đỉnh tải), gần hơn nhiều với N=1000's 901 người thật
+so với con số N danh nghĩa 2000. **Không kết luận gì về tuyến tính từ lần đo này** — dừng thử lại
+(Điều 9, đã đủ bằng chứng "off-heap tồn tại và đáng kể" ở N=0/1000, việc xác nhận tuyến tính chính
+xác cần lát cắt riêng có đo `kage_players_online` liên tục để bắt đúng đỉnh tải, chưa làm ở đây).
+
 ### 5.2 AoI spatial-grid sharding (Phase 9, 2026-07-28)
 
 ⏳ **Đo thật, lát cắt tiếp theo sau lát cắt 20Hz** (commit `2198e76` + thay đổi CHƯA commit trong
