@@ -448,6 +448,39 @@ giống cách `totalPlayers()` đã làm — không đi qua `TickMetricsPort`).
 CPU ở §5.4 KHÔNG đổi (lỗ hổng đã vá là lỗ hổng QUAN SÁT, không phải lỗ hổng HIỆU NĂNG — không có bằng
 chứng mới nào về RAM/CPU/tick timing thật ở N=1000/2000 từ lát cắt này).
 
+### 5.6 `SO_BACKLOG` — sửa phát hiện phụ ở §5.4 (2026-07-29, cùng ngày)
+
+✅ **Đo thật, sửa follow-up "Netty SOMAXCONN=200" nêu ở §5.4** — đọc lại code
+(`GatewayServer.start()`) phát hiện diễn giải ở §5.4 CHƯA ĐÚNG NGUYÊN NHÂN: dòng log Netty
+`"Failed to get SOMAXCONN ... Default: 200"` chỉ là Netty tự dò backlog mặc định của HĐH lúc KHÔNG
+set `SO_BACKLOG` tường minh — code này LUÔN set tường minh (`ChannelOption.SO_BACKLOG`), nên giá trị
+áp dụng THẬT là con số hardcode cũ **128** (thấp hơn cả "200" bị nghi oan), không phải OS default.
+Sửa: nâng lên **1024** (khởi điểm hợp lý hơn dựa trên bằng chứng lỗi thật ở §5.4, cùng tinh thần
+HikariCP 10→20 — chưa test tới điểm gãy mới, sẽ tinh chỉnh tiếp nếu cần), đặt tên hằng số
+`SO_BACKLOG` (trước là magic number trần, /CLAUDE.md §11 cấm). Giữ nguyên cảnh báo: giá trị THẬT áp
+dụng lúc production còn bị OS clamp thêm (Linux `net.core.somaxconn` lúc deploy, DOCKER.md — ngoài
+phạm vi code Java) — set cao ở code là điều kiện CẦN, không ĐỦ.
+
+**Verify — load-test lại ĐÚNG kịch bản gây lỗi ở §5.4** (burst connect tức thời
+`initialClients=maxClients`, cùng máy/JDK, DB xoá sạch trước mỗi N):
+
+| N | Lỗi client TRƯỚC (§5.4, backlog=128) | Lỗi client SAU (backlog=1024) |
+|---|---|---|
+| 1000 | 149 (lần 1) / 0 (lần 2 — không tất định) | **89** |
+| 2000 | 856 | **95** |
+
+N=2000 cải thiện rõ rệt (~9× ít lỗi hơn). N=1000 nằm trong khoảng nhiễu đã ghi nhận ở §5.4 (0-149,
+không tất định theo đúng bản chất race OS xử lý backlog) — không đủ để nói "chắc chắn tốt hơn" riêng
+lẻ, nhưng N=2000 (mẫu lớn hơn, chênh lệch lớn hơn nhiều so với nhiễu quan sát được) đủ thuyết phục.
+⚠️ Tick p99 lúc N=2000 lần này cao hơn §5.4 (0.02-2.75ms so với 0.06-0.72ms) — **không phải
+regression**: vì ÍT bị từ chối kết nối hơn (95 lỗi so với 856), nhiều client hơn THẬT SỰ vào world
+tạo tải thật (auto-open nhiều khu vực hơn, mỗi khu xử lý combat/AoI thật) — số liệu p99 lần này
+ĐẠI DIỆN đúng hơn cho tải thật ở N=2000, vẫn trong ngân sách 16.6ms.
+
+**Kết luận**: giảm lỗi client thật khi burst-connect ở N lớn — chưa test tới điểm gãy mới của
+backlog=1024 (Điều 30: chưa biết N nào làm 1024 không đủ nữa), chỉ xác nhận cải thiện so với 128 ở
+đúng 2 điểm N=1000/2000 đã có baseline.
+
 ---
 
 ## 6. Khi nào chạy

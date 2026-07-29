@@ -33,6 +33,18 @@ public final class GatewayServer {
     private static final int MAX_FRAME_LENGTH = 1024 * 1024;
     private static final int LENGTH_FIELD_LENGTH = 4;
 
+    // Số kết nối TCP chờ accept() tối đa (hàng đợi SYN đã hoàn tất handshake, chưa được boss thread
+    // nhận). PHÁT HIỆN THẬT (BENCHMARK.md §5.4, 2026-07-29): giá trị cũ 128 chính là nguyên nhân
+    // 149-856 lỗi client "Connection refused" khi load-test burst-connect tức thời N=1000/2000 —
+    // KHÔNG phải do OS default (dòng log Netty "Failed to get SOMAXCONN ... Default: 200" chỉ là
+    // Netty tự dò backlog mặc định của HĐH khi KHÔNG set SO_BACKLOG tường minh; code này LUÔN set
+    // tường minh nên giá trị áp dụng thật là 128, không phải 200). 1024 là khởi điểm hợp lý hơn hẳn
+    // (thấy rõ ràng ở BENCHMARK.md §5.4, chưa test tới điểm gãy mới) — CÙNG tinh thần HikariCP
+    // 10→20 (Điều 30: đo trước, tinh chỉnh sau bằng số liệu thật, không đoán số cuối cùng ngay).
+    // ⚠️ Giá trị THẬT sự áp dụng còn bị OS clamp thêm (Linux: net.core.somaxconn lúc deploy thật,
+    // DOCKER.md — ngoài phạm vi code Java này) — set cao ở đây là điều kiện CẦN, không phải ĐỦ.
+    private static final int SO_BACKLOG = 1024;
+
     // Chờ auth đang xử lý dở xong trước khi đóng DB lúc shutdown (SERVER.md §10 bước 3-4).
     private static final int AUTH_SHUTDOWN_TIMEOUT_SECONDS = 10;
 
@@ -73,7 +85,7 @@ public final class GatewayServer {
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.group(bossGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
-                .option(ChannelOption.SO_BACKLOG, 128)
+                .option(ChannelOption.SO_BACKLOG, SO_BACKLOG)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) {
