@@ -567,6 +567,37 @@ chứng đủ tách bạch để biết con số mới nên là bao nhiêu), ch�
 nghĩa rộng hơn những gì §5.2/§5.3 từng nêu (không chỉ vì sharding), cần đo lại từ đầu (2 điểm N mới,
 đúng nội dung/observability hiện tại) nếu cần con số capacity-planning đáng tin cho production.
 
+### 5.9 Tracing/OTLP có tốn CPU thừa không? (2026-07-29, cùng ngày) — kiểm chứng ứng viên còn lại ở §5.8
+
+⚠️ **Đo thật, BÁC BỎ nốt ứng viên đầu tiên nêu ở §5.8** — nghi ngờ: `GatewayTracing` liên tục thử
+xuất span qua OTLP tới `localhost:4318` (Jaeger) và THẤT BẠI mỗi vài giây khi không chạy Jaeger lúc
+đo (thấy trong log §5.4/§5.8), có thể là nguồn CPU thừa (dựng exception + stack trace mỗi lần thất
+bại). Kiểm chứng: sửa TẠM `GatewayBootstrap.wireFacades`-lân cận (`new GatewayTracing()` →
+`GatewayTracing.disabled()`, dùng đúng `Sampler.alwaysOff()` sẵn có cho test — không tạo network
+call OTLP nào), build lại, đo N=1000 (cùng máy/JDK/flags/kịch bản §5.8), rồi **revert ngay** (`git
+diff` sạch sau khi đo).
+
+**Kết quả — N=1000, tracing TẮT hẳn (0 lần log thấy `4318`/OTLP, xác nhận đã tắt thật):**
+
+| Metric | Tracing BẬT (§5.4, mặc định) | Tracing TẮT (thử nghiệm này) |
+|---|---|---|
+| CPU trung bình | ~6.2 lõi | **~6.5 lõi** |
+| Tick p99 | 0.06–0.72ms | 0.79ms |
+| Lỗi client | 0-149 | 93 |
+
+**Không có khác biệt có ý nghĩa** — 6.5 lõi tắt tracing so với 6.2 lõi bật tracing nằm trong biên độ
+nhiễu đo được xuyên suốt cả chuỗi lát cắt này (Điều 30 §9: "cải thiện <10% và trong nhiễu = không
+cải thiện" — áp dụng ngược lại ở đây: KHÔNG có sự khác biệt đáng kể để nói tracing tốn CPU). Loại
+trừ tracing/OTLP khỏi danh sách nghi phạm.
+
+**Kết luận toàn chuỗi §5.4-5.9**: đã kiểm chứng và loại trừ CẢ 2 giả thuyết cụ thể có thể kiểm tra
+được (sharding §5.8, tracing §5.9) cho khoảng cách CPU-so-với-công-thức-§5.1. Ứng viên còn lại
+("nội dung gameplay tăng từ Phase 4") khó kiểm chứng bằng cách bật/tắt 1 flag như 2 lần trên — đòi
+hỏi so sánh 2 checkout code khác nhau (Phase 4 vs hiện tại) hoặc đo lại công thức §5.1 từ đầu trực
+tiếp, không phải việc "tắt 1 công tắc". Dừng điều tra thêm ở đây (Điều 9 — không đào sâu vô hạn 1
+câu hỏi phụ); nếu cần công thức capacity-planning đáng tin, hướng đi rõ ràng nhất là đo lại từ đầu
+(gợi ý đã ghi ở kết luận §5.8), không phải tiếp tục loại trừ từng giả thuyết nhỏ.
+
 ---
 
 ## 6. Khi nào chạy
