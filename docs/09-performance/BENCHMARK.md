@@ -481,6 +481,47 @@ tạo tải thật (auto-open nhiều khu vực hơn, mỗi khu xử lý combat/
 backlog=1024 (Điều 30: chưa biết N nào làm 1024 không đủ nữa), chỉ xác nhận cải thiện so với 128 ở
 đúng 2 điểm N=1000/2000 đã có baseline.
 
+### 5.7 Đo lại RAM "sạch" — follow-up bắt buộc từ §5.4 (2026-07-29, cùng ngày)
+
+⚠️ **Đo thật, nhưng KẾT QUẢ NGƯỢC KỲ VỌNG** — §5.4 nói RAM 7.7GB là "rác chưa dọn" và yêu cầu đo lại
+với `-Xmx` production-like + `leakDetection=simple` để có số "sạch". Lần này chạy gateway TRỰC TIẾP
+bằng `java` (không qua `./gradlew run`, tránh `-Dio.netty.leakDetection.level=paranoid` bị cứng
+trong `applicationDefaultJvmArgs` — build.gradle.kts) với `-Xmx2g -Xms2g -XX:+UseZGC
+-XX:+ExitOnOutOfMemoryError`, không set `leakDetection` (mặc định Netty = `simple`). Máy/JDK/kịch
+bản giống hệt §5.4 (DB xoá sạch trước mỗi N, `docker compose down -v`).
+
+**Kết quả — WorkingSet giờ đúng là "sạch"/bị chặn trần như mong đợi:**
+
+| N | `-Xmx` | WorkingSet ổn định | GC pause lớn nhất | Lỗi client | packetLatency p99 |
+|---|---|---|---|---|---|
+| 1000 | 2g | ~2.4GB | 0.166s | 192 | (bình thường) |
+| 2000 | 2g | ~2.5GB | **2.811s** | 268 | **8460ms** |
+| 2000 | 4g | ~4.6GB | **1.240s** | 261 | **7298ms** |
+
+⚠️ **Đây KHÔNG phải "đã sạch, đóng việc"** — ép heap nhỏ lại (2GB, rồi 4GB) tại N=2000 gây GC pause
+tới **hàng giây** (một số cycle "Young Generation" còn cho thấy usage TĂNG thay vì giảm giữa lúc đo,
+vd. `748M(37%)->882M(43%) 2.811s` — dấu hiệu allocation-pressure thật, không phải nhiễu đo) và
+packet latency phía client tăng vọt lên **7-8 GIÂY** — tệ hơn HẲN so với heap KHÔNG giới hạn ở §5.4
+(pause <0.06ms, packet latency bình thường, dù lúc đó có confound khác là SO_BACKLOG=128 gây nhiều
+lỗi connect hơn — nhưng pause time đo trực tiếp từ `gc.log` không liên quan gì tới backlog, so sánh
+này vẫn hợp lệ). Ngay cả 4GB (gấp đôi 2GB) vẫn CHƯA đủ để tránh pause giây — chưa biết ngưỡng heap
+nào mới đủ ở N=2000 tụ 1 điểm.
+
+**Diễn giải trung thực**: mục tiêu ban đầu ("số RAM sạch để cập nhật công thức §5.1") đã đạt được
+đúng nghĩa đen — WorkingSet giờ phản ánh committed thật thay vì trần tự chọn — nhưng phát hiện QUAN
+TRỌNG HƠN nhiều: **ép `-Xmx` nhỏ để "đo sạch" tự nó tạo ra regression hiệu năng thật dưới tải đỉnh**,
+đúng cơ chế ZGC cần khoảng trống heap rộng rãi để tránh pha "dọn dưới áp lực" (JVM.md §2 "ZGC pause
+gần như bằng 0 bất kể heap lớn cỡ nào" — ngầm định heap ĐỦ RỘNG, không phải bất kỳ kích thước nào).
+Xác nhận lại đúng khuyến nghị SẴN CÓ ở JVM.md §3 ("Không dùng `-Xmx` cố định trong container") —
+KHÔNG đề xuất đổi cấu hình hiện tại (không set `-Xmx`, để JVM tự chọn) dựa trên số đo này; ngược
+lại, số đo này là bằng chứng THẬT ủng hộ giữ nguyên cách làm cũ, không phải lý do để đổi.
+
+**Việc CHƯA làm** (Điều 30 — không suy rộng quá số liệu đang có): chưa tìm được heap cap nào (nếu
+có) đủ lớn để vừa bounded vừa không gây pause giây ở N=2000 — có thể cần ≥6-8GB (gần bằng đúng mức
+JVM tự chọn ở §5.4) hoặc có thể vấn đề không nằm ở kích thước heap mà ở tốc độ SINH rác lúc burst
+connect (churn protobuf/Netty buffer khi 2000 kết nối cùng lúc) — chưa tách bạch được nguyên nhân,
+cần lát cắt riêng nếu muốn heap cap nhỏ mà vẫn an toàn.
+
 ---
 
 ## 6. Khi nào chạy
