@@ -242,13 +242,58 @@ lỗi mà §5.4/§5.7 lần này phát hiện) chứ không phải heap sống t
 rõ rệt** (0.26→1.57→6.12 lõi, KHÔNG tuyến tính — độ dốc tăng dần, không giảm) — đây mới là trục cần
 capacity-planning thật, không phải RAM.
 
-**Việc CHƯA làm** (Điều 30): (1) chưa đo lại N=2000 trong CÙNG 1 buổi (số 7.3 lõi/144MB tái dùng từ
-§5.4/lần đo lỡ, không hoàn toàn cùng điều kiện dù cùng máy/code); (2) chưa tách bạch RAM off-heap
-(Netty buffer/connection) — có thể đây mới là trục RAM thật sự đáng lo, không phải Java heap; (3)
-chưa biết nguyên nhân "gửi" thấp hơn ngoại suy cũ; (4) độ dốc CPU không đều giữa các cặp điểm (N=100-500
-vs N=500-1000) nghĩa là CHƯA CÓ công thức ngoại suy an toàn cho N>2000 — **PHẢI đo thật trước khi trả
+**Việc CHƯA làm lúc viết đoạn trên** (Điều 30): (1) chưa đo lại N=2000 trong CÙNG 1 buổi (số 7.3
+lõi/144MB tái dùng từ §5.4/lần đo lỡ, không hoàn toàn cùng điều kiện dù cùng máy/code); (2) ~~chưa
+tách bạch RAM off-heap (Netty buffer/connection)~~ **✅ ĐÃ ĐO — xem ngay bên dưới**; (3) chưa biết
+nguyên nhân "gửi" thấp hơn ngoại suy cũ; (4) độ dốc CPU không đều giữa các cặp điểm (N=100-500 vs
+N=500-1000) nghĩa là CHƯA CÓ công thức ngoại suy an toàn cho N>2000 — **PHẢI đo thật trước khi trả
 lời "N người có an toàn không"**, đúng nguyên tắc §5.1 gốc đã nêu, giờ càng đúng hơn vì đã biết quan
 hệ không tuyến tính rõ ràng hơn.
+
+⚠️ **RAM off-heap (2026-07-29, cùng ngày, cùng buổi tiếp theo) — trục RAM thật sự tăng theo N, KHÔNG
+phải Java heap.** Đo bằng Native Memory Tracking (`-XX:NativeMemoryTracking=summary` +
+`jcmd <pid> VM.native_memory summary`) — bật cờ này CHỈ để đo, không thêm vào cấu hình chạy thật
+(overhead NMT nhỏ nhưng không cần bật thường trực). So sánh 2 lần chụp CÙNG 1 process (không restart
+giữa 2 lần, tránh lẫn baseline khác nhau): baseline N=0 (vừa khởi động xong) → N=1000 (819-1000 người
+online, giữ tải ~40s).
+
+| Danh mục NMT | N=0 (baseline) | N≈1000 | Chênh lệch |
+|---|---|---|---|
+| Java Heap (committed, CHƯA ép GC — không dùng số này, xem công thức RAM ở trên) | 508MB | 6952MB | +6444MB |
+| **GC** (cấu trúc nội bộ ZGC — forwarding table, remembered set) | 10MB | 227MB | **+217MB** |
+| **Other** (chủ yếu `DirectByteBuffer` — nghi là buffer Netty pooled direct arena) | 0.3MB | 257MB | **+256MB** |
+| Thread (stack, 94→210 thread) | 4.6MB | 15.4MB | +10.8MB |
+| Code (JIT compiled) | 19.8MB | 36.6MB | +16.8MB |
+| Metaspace + Symbol + còn lại | ~54MB | ~72MB | +18MB |
+| **Tổng non-heap** | ~89MB | ~618MB | **~+529MB** |
+
+**Phát hiện thật**: "GC" + "Other" cộng lại **+473MB** cho ~819-1000 kết nối (~500-650KB/kết nối) —
+đây là chi phí RAM THẬT tăng theo N mà cả công thức cũ (đo WorkingSet, lẫn cả heap tự phình) LẪN
+công thức mới ở trên (chỉ đo Java heap sống qua `GC.heap_info`) đều **BỎ SÓT HOÀN TOÀN**. "Other" tăng
+gần tuyến tính theo số kết nối khớp đúng bản chất Netty pooled direct `ByteBuf` (1 allocator arena
+per-thread, buffer đọc/ghi cấp theo kết nối) — dù NMT không gắn nhãn "Netty" trực tiếp (Netty PHẦN
+LỚN cấp phát qua `sun.misc.Unsafe`, không phải lúc nào cũng đi qua đường JVM track được 100% chính
+xác, nên +256MB là ước tính CẬN DƯỚI hợp lý, không phải con số tuyệt đối). "GC" tăng theo kích thước
+heap đang hoạt động (bảng ZGC forwarding/remembered-set tỉ lệ thuận vùng heap live+churn), không trực
+tiếp theo N nhưng gián tiếp qua việc N lớn hơn → nhiều packet hơn → nhiều rác hơn → ZGC cần cấu trúc
+theo dõi lớn hơn.
+
+**Công thức RAM ĐẦY ĐỦ hơn** (cộng heap sống + off-heap, dùng N=1000 làm điểm neo — CHƯA đủ điểm đo
+để fit công thức tuyến tính đáng tin, chỉ trình bày phép cộng để không ai quên phần off-heap):
+
+```
+RAM thật cần cấp phát ≈ RAM sống Java heap (gần phẳng, ~110-144MB) + off-heap tăng theo N
+                          (~500-650KB/kết nối, CHỈ 2 điểm đo N=0/N=1000, CHƯA đủ để tin số per-
+                          connection này chính xác — cần thêm ít nhất 1 điểm N khác, vd N=2000, để
+                          xác nhận có thật sự tuyến tính hay không)
+```
+
+**Việc CHƯA làm** (Điều 30): chỉ có 2 điểm đo (N=0, N=1000) — chưa đủ để khẳng định quan hệ tuyến
+tính giữa off-heap và N, chỉ đủ để khẳng định off-heap TỒN TẠI và ĐÁNG KỂ (nửa GB cho 1000 kết nối,
+không phải số có thể bỏ qua khi lên kế hoạch hạ tầng); "Other" chưa tách bạch được chính xác bao
+nhiêu % là Netty buffer thật so với native allocation khác (HikariCP driver, Redis client, GraalJS
+runtime nếu có script chạy) — cần NMT `detail` level (`-XX:NativeMemoryTracking=detail`, tốn overhead
+hơn `summary`) nếu cần độ chính xác cao hơn.
 
 ### 5.2 AoI spatial-grid sharding (Phase 9, 2026-07-28)
 
