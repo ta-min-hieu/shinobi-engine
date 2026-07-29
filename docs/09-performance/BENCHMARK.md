@@ -308,6 +308,109 @@ phải chứa quá đông người để cách tính đó có ý nghĩa.
 3. `SPECIAL_CAPACITY=50` chưa có nơi nào trong game gán/dùng (chưa có khái niệm "map đặc biệt") —
    hook đã sẵn, chờ nội dung game thật cần tới.
 
+### 5.4 Shared tick-pool — `WorldTickScheduler` (commit `94befe0`, 2026-07-29)
+
+✅ **Đo thật, verify follow-up nêu ở đầu §5.3** — §5.2/5.3 phát hiện số kênh (`MainWorldChannelRegistry`,
+capacity 20/kênh, tự mở ở 80%) tỉ lệ thẳng với N, mỗi kênh trước đây tự spawn 1 `Thread` OS riêng
+(N=1000 ⇒ ~50-63 kênh ⇒ ~50-63 thread). `WorldTickScheduler` thay bằng 1
+`ScheduledExecutorService` dùng chung, kích thước cố định = `Runtime.availableProcessors()` (xem
+plan gốc). Mục tiêu đo: xác nhận trần thread THẬT (không chỉ suy luận kiến trúc).
+
+**Máy đo**: cùng máy §5.1-5.3 (Intel i9-14900HX, 24 lõi thật/32 luồng logic, 32GB RAM, Windows). JDK
+`loom-ea-25-loom+1-11`. Chạy qua `./gradlew :server:server-gateway:run` (dev command, giống các lần
+đo trước) — flags thật đang bật: `-XX:+UseZGC` (qua `JAVA_TOOL_OPTIONS`) +
+`-Dio.netty.leakDetection.level=paranoid` (mặc định dev của `applicationDefaultJvmArgs`, KHÔNG phải
+flag production JVM.md §3) + **KHÔNG có `-Xmx`** (JVM tự chọn heap tối đa theo RAM máy — ảnh hưởng
+số RAM đo được, xem diễn giải bên dưới). Postgres/Redis thật qua Docker (chỉ 2 service này, không
+kèm observability stack). DB Postgres mới tinh (volume mới tạo) trước lần đo.
+
+⚠️ **`.gradlew build -x pmdMain -x pmdTest -x pmdJmh`**: `server-world:test`+`server-gateway:test`
+đều UP-TO-DATE (xanh, khớp code đã commit) trước khi chạy — bước 1 của Verification trong plan coi
+như xác nhận lại, không chạy lại từ đầu vì input không đổi từ lần chạy trước.
+
+**Xác nhận trần thread (bước 2 + 3 của Verification) — `jstack` thật lúc đang tải**:
+
+| N | Số kênh ước tính (N/(20×0.8)) | Thread `world-tick-pool` đếm được (`jstack`) |
+|---|---|---|
+| 1000 | ~50-63 | **32** |
+| 2000 | ~100-125 | **32** |
+
+`jstack` đếm CHÍNH XÁC 32 thread tên `world-tick-pool` ở CẢ 2 lần đo — đúng bằng
+`availableProcessors()` của máy (32 luồng logic), KHÔNG tăng theo N dù số kênh tăng gấp đôi. Đây là
+bằng chứng trực tiếp (không phải suy luận) rằng trần thread đã bị chặn đúng như thiết kế — so với
+kiến trúc cũ (1 thread OS/kênh) thì N=2000 lẽ ra đã cần ~100-125 thread độc lập.
+
+**Tick p99 (scrape `/metrics`, LƯU Ý quan trọng bên dưới) — cùng kịch bản xấu nhất §5.2/5.3 (tụ 1
+điểm), giữ tải ~80-90s:**
+
+| N | Tick p99 ổn định (channel "main") | Lỗi client |
+|---|---|---|
+| 1000 | 0.06–0.72ms (2 lần đo lặp lại, 1 lần có đỉnh khởi động 950ms) | 0 (lần 2) / 149 (lần 1) |
+| 2000 | 0.06–0.72ms | 856 |
+
+⚠️ **Caveat PHẢI đọc trước khi so `p99` này với §5.3**: `MicrometerTickMetricsPort` thật (nguồn của
+số `/metrics` bên trên) **CHỈ gắn vào kênh #1** (tag `"main"`) — mọi kênh mở thêm sau (kênh #2, #3...
+tới ~50-125 kênh ở N lớn) dùng `TickMetricsPort.NO_OP` (xem javadoc `GatewayBootstrap.startWorld` +
+`MainWorldChannelRegistry`). Nghĩa là **con số p99 bên trên chỉ phản ánh 1 kênh trong số ~50-125
+kênh đang chạy**, KHÔNG phải toàn hệ thống — khác với số p99 ở §5.3 (đo TRƯỚC khi channel sharding
+tồn tại, lúc đó chỉ có 1 World nên p99 = toàn hệ thống thật). **Không kết luận "nhanh hơn §5.3"** từ
+bảng này — đó là so sánh sai đối tượng đo (1 kênh nay vs toàn hệ thống trước).
+
+**Tín hiệu CHÉO kênh duy nhất có được** (log `WARN "World tick quá hạn"`, bắn ra ở MỌI kênh kể cả
+NO_OP — xem `WorldFacade.tickTask()`): **31 lần overrun** (tick > 16.6ms) trong suốt ~5 phút tải
+thật (2 lần N=1000 + 1 lần N=2000, tổng hàng triệu lượt tick trên ~50-125 World cộng lại) — lớn nhất
+đo được **95ms** (~5.7× ngân sách), phần lớn 22–57ms, đều xảy ra đúng lúc burst connect (ramp tức
+thời `initialClients=maxClients`, không ramp dần). Tỉ lệ overrun cực nhỏ (~0.002% số lượt tick ước
+tính) và không kèm crash — nhưng đây là bằng chứng gián tiếp DUY NHẤT về hiệu năng của các kênh
+NO_OP; **chưa có số liệu p99 thật cho toàn bộ ~50-125 kênh** (lỗ hổng quan sát có từ §5.3, chưa phải
+lát cắt này giải quyết — theo dõi thêm nếu cần độ tin cậy cao hơn).
+
+**RAM/CPU đo qua Windows (`Get-Process`, lấy mẫu 5s/lần suốt thời gian giữ tải) — LẦN ĐẦU đo bằng
+công cụ OS-level thay vì suy luận (khoảng trống §5.1 nêu rõ chưa từng làm việc này):**
+
+| N | RAM (WorkingSet, đỉnh) | CPU trung bình (đo qua CPU-time delta) | Thread process tổng |
+|---|---|---|---|
+| 1000 | ~7.7GB | ~6.2 lõi (cửa sổ 80s hoạt động) | ~209-217 |
+| 2000 | ~7.7GB | ~7.3 lõi (cửa sổ 80s hoạt động) | ~209-217 |
+
+⚠️ **RAM 7.7GB KHÔNG phải "chi phí thật/N" — đây là confound của cách chạy test, PHẢI sửa trước khi
+dùng số này** (Điều 30, không được dùng để cập nhật công thức §5.1): (1) **không đặt `-Xmx`** ⇒ JVM
+tự chọn heap tối đa lớn (mặc định ~25% RAM máy = ~8GB trên máy 32GB) ⇒ ZGC chỉ dọn rác khi gần đầy,
+không phải khi cần; (2) `-Dio.netty.leakDetection.level=paranoid` là cấu hình DEV
+(`applicationDefaultJvmArgs`), tốn bộ nhớ theo dõi hơn nhiều so với `simple` ở production (JVM.md
+§3). Bằng chứng RAM 7.7GB là RÁC CHƯA DỌN chứ không phải dữ liệu sống thật: đọc trực tiếp
+`gateway-gc.log` (ZGC) bắt được **1 lần GC thật ở N=2000: "Young Generation 6878M(85%)->220M(3%)"**
+— nghĩa là ngay trước khi GC chạy, heap đã đầy 6.9GB RÁC, nhưng dữ liệu SỐNG THẬT sau khi dọn chỉ
+còn **220MB** (thấp hơn NHIỀU so với công thức ngoại suy §5.1 cho N=2000, ~2.9GB) — không leak (log
+kết thúc bằng `"Uncommitted: 76M(1%)"` sau khi client ngắt kết nối, heap trả gần hết về hệ điều
+hành). **Follow-up bắt buộc trước khi coi RAM đã đo xong**: chạy lại với `-Xmx` production-like +
+`leakDetection=simple` để có số RAM committed/uptime thực tế thay vì "đầy tới ngưỡng GC tự chọn".
+
+CPU trung bình (~6.2-7.3 lõi) đo được **cao hơn** công thức ngoại suy §5.1
+(`0.02 + 0.00275×N` ⇒ 2.77 lõi @1000, 5.52 lõi @2000) — khoảng cách thu hẹp dần khi N tăng (2.2× ở
+N=1000 → 1.3× ở N=2000). **Không kết luận nguyên nhân chắc chắn** (nhiều thay đổi kiến trúc xảy ra
+CÙNG LÚC giữa lần đo công thức gốc và lần đo này — channel sharding lẫn thread-pool đều mới, công
+thức gốc đo TRƯỚC khi sharding tồn tại nên không tính chi phí per-channel bookkeeping của ~50-125
+World song song, ví dụ mỗi kênh có `AreaOfInterestTracker`/training-dummy/NPC riêng) — chỉ ghi nhận
+số đo thật, KHÔNG cập nhật công thức §5.1 tới khi có phép đo tách bạch riêng chi phí sharding khỏi
+chi phí thread-pool.
+
+**Phát hiện phụ ngoài phạm vi lát cắt này** (đáng ghi lại, không phải bug của
+`WorldTickScheduler`): burst connect tức thời (`initialClients=maxClients`, không ramp dần) gây
+**149 lỗi `Connection refused` ở N=1000 (lần đo 1), 856 lỗi ở N=2000** — khớp với dòng log Netty lúc
+khởi động `"Failed to get SOMAXCONN ... Default: 200"` (hàng đợi backlog kernel mặc định chỉ 200 kết
+nối chờ accept). Lần đo N=1000 thứ 2 (cùng tham số) ra **0 lỗi** — không tất định, phụ thuộc thời
+điểm OS xử lý backlog. Chưa sửa (ngoài phạm vi plan này); follow-up: tăng backlog Netty
+(`ServerBootstrap.option(ChannelOption.SO_BACKLOG, ...)`) nếu kịch bản burst-connect thật (world
+boss, mở server) là kịch bản cần tối ưu.
+
+**Kết luận** (đúng phạm vi plan gốc, KHÔNG suy rộng): mục tiêu duy nhất của
+`WorldTickScheduler` — chặn trần thread OS ở `POOL_SIZE` bất kể N — **xác nhận ĐÚNG bằng số đo thật**
+(32 thread cố định ở cả N=1000 và N=2000, jstack). Tick p99 kênh "main" và tần suất overrun cross-kênh
+đều không cho thấy regression. RAM/CPU đo được có giá trị tham khảo nhưng **CHƯA đủ sạch** (confound
+`-Xmx`/leak-detection cho RAM, thiếu tách bạch sharding-vs-pool cho CPU) để thay thế công thức §5.1 —
+đây là việc CHƯA xong, không phải đã xong.
+
 ---
 
 ## 6. Khi nào chạy

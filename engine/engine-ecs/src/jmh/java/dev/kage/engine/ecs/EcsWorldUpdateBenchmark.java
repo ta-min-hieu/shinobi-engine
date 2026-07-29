@@ -61,7 +61,7 @@ public class EcsWorldUpdateBenchmark {
             VelocityComponent velocity = new VelocityComponent();
             velocity.x = 1f;
             velocity.y = -1f;
-            KEntity entity = ecsWorld.createEntity().add(position).add(velocity);
+            ecsWorld.createEntity().add(position).add(velocity);
             if (i == 0) {
                 sampleEntityPosition = position;
             }
