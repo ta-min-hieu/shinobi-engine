@@ -522,6 +522,51 @@ JVM tự chọn ở §5.4) hoặc có thể vấn đề không nằm ở kích t
 connect (churn protobuf/Netty buffer khi 2000 kết nối cùng lúc) — chưa tách bạch được nguyên nhân,
 cần lát cắt riêng nếu muốn heap cap nhỏ mà vẫn an toàn.
 
+### 5.8 Tách bạch CPU: sharding hay thread-pool? (2026-07-29, cùng ngày) — follow-up cuối của §5.4
+
+⚠️ **Đo thật, BÁC BỎ giả thuyết nêu ở §5.4** — §5.4 đoán chi phí CPU cao hơn công thức §5.1
+(~6.2-7.3 lõi đo được so với 2.77-5.52 lõi dự đoán) có thể do "chi phí bookkeeping riêng của mỗi
+kênh (`AreaOfInterestTracker`/training-dummy/NPC) khi sharding tạo ra ~50-125 World song song".
+Kiểm chứng: sửa TẠM `MainWorldChannelRegistry.DEFAULT_CAPACITY` 20→2500 (ép CHỈ 1 kênh duy nhất dù
+N=1000 — tắt hẳn sharding, không commit, revert ngay sau khi đo — `git diff` sạch), build lại, chạy
+N=1000 với cùng máy/JDK/flags như §5.4 (`./gradlew run`, `-XX:+UseZGC`, DB xoá sạch).
+
+**Kết quả — N=1000, KHÔNG sharding (1 World duy nhất):**
+
+| Metric | Có sharding (§5.4, mặc định 20/kênh) | KHÔNG sharding (thử nghiệm này) |
+|---|---|---|
+| CPU trung bình | ~6.2 lõi | **~8.18 lõi** |
+| Tick p99 | 0.06–0.72ms | **48.23–60.82ms** (vượt ngân sách ~3-4×) |
+| Lỗi client | 0-149 (SO_BACKLOG, không liên quan) | 96 |
+
+**Sharding RẺ HƠN CPU, không đắt hơn** — ngược hẳn giả thuyết ở §5.4. Kết quả này khớp với chính lý
+do sharding được tạo ra ở §5.2/5.3: 1 World lớn phải tính AoI cho toàn bộ 1000 người tụ 1 điểm (gần
+O(n²) dù đã có spatial-grid — mọi người vẫn rơi vào CÙNG vài ô lưới), tốn CPU nhiều hơn hẳn so với
+chia nhỏ thành ~50 World độc lập mỗi World chỉ tính AoI cho ~20 người. **Không chạy lại N=2000
+không-sharding** — §5.2 đã ghi nhận kịch bản này (trước khi sharding tồn tại) sập hẳn ở N=2000 (tick
+tối đa 10.76s, lỗi client leo thang không dừng), lặp lại chỉ tốn thời gian mà không thêm thông tin
+mới, và số CPU đo được lúc server quá tải/backpressure không đáng tin (Điều 30).
+
+⚠️ **Vậy nguyên nhân CPU cao hơn công thức §5.1 THẬT SỰ là gì?** Vẫn CHƯA biết — thí nghiệm này chỉ
+loại trừ được 1 giả thuyết (sharding), không xác nhận được giả thuyết đúng. Ứng viên còn lại, CHƯA
+kiểm chứng: (a) toàn bộ observability thêm ở Phase 9 sau khi công thức §5.1 được đo (Micrometer
+Timer/Counter/Gauge cho MỌI kênh từ §5.5, JVM GC/Memory/Thread metrics binder, OpenTelemetry tracing
+— log thấy tracing liên tục thử kết nối `localhost:4318` (Jaeger) và THẤT BẠI mỗi vài giây vì không
+chạy Jaeger lúc đo, mỗi lần thất bại tốn CPU dựng exception/stack trace — tần suất thấy được (~16
+lần/phiên đo) có vẻ không đủ giải thích hết chênh lệch nhưng CHƯA đo tách bạch được đóng góp thật);
+(b) nội dung gameplay (skill/quest/dungeon/PvP) đã thêm rất nhiều từ Phase 4 tới nay, trong khi công
+thức §5.1 đo lúc "chỉ có nội dung này tồn tại trong game" (Phase 9 lát cắt 5, ít tính năng hơn hẳn
+hiện tại) — có thể mỗi tick giờ tốn hơn CHỈ vì có nhiều System/component hơn phải chạy qua, không
+liên quan gì tới sharding/thread-pool.
+
+**Kết luận**: `WorldTickScheduler` (chủ đề chính của toàn bộ chuỗi lát cắt §5.4-5.8) và sharding đều
+KHÔNG phải nguyên nhân CPU cao hơn công thức cũ — ngược lại, cả 2 đều đang giúp giảm chi phí so với
+kịch bản không có chúng. Công thức §5.1 vẫn đo dưới điều kiện QUÁ KHÁC hiện tại (ít observability
+hơn, ít nội dung game hơn) để so sánh trực tiếp — **không sửa công thức §5.1** (Điều 30, chưa có bằng
+chứng đủ tách bạch để biết con số mới nên là bao nhiêu), chỉ ghi nhận: công thức đó đã LỖI THỜI theo
+nghĩa rộng hơn những gì §5.2/§5.3 từng nêu (không chỉ vì sharding), cần đo lại từ đầu (2 điểm N mới,
+đúng nội dung/observability hiện tại) nếu cần con số capacity-planning đáng tin cho production.
+
 ---
 
 ## 6. Khi nào chạy
