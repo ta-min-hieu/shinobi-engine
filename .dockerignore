@@ -1,0 +1,13 @@
+# DOCKER.md §2/§4 — build context = repo root (deploy/docker/docker-compose.yml `context: ../..`).
+# Loại thứ không cần để build :server:server-gateway:installDist — context nhỏ, build nhanh hơn,
+# không rò rỉ lịch sử git / cấu hình IDE vào layer.
+.git/
+.github/
+.idea/
+.claude/
+.gradle/
+**/build/
+benchmarks/
+docs/
+client/**/assets/
+*.md

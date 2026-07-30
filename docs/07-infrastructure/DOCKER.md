@@ -174,7 +174,9 @@ ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 
 ⚠️ **Không dùng `-Xmx` cố định trong image** — image chạy ở nhiều cấu hình RAM khác nhau.
 
-**GC flags**: chưa chốt — cần ADR-019 ([JVM.md](../09-performance/JVM.md)).
+**GC flags**: ✅ chốt — [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md) (ZGC, Accepted
+2026-07-28), flag set đầy đủ ở [JVM.md §3](../09-performance/JVM.md), đã đưa vào
+`deploy/docker/server.Dockerfile` (`ENV JAVA_OPTS`, 2026-07-30).
 
 ---
 
@@ -233,9 +235,7 @@ ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 
 ## ADR cần tạo
 
-| ADR | Nội dung | Ưu tiên |
-|---|---|---|
-| **ADR-019** | GC flags cho container (§7) | 🟢 Chặn Phase 9 |
+Không còn — ADR-019 (GC flags cho container, §7) đã Accepted 2026-07-28.
 
 ## Tài liệu liên quan
 
@@ -252,5 +252,15 @@ ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 3. Phase 9: chốt GC flags §7 sau khi đo (✅ ADR-019 Accepted, xem JVM.md §3).
 4. ✅ **Phase 9 lát cắt 10 (2026-07-28)** — thêm 4 service vào `docker-compose.yml`: `prometheus`,
    `alertmanager`, `grafana`, `jaeger` (chi tiết đầy đủ ở [OBSERVABILITY.md](OBSERVABILITY.md) §6-10).
-   `server-gateway` vẫn CHƯA có `server.Dockerfile` thật (§1 sơ đồ trên chỉ là kế hoạch) — Prometheus
+   `server-gateway` vẫn CHƯA có `server.Dockerfile` thật lúc đó (§1 sơ đồ chỉ là kế hoạch) — Prometheus
    scrape server chạy native trên host qua `host.docker.internal:9404`.
+5. ✅ **Phase 10 (2026-07-30)** — `deploy/docker/server.Dockerfile` viết xong theo đúng cấu trúc multi-
+   stage §3, verify THẬT bằng `docker build` + chạy container nối `postgres`/`cache` container thật
+   (không phải suy luận từ đọc code): image build thành công (623MB, không tối ưu size — §8 chưa làm,
+   ngoài phạm vi lần này), `docker`-native HEALTHCHECK báo `healthy`, `/health/live`+`/health/ready`+
+   `/metrics` (cổng 9404) đều trả về đúng qua container, JVM flags JVM.md §3 (ZGC/MaxRAMPercentage/
+   JFR/GC log) xác nhận áp dụng đúng qua log thật (không phải chỉ đọc `ENV` trong Dockerfile). Chưa
+   làm (ngoài phạm vi, không phải thiếu sót): chưa wire vào `docker-compose.yml` dev (server vẫn chạy
+   native qua `./gradlew run` theo thói quen hiện tại — Prometheus vẫn scrape qua
+   `host.docker.internal`, xem `prometheus.yml`), chưa có `docker-compose.prod.yml` (§6), CI chưa build/
+   push image (`ci.yml` không có bước Docker), chưa tối ưu size (`jlink`, §8).

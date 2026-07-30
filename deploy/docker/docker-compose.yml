@@ -1,5 +1,8 @@
-# Môi trường Development (DOCKER.md §5). `docker compose up` dựng DB + cache.
-# Server chưa có Dockerfile ở Phase 0 — thêm ở Phase 2/3 khi server chạy được.
+# Môi trường Development (DOCKER.md §5). `docker compose up` dựng DB + cache + observability.
+# server-gateway giờ ĐÃ có Dockerfile (`server.Dockerfile`, Phase 10, 2026-07-30) nhưng CHƯA khai báo
+# service ở đây — cố ý giữ nguyên thói quen chạy native qua `./gradlew run` lúc dev (Prometheus scrape
+# qua host.docker.internal:9404, xem prometheus.yml); dùng `docker build -f server.Dockerfile ..` trực
+# tiếp nếu cần build/chạy thử image.
 services:
   postgres:
     image: postgres:17
