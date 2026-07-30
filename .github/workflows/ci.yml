@@ -1,8 +1,12 @@
 name: CI
 
+# ⚠️ PHÁT HIỆN THẬT (2026-07-30): repo này CHỈ CÓ nhánh `master` (`git remote show origin` → "HEAD
+# branch: master") — GIT-WORKFLOW.md §2 tả quy trình dùng `main`/`develop`, nhưng chưa từng áp dụng
+# thật (dự án cá nhân, luôn push thẳng `master`). Trigger dưới đây dùng `master` để KHỚP THỰC TẾ —
+# nếu sau này đổi sang quy trình main/develop thật (đổi tên nhánh mặc định trên GitHub), sửa lại đây.
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ master, develop ]
     tags: [ 'v*' ]
   pull_request:
 
@@ -61,11 +65,12 @@ jobs:
   #     - run: ./gradlew integrationTest
 
   # Docker build + push (CI-CD.md §7, Phase 10 2026-07-30) — CHỈ chạy sau khi build-and-verify PASS,
-  # và CHỈ trên push thật vào main hoặc tag version — KHÔNG BAO GIỜ build/push image từ PR (đúng bảng
-  # CI-CD.md §7: "PR ❌ Không build image").
+  # và CHỈ trên push thật vào master (nhánh production thật của repo — xem ghi chú ⚠️ ở "on:" trên
+  # đầu file) hoặc tag version — KHÔNG BAO GIỜ build/push image từ PR (đúng bảng CI-CD.md §7:
+  # "PR ❌ Không build image").
   docker-build-push:
     needs: build-and-verify
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -83,14 +88,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Tag theo đúng CI-CD.md §7: merge main → main-<sha>; tag v1.2.3 → 1.2.3 + latest.
+      # Tag theo tinh thần CI-CD.md §7 ("main-<sha>" trong doc — đổi thành "master-<sha>" cho khớp
+      # tên nhánh thật, xem ghi chú ⚠️ đầu file): merge master → master-<sha>; tag v1.2.3 → 1.2.3 + latest.
       - name: Tính tag image
         id: meta
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository }}/server-gateway
           tags: |
-            type=raw,value=main-{{sha}},enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=master-{{sha}},enable=${{ github.ref == 'refs/heads/master' }}
             type=semver,pattern={{version}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 

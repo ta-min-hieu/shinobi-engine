@@ -160,14 +160,26 @@ jobs:
 **Tag `latest` chỉ trỏ tới release chính thức**, không trỏ tới `main` — tránh deploy nhầm bản chưa release.
 
 ✅ **Implemented (2026-07-30, Phase 10)** — job `docker-build-push` trong `ci.yml`, `needs:
-build-and-verify` (không publish nếu build/test fail), `if:` chỉ khớp push thật vào `main` hoặc tag
-`v*` (không bao giờ chạy trên PR — đúng bảng trên). Registry: **GitHub Container Registry** (`ghcr.io`),
-không cần secret thêm ngoài `GITHUB_TOKEN` có sẵn (`permissions: packages: write` ở job). Image:
-`ghcr.io/<owner>/<repo>/server-gateway`, build từ `deploy/docker/server.Dockerfile` (Phase 10, xem
-[DOCKER.md](DOCKER.md)). Dùng `docker/metadata-action` để tính tag thay vì tự viết shell — tránh tự
-làm sai regex tag. **Chưa verify bằng lần push/tag thật lên GitHub** (chỉ verify được cú pháp YAML +
-input/output name của từng action qua đọc `action.yml` thật, không mock) — cần push thật ít nhất 1
-lần lên `main` để xác nhận job chạy đúng.
+build-and-verify` (không publish nếu build/test fail), `if:` chỉ khớp push thật vào **`master`** hoặc
+tag `v*` (không bao giờ chạy trên PR — đúng bảng trên). Registry: **GitHub Container Registry**
+(`ghcr.io`), không cần secret thêm ngoài `GITHUB_TOKEN` có sẵn (`permissions: packages: write` ở job).
+Image: `ghcr.io/<owner>/<repo>/server-gateway`, build từ `deploy/docker/server.Dockerfile` (Phase 10,
+xem [DOCKER.md](DOCKER.md)). Dùng `docker/metadata-action` để tính tag thay vì tự viết shell — tránh
+tự làm sai regex tag.
+
+⚠️ **PHÁT HIỆN THẬT (2026-07-30) — bảng trên nói "main" nhưng repo CHỈ CÓ nhánh `master`**
+(`git remote show origin` → "HEAD branch: master"; [GIT-WORKFLOW.md §2](../11-process/GIT-WORKFLOW.md)
+tả quy trình `main`/`develop` nhưng dự án cá nhân này chưa từng áp dụng, luôn push thẳng `master`).
+`ci.yml` viết đúng theo **thực tế** (`refs/heads/master`, tag `master-<sha>` thay vì `main-<sha>`) —
+tài liệu này giữ nguyên chữ "main" vì đó là tên nhánh ĐÚNG theo quy trình tài liệu mô tả, chưa sửa
+lại thành "master" để không lẫn 2 tầng ý nghĩa (quy trình lý tưởng vs. thực tế hiện tại). Nếu sau
+này đổi tên nhánh mặc định GitHub thành `main` thật, sửa `ci.yml` và xoá cảnh báo này.
+
+**Verify được (2026-07-30)**: cú pháp YAML + input/output name của 4 action mới (`docker/
+setup-buildx-action`, `docker/login-action`, `docker/metadata-action`, `docker/build-push-action`) qua
+đọc `action.yml` thật — không mock. **Chưa verify**: 1 lần chạy CI thật trên GitHub (đã push 4 commit
+lên `origin/master` cùng ngày — cần chủ dự án tự xác nhận qua tab Actions vì repo private, không gọi
+được API ẩn danh để tự kiểm tra).
 
 ---
 
