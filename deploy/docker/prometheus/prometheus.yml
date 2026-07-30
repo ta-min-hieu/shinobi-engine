@@ -1,7 +1,9 @@
 # OBSERVABILITY.md §9-10 — Prometheus scrape + alerting rule cho server-gateway thật.
-# server-gateway CHƯA có Dockerfile (chạy native qua ./gradlew run/installDist, không phải
-# container trong compose này) — scrape qua host.docker.internal, xem docker-compose.yml
-# "extra_hosts" trên service prometheus (Linux cần host-gateway, Windows/Mac Docker Desktop có sẵn).
+# 2 target CÙNG job — server-gateway có thể chạy container ("server", service Compose, Phase 10
+# 2026-07-30) HOẶC native qua ./gradlew run (host.docker.internal, xem docker-compose.yml
+# "extra_hosts" — Linux cần host-gateway, Windows/Mac Docker Desktop có sẵn). Chỉ 1 trong 2 chạy
+# tại 1 thời điểm (xung đột cổng 7777/9404) — target còn lại hiện `up=0` trên Prometheus, không
+# làm job lỗi hay dashboard vỡ.
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -18,4 +20,4 @@ scrape_configs:
   - job_name: kage-server-gateway
     metrics_path: /metrics
     static_configs:
-      - targets: ["host.docker.internal:9404"]
+      - targets: ["server:9404", "host.docker.internal:9404"]

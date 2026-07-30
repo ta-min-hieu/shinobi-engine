@@ -1,8 +1,16 @@
-# Môi trường Development (DOCKER.md §5). `docker compose up` dựng DB + cache + observability.
-# server-gateway giờ ĐÃ có Dockerfile (`server.Dockerfile`, Phase 10, 2026-07-30) nhưng CHƯA khai báo
-# service ở đây — cố ý giữ nguyên thói quen chạy native qua `./gradlew run` lúc dev (Prometheus scrape
-# qua host.docker.internal:9404, xem prometheus.yml); dùng `docker build -f server.Dockerfile ..` trực
-# tiếp nếu cần build/chạy thử image.
+# Môi trường Development (DOCKER.md §5). `docker compose up` dựng TOÀN BỘ stack: DB + cache +
+# server (container, từ `server.Dockerfile`, Phase 10 2026-07-30) + observability.
+# ⚠️ Xung đột cổng nếu chạy CẢ container này LẪN `./gradlew run` cùng lúc — cả hai đều bind
+# 7777/9404 trên host, container sẽ chiếm cổng trước và native start sẽ lỗi "address already in
+# use". Chọn 1 trong 2: `docker compose up` (full stack đóng gói) HOẶC
+# `docker compose up postgres cache prometheus alertmanager grafana jaeger` (loại "server", chạy
+# server native qua `./gradlew run` để lặp code nhanh không cần rebuild image).
+# ⚠️ PHÁT HIỆN THẬT lúc verify (2026-07-30): khi container "server" chạy VÀ publish cổng 9404 ra
+# host, prometheus.yml's 2 target (`server:9404` + `host.docker.internal:9404`) đều BÁO "up" —
+# nhưng đó là CÙNG 1 tiến trình (host.docker.internal:9404 vòng qua cổng host đã publish, trỏ về
+# lại đúng container đó), KHÔNG PHẢI 2 instance thật. Dashboard nào `sum` theo `instance` sẽ đếm
+# gấp đôi trong tình huống này — chỉ đáng tin cách chạy tách biệt như trên (container HOẶC native,
+# không chạy song song).
 services:
   postgres:
     image: postgres:17
@@ -37,10 +45,33 @@ services:
       timeout: 3s
       retries: 10
 
+  server:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/server.Dockerfile
+    depends_on:
+      postgres: { condition: service_healthy }
+      cache:    { condition: service_healthy }
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: kage
+      DB_USER: kage
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD trong .env}
+      CACHE_HOST: cache
+      CACHE_PORT: "6379"
+      CACHE_PASSWORD: ${CACHE_PASSWORD:?set CACHE_PASSWORD}
+      # GatewayTracing mặc định trỏ localhost:4318 (đúng cho ./gradlew run native) — container
+      # phải trỏ qua tên service Compose "jaeger" thay vì localhost.
+      KAGE_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "7777:7777"
+      - "9404:9404"
+
   prometheus:
-    # OBSERVABILITY.md §9-10 (Phase 9 lát cắt 9). Scrape server-gateway thật chạy NATIVE trên host
-    # (chưa có Dockerfile, xem docker-compose.yml đầu file) — cần thấy cổng host qua
-    # host.docker.internal (Docker Desktop Windows/Mac có sẵn; Linux cần extra_hosts bên dưới).
+    # OBSERVABILITY.md §9-10 (Phase 9 lát cắt 9). Scrape CẢ container "server" (service ở trên) LẪN
+    # server-gateway chạy NATIVE trên host qua host.docker.internal — xem prometheus.yml (Docker
+    # Desktop Windows/Mac có sẵn; Linux cần extra_hosts bên dưới).
     image: prom/prometheus:v3.8.1
     extra_hosts:
       - "host.docker.internal:host-gateway"

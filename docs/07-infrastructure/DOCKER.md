@@ -259,8 +259,18 @@ Không còn — ADR-019 (GC flags cho container, §7) đã Accepted 2026-07-28.
    (không phải suy luận từ đọc code): image build thành công (623MB, không tối ưu size — §8 chưa làm,
    ngoài phạm vi lần này), `docker`-native HEALTHCHECK báo `healthy`, `/health/live`+`/health/ready`+
    `/metrics` (cổng 9404) đều trả về đúng qua container, JVM flags JVM.md §3 (ZGC/MaxRAMPercentage/
-   JFR/GC log) xác nhận áp dụng đúng qua log thật (không phải chỉ đọc `ENV` trong Dockerfile). Chưa
-   làm (ngoài phạm vi, không phải thiếu sót): chưa wire vào `docker-compose.yml` dev (server vẫn chạy
-   native qua `./gradlew run` theo thói quen hiện tại — Prometheus vẫn scrape qua
-   `host.docker.internal`, xem `prometheus.yml`), chưa có `docker-compose.prod.yml` (§6), CI chưa build/
-   push image (`ci.yml` không có bước Docker), chưa tối ưu size (`jlink`, §8).
+   JFR/GC log) xác nhận áp dụng đúng qua log thật (không phải chỉ đọc `ENV` trong Dockerfile).
+6. ✅ **Phase 10, cùng ngày (2026-07-30, theo yêu cầu chủ dự án)** — wire service `server` vào
+   `docker-compose.yml` dev (dùng `server.Dockerfile`), `prometheus.yml` scrape CẢ `server:9404` LẪN
+   `host.docker.internal:9404` (2 target cùng job) để dashboard vẫn thấy server dù chạy container hay
+   native. Verify THẬT bằng `docker compose up -d --build` full stack (7 container, không phải chỉ
+   đọc YAML): `server` container `healthy`, `/api/v1/targets` Prometheus xác nhận cả 2 target
+   `health:"up"`, Grafana `/api/health` OK. **Phát hiện thật khi verify**: nếu chạy container VÀ
+   container publish cổng 9404 ra host, 2 target Prometheus đều "up" nhưng là **CÙNG 1 tiến trình**
+   (`host.docker.internal:9404` vòng qua cổng host publish, trỏ lại đúng container "server") — dashboard
+   nào `sum` theo `instance` sẽ đếm gấp đôi trong tình huống này, ghi rõ trong comment
+   `docker-compose.yml`. Cách chạy an toàn: dùng `docker compose up` (full container) HOẶC
+   `docker compose up postgres cache prometheus alertmanager grafana jaeger` (loại "server", chạy
+   native) — không chạy song song cả 2. Chưa làm (ngoài phạm vi, không phải thiếu sót):
+   `docker-compose.prod.yml` (§6), CI chưa build/push image (`ci.yml` không có bước Docker), chưa tối
+   ưu size image (`jlink`, §8).
