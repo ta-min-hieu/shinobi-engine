@@ -437,9 +437,25 @@ Chi tiết kỹ thuật:
 | ✅ ADR-015, ADR-014 đã chốt (2026-07-26, trước khi mở lát cắt code) | [ADR-015](../01-architecture/adr/ADR-015-Micrometer-vs-OpenTelemetry.md), [ADR-014](../01-architecture/adr/ADR-014-Kubernetes-vs-Docker-Compose.md) |
 
 **Exit Criteria:**
-- [ ] Tick p99 ≤ ngân sách dưới tải mục tiêu
-- [ ] **Không leak sau soak 2h** (heap sau major GC không tăng đều)
-- [ ] Observability đầy đủ (Điều 44)
+- [x] Tick p99 ≤ ngân sách dưới tải mục tiêu — N=1000 0.82-1.57ms, N=2000 0.98-3.15ms (1 đỉnh đơn lẻ
+      28.6ms), đều dưới ngân sách 16.6ms, 0 lỗi client ([BENCHMARK.md §5.3](../09-performance/BENCHMARK.md),
+      lát cắt 7, 2026-07-28)
+- [x] **Không leak sau soak 2h** (heap sau major GC không tăng đều) — soak 2h14/N=80, heap Live phẳng
+      39MB suốt 34 chu kỳ GC ([ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md), 2026-07-28)
+- [x] Observability đầy đủ (Điều 44) — Prometheus+Alertmanager+Grafana (5 dashboard)+Tracing chạy qua
+      `docker compose up` ([OBSERVABILITY.md](../07-infrastructure/OBSERVABILITY.md) §10, lát cắt 9+10, 2026-07-28)
+
+⚠️ **Chốt 2026-07-30 kèm 2 caveat CHƯA chặn đóng phase** (đã hỏi chủ dự án, quyết định đóng dù còn 2
+việc mở, vì Exit Criteria chỉ đòi "dưới tải mục tiêu đã đo" chứ không đòi công thức ngoại suy an toàn
+mọi N):
+1. Benchmark đo lại sau khi đổi sang shared tick pool (§5.1 v2, 2026-07-29) phát hiện **CPU không
+   tuyến tính theo N** (độ dốc CPU/người tăng dần 100→500→1000) — tick p99 vẫn ổn trong vùng ĐÃ đo
+   (N≤2000), nhưng KHÔNG có công thức ngoại suy đáng tin cho N lớn hơn (Điều 30). Việc cần làm nếu
+   quy mô người chơi thật vượt 2000: đo lại thật, không ngoại suy.
+2. Off-heap (~500-650KB/kết nối, NMT) chỉ đo 1 lần chụp ngắn N=0→1000, CHƯA từng chạy trong 1 buổi
+   soak dài để xác nhận tự giải phóng đúng khi client ngắt kết nối (leak thật hay không) — soak 2h14
+   gốc (ADR-019) chỉ đo Java heap, chưa biết off-heap lúc đó vì phát hiện này đến sau. Việc cần làm:
+   1 buổi soak dài có bật NMT nếu cần xác nhận chắc chắn hơn trước khi vận hành production thật lâu.
 
 ⚠️ **Phase 9 không đóng nếu chưa có observability** — Điều 44: không có Observability thì Production không hoàn chỉnh.
 
@@ -725,3 +741,9 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **16 ADR Accepted** (gồm
     **Phase 9 Exit Criteria observability giờ ĐỦ (Điều 44)** — CHƯA làm (ngoài phạm vi, không phải
     thiếu sót): tracing sâu cho ~50 opcode còn lại, nhánh sampling "100% Command chậm", kênh thông
     báo Alertmanager thật (Slack/email), `server.Dockerfile` (server-gateway vẫn chạy native).
+21. ✅ **Phase 9 ĐÓNG (2026-07-30, chủ dự án xác nhận)** — sau loạt benchmark bổ sung §5.1/5.2/5.4/
+    5.7/5.8/5.9 (2026-07-28 đến 2026-07-29, phát hiện công thức capacity-planning gốc lỗi thời +
+    CPU không tuyến tính + off-heap ~500-650KB/kết nối bị bỏ sót), rà lại cả 3 Exit Criteria — cả 3
+    tick, kèm 2 caveat KHÔNG chặn đóng phase (xem ghi chú ngay dưới Exit Criteria ở đầu mục Phase 9):
+    CPU chưa có công thức ngoại suy an toàn cho N>2000, off-heap chưa soak-test dài hạn để loại trừ
+    leak. Next: Phase 10 (Release).
