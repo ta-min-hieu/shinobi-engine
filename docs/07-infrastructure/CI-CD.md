@@ -159,6 +159,16 @@ jobs:
 
 **Tag `latest` chỉ trỏ tới release chính thức**, không trỏ tới `main` — tránh deploy nhầm bản chưa release.
 
+✅ **Implemented (2026-07-30, Phase 10)** — job `docker-build-push` trong `ci.yml`, `needs:
+build-and-verify` (không publish nếu build/test fail), `if:` chỉ khớp push thật vào `main` hoặc tag
+`v*` (không bao giờ chạy trên PR — đúng bảng trên). Registry: **GitHub Container Registry** (`ghcr.io`),
+không cần secret thêm ngoài `GITHUB_TOKEN` có sẵn (`permissions: packages: write` ở job). Image:
+`ghcr.io/<owner>/<repo>/server-gateway`, build từ `deploy/docker/server.Dockerfile` (Phase 10, xem
+[DOCKER.md](DOCKER.md)). Dùng `docker/metadata-action` để tính tag thay vì tự viết shell — tránh tự
+làm sai regex tag. **Chưa verify bằng lần push/tag thật lên GitHub** (chỉ verify được cú pháp YAML +
+input/output name của từng action qua đọc `action.yml` thật, không mock) — cần push thật ít nhất 1
+lần lên `main` để xác nhận job chạy đúng.
+
 ---
 
 ## 8. Deploy
