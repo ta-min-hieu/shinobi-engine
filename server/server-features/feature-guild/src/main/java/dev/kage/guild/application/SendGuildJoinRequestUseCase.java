@@ -1,9 +1,10 @@
 package dev.kage.guild.application;
 
+import java.util.Optional;
+
 import dev.kage.guild.domain.DuplicateGuildJoinRequestException;
 import dev.kage.guild.domain.Guild;
 import dev.kage.guild.domain.GuildPort;
-import java.util.Optional;
 
 /**
  * Xin gia nhập bang theo tên — leader duyệt/từ chối sau (quyết định cùng chủ dự án 2026-07-23,
@@ -37,5 +38,10 @@ public final class SendGuildJoinRequestUseCase {
         return Result.OK;
     }
 
-    public enum Result { OK, ALREADY_IN_GUILD, GUILD_NOT_FOUND, REQUEST_ALREADY_PENDING }
+    public enum Result {
+        OK,
+        ALREADY_IN_GUILD,
+        GUILD_NOT_FOUND,
+        REQUEST_ALREADY_PENDING
+    }
 }

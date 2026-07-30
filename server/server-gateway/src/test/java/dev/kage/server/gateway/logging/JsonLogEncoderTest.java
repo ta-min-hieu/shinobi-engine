@@ -2,10 +2,11 @@ package dev.kage.server.gateway.logging;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.charset.StandardCharsets;
+
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.LoggingEvent;
-import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
@@ -29,8 +30,12 @@ class JsonLogEncoderTest {
     @Test
     void shouldEscapeQuotesAndNewlines_inMessage() {
         LoggingEvent event = new LoggingEvent(
-                JsonLogEncoderTest.class.getName(), LOGGER, Level.WARN,
-                "line1\nline2 \"quoted\" \\backslash", null, null);
+                JsonLogEncoderTest.class.getName(),
+                LOGGER,
+                Level.WARN,
+                "line1\nline2 \"quoted\" \\backslash",
+                null,
+                null);
 
         String json = new String(new JsonLogEncoder().encode(event), StandardCharsets.UTF_8);
 
@@ -41,8 +46,12 @@ class JsonLogEncoderTest {
     @Test
     void shouldIncludeStackTrace_whenThrowablePresent() {
         LoggingEvent event = new LoggingEvent(
-                JsonLogEncoderTest.class.getName(), LOGGER, Level.ERROR, "lỗi không mong đợi",
-                new IllegalStateException("boom"), null);
+                JsonLogEncoderTest.class.getName(),
+                LOGGER,
+                Level.ERROR,
+                "lỗi không mong đợi",
+                new IllegalStateException("boom"),
+                null);
 
         String json = new String(new JsonLogEncoder().encode(event), StandardCharsets.UTF_8);
 

@@ -2,8 +2,9 @@ package dev.kage.trade.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.kage.trade.domain.TradeSession;
 import org.junit.jupiter.api.Test;
+
+import dev.kage.trade.domain.TradeSession;
 
 class AcceptTradeRequestUseCaseTest {
 

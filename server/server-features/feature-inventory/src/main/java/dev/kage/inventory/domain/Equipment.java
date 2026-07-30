@@ -55,5 +55,8 @@ public final class Equipment {
         return UnequipResult.UNEQUIPPED;
     }
 
-    public enum UnequipResult { UNEQUIPPED, NOT_EQUIPPED }
+    public enum UnequipResult {
+        UNEQUIPPED,
+        NOT_EQUIPPED
+    }
 }

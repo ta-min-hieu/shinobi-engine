@@ -10,5 +10,4 @@ import dev.kage.quest.domain.QuestInventoryGrantPort;
  * đã dùng chung với {@link AcceptQuestUseCase}/{@link ProcessMonsterKilledUseCase}, cùng tinh thần
  * {@code ShopPorts}/{@code EnhancePorts}.
  */
-public record QuestRewardPorts(ExpPort expPort, QuestInventoryGrantPort inventoryGrantPort, AuditPort auditPort) {
-}
+public record QuestRewardPorts(ExpPort expPort, QuestInventoryGrantPort inventoryGrantPort, AuditPort auditPort) {}

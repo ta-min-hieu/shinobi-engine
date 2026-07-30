@@ -1,5 +1,7 @@
 package dev.kage.quest.application;
 
+import java.util.Optional;
+
 import dev.kage.quest.domain.QuestProgress;
 import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestStatus;
@@ -7,7 +9,6 @@ import dev.kage.quest.domain.QuestTemplate;
 import dev.kage.quest.domain.QuestTemplatePort;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.quest.domain.TransactionRunner;
-import java.util.Optional;
 
 /**
  * Xử lý sự kiện "quái chết" cho tiến độ quest — gọi từ {@code ConnectedCharacterRegistry.onMonsterKilled}
@@ -50,8 +51,8 @@ public final class ProcessMonsterKilledUseCase {
         QuestScriptRunner.HookEffects effects = scriptRunner.runEvent(
                 template.scriptRef(), progress.progressJson(), MONSTER_KILLED_EVENT_TYPE, monsterCode);
         QuestStatus newStatus = effects.completed() ? QuestStatus.COMPLETED : QuestStatus.IN_PROGRESS;
-        tx.inTransaction((Transaction t) -> progressPort.save(
-                t, new QuestProgress(characterId, template.id(), newStatus, effects.progressJson())));
+        tx.inTransaction((Transaction t) ->
+                progressPort.save(t, new QuestProgress(characterId, template.id(), newStatus, effects.progressJson())));
 
         if (!effects.completed()) {
             return Optional.empty(); // KHÔNG push sự kiện cho mỗi lần tick tiến độ — chỉ khi hoàn thành.
@@ -59,6 +60,5 @@ public final class ProcessMonsterKilledUseCase {
         return Optional.of(new QuestStatusChange(TRACKED_QUEST_CODE, QuestStatus.COMPLETED));
     }
 
-    public record QuestStatusChange(String questCode, QuestStatus status) {
-    }
+    public record QuestStatusChange(String questCode, QuestStatus status) {}
 }

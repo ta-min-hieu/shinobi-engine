@@ -9,7 +9,11 @@ import java.util.Objects;
  * (feature-character).
  */
 public record NewMail(
-        Long senderId, long recipientId, String subject, String body, long goldAmount,
+        Long senderId,
+        long recipientId,
+        String subject,
+        String body,
+        long goldAmount,
         List<MailAttachment> attachments) {
 
     public NewMail {

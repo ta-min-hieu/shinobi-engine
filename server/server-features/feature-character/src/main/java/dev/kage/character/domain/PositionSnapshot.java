@@ -5,5 +5,4 @@ package dev.kage.character.domain;
  * tick (đó là {@code server-world.component.CharacterIdComponent}/{@code PositionComponent}).
  * Dùng để tính điểm spawn khi nhân vật chọn vào world lần sau.
  */
-public record PositionSnapshot(float x, float y) {
-}
+public record PositionSnapshot(float x, float y) {}

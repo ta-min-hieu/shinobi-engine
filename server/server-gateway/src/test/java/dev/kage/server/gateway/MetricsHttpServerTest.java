@@ -2,14 +2,15 @@ package dev.kage.server.gateway;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.micrometer.prometheusmetrics.PrometheusConfig;
-import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import java.io.IOException;
+import java.net.ServerSocket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.net.ServerSocket;
+
+import io.micrometer.prometheusmetrics.PrometheusConfig;
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -40,14 +41,15 @@ class MetricsHttpServerTest {
         server = new MetricsHttpServer(freePort, registry, () -> true);
         server.start();
 
-        HttpResponse<String> response = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + freePort + "/metrics")).GET().build(),
-                HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create("http://localhost:" + freePort + "/metrics"))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).isEqualTo(200);
-        assertThat(response.body())
-                .contains("kage_tick_duration_seconds")
-                .contains("world=\"main\"");
+        assertThat(response.body()).contains("kage_tick_duration_seconds").contains("world=\"main\"");
     }
 
     @Test
@@ -56,9 +58,12 @@ class MetricsHttpServerTest {
         server = new MetricsHttpServer(freePort, new PrometheusMeterRegistry(PrometheusConfig.DEFAULT), () -> false);
         server.start();
 
-        HttpResponse<String> response = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + freePort + "/health/live")).GET().build(),
-                HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create("http://localhost:" + freePort + "/health/live"))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).isEqualTo(200);
     }
@@ -69,9 +74,12 @@ class MetricsHttpServerTest {
         server = new MetricsHttpServer(freePort, new PrometheusMeterRegistry(PrometheusConfig.DEFAULT), () -> true);
         server.start();
 
-        HttpResponse<String> response = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + freePort + "/health/ready")).GET().build(),
-                HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create("http://localhost:" + freePort + "/health/ready"))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).isEqualTo(200);
     }
@@ -82,9 +90,12 @@ class MetricsHttpServerTest {
         server = new MetricsHttpServer(freePort, new PrometheusMeterRegistry(PrometheusConfig.DEFAULT), () -> false);
         server.start();
 
-        HttpResponse<String> response = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + freePort + "/health/ready")).GET().build(),
-                HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create("http://localhost:" + freePort + "/health/ready"))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).isEqualTo(503);
     }

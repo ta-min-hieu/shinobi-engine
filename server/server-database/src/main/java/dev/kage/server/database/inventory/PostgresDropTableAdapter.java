@@ -1,10 +1,12 @@
 package dev.kage.server.database.inventory;
 
+import java.util.List;
+
+import javax.sql.DataSource;
+
 import dev.kage.inventory.domain.DropTableEntry;
 import dev.kage.inventory.domain.DropTablePort;
 import dev.kage.server.database.JdbcOperations;
-import java.util.List;
-import javax.sql.DataSource;
 
 /**
  * Hiện thực {@link DropTablePort} trên PostgreSQL — đọc thuần, không random (roll ở

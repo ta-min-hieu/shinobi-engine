@@ -2,10 +2,11 @@ package dev.kage.server.world;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.junit.jupiter.api.Test;
+
 import dev.kage.server.world.component.StatusEffect;
 import dev.kage.server.world.component.StatusEffectComponent;
 import dev.kage.server.world.component.StatusEffectType;
-import org.junit.jupiter.api.Test;
 
 /** Phase 8 (4 hệ phái) — helper thuần đọc/ghi {@link StatusEffectComponent}, test không qua tick loop. */
 class StatusEffectsTest {

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
+
 import org.junit.jupiter.api.Test;
 
 class CharacterTest {
@@ -23,15 +24,13 @@ class CharacterTest {
 
     @Test
     void shouldRejectName_whenTooLong() {
-        assertThatThrownBy(
-                        () -> new Character(1L, 1L, 1, "A".repeat(17), Faction.HOA, 1, 0, 0, Instant.now()))
+        assertThatThrownBy(() -> new Character(1L, 1L, 1, "A".repeat(17), Faction.HOA, 1, 0, 0, Instant.now()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void shouldRejectName_whenContainsInvalidCharacter() {
-        assertThatThrownBy(
-                        () -> new Character(1L, 1L, 1, "Kage!Hero", Faction.HOA, 1, 0, 0, Instant.now()))
+        assertThatThrownBy(() -> new Character(1L, 1L, 1, "Kage!Hero", Faction.HOA, 1, 0, 0, Instant.now()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

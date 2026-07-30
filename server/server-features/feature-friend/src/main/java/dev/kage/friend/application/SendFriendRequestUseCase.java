@@ -1,10 +1,11 @@
 package dev.kage.friend.application;
 
+import java.util.Optional;
+
 import dev.kage.friend.domain.DuplicateFriendRequestException;
 import dev.kage.friend.domain.FriendPort;
 import dev.kage.friend.domain.Friendship;
 import dev.kage.friend.domain.FriendshipStatus;
-import java.util.Optional;
 
 /** Gửi lời mời kết bạn — kiểm tự-mời/đã-bạn/đã-có-lời-mời TRƯỚC khi chạm DB. */
 public final class SendFriendRequestUseCase {
@@ -33,5 +34,10 @@ public final class SendFriendRequestUseCase {
         return Result.OK;
     }
 
-    public enum Result { OK, CANNOT_FRIEND_SELF, ALREADY_FRIENDS, REQUEST_ALREADY_PENDING }
+    public enum Result {
+        OK,
+        CANNOT_FRIEND_SELF,
+        ALREADY_FRIENDS,
+        REQUEST_ALREADY_PENDING
+    }
 }

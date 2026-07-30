@@ -3,17 +3,19 @@ package dev.kage.account.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import dev.kage.account.domain.Account;
-import dev.kage.account.domain.AccountPort;
-import dev.kage.account.domain.SessionPort;
-import dev.kage.account.domain.Transaction;
-import dev.kage.account.domain.TransactionRunner;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
+
 import org.junit.jupiter.api.Test;
+
+import dev.kage.account.domain.Account;
+import dev.kage.account.domain.AccountPort;
+import dev.kage.account.domain.SessionPort;
+import dev.kage.account.domain.Transaction;
+import dev.kage.account.domain.TransactionRunner;
 
 class LoginOrCreateAccountUseCaseTest {
 

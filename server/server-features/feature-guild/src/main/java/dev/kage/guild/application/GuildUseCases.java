@@ -16,5 +16,4 @@ public record GuildUseCases(
         KickGuildMemberUseCase kickGuildMemberUseCase,
         ListGuildMembersUseCase listGuildMembersUseCase,
         ListPendingGuildJoinRequestsUseCase listPendingGuildJoinRequestsUseCase,
-        FindMyGuildUseCase findMyGuildUseCase) {
-}
+        FindMyGuildUseCase findMyGuildUseCase) {}

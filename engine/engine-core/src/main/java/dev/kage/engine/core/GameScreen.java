@@ -9,20 +9,15 @@ package dev.kage.engine.core;
  */
 public interface GameScreen {
 
-    default void show() {
-    }
+    default void show() {}
 
-    default void hide() {
-    }
+    default void hide() {}
 
-    default void pause() {
-    }
+    default void pause() {}
 
-    default void resume() {
-    }
+    default void resume() {}
 
-    default void resize(int width, int height) {
-    }
+    default void resize(int width, int height) {}
 
     /** Logic — chạy đúng {@code FIXED_DT}, không phụ thuộc FPS. */
     void fixedUpdate(float fixedDeltaTime);
@@ -32,6 +27,5 @@ public interface GameScreen {
      */
     void render(float alpha);
 
-    default void dispose() {
-    }
+    default void dispose() {}
 }

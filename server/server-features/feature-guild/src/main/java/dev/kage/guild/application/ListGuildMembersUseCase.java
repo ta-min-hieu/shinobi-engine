@@ -1,8 +1,9 @@
 package dev.kage.guild.application;
 
+import java.util.List;
+
 import dev.kage.guild.domain.GuildMember;
 import dev.kage.guild.domain.GuildPort;
-import java.util.List;
 
 /** Danh sách thành viên bang của {@code characterId} — rỗng nếu chưa vào bang nào. */
 public final class ListGuildMembersUseCase {

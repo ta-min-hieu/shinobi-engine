@@ -3,6 +3,11 @@ package dev.kage.shop.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+
 import dev.kage.shop.domain.AuditPort;
 import dev.kage.shop.domain.GoldPort;
 import dev.kage.shop.domain.IdempotencyKeyReusedException;
@@ -13,9 +18,6 @@ import dev.kage.shop.domain.ShopCatalogPort;
 import dev.kage.shop.domain.ShopListing;
 import dev.kage.shop.domain.Transaction;
 import dev.kage.shop.domain.TransactionRunner;
-import java.util.List;
-import java.util.Optional;
-import org.junit.jupiter.api.Test;
 
 class SellItemUseCaseTest {
 
@@ -33,7 +35,8 @@ class SellItemUseCaseTest {
         @Override
         public Optional<ShopListing> findListing(long itemTemplateId) {
             return listing != null && listing.itemTemplateId() == itemTemplateId
-                    ? Optional.of(listing) : Optional.empty();
+                    ? Optional.of(listing)
+                    : Optional.empty();
         }
 
         @Override
@@ -109,14 +112,19 @@ class SellItemUseCaseTest {
     private static final String IDEMPOTENCY_KEY = "key-1";
 
     private static SellItemUseCase newUseCase(
-            ShopCatalogPort catalogPort, FakeInventoryGatewayPort inventoryGatewayPort, FakeGoldPort goldPort,
+            ShopCatalogPort catalogPort,
+            FakeInventoryGatewayPort inventoryGatewayPort,
+            FakeGoldPort goldPort,
             FakeAuditPort auditPort) {
         return newUseCase(catalogPort, inventoryGatewayPort, goldPort, auditPort, new FakeIdempotencyPort());
     }
 
     private static SellItemUseCase newUseCase(
-            ShopCatalogPort catalogPort, FakeInventoryGatewayPort inventoryGatewayPort, FakeGoldPort goldPort,
-            FakeAuditPort auditPort, FakeIdempotencyPort idempotencyPort) {
+            ShopCatalogPort catalogPort,
+            FakeInventoryGatewayPort inventoryGatewayPort,
+            FakeGoldPort goldPort,
+            FakeAuditPort auditPort,
+            FakeIdempotencyPort idempotencyPort) {
         ShopPorts ports = new ShopPorts(catalogPort, goldPort, inventoryGatewayPort, auditPort, idempotencyPort);
         return new SellItemUseCase(ports, DIRECT_TX);
     }

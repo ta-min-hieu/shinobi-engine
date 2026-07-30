@@ -37,5 +37,9 @@ public final class AcceptQuestUseCase {
         return AcceptResult.OK;
     }
 
-    public enum AcceptResult { OK, QUEST_NOT_FOUND, ALREADY_ACCEPTED }
+    public enum AcceptResult {
+        OK,
+        QUEST_NOT_FOUND,
+        ALREADY_ACCEPTED
+    }
 }

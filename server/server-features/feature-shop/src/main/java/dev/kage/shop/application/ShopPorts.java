@@ -17,5 +17,4 @@ public record ShopPorts(
         GoldPort goldPort,
         InventoryGatewayPort inventoryGatewayPort,
         AuditPort auditPort,
-        IdempotencyPort idempotencyPort) {
-}
+        IdempotencyPort idempotencyPort) {}

@@ -1,13 +1,15 @@
 package dev.kage.server.database.shop;
 
-import dev.kage.server.database.JdbcOperations;
-import dev.kage.shop.domain.ShopCatalogPort;
-import dev.kage.shop.domain.ShopListing;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
+
 import javax.sql.DataSource;
+
+import dev.kage.server.database.JdbcOperations;
+import dev.kage.shop.domain.ShopCatalogPort;
+import dev.kage.shop.domain.ShopListing;
 
 /** Hiện thực {@link ShopCatalogPort} trên PostgreSQL — đọc thuần, {@code shop_item} là config tĩnh. */
 public final class PostgresShopCatalogAdapter implements ShopCatalogPort {

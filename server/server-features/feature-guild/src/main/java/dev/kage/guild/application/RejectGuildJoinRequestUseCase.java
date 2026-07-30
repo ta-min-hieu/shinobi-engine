@@ -15,5 +15,8 @@ public final class RejectGuildJoinRequestUseCase {
         return port.rejectJoinRequest(requestId, leaderCharacterId) ? Result.OK : Result.NOT_FOUND;
     }
 
-    public enum Result { OK, NOT_FOUND }
+    public enum Result {
+        OK,
+        NOT_FOUND
+    }
 }

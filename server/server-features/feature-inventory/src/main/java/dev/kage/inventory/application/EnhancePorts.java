@@ -11,5 +11,4 @@ import dev.kage.inventory.domain.ItemTemplatePort;
  * {@code EquipmentUseCases}/{@code ShopPorts}.
  */
 public record EnhancePorts(
-        InventoryPort inventoryPort, GoldPort goldPort, AuditPort auditPort, ItemTemplatePort itemTemplatePort) {
-}
+        InventoryPort inventoryPort, GoldPort goldPort, AuditPort auditPort, ItemTemplatePort itemTemplatePort) {}

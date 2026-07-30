@@ -19,11 +19,11 @@ public final class EnhancementTable {
     public static final String PROTECTION_CHARM_CODE = "enhance_protection_charm";
 
     private static final int[] SUCCESS_RATE_PERCENT = {95, 90, 85, 80, 70, 60, 50, 40, 30, 20, 15, 12, 10, 8, 5};
-    private static final long[] GOLD_COST = {100, 200, 350, 550, 800, 1200, 1700, 2300, 3000, 4000, 5500, 7500, 10000,
-            14000, 20000};
+    private static final long[] GOLD_COST = {
+        100, 200, 350, 550, 800, 1200, 1700, 2300, 3000, 4000, 5500, 7500, 10000, 14000, 20000
+    };
 
-    private EnhancementTable() {
-    }
+    private EnhancementTable() {}
 
     public static int successRatePercent(int currentLevel) {
         return SUCCESS_RATE_PERCENT[currentLevel];

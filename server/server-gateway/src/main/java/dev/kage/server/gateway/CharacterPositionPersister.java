@@ -1,12 +1,14 @@
 package dev.kage.server.gateway;
 
-import dev.kage.character.api.CharacterFacade;
 import java.time.Duration;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import dev.kage.character.api.CharacterFacade;
 
 /**
  * Ghi vị trí nhân vật xuống DB ĐỊNH KỲ + lúc logout (SERVER.md §8) — KHÔNG mỗi tick, KHÔNG trên
@@ -34,8 +36,7 @@ final class CharacterPositionPersister {
     }
 
     void start() {
-        scheduler = Executors.newSingleThreadScheduledExecutor(
-                r -> new Thread(r, "character-position-persister"));
+        scheduler = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "character-position-persister"));
         long intervalMillis = interval.toMillis();
         scheduler.scheduleAtFixedRate(
                 this::saveAllKnownPositions, intervalMillis, intervalMillis, TimeUnit.MILLISECONDS);
@@ -61,8 +62,8 @@ final class CharacterPositionPersister {
     // không được làm cả vòng quét dừng lại hay ScheduledExecutorService tự huỷ lịch tiếp theo.
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void saveAllKnownPositions() {
-        registry.snapshotPositions().forEach((characterId, position) ->
-                savePositionSafely(characterId, position.x(), position.y()));
+        registry.snapshotPositions()
+                .forEach((characterId, position) -> savePositionSafely(characterId, position.x(), position.y()));
     }
 
     @SuppressWarnings("PMD.AvoidCatchingGenericException")

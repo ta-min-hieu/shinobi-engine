@@ -2,6 +2,11 @@ package dev.kage.shop.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+
 import dev.kage.shop.domain.AuditPort;
 import dev.kage.shop.domain.GoldPort;
 import dev.kage.shop.domain.IdempotencyKeyReusedException;
@@ -12,9 +17,6 @@ import dev.kage.shop.domain.ShopCatalogPort;
 import dev.kage.shop.domain.ShopListing;
 import dev.kage.shop.domain.Transaction;
 import dev.kage.shop.domain.TransactionRunner;
-import java.util.List;
-import java.util.Optional;
-import org.junit.jupiter.api.Test;
 
 class BuyItemUseCaseTest {
 
@@ -31,7 +33,8 @@ class BuyItemUseCaseTest {
         @Override
         public Optional<ShopListing> findListing(long itemTemplateId) {
             return listing != null && listing.itemTemplateId() == itemTemplateId
-                    ? Optional.of(listing) : Optional.empty();
+                    ? Optional.of(listing)
+                    : Optional.empty();
         }
 
         @Override
@@ -111,14 +114,19 @@ class BuyItemUseCaseTest {
     private static final String IDEMPOTENCY_KEY = "key-1";
 
     private static BuyItemUseCase newUseCase(
-            ShopCatalogPort catalogPort, FakeGoldPort goldPort, FakeInventoryGatewayPort inventoryGatewayPort,
+            ShopCatalogPort catalogPort,
+            FakeGoldPort goldPort,
+            FakeInventoryGatewayPort inventoryGatewayPort,
             FakeAuditPort auditPort) {
         return newUseCase(catalogPort, goldPort, inventoryGatewayPort, auditPort, new FakeIdempotencyPort());
     }
 
     private static BuyItemUseCase newUseCase(
-            ShopCatalogPort catalogPort, FakeGoldPort goldPort, FakeInventoryGatewayPort inventoryGatewayPort,
-            FakeAuditPort auditPort, FakeIdempotencyPort idempotencyPort) {
+            ShopCatalogPort catalogPort,
+            FakeGoldPort goldPort,
+            FakeInventoryGatewayPort inventoryGatewayPort,
+            FakeAuditPort auditPort,
+            FakeIdempotencyPort idempotencyPort) {
         ShopPorts ports = new ShopPorts(catalogPort, goldPort, inventoryGatewayPort, auditPort, idempotencyPort);
         return new BuyItemUseCase(ports, DIRECT_TX);
     }
@@ -201,8 +209,8 @@ class BuyItemUseCaseTest {
     @Test
     void shouldRejectNonPositiveQuantity() {
         FakeCatalogPort catalogPort = new FakeCatalogPort(new ShopListing(TEMPLATE_ID, 5, 2));
-        BuyItemUseCase useCase = newUseCase(catalogPort, new FakeGoldPort(true), new FakeInventoryGatewayPort(true),
-                new FakeAuditPort());
+        BuyItemUseCase useCase = newUseCase(
+                catalogPort, new FakeGoldPort(true), new FakeInventoryGatewayPort(true), new FakeAuditPort());
 
         org.assertj.core.api.Assertions.assertThatThrownBy(
                         () -> useCase.execute(CHARACTER_ID, TEMPLATE_ID, 0, IDEMPOTENCY_KEY))

@@ -45,7 +45,9 @@ public final class Inventory {
      * thật (Phase 5 §7.1).
      */
     public Optional<ItemStack> findByTemplate(long itemTemplateId) {
-        return items.stream().filter(stack -> stack.itemTemplateId() == itemTemplateId).findFirst();
+        return items.stream()
+                .filter(stack -> stack.itemTemplateId() == itemTemplateId)
+                .findFirst();
     }
 
     /**
@@ -76,8 +78,10 @@ public final class Inventory {
                 if (stack.quantity() <= 1) {
                     items.remove(i);
                 } else {
-                    items.set(i, new ItemStack(stack.id(), stack.itemTemplateId(), stack.quantity() - 1,
-                            stack.enhanceLevel()));
+                    items.set(
+                            i,
+                            new ItemStack(
+                                    stack.id(), stack.itemTemplateId(), stack.quantity() - 1, stack.enhanceLevel()));
                 }
                 return;
             }
@@ -109,9 +113,7 @@ public final class Inventory {
     }
 
     // public — package khác (application/) cần pattern-match được trên các nhánh này
-    public record Added() implements AddResult {
-    }
+    public record Added() implements AddResult {}
 
-    public record Full() implements AddResult {
-    }
+    public record Full() implements AddResult {}
 }

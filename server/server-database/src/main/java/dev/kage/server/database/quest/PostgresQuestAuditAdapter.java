@@ -1,11 +1,12 @@
 package dev.kage.server.database.quest;
 
-import dev.kage.quest.domain.AuditPort;
-import dev.kage.quest.domain.Transaction;
-import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
 import java.sql.Timestamp;
 import java.time.Instant;
+
+import dev.kage.quest.domain.AuditPort;
+import dev.kage.quest.domain.Transaction;
+import dev.kage.server.database.JdbcOperations;
 
 /** Hiện thực {@link AuditPort} trên PostgreSQL — ghi {@code audit_log} (DATABASE.md §2.7, V7). */
 public final class PostgresQuestAuditAdapter implements AuditPort {

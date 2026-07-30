@@ -1,12 +1,14 @@
 package dev.kage.server.gateway;
 
-import dev.kage.protocol.Opcode;
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.Gauge;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+
+import dev.kage.protocol.Opcode;
 
 /**
  * OBSERVABILITY.md §3.2 (Network) + §3.5 (Business, phần {@code kage.login.*}/{@code
@@ -90,7 +92,8 @@ final class GatewayNetworkMetrics {
     }
 
     private Counter counterFor(Map<String, Counter> cache, String metricName, String tagKey, String tagValue) {
-        return cache.computeIfAbsent(tagValue,
+        return cache.computeIfAbsent(
+                tagValue,
                 value -> Counter.builder(metricName).tag(tagKey, value).register(registry));
     }
 }

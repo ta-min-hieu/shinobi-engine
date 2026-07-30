@@ -1,11 +1,13 @@
 package dev.kage.server.database;
 
+import java.util.Optional;
+import java.util.TimeZone;
+
+import javax.sql.DataSource;
+
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.HikariPoolMXBean;
-import java.util.Optional;
-import java.util.TimeZone;
-import javax.sql.DataSource;
 
 /** Dựng connection pool HikariCP (ADR-004) từ {@link DatabaseConfig}. */
 public final class PostgresDataSourceFactory {
@@ -34,8 +36,7 @@ public final class PostgresDataSourceFactory {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
     }
 
-    private PostgresDataSourceFactory() {
-    }
+    private PostgresDataSourceFactory() {}
 
     public static DataSource create(DatabaseConfig config) {
         HikariConfig hikariConfig = new HikariConfig();
@@ -62,12 +63,16 @@ public final class PostgresDataSourceFactory {
      * {@link ServerDatabaseBootstrap#totalGold()} trả {@code long} thuần thay vì {@code Gauge}).
      */
     public static int activeConnections(DataSource dataSource) {
-        return poolMxBean(dataSource).map(HikariPoolMXBean::getActiveConnections).orElse(0);
+        return poolMxBean(dataSource)
+                .map(HikariPoolMXBean::getActiveConnections)
+                .orElse(0);
     }
 
     /** Số thread đang CHỜ có connection — {@code > 0} kéo dài nghĩa là pool quá nhỏ (OBSERVABILITY.md §3.3). */
     public static int pendingThreads(DataSource dataSource) {
-        return poolMxBean(dataSource).map(HikariPoolMXBean::getThreadsAwaitingConnection).orElse(0);
+        return poolMxBean(dataSource)
+                .map(HikariPoolMXBean::getThreadsAwaitingConnection)
+                .orElse(0);
     }
 
     private static Optional<HikariPoolMXBean> poolMxBean(DataSource dataSource) {

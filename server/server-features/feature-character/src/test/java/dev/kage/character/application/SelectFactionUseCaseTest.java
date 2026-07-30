@@ -3,6 +3,13 @@ package dev.kage.character.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.CharacterStats;
@@ -10,11 +17,6 @@ import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.character.domain.Transaction;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import org.junit.jupiter.api.Test;
 
 /** Phase 8 (4 hệ phái) — GDD §4 "chọn hệ ở Lv10". Fake = implementation in-memory thật (TESTING §4). */
 class SelectFactionUseCaseTest {
@@ -76,9 +78,18 @@ class SelectFactionUseCaseTest {
             for (int i = 0; i < characters.size(); i++) {
                 Character c = characters.get(i);
                 if (c.id() == characterId) {
-                    characters.set(i, new Character(
-                            c.id(), c.accountId(), c.realmId(), c.name(), faction,
-                            c.level(), c.exp(), c.rebirthCount(), c.createdAt()));
+                    characters.set(
+                            i,
+                            new Character(
+                                    c.id(),
+                                    c.accountId(),
+                                    c.realmId(),
+                                    c.name(),
+                                    faction,
+                                    c.level(),
+                                    c.exp(),
+                                    c.rebirthCount(),
+                                    c.createdAt()));
                     return;
                 }
             }
@@ -115,7 +126,6 @@ class SelectFactionUseCaseTest {
         FakeCharacterPort port = new FakeCharacterPort();
         SelectFactionUseCase useCase = new SelectFactionUseCase(port);
 
-        assertThatThrownBy(() -> useCase.execute(999L, Faction.THUY))
-                .isInstanceOf(CharacterNotFoundException.class);
+        assertThatThrownBy(() -> useCase.execute(999L, Faction.THUY)).isInstanceOf(CharacterNotFoundException.class);
     }
 }

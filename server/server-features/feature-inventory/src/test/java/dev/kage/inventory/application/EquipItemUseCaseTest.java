@@ -2,6 +2,12 @@ package dev.kage.inventory.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+
 import dev.kage.inventory.domain.Equipment;
 import dev.kage.inventory.domain.EquipmentPort;
 import dev.kage.inventory.domain.EquipmentSlotType;
@@ -12,10 +18,6 @@ import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
 import dev.kage.inventory.domain.Transaction;
 import dev.kage.inventory.domain.TransactionRunner;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import org.junit.jupiter.api.Test;
 
 class EquipItemUseCaseTest {
 
@@ -82,8 +84,8 @@ class EquipItemUseCaseTest {
 
     @Test
     void shouldEquip_whenItemBelongsToCharacterAndMatchesSlot() {
-        FakeInventoryPort inventoryPort = new FakeInventoryPort(new Inventory(
-                CHARACTER_ID, 20, List.of(new ItemStack(WEAPON_ITEM_ID, WEAPON_TEMPLATE_ID, 1, 0))));
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(
+                new Inventory(CHARACTER_ID, 20, List.of(new ItemStack(WEAPON_ITEM_ID, WEAPON_TEMPLATE_ID, 1, 0))));
         FakeItemTemplatePort templatePort = new FakeItemTemplatePort(
                 Map.of(WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 5)));
         FakeEquipmentPort equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
@@ -112,8 +114,8 @@ class EquipItemUseCaseTest {
     @Test
     void shouldRejectEquip_whenItemDoesNotMatchTargetSlot() {
         // Item là WEAPON nhưng người chơi cố mặc vào slot ARMOR — server tự kiểm tra, không tin client.
-        FakeInventoryPort inventoryPort = new FakeInventoryPort(new Inventory(
-                CHARACTER_ID, 20, List.of(new ItemStack(WEAPON_ITEM_ID, WEAPON_TEMPLATE_ID, 1, 0))));
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(
+                new Inventory(CHARACTER_ID, 20, List.of(new ItemStack(WEAPON_ITEM_ID, WEAPON_TEMPLATE_ID, 1, 0))));
         FakeItemTemplatePort templatePort = new FakeItemTemplatePort(
                 Map.of(WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 5)));
         FakeEquipmentPort equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));

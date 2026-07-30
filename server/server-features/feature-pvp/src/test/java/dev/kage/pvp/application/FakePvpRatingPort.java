@@ -1,11 +1,12 @@
 package dev.kage.pvp.application;
 
-import dev.kage.pvp.domain.PvpRating;
-import dev.kage.pvp.domain.PvpRatingPort;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import dev.kage.pvp.domain.PvpRating;
+import dev.kage.pvp.domain.PvpRatingPort;
 
 /** Fake in-memory THẬT (TESTING.md §4), không Mockito — mô phỏng UPSERT của adapter Postgres thật. */
 final class FakePvpRatingPort implements PvpRatingPort {

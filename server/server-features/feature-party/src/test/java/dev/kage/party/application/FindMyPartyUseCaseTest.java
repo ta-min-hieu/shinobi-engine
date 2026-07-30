@@ -2,8 +2,9 @@ package dev.kage.party.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.kage.party.domain.PartyRole;
 import org.junit.jupiter.api.Test;
+
+import dev.kage.party.domain.PartyRole;
 
 class FindMyPartyUseCaseTest {
 

@@ -2,11 +2,13 @@ package dev.kage.trade.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
 import dev.kage.trade.domain.OfferedItemInput;
 import dev.kage.trade.domain.TradeSession;
 import dev.kage.trade.domain.TradeStatus;
-import java.util.List;
-import org.junit.jupiter.api.Test;
 
 class GetTradeStatusUseCaseTest {
 

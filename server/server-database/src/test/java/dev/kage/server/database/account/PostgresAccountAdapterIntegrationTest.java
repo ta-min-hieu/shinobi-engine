@@ -3,22 +3,25 @@ package dev.kage.server.database.account;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import dev.kage.account.domain.Account;
-import dev.kage.server.database.DatabaseConfig;
-import dev.kage.server.database.FlywayMigrator;
-import dev.kage.server.database.PostgresDataSourceFactory;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
+
 import javax.sql.DataSource;
+
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
+
+import dev.kage.account.domain.Account;
+import dev.kage.server.database.DatabaseConfig;
+import dev.kage.server.database.FlywayMigrator;
+import dev.kage.server.database.PostgresDataSourceFactory;
 
 /**
  * Test bằng PostgreSQL THẬT qua Testcontainers (không mock JDBC) — verify migration V1 + adapter
@@ -93,7 +96,9 @@ class PostgresAccountAdapterIntegrationTest {
             statement.setString(1, "rollbackplayer");
             try (ResultSet resultSet = statement.executeQuery()) {
                 resultSet.next();
-                assertThat(resultSet.getInt(1)).as("rollback phải xoá row chưa commit").isZero();
+                assertThat(resultSet.getInt(1))
+                        .as("rollback phải xoá row chưa commit")
+                        .isZero();
             }
         }
     }

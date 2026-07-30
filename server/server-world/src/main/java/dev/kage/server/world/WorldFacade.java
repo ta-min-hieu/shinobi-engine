@@ -1,5 +1,18 @@
 package dev.kage.server.world;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.EcsWorld;
 import dev.kage.engine.ecs.KEntity;
@@ -17,21 +30,9 @@ import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterComponent;
 import dev.kage.server.world.component.MonsterIdComponent;
 import dev.kage.server.world.component.NpcComponent;
-import dev.kage.server.world.component.NpcIdComponent;
 import dev.kage.server.world.component.SkillCooldownComponent;
 import dev.kage.server.world.component.StatusEffectComponent;
 import dev.kage.server.world.component.TargetComponent;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Composition root của server-world (SERVER.md §1-3) — sở hữu {@link EcsWorld} + vòng lặp tick
@@ -48,10 +49,8 @@ public final class WorldFacade {
 
     private static final Logger LOG = LoggerFactory.getLogger(WorldFacade.class);
 
-    private static final ComponentMapper<PositionComponent> POSITION =
-            ComponentMapper.getFor(PositionComponent.class);
-    private static final ComponentMapper<VelocityComponent> VELOCITY =
-            ComponentMapper.getFor(VelocityComponent.class);
+    private static final ComponentMapper<PositionComponent> POSITION = ComponentMapper.getFor(PositionComponent.class);
+    private static final ComponentMapper<VelocityComponent> VELOCITY = ComponentMapper.getFor(VelocityComponent.class);
     private static final ComponentMapper<TargetComponent> TARGET = ComponentMapper.getFor(TargetComponent.class);
     private static final ComponentMapper<MonsterComponent> MONSTER = ComponentMapper.getFor(MonsterComponent.class);
     private static final ComponentMapper<CombatStatsComponent> COMBAT_STATS =
@@ -330,16 +329,16 @@ public final class WorldFacade {
         while ((command = inbox.poll()) != null) {
             switch (command) {
                 case WorldCommand.AttachCharacterCommand c ->
-                        handleAttach(c.characterId(), c.spawnX(), c.spawnY(), c.baseStats());
+                    handleAttach(c.characterId(), c.spawnX(), c.spawnY(), c.baseStats());
                 case WorldCommand.DetachCharacterCommand c -> handleDetach(c.characterId());
                 case WorldCommand.MoveIntentCommand c -> handleMoveIntent(c);
                 case WorldCommand.SetTargetCommand c -> handleSetTarget(c.characterId(), c.targetEntityId());
                 case WorldCommand.UseSkillCommand c ->
-                        handleUseSkill(c.characterId(), c.skillCode(), c.targetEntityId());
+                    handleUseSkill(c.characterId(), c.skillCode(), c.targetEntityId());
                 case WorldCommand.ApplyEquipmentBonusCommand c ->
-                        handleApplyEquipmentBonus(c.characterId(), c.bonusAtk());
+                    handleApplyEquipmentBonus(c.characterId(), c.bonusAtk());
                 case WorldCommand.AreaChatMessageCommand c ->
-                        handleAreaChatMessage(c.characterId(), c.senderName(), c.body());
+                    handleAreaChatMessage(c.characterId(), c.senderName(), c.body());
                 case WorldCommand.SpawnBossCommand ignored -> spawnBossEntity();
             }
         }
@@ -697,10 +696,6 @@ public final class WorldFacade {
         NpcComponent npc = new NpcComponent();
         npc.npcCode = SAMPLE_NPC_CODE;
         entity.add(npc);
-
-        NpcIdComponent npcIdComponent = new NpcIdComponent();
-        npcIdComponent.npcId = npcId;
-        entity.add(npcIdComponent);
 
         entitiesByNpcId.put(npcId, entity);
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi NpcSpawnedEvent —

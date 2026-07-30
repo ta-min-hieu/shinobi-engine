@@ -12,8 +12,7 @@ import dev.kage.server.world.Element;
  */
 final class FactionMapping {
 
-    private FactionMapping() {
-    }
+    private FactionMapping() {}
 
     static Element toElement(Faction faction) {
         return switch (faction) {

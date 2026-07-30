@@ -2,10 +2,12 @@ package dev.kage.dialogue.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+
 import dev.kage.dialogue.domain.DialogueNode;
 import dev.kage.dialogue.domain.NpcTemplatePort;
-import java.util.Optional;
-import org.junit.jupiter.api.Test;
 
 class GetDialogueNodeUseCaseTest {
 

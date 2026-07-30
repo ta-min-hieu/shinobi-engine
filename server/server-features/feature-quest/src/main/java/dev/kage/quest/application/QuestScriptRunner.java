@@ -1,7 +1,5 @@
 package dev.kage.quest.application;
 
-import dev.kage.engine.scripting.ScriptExecutionException;
-import dev.kage.engine.scripting.ScriptSandbox;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -11,9 +9,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
 import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import dev.kage.engine.scripting.ScriptExecutionException;
+import dev.kage.engine.scripting.ScriptSandbox;
 
 /**
  * Chạy 1 hook quest script ({@code on_accept}/{@code on_event}/{@code on_claim}, SCRIPTING.md §5) —
@@ -37,11 +39,9 @@ final class QuestScriptRunner {
     // Script không đổi lúc chạy — cache theo scriptRef, cùng lý do GetDialogueNodeUseCase.
     private final Map<String, String> scriptSourceCache = new ConcurrentHashMap<>();
 
-    record HookEffects(String progressJson, boolean completed, long expGranted, List<ItemGrant> itemGrants) {
-    }
+    record HookEffects(String progressJson, boolean completed, long expGranted, List<ItemGrant> itemGrants) {}
 
-    record ItemGrant(String itemTemplateCode, int quantity) {
-    }
+    record ItemGrant(String itemTemplateCode, int quantity) {}
 
     private static final class MutableEffects {
         String progressJson;
@@ -86,8 +86,7 @@ final class QuestScriptRunner {
             return null;
         });
 
-        Map<String, Object> hostApi =
-                Map.of("ctx", (Object) ctx, "event", (Object) (event == null ? Map.of() : event));
+        Map<String, Object> hostApi = Map.of("ctx", (Object) ctx, "event", (Object) (event == null ? Map.of() : event));
         String wrapped = "var quest = " + source + "; quest." + hookName + "(ctx, event);";
         try {
             scriptSandbox.eval(wrapped, hostApi);

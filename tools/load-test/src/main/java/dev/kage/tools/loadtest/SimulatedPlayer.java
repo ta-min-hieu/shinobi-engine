@@ -1,5 +1,18 @@
 package dev.kage.tools.loadtest;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
@@ -15,17 +28,6 @@ import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
-import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * 1 người chơi giả lập — nói chuyện qua ĐÚNG giao thức dây (socket TCP thuần + protobuf, giống hệt
@@ -60,8 +62,7 @@ final class SimulatedPlayer implements Runnable {
      * Postgres/Redis (giao thức game và giao thức DB không đi qua cùng 1 socket).
      */
     record Metrics(
-            LatencyRecorder latencyRecorder, AtomicLong errorCount, AtomicLong bytesSent, AtomicLong bytesReceived) {
-    }
+            LatencyRecorder latencyRecorder, AtomicLong errorCount, AtomicLong bytesSent, AtomicLong bytesReceived) {}
 
     private final String host;
     private final int port;
@@ -99,8 +100,10 @@ final class SimulatedPlayer implements Runnable {
                 consecutiveFailures = playOneCycle(in, monsterId) ? 0 : consecutiveFailures + 1;
             }
             if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                LOG.debug("Client {} bỏ cuộc sau {} lỗi liên tiếp — kết nối coi như đã chết",
-                        username, consecutiveFailures);
+                LOG.debug(
+                        "Client {} bỏ cuộc sau {} lỗi liên tiếp — kết nối coi như đã chết",
+                        username,
+                        consecutiveFailures);
             }
         } catch (IOException e) {
             if (running.get()) { // đóng chủ động lúc test kết thúc không tính là lỗi thật.
@@ -111,7 +114,8 @@ final class SimulatedPlayer implements Runnable {
     }
 
     private void connectCreateSelect(DataInputStream in) throws IOException {
-        ConnectRequest connectRequest = ConnectRequest.newBuilder().setUsername(username).build();
+        ConnectRequest connectRequest =
+                ConnectRequest.newBuilder().setUsername(username).build();
         sendFrame(Opcode.OPCODE_CONNECT_REQUEST_VALUE, connectRequest.toByteArray());
         ConnectResponse.parseFrom(readFrame(in).payload());
 
@@ -120,7 +124,8 @@ final class SimulatedPlayer implements Runnable {
                 .setIdempotencyKey(UUID.randomUUID().toString())
                 .build();
         sendFrame(Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, createRequest.toByteArray());
-        CreateCharacterResponse createResponse = CreateCharacterResponse.parseFrom(readFrame(in).payload());
+        CreateCharacterResponse createResponse =
+                CreateCharacterResponse.parseFrom(readFrame(in).payload());
 
         SelectCharacterRequest selectRequest = SelectCharacterRequest.newBuilder()
                 .setCharacterId(createResponse.getCharacter().getId())
@@ -160,28 +165,7 @@ final class SimulatedPlayer implements Runnable {
     private boolean playOneCycle(DataInputStream in, long monsterId) {
         ThreadLocalRandom random = ThreadLocalRandom.current();
         try {
-            timedRoundTrip(in, Opcode.OPCODE_MOVE_COMMAND_VALUE, Opcode.OPCODE_MOVE_RESPONSE_VALUE,
-                    MoveCommand.newBuilder().setDirX(DUMMY_DIR_X).setDirY(DUMMY_DIR_Y).build().toByteArray());
-
-            if (monsterId != 0 && random.nextInt(100) < 70) { // GDD §6 auto-target — fire-and-forget.
-                SetTargetCommand setTarget = SetTargetCommand.newBuilder().setTargetEntityId(monsterId).build();
-                sendFrame(Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, setTarget.toByteArray());
-            }
-            if (random.nextInt(100) < CHAT_PROBABILITY_PERCENT) {
-                timedRoundTrip(in, Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE,
-                        Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE,
-                        SendChatMessageCommand.newBuilder()
-                                .setChannel(ChatChannel.CHAT_CHANNEL_WORLD)
-                                .setBody("load-test " + username)
-                                .build().toByteArray());
-            }
-            if (random.nextInt(100) < 30) {
-                PingCommand ping = PingCommand.newBuilder().setClientTimestampMs(System.currentTimeMillis()).build();
-                timedRoundTrip(in, Opcode.OPCODE_PING_VALUE, Opcode.OPCODE_PONG_VALUE, ping.toByteArray());
-            }
-
-            MoveCommand stop = MoveCommand.newBuilder().setDirX(0f).setDirY(0f).build();
-            sendFrame(Opcode.OPCODE_MOVE_COMMAND_VALUE, stop.toByteArray());
+            runCycleBody(in, monsterId, random);
             return true;
         } catch (SocketTimeoutException e) {
             // server chậm/quá tải, hoặc AoI event dồn dập che mất response cần tìm — 1 tín hiệu, không phải crash.
@@ -195,6 +179,45 @@ final class SimulatedPlayer implements Runnable {
         } finally {
             sleepJitter(random);
         }
+    }
+
+    /** Tách khỏi {@link #playOneCycle} để giữ dưới giới hạn Checkstyle MethodLength. */
+    private void runCycleBody(DataInputStream in, long monsterId, ThreadLocalRandom random) throws IOException {
+        timedRoundTrip(
+                in,
+                Opcode.OPCODE_MOVE_COMMAND_VALUE,
+                Opcode.OPCODE_MOVE_RESPONSE_VALUE,
+                MoveCommand.newBuilder()
+                        .setDirX(DUMMY_DIR_X)
+                        .setDirY(DUMMY_DIR_Y)
+                        .build()
+                        .toByteArray());
+
+        if (monsterId != 0 && random.nextInt(100) < 70) { // GDD §6 auto-target — fire-and-forget.
+            SetTargetCommand setTarget =
+                    SetTargetCommand.newBuilder().setTargetEntityId(monsterId).build();
+            sendFrame(Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, setTarget.toByteArray());
+        }
+        if (random.nextInt(100) < CHAT_PROBABILITY_PERCENT) {
+            timedRoundTrip(
+                    in,
+                    Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE,
+                    Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE,
+                    SendChatMessageCommand.newBuilder()
+                            .setChannel(ChatChannel.CHAT_CHANNEL_WORLD)
+                            .setBody("load-test " + username)
+                            .build()
+                            .toByteArray());
+        }
+        if (random.nextInt(100) < 30) {
+            PingCommand ping = PingCommand.newBuilder()
+                    .setClientTimestampMs(System.currentTimeMillis())
+                    .build();
+            timedRoundTrip(in, Opcode.OPCODE_PING_VALUE, Opcode.OPCODE_PONG_VALUE, ping.toByteArray());
+        }
+
+        MoveCommand stop = MoveCommand.newBuilder().setDirX(0f).setDirY(0f).build();
+        sendFrame(Opcode.OPCODE_MOVE_COMMAND_VALUE, stop.toByteArray());
     }
 
     private void sleepJitter(ThreadLocalRandom random) {
@@ -237,9 +260,8 @@ final class SimulatedPlayer implements Runnable {
                 return frame;
             }
         }
-        throw new IOException(
-                "Không thấy opcode " + expectedOpcode + " sau " + MAX_FRAMES_TO_SKIP
-                        + " frame — server có quá tải không?");
+        throw new IOException("Không thấy opcode " + expectedOpcode + " sau " + MAX_FRAMES_TO_SKIP
+                + " frame — server có quá tải không?");
     }
 
     private PacketCodec.Frame readFrame(DataInputStream in) throws IOException {

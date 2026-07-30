@@ -1,15 +1,24 @@
 package dev.kage.server.gateway;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import io.netty.channel.ChannelHandlerContext;
+
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.protocol.AttackResultEvent;
-import dev.kage.protocol.EffectKind;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ChatMessageEvent;
+import dev.kage.protocol.EffectKind;
 import dev.kage.protocol.ItemGrantedEvent;
 import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
@@ -27,13 +36,6 @@ import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
 import dev.kage.quest.api.QuestFacade;
 import dev.kage.server.world.WorldOutboundSink;
-import io.netty.channel.ChannelHandlerContext;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * Sổ đăng ký {@code characterId -> ChannelHandlerContext} + implementation THẬT của
@@ -114,7 +116,8 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     void broadcastShuttingDown() {
         ServerShuttingDownEvent event = ServerShuttingDownEvent.newBuilder().build();
         byte[] payload = event.toByteArray();
-        contextsByCharacterId.values()
+        contextsByCharacterId
+                .values()
                 .forEach(ctx -> send(ctx, Opcode.OPCODE_SERVER_SHUTTING_DOWN_EVENT_VALUE, 0, payload));
     }
 
@@ -209,7 +212,8 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         if (ctx == null) {
             return;
         }
-        MonsterDespawnedEvent event = MonsterDespawnedEvent.newBuilder().setMonsterId(monsterId).build();
+        MonsterDespawnedEvent event =
+                MonsterDespawnedEvent.newBuilder().setMonsterId(monsterId).build();
         send(ctx, Opcode.OPCODE_MONSTER_DESPAWNED_EVENT_VALUE, 0, event.toByteArray());
     }
 
@@ -219,7 +223,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         if (ctx == null) {
             return;
         }
-        MonsterMovedEvent event = MonsterMovedEvent.newBuilder().setMonsterId(monsterId).setX(x).setY(y).build();
+        MonsterMovedEvent event = MonsterMovedEvent.newBuilder()
+                .setMonsterId(monsterId)
+                .setX(x)
+                .setY(y)
+                .build();
         send(ctx, Opcode.OPCODE_MONSTER_MOVED_EVENT_VALUE, 0, event.toByteArray());
     }
 

@@ -3,6 +3,8 @@ package dev.kage.protocol.wire;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import org.junit.jupiter.api.Test;
+
 import dev.kage.protocol.AcceptTradeRequestCommand;
 import dev.kage.protocol.AcceptTradeRequestOutcome;
 import dev.kage.protocol.AcceptTradeRequestResponse;
@@ -12,7 +14,6 @@ import dev.kage.protocol.CancelTradeResponse;
 import dev.kage.protocol.ConfirmTradeCommand;
 import dev.kage.protocol.ConfirmTradeOutcome;
 import dev.kage.protocol.ConfirmTradeResponse;
-import dev.kage.protocol.GetTradeStatusRequest;
 import dev.kage.protocol.GetTradeStatusResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.RequestTradeCommand;
@@ -28,7 +29,6 @@ import dev.kage.protocol.TradeOfferItemView;
 import dev.kage.protocol.TradePhase;
 import dev.kage.protocol.TradeRequestedEvent;
 import dev.kage.protocol.TradeUpdatedEvent;
-import org.junit.jupiter.api.Test;
 
 /**
  * Round-trip test bắt buộc theo shared/CLAUDE.md khi thêm packet mới — verify {@code PacketCodec}
@@ -38,11 +38,13 @@ class TradePacketsTest {
 
     @Test
     void shouldRoundTripRequestTradeCommand() throws InvalidProtocolBufferException {
-        RequestTradeCommand command = RequestTradeCommand.newBuilder().setTargetName("naruto").build();
+        RequestTradeCommand command =
+                RequestTradeCommand.newBuilder().setTargetName("naruto").build();
         PacketHeader header = new PacketHeader(Opcode.OPCODE_REQUEST_TRADE_COMMAND_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        RequestTradeCommand parsed = RequestTradeCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        RequestTradeCommand parsed = RequestTradeCommand.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getTargetName()).isEqualTo("naruto");
     }
@@ -56,7 +58,8 @@ class TradePacketsTest {
         PacketHeader header = new PacketHeader(Opcode.OPCODE_REQUEST_TRADE_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        RequestTradeResponse parsed = RequestTradeResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        RequestTradeResponse parsed = RequestTradeResponse.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(RequestTradeOutcome.REQUEST_TRADE_OUTCOME_OK);
         assertThat(parsed.getSessionId()).isEqualTo(7L);
@@ -64,11 +67,14 @@ class TradePacketsTest {
 
     @Test
     void shouldRoundTripAcceptTradeRequestCommandAndResponse() throws InvalidProtocolBufferException {
-        AcceptTradeRequestCommand command = AcceptTradeRequestCommand.newBuilder().setSessionId(9L).build();
+        AcceptTradeRequestCommand command =
+                AcceptTradeRequestCommand.newBuilder().setSessionId(9L).build();
         PacketHeader header =
                 new PacketHeader(Opcode.OPCODE_ACCEPT_TRADE_REQUEST_COMMAND_VALUE, ProtocolVersion.CURRENT, 2);
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        assertThat(AcceptTradeRequestCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload()).getSessionId())
+        assertThat(AcceptTradeRequestCommand.parseFrom(
+                                PacketCodec.decodeFrame(frameBytes).payload())
+                        .getSessionId())
                 .isEqualTo(9L);
 
         AcceptTradeRequestResponse response = AcceptTradeRequestResponse.newBuilder()
@@ -77,33 +83,38 @@ class TradePacketsTest {
         PacketHeader responseHeader =
                 new PacketHeader(Opcode.OPCODE_ACCEPT_TRADE_REQUEST_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
         byte[] responseBytes = PacketCodec.encodeFrame(responseHeader, response.toByteArray());
-        AcceptTradeRequestResponse parsedResponse =
-                AcceptTradeRequestResponse.parseFrom(PacketCodec.decodeFrame(responseBytes).payload());
+        AcceptTradeRequestResponse parsedResponse = AcceptTradeRequestResponse.parseFrom(
+                PacketCodec.decodeFrame(responseBytes).payload());
         assertThat(parsedResponse.getOutcome())
                 .isEqualTo(AcceptTradeRequestOutcome.ACCEPT_TRADE_REQUEST_OUTCOME_NOT_FOUND);
     }
 
     @Test
     void shouldRoundTripCancelTradeCommandAndResponse() throws InvalidProtocolBufferException {
-        CancelTradeCommand command = CancelTradeCommand.newBuilder().setSessionId(11L).build();
+        CancelTradeCommand command =
+                CancelTradeCommand.newBuilder().setSessionId(11L).build();
         PacketHeader header = new PacketHeader(Opcode.OPCODE_CANCEL_TRADE_COMMAND_VALUE, ProtocolVersion.CURRENT, 3);
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        assertThat(CancelTradeCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload()).getSessionId())
+        assertThat(CancelTradeCommand.parseFrom(
+                                PacketCodec.decodeFrame(frameBytes).payload())
+                        .getSessionId())
                 .isEqualTo(11L);
 
-        CancelTradeResponse response =
-                CancelTradeResponse.newBuilder().setOutcome(CancelTradeOutcome.CANCEL_TRADE_OUTCOME_OK).build();
+        CancelTradeResponse response = CancelTradeResponse.newBuilder()
+                .setOutcome(CancelTradeOutcome.CANCEL_TRADE_OUTCOME_OK)
+                .build();
         PacketHeader responseHeader =
                 new PacketHeader(Opcode.OPCODE_CANCEL_TRADE_RESPONSE_VALUE, ProtocolVersion.CURRENT, 3);
         byte[] responseBytes = PacketCodec.encodeFrame(responseHeader, response.toByteArray());
-        CancelTradeResponse parsedResponse =
-                CancelTradeResponse.parseFrom(PacketCodec.decodeFrame(responseBytes).payload());
+        CancelTradeResponse parsedResponse = CancelTradeResponse.parseFrom(
+                PacketCodec.decodeFrame(responseBytes).payload());
         assertThat(parsedResponse.getOutcome()).isEqualTo(CancelTradeOutcome.CANCEL_TRADE_OUTCOME_OK);
     }
 
     @Test
     void shouldRoundTripSetTradeOfferCommand() throws InvalidProtocolBufferException {
-        TradeOfferItemInput item = TradeOfferItemInput.newBuilder().setItemId(42L).setQuantity(3).build();
+        TradeOfferItemInput item =
+                TradeOfferItemInput.newBuilder().setItemId(42L).setQuantity(3).build();
         SetTradeOfferCommand command = SetTradeOfferCommand.newBuilder()
                 .setSessionId(1L)
                 .setGoldAmount(100L)
@@ -112,7 +123,8 @@ class TradePacketsTest {
         PacketHeader header = new PacketHeader(Opcode.OPCODE_SET_TRADE_OFFER_COMMAND_VALUE, ProtocolVersion.CURRENT, 4);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        SetTradeOfferCommand parsed = SetTradeOfferCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SetTradeOfferCommand parsed = SetTradeOfferCommand.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getSessionId()).isEqualTo(1L);
         assertThat(parsed.getGoldAmount()).isEqualTo(100L);
@@ -130,7 +142,8 @@ class TradePacketsTest {
                 new PacketHeader(Opcode.OPCODE_SET_TRADE_OFFER_RESPONSE_VALUE, ProtocolVersion.CURRENT, 4);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        SetTradeOfferResponse parsed = SetTradeOfferResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SetTradeOfferResponse parsed = SetTradeOfferResponse.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(SetTradeOfferOutcome.SET_TRADE_OFFER_OUTCOME_NOT_FOUND);
     }
@@ -144,7 +157,8 @@ class TradePacketsTest {
         PacketHeader header = new PacketHeader(Opcode.OPCODE_CONFIRM_TRADE_COMMAND_VALUE, ProtocolVersion.CURRENT, 5);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        ConfirmTradeCommand parsed = ConfirmTradeCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ConfirmTradeCommand parsed = ConfirmTradeCommand.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getSessionId()).isEqualTo(1L);
         assertThat(parsed.getIdempotencyKey()).isEqualTo("44444444-4444-4444-4444-444444444444");
@@ -158,14 +172,14 @@ class TradePacketsTest {
         PacketHeader header = new PacketHeader(Opcode.OPCODE_CONFIRM_TRADE_RESPONSE_VALUE, ProtocolVersion.CURRENT, 5);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        ConfirmTradeResponse parsed = ConfirmTradeResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ConfirmTradeResponse parsed = ConfirmTradeResponse.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_EXECUTED);
     }
 
     @Test
     void shouldRoundTripGetTradeStatusResponse() throws InvalidProtocolBufferException {
-        GetTradeStatusRequest.newBuilder().build();
         TradeOfferItemView item = TradeOfferItemView.newBuilder()
                 .setItemId(1L)
                 .setItemTemplateId(200L)
@@ -189,7 +203,8 @@ class TradePacketsTest {
                 new PacketHeader(Opcode.OPCODE_GET_TRADE_STATUS_RESPONSE_VALUE, ProtocolVersion.CURRENT, 6);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        GetTradeStatusResponse parsed = GetTradeStatusResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        GetTradeStatusResponse parsed = GetTradeStatusResponse.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getInTrade()).isTrue();
         assertThat(parsed.getSessionId()).isEqualTo(5L);
@@ -215,7 +230,8 @@ class TradePacketsTest {
         PacketHeader header = new PacketHeader(Opcode.OPCODE_TRADE_REQUESTED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        TradeRequestedEvent parsed = TradeRequestedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        TradeRequestedEvent parsed = TradeRequestedEvent.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getSessionId()).isEqualTo(1L);
         assertThat(parsed.getFromCharacterId()).isEqualTo(5L);
@@ -224,11 +240,13 @@ class TradePacketsTest {
 
     @Test
     void shouldRoundTripTradeUpdatedEvent() throws InvalidProtocolBufferException {
-        TradeUpdatedEvent event = TradeUpdatedEvent.newBuilder().setSessionId(1L).build();
+        TradeUpdatedEvent event =
+                TradeUpdatedEvent.newBuilder().setSessionId(1L).build();
         PacketHeader header = new PacketHeader(Opcode.OPCODE_TRADE_UPDATED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        TradeUpdatedEvent parsed = TradeUpdatedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        TradeUpdatedEvent parsed =
+                TradeUpdatedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getSessionId()).isEqualTo(1L);
     }
@@ -242,7 +260,8 @@ class TradePacketsTest {
         PacketHeader header = new PacketHeader(Opcode.OPCODE_TRADE_CLOSED_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        TradeClosedEvent parsed = TradeClosedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        TradeClosedEvent parsed =
+                TradeClosedEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getSessionId()).isEqualTo(1L);
         assertThat(parsed.getReason()).isEqualTo(TradeCloseReason.TRADE_CLOSE_REASON_EXECUTED);

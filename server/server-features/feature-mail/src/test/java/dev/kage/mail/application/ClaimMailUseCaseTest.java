@@ -2,6 +2,13 @@ package dev.kage.mail.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+
 import dev.kage.mail.domain.AuditPort;
 import dev.kage.mail.domain.GoldPort;
 import dev.kage.mail.domain.IdempotencyKeyReusedException;
@@ -12,11 +19,6 @@ import dev.kage.mail.domain.MailAttachment;
 import dev.kage.mail.domain.MailRepositoryPort;
 import dev.kage.mail.domain.NewMail;
 import dev.kage.mail.domain.Transaction;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import org.junit.jupiter.api.Test;
 
 class ClaimMailUseCaseTest {
 
@@ -41,8 +43,12 @@ class ClaimMailUseCaseTest {
     void shouldReturnNotFound_whenRecipientMismatch() {
         FakeMailRepositoryPort repositoryPort = new FakeMailRepositoryPort();
         repositoryPort.mails.add(new Mail(1, null, 5, "s", "b", 0, List.of(), null, Instant.now()));
-        MailPorts ports = new MailPorts(repositoryPort, new FakeGoldPort(), new FakeInventoryGatewayPort(true),
-                new FakeAuditPort(), new FakeIdempotencyPort());
+        MailPorts ports = new MailPorts(
+                repositoryPort,
+                new FakeGoldPort(),
+                new FakeInventoryGatewayPort(true),
+                new FakeAuditPort(),
+                new FakeIdempotencyPort());
         ClaimMailUseCase useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
 
         // 999 không phải recipient thật (5)
@@ -55,8 +61,12 @@ class ClaimMailUseCaseTest {
     void shouldReturnAlreadyClaimed_whenClaimedAtSet() {
         FakeMailRepositoryPort repositoryPort = new FakeMailRepositoryPort();
         repositoryPort.mails.add(new Mail(1, null, 5, "s", "b", 0, List.of(), Instant.now(), Instant.now()));
-        MailPorts ports = new MailPorts(repositoryPort, new FakeGoldPort(), new FakeInventoryGatewayPort(true),
-                new FakeAuditPort(), new FakeIdempotencyPort());
+        MailPorts ports = new MailPorts(
+                repositoryPort,
+                new FakeGoldPort(),
+                new FakeInventoryGatewayPort(true),
+                new FakeAuditPort(),
+                new FakeIdempotencyPort());
         ClaimMailUseCase useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
 
         ClaimMailUseCase.ClaimOutcome result = useCase.execute(1, 5, IDEMPOTENCY_KEY);
@@ -115,8 +125,12 @@ class ClaimMailUseCaseTest {
         repositoryPort.mails.add(
                 new Mail(1, 7L, 5, "s", "b", 50, List.of(new MailAttachment(1, 2)), null, Instant.now()));
         FakeIdempotencyPort idempotencyPort = new FakeIdempotencyPort();
-        MailPorts ports = new MailPorts(repositoryPort, new FakeGoldPort(), new FakeInventoryGatewayPort(true),
-                new FakeAuditPort(), idempotencyPort);
+        MailPorts ports = new MailPorts(
+                repositoryPort,
+                new FakeGoldPort(),
+                new FakeInventoryGatewayPort(true),
+                new FakeAuditPort(),
+                idempotencyPort);
         ClaimMailUseCase useCase = new ClaimMailUseCase(ports, action -> action.accept(null));
         useCase.execute(1, 5, IDEMPOTENCY_KEY);
 
@@ -155,8 +169,18 @@ class ClaimMailUseCaseTest {
             for (int i = 0; i < mails.size(); i++) {
                 Mail m = mails.get(i);
                 if (m.id() == mailId && m.recipientId() == recipientId && !m.isClaimed()) {
-                    mails.set(i, new Mail(m.id(), m.senderId(), m.recipientId(), m.subject(), m.body(),
-                            m.goldAmount(), m.attachments(), Instant.now(), m.createdAt()));
+                    mails.set(
+                            i,
+                            new Mail(
+                                    m.id(),
+                                    m.senderId(),
+                                    m.recipientId(),
+                                    m.subject(),
+                                    m.body(),
+                                    m.goldAmount(),
+                                    m.attachments(),
+                                    Instant.now(),
+                                    m.createdAt()));
                     return true;
                 }
             }

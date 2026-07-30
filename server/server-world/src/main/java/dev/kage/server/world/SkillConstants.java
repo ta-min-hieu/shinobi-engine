@@ -28,6 +28,5 @@ final class SkillConstants {
     // GDD §5 "Tuyệt Kỹ Lv50" — gate ở SkillSystem.tryCast qua CharacterLevelComponent.
     static final int ULTIMATE_REQUIRED_LEVEL = 50;
 
-    private SkillConstants() {
-    }
+    private SkillConstants() {}
 }

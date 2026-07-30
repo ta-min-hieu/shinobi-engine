@@ -2,10 +2,11 @@ package dev.kage.chat.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.junit.jupiter.api.Test;
+
 import dev.kage.chat.domain.ChatAuditPort;
 import dev.kage.chat.domain.ChatChannel;
 import dev.kage.chat.domain.ChatMessage;
-import org.junit.jupiter.api.Test;
 
 class SendChatMessageUseCaseTest {
 

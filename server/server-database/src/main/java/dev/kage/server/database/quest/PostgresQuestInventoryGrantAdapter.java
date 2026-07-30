@@ -1,11 +1,13 @@
 package dev.kage.server.database.quest;
 
+import java.sql.Connection;
+import java.util.Optional;
+
+import javax.sql.DataSource;
+
 import dev.kage.quest.domain.QuestInventoryGrantPort;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.server.database.JdbcOperations;
-import java.sql.Connection;
-import java.util.Optional;
-import javax.sql.DataSource;
 
 /**
  * Hiện thực {@link QuestInventoryGrantPort} trên PostgreSQL — SQL riêng cho {@code inventory_item}
@@ -47,8 +49,8 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
         if (itemTemplateId.isEmpty()) {
             return false;
         }
-        int existingCount =
-                JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId).orElse(0);
+        int existingCount = JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId)
+                .orElse(0);
         if (existingCount >= DEFAULT_CAPACITY) {
             return false;
         }

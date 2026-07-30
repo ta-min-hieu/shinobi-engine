@@ -1,10 +1,12 @@
 package dev.kage.server.database.mail;
 
+import java.util.function.Consumer;
+
+import javax.sql.DataSource;
+
 import dev.kage.mail.domain.Transaction;
 import dev.kage.mail.domain.TransactionRunner;
 import dev.kage.server.database.JdbcTransactionRunner;
-import java.util.function.Consumer;
-import javax.sql.DataSource;
 
 /** Hiện thực {@code feature-mail}'s {@link TransactionRunner} bằng JDBC thật. */
 public final class JdbcMailTransactionRunner implements TransactionRunner {

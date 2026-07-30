@@ -29,9 +29,11 @@ public final class ComputeEquipmentBonusUseCase {
     }
 
     public EquipmentBonus execute(long characterId) {
-        Equipment equipment = equipmentPort.findByCharacter(characterId)
+        Equipment equipment = equipmentPort
+                .findByCharacter(characterId)
                 .orElseThrow(() -> new IllegalStateException("EquipmentPort phải luôn trả Optional có giá trị"));
-        Inventory inventory = inventoryPort.findByCharacter(characterId)
+        Inventory inventory = inventoryPort
+                .findByCharacter(characterId)
                 .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
 
         int totalBonusAtk = 0;
@@ -40,7 +42,8 @@ public final class ComputeEquipmentBonusUseCase {
             if (item == null) {
                 continue; // dữ liệu lệch hiếm gặp (item bị xoá khỏi túi nhưng equipment_slot chưa dọn) — bỏ qua an toàn
             }
-            ItemTemplate template = itemTemplatePort.findById(item.itemTemplateId()).orElse(null);
+            ItemTemplate template =
+                    itemTemplatePort.findById(item.itemTemplateId()).orElse(null);
             if (template == null) {
                 continue;
             }

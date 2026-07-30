@@ -1,16 +1,18 @@
 package dev.kage.server.database.pvp;
 
-import dev.kage.pvp.domain.PvpRating;
-import dev.kage.pvp.domain.PvpRatingPort;
-import dev.kage.server.database.JdbcOperations;
-import dev.kage.server.database.JdbcTransactionRunner;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Optional;
+
 import javax.sql.DataSource;
+
+import dev.kage.pvp.domain.PvpRating;
+import dev.kage.pvp.domain.PvpRatingPort;
+import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.JdbcTransactionRunner;
 
 /**
  * Hiện thực {@link PvpRatingPort} trên PostgreSQL — bảng {@code pvp_rating} (V18).
@@ -58,8 +60,7 @@ public final class PostgresPvpRatingAdapter implements PvpRatingPort {
     }
 
     /** Gộp tham số UPSERT — tránh vượt giới hạn 4 tham số/method (STATIC-ANALYSIS.md). */
-    private record RatingDelta(int newRating, int winsDelta, int lossesDelta) {
-    }
+    private record RatingDelta(int newRating, int winsDelta, int lossesDelta) {}
 
     private static void upsert(Connection connection, long characterId, RatingDelta delta) {
         JdbcOperations.update(
@@ -74,7 +75,10 @@ public final class PostgresPvpRatingAdapter implements PvpRatingPort {
 
     private static PvpRating mapRating(ResultSet rs) throws SQLException {
         return new PvpRating(
-                rs.getLong("character_id"), rs.getInt("rating"), rs.getInt("wins"), rs.getInt("losses"),
+                rs.getLong("character_id"),
+                rs.getInt("rating"),
+                rs.getInt("wins"),
+                rs.getInt("losses"),
                 rs.getTimestamp("updated_at").toInstant());
     }
 }

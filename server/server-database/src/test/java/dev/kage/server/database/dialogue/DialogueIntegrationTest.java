@@ -2,21 +2,24 @@ package dev.kage.server.database.dialogue;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.kage.dialogue.application.GetDialogueNodeUseCase;
-import dev.kage.dialogue.domain.DialogueNode;
-import dev.kage.server.database.DatabaseConfig;
-import dev.kage.server.database.FlywayMigrator;
-import dev.kage.server.database.PostgresDataSourceFactory;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+
 import javax.sql.DataSource;
+
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+
+import dev.kage.dialogue.application.GetDialogueNodeUseCase;
+import dev.kage.dialogue.domain.DialogueNode;
+import dev.kage.server.database.DatabaseConfig;
+import dev.kage.server.database.FlywayMigrator;
+import dev.kage.server.database.PostgresDataSourceFactory;
 
 /**
  * Test bằng PostgreSQL THẬT qua Testcontainers — verify migration V10 ({@code npc_template}) +
@@ -57,7 +60,8 @@ class DialogueIntegrationTest {
         assertThat(result).isPresent();
         DialogueNode node = result.get();
         assertThat(node.textKey()).isEqualTo("dialogue.town_elder.greeting");
-        assertThat(node.options()).extracting("action")
+        assertThat(node.options())
+                .extracting("action")
                 .containsExactly("about_town", "accept_quest:kill_training_dummies", "open_shop", "end");
     }
 

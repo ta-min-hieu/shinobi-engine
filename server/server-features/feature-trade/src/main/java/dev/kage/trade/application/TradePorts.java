@@ -17,5 +17,4 @@ public record TradePorts(
         TradeInventoryPort inventoryPort,
         TradeGoldPort goldPort,
         TradeAuditPort auditPort,
-        IdempotencyPort idempotencyPort) {
-}
+        IdempotencyPort idempotencyPort) {}

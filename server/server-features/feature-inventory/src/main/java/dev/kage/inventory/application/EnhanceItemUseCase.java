@@ -1,13 +1,14 @@
 package dev.kage.inventory.application;
 
+import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicReference;
+
 import dev.kage.inventory.domain.EnhancementTable;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.Transaction;
 import dev.kage.inventory.domain.TransactionRunner;
-import java.util.Optional;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Cường hoá item +0→+15 (GAMEPLAY.md §7) — tốn gold, tỉ lệ thành công giảm dần theo cấp
@@ -31,7 +32,8 @@ public final class EnhanceItemUseCase {
     }
 
     public EnhanceResult execute(long characterId, long itemId, boolean useProtection) {
-        Inventory inventory = ports.inventoryPort().findByCharacter(characterId)
+        Inventory inventory = ports.inventoryPort()
+                .findByCharacter(characterId)
                 .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
         ItemStack item = inventory.findItem(itemId).orElse(null);
         if (item == null) {
@@ -70,7 +72,8 @@ public final class EnhanceItemUseCase {
         if (!useProtection || rolledSuccess || currentLevel < EnhancementTable.DROP_ON_FAIL_FROM_LEVEL) {
             return Optional.empty();
         }
-        return ports.itemTemplatePort().findIdByCode(EnhancementTable.PROTECTION_CHARM_CODE)
+        return ports.itemTemplatePort()
+                .findIdByCode(EnhancementTable.PROTECTION_CHARM_CODE)
                 .flatMap(inventory::findByTemplate);
     }
 
@@ -92,10 +95,15 @@ public final class EnhanceItemUseCase {
                 .formatted(itemId, outcome.fromLevel(), outcome.toLevel(), cost, outcome.result());
     }
 
-    private record EnhanceOutcome(int fromLevel, int toLevel, EnhanceResult result) {
-    }
+    private record EnhanceOutcome(int fromLevel, int toLevel, EnhanceResult result) {}
 
     public enum EnhanceResult {
-        SUCCESS, FAILED_NO_DROP, FAILED_DROPPED, FAILED_PROTECTED, ITEM_NOT_FOUND, MAX_LEVEL, INSUFFICIENT_GOLD
+        SUCCESS,
+        FAILED_NO_DROP,
+        FAILED_DROPPED,
+        FAILED_PROTECTED,
+        ITEM_NOT_FOUND,
+        MAX_LEVEL,
+        INSUFFICIENT_GOLD
     }
 }

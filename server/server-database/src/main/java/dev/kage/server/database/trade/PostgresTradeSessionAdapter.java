@@ -1,14 +1,5 @@
 package dev.kage.server.database.trade;
 
-import dev.kage.server.database.DatabaseAccessException;
-import dev.kage.server.database.JdbcOperations;
-import dev.kage.trade.domain.OfferedItemInput;
-import dev.kage.trade.domain.Transaction;
-import dev.kage.trade.domain.TradeOfferItem;
-import dev.kage.trade.domain.TradeSession;
-import dev.kage.trade.domain.TradeSessionPort;
-import dev.kage.trade.domain.TradeSessionSnapshot;
-import dev.kage.trade.domain.TradeStatus;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -17,7 +8,18 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
 import javax.sql.DataSource;
+
+import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
+import dev.kage.trade.domain.OfferedItemInput;
+import dev.kage.trade.domain.TradeOfferItem;
+import dev.kage.trade.domain.TradeSession;
+import dev.kage.trade.domain.TradeSessionPort;
+import dev.kage.trade.domain.TradeSessionSnapshot;
+import dev.kage.trade.domain.TradeStatus;
+import dev.kage.trade.domain.Transaction;
 
 /**
  * Hiện thực {@link TradeSessionPort} trên PostgreSQL — bảng {@code trade_session}/{@code
@@ -161,18 +163,17 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
     }
 
     /** Gói tham số cho {@link #replaceOfferInTransaction} — tránh vượt 4 tham số Checkstyle {@code ParameterNumber}. */
-    private record OfferRequest(long sessionId, long characterId, long goldAmount, List<OfferedItemInput> items) {
-    }
+    private record OfferRequest(long sessionId, long characterId, long goldAmount, List<OfferedItemInput> items) {}
 
-    private record SessionForOfferRow(long requesterId, long targetId, String status) {
-    }
+    private record SessionForOfferRow(long requesterId, long targetId, String status) {}
 
     private static boolean replaceOfferInTransaction(Connection connection, OfferRequest request) {
         Optional<SessionForOfferRow> session = JdbcOperations.queryOne(
                 connection,
                 SELECT_SESSION_FOR_OFFER,
                 rs -> new SessionForOfferRow(
-                        rs.getLong("requester_character_id"), rs.getLong("target_character_id"),
+                        rs.getLong("requester_character_id"),
+                        rs.getLong("target_character_id"),
                         rs.getString("status")),
                 request.sessionId());
         if (session.isEmpty() || !"OPEN".equals(session.get().status())) {
@@ -221,15 +222,26 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
                 connection, SELECT_OFFER_ITEMS, PostgresTradeSessionAdapter::mapOfferItem, sessionId);
         SessionRow r = row.get();
         return Optional.of(new TradeSessionSnapshot(
-                sessionId, r.requesterId(), r.targetId(), r.status(), r.requesterGold(), r.targetGold(),
-                r.requesterConfirmed(), r.targetConfirmed(), items));
+                sessionId,
+                r.requesterId(),
+                r.targetId(),
+                r.status(),
+                r.requesterGold(),
+                r.targetGold(),
+                r.requesterConfirmed(),
+                r.targetConfirmed(),
+                items));
     }
 
     /** Kết quả SELECT 1 dòng {@code trade_session} — record header không tính Checkstyle {@code ParameterNumber}. */
     private record SessionRow(
-            long requesterId, long targetId, TradeStatus status, long requesterGold, long targetGold,
-            boolean requesterConfirmed, boolean targetConfirmed) {
-    }
+            long requesterId,
+            long targetId,
+            TradeStatus status,
+            long requesterGold,
+            long targetGold,
+            boolean requesterConfirmed,
+            boolean targetConfirmed) {}
 
     private static SessionRow mapSessionRow(ResultSet rs) throws SQLException {
         return new SessionRow(
@@ -244,8 +256,11 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
 
     private static TradeOfferItem mapOfferItem(ResultSet rs) throws SQLException {
         return new TradeOfferItem(
-                rs.getLong("id"), rs.getLong("session_id"), rs.getLong("offering_character_id"),
-                rs.getLong("item_id"), rs.getInt("quantity"));
+                rs.getLong("id"),
+                rs.getLong("session_id"),
+                rs.getLong("offering_character_id"),
+                rs.getLong("item_id"),
+                rs.getInt("quantity"));
     }
 
     @Override
@@ -262,7 +277,10 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
 
     private static TradeSession mapSession(ResultSet rs) throws SQLException {
         return new TradeSession(
-                rs.getLong("id"), rs.getLong("requester_character_id"), rs.getLong("target_character_id"),
-                TradeStatus.valueOf(rs.getString("status")), rs.getTimestamp("created_at").toInstant());
+                rs.getLong("id"),
+                rs.getLong("requester_character_id"),
+                rs.getLong("target_character_id"),
+                TradeStatus.valueOf(rs.getString("status")),
+                rs.getTimestamp("created_at").toInstant());
     }
 }

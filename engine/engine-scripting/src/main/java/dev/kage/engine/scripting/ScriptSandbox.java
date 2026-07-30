@@ -3,6 +3,7 @@ package dev.kage.engine.scripting;
 import java.io.IOException;
 import java.util.Map;
 import java.util.function.Function;
+
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.EnvironmentAccess;
 import org.graalvm.polyglot.HostAccess;

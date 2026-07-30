@@ -2,6 +2,25 @@ package dev.kage.server.database.inventory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import javax.sql.DataSource;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
+
 import dev.kage.account.domain.Account;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.Faction;
@@ -18,22 +37,6 @@ import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-import javax.sql.DataSource;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * Test bằng PostgreSQL THẬT qua Testcontainers — verify migration V7 (`character_stat.gold`,
@@ -73,7 +76,8 @@ class EnhanceItemUseCaseIntegrationTest {
     private static long createFreshCharacter(String name) {
         PostgresCharacterAdapter characterAdapter = new PostgresCharacterAdapter(dataSource);
         JdbcCharacterTransactionRunner characterTx = new JdbcCharacterTransactionRunner(dataSource);
-        NewCharacter newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
+        NewCharacter newCharacter =
+                new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
         Character[] holder = new Character[1];
         characterTx.inTransaction(tx -> holder[0] = characterAdapter.create(tx, newCharacter));
         return holder[0].id();
@@ -139,7 +143,12 @@ class EnhanceItemUseCaseIntegrationTest {
         JdbcInventoryTransactionRunner inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
         Inventory inventory = new Inventory(characterId, 20, List.of(ItemStack.newItem(itemTemplateId, 1, 0)));
         inventoryTx.inTransaction(tx -> inventoryAdapter.save(tx, inventory));
-        return inventoryAdapter.findByCharacter(characterId).orElseThrow().items().get(0).id();
+        return inventoryAdapter
+                .findByCharacter(characterId)
+                .orElseThrow()
+                .items()
+                .get(0)
+                .id();
     }
 
     private static EnhanceItemUseCase newUseCase() {
@@ -186,8 +195,8 @@ class EnhanceItemUseCaseIntegrationTest {
 
         EnhanceItemUseCase.EnhanceResult result = newUseCase().execute(characterId, realItemId, false);
 
-        assertThat(result).isIn(
-                EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP);
+        assertThat(result)
+                .isIn(EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP);
         assertThat(readGold(characterId)).isZero(); // đã trừ hết 100 gold dù thành công hay thất bại
         assertThat(countAuditLogRows(characterId, "ENHANCE_ITEM")).isEqualTo(1);
     }
@@ -198,10 +207,15 @@ class EnhanceItemUseCaseIntegrationTest {
         long woodenSwordId = findItemTemplateIdByCode("wooden_sword");
         PostgresInventoryAdapter inventoryAdapter = new PostgresInventoryAdapter(dataSource);
         JdbcInventoryTransactionRunner inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
-        Inventory maxedInventory = new Inventory(
-                characterId, 20, List.of(ItemStack.newItem(woodenSwordId, 1, ItemStack.MAX_ENHANCE)));
+        Inventory maxedInventory =
+                new Inventory(characterId, 20, List.of(ItemStack.newItem(woodenSwordId, 1, ItemStack.MAX_ENHANCE)));
         inventoryTx.inTransaction(tx -> inventoryAdapter.save(tx, maxedInventory));
-        long realItemId = inventoryAdapter.findByCharacter(characterId).orElseThrow().items().get(0).id();
+        long realItemId = inventoryAdapter
+                .findByCharacter(characterId)
+                .orElseThrow()
+                .items()
+                .get(0)
+                .id();
         grantGold(characterId, 1_000_000);
 
         EnhanceItemUseCase.EnhanceResult result = newUseCase().execute(characterId, realItemId, false);
@@ -222,7 +236,12 @@ class EnhanceItemUseCaseIntegrationTest {
             JdbcInventoryTransactionRunner inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
             inventoryTx.inTransaction(tx -> inventoryAdapter.save(
                     tx, new Inventory(characterId, 20, List.of(ItemStack.newItem(woodenSwordId, 1, 14)))));
-            long realItemId = inventoryAdapter.findByCharacter(characterId).orElseThrow().items().get(0).id();
+            long realItemId = inventoryAdapter
+                    .findByCharacter(characterId)
+                    .orElseThrow()
+                    .items()
+                    .get(0)
+                    .id();
             grantProtectionCharm(characterId);
             grantGold(characterId, EnhancementTable.goldCost(14));
 
@@ -230,13 +249,21 @@ class EnhanceItemUseCaseIntegrationTest {
 
             if (result == EnhanceItemUseCase.EnhanceResult.FAILED_PROTECTED) {
                 sawProtected = true;
-                Optional<ItemStack> finalItem =
-                        inventoryAdapter.findByCharacter(characterId).orElseThrow().findItem(realItemId);
-                assertThat(finalItem).isPresent().get()
-                        .extracting(ItemStack::enhanceLevel).isEqualTo(14); // KHÔNG rớt cấp
+                Optional<ItemStack> finalItem = inventoryAdapter
+                        .findByCharacter(characterId)
+                        .orElseThrow()
+                        .findItem(realItemId);
+                assertThat(finalItem)
+                        .isPresent()
+                        .get()
+                        .extracting(ItemStack::enhanceLevel)
+                        .isEqualTo(14); // KHÔNG rớt cấp
                 long protectionTemplateId = findItemTemplateIdByCode(EnhancementTable.PROTECTION_CHARM_CODE);
-                assertThat(inventoryAdapter.findByCharacter(characterId).orElseThrow()
-                        .findByTemplate(protectionTemplateId)).isEmpty(); // Bảo Vệ đã tiêu
+                assertThat(inventoryAdapter
+                                .findByCharacter(characterId)
+                                .orElseThrow()
+                                .findByTemplate(protectionTemplateId))
+                        .isEmpty(); // Bảo Vệ đã tiêu
                 assertThat(countAuditLogRows(characterId, "ENHANCE_ITEM")).isEqualTo(1);
             }
         }
@@ -253,7 +280,12 @@ class EnhanceItemUseCaseIntegrationTest {
             JdbcInventoryTransactionRunner inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
             inventoryTx.inTransaction(tx -> inventoryAdapter.save(
                     tx, new Inventory(characterId, 20, List.of(ItemStack.newItem(woodenSwordId, 1, 14)))));
-            long realItemId = inventoryAdapter.findByCharacter(characterId).orElseThrow().items().get(0).id();
+            long realItemId = inventoryAdapter
+                    .findByCharacter(characterId)
+                    .orElseThrow()
+                    .items()
+                    .get(0)
+                    .id();
             // KHÔNG gọi grantProtectionCharm — túi không có Bảo Vệ dù client bật cờ useProtection.
             grantGold(characterId, EnhancementTable.goldCost(14));
 
@@ -261,9 +293,15 @@ class EnhanceItemUseCaseIntegrationTest {
 
             if (result == EnhanceItemUseCase.EnhanceResult.FAILED_DROPPED) {
                 sawDropped = true;
-                Optional<ItemStack> finalItem =
-                        inventoryAdapter.findByCharacter(characterId).orElseThrow().findItem(realItemId);
-                assertThat(finalItem).isPresent().get().extracting(ItemStack::enhanceLevel).isEqualTo(13);
+                Optional<ItemStack> finalItem = inventoryAdapter
+                        .findByCharacter(characterId)
+                        .orElseThrow()
+                        .findItem(realItemId);
+                assertThat(finalItem)
+                        .isPresent()
+                        .get()
+                        .extracting(ItemStack::enhanceLevel)
+                        .isEqualTo(13);
             }
         }
         assertThat(sawDropped).isTrue();

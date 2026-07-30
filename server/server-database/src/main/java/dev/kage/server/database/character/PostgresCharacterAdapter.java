@@ -1,5 +1,17 @@
 package dev.kage.server.database.character;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import javax.sql.DataSource;
+
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.CharacterStats;
@@ -10,16 +22,6 @@ import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.character.domain.Transaction;
 import dev.kage.server.database.DatabaseAccessException;
 import dev.kage.server.database.JdbcOperations;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-import javax.sql.DataSource;
 
 /**
  * Hiện thực {@link CharacterPort} trên PostgreSQL. SQL chỉ tồn tại ở đây (Điều 24 + DATABASE.md
@@ -111,7 +113,8 @@ public final class PostgresCharacterAdapter implements CharacterPort {
 
     @Override
     public boolean existsByName(String name) {
-        return JdbcOperations.queryOne(dataSource, EXISTS_BY_NAME, rs -> Boolean.TRUE, name).isPresent();
+        return JdbcOperations.queryOne(dataSource, EXISTS_BY_NAME, rs -> Boolean.TRUE, name)
+                .isPresent();
     }
 
     @Override
@@ -173,8 +176,8 @@ public final class PostgresCharacterAdapter implements CharacterPort {
                         LOAD_POSITION,
                         rs -> new PositionSnapshot(rs.getFloat("pos_x"), rs.getFloat("pos_y")),
                         characterId)
-                .orElseThrow(() ->
-                        new DatabaseAccessException("Nhân vật không tồn tại: characterId=" + characterId, null));
+                .orElseThrow(
+                        () -> new DatabaseAccessException("Nhân vật không tồn tại: characterId=" + characterId, null));
     }
 
     @Override

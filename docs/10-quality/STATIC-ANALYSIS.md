@@ -88,7 +88,14 @@ Bắt bug **lúc compile** — Google đúc kết từ codebase khổng lồ.
 
 Bắt được: `equals()` sai kiểu · `Optional.get()` không check · so sánh reference thay `equals` · format string sai · **boxing ngầm**...
 
-⚠️ **`AutoBoxing` check đặc biệt giá trị** với dự án này — boxing trong hot path vi phạm Điều 31 và rất khó phát hiện bằng mắt ([JAVA-GUIDELINES.md §4.1](../02-coding-standards/JAVA-GUIDELINES.md)).
+⚠️ **PHÁT HIỆN THẬT (2026-07-30, lúc wire thật)**: check tên `AutoBoxing` **KHÔNG TỒN TẠI** trong
+Error Prone thật (`AutoBoxing is not a valid checker name` — build fail thật, không phải suy đoán).
+Không có 1 check chung nào phát hiện MỌI autoboxing; chỉ có vài check hẹp hơn LIÊN QUAN đến boxed
+primitive, đã bật sẵn ở severity mặc định (không cần cấu hình thêm): `BoxedPrimitiveEquality`/
+`LockOnBoxedPrimitive`/`IdentityHashMapBoxing` (ERROR), `BoxedPrimitiveConstructor`/
+`BoxingComparator`/`ObjectEqualsForPrimitives` (WARNING). Boxing trong hot path (Điều 31) vẫn chủ
+yếu dựa vào review + JMH benchmark ([BENCHMARK.md](../09-performance/BENCHMARK.md)), không có 1
+check tĩnh nào bắt được toàn bộ trường hợp — xem `build-logic/src/main/kotlin/kage.quality-conventions.gradle.kts`.
 
 ---
 
@@ -178,6 +185,15 @@ Các công cụ trên bắt **lỗi code**. ArchUnit bắt **lỗi kiến trúc*
 
 ⚠️ **Phải làm ở Phase 0.** Thêm static analysis vào codebase 100k dòng = 5000 warning = không ai fix = tắt luôn.
 
+⚠️ **Thực tế khác dự đoán (2026-07-30)**: Phase 0 CHƯA bật Spotless/SpotBugs/Error Prone (chỉ
+Checkstyle+PMD+ArchUnit), ~10 phase sau mới wire nốt (BUILD.md "Bước 3") — codebase lúc đó đã hàng
+chục nghìn dòng qua nhiều feature. Kết quả KHÔNG phải "5000 warning không ai fix": 338 file cần
+format lại (auto-fix, không tốn công người), và chỉ ~30 SpotBugs finding thật cần xử lý (2 bug thật
+sửa, còn lại suppress có lý do rõ — xem `config/spotbugs/exclude.xml`). Dự đoán "trễ = thảm hoạ" ở
+trên đúng tinh thần nhưng phóng đại quy mô — có thể vì đa số finding rơi vào vài pattern lặp lại
+nhiều lần (Port/DataSource/JedisPool held-by-reference, TLS chưa làm) chứ không phải rải rác ngẫu
+nhiên khắp nơi.
+
 ---
 
 ## Technical Decisions
@@ -188,7 +204,7 @@ Các công cụ trên bắt **lỗi code**. ArchUnit bắt **lỗi kiến trúc*
 | 2 | **`find-sec-bugs` bắt buộc** — không có ORM che SQL injection | Accepted |
 | 3 | **ArchUnit là công cụ quan trọng nhất** | Accepted — ADR-011 |
 | 4 | Custom Checkstyle rule cấm `*Manager/*Helper/*Util` | Accepted |
-| 5 | Error Prone `AutoBoxing` check — giá trị cao cho Điều 31 | Accepted |
+| 5 | ~~Error Prone `AutoBoxing` check~~ — check này KHÔNG TỒN TẠI (phát hiện 2026-07-30), xem §6 | Superseded |
 | 6 | **Suppress phải hẹp + có lý do** | Accepted |
 | 7 | Rule **fail** chỉ cho bug/bảo mật/kiến trúc; style → auto-fix | Accepted |
 | 8 | **Toàn bộ ở Phase 0** — thêm sau = 5000 warning = bị tắt | Accepted |
@@ -212,3 +228,11 @@ Các công cụ trên bắt **lỗi code**. ArchUnit bắt **lỗi kiến trúc*
 1. 🔴 **Phase 0: cấu hình toàn bộ §2** — đây là cửa sổ duy nhất để làm rẻ.
 2. Viết `checkstyle.xml` với custom rule §5.
 3. ADR-011 + ArchUnit **trước dòng code gameplay đầu tiên**.
+4. ✅ **BUILD.md "Bước 3" xong (2026-07-30)** — Spotless + SpotBugs(+find-sec-bugs) + Error Prone
+   wire xong, `./gradlew build`+`test` xanh (trừ `pmdMain`/`pmdTest`, PMD 7.10.0 crash thật với
+   JDK 25 — xem BUILD.md). Chi tiết đầy đủ + gotcha thật: BUILD.md "Bước 3".
+5. **Chưa làm**: TLS thật cho GameConnection/GatewayServer (SpotBugs phát hiện, đang suppress tạm
+   trong `config/spotbugs/exclude.xml` — NETWORK.md ghi "TLS bắt buộc ở Production" Accepted nhưng
+   chưa 1 dòng code nào, cần ADR riêng trước khi làm).
+6. **Chưa làm**: PMD chờ bản hỗ trợ JDK 25 (theo dõi Dependabot `com.google.errorprone`... không,
+   theo dõi PMD riêng — chưa có Dependabot entry cho PMD, cân nhắc thêm nếu muốn tự động nhắc).

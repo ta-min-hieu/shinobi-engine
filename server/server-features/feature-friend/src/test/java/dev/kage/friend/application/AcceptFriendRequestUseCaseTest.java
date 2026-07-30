@@ -2,14 +2,16 @@ package dev.kage.friend.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.kage.friend.domain.FriendPort;
-import dev.kage.friend.domain.Friendship;
-import dev.kage.friend.domain.FriendshipStatus;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
+
+import dev.kage.friend.domain.FriendPort;
+import dev.kage.friend.domain.Friendship;
+import dev.kage.friend.domain.FriendshipStatus;
 
 class AcceptFriendRequestUseCaseTest {
 
@@ -66,8 +68,15 @@ class AcceptFriendRequestUseCaseTest {
                         && f.addresseeId() == addresseeId
                         && f.status() == FriendshipStatus.PENDING;
                 if (matches) {
-                    friendships.set(i, new Friendship(f.id(), f.requesterId(), f.addresseeId(),
-                            FriendshipStatus.ACCEPTED, f.createdAt(), Instant.now()));
+                    friendships.set(
+                            i,
+                            new Friendship(
+                                    f.id(),
+                                    f.requesterId(),
+                                    f.addresseeId(),
+                                    FriendshipStatus.ACCEPTED,
+                                    f.createdAt(),
+                                    Instant.now()));
                     return true;
                 }
             }

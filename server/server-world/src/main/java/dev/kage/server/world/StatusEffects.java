@@ -16,8 +16,7 @@ final class StatusEffects {
     private static final float MIN_CRIT_PERCENT = 0f;
     private static final float MAX_CRIT_PERCENT = 1f;
 
-    private StatusEffects() {
-    }
+    private StatusEffects() {}
 
     static boolean isStunned(StatusEffectComponent status) {
         for (StatusEffect effect : status.slots) {

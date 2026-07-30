@@ -2,6 +2,25 @@ package dev.kage.server.database;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import javax.sql.DataSource;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
+
 import dev.kage.account.domain.Account;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.Faction;
@@ -35,22 +54,6 @@ import dev.kage.server.database.quest.PostgresQuestExpAdapter;
 import dev.kage.server.database.quest.PostgresQuestInventoryGrantAdapter;
 import dev.kage.server.database.quest.PostgresQuestProgressAdapter;
 import dev.kage.server.database.quest.PostgresQuestTemplateAdapter;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-import javax.sql.DataSource;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * Test bằng PostgreSQL THẬT qua Testcontainers — verify Phase 6 Exit Criteria (ROADMAP.md):
@@ -109,7 +112,8 @@ class MvpLoopIntegrationTest {
     private static long createFreshCharacter(String name) {
         PostgresCharacterAdapter characterAdapter = new PostgresCharacterAdapter(dataSource);
         JdbcCharacterTransactionRunner characterTx = new JdbcCharacterTransactionRunner(dataSource);
-        NewCharacter newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
+        NewCharacter newCharacter =
+                new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
         Character[] holder = new Character[1];
         characterTx.inTransaction(tx -> holder[0] = characterAdapter.create(tx, newCharacter));
         return holder[0].id();
@@ -156,28 +160,34 @@ class MvpLoopIntegrationTest {
 
     private static AcceptQuestUseCase newAcceptQuestUseCase() {
         return new AcceptQuestUseCase(
-                new PostgresQuestProgressAdapter(dataSource), new PostgresQuestTemplateAdapter(dataSource),
+                new PostgresQuestProgressAdapter(dataSource),
+                new PostgresQuestTemplateAdapter(dataSource),
                 new JdbcQuestTransactionRunner(dataSource));
     }
 
     private static ProcessMonsterKilledUseCase newProcessMonsterKilledUseCase() {
         return new ProcessMonsterKilledUseCase(
-                new PostgresQuestProgressAdapter(dataSource), new PostgresQuestTemplateAdapter(dataSource),
+                new PostgresQuestProgressAdapter(dataSource),
+                new PostgresQuestTemplateAdapter(dataSource),
                 new JdbcQuestTransactionRunner(dataSource));
     }
 
     private static ClaimQuestRewardUseCase newClaimQuestRewardUseCase() {
         QuestRewardPorts rewardPorts = new QuestRewardPorts(
-                new PostgresQuestExpAdapter(), new PostgresQuestInventoryGrantAdapter(dataSource),
+                new PostgresQuestExpAdapter(),
+                new PostgresQuestInventoryGrantAdapter(dataSource),
                 new PostgresQuestAuditAdapter());
         return new ClaimQuestRewardUseCase(
-                new PostgresQuestProgressAdapter(dataSource), new PostgresQuestTemplateAdapter(dataSource),
-                rewardPorts, new JdbcQuestTransactionRunner(dataSource));
+                new PostgresQuestProgressAdapter(dataSource),
+                new PostgresQuestTemplateAdapter(dataSource),
+                rewardPorts,
+                new JdbcQuestTransactionRunner(dataSource));
     }
 
     private static GrantLootUseCase newGrantLootUseCase() {
         return new GrantLootUseCase(
-                new PostgresDropTableAdapter(dataSource), new PostgresInventoryAdapter(dataSource),
+                new PostgresDropTableAdapter(dataSource),
+                new PostgresInventoryAdapter(dataSource),
                 new JdbcInventoryTransactionRunner(dataSource));
     }
 
@@ -194,7 +204,9 @@ class MvpLoopIntegrationTest {
 
     private static EnhanceItemUseCase newEnhanceItemUseCase() {
         EnhancePorts ports = new EnhancePorts(
-                new PostgresInventoryAdapter(dataSource), new PostgresGoldAdapter(), new PostgresAuditAdapter(),
+                new PostgresInventoryAdapter(dataSource),
+                new PostgresGoldAdapter(),
+                new PostgresAuditAdapter(),
                 new PostgresItemTemplateAdapter(dataSource));
         return new EnhanceItemUseCase(ports, new JdbcInventoryTransactionRunner(dataSource));
     }
@@ -236,8 +248,12 @@ class MvpLoopIntegrationTest {
         AddItemUseCase.AddItemResult addResult =
                 newAddItemUseCase().execute(characterId, ItemStack.newItem(woodenSwordTemplateId, 1, 0));
         assertThat(addResult).isEqualTo(AddItemUseCase.AddItemResult.OK);
-        long swordItemId = new PostgresInventoryAdapter(dataSource).findByCharacter(characterId).orElseThrow()
-                .findByTemplate(woodenSwordTemplateId).orElseThrow().id();
+        long swordItemId = new PostgresInventoryAdapter(dataSource)
+                .findByCharacter(characterId)
+                .orElseThrow()
+                .findByTemplate(woodenSwordTemplateId)
+                .orElseThrow()
+                .id();
 
         EquipItemUseCase.EquipItemResult equipResult =
                 newEquipItemUseCase().execute(characterId, swordItemId, EquipmentSlotType.WEAPON);
@@ -247,8 +263,8 @@ class MvpLoopIntegrationTest {
         grantGold(characterId, 100); // đúng giá cường hoá +0->+1
         EnhanceItemUseCase.EnhanceResult enhanceResult =
                 newEnhanceItemUseCase().execute(characterId, swordItemId, false);
-        assertThat(enhanceResult).isIn(
-                EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP);
+        assertThat(enhanceResult)
+                .isIn(EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP);
 
         // 8. Nhận thưởng hoàn thành quest.
         long expBefore = readExp(characterId);

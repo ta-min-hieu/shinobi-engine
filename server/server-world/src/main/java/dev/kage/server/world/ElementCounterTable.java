@@ -21,8 +21,7 @@ final class ElementCounterTable {
             Element.THO, Element.THUY,
             Element.THUY, Element.HOA);
 
-    private ElementCounterTable() {
-    }
+    private ElementCounterTable() {}
 
     static float multiplier(Element attacker, Element defender) {
         if (BEATS.get(attacker) == defender) {

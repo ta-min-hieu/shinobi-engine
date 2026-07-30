@@ -1,5 +1,7 @@
 package dev.kage.quest.application;
 
+import java.util.List;
+
 import dev.kage.quest.domain.QuestProgress;
 import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestStatus;
@@ -7,7 +9,6 @@ import dev.kage.quest.domain.QuestTemplate;
 import dev.kage.quest.domain.QuestTemplatePort;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.quest.domain.TransactionRunner;
-import java.util.List;
 
 /**
  * Nhận thưởng quest ĐÃ HOÀN THÀNH (status COMPLETED) — chạy {@code on_claim} lấy EXP/item thưởng,
@@ -23,7 +24,9 @@ public final class ClaimQuestRewardUseCase {
     private final QuestScriptRunner scriptRunner = new QuestScriptRunner();
 
     public ClaimQuestRewardUseCase(
-            QuestProgressPort progressPort, QuestTemplatePort templatePort, QuestRewardPorts rewardPorts,
+            QuestProgressPort progressPort,
+            QuestTemplatePort templatePort,
+            QuestRewardPorts rewardPorts,
             TransactionRunner tx) {
         this.progressPort = progressPort;
         this.templatePort = templatePort;
@@ -48,8 +51,9 @@ public final class ClaimQuestRewardUseCase {
         tx.inTransaction((Transaction t) -> {
             rewardPorts.expPort().grantExp(t, characterId, effects.expGranted());
             for (QuestScriptRunner.ItemGrant itemGrant : effects.itemGrants()) {
-                rewardPorts.inventoryGrantPort().grantItemByCode(
-                        t, characterId, itemGrant.itemTemplateCode(), itemGrant.quantity());
+                rewardPorts
+                        .inventoryGrantPort()
+                        .grantItemByCode(t, characterId, itemGrant.itemTemplateCode(), itemGrant.quantity());
             }
             rewardPorts.auditPort().log(t, characterId, "QUEST_CLAIM", detailJson(questCode, effects));
             QuestProgress claimed =
@@ -69,10 +73,18 @@ public final class ClaimQuestRewardUseCase {
     }
 
     public record ClaimResult(Outcome outcome, long expGranted, List<ItemReward> itemsGranted) {
-        public enum Outcome { OK, QUEST_NOT_FOUND, NOT_ACCEPTED, NOT_COMPLETED_YET }
-
-        public record ItemReward(String itemTemplateCode, int quantity) {
+        public ClaimResult {
+            itemsGranted = List.copyOf(itemsGranted);
         }
+
+        public enum Outcome {
+            OK,
+            QUEST_NOT_FOUND,
+            NOT_ACCEPTED,
+            NOT_COMPLETED_YET
+        }
+
+        public record ItemReward(String itemTemplateCode, int quantity) {}
 
         static ClaimResult ok(long expGranted, List<ItemReward> items) {
             return new ClaimResult(Outcome.OK, expGranted, items);

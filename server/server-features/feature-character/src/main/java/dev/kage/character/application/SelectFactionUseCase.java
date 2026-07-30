@@ -25,13 +25,21 @@ public final class SelectFactionUseCase {
     }
 
     public Character execute(long characterId, Faction faction) {
-        Character character = characterPort.findById(characterId)
-                .orElseThrow(() -> new CharacterNotFoundException(characterId));
+        Character character =
+                characterPort.findById(characterId).orElseThrow(() -> new CharacterNotFoundException(characterId));
         if (character.level() < MIN_LEVEL) {
             throw new FactionSelectionLevelTooLowException(characterId, character.level(), MIN_LEVEL);
         }
         characterPort.updateFaction(characterId, faction);
-        return new Character(character.id(), character.accountId(), character.realmId(), character.name(),
-                faction, character.level(), character.exp(), character.rebirthCount(), character.createdAt());
+        return new Character(
+                character.id(),
+                character.accountId(),
+                character.realmId(),
+                character.name(),
+                faction,
+                character.level(),
+                character.exp(),
+                character.rebirthCount(),
+                character.createdAt());
     }
 }

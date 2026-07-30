@@ -4,7 +4,9 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.function.Consumer;
 import java.util.function.Function;
+
 import javax.sql.DataSource;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,8 +30,7 @@ public final class JdbcTransactionRunner {
 
     private static final Logger LOG = LoggerFactory.getLogger(JdbcTransactionRunner.class);
 
-    private JdbcTransactionRunner() {
-    }
+    private JdbcTransactionRunner() {}
 
     public static void run(DataSource dataSource, Consumer<Connection> action) {
         try (Connection connection = dataSource.getConnection()) {

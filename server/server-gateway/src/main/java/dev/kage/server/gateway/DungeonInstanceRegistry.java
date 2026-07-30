@@ -1,5 +1,12 @@
 package dev.kage.server.gateway;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterStats;
@@ -8,12 +15,6 @@ import dev.kage.party.api.PartyFacade;
 import dev.kage.server.world.CharacterBaseStats;
 import dev.kage.server.world.Element;
 import dev.kage.server.world.WorldFacade;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
 
 /**
  * Vòng đời dungeon instance + bảng định tuyến {@code characterId -> WorldFacade} (Phase 8 lát cắt
@@ -48,7 +49,9 @@ final class DungeonInstanceRegistry {
     private final Map<Long, PositionSnapshot> returnPositionByCharacterId = new HashMap<>();
 
     DungeonInstanceRegistry(
-            ConnectedCharacterRegistry registry, CharacterFacade characterFacade, PartyFacade partyFacade,
+            ConnectedCharacterRegistry registry,
+            CharacterFacade characterFacade,
+            PartyFacade partyFacade,
             MainWorldChannelRegistry mainWorldChannels) {
         this.registry = registry;
         this.characterFacade = characterFacade;
@@ -163,7 +166,8 @@ final class DungeonInstanceRegistry {
     private CharacterBaseStats loadBaseStats(long characterId) {
         CharacterStats stats = characterFacade.loadStats(characterId);
         Optional<Character> character = characterFacade.findById(characterId);
-        Element element = character.map(c -> FactionMapping.toElement(c.faction())).orElse(Element.NONE);
+        Element element =
+                character.map(c -> FactionMapping.toElement(c.faction())).orElse(Element.NONE);
         int level = character.map(Character::level).orElse(1);
         return new CharacterBaseStats(stats.str(), stats.agi(), stats.intelligence(), stats.vit(), element, level);
     }

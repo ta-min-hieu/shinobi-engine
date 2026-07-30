@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,15 +29,19 @@ public final class LoadTestRunner {
 
     private static final Logger LOG = LoggerFactory.getLogger(LoadTestRunner.class);
 
-    private LoadTestRunner() {
-    }
+    private LoadTestRunner() {}
 
     public static void main(String[] args) throws InterruptedException {
         LoadTestConfig config = LoadTestConfig.parse(args);
         LOG.info(
                 "Bắt đầu load test: {}:{} — {} → {} client (bước {} mỗi {}s), chạy {}s",
-                config.host(), config.port(), config.initialClients(), config.maxClients(),
-                config.rampStepClients(), config.rampStepIntervalSeconds(), config.durationSeconds());
+                config.host(),
+                config.port(),
+                config.initialClients(),
+                config.maxClients(),
+                config.rampStepClients(),
+                config.rampStepIntervalSeconds(),
+                config.durationSeconds());
 
         SimulatedPlayer.Metrics metrics = new SimulatedPlayer.Metrics(
                 new LatencyRecorder(), new AtomicLong(), new AtomicLong(), new AtomicLong());
@@ -59,12 +64,13 @@ public final class LoadTestRunner {
         ScheduledFuture<?> rampTask = scheduleRamp(scheduler, config, players, spawnOneClient);
         scheduler.scheduleAtFixedRate(
                 () -> report(players.size(), metrics, metricsScraper, config.reportIntervalSeconds()),
-                config.reportIntervalSeconds(), config.reportIntervalSeconds(), TimeUnit.SECONDS);
+                config.reportIntervalSeconds(),
+                config.reportIntervalSeconds(),
+                TimeUnit.SECONDS);
 
         RunningTest runningTest = new RunningTest(rampTask, scheduler, players, clientExecutor);
         AtomicBoolean stopped = new AtomicBoolean();
-        Runtime.getRuntime().addShutdownHook(
-                new Thread(() -> stopAll(stopped, runningTest), "load-test-shutdown"));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> stopAll(stopped, runningTest), "load-test-shutdown"));
 
         Thread.sleep(Duration.ofSeconds(config.durationSeconds()));
         stopAll(stopped, runningTest);
@@ -74,22 +80,29 @@ public final class LoadTestRunner {
 
     /** Gộp toàn bộ tài nguyên cần dọn lúc shutdown — Checkstyle ParameterNumber tối đa 4 tham số. */
     private record RunningTest(
-            ScheduledFuture<?> rampTask, ScheduledExecutorService scheduler,
-            List<SimulatedPlayer> players, ExecutorService clientExecutor) {
-    }
+            ScheduledFuture<?> rampTask,
+            ScheduledExecutorService scheduler,
+            List<SimulatedPlayer> players,
+            ExecutorService clientExecutor) {}
 
     private static ScheduledFuture<?> scheduleRamp(
-            ScheduledExecutorService scheduler, LoadTestConfig config, List<SimulatedPlayer> players,
+            ScheduledExecutorService scheduler,
+            LoadTestConfig config,
+            List<SimulatedPlayer> players,
             Runnable spawnOneClient) {
         if (config.maxClients() <= config.initialClients()) {
             return null;
         }
-        return scheduler.scheduleAtFixedRate(() -> {
-            for (int i = 0; i < config.rampStepClients() && players.size() < config.maxClients(); i++) {
-                spawnOneClient.run();
-            }
-            LOG.info("Ramp: {} client đang hoạt động", players.size());
-        }, config.rampStepIntervalSeconds(), config.rampStepIntervalSeconds(), TimeUnit.SECONDS);
+        return scheduler.scheduleAtFixedRate(
+                () -> {
+                    for (int i = 0; i < config.rampStepClients() && players.size() < config.maxClients(); i++) {
+                        spawnOneClient.run();
+                    }
+                    LOG.info("Ramp: {} client đang hoạt động", players.size());
+                },
+                config.rampStepIntervalSeconds(),
+                config.rampStepIntervalSeconds(),
+                TimeUnit.SECONDS);
     }
 
     /** {@code stopped} chặn double-shutdown (sleep hết hạn bình thường VÀ Ctrl+C cùng gọi tới). */
@@ -122,9 +135,16 @@ public final class LoadTestRunner {
                 "[report] client={} packetLatencyMs(p50/p95/p99)={}/{}/{} (n={}) "
                         + "serverTickMs(p50/p95/p99)={}/{}/{} băngThôngKBs(gửi/nhận)={}/{} lỗi={}",
                 activeClients,
-                round(latency.p50Millis()), round(latency.p95Millis()), round(latency.p99Millis()), latency.count(),
-                round(tick.p50Millis()), round(tick.p95Millis()), round(tick.p99Millis()),
-                round(sentKBs), round(receivedKBs), metrics.errorCount().get());
+                round(latency.p50Millis()),
+                round(latency.p95Millis()),
+                round(latency.p99Millis()),
+                latency.count(),
+                round(tick.p50Millis()),
+                round(tick.p95Millis()),
+                round(tick.p99Millis()),
+                round(sentKBs),
+                round(receivedKBs),
+                metrics.errorCount().get());
     }
 
     private static double round(double millis) {

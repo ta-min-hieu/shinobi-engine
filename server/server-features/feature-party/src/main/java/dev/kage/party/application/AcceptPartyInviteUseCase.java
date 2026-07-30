@@ -20,5 +20,10 @@ public final class AcceptPartyInviteUseCase {
         };
     }
 
-    public enum Result { OK, NOT_FOUND, ALREADY_IN_PARTY, PARTY_FULL }
+    public enum Result {
+        OK,
+        NOT_FOUND,
+        ALREADY_IN_PARTY,
+        PARTY_FULL
+    }
 }

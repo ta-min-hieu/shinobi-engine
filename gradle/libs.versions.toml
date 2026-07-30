@@ -33,12 +33,13 @@ archunit = "1.4.2"                # ✅ latest 04/2026 — ADR-011
 # --- Static analysis (tool versions) ---
 checkstyle = "10.21.0"            # ⚠️ verify — tool version, dùng trong quality convention
 pmd = "7.10.0"                    # ⚠️ verify — tool version
-errorprone = "2.42.0"             # ⚠️ verify — Error Prone core
+errorprone = "2.50.0"             # ✅ latest verify 07/2026 (BUILD.md Bước 3 — javadoc.io "latest" redirect)
+findsecbugs = "1.14.0"            # ✅ latest verify 07/2026 — SpotBugs plugin bắt SQL injection (STATIC-ANALYSIS.md §7, ADR-004)
 
 # --- Gradle plugins ---
-spotless = "7.2.1"                # ⚠️ verify — Gradle 9 compatible
+spotless = "8.9.0"                 # ✅ latest verify 07/2026 — Gradle 9 OK từ 8.5.0 (CHANGES.md, min Gradle 8.1 từ 8.1.0)
 spotbugsPlugin = "6.5.9"          # ✅ SpotBugs Gradle plugin 07/2026
-errorpronePlugin = "4.3.0"        # ⚠️ verify — net.ltgt.errorprone
+errorpronePlugin = "5.1.0"        # ✅ latest verify 07/2026 — net.ltgt.errorprone (khớp PR Dependabot đang chờ)
 protobufPlugin = "0.10.0"         # ✅ latest 07/2026 — com.google.protobuf Gradle plugin
 jmhPlugin = "0.7.3"                # ✅ latest (verified 07/2026, no release since 01/2025) — me.champeau.jmh
 jmh = "1.37"                       # ✅ latest — org.openjdk.jmh core (BENCHMARK.md §2-3)
@@ -97,6 +98,7 @@ archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref
 testcontainers-junit = { module = "org.testcontainers:testcontainers-junit-jupiter", version.ref = "testcontainers" }
 testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql", version.ref = "testcontainers" }
 errorprone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }
+findsecbugs-plugin = { module = "com.h3xstream.findsecbugs:findsecbugs-plugin", version.ref = "findsecbugs" }
 
 [bundles]
 gdx-desktop = ["gdx-core", "gdx-backend-lwjgl3", "gdx-box2d", "gdx-freetype"]

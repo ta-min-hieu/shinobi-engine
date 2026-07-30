@@ -1,9 +1,7 @@
 package dev.kage.engine.ecs;
 
-import dev.kage.engine.ecs.component.PositionComponent;
-import dev.kage.engine.ecs.component.VelocityComponent;
-import dev.kage.engine.ecs.system.MovementSystem;
 import java.util.concurrent.TimeUnit;
+
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -15,6 +13,10 @@ import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+
+import dev.kage.engine.ecs.component.PositionComponent;
+import dev.kage.engine.ecs.component.VelocityComponent;
+import dev.kage.engine.ecs.system.MovementSystem;
 
 /**
  * Micro-benchmark {@code EcsWorld.update} (BENCHMARK.md §4 "🔴 Cao nhất — kích hoạt Revisit

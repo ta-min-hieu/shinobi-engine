@@ -13,10 +13,8 @@ import dev.kage.engine.ecs.component.VelocityComponent;
  */
 public final class MovementSystem extends IteratingKSystem {
 
-    private static final ComponentMapper<PositionComponent> POSITION =
-            ComponentMapper.getFor(PositionComponent.class);
-    private static final ComponentMapper<VelocityComponent> VELOCITY =
-            ComponentMapper.getFor(VelocityComponent.class);
+    private static final ComponentMapper<PositionComponent> POSITION = ComponentMapper.getFor(PositionComponent.class);
+    private static final ComponentMapper<VelocityComponent> VELOCITY = ComponentMapper.getFor(VelocityComponent.class);
 
     public MovementSystem() {
         super(Family.all(PositionComponent.class, VelocityComponent.class).get());

@@ -2,9 +2,10 @@ package dev.kage.party.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.junit.jupiter.api.Test;
+
 import dev.kage.party.domain.Party;
 import dev.kage.party.domain.PartyRole;
-import org.junit.jupiter.api.Test;
 
 class LeavePartyUseCaseTest {
 

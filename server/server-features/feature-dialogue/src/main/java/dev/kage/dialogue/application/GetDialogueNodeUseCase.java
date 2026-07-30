@@ -1,10 +1,5 @@
 package dev.kage.dialogue.application;
 
-import dev.kage.dialogue.domain.DialogueNode;
-import dev.kage.dialogue.domain.DialogueOption;
-import dev.kage.dialogue.domain.NpcTemplatePort;
-import dev.kage.engine.scripting.ScriptExecutionException;
-import dev.kage.engine.scripting.ScriptSandbox;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -13,9 +8,16 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+
 import org.graalvm.polyglot.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import dev.kage.dialogue.domain.DialogueNode;
+import dev.kage.dialogue.domain.DialogueOption;
+import dev.kage.dialogue.domain.NpcTemplatePort;
+import dev.kage.engine.scripting.ScriptExecutionException;
+import dev.kage.engine.scripting.ScriptSandbox;
 
 /**
  * Tra {@code npc_template.dialogue_script_ref} theo {@code npcCode} rồi chạy script lấy 1
@@ -69,7 +71,8 @@ public final class GetDialogueNodeUseCase {
         for (long i = 0; i < size; i++) {
             Value option = optionsValue.getArrayElement(i);
             options.add(new DialogueOption(
-                    option.getMember("label_key").asString(), option.getMember("action").asString()));
+                    option.getMember("label_key").asString(),
+                    option.getMember("action").asString()));
         }
         return new DialogueNode(nodeId, textKey, options);
     }

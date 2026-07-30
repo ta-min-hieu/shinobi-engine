@@ -6,5 +6,7 @@ package dev.kage.quest.domain;
  * không cần dòng {@code equipment_slot}.
  */
 public enum QuestStatus {
-    IN_PROGRESS, COMPLETED, CLAIMED
+    IN_PROGRESS,
+    COMPLETED,
+    CLAIMED
 }

@@ -1,9 +1,10 @@
 package dev.kage.guild.application;
 
+import java.util.Optional;
+
 import dev.kage.guild.domain.GuildMember;
 import dev.kage.guild.domain.GuildPort;
 import dev.kage.guild.domain.GuildRole;
-import java.util.Optional;
 
 /** Thành viên MEMBER tự rời bang — LEADER không được rời, phải {@link DisbandGuildUseCase}. */
 public final class LeaveGuildUseCase {
@@ -26,5 +27,9 @@ public final class LeaveGuildUseCase {
         return Result.OK;
     }
 
-    public enum Result { OK, NOT_IN_GUILD, LEADER_CANNOT_LEAVE }
+    public enum Result {
+        OK,
+        NOT_IN_GUILD,
+        LEADER_CANNOT_LEAVE
+    }
 }

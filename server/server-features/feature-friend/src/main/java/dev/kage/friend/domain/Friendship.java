@@ -9,19 +9,13 @@ import java.util.Objects;
  * phải xét cả 2 cột (xem {@link FriendPort#listAccepted}).
  */
 public record Friendship(
-        long id,
-        long requesterId,
-        long addresseeId,
-        FriendshipStatus status,
-        Instant createdAt,
-        Instant respondedAt) {
+        long id, long requesterId, long addresseeId, FriendshipStatus status, Instant createdAt, Instant respondedAt) {
 
     public Friendship {
         Objects.requireNonNull(status, "status");
         Objects.requireNonNull(createdAt, "createdAt");
         if (requesterId == addresseeId) {
-            throw new IllegalArgumentException(
-                    "requesterId và addresseeId không được trùng: " + requesterId);
+            throw new IllegalArgumentException("requesterId và addresseeId không được trùng: " + requesterId);
         }
     }
 

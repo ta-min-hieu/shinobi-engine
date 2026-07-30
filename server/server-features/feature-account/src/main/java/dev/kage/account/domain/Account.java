@@ -19,9 +19,8 @@ public record Account(long id, String username, Instant createdAt) {
         Objects.requireNonNull(username, "username");
         Objects.requireNonNull(createdAt, "createdAt");
         if (username.length() < USERNAME_MIN_LENGTH || username.length() > USERNAME_MAX_LENGTH) {
-            throw new IllegalArgumentException(
-                    "username phải dài %d-%d ký tự: '%s'"
-                            .formatted(USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH, username));
+            throw new IllegalArgumentException("username phải dài %d-%d ký tự: '%s'"
+                    .formatted(USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH, username));
         }
         if (!USERNAME_PATTERN.matcher(username).matches()) {
             throw new IllegalArgumentException("username chỉ được chứa chữ/số/gạch dưới: '" + username + "'");

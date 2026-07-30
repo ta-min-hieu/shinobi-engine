@@ -4,11 +4,9 @@ plugins {
 }
 
 dependencies {
-    // Phase 0: convention plugin chỉ dùng plugin BUILT-IN (checkstyle, pmd) → không cần dep ở đây.
-    //
-    // Khi wire Spotless / SpotBugs / Error Prone (bước tiếp theo sau khi build đầu xanh),
-    // bỏ comment các dòng dưới. ⚠️ Version phải khớp [plugins] trong gradle/libs.versions.toml.
-    // implementation("com.diffplug.spotless:spotless-plugin-gradle:7.2.1")
-    // implementation("com.github.spotbugs.snom:spotbugs-gradle-plugin:6.5.9")
-    // implementation("net.ltgt.gradle:gradle-errorprone-plugin:4.3.0")
+    // BUILD.md "Bước 3" (2026-07-30) — version khớp [plugins]/[versions] gradle/libs.versions.toml,
+    // verify thật trước khi ghi (không copy số cũ — CLAUDE.md).
+    implementation("com.diffplug.spotless:spotless-plugin-gradle:8.9.0")
+    implementation("com.github.spotbugs.snom:spotbugs-gradle-plugin:6.5.9")
+    implementation("net.ltgt.gradle:gradle-errorprone-plugin:5.1.0")
 }

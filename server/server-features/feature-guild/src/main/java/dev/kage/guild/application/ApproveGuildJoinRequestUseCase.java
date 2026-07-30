@@ -19,5 +19,9 @@ public final class ApproveGuildJoinRequestUseCase {
         };
     }
 
-    public enum Result { OK, NOT_FOUND, TARGET_ALREADY_IN_GUILD }
+    public enum Result {
+        OK,
+        NOT_FOUND,
+        TARGET_ALREADY_IN_GUILD
+    }
 }

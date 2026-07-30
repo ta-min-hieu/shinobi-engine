@@ -3,9 +3,10 @@ package dev.kage.protocol.wire;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import org.junit.jupiter.api.Test;
+
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.ServerShuttingDownEvent;
-import org.junit.jupiter.api.Test;
 
 /** Round-trip test bắt buộc khi thêm packet mới (shared/CLAUDE.md). */
 class ServerShuttingDownEventTest {

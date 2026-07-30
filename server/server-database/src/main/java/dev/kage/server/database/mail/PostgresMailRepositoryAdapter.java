@@ -1,12 +1,5 @@
 package dev.kage.server.database.mail;
 
-import dev.kage.mail.domain.Mail;
-import dev.kage.mail.domain.MailAttachment;
-import dev.kage.mail.domain.MailRepositoryPort;
-import dev.kage.mail.domain.NewMail;
-import dev.kage.mail.domain.Transaction;
-import dev.kage.server.database.DatabaseAccessException;
-import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -17,7 +10,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
 import javax.sql.DataSource;
+
+import dev.kage.mail.domain.Mail;
+import dev.kage.mail.domain.MailAttachment;
+import dev.kage.mail.domain.MailRepositoryPort;
+import dev.kage.mail.domain.NewMail;
+import dev.kage.mail.domain.Transaction;
+import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 
 /**
  * Hiện thực {@link MailRepositoryPort} trên PostgreSQL — bảng {@code mail}/{@code mail_item} (V13).
@@ -82,8 +84,15 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
         long mailId = insertMail(connection, newMail);
         insertMailItems(connection, mailId, newMail.attachments());
         return new Mail(
-                mailId, newMail.senderId(), newMail.recipientId(), newMail.subject(), newMail.body(),
-                newMail.goldAmount(), newMail.attachments(), null, Instant.now());
+                mailId,
+                newMail.senderId(),
+                newMail.recipientId(),
+                newMail.subject(),
+                newMail.body(),
+                newMail.goldAmount(),
+                newMail.attachments(),
+                null,
+                Instant.now());
     }
 
     private static long insertMail(Connection connection, NewMail newMail) {

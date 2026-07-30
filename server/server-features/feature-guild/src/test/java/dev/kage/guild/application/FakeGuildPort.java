@@ -1,12 +1,5 @@
 package dev.kage.guild.application;
 
-import dev.kage.guild.domain.DuplicateGuildJoinRequestException;
-import dev.kage.guild.domain.DuplicateGuildNameException;
-import dev.kage.guild.domain.Guild;
-import dev.kage.guild.domain.GuildJoinRequest;
-import dev.kage.guild.domain.GuildMember;
-import dev.kage.guild.domain.GuildPort;
-import dev.kage.guild.domain.GuildRole;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -14,6 +7,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
+
+import dev.kage.guild.domain.DuplicateGuildJoinRequestException;
+import dev.kage.guild.domain.DuplicateGuildNameException;
+import dev.kage.guild.domain.Guild;
+import dev.kage.guild.domain.GuildJoinRequest;
+import dev.kage.guild.domain.GuildMember;
+import dev.kage.guild.domain.GuildPort;
+import dev.kage.guild.domain.GuildRole;
 
 /**
  * Fake in-memory THẬT (TESTING.md §4), không Mockito — DÙNG CHUNG cho toàn bộ test
@@ -117,7 +118,8 @@ final class FakeGuildPort implements GuildPort {
 
     @Override
     public ApproveResult approveJoinRequest(long requestId, long leaderCharacterId) {
-        Optional<GuildJoinRequest> request = joinRequests.stream().filter(r -> r.id() == requestId).findFirst();
+        Optional<GuildJoinRequest> request =
+                joinRequests.stream().filter(r -> r.id() == requestId).findFirst();
         if (request.isEmpty()) {
             return ApproveResult.NOT_FOUND;
         }
@@ -129,15 +131,16 @@ final class FakeGuildPort implements GuildPort {
             joinRequests.remove(request.get());
             return ApproveResult.TARGET_ALREADY_IN_GUILD;
         }
-        members.add(new GuildMember(
-                request.get().guildId(), request.get().characterId(), GuildRole.MEMBER, Instant.now()));
+        members.add(
+                new GuildMember(request.get().guildId(), request.get().characterId(), GuildRole.MEMBER, Instant.now()));
         joinRequests.remove(request.get());
         return ApproveResult.OK;
     }
 
     @Override
     public boolean rejectJoinRequest(long requestId, long leaderCharacterId) {
-        Optional<GuildJoinRequest> request = joinRequests.stream().filter(r -> r.id() == requestId).findFirst();
+        Optional<GuildJoinRequest> request =
+                joinRequests.stream().filter(r -> r.id() == requestId).findFirst();
         if (request.isEmpty()) {
             return false;
         }

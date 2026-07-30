@@ -1,10 +1,12 @@
 package dev.kage.server.database.quest;
 
+import java.util.function.Consumer;
+
+import javax.sql.DataSource;
+
 import dev.kage.quest.domain.Transaction;
 import dev.kage.quest.domain.TransactionRunner;
 import dev.kage.server.database.JdbcTransactionRunner;
-import java.util.function.Consumer;
-import javax.sql.DataSource;
 
 /** Hiện thực {@code feature-quest}'s {@link TransactionRunner} bằng JDBC thật. */
 public final class JdbcQuestTransactionRunner implements TransactionRunner {

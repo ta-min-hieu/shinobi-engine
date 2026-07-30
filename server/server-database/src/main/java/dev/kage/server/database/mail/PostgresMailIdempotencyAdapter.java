@@ -1,13 +1,14 @@
 package dev.kage.server.database.mail;
 
-import dev.kage.mail.domain.IdempotencyKeyReusedException;
-import dev.kage.mail.domain.IdempotencyPort;
-import dev.kage.mail.domain.Transaction;
-import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
+
+import dev.kage.mail.domain.IdempotencyKeyReusedException;
+import dev.kage.mail.domain.IdempotencyPort;
+import dev.kage.mail.domain.Transaction;
+import dev.kage.server.database.JdbcOperations;
 
 /**
  * Hiện thực {@link IdempotencyPort} trên PostgreSQL — bảng {@code idempotency_key} DÙNG CHUNG

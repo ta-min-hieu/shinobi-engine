@@ -1,8 +1,9 @@
 package dev.kage.mail.application;
 
+import java.util.List;
+
 import dev.kage.mail.domain.Mail;
 import dev.kage.mail.domain.MailRepositoryPort;
-import java.util.List;
 
 /** Toàn bộ thư của {@code characterId}. */
 public final class ListMailUseCase {

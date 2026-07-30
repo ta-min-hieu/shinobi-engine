@@ -1,8 +1,9 @@
 package dev.kage.party.application;
 
+import java.util.Optional;
+
 import dev.kage.party.domain.PartyPort;
 import dev.kage.party.domain.PartyRole;
-import java.util.Optional;
 
 /** Thông tin party hiện tại của {@code characterId} — rỗng nếu chưa vào party nào. */
 public final class FindMyPartyUseCase {
@@ -17,6 +18,5 @@ public final class FindMyPartyUseCase {
         return port.findMembershipOf(characterId).map(member -> new Result(member.partyId(), member.role()));
     }
 
-    public record Result(long partyId, PartyRole myRole) {
-    }
+    public record Result(long partyId, PartyRole myRole) {}
 }

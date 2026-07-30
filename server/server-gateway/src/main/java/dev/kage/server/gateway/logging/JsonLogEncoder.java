@@ -1,11 +1,12 @@
 package dev.kage.server.gateway.logging;
 
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.IThrowableProxy;
 import ch.qos.logback.classic.spi.ThrowableProxyUtil;
 import ch.qos.logback.core.encoder.EncoderBase;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 
 /**
  * Encoder JSON tự viết cho Logback — OBSERVABILITY.md §5.1 "Production: JSON structured — máy
@@ -29,7 +30,8 @@ public final class JsonLogEncoder extends EncoderBase<ILoggingEvent> {
     public byte[] encode(ILoggingEvent event) {
         StringBuilder json = new StringBuilder(256);
         json.append('{');
-        appendField(json, "timestamp", Instant.ofEpochMilli(event.getTimeStamp()).toString());
+        appendField(
+                json, "timestamp", Instant.ofEpochMilli(event.getTimeStamp()).toString());
         json.append(',');
         appendField(json, "level", event.getLevel().toString());
         json.append(',');

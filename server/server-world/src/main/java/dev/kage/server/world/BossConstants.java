@@ -22,6 +22,5 @@ final class BossConstants {
     // (SCRIPTING.md §4, ScriptSandbox.statementLimit), không phải giới hạn "vừa đủ" cần tinh chỉnh.
     static final long SCRIPT_MAX_STATEMENTS = 10_000L;
 
-    private BossConstants() {
-    }
+    private BossConstants() {}
 }

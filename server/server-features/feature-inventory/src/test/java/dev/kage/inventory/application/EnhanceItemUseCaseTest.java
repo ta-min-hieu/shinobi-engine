@@ -2,6 +2,11 @@ package dev.kage.inventory.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+
 import dev.kage.inventory.domain.AuditPort;
 import dev.kage.inventory.domain.EnhancementTable;
 import dev.kage.inventory.domain.GoldPort;
@@ -10,9 +15,6 @@ import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.ItemTemplatePort;
 import dev.kage.inventory.domain.Transaction;
-import java.util.List;
-import java.util.Optional;
-import org.junit.jupiter.api.Test;
 
 class EnhanceItemUseCaseTest {
 
@@ -85,14 +87,17 @@ class EnhanceItemUseCaseTest {
         @Override
         public Optional<Long> findIdByCode(String code) {
             return hasProtectionCharm && code.equals(EnhancementTable.PROTECTION_CHARM_CODE)
-                    ? Optional.of(PROTECTION_TEMPLATE_ID) : Optional.empty();
+                    ? Optional.of(PROTECTION_TEMPLATE_ID)
+                    : Optional.empty();
         }
     }
 
     private static final dev.kage.inventory.domain.TransactionRunner DIRECT_TX = action -> action.accept(null);
 
     private static EnhanceItemUseCase newUseCase(
-            FakeInventoryPort inventoryPort, FakeGoldPort goldPort, FakeAuditPort auditPort,
+            FakeInventoryPort inventoryPort,
+            FakeGoldPort goldPort,
+            FakeAuditPort auditPort,
             FakeItemTemplatePort itemTemplatePort) {
         EnhancePorts ports = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
         return new EnhanceItemUseCase(ports, DIRECT_TX);
@@ -154,8 +159,8 @@ class EnhanceItemUseCaseTest {
 
         EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
 
-        assertThat(result).isIn(
-                EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP);
+        assertThat(result)
+                .isIn(EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP);
         assertThat(goldPort.deductCalled).isTrue();
         assertThat(auditPort.loggedAction).isEqualTo("ENHANCE_ITEM");
         assertThat(auditPort.loggedDetail).contains("\"itemId\":" + ITEM_ID);
@@ -179,10 +184,12 @@ class EnhanceItemUseCaseTest {
             EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
             if (result == EnhanceItemUseCase.EnhanceResult.FAILED_DROPPED) {
                 sawDropped = true;
-                assertThat(inventoryPort.saved.findItem(ITEM_ID).orElseThrow().enhanceLevel()).isEqualTo(13);
+                assertThat(inventoryPort.saved.findItem(ITEM_ID).orElseThrow().enhanceLevel())
+                        .isEqualTo(13);
             } else if (result == EnhanceItemUseCase.EnhanceResult.SUCCESS) {
                 sawSuccess = true;
-                assertThat(inventoryPort.saved.findItem(ITEM_ID).orElseThrow().enhanceLevel()).isEqualTo(15);
+                assertThat(inventoryPort.saved.findItem(ITEM_ID).orElseThrow().enhanceLevel())
+                        .isEqualTo(15);
             }
         }
         assertThat(sawDropped).isTrue();
@@ -202,9 +209,11 @@ class EnhanceItemUseCaseTest {
             EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, true);
             if (result == EnhanceItemUseCase.EnhanceResult.FAILED_PROTECTED) {
                 sawProtected = true;
-                assertThat(inventoryPort.saved.findItem(ITEM_ID).orElseThrow().enhanceLevel()).isEqualTo(14);
+                assertThat(inventoryPort.saved.findItem(ITEM_ID).orElseThrow().enhanceLevel())
+                        .isEqualTo(14);
                 // Bảo Vệ đã tiêu — quantity 1 nên dòng bị XOÁ hẳn khỏi túi.
-                assertThat(inventoryPort.saved.findByTemplate(PROTECTION_TEMPLATE_ID)).isEmpty();
+                assertThat(inventoryPort.saved.findByTemplate(PROTECTION_TEMPLATE_ID))
+                        .isEmpty();
             }
         }
         assertThat(sawProtected).isTrue();
@@ -223,7 +232,8 @@ class EnhanceItemUseCaseTest {
             EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, true);
             if (result == EnhanceItemUseCase.EnhanceResult.FAILED_DROPPED) {
                 sawDropped = true;
-                assertThat(inventoryPort.saved.findItem(ITEM_ID).orElseThrow().enhanceLevel()).isEqualTo(13);
+                assertThat(inventoryPort.saved.findItem(ITEM_ID).orElseThrow().enhanceLevel())
+                        .isEqualTo(13);
             }
         }
         assertThat(sawDropped).isTrue();
@@ -245,7 +255,8 @@ class EnhanceItemUseCaseTest {
             EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, true);
             if (result == EnhanceItemUseCase.EnhanceResult.SUCCESS) {
                 sawSuccess = true;
-                assertThat(inventoryPort.saved.findByTemplate(PROTECTION_TEMPLATE_ID)).isPresent();
+                assertThat(inventoryPort.saved.findByTemplate(PROTECTION_TEMPLATE_ID))
+                        .isPresent();
             }
         }
         assertThat(sawSuccess).isTrue();

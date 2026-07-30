@@ -2,6 +2,10 @@ package dev.kage.quest.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+
 import dev.kage.quest.domain.AuditPort;
 import dev.kage.quest.domain.ExpPort;
 import dev.kage.quest.domain.QuestInventoryGrantPort;
@@ -12,8 +16,6 @@ import dev.kage.quest.domain.QuestTemplate;
 import dev.kage.quest.domain.QuestTemplatePort;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.quest.domain.TransactionRunner;
-import java.util.Optional;
-import org.junit.jupiter.api.Test;
 
 class ClaimQuestRewardUseCaseTest {
 
@@ -25,7 +27,8 @@ class ClaimQuestRewardUseCaseTest {
     static final class FakeQuestTemplatePort implements QuestTemplatePort {
         @Override
         public Optional<QuestTemplate> findByCode(String questCode) {
-            return QUEST_CODE.equals(questCode) ? Optional.of(new QuestTemplate(TEMPLATE_ID, SCRIPT_REF))
+            return QUEST_CODE.equals(questCode)
+                    ? Optional.of(new QuestTemplate(TEMPLATE_ID, SCRIPT_REF))
                     : Optional.empty();
         }
     }
@@ -82,7 +85,9 @@ class ClaimQuestRewardUseCaseTest {
     private static final TransactionRunner DIRECT_TX = action -> action.accept(null);
 
     private static ClaimQuestRewardUseCase newUseCase(
-            QuestProgressPort progressPort, FakeExpPort expPort, FakeInventoryGrantPort inventoryGrantPort,
+            QuestProgressPort progressPort,
+            FakeExpPort expPort,
+            FakeInventoryGrantPort inventoryGrantPort,
             FakeAuditPort auditPort) {
         QuestRewardPorts rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
         return new ClaimQuestRewardUseCase(progressPort, new FakeQuestTemplatePort(), rewardPorts, DIRECT_TX);
@@ -112,7 +117,9 @@ class ClaimQuestRewardUseCaseTest {
     void shouldReturnNotCompletedYet_whenStillInProgress() {
         QuestProgress progress = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.IN_PROGRESS, "{}");
         ClaimQuestRewardUseCase useCase = newUseCase(
-                new FakeQuestProgressPort(progress), new FakeExpPort(), new FakeInventoryGrantPort(),
+                new FakeQuestProgressPort(progress),
+                new FakeExpPort(),
+                new FakeInventoryGrantPort(),
                 new FakeAuditPort());
 
         ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE);
@@ -133,8 +140,8 @@ class ClaimQuestRewardUseCaseTest {
 
         assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
         assertThat(result.expGranted()).isEqualTo(100L);
-        assertThat(result.itemsGranted()).containsExactly(
-                new ClaimQuestRewardUseCase.ClaimResult.ItemReward("test_item", 3));
+        assertThat(result.itemsGranted())
+                .containsExactly(new ClaimQuestRewardUseCase.ClaimResult.ItemReward("test_item", 3));
         assertThat(expPort.grantedAmount).isEqualTo(100L);
         assertThat(inventoryGrantPort.grantedCode).isEqualTo("test_item");
         assertThat(inventoryGrantPort.grantedQuantity).isEqualTo(3);

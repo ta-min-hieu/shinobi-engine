@@ -17,8 +17,7 @@ public record ChatMessage(long senderId, ChatChannel channel, String body) {
             throw new IllegalArgumentException("body không được rỗng");
         }
         if (body.length() > MAX_BODY_LENGTH) {
-            throw new IllegalArgumentException(
-                    "body vượt quá " + MAX_BODY_LENGTH + " ký tự: " + body.length());
+            throw new IllegalArgumentException("body vượt quá " + MAX_BODY_LENGTH + " ký tự: " + body.length());
         }
     }
 }

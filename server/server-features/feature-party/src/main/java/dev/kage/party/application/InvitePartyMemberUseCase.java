@@ -1,11 +1,12 @@
 package dev.kage.party.application;
 
+import java.util.Optional;
+
 import dev.kage.party.domain.DuplicatePartyInviteException;
 import dev.kage.party.domain.Party;
 import dev.kage.party.domain.PartyMember;
 import dev.kage.party.domain.PartyPort;
 import dev.kage.party.domain.PartyRole;
-import java.util.Optional;
 
 /**
  * Leader mời 1 nhân vật theo ID đã resolve từ tên ở gateway (cùng lý do feature-friend — mời trực
@@ -46,6 +47,11 @@ public final class InvitePartyMemberUseCase {
     }
 
     public enum Result {
-        OK, NOT_LEADER, CANNOT_INVITE_SELF, TARGET_ALREADY_IN_PARTY, PARTY_FULL, INVITE_ALREADY_PENDING
+        OK,
+        NOT_LEADER,
+        CANNOT_INVITE_SELF,
+        TARGET_ALREADY_IN_PARTY,
+        PARTY_FULL,
+        INVITE_ALREADY_PENDING
     }
 }

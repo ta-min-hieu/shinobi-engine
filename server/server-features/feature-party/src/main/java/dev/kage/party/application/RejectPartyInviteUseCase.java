@@ -15,5 +15,8 @@ public final class RejectPartyInviteUseCase {
         return port.rejectInvite(inviteId, characterId) ? Result.OK : Result.NOT_FOUND;
     }
 
-    public enum Result { OK, NOT_FOUND }
+    public enum Result {
+        OK,
+        NOT_FOUND
+    }
 }

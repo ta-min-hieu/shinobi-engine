@@ -7,5 +7,4 @@ package dev.kage.engine.ecs;
  * listener không quan tâm lẫn nhau) — cần kết quả trả về ngay thì gọi Facade trực tiếp, không
  * dùng Event (ECS.md §7, ADR-008).
  */
-public interface Event {
-}
+public interface Event {}

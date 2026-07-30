@@ -3,6 +3,8 @@ package dev.kage.protocol.wire;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import org.junit.jupiter.api.Test;
+
 import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.BuyItemResponse;
 import dev.kage.protocol.BuyOutcome;
@@ -13,7 +15,6 @@ import dev.kage.protocol.SellItemCommand;
 import dev.kage.protocol.SellItemResponse;
 import dev.kage.protocol.SellOutcome;
 import dev.kage.protocol.ShopListingView;
-import org.junit.jupiter.api.Test;
 
 /**
  * Round-trip test bắt buộc theo shared/CLAUDE.md khi thêm packet mới — verify {@code PacketCodec}
@@ -27,21 +28,27 @@ class ShopPacketsTest {
         PacketHeader header = new PacketHeader(Opcode.OPCODE_LIST_SHOP_ITEMS_REQUEST_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, request.toByteArray());
-        ListShopItemsRequest parsed = ListShopItemsRequest.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ListShopItemsRequest parsed = ListShopItemsRequest.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed).isEqualTo(request);
     }
 
     @Test
     void shouldRoundTripListShopItemsResponse() throws InvalidProtocolBufferException {
-        ShopListingView listing =
-                ShopListingView.newBuilder().setItemTemplateId(1L).setBuyPrice(5L).setSellPrice(2L).build();
-        ListShopItemsResponse response = ListShopItemsResponse.newBuilder().addListings(listing).build();
+        ShopListingView listing = ShopListingView.newBuilder()
+                .setItemTemplateId(1L)
+                .setBuyPrice(5L)
+                .setSellPrice(2L)
+                .build();
+        ListShopItemsResponse response =
+                ListShopItemsResponse.newBuilder().addListings(listing).build();
         PacketHeader header =
                 new PacketHeader(Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        ListShopItemsResponse parsed = ListShopItemsResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ListShopItemsResponse parsed = ListShopItemsResponse.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getListingsList()).hasSize(1);
         assertThat(parsed.getListings(0).getItemTemplateId()).isEqualTo(1L);
@@ -59,7 +66,8 @@ class ShopPacketsTest {
         PacketHeader header = new PacketHeader(Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        BuyItemCommand parsed = BuyItemCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        BuyItemCommand parsed =
+                BuyItemCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getItemTemplateId()).isEqualTo(1L);
         assertThat(parsed.getQuantity()).isEqualTo(3);
@@ -68,12 +76,14 @@ class ShopPacketsTest {
 
     @Test
     void shouldRoundTripBuyItemResponse() throws InvalidProtocolBufferException {
-        BuyItemResponse response =
-                BuyItemResponse.newBuilder().setOutcome(BuyOutcome.BUY_OUTCOME_INSUFFICIENT_GOLD).build();
+        BuyItemResponse response = BuyItemResponse.newBuilder()
+                .setOutcome(BuyOutcome.BUY_OUTCOME_INSUFFICIENT_GOLD)
+                .build();
         PacketHeader header = new PacketHeader(Opcode.OPCODE_BUY_ITEM_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        BuyItemResponse parsed = BuyItemResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        BuyItemResponse parsed =
+                BuyItemResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(BuyOutcome.BUY_OUTCOME_INSUFFICIENT_GOLD);
     }
@@ -88,7 +98,8 @@ class ShopPacketsTest {
         PacketHeader header = new PacketHeader(Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, ProtocolVersion.CURRENT, 5);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        SellItemCommand parsed = SellItemCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SellItemCommand parsed =
+                SellItemCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getItemId()).isEqualTo(42L);
         assertThat(parsed.getQuantity()).isEqualTo(2);
@@ -97,11 +108,14 @@ class ShopPacketsTest {
 
     @Test
     void shouldRoundTripSellItemResponse() throws InvalidProtocolBufferException {
-        SellItemResponse response = SellItemResponse.newBuilder().setOutcome(SellOutcome.SELL_OUTCOME_OK).build();
+        SellItemResponse response = SellItemResponse.newBuilder()
+                .setOutcome(SellOutcome.SELL_OUTCOME_OK)
+                .build();
         PacketHeader header = new PacketHeader(Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE, ProtocolVersion.CURRENT, 5);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        SellItemResponse parsed = SellItemResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SellItemResponse parsed =
+                SellItemResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(SellOutcome.SELL_OUTCOME_OK);
     }

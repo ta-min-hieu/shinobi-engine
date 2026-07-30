@@ -1,5 +1,12 @@
 package dev.kage.server.gateway;
 
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
+
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterStats;
@@ -11,12 +18,6 @@ import dev.kage.pvp.application.RecordDuelResultUseCase;
 import dev.kage.server.world.CharacterBaseStats;
 import dev.kage.server.world.Element;
 import dev.kage.server.world.WorldFacade;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Vòng đời thách đấu + trận Arena 1v1 (Phase 8 lát cắt 4, GDD §6) — bảng định tuyến
@@ -61,7 +62,9 @@ final class ArenaInstanceRegistry {
     private final ExecutorService settlementExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     ArenaInstanceRegistry(
-            ConnectedCharacterRegistry registry, CharacterFacade characterFacade, PvpFacade pvpFacade,
+            ConnectedCharacterRegistry registry,
+            CharacterFacade characterFacade,
+            PvpFacade pvpFacade,
             MainWorldChannelRegistry mainWorldChannels) {
         this.registry = registry;
         this.characterFacade = characterFacade;
@@ -244,24 +247,24 @@ final class ArenaInstanceRegistry {
 
     private static long opponentOf(long characterId, DuelInstance instance) {
         return instance.challengerCharacterId() == characterId
-                ? instance.targetCharacterId() : instance.challengerCharacterId();
+                ? instance.targetCharacterId()
+                : instance.challengerCharacterId();
     }
 
     private CharacterBaseStats loadBaseStats(long characterId) {
         CharacterStats stats = characterFacade.loadStats(characterId);
         Optional<Character> character = characterFacade.findById(characterId);
-        Element element = character.map(c -> FactionMapping.toElement(c.faction())).orElse(Element.NONE);
+        Element element =
+                character.map(c -> FactionMapping.toElement(c.faction())).orElse(Element.NONE);
         int level = character.map(Character::level).orElse(1);
         return new CharacterBaseStats(stats.str(), stats.agi(), stats.intelligence(), stats.vit(), element, level);
     }
 
-    private record PendingChallenge(long challengeId, long challengerCharacterId, long targetCharacterId) {
-    }
+    private record PendingChallenge(long challengeId, long challengerCharacterId, long targetCharacterId) {}
 
     /** 1 trận Arena đang chạy — {@code challengerCharacterId}/{@code targetCharacterId} cố định cả trận. */
     private record DuelInstance(
-            long challengeId, WorldFacade facade, long challengerCharacterId, long targetCharacterId) {
-    }
+            long challengeId, WorldFacade facade, long challengerCharacterId, long targetCharacterId) {}
 
     enum ChallengeOutcome {
         OK,
@@ -271,30 +274,26 @@ final class ArenaInstanceRegistry {
         TARGET_OFFLINE
     }
 
-    record ChallengeResult(ChallengeOutcome outcome, long challengeId) {
-    }
+    record ChallengeResult(ChallengeOutcome outcome, long challengeId) {}
 
     enum AcceptOutcome {
         OK,
         NOT_FOUND
     }
 
-    record AcceptResult(AcceptOutcome outcome, long challengerCharacterId) {
-    }
+    record AcceptResult(AcceptOutcome outcome, long challengerCharacterId) {}
 
     enum DeclineOutcome {
         OK,
         NOT_FOUND
     }
 
-    record DeclineResult(DeclineOutcome outcome, long challengerCharacterId) {
-    }
+    record DeclineResult(DeclineOutcome outcome, long challengerCharacterId) {}
 
     enum ExitOutcome {
         OK,
         NOT_IN_DUEL
     }
 
-    record ExitResult(ExitOutcome outcome, long opponentCharacterId) {
-    }
+    record ExitResult(ExitOutcome outcome, long opponentCharacterId) {}
 }

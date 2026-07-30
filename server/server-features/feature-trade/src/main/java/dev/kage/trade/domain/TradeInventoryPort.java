@@ -22,8 +22,7 @@ public interface TradeInventoryPort {
     TransferOutcome transferItem(Transaction tx, TransferRequest request);
 
     /** Gói tham số cho {@link #transferItem} — tránh vượt 4 tham số Checkstyle {@code ParameterNumber}. */
-    record TransferRequest(long fromCharacterId, long toCharacterId, long itemId, int quantity) {
-    }
+    record TransferRequest(long fromCharacterId, long toCharacterId, long itemId, int quantity) {}
 
     enum TransferOutcome {
         OK,

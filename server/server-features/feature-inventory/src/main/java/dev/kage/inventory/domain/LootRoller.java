@@ -12,8 +12,7 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public final class LootRoller {
 
-    private LootRoller() {
-    }
+    private LootRoller() {}
 
     public static List<ItemStack> roll(List<DropTableEntry> entries) {
         ArrayList<ItemStack> drops = new ArrayList<ItemStack>();

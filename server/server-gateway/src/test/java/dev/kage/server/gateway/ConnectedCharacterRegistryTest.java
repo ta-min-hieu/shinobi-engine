@@ -2,7 +2,20 @@ package dev.kage.server.gateway;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
 import com.google.protobuf.InvalidProtocolBufferException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.embedded.EmbeddedChannel;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
 import dev.kage.inventory.api.EquipmentUseCases;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.application.AddItemUseCase;
@@ -36,17 +49,6 @@ import dev.kage.quest.domain.QuestInventoryGrantPort;
 import dev.kage.quest.domain.QuestProgress;
 import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestTemplatePort;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.embedded.EmbeddedChannel;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Verify {@code onMonsterKilled} -> roll drop table -> cộng túi đồ -> gửi {@code
@@ -68,13 +70,12 @@ class ConnectedCharacterRegistryTest {
             }
 
             @Override
-            public void save(dev.kage.quest.domain.Transaction tx, QuestProgress progress) {
-            }
+            public void save(dev.kage.quest.domain.Transaction tx, QuestProgress progress) {}
         };
         QuestTemplatePort templatePort = questCode -> Optional.empty();
-        ExpPort expPort = (tx, characterId, amount) -> { };
+        ExpPort expPort = (tx, characterId, amount) -> {};
         QuestInventoryGrantPort inventoryGrantPort = (tx, characterId, itemTemplateCode, quantity) -> true;
-        dev.kage.quest.domain.AuditPort auditPort = (tx, characterId, action, detailJson) -> { };
+        dev.kage.quest.domain.AuditPort auditPort = (tx, characterId, action, detailJson) -> {};
         dev.kage.quest.domain.TransactionRunner tx = action -> action.accept(null);
 
         AcceptQuestUseCase acceptQuestUseCase = new AcceptQuestUseCase(progressPort, templatePort, tx);
@@ -138,8 +139,7 @@ class ConnectedCharacterRegistryTest {
                 return inventory;
             }
         };
-        DropTablePort dropTablePort =
-                dropTableCode -> List.of(new DropTableEntry(100L, dropChancePercent, 2, 2));
+        DropTablePort dropTablePort = dropTableCode -> List.of(new DropTableEntry(100L, dropChancePercent, 2, 2));
         AddItemUseCase addItemUseCase = new AddItemUseCase(inventoryPort, action -> action.accept(null));
         GrantLootUseCase grantLootUseCase =
                 new GrantLootUseCase(dropTablePort, inventoryPort, action -> action.accept(null));
@@ -162,23 +162,20 @@ class ConnectedCharacterRegistryTest {
             }
 
             @Override
-            public void save(Transaction tx, Equipment equipment) {
-            }
+            public void save(Transaction tx, Equipment equipment) {}
         };
-        EquipItemUseCase equipItemUseCase = new EquipItemUseCase(
-                inventoryPort, itemTemplatePort, equipmentPort, action -> action.accept(null));
-        UnequipItemUseCase unequipItemUseCase =
-                new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
+        EquipItemUseCase equipItemUseCase =
+                new EquipItemUseCase(inventoryPort, itemTemplatePort, equipmentPort, action -> action.accept(null));
+        UnequipItemUseCase unequipItemUseCase = new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
         ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase =
                 new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
         EquipmentUseCases equipmentUseCases =
                 new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
         // Cường hoá không dùng trong test này — fake tối thiểu để compile.
         GoldPort goldPort = (tx, characterId, amount) -> true;
-        AuditPort auditPort = (tx, characterId, action, detailJson) -> { };
+        AuditPort auditPort = (tx, characterId, action, detailJson) -> {};
         EnhancePorts enhancePorts = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
-        EnhanceItemUseCase enhanceItemUseCase =
-                new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
+        EnhanceItemUseCase enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
         return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
     }
 

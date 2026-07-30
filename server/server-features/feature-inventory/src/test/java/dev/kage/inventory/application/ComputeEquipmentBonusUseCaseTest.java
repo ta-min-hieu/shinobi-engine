@@ -2,6 +2,13 @@ package dev.kage.inventory.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.LongFunction;
+
+import org.junit.jupiter.api.Test;
+
 import dev.kage.inventory.domain.Equipment;
 import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.EquipmentPort;
@@ -12,11 +19,6 @@ import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
 import dev.kage.inventory.domain.Transaction;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.function.LongFunction;
-import org.junit.jupiter.api.Test;
 
 class ComputeEquipmentBonusUseCaseTest {
 
@@ -30,8 +32,7 @@ class ComputeEquipmentBonusUseCaseTest {
             }
 
             @Override
-            public void save(Transaction tx, Equipment equipment) {
-            }
+            public void save(Transaction tx, Equipment equipment) {}
         };
     }
 

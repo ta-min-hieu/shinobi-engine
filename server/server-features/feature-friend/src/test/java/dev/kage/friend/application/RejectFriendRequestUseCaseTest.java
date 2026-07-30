@@ -2,14 +2,16 @@ package dev.kage.friend.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.kage.friend.domain.FriendPort;
-import dev.kage.friend.domain.Friendship;
-import dev.kage.friend.domain.FriendshipStatus;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
+
+import dev.kage.friend.domain.FriendPort;
+import dev.kage.friend.domain.Friendship;
+import dev.kage.friend.domain.FriendshipStatus;
 
 class RejectFriendRequestUseCaseTest {
 
@@ -54,9 +56,8 @@ class RejectFriendRequestUseCaseTest {
 
         @Override
         public boolean reject(long friendshipId, long addresseeId) {
-            return friendships.removeIf(f -> f.id() == friendshipId
-                    && f.addresseeId() == addresseeId
-                    && f.status() == FriendshipStatus.PENDING);
+            return friendships.removeIf(f ->
+                    f.id() == friendshipId && f.addresseeId() == addresseeId && f.status() == FriendshipStatus.PENDING);
         }
 
         @Override

@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
+
 import javax.sql.DataSource;
 
 /**
@@ -28,8 +29,7 @@ public final class JdbcOperations {
     // Mã lỗi Postgres cho unique_violation (SQLState) — dùng bởi updateOrThrow/insertReturningIdOrThrow.
     private static final String UNIQUE_VIOLATION_SQLSTATE = "23505";
 
-    private JdbcOperations() {
-    }
+    private JdbcOperations() {}
 
     public static <T> List<T> query(DataSource dataSource, String sql, RowMapper<T> mapper, Object... params) {
         try (Connection connection = dataSource.getConnection()) {

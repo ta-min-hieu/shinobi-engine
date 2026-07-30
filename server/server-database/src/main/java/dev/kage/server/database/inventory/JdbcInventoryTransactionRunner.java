@@ -1,10 +1,12 @@
 package dev.kage.server.database.inventory;
 
+import java.util.function.Consumer;
+
+import javax.sql.DataSource;
+
 import dev.kage.inventory.domain.Transaction;
 import dev.kage.inventory.domain.TransactionRunner;
 import dev.kage.server.database.JdbcTransactionRunner;
-import java.util.function.Consumer;
-import javax.sql.DataSource;
 
 /** Hiện thực {@code feature-inventory}'s {@link TransactionRunner} bằng JDBC thật. */
 public final class JdbcInventoryTransactionRunner implements TransactionRunner {

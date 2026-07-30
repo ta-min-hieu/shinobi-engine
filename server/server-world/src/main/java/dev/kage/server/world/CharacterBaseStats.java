@@ -9,5 +9,4 @@ package dev.kage.server.world;
  * gắn {@code CharacterLevelComponent} lúc attach (gate Tuyệt Kỹ Lv50, GDD §5) — KHÔNG ảnh hưởng
  * công thức derive ở trên.
  */
-public record CharacterBaseStats(int str, int agi, int intelligence, int vit, Element element, int level) {
-}
+public record CharacterBaseStats(int str, int agi, int intelligence, int vit, Element element, int level) {}

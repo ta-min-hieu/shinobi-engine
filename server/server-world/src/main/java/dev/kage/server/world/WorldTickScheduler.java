@@ -35,6 +35,5 @@ final class WorldTickScheduler {
         return thread;
     }
 
-    private WorldTickScheduler() {
-    }
+    private WorldTickScheduler() {}
 }

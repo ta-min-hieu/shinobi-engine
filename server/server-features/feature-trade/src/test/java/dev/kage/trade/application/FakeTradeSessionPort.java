@@ -1,12 +1,5 @@
 package dev.kage.trade.application;
 
-import dev.kage.trade.domain.OfferedItemInput;
-import dev.kage.trade.domain.Transaction;
-import dev.kage.trade.domain.TradeOfferItem;
-import dev.kage.trade.domain.TradeSession;
-import dev.kage.trade.domain.TradeSessionPort;
-import dev.kage.trade.domain.TradeSessionSnapshot;
-import dev.kage.trade.domain.TradeStatus;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -14,6 +7,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
+
+import dev.kage.trade.domain.OfferedItemInput;
+import dev.kage.trade.domain.TradeOfferItem;
+import dev.kage.trade.domain.TradeSession;
+import dev.kage.trade.domain.TradeSessionPort;
+import dev.kage.trade.domain.TradeSessionSnapshot;
+import dev.kage.trade.domain.TradeStatus;
+import dev.kage.trade.domain.Transaction;
 
 /**
  * Fake in-memory THẬT (TESTING.md §4), không Mockito — DÙNG CHUNG cho toàn bộ test
@@ -82,7 +83,8 @@ final class FakeTradeSessionPort implements TradeSessionPort {
     @Override
     public boolean replaceOffer(long sessionId, long characterId, long goldAmount, List<OfferedItemInput> items) {
         MutableState state = sessions.get(sessionId);
-        if (state == null || state.status != TradeStatus.OPEN
+        if (state == null
+                || state.status != TradeStatus.OPEN
                 || (state.requesterCharacterId != characterId && state.targetCharacterId != characterId)) {
             return false;
         }
@@ -135,7 +137,15 @@ final class FakeTradeSessionPort implements TradeSessionPort {
     }
 
     private static TradeSessionSnapshot toSnapshot(MutableState s) {
-        return new TradeSessionSnapshot(s.id, s.requesterCharacterId, s.targetCharacterId, s.status,
-                s.requesterGold, s.targetGold, s.requesterConfirmed, s.targetConfirmed, List.copyOf(s.items));
+        return new TradeSessionSnapshot(
+                s.id,
+                s.requesterCharacterId,
+                s.targetCharacterId,
+                s.status,
+                s.requesterGold,
+                s.targetGold,
+                s.requesterConfirmed,
+                s.targetConfirmed,
+                List.copyOf(s.items));
     }
 }

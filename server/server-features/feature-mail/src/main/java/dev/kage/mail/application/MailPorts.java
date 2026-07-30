@@ -14,6 +14,8 @@ import dev.kage.mail.domain.MailRepositoryPort;
  * (ADR-025 retrofit, phát hiện lúc làm Trade — ClaimMail được ADR nêu tên nhưng chưa enforce).
  */
 public record MailPorts(
-        MailRepositoryPort repositoryPort, GoldPort goldPort, InventoryGatewayPort inventoryGatewayPort,
-        AuditPort auditPort, IdempotencyPort idempotencyPort) {
-}
+        MailRepositoryPort repositoryPort,
+        GoldPort goldPort,
+        InventoryGatewayPort inventoryGatewayPort,
+        AuditPort auditPort,
+        IdempotencyPort idempotencyPort) {}

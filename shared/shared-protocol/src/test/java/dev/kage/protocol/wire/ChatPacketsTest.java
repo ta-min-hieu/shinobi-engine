@@ -3,13 +3,14 @@ package dev.kage.protocol.wire;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import org.junit.jupiter.api.Test;
+
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ChatMessageEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SendChatMessageCommand;
 import dev.kage.protocol.SendChatMessageOutcome;
 import dev.kage.protocol.SendChatMessageResponse;
-import org.junit.jupiter.api.Test;
 
 /**
  * Round-trip test bắt buộc theo shared/CLAUDE.md khi thêm packet mới — verify {@code PacketCodec}
@@ -28,7 +29,8 @@ class ChatPacketsTest {
                 new PacketHeader(Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        SendChatMessageCommand parsed = SendChatMessageCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SendChatMessageCommand parsed = SendChatMessageCommand.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getChannel()).isEqualTo(ChatChannel.CHAT_CHANNEL_PRIVATE);
         assertThat(parsed.getTargetName()).isEqualTo("sasuke");
@@ -44,8 +46,8 @@ class ChatPacketsTest {
                 new PacketHeader(Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        SendChatMessageResponse parsed =
-                SendChatMessageResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SendChatMessageResponse parsed = SendChatMessageResponse.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_RATE_LIMITED);
     }
@@ -61,7 +63,8 @@ class ChatPacketsTest {
         PacketHeader header = new PacketHeader(Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, event.toByteArray());
-        ChatMessageEvent parsed = ChatMessageEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ChatMessageEvent parsed =
+                ChatMessageEvent.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getChannel()).isEqualTo(ChatChannel.CHAT_CHANNEL_WORLD);
         assertThat(parsed.getSenderId()).isEqualTo(7L);

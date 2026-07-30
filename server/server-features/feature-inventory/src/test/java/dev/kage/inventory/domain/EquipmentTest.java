@@ -3,6 +3,7 @@ package dev.kage.inventory.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 
 class EquipmentTest {

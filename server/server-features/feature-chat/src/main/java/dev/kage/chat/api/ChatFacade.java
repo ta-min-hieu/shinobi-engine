@@ -25,5 +25,10 @@ public final class ChatFacade {
         };
     }
 
-    public enum SendResult { OK, MESSAGE_BLANK, MESSAGE_TOO_LONG, CONTAINS_BANNED_WORD }
+    public enum SendResult {
+        OK,
+        MESSAGE_BLANK,
+        MESSAGE_TOO_LONG,
+        CONTAINS_BANNED_WORD
+    }
 }

@@ -1,10 +1,5 @@
 package dev.kage.client.core.net;
 
-import dev.kage.protocol.Opcode;
-import dev.kage.protocol.PingCommand;
-import dev.kage.protocol.wire.PacketCodec;
-import dev.kage.protocol.wire.PacketHeader;
-import dev.kage.protocol.wire.ProtocolVersion;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -13,8 +8,15 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import dev.kage.protocol.Opcode;
+import dev.kage.protocol.PingCommand;
+import dev.kage.protocol.wire.PacketCodec;
+import dev.kage.protocol.wire.PacketHeader;
+import dev.kage.protocol.wire.ProtocolVersion;
 
 /**
  * Kết nối tới server-gateway qua {@link Socket} THUẦN — KHÔNG Netty (Điều 23: chỉ server-gateway
@@ -115,8 +117,7 @@ public final class GameConnection {
             if (!running.get()) {
                 return;
             }
-            int backoffSeconds =
-                    RECONNECT_BACKOFF_SECONDS[Math.min(attempt, RECONNECT_BACKOFF_SECONDS.length - 1)];
+            int backoffSeconds = RECONNECT_BACKOFF_SECONDS[Math.min(attempt, RECONNECT_BACKOFF_SECONDS.length - 1)];
             attempt++;
             LOG.info("Thử kết nối lại sau {}s (lần {})", backoffSeconds, attempt);
             sleepQuietly(backoffSeconds * 1000L);
@@ -142,23 +143,25 @@ public final class GameConnection {
     }
 
     private void startHeartbeat() {
-        heartbeatThread = new Thread(() -> {
-            while (running.get() && isConnected()) {
-                try {
-                    PingCommand ping = PingCommand.newBuilder()
-                            .setClientTimestampMs(System.currentTimeMillis())
-                            .build();
-                    send(Opcode.OPCODE_PING_VALUE, nextSequenceId(), ping.toByteArray());
-                    Thread.sleep(HEARTBEAT_INTERVAL_MS);
-                } catch (IOException e) {
-                    LOG.debug("Gửi heartbeat thất bại, kết nối có thể đã chết", e);
-                    return;
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
-            }
-        }, "game-connection-heartbeat");
+        heartbeatThread = new Thread(
+                () -> {
+                    while (running.get() && isConnected()) {
+                        try {
+                            PingCommand ping = PingCommand.newBuilder()
+                                    .setClientTimestampMs(System.currentTimeMillis())
+                                    .build();
+                            send(Opcode.OPCODE_PING_VALUE, nextSequenceId(), ping.toByteArray());
+                            Thread.sleep(HEARTBEAT_INTERVAL_MS);
+                        } catch (IOException e) {
+                            LOG.debug("Gửi heartbeat thất bại, kết nối có thể đã chết", e);
+                            return;
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                    }
+                },
+                "game-connection-heartbeat");
         heartbeatThread.setDaemon(true);
         heartbeatThread.start();
     }

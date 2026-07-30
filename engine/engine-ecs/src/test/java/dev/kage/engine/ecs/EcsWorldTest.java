@@ -2,10 +2,11 @@ package dev.kage.engine.ecs;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.junit.jupiter.api.Test;
+
 import dev.kage.engine.ecs.component.PositionComponent;
 import dev.kage.engine.ecs.component.VelocityComponent;
 import dev.kage.engine.ecs.system.MovementSystem;
-import org.junit.jupiter.api.Test;
 
 /**
  * ⚠️ PHÁT HIỆN THẬT (Phase 4): {@code Engine.addSystem} của Ashley coi 2 system CÙNG
@@ -16,8 +17,7 @@ import org.junit.jupiter.api.Test;
  */
 class EcsWorldTest {
 
-    private static final ComponentMapper<PositionComponent> POSITION =
-            ComponentMapper.getFor(PositionComponent.class);
+    private static final ComponentMapper<PositionComponent> POSITION = ComponentMapper.getFor(PositionComponent.class);
 
     /** System thứ 2 tối giản — chỉ cần KHÁC {@link MovementSystem} để tái hiện lỗi gốc. */
     private static final class MarkerSystem extends IteratingKSystem {
@@ -45,7 +45,8 @@ class EcsWorldTest {
         entity.add(position);
         entity.add(new VelocityComponent());
         POSITION.get(entity).x = 0f;
-        VelocityComponent velocity = ComponentMapper.getFor(VelocityComponent.class).get(entity);
+        VelocityComponent velocity =
+                ComponentMapper.getFor(VelocityComponent.class).get(entity);
         velocity.x = 10f;
 
         world.update(1f);

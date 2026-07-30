@@ -1,14 +1,15 @@
 package dev.kage.trade.application;
 
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+
 import dev.kage.trade.domain.IdempotencyKeyReusedException;
-import dev.kage.trade.domain.Transaction;
 import dev.kage.trade.domain.TradeInventoryPort;
 import dev.kage.trade.domain.TradeInventoryPort.TransferOutcome;
 import dev.kage.trade.domain.TradeOfferItem;
 import dev.kage.trade.domain.TradeSessionSnapshot;
+import dev.kage.trade.domain.Transaction;
 import dev.kage.trade.domain.TransactionRunner;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Xác nhận trade — TRONG CÙNG 1 transaction: ghi {@code idempotencyKey} (ADR-025) → khoá phiên
@@ -77,12 +78,12 @@ public final class ConfirmTradeUseCase {
             ports.goldPort().creditGold(t, requesterId, snapshot.targetGold());
         }
         for (TradeOfferItem item : snapshot.itemsOffered(requesterId)) {
-            transferOrAbort(t,
-                    new TradeInventoryPort.TransferRequest(requesterId, targetId, item.itemId(), item.quantity()));
+            transferOrAbort(
+                    t, new TradeInventoryPort.TransferRequest(requesterId, targetId, item.itemId(), item.quantity()));
         }
         for (TradeOfferItem item : snapshot.itemsOffered(targetId)) {
-            transferOrAbort(t,
-                    new TradeInventoryPort.TransferRequest(targetId, requesterId, item.itemId(), item.quantity()));
+            transferOrAbort(
+                    t, new TradeInventoryPort.TransferRequest(targetId, requesterId, item.itemId(), item.quantity()));
         }
     }
 
@@ -95,11 +96,25 @@ public final class ConfirmTradeUseCase {
 
     private void logAudit(Transaction t, TradeSessionSnapshot snapshot) {
         String detail = "{\"sessionId\":%d,\"counterpartId\":%d}";
-        ports.auditPort().log(t, snapshot.requesterCharacterId(), "TRADE_EXECUTED",
-                detail.formatted(snapshot.id(), snapshot.targetCharacterId()));
-        ports.auditPort().log(t, snapshot.targetCharacterId(), "TRADE_EXECUTED",
-                detail.formatted(snapshot.id(), snapshot.requesterCharacterId()));
+        ports.auditPort()
+                .log(
+                        t,
+                        snapshot.requesterCharacterId(),
+                        "TRADE_EXECUTED",
+                        detail.formatted(snapshot.id(), snapshot.targetCharacterId()));
+        ports.auditPort()
+                .log(
+                        t,
+                        snapshot.targetCharacterId(),
+                        "TRADE_EXECUTED",
+                        detail.formatted(snapshot.id(), snapshot.requesterCharacterId()));
     }
 
-    public enum Result { OK, EXECUTED, NOT_FOUND, OFFER_INVALID, DUPLICATE_REQUEST }
+    public enum Result {
+        OK,
+        EXECUTED,
+        NOT_FOUND,
+        OFFER_INVALID,
+        DUPLICATE_REQUEST
+    }
 }

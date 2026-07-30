@@ -18,6 +18,5 @@ public final class GetPvpRatingUseCase {
                 .orElse(new RatingView(EloRating.DEFAULT_RATING, 0, 0));
     }
 
-    public record RatingView(int rating, int wins, int losses) {
-    }
+    public record RatingView(int rating, int wins, int losses) {}
 }

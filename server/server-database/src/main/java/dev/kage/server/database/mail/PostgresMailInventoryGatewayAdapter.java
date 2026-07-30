@@ -1,10 +1,12 @@
 package dev.kage.server.database.mail;
 
+import java.sql.Connection;
+
+import javax.sql.DataSource;
+
 import dev.kage.mail.domain.InventoryGatewayPort;
 import dev.kage.mail.domain.Transaction;
 import dev.kage.server.database.JdbcOperations;
-import java.sql.Connection;
-import javax.sql.DataSource;
 
 /**
  * Hiện thực {@link InventoryGatewayPort} trên PostgreSQL — SQL riêng cho {@code inventory_item},
@@ -34,8 +36,8 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
     @Override
     public boolean grantItem(Transaction tx, long characterId, long itemTemplateId, int quantity) {
         Connection connection = ((JdbcTransaction) tx).connection();
-        int existingCount =
-                JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId).orElse(0);
+        int existingCount = JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId)
+                .orElse(0);
         if (existingCount >= DEFAULT_CAPACITY) {
             return false;
         }

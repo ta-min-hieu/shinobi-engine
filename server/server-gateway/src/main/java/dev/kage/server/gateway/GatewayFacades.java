@@ -12,6 +12,7 @@ import dev.kage.inventory.api.InventoryFacade;
  * {@link ContentFacades} khi thêm {@code dialogueFacade} (Phase 6 lát cắt 2) mới CHẠM giới hạn.
  */
 record GatewayFacades(
-        AccountFacade accountFacade, CharacterFacade characterFacade, InventoryFacade inventoryFacade,
-        ContentFacades contentFacades) {
-}
+        AccountFacade accountFacade,
+        CharacterFacade characterFacade,
+        InventoryFacade inventoryFacade,
+        ContentFacades contentFacades) {}

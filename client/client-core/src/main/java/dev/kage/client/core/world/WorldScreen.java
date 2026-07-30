@@ -1,5 +1,9 @@
 package dev.kage.client.core.world;
 
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
@@ -8,6 +12,9 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.google.protobuf.InvalidProtocolBufferException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import dev.kage.client.core.input.GameAction;
 import dev.kage.client.core.input.InputMapper;
 import dev.kage.client.core.net.GameConnection;
@@ -25,11 +32,6 @@ import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.wire.PacketCodec;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Màn hình gameplay thật đầu tiên (Phase 3 — movement) — server-authoritative, client chỉ gửi Ý
@@ -44,10 +46,8 @@ public final class WorldScreen implements GameScreen {
 
     private static final Logger LOG = LoggerFactory.getLogger(WorldScreen.class);
 
-    private static final ComponentMapper<PositionComponent> POSITION =
-            ComponentMapper.getFor(PositionComponent.class);
-    private static final ComponentMapper<VelocityComponent> VELOCITY =
-            ComponentMapper.getFor(VelocityComponent.class);
+    private static final ComponentMapper<PositionComponent> POSITION = ComponentMapper.getFor(PositionComponent.class);
+    private static final ComponentMapper<VelocityComponent> VELOCITY = ComponentMapper.getFor(VelocityComponent.class);
 
     private final InputMapper inputMapper;
     private final GameConnection connection;
@@ -66,8 +66,8 @@ public final class WorldScreen implements GameScreen {
         this.world = world;
         this.inputMapper = inputMapper;
         this.connection = connection;
-        this.viewport = new FitViewport(
-                WorldConstants.VIEWPORT_HEIGHT_UNITS, WorldConstants.VIEWPORT_HEIGHT_UNITS, camera);
+        this.viewport =
+                new FitViewport(WorldConstants.VIEWPORT_HEIGHT_UNITS, WorldConstants.VIEWPORT_HEIGHT_UNITS, camera);
 
         world.addSystem(new MovementSystem());
 
@@ -111,7 +111,10 @@ public final class WorldScreen implements GameScreen {
             }
             // Opcode khác (VD PongResponse của heartbeat) — không thuộc gameplay world, bỏ qua.
         } catch (InvalidProtocolBufferException e) {
-            LOG.warn("Payload protobuf không hợp lệ từ server: opcode={}", frame.header().opcode(), e);
+            LOG.warn(
+                    "Payload protobuf không hợp lệ từ server: opcode={}",
+                    frame.header().opcode(),
+                    e);
         }
     }
 
@@ -196,7 +199,8 @@ public final class WorldScreen implements GameScreen {
 
     private void sendMoveCommand(float dirX, float dirY) {
         try {
-            MoveCommand command = MoveCommand.newBuilder().setDirX(dirX).setDirY(dirY).build();
+            MoveCommand command =
+                    MoveCommand.newBuilder().setDirX(dirX).setDirY(dirY).build();
             connection.send(Opcode.OPCODE_MOVE_COMMAND_VALUE, connection.nextSequenceId(), command.toByteArray());
         } catch (IOException e) {
             // Mất kết nối tạm thời — bình thường (GameConnection tự reconnect), hướng mới nhất sẽ

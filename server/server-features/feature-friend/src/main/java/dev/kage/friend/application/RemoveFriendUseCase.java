@@ -15,5 +15,8 @@ public final class RemoveFriendUseCase {
         return port.remove(characterId, friendCharacterId) ? Result.OK : Result.NOT_FOUND;
     }
 
-    public enum Result { OK, NOT_FOUND }
+    public enum Result {
+        OK,
+        NOT_FOUND
+    }
 }

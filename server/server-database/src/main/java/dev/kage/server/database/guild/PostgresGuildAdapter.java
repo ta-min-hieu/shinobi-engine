@@ -1,5 +1,17 @@
 package dev.kage.server.database.guild;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Savepoint;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+import javax.sql.DataSource;
+
 import dev.kage.guild.domain.DuplicateGuildJoinRequestException;
 import dev.kage.guild.domain.DuplicateGuildNameException;
 import dev.kage.guild.domain.Guild;
@@ -10,16 +22,6 @@ import dev.kage.guild.domain.GuildRole;
 import dev.kage.server.database.DatabaseAccessException;
 import dev.kage.server.database.JdbcOperations;
 import dev.kage.server.database.JdbcTransactionRunner;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Savepoint;
-import java.sql.Timestamp;
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import javax.sql.DataSource;
 
 /**
  * Hiện thực {@link GuildPort} trên PostgreSQL — bảng {@code guild}/{@code guild_member}/
@@ -152,8 +154,7 @@ public final class PostgresGuildAdapter implements GuildPort {
     }
 
     /** Gói tham số cho {@link #insertMember} — tránh vượt 4 tham số Checkstyle {@code ParameterNumber}. */
-    private record NewMember(long guildId, long characterId, GuildRole role, Instant joinedAt) {
-    }
+    private record NewMember(long guildId, long characterId, GuildRole role, Instant joinedAt) {}
 
     private static void insertMember(Connection connection, NewMember member) {
         JdbcOperations.update(
@@ -308,11 +309,12 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     private static GuildJoinRequest mapJoinRequest(ResultSet rs) throws SQLException {
         return new GuildJoinRequest(
-                rs.getLong("id"), rs.getLong("guild_id"), rs.getLong("character_id"),
+                rs.getLong("id"),
+                rs.getLong("guild_id"),
+                rs.getLong("character_id"),
                 rs.getTimestamp("requested_at").toInstant());
     }
 
     /** Kết quả SELECT ... FOR UPDATE trước khi duyệt — gói 3 cột thay vì truyền rời (PMD). */
-    private record PendingApproval(long characterId, long guildId, long guildLeaderCharacterId) {
-    }
+    private record PendingApproval(long characterId, long guildId, long guildLeaderCharacterId) {}
 }

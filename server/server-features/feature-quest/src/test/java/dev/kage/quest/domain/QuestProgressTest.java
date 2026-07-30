@@ -27,6 +27,7 @@ class QuestProgressTest {
 
     @Test
     void shouldAllowEmptyProgressJson() {
-        assertThatCode(() -> new QuestProgress(1, 1, QuestStatus.IN_PROGRESS, "")).doesNotThrowAnyException();
+        assertThatCode(() -> new QuestProgress(1, 1, QuestStatus.IN_PROGRESS, ""))
+                .doesNotThrowAnyException();
     }
 }

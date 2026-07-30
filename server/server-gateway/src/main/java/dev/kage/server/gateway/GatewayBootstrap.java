@@ -1,5 +1,15 @@
 package dev.kage.server.gateway;
 
+import java.time.Duration;
+import java.util.ArrayList;
+
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics;
+import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics;
+import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics;
+import io.micrometer.prometheusmetrics.PrometheusConfig;
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
+
 import dev.kage.account.api.AccountFacade;
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.chat.api.ChatFacade;
@@ -17,14 +27,6 @@ import dev.kage.server.database.ServerDatabaseBootstrap;
 import dev.kage.server.world.WorldFacade;
 import dev.kage.shop.api.ShopFacade;
 import dev.kage.trade.api.TradeFacade;
-import io.micrometer.core.instrument.Gauge;
-import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics;
-import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics;
-import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics;
-import io.micrometer.prometheusmetrics.PrometheusConfig;
-import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
-import java.time.Duration;
-import java.util.ArrayList;
 
 /**
  * Entrypoint {@code main()} mỏng — logic thật ở {@link GatewayServer} (tách ra để test end-to-end
@@ -51,8 +53,7 @@ public final class GatewayBootstrap {
     // lát cắt persistence này (tinh chỉnh 1 chỗ khi có số liệu thật, giống MOVE_SPEED_MPS/AOI_RADIUS).
     private static final Duration POSITION_SAVE_INTERVAL = Duration.ofMinutes(5);
 
-    private GatewayBootstrap() {
-    }
+    private GatewayBootstrap() {}
 
     public static void main(String[] args) throws InterruptedException {
         ServerDatabaseBootstrap databaseBootstrap = new ServerDatabaseBootstrap();
@@ -81,44 +82,68 @@ public final class GatewayBootstrap {
         positionPersister.start();
         InstanceRegistries instanceRegistries =
                 buildInstanceRegistries(characterRegistry, facades, mainWorldChannels, positionPersister);
-        DungeonInstanceRegistry dungeonInstanceRegistry = instanceRegistries.dungeon();
-        ArenaInstanceRegistry arenaInstanceRegistry = instanceRegistries.arena();
 
         GatewayServer server = new GatewayServer(PORT, facades, instanceRegistries.worldGateway(), observability);
         server.start();
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            // Thứ tự SERVER.md §10: ngừng nhận kết nối mới trước (server.stop() đóng channel),
-            // rồi mới dừng world tick + đóng DB. positionPersister dừng SAU worldFacade — vòng
-            // quét định kỳ cuối cùng vẫn nên chạy trước khi tắt hẳn (không mất vị trí ai đó vừa
-            // logout đúng lúc server tắt). dungeonInstanceRegistry/arenaInstanceRegistry dừng CÙNG
-            // lúc worldFacade (mọi World, chính lẫn dungeon/duel, dừng trước khi đóng DB).
-            server.stop();
-            mainWorldChannels.stopAll();
-            dungeonInstanceRegistry.stopAll();
-            arenaInstanceRegistry.stopAll();
-            characterRegistry.stop();
-            positionPersister.stop();
-            worldContext.metricsHttpServer().stop();
-            observability.tracing().shutdown();
-            databaseBootstrap.shutdown();
-        }, "gateway-shutdown"));
+        registerShutdownHook(
+                new ShutdownContext(server, worldContext, instanceRegistries, characterRegistry),
+                positionPersister,
+                observability,
+                databaseBootstrap);
         server.awaitTermination();
     }
+
+    /**
+     * Tách khỏi {@code main()} để giữ dưới giới hạn Checkstyle MethodLength.
+     */
+    private static void registerShutdownHook(
+            ShutdownContext ctx,
+            CharacterPositionPersister positionPersister,
+            GatewayObservability observability,
+            ServerDatabaseBootstrap databaseBootstrap) {
+        Runtime.getRuntime()
+                .addShutdownHook(new Thread(
+                        () -> {
+                            // Thứ tự SERVER.md §10: ngừng nhận kết nối mới trước (server.stop() đóng channel),
+                            // rồi mới dừng world tick + đóng DB. positionPersister dừng SAU worldFacade — vòng
+                            // quét định kỳ cuối cùng vẫn nên chạy trước khi tắt hẳn (không mất vị trí ai đó vừa
+                            // logout đúng lúc server tắt). dungeonInstanceRegistry/arenaInstanceRegistry dừng CÙNG
+                            // lúc worldFacade (mọi World, chính lẫn dungeon/duel, dừng trước khi đóng DB).
+                            ctx.server().stop();
+                            ctx.worldContext().mainWorldChannels().stopAll();
+                            ctx.instanceRegistries().dungeon().stopAll();
+                            ctx.instanceRegistries().arena().stopAll();
+                            ctx.characterRegistry().stop();
+                            positionPersister.stop();
+                            ctx.worldContext().metricsHttpServer().stop();
+                            observability.tracing().shutdown();
+                            databaseBootstrap.shutdown();
+                        },
+                        "gateway-shutdown"));
+    }
+
+    /**
+     * Gộp thứ cần cho {@link #registerShutdownHook} — giữ tham số method đó ≤ 4 (Checkstyle
+     * ParameterNumber).
+     */
+    private record ShutdownContext(
+            GatewayServer server,
+            WorldContext worldContext,
+            InstanceRegistries instanceRegistries,
+            ConnectedCharacterRegistry characterRegistry) {}
 
     /**
      * Gộp {@link MainWorldChannelRegistry} + {@link MetricsHttpServer} — cả hai sinh ra CÙNG lúc
      * trong {@link #startWorld}.
      */
-    private record WorldContext(MainWorldChannelRegistry mainWorldChannels, MetricsHttpServer metricsHttpServer) {
-    }
+    private record WorldContext(MainWorldChannelRegistry mainWorldChannels, MetricsHttpServer metricsHttpServer) {}
 
     /**
      * Gộp Dungeon/Arena instance registry + {@link WorldGateway} — dựng cùng lúc,
      * xem {@link #buildInstanceRegistries}.
      */
     private record InstanceRegistries(
-            DungeonInstanceRegistry dungeon, ArenaInstanceRegistry arena, WorldGateway worldGateway) {
-    }
+            DungeonInstanceRegistry dungeon, ArenaInstanceRegistry arena, WorldGateway worldGateway) {}
 
     /**
      * Tách khỏi {@code main()} để giữ dưới giới hạn Checkstyle MethodLength — Dungeon/Arena
@@ -126,16 +151,25 @@ public final class GatewayBootstrap {
      * lát cắt 1/4) nên dựng cùng chỗ với {@link WorldGateway} luôn cho gọn.
      */
     private static InstanceRegistries buildInstanceRegistries(
-            ConnectedCharacterRegistry characterRegistry, GatewayFacades facades,
-            MainWorldChannelRegistry mainWorldChannels, CharacterPositionPersister positionPersister) {
+            ConnectedCharacterRegistry characterRegistry,
+            GatewayFacades facades,
+            MainWorldChannelRegistry mainWorldChannels,
+            CharacterPositionPersister positionPersister) {
         DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
-                characterRegistry, facades.characterFacade(), facades.contentFacades().socialFacades().partyFacade(),
+                characterRegistry,
+                facades.characterFacade(),
+                facades.contentFacades().socialFacades().partyFacade(),
                 mainWorldChannels);
         ArenaInstanceRegistry arenaInstanceRegistry = new ArenaInstanceRegistry(
-                characterRegistry, facades.characterFacade(), facades.contentFacades().socialFacades().pvpFacade(),
+                characterRegistry,
+                facades.characterFacade(),
+                facades.contentFacades().socialFacades().pvpFacade(),
                 mainWorldChannels);
         WorldGateway worldGateway = new WorldGateway(
-                mainWorldChannels, characterRegistry, positionPersister, dungeonInstanceRegistry,
+                mainWorldChannels,
+                characterRegistry,
+                positionPersister,
+                dungeonInstanceRegistry,
                 arenaInstanceRegistry);
         return new InstanceRegistries(dungeonInstanceRegistry, arenaInstanceRegistry, worldGateway);
     }
@@ -144,8 +178,7 @@ public final class GatewayBootstrap {
      * Gộp {@link PrometheusMeterRegistry} + {@link GatewayNetworkMetrics} — dựng cùng lúc,
      * xem {@link #buildMetrics}.
      */
-    private record MetricsContext(PrometheusMeterRegistry meterRegistry, GatewayNetworkMetrics networkMetrics) {
-    }
+    private record MetricsContext(PrometheusMeterRegistry meterRegistry, GatewayNetworkMetrics networkMetrics) {}
 
     /**
      * Tách khỏi {@code main()} để giữ dưới giới hạn Checkstyle MethodLength — {@code meterRegistry}
@@ -175,7 +208,8 @@ public final class GatewayBootstrap {
      * thêm sau (Phase 9 lát cắt 6) dùng {@code NO_OP}, xem javadoc {@link MainWorldChannelRegistry}.
      */
     private static WorldContext startWorld(
-            ConnectedCharacterRegistry characterRegistry, ServerDatabaseBootstrap databaseBootstrap,
+            ConnectedCharacterRegistry characterRegistry,
+            ServerDatabaseBootstrap databaseBootstrap,
             PrometheusMeterRegistry meterRegistry) {
         MetricsHttpServer metricsHttpServer =
                 new MetricsHttpServer(METRICS_PORT, meterRegistry, databaseBootstrap::isReady);
@@ -196,8 +230,8 @@ public final class GatewayBootstrap {
         Gauge.builder("kage.db.pool.pending", databaseBootstrap, ServerDatabaseBootstrap::poolPendingThreads)
                 .description("Số thread đang chờ pool có connection trống — >0 kéo dài nghĩa là pool quá nhỏ")
                 .register(meterRegistry);
-        WorldFacade firstChannelFacade = new WorldFacade(
-                characterRegistry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG_MAIN));
+        WorldFacade firstChannelFacade =
+                new WorldFacade(characterRegistry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG_MAIN));
         firstChannelFacade.start();
         MainWorldChannelRegistry mainWorldChannels =
                 new MainWorldChannelRegistry(characterRegistry, firstChannelFacade, meterRegistry);

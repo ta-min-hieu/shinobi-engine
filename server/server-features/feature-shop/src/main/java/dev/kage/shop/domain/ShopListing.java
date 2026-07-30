@@ -12,8 +12,7 @@ public record ShopListing(long itemTemplateId, long buyPrice, long sellPrice) {
             throw new IllegalArgumentException("itemTemplateId phải > 0: " + itemTemplateId);
         }
         if (buyPrice < 0 || sellPrice < 0) {
-            throw new IllegalArgumentException(
-                    "Giá không được âm: buyPrice=" + buyPrice + ", sellPrice=" + sellPrice);
+            throw new IllegalArgumentException("Giá không được âm: buyPrice=" + buyPrice + ", sellPrice=" + sellPrice);
         }
     }
 }

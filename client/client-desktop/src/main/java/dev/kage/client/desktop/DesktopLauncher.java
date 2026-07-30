@@ -1,13 +1,15 @@
 package dev.kage.client.desktop;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
+
 import dev.kage.client.core.net.GameConnection;
 import dev.kage.client.core.net.NetworkBootstrap;
 import dev.kage.client.core.world.WorldScreen;
 import dev.kage.engine.core.KageEngine;
 import dev.kage.engine.ecs.EcsWorld;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Launcher Desktop — CHỈ chứa khởi động + platform adapter, KHÔNG gameplay (Điều 28,
@@ -22,11 +24,12 @@ public final class DesktopLauncher {
     private static final String GATEWAY_HOST = "127.0.0.1";
     private static final int GATEWAY_PORT = 7777;
 
-    private DesktopLauncher() {
-    }
+    private DesktopLauncher() {}
 
     public static void main(String[] args) throws Exception {
-        String username = args.length > 0 ? args[0] : "player" + ThreadLocalRandom.current().nextInt(1000, 9999);
+        String username = args.length > 0
+                ? args[0]
+                : "player" + ThreadLocalRandom.current().nextInt(1000, 9999);
 
         GameConnection connection = new GameConnection(GATEWAY_HOST, GATEWAY_PORT);
         connection.start();

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Map;
+
 import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.Test;
 
@@ -51,7 +52,8 @@ class ScriptSandboxTest {
         String text = sandbox.eval(
                 "({text: 'hello', options: ['a', 'b']})",
                 Map.of(),
-                value -> value.getMember("text").asString() + ":" + value.getMember("options").getArraySize());
+                value -> value.getMember("text").asString() + ":"
+                        + value.getMember("options").getArraySize());
 
         assertThat(text).isEqualTo("hello:2");
     }

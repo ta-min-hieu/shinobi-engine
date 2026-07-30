@@ -19,5 +19,8 @@ public final class CancelTradeUseCase {
         return port.deleteSessionIfParticipant(sessionId, characterId) ? Result.OK : Result.NOT_FOUND;
     }
 
-    public enum Result { OK, NOT_FOUND }
+    public enum Result {
+        OK,
+        NOT_FOUND
+    }
 }

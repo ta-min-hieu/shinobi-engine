@@ -34,5 +34,10 @@ public final class SendChatMessageUseCase {
         return Result.OK;
     }
 
-    public enum Result { OK, MESSAGE_BLANK, MESSAGE_TOO_LONG, CONTAINS_BANNED_WORD }
+    public enum Result {
+        OK,
+        MESSAGE_BLANK,
+        MESSAGE_TOO_LONG,
+        CONTAINS_BANNED_WORD
+    }
 }

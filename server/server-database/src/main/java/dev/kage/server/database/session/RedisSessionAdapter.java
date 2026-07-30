@@ -1,12 +1,14 @@
 package dev.kage.server.database.session;
 
-import dev.kage.account.domain.SessionPort;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Optional;
+
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
+
+import dev.kage.account.domain.SessionPort;
 
 /**
  * Session token (ADR-017): opaque random 256-bit, key {@code session:{token}} → accountId,

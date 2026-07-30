@@ -1,10 +1,11 @@
 package dev.kage.shop.api;
 
+import java.util.List;
+
 import dev.kage.shop.application.BuyItemUseCase;
 import dev.kage.shop.application.ListShopItemsUseCase;
 import dev.kage.shop.application.SellItemUseCase;
 import dev.kage.shop.domain.ShopListing;
-import java.util.List;
 
 /**
  * API công khai của {@code feature-shop} — module khác (server-gateway) CHỈ gọi qua đây, không
@@ -53,7 +54,19 @@ public final class ShopFacade {
         };
     }
 
-    public enum BuyResult { OK, ITEM_NOT_IN_SHOP, INSUFFICIENT_GOLD, INVENTORY_FULL, DUPLICATE_REQUEST }
+    public enum BuyResult {
+        OK,
+        ITEM_NOT_IN_SHOP,
+        INSUFFICIENT_GOLD,
+        INVENTORY_FULL,
+        DUPLICATE_REQUEST
+    }
 
-    public enum SellResult { OK, ITEM_NOT_FOUND, ITEM_NOT_SELLABLE, INSUFFICIENT_QUANTITY, DUPLICATE_REQUEST }
+    public enum SellResult {
+        OK,
+        ITEM_NOT_FOUND,
+        ITEM_NOT_SELLABLE,
+        INSUFFICIENT_QUANTITY,
+        DUPLICATE_REQUEST
+    }
 }

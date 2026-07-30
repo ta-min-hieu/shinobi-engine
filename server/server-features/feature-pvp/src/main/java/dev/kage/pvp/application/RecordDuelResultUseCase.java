@@ -18,8 +18,7 @@ public final class RecordDuelResultUseCase {
         int winnerRating = currentRating(winnerCharacterId);
         int loserRating = currentRating(loserCharacterId);
         EloRating.Result result = EloRating.computeNewRatings(winnerRating, loserRating);
-        port.recordMatchResult(
-                winnerCharacterId, result.newWinnerRating(), loserCharacterId, result.newLoserRating());
+        port.recordMatchResult(winnerCharacterId, result.newWinnerRating(), loserCharacterId, result.newLoserRating());
         return new DuelSettlement(
                 winnerCharacterId, result.newWinnerRating(), loserCharacterId, result.newLoserRating());
     }
@@ -30,6 +29,5 @@ public final class RecordDuelResultUseCase {
 
     /** Gộp tham số kết quả trả về (STATIC-ANALYSIS.md). */
     public record DuelSettlement(
-            long winnerCharacterId, int winnerNewRating, long loserCharacterId, int loserNewRating) {
-    }
+            long winnerCharacterId, int winnerNewRating, long loserCharacterId, int loserNewRating) {}
 }

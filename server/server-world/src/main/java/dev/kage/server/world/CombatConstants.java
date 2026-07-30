@@ -1,8 +1,9 @@
 package dev.kage.server.world;
 
-import dev.kage.server.world.component.CombatStatsComponent;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
+
+import dev.kage.server.world.component.CombatStatsComponent;
 
 /**
  * Chỉ số + công thức damage — TOÀN BỘ hệ số ở đây là PLACEHOLDER, chưa cân bằng qua playtest
@@ -23,13 +24,19 @@ import java.util.concurrent.ThreadLocalRandom;
 final class CombatConstants {
 
     /** Chỉ số chiến đấu 1 phe — dùng chung cho cả nhân vật lẫn quái (GDD §5). */
-    record CombatStats(int atk, int skillDmg, int def, int res, float hitPercent, float dodgePercent,
-            float critPercent, float critDamageMultiplier, Element element) {
-    }
+    record CombatStats(
+            int atk,
+            int skillDmg,
+            int def,
+            int res,
+            float hitPercent,
+            float dodgePercent,
+            float critPercent,
+            float critDamageMultiplier,
+            Element element) {}
 
     /** Kết quả 1 đòn đánh/skill đã tính xong — {@code damage == 0} khi {@code miss}. */
-    record AttackResult(boolean miss, boolean crit, int damage) {
-    }
+    record AttackResult(boolean miss, boolean crit, int damage) {}
 
     static final int CHARACTER_MAX_HP = 100; // placeholder — GDD chưa chốt công thức HP tối đa
 
@@ -71,15 +78,21 @@ final class CombatConstants {
     static final int MONSTER_MAX_HP = 50;
     static final float MONSTER_RESPAWN_SECONDS = 10f;
 
-    private CombatConstants() {
-    }
+    private CombatConstants() {}
 
     /** Bonus passive TĨNH theo hệ phái (GDD §5 "2 passive/hệ", Phase 8 4-hệ-mới) — cộng THẲNG vào
      * chỉ số derive, KHÔNG dùng script (Điều 27 chỉ bắt buộc script cho NỘI DUNG skill, passive chỉ
      * là số cố định giống các hằng số khác trong lớp này). Hỏa/NONE = 0 (Hỏa chưa có passive nào ở
      * lát cắt trước, hoàn thiện nốt là việc sau — xem ROADMAP.md Phase 8). */
-    private record PassiveBonus(int atk, int skillDmg, int def, int res,
-            float hitPercent, float dodgePercent, float critPercent, float critDamageMultiplier) {
+    private record PassiveBonus(
+            int atk,
+            int skillDmg,
+            int def,
+            int res,
+            float hitPercent,
+            float dodgePercent,
+            float critPercent,
+            float critDamageMultiplier) {
         private static final PassiveBonus NONE_BONUS = new PassiveBonus(0, 0, 0, 0, 0f, 0f, 0f, 0f);
     }
 
@@ -183,8 +196,16 @@ final class CombatConstants {
      * {@link CombatSystem}/{@link SkillSystem}.
      */
     static CombatStats toStats(CombatStatsComponent c) {
-        return new CombatStats(c.atk, c.skillDmg, c.def, c.res, c.hitPercent, c.dodgePercent, c.critPercent,
-                c.critDamageMultiplier, c.element);
+        return new CombatStats(
+                c.atk,
+                c.skillDmg,
+                c.def,
+                c.res,
+                c.hitPercent,
+                c.dodgePercent,
+                c.critPercent,
+                c.critDamageMultiplier,
+                c.element);
     }
 
     private static float clamp(float value, float min, float max) {

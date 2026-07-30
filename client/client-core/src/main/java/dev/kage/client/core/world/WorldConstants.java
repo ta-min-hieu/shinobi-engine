@@ -23,6 +23,5 @@ final class WorldConstants {
      */
     static final float RECONCILE_SNAP_THRESHOLD = 1f;
 
-    private WorldConstants() {
-    }
+    private WorldConstants() {}
 }

@@ -22,5 +22,8 @@ public final class LeavePartyUseCase {
         };
     }
 
-    public enum Result { OK, NOT_IN_PARTY }
+    public enum Result {
+        OK,
+        NOT_IN_PARTY
+    }
 }

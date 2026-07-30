@@ -18,5 +18,9 @@ public final class KickGuildMemberUseCase {
         return port.kickMember(leaderCharacterId, targetCharacterId) ? Result.OK : Result.NOT_FOUND;
     }
 
-    public enum Result { OK, CANNOT_KICK_SELF, NOT_FOUND }
+    public enum Result {
+        OK,
+        CANNOT_KICK_SELF,
+        NOT_FOUND
+    }
 }

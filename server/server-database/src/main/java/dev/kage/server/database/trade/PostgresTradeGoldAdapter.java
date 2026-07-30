@@ -1,9 +1,10 @@
 package dev.kage.server.database.trade;
 
-import dev.kage.server.database.JdbcOperations;
-import dev.kage.trade.domain.Transaction;
-import dev.kage.trade.domain.TradeGoldPort;
 import java.sql.Connection;
+
+import dev.kage.server.database.JdbcOperations;
+import dev.kage.trade.domain.TradeGoldPort;
+import dev.kage.trade.domain.Transaction;
 
 /**
  * Hiện thực {@link TradeGoldPort} trên PostgreSQL — gold vật lý ở {@code character_stat.gold}

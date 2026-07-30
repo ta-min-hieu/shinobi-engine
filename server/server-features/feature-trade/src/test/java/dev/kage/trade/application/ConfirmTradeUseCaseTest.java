@@ -2,19 +2,24 @@ package dev.kage.trade.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
 import dev.kage.trade.domain.OfferedItemInput;
 import dev.kage.trade.domain.TradeSession;
 import dev.kage.trade.domain.TransactionRunner;
-import java.util.List;
-import org.junit.jupiter.api.Test;
 
 class ConfirmTradeUseCaseTest {
 
     private static final TransactionRunner DIRECT_TX = action -> action.accept(null);
 
     private static ConfirmTradeUseCase newUseCase(
-            FakeTradeSessionPort sessionPort, FakeTradeInventoryPort inventoryPort, FakeTradeGoldPort goldPort,
-            FakeTradeAuditPort auditPort, FakeIdempotencyPort idempotencyPort) {
+            FakeTradeSessionPort sessionPort,
+            FakeTradeInventoryPort inventoryPort,
+            FakeTradeGoldPort goldPort,
+            FakeTradeAuditPort auditPort,
+            FakeIdempotencyPort idempotencyPort) {
         TradePorts ports = new TradePorts(sessionPort, inventoryPort, goldPort, auditPort, idempotencyPort);
         return new ConfirmTradeUseCase(ports, DIRECT_TX);
     }
@@ -25,7 +30,10 @@ class ConfirmTradeUseCaseTest {
         TradeSession session = sessionPort.createRequest(1, 5);
         sessionPort.acceptRequest(session.id(), 5);
         ConfirmTradeUseCase useCase = newUseCase(
-                sessionPort, new FakeTradeInventoryPort(), new FakeTradeGoldPort(), new FakeTradeAuditPort(),
+                sessionPort,
+                new FakeTradeInventoryPort(),
+                new FakeTradeGoldPort(),
+                new FakeTradeAuditPort(),
                 new FakeIdempotencyPort());
 
         ConfirmTradeUseCase.Result result = useCase.execute(session.id(), 1, "key-1");
@@ -57,8 +65,10 @@ class ConfirmTradeUseCaseTest {
         assertThat(result).isEqualTo(ConfirmTradeUseCase.Result.EXECUTED);
         assertThat(goldPort.getGold(1)).isEqualTo(90); // 100 - 20 + 10
         assertThat(goldPort.getGold(5)).isEqualTo(60); // 50 - 10 + 20
-        assertThat(inventoryPort.findItemById(requesterItemId).orElseThrow().characterId()).isEqualTo(5);
-        assertThat(inventoryPort.findItemById(targetItemId).orElseThrow().characterId()).isEqualTo(1);
+        assertThat(inventoryPort.findItemById(requesterItemId).orElseThrow().characterId())
+                .isEqualTo(5);
+        assertThat(inventoryPort.findItemById(targetItemId).orElseThrow().characterId())
+                .isEqualTo(1);
         assertThat(sessionPort.findActiveSessionOfCharacter(1)).isEmpty(); // phiên đã bị xoá
         assertThat(auditPort.loggedActions).containsExactly("TRADE_EXECUTED", "TRADE_EXECUTED");
     }
@@ -73,14 +83,15 @@ class ConfirmTradeUseCaseTest {
         long itemId = inventoryPort.addItem(1, 200, 10, 0); // có 10, chào 3
         sessionPort.replaceOffer(session.id(), 1, 0, List.of(new OfferedItemInput(itemId, 3)));
         sessionPort.replaceOffer(session.id(), 5, 0, List.of());
-        ConfirmTradeUseCase useCase = newUseCase(
-                sessionPort, inventoryPort, goldPort, new FakeTradeAuditPort(), new FakeIdempotencyPort());
+        ConfirmTradeUseCase useCase =
+                newUseCase(sessionPort, inventoryPort, goldPort, new FakeTradeAuditPort(), new FakeIdempotencyPort());
 
         useCase.execute(session.id(), 1, "key-a");
         useCase.execute(session.id(), 5, "key-b");
 
         assertThat(inventoryPort.findItemById(itemId).orElseThrow().quantity()).isEqualTo(7); // giữ lại 7
-        assertThat(inventoryPort.findItemById(itemId).orElseThrow().characterId()).isEqualTo(1);
+        assertThat(inventoryPort.findItemById(itemId).orElseThrow().characterId())
+                .isEqualTo(1);
     }
 
     @Test
@@ -120,7 +131,10 @@ class ConfirmTradeUseCaseTest {
         sessionPort.acceptRequest(session.id(), 5);
         FakeIdempotencyPort idempotencyPort = new FakeIdempotencyPort();
         ConfirmTradeUseCase useCase = newUseCase(
-                sessionPort, new FakeTradeInventoryPort(), new FakeTradeGoldPort(), new FakeTradeAuditPort(),
+                sessionPort,
+                new FakeTradeInventoryPort(),
+                new FakeTradeGoldPort(),
+                new FakeTradeAuditPort(),
                 idempotencyPort);
         useCase.execute(session.id(), 1, "same-key");
 
@@ -134,7 +148,10 @@ class ConfirmTradeUseCaseTest {
         FakeTradeSessionPort sessionPort = new FakeTradeSessionPort();
         TradeSession session = sessionPort.createRequest(1, 5);
         ConfirmTradeUseCase useCase = newUseCase(
-                sessionPort, new FakeTradeInventoryPort(), new FakeTradeGoldPort(), new FakeTradeAuditPort(),
+                sessionPort,
+                new FakeTradeInventoryPort(),
+                new FakeTradeGoldPort(),
+                new FakeTradeAuditPort(),
                 new FakeIdempotencyPort());
 
         ConfirmTradeUseCase.Result result = useCase.execute(session.id(), 999, "key-1");

@@ -2,8 +2,9 @@ package dev.kage.guild.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.kage.guild.domain.GuildRole;
 import org.junit.jupiter.api.Test;
+
+import dev.kage.guild.domain.GuildRole;
 
 class FindMyGuildUseCaseTest {
 

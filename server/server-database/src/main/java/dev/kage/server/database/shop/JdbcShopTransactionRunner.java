@@ -1,10 +1,12 @@
 package dev.kage.server.database.shop;
 
+import java.util.function.Consumer;
+
+import javax.sql.DataSource;
+
 import dev.kage.server.database.JdbcTransactionRunner;
 import dev.kage.shop.domain.Transaction;
 import dev.kage.shop.domain.TransactionRunner;
-import java.util.function.Consumer;
-import javax.sql.DataSource;
 
 /** Hiện thực {@code feature-shop}'s {@link TransactionRunner} bằng JDBC thật. */
 public final class JdbcShopTransactionRunner implements TransactionRunner {

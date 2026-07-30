@@ -16,6 +16,10 @@ import dev.kage.trade.api.TradeFacade;
  * lớp gộp chỉ vì số trường tăng.
  */
 record SocialFacades(
-        FriendFacade friendFacade, MailFacade mailFacade, ChatFacade chatFacade, GuildFacade guildFacade,
-        PartyFacade partyFacade, TradeFacade tradeFacade, PvpFacade pvpFacade) {
-}
+        FriendFacade friendFacade,
+        MailFacade mailFacade,
+        ChatFacade chatFacade,
+        GuildFacade guildFacade,
+        PartyFacade partyFacade,
+        TradeFacade tradeFacade,
+        PvpFacade pvpFacade) {}

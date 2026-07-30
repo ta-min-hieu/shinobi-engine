@@ -1,17 +1,18 @@
 package dev.kage.server.world;
 
-import dev.kage.engine.ecs.ComponentMapper;
-import dev.kage.engine.ecs.KEntity;
-import dev.kage.engine.ecs.component.PositionComponent;
-import dev.kage.server.world.component.HealthComponent;
-import dev.kage.server.world.component.MonsterComponent;
-import dev.kage.server.world.component.NpcComponent;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import dev.kage.engine.ecs.ComponentMapper;
+import dev.kage.engine.ecs.KEntity;
+import dev.kage.engine.ecs.component.PositionComponent;
+import dev.kage.server.world.component.HealthComponent;
+import dev.kage.server.world.component.MonsterComponent;
+import dev.kage.server.world.component.NpcComponent;
 
 /**
  * Area of Interest (SERVER.md §6 — "bắt buộc, không phải tối ưu, ngay từ Phase 3"). Diff cặp
@@ -51,8 +52,7 @@ import java.util.Set;
  */
 final class AreaOfInterestTracker {
 
-    private static final ComponentMapper<PositionComponent> POSITION =
-            ComponentMapper.getFor(PositionComponent.class);
+    private static final ComponentMapper<PositionComponent> POSITION = ComponentMapper.getFor(PositionComponent.class);
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
     private static final ComponentMapper<MonsterComponent> MONSTER = ComponentMapper.getFor(MonsterComponent.class);
     private static final ComponentMapper<NpcComponent> NPC = ComponentMapper.getFor(NpcComponent.class);
@@ -127,7 +127,8 @@ final class AreaOfInterestTracker {
     }
 
     void sync(
-            Map<Long, KEntity> entitiesByCharacterId, Map<Long, KEntity> entitiesByMonsterId,
+            Map<Long, KEntity> entitiesByCharacterId,
+            Map<Long, KEntity> entitiesByMonsterId,
             Map<Long, KEntity> entitiesByNpcId) {
         buildGrid(entitiesByCharacterId, characterGrid);
         buildGrid(entitiesByMonsterId, monsterGrid);
@@ -165,7 +166,8 @@ final class AreaOfInterestTracker {
         grid.clear();
         for (Map.Entry<Long, KEntity> entry : entitiesById.entrySet()) {
             PositionComponent pos = POSITION.get(entry.getValue());
-            grid.computeIfAbsent(cellKey(pos.x, pos.y), unusedKey -> new ArrayList<>()).add(entry.getKey());
+            grid.computeIfAbsent(cellKey(pos.x, pos.y), unusedKey -> new ArrayList<>())
+                    .add(entry.getKey());
         }
     }
 
@@ -229,7 +231,9 @@ final class AreaOfInterestTracker {
     }
 
     private void syncCharacterMonsterPair(
-            Map<Long, KEntity> entitiesByCharacterId, Map<Long, KEntity> entitiesByMonsterId, long characterId,
+            Map<Long, KEntity> entitiesByCharacterId,
+            Map<Long, KEntity> entitiesByMonsterId,
+            long characterId,
             long monsterId) {
         PositionComponent charPos = POSITION.get(entitiesByCharacterId.get(characterId));
         KEntity monsterEntity = entitiesByMonsterId.get(monsterId);
@@ -241,8 +245,10 @@ final class AreaOfInterestTracker {
             visibleTo.get(characterId).add(monsterId);
             HealthComponent health = HEALTH.get(monsterEntity);
             MonsterComponent monster = MONSTER.get(monsterEntity);
-            sink.onMonsterSpawned(characterId, new WorldOutboundSink.MonsterSnapshot(
-                    monsterId, monster.monsterCode, monsterPos.x, monsterPos.y, health.current, health.max));
+            sink.onMonsterSpawned(
+                    characterId,
+                    new WorldOutboundSink.MonsterSnapshot(
+                            monsterId, monster.monsterCode, monsterPos.x, monsterPos.y, health.current, health.max));
         } else if (!within && wasVisible) {
             visibleTo.get(characterId).remove(monsterId);
             sink.onMonsterDespawned(characterId, monsterId);
@@ -253,7 +259,9 @@ final class AreaOfInterestTracker {
 
     /** NPC tĩnh — không có nhánh "trong tầm nhìn, đã đổi vị trí" như {@code syncCharacterMonsterPair}. */
     private void syncCharacterNpcPair(
-            Map<Long, KEntity> entitiesByCharacterId, Map<Long, KEntity> entitiesByNpcId, long characterId,
+            Map<Long, KEntity> entitiesByCharacterId,
+            Map<Long, KEntity> entitiesByNpcId,
+            long characterId,
             long npcId) {
         PositionComponent charPos = POSITION.get(entitiesByCharacterId.get(characterId));
         KEntity npcEntity = entitiesByNpcId.get(npcId);

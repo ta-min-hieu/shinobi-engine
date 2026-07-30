@@ -1,17 +1,19 @@
 package dev.kage.server.database.inventory;
 
-import dev.kage.inventory.domain.Equipment;
-import dev.kage.inventory.domain.EquipmentPort;
-import dev.kage.inventory.domain.EquipmentSlotType;
-import dev.kage.inventory.domain.Transaction;
-import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
 import javax.sql.DataSource;
+
+import dev.kage.inventory.domain.Equipment;
+import dev.kage.inventory.domain.EquipmentPort;
+import dev.kage.inventory.domain.EquipmentSlotType;
+import dev.kage.inventory.domain.Transaction;
+import dev.kage.server.database.JdbcOperations;
 
 /**
  * Hiện thực {@link EquipmentPort} trên PostgreSQL (Điều 24 + DATABASE.md §11). Tối đa 7 dòng/nhân
@@ -69,11 +71,11 @@ public final class PostgresEquipmentAdapter implements EquipmentPort {
         }
         List<Object[]> batchParams = new ArrayList<Object[]>();
         for (Map.Entry<EquipmentSlotType, Long> entry : slots.entrySet()) {
-            batchParams.add(new Object[] {equipment.characterId(), entry.getKey().name(), entry.getValue()});
+            batchParams.add(
+                    new Object[] {equipment.characterId(), entry.getKey().name(), entry.getValue()});
         }
         JdbcOperations.batchUpdate(connection, INSERT_SLOT, batchParams);
     }
 
-    private record SlotRow(EquipmentSlotType slotType, long inventoryItemId) {
-    }
+    private record SlotRow(EquipmentSlotType slotType, long inventoryItemId) {}
 }

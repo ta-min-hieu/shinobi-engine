@@ -1,5 +1,7 @@
 package dev.kage.inventory.api;
 
+import java.util.List;
+
 import dev.kage.inventory.application.AddItemUseCase;
 import dev.kage.inventory.application.ComputeEquipmentBonusUseCase;
 import dev.kage.inventory.application.EnhanceItemUseCase;
@@ -9,7 +11,6 @@ import dev.kage.inventory.application.UnequipItemUseCase;
 import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.ItemStack;
-import java.util.List;
 
 /**
  * API công khai của {@code feature-inventory} — module khác (server-gateway) CHỈ gọi qua đây,
@@ -107,13 +108,29 @@ public final class InventoryFacade {
         };
     }
 
-    public enum Result { OK, FULL }
+    public enum Result {
+        OK,
+        FULL
+    }
 
-    public enum EquipResult { OK, ITEM_NOT_FOUND, WRONG_SLOT }
+    public enum EquipResult {
+        OK,
+        ITEM_NOT_FOUND,
+        WRONG_SLOT
+    }
 
-    public enum UnequipResult { OK, NOT_EQUIPPED }
+    public enum UnequipResult {
+        OK,
+        NOT_EQUIPPED
+    }
 
     public enum EnhanceResult {
-        SUCCESS, FAILED_NO_DROP, FAILED_DROPPED, FAILED_PROTECTED, ITEM_NOT_FOUND, MAX_LEVEL, INSUFFICIENT_GOLD
+        SUCCESS,
+        FAILED_NO_DROP,
+        FAILED_DROPPED,
+        FAILED_PROTECTED,
+        ITEM_NOT_FOUND,
+        MAX_LEVEL,
+        INSUFFICIENT_GOLD
     }
 }

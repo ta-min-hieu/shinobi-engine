@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.ServerSocket;
 import java.net.Socket;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -39,7 +40,9 @@ class GameConnectionReconnectTest {
             try (ServerSocket serverSocket = new ServerSocket(port)) {
                 serverSocket.setSoTimeout(8_000);
                 Socket accepted = serverSocket.accept();
-                assertThat(accepted).as("GameConnection phải tự kết nối lại khi server xuất hiện").isNotNull();
+                assertThat(accepted)
+                        .as("GameConnection phải tự kết nối lại khi server xuất hiện")
+                        .isNotNull();
                 accepted.close();
             }
         } finally {

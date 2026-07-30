@@ -1,5 +1,11 @@
 package dev.kage.client.core.net;
 
+import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.UUID;
+import java.util.concurrent.TimeoutException;
+
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
@@ -10,11 +16,6 @@ import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.SelectCharacterResponse;
 import dev.kage.protocol.wire.PacketCodec;
-import java.io.IOException;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Chuỗi handshake login → chọn nhân vật, chạy MỘT LẦN lúc khởi động, TRƯỚC khi game loop bắt đầu
@@ -31,17 +32,19 @@ public final class NetworkBootstrap {
     private static final Duration STEP_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
 
-    private NetworkBootstrap() {
-    }
+    private NetworkBootstrap() {}
 
     /** @return {@code characterId} đã chọn — sẵn sàng để gameplay Command dùng ngay. */
     public static long connectAndSelectCharacter(GameConnection connection, String username)
             throws IOException, TimeoutException {
         awaitConnected(connection);
 
-        ConnectRequest connectRequest = ConnectRequest.newBuilder().setUsername(username).build();
+        ConnectRequest connectRequest =
+                ConnectRequest.newBuilder().setUsername(username).build();
         byte[] connectPayload = sendAndAwait(
-                connection, Opcode.OPCODE_CONNECT_REQUEST_VALUE, Opcode.OPCODE_CONNECT_RESPONSE_VALUE,
+                connection,
+                Opcode.OPCODE_CONNECT_REQUEST_VALUE,
+                Opcode.OPCODE_CONNECT_RESPONSE_VALUE,
                 connectRequest.toByteArray());
         ConnectResponse connectResponse = ConnectResponse.parseFrom(connectPayload);
         if (!connectResponse.getSuccess()) {
@@ -53,8 +56,10 @@ public final class NetworkBootstrap {
         SelectCharacterRequest selectRequest =
                 SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
         byte[] selectPayload = sendAndAwait(
-                connection, Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE,
-                Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, selectRequest.toByteArray());
+                connection,
+                Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE,
+                Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE,
+                selectRequest.toByteArray());
         SelectCharacterResponse selectResponse = SelectCharacterResponse.parseFrom(selectPayload);
         if (!selectResponse.getSuccess()) {
             throw new IOException("Chọn nhân vật thất bại: characterId=" + characterId);
@@ -64,7 +69,8 @@ public final class NetworkBootstrap {
 
     private static long findOrCreateCharacter(GameConnection connection, String username) throws IOException {
         byte[] listPayload = sendAndAwait(
-                connection, Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE,
+                connection,
+                Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE,
                 Opcode.OPCODE_LIST_CHARACTERS_RESPONSE_VALUE,
                 ListCharactersRequest.newBuilder().build().toByteArray());
         ListCharactersResponse listResponse = ListCharactersResponse.parseFrom(listPayload);
@@ -79,8 +85,10 @@ public final class NetworkBootstrap {
                 .setIdempotencyKey(UUID.randomUUID().toString())
                 .build();
         byte[] createPayload = sendAndAwait(
-                connection, Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE,
-                Opcode.OPCODE_CREATE_CHARACTER_RESPONSE_VALUE, createRequest.toByteArray());
+                connection,
+                Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE,
+                Opcode.OPCODE_CREATE_CHARACTER_RESPONSE_VALUE,
+                createRequest.toByteArray());
         CreateCharacterResponse createResponse = CreateCharacterResponse.parseFrom(createPayload);
         if (!createResponse.getSuccess()) {
             throw new IOException("Tạo nhân vật thất bại cho username: " + username);
@@ -120,8 +128,7 @@ public final class NetworkBootstrap {
             }
             // Opcode khác (VD PongResponse của heartbeat) — bỏ qua, không phải phần handshake này.
         }
-        throw new IOException(
-                "Không nhận được response opcode=" + expectedResponseOpcode + " sau " + STEP_TIMEOUT);
+        throw new IOException("Không nhận được response opcode=" + expectedResponseOpcode + " sau " + STEP_TIMEOUT);
     }
 
     private static void sleepQuietly() {

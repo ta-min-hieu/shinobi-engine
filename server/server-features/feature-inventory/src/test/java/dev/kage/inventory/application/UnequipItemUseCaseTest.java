@@ -2,14 +2,16 @@ package dev.kage.inventory.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Map;
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+
 import dev.kage.inventory.domain.Equipment;
 import dev.kage.inventory.domain.EquipmentPort;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.Transaction;
 import dev.kage.inventory.domain.TransactionRunner;
-import java.util.Map;
-import java.util.Optional;
-import org.junit.jupiter.api.Test;
 
 class UnequipItemUseCaseTest {
 

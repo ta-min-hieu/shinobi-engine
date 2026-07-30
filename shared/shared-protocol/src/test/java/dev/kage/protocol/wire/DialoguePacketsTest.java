@@ -3,13 +3,14 @@ package dev.kage.protocol.wire;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import org.junit.jupiter.api.Test;
+
 import dev.kage.protocol.DialogueEndedResponse;
 import dev.kage.protocol.DialogueNodeResponse;
 import dev.kage.protocol.DialogueOptionView;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SelectDialogueOptionCommand;
 import dev.kage.protocol.TalkToNpcCommand;
-import org.junit.jupiter.api.Test;
 
 /**
  * Round-trip test bắt buộc theo shared/CLAUDE.md khi thêm packet mới — verify {@code PacketCodec}
@@ -19,19 +20,23 @@ class DialoguePacketsTest {
 
     @Test
     void shouldRoundTripTalkToNpcCommand() throws InvalidProtocolBufferException {
-        TalkToNpcCommand command = TalkToNpcCommand.newBuilder().setNpcCode("town_elder").build();
+        TalkToNpcCommand command =
+                TalkToNpcCommand.newBuilder().setNpcCode("town_elder").build();
         PacketHeader header = new PacketHeader(Opcode.OPCODE_TALK_TO_NPC_COMMAND_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        TalkToNpcCommand parsed = TalkToNpcCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        TalkToNpcCommand parsed =
+                TalkToNpcCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getNpcCode()).isEqualTo("town_elder");
     }
 
     @Test
     void shouldRoundTripDialogueNodeResponse() throws InvalidProtocolBufferException {
-        DialogueOptionView option =
-                DialogueOptionView.newBuilder().setLabelKey("dialogue.option.bye").setAction("end").build();
+        DialogueOptionView option = DialogueOptionView.newBuilder()
+                .setLabelKey("dialogue.option.bye")
+                .setAction("end")
+                .build();
         DialogueNodeResponse response = DialogueNodeResponse.newBuilder()
                 .setNodeId("start")
                 .setTextKey("dialogue.town_elder.greeting")
@@ -40,7 +45,8 @@ class DialoguePacketsTest {
         PacketHeader header = new PacketHeader(Opcode.OPCODE_DIALOGUE_NODE_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        DialogueNodeResponse parsed = DialogueNodeResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        DialogueNodeResponse parsed = DialogueNodeResponse.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getNodeId()).isEqualTo("start");
         assertThat(parsed.getTextKey()).isEqualTo("dialogue.town_elder.greeting");
@@ -60,8 +66,8 @@ class DialoguePacketsTest {
                 new PacketHeader(Opcode.OPCODE_SELECT_DIALOGUE_OPTION_COMMAND_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        SelectDialogueOptionCommand parsed =
-                SelectDialogueOptionCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SelectDialogueOptionCommand parsed = SelectDialogueOptionCommand.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getNpcCode()).isEqualTo("town_elder");
         assertThat(parsed.getCurrentNodeId()).isEqualTo("start");
@@ -74,7 +80,8 @@ class DialoguePacketsTest {
         PacketHeader header = new PacketHeader(Opcode.OPCODE_DIALOGUE_ENDED_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        DialogueEndedResponse parsed = DialogueEndedResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        DialogueEndedResponse parsed = DialogueEndedResponse.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed).isEqualTo(response);
     }

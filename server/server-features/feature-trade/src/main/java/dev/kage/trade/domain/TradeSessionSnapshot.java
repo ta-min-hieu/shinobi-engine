@@ -33,6 +33,8 @@ public record TradeSessionSnapshot(
     }
 
     public List<TradeOfferItem> itemsOffered(long offeringCharacterId) {
-        return items.stream().filter(i -> i.offeringCharacterId() == offeringCharacterId).toList();
+        return items.stream()
+                .filter(i -> i.offeringCharacterId() == offeringCharacterId)
+                .toList();
     }
 }

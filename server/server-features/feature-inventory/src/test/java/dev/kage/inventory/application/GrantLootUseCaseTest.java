@@ -2,6 +2,11 @@ package dev.kage.inventory.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+
 import dev.kage.inventory.domain.DropTableEntry;
 import dev.kage.inventory.domain.DropTablePort;
 import dev.kage.inventory.domain.Inventory;
@@ -9,9 +14,6 @@ import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.Transaction;
 import dev.kage.inventory.domain.TransactionRunner;
-import java.util.List;
-import java.util.Optional;
-import org.junit.jupiter.api.Test;
 
 class GrantLootUseCaseTest {
 
@@ -98,8 +100,8 @@ class GrantLootUseCaseTest {
             public Inventory save(Transaction tx, Inventory inv) {
                 // Mô phỏng DB gán ID thật (999L) cho item mới, giống PostgresInventoryAdapter thật.
                 List<ItemStack> withRealId = inv.items().stream()
-                        .map(stack -> new ItemStack(
-                                999L, stack.itemTemplateId(), stack.quantity(), stack.enhanceLevel()))
+                        .map(stack ->
+                                new ItemStack(999L, stack.itemTemplateId(), stack.quantity(), stack.enhanceLevel()))
                         .toList();
                 return new Inventory(inv.characterId(), inv.capacity(), withRealId);
             }
@@ -117,9 +119,8 @@ class GrantLootUseCaseTest {
     void shouldLoseItem_whenBagFullMidway() {
         // Túi CHỈ CÒN 1 chỗ trống, 2 entry cùng luôn rơi -> item thứ 2 bị mất (feature-inventory/
         // CLAUDE.md ghi rõ đây là hạn chế tạm thời, chưa có ground-item để trả lại).
-        List<DropTableEntry> entries = List.of(
-                new DropTableEntry(100L, 100, 1, 1),
-                new DropTableEntry(200L, 100, 1, 1));
+        List<DropTableEntry> entries =
+                List.of(new DropTableEntry(100L, 100, 1, 1), new DropTableEntry(200L, 100, 1, 1));
         FakeDropTablePort dropTablePort = new FakeDropTablePort(entries);
         Inventory inventory = new Inventory(1L, 1, List.of());
         FakeInventoryPort inventoryPort = new FakeInventoryPort(inventory);

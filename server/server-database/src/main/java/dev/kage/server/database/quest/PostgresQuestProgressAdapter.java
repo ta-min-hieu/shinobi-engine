@@ -1,15 +1,17 @@
 package dev.kage.server.database.quest;
 
+import java.sql.Connection;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.Optional;
+
+import javax.sql.DataSource;
+
 import dev.kage.quest.domain.QuestProgress;
 import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestStatus;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.server.database.JdbcOperations;
-import java.sql.Connection;
-import java.sql.Timestamp;
-import java.time.Instant;
-import java.util.Optional;
-import javax.sql.DataSource;
 
 /** Hiện thực {@link QuestProgressPort} trên PostgreSQL — upsert thật theo khoá tự nhiên (PK). */
 public final class PostgresQuestProgressAdapter implements QuestProgressPort {

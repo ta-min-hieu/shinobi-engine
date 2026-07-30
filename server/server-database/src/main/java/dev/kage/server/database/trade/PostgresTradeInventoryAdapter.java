@@ -1,14 +1,16 @@
 package dev.kage.server.database.trade;
 
-import dev.kage.server.database.JdbcOperations;
-import dev.kage.trade.domain.OwnedItemSnapshot;
-import dev.kage.trade.domain.Transaction;
-import dev.kage.trade.domain.TradeInventoryPort;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Optional;
+
 import javax.sql.DataSource;
+
+import dev.kage.server.database.JdbcOperations;
+import dev.kage.trade.domain.OwnedItemSnapshot;
+import dev.kage.trade.domain.TradeInventoryPort;
+import dev.kage.trade.domain.Transaction;
 
 /**
  * Hiện thực {@link TradeInventoryPort} trên PostgreSQL — SQL riêng cho {@code inventory_item},
@@ -85,13 +87,17 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
                 connection,
                 SELECT_FOR_UPDATE,
                 rs -> new OwnedItemSnapshot(
-                        itemId, rs.getLong("character_id"), rs.getLong("item_template_id"), rs.getInt("quantity"),
+                        itemId,
+                        rs.getLong("character_id"),
+                        rs.getLong("item_template_id"),
+                        rs.getInt("quantity"),
                         rs.getInt("enhance_level")),
                 itemId);
     }
 
     private static int countItems(Connection connection, long characterId) {
-        return JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId).orElse(0);
+        return JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId)
+                .orElse(0);
     }
 
     private static void insertRow(Connection connection, TransferRequest request, OwnedItemSnapshot original) {
@@ -108,7 +114,10 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
 
     private static OwnedItemSnapshot mapRow(ResultSet rs) throws SQLException {
         return new OwnedItemSnapshot(
-                rs.getLong("id"), rs.getLong("character_id"), rs.getLong("item_template_id"), rs.getInt("quantity"),
+                rs.getLong("id"),
+                rs.getLong("character_id"),
+                rs.getLong("item_template_id"),
+                rs.getInt("quantity"),
                 rs.getInt("enhance_level"));
     }
 }

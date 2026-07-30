@@ -1,10 +1,12 @@
 package dev.kage.engine.core;
 
+import java.util.function.Function;
+
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+
 import dev.kage.engine.ecs.EcsWorld;
 import dev.kage.engine.ecs.EventBus;
-import java.util.function.Function;
 
 /**
  * Composition root của engine (ENGINE.md §3, §5). Vòng lặp fixed-timestep — quyết định thiết kế
@@ -18,6 +20,7 @@ public final class KageEngine extends ApplicationAdapter {
 
     /** Tick rate 60Hz — ADR-018. Client và server PHẢI dùng cùng giá trị này. */
     public static final float TICK_RATE = 60f;
+
     public static final float FIXED_DT = 1f / TICK_RATE;
     private static final float MAX_FRAME_TIME = 0.25f;
 

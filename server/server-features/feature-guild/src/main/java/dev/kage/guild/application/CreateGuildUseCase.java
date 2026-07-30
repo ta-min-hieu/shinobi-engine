@@ -24,8 +24,11 @@ public final class CreateGuildUseCase {
         }
     }
 
-    public enum Outcome { OK, ALREADY_IN_GUILD, NAME_TAKEN }
-
-    public record Result(Outcome outcome, Guild guild) {
+    public enum Outcome {
+        OK,
+        ALREADY_IN_GUILD,
+        NAME_TAKEN
     }
+
+    public record Result(Outcome outcome, Guild guild) {}
 }

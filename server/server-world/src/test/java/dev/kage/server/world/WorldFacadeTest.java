@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Supplier;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -29,51 +30,44 @@ class WorldFacadeTest {
     private static final CharacterBaseStats THO_STATS = new CharacterBaseStats(10, 10, 10, 10, Element.THO, 1);
     private static final CharacterBaseStats LOI_STATS = new CharacterBaseStats(10, 10, 10, 10, Element.LOI, 1);
 
-    private record Spawned(long target, long spawned, float x, float y) {
-    }
+    private record Spawned(long target, long spawned, float x, float y) {}
 
-    private record Moved(long target, long moved, float x, float y) {
-    }
+    private record Moved(long target, long moved, float x, float y) {}
 
-    private record Despawned(long target, long despawned) {
-    }
+    private record Despawned(long target, long despawned) {}
 
-    private record Accepted(long characterId, int sequenceId, float x, float y) {
-    }
+    private record Accepted(long characterId, int sequenceId, float x, float y) {}
 
-    private record MonsterSpawned(long target, long monsterId, String code, float x, float y, int hp, int maxHp) {
-    }
+    private record MonsterSpawned(long target, long monsterId, String code, float x, float y, int hp, int maxHp) {}
 
-    private record MonsterDespawned(long target, long monsterId) {
-    }
+    private record MonsterDespawned(long target, long monsterId) {}
 
-    private record MonsterMoved(long target, long monsterId, float x, float y) {
-    }
+    private record MonsterMoved(long target, long monsterId, float x, float y) {}
 
-    private record MonsterKilled(long killerCharacterId, String monsterCode) {
-    }
+    private record MonsterKilled(long killerCharacterId, String monsterCode) {}
 
-    private record NpcSpawned(long target, long npcId, String code, float x, float y) {
-    }
+    private record NpcSpawned(long target, long npcId, String code, float x, float y) {}
 
-    private record NpcDespawned(long target, long npcId) {
-    }
+    private record NpcDespawned(long target, long npcId) {}
 
     private record AttackResult(
-            long target, long attacker, long defender, int damage, boolean crit, boolean miss, int hp,
-            boolean died) {
-    }
+            long target, long attacker, long defender, int damage, boolean crit, boolean miss, int hp, boolean died) {}
 
     private record SkillResult(
-            long target, String skillCode, long attacker, long defender, int damage, boolean crit, boolean miss,
-            int hp, boolean died, SkillEffectKind effectKind) {
-    }
+            long target,
+            String skillCode,
+            long attacker,
+            long defender,
+            int damage,
+            boolean crit,
+            boolean miss,
+            int hp,
+            boolean died,
+            SkillEffectKind effectKind) {}
 
-    private record AreaChatMessage(long target, long senderCharacterId, String senderName, String body) {
-    }
+    private record AreaChatMessage(long target, long senderCharacterId, String senderName, String body) {}
 
-    private record CharacterDefeated(long defeatedCharacterId, long killerEntityId) {
-    }
+    private record CharacterDefeated(long defeatedCharacterId, long killerEntityId) {}
 
     private static final class RecordingSink implements WorldOutboundSink {
         final List<Spawned> spawned = new CopyOnWriteArrayList<>();
@@ -114,8 +108,13 @@ class WorldFacadeTest {
         @Override
         public void onMonsterSpawned(long targetCharacterId, WorldOutboundSink.MonsterSnapshot monster) {
             monsterSpawned.add(new MonsterSpawned(
-                    targetCharacterId, monster.monsterId(), monster.monsterCode(), monster.x(), monster.y(),
-                    monster.currentHp(), monster.maxHp()));
+                    targetCharacterId,
+                    monster.monsterId(),
+                    monster.monsterCode(),
+                    monster.x(),
+                    monster.y(),
+                    monster.currentHp(),
+                    monster.maxHp()));
         }
 
         @Override
@@ -146,16 +145,29 @@ class WorldFacadeTest {
         @Override
         public void onAttackResult(long targetCharacterId, WorldOutboundSink.AttackOutcome outcome) {
             attackResults.add(new AttackResult(
-                    targetCharacterId, outcome.attackerEntityId(), outcome.targetEntityId(), outcome.damage(),
-                    outcome.crit(), outcome.miss(), outcome.targetCurrentHp(), outcome.targetDied()));
+                    targetCharacterId,
+                    outcome.attackerEntityId(),
+                    outcome.targetEntityId(),
+                    outcome.damage(),
+                    outcome.crit(),
+                    outcome.miss(),
+                    outcome.targetCurrentHp(),
+                    outcome.targetDied()));
         }
 
         @Override
         public void onSkillResult(long targetCharacterId, WorldOutboundSink.SkillOutcome outcome) {
             skillResults.add(new SkillResult(
-                    targetCharacterId, outcome.skillCode(), outcome.attackerEntityId(), outcome.targetEntityId(),
-                    outcome.damage(), outcome.crit(), outcome.miss(), outcome.targetCurrentHp(),
-                    outcome.targetDied(), outcome.effectKind()));
+                    targetCharacterId,
+                    outcome.skillCode(),
+                    outcome.attackerEntityId(),
+                    outcome.targetEntityId(),
+                    outcome.damage(),
+                    outcome.crit(),
+                    outcome.miss(),
+                    outcome.targetCurrentHp(),
+                    outcome.targetDied(),
+                    outcome.effectKind()));
         }
 
         @Override
@@ -309,9 +321,8 @@ class WorldFacadeTest {
 
         world.attachCharacter(1L, 5f, 6f, DEFAULT_STATS); // gần quái bù nhìn (spawn cố định (5,5), WorldFacade)
 
-        awaitTrue(
-                () -> sink.monsterSpawned.stream()
-                        .anyMatch(m -> m.target() == 1L && m.code().equals("training_dummy")));
+        awaitTrue(() -> sink.monsterSpawned.stream()
+                .anyMatch(m -> m.target() == 1L && m.code().equals("training_dummy")));
     }
 
     @Test
@@ -320,9 +331,8 @@ class WorldFacadeTest {
 
         world.attachCharacter(1L, -5f, -6f, DEFAULT_STATS); // gần NPC mẫu (spawn cố định (-5,-5))
 
-        awaitTrue(
-                () -> sink.npcSpawned.stream()
-                        .anyMatch(n -> n.target() == 1L && n.code().equals("town_elder")));
+        awaitTrue(() -> sink.npcSpawned.stream()
+                .anyMatch(n -> n.target() == 1L && n.code().equals("town_elder")));
     }
 
     @Test
@@ -362,7 +372,8 @@ class WorldFacadeTest {
             // thông báo (aoiTracker.sync() so cặp nhân vật-quái, không tự báo quái "mồ côi" không
             // ai quan sát). Spawn cách boss (3,0) đúng 1m — trong tầm đánh (2m) VÀ tầm aggro (6m).
             dungeonWorld.attachCharacter(1L, 3f, 1f, DEFAULT_STATS);
-            awaitTrue(() -> dungeonSink.monsterSpawned.stream().anyMatch(m -> m.code().equals("sample_boss")));
+            awaitTrue(() ->
+                    dungeonSink.monsterSpawned.stream().anyMatch(m -> m.code().equals("sample_boss")));
             long bossId = dungeonSink.monsterSpawned.get(0).monsterId();
 
             dungeonWorld.setTarget(1L, bossId);
@@ -397,7 +408,8 @@ class WorldFacadeTest {
             dungeonWorld.start();
             dungeonWorld.spawnBoss();
             dungeonWorld.attachCharacter(1L, 3f, 1f, DEFAULT_STATS);
-            awaitTrue(() -> dungeonSink.monsterSpawned.stream().anyMatch(m -> m.code().equals("sample_boss")));
+            awaitTrue(() ->
+                    dungeonSink.monsterSpawned.stream().anyMatch(m -> m.code().equals("sample_boss")));
             long bossId = dungeonSink.monsterSpawned.get(0).monsterId();
 
             dungeonWorld.applyEquipmentBonus(1L, 1000); // đủ lớn để hạ gục BOSS_MAX_HP (320) ngay đòn đầu.
@@ -445,10 +457,10 @@ class WorldFacadeTest {
 
         awaitTrue(() -> sink.monsterDespawned.stream().anyMatch(d -> d.target() == 1L && d.monsterId() == monsterId));
         // Đòn hạ gục PHẢI có targetDied=true — không chỉ despawn suông không rõ lý do.
-        assertThat(sink.attackResults.stream().anyMatch(a -> a.defender() == monsterId && a.died())).isTrue();
+        assertThat(sink.attackResults.stream().anyMatch(a -> a.defender() == monsterId && a.died()))
+                .isTrue();
         // Server-world báo ĐÚNG người hạ gục — gateway dùng cái này để roll rơi đồ (GAMEPLAY.md §5).
-        assertThat(sink.monsterKilled)
-                .containsExactly(new MonsterKilled(1L, "training_dummy"));
+        assertThat(sink.monsterKilled).containsExactly(new MonsterKilled(1L, "training_dummy"));
     }
 
     @Test
@@ -465,8 +477,7 @@ class WorldFacadeTest {
         // Quái hồi sinh là entity MỚI (ID khác — WorldFacade không tái dùng ID đã cấp), đầy máu.
         // MONSTER_RESPAWN_SECONDS=10s > 5s mặc định của awaitTrue — dùng deadline dài hơn.
         awaitTrue(
-                () -> sink.monsterSpawned.stream()
-                        .anyMatch(m -> m.target() == 1L && m.monsterId() != firstMonsterId),
+                () -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L && m.monsterId() != firstMonsterId),
                 Duration.ofSeconds(15));
         MonsterSpawned respawned = sink.monsterSpawned.stream()
                 .filter(m -> m.monsterId() != firstMonsterId)
@@ -491,8 +502,9 @@ class WorldFacadeTest {
 
         sleepQuietly(1200); // ~1.2s thật — ATK_SPEED placeholder = 1 đòn/giây (CombatConstants)
 
-        long attacksLandedOnMonster =
-                sink.attackResults.stream().filter(a -> a.defender() == monsterId && !a.miss()).count();
+        long attacksLandedOnMonster = sink.attackResults.stream()
+                .filter(a -> a.defender() == monsterId && !a.miss())
+                .count();
         // Đúng thiết kế: tối đa ~1-2 đòn trong 1.2s dù gửi 500 lệnh — KHÔNG phải 500 đòn (sẽ xảy
         // ra nếu SetTargetCommand vô tình reset/rút ngắn cooldown).
         assertThat(attacksLandedOnMonster).isLessThanOrEqualTo(2);
@@ -534,7 +546,9 @@ class WorldFacadeTest {
         }
         sleepQuietly(500); // << 3s cooldown — chỉ đủ thời gian cho ĐÚNG 1 lần cast thật xử lý xong
 
-        long castsLanded = sink.skillResults.stream().filter(r -> r.defender() == monsterId).count();
+        long castsLanded = sink.skillResults.stream()
+                .filter(r -> r.defender() == monsterId)
+                .count();
         assertThat(castsLanded).isLessThanOrEqualTo(1);
     }
 
@@ -595,7 +609,9 @@ class WorldFacadeTest {
         // Đòn hạ gục chỉ bắn ĐÚNG 1 lần (CombatSystem tự bỏ chọn target sau khi thấy mục tiêu đã
         // chết — xem javadoc WorldFacade#handleCombatResults) dù nhân vật vẫn còn attach trong World.
         sleepQuietly(1200);
-        assertThat(sink.characterDefeated.stream().filter(d -> d.defeatedCharacterId() == 2L).count())
+        assertThat(sink.characterDefeated.stream()
+                        .filter(d -> d.defeatedCharacterId() == 2L)
+                        .count())
                 .isEqualTo(1);
     }
 
@@ -612,8 +628,9 @@ class WorldFacadeTest {
 
         world.useSkill(1L, "thuy_hoi_phuc", 1L);
 
-        awaitTrue(() -> sink.skillResults.stream().anyMatch(
-                r -> "thuy_hoi_phuc".equals(r.skillCode()) && r.effectKind() == SkillEffectKind.HEAL
+        awaitTrue(() -> sink.skillResults.stream()
+                .anyMatch(r -> "thuy_hoi_phuc".equals(r.skillCode())
+                        && r.effectKind() == SkillEffectKind.HEAL
                         && r.damage() > 0));
     }
 
@@ -652,8 +669,9 @@ class WorldFacadeTest {
         long monsterId = sink.monsterSpawned.get(0).monsterId();
 
         awaitTrue(() -> sink.attackResults.stream().anyMatch(a -> a.attacker() == monsterId));
-        long attacksBeforeStun =
-                sink.attackResults.stream().filter(a -> a.attacker() == monsterId).count();
+        long attacksBeforeStun = sink.attackResults.stream()
+                .filter(a -> a.attacker() == monsterId)
+                .count();
 
         world.useSkill(1L, "loi_dien_giat", monsterId);
         awaitTrue(() -> sink.skillResults.stream()
@@ -663,8 +681,9 @@ class WorldFacadeTest {
         // không bị stun thì quái đã kịp đánh thêm ít nhất 1 lần trong khoảng này.
         sleepQuietly(1800);
 
-        long attacksAfterStun =
-                sink.attackResults.stream().filter(a -> a.attacker() == monsterId).count();
+        long attacksAfterStun = sink.attackResults.stream()
+                .filter(a -> a.attacker() == monsterId)
+                .count();
         assertThat(attacksAfterStun).isEqualTo(attacksBeforeStun);
     }
 
@@ -707,7 +726,8 @@ class WorldFacadeTest {
         world.useSkill(1L, "thuy_song_du", monsterId);
         sleepQuietly(500);
 
-        assertThat(sink.skillResults.stream().anyMatch(r -> "thuy_song_du".equals(r.skillCode()))).isFalse();
+        assertThat(sink.skillResults.stream().anyMatch(r -> "thuy_song_du".equals(r.skillCode())))
+                .isFalse();
     }
 
     @Test
@@ -723,7 +743,8 @@ class WorldFacadeTest {
         world.useSkill(1L, "thuy_thuy_trieu", monsterId);
         sleepQuietly(500);
 
-        assertThat(sink.skillResults.stream().anyMatch(r -> "thuy_thuy_trieu".equals(r.skillCode()))).isFalse();
+        assertThat(sink.skillResults.stream().anyMatch(r -> "thuy_thuy_trieu".equals(r.skillCode())))
+                .isFalse();
     }
 
     @Test
@@ -741,8 +762,7 @@ class WorldFacadeTest {
         world.setTarget(1L, monsterId);
 
         // HIT% placeholder ~91% — chờ đòn trúng đầu tiên, không giả định đòn đầu chắc chắn trúng.
-        awaitTrue(() -> sink.attackResults.stream()
-                .anyMatch(a -> a.defender() == monsterId && !a.miss() && a.died()));
+        awaitTrue(() -> sink.attackResults.stream().anyMatch(a -> a.defender() == monsterId && !a.miss() && a.died()));
     }
 
     @Test
@@ -770,7 +790,9 @@ class WorldFacadeTest {
         world.enqueueAreaChatMessage(1L, "Naruto", "xin chào khu vực");
 
         awaitTrue(() -> sink.areaChatMessages.stream()
-                .anyMatch(m -> m.target() == 2L && m.senderCharacterId() == 1L && m.body().equals("xin chào khu vực")));
+                .anyMatch(m -> m.target() == 2L
+                        && m.senderCharacterId() == 1L
+                        && m.body().equals("xin chào khu vực")));
         awaitTrue(() -> sink.areaChatMessages.stream()
                 .anyMatch(m -> m.target() == 1L && m.senderCharacterId() == 1L)); // người gửi tự thấy tin của mình
     }
@@ -789,7 +811,8 @@ class WorldFacadeTest {
 
         // defender() = ai BỊ đánh (không phải target() — đó là người NHẬN broadcast, có thể là
         // chính người quan sát trận đánh của người khác). Không quái nào đánh nhân vật 1 cả.
-        assertThat(sink.attackResults.stream().anyMatch(a -> a.defender() == 1L)).isFalse();
+        assertThat(sink.attackResults.stream().anyMatch(a -> a.defender() == 1L))
+                .isFalse();
     }
 
     /** Poll với timeout thay vì {@code Thread.sleep} cố định — tick loop chạy real-time 60Hz. */

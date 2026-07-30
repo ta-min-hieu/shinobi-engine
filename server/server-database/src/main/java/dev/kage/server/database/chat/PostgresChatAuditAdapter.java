@@ -1,10 +1,12 @@
 package dev.kage.server.database.chat;
 
-import dev.kage.chat.domain.ChatAuditPort;
-import dev.kage.server.database.JdbcOperations;
 import java.sql.Timestamp;
 import java.time.Instant;
+
 import javax.sql.DataSource;
+
+import dev.kage.chat.domain.ChatAuditPort;
+import dev.kage.server.database.JdbcOperations;
 
 /** Hiện thực {@link ChatAuditPort} trên PostgreSQL — ghi {@code audit_log} (DATABASE.md §2.7, V7). */
 public final class PostgresChatAuditAdapter implements ChatAuditPort {

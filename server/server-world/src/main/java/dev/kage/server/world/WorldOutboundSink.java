@@ -78,12 +78,10 @@ public interface WorldOutboundSink {
     void onCharacterDefeated(long defeatedCharacterId, long killerEntityId);
 
     /** Ảnh chụp trạng thái quái lúc phát {@link #onMonsterSpawned} — gộp tham số (STATIC-ANALYSIS.md). */
-    record MonsterSnapshot(long monsterId, String monsterCode, float x, float y, int currentHp, int maxHp) {
-    }
+    record MonsterSnapshot(long monsterId, String monsterCode, float x, float y, int currentHp, int maxHp) {}
 
     /** Ảnh chụp NPC lúc phát {@link #onNpcSpawned} — không có HP (NPC không combat, khác quái). */
-    record NpcSnapshot(long npcId, String npcCode, float x, float y) {
-    }
+    record NpcSnapshot(long npcId, String npcCode, float x, float y) {}
 
     /** Kết quả 1 đòn đánh — gộp tham số cho {@link #onAttackResult} (STATIC-ANALYSIS.md). */
     record AttackOutcome(
@@ -93,8 +91,7 @@ public interface WorldOutboundSink {
             boolean crit,
             boolean miss,
             int targetCurrentHp,
-            boolean targetDied) {
-    }
+            boolean targetDied) {}
 
     /**
      * Kết quả 1 lần dùng skill — gộp tham số cho {@link #onSkillResult} (STATIC-ANALYSIS.md).
@@ -110,6 +107,5 @@ public interface WorldOutboundSink {
             boolean miss,
             int targetCurrentHp,
             boolean targetDied,
-            SkillEffectKind effectKind) {
-    }
+            SkillEffectKind effectKind) {}
 }

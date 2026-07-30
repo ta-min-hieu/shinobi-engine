@@ -22,7 +22,8 @@ public final class AddItemUseCase {
     }
 
     public AddItemResult execute(long characterId, ItemStack stack) {
-        Inventory inventory = inventoryPort.findByCharacter(characterId)
+        Inventory inventory = inventoryPort
+                .findByCharacter(characterId)
                 .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
 
         Inventory.AddResult result = inventory.add(stack); // quy tắc nghiệp vụ ở domain
@@ -34,5 +35,8 @@ public final class AddItemUseCase {
         return AddItemResult.OK;
     }
 
-    public enum AddItemResult { OK, FULL }
+    public enum AddItemResult {
+        OK,
+        FULL
+    }
 }

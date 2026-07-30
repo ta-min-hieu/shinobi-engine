@@ -1,10 +1,11 @@
 package dev.kage.shop.application;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import dev.kage.shop.domain.IdempotencyKeyReusedException;
 import dev.kage.shop.domain.ShopListing;
 import dev.kage.shop.domain.Transaction;
 import dev.kage.shop.domain.TransactionRunner;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Mua item từ shop: ghi {@code idempotencyKey} TRƯỚC (ADR-025 — chống double-effect khi client tự
@@ -56,5 +57,11 @@ public final class BuyItemUseCase {
         return resultHolder.get();
     }
 
-    public enum BuyResult { OK, ITEM_NOT_IN_SHOP, INSUFFICIENT_GOLD, INVENTORY_FULL, DUPLICATE_REQUEST }
+    public enum BuyResult {
+        OK,
+        ITEM_NOT_IN_SHOP,
+        INSUFFICIENT_GOLD,
+        INVENTORY_FULL,
+        DUPLICATE_REQUEST
+    }
 }

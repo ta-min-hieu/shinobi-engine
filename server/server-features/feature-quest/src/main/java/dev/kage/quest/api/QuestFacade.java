@@ -1,11 +1,12 @@
 package dev.kage.quest.api;
 
+import java.util.List;
+import java.util.Optional;
+
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
 import dev.kage.quest.application.ProcessMonsterKilledUseCase;
 import dev.kage.quest.domain.QuestStatus;
-import java.util.List;
-import java.util.Optional;
 
 /**
  * API công khai của {@code feature-quest} — module khác (server-gateway) CHỈ gọi qua đây, không
@@ -21,7 +22,8 @@ public final class QuestFacade {
     private final ClaimQuestRewardUseCase claimQuestRewardUseCase;
 
     public QuestFacade(
-            AcceptQuestUseCase acceptQuestUseCase, ProcessMonsterKilledUseCase processMonsterKilledUseCase,
+            AcceptQuestUseCase acceptQuestUseCase,
+            ProcessMonsterKilledUseCase processMonsterKilledUseCase,
             ClaimQuestRewardUseCase claimQuestRewardUseCase) {
         this.acceptQuestUseCase = acceptQuestUseCase;
         this.processMonsterKilledUseCase = processMonsterKilledUseCase;
@@ -42,35 +44,47 @@ public final class QuestFacade {
      * chuyển sang COMPLETED (không push sự kiện cho mỗi lần tiến độ tăng).
      */
     public Optional<QuestStatusChange> onMonsterKilled(long characterId, String monsterCode) {
-        return processMonsterKilledUseCase.execute(characterId, monsterCode)
+        return processMonsterKilledUseCase
+                .execute(characterId, monsterCode)
                 .map(change -> new QuestStatusChange(change.questCode(), change.status()));
     }
 
     public ClaimResult claimReward(long characterId, String questCode) {
         ClaimQuestRewardUseCase.ClaimResult result = claimQuestRewardUseCase.execute(characterId, questCode);
-        ClaimOutcome outcome = switch (result.outcome()) {
-            case OK -> ClaimOutcome.OK;
-            case QUEST_NOT_FOUND -> ClaimOutcome.QUEST_NOT_FOUND;
-            case NOT_ACCEPTED -> ClaimOutcome.NOT_ACCEPTED;
-            case NOT_COMPLETED_YET -> ClaimOutcome.NOT_COMPLETED_YET;
-        };
+        ClaimOutcome outcome =
+                switch (result.outcome()) {
+                    case OK -> ClaimOutcome.OK;
+                    case QUEST_NOT_FOUND -> ClaimOutcome.QUEST_NOT_FOUND;
+                    case NOT_ACCEPTED -> ClaimOutcome.NOT_ACCEPTED;
+                    case NOT_COMPLETED_YET -> ClaimOutcome.NOT_COMPLETED_YET;
+                };
         List<ItemReward> items = result.itemsGranted().stream()
                 .map(item -> new ItemReward(item.itemTemplateCode(), item.quantity()))
                 .toList();
         return new ClaimResult(outcome, result.expGranted(), items);
     }
 
-    public enum AcceptResult { OK, QUEST_NOT_FOUND, ALREADY_ACCEPTED }
+    public enum AcceptResult {
+        OK,
+        QUEST_NOT_FOUND,
+        ALREADY_ACCEPTED
+    }
 
-    public enum ClaimOutcome { OK, QUEST_NOT_FOUND, NOT_ACCEPTED, NOT_COMPLETED_YET }
+    public enum ClaimOutcome {
+        OK,
+        QUEST_NOT_FOUND,
+        NOT_ACCEPTED,
+        NOT_COMPLETED_YET
+    }
 
     /** {@code status} chỉ bao giờ là COMPLETED ở lát cắt này (xem {@link #onMonsterKilled} javadoc). */
-    public record QuestStatusChange(String questCode, QuestStatus status) {
-    }
+    public record QuestStatusChange(String questCode, QuestStatus status) {}
 
-    public record ItemReward(String itemTemplateCode, int quantity) {
-    }
+    public record ItemReward(String itemTemplateCode, int quantity) {}
 
     public record ClaimResult(ClaimOutcome outcome, long expGranted, List<ItemReward> itemsGranted) {
+        public ClaimResult {
+            itemsGranted = List.copyOf(itemsGranted);
+        }
     }
 }

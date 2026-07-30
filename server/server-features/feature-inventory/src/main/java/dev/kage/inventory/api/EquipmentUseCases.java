@@ -12,5 +12,4 @@ import dev.kage.inventory.application.UnequipItemUseCase;
 public record EquipmentUseCases(
         EquipItemUseCase equipItemUseCase,
         UnequipItemUseCase unequipItemUseCase,
-        ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase) {
-}
+        ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase) {}

@@ -1,5 +1,18 @@
 package dev.kage.server.world;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.function.LongFunction;
+import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.Family;
 import dev.kage.engine.ecs.IteratingKSystem;
@@ -14,17 +27,6 @@ import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.SkillCooldownComponent;
 import dev.kage.server.world.component.StatusEffectComponent;
 import dev.kage.server.world.component.StatusEffectType;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.function.LongFunction;
-import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Dùng kỹ năng (GAMEPLAY.md §3-4) — registry nhiều skill (Phase 8, 4 hệ phái, {@link SkillRegistry}
@@ -40,8 +42,7 @@ final class SkillSystem extends IteratingKSystem {
 
     private static final Logger LOG = LoggerFactory.getLogger(SkillSystem.class);
 
-    private static final ComponentMapper<PositionComponent> POSITION =
-            ComponentMapper.getFor(PositionComponent.class);
+    private static final ComponentMapper<PositionComponent> POSITION = ComponentMapper.getFor(PositionComponent.class);
     private static final ComponentMapper<SkillCooldownComponent> COOLDOWN =
             ComponentMapper.getFor(SkillCooldownComponent.class);
     private static final ComponentMapper<ChiComponent> CHI = ComponentMapper.getFor(ChiComponent.class);
@@ -63,8 +64,7 @@ final class SkillSystem extends IteratingKSystem {
             boolean miss,
             int targetCurrentHp,
             boolean targetDied,
-            SkillEffectKind effectKind) {
-    }
+            SkillEffectKind effectKind) {}
 
     /**
      * Kết quả script skill trả về, ĐÃ PARSE — {@code effect}: "damage"|"heal"|"shield"|"buff"|
@@ -72,12 +72,10 @@ final class SkillSystem extends IteratingKSystem {
      * {@code duration}/{@code armorPierce} chỉ có ý nghĩa với 1 số {@code effect} nhất định, mặc
      * định rỗng/0 nếu script không set.
      */
-    private record ScriptEffect(String effect, double value, String stat, double duration, double armorPierce) {
-    }
+    private record ScriptEffect(String effect, double value, String stat, double duration, double armorPierce) {}
 
     /** Gộp tham số 1 lần cast ĐÃ resolve xong mục tiêu — tránh vượt giới hạn 4 tham số/method. */
-    private record CastContext(SkillDefinition definition, long casterId, long targetId, KEntity target) {
-    }
+    private record CastContext(SkillDefinition definition, long casterId, long targetId, KEntity target) {}
 
     private final LongFunction<KEntity> entityLookup;
     private final ScriptSandbox scriptSandbox = new ScriptSandbox(SkillConstants.SCRIPT_MAX_STATEMENTS);
@@ -213,8 +211,16 @@ final class SkillSystem extends IteratingKSystem {
         int damageAfterShield = StatusEffects.absorbWithShield(targetStatus, result.damage());
         targetHealth.current = Math.max(0, targetHealth.current - damageAfterShield);
 
-        pendingResults.add(new SkillOutcome(ctx.definition().code(), ctx.casterId(), ctx.targetId(), damageAfterShield,
-                result.crit(), result.miss(), targetHealth.current, targetHealth.isDead(), SkillEffectKind.DAMAGE));
+        pendingResults.add(new SkillOutcome(
+                ctx.definition().code(),
+                ctx.casterId(),
+                ctx.targetId(),
+                damageAfterShield,
+                result.crit(),
+                result.miss(),
+                targetHealth.current,
+                targetHealth.isDead(),
+                SkillEffectKind.DAMAGE));
     }
 
     private void applyHeal(CastContext ctx, ScriptEffect scriptEffect) {
@@ -223,28 +229,52 @@ final class SkillSystem extends IteratingKSystem {
         int before = targetHealth.current;
         targetHealth.current = Math.min(targetHealth.max, targetHealth.current + healAmount);
 
-        pendingResults.add(new SkillOutcome(ctx.definition().code(), ctx.casterId(), ctx.targetId(),
-                targetHealth.current - before, false, false, targetHealth.current, false, SkillEffectKind.HEAL));
+        pendingResults.add(new SkillOutcome(
+                ctx.definition().code(),
+                ctx.casterId(),
+                ctx.targetId(),
+                targetHealth.current - before,
+                false,
+                false,
+                targetHealth.current,
+                false,
+                SkillEffectKind.HEAL));
     }
 
     private void applyShield(CastContext ctx, ScriptEffect scriptEffect) {
-        StatusEffects.applyEffect(STATUS_EFFECT.get(ctx.target()), StatusEffectType.SHIELD,
-                (float) scriptEffect.value(), (float) scriptEffect.duration());
+        StatusEffects.applyEffect(
+                STATUS_EFFECT.get(ctx.target()), StatusEffectType.SHIELD, (float) scriptEffect.value(), (float)
+                        scriptEffect.duration());
         HealthComponent targetHealth = HEALTH.get(ctx.target());
-        pendingResults.add(new SkillOutcome(ctx.definition().code(), ctx.casterId(), ctx.targetId(),
-                Math.round((float) scriptEffect.value()), false, false, targetHealth.current, false,
+        pendingResults.add(new SkillOutcome(
+                ctx.definition().code(),
+                ctx.casterId(),
+                ctx.targetId(),
+                Math.round((float) scriptEffect.value()),
+                false,
+                false,
+                targetHealth.current,
+                false,
                 SkillEffectKind.SHIELD));
     }
 
     private void applyStatusOutcome(CastContext ctx, ScriptEffect scriptEffect, SkillEffectKind kind) {
         StatusEffectType type = parseStatusEffectType(scriptEffect.stat());
         if (type != null) {
-            StatusEffects.applyEffect(STATUS_EFFECT.get(ctx.target()), type,
-                    (float) scriptEffect.value(), (float) scriptEffect.duration());
+            StatusEffects.applyEffect(STATUS_EFFECT.get(ctx.target()), type, (float) scriptEffect.value(), (float)
+                    scriptEffect.duration());
         }
         HealthComponent targetHealth = HEALTH.get(ctx.target());
-        pendingResults.add(new SkillOutcome(ctx.definition().code(), ctx.casterId(), ctx.targetId(),
-                Math.round((float) scriptEffect.value() * 100), false, false, targetHealth.current, false, kind));
+        pendingResults.add(new SkillOutcome(
+                ctx.definition().code(),
+                ctx.casterId(),
+                ctx.targetId(),
+                Math.round((float) scriptEffect.value() * 100),
+                false,
+                false,
+                targetHealth.current,
+                false,
+                kind));
     }
 
     private static StatusEffectType parseStatusEffectType(String stat) {
@@ -275,7 +305,9 @@ final class SkillSystem extends IteratingKSystem {
                 value.getMember("value").asDouble(),
                 value.hasMember("stat") ? value.getMember("stat").asString() : "",
                 value.hasMember("duration") ? value.getMember("duration").asDouble() : 0.0,
-                value.hasMember("armor_pierce") ? value.getMember("armor_pierce").asDouble() : 0.0);
+                value.hasMember("armor_pierce")
+                        ? value.getMember("armor_pierce").asDouble()
+                        : 0.0);
     }
 
     private static double distance(PositionComponent a, PositionComponent b) {

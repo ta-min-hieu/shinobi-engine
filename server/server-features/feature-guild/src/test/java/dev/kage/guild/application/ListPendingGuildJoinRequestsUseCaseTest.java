@@ -2,10 +2,12 @@ package dev.kage.guild.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
 import dev.kage.guild.domain.Guild;
 import dev.kage.guild.domain.GuildJoinRequest;
-import java.util.List;
-import org.junit.jupiter.api.Test;
 
 class ListPendingGuildJoinRequestsUseCaseTest {
 

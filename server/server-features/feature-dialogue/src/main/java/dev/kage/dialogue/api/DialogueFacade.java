@@ -1,10 +1,11 @@
 package dev.kage.dialogue.api;
 
+import java.util.List;
+import java.util.Optional;
+
 import dev.kage.dialogue.application.GetDialogueNodeUseCase;
 import dev.kage.dialogue.domain.DialogueNode;
 import dev.kage.dialogue.domain.DialogueOption;
-import java.util.List;
-import java.util.Optional;
 
 /**
  * API công khai của {@code feature-dialogue} — module khác (server-gateway) CHỈ gọi qua đây, không
@@ -51,7 +52,8 @@ public final class DialogueFacade {
             String questCode = option.action().substring(DialogueOption.ACTION_ACCEPT_QUEST_PREFIX.length());
             return new SelectOptionResult.AcceptQuest(questCode);
         }
-        return getDialogueNodeUseCase.execute(npcCode, option.action())
+        return getDialogueNodeUseCase
+                .execute(npcCode, option.action())
                 .<SelectOptionResult>map(SelectOptionResult.Node::new)
                 .orElseGet(SelectOptionResult.NotFound::new);
     }
@@ -63,19 +65,14 @@ public final class DialogueFacade {
      * tách biệt, cùng cách "open_shop" được gateway xử lý thay vì DialogueFacade tự gọi ShopFacade).
      */
     public sealed interface SelectOptionResult {
-        record Node(DialogueNode node) implements SelectOptionResult {
-        }
+        record Node(DialogueNode node) implements SelectOptionResult {}
 
-        record OpenShop() implements SelectOptionResult {
-        }
+        record OpenShop() implements SelectOptionResult {}
 
-        record Ended() implements SelectOptionResult {
-        }
+        record Ended() implements SelectOptionResult {}
 
-        record NotFound() implements SelectOptionResult {
-        }
+        record NotFound() implements SelectOptionResult {}
 
-        record AcceptQuest(String questCode) implements SelectOptionResult {
-        }
+        record AcceptQuest(String questCode) implements SelectOptionResult {}
     }
 }

@@ -2,17 +2,19 @@ package dev.kage.mail.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.kage.mail.domain.Mail;
-import dev.kage.mail.domain.MailAttachment;
-import dev.kage.mail.domain.MailRepositoryPort;
-import dev.kage.mail.domain.NewMail;
-import dev.kage.mail.domain.Transaction;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
+
 import org.junit.jupiter.api.Test;
+
+import dev.kage.mail.domain.Mail;
+import dev.kage.mail.domain.MailAttachment;
+import dev.kage.mail.domain.MailRepositoryPort;
+import dev.kage.mail.domain.NewMail;
+import dev.kage.mail.domain.Transaction;
 
 class SendMailUseCaseTest {
 
@@ -21,8 +23,7 @@ class SendMailUseCaseTest {
         FakeMailRepositoryPort port = new FakeMailRepositoryPort();
         SendMailUseCase useCase = new SendMailUseCase(port, action -> action.accept(null));
 
-        Mail created = useCase.execute(
-                new NewMail(7L, 5, "Chào", "Nội dung", 100, List.of(new MailAttachment(1, 3))));
+        Mail created = useCase.execute(new NewMail(7L, 5, "Chào", "Nội dung", 100, List.of(new MailAttachment(1, 3))));
 
         assertThat(created.senderId()).isEqualTo(7L);
         assertThat(created.recipientId()).isEqualTo(5);
@@ -49,8 +50,15 @@ class SendMailUseCaseTest {
         @Override
         public Mail send(Transaction tx, NewMail newMail) {
             Mail mail = new Mail(
-                    nextId.getAndIncrement(), newMail.senderId(), newMail.recipientId(), newMail.subject(),
-                    newMail.body(), newMail.goldAmount(), newMail.attachments(), null, Instant.now());
+                    nextId.getAndIncrement(),
+                    newMail.senderId(),
+                    newMail.recipientId(),
+                    newMail.subject(),
+                    newMail.body(),
+                    newMail.goldAmount(),
+                    newMail.attachments(),
+                    null,
+                    Instant.now());
             stored.add(mail);
             return mail;
         }

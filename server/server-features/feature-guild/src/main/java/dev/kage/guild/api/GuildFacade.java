@@ -1,5 +1,8 @@
 package dev.kage.guild.api;
 
+import java.util.List;
+import java.util.Optional;
+
 import dev.kage.guild.application.ApproveGuildJoinRequestUseCase;
 import dev.kage.guild.application.CreateGuildUseCase;
 import dev.kage.guild.application.DisbandGuildUseCase;
@@ -8,8 +11,6 @@ import dev.kage.guild.application.KickGuildMemberUseCase;
 import dev.kage.guild.application.LeaveGuildUseCase;
 import dev.kage.guild.application.RejectGuildJoinRequestUseCase;
 import dev.kage.guild.domain.GuildRole;
-import java.util.List;
-import java.util.Optional;
 
 /**
  * API công khai của {@code feature-guild} — module khác (server-gateway) CHỈ gọi qua đây, không
@@ -27,11 +28,12 @@ public final class GuildFacade {
 
     public CreateResult createGuild(long characterId, String name) {
         CreateGuildUseCase.Result result = useCases.createGuildUseCase().execute(characterId, name);
-        CreateOutcome outcome = switch (result.outcome()) {
-            case OK -> CreateOutcome.OK;
-            case ALREADY_IN_GUILD -> CreateOutcome.ALREADY_IN_GUILD;
-            case NAME_TAKEN -> CreateOutcome.NAME_TAKEN;
-        };
+        CreateOutcome outcome =
+                switch (result.outcome()) {
+                    case OK -> CreateOutcome.OK;
+                    case ALREADY_IN_GUILD -> CreateOutcome.ALREADY_IN_GUILD;
+                    case NAME_TAKEN -> CreateOutcome.NAME_TAKEN;
+                };
         Long guildId = result.guild() == null ? null : result.guild().id();
         return new CreateResult(outcome, guildId);
     }
@@ -97,33 +99,57 @@ public final class GuildFacade {
     }
 
     public Optional<MyGuildView> findMyGuild(long characterId) {
-        return useCases.findMyGuildUseCase().execute(characterId)
+        return useCases.findMyGuildUseCase()
+                .execute(characterId)
                 .map(r -> new MyGuildView(r.guildId(), r.guildName(), r.myRole() == GuildRole.LEADER));
     }
 
-    public enum CreateOutcome { OK, ALREADY_IN_GUILD, NAME_TAKEN }
-
-    public enum SendJoinRequestResult { OK, ALREADY_IN_GUILD, GUILD_NOT_FOUND, REQUEST_ALREADY_PENDING }
-
-    public enum ApproveResult { OK, NOT_FOUND, TARGET_ALREADY_IN_GUILD }
-
-    public enum RejectResult { OK, NOT_FOUND }
-
-    public enum LeaveResult { OK, NOT_IN_GUILD, LEADER_CANNOT_LEAVE }
-
-    public enum DisbandResult { OK, NOT_LEADER }
-
-    public enum KickResult { OK, CANNOT_KICK_SELF, NOT_FOUND }
-
-    public record CreateResult(CreateOutcome outcome, Long guildId) {
+    public enum CreateOutcome {
+        OK,
+        ALREADY_IN_GUILD,
+        NAME_TAKEN
     }
 
-    public record MemberView(long characterId, boolean isLeader) {
+    public enum SendJoinRequestResult {
+        OK,
+        ALREADY_IN_GUILD,
+        GUILD_NOT_FOUND,
+        REQUEST_ALREADY_PENDING
     }
 
-    public record PendingJoinRequestView(long requestId, long characterId) {
+    public enum ApproveResult {
+        OK,
+        NOT_FOUND,
+        TARGET_ALREADY_IN_GUILD
     }
 
-    public record MyGuildView(long guildId, String guildName, boolean isLeader) {
+    public enum RejectResult {
+        OK,
+        NOT_FOUND
     }
+
+    public enum LeaveResult {
+        OK,
+        NOT_IN_GUILD,
+        LEADER_CANNOT_LEAVE
+    }
+
+    public enum DisbandResult {
+        OK,
+        NOT_LEADER
+    }
+
+    public enum KickResult {
+        OK,
+        CANNOT_KICK_SELF,
+        NOT_FOUND
+    }
+
+    public record CreateResult(CreateOutcome outcome, Long guildId) {}
+
+    public record MemberView(long characterId, boolean isLeader) {}
+
+    public record PendingJoinRequestView(long requestId, long characterId) {}
+
+    public record MyGuildView(long guildId, String guildName, boolean isLeader) {}
 }

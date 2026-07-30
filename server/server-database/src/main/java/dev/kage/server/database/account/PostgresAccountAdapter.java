@@ -1,15 +1,16 @@
 package dev.kage.server.database.account;
 
-import dev.kage.account.domain.Account;
-import dev.kage.account.domain.AccountPort;
-import dev.kage.account.domain.Transaction;
-import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+
+import dev.kage.account.domain.Account;
+import dev.kage.account.domain.AccountPort;
+import dev.kage.account.domain.Transaction;
+import dev.kage.server.database.JdbcOperations;
 
 /**
  * Hiện thực {@link AccountPort} trên PostgreSQL. SQL chỉ tồn tại ở đây (Điều 24 + DATABASE.md
@@ -44,6 +45,9 @@ public final class PostgresAccountAdapter implements AccountPort {
     }
 
     private static Account mapRow(ResultSet rs) throws SQLException {
-        return new Account(rs.getLong("id"), rs.getString("username"), rs.getTimestamp("created_at").toInstant());
+        return new Account(
+                rs.getLong("id"),
+                rs.getString("username"),
+                rs.getTimestamp("created_at").toInstant());
     }
 }

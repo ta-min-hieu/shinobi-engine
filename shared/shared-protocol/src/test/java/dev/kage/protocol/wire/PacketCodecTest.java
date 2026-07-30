@@ -4,8 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.google.protobuf.InvalidProtocolBufferException;
-import dev.kage.protocol.PingCommand;
 import org.junit.jupiter.api.Test;
+
+import dev.kage.protocol.PingCommand;
 
 /**
  * Round-trip test bắt buộc theo TESTING.md §6 và ROADMAP Phase 2 Exit Criteria — xác nhận
@@ -30,7 +31,9 @@ class PacketCodecTest {
 
     @Test
     void shouldRoundTripRealProtobufPayload() throws InvalidProtocolBufferException {
-        PingCommand ping = PingCommand.newBuilder().setClientTimestampMs(1_700_000_000_000L).build();
+        PingCommand ping = PingCommand.newBuilder()
+                .setClientTimestampMs(1_700_000_000_000L)
+                .build();
         PacketHeader header = new PacketHeader(1, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, ping.toByteArray());
@@ -45,8 +48,7 @@ class PacketCodecTest {
     void shouldRejectFrameShorterThanHeader() {
         byte[] tooShort = {1, 2, 3};
 
-        assertThatThrownBy(() -> PacketCodec.decodeFrame(tooShort))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> PacketCodec.decodeFrame(tooShort)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -57,7 +59,6 @@ class PacketCodecTest {
 
     @Test
     void headerShouldRejectProtocolVersionOutOfUint8Range() {
-        assertThatThrownBy(() -> new PacketHeader(1, 300, 1))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new PacketHeader(1, 300, 1)).isInstanceOf(IllegalArgumentException.class);
     }
 }

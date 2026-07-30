@@ -1,5 +1,10 @@
 package dev.kage.server.world;
 
+import java.util.Collection;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.LongFunction;
+import java.util.function.Supplier;
+
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.Family;
 import dev.kage.engine.ecs.IteratingKSystem;
@@ -12,10 +17,6 @@ import dev.kage.server.world.component.CharacterIdComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.StatusEffectComponent;
 import dev.kage.server.world.component.TargetComponent;
-import java.util.Collection;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.LongFunction;
-import java.util.function.Supplier;
 
 /**
  * FSM quái thường (AI.md §3): Idle &lt;-&gt; Patrol (hết giờ chờ/tới điểm), Idle/Patrol -&gt; Chase
@@ -33,10 +34,8 @@ import java.util.function.Supplier;
  */
 final class AiSystem extends IteratingKSystem {
 
-    private static final ComponentMapper<PositionComponent> POSITION =
-            ComponentMapper.getFor(PositionComponent.class);
-    private static final ComponentMapper<VelocityComponent> VELOCITY =
-            ComponentMapper.getFor(VelocityComponent.class);
+    private static final ComponentMapper<PositionComponent> POSITION = ComponentMapper.getFor(PositionComponent.class);
+    private static final ComponentMapper<VelocityComponent> VELOCITY = ComponentMapper.getFor(VelocityComponent.class);
     private static final ComponentMapper<AiStateComponent> AI_STATE = ComponentMapper.getFor(AiStateComponent.class);
     private static final ComponentMapper<TargetComponent> TARGET = ComponentMapper.getFor(TargetComponent.class);
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
@@ -55,8 +54,9 @@ final class AiSystem extends IteratingKSystem {
      *     trí/HP của mục tiêu đã chọn.
      */
     AiSystem(Supplier<Collection<KEntity>> characterEntities, LongFunction<KEntity> entityLookup) {
-        super(Family.all(PositionComponent.class, VelocityComponent.class, AiStateComponent.class,
-                TargetComponent.class).get());
+        super(Family.all(
+                        PositionComponent.class, VelocityComponent.class, AiStateComponent.class, TargetComponent.class)
+                .get());
         this.characterEntities = characterEntities;
         this.entityLookup = entityLookup;
     }

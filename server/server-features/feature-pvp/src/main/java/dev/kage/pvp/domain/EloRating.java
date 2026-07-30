@@ -13,12 +13,10 @@ public final class EloRating {
     // chỉnh theo dữ liệu thật (Điều 30 — benchmark trước khi đổi).
     private static final int K_FACTOR = 32;
 
-    private EloRating() {
-    }
+    private EloRating() {}
 
     /** Kết quả rating mới của CẢ 2 sau 1 trận — {@code loserRating} luôn là người THUA. */
-    public record Result(int newWinnerRating, int newLoserRating) {
-    }
+    public record Result(int newWinnerRating, int newLoserRating) {}
 
     public static Result computeNewRatings(int winnerRating, int loserRating) {
         double expectedWinner = 1.0 / (1.0 + Math.pow(10.0, (loserRating - winnerRating) / 400.0));

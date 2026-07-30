@@ -1,8 +1,9 @@
 package dev.kage.party.application;
 
+import java.util.List;
+
 import dev.kage.party.domain.PartyMember;
 import dev.kage.party.domain.PartyPort;
-import java.util.List;
 
 /** Danh sách thành viên party của {@code characterId} — rỗng nếu chưa vào party nào. */
 public final class ListPartyMembersUseCase {

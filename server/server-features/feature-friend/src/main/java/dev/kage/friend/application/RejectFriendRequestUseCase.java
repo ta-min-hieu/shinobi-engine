@@ -15,5 +15,8 @@ public final class RejectFriendRequestUseCase {
         return port.reject(friendshipId, addresseeId) ? Result.OK : Result.NOT_FOUND;
     }
 
-    public enum Result { OK, NOT_FOUND }
+    public enum Result {
+        OK,
+        NOT_FOUND
+    }
 }

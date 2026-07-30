@@ -7,5 +7,4 @@ package dev.kage.character.domain;
  *
  * <p>{@code intelligence} thay vì {@code int} (từ khoá Java) — cột DB là {@code int_}.
  */
-public record CharacterStats(int str, int agi, int intelligence, int vit) {
-}
+public record CharacterStats(int str, int agi, int intelligence, int vit) {}

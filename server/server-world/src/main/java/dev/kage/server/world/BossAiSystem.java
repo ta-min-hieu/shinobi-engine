@@ -1,5 +1,17 @@
 package dev.kage.server.world;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.function.LongFunction;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.Family;
 import dev.kage.engine.ecs.IteratingKSystem;
@@ -14,16 +26,6 @@ import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterIdComponent;
 import dev.kage.server.world.component.TargetComponent;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.function.LongFunction;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Boss AI (Phase 8 lát cắt 2, AI.md §4) — CƠ CHẾ (cooldown, throttle, tính damage) là JAVA; NỘI
@@ -62,11 +64,9 @@ final class BossAiSystem extends IteratingKSystem {
             boolean crit,
             boolean miss,
             int targetCurrentHp,
-            boolean targetDied) {
-    }
+            boolean targetDied) {}
 
-    private record ScriptDecision(String action, double rawDamage) {
-    }
+    private record ScriptDecision(String action, double rawDamage) {}
 
     private final LongFunction<KEntity> entityLookup;
     private final ScriptSandbox scriptSandbox = new ScriptSandbox(BossConstants.SCRIPT_MAX_STATEMENTS);
@@ -76,8 +76,13 @@ final class BossAiSystem extends IteratingKSystem {
     /** @param entityLookup tra KEntity theo entity ID (nhân vật DƯƠNG hoặc quái ÂM — combat.proto). */
     BossAiSystem(LongFunction<KEntity> entityLookup) {
         super(Family.all(
-                BossAiComponent.class, AiStateComponent.class, TargetComponent.class, HealthComponent.class,
-                CombatStatsComponent.class, PositionComponent.class).get());
+                        BossAiComponent.class,
+                        AiStateComponent.class,
+                        TargetComponent.class,
+                        HealthComponent.class,
+                        CombatStatsComponent.class,
+                        PositionComponent.class)
+                .get());
         this.entityLookup = entityLookup;
         // SCRIPTING.md §8: validate script lúc khởi động, fail fast — cùng lý do SkillSystem.
         evalScript(0.0, false, false, 0.0);
@@ -116,8 +121,10 @@ final class BossAiSystem extends IteratingKSystem {
         }
 
         ScriptDecision decision = evalScript(
-                healthPercent(HEALTH.get(entity)), bossAi.enraged,
-                bossAi.heavyStrikeCooldownSeconds <= 0f, CombatConstants.toStats(COMBAT_STATS.get(entity)).atk());
+                healthPercent(HEALTH.get(entity)),
+                bossAi.enraged,
+                bossAi.heavyStrikeCooldownSeconds <= 0f,
+                CombatConstants.toStats(COMBAT_STATS.get(entity)).atk());
         applyDecision(entity, targetEntity, targetEntityId, decision);
     }
 
@@ -163,8 +170,12 @@ final class BossAiSystem extends IteratingKSystem {
                 "heavy_strike_ready", heavyStrikeReady,
                 "base_atk", baseAtk);
         try {
-            return scriptSandbox.eval(bossScript, Map.of("ctx", ctx), value -> new ScriptDecision(
-                    value.getMember("action").asString(), value.getMember("raw_damage").asDouble()));
+            return scriptSandbox.eval(
+                    bossScript,
+                    Map.of("ctx", ctx),
+                    value -> new ScriptDecision(
+                            value.getMember("action").asString(),
+                            value.getMember("raw_damage").asDouble()));
         } catch (ScriptExecutionException e) {
             LOG.error("Script boss '{}' lỗi lúc chạy — coi như basic_attack", BossConstants.BOSS_CODE, e);
             return new ScriptDecision("basic_attack", 0.0);

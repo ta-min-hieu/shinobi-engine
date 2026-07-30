@@ -6,7 +6,7 @@ public final class FactionSelectionLevelTooLowException extends RuntimeException
     private static final long serialVersionUID = 1L;
 
     public FactionSelectionLevelTooLowException(long characterId, int currentLevel, int requiredLevel) {
-        super("Nhân vật " + characterId + " chưa đủ cấp chọn hệ phái: hiện Lv" + currentLevel
-                + ", cần Lv" + requiredLevel);
+        super("Nhân vật " + characterId + " chưa đủ cấp chọn hệ phái: hiện Lv" + currentLevel + ", cần Lv"
+                + requiredLevel);
     }
 }

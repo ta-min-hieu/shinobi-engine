@@ -2,19 +2,28 @@ package dev.kage.server.database.trade;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.Duration;
+import java.util.List;
+import java.util.UUID;
+
+import javax.sql.DataSource;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
+
 import dev.kage.account.domain.Account;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.inventory.domain.Inventory;
-import dev.kage.trade.application.AcceptTradeRequestUseCase;
-import dev.kage.trade.application.CancelTradeUseCase;
-import dev.kage.trade.application.ConfirmTradeUseCase;
-import dev.kage.trade.application.RequestTradeUseCase;
-import dev.kage.trade.application.SetTradeOfferUseCase;
-import dev.kage.trade.application.TradePorts;
-import dev.kage.trade.domain.OfferedItemInput;
-import dev.kage.trade.domain.TradeSession;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.PostgresDataSourceFactory;
@@ -24,20 +33,14 @@ import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
 import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
 import dev.kage.server.database.inventory.PostgresInventoryAdapter;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.time.Duration;
-import java.util.List;
-import java.util.UUID;
-import javax.sql.DataSource;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
+import dev.kage.trade.application.AcceptTradeRequestUseCase;
+import dev.kage.trade.application.CancelTradeUseCase;
+import dev.kage.trade.application.ConfirmTradeUseCase;
+import dev.kage.trade.application.RequestTradeUseCase;
+import dev.kage.trade.application.SetTradeOfferUseCase;
+import dev.kage.trade.application.TradePorts;
+import dev.kage.trade.domain.OfferedItemInput;
+import dev.kage.trade.domain.TradeSession;
 
 /**
  * Test bằng PostgreSQL THẬT qua Testcontainers — verify migration V16 ({@code trade_session}/
@@ -93,7 +96,8 @@ class TradeIntegrationTest {
     private static long createFreshCharacter(String name) {
         PostgresCharacterAdapter characterAdapter = new PostgresCharacterAdapter(dataSource);
         JdbcCharacterTransactionRunner characterTx = new JdbcCharacterTransactionRunner(dataSource);
-        NewCharacter newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
+        NewCharacter newCharacter =
+                new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
         Character[] holder = new Character[1];
         characterTx.inTransaction(tx -> holder[0] = characterAdapter.create(tx, newCharacter));
         return holder[0].id();
@@ -128,10 +132,15 @@ class TradeIntegrationTest {
     private static long persistOneItem(long characterId, long itemTemplateId, int quantity) {
         PostgresInventoryAdapter inventoryAdapter = new PostgresInventoryAdapter(dataSource);
         JdbcInventoryTransactionRunner inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
-        Inventory inventory = new dev.kage.inventory.domain.Inventory(characterId, 20,
-                List.of(dev.kage.inventory.domain.ItemStack.newItem(itemTemplateId, quantity, 0)));
+        Inventory inventory = new dev.kage.inventory.domain.Inventory(
+                characterId, 20, List.of(dev.kage.inventory.domain.ItemStack.newItem(itemTemplateId, quantity, 0)));
         inventoryTx.inTransaction(tx -> inventoryAdapter.save(tx, inventory));
-        return inventoryAdapter.findByCharacter(characterId).orElseThrow().items().get(0).id();
+        return inventoryAdapter
+                .findByCharacter(characterId)
+                .orElseThrow()
+                .items()
+                .get(0)
+                .id();
     }
 
     private static int itemQuantity(long itemId) {
@@ -168,8 +177,11 @@ class TradeIntegrationTest {
 
     private static ConfirmTradeUseCase newConfirmUseCase(PostgresTradeSessionAdapter sessionPort) {
         TradePorts ports = new TradePorts(
-                sessionPort, new PostgresTradeInventoryAdapter(dataSource), new PostgresTradeGoldAdapter(),
-                new PostgresTradeAuditAdapter(), new PostgresTradeIdempotencyAdapter());
+                sessionPort,
+                new PostgresTradeInventoryAdapter(dataSource),
+                new PostgresTradeGoldAdapter(),
+                new PostgresTradeAuditAdapter(),
+                new PostgresTradeIdempotencyAdapter());
         return new ConfirmTradeUseCase(ports, new JdbcTradeTransactionRunner(dataSource));
     }
 
@@ -186,7 +198,8 @@ class TradeIntegrationTest {
         long itemA = persistOneItem(a, kunaiTemplateId, 3);
         long itemB = persistOneItem(b, kunaiTemplateId, 1);
         PostgresTradeSessionAdapter sessionPort = newSessionPort();
-        TradeSession session = new RequestTradeUseCase(sessionPort).execute(a, b).session();
+        TradeSession session =
+                new RequestTradeUseCase(sessionPort).execute(a, b).session();
         new AcceptTradeRequestUseCase(sessionPort).execute(session.id(), b);
         new SetTradeOfferUseCase(sessionPort).execute(session.id(), a, 20, List.of(new OfferedItemInput(itemA, 3)));
         new SetTradeOfferUseCase(sessionPort).execute(session.id(), b, 10, List.of(new OfferedItemInput(itemB, 1)));
@@ -209,7 +222,8 @@ class TradeIntegrationTest {
         long b = createFreshCharacter("TradeB2");
         long itemA = persistOneItem(a, kunaiTemplateId, 10); // có 10, chào 3
         PostgresTradeSessionAdapter sessionPort = newSessionPort();
-        TradeSession session = new RequestTradeUseCase(sessionPort).execute(a, b).session();
+        TradeSession session =
+                new RequestTradeUseCase(sessionPort).execute(a, b).session();
         new AcceptTradeRequestUseCase(sessionPort).execute(session.id(), b);
         new SetTradeOfferUseCase(sessionPort).execute(session.id(), a, 0, List.of(new OfferedItemInput(itemA, 3)));
         new SetTradeOfferUseCase(sessionPort).execute(session.id(), b, 0, List.of());
@@ -229,7 +243,8 @@ class TradeIntegrationTest {
         grantGold(a, 100);
         long itemA = persistOneItem(a, kunaiTemplateId, 1);
         PostgresTradeSessionAdapter sessionPort = newSessionPort();
-        TradeSession session = new RequestTradeUseCase(sessionPort).execute(a, b).session();
+        TradeSession session =
+                new RequestTradeUseCase(sessionPort).execute(a, b).session();
         new AcceptTradeRequestUseCase(sessionPort).execute(session.id(), b);
         new SetTradeOfferUseCase(sessionPort).execute(session.id(), a, 20, List.of(new OfferedItemInput(itemA, 1)));
         new SetTradeOfferUseCase(sessionPort).execute(session.id(), b, 0, List.of());
@@ -256,7 +271,8 @@ class TradeIntegrationTest {
         grantGold(a, 100);
         grantGold(b, 100);
         PostgresTradeSessionAdapter sessionPort = newSessionPort();
-        TradeSession session = new RequestTradeUseCase(sessionPort).execute(a, b).session();
+        TradeSession session =
+                new RequestTradeUseCase(sessionPort).execute(a, b).session();
         new AcceptTradeRequestUseCase(sessionPort).execute(session.id(), b);
         new SetTradeOfferUseCase(sessionPort).execute(session.id(), a, 10, List.of());
         new SetTradeOfferUseCase(sessionPort).execute(session.id(), b, 10, List.of());
@@ -277,7 +293,8 @@ class TradeIntegrationTest {
         long a = createFreshCharacter("TradeA5");
         long b = createFreshCharacter("TradeB5");
         PostgresTradeSessionAdapter sessionPort = newSessionPort();
-        TradeSession session = new RequestTradeUseCase(sessionPort).execute(a, b).session();
+        TradeSession session =
+                new RequestTradeUseCase(sessionPort).execute(a, b).session();
         new AcceptTradeRequestUseCase(sessionPort).execute(session.id(), b);
 
         CancelTradeUseCase.Result result = new CancelTradeUseCase(sessionPort).execute(session.id(), a);

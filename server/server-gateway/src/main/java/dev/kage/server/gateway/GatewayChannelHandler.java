@@ -1,6 +1,21 @@
 package dev.kage.server.gateway;
 
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.Executor;
+
 import com.google.protobuf.InvalidProtocolBufferException;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.SimpleChannelInboundHandler;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.Scope;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import dev.kage.account.api.AccountFacade;
 import dev.kage.account.application.LoginResult;
 import dev.kage.character.api.CharacterFacade;
@@ -23,23 +38,29 @@ import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.mail.api.MailFacade;
 import dev.kage.party.api.PartyFacade;
-import dev.kage.pvp.api.PvpFacade;
-import dev.kage.pvp.application.GetPvpRatingUseCase;
-import dev.kage.trade.api.TradeFacade;
 import dev.kage.protocol.AcceptDuelCommand;
 import dev.kage.protocol.AcceptDuelOutcome;
 import dev.kage.protocol.AcceptDuelResponse;
 import dev.kage.protocol.AcceptFriendRequestCommand;
 import dev.kage.protocol.AcceptFriendRequestOutcome;
 import dev.kage.protocol.AcceptFriendRequestResponse;
+import dev.kage.protocol.AcceptPartyInviteCommand;
+import dev.kage.protocol.AcceptPartyInviteOutcome;
+import dev.kage.protocol.AcceptPartyInviteResponse;
 import dev.kage.protocol.AcceptQuestOutcome;
 import dev.kage.protocol.AcceptQuestResponse;
+import dev.kage.protocol.AcceptTradeRequestCommand;
+import dev.kage.protocol.AcceptTradeRequestOutcome;
+import dev.kage.protocol.AcceptTradeRequestResponse;
 import dev.kage.protocol.ApproveGuildJoinRequestCommand;
 import dev.kage.protocol.ApproveGuildJoinRequestOutcome;
 import dev.kage.protocol.ApproveGuildJoinRequestResponse;
 import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.BuyItemResponse;
 import dev.kage.protocol.BuyOutcome;
+import dev.kage.protocol.CancelTradeCommand;
+import dev.kage.protocol.CancelTradeOutcome;
+import dev.kage.protocol.CancelTradeResponse;
 import dev.kage.protocol.ChallengeDuelCommand;
 import dev.kage.protocol.ChallengeDuelOutcome;
 import dev.kage.protocol.ChallengeDuelResponse;
@@ -52,6 +73,9 @@ import dev.kage.protocol.ClaimMailResponse;
 import dev.kage.protocol.ClaimQuestRewardCommand;
 import dev.kage.protocol.ClaimQuestRewardOutcome;
 import dev.kage.protocol.ClaimQuestRewardResponse;
+import dev.kage.protocol.ConfirmTradeCommand;
+import dev.kage.protocol.ConfirmTradeOutcome;
+import dev.kage.protocol.ConfirmTradeResponse;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
@@ -59,15 +83,18 @@ import dev.kage.protocol.CreateCharacterResponse;
 import dev.kage.protocol.CreateGuildCommand;
 import dev.kage.protocol.CreateGuildOutcome;
 import dev.kage.protocol.CreateGuildResponse;
+import dev.kage.protocol.CreatePartyCommand;
+import dev.kage.protocol.CreatePartyOutcome;
+import dev.kage.protocol.CreatePartyResponse;
+import dev.kage.protocol.DeclineDuelCommand;
+import dev.kage.protocol.DeclineDuelOutcome;
+import dev.kage.protocol.DeclineDuelResponse;
 import dev.kage.protocol.DeleteMailCommand;
 import dev.kage.protocol.DeleteMailOutcome;
 import dev.kage.protocol.DeleteMailResponse;
 import dev.kage.protocol.DialogueEndedResponse;
 import dev.kage.protocol.DialogueNodeResponse;
 import dev.kage.protocol.DialogueOptionView;
-import dev.kage.protocol.DeclineDuelCommand;
-import dev.kage.protocol.DeclineDuelOutcome;
-import dev.kage.protocol.DeclineDuelResponse;
 import dev.kage.protocol.DisbandGuildCommand;
 import dev.kage.protocol.DisbandGuildOutcome;
 import dev.kage.protocol.DisbandGuildResponse;
@@ -80,32 +107,45 @@ import dev.kage.protocol.EnhanceOutcome;
 import dev.kage.protocol.EnterDungeonCommand;
 import dev.kage.protocol.EnterDungeonOutcome;
 import dev.kage.protocol.EnterDungeonResponse;
+import dev.kage.protocol.EquipItemCommand;
+import dev.kage.protocol.EquipItemResponse;
+import dev.kage.protocol.EquipmentSlot;
+import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.ExitDuelCommand;
 import dev.kage.protocol.ExitDuelOutcome;
 import dev.kage.protocol.ExitDuelResponse;
 import dev.kage.protocol.ExitDungeonCommand;
 import dev.kage.protocol.ExitDungeonOutcome;
 import dev.kage.protocol.ExitDungeonResponse;
-import dev.kage.protocol.EquipItemCommand;
-import dev.kage.protocol.EquipItemResponse;
-import dev.kage.protocol.EquipmentSlot;
-import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.Faction;
 import dev.kage.protocol.FriendOfflineEvent;
 import dev.kage.protocol.FriendOnlineEvent;
 import dev.kage.protocol.FriendView;
 import dev.kage.protocol.GetMyGuildRequest;
 import dev.kage.protocol.GetMyGuildResponse;
+import dev.kage.protocol.GetMyPartyRequest;
+import dev.kage.protocol.GetMyPartyResponse;
 import dev.kage.protocol.GetPvpRatingRequest;
 import dev.kage.protocol.GetPvpRatingResponse;
+import dev.kage.protocol.GetTradeStatusRequest;
+import dev.kage.protocol.GetTradeStatusResponse;
 import dev.kage.protocol.GuildMemberView;
+import dev.kage.protocol.InvitePartyMemberCommand;
+import dev.kage.protocol.InvitePartyMemberOutcome;
+import dev.kage.protocol.InvitePartyMemberResponse;
 import dev.kage.protocol.ItemRewardView;
 import dev.kage.protocol.KickGuildMemberCommand;
 import dev.kage.protocol.KickGuildMemberOutcome;
 import dev.kage.protocol.KickGuildMemberResponse;
+import dev.kage.protocol.KickPartyMemberCommand;
+import dev.kage.protocol.KickPartyMemberOutcome;
+import dev.kage.protocol.KickPartyMemberResponse;
 import dev.kage.protocol.LeaveGuildCommand;
 import dev.kage.protocol.LeaveGuildOutcome;
 import dev.kage.protocol.LeaveGuildResponse;
+import dev.kage.protocol.LeavePartyCommand;
+import dev.kage.protocol.LeavePartyOutcome;
+import dev.kage.protocol.LeavePartyResponse;
 import dev.kage.protocol.ListCharactersRequest;
 import dev.kage.protocol.ListCharactersResponse;
 import dev.kage.protocol.ListFriendsRequest;
@@ -114,12 +154,12 @@ import dev.kage.protocol.ListGuildMembersRequest;
 import dev.kage.protocol.ListGuildMembersResponse;
 import dev.kage.protocol.ListMailRequest;
 import dev.kage.protocol.ListMailResponse;
+import dev.kage.protocol.ListPartyMembersRequest;
+import dev.kage.protocol.ListPartyMembersResponse;
 import dev.kage.protocol.ListPendingFriendRequestsRequest;
 import dev.kage.protocol.ListPendingFriendRequestsResponse;
 import dev.kage.protocol.ListPendingGuildJoinRequestsRequest;
 import dev.kage.protocol.ListPendingGuildJoinRequestsResponse;
-import dev.kage.protocol.ListPartyMembersRequest;
-import dev.kage.protocol.ListPartyMembersResponse;
 import dev.kage.protocol.ListPendingPartyInvitesRequest;
 import dev.kage.protocol.ListPendingPartyInvitesResponse;
 import dev.kage.protocol.ListShopItemsRequest;
@@ -129,33 +169,10 @@ import dev.kage.protocol.MailView;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.NewMailEvent;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.PartyMemberView;
+import dev.kage.protocol.PendingFriendRequestView;
 import dev.kage.protocol.PendingGuildJoinRequestView;
 import dev.kage.protocol.PendingPartyInviteView;
-import dev.kage.protocol.GetMyPartyRequest;
-import dev.kage.protocol.GetMyPartyResponse;
-import dev.kage.protocol.CreatePartyCommand;
-import dev.kage.protocol.CreatePartyOutcome;
-import dev.kage.protocol.CreatePartyResponse;
-import dev.kage.protocol.InvitePartyMemberCommand;
-import dev.kage.protocol.InvitePartyMemberOutcome;
-import dev.kage.protocol.InvitePartyMemberResponse;
-import dev.kage.protocol.AcceptPartyInviteCommand;
-import dev.kage.protocol.AcceptPartyInviteOutcome;
-import dev.kage.protocol.AcceptPartyInviteResponse;
-import dev.kage.protocol.RejectPartyInviteCommand;
-import dev.kage.protocol.RejectPartyInviteOutcome;
-import dev.kage.protocol.RejectPartyInviteResponse;
-import dev.kage.protocol.LeavePartyCommand;
-import dev.kage.protocol.LeavePartyOutcome;
-import dev.kage.protocol.LeavePartyResponse;
-import dev.kage.protocol.KickPartyMemberCommand;
-import dev.kage.protocol.KickPartyMemberOutcome;
-import dev.kage.protocol.KickPartyMemberResponse;
-import dev.kage.protocol.PartyMemberView;
-import dev.kage.protocol.SendChatMessageCommand;
-import dev.kage.protocol.SendChatMessageOutcome;
-import dev.kage.protocol.SendChatMessageResponse;
-import dev.kage.protocol.PendingFriendRequestView;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
 import dev.kage.protocol.RejectFriendRequestCommand;
@@ -164,9 +181,15 @@ import dev.kage.protocol.RejectFriendRequestResponse;
 import dev.kage.protocol.RejectGuildJoinRequestCommand;
 import dev.kage.protocol.RejectGuildJoinRequestOutcome;
 import dev.kage.protocol.RejectGuildJoinRequestResponse;
+import dev.kage.protocol.RejectPartyInviteCommand;
+import dev.kage.protocol.RejectPartyInviteOutcome;
+import dev.kage.protocol.RejectPartyInviteResponse;
 import dev.kage.protocol.RemoveFriendCommand;
 import dev.kage.protocol.RemoveFriendOutcome;
 import dev.kage.protocol.RemoveFriendResponse;
+import dev.kage.protocol.RequestTradeCommand;
+import dev.kage.protocol.RequestTradeOutcome;
+import dev.kage.protocol.RequestTradeResponse;
 import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.SelectCharacterResponse;
 import dev.kage.protocol.SelectDialogueOptionCommand;
@@ -175,6 +198,9 @@ import dev.kage.protocol.SelectFactionResponse;
 import dev.kage.protocol.SellItemCommand;
 import dev.kage.protocol.SellItemResponse;
 import dev.kage.protocol.SellOutcome;
+import dev.kage.protocol.SendChatMessageCommand;
+import dev.kage.protocol.SendChatMessageOutcome;
+import dev.kage.protocol.SendChatMessageResponse;
 import dev.kage.protocol.SendFriendRequestCommand;
 import dev.kage.protocol.SendFriendRequestOutcome;
 import dev.kage.protocol.SendFriendRequestResponse;
@@ -185,54 +211,30 @@ import dev.kage.protocol.SendMailCommand;
 import dev.kage.protocol.SendMailOutcome;
 import dev.kage.protocol.SendMailResponse;
 import dev.kage.protocol.SetTargetCommand;
-import dev.kage.protocol.ShopListingView;
-import dev.kage.protocol.RequestTradeCommand;
-import dev.kage.protocol.RequestTradeOutcome;
-import dev.kage.protocol.RequestTradeResponse;
-import dev.kage.protocol.AcceptTradeRequestCommand;
-import dev.kage.protocol.AcceptTradeRequestOutcome;
-import dev.kage.protocol.AcceptTradeRequestResponse;
-import dev.kage.protocol.CancelTradeCommand;
-import dev.kage.protocol.CancelTradeOutcome;
-import dev.kage.protocol.CancelTradeResponse;
 import dev.kage.protocol.SetTradeOfferCommand;
 import dev.kage.protocol.SetTradeOfferOutcome;
 import dev.kage.protocol.SetTradeOfferResponse;
-import dev.kage.protocol.ConfirmTradeCommand;
-import dev.kage.protocol.ConfirmTradeOutcome;
-import dev.kage.protocol.ConfirmTradeResponse;
-import dev.kage.protocol.GetTradeStatusRequest;
-import dev.kage.protocol.GetTradeStatusResponse;
+import dev.kage.protocol.ShopListingView;
+import dev.kage.protocol.TalkToNpcCommand;
+import dev.kage.protocol.TradeCloseReason;
+import dev.kage.protocol.TradeClosedEvent;
 import dev.kage.protocol.TradeOfferItemView;
 import dev.kage.protocol.TradePhase;
 import dev.kage.protocol.TradeRequestedEvent;
 import dev.kage.protocol.TradeUpdatedEvent;
-import dev.kage.protocol.TradeClosedEvent;
-import dev.kage.protocol.TradeCloseReason;
-import dev.kage.protocol.TalkToNpcCommand;
 import dev.kage.protocol.UnequipItemCommand;
 import dev.kage.protocol.UnequipItemResponse;
 import dev.kage.protocol.UseSkillCommand;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
+import dev.kage.pvp.api.PvpFacade;
+import dev.kage.pvp.application.GetPvpRatingUseCase;
 import dev.kage.quest.api.QuestFacade;
 import dev.kage.server.world.CharacterBaseStats;
 import dev.kage.server.world.WorldFacade;
 import dev.kage.shop.api.ShopFacade;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.SimpleChannelInboundHandler;
-import io.opentelemetry.api.trace.Span;
-import io.opentelemetry.api.trace.StatusCode;
-import io.opentelemetry.context.Context;
-import io.opentelemetry.context.Scope;
-import java.time.Duration;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.Executor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import dev.kage.trade.api.TradeFacade;
 
 /**
  * Xử lý packet hệ thống + Character trên Netty EventLoop — nhưng CHỈ phần rẻ (decode, validate
@@ -328,7 +330,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_REJECT_FRIEND_REQUEST_COMMAND_VALUE, this::handleRejectFriendRequestCommand),
             Map.entry(Opcode.OPCODE_REMOVE_FRIEND_COMMAND_VALUE, this::handleRemoveFriendCommand),
             Map.entry(Opcode.OPCODE_LIST_FRIENDS_REQUEST_VALUE, this::handleListFriendsRequest),
-            Map.entry(Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_REQUEST_VALUE,
+            Map.entry(
+                    Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_REQUEST_VALUE,
                     this::handleListPendingFriendRequestsRequest),
             Map.entry(Opcode.OPCODE_SEND_MAIL_COMMAND_VALUE, this::handleSendMailCommand),
             Map.entry(Opcode.OPCODE_LIST_MAIL_REQUEST_VALUE, this::handleListMailRequest),
@@ -337,15 +340,15 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE, this::handleSendChatMessageCommand),
             Map.entry(Opcode.OPCODE_CREATE_GUILD_COMMAND_VALUE, this::handleCreateGuildCommand),
             Map.entry(Opcode.OPCODE_SEND_GUILD_JOIN_REQUEST_COMMAND_VALUE, this::handleSendGuildJoinRequestCommand),
-            Map.entry(Opcode.OPCODE_APPROVE_GUILD_JOIN_REQUEST_COMMAND_VALUE,
-                    this::handleApproveGuildJoinRequestCommand),
-            Map.entry(Opcode.OPCODE_REJECT_GUILD_JOIN_REQUEST_COMMAND_VALUE,
-                    this::handleRejectGuildJoinRequestCommand),
+            Map.entry(
+                    Opcode.OPCODE_APPROVE_GUILD_JOIN_REQUEST_COMMAND_VALUE, this::handleApproveGuildJoinRequestCommand),
+            Map.entry(Opcode.OPCODE_REJECT_GUILD_JOIN_REQUEST_COMMAND_VALUE, this::handleRejectGuildJoinRequestCommand),
             Map.entry(Opcode.OPCODE_LEAVE_GUILD_COMMAND_VALUE, this::handleLeaveGuildCommand),
             Map.entry(Opcode.OPCODE_DISBAND_GUILD_COMMAND_VALUE, this::handleDisbandGuildCommand),
             Map.entry(Opcode.OPCODE_KICK_GUILD_MEMBER_COMMAND_VALUE, this::handleKickGuildMemberCommand),
             Map.entry(Opcode.OPCODE_LIST_GUILD_MEMBERS_REQUEST_VALUE, this::handleListGuildMembersRequest),
-            Map.entry(Opcode.OPCODE_LIST_PENDING_GUILD_JOIN_REQUESTS_REQUEST_VALUE,
+            Map.entry(
+                    Opcode.OPCODE_LIST_PENDING_GUILD_JOIN_REQUESTS_REQUEST_VALUE,
                     this::handleListPendingGuildJoinRequestsRequest),
             Map.entry(Opcode.OPCODE_GET_MY_GUILD_REQUEST_VALUE, this::handleGetMyGuildRequest),
             Map.entry(Opcode.OPCODE_CREATE_PARTY_COMMAND_VALUE, this::handleCreatePartyCommand),
@@ -355,8 +358,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_LEAVE_PARTY_COMMAND_VALUE, this::handleLeavePartyCommand),
             Map.entry(Opcode.OPCODE_KICK_PARTY_MEMBER_COMMAND_VALUE, this::handleKickPartyMemberCommand),
             Map.entry(Opcode.OPCODE_LIST_PARTY_MEMBERS_REQUEST_VALUE, this::handleListPartyMembersRequest),
-            Map.entry(Opcode.OPCODE_LIST_PENDING_PARTY_INVITES_REQUEST_VALUE,
-                    this::handleListPendingPartyInvitesRequest),
+            Map.entry(
+                    Opcode.OPCODE_LIST_PENDING_PARTY_INVITES_REQUEST_VALUE, this::handleListPendingPartyInvitesRequest),
             Map.entry(Opcode.OPCODE_GET_MY_PARTY_REQUEST_VALUE, this::handleGetMyPartyRequest),
             Map.entry(Opcode.OPCODE_REQUEST_TRADE_COMMAND_VALUE, this::handleRequestTradeCommand),
             Map.entry(Opcode.OPCODE_ACCEPT_TRADE_REQUEST_COMMAND_VALUE, this::handleAcceptTradeRequestCommand),
@@ -373,7 +376,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_GET_PVP_RATING_REQUEST_VALUE, this::handleGetPvpRatingRequest));
 
     GatewayChannelHandler(
-            GatewayFacades facades, WorldGateway worldGateway, Executor authExecutor,
+            GatewayFacades facades,
+            WorldGateway worldGateway,
+            Executor authExecutor,
             GatewayObservability observability) {
         this.accountFacade = facades.accountFacade();
         this.characterFacade = facades.characterFacade();
@@ -418,8 +423,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             handler.handle(ctx, header, frame.payload());
         } catch (InvalidProtocolBufferException e) {
             // Fail fast ở MỨC PACKET (Điều 16) — không làm sập kết nối vì 1 payload hỏng.
-            LOG.warn("Payload protobuf không hợp lệ: opcode={}, sequenceId={}",
-                    header.opcode(), header.sequenceId(), e);
+            LOG.warn(
+                    "Payload protobuf không hợp lệ: opcode={}, sequenceId={}", header.opcode(), header.sequenceId(), e);
             span.recordException(e);
             span.setStatus(StatusCode.ERROR);
             sendError(ctx, header.sequenceId(), 400, "error.invalid_payload");
@@ -499,7 +504,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         try {
             List<Character> characters = characterFacade.listCharacters(accountId);
             ListCharactersResponse response = ListCharactersResponse.newBuilder()
-                    .addAllCharacters(characters.stream().map(GatewayChannelHandler::toProto).toList())
+                    .addAllCharacters(characters.stream()
+                            .map(GatewayChannelHandler::toProto)
+                            .toList())
                     .build();
             send(ctx, Opcode.OPCODE_LIST_CHARACTERS_RESPONSE_VALUE, sequenceId, response.toByteArray());
         } catch (RuntimeException e) {
@@ -525,8 +532,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleCreateCharacterBlocking(
             ChannelHandlerContext ctx, int sequenceId, long accountId, CreateCharacterRequest request) {
         try {
-            Character character = characterFacade.createCharacter(
-                    accountId, request.getName(), request.getIdempotencyKey());
+            Character character =
+                    characterFacade.createCharacter(accountId, request.getName(), request.getIdempotencyKey());
             CreateCharacterResponse response = CreateCharacterResponse.newBuilder()
                     .setSuccess(true)
                     .setCharacter(toProto(character))
@@ -576,8 +583,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             PositionSnapshot spawn = characterFacade.loadPosition(characterId);
             CharacterStats stats = characterFacade.loadStats(characterId);
             CharacterBaseStats baseStats = new CharacterBaseStats(
-                    stats.str(), stats.agi(), stats.intelligence(), stats.vit(),
-                    FactionMapping.toElement(character.faction()), character.level());
+                    stats.str(),
+                    stats.agi(),
+                    stats.intelligence(),
+                    stats.vit(),
+                    FactionMapping.toElement(character.faction()),
+                    character.level());
             // Phase 9 lát cắt 6: định tuyến vào khu vực (channel) còn chỗ thay vì thẳng 1 World
             // duy nhất — MainWorldChannelRegistry tự mở thêm khu vực nếu cần (giới hạn người/khu
             // vực chặn AoI phình theo TỔNG N toàn map, xem javadoc class đó).
@@ -588,7 +599,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // bonus khi đăng nhập lại (server-world không tự biết feature-inventory).
             EquipmentBonus equipmentBonus = inventoryFacade.computeEquipmentBonus(characterId);
             channelFacade.applyEquipmentBonus(characterId, equipmentBonus.bonusAtk());
-            SelectCharacterResponse response = SelectCharacterResponse.newBuilder().setSuccess(true).build();
+            SelectCharacterResponse response =
+                    SelectCharacterResponse.newBuilder().setSuccess(true).build();
             send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
             // Đang trên authExecutor (Virtual Thread) rồi — friendFacade.listFriends chạm DB, an
             // toàn gọi thẳng, không cần đẩy thêm 1 lớp executor nữa (khác channelInactive bên dưới).
@@ -628,7 +640,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             ChannelHandlerContext ctx, int sequenceId, long characterId, SelectFactionRequest request) {
         try {
             characterFacade.selectFaction(characterId, toDomainFaction(request.getFaction()));
-            SelectFactionResponse response = SelectFactionResponse.newBuilder().setSuccess(true).build();
+            SelectFactionResponse response =
+                    SelectFactionResponse.newBuilder().setSuccess(true).build();
             send(ctx, Opcode.OPCODE_SELECT_FACTION_RESPONSE_VALUE, sequenceId, response.toByteArray());
         } catch (CharacterNotFoundException e) {
             LOG.warn("Chọn hệ phái thất bại: không tìm thấy nhân vật", e);
@@ -652,7 +665,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * CHỦ Ý ở {@code ArenaInstanceRegistry} javadoc) nên thứ tự kiểm tra không quan trọng.
      */
     private WorldFacade currentWorldFacade(long characterId) {
-        return worldGateway.dungeonInstanceRegistry().worldFacadeFor(characterId)
+        return worldGateway
+                .dungeonInstanceRegistry()
+                .worldFacadeFor(characterId)
                 .or(() -> worldGateway.arenaInstanceRegistry().worldFacadeFor(characterId))
                 .or(() -> worldGateway.mainWorldChannels().worldFacadeFor(characterId))
                 .orElseThrow(() -> new IllegalStateException(
@@ -802,8 +817,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private record EnhanceItemRequest(
-            int sequenceId, long characterId, EnhanceItemCommand command, Context tracingContext) {
-    }
+            int sequenceId, long characterId, EnhanceItemCommand command, Context tracingContext) {}
 
     /**
      * Luồng ĐẠI DIỆN duy nhất được retrofit span con sâu (feature + DB gộp làm 1, xem javadoc
@@ -815,10 +829,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         Span span = tracing.startChildSpan("feature.inventory.enhance", request.tracingContext());
         try (Scope scope = span.makeCurrent()) {
             InventoryFacade.EnhanceResult result = inventoryFacade.enhanceItem(
-                    request.characterId(), request.command().getItemId(), request.command().getUseProtection());
+                    request.characterId(),
+                    request.command().getItemId(),
+                    request.command().getUseProtection());
             networkMetrics.recordEnhanceResult(result.name());
             span.setAttribute("result", result.name());
-            EnhanceItemResponse response = EnhanceItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+            EnhanceItemResponse response = EnhanceItemResponse.newBuilder()
+                    .setOutcome(toProtoOutcome(result))
+                    .build();
             send(ctx, Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE, request.sequenceId(), response.toByteArray());
         } finally {
             span.end();
@@ -852,7 +870,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleListShopItemsBlocking(ChannelHandlerContext ctx, int sequenceId) {
-        send(ctx, Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE, sequenceId, buildShopListingsResponse().toByteArray());
+        send(
+                ctx,
+                Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE,
+                sequenceId,
+                buildShopListingsResponse().toByteArray());
     }
 
     /** Gộp lại — dùng cả cho {@code ListShopItemsRequest} thật lẫn nhánh action="open_shop" của dialogue. */
@@ -883,7 +905,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             ChannelHandlerContext ctx, int sequenceId, long characterId, BuyItemCommand command) {
         ShopFacade.BuyResult result = shopFacade.buyItem(
                 characterId, command.getItemTemplateId(), command.getQuantity(), command.getIdempotencyKey());
-        BuyItemResponse response = BuyItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        BuyItemResponse response =
+                BuyItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
         send(ctx, Opcode.OPCODE_BUY_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -914,7 +937,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             ChannelHandlerContext ctx, int sequenceId, long characterId, SellItemCommand command) {
         ShopFacade.SellResult result = shopFacade.sellItem(
                 characterId, command.getItemId(), command.getQuantity(), command.getIdempotencyKey());
-        SellItemResponse response = SellItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        SellItemResponse response =
+                SellItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
         send(ctx, Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -947,7 +971,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 404, "error.npc_not_found");
             return;
         }
-        send(ctx, Opcode.OPCODE_DIALOGUE_NODE_RESPONSE_VALUE, sequenceId, toResponse(node.get()).toByteArray());
+        send(
+                ctx,
+                Opcode.OPCODE_DIALOGUE_NODE_RESPONSE_VALUE,
+                sequenceId,
+                toResponse(node.get()).toByteArray());
     }
 
     private void handleSelectDialogueOptionCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -964,23 +992,34 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSelectDialogueOptionBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, SelectDialogueOptionCommand command) {
-        DialogueFacade.SelectOptionResult result = dialogueFacade.selectOption(
-                command.getNpcCode(), command.getCurrentNodeId(), command.getOptionIndex());
+        DialogueFacade.SelectOptionResult result =
+                dialogueFacade.selectOption(command.getNpcCode(), command.getCurrentNodeId(), command.getOptionIndex());
         switch (result) {
-            case DialogueFacade.SelectOptionResult.Node r -> send(
-                    ctx, Opcode.OPCODE_DIALOGUE_NODE_RESPONSE_VALUE, sequenceId, toResponse(r.node()).toByteArray());
-            case DialogueFacade.SelectOptionResult.OpenShop ignored -> send(
-                    ctx, Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE, sequenceId,
-                    buildShopListingsResponse().toByteArray());
-            case DialogueFacade.SelectOptionResult.Ended ignored -> send(
-                    ctx, Opcode.OPCODE_DIALOGUE_ENDED_RESPONSE_VALUE, sequenceId,
-                    DialogueEndedResponse.newBuilder().build().toByteArray());
+            case DialogueFacade.SelectOptionResult.Node r ->
+                send(
+                        ctx,
+                        Opcode.OPCODE_DIALOGUE_NODE_RESPONSE_VALUE,
+                        sequenceId,
+                        toResponse(r.node()).toByteArray());
+            case DialogueFacade.SelectOptionResult.OpenShop ignored ->
+                send(
+                        ctx,
+                        Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE,
+                        sequenceId,
+                        buildShopListingsResponse().toByteArray());
+            case DialogueFacade.SelectOptionResult.Ended ignored ->
+                send(
+                        ctx,
+                        Opcode.OPCODE_DIALOGUE_ENDED_RESPONSE_VALUE,
+                        sequenceId,
+                        DialogueEndedResponse.newBuilder().build().toByteArray());
             case DialogueFacade.SelectOptionResult.NotFound ignored ->
-                    sendError(ctx, sequenceId, 404, "error.dialogue_option_not_found");
+                sendError(ctx, sequenceId, 404, "error.dialogue_option_not_found");
             case DialogueFacade.SelectOptionResult.AcceptQuest r -> {
                 QuestFacade.AcceptResult acceptResult = questFacade.acceptQuest(characterId, r.questCode());
-                AcceptQuestResponse response =
-                        AcceptQuestResponse.newBuilder().setOutcome(toProtoOutcome(acceptResult)).build();
+                AcceptQuestResponse response = AcceptQuestResponse.newBuilder()
+                        .setOutcome(toProtoOutcome(acceptResult))
+                        .build();
                 send(ctx, Opcode.OPCODE_ACCEPT_QUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
             }
         }
@@ -1019,12 +1058,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setQuantity(item.quantity())
                     .build());
         }
-        send(ctx, Opcode.OPCODE_CLAIM_QUEST_REWARD_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+        send(
+                ctx,
+                Opcode.OPCODE_CLAIM_QUEST_REWARD_RESPONSE_VALUE,
+                sequenceId,
+                responseBuilder.build().toByteArray());
     }
 
     private static final Map<QuestFacade.ClaimOutcome, ClaimQuestRewardOutcome> CLAIM_QUEST_REWARD_OUTCOME_MAPPING =
             Map.of(
-                    QuestFacade.ClaimOutcome.OK, ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_OK,
+                    QuestFacade.ClaimOutcome.OK,
+                    ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_OK,
                     QuestFacade.ClaimOutcome.QUEST_NOT_FOUND,
                     ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_QUEST_NOT_FOUND,
                     QuestFacade.ClaimOutcome.NOT_ACCEPTED,
@@ -1058,9 +1102,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             send(ctx, Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
-        FriendFacade.SendRequestResult result = friendFacade.sendRequest(characterId, target.get().id());
-        SendFriendRequestResponse response =
-                SendFriendRequestResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        FriendFacade.SendRequestResult result =
+                friendFacade.sendRequest(characterId, target.get().id());
+        SendFriendRequestResponse response = SendFriendRequestResponse.newBuilder()
+                .setOutcome(toProtoOutcome(result))
+                .build();
         send(ctx, Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1097,7 +1143,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         AcceptFriendRequestOutcome outcome = result == FriendFacade.AcceptResult.OK
                 ? AcceptFriendRequestOutcome.ACCEPT_FRIEND_REQUEST_OUTCOME_OK
                 : AcceptFriendRequestOutcome.ACCEPT_FRIEND_REQUEST_OUTCOME_NOT_FOUND;
-        AcceptFriendRequestResponse response = AcceptFriendRequestResponse.newBuilder().setOutcome(outcome).build();
+        AcceptFriendRequestResponse response =
+                AcceptFriendRequestResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_ACCEPT_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1119,7 +1166,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         RejectFriendRequestOutcome outcome = result == FriendFacade.RejectResult.OK
                 ? RejectFriendRequestOutcome.REJECT_FRIEND_REQUEST_OUTCOME_OK
                 : RejectFriendRequestOutcome.REJECT_FRIEND_REQUEST_OUTCOME_NOT_FOUND;
-        RejectFriendRequestResponse response = RejectFriendRequestResponse.newBuilder().setOutcome(outcome).build();
+        RejectFriendRequestResponse response =
+                RejectFriendRequestResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_REJECT_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1145,11 +1193,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             send(ctx, Opcode.OPCODE_REMOVE_FRIEND_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
-        FriendFacade.RemoveResult result = friendFacade.remove(characterId, target.get().id());
+        FriendFacade.RemoveResult result =
+                friendFacade.remove(characterId, target.get().id());
         RemoveFriendOutcome outcome = result == FriendFacade.RemoveResult.OK
                 ? RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_OK
                 : RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_NOT_FRIENDS;
-        RemoveFriendResponse response = RemoveFriendResponse.newBuilder().setOutcome(outcome).build();
+        RemoveFriendResponse response =
+                RemoveFriendResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_REMOVE_FRIEND_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1170,18 +1220,23 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         for (long friendId : friendFacade.listFriends(characterId)) {
             // findByName/findById chạm DB mỗi bạn — chấp nhận N+1 ở quy mô danh sách bạn bè MVP
             // (vài chục), không phải đường nóng mỗi tick (khác AoI/combat).
-            String name = characterFacade.findById(friendId).map(Character::name).orElse("");
+            String name =
+                    characterFacade.findById(friendId).map(Character::name).orElse("");
             responseBuilder.addFriends(FriendView.newBuilder()
                     .setCharacterId(friendId)
                     .setName(name)
                     .setOnline(worldGateway.registry().isOnline(friendId))
                     .build());
         }
-        send(ctx, Opcode.OPCODE_LIST_FRIENDS_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+        send(
+                ctx,
+                Opcode.OPCODE_LIST_FRIENDS_RESPONSE_VALUE,
+                sequenceId,
+                responseBuilder.build().toByteArray());
     }
 
-    private void handleListPendingFriendRequestsRequest(
-            ChannelHandlerContext ctx, PacketHeader header, byte[] payload) throws InvalidProtocolBufferException {
+    private void handleListPendingFriendRequestsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
         ListPendingFriendRequestsRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
@@ -1195,14 +1250,20 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleListPendingFriendRequestsBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
         ListPendingFriendRequestsResponse.Builder responseBuilder = ListPendingFriendRequestsResponse.newBuilder();
         for (FriendFacade.PendingRequestView pending : friendFacade.listPendingRequests(characterId)) {
-            String requesterName = characterFacade.findById(pending.requesterId()).map(Character::name).orElse("");
+            String requesterName = characterFacade
+                    .findById(pending.requesterId())
+                    .map(Character::name)
+                    .orElse("");
             responseBuilder.addRequests(PendingFriendRequestView.newBuilder()
                     .setFriendshipId(pending.friendshipId())
                     .setRequesterId(pending.requesterId())
                     .setRequesterName(requesterName)
                     .build());
         }
-        send(ctx, Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_RESPONSE_VALUE, sequenceId,
+        send(
+                ctx,
+                Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_RESPONSE_VALUE,
+                sequenceId,
                 responseBuilder.build().toByteArray());
     }
 
@@ -1226,7 +1287,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         if (result.guildId() != null) {
             responseBuilder.setGuildId(result.guildId());
         }
-        send(ctx, Opcode.OPCODE_CREATE_GUILD_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+        send(
+                ctx,
+                Opcode.OPCODE_CREATE_GUILD_RESPONSE_VALUE,
+                sequenceId,
+                responseBuilder.build().toByteArray());
     }
 
     private static final Map<GuildFacade.CreateOutcome, CreateGuildOutcome> CREATE_GUILD_OUTCOME_MAPPING = Map.of(
@@ -1253,8 +1318,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleSendGuildJoinRequestBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, SendGuildJoinRequestCommand command) {
         GuildFacade.SendJoinRequestResult result = guildFacade.sendJoinRequest(characterId, command.getGuildName());
-        SendGuildJoinRequestResponse response =
-                SendGuildJoinRequestResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        SendGuildJoinRequestResponse response = SendGuildJoinRequestResponse.newBuilder()
+                .setOutcome(toProtoOutcome(result))
+                .build();
         send(ctx, Opcode.OPCODE_SEND_GUILD_JOIN_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1288,14 +1354,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleApproveGuildJoinRequestBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, ApproveGuildJoinRequestCommand command) {
         GuildFacade.ApproveResult result = guildFacade.approveJoinRequest(command.getRequestId(), characterId);
-        ApproveGuildJoinRequestResponse response =
-                ApproveGuildJoinRequestResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        ApproveGuildJoinRequestResponse response = ApproveGuildJoinRequestResponse.newBuilder()
+                .setOutcome(toProtoOutcome(result))
+                .build();
         send(ctx, Opcode.OPCODE_APPROVE_GUILD_JOIN_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
     private static final Map<GuildFacade.ApproveResult, ApproveGuildJoinRequestOutcome>
             APPROVE_GUILD_JOIN_REQUEST_OUTCOME_MAPPING = Map.of(
-                    GuildFacade.ApproveResult.OK, ApproveGuildJoinRequestOutcome.APPROVE_GUILD_JOIN_REQUEST_OUTCOME_OK,
+                    GuildFacade.ApproveResult.OK,
+                    ApproveGuildJoinRequestOutcome.APPROVE_GUILD_JOIN_REQUEST_OUTCOME_OK,
                     GuildFacade.ApproveResult.NOT_FOUND,
                     ApproveGuildJoinRequestOutcome.APPROVE_GUILD_JOIN_REQUEST_OUTCOME_NOT_FOUND,
                     GuildFacade.ApproveResult.TARGET_ALREADY_IN_GUILD,
@@ -1341,12 +1409,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleLeaveGuildBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        LeaveGuildOutcome outcome = switch (guildFacade.leaveGuild(characterId)) {
-            case OK -> LeaveGuildOutcome.LEAVE_GUILD_OUTCOME_OK;
-            case NOT_IN_GUILD -> LeaveGuildOutcome.LEAVE_GUILD_OUTCOME_NOT_IN_GUILD;
-            case LEADER_CANNOT_LEAVE -> LeaveGuildOutcome.LEAVE_GUILD_OUTCOME_LEADER_CANNOT_LEAVE;
-        };
-        LeaveGuildResponse response = LeaveGuildResponse.newBuilder().setOutcome(outcome).build();
+        LeaveGuildOutcome outcome =
+                switch (guildFacade.leaveGuild(characterId)) {
+                    case OK -> LeaveGuildOutcome.LEAVE_GUILD_OUTCOME_OK;
+                    case NOT_IN_GUILD -> LeaveGuildOutcome.LEAVE_GUILD_OUTCOME_NOT_IN_GUILD;
+                    case LEADER_CANNOT_LEAVE -> LeaveGuildOutcome.LEAVE_GUILD_OUTCOME_LEADER_CANNOT_LEAVE;
+                };
+        LeaveGuildResponse response =
+                LeaveGuildResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_LEAVE_GUILD_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1366,7 +1436,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         DisbandGuildOutcome outcome = guildFacade.disbandGuild(characterId) == GuildFacade.DisbandResult.OK
                 ? DisbandGuildOutcome.DISBAND_GUILD_OUTCOME_OK
                 : DisbandGuildOutcome.DISBAND_GUILD_OUTCOME_NOT_LEADER;
-        DisbandGuildResponse response = DisbandGuildResponse.newBuilder().setOutcome(outcome).build();
+        DisbandGuildResponse response =
+                DisbandGuildResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_DISBAND_GUILD_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1392,13 +1463,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             send(ctx, Opcode.OPCODE_KICK_GUILD_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
-        GuildFacade.KickResult result = guildFacade.kickMember(characterId, target.get().id());
-        KickGuildMemberOutcome outcome = switch (result) {
-            case OK -> KickGuildMemberOutcome.KICK_GUILD_MEMBER_OUTCOME_OK;
-            case CANNOT_KICK_SELF -> KickGuildMemberOutcome.KICK_GUILD_MEMBER_OUTCOME_CANNOT_KICK_SELF;
-            case NOT_FOUND -> KickGuildMemberOutcome.KICK_GUILD_MEMBER_OUTCOME_NOT_FOUND;
-        };
-        KickGuildMemberResponse response = KickGuildMemberResponse.newBuilder().setOutcome(outcome).build();
+        GuildFacade.KickResult result =
+                guildFacade.kickMember(characterId, target.get().id());
+        KickGuildMemberOutcome outcome =
+                switch (result) {
+                    case OK -> KickGuildMemberOutcome.KICK_GUILD_MEMBER_OUTCOME_OK;
+                    case CANNOT_KICK_SELF -> KickGuildMemberOutcome.KICK_GUILD_MEMBER_OUTCOME_CANNOT_KICK_SELF;
+                    case NOT_FOUND -> KickGuildMemberOutcome.KICK_GUILD_MEMBER_OUTCOME_NOT_FOUND;
+                };
+        KickGuildMemberResponse response =
+                KickGuildMemberResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_KICK_GUILD_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1419,7 +1493,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         for (GuildFacade.MemberView member : guildFacade.listMembers(characterId)) {
             // findById chạm DB mỗi thành viên — chấp nhận N+1 ở quy mô 1 bang MVP (vài chục),
             // cùng lý do ListFriendsResponse.
-            String name = characterFacade.findById(member.characterId()).map(Character::name).orElse("");
+            String name = characterFacade
+                    .findById(member.characterId())
+                    .map(Character::name)
+                    .orElse("");
             responseBuilder.addMembers(GuildMemberView.newBuilder()
                     .setCharacterId(member.characterId())
                     .setName(name)
@@ -1427,7 +1504,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setOnline(worldGateway.registry().isOnline(member.characterId()))
                     .build());
         }
-        send(ctx, Opcode.OPCODE_LIST_GUILD_MEMBERS_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+        send(
+                ctx,
+                Opcode.OPCODE_LIST_GUILD_MEMBERS_RESPONSE_VALUE,
+                sequenceId,
+                responseBuilder.build().toByteArray());
     }
 
     private void handleListPendingGuildJoinRequestsRequest(
@@ -1447,14 +1528,20 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         ListPendingGuildJoinRequestsResponse.Builder responseBuilder =
                 ListPendingGuildJoinRequestsResponse.newBuilder();
         for (GuildFacade.PendingJoinRequestView pending : guildFacade.listPendingJoinRequests(characterId)) {
-            String name = characterFacade.findById(pending.characterId()).map(Character::name).orElse("");
+            String name = characterFacade
+                    .findById(pending.characterId())
+                    .map(Character::name)
+                    .orElse("");
             responseBuilder.addRequests(PendingGuildJoinRequestView.newBuilder()
                     .setRequestId(pending.requestId())
                     .setCharacterId(pending.characterId())
                     .setCharacterName(name)
                     .build());
         }
-        send(ctx, Opcode.OPCODE_LIST_PENDING_GUILD_JOIN_REQUESTS_RESPONSE_VALUE, sequenceId,
+        send(
+                ctx,
+                Opcode.OPCODE_LIST_PENDING_GUILD_JOIN_REQUESTS_RESPONSE_VALUE,
+                sequenceId,
                 responseBuilder.build().toByteArray());
     }
 
@@ -1472,12 +1559,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleGetMyGuildBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
         Optional<GuildFacade.MyGuildView> myGuild = guildFacade.findMyGuild(characterId);
-        GetMyGuildResponse.Builder responseBuilder = GetMyGuildResponse.newBuilder().setInGuild(myGuild.isPresent());
+        GetMyGuildResponse.Builder responseBuilder =
+                GetMyGuildResponse.newBuilder().setInGuild(myGuild.isPresent());
         myGuild.ifPresent(guild -> responseBuilder
                 .setGuildId(guild.guildId())
                 .setGuildName(guild.guildName())
                 .setIsLeader(guild.isLeader()));
-        send(ctx, Opcode.OPCODE_GET_MY_GUILD_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+        send(
+                ctx,
+                Opcode.OPCODE_GET_MY_GUILD_RESPONSE_VALUE,
+                sequenceId,
+                responseBuilder.build().toByteArray());
     }
 
     private void handleCreatePartyCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -1497,11 +1589,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         CreatePartyOutcome outcome = result.outcome() == PartyFacade.CreateOutcome.OK
                 ? CreatePartyOutcome.CREATE_PARTY_OUTCOME_OK
                 : CreatePartyOutcome.CREATE_PARTY_OUTCOME_ALREADY_IN_PARTY;
-        CreatePartyResponse.Builder responseBuilder = CreatePartyResponse.newBuilder().setOutcome(outcome);
+        CreatePartyResponse.Builder responseBuilder =
+                CreatePartyResponse.newBuilder().setOutcome(outcome);
         if (result.partyId() != null) {
             responseBuilder.setPartyId(result.partyId());
         }
-        send(ctx, Opcode.OPCODE_CREATE_PARTY_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+        send(
+                ctx,
+                Opcode.OPCODE_CREATE_PARTY_RESPONSE_VALUE,
+                sequenceId,
+                responseBuilder.build().toByteArray());
     }
 
     private void handleInvitePartyMemberCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -1526,15 +1623,18 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             send(ctx, Opcode.OPCODE_INVITE_PARTY_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
-        PartyFacade.InviteResult result = partyFacade.invite(characterId, target.get().id());
-        InvitePartyMemberResponse response =
-                InvitePartyMemberResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        PartyFacade.InviteResult result =
+                partyFacade.invite(characterId, target.get().id());
+        InvitePartyMemberResponse response = InvitePartyMemberResponse.newBuilder()
+                .setOutcome(toProtoOutcome(result))
+                .build();
         send(ctx, Opcode.OPCODE_INVITE_PARTY_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
     private static final Map<PartyFacade.InviteResult, InvitePartyMemberOutcome> INVITE_PARTY_MEMBER_OUTCOME_MAPPING =
             Map.of(
-                    PartyFacade.InviteResult.OK, InvitePartyMemberOutcome.INVITE_PARTY_MEMBER_OUTCOME_OK,
+                    PartyFacade.InviteResult.OK,
+                    InvitePartyMemberOutcome.INVITE_PARTY_MEMBER_OUTCOME_OK,
                     PartyFacade.InviteResult.NOT_LEADER,
                     InvitePartyMemberOutcome.INVITE_PARTY_MEMBER_OUTCOME_NOT_LEADER,
                     PartyFacade.InviteResult.CANNOT_INVITE_SELF,
@@ -1565,13 +1665,15 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleAcceptPartyInviteBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, AcceptPartyInviteCommand command) {
         PartyFacade.AcceptResult result = partyFacade.acceptInvite(command.getInviteId(), characterId);
-        AcceptPartyInviteOutcome outcome = switch (result) {
-            case OK -> AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_OK;
-            case NOT_FOUND -> AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_NOT_FOUND;
-            case ALREADY_IN_PARTY -> AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_ALREADY_IN_PARTY;
-            case PARTY_FULL -> AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_PARTY_FULL;
-        };
-        AcceptPartyInviteResponse response = AcceptPartyInviteResponse.newBuilder().setOutcome(outcome).build();
+        AcceptPartyInviteOutcome outcome =
+                switch (result) {
+                    case OK -> AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_OK;
+                    case NOT_FOUND -> AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_NOT_FOUND;
+                    case ALREADY_IN_PARTY -> AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_ALREADY_IN_PARTY;
+                    case PARTY_FULL -> AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_PARTY_FULL;
+                };
+        AcceptPartyInviteResponse response =
+                AcceptPartyInviteResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_ACCEPT_PARTY_INVITE_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1593,7 +1695,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         RejectPartyInviteOutcome outcome = result == PartyFacade.RejectResult.OK
                 ? RejectPartyInviteOutcome.REJECT_PARTY_INVITE_OUTCOME_OK
                 : RejectPartyInviteOutcome.REJECT_PARTY_INVITE_OUTCOME_NOT_FOUND;
-        RejectPartyInviteResponse response = RejectPartyInviteResponse.newBuilder().setOutcome(outcome).build();
+        RejectPartyInviteResponse response =
+                RejectPartyInviteResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_REJECT_PARTY_INVITE_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1613,7 +1716,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         LeavePartyOutcome outcome = partyFacade.leaveParty(characterId) == PartyFacade.LeaveResult.OK
                 ? LeavePartyOutcome.LEAVE_PARTY_OUTCOME_OK
                 : LeavePartyOutcome.LEAVE_PARTY_OUTCOME_NOT_IN_PARTY;
-        LeavePartyResponse response = LeavePartyResponse.newBuilder().setOutcome(outcome).build();
+        LeavePartyResponse response =
+                LeavePartyResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_LEAVE_PARTY_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1639,13 +1743,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             send(ctx, Opcode.OPCODE_KICK_PARTY_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
-        PartyFacade.KickResult result = partyFacade.kickMember(characterId, target.get().id());
-        KickPartyMemberOutcome outcome = switch (result) {
-            case OK -> KickPartyMemberOutcome.KICK_PARTY_MEMBER_OUTCOME_OK;
-            case CANNOT_KICK_SELF -> KickPartyMemberOutcome.KICK_PARTY_MEMBER_OUTCOME_CANNOT_KICK_SELF;
-            case NOT_FOUND -> KickPartyMemberOutcome.KICK_PARTY_MEMBER_OUTCOME_NOT_FOUND;
-        };
-        KickPartyMemberResponse response = KickPartyMemberResponse.newBuilder().setOutcome(outcome).build();
+        PartyFacade.KickResult result =
+                partyFacade.kickMember(characterId, target.get().id());
+        KickPartyMemberOutcome outcome =
+                switch (result) {
+                    case OK -> KickPartyMemberOutcome.KICK_PARTY_MEMBER_OUTCOME_OK;
+                    case CANNOT_KICK_SELF -> KickPartyMemberOutcome.KICK_PARTY_MEMBER_OUTCOME_CANNOT_KICK_SELF;
+                    case NOT_FOUND -> KickPartyMemberOutcome.KICK_PARTY_MEMBER_OUTCOME_NOT_FOUND;
+                };
+        KickPartyMemberResponse response =
+                KickPartyMemberResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_KICK_PARTY_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1664,7 +1771,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleListPartyMembersBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
         ListPartyMembersResponse.Builder responseBuilder = ListPartyMembersResponse.newBuilder();
         for (PartyFacade.MemberView member : partyFacade.listMembers(characterId)) {
-            String name = characterFacade.findById(member.characterId()).map(Character::name).orElse("");
+            String name = characterFacade
+                    .findById(member.characterId())
+                    .map(Character::name)
+                    .orElse("");
             responseBuilder.addMembers(PartyMemberView.newBuilder()
                     .setCharacterId(member.characterId())
                     .setName(name)
@@ -1672,7 +1782,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setOnline(worldGateway.registry().isOnline(member.characterId()))
                     .build());
         }
-        send(ctx, Opcode.OPCODE_LIST_PARTY_MEMBERS_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+        send(
+                ctx,
+                Opcode.OPCODE_LIST_PARTY_MEMBERS_RESPONSE_VALUE,
+                sequenceId,
+                responseBuilder.build().toByteArray());
     }
 
     private void handleListPendingPartyInvitesRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -1695,7 +1809,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setPartyId(pending.partyId())
                     .build());
         }
-        send(ctx, Opcode.OPCODE_LIST_PENDING_PARTY_INVITES_RESPONSE_VALUE, sequenceId,
+        send(
+                ctx,
+                Opcode.OPCODE_LIST_PENDING_PARTY_INVITES_RESPONSE_VALUE,
+                sequenceId,
                 responseBuilder.build().toByteArray());
     }
 
@@ -1713,9 +1830,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleGetMyPartyBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
         Optional<PartyFacade.MyPartyView> myParty = partyFacade.findMyParty(characterId);
-        GetMyPartyResponse.Builder responseBuilder = GetMyPartyResponse.newBuilder().setInParty(myParty.isPresent());
+        GetMyPartyResponse.Builder responseBuilder =
+                GetMyPartyResponse.newBuilder().setInParty(myParty.isPresent());
         myParty.ifPresent(party -> responseBuilder.setPartyId(party.partyId()).setIsLeader(party.isLeader()));
-        send(ctx, Opcode.OPCODE_GET_MY_PARTY_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+        send(
+                ctx,
+                Opcode.OPCODE_GET_MY_PARTY_RESPONSE_VALUE,
+                sequenceId,
+                responseBuilder.build().toByteArray());
     }
 
     // EnterDungeonCommand chạm PartyFacade/CharacterFacade (DB) qua DungeonInstanceRegistry —
@@ -1736,14 +1858,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             ChannelHandlerContext ctx, int sequenceId, long characterId, EnterDungeonCommand command) {
         DungeonInstanceRegistry.EnterOutcome outcome =
                 worldGateway.dungeonInstanceRegistry().enterDungeon(characterId, command.getDungeonCode());
-        EnterDungeonOutcome protoOutcome = switch (outcome) {
-            case OK -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK;
-            case NOT_IN_PARTY -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_NOT_IN_PARTY;
-            case PARTY_MEMBER_OFFLINE -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_PARTY_MEMBER_OFFLINE;
-            case ALREADY_IN_DUNGEON -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_ALREADY_IN_DUNGEON;
-            case UNKNOWN_DUNGEON -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_UNKNOWN_DUNGEON;
-        };
-        EnterDungeonResponse response = EnterDungeonResponse.newBuilder().setOutcome(protoOutcome).build();
+        EnterDungeonOutcome protoOutcome =
+                switch (outcome) {
+                    case OK -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK;
+                    case NOT_IN_PARTY -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_NOT_IN_PARTY;
+                    case PARTY_MEMBER_OFFLINE -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_PARTY_MEMBER_OFFLINE;
+                    case ALREADY_IN_DUNGEON -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_ALREADY_IN_DUNGEON;
+                    case UNKNOWN_DUNGEON -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_UNKNOWN_DUNGEON;
+                };
+        EnterDungeonResponse response =
+                EnterDungeonResponse.newBuilder().setOutcome(protoOutcome).build();
         send(ctx, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1761,11 +1885,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleExitDungeonBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        DungeonInstanceRegistry.ExitOutcome outcome = worldGateway.dungeonInstanceRegistry().exitDungeon(characterId);
+        DungeonInstanceRegistry.ExitOutcome outcome =
+                worldGateway.dungeonInstanceRegistry().exitDungeon(characterId);
         ExitDungeonOutcome protoOutcome = outcome == DungeonInstanceRegistry.ExitOutcome.OK
                 ? ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK
                 : ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_NOT_IN_DUNGEON;
-        ExitDungeonResponse response = ExitDungeonResponse.newBuilder().setOutcome(protoOutcome).build();
+        ExitDungeonResponse response =
+                ExitDungeonResponse.newBuilder().setOutcome(protoOutcome).build();
         send(ctx, Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1793,29 +1919,41 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             send(ctx, Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
-        ArenaInstanceRegistry.ChallengeResult result =
-                worldGateway.arenaInstanceRegistry().challengeDuel(characterId, target.get().id());
+        ArenaInstanceRegistry.ChallengeResult result = worldGateway
+                .arenaInstanceRegistry()
+                .challengeDuel(characterId, target.get().id());
         ChallengeDuelResponse.Builder responseBuilder =
                 ChallengeDuelResponse.newBuilder().setOutcome(toProtoOutcome(result.outcome()));
         if (result.outcome() == ArenaInstanceRegistry.ChallengeOutcome.OK) {
             responseBuilder.setChallengeId(result.challengeId());
         }
-        send(ctx, Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+        send(
+                ctx,
+                Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE,
+                sequenceId,
+                responseBuilder.build().toByteArray());
         if (result.outcome() == ArenaInstanceRegistry.ChallengeOutcome.OK) {
-            String challengerName = characterFacade.findById(characterId).map(Character::name).orElse("");
+            String challengerName =
+                    characterFacade.findById(characterId).map(Character::name).orElse("");
             DuelChallengeReceivedEvent event = DuelChallengeReceivedEvent.newBuilder()
                     .setChallengeId(result.challengeId())
                     .setChallengerCharacterId(characterId)
                     .setChallengerName(challengerName)
                     .build();
-            worldGateway.registry().sendToCharacterIfOnline(
-                    target.get().id(), Opcode.OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT_VALUE, 0, event.toByteArray());
+            worldGateway
+                    .registry()
+                    .sendToCharacterIfOnline(
+                            target.get().id(),
+                            Opcode.OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT_VALUE,
+                            0,
+                            event.toByteArray());
         }
     }
 
     private static final Map<ArenaInstanceRegistry.ChallengeOutcome, ChallengeDuelOutcome>
             CHALLENGE_DUEL_OUTCOME_MAPPING = Map.of(
-                    ArenaInstanceRegistry.ChallengeOutcome.OK, ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_OK,
+                    ArenaInstanceRegistry.ChallengeOutcome.OK,
+                    ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_OK,
                     ArenaInstanceRegistry.ChallengeOutcome.CANNOT_CHALLENGE_SELF,
                     ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_CANNOT_CHALLENGE_SELF,
                     ArenaInstanceRegistry.ChallengeOutcome.ALREADY_IN_DUEL,
@@ -1848,14 +1986,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         AcceptDuelOutcome outcome = result.outcome() == ArenaInstanceRegistry.AcceptOutcome.OK
                 ? AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_OK
                 : AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_NOT_FOUND;
-        AcceptDuelResponse response = AcceptDuelResponse.newBuilder().setOutcome(outcome).build();
+        AcceptDuelResponse response =
+                AcceptDuelResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_ACCEPT_DUEL_RESPONSE_VALUE, sequenceId, response.toByteArray());
         if (result.outcome() != ArenaInstanceRegistry.AcceptOutcome.OK) {
             return;
         }
         long challengerCharacterId = result.challengerCharacterId();
-        String challengerName = characterFacade.findById(challengerCharacterId).map(Character::name).orElse("");
-        String accepterName = characterFacade.findById(characterId).map(Character::name).orElse("");
+        String challengerName = characterFacade
+                .findById(challengerCharacterId)
+                .map(Character::name)
+                .orElse("");
+        String accepterName =
+                characterFacade.findById(characterId).map(Character::name).orElse("");
         DuelStartedEvent eventForAccepter = DuelStartedEvent.newBuilder()
                 .setOpponentCharacterId(challengerCharacterId)
                 .setOpponentName(challengerName)
@@ -1865,8 +2008,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 .setOpponentCharacterId(characterId)
                 .setOpponentName(accepterName)
                 .build();
-        worldGateway.registry().sendToCharacterIfOnline(
-                challengerCharacterId, Opcode.OPCODE_DUEL_STARTED_EVENT_VALUE, 0, eventForChallenger.toByteArray());
+        worldGateway
+                .registry()
+                .sendToCharacterIfOnline(
+                        challengerCharacterId,
+                        Opcode.OPCODE_DUEL_STARTED_EVENT_VALUE,
+                        0,
+                        eventForChallenger.toByteArray());
     }
 
     private void handleDeclineDuelCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -1888,14 +2036,20 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         DeclineDuelOutcome outcome = result.outcome() == ArenaInstanceRegistry.DeclineOutcome.OK
                 ? DeclineDuelOutcome.DECLINE_DUEL_OUTCOME_OK
                 : DeclineDuelOutcome.DECLINE_DUEL_OUTCOME_NOT_FOUND;
-        DeclineDuelResponse response = DeclineDuelResponse.newBuilder().setOutcome(outcome).build();
+        DeclineDuelResponse response =
+                DeclineDuelResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_DECLINE_DUEL_RESPONSE_VALUE, sequenceId, response.toByteArray());
         if (result.outcome() == ArenaInstanceRegistry.DeclineOutcome.OK) {
-            DuelChallengeDeclinedEvent event =
-                    DuelChallengeDeclinedEvent.newBuilder().setChallengeId(command.getChallengeId()).build();
-            worldGateway.registry().sendToCharacterIfOnline(
-                    result.challengerCharacterId(), Opcode.OPCODE_DUEL_CHALLENGE_DECLINED_EVENT_VALUE, 0,
-                    event.toByteArray());
+            DuelChallengeDeclinedEvent event = DuelChallengeDeclinedEvent.newBuilder()
+                    .setChallengeId(command.getChallengeId())
+                    .build();
+            worldGateway
+                    .registry()
+                    .sendToCharacterIfOnline(
+                            result.challengerCharacterId(),
+                            Opcode.OPCODE_DUEL_CHALLENGE_DECLINED_EVENT_VALUE,
+                            0,
+                            event.toByteArray());
         }
     }
 
@@ -1915,11 +2069,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleExitDuelBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        ArenaInstanceRegistry.ExitResult result = worldGateway.arenaInstanceRegistry().forfeitDuel(characterId);
+        ArenaInstanceRegistry.ExitResult result =
+                worldGateway.arenaInstanceRegistry().forfeitDuel(characterId);
         ExitDuelOutcome outcome = result.outcome() == ArenaInstanceRegistry.ExitOutcome.OK
                 ? ExitDuelOutcome.EXIT_DUEL_OUTCOME_OK
                 : ExitDuelOutcome.EXIT_DUEL_OUTCOME_NOT_IN_DUEL;
-        ExitDuelResponse response = ExitDuelResponse.newBuilder().setOutcome(outcome).build();
+        ExitDuelResponse response =
+                ExitDuelResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_EXIT_DUEL_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -1967,29 +2123,40 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             send(ctx, Opcode.OPCODE_REQUEST_TRADE_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
-        TradeFacade.RequestResult result = tradeFacade.requestTrade(characterId, target.get().id());
+        TradeFacade.RequestResult result =
+                tradeFacade.requestTrade(characterId, target.get().id());
         RequestTradeResponse.Builder responseBuilder =
                 RequestTradeResponse.newBuilder().setOutcome(toProtoOutcome(result.outcome()));
         if (result.sessionId() != null) {
             responseBuilder.setSessionId(result.sessionId());
         }
-        send(ctx, Opcode.OPCODE_REQUEST_TRADE_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+        send(
+                ctx,
+                Opcode.OPCODE_REQUEST_TRADE_RESPONSE_VALUE,
+                sequenceId,
+                responseBuilder.build().toByteArray());
         if (result.outcome() == TradeFacade.RequestOutcome.OK) {
-            String senderName = characterFacade.findById(characterId).map(Character::name).orElse("");
+            String senderName =
+                    characterFacade.findById(characterId).map(Character::name).orElse("");
             TradeRequestedEvent event = TradeRequestedEvent.newBuilder()
                     .setSessionId(result.sessionId())
                     .setFromCharacterId(characterId)
                     .setFromName(senderName)
                     .build();
-            worldGateway.registry().sendToCharacterIfOnline(
-                    target.get().id(), Opcode.OPCODE_TRADE_REQUESTED_EVENT_VALUE, 0, event.toByteArray());
+            worldGateway
+                    .registry()
+                    .sendToCharacterIfOnline(
+                            target.get().id(), Opcode.OPCODE_TRADE_REQUESTED_EVENT_VALUE, 0, event.toByteArray());
         }
     }
 
     private static final Map<TradeFacade.RequestOutcome, RequestTradeOutcome> REQUEST_TRADE_OUTCOME_MAPPING = Map.of(
-            TradeFacade.RequestOutcome.OK, RequestTradeOutcome.REQUEST_TRADE_OUTCOME_OK,
-            TradeFacade.RequestOutcome.CANNOT_TRADE_SELF, RequestTradeOutcome.REQUEST_TRADE_OUTCOME_CANNOT_TRADE_SELF,
-            TradeFacade.RequestOutcome.ALREADY_IN_TRADE, RequestTradeOutcome.REQUEST_TRADE_OUTCOME_ALREADY_IN_TRADE,
+            TradeFacade.RequestOutcome.OK,
+            RequestTradeOutcome.REQUEST_TRADE_OUTCOME_OK,
+            TradeFacade.RequestOutcome.CANNOT_TRADE_SELF,
+            RequestTradeOutcome.REQUEST_TRADE_OUTCOME_CANNOT_TRADE_SELF,
+            TradeFacade.RequestOutcome.ALREADY_IN_TRADE,
+            RequestTradeOutcome.REQUEST_TRADE_OUTCOME_ALREADY_IN_TRADE,
             TradeFacade.RequestOutcome.TARGET_ALREADY_IN_TRADE,
             RequestTradeOutcome.REQUEST_TRADE_OUTCOME_TARGET_ALREADY_IN_TRADE);
 
@@ -2015,7 +2182,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         AcceptTradeRequestOutcome outcome = result == TradeFacade.AcceptResult.OK
                 ? AcceptTradeRequestOutcome.ACCEPT_TRADE_REQUEST_OUTCOME_OK
                 : AcceptTradeRequestOutcome.ACCEPT_TRADE_REQUEST_OUTCOME_NOT_FOUND;
-        AcceptTradeRequestResponse response = AcceptTradeRequestResponse.newBuilder().setOutcome(outcome).build();
+        AcceptTradeRequestResponse response =
+                AcceptTradeRequestResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_ACCEPT_TRADE_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
         if (result == TradeFacade.AcceptResult.OK) {
             notifyCounterpart(characterId, command.getSessionId());
@@ -2041,16 +2209,21 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         CancelTradeOutcome outcome = result == TradeFacade.CancelResult.OK
                 ? CancelTradeOutcome.CANCEL_TRADE_OUTCOME_OK
                 : CancelTradeOutcome.CANCEL_TRADE_OUTCOME_NOT_FOUND;
-        CancelTradeResponse response = CancelTradeResponse.newBuilder().setOutcome(outcome).build();
+        CancelTradeResponse response =
+                CancelTradeResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_CANCEL_TRADE_RESPONSE_VALUE, sequenceId, response.toByteArray());
         if (result == TradeFacade.CancelResult.OK && statusBefore.isPresent()) {
             TradeClosedEvent event = TradeClosedEvent.newBuilder()
                     .setSessionId(command.getSessionId())
                     .setReason(TradeCloseReason.TRADE_CLOSE_REASON_CANCELLED)
                     .build();
-            worldGateway.registry().sendToCharacterIfOnline(
-                    statusBefore.get().counterpartCharacterId(), Opcode.OPCODE_TRADE_CLOSED_EVENT_VALUE, 0,
-                    event.toByteArray());
+            worldGateway
+                    .registry()
+                    .sendToCharacterIfOnline(
+                            statusBefore.get().counterpartCharacterId(),
+                            Opcode.OPCODE_TRADE_CLOSED_EVENT_VALUE,
+                            0,
+                            event.toByteArray());
         }
     }
 
@@ -2076,7 +2249,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         SetTradeOfferOutcome outcome = result == TradeFacade.SetOfferResult.OK
                 ? SetTradeOfferOutcome.SET_TRADE_OFFER_OUTCOME_OK
                 : SetTradeOfferOutcome.SET_TRADE_OFFER_OUTCOME_NOT_FOUND;
-        SetTradeOfferResponse response = SetTradeOfferResponse.newBuilder().setOutcome(outcome).build();
+        SetTradeOfferResponse response =
+                SetTradeOfferResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_SET_TRADE_OFFER_RESPONSE_VALUE, sequenceId, response.toByteArray());
         if (result == TradeFacade.SetOfferResult.OK) {
             notifyCounterpart(characterId, command.getSessionId());
@@ -2100,14 +2274,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         Optional<TradeFacade.TradeStatusView> statusBefore = tradeFacade.getStatus(characterId);
         TradeFacade.ConfirmResult result =
                 tradeFacade.confirm(command.getSessionId(), characterId, command.getIdempotencyKey());
-        ConfirmTradeOutcome outcome = switch (result) {
-            case OK -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_OK;
-            case EXECUTED -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_EXECUTED;
-            case NOT_FOUND -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_NOT_FOUND;
-            case OFFER_INVALID -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_OFFER_INVALID;
-            case DUPLICATE_REQUEST -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_DUPLICATE_REQUEST;
-        };
-        ConfirmTradeResponse response = ConfirmTradeResponse.newBuilder().setOutcome(outcome).build();
+        ConfirmTradeOutcome outcome =
+                switch (result) {
+                    case OK -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_OK;
+                    case EXECUTED -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_EXECUTED;
+                    case NOT_FOUND -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_NOT_FOUND;
+                    case OFFER_INVALID -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_OFFER_INVALID;
+                    case DUPLICATE_REQUEST -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_DUPLICATE_REQUEST;
+                };
+        ConfirmTradeResponse response =
+                ConfirmTradeResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_CONFIRM_TRADE_RESPONSE_VALUE, sequenceId, response.toByteArray());
         if (statusBefore.isEmpty()) {
             return;
@@ -2118,12 +2294,18 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setSessionId(command.getSessionId())
                     .setReason(TradeCloseReason.TRADE_CLOSE_REASON_EXECUTED)
                     .build();
-            worldGateway.registry().sendToCharacterIfOnline(
-                    counterpartId, Opcode.OPCODE_TRADE_CLOSED_EVENT_VALUE, 0, event.toByteArray());
+            worldGateway
+                    .registry()
+                    .sendToCharacterIfOnline(
+                            counterpartId, Opcode.OPCODE_TRADE_CLOSED_EVENT_VALUE, 0, event.toByteArray());
         } else if (result == TradeFacade.ConfirmResult.OK || result == TradeFacade.ConfirmResult.OFFER_INVALID) {
-            TradeUpdatedEvent event = TradeUpdatedEvent.newBuilder().setSessionId(command.getSessionId()).build();
-            worldGateway.registry().sendToCharacterIfOnline(
-                    counterpartId, Opcode.OPCODE_TRADE_UPDATED_EVENT_VALUE, 0, event.toByteArray());
+            TradeUpdatedEvent event = TradeUpdatedEvent.newBuilder()
+                    .setSessionId(command.getSessionId())
+                    .build();
+            worldGateway
+                    .registry()
+                    .sendToCharacterIfOnline(
+                            counterpartId, Opcode.OPCODE_TRADE_UPDATED_EVENT_VALUE, 0, event.toByteArray());
         }
     }
 
@@ -2133,10 +2315,15 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         if (status.isEmpty()) {
             return;
         }
-        TradeUpdatedEvent event = TradeUpdatedEvent.newBuilder().setSessionId(sessionId).build();
-        worldGateway.registry().sendToCharacterIfOnline(
-                status.get().counterpartCharacterId(), Opcode.OPCODE_TRADE_UPDATED_EVENT_VALUE, 0,
-                event.toByteArray());
+        TradeUpdatedEvent event =
+                TradeUpdatedEvent.newBuilder().setSessionId(sessionId).build();
+        worldGateway
+                .registry()
+                .sendToCharacterIfOnline(
+                        status.get().counterpartCharacterId(),
+                        Opcode.OPCODE_TRADE_UPDATED_EVENT_VALUE,
+                        0,
+                        event.toByteArray());
     }
 
     private void handleGetTradeStatusRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -2156,13 +2343,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         GetTradeStatusResponse.Builder responseBuilder =
                 GetTradeStatusResponse.newBuilder().setInTrade(statusOpt.isPresent());
         statusOpt.ifPresent(status -> {
-            String counterpartName =
-                    characterFacade.findById(status.counterpartCharacterId()).map(Character::name).orElse("");
+            String counterpartName = characterFacade
+                    .findById(status.counterpartCharacterId())
+                    .map(Character::name)
+                    .orElse("");
             responseBuilder
                     .setSessionId(status.sessionId())
-                    .setPhase(status.phase() == TradeFacade.TradePhase.PENDING_ACCEPT
-                            ? TradePhase.TRADE_PHASE_PENDING_ACCEPT
-                            : TradePhase.TRADE_PHASE_OPEN)
+                    .setPhase(
+                            status.phase() == TradeFacade.TradePhase.PENDING_ACCEPT
+                                    ? TradePhase.TRADE_PHASE_PENDING_ACCEPT
+                                    : TradePhase.TRADE_PHASE_OPEN)
                     .setCounterpartCharacterId(status.counterpartCharacterId())
                     .setCounterpartName(counterpartName)
                     .setIsRequester(status.isRequester())
@@ -2177,7 +2367,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 responseBuilder.addTheirItems(toProtoOfferItemView(item));
             }
         });
-        send(ctx, Opcode.OPCODE_GET_TRADE_STATUS_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+        send(
+                ctx,
+                Opcode.OPCODE_GET_TRADE_STATUS_RESPONSE_VALUE,
+                sequenceId,
+                responseBuilder.build().toByteArray());
     }
 
     private static TradeOfferItemView toProtoOfferItemView(TradeFacade.OfferItemView item) {
@@ -2215,7 +2409,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 .map(a -> new MailFacade.AttachmentRequest(a.getItemTemplateId(), a.getQuantity()))
                 .toList();
         MailFacade.SendMailRequest request = new MailFacade.SendMailRequest(
-                characterId, recipient.get().id(), command.getSubject(), command.getBody(), command.getGoldAmount(),
+                characterId,
+                recipient.get().id(),
+                command.getSubject(),
+                command.getBody(),
+                command.getGoldAmount(),
                 attachments);
         long mailId = mailFacade.sendMail(request);
         SendMailResponse response = SendMailResponse.newBuilder()
@@ -2224,8 +2422,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 .build();
         send(ctx, Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE, sequenceId, response.toByteArray());
         NewMailEvent event = NewMailEvent.newBuilder().setMailId(mailId).build();
-        worldGateway.registry().sendToCharacterIfOnline(
-                recipient.get().id(), Opcode.OPCODE_NEW_MAIL_EVENT_VALUE, 0, event.toByteArray());
+        worldGateway
+                .registry()
+                .sendToCharacterIfOnline(
+                        recipient.get().id(), Opcode.OPCODE_NEW_MAIL_EVENT_VALUE, 0, event.toByteArray());
     }
 
     private void handleListMailRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -2259,7 +2459,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             }
             responseBuilder.addMails(viewBuilder.build());
         }
-        send(ctx, Opcode.OPCODE_LIST_MAIL_RESPONSE_VALUE, sequenceId, responseBuilder.build().toByteArray());
+        send(
+                ctx,
+                Opcode.OPCODE_LIST_MAIL_RESPONSE_VALUE,
+                sequenceId,
+                responseBuilder.build().toByteArray());
     }
 
     private void handleClaimMailCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -2278,7 +2482,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             ChannelHandlerContext ctx, int sequenceId, long characterId, ClaimMailCommand command) {
         MailFacade.ClaimResult result =
                 mailFacade.claimMail(command.getMailId(), characterId, command.getIdempotencyKey());
-        ClaimMailResponse response = ClaimMailResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        ClaimMailResponse response = ClaimMailResponse.newBuilder()
+                .setOutcome(toProtoOutcome(result))
+                .build();
         send(ctx, Opcode.OPCODE_CLAIM_MAIL_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -2308,7 +2514,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleDeleteMailBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, DeleteMailCommand command) {
         MailFacade.DeleteResult result = mailFacade.deleteMail(command.getMailId(), characterId);
-        DeleteMailResponse response = DeleteMailResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
+        DeleteMailResponse response = DeleteMailResponse.newBuilder()
+                .setOutcome(toProtoOutcome(result))
+                .build();
         send(ctx, Opcode.OPCODE_DELETE_MAIL_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -2332,7 +2540,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         RateLimiter rateLimiter = chatRateLimiterFor(command.getChannel());
         if (!rateLimiter.tryAcquire()) {
-            networkMetrics.recordRateLimitRejected("chat_" + command.getChannel().name());
+            networkMetrics.recordRateLimitRejected(
+                    "chat_" + command.getChannel().name());
             SendChatMessageResponse response = SendChatMessageResponse.newBuilder()
                     .setOutcome(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_RATE_LIMITED)
                     .build();
@@ -2377,11 +2586,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 return;
             }
         }
-        if (domainChannel == dev.kage.chat.domain.ChatChannel.GUILD && guildFacade.findMyGuild(characterId).isEmpty()) {
+        if (domainChannel == dev.kage.chat.domain.ChatChannel.GUILD
+                && guildFacade.findMyGuild(characterId).isEmpty()) {
             sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_GUILD);
             return;
         }
-        if (domainChannel == dev.kage.chat.domain.ChatChannel.PARTY && partyFacade.findMyParty(characterId).isEmpty()) {
+        if (domainChannel == dev.kage.chat.domain.ChatChannel.PARTY
+                && partyFacade.findMyParty(characterId).isEmpty()) {
             sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_PARTY);
             return;
         }
@@ -2390,13 +2601,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         if (result != ChatFacade.SendResult.OK) {
             return;
         }
-        String senderName = characterFacade.findById(characterId).map(Character::name).orElse("");
+        String senderName =
+                characterFacade.findById(characterId).map(Character::name).orElse("");
         routeChatMessage(domainChannel, new ChatRouteContext(characterId, senderName, target, command.getBody()));
     }
 
     /** Gói tham số cho {@link #routeChatMessage} — tránh vượt 4 tham số Checkstyle {@code ParameterNumber}. */
-    private record ChatRouteContext(long characterId, String senderName, Character target, String body) {
-    }
+    private record ChatRouteContext(long characterId, String senderName, Character target, String body) {}
 
     /** Định tuyến người nhận SAU KHI {@code ChatFacade.sendMessage} đã trả OK — tách khỏi
      * {@code handleSendChatMessageBlocking} để giữ method đó dưới giới hạn Checkstyle MethodLength. */
@@ -2418,18 +2629,31 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         .setSenderName(ctx.senderName())
                         .setBody(ctx.body())
                         .build();
-                worldGateway.registry().sendToCharacterIfOnline(
-                        ctx.target().id(), Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
+                worldGateway
+                        .registry()
+                        .sendToCharacterIfOnline(
+                                ctx.target().id(), Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
             }
-            case AREA -> currentWorldFacade(ctx.characterId())
-                    .enqueueAreaChatMessage(ctx.characterId(), ctx.senderName(), ctx.body());
+            case AREA ->
+                currentWorldFacade(ctx.characterId())
+                        .enqueueAreaChatMessage(ctx.characterId(), ctx.senderName(), ctx.body());
             // GUILD/PARTY: broadcast cho MỌI thành viên đang online (gồm cả người gửi, cùng cách
             // AREA tự thấy tin của mình) — không cần AoI/tick thread, guild/party membership
             // không phải dữ liệu world-tick (feature-guild, feature-party/CLAUDE.md).
-            case GUILD -> broadcastToGroup(ChatChannel.CHAT_CHANNEL_GUILD, ctx,
-                    guildFacade.listMembers(ctx.characterId()).stream().map(m -> m.characterId()).toList());
-            case PARTY -> broadcastToGroup(ChatChannel.CHAT_CHANNEL_PARTY, ctx,
-                    partyFacade.listMembers(ctx.characterId()).stream().map(m -> m.characterId()).toList());
+            case GUILD ->
+                broadcastToGroup(
+                        ChatChannel.CHAT_CHANNEL_GUILD,
+                        ctx,
+                        guildFacade.listMembers(ctx.characterId()).stream()
+                                .map(m -> m.characterId())
+                                .toList());
+            case PARTY ->
+                broadcastToGroup(
+                        ChatChannel.CHAT_CHANNEL_PARTY,
+                        ctx,
+                        partyFacade.listMembers(ctx.characterId()).stream()
+                                .map(m -> m.characterId())
+                                .toList());
             default -> throw new IllegalStateException("ChatChannel không xử lý: " + domainChannel);
         }
     }
@@ -2442,13 +2666,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 .setBody(ctx.body())
                 .build();
         for (long memberCharacterId : memberCharacterIds) {
-            worldGateway.registry().sendToCharacterIfOnline(
-                    memberCharacterId, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
+            worldGateway
+                    .registry()
+                    .sendToCharacterIfOnline(
+                            memberCharacterId, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
         }
     }
 
     private void sendChatOutcome(ChannelHandlerContext ctx, int sequenceId, SendChatMessageOutcome outcome) {
-        SendChatMessageResponse response = SendChatMessageResponse.newBuilder().setOutcome(outcome).build();
+        SendChatMessageResponse response =
+                SendChatMessageResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
@@ -2463,23 +2690,23 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         };
     }
 
-    private static final Map<ChatFacade.SendResult, SendChatMessageOutcome> SEND_CHAT_MESSAGE_OUTCOME_MAPPING =
-            Map.of(
-                    ChatFacade.SendResult.OK, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_OK,
-                    ChatFacade.SendResult.MESSAGE_BLANK, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_MESSAGE_BLANK,
-                    ChatFacade.SendResult.MESSAGE_TOO_LONG,
-                    SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_MESSAGE_TOO_LONG,
-                    ChatFacade.SendResult.CONTAINS_BANNED_WORD,
-                    SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_CONTAINS_BANNED_WORD);
+    private static final Map<ChatFacade.SendResult, SendChatMessageOutcome> SEND_CHAT_MESSAGE_OUTCOME_MAPPING = Map.of(
+            ChatFacade.SendResult.OK,
+            SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_OK,
+            ChatFacade.SendResult.MESSAGE_BLANK,
+            SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_MESSAGE_BLANK,
+            ChatFacade.SendResult.MESSAGE_TOO_LONG,
+            SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_MESSAGE_TOO_LONG,
+            ChatFacade.SendResult.CONTAINS_BANNED_WORD,
+            SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_CONTAINS_BANNED_WORD);
 
     private static SendChatMessageOutcome toProtoOutcome(ChatFacade.SendResult result) {
         return SEND_CHAT_MESSAGE_OUTCOME_MAPPING.get(result);
     }
 
     private static DialogueNodeResponse toResponse(DialogueNode node) {
-        DialogueNodeResponse.Builder builder = DialogueNodeResponse.newBuilder()
-                .setNodeId(node.nodeId())
-                .setTextKey(node.textKey());
+        DialogueNodeResponse.Builder builder =
+                DialogueNodeResponse.newBuilder().setNodeId(node.nodeId()).setTextKey(node.textKey());
         for (DialogueOption option : node.options()) {
             builder.addOptions(DialogueOptionView.newBuilder()
                     .setLabelKey(option.labelKey())
@@ -2610,8 +2837,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         int opcode = online ? Opcode.OPCODE_FRIEND_ONLINE_EVENT_VALUE : Opcode.OPCODE_FRIEND_OFFLINE_EVENT_VALUE;
         byte[] payload = online
-                ? FriendOnlineEvent.newBuilder().setCharacterId(characterId).build().toByteArray()
-                : FriendOfflineEvent.newBuilder().setCharacterId(characterId).build().toByteArray();
+                ? FriendOnlineEvent.newBuilder()
+                        .setCharacterId(characterId)
+                        .build()
+                        .toByteArray()
+                : FriendOfflineEvent.newBuilder()
+                        .setCharacterId(characterId)
+                        .build()
+                        .toByteArray();
         for (long friendId : friendIds) {
             worldGateway.registry().sendToCharacterIfOnline(friendId, opcode, 0, payload);
         }

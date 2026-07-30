@@ -1,10 +1,5 @@
 package dev.kage.server.database.inventory;
 
-import dev.kage.inventory.domain.Inventory;
-import dev.kage.inventory.domain.InventoryPort;
-import dev.kage.inventory.domain.ItemStack;
-import dev.kage.inventory.domain.Transaction;
-import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -14,7 +9,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+
 import javax.sql.DataSource;
+
+import dev.kage.inventory.domain.Inventory;
+import dev.kage.inventory.domain.InventoryPort;
+import dev.kage.inventory.domain.ItemStack;
+import dev.kage.inventory.domain.Transaction;
+import dev.kage.server.database.JdbcOperations;
 
 /**
  * Hiện thực {@link InventoryPort} trên PostgreSQL. SQL chỉ tồn tại ở đây (Điều 24 + DATABASE.md
@@ -133,7 +135,12 @@ public final class PostgresInventoryAdapter implements InventoryPort {
 
     private static long insertItem(Connection connection, long characterId, ItemStack stack, int slotIndex) {
         return JdbcOperations.insertReturningId(
-                connection, INSERT_ITEM, characterId, stack.itemTemplateId(), stack.quantity(), stack.enhanceLevel(),
+                connection,
+                INSERT_ITEM,
+                characterId,
+                stack.itemTemplateId(),
+                stack.quantity(),
+                stack.enhanceLevel(),
                 slotIndex);
     }
 }

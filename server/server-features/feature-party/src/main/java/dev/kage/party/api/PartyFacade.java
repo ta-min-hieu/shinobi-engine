@@ -1,5 +1,8 @@
 package dev.kage.party.api;
 
+import java.util.List;
+import java.util.Optional;
+
 import dev.kage.party.application.AcceptPartyInviteUseCase;
 import dev.kage.party.application.CreatePartyUseCase;
 import dev.kage.party.application.KickPartyMemberUseCase;
@@ -7,8 +10,6 @@ import dev.kage.party.application.LeavePartyUseCase;
 import dev.kage.party.application.PartyUseCases;
 import dev.kage.party.application.RejectPartyInviteUseCase;
 import dev.kage.party.domain.PartyRole;
-import java.util.List;
-import java.util.Optional;
 
 /**
  * API công khai của {@code feature-party} — module khác (server-gateway) CHỈ gọi qua đây, không
@@ -87,33 +88,53 @@ public final class PartyFacade {
     }
 
     public Optional<MyPartyView> findMyParty(long characterId) {
-        return useCases.findMyPartyUseCase().execute(characterId)
+        return useCases.findMyPartyUseCase()
+                .execute(characterId)
                 .map(r -> new MyPartyView(r.partyId(), r.myRole() == PartyRole.LEADER));
     }
 
-    public enum CreateOutcome { OK, ALREADY_IN_PARTY }
+    public enum CreateOutcome {
+        OK,
+        ALREADY_IN_PARTY
+    }
 
     public enum InviteResult {
-        OK, NOT_LEADER, CANNOT_INVITE_SELF, TARGET_ALREADY_IN_PARTY, PARTY_FULL, INVITE_ALREADY_PENDING
+        OK,
+        NOT_LEADER,
+        CANNOT_INVITE_SELF,
+        TARGET_ALREADY_IN_PARTY,
+        PARTY_FULL,
+        INVITE_ALREADY_PENDING
     }
 
-    public enum AcceptResult { OK, NOT_FOUND, ALREADY_IN_PARTY, PARTY_FULL }
-
-    public enum RejectResult { OK, NOT_FOUND }
-
-    public enum LeaveResult { OK, NOT_IN_PARTY }
-
-    public enum KickResult { OK, CANNOT_KICK_SELF, NOT_FOUND }
-
-    public record CreateResult(CreateOutcome outcome, Long partyId) {
+    public enum AcceptResult {
+        OK,
+        NOT_FOUND,
+        ALREADY_IN_PARTY,
+        PARTY_FULL
     }
 
-    public record MemberView(long characterId, boolean isLeader) {
+    public enum RejectResult {
+        OK,
+        NOT_FOUND
     }
 
-    public record PendingInviteView(long inviteId, long partyId) {
+    public enum LeaveResult {
+        OK,
+        NOT_IN_PARTY
     }
 
-    public record MyPartyView(long partyId, boolean isLeader) {
+    public enum KickResult {
+        OK,
+        CANNOT_KICK_SELF,
+        NOT_FOUND
     }
+
+    public record CreateResult(CreateOutcome outcome, Long partyId) {}
+
+    public record MemberView(long characterId, boolean isLeader) {}
+
+    public record PendingInviteView(long inviteId, long partyId) {}
+
+    public record MyPartyView(long partyId, boolean isLeader) {}
 }

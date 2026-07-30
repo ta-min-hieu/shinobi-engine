@@ -24,5 +24,8 @@ public interface PlatformAdapter {
     /** No-op trên desktop; rung thiết bị thật trên Android. */
     void vibrate(int millis);
 
-    enum InputType { KEYBOARD_MOUSE, TOUCH }
+    enum InputType {
+        KEYBOARD_MOUSE,
+        TOUCH
+    }
 }

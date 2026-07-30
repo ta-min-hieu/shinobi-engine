@@ -1,7 +1,8 @@
 package dev.kage.server.database.trade;
 
-import dev.kage.trade.domain.Transaction;
 import java.sql.Connection;
+
+import dev.kage.trade.domain.Transaction;
 
 /** Bọc {@link Connection} thật — adapter trong package này ép kiểu về lại để lấy connection. */
 final class JdbcTransaction implements Transaction {

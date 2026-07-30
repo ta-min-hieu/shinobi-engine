@@ -18,8 +18,7 @@ public final class PacketCodec {
     /** opcode(2) + protocolVersion(1) + sequenceId(4). */
     private static final int HEADER_SIZE = 7;
 
-    private PacketCodec() {
-    }
+    private PacketCodec() {}
 
     public static byte[] encodeFrame(PacketHeader header, byte[] payload) {
         ByteBuffer buffer = ByteBuffer.allocate(HEADER_SIZE + payload.length);
@@ -53,6 +52,5 @@ public final class PacketCodec {
      * sánh {@code header} và nội dung {@code payload} (VD {@code Arrays.equals}) RIÊNG, không
      * dùng {@code equals()} mặc định của record này.
      */
-    public record Frame(PacketHeader header, byte[] payload) {
-    }
+    public record Frame(PacketHeader header, byte[] payload) {}
 }

@@ -13,5 +13,4 @@ import dev.kage.shop.api.ShopFacade;
  * trực tiếp.
  */
 record ContentFacades(
-        ShopFacade shopFacade, DialogueFacade dialogueFacade, QuestFacade questFacade, SocialFacades socialFacades) {
-}
+        ShopFacade shopFacade, DialogueFacade dialogueFacade, QuestFacade questFacade, SocialFacades socialFacades) {}

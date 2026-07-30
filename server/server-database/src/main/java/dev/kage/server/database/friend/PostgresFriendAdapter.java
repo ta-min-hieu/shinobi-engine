@@ -1,11 +1,5 @@
 package dev.kage.server.database.friend;
 
-import dev.kage.friend.domain.DuplicateFriendRequestException;
-import dev.kage.friend.domain.FriendPort;
-import dev.kage.friend.domain.Friendship;
-import dev.kage.friend.domain.FriendshipStatus;
-import dev.kage.server.database.DatabaseAccessException;
-import dev.kage.server.database.JdbcOperations;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -13,7 +7,15 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+
 import javax.sql.DataSource;
+
+import dev.kage.friend.domain.DuplicateFriendRequestException;
+import dev.kage.friend.domain.FriendPort;
+import dev.kage.friend.domain.Friendship;
+import dev.kage.friend.domain.FriendshipStatus;
+import dev.kage.server.database.DatabaseAccessException;
+import dev.kage.server.database.JdbcOperations;
 
 /**
  * Hiện thực {@link FriendPort} trên PostgreSQL — bảng {@code friendship} (V12). Không có
@@ -105,8 +107,7 @@ public final class PostgresFriendAdapter implements FriendPort {
 
     @Override
     public boolean remove(long characterId, long friendCharacterId) {
-        return JdbcOperations.update(
-                        dataSource, REMOVE, characterId, friendCharacterId, friendCharacterId, characterId)
+        return JdbcOperations.update(dataSource, REMOVE, characterId, friendCharacterId, friendCharacterId, characterId)
                 > 0;
     }
 

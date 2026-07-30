@@ -3,6 +3,18 @@ package dev.kage.server.database.character;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Duration;
+import java.util.UUID;
+
+import javax.sql.DataSource;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
+
 import dev.kage.account.domain.Account;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterStats;
@@ -15,15 +27,6 @@ import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.PostgresDataSourceFactory;
 import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
-import java.time.Duration;
-import java.util.UUID;
-import javax.sql.DataSource;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * Test bằng PostgreSQL THẬT qua Testcontainers — verify migration V2 + adapter + idempotency
@@ -64,7 +67,8 @@ class PostgresCharacterAdapterIntegrationTest {
     void shouldCreateCharacter_withStatRow() {
         PostgresCharacterAdapter adapter = new PostgresCharacterAdapter(dataSource);
         JdbcCharacterTransactionRunner transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
-        NewCharacter newCharacter = new NewCharacter(accountId, "KageHero1", Faction.HOA, UUID.randomUUID().toString());
+        NewCharacter newCharacter = new NewCharacter(
+                accountId, "KageHero1", Faction.HOA, UUID.randomUUID().toString());
         Character[] holder = new Character[1];
 
         transactionRunner.inTransaction(tx -> holder[0] = adapter.create(tx, newCharacter));
@@ -101,20 +105,22 @@ class PostgresCharacterAdapterIntegrationTest {
         accountTx.inTransaction(tx -> accountHolder[0] = freshAccountAdapter.findOrCreate(tx, "listtester"));
         long freshAccountId = accountHolder[0].id();
 
-        NewCharacter newCharacter =
-                new NewCharacter(freshAccountId, "ListHero", Faction.HOA, UUID.randomUUID().toString());
+        NewCharacter newCharacter = new NewCharacter(
+                freshAccountId, "ListHero", Faction.HOA, UUID.randomUUID().toString());
         transactionRunner.inTransaction(tx -> adapter.create(tx, newCharacter));
 
         assertThat(adapter.countByAccount(freshAccountId)).isEqualTo(1);
-        assertThat(adapter.listByAccount(freshAccountId)).extracting(Character::name).containsExactly("ListHero");
+        assertThat(adapter.listByAccount(freshAccountId))
+                .extracting(Character::name)
+                .containsExactly("ListHero");
     }
 
     @Test
     void shouldDefaultToOrigin_whenPositionNeverSaved() {
         PostgresCharacterAdapter adapter = new PostgresCharacterAdapter(dataSource);
         JdbcCharacterTransactionRunner transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
-        NewCharacter newCharacter =
-                new NewCharacter(accountId, "PosDefault", Faction.HOA, UUID.randomUUID().toString());
+        NewCharacter newCharacter = new NewCharacter(
+                accountId, "PosDefault", Faction.HOA, UUID.randomUUID().toString());
         Character[] holder = new Character[1];
         transactionRunner.inTransaction(tx -> holder[0] = adapter.create(tx, newCharacter));
 
@@ -128,7 +134,8 @@ class PostgresCharacterAdapterIntegrationTest {
     void shouldPersistPosition_acrossSaveAndLoad() {
         PostgresCharacterAdapter adapter = new PostgresCharacterAdapter(dataSource);
         JdbcCharacterTransactionRunner transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
-        NewCharacter newCharacter = new NewCharacter(accountId, "PosSaved", Faction.HOA, UUID.randomUUID().toString());
+        NewCharacter newCharacter = new NewCharacter(
+                accountId, "PosSaved", Faction.HOA, UUID.randomUUID().toString());
         Character[] holder = new Character[1];
         transactionRunner.inTransaction(tx -> holder[0] = adapter.create(tx, newCharacter));
 
@@ -143,7 +150,8 @@ class PostgresCharacterAdapterIntegrationTest {
     void shouldLoadStartingStats_afterCreate() {
         PostgresCharacterAdapter adapter = new PostgresCharacterAdapter(dataSource);
         JdbcCharacterTransactionRunner transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
-        NewCharacter newCharacter = new NewCharacter(accountId, "StatHero", Faction.HOA, UUID.randomUUID().toString());
+        NewCharacter newCharacter = new NewCharacter(
+                accountId, "StatHero", Faction.HOA, UUID.randomUUID().toString());
         Character[] holder = new Character[1];
         transactionRunner.inTransaction(tx -> holder[0] = adapter.create(tx, newCharacter));
 

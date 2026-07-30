@@ -1,14 +1,15 @@
 package dev.kage.trade.application;
 
-import dev.kage.trade.domain.OwnedItemSnapshot;
-import dev.kage.trade.domain.Transaction;
-import dev.kage.trade.domain.TradeInventoryPort;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+
+import dev.kage.trade.domain.OwnedItemSnapshot;
+import dev.kage.trade.domain.TradeInventoryPort;
+import dev.kage.trade.domain.Transaction;
 
 /** Fake in-memory THẬT — mô phỏng {@code inventory_item}, dùng chung cho test {@code application/}. */
 final class FakeTradeInventoryPort implements TradeInventoryPort {
@@ -45,17 +46,32 @@ final class FakeTradeInventoryPort implements TradeInventoryPort {
             return TransferOutcome.RECIPIENT_INVENTORY_FULL;
         }
         if (current.quantity() == request.quantity()) {
-            items.put(request.itemId(), new OwnedItemSnapshot(
-                    request.itemId(), request.toCharacterId(), current.itemTemplateId(), request.quantity(),
-                    current.enhanceLevel()));
+            items.put(
+                    request.itemId(),
+                    new OwnedItemSnapshot(
+                            request.itemId(),
+                            request.toCharacterId(),
+                            current.itemTemplateId(),
+                            request.quantity(),
+                            current.enhanceLevel()));
         } else {
-            items.put(request.itemId(), new OwnedItemSnapshot(
-                    request.itemId(), request.fromCharacterId(), current.itemTemplateId(),
-                    current.quantity() - request.quantity(), current.enhanceLevel()));
+            items.put(
+                    request.itemId(),
+                    new OwnedItemSnapshot(
+                            request.itemId(),
+                            request.fromCharacterId(),
+                            current.itemTemplateId(),
+                            current.quantity() - request.quantity(),
+                            current.enhanceLevel()));
             long newId = nextItemId.getAndIncrement();
-            items.put(newId, new OwnedItemSnapshot(
-                    newId, request.toCharacterId(), current.itemTemplateId(), request.quantity(),
-                    current.enhanceLevel()));
+            items.put(
+                    newId,
+                    new OwnedItemSnapshot(
+                            newId,
+                            request.toCharacterId(),
+                            current.itemTemplateId(),
+                            request.quantity(),
+                            current.enhanceLevel()));
         }
         return TransferOutcome.OK;
     }

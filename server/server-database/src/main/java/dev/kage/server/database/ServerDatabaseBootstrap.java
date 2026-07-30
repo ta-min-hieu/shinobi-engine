@@ -1,5 +1,12 @@
 package dev.kage.server.database;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.sql.DataSource;
+
+import redis.clients.jedis.JedisPool;
+
 import dev.kage.account.api.AccountFacade;
 import dev.kage.account.application.LoginOrCreateAccountUseCase;
 import dev.kage.character.api.CharacterFacade;
@@ -42,6 +49,11 @@ import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
 import dev.kage.mail.api.MailFacade;
+import dev.kage.mail.application.ClaimMailUseCase;
+import dev.kage.mail.application.DeleteMailUseCase;
+import dev.kage.mail.application.ListMailUseCase;
+import dev.kage.mail.application.MailPorts;
+import dev.kage.mail.application.SendMailUseCase;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.party.application.AcceptPartyInviteUseCase;
 import dev.kage.party.application.CreatePartyUseCase;
@@ -54,20 +66,6 @@ import dev.kage.party.application.ListPendingPartyInvitesUseCase;
 import dev.kage.party.application.PartyUseCases;
 import dev.kage.party.application.RejectPartyInviteUseCase;
 import dev.kage.pvp.api.PvpFacade;
-import dev.kage.trade.api.TradeFacade;
-import dev.kage.trade.application.AcceptTradeRequestUseCase;
-import dev.kage.trade.application.CancelTradeUseCase;
-import dev.kage.trade.application.ConfirmTradeUseCase;
-import dev.kage.trade.application.GetTradeStatusUseCase;
-import dev.kage.trade.application.RequestTradeUseCase;
-import dev.kage.trade.application.SetTradeOfferUseCase;
-import dev.kage.trade.application.TradePorts;
-import dev.kage.trade.application.TradeUseCases;
-import dev.kage.mail.application.ClaimMailUseCase;
-import dev.kage.mail.application.DeleteMailUseCase;
-import dev.kage.mail.application.ListMailUseCase;
-import dev.kage.mail.application.MailPorts;
-import dev.kage.mail.application.SendMailUseCase;
 import dev.kage.quest.api.QuestFacade;
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
@@ -81,14 +79,6 @@ import dev.kage.server.database.chat.PostgresChatAuditAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcTemplateAdapter;
 import dev.kage.server.database.friend.PostgresFriendAdapter;
 import dev.kage.server.database.guild.PostgresGuildAdapter;
-import dev.kage.server.database.party.PostgresPartyAdapter;
-import dev.kage.server.database.pvp.PostgresPvpRatingAdapter;
-import dev.kage.server.database.trade.JdbcTradeTransactionRunner;
-import dev.kage.server.database.trade.PostgresTradeAuditAdapter;
-import dev.kage.server.database.trade.PostgresTradeGoldAdapter;
-import dev.kage.server.database.trade.PostgresTradeIdempotencyAdapter;
-import dev.kage.server.database.trade.PostgresTradeInventoryAdapter;
-import dev.kage.server.database.trade.PostgresTradeSessionAdapter;
 import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
 import dev.kage.server.database.inventory.PostgresAuditAdapter;
 import dev.kage.server.database.inventory.PostgresDropTableAdapter;
@@ -102,6 +92,8 @@ import dev.kage.server.database.mail.PostgresMailGoldAdapter;
 import dev.kage.server.database.mail.PostgresMailIdempotencyAdapter;
 import dev.kage.server.database.mail.PostgresMailInventoryGatewayAdapter;
 import dev.kage.server.database.mail.PostgresMailRepositoryAdapter;
+import dev.kage.server.database.party.PostgresPartyAdapter;
+import dev.kage.server.database.pvp.PostgresPvpRatingAdapter;
 import dev.kage.server.database.quest.JdbcQuestTransactionRunner;
 import dev.kage.server.database.quest.PostgresQuestAuditAdapter;
 import dev.kage.server.database.quest.PostgresQuestExpAdapter;
@@ -117,15 +109,26 @@ import dev.kage.server.database.shop.PostgresShopCatalogAdapter;
 import dev.kage.server.database.shop.PostgresShopGoldAdapter;
 import dev.kage.server.database.shop.PostgresShopIdempotencyAdapter;
 import dev.kage.server.database.shop.PostgresShopInventoryGatewayAdapter;
+import dev.kage.server.database.trade.JdbcTradeTransactionRunner;
+import dev.kage.server.database.trade.PostgresTradeAuditAdapter;
+import dev.kage.server.database.trade.PostgresTradeGoldAdapter;
+import dev.kage.server.database.trade.PostgresTradeIdempotencyAdapter;
+import dev.kage.server.database.trade.PostgresTradeInventoryAdapter;
+import dev.kage.server.database.trade.PostgresTradeSessionAdapter;
 import dev.kage.shop.api.ShopFacade;
 import dev.kage.shop.application.BuyItemUseCase;
 import dev.kage.shop.application.ListShopItemsUseCase;
 import dev.kage.shop.application.SellItemUseCase;
 import dev.kage.shop.application.ShopPorts;
-import java.util.ArrayList;
-import java.util.List;
-import javax.sql.DataSource;
-import redis.clients.jedis.JedisPool;
+import dev.kage.trade.api.TradeFacade;
+import dev.kage.trade.application.AcceptTradeRequestUseCase;
+import dev.kage.trade.application.CancelTradeUseCase;
+import dev.kage.trade.application.ConfirmTradeUseCase;
+import dev.kage.trade.application.GetTradeStatusUseCase;
+import dev.kage.trade.application.RequestTradeUseCase;
+import dev.kage.trade.application.SetTradeOfferUseCase;
+import dev.kage.trade.application.TradePorts;
+import dev.kage.trade.application.TradeUseCases;
 
 /**
  * Composition root — nơi DUY NHẤT lắp ráp Facade thật (Adapter + UseCase + TransactionRunner)
@@ -208,8 +211,11 @@ public final class ServerDatabaseBootstrap {
      * shop/mail/trade/inventory (4 module đó chỉ CHẠM gold của 1 nhân vật/giao dịch, không tổng).
      */
     public long totalGold() {
-        return JdbcOperations.queryOne(dataSource, "SELECT COALESCE(SUM(gold), 0) FROM character_stat",
-                resultSet -> resultSet.getLong(1)).orElse(0L);
+        return JdbcOperations.queryOne(
+                        dataSource,
+                        "SELECT COALESCE(SUM(gold), 0) FROM character_stat",
+                        resultSet -> resultSet.getLong(1))
+                .orElse(0L);
     }
 
     /** OBSERVABILITY.md §3.3 {@code kage.db.pool.active} — số connection đang được dùng thật. */

@@ -14,20 +14,16 @@ public interface TickMetricsPort {
     /** No-op mặc định — dùng cho test và World không cần đo (ArenaInstanceRegistry, test đơn vị). */
     TickMetricsPort NO_OP = new TickMetricsPort() {
         @Override
-        public void recordTickDuration(long durationNanos) {
-        }
+        public void recordTickDuration(long durationNanos) {}
 
         @Override
-        public void recordTickOverrun() {
-        }
+        public void recordTickOverrun() {}
 
         @Override
-        public void recordSystemDuration(String systemName, long durationNanos) {
-        }
+        public void recordSystemDuration(String systemName, long durationNanos) {}
 
         @Override
-        public void recordEntityCount(int count) {
-        }
+        public void recordEntityCount(int count) {}
     };
 
     /** {@code durationNanos} là thời gian {@link WorldFacade#tickOnce} vừa chạy xong mất bao lâu. */

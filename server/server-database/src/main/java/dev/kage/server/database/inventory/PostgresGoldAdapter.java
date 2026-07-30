@@ -1,9 +1,10 @@
 package dev.kage.server.database.inventory;
 
+import java.sql.Connection;
+
 import dev.kage.inventory.domain.GoldPort;
 import dev.kage.inventory.domain.Transaction;
 import dev.kage.server.database.JdbcOperations;
-import java.sql.Connection;
 
 /**
  * Hiện thực {@link GoldPort} trên PostgreSQL — gold vật lý ở {@code character_stat.gold} (V7).

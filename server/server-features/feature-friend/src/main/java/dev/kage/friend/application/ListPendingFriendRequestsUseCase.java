@@ -1,8 +1,9 @@
 package dev.kage.friend.application;
 
+import java.util.List;
+
 import dev.kage.friend.domain.FriendPort;
 import dev.kage.friend.domain.Friendship;
-import java.util.List;
 
 /** Lời mời kết bạn đang chờ {@code characterId} chấp nhận/từ chối. */
 public final class ListPendingFriendRequestsUseCase {

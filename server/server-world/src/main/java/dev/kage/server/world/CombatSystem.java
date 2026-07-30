@@ -1,5 +1,9 @@
 package dev.kage.server.world;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.LongFunction;
+
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.Family;
 import dev.kage.engine.ecs.IteratingKSystem;
@@ -12,9 +16,6 @@ import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterIdComponent;
 import dev.kage.server.world.component.StatusEffectComponent;
 import dev.kage.server.world.component.TargetComponent;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.LongFunction;
 
 /**
  * Đánh thường TỰ ĐỘNG (GDD §6 "Auto-target đánh thường") — không phải {@code UseSkillCommand}
@@ -30,10 +31,8 @@ import java.util.function.LongFunction;
  */
 final class CombatSystem extends IteratingKSystem {
 
-    private static final ComponentMapper<PositionComponent> POSITION =
-            ComponentMapper.getFor(PositionComponent.class);
-    private static final ComponentMapper<TargetComponent> TARGET =
-            ComponentMapper.getFor(TargetComponent.class);
+    private static final ComponentMapper<PositionComponent> POSITION = ComponentMapper.getFor(PositionComponent.class);
+    private static final ComponentMapper<TargetComponent> TARGET = ComponentMapper.getFor(TargetComponent.class);
     private static final ComponentMapper<AttackCooldownComponent> COOLDOWN =
             ComponentMapper.getFor(AttackCooldownComponent.class);
     private static final ComponentMapper<CharacterIdComponent> CHARACTER_ID =
@@ -54,15 +53,15 @@ final class CombatSystem extends IteratingKSystem {
             boolean crit,
             boolean miss,
             int targetCurrentHp,
-            boolean targetDied) {
-    }
+            boolean targetDied) {}
 
     private final LongFunction<KEntity> entityLookup;
     private final List<AttackOutcome> pendingResults = new ArrayList<>();
 
     /** @param entityLookup tra KEntity theo entity ID (nhân vật DƯƠNG hoặc quái ÂM — combat.proto). */
     CombatSystem(LongFunction<KEntity> entityLookup) {
-        super(Family.all(PositionComponent.class, TargetComponent.class, AttackCooldownComponent.class).get());
+        super(Family.all(PositionComponent.class, TargetComponent.class, AttackCooldownComponent.class)
+                .get());
         this.entityLookup = entityLookup;
     }
 

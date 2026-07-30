@@ -16,51 +16,43 @@ sealed interface WorldCommand {
      * {@code CharacterFacade.loadStats}) — world derive thành ATK/DEF/... (GDD §5).
      */
     record AttachCharacterCommand(long characterId, float spawnX, float spawnY, CharacterBaseStats baseStats)
-            implements WorldCommand {
-    }
+            implements WorldCommand {}
 
     /** Xoá entity ECS của {@code characterId} — gọi khi mất kết nối. */
-    record DetachCharacterCommand(long characterId) implements WorldCommand {
-    }
+    record DetachCharacterCommand(long characterId) implements WorldCommand {}
 
     /** Ý định di chuyển — {@code dirX/dirY} là hướng CHƯA chuẩn hoá, world tự clamp + nhân tốc độ. */
-    record MoveIntentCommand(long characterId, int sequenceId, float dirX, float dirY) implements WorldCommand {
-    }
+    record MoveIntentCommand(long characterId, int sequenceId, float dirX, float dirY) implements WorldCommand {}
 
     /**
      * Chọn mục tiêu chiến đấu (GDD §6 "Auto-target đánh thường") — server tự động đánh khi hết
      * cooldown, KHÔNG phải lệnh "đánh 1 nhát" (xem {@code CombatSystem}).
      */
-    record SetTargetCommand(long characterId, long targetEntityId) implements WorldCommand {
-    }
+    record SetTargetCommand(long characterId, long targetEntityId) implements WorldCommand {}
 
     /**
      * Dùng skill nhắm mục tiêu (GAMEPLAY.md §3-4) — {@code skillCode} do client gửi, server tự
      * kiểm tra có tồn tại/cooldown/Khí/tầm (xem {@code SkillSystem}), KHÔNG tin client.
      */
-    record UseSkillCommand(long characterId, String skillCode, long targetEntityId) implements WorldCommand {
-    }
+    record UseSkillCommand(long characterId, String skillCode, long targetEntityId) implements WorldCommand {}
 
     /**
      * Tính lại chỉ số dẫn xuất theo trang bị (GAMEPLAY.md §2/§7) — {@code bonusAtk} là TỔNG cộng
      * dồn hiện tại từ mọi item đang mặc, gateway (feature-inventory) tự tính lại từ đầu mỗi lần.
      */
-    record ApplyEquipmentBonusCommand(long characterId, int bonusAtk) implements WorldCommand {
-    }
+    record ApplyEquipmentBonusCommand(long characterId, int bonusAtk) implements WorldCommand {}
 
     /**
      * Chat kênh Khu vực (GAMEPLAY.md §10, Phase 6 lát cắt 6) — CHỈ kênh này cần world tick (đọc
      * {@code AreaOfInterestTracker}, không thread-safe ngoài tick thread); World/Riêng tư gateway
      * tự định tuyến thẳng qua {@code ConnectedCharacterRegistry}, không đi qua hàng đợi này.
      */
-    record AreaChatMessageCommand(long characterId, String senderName, String body) implements WorldCommand {
-    }
+    record AreaChatMessageCommand(long characterId, String senderName, String body) implements WorldCommand {}
 
     /**
      * Spawn 1 boss hardcode ({@code BossConstants.BOSS_CODE}, Phase 8 lát cắt 2) — gọi từ
      * {@code DungeonInstanceRegistry} ngay sau khi tạo dungeon World, KHÔNG phải lệnh từ client
      * (world-command nội bộ, giống mọi command khác ở đây).
      */
-    record SpawnBossCommand() implements WorldCommand {
-    }
+    record SpawnBossCommand() implements WorldCommand {}
 }

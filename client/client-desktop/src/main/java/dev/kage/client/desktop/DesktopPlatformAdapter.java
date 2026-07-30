@@ -1,8 +1,10 @@
 package dev.kage.client.desktop;
 
-import com.badlogic.gdx.Gdx;
-import dev.kage.engine.core.PlatformAdapter;
 import java.nio.file.Path;
+
+import com.badlogic.gdx.Gdx;
+
+import dev.kage.engine.core.PlatformAdapter;
 
 /** Implementation Desktop của {@link PlatformAdapter} (ENGINE.md §8, CLIENT.md §11). */
 final class DesktopPlatformAdapter implements PlatformAdapter {

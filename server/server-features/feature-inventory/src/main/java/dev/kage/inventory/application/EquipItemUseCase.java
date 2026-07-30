@@ -26,7 +26,9 @@ public final class EquipItemUseCase {
     private final TransactionRunner tx;
 
     public EquipItemUseCase(
-            InventoryPort inventoryPort, ItemTemplatePort itemTemplatePort, EquipmentPort equipmentPort,
+            InventoryPort inventoryPort,
+            ItemTemplatePort itemTemplatePort,
+            EquipmentPort equipmentPort,
             TransactionRunner tx) {
         this.inventoryPort = inventoryPort;
         this.itemTemplatePort = itemTemplatePort;
@@ -35,7 +37,8 @@ public final class EquipItemUseCase {
     }
 
     public EquipItemResult execute(long characterId, long itemId, EquipmentSlotType targetSlot) {
-        Inventory inventory = inventoryPort.findByCharacter(characterId)
+        Inventory inventory = inventoryPort
+                .findByCharacter(characterId)
                 .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
         ItemStack item = inventory.findItem(itemId).orElse(null);
         if (item == null) {
@@ -43,19 +46,25 @@ public final class EquipItemUseCase {
             return EquipItemResult.ITEM_NOT_FOUND;
         }
 
-        ItemTemplate template = itemTemplatePort.findById(item.itemTemplateId())
+        ItemTemplate template = itemTemplatePort
+                .findById(item.itemTemplateId())
                 .orElseThrow(() -> new IllegalStateException(
                         "item_template không tồn tại cho itemTemplateId=" + item.itemTemplateId()));
         if (template.equipSlot() != targetSlot) {
             return EquipItemResult.WRONG_SLOT;
         }
 
-        Equipment equipment = equipmentPort.findByCharacter(characterId)
+        Equipment equipment = equipmentPort
+                .findByCharacter(characterId)
                 .orElseThrow(() -> new IllegalStateException("EquipmentPort phải luôn trả Optional có giá trị"));
         equipment.equip(targetSlot, itemId);
         tx.inTransaction((Transaction t) -> equipmentPort.save(t, equipment));
         return EquipItemResult.OK;
     }
 
-    public enum EquipItemResult { OK, ITEM_NOT_FOUND, WRONG_SLOT }
+    public enum EquipItemResult {
+        OK,
+        ITEM_NOT_FOUND,
+        WRONG_SLOT
+    }
 }

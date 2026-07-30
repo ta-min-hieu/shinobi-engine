@@ -1,11 +1,12 @@
 package dev.kage.character.application;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.character.domain.TransactionRunner;
-import java.util.concurrent.atomic.AtomicReference;
 
 /** Tạo nhân vật mới cho account (GAMEPLAY.md §2) — validate tên, giới hạn số nhân vật, idempotency. */
 public final class CreateCharacterUseCase {

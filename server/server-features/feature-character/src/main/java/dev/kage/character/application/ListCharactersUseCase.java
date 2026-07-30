@@ -1,8 +1,9 @@
 package dev.kage.character.application;
 
+import java.util.List;
+
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
-import java.util.List;
 
 /** Liệt kê nhân vật của account — accountId luôn từ session, không từ packet (Điều 24). */
 public final class ListCharactersUseCase {

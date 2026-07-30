@@ -2,6 +2,7 @@ package dev.kage.client.desktop;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input.Keys;
+
 import dev.kage.client.core.input.GameAction;
 import dev.kage.client.core.input.InputMapper;
 

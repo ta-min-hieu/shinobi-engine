@@ -1,5 +1,9 @@
 package dev.kage.inventory.application;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+
 import dev.kage.inventory.domain.DropTableEntry;
 import dev.kage.inventory.domain.DropTablePort;
 import dev.kage.inventory.domain.Inventory;
@@ -8,9 +12,6 @@ import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.LootRoller;
 import dev.kage.inventory.domain.Transaction;
 import dev.kage.inventory.domain.TransactionRunner;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Quái chết → roll {@code drop_table} → cộng item rơi được vào túi người hạ gục (GAMEPLAY.md §5).
@@ -44,7 +45,8 @@ public final class GrantLootUseCase {
             return List.of();
         }
 
-        Inventory inventory = inventoryPort.findByCharacter(characterId)
+        Inventory inventory = inventoryPort
+                .findByCharacter(characterId)
                 .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
 
         // Inventory.add() luôn APPEND (xem javadoc) — vị trí cuối cùng ngay sau add() chính là vị

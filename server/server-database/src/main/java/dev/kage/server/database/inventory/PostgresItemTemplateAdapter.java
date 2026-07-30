@@ -1,13 +1,15 @@
 package dev.kage.server.database.inventory;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Optional;
+
+import javax.sql.DataSource;
+
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
 import dev.kage.server.database.JdbcOperations;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.Optional;
-import javax.sql.DataSource;
 
 /** Hiện thực {@link ItemTemplatePort} trên PostgreSQL — đọc thuần, {@code item_template} là config tĩnh. */
 public final class PostgresItemTemplateAdapter implements ItemTemplatePort {

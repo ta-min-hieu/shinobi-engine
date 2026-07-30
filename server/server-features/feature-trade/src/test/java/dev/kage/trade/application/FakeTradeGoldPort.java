@@ -1,9 +1,10 @@
 package dev.kage.trade.application;
 
-import dev.kage.trade.domain.Transaction;
-import dev.kage.trade.domain.TradeGoldPort;
 import java.util.HashMap;
 import java.util.Map;
+
+import dev.kage.trade.domain.TradeGoldPort;
+import dev.kage.trade.domain.Transaction;
 
 /** Fake in-memory THẬT — mô phỏng {@code character_stat.gold}, dùng chung cho test {@code application/}. */
 final class FakeTradeGoldPort implements TradeGoldPort {

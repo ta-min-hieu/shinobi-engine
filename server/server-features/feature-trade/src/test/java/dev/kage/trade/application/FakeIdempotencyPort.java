@@ -1,10 +1,11 @@
 package dev.kage.trade.application;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import dev.kage.trade.domain.IdempotencyKeyReusedException;
 import dev.kage.trade.domain.IdempotencyPort;
 import dev.kage.trade.domain.Transaction;
-import java.util.HashSet;
-import java.util.Set;
 
 /** Fake in-memory THẬT — dùng chung cho test {@code application/}. */
 final class FakeIdempotencyPort implements IdempotencyPort {

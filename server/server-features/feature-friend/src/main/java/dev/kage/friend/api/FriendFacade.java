@@ -1,10 +1,11 @@
 package dev.kage.friend.api;
 
+import java.util.List;
+
 import dev.kage.friend.application.AcceptFriendRequestUseCase;
 import dev.kage.friend.application.FriendUseCases;
 import dev.kage.friend.application.RejectFriendRequestUseCase;
 import dev.kage.friend.application.RemoveFriendUseCase;
-import java.util.List;
 
 /**
  * API công khai của {@code feature-friend} — module khác (server-gateway) CHỈ gọi qua đây, không
@@ -62,14 +63,27 @@ public final class FriendFacade {
                 .toList();
     }
 
-    public enum SendRequestResult { OK, CANNOT_FRIEND_SELF, ALREADY_FRIENDS, REQUEST_ALREADY_PENDING }
-
-    public enum AcceptResult { OK, NOT_FOUND }
-
-    public enum RejectResult { OK, NOT_FOUND }
-
-    public enum RemoveResult { OK, NOT_FOUND }
-
-    public record PendingRequestView(long friendshipId, long requesterId) {
+    public enum SendRequestResult {
+        OK,
+        CANNOT_FRIEND_SELF,
+        ALREADY_FRIENDS,
+        REQUEST_ALREADY_PENDING
     }
+
+    public enum AcceptResult {
+        OK,
+        NOT_FOUND
+    }
+
+    public enum RejectResult {
+        OK,
+        NOT_FOUND
+    }
+
+    public enum RemoveResult {
+        OK,
+        NOT_FOUND
+    }
+
+    public record PendingRequestView(long friendshipId, long requesterId) {}
 }

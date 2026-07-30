@@ -4,14 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
+
 import org.junit.jupiter.api.Test;
 
 class AccountTest {
 
     @Test
     void shouldRejectUsername_whenTooShort() {
-        assertThatThrownBy(() -> new Account(1L, "ab", Instant.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Account(1L, "ab", Instant.now())).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

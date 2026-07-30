@@ -1,13 +1,14 @@
 package dev.kage.server.gateway;
 
-import com.sun.net.httpserver.HttpServer;
-import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Executors;
 import java.util.function.BooleanSupplier;
+
+import com.sun.net.httpserver.HttpServer;
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,7 +77,10 @@ final class MetricsHttpServer {
 
     void start() {
         httpServer.start();
-        LOG.info("Metrics HTTP server sẵn sàng ở cổng {}{}", httpServer.getAddress().getPort(), METRICS_PATH);
+        LOG.info(
+                "Metrics HTTP server sẵn sàng ở cổng {}{}",
+                httpServer.getAddress().getPort(),
+                METRICS_PATH);
     }
 
     /** Graceful shutdown (SERVER.md §10) — {@code delaySeconds=0} vì scrape không có state cần lưu. */

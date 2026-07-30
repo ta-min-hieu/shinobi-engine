@@ -1,11 +1,12 @@
 package dev.kage.shop.application;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import dev.kage.shop.domain.IdempotencyKeyReusedException;
 import dev.kage.shop.domain.OwnedItem;
 import dev.kage.shop.domain.ShopListing;
 import dev.kage.shop.domain.Transaction;
 import dev.kage.shop.domain.TransactionRunner;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Bán item cho shop: ghi {@code idempotencyKey} TRƯỚC (ADR-025), bớt item (điều kiện, no-op nếu
@@ -26,11 +27,13 @@ public final class SellItemUseCase {
         if (quantity <= 0) {
             throw new IllegalArgumentException("quantity phải > 0: " + quantity);
         }
-        OwnedItem owned = ports.inventoryGatewayPort().findItem(characterId, itemId).orElse(null);
+        OwnedItem owned =
+                ports.inventoryGatewayPort().findItem(characterId, itemId).orElse(null);
         if (owned == null) {
             return SellResult.ITEM_NOT_FOUND;
         }
-        ShopListing listing = ports.catalogPort().findListing(owned.itemTemplateId()).orElse(null);
+        ShopListing listing =
+                ports.catalogPort().findListing(owned.itemTemplateId()).orElse(null);
         if (listing == null) {
             return SellResult.ITEM_NOT_SELLABLE;
         }
@@ -45,8 +48,8 @@ public final class SellItemUseCase {
                     return;
                 }
                 ports.goldPort().creditGold(t, characterId, totalCredit);
-                String detail = "{\"itemId\":%d,\"quantity\":%d,\"goldEarned\":%d}"
-                        .formatted(itemId, quantity, totalCredit);
+                String detail =
+                        "{\"itemId\":%d,\"quantity\":%d,\"goldEarned\":%d}".formatted(itemId, quantity, totalCredit);
                 ports.auditPort().log(t, characterId, "SHOP_SELL", detail);
                 resultHolder.set(SellResult.OK);
             });
@@ -56,5 +59,11 @@ public final class SellItemUseCase {
         return resultHolder.get();
     }
 
-    public enum SellResult { OK, ITEM_NOT_FOUND, ITEM_NOT_SELLABLE, INSUFFICIENT_QUANTITY, DUPLICATE_REQUEST }
+    public enum SellResult {
+        OK,
+        ITEM_NOT_FOUND,
+        ITEM_NOT_SELLABLE,
+        INSUFFICIENT_QUANTITY,
+        DUPLICATE_REQUEST
+    }
 }

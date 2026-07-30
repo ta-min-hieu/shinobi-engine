@@ -1,5 +1,8 @@
 package dev.kage.character.api;
 
+import java.util.List;
+import java.util.Optional;
+
 import dev.kage.character.application.CharacterUseCases;
 import dev.kage.character.application.CreateCharacterUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
@@ -10,8 +13,6 @@ import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.PositionSnapshot;
-import java.util.List;
-import java.util.Optional;
 
 /**
  * API công khai của {@code feature-character} — module khác (server-gateway) CHỈ gọi qua đây,

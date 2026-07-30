@@ -1,12 +1,13 @@
 package dev.kage.mail.application;
 
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+
 import dev.kage.mail.domain.IdempotencyKeyReusedException;
 import dev.kage.mail.domain.Mail;
 import dev.kage.mail.domain.MailAttachment;
 import dev.kage.mail.domain.Transaction;
 import dev.kage.mail.domain.TransactionRunner;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Nhận gold + item đính kèm của 1 lá thư — TRONG CÙNG 1 transaction: ghi {@code idempotencyKey}
@@ -70,5 +71,11 @@ public final class ClaimMailUseCase {
         return resultHolder.get();
     }
 
-    public enum ClaimOutcome { OK, NOT_FOUND, ALREADY_CLAIMED, INVENTORY_FULL, DUPLICATE_REQUEST }
+    public enum ClaimOutcome {
+        OK,
+        NOT_FOUND,
+        ALREADY_CLAIMED,
+        INVENTORY_FULL,
+        DUPLICATE_REQUEST
+    }
 }

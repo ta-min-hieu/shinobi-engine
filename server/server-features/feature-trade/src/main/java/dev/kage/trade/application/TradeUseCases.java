@@ -11,5 +11,4 @@ public record TradeUseCases(
         CancelTradeUseCase cancelTradeUseCase,
         SetTradeOfferUseCase setTradeOfferUseCase,
         ConfirmTradeUseCase confirmTradeUseCase,
-        GetTradeStatusUseCase getTradeStatusUseCase) {
-}
+        GetTradeStatusUseCase getTradeStatusUseCase) {}

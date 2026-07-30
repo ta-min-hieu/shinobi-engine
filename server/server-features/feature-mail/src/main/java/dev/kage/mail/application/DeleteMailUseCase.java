@@ -1,8 +1,9 @@
 package dev.kage.mail.application;
 
+import java.util.Optional;
+
 import dev.kage.mail.domain.Mail;
 import dev.kage.mail.domain.MailRepositoryPort;
-import java.util.Optional;
 
 /**
  * Xoá thư — CẤM xoá thư CHƯA nhận mà còn gold/item đính kèm (mất thưởng âm thầm), phải nhận
@@ -29,5 +30,9 @@ public final class DeleteMailUseCase {
         return Result.OK;
     }
 
-    public enum Result { OK, NOT_FOUND, MUST_CLAIM_FIRST }
+    public enum Result {
+        OK,
+        NOT_FOUND,
+        MUST_CLAIM_FIRST
+    }
 }

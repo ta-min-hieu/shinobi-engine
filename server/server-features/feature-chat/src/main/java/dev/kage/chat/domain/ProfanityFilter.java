@@ -16,8 +16,7 @@ public final class ProfanityFilter {
     // PLACEHOLDER — vài từ mẫu để chứng minh cơ chế hoạt động, KHÔNG phải danh sách sản phẩm thật.
     private static final Set<String> BANNED_WORDS = Set.of("ngu", "chó chết");
 
-    private ProfanityFilter() {
-    }
+    private ProfanityFilter() {}
 
     public static boolean containsBannedWord(String text) {
         String lower = text.toLowerCase(Locale.ROOT);

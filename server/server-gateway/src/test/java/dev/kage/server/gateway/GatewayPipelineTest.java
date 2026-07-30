@@ -2,7 +2,24 @@ package dev.kage.server.gateway;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+
 import com.google.protobuf.InvalidProtocolBufferException;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
+import io.netty.handler.codec.LengthFieldPrepender;
+import org.junit.jupiter.api.Test;
+
 import dev.kage.account.api.AccountFacade;
 import dev.kage.account.application.LoginOrCreateAccountUseCase;
 import dev.kage.account.domain.Account;
@@ -57,21 +74,6 @@ import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
 import dev.kage.server.world.WorldFacade;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.embedded.EmbeddedChannel;
-import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
-import io.netty.handler.codec.LengthFieldPrepender;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
-import org.junit.jupiter.api.Test;
 
 /**
  * Test TOÀN BỘ pipeline (framing + codec + handler) qua {@link EmbeddedChannel} — không cần
@@ -102,7 +104,8 @@ class GatewayPipelineTest {
     @Test
     void shouldReplyConnectResponse_toConnectRequest() throws InvalidProtocolBufferException {
         EmbeddedChannel channel = newPipeline();
-        ConnectRequest request = ConnectRequest.newBuilder().setUsername("kagehero").build();
+        ConnectRequest request =
+                ConnectRequest.newBuilder().setUsername("kagehero").build();
         PacketHeader header = new PacketHeader(Opcode.OPCODE_CONNECT_REQUEST_VALUE, ProtocolVersion.CURRENT, 1);
 
         writeInboundFrame(channel, header, request.toByteArray());
@@ -131,7 +134,8 @@ class GatewayPipelineTest {
         EmbeddedChannel channel = newPipeline();
         PacketHeader header = new PacketHeader(Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE, ProtocolVersion.CURRENT, 1);
 
-        writeInboundFrame(channel, header, ListCharactersRequest.newBuilder().build().toByteArray());
+        writeInboundFrame(
+                channel, header, ListCharactersRequest.newBuilder().build().toByteArray());
         PacketCodec.Frame response = readOutboundFrame(channel);
 
         // accountId gắn vào CONNECTION lúc Connect thành công (xem GatewayChannelHandler) — chưa
@@ -165,7 +169,9 @@ class GatewayPipelineTest {
         PacketCodec.Frame listResponseFrame = readOutboundFrame(channel);
         assertThat(listResponseFrame.header().opcode()).isEqualTo(Opcode.OPCODE_LIST_CHARACTERS_RESPONSE_VALUE);
         ListCharactersResponse listResponse = ListCharactersResponse.parseFrom(listResponseFrame.payload());
-        assertThat(listResponse.getCharactersList()).extracting(c -> c.getName()).containsExactly("KageHero");
+        assertThat(listResponse.getCharactersList())
+                .extracting(c -> c.getName())
+                .containsExactly("KageHero");
     }
 
     @Test
@@ -174,7 +180,8 @@ class GatewayPipelineTest {
         connect(channel, "selecttest1");
         long characterId = createCharacter(channel, "SelectHero", 2);
 
-        SelectCharacterRequest request = SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
+        SelectCharacterRequest request =
+                SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
         writeInboundFrame(
                 channel,
                 new PacketHeader(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, ProtocolVersion.CURRENT, 3),
@@ -198,8 +205,9 @@ class GatewayPipelineTest {
         EmbeddedChannel channel = newPipeline(characterPort);
         connect(channel, "selecttest2");
 
-        SelectCharacterRequest request =
-                SelectCharacterRequest.newBuilder().setCharacterId(otherAccountCharacter.id()).build();
+        SelectCharacterRequest request = SelectCharacterRequest.newBuilder()
+                .setCharacterId(otherAccountCharacter.id())
+                .build();
         writeInboundFrame(
                 channel,
                 new PacketHeader(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, ProtocolVersion.CURRENT, 2),
@@ -260,24 +268,38 @@ class GatewayPipelineTest {
     private static void bumpLevel(FakeCharacterPort characterPort, long characterId, int level) {
         Character character = characterPort.findById(characterId).orElseThrow();
         int index = characterPort.characters.indexOf(character);
-        characterPort.characters.set(index, new Character(character.id(), character.accountId(),
-                character.realmId(), character.name(), character.faction(), level, character.exp(),
-                character.rebirthCount(), character.createdAt()));
+        characterPort.characters.set(
+                index,
+                new Character(
+                        character.id(),
+                        character.accountId(),
+                        character.realmId(),
+                        character.name(),
+                        character.faction(),
+                        level,
+                        character.exp(),
+                        character.rebirthCount(),
+                        character.createdAt()));
     }
 
     private static void selectCharacter(EmbeddedChannel channel, long characterId, int sequenceId)
             throws InvalidProtocolBufferException {
-        SelectCharacterRequest request = SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
+        SelectCharacterRequest request =
+                SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
         writeInboundFrame(
                 channel,
                 new PacketHeader(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, ProtocolVersion.CURRENT, sequenceId),
                 request.toByteArray());
-        SelectCharacterResponse response = SelectCharacterResponse.parseFrom(readOutboundFrame(channel).payload());
-        assertThat(response.getSuccess()).as("setup: select character phải thành công trước khi test").isTrue();
+        SelectCharacterResponse response =
+                SelectCharacterResponse.parseFrom(readOutboundFrame(channel).payload());
+        assertThat(response.getSuccess())
+                .as("setup: select character phải thành công trước khi test")
+                .isTrue();
     }
 
     private static void connect(EmbeddedChannel channel, String username) {
-        ConnectRequest request = ConnectRequest.newBuilder().setUsername(username).build();
+        ConnectRequest request =
+                ConnectRequest.newBuilder().setUsername(username).build();
         PacketHeader header = new PacketHeader(Opcode.OPCODE_CONNECT_REQUEST_VALUE, ProtocolVersion.CURRENT, 1);
         writeInboundFrame(channel, header, request.toByteArray());
         readOutboundFrame(channel); // tiêu thụ ConnectResponse — caller không kiểm tra lại nội dung
@@ -292,7 +314,8 @@ class GatewayPipelineTest {
         PacketHeader header =
                 new PacketHeader(Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, ProtocolVersion.CURRENT, sequenceId);
         writeInboundFrame(channel, header, request.toByteArray());
-        CreateCharacterResponse response = CreateCharacterResponse.parseFrom(readOutboundFrame(channel).payload());
+        CreateCharacterResponse response =
+                CreateCharacterResponse.parseFrom(readOutboundFrame(channel).payload());
         return response.getCharacter().getId();
     }
 
@@ -337,23 +360,20 @@ class GatewayPipelineTest {
             }
 
             @Override
-            public void save(dev.kage.inventory.domain.Transaction tx, Equipment equipment) {
-            }
+            public void save(dev.kage.inventory.domain.Transaction tx, Equipment equipment) {}
         };
-        EquipItemUseCase equipItemUseCase = new EquipItemUseCase(
-                inventoryPort, itemTemplatePort, equipmentPort, action -> action.accept(null));
-        UnequipItemUseCase unequipItemUseCase =
-                new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
+        EquipItemUseCase equipItemUseCase =
+                new EquipItemUseCase(inventoryPort, itemTemplatePort, equipmentPort, action -> action.accept(null));
+        UnequipItemUseCase unequipItemUseCase = new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
         ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase =
                 new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
         EquipmentUseCases equipmentUseCases =
                 new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
         // Cường hoá không dùng trong test này — fake tối thiểu để compile.
         GoldPort goldPort = (tx, characterId, amount) -> true;
-        AuditPort auditPort = (tx, characterId, action, detailJson) -> { };
+        AuditPort auditPort = (tx, characterId, action, detailJson) -> {};
         EnhancePorts enhancePorts = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
-        EnhanceItemUseCase enhanceItemUseCase =
-                new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
+        EnhanceItemUseCase enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
         return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
     }
 
@@ -377,30 +397,29 @@ class GatewayPipelineTest {
             }
 
             @Override
-            public void creditGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {
-            }
+            public void creditGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {}
         };
         dev.kage.shop.domain.InventoryGatewayPort inventoryGatewayPort =
                 new dev.kage.shop.domain.InventoryGatewayPort() {
-            @Override
-            public Optional<dev.kage.shop.domain.OwnedItem> findItem(long characterId, long itemId) {
-                return Optional.empty();
-            }
+                    @Override
+                    public Optional<dev.kage.shop.domain.OwnedItem> findItem(long characterId, long itemId) {
+                        return Optional.empty();
+                    }
 
-            @Override
-            public boolean grantItem(
-                    dev.kage.shop.domain.Transaction tx, long characterId, long itemTemplateId, int quantity) {
-                return true;
-            }
+                    @Override
+                    public boolean grantItem(
+                            dev.kage.shop.domain.Transaction tx, long characterId, long itemTemplateId, int quantity) {
+                        return true;
+                    }
 
-            @Override
-            public boolean removeQuantity(
-                    dev.kage.shop.domain.Transaction tx, long characterId, long itemId, int quantity) {
-                return true;
-            }
-        };
-        dev.kage.shop.domain.AuditPort shopAuditPort = (tx, characterId, action, detailJson) -> { };
-        dev.kage.shop.domain.IdempotencyPort shopIdempotencyPort = (tx, idempotencyKey) -> { };
+                    @Override
+                    public boolean removeQuantity(
+                            dev.kage.shop.domain.Transaction tx, long characterId, long itemId, int quantity) {
+                        return true;
+                    }
+                };
+        dev.kage.shop.domain.AuditPort shopAuditPort = (tx, characterId, action, detailJson) -> {};
+        dev.kage.shop.domain.IdempotencyPort shopIdempotencyPort = (tx, idempotencyKey) -> {};
         dev.kage.shop.application.ShopPorts ports = new dev.kage.shop.application.ShopPorts(
                 catalogPort, shopGoldPort, inventoryGatewayPort, shopAuditPort, shopIdempotencyPort);
         dev.kage.shop.application.ListShopItemsUseCase listShopItemsUseCase =
@@ -429,14 +448,13 @@ class GatewayPipelineTest {
             }
 
             @Override
-            public void save(dev.kage.quest.domain.Transaction tx, dev.kage.quest.domain.QuestProgress progress) {
-            }
+            public void save(dev.kage.quest.domain.Transaction tx, dev.kage.quest.domain.QuestProgress progress) {}
         };
         dev.kage.quest.domain.QuestTemplatePort templatePort = questCode -> Optional.empty();
-        dev.kage.quest.domain.ExpPort expPort = (tx, characterId, amount) -> { };
+        dev.kage.quest.domain.ExpPort expPort = (tx, characterId, amount) -> {};
         dev.kage.quest.domain.QuestInventoryGrantPort inventoryGrantPort =
                 (tx, characterId, itemTemplateCode, quantity) -> true;
-        dev.kage.quest.domain.AuditPort auditPort = (tx, characterId, action, detailJson) -> { };
+        dev.kage.quest.domain.AuditPort auditPort = (tx, characterId, action, detailJson) -> {};
         dev.kage.quest.domain.TransactionRunner tx = action -> action.accept(null);
 
         dev.kage.quest.application.AcceptQuestUseCase acceptQuestUseCase =
@@ -446,8 +464,7 @@ class GatewayPipelineTest {
         dev.kage.quest.application.QuestRewardPorts rewardPorts =
                 new dev.kage.quest.application.QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
         dev.kage.quest.application.ClaimQuestRewardUseCase claimQuestRewardUseCase =
-                new dev.kage.quest.application.ClaimQuestRewardUseCase(
-                        progressPort, templatePort, rewardPorts, tx);
+                new dev.kage.quest.application.ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx);
         return new dev.kage.quest.api.QuestFacade(
                 acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
     }
@@ -535,11 +552,11 @@ class GatewayPipelineTest {
                 return false;
             }
         };
-        dev.kage.mail.domain.GoldPort mailGoldPort = (tx, characterId, amount) -> { };
+        dev.kage.mail.domain.GoldPort mailGoldPort = (tx, characterId, amount) -> {};
         dev.kage.mail.domain.InventoryGatewayPort mailInventoryGatewayPort =
                 (tx, characterId, itemTemplateId, quantity) -> true;
-        dev.kage.mail.domain.AuditPort mailAuditPort = (tx, characterId, action, detailJson) -> { };
-        dev.kage.mail.domain.IdempotencyPort mailIdempotencyPort = (tx, idempotencyKey) -> { };
+        dev.kage.mail.domain.AuditPort mailAuditPort = (tx, characterId, action, detailJson) -> {};
+        dev.kage.mail.domain.IdempotencyPort mailIdempotencyPort = (tx, idempotencyKey) -> {};
         dev.kage.mail.domain.TransactionRunner mailTx = action -> action.accept(null);
         dev.kage.mail.application.SendMailUseCase sendMailUseCase =
                 new dev.kage.mail.application.SendMailUseCase(mailRepositoryPort, mailTx);
@@ -556,7 +573,7 @@ class GatewayPipelineTest {
 
     // Chat không dùng trong test này — fake tối thiểu để compile (cùng convention fakeMailFacade).
     private static dev.kage.chat.api.ChatFacade fakeChatFacade() {
-        dev.kage.chat.domain.ChatAuditPort chatAuditPort = (characterId, action, detailJson) -> { };
+        dev.kage.chat.domain.ChatAuditPort chatAuditPort = (characterId, action, detailJson) -> {};
         return new dev.kage.chat.api.ChatFacade(new dev.kage.chat.application.SendChatMessageUseCase(chatAuditPort));
     }
 
@@ -732,7 +749,10 @@ class GatewayPipelineTest {
             }
 
             @Override
-            public boolean replaceOffer(long sessionId, long characterId, long goldAmount,
+            public boolean replaceOffer(
+                    long sessionId,
+                    long characterId,
+                    long goldAmount,
                     java.util.List<dev.kage.trade.domain.OfferedItemInput> items) {
                 throw new UnsupportedOperationException("không dùng ở test này");
             }
@@ -780,8 +800,8 @@ class GatewayPipelineTest {
                 throw new UnsupportedOperationException("không dùng ở test này");
             }
         };
-        dev.kage.trade.domain.TradeAuditPort auditPort = (tx, characterId, action, detailJson) -> { };
-        dev.kage.trade.domain.IdempotencyPort idempotencyPort = (tx, idempotencyKey) -> { };
+        dev.kage.trade.domain.TradeAuditPort auditPort = (tx, characterId, action, detailJson) -> {};
+        dev.kage.trade.domain.IdempotencyPort idempotencyPort = (tx, idempotencyKey) -> {};
         dev.kage.trade.application.TradePorts ports = new dev.kage.trade.application.TradePorts(
                 sessionPort, inventoryPort, goldPort, auditPort, idempotencyPort);
         dev.kage.trade.application.TradeUseCases useCases = new dev.kage.trade.application.TradeUseCases(
@@ -863,7 +883,10 @@ class GatewayPipelineTest {
         ArenaInstanceRegistry arenaInstanceRegistry =
                 new ArenaInstanceRegistry(characterRegistry, characterFacade, pvpFacade, mainWorldChannels);
         WorldGateway worldGateway = new WorldGateway(
-                mainWorldChannels, characterRegistry, positionPersister, dungeonInstanceRegistry,
+                mainWorldChannels,
+                characterRegistry,
+                positionPersister,
+                dungeonInstanceRegistry,
                 arenaInstanceRegistry);
 
         return new EmbeddedChannel(
@@ -873,12 +896,24 @@ class GatewayPipelineTest {
                 new PacketFrameEncoder(),
                 new GatewayChannelHandler(
                         new GatewayFacades(
-                                accountFacade, characterFacade, inventoryFacade,
-                                new ContentFacades(shopFacade, dialogueFacade, questFacade,
+                                accountFacade,
+                                characterFacade,
+                                inventoryFacade,
+                                new ContentFacades(
+                                        shopFacade,
+                                        dialogueFacade,
+                                        questFacade,
                                         new SocialFacades(
-                                                friendFacade, mailFacade, chatFacade, guildFacade, partyFacade,
-                                                tradeFacade, pvpFacade))),
-                        worldGateway, Runnable::run, observability));
+                                                friendFacade,
+                                                mailFacade,
+                                                chatFacade,
+                                                guildFacade,
+                                                partyFacade,
+                                                tradeFacade,
+                                                pvpFacade))),
+                        worldGateway,
+                        Runnable::run,
+                        observability));
     }
 
     /** Fake = implementation in-memory THẬT (TESTING.md §4), không Mockito. */
@@ -981,9 +1016,18 @@ class GatewayPipelineTest {
             for (int i = 0; i < characters.size(); i++) {
                 Character c = characters.get(i);
                 if (c.id() == characterId) {
-                    characters.set(i, new Character(
-                            c.id(), c.accountId(), c.realmId(), c.name(), faction,
-                            c.level(), c.exp(), c.rebirthCount(), c.createdAt()));
+                    characters.set(
+                            i,
+                            new Character(
+                                    c.id(),
+                                    c.accountId(),
+                                    c.realmId(),
+                                    c.name(),
+                                    faction,
+                                    c.level(),
+                                    c.exp(),
+                                    c.rebirthCount(),
+                                    c.createdAt()));
                     return;
                 }
             }

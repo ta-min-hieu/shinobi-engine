@@ -2,8 +2,9 @@ package dev.kage.pvp.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.kage.pvp.domain.EloRating;
 import org.junit.jupiter.api.Test;
+
+import dev.kage.pvp.domain.EloRating;
 
 class RecordDuelResultUseCaseTest {
 

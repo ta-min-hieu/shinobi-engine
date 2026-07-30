@@ -41,7 +41,8 @@ final class GatewayTracing {
     private final Tracer tracer;
 
     GatewayTracing() {
-        this(Sampler.traceIdRatioBased(SAMPLE_RATIO),
+        this(
+                Sampler.traceIdRatioBased(SAMPLE_RATIO),
                 System.getenv().getOrDefault("KAGE_OTLP_ENDPOINT", DEFAULT_OTLP_ENDPOINT));
     }
 
@@ -51,8 +52,9 @@ final class GatewayTracing {
         SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
                 .setResource(resource)
                 .setSampler(sampler)
-                .addSpanProcessor(BatchSpanProcessor.builder(
-                                OtlpHttpSpanExporter.builder().setEndpoint(otlpEndpoint).build())
+                .addSpanProcessor(BatchSpanProcessor.builder(OtlpHttpSpanExporter.builder()
+                                .setEndpoint(otlpEndpoint)
+                                .build())
                         .build())
                 .build();
         this.sdk = OpenTelemetrySdk.builder().setTracerProvider(tracerProvider).build();

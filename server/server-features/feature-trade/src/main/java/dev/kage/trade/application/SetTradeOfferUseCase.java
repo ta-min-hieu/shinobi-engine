@@ -1,8 +1,9 @@
 package dev.kage.trade.application;
 
+import java.util.List;
+
 import dev.kage.trade.domain.OfferedItemInput;
 import dev.kage.trade.domain.TradeSessionPort;
-import java.util.List;
 
 /**
  * Đặt lại lời chào (gold + item) — KHÔNG xác thực sở hữu ở đây, chỉ lưu Ý ĐỊNH (xem
@@ -23,5 +24,8 @@ public final class SetTradeOfferUseCase {
         return port.replaceOffer(sessionId, characterId, goldAmount, items) ? Result.OK : Result.NOT_FOUND;
     }
 
-    public enum Result { OK, NOT_FOUND }
+    public enum Result {
+        OK,
+        NOT_FOUND
+    }
 }

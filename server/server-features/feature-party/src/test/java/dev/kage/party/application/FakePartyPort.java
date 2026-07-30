@@ -1,11 +1,5 @@
 package dev.kage.party.application;
 
-import dev.kage.party.domain.DuplicatePartyInviteException;
-import dev.kage.party.domain.Party;
-import dev.kage.party.domain.PartyInvite;
-import dev.kage.party.domain.PartyMember;
-import dev.kage.party.domain.PartyPort;
-import dev.kage.party.domain.PartyRole;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -14,6 +8,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
+
+import dev.kage.party.domain.DuplicatePartyInviteException;
+import dev.kage.party.domain.Party;
+import dev.kage.party.domain.PartyInvite;
+import dev.kage.party.domain.PartyMember;
+import dev.kage.party.domain.PartyPort;
+import dev.kage.party.domain.PartyRole;
 
 /**
  * Fake in-memory THẬT (TESTING.md §4), không Mockito — DÙNG CHUNG cho toàn bộ test
@@ -50,12 +51,16 @@ final class FakePartyPort implements PartyPort {
 
     @Override
     public Optional<PartyInvite> findPendingInviteOfInvitee(long characterId) {
-        return invites.stream().filter(i -> i.inviteeCharacterId() == characterId).findFirst();
+        return invites.stream()
+                .filter(i -> i.inviteeCharacterId() == characterId)
+                .findFirst();
     }
 
     @Override
     public List<PartyInvite> listPendingInvitesOfInvitee(long characterId) {
-        return invites.stream().filter(i -> i.inviteeCharacterId() == characterId).toList();
+        return invites.stream()
+                .filter(i -> i.inviteeCharacterId() == characterId)
+                .toList();
     }
 
     @Override
@@ -119,7 +124,10 @@ final class FakePartyPort implements PartyPort {
         }
         members.remove(remaining.get());
         members.add(new PartyMember(
-                partyId, remaining.get().characterId(), PartyRole.LEADER, remaining.get().joinedAt()));
+                partyId,
+                remaining.get().characterId(),
+                PartyRole.LEADER,
+                remaining.get().joinedAt()));
         return LeaveResult.OK;
     }
 

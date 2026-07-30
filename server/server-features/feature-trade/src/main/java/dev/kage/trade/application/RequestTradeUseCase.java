@@ -25,8 +25,12 @@ public final class RequestTradeUseCase {
         return new Result(Outcome.OK, port.createRequest(requesterCharacterId, targetCharacterId));
     }
 
-    public enum Outcome { OK, CANNOT_TRADE_SELF, ALREADY_IN_TRADE, TARGET_ALREADY_IN_TRADE }
-
-    public record Result(Outcome outcome, TradeSession session) {
+    public enum Outcome {
+        OK,
+        CANNOT_TRADE_SELF,
+        ALREADY_IN_TRADE,
+        TARGET_ALREADY_IN_TRADE
     }
+
+    public record Result(Outcome outcome, TradeSession session) {}
 }

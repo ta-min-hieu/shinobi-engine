@@ -10,5 +10,4 @@ public record FriendUseCases(
         RejectFriendRequestUseCase rejectFriendRequestUseCase,
         RemoveFriendUseCase removeFriendUseCase,
         ListFriendsUseCase listFriendsUseCase,
-        ListPendingFriendRequestsUseCase listPendingFriendRequestsUseCase) {
-}
+        ListPendingFriendRequestsUseCase listPendingFriendRequestsUseCase) {}

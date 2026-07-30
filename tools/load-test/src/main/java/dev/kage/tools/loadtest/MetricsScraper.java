@@ -8,6 +8,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,8 +25,8 @@ final class MetricsScraper {
 
     // Format Prometheus text của Micrometer Timer.publishPercentiles: mỗi quantile 1 dòng riêng,
     // nhãn khác (world=...) không quan trọng thứ tự — [^}]* bắt bất kỳ nhãn nào đứng trước/sau.
-    private static final Pattern QUANTILE_LINE = Pattern.compile(
-            "kage_tick_duration_seconds\\{[^}]*quantile=\"(0\\.\\d+)\"[^}]*}\\s+([0-9.eE+-]+)");
+    private static final Pattern QUANTILE_LINE =
+            Pattern.compile("kage_tick_duration_seconds\\{[^}]*quantile=\"(0\\.\\d+)\"[^}]*}\\s+([0-9.eE+-]+)");
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final URI metricsUri;

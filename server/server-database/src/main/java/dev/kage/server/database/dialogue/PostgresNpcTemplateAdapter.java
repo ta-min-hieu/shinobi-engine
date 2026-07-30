@@ -1,10 +1,12 @@
 package dev.kage.server.database.dialogue;
 
-import dev.kage.dialogue.domain.NpcTemplatePort;
-import dev.kage.server.database.JdbcOperations;
 import java.util.List;
 import java.util.Optional;
+
 import javax.sql.DataSource;
+
+import dev.kage.dialogue.domain.NpcTemplatePort;
+import dev.kage.server.database.JdbcOperations;
 
 /** Hiện thực {@link NpcTemplatePort} trên PostgreSQL — đọc thuần, {@code npc_template} là config tĩnh. */
 public final class PostgresNpcTemplateAdapter implements NpcTemplatePort {

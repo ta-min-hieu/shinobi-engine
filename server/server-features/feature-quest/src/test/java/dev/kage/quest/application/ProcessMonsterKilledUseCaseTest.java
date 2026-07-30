@@ -2,6 +2,10 @@ package dev.kage.quest.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+
 import dev.kage.quest.domain.QuestProgress;
 import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestStatus;
@@ -9,8 +13,6 @@ import dev.kage.quest.domain.QuestTemplate;
 import dev.kage.quest.domain.QuestTemplatePort;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.quest.domain.TransactionRunner;
-import java.util.Optional;
-import org.junit.jupiter.api.Test;
 
 class ProcessMonsterKilledUseCaseTest {
 
@@ -22,7 +24,8 @@ class ProcessMonsterKilledUseCaseTest {
     static final class FakeQuestTemplatePort implements QuestTemplatePort {
         @Override
         public Optional<QuestTemplate> findByCode(String questCode) {
-            return TRACKED_QUEST_CODE.equals(questCode) ? Optional.of(new QuestTemplate(TEMPLATE_ID, SCRIPT_REF))
+            return TRACKED_QUEST_CODE.equals(questCode)
+                    ? Optional.of(new QuestTemplate(TEMPLATE_ID, SCRIPT_REF))
                     : Optional.empty();
         }
     }

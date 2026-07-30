@@ -1,5 +1,15 @@
 package dev.kage.server.database.party;
 
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+import javax.sql.DataSource;
+
 import dev.kage.party.domain.DuplicatePartyInviteException;
 import dev.kage.party.domain.Party;
 import dev.kage.party.domain.PartyInvite;
@@ -9,14 +19,6 @@ import dev.kage.party.domain.PartyRole;
 import dev.kage.server.database.DatabaseAccessException;
 import dev.kage.server.database.JdbcOperations;
 import dev.kage.server.database.JdbcTransactionRunner;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import javax.sql.DataSource;
 
 /**
  * Hiện thực {@link PartyPort} trên PostgreSQL — bảng {@code party}/{@code party_member}/
@@ -125,8 +127,8 @@ public final class PostgresPartyAdapter implements PartyPort {
     public Party createParty(long leaderCharacterId) {
         return JdbcTransactionRunner.call(dataSource, connection -> {
             Instant now = Instant.now();
-            long partyId = JdbcOperations.insertReturningId(
-                    connection, INSERT_PARTY, leaderCharacterId, Timestamp.from(now));
+            long partyId =
+                    JdbcOperations.insertReturningId(connection, INSERT_PARTY, leaderCharacterId, Timestamp.from(now));
             insertMember(connection, new NewMember(partyId, leaderCharacterId, PartyRole.LEADER, now));
             return new Party(partyId, leaderCharacterId, now);
         });
@@ -189,16 +191,17 @@ public final class PostgresPartyAdapter implements PartyPort {
     }
 
     private static boolean isAlreadyMember(Connection connection, long characterId) {
-        return JdbcOperations.queryOne(connection, FIND_MEMBERSHIP, rs -> Boolean.TRUE, characterId).isPresent();
+        return JdbcOperations.queryOne(connection, FIND_MEMBERSHIP, rs -> Boolean.TRUE, characterId)
+                .isPresent();
     }
 
     private static int countMembers(Connection connection, long partyId) {
-        return JdbcOperations.queryOne(connection, COUNT_MEMBERS, rs -> rs.getInt(1), partyId).orElse(0);
+        return JdbcOperations.queryOne(connection, COUNT_MEMBERS, rs -> rs.getInt(1), partyId)
+                .orElse(0);
     }
 
     /** Gói tham số cho {@link #insertMember} — tránh vượt 4 tham số Checkstyle {@code ParameterNumber}. */
-    private record NewMember(long partyId, long characterId, PartyRole role, Instant joinedAt) {
-    }
+    private record NewMember(long partyId, long characterId, PartyRole role, Instant joinedAt) {}
 
     private static void insertMember(Connection connection, NewMember member) {
         JdbcOperations.update(
@@ -243,8 +246,7 @@ public final class PostgresPartyAdapter implements PartyPort {
         return LeaveResult.OK;
     }
 
-    private record MembershipRow(long partyId, PartyRole role) {
-    }
+    private record MembershipRow(long partyId, PartyRole role) {}
 
     private static void promoteNextLeaderOrDissolve(Connection connection, long partyId) {
         Optional<Long> nextLeaderId = JdbcOperations.queryOne(
@@ -272,7 +274,9 @@ public final class PostgresPartyAdapter implements PartyPort {
 
     private static PartyInvite mapInvite(ResultSet rs) throws SQLException {
         return new PartyInvite(
-                rs.getLong("id"), rs.getLong("party_id"), rs.getLong("invitee_character_id"),
+                rs.getLong("id"),
+                rs.getLong("party_id"),
+                rs.getLong("invitee_character_id"),
                 rs.getTimestamp("invited_at").toInstant());
     }
 }

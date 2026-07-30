@@ -13,5 +13,4 @@ package dev.kage.engine.ecs;
  * <p>Component chỉ chứa DỮ LIỆU, mutable + field public là ngoại lệ có chủ đích của
  * Điều 43 — xem CODING-STANDARDS.md §12 và ECS.md §3.1.
  */
-public interface Component extends com.badlogic.ashley.core.Component {
-}
+public interface Component extends com.badlogic.ashley.core.Component {}

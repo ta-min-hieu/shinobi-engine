@@ -9,5 +9,4 @@ public record CharacterUseCases(
         CreateCharacterUseCase createCharacterUseCase,
         ListCharactersUseCase listCharactersUseCase,
         SelectCharacterUseCase selectCharacterUseCase,
-        SelectFactionUseCase selectFactionUseCase) {
-}
+        SelectFactionUseCase selectFactionUseCase) {}

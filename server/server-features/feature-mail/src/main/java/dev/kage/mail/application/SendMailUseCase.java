@@ -1,11 +1,12 @@
 package dev.kage.mail.application;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import dev.kage.mail.domain.Mail;
 import dev.kage.mail.domain.MailRepositoryPort;
 import dev.kage.mail.domain.NewMail;
 import dev.kage.mail.domain.Transaction;
 import dev.kage.mail.domain.TransactionRunner;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Gửi thư — MVP KHÔNG mất gold để gửi (feature-mail/CLAUDE.md), nên chỉ cần

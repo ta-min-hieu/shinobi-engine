@@ -1,14 +1,16 @@
 package dev.kage.server.gateway;
 
-import dev.kage.server.world.TickMetricsPort;
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.Gauge;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+
+import dev.kage.server.world.TickMetricsPort;
 
 /**
  * Implementation thật của {@link TickMetricsPort} (ADR-015) — {@code kage.tick.duration}, metric
@@ -64,11 +66,13 @@ final class MicrometerTickMetricsPort implements TickMetricsPort {
     private Map<String, Timer> buildSystemTimers() {
         Map<String, Timer> timers = new HashMap<>();
         for (String systemName : SYSTEM_NAMES) {
-            timers.put(systemName, Timer.builder("kage.ecs.system.duration")
-                    .description("Thời gian 1 System xử lý xong toàn bộ entity của nó trong 1 tick")
-                    .tag("world", worldTag)
-                    .tag("system", systemName)
-                    .register(registry));
+            timers.put(
+                    systemName,
+                    Timer.builder("kage.ecs.system.duration")
+                            .description("Thời gian 1 System xử lý xong toàn bộ entity của nó trong 1 tick")
+                            .tag("world", worldTag)
+                            .tag("system", systemName)
+                            .register(registry));
         }
         return timers;
     }

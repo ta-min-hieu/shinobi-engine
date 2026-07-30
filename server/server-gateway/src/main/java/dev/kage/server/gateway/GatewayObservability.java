@@ -5,5 +5,4 @@ package dev.kage.server.gateway;
  * GatewayChannelHandler}/{@link GatewayServer} đều cần cả hai, gộp lại tránh vượt giới hạn
  * Checkstyle {@code ParameterNumber} (max 4) ở constructor.
  */
-record GatewayObservability(GatewayNetworkMetrics networkMetrics, GatewayTracing tracing) {
-}
+record GatewayObservability(GatewayNetworkMetrics networkMetrics, GatewayTracing tracing) {}

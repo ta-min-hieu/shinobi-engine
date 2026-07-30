@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs exclude filter (STATIC-ANALYSIS.md §10 — suppress hẹp nhất + có lý do, không suppress
+  cả class/module trừ khi lý do áp dụng cho cả class). Mỗi <Match> phải có lý do bằng comment ngay
+  trên nó — không suppress không giải thích.
+-->
+<FindBugsFilter>
+    <!-- Code protobuf DO PROTOC TỰ SINH (shared-protocol build/generated/sources/proto — không
+         phải viết tay, không thể/không nên "sửa" vì protoc ghi đè lại y hệt lần build sau). Toàn
+         bộ generated code nằm TRỰC TIẾP dưới dev.kage.protocol; code viết tay (PacketCodec,
+         PacketHeader, ProtocolVersion) nằm ở dev.kage.protocol.wire — regex loại trừ chính xác
+         subpackage .wire, không đụng tới code viết tay. -->
+    <Match>
+        <Class name="~dev\.kage\.protocol\.(?!wire\.).*"/>
+    </Match>
+
+    <!-- Test giả lập server bằng ServerSocket thường để verify hành vi reconnect/backoff của
+         GameConnection — không phải traffic thật, không liên quan TLS Production. -->
+    <Match>
+        <Class name="dev.kage.client.core.net.GameConnectionReconnectTest"/>
+        <Bug pattern="UNENCRYPTED_SERVER_SOCKET"/>
+    </Match>
+
+    <!-- GatewayServerIntegrationTest nói ĐÚNG giao thức dây qua socket thật để verify end-to-end
+         (chủ đích, xem javadoc class) — cùng lý do TLS-gap ở GameConnection phía trên, dùng
+         java.net.Socket thường vì server thật (GatewayServer) cũng plaintext, không phải lỗi
+         riêng của test. -->
+    <Match>
+        <Class name="dev.kage.server.gateway.GatewayServerIntegrationTest"/>
+        <Bug pattern="UNENCRYPTED_SOCKET"/>
+    </Match>
+
+    <!-- findFreePort() chỉ mở ServerSocket(0) để LẤY SỐ CỔNG TRỐNG rồi đóng ngay — không bao giờ
+         accept() hay truyền dữ liệu, TLS không liên quan. -->
+    <Match>
+        <Class name="dev.kage.server.gateway.MetricsHttpServerTest"/>
+        <Bug pattern="UNENCRYPTED_SERVER_SOCKET"/>
+    </Match>
+
+    <!-- Random chọn hướng tuần tra quái vật (gameplay, KHÔNG bảo mật) — sinh ở server đúng quy tắc
+         (CLAUDE.md "Random ảnh hưởng gameplay: chỉ sinh ở server"), predictable PRNG là lựa chọn
+         ĐÚNG cho gameplay (SecureRandom lãng phí, không cần thiết cho hướng đi AI). -->
+    <Match>
+        <Class name="dev.kage.server.world.AiSystem"/>
+        <Bug pattern="PREDICTABLE_RANDOM"/>
+    </Match>
+
+    <!-- Roll trúng đòn/chí mạng trong combat (gameplay, KHÔNG bảo mật) — sinh ở server đúng quy
+         tắc, predictable PRNG đúng cho gameplay damage roll, không cần SecureRandom. -->
+    <Match>
+        <Class name="dev.kage.server.world.CombatConstants"/>
+        <Bug pattern="PREDICTABLE_RANDOM"/>
+    </Match>
+
+    <!-- ⚠️ KHÔNG PHẢI false positive — TLS THẬT SỰ CHƯA ĐƯỢC IMPLEMENT ở đây (2026-07-30, phát
+         hiện lần đầu khi bật SpotBugs/find-sec-bugs). NETWORK.md liệt "TLS bắt buộc ở Production"
+         là Technical Decision Accepted, nhưng chưa có dòng code SslContext/SSLSocket nào trong
+         GameConnection HAY GatewayServer (Netty phía server cũng plaintext, find-sec-bugs không
+         bắt được vì detector chỉ nhận java.net.Socket, không nhận Netty SocketChannel — kiểm tra
+         thủ công xác nhận). Suppress ở ĐÂY chỉ để không chặn build trong lúc chờ quyết định làm
+         TLS thật (việc lớn, cần ADR riêng: cert management, SslHandler cả 2 phía, tự ký hay CA
+         thật) — KHÔNG suppress vĩnh viễn, xoá <Match> này ngay khi TLS được code thật. -->
+    <Match>
+        <Class name="dev.kage.client.core.net.GameConnection"/>
+        <Bug pattern="UNENCRYPTED_SOCKET"/>
+    </Match>
+
+    <!-- EcsWorld là live shared state theo đúng thiết kế ECS (ECS.md) — WorldScreen CẦN giữ tham
+         chiếu tới CÙNG 1 world mà game loop đang mutate, defensive-copy ở đây vô nghĩa (sẽ tách rời
+         khỏi world thật, WorldScreen sẽ render dữ liệu cũ mãi mãi). -->
+    <Match>
+        <Class name="dev.kage.client.core.world.WorldScreen"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- So sánh float bằng != có chủ đích: phát hiện "hướng di chuyển đổi so với lần gửi trước" để
+         tránh gửi lại lệnh move dư thừa (giảm băng thông) — cả 2 giá trị đến từ CÙNG 1 phép tính
+         xác định (sqrt/chia) trên input rời rạc, không phải so sánh 2 giá trị trôi dạt độc lập.
+         Trường hợp xấu nhất nếu có sai số nổi: gửi thêm 1 gói tin thừa thỉnh thoảng, không phải lỗi
+         gameplay. -->
+    <Match>
+        <Class name="dev.kage.client.core.world.WorldScreen"/>
+        <Bug pattern="FE_FLOATING_POINT_EQUALITY"/>
+    </Match>
+
+    <!-- Username mặc định CHỈ dùng khi chạy dev/test không truyền username (2 client cùng máy,
+         ROADMAP Phase 3 Exit Criteria) — không phải giá trị bảo mật (không phải token/mật khẩu),
+         predictable là chấp nhận được ở đây. -->
+    <Match>
+        <Class name="dev.kage.client.desktop.DesktopLauncher"/>
+        <Bug pattern="PREDICTABLE_RANDOM"/>
+    </Match>
+
+    <!-- Cố ý (ECS.md §10, xem javadoc Component.java): interface này là CẦU NỐI DUY NHẤT bọc
+         com.badlogic.ashley.core.Component — trùng simple name là thiết kế, không phải nhầm lẫn. -->
+    <Match>
+        <Class name="dev.kage.engine.ecs.Component"/>
+        <Bug pattern="NM_SAME_SIMPLE_NAME_AS_INTERFACE"/>
+    </Match>
+
+    <!-- DataSource (HikariCP) / JedisPool (Redis) là tài nguyên hạ tầng dùng chung (connection
+         pool), KHÔNG phải value object — giữ tham chiếu trực tiếp là đúng thiết kế (server-database
+         là module DUY NHẤT được chạm JDBC/Redis, Điều 23), copy "phòng thủ" vô nghĩa (không thể
+         "copy" 1 connection pool). Khớp theo KIỂU field (không phải từng class) vì rất nhiều
+         adapter/transaction-runner trong server-database đều giữ 1 trong 2 kiểu này (cú pháp
+         <Field type=...> xác nhận đúng qua ví dụ thật killbill/killbill spotbugs-exclude.xml,
+         không đoán). -->
+    <Match>
+        <Or>
+            <Field type="javax.sql.DataSource"/>
+            <Field type="redis.clients.jedis.JedisPool"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- PacketCodec.Frame.payload là byte[] KHÔNG copy phòng thủ — có chủ đích vì hiệu năng
+         (javadoc class đã ghi rõ cạm bẫy equals()): MỌI gói tin mạng đi qua encodeFrame/decodeFrame,
+         copy mảng ở đây là allocation thật trong hot path, vi phạm Điều 6/31 (cấm allocation mỗi
+         frame). Đánh đổi có chủ đích, không phải sơ suất. -->
+    <Match>
+        <Class name="dev.kage.protocol.wire.PacketCodec$Frame"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- tools:load-test giả lập client nói ĐÚNG giao thức dây qua socket thật (chủ đích, xem
+         javadoc LoadTestRunner) — cùng lý do TLS-gap ở GameConnection: production thật cũng
+         plaintext, không phải lỗi riêng của tool đo tải. -->
+    <Match>
+        <Class name="dev.kage.tools.loadtest.SimulatedPlayer"/>
+        <Bug pattern="UNENCRYPTED_SOCKET"/>
+    </Match>
+
+    <!-- Random quyết định hành vi giả lập (xác suất chat/ping/auto-target mỗi cycle) — công cụ đo
+         tải, không phải gameplay hay bảo mật thật, predictable PRNG hoàn toàn phù hợp. -->
+    <Match>
+        <Class name="dev.kage.tools.loadtest.SimulatedPlayer"/>
+        <Bug pattern="PREDICTABLE_RANDOM"/>
+    </Match>
+
+    <!-- So sánh double == 0.5/0.95/0.99 sau khi parse TỪ CHUỖI CỐ ĐỊNH Micrometer luôn ghi y hệt
+         ("quantile=\"0.5\"") — Double.parseDouble cho cùng input luôn ra cùng bit pattern như
+         literal trong code (cùng thuật toán chuyển decimal->double), không phải so sánh 2 giá trị
+         tính toán độc lập có thể trôi dạt. -->
+    <Match>
+        <Class name="dev.kage.tools.loadtest.MetricsScraper"/>
+        <Bug pattern="FE_FLOATING_POINT_EQUALITY"/>
+    </Match>
+
+    <!-- Clean Architecture Port (docs/templates/feature-module) — MỌI UseCase trong MỌI
+         server-features/feature-* giữ tham chiếu tới 1 Port (interface, dependency injection),
+         KHÔNG phải value object. Đây là core pattern lặp lại hàng trăm lần xuyên suốt dự án.
+         ⚠️ PHÁT HIỆN THẬT: thử khớp theo <Field type="~.*Port"/> TRƯỚC nhưng KHÔNG hoạt động (build
+         thật vẫn báo lỗi sau khi thêm — SpotBugs filter <Field type=...> có thể cần định dạng khác
+         plain dotted name, không xác nhận được cú pháp đúng do docs 429 lúc tra). Đổi sang khớp
+         THEO TÊN CLASS (đã verify class-name regex hoạt động đúng ở entry generated-code phía
+         trên) — mọi class `*UseCase` trong package `dev.kage.<feature>.application` (quy ước
+         template, không phải đoán). -->
+    <!-- Cùng lý do — "*Ports" là record gộp NHIỀU Port để tránh vượt ParameterNumber (vd MailPorts,
+         ShopPorts, cùng tinh thần ShutdownContext ở GatewayBootstrap) — cũng chỉ giữ tham chiếu
+         Port, không phải value object. -->
+    <Match>
+        <Class name="~dev\.kage\.[a-z]+\.application\..*(UseCase|Ports)"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- Roll rơi đồ / cường hoá (gameplay, KHÔNG bảo mật) — sinh ở server đúng quy tắc
+         (ENGINE.md §10, javadoc class), predictable PRNG đúng cho gameplay, không cần SecureRandom. -->
+    <Match>
+        <Class name="dev.kage.inventory.domain.LootRoller"/>
+        <Bug pattern="PREDICTABLE_RANDOM"/>
+    </Match>
+    <Match>
+        <Class name="dev.kage.inventory.application.EnhanceItemUseCase"/>
+        <Bug pattern="PREDICTABLE_RANDOM"/>
+    </Match>
+
+    <!-- Fake*Port trong test là test double (capture tham chiếu để assert lại) — không phải state
+         thật cần bảo vệ, defensive-copy vô nghĩa trong test fake. Khớp mọi nested Fake*Port bên
+         trong class Test (cùng lý do sẽ lặp lại ở feature khác dùng cùng pattern test double). -->
+    <Match>
+        <Class name="~.*Test\$Fake.*"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+</FindBugsFilter>

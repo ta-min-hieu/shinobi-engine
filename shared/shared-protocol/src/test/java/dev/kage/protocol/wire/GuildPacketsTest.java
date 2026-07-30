@@ -3,6 +3,8 @@ package dev.kage.protocol.wire;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import org.junit.jupiter.api.Test;
+
 import dev.kage.protocol.ApproveGuildJoinRequestCommand;
 import dev.kage.protocol.ApproveGuildJoinRequestOutcome;
 import dev.kage.protocol.ApproveGuildJoinRequestResponse;
@@ -12,7 +14,6 @@ import dev.kage.protocol.CreateGuildResponse;
 import dev.kage.protocol.DisbandGuildCommand;
 import dev.kage.protocol.DisbandGuildOutcome;
 import dev.kage.protocol.DisbandGuildResponse;
-import dev.kage.protocol.GetMyGuildRequest;
 import dev.kage.protocol.GetMyGuildResponse;
 import dev.kage.protocol.GuildMemberView;
 import dev.kage.protocol.KickGuildMemberCommand;
@@ -21,9 +22,7 @@ import dev.kage.protocol.KickGuildMemberResponse;
 import dev.kage.protocol.LeaveGuildCommand;
 import dev.kage.protocol.LeaveGuildOutcome;
 import dev.kage.protocol.LeaveGuildResponse;
-import dev.kage.protocol.ListGuildMembersRequest;
 import dev.kage.protocol.ListGuildMembersResponse;
-import dev.kage.protocol.ListPendingGuildJoinRequestsRequest;
 import dev.kage.protocol.ListPendingGuildJoinRequestsResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PendingGuildJoinRequestView;
@@ -33,7 +32,6 @@ import dev.kage.protocol.RejectGuildJoinRequestResponse;
 import dev.kage.protocol.SendGuildJoinRequestCommand;
 import dev.kage.protocol.SendGuildJoinRequestOutcome;
 import dev.kage.protocol.SendGuildJoinRequestResponse;
-import org.junit.jupiter.api.Test;
 
 /**
  * Round-trip test bắt buộc theo shared/CLAUDE.md khi thêm packet mới — verify {@code PacketCodec}
@@ -43,11 +41,13 @@ class GuildPacketsTest {
 
     @Test
     void shouldRoundTripCreateGuildCommand() throws InvalidProtocolBufferException {
-        CreateGuildCommand command = CreateGuildCommand.newBuilder().setName("Konoha").build();
+        CreateGuildCommand command =
+                CreateGuildCommand.newBuilder().setName("Konoha").build();
         PacketHeader header = new PacketHeader(Opcode.OPCODE_CREATE_GUILD_COMMAND_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        CreateGuildCommand parsed = CreateGuildCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        CreateGuildCommand parsed =
+                CreateGuildCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getName()).isEqualTo("Konoha");
     }
@@ -61,7 +61,8 @@ class GuildPacketsTest {
         PacketHeader header = new PacketHeader(Opcode.OPCODE_CREATE_GUILD_RESPONSE_VALUE, ProtocolVersion.CURRENT, 1);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        CreateGuildResponse parsed = CreateGuildResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        CreateGuildResponse parsed = CreateGuildResponse.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(CreateGuildOutcome.CREATE_GUILD_OUTCOME_OK);
         assertThat(parsed.getGuildId()).isEqualTo(3L);
@@ -69,13 +70,14 @@ class GuildPacketsTest {
 
     @Test
     void shouldRoundTripSendGuildJoinRequestCommand() throws InvalidProtocolBufferException {
-        SendGuildJoinRequestCommand command = SendGuildJoinRequestCommand.newBuilder().setGuildName("Konoha").build();
+        SendGuildJoinRequestCommand command =
+                SendGuildJoinRequestCommand.newBuilder().setGuildName("Konoha").build();
         PacketHeader header =
                 new PacketHeader(Opcode.OPCODE_SEND_GUILD_JOIN_REQUEST_COMMAND_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        SendGuildJoinRequestCommand parsed =
-                SendGuildJoinRequestCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SendGuildJoinRequestCommand parsed = SendGuildJoinRequestCommand.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getGuildName()).isEqualTo("Konoha");
     }
@@ -89,8 +91,8 @@ class GuildPacketsTest {
                 new PacketHeader(Opcode.OPCODE_SEND_GUILD_JOIN_REQUEST_RESPONSE_VALUE, ProtocolVersion.CURRENT, 2);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        SendGuildJoinRequestResponse parsed =
-                SendGuildJoinRequestResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        SendGuildJoinRequestResponse parsed = SendGuildJoinRequestResponse.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome())
                 .isEqualTo(SendGuildJoinRequestOutcome.SEND_GUILD_JOIN_REQUEST_OUTCOME_GUILD_NOT_FOUND);
@@ -98,13 +100,14 @@ class GuildPacketsTest {
 
     @Test
     void shouldRoundTripApproveGuildJoinRequestCommand() throws InvalidProtocolBufferException {
-        ApproveGuildJoinRequestCommand command = ApproveGuildJoinRequestCommand.newBuilder().setRequestId(9L).build();
+        ApproveGuildJoinRequestCommand command =
+                ApproveGuildJoinRequestCommand.newBuilder().setRequestId(9L).build();
         PacketHeader header =
                 new PacketHeader(Opcode.OPCODE_APPROVE_GUILD_JOIN_REQUEST_COMMAND_VALUE, ProtocolVersion.CURRENT, 3);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        ApproveGuildJoinRequestCommand parsed =
-                ApproveGuildJoinRequestCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ApproveGuildJoinRequestCommand parsed = ApproveGuildJoinRequestCommand.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getRequestId()).isEqualTo(9L);
     }
@@ -118,8 +121,8 @@ class GuildPacketsTest {
                 new PacketHeader(Opcode.OPCODE_APPROVE_GUILD_JOIN_REQUEST_RESPONSE_VALUE, ProtocolVersion.CURRENT, 3);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        ApproveGuildJoinRequestResponse parsed =
-                ApproveGuildJoinRequestResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ApproveGuildJoinRequestResponse parsed = ApproveGuildJoinRequestResponse.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome())
                 .isEqualTo(ApproveGuildJoinRequestOutcome.APPROVE_GUILD_JOIN_REQUEST_OUTCOME_TARGET_ALREADY_IN_GUILD);
@@ -127,13 +130,14 @@ class GuildPacketsTest {
 
     @Test
     void shouldRoundTripRejectGuildJoinRequestCommand() throws InvalidProtocolBufferException {
-        RejectGuildJoinRequestCommand command = RejectGuildJoinRequestCommand.newBuilder().setRequestId(11L).build();
+        RejectGuildJoinRequestCommand command =
+                RejectGuildJoinRequestCommand.newBuilder().setRequestId(11L).build();
         PacketHeader header =
                 new PacketHeader(Opcode.OPCODE_REJECT_GUILD_JOIN_REQUEST_COMMAND_VALUE, ProtocolVersion.CURRENT, 4);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        RejectGuildJoinRequestCommand parsed =
-                RejectGuildJoinRequestCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        RejectGuildJoinRequestCommand parsed = RejectGuildJoinRequestCommand.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getRequestId()).isEqualTo(11L);
     }
@@ -147,8 +151,8 @@ class GuildPacketsTest {
                 new PacketHeader(Opcode.OPCODE_REJECT_GUILD_JOIN_REQUEST_RESPONSE_VALUE, ProtocolVersion.CURRENT, 4);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        RejectGuildJoinRequestResponse parsed =
-                RejectGuildJoinRequestResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        RejectGuildJoinRequestResponse parsed = RejectGuildJoinRequestResponse.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(RejectGuildJoinRequestOutcome.REJECT_GUILD_JOIN_REQUEST_OUTCOME_OK);
     }
@@ -158,7 +162,9 @@ class GuildPacketsTest {
         LeaveGuildCommand command = LeaveGuildCommand.newBuilder().build();
         PacketHeader header = new PacketHeader(Opcode.OPCODE_LEAVE_GUILD_COMMAND_VALUE, ProtocolVersion.CURRENT, 5);
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        assertThat(LeaveGuildCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload())).isEqualTo(command);
+        assertThat(LeaveGuildCommand.parseFrom(
+                        PacketCodec.decodeFrame(frameBytes).payload()))
+                .isEqualTo(command);
 
         LeaveGuildResponse response = LeaveGuildResponse.newBuilder()
                 .setOutcome(LeaveGuildOutcome.LEAVE_GUILD_OUTCOME_LEADER_CANNOT_LEAVE)
@@ -166,8 +172,8 @@ class GuildPacketsTest {
         PacketHeader responseHeader =
                 new PacketHeader(Opcode.OPCODE_LEAVE_GUILD_RESPONSE_VALUE, ProtocolVersion.CURRENT, 5);
         byte[] responseBytes = PacketCodec.encodeFrame(responseHeader, response.toByteArray());
-        LeaveGuildResponse parsedResponse =
-                LeaveGuildResponse.parseFrom(PacketCodec.decodeFrame(responseBytes).payload());
+        LeaveGuildResponse parsedResponse = LeaveGuildResponse.parseFrom(
+                PacketCodec.decodeFrame(responseBytes).payload());
         assertThat(parsedResponse.getOutcome()).isEqualTo(LeaveGuildOutcome.LEAVE_GUILD_OUTCOME_LEADER_CANNOT_LEAVE);
     }
 
@@ -176,26 +182,31 @@ class GuildPacketsTest {
         DisbandGuildCommand command = DisbandGuildCommand.newBuilder().build();
         PacketHeader header = new PacketHeader(Opcode.OPCODE_DISBAND_GUILD_COMMAND_VALUE, ProtocolVersion.CURRENT, 6);
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        assertThat(DisbandGuildCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload())).isEqualTo(command);
+        assertThat(DisbandGuildCommand.parseFrom(
+                        PacketCodec.decodeFrame(frameBytes).payload()))
+                .isEqualTo(command);
 
-        DisbandGuildResponse response =
-                DisbandGuildResponse.newBuilder().setOutcome(DisbandGuildOutcome.DISBAND_GUILD_OUTCOME_OK).build();
+        DisbandGuildResponse response = DisbandGuildResponse.newBuilder()
+                .setOutcome(DisbandGuildOutcome.DISBAND_GUILD_OUTCOME_OK)
+                .build();
         PacketHeader responseHeader =
                 new PacketHeader(Opcode.OPCODE_DISBAND_GUILD_RESPONSE_VALUE, ProtocolVersion.CURRENT, 6);
         byte[] responseBytes = PacketCodec.encodeFrame(responseHeader, response.toByteArray());
-        DisbandGuildResponse parsedResponse =
-                DisbandGuildResponse.parseFrom(PacketCodec.decodeFrame(responseBytes).payload());
+        DisbandGuildResponse parsedResponse = DisbandGuildResponse.parseFrom(
+                PacketCodec.decodeFrame(responseBytes).payload());
         assertThat(parsedResponse.getOutcome()).isEqualTo(DisbandGuildOutcome.DISBAND_GUILD_OUTCOME_OK);
     }
 
     @Test
     void shouldRoundTripKickGuildMemberCommand() throws InvalidProtocolBufferException {
-        KickGuildMemberCommand command = KickGuildMemberCommand.newBuilder().setTargetName("sasuke").build();
+        KickGuildMemberCommand command =
+                KickGuildMemberCommand.newBuilder().setTargetName("sasuke").build();
         PacketHeader header =
                 new PacketHeader(Opcode.OPCODE_KICK_GUILD_MEMBER_COMMAND_VALUE, ProtocolVersion.CURRENT, 7);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, command.toByteArray());
-        KickGuildMemberCommand parsed = KickGuildMemberCommand.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        KickGuildMemberCommand parsed = KickGuildMemberCommand.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getTargetName()).isEqualTo("sasuke");
     }
@@ -209,28 +220,28 @@ class GuildPacketsTest {
                 new PacketHeader(Opcode.OPCODE_KICK_GUILD_MEMBER_RESPONSE_VALUE, ProtocolVersion.CURRENT, 7);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        KickGuildMemberResponse parsed =
-                KickGuildMemberResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        KickGuildMemberResponse parsed = KickGuildMemberResponse.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getOutcome()).isEqualTo(KickGuildMemberOutcome.KICK_GUILD_MEMBER_OUTCOME_CANNOT_KICK_SELF);
     }
 
     @Test
     void shouldRoundTripListGuildMembersResponse() throws InvalidProtocolBufferException {
-        ListGuildMembersRequest.newBuilder().build(); // não field nào — build để chắc không lỗi
         GuildMemberView member = GuildMemberView.newBuilder()
                 .setCharacterId(3L)
                 .setName("naruto")
                 .setIsLeader(true)
                 .setOnline(true)
                 .build();
-        ListGuildMembersResponse response = ListGuildMembersResponse.newBuilder().addMembers(member).build();
+        ListGuildMembersResponse response =
+                ListGuildMembersResponse.newBuilder().addMembers(member).build();
         PacketHeader header =
                 new PacketHeader(Opcode.OPCODE_LIST_GUILD_MEMBERS_RESPONSE_VALUE, ProtocolVersion.CURRENT, 8);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        ListGuildMembersResponse parsed =
-                ListGuildMembersResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ListGuildMembersResponse parsed = ListGuildMembersResponse.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getMembersList()).hasSize(1);
         assertThat(parsed.getMembers(0).getCharacterId()).isEqualTo(3L);
@@ -241,20 +252,20 @@ class GuildPacketsTest {
 
     @Test
     void shouldRoundTripListPendingGuildJoinRequestsResponse() throws InvalidProtocolBufferException {
-        ListPendingGuildJoinRequestsRequest.newBuilder().build();
         PendingGuildJoinRequestView pending = PendingGuildJoinRequestView.newBuilder()
                 .setRequestId(1L)
                 .setCharacterId(2L)
                 .setCharacterName("sasuke")
                 .build();
-        ListPendingGuildJoinRequestsResponse response =
-                ListPendingGuildJoinRequestsResponse.newBuilder().addRequests(pending).build();
+        ListPendingGuildJoinRequestsResponse response = ListPendingGuildJoinRequestsResponse.newBuilder()
+                .addRequests(pending)
+                .build();
         PacketHeader header = new PacketHeader(
                 Opcode.OPCODE_LIST_PENDING_GUILD_JOIN_REQUESTS_RESPONSE_VALUE, ProtocolVersion.CURRENT, 9);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        ListPendingGuildJoinRequestsResponse parsed =
-                ListPendingGuildJoinRequestsResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        ListPendingGuildJoinRequestsResponse parsed = ListPendingGuildJoinRequestsResponse.parseFrom(
+                PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getRequestsList()).hasSize(1);
         assertThat(parsed.getRequests(0).getRequestId()).isEqualTo(1L);
@@ -264,7 +275,6 @@ class GuildPacketsTest {
 
     @Test
     void shouldRoundTripGetMyGuildResponse() throws InvalidProtocolBufferException {
-        GetMyGuildRequest.newBuilder().build();
         GetMyGuildResponse response = GetMyGuildResponse.newBuilder()
                 .setInGuild(true)
                 .setGuildId(5L)
@@ -274,7 +284,8 @@ class GuildPacketsTest {
         PacketHeader header = new PacketHeader(Opcode.OPCODE_GET_MY_GUILD_RESPONSE_VALUE, ProtocolVersion.CURRENT, 10);
 
         byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
-        GetMyGuildResponse parsed = GetMyGuildResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+        GetMyGuildResponse parsed =
+                GetMyGuildResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
 
         assertThat(parsed.getInGuild()).isTrue();
         assertThat(parsed.getGuildId()).isEqualTo(5L);

@@ -39,6 +39,5 @@ final class WorldConstants {
     static final float AOI_SYNC_RATE_HZ = 20f;
     static final int AOI_SYNC_INTERVAL_TICKS = Math.round(TICK_RATE / AOI_SYNC_RATE_HZ);
 
-    private WorldConstants() {
-    }
+    private WorldConstants() {}
 }

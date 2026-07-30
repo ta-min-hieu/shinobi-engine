@@ -11,7 +11,8 @@ package dev.kage.server.gateway;
  * {@code arenaInstanceRegistry} (Phase 8 lát cắt 4) không vi phạm giới hạn.
  */
 record WorldGateway(
-        MainWorldChannelRegistry mainWorldChannels, ConnectedCharacterRegistry registry,
-        CharacterPositionPersister positionPersister, DungeonInstanceRegistry dungeonInstanceRegistry,
-        ArenaInstanceRegistry arenaInstanceRegistry) {
-}
+        MainWorldChannelRegistry mainWorldChannels,
+        ConnectedCharacterRegistry registry,
+        CharacterPositionPersister positionPersister,
+        DungeonInstanceRegistry dungeonInstanceRegistry,
+        ArenaInstanceRegistry arenaInstanceRegistry) {}

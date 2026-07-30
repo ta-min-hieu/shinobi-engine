@@ -15,5 +15,8 @@ public final class AcceptTradeRequestUseCase {
         return port.acceptRequest(sessionId, characterId) ? Result.OK : Result.NOT_FOUND;
     }
 
-    public enum Result { OK, NOT_FOUND }
+    public enum Result {
+        OK,
+        NOT_FOUND
+    }
 }

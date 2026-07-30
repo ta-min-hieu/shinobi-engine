@@ -17,6 +17,5 @@ final class AiConstants {
     static final float IDLE_DURATION_SECONDS = 3f;
     static final float MAX_PATROL_DURATION_SECONDS = 5f; // tránh kẹt nếu vì lý do gì không tới được điểm patrol
 
-    private AiConstants() {
-    }
+    private AiConstants() {}
 }

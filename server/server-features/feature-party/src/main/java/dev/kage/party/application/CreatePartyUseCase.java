@@ -19,8 +19,10 @@ public final class CreatePartyUseCase {
         return new Result(Outcome.OK, port.createParty(characterId));
     }
 
-    public enum Outcome { OK, ALREADY_IN_PARTY }
-
-    public record Result(Outcome outcome, Party party) {
+    public enum Outcome {
+        OK,
+        ALREADY_IN_PARTY
     }
+
+    public record Result(Outcome outcome, Party party) {}
 }

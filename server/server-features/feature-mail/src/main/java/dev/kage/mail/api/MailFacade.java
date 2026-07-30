@@ -1,12 +1,13 @@
 package dev.kage.mail.api;
 
+import java.util.List;
+
 import dev.kage.mail.application.ClaimMailUseCase;
 import dev.kage.mail.application.DeleteMailUseCase;
 import dev.kage.mail.application.ListMailUseCase;
 import dev.kage.mail.application.SendMailUseCase;
 import dev.kage.mail.domain.MailAttachment;
 import dev.kage.mail.domain.NewMail;
-import java.util.List;
 
 /**
  * API công khai của {@code feature-mail} — module khác (server-gateway) CHỈ gọi qua đây, không
@@ -21,7 +22,9 @@ public final class MailFacade {
     private final DeleteMailUseCase deleteMailUseCase;
 
     public MailFacade(
-            SendMailUseCase sendMailUseCase, ListMailUseCase listMailUseCase, ClaimMailUseCase claimMailUseCase,
+            SendMailUseCase sendMailUseCase,
+            ListMailUseCase listMailUseCase,
+            ClaimMailUseCase claimMailUseCase,
             DeleteMailUseCase deleteMailUseCase) {
         this.sendMailUseCase = sendMailUseCase;
         this.listMailUseCase = listMailUseCase;
@@ -35,7 +38,11 @@ public final class MailFacade {
                 .map(a -> new MailAttachment(a.itemTemplateId(), a.quantity()))
                 .toList();
         NewMail newMail = new NewMail(
-                request.senderId(), request.recipientId(), request.subject(), request.body(), request.goldAmount(),
+                request.senderId(),
+                request.recipientId(),
+                request.subject(),
+                request.body(),
+                request.goldAmount(),
                 domainAttachments);
         return sendMailUseCase.execute(newMail).id();
     }
@@ -74,24 +81,47 @@ public final class MailFacade {
         };
     }
 
-    public enum ClaimResult { OK, NOT_FOUND, ALREADY_CLAIMED, INVENTORY_FULL, DUPLICATE_REQUEST }
-
-    public enum DeleteResult { OK, NOT_FOUND, MUST_CLAIM_FIRST }
-
-    public record AttachmentRequest(long itemTemplateId, int quantity) {
+    public enum ClaimResult {
+        OK,
+        NOT_FOUND,
+        ALREADY_CLAIMED,
+        INVENTORY_FULL,
+        DUPLICATE_REQUEST
     }
+
+    public enum DeleteResult {
+        OK,
+        NOT_FOUND,
+        MUST_CLAIM_FIRST
+    }
+
+    public record AttachmentRequest(long itemTemplateId, int quantity) {}
 
     /** Gộp tham số gửi thư — tránh {@link #sendMail} vượt 4 tham số (Checkstyle ParameterNumber). */
     public record SendMailRequest(
-            Long senderId, long recipientId, String subject, String body, long goldAmount,
+            Long senderId,
+            long recipientId,
+            String subject,
+            String body,
+            long goldAmount,
             List<AttachmentRequest> attachments) {
+        public SendMailRequest {
+            attachments = List.copyOf(attachments);
+        }
     }
 
-    public record AttachmentView(long itemTemplateId, int quantity) {
-    }
+    public record AttachmentView(long itemTemplateId, int quantity) {}
 
     public record MailView(
-            long mailId, Long senderId, String subject, String body, long goldAmount,
-            List<AttachmentView> attachments, boolean claimed) {
+            long mailId,
+            Long senderId,
+            String subject,
+            String body,
+            long goldAmount,
+            List<AttachmentView> attachments,
+            boolean claimed) {
+        public MailView {
+            attachments = List.copyOf(attachments);
+        }
     }
 }

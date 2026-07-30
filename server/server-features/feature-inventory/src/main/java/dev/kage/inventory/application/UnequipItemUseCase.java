@@ -18,7 +18,8 @@ public final class UnequipItemUseCase {
     }
 
     public UnequipItemResult execute(long characterId, EquipmentSlotType slot) {
-        Equipment equipment = equipmentPort.findByCharacter(characterId)
+        Equipment equipment = equipmentPort
+                .findByCharacter(characterId)
                 .orElseThrow(() -> new IllegalStateException("EquipmentPort phải luôn trả Optional có giá trị"));
 
         if (equipment.unequip(slot) == Equipment.UnequipResult.NOT_EQUIPPED) {
@@ -28,5 +29,8 @@ public final class UnequipItemUseCase {
         return UnequipItemResult.OK;
     }
 
-    public enum UnequipItemResult { OK, NOT_EQUIPPED }
+    public enum UnequipItemResult {
+        OK,
+        NOT_EQUIPPED
+    }
 }

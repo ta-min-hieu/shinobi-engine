@@ -2,6 +2,24 @@ package dev.kage.server.gateway;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.net.Socket;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
 import dev.kage.account.api.AccountFacade;
 import dev.kage.account.application.LoginOrCreateAccountUseCase;
 import dev.kage.account.domain.Account;
@@ -49,11 +67,11 @@ import dev.kage.protocol.BuyOutcome;
 import dev.kage.protocol.ChallengeDuelCommand;
 import dev.kage.protocol.ChallengeDuelOutcome;
 import dev.kage.protocol.ChallengeDuelResponse;
-import dev.kage.protocol.ChatChannel;
-import dev.kage.protocol.ChatMessageEvent;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
+import dev.kage.protocol.ChatChannel;
+import dev.kage.protocol.ChatMessageEvent;
 import dev.kage.protocol.ClaimQuestRewardCommand;
 import dev.kage.protocol.ClaimQuestRewardOutcome;
 import dev.kage.protocol.ClaimQuestRewardResponse;
@@ -74,16 +92,16 @@ import dev.kage.protocol.EnhanceOutcome;
 import dev.kage.protocol.EnterDungeonCommand;
 import dev.kage.protocol.EnterDungeonOutcome;
 import dev.kage.protocol.EnterDungeonResponse;
+import dev.kage.protocol.EquipItemCommand;
+import dev.kage.protocol.EquipItemResponse;
+import dev.kage.protocol.EquipmentSlot;
+import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.ExitDuelCommand;
 import dev.kage.protocol.ExitDuelOutcome;
 import dev.kage.protocol.ExitDuelResponse;
 import dev.kage.protocol.ExitDungeonCommand;
 import dev.kage.protocol.ExitDungeonOutcome;
 import dev.kage.protocol.ExitDungeonResponse;
-import dev.kage.protocol.EquipItemCommand;
-import dev.kage.protocol.EquipItemResponse;
-import dev.kage.protocol.EquipmentSlot;
-import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.GetPvpRatingRequest;
 import dev.kage.protocol.GetPvpRatingResponse;
 import dev.kage.protocol.ListShopItemsRequest;
@@ -98,12 +116,12 @@ import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.SellItemCommand;
 import dev.kage.protocol.SellItemResponse;
 import dev.kage.protocol.SellOutcome;
-import dev.kage.protocol.SendFriendRequestCommand;
-import dev.kage.protocol.SendFriendRequestOutcome;
-import dev.kage.protocol.SendFriendRequestResponse;
 import dev.kage.protocol.SendChatMessageCommand;
 import dev.kage.protocol.SendChatMessageOutcome;
 import dev.kage.protocol.SendChatMessageResponse;
+import dev.kage.protocol.SendFriendRequestCommand;
+import dev.kage.protocol.SendFriendRequestOutcome;
+import dev.kage.protocol.SendFriendRequestResponse;
 import dev.kage.protocol.SendMailCommand;
 import dev.kage.protocol.SendMailOutcome;
 import dev.kage.protocol.SendMailResponse;
@@ -115,22 +133,6 @@ import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
 import dev.kage.server.world.WorldFacade;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.net.Socket;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test end-to-end bằng SOCKET TCP THẬT (không {@code EmbeddedChannel}) — verify đúng ROADMAP
@@ -182,7 +184,10 @@ class GatewayServerIntegrationTest {
         ArenaInstanceRegistry arenaInstanceRegistry =
                 new ArenaInstanceRegistry(characterRegistry, characterFacade, pvpFacade, mainWorldChannels);
         WorldGateway worldGateway = new WorldGateway(
-                mainWorldChannels, characterRegistry, positionPersister, dungeonInstanceRegistry,
+                mainWorldChannels,
+                characterRegistry,
+                positionPersister,
+                dungeonInstanceRegistry,
                 arenaInstanceRegistry);
         SocialFacades socialFacades = new SocialFacades(
                 friendFacade, mailFacade, chatFacade, guildFacade, partyFacade, tradeFacade, pvpFacade);
@@ -254,7 +259,9 @@ class GatewayServerIntegrationTest {
 
             @Override
             public List<Character> listByAccount(long accountId) {
-                return characters.stream().filter(c -> c.accountId() == accountId).toList();
+                return characters.stream()
+                        .filter(c -> c.accountId() == accountId)
+                        .toList();
             }
 
             @Override
@@ -298,9 +305,18 @@ class GatewayServerIntegrationTest {
                 for (int i = 0; i < characters.size(); i++) {
                     Character c = characters.get(i);
                     if (c.id() == characterId) {
-                        characters.set(i, new Character(
-                                c.id(), c.accountId(), c.realmId(), c.name(), faction,
-                                c.level(), c.exp(), c.rebirthCount(), c.createdAt()));
+                        characters.set(
+                                i,
+                                new Character(
+                                        c.id(),
+                                        c.accountId(),
+                                        c.realmId(),
+                                        c.name(),
+                                        faction,
+                                        c.level(),
+                                        c.exp(),
+                                        c.rebirthCount(),
+                                        c.createdAt()));
                         return;
                     }
                 }
@@ -352,23 +368,20 @@ class GatewayServerIntegrationTest {
             }
 
             @Override
-            public void save(dev.kage.inventory.domain.Transaction tx, Equipment equipment) {
-            }
+            public void save(dev.kage.inventory.domain.Transaction tx, Equipment equipment) {}
         };
-        EquipItemUseCase equipItemUseCase = new EquipItemUseCase(
-                inventoryPort, itemTemplatePort, equipmentPort, action -> action.accept(null));
-        UnequipItemUseCase unequipItemUseCase =
-                new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
+        EquipItemUseCase equipItemUseCase =
+                new EquipItemUseCase(inventoryPort, itemTemplatePort, equipmentPort, action -> action.accept(null));
+        UnequipItemUseCase unequipItemUseCase = new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
         ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase =
                 new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
         EquipmentUseCases equipmentUseCases =
                 new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
         // Cường hoá không dùng trong test này — fake tối thiểu để compile.
         GoldPort goldPort = (tx, characterId, amount) -> true;
-        AuditPort auditPort = (tx, characterId, action, detailJson) -> { };
+        AuditPort auditPort = (tx, characterId, action, detailJson) -> {};
         EnhancePorts enhancePorts = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
-        EnhanceItemUseCase enhanceItemUseCase =
-                new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
+        EnhanceItemUseCase enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
         return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
     }
 
@@ -393,30 +406,29 @@ class GatewayServerIntegrationTest {
             }
 
             @Override
-            public void creditGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {
-            }
+            public void creditGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {}
         };
         dev.kage.shop.domain.InventoryGatewayPort inventoryGatewayPort =
                 new dev.kage.shop.domain.InventoryGatewayPort() {
-            @Override
-            public Optional<dev.kage.shop.domain.OwnedItem> findItem(long characterId, long itemId) {
-                return Optional.empty();
-            }
+                    @Override
+                    public Optional<dev.kage.shop.domain.OwnedItem> findItem(long characterId, long itemId) {
+                        return Optional.empty();
+                    }
 
-            @Override
-            public boolean grantItem(
-                    dev.kage.shop.domain.Transaction tx, long characterId, long itemTemplateId, int quantity) {
-                return true;
-            }
+                    @Override
+                    public boolean grantItem(
+                            dev.kage.shop.domain.Transaction tx, long characterId, long itemTemplateId, int quantity) {
+                        return true;
+                    }
 
-            @Override
-            public boolean removeQuantity(
-                    dev.kage.shop.domain.Transaction tx, long characterId, long itemId, int quantity) {
-                return true;
-            }
-        };
-        dev.kage.shop.domain.AuditPort shopAuditPort = (tx, characterId, action, detailJson) -> { };
-        dev.kage.shop.domain.IdempotencyPort shopIdempotencyPort = (tx, idempotencyKey) -> { };
+                    @Override
+                    public boolean removeQuantity(
+                            dev.kage.shop.domain.Transaction tx, long characterId, long itemId, int quantity) {
+                        return true;
+                    }
+                };
+        dev.kage.shop.domain.AuditPort shopAuditPort = (tx, characterId, action, detailJson) -> {};
+        dev.kage.shop.domain.IdempotencyPort shopIdempotencyPort = (tx, idempotencyKey) -> {};
         dev.kage.shop.application.ShopPorts ports = new dev.kage.shop.application.ShopPorts(
                 catalogPort, shopGoldPort, inventoryGatewayPort, shopAuditPort, shopIdempotencyPort);
         dev.kage.shop.application.ListShopItemsUseCase listShopItemsUseCase =
@@ -446,14 +458,13 @@ class GatewayServerIntegrationTest {
             }
 
             @Override
-            public void save(dev.kage.quest.domain.Transaction tx, dev.kage.quest.domain.QuestProgress progress) {
-            }
+            public void save(dev.kage.quest.domain.Transaction tx, dev.kage.quest.domain.QuestProgress progress) {}
         };
         dev.kage.quest.domain.QuestTemplatePort templatePort = questCode -> Optional.empty();
-        dev.kage.quest.domain.ExpPort expPort = (tx, characterId, amount) -> { };
+        dev.kage.quest.domain.ExpPort expPort = (tx, characterId, amount) -> {};
         dev.kage.quest.domain.QuestInventoryGrantPort inventoryGrantPort =
                 (tx, characterId, itemTemplateCode, quantity) -> true;
-        dev.kage.quest.domain.AuditPort auditPort = (tx, characterId, action, detailJson) -> { };
+        dev.kage.quest.domain.AuditPort auditPort = (tx, characterId, action, detailJson) -> {};
         dev.kage.quest.domain.TransactionRunner tx = action -> action.accept(null);
 
         dev.kage.quest.application.AcceptQuestUseCase acceptQuestUseCase =
@@ -463,8 +474,7 @@ class GatewayServerIntegrationTest {
         dev.kage.quest.application.QuestRewardPorts rewardPorts =
                 new dev.kage.quest.application.QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
         dev.kage.quest.application.ClaimQuestRewardUseCase claimQuestRewardUseCase =
-                new dev.kage.quest.application.ClaimQuestRewardUseCase(
-                        progressPort, templatePort, rewardPorts, tx);
+                new dev.kage.quest.application.ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx);
         return new dev.kage.quest.api.QuestFacade(
                 acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
     }
@@ -552,11 +562,11 @@ class GatewayServerIntegrationTest {
                 return false;
             }
         };
-        dev.kage.mail.domain.GoldPort mailGoldPort = (tx, characterId, amount) -> { };
+        dev.kage.mail.domain.GoldPort mailGoldPort = (tx, characterId, amount) -> {};
         dev.kage.mail.domain.InventoryGatewayPort mailInventoryGatewayPort =
                 (tx, characterId, itemTemplateId, quantity) -> true;
-        dev.kage.mail.domain.AuditPort mailAuditPort = (tx, characterId, action, detailJson) -> { };
-        dev.kage.mail.domain.IdempotencyPort mailIdempotencyPort = (tx, idempotencyKey) -> { };
+        dev.kage.mail.domain.AuditPort mailAuditPort = (tx, characterId, action, detailJson) -> {};
+        dev.kage.mail.domain.IdempotencyPort mailIdempotencyPort = (tx, idempotencyKey) -> {};
         dev.kage.mail.domain.TransactionRunner mailTx = action -> action.accept(null);
         dev.kage.mail.application.SendMailUseCase sendMailUseCase =
                 new dev.kage.mail.application.SendMailUseCase(mailRepositoryPort, mailTx);
@@ -573,7 +583,7 @@ class GatewayServerIntegrationTest {
 
     // Chat không dùng trong test này — fake tối thiểu để compile (cùng convention fakeMailFacade).
     private dev.kage.chat.api.ChatFacade fakeChatFacade() {
-        dev.kage.chat.domain.ChatAuditPort chatAuditPort = (characterId, action, detailJson) -> { };
+        dev.kage.chat.domain.ChatAuditPort chatAuditPort = (characterId, action, detailJson) -> {};
         return new dev.kage.chat.api.ChatFacade(new dev.kage.chat.application.SendChatMessageUseCase(chatAuditPort));
     }
 
@@ -716,8 +726,8 @@ class GatewayServerIntegrationTest {
             @Override
             public dev.kage.party.domain.PartyInvite invite(long partyId, long inviteeCharacterId) {
                 long inviteId = nextInviteId.getAndIncrement();
-                dev.kage.party.domain.PartyInvite invite = new dev.kage.party.domain.PartyInvite(
-                        inviteId, partyId, inviteeCharacterId, Instant.now());
+                dev.kage.party.domain.PartyInvite invite =
+                        new dev.kage.party.domain.PartyInvite(inviteId, partyId, inviteeCharacterId, Instant.now());
                 invitesById.put(inviteId, invite);
                 return invite;
             }
@@ -731,7 +741,9 @@ class GatewayServerIntegrationTest {
                 invitesById.remove(inviteId);
                 dev.kage.party.domain.PartyMember member = new dev.kage.party.domain.PartyMember(
                         invite.partyId(), characterId, dev.kage.party.domain.PartyRole.MEMBER, Instant.now());
-                membersByPartyId.computeIfAbsent(invite.partyId(), id -> new ArrayList<>()).add(member);
+                membersByPartyId
+                        .computeIfAbsent(invite.partyId(), id -> new ArrayList<>())
+                        .add(member);
                 return AcceptResult.OK;
             }
 
@@ -797,7 +809,10 @@ class GatewayServerIntegrationTest {
             }
 
             @Override
-            public boolean replaceOffer(long sessionId, long characterId, long goldAmount,
+            public boolean replaceOffer(
+                    long sessionId,
+                    long characterId,
+                    long goldAmount,
                     List<dev.kage.trade.domain.OfferedItemInput> items) {
                 throw new UnsupportedOperationException("không dùng ở test này");
             }
@@ -845,8 +860,8 @@ class GatewayServerIntegrationTest {
                 throw new UnsupportedOperationException("không dùng ở test này");
             }
         };
-        dev.kage.trade.domain.TradeAuditPort auditPort = (tx, characterId, action, detailJson) -> { };
-        dev.kage.trade.domain.IdempotencyPort idempotencyPort = (tx, idempotencyKey) -> { };
+        dev.kage.trade.domain.TradeAuditPort auditPort = (tx, characterId, action, detailJson) -> {};
+        dev.kage.trade.domain.IdempotencyPort idempotencyPort = (tx, idempotencyKey) -> {};
         dev.kage.trade.application.TradePorts ports = new dev.kage.trade.application.TradePorts(
                 sessionPort, inventoryPort, goldPort, auditPort, idempotencyPort);
         dev.kage.trade.application.TradeUseCases useCases = new dev.kage.trade.application.TradeUseCases(
@@ -882,8 +897,8 @@ class GatewayServerIntegrationTest {
                 int wins = (existing == null ? 0 : existing.wins()) + winsDelta;
                 int losses = (existing == null ? 0 : existing.losses()) + lossesDelta;
                 ratingsByCharacterId.put(
-                        characterId, new dev.kage.pvp.domain.PvpRating(characterId, newRating, wins, losses,
-                                Instant.now()));
+                        characterId,
+                        new dev.kage.pvp.domain.PvpRating(characterId, newRating, wins, losses, Instant.now()));
             }
         };
         return new dev.kage.pvp.api.PvpFacade(ratingPort);
@@ -907,7 +922,8 @@ class GatewayServerIntegrationTest {
             DataInputStream in = new DataInputStream(socket.getInputStream());
             long characterId = connectCreateAndSelect(socket, in, "shutdowntest");
 
-            MoveCommand moveCommand = MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
+            MoveCommand moveCommand =
+                    MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
             sendFrame(socket, Opcode.OPCODE_MOVE_COMMAND_VALUE, 10, moveCommand.toByteArray());
             readUntilOpcode(in, Opcode.OPCODE_MOVE_RESPONSE_VALUE); // xác nhận world đã bắt đầu di chuyển
 
@@ -915,10 +931,11 @@ class GatewayServerIntegrationTest {
 
             // MoveCommand thứ 2 (dừng lại) — MoveResponse trả về là vị trí HIỆN TẠI, dùng làm giá
             // trị kỳ vọng để so sánh với DB sau khi tắt server (không đoán khoảng cách đã đi).
-            MoveCommand stopCommand = MoveCommand.newBuilder().setDirX(0f).setDirY(0f).build();
+            MoveCommand stopCommand =
+                    MoveCommand.newBuilder().setDirX(0f).setDirY(0f).build();
             sendFrame(socket, Opcode.OPCODE_MOVE_COMMAND_VALUE, 11, stopCommand.toByteArray());
-            MoveResponse stopResponse =
-                    MoveResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_MOVE_RESPONSE_VALUE).payload());
+            MoveResponse stopResponse = MoveResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_MOVE_RESPONSE_VALUE).payload());
             assertThat(stopResponse.getX()).isGreaterThan(0f); // sanity: di chuyển thật đã xảy ra
 
             server.stop(); // KHÔNG đợi @AfterEach — test tự gọi để verify NGAY sau khi trả về
@@ -935,7 +952,8 @@ class GatewayServerIntegrationTest {
             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
             DataInputStream in = new DataInputStream(socket.getInputStream());
 
-            PingCommand ping = PingCommand.newBuilder().setClientTimestampMs(999L).build();
+            PingCommand ping =
+                    PingCommand.newBuilder().setClientTimestampMs(999L).build();
             PacketHeader header = new PacketHeader(Opcode.OPCODE_PING_VALUE, ProtocolVersion.CURRENT, 1);
             byte[] frame = PacketCodec.encodeFrame(header, ping.toByteArray());
             out.writeInt(frame.length);
@@ -989,15 +1007,18 @@ class GatewayServerIntegrationTest {
             long characterB = connectCreateAndSelect(socketB, inB, "b" + suffix);
 
             // Cả 2 spawn cùng điểm (0,0) — vào AoI của nhau ngay tick kế tiếp sau khi attach.
-            CharacterSpawnedEvent spawnSeenByA = CharacterSpawnedEvent.parseFrom(
-                    readUntilOpcode(inA, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload());
+            CharacterSpawnedEvent spawnSeenByA =
+                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
+                            .payload());
             assertThat(spawnSeenByA.getCharacterId()).isEqualTo(characterB);
-            CharacterSpawnedEvent spawnSeenByB = CharacterSpawnedEvent.parseFrom(
-                    readUntilOpcode(inB, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload());
+            CharacterSpawnedEvent spawnSeenByB =
+                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
+                            .payload());
             assertThat(spawnSeenByB.getCharacterId()).isEqualTo(characterA);
 
             // A di chuyển — chỉ gửi HƯỚNG (movement.proto), server tự nhân tốc độ.
-            MoveCommand moveCommand = MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
+            MoveCommand moveCommand =
+                    MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
             sendFrame(socketA, Opcode.OPCODE_MOVE_COMMAND_VALUE, 10, moveCommand.toByteArray());
 
             // A tự nhận MoveResponse (reconciliation, CLIENT.md §6) khớp sequenceId đã gửi.
@@ -1007,8 +1028,9 @@ class GatewayServerIntegrationTest {
             assertThat(moveResponse.getX()).isGreaterThanOrEqualTo(0f);
 
             // B nhận CharacterMovedEvent về A (AoI — SERVER.md §6), vị trí đã đổi khỏi (0,0).
-            CharacterMovedEvent movedSeenByB = CharacterMovedEvent.parseFrom(
-                    readUntilOpcode(inB, Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE).payload());
+            CharacterMovedEvent movedSeenByB =
+                    CharacterMovedEvent.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE)
+                            .payload());
             assertThat(movedSeenByB.getCharacterId()).isEqualTo(characterA);
             assertThat(movedSeenByB.getX()).isGreaterThan(0f);
         }
@@ -1035,7 +1057,7 @@ class GatewayServerIntegrationTest {
             String suffix = UUID.randomUUID().toString().substring(0, 8);
             long characterA = connectCreateAndSelect(socketA, inA, "da" + suffix);
             long characterB = connectCreateAndSelect(socketB, inB, "db" + suffix);
-            long characterC = connectCreateAndSelect(socketC, inC, "dc" + suffix);
+            connectCreateAndSelect(socketC, inC, "dc" + suffix);
 
             // AoI sync() chạy 20Hz (tách khỏi tick 60Hz, WorldConstants.AOI_SYNC_RATE_HZ) — PHẢI
             // đợi C thật sự THẤY A/B spawn (bằng chứng sync() đã chạy ít nhất 1 lần từ lúc C attach)
@@ -1043,12 +1065,14 @@ class GatewayServerIntegrationTest {
             // có thể đợi mãi: nếu sync() CHƯA từng chạy, {@code visibleTo} của A/B vẫn RỖNG lúc
             // detach nên KHÔNG có ai để báo despawn (không phải lỗi despawn, mà chưa từng "spawn").
             java.util.HashSet<Long> spawnedSeenByC = new java.util.HashSet<Long>();
-            spawnedSeenByC.add(CharacterSpawnedEvent.parseFrom(
-                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload())
-                    .getCharacterId());
-            spawnedSeenByC.add(CharacterSpawnedEvent.parseFrom(
-                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload())
-                    .getCharacterId());
+            spawnedSeenByC.add(
+                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
+                                    .payload())
+                            .getCharacterId());
+            spawnedSeenByC.add(
+                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
+                                    .payload())
+                            .getCharacterId());
             assertThat(spawnedSeenByC).containsExactlyInAnyOrder(characterA, characterB);
 
             // Party A+B qua PartyFacade trực tiếp (đã có test riêng cho luồng mời/chấp nhận qua
@@ -1060,17 +1084,20 @@ class GatewayServerIntegrationTest {
             partyFacade.acceptInvite(inviteId, characterB);
 
             // A gửi EnterDungeonCommand — kéo THEO CẢ B (cùng party, đang online) vào CHUNG 1 instance.
-            EnterDungeonCommand enterCommand =
-                    EnterDungeonCommand.newBuilder().setDungeonCode("sample_dungeon").build();
+            EnterDungeonCommand enterCommand = EnterDungeonCommand.newBuilder()
+                    .setDungeonCode("sample_dungeon")
+                    .build();
             sendFrame(socketA, Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, 20, enterCommand.toByteArray());
-            EnterDungeonResponse enterResponseA = EnterDungeonResponse.parseFrom(
-                    readUntilOpcode(inA, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE).payload());
+            EnterDungeonResponse enterResponseA =
+                    EnterDungeonResponse.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE)
+                            .payload());
             assertThat(enterResponseA.getOutcome()).isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
 
             // B gửi lại CŨNG EnterDungeonCommand — đã bị A kéo vào sẵn, outcome phải là ALREADY_IN_DUNGEON.
             sendFrame(socketB, Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, 20, enterCommand.toByteArray());
-            EnterDungeonResponse enterResponseB = EnterDungeonResponse.parseFrom(
-                    readUntilOpcode(inB, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE).payload());
+            EnterDungeonResponse enterResponseB =
+                    EnterDungeonResponse.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE)
+                            .payload());
             assertThat(enterResponseB.getOutcome())
                     .isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_ALREADY_IN_DUNGEON);
 
@@ -1078,22 +1105,26 @@ class GatewayServerIntegrationTest {
             // thật (không chỉ "coi như" rời), vì AoI world chính không còn giữ entity của họ nữa.
             java.util.HashSet<Long> despawnedIds = new java.util.HashSet<Long>();
             despawnedIds.add(CharacterDespawnedEvent.parseFrom(
-                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE).payload())
+                            readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE)
+                                    .payload())
                     .getCharacterId());
             despawnedIds.add(CharacterDespawnedEvent.parseFrom(
-                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE).payload())
+                            readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE)
+                                    .payload())
                     .getCharacterId());
             assertThat(despawnedIds).containsExactlyInAnyOrder(characterA, characterB);
 
             // A di chuyển TRONG dungeon — B (cùng instance) phải thấy, chứng minh 2 người đang
             // tick chung 1 World riêng (không phải world chính, đã verify despawn ở trên).
-            MoveCommand moveCommand = MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
+            MoveCommand moveCommand =
+                    MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
             sendFrame(socketA, Opcode.OPCODE_MOVE_COMMAND_VALUE, 21, moveCommand.toByteArray());
             PacketCodec.Frame moveResponseFrame = readUntilOpcode(inA, Opcode.OPCODE_MOVE_RESPONSE_VALUE);
             assertThat(moveResponseFrame.header().sequenceId()).isEqualTo(21);
 
-            CharacterMovedEvent movedSeenByB = CharacterMovedEvent.parseFrom(
-                    readUntilOpcode(inB, Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE).payload());
+            CharacterMovedEvent movedSeenByB =
+                    CharacterMovedEvent.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE)
+                            .payload());
             assertThat(movedSeenByB.getCharacterId()).isEqualTo(characterA);
             assertThat(movedSeenByB.getX()).isGreaterThan(0f);
 
@@ -1101,20 +1132,23 @@ class GatewayServerIntegrationTest {
             // spawn lại — chứng minh A đã quay về world chính thành công.
             ExitDungeonCommand exitCommand = ExitDungeonCommand.newBuilder().build();
             sendFrame(socketA, Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE, 22, exitCommand.toByteArray());
-            ExitDungeonResponse exitResponseA = ExitDungeonResponse.parseFrom(
-                    readUntilOpcode(inA, Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE).payload());
+            ExitDungeonResponse exitResponseA =
+                    ExitDungeonResponse.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE)
+                            .payload());
             assertThat(exitResponseA.getOutcome()).isEqualTo(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK);
 
-            CharacterSpawnedEvent spawnSeenByC = CharacterSpawnedEvent.parseFrom(
-                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload());
+            CharacterSpawnedEvent spawnSeenByC =
+                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
+                            .payload());
             assertThat(spawnSeenByC.getCharacterId()).isEqualTo(characterA);
             assertThat(spawnSeenByC.getX()).isEqualTo(0f);
             assertThat(spawnSeenByC.getY()).isEqualTo(0f);
 
             // B rời nốt — dungeon instance rỗng, World của nó tự dừng (DungeonInstanceRegistry).
             sendFrame(socketB, Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE, 22, exitCommand.toByteArray());
-            ExitDungeonResponse exitResponseB = ExitDungeonResponse.parseFrom(
-                    readUntilOpcode(inB, Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE).payload());
+            ExitDungeonResponse exitResponseB =
+                    ExitDungeonResponse.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE)
+                            .payload());
             assertThat(exitResponseB.getOutcome()).isEqualTo(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK);
         }
     }
@@ -1136,19 +1170,23 @@ class GatewayServerIntegrationTest {
                     socket, in, "boss" + UUID.randomUUID().toString().substring(0, 6));
             partyFacade.createParty(characterId); // party 1 người — đủ điều kiện vào dungeon.
 
-            EnterDungeonCommand enterCommand =
-                    EnterDungeonCommand.newBuilder().setDungeonCode("sample_dungeon").build();
+            EnterDungeonCommand enterCommand = EnterDungeonCommand.newBuilder()
+                    .setDungeonCode("sample_dungeon")
+                    .build();
             sendFrame(socket, Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, 30, enterCommand.toByteArray());
-            EnterDungeonResponse enterResponse = EnterDungeonResponse.parseFrom(
-                    readUntilOpcode(in, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE).payload());
+            EnterDungeonResponse enterResponse =
+                    EnterDungeonResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE)
+                            .payload());
             assertThat(enterResponse.getOutcome()).isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
 
-            MonsterSpawnedEvent bossSpawned = MonsterSpawnedEvent.parseFrom(
-                    readUntilOpcode(in, Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE).payload());
+            MonsterSpawnedEvent bossSpawned =
+                    MonsterSpawnedEvent.parseFrom(readUntilOpcode(in, Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE)
+                            .payload());
             assertThat(bossSpawned.getMonsterCode()).isEqualTo("sample_boss");
             long bossId = bossSpawned.getMonsterId();
 
-            SetTargetCommand setTarget = SetTargetCommand.newBuilder().setTargetEntityId(bossId).build();
+            SetTargetCommand setTarget =
+                    SetTargetCommand.newBuilder().setTargetEntityId(bossId).build();
             sendFrame(socket, Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, 31, setTarget.toByteArray());
 
             // Boss phải dùng ÍT NHẤT 1 chiêu đặc biệt trước khi chết — đọc frame liên tục, phân
@@ -1161,7 +1199,7 @@ class GatewayServerIntegrationTest {
                     dev.kage.protocol.SkillResultEvent skillResult =
                             dev.kage.protocol.SkillResultEvent.parseFrom(frame.payload());
                     if (("heavy_strike".equals(skillResult.getSkillCode())
-                            || "enrage".equals(skillResult.getSkillCode()))
+                                    || "enrage".equals(skillResult.getSkillCode()))
                             && skillResult.getAttackerEntityId() == bossId) {
                         sawSpecialAction = true;
                     }
@@ -1174,7 +1212,9 @@ class GatewayServerIntegrationTest {
                 }
             }
             assertThat(bossDied).as("boss phải chết trong thời gian chờ").isTrue();
-            assertThat(sawSpecialAction).as("boss phải dùng heavy_strike hoặc enrage trước khi chết").isTrue();
+            assertThat(sawSpecialAction)
+                    .as("boss phải dùng heavy_strike hoặc enrage trước khi chết")
+                    .isTrue();
         }
     }
 
@@ -1194,33 +1234,41 @@ class GatewayServerIntegrationTest {
             connectCreateAndSelectNamed(socketA, inA, "duA" + suffix);
             CreatedCharacter characterB = connectCreateAndSelectNamed(socketB, inB, "duB" + suffix);
 
-            ChallengeDuelCommand challenge =
-                    ChallengeDuelCommand.newBuilder().setTargetName(characterB.name()).build();
+            ChallengeDuelCommand challenge = ChallengeDuelCommand.newBuilder()
+                    .setTargetName(characterB.name())
+                    .build();
             sendFrame(socketA, Opcode.OPCODE_CHALLENGE_DUEL_COMMAND_VALUE, 40, challenge.toByteArray());
-            ChallengeDuelResponse challengeResponse = ChallengeDuelResponse.parseFrom(
-                    readUntilOpcode(inA, Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE).payload());
+            ChallengeDuelResponse challengeResponse =
+                    ChallengeDuelResponse.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE)
+                            .payload());
             assertThat(challengeResponse.getOutcome()).isEqualTo(ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_OK);
             long challengeId = challengeResponse.getChallengeId();
 
             DuelChallengeReceivedEvent received = DuelChallengeReceivedEvent.parseFrom(
-                    readUntilOpcode(inB, Opcode.OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT_VALUE).payload());
+                    readUntilOpcode(inB, Opcode.OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT_VALUE)
+                            .payload());
             assertThat(received.getChallengeId()).isEqualTo(challengeId);
 
-            DeclineDuelCommand decline = DeclineDuelCommand.newBuilder().setChallengeId(challengeId).build();
+            DeclineDuelCommand decline =
+                    DeclineDuelCommand.newBuilder().setChallengeId(challengeId).build();
             sendFrame(socketB, Opcode.OPCODE_DECLINE_DUEL_COMMAND_VALUE, 41, decline.toByteArray());
-            DeclineDuelResponse declineResponse = DeclineDuelResponse.parseFrom(
-                    readUntilOpcode(inB, Opcode.OPCODE_DECLINE_DUEL_RESPONSE_VALUE).payload());
+            DeclineDuelResponse declineResponse =
+                    DeclineDuelResponse.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_DECLINE_DUEL_RESPONSE_VALUE)
+                            .payload());
             assertThat(declineResponse.getOutcome()).isEqualTo(DeclineDuelOutcome.DECLINE_DUEL_OUTCOME_OK);
 
             DuelChallengeDeclinedEvent declinedEvent = DuelChallengeDeclinedEvent.parseFrom(
-                    readUntilOpcode(inA, Opcode.OPCODE_DUEL_CHALLENGE_DECLINED_EVENT_VALUE).payload());
+                    readUntilOpcode(inA, Opcode.OPCODE_DUEL_CHALLENGE_DECLINED_EVENT_VALUE)
+                            .payload());
             assertThat(declinedEvent.getChallengeId()).isEqualTo(challengeId);
 
             // Thách đấu cũ đã bị dọn — chấp nhận lại (challengeId cũ) phải NOT_FOUND.
-            AcceptDuelCommand lateAccept = AcceptDuelCommand.newBuilder().setChallengeId(challengeId).build();
+            AcceptDuelCommand lateAccept =
+                    AcceptDuelCommand.newBuilder().setChallengeId(challengeId).build();
             sendFrame(socketB, Opcode.OPCODE_ACCEPT_DUEL_COMMAND_VALUE, 42, lateAccept.toByteArray());
-            AcceptDuelResponse lateAcceptResponse = AcceptDuelResponse.parseFrom(
-                    readUntilOpcode(inB, Opcode.OPCODE_ACCEPT_DUEL_RESPONSE_VALUE).payload());
+            AcceptDuelResponse lateAcceptResponse =
+                    AcceptDuelResponse.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_ACCEPT_DUEL_RESPONSE_VALUE)
+                            .payload());
             assertThat(lateAcceptResponse.getOutcome()).isEqualTo(AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_NOT_FOUND);
         }
     }
@@ -1253,29 +1301,36 @@ class GatewayServerIntegrationTest {
             // AoI sync() 20Hz — đợi C thật sự THẤY A/B spawn trước khi để họ vào duel, cùng lý do
             // partyShouldEnterAndExitDungeonAsSeparateWorld_overRealSockets (xem comment ở đó).
             java.util.HashSet<Long> spawnedSeenByC = new java.util.HashSet<Long>();
-            spawnedSeenByC.add(CharacterSpawnedEvent.parseFrom(
-                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload())
-                    .getCharacterId());
-            spawnedSeenByC.add(CharacterSpawnedEvent.parseFrom(
-                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload())
-                    .getCharacterId());
+            spawnedSeenByC.add(
+                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
+                                    .payload())
+                            .getCharacterId());
+            spawnedSeenByC.add(
+                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
+                                    .payload())
+                            .getCharacterId());
             assertThat(spawnedSeenByC).containsExactlyInAnyOrder(characterA, characterB);
 
-            ChallengeDuelCommand challenge =
-                    ChallengeDuelCommand.newBuilder().setTargetName(createdB.name()).build();
+            ChallengeDuelCommand challenge = ChallengeDuelCommand.newBuilder()
+                    .setTargetName(createdB.name())
+                    .build();
             sendFrame(socketA, Opcode.OPCODE_CHALLENGE_DUEL_COMMAND_VALUE, 40, challenge.toByteArray());
-            ChallengeDuelResponse challengeResponse = ChallengeDuelResponse.parseFrom(
-                    readUntilOpcode(inA, Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE).payload());
+            ChallengeDuelResponse challengeResponse =
+                    ChallengeDuelResponse.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE)
+                            .payload());
             assertThat(challengeResponse.getOutcome()).isEqualTo(ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_OK);
             long challengeId = challengeResponse.getChallengeId();
             DuelChallengeReceivedEvent received = DuelChallengeReceivedEvent.parseFrom(
-                    readUntilOpcode(inB, Opcode.OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT_VALUE).payload());
+                    readUntilOpcode(inB, Opcode.OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT_VALUE)
+                            .payload());
             assertThat(received.getChallengerCharacterId()).isEqualTo(characterA);
 
-            AcceptDuelCommand accept = AcceptDuelCommand.newBuilder().setChallengeId(challengeId).build();
+            AcceptDuelCommand accept =
+                    AcceptDuelCommand.newBuilder().setChallengeId(challengeId).build();
             sendFrame(socketB, Opcode.OPCODE_ACCEPT_DUEL_COMMAND_VALUE, 41, accept.toByteArray());
-            AcceptDuelResponse acceptResponse = AcceptDuelResponse.parseFrom(
-                    readUntilOpcode(inB, Opcode.OPCODE_ACCEPT_DUEL_RESPONSE_VALUE).payload());
+            AcceptDuelResponse acceptResponse =
+                    AcceptDuelResponse.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_ACCEPT_DUEL_RESPONSE_VALUE)
+                            .payload());
             assertThat(acceptResponse.getOutcome()).isEqualTo(AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_OK);
 
             DuelStartedEvent startedForB = DuelStartedEvent.parseFrom(
@@ -1288,17 +1343,21 @@ class GatewayServerIntegrationTest {
             // C (world chính) phải thấy CẢ A lẫn B despawn — chứng minh cách ly instance thật.
             java.util.HashSet<Long> despawnedIds = new java.util.HashSet<Long>();
             despawnedIds.add(CharacterDespawnedEvent.parseFrom(
-                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE).payload())
+                            readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE)
+                                    .payload())
                     .getCharacterId());
             despawnedIds.add(CharacterDespawnedEvent.parseFrom(
-                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE).payload())
+                            readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE)
+                                    .payload())
                     .getCharacterId());
             assertThat(despawnedIds).containsExactlyInAnyOrder(characterA, characterB);
 
             // Cùng chỉ số nền — cả 2 tự đánh nhau tới khi 1 người chết (CombatConstants.CHARACTER_MAX_HP=100).
-            SetTargetCommand targetB = SetTargetCommand.newBuilder().setTargetEntityId(characterB).build();
+            SetTargetCommand targetB =
+                    SetTargetCommand.newBuilder().setTargetEntityId(characterB).build();
             sendFrame(socketA, Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, 42, targetB.toByteArray());
-            SetTargetCommand targetA = SetTargetCommand.newBuilder().setTargetEntityId(characterA).build();
+            SetTargetCommand targetA =
+                    SetTargetCommand.newBuilder().setTargetEntityId(characterA).build();
             sendFrame(socketB, Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, 42, targetA.toByteArray());
 
             DuelResultEvent resultForA = DuelResultEvent.parseFrom(
@@ -1314,12 +1373,14 @@ class GatewayServerIntegrationTest {
 
             // C phải thấy CẢ A lẫn B spawn lại — chứng minh cả 2 đã quay về world chính thật.
             java.util.HashSet<Long> respawnedIds = new java.util.HashSet<Long>();
-            respawnedIds.add(CharacterSpawnedEvent.parseFrom(
-                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload())
-                    .getCharacterId());
-            respawnedIds.add(CharacterSpawnedEvent.parseFrom(
-                    readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE).payload())
-                    .getCharacterId());
+            respawnedIds.add(
+                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
+                                    .payload())
+                            .getCharacterId());
+            respawnedIds.add(
+                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
+                                    .payload())
+                            .getCharacterId());
             assertThat(respawnedIds).containsExactlyInAnyOrder(characterA, characterB);
 
             long winnerCharacterId = resultForA.getWinnerCharacterId();
@@ -1328,7 +1389,8 @@ class GatewayServerIntegrationTest {
             GetPvpRatingRequest ratingRequest = GetPvpRatingRequest.newBuilder().build();
             sendFrame(winnerSocket, Opcode.OPCODE_GET_PVP_RATING_REQUEST_VALUE, 43, ratingRequest.toByteArray());
             GetPvpRatingResponse ratingResponse = GetPvpRatingResponse.parseFrom(
-                    readUntilOpcode(winnerIn, Opcode.OPCODE_GET_PVP_RATING_RESPONSE_VALUE).payload());
+                    readUntilOpcode(winnerIn, Opcode.OPCODE_GET_PVP_RATING_RESPONSE_VALUE)
+                            .payload());
             assertThat(ratingResponse.getRating()).isEqualTo(1016);
             assertThat(ratingResponse.getWins()).isEqualTo(1);
             assertThat(ratingResponse.getLosses()).isZero();
@@ -1351,15 +1413,18 @@ class GatewayServerIntegrationTest {
             long characterA = connectCreateAndSelect(socketA, inA, "foA" + suffix);
             CreatedCharacter createdB = connectCreateAndSelectNamed(socketB, inB, "foB" + suffix);
 
-            ChallengeDuelCommand challenge =
-                    ChallengeDuelCommand.newBuilder().setTargetName(createdB.name()).build();
+            ChallengeDuelCommand challenge = ChallengeDuelCommand.newBuilder()
+                    .setTargetName(createdB.name())
+                    .build();
             sendFrame(socketA, Opcode.OPCODE_CHALLENGE_DUEL_COMMAND_VALUE, 40, challenge.toByteArray());
             long challengeId = ChallengeDuelResponse.parseFrom(
-                    readUntilOpcode(inA, Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE).payload())
+                            readUntilOpcode(inA, Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE)
+                                    .payload())
                     .getChallengeId();
             readUntilOpcode(inB, Opcode.OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT_VALUE);
 
-            AcceptDuelCommand accept = AcceptDuelCommand.newBuilder().setChallengeId(challengeId).build();
+            AcceptDuelCommand accept =
+                    AcceptDuelCommand.newBuilder().setChallengeId(challengeId).build();
             sendFrame(socketB, Opcode.OPCODE_ACCEPT_DUEL_COMMAND_VALUE, 41, accept.toByteArray());
             readUntilOpcode(inB, Opcode.OPCODE_ACCEPT_DUEL_RESPONSE_VALUE);
             readUntilOpcode(inA, Opcode.OPCODE_DUEL_STARTED_EVENT_VALUE);
@@ -1401,23 +1466,28 @@ class GatewayServerIntegrationTest {
         try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
-            long characterId = connectCreateAndSelect(socket, in, "atk" + UUID.randomUUID().toString().substring(0, 6));
+            long characterId = connectCreateAndSelect(
+                    socket, in, "atk" + UUID.randomUUID().toString().substring(0, 6));
 
             // Nhân vật mới spawn (0,0) — quái ở (5,5), cách ~7.07m, đã trong AoI (15m) nên
             // MonsterSpawnedEvent tới ngay, nhưng CHƯA trong tầm đánh (2m) — phải di chuyển lại gần.
-            MonsterSpawnedEvent monsterSpawned = MonsterSpawnedEvent.parseFrom(
-                    readUntilOpcode(in, Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE).payload());
+            MonsterSpawnedEvent monsterSpawned =
+                    MonsterSpawnedEvent.parseFrom(readUntilOpcode(in, Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE)
+                            .payload());
             long monsterId = monsterSpawned.getMonsterId();
 
             // Hướng chéo (0.7071, 0.7071) — chuẩn hoá, giống hệt client thật gửi (server tự nhân
             // tốc độ, movement.proto). ~1.2s ở 5 m/s đưa nhân vật vào trong tầm đánh (còn cách quái ~1m).
-            MoveCommand moveCommand = MoveCommand.newBuilder().setDirX(0.7071f).setDirY(0.7071f).build();
+            MoveCommand moveCommand =
+                    MoveCommand.newBuilder().setDirX(0.7071f).setDirY(0.7071f).build();
             sendFrame(socket, Opcode.OPCODE_MOVE_COMMAND_VALUE, 10, moveCommand.toByteArray());
             Thread.sleep(1200);
-            MoveCommand stopCommand = MoveCommand.newBuilder().setDirX(0f).setDirY(0f).build();
+            MoveCommand stopCommand =
+                    MoveCommand.newBuilder().setDirX(0f).setDirY(0f).build();
             sendFrame(socket, Opcode.OPCODE_MOVE_COMMAND_VALUE, 11, stopCommand.toByteArray());
 
-            SetTargetCommand setTarget = SetTargetCommand.newBuilder().setTargetEntityId(monsterId).build();
+            SetTargetCommand setTarget =
+                    SetTargetCommand.newBuilder().setTargetEntityId(monsterId).build();
             sendFrame(socket, Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, 12, setTarget.toByteArray());
 
             // PHÁT HIỆN THẬT (Phase 8 lát cắt 2): quái giờ đánh trả CŨNG tới được client (trước đây
@@ -1426,8 +1496,8 @@ class GatewayServerIntegrationTest {
             // của NHÂN VẬT thay vì giả định đòn ĐẦU TIÊN luôn là của nó.
             AttackResultEvent attackResult;
             do {
-                attackResult = AttackResultEvent.parseFrom(
-                        readUntilOpcode(in, Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE).payload());
+                attackResult = AttackResultEvent.parseFrom(readUntilOpcode(in, Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE)
+                        .payload());
             } while (attackResult.getAttackerEntityId() != characterId);
             assertThat(attackResult.getTargetEntityId()).isEqualTo(monsterId);
         }
@@ -1445,7 +1515,8 @@ class GatewayServerIntegrationTest {
         try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
-            connectCreateAndSelect(socket, in, "equip" + UUID.randomUUID().toString().substring(0, 6));
+            connectCreateAndSelect(
+                    socket, in, "equip" + UUID.randomUUID().toString().substring(0, 6));
 
             EquipItemCommand equipCommand = EquipItemCommand.newBuilder()
                     .setItemId(1L)
@@ -1466,14 +1537,17 @@ class GatewayServerIntegrationTest {
         try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
-            connectCreateAndSelect(socket, in, "unequip" + UUID.randomUUID().toString().substring(0, 6));
+            connectCreateAndSelect(
+                    socket, in, "unequip" + UUID.randomUUID().toString().substring(0, 6));
 
-            UnequipItemCommand unequipCommand =
-                    UnequipItemCommand.newBuilder().setSlot(EquipmentSlot.EQUIPMENT_SLOT_WEAPON).build();
+            UnequipItemCommand unequipCommand = UnequipItemCommand.newBuilder()
+                    .setSlot(EquipmentSlot.EQUIPMENT_SLOT_WEAPON)
+                    .build();
             sendFrame(socket, Opcode.OPCODE_UNEQUIP_ITEM_COMMAND_VALUE, 10, unequipCommand.toByteArray());
 
-            UnequipItemResponse response = UnequipItemResponse.parseFrom(
-                    readUntilOpcode(in, Opcode.OPCODE_UNEQUIP_ITEM_RESPONSE_VALUE).payload());
+            UnequipItemResponse response =
+                    UnequipItemResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_UNEQUIP_ITEM_RESPONSE_VALUE)
+                            .payload());
             assertThat(response.getSuccess()).isFalse(); // slot rỗng — không có gì để gỡ
             assertThat(response.getErrorKey()).isEqualTo("error.slot_not_equipped");
         }
@@ -1490,13 +1564,16 @@ class GatewayServerIntegrationTest {
         try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
-            connectCreateAndSelect(socket, in, "enhance" + UUID.randomUUID().toString().substring(0, 6));
+            connectCreateAndSelect(
+                    socket, in, "enhance" + UUID.randomUUID().toString().substring(0, 6));
 
-            EnhanceItemCommand enhanceCommand = EnhanceItemCommand.newBuilder().setItemId(1L).build();
+            EnhanceItemCommand enhanceCommand =
+                    EnhanceItemCommand.newBuilder().setItemId(1L).build();
             sendFrame(socket, Opcode.OPCODE_ENHANCE_ITEM_COMMAND_VALUE, 10, enhanceCommand.toByteArray());
 
-            EnhanceItemResponse response = EnhanceItemResponse.parseFrom(
-                    readUntilOpcode(in, Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE).payload());
+            EnhanceItemResponse response =
+                    EnhanceItemResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE)
+                            .payload());
             assertThat(response.getOutcome()).isEqualTo(EnhanceOutcome.ENHANCE_OUTCOME_ITEM_NOT_FOUND);
         }
     }
@@ -1510,13 +1587,15 @@ class GatewayServerIntegrationTest {
         try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
-            connectCreateAndSelect(socket, in, "shoplist" + UUID.randomUUID().toString().substring(0, 6));
+            connectCreateAndSelect(
+                    socket, in, "shoplist" + UUID.randomUUID().toString().substring(0, 6));
 
             ListShopItemsRequest request = ListShopItemsRequest.newBuilder().build();
             sendFrame(socket, Opcode.OPCODE_LIST_SHOP_ITEMS_REQUEST_VALUE, 10, request.toByteArray());
 
-            ListShopItemsResponse response = ListShopItemsResponse.parseFrom(
-                    readUntilOpcode(in, Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE).payload());
+            ListShopItemsResponse response =
+                    ListShopItemsResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE)
+                            .payload());
             assertThat(response.getListingsList()).isEmpty();
         }
     }
@@ -1529,9 +1608,13 @@ class GatewayServerIntegrationTest {
         try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
-            connectCreateAndSelect(socket, in, "buy" + UUID.randomUUID().toString().substring(0, 6));
+            connectCreateAndSelect(
+                    socket, in, "buy" + UUID.randomUUID().toString().substring(0, 6));
 
-            BuyItemCommand command = BuyItemCommand.newBuilder().setItemTemplateId(1L).setQuantity(1).build();
+            BuyItemCommand command = BuyItemCommand.newBuilder()
+                    .setItemTemplateId(1L)
+                    .setQuantity(1)
+                    .build();
             sendFrame(socket, Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, 10, command.toByteArray());
 
             BuyItemResponse response = BuyItemResponse.parseFrom(
@@ -1547,9 +1630,11 @@ class GatewayServerIntegrationTest {
         try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
-            connectCreateAndSelect(socket, in, "sell" + UUID.randomUUID().toString().substring(0, 6));
+            connectCreateAndSelect(
+                    socket, in, "sell" + UUID.randomUUID().toString().substring(0, 6));
 
-            SellItemCommand command = SellItemCommand.newBuilder().setItemId(1L).setQuantity(1).build();
+            SellItemCommand command =
+                    SellItemCommand.newBuilder().setItemId(1L).setQuantity(1).build();
             sendFrame(socket, Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, 10, command.toByteArray());
 
             SellItemResponse response = SellItemResponse.parseFrom(
@@ -1566,12 +1651,15 @@ class GatewayServerIntegrationTest {
         try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
-            connectCreateAndSelect(socket, in, "npc" + UUID.randomUUID().toString().substring(0, 6));
+            connectCreateAndSelect(
+                    socket, in, "npc" + UUID.randomUUID().toString().substring(0, 6));
 
-            TalkToNpcCommand command = TalkToNpcCommand.newBuilder().setNpcCode("town_elder").build();
+            TalkToNpcCommand command =
+                    TalkToNpcCommand.newBuilder().setNpcCode("town_elder").build();
             sendFrame(socket, Opcode.OPCODE_TALK_TO_NPC_COMMAND_VALUE, 10, command.toByteArray());
 
-            ErrorResponse response = ErrorResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_ERROR_VALUE).payload());
+            ErrorResponse response = ErrorResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_ERROR_VALUE).payload());
             assertThat(response.getErrorKey()).isEqualTo("error.npc_not_found");
         }
     }
@@ -1584,14 +1672,17 @@ class GatewayServerIntegrationTest {
         try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
-            connectCreateAndSelect(socket, in, "quest" + UUID.randomUUID().toString().substring(0, 6));
+            connectCreateAndSelect(
+                    socket, in, "quest" + UUID.randomUUID().toString().substring(0, 6));
 
-            ClaimQuestRewardCommand command =
-                    ClaimQuestRewardCommand.newBuilder().setQuestCode("kill_training_dummies").build();
+            ClaimQuestRewardCommand command = ClaimQuestRewardCommand.newBuilder()
+                    .setQuestCode("kill_training_dummies")
+                    .build();
             sendFrame(socket, Opcode.OPCODE_CLAIM_QUEST_REWARD_COMMAND_VALUE, 10, command.toByteArray());
 
             ClaimQuestRewardResponse response = ClaimQuestRewardResponse.parseFrom(
-                    readUntilOpcode(in, Opcode.OPCODE_CLAIM_QUEST_REWARD_RESPONSE_VALUE).payload());
+                    readUntilOpcode(in, Opcode.OPCODE_CLAIM_QUEST_REWARD_RESPONSE_VALUE)
+                            .payload());
             assertThat(response.getOutcome())
                     .isEqualTo(ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_QUEST_NOT_FOUND);
         }
@@ -1606,14 +1697,17 @@ class GatewayServerIntegrationTest {
         try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
-            connectCreateAndSelect(socket, in, "friend" + UUID.randomUUID().toString().substring(0, 6));
+            connectCreateAndSelect(
+                    socket, in, "friend" + UUID.randomUUID().toString().substring(0, 6));
 
-            SendFriendRequestCommand command =
-                    SendFriendRequestCommand.newBuilder().setTargetName("khong_ton_tai").build();
+            SendFriendRequestCommand command = SendFriendRequestCommand.newBuilder()
+                    .setTargetName("khong_ton_tai")
+                    .build();
             sendFrame(socket, Opcode.OPCODE_SEND_FRIEND_REQUEST_COMMAND_VALUE, 10, command.toByteArray());
 
             SendFriendRequestResponse response = SendFriendRequestResponse.parseFrom(
-                    readUntilOpcode(in, Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE).payload());
+                    readUntilOpcode(in, Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE)
+                            .payload());
             assertThat(response.getOutcome())
                     .isEqualTo(SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_TARGET_NOT_FOUND);
         }
@@ -1628,7 +1722,8 @@ class GatewayServerIntegrationTest {
         try (Socket socket = new Socket("127.0.0.1", server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
-            connectCreateAndSelect(socket, in, "mail" + UUID.randomUUID().toString().substring(0, 6));
+            connectCreateAndSelect(
+                    socket, in, "mail" + UUID.randomUUID().toString().substring(0, 6));
 
             SendMailCommand command = SendMailCommand.newBuilder()
                     .setRecipientName("khong_ton_tai")
@@ -1637,8 +1732,8 @@ class GatewayServerIntegrationTest {
                     .build();
             sendFrame(socket, Opcode.OPCODE_SEND_MAIL_COMMAND_VALUE, 10, command.toByteArray());
 
-            SendMailResponse response =
-                    SendMailResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE).payload());
+            SendMailResponse response = SendMailResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE).payload());
             assertThat(response.getOutcome()).isEqualTo(SendMailOutcome.SEND_MAIL_OUTCOME_RECIPIENT_NOT_FOUND);
         }
     }
@@ -1666,21 +1761,21 @@ class GatewayServerIntegrationTest {
             sendFrame(socketA, Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE, 10, command.toByteArray());
 
             SendChatMessageResponse ackResponse = SendChatMessageResponse.parseFrom(
-                    readUntilOpcode(inA, Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE).payload());
+                    readUntilOpcode(inA, Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE)
+                            .payload());
             assertThat(ackResponse.getOutcome()).isEqualTo(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_OK);
 
-            ChatMessageEvent eventSeenByA =
-                    ChatMessageEvent.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE).payload());
+            ChatMessageEvent eventSeenByA = ChatMessageEvent.parseFrom(
+                    readUntilOpcode(inA, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE).payload());
             assertThat(eventSeenByA.getBody()).isEqualTo("xin chào thế giới");
-            ChatMessageEvent eventSeenByB =
-                    ChatMessageEvent.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE).payload());
+            ChatMessageEvent eventSeenByB = ChatMessageEvent.parseFrom(
+                    readUntilOpcode(inB, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE).payload());
             assertThat(eventSeenByB.getBody()).isEqualTo("xin chào thế giới");
         }
     }
 
     /** Tên nhân vật THẬT (sinh ngẫu nhiên "Hero...") — KHÁC {@code username} tài khoản. */
-    private record CreatedCharacter(long characterId, String name) {
-    }
+    private record CreatedCharacter(long characterId, String name) {}
 
     /**
      * Như {@link #connectCreateAndSelect} nhưng trả thêm tên nhân vật THẬT — cần cho
@@ -1689,7 +1784,8 @@ class GatewayServerIntegrationTest {
      */
     private static CreatedCharacter connectCreateAndSelectNamed(Socket socket, DataInputStream in, String username)
             throws Exception {
-        ConnectRequest connectRequest = ConnectRequest.newBuilder().setUsername(username).build();
+        ConnectRequest connectRequest =
+                ConnectRequest.newBuilder().setUsername(username).build();
         sendFrame(socket, Opcode.OPCODE_CONNECT_REQUEST_VALUE, 1, connectRequest.toByteArray());
         ConnectResponse.parseFrom(readFrame(in).payload());
 
@@ -1698,20 +1794,22 @@ class GatewayServerIntegrationTest {
                 .setIdempotencyKey(UUID.randomUUID().toString())
                 .build();
         sendFrame(socket, Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, 2, createRequest.toByteArray());
-        CreateCharacterResponse createResponse = CreateCharacterResponse.parseFrom(readFrame(in).payload());
+        CreateCharacterResponse createResponse =
+                CreateCharacterResponse.parseFrom(readFrame(in).payload());
         long characterId = createResponse.getCharacter().getId();
         String name = createResponse.getCharacter().getName();
 
-        SelectCharacterRequest selectRequest = SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
+        SelectCharacterRequest selectRequest =
+                SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
         sendFrame(socket, Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, 3, selectRequest.toByteArray());
         readFrame(in); // SelectCharacterResponse — nội dung đã verify ở GatewayPipelineTest
 
         return new CreatedCharacter(characterId, name);
     }
 
-    private static long connectCreateAndSelect(Socket socket, DataInputStream in, String username)
-            throws Exception {
-        ConnectRequest connectRequest = ConnectRequest.newBuilder().setUsername(username).build();
+    private static long connectCreateAndSelect(Socket socket, DataInputStream in, String username) throws Exception {
+        ConnectRequest connectRequest =
+                ConnectRequest.newBuilder().setUsername(username).build();
         sendFrame(socket, Opcode.OPCODE_CONNECT_REQUEST_VALUE, 1, connectRequest.toByteArray());
         ConnectResponse.parseFrom(readFrame(in).payload());
 
@@ -1721,10 +1819,12 @@ class GatewayServerIntegrationTest {
                 .setIdempotencyKey(UUID.randomUUID().toString())
                 .build();
         sendFrame(socket, Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, 2, createRequest.toByteArray());
-        CreateCharacterResponse createResponse = CreateCharacterResponse.parseFrom(readFrame(in).payload());
+        CreateCharacterResponse createResponse =
+                CreateCharacterResponse.parseFrom(readFrame(in).payload());
         long characterId = createResponse.getCharacter().getId();
 
-        SelectCharacterRequest selectRequest = SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
+        SelectCharacterRequest selectRequest =
+                SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
         sendFrame(socket, Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, 3, selectRequest.toByteArray());
         readFrame(in); // SelectCharacterResponse — nội dung đã verify ở GatewayPipelineTest
 
@@ -1755,7 +1855,8 @@ class GatewayServerIntegrationTest {
 
     private static void sendPing(Socket socket, int sequenceId, long clientTimestampMs) throws Exception {
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-        PingCommand ping = PingCommand.newBuilder().setClientTimestampMs(clientTimestampMs).build();
+        PingCommand ping =
+                PingCommand.newBuilder().setClientTimestampMs(clientTimestampMs).build();
         PacketHeader header = new PacketHeader(Opcode.OPCODE_PING_VALUE, ProtocolVersion.CURRENT, sequenceId);
         byte[] frame = PacketCodec.encodeFrame(header, ping.toByteArray());
         out.writeInt(frame.length);

@@ -2,15 +2,17 @@ package dev.kage.mail.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.kage.mail.domain.Mail;
-import dev.kage.mail.domain.MailRepositoryPort;
-import dev.kage.mail.domain.NewMail;
-import dev.kage.mail.domain.Transaction;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
+
+import dev.kage.mail.domain.Mail;
+import dev.kage.mail.domain.MailRepositoryPort;
+import dev.kage.mail.domain.NewMail;
+import dev.kage.mail.domain.Transaction;
 
 class DeleteMailUseCaseTest {
 

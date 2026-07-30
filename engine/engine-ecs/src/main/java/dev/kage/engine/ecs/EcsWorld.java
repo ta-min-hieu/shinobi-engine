@@ -1,12 +1,13 @@
 package dev.kage.engine.ecs;
 
-import com.badlogic.ashley.core.PooledEngine;
-import com.badlogic.ashley.utils.ImmutableArray;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+
+import com.badlogic.ashley.core.PooledEngine;
+import com.badlogic.ashley.utils.ImmutableArray;
 
 /**
  * Thế giới ECS — bọc Ashley {@code PooledEngine} (ENGINE.md §5, ECS.md §10).
@@ -60,7 +61,7 @@ public final class EcsWorld {
      * import Micrometer trực tiếp ở đây).
      */
     public interface SystemTimingListener {
-        SystemTimingListener NO_OP = (systemName, durationNanos) -> { };
+        SystemTimingListener NO_OP = (systemName, durationNanos) -> {};
 
         void onSystemUpdated(String systemName, long durationNanos);
     }
