@@ -274,3 +274,21 @@ Không còn — ADR-019 (GC flags cho container, §7) đã Accepted 2026-07-28.
    native) — không chạy song song cả 2. Chưa làm (ngoài phạm vi, không phải thiếu sót):
    `docker-compose.prod.yml` (§6), CI chưa build/push image (`ci.yml` không có bước Docker), chưa tối
    ưu size image (`jlink`, §8).
+7. ✅ **Phase 10 (2026-07-31)** — `deploy/docker/docker-compose.prod.yml` viết xong (§6) + mẫu
+   `.env.prod.example` + sửa `.gitignore` (`.env.*` + negate 2 file `.example` — trước đó chỉ có
+   `.env`/`*.env` exact/suffix, KHÔNG bắt được `.env.prod`, một lỗ hổng thật phát hiện khi viết file
+   này: nếu ai đó tạo `.env.prod` từ mẫu mà không sửa gitignore, secret Production có nguy cơ bị
+   commit nhầm). Khác dev ở 4 điểm: (1) `server` PULL image GHCR đã build sẵn qua CI thay vì build
+   tại chỗ, `IMAGE_TAG` bắt buộc chỉ định tường minh, không default "latest"; (2) JSON structured log
+   (`logback-production.xml`, ghi đè `JAVA_OPTS` toàn bộ vì Compose `environment` thay thế chứ không
+   cộng dồn với `ENV` của Dockerfile); (3) Postgres/Redis không publish cổng ra host, Prometheus/
+   Alertmanager/Grafana/Jaeger UI chỉ bind `127.0.0.1` (SSH tunnel để xem) — chỉ 7777 (game) public;
+   (4) `restart: unless-stopped` + giới hạn log file (`json-file` driver, DOCKER.md §9). **CHƯA verify
+   thật bằng chạy container thật trên VM** (chỉ viết theo tài liệu + đối chiếu `server.Dockerfile`/
+   `ci.yml`/`docker-compose.yml` hiện có — chưa có VM Production thật để chạy `docker compose -f
+   docker-compose.prod.yml up -d` kiểm tra, khác cách các mục 5-6 ở trên đã verify THẬT). ⚠️ **Phát
+   hiện thật, chặn dùng file này cho Production công khai**: TLS vẫn CHƯA implement (SECURITY.md §13
+   ghi "Bắt buộc Production", phát hiện lần đầu ở BUILD.md Bước 3) — comment đầu file cảnh báo rõ,
+   chỉ an toàn dùng cho Closed Beta trong mạng riêng/VPN lúc này. Cơ chế cụ thể đã đề xuất ở
+   [ADR-027](../01-architecture/adr/ADR-027-TLS-Transport-Security.md) (2026-07-31, Status Proposed
+   — chờ chủ dự án xác nhận trước khi code).

@@ -1,0 +1,163 @@
+# Môi trường Production (DOCKER.md §6, ADR-014 — không K8s, VM đơn chạy Compose).
+# KHÁC docker-compose.yml (dev) ở 4 điểm:
+#   1. `server` PULL image đã build sẵn từ GHCR (CI đã build+push, xem ci.yml job "docker-build-push"),
+#      KHÔNG build lại tại chỗ — image phải PIN version thật (DOCKER.md Technical Decision #3), không
+#      dùng "latest" trôi nổi cho Production.
+#   2. Log JSON structured (OBSERVABILITY.md §5.1, `logback-production.xml`) thay vì console
+#      human-readable mặc định của dev.
+#   3. Cổng nội bộ (Postgres/Redis/metrics 9404/Prometheus/Alertmanager/Grafana/Jaeger UI) KHÔNG public
+#      ra Internet — chỉ publish 7777 (game) ra ngoài; phần còn lại bind `127.0.0.1` (chỉ máy VM tự gọi
+#      được, admin truy cập qua SSH tunnel: `ssh -L 3000:localhost:3000 <vm>`).
+#   4. `restart: unless-stopped` + giới hạn log file (Docker json-file driver mặc định phình vô hạn —
+#      DOCKER.md §9 "không log rotate trong app, Docker/orchestrator lo", đây chính là chỗ lo).
+#
+# ⚠️ ⚠️ ⚠️ CHẶN THẬT SỰ TRƯỚC KHI DÙNG FILE NÀY CHO PRODUCTION THẬT:
+# TLS **CHƯA được implement** dù SECURITY.md §13 ghi "TLS | Bắt buộc Production" (Accepted) — phát
+# hiện thật lúc wire SpotBugs (BUILD.md Bước 3, 2026-07-30), suppress tạm chưa code. Cổng 7777 ở file
+# này vẫn là TCP thuần (plaintext) — mật khẩu/session truyền trần trên dây (SECURITY.md §3, §8: "TLS
+# đã lo việc bảo vệ đường truyền" — hiện KHÔNG ai lo việc đó). KHÔNG mở cổng 7777 ra Internet công khai
+# bằng file này cho tới khi TLS xong (cơ chế đã đề xuất ở ADR-027-TLS-Transport-Security.md, Status
+# Proposed 2026-07-31, chờ chủ dự án — việc lớn riêng, ngoài phạm vi 1 file Compose). Dùng được NGAY
+# cho Closed Beta trong mạng riêng/VPN/LAN (đúng
+# GIT-WORKFLOW.md: "không tính năng nào lên Production chưa qua ≥1 vòng Closed Beta" — Closed Beta nội
+# bộ không cần TLS công khai ngay, nhưng Production thật thì bắt buộc).
+#
+# Chạy (KHÔNG dùng chung .env với dev — tránh lẫn secret dev/prod):
+#   cp deploy/docker/.env.prod.example deploy/docker/.env.prod   # rồi sửa password thật, mạnh
+#   docker compose -f deploy/docker/docker-compose.prod.yml --env-file deploy/docker/.env.prod \
+#       up -d
+#
+# Theo GIT-WORKFLOW.md: Không auto-deploy Production (Điều — deploy = đá người chơi đang online),
+# lệnh trên luôn chạy TAY bởi người, không có bước CI nào gọi tới `up -d` này.
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kage
+      POSTGRES_USER: kage
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD trong .env.prod}
+      POSTGRES_INITDB_ARGS: "--locale=en_US.UTF-8" # UTF-8 collation — DATABASE.md §1, xem docker-compose.yml
+    # KHÔNG publish cổng ra host — chỉ service khác trong network Compose này gọi được `postgres:5432`.
+    # Cần psql thật từ ngoài (backup, sự cố) → SSH vào VM rồi `docker exec -it <container> psql ...`.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kage"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "5" }
+
+  cache:
+    image: redis:8
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${CACHE_PASSWORD:?set CACHE_PASSWORD}"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "5" }
+
+  server:
+    # Pull image CI đã build+push (ci.yml "docker-build-push") — KHÔNG build tại chỗ trên VM Production.
+    # IMAGE_TAG bắt buộc chỉ định tường minh (vd "0.1.0" hoặc "master-<sha>" cụ thể), KHÔNG có default
+    # "latest" — cùng nguyên tắc "pin version, không latest" đã áp cho base image (DOCKER.md #3).
+    image: ghcr.io/ta-min-hieu/shinobi-engine/server-gateway:${IMAGE_TAG:?set IMAGE_TAG trong .env.prod, pin version cu the, khong dung latest}
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      cache:    { condition: service_healthy }
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: kage
+      DB_USER: kage
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD trong .env.prod}
+      CACHE_HOST: cache
+      CACHE_PORT: "6379"
+      CACHE_PASSWORD: ${CACHE_PASSWORD:?set CACHE_PASSWORD}
+      KAGE_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+      # Ghi đè TOÀN BỘ JAVA_OPTS của server.Dockerfile (Docker Compose "environment" thay thế, không
+      # cộng dồn) — giữ NGUYÊN mọi flag GC/JFR đã verify thật qua ADR-019 soak test 2h14, chỉ thêm
+      # `-Dlogback.configurationFile=logback-production.xml` (OBSERVABILITY.md §5.1 — JSON log, cách
+      # kích hoạt đúng như comment trong chính file logback-production.xml).
+      JAVA_OPTS: >-
+        -XX:+UseZGC -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError
+        -Dio.netty.leakDetection.level=simple
+        -XX:+FlightRecorder -XX:StartFlightRecording=disk=true,maxsize=1g,maxage=24h,dumponexit=true,filename=/tmp/kage.jfr
+        -Xlog:gc*:file=/tmp/gc.log:time,uptime:filecount=5,filesize=10m
+        -Dlogback.configurationFile=logback-production.xml
+    ports:
+      - "7777:7777" # game port — ⚠️ xem cảnh báo TLS ở đầu file trước khi public ra Internet thật
+      # 9404 (metrics + /health/*) CỐ Ý không publish — không xác thực (MetricsHttpServer), lộ ra
+      # Internet là rò rỉ thông tin nội bộ (OBSERVABILITY.md). Prometheus (cùng network Compose) gọi
+      # thẳng `server:9404`, admin cần xem trực tiếp thì SSH tunnel.
+    logging:
+      driver: json-file
+      options: { max-size: "100m", max-file: "5" }
+
+  prometheus:
+    image: prom/prometheus:v3.8.1
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090" # loopback-only — SSH tunnel để xem, không public
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "5" }
+
+  alertmanager:
+    image: prom/alertmanager:v0.32.1
+    restart: unless-stopped
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "127.0.0.1:9093:9093"
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "5" }
+
+  grafana:
+    image: grafana/grafana:13.1.1
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD trong .env.prod}
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+      - jaeger
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "5" }
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.76.0
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "127.0.0.1:16686:16686" # UI — SSH tunnel để xem
+      - "4318:4318" # OTLP/HTTP nhận trace — chỉ container khác trong network này gọi thật (server), nhưng
+        # publish ra host để tiện gỡ lỗi thủ công tạm thời; KHÔNG có traffic ngoài nào cần gọi cổng này.
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "5" }
+
+volumes:
+  pgdata:
+  prometheus-data:
+  grafana-data:
