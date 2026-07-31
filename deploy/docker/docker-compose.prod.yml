@@ -25,6 +25,14 @@
 # cert bundled, đổi cert mà không build lại client = client không kết nối được (đúng thiết kế
 # ADR-027, không phải bug). KHÔNG mở cổng 7777 ra Internet công khai cho tới khi làm đủ 2 bước trên.
 #
+# ⚠️ ⚠️ ⚠️ AUTH (phát hiện 2026-07-31, chủ dự án xác nhận CHẤP NHẬN ĐƯỢC cho Closed Beta nội bộ, KHÔNG
+# phải bug bị bỏ sót — nhưng PHẢI nhớ trước khi mở rộng ra người lạ): `ConnectRequest` hiện CHỈ có
+# `username`, KHÔNG có password (V1__create_account_table.sql: "đăng nhập username-only, chưa cần
+# mật khẩu"). Nghĩa là AI GÕ ĐÚNG 1 username đã tồn tại đều đăng nhập được vào account đó — TLS chỉ
+# bảo vệ đường truyền, KHÔNG bảo vệ khỏi việc này. Chỉ mời người quen/tin tưởng vào Closed Beta cho
+# tới khi có password auth thật (SECURITY.md §3 đã thiết kế Argon2id/bcrypt, CHƯA code — thay đổi
+# protocol lớn, cần bàn riêng trước khi làm, không phải việc trong phạm vi file Compose này).
+#
 # Chạy (KHÔNG dùng chung .env với dev — tránh lẫn secret dev/prod):
 #   cp deploy/docker/.env.prod.example deploy/docker/.env.prod   # rồi sửa password thật, mạnh
 #   docker compose -f deploy/docker/docker-compose.prod.yml --env-file deploy/docker/.env.prod \
