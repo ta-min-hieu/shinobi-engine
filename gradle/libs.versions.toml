@@ -21,7 +21,7 @@ graaljs = "25.1.3"                 # ✅ latest 07/2026 (org.graalvm.polyglot:js
 slf4j = "2.0.18"                  # ✅ verified 07/2026 (transitive qua logback-classic)
 logback = "1.5.31"                # ✅ latest 02/2026
 micrometer = "1.16.0"             # ✅ latest 07/2026 — ADR-015 (Metrics, Prometheus registry)
-opentelemetry = "1.63.0"          # ✅ latest 07/2026 (opentelemetry-bom) — ADR-015 (Tracing)
+opentelemetry = "1.64.0"          # ✅ latest 07/2026 (opentelemetry-bom) — ADR-015 (Tracing)
 
 # --- Test ---
 junit = "5.14.4"                  # ✅ junit-bom latest 04/2026
