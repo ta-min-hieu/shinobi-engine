@@ -11,8 +11,47 @@ COPY build-logic/ build-logic/
 # Windows checkout không giữ exec bit (git ls-files cho thấy gradlew ở mode 100644) — chmod lại
 # tường minh, không dựa vào bit đã commit.
 RUN chmod +x gradlew
-# Tải dependency trước — tận dụng layer cache khi chỉ source đổi, không đổi bản build.
-RUN ./gradlew dependencies --no-daemon || true
+
+# Tải dependency trước khi COPY source thật — tận dụng layer cache khi chỉ source đổi (không đổi
+# bản build). Gradle configure TOÀN BỘ project graph trước khi chạy bất kỳ task nào (settings.
+# gradle.kts include() hết, không configuration-on-demand) — thiếu build.gradle.kts của 1 module là
+# lỗi "Configuring project ':x' without an existing directory is not allowed", nên phải COPY riêng
+# build.gradle.kts của TỪNG module (không phải toàn bộ source) trước bước này.
+# ⚠️ Trước đây bước này chạy `./gradlew dependencies` (task ở ROOT, root không khai báo dependency
+# nào — build.gradle.kts root cố ý tối thiểu) kèm `|| true` nuốt lỗi — layer luôn fail (thiếu
+# build.gradle.kts của các module con) VÀ dù không fail cũng không tải dependency thật nào của
+# server-gateway, làm layer cache này vô nghĩa hoàn toàn, mọi build Docker phải tải lại từ đầu.
+# Target thẳng `:server:server-gateway:dependencies` để Gradle resolve THẬT compile/runtime
+# classpath của module cần build (kéo theo Netty, protobuf, GraalJS...), verify bằng docker build
+# thật (không suy đoán).
+COPY shared/shared-common/build.gradle.kts shared/shared-common/
+COPY shared/shared-protocol/build.gradle.kts shared/shared-protocol/
+COPY engine/engine-core/build.gradle.kts engine/engine-core/
+COPY engine/engine-ecs/build.gradle.kts engine/engine-ecs/
+COPY engine/engine-physics/build.gradle.kts engine/engine-physics/
+COPY engine/engine-scripting/build.gradle.kts engine/engine-scripting/
+COPY engine/engine-plugin-api/build.gradle.kts engine/engine-plugin-api/
+COPY client/client-core/build.gradle.kts client/client-core/
+COPY client/client-desktop/build.gradle.kts client/client-desktop/
+COPY server/server-gateway/build.gradle.kts server/server-gateway/
+COPY server/server-world/build.gradle.kts server/server-world/
+COPY server/server-database/build.gradle.kts server/server-database/
+COPY server/server-features/feature-account/build.gradle.kts server/server-features/feature-account/
+COPY server/server-features/feature-character/build.gradle.kts server/server-features/feature-character/
+COPY server/server-features/feature-inventory/build.gradle.kts server/server-features/feature-inventory/
+COPY server/server-features/feature-shop/build.gradle.kts server/server-features/feature-shop/
+COPY server/server-features/feature-dialogue/build.gradle.kts server/server-features/feature-dialogue/
+COPY server/server-features/feature-quest/build.gradle.kts server/server-features/feature-quest/
+COPY server/server-features/feature-friend/build.gradle.kts server/server-features/feature-friend/
+COPY server/server-features/feature-mail/build.gradle.kts server/server-features/feature-mail/
+COPY server/server-features/feature-chat/build.gradle.kts server/server-features/feature-chat/
+COPY server/server-features/feature-guild/build.gradle.kts server/server-features/feature-guild/
+COPY server/server-features/feature-party/build.gradle.kts server/server-features/feature-party/
+COPY server/server-features/feature-trade/build.gradle.kts server/server-features/feature-trade/
+COPY server/server-features/feature-pvp/build.gradle.kts server/server-features/feature-pvp/
+COPY quality/architecture-tests/build.gradle.kts quality/architecture-tests/
+COPY tools/load-test/build.gradle.kts tools/load-test/
+RUN ./gradlew :server:server-gateway:dependencies --no-daemon
 COPY . .
 RUN chmod +x gradlew
 RUN ./gradlew :server:server-gateway:installDist --no-daemon
