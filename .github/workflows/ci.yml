@@ -30,6 +30,15 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # `git ls-files -s gradlew` → mode 100644 (Windows checkout, không giữ exec bit) — actions/
+      # checkout lấy đúng bit đó, ubuntu-latest chạy "./gradlew" thẳng sẽ "Permission denied" (exit
+      # 126). CÙNG PHÁT HIỆN đã sửa ở server.Dockerfile (DOCKER.md/BUILD.md) nhưng ci.yml lúc đó
+      # KHÔNG được sửa theo — 2 lần push thẳng vào master sau đó (`c2dd43a`, `b9a0ee3`) đều fail
+      # NGAY ở bước này (31s, chưa từng chạy tới Gradle thật), phát hiện lúc kiểm tra CI thật qua
+      # GitHub UI (2026-07-31, không phải suy đoán).
+      - name: Fix quyền thực thi gradlew
+        run: chmod +x gradlew
+
       # Thứ nhanh + hay fail nhất chạy trước (CI-CD §2). Error Prone chạy NGAY TRONG bước này
       # (javac plugin, không phải task riêng) — mọi lỗi ERROR-severity chặn compile ở đây.
       - name: Build (không test)
