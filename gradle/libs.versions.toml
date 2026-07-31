@@ -20,7 +20,7 @@ jedis = "7.5.3"                    # ✅ latest 07/2026 — Redis client (ADR-00
 graaljs = "25.1.3"                 # ✅ latest 07/2026 (org.graalvm.polyglot:js, published ~07/2026) — ADR-016
 slf4j = "2.0.18"                  # ✅ verified 07/2026 (transitive qua logback-classic)
 logback = "1.5.31"                # ✅ latest 02/2026
-micrometer = "1.16.0"             # ✅ latest 07/2026 — ADR-015 (Metrics, Prometheus registry)
+micrometer = "1.17.0"             # ✅ latest 07/2026 — ADR-015 (Metrics, Prometheus registry)
 opentelemetry = "1.64.0"          # ✅ latest 07/2026 (opentelemetry-bom) — ADR-015 (Tracing)
 
 # --- Test ---
