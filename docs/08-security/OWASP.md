@@ -54,8 +54,8 @@ Quy tắc gate:
 
 | Công cụ | Khi nào |
 |---|---|
-| **GitHub Secret Scanning** | Bật ngay — miễn phí |
-| **gitleaks** | Pre-commit hook + CI |
+| **GitHub Secret Scanning** | ⚠️ **Chỉ miễn phí cho repo PUBLIC** — repo private cần GitHub Advanced Security (trả phí, cấp Organization). **PHÁT HIỆN THẬT (2026-07-31)**: repo dự án là private, mục Secret Scanning không hề xuất hiện trong Settings → Security (không phải "chưa bật", là "không có tuỳ chọn"). Đã bật thay thế 2 mục miễn phí cùng trang: **Dependency graph** + **Dependabot alerts** (khác `dependabot.yml` — đó chỉ tạo PR version-bump, không cảnh báo CVE) |
+| **gitleaks** | Pre-commit hook + CI — **CHƯA làm** (không có `.pre-commit-config.yaml`/git hook nào trong repo tính tới 2026-07-31, dù dự án đã qua nhiều trăm file/commit) |
 | **git-secrets** | Thay thế |
 
 **Bắt buộc**: pre-commit hook — chặn secret **trước khi** vào git, vì:

@@ -62,8 +62,16 @@ git status          # ⚠️ kiểm tra KHÔNG có .env / secret nào (SECURITY.
 git commit -m "Phase 0: foundation scaffold"
 ```
 - Bật **Dependabot** (`.github/dependabot.yml` đã có) — nó sẽ chốt dần các version `⚠️`.
-- Bật **Secret scanning** trong Settings → Security của repo (OWASP.md §2).
-- Bật **branch protection** cho `main`/`develop` (GIT-WORKFLOW.md §5).
+- ⚠️ **Secret scanning KHÔNG khả dụng** — repo private cần GitHub Advanced Security trả phí, mục đó
+  không xuất hiện trong Settings → Security (phát hiện thật 2026-07-31, không phải "chưa bật"). Đã
+  bật thay thế **Dependency graph** + **Dependabot alerts** (2 mục miễn phí duy nhất cùng trang) —
+  KHÔNG tương đương secret scanning, chỉ cảnh báo CVE dependency. `gitleaks` pre-commit hook (OWASP.md
+  §2 đề xuất) vẫn CHƯA làm — repo chưa có `.pre-commit-config.yaml`/git hook nào.
+- ⚠️ **Branch protection KHÔNG khả dụng** — thử cả "classic branch protection rule" lẫn "ruleset" mới
+  đều báo *"Your rules won't be enforced on this private repository until you move to GitHub Team
+  organization account"* (phát hiện thật 2026-07-31). Giới hạn nền tảng GitHub cho private repo cá
+  nhân/free — không phải cấu hình sai, không có cách bật thật qua Settings UI ở gói hiện tại. Không
+  tạo rule "rỗng tác dụng" (dễ hiểu lầm là đã được bảo vệ). Muốn bật thật cần nâng cấp GitHub Team.
 
 ## Bước 5 — Môi trường dev (DB + cache)
 ```bash

@@ -81,7 +81,9 @@ graph LR
 - [ ] Mọi module ở §1 REPOSITORY-STRUCTURE tồn tại (có thể rỗng)
 - [ ] ArchUnit chạy (dù chưa có gì để kiểm)
 - [ ] `docker compose up` dựng được PostgreSQL + cache
-- [ ] Secret scanning hoạt động
+- [ ] ~~Secret scanning hoạt động~~ — **KHÔNG khả dụng** (repo private, cần GitHub Advanced Security
+      trả phí — phát hiện thật 2026-07-31, không phải thiếu sót). Đã bật thay thế: Dependency graph +
+      Dependabot alerts (miễn phí). Xem [OWASP.md §2](../08-security/OWASP.md), [BUILD.md](../../BUILD.md).
 
 ---
 
