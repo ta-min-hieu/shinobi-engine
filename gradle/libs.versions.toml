@@ -13,7 +13,7 @@ libgdx = "1.14.2"                 # ✅ latest 05/2026 (ADR-002 ghi 1.13.x — �
 # --- Server ---
 netty = "4.1.136.Final"           # ✅ latest 4.1.x 07/2026 — ADR-003
 protobuf = "4.35.1"               # ✅ latest 06/2026
-hikaricp = "7.0.2"                # ⚠️ verify — HikariCP (ADR-004)
+hikaricp = "7.1.0"                # ⚠️ verify — HikariCP (ADR-004)
 postgresql = "42.7.9"             # ⚠️ verify — JDBC driver
 flyway = "12.11.0"                 # ✅ latest 07/2026 — ADR-013
 jedis = "7.1.0"                    # ✅ latest 07/2026 — Redis client (ADR-005)
