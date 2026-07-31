@@ -39,9 +39,13 @@ lỗi Phase 0 tránh được nhờ "0 warning từ đầu" giờ phải dọn 1
 - 338 file cần `spotlessApply` 1 lần (định dạng lần đầu — "quyết định 1 lần" đúng nghĩa).
 - SpotBugs bắt được 1 lỗ hổng thật đáng chú ý: **TLS chưa từng được code** dù NETWORK.md ghi "TLS
   bắt buộc ở Production" là Accepted — suppress tạm ở `exclude.xml` kèm cảnh báo rõ, CHƯA implement
-  (việc lớn riêng, cần ADR). ✅ Cơ chế đã được đề xuất ở
-  [ADR-027](docs/01-architecture/adr/ADR-027-TLS-Transport-Security.md) (2026-07-31, Status
-  Proposed, chờ chủ dự án) — code vẫn CHƯA viết, chỉ mới đề xuất.
+  lúc đó (việc lớn riêng, cần ADR). ✅ **Đã code xong 2026-07-31** — cơ chế đề xuất+chốt ở
+  [ADR-027](docs/01-architecture/adr/ADR-027-TLS-Transport-Security.md) (Accepted, chủ dự án xác
+  nhận qua chat), implement thật: `TlsConfig`+`GatewayServer` (Netty `SslHandler`, server-gateway),
+  `GameConnection`+`SimulatedPlayer` (JDK `SSLSocket` pin cert, client-core/tools:load-test). Build+
+  test đầy đủ xanh (bao gồm 3 test TLS thật qua socket: handshake pin-cert, từ chối cert lạ, từ
+  chối client bỏ qua TLS). CHƯA làm: chạy thật trên VM (chỉ verify qua test tự động), cert
+  Production thật (operator phải tự tạo, xem cảnh báo đầu `docker-compose.prod.yml`).
 - 2 bug thật khác được sửa nhân tiện: `NpcIdComponent.npcId` chết hoàn toàn (ghi nhưng không bao
   giờ đọc) → xoá cả field; ~8 dòng `.newBuilder().build();` chết trong test round-trip protobuf
   (kết quả không dùng vào đâu) → xoá.

@@ -12,9 +12,13 @@ import org.junit.jupiter.api.Timeout;
  * Verify {@link GameConnection} tự kết nối lại sau khi mất kết nối (NETWORK.md §10, ROADMAP
  * Phase 2 Exit Criteria "Mất kết nối → reconnect có backoff").
  *
- * <p>Dùng {@link ServerSocket} THUẦN (không {@code GatewayServer} thật của server-gateway) —
- * tránh client-core test phụ thuộc ngược sang module server; {@link GameConnection} chỉ cần TCP
- * handshake thành công để bắt đầu heartbeat, không cần giao thức đầy đủ cho test này.
+ * <p>Dùng {@link ServerSocket} THUẦN (không {@code GatewayServer} thật của server-gateway, không
+ * TLS) — tránh client-core test phụ thuộc ngược sang module server. Assertion chỉ cần {@code
+ * accept()} tầng TCP thành công (ADR-027: TLS handshake là hành động ỨNG DỤNG xảy ra SAU khi TCP
+ * đã kết nối — {@code accept()} trả về độc lập với việc handshake TLS có thành công hay không sau
+ * đó). {@link GameConnection} sẽ cố bắt tay TLS trên kết nối này và thất bại (phía server giả
+ * không phải TLS) — vô hại, {@code connectionLoop()} bắt IOException/SSLException đó, coi là mất
+ * kết nối bình thường, không ảnh hưởng assertion đã pass trước khi {@code finally} dọn dẹp.
  */
 class GameConnectionReconnectTest {
 

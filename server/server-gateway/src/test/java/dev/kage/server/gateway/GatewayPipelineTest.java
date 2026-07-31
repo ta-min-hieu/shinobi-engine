@@ -833,6 +833,9 @@ class GatewayPipelineTest {
 
     private static EmbeddedChannel newPipeline(FakeCharacterPort characterPort) {
         // ⚠️ Phải khớp CHÍNH XÁC pipeline thật trong GatewayBootstrap — lệch ở đây là test giả.
+        // CỐ Ý bỏ qua SslHandler (ADR-027) — EmbeddedChannel không mô phỏng handshake TLS thật
+        // tiện lợi, và đây là test framing/handler logic ở tầng plaintext. TLS thật (handshake,
+        // từ chối kết nối không mã hoá) verify ở GatewayServerTlsIntegrationTest (socket thật).
         // AccountFacade/CharacterFacade THẬT (không mock), chỉ Port bên dưới là Fake (TESTING.md
         // §4) — cùng kiểu Fake với *UseCaseTest ở feature-account/feature-character. Executor
         // chạy ĐỒNG BỘ (Runnable::run) — handler thật đẩy việc chạm DB sang authExecutor (Virtual

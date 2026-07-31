@@ -11,16 +11,19 @@
 #   4. `restart: unless-stopped` + giới hạn log file (Docker json-file driver mặc định phình vô hạn —
 #      DOCKER.md §9 "không log rotate trong app, Docker/orchestrator lo", đây chính là chỗ lo).
 #
-# ⚠️ ⚠️ ⚠️ CHẶN THẬT SỰ TRƯỚC KHI DÙNG FILE NÀY CHO PRODUCTION THẬT:
-# TLS **CHƯA được implement** dù SECURITY.md §13 ghi "TLS | Bắt buộc Production" (Accepted) — phát
-# hiện thật lúc wire SpotBugs (BUILD.md Bước 3, 2026-07-30), suppress tạm chưa code. Cổng 7777 ở file
-# này vẫn là TCP thuần (plaintext) — mật khẩu/session truyền trần trên dây (SECURITY.md §3, §8: "TLS
-# đã lo việc bảo vệ đường truyền" — hiện KHÔNG ai lo việc đó). KHÔNG mở cổng 7777 ra Internet công khai
-# bằng file này cho tới khi TLS xong (cơ chế đã đề xuất ở ADR-027-TLS-Transport-Security.md, Status
-# Proposed 2026-07-31, chờ chủ dự án — việc lớn riêng, ngoài phạm vi 1 file Compose). Dùng được NGAY
-# cho Closed Beta trong mạng riêng/VPN/LAN (đúng
-# GIT-WORKFLOW.md: "không tính năng nào lên Production chưa qua ≥1 vòng Closed Beta" — Closed Beta nội
-# bộ không cần TLS công khai ngay, nhưng Production thật thì bắt buộc).
+# ⚠️ ⚠️ ⚠️ TLS (ADR-027, Accepted 2026-07-31, code xong) — ĐỌC TRƯỚC KHI DÙNG FILE NÀY CHO PRODUCTION:
+# Server BẮT BUỘC 1 cặp cert/key THẬT của bạn — KHÔNG dùng
+# server/server-gateway/src/test/resources/tls/dev-cert.pem (cert TEST, private key tương ứng đã
+# public trên GitHub, ai cũng lấy được — dùng cert đó cho Production là KHÔNG BẢO VỆ GÌ CẢ). Tạo
+# cert riêng (self-signed, đủ cho Closed Beta qua VPN/mạng riêng — xem ADR-027 Revisit Trigger cho
+# lúc cần CA-signed công khai):
+#   openssl genpkey -algorithm RSA -out key.pem -pkeyopt rsa_keygen_bits:2048
+#   openssl req -new -x509 -key key.pem -out cert.pem -days 3650 -subj "/CN=<domain-hoac-IP-VM>"
+# Rồi: (1) trỏ TLS_CERT_HOST_PATH/TLS_KEY_HOST_PATH trong .env.prod tới 2 file đó trên VM; (2) copy
+# NỘI DUNG cert.pem (KHÔNG PHẢI key.pem) đè vào
+# client/client-core/src/main/resources/tls/dev-cert.pem rồi build lại client — client PIN đúng
+# cert bundled, đổi cert mà không build lại client = client không kết nối được (đúng thiết kế
+# ADR-027, không phải bug). KHÔNG mở cổng 7777 ra Internet công khai cho tới khi làm đủ 2 bước trên.
 #
 # Chạy (KHÔNG dùng chung .env với dev — tránh lẫn secret dev/prod):
 #   cp deploy/docker/.env.prod.example deploy/docker/.env.prod   # rồi sửa password thật, mạnh
@@ -83,6 +86,12 @@ services:
       CACHE_PORT: "6379"
       CACHE_PASSWORD: ${CACHE_PASSWORD:?set CACHE_PASSWORD}
       KAGE_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+      # ADR-027 — mặc định TlsConfig.fromEnvironment() đã BẬT nếu không set gì, nhưng ghi tường
+      # minh ở đây cho rõ ràng (Production không được vô tình chạy thiếu dòng KAGE_TLS_CERT_PATH
+      # bên dưới rồi server tự crash lúc khởi động vì thiếu biến bắt buộc — thà thấy ngay ở đây).
+      KAGE_TLS_ENABLED: "true"
+      KAGE_TLS_CERT_PATH: /run/secrets/tls/cert.pem
+      KAGE_TLS_KEY_PATH: /run/secrets/tls/key.pem
       # Ghi đè TOÀN BỘ JAVA_OPTS của server.Dockerfile (Docker Compose "environment" thay thế, không
       # cộng dồn) — giữ NGUYÊN mọi flag GC/JFR đã verify thật qua ADR-019 soak test 2h14, chỉ thêm
       # `-Dlogback.configurationFile=logback-production.xml` (OBSERVABILITY.md §5.1 — JSON log, cách
@@ -94,10 +103,15 @@ services:
         -Xlog:gc*:file=/tmp/gc.log:time,uptime:filecount=5,filesize=10m
         -Dlogback.configurationFile=logback-production.xml
     ports:
-      - "7777:7777" # game port — ⚠️ xem cảnh báo TLS ở đầu file trước khi public ra Internet thật
+      - "7777:7777" # game port — an toàn public SAU khi làm đủ 2 bước cert thật ở cảnh báo đầu file
       # 9404 (metrics + /health/*) CỐ Ý không publish — không xác thực (MetricsHttpServer), lộ ra
       # Internet là rò rỉ thông tin nội bộ (OBSERVABILITY.md). Prometheus (cùng network Compose) gọi
       # thẳng `server:9404`, admin cần xem trực tiếp thì SSH tunnel.
+    volumes:
+      # Cert/key THẬT của bạn, KHÔNG bake vào image (DOCKER.md Technical Decision #4 "không secret
+      # trong image") — bind-mount read-only từ VM. Đường dẫn HOST đọc từ .env.prod (ADR-027).
+      - ${TLS_CERT_HOST_PATH:?set TLS_CERT_HOST_PATH trong .env.prod, xem canh bao TLS dau file}:/run/secrets/tls/cert.pem:ro
+      - ${TLS_KEY_HOST_PATH:?set TLS_KEY_HOST_PATH trong .env.prod, xem canh bao TLS dau file}:/run/secrets/tls/key.pem:ro
     logging:
       driver: json-file
       options: { max-size: "100m", max-file: "5" }

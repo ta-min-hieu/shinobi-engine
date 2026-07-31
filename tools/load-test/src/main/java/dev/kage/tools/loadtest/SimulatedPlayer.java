@@ -3,12 +3,22 @@ package dev.kage.tools.loadtest;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManagerFactory;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +65,12 @@ final class SimulatedPlayer implements Runnable {
     // client bị ngắt kết nối hàng loạt trong soak test đầu).
     private static final int CHAT_PROBABILITY_PERCENT = 3;
 
+    // ADR-027 — CÙNG cert dev/test dùng ở server-gateway/client-core (xem comment tương ứng ở đó,
+    // KHÔNG an toàn cho môi trường thật). Load-test nói ĐÚNG giao thức dây thật kể cả TLS — không
+    // gọi tắt, khớp mục đích tool (javadoc class "KHÔNG gọi tắt API nội bộ server").
+    private static final String PINNED_CERT_RESOURCE = "tls/dev-cert.pem";
+    private static final SSLSocketFactory SSL_SOCKET_FACTORY = buildPinnedSocketFactory();
+
     /**
      * Gộp mọi bộ đếm chia sẻ giữa các client — Checkstyle ParameterNumber tối đa 4 tham số.
      * {@code bytesSent}/{@code bytesReceived} đo THẬT qua chính socket (gồm 4-byte length prefix +
@@ -87,9 +103,10 @@ final class SimulatedPlayer implements Runnable {
 
     @Override
     public void run() {
-        try (Socket clientSocket = new Socket(host, port)) {
-            this.socket = clientSocket;
+        try (SSLSocket clientSocket = (SSLSocket) SSL_SOCKET_FACTORY.createSocket(host, port)) {
             clientSocket.setSoTimeout(SOCKET_TIMEOUT_MS);
+            clientSocket.startHandshake();
+            this.socket = clientSocket;
             DataInputStream in = new DataInputStream(clientSocket.getInputStream());
 
             connectCreateSelect(in);
@@ -280,6 +297,30 @@ final class SimulatedPlayer implements Runnable {
             }
         } catch (IOException e) {
             LOG.debug("Lỗi đóng socket client {} — bỏ qua, đang shutdown", username, e);
+        }
+    }
+
+    /** Xây 1 lần lúc load class — {@link SSLSocketFactory} PIN đúng cert (ADR-027). */
+    private static SSLSocketFactory buildPinnedSocketFactory() {
+        try {
+            CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+            Certificate pinnedCert;
+            try (InputStream in = SimulatedPlayer.class.getClassLoader().getResourceAsStream(PINNED_CERT_RESOURCE)) {
+                pinnedCert = certificateFactory.generateCertificate(in);
+            }
+            KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            trustStore.load(null, null);
+            trustStore.setCertificateEntry("kage-server", pinnedCert);
+
+            TrustManagerFactory trustManagerFactory =
+                    TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init(trustStore);
+
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, trustManagerFactory.getTrustManagers(), null);
+            return sslContext.getSocketFactory();
+        } catch (GeneralSecurityException | IOException e) {
+            throw new IllegalStateException("Không load được cert pin (" + PINNED_CERT_RESOURCE + ") — ADR-027", e);
         }
     }
 }

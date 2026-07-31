@@ -287,8 +287,8 @@ Không còn — ADR-019 (GC flags cho container, §7) đã Accepted 2026-07-28.
    thật bằng chạy container thật trên VM** (chỉ viết theo tài liệu + đối chiếu `server.Dockerfile`/
    `ci.yml`/`docker-compose.yml` hiện có — chưa có VM Production thật để chạy `docker compose -f
    docker-compose.prod.yml up -d` kiểm tra, khác cách các mục 5-6 ở trên đã verify THẬT). ⚠️ **Phát
-   hiện thật, chặn dùng file này cho Production công khai**: TLS vẫn CHƯA implement (SECURITY.md §13
-   ghi "Bắt buộc Production", phát hiện lần đầu ở BUILD.md Bước 3) — comment đầu file cảnh báo rõ,
-   chỉ an toàn dùng cho Closed Beta trong mạng riêng/VPN lúc này. Cơ chế cụ thể đã đề xuất ở
-   [ADR-027](../01-architecture/adr/ADR-027-TLS-Transport-Security.md) (2026-07-31, Status Proposed
-   — chờ chủ dự án xác nhận trước khi code).
+   hiện thật lúc viết, chặn dùng file này cho Production công khai**: TLS CHƯA implement lúc đó
+   (SECURITY.md §13 ghi "Bắt buộc Production", phát hiện lần đầu ở BUILD.md Bước 3). ✅ **Đã code
+   xong cùng ngày** — [ADR-027](../01-architecture/adr/ADR-027-TLS-Transport-Security.md) Accepted,
+   `docker-compose.prod.yml` đã có volume mount cert/key + `KAGE_TLS_ENABLED=true`. Vẫn cần operator
+   tự tạo cert THẬT (không dùng cert test) trước khi public cổng 7777 — xem cảnh báo đầu file đó.

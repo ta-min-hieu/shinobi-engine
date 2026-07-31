@@ -3,6 +3,8 @@ package dev.kage.server.gateway;
 import java.time.Duration;
 import java.util.ArrayList;
 
+import javax.net.ssl.SSLException;
+
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics;
 import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics;
@@ -55,7 +57,7 @@ public final class GatewayBootstrap {
 
     private GatewayBootstrap() {}
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException, SSLException {
         ServerDatabaseBootstrap databaseBootstrap = new ServerDatabaseBootstrap();
         GatewayFacades facades = wireFacades(databaseBootstrap);
 
@@ -83,7 +85,11 @@ public final class GatewayBootstrap {
         InstanceRegistries instanceRegistries =
                 buildInstanceRegistries(characterRegistry, facades, mainWorldChannels, positionPersister);
 
-        GatewayServer server = new GatewayServer(PORT, facades, instanceRegistries.worldGateway(), observability);
+        GatewayServer server = new GatewayServer(
+                PORT,
+                facades,
+                new GatewayServer.GatewayContext(instanceRegistries.worldGateway(), observability),
+                TlsConfig.fromEnvironment());
         server.start();
         registerShutdownHook(
                 new ShutdownContext(server, worldContext, instanceRegistries, characterRegistry),

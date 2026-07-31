@@ -156,7 +156,12 @@ Toàn bộ 4 ADR chặn Phase 3 đã Accepted — **Phase 3 đủ điều kiện
 | 15 | Asset distribution / CDN | ADR-024 |
 | 16 | i18n: có tiếng Anh ở MVP không | — |
 | 17 | Mô hình kinh doanh | — |
-| 18 | **TLS thật** (self-signed+pin cho Closed Beta, chặn mở cổng 7777 công khai ở `docker-compose.prod.yml`) | [ADR-027](01-architecture/adr/ADR-027-TLS-Transport-Security.md) *(⏳ Proposed 2026-07-31, chờ chủ dự án)* |
+
+### ✅ Đã chốt (2026-07-31)
+
+| Quyết định | ADR |
+|---|---|
+| **TLS**: in-process Netty (server) + JDK `SSLSocket` pin cert (client), self-signed cho Closed Beta | ✅ [ADR-027](01-architecture/adr/ADR-027-TLS-Transport-Security.md) |
 
 ---
 

@@ -5,16 +5,21 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import javax.net.ssl.SSLException;
+
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,8 +28,9 @@ import org.slf4j.LoggerFactory;
  * socket thật — không chỉ {@code EmbeddedChannel}). {@link GatewayBootstrap} chỉ là entrypoint
  * mỏng gọi lớp này.
  *
- * <p>Pipeline: framing length-prefixed (NETWORK.md §101) → {@code PacketCodec} →
- * {@link GatewayChannelHandler}. MODULE DUY NHẤT được import Netty (Điều 23).
+ * <p>Pipeline: [TLS nếu {@link TlsConfig#enabled()}, ADR-027] → framing length-prefixed
+ * (NETWORK.md §101) → {@code PacketCodec} → {@link GatewayChannelHandler}. MODULE DUY NHẤT được
+ * import Netty (Điều 23).
  */
 public final class GatewayServer {
 
@@ -54,10 +60,19 @@ public final class GatewayServer {
     private static final long EVENT_LOOP_QUIET_PERIOD_MILLIS = 100;
     private static final long EVENT_LOOP_SHUTDOWN_TIMEOUT_MILLIS = 5000;
 
+    /**
+     * Gộp {@code worldGateway} + {@code observability} — Checkstyle ParameterNumber tối đa 4 tham
+     * số cho constructor (cùng lý do các record {@code *Context} ở {@link GatewayBootstrap}).
+     *
+     * @param worldGateway {@code registry()} đã đăng ký làm {@code WorldOutboundSink} của
+     *     {@code facade()} TRƯỚC khi truyền vào đây (composition root — {@code GatewayBootstrap}).
+     */
+    public record GatewayContext(WorldGateway worldGateway, GatewayObservability observability) {}
+
     private final int requestedPort;
     private final GatewayFacades facades;
-    private final WorldGateway worldGateway;
-    private final GatewayObservability observability;
+    private final GatewayContext context;
+    private final TlsConfig tlsConfig;
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private ExecutorService authExecutor;
@@ -65,23 +80,26 @@ public final class GatewayServer {
 
     /**
      * @param port 0 = để hệ điều hành tự cấp cổng trống (dùng trong test, xem {@link #port()}).
-     * @param worldGateway {@code registry()} đã đăng ký làm {@code WorldOutboundSink} của
-     *     {@code facade()} TRƯỚC khi truyền vào đây (composition root — {@code GatewayBootstrap}).
+     * @param tlsConfig ADR-027 — {@link TlsConfig#disabled()} chỉ dùng cho test/dev cục bộ.
      */
-    public GatewayServer(
-            int port, GatewayFacades facades, WorldGateway worldGateway, GatewayObservability observability) {
+    public GatewayServer(int port, GatewayFacades facades, GatewayContext context, TlsConfig tlsConfig) {
         this.requestedPort = port;
         this.facades = facades;
-        this.worldGateway = worldGateway;
-        this.observability = observability;
+        this.context = context;
+        this.tlsConfig = tlsConfig;
     }
 
-    public void start() throws InterruptedException {
+    public void start() throws InterruptedException, SSLException {
         bossGroup = new NioEventLoopGroup(1);
         workerGroup = new NioEventLoopGroup();
         // Auth chạm Redis/PostgreSQL (blocking I/O) — Virtual Thread, KHÔNG chạy trên EventLoop
         // (SERVER.md §2). Không giới hạn ECS state nào ở đây nên không cần enqueue vào server-world.
         authExecutor = Executors.newVirtualThreadPerTaskExecutor();
+
+        // ADR-027: 1 SslContext dùng chung cho mọi channel (không tạo lại mỗi kết nối) — mỗi
+        // channel tự có SslHandler RIÊNG qua sslContext.newHandler(alloc) bên dưới (state
+        // handshake là per-channel, SslContext chỉ giữ cert/key dùng chung).
+        SslContext sslContext = buildSslContext();
 
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap
@@ -91,18 +109,33 @@ public final class GatewayServer {
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) {
-                        ch.pipeline()
-                                .addLast(new LengthFieldBasedFrameDecoder(
+                        ChannelPipeline pipeline = ch.pipeline();
+                        // TLS PHẢI là handler ĐẦU TIÊN — mọi byte sau đó (framing, packet) đi qua
+                        // lớp mã hoá trước khi tới các handler khác.
+                        if (sslContext != null) {
+                            pipeline.addLast(sslContext.newHandler(ch.alloc()));
+                        }
+                        pipeline.addLast(new LengthFieldBasedFrameDecoder(
                                         MAX_FRAME_LENGTH, 0, LENGTH_FIELD_LENGTH, 0, LENGTH_FIELD_LENGTH))
                                 .addLast(new LengthFieldPrepender(LENGTH_FIELD_LENGTH))
                                 .addLast(new PacketFrameDecoder())
                                 .addLast(new PacketFrameEncoder())
-                                .addLast(new GatewayChannelHandler(facades, worldGateway, authExecutor, observability));
+                                .addLast(new GatewayChannelHandler(
+                                        facades, context.worldGateway(), authExecutor, context.observability()));
                     }
                 });
 
         serverChannel = bootstrap.bind(requestedPort).sync().channel();
-        LOG.info("server-gateway lắng nghe cổng {}", port());
+        LOG.info("server-gateway lắng nghe cổng {} (TLS {})", port(), tlsConfig.enabled() ? "bật" : "TẮT");
+    }
+
+    /** {@code null} nếu {@link TlsConfig#enabled()} là false (ADR-027 — test/dev tường minh). */
+    private SslContext buildSslContext() throws SSLException {
+        if (!tlsConfig.enabled()) {
+            return null;
+        }
+        return SslContextBuilder.forServer(tlsConfig.certChainFile(), tlsConfig.keyFile())
+                .build();
     }
 
     /** Cổng thật đang lắng nghe — khác {@code requestedPort} nếu tạo bằng port 0. */
@@ -129,7 +162,7 @@ public final class GatewayServer {
         if (serverChannel != null) {
             serverChannel.close();
         }
-        worldGateway.registry().broadcastShuttingDown();
+        context.worldGateway().registry().broadcastShuttingDown();
         awaitGracefully(workerGroup);
         awaitGracefully(bossGroup);
         if (authExecutor != null) {

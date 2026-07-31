@@ -152,7 +152,7 @@ class GatewayServerIntegrationTest {
     private dev.kage.pvp.api.PvpFacade pvpFacade;
 
     @BeforeEach
-    void startServer() throws InterruptedException {
+    void startServer() throws InterruptedException, javax.net.ssl.SSLException {
         // port 0 = OS tự cấp cổng trống — tránh đụng cổng khi nhiều test chạy song song.
         // AccountFacade/CharacterFacade THẬT với Fake Port (không server-database thật) — test
         // này chỉ verify ping/pong qua socket thật, không chạm Connect/Character, nhưng
@@ -194,7 +194,11 @@ class GatewayServerIntegrationTest {
         ContentFacades contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
         GatewayFacades facades =
                 new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
-        server = new GatewayServer(0, facades, worldGateway, observability);
+        // TlsConfig.disabled() — mọi test ở trên verify giao thức qua socket thuần, TLS thật
+        // verify riêng ở cuối file này (shouldReceivePong_overTlsSocket_withPinnedCert và 2 test
+        // cạnh nó, ADR-027) — tự start/stop server RIÊNG, không dùng field server này.
+        server = new GatewayServer(
+                0, facades, new GatewayServer.GatewayContext(worldGateway, observability), TlsConfig.disabled());
         server.start();
     }
 
@@ -1869,5 +1873,162 @@ class GatewayServerIntegrationTest {
         byte[] bytes = new byte[length];
         in.readFully(bytes);
         return PacketCodec.decodeFrame(bytes);
+    }
+
+    // ============================================================================================
+    // ADR-027 — TLS thật qua socket (KHÔNG dùng field server/mainWorldChannels/characterRegistry
+    // chính, tự start/stop RIÊNG qua try-with-resources — tránh @AfterEach dọn nhầm server TLS
+    // thay vì server chính do startServer() tạo).
+    // ============================================================================================
+
+    private record TlsTestServer(
+            GatewayServer server,
+            MainWorldChannelRegistry mainWorldChannels,
+            ConnectedCharacterRegistry characterRegistry)
+            implements AutoCloseable {
+        @Override
+        public void close() {
+            server.stop();
+            mainWorldChannels.stopAll();
+            characterRegistry.stop();
+        }
+    }
+
+    /** Bản sao độc lập của {@link #startServer()} — cùng cách wire facades, khác {@code tlsConfig}. */
+    private TlsTestServer startServerWithTls(TlsConfig tlsConfig)
+            throws InterruptedException, javax.net.ssl.SSLException {
+        CharacterFacade characterFacade = fakeCharacterFacade();
+        InventoryFacade inventoryFacade = fakeInventoryFacade();
+        dev.kage.shop.api.ShopFacade shopFacade = fakeShopFacade();
+        dev.kage.dialogue.api.DialogueFacade dialogueFacade = fakeDialogueFacade();
+        dev.kage.quest.api.QuestFacade questFacade = fakeQuestFacade();
+        dev.kage.friend.api.FriendFacade friendFacade = fakeFriendFacade();
+        dev.kage.mail.api.MailFacade mailFacade = fakeMailFacade();
+        dev.kage.chat.api.ChatFacade chatFacade = fakeChatFacade();
+        dev.kage.guild.api.GuildFacade guildFacade = fakeGuildFacade();
+        dev.kage.party.api.PartyFacade localPartyFacade = fakePartyFacade();
+        dev.kage.trade.api.TradeFacade tradeFacade = fakeTradeFacade();
+        dev.kage.pvp.api.PvpFacade localPvpFacade = fakePvpFacade();
+        io.micrometer.core.instrument.simple.SimpleMeterRegistry meterRegistry =
+                new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        GatewayNetworkMetrics networkMetrics = new GatewayNetworkMetrics(meterRegistry);
+        GatewayObservability observability = new GatewayObservability(networkMetrics, GatewayTracing.disabled());
+        ConnectedCharacterRegistry localCharacterRegistry =
+                new ConnectedCharacterRegistry(inventoryFacade, questFacade, networkMetrics);
+        WorldFacade firstChannelFacade = new WorldFacade(localCharacterRegistry);
+        firstChannelFacade.start();
+        MainWorldChannelRegistry localMainWorldChannels =
+                new MainWorldChannelRegistry(localCharacterRegistry, firstChannelFacade, meterRegistry);
+        CharacterPositionPersister positionPersister =
+                new CharacterPositionPersister(characterFacade, localCharacterRegistry, Duration.ofMinutes(5));
+        DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
+                localCharacterRegistry, characterFacade, localPartyFacade, localMainWorldChannels);
+        ArenaInstanceRegistry arenaInstanceRegistry = new ArenaInstanceRegistry(
+                localCharacterRegistry, characterFacade, localPvpFacade, localMainWorldChannels);
+        WorldGateway worldGateway = new WorldGateway(
+                localMainWorldChannels,
+                localCharacterRegistry,
+                positionPersister,
+                dungeonInstanceRegistry,
+                arenaInstanceRegistry);
+        SocialFacades socialFacades = new SocialFacades(
+                friendFacade, mailFacade, chatFacade, guildFacade, localPartyFacade, tradeFacade, localPvpFacade);
+        ContentFacades contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
+        GatewayFacades facades =
+                new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
+
+        GatewayServer tlsServer =
+                new GatewayServer(0, facades, new GatewayServer.GatewayContext(worldGateway, observability), tlsConfig);
+        tlsServer.start();
+        return new TlsTestServer(tlsServer, localMainWorldChannels, localCharacterRegistry);
+    }
+
+    @Test
+    @Timeout(10)
+    void shouldReceivePong_overTlsSocket_withPinnedCert() throws Exception {
+        java.io.File certFile = testResourceFile("tls/dev-cert.pem");
+        java.io.File keyFile = testResourceFile("tls/dev-key.pem");
+        try (TlsTestServer tlsServer = startServerWithTls(new TlsConfig(true, certFile, keyFile))) {
+            javax.net.ssl.SSLSocketFactory factory = pinnedTrustFactory("tls/dev-cert.pem");
+            try (javax.net.ssl.SSLSocket socket = (javax.net.ssl.SSLSocket)
+                    factory.createSocket("127.0.0.1", tlsServer.server().port())) {
+                socket.startHandshake();
+
+                DataInputStream in = new DataInputStream(socket.getInputStream());
+                sendPing(socket, 1, 999L);
+                PacketCodec.Frame decoded = readFrame(in);
+
+                assertThat(decoded.header().opcode()).isEqualTo(Opcode.OPCODE_PONG_VALUE);
+                PongResponse pong = PongResponse.parseFrom(decoded.payload());
+                assertThat(pong.getClientTimestampMs()).isEqualTo(999L);
+            }
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void shouldFailHandshake_whenClientDoesNotTrustServerCert() throws Exception {
+        java.io.File certFile = testResourceFile("tls/dev-cert.pem");
+        java.io.File keyFile = testResourceFile("tls/dev-key.pem");
+        try (TlsTestServer tlsServer = startServerWithTls(new TlsConfig(true, certFile, keyFile))) {
+            // TrustManager MẶC ĐỊNH của JDK (CA store hệ thống) — cert self-signed test KHÔNG nằm
+            // trong đó, đúng hành vi "không pin thì không tin" (ADR-027).
+            javax.net.ssl.SSLSocketFactory factory =
+                    (javax.net.ssl.SSLSocketFactory) javax.net.ssl.SSLSocketFactory.getDefault();
+            try (javax.net.ssl.SSLSocket socket = (javax.net.ssl.SSLSocket)
+                    factory.createSocket("127.0.0.1", tlsServer.server().port())) {
+                org.assertj.core.api.Assertions.assertThatThrownBy(socket::startHandshake)
+                        .isInstanceOf(javax.net.ssl.SSLHandshakeException.class);
+            }
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void shouldNotReturnValidResponse_whenClientSkipsTls() throws Exception {
+        java.io.File certFile = testResourceFile("tls/dev-cert.pem");
+        java.io.File keyFile = testResourceFile("tls/dev-key.pem");
+        try (TlsTestServer tlsServer = startServerWithTls(new TlsConfig(true, certFile, keyFile))) {
+            // Client plaintext gửi ĐÚNG format framing cũ — server giờ mong đợi TLS record ở byte
+            // đầu tiên, không phải plaintext frame. Server KHÔNG được trả pong hợp lệ.
+            try (Socket socket = new Socket("127.0.0.1", tlsServer.server().port())) {
+                socket.setSoTimeout(3000);
+                sendPing(socket, 1, 999L);
+
+                org.assertj.core.api.Assertions.assertThatThrownBy(
+                                () -> readFrame(new DataInputStream(socket.getInputStream())))
+                        .as("server không được trả pong hợp lệ cho client bỏ qua TLS")
+                        .isInstanceOf(Exception.class);
+            }
+        }
+    }
+
+    private static java.io.File testResourceFile(String classpathPath) throws Exception {
+        return new java.io.File(GatewayServerIntegrationTest.class
+                .getClassLoader()
+                .getResource(classpathPath)
+                .toURI());
+    }
+
+    /** Xây {@link javax.net.ssl.SSLSocketFactory} PIN đúng 1 cert — cùng cơ chế client thật dùng (ADR-027). */
+    private static javax.net.ssl.SSLSocketFactory pinnedTrustFactory(String certClasspathPath) throws Exception {
+        java.security.cert.CertificateFactory certificateFactory =
+                java.security.cert.CertificateFactory.getInstance("X.509");
+        java.security.cert.Certificate pinnedCert;
+        try (java.io.InputStream in =
+                GatewayServerIntegrationTest.class.getClassLoader().getResourceAsStream(certClasspathPath)) {
+            pinnedCert = certificateFactory.generateCertificate(in);
+        }
+        java.security.KeyStore trustStore = java.security.KeyStore.getInstance(java.security.KeyStore.getDefaultType());
+        trustStore.load(null, null);
+        trustStore.setCertificateEntry("kage-server-test", pinnedCert);
+
+        javax.net.ssl.TrustManagerFactory trustManagerFactory =
+                javax.net.ssl.TrustManagerFactory.getInstance(javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm());
+        trustManagerFactory.init(trustStore);
+
+        javax.net.ssl.SSLContext sslContext = javax.net.ssl.SSLContext.getInstance("TLS");
+        sslContext.init(null, trustManagerFactory.getTrustManagers(), null);
+        return sslContext.getSocketFactory();
     }
 }

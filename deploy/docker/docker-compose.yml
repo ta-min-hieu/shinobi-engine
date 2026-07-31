@@ -64,6 +64,10 @@ services:
       # GatewayTracing mặc định trỏ localhost:4318 (đúng cho ./gradlew run native) — container
       # phải trỏ qua tên service Compose "jaeger" thay vì localhost.
       KAGE_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+      # ADR-027 — TẮT TƯỜNG MINH cho dev (đúng NETWORK.md §2 "dev có thể tắt qua flag tường minh,
+      # không mặc định tắt" — flag đó CHÍNH LÀ dòng này). Không tắt thì cần KAGE_TLS_CERT_PATH/
+      # KAGE_TLS_KEY_PATH trỏ cert thật; dev.compose ưu tiên chạy nhanh không cần chuẩn bị cert.
+      KAGE_TLS_ENABLED: "false"
     ports:
       - "7777:7777"
       - "9404:9404"

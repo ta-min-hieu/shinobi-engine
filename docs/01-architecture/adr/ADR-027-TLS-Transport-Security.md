@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| Status | ⏳ **Proposed** — AI đề xuất, chờ chủ dự án xác nhận Accepted (adr/README.md quy tắc #5, AI không tự chốt) |
+| Status | ✅ **Accepted** (2026-07-31, chủ dự án xác nhận qua chat) |
 | Date | 2026-07-31 |
-| Deciders | AI (Claude) đề xuất; chờ chủ dự án |
+| Deciders | AI (Claude) đề xuất; chủ dự án chốt |
 | Related | [NETWORK.md §2, §14](../../05-server/NETWORK.md), [SECURITY.md §3, §13](../../08-security/SECURITY.md), [ADR-003](ADR-003-Why-Netty.md) (Netty, server-side), [client/CLAUDE.md](../../../client/CLAUDE.md) (Điều 23 — client không import Netty), [GIT-WORKFLOW.md](../../11-process/GIT-WORKFLOW.md) (Closed Beta trước Production), [DOCKER.md §6](../../07-infrastructure/DOCKER.md) (`docker-compose.prod.yml`), [BUILD.md](../../../BUILD.md) (phát hiện gốc) |
 
 ---
