@@ -18,7 +18,7 @@
 |---|---|
 | Giao thức | **TCP** qua Netty |
 | Framing | Length-prefixed: 4-byte big-endian length + payload. Dùng `LengthFieldBasedFrameDecoder`/`LengthFieldPrepender` — **không tự viết** |
-| Mã hoá | **TLS bắt buộc ở Production**. Dev có thể tắt qua flag tường minh, không mặc định tắt |
+| Mã hoá | **TLS bắt buộc ở Production**. Dev có thể tắt qua flag tường minh, không mặc định tắt. Cơ chế cụ thể (self-signed+pin cho Closed Beta): [ADR-027](../01-architecture/adr/ADR-027-TLS-Transport-Security.md) ✅ Accepted, code xong 2026-07-31 |
 | UDP | ❌ Không ở MVP — xem §11 |
 
 ---
@@ -162,7 +162,7 @@ Client hiển thị theo `errorKey` + ngôn ngữ hiện tại ([UI.md §7](../0
 |---|---|
 | Transport | **TLS** — dùng chuẩn, **không tự viết mã hoá** |
 | Payload | Không mã hoá thêm (TLS đã lo) |
-| Mật khẩu | Không bao giờ gửi plaintext, kể cả trong TLS — hash phía client trước? → **cần quyết định ở SECURITY.md** |
+| Mật khẩu | ✅ Đã chốt ở [SECURITY.md §3](../08-security/SECURITY.md): **KHÔNG hash ở client**, gửi qua TLS nguyên bản (hash ở client = hash trở thành mật khẩu mới). ⚠️ Chưa áp dụng được — hệ thống hiện CHƯA có password login nào (chỉ username, xem `V1__create_account_table.sql`), quyết định này chờ tới khi có |
 
 ⚠️ **Không tự phát minh mã hoá.** Đây là quy tắc tuyệt đối. Tự viết crypto = chắc chắn có lỗ hổng.
 
@@ -270,7 +270,7 @@ Cơ chế token: session token tự phát hành + Redis, sliding TTL 24h — **A
 | 5 | **Chỉ được THÊM field protobuf**, không đổi/xoá | Client cũ đọc sai mà không báo lỗi | Accepted |
 | 6 | Server trả `errorKey`, không trả message | i18n + không lộ thông tin | Accepted |
 | 7 | **MVP không nén** | Đo trước (Điều 30) | Accepted |
-| 8 | **TLS chuẩn, không tự viết crypto** | Tuyệt đối | Accepted |
+| 8 | **TLS chuẩn, không tự viết crypto** — cơ chế cụ thể [ADR-027](../01-architecture/adr/ADR-027-TLS-Transport-Security.md) | Tuyệt đối | Accepted |
 | 9 | **Reconnect bắt buộc có backoff** | Chống thundering herd | Accepted |
 | 10 | **TCP ở MVP**, không UDP | Điều 9; MMORPG 2D không nhạy latency như FPS | Accepted |
 | 11 | Validate gateway **không** thay validate nghiệp vụ | Hai việc khác nhau | Accepted |

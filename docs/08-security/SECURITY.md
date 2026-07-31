@@ -254,7 +254,7 @@ Bật **secret scanning** ([OWASP.md](OWASP.md)).
 | Container | Không chạy root ([DOCKER.md §4](../07-infrastructure/DOCKER.md)) |
 | DB | Không expose ra internet; chỉ server truy cập |
 | Redis | ⚠️ **Redis mặc định không có auth** — phải bật password + không expose |
-| TLS | Bắt buộc Production |
+| TLS | Bắt buộc Production — cơ chế cụ thể [ADR-027](../01-architecture/adr/ADR-027-TLS-Transport-Security.md) ✅ Accepted, code xong 2026-07-31 |
 | Dependency | Scan CVE ([OWASP.md](OWASP.md)) |
 
 ⚠️ **Redis expose ra internet không password là lỗ hổng cực kỳ phổ biến** — bot quét internet tìm Redis mở suốt ngày.
