@@ -127,6 +127,16 @@ RUN jlink \
 # distro với eclipse-temurin:25-jdk/-jre (xác nhận thật qua `/etc/os-release` cả 2 image: Ubuntu
 # 26.04) để runtime jlink build ở stage trên khớp glibc ABI, không phải suy đoán tương thích.
 FROM ubuntu:26.04 AS runtime
+# ⚠️ PHÁT HIỆN THẬT (verify bằng `docker run ... locale`, không suy đoán): `eclipse-temurin:25-jre`
+# (base cũ) tự cấu hình sẵn `LANG=en_US.UTF-8`, nhưng `ubuntu:26.04` trần mặc định locale `POSIX`
+# (không UTF-8) — mọi log/exception tiếng Việt của server (khắp `server-world`/`server-database`...)
+# sẽ ra mojibake (`Thi?u bi?n m?i tr??ng b?t bu?c` thay vì `Thiếu biến môi trường bắt buộc`, verify
+# thật bằng `docker run` container này thiếu `DB_PASSWORD`). `C.utf8` có sẵn trong glibc của Ubuntu
+# (`locale -a` liệt kê, không cần cài `locales` package/`locale-gen`) — đủ để UTF-8 hoạt động đúng,
+# không cần dữ liệu vùng miền đầy đủ của `en_US.UTF-8` (server không hiển thị ngày/giờ/số theo locale
+# hệ điều hành, dùng `TIMESTAMPTZ` + code tự format).
+ENV LANG=C.utf8
+ENV LC_ALL=C.utf8
 COPY --from=jlink-builder /opt/kage-jre /opt/kage-jre
 ENV JAVA_HOME=/opt/kage-jre
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
