@@ -416,11 +416,11 @@ Nên trang quản trị **tự cắt được mọi vùng** bằng `canvas.drawI
 
 ## 10. ADR cần tạo / quyết định treo
 
-- **ADR đề xuất — "Graphics Quality Tiers & Pre-render Pipeline"**: gộp quyết định #1–#4 (ảnh hưởng cấu trúc `assets/exported/`, ResourceManager, và là cam kết dài hạn về cách sản xuất art). Chủ dự án Accept thì tài liệu này chuyển Status → Approved.
-- **Migration registry** (§8.2): là DB schema change — tạo Flyway migration `V19__create_art_registry.sql` (gồm `art_category` + seed cây danh mục + `art_asset`) khi chủ dự án duyệt cột/kiểu; kèm quyết định #7–#8 vào ADR trên (không cần ADR riêng).
+- ✅ **ADR "Graphics Quality Tiers & Pre-render Pipeline"** — quyết định #1–#4 chốt qua thực tế đã triển khai (không tách ADR riêng, xem [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) cho phần phát hành).
+- ✅ **Migration registry** (§8.2): `V19__create_art_registry.sql` (2026-08-01) — `art_category` + seed cây danh mục + `art_asset`, verify thật qua Postgres 17.
 - **Lưu trữ file: không cần ADR** — §8.4 chốt nginx + đĩa, không thêm dependency nào.
-- ✅ **Phát hành asset đã có ADR riêng**: [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) (Proposed 2026-08-01) — bản cài đóng gói **đúng 1 tier mặc định (MEDIUM)**, LOW/HIGH tải theo yêu cầu khi người chơi đổi mức đồ họa; client **luôn** gọi `ensureAssetsAvailable(tier)` kể cả khi asset có sẵn (chống nhánh code mục). ADR-028 **amend** [ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md) ở đúng điểm "đóng gói toàn bộ"; phần hoãn CDN/OBB của ADR-024 vẫn giữ nguyên.
-- ✅ **`tools/asset-pipeline` đã có ADR riêng**: [ADR-029](../01-architecture/adr/ADR-029-Asset-Pipeline-Tool.md) (Proposed 2026-08-01) — tạo module `tools:asset-pipeline` + dùng `gdx-tools` TexturePacker đóng gói atlas. Phạm vi v1 **không gồm** bước upsert DB (mục "Migration registry" ở trên) — chờ `V19` được duyệt riêng rồi nối thêm.
+- ✅ **Phát hành asset**: [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) Accepted (2026-08-01) — bản cài đóng gói **đúng 1 tier mặc định (MEDIUM)**, LOW/HIGH tải theo yêu cầu khi người chơi đổi mức đồ họa; client **luôn** gọi `ensureAssetsAvailable(tier)` kể cả khi asset có sẵn (chống nhánh code mục). Amend [ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md) ở đúng điểm "đóng gói toàn bộ"; phần hoãn CDN/OBB của ADR-024 vẫn giữ nguyên.
+- ✅ **`tools/asset-pipeline`**: [ADR-029](../01-architecture/adr/ADR-029-Asset-Pipeline-Tool.md) Accepted (2026-08-01) — module `tools:asset-pipeline` + `gdx-tools` TexturePacker đóng gói atlas, **đã nối** bước upsert `art_asset` (V19) qua `ArtRegistryUpserter`.
 - **Treo**: có làm bộ atlas @2x cho desktop High không (tốn thêm dung lượng patch)? · **Git LFS cho .blend lớn — vẫn treo** (MinIO từng được coi là lời giải, nay đã loại) · Blender tooling không cần ADR dependency (chạy dev-time, không vào runtime game).
 
 ## 11. Tài liệu liên quan
@@ -436,6 +436,13 @@ Nên trang quản trị **tự cắt được mọi vùng** bằng `canvas.drawI
    Accepted) — downscale @1x/@0.5x + validate tên + pack 3 bộ atlas (`gdx-tools` TexturePacker thật) +
    sinh `asset-manifest.json` đều chạy thật trên toàn bộ asset đang có (`./gradlew :tools:asset-pipeline:run`).
    HIGH tier sao chép trực tiếp từ MEDIUM (cùng độ phân giải @1x, chỉ khác hiệu ứng runtime — xem
-   `GraphicsTier` javadoc). **upsert registry vào DB** (§8.3) hoãn tới mục 4 dưới — vẫn chưa làm.
-4. Chủ dự án duyệt schema §8.2 → tạo `V19__create_art_registry.sql` → nối bước upsert vào `tools/asset-pipeline`.
+   `GraphicsTier` javadoc).
+4. ✅ `V19__create_art_registry.sql` viết + verify thật qua Postgres 17 thật (2026-08-01) — `art_category`
+   (seed 6 tầng 1 + 19 tầng 2) + `art_asset`. Bước upsert đã nối vào `tools/asset-pipeline`
+   (`ArtRegistryUpserter`, tuỳ chọn qua biến môi trường `DB_PASSWORD` — thiếu thì bỏ qua, không fail),
+   verify thật: 37 asset đang có upsert đúng category/element/blend_path/actions, chạy 2 lần cho ra
+   đúng 37 dòng (idempotent, không trùng). Phát hiện thật lúc verify: pgjdbc gửi `TimeZone.getDefault()`
+   của JVM cho Postgres lúc connect, máy dev múi giờ "Asia/Saigon" (alias tzdata cũ) làm Postgres 17
+   FATAL — cùng bug đã gặp ở `PostgresDataSourceFactory` (server-database), sửa lại đúng cách đã verify
+   ở đó (`TimeZone.setDefault(UTC)`, không phải connection property).
 5. Code `GraphicsQuality` trong client-core khi tới phase thích hợp (không code trước — Phase discipline).

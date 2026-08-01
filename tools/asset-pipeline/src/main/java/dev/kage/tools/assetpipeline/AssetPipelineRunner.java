@@ -13,10 +13,9 @@ import java.util.stream.Stream;
 /**
  * Entry point {@code tools:asset-pipeline} (ADR-029). Đọc {@code assets/raw/render-out/} → hạ mẫu
  * xuống tier 1x/0.5x → validate tên → đóng gói atlas 3 tier (low/med/high) → sinh
- * {@code asset-manifest.json}.
- *
- * <p>Phạm vi v1 KHÔNG gồm upsert DB {@code art_asset} (ADR-029 — chờ
- * {@code V19__create_art_registry.sql} được duyệt riêng).
+ * {@code asset-manifest.json} → upsert {@code art_asset} (V19, ART-PIPELINE §8.3) NẾU có cấu hình
+ * DB (biến môi trường {@code DB_PASSWORD} — xem {@link ArtRegistryConfig}); không có thì bỏ qua
+ * bước upsert, không fail — cho phép duyệt atlas cục bộ mà không cần Postgres đang chạy.
  */
 public final class AssetPipelineRunner {
 
@@ -38,6 +37,14 @@ public final class AssetPipelineRunner {
 
         Path manifestPath = exportedRoot.resolve("asset-manifest.json");
         ManifestWriter.writeManifest(exportedRoot, manifestPath);
+
+        ArtRegistryConfig dbConfig = ArtRegistryConfig.fromEnvironmentOrNull();
+        if (dbConfig != null) {
+            ArtRegistryUpserter.upsertAll(assets, dbConfig);
+        } else {
+            System.out.println("[asset-pipeline] bỏ qua upsert art_asset (thiếu biến môi trường DB_PASSWORD)");
+        }
+
         System.out.println("[asset-pipeline] xong -> " + exportedRoot);
     }
 
