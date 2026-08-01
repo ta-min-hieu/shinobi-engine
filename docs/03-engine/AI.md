@@ -114,7 +114,9 @@ libGDX có thư viện `gdx-ai` (FSM, Behavior Tree, pathfinding, steering).
 
 **Đề xuất**: **KHÔNG dùng gdx-ai cho FSM** — FSM quái thường quá đơn giản, tự viết rẻ hơn thêm dependency đang thoi thóp. **Cân nhắc** gdx-ai cho A* pathfinding (phần đó phức tạp hơn).
 
-→ Cần ADR-022.
+✅ **[ADR-022](../01-architecture/adr/ADR-022-Custom-FSM-No-Gdx-Ai.md) đã viết** (2026-08-01, Status:
+Proposed) — khớp đúng code `AiSystem` đã chạy thật từ Phase 4 (tự viết FSM bằng `enum`/`switch`, không
+`gdx-ai`). Pathfinding vẫn hoãn — chưa có map/chướng ngại vật thật để cần né.
 
 ---
 

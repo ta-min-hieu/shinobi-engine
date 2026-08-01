@@ -48,9 +48,9 @@ graph LR
 | Thành phần | Chọn | Vì sao |
 |---|---|---|
 | Camera | `OrthographicCamera` | Game 2D side-view |
-| Viewport | `FitViewport` hoặc `ExtendViewport` | **Chưa chốt** — xem bên dưới |
+| Viewport | `FitViewport` | ✅ [ADR-020](../01-architecture/adr/ADR-020-Viewport-Strategy.md) *(Proposed 2026-08-01, khớp code `WorldScreen` đã dùng từ Phase 1)* |
 
-**Vấn đề cần quyết định**: game phải chạy trên tỉ lệ màn hình rất khác nhau (16:9 desktop, 20:9 điện thoại, tablet 4:3).
+**Vấn đề đã quyết định** (xem ADR-020 để biết vì sao): game phải chạy trên tỉ lệ màn hình rất khác nhau (16:9 desktop, 20:9 điện thoại, tablet 4:3).
 
 | Viewport | Ưu | Nhược |
 |---|---|---|
@@ -241,13 +241,13 @@ Với map lớn nhiều entity: cân nhắc **spatial partition** (grid đơn gi
 | 6 | **Không lighting động ở MVP** | Điều 9, 10 — chưa gameplay nào cần | Accepted |
 | 7 | Particle **bắt buộc pool** + giới hạn số lượng | Mobile | Accepted |
 | 8 | Không spatial partition ở MVP cho tới khi đo thấy cần | Điều 30 | Accepted |
-| 9 | **Viewport chưa chốt** — ảnh hưởng công bằng PvP | Là quyết định gameplay | ⏳ **Chờ quyết định** |
+| 9 | **`FitViewport`** — ảnh hưởng công bằng PvP | Là quyết định gameplay | ⏳ Proposed ([ADR-020](../01-architecture/adr/ADR-020-Viewport-Strategy.md)) |
 
 ## ADR cần tạo
 
-| ADR | Nội dung | Ưu tiên |
-|---|---|---|
-| **ADR-020** | **Chọn Viewport strategy** (§3) — ảnh hưởng cân bằng PvP, không chỉ kỹ thuật | 🟡 Chặn Phase 1 |
+✅ **ADR-020 đã viết** (2026-08-01, Status: Proposed) — xem §3 và
+[ADR-020](../01-architecture/adr/ADR-020-Viewport-Strategy.md). Không còn nằm trong danh sách "cần
+tạo" — chờ chủ dự án Accept, không phải chờ viết.
 
 ## Tài liệu liên quan
 
@@ -259,6 +259,6 @@ Với map lớn nhiều entity: cân nhắc **spatial partition** (grid đơn gi
 
 ## Việc cần làm tiếp theo
 
-1. **Chốt ADR-020 (Viewport)** cùng game designer — đây là quyết định gameplay đội lốt kỹ thuật.
+1. ✅ **ADR-020 (Viewport) đã viết** (2026-08-01) — chờ chủ dự án Accept.
 2. Phase 1: xác lập §4 (world unit) ngay từ đầu — đổi sau = đổi mọi số liệu gameplay.
 3. Test shader (§9) trên Android **sớm**, không để tới Phase 8 mới phát hiện GLSL không tương thích.

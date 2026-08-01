@@ -189,19 +189,23 @@ Câu hỏi trung thực: game side-view kiểu Ninja School có cần **full phy
 | # | Quyết định | Lý do | Trạng thái |
 |---|---|---|---|
 | 1 | **Box2D KHÔNG dùng cho combat/damage** | Không xác định, không khớp tick, không kiểm soát được | Accepted — quan trọng nhất |
-| 2 | Server **bắt buộc** chạy physics va chạm địa hình | Điều 15 — chống hack xuyên tường/bay | Accepted |
+| 2 | Server **bắt buộc** chạy physics va chạm địa hình | Điều 15 — chống hack xuyên tường/bay | ⚠️ Accepted về nguyên tắc, **chưa implement** — xem [ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md) |
 | 3 | Fixed timestep khớp game tick | Xác định, tái hiện được | Accepted |
 | 4 | World unit = mét, dùng chung với rendering | Box2D ổn định ở 0.1–10 unit | Accepted |
 | 5 | **Player ↔ Player và Player ↔ Monster KHÔNG va chạm vật lý** | Tránh kẹt/chặn đường; hợp thể loại | Accepted — quyết định gameplay |
 | 6 | Entity có physics body → **chỉ** điều khiển qua lực/vận tốc | Tránh hai nguồn chân lý về vị trí | Accepted |
 | 7 | Bắt buộc `destroyBody()` khi entity chết | Native memory không được GC | Accepted |
-| 8 | Dùng Box2D, **nhưng ghi nhận rủi ro** cảm giác điều khiển | Điều 9 — không tự viết thứ đã có | Accepted có điều kiện |
+| 8 | Dùng Box2D, **nhưng ghi nhận rủi ro** cảm giác điều khiển | Điều 9 — không tự viết thứ đã có | ⏳ **Superseded (đề xuất) bởi [ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md)** — không dùng Box2D |
 
 ## ADR cần tạo
 
-| ADR | Nội dung | Ưu tiên |
-|---|---|---|
-| **ADR-021** | Box2D hay AABB tự viết cho chuyển động nhân vật — **chỉ tạo nếu Phase 3 thấy điều khiển không đạt** | 🟢 Thấp — chờ dữ liệu Phase 3 |
+✅ **ADR-021 đã viết** (2026-08-01, Status: Proposed) —
+[ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md): không dùng Box2D, chỉ AABB tự viết khi có
+map thật. Dựa trên dữ liệu THẬT sau khi Phase 3-9 đã đóng (không cần chờ nữa — dữ liệu đã có):
+`engine-physics` chưa từng có code, `MovementSystem` chỉ là velocity thuần, chưa có map/terrain nào
+tồn tại để va chạm. ⚠️ **Hệ quả**: Technical Decision #2 dưới đây và §2-§4 phía trên mô tả một hệ
+thống Box2D/gravity/jump **chưa từng được implement** — tài liệu này cần một đợt rà soát lớn riêng
+sau khi ADR-021 được Accept (không sửa trong lần cập nhật này — xem ADR-021 "Consequences").
 
 ## Tài liệu liên quan
 

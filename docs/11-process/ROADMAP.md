@@ -659,7 +659,7 @@ Closed Beta → Open Beta → Release Candidate → Production → Hotfix
 
 ## ADR cần tạo
 
-Xem [ADR Index](../01-architecture/adr/README.md) — **16 ADR Accepted** (gồm 010/012/018 chốt 2026-07-18, ADR-026 chốt 2026-07-24); **10 đang chờ** (007, 011 Proposed; 014–015, 019–024 chưa viết).
+Xem [ADR Index](../01-architecture/adr/README.md) — **20 ADR Accepted** (gồm 010/012/018 chốt 2026-07-18, ADR-026 chốt 2026-07-24, ADR-014/015/019 chốt 2026-07-26/28, ADR-027 TLS chốt 2026-07-31); **7 đang chờ** — 007, 011, **024** (Asset Distribution, viết 2026-08-01) đều **Proposed** (đã có bản nháp, chờ chủ dự án Accept); 020–023 vẫn **chưa viết**.
 
 ## Tài liệu liên quan
 
@@ -749,3 +749,38 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **16 ADR Accepted** (gồm
     tick, kèm 2 caveat KHÔNG chặn đóng phase (xem ghi chú ngay dưới Exit Criteria ở đầu mục Phase 9):
     CPU chưa có công thức ngoại suy an toàn cho N>2000, off-heap chưa soak-test dài hạn để loại trừ
     leak. Next: Phase 10 (Release).
+22. Phase 10 — tiến độ tính đến 2026-08-01 (chưa có Exit Criteria hình thức như Phase 0-9, chỉ có
+    bảng quy tắc Beta→RC→Production ở §Phase 10 phía trên):
+    - ✅ `server.Dockerfile` + `.dockerignore` (`35bfe03`), `server` service wired vào
+      `docker-compose.yml` (`c789281`), CI job `docker-build-push` đẩy image lên GHCR (`db4ffa8`,
+      verify phiên bản action thật thay vì copy số cũ).
+    - ✅ Bug thật phát hiện+sửa ngay sau khi push: `ci.yml` trigger sai nhánh `main` trong khi repo
+      chỉ có `master` (`c2dd43a`) — nghĩa là `docker-build-push` (và có thể cả `build-and-verify`
+      trên push trực tiếp) chưa từng chạy thật trước đó.
+    - ✅ **ADR-027 (TLS) Accepted + code xong** (2026-07-31, chủ dự án chốt trực tiếp) — Netty
+      `SslHandler` phía server + JDK `SSLSocket` pin phía client. Build+test xanh. Cert bundle
+      trong repo CHỈ để test (khóa public trên GitHub) — **cần cert thật trước khi chạy Production**.
+    - ✅ `docker-compose.prod.yml` (chưa nối TLS, có cảnh báo chặn dùng cổng public 7777 tới khi có
+      cert thật) — commit `ff5e165`.
+    - ✅ CI trên `master` **CONFIRMED XANH lần đầu tiên trong lịch sử repo** (run #31, commit
+      `ff5e165`, 2026-07-31) sau khi sửa thêm 1 bug thật: `gradlew` không có exec bit khi checkout
+      từ Windows → `chmod +x gradlew` thiếu trong `ci.yml` (đã có trong Dockerfile nhưng chưa có
+      trong CI) — sửa ở `018cb7a`.
+    - ✅ Bug thật thứ hai trong chính Dockerfile: layer "dependency warmup" là no-op kép — chạy
+      `./gradlew dependencies` trên **root project** (vốn không khai dependency nào) thay vì target
+      đúng `:server:server-gateway:dependencies`. Sửa + verify bằng `docker build --no-cache` thật
+      (thấy đúng Netty/Micrometer/protobuf resolve vào layer) — commit `b81a0f7`. **CI run #58
+      confirmed Success 2026-08-01** (`build-and-verify` 12m24s + `docker-build-push` 4m34s).
+    - ✅ Dependabot backlog (15 PR) gần như đã dọn sạch qua các lần merge CI #40-57 — chỉ còn 1 PR mở
+      (`netty-all` 4.1.136→4.2.16, #8), **cố tình giữ lại** vì build thật cho thấy Netty 4.2 gây lỗi
+      TLS (`bad_record_mac`) dưới tải trong integration test.
+    - ⛔ **Chưa làm** (không phải thiếu sót, ngoài phạm vi các đợt trên): TLS thật trong
+      `docker-compose.prod.yml`, cert Production thật, tối ưu kích thước image (jlink/Alpine —
+      DOCKER.md §8 khuyến nghị KHÔNG dùng Alpine cho project này), và toàn bộ quy trình
+      Closed Beta → Open Beta → RC → Production ở bảng quy tắc phía trên vẫn chưa bắt đầu (đòi hỏi
+      quyết định của chủ dự án, không phải việc AI tự chạy).
+    - ✅ **ADR-024 (Asset Distribution) viết 2026-08-01, Status Proposed** — gỡ nhãn "chặn Phase 10"
+      bằng cách chính thức hoá lại quyết định MVP có sẵn (đóng gói toàn bộ asset, hoãn patch/CDN/Play
+      Asset Delivery) thay vì đoán số liệu chưa tồn tại (repo hiện chưa có `assets/` thật nào, Android
+      cũng chưa phải target đã chốt). Chờ chủ dự án Accept. Xem
+      [ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md).

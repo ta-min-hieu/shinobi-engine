@@ -50,6 +50,10 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-017](ADR-017-Auth-Token.md) | Auth token: session token tự phát hành + Redis | ✅ Accepted | — |
 | [ADR-018](ADR-018-Tick-Rate.md) | Tick rate **60Hz** | ✅ Accepted | — |
 | [ADR-019](ADR-019-GC-Choice.md) | Dùng ZGC cho server production | ✅ Accepted | — |
+| [ADR-020](ADR-020-Viewport-Strategy.md) | `FitViewport` cho camera gameplay — công bằng PvP | ⏳ **Proposed** *(2026-08-01, khớp code `WorldScreen` từ Phase 1)* | — |
+| [ADR-021](ADR-021-Box2D-vs-AABB.md) | Không dùng Box2D cho di chuyển — AABB tự viết khi có map thật | ⏳ **Proposed** *(2026-08-01, dựa dữ liệu Phase 3-9 đã đóng)* | PHYSICS.md §2-§4/Technical Decision #2/#8 cần rà lại sau khi Accept |
+| [ADR-022](ADR-022-Custom-FSM-No-Gdx-Ai.md) | Tự viết FSM cho AI quái, không dùng gdx-ai | ⏳ **Proposed** *(2026-08-01, khớp code `AiSystem` từ Phase 4)* | — |
+| [ADR-024](ADR-024-Asset-Distribution-Strategy.md) | Đóng gói toàn bộ asset trong build, hoãn patch/CDN/Play Asset Delivery tới Revisit Trigger | ⏳ **Proposed** *(2026-08-01)* | Được gỡ khỏi "chặn Phase 10" bởi chính ADR này |
 | [ADR-025](ADR-025-Idempotency.md) | Idempotency cho Command có side-effect | ✅ Accepted | — |
 | [ADR-026](ADR-026-Dungeon-Instance-Model.md) | Dungeon instance model: cùng process, World riêng trong 1 JVM | ✅ Accepted | — |
 | [ADR-027](ADR-027-TLS-Transport-Security.md) | TLS cho kết nối game: in-process Netty (server) + JDK `SSLSocket` pin cert (client), self-signed cho Closed Beta | ✅ Accepted *(2026-07-31, chủ dự án xác nhận)* | — |
@@ -62,13 +66,9 @@ Tổng hợp từ toàn bộ tài liệu. **Không code chạm các vùng này k
 
 | ADR | Nội dung | Ưu tiên | Chặn | Nguồn |
 |---|---|---|---|---|
-| **ADR-020** | Viewport strategy (ảnh hưởng công bằng PvP) | 🟡 Trung bình | Phase 1 | [RENDERING.md §3](../../03-engine/RENDERING.md) |
-| **ADR-021** | Box2D vs AABB tự viết cho chuyển động nhân vật | 🟢 Thấp | Chờ dữ liệu Phase 3 | [PHYSICS.md §10](../../03-engine/PHYSICS.md) |
-| **ADR-022** | gdx-ai hay tự viết FSM/pathfinding | 🟡 Trung bình | Phase 2 | [AI.md §5](../../03-engine/AI.md) |
-| **ADR-023** | Mobile input scheme (joystick ảo / tap-to-move) | 🟡 Trung bình | Phase 2 nếu mobile-first | [CLIENT.md §5](../../04-client/CLIENT.md) |
-| **ADR-024** | Asset distribution: đóng gói / patch / CDN | 🟢 Thấp | Phase 10 | [RESOURCE.md §10](../../04-client/RESOURCE.md) |
+| **ADR-023** | Mobile input scheme (joystick ảo / tap-to-move) | 🟡 Trung bình | Phụ thuộc quyết định Android (TECHNOLOGY-STACK.md — chưa chốt mobile-first hay desktop-first) | [CLIENT.md §5](../../04-client/CLIENT.md) |
 
-> ADR-013, ADR-017, ADR-025 đã Accepted (2026-07-19), ADR-016 đã Accepted (2026-07-20), ADR-026 đã Accepted (2026-07-24), ADR-014/ADR-015 đã Accepted (2026-07-26), ADR-019 đã Accepted (2026-07-28) — xem bảng "Danh sách ADR" ở trên, không còn nằm ở đây.
+> ADR-013, ADR-017, ADR-025 đã Accepted (2026-07-19), ADR-016 đã Accepted (2026-07-20), ADR-026 đã Accepted (2026-07-24), ADR-014/ADR-015 đã Accepted (2026-07-26), ADR-019 đã Accepted (2026-07-28), ADR-027 đã Accepted (2026-07-31) — xem bảng "Danh sách ADR" ở trên, không còn nằm ở đây. ADR-020/021/022/024 đã viết (2026-08-01, tất cả Status Proposed, dựa dữ liệu code thật đã chạy qua Phase 1-9) — cũng chuyển sang bảng "Danh sách ADR". Chỉ còn **ADR-023** thật sự "chưa viết" — bị chặn bởi câu hỏi Android chưa chốt, không phải bị bỏ quên.
 
 ---
 

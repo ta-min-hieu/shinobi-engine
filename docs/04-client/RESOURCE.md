@@ -170,18 +170,23 @@ public interface ResourceManager {
 
 ## 10. Patch & CDN
 
-⚠️ **Đây là phần chưa chốt và không thuộc MVP.**
+✅ **[ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md) đề xuất 2026-08-01**
+(Status: Proposed, chờ chủ dự án chốt): đóng gói toàn bộ asset trong bản build cho suốt Closed Beta
+Desktop, hoãn patch/CDN/Play Asset Delivery tới khi có Revisit Trigger cụ thể (Android được chốt là
+target thật, hoặc dung lượng asset thật đo được vượt ngưỡng gây trải nghiệm tệ). Lý do hoãn: repo hiện
+chưa có `assets/` thật nào để đo, và Android chưa phải target đã chốt — quyết định CDN/OBB/Play Asset
+Delivery trước khi có 2 dữ kiện đó sẽ chỉ là đoán (Điều 30).
 
-| Câu hỏi chưa trả lời | Ảnh hưởng |
+| Câu hỏi (xem ADR-024 để biết vì sao hoãn) | Ảnh hưởng |
 |---|---|
 | Asset đóng gói trong bản cài hay tải về sau? | Kích thước bản cài; thời gian chờ lần đầu |
 | Có CDN không? Ai trả tiền? | Chi phí vận hành |
 | Patch từng file hay tải nguyên atlas? | Băng thông |
 | Android: asset trong APK hay OBB/Play Asset Delivery? | Giới hạn 150MB của Google Play |
 
-**MVP**: đóng gói toàn bộ asset trong bản build. Đơn giản nhất (Điều 9).
+**Closed Beta (hiện tại)**: đóng gói toàn bộ asset trong bản build. Đơn giản nhất (Điều 9).
 
-**Sau MVP**: xem [LAUNCHER.md](../12-devtools/LAUNCHER.md) (stub) — cần ADR khi tới lúc.
+**Sau khi chạm Revisit Trigger của ADR-024**: xem [LAUNCHER.md](../12-devtools/LAUNCHER.md) (stub).
 
 ---
 
@@ -229,16 +234,16 @@ Trung thực về rủi ro:
 | 5 | Font qua **FreeType**, không bitmap font | Hỗ trợ uiScale | Accepted |
 | 6 | Tên file: không dấu, không hoa, không space | Lỗi cross-platform | Accepted |
 | 7 | Unload zone cũ **sau khi** zone mới load xong | Tránh màn hình trắng | Accepted |
-| 8 | **MVP: đóng gói toàn bộ asset**, không patch/CDN | Điều 9 | Accepted |
+| 8 | **Đóng gói toàn bộ asset**, không patch/CDN, cho Closed Beta | Điều 9; chính thức hoá ở [ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md) | ⏳ Proposed (ADR-024) |
 | 9 | `tools/asset-pipeline` là lớp đệm để thay editor được | Giảm rủi ro HyperLap2D | Accepted |
 | 10 | CI **fail** nếu vi phạm §4, §5, §6 | Điều 41 — máy kiểm, không dựa vào người nhớ | Accepted |
 | 11 | **License font chưa kiểm tra** | Cần trước khi chốt font | ⏳ **Rủi ro pháp lý** |
 
 ## ADR cần tạo
 
-| ADR | Nội dung | Ưu tiên |
-|---|---|---|
-| **ADR-024** | Chiến lược phát hành asset: đóng gói / patch / CDN / Play Asset Delivery (§10) | 🟢 Chặn Phase 10 |
+✅ **ADR-024 đã viết** (2026-08-01, Status: Proposed) — xem §10 và
+[ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md). Không còn nằm trong danh
+sách "cần tạo" — chờ chủ dự án Accept, không phải chờ viết.
 
 ## Tài liệu liên quan
 
