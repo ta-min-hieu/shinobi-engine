@@ -110,16 +110,18 @@ thật (phụ thuộc art chưa tồn tại — ADR-021 Revisit Trigger).
 
 ---
 
-## 7. Trigger zone / sensor — CHƯA implement
+## 7. Trigger zone / sensor
 
-Ý tưởng cũ (Box2D sensor) vẫn là nhu cầu gameplay thật (vùng kích hoạt load map, vùng an toàn tắt
-PvP, vùng NPC hiện nút tương tác, vùng bẫy) — nhưng **chưa có cơ chế nào implement** việc này, kể cả
-sau khi có `TerrainCollisionSystem` (hệ đó chỉ CHẶN, không PHÁT HIỆN-không-chặn).
+✅ **Đã implement** (2026-08-01) — `TriggerZoneSystem` (engine-ecs), dùng lại `Aabb`/`NamedZone`.
+KHÔNG chặn di chuyển (khác `TerrainCollisionSystem`) — chỉ gọi callback (`BiConsumer<KEntity,
+String>`, không dùng `EventBus`/ADR-008 vì server-world hiện chưa dùng EventBus ở đâu, giữ nhất
+quán với pattern callback trực tiếp đã có ở `AiSystem`/`CombatSystem`) khi entity **vào** hoặc
+**ra** một zone có tên. Entity phải có `TriggerZoneMembershipComponent` mới được theo dõi (opt-in).
 
-Đây là tính năng riêng, khác `TerrainCollisionSystem` — không quyết ở đây, không có ADR nào chặn
-(không phải kiến trúc lớn, chỉ là chưa ai cần tới). Khi cần, cách hợp lý nhất là 1 System mới kiểm
-tra `Aabb.contains` tương tự nhưng KHÔNG revert position, chỉ phát Event khi entity vào/ra vùng
-(đúng ADR-008 Event-Driven) — tận dụng lại `Aabb` đã có, không cần thư viện physics nào.
+Nối vào `WorldFacade` sau `TerrainCollisionSystem`, **zone danh sách rỗng mặc định + chưa entity
+nào mang component** — chưa có consumer thật (vùng an toàn PvP, tương tác NPC theo khoảng cách...)
+wire vào lúc viết. Xây trước cơ chế để dùng sau, cùng tinh thần `TerrainCollisionSystem`. 5 test
+PASS (`TriggerZoneSystemTest`).
 
 ---
 
@@ -148,7 +150,7 @@ GC lo hết. Cạm bẫy Box2D cũ (destroy body, sửa world giữa step, tunne
 | 5 | **Player ↔ Player và Player ↔ Monster KHÔNG va chạm vật lý** | Tránh kẹt/chặn đường; hợp thể loại | Accepted — quyết định gameplay |
 | 6 | Entity là 1 điểm, không bán kính va chạm | Chưa có kích thước hitbox thật (art chưa tồn tại) | Accepted tạm thời — xem ADR-021 Revisit Trigger |
 | 7 | Obstacle mặc định RỖNG cho tới khi có map thật | Chưa có `assets/` nào (ADR-024) | Accepted |
-| 8 | Trigger zone/sensor **chưa implement** | Chưa ai cần tới, không phải kiến trúc lớn | ⏳ Chưa làm — §7 |
+| 8 | Trigger zone/sensor: `TriggerZoneSystem` + callback trực tiếp, không `EventBus` | Nhất quán pattern callback đã có, `EventBus` chưa dùng ở đâu | ✅ Accepted, implemented — §7 |
 
 ## ADR cần tạo
 
@@ -167,8 +169,8 @@ GC lo hết. Cạm bẫy Box2D cũ (destroy body, sửa world giữa step, tunne
 
 1. Khi asset pipeline (ADR-024) sản xuất map thật đầu tiên có tường → nạp `Aabb` obstacle thật qua
    `TerrainCollisionSystem.setObstacles(...)`, đo CPU cost thật (Điều 30).
-2. Trigger zone/sensor (§7) — implement khi có nhu cầu gameplay cụ thể đầu tiên (vùng an toàn PvP,
-   tương tác NPC theo khoảng cách hiện đã dùng distance-check trực tiếp trong `AiSystem`/tương tự,
-   không nhất thiết cần "sensor" chung).
+2. Trigger zone/sensor (§7) đã có cơ chế — còn thiếu: consumer thật đầu tiên (vd. vùng an toàn PvP)
+   gọi `TriggerZoneSystem.setZones(...)` và gắn `TriggerZoneMembershipComponent` cho character khi
+   attach, cùng lúc có map/zone data thật (ADR-024).
 3. Client-side prediction cho va chạm địa hình (bảng §3) — hiện client CHƯA dùng
    `TerrainCollisionSystem` cục bộ; không cấp bách vì chưa có obstacle thật để dự đoán.

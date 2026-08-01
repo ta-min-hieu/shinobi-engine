@@ -20,6 +20,7 @@ import dev.kage.engine.ecs.component.PositionComponent;
 import dev.kage.engine.ecs.component.VelocityComponent;
 import dev.kage.engine.ecs.system.MovementSystem;
 import dev.kage.engine.ecs.system.TerrainCollisionSystem;
+import dev.kage.engine.ecs.system.TriggerZoneSystem;
 import dev.kage.server.world.component.AiStateComponent;
 import dev.kage.server.world.component.AttackCooldownComponent;
 import dev.kage.server.world.component.BossAiComponent;
@@ -181,6 +182,10 @@ public final class WorldFacade {
         // Obstacle mặc định RỖNG — chưa có map/asset thật (ADR-021). No-op an toàn cho tới khi có
         // nguồn map thật gọi setObstacles(...); giữ đúng thứ tự PHYSICS.md §4 (sau MovementSystem).
         ecsWorld.addSystem(new TerrainCollisionSystem());
+        // Zone mặc định RỖNG + chưa entity nào mang TriggerZoneMembershipComponent — chưa có
+        // consumer thật (vùng an toàn PvP, tương tác NPC...) wire vào, xây trước cơ chế để dùng
+        // sau (PHYSICS.md §7). No-op an toàn, cùng tinh thần TerrainCollisionSystem phía trên.
+        ecsWorld.addSystem(new TriggerZoneSystem());
         ecsWorld.addSystem(combatSystem);
         ecsWorld.addSystem(skillSystem);
         ecsWorld.addSystem(bossAiSystem);
