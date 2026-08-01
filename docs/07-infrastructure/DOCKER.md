@@ -218,6 +218,15 @@ Verify THẬT: `docker build` (không cache) + `docker run` full stack (Postgres
 chạy hết 19 migration, HikariCP pool warm 20/20, GraalJS/Truffle init không lỗi, `server-gateway
 lắng nghe cổng 7777` xuất hiện trong log, `/health/live` trả 200, container `healthy` ổn định.
 
+⚠️ **Phát hiện thật lúc review độc lập lại (cùng ngày)**: `ubuntu:26.04` trần mặc định locale
+`POSIX` (không UTF-8) — khác `eclipse-temurin:25-jre` (base cũ) vốn tự cấu hình sẵn
+`LANG=en_US.UTF-8`. Mọi log/exception tiếng Việt khắp server (`server-world`/`server-database`...)
+ra mojibake trong container mới (verify bằng `docker run` thiếu biến môi trường bắt buộc, thấy
+`Thi?u bi?n m?i tr??ng b?t bu?c` thay vì `Thiếu biến môi trường bắt buộc`). Sửa bằng
+`ENV LANG=C.utf8` ở stage `runtime` — `C.utf8` có sẵn trong glibc Ubuntu (`locale -a` liệt kê),
+không cần cài `locales` package/chạy `locale-gen` (server không cần dữ liệu vùng miền đầy đủ của
+`en_US.UTF-8`, chỉ cần UTF-8 hoạt động đúng). Kích thước image không đổi đáng kể sau khi sửa.
+
 ---
 
 ## 9. Logging trong container
