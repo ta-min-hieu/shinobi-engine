@@ -49,11 +49,14 @@ def _add_box(verts, faces, half_x, half_y, z_lo, z_hi, off_x=0.0, off_y=0.0):
     return list(range(base, base + 8)), list(range(face_start, len(faces)))
 
 
-def _build_body_and_rig(name_prefix, bulk=1.0, props=None):
+def _build_body_and_rig(name_prefix, bulk=1.0, props=None, gear=None):
     """bulk scales torso/pelvis/leg thickness (ART-PIPELINE §2.2 wants Thổ
     visibly "nặng nhất"). props is a list of extra weapon-silhouette boxes,
-    each (half_x, half_y, z_lo, z_hi, off_x, off_y), rigidly attached to the
-    pelvis so they read as hip-mounted gear without adding a new bone."""
+    each (half_x, half_y, z_lo, z_hi, off_x, off_y) — always hip-mounted
+    (pelvis bone), matching the "Vũ khí" line which doesn't change per tier.
+    gear is B2/B3 costume pieces (armor/scarf/thigh guards): each tuple adds
+    a `bone` field so a piece can ride a different bone (e.g. thigh guards on
+    leg_l/leg_r instead of pelvis)."""
     verts, faces = [], []
     idx_pelvis, faces_pelvis = _add_box(verts, faces, 0.13 * bulk, 0.10 * bulk, 0.20, 0.25)
     idx_torso, _ = _add_box(verts, faces, 0.14 * bulk, 0.10 * bulk, 0.25, 0.58)
@@ -63,12 +66,19 @@ def _build_body_and_rig(name_prefix, bulk=1.0, props=None):
     idx_leg_l, _ = _add_box(verts, faces, 0.055 * bulk, 0.06 * bulk, 0.0, 0.24, off_x=-0.07 * bulk, off_y=-0.04)
     idx_leg_r, _ = _add_box(verts, faces, 0.055 * bulk, 0.06 * bulk, 0.0, 0.24, off_x=0.07 * bulk, off_y=-0.04)
 
-    idx_props = []
+    idx_by_bone = {
+        "pelvis": list(idx_pelvis), "spine": [], "head": [],
+        "arm_l": [], "arm_r": [], "leg_l": [], "leg_r": [],
+    }
     faces_accent = list(faces_pelvis)
     for half_x, half_y, z_lo, z_hi, off_x, off_y in (props or []):
         idx, prop_faces = _add_box(verts, faces, half_x, half_y, z_lo, z_hi, off_x=off_x, off_y=off_y)
-        idx_props.extend(idx)
+        idx_by_bone["pelvis"].extend(idx)
         faces_accent.extend(prop_faces)
+    for half_x, half_y, z_lo, z_hi, off_x, off_y, bone in (gear or []):
+        idx, gear_faces = _add_box(verts, faces, half_x, half_y, z_lo, z_hi, off_x=off_x, off_y=off_y)
+        idx_by_bone[bone].extend(idx)
+        faces_accent.extend(gear_faces)
 
     mesh = bpy.data.meshes.new(name_prefix + "_Body")
     mesh.from_pydata(verts, [], faces)
@@ -100,11 +110,13 @@ def _build_body_and_rig(name_prefix, bulk=1.0, props=None):
     for pb in rig.pose.bones:
         pb.rotation_mode = "XYZ"
 
-    vgroups = {
-        "pelvis": idx_pelvis + idx_props, "spine": idx_torso, "head": idx_head,
-        "arm_l": idx_arm_l, "arm_r": idx_arm_r, "leg_l": idx_leg_l, "leg_r": idx_leg_r,
-    }
-    for vg_name, indices in vgroups.items():
+    idx_by_bone["spine"].extend(idx_torso)
+    idx_by_bone["head"].extend(idx_head)
+    idx_by_bone["arm_l"].extend(idx_arm_l)
+    idx_by_bone["arm_r"].extend(idx_arm_r)
+    idx_by_bone["leg_l"].extend(idx_leg_l)
+    idx_by_bone["leg_r"].extend(idx_leg_r)
+    for vg_name, indices in idx_by_bone.items():
         vg = body.vertex_groups.new(name=vg_name)
         vg.add(indices, 1.0, "REPLACE")
 
@@ -219,8 +231,78 @@ ELEMENT_SPECS = {
     },
 }
 
+# B2 costume pieces ("giáp mảnh + khăn/đai màu hệ", ART-PIPELINE §2.2 §"Trang
+# phục" B2 line for each element). Each tuple is
+# (half_x, half_y, z_lo, z_hi, off_x, off_y, bone) — 7th field picks which
+# bone the piece rides, since e.g. thigh guards need to move with the legs,
+# not the torso. Rendered in the accent color, same as weapon props.
+GEAR_SPECS_B2 = {
+    "hoa": [(0.045, 0.05, 0.48, 0.58, -0.16, -0.06, "spine")],  # giáp vai trái đơn
+    "thuy": [(0.11, 0.02, 0.38, 0.52, 0.0, -0.11, "spine")],  # giáp ngực mỏng
+    "phong": [  # áo gile + đai lưng dài
+        (0.145, 0.015, 0.30, 0.55, 0.0, -0.105, "spine"),
+        (0.03, 0.015, 0.06, 0.22, -0.05, -0.10, "pelvis"),
+    ],
+    "loi": [  # giáp vai đôi góc cạnh
+        (0.045, 0.05, 0.48, 0.58, -0.16, -0.06, "spine"),
+        (0.045, 0.05, 0.48, 0.58, 0.16, -0.06, "spine"),
+    ],
+    "tho": [  # giáp ngực dày + tấm che đùi
+        (0.16, 0.02, 0.30, 0.55, 0.0, -0.115, "spine"),
+        (0.05, 0.02, 0.05, 0.15, -0.08, -0.09, "leg_l"),
+        (0.05, 0.02, 0.05, 0.15, 0.08, -0.09, "leg_r"),
+    ],
+}
 
-def build(element, base_hex, accent_hex, out_path, outline_px_at_1x=0.8):
+# B3 adds one continuously-moving decorative detail (ART-PIPELINE §2.2 B3:
+# "đuôi khăn dài, vòng nguyên tố bay quanh" — a floating/orbiting accent).
+# Implemented via drivers (not per-action keyframes) so it keeps moving no
+# matter which action is playing. (radius, z_center, speed, size) — orbits in
+# the screen-visible X-Z plane around a point near the head/shoulder.
+ORBIT_SPECS_B3 = {
+    "hoa": (0.13, 0.90, 0.25, 0.045),
+    "thuy": (0.11, 0.55, 0.18, 0.042),
+    "phong": (0.14, 0.75, 0.35, 0.040),
+    "loi": (0.12, 0.85, 0.45, 0.038),
+    "tho": (0.15, 0.80, 0.12, 0.052),
+}
+
+
+def _add_scripted_driver(obj, path, index, expression):
+    fcurve = obj.driver_add(path, index)
+    drv = fcurve.driver
+    drv.type = "SCRIPTED"
+    var = drv.variables.new()
+    var.name = "f"
+    var.type = "SINGLE_PROP"
+    var.targets[0].id_type = "SCENE"
+    var.targets[0].id = bpy.context.scene
+    var.targets[0].data_path = "frame_current"
+    drv.expression = expression
+
+
+def _add_orbit_prop(rig, name_prefix, element, accent_hex, radius, z_center, speed, size):
+    verts = [(sx * size, sy * size, sz * size)
+             for sz in (-1, 1) for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    faces = [(0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)]
+    mesh = bpy.data.meshes.new(name_prefix + "_Orbit")
+    mesh.from_pydata(verts, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new(name_prefix + "_Orbit", mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    mat = make_toon_material("toon_" + element + "_orbit", accent_hex, shades=2)
+    obj.data.materials.append(mat)
+    obj.parent = rig
+    # y=-0.22 keeps it in front of the head (front face at -0.17) at every
+    # orbit angle, so it's never depth-occluded — same class of bug as the
+    # original arm-vs-torso occlusion (BLENDER-SESSION-GUIDE §4).
+    obj.location = (radius, -0.22, z_center)
+    _add_scripted_driver(obj, "location", 0, "{0} * cos(f * {1})".format(radius, speed))
+    _add_scripted_driver(obj, "location", 2, "{0} + {1} * sin(f * {2})".format(z_center, radius, speed))
+    return obj
+
+
+def build(element, base_hex, accent_hex, out_path, tier="b1", outline_px_at_1x=0.8):
     setup_scene(px=256, outline_px_at_1x=outline_px_at_1x)
     scene = bpy.context.scene
     lineset = scene.view_layers[0].freestyle_settings.linesets[0]
@@ -229,14 +311,18 @@ def build(element, base_hex, accent_hex, out_path, outline_px_at_1x=0.8):
     lineset.select_border = True
 
     spec = ELEMENT_SPECS.get(element, {})
+    gear = GEAR_SPECS_B2.get(element) if tier in ("b2", "b3") else None
     body, rig, mesh, faces_accent = _build_body_and_rig(
-        element, bulk=spec.get("bulk", 1.0), props=spec.get("props"))
+        element, bulk=spec.get("bulk", 1.0), props=spec.get("props"), gear=gear)
     _apply_materials(body, mesh, faces_accent, element, base_hex, accent_hex)
     _author_actions(rig)
+    if tier == "b3" and element in ORBIT_SPECS_B3:
+        _add_orbit_prop(rig, element, element, accent_hex, *ORBIT_SPECS_B3[element])
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=out_path)
     print("[kage] box character saved: " + out_path)
+    print("[kage] tier: " + tier)
     print("[kage] actions: " + str([a.name for a in bpy.data.actions]))
 
 
@@ -250,6 +336,9 @@ def _cli_args(argv):
     parser.add_argument("--base-hex", required=True, help="main element color, ART-PIPELINE §2.2")
     parser.add_argument("--accent-hex", required=True, help="secondary element color")
     parser.add_argument("--out", required=True, help="output .blend path")
+    parser.add_argument("--tier", default="b1", choices=("b1", "b2", "b3"),
+                         help="gear tier per ART-PIPELINE §2.2: b1 plain, b2 +armor/sash, "
+                              "b3 +moving accent detail")
     parser.add_argument("--outline-px", type=float, default=0.8,
                          help="outline width @1x px; 0.8 matches char_hoa-pilot's box-rig style")
     return parser.parse_args(argv[argv.index("--") + 1:])
@@ -258,4 +347,4 @@ def _cli_args(argv):
 if __name__ == "__main__":
     args = _cli_args(sys.argv)
     if args is not None:
-        build(args.element, args.base_hex, args.accent_hex, args.out, args.outline_px)
+        build(args.element, args.base_hex, args.accent_hex, args.out, args.tier, args.outline_px)

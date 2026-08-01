@@ -290,4 +290,12 @@ Không. Tài liệu này là thao tác, mọi quyết định kiến trúc nằm
 3. Cân nhắc: rig kiểu "nhiều box rời + outline mỏng" (đã dùng cho cả 5 pilot) so với "mesh liền mạch
    điêu khắc + outline chuẩn 2.5px" cho nhân vật thật — pilot chọn cách đầu vì nhanh, nhưng chưa rõ cách
    nào cho chất lượng cuối tốt hơn.
-4. Viết `tools/asset-pipeline` để bước 6 hết rỗng — giờ có 5 bộ sheet thật để test thay vì chỉ 1.
+4. ✅ **Xong 2026-08-01 (cùng ngày, lần 3)**: B2 + B3 cho cả 5 hệ (`char_<hệ>-b2`, `char_<hệ>-b3`), đúng
+   3 bậc B1/B2/B3 ở ART-PIPELINE §2.2. B2 = B1 + giáp mảnh/đai (`GEAR_SPECS_B2`, gắn bone tuỳ vị trí —
+   riêng tấm che đùi Thổ gắn `leg_l`/`leg_r` chứ không phải `pelvis` vì cần di chuyển theo chân). B3 = B2
+   + 1 khối phụ kiện bay quanh đầu bằng **driver** dựa `frame_current` (`_add_orbit_prop`) — chọn driver
+   thay vì keyframe theo action vì phải động **bất kể action nào đang chạy**, và keyframe riêng cho từng
+   action sẽ tốn công + dễ lặp lại bug "để sót bone" đã gặp ở `die` (mục 2 log này). Đây vẫn là orbit
+   generic giống nhau cho cả 5 hệ (không phải ring/ribbon/mảnh đá khác nhau thật theo mô tả riêng từng
+   hệ) — nhân vật thật cần 5 kiểu chuyển động khác nhau, không chỉ đổi màu.
+5. Viết `tools/asset-pipeline` để bước 6 hết rỗng — giờ có 15 bộ sheet thật (5 hệ × 3 bậc) để test.
