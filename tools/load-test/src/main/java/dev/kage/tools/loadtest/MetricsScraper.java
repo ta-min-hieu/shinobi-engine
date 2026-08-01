@@ -28,6 +28,15 @@ final class MetricsScraper {
     private static final Pattern QUANTILE_LINE =
             Pattern.compile("kage_tick_duration_seconds\\{[^}]*quantile=\"(0\\.\\d+)\"[^}]*}\\s+([0-9.eE+-]+)");
 
+    // kage.players.online (GatewayBootstrap) là Gauge KHÔNG có tag → Prometheus in ra không kèm
+    // {...} (vd "kage_players_online 199.0"). 2 nhánh tách rời (có nhãn / không nhãn) thay vì bọc
+    // "{...}" trong 1 group rồi quantify thêm (?) — hình dạng đó bị SpotBugs/find-sec-bugs (SECRD)
+    // báo nhầm ReDoS, và quan trọng hơn: [^}]* không bị chặn biên nếu KHÔNG có "{" sẽ tham lam ăn
+    // qua nhiều dòng phía sau tới tận dấu "}" tiếp theo trong toàn file — sai kết quả. 2 nhánh rõ
+    // ràng ở đây luôn bị chặn biên đúng (có "{...}" thật hoặc không có gì cả), không tham lam.
+    private static final Pattern PLAYERS_ONLINE_LINE =
+            Pattern.compile("kage_players_online\\{[^}]*}\\s+([0-9.eE+-]+)" + "|kage_players_online\\s+([0-9.eE+-]+)");
+
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final URI metricsUri;
 
@@ -35,11 +44,17 @@ final class MetricsScraper {
         this.metricsUri = URI.create("http://" + host + ":" + metricsPort + "/metrics");
     }
 
-    record TickSnapshot(double p50Millis, double p95Millis, double p99Millis) {
-        static final TickSnapshot UNAVAILABLE = new TickSnapshot(-1, -1, -1);
+    /**
+     * Ảnh chụp 1 lần {@code GET /metrics}: latency tick phía server (percentile) VÀ
+     * {@code kage_players_online} tại đúng thời điểm scrape đó — 2 con số đến từ CÙNG 1 response
+     * body nên luôn đồng bộ thời gian với nhau (BENCHMARK.md §5.1, tránh lệch pha giữa 2 lần gọi
+     * HTTP riêng).
+     */
+    record MetricsSnapshot(double p50Millis, double p95Millis, double p99Millis, double playersOnline) {
+        static final MetricsSnapshot UNAVAILABLE = new MetricsSnapshot(-1, -1, -1, -1);
     }
 
-    TickSnapshot scrape() {
+    MetricsSnapshot scrape() {
         try {
             HttpResponse<String> response = httpClient.send(
                     HttpRequest.newBuilder(metricsUri).timeout(TIMEOUT).GET().build(),
@@ -50,11 +65,11 @@ final class MetricsScraper {
                 Thread.currentThread().interrupt();
             }
             LOG.warn("Không scrape được {} — server có đang chạy không?", metricsUri, e);
-            return TickSnapshot.UNAVAILABLE;
+            return MetricsSnapshot.UNAVAILABLE;
         }
     }
 
-    private static TickSnapshot parse(String body) {
+    static MetricsSnapshot parse(String body) {
         double p50 = -1;
         double p95 = -1;
         double p99 = -1;
@@ -70,6 +85,12 @@ final class MetricsScraper {
                 p99 = valueMillis;
             }
         }
-        return new TickSnapshot(p50, p95, p99);
+        double playersOnline = -1;
+        Matcher playersMatcher = PLAYERS_ONLINE_LINE.matcher(body);
+        if (playersMatcher.find()) {
+            String value = playersMatcher.group(1) != null ? playersMatcher.group(1) : playersMatcher.group(2);
+            playersOnline = Double.parseDouble(value);
+        }
+        return new MetricsSnapshot(p50, p95, p99, playersOnline);
     }
 }

@@ -308,6 +308,15 @@ so với con số N danh nghĩa 2000. **Không kết luận gì về tuyến tí
 (Điều 9, đã đủ bằng chứng "off-heap tồn tại và đáng kể" ở N=0/1000, việc xác nhận tuyến tính chính
 xác cần lát cắt riêng có đo `kage_players_online` liên tục để bắt đúng đỉnh tải, chưa làm ở đây).
 
+✅ **Lỗ hổng công cụ nêu trên đã được vá** (2026-08-01, `tools:load-test`): `MetricsScraper` nay
+parse thêm dòng `kage_players_online` từ CÙNG response body `/metrics` mỗi lần scrape (không gọi
+HTTP riêng), và `LoadTestRunner` giữ 1 running-max (`AtomicInteger`, cập nhật ở đúng lịch scrape có
+sẵn của `report()` — không thêm vòng polling thứ 2) suốt cả lần chạy, in ra ở cuối test
+("Đỉnh tải thật đo được: kage_players_online cao nhất = ..."). Có unit test verify parse +
+running-max. **Chỉ lỗ hổng công cụ được vá — CHƯA đo lại N=2000 thật**: lần chạy N=2000 ở trên vẫn
+là kết quả hỏng, chưa bị xoá (Điều 30); việc xác nhận tuyến tính off-heap ở N=2000 vẫn là việc CHƯA
+làm, cần 1 lần chạy thật riêng (có thể dùng ramp thay vì burst-connect) mới đóng được.
+
 ### 5.2 AoI spatial-grid sharding (Phase 9, 2026-07-28)
 
 ⏳ **Đo thật, lát cắt tiếp theo sau lát cắt 20Hz** (commit `2198e76` + thay đổi CHƯA commit trong
