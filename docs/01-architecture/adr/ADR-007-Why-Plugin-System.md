@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ⏳ **Proposed — chốt phạm vi sau Phase 6 (MVP)** |
+| Status | 🔀 **Superseded by [ADR-030](ADR-030-No-Plugin-System.md)** (2026-08-01) — chủ dự án chốt không xây plugin system |
 | Date | 2026-07-16 |
 | Deciders | Chủ dự án |
 | Related | [Hiến pháp Điều 4, 9, 27](../../00-governance/KAGE-CONSTITUTION.md), [PLUGIN.md](../../06-plugin/PLUGIN.md), [SCRIPTING.md](../../06-plugin/SCRIPTING.md) |

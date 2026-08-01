@@ -153,10 +153,6 @@ Toàn bộ 4 ADR chặn Phase 3 đã Accepted — **Phase 3 đủ điều kiện
 | # | Quyết định | ADR |
 |---|---|---|
 | 7 | **Desktop-first hay mobile-first** (ảnh hưởng input/UI/launcher) | ADR-023 |
-| 8 | Viewport strategy — công bằng PvP (chặn Phase 1) | ADR-020 |
-| 9 | gdx-ai hay tự viết FSM | ADR-022 |
-| 13 | Phạm vi Plugin (hoặc bỏ hẳn) | ADR-007 |
-| 15 | Asset distribution / CDN | ADR-024 |
 | 16 | i18n: có tiếng Anh ở MVP không | — |
 | 17 | Mô hình kinh doanh | — |
 
@@ -166,6 +162,19 @@ Toàn bộ 4 ADR chặn Phase 3 đã Accepted — **Phase 3 đủ điều kiện
 |---|---|
 | **TLS**: in-process Netty (server) + JDK `SSLSocket` pin cert (client), self-signed cho Closed Beta | ✅ [ADR-027](01-architecture/adr/ADR-027-TLS-Transport-Security.md) |
 
+### ✅ Đã chốt (2026-08-01)
+
+| Quyết định | ADR |
+|---|---|
+| **ArchUnit** thực thi luật dependency (đã chạy thật từ Phase 0) | ✅ [ADR-011](01-architecture/adr/ADR-011-Enforce-Dependency-Rules.md) |
+| **`FitViewport`** cho camera gameplay — công bằng PvP | ✅ [ADR-020](01-architecture/adr/ADR-020-Viewport-Strategy.md) |
+| **Không dùng Box2D** — AABB tự viết cho va chạm địa hình | ✅ [ADR-021](01-architecture/adr/ADR-021-Box2D-vs-AABB.md) |
+| **Tự viết FSM** cho AI quái, không dùng gdx-ai | ✅ [ADR-022](01-architecture/adr/ADR-022-Custom-FSM-No-Gdx-Ai.md) |
+| **Không xây Plugin System** — xoá `engine-plugin-api` | ✅ [ADR-030](01-architecture/adr/ADR-030-No-Plugin-System.md) *(supersedes ADR-007)* |
+| **Asset distribution**: không CDN/patch/OBB cho Closed Beta Desktop | ✅ [ADR-024](01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md) |
+| **Graphics tier delivery**: đóng gói 1 tier (MEDIUM), tier khác tải theo yêu cầu | ✅ [ADR-028](01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) |
+| **`tools:asset-pipeline`** + `gdx-tools` TexturePacker | ✅ [ADR-029](01-architecture/adr/ADR-029-Asset-Pipeline-Tool.md) |
+
 ---
 
 ## Trạng thái
@@ -174,5 +183,5 @@ Tất cả tài liệu ở `Status: Draft`. Chuyển `Approved` chỉ khi chủ 
 
 **Việc cần làm tiếp theo của cả bộ docs:**
 1. ✅ Phase 0–4 đã code xong + đạt Exit Criteria (checklist thật ở [ROADMAP.md](11-process/ROADMAP.md)) — không còn "chỉ có docs".
-2. ✅ [ADR-011](01-architecture/adr/ADR-011-Enforce-Dependency-Rules.md) (ArchUnit) đã viết (2026-07-22) — ghi lại quyết định đã chạy thật từ Phase 0. Status vẫn `⏳ Proposed`, chờ chủ dự án xác nhận `Accepted` (AI không tự đặt, Điều 37).
+2. ✅ [ADR-011](01-architecture/adr/ADR-011-Enforce-Dependency-Rules.md) (ArchUnit) Accepted (2026-08-01).
 3. Chốt dần các quyết định "🟡 Chặn Phase sau" (§ trên) theo tiến độ — Phase 5 hiện không bị ADR nào chặn.

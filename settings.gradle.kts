@@ -28,7 +28,6 @@ include(":engine:engine-core")
 include(":engine:engine-ecs")
 include(":engine:engine-physics")
 include(":engine:engine-scripting")
-include(":engine:engine-plugin-api")
 
 // ---- client ----
 include(":client:client-core")

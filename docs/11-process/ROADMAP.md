@@ -659,7 +659,7 @@ Closed Beta → Open Beta → Release Candidate → Production → Hotfix
 
 ## ADR cần tạo
 
-Xem [ADR Index](../01-architecture/adr/README.md) — **20 ADR Accepted** (gồm 010/012/018 chốt 2026-07-18, ADR-026 chốt 2026-07-24, ADR-014/015/019 chốt 2026-07-26/28, ADR-027 TLS chốt 2026-07-31); **7 đang chờ** — 007, 011, **024** (Asset Distribution, viết 2026-08-01) đều **Proposed** (đã có bản nháp, chờ chủ dự án Accept); 020–023 vẫn **chưa viết**.
+Xem [ADR Index](../01-architecture/adr/README.md) — **28 ADR Accepted** (gồm 010/012/018 chốt 2026-07-18, ADR-026 chốt 2026-07-24, ADR-014/015/019 chốt 2026-07-26/28, ADR-027 TLS chốt 2026-07-31; ADR-011/020/021/022/024/028/029/030 chốt 2026-08-01); ADR-007 **Superseded by ADR-030** (không xây Plugin System); chỉ còn **ADR-023** chưa viết (chờ chốt desktop-first hay mobile-first).
 
 ## Tài liệu liên quan
 

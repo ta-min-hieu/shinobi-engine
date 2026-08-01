@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ⏳ **Proposed** — AI không tự Accept ([adr/README.md](README.md) quy tắc 5) |
+| Status | ✅ **Accepted** (2026-08-01, chủ dự án xác nhận qua chat) |
 | Date | 2026-08-01 |
 | Deciders | Chủ dự án quyết (Điều 36: module mới + dependency mới) |
 | Related | [ART-PIPELINE.md §8](../../14-art/ART-PIPELINE.md) · [RESOURCE.md §4, §5, §9](../../04-client/RESOURCE.md) · [ADR-028](ADR-028-Graphics-Tier-Asset-Delivery.md) (đang chờ module này) · [REPOSITORY-STRUCTURE.md §1, §7](../REPOSITORY-STRUCTURE.md) |

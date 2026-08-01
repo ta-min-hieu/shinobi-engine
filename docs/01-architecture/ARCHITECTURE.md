@@ -222,7 +222,6 @@ graph TB
         EE["engine-ecs"]
         EP["engine-physics"]
         ES["engine-scripting"]
-        EA["engine-plugin-api"]
     end
     subgraph client
         CC["client-core"]
@@ -241,7 +240,6 @@ graph TB
     EE --> SC
     EP --> EE
     ES --> EE
-    EA --> EE
     CC --> EC
     CC --> EE
     CC --> SP

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ⏳ **Proposed** — AI không tự Accept ([adr/README.md](README.md) quy tắc 5) |
+| Status | ✅ **Accepted** (2026-08-01, chủ dự án xác nhận qua chat) |
 | Date | 2026-08-01 |
 | Deciders | Chủ dự án chọn phương án (2026-08-01); AI soạn |
 | Related | **Amend [ADR-024](ADR-024-Asset-Distribution-Strategy.md)** · [ART-PIPELINE.md §5, §8.4](../../14-art/ART-PIPELINE.md) · [RESOURCE.md §9, §10](../../04-client/RESOURCE.md) · [RENDERING.md](../../03-engine/RENDERING.md) |

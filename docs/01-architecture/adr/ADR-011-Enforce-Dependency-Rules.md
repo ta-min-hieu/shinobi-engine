@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ⏳ **Proposed** — đã CHẠY THẬT trong build từ Phase 0, chờ chủ dự án xác nhận Accepted (xem "Ghi chú" cuối file) |
+| Status | ✅ **Accepted** (2026-08-01, chủ dự án xác nhận qua chat) |
 | Date | 2026-07-18 (code) — 2026-07-22 (viết ADR) |
 | Deciders | Chủ dự án (qua scaffold Phase 0 — xem "Ghi chú") |
 | Related | [ARCHITECTURE.md §8](../ARCHITECTURE.md), [CI-CD.md §4](../../07-infrastructure/CI-CD.md), [REPOSITORY-STRUCTURE.md §4](../REPOSITORY-STRUCTURE.md), Điều 23 |

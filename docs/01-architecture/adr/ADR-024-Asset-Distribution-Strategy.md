@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ⏳ **Proposed** — AI không tự Accept ([adr/README.md](README.md) quy tắc 5) |
+| Status | ✅ **Accepted** (2026-08-01, chủ dự án xác nhận qua chat) |
 | Date | 2026-08-01 |
 | Deciders | AI (Claude) đề xuất; chờ chủ dự án chốt |
 | Related | [RESOURCE.md §9, §10](../../04-client/RESOURCE.md), [TECHNOLOGY-STACK.md](../TECHNOLOGY-STACK.md) (dòng "Android — cần chốt mobile-first hay desktop-first"), ADR-023 *(chưa viết — câu hỏi mobile input song song, xem [README.md](README.md) "ADR cần tạo")*, [GIT-WORKFLOW.md](../../11-process/GIT-WORKFLOW.md) (Closed Beta trước Production), [ROADMAP.md Phase 10](../../11-process/ROADMAP.md) |

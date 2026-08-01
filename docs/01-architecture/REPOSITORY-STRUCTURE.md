@@ -34,8 +34,7 @@ shinobi-engine/
 │   ├── engine-core/                # Rendering, asset, screen/state lifecycle
 │   ├── engine-ecs/                 # Bọc ECS framework (Ashley hôm nay, Kage ECS sau)
 │   ├── engine-physics/             # Bọc Box2D
-│   ├── engine-scripting/           # Script sandbox runtime
-│   └── engine-plugin-api/          # Plugin interface
+│   └── engine-scripting/           # Script sandbox runtime
 │
 ├── client/
 │   ├── client-core/                # Gameplay + UI đặc thù game, platform-agnostic
@@ -94,7 +93,6 @@ Mỗi thư mục cấp 2 trở lên là **một Gradle module** (`:engine:engine
 | `engine-ecs` | Bọc ECS framework, cung cấp API nội bộ ổn định | Ashley, `shared-common` |
 | `engine-physics` | Bọc Box2D | Box2D, `engine-ecs` |
 | `engine-scripting` | Chạy script sandbox | `engine-ecs` |
-| `engine-plugin-api` | Interface cho Plugin | `engine-ecs`, `shared-common` |
 | `client-core` | Gameplay client + Scene2D UI | `engine-*`, `shared-protocol` |
 | `client-desktop/android/ios` | **Chỉ** Launcher + platform adapter | `client-core` |
 | `server-gateway` | Nhận kết nối, xác thực, routing packet | Netty, `shared-protocol` |

@@ -15,7 +15,6 @@ dependencies {
     testImplementation(project(":engine:engine-ecs"))
     testImplementation(project(":engine:engine-physics"))
     testImplementation(project(":engine:engine-scripting"))
-    testImplementation(project(":engine:engine-plugin-api"))
     testImplementation(project(":client:client-core"))
     testImplementation(project(":server:server-gateway"))
     testImplementation(project(":server:server-world"))

@@ -5,11 +5,14 @@
 | | |
 |---|---|
 | Version | 1.0.0 |
-| Status | Draft — ⏳ phạm vi chưa chốt |
-| ADR | [ADR-007](../01-architecture/adr/ADR-007-Why-Plugin-System.md) — **Proposed** |
+| Status | ⛔ **Superseded** — xem [ADR-030](../01-architecture/adr/ADR-030-No-Plugin-System.md) |
+| ADR | [ADR-007](../01-architecture/adr/ADR-007-Why-Plugin-System.md) (Superseded) → [ADR-030](../01-architecture/adr/ADR-030-No-Plugin-System.md) (Accepted 2026-08-01) |
 
-> ⚠️ **Đọc [ADR-007](../01-architecture/adr/ADR-007-Why-Plugin-System.md) trước.** Quyết định hiện tại: **hoãn plugin system tới sau Phase 6 (MVP)**, chỉ giữ chỗ `engine-plugin-api`.
-> Tài liệu này mô tả thiết kế *khi tới lúc làm*, không phải việc làm ngay.
+> ⚠️ **Đọc [ADR-030](../01-architecture/adr/ADR-030-No-Plugin-System.md) trước.** Quyết định cuối: **không
+> xây Plugin System** — `engine-plugin-api` đã bị xoá khỏi codebase (2026-08-01), tính năng lớn tiếp tục
+> viết thẳng vào `server-features/<feature>/`. Toàn bộ nội dung bên dưới mô tả một thiết kế **không còn
+> được triển khai** — giữ lại để tham khảo lịch sử, không phải việc cần làm. Cần rà soát/rút gọn lại
+> file này ở phiên riêng (CLAUDE.md §13 — việc tài liệu lớn cần đề xuất bố cục trước).
 
 ---
 
