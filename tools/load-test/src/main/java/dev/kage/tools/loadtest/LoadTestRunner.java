@@ -43,16 +43,18 @@ public final class LoadTestRunner {
                 config.rampStepIntervalSeconds(),
                 config.durationSeconds());
 
-        SimulatedPlayer.Metrics metrics = new SimulatedPlayer.Metrics(
-                new LatencyRecorder(), new AtomicLong(), new AtomicLong(), new AtomicLong());
-        MetricsScraper metricsScraper = new MetricsScraper(config.host(), config.metricsPort());
+        ReportingContext reporting = new ReportingContext(
+                new SimulatedPlayer.Metrics(
+                        new LatencyRecorder(), new AtomicLong(), new AtomicLong(), new AtomicLong()),
+                new MetricsScraper(config.host(), config.metricsPort()),
+                new AtomicInteger());
         List<SimulatedPlayer> players = new CopyOnWriteArrayList<>();
         AtomicInteger nextClientIndex = new AtomicInteger();
         ExecutorService clientExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
         Runnable spawnOneClient = () -> {
             SimulatedPlayer player = new SimulatedPlayer(
-                    config.host(), config.port(), "loadtest" + nextClientIndex.getAndIncrement(), metrics);
+                    config.host(), config.port(), "loadtest" + nextClientIndex.getAndIncrement(), reporting.metrics());
             players.add(player);
             clientExecutor.submit(player);
         };
@@ -62,11 +64,7 @@ public final class LoadTestRunner {
 
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
         ScheduledFuture<?> rampTask = scheduleRamp(scheduler, config, players, spawnOneClient);
-        scheduler.scheduleAtFixedRate(
-                () -> report(players.size(), metrics, metricsScraper, config.reportIntervalSeconds()),
-                config.reportIntervalSeconds(),
-                config.reportIntervalSeconds(),
-                TimeUnit.SECONDS);
+        scheduleReporting(scheduler, config, players, reporting);
 
         RunningTest runningTest = new RunningTest(rampTask, scheduler, players, clientExecutor);
         AtomicBoolean stopped = new AtomicBoolean();
@@ -74,8 +72,61 @@ public final class LoadTestRunner {
 
         Thread.sleep(Duration.ofSeconds(config.durationSeconds()));
         stopAll(stopped, runningTest);
-        report(0, metrics, metricsScraper, config.reportIntervalSeconds());
+        reportFinal(reporting, config);
         LOG.info("Load test kết thúc.");
+    }
+
+    /** Gộp state cần cho lịch report định kỳ — Checkstyle ParameterNumber tối đa 4 tham số. */
+    private record ReportingContext(
+            SimulatedPlayer.Metrics metrics, MetricsScraper metricsScraper, AtomicInteger peakPlayersOnline) {}
+
+    private static void scheduleReporting(
+            ScheduledExecutorService scheduler,
+            LoadTestConfig config,
+            List<SimulatedPlayer> players,
+            ReportingContext reporting) {
+        scheduler.scheduleAtFixedRate(
+                () -> report(
+                        players.size(),
+                        reporting.metrics(),
+                        scrapeAndTrackPeak(reporting.metricsScraper(), reporting.peakPlayersOnline()),
+                        config.reportIntervalSeconds()),
+                config.reportIntervalSeconds(),
+                config.reportIntervalSeconds(),
+                TimeUnit.SECONDS);
+    }
+
+    /**
+     * Report cuối cùng, SAU KHI đã dừng hết client — kèm log đỉnh {@code kage_players_online} thật
+     * đo được LIÊN TỤC suốt quá trình chạy (BENCHMARK.md §5.1: thay cho cách đo cũ — 1 snapshot
+     * post-hoc bằng {@code jcmd VM.native_memory} sau khi test kết thúc, dễ lệch pha nếu test dừng
+     * sớm hơn dự kiến và client đã ngắt hết trước lúc chụp).
+     */
+    private static void reportFinal(ReportingContext reporting, LoadTestConfig config) {
+        MetricsScraper.MetricsSnapshot snapshot =
+                scrapeAndTrackPeak(reporting.metricsScraper(), reporting.peakPlayersOnline());
+        report(0, reporting.metrics(), snapshot, config.reportIntervalSeconds());
+        LOG.info(
+                "Đỉnh tải thật đo được: kage_players_online cao nhất = {}",
+                reporting.peakPlayersOnline().get());
+    }
+
+    /**
+     * Scrape + cập nhật đỉnh {@code kage_players_online} — tái dùng đúng lịch scrape có sẵn của
+     * {@code report()}, không thêm vòng lặp polling thứ 2.
+     */
+    private static MetricsScraper.MetricsSnapshot scrapeAndTrackPeak(
+            MetricsScraper metricsScraper, AtomicInteger peakPlayersOnline) {
+        MetricsScraper.MetricsSnapshot snapshot = metricsScraper.scrape();
+        trackPeak(snapshot, peakPlayersOnline);
+        return snapshot;
+    }
+
+    /** Package-private để test đơn vị chạy trực tiếp logic running-max, không cần HTTP thật. */
+    static void trackPeak(MetricsScraper.MetricsSnapshot snapshot, AtomicInteger peakPlayersOnline) {
+        if (snapshot.playersOnline() >= 0) {
+            peakPlayersOnline.accumulateAndGet((int) Math.round(snapshot.playersOnline()), Math::max);
+        }
     }
 
     /** Gộp toàn bộ tài nguyên cần dọn lúc shutdown — Checkstyle ParameterNumber tối đa 4 tham số. */
@@ -125,9 +176,11 @@ public final class LoadTestRunner {
     }
 
     private static void report(
-            int activeClients, SimulatedPlayer.Metrics metrics, MetricsScraper metricsScraper, long intervalSeconds) {
+            int activeClients,
+            SimulatedPlayer.Metrics metrics,
+            MetricsScraper.MetricsSnapshot tick,
+            long intervalSeconds) {
         LatencyRecorder.Snapshot latency = metrics.latencyRecorder().snapshot();
-        MetricsScraper.TickSnapshot tick = metricsScraper.scrape();
         // getAndSet(0) — băng thông là RATE của khoảng vừa qua, không phải số cộng dồn từ đầu test.
         double sentKBs = metrics.bytesSent().getAndSet(0) / 1024.0 / intervalSeconds;
         double receivedKBs = metrics.bytesReceived().getAndSet(0) / 1024.0 / intervalSeconds;
