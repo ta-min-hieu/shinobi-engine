@@ -275,7 +275,17 @@ Không. Tài liệu này là thao tác, mọi quyết định kiến trúc nằm
 
 ## 8. Việc cần làm tiếp theo
 
-1. ✅ **Xong 2026-08-01**: `char_hoa-pilot` — nhân vật Hỏa thí điểm chạy hết §1, checklist §2 dùng thật lần đầu (xem `assets/raw/ASSET-LOG.md`). 2 lỗi pipeline thật đã ghi vào §4. Đây là khối hộp thô (rig 7-bone thật, không phải object rời) — **chưa phải art final**, mục đích là kiểm chứng pipeline.
-2. Art direction cần quyết: nhân vật thật cần silhouette đặc trưng hơn (vũ khí/tóc/gai) — pilot đọc được ở @1x nhưng chỉ còn "khối màu" ở @0.5x do hình quá đơn giản.
-3. Cân nhắc: rig kiểu "nhiều box rời + outline mỏng" (đã dùng cho pilot) so với "mesh liền mạch điêu khắc + outline chuẩn 2.5px" cho nhân vật thật — pilot chọn cách đầu vì nhanh, nhưng chưa rõ cách nào cho chất lượng cuối tốt hơn.
-4. Viết `tools/asset-pipeline` để bước 6 hết rỗng.
+1. ✅ **Xong 2026-08-01**: cả **5 hệ** (`char_hoa-pilot`, `char_thuy-pilot`, `char_phong-pilot`,
+   `char_loi-pilot`, `char_tho-pilot`) chạy hết §1, checklist §2 dùng thật (xem `assets/raw/ASSET-LOG.md`).
+   Từ nhân vật thứ 2 trở đi dùng `tools/blender/build_box_character.py` (tách ra từ recipe Hỏa) chạy
+   **hoàn toàn headless**, không cần mở Blender/MCP nữa — chỉ cần chọn hệ + 2 màu hex. 3 lỗi pipeline
+   thật đã ghi vào §4. Đây vẫn là khối hộp thô giống hệt nhau giữa 5 hệ (chỉ đổi màu) — **chưa phải art
+   final**, mục đích là kiểm chứng pipeline đủ 5 hệ hoạt động nhất quán (đã xác nhận: cả 5 asset cùng
+   `pivot_y_px_from_bottom=20.48`).
+2. Art direction cần quyết: nhân vật thật cần silhouette đặc trưng hơn (vũ khí/tóc/gai) **và khác nhau
+   giữa 5 hệ** — hiện tại cả 5 pilot silhouette giống hệt nhau (chỉ đổi màu), trong khi ART-PIPELINE §2.2
+   đòi Thổ phải "nặng nhất" (bóng đổ dày, chân bám đất rộng) — pilot Thổ **chưa** thể hiện điều này.
+3. Cân nhắc: rig kiểu "nhiều box rời + outline mỏng" (đã dùng cho cả 5 pilot) so với "mesh liền mạch
+   điêu khắc + outline chuẩn 2.5px" cho nhân vật thật — pilot chọn cách đầu vì nhanh, nhưng chưa rõ cách
+   nào cho chất lượng cuối tốt hơn.
+4. Viết `tools/asset-pipeline` để bước 6 hết rỗng — giờ có 5 bộ sheet thật để test thay vì chỉ 1.
