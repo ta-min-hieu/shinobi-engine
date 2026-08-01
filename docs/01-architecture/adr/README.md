@@ -58,6 +58,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-026](ADR-026-Dungeon-Instance-Model.md) | Dungeon instance model: cùng process, World riêng trong 1 JVM | ✅ Accepted | — |
 | [ADR-027](ADR-027-TLS-Transport-Security.md) | TLS cho kết nối game: in-process Netty (server) + JDK `SSLSocket` pin cert (client), self-signed cho Closed Beta | ✅ Accepted *(2026-07-31, chủ dự án xác nhận)* | — |
 | [ADR-028](ADR-028-Graphics-Tier-Asset-Delivery.md) | Bản cài đóng gói 1 tier đồ họa mặc định (MEDIUM), tier khác tải theo yêu cầu; client luôn qua `ensureAssetsAvailable(tier)` | ⏳ **Proposed** *(2026-08-01, chủ dự án chọn phương án)* | **Amend ADR-024**; cần `tools/asset-pipeline` xuất atlas tách tier + manifest theo tier |
+| [ADR-029](ADR-029-Asset-Pipeline-Tool.md) | Tạo module `tools:asset-pipeline`, dùng `gdx-tools` TexturePacker đóng gói atlas | ⏳ **Proposed** *(2026-08-01)* | Mở khoá [ADR-028](ADR-028-Graphics-Tier-Asset-Delivery.md); v1 không gồm upsert DB — chờ `V19__create_art_registry.sql` được duyệt |
 
 ---
 
