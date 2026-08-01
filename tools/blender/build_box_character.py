@@ -353,8 +353,14 @@ def _add_b3_detail(rig, element, accent_hex):
         _add_sway_prop(rig, "phong", element, accent_hex, "_RibbonR", pivot=(0.15, -0.10, 0.55),
                         half_x=0.018, half_y=0.055, length=0.24, amplitude_deg=24, speed=0.30, phase=3.14159)
     elif element == "loi":
-        _add_flicker_prop(rig, "loi", element, accent_hex, position=(0.17, -0.10, 0.50),
-                           size=0.045, period=2, min_scale=0.12)
+        # Two failed spots first: near the hip weapon (same accent color,
+        # same location -> invisible), then touching the shoulder plate edge
+        # (still same color, no negative space around it -> no contrast even
+        # in front). This sits in open space past the shoulder's outer edge
+        # (plate spans x=0.115-0.205) so there's always a visible gap around
+        # it regardless of the plate's own shading.
+        _add_flicker_prop(rig, "loi", element, accent_hex, position=(0.26, -0.08, 0.53),
+                           size=0.05, period=2, min_scale=0.08)
     elif element == "tho":
         for i in range(2):
             _add_orbit_prop(rig, "tho", element, accent_hex, radius=0.15, z_center=0.80,
