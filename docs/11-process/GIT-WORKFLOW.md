@@ -157,7 +157,7 @@ Refs: #issue / ADR-XXX
 | Server/Client | `v1.2.3` | — |
 | **Protocol** | riêng | [NETWORK.md §6](../05-server/NETWORK.md) — client cũ phải chạy |
 | **Asset** | riêng | [RESOURCE.md §9](../04-client/RESOURCE.md) — patch không rebuild |
-| Plugin | riêng | [PLUGIN.md §7](../06-plugin/PLUGIN.md) |
+| ~~Plugin~~ | *(không áp dụng)* | Plugin System không được xây — [ADR-030](../01-architecture/adr/ADR-030-No-Plugin-System.md); xem [PLUGIN.md §7](../06-plugin/PLUGIN.md) cho quy ước versioning đã từng được đề xuất |
 
 | Thay đổi | Bump |
 |---|---|
