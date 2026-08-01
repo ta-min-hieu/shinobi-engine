@@ -176,9 +176,9 @@ def _author_actions(rig):
     _full_pose_kf(rig, 10, {}, obj_z=0.0)
 
     new_action("die")
-    _full_pose_kf(rig, 1, {})
-    _full_pose_kf(rig, 8, {"spine": -85})
-    _full_pose_kf(rig, 14, {"spine": -90})
+    _full_pose_kf(rig, 1, {}, obj_z=0.0)
+    _full_pose_kf(rig, 8, {"spine": -55, "pelvis": -30}, obj_z=-0.05)
+    _full_pose_kf(rig, 14, {"spine": -65, "pelvis": -40}, obj_z=-0.09)
 
     for pb in rig.pose.bones:
         pb.rotation_euler = (0, 0, 0)
