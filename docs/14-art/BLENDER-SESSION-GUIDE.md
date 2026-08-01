@@ -295,7 +295,12 @@ Không. Tài liệu này là thao tác, mọi quyết định kiến trúc nằm
    riêng tấm che đùi Thổ gắn `leg_l`/`leg_r` chứ không phải `pelvis` vì cần di chuyển theo chân). B3 = B2
    + 1 khối phụ kiện bay quanh đầu bằng **driver** dựa `frame_current` (`_add_orbit_prop`) — chọn driver
    thay vì keyframe theo action vì phải động **bất kể action nào đang chạy**, và keyframe riêng cho từng
-   action sẽ tốn công + dễ lặp lại bug "để sót bone" đã gặp ở `die` (mục 2 log này). Đây vẫn là orbit
-   generic giống nhau cho cả 5 hệ (không phải ring/ribbon/mảnh đá khác nhau thật theo mô tả riêng từng
-   hệ) — nhân vật thật cần 5 kiểu chuyển động khác nhau, không chỉ đổi màu.
-5. Viết `tools/asset-pipeline` để bước 6 hết rỗng — giờ có 15 bộ sheet thật (5 hệ × 3 bậc) để test.
+   action sẽ tốn công + dễ lặp lại bug "để sót bone" đã gặp ở `die` (mục 2 log này).
+6. ✅ **Xong 2026-08-01 (cùng ngày, lần 4 — chủ dự án yêu cầu tách B3 khác nhau thật)**: mục 4 ban đầu
+   dùng 1 kiểu orbit chung cho cả 5 hệ, chỉ khác màu — chưa đạt. Sửa: `_add_b3_detail()` dispatch theo
+   từng hệ sang 1 trong 3 cơ chế riêng biệt (`_add_orbit_prop` nhiều instance lệch pha, `_add_sway_prop`
+   xoay quanh trục Y cho hiệu ứng đung đưa, `_add_flicker_prop` bật/tắt scale theo `floor(frame)%period`
+   cho hiệu ứng chớp — không phải chuyển động liên tục). Khớp đúng mô tả B3 từng hệ ở §2.2: Hỏa 3 đốm
+   lửa, Thủy 1 vòng quanh cổ tay, Phong 2 dải lụa đung đưa, Lôi tia điện chớp 2-frame, Thổ 2 mảnh đá
+   orbit chậm/to. Vẫn box-prototype (không phải VFX shader/particle), nhưng giờ 5 cơ chế thật khác nhau.
+7. Viết `tools/asset-pipeline` để bước 6 hết rỗng — giờ có 15 bộ sheet thật (5 hệ × 3 bậc) để test.

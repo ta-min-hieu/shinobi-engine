@@ -254,18 +254,16 @@ GEAR_SPECS_B2 = {
     ],
 }
 
-# B3 adds one continuously-moving decorative detail (ART-PIPELINE §2.2 B3:
-# "đuôi khăn dài, vòng nguyên tố bay quanh" — a floating/orbiting accent).
-# Implemented via drivers (not per-action keyframes) so it keeps moving no
-# matter which action is playing. (radius, z_center, speed, size) — orbits in
-# the screen-visible X-Z plane around a point near the head/shoulder.
-ORBIT_SPECS_B3 = {
-    "hoa": (0.13, 0.90, 0.25, 0.045),
-    "thuy": (0.11, 0.55, 0.18, 0.042),
-    "phong": (0.14, 0.75, 0.35, 0.040),
-    "loi": (0.12, 0.85, 0.45, 0.038),
-    "tho": (0.15, 0.80, 0.12, 0.052),
-}
+# B3 adds one continuously-moving decorative detail (ART-PIPELINE §2.2 B3
+# line per element — NOT the same effect reused with a different color: each
+# element gets its own motion style, matching what the doc actually
+# describes). Implemented via drivers (not per-action keyframes) so it keeps
+# moving no matter which action is playing — see BLENDER-SESSION-GUIDE §8.
+#   hoa   "3 đốm lửa lơ lửng sau lưng"        -> 3 embers orbiting the back
+#   thuy  "vòng nước xoay chậm quanh cổ tay"  -> 1 ring orbiting the wrist, slow
+#   phong "2 dải lụa bay tự do"               -> 2 ribbons swaying off the shoulders
+#   loi   "tia điện...2 frame lặp"            -> 1 spark blinking on a 2-frame cycle
+#   tho   "mảnh đá lơ lửng quanh vai"         -> 2 chunky shards orbiting the shoulder, slow
 
 
 def _add_scripted_driver(obj, path, index, expression):
@@ -281,25 +279,86 @@ def _add_scripted_driver(obj, path, index, expression):
     drv.expression = expression
 
 
-def _add_orbit_prop(rig, name_prefix, element, accent_hex, radius, z_center, speed, size):
-    verts = [(sx * size, sy * size, sz * size)
-             for sz in (-1, 1) for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
-    faces = [(0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)]
-    mesh = bpy.data.meshes.new(name_prefix + "_Orbit")
+def _new_prop_mesh(rig, name_prefix, suffix, element, accent_hex, verts, faces):
+    mesh = bpy.data.meshes.new(name_prefix + suffix)
     mesh.from_pydata(verts, [], faces)
     mesh.update()
-    obj = bpy.data.objects.new(name_prefix + "_Orbit", mesh)
+    obj = bpy.data.objects.new(name_prefix + suffix, mesh)
     bpy.context.scene.collection.objects.link(obj)
-    mat = make_toon_material("toon_" + element + "_orbit", accent_hex, shades=2)
+    mat = make_toon_material("toon_" + element + suffix.lower(), accent_hex, shades=2)
     obj.data.materials.append(mat)
     obj.parent = rig
-    # y=-0.22 keeps it in front of the head (front face at -0.17) at every
-    # orbit angle, so it's never depth-occluded — same class of bug as the
-    # original arm-vs-torso occlusion (BLENDER-SESSION-GUIDE §4).
-    obj.location = (radius, -0.22, z_center)
-    _add_scripted_driver(obj, "location", 0, "{0} * cos(f * {1})".format(radius, speed))
-    _add_scripted_driver(obj, "location", 2, "{0} + {1} * sin(f * {2})".format(z_center, radius, speed))
     return obj
+
+
+def _box_verts(size):
+    return [(sx * size, sy * size, sz * size)
+            for sz in (-1, 1) for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+
+
+_BOX_FACES = [(0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)]
+
+
+def _add_orbit_prop(rig, name_prefix, element, accent_hex, radius, z_center, speed, size,
+                     x_center=0.0, phase=0.0, suffix="_Orbit"):
+    """Circles in the screen-visible X-Z plane. y=-0.22 keeps it in front of
+    the head (front face at -0.17) at every angle, so it's never depth-
+    occluded — same bug class as the original arm-vs-torso occlusion."""
+    obj = _new_prop_mesh(rig, name_prefix, suffix, element, accent_hex, _box_verts(size), _BOX_FACES)
+    obj.location = (x_center + radius, -0.22, z_center)
+    _add_scripted_driver(obj, "location", 0,
+                          "{0} + {1} * cos(f * {2} + {3})".format(x_center, radius, speed, phase))
+    _add_scripted_driver(obj, "location", 2,
+                          "{0} + {1} * sin(f * {2} + {3})".format(z_center, radius, speed, phase))
+    return obj
+
+
+def _add_flicker_prop(rig, name_prefix, element, accent_hex, position, size, period=2, min_scale=0.12):
+    """Fixed position, scale toggles between full and near-zero every
+    `period` frames — a blink/spark, not smooth motion (matches Lôi's "2
+    frame lặp" description, which is explicitly not an orbit)."""
+    obj = _new_prop_mesh(rig, name_prefix, "_Spark", element, accent_hex, _box_verts(size), _BOX_FACES)
+    obj.location = position
+    expr = "1.0 if (int(floor(f)) % {0}) == 0 else {1}".format(period, min_scale)
+    for axis in range(3):
+        _add_scripted_driver(obj, "scale", axis, expr)
+    return obj
+
+
+def _add_sway_prop(rig, name_prefix, element, accent_hex, suffix, pivot, half_x, half_y, length,
+                    amplitude_deg, speed, phase=0.0):
+    """A thin strip hanging from `pivot`, swaying like a loose ribbon. Object-
+    level rotation around Y = world Y here (no parent rotation), which is the
+    axis that swings something visibly within our X-Z camera view."""
+    verts = [(sx * half_x, sy * half_y, z) for z in (-length, 0.0)
+             for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    obj = _new_prop_mesh(rig, name_prefix, suffix, element, accent_hex, verts, _BOX_FACES)
+    obj.location = pivot
+    _add_scripted_driver(obj, "rotation_euler", 1,
+                          "radians({0}) * sin(f * {1} + {2})".format(amplitude_deg, speed, phase))
+    return obj
+
+
+def _add_b3_detail(rig, element, accent_hex):
+    if element == "hoa":
+        for i in range(3):
+            _add_orbit_prop(rig, "hoa", element, accent_hex, radius=0.11, z_center=0.72,
+                             speed=0.16, size=0.032, phase=i * 2.09, suffix="_Ember{0}".format(i))
+    elif element == "thuy":
+        _add_orbit_prop(rig, "thuy", element, accent_hex, radius=0.06, z_center=0.42,
+                         speed=0.06, size=0.032, x_center=0.19, suffix="_WristRing")
+    elif element == "phong":
+        _add_sway_prop(rig, "phong", element, accent_hex, "_RibbonL", pivot=(-0.15, -0.10, 0.55),
+                        half_x=0.018, half_y=0.055, length=0.24, amplitude_deg=24, speed=0.30, phase=0.0)
+        _add_sway_prop(rig, "phong", element, accent_hex, "_RibbonR", pivot=(0.15, -0.10, 0.55),
+                        half_x=0.018, half_y=0.055, length=0.24, amplitude_deg=24, speed=0.30, phase=3.14159)
+    elif element == "loi":
+        _add_flicker_prop(rig, "loi", element, accent_hex, position=(0.17, -0.10, 0.50),
+                           size=0.045, period=2, min_scale=0.12)
+    elif element == "tho":
+        for i in range(2):
+            _add_orbit_prop(rig, "tho", element, accent_hex, radius=0.15, z_center=0.80,
+                             speed=0.05, size=0.048, phase=i * 3.14159, suffix="_Shard{0}".format(i))
 
 
 def build(element, base_hex, accent_hex, out_path, tier="b1", outline_px_at_1x=0.8):
@@ -316,8 +375,8 @@ def build(element, base_hex, accent_hex, out_path, tier="b1", outline_px_at_1x=0
         element, bulk=spec.get("bulk", 1.0), props=spec.get("props"), gear=gear)
     _apply_materials(body, mesh, faces_accent, element, base_hex, accent_hex)
     _author_actions(rig)
-    if tier == "b3" and element in ORBIT_SPECS_B3:
-        _add_orbit_prop(rig, element, element, accent_hex, *ORBIT_SPECS_B3[element])
+    if tier == "b3":
+        _add_b3_detail(rig, element, accent_hex)
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=out_path)
