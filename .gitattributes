@@ -30,6 +30,5 @@ gradlew.bat text eol=crlf
 *.proto text eol=lf
 
 # Git LFS cho asset nguồn nặng (GIT-WORKFLOW.md §9)
-# Bật sau khi cài git-lfs: chạy `git lfs install` rồi bỏ comment các dòng dưới.
-# assets/raw/**            filter=lfs diff=lfs merge=lfs -text
-# assets/hyperlap2d-projects/**  filter=lfs diff=lfs merge=lfs -text
+assets/raw/**                  filter=lfs diff=lfs merge=lfs -text
+assets/hyperlap2d-projects/**  filter=lfs diff=lfs merge=lfs -text

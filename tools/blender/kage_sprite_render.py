@@ -464,6 +464,10 @@ def _cli_args(argv):
     parser.add_argument("--out", required=True, help="output directory")
     parser.add_argument("--px", type=int, default=256,
                         help="master (@2x) resolution, see ART-PIPELINE §4.1")
+    parser.add_argument("--outline-px", type=float, default=DEFAULT_OUTLINE_PX_AT_1X,
+                        help="outline width in @1x px; the 2.5px default floods small "
+                             "edge-dense multi-part builds (blocky rigid rigs) with the "
+                             "crease detector on, so those characters need a thinner value")
     return parser.parse_args(argv[argv.index("--") + 1:])
 
 
@@ -471,7 +475,7 @@ def _main():
     args = _cli_args(sys.argv)
     if args is None or not args.all_actions:
         return
-    setup_scene(px=args.px)
+    setup_scene(px=args.px, outline_px_at_1x=args.outline_px)
     render_all_actions(find_armature(), out_dir=args.out)
 
 

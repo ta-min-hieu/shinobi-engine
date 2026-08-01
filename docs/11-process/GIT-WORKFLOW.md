@@ -250,7 +250,7 @@ hotfix/1.2.1 → main + develop
 | 7 | 🔴 **`.gitattributes` + LFS + secret hook TRƯỚC commit đầu** | Accepted |
 | 8 | Nhánh feature ≤ 1 tuần | Accepted |
 | 9 | Ngôn ngữ commit: **tiếng Việt** (đề xuất) | ⏳ Chờ chốt |
-| 10 | Git LFS cho `assets/raw/**` | ⏳ Đề xuất |
+| 10 | Git LFS cho `assets/raw/**` | Accepted (bật 2026-08-01) |
 
 ## ADR cần tạo
 

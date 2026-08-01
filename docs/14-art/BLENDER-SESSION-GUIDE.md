@@ -234,6 +234,8 @@ Các mục ✅ dưới đây là lỗi **đã gặp thật** khi chạy Blender 
 | ✅ `AttributeError: 'Context' object has no attribute 'active_object'` | Context của MCP **không có active object** — mọi `bpy.ops.mesh.primitive_*_add()` rồi đọc `active_object` đều hỏng | Dựng mesh trực tiếp bằng `bpy.data.meshes.new()` + `from_pydata()` (xem `_make_box()` trong `build_character_base.py`), không dùng operator phụ thuộc context |
 | Mất kết nối MCP giữa chừng | Blender bận render dài → không trả lời addon | Không render dài trong MCP: dùng headless (bước 5). Mất rồi thì kiểm Blender còn chạy, gọi lại `get_scene_info` |
 | Blender treo, không nhận lệnh nào | Có dialog/modal operator đang mở | Đóng thủ công trong Blender; tránh operator mở hộp thoại (`bpy.ops.wm.*` dạng invoke) |
+| ✅ Nhân vật đứng thẳng ở action A lại "gãy gập" theo pose cuối của action B | `fit_camera()` quét **mọi** action để đo bounds; bone **không có keyframe** ở action đang active giữ nguyên giá trị được ghi lúc quét action khác (Blender không tự reset về 0 khi đổi action) | Khi author action cho rig nhiều bone dùng chung, keyframe **mọi** bone ở **mọi** frame của **mọi** action (kể cả set về 0 tường minh) — đừng chỉ keyframe bone đang "diễn". Xem `full_pose_kf()` trong ASSET-LOG entry `char_hoa-pilot` |
+| ✅ Outline 2.5px@1x (mặc định) phủ gần kín cả nhân vật thành mảng đen lớn | Nhân vật ghép từ **nhiều box rời** (không hàn liền) — mỗi box có đủ 12 cạnh riêng, `select_crease` bắt outline ở **mọi** cạnh 90° kể cả cạnh nối giữa 2 box chạm nhau, cạnh dày đặc so với kích thước 256px | Với rig kiểu "nhiều khối rời cứng" (không phải mesh liền mạch điêu khắc), hạ outline xuống ~0.8px@1x qua `setup_scene(outline_px_at_1x=0.8)` (MCP) hoặc `--outline-px 0.8` (CLI, đã thêm vào script). **Không** tắt `select_crease` để "sửa" — thử tắt cho thấy `select_silhouette`/`select_border` một mình **không** bắt được biên ngoài thật của khối hộp căn trục thẳng dưới camera ortho (nghi ngờ là trường hợp suy biến dot-product=0 khi mặt bên vuông góc hoàn toàn với hướng nhìn), outline biến mất hoàn toàn thay vì chỉ mỏng đi |
 | Output MCP quá dài, tốn token | `print()` cả list object lớn | In số lượng/tên ngắn; script đã in gọn 1 dòng mỗi bước |
 
 ### 4.1 Bật lại addon MCP sau khi mất kết nối
@@ -273,6 +275,7 @@ Không. Tài liệu này là thao tác, mọi quyết định kiến trúc nằm
 
 ## 8. Việc cần làm tiếp theo
 
-1. Dựng `kage_character_base.blend` rồi chạy §1 cho **1 nhân vật Hỏa thí điểm** — đây là lần đầu checklist §2 được dùng thật.
-2. Bổ sung vào §4 mọi lỗi mới gặp (mục không đánh ✅ là suy đoán — gặp thật thì đánh dấu lại).
-3. Viết `tools/asset-pipeline` để bước 6 hết rỗng.
+1. ✅ **Xong 2026-08-01**: `char_hoa-pilot` — nhân vật Hỏa thí điểm chạy hết §1, checklist §2 dùng thật lần đầu (xem `assets/raw/ASSET-LOG.md`). 2 lỗi pipeline thật đã ghi vào §4. Đây là khối hộp thô (rig 7-bone thật, không phải object rời) — **chưa phải art final**, mục đích là kiểm chứng pipeline.
+2. Art direction cần quyết: nhân vật thật cần silhouette đặc trưng hơn (vũ khí/tóc/gai) — pilot đọc được ở @1x nhưng chỉ còn "khối màu" ở @0.5x do hình quá đơn giản.
+3. Cân nhắc: rig kiểu "nhiều box rời + outline mỏng" (đã dùng cho pilot) so với "mesh liền mạch điêu khắc + outline chuẩn 2.5px" cho nhân vật thật — pilot chọn cách đầu vì nhanh, nhưng chưa rõ cách nào cho chất lượng cuối tốt hơn.
+4. Viết `tools/asset-pipeline` để bước 6 hết rỗng.
