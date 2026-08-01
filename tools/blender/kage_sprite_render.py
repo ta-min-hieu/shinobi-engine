@@ -479,4 +479,5 @@ def _main():
     render_all_actions(find_armature(), out_dir=args.out)
 
 
-_main()
+if __name__ == "__main__":
+    _main()
