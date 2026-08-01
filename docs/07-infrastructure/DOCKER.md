@@ -186,10 +186,37 @@ ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 |---|---|
 | Multi-stage (§3) | ~1.5GB → ~200MB |
 | `temurin:25-jre` thay `jdk` | ~150MB tiết kiệm |
-| `jlink` custom runtime | Thêm ~50MB tiết kiệm |
+| `jlink` custom runtime | ✅ **Đã làm** (2026-08-01) — ~170.5MB → ~130.5MB thật (`docker image inspect --format '{{.Size}}'`), tiết kiệm ~40MB |
 | Alpine base | ⚠️ **Cẩn thận** — musl libc có thể gây vấn đề với native lib (Netty, Box2D) |
 
-**Đề xuất**: multi-stage + JRE là đủ. **Không dùng Alpine** cho app có native dependency — rủi ro không đáng với vài chục MB.
+**Không dùng Alpine** cho app có native dependency — rủi ro không đáng với vài chục MB.
+
+**`jlink` — chi tiết implementation** (`server.Dockerfile` stage `jlink-builder`): dùng `jdeps` quét
+THẬT bộ jar `server-gateway/lib/` (không đoán module list tay) để tính `--add-modules` cho `jlink`,
+runtime cuối chạy trên custom JRE thay vì `temurin:25-jre` đầy đủ. Base OS stage cuối đổi từ
+`eclipse-temurin:25-jre` sang `ubuntu:26.04` trần (xác nhận cùng distro/glibc ABI với temurin qua
+`/etc/os-release` — KHÔNG phải Alpine, giữ nguyên quyết định #7 bên dưới) vì bản thân custom JRE đã
+tự chứa toàn bộ runtime cần thiết, không cần lớp JRE đầy đủ của temurin nữa.
+
+⚠️ **Phát hiện thật lúc verify** (không suy đoán): ~25/117 jar trong `lib/` là module JPMS THẬT
+(GraalJS/Truffle, Jackson 3.x, logback 1.5.x, HikariCP...) xen giữa phần lớn jar thường (Netty,
+protobuf...). Đưa CẢ 117 jar vào `jdeps --module-path` cùng lúc vỡ vì Netty tự split-package thật
+giữa nhiều jar của nó (`io.netty.handler.ssl.ocsp` nằm ở cả `netty-handler` lẫn `netty-codec-http` —
+Netty chưa từng thiết kế chạy như module JPMS thật). Dùng `--class-path` cho tất cả thì các jar
+module thật lại không tự suy ra được automatic module cho nhau (`okio`, `kotlin.stdlib`,
+`org.graalvm.truffle` — lỗi "Module X not found"). Giải quyết bằng cách tách 2 thư mục ngay trong
+Dockerfile (`modpath/` cho jar có `module-info.class` thật, `classpath/` cho phần còn lại) + vòng
+lặp tự dò (đọc thông báo lỗi thật của `jdeps`, không đoán tên jar) chuyển đúng 1 jar còn thiếu
+(`okio`, do `okhttp3` — dependency gián tiếp của OTLP exporter — cần nó nhưng bản thân `okio` chỉ
+có `Automatic-Module-Name` chứ không có module-info thật) sang `modpath/`. `jdk.crypto.ec` được
+thêm tay (không phải `jdeps` tự phát hiện) vì ADR-027 dùng EC certificate — provider này đăng ký qua
+`java.security`/ServiceLoader, không xuất hiện trong tham chiếu bytecode nên `jdeps` không tự thấy;
+thiếu module này thì TLS handshake lỗi "no cipher suites in common" ở RUNTIME, không phải lúc build.
+Module list cuối cùng (tính lại tự động mỗi lần build, không hardcode):
+`java.base,java.compiler,java.desktop,java.naming,java.security.jgss,java.sql,jdk.httpserver,jdk.internal.vm.ci,jdk.jfr,jdk.management,jdk.sctp,jdk.unsupported,jdk.crypto.ec`.
+Verify THẬT: `docker build` (không cache) + `docker run` full stack (Postgres + Redis) — Flyway
+chạy hết 19 migration, HikariCP pool warm 20/20, GraalJS/Truffle init không lỗi, `server-gateway
+lắng nghe cổng 7777` xuất hiện trong log, `/health/live` trả 200, container `healthy` ổn định.
 
 ---
 
@@ -292,3 +319,9 @@ Không còn — ADR-019 (GC flags cho container, §7) đã Accepted 2026-07-28.
    xong cùng ngày** — [ADR-027](../01-architecture/adr/ADR-027-TLS-Transport-Security.md) Accepted,
    `docker-compose.prod.yml` đã có volume mount cert/key + `KAGE_TLS_ENABLED=true`. Vẫn cần operator
    tự tạo cert THẬT (không dùng cert test) trước khi public cổng 7777 — xem cảnh báo đầu file đó.
+8. ✅ **`jlink` custom runtime (2026-08-01)** — §8 lever cuối cùng còn lại đã làm. Chi tiết đầy đủ
+   (module list, cách tránh split-package Netty vs. resolve automatic module của jar module thật,
+   số đo before/after thật) xem §8 ở trên. Nhân tiện sửa 2 lỗi lệch pha có sẵn giữa `server.Dockerfile`
+   và `settings.gradle.kts` chặn MỌI build Docker (kể cả bản chưa có jlink): COPY thừa
+   `engine/engine-plugin-api` (module không còn tồn tại) và thiếu COPY `tools/asset-pipeline`
+   (module mới từ ADR-029, Dockerfile chưa theo kịp).
