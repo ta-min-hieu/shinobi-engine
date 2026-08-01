@@ -35,7 +35,7 @@ Kage Engine = **lớp mỏng trên libGDX**, cung cấp thứ libGDX không có,
 |---|---|---|
 | `engine-core` | Rendering, asset, Screen/State lifecycle, Service Registry | Tài liệu này + [RENDERING.md](RENDERING.md) |
 | `engine-ecs` | Bọc ECS, Event Bus, Scheduler | [ECS.md](ECS.md) |
-| `engine-physics` | Bọc Box2D | [PHYSICS.md](PHYSICS.md) |
+| `engine-physics` | ⚠️ Rỗng — [ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md): không dùng Box2D, va chạm địa hình (`Aabb`/`TerrainCollisionSystem`) sống trong `engine-ecs` | [PHYSICS.md](PHYSICS.md) |
 | `engine-scripting` | Script sandbox | [SCRIPTING.md](../06-plugin/SCRIPTING.md) |
 | `engine-plugin-api` | Plugin interface | [PLUGIN.md](../06-plugin/PLUGIN.md) |
 

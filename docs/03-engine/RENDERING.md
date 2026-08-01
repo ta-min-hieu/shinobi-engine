@@ -77,7 +77,7 @@ Sprite 32px  = 1 world unit  →  PIXELS_PER_UNIT = 32
 
 **Vì sao**: dùng pixel → đổi độ phân giải asset là đổi toàn bộ số liệu gameplay (tốc độ, tầm đánh). Dùng world unit → asset đổi, gameplay không đổi.
 
-Box2D cũng cần world unit hợp lý (Box2D tối ưu cho vật thể 0.1–10 unit) — xem [PHYSICS.md](PHYSICS.md).
+Va chạm địa hình (`TerrainCollisionSystem`) cũng dùng chung world unit này cho `Aabb` — xem [PHYSICS.md §5](PHYSICS.md).
 
 ---
 

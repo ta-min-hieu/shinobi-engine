@@ -154,7 +154,7 @@ Kẻ tấn công ghi lại packet hợp lệ rồi gửi lại nhiều lần.
 | **Damage hack** | Server tính damage ([GAMEPLAY.md §3](../05-server/GAMEPLAY.md)) | ✅ Chặn hoàn toàn |
 | **Speed hack** | Server kiểm tra khoảng cách/tick | ✅ Chặn hoàn toàn |
 | **Teleport** | Như trên | ✅ |
-| **Đi xuyên tường** | Server chạy physics ([PHYSICS.md §3](../03-engine/PHYSICS.md)) | ✅ |
+| **Đi xuyên tường** | `TerrainCollisionSystem` ([PHYSICS.md §3](../03-engine/PHYSICS.md)) | ⚠️ Cơ chế đã có, nhưng **obstacle rỗng** — chưa có map thật để chặn ([ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md)) |
 | **Cooldown hack** | Server giữ cooldown | ✅ |
 | **Item duplicate** | Transaction + audit ([DATABASE.md §5](../05-server/DATABASE.md)) | ✅ nếu làm đúng |
 | **Packet giả** | Validation (§5) | ✅ |

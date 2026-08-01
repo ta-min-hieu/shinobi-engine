@@ -433,9 +433,9 @@ Chi tiết: [SECURITY.md](../08-security/SECURITY.md). Ở tầng gameplay:
 
 | Hack | Chặn bằng |
 |---|---|
-| Speed hack | Server kiểm tra khoảng cách di chuyển/tick ≤ tốc độ tối đa |
-| Teleport | Như trên — di chuyển quá xa trong 1 tick = từ chối |
-| Đi xuyên tường | Server chạy physics ([PHYSICS.md §3](../03-engine/PHYSICS.md)) |
+| Speed hack | `MoveCommand` chỉ mang **hướng** (`dirX/dirY`), server tự sở hữu hằng số tốc độ và tự tính vị trí — client không có kênh nào để gửi vị trí/tốc độ, nên không có gì để "kiểm tra rồi từ chối" (loại bỏ hẳn kênh tấn công, không phải validate-sau) |
+| Teleport | Như trên — cùng lý do, không phải "phát hiện di chuyển quá xa" |
+| Đi xuyên tường | `TerrainCollisionSystem` ([PHYSICS.md §3](../03-engine/PHYSICS.md)) — ⚠️ cơ chế đã có, obstacle rỗng, chưa có map thật để chặn ([ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md)) |
 | Cooldown hack | Server giữ cooldown, không tin client |
 | Damage hack | Server tính damage |
 | Item duplicate | Transaction + audit (§7, §8, §11) |

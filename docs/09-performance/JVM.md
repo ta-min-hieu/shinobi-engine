@@ -162,7 +162,6 @@ Metrics ở production: [OBSERVABILITY.md §3.4](../07-infrastructure/OBSERVABIL
 | Nguồn | Ghi chú |
 |---|---|
 | **Netty direct ByteBuf** | ⚠️ Không được GC quản — refcount thủ công |
-| **Box2D** | Native lib — `destroyBody()` bắt buộc ([PHYSICS.md §9](../03-engine/PHYSICS.md)) |
 | **LWJGL/OpenGL** (client) | Texture, buffer |
 | Thread stack | ~1MB/thread |
 | Metaspace | Class metadata |
