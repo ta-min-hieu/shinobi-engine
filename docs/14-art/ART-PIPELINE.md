@@ -432,8 +432,10 @@ Nên trang quản trị **tự cắt được mọi vùng** bằng `canvas.drawI
 1. ✅ Chủ dự án duyệt Art Direction §2 bằng **asset thí điểm** — thực tế đã đi xa hơn 1 asset: cả 5 hệ ×
    3 bậc B1/B2/B3 đã render thật (`assets/raw/ASSET-LOG.md`), không chỉ 1 nhân vật Hỏa.
 2. ✅ Dựng `kage_character_base.blend` (phiên Blender MCP đầu tiên, theo §3.3) — xong.
-3. `tools/asset-pipeline`: ADR đã viết ([ADR-029](../01-architecture/adr/ADR-029-Asset-Pipeline-Tool.md),
-   chờ Accept) — downscale @1x/@0.5x + pack 3 bộ atlas nằm trong phạm vi v1; **upsert registry vào DB**
-   (§8.3) hoãn tới mục 4 dưới.
+3. ✅ `tools/asset-pipeline` code xong (2026-08-01, [ADR-029](../01-architecture/adr/ADR-029-Asset-Pipeline-Tool.md)
+   Accepted) — downscale @1x/@0.5x + validate tên + pack 3 bộ atlas (`gdx-tools` TexturePacker thật) +
+   sinh `asset-manifest.json` đều chạy thật trên toàn bộ asset đang có (`./gradlew :tools:asset-pipeline:run`).
+   HIGH tier sao chép trực tiếp từ MEDIUM (cùng độ phân giải @1x, chỉ khác hiệu ứng runtime — xem
+   `GraphicsTier` javadoc). **upsert registry vào DB** (§8.3) hoãn tới mục 4 dưới — vẫn chưa làm.
 4. Chủ dự án duyệt schema §8.2 → tạo `V19__create_art_registry.sql` → nối bước upsert vào `tools/asset-pipeline`.
 5. Code `GraphicsQuality` trong client-core khi tới phase thích hợp (không code trước — Phase discipline).

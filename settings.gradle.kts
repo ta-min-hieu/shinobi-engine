@@ -63,5 +63,5 @@ include(":server:server-features:feature-pvp")
 include(":quality:architecture-tests")   // ArchUnit (ADR-011) — enforce dependency rule
 
 // ---- tools ----
-// tools:asset-pipeline: THÊM ở Phase 1 (RESOURCE.md). Không scaffold trước.
+include(":tools:asset-pipeline")   // ADR-029 — hạ mẫu + đóng gói atlas + sinh manifest
 include(":tools:load-test")   // BENCHMARK.md §5 — Phase 9 lát cắt 2, client giả lập qua socket thật

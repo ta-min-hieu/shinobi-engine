@@ -55,6 +55,8 @@ gdx-platform = { module = "com.badlogicgames.gdx:gdx-platform", version.ref = "l
 gdx-freetype = { module = "com.badlogicgames.gdx:gdx-freetype", version.ref = "libgdx" }
 gdx-freetype-platform = { module = "com.badlogicgames.gdx:gdx-freetype-platform", version.ref = "libgdx" }
 gdx-box2d = { module = "com.badlogicgames.gdx:gdx-box2d", version.ref = "libgdx" }
+# ADR-029 — TexturePacker cho tools:asset-pipeline. Build-time only, không vào bundle game.
+gdx-tools = { module = "com.badlogicgames.gdx:gdx-tools", version.ref = "libgdx" }
 # ⚠️ Ashley ECS: chỉ engine-ecs được dùng (ADR-006). ArchUnit chặn nơi khác.
 gdx-ashley = { module = "com.badlogicgames.ashley:ashley", version = "1.7.4" }  # ✅ latest (verified 07/2026)
 

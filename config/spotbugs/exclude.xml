@@ -181,4 +181,14 @@
         <Class name="~.*Test\$Fake.*"/>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
+
+    <!-- Prefix truyền cho Files.createTempDirectory() là hằng số ghép từ tên enum GraphicsTier
+         (LOW/MEDIUM/HIGH) trong chính code, KHÔNG phải input người dùng — find-sec-bugs
+         (PATH_TRAVERSAL_IN) không phân biệt được "String ghép từ đâu", chỉ thấy signature API
+         nhận String nên báo bảo thủ cho MỌI lời gọi createTempDirectory bất kể nguồn. tools/*
+         chạy build-time trên máy dev/CI, không nhận input từ người dùng cuối. -->
+    <Match>
+        <Class name="dev.kage.tools.assetpipeline.AssetPipelineRunner"/>
+        <Bug pattern="PATH_TRAVERSAL_IN"/>
+    </Match>
 </FindBugsFilter>
