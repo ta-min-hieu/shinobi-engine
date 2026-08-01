@@ -282,9 +282,11 @@ Không. Tài liệu này là thao tác, mọi quyết định kiến trúc nằm
    thật đã ghi vào §4. Đây vẫn là khối hộp thô giống hệt nhau giữa 5 hệ (chỉ đổi màu) — **chưa phải art
    final**, mục đích là kiểm chứng pipeline đủ 5 hệ hoạt động nhất quán (đã xác nhận: cả 5 asset cùng
    `pivot_y_px_from_bottom=20.48`).
-2. Art direction cần quyết: nhân vật thật cần silhouette đặc trưng hơn (vũ khí/tóc/gai) **và khác nhau
-   giữa 5 hệ** — hiện tại cả 5 pilot silhouette giống hệt nhau (chỉ đổi màu), trong khi ART-PIPELINE §2.2
-   đòi Thổ phải "nặng nhất" (bóng đổ dày, chân bám đất rộng) — pilot Thổ **chưa** thể hiện điều này.
+2. ✅ **Xong 2026-08-01 (cùng ngày, sau khi so 5 hệ cạnh nhau)**: mỗi hệ giờ có 1 prop vũ khí gắn hông
+   riêng theo đúng dòng "Vũ khí" ở ART-PIPELINE §2.2 (kunai/hồ lô/song đao/trường đao/chuỳ đá), Thổ tăng
+   `bulk=1.22` để trông nặng hơn — xem `ELEMENT_SPECS` trong `build_box_character.py`. Đây vẫn là mức
+   "khối hộp có phụ kiện", chưa phải costume/vũ khí điêu khắc thật theo B1/B2/B3 — nếu cần silhouette
+   tinh hơn (tóc, gai, dáng đứng khác nhau thật sự) thì phải làm model riêng cho nhân vật thật.
 3. Cân nhắc: rig kiểu "nhiều box rời + outline mỏng" (đã dùng cho cả 5 pilot) so với "mesh liền mạch
    điêu khắc + outline chuẩn 2.5px" cho nhân vật thật — pilot chọn cách đầu vì nhanh, nhưng chưa rõ cách
    nào cho chất lượng cuối tốt hơn.

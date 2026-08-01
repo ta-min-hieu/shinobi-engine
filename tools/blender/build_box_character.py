@@ -49,15 +49,26 @@ def _add_box(verts, faces, half_x, half_y, z_lo, z_hi, off_x=0.0, off_y=0.0):
     return list(range(base, base + 8)), list(range(face_start, len(faces)))
 
 
-def _build_body_and_rig(name_prefix):
+def _build_body_and_rig(name_prefix, bulk=1.0, props=None):
+    """bulk scales torso/pelvis/leg thickness (ART-PIPELINE §2.2 wants Thổ
+    visibly "nặng nhất"). props is a list of extra weapon-silhouette boxes,
+    each (half_x, half_y, z_lo, z_hi, off_x, off_y), rigidly attached to the
+    pelvis so they read as hip-mounted gear without adding a new bone."""
     verts, faces = [], []
-    idx_pelvis, faces_pelvis = _add_box(verts, faces, 0.13, 0.10, 0.20, 0.25)
-    idx_torso, _ = _add_box(verts, faces, 0.14, 0.10, 0.25, 0.58)
+    idx_pelvis, faces_pelvis = _add_box(verts, faces, 0.13 * bulk, 0.10 * bulk, 0.20, 0.25)
+    idx_torso, _ = _add_box(verts, faces, 0.14 * bulk, 0.10 * bulk, 0.25, 0.58)
     idx_head, _ = _add_box(verts, faces, 0.19, 0.17, 0.58, 0.98)
     idx_arm_l, _ = _add_box(verts, faces, 0.05, 0.05, 0.30, 0.56, off_x=-0.19, off_y=-0.05)
     idx_arm_r, _ = _add_box(verts, faces, 0.05, 0.05, 0.30, 0.56, off_x=0.19, off_y=-0.05)
-    idx_leg_l, _ = _add_box(verts, faces, 0.055, 0.06, 0.0, 0.24, off_x=-0.07, off_y=-0.04)
-    idx_leg_r, _ = _add_box(verts, faces, 0.055, 0.06, 0.0, 0.24, off_x=0.07, off_y=-0.04)
+    idx_leg_l, _ = _add_box(verts, faces, 0.055 * bulk, 0.06 * bulk, 0.0, 0.24, off_x=-0.07 * bulk, off_y=-0.04)
+    idx_leg_r, _ = _add_box(verts, faces, 0.055 * bulk, 0.06 * bulk, 0.0, 0.24, off_x=0.07 * bulk, off_y=-0.04)
+
+    idx_props = []
+    faces_accent = list(faces_pelvis)
+    for half_x, half_y, z_lo, z_hi, off_x, off_y in (props or []):
+        idx, prop_faces = _add_box(verts, faces, half_x, half_y, z_lo, z_hi, off_x=off_x, off_y=off_y)
+        idx_props.extend(idx)
+        faces_accent.extend(prop_faces)
 
     mesh = bpy.data.meshes.new(name_prefix + "_Body")
     mesh.from_pydata(verts, [], faces)
@@ -90,7 +101,7 @@ def _build_body_and_rig(name_prefix):
         pb.rotation_mode = "XYZ"
 
     vgroups = {
-        "pelvis": idx_pelvis, "spine": idx_torso, "head": idx_head,
+        "pelvis": idx_pelvis + idx_props, "spine": idx_torso, "head": idx_head,
         "arm_l": idx_arm_l, "arm_r": idx_arm_r, "leg_l": idx_leg_l, "leg_r": idx_leg_r,
     }
     for vg_name, indices in vgroups.items():
@@ -101,15 +112,15 @@ def _build_body_and_rig(name_prefix):
     modifier.object = rig
     body.parent = rig
 
-    return body, rig, mesh, faces_pelvis
+    return body, rig, mesh, faces_accent
 
 
-def _apply_materials(body, mesh, faces_pelvis, element, base_hex, accent_hex):
+def _apply_materials(body, mesh, faces_accent, element, base_hex, accent_hex):
     mat_main = make_toon_material("toon_" + element + "_body", base_hex, shades=3)
     mat_accent = make_toon_material("toon_" + element + "_accent", accent_hex, shades=3)
     body.data.materials.append(mat_main)
     body.data.materials.append(mat_accent)
-    for face_index in faces_pelvis:
+    for face_index in faces_accent:
         mesh.polygons[face_index].material_index = 1
 
 
@@ -176,6 +187,39 @@ def _author_actions(rig):
         action.use_fake_user = True
 
 
+# One weapon-silhouette prop box per element, matching the "Vũ khí" line in
+# ART-PIPELINE.md §2.2 for that element. Each tuple is
+# (half_x, half_y, z_lo, z_hi, off_x, off_y); all hip-mounted (parented to
+# pelvis, offset_y=-0.08/-0.10 to sit level with the torso's front plane like
+# the arms do, so it isn't depth-occluded — see BLENDER-SESSION-GUIDE §4).
+# bulk scales torso/pelvis/leg thickness; only Thổ uses >1.0 ("nặng nhất").
+ELEMENT_SPECS = {
+    "hoa": {  # kunai lưỡi rộng ở hông
+        "bulk": 1.0,
+        "props": [(0.10, 0.02, 0.22, 0.42, 0.20, -0.08)],
+    },
+    "thuy": {  # bình hồ lô đeo hông (không phải kiếm, hệ hỗ trợ)
+        "bulk": 1.0,
+        "props": [(0.06, 0.06, 0.30, 0.44, -0.20, -0.06)],
+    },
+    "phong": {  # song đao ngắn cong, 2 bên hông
+        "bulk": 1.0,
+        "props": [
+            (0.025, 0.07, 0.20, 0.34, 0.20, -0.08),
+            (0.025, 0.07, 0.20, 0.34, -0.20, -0.08),
+        ],
+    },
+    "loi": {  # trường đao thẳng lưỡi mảnh — dài hơn hẳn các hệ khác
+        "bulk": 1.0,
+        "props": [(0.02, 0.10, 0.12, 0.50, 0.20, -0.08)],
+    },
+    "tho": {  # chuỳ đá lớn + thân hình nặng nhất
+        "bulk": 1.22,
+        "props": [(0.09, 0.09, 0.16, 0.40, 0.24, -0.10)],
+    },
+}
+
+
 def build(element, base_hex, accent_hex, out_path, outline_px_at_1x=0.8):
     setup_scene(px=256, outline_px_at_1x=outline_px_at_1x)
     scene = bpy.context.scene
@@ -184,8 +228,10 @@ def build(element, base_hex, accent_hex, out_path, outline_px_at_1x=0.8):
     lineset.select_silhouette = True
     lineset.select_border = True
 
-    body, rig, mesh, faces_pelvis = _build_body_and_rig(element)
-    _apply_materials(body, mesh, faces_pelvis, element, base_hex, accent_hex)
+    spec = ELEMENT_SPECS.get(element, {})
+    body, rig, mesh, faces_accent = _build_body_and_rig(
+        element, bulk=spec.get("bulk", 1.0), props=spec.get("props"))
+    _apply_materials(body, mesh, faces_accent, element, base_hex, accent_hex)
     _author_actions(rig)
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
