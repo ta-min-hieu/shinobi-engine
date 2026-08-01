@@ -186,7 +186,7 @@ Toàn bộ mục 2.1, cộng thêm:
 
 ### 2.3 VFX skill (master 384)
 
-- [ ] Tên khớp **skill code thật** trong `SkillRegistry.java` → `vfx_<skill_code>` (xem [ART-PIPELINE §2.2](ART-PIPELINE.md)).
+- [ ] Tên khớp **skill code thật** trong `SkillRegistry.java` → `vfx_<skill_code>` (xem [ART-PIPELINE §2.3](ART-PIPELINE.md)).
 - [ ] Đọc được trên **cả nền sáng lẫn nền tối** — VFX chìm vào nền là lỗi phổ biến nhất.
 - [ ] Đúng palette hệ; nhìn 1 frame là biết hệ nào.
 - [ ] Frame đầu/cuối **không** đột ngột (VFX bật/tắt gắt gây cảm giác giật).

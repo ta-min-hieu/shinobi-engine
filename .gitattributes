@@ -22,6 +22,7 @@ gradlew.bat text eol=crlf
 *.otf  binary
 *.psd  binary
 *.ai   binary
+*.blend binary
 
 # Text asset giữ LF
 *.atlas text eol=lf

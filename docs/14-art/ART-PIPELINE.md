@@ -57,7 +57,7 @@ Khớp [GDD §4](../13-game-design/GAME-DESIGN-DOCUMENT.md) (Hỏa/Thủy/Phong/
 
 ### 2.3 Style sheet 5 hệ phái
 
-**Skill code trong bảng dưới là code thật** trong `server/server-world/src/main/java/dev/kage/server/world/SkillRegistry.java` — không phải tên đặt cho vui. Quy tắc đặt tên VFX: **`vfx_<skill_code>`** (ví dụ `vfx_loi_thien_loi`), nên asset map 1-1 với skill, không cần bảng tra riêng.
+**Skill code trong bảng dưới là code thật** trong `server/server-world/src/main/java/dev/kage/server/world/SkillRegistry.java` (riêng `fireball` khai báo ở `SkillConstants.java` cùng package — skill chạy qua script engine từ Phase 4) — không phải tên đặt cho vui. Quy tắc đặt tên VFX: **`vfx_<skill_code>`** (ví dụ `vfx_loi_thien_loi`), nên asset map 1-1 với skill, không cần bảng tra riêng.
 
 3 bậc trang bị dùng chung tên gọi: **B1 Học Viên** → **B2 Nhẫn Giả** → **B3 Thượng Nhẫn**. Quy tắc leo bậc chung cho mọi hệ: B1 vải thô/ít phụ kiện, B2 thêm giáp mảnh + khăn/đai màu hệ, B3 thêm 1 chi tiết *chuyển động* (đuôi khăn dài, vòng nguyên tố bay quanh) — đây là thứ khiến người chơi nhìn phát biết "đồ xịn" ngay cả ở @0.5x.
 
@@ -263,7 +263,7 @@ assets/raw/ASSET-LOG.md              # sổ asset — COMMIT
 |---|---|
 | asset_key, loại, hệ, trạng thái duyệt, đường dẫn nguồn, bộ action, license/attribution, checksum | File PNG/atlas/.blend (binary) |
 
-Lý do: client nhận asset qua **patch manifest** ([RESOURCE.md §7](../04-client/RESOURCE.md)), không bao giờ nối DB; nhét blob vào Postgres chỉ làm phình DB/backup mà không ai đọc. Trang quản trị đọc metadata từ DB và **preview ảnh bằng đường dẫn** trỏ vào `assets/exported/`.
+Lý do: client nhận asset qua **patch manifest** ([RESOURCE.md §9–§10](../04-client/RESOURCE.md)), không bao giờ nối DB; nhét blob vào Postgres chỉ làm phình DB/backup mà không ai đọc. Trang quản trị đọc metadata từ DB và **preview ảnh bằng đường dẫn** trỏ vào `assets/exported/`.
 
 ### 8.2 Bảng đề xuất (⚠️ DB schema change — chỉ tạo Flyway migration khi chủ dự án duyệt thiết kế này)
 
@@ -326,14 +326,14 @@ Chốt 2026-08-01: file tĩnh (atlas, manifest, ảnh preview) phục vụ bằn
 
 | Nhu cầu | Giải pháp |
 |---|---|
-| Phát patch cho client | nginx serve `assets/exported/` với `Cache-Control: public, immutable` — an toàn vì tên file patch đã có content hash ([RESOURCE.md §7](../04-client/RESOURCE.md)) |
+| Phát patch cho client | nginx serve `assets/exported/` với `Cache-Control: public, immutable` — chỉ an toàn khi **tên file phát hành mang content hash**; manifest [RESOURCE.md §9](../04-client/RESOURCE.md) hiện để sha256 ở field riêng, nên `tools/asset-pipeline` phải đưa hash vào tên file khi xuất |
 | Preview ảnh cho trang quản trị | Cùng nginx đó, thêm `location` riêng có kiểm tra auth của admin |
 | Kho `.blend` + master render @2x | Thư mục ngoài git + backup định kỳ (restic/rsync) |
 | Khi bandwidth lớn | Đặt **CDN trước nginx**; nếu lên cloud thì đi thẳng **Cloudflare R2** (egress = 0đ, hợp phát patch game) |
 
 Client **không** import SDK lưu trữ nào — chỉ tải qua URL HTTP trong manifest, đúng luật "gameplay chỉ phụ thuộc abstraction" ([/CLAUDE.md §5](../../CLAUDE.md)). Nhờ vậy đổi origin (nginx → CDN → R2) chỉ là đổi base URL trong manifest, không sửa code.
 
-Cột `storage_url VARCHAR(255)` trong `art_asset` giữ đường dẫn **tương đối** (ví dụ `atlases/high/academy-hub.atlas`) — không nhúng hostname, để đổi origin không phải sửa DB.
+Mọi cột đường dẫn trong `art_asset` (`blend_path`, `render_dir`, `preview_url`, `atlas_name` — §8.2/§8.5) đều giữ đường dẫn **tương đối** — không nhúng hostname, để đổi origin không phải sửa DB.
 
 > **Đã cân nhắc và loại: MinIO** (và object storage nói chung). Ba lý do, ghi lại để khỏi đề xuất lại:
 > 1. **Không nhanh hơn.** MinIO cũng ghi object xuống filesystem rồi cộng thêm tầng HTTP + S3 protocol + chữ ký SigV4 + tra metadata. nginx đọc file bằng `sendfile()` zero-copy — cùng một byte, MinIO làm nhiều việc hơn.
@@ -411,7 +411,7 @@ Nên trang quản trị **tự cắt được mọi vùng** bằng `canvas.drawI
 | 9 | **nginx đọc đĩa** phục vụ file tĩnh; không dùng object storage | §8.4 — nhanh hơn (`sendfile()` zero-copy), không thêm dependency, patcher vốn dùng URL HTTP nên không có lock-in để chống | **Chốt** 2026-08-01 (chủ dự án loại MinIO) |
 | 10 | VFX đặt tên `vfx_<skill_code>` khớp `SkillRegistry` | Asset map 1-1 với skill thật, không cần bảng tra | Đề xuất |
 | 11 | Mọi asset **bắt buộc** có dòng trong `art_asset` kèm đường dẫn; pipeline fail build nếu thiếu | §8.5 — chủ dự án yêu cầu quản toàn bộ kho đồ họa qua trang quản trị; ràng buộc bằng công cụ, không bằng trí nhớ | Đề xuất |
-| 12 | Pipeline xuất thêm **thumbnail rời** mỗi asset (`preview_url`) | §8.6 — chỉ để danh sách nhiều asset không phải tải atlas 4MB mỗi ô; **không** phải vì bị giới hạn hiển thị |
+| 12 | Pipeline xuất thêm **thumbnail rời** mỗi asset (`preview_url`) | §8.6 — chỉ để danh sách nhiều asset không phải tải atlas 4MB mỗi ô; **không** phải vì bị giới hạn hiển thị | Đề xuất |
 | 13 | Region trong atlas đặt tên `<asset_key>_<action>` + `index` (dạng libGDX gốc) | §8.6 — `atlas.findRegions()` gom được frame cho `Animation`; trang quản trị lọc cùng tiền tố. Đặt sai kiểu `..._idle_00` là hỏng cả hai phía | Đề xuất |
 
 ## 10. ADR cần tạo / quyết định treo
@@ -429,7 +429,7 @@ Nên trang quản trị **tự cắt được mọi vùng** bằng `canvas.drawI
 ## 12. Việc cần làm tiếp theo
 
 1. Chủ dự án duyệt Art Direction §2 bằng **1 asset thí điểm** (nhân vật Hỏa) trước khi sản xuất hàng loạt.
-3. Dựng `kage_character_base.blend` (phiên Blender MCP đầu tiên, theo §3.3).
-4. `tools/asset-pipeline` (đã hứa ở RESOURCE.md, chưa tồn tại): downscale @1x/@0.5x + pack 3 bộ atlas + **upsert registry vào DB** (§8.3, kèm validate prefix↔category).
-5. Chủ dự án duyệt schema §8.2 → tạo `V19__create_art_registry.sql`.
-6. Code `GraphicsQuality` trong client-core khi tới phase thích hợp (không code trước — Phase discipline).
+2. Dựng `kage_character_base.blend` (phiên Blender MCP đầu tiên, theo §3.3).
+3. `tools/asset-pipeline` (đã hứa ở RESOURCE.md, chưa tồn tại): downscale @1x/@0.5x + pack 3 bộ atlas + **upsert registry vào DB** (§8.3, kèm validate prefix↔category).
+4. Chủ dự án duyệt schema §8.2 → tạo `V19__create_art_registry.sql`.
+5. Code `GraphicsQuality` trong client-core khi tới phase thích hợp (không code trước — Phase discipline).
