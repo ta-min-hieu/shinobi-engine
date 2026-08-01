@@ -69,6 +69,8 @@ graph TB
 
 Bước 5 (`tools/asset-pipeline`) chạy **build-time/dev-time**, không nằm trong game.
 
+Bước 1–2 (art thô → sprite sheet) được sản xuất bằng Blender pre-render qua AI — xem [ART-PIPELINE.md](../14-art/ART-PIPELINE.md).
+
 ---
 
 ## 4. Naming Convention

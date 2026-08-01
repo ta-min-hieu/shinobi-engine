@@ -38,8 +38,17 @@ local.properties
 !.env.prod.example
 secrets/
 
+# Python bytecode (script Blender, tools/blender/)
+__pycache__/
+
+# Blender tự sinh bản sao lưu .blend1/.blend2 mỗi lần save đè — không commit
+*.blend[0-9]
+
 # Asset nguồn KHÔNG đóng gói vào build (RESOURCE.md §2)
 # assets/raw/ và assets/hyperlap2d-projects/ dùng Git LFS, không ignore.
+# Ngoại lệ: render-out/ là PNG master sinh lại được từ .blend (ART-PIPELINE.md §7) — không commit.
+assets/raw/render-out/
+assets/exported/
 
 # Protobuf generated (sinh lúc build, không commit — TECHNOLOGY-STACK.md §5)
 **/generated/

@@ -71,6 +71,7 @@ Tra bảng này **trước khi** mở file. Cột "Đọc" là **tối thiểu �
 | **Truy vấn DB / adapter** | `server/CLAUDE.md` | `templates/feature-module/infrastructure` | [DATABASE.md §5,§11](05-server/DATABASE.md) |
 | **Viết test** | (theo vùng) | `templates/*` có test kèm | [TESTING.md](10-quality/TESTING.md) |
 | **Sửa bug** | — | — | [AI-WORKING-RULES §9](00-governance/AI-WORKING-RULES.md) (test tái hiện trước!) |
+| **Làm art/sprite (Blender MCP)** | — | `tools/blender/` | [ART-PIPELINE.md](14-art/ART-PIPELINE.md) — **chỉ** doc này, không đọc thêm |
 | **Tạo ADR** | — | `01-architecture/adr/ADR-TEMPLATE.md` | [adr/README](01-architecture/adr/README.md) |
 | **Thêm module** | — | — | 🛑 **DỪNG — cần ADR** ([AI-WORKING-RULES §6.2](00-governance/AI-WORKING-RULES.md)) |
 

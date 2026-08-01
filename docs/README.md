@@ -71,6 +71,9 @@
 ### 13 · Game Design
 [GAME-DESIGN-DOCUMENT.md](13-game-design/GAME-DESIGN-DOCUMENT.md)
 
+### 14 · Art
+[ART-PIPELINE.md](14-art/ART-PIPELINE.md) — Blender MCP pre-render → sprite, art direction, 3 mức cấu hình đồ họa client · [BLENDER-SESSION-GUIDE.md](14-art/BLENDER-SESSION-GUIDE.md) — lệnh từng bước, checklist nghiệm thu, bảng lỗi
+
 ### Xuyên suốt
 [GLOSSARY.md](GLOSSARY.md) — thuật ngữ Việt–Anh
 
