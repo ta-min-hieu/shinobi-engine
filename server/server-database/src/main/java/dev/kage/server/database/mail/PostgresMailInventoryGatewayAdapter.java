@@ -2,8 +2,6 @@ package dev.kage.server.database.mail;
 
 import java.sql.Connection;
 
-import javax.sql.DataSource;
-
 import dev.kage.mail.domain.InventoryGatewayPort;
 import dev.kage.mail.domain.Transaction;
 import dev.kage.server.database.JdbcOperations;
@@ -26,12 +24,6 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
             INSERT INTO inventory_item (character_id, item_template_id, quantity, enhance_level, slot_index)
             VALUES (?, ?, ?, 0, ?)
             """;
-
-    private final DataSource dataSource;
-
-    public PostgresMailInventoryGatewayAdapter(DataSource dataSource) {
-        this.dataSource = dataSource;
-    }
 
     @Override
     public boolean grantItem(Transaction tx, long characterId, long itemTemplateId, int quantity) {

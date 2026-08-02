@@ -250,6 +250,14 @@ import dev.kage.trade.api.TradeFacade;
  * nhập thành công, accountId gắn vào CONNECTION này, không phải đọc lại từ packet ở Command sau
  * (đúng tinh thần "characterId/accountId từ session, không từ packet" — SECURITY.md §4).
  */
+// PMD CyclomaticComplexity (class-level, ngưỡng mặc định 80, lớp này ~366): PMD 7.10.0 chưa từng
+// chạy được thật trên JDK 25 (StackOverflowError type-inference — xem STATIC-ANALYSIS.md), nên đây
+// là lần đầu class này bị đo. Nguyên nhân THẬT: 1 handler dispatch ~119 opcode (mỗi handleXBlocking
+// riêng, complexity từng method thấp — bảng opcode->handler đã cố tình tránh if-else dài, xem
+// javadoc PacketHandler bên dưới) — không phải 1 method phình to. Tách theo feature (mỗi feature 1
+// handler riêng, server-gateway chỉ định tuyến) là thay đổi kiến trúc tầng gateway, cần chủ dự án
+// quyết định (CLAUDE.md §4) — KHÔNG tự làm ở đây, chỉ ghi nhận nợ kỹ thuật.
+@SuppressWarnings("PMD.CyclomaticComplexity")
 final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCodec.Frame> {
 
     private static final Logger LOG = LoggerFactory.getLogger(GatewayChannelHandler.class);
@@ -404,9 +412,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         networkMetrics.connectionOpened();
     }
 
-    // javac [try]: `scope` không đọc trong thân try — ĐÚNG Ý, try-with-resources chỉ dùng để đảm
-    // bảo Scope.close() gọi đúng lúc (OTel Context propagation), không cần đọc biến đó.
-    @SuppressWarnings("try")
+    // javac [try] + PMD UnusedLocalVariable: `scope` không đọc trong thân try — ĐÚNG Ý,
+    // try-with-resources chỉ dùng để đảm bảo Scope.close() gọi đúng lúc (OTel Context propagation),
+    // không cần đọc biến đó. PMD 7.26.0 không tự loại trừ resource variable kiểu này (khác javac).
+    @SuppressWarnings({"try", "PMD.UnusedLocalVariable"})
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, PacketCodec.Frame frame) {
         PacketHeader header = frame.header();
@@ -824,7 +833,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * {@link GatewayTracing}) khớp ví dụ đầy đủ OBSERVABILITY.md §6 — CHƯA làm cho ~50 opcode còn
      * lại (phạm vi lát cắt 9, không phải thiếu sót).
      */
-    @SuppressWarnings("try") // xem javadoc @SuppressWarnings("try") ở channelRead0
+    @SuppressWarnings({"try", "PMD.UnusedLocalVariable"}) // xem giải thích ở channelRead0
     private void handleEnhanceItemBlocking(ChannelHandlerContext ctx, EnhanceItemRequest request) {
         Span span = tracing.startChildSpan("feature.inventory.enhance", request.tracingContext());
         try (Scope scope = span.makeCurrent()) {
@@ -2285,13 +2294,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         ConfirmTradeResponse response =
                 ConfirmTradeResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_CONFIRM_TRADE_RESPONSE_VALUE, sequenceId, response.toByteArray());
-        if (statusBefore.isEmpty()) {
-            return;
-        }
-        long counterpartId = statusBefore.get().counterpartCharacterId();
+        statusBefore.ifPresent(status ->
+                notifyCounterpartOfConfirmResult(status.counterpartCharacterId(), result, command.getSessionId()));
+    }
+
+    /** Đẩy event cho đối phương SAU KHI {@code ConfirmTradeUseCase} đã trả kết quả — tách khỏi
+     * {@code handleConfirmTradeBlocking} chỉ để giữ độ phức tạp method dưới ngưỡng CyclomaticComplexity. */
+    private void notifyCounterpartOfConfirmResult(
+            long counterpartId, TradeFacade.ConfirmResult result, long sessionId) {
         if (result == TradeFacade.ConfirmResult.EXECUTED) {
             TradeClosedEvent event = TradeClosedEvent.newBuilder()
-                    .setSessionId(command.getSessionId())
+                    .setSessionId(sessionId)
                     .setReason(TradeCloseReason.TRADE_CLOSE_REASON_EXECUTED)
                     .build();
             worldGateway
@@ -2299,9 +2312,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .sendToCharacterIfOnline(
                             counterpartId, Opcode.OPCODE_TRADE_CLOSED_EVENT_VALUE, 0, event.toByteArray());
         } else if (result == TradeFacade.ConfirmResult.OK || result == TradeFacade.ConfirmResult.OFFER_INVALID) {
-            TradeUpdatedEvent event = TradeUpdatedEvent.newBuilder()
-                    .setSessionId(command.getSessionId())
-                    .build();
+            TradeUpdatedEvent event =
+                    TradeUpdatedEvent.newBuilder().setSessionId(sessionId).build();
             worldGateway
                     .registry()
                     .sendToCharacterIfOnline(
@@ -2586,14 +2598,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 return;
             }
         }
-        if (domainChannel == dev.kage.chat.domain.ChatChannel.GUILD
-                && guildFacade.findMyGuild(characterId).isEmpty()) {
-            sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_GUILD);
-            return;
-        }
-        if (domainChannel == dev.kage.chat.domain.ChatChannel.PARTY
-                && partyFacade.findMyParty(characterId).isEmpty()) {
-            sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_PARTY);
+        if (!isChannelMembershipValid(characterId, domainChannel, ctx, sequenceId)) {
             return;
         }
         ChatFacade.SendResult result = chatFacade.sendMessage(characterId, domainChannel, command.getBody());
@@ -2604,6 +2609,26 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         String senderName =
                 characterFacade.findById(characterId).map(Character::name).orElse("");
         routeChatMessage(domainChannel, new ChatRouteContext(characterId, senderName, target, command.getBody()));
+    }
+
+    /** GUILD/PARTY chỉ gửi được nếu đang ở trong guild/party đó — tách khỏi
+     * {@code handleSendChatMessageBlocking} chỉ để giữ độ phức tạp method dưới ngưỡng CyclomaticComplexity. */
+    private boolean isChannelMembershipValid(
+            long characterId,
+            dev.kage.chat.domain.ChatChannel domainChannel,
+            ChannelHandlerContext ctx,
+            int sequenceId) {
+        if (domainChannel == dev.kage.chat.domain.ChatChannel.GUILD
+                && guildFacade.findMyGuild(characterId).isEmpty()) {
+            sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_GUILD);
+            return false;
+        }
+        if (domainChannel == dev.kage.chat.domain.ChatChannel.PARTY
+                && partyFacade.findMyParty(characterId).isEmpty()) {
+            sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_PARTY);
+            return false;
+        }
+        return true;
     }
 
     /** Gói tham số cho {@link #routeChatMessage} — tránh vượt 4 tham số Checkstyle {@code ParameterNumber}. */

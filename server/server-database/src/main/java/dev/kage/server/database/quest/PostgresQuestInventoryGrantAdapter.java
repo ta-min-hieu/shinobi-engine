@@ -3,8 +3,6 @@ package dev.kage.server.database.quest;
 import java.sql.Connection;
 import java.util.Optional;
 
-import javax.sql.DataSource;
-
 import dev.kage.quest.domain.QuestInventoryGrantPort;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.server.database.JdbcOperations;
@@ -34,12 +32,6 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
             INSERT INTO inventory_item (character_id, item_template_id, quantity, enhance_level, slot_index)
             VALUES (?, ?, ?, 0, ?)
             """;
-
-    private final DataSource dataSource;
-
-    public PostgresQuestInventoryGrantAdapter(DataSource dataSource) {
-        this.dataSource = dataSource;
-    }
 
     @Override
     public boolean grantItemByCode(Transaction tx, long characterId, String itemTemplateCode, int quantity) {

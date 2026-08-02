@@ -118,16 +118,11 @@ class BuyItemUseCaseTest {
             FakeGoldPort goldPort,
             FakeInventoryGatewayPort inventoryGatewayPort,
             FakeAuditPort auditPort) {
-        return newUseCase(catalogPort, goldPort, inventoryGatewayPort, auditPort, new FakeIdempotencyPort());
+        return newUseCase(
+                new ShopPorts(catalogPort, goldPort, inventoryGatewayPort, auditPort, new FakeIdempotencyPort()));
     }
 
-    private static BuyItemUseCase newUseCase(
-            ShopCatalogPort catalogPort,
-            FakeGoldPort goldPort,
-            FakeInventoryGatewayPort inventoryGatewayPort,
-            FakeAuditPort auditPort,
-            FakeIdempotencyPort idempotencyPort) {
-        ShopPorts ports = new ShopPorts(catalogPort, goldPort, inventoryGatewayPort, auditPort, idempotencyPort);
+    private static BuyItemUseCase newUseCase(ShopPorts ports) {
         return new BuyItemUseCase(ports, DIRECT_TX);
     }
 
@@ -198,7 +193,8 @@ class BuyItemUseCaseTest {
         FakeInventoryGatewayPort inventoryGatewayPort = new FakeInventoryGatewayPort(true);
         FakeAuditPort auditPort = new FakeAuditPort();
         FakeIdempotencyPort idempotencyPort = new FakeIdempotencyPort();
-        BuyItemUseCase useCase = newUseCase(catalogPort, goldPort, inventoryGatewayPort, auditPort, idempotencyPort);
+        BuyItemUseCase useCase =
+                newUseCase(new ShopPorts(catalogPort, goldPort, inventoryGatewayPort, auditPort, idempotencyPort));
         useCase.execute(CHARACTER_ID, TEMPLATE_ID, 1, IDEMPOTENCY_KEY);
 
         BuyItemUseCase.BuyResult result = useCase.execute(CHARACTER_ID, TEMPLATE_ID, 1, IDEMPOTENCY_KEY);

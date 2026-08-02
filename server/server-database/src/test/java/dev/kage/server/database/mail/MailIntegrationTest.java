@@ -153,7 +153,7 @@ class MailIntegrationTest {
         MailPorts ports = new MailPorts(
                 new PostgresMailRepositoryAdapter(dataSource),
                 new PostgresMailGoldAdapter(),
-                new PostgresMailInventoryGatewayAdapter(dataSource),
+                new PostgresMailInventoryGatewayAdapter(),
                 new PostgresMailAuditAdapter(),
                 new PostgresMailIdempotencyAdapter());
         return new ClaimMailUseCase(ports, new JdbcMailTransactionRunner(dataSource));

@@ -65,6 +65,20 @@ public final class ConfirmTradeUseCase {
     private void executeTransferOrAbort(Transaction t, TradeSessionSnapshot snapshot) {
         long requesterId = snapshot.requesterCharacterId();
         long targetId = snapshot.targetCharacterId();
+        transferGoldOrAbort(t, snapshot, requesterId, targetId);
+        for (TradeOfferItem item : snapshot.itemsOffered(requesterId)) {
+            transferOrAbort(
+                    t, new TradeInventoryPort.TransferRequest(requesterId, targetId, item.itemId(), item.quantity()));
+        }
+        for (TradeOfferItem item : snapshot.itemsOffered(targetId)) {
+            transferOrAbort(
+                    t, new TradeInventoryPort.TransferRequest(targetId, requesterId, item.itemId(), item.quantity()));
+        }
+    }
+
+    /** Tách khỏi {@link #executeTransferOrAbort} chỉ để giữ độ phức tạp method dưới ngưỡng
+     * CyclomaticComplexity — thứ tự/điều kiện gốc (deduct cả 2 bên trước, rồi mới credit) giữ NGUYÊN. */
+    private void transferGoldOrAbort(Transaction t, TradeSessionSnapshot snapshot, long requesterId, long targetId) {
         if (snapshot.requesterGold() > 0 && !ports.goldPort().deductGold(t, requesterId, snapshot.requesterGold())) {
             throw new TradeExecutionAbortedException();
         }
@@ -76,14 +90,6 @@ public final class ConfirmTradeUseCase {
         }
         if (snapshot.targetGold() > 0) {
             ports.goldPort().creditGold(t, requesterId, snapshot.targetGold());
-        }
-        for (TradeOfferItem item : snapshot.itemsOffered(requesterId)) {
-            transferOrAbort(
-                    t, new TradeInventoryPort.TransferRequest(requesterId, targetId, item.itemId(), item.quantity()));
-        }
-        for (TradeOfferItem item : snapshot.itemsOffered(targetId)) {
-            transferOrAbort(
-                    t, new TradeInventoryPort.TransferRequest(targetId, requesterId, item.itemId(), item.quantity()));
         }
     }
 

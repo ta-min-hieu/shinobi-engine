@@ -264,7 +264,7 @@ public final class ServerDatabaseBootstrap {
         PostgresQuestProgressAdapter progressPort = new PostgresQuestProgressAdapter(dataSource);
         PostgresQuestTemplateAdapter templatePort = new PostgresQuestTemplateAdapter(dataSource);
         PostgresQuestExpAdapter expPort = new PostgresQuestExpAdapter();
-        PostgresQuestInventoryGrantAdapter inventoryGrantPort = new PostgresQuestInventoryGrantAdapter(dataSource);
+        PostgresQuestInventoryGrantAdapter inventoryGrantPort = new PostgresQuestInventoryGrantAdapter();
         PostgresQuestAuditAdapter auditPort = new PostgresQuestAuditAdapter();
         JdbcQuestTransactionRunner transactionRunner = new JdbcQuestTransactionRunner(dataSource);
         AcceptQuestUseCase acceptQuestUseCase = new AcceptQuestUseCase(progressPort, templatePort, transactionRunner);
@@ -291,7 +291,7 @@ public final class ServerDatabaseBootstrap {
     public MailFacade wireMailFacade() {
         PostgresMailRepositoryAdapter repositoryPort = new PostgresMailRepositoryAdapter(dataSource);
         PostgresMailGoldAdapter goldPort = new PostgresMailGoldAdapter();
-        PostgresMailInventoryGatewayAdapter inventoryGatewayPort = new PostgresMailInventoryGatewayAdapter(dataSource);
+        PostgresMailInventoryGatewayAdapter inventoryGatewayPort = new PostgresMailInventoryGatewayAdapter();
         PostgresMailAuditAdapter auditPort = new PostgresMailAuditAdapter();
         PostgresMailIdempotencyAdapter idempotencyPort = new PostgresMailIdempotencyAdapter();
         JdbcMailTransactionRunner transactionRunner = new JdbcMailTransactionRunner(dataSource);

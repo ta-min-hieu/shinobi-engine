@@ -21,8 +21,7 @@ Mọi version `⚠️` trong catalog thực tế **đã resolve OK** (AssertJ 3.
 ## Bước 3 — Wire nốt Spotless + SpotBugs + Error Prone
 
 ✅ **XONG (2026-07-30)** — cả 3 tool đã wire vào `kage.quality-conventions.gradle.kts` + `ci.yml`.
-Toàn bộ `./gradlew build`+`test` xanh (trừ `pmdMain`/`pmdTest`, xem ghi chú PMD bên dưới). Verify
-THẬT bằng build/test thật, không suy luận.
+Toàn bộ `./gradlew build`+`test` xanh. Verify THẬT bằng build/test thật, không suy luận.
 
 **Phát hiện thật đáng nhớ khi wire lần đầu trên codebase đã lớn** (không phải Phase 0 nữa — nhiều
 lỗi Phase 0 tránh được nhờ "0 warning từ đầu" giờ phải dọn 1 lần):
@@ -50,9 +49,38 @@ lỗi Phase 0 tránh được nhờ "0 warning từ đầu" giờ phải dọn 1
   giờ đọc) → xoá cả field; ~8 dòng `.newBuilder().build();` chết trong test round-trip protobuf
   (kết quả không dùng vào đâu) → xoá.
 
-⚠️ **PMD KHÔNG chạy được trên JDK 25** — `Unsupported class file major version 69` (lỗi nội bộ ASM
-của PMD 7.10.0 chưa hỗ trợ bytecode JDK 25 khi resolve type) — không phải lỗi máy, sẽ crash y hệt
-trên CI. Luôn `-x pmdMain -x pmdTest` cho tới khi PMD ra bản hỗ trợ JDK 25 (theo dõi qua Dependabot).
+✅ **PMD ĐÃ SỬA (2026-08-02)** — trước đây `pmdMain`/`pmdTest` crash `StackOverflowError` ở
+`TypeOps.isSubClassOfNoInterface` (PMD 7.10.0, phát hành TRƯỚC KHI PMD hỗ trợ Java 25 thật —
+support Java 25 chỉ có từ PMD 7.16.0). KHÔNG phải lỗi cấu hình/máy — reproduce y hệt trên mọi
+module, "Unsupported class file major version 69" từng bị ghi nhầm là nguyên nhân gốc, thật ra đó
+chỉ là triệu chứng của cùng 1 gap hỗ trợ JDK 25. Fix: bump `pmd = "7.26.0"`
+(`gradle/libs.versions.toml`, sync `kage.quality-conventions.gradle.kts`) — verify bằng build thật
+trên toàn bộ 32 module, không còn crash. PMD chạy xong bắt được 1 loạt vi phạm THẬT (lần đầu PMD
+chạy được để bắt) — đã sửa hết:
+- `GatewayChannelHandler`/`WorldFacade`: class-level `CyclomaticComplexity` (dispatcher/composition
+  root nhiều method nhỏ, không phải 1 method phình to) — suppress hẹp có comment, không đổi kiến
+  trúc tầng gateway/world (việc đó cần ADR riêng, đã ghi nhận nợ kỹ thuật trong code).
+- `SkillSystem.tryCast`/`resolveTarget`, `ConfirmTradeUseCase.executeTransferOrAbort`,
+  `GatewayChannelHandler.handleConfirmTradeBlocking`/`handleSendChatMessageBlocking`: method-level
+  `CyclomaticComplexity` = 10-11 — tách 1 helper method nội bộ mỗi chỗ, KHÔNG đổi thứ tự/điều kiện
+  gốc (đặc biệt `ConfirmTradeUseCase` — atomicity nguyên bản giữ nguyên).
+- `GatewayChannelHandler`: 2 `UnusedLocalVariable` false-positive trên biến `Scope` của
+  try-with-resources (PMD 7.26.0 không tự loại trừ như javac `@SuppressWarnings("try")`) — suppress
+  thêm `PMD.UnusedLocalVariable` cạnh suppression `"try"` đã có.
+- `PostgresMailInventoryGatewayAdapter`/`PostgresQuestInventoryGrantAdapter`: field `dataSource`
+  chết thật (constructor nhận nhưng không bao giờ dùng — luôn lấy `Connection` từ
+  `Transaction`) — xoá field + tham số constructor, cập nhật mọi call site.
+- `WorldFacade.tickTask`: `@SuppressWarnings("PMD.AvoidCatchingThrowable")` ghi SAI tên rule (rule
+  thật trong `ruleset.xml` là `AvoidCatchingGenericException`) — annotation này chưa từng có hiệu
+  lực vì PMD chưa từng chạy được để kiểm tra nó. Sửa đúng tên, catch-Throwable vẫn giữ nguyên (có
+  chủ đích, đã có javadoc giải thích từ trước — ADR-026).
+- `ConfirmTradeUseCaseTest`/`BuyItemUseCaseTest`/`SellItemUseCaseTest`: `ExcessiveParameterList` ở
+  helper `newUseCase` — đổi sang nhận thẳng `TradePorts`/`ShopPorts` (record đã có sẵn trong code
+  production) thay vì liệt kê từng Port riêng.
+- `config/pmd/ruleset.xml`: `AvoidCatchingGenericException` đổi category `design.xml` →
+  `errorprone.xml` (PMD 8.0.0 sẽ bỏ tên cũ — cảnh báo deprecated xuất hiện ngay khi PMD chạy được).
+
+`ci.yml` bỏ `-x pmdMain -x pmdTest` — PMD chạy thật trong CI từ giờ, không còn workaround.
 
 ## Bước 4 — Git & Dependabot
 ```bash

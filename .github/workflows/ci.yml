@@ -42,17 +42,15 @@ jobs:
       # Thứ nhanh + hay fail nhất chạy trước (CI-CD §2). Error Prone chạy NGAY TRONG bước này
       # (javac plugin, không phải task riêng) — mọi lỗi ERROR-severity chặn compile ở đây.
       - name: Build (không test)
-        run: ./gradlew build -x test -x pmdMain -x pmdTest
+        run: ./gradlew build -x test
 
-      # ⚠️ PMD CHỦ ĐÍCH KHÔNG chạy ở đây (2026-07-30) — PMD 7.10.0 crash thật với JDK 25
-      # ("Unsupported class file major version 69", lỗi nội bộ ASM của PMD chưa hỗ trợ bytecode
-      # JDK 25 khi resolve type) — không phải lỗi riêng máy dev, sẽ crash y hệt trên CI (cùng
-      # JDK/PMD version). Luôn chạy `-x pmdMain -x pmdTest` cho tới khi PMD ra bản hỗ trợ JDK 25.
-      - name: Static analysis (Checkstyle + Spotless + SpotBugs)
-        run: ./gradlew checkstyleMain spotlessCheck spotbugsMain -x pmdMain -x pmdTest
+      # PMD 7.26.0 (2026-08-02) — bump từ 7.10.0, fix StackOverflowError type-inference thật gặp
+      # trên JDK 25 (xem BUILD.md "Bước 3"). PMD chạy thật ở đây từ giờ, không còn -x pmdMain/pmdTest.
+      - name: Static analysis (Checkstyle + Spotless + SpotBugs + PMD)
+        run: ./gradlew checkstyleMain spotlessCheck spotbugsMain pmdMain pmdTest
 
       - name: Unit test + ArchUnit (ADR-011)
-        run: ./gradlew test -x pmdMain -x pmdTest
+        run: ./gradlew test
 
       - name: Upload báo cáo khi fail
         if: failure()

@@ -134,15 +134,9 @@ final class SkillSystem extends IteratingKSystem {
             return;
         }
 
-        SkillCooldownComponent cooldown = COOLDOWN.get(caster);
-        ChiComponent chi = CHI.get(caster);
-        int chiCost = definition.isUltimate() ? chi.current : definition.chiCost();
-        // Tuyệt Kỹ cần > 0 Khí hiện có (GDD §4 "tốn TOÀN BỘ Khí"); skill thường cần đủ chiCost cố định.
-        if (cooldown.remainingSeconds[definition.slotIndex()] > 0f || chiCost <= 0 || chi.current < chiCost) {
+        if (!consumeCooldownAndChi(caster, definition)) {
             return;
         }
-        cooldown.remainingSeconds[definition.slotIndex()] = definition.cooldownSeconds();
-        chi.current -= chiCost;
 
         CombatConstants.CombatStats casterStats = StatusEffects.applyModifiers(
                 CombatConstants.toStats(COMBAT_STATS.get(caster)), STATUS_EFFECT.get(caster));
@@ -150,6 +144,25 @@ final class SkillSystem extends IteratingKSystem {
         double targetHpPercent = targetHealth.max <= 0 ? 0.0 : (double) targetHealth.current / targetHealth.max;
         ScriptEffect scriptEffect = evalSkillScript(definition, casterStats.skillDmg(), targetHpPercent);
         applyScriptEffect(ctx, casterStats, scriptEffect);
+    }
+
+    /**
+     * Kiểm cooldown + Khí VÀ trừ luôn nếu đủ điều kiện (gộp 1 chỗ — tách khỏi {@link #tryCast} chỉ
+     * để giữ độ phức tạp method dưới ngưỡng CyclomaticComplexity, không đổi thứ tự/điều kiện gốc).
+     *
+     * @return {@code false} nếu còn cooldown hoặc không đủ Khí (KHÔNG trừ gì) — caller bỏ qua âm thầm.
+     */
+    private boolean consumeCooldownAndChi(KEntity caster, SkillDefinition definition) {
+        SkillCooldownComponent cooldown = COOLDOWN.get(caster);
+        ChiComponent chi = CHI.get(caster);
+        int chiCost = definition.isUltimate() ? chi.current : definition.chiCost();
+        // Tuyệt Kỹ cần > 0 Khí hiện có (GDD §4 "tốn TOÀN BỘ Khí"); skill thường cần đủ chiCost cố định.
+        if (cooldown.remainingSeconds[definition.slotIndex()] > 0f || chiCost <= 0 || chi.current < chiCost) {
+            return false;
+        }
+        cooldown.remainingSeconds[definition.slotIndex()] = definition.cooldownSeconds();
+        chi.current -= chiCost;
+        return true;
     }
 
     private boolean isCasterEligible(KEntity caster, SkillDefinition definition) {
@@ -166,14 +179,23 @@ final class SkillSystem extends IteratingKSystem {
         return !StatusEffects.isStunned(STATUS_EFFECT.get(caster));
     }
 
+    /**
+     * ALLY phải là nhân vật (ID dương, không cho "hồi máu" quái); ENEMY không được tự nhắm chính
+     * mình (khác SELF/ALLY — cố ý cho phép tự buff/heal). Tách khỏi {@link #resolveTarget} chỉ để
+     * giữ độ phức tạp method dưới ngưỡng CyclomaticComplexity, không đổi điều kiện gốc.
+     */
+    private boolean isTargetKindAllowed(SkillDefinition definition, long casterId, long resolvedTargetId) {
+        if (definition.targetKind() == SkillTargetKind.ALLY && resolvedTargetId <= 0) {
+            return false;
+        }
+        return definition.targetKind() != SkillTargetKind.ENEMY || resolvedTargetId != casterId;
+    }
+
     /** @return {@code null} nếu mục tiêu không hợp lệ theo {@code definition.targetKind()} (bỏ qua âm thầm). */
     private CastContext resolveTarget(long casterId, KEntity caster, SkillDefinition definition, long targetEntityId) {
         long resolvedTargetId = definition.targetKind() == SkillTargetKind.SELF ? casterId : targetEntityId;
-        if (definition.targetKind() == SkillTargetKind.ALLY && resolvedTargetId <= 0) {
-            return null; // ALLY phải là nhân vật (ID dương) — không cho "hồi máu" quái.
-        }
-        if (definition.targetKind() == SkillTargetKind.ENEMY && resolvedTargetId == casterId) {
-            return null; // khác SELF/ALLY (cố ý cho phép tự buff/heal) — ENEMY không tự nhắm chính mình.
+        if (!isTargetKindAllowed(definition, casterId, resolvedTargetId)) {
+            return null;
         }
         KEntity target = entityLookup.apply(resolvedTargetId);
         if (target == null) {
