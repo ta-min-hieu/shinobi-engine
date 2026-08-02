@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | Version | 1.0.0 |
-| Status | Draft — ✅ **ADR-019 đề xuất ZGC** (2026-07-26, số liệu thật từ soak test — chờ chủ dự án xác nhận Accepted) |
+| Status | 🟡 Draft (từng phần) — GC choice (§2): ✅ [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md) **Accepted** (2026-07-28, chủ dự án đã xác nhận — KHÔNG còn chờ). JVM flags (§3): tập flag GC/bộ nhớ/JFR/GC-log cốt lõi đã chạy thật trong soak test 2h14 (2026-07-26) và đang dùng thật trong `server.Dockerfile` production, nhưng còn khác biệt đường dẫn log chưa đồng bộ giữa 2 nơi và bản thân việc đóng gói Docker chưa có soak test riêng — xem ghi chú chi tiết ở §3. Ngưỡng đo GC ở §7 vẫn là đề xuất chưa verify. |
 | Liên quan | [PERFORMANCE.md](PERFORMANCE.md), [JAVA-GUIDELINES.md](../02-coding-standards/JAVA-GUIDELINES.md) |
 
 ---
@@ -53,31 +53,53 @@ nguyên 39M suốt 34 chu kỳ GC liên tiếp (không leak). Không còn là "k
 
 ## 3. JVM Flags đề xuất
 
-⚠️ **CHƯA VERIFY** — là điểm khởi đầu để đo, không phải cấu hình cuối.
+✅ **Flags GC/bộ nhớ/chẩn đoán dưới đây đã chạy thật** trong soak test 2h14 (2026-07-26,
+[ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md)) — đúng tập flag này (trừ
+`-XX:+ZGenerational`, đã bỏ, xem ghi chú ngay dưới) — kết quả STW pause tối đa **0.052ms**, không
+leak suốt 34 chu kỳ GC. `deploy/docker/server.Dockerfile` (dòng ~155, viết ở Phase 10) dùng lại
+đúng tập giá trị GC/bộ nhớ/JFR/GC-log này cho production hiện tại.
+
+⚠️ **Nhưng lưu ý một khoảng trống thật**: soak test 2026-07-26 chạy **TRƯỚC KHI
+`server.Dockerfile` tồn tại** (Dockerfile chỉ được viết ở Phase 10, sau khi Phase 9 đóng
+2026-07-30 — xem `ROADMAP.md` Phase 9 lát cắt 10, liệt `server.Dockerfile` vào mục "CHƯA làm").
+Nghĩa là các GIÁ TRỊ flag đã được đo thật, nhưng KHÔNG phải qua chính cơ chế đóng gói Docker (biến
+môi trường `JAVA_OPTS` nối vào start script Gradle sinh ra, container cgroup limit tương tác với
+`MaxRAMPercentage`, user `kage` non-root, runtime jlink) — bản thân pipeline đóng gói đó chưa có
+soak test riêng của nó. Coi các flag dưới đây là "giá trị đã verify, đóng gói Docker thì chưa".
 
 ```bash
-# --- GC (ADR-019 ✅ — ZGC) ---
+# --- GC (ADR-019 ✅ Accepted — ZGC, giá trị đã verify qua soak test 2h14) ---
 -XX:+UseZGC
 # ⚠️ PHÁT HIỆN THẬT (2026-07-26, verify trên JDK 25): -XX:+ZGenerational KHÔNG còn hợp lệ — JDK in
 # cảnh báo "Ignoring option ZGenerational; support was removed in 24.0". Từ JDK 24, ZGC thế hệ là
 # chế độ DUY NHẤT khi bật -XX:+UseZGC, không cần (và không còn) flag riêng. KHÔNG thêm flag này.
 
-# --- Bộ nhớ ---
+# --- Bộ nhớ (✅ verify qua soak test + đang dùng thật trong server.Dockerfile) ---
 -XX:MaxRAMPercentage=75.0       # Container: chừa chỗ cho native (DOCKER.md §7)
 -XX:+ExitOnOutOfMemoryError     # OOM → chết hẳn, orchestrator restart
 
-# --- Chẩn đoán (BẬT Ở PRODUCTION) ---
+# --- Chẩn đoán (BẬT Ở PRODUCTION, ✅ verify qua soak test + đang dùng thật trong server.Dockerfile) ---
 -XX:+FlightRecorder
 -XX:StartFlightRecording=disk=true,maxsize=1g,maxage=24h,dumponexit=true
 -Xlog:gc*:file=/var/log/gc.log:time,uptime:filecount=5,filesize=10m
+# ⚠️ KHÁC BIỆT CHƯA ĐỒNG BỘ với server.Dockerfile thật (deploy/docker/server.Dockerfile dòng
+# ~155-158): Dockerfile dùng /tmp/gc.log và /tmp/kage.jfr (container chạy user `kage` non-root,
+# không chắc có quyền ghi /var/log) thay vì /var/log/gc.log ở trên, và thêm tham số
+# filename=/tmp/kage.jfr vào StartFlightRecording (JVM.md không có tham số filename). Đường dẫn ở
+# đây chỉ là ví dụ minh hoạ, KHÔNG khớp giá trị thật đang chạy production — ghi nhận là khoảng
+# trống, không tự sửa 1 trong 2 file, cần chủ dự án chọn chuẩn.
 
-# --- Native memory (khi điều tra leak) ---
+# --- Native memory (khi điều tra leak, ⚠️ CHƯA verify — không bật mặc định, kể cả trong server.Dockerfile) ---
 -XX:NativeMemoryTracking=summary
 ```
 
 ⚠️ **Không dùng `-Xmx` cố định trong container** — image chạy ở nhiều cấu hình RAM ([DOCKER.md §7](../07-infrastructure/DOCKER.md)).
 
 ⚠️ **JFR bật ở production là đúng** — overhead ~1%, và khi có sự cố thì đã có dữ liệu. Không có JFR = "chờ nó xảy ra lần nữa rồi bật lên xem".
+
+⚠️ **`server.Dockerfile` còn thêm `-Dio.netty.leakDetection.level=simple`** ở production — không
+liệt ở đây vì đó là system property của Netty, không phải flag JVM/GC; đã tài liệu hoá riêng ở
+[§8](#8-native-memory) "Netty leak detector".
 
 ---
 
@@ -224,7 +246,8 @@ Client khác server:
 | 6 | Chỉ thêm flag khi giải quyết vấn đề **đã đo** | Điều 30 | Accepted |
 | 7 | Netty leak detector: `paranoid` ở dev | Quên `release()` là lỗi phổ biến nhất | Accepted |
 | 8 | **Android dùng ART — mọi thứ về GC ở đây không áp dụng** | Trung thực về giới hạn | Accepted |
-| 9 | Flags §3 **chưa verify** | Điểm khởi đầu để đo | ⏳ |
+| 9 | Flags §3 (GC/bộ nhớ/JFR/GC-log cốt lõi) **đã verify** qua soak test 2h14 + đang dùng thật trong `server.Dockerfile` | Soak test 2h14 chạy đúng tập flag này; đóng gói Docker viết sau, dùng lại giá trị | 🟡 Giá trị Accepted, đóng gói Docker + đường dẫn log chưa đồng bộ chưa có soak test riêng |
+| 10 | `-XX:NativeMemoryTracking=summary` **chưa verify**, không bật mặc định | Chỉ dùng khi điều tra leak, có overhead | ⏳ |
 
 ## Tài liệu liên quan
 
@@ -239,4 +262,11 @@ Client khác server:
 1. ✅ Phase 0: bật JFR + GC log ngay — đã dùng thật lúc soak test 2026-07-26.
 2. ✅ Phase 9: đo ZGC **trên workload thật** (soak 2h14, 80 client) → [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md) Accepted (2026-07-28). Chưa đo G1 thực nghiệm trên chính dự án (xem Revisit Trigger ADR-019) — quyết định dựa trên số liệu ZGC thật + đặc tính G1 đã biết rộng rãi.
 3. ✅ Phase 2: bật Netty leak detector `paranoid` ở dev (§8).
-4. Chủ dự án xác nhận ADR-019 Accepted.
+4. ✅ Chủ dự án đã xác nhận ADR-019 Accepted (2026-07-28).
+5. Đồng bộ đường dẫn `gc.log`/JFR filename giữa JVM.md §3 (`/var/log/gc.log`, không có tham số
+   `filename` cho JFR) và `deploy/docker/server.Dockerfile` thật (`/tmp/gc.log`, `/tmp/kage.jfr`) —
+   chủ dự án chọn 1 chuẩn, hiện đang khác nhau thật (xem §3).
+6. Cân nhắc 1 soak test riêng chạy ĐÚNG qua `server.Dockerfile`/container thật (không chỉ giá trị
+   flag) — soak test gốc dùng cho ADR-019 chạy trước khi Dockerfile tồn tại (Phase 9 lát cắt 3,
+   2026-07-26, so với Dockerfile viết ở Phase 10 sau 2026-07-30), nên phần đóng gói Docker
+   (`JAVA_OPTS`, container cgroup, user non-root, jlink runtime) chưa tự nó có số liệu.
