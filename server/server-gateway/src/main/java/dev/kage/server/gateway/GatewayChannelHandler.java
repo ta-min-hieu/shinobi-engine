@@ -419,7 +419,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, PacketCodec.Frame frame) {
         PacketHeader header = frame.header();
-        networkMetrics.recordPacketReceived(header.opcode());
+        networkMetrics.recordPacketReceived(header.opcode(), frame.payload().length);
         PacketHandler handler = handlers.get(header.opcode());
         // OBSERVABILITY.md §6 — span "gateway.command" bao decode+validate+dispatch, 1 chỗ trung
         // tâm áp dụng cho MỌI opcode (không retrofit sâu hơn từng handler — xem javadoc GatewayTracing).
@@ -2813,7 +2813,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void send(ChannelHandlerContext ctx, int opcode, int sequenceId, byte[] payload) {
-        networkMetrics.recordPacketSent(opcode);
+        networkMetrics.recordPacketSent(opcode, payload.length);
         PacketHeader header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
         ctx.writeAndFlush(new PacketCodec.Frame(header, payload));
     }

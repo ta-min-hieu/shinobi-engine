@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 
@@ -32,6 +33,8 @@ final class GatewayNetworkMetrics {
     private final Map<String, Counter> enhanceResults = new ConcurrentHashMap<>();
     private final Counter loginSuccess;
     private final Counter loginFailed;
+    private final DistributionSummary packetSizeReceived;
+    private final DistributionSummary packetSizeSent;
     private final AtomicInteger activeConnections = new AtomicInteger();
 
     GatewayNetworkMetrics(MeterRegistry registry) {
@@ -45,14 +48,26 @@ final class GatewayNetworkMetrics {
         Gauge.builder("kage.connection.active", activeConnections, AtomicInteger::get)
                 .description("Số kết nối TCP đang mở — khác kage.players.online (đã chọn nhân vật)")
                 .register(registry);
+        this.packetSizeReceived = DistributionSummary.builder("kage.packet.size")
+                .tag("direction", "received")
+                .baseUnit("bytes")
+                .description("Kích thước payload packet — phát hiện client gửi packet bất thường lớn")
+                .register(registry);
+        this.packetSizeSent = DistributionSummary.builder("kage.packet.size")
+                .tag("direction", "sent")
+                .baseUnit("bytes")
+                .description("Kích thước payload packet gửi đi — phát hiện response phình bất thường")
+                .register(registry);
     }
 
-    void recordPacketReceived(int opcode) {
+    void recordPacketReceived(int opcode, int payloadSizeBytes) {
         counterFor(packetsReceived, "kage.packet.received", opcodeName(opcode)).increment();
+        packetSizeReceived.record(payloadSizeBytes);
     }
 
-    void recordPacketSent(int opcode) {
+    void recordPacketSent(int opcode, int payloadSizeBytes) {
         counterFor(packetsSent, "kage.packet.sent", opcodeName(opcode)).increment();
+        packetSizeSent.record(payloadSizeBytes);
     }
 
     /** {@code scope} = nhãn rate limiter CỐ ĐỊNH ("move", tên {@code ChatChannel}...), KHÔNG phải characterId. */

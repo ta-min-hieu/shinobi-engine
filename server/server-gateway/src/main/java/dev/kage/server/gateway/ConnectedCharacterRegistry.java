@@ -387,7 +387,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     }
 
     private void send(ChannelHandlerContext ctx, int opcode, int sequenceId, byte[] payload) {
-        networkMetrics.recordPacketSent(opcode);
+        networkMetrics.recordPacketSent(opcode, payload.length);
         PacketHeader header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
         ctx.writeAndFlush(new PacketCodec.Frame(header, payload));
     }

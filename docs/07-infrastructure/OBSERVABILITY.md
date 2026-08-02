@@ -64,7 +64,7 @@
 | Metric | Kiểu | Trạng thái |
 |---|---|---|
 | `kage.packet.received` / `sent` | Counter (tag: opcode) | ✅ **implemented 2026-07-28** — `GatewayNetworkMetrics`, opcode lạ gộp vào tag `"unknown"` (chống cardinality nổ nếu client giả mạo opcode) |
-| `kage.packet.size` | Distribution | ⏳ chưa làm |
+| `kage.packet.size` | Distribution (tag: direction) | ✅ **implemented 2026-08-02** — `GatewayNetworkMetrics`, đọc `frame.payload().length`/`payload.length` sẵn có tại điểm gọi (không re-serialize), tag `direction=received\|sent` |
 | `kage.connection.active` | Gauge | ✅ **implemented 2026-07-28** — đếm ở `channelActive`/`channelInactive`, khác `kage.players.online` (đã chọn nhân vật) |
 | `kage.ratelimit.rejected` | Counter (tag: scope) | ✅ **implemented 2026-07-28** — 2 điểm chặn thật: `MoveCommand` (tag `move`) + chat (tag `chat_<CHANNEL>`) |
 
