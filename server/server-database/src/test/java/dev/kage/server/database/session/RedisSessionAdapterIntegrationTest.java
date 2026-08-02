@@ -1,6 +1,7 @@
 package dev.kage.server.database.session;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -10,7 +11,9 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.exceptions.JedisAccessControlException;
 
 /** Test bằng Redis THẬT qua Testcontainers — verify sliding TTL + thu hồi tức thì (ADR-017). */
 @Testcontainers
@@ -76,6 +79,21 @@ class RedisSessionAdapterIntegrationTest {
             assertThat(tokenA).isNotEqualTo(tokenB);
             assertThat(adapter.validateAndRenew(tokenA)).contains(1L);
             assertThat(adapter.validateAndRenew(tokenB)).contains(2L);
+        }
+    }
+
+    @Test
+    void shouldRejectConnection_whenNoPasswordProvided() {
+        // SECURITY.md §14 — verify runtime thật rằng `--requirepass` từ chối kết nối không auth,
+        // không chỉ đọc cấu hình compose bằng mắt.
+        try (JedisPool noAuthPool = new JedisPool(REDIS.getHost(), REDIS.getMappedPort(6379))) {
+            assertThatThrownBy(() -> {
+                        try (Jedis jedis = noAuthPool.getResource()) {
+                            jedis.ping();
+                        }
+                    })
+                    .isInstanceOf(JedisAccessControlException.class)
+                    .hasMessageContaining("NOAUTH");
         }
     }
 }
