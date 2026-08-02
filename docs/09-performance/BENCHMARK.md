@@ -729,6 +729,66 @@ tiếp, không phải việc "tắt 1 công tắc". Dừng điều tra thêm ở
 câu hỏi phụ); nếu cần công thức capacity-planning đáng tin, hướng đi rõ ràng nhất là đo lại từ đầu
 (gợi ý đã ghi ở kết luận §5.8), không phải tiếp tục loại trừ từng giả thuyết nhỏ.
 
+### 5.10 ECS update/tick thật — đóng câu hỏi factual Revisit Trigger ADR-006 (2026-08-02)
+
+✅ **Đo thật lần đầu bằng metric production `kage.ecs.system.duration`** (không phải JMH) — mục đích
+DUY NHẤT: trả lời câu hỏi factual mà [ADR-006](../01-architecture/adr/ADR-006-Why-ECS.md) "Revisit
+Trigger" đặt ra ("ECS update > 4ms/tick với số entity mục tiêu của 1 map đông người?"), Phase 9 đã
+đóng (2026-07-30) nhưng chưa ai thật sự cộng 6 Timer System (`kage.ecs.system.duration`, Phase 9 lát
+cắt 9) lại thành 1 con số rồi so ngưỡng — JMH 2026-07-26 (ghi ở ADR-006) chỉ đo proxy
+`MovementSystem`, không có AI/Combat/Skill/Boss/StatusEffect thật.
+
+**Máy/điều kiện**: cùng máy mọi lần đo ở §5 (Intel i9-14900HX, 24 lõi thật/32 luồng logic, 32GB RAM,
+Windows), JDK GraalVM 21.0.8 chạy `./gradlew run` (KHÔNG `-Xmx`, TLS bật thật dev-cert ADR-027,
+tracing OTLP mặc định dù không có Jaeger — cấu hình dev y hệt §5.4 trở đi). Postgres 17 + Redis 8
+thật (container standalone, cổng khác mặc định vì máy đang chạy sẵn service khác chiếm 5432/6379 —
+không ảnh hưởng số đo). `tools:load-test` **N=500**, ramp 50→500 (bước 50/5s), giữ tải ổn định ~2
+phút — **peak run ngắn, KHÔNG phải soak 2 giờ** (Điều 30: ghi rõ đây không phải soak). **0 lỗi
+client** suốt lần chạy, `kage_players_online` đỉnh = 500 (khớp đúng N mục tiêu, không hụt như 1 số
+lần đo N=2000 trước đây bị burst-connect).
+
+**Cách đo**: 2 lần scrape `/metrics` cách nhau ~85s, CẢ HAI lúc `kage_players_online=500` (giữa cửa
+sổ tải ổn định) — lấy **delta** `_sum`/`_count` giữa 2 lần để có mean đúng trong cửa sổ tải, tránh bị
+pha loãng bởi thời gian server chạy không tải trước đó. ⚠️ `kage.ecs.system.duration` **không có
+percentile** — code (`MicrometerTickMetricsPort`) chỉ gọi `publishPercentiles(0.5, 0.95, 0.99)` cho
+`kage.tick.duration`, KHÔNG cho Timer System — mỗi Timer System chỉ phơi `_count`/`_sum`/`_max`, nên
+mục này chỉ có **mean** (từ `_sum/_count`) và **max**, không có p95/p99 per-System.
+
+| System | Δsum (85s, 42.810 tick) | Mean/tick |
+|---|---|---|
+| AiSystem | 0.394126s | 0.00921 ms |
+| BossAiSystem | 0.015393s | 0.00036 ms |
+| CombatSystem | 0.307498s | 0.00718 ms |
+| MovementSystem | 0.426417s | 0.00996 ms |
+| SkillSystem | 0.184637s | 0.00431 ms |
+| StatusEffectSystem | 0.093353s | 0.00218 ms |
+| **Tổng ECS update/tick** | **1.421424s** | **0.03320 ms** |
+
+**So ngưỡng**: 0.0332ms / **4ms** (Revisit Trigger) = **0.83%**. 0.0332ms / **16.6ms** (ngân sách tick
+đầy đủ @60Hz, ADR-018) = **0.20%**. Đối chiếu: tổng thời gian tick đầy đủ đo cùng cửa sổ (delta
+`kage.tick.duration`, 42.818 tick) = 0.15942 ms/tick trung bình — ECS chiếm ~20.8% tick, nhưng bản
+thân tick đã cực nhỏ so với 16.6ms nên tỉ lệ % này không đáng lo. Tick p99 (Micrometer tự tính,
+rolling) trong cửa sổ N=500 ổn định: 1.7–2.36ms — khớp `serverTickMs` p99 mà `tools:load-test` tự
+báo cáo cùng lúc, cả 2 đều xa dưới ngân sách 16.6ms.
+
+**Kết luận: Revisit Trigger CHƯA kích hoạt.** Số production thật (có đủ AI/Combat/Skill/Boss/
+StatusEffect System, không phải proxy JMH) xác nhận lại kết luận JMH 2026-07-26 — ECS ăn chưa tới 1%
+ngân sách Trigger. Xem [ADR-006](../01-architecture/adr/ADR-006-Why-ECS.md#ghi-chú--đánh-giá-lại-bằng-production-metric-thật-2026-08-02)
+cho phần diễn giải quyết định đầy đủ (không lặp lại ở đây, Điều 13 CLAUDE.md).
+
+⚠️ **Outlier thật, không giấu**: `kage_ecs_system_duration_seconds_max{system="AiSystem"}` đo được
+**21.281ms** (cộng dồn từ lúc server khởi động, không phải trong cửa sổ delta 85s ở trên) — tự nó
+vượt NGUYÊN ngân sách tick 16.6ms. 1 mẫu đơn lẻ trong 187.569 mẫu — nhiều khả năng JIT chưa warm-up/
+GC pause/burst-connect (ramp 50→500 dồn AI System xử lý nhiều entity mới cùng lúc), **chưa điều tra
+nguyên nhân** (ngoài phạm vi câu hỏi factual của Trigger, Điều 9). Không đủ để kích hoạt Trigger (đòi
+hỏi mức ổn định > 4ms, không phải 1 outlier), nhưng đáng theo dõi nếu lặp lại thường xuyên hơn ở N
+lớn hơn hoặc soak dài hơn.
+
+**Việc CHƯA làm** (Điều 30): chỉ đo N=500 bằng metric này (chưa N=1000/2000); chỉ ~2 phút giữ tải
+(chưa soak 2 giờ); chưa điều tra outlier AiSystem 21ms. Không chặn kết luận Trigger — N=500 với 0 lỗi
+client và tick p99 xa dưới ngân sách đã đủ để trả lời "> 4ms/tick?" là KHÔNG, còn cách xa — nhưng nếu
+sau này cần con số ở N/soak lớn hơn, đây là điểm bắt đầu tiếp theo, không phải kết luận cuối cùng.
+
 ---
 
 ## 6. Khi nào chạy
@@ -854,3 +914,7 @@ Không có — đây là quy trình, không phải quyết định kiến trúc.
    (GC, Proposed) + [ADR-006](../01-architecture/adr/ADR-006-Why-ECS.md) (Ashley, Revisit Trigger
    đánh giá lại — CHƯA kích hoạt, giữ nguyên Ashley).
 3. ✅ Kết quả đầu tiên đã ghi vào `benchmarks/results/engine-ecs-jmh-result.json`.
+4. ✅ **(2026-08-02, sau khi Phase 9 đã đóng)** — đóng khoảng trống "chưa ai cộng
+   `kage.ecs.system.duration` thành 1 con số thật rồi so Trigger": xem §5.10. Xác nhận lại bằng
+   production metric thật (N=500, có đủ AI/Combat/Skill/Boss/StatusEffect System) đúng kết luận JMH
+   — Trigger CHƯA kích hoạt (0.83% ngân sách 4ms).
