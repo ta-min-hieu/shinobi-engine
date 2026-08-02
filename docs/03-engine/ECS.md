@@ -228,6 +228,13 @@ entity.add(new PendingRemovalComponent());
 
 ✅ **Đã đo bằng JMH thật (2026-07-26)** — xem [ADR-006 "Ghi chú — đánh giá lại Phase 9"](../01-architecture/adr/ADR-006-Why-ECS.md#ghi-chú--đánh-giá-lại-phase-9-2026-07-26): Revisit Trigger CHƯA kích hoạt (5000 entity chỉ ăn 3.66% ngân sách ECS), nhưng chi phí/entity tăng KHÔNG tuyến tính khi entity tăng — tín hiệu theo dõi cho tương lai, không phải hành động ngay.
 
+✅ **Đã đo lại bằng production metric thật (2026-08-02)** — `kage.ecs.system.duration` (không phải
+JMH mô phỏng) qua gateway thật + `tools:load-test` N=500 người chơi thật: tổng 6 System thật (AI +
+Movement + Combat + Skill + Boss AI + StatusEffect) chỉ **0.0332ms/tick trung bình** (0.83% ngân sách
+4ms của Trigger) — xác nhận lại kết luận JMH, lần này với System thật chứ không phải proxy. Chi tiết:
+[ADR-006 "Ghi chú — đánh giá lại bằng production metric thật"](../01-architecture/adr/ADR-006-Why-ECS.md#ghi-chú--đánh-giá-lại-bằng-production-metric-thật-2026-08-02),
+[BENCHMARK.md §5.10](../09-performance/BENCHMARK.md).
+
 **Ngân sách hiệu năng** (**60Hz → 16.6ms/tick** — [ADR-018](../01-architecture/adr/ADR-018-Tick-Rate.md)):
 
 | Hạng mục | Ngân sách |
@@ -281,7 +288,7 @@ Vượt ngưỡng → kích hoạt Revisit Trigger của ADR-006.
 |---|---|---|
 | **ADR-011** | Enforce `engine-ecs` boundary (§10) — **quan trọng nhất cho tài liệu này** | 🔴 Chặn Phase 0 |
 | ✅ **ADR-018** | Tick rate 60Hz — §9 ngân sách = 16.6ms | Accepted |
-| **ADR-006** | Đánh giá lại Ashley cuối Phase 9 | ⏳ Đã có, chờ Phase 9 |
+| **ADR-006** | Đánh giá lại Ashley cuối Phase 9 | ✅ Đã đánh giá (2026-08-02, production metric thật N=500) — Trigger CHƯA kích hoạt, xem [ADR-006 "Ghi chú — đánh giá lại bằng production metric thật"](../01-architecture/adr/ADR-006-Why-ECS.md#ghi-chú--đánh-giá-lại-bằng-production-metric-thật-2026-08-02) |
 
 ## Tài liệu liên quan
 
