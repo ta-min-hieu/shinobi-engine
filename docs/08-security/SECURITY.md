@@ -276,10 +276,11 @@ Bật **secret scanning** ([OWASP.md](OWASP.md)).
 | Dependency | Scan CVE ([OWASP.md](OWASP.md)) |
 
 ✅ **Redis đã có password bắt buộc** (`CACHE_PASSWORD` fail-fast nếu thiếu, không có default ngầm) —
-đóng lỗ hổng "Redis expose ra internet không password" phổ biến. ⚠️ Chưa verify bằng test thật rằng
-`requirepass` từ chối kết nối không auth (chỉ verify cấu hình compose, chưa có integration test kết
-nối Redis không password để xác nhận hành vi runtime) — nếu cần độ tin cậy cao hơn thì đây là việc
-còn thiếu, không phải đã đóng hoàn toàn.
+đóng lỗ hổng "Redis expose ra internet không password" phổ biến. ✅ Đã verify bằng test thật
+(`RedisSessionAdapterIntegrationTest.shouldRejectConnection_whenNoPasswordProvided`, 2026-08-02) —
+kết nối Redis THẬT (Testcontainers) không kèm password bị từ chối với
+`JedisAccessControlException: NOAUTH Authentication required.`; test đã sanity-check bằng cách tạm
+bỏ `--requirepass` để xác nhận nó fail đúng khi mất bảo vệ, không phải test vô nghĩa.
 
 ---
 
