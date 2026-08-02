@@ -137,7 +137,7 @@ Trung thực: OWASP Top 10 viết cho **web app**. Không phải mục nào cũn
 | **A02 Cryptographic Failures** | 🔴 Liên quan | Mật khẩu, TLS — [SECURITY.md §3](SECURITY.md) |
 | **A03 Injection** | 🔴 Liên quan | SQL injection — không có ORM che |
 | A04 Insecure Design | 🟡 Liên quan | Toàn bộ [SECURITY.md](SECURITY.md) |
-| A05 Security Misconfiguration | 🔴 Liên quan | ⚠️ Redis không password — [SECURITY.md §14](SECURITY.md) |
+| A05 Security Misconfiguration | 🔴 Liên quan | ✅ Redis đã có password bắt buộc (`requirepass` qua `CACHE_PASSWORD`, verify 2026-08-02) — [SECURITY.md §14](SECURITY.md); ⚠️ còn thiếu test runtime xác nhận `requirepass` chặn kết nối không auth |
 | A06 Vulnerable Components | 🔴 Liên quan | §1 |
 | A07 Auth Failures | 🔴 Liên quan | Brute-force, session |
 | A08 Data Integrity Failures | 🟡 Liên quan | Java Serialization (đã cấm) |
@@ -192,6 +192,6 @@ Không có — đây là công cụ, không phải quyết định kiến trúc.
 ## Việc cần làm tiếp theo
 
 1. 🔴 **Bật secret scanning + pre-commit hook TRƯỚC khi có commit đầu tiên** (§2). Đây là việc rẻ nhất và giá trị cao nhất trong toàn bộ tài liệu này.
-2. Phase 0: Dependabot + `find-sec-bugs`.
+2. ~~Phase 0: Dependabot + `find-sec-bugs`~~ — ✅ **done, verify 2026-08-02** — Dependabot alerts bật (§2, thay thế Secret Scanning không có trên private tier); `find-sec-bugs` wired bắt buộc vào SpotBugs qua `kage.quality-conventions.gradle.kts` (`spotbugsPlugins` dependency, không điều kiện tắt) — build+test thật đã xanh với static analysis này (BUILD.md "Bước 3", 2026-07-30). Việc pre-commit hook/gitleaks ở mục 1 **vẫn còn thiếu**, không nhầm với mục này.
 3. ~~Phase 3: viết bộ test §4 (authz, replay)~~ — ✅ **implemented 2026-08-02**, cùng fuzzing + rate-limit, xem §4.
 4. ~~Bộ test thoát script sandbox (§4 TOC mục 4)~~ — ✅ **implemented 2026-08-02**, xem §4. Toàn bộ §4 nay chỉ còn mục 5 (DAST admin API) không áp dụng.

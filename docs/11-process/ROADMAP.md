@@ -779,9 +779,16 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **28 ADR Accepted** (gồm
     - ✅ Dependabot backlog (15 PR) gần như đã dọn sạch qua các lần merge CI #40-57 — chỉ còn 1 PR mở
       (`netty-all` 4.1.136→4.2.16, #8), **cố tình giữ lại** vì build thật cho thấy Netty 4.2 gây lỗi
       TLS (`bad_record_mac`) dưới tải trong integration test.
+    - ✅ **Tối ưu kích thước image: jlink custom runtime** (`47293f7`, 2026-08-01) — thêm stage
+      jlink vào `server.Dockerfile` (DOCKER.md §8), bớt ~40MB image `server-gateway` bằng cách tự
+      quét THẬT bộ jar qua `jdeps` (không đoán module list tay), tách `modpath/`/`classpath/` để né
+      lỗi Netty split-package khi đưa cả ~117 jar vào `--module-path` cùng lúc. Alpine **vẫn KHÔNG
+      dùng** — DOCKER.md §8 đã reject (musl libc phá native lib Netty), jlink chỉ đổi runtime JRE,
+      giữ nguyên base OS Ubuntu. Kèm 1 bug thật phát hiện+sửa ngay sau đó: `ubuntu:26.04` trần mặc
+      định locale `POSIX` (không UTF-8) làm mojibake log/exception tiếng Việt — vá bằng
+      `LANG=C.utf8`/`LC_ALL=C.utf8` (`8ab0e94`).
     - ⛔ **Chưa làm** (không phải thiếu sót, ngoài phạm vi các đợt trên): TLS thật trong
-      `docker-compose.prod.yml`, cert Production thật, tối ưu kích thước image (jlink/Alpine —
-      DOCKER.md §8 khuyến nghị KHÔNG dùng Alpine cho project này), và toàn bộ quy trình
+      `docker-compose.prod.yml`, cert Production thật, và toàn bộ quy trình
       Closed Beta → Open Beta → RC → Production ở bảng quy tắc phía trên vẫn chưa bắt đầu (đòi hỏi
       quyết định của chủ dự án, không phải việc AI tự chạy).
     - ✅ **ADR-024 (Asset Distribution) viết 2026-08-01, Status Proposed** — gỡ nhãn "chặn Phase 10"

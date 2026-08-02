@@ -122,13 +122,31 @@ public record BuyItemCommand(long itemId, int quantity) {
 
 Kẻ tấn công ghi lại packet hợp lệ rồi gửi lại nhiều lần.
 
+⚠️ **Sửa lại 2026-08-02 — mô tả cũ của mục này sai với code thật.** Bản trước liệt `sequenceId` tăng
+dần như 1 cơ chế chống replay ("server từ chối sequenceId ≤ cái đã thấy"). Verify thật bằng
+`SecurityIntegrationTest#moveCommand_sequenceIdIsNotEnforcedAsReplayGuard_documentedGap`
+(`server/server-gateway/src/test/.../SecurityIntegrationTest.java`, xem phát hiện gốc ở
+[OWASP.md §4 mục 3](OWASP.md)): **không có nơi nào trong code lưu "sequenceId cuối đã thấy"** cho
+bất kỳ Command nào — gửi lại 1 packet cũ với `sequenceId` thấp hơn vẫn được `GatewayChannelHandler`
+xử lý bình thường. `sequenceId` chỉ dùng để **khớp Request ↔ Response**
+([NETWORK.md §5](../05-server/NETWORK.md)), không phải guard.
+
 | Cách chặn | Chi tiết |
 |---|---|
-| `sequenceId` tăng dần | Server từ chối sequenceId ≤ cái đã thấy |
-| **Idempotency key** cho Command có side-effect | ✅ `idempotencyKey` client sinh + enforce ở DB trong transaction — [ADR-025](../01-architecture/adr/ADR-025-Idempotency.md) Accepted |
-| TLS | Chặn replay từ ngoài (nhưng không chặn client tự replay) |
+| **Idempotency key** cho Command có side-effect | ✅ `idempotencyKey` client sinh (UUID v4) + enforce **unique ở DB trong cùng transaction** với hiệu ứng thật — [ADR-025](../01-architecture/adr/ADR-025-Idempotency.md) Accepted, đã code thật cho `CreateCharacterRequest`, `BuyItemCommand`, `SellItemCommand`, `ClaimMailCommand`, `ConfirmTradeCommand` (verify bằng `SecurityIntegrationTest`, nhóm "REPLAY" — gold trừ đúng 1 lần/item cấp đúng 1 lần dù gửi lại) |
+| TLS | Chặn replay **từ ngoài** (kẻ nghe lén ghi lại rồi phát lại), **không** chặn client tự gửi lại packet của chính nó |
+| `sequenceId` | ❌ **KHÔNG phải cơ chế chống replay** — chỉ để khớp request/response, không có state "đã thấy" nào được server lưu |
 
-✅ **ADR-025 đã Accepted (2026-07-19).** Thiết kế đã có hướng đóng lỗ hổng duplicate — việc còn lại là triển khai `idempotencyKey` thật khi viết Command side-effect (`BuyItemCommand`, trade, mail-claim...) ở Phase 3, không phải thiết kế lại từ đầu.
+✅ **ADR-025 đã Accepted (2026-07-19) và đã triển khai xong** (không còn là "còn lại là code" như bản
+mô tả cũ) — 5 Command side-effect tài chính/vật phẩm ở trên đều có `idempotencyKey` thật, enforce ở
+DB. `EnterDungeonCommand`/`ExitDungeonCommand` **cố tình không có** — vào/ra dungeon không sinh hiệu
+ứng kinh tế trùng lặp được (xem comment trong `dungeon.proto`).
+
+⚠️ **Khoảng trống còn lại, trung thực**: Command **không** có side-effect tài chính/vật phẩm
+(`MoveCommand`, `SetTargetCommand`, `UseSkillCommand`...) hiện **không có bất kỳ cơ chế chống replay
+nào** — không `sequenceId` guard, không `idempotencyKey`. Rủi ro thực tế thấp (không nhân bản được
+item/gold qua các Command này), nhưng đây là gap thật, không phải đã được che chắn như tài liệu cũ
+ngụ ý.
 
 ---
 
@@ -253,11 +271,15 @@ Bật **secret scanning** ([OWASP.md](OWASP.md)).
 |---|---|
 | Container | Không chạy root ([DOCKER.md §4](../07-infrastructure/DOCKER.md)) |
 | DB | Không expose ra internet; chỉ server truy cập |
-| Redis | ⚠️ **Redis mặc định không có auth** — phải bật password + không expose |
+| Redis | ✅ **Có password** — `docker-compose.yml`/`docker-compose.prod.yml` chạy `redis-server --requirepass ${CACHE_PASSWORD:?set CACHE_PASSWORD}` (verify thật bằng đọc 2 file compose, 2026-08-02); Redis chỉ bind trong network nội bộ docker-compose, không publish port ra host |
 | TLS | Bắt buộc Production — cơ chế cụ thể [ADR-027](../01-architecture/adr/ADR-027-TLS-Transport-Security.md) ✅ Accepted, code xong 2026-07-31 |
 | Dependency | Scan CVE ([OWASP.md](OWASP.md)) |
 
-⚠️ **Redis expose ra internet không password là lỗ hổng cực kỳ phổ biến** — bot quét internet tìm Redis mở suốt ngày.
+✅ **Redis đã có password bắt buộc** (`CACHE_PASSWORD` fail-fast nếu thiếu, không có default ngầm) —
+đóng lỗ hổng "Redis expose ra internet không password" phổ biến. ⚠️ Chưa verify bằng test thật rằng
+`requirepass` từ chối kết nối không auth (chỉ verify cấu hình compose, chưa có integration test kết
+nối Redis không password để xác nhận hành vi runtime) — nếu cần độ tin cậy cao hơn thì đây là việc
+còn thiếu, không phải đã đóng hoàn toàn.
 
 ---
 
@@ -312,4 +334,4 @@ Không còn — ADR-017, ADR-025 đã Accepted 2026-07-19. Xem [adr/README.md](.
 1. Phase 3: triển khai `idempotencyKey` thật (ADR-025) khi viết Command side-effect đầu tiên (`BuyItemCommand` hoặc tương đương) — ADR đã Accepted, còn lại là code.
 2. Phase 3: §4 (lấy characterId từ session) — làm sai từ đầu là lỗ hổng IDOR toàn hệ thống.
 3. Phase 3: audit log (§9) **cùng lúc** với trade/gold, không để sau.
-4. Phase 0: Redis password + không expose (§14).
+4. ~~Phase 0: Redis password + không expose (§14)~~ — ✅ **done, verify 2026-08-02** — `docker-compose.yml`/`docker-compose.prod.yml` đều `requirepass` bắt buộc qua `CACHE_PASSWORD` (fail-fast nếu thiếu). Còn thiếu: test thật xác nhận `requirepass` chặn kết nối không auth ở runtime.
