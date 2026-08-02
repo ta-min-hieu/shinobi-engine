@@ -175,7 +175,7 @@ class MvpLoopIntegrationTest {
     private static ClaimQuestRewardUseCase newClaimQuestRewardUseCase() {
         QuestRewardPorts rewardPorts = new QuestRewardPorts(
                 new PostgresQuestExpAdapter(),
-                new PostgresQuestInventoryGrantAdapter(dataSource),
+                new PostgresQuestInventoryGrantAdapter(),
                 new PostgresQuestAuditAdapter());
         return new ClaimQuestRewardUseCase(
                 new PostgresQuestProgressAdapter(dataSource),

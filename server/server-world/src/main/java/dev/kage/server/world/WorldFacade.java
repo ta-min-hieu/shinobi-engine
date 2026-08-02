@@ -47,6 +47,11 @@ import dev.kage.server.world.component.TargetComponent;
  * Thread cấm sửa ECS state trực tiếp"). Việc thật xảy ra ở đầu tick kế tiếp trên {@link #tickLoop},
  * đúng pseudocode SERVER.md §3.
  */
+// PMD CyclomaticComplexity (class-level, ngưỡng mặc định 80): PMD 7.10.0 chưa từng chạy được thật
+// trên JDK 25 (StackOverflowError type-inference — xem STATIC-ANALYSIS.md), nên đây là lần đầu
+// class này bị đo. Composition root nhiều method nhỏ (wiring + tick loop) — KHÔNG phải 1 method
+// phình to; tách nhỏ hơn nữa là thay đổi kiến trúc composition-root, để chủ dự án quyết định.
+@SuppressWarnings("PMD.CyclomaticComplexity")
 public final class WorldFacade {
 
     private static final Logger LOG = LoggerFactory.getLogger(WorldFacade.class);
@@ -275,7 +280,9 @@ public final class WorldFacade {
      * nếu Runnable để lọt exception ra ngoài (xem javadoc {@link WorldTickScheduler}). Đây là lưới
      * an toàn tầng ngoài cùng, không thay thế cách ly lỗi đã có trong {@code tickOnce()}.
      */
-    @SuppressWarnings("PMD.AvoidCatchingThrowable")
+    // PMD rule thật trong config/pmd/ruleset.xml là AvoidCatchingGenericException (không phải
+    // AvoidCatchingThrowable — tên cũ ghi nhầm từ trước khi PMD chạy được thật, xem STATIC-ANALYSIS.md).
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void tickTask() {
         if (!running) {
             return; // cancel(false) không huỷ lần đã dispatch dở — bỏ qua an toàn nếu lỡ chạy tới đây.

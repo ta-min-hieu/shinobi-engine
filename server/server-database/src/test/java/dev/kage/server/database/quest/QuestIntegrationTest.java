@@ -132,7 +132,7 @@ class QuestIntegrationTest {
         QuestTemplatePort templatePort = new PostgresQuestTemplateAdapter(dataSource);
         QuestRewardPorts rewardPorts = new QuestRewardPorts(
                 new PostgresQuestExpAdapter(),
-                new PostgresQuestInventoryGrantAdapter(dataSource),
+                new PostgresQuestInventoryGrantAdapter(),
                 new PostgresQuestAuditAdapter());
         TransactionRunner tx = new JdbcQuestTransactionRunner(dataSource);
         return new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx);

@@ -33,7 +33,7 @@ tasks.named<Checkstyle>("checkstyleTest") {
 }
 
 pmd {
-    toolVersion = "7.10.0"    // ⚠️ sync
+    toolVersion = "7.26.0"    // ⚠️ sync — bump từ 7.10.0, fix StackOverflowError type-inference JDK 25
     isConsoleOutput = true
     ruleSetFiles = files(rootProject.file("config/pmd/ruleset.xml"))
     ruleSets = emptyList()    // chỉ ruleset dự án

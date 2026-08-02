@@ -229,10 +229,15 @@ nhiên khắp nơi.
 2. Viết `checkstyle.xml` với custom rule §5.
 3. ADR-011 + ArchUnit **trước dòng code gameplay đầu tiên**.
 4. ✅ **BUILD.md "Bước 3" xong (2026-07-30)** — Spotless + SpotBugs(+find-sec-bugs) + Error Prone
-   wire xong, `./gradlew build`+`test` xanh (trừ `pmdMain`/`pmdTest`, PMD 7.10.0 crash thật với
-   JDK 25 — xem BUILD.md). Chi tiết đầy đủ + gotcha thật: BUILD.md "Bước 3".
+   wire xong, `./gradlew build`+`test` xanh. Chi tiết đầy đủ + gotcha thật: BUILD.md "Bước 3".
 5. **Chưa làm**: TLS thật cho GameConnection/GatewayServer (SpotBugs phát hiện, đang suppress tạm
    trong `config/spotbugs/exclude.xml` — NETWORK.md ghi "TLS bắt buộc ở Production" Accepted nhưng
    chưa 1 dòng code nào, cần ADR riêng trước khi làm).
-6. **Chưa làm**: PMD chờ bản hỗ trợ JDK 25 (theo dõi Dependabot `com.google.errorprone`... không,
-   theo dõi PMD riêng — chưa có Dependabot entry cho PMD, cân nhắc thêm nếu muốn tự động nhắc).
+6. ✅ **PMD thật sự chạy được (2026-08-02)** — root cause KHÔNG phải "chưa hỗ trợ JDK 25" như ghi
+   trước đây, mà là bug thật trong PMD 7.10.0: `StackOverflowError` ở
+   `TypeOps.isSubClassOfNoInterface` (type-inference engine crash khi resolve type trên bytecode
+   JDK 25/class file version 69 — PMD 7.10.0 phát hành trước khi PMD có hỗ trợ Java 25 thật, tức
+   PMD 7.16.0 trở đi). Bump `pmd = "7.26.0"` (`gradle/libs.versions.toml` + toolVersion trong
+   `kage.quality-conventions.gradle.kts`) — verify bằng build thật, không suy luận: PMD chạy xong
+   không crash, và bắt được 1 loạt vi phạm thật (chưa từng chạy được để bắt trước đây) — đã sửa hết,
+   xem BUILD.md "Bước 3" để biết chi tiết từng vi phạm.

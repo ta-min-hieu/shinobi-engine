@@ -32,7 +32,7 @@ archunit = "1.4.2"                # ✅ latest 04/2026 — ADR-011
 
 # --- Static analysis (tool versions) ---
 checkstyle = "10.21.0"            # ⚠️ verify — tool version, dùng trong quality convention
-pmd = "7.10.0"                    # ⚠️ verify — tool version
+pmd = "7.26.0"                    # ✅ verify 08/2026 — bump từ 7.10.0, fix StackOverflowError type-inference trên JDK 25 (xem STATIC-ANALYSIS.md)
 errorprone = "2.50.0"             # ✅ latest verify 07/2026 (BUILD.md Bước 3 — javadoc.io "latest" redirect)
 findsecbugs = "1.14.0"            # ✅ latest verify 07/2026 — SpotBugs plugin bắt SQL injection (STATIC-ANALYSIS.md §7, ADR-004)
 
