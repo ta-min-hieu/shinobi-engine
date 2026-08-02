@@ -241,7 +241,7 @@ Với map lớn nhiều entity: cân nhắc **spatial partition** (grid đơn gi
 | 6 | **Không lighting động ở MVP** | Điều 9, 10 — chưa gameplay nào cần | Accepted |
 | 7 | Particle **bắt buộc pool** + giới hạn số lượng | Mobile | Accepted |
 | 8 | Không spatial partition ở MVP cho tới khi đo thấy cần | Điều 30 | Accepted |
-| 9 | **`FitViewport`** — ảnh hưởng công bằng PvP | Là quyết định gameplay | ⏳ Proposed ([ADR-020](../01-architecture/adr/ADR-020-Viewport-Strategy.md)) |
+| 9 | **`FitViewport`** — ảnh hưởng công bằng PvP | Là quyết định gameplay | ✅ [ADR-020](../01-architecture/adr/ADR-020-Viewport-Strategy.md) Accepted (2026-08-01) |
 
 ## ADR cần tạo
 

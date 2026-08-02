@@ -144,7 +144,7 @@ GC lo hết. Cạm bẫy Box2D cũ (destroy body, sửa world giữa step, tunne
 | # | Quyết định | Lý do | Trạng thái |
 |---|---|---|---|
 | 1 | Va chạm địa hình **KHÔNG** dùng để tính damage/combat | Không xác định, không khớp tick, không kiểm soát được | Accepted — quan trọng nhất |
-| 2 | **Không dùng Box2D** — `Aabb` + `TerrainCollisionSystem` tự viết | [ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md) | ⏳ Proposed |
+| 2 | **Không dùng Box2D** — `Aabb` + `TerrainCollisionSystem` tự viết | [ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md) | ✅ Accepted (2026-08-01) |
 | 3 | `TerrainCollisionSystem` chạy đúng nhịp game tick 60Hz, không có "physics step" riêng | Đơn giản, xác định, tái hiện được | Accepted |
 | 4 | World unit = mét, dùng chung với rendering | Nhất quán tính khoảng cách | Accepted |
 | 5 | **Player ↔ Player và Player ↔ Monster KHÔNG va chạm vật lý** | Tránh kẹt/chặn đường; hợp thể loại | Accepted — quyết định gameplay |

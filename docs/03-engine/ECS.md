@@ -279,7 +279,7 @@ Vượt ngưỡng → kích hoạt Revisit Trigger của ADR-006.
 
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
-| **ADR-011** | Enforce `engine-ecs` boundary (§10) — **quan trọng nhất cho tài liệu này** | 🔴 Chặn Phase 0 |
+| ✅ **ADR-011** | Enforce `engine-ecs` boundary (§10) — **quan trọng nhất cho tài liệu này** | Accepted (2026-08-01) |
 | ✅ **ADR-018** | Tick rate 60Hz — §9 ngân sách = 16.6ms | Accepted |
 | **ADR-006** | Đánh giá lại Ashley cuối Phase 9 | ⏳ Đã có, chờ Phase 9 |
 

@@ -213,7 +213,7 @@ Theo Điều 27, hành vi AI **không hardcode**:
 | 7 | AI thiết kế để **cho phép time-slicing** ngay từ đầu | Không giả định chạy mỗi tick | Accepted |
 | 8 | Tham số AI là **config**, không phải code | Điều 27 | Accepted |
 | 9 | Boss AI dùng **Script** (GraalJS) | Điều 27; số boss ít nên chi phí script không đáng | Accepted — [ADR-016](../01-architecture/adr/ADR-016-Scripting-Engine.md) |
-| 10 | **Không dùng gdx-ai cho FSM** | Bảo trì chậm; FSM tự viết < 100 dòng | ⏳ Cần ADR-022 |
+| 10 | **Không dùng gdx-ai cho FSM** | Bảo trì chậm; FSM tự viết < 100 dòng | ✅ [ADR-022](../01-architecture/adr/ADR-022-Custom-FSM-No-Gdx-Ai.md) Accepted (2026-08-01) |
 
 ## ADR cần tạo
 

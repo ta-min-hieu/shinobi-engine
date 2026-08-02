@@ -93,7 +93,7 @@ Chi tiết: [JVM.md](JVM.md).
 
 **GC pause là kẻ thù số 1 của game loop.** Pause 100ms = 3 tick bị bỏ = người chơi thấy giật.
 
-⏳ Chọn GC: **ADR-019**, chờ số liệu Phase 9.
+✅ Chọn GC: **ADR-019** — ZGC, Accepted (2026-07-28, số liệu thật từ soak test Phase 9).
 
 ---
 
