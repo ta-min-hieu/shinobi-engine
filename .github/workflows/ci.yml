@@ -59,6 +59,43 @@ jobs:
           name: reports
           path: '**/build/reports/'
 
+  # Secret scan (OWASP.md §2) — hàng rào chặn THẬT, không phụ thuộc máy dev nào có cài gitleaks hay
+  # không (local pre-commit hook .githooks/pre-commit chỉ là fast pre-check, tự bỏ qua nếu máy chưa
+  # cài gitleaks). Quét TOÀN BỘ git history mỗi lần chạy (không chỉ diff) — đơn giản hơn quét
+  # riêng PR diff và bắt được cả trường hợp secret lọt vào một commit cũ rồi bị "xoá" ở commit sau
+  # (secret vẫn còn trong history, `git diff` của PR sẽ không thấy).
+  #
+  # KHÔNG dùng gitleaks/gitleaks-action: action đó license theo gitleaks.io EULA (cần license key
+  # trả phí nếu repo thuộc GitHub Organization — repo này là personal account nên hiện tại không
+  # cần, nhưng phụ thuộc license bên thứ 3 cho việc chỉ là tải+chạy 1 binary là không cần thiết).
+  # Tải thẳng gitleaks CLI từ GitHub Releases + verify checksum — cùng version với hook local
+  # (.githooks/pre-commit) dùng, 1 nguồn sự thật duy nhất cho version (env GITLEAKS_VERSION dưới).
+  # Version xác nhận THẬT qua GitHub API (releases/latest) ngày 2026-08-02, không copy từ trí nhớ.
+  secret-scan:
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: 8.30.1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # cần full history — gitleaks quét toàn bộ commit, không chỉ commit mới nhất
+
+      - name: Cài gitleaks ${{ env.GITLEAKS_VERSION }} (tải + verify checksum từ GitHub Releases)
+        run: |
+          curl -sSL -o gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSL -o checksums.txt "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          EXPECTED=$(grep "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" checksums.txt | awk '{print $1}')
+          ACTUAL=$(sha256sum gitleaks.tar.gz | awk '{print $1}')
+          if [ -z "$EXPECTED" ] || [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "Checksum mismatch cho gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz — dừng, không chạy binary chưa verify được." >&2
+            exit 1
+          fi
+          tar -xzf gitleaks.tar.gz gitleaks
+          chmod +x gitleaks
+
+      - name: gitleaks — quét secret toàn bộ git history
+        run: ./gitleaks git --redact -v
+
   # Integration test (Testcontainers) tách job song song — không chặn feedback nhanh (CI-CD §3).
   # Bật khi có integration test đầu tiên (Phase 3).
   # integration-test:

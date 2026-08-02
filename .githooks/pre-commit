@@ -1,0 +1,34 @@
+#!/usr/bin/env sh
+# Pre-commit hook: scan STAGED content for secrets before allowing a commit (gitleaks).
+#
+# One-time setup per machine (see .githooks/README.md):
+#   git config core.hooksPath .githooks
+#
+# This is a fast local pre-check for developers, NOT the real enforcement backstop:
+#   - If gitleaks is not installed locally, this hook WARNS and lets the commit through.
+#   - The real backstop is the `secret-scan` CI job (.github/workflows/ci.yml), which always
+#     runs regardless of whether any given developer machine has gitleaks installed.
+#
+# See docs/08-security/OWASP.md section 2.
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+    echo "[pre-commit] WARNING: 'gitleaks' not found in PATH - skipping local secret scan." >&2
+    echo "[pre-commit] Install gitleaks to get pre-commit scanning: https://github.com/gitleaks/gitleaks/releases" >&2
+    echo "[pre-commit] (Not fatal - the 'secret-scan' CI job will still scan for real.)" >&2
+    exit 0
+fi
+
+gitleaks git --staged --redact -v
+status=$?
+
+if [ "$status" -ne 0 ]; then
+    echo "" >&2
+    echo "[pre-commit] gitleaks found a likely secret in staged changes - COMMIT BLOCKED." >&2
+    echo "[pre-commit] - False positive? Add a rule/allowlist to .gitleaks.toml at repo root, or use a 'gitleaks:allow' comment." >&2
+    echo "[pre-commit] - Real secret? Remove it from staged changes now. If it was ever committed before," >&2
+    echo "[pre-commit]   removing it from git history is NOT enough - you must ROTATE that secret" >&2
+    echo "[pre-commit]   (see docs/08-security/SECURITY.md)." >&2
+    exit 1
+fi
+
+exit 0

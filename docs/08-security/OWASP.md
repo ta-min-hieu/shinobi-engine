@@ -55,7 +55,7 @@ Quy tắc gate:
 | Công cụ | Khi nào |
 |---|---|
 | **GitHub Secret Scanning** | ⚠️ **Chỉ miễn phí cho repo PUBLIC** — repo private cần GitHub Advanced Security (trả phí, cấp Organization). **PHÁT HIỆN THẬT (2026-07-31)**: repo dự án là private, mục Secret Scanning không hề xuất hiện trong Settings → Security (không phải "chưa bật", là "không có tuỳ chọn"). Đã bật thay thế 2 mục miễn phí cùng trang: **Dependency graph** + **Dependabot alerts** (khác `dependabot.yml` — đó chỉ tạo PR version-bump, không cảnh báo CVE) |
-| **gitleaks** | Pre-commit hook + CI — **CHƯA làm** (không có `.pre-commit-config.yaml`/git hook nào trong repo tính tới 2026-07-31, dù dự án đã qua nhiều trăm file/commit) |
+| **gitleaks** | Pre-commit hook + CI — ✅ **implemented 2026-08-02**. Pre-commit hook: [`.githooks/pre-commit`](../../.githooks/pre-commit) (cài 1 lần/máy: `git config core.hooksPath .githooks`, xem [`.githooks/README.md`](../../.githooks/README.md)) — quét `gitleaks git --staged`, chặn commit nếu thấy secret; nếu máy chưa cài `gitleaks` thì chỉ cảnh báo, không chặn (fast pre-check, không phải hàng rào chặn thật). CI: job `secret-scan` trong [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) — tải gitleaks v8.30.1 (verify SHA-256 checksum từ GitHub Releases thật, không dùng `gitleaks-action` để tránh phụ thuộc license bên thứ 3), quét **toàn bộ git history** mỗi lần chạy — đây mới là hàng rào chặn thật, không phụ thuộc máy dev nào có cài `gitleaks` hay không. Verify thật: đã stage 1 fake secret dạng AWS key, xác nhận hook + CLI chặn commit (exit 1), rồi xoá. |
 | **git-secrets** | Thay thế |
 
 **Bắt buộc**: pre-commit hook — chặn secret **trước khi** vào git, vì:
@@ -191,7 +191,7 @@ Không có — đây là công cụ, không phải quyết định kiến trúc.
 
 ## Việc cần làm tiếp theo
 
-1. 🔴 **Bật secret scanning + pre-commit hook TRƯỚC khi có commit đầu tiên** (§2). Đây là việc rẻ nhất và giá trị cao nhất trong toàn bộ tài liệu này.
-2. ~~Phase 0: Dependabot + `find-sec-bugs`~~ — ✅ **done, verify 2026-08-02** — Dependabot alerts bật (§2, thay thế Secret Scanning không có trên private tier); `find-sec-bugs` wired bắt buộc vào SpotBugs qua `kage.quality-conventions.gradle.kts` (`spotbugsPlugins` dependency, không điều kiện tắt) — build+test thật đã xanh với static analysis này (BUILD.md "Bước 3", 2026-07-30). Việc pre-commit hook/gitleaks ở mục 1 **vẫn còn thiếu**, không nhầm với mục này.
+1. ~~🔴 Bật secret scanning + pre-commit hook TRƯỚC khi có commit đầu tiên~~ (§2) — ✅ **implemented 2026-08-02**. Trung thực: KHÔNG còn kịp "trước commit đầu tiên" (repo đã qua nhiều trăm commit) — nhưng bật muộn vẫn tốt hơn không bật. Pre-commit hook `.githooks/pre-commit` + CI job `secret-scan` (`.github/workflows/ci.yml`), xem §2.
+2. ~~Phase 0: Dependabot + `find-sec-bugs`~~ — ✅ **done, verify 2026-08-02** — Dependabot alerts bật (§2, thay thế Secret Scanning không có trên private tier); `find-sec-bugs` wired bắt buộc vào SpotBugs qua `kage.quality-conventions.gradle.kts` (`spotbugsPlugins` dependency, không điều kiện tắt) — build+test thật đã xanh với static analysis này (BUILD.md "Bước 3", 2026-07-30).
 3. ~~Phase 3: viết bộ test §4 (authz, replay)~~ — ✅ **implemented 2026-08-02**, cùng fuzzing + rate-limit, xem §4.
 4. ~~Bộ test thoát script sandbox (§4 TOC mục 4)~~ — ✅ **implemented 2026-08-02**, xem §4. Toàn bộ §4 nay chỉ còn mục 5 (DAST admin API) không áp dụng.
