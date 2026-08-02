@@ -91,7 +91,7 @@ Static Application Security Testing — quét source tìm lỗ hổng.
 
 ---
 
-## 4. DAST ⏳ (Phase 4+, mục 1-3 ✅ implemented 2026-08-02)
+## 4. DAST — thay bằng test tự viết, mục 1-4 ✅ implemented 2026-08-02 (chỉ mục 5 không áp dụng)
 
 Dynamic Application Security Testing — quét app **đang chạy**.
 
@@ -122,7 +122,7 @@ Dynamic Application Security Testing — quét app **đang chạy**.
 1. ✅ **implemented 2026-08-02** — Fuzzing harness cho packet. `SecurityIntegrationTest#shouldNotCrashOrHang_whenReceivingMalformedOrRandomFrames` (`server/server-gateway/src/test/.../SecurityIntegrationTest.java`) — 36 lần lặp, 6 biến thể xoay vòng (payload protobuf rác, opcode giả mạo, frame ngắn hơn header, frame rỗng, khai length > `MAX_FRAME_LENGTH`, frame cắt cụt giữa chừng), rồi sanity-check server còn sống bằng 1 kết nối Ping/Pong sạch. Không dùng thư viện fuzzing riêng (CLAUDE.md §4 — không thêm dependency).
 2. ✅ **implemented 2026-08-02** — Bộ test authorization. `SecurityIntegrationTest` 4 test đầu (nhóm "AUTHORIZATION / IDOR"). **Phát hiện quan trọng**: `characterId` KHÔNG BAO GIỜ nằm trong bất kỳ Command nào khác ngoài `SelectCharacterRequest` (mọi Command gameplay khác dùng `boundCharacterId` từ session — đúng thiết kế SECURITY.md §4) — IDOR kiểu "client A gửi Command mang `characterId` của B" **không tồn tại được** cho các Command đó. `SelectCharacterRequest` LÀ packet duy nhất client tự khai `characterId`, nên đó chính là bề mặt IDOR thật: test `shouldRejectSelectCharacter_whenCharacterBelongsToAnotherAccount` verify server chặn đúng (404 `error.character_not_found`, fail-secure — cùng lỗi dù id không tồn tại hay thuộc account khác) + session KHÔNG bị bind. Cũng verify ranh giới "channel chưa đăng nhập / đã đăng nhập nhưng chưa chọn nhân vật" không gửi được Command gameplay nào (401 `error.not_authenticated`).
 3. ✅ **implemented 2026-08-02** — Bộ test replay/rate-limit. Cùng file, 2 nhóm "REPLAY" và "RATE LIMIT": `idempotencyKey` (ADR-025) verify THẬT qua `BuyItemCommand` (gold trừ đúng 1 lần/item cấp đúng 1 lần dù gửi lại) và `CreateCharacterCommand`; rate limit verify THẬT qua flood socket thật cho `MoveCommand` (30/giây) và chat WORLD (5/10s), xác nhận `kage.ratelimit.rejected` tăng thật + kết nối bị ngắt sau 3 window liên tiếp vượt ngưỡng. **Phát hiện quan trọng**: [SECURITY.md §6](SECURITY.md) liệt "`sequenceId` tăng dần — server từ chối sequenceId ≤ cái đã thấy" như 1 cơ chế chống replay, nhưng code hiện tại KHÔNG hề implement việc này — `sequenceId` chỉ dùng để khớp request/response ([NETWORK.md §5](../05-server/NETWORK.md)), không có state nào lưu "sequenceId cuối đã thấy" cho bất kỳ Command nào. Test `moveCommand_sequenceIdIsNotEnforcedAsReplayGuard_documentedGap` xác nhận trung thực khoảng trống này (gửi sequenceId thấp hơn vẫn được xử lý bình thường) thay vì giả vờ nó đã được chặn. Không phải lỗ hổng khai thác được thật (Command không mang side-effect tài chính dùng cơ chế này) — Command CÓ side-effect được `idempotencyKey` bảo vệ riêng, đã verify OK ở trên. SECURITY.md §6 cần sửa lại mô tả cho khớp thực tế (ngoài scope thay đổi của lần này — chỉ ghi nhận, không tự sửa tài liệu thiết kế).
-4. ⏳ Bộ test thoát script sandbox — CHƯA làm ở đợt này (ngoài scope yêu cầu 2026-08-02, cần harness riêng cho GraalJS/ADR-016).
+4. ✅ **implemented 2026-08-02** — Bộ test thoát script sandbox. `ScriptSandboxSecurityTest` (`engine/engine-scripting/src/test/.../ScriptSandboxSecurityTest.java`, làm song song cùng ngày, luồng riêng) — 15 test verify sandbox `CONSTRAINED`-equivalent (ADR-016) chặn đúng host access/file I/O/thread/process/env access/runaway script/cross-script leak/Polyglot global. Không phát hiện gap thật — mọi vector đều bị chặn đúng như javadoc `ScriptSandbox` claim.
 5. ⏳ DAST cho admin API — chưa có admin API nào tồn tại trong dự án, không áp dụng.
 
 ---
@@ -194,4 +194,4 @@ Không có — đây là công cụ, không phải quyết định kiến trúc.
 1. 🔴 **Bật secret scanning + pre-commit hook TRƯỚC khi có commit đầu tiên** (§2). Đây là việc rẻ nhất và giá trị cao nhất trong toàn bộ tài liệu này.
 2. Phase 0: Dependabot + `find-sec-bugs`.
 3. ~~Phase 3: viết bộ test §4 (authz, replay)~~ — ✅ **implemented 2026-08-02**, cùng fuzzing + rate-limit, xem §4.
-4. ⏳ Bộ test thoát script sandbox (§4 TOC mục 4) — còn lại duy nhất trong danh sách §4, cần harness riêng cho GraalJS (ADR-016).
+4. ~~Bộ test thoát script sandbox (§4 TOC mục 4)~~ — ✅ **implemented 2026-08-02**, xem §4. Toàn bộ §4 nay chỉ còn mục 5 (DAST admin API) không áp dụng.
