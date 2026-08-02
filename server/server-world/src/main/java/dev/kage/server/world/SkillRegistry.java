@@ -16,8 +16,9 @@ final class SkillRegistry {
     private static final int CONSUME_ALL_CHI = SkillDefinition.CONSUME_ALL_CHI;
 
     private static final List<SkillDefinition> ALL = List.of(
-            // Hỏa — 1 skill active duy nhất từ Phase 4 (hoàn thiện nốt 2 active/2 passive/Tuyệt Kỹ
-            // là việc của lát cắt sau, xem ROADMAP.md Phase 8).
+            // Hỏa — "sát thương liên tục, bùng nổ" (GDD §5 dòng 60), hoàn thiện nốt lát cắt sau Phase
+            // 8 (xem ROADMAP.md Phase 8 lát cắt 3) — không CC/khiên/hồi phục như 4 hệ kia, dồn toàn
+            // bộ 4 active vào damage thuần, khác biệt bằng cooldown/hệ số thay vì cơ chế.
             new SkillDefinition(
                     SkillConstants.FIREBALL_SKILL_CODE,
                     Element.HOA,
@@ -28,6 +29,36 @@ final class SkillRegistry {
                     SkillConstants.FIREBALL_CHI_COST,
                     SkillConstants.FIREBALL_RANGE_METERS,
                     1),
+            new SkillDefinition(
+                    "hoa_tia_lua",
+                    Element.HOA,
+                    1,
+                    SkillTargetKind.ENEMY,
+                    "/scripts/skill/hoa_tia_lua.js",
+                    2f,
+                    8,
+                    5f,
+                    1),
+            new SkillDefinition(
+                    "hoa_bung_no",
+                    Element.HOA,
+                    2,
+                    SkillTargetKind.ENEMY,
+                    "/scripts/skill/hoa_bung_no.js",
+                    7f,
+                    16,
+                    5f,
+                    1),
+            new SkillDefinition(
+                    "hoa_diem_nguc",
+                    Element.HOA,
+                    SkillDefinition.ULTIMATE_SLOT,
+                    SkillTargetKind.ENEMY,
+                    "/scripts/skill/hoa_diem_nguc.js",
+                    90f,
+                    CONSUME_ALL_CHI,
+                    6f,
+                    ULTIMATE_LEVEL),
 
             // Thủy — khống chế + hồi phục (GDD §4). Toàn bộ cooldown/chi/tầm là PLACEHOLDER, chưa
             // cân bằng qua playtest (cùng tinh thần CombatConstants/SkillConstants).

@@ -533,6 +533,65 @@ class WorldFacadeTest {
     }
 
     @Test
+    @Timeout(15) // vài lần thử cast — cooldown 2s (hoa_tia_lua) ngắn hơn fireball (3s).
+    void shouldDealSkillDamage_whenHoaTiaLuaCast() {
+        // Hỏa active 2 (hoa_tia_lua.js) — "sát thương liên tục" (GDD §5 dòng 60): cooldown thấp
+        // nhất trong mọi skill hiện có, verify vẫn deal damage thật qua script GraalJS như fireball.
+        world.start();
+        world.attachCharacter(1L, 5f, 6f, DEFAULT_STATS);
+        awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
+        long monsterId = sink.monsterSpawned.get(0).monsterId();
+
+        castUntilHit(monsterId, "hoa_tia_lua", 2f);
+
+        SkillResult hit = sink.skillResults.stream()
+                .filter(r -> r.defender() == monsterId && !r.miss() && "hoa_tia_lua".equals(r.skillCode()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Không lần cast hoa_tia_lua nào trúng sau nhiều lần thử"));
+        assertThat(hit.attacker()).isEqualTo(1L);
+        assertThat(hit.damage()).isGreaterThan(0);
+    }
+
+    @Test
+    @Timeout(15)
+    void shouldDealSkillDamage_whenHoaBungNoCast() {
+        // Hỏa active 3 (hoa_bung_no.js) — "sát thương bùng nổ" (GDD §5 dòng 60): đòn nặng hơn, có
+        // armor_pierce nhẹ (0.15) — verify vẫn deal damage thật qua CombatConstants.resolveSkillAttack
+        // overload 4 tham số (armor_pierce), không chỉ overload thường (giống loi_tia_set.js).
+        world.start();
+        world.attachCharacter(1L, 5f, 6f, DEFAULT_STATS);
+        awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
+        long monsterId = sink.monsterSpawned.get(0).monsterId();
+
+        castUntilHit(monsterId, "hoa_bung_no", 7f);
+
+        SkillResult hit = sink.skillResults.stream()
+                .filter(r -> r.defender() == monsterId && !r.miss() && "hoa_bung_no".equals(r.skillCode()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Không lần cast hoa_bung_no nào trúng sau nhiều lần thử"));
+        assertThat(hit.attacker()).isEqualTo(1L);
+        assertThat(hit.damage()).isGreaterThan(0);
+    }
+
+    @Test
+    @Timeout(15)
+    void shouldSilentlyRejectHoaUltimate_whenBelowRequiredLevel() {
+        // GDD §5 "Tuyệt Kỹ Lv50" — hoa_diem_nguc (Hỏa) phải bị chặn ÂM THẦM giống thuy_thuy_trieu
+        // (shouldSilentlyRejectUltimate_whenBelowRequiredLevel), xác nhận Tuyệt Kỹ mới của Hỏa cũng
+        // đi qua đúng gate CharacterLevelComponent, không phải case đặc biệt bị bỏ sót lúc đăng ký.
+        world.start();
+        world.attachCharacter(1L, 5f, 6f, DEFAULT_STATS); // level=1 < ULTIMATE_REQUIRED_LEVEL (50)
+        awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
+        long monsterId = sink.monsterSpawned.get(0).monsterId();
+
+        world.useSkill(1L, "hoa_diem_nguc", monsterId);
+        sleepQuietly(500);
+
+        assertThat(sink.skillResults.stream().anyMatch(r -> "hoa_diem_nguc".equals(r.skillCode())))
+                .isFalse();
+    }
+
+    @Test
     void shouldRespectSkillCooldown_whenSpammingUseSkillCommand() {
         // Chống cooldown hack giống SetTargetCommand: gửi dồn dập UseSkillCommand KHÔNG được cast
         // nhiều hơn 1 lần trong lúc còn cooldown (SkillConstants.FIREBALL_COOLDOWN_SECONDS = 3s).
@@ -848,10 +907,17 @@ class WorldFacadeTest {
 
     /** Cast fireball tối đa vài lần, mỗi lần chờ hết cooldown, tới khi trúng 1 lần hoặc hết lượt thử. */
     private void castUntilHit(long monsterId) {
+        castUntilHit(monsterId, "fireball", SkillConstants.FIREBALL_COOLDOWN_SECONDS);
+    }
+
+    /** Cast 1 skill bất kỳ tối đa vài lần, mỗi lần chờ hết cooldown, tới khi trúng 1 lần hoặc hết lượt thử. */
+    private void castUntilHit(long monsterId, String skillCode, float cooldownSeconds) {
+        long waitMillis = (long) (cooldownSeconds * 1000) + 200; // đệm jitter tick loop thật
         for (int attempt = 0; attempt < 3; attempt++) {
-            world.useSkill(1L, "fireball", monsterId);
-            sleepQuietly(3200); // > FIREBALL_COOLDOWN_SECONDS (3s) — đợi cooldown xong trước lần thử tiếp
-            if (sink.skillResults.stream().anyMatch(r -> r.defender() == monsterId && !r.miss())) {
+            world.useSkill(1L, skillCode, monsterId);
+            sleepQuietly(waitMillis); // > cooldown skill — đợi xong trước lần thử tiếp
+            if (sink.skillResults.stream()
+                    .anyMatch(r -> r.defender() == monsterId && !r.miss() && skillCode.equals(r.skillCode()))) {
                 return;
             }
         }

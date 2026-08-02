@@ -80,10 +80,9 @@ final class CombatConstants {
 
     private CombatConstants() {}
 
-    /** Bonus passive TĨNH theo hệ phái (GDD §5 "2 passive/hệ", Phase 8 4-hệ-mới) — cộng THẲNG vào
-     * chỉ số derive, KHÔNG dùng script (Điều 27 chỉ bắt buộc script cho NỘI DUNG skill, passive chỉ
-     * là số cố định giống các hằng số khác trong lớp này). Hỏa/NONE = 0 (Hỏa chưa có passive nào ở
-     * lát cắt trước, hoàn thiện nốt là việc sau — xem ROADMAP.md Phase 8). */
+    /** Bonus passive TĨNH theo hệ phái (GDD §5 "2 passive/hệ") — cộng THẲNG vào chỉ số derive,
+     * KHÔNG dùng script (Điều 27 chỉ bắt buộc script cho NỘI DUNG skill, passive chỉ là số cố định
+     * giống các hằng số khác trong lớp này). NONE = 0 (quái/boss chưa gán hệ phái). */
     private record PassiveBonus(
             int atk,
             int skillDmg,
@@ -97,7 +96,10 @@ final class CombatConstants {
     }
 
     private static final Map<Element, PassiveBonus> FACTION_PASSIVES = Map.of(
-            Element.HOA, PassiveBonus.NONE_BONUS,
+            // Hỏa: "sát thương liên tục, bùng nổ" (GDD §5 dòng 60) — nuker thuần, không CC/khiên/hồi
+            // phục nên dồn cả 2 passive vào tấn công: SKILL_DMG cao hơn + tỉ lệ bạo kích cao hơn (dễ
+            // nổ crit hơn = "bùng nổ").
+            Element.HOA, new PassiveBonus(0, 6, 0, 0, 0f, 0f, 0.05f, 0f),
             Element.NONE, PassiveBonus.NONE_BONUS,
             // Thủy: "khống chế, hồi phục" — né tốt hơn (linh hoạt) + kháng phép tốt hơn (dai sức).
             Element.THUY, new PassiveBonus(0, 0, 0, 5, 0f, 0.05f, 0f, 0f),

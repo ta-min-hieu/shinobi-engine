@@ -379,8 +379,10 @@ Chi tiết kỹ thuật (6 phần, làm tuần tự vì phần sau phụ thuộc
    `SelectFactionRequest/Response` (opcode 206/207, characterId từ session như `UseSkillCommand`,
    KHÔNG có field character_id trong packet).
 
-**Scope cut có chủ đích** (ghi lại để không lẫn với "quên làm"): (a) Hỏa vẫn chỉ có 1 skill active —
-hoàn thiện nốt 2 active/2 passive/Tuyệt Kỹ là việc lát cắt sau; (b) "Đá Chuyển Hệ" sau lần đổi hệ
+**Scope cut có chủ đích** (ghi lại để không lẫn với "quên làm"): (a) ~~Hỏa vẫn chỉ có 1 skill
+active~~ **ĐÃ XONG 2026-08-02**: thêm `hoa_tia_lua`/`hoa_bung_no` (active 2-3) + `hoa_diem_nguc`
+(Tuyệt Kỹ) + 2 passive (`skillDmg`+6, `critPercent`+0.05) — Hỏa giờ đủ 3 active + 1 Tuyệt Kỹ + 2
+passive như 4 hệ kia (`SkillRegistry`/`CombatConstants`); (b) "Đá Chuyển Hệ" sau lần đổi hệ
 miễn phí đầu tiên (GDD §4) CHƯA enforce — `SelectFactionUseCase` chỉ gate `level>=10`, chưa đếm số
 lần đổi/tốn item (cần thêm cột DB + item ở feature-inventory, để dành lát cắt sau).
 
