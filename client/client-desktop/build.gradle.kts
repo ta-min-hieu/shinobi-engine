@@ -9,6 +9,9 @@ dependencies {
     // Native binary bắt buộc cho LWJGL3 chạy — TOML không hỗ trợ classifier trực tiếp nên áp
     // dụng bằng variantOf (gradle/libs.versions.toml giải thích lý do).
     implementation(variantOf(libs.gdx.platform) { classifier("natives-desktop") })
+    // Native FreeType — client-core khai báo gdx-freetype (API thuần Java), launcher thật quyết
+    // định native platform nào cần (cùng lý do gdx-platform natives-desktop ở trên).
+    implementation(variantOf(libs.gdx.freetype.platform) { classifier("natives-desktop") })
 }
 application {
     mainClass.set("dev.kage.client.desktop.DesktopLauncher")

@@ -121,7 +121,25 @@ Bước 1–2 (art thô → sprite sheet) được sản xuất bằng Blender p
 
 ⚠️ **Tiếng Việt**: font `.ttf` **phải chứa đủ glyph tiếng Việt có dấu** (ế, ộ, ữ...). Nhiều font miễn phí thiếu. **Test ở Phase 1**, không để tới cuối.
 
-⚠️ **Chưa chốt**: license font. Font dùng trong game thương mại cần license thương mại. Phải kiểm tra trước khi chốt font.
+✅ **Font đã chọn (đề xuất phiên làm việc 2026-08-02, chủ dự án có thể đổi)**: **Be Vietnam Pro**,
+weight Regular, bundle tại `assets/raw/fonts/BeVietnamPro-Regular.ttf` (kèm `OFL.txt` cạnh đó).
+
+| Tiêu chí | Kết quả kiểm chứng |
+|---|---|
+| Coverage tiếng Việt | Thiết kế **riêng cho tiếng Việt** bởi Lâm Bảo, Tony Le, ViệtAnh Nguyễn; `METADATA.pb` chính thức của Google Fonts (`google/fonts` repo, `ofl/bevietnampro/METADATA.pb`) khai subset `latin`, `latin-ext`, **`vietnamese`**, `menu`. Kiểm chứng lại bằng test tự động (§ dưới) — không chỉ tin metadata: `FreeTypeFontGenerator.hasGlyph()` tra cmap thật của chính file `.ttf` đã tải, PASS cho toàn bộ ký tự trong `FontFactory.VIETNAMESE_CHARACTERS` (6 thanh điệu × nguyên âm/phụ âm riêng tiếng Việt). |
+| License | **SIL Open Font License (OFL) 1.1** — lấy nguyên văn từ nguồn gốc `raw.githubusercontent.com/google/fonts/main/ofl/bevietnampro/OFL.txt` (không qua bên thứ ba tóm tắt). Cho phép dùng/sửa/nhúng/phân phối lại kể cả trong sản phẩm thương mại; chỉ cấm bán riêng lẻ chính font đó và bắt buộc bản phái sinh giữ nguyên license. → dùng được cho game thương mại, không cần license trả phí riêng. |
+
+**Rủi ro pháp lý (§Technical Decisions #11 cũ) coi như đã đóng** với lựa chọn này — vẫn là đề xuất
+của phiên làm việc này (Điều 1: AI đề xuất, con người quyết định), không phải khoá cứng kiến trúc;
+đổi font khác (VD Noto Sans, Inter — cũng OFL, cũng đủ coverage Latin Extended Additional) chỉ tốn
+công tải lại file + chạy lại test, không đụng kiến trúc.
+
+**Wiring thật** (không chỉ chọn — đã kích hoạt `gdx-freetype`/`gdx-freetype-platform` vốn nằm sẵn
+trong `libs.versions.toml` nhưng chưa từng dùng tới):
+- `client-core`: `api(libs.gdx.freetype)` — API thuần Java, không kéo native.
+- `client-desktop`: `implementation(variantOf(libs.gdx.freetype.platform) { classifier("natives-desktop") })` — cùng pattern `gdx-platform natives-desktop` đã có.
+- `dev.kage.client.core.render.FontFactory` — bọc `FreeTypeFontGenerator` tối thiểu: `generate(FileHandle, sizePx)` sinh `BitmapFont` thật (cần GL, dùng lúc chạy game); `hasGlyph(FileHandle, codePoint)` tra cmap FreeType KHÔNG cần GL (dùng để test coverage headless). CHƯA tích hợp `AssetManager`/cache — chưa có màn hình UI nào tiêu thụ (ngoài phạm vi việc này).
+- Test: `FontFactoryVietnameseGlyphTest` (`client-core`) — assert `hasGlyph()` cho từng code point của câu mẫu đủ 6 thanh điệu VÀ toàn bộ `FontFactory.VIETNAMESE_CHARACTERS`, dùng thẳng file `.ttf` đã bundle. Không cần GL context nên chạy được trên CI (`ubuntu-latest`, không Xvfb) — khác với việc render thật ra màn hình (chưa test, vì chưa có UI consumer).
 
 ---
 
@@ -239,7 +257,7 @@ Trung thực về rủi ro:
 | 8 | **Đóng gói toàn bộ asset**, không patch/CDN, cho Closed Beta | Điều 9; chính thức hoá ở [ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md) | ⏳ Proposed (ADR-024) |
 | 9 | `tools/asset-pipeline` là lớp đệm để thay editor được | Giảm rủi ro HyperLap2D | Accepted |
 | 10 | CI **fail** nếu vi phạm §4, §5, §6 | Điều 41 — máy kiểm, không dựa vào người nhớ | Accepted |
-| 11 | **License font chưa kiểm tra** | Cần trước khi chốt font | ⏳ **Rủi ro pháp lý** |
+| 11 | Font **Be Vietnam Pro** (OFL 1.1), bundle `assets/raw/fonts/BeVietnamPro-Regular.ttf` | Coverage tiếng Việt + license thương mại đã kiểm chứng tại nguồn (§7) | ✅ Đề xuất phiên 2026-08-02, chờ chủ dự án xác nhận |
 
 ## ADR cần tạo
 
@@ -257,7 +275,8 @@ sách "cần tạo" — chờ chủ dự án Accept, không phải chờ viết.
 
 ## Việc cần làm tiếp theo
 
-1. 🔴 **Kiểm tra license font trước khi chốt** (§7) — rủi ro pháp lý, không phải kỹ thuật.
-2. **Phase 1: test glyph tiếng Việt** trên font đã chọn.
+1. ✅ ~~Kiểm tra license font trước khi chốt~~ (§7) — Be Vietnam Pro (OFL 1.1) đã kiểm chứng tại nguồn 2026-08-02, chờ chủ dự án xác nhận cuối.
+2. ✅ ~~Phase 1: test glyph tiếng Việt~~ — `FontFactoryVietnameseGlyphTest` (client-core), PASS 2026-08-02.
 3. **Phase 1: test atlas 2048 trên thiết bị Android thật** — không tin desktop.
 4. Phase 0: dựng `tools/asset-pipeline` với validate §11 ngay từ đầu.
+5. Chưa có màn hình UI nào tiêu thụ `FontFactory` — khi có (Login/HUD...), quyết định lúc đó có cần cache font theo `ResourceManager` (§8) hay không, đừng xây trước khi có consumer thật.

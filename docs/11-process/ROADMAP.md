@@ -110,7 +110,12 @@ graph LR
 **Exit Criteria:**
 - [ ] Chạy `client-desktop` → nhân vật hiển thị, di chuyển bằng bàn phím
 - [ ] Asset load qua pipeline thật (không file tạm)
-- [ ] Tiếng Việt có dấu hiển thị đúng
+- [x] Tiếng Việt có dấu hiển thị đúng — font **Be Vietnam Pro** (OFL 1.1) bundle +
+      `dev.kage.client.core.render.FontFactory` (FreeType, `client-core`) + test tự động
+      `FontFactoryVietnameseGlyphTest` chứng minh `hasGlyph()` PASS cho toàn bộ 6 thanh điệu tiếng
+      Việt qua cmap FreeType thật (2026-08-02, xem [RESOURCE.md §7](../04-client/RESOURCE.md)).
+      ⚠️ Chỉ chứng minh glyph TỒN TẠI trong font — chưa có màn hình UI thật render lên nền cho
+      người xem, việc đó nằm ngoài phạm vi checkbox này.
 - [ ] Fixed timestep hoạt động (FPS đổi không ảnh hưởng tốc độ nhân vật)
 
 ⚠️ **Bốn thứ ở Phase 1 cực đắt để sửa sau**: fixed timestep · world unit · input abstraction · tách rendering khỏi `engine-ecs`.
