@@ -37,6 +37,26 @@
         <Bug pattern="UNENCRYPTED_SERVER_SOCKET"/>
     </Match>
 
+    <!-- SecurityIntegrationTest (OWASP.md §4 — authz/replay/rate-limit/fuzzing thay DAST) nói ĐÚNG
+         giao thức dây qua socket thật để tấn công server thật, CÙNG lý do GatewayServerIntegrationTest
+         ở trên — server thật (GatewayServer) cũng plaintext khi TLS tắt (TlsConfig.disabled(),
+         dùng riêng cho test), không phải lỗi riêng của test này. -->
+    <Match>
+        <Class name="dev.kage.server.gateway.SecurityIntegrationTest"/>
+        <Bug pattern="UNENCRYPTED_SOCKET"/>
+    </Match>
+
+    <!-- Fuzz test (shouldNotCrashOrHang_whenReceivingMalformedOrRandomFrames) dùng java.util.Random
+         với seed CỐ ĐỊNH CHỦ ĐÍCH — tái lập được khi cần điều tra lại 1 lần fail (xem comment tại
+         chỗ khởi tạo). Đây là test tự tấn công server bằng byte rác, KHÔNG phải giá trị bảo mật
+         thật (không phải token/khoá) — SecureRandom ở đây chỉ làm test không tái lập được, không
+         thêm gì. Cùng tinh thần các exclude PREDICTABLE_RANDOM khác trong file này (AiSystem,
+         LootRoller, SimulatedPlayer — random KHÔNG bảo mật thì predictable là lựa chọn ĐÚNG). -->
+    <Match>
+        <Class name="dev.kage.server.gateway.SecurityIntegrationTest"/>
+        <Bug pattern="PREDICTABLE_RANDOM"/>
+    </Match>
+
     <!-- Random chọn hướng tuần tra quái vật (gameplay, KHÔNG bảo mật) — sinh ở server đúng quy tắc
          (CLAUDE.md "Random ảnh hưởng gameplay: chỉ sinh ở server"), predictable PRNG là lựa chọn
          ĐÚNG cho gameplay (SecureRandom lãng phí, không cần thiết cho hướng đi AI). -->

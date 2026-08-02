@@ -276,7 +276,7 @@ Cơ chế token: session token tự phát hành + Redis, sliding TTL 24h — **A
 | 11 | Validate gateway **không** thay validate nghiệp vụ | Hai việc khác nhau | Accepted |
 | 12 | Idempotency cho Command có side-effect | Chống retry mua 2 lần | ⏳ **Chưa thiết kế — Phase 3** |
 | 13 | Session giữ 30–60s sau mất kết nối (đề xuất) | Cân bằng UX vs PvP | ⏳ Chờ game design |
-| 14 | Rate limit §13 **chưa verify** | Cần đo thật | ⏳ Tạm thời |
+| 14 | Rate limit §13 verify qua socket thật | `SecurityIntegrationTest` (server-gateway) flood `MoveCommand`/chat WORLD thật, xác nhận `kage.ratelimit.rejected` tăng + kết nối bị ngắt sau vi phạm liên tục | ✅ **implemented 2026-08-02** |
 
 ## ADR cần tạo
 
