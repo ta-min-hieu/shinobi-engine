@@ -8,13 +8,19 @@ import java.net.Socket;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.sdk.common.CompletableResultCode;
+import io.opentelemetry.sdk.trace.data.SpanData;
+import io.opentelemetry.sdk.trace.export.SpanExporter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,6 +81,9 @@ import dev.kage.protocol.ChatMessageEvent;
 import dev.kage.protocol.ClaimQuestRewardCommand;
 import dev.kage.protocol.ClaimQuestRewardOutcome;
 import dev.kage.protocol.ClaimQuestRewardResponse;
+import dev.kage.protocol.ConfirmTradeCommand;
+import dev.kage.protocol.ConfirmTradeOutcome;
+import dev.kage.protocol.ConfirmTradeResponse;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
@@ -2000,6 +2009,270 @@ class GatewayServerIntegrationTest {
                         .as("server không được trả pong hợp lệ cho client bỏ qua TLS")
                         .isInstanceOf(Exception.class);
             }
+        }
+    }
+
+    // ============================================================================================
+    // OBSERVABILITY.md §6 — verify span con sâu THẬT SỰ được tạo (không chỉ đọc code) cho 3 lệnh
+    // retrofit ở lát cắt này: BuyItemCommand/SellItemCommand/ConfirmTradeCommand. Dùng
+    // GatewayTracing.forTesting(exporter) thay vì disabled() (mọi test khác ở file này) —
+    // Sampler.alwaysOn() + SimpleSpanProcessor export ĐỒNG BỘ, không cần OTLP/Jaeger thật để verify
+    // wiring. Dây OTLP→Jaeger thật đã verify tay qua `docker compose up` từ lát cắt gốc
+    // (feature.inventory.enhance, Phase 9 lát cắt 10) — không lặp lại ở đây, chỉ verify phần MỚI.
+    // ============================================================================================
+
+    /** Exporter thu thập span vào bộ nhớ — thay OTLP thật, không cần Jaeger để verify wiring. */
+    private static final class RecordingSpanExporter implements SpanExporter {
+        private final List<SpanData> exported = new CopyOnWriteArrayList<>();
+
+        @Override
+        public CompletableResultCode export(Collection<SpanData> spans) {
+            exported.addAll(spans);
+            return CompletableResultCode.ofSuccess();
+        }
+
+        @Override
+        public CompletableResultCode flush() {
+            return CompletableResultCode.ofSuccess();
+        }
+
+        @Override
+        public CompletableResultCode shutdown() {
+            return CompletableResultCode.ofSuccess();
+        }
+
+        List<SpanData> exported() {
+            return exported;
+        }
+    }
+
+    private record TracingTestServer(
+            GatewayServer server,
+            MainWorldChannelRegistry mainWorldChannels,
+            ConnectedCharacterRegistry characterRegistry)
+            implements AutoCloseable {
+        @Override
+        public void close() {
+            server.stop();
+            mainWorldChannels.stopAll();
+            characterRegistry.stop();
+        }
+    }
+
+    /** Bản sao độc lập của {@link #startServer()} — khác {@code observability} (dùng tracing thật). */
+    private TracingTestServer startServerWithTracing(GatewayTracing tracing)
+            throws InterruptedException, javax.net.ssl.SSLException {
+        CharacterFacade characterFacade = fakeCharacterFacade();
+        InventoryFacade inventoryFacade = fakeInventoryFacade();
+        dev.kage.shop.api.ShopFacade shopFacade = fakeShopFacade();
+        dev.kage.dialogue.api.DialogueFacade dialogueFacade = fakeDialogueFacade();
+        dev.kage.quest.api.QuestFacade questFacade = fakeQuestFacade();
+        dev.kage.friend.api.FriendFacade friendFacade = fakeFriendFacade();
+        dev.kage.mail.api.MailFacade mailFacade = fakeMailFacade();
+        dev.kage.chat.api.ChatFacade chatFacade = fakeChatFacade();
+        dev.kage.guild.api.GuildFacade guildFacade = fakeGuildFacade();
+        dev.kage.party.api.PartyFacade localPartyFacade = fakePartyFacade();
+        // Khác fakeTradeFacade() dùng ở nơi khác của file này — lockForExecution trả rỗng SẠCH
+        // (NOT_FOUND) thay vì throw, vì test này THẬT SỰ gọi ConfirmTradeCommand tới hết luồng
+        // (khác các test khác chỉ cần compile, không gọi confirm).
+        dev.kage.trade.api.TradeFacade tradeFacade = fakeTradeFacadeAllowingConfirm();
+        dev.kage.pvp.api.PvpFacade localPvpFacade = fakePvpFacade();
+        io.micrometer.core.instrument.simple.SimpleMeterRegistry meterRegistry =
+                new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        GatewayNetworkMetrics networkMetrics = new GatewayNetworkMetrics(meterRegistry);
+        GatewayObservability observability = new GatewayObservability(networkMetrics, tracing);
+        ConnectedCharacterRegistry localCharacterRegistry =
+                new ConnectedCharacterRegistry(inventoryFacade, questFacade, networkMetrics);
+        WorldFacade firstChannelFacade = new WorldFacade(localCharacterRegistry);
+        firstChannelFacade.start();
+        MainWorldChannelRegistry localMainWorldChannels =
+                new MainWorldChannelRegistry(localCharacterRegistry, firstChannelFacade, meterRegistry);
+        CharacterPositionPersister positionPersister =
+                new CharacterPositionPersister(characterFacade, localCharacterRegistry, Duration.ofMinutes(5));
+        DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
+                localCharacterRegistry, characterFacade, localPartyFacade, localMainWorldChannels);
+        ArenaInstanceRegistry arenaInstanceRegistry = new ArenaInstanceRegistry(
+                localCharacterRegistry, characterFacade, localPvpFacade, localMainWorldChannels);
+        WorldGateway worldGateway = new WorldGateway(
+                localMainWorldChannels,
+                localCharacterRegistry,
+                positionPersister,
+                dungeonInstanceRegistry,
+                arenaInstanceRegistry);
+        SocialFacades socialFacades = new SocialFacades(
+                friendFacade, mailFacade, chatFacade, guildFacade, localPartyFacade, tradeFacade, localPvpFacade);
+        ContentFacades contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
+        GatewayFacades facades =
+                new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
+
+        GatewayServer tracingServer = new GatewayServer(
+                0, facades, new GatewayServer.GatewayContext(worldGateway, observability), TlsConfig.disabled());
+        tracingServer.start();
+        return new TracingTestServer(tracingServer, localMainWorldChannels, localCharacterRegistry);
+    }
+
+    /** Cùng {@code fakeTradeFacade()} nhưng {@code lockForExecution} trả rỗng SẠCH (NOT_FOUND)
+     * thay vì throw — cho phép test gọi {@code ConfirmTradeCommand} hết luồng thật. */
+    private dev.kage.trade.api.TradeFacade fakeTradeFacadeAllowingConfirm() {
+        dev.kage.trade.domain.TradeSessionPort sessionPort = new dev.kage.trade.domain.TradeSessionPort() {
+            @Override
+            public Optional<dev.kage.trade.domain.TradeSession> findActiveSessionOfCharacter(long characterId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public dev.kage.trade.domain.TradeSession createRequest(long requesterCharacterId, long targetCharacterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public boolean acceptRequest(long sessionId, long characterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public boolean deleteSessionIfParticipant(long sessionId, long characterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public boolean replaceOffer(
+                    long sessionId,
+                    long characterId,
+                    long goldAmount,
+                    List<dev.kage.trade.domain.OfferedItemInput> items) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public Optional<dev.kage.trade.domain.TradeSessionSnapshot> findSnapshot(long sessionId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public Optional<dev.kage.trade.domain.TradeSessionSnapshot> lockForExecution(
+                    dev.kage.trade.domain.Transaction tx, long sessionId) {
+                // khác fakeTradeFacade() — cho phép confirm chạy hết luồng, trả NOT_FOUND SẠCH.
+                return Optional.empty();
+            }
+
+            @Override
+            public void setConfirmed(dev.kage.trade.domain.Transaction tx, long sessionId, long characterId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public void deleteSession(dev.kage.trade.domain.Transaction tx, long sessionId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+        };
+        dev.kage.trade.domain.TradeInventoryPort inventoryPort = new dev.kage.trade.domain.TradeInventoryPort() {
+            @Override
+            public Optional<dev.kage.trade.domain.OwnedItemSnapshot> findItemById(long itemId) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public TransferOutcome transferItem(dev.kage.trade.domain.Transaction tx, TransferRequest request) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+        };
+        dev.kage.trade.domain.TradeGoldPort goldPort = new dev.kage.trade.domain.TradeGoldPort() {
+            @Override
+            public boolean deductGold(dev.kage.trade.domain.Transaction tx, long characterId, long amount) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+
+            @Override
+            public void creditGold(dev.kage.trade.domain.Transaction tx, long characterId, long amount) {
+                throw new UnsupportedOperationException("không dùng ở test này");
+            }
+        };
+        dev.kage.trade.domain.TradeAuditPort auditPort = (tx, characterId, action, detailJson) -> {};
+        dev.kage.trade.domain.IdempotencyPort idempotencyPort = (tx, idempotencyKey) -> {};
+        dev.kage.trade.application.TradePorts ports = new dev.kage.trade.application.TradePorts(
+                sessionPort, inventoryPort, goldPort, auditPort, idempotencyPort);
+        dev.kage.trade.application.TradeUseCases useCases = new dev.kage.trade.application.TradeUseCases(
+                new dev.kage.trade.application.RequestTradeUseCase(sessionPort),
+                new dev.kage.trade.application.AcceptTradeRequestUseCase(sessionPort),
+                new dev.kage.trade.application.CancelTradeUseCase(sessionPort),
+                new dev.kage.trade.application.SetTradeOfferUseCase(sessionPort),
+                new dev.kage.trade.application.ConfirmTradeUseCase(ports, action -> action.accept(null)),
+                new dev.kage.trade.application.GetTradeStatusUseCase(sessionPort, inventoryPort));
+        return new dev.kage.trade.api.TradeFacade(useCases);
+    }
+
+    /** Chờ (poll ngắn, KHÔNG {@code Thread.sleep} dài) tới khi {@code exporter} có span tên {@code spanName} —
+     * {@code span.end()} chạy trên Virtual Thread khác thread test, cần chờ thay vì đọc ngay. */
+    private static void awaitSpan(RecordingSpanExporter exporter, String spanName) throws InterruptedException {
+        long deadlineMs = System.currentTimeMillis() + 5000;
+        while (System.currentTimeMillis() < deadlineMs) {
+            if (exporter.exported().stream().anyMatch(s -> s.getName().equals(spanName))) {
+                return;
+            }
+            Thread.sleep(20);
+        }
+        throw new AssertionError("Không thấy span \"" + spanName + "\" sau 5s — xem GatewayTracing/handle*Blocking");
+    }
+
+    @Test
+    @Timeout(15)
+    void clientCommands_shouldEmitDeepChildSpans_forGoldAffectingCommands() throws Exception {
+        RecordingSpanExporter exporter = new RecordingSpanExporter();
+        try (TracingTestServer tracingServer = startServerWithTracing(GatewayTracing.forTesting(exporter))) {
+            try (Socket socket = new Socket("127.0.0.1", tracingServer.server().port())) {
+                socket.setSoTimeout(5000);
+                DataInputStream in = new DataInputStream(socket.getInputStream());
+                connectCreateAndSelect(
+                        socket, in, "tracing" + UUID.randomUUID().toString().substring(0, 6));
+
+                BuyItemCommand buyCommand = BuyItemCommand.newBuilder()
+                        .setItemTemplateId(1L)
+                        .setQuantity(1)
+                        .build();
+                sendFrame(socket, Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, 20, buyCommand.toByteArray());
+                readUntilOpcode(in, Opcode.OPCODE_BUY_ITEM_RESPONSE_VALUE);
+
+                SellItemCommand sellCommand = SellItemCommand.newBuilder()
+                        .setItemId(1L)
+                        .setQuantity(1)
+                        .build();
+                sendFrame(socket, Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, 21, sellCommand.toByteArray());
+                readUntilOpcode(in, Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE);
+
+                ConfirmTradeCommand confirmCommand =
+                        ConfirmTradeCommand.newBuilder().setSessionId(1L).build();
+                sendFrame(socket, Opcode.OPCODE_CONFIRM_TRADE_COMMAND_VALUE, 22, confirmCommand.toByteArray());
+                ConfirmTradeResponse confirmResponse =
+                        ConfirmTradeResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_CONFIRM_TRADE_RESPONSE_VALUE)
+                                .payload());
+                assertThat(confirmResponse.getOutcome()).isEqualTo(ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_NOT_FOUND);
+            }
+
+            awaitSpan(exporter, "feature.shop.buy");
+            awaitSpan(exporter, "feature.shop.sell");
+            awaitSpan(exporter, "feature.trade.confirm");
+
+            assertThat(exporter.exported())
+                    .as("cả 3 span đều phải là CON của span gateway.command (khớp pattern feature.inventory.enhance)")
+                    .filteredOn(s -> s.getName().startsWith("feature."))
+                    .allSatisfy(s -> assertThat(s.getParentSpanId()).isNotEqualTo("0000000000000000"));
+
+            assertThat(exporter.exported())
+                    .filteredOn(s -> s.getName().equals("feature.shop.buy"))
+                    .singleElement()
+                    .satisfies(s -> assertThat(s.getAttributes().get(AttributeKey.stringKey("result")))
+                            .isEqualTo("ITEM_NOT_IN_SHOP"));
+            assertThat(exporter.exported())
+                    .filteredOn(s -> s.getName().equals("feature.shop.sell"))
+                    .singleElement()
+                    .satisfies(s -> assertThat(s.getAttributes().get(AttributeKey.stringKey("result")))
+                            .isEqualTo("ITEM_NOT_FOUND"));
+            assertThat(exporter.exported())
+                    .filteredOn(s -> s.getName().equals("feature.trade.confirm"))
+                    .singleElement()
+                    .satisfies(s -> assertThat(s.getAttributes().get(AttributeKey.stringKey("result")))
+                            .isEqualTo("NOT_FOUND"));
         }
     }
 

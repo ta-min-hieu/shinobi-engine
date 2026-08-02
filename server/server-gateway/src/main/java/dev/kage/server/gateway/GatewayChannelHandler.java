@@ -907,16 +907,35 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleBuyItemBlocking(ctx, sequenceId, characterId, command));
+        // Context.current() PHẢI chụp NGAY ở đây (còn trên EventLoop, bên trong span "gateway.command"
+        // của channelRead0) — cùng lý do EnhanceItemRequest ở handleEnhanceItemCommand.
+        BuyItemRequest request = new BuyItemRequest(sequenceId, characterId, command, Context.current());
+        authExecutor.execute(() -> handleBuyItemBlocking(ctx, request));
     }
 
-    private void handleBuyItemBlocking(
-            ChannelHandlerContext ctx, int sequenceId, long characterId, BuyItemCommand command) {
-        ShopFacade.BuyResult result = shopFacade.buyItem(
-                characterId, command.getItemTemplateId(), command.getQuantity(), command.getIdempotencyKey());
-        BuyItemResponse response =
-                BuyItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
-        send(ctx, Opcode.OPCODE_BUY_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    private record BuyItemRequest(int sequenceId, long characterId, BuyItemCommand command, Context tracingContext) {}
+
+    /**
+     * BuyItemCommand chạm gold thật (cùng lớp rủi ro cường hoá) — retrofit span con sâu
+     * "feature.shop.buy" khớp pattern {@link #handleEnhanceItemBlocking} (OBSERVABILITY.md §6).
+     */
+    @SuppressWarnings({"try", "PMD.UnusedLocalVariable"}) // xem giải thích ở channelRead0
+    private void handleBuyItemBlocking(ChannelHandlerContext ctx, BuyItemRequest request) {
+        Span span = tracing.startChildSpan("feature.shop.buy", request.tracingContext());
+        try (Scope scope = span.makeCurrent()) {
+            ShopFacade.BuyResult result = shopFacade.buyItem(
+                    request.characterId(),
+                    request.command().getItemTemplateId(),
+                    request.command().getQuantity(),
+                    request.command().getIdempotencyKey());
+            span.setAttribute("result", result.name());
+            BuyItemResponse response = BuyItemResponse.newBuilder()
+                    .setOutcome(toProtoOutcome(result))
+                    .build();
+            send(ctx, Opcode.OPCODE_BUY_ITEM_RESPONSE_VALUE, request.sequenceId(), response.toByteArray());
+        } finally {
+            span.end();
+        }
     }
 
     private static final Map<ShopFacade.BuyResult, BuyOutcome> BUY_OUTCOME_MAPPING = Map.of(
@@ -939,16 +958,34 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleSellItemBlocking(ctx, sequenceId, characterId, command));
+        // Context.current() PHẢI chụp NGAY ở đây — cùng lý do handleBuyItemCommand.
+        SellItemRequest request = new SellItemRequest(sequenceId, characterId, command, Context.current());
+        authExecutor.execute(() -> handleSellItemBlocking(ctx, request));
     }
 
-    private void handleSellItemBlocking(
-            ChannelHandlerContext ctx, int sequenceId, long characterId, SellItemCommand command) {
-        ShopFacade.SellResult result = shopFacade.sellItem(
-                characterId, command.getItemId(), command.getQuantity(), command.getIdempotencyKey());
-        SellItemResponse response =
-                SellItemResponse.newBuilder().setOutcome(toProtoOutcome(result)).build();
-        send(ctx, Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    private record SellItemRequest(int sequenceId, long characterId, SellItemCommand command, Context tracingContext) {}
+
+    /**
+     * SellItemCommand chạm gold thật (cùng lớp rủi ro cường hoá/mua đồ) — retrofit span con sâu
+     * "feature.shop.sell" khớp pattern {@link #handleEnhanceItemBlocking} (OBSERVABILITY.md §6).
+     */
+    @SuppressWarnings({"try", "PMD.UnusedLocalVariable"}) // xem giải thích ở channelRead0
+    private void handleSellItemBlocking(ChannelHandlerContext ctx, SellItemRequest request) {
+        Span span = tracing.startChildSpan("feature.shop.sell", request.tracingContext());
+        try (Scope scope = span.makeCurrent()) {
+            ShopFacade.SellResult result = shopFacade.sellItem(
+                    request.characterId(),
+                    request.command().getItemId(),
+                    request.command().getQuantity(),
+                    request.command().getIdempotencyKey());
+            span.setAttribute("result", result.name());
+            SellItemResponse response = SellItemResponse.newBuilder()
+                    .setOutcome(toProtoOutcome(result))
+                    .build();
+            send(ctx, Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE, request.sequenceId(), response.toByteArray());
+        } finally {
+            span.end();
+        }
     }
 
     private static final Map<ShopFacade.SellResult, SellOutcome> SELL_OUTCOME_MAPPING = Map.of(
@@ -2275,27 +2312,46 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleConfirmTradeBlocking(ctx, sequenceId, characterId, command));
+        // Context.current() PHẢI chụp NGAY ở đây — cùng lý do handleBuyItemCommand.
+        ConfirmTradeRequest request = new ConfirmTradeRequest(sequenceId, characterId, command, Context.current());
+        authExecutor.execute(() -> handleConfirmTradeBlocking(ctx, request));
     }
 
-    private void handleConfirmTradeBlocking(
-            ChannelHandlerContext ctx, int sequenceId, long characterId, ConfirmTradeCommand command) {
-        Optional<TradeFacade.TradeStatusView> statusBefore = tradeFacade.getStatus(characterId);
-        TradeFacade.ConfirmResult result =
-                tradeFacade.confirm(command.getSessionId(), characterId, command.getIdempotencyKey());
-        ConfirmTradeOutcome outcome =
-                switch (result) {
-                    case OK -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_OK;
-                    case EXECUTED -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_EXECUTED;
-                    case NOT_FOUND -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_NOT_FOUND;
-                    case OFFER_INVALID -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_OFFER_INVALID;
-                    case DUPLICATE_REQUEST -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_DUPLICATE_REQUEST;
-                };
-        ConfirmTradeResponse response =
-                ConfirmTradeResponse.newBuilder().setOutcome(outcome).build();
-        send(ctx, Opcode.OPCODE_CONFIRM_TRADE_RESPONSE_VALUE, sequenceId, response.toByteArray());
-        statusBefore.ifPresent(status ->
-                notifyCounterpartOfConfirmResult(status.counterpartCharacterId(), result, command.getSessionId()));
+    private record ConfirmTradeRequest(
+            int sequenceId, long characterId, ConfirmTradeCommand command, Context tracingContext) {}
+
+    /**
+     * ConfirmTradeCommand — NƠI DUY NHẤT {@code ConfirmTradeUseCase} xác thực lại TOÀN BỘ lời chào
+     * LÚC THI HÀNH rồi chạm gold/item thật (feature-trade/CLAUDE.md, SECURITY.md) — cùng lớp rủi ro
+     * cường hoá/mua-bán, retrofit span con sâu "feature.trade.confirm" khớp pattern
+     * {@link #handleEnhanceItemBlocking} (OBSERVABILITY.md §6).
+     */
+    @SuppressWarnings({"try", "PMD.UnusedLocalVariable"}) // xem giải thích ở channelRead0
+    private void handleConfirmTradeBlocking(ChannelHandlerContext ctx, ConfirmTradeRequest request) {
+        Span span = tracing.startChildSpan("feature.trade.confirm", request.tracingContext());
+        try (Scope scope = span.makeCurrent()) {
+            long characterId = request.characterId();
+            ConfirmTradeCommand command = request.command();
+            Optional<TradeFacade.TradeStatusView> statusBefore = tradeFacade.getStatus(characterId);
+            TradeFacade.ConfirmResult result =
+                    tradeFacade.confirm(command.getSessionId(), characterId, command.getIdempotencyKey());
+            span.setAttribute("result", result.name());
+            ConfirmTradeOutcome outcome =
+                    switch (result) {
+                        case OK -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_OK;
+                        case EXECUTED -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_EXECUTED;
+                        case NOT_FOUND -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_NOT_FOUND;
+                        case OFFER_INVALID -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_OFFER_INVALID;
+                        case DUPLICATE_REQUEST -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_DUPLICATE_REQUEST;
+                    };
+            ConfirmTradeResponse response =
+                    ConfirmTradeResponse.newBuilder().setOutcome(outcome).build();
+            send(ctx, Opcode.OPCODE_CONFIRM_TRADE_RESPONSE_VALUE, request.sequenceId(), response.toByteArray());
+            statusBefore.ifPresent(status ->
+                    notifyCounterpartOfConfirmResult(status.counterpartCharacterId(), result, command.getSessionId()));
+        } finally {
+            span.end();
+        }
     }
 
     /** Đẩy event cho đối phương SAU KHI {@code ConfirmTradeUseCase} đã trả kết quả — tách khỏi

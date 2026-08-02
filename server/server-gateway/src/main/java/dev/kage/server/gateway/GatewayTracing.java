@@ -10,7 +10,10 @@ import io.opentelemetry.exporter.otlp.http.trace.OtlpHttpSpanExporter;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.resources.Resource;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.SpanProcessor;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
+import io.opentelemetry.sdk.trace.export.SpanExporter;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 
 /**
@@ -27,9 +30,10 @@ import io.opentelemetry.sdk.trace.samplers.Sampler;
  *
  * <p>Chỉ 1 span "gateway.command" bao decode+validate+dispatch được tạo cho MỌI opcode (ở
  * {@link GatewayChannelHandler#channelRead0}, 1 điểm trung tâm) — span con sâu hơn (feature + DB,
- * khớp ví dụ đầy đủ OBSERVABILITY.md §6) mới chỉ làm cho 1 luồng đại diện
- * ({@code EnhanceItemCommand}), CHƯA retrofit hết ~50 opcode (phạm vi lát cắt này, xem javadoc
- * {@link GatewayChannelHandler#handleEnhanceItemBlocking}).
+ * khớp ví dụ đầy đủ OBSERVABILITY.md §6) đã retrofit cho nhóm lệnh chạm gold/item thật (cùng lớp
+ * rủi ro): {@code EnhanceItemCommand} (luồng đại diện gốc), {@code BuyItemCommand},
+ * {@code SellItemCommand}, {@code ConfirmTradeCommand} — CHƯA retrofit phần opcode còn lại (đa số
+ * không chạm DB/gold, xem javadoc {@link GatewayChannelHandler#handleEnhanceItemBlocking}).
  */
 final class GatewayTracing {
 
@@ -47,15 +51,21 @@ final class GatewayTracing {
     }
 
     private GatewayTracing(Sampler sampler, String otlpEndpoint) {
+        this(
+                sampler,
+                BatchSpanProcessor.builder(OtlpHttpSpanExporter.builder()
+                                .setEndpoint(otlpEndpoint)
+                                .build())
+                        .build());
+    }
+
+    private GatewayTracing(Sampler sampler, SpanProcessor spanProcessor) {
         Resource resource = Resource.getDefault()
                 .merge(Resource.create(Attributes.of(AttributeKey.stringKey("service.name"), SERVICE_NAME)));
         SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
                 .setResource(resource)
                 .setSampler(sampler)
-                .addSpanProcessor(BatchSpanProcessor.builder(OtlpHttpSpanExporter.builder()
-                                .setEndpoint(otlpEndpoint)
-                                .build())
-                        .build())
+                .addSpanProcessor(spanProcessor)
                 .build();
         this.sdk = OpenTelemetrySdk.builder().setTracerProvider(tracerProvider).build();
         this.tracer = sdk.getTracer(SERVICE_NAME);
@@ -64,6 +74,17 @@ final class GatewayTracing {
     /** {@code Sampler.alwaysOff()} — dùng cho test, không tạo network call OTLP thật nào. */
     static GatewayTracing disabled() {
         return new GatewayTracing(Sampler.alwaysOff(), DEFAULT_OTLP_ENDPOINT);
+    }
+
+    /**
+     * Dùng cho test cần VERIFY span thật sự được tạo (khác {@link #disabled()} tắt hẳn sampler,
+     * không ghi gì) — {@code Sampler.alwaysOn()} + {@link SimpleSpanProcessor} export ĐỒNG BỘ (khác
+     * {@link BatchSpanProcessor} có độ trễ hàng đợi), test đọc được {@code exporter} ngay sau khi
+     * span {@code end()}, không cần OTLP/Jaeger thật. Không thêm dependency mới — {@code
+     * SpanExporter}/{@code SimpleSpanProcessor} đã có sẵn trong {@code opentelemetry-sdk-trace}.
+     */
+    static GatewayTracing forTesting(SpanExporter exporter) {
+        return new GatewayTracing(Sampler.alwaysOn(), SimpleSpanProcessor.create(exporter));
     }
 
     /** Span gốc cho 1 packet vào — {@code opcodeName} = tên hằng {@code Opcode}, hoặc "unknown" nếu số hiệu lạ. */

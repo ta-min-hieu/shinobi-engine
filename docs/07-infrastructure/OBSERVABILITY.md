@@ -172,10 +172,40 @@ Command từ client
 OTLP/HTTP tới Jaeger `docker-compose` service, cổng 4318), `Sampler.traceIdRatioBased(0.01)` (nhánh
 "1% Command" — nhánh "100% Command chậm" CHƯA làm, cần `SpanProcessor` tự viết lọc theo duration,
 để dành lát cắt sau). Span `gateway.command` (tag `opcode`) bao decode+validate+dispatch tạo ở 1
-điểm trung tâm (`GatewayChannelHandler.channelRead0`) — áp dụng cho MỌI opcode. Span con sâu hơn
-(`feature.inventory.enhance`, dùng OTel `Context.current()` chụp TRƯỚC khi rời EventLoop, `Scope`
-lúc chạy trên Virtual Thread) mới làm cho **1 luồng đại diện** (`EnhanceItemCommand`) khớp ví dụ
-đầy đủ ở trên — **CHƯA retrofit ~50 opcode còn lại**, phạm vi lát cắt này, không phải thiếu sót.
+điểm trung tâm (`GatewayChannelHandler.channelRead0`) — áp dụng cho MỌI opcode (~57 opcode có
+handler thật).
+
+✅ **Retrofit span con sâu hơn — cập nhật 2026-08-02** (khớp ví dụ đầy đủ ở trên, dùng OTel
+`Context.current()` chụp TRƯỚC khi rời EventLoop + `Scope` lúc chạy trên Virtual Thread, cùng
+attribute `result` = tên enum kết quả nghiệp vụ): mở rộng từ 1 luồng đại diện gốc
+(`feature.inventory.enhance`, `EnhanceItemCommand`) sang **3 lệnh chạm gold/item thật khác, cùng
+lớp rủi ro** (SECURITY.md, `server/CLAUDE.md` "Transaction + audit log cho: trade, gold, cường
+hoá... shop"):
+
+| Span | Lệnh | Vì sao chọn |
+|---|---|---|
+| `feature.inventory.enhance` | `EnhanceItemCommand` | Luồng đại diện gốc (Phase 9 lát cắt 10) |
+| `feature.shop.buy` | `BuyItemCommand` | Chạm gold thật, cùng lớp rủi ro cường hoá |
+| `feature.shop.sell` | `SellItemCommand` | Chạm gold thật, cùng lớp rủi ro cường hoá |
+| `feature.trade.confirm` | `ConfirmTradeCommand` | NƠI DUY NHẤT `ConfirmTradeUseCase` xác thực lại TOÀN BỘ lời chào LÚC THI HÀNH rồi chạm gold/item thật (feature-trade/CLAUDE.md) — SECURITY.md ghi trade dùng xác thực lại lúc thi hành, đáng để trace |
+
+**CHƯA retrofit phần opcode còn lại (~53/57)** — có chủ đích, không phải thiếu sót: đa số (Move,
+SetTarget, UseSkill, chat, dialogue, quest liệt kê...) không chạm DB/gold trong lời gọi từ gateway
+(VD `UseSkillCommand`/`MoveCommand` chỉ enqueue vào `server-world` — inbox rẻ, xử lý thật xảy ra
+SAU trên tick thread riêng, không đồng bộ với request/response gateway — span con kiểu
+"chụp Context trước khi rời EventLoop, Virtual Thread thực thi" không áp dụng được tự nhiên cho
+luồng fire-and-forget này; trace tick thread là bài toán khác, chưa làm). Combat/skill-cast vì
+vậy KHÔNG có deep span ở lát cắt này — cân nhắc rồi loại, không phải bỏ sót.
+
+Verify span thật sự được tạo (không chỉ đọc code): `GatewayTracing.forTesting(SpanExporter)` (mới
+thêm, `Sampler.alwaysOn()` + `SimpleSpanProcessor` export ĐỒNG BỘ, KHÔNG cần OTLP/Jaeger thật —
+không thêm dependency mới, `SpanExporter`/`SimpleSpanProcessor` đã có sẵn trong
+`opentelemetry-sdk-trace`) dùng ở
+`GatewayServerIntegrationTest#clientCommands_shouldEmitDeepChildSpans_forGoldAffectingCommands` —
+gửi cả 3 lệnh qua socket thật, xác nhận span đúng tên + attribute `result` xuất hiện. Dây
+OTLP→Jaeger thật (docker compose) đã verify tay ở lát cắt gốc (`feature.inventory.enhance`), không
+lặp lại ở đây.
+
 Dùng OTLP/HTTP (không phải gRPC) để tránh transitive `grpc-netty-shaded` đụng version với
 `netty-all` dự án đã dùng (Điều 23).
 
@@ -315,8 +345,9 @@ import tay. Datasource Prometheus (metrics) + Jaeger (traces) cũng provision t�
      `docker compose config` + `docker compose up` thật (không chỉ viết YAML suông).
    - ⚠️ Phát hiện thật: `kage.gold.total` scrape ra tên `kage_gold` (không phải `kage_gold_total`) —
      xem §8 phía trên, xác nhận bằng dump `registry.scrape()` thật trước khi viết PromQL.
-   - CHƯA làm (không phải thiếu sót, chỉ ngoài phạm vi): retrofit tracing sâu cho ~50 opcode còn
-     lại; nhánh sampling "100% Command chậm"; kênh thông báo Alertmanager thật (Slack/email).
+   - CHƯA làm ở lát cắt này (không phải thiếu sót, chỉ ngoài phạm vi): retrofit tracing sâu cho
+     phần opcode còn lại (xem mục 8 — đã mở rộng thêm 3 lệnh); nhánh sampling "100% Command chậm";
+     kênh thông báo Alertmanager thật (Slack/email).
 7. ✅ **`kage.packet.size` (2026-08-02, lát cắt riêng) + `kage.db.query.duration`/
    `kage.db.transaction.failed` (2026-08-02) — cả 3 metric còn thiếu của mục này đều đã xong**:
    - `kage.db.query.duration`: `JdbcOperations` đo quanh 5 điểm thực thi JDBC thật (không đếm
@@ -329,3 +360,14 @@ import tay. Datasource Prometheus (metrics) + Jaeger (traces) cũng provision t�
      không đoán tên): `kage_db_query_duration_seconds` (tag `operation`) và
      `kage_db_transaction_failed_total` — Timer KHÔNG bị strip hậu tố `.total` như Gauge
      `kage.gold.total` → `kage_gold` (mục 6 phía trên), chỉ Gauge mới bị vậy.
+8. ✅ **Retrofit tracing sâu cho 3 lệnh chạm gold/item thật (2026-08-02)** — mở rộng từ 1 luồng đại
+   diện (`feature.inventory.enhance`) sang `feature.shop.buy`/`feature.shop.sell` (`BuyItemCommand`/
+   `SellItemCommand`, chạm gold) + `feature.trade.confirm` (`ConfirmTradeCommand`, nơi duy nhất
+   `ConfirmTradeUseCase` xác thực lại lúc thi hành rồi chạm gold/item thật). Chọn có chủ đích, KHÔNG
+   sweep máy móc hết opcode còn lại (CLAUDE.md §"Cấm kỵ" chống scope creep) — combat/skill-cast
+   (`UseSkillCommand`) cân nhắc rồi LOẠI vì chỉ enqueue fire-and-forget vào `server-world` (không
+   chạm DB, không trả kết quả đồng bộ cho gateway — pattern "chụp Context trước khi rời EventLoop"
+   không áp dụng tự nhiên). Guild không có nghiệp vụ treasury/gold nên không có gì để trace. Verify
+   bằng test mới `GatewayServerIntegrationTest#clientCommands_shouldEmitDeepChildSpans_forGoldAffectingCommands`
+   (thêm `GatewayTracing.forTesting(SpanExporter)` — không dependency mới) gửi cả 3 lệnh qua socket
+   thật, xác nhận span đúng tên + attribute `result`. Còn lại ~53/57 opcode chưa có span sâu.
