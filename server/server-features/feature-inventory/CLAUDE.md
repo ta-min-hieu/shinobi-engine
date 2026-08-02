@@ -189,6 +189,19 @@ THẤT BẠI THẬT (server roll trước, mới biết có cần tiêu hay khô
   3 file fake ở `server-gateway/src/test` (`GatewayPipelineTest`/`GatewayServerIntegrationTest`/
   `ConnectedCharacterRegistryTest`), đã sửa hết cùng lát cắt này.
 
+### ADR-025 retrofit (2026-08-02): `EnhanceItemCommand` giờ có `idempotency_key`
+
+Audit hệ thống (rà toàn bộ Command có side-effect theo ADR-025) phát hiện `EnhanceItemUseCase` trừ
+gold + đổi `enhance_level` thật (cùng lớp rủi ro `BuyItemCommand`) nhưng CHƯA enforce
+`idempotency_key` — client tự retry sau khi mất kết nối trước response sẽ bị trừ gold + roll cường
+hoá 2 lần. Vá theo ĐÚNG pattern đã dùng cho `BuyItemUseCase`/`ClaimMailUseCase`: thêm
+`IdempotencyPort`/`IdempotencyKeyReusedException` ở `domain/` (bản sao ý tưởng, không phụ thuộc
+Gradle vào feature-shop), `EnhancePorts` giờ 5 Port (thêm `idempotencyPort`), ghi key TRƯỚC trừ gold
+trong CÙNG transaction — vi phạm UNIQUE → rollback, trả `EnhanceResult.DUPLICATE_REQUEST` (giá trị
+enum mới, `EnhanceOutcome.ENHANCE_OUTCOME_DUPLICATE_REQUEST = 8` ở protocol, additive). `EquipItemCommand`/
+`UnequipItemCommand` KHÔNG cần field này — thuần đổi trạng thái (map slot→itemId), retry không có
+hiệu ứng cộng dồn (xem `EquipItemUseCase`/`UnequipItemUseCase`, không gold/item nào bị chạm).
+
 ## Cứng
 
 ✅ Quy tắc nghiệp vụ ở `domain/` (túi đầy = `Inventory.add()`, không phải UseCase)

@@ -47,10 +47,12 @@ import dev.kage.server.database.inventory.PostgresDropTableAdapter;
 import dev.kage.server.database.inventory.PostgresEquipmentAdapter;
 import dev.kage.server.database.inventory.PostgresGoldAdapter;
 import dev.kage.server.database.inventory.PostgresInventoryAdapter;
+import dev.kage.server.database.inventory.PostgresInventoryIdempotencyAdapter;
 import dev.kage.server.database.inventory.PostgresItemTemplateAdapter;
 import dev.kage.server.database.quest.JdbcQuestTransactionRunner;
 import dev.kage.server.database.quest.PostgresQuestAuditAdapter;
 import dev.kage.server.database.quest.PostgresQuestExpAdapter;
+import dev.kage.server.database.quest.PostgresQuestIdempotencyAdapter;
 import dev.kage.server.database.quest.PostgresQuestInventoryGrantAdapter;
 import dev.kage.server.database.quest.PostgresQuestProgressAdapter;
 import dev.kage.server.database.quest.PostgresQuestTemplateAdapter;
@@ -176,7 +178,8 @@ class MvpLoopIntegrationTest {
         QuestRewardPorts rewardPorts = new QuestRewardPorts(
                 new PostgresQuestExpAdapter(),
                 new PostgresQuestInventoryGrantAdapter(),
-                new PostgresQuestAuditAdapter());
+                new PostgresQuestAuditAdapter(),
+                new PostgresQuestIdempotencyAdapter());
         return new ClaimQuestRewardUseCase(
                 new PostgresQuestProgressAdapter(dataSource),
                 new PostgresQuestTemplateAdapter(dataSource),
@@ -207,7 +210,8 @@ class MvpLoopIntegrationTest {
                 new PostgresInventoryAdapter(dataSource),
                 new PostgresGoldAdapter(),
                 new PostgresAuditAdapter(),
-                new PostgresItemTemplateAdapter(dataSource));
+                new PostgresItemTemplateAdapter(dataSource),
+                new PostgresInventoryIdempotencyAdapter());
         return new EnhanceItemUseCase(ports, new JdbcInventoryTransactionRunner(dataSource));
     }
 
@@ -261,15 +265,15 @@ class MvpLoopIntegrationTest {
 
         // 7. Cường hoá vũ khí vừa mặc.
         grantGold(characterId, 100); // đúng giá cường hoá +0->+1
-        EnhanceItemUseCase.EnhanceResult enhanceResult =
-                newEnhanceItemUseCase().execute(characterId, swordItemId, false);
+        EnhanceItemUseCase.EnhanceResult enhanceResult = newEnhanceItemUseCase()
+                .execute(characterId, swordItemId, false, UUID.randomUUID().toString());
         assertThat(enhanceResult)
                 .isIn(EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP);
 
         // 8. Nhận thưởng hoàn thành quest.
         long expBefore = readExp(characterId);
-        ClaimQuestRewardUseCase.ClaimResult claimResult =
-                newClaimQuestRewardUseCase().execute(characterId, QUEST_CODE);
+        ClaimQuestRewardUseCase.ClaimResult claimResult = newClaimQuestRewardUseCase()
+                .execute(characterId, QUEST_CODE, UUID.randomUUID().toString());
         assertThat(claimResult.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
         assertThat(readExp(characterId)).isEqualTo(expBefore + claimResult.expGranted());
     }

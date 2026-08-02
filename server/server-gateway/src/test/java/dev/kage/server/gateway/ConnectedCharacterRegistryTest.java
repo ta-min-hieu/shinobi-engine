@@ -81,7 +81,9 @@ class ConnectedCharacterRegistryTest {
         AcceptQuestUseCase acceptQuestUseCase = new AcceptQuestUseCase(progressPort, templatePort, tx);
         ProcessMonsterKilledUseCase processMonsterKilledUseCase =
                 new ProcessMonsterKilledUseCase(progressPort, templatePort, tx);
-        QuestRewardPorts rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
+        dev.kage.quest.domain.IdempotencyPort questIdempotencyPort = (t, idempotencyKey) -> {};
+        QuestRewardPorts rewardPorts =
+                new QuestRewardPorts(expPort, inventoryGrantPort, auditPort, questIdempotencyPort);
         ClaimQuestRewardUseCase claimQuestRewardUseCase =
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx);
         return new QuestFacade(acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
@@ -174,7 +176,9 @@ class ConnectedCharacterRegistryTest {
         // Cường hoá không dùng trong test này — fake tối thiểu để compile.
         GoldPort goldPort = (tx, characterId, amount) -> true;
         AuditPort auditPort = (tx, characterId, action, detailJson) -> {};
-        EnhancePorts enhancePorts = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
+        dev.kage.inventory.domain.IdempotencyPort idempotencyPort = (tx, idempotencyKey) -> {};
+        EnhancePorts enhancePorts =
+                new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort, idempotencyPort);
         EnhanceItemUseCase enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
         return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
     }

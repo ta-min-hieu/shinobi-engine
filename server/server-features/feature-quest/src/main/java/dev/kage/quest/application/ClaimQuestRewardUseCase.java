@@ -2,6 +2,7 @@ package dev.kage.quest.application;
 
 import java.util.List;
 
+import dev.kage.quest.domain.IdempotencyKeyReusedException;
 import dev.kage.quest.domain.QuestProgress;
 import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestStatus;
@@ -12,8 +13,9 @@ import dev.kage.quest.domain.TransactionRunner;
 
 /**
  * Nhận thưởng quest ĐÃ HOÀN THÀNH (status COMPLETED) — chạy {@code on_claim} lấy EXP/item thưởng,
- * trao thưởng THẬT (EXP + item) + ghi audit + đổi status CLAIMED trong 1 transaction (DATABASE.md
- * §5 — trao thưởng thành công nhưng không đánh dấu CLAIMED = nhận thưởng lặp lại được).
+ * ghi {@code idempotencyKey} (ADR-025 — chống double-effect khi client tự retry) + trao thưởng
+ * THẬT (EXP + item) + ghi audit + đổi status CLAIMED trong 1 transaction (DATABASE.md §5 — trao
+ * thưởng thành công nhưng không đánh dấu CLAIMED = nhận thưởng lặp lại được).
  */
 public final class ClaimQuestRewardUseCase {
 
@@ -34,7 +36,7 @@ public final class ClaimQuestRewardUseCase {
         this.tx = tx;
     }
 
-    public ClaimResult execute(long characterId, String questCode) {
+    public ClaimResult execute(long characterId, String questCode, String idempotencyKey) {
         QuestTemplate template = templatePort.findByCode(questCode).orElse(null);
         if (template == null) {
             return ClaimResult.notFound();
@@ -48,18 +50,23 @@ public final class ClaimQuestRewardUseCase {
         }
 
         QuestScriptRunner.HookEffects effects = scriptRunner.runClaim(template.scriptRef(), progress.progressJson());
-        tx.inTransaction((Transaction t) -> {
-            rewardPorts.expPort().grantExp(t, characterId, effects.expGranted());
-            for (QuestScriptRunner.ItemGrant itemGrant : effects.itemGrants()) {
-                rewardPorts
-                        .inventoryGrantPort()
-                        .grantItemByCode(t, characterId, itemGrant.itemTemplateCode(), itemGrant.quantity());
-            }
-            rewardPorts.auditPort().log(t, characterId, "QUEST_CLAIM", detailJson(questCode, effects));
-            QuestProgress claimed =
-                    new QuestProgress(characterId, template.id(), QuestStatus.CLAIMED, progress.progressJson());
-            progressPort.save(t, claimed);
-        });
+        try {
+            tx.inTransaction((Transaction t) -> {
+                rewardPorts.idempotencyPort().recordOrThrow(t, idempotencyKey);
+                rewardPorts.expPort().grantExp(t, characterId, effects.expGranted());
+                for (QuestScriptRunner.ItemGrant itemGrant : effects.itemGrants()) {
+                    rewardPorts
+                            .inventoryGrantPort()
+                            .grantItemByCode(t, characterId, itemGrant.itemTemplateCode(), itemGrant.quantity());
+                }
+                rewardPorts.auditPort().log(t, characterId, "QUEST_CLAIM", detailJson(questCode, effects));
+                QuestProgress claimed =
+                        new QuestProgress(characterId, template.id(), QuestStatus.CLAIMED, progress.progressJson());
+                progressPort.save(t, claimed);
+            });
+        } catch (IdempotencyKeyReusedException e) {
+            return ClaimResult.duplicateRequest();
+        }
 
         List<ClaimResult.ItemReward> items = effects.itemGrants().stream()
                 .map(g -> new ClaimResult.ItemReward(g.itemTemplateCode(), g.quantity()))
@@ -81,7 +88,8 @@ public final class ClaimQuestRewardUseCase {
             OK,
             QUEST_NOT_FOUND,
             NOT_ACCEPTED,
-            NOT_COMPLETED_YET
+            NOT_COMPLETED_YET,
+            DUPLICATE_REQUEST
         }
 
         public record ItemReward(String itemTemplateCode, int quantity) {}
@@ -100,6 +108,10 @@ public final class ClaimQuestRewardUseCase {
 
         static ClaimResult notCompletedYet() {
             return new ClaimResult(Outcome.NOT_COMPLETED_YET, 0, List.of());
+        }
+
+        static ClaimResult duplicateRequest() {
+            return new ClaimResult(Outcome.DUPLICATE_REQUEST, 0, List.of());
         }
     }
 }

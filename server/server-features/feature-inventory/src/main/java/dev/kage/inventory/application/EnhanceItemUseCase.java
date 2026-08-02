@@ -5,6 +5,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 
 import dev.kage.inventory.domain.EnhancementTable;
+import dev.kage.inventory.domain.IdempotencyKeyReusedException;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.Transaction;
@@ -12,8 +13,9 @@ import dev.kage.inventory.domain.TransactionRunner;
 
 /**
  * Cường hoá item +0→+15 (GAMEPLAY.md §7) — tốn gold, tỉ lệ thành công giảm dần theo cấp
- * ({@link EnhancementTable}), TRỪ GOLD + ĐỔI CẤP + GHI AUDIT trong 1 transaction (DATABASE.md §5:
- * trừ gold thành công nhưng ghi cấp thất bại = mất tài sản thật).
+ * ({@link EnhancementTable}), ghi {@code idempotencyKey} (ADR-025 — chống double-effect khi client
+ * tự retry) + TRỪ GOLD + ĐỔI CẤP + GHI AUDIT trong 1 transaction (DATABASE.md §5: trừ gold thành
+ * công nhưng ghi cấp thất bại = mất tài sản thật).
  *
  * <p>"Bảo Vệ" (GAMEPLAY.md §7.1): từ {@link EnhancementTable#DROP_ON_FAIL_FROM_LEVEL} trở lên,
  * nếu {@code useProtection=true} VÀ người chơi có item {@link EnhancementTable#PROTECTION_CHARM_CODE}
@@ -31,7 +33,7 @@ public final class EnhanceItemUseCase {
         this.tx = tx;
     }
 
-    public EnhanceResult execute(long characterId, long itemId, boolean useProtection) {
+    public EnhanceResult execute(long characterId, long itemId, boolean useProtection, String idempotencyKey) {
         Inventory inventory = ports.inventoryPort()
                 .findByCharacter(characterId)
                 .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
@@ -49,20 +51,26 @@ public final class EnhanceItemUseCase {
         boolean rolledSuccess = ThreadLocalRandom.current().nextInt(100) < successRate;
 
         AtomicReference<EnhanceResult> resultHolder = new AtomicReference<EnhanceResult>();
-        tx.inTransaction((Transaction t) -> {
-            if (!ports.goldPort().deductGold(t, characterId, cost)) {
-                resultHolder.set(EnhanceResult.INSUFFICIENT_GOLD);
-                return;
-            }
-            Optional<ItemStack> protectionCharge =
-                    findProtectionCharge(inventory, currentLevel, rolledSuccess, useProtection);
-            EnhanceOutcome outcome = resolveOutcome(currentLevel, rolledSuccess, protectionCharge.isPresent());
-            inventory.replaceItem(new ItemStack(item.id(), item.itemTemplateId(), item.quantity(), outcome.toLevel()));
-            protectionCharge.ifPresent(charge -> inventory.consumeOne(charge.id()));
-            ports.inventoryPort().save(t, inventory);
-            ports.auditPort().log(t, characterId, "ENHANCE_ITEM", detailJson(itemId, cost, outcome));
-            resultHolder.set(outcome.result());
-        });
+        try {
+            tx.inTransaction((Transaction t) -> {
+                ports.idempotencyPort().recordOrThrow(t, idempotencyKey);
+                if (!ports.goldPort().deductGold(t, characterId, cost)) {
+                    resultHolder.set(EnhanceResult.INSUFFICIENT_GOLD);
+                    return;
+                }
+                Optional<ItemStack> protectionCharge =
+                        findProtectionCharge(inventory, currentLevel, rolledSuccess, useProtection);
+                EnhanceOutcome outcome = resolveOutcome(currentLevel, rolledSuccess, protectionCharge.isPresent());
+                inventory.replaceItem(
+                        new ItemStack(item.id(), item.itemTemplateId(), item.quantity(), outcome.toLevel()));
+                protectionCharge.ifPresent(charge -> inventory.consumeOne(charge.id()));
+                ports.inventoryPort().save(t, inventory);
+                ports.auditPort().log(t, characterId, "ENHANCE_ITEM", detailJson(itemId, cost, outcome));
+                resultHolder.set(outcome.result());
+            });
+        } catch (IdempotencyKeyReusedException e) {
+            return EnhanceResult.DUPLICATE_REQUEST;
+        }
         return resultHolder.get();
     }
 
@@ -104,6 +112,7 @@ public final class EnhanceItemUseCase {
         FAILED_PROTECTED,
         ITEM_NOT_FOUND,
         MAX_LEVEL,
-        INSUFFICIENT_GOLD
+        INSUFFICIENT_GOLD,
+        DUPLICATE_REQUEST
     }
 }

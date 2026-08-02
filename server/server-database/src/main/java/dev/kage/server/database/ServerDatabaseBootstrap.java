@@ -85,6 +85,7 @@ import dev.kage.server.database.inventory.PostgresDropTableAdapter;
 import dev.kage.server.database.inventory.PostgresEquipmentAdapter;
 import dev.kage.server.database.inventory.PostgresGoldAdapter;
 import dev.kage.server.database.inventory.PostgresInventoryAdapter;
+import dev.kage.server.database.inventory.PostgresInventoryIdempotencyAdapter;
 import dev.kage.server.database.inventory.PostgresItemTemplateAdapter;
 import dev.kage.server.database.mail.JdbcMailTransactionRunner;
 import dev.kage.server.database.mail.PostgresMailAuditAdapter;
@@ -97,6 +98,7 @@ import dev.kage.server.database.pvp.PostgresPvpRatingAdapter;
 import dev.kage.server.database.quest.JdbcQuestTransactionRunner;
 import dev.kage.server.database.quest.PostgresQuestAuditAdapter;
 import dev.kage.server.database.quest.PostgresQuestExpAdapter;
+import dev.kage.server.database.quest.PostgresQuestIdempotencyAdapter;
 import dev.kage.server.database.quest.PostgresQuestInventoryGrantAdapter;
 import dev.kage.server.database.quest.PostgresQuestProgressAdapter;
 import dev.kage.server.database.quest.PostgresQuestTemplateAdapter;
@@ -190,6 +192,7 @@ public final class ServerDatabaseBootstrap {
         PostgresEquipmentAdapter equipmentPort = new PostgresEquipmentAdapter(dataSource);
         PostgresGoldAdapter goldPort = new PostgresGoldAdapter();
         PostgresAuditAdapter auditPort = new PostgresAuditAdapter();
+        PostgresInventoryIdempotencyAdapter idempotencyPort = new PostgresInventoryIdempotencyAdapter();
         JdbcInventoryTransactionRunner transactionRunner = new JdbcInventoryTransactionRunner(dataSource);
         AddItemUseCase addItemUseCase = new AddItemUseCase(inventoryPort, transactionRunner);
         GrantLootUseCase grantLootUseCase = new GrantLootUseCase(dropTablePort, inventoryPort, transactionRunner);
@@ -200,7 +203,8 @@ public final class ServerDatabaseBootstrap {
                 new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
         EquipmentUseCases equipmentUseCases =
                 new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
-        EnhancePorts enhancePorts = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
+        EnhancePorts enhancePorts =
+                new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort, idempotencyPort);
         EnhanceItemUseCase enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, transactionRunner);
         return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
     }
@@ -280,11 +284,12 @@ public final class ServerDatabaseBootstrap {
         PostgresQuestExpAdapter expPort = new PostgresQuestExpAdapter();
         PostgresQuestInventoryGrantAdapter inventoryGrantPort = new PostgresQuestInventoryGrantAdapter();
         PostgresQuestAuditAdapter auditPort = new PostgresQuestAuditAdapter();
+        PostgresQuestIdempotencyAdapter idempotencyPort = new PostgresQuestIdempotencyAdapter();
         JdbcQuestTransactionRunner transactionRunner = new JdbcQuestTransactionRunner(dataSource);
         AcceptQuestUseCase acceptQuestUseCase = new AcceptQuestUseCase(progressPort, templatePort, transactionRunner);
         ProcessMonsterKilledUseCase processMonsterKilledUseCase =
                 new ProcessMonsterKilledUseCase(progressPort, templatePort, transactionRunner);
-        QuestRewardPorts rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
+        QuestRewardPorts rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort, idempotencyPort);
         ClaimQuestRewardUseCase claimQuestRewardUseCase =
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, transactionRunner);
         return new QuestFacade(acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);

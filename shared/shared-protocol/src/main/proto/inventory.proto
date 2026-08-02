@@ -69,6 +69,7 @@ enum EnhanceOutcome {
   ENHANCE_OUTCOME_MAX_LEVEL = 5; // đã +15, không cường hoá thêm được
   ENHANCE_OUTCOME_INSUFFICIENT_GOLD = 6;
   ENHANCE_OUTCOME_FAILED_PROTECTED = 7; // thất bại từ +10, Bảo Vệ đã tiêu để chặn rớt cấp (§7.1)
+  ENHANCE_OUTCOME_DUPLICATE_REQUEST = 8; // ADR-025: idempotency_key đã dùng trước đó (client tự retry)
 }
 
 // Command: Client -> Server (OPCODE_ENHANCE_ITEM_COMMAND). item_id là inventory_item.id THẬT
@@ -76,9 +77,14 @@ enum EnhanceOutcome {
 // tin số liệu từ client (Điều 24, GAMEPLAY.md §7.1). use_protection: người chơi CHỦ ĐỘNG chọn có
 // tiêu "Bảo Vệ" hay không mỗi lần gọi — server chỉ thật sự tiêu khi roll THẤT BẠI ở +10 trở lên VÀ
 // còn Bảo Vệ trong túi, không tiêu nếu thành công hoặc thất bại dưới +10 dù cờ này = true.
+// idempotency_key (ADR-025, thêm 2026-08-02 — retrofit, cường hoá trừ gold thật giống BuyItemCommand
+// nhưng chưa enforce lúc code lát cắt gốc): UUID v4 client tự sinh, giữ nguyên khi tự retry cùng 1
+// lần cường hoá — server enforce unique ở bảng idempotency_key trong CÙNG transaction với hiệu ứng
+// thật (trừ gold + đổi enhance_level), xem BuyItemCommand (shop.proto) cho pattern gốc.
 message EnhanceItemCommand {
   int64 item_id = 1;
   bool use_protection = 2;
+  string idempotency_key = 3;
 }
 
 // Response: Server -> Client (OPCODE_ENHANCE_ITEM_RESPONSE).

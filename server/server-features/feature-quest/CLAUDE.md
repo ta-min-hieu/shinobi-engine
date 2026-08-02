@@ -89,6 +89,19 @@ tách chuỗi thành `SelectOptionResult.AcceptQuest(questCode)`, KHÔNG tự g�
 biến thể `AcceptQuest` — giữ `feature-dialogue` và `feature-quest` không biết nhau, đúng nguyên tắc
 đã dùng cho action `open_shop` gọi `ShopFacade` (lát cắt 2).
 
+## ADR-025 retrofit (2026-08-02): `ClaimQuestRewardCommand` giờ có `idempotency_key`
+
+Audit hệ thống (rà toàn bộ Command có side-effect theo ADR-025) phát hiện `ClaimQuestRewardUseCase`
+trao EXP + item thật (cùng lớp rủi ro `ClaimMailCommand`) nhưng CHƯA enforce `idempotency_key` —
+client tự retry sẽ có nguy cơ nhận thưởng 2 lần NẾU 2 request tới gần như đồng thời (trước khi
+request đầu commit xong đổi status COMPLETED→CLAIMED — guard trạng thái tự nhiên chỉ chặn được
+retry TUẦN TỰ SAU khi request đầu đã commit, không chặn được race thật). Vá theo ĐÚNG pattern đã
+dùng cho `ClaimMailUseCase` (Command "nhận 1 lần" gần nhất về ngữ nghĩa): thêm
+`IdempotencyPort`/`IdempotencyKeyReusedException` ở `domain/`, `QuestRewardPorts` giờ 4 Port (thêm
+`idempotencyPort`), ghi key TRƯỚC trao EXP/item trong CÙNG transaction — vi phạm UNIQUE → rollback,
+trả `ClaimResult.Outcome.DUPLICATE_REQUEST` (`ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_DUPLICATE_REQUEST
+= 5` ở protocol, additive, cùng số 5 các Command khác đã dùng cho DUPLICATE_REQUEST).
+
 ## Cứng
 
 ✅ Nội dung quest (điều kiện hoàn thành, công thức thưởng) là SCRIPT (Điều 27) — Java chỉ là cơ chế

@@ -43,6 +43,23 @@ gold nhưng mất item" (DATABASE.md §5, đúng cảnh báo gốc ở GAMEPLAY.
 `findByIdForUpdate` PHẢI chạy trong transaction (khoá dòng) — khác `findById` (đọc thuần, dùng cho
 danh sách/xoá, không cần khoá vì không đổi gì).
 
+## ⚠️ Lỗ hổng CHƯA vá — phát hiện lúc audit idempotency (2026-08-02)
+
+`SendMailCommand` (`mail.proto`) cho phép client gửi `gold_amount`/`attachments` bất kỳ, nhưng
+`SendMailUseCase` CHỈ nhận `MailRepositoryPort` — KHÔNG có `GoldPort`/`InventoryGatewayPort` nào
+trừ gì từ người gửi trước khi ghi `gold_amount`/`mail_item` vào lá thư. Nói cách khác: bất kỳ
+người chơi nào cũng có thể tự gửi thư cho chính mình (hoặc bạn bè) kèm gold/item KHÔNG GIỚI HẠN,
+rồi `ClaimMailCommand` (đã bảo vệ idempotency đúng) cấp thật số gold/item đó — đây là lỗ hổng kinh
+tế nghiêm trọng hơn hẳn vấn đề idempotency đang audit ở đây, và KHÔNG sửa được chỉ bằng cách thêm
+`idempotency_key` cho `SendMailCommand` (retry chỉ tạo thêm 1 lá thư gian lận nữa, gốc vấn đề là
+thiếu validate/trừ tài nguyên, không phải double-effect từ retry).
+
+Theo CLAUDE.md §4 (phát hiện vấn đề thiết kế → mô tả + đề xuất, KHÔNG tự sửa): việc này cần quyết
+định của chủ dự án trước khi code — ví dụ (a) `SendMailUseCase` phải `deductGold`/tiêu item của
+người gửi giống `BuyItemUseCase`, nếu gửi thư có đính kèm; hoặc (b) chỉ hệ thống (`senderId=null`)
+được đính kèm gold/item, client gửi thư giữa người chơi bị cấm đính kèm gì cả (validate ở
+`SendMailUseCase`, không phải chỉ ở client). Xem thêm [NETWORK.md #12](../../../docs/05-server/NETWORK.md).
+
 ## Cứng
 
 ✅ Quy tắc validate (goldAmount âm, quantity ≤ 0) ở `domain/` compact constructor (`Mail`,

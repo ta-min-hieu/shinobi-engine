@@ -133,9 +133,14 @@ class QuestIntegrationTest {
         QuestRewardPorts rewardPorts = new QuestRewardPorts(
                 new PostgresQuestExpAdapter(),
                 new PostgresQuestInventoryGrantAdapter(),
-                new PostgresQuestAuditAdapter());
+                new PostgresQuestAuditAdapter(),
+                new PostgresQuestIdempotencyAdapter());
         TransactionRunner tx = new JdbcQuestTransactionRunner(dataSource);
         return new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx);
+    }
+
+    private static String newIdempotencyKey() {
+        return UUID.randomUUID().toString();
     }
 
     @Test
@@ -161,14 +166,16 @@ class QuestIntegrationTest {
         long expBefore = readExp(characterId);
         int itemsBefore = countInventoryRows(characterId);
 
-        ClaimQuestRewardUseCase.ClaimResult claimResult = newClaimUseCase().execute(characterId, QUEST_CODE);
+        ClaimQuestRewardUseCase.ClaimResult claimResult =
+                newClaimUseCase().execute(characterId, QUEST_CODE, newIdempotencyKey());
         assertThat(claimResult.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
         assertThat(claimResult.expGranted()).isEqualTo(500L);
         assertThat(readExp(characterId)).isEqualTo(expBefore + 500L);
         assertThat(countInventoryRows(characterId)).isEqualTo(itemsBefore + 1); // 5 kunai trong 1 dòng mới
 
         // Không nhận thưởng lặp lại được (status đã CLAIMED).
-        ClaimQuestRewardUseCase.ClaimResult secondClaim = newClaimUseCase().execute(characterId, QUEST_CODE);
+        ClaimQuestRewardUseCase.ClaimResult secondClaim =
+                newClaimUseCase().execute(characterId, QUEST_CODE, newIdempotencyKey());
         assertThat(secondClaim.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.NOT_COMPLETED_YET);
     }
 
@@ -195,8 +202,35 @@ class QuestIntegrationTest {
     void shouldRejectClaim_beforeAccepting() {
         long characterId = createFreshCharacter("QuestPlayer3");
 
-        ClaimQuestRewardUseCase.ClaimResult result = newClaimUseCase().execute(characterId, QUEST_CODE);
+        ClaimQuestRewardUseCase.ClaimResult result =
+                newClaimUseCase().execute(characterId, QUEST_CODE, newIdempotencyKey());
 
         assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.NOT_ACCEPTED);
+    }
+
+    @Test
+    void shouldRejectDuplicateClaim_whenIdempotencyKeyReused() {
+        long characterId = createFreshCharacter("QuestPlayer4");
+        newAcceptUseCase().execute(characterId, QUEST_CODE);
+        newProcessUseCase().execute(characterId, "training_dummy");
+        newProcessUseCase().execute(characterId, "training_dummy");
+        newProcessUseCase().execute(characterId, "training_dummy");
+        String key = newIdempotencyKey();
+        newClaimUseCase().execute(characterId, QUEST_CODE, key); // lần đầu — nhận thưởng thật
+
+        long expAfterFirstClaim = readExp(characterId);
+        int itemsAfterFirstClaim = countInventoryRows(characterId);
+        ClaimQuestRewardUseCase.ClaimResult result = newClaimUseCase().execute(characterId, QUEST_CODE, key);
+
+        // Trạng thái CLAIMED sau lần đầu đã tự chặn NOT_COMPLETED_YET rồi (business guard) — request
+        // song song THẬT SỰ (2 request cùng đọc status COMPLETED trước khi request đầu commit) mới
+        // chạm nhánh DUPLICATE_REQUEST của idempotencyKey; ở đây verify KHÔNG có phản ứng phụ nào
+        // lặp lại dù nhánh nào được trả về (EXP/item không tăng lần 2 SO VỚI SAU lần nhận đầu tiên).
+        assertThat(result.outcome())
+                .isIn(
+                        ClaimQuestRewardUseCase.ClaimResult.Outcome.NOT_COMPLETED_YET,
+                        ClaimQuestRewardUseCase.ClaimResult.Outcome.DUPLICATE_REQUEST);
+        assertThat(readExp(characterId)).isEqualTo(expAfterFirstClaim); // KHÔNG cộng EXP lần 2
+        assertThat(countInventoryRows(characterId)).isEqualTo(itemsAfterFirstClaim); // KHÔNG cấp item lần 2
     }
 }

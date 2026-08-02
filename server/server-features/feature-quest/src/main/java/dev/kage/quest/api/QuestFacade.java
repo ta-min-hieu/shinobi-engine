@@ -49,14 +49,17 @@ public final class QuestFacade {
                 .map(change -> new QuestStatusChange(change.questCode(), change.status()));
     }
 
-    public ClaimResult claimReward(long characterId, String questCode) {
-        ClaimQuestRewardUseCase.ClaimResult result = claimQuestRewardUseCase.execute(characterId, questCode);
+    /** {@code idempotencyKey} (ADR-025) — client sinh UUID, giữ nguyên khi tự retry. */
+    public ClaimResult claimReward(long characterId, String questCode, String idempotencyKey) {
+        ClaimQuestRewardUseCase.ClaimResult result =
+                claimQuestRewardUseCase.execute(characterId, questCode, idempotencyKey);
         ClaimOutcome outcome =
                 switch (result.outcome()) {
                     case OK -> ClaimOutcome.OK;
                     case QUEST_NOT_FOUND -> ClaimOutcome.QUEST_NOT_FOUND;
                     case NOT_ACCEPTED -> ClaimOutcome.NOT_ACCEPTED;
                     case NOT_COMPLETED_YET -> ClaimOutcome.NOT_COMPLETED_YET;
+                    case DUPLICATE_REQUEST -> ClaimOutcome.DUPLICATE_REQUEST;
                 };
         List<ItemReward> items = result.itemsGranted().stream()
                 .map(item -> new ItemReward(item.itemTemplateCode(), item.quantity()))
@@ -74,7 +77,8 @@ public final class QuestFacade {
         OK,
         QUEST_NOT_FOUND,
         NOT_ACCEPTED,
-        NOT_COMPLETED_YET
+        NOT_COMPLETED_YET,
+        DUPLICATE_REQUEST
     }
 
     /** {@code status} chỉ bao giờ là COMPLETED ở lát cắt này (xem {@link #onMonsterKilled} javadoc). */

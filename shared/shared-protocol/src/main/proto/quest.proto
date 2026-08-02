@@ -43,8 +43,14 @@ message QuestStatusChangedEvent {
 
 // Command: Client -> Server (OPCODE_CLAIM_QUEST_REWARD_COMMAND). Đứng riêng, KHÔNG qua dialogue ở
 // lát cắt này (kiểm soát phạm vi — có thể gắn vào dialogue "trả nhiệm vụ" ở lát cắt sau).
+// idempotency_key (ADR-025, thêm 2026-08-02 — retrofit, trao EXP/item thưởng thật giống
+// ClaimMailCommand nhưng chưa enforce lúc code lát cắt gốc): UUID v4 client tự sinh, giữ nguyên
+// khi tự retry cùng 1 lần nhận thưởng — server enforce unique ở bảng idempotency_key trong CÙNG
+// transaction với hiệu ứng thật (EXP + item + đổi status CLAIMED), xem ClaimMailCommand (mail.proto)
+// cho pattern gốc ("nhận thưởng 1 lần" gần nhất về ngữ nghĩa).
 message ClaimQuestRewardCommand {
   string quest_code = 1;
+  string idempotency_key = 2;
 }
 
 enum ClaimQuestRewardOutcome {
@@ -53,6 +59,7 @@ enum ClaimQuestRewardOutcome {
   CLAIM_QUEST_REWARD_OUTCOME_QUEST_NOT_FOUND = 2;
   CLAIM_QUEST_REWARD_OUTCOME_NOT_ACCEPTED = 3;
   CLAIM_QUEST_REWARD_OUTCOME_NOT_COMPLETED_YET = 4;
+  CLAIM_QUEST_REWARD_OUTCOME_DUPLICATE_REQUEST = 5; // ADR-025: idempotency_key đã dùng trước đó
 }
 
 message ItemRewardView {

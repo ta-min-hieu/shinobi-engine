@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import dev.kage.inventory.domain.AuditPort;
 import dev.kage.inventory.domain.EnhancementTable;
 import dev.kage.inventory.domain.GoldPort;
+import dev.kage.inventory.domain.IdempotencyKeyReusedException;
+import dev.kage.inventory.domain.IdempotencyPort;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.inventory.domain.ItemStack;
@@ -92,14 +94,30 @@ class EnhanceItemUseCaseTest {
         }
     }
 
+    static final class FakeIdempotencyPort implements IdempotencyPort {
+        private final java.util.Set<String> usedKeys = new java.util.HashSet<>();
+
+        @Override
+        public void recordOrThrow(Transaction tx, String idempotencyKey) {
+            if (!usedKeys.add(idempotencyKey)) {
+                throw new IdempotencyKeyReusedException(idempotencyKey);
+            }
+        }
+    }
+
     private static final dev.kage.inventory.domain.TransactionRunner DIRECT_TX = action -> action.accept(null);
+    private static final String IDEMPOTENCY_KEY = "key-1";
 
     private static EnhanceItemUseCase newUseCase(
             FakeInventoryPort inventoryPort,
             FakeGoldPort goldPort,
             FakeAuditPort auditPort,
             FakeItemTemplatePort itemTemplatePort) {
-        EnhancePorts ports = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
+        return newUseCase(
+                new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort, new FakeIdempotencyPort()));
+    }
+
+    private static EnhanceItemUseCase newUseCase(EnhancePorts ports) {
         return new EnhanceItemUseCase(ports, DIRECT_TX);
     }
 
@@ -110,7 +128,7 @@ class EnhanceItemUseCaseTest {
         FakeAuditPort auditPort = new FakeAuditPort();
         EnhanceItemUseCase useCase = newUseCase(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false));
 
-        EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, 999L, false);
+        EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, 999L, false, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.ITEM_NOT_FOUND);
         assertThat(goldPort.deductCalled).isFalse();
@@ -125,7 +143,7 @@ class EnhanceItemUseCaseTest {
         FakeAuditPort auditPort = new FakeAuditPort();
         EnhanceItemUseCase useCase = newUseCase(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false));
 
-        EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
+        EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.MAX_LEVEL);
         assertThat(goldPort.deductCalled).isFalse();
@@ -139,7 +157,7 @@ class EnhanceItemUseCaseTest {
         FakeAuditPort auditPort = new FakeAuditPort();
         EnhanceItemUseCase useCase = newUseCase(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false));
 
-        EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
+        EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false, IDEMPOTENCY_KEY);
 
         assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.INSUFFICIENT_GOLD);
         assertThat(inventoryPort.saved).isNull(); // không đổi enhance_level khi không trả được tiền
@@ -157,7 +175,7 @@ class EnhanceItemUseCaseTest {
         FakeAuditPort auditPort = new FakeAuditPort();
         EnhanceItemUseCase useCase = newUseCase(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false));
 
-        EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
+        EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false, IDEMPOTENCY_KEY);
 
         assertThat(result)
                 .isIn(EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP);
@@ -165,6 +183,22 @@ class EnhanceItemUseCaseTest {
         assertThat(auditPort.loggedAction).isEqualTo("ENHANCE_ITEM");
         assertThat(auditPort.loggedDetail).contains("\"itemId\":" + ITEM_ID);
         assertThat(inventoryPort.saved).isNotNull();
+    }
+
+    @Test
+    void shouldReturnDuplicateRequest_whenIdempotencyKeyReused() {
+        ItemStack item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 0);
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item)));
+        FakeGoldPort goldPort = new FakeGoldPort(true);
+        FakeAuditPort auditPort = new FakeAuditPort();
+        FakeIdempotencyPort idempotencyPort = new FakeIdempotencyPort();
+        EnhanceItemUseCase useCase = newUseCase(
+                new EnhancePorts(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false), idempotencyPort));
+        useCase.execute(CHARACTER_ID, ITEM_ID, false, IDEMPOTENCY_KEY);
+
+        EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false, IDEMPOTENCY_KEY);
+
+        assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.DUPLICATE_REQUEST);
     }
 
     @Test
@@ -181,7 +215,7 @@ class EnhanceItemUseCaseTest {
             EnhanceItemUseCase useCase = newUseCase(
                     inventoryPort, new FakeGoldPort(true), new FakeAuditPort(), new FakeItemTemplatePort(false));
 
-            EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false);
+            EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false, IDEMPOTENCY_KEY);
             if (result == EnhanceItemUseCase.EnhanceResult.FAILED_DROPPED) {
                 sawDropped = true;
                 assertThat(inventoryPort.saved.findItem(ITEM_ID).orElseThrow().enhanceLevel())
@@ -206,7 +240,7 @@ class EnhanceItemUseCaseTest {
             EnhanceItemUseCase useCase = newUseCase(
                     inventoryPort, new FakeGoldPort(true), new FakeAuditPort(), new FakeItemTemplatePort(true));
 
-            EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, true);
+            EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, true, IDEMPOTENCY_KEY);
             if (result == EnhanceItemUseCase.EnhanceResult.FAILED_PROTECTED) {
                 sawProtected = true;
                 assertThat(inventoryPort.saved.findItem(ITEM_ID).orElseThrow().enhanceLevel())
@@ -229,7 +263,7 @@ class EnhanceItemUseCaseTest {
             EnhanceItemUseCase useCase = newUseCase(
                     inventoryPort, new FakeGoldPort(true), new FakeAuditPort(), new FakeItemTemplatePort(true));
 
-            EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, true);
+            EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, true, IDEMPOTENCY_KEY);
             if (result == EnhanceItemUseCase.EnhanceResult.FAILED_DROPPED) {
                 sawDropped = true;
                 assertThat(inventoryPort.saved.findItem(ITEM_ID).orElseThrow().enhanceLevel())
@@ -252,7 +286,7 @@ class EnhanceItemUseCaseTest {
             EnhanceItemUseCase useCase = newUseCase(
                     inventoryPort, new FakeGoldPort(true), new FakeAuditPort(), new FakeItemTemplatePort(true));
 
-            EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, true);
+            EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, true, IDEMPOTENCY_KEY);
             if (result == EnhanceItemUseCase.EnhanceResult.SUCCESS) {
                 sawSuccess = true;
                 assertThat(inventoryPort.saved.findByTemplate(PROTECTION_TEMPLATE_ID))
