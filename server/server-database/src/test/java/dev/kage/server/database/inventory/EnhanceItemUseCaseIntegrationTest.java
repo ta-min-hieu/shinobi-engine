@@ -156,9 +156,14 @@ class EnhanceItemUseCaseIntegrationTest {
         PostgresGoldAdapter goldPort = new PostgresGoldAdapter();
         PostgresAuditAdapter auditPort = new PostgresAuditAdapter();
         PostgresItemTemplateAdapter itemTemplatePort = new PostgresItemTemplateAdapter(dataSource);
+        PostgresInventoryIdempotencyAdapter idempotencyPort = new PostgresInventoryIdempotencyAdapter();
         JdbcInventoryTransactionRunner tx = new JdbcInventoryTransactionRunner(dataSource);
-        EnhancePorts ports = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
+        EnhancePorts ports = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort, idempotencyPort);
         return new EnhanceItemUseCase(ports, tx);
+    }
+
+    private static String newIdempotencyKey() {
+        return UUID.randomUUID().toString();
     }
 
     private static void grantProtectionCharm(long characterId) {
@@ -179,7 +184,8 @@ class EnhanceItemUseCaseIntegrationTest {
         long realItemId = persistOneItem(characterId, woodenSwordId);
         grantGold(characterId, 0); // không đủ trả 100 gold cường hoá +0->+1
 
-        EnhanceItemUseCase.EnhanceResult result = newUseCase().execute(characterId, realItemId, false);
+        EnhanceItemUseCase.EnhanceResult result =
+                newUseCase().execute(characterId, realItemId, false, newIdempotencyKey());
 
         assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.INSUFFICIENT_GOLD);
         assertThat(readGold(characterId)).isZero(); // không bị trừ gì
@@ -193,7 +199,8 @@ class EnhanceItemUseCaseIntegrationTest {
         long realItemId = persistOneItem(characterId, woodenSwordId);
         grantGold(characterId, 100); // đúng giá cường hoá +0->+1
 
-        EnhanceItemUseCase.EnhanceResult result = newUseCase().execute(characterId, realItemId, false);
+        EnhanceItemUseCase.EnhanceResult result =
+                newUseCase().execute(characterId, realItemId, false, newIdempotencyKey());
 
         assertThat(result)
                 .isIn(EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP);
@@ -218,7 +225,8 @@ class EnhanceItemUseCaseIntegrationTest {
                 .id();
         grantGold(characterId, 1_000_000);
 
-        EnhanceItemUseCase.EnhanceResult result = newUseCase().execute(characterId, realItemId, false);
+        EnhanceItemUseCase.EnhanceResult result =
+                newUseCase().execute(characterId, realItemId, false, newIdempotencyKey());
 
         assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.MAX_LEVEL);
         assertThat(readGold(characterId)).isEqualTo(1_000_000); // không trừ gold
@@ -245,7 +253,8 @@ class EnhanceItemUseCaseIntegrationTest {
             grantProtectionCharm(characterId);
             grantGold(characterId, EnhancementTable.goldCost(14));
 
-            EnhanceItemUseCase.EnhanceResult result = newUseCase().execute(characterId, realItemId, true);
+            EnhanceItemUseCase.EnhanceResult result =
+                    newUseCase().execute(characterId, realItemId, true, newIdempotencyKey());
 
             if (result == EnhanceItemUseCase.EnhanceResult.FAILED_PROTECTED) {
                 sawProtected = true;
@@ -289,7 +298,8 @@ class EnhanceItemUseCaseIntegrationTest {
             // KHÔNG gọi grantProtectionCharm — túi không có Bảo Vệ dù client bật cờ useProtection.
             grantGold(characterId, EnhancementTable.goldCost(14));
 
-            EnhanceItemUseCase.EnhanceResult result = newUseCase().execute(characterId, realItemId, true);
+            EnhanceItemUseCase.EnhanceResult result =
+                    newUseCase().execute(characterId, realItemId, true, newIdempotencyKey());
 
             if (result == EnhanceItemUseCase.EnhanceResult.FAILED_DROPPED) {
                 sawDropped = true;
@@ -305,5 +315,21 @@ class EnhanceItemUseCaseIntegrationTest {
             }
         }
         assertThat(sawDropped).isTrue();
+    }
+
+    @Test
+    void shouldRejectDuplicateEnhance_whenIdempotencyKeyReused() {
+        long characterId = createFreshCharacter("EnhanceDupe");
+        long woodenSwordId = findItemTemplateIdByCode("wooden_sword");
+        long realItemId = persistOneItem(characterId, woodenSwordId);
+        grantGold(characterId, 100); // đúng giá cường hoá +0->+1
+        String key = newIdempotencyKey();
+        newUseCase().execute(characterId, realItemId, false, key);
+
+        EnhanceItemUseCase.EnhanceResult result = newUseCase().execute(characterId, realItemId, false, key);
+
+        assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.DUPLICATE_REQUEST);
+        assertThat(readGold(characterId)).isZero(); // chỉ trừ 1 lần (100 gold), KHÔNG lặp lại
+        assertThat(countAuditLogRows(characterId, "ENHANCE_ITEM")).isEqualTo(1); // KHÔNG ghi audit lần 2
     }
 }

@@ -393,7 +393,9 @@ class GatewayServerIntegrationTest {
         // Cường hoá không dùng trong test này — fake tối thiểu để compile.
         GoldPort goldPort = (tx, characterId, amount) -> true;
         AuditPort auditPort = (tx, characterId, action, detailJson) -> {};
-        EnhancePorts enhancePorts = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort);
+        dev.kage.inventory.domain.IdempotencyPort idempotencyPort = (tx, idempotencyKey) -> {};
+        EnhancePorts enhancePorts =
+                new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort, idempotencyPort);
         EnhanceItemUseCase enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
         return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
     }
@@ -484,8 +486,9 @@ class GatewayServerIntegrationTest {
                 new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx);
         dev.kage.quest.application.ProcessMonsterKilledUseCase processMonsterKilledUseCase =
                 new dev.kage.quest.application.ProcessMonsterKilledUseCase(progressPort, templatePort, tx);
-        dev.kage.quest.application.QuestRewardPorts rewardPorts =
-                new dev.kage.quest.application.QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
+        dev.kage.quest.domain.IdempotencyPort questIdempotencyPort = (t, idempotencyKey) -> {};
+        dev.kage.quest.application.QuestRewardPorts rewardPorts = new dev.kage.quest.application.QuestRewardPorts(
+                expPort, inventoryGrantPort, auditPort, questIdempotencyPort);
         dev.kage.quest.application.ClaimQuestRewardUseCase claimQuestRewardUseCase =
                 new dev.kage.quest.application.ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx);
         return new dev.kage.quest.api.QuestFacade(

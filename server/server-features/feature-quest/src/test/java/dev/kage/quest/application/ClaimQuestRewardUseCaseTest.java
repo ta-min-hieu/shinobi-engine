@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 
 import dev.kage.quest.domain.AuditPort;
 import dev.kage.quest.domain.ExpPort;
+import dev.kage.quest.domain.IdempotencyKeyReusedException;
+import dev.kage.quest.domain.IdempotencyPort;
 import dev.kage.quest.domain.QuestInventoryGrantPort;
 import dev.kage.quest.domain.QuestProgress;
 import dev.kage.quest.domain.QuestProgressPort;
@@ -82,14 +84,30 @@ class ClaimQuestRewardUseCaseTest {
         }
     }
 
+    static final class FakeIdempotencyPort implements IdempotencyPort {
+        private final java.util.Set<String> usedKeys = new java.util.HashSet<>();
+
+        @Override
+        public void recordOrThrow(Transaction tx, String idempotencyKey) {
+            if (!usedKeys.add(idempotencyKey)) {
+                throw new IdempotencyKeyReusedException(idempotencyKey);
+            }
+        }
+    }
+
     private static final TransactionRunner DIRECT_TX = action -> action.accept(null);
+    private static final String IDEMPOTENCY_KEY = "key-1";
 
     private static ClaimQuestRewardUseCase newUseCase(
             QuestProgressPort progressPort,
             FakeExpPort expPort,
             FakeInventoryGrantPort inventoryGrantPort,
             FakeAuditPort auditPort) {
-        QuestRewardPorts rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort);
+        return newUseCase(
+                progressPort, new QuestRewardPorts(expPort, inventoryGrantPort, auditPort, new FakeIdempotencyPort()));
+    }
+
+    private static ClaimQuestRewardUseCase newUseCase(QuestProgressPort progressPort, QuestRewardPorts rewardPorts) {
         return new ClaimQuestRewardUseCase(progressPort, new FakeQuestTemplatePort(), rewardPorts, DIRECT_TX);
     }
 
@@ -98,7 +116,7 @@ class ClaimQuestRewardUseCaseTest {
         ClaimQuestRewardUseCase useCase = newUseCase(
                 new FakeQuestProgressPort(null), new FakeExpPort(), new FakeInventoryGrantPort(), new FakeAuditPort());
 
-        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, "unknown_code");
+        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, "unknown_code", IDEMPOTENCY_KEY);
 
         assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.QUEST_NOT_FOUND);
     }
@@ -108,7 +126,7 @@ class ClaimQuestRewardUseCaseTest {
         ClaimQuestRewardUseCase useCase = newUseCase(
                 new FakeQuestProgressPort(null), new FakeExpPort(), new FakeInventoryGrantPort(), new FakeAuditPort());
 
-        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE);
+        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE, IDEMPOTENCY_KEY);
 
         assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.NOT_ACCEPTED);
     }
@@ -122,7 +140,7 @@ class ClaimQuestRewardUseCaseTest {
                 new FakeInventoryGrantPort(),
                 new FakeAuditPort());
 
-        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE);
+        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE, IDEMPOTENCY_KEY);
 
         assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.NOT_COMPLETED_YET);
     }
@@ -136,7 +154,7 @@ class ClaimQuestRewardUseCaseTest {
         FakeAuditPort auditPort = new FakeAuditPort();
         ClaimQuestRewardUseCase useCase = newUseCase(progressPort, expPort, inventoryGrantPort, auditPort);
 
-        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE);
+        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE, IDEMPOTENCY_KEY);
 
         assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
         assertThat(result.expGranted()).isEqualTo(100L);
@@ -147,5 +165,20 @@ class ClaimQuestRewardUseCaseTest {
         assertThat(inventoryGrantPort.grantedQuantity).isEqualTo(3);
         assertThat(auditPort.loggedAction).isEqualTo("QUEST_CLAIM");
         assertThat(progressPort.saved.status()).isEqualTo(QuestStatus.CLAIMED);
+    }
+
+    @Test
+    void shouldReturnDuplicateRequest_whenIdempotencyKeyReused() {
+        QuestProgress progress = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.COMPLETED, "{\"counter\":2}");
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(progress);
+        FakeIdempotencyPort idempotencyPort = new FakeIdempotencyPort();
+        QuestRewardPorts rewardPorts = new QuestRewardPorts(
+                new FakeExpPort(), new FakeInventoryGrantPort(), new FakeAuditPort(), idempotencyPort);
+        ClaimQuestRewardUseCase useCase = newUseCase(progressPort, rewardPorts);
+        useCase.execute(CHARACTER_ID, QUEST_CODE, IDEMPOTENCY_KEY);
+
+        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE, IDEMPOTENCY_KEY);
+
+        assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.DUPLICATE_REQUEST);
     }
 }

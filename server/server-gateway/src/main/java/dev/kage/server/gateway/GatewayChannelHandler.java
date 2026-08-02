@@ -840,7 +840,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             InventoryFacade.EnhanceResult result = inventoryFacade.enhanceItem(
                     request.characterId(),
                     request.command().getItemId(),
-                    request.command().getUseProtection());
+                    request.command().getUseProtection(),
+                    request.command().getIdempotencyKey());
             networkMetrics.recordEnhanceResult(result.name());
             span.setAttribute("result", result.name());
             EnhanceItemResponse response = EnhanceItemResponse.newBuilder()
@@ -860,7 +861,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             InventoryFacade.EnhanceResult.FAILED_PROTECTED, EnhanceOutcome.ENHANCE_OUTCOME_FAILED_PROTECTED,
             InventoryFacade.EnhanceResult.ITEM_NOT_FOUND, EnhanceOutcome.ENHANCE_OUTCOME_ITEM_NOT_FOUND,
             InventoryFacade.EnhanceResult.MAX_LEVEL, EnhanceOutcome.ENHANCE_OUTCOME_MAX_LEVEL,
-            InventoryFacade.EnhanceResult.INSUFFICIENT_GOLD, EnhanceOutcome.ENHANCE_OUTCOME_INSUFFICIENT_GOLD);
+            InventoryFacade.EnhanceResult.INSUFFICIENT_GOLD, EnhanceOutcome.ENHANCE_OUTCOME_INSUFFICIENT_GOLD,
+            InventoryFacade.EnhanceResult.DUPLICATE_REQUEST, EnhanceOutcome.ENHANCE_OUTCOME_DUPLICATE_REQUEST);
 
     private static EnhanceOutcome toProtoOutcome(InventoryFacade.EnhanceResult result) {
         return ENHANCE_OUTCOME_MAPPING.get(result);
@@ -1094,7 +1096,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleClaimQuestRewardBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, ClaimQuestRewardCommand command) {
-        QuestFacade.ClaimResult result = questFacade.claimReward(characterId, command.getQuestCode());
+        QuestFacade.ClaimResult result =
+                questFacade.claimReward(characterId, command.getQuestCode(), command.getIdempotencyKey());
         ClaimQuestRewardResponse.Builder responseBuilder = ClaimQuestRewardResponse.newBuilder()
                 .setOutcome(toProtoOutcome(result.outcome()))
                 .setExpGranted(result.expGranted());
@@ -1120,7 +1123,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     QuestFacade.ClaimOutcome.NOT_ACCEPTED,
                     ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_NOT_ACCEPTED,
                     QuestFacade.ClaimOutcome.NOT_COMPLETED_YET,
-                    ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_NOT_COMPLETED_YET);
+                    ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_NOT_COMPLETED_YET,
+                    QuestFacade.ClaimOutcome.DUPLICATE_REQUEST,
+                    ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_DUPLICATE_REQUEST);
 
     private static ClaimQuestRewardOutcome toProtoOutcome(QuestFacade.ClaimOutcome outcome) {
         return CLAIM_QUEST_REWARD_OUTCOME_MAPPING.get(outcome);

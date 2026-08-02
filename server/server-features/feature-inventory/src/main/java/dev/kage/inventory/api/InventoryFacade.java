@@ -95,9 +95,10 @@ public final class InventoryFacade {
      * Cường hoá item {@code itemId} (ID thật, không phải vị trí) — tốn gold, tỉ lệ thành công giảm
      * dần theo cấp (GAMEPLAY.md §7). Từ +10 trở lên, thất bại rớt 1 cấp ({@code FAILED_DROPPED})
      * TRỪ KHI {@code useProtection=true} VÀ đủ "Bảo Vệ" trong túi ({@code FAILED_PROTECTED}, §7.1).
+     * {@code idempotencyKey} (ADR-025) — client sinh UUID, giữ nguyên khi tự retry.
      */
-    public EnhanceResult enhanceItem(long characterId, long itemId, boolean useProtection) {
-        return switch (enhanceItemUseCase.execute(characterId, itemId, useProtection)) {
+    public EnhanceResult enhanceItem(long characterId, long itemId, boolean useProtection, String idempotencyKey) {
+        return switch (enhanceItemUseCase.execute(characterId, itemId, useProtection, idempotencyKey)) {
             case SUCCESS -> EnhanceResult.SUCCESS;
             case FAILED_NO_DROP -> EnhanceResult.FAILED_NO_DROP;
             case FAILED_DROPPED -> EnhanceResult.FAILED_DROPPED;
@@ -105,6 +106,7 @@ public final class InventoryFacade {
             case ITEM_NOT_FOUND -> EnhanceResult.ITEM_NOT_FOUND;
             case MAX_LEVEL -> EnhanceResult.MAX_LEVEL;
             case INSUFFICIENT_GOLD -> EnhanceResult.INSUFFICIENT_GOLD;
+            case DUPLICATE_REQUEST -> EnhanceResult.DUPLICATE_REQUEST;
         };
     }
 
@@ -131,6 +133,7 @@ public final class InventoryFacade {
         FAILED_PROTECTED,
         ITEM_NOT_FOUND,
         MAX_LEVEL,
-        INSUFFICIENT_GOLD
+        INSUFFICIENT_GOLD,
+        DUPLICATE_REQUEST
     }
 }
