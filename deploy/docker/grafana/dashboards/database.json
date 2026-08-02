@@ -15,6 +15,31 @@
         {"expr": "kage_db_pool_active", "legendFormat": "active", "refId": "A"},
         {"expr": "kage_db_pool_pending", "legendFormat": "pending (chờ)", "refId": "B"}
       ]
+    },
+    {
+      "id": 2,
+      "title": "Query duration avg (by operation)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "targets": [
+        {
+          "expr": "rate(kage_db_query_duration_seconds_sum[5m]) / rate(kage_db_query_duration_seconds_count[5m])",
+          "legendFormat": "{{operation}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Transaction failed rate",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "rate(kage_db_transaction_failed_total[5m])", "legendFormat": "failed/s", "refId": "A"}
+      ]
     }
   ]
 }

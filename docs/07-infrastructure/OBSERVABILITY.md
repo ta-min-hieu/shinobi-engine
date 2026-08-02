@@ -331,8 +331,8 @@ tại, để dành cho lúc content quái mở rộng thật (Phase 6+).
 | Dashboard | Cho ai | Nội dung | Trạng thái |
 |---|---|---|---|
 | **Server Health** | Vận hành | Tick time, players online, entities, ECS system duration, GC pause, JVM memory | ✅ `server-health.json` |
-| **Network** | Vận hành | Packet rate, connection active, rate-limit rejected | ✅ `network.json` (chưa có latency — `kage.packet.size` chưa implement) |
-| **Database** | Vận hành | Pool active/pending | ✅ `database.json` (chưa có query duration/transaction failed — chưa implement) |
+| **Network** | Vận hành | Packet rate, connection active, rate-limit rejected, packet size (avg/max theo direction) | ✅ `network.json` (packet size thêm 2026-08-02, sau khi `kage.packet.size` implement) |
+| **Database** | Vận hành | Pool active/pending, query duration (theo operation), transaction failed | ✅ `database.json` (query duration/transaction failed thêm 2026-08-02, sau khi `kage.db.query.duration`/`kage.db.transaction.failed` implement) |
 | **Business** | Game designer | Login, tỉ lệ cường hoá, gold tổng, người chơi online | ✅ `business.json` (chưa có level distribution — không phải metric hiện có) |
 | **Anti-cheat** | Vận hành | Rate-limit rejected, login failed, gold tăng trưởng | ✅ `anti-cheat.json` |
 
