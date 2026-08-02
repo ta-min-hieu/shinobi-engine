@@ -52,6 +52,39 @@ class MetricsHttpServerTest {
         assertThat(response.body()).contains("kage_tick_duration_seconds").contains("world=\"main\"");
     }
 
+    /**
+     * OBSERVABILITY.md §3.3 {@code kage.db.query.duration}/{@code kage.db.transaction.failed} —
+     * xác nhận bằng scrape HTTP thật (không đoán tên metric): dump cho thấy Timer ra tên
+     * {@code kage_db_query_duration_seconds} (tag {@code operation}, KHÔNG bị hậu tố {@code .total}
+     * strip như {@code kage.gold.total} → {@code kage_gold}, vì đây là Timer chứ không phải Gauge —
+     * xem OBSERVABILITY.md §8 phát hiện cũ) và Counter ra tên
+     * {@code kage_db_transaction_failed_total} (hậu tố {@code _total} CÓ được thêm cho Counter).
+     */
+    @Test
+    void shouldExposeDbMetrics_afterRecordingViaPort() throws IOException, InterruptedException {
+        PrometheusMeterRegistry registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
+        MicrometerDbMetricsPort port = new MicrometerDbMetricsPort(registry);
+        port.recordQueryDuration("SELECT", 2_000_000L); // 2ms — giá trị bất kỳ, chỉ cần khác 0.
+        port.recordTransactionFailed();
+
+        int freePort = findFreePort();
+        server = new MetricsHttpServer(freePort, registry, () -> true);
+        server.start();
+
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create("http://localhost:" + freePort + "/metrics"))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body())
+                .contains("kage_db_query_duration_seconds")
+                .contains("operation=\"SELECT\"")
+                .contains("kage_db_transaction_failed_total");
+    }
+
     @Test
     void shouldReturnOk_forHealthLive_regardlessOfReadiness() throws IOException, InterruptedException {
         int freePort = findFreePort();

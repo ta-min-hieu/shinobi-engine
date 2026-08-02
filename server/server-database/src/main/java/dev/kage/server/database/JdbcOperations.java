@@ -7,6 +7,7 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -29,7 +30,31 @@ public final class JdbcOperations {
     // Mã lỗi Postgres cho unique_violation (SQLState) — dùng bởi updateOrThrow/insertReturningIdOrThrow.
     private static final String UNIQUE_VIOLATION_SQLSTATE = "23505";
 
+    // OBSERVABILITY.md §3.3 kage.db.query.duration — xem javadoc DbMetricsPort: cấu hình 1 LẦN lúc
+    // khởi động (ServerDatabaseBootstrap), mặc định NO_OP nên mọi test/call site hiện có không đổi
+    // hành vi khi chưa gọi configureMetrics.
+    private static volatile DbMetricsPort metricsPort = DbMetricsPort.NO_OP;
+
     private JdbcOperations() {}
+
+    /**
+     * Gọi 1 LẦN lúc khởi động ({@code ServerDatabaseBootstrap}) để bật đo {@code
+     * kage.db.query.duration} thật (Micrometer, wiring ở server-gateway) — xem javadoc
+     * {@link DbMetricsPort} vì sao là field tĩnh thay vì tham số từng call site.
+     */
+    public static void configureMetrics(DbMetricsPort port) {
+        metricsPort = port;
+    }
+
+    // Verb đầu câu SQL (SELECT/INSERT/UPDATE/DELETE) — literal viết tay trong Postgres*Adapter
+    // (server/CLAUDE.md "PreparedStatement, không nối chuỗi SQL"), KHÔNG phải input người chơi, nên
+    // dùng làm tag Timer an toàn (OBSERVABILITY.md §4: hữu hạn và nhỏ).
+    private static String queryOperation(String sql) {
+        String trimmed = sql.stripLeading();
+        int spaceIndex = trimmed.indexOf(' ');
+        String firstWord = spaceIndex > 0 ? trimmed.substring(0, spaceIndex) : trimmed;
+        return firstWord.toUpperCase(Locale.ROOT);
+    }
 
     public static <T> List<T> query(DataSource dataSource, String sql, RowMapper<T> mapper, Object... params) {
         try (Connection connection = dataSource.getConnection()) {
@@ -40,6 +65,7 @@ public final class JdbcOperations {
     }
 
     public static <T> List<T> query(Connection connection, String sql, RowMapper<T> mapper, Object... params) {
+        long startNanos = System.nanoTime();
         try (PreparedStatement statement = prepare(connection, sql, params);
                 ResultSet resultSet = statement.executeQuery()) {
             List<T> results = new ArrayList<T>();
@@ -49,6 +75,8 @@ public final class JdbcOperations {
             return results;
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi truy vấn: " + sql, e);
+        } finally {
+            metricsPort.recordQueryDuration(queryOperation(sql), System.nanoTime() - startNanos);
         }
     }
 
@@ -96,8 +124,11 @@ public final class JdbcOperations {
     }
 
     private static int executeUpdate(Connection connection, String sql, Object... params) throws SQLException {
+        long startNanos = System.nanoTime();
         try (PreparedStatement statement = prepare(connection, sql, params)) {
             return statement.executeUpdate();
+        } finally {
+            metricsPort.recordQueryDuration(queryOperation(sql), System.nanoTime() - startNanos);
         }
     }
 
@@ -131,10 +162,13 @@ public final class JdbcOperations {
 
     private static long executeInsertReturningId(Connection connection, String sql, Object... params)
             throws SQLException {
+        long startNanos = System.nanoTime();
         try (PreparedStatement statement = prepare(connection, sql, params);
                 ResultSet resultSet = statement.executeQuery()) {
             resultSet.next();
             return resultSet.getLong(1);
+        } finally {
+            metricsPort.recordQueryDuration(queryOperation(sql), System.nanoTime() - startNanos);
         }
     }
 
@@ -152,11 +186,14 @@ public final class JdbcOperations {
      * {@link #query} (trả {@code List}) chỉ để khoá dòng rồi vứt kết quả.
      */
     public static void lock(Connection connection, String sql, Object... params) {
+        long startNanos = System.nanoTime();
         try (PreparedStatement statement = prepare(connection, sql, params)) {
             // ResultSet không cần đọc — statement.close() tự đóng nó theo spec JDBC.
             statement.executeQuery();
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi khoá dòng: " + sql, e);
+        } finally {
+            metricsPort.recordQueryDuration(queryOperation(sql), System.nanoTime() - startNanos);
         }
     }
 
@@ -165,6 +202,7 @@ public final class JdbcOperations {
         if (paramsList.isEmpty()) {
             return;
         }
+        long startNanos = System.nanoTime();
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             for (Object[] params : paramsList) {
                 bindParams(statement, params);
@@ -173,6 +211,8 @@ public final class JdbcOperations {
             statement.executeBatch();
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi batch update: " + sql, e);
+        } finally {
+            metricsPort.recordQueryDuration(queryOperation(sql), System.nanoTime() - startNanos);
         }
     }
 

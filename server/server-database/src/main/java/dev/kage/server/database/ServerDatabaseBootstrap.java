@@ -143,9 +143,23 @@ public final class ServerDatabaseBootstrap {
     private final JedisPool jedisPool;
 
     public ServerDatabaseBootstrap() {
+        this(DbMetricsPort.NO_OP);
+    }
+
+    /**
+     * OBSERVABILITY.md §3.3 {@code kage.db.query.duration}/{@code kage.db.transaction.failed} —
+     * {@code metricsPort} cấu hình 1 LẦN vào 2 static utility {@link JdbcOperations}/
+     * {@link JdbcTransactionRunner} (KHÔNG thread qua tham số của ~35 {@code Postgres*Adapter}, xem
+     * javadoc {@link JdbcOperations#configureMetrics}). Constructor không tham số ở trên (test,
+     * hoặc nơi chưa có registry thật) dùng {@link DbMetricsPort#NO_OP} — hành vi y hệt trước khi có
+     * metric này.
+     */
+    public ServerDatabaseBootstrap(DbMetricsPort metricsPort) {
         this.dataSource = PostgresDataSourceFactory.create(DatabaseConfig.fromEnvironment());
         FlywayMigrator.migrate(dataSource);
         this.jedisPool = RedisClientFactory.create(RedisConfig.fromEnvironment());
+        JdbcOperations.configureMetrics(metricsPort);
+        JdbcTransactionRunner.configureMetrics(metricsPort);
     }
 
     public AccountFacade wireAccountFacade() {

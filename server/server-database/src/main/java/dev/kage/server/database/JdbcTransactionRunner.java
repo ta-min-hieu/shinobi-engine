@@ -30,7 +30,20 @@ public final class JdbcTransactionRunner {
 
     private static final Logger LOG = LoggerFactory.getLogger(JdbcTransactionRunner.class);
 
+    // OBSERVABILITY.md §3.3 kage.db.transaction.failed — xem javadoc DbMetricsPort/JdbcOperations
+    // cho lý do field tĩnh (cấu hình 1 LẦN lúc khởi động, mặc định NO_OP).
+    private static volatile DbMetricsPort metricsPort = DbMetricsPort.NO_OP;
+
     private JdbcTransactionRunner() {}
+
+    /**
+     * Gọi 1 LẦN lúc khởi động ({@code ServerDatabaseBootstrap}) để bật đo {@code
+     * kage.db.transaction.failed} thật — xem {@link JdbcOperations#configureMetrics} (cùng port,
+     * cấu hình cùng chỗ).
+     */
+    public static void configureMetrics(DbMetricsPort port) {
+        metricsPort = port;
+    }
 
     public static void run(DataSource dataSource, Consumer<Connection> action) {
         try (Connection connection = dataSource.getConnection()) {
@@ -77,6 +90,9 @@ public final class JdbcTransactionRunner {
     }
 
     private static void rollbackQuietly(Connection connection) {
+        // Đếm NGAY khi action ném RuntimeException (transaction coi như thất bại), bất kể bản thân
+        // rollback() có thành công hay không — OBSERVABILITY.md §3.3 kage.db.transaction.failed.
+        metricsPort.recordTransactionFailed();
         try {
             connection.rollback();
         } catch (SQLException e) {

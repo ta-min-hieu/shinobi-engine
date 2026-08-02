@@ -72,9 +72,9 @@
 
 | Metric | Kiểu | Trạng thái |
 |---|---|---|
-| `kage.db.query.duration` | Timer (tag: query name) | ⏳ chưa làm |
+| `kage.db.query.duration` | Timer (tag: `operation`) | ✅ **implemented 2026-08-02** — `JdbcOperations` đo quanh 5 điểm thực thi JDBC thật (`query(Connection,...)`, `executeUpdate`, `executeInsertReturningId`, `lock`, `batchUpdate` — mọi overload nhận `DataSource`/`*OrThrow` đều delegate qua 1 trong 5 điểm này nên không đếm trùng), qua `DbMetricsPort`/`MicrometerDbMetricsPort` (cùng pattern `TickMetricsPort`). ⚠️ Tag `operation` KHÔNG phải "tên câu query" như dự kiến ban đầu ở cột "Kiểu" — mà là verb đầu câu SQL (SELECT/INSERT/UPDATE/DELETE) lấy từ literal SQL: thread `DbMetricsPort` qua tham số của ~35 `Postgres*Adapter` (131 call site `JdbcOperations`) để có tên query thật là đổi chữ ký hàng loạt, ngoài phạm vi lát cắt này — verb là thoả hiệp an toàn cardinality (§4) không cần đổi call site nào |
 | `kage.db.pool.active` / `pending` | Gauge — ⚠️ pending > 0 kéo dài = pool quá nhỏ | ✅ **implemented 2026-07-28** — đọc `HikariPoolMXBean` qua `ServerDatabaseBootstrap` (Điều 23, cùng pattern `totalGold()`) |
-| `kage.db.transaction.failed` | Counter | ⏳ chưa làm |
+| `kage.db.transaction.failed` | Counter | ✅ **implemented 2026-08-02** — `JdbcTransactionRunner.rollbackQuietly` gọi `DbMetricsPort#recordTransactionFailed()` ngay khi action ném `RuntimeException` (transaction coi như thất bại), bất kể bản thân `connection.rollback()` có thành công hay không |
 
 ### 3.4 JVM (Micrometer có sẵn)
 
@@ -317,5 +317,15 @@ import tay. Datasource Prometheus (metrics) + Jaeger (traces) cũng provision t�
      xem §8 phía trên, xác nhận bằng dump `registry.scrape()` thật trước khi viết PromQL.
    - CHƯA làm (không phải thiếu sót, chỉ ngoài phạm vi): retrofit tracing sâu cho ~50 opcode còn
      lại; nhánh sampling "100% Command chậm"; kênh thông báo Alertmanager thật (Slack/email).
-7. `kage.packet.size` (Distribution), `kage.db.query.duration`/`transaction.failed` — chưa làm,
-   không nằm trong phạm vi các lát cắt trên (chưa ai yêu cầu, không phải blocker Điều 44).
+7. ✅ **`kage.packet.size` (2026-08-02, lát cắt riêng) + `kage.db.query.duration`/
+   `kage.db.transaction.failed` (2026-08-02) — cả 3 metric còn thiếu của mục này đều đã xong**:
+   - `kage.db.query.duration`: `JdbcOperations` đo quanh 5 điểm thực thi JDBC thật (không đếm
+     trùng — mọi overload `DataSource`/`*OrThrow` delegate qua 1 trong 5 điểm), cấu hình
+     `DbMetricsPort` (NO_OP mặc định) 1 LẦN lúc khởi động qua `ServerDatabaseBootstrap` — thread
+     port qua tham số của ~35 `Postgres*Adapter` (131 call site) ngoài phạm vi, xem §3.3 phía trên.
+   - `kage.db.transaction.failed`: `JdbcTransactionRunner.rollbackQuietly` tăng Counter đúng lúc
+     transaction rollback do exception.
+   - Xác nhận bằng scrape HTTP thật (`MetricsHttpServerTest.shouldExposeDbMetrics_afterRecordingViaPort`,
+     không đoán tên): `kage_db_query_duration_seconds` (tag `operation`) và
+     `kage_db_transaction_failed_total` — Timer KHÔNG bị strip hậu tố `.total` như Gauge
+     `kage.gold.total` → `kage_gold` (mục 6 phía trên), chỉ Gauge mới bị vậy.

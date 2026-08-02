@@ -58,7 +58,14 @@ public final class GatewayBootstrap {
     private GatewayBootstrap() {}
 
     public static void main(String[] args) throws InterruptedException, SSLException {
-        ServerDatabaseBootstrap databaseBootstrap = new ServerDatabaseBootstrap();
+        // buildMetrics() dựng TRƯỚC ServerDatabaseBootstrap (khác thứ tự cũ) vì
+        // MicrometerDbMetricsPort (OBSERVABILITY.md §3.3 kage.db.query.duration/
+        // kage.db.transaction.failed) cần meterRegistry lúc construct, và ServerDatabaseBootstrap
+        // cấu hình JdbcOperations/JdbcTransactionRunner với port này NGAY trong constructor —
+        // trước khi bất kỳ Postgres*Adapter nào chạy query đầu tiên.
+        MetricsContext metricsContext = buildMetrics();
+        ServerDatabaseBootstrap databaseBootstrap =
+                new ServerDatabaseBootstrap(new MicrometerDbMetricsPort(metricsContext.meterRegistry()));
         GatewayFacades facades = wireFacades(databaseBootstrap);
 
         // SCRIPTING.md §8 — fail fast lúc khởi động, KHÔNG đợi người chơi phát hiện lỗi cú pháp
@@ -69,7 +76,6 @@ public final class GatewayBootstrap {
         scriptRefs.addAll(WorldFacade.listBossScriptResources());
         new ScriptValidator(new ScriptSandbox(SCRIPT_VALIDATION_STATEMENT_LIMIT)).validateAll(scriptRefs);
 
-        MetricsContext metricsContext = buildMetrics();
         GatewayObservability observability =
                 new GatewayObservability(metricsContext.networkMetrics(), new GatewayTracing());
 
