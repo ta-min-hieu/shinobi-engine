@@ -23,6 +23,9 @@ final class MetricsScraperTest {
             # HELP kage_players_online Số người chơi đang online
             # TYPE kage_players_online gauge
             kage_players_online 199.0
+            # HELP kage_gold Tổng gold toàn server
+            # TYPE kage_gold gauge
+            kage_gold 12345.0
             """;
 
     @Test
@@ -63,13 +66,45 @@ final class MetricsScraperTest {
         assertThat(snapshot.playersOnline()).isEqualTo(42.0);
     }
 
+    // kage_gold (OBSERVABILITY.md §8.1 — nền tảng đo baseline GoldTotalSpike) parse ĐÚNG tên strip
+    // ".total" của Micrometer cho Gauge — cùng hình dạng regex với players_online nên test lặp lại
+    // ba nhánh tương ứng (không nhãn / thiếu dòng / có nhãn) thay vì chỉ 1 test smoke.
+    @Test
+    void shouldParseGoldTotal_fromSameBodyAsPlayersOnline() {
+        MetricsScraper.MetricsSnapshot snapshot = MetricsScraper.parse(SAMPLE_BODY);
+
+        assertThat(snapshot.goldTotal()).isEqualTo(12345.0);
+    }
+
+    @Test
+    void shouldReportUnavailable_whenGoldTotalLineMissing() {
+        String bodyWithoutGauge = """
+                kage_tick_duration_seconds{world="0",quantile="0.5"} 0.002
+                """;
+
+        MetricsScraper.MetricsSnapshot snapshot = MetricsScraper.parse(bodyWithoutGauge);
+
+        assertThat(snapshot.goldTotal()).isEqualTo(-1);
+    }
+
+    @Test
+    void shouldParseLabeledGoldTotalLine_whenGaugeHasTags() {
+        String bodyWithLabel = """
+                kage_gold{world="0"} 777.0
+                """;
+
+        MetricsScraper.MetricsSnapshot snapshot = MetricsScraper.parse(bodyWithLabel);
+
+        assertThat(snapshot.goldTotal()).isEqualTo(777.0);
+    }
+
     @Test
     void shouldKeepPeak_whenLaterScrapesAreLower() {
         AtomicInteger peak = new AtomicInteger();
 
-        LoadTestRunner.trackPeak(new MetricsScraper.MetricsSnapshot(-1, -1, -1, 50), peak);
-        LoadTestRunner.trackPeak(new MetricsScraper.MetricsSnapshot(-1, -1, -1, 199), peak);
-        LoadTestRunner.trackPeak(new MetricsScraper.MetricsSnapshot(-1, -1, -1, 120), peak);
+        LoadTestRunner.trackPeak(new MetricsScraper.MetricsSnapshot(-1, -1, -1, 50, -1), peak);
+        LoadTestRunner.trackPeak(new MetricsScraper.MetricsSnapshot(-1, -1, -1, 199, -1), peak);
+        LoadTestRunner.trackPeak(new MetricsScraper.MetricsSnapshot(-1, -1, -1, 120, -1), peak);
 
         assertThat(peak.get()).isEqualTo(199);
     }
@@ -78,7 +113,7 @@ final class MetricsScraperTest {
     void shouldIgnoreUnavailableSnapshot_whenScrapeFailed() {
         AtomicInteger peak = new AtomicInteger();
 
-        LoadTestRunner.trackPeak(new MetricsScraper.MetricsSnapshot(-1, -1, -1, 80), peak);
+        LoadTestRunner.trackPeak(new MetricsScraper.MetricsSnapshot(-1, -1, -1, 80, -1), peak);
         LoadTestRunner.trackPeak(MetricsScraper.MetricsSnapshot.UNAVAILABLE, peak);
 
         assertThat(peak.get()).isEqualTo(80);

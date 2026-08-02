@@ -37,6 +37,13 @@ final class MetricsScraper {
     private static final Pattern PLAYERS_ONLINE_LINE =
             Pattern.compile("kage_players_online\\{[^}]*}\\s+([0-9.eE+-]+)" + "|kage_players_online\\s+([0-9.eE+-]+)");
 
+    // kage.gold.total (Gauge, cũng KHÔNG có tag — GatewayBootstrap) scrape ra tên kage_gold (không
+    // phải kage_gold_total — Micrometer strip hậu tố ".total" cho Gauge, OBSERVABILITY.md §8, PHÁT
+    // HIỆN THẬT xác nhận bằng dump registry.scrape() lúc viết lát cắt baseline 2026-08-02). Cùng
+    // hình dạng 2-nhánh với PLAYERS_ONLINE_LINE ở trên, cùng lý do (né ReDoS + tham lam biên).
+    private static final Pattern GOLD_TOTAL_LINE =
+            Pattern.compile("kage_gold\\{[^}]*}\\s+([0-9.eE+-]+)" + "|kage_gold\\s+([0-9.eE+-]+)");
+
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final URI metricsUri;
 
@@ -50,8 +57,8 @@ final class MetricsScraper {
      * body nên luôn đồng bộ thời gian với nhau (BENCHMARK.md §5.1, tránh lệch pha giữa 2 lần gọi
      * HTTP riêng).
      */
-    record MetricsSnapshot(double p50Millis, double p95Millis, double p99Millis, double playersOnline) {
-        static final MetricsSnapshot UNAVAILABLE = new MetricsSnapshot(-1, -1, -1, -1);
+    record MetricsSnapshot(double p50Millis, double p95Millis, double p99Millis, double playersOnline, double goldTotal) {
+        static final MetricsSnapshot UNAVAILABLE = new MetricsSnapshot(-1, -1, -1, -1, -1);
     }
 
     MetricsSnapshot scrape() {
@@ -91,6 +98,12 @@ final class MetricsScraper {
             String value = playersMatcher.group(1) != null ? playersMatcher.group(1) : playersMatcher.group(2);
             playersOnline = Double.parseDouble(value);
         }
-        return new MetricsSnapshot(p50, p95, p99, playersOnline);
+        double goldTotal = -1;
+        Matcher goldMatcher = GOLD_TOTAL_LINE.matcher(body);
+        if (goldMatcher.find()) {
+            String value = goldMatcher.group(1) != null ? goldMatcher.group(1) : goldMatcher.group(2);
+            goldTotal = Double.parseDouble(value);
+        }
+        return new MetricsSnapshot(p50, p95, p99, playersOnline, goldTotal);
     }
 }

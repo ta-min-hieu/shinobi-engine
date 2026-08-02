@@ -132,8 +132,25 @@ với `kage.tick.duration` phía server thật (scrape `/metrics`, Phase 9 lát 
 | Packet latency p50/p95/p99 | — | `tools:load-test` (client-side) |
 | GC pause p99 | [JVM.md §7](JVM.md) | JFR (bật sẵn từ Phase 0) — ngoài phạm vi `tools:load-test` |
 | **Heap sau major GC** | ⚠️ Tăng đều = leak | JFR/GC log — ngoài phạm vi `tools:load-test` |
-| DB pool pending | Phải = 0 | ⏳ chưa có metric (HikariCP — lát cắt sau) |
+| DB pool pending | Phải = 0 khi tải ổn định | ✅ `kage_db_pool_pending`/`kage_db_pool_active` (Micrometer HikariCP, xem [OBSERVABILITY.md §3.3](../07-infrastructure/OBSERVABILITY.md)) |
 | CPU / RAM | — | OS-level, ngoài phạm vi `tools:load-test` |
+
+✅ **DB pool pending đo thật lần đầu** (2026-08-02) — chạy `tools:load-test` ramp 10→100 client/300s
+nhắm `server-gateway` thật (Postgres 17 + Redis 8 qua Docker, `maximumPoolSize=20` —
+`PostgresDataSourceFactory.DEFAULT_MAX_POOL_SIZE`), đọc trực tiếp log DEBUG của HikariCP
+(`HikariPool-1 - ... stats (total=.../20, active=..., waiting=...)`) xuyên suốt cả lần chạy thay vì chỉ
+scrape rời rạc. Trong suốt pha ramp + giữ tải ổn định ở 100 client (20:02-20:06): `active` đạt tối đa
+12/20, **`pending` = 0 gần như 100% thời gian** (chỉ 3 mẫu `waiting=1` thoáng qua lúc pool mới khởi
+động ở giây đầu) — pool 20 dư sức cho kịch bản 100 client di chuyển+auto-attack+chat+ping. NHƯNG phát
+hiện thật quan trọng hơn: khi load-test dừng đột ngột (toàn bộ 100 client ngắt kết nối gần như cùng lúc
+trong <1 tick), pool BÃO HOÀ ngay lập tức — `active` chạm trần 20/20 và `pending` vọt lên tới **147**
+thread chờ, kéo dài **~21 giây** (20:06:21 → 20:06:42) rồi tự thoát hết hàng đợi (không timeout —
+`connectionTimeout=30000ms` đủ dư, không có `SQLTransientConnectionException` nào; chỉ có vài dòng lỗi
+Netty "connection reset by peer" vô hại từ phía kết nối đang đóng). **Kết luận**: pool 20 KHÔNG phải
+nút thắt khi tải ổn định tới N=100, nhưng **mass-disconnect** (server restart/crash làm nhiều client
+rớt cùng lúc, hoặc nhiều người logout đồng loạt sau sự kiện) là kịch bản thật có thể làm nghẽn pool vài
+chục giây. Chưa đo ở N>100, chưa đo soak dài, và chưa đo xem 147 pending dồn lại có gây lag cho lượt
+chơi tiếp theo hay không — ngoài phạm vi lần đo này (Điều 9, không suy diễn thêm).
 
 ⚠️ **Soak test (chạy dài) quan trọng hơn peak test.** Server chịu 500 người trong 5 phút nhưng leak sau 6 giờ = vẫn sập ở production.
 

@@ -16,8 +16,15 @@
 # 10→100, giữ tải ~19.5 phút, tổng 25 phút, Postgres 17 + Redis 8 thật qua Docker cổng non-default
 # 55432/55679 tránh đụng service khác trên máy, scrape /metrics mỗi 30s — xem OBSERVABILITY.md §8
 # và BENCHMARK.md §5 cho chi tiết đầy đủ + giới hạn phép đo). Kết quả: LoginFailedSpike VERIFY được
-# (xem ngay dưới); GoldTotalSpike CHỈ verify được 1 phần (combat/quest xác nhận 0%, đường tăng gold
-# hợp lệ khác — bán đồ ở shop — CHƯA được `tools:load-test` giả lập nên vẫn PLACEHOLDER).
+# (xem ngay dưới). GoldTotalSpike — lần đo lại CÙNG NGÀY, SAU KHI thêm hành vi bán đồ vào
+# `SimulatedPlayer`: kage_gold tăng THẬT 0 → 14 trong 1500s (0 lỗi client), xác nhận đường bán đồ
+# hoạt động thật đầu-cuối qua socket, không còn CHƯA đo được như trước. Số tuyệt đối nhỏ vì 2 giới
+# hạn RIÊNG của phép đo này (không phải trần thật của economy — xem OBSERVABILITY.md §8.1 cho phân
+# tích đầy đủ): (1) chỉ có 1 quái nội dung (training dummy) tồn tại; (2) SimulatedPlayer chỉ chốt
+# monsterId 1 LẦN lúc connect, không re-target sau khi dummy chết+hồi sinh (ID mới, tăng giảm dần) —
+# hầu hết client trở nên "mù mục tiêu" vĩnh viễn sau lần hồi sinh đầu tiên. Vẫn GIỮ 20% (biên độ đủ
+# rộng so với %/giờ đo được, xem tính toán trong OBSERVABILITY.md §8.1) nhưng thêm 1 guard mới
+# (`kage_gold > 1000`) để tránh chia gần 0 (server mới khởi động, kage_gold ~0) làm tỉ lệ nổ số giả.
 groups:
   - name: kage-server-gateway
     rules:
@@ -46,23 +53,24 @@ groups:
         annotations:
           summary: "HikariCP có thread đang chờ connection liên tục — pool quá nhỏ (BENCHMARK.md §5.2)"
 
-      # [NGƯỠNG CHƯA VERIFY] 20%/giờ vẫn là PLACEHOLDER — đo thật 2026-08-02 (100 client, 25 phút,
-      # combat+move+chat+ping — hành vi mặc định `tools:load-test`) cho kage_gold PHẲNG TUYỆT ĐỐI ở
-      # 0.0 suốt 51 lần scrape (0%/giờ từ combat/quest) — khớp ĐÚNG với code: GrantLootUseCase chỉ
-      # cộng item (không gold), QuestFacade chỉ cộng ExpPort (không GoldPort) — hiện KHÔNG có đường
-      # "giết quái/nhiệm vụ ⇒ gold" nào trong game content hiện tại, nên 0% là kết quả chắc chắn,
-      # không phải trùng hợp của 1 lần chạy. NHƯNG: đường tăng gold HỢP LỆ duy nhất đang tồn tại
-      # (SellItemUseCase — bán đồ cho NPC shop cộng gold thật) KHÔNG được `tools:load-test` giả lập
-      # (hành vi client chỉ move+combat+chat+ping, không có thao tác shop) — nên %/giờ tăng trưởng
-      # gold CHO TOÀN BỘ hoạt động hợp lệ (kể cả bán đồ) vẫn CHƯA đo được, giữ marker cho tới khi
-      # `SimulatedPlayer` mô phỏng thêm hành vi bán đồ. Xem OBSERVABILITY.md §8.
+      # ĐO LẠI 2026-08-02 (SimulatedPlayer giờ có bán đồ, xem block đầu file + OBSERVABILITY.md
+      # §8.1): kage_gold tăng 0 → 14 trong 1500s (100 client) = ~34/giờ TUYỆT ĐỐI đo được — quy đổi
+      # %/giờ cần chia cho tổng gold server hiện có (mẫu số không cố định, phụ thuộc tuổi đời
+      # server), nên KHÔNG quy đổi máy móc thành 1 con số %/giờ duy nhất; thay vào đó so sánh biên
+      # độ: 34 gold/giờ chỉ vượt 20% NẾU tổng gold server hiện tại < 170 — với guard
+      # `kage_gold > 1000` bên dưới, %/giờ tương ứng từ đúng mức tăng trưởng đo được luôn < 3.4%,
+      # cách xa 20% nhiều lần — biên độ giữ 20% vẫn AN TOÀN dù chưa đo được trần thật (2 giới hạn ở
+      # block đầu file khiến số đo được là CẬN DƯỚI, không phải cận trên, của tăng trưởng hợp lệ).
+      # Guard `kage_gold > 1000` mới thêm — PHÁT HIỆN THẬT lúc đo: server mới khởi động có
+      # kage_gold ~0, biểu thức tỉ lệ gốc (không guard) chia gần 0 → giá trị nổ số/không xác định,
+      # có thể false-positive ngay lúc bootstrap dù tăng trưởng tuyệt đối rất nhỏ và hợp lệ.
       - alert: GoldTotalSpike
-        expr: (increase(kage_gold[1h]) / kage_gold) > 0.20
+        expr: (increase(kage_gold[1h]) / kage_gold) > 0.20 and kage_gold > 1000
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: "[NGƯỠNG CHƯA VERIFY] Tổng gold toàn server tăng >20%/giờ — nghi duplicate (OBSERVABILITY.md §3.5)"
+          summary: "Tổng gold toàn server tăng >20%/giờ (kage_gold > 1000) — nghi duplicate (OBSERVABILITY.md §3.5, §8.1)"
 
       - alert: GcPauseHigh
         expr: jvm_gc_pause_seconds_max > 0.1

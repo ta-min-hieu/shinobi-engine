@@ -798,3 +798,25 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **28 ADR Accepted** (gồm
       Asset Delivery) thay vì đoán số liệu chưa tồn tại (repo hiện chưa có `assets/` thật nào, Android
       cũng chưa phải target đã chốt). Chờ chủ dự án Accept. Xem
       [ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md).
+23. Phase 10 — 3 luồng song song đóng nốt các khoảng trống observability/security còn lại
+    (2026-08-02, chạy đồng thời qua worktree-isolated agent, main session review + merge):
+    - ✅ **GoldTotalSpike đo lại thật, gỡ marker `[NGƯỠNG CHƯA VERIFY]`** — `SimulatedPlayer` (tools:
+      load-test) giờ ghi nhận `ItemGrantedEvent` rồi bán lại qua `SellItemCommand` thật (50%/cycle
+      nếu đang giữ item); đo lại đúng quy trình cũ (100 client, ramp 10→100, 1500s, Postgres/Redis
+      thật cổng 55432/55679): `kage_gold` tăng thật 0 → 14, 0 lỗi client. Số tuyệt đối nhỏ vì 2 giới
+      hạn RIÊNG của phép đo (không phải trần thật): chỉ 1 quái nội dung tồn tại + tool chỉ chốt
+      `monsterId` 1 lần lúc connect (không re-target sau respawn, ID mới mỗi lần hồi sinh) — xem
+      phân tích đầy đủ [OBSERVABILITY.md §8.1](../07-infrastructure/OBSERVABILITY.md). Giữ ngưỡng
+      20% (bằng chứng thật củng cố biên độ an toàn), thêm guard `kage_gold > 1000` vào
+      `alert_rules.yml` sau khi phát hiện thật biểu thức tỉ lệ gốc chia gần 0 lúc server mới khởi
+      động (nổ số/không xác định).
+    - ✅ **Grafana dashboard vá khoảng trống với metric đã implement nhưng chưa có panel** —
+      `kage.packet.size` (network.json) và `kage.db.query.duration`/`kage.db.transaction.failed`
+      (database.json) đã có code từ trước (2026-08-02, round quan sát trước) nhưng dashboard/doc
+      §9 vẫn ghi "chưa implement". Verify tên Prometheus series thật (không đoán) bằng scrape thử,
+      xác nhận cả 2 dashboard provision đúng qua Grafana API thật (`docker compose up` thật).
+    - ✅ **Đóng gap kiểm chứng runtime cho Redis `requirepass`** (SECURITY.md §14) — thêm
+      `RedisSessionAdapterIntegrationTest.shouldRejectConnection_whenNoPasswordProvided`
+      (Testcontainers, tái dùng container `--requirepass` có sẵn): xác nhận kết nối không password
+      bị từ chối thật với `JedisAccessControlException: NOAUTH Authentication required.`,
+      sanity-check bằng cách tạm bỏ `--requirepass` để xác nhận test fail đúng khi mất bảo vệ.

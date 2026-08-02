@@ -10,6 +10,8 @@ import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -28,11 +30,13 @@ import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
 import dev.kage.protocol.CreateCharacterResponse;
+import dev.kage.protocol.ItemGrantedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.SelectCharacterRequest;
+import dev.kage.protocol.SellItemCommand;
 import dev.kage.protocol.SendChatMessageCommand;
 import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.wire.PacketCodec;
@@ -44,6 +48,12 @@ import dev.kage.protocol.wire.ProtocolVersion;
  * {@code GatewayServerIntegrationTest}), KHÔNG gọi tắt API nội bộ server. Vòng lặp hành vi
  * (BENCHMARK.md §5 "giả lập hành vi thật — move + combat + chat"): mỗi hành động là 1 command đi
  * kèm phản hồi đọc thật (đo latency) hoặc fire-and-forget (SetTargetCommand — auto-attack, GDD §6).
+ *
+ * <p>Bán đồ (OBSERVABILITY.md §8.1 "Việc cần làm tiếp theo" — đóng khoảng trống baseline
+ * {@code GoldTotalSpike}): {@code ItemGrantedEvent} rơi ra sau lúc hạ dummy được ghi nhận thụ động
+ * ở {@link #readFrame} (xen giữa AoI event, giống cách {@link #findTrainingDummy} bắt
+ * {@code MonsterSpawnedEvent}), rồi bán lại qua {@code SellItemCommand} — đây là đường DUY NHẤT
+ * trong code hiện tại làm {@code kage.gold.total} tăng thật (combat/quest chỉ cộng item/EXP).
  *
  * <p>Chỉ dummy tập luyện cố định (5,5) tồn tại trong World chính lúc viết lát cắt này — mọi người
  * chơi giả lập hội tụ về cùng 1 điểm, MÔ PHỎNG ĐÚNG kịch bản áp lực AoI/combat cao nhất hiện có
@@ -64,6 +74,9 @@ final class SimulatedPlayer implements Runnable {
     // phải đủ thấp để KHÔNG chạm ngưỡng đó dù cộng dồn nhiều cycle liên tiếp (trước là 20, gây
     // client bị ngắt kết nối hàng loạt trong soak test đầu).
     private static final int CHAT_PROBABILITY_PERCENT = 3;
+    // Không giới hạn rate riêng ở server cho bán đồ (khác world chat) — xác suất chỉ để tránh MỌI
+    // client cùng bán đúng 1 nhịp, không phải né rate limiter.
+    private static final int SELL_PROBABILITY_PERCENT = 50;
 
     // ADR-027 — CÙNG cert dev/test dùng ở server-gateway/client-core (xem comment tương ứng ở đó,
     // KHÔNG an toàn cho môi trường thật). Load-test nói ĐÚNG giao thức dây thật kể cả TLS — không
@@ -80,11 +93,16 @@ final class SimulatedPlayer implements Runnable {
     record Metrics(
             LatencyRecorder latencyRecorder, AtomicLong errorCount, AtomicLong bytesSent, AtomicLong bytesReceived) {}
 
+    /** 1 dòng {@code ItemGrantedEvent} chưa bán — {@code itemId} là {@code inventory_item.id} thật. */
+    private record OwnedItem(long itemId, int quantity) {}
+
     private final String host;
     private final int port;
     private final String username;
     private final Metrics metrics;
     private final AtomicBoolean running = new AtomicBoolean(true);
+    // 1 thread/player (Runnable chạy trên Virtual Thread riêng, LoadTestRunner), không cần đồng bộ.
+    private final Deque<OwnedItem> ownedItems = new ArrayDeque<>();
 
     private Socket socket;
     private int nextSequenceId = 1;
@@ -232,9 +250,32 @@ final class SimulatedPlayer implements Runnable {
                     .build();
             timedRoundTrip(in, Opcode.OPCODE_PING_VALUE, Opcode.OPCODE_PONG_VALUE, ping.toByteArray());
         }
+        if (!ownedItems.isEmpty() && random.nextInt(100) < SELL_PROBABILITY_PERCENT) {
+            sellOneOwnedItem(in);
+        }
 
         MoveCommand stop = MoveCommand.newBuilder().setDirX(0f).setDirY(0f).build();
         sendFrame(Opcode.OPCODE_MOVE_COMMAND_VALUE, stop.toByteArray());
+    }
+
+    /**
+     * Bán 1 dòng item đã nhặt được (kunai rơi từ dummy tập luyện, LUÔN nằm trong {@code shop_item}
+     * — xem {@code feature-shop/CLAUDE.md}), chấp nhận outcome bất kỳ (kể cả {@code ITEM_NOT_FOUND}
+     * nếu server đã dọn item đó vì lý do khác — tool chỉ cần round-trip THẬT để tạo tải kage.gold
+     * thật, không assert nghiệp vụ ở đây, business logic đã có test riêng ở feature-shop).
+     */
+    private void sellOneOwnedItem(DataInputStream in) throws IOException {
+        OwnedItem item = ownedItems.poll();
+        timedRoundTrip(
+                in,
+                Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE,
+                Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE,
+                SellItemCommand.newBuilder()
+                        .setItemId(item.itemId())
+                        .setQuantity(item.quantity())
+                        .setIdempotencyKey(UUID.randomUUID().toString())
+                        .build()
+                        .toByteArray());
     }
 
     private void sleepJitter(ThreadLocalRandom random) {
@@ -287,7 +328,15 @@ final class SimulatedPlayer implements Runnable {
         in.readFully(bytes);
         // Đếm MỌI frame nhận được (kể cả AoI event bị readUntilOpcode bỏ qua) — băng thông nhận thật.
         metrics.bytesReceived().addAndGet(4L + length);
-        return PacketCodec.decodeFrame(bytes);
+        PacketCodec.Frame frame = PacketCodec.decodeFrame(bytes);
+        // Ghi nhận THỤ ĐỘNG ở đây (không phải nơi gọi cụ thể nào) vì ItemGrantedEvent có thể xen
+        // giữa BẤT KỲ readUntilOpcode nào (move/chat/ping response) sau lúc hạ dummy — cùng lý do
+        // findTrainingDummy phải quét MonsterSpawnedEvent thay vì đợi ở 1 điểm cố định.
+        if (frame.header().opcode() == Opcode.OPCODE_ITEM_GRANTED_EVENT_VALUE) {
+            ItemGrantedEvent event = ItemGrantedEvent.parseFrom(frame.payload());
+            ownedItems.add(new OwnedItem(event.getItemId(), event.getQuantity()));
+        }
+        return frame;
     }
 
     private void closeQuietly() {

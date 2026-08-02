@@ -186,7 +186,7 @@ public final class LoadTestRunner {
         double receivedKBs = metrics.bytesReceived().getAndSet(0) / 1024.0 / intervalSeconds;
         LOG.info(
                 "[report] client={} packetLatencyMs(p50/p95/p99)={}/{}/{} (n={}) "
-                        + "serverTickMs(p50/p95/p99)={}/{}/{} băngThôngKBs(gửi/nhận)={}/{} lỗi={}",
+                        + "serverTickMs(p50/p95/p99)={}/{}/{} băngThôngKBs(gửi/nhận)={}/{} lỗi={} kageGold={}",
                 activeClients,
                 round(latency.p50Millis()),
                 round(latency.p95Millis()),
@@ -197,7 +197,8 @@ public final class LoadTestRunner {
                 round(tick.p99Millis()),
                 round(sentKBs),
                 round(receivedKBs),
-                metrics.errorCount().get());
+                metrics.errorCount().get(),
+                tick.goldTotal());
     }
 
     private static double round(double millis) {

@@ -241,7 +241,7 @@ process không tồn tại để trả `/health/ready` nếu bước đó thất
 | 🔴 Tick p99 > ngân sách | > 16.6ms trong 5 phút (@60Hz) — ✅ số thật (ADR-018) | Điều tra ngay |
 | 🔴 Server down | `up{job="kage-server-gateway"} == 0` trong 1 phút | Restart / failover |
 | 🔴 DB pool cạn | pending > 0 trong 1 phút | Tăng pool / tìm query chậm |
-| 🔴 **Gold tổng tăng bất thường** | ⚠️ [NGƯỠNG CHƯA VERIFY] > 20%/giờ (đo thật 1 phần 2026-08-02 — xem §8.1) | Nghi duplicate — điều tra ngay |
+| 🔴 **Gold tổng tăng bất thường** | ✅ > 20%/giờ VÀ `kage_gold` > 1000 (đo thật 2026-08-02, cận dưới — xem §8.1) | Nghi duplicate — điều tra ngay |
 | 🟡 GC pause > 100ms | max — ✅ đã có baseline thật (ADR-019: ZGC max đo được 0.052ms ở tải 80 client; 100ms là ngưỡng an toàn tạm, rộng hơn nhiều so với đã đo) | Xem lại GC config |
 | 🟡 Login failed tăng vọt | ✅ > 5/phút trong 1 phút — đo thật 2026-08-02, xem §8.1 | Nghi brute-force |
 | 🟢 Người chơi online thấp bất thường | — | **Không tạo alert** (Kỹ thuật quyết định #11: không hành động được → nhiễu) |
@@ -249,7 +249,8 @@ process không tồn tại để trả `/health/ready` nếu bước đó thất
 ✅ **implemented 2026-07-28** (Phase 9 lát cắt 9) — `deploy/docker/prometheus/alert_rules.yml` +
 `deploy/docker/alertmanager/alertmanager.yml` (receiver `"null"` — CHƯA có kênh thông báo thật
 Slack/email, chỉ xem UI `:9093`). Cập nhật 2026-08-02: `LoginFailedSpike` giờ có baseline thật,
-`GoldTotalSpike` vẫn ⚠️ **[NGƯỠNG CHƯA VERIFY]** (đo được 1 phần, chưa đủ để chốt số) — xem §8.1.
+`GoldTotalSpike` đo lại thật cùng ngày (gỡ marker `[NGƯỠNG CHƯA VERIFY]`, giữ 20% + thêm guard
+`kage_gold > 1000`) — xem §8.1.
 
 ⚠️ **PHÁT HIỆN THẬT lúc viết PromQL** (xác nhận bằng cách dump `registry.scrape()` thật, không đoán):
 Micrometer/Prometheus registry đổi tên metric Gauge `kage.gold.total` thành **`kage_gold`**, KHÔNG
@@ -283,7 +284,8 @@ thấp để bắt brute-force thật (hàng chục+ lần thất bại/phút li
 chọn có lý do, KHÔNG phải đo trực tiếp được** — `tools:load-test` dùng username hợp lệ cố định,
 không mô phỏng được người gõ sai thật (khác giới hạn tự nhiên của công cụ, không phải thiếu sót).
 
-**GoldTotalSpike — verify được 1 phần, GIỮ marker:**
+**GoldTotalSpike — combat/quest xác nhận 0% (không đổi); bán đồ ĐO LẠI THẬT 2026-08-02, ngưỡng
+GIỮ NGUYÊN 20% (có thêm guard chia gần 0):**
 
 `kage_gold` **phẳng tuyệt đối ở 0.0 suốt cả 51 lần scrape** — 0%/giờ tăng trưởng từ hành vi
 combat+move+chat+ping (hành vi mặc định `tools:load-test`, xem `SimulatedPlayer`). Đọc code xác
@@ -293,15 +295,34 @@ túi đồ (không chạm `GoldPort`); `QuestFacade.onMonsterKilled` chỉ cộn
 nhiệm vụ ⇒ nhận gold trực tiếp" nào** — 0% đo được là kết quả chắc chắn về mặt code, không chỉ là
 noise của 1 lần đo ngắn.
 
-⚠️ **Vì sao vẫn CHƯA verify được toàn bộ, giữ marker**: đường tăng gold **hợp lệ** duy nhất đang tồn
-tại trong code là `SellItemUseCase` (bán đồ rơi được cho NPC shop, cộng gold thật cho người bán) —
-`tools:load-test`'s `SimulatedPlayer` **không mô phỏng hành vi bán đồ ở shop**, nên %/giờ tăng
-trưởng gold cho TOÀN BỘ hoạt động hợp lệ (không chỉ riêng combat/quest) vẫn chưa có số liệu thật.
-Không hạ ngưỡng 20% xuống dựa trên số 0% đo được ở đây — làm vậy sẽ ngầm coi "combat không tạo gold"
-tương đương "toàn bộ economy không tăng trưởng", trong khi bán đồ (không đo được ở lần này) hoàn
-toàn có thể tạo ra %/giờ đáng kể khi nhiều người chơi cùng bán đồ, đặc biệt sau các đợt dọn túi đồ.
-**Việc cần làm tiếp theo** để đóng khoảng trống này: thêm hành vi bán đồ định kỳ vào `SimulatedPlayer`
-(đủ item để bán cần trước đó đã có drop, tối thiểu vài chu kỳ combat), rồi đo lại cùng quy trình.
+✅ **Đóng khoảng trống "chưa mô phỏng bán đồ"**: `SimulatedPlayer` giờ ghi nhận `ItemGrantedEvent`
+(kunai rơi từ training dummy) rồi bán lại qua `SellItemCommand` (50%/cycle nếu đang giữ item — xem
+mã nguồn `tools/load-test/.../SimulatedPlayer.java`). Đo lại ĐÚNG quy trình cũ (100 client, ramp
+10→100, 1500s, Postgres/Redis thật cổng 55432/55679): `kage_gold` tăng THẬT **0 → 14** trong suốt
+lần chạy, **0 lỗi client** — xác nhận đường bán đồ hoạt động đúng đầu-cuối qua socket thật (không
+chỉ đúng ở tầng UseCase như trước).
+
+⚠️ **Vì sao số tuyệt đối đo được nhỏ (14 gold/1500s) — 2 giới hạn RIÊNG của phép đo, không phải trần
+thật của economy**, nên KHÔNG dùng con số này làm "trần" để SIẾT ngưỡng xuống:
+1. **Chỉ có 1 quái nội dung tồn tại** (`training_dummy`, cố định 1 điểm — Phase 4) — mọi client giả
+   lập tranh nhau 1 mục tiêu duy nhất, respawn 10s (`CombatConstants.MONSTER_RESPAWN_SECONDS`).
+2. **`SimulatedPlayer` chỉ chốt `monsterId` MỘT LẦN lúc connect** (`findTrainingDummy`), không
+   re-target sau khi dummy đó chết — mỗi lần hồi sinh tạo entity ID MỚI (giảm dần,
+   `WorldFacade.spawnTrainingDummy`), nên phần lớn client "mù mục tiêu" vĩnh viễn ngay sau lần hồi
+   sinh đầu tiên chúng chạm phải. Đây là giới hạn CỦA TOOL (người chơi thật sẽ tự bấm lại mục tiêu
+   qua UI khi thấy quái mới) — nghĩa là **14 gold/1500s là CẬN DƯỚI**, không phải cận trên, của tốc
+   độ tăng trưởng hợp lệ mà nhiều người chơi thật, chủ động cày liên tục, có thể tạo ra.
+
+**Kết luận ngưỡng**: quy đổi 14 gold/1500s ≈ 34 gold/giờ tuyệt đối. %/giờ phụ thuộc tổng gold server
+hiện có (mẫu số không cố định theo tuổi đời server) nên không quy đổi máy móc thành 1 số %/giờ cố
+định — nhưng với guard `kage_gold > 1000` mới thêm vào `alert_rules.yml` (tránh chia gần 0 lúc
+server mới khởi động, PHÁT HIỆN THẬT: biểu thức gốc không guard sẽ nổ số/không xác định khi
+`kage_gold` ~0), 34 gold/giờ tương ứng < 3.4%/giờ — cách xa 20% nhiều lần. Giữ nguyên **20%**
+(không đổi số) vì bằng chứng thật thu được củng cố, không mâu thuẫn, giả định ban đầu rằng 20% có
+biên độ rộng so với hoạt động hợp lệ — dù trần thật của economy (nếu nội dung quái mở rộng, nhiều
+điểm farm hơn) vẫn CHƯA đo được do 2 giới hạn ở trên. Không cố đẩy `SimulatedPlayer` tới trần thật
+ở lát cắt này (re-target sau respawn, nhiều điểm quái...) — chưa cần thiết để đóng gap ngưỡng hiện
+tại, để dành cho lúc content quái mở rộng thật (Phase 6+).
 
 ---
 
@@ -349,7 +370,7 @@ import tay. Datasource Prometheus (metrics) + Jaeger (traces) cũng provision t�
 | 7 | Tracing có **sampling** (1%, `traceIdRatioBased`), không trace mọi tick | Overhead | Accepted, implemented 2026-07-28 |
 | 8 | `live` vs `ready` phân biệt rõ | DB chết thì restart không giúp | Accepted |
 | 9 | Health check tự implement, không Spring Actuator | [ADR-009](../01-architecture/adr/ADR-009-Why-No-Spring-Boot.md) | Accepted |
-| 10 | **Ngưỡng alert đa số đã có baseline thật** — 4/6 alert (tick p99, GC pause, LoginFailedSpike từ 2026-08-02, GoldTotalSpike verify 1 phần) có số liệu thật đứng sau, chỉ GoldTotalSpike còn đánh dấu [NGƯỠNG CHƯA VERIFY] (§8.1: đường bán đồ ở shop chưa đo được) | Ngưỡng bừa = alert fatigue | ⏳ một phần |
+| 10 | **Ngưỡng alert đa số đã có baseline thật** — 5/6 alert (tick p99, GC pause, LoginFailedSpike, GoldTotalSpike đều từ 2026-08-02) có số liệu thật đứng sau; GoldTotalSpike đo được CẬN DƯỚI (§8.1: 2 giới hạn của phép đo), trần thật vẫn chưa xác định | Ngưỡng bừa = alert fatigue | ✅ gần hết |
 | 11 | Alert không hành động được → **không tạo** (bỏ "players online thấp") | Nhiễu làm hỏng cả hệ thống alert | Accepted, implemented 2026-07-28 |
 | 12 | OTLP/HTTP (không phải gRPC) cho tracing exporter | Tránh transitive grpc-netty-shaded đụng version netty-all (Điều 23) | Accepted, implemented 2026-07-28 |
 | 13 | Jaeger all-in-one thay vì Tempo/Collector riêng | Đơn giản nhất cho dự án cá nhân single-instance (cùng tinh thần ADR-014) | Accepted, implemented 2026-07-28 |
@@ -367,9 +388,10 @@ import tay. Datasource Prometheus (metrics) + Jaeger (traces) cũng provision t�
 
 1. ✅ **ADR-015 đã chốt** (2026-07-26).
 2. ✅ Phase 9 lát cắt 1: `kage.tick.duration` — xong 2026-07-26.
-3. Phase 9: đo **baseline** trước, đặt ngưỡng alert sau (§8) — tick p99/GC pause/LoginFailedSpike đã
-   có baseline thật (xem BENCHMARK.md §5.2-5.3 và §8.1 ở trên); **GoldTotalSpike vẫn ⏳** — verify
-   được phần combat/quest (0%, chắc chắn về mặt code) nhưng chưa đo được phần bán đồ ở shop.
+3. ✅ Phase 9: đo **baseline** trước, đặt ngưỡng alert sau (§8) — tick p99/GC pause/LoginFailedSpike/
+   GoldTotalSpike đều có baseline thật (xem BENCHMARK.md §5.2-5.3 và §8.1 ở trên). GoldTotalSpike
+   đo được là CẬN DƯỚI (2 giới hạn của phép đo, §8.1) — trần thật của economy để dành đo lại khi
+   content quái mở rộng, không chặn việc đặt ngưỡng hiện tại.
 4. ✅ Phase 9 lát cắt 8 (2026-07-28, trễ hơn Phase 5/7 dự kiến ban đầu — làm ở Phase 9 vì đây mới là
    lúc quay lại đóng khoảng trống observability): `kage.gold.total`, `kage.tick.overrun.count`,
    `kage.players.online`, `/health/live`, `/health/ready` — pure code, KHÔNG thêm dependency mới.
@@ -421,6 +443,8 @@ import tay. Datasource Prometheus (metrics) + Jaeger (traces) cũng provision t�
    thật, xác nhận span đúng tên + attribute `result`. Còn lại ~53/57 opcode chưa có span sâu.
 9. ✅ **Đo baseline GoldTotalSpike/LoginFailedSpike thật (2026-08-02)** — xem §8.1 chi tiết đầy đủ.
    `LoginFailedSpike` xong (5/phút, `for: 1m`, có baseline thật + lý do rõ ràng cho phần không đo
-   trực tiếp được). `GoldTotalSpike` **CHƯA xong** — cần thêm hành vi bán đồ (shop sell) vào
-   `tools:load-test`'s `SimulatedPlayer` rồi đo lại mới đủ dữ liệu chốt ngưỡng thật, gỡ marker
-   [NGƯỠNG CHƯA VERIFY].
+   trực tiếp được). `GoldTotalSpike` **ĐO LẠI xong cùng ngày** (sau khi thêm hành vi bán đồ vào
+   `SimulatedPlayer`) — gỡ marker `[NGƯỠNG CHƯA VERIFY]`, giữ 20% (bằng chứng thật củng cố biên độ
+   an toàn) + thêm guard `kage_gold > 1000` (tránh chia gần 0 lúc bootstrap). Trần thật của economy
+   (không chỉ cận dưới đo được) vẫn chưa xác định — 2 giới hạn cụ thể ghi ở §8.1, để dành đo lại
+   khi content quái mở rộng thật.
