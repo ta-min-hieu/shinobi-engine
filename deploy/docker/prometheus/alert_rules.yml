@@ -8,9 +8,16 @@
 # MicrometerTickMetricsPort javadoc.
 #
 # Ngưỡng đánh dấu [NGƯỠNG CHƯA VERIFY] là số PLACEHOLDER — OBSERVABILITY.md §8 tự ghi rõ "chưa có,
-# phải đo baseline trước, đặt bừa = alert fatigue". Chỉ 2 ngưỡng có số liệu thật đo được: tick p99
-# 16.6ms (60Hz, ADR-018) và GC pause (ADR-019 đo thật 0.052ms max ở tải 80 client — 100ms vẫn còn
-# rất rộng so với số đã đo, coi là ngưỡng an toàn tạm thời, không phải baseline chính xác).
+# phải đo baseline trước, đặt bừa = alert fatigue". Tick p99 16.6ms (60Hz, ADR-018) và GC pause
+# (ADR-019 đo thật 0.052ms max ở tải 80 client — 100ms vẫn còn rất rộng so với số đã đo, coi là
+# ngưỡng an toàn tạm thời, không phải baseline chính xác) đã có số liệu thật từ trước.
+#
+# 2026-08-02 — đo baseline LoginFailedSpike/GoldTotalSpike thật (`tools:load-test`, 100 client, ramp
+# 10→100, giữ tải ~19.5 phút, tổng 25 phút, Postgres 17 + Redis 8 thật qua Docker cổng non-default
+# 55432/55679 tránh đụng service khác trên máy, scrape /metrics mỗi 30s — xem OBSERVABILITY.md §8
+# và BENCHMARK.md §5 cho chi tiết đầy đủ + giới hạn phép đo). Kết quả: LoginFailedSpike VERIFY được
+# (xem ngay dưới); GoldTotalSpike CHỈ verify được 1 phần (combat/quest xác nhận 0%, đường tăng gold
+# hợp lệ khác — bán đồ ở shop — CHƯA được `tools:load-test` giả lập nên vẫn PLACEHOLDER).
 groups:
   - name: kage-server-gateway
     rules:
@@ -39,7 +46,16 @@ groups:
         annotations:
           summary: "HikariCP có thread đang chờ connection liên tục — pool quá nhỏ (BENCHMARK.md §5.2)"
 
-      # [NGƯỠNG CHƯA VERIFY] 20%/giờ là số PLACEHOLDER — chưa đo baseline tăng trưởng gold thật.
+      # [NGƯỠNG CHƯA VERIFY] 20%/giờ vẫn là PLACEHOLDER — đo thật 2026-08-02 (100 client, 25 phút,
+      # combat+move+chat+ping — hành vi mặc định `tools:load-test`) cho kage_gold PHẲNG TUYỆT ĐỐI ở
+      # 0.0 suốt 51 lần scrape (0%/giờ từ combat/quest) — khớp ĐÚNG với code: GrantLootUseCase chỉ
+      # cộng item (không gold), QuestFacade chỉ cộng ExpPort (không GoldPort) — hiện KHÔNG có đường
+      # "giết quái/nhiệm vụ ⇒ gold" nào trong game content hiện tại, nên 0% là kết quả chắc chắn,
+      # không phải trùng hợp của 1 lần chạy. NHƯNG: đường tăng gold HỢP LỆ duy nhất đang tồn tại
+      # (SellItemUseCase — bán đồ cho NPC shop cộng gold thật) KHÔNG được `tools:load-test` giả lập
+      # (hành vi client chỉ move+combat+chat+ping, không có thao tác shop) — nên %/giờ tăng trưởng
+      # gold CHO TOÀN BỘ hoạt động hợp lệ (kể cả bán đồ) vẫn CHƯA đo được, giữ marker cho tới khi
+      # `SimulatedPlayer` mô phỏng thêm hành vi bán đồ. Xem OBSERVABILITY.md §8.
       - alert: GoldTotalSpike
         expr: (increase(kage_gold[1h]) / kage_gold) > 0.20
         for: 5m
@@ -56,10 +72,21 @@ groups:
         annotations:
           summary: "GC pause tối đa > 100ms (ADR-019 đo thật ZGC max 0.052ms ở tải 80 client — 100ms là ngưỡng an toàn tạm, không phải baseline chính xác)"
 
-      # [NGƯỠNG CHƯA VERIFY] 10 lần/phút là số PLACEHOLDER — chưa đo baseline login thật.
+      # ✅ Đo thật 2026-08-02 (xem block đầu file) — kage_login_failed_total = 0 tuyệt đối suốt 25
+      # phút/100 client thật (noise floor thật đo được = 0). LoginOrCreateAccountUseCase KHÔNG có
+      # mật khẩu (kage_no_password_auth, MVP cắt) — account tự tạo nếu username chưa tồn tại, nên
+      # đường "login thất bại" DUY NHẤT ở normal play là username sai định dạng (độ dài/ký tự,
+      # Account.java) hoặc lỗi hạ tầng (DB/Redis down — đã có ServerDown/DbPoolExhausted alert riêng
+      # bắt việc đó). Không có "sai mật khẩu" để gõ nhầm như game thường — noise thật còn THẤP HƠN
+      # cả giả định "gõ nhầm mật khẩu" thông thường. Ngưỡng 5/phút là LỰA CHỌN CÓ LÝ DO (KHÔNG phải
+      # đo được trực tiếp — `tools:load-test` dùng username hợp lệ cố định, không mô phỏng người
+      # gõ sai được): margin rộng so với noise floor=0 thật đã xác nhận, đủ thấp để vẫn bắt được
+      # brute-force thật (hàng chục+ lần thất bại/phút liên tục) — thấp hơn placeholder cũ (10) vì
+      # giờ đã CÓ bằng chứng thật (không phải đoán) rằng noise thật bằng 0.
       - alert: LoginFailedSpike
-        expr: increase(kage_login_failed_total[1m]) > 10
+        expr: increase(kage_login_failed_total[1m]) > 5
+        for: 1m
         labels:
           severity: warning
         annotations:
-          summary: "[NGƯỠNG CHƯA VERIFY] Đăng nhập thất bại tăng vọt — nghi brute-force"
+          summary: "Đăng nhập thất bại tăng vọt (>5/phút, ngưỡng có lý do — noise floor thật đo được = 0, OBSERVABILITY.md §8) — nghi brute-force"

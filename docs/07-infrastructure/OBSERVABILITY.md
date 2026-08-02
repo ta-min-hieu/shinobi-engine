@@ -241,20 +241,67 @@ process không tồn tại để trả `/health/ready` nếu bước đó thất
 | 🔴 Tick p99 > ngân sách | > 16.6ms trong 5 phút (@60Hz) — ✅ số thật (ADR-018) | Điều tra ngay |
 | 🔴 Server down | `up{job="kage-server-gateway"} == 0` trong 1 phút | Restart / failover |
 | 🔴 DB pool cạn | pending > 0 trong 1 phút | Tăng pool / tìm query chậm |
-| 🔴 **Gold tổng tăng bất thường** | ⚠️ [NGƯỠNG CHƯA VERIFY] > 20%/giờ | Nghi duplicate — điều tra ngay |
+| 🔴 **Gold tổng tăng bất thường** | ⚠️ [NGƯỠNG CHƯA VERIFY] > 20%/giờ (đo thật 1 phần 2026-08-02 — xem §8.1) | Nghi duplicate — điều tra ngay |
 | 🟡 GC pause > 100ms | max — ✅ đã có baseline thật (ADR-019: ZGC max đo được 0.052ms ở tải 80 client; 100ms là ngưỡng an toàn tạm, rộng hơn nhiều so với đã đo) | Xem lại GC config |
-| 🟡 Login failed tăng vọt | ⚠️ [NGƯỠNG CHƯA VERIFY] > 10/phút | Nghi brute-force |
+| 🟡 Login failed tăng vọt | ✅ > 5/phút trong 1 phút — đo thật 2026-08-02, xem §8.1 | Nghi brute-force |
 | 🟢 Người chơi online thấp bất thường | — | **Không tạo alert** (Kỹ thuật quyết định #11: không hành động được → nhiễu) |
 
 ✅ **implemented 2026-07-28** (Phase 9 lát cắt 9) — `deploy/docker/prometheus/alert_rules.yml` +
 `deploy/docker/alertmanager/alertmanager.yml` (receiver `"null"` — CHƯA có kênh thông báo thật
-Slack/email, chỉ xem UI `:9093`). 2 ngưỡng đánh dấu ⚠️ **[NGƯỠNG CHƯA VERIFY]** vẫn là placeholder —
-đo baseline thật trước khi tin, đúng cảnh báo gốc của mục này.
+Slack/email, chỉ xem UI `:9093`). Cập nhật 2026-08-02: `LoginFailedSpike` giờ có baseline thật,
+`GoldTotalSpike` vẫn ⚠️ **[NGƯỠNG CHƯA VERIFY]** (đo được 1 phần, chưa đủ để chốt số) — xem §8.1.
 
 ⚠️ **PHÁT HIỆN THẬT lúc viết PromQL** (xác nhận bằng cách dump `registry.scrape()` thật, không đoán):
 Micrometer/Prometheus registry đổi tên metric Gauge `kage.gold.total` thành **`kage_gold`**, KHÔNG
 PHẢI `kage_gold_total` — hậu tố `.total` bị coi là marker Counter `_total` nên bị strip cho Gauge,
 không cộng lại. Viết PromQL/dashboard theo tên dotted + `_total` máy móc sẽ SAI thật (query trả rỗng).
+
+### 8.1 Đo baseline thật cho GoldTotalSpike/LoginFailedSpike (2026-08-02)
+
+✅ **Đo thật bằng `tools:load-test`**, đúng quy trình BENCHMARK.md §5 (server-gateway thật qua
+`./gradlew :server:server-gateway:run`, JDK `loom-ea-25-loom+1-11`, Postgres 17 + Redis 8 thật qua
+Docker — cổng **non-default** 55432/55679 để không đụng service khác đang chạy sẵn trên máy đo,
+TLS bật với cert dev tự ký sẵn có `server-gateway/src/test/resources/tls/dev-cert.pem`). Kịch bản:
+**100 client** (`--maxClients=100`, mốc N đã biết an toàn từ BENCHMARK.md §5.1/§5.3 — tick p99 dưới
+2ms ở N còn lớn hơn nhiều), ramp 10→100 (mặc định `tools:load-test`, bước 10 client/30s), giữ tải
+ổn định ~19.5 phút, **tổng 25 phút** (`--durationSeconds=1500`), scrape `/metrics` mỗi 30s
+(`--reportIntervalSeconds=30` cho báo cáo phía client; scrape riêng biệt lấy `kage_gold`/
+`kage_login_failed_total`/`kage_players_online` mỗi 30s suốt toàn bộ 25 phút). Kết quả: **0 lỗi
+client** suốt test, đỉnh tải xác nhận đúng 100 (`kage_players_online` cao nhất = 100).
+
+**LoginFailedSpike — VERIFY được, đã cập nhật ngưỡng:**
+
+`kage_login_failed_total` **= 0 tuyệt đối** suốt cả 51 lần scrape (kể cả lúc ramp connect 100 client
+gần như đồng thời) — noise floor thật đo được là **0**. Đọc code xác nhận vì sao: đăng nhập game
+này **không có mật khẩu** (`LoginOrCreateAccountUseCase`/`AccountPort.findOrCreate` — tự tạo account
+nếu username chưa tồn tại, quyết định MVP đã ghi nhận trước đó), nên đường "login thất bại" DUY NHẤT
+ở normal play là username sai định dạng (độ dài/ký tự, `Account.java`) hoặc lỗi hạ tầng (DB/Redis
+down — đã có `ServerDown`/`DbPoolExhausted` alert riêng bắt việc đó) — **không có khái niệm "gõ
+nhầm mật khẩu"** như phần lớn game khác, nên noise thật còn thấp hơn cả giả định thông thường.
+Ngưỡng mới **> 5/phút, `for: 1m`** — margin rộng so với noise floor=0 đã xác nhận thật, nhưng vẫn đủ
+thấp để bắt brute-force thật (hàng chục+ lần thất bại/phút liên tục). ⚠️ Bản thân con số 5 là **lựa
+chọn có lý do, KHÔNG phải đo trực tiếp được** — `tools:load-test` dùng username hợp lệ cố định,
+không mô phỏng được người gõ sai thật (khác giới hạn tự nhiên của công cụ, không phải thiếu sót).
+
+**GoldTotalSpike — verify được 1 phần, GIỮ marker:**
+
+`kage_gold` **phẳng tuyệt đối ở 0.0 suốt cả 51 lần scrape** — 0%/giờ tăng trưởng từ hành vi
+combat+move+chat+ping (hành vi mặc định `tools:load-test`, xem `SimulatedPlayer`). Đọc code xác
+nhận đây KHÔNG phải trùng hợp của 1 lần chạy: `GrantLootUseCase` (quái chết) chỉ cộng **item** vào
+túi đồ (không chạm `GoldPort`); `QuestFacade.onMonsterKilled` chỉ cộng **EXP** (`ExpPort`, không có
+`GoldPort` nào ở feature-quest). Nói cách khác, **hiện tại game KHÔNG có đường "giết quái/hoàn thành
+nhiệm vụ ⇒ nhận gold trực tiếp" nào** — 0% đo được là kết quả chắc chắn về mặt code, không chỉ là
+noise của 1 lần đo ngắn.
+
+⚠️ **Vì sao vẫn CHƯA verify được toàn bộ, giữ marker**: đường tăng gold **hợp lệ** duy nhất đang tồn
+tại trong code là `SellItemUseCase` (bán đồ rơi được cho NPC shop, cộng gold thật cho người bán) —
+`tools:load-test`'s `SimulatedPlayer` **không mô phỏng hành vi bán đồ ở shop**, nên %/giờ tăng
+trưởng gold cho TOÀN BỘ hoạt động hợp lệ (không chỉ riêng combat/quest) vẫn chưa có số liệu thật.
+Không hạ ngưỡng 20% xuống dựa trên số 0% đo được ở đây — làm vậy sẽ ngầm coi "combat không tạo gold"
+tương đương "toàn bộ economy không tăng trưởng", trong khi bán đồ (không đo được ở lần này) hoàn
+toàn có thể tạo ra %/giờ đáng kể khi nhiều người chơi cùng bán đồ, đặc biệt sau các đợt dọn túi đồ.
+**Việc cần làm tiếp theo** để đóng khoảng trống này: thêm hành vi bán đồ định kỳ vào `SimulatedPlayer`
+(đủ item để bán cần trước đó đã có drop, tối thiểu vài chu kỳ combat), rồi đo lại cùng quy trình.
 
 ---
 
@@ -302,7 +349,7 @@ import tay. Datasource Prometheus (metrics) + Jaeger (traces) cũng provision t�
 | 7 | Tracing có **sampling** (1%, `traceIdRatioBased`), không trace mọi tick | Overhead | Accepted, implemented 2026-07-28 |
 | 8 | `live` vs `ready` phân biệt rõ | DB chết thì restart không giúp | Accepted |
 | 9 | Health check tự implement, không Spring Actuator | [ADR-009](../01-architecture/adr/ADR-009-Why-No-Spring-Boot.md) | Accepted |
-| 10 | **Ngưỡng alert đa số vẫn placeholder** — 2/6 alert (tick p99, GC pause) có baseline thật, 2 alert còn đánh dấu [NGƯỠNG CHƯA VERIFY] | Ngưỡng bừa = alert fatigue | ⏳ một phần |
+| 10 | **Ngưỡng alert đa số đã có baseline thật** — 4/6 alert (tick p99, GC pause, LoginFailedSpike từ 2026-08-02, GoldTotalSpike verify 1 phần) có số liệu thật đứng sau, chỉ GoldTotalSpike còn đánh dấu [NGƯỠNG CHƯA VERIFY] (§8.1: đường bán đồ ở shop chưa đo được) | Ngưỡng bừa = alert fatigue | ⏳ một phần |
 | 11 | Alert không hành động được → **không tạo** (bỏ "players online thấp") | Nhiễu làm hỏng cả hệ thống alert | Accepted, implemented 2026-07-28 |
 | 12 | OTLP/HTTP (không phải gRPC) cho tracing exporter | Tránh transitive grpc-netty-shaded đụng version netty-all (Điều 23) | Accepted, implemented 2026-07-28 |
 | 13 | Jaeger all-in-one thay vì Tempo/Collector riêng | Đơn giản nhất cho dự án cá nhân single-instance (cùng tinh thần ADR-014) | Accepted, implemented 2026-07-28 |
@@ -320,8 +367,9 @@ import tay. Datasource Prometheus (metrics) + Jaeger (traces) cũng provision t�
 
 1. ✅ **ADR-015 đã chốt** (2026-07-26).
 2. ✅ Phase 9 lát cắt 1: `kage.tick.duration` — xong 2026-07-26.
-3. Phase 9: đo **baseline** trước, đặt ngưỡng alert sau (§8) — CHƯA làm (chỉ tick p99 có baseline
-   thật, xem BENCHMARK.md §5.2-5.3; các alert khác ở §8 vẫn ⏳ chưa verify ngưỡng).
+3. Phase 9: đo **baseline** trước, đặt ngưỡng alert sau (§8) — tick p99/GC pause/LoginFailedSpike đã
+   có baseline thật (xem BENCHMARK.md §5.2-5.3 và §8.1 ở trên); **GoldTotalSpike vẫn ⏳** — verify
+   được phần combat/quest (0%, chắc chắn về mặt code) nhưng chưa đo được phần bán đồ ở shop.
 4. ✅ Phase 9 lát cắt 8 (2026-07-28, trễ hơn Phase 5/7 dự kiến ban đầu — làm ở Phase 9 vì đây mới là
    lúc quay lại đóng khoảng trống observability): `kage.gold.total`, `kage.tick.overrun.count`,
    `kage.players.online`, `/health/live`, `/health/ready` — pure code, KHÔNG thêm dependency mới.
@@ -371,3 +419,8 @@ import tay. Datasource Prometheus (metrics) + Jaeger (traces) cũng provision t�
    bằng test mới `GatewayServerIntegrationTest#clientCommands_shouldEmitDeepChildSpans_forGoldAffectingCommands`
    (thêm `GatewayTracing.forTesting(SpanExporter)` — không dependency mới) gửi cả 3 lệnh qua socket
    thật, xác nhận span đúng tên + attribute `result`. Còn lại ~53/57 opcode chưa có span sâu.
+9. ✅ **Đo baseline GoldTotalSpike/LoginFailedSpike thật (2026-08-02)** — xem §8.1 chi tiết đầy đủ.
+   `LoginFailedSpike` xong (5/phút, `for: 1m`, có baseline thật + lý do rõ ràng cho phần không đo
+   trực tiếp được). `GoldTotalSpike` **CHƯA xong** — cần thêm hành vi bán đồ (shop sell) vào
+   `tools:load-test`'s `SimulatedPlayer` rồi đo lại mới đủ dữ liệu chốt ngưỡng thật, gỡ marker
+   [NGƯỠNG CHƯA VERIFY].
