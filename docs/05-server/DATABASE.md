@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version | 1.1.0 |
+| Version | 1.2.0 |
 | Status | Draft |
 | Liên quan | [ADR-004](../01-architecture/adr/ADR-004-Why-PostgreSQL.md), [ADR-005](../01-architecture/adr/ADR-005-Why-Redis.md) |
 
@@ -192,16 +192,32 @@ Dùng Redis ([ADR-005](../01-architecture/adr/ADR-005-Why-Redis.md) ✅ Accepted
 
 ## 8. Index
 
-Đề xuất (⚠️ **chưa verify** — phải đo query thật):
+✅ **Đã verify thật** (2026-08-02) — Testcontainers `postgres:17`, migrate qua `FlywayMigrator` (schema
+thật, không giả lập), seed dữ liệu quy mô thực tế (5.000 `character` trên 1.000 `account`, 20.000
+`inventory_item`, 5.000 `character_quest_progress`, 300 `guild` × 3.000 `guild_member`, 20.000 `mail`,
+50.000 `audit_log`), `ANALYZE` để planner có thống kê thật, rồi chạy `EXPLAIN (ANALYZE, BUFFERS)`
+với **đúng câu SQL các adapter thật sự phát ra** (đọc trực tiếp `Postgres*Adapter.java`, không bịa
+query). Mỗi index test theo cặp: xoá tạm (`DROP INDEX`/`DROP CONSTRAINT`) đo trước, tạo lại đúng
+định nghĩa migration đo sau.
 
-| Bảng | Index |
-|---|---|
-| `character` | `account_id`, `UNIQUE(name)` |
-| `inventory_item` | `character_id`, `(character_id, slot_index)` |
-| `character_quest_progress` | `(character_id, status)` |
-| `guild_member` | `guild_id`, `character_id` |
-| `mail` | `(receiver_character_id, is_read)`, `expires_at` |
-| `audit_log` | `(character_id, created_at)`, `created_at` |
+| Bảng | Index đề xuất ban đầu | Kết quả | Bằng chứng |
+|---|---|---|---|
+| `character` | `account_id` | ✅ **Đã có sẵn** (V2 `idx_character_account_id`) | `LIST_BY_ACCOUNT`: Seq Scan 0.160ms (quét 4995/5000 dòng thừa) → Index Scan 0.013ms |
+| `character` | `UNIQUE(name)` | ✅ **Đã có sẵn** (V2, cột `name ... UNIQUE` → constraint `character_name_key`) | `FIND_BY_NAME`/`EXISTS_BY_NAME`: Seq Scan 0.200ms → Index Scan 0.015ms |
+| `inventory_item` | `character_id` | ✅ **Đã có sẵn** (V4 `idx_inventory_item_character_id`) | `FIND_BY_CHARACTER`: Seq Scan 0.582ms (20.000 dòng) → Index Scan 0.010ms |
+| `inventory_item` | `(character_id, slot_index)` | ❌ **Từ chối** | Grep toàn bộ adapter đụng `inventory_item` (Inventory/Equipment/Trade/Shop/Mail/Quest) — `slot_index` **chỉ** xuất hiện ở `UPDATE SET`/`INSERT VALUES`, KHÔNG BAO GIỜ ở `WHERE`. Không có query thật để đo, không có lý do thêm |
+| `character_quest_progress` | `(character_id, status)` | ✅ **Đã có sẵn** (V11 `idx_character_quest_progress_status`) — nhưng ⚠️ query thật duy nhất (`FIND`) lọc theo PK `(character_id, quest_template_id)`, KHÔNG lọc `status`. Planner vẫn tận dụng được (cột `character_id` đứng đầu cả 2 index) nên không gây hại, nhưng index này hiện **thừa so với nhu cầu thật** — giữ nguyên vì đã migrate, không xoá lại (Điều 40) | `EXPLAIN`: Index Scan dùng `idx_character_quest_progress_status`, 0.008ms |
+| `guild_member` | `guild_id` | ✅ **Đã có sẵn** — là cột đầu PK composite `(guild_id, character_id)` (V14) | `LIST_MEMBERS`: Seq Scan 0.076ms → Index Scan (`guild_member_pkey`) 0.009ms |
+| `guild_member` | `character_id` | ✅ **Đã có sẵn** — `UNIQUE (character_id)` (V14, ràng buộc "1 nhân vật tối đa 1 bang") | `FIND_MEMBERSHIP`: Seq Scan 0.075ms → Index Scan (`guild_member_character_id_key`) 0.009ms |
+| `mail` | `(receiver_character_id, is_read)` | ❌ **Đề xuất sai ngay từ tên cột** — schema thật (V13) là `recipient_id`/`claimed_at` (nullable = chưa nhận), không có cột `is_read`. Cột `recipient_id` đơn đã có sẵn (V13 `idx_mail_recipient_id`) và đủ dùng — thử thêm composite `(recipient_id, created_at DESC)` cho `ORDER BY created_at DESC` (`listForRecipient`) nhưng planner **vẫn chọn index đơn cột cũ**, thời gian giống hệt (0.018ms cả 2 case) vì số thư/người chơi thực tế nhỏ (~4 dòng/`recipient_id`, sort trong RAM không đáng kể) | `listForRecipient`: Seq Scan 0.620ms → Index đơn cột 0.018ms; composite thêm vào KHÔNG cải thiện gì thêm (planner bỏ qua) |
+| `mail` | `expires_at` | ❌ **Từ chối — cột không tồn tại** | V13 không có cột `expires_at` (chỉ có `claimed_at`). Grep toàn repo "expire" — không có job quét thư hết hạn nào implement. Đề xuất cũ dựa trên schema chưa từng có thật |
+| `audit_log` | `(character_id, created_at)` | ❌ **Từ chối — chưa có query thật nào cần** | Grep toàn bộ `Postgres*AuditAdapter` — chỉ có `INSERT`, **0 SELECT** trong production code. Query duy nhất từng thấy là trong TEST (`EnhanceItemUseCaseIntegrationTest`, lọc `character_id + action`, không dùng `created_at`) |
+| `audit_log` | `created_at` (đơn) | ❌ **Từ chối — cùng lý do trên** | Không có admin/audit-viewer feature nào đọc bảng này theo thời gian; index đơn `character_id` sẵn có (V7 `idx_audit_log_character_id`) đã đủ cho pattern test duy nhất tồn tại (Seq Scan 1.267ms → Index Scan 0.019ms) |
+
+**Kết luận**: **không tạo migration mới** — mọi index thật sự cần đều đã được thêm ad-hoc ở các migration
+trước (V2/V4/V7/V11/V13/V14) mà chưa bao giờ cập nhật lại bảng này; phần đề xuất KHÔNG được các
+index có sẵn phủ (composite `inventory_item`, `mail.is_read`/`expires_at`, composite/đơn `audit_log`)
+đều bị bác bỏ vì không khớp query thật hoặc cột không tồn tại.
 
 **Nguyên tắc** (Điều 30): **không thêm index theo cảm tính.** Index tăng tốc đọc, **làm chậm ghi**, tốn dung lượng. Chỉ thêm khi `EXPLAIN ANALYZE` chứng minh cần.
 
@@ -288,7 +304,7 @@ private static final String FIND_INVENTORY = """
 | 10 | **MVP không partition** | Điều 9, 30 | Accepted |
 | 11 | SQL **chỉ** trong `infrastructure/`; luôn `PreparedStatement` | Kiến trúc + bảo mật | Accepted |
 | 12 | **`realm_id` = có, mặc định 1** (single-realm MVP) | Sẵn sàng multi-realm không migration | ✅ [ADR-010](../01-architecture/adr/ADR-010-Realm-Model.md) |
-| 13 | Index §8 **chưa verify** | Phải đo `EXPLAIN ANALYZE` | ⏳ Tạm thời |
+| 13 | Index §8 **đã verify thật** qua Testcontainers + `EXPLAIN ANALYZE` (2026-08-02) | Mọi index cần thiết đều đã tồn tại sẵn (V2/V4/V7/V11/V13/V14); phần đề xuất còn lại bị bác bỏ có bằng chứng — không cần migration mới | ✅ Đã đóng |
 
 ## ADR cần tạo
 
@@ -311,4 +327,4 @@ private static final String FIND_INVENTORY = """
 1. ✅ ADR-010 đã chốt — tạo bảng `character` **có cột `realm_id`** (mặc định 1) ngay từ migration đầu.
 2. Phase 0: tạo database với **UTF-8 collation** (§1) — đây là thứ dễ quên và rất khó sửa.
 3. Phase 3: thiết kế `audit_log` (§2.7) cùng lúc với trade, không để sau.
-4. Phase 4: `EXPLAIN ANALYZE` query thật → chốt index §8.
+4. ✅ `EXPLAIN ANALYZE` query thật → chốt index §8 (2026-08-02, xem bảng bằng chứng ở §8 — không cần migration mới).
