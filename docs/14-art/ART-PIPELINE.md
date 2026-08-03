@@ -43,7 +43,7 @@ Từ [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md), pip
 
 **Ràng buộc chung cả hai nhánh**
 
-8. Atlas ≤ **2048×2048** (GPU Android cũ), **không** lighting engine runtime, **không** Spine/skeletal, `Animation` object dùng chung (Flyweight), particle bắt buộc pool.
+8. Atlas ≤ **2048×2048** (GPU Android cũ), **không** lighting engine runtime, **không** Spine (skeletal của nhánh 3D đã có sẵn trong glTF — không thêm dependency thương mại; nhánh 2D vẫn frame-based thuần, không skeletal), `Animation`/`Model` dùng chung (Flyweight), particle bắt buộc pool.
 9. Vẻ ngoài cel phải **giống nhau giữa hai nhánh** — VFX 2D vẽ đè lên nhân vật 3D trong cùng một khung hình. Cel ramp và độ dày viền là hợp đồng chung, xem [ART-QUALITY-STANDARD §4](ART-QUALITY-STANDARD.md).
 
 ---
@@ -448,6 +448,14 @@ Suy ra thay vì lưu cứng để đổi tier hoặc đổi origin không phải
 
 **Thi hành — không dựa vào trí nhớ con người**: bước cuối của `tools/asset-pipeline` **upsert** mọi asset vào `art_asset`, và **fail build nếu có file trong `assets/exported/` không truy ra được dòng DB tương ứng**. `ASSET-LOG.md` chỉ là sổ tay token-rẻ cho phiên AI; **DB là nguồn chuẩn** cho trang quản trị.
 
+> ⚠️ **TODO-OPUS (2026-08-03): §8 chưa phủ nhánh 3D.** Toàn bộ cột đường dẫn (`render_dir`,
+> `atlas_name`, `master_px`) và quy ước suy đường dẫn ở trên viết cho asset sprite. Model glTF
+> xuất vào `assets/exported/models/{low,med,high}/` ([§3.2](#32-sơ-đồ--nhánh-3d-nhân-vật--quái--npc))
+> chưa có chỗ đứng trong `art_asset` — ngày bước decimate/xuất glTF được code (§10), luật
+> "fail build nếu file không truy ra được dòng DB" sẽ tự vỡ. Cần thiết kế mở rộng schema
+> (ví dụ cột `model_path` hoặc bảng phụ theo tier) — **DB schema change, phải chờ chủ dự án duyệt**,
+> đừng sửa V19 tại chỗ.
+
 ### 8.6 Trang quản trị xem được những gì
 
 **Không bị giới hạn ở ảnh tĩnh.** File `.atlas` của libGDX là **text thuần, đọc được**, không phải định dạng nhị phân đóng:
@@ -468,7 +476,7 @@ Nên trang quản trị **tự cắt được mọi vùng** bằng `canvas.drawI
 | Xem được | Cách |
 |---|---|
 | **Từng frame** của mọi action | Parse `.atlas`, lọc region theo tiền tố `<asset_key>_<action>`, sắp theo `index` |
-| **Animation chạy thật** | Lần lượt vẽ các frame theo `setInterval` **12 fps** (`PLAYBACK_FPS`, §1.5) — đúng tốc độ trong game |
+| **Animation chạy thật** | Lần lượt vẽ các frame theo `setInterval` **12 fps** (`PLAYBACK_FPS`, §1.7) — đúng tốc độ trong game |
 | **Toàn bộ atlas** kèm khung viền từng region | Vẽ ảnh atlas gốc + overlay các `bounds` |
 | **So sánh 3 tier cạnh nhau** | Cùng `atlas_name`, đổi thư mục `low`/`med`/`high` (§8.5) |
 | **Kiểm tra baseline/pivot** | `render-meta.json` có `pivot_x_px` + `pivot_y_px_from_bottom` — kẻ 1 đường ngang là thấy chân có thẳng hàng không |

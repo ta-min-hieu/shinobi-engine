@@ -146,7 +146,7 @@ Xem lại quyết định này khi **một trong ba** điều kiện sau xảy r
 
 ## Việc cần làm tiếp theo
 
-1. Chủ dự án Accept hoặc bác ADR này (AI không tự Accept).
+1. ✅ Chủ dự án đã Accept (2026-08-03, qua chat).
 2. Chốt cách phòng vệ JitPack **trước** khi thêm dependency thật.
 3. Đo poly budget thật: decimate mesh pilot xuống 5k/10k/20k, so ảnh và so frame time.
 4. Viết lại ART-PIPELINE §3 + RENDERING.md.

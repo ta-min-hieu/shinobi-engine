@@ -25,7 +25,7 @@
 
 Thế hệ nhân vật đầu (`build_box_character.py`) là khối hộp căn trục — đúng vai trò *kiểm chứng pipeline*, nhưng chủ dự án đánh giá **không đạt** ("hình hộp lego, rất xấu", 2026-08-02). Từ nay:
 
-- Nhân vật/quái/NPC dựng bằng **`tools/blender/kage_mesh_kit.py`** (§5). `build_box_character.py` chỉ còn để dựng lại file cũ — **không dùng cho asset mới**.
+- Nhân vật/quái/NPC dựng bằng **Text→3D qua `tools/blender/kage_text3d_kit.py`** ([ART-PIPELINE §6.4](ART-PIPELINE.md)); `kage_mesh_kit.py` chỉ còn cho vũ khí/phụ kiện (§5). `build_box_character.py` chỉ còn để dựng lại file cũ — **không dùng cho asset mới**.
 - Mọi asset nhân vật/quái/NPC mới phải qua bảng nghiệm thu §2. FAIL 1 tiêu chí = không ghi ASSET-LOG, không pack atlas.
 - 15 sheet `char_*-pilot/-b2/-b3` cũ + `monster_training_dummy` + `npc_town_elder` = **PLACEHOLDER**, thay dần (§8).
 - Checklist kỹ thuật ở [BLENDER-SESSION-GUIDE §2](BLENDER-SESSION-GUIDE.md) **vẫn giữ nguyên** — file này là tầng *thẩm mỹ* bên trên, không thay thế tầng kỹ thuật.
@@ -47,7 +47,7 @@ AI chưa từng thấy game này nên quy ra đặc điểm cụ thể. NSO là 
 
 **Một câu cho mọi phiên art**: *nhân vật phải trông như chú ninja chibi trong anime — không phải robot ghép từ hộp.*
 
-Ảnh chuẩn đã duyệt: `assets/raw/reference/gold_char_hoa_b1.png` (1 nhân vật) · `gold_5elements_b3.png` (cả 5 hệ đứng cạnh nhau).
+Ảnh chuẩn đã duyệt (2026-08-03, pilot Text→3D): `assets/raw/reference/pilot_text3d_hoa_v2_actions.png` · `pilot_text3d_hoa_v2_goc_camera.png`. Bộ `gold_char_hoa_b1.png` / `gold_5elements_b3.png` (thế hệ mesh kit) **đã bị chủ dự án bác** cùng ngày — chỉ giữ làm lịch sử, không dùng làm chuẩn so.
 
 ---
 
@@ -72,7 +72,7 @@ Chấm trên **PNG đã render** (không phải viewport), ở @1x rồi @0.5x. 
 
 Q11–Q12 chỉ chấm sau khi Q1–Q10 pass trên frame `idle`.
 
-**Chuẩn so sánh cuối**: đặt cạnh `assets/raw/reference/gold_char_hoa_b1.png` — asset mới không được "tụt cấp" so với ảnh này.
+**Chuẩn so sánh cuối**: đặt cạnh `assets/raw/reference/pilot_text3d_hoa_v2_actions.png` — asset mới không được "tụt cấp" so với ảnh này.
 
 ---
 
@@ -183,6 +183,13 @@ Số frame render được chọn **rơi đúng vào keyframe** (idle 1..17, run
 
 ## 7. Vòng tự nghiệm thu của Sonnet (bắt buộc, tối đa 3 vòng)
 
+> ⚠️ **TODO-OPUS (2026-08-03): lệnh trong mục này là của thế hệ mesh kit, đã lỗi thời cho nhân vật.**
+> Nhân vật giờ sinh bằng Text→3D ([BLENDER-SESSION-GUIDE §1.5](BLENDER-SESSION-GUIDE.md) bước A–D) —
+> không có "1 dòng lệnh dựng lại từ spec" nữa vì mesh đến từ Rodin (không tái sinh được). **Vòng lặp
+> chấm Q1–Q12 + giới hạn 3 vòng + kỷ luật token vẫn giữ nguyên hiệu lực**; chỉ phần lệnh dựng
+> (`build_kage_character.py`) cần viết lại theo flow Text→3D. Lệnh render preview/contact sheet
+> (`kage_sprite_render.py`, `make_contact_sheet.py`) vẫn dùng được y nguyên để nghiệm thu.
+
 ```bash
 # 1. Dựng + render 1 frame duyệt style
 blender -b assets/raw/blender/kage_character_base.blend -P tools/blender/build_kage_character.py \
@@ -217,10 +224,10 @@ Kỷ luật token giữ nguyên [ART-PIPELINE §6.1](ART-PIPELINE.md): batch l�
 |---|---|---|---|
 | 1 | `kage_mesh_kit.py` — toàn bộ hàm §5 | Opus | ✅ **Xong 2026-08-03**, verify bằng render thật |
 | 2 | Rig 11 xương + 7 action có khuỷu/gối | Opus | ✅ **Xong** (trong kit) |
-| 3 | Gold standard Hỏa B1 + ảnh tham chiếu | Opus | ✅ **Render xong**, `assets/raw/reference/` — ⏳ **chờ chủ dự án duyệt** |
-| 4 | Spec 5 hệ × 3 bậc | Opus | ✅ **Xong** — bảng `CHARACTERS` trong `build_kage_character.py`, đã build thật cả 5 hệ bậc B3 |
-| 5 | Re-render 15 sheet nhân vật + `monster_training_dummy` + `npc_town_elder`, qua vòng §7, cập nhật ASSET-LOG + chạy asset-pipeline | **Sonnet** | ⏳ Chờ #3 được duyệt |
-| 6 | Quái/NPC/boss mới về sau | Sonnet (boss khó → escalate) | Chờ #3 |
+| 3 | Gold standard Hỏa B1 + ảnh tham chiếu | Opus | ❌ **Bị bác 2026-08-03** (~1/5 NSO) → thay bằng pilot Text→3D Hỏa, **đã duyệt cùng ngày** (`pilot_text3d_hoa_v2_*.png`) |
+| 4 | Spec 5 hệ × 3 bậc | Opus | ✅ **Xong** — bảng `CHARACTERS` trong `build_kage_character.py`; giờ chỉ còn giá trị làm **spec trang phục/vũ khí** tham chiếu cho prompt Text→3D (§2.3 ART-PIPELINE) |
+| 5 | ~~Re-render 15 sheet~~ → Sản xuất **14 nhân vật còn lại bằng Text→3D**, qua vòng §7 (bản sửa theo TODO-OPUS), cập nhật ASSET-LOG | **Sonnet** | ⏳ Chờ chốt ngân sách tam giác + gắn vũ khí ([ART-PIPELINE §12.1](ART-PIPELINE.md)) |
+| 6 | Quái/NPC/boss mới về sau | Sonnet (boss khó → escalate) | Chờ #5 chạy ổn |
 | 7 | VFX skill: giữ chuẩn hiện có (17 VFX đã ship không thuộc diện placeholder) | Sonnet | Không đổi |
 
 **Sonnet bắt đầu từ #5.** Khi làm quái/NPC (#6) mà kit thiếu bộ phận (sừng, đuôi, 4 chân...) → **không sculpt tay**, báo lại để bổ sung hàm vào kit; kit là nơi giữ chất lượng đồng đều.
@@ -241,7 +248,7 @@ Kỷ luật token giữ nguyên [ART-PIPELINE §6.1](ART-PIPELINE.md): batch l�
 | 4 | Thư viện `kage_mesh_kit.py`, Sonnet chỉ gọi + spec dict | Sculpt tự do tốn token và ra kết quả không đều | Đề xuất |
 | 5 | Rig 11 xương (thêm forearm/shin), giữ nguyên toạ độ khớp cũ | Chi 1 đoạn không gập được khuỷu/gối → animation đơ; giữ toạ độ để baseline/pivot không phải verify lại | Đề xuất |
 | 6 | 15 sheet box hiện tại = PLACEHOLDER, thay dần, không sửa tại chỗ | Giữ pipeline chạy được trong lúc nâng cấp | Đề xuất |
-| 7 | Outline nhân vật = **1.1px@1x**, lưu trong .blend, bước render kế thừa | Đo thật: 2.5px@1x phủ đen nhân vật ở master 256px. Lưu trong file để không ai vô tình render lại bằng giá trị cũ | Đề xuất |
+| 7 | Outline **không phải hằng số** — đo lại cho từng thế hệ mesh, nguồn duy nhất là §4 mục 3 (mesh kit 1.1px@1x Freestyle · Text→3D 3.0px@1x inverted hull), lưu trong .blend để bước render kế thừa | Đo thật: 2.5px@1x phủ đen nhân vật ở master 256px; Freestyle trên mesh Text→3D vẽ viền từng lọn tóc | Đề xuất |
 | 8 | `die` là cú gục gọn, không phải nằm sải dài | `fit_camera` lấy pose rộng nhất cho cả sheet — pose chết sải dài thu nhỏ nhân vật ở toàn bộ 33 frame | Đề xuất |
 | 9 | Dấu xoay xương tính từ `axis × bone_direction`, không hằng số | Cùng một trục thế giới làm xương hướng lên và xương hướng xuống quay ngược nhau; hằng số chung làm tay chân vung ngược | Đề xuất |
 | 10 | Loại nét mặt khỏi outline bằng **collection filter** của Freestyle | `obj.lineart.usage` trông đúng nhưng thuộc Grease Pencil Line Art, **không tác dụng gì** với Freestyle — nó im lặng không làm gì cả | Đề xuất |
@@ -256,8 +263,8 @@ Không. Không thêm dependency, không đổi kiến trúc — chỉ nâng chu�
 
 ## 12. Việc cần làm tiếp theo
 
-1. ⏳ **Chủ dự án duyệt gold standard** — mở `assets/raw/reference/gold_char_hoa_b1.png` và `gold_5elements_b3.png`. Duyệt xong thì Sonnet chạy được #5.
-2. Sonnet: re-render 15 sheet nhân vật + monster/NPC placeholder qua vòng §7, cập nhật `ASSET-LOG.md`, chạy `tools/asset-pipeline` (upsert `art_asset`).
+1. ✅ **Đóng 2026-08-03**: gold standard mesh kit **bị bác** (~1/5 NSO); chủ dự án **duyệt hướng Text→3D** trên pilot Hỏa cùng ngày (`pilot_text3d_hoa_v2_*.png` là chuẩn so mới).
+2. Sonnet: sản xuất 14 nhân vật còn lại + monster/NPC placeholder bằng Text→3D qua vòng §7 (sau khi viết lại theo TODO-OPUS), cập nhật `ASSET-LOG.md`. **Chặn bởi**: ngân sách tam giác + gắn vũ khí ([ART-PIPELINE §12.1](ART-PIPELINE.md)).
 3. ✅ **Xong 2026-08-03**: đã quét sạch con số outline cũ khỏi mọi tài liệu (ART-PIPELINE §2.1, BLENDER-SESSION-GUIDE §1/§3/§8, `tools/blender/README.md`) — giờ chỉ còn **một nguồn duy nhất** là §4 mục 3 của file này, các nơi khác trỏ về đây.
 4. Thổ B3 dùng `topknot` nhưng render ra giống **nón lá** hơn búi tóc — hợp hệ Thổ nên tạm giữ, cần thì đổi tên style hoặc dựng lại khối búi.
 5. Vũ khí gắn cố định ở hông/lưng, **không vào tay khi `attack`** (thế hệ box cũng vậy) — nếu muốn cầm vũ khí thật thì thêm bone `hand_r` + constraint, là việc riêng.

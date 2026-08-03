@@ -61,12 +61,13 @@ blender -b <file>.blend -P <script>.py -- ...
 
 ---
 
-> ⚠️ **Nhân vật/quái/NPC không còn đi theo §1 nữa.** Từ 2026-08-03 chúng được dựng bằng
-> `tools/blender/kage_mesh_kit.py` + `build_kage_character.py`, chạy **hoàn toàn headless bằng 1 dòng
-> lệnh**, không cần mở Blender hay MCP — xem [ART-QUALITY-STANDARD §5 và §7](ART-QUALITY-STANDARD.md).
-> §1 dưới đây vẫn đúng cho những thứ phải model tay (prop, tile, VFX khối, boss dị hình).
+> ⚠️ **Nhân vật/quái/NPC không còn đi theo §1 nữa.** Từ 2026-08-03 chúng đi theo **§1.5**
+> (Text→3D qua `kage_text3d_kit.py` — [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md));
+> `kage_mesh_kit.py` + `build_kage_character.py` chỉ còn dùng cho vũ khí/phụ kiện và dựng lại
+> file thế hệ cũ ([ART-QUALITY-STANDARD §5](ART-QUALITY-STANDARD.md)).
+> §1 dưới đây vẫn đúng cho những thứ phải model tay **và vẫn ra sprite** (prop, tile, VFX khối, icon).
 
-## 1. Trình tự phiên chuẩn — nhân vật mới
+## 1. Trình tự phiên chuẩn — asset model tay (ra sprite)
 
 Mỗi ô code = **một** lần `execute_blender_code`. Đừng tách nhỏ hơn (mỗi round-trip là token).
 
@@ -156,7 +157,7 @@ Chạy bằng Bash tool với `run_in_background: true`. Kết quả mong đợi
 ### Bước 6 · Hạ mẫu + pack atlas
 
 ```bash
-# tools/asset-pipeline — chưa tồn tại, xem ART-PIPELINE §12 việc cần làm
+./gradlew :tools:asset-pipeline:run   # downscale @1x/@0.5x + validate + pack 3 atlas + manifest + upsert art_asset
 ```
 
 ### Bước 7 · Ghi sổ + đóng phiên
@@ -401,4 +402,4 @@ phải hướng dẫn còn hiệu lực. Nhân vật hiện làm theo [ART-QUALI
    cho hiệu ứng chớp — không phải chuyển động liên tục). Khớp đúng mô tả B3 từng hệ ở §2.2: Hỏa 3 đốm
    lửa, Thủy 1 vòng quanh cổ tay, Phong 2 dải lụa đung đưa, Lôi tia điện chớp 2-frame, Thổ 2 mảnh đá
    orbit chậm/to. Vẫn box-prototype (không phải VFX shader/particle), nhưng giờ 5 cơ chế thật khác nhau.
-7. Viết `tools/asset-pipeline` để bước 6 hết rỗng — giờ có 15 bộ sheet thật (5 hệ × 3 bậc) để test.
+7. ✅ **Xong 2026-08-01**: `tools/asset-pipeline` đã code + chạy thật trên toàn bộ asset ([ADR-029](../01-architecture/adr/ADR-029-Asset-Pipeline-Tool.md) Accepted) — bước 6 hết rỗng.

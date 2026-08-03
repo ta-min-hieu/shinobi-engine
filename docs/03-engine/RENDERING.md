@@ -181,7 +181,7 @@ glTF, không tốn thêm dependency thương mại nào.
 | Khía cạnh | Quyết định |
 |---|---|
 | Kiểu | **Frame-based** (sprite sheet), playback 12 fps |
-| Nguồn | HyperLap2D export ([RESOURCE.md](../04-client/RESOURCE.md)) |
+| Nguồn | Blender pre-render → `tools/asset-pipeline` pack atlas ([ART-PIPELINE §3.3](../14-art/ART-PIPELINE.md)); HyperLap2D chỉ cho scene/map ([RESOURCE.md](../04-client/RESOURCE.md)) |
 | Lưu ở đâu | `AnimationComponent` giữ **tham chiếu** tới `Animation` dùng chung + `stateTime` riêng |
 
 ⚠️ **Cạm bẫy**: `Animation` object phải **chia sẻ giữa các entity cùng loại** (Flyweight). Mỗi entity chỉ giữ `stateTime` riêng. Nếu mỗi entity giữ `Animation` riêng → nhân bản dữ liệu frame → tốn bộ nhớ vô ích.
