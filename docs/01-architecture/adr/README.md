@@ -60,6 +60,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-028](ADR-028-Graphics-Tier-Asset-Delivery.md) | Bản cài đóng gói 1 tier đồ họa mặc định (MEDIUM), tier khác tải theo yêu cầu; client luôn qua `ensureAssetsAvailable(tier)` | ✅ Accepted *(2026-08-01)* | **Amend ADR-024**; cần `tools/asset-pipeline` xuất atlas tách tier + manifest theo tier |
 | [ADR-029](ADR-029-Asset-Pipeline-Tool.md) | Tạo module `tools:asset-pipeline`, dùng `gdx-tools` TexturePacker đóng gói atlas | ✅ Accepted *(2026-08-01)* | Mở khoá [ADR-028](ADR-028-Graphics-Tier-Asset-Delivery.md); v1 không gồm upsert DB — chờ `V19__create_art_registry.sql` được duyệt |
 | [ADR-030](ADR-030-No-Plugin-System.md) | Không xây Plugin System — xoá `engine-plugin-api` | ✅ Accepted *(2026-08-01)* | Supersedes ADR-007 |
+| [ADR-031](ADR-031-25D-Realtime-3D-Rendering.md) | Nhân vật render 3D thời gian thực qua camera orthographic khoá góc (2.5D); VFX/icon/UI vẫn 2D | ✅ Accepted *(2026-08-03)* | Amend [ADR-028](ADR-028-Graphics-Tier-Asset-Delivery.md), thu hẹp phạm vi [ADR-029](ADR-029-Asset-Pipeline-Tool.md); thêm dependency `gdx-gltf` qua JitPack — **chưa thêm vào `libs.versions.toml`, chờ chốt cách phòng vệ JitPack** |
 
 ---
 

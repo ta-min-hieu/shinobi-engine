@@ -1,12 +1,18 @@
 # ART-PIPELINE.md
 
-**Sản xuất đồ họa bằng Blender (AI-driven qua Blender MCP) → sprite 2D → cấu hình đồ họa client**
+**Sản xuất đồ họa bằng Blender (AI-driven) → model 3D cho nhân vật, sprite 2D cho VFX/icon → cấu hình đồ họa client**
 
 | | |
 |---|---|
-| Version | 0.1.0 |
+| Version | 0.2.0 |
 | Status | Draft |
-| Liên quan | [RESOURCE.md](../04-client/RESOURCE.md) · [RENDERING.md](../03-engine/RENDERING.md) · [GAME-DESIGN-DOCUMENT.md](../13-game-design/GAME-DESIGN-DOCUMENT.md) |
+| Liên quan | [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) (2.5D — **đổi kiến trúc tài liệu này**) · [RESOURCE.md](../04-client/RESOURCE.md) · [RENDERING.md](../03-engine/RENDERING.md) · [GAME-DESIGN-DOCUMENT.md](../13-game-design/GAME-DESIGN-DOCUMENT.md) |
+
+> ⚠️ **Đổi lớn 2026-08-03 ([ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md), Accepted).**
+> **Nhân vật · quái · NPC không còn nướng ra sprite** — chúng xuất thành model glTF và được client
+> render 3D thời gian thực qua camera orthographic khoá góc (2.5D). **VFX kỹ năng · icon vật phẩm ·
+> UI vẫn là sprite 2D**, không đổi gì.
+> Bản v0.1.0 (pre-render toàn bộ) còn trong lịch sử git nếu cần đối chiếu.
 
 > Thao tác cụ thể → [BLENDER-SESSION-GUIDE.md](BLENDER-SESSION-GUIDE.md). Contract script → [tools/blender/README.md](../../tools/blender/README.md).
 
@@ -14,17 +20,31 @@
 
 ## 0. Kỷ luật token cho phiên làm art
 
-Phiên làm art bằng Blender MCP **chỉ cần nạp**: tài liệu này + [tools/blender/](../../tools/blender/README.md). Không đọc docs khác (mọi ràng buộc liên quan đã được chưng cất vào §1).
+Phiên làm art bằng Blender MCP **chỉ cần nạp**: tài liệu này + [ART-QUALITY-STANDARD.md](ART-QUALITY-STANDARD.md) (thước đo ĐẠT/KHÔNG ĐẠT — bắt buộc cho nhân vật/quái/NPC) + [tools/blender/](../../tools/blender/README.md). Không đọc docs khác (mọi ràng buộc liên quan đã được chưng cất vào §1).
 
 ---
 
 ## 1. Kết luận nền tảng (đọc 30 giây)
 
-1. Game là **2D side-view, sprite frame-based** ([RENDERING.md §8](../03-engine/RENDERING.md)). Blender **không** render realtime trong game — Blender là **xưởng pre-render**: model 3D một lần, render ra sprite sheet 2D.
-2. Side-view nên **chỉ render hướng nhìn phải**. Hướng trái = flip sprite trong code. Đây là khoản tiết kiệm lớn nhất toàn pipeline (½ số frame, ½ atlas).
-3. Render **một bản master @2x** duy nhất → `tools/asset-pipeline` hạ mẫu ra @1x và @0.5x → **3 bộ atlas = 3 mức cấu hình đồ họa** (§5). Không render lại nhiều lần theo tier.
-4. Ràng buộc bất biến kế thừa từ docs khác: atlas ≤ **2048×2048** (GPU Android cũ), **không** lighting engine runtime, **không** Spine/skeletal, `Animation` object dùng chung (Flyweight), particle bắt buộc pool.
-5. Animation chạy "on twos" kiểu anime: **12 fps playback**, ít frame — vừa đúng phong cách vừa tiết kiệm atlas. Số fps này là **thuộc tính asset, không phải setting đồ họa**.
+Từ [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md), pipeline **chia làm hai nhánh**. Đọc đúng nhánh của thứ mình đang làm.
+
+**Nhánh 3D — nhân vật · quái · NPC**
+
+1. Game trình bày **như 2D side-view**, nhưng nhân vật được **render 3D thời gian thực** qua camera orthographic khoá cứng góc nhìn (2.5D). Blender là xưởng **dựng model**, không còn là xưởng render.
+2. **Hướng nhìn là hằng số runtime**, không nướng vào tài sản. Không còn "chỉ render hướng phải" và không còn trò flip sprite — nhân vật xoay được tự do.
+3. Xuất **glTF 2.0** từ Blender (Blender xuất sẵn trong core, không qua công cụ ngoài). 3 mức đồ họa (§5) là **3 mức LOD của model + cỡ texture**, không phải 3 bộ atlas.
+4. Animation chạy đúng tần số khung hình thật của máy — **không còn trần 12 fps**. Đây là lý do chính đổi sang 2.5D.
+5. **Poly budget là ràng buộc thật, phải đo.** Mesh sinh từ text→3D ra ~90k tam giác; phải decimate trước khi xuất. Ngưỡng chưa chốt — xem §10.
+
+**Nhánh 2D — VFX kỹ năng · icon vật phẩm · UI** *(không đổi)*
+
+6. Vẫn pre-render ra sprite: **một bản master @2x** duy nhất → `tools/asset-pipeline` hạ mẫu @1x và @0.5x → 3 bộ atlas.
+7. Animation VFX vẫn chạy "on twos" kiểu anime: **12 fps playback**. Số fps này là **thuộc tính asset, không phải setting đồ họa**.
+
+**Ràng buộc chung cả hai nhánh**
+
+8. Atlas ≤ **2048×2048** (GPU Android cũ), **không** lighting engine runtime, **không** Spine/skeletal, `Animation` object dùng chung (Flyweight), particle bắt buộc pool.
+9. Vẻ ngoài cel phải **giống nhau giữa hai nhánh** — VFX 2D vẽ đè lên nhân vật 3D trong cùng một khung hình. Cel ramp và độ dày viền là hợp đồng chung, xem [ART-QUALITY-STANDARD §4](ART-QUALITY-STANDARD.md).
 
 ---
 
@@ -35,7 +55,7 @@ Phiên làm art bằng Blender MCP **chỉ cần nạp**: tài liệu này + [to
 | Trụ cột | Chuẩn | Nguồn tham chiếu |
 |---|---|---|
 | Tỷ lệ nhân vật | Chibi 2–2.5 đầu, đầu to, chi ngắn | Ninja School Online |
-| Đường nét | Outline đen/đậm 2–3px (ở @1x), Freestyle | Ninja School Online |
+| Đường nét | Outline đen, Freestyle. **Độ dày không phải hằng số** — tuỳ nhân vật chiếm bao nhiêu phần khung; số đo cho nhân vật chibi ở [ART-QUALITY-STANDARD §4](ART-QUALITY-STANDARD.md) | Ninja School Online |
 | Màu | Cel 2–3 nấc (base + shadow + highlight), màu phẳng, bão hòa cao | Anime nói chung |
 | Readability | Silhouette phải nhận ra được ở 64px (Low tier); mọi asset duyệt ở cả @0.5x | Nguyên tắc mobile |
 | VFX skill | Kịch tính, aura/trail đậm, tương phản mạnh với nền; boss & bí cảnh tông tối hơn thế giới thường | The Eminence in Shadow |
@@ -109,82 +129,122 @@ Khớp [GDD §4](../13-game-design/GAME-DESIGN-DOCUMENT.md) (Hỏa/Thủy/Phong/
 
 ---
 
-## 3. Kiến trúc pipeline: Blender pre-render
+## 3. Kiến trúc pipeline
 
-### 3.1 Vì sao pre-render thay vì vẽ tay từng frame
+### 3.1 Vì sao Blender là nguồn duy nhất cho cả hai nhánh
 
 | Lợi ích | Giải thích |
 |---|---|
-| 1 model → N output | Mọi animation, mọi scale render tự động từ 1 nguồn |
-| Đổi trang bị rẻ | Thay mesh phụ kiện, re-render — không vẽ lại toàn bộ frame |
-| Nhất quán | Cùng rig/camera/light → mọi nhân vật cùng góc nhìn, cùng tỷ lệ |
-| AI tự động hóa được | Toàn pipeline là script Python (bpy), Claude chạy qua MCP không cần bàn tay họa sĩ |
+| 1 model → N output | Nhánh 3D xuất glTF; nhánh 2D render sprite — cùng một file nguồn |
+| Đổi trang bị rẻ | Nhánh 3D: gắn mesh vào xương lúc chạy, không nhân tổ hợp tài sản |
+| Nhất quán | Cùng rig/tỷ lệ/palette → mọi nhân vật khớp nhau |
+| AI tự động hóa được | Toàn pipeline là script Python (bpy), chạy headless không cần bàn tay họa sĩ |
 
-### 3.2 Sơ đồ (thay bước 1–2 của [RESOURCE.md §3](../04-client/RESOURCE.md))
+### 3.2 Sơ đồ — nhánh 3D (nhân vật · quái · NPC)
+
+```
+assets/raw/blender/characters/*.blend  ── kage_text3d_kit.py ──►  model đã rig + 7 action
+        │                                                                  │
+   (source of truth,                                                       ▼
+    commit vào git)                          decimate → xuất glTF 2.0 (Blender core exporter)
+                                                                           │
+                                                                           ▼
+                                   assets/exported/models/{low,med,high}/<asset>.gltf
+                                                                           │
+                                                                           ▼
+                                   client-core: gdx-gltf nạp → ModelBatch + shader cel tự viết
+                                   camera orthographic khoá góc (hằng số runtime)
+```
+
+### 3.3 Sơ đồ — nhánh 2D (VFX · icon · UI) *(không đổi)*
 
 ```
 assets/raw/blender/*.blend  ── kage_sprite_render.py ──►  assets/raw/render-out/<asset>/<action>_##.png  (master @2x)
-        │                                                            │
-   (source of truth,                                                 ▼
-    commit vào git)                    tools/asset-pipeline: hạ mẫu @1x + @0.5x, validate naming,
-                                       pack 3 bộ atlas ≤2048, sinh manifest
-                                                            │
-                                                            ▼
-                                       assets/exported/atlases/{low,med,high}/... → ResourceManager
+                                                                     │
+                                                                     ▼
+                             tools/asset-pipeline: hạ mẫu @1x + @0.5x, validate naming,
+                             pack 3 bộ atlas ≤2048, sinh manifest
+                                                                     │
+                                                                     ▼
+                             assets/exported/atlases/{low,med,high}/... → ResourceManager
 ```
 
-### 3.3 Thiết lập kỹ thuật Blender (chuẩn hóa trong script, không làm tay)
+### 3.4 Thiết lập kỹ thuật Blender (chuẩn hóa trong script, không làm tay)
+
+Nhánh 2D (`kage_sprite_render.py`):
 
 - **Renderer**: EEVEE, `film_transparent = True`.
-- **Toon**: Shader-to-RGB + ColorRamp (Constant, 2–3 nấc). **Freestyle** cho outline.
-- **Camera**: Orthographic, đặt trên trục −Y nhìn vào +Y (nhân vật quay mặt +X = hướng phải).
+- **Toon**: Shader-to-RGB + ColorRamp (Constant, 2–3 nấc).
+- **Camera**: Orthographic, đặt trên trục −Y nhìn vào +Y.
 - **Light**: 1 Sun key (trên-trước, ~30°) + 1 fill yếu. Không HDRI, không GI — toon không cần.
-- Mọi thứ trên nằm sẵn trong **file base dùng chung** `kage_character_base.blend` (§7) — mỗi asset mới mở từ base, không dựng lại.
+
+Nhánh 3D (`kage_text3d_kit.py`) — vẻ ngoài do **shader runtime** quyết định, không phải render setting. Phía Blender chỉ chuẩn bị dữ liệu cho shader đó:
+
+- **Chuẩn hóa**: cao 1.0, chân z=0, mặt +X (`normalise()`).
+- **Rig**: 11 xương của `kage_mesh_kit.build_rig()`, đặt theo số đo **đo lại cho từng mesh** (`measure()`), không có hằng số chung.
+- **Toon**: `toon_textured()` giữ nguyên texture đã vẽ, chỉ lượng tử hoá ánh sáng — nấc ramp dùng `TEXTURED_SHADE_STEPS` chứ **không** dùng `SHADE_STEPS` của nhánh 2D (texture sinh ra đã có sẵn bóng, dùng nhầm là tối hai lần).
+- **Viền**: `add_inverted_hull_outline()` — shell lật normal, cull mặt trước. **Không dùng Freestyle**: Freestyle không tồn tại lúc runtime, và trên mesh nhiều tóc nó vẽ viền cho từng lọn. Kỹ thuật shell chuyển thẳng sang GLSL được.
 
 ---
 
 ## 4. Chuẩn kỹ thuật asset
 
-### 4.1 Kích thước (master @2x → game @1x → Low @0.5x)
+### 4.1 Kích thước sprite — **chỉ còn áp dụng cho nhánh 2D**
 
 | Loại | Master @2x | @1x | @0.5x |
 |---|---|---|---|
-| Nhân vật / NPC / quái thường | 256×256 | 128 | 64 |
-| Boss / World Boss | 512×512 | 256 | 128 |
 | VFX skill (1 ô) | 384×384 | 192 | 96 |
 | Icon (skill/item/buff) | 128×128 | 64 | 32 |
 | Tile/prop môi trường | theo lưới map, bội số 32 @1x | — | — |
 
-### 4.2 Bộ animation chuẩn cho nhân vật/quái (playback 12 fps)
+Nhân vật / NPC / quái / boss **không còn ở bảng này** — chúng là model 3D, "kích thước" của chúng
+là chiều cao world unit (chuẩn hoá **1.0**) và ngân sách tam giác (§4.4), không phải pixel.
 
-| Action | Frame | Ghi chú |
+### 4.2 Bộ animation chuẩn cho nhân vật/quái
+
+Bộ **7 action** giữ nguyên tên và ý nghĩa; cột "Frame" giờ chỉ mô tả **số khoá chính** đã author
+trong Blender, không còn là số ảnh render ra.
+
+| Action | Khoá chính | Ghi chú |
 |---|---|---|
 | idle | 4 | loop |
 | run | 6 | loop |
-| attack | 5 | frame 3 = impact (khớp hitbox timing server) |
-| skill_cast | 6 | có thể giữ frame cuối khi channel |
-| hit | 2 | kèm tint flash trong code, không render riêng bản trắng |
+| attack | 5 | khoá thứ 3 = impact, khớp hitbox timing server |
+| skill_cast | 6 | có thể giữ tư thế cuối khi channel |
+| hit | 2 | kèm tint flash trong code |
 | jump | 4 | lên 2 / xuống 2 |
-| die | 6 | frame cuối nằm yên, không loop |
+| die | 6 | dừng ở tư thế cuối, không loop |
 
-→ 1 nhân vật ≈ 33 frame @1x 128px ≈ chiếm ~1/4 atlas 2048 — trong ngân sách.
+**Khác biệt lớn nhất so với bản v0.1.0:** client **nội suy giữa các khoá này theo tần số khung hình
+thật**, thay vì phát 33 ảnh cố định ở 12 fps. Tư thế `die` vẫn phải **gục gọn**, không nằm sải dài —
+ràng buộc này đến từ khung hình camera, không phải từ việc render (xem ART-QUALITY-STANDARD).
+
+VFX ở nhánh 2D vẫn giữ nguyên playback **12 fps** như cũ.
 
 ### 4.3 Quy tắc chung
 
-- Naming theo [RESOURCE.md §4](../04-client/RESOURCE.md): `char_ninja-fire_idle.png`, atlas theo zone.
-- **Pivot = chân, giữa** (mọi sprite nhân vật đứng trên cùng baseline).
-- Chừa lề trong khung để frame animation không bị cắt (tay vung, tóc bay); padding pack 2px.
-- Chỉ render **hướng phải** (§1.2).
+- Naming theo [RESOURCE.md §4](../04-client/RESOURCE.md).
+- **Gốc toạ độ model = chân, giữa** — mọi nhân vật đứng trên cùng một baseline, y hệt quy ước pivot cũ.
+- Nhánh 2D: chừa lề trong khung để frame animation không bị cắt; padding pack 2px.
+- **Không còn quy tắc "chỉ render hướng phải"** — hướng nhìn là hằng số runtime (§1.2).
+
+### 4.4 Ngân sách tam giác (nhánh 3D)
+
+Mesh sinh từ text→3D ra **~90k tam giác**; con số đó không dùng thẳng được. Ngưỡng cho mỗi mức LOD
+**chưa chốt** — phải đo bằng frame time thật, không đoán ([Điều 9](../00-governance/KAGE-CONSTITUTION.md)).
+Cách đo và ngưỡng phải điền vào đây trước khi sản xuất hàng loạt; xem §10 và
+[ADR-031 "Revisit Trigger"](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md).
 
 ---
 
 ## 5. Cấu hình đồ họa client (3 mức)
 
-⚠️ **Bảng tier kiểu 3D (shadow/water reflection/GI/SSR/DoF/texture 4096) KHÔNG áp dụng cho game này**: đây là 2D side-view sprite — không có shadow map, không có mặt nước 3D, không có GI; lighting engine đã bị từ chối có chủ đích ([RENDERING.md](../03-engine/RENDERING.md)); atlas 4096 vượt trần phần cứng 2048; và animation fps là thuộc tính asset (§1.5), không phải setting. Bảng đúng cho 2D:
+⚠️ **Vẫn KHÔNG phải bảng tier kiểu 3D thông thường** (shadow map / water reflection / GI / SSR / DoF / texture 4096). 2.5D không đổi điều đó: lighting engine đã bị từ chối có chủ đích ([RENDERING.md](../03-engine/RENDERING.md)), vẻ ngoài là cel phẳng nên không có gì để bật thêm, atlas 4096 vẫn vượt trần phần cứng 2048. Cái **thực sự đổi** so với v0.1.0 là hai dòng đầu và dòng FPS:
 
 | Thành phần | Low | Medium | High |
 |---|---|---|---|
-| Bộ atlas | @0.5x | @1x (**đóng gói sẵn trong bản cài**) | @1x + hiệu ứng |
+| Model nhân vật (nhánh 3D) | LOD thấp nhất, texture 512 | LOD trung bình, texture 1024 (**đóng gói sẵn trong bản cài**) | LOD gốc, texture 2048 |
+| Bộ atlas VFX/icon (nhánh 2D) | @0.5x | @1x (**đóng gói sẵn trong bản cài**) | @1x + hiệu ứng |
 | Texture filter | Linear | Linear | Linear + mipmap khi camera zoom |
 | Particle đồng thời (cap toàn màn) | 64 | 256 | 1024 |
 | VFX skill người chơi khác | ẩn (giữ của mình + boss) | chỉ trong khung hình | tất cả |
@@ -194,8 +254,9 @@ assets/raw/blender/*.blend  ── kage_sprite_render.py ──►  assets/raw/r
 | FPS mục tiêu | 30 | 60 | 60 + vsync |
 
 Nguyên tắc thiết kế tier:
+- **FPS mục tiêu giờ là mục tiêu thật.** Ở v0.1.0 nó gần như vô nghĩa vì animation khoá cứng 12 fps bất kể máy; với 2.5D thì animation nhân vật thực sự chạy theo tần số khung hình.
 - **Tier chỉ tồn tại phía client** — server không biết, không validate, gameplay không đổi (Server Authority không bị đụng).
-- Đổi tier = reload zone (đổi bộ atlas) — chấp nhận được, không cần hot-swap texture. **Chỉ MEDIUM được đóng gói trong bản cài**; đổi sang LOW/HIGH thì client tải bộ atlas đó về trước ([ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md)).
+- Đổi tier = reload zone (đổi bộ model + atlas) — chấp nhận được, không cần hot-swap texture. **Chỉ MEDIUM được đóng gói trong bản cài**; đổi sang LOW/HIGH thì client tải bộ đó về trước ([ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md), vẫn còn hiệu lực — ADR-031 chỉ đổi *nội dung* của tier, không đổi cơ chế).
 - Cap particle là cap **pool size** — Low không tạo rồi vứt, mà không tạo từ đầu.
 - Code dự kiến: `enum GraphicsQuality { LOW, MEDIUM, HIGH }` trong `client-core`, lưu settings local, `ResourceManager.loadZone()` chọn thư mục atlas theo tier. **Chưa code ở phase hiện tại** — ghi ở §11.
 
@@ -215,6 +276,10 @@ Nguyên tắc thiết kế tier:
 
 ### 6.2 Workflow chuẩn: 1 nhân vật mới
 
+> ⚠️ **Nhân vật/quái/NPC hình người không đi qua bảng này.** Từ 2026-08-03 chúng đi theo
+> [§6.4](#64-workflow-nhân-vật-nhánh-3d). Bảng dưới chỉ còn cho thứ phải model tay và **vẫn ra
+> sprite**: VFX kỹ năng, icon, prop, tile.
+
 | Bước | Công cụ | Checkpoint |
 |---|---|---|
 | 1. Mở `kage_character_base.blend`, load script repo | MCP `execute_blender_code` | — |
@@ -230,11 +295,27 @@ Nguyên tắc thiết kế tier:
 | Nguồn | Dùng khi | Lưu ý |
 |---|---|---|
 | Model bằng script (bpy primitives) | Props, vũ khí, tile, VFX mesh đơn giản | Rẻ nhất, ưu tiên |
-| Hyper3D / Hunyuan3D (text→3D) | Base mesh nhân vật/quái phức tạp | Ra mesh photoreal-ish → **phải** toon hóa lại (retopo nếu quá dày, apply toon material, chỉnh tỷ lệ về chibi) |
+| **Hyper3D Rodin (text→3D)** | **Nhân vật · quái · NPC hình người — đường chính** | Phải gọi thẳng REST API để chỉnh `tier`/`quality`/`use_hyper`/`TAPose`; tool MCP không expose và mặc định ở tier rẻ nhất. Chi tiết ở [BLENDER-SESSION-GUIDE](BLENDER-SESSION-GUIDE.md) |
 | Sketchfab | Có model hợp sẵn | **Chỉ license CC0/CC-BY** (dự án ưu tiên free-to-use); ghi attribution vào ASSET-LOG |
 | PolyHaven | ❌ Tránh — texture/HDRI photoreal, không hợp toon và toon không cần HDRI | — |
 
-➡️ **Lệnh cụ thể từng bước, checklist nghiệm thu 4 loại asset, và bảng lỗi thường gặp**: [BLENDER-SESSION-GUIDE.md](BLENDER-SESSION-GUIDE.md).
+### 6.4 Workflow nhân vật (nhánh 3D)
+
+Chạy headless bằng `tools/blender/kage_text3d_kit.py`. Không bước nào là thao tác tay.
+
+| Bước | Hàm | Vì sao không bỏ được |
+|---|---|---|
+| 1. Sinh mesh | REST API Rodin (§6.3) | Prompt phải nêu rõ khuôn mặt và **đúng spec trang phục §2.3** — sai spec ở đây là hỏng cả nhân vật |
+| 2. Chuẩn hoá | `normalise()` | Cao 1.0, chân z=0, mặt +X. Phải biến đổi ở cấp mesh data |
+| 3. Hàn đỉnh | `clean()` | glTF tách đỉnh theo seam UV; không hàn thì bước 5 gãy |
+| 4. Đo giải phẫu | `measure()` | Không có hằng số chung — mỗi mesh một tỷ lệ |
+| 5. Rig + trọng số | `rig()` | Tự chuyển sang `weight_by_proximity()` khi bone-heat gãy |
+| 6. Bảy action | `author_scaled_actions()` | Hiệu chỉnh biên độ theo tỷ lệ thân, giữ nguyên nhịp |
+| 7. Toon + viền | `toon_textured()` · `add_inverted_hull_outline()` | Xem §3.4 — dùng nhầm nấc ramp là tối hai lần |
+| 8. Nghiệm thu | render preview → bảng Q ở [ART-QUALITY-STANDARD](ART-QUALITY-STANDARD.md) | Preview vẫn render bằng `kage_sprite_render.py`, nhưng **chỉ để nghiệm thu**, không phải sản phẩm |
+| 9. Decimate + xuất glTF | *(chưa code — §10)* | Ngân sách tam giác chưa chốt |
+
+➡️ **Lệnh cụ thể từng bước, checklist nghiệm thu, và bảng lỗi thường gặp**: [BLENDER-SESSION-GUIDE.md](BLENDER-SESSION-GUIDE.md).
 
 ---
 
@@ -246,9 +327,12 @@ assets/raw/blender/                  # .blend nguồn — COMMIT (source of trut
 ├── characters/  ├── monsters/  ├── effects/  └── props/
 assets/raw/render-out/               # PNG master @2x — KHÔNG commit (sinh lại được), .gitignore
 assets/raw/ASSET-LOG.md              # sổ asset — COMMIT
+assets/exported/models/{low,med,high}/   # glTF đã decimate — KHÔNG commit (sinh lại được), .gitignore
 ```
 
-- `.blend` giữ **nhỏ** (không pack texture thừa, purge orphan trước khi save). Nếu file nào vượt ~25MB → dừng, cân nhắc Git LFS (quota free tier có hạn — quyết định treo §10).
+- `.blend` giữ **nhỏ** (không pack texture thừa, purge orphan trước khi save). Git LFS **đã bật** cho `assets/raw/**` (`.gitattributes`, 2026-08-01) — quota free tier có hạn, đừng commit thêm binary không cần thiết.
+- ⚠️ **Ngoại lệ quan trọng với nhánh 3D:** `.blend` chứa mesh sinh từ Rodin **không sinh lại được** — chạy lại prompt cũ ra model khác. Quy tắc "không commit thứ sinh lại được" **không** áp dụng cho chúng; mất là mất hẳn. Đổi lại, chúng buộc phải `pack_all()` texture nên nặng hơn nhiều (bản pilot Hỏa: 47 MB).
+- ⚠️ **Ngoại lệ cho luật "COMMIT .blend nguồn"**: nhân vật sinh từ mesh kit dựng lại nguyên vẹn bằng 1 dòng lệnh nên **không commit** hàng loạt — nguồn thật là spec dict + kit (text). Xem [ART-QUALITY-STANDARD §8](ART-QUALITY-STANDARD.md); chỉ `.blend` model tay mới là source of truth phải commit.
 - `assets/raw/` vốn đã bị loại khỏi bản build theo [RESOURCE.md §2](../04-client/RESOURCE.md) — cấu trúc trên không đổi luật đó.
 
 ---
@@ -400,11 +484,12 @@ Nên trang quản trị **tự cắt được mọi vùng** bằng `canvas.drawI
 
 | # | Quyết định | Lý do | Trạng thái |
 |---|---|---|---|
-| 1 | Blender **pre-render** ra sprite, không realtime 3D | Game 2D side-view; tái dùng model; AI tự động hóa được | Đề xuất |
-| 2 | Chỉ render hướng phải, trái = flip code | ½ frame, ½ atlas | Đề xuất |
-| 3 | Master @2x duy nhất → downscale @1x/@0.5x tại asset-pipeline | Render 1 lần, 3 tier atlas | Đề xuất |
-| 4 | 3 mức đồ họa LOW/MEDIUM/HIGH, chỉ tồn tại client-side | Bảng §5; không đụng Server Authority | Đề xuất |
-| 5 | Animation 12fps on-twos, số frame cố định theo asset | Phong cách anime + ngân sách atlas; không phải setting | Đề xuất |
+| 1 | ~~Blender pre-render ra sprite, không realtime 3D~~ → **nhân vật render 3D thời gian thực (2.5D); VFX/icon vẫn pre-render** | Bỏ trần 12 fps, bỏ khoá góc nhìn vào tài sản, mở đường cho trang bị nhìn thấy được | 🔀 **Thay bởi [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)** (Accepted 2026-08-03) |
+| 2 | ~~Chỉ render hướng phải, trái = flip code~~ | Không còn ý nghĩa — hướng nhìn là hằng số runtime | 🔀 Bỏ theo ADR-031 |
+| 3 | Master @2x duy nhất → downscale @1x/@0.5x tại asset-pipeline | Render 1 lần, 3 tier atlas | **Còn hiệu lực — chỉ cho nhánh 2D** |
+| 4 | 3 mức đồ họa LOW/MEDIUM/HIGH, chỉ tồn tại client-side | Bảng §5; không đụng Server Authority | Còn hiệu lực (ADR-031 đổi *nội dung* tier, không đổi cơ chế) |
+| 5 | Animation 12fps on-twos, số frame cố định theo asset | Phong cách anime + ngân sách atlas; không phải setting | **Còn hiệu lực — chỉ cho VFX 2D**; nhân vật chạy theo fps thật |
+| 5b | Nhân vật xuất **glTF 2.0**, client nạp bằng `gdx-gltf`; vẻ ngoài cel do shader runtime | Blender xuất glTF sẵn trong core, không qua công cụ ngoài đã bỏ hoang | **Chốt** — [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) |
 | 6 | Script chuẩn trong `tools/blender/`, MCP chỉ gọi hàm | Kỷ luật token §6.1 | Đề xuất |
 | 7 | DB lưu **metadata** asset (bảng `art_asset`), binary ở file/patch | §8 — trang quản trị cần registry, client không nối DB | Đề xuất (chủ dự án đã yêu cầu có DB, thiết kế bảng chờ duyệt) |
 | 8 | Danh mục = bảng `art_category` phân cấp 2 tầng, asset gắn tầng lá | Chủ dự án yêu cầu chia category rõ ràng; thêm loại không cần migration | Đề xuất |
@@ -416,21 +501,27 @@ Nên trang quản trị **tự cắt được mọi vùng** bằng `canvas.drawI
 
 ## 10. ADR cần tạo / quyết định treo
 
-- ✅ **ADR "Graphics Quality Tiers & Pre-render Pipeline"** — quyết định #1–#4 chốt qua thực tế đã triển khai (không tách ADR riêng, xem [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) cho phần phát hành).
+- 🔀 **[ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) Accepted 2026-08-03** — nhân vật chuyển sang render 3D thời gian thực (2.5D). Thay quyết định #1 và #2 ở §9. **Hai việc treo do ADR này sinh ra:**
+  - **Ngân sách tam giác chưa chốt** (§4.4). Mesh pilot 90k tam giác; phải đo frame time thật ở nhiều mức decimate rồi mới điền số, không đoán.
+  - **Cách phòng vệ JitPack chưa chốt.** `gdx-gltf` chỉ phát hành qua JitPack, không có trên Maven Central. **Chưa được thêm vào `libs.versions.toml`** cho tới khi chốt.
+- ✅ **ADR "Graphics Quality Tiers & Pre-render Pipeline"** — quyết định #3–#4 chốt qua thực tế đã triển khai (không tách ADR riêng, xem [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) cho phần phát hành).
 - ✅ **Migration registry** (§8.2): `V19__create_art_registry.sql` (2026-08-01) — `art_category` + seed cây danh mục + `art_asset`, verify thật qua Postgres 17.
 - **Lưu trữ file: không cần ADR** — §8.4 chốt nginx + đĩa, không thêm dependency nào.
 - ✅ **Phát hành asset**: [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) Accepted (2026-08-01) — bản cài đóng gói **đúng 1 tier mặc định (MEDIUM)**, LOW/HIGH tải theo yêu cầu khi người chơi đổi mức đồ họa; client **luôn** gọi `ensureAssetsAvailable(tier)` kể cả khi asset có sẵn (chống nhánh code mục). Amend [ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md) ở đúng điểm "đóng gói toàn bộ"; phần hoãn CDN/OBB của ADR-024 vẫn giữ nguyên.
 - ✅ **`tools/asset-pipeline`**: [ADR-029](../01-architecture/adr/ADR-029-Asset-Pipeline-Tool.md) Accepted (2026-08-01) — module `tools:asset-pipeline` + `gdx-tools` TexturePacker đóng gói atlas, **đã nối** bước upsert `art_asset` (V19) qua `ArtRegistryUpserter`.
-- **Treo**: có làm bộ atlas @2x cho desktop High không (tốn thêm dung lượng patch)? · **Git LFS cho .blend lớn — vẫn treo** (MinIO từng được coi là lời giải, nay đã loại) · Blender tooling không cần ADR dependency (chạy dev-time, không vào runtime game).
+- **Treo**: có làm bộ atlas @2x cho desktop High không (tốn thêm dung lượng patch)? · Blender tooling không cần ADR dependency (chạy dev-time, không vào runtime game).
+- ✅ **Git LFS**: đã bật cho `assets/raw/**` từ 2026-08-01 (`.gitattributes`) — hết treo. Kỷ luật quota: xem §7 + [ART-QUALITY-STANDARD §8](ART-QUALITY-STANDARD.md).
 
 ## 11. Tài liệu liên quan
 
-[RESOURCE.md](../04-client/RESOURCE.md) (pipeline hạ nguồn, naming, atlas) · [RENDERING.md](../03-engine/RENDERING.md) (animation flyweight, particle pool, shader) · [GDD](../13-game-design/GAME-DESIGN-DOCUMENT.md) (5 hệ phái) · [tools/blender/README.md](../../tools/blender/README.md) (contract script) · [DATABASE.md](../05-server/DATABASE.md) + [ADMIN.md](../12-devtools/ADMIN.md) (registry §8)
+[ART-QUALITY-STANDARD.md](ART-QUALITY-STANDARD.md) (**thước đo ĐẠT/KHÔNG ĐẠT + mesh kit dựng nhân vật**) · [RESOURCE.md](../04-client/RESOURCE.md) (pipeline hạ nguồn, naming, atlas) · [RENDERING.md](../03-engine/RENDERING.md) (animation flyweight, particle pool, shader) · [GDD](../13-game-design/GAME-DESIGN-DOCUMENT.md) (5 hệ phái) · [tools/blender/README.md](../../tools/blender/README.md) (contract script) · [DATABASE.md](../05-server/DATABASE.md) + [ADMIN.md](../12-devtools/ADMIN.md) (registry §8)
 
 ## 12. Việc cần làm tiếp theo
 
-1. ✅ Chủ dự án duyệt Art Direction §2 bằng **asset thí điểm** — thực tế đã đi xa hơn 1 asset: cả 5 hệ ×
-   3 bậc B1/B2/B3 đã render thật (`assets/raw/ASSET-LOG.md`), không chỉ 1 nhân vật Hỏa.
+1. ✅ **Hướng art đã được duyệt 2026-08-03.** Pilot Hỏa dựng bằng Text→3D (Hyper3D Rodin tier Detail)
+   qua `kage_text3d_kit.py` — chủ dự án duyệt sau 3 vòng. Sheet thế hệ cũ (5 hệ × 3 bậc, khối hộp,
+   bị bác 2026-08-02) giờ là **PLACEHOLDER**, sẽ bị thay khi 14 nhân vật còn lại được sản xuất.
+   **Chưa sản xuất hàng loạt** — chờ chốt ngân sách tam giác (§4.4) và gắn vũ khí.
 2. ✅ Dựng `kage_character_base.blend` (phiên Blender MCP đầu tiên, theo §3.3) — xong.
 3. ✅ `tools/asset-pipeline` code xong (2026-08-01, [ADR-029](../01-architecture/adr/ADR-029-Asset-Pipeline-Tool.md)
    Accepted) — downscale @1x/@0.5x + validate tên + pack 3 bộ atlas (`gdx-tools` TexturePacker thật) +

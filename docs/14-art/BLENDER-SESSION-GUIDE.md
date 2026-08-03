@@ -1,15 +1,20 @@
 # BLENDER-SESSION-GUIDE.md
 
-**Phụ lục thao tác: chạy một phiên Blender MCP để ra sprite**
+**Phụ lục thao tác: chạy một phiên Blender để ra model nhân vật (3D) hoặc sprite (VFX/icon)**
 
 | | |
 |---|---|
-| Version | 1.0.0 |
+| Version | 1.1.0 |
 | Status | Draft |
-| Liên quan | [ART-PIPELINE.md](ART-PIPELINE.md) (thiết kế) · [tools/blender/README.md](../../tools/blender/README.md) (contract hàm) |
+| Liên quan | [ART-PIPELINE.md](ART-PIPELINE.md) (thiết kế) · [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) (2.5D) · [tools/blender/README.md](../../tools/blender/README.md) (contract hàm) |
 
 > Đây là phần "làm thế nào". Phần "vì sao" nằm ở ART-PIPELINE.md — không lặp lại ở đây.
 > Mọi lệnh dưới đây bám 7 quy tắc token ở [ART-PIPELINE §6.1](ART-PIPELINE.md).
+
+> ⚠️ **Từ [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) (Accepted 2026-08-03):**
+> nhân vật · quái · NPC **không còn ra sprite**, chúng ra **model glTF**. §1 dưới đây vẫn dùng được
+> nhưng bước render giờ chỉ để **nghiệm thu**, không phải để lấy sản phẩm. Quy trình sản xuất nhân
+> vật thật nằm ở **§1.5**. VFX · icon · prop vẫn theo §1 nguyên vẹn.
 
 ---
 
@@ -56,6 +61,11 @@ blender -b <file>.blend -P <script>.py -- ...
 
 ---
 
+> ⚠️ **Nhân vật/quái/NPC không còn đi theo §1 nữa.** Từ 2026-08-03 chúng được dựng bằng
+> `tools/blender/kage_mesh_kit.py` + `build_kage_character.py`, chạy **hoàn toàn headless bằng 1 dòng
+> lệnh**, không cần mở Blender hay MCP — xem [ART-QUALITY-STANDARD §5 và §7](ART-QUALITY-STANDARD.md).
+> §1 dưới đây vẫn đúng cho những thứ phải model tay (prop, tile, VFX khối, boss dị hình).
+
 ## 1. Trình tự phiên chuẩn — nhân vật mới
 
 Mỗi ô code = **một** lần `execute_blender_code`. Đừng tách nhỏ hơn (mỗi round-trip là token).
@@ -73,8 +83,9 @@ exec(open(r'E:/study/libgdx/shinobi-engine/tools/blender/kage_sprite_render.py')
 setup_scene(px=256)   # 256 = nhân vật; boss 512; VFX 384; icon 128 (ART-PIPELINE §4.1)
 ```
 
-In ra: `[kage] scene ready: engine=BLENDER_EEVEE px=256 outline=5.0px`.
-`outline=5.0px` là đúng: art direction yêu cầu 2.5px ở @1x, master là @2x → 5px.
+In ra: `[kage] scene ready: engine=BLENDER_EEVEE px=256 outline=5.0px` (số in ra là px trên master @2x, tức gấp đôi giá trị @1x bạn truyền vào).
+
+⚠️ **5.0px chỉ đúng nếu asset choán ít khung.** Với nhân vật chibi cao ~166px trong khung 256px, 2.5px@1x phủ đen gần kín hình — số đo đúng là **1.1px@1x** ([ART-QUALITY-STANDARD §4](ART-QUALITY-STANDARD.md)). Luôn chọn độ dày theo kích thước thật của asset trong khung, đừng mặc định.
 
 ⚠️ **Tuyệt đối không** `bpy.ops.wm.read_factory_settings()` để "làm sạch scene" — lệnh đó tắt addon MCP và giết kết nối (§4). Cần dựng lại file base thì chạy headless:
 `blender -b --factory-startup -P tools/blender/build_character_base.py`
@@ -160,16 +171,94 @@ Thêm 1 dòng vào `assets/raw/ASSET-LOG.md`:
 
 ---
 
+## 1.5. Trình tự sản xuất **nhân vật** (nhánh 3D — [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md))
+
+Chạy được hoàn toàn headless. Toàn bộ hàm nằm ở `tools/blender/kage_text3d_kit.py`.
+
+### Bước A · Bật Hyper3D bằng code (không cần bấm checkbox trong Blender)
+
+```python
+sc = bpy.context.scene
+sc.blendermcp_use_hyper3d = True
+sc.blendermcp_hyper3d_mode = 'MAIN_SITE'
+bpy.ops.blendermcp.set_hyper3d_free_trial_api_key()   # key free-trial, ~0.5 credit/lần
+```
+
+Hunyuan3D **không dùng được**: mode mặc định là `LOCAL_API` trỏ `localhost:8081`, tức là cần tự dựng server.
+
+### Bước B · Sinh mesh — gọi thẳng REST API, **không** dùng tool MCP
+
+Tool `generate_hyper3d_model_via_text` không expose các tham số quyết định chất lượng và mặc định ở
+`tier=Sketch` (rẻ nhất, texture 512). Gọi thẳng:
+
+```python
+requests.post("https://hyperhuman.deemos.com/api/v2/rodin",
+    headers={"Authorization": f"Bearer {sc.blendermcp_hyper3d_api_key}"},
+    files=[("prompt", (None, PROMPT)), ("tier", (None, "Detail")),
+           ("quality", (None, "high")), ("use_hyper", (None, "true")),
+           ("TAPose", (None, "true")), ("material", (None, "PBR")),
+           ("geometry_file_format", (None, "glb"))])
+```
+
+`tier=Detail` cho texture **2048**. Lấy `uuid` trong response, poll bằng
+`poll_rodin_job_status`, rồi import bằng `import_generated_asset(name, task_uuid=...)` — tool MCP
+nhận `task_uuid` của job gọi tay bình thường.
+
+Ba cái bẫy ở bước này:
+
+- **`bbox_condition` làm hỏng tool MCP** → `Expecting value: line 1 column 1`. Bỏ tham số đó đi.
+- **API trả HTTP 201 kèm `{"error": ...}`** — status code không phản ánh lỗi, phải đọc body.
+- **`IMAGE_CONTENT_VIOLATION`** nếu prompt có "bare legs" + "boy". Dùng "chibi ninja warrior
+  character" + "dark knee-length trousers".
+- `mesh_mode=Quad` **không có tác dụng** — GLB trả về vẫn 100% tam giác.
+
+Prompt phải nêu rõ **khuôn mặt** ("clearly visible anime face: large glossy black eyes with white
+highlights, thin sharp eyebrows, small smiling mouth, spiky black hair") — thiếu là ra nhân vật đầu
+trọc không mặt — và phải **bám đúng spec trang phục** ở [ART-PIPELINE §2.3](ART-PIPELINE.md).
+**Bỏ** cụm "side profile facing right": vô nghĩa với mesh 3D và làm mesh dẹt theo chiều sâu.
+
+### Bước C · Chuẩn hoá → rig → action → toon (batch 1 lần)
+
+```python
+import kage_text3d_kit as t3d
+obj = t3d.clean(t3d.normalise('Rodin_Import', 'Hoa'))
+t3d.measure(obj)          # đọc số đo khớp từ bảng in ra, KHÔNG dùng hằng số của nhân vật khác
+rig = t3d.rig(obj, 'hoa', arm_y=..., leg_y=..., hip=..., chest=...,
+              shoulder=..., elbow=..., wrist=..., knee=...)
+t3d.author_scaled_actions(rig)
+t3d.toon_textured(obj, shades=3)
+t3d.add_far_shade(obj)
+t3d.add_inverted_hull_outline(obj, width_px_at_1x=3.0)   # gọi SAU fit_camera
+```
+
+### Bước D · Nghiệm thu rồi save
+
+Render preview bằng `kage_sprite_render.py` như §1 bước 4, chấm bảng Q ở
+[ART-QUALITY-STANDARD §2](ART-QUALITY-STANDARD.md). **Ảnh render ở đây là bằng chứng nghiệm thu,
+không phải sản phẩm giao.**
+
+Save `.blend` có `bpy.ops.file.pack_all()` — texture đến từ job cloud nên không pack là mất.
+⚠️ File dạng này **không sinh lại được**: chạy lại prompt cũ ra model khác. Xem
+[ART-PIPELINE §7](ART-PIPELINE.md).
+
+### Bước E · Decimate + xuất glTF
+
+**Chưa code** — ngân sách tam giác chưa chốt ([ART-PIPELINE §4.4](ART-PIPELINE.md)).
+
+---
+
 ## 2. Checklist nghiệm thu
 
 Chạy checklist **trên file PNG đã render**, không phải trên viewport. Bắt buộc kiểm ở cả @1x và @0.5x (thu nhỏ ảnh xuống 50%/25%) — lỗi readability chỉ lộ ra khi nhỏ.
 
-### 2.1 Nhân vật / NPC (master 256)
+⚠️ Checklist dưới đây là tầng **kỹ thuật**. Nhân vật/quái/NPC còn phải qua tầng **thẩm mỹ** — bảng PASS/FAIL Q1–Q12 ở [ART-QUALITY-STANDARD.md §2](ART-QUALITY-STANDARD.md) (benchmark Ninja School Online). FAIL tầng thẩm mỹ = không render sheet, không ghi log.
+
+### 2.1 Nhân vật / NPC — nghiệm thu trên **ảnh preview**, sản phẩm giao là model
 
 - [ ] Nền **trong suốt** hoàn toàn, không viền trắng/xám quanh mép.
 - [ ] Outline đen liền mạch, không đứt ở chỗ chi mảnh (tay, vũ khí mỏng).
 - [ ] Cel 2–3 nấc rõ ràng — không có gradient mượt (gradient = shader sai, xem §4).
-- [ ] Nhân vật **quay mặt sang phải** (+X). Sai hướng = cả bộ sheet vô dụng.
+- [ ] Model **quay mặt +X** trong không gian gốc. Từ ADR-031 đây **không còn là hướng nhìn trên màn** (góc camera là hằng số runtime), nhưng vẫn bắt buộc: rig, bảng pose và `add_far_shade()` đều giả định trục này.
 - [ ] Chân chạm đúng baseline: kiểm `pivot_y_px_from_bottom` trong `render-meta.json` **giống nhau** giữa các asset cùng loại.
 - [ ] Không frame nào bị **cắt** (tay vung, tóc, vũ khí) — `fit_camera` quét mọi frame nên lỗi này chỉ xảy ra khi thêm action sau lúc fit.
 - [ ] Tỷ lệ chibi 2–2.5 đầu; đặt cạnh asset đã duyệt trong ASSET-LOG để so.
@@ -207,8 +296,8 @@ Toàn bộ mục 2.1, cộng thêm:
 
 | Loại | `setup_scene(px=)` | Outline | Freestyle | Bộ action |
 |---|---|---|---|---|
-| Nhân vật/NPC/quái | 256 | 2.5px @1x (mặc định) | Bật | Bộ chuẩn §4.2 |
-| Boss | 512 | 2.5px @1x | Bật | Bộ chuẩn + action riêng của boss |
+| Nhân vật/NPC/quái | 256 | **1.1px @1x** (đo thật, [ART-QUALITY-STANDARD §4](ART-QUALITY-STANDARD.md)) | Bật | Bộ chuẩn §4.2 |
+| Boss | 512 | ~1.1px @1x (chưa đo riêng — boss choán khung tương tự, kiểm lại khi làm boss đầu tiên) | Bật | Bộ chuẩn + action riêng của boss |
 | VFX khối | 384 | 1.5px @1x | Bật | 1 action `skill_cast` |
 | VFX mềm (lửa/khói) | 384 | — | **Tắt** | 1 action `skill_cast` |
 | Icon | 128 | 2px @1x | Bật | Không (1 frame) |
@@ -236,6 +325,11 @@ Các mục ✅ dưới đây là lỗi **đã gặp thật** khi chạy Blender 
 | Blender treo, không nhận lệnh nào | Có dialog/modal operator đang mở | Đóng thủ công trong Blender; tránh operator mở hộp thoại (`bpy.ops.wm.*` dạng invoke) |
 | ✅ Nhân vật đứng thẳng ở action A lại "gãy gập" theo pose cuối của action B | `fit_camera()` quét **mọi** action để đo bounds; bone **không có keyframe** ở action đang active giữ nguyên giá trị được ghi lúc quét action khác (Blender không tự reset về 0 khi đổi action) | Khi author action cho rig nhiều bone dùng chung, keyframe **mọi** bone ở **mọi** frame của **mọi** action (kể cả set về 0 tường minh) — đừng chỉ keyframe bone đang "diễn". Xem `full_pose_kf()` trong ASSET-LOG entry `char_hoa-pilot` |
 | ✅ Outline 2.5px@1x (mặc định) phủ gần kín cả nhân vật thành mảng đen lớn | Nhân vật ghép từ **nhiều box rời** (không hàn liền) — mỗi box có đủ 12 cạnh riêng, `select_crease` bắt outline ở **mọi** cạnh 90° kể cả cạnh nối giữa 2 box chạm nhau, cạnh dày đặc so với kích thước 256px | Với rig kiểu "nhiều khối rời cứng" (không phải mesh liền mạch điêu khắc), hạ outline xuống ~0.8px@1x qua `setup_scene(outline_px_at_1x=0.8)` (MCP) hoặc `--outline-px 0.8` (CLI, đã thêm vào script). **Không** tắt `select_crease` để "sửa" — thử tắt cho thấy `select_silhouette`/`select_border` một mình **không** bắt được biên ngoài thật của khối hộp căn trục thẳng dưới camera ortho (nghi ngờ là trường hợp suy biến dot-product=0 khi mặt bên vuông góc hoàn toàn với hướng nhìn), outline biến mất hoàn toàn thay vì chỉ mỏng đi |
+| ✅ **Một bộ phận "biến mất" khỏi bản render dù mesh có thật và silhouette vẫn trông đúng** | Bộ phận nằm **lọt trong bề dày** của bộ phận che nó. Gặp thật: `ARM_Y=0.085` < nửa bề dày thân `0.114` → cả 2 cánh tay nằm trong lồng ngực, mặt thân render đè lên | Mọi bộ phận phải nằm ngoài bề dày của thứ che nó ([ART-QUALITY-STANDARD §3](ART-QUALITY-STANDARD.md)). Không phát hiện được bằng cách nhìn 1 ảnh tĩnh — phải soi đúng câu hỏi "tay đâu?" |
+| ✅ Nhân vật ra **một mảng đen kín**, không thấy chi tiết | Outline quá dày so với kích thước nhân vật **trong khung**. Master 256px với nhân vật cao ~166px thì 2.5px@1x (=5px master) phủ gần hết | Nhân vật dùng **1.1px@1x**. `build_kage_character.py` ghi sẵn vào .blend, `kage_sprite_render.py` mặc định **kế thừa** giá trị trong file — chỉ truyền `--outline-px` khi cố ý |
+| ✅ Loại một object khỏi outline bằng `obj.lineart.usage = "EXCLUDE"` **không có tác dụng** | Thuộc tính đó của **Grease Pencil Line Art**, không phải Freestyle. Nó im lặng không làm gì | Freestyle lọc theo **collection**: `lineset.select_by_collection = True` + `lineset.collection` + `collection_negation = "EXCLUSIVE"` (xem `apply_outline_exclusions()` trong `kage_mesh_kit.py`) |
+| ✅ Tay/chân vung **ngược hướng** so với bảng pose | Dùng một dấu xoay chung cho mọi xương. Cùng một trục thế giới làm xương hướng **lên** (spine/head) và xương hướng **xuống** (tay/chân) quay ngược nhau | Tính dấu từ `axis × bone_direction` rồi chuẩn hoá "dương = mũi xương ra trước" (`_swing_channel()` trong kit) |
+| ✅ Cả sheet bị thu nhỏ, nhân vật thành chấm nhỏ giữa khung | Một pose duy nhất chìm dưới `z=0`. Baseline 0.08 nên mỗi đơn vị dưới đất tốn **12.5×** zoom; gặp thật ở `die` khi góc cộng dồn `pelvis+spine+head` đạt −190° và cắm đầu xuống `z=−0.59` | `fit_camera()` giờ **in cảnh báo** khi phần dưới đất là yếu tố quyết định. Sửa **pose**, không sửa camera. Nhớ góc cộng dồn theo chuỗi xương |
 | Output MCP quá dài, tốn token | `print()` cả list object lớn | In số lượng/tên ngắn; script đã in gọn 1 dòng mỗi bước |
 
 ### 4.1 Bật lại addon MCP sau khi mất kết nối
@@ -287,9 +381,13 @@ Không. Tài liệu này là thao tác, mọi quyết định kiến trúc nằm
    `bulk=1.22` để trông nặng hơn — xem `ELEMENT_SPECS` trong `build_box_character.py`. Đây vẫn là mức
    "khối hộp có phụ kiện", chưa phải costume/vũ khí điêu khắc thật theo B1/B2/B3 — nếu cần silhouette
    tinh hơn (tóc, gai, dáng đứng khác nhau thật sự) thì phải làm model riêng cho nhân vật thật.
-3. Cân nhắc: rig kiểu "nhiều box rời + outline mỏng" (đã dùng cho cả 5 pilot) so với "mesh liền mạch
-   điêu khắc + outline chuẩn 2.5px" cho nhân vật thật — pilot chọn cách đầu vì nhanh, nhưng chưa rõ cách
-   nào cho chất lượng cuối tốt hơn.
+3. ✅ **Chốt 2026-08-02, đã triển khai 2026-08-03** (câu hỏi "box rời vs mesh liền mạch"): chủ dự án đánh
+   giá box-pilot không đạt chất lượng ("hình hộp lego") — chuẩn mới là **mesh trơn**, box trần bị cấm cho
+   cơ thể nhân vật. Outline đi kèm hoá ra **không phải 2.5px** như dự đoán ban đầu mà là **1.1px@1x** (đo
+   thật). Toàn bộ tiêu chuẩn + lộ trình thay thế: [ART-QUALITY-STANDARD.md](ART-QUALITY-STANDARD.md).
+
+⚠️ **Mục 1, 2, 4, 6 dưới đây nói về thế hệ box và đã bị thay thế** — giữ lại làm lịch sử pipeline, không
+phải hướng dẫn còn hiệu lực. Nhân vật hiện làm theo [ART-QUALITY-STANDARD §5/§7](ART-QUALITY-STANDARD.md).
 4. ✅ **Xong 2026-08-01 (cùng ngày, lần 3)**: B2 + B3 cho cả 5 hệ (`char_<hệ>-b2`, `char_<hệ>-b3`), đúng
    3 bậc B1/B2/B3 ở ART-PIPELINE §2.2. B2 = B1 + giáp mảnh/đai (`GEAR_SPECS_B2`, gắn bone tuỳ vị trí —
    riêng tấm che đùi Thổ gắn `leg_l`/`leg_r` chứ không phải `pelvis` vì cần di chuyển theo chân). B3 = B2
