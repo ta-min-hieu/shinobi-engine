@@ -71,6 +71,8 @@ Bước 5 (`tools/asset-pipeline`) chạy **build-time/dev-time**, không nằm 
 
 Bước 1–2 (art thô → sprite sheet) được sản xuất bằng Blender pre-render qua AI — xem [ART-PIPELINE.md](../14-art/ART-PIPELINE.md).
 
+⚠️ **Từ [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) (Accepted 2026-08-03), luồng này chỉ còn cho VFX kỹ năng · icon · UI.** Nhân vật · quái · NPC **không đi qua sprite sheet nữa**: chúng xuất glTF từ Blender và client render 3D thời gian thực. Chúng vẫn dùng chung cơ chế 3 tier và `ensureAssetsAvailable(tier)` ở §9 — chỉ khác nội dung tier là **model LOD + cỡ texture** thay vì độ phân giải atlas.
+
 ---
 
 ## 4. Naming Convention

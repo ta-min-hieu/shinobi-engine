@@ -111,6 +111,12 @@ Chi tiết: [RENDERING.md](../03-engine/RENDERING.md).
 
 ⚠️ **Draw call là chi phí chính của 2D rendering**, không phải số pixel.
 
+⚠️ **Nhánh 3D có thêm một nguồn chậm mà bảng trên không có: số tam giác.** Từ
+[ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md), nhân vật render bằng
+`ModelBatch`. Mesh sinh từ text→3D ra ~90k tam giác — 20 nhân vật trên màn là 1,9 triệu tam giác
+mỗi khung. Ngân sách LOD **chưa chốt, phải đo** ([ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md)).
+Thêm nữa, `ModelBatch` và `SpriteBatch` **không trộn được** — mỗi lần đổi qua lại là một flush.
+
 ---
 
 ## 7. Network

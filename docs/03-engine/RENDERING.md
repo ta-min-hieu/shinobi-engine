@@ -4,12 +4,19 @@
 
 | | |
 |---|---|
-| Version | 1.0.0 |
+| Version | 1.1.0 |
 | Status | Draft |
-| Liên quan | [ENGINE.md](ENGINE.md), [ADR-002](../01-architecture/adr/ADR-002-Why-libGDX.md) |
+| Liên quan | [ENGINE.md](ENGINE.md), [ADR-002](../01-architecture/adr/ADR-002-Why-libGDX.md), [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) |
 
 > Rendering **chỉ chạy ở client**. Server không render ([ENGINE.md §9](ENGINE.md)).
 > Rendering là vùng **Clean Architecture không áp dụng** (Điều 25) — hiệu năng thắng abstraction.
+
+> ⚠️ **Đổi lớn 2026-08-03 — [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) (Accepted).**
+> Tài liệu này viết khi **mọi thứ** đi qua `SpriteBatch`. Từ ADR-031, **nhân vật · quái · NPC**
+> render 3D thời gian thực (`ModelBatch` + glTF có skin) qua camera orthographic khoá góc; **VFX
+> kỹ năng · icon · UI** vẫn `SpriteBatch` y như mô tả ở đây.
+> Mọi mục dưới đây **vẫn đúng cho nhánh 2D**. Chỗ nào ADR-031 phủ định thì đã ghi rõ tại chỗ —
+> đáng chú ý nhất là **§8 và quyết định #5**, vốn ghi "frame-based, không skeletal".
 
 ---
 
@@ -31,13 +38,19 @@ graph LR
     S["State (ECS Components)"] --> I["Interpolation<br/>alpha giữa 2 tick"]
     I --> C["Culling<br/>bỏ entity ngoài camera"]
     C --> Z["Sort theo layer + Y<br/>(side-view depth)"]
-    Z --> B["SpriteBatch<br/>gom draw call"]
+    Z --> M["ModelBatch<br/>nhân vật · quái · NPC (glTF)"]
+    Z --> B["SpriteBatch<br/>VFX · icon — gom draw call"]
+    M --> G["GPU"]
     B --> G["GPU"]
 
     U["Scene2D UI"] --> G
 
     style B fill:#2d6a4f,color:#fff
+    style M fill:#7a3b2e,color:#fff
 ```
+
+⚠️ Hai batch **không trộn lẫn được**: mỗi lần đổi qua lại là một lần flush. Nhân vật vẽ trước,
+VFX vẽ đè sau — gom theo nhánh, đừng gom theo entity.
 
 **Thứ tự bắt buộc**: Culling **trước** Sort — sort ít phần tử rẻ hơn nhiều.
 
@@ -144,15 +157,34 @@ public final class PositionComponent implements Component {
 
 ## 8. Animation
 
+Hai kiểu, chọn theo loại đối tượng ([ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)).
+
+### 8.1 Nhân vật · quái · NPC — **skeletal, 3D**
+
 | Khía cạnh | Quyết định |
 |---|---|
-| Kiểu | **Frame-based** (sprite sheet), không skeletal |
+| Kiểu | **Skeletal** — rig 11 xương, 7 action, nạp từ glTF 2.0 |
+| Nguồn | Blender → glTF ([ART-PIPELINE §6.4](../14-art/ART-PIPELINE.md)) |
+| Nạp bằng | `gdx-gltf` — ⚠️ **chưa thêm vào `libs.versions.toml`**, xem [TECHNOLOGY-STACK](../01-architecture/TECHNOLOGY-STACK.md) |
+
+Client **nội suy giữa các khoá theo tần số khung hình thật** thay vì phát ảnh cố định ở 12 fps.
+Đây là lý do chính đổi sang 2.5D — bảng tier §5 của ART-PIPELINE giờ mới có "FPS mục tiêu" thật.
+
+⚠️ Cạm bẫy Flyweight vẫn nguyên: dữ liệu `Model` và clip animation phải **dùng chung giữa các
+entity cùng loại**, mỗi entity chỉ giữ trạng thái phát riêng.
+
+**Không dùng Spine** — lý do license phí vẫn đúng, và giờ càng không cần: skeletal đã có sẵn trong
+glTF, không tốn thêm dependency thương mại nào.
+
+### 8.2 VFX kỹ năng · icon · UI — **frame-based** *(không đổi)*
+
+| Khía cạnh | Quyết định |
+|---|---|
+| Kiểu | **Frame-based** (sprite sheet), playback 12 fps |
 | Nguồn | HyperLap2D export ([RESOURCE.md](../04-client/RESOURCE.md)) |
 | Lưu ở đâu | `AnimationComponent` giữ **tham chiếu** tới `Animation` dùng chung + `stateTime` riêng |
 
 ⚠️ **Cạm bẫy**: `Animation` object phải **chia sẻ giữa các entity cùng loại** (Flyweight). Mỗi entity chỉ giữ `stateTime` riêng. Nếu mỗi entity giữ `Animation` riêng → nhân bản dữ liệu frame → tốn bộ nhớ vô ích.
-
-**Không dùng Spine/skeletal ở MVP** — thêm dependency thương mại (Spine có license phí), và frame-based đủ cho phong cách 2D anime ninja.
 
 ---
 
@@ -237,7 +269,7 @@ Với map lớn nhiều entity: cân nhắc **spatial partition** (grid đơn gi
 | 2 | 1 atlas / 1 zone; UI atlas tách riêng | Giảm texture switch + unload theo zone | Accepted |
 | 3 | Sort Y trong layer entity (side-view depth) | Đúng thị giác 2D side-view | Accepted |
 | 4 | Position lưu cả `prev` để interpolation | Đổi 8 byte/entity lấy hình mượt | Accepted |
-| 5 | Animation **frame-based**, `Animation` object chia sẻ (Flyweight) | Không tốn license Spine; không nhân bản frame data | Accepted |
+| 5 | ~~Animation **frame-based** cho mọi thứ~~ → **skeletal (glTF) cho nhân vật/quái/NPC; frame-based cho VFX/icon/UI**. `Animation`/`Model` chia sẻ (Flyweight) ở cả hai nhánh | Bỏ trần 12 fps; vẫn không tốn license Spine (skeletal có sẵn trong glTF); vẫn không nhân bản dữ liệu | 🔀 **Thay bởi [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)** (Accepted 2026-08-03) |
 | 6 | **Không lighting động ở MVP** | Điều 9, 10 — chưa gameplay nào cần | Accepted |
 | 7 | Particle **bắt buộc pool** + giới hạn số lượng | Mobile | Accepted |
 | 8 | Không spatial partition ở MVP cho tới khi đo thấy cần | Điều 30 | Accepted |

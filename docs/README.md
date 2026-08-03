@@ -72,7 +72,7 @@
 [GAME-DESIGN-DOCUMENT.md](13-game-design/GAME-DESIGN-DOCUMENT.md)
 
 ### 14 · Art
-[ART-PIPELINE.md](14-art/ART-PIPELINE.md) — Blender MCP pre-render → sprite, art direction, 3 mức cấu hình đồ họa client · [BLENDER-SESSION-GUIDE.md](14-art/BLENDER-SESSION-GUIDE.md) — lệnh từng bước, checklist nghiệm thu, bảng lỗi
+[ART-PIPELINE.md](14-art/ART-PIPELINE.md) — Blender → **model glTF cho nhân vật (2.5D, [ADR-031](01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md))** + pre-render sprite cho VFX/icon, art direction, 3 mức cấu hình đồ họa client · [BLENDER-SESSION-GUIDE.md](14-art/BLENDER-SESSION-GUIDE.md) — lệnh từng bước, checklist nghiệm thu, bảng lỗi · [ART-QUALITY-STANDARD.md](14-art/ART-QUALITY-STANDARD.md) — thước đo ĐẠT/KHÔNG ĐẠT (benchmark Ninja School Online)
 
 ### Xuyên suốt
 [GLOSSARY.md](GLOSSARY.md) — thuật ngữ Việt–Anh
