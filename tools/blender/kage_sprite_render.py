@@ -328,6 +328,14 @@ def fit_camera(objects, margin=DEFAULT_MARGIN, armature=None, actions=None,
     camera.data.ortho_scale = ortho_scale
     camera.location = (0.0, -10.0, ortho_scale * (0.5 - baseline))
 
+    # Anything below z=0 has to fit in the thin strip under the baseline, so a
+    # pose that sinks through the floor costs 1/baseline (12.5x) of zoom and
+    # silently shrinks the character to a speck. Loud is better than subtle.
+    if needed_down > max(needed_horizontal, needed_up):
+        print("[kage] WARNING: geometry reaches z={0:.3f}, below the ground plane; "
+              "it alone forces ortho_scale={1:.2f}. Fix the pose instead of the "
+              "camera.".format(min_z, ortho_scale))
+
     pivot_y_px = baseline * scene.render.resolution_y
     print("[kage] fit: ortho_scale={0:.3f} pivot=({1:.0f},{2:.0f} from bottom)".format(
         ortho_scale, scene.render.resolution_x / 2.0, pivot_y_px))
@@ -461,22 +469,57 @@ def _cli_args(argv):
     parser = argparse.ArgumentParser(prog="kage_sprite_render")
     parser.add_argument("--all-actions", action="store_true",
                         help="render every standard action found in the file")
+    parser.add_argument("--preview", metavar="ACTION",
+                        help="render a single frame of ACTION into --out and stop; "
+                             "this is the style-approval gate before a full sheet "
+                             "(BLENDER-SESSION-GUIDE §1 step 4)")
+    parser.add_argument("--preview-frame", type=int, default=None,
+                        help="frame index within --preview's action (default: first)")
     parser.add_argument("--out", required=True, help="output directory")
     parser.add_argument("--px", type=int, default=256,
                         help="master (@2x) resolution, see ART-PIPELINE §4.1")
-    parser.add_argument("--outline-px", type=float, default=DEFAULT_OUTLINE_PX_AT_1X,
-                        help="outline width in @1x px; the 2.5px default floods small "
-                             "edge-dense multi-part builds (blocky rigid rigs) with the "
-                             "crease detector on, so those characters need a thinner value")
+    parser.add_argument("--outline-px", type=float, default=None,
+                        help="outline width in @1x px. Default: keep whatever the .blend "
+                             "was built with, because the right width depends on how big "
+                             "the character is inside the frame and the build script "
+                             "already picked it. Passing 2.5 (the art-direction figure) "
+                             "onto a 256px character sheet floods it into a black blob.")
     return parser.parse_args(argv[argv.index("--") + 1:])
+
+
+def _resolve_outline(requested):
+    """Explicit width wins; otherwise reuse the one baked into the .blend."""
+    if requested is not None:
+        return requested
+    saved = bpy.context.scene.render.line_thickness
+    if saved > 0.0:
+        return saved / MASTER_SCALE
+    return DEFAULT_OUTLINE_PX_AT_1X
 
 
 def _main():
     args = _cli_args(sys.argv)
-    if args is None or not args.all_actions:
+    if args is None:
         return
-    setup_scene(px=args.px, outline_px_at_1x=args.outline_px)
-    render_all_actions(find_armature(), out_dir=args.out)
+    args.outline_px = _resolve_outline(args.outline_px)
+    if args.preview:
+        setup_scene(px=args.px, outline_px_at_1x=args.outline_px)
+        armature = find_armature()
+        # Frame the preview exactly as the sheet will be framed, so what gets
+        # approved here is what comes out of the batch render.
+        fit_camera([obj for obj in bpy.context.scene.objects if obj.type == "MESH"],
+                   armature=armature)
+        frames = None
+        if args.preview_frame is not None:
+            action = bpy.data.actions[args.preview]
+            count, loop = ACTION_SPEC.get(args.preview, (1, False))
+            frames = _sample_frames(action, count, loop)[args.preview_frame]
+        render_preview(os.path.join(args.out, "_preview_" + args.preview + ".png"),
+                       action=args.preview, frame=frames, armature=armature)
+        return
+    if args.all_actions:
+        setup_scene(px=args.px, outline_px_at_1x=args.outline_px)
+        render_all_actions(find_armature(), out_dir=args.out)
 
 
 if __name__ == "__main__":
