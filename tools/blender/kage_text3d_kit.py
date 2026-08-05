@@ -467,6 +467,166 @@ def add_inverted_hull_outline(obj, width_px_at_1x=1.2, scene=None):
     return thickness
 
 
+def decimate(obj, target_triangles):
+    """Collapse the mesh towards a triangle budget, in place.
+
+    A generated mesh arrives near 93k triangles because the generator has no
+    idea what it is for. Twenty of those on screen is 1.9M triangles per frame
+    (ADR-031), so the budget is a real constraint rather than tidiness.
+
+    The modifier is moved to the top of the stack before being applied: left at
+    the bottom it would sit after Armature and KageOutline, and Blender applies
+    a modifier as if the ones above it were already applied — which bakes the
+    rest pose and the outline shell into the mesh data.
+
+    Collapse (not un-subdivide or planar) because it is the only mode that
+    keeps vertex groups: the mesh is already skinned at this point, and losing
+    the weights means re-rigging every LOD by hand.
+    """
+    mesh = obj.data
+    mesh.calc_loop_triangles()
+    before = len(mesh.loop_triangles)
+    if before <= target_triangles:
+        return before, before
+
+    bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+
+    modifier = obj.modifiers.new("KageDecimate", "DECIMATE")
+    modifier.decimate_type = "COLLAPSE"
+    modifier.use_collapse_triangulate = True
+    modifier.ratio = target_triangles / float(before)
+    while obj.modifiers[0] != modifier:
+        bpy.ops.object.modifier_move_up(modifier=modifier.name)
+    bpy.ops.object.modifier_apply(modifier=modifier.name)
+
+    mesh = obj.data
+    mesh.calc_loop_triangles()
+    after = len(mesh.loop_triangles)
+    print("[t3d] decimate {0}: {1} -> {2} tris (asked {3})".format(
+        obj.name, before, after, target_triangles))
+    return before, after
+
+
+def _export_material(image, name):
+    """Plain base-colour material, because the runtime shader does the rest.
+
+    `toon_textured()` builds an Emission graph and `add_far_shade()` adds a
+    dimmed twin of it. Both are render-time tricks for a fixed camera: the cel
+    banding is a stepped ramp the GLSL shader reproduces, and the far shade
+    fakes depth for a profile view that no longer exists once the character can
+    turn. Exporting them would bake a lighting decision into the asset, which is
+    the thing ADR-031 set out to stop.
+
+    glTF also cannot carry them. The exporter maps Principled BSDF onto the PBR
+    material model; an Emission-only graph exports with no base colour texture
+    at all, so the character would arrive in the client untextured.
+    """
+    material = bpy.data.materials.new(name)
+    material.use_nodes = True
+    tree = material.node_tree
+    tree.nodes.clear()
+    output = tree.nodes.new("ShaderNodeOutputMaterial")
+    output.location = (400, 0)
+    principled = tree.nodes.new("ShaderNodeBsdfPrincipled")
+    principled.location = (100, 0)
+    principled.inputs["Metallic"].default_value = 0.0
+    principled.inputs["Roughness"].default_value = 1.0
+    texture = tree.nodes.new("ShaderNodeTexImage")
+    texture.location = (-250, 0)
+    texture.image = image
+    tree.links.new(texture.outputs["Color"], principled.inputs["Base Color"])
+    tree.links.new(principled.outputs["BSDF"], output.inputs["Surface"])
+    return material
+
+
+def export_gltf(path, obj, armature, extras=(), texture_px=None):
+    """Write one LOD as a self-contained .glb, ready for gdx-gltf.
+
+    Everything this does is undone afterwards: the caller keeps working on the
+    same scene for the next LOD.
+
+    Three things are deliberately dropped on the way out.
+
+      * The KageOutline SOLIDIFY modifier. glTF has no modifier concept, so the
+        exporter evaluates it — the inverted hull becomes real geometry and the
+        triangle count doubles, which would make the budget meaningless. The
+        shell is one extra draw with front faces culled; the runtime redoes it
+        for free (ADR-031).
+      * The toon and far-shade materials — see `_export_material`.
+      * Everything else in the .blend. A working character file accumulates the
+        rejected generations, and `use_selection` is what stops a 93k reject
+        from riding along inside the shipped model.
+    """
+    scene = bpy.context.scene
+    exported = [obj] + list(extras)
+
+    image = _diffuse_image(obj.data.materials[0])
+    if texture_px is not None and tuple(image.size) != (texture_px, texture_px):
+        scaled = image.copy()
+        scaled.name = "{0}_{1}".format(image.name, texture_px)
+        scaled.scale(texture_px, texture_px)
+        image = scaled
+    material = _export_material(image, "gltf_" + obj.name)
+
+    saved_materials = {}
+    saved_outlines = {}
+    for mesh_obj in exported:
+        saved_materials[mesh_obj] = list(mesh_obj.data.materials)
+        mesh_obj.data.materials.clear()
+        mesh_obj.data.materials.append(material)
+        for polygon in mesh_obj.data.polygons:
+            polygon.material_index = 0
+        outline = mesh_obj.modifiers.get("KageOutline")
+        if outline is not None:
+            saved_outlines[mesh_obj] = {
+                "thickness": outline.thickness,
+                "material_offset": outline.material_offset,
+            }
+            mesh_obj.modifiers.remove(outline)
+
+    bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.select_all(action="DESELECT")
+    for mesh_obj in exported:
+        mesh_obj.select_set(True)
+    armature.select_set(True)
+    bpy.context.view_layer.objects.active = armature
+
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    try:
+        bpy.ops.export_scene.gltf(
+            filepath=path,
+            export_format="GLB",
+            use_selection=True,
+            export_apply=True,
+            export_skins=True,
+            export_animations=True,
+            export_animation_mode="ACTIONS",
+            export_yup=True,
+        )
+    finally:
+        for mesh_obj in exported:
+            mesh_obj.data.materials.clear()
+            for slot in saved_materials[mesh_obj]:
+                mesh_obj.data.materials.append(slot)
+            saved = saved_outlines.get(mesh_obj)
+            if saved is not None:
+                restored = mesh_obj.modifiers.new("KageOutline", "SOLIDIFY")
+                restored.thickness = saved["thickness"]
+                restored.offset = 1.0
+                restored.use_flip_normals = True
+                restored.use_rim = False
+                restored.material_offset = saved["material_offset"]
+                restored.material_offset_rim = saved["material_offset"]
+
+    size = os.path.getsize(path)
+    print("[t3d] export {0}: {1:.2f} MB texture={2}".format(
+        os.path.basename(path), size / (1024.0 * 1024.0), tuple(image.size)))
+    return size
+
+
 def add_far_shade(obj, factor=FAR_SHADE):
     """Dim the limbs on the far side of a profile view.
 

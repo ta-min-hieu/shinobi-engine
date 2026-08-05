@@ -12,6 +12,8 @@ Tài liệu gốc: [docs/14-art/ART-PIPELINE.md](../../docs/14-art/ART-PIPELINE.
 | Script | Dùng khi | Cần mở Blender? |
 |---|---|---|
 | `kage_text3d_kit.py` | **Nhân vật / NPC / quái hình người — đường chính hiện nay** (nhánh 3D) | ✅ cho bước sinh+import mesh (tool MCP), ❌ từ bước chuẩn hoá trở đi |
+| `export_character_lods.py` | **Bước E nhánh 3D** — decimate + xuất 3 tier `.glb` + sidecar `model-meta.json` | ❌ headless |
+| `measure_triangle_budget.py` | Đo lại ngân sách tam giác khi cần (đã chạy 2026-08-05, kết quả ở ART-PIPELINE §4.4) | ❌ headless |
 | `kage_sprite_render.py` | Render preview 1 frame hoặc cả sheet. Nhánh 2D: **là sản phẩm**. Nhánh 3D: **chỉ để nghiệm thu** | ❌ headless |
 | `make_contact_sheet.py` | Ghép nhiều frame thành 1 ảnh để nghiệm thu | ❌ headless |
 | `build_character_base.py` | Dựng lại `kage_character_base.blend` | ❌ headless |
@@ -38,13 +40,28 @@ Vòng nghiệm thu và ngân sách vòng: [ART-QUALITY-STANDARD §7](../../docs/
 | `author_scaled_actions(rig, gains=None)` | 7 action chuẩn, hiệu chỉnh biên độ theo `CHIBI_GAINS`, giữ nguyên nhịp bảng gốc |
 | `toon_textured(obj, shades=3)` | Toon cho mesh **có texture sẵn** — dùng nấc ramp riêng, không dùng bảng của mesh thủ tục |
 | `add_far_shade(obj)` · `add_inverted_hull_outline(obj, width_px_at_1x)` | Chiều sâu + viền. Viền gọi **sau** `fit_camera` |
-| `attach_weapon(rig, name, kind, offset, outline_px_at_1x)` | Vũ khí là object rời nên phải tự thêm viền riêng |
+| `attach_weapon(rig, name, kind, offset, outline_px_at_1x)` | Vũ khí là object rời nên phải tự thêm viền riêng. **Vũ khí không bao giờ nằm trong prompt Rodin** — xem ART-PIPELINE §2.3 |
+| `decimate(obj, target_triangles)` | Hạ mesh về ngân sách tam giác. Modifier được đẩy lên **đầu** stack trước khi apply, nếu không nó nướng luôn rest pose + vỏ viền vào mesh |
+| `export_gltf(path, obj, armature, extras, texture_px)` | Xuất 1 LOD ra `.glb`; tự bỏ viền/far-shade/vật liệu toon và trả lại nguyên trạng sau khi xuất |
 
 ⚠️ **`.blend` sinh ra không tái tạo được** — chạy lại đúng prompt cũ ra model khác. Save kèm
 `bpy.ops.file.pack_all()` (texture đến từ job cloud) và **commit** bản đã PASS.
 
-⚠️ **Decimate + xuất glTF chưa code** — ngân sách tam giác chưa chốt (ART-PIPELINE §4.4). Phiên art
-hiện dừng ở `.blend` đã nghiệm thu.
+---
+
+## `export_character_lods.py` — bước E
+
+```bash
+blender -b <char>.blend -P tools/blender/export_character_lods.py -- \
+  --object Hoa_D --rig hoa_d_Rig --extras hoa_KunaiBlade,hoa_KunaiGrip,hoa_KunaiRing \
+  --asset-key char_hoa-b1 --out <abs>/assets/exported/models
+```
+
+Ngân sách trong `TIERS` **đo thật**, không đoán: low 5k/512 · med 10k/1024 · high 20k/2048
+(ART-PIPELINE §4.4). Xuất `.glb` một file tự chứa chứ không phải bộ `.gltf`+`.bin`+`.png`.
+
+⚠️ **Luôn ghi rõ `--object` và `--rig`.** File nhân vật thật giữ nhiều thế hệ mesh, và
+`find_armature()` lấy armature **đầu tiên trong scene** — ở file pilot Hỏa đó là rig của town-elder.
 
 ---
 

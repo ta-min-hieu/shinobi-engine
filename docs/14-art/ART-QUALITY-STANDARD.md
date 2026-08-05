@@ -230,9 +230,9 @@ Q11–Q12 FAIL là lỗi biên độ pose → `author_scaled_actions(rig, gains=
 
 **Bước 5 · PASS → ghi sổ + đóng phiên** theo [BLENDER-SESSION-GUIDE §1](BLENDER-SESSION-GUIDE.md)
 bước 7. ⚠️ **Không còn bước hạ mẫu/pack atlas cho nhân vật** — từ [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)
-sản phẩm giao là **model glTF**, ảnh render chỉ là bằng chứng nghiệm thu. Bước xuất glTF
-([BLENDER-SESSION-GUIDE §1.5](BLENDER-SESSION-GUIDE.md) bước E) **chưa code**, đang chờ chốt ngân sách
-tam giác — nên hiện tại phiên art dừng ở `.blend` đã nghiệm thu.
+sản phẩm giao là **model glTF**, ảnh render chỉ là bằng chứng nghiệm thu. PASS xong thì chạy tiếp
+**bước E** ([BLENDER-SESSION-GUIDE §1.5](BLENDER-SESSION-GUIDE.md)) — `export_character_lods.py` sinh
+cả 3 tier `.glb` + sidecar `model-meta.json`.
 
 > Bước 1 gọi REST API Rodin từ trong Blender. Chạy được headless, nhưng bước import
 > (`import_generated_asset`) là tool MCP → **bước A–B cần phiên có MCP**; từ bước C trở đi headless.
@@ -245,7 +245,8 @@ credit vừa mất luôn mesh đang có.
 | FAIL ở | Nguyên nhân nằm ở | Vòng | Cách sửa |
 |---|---|---|---|
 | **Q1, Q2, Q3, Q6** (hình khối đầu/mặt/tóc/chi) | Hình học Rodin trả về | **A — sinh lại mesh** | Sửa prompt (§1.5 bước B: mô tả mặt phải cụ thể) rồi chạy lại job |
-| **Q4, Q5, Q7** (mảng màu, phụ kiện, vũ khí) | Prompt thiếu spec trang phục | **A** — trừ khi vũ khí gắn rời | Vũ khí/phụ kiện gắn rời → `attach_weapon()`, thuộc vòng B |
+| **Q4, Q5** (mảng màu, phụ kiện trên thân) | Prompt thiếu spec trang phục | **A** | Trang phục nướng vào mesh nên chỉ sửa được bằng prompt ([ART-PIPELINE §2.3](ART-PIPELINE.md)) |
+| **Q7** (vũ khí đọc được) | Mesh/vị trí vũ khí | **B — luôn luôn** | Vũ khí **không bao giờ** nằm trong prompt, nó là object rời: `attach_weapon(kind=...)`, chỉnh `offset`/`outline_px_at_1x` rồi render lại. Không tốn credit |
 | **Q8** (cel shading) | `toon_textured(shades=)` | **B** | Đổi `shades`/`steps` |
 | **Q9** (outline) | `add_inverted_hull_outline(width_px_at_1x=)` | **B** | Đo lại theo §4 mục 3, gọi **sau** `fit_camera` |
 | **Q10** (đọc được ở @0.5x) | Tương phản/silhouette | **B trước, A sau** | Thử tăng tương phản + độ dày outline; vẫn FAIL thì là lỗi silhouette gốc → vòng A |
@@ -279,7 +280,7 @@ headless cho việc dài.
 | 2 | Rig 11 xương + 7 action có khuỷu/gối | Opus | ✅ **Xong** (trong kit) |
 | 3 | Gold standard Hỏa B1 + ảnh tham chiếu | Opus | ❌ **Bị bác 2026-08-03** (~1/5 NSO) → thay bằng pilot Text→3D Hỏa, **đã duyệt cùng ngày** (`pilot_text3d_hoa_v2_*.png`) |
 | 4 | Spec 5 hệ × 3 bậc | Opus | ✅ **Xong** — bảng `CHARACTERS` trong `build_kage_character.py`; giờ chỉ còn giá trị làm **spec trang phục/vũ khí** tham chiếu cho prompt Text→3D (§2.3 ART-PIPELINE) |
-| 5 | ~~Re-render 15 sheet~~ → Sản xuất **14 nhân vật còn lại bằng Text→3D**, qua vòng §7, cập nhật ASSET-LOG | **Sonnet** | ⏳ Chờ chốt ngân sách tam giác + gắn vũ khí ([ART-PIPELINE §12.1](ART-PIPELINE.md)) |
+| 5 | ~~Re-render 15 sheet~~ → Sản xuất **14 nhân vật còn lại bằng Text→3D**, qua vòng §7, cập nhật ASSET-LOG | **Sonnet** | ✅ **Hết chặn 2026-08-05** — ngân sách tam giác đã đo ([ART-PIPELINE §4.4](ART-PIPELINE.md)), vũ khí chốt là gắn rời (§2.3), bước E đã code |
 | 6 | Quái/NPC/boss mới về sau | Sonnet (boss khó → escalate) | Chờ #5 chạy ổn |
 | 7 | VFX skill: giữ chuẩn hiện có (17 VFX đã ship không thuộc diện placeholder) | Sonnet | Không đổi |
 
@@ -317,7 +318,8 @@ Không. Không thêm dependency, không đổi kiến trúc — chỉ nâng chu�
 ## 12. Việc cần làm tiếp theo
 
 1. ✅ **Đóng 2026-08-03**: gold standard mesh kit **bị bác** (~1/5 NSO); chủ dự án **duyệt hướng Text→3D** trên pilot Hỏa cùng ngày (`pilot_text3d_hoa_v2_*.png` là chuẩn so mới).
-2. Sonnet: sản xuất 14 nhân vật còn lại + monster/NPC placeholder bằng Text→3D qua vòng §7, cập nhật `ASSET-LOG.md`. **Chặn bởi**: ngân sách tam giác + gắn vũ khí ([ART-PIPELINE §12.1](ART-PIPELINE.md)).
+2. Sonnet: sản xuất 14 nhân vật còn lại + monster/NPC placeholder bằng Text→3D qua vòng §7, cập nhật `ASSET-LOG.md`, rồi chạy bước E. **Không còn bị chặn** từ 2026-08-05.
 3. ✅ **Xong 2026-08-03**: đã quét sạch con số outline cũ khỏi mọi tài liệu (ART-PIPELINE §2.1, BLENDER-SESSION-GUIDE §1/§3/§8, `tools/blender/README.md`) — giờ chỉ còn **một nguồn duy nhất** là §4 mục 3 của file này, các nơi khác trỏ về đây.
 4. Thổ B3 dùng `topknot` nhưng render ra giống **nón lá** hơn búi tóc — hợp hệ Thổ nên tạm giữ, cần thì đổi tên style hoặc dựng lại khối búi.
-5. Vũ khí gắn cố định ở hông/lưng, **không vào tay khi `attack`** (thế hệ box cũng vậy) — nếu muốn cầm vũ khí thật thì thêm bone `hand_r` + constraint, là việc riêng.
+5. Vũ khí gắn cố định ở hông/lưng, **không vào tay khi `attack`** (thế hệ box cũng vậy) — nếu muốn cầm vũ khí thật thì thêm bone `hand_r` + constraint, là việc riêng. Lưu ý: đây là câu hỏi *vũ khí gắn ở đâu*, đã tách khỏi câu hỏi *vũ khí có nằm trong prompt không* — cái sau chốt rồi ([ART-PIPELINE §2.3](ART-PIPELINE.md): luôn gắn rời).
+6. ⚠️ **`hoa-text3d-pilot.blend` là một ngăn kéo tạp** — chứa 8 mesh của cùng nhân vật Hỏa (`Hoa_Raw` `Hoa_V2` `Hoa_V3` `Hoa_P3` `Hoa_Reg2` `Hoa_Detail` `Hoa_Pilot` `Hoa_D`), 3 rig, cộng cả `Elder_Body`/`Elder_Rig` của NPC khác. Chỉ **`Hoa_D` + `hoa_d_Rig`** là bản đã duyệt. Đây là lý do file nặng 47 MB, và §7.3 vốn đã yêu cầu "xoá bản thua trước khi đóng phiên" — chưa làm. Trước khi sản xuất 14 nhân vật còn lại, dọn file này, nếu không 15 nhân vật × ~47 MB sẽ ngốn hết quota Git LFS.

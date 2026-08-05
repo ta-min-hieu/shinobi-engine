@@ -147,7 +147,12 @@ Xem lại quyết định này khi **một trong ba** điều kiện sau xảy r
 ## Việc cần làm tiếp theo
 
 1. ✅ Chủ dự án đã Accept (2026-08-03, qua chat).
-2. Chốt cách phòng vệ JitPack **trước** khi thêm dependency thật.
-3. Đo poly budget thật: decimate mesh pilot xuống 5k/10k/20k, so ảnh và so frame time.
+2. 📝 Chốt cách phòng vệ JitPack **trước** khi thêm dependency thật → đã soạn
+   [ADR-032](ADR-032-JitPack-Dependency-Defence.md) (Proposed 2026-08-05), **chờ duyệt**.
+3. ✅ **Đo poly budget — xong 2026-08-05.** Decimate mesh pilot xuống 5k/10k/20k/40k, so ảnh từng
+   pixel, xuất `.glb` thật: ngưỡng 5k/10k/20k cho low/med/high, số liệu ở
+   [ART-PIPELINE §4.4](../../14-art/ART-PIPELINE.md). Cảnh báo "mesh pilot 93k tam giác" ở phần
+   Consequences là **đo đúng**. Phần **chưa** làm được: frame time GPU — cần chính việc #2 và #5 xong trước.
 4. Viết lại ART-PIPELINE §3 + RENDERING.md.
-5. Nối `WorldScreen` sang `ModelBatch` với đúng một nhân vật trước, rồi mới nhân rộng.
+5. Nối `WorldScreen` sang `ModelBatch` với đúng một nhân vật trước, rồi mới nhân rộng — đây cũng là
+   thứ mở khoá phép đo ở Revisit Trigger #1.

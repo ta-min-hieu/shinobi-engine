@@ -70,7 +70,7 @@ Các số phiên bản trong tài liệu này là **baseline đề xuất tại 
 | **gdx-freetype** | bundled ext | Font | **Bắt buộc cho tiếng Việt có dấu** | — | Không thay | — |
 | **gdx-gltf** | 2.3.0 (05/02/2026) | Nạp model glTF 2.0 cho nhân vật 3D | Blender xuất glTF sẵn trong core — không cần công cụ trung gian; chuẩn mở; Apache-2.0 | ⚠️ **Chỉ phát hành qua JitPack, không có trên Maven Central** — JitPack build artifact theo yêu cầu từ GitHub, repo gốc mất là build gãy. Từng crash vì libGDX 1.14.x đổi collection (1.14.2 đã hoàn tác) | Nếu JitPack ngừng phục vụ, hoặc không ra bản tương thích trong 12 tháng sau lần libGDX phát hành lớn kế tiếp | [ADR-031](adr/ADR-031-25D-Realtime-3D-Rendering.md) |
 
-> ⚠️ **`gdx-gltf` CHƯA được thêm vào `libs.versions.toml`.** [ADR-031](adr/ADR-031-25D-Realtime-3D-Rendering.md) bắt chốt **cách phòng vệ JitPack** trước khi phụ thuộc thật. Hệ quả kèm theo: **khoá libGDX ở 1.14.2** cho tới khi kiểm chứng gdx-gltf trên bản mới hơn — đừng nâng tuỳ tiện.
+> ⚠️ **`gdx-gltf` CHƯA được thêm vào `libs.versions.toml`.** [ADR-031](adr/ADR-031-25D-Realtime-3D-Rendering.md) bắt chốt **cách phòng vệ JitPack** trước khi phụ thuộc thật — cách phòng vệ đã soạn ở [ADR-032](adr/ADR-032-JitPack-Dependency-Defence.md) (đóng gói vào `third-party/m2/`, jar đo thật 318 KB, Apache-2.0), **đang Proposed, chờ chủ dự án duyệt**. Hệ quả kèm theo: **khoá libGDX ở 1.14.2** cho tới khi kiểm chứng gdx-gltf trên bản mới hơn — đừng nâng tuỳ tiện.
 
 ⚠️ **Box2D chỉ dùng cho va chạm & vật lý môi trường. KHÔNG dùng tính damage/combat** — combat là logic gameplay thuần, không phải physics.
 

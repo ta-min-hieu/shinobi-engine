@@ -242,9 +242,24 @@ Save `.blend` có `bpy.ops.file.pack_all()` — texture đến từ job cloud n�
 ⚠️ File dạng này **không sinh lại được**: chạy lại prompt cũ ra model khác. Xem
 [ART-PIPELINE §7](ART-PIPELINE.md).
 
-### Bước E · Decimate + xuất glTF
+### Bước E · Decimate + xuất 3 LOD
 
-**Chưa code** — ngân sách tam giác chưa chốt ([ART-PIPELINE §4.4](ART-PIPELINE.md)).
+Chạy headless, sinh cả 3 tier cùng lúc theo ngân sách đã đo ở [ART-PIPELINE §4.4](ART-PIPELINE.md):
+
+```bash
+blender -b assets/raw/blender/characters/<hệ>-<bậc>.blend \
+  -P tools/blender/export_character_lods.py -- \
+  --object <MeshThân> --rig <tên_Rig> --extras <các,phần,vũ,khí> \
+  --asset-key char_<hệ>-<bậc> --out <abs>/assets/exported/models
+```
+
+⚠️ **`--object` và `--rig` phải ghi rõ, không để script tự đoán.** File nhân vật thật chứa nhiều thế
+hệ mesh của cùng nhân vật đó, và `find_armature()` trả về armature **đầu tiên trong scene** — trong
+file pilot Hỏa đó lại là rig của NPC town-elder, không phải rig nhân vật.
+
+Ra `low/med/high/<asset_key>.glb` + `<asset_key>.model-meta.json` (`tri_counts` cho `art_asset`,
+[ART-PIPELINE §8.6](ART-PIPELINE.md)). Bước xuất **tự bỏ** viền inverted hull, far-shade và vật liệu
+toon — shader runtime dựng lại cả ba; giữ viền lại thì nó thành hình học thật và **gấp đôi số tam giác**.
 
 ---
 
@@ -272,7 +287,7 @@ Toàn bộ mục 2.1, cộng thêm:
 - [ ] Silhouette **khác hẳn** quái thường — người chơi phải nhận ra "đây là boss" trong 1 frame.
 - [ ] Tông tối/tương phản mạnh hơn thế giới thường (art direction, The Eminence in Shadow).
 - [ ] Khung 512 nhưng vẫn cùng baseline: boss đứng cùng mặt đất với người chơi, không "lơ lửng".
-- [ ] ~~Ngân sách atlas: 1 boss @1x 256px × ~33 frame ≈ trọn 1 atlas 2048, atlas riêng~~ — **hết hiệu lực từ [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)**: boss thuộc nhánh 3D, giao model glTF, không còn atlas. Ràng buộc thay thế là **ngân sách tam giác** ([ART-PIPELINE §4.4](ART-PIPELINE.md), chưa chốt).
+- [ ] ~~Ngân sách atlas: 1 boss @1x 256px × ~33 frame ≈ trọn 1 atlas 2048, atlas riêng~~ — **hết hiệu lực từ [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)**: boss thuộc nhánh 3D, giao model glTF, không còn atlas. Ràng buộc thay thế là **ngân sách tam giác** ([ART-PIPELINE §4.4](ART-PIPELINE.md)) — boss chưa đo riêng, tạm dùng ngưỡng nhân vật.
 
 ### 2.3 VFX skill (master 384)
 

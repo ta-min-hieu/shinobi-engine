@@ -113,8 +113,11 @@ Chi tiết: [RENDERING.md](../03-engine/RENDERING.md).
 
 ⚠️ **Nhánh 3D có thêm một nguồn chậm mà bảng trên không có: số tam giác.** Từ
 [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md), nhân vật render bằng
-`ModelBatch`. Mesh sinh từ text→3D ra ~90k tam giác — 20 nhân vật trên màn là 1,9 triệu tam giác
-mỗi khung. Ngân sách LOD **chưa chốt, phải đo** ([ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md)).
+`ModelBatch`. Mesh sinh từ text→3D ra ~93k tam giác — 20 nhân vật trên màn là 1,9 triệu tam giác
+mỗi khung. Ngân sách LOD **đã đo 2026-08-05**: 5k/10k/20k cho low/med/high, tức 20 nhân vật ở tier
+Medium là **200k tam giác/khung** ([ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md)). Con số còn thiếu
+là **frame time GPU thật** — đo được khi `client-core` vẽ được model đầu tiên; đó cũng là điều kiện #1
+ở [ADR-031 "Revisit Trigger"](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md).
 Thêm nữa, `ModelBatch` và `SpriteBatch` **không trộn được** — mỗi lần đổi qua lại là một flush.
 
 ---

@@ -32,9 +32,9 @@ Từ [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md), pip
 
 1. Game trình bày **như 2D side-view**, nhưng nhân vật được **render 3D thời gian thực** qua camera orthographic khoá cứng góc nhìn (2.5D). Blender là xưởng **dựng model**, không còn là xưởng render.
 2. **Hướng nhìn là hằng số runtime**, không nướng vào tài sản. Không còn "chỉ render hướng phải" và không còn trò flip sprite — nhân vật xoay được tự do.
-3. Xuất **glTF 2.0** từ Blender (Blender xuất sẵn trong core, không qua công cụ ngoài). 3 mức đồ họa (§5) là **3 mức LOD của model + cỡ texture**, không phải 3 bộ atlas.
+3. Xuất **glTF 2.0 dạng `.glb`** từ Blender (Blender xuất sẵn trong core, không qua công cụ ngoài). 3 mức đồ họa (§5) là **3 mức LOD của model + cỡ texture** — 5k/10k/20k tam giác, đo thật ở §4.4 — không phải 3 bộ atlas.
 4. Animation chạy đúng tần số khung hình thật của máy — **không còn trần 12 fps**. Đây là lý do chính đổi sang 2.5D.
-5. **Poly budget là ràng buộc thật, phải đo.** Mesh sinh từ text→3D ra ~90k tam giác; phải decimate trước khi xuất. Ngưỡng chưa chốt — xem §10.
+5. **Poly budget là ràng buộc thật, đã đo** (2026-08-05). Mesh text→3D ra ~93k tam giác; ngưỡng từng tier ở **§4.4** (5k/10k/20k). Còn thiếu đúng một mảnh: frame time thật, chờ client vẽ được model đầu tiên.
 
 **Nhánh 2D — VFX kỹ năng · icon vật phẩm · UI** *(không đổi)*
 
@@ -105,7 +105,7 @@ Khớp [GDD §4](../13-game-design/GAME-DESIGN-DOCUMENT.md) (Hỏa/Thủy/Phong/
 - **Vũ khí**: song đao ngắn cong (đánh nhanh 2 tay).
 - **Skill thường `phong_gia_toc`** (buff SELF) — cast: dậm chân, luồng gió xoáy `#3DBF7A` bốc từ chân lên. Trong lúc buff: **afterimage mờ** phía sau khi di chuyển (làm bằng code — vẽ lại sprite cũ với alpha giảm, **không** render frame riêng, tiết kiệm cả atlas lẫn công).
 - **Ultimate `phong_loc_xoay`** (ENEMY) — cast: xoay người 1 vòng. Impact: **cột lốc xoáy** dựng tại vị trí mục tiêu, lá cuốn theo xoắn ốc, kéo đối thủ vào giữa; tan dần từ dưới lên.
-- **Prompt 3D**: `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, tight sleeveless top, long flowing sash, twin short curved blades, dynamic light armor, dark knee-length trousers, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology`
+- **Prompt 3D**: `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, tight sleeveless top, long flowing sash, dynamic light armor, dark knee-length trousers, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology` — song đao gắn rời bằng `attach_weapon(kind='twin_blades')`
 
 #### ⚡ Lôi — *đơn mục tiêu, xuyên giáp*
 
@@ -113,7 +113,7 @@ Khớp [GDD §4](../13-game-design/GAME-DESIGN-DOCUMENT.md) (Hỏa/Thủy/Phong/
 - **Vũ khí**: trường đao thẳng lưỡi mảnh (hệ xuyên giáp — hình dáng phải "sắc", không tù).
 - **Skill thường `loi_tia_set`** (ENEMY) — cast: chỉ tay, tụ sáng ở đầu ngón (1 frame). Impact: **tia zigzag `#FFE84D` đánh thẳng xuống mục tiêu**, kèm **flash trắng toàn màn 1 frame** rồi tắt hẳn — độ giật là bản sắc hệ Lôi, không kéo dài.
 - **Ultimate `loi_thien_loi`** (ENEMY) — cast: giơ tay lên trời, mây tối tụ trên đầu 3 frame (báo hiệu để đối thủ né — luật thiết kế PvP: ult phải đọc được). Impact: **cột sét khổng lồ giáng thẳng**, chớp 2 lần, để lại vệt cháy tím `#8C4DE8` mờ dần trên đất.
-- **Prompt 3D**: `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, dark hooded jacket, angular shoulder armor, long straight thin blade, headband, dark knee-length trousers, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology`
+- **Prompt 3D**: `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, dark hooded jacket, angular shoulder armor, headband, dark knee-length trousers, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology` — trường đao gắn rời bằng `attach_weapon(kind='long_blade')`
 
 #### ⛰ Thổ — *phòng thủ, khiên*
 
@@ -121,7 +121,7 @@ Khớp [GDD §4](../13-game-design/GAME-DESIGN-DOCUMENT.md) (Hỏa/Thủy/Phong/
 - **Vũ khí**: chuỳ đá lớn hoặc găng chiến (không dùng vũ khí mảnh).
 - **Skill thường `tho_khien_da`** (buff SELF) — cast: dậm chân mạnh, **3 phiến đá trồi lên từ mặt đất** dựng thành khiên trước mặt; giữ nguyên trong suốt thời gian buff, nứt dần theo lượng damage đã chặn (2 mức nứt là đủ).
 - **Ultimate `tho_dia_chan`** (ENEMY) — cast: nhảy lên rồi giáng cả người xuống. Impact: **vết nứt lan trên mặt đất** theo chiều ngang + bụi thấp sát đất + **rung camera** (camera shake là hiệu ứng code, thuộc tier Medium/High §5, tier Low tắt).
-- **Prompt 3D**: `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, heavy stone plate armor, bulky shoulders, thick leather chest guard, large stone mace, dark knee-length trousers, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology`
+- **Prompt 3D**: `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, heavy stone plate armor, bulky shoulders, thick leather chest guard, dark knee-length trousers, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology` — chuỳ đá gắn rời bằng `attach_weapon(kind='stone_mace')`
 
 ---
 
@@ -136,6 +136,36 @@ thin sharp eyebrows, small smiling mouth, spiky black hair,
 toon style, flat colors, T-pose, low poly, clean topology
 ```
 
+⚠️ **Vũ khí KHÔNG bao giờ nằm trong prompt.** Ranh giới: *thứ biến dạng theo cơ thể thì nướng vào mesh,
+thứ cầm cứng hoặc thay được thì gắn lên xương.*
+
+| | Vào prompt Rodin | Gắn rời |
+|---|---|---|
+| Trang phục (áo, khăn, giáp, băng tay) — định nghĩa bậc B1/B2/B3 | ✅ | |
+| Vũ khí (`kunai` `gourd` `twin_blades` `long_blade` `stone_mace`) | | ✅ `attach_weapon()` |
+
+Bốn lý do, không phải sở thích:
+
+1. **Vũ khí nướng vào mesh sẽ bị biến dạng.** Mesh sinh ra là *một khối hàn liền* rồi mới gán trọng số
+   theo khoảng cách tới xương (`weight_by_proximity`). Lưỡi đao vươn ra khỏi bàn tay sẽ bị chia trọng số
+   cho nhiều xương và **uốn dẻo như cao su** mỗi lần gập khuỷu. Trang phục thì ngược lại — nó *phải*
+   biến dạng theo thân, nên nướng vào là đúng.
+2. **Chi phí sửa lệch nhau hàng chục lần.** Vũ khí gắn rời: Q7 FAIL là **vòng B miễn phí**
+   ([ART-QUALITY-STANDARD §7.2](ART-QUALITY-STANDARD.md)). Vũ khí trong mesh: Q7 FAIL là **vòng A tốn
+   credit Rodin**, và sinh lại thì mất luôn cơ thể đang đạt.
+3. **Trùng khớp với [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)** ("trang bị
+   nhìn thấy được là gắn mesh vào xương, không nhân tổ hợp sheet") và §3.1. Trang bị là **chỉ số thay
+   đổi được** trong `item_template`; nướng vũ khí vào thân là khoá cứng người chơi vào một vũ khí.
+4. **Bản pilot đã duyệt vốn làm đúng cách này** — kunai của Hỏa nằm trong file dưới dạng 3 object rời
+   (`hoa_KunaiBlade` · `hoa_KunaiGrip` · `hoa_KunaiRing`), không phải một phần của `Hoa_D`. Prompt Hỏa
+   và Thủy vốn đã không có vũ khí; ba prompt còn lại là chỗ lệch chuẩn, nay đã sửa.
+
+Cả 5 kiểu vũ khí **đã có sẵn** trong `kage_mesh_kit.build_weapon()` — không có khoảng trống nào phải lấp.
+
+> Vì sao **trang phục** vẫn nướng vào mesh dù cũng là "trang bị": `item_template` hiện **không có cột hình
+> ảnh nào** (ADR-031 Context) nên chưa có gì để thay lúc chạy, và trang phục là thứ tạo ra 3 vùng màu của
+> Q4/Q5. Điều kiện đảo lại quyết định này: ngày `item_template` có cột hình ảnh thật.
+
 Ba mệnh đề **không được bỏ**, mỗi cái mua bằng một lần hỏng thật ([BLENDER-SESSION-GUIDE §1.5](BLENDER-SESSION-GUIDE.md) bước B):
 
 - **Cả cụm mô tả khuôn mặt** — thiếu là ra nhân vật đầu trọc không mặt.
@@ -143,14 +173,6 @@ Ba mệnh đề **không được bỏ**, mỗi cái mua bằng một lần hỏ
 - **KHÔNG có `side profile facing right`** — vô nghĩa với mesh 3D và làm mesh **dẹt theo chiều sâu**. (Cụm này là di sản thời pre-render sprite; ADR-031 bỏ hẳn khái niệm "hướng nướng vào tài sản".)
 
 ⚠️ **Prompt chỉ ra base mesh thô.** Model Rodin trả về luôn kiểu bán-tả-thực → bắt buộc chuẩn hoá + toon hoá lại bằng `kage_text3d_kit` (`normalise` → `clean` → `toon_textured`) trước khi nghiệm thu ([BLENDER-SESSION-GUIDE §1.5](BLENDER-SESSION-GUIDE.md) bước C). Đừng render thẳng.
-
-> 🔴 **TODO-OPUS — vũ khí trong prompt hay gắn rời?** 5 prompt trên đang tự mâu thuẫn: Phong/Lôi/Thổ
-> **nướng vũ khí vào mesh** (`twin short curved blades`, `long straight thin blade`, `large stone mace`)
-> còn Hỏa/Thủy thì không. Nướng vào mesh đi ngược §3.1 ("đổi trang bị rẻ — gắn mesh vào xương lúc chạy")
-> và luồng `attach_weapon()` ở [ART-QUALITY-STANDARD §7.2](ART-QUALITY-STANDARD.md) (Q7 FAIL → vũ khí
-> gắn rời là vòng B miễn phí; vũ khí trong mesh là vòng A tốn credit). Cần **quyết định một đường** rồi
-> sửa cả 5 prompt cho nhất quán — quyết định này trùng với việc treo "gắn vũ khí" ở §12.1 và có thể
-> phải đốt credit Rodin để test lại prompt, nên để Opus làm trọn gói, đừng sửa lẻ.
 
 ---
 
@@ -171,10 +193,11 @@ Ba mệnh đề **không được bỏ**, mỗi cái mua bằng một lần hỏ
 assets/raw/blender/characters/*.blend  ── kage_text3d_kit.py ──►  model đã rig + 7 action
         │                                                                  │
    (source of truth,                                                       ▼
-    commit vào git)                          decimate → xuất glTF 2.0 (Blender core exporter)
+    commit vào git)                    export_character_lods.py: decimate → .glb (Blender core)
                                                                            │
                                                                            ▼
-                                   assets/exported/models/{low,med,high}/<asset>.gltf
+                                   assets/exported/models/{low,med,high}/<asset>.glb
+                                   + <asset>.model-meta.json (tri_counts cho art_asset)
                                                                            │
                                                                            ▼
                                    client-core: gdx-gltf nạp → ModelBatch + shader cel tự viết
@@ -253,12 +276,48 @@ VFX ở nhánh 2D vẫn giữ nguyên playback **12 fps** như cũ.
 - Nhánh 2D: chừa lề trong khung để frame animation không bị cắt; padding pack 2px.
 - **Không còn quy tắc "chỉ render hướng phải"** — hướng nhìn là hằng số runtime (§1.2).
 
-### 4.4 Ngân sách tam giác (nhánh 3D)
+### 4.4 Ngân sách tam giác (nhánh 3D) — **đã đo 2026-08-05**
 
-Mesh sinh từ text→3D ra **~90k tam giác**; con số đó không dùng thẳng được. Ngưỡng cho mỗi mức LOD
-**chưa chốt** — phải đo bằng frame time thật, không đoán ([Điều 9](../00-governance/KAGE-CONSTITUTION.md)).
-Cách đo và ngưỡng phải điền vào đây trước khi sản xuất hàng loạt; xem §10 và
-[ADR-031 "Revisit Trigger"](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md).
+Mesh Rodin trả về **93.165 tam giác** (pilot Hỏa, gồm cả kunai). Ngưỡng dưới đây đo thật trên chính
+mesh đó bằng `tools/blender/measure_triangle_budget.py`, không phải ước lượng.
+
+| Tier | Tam giác | Texture | `.glb` |
+|---|---|---|---|
+| Low | **5.000** | 512 | 0,59 MB |
+| Medium (đóng gói trong bản cài) | **10.000** | 1024 | 1,38 MB |
+| High | **20.000** | 2048 | 3,60 MB |
+
+**Cách đo** — hai lượt quét tách biệt, vì trộn hai biến thì ra một con số không hành động được:
+
+1. *Hình học*: giữ texture cố định 1024, hạ mesh xuống 5k/10k/20k/40k, xuất `.glb`, render `idle`.
+2. *Texture*: giữ mesh cố định 10k, đổi texture 512/1024/2048.
+
+Rồi so từng pixel với bản gốc (kênh RGB, chỉ tính pixel có alpha):
+
+| Mức | Lệch trung bình | Lệch lớn nhất | % pixel lệch >2/255 | `.glb` |
+|---|---|---|---|---|
+| 40k tam giác | 0,0039 | 0,76 | 7,9% | 2,42 MB |
+| 20k tam giác | 0,0088 | 0,92 | 15,4% | 1,74 MB |
+| 10k tam giác | 0,0148 | 0,93 | 20,7% | 1,38 MB |
+| 5k tam giác | 0,0250 | 0,93 | 26,2% | 1,19 MB |
+| texture 1024 | 0,0015 | 0,07 | 2,5% | 1,38 MB |
+| texture 512 | 0,0039 | 0,30 | 10,1% | 0,78 MB |
+
+Ba kết luận rút ra từ bảng trên:
+
+- **Mesh 93k là dư thừa, không phải cần thiết.** Ở kích thước nhân vật chiếm trên màn, bản 5k và bản
+  93k **nhìn bằng mắt không phân biệt được** — 93k chỉ phản ánh việc Rodin không biết mesh dùng để làm gì.
+- **Hạ texture rẻ hơn hạ mesh.** Cùng mức lệch trung bình 0,0039, hạ texture 2048→512 chỉ gây lệch
+  lớn nhất **0,30** còn hạ mesh 93k→40k gây **0,76**. Texture mờ đi đều; mesh thì **vỡ silhouette cục bộ**
+  — mà silhouette chính là thứ Q10 chấm. Nên khi cần cắt dung lượng, cắt texture trước.
+- **Dung lượng hình học ≈ 35 byte/tam giác**, tuyến tính trong toàn dải đo.
+
+⚠️ **Chưa đo được frame time**, và ngân sách này **chưa đóng hoàn toàn**. Điều kiện #1 ở
+[ADR-031 "Revisit Trigger"](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) nói về GPU frame
+time với 20 nhân vật trên màn; đo được nó cần `gdx-gltf` trên classpath và đường render 3D trong
+`client-core`, **cả hai đều chưa có**. Bảng trên chốt phần *đo được hôm nay* (số tam giác, dung lượng,
+chất lượng ảnh); dòng frame time phải điền khi client vẽ được model đầu tiên. Ngân sách 5–10k khớp với
+mức ADR-031 đoán ban đầu — 20 nhân vật × 10k = **200k tam giác/khung**, thay vì 1,9 triệu.
 
 ---
 
@@ -268,7 +327,7 @@ Cách đo và ngưỡng phải điền vào đây trước khi sản xuất hàn
 
 | Thành phần | Low | Medium | High |
 |---|---|---|---|
-| Model nhân vật (nhánh 3D) | LOD thấp nhất, texture 512 | LOD trung bình, texture 1024 (**đóng gói sẵn trong bản cài**) | LOD gốc, texture 2048 |
+| Model nhân vật (nhánh 3D) | 5k tam giác, texture 512 (0,59 MB) | 10k tam giác, texture 1024 (1,38 MB — **đóng gói sẵn trong bản cài**) | 20k tam giác, texture 2048 (3,60 MB) |
 | Bộ atlas VFX/icon (nhánh 2D) | @0.5x | @1x (**đóng gói sẵn trong bản cài**) | @1x + hiệu ứng |
 | Texture filter | Linear | Linear | Linear + mipmap khi camera zoom |
 | Particle đồng thời (cap toàn màn) | 64 | 256 | 1024 |
@@ -338,7 +397,7 @@ Chạy headless bằng `tools/blender/kage_text3d_kit.py`. Không bước nào l
 | 6. Bảy action | `author_scaled_actions()` | Hiệu chỉnh biên độ theo tỷ lệ thân, giữ nguyên nhịp |
 | 7. Toon + viền | `toon_textured()` · `add_inverted_hull_outline()` | Xem §3.4 — dùng nhầm nấc ramp là tối hai lần |
 | 8. Nghiệm thu | render preview → bảng Q ở [ART-QUALITY-STANDARD](ART-QUALITY-STANDARD.md) | Preview vẫn render bằng `kage_sprite_render.py`, nhưng **chỉ để nghiệm thu**, không phải sản phẩm |
-| 9. Decimate + xuất glTF | *(chưa code — §10)* | Ngân sách tam giác chưa chốt |
+| 9. Decimate + xuất 3 LOD | `export_character_lods.py` (gọi `decimate()` + `export_gltf()`) | Sinh cả 3 tier §4.4 + sidecar `model-meta.json`. Bỏ viền/far-shade/vật liệu toon: shader runtime dựng lại, giữ lại thì **gấp đôi số tam giác** |
 
 ➡️ **Lệnh cụ thể từng bước, checklist nghiệm thu, và bảng lỗi thường gặp**: [BLENDER-SESSION-GUIDE.md](BLENDER-SESSION-GUIDE.md).
 
@@ -491,8 +550,8 @@ truy ra được dòng DB" sẽ **tự vỡ**: file model nào cũng là mồ c�
 | Cột mới | Kiểu | Ý nghĩa |
 |---|---|---|
 | `asset_kind` | `VARCHAR(8) NOT NULL DEFAULT 'SPRITE'` | `SPRITE` \| `MODEL` — quyết định nhóm cột nào có nghĩa, và pipeline soi thư mục nào khi kiểm mồ côi |
-| `model_name` | `VARCHAR(64)` | Tên gốc của model, ví dụ `char_ninja-fire`. Đường dẫn từng tier **suy ra** như atlas: `models/{low\|med\|high}/{model_name}.gltf` |
-| `tri_counts` | `JSONB` | `{"low":8000,"med":20000,"high":45000}` — số tam giác thật sau decimate từng tier |
+| `model_name` | `VARCHAR(64)` | Tên gốc của model, ví dụ `char_ninja-fire`. Đường dẫn từng tier **suy ra** như atlas: `models/{low\|med\|high}/{model_name}.glb` |
+| `tri_counts` | `JSONB` | `{"low":5107,"med":10107,"high":20107}` — số tam giác thật sau decimate từng tier, đọc thẳng từ sidecar `model-meta.json` |
 
 Ràng buộc chống lẫn nhánh (rẻ, bắt sai ngay lúc insert):
 
@@ -524,8 +583,13 @@ pack. Hai nhánh vì thế vẫn dùng chung trang quản trị và chung câu l
 - `ArtRegistryUpserter` đọc thêm `asset_kind` từ ASSET-LOG/manifest và điền `model_name`/`tri_counts`.
 - Bước kiểm mồ côi soi **cả hai** thư mục: `assets/exported/atlases/` (nhánh SPRITE) và
   `assets/exported/models/` (nhánh MODEL).
-- `tri_counts` chính là số liệu để chốt **ngân sách tam giác** đang treo ở §4.4 — điền vào lúc
-  decimate thì không phải đo lại lần nữa.
+- `tri_counts` không phải đo lại: `export_character_lods.py` đã ghi sẵn nó (cùng `glb_bytes`,
+  `texture_px`, `actions`) vào sidecar **`<asset_key>.model-meta.json`** đặt cạnh thư mục model —
+  đúng vai trò `render-meta.json` giữ cho nhánh sprite.
+
+⚠️ **Đuôi file là `.glb`, không phải `.gltf`.** Xuất dạng một file tự chứa thay vì bộ ba
+`.gltf` + `.bin` + `.png`: patcher băm và phát **theo từng file** ([RESOURCE.md §9](../04-client/RESOURCE.md)),
+nên asset 3 file là 3 cơ hội để một lần tải dở dang để lại model nạp được nhưng mất texture.
 
 ### 8.7 Trang quản trị xem được những gì
 
@@ -586,12 +650,14 @@ Nên trang quản trị **tự cắt được mọi vùng** bằng `canvas.drawI
 | 11 | Mọi asset **bắt buộc** có dòng trong `art_asset` kèm đường dẫn; pipeline fail build nếu thiếu | §8.5 — chủ dự án yêu cầu quản toàn bộ kho đồ họa qua trang quản trị; ràng buộc bằng công cụ, không bằng trí nhớ | Đề xuất |
 | 12 | Pipeline xuất thêm **thumbnail rời** mỗi asset (`preview_url`) | §8.7 — chỉ để danh sách nhiều asset không phải tải atlas 4MB mỗi ô; **không** phải vì bị giới hạn hiển thị | Đề xuất |
 | 13 | Region trong atlas đặt tên `<asset_key>_<action>` + `index` (dạng libGDX gốc) | §8.7 — `atlas.findRegions()` gom được frame cho `Animation`; trang quản trị lọc cùng tiền tố. Đặt sai kiểu `..._idle_00` là hỏng cả hai phía | Đề xuất |
+| 14 | **Trang phục nướng vào mesh Text→3D; vũ khí luôn gắn rời lên xương** | §2.3 — ranh giới là "biến dạng theo thân hay không": vũ khí trong khối hàn liền sẽ bị `weight_by_proximity` bẻ cong khi gập khuỷu; ngoài ra Q7 FAIL thành vòng B miễn phí thay vì vòng A tốn credit. Trang phục chưa cần thay lúc chạy vì `item_template` không có cột hình ảnh | **Chốt** — suy ra từ [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) đã Accepted, không phải quyết định mới. Đảo lại khi `item_template` có cột hình ảnh |
+| 15 | Xuất glTF **bỏ** viền inverted hull, far-shade và vật liệu toon; chỉ mang base-color texture | §6.4 bước 9 — cả ba là mẹo lúc render cho camera cố định, shader runtime dựng lại được; giữ lại thì viền biến thành hình học thật và **gấp đôi số tam giác**, còn vật liệu Emission thì glTF xuất ra **không có texture nào** | **Chốt** — đo thật, xem §4.4 |
 
 ## 10. ADR cần tạo / quyết định treo
 
 - 🔀 **[ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) Accepted 2026-08-03** — nhân vật chuyển sang render 3D thời gian thực (2.5D). Thay quyết định #1 và #2 ở §9. **Hai việc treo do ADR này sinh ra:**
-  - **Ngân sách tam giác chưa chốt** (§4.4). Mesh pilot 90k tam giác; phải đo frame time thật ở nhiều mức decimate rồi mới điền số, không đoán.
-  - **Cách phòng vệ JitPack chưa chốt.** `gdx-gltf` chỉ phát hành qua JitPack, không có trên Maven Central. **Chưa được thêm vào `libs.versions.toml`** cho tới khi chốt.
+  - ✅ **Ngân sách tam giác — đã đo 2026-08-05** (§4.4): 5k/10k/20k tam giác cho low/med/high, đo trên mesh pilot bằng `measure_triangle_budget.py`. Còn thiếu **dòng frame time**, chờ client vẽ được model đầu tiên.
+  - 📝 **Phòng vệ JitPack — đã có [ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md), chờ chủ dự án duyệt.** Kiểm chứng thật: `gdx-gltf` **không có trên Maven Central**, jar 318 KB, Apache-2.0, phụ thuộc bắc cầu duy nhất là `gdx` vốn đã có. Đề xuất đóng gói vào `third-party/m2/`. **Chưa được thêm vào `libs.versions.toml`** cho tới khi ADR-032 được duyệt.
   - 🛑 **Mở rộng `art_asset` cho nhánh 3D — chờ chủ dự án duyệt.** Thiết kế đã viết đầy đủ ở §8.6
     (3 cột `asset_kind`/`model_name`/`tri_counts` + `CHECK` chống lẫn nhánh, không tách bảng phụ).
     Là **DB schema change** nên không tự thi hành ([/CLAUDE.md §4](../../CLAUDE.md)); duyệt xong thì
@@ -614,7 +680,8 @@ Nên trang quản trị **tự cắt được mọi vùng** bằng `canvas.drawI
 1. ✅ **Hướng art đã được duyệt 2026-08-03.** Pilot Hỏa dựng bằng Text→3D (Hyper3D Rodin tier Detail)
    qua `kage_text3d_kit.py` — chủ dự án duyệt sau 3 vòng. Sheet thế hệ cũ (5 hệ × 3 bậc, khối hộp,
    bị bác 2026-08-02) giờ là **PLACEHOLDER**, sẽ bị thay khi 14 nhân vật còn lại được sản xuất.
-   **Chưa sản xuất hàng loạt** — chờ chốt ngân sách tam giác (§4.4) và gắn vũ khí.
+   ✅ **Hết chặn từ 2026-08-05**: ngân sách tam giác đã đo (§4.4), cách gắn vũ khí đã chốt (§2.3 —
+   luôn gắn rời), bước E đã code (`export_character_lods.py`). Sonnet chạy được ngay.
 2. ✅ Dựng `kage_character_base.blend` (phiên Blender MCP đầu tiên, theo §3.3) — xong.
 3. ✅ `tools/asset-pipeline` code xong (2026-08-01, [ADR-029](../01-architecture/adr/ADR-029-Asset-Pipeline-Tool.md)
    Accepted) — downscale @1x/@0.5x + validate tên + pack 3 bộ atlas (`gdx-tools` TexturePacker thật) +
