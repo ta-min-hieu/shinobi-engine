@@ -276,10 +276,14 @@ VFX ở nhánh 2D vẫn giữ nguyên playback **12 fps** như cũ.
 - Nhánh 2D: chừa lề trong khung để frame animation không bị cắt; padding pack 2px.
 - **Không còn quy tắc "chỉ render hướng phải"** — hướng nhìn là hằng số runtime (§1.2).
 
-### 4.4 Ngân sách tam giác (nhánh 3D) — **đã đo 2026-08-05**
+### 4.4 Ngân sách tam giác (nhánh 3D)
 
-Mesh Rodin trả về **93.165 tam giác** (pilot Hỏa, gồm cả kunai). Ngưỡng dưới đây đo thật trên chính
-mesh đó bằng `tools/blender/measure_triangle_budget.py`, không phải ước lượng.
+✅ **Đã đo 2026-08-05** — không còn treo. Mesh Rodin trả về **93.165 tam giác** (pilot Hỏa, gồm cả
+kunai). Ngưỡng dưới đây đo thật trên chính mesh đó bằng `tools/blender/measure_triangle_budget.py`,
+không phải ước lượng.
+
+> Tiêu đề mục này cố ý **không mang ngày tháng**: có link neo `#44-ngân-sách-tam-giác-nhánh-3d` trỏ
+> vào đây, mà đổi tiêu đề là gãy neo (đã gãy một lần đúng vì lý do đó).
 
 | Tier | Tam giác | Texture | `.glb` |
 |---|---|---|---|
