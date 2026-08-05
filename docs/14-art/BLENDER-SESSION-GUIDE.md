@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version | 1.1.0 |
+| Version | 1.2.0 |
 | Status | Draft |
 | Liên quan | [ART-PIPELINE.md](ART-PIPELINE.md) (thiết kế) · [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) (2.5D) · [tools/blender/README.md](../../tools/blender/README.md) (contract hàm) |
 
@@ -381,7 +381,7 @@ Không. Tài liệu này là thao tác, mọi quyết định kiến trúc nằm
 
 ## 7. Tài liệu liên quan
 
-[ART-PIPELINE.md](ART-PIPELINE.md) · [tools/blender/README.md](../../tools/blender/README.md) · [RESOURCE.md](../04-client/RESOURCE.md)
+[ART-PIPELINE.md](ART-PIPELINE.md) (pipeline & định hướng) · [ART-QUALITY-STANDARD.md](ART-QUALITY-STANDARD.md) (thước đo ĐẠT/KHÔNG ĐẠT + vòng nghiệm thu — **bắt buộc nạp cùng file này**) · [tools/blender/README.md](../../tools/blender/README.md) (contract script) · [RESOURCE.md](../04-client/RESOURCE.md)
 
 ## 8. Việc cần làm tiếp theo
 
@@ -399,12 +399,14 @@ Không. Tài liệu này là thao tác, mọi quyết định kiến trúc nằm
    tinh hơn (tóc, gai, dáng đứng khác nhau thật sự) thì phải làm model riêng cho nhân vật thật.
 3. ✅ **Chốt 2026-08-02, đã triển khai 2026-08-03** (câu hỏi "box rời vs mesh liền mạch"): chủ dự án đánh
    giá box-pilot không đạt chất lượng ("hình hộp lego") — chuẩn mới là **mesh trơn**, box trần bị cấm cho
-   cơ thể nhân vật. Outline đi kèm hoá ra **không phải 2.5px** như dự đoán ban đầu mà là **1.1px@1x** (đo
-   thật). Toàn bộ tiêu chuẩn + lộ trình thay thế: [ART-QUALITY-STANDARD.md](ART-QUALITY-STANDARD.md).
+   cơ thể nhân vật. Outline đi kèm hoá ra **không phải 2.5px** như dự đoán ban đầu — con số đo được cho
+   *thế hệ mesh thủ tục đó* nay chỉ còn giá trị lịch sử; số đúng cho mesh đang dùng tra ở
+   [ART-QUALITY-STANDARD §4](ART-QUALITY-STANDARD.md) mục 3 (nguồn duy nhất, khác nhau theo thế hệ mesh
+   **và** theo kỹ thuật vẽ viền). Toàn bộ tiêu chuẩn + lộ trình thay thế: [ART-QUALITY-STANDARD.md](ART-QUALITY-STANDARD.md).
 
-⚠️ **Mục 1, 2, 4, 6 dưới đây nói về thế hệ box và đã bị thay thế** — giữ lại làm lịch sử pipeline, không
-phải hướng dẫn còn hiệu lực. Nhân vật hiện làm theo **§1.5** của file này (Text→3D), nghiệm thu theo
-[ART-QUALITY-STANDARD §7](ART-QUALITY-STANDARD.md).
+⚠️ **Mục 1, 2, 4, 6 của danh sách này nói về thế hệ box và đã bị thay thế** (mục 1–2 ở trên, mục 4 và 6
+ở dưới) — giữ lại làm lịch sử pipeline, **không phải hướng dẫn còn hiệu lực**. Nhân vật hiện làm theo
+**§1.5** của file này (Text→3D), nghiệm thu theo [ART-QUALITY-STANDARD §7](ART-QUALITY-STANDARD.md).
 4. ✅ **Xong 2026-08-01 (cùng ngày, lần 3)**: B2 + B3 cho cả 5 hệ (`char_<hệ>-b2`, `char_<hệ>-b3`), đúng
    3 bậc B1/B2/B3 ở ART-PIPELINE §2.2. B2 = B1 + giáp mảnh/đai (`GEAR_SPECS_B2`, gắn bone tuỳ vị trí —
    riêng tấm che đùi Thổ gắn `leg_l`/`leg_r` chứ không phải `pelvis` vì cần di chuyển theo chân). B3 = B2

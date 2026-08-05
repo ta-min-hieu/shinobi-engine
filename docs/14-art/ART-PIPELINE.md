@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version | 0.3.0 |
+| Version | 0.4.0 |
 | Status | Draft |
 | Liên quan | [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) (2.5D — **đổi kiến trúc tài liệu này**) · [RESOURCE.md](../04-client/RESOURCE.md) · [RENDERING.md](../03-engine/RENDERING.md) · [GAME-DESIGN-DOCUMENT.md](../13-game-design/GAME-DESIGN-DOCUMENT.md) |
 
@@ -673,7 +673,7 @@ Nên trang quản trị **tự cắt được mọi vùng** bằng `canvas.drawI
 
 ## 11. Tài liệu liên quan
 
-[ART-QUALITY-STANDARD.md](ART-QUALITY-STANDARD.md) (**thước đo ĐẠT/KHÔNG ĐẠT + mesh kit dựng nhân vật**) · [RESOURCE.md](../04-client/RESOURCE.md) (pipeline hạ nguồn, naming, atlas) · [RENDERING.md](../03-engine/RENDERING.md) (animation flyweight, particle pool, shader) · [GDD](../13-game-design/GAME-DESIGN-DOCUMENT.md) (5 hệ phái) · [tools/blender/README.md](../../tools/blender/README.md) (contract script) · [DATABASE.md](../05-server/DATABASE.md) + [ADMIN.md](../12-devtools/ADMIN.md) (registry §8)
+[ART-QUALITY-STANDARD.md](ART-QUALITY-STANDARD.md) (**thước đo ĐẠT/KHÔNG ĐẠT + vòng nghiệm thu A/B**) · [BLENDER-SESSION-GUIDE.md](BLENDER-SESSION-GUIDE.md) (thao tác từng bước) · [RESOURCE.md](../04-client/RESOURCE.md) (pipeline hạ nguồn, naming, atlas) · [RENDERING.md](../03-engine/RENDERING.md) (animation flyweight, particle pool, shader) · [GDD](../13-game-design/GAME-DESIGN-DOCUMENT.md) (5 hệ phái) · [tools/blender/README.md](../../tools/blender/README.md) (contract script) · [DATABASE.md](../05-server/DATABASE.md) + [ADMIN.md](../12-devtools/ADMIN.md) (registry §8)
 
 ## 12. Việc cần làm tiếp theo
 

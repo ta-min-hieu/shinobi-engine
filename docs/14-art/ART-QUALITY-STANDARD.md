@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version | 1.2.0 |
+| Version | 1.3.0 |
 | Status | Draft |
 | Benchmark | **Ninja School Online** (TeaMobi) — mức tối thiểu phải đạt |
 | Liên quan | [ART-PIPELINE.md](ART-PIPELINE.md) (pipeline) · [BLENDER-SESSION-GUIDE.md](BLENDER-SESSION-GUIDE.md) (thao tác) · [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) (2.5D) |
@@ -298,8 +298,8 @@ headless cho việc dài.
 |---|---|---|---|
 | 1 | Benchmark chất lượng tối thiểu = Ninja School Online | Chủ dự án chốt 2026-08-02 | **Chốt** |
 | 2 | Nghiệm thu bằng bảng PASS/FAIL đo trên PNG, AI tự chấm | Chuẩn cảm tính ("đẹp", "chibi") đã cho ra box — phải đo được | Đề xuất |
-| 3 | Cơ thể = mặt tròn xoay, cấm box trần | Nguyên nhân trực tiếp của "hình hộp lego"; cel shader không đòi mesh vuông | Đề xuất |
-| 4 | Thư viện `kage_mesh_kit.py`, Sonnet chỉ gọi + spec dict | Sculpt tự do tốn token và ra kết quả không đều | Đề xuất |
+| 3 | Cấm box trần cho hình khối hữu cơ; dùng mặt tròn xoay | Nguyên nhân trực tiếp của "hình hộp lego"; cel shader không đòi mesh vuông | **Còn hiệu lực cho vũ khí/phụ kiện.** Cơ thể nay đến từ Text→3D nên vốn đã trơn |
+| 4 | Thư viện `kage_mesh_kit.py`, Sonnet chỉ gọi + spec dict | Sculpt tự do tốn token và ra kết quả không đều | **Còn hiệu lực — chỉ cho vũ khí/phụ kiện/rig/action** (§5), không còn dựng cơ thể |
 | 5 | Rig 11 xương (thêm forearm/shin), giữ nguyên toạ độ khớp cũ | Chi 1 đoạn không gập được khuỷu/gối → animation đơ; giữ toạ độ để baseline/pivot không phải verify lại | Đề xuất |
 | 6 | 15 sheet box hiện tại = PLACEHOLDER, thay dần, không sửa tại chỗ | Giữ pipeline chạy được trong lúc nâng cấp | Đề xuất |
 | 7 | Outline **không phải hằng số** — đo lại cho từng thế hệ mesh, nguồn duy nhất là §4 mục 3 (mesh kit 1.1px@1x Freestyle · Text→3D 3.0px@1x inverted hull), lưu trong .blend để bước render kế thừa | Đo thật: 2.5px@1x phủ đen nhân vật ở master 256px; Freestyle trên mesh Text→3D vẽ viền từng lọn tóc | Đề xuất |
@@ -319,7 +319,7 @@ Không. Không thêm dependency, không đổi kiến trúc — chỉ nâng chu�
 
 1. ✅ **Đóng 2026-08-03**: gold standard mesh kit **bị bác** (~1/5 NSO); chủ dự án **duyệt hướng Text→3D** trên pilot Hỏa cùng ngày (`pilot_text3d_hoa_v2_*.png` là chuẩn so mới).
 2. Sonnet: sản xuất 14 nhân vật còn lại + monster/NPC placeholder bằng Text→3D qua vòng §7, cập nhật `ASSET-LOG.md`, rồi chạy bước E. **Không còn bị chặn** từ 2026-08-05.
-3. ✅ **Xong 2026-08-03**: đã quét sạch con số outline cũ khỏi mọi tài liệu (ART-PIPELINE §2.1, BLENDER-SESSION-GUIDE §1/§3/§8, `tools/blender/README.md`) — giờ chỉ còn **một nguồn duy nhất** là §4 mục 3 của file này, các nơi khác trỏ về đây.
+3. ✅ **Xong 2026-08-05** (bắt đầu 2026-08-03, đợt đầu còn sót): mọi con số outline rải rác đã trỏ về **một nguồn duy nhất** là §4 mục 3 của file này. Ba chỗ sót được tìm ra sau đó: bảng tra nhanh BLENDER-SESSION-GUIDE §3 (còn kê `1.1px` **và** Freestyle=Bật, sai với mesh Text→3D), bảng lỗi §4, và mục lịch sử §8 — nay đều đã sửa hoặc đánh dấu là số của thế hệ mesh cũ.
 4. Thổ B3 dùng `topknot` nhưng render ra giống **nón lá** hơn búi tóc — hợp hệ Thổ nên tạm giữ, cần thì đổi tên style hoặc dựng lại khối búi.
 5. Vũ khí gắn cố định ở hông/lưng, **không vào tay khi `attack`** (thế hệ box cũng vậy) — nếu muốn cầm vũ khí thật thì thêm bone `hand_r` + constraint, là việc riêng. Lưu ý: đây là câu hỏi *vũ khí gắn ở đâu*, đã tách khỏi câu hỏi *vũ khí có nằm trong prompt không* — cái sau chốt rồi ([ART-PIPELINE §2.3](ART-PIPELINE.md): luôn gắn rời).
 6. ⚠️ **`hoa-text3d-pilot.blend` là một ngăn kéo tạp** — chứa 8 mesh của cùng nhân vật Hỏa (`Hoa_Raw` `Hoa_V2` `Hoa_V3` `Hoa_P3` `Hoa_Reg2` `Hoa_Detail` `Hoa_Pilot` `Hoa_D`), 3 rig, cộng cả `Elder_Body`/`Elder_Rig` của NPC khác. Chỉ **`Hoa_D` + `hoa_d_Rig`** là bản đã duyệt. Đây là lý do file nặng 47 MB, và §7.3 vốn đã yêu cầu "xoá bản thua trước khi đóng phiên" — chưa làm. Trước khi sản xuất 14 nhân vật còn lại, dọn file này, nếu không 15 nhân vật × ~47 MB sẽ ngốn hết quota Git LFS.
