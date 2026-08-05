@@ -30,10 +30,10 @@ Ràng buộc từ tài liệu đã chốt, không phải AI tự nghĩ ra:
 
 - Format atlas output phải là **định dạng `.atlas` gốc của libGDX**, vì client (`client-core`,
   `ResourceManager`) sẽ đọc bằng `com.badlogic.gdx.graphics.g2d.TextureAtlas` — và trang quản trị
-  (ADMIN.md) cũng cần parse được file này để hiển thị preview (ART-PIPELINE §8.6: *"File `.atlas` của
+  (ADMIN.md) cũng cần parse được file này để hiển thị preview (ART-PIPELINE §8.7: *"File `.atlas` của
   libGDX là text thuần, đọc được"*).
 - Tên region bắt buộc `<asset_key>_<action>` + `index` tăng dần để `TextureAtlas.findRegions()` gom
-  đúng mảng frame cho `Animation` (ART-PIPELINE §8.6) — sai định dạng là hỏng cả game lẫn trang quản trị.
+  đúng mảng frame cho `Animation` (ART-PIPELINE §8.7) — sai định dạng là hỏng cả game lẫn trang quản trị.
 - **Không phạm vi ADR này**: bước cuối "upsert vào DB `art_asset`" (ART-PIPELINE §8.5) — bảng đó cần
   schema `V19__create_art_registry.sql` mà chủ dự án **chưa duyệt** (CLAUDE.md §4: đổi DB schema luôn
   cần dừng hỏi, không phụ thuộc ADR này). Tool ở ADR này dừng lại ở: hạ mẫu → validate tên → đóng gói

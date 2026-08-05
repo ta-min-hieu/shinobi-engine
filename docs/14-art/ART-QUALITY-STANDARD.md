@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version | 1.1.0 |
+| Version | 1.2.0 |
 | Status | Draft |
 | Benchmark | **Ninja School Online** (TeaMobi) — mức tối thiểu phải đạt |
 | Liên quan | [ART-PIPELINE.md](ART-PIPELINE.md) (pipeline) · [BLENDER-SESSION-GUIDE.md](BLENDER-SESSION-GUIDE.md) (thao tác) · [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) (2.5D) |
@@ -26,7 +26,7 @@
 Thế hệ nhân vật đầu (`build_box_character.py`) là khối hộp căn trục — đúng vai trò *kiểm chứng pipeline*, nhưng chủ dự án đánh giá **không đạt** ("hình hộp lego, rất xấu", 2026-08-02). Từ nay:
 
 - Nhân vật/quái/NPC dựng bằng **Text→3D qua `tools/blender/kage_text3d_kit.py`** ([ART-PIPELINE §6.4](ART-PIPELINE.md)); `kage_mesh_kit.py` chỉ còn cho vũ khí/phụ kiện (§5). `build_box_character.py` chỉ còn để dựng lại file cũ — **không dùng cho asset mới**.
-- Mọi asset nhân vật/quái/NPC mới phải qua bảng nghiệm thu §2. FAIL 1 tiêu chí = không ghi ASSET-LOG, không pack atlas.
+- Mọi asset nhân vật/quái/NPC mới phải qua bảng nghiệm thu §2. FAIL 1 tiêu chí = không ghi ASSET-LOG, không giao model (và với nhánh 2D còn lại: không pack atlas).
 - 15 sheet `char_*-pilot/-b2/-b3` cũ + `monster_training_dummy` + `npc_town_elder` = **PLACEHOLDER**, thay dần (§8).
 - Checklist kỹ thuật ở [BLENDER-SESSION-GUIDE §2](BLENDER-SESSION-GUIDE.md) **vẫn giữ nguyên** — file này là tầng *thẩm mỹ* bên trên, không thay thế tầng kỹ thuật.
 
@@ -53,7 +53,7 @@ AI chưa từng thấy game này nên quy ra đặc điểm cụ thể. NSO là 
 
 ## 2. Bảng nghiệm thu PASS/FAIL
 
-Chấm trên **PNG đã render** (không phải viewport), ở @1x rồi @0.5x. Xem nhiều frame một lần bằng `make_contact_sheet.py` (§7 bước 4). **FAIL bất kỳ mục nào = sửa rồi lặp lại, không render tiếp cả sheet.**
+Chấm trên **PNG đã render** (không phải viewport), ở @1x rồi @0.5x. Xem nhiều frame một lần bằng `make_contact_sheet.py` (§7.1 bước 4). **FAIL bất kỳ mục nào = sửa rồi lặp lại, không render tiếp cả sheet.**
 
 | # | Tiêu chí | Cách kiểm nhanh |
 |---|---|---|
@@ -181,27 +181,41 @@ Số frame render được chọn **rơi đúng vào keyframe** (idle 1..17, run
 
 ---
 
-## 7. Vòng tự nghiệm thu của Sonnet (bắt buộc, tối đa 3 vòng)
+## 7. Vòng tự nghiệm thu của Sonnet (bắt buộc)
 
-> ⚠️ **TODO-OPUS (2026-08-03): lệnh trong mục này là của thế hệ mesh kit, đã lỗi thời cho nhân vật.**
-> Nhân vật giờ sinh bằng Text→3D ([BLENDER-SESSION-GUIDE §1.5](BLENDER-SESSION-GUIDE.md) bước A–D) —
-> không có "1 dòng lệnh dựng lại từ spec" nữa vì mesh đến từ Rodin (không tái sinh được). **Vòng lặp
-> chấm Q1–Q12 + giới hạn 3 vòng + kỷ luật token vẫn giữ nguyên hiệu lực**; chỉ phần lệnh dựng
-> (`build_kage_character.py`) cần viết lại theo flow Text→3D. Lệnh render preview/contact sheet
-> (`kage_sprite_render.py`, `make_contact_sheet.py`) vẫn dùng được y nguyên để nghiệm thu.
+### 7.0 Vì sao vòng lặp này khác vòng lặp cũ
+
+Thế hệ mesh kit dựng lại nguyên vẹn từ 1 dòng lệnh, nên mọi FAIL đều sửa được bằng cách đổi spec rồi
+chạy lại. **Text→3D không như vậy**: mesh đến từ job cloud Rodin, chạy lại đúng prompt cũ ra model
+khác ([BLENDER-SESSION-GUIDE §1.5](BLENDER-SESSION-GUIDE.md) bước D). Hệ quả chi phối cả mục này:
+
+- **Có hai loại FAIL, chi phí lệch nhau hàng chục lần.** Phải phân loại trước khi sửa (§7.2).
+- **Mesh đạt là tài sản.** Save + `pack_all()` **ngay khi mesh qua vòng A** (§7.1 bước 2), trước khi
+  tiêu bất kỳ vòng chỉnh nào — hỏng tay ở bước rig không được kéo theo mất mesh.
+- **Ngân sách vòng đếm riêng cho từng loại**, không còn một con số 3 duy nhất (§7.3).
+
+### 7.1 Trình tự
+
+Toàn bộ chạy headless — **không cần mở Blender, không cần MCP** (trừ bước 1, xem ghi chú).
+
+**Bước 1 · Sinh mesh + chuẩn hoá + rig + action.** Theo [BLENDER-SESSION-GUIDE §1.5](BLENDER-SESSION-GUIDE.md)
+bước A–C. Đây là bước duy nhất tiêu credit Rodin. Prompt bám spec trang phục ở
+[ART-PIPELINE §2.3](ART-PIPELINE.md).
+
+**Bước 2 · Chấm vòng A (chất lượng mesh) trên preview `idle`** — trước khi tinh chỉnh bất cứ thứ gì:
 
 ```bash
-# 1. Dựng + render 1 frame duyệt style
-blender -b assets/raw/blender/kage_character_base.blend -P tools/blender/build_kage_character.py \
-  -- --element <hệ> --tier <bậc> --out assets/raw/blender/characters/<hệ>-<bậc>.blend
 blender -b assets/raw/blender/characters/<hệ>-<bậc>.blend -P tools/blender/kage_sprite_render.py \
   -- --preview idle --out assets/raw/render-out/_review
-
-# 2. Read PNG vừa render → chấm Q1–Q10, ghi mỗi mục 1 dòng PASS/FAIL
 ```
 
-3. Có FAIL → sửa spec/tham số → lặp. **Tối đa 3 vòng**; vẫn FAIL → dừng, ghi vấn đề + ảnh vào ASSET-LOG, đánh dấu chờ Opus. **Không hạ chuẩn, không render cả sheet để "tạm dùng".**
-4. PASS Q1–Q10 → render cả bộ, rồi ghép contact sheet để chấm Q11–Q12 trong **một** lần xem:
+Read PNG → chấm **Q1–Q10**, mỗi mục 1 dòng PASS/FAIL. Phân loại FAIL theo §7.2.
+PASS vòng A → **save `.blend` kèm `bpy.ops.file.pack_all()` ngay**, rồi mới đi tiếp.
+
+**Bước 3 · Vòng B (tinh chỉnh trong Blender).** Sửa tham số bước C rồi render lại đúng lệnh ở bước 2.
+Không sinh mesh mới.
+
+**Bước 4 · PASS Q1–Q10 → render cả bộ, ghép contact sheet, chấm Q11–Q12 trong _một_ lần xem:**
 
 ```bash
 blender -b assets/raw/blender/characters/<hệ>-<bậc>.blend -P tools/blender/kage_sprite_render.py \
@@ -212,9 +226,48 @@ blender -b -P tools/blender/make_contact_sheet.py -- \
   --out assets/raw/render-out/_review/<hệ>-<bậc>.png --scale 2
 ```
 
-5. PASS → hạ mẫu/pack/ghi log theo [BLENDER-SESSION-GUIDE §1](BLENDER-SESSION-GUIDE.md) bước 6–7.
+Q11–Q12 FAIL là lỗi biên độ pose → `author_scaled_actions(rig, gains=...)`, thuộc vòng B.
 
-Kỷ luật token giữ nguyên [ART-PIPELINE §6.1](ART-PIPELINE.md): batch lệnh, preview trước sheet sau, headless cho việc dài. Toàn bộ vòng trên chạy headless — **không cần mở Blender, không cần MCP**.
+**Bước 5 · PASS → ghi sổ + đóng phiên** theo [BLENDER-SESSION-GUIDE §1](BLENDER-SESSION-GUIDE.md)
+bước 7. ⚠️ **Không còn bước hạ mẫu/pack atlas cho nhân vật** — từ [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)
+sản phẩm giao là **model glTF**, ảnh render chỉ là bằng chứng nghiệm thu. Bước xuất glTF
+([BLENDER-SESSION-GUIDE §1.5](BLENDER-SESSION-GUIDE.md) bước E) **chưa code**, đang chờ chốt ngân sách
+tam giác — nên hiện tại phiên art dừng ở `.blend` đã nghiệm thu.
+
+> Bước 1 gọi REST API Rodin từ trong Blender. Chạy được headless, nhưng bước import
+> (`import_generated_asset`) là tool MCP → **bước A–B cần phiên có MCP**; từ bước C trở đi headless.
+
+### 7.2 Phân loại FAIL trước khi sửa — luật bắt buộc
+
+Sửa sai tầng là cách tiêu credit nhanh nhất: sinh lại mesh vì một con số outline sai thì vừa mất
+credit vừa mất luôn mesh đang có.
+
+| FAIL ở | Nguyên nhân nằm ở | Vòng | Cách sửa |
+|---|---|---|---|
+| **Q1, Q2, Q3, Q6** (hình khối đầu/mặt/tóc/chi) | Hình học Rodin trả về | **A — sinh lại mesh** | Sửa prompt (§1.5 bước B: mô tả mặt phải cụ thể) rồi chạy lại job |
+| **Q4, Q5, Q7** (mảng màu, phụ kiện, vũ khí) | Prompt thiếu spec trang phục | **A** — trừ khi vũ khí gắn rời | Vũ khí/phụ kiện gắn rời → `attach_weapon()`, thuộc vòng B |
+| **Q8** (cel shading) | `toon_textured(shades=)` | **B** | Đổi `shades`/`steps` |
+| **Q9** (outline) | `add_inverted_hull_outline(width_px_at_1x=)` | **B** | Đo lại theo §4 mục 3, gọi **sau** `fit_camera` |
+| **Q10** (đọc được ở @0.5x) | Tương phản/silhouette | **B trước, A sau** | Thử tăng tương phản + độ dày outline; vẫn FAIL thì là lỗi silhouette gốc → vòng A |
+| **Q11, Q12** (biên độ pose) | `CHIBI_GAINS` | **B** | `author_scaled_actions(rig, gains=...)` |
+| Tỷ lệ khớp sai, xoay ngược, trượt da | Tham số `rig()` | **B** | `measure(obj)` lại — **không** dùng hằng số của nhân vật khác |
+
+Vòng B **không bao giờ** tiêu credit. Nếu định làm gì đó ở vòng A, ghi rõ trong ASSET-LOG là vì tiêu
+chí Q nào — để lần sau biết prompt nào hỏng ở đâu.
+
+### 7.3 Ngân sách vòng
+
+| Vòng | Giới hạn | Chạm trần thì |
+|---|---|---|
+| **A — sinh mesh** | **3 job Rodin / nhân vật** | Dừng, ghi ASSET-LOG kèm ảnh + prompt của cả 3 lần, đánh dấu chờ Opus |
+| **B — chỉnh trong Blender** | **3 vòng / mỗi mesh** | Dừng vòng B; nếu FAIL còn lại thuộc nhóm vòng A theo §7.2 thì đổi sang vòng A (vẫn trong ngân sách 3 job) |
+
+**Không hạ chuẩn, không render cả sheet để "tạm dùng".** Mesh nào PASS vòng A rồi thì giữ `.blend`
+đó lại kể cả khi sau đó sinh mesh khác tốt hơn — cho tới lúc đóng phiên mới xoá bản thua, vì bản
+thắng không sinh lại được.
+
+Kỷ luật token giữ nguyên [ART-PIPELINE §6.1](ART-PIPELINE.md): batch lệnh, preview trước sheet sau,
+headless cho việc dài.
 
 ---
 
@@ -226,13 +279,13 @@ Kỷ luật token giữ nguyên [ART-PIPELINE §6.1](ART-PIPELINE.md): batch l�
 | 2 | Rig 11 xương + 7 action có khuỷu/gối | Opus | ✅ **Xong** (trong kit) |
 | 3 | Gold standard Hỏa B1 + ảnh tham chiếu | Opus | ❌ **Bị bác 2026-08-03** (~1/5 NSO) → thay bằng pilot Text→3D Hỏa, **đã duyệt cùng ngày** (`pilot_text3d_hoa_v2_*.png`) |
 | 4 | Spec 5 hệ × 3 bậc | Opus | ✅ **Xong** — bảng `CHARACTERS` trong `build_kage_character.py`; giờ chỉ còn giá trị làm **spec trang phục/vũ khí** tham chiếu cho prompt Text→3D (§2.3 ART-PIPELINE) |
-| 5 | ~~Re-render 15 sheet~~ → Sản xuất **14 nhân vật còn lại bằng Text→3D**, qua vòng §7 (bản sửa theo TODO-OPUS), cập nhật ASSET-LOG | **Sonnet** | ⏳ Chờ chốt ngân sách tam giác + gắn vũ khí ([ART-PIPELINE §12.1](ART-PIPELINE.md)) |
+| 5 | ~~Re-render 15 sheet~~ → Sản xuất **14 nhân vật còn lại bằng Text→3D**, qua vòng §7, cập nhật ASSET-LOG | **Sonnet** | ⏳ Chờ chốt ngân sách tam giác + gắn vũ khí ([ART-PIPELINE §12.1](ART-PIPELINE.md)) |
 | 6 | Quái/NPC/boss mới về sau | Sonnet (boss khó → escalate) | Chờ #5 chạy ổn |
 | 7 | VFX skill: giữ chuẩn hiện có (17 VFX đã ship không thuộc diện placeholder) | Sonnet | Không đổi |
 
 **Sonnet bắt đầu từ #5.** Khi làm quái/NPC (#6) mà kit thiếu bộ phận (sừng, đuôi, 4 chân...) → **không sculpt tay**, báo lại để bổ sung hàm vào kit; kit là nơi giữ chất lượng đồng đều.
 
-⚠️ **Chỉ commit .blend khi thật cần.** Thế hệ mới sinh lại nguyên vẹn từ 1 dòng lệnh (§7 bước 1) nên `.blend` không còn là "source of truth" không thể thay thế như thế hệ model tay — nguồn thật giờ là **spec dict + kit**, đều là text. Repo đang bật Git LFS với quota hữu hạn, đừng nạp 15 file nhị phân sinh lại được. Hiện chỉ commit `hoa-b1.blend` làm mẫu đối chiếu cho gold standard.
+⚠️ **`.blend` nhân vật Text→3D BẮT BUỘC commit** — đảo ngược so với thế hệ mesh kit. Mesh đến từ job cloud Rodin, chạy lại prompt cũ ra model khác, nên `.blend` (đã `pack_all()`) là **bản duy nhất tồn tại**: mất là mất hẳn, không có "spec dict + kit" nào dựng lại được. Đổi lại chúng rất nặng (pilot Hỏa: 47 MB) — Git LFS đang bật cho `assets/raw/**` với quota hữu hạn, nên **chỉ commit bản đã PASS nghiệm thu §7**, xoá các bản thua trước khi đóng phiên. Chi tiết: [ART-PIPELINE §7](ART-PIPELINE.md).
 
 ⚠️ **File `.blend` thế hệ box vẫn còn trong git** (`<hệ>-pilot/-b2/-b3.blend`). Khi #5 chạy, chúng bị ghi đè nếu đặt trùng tên — chỉ làm việc đó **sau khi #3 được duyệt**, và biết rằng chúng dựng lại được bằng `build_box_character.py`.
 
@@ -264,7 +317,7 @@ Không. Không thêm dependency, không đổi kiến trúc — chỉ nâng chu�
 ## 12. Việc cần làm tiếp theo
 
 1. ✅ **Đóng 2026-08-03**: gold standard mesh kit **bị bác** (~1/5 NSO); chủ dự án **duyệt hướng Text→3D** trên pilot Hỏa cùng ngày (`pilot_text3d_hoa_v2_*.png` là chuẩn so mới).
-2. Sonnet: sản xuất 14 nhân vật còn lại + monster/NPC placeholder bằng Text→3D qua vòng §7 (sau khi viết lại theo TODO-OPUS), cập nhật `ASSET-LOG.md`. **Chặn bởi**: ngân sách tam giác + gắn vũ khí ([ART-PIPELINE §12.1](ART-PIPELINE.md)).
+2. Sonnet: sản xuất 14 nhân vật còn lại + monster/NPC placeholder bằng Text→3D qua vòng §7, cập nhật `ASSET-LOG.md`. **Chặn bởi**: ngân sách tam giác + gắn vũ khí ([ART-PIPELINE §12.1](ART-PIPELINE.md)).
 3. ✅ **Xong 2026-08-03**: đã quét sạch con số outline cũ khỏi mọi tài liệu (ART-PIPELINE §2.1, BLENDER-SESSION-GUIDE §1/§3/§8, `tools/blender/README.md`) — giờ chỉ còn **một nguồn duy nhất** là §4 mục 3 của file này, các nơi khác trỏ về đây.
 4. Thổ B3 dùng `topknot` nhưng render ra giống **nón lá** hơn búi tóc — hợp hệ Thổ nên tạm giữ, cần thì đổi tên style hoặc dựng lại khối búi.
 5. Vũ khí gắn cố định ở hông/lưng, **không vào tay khi `attack`** (thế hệ box cũng vậy) — nếu muốn cầm vũ khí thật thì thêm bone `hand_r` + constraint, là việc riêng.

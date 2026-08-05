@@ -19,6 +19,16 @@ git config value — it is not (and cannot be) committed, so every contributor m
 | Hook | Purpose |
 |---|---|
 | `pre-commit` | Runs [gitleaks](https://github.com/gitleaks/gitleaks) against **staged** content and blocks the commit if it finds a likely secret. If `gitleaks` is not installed locally, it warns and lets the commit through — it is a fast local pre-check, not the real enforcement backstop. |
+| `pre-push`, `post-checkout`, `post-commit`, `post-merge` | Git LFS plumbing, written here by `git lfs install`. |
+
+⚠️ **Why the Git LFS hooks are committed.** `git lfs install` normally writes its four hooks into
+`.git/hooks/`. Setting `core.hooksPath` above makes git ignore `.git/hooks/` entirely — so on a
+machine where hooksPath was set *before* `git lfs install` ran, LFS would have **no hooks at all**
+and `git push` would happily send LFS pointer files without uploading the objects behind them.
+The repo keeps `assets/raw/**` in LFS ([.gitattributes](../.gitattributes)), including `.blend`
+files that cannot be regenerated, so that failure mode loses real work. Committing the four hooks
+makes the LFS wiring survive the hooksPath redirect. They are stock git-lfs boilerplate — if
+`git lfs install` ever rewrites them, commit the new version rather than reverting it.
 
 ## Real enforcement
 

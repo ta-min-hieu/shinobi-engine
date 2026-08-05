@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version | 0.2.0 |
+| Version | 0.3.0 |
 | Status | Draft |
 | Liên quan | [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) (2.5D — **đổi kiến trúc tài liệu này**) · [RESOURCE.md](../04-client/RESOURCE.md) · [RENDERING.md](../03-engine/RENDERING.md) · [GAME-DESIGN-DOCUMENT.md](../13-game-design/GAME-DESIGN-DOCUMENT.md) |
 
@@ -89,7 +89,7 @@ Khớp [GDD §4](../13-game-design/GAME-DESIGN-DOCUMENT.md) (Hỏa/Thủy/Phong/
 - **Vũ khí**: kunai lưỡi rộng ám khói + cuộn giấy phù chú đeo hông.
 - **Skill thường `fireball`** — cast: lùi nửa bước, tay kết ấn, quầng cam nhỏ ở lòng bàn tay (2 frame). Bay: cầu lửa lưỡi liềm kéo đuôi ember. Impact: nở hoa lửa 3 frame + tàn lửa bay **lên** (particle runtime, không render sẵn).
 - **Ultimate**: *chưa có trong `SkillRegistry`* — Hỏa mới chỉ có `fireball` (MVP đi 1 hệ trước, [GDD](../13-game-design/GAME-DESIGN-DOCUMENT.md)). Khi thêm ult mới làm VFX, **đừng làm trước**.
-- **Prompt 3D**: `chibi ninja boy, 2.5 heads tall, big head, short limbs, sleeveless burnt-edge coat, long scarf, arm wraps, toon style, flat colors, side profile facing right, T-pose, low poly, clean topology`
+- **Prompt 3D** (khung chung ở cuối §2.3): `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, sleeveless burnt-edge coat, long scarf, arm wraps, dark knee-length trousers, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology`
 
 #### 💧 Thủy — *khống chế, hồi phục*
 
@@ -97,7 +97,7 @@ Khớp [GDD §4](../13-game-design/GAME-DESIGN-DOCUMENT.md) (Hỏa/Thủy/Phong/
 - **Vũ khí**: bình hồ lô đeo lưng + dải lụa nước (không phải kiếm — Thủy là hệ hỗ trợ).
 - **Skill thường `thuy_hoi_phuc`** (mục tiêu ALLY) — cast: chắp tay, cúi nhẹ. Impact: **cột nước dịu dâng từ chân lên** đồng đội, kèm vòng ripple ở mặt đất, tông `#7FD4FF` trong mờ. Tránh dùng màu xanh lá — dễ nhầm hệ Phong.
 - **Ultimate `thuy_thuy_trieu`** (ENEMY) — cast dài 4 frame: nước dâng quanh chân người thi triển. Impact: **sóng lớn quét ngang màn hình** từ trái sang phải, đối thủ trong sóng bị đẩy lùi; kết bằng màn nước rơi + ripple đọng 2 frame.
-- **Prompt 3D**: `chibi ninja, 2.5 heads tall, flowing wide-sleeve robe, gourd flask on back, cloth wraps on bare feet, toon style, flat colors, side profile facing right, T-pose, low poly`
+- **Prompt 3D**: `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, flowing wide-sleeve robe, gourd flask on back, dark knee-length trousers, cloth wraps on feet, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology`
 
 #### 🌪 Phong — *tốc độ, bạo kích*
 
@@ -105,7 +105,7 @@ Khớp [GDD §4](../13-game-design/GAME-DESIGN-DOCUMENT.md) (Hỏa/Thủy/Phong/
 - **Vũ khí**: song đao ngắn cong (đánh nhanh 2 tay).
 - **Skill thường `phong_gia_toc`** (buff SELF) — cast: dậm chân, luồng gió xoáy `#3DBF7A` bốc từ chân lên. Trong lúc buff: **afterimage mờ** phía sau khi di chuyển (làm bằng code — vẽ lại sprite cũ với alpha giảm, **không** render frame riêng, tiết kiệm cả atlas lẫn công).
 - **Ultimate `phong_loc_xoay`** (ENEMY) — cast: xoay người 1 vòng. Impact: **cột lốc xoáy** dựng tại vị trí mục tiêu, lá cuốn theo xoắn ốc, kéo đối thủ vào giữa; tan dần từ dưới lên.
-- **Prompt 3D**: `chibi ninja, 2.5 heads tall, tight sleeveless top, long flowing sash, twin short curved blades, dynamic light armor, toon style, flat colors, side profile facing right, T-pose, low poly`
+- **Prompt 3D**: `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, tight sleeveless top, long flowing sash, twin short curved blades, dynamic light armor, dark knee-length trousers, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology`
 
 #### ⚡ Lôi — *đơn mục tiêu, xuyên giáp*
 
@@ -113,7 +113,7 @@ Khớp [GDD §4](../13-game-design/GAME-DESIGN-DOCUMENT.md) (Hỏa/Thủy/Phong/
 - **Vũ khí**: trường đao thẳng lưỡi mảnh (hệ xuyên giáp — hình dáng phải "sắc", không tù).
 - **Skill thường `loi_tia_set`** (ENEMY) — cast: chỉ tay, tụ sáng ở đầu ngón (1 frame). Impact: **tia zigzag `#FFE84D` đánh thẳng xuống mục tiêu**, kèm **flash trắng toàn màn 1 frame** rồi tắt hẳn — độ giật là bản sắc hệ Lôi, không kéo dài.
 - **Ultimate `loi_thien_loi`** (ENEMY) — cast: giơ tay lên trời, mây tối tụ trên đầu 3 frame (báo hiệu để đối thủ né — luật thiết kế PvP: ult phải đọc được). Impact: **cột sét khổng lồ giáng thẳng**, chớp 2 lần, để lại vệt cháy tím `#8C4DE8` mờ dần trên đất.
-- **Prompt 3D**: `chibi ninja, 2.5 heads tall, dark hooded jacket, angular shoulder armor, long straight thin blade, headband, toon style, flat colors, side profile facing right, T-pose, low poly`
+- **Prompt 3D**: `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, dark hooded jacket, angular shoulder armor, long straight thin blade, headband, dark knee-length trousers, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology`
 
 #### ⛰ Thổ — *phòng thủ, khiên*
 
@@ -121,11 +121,28 @@ Khớp [GDD §4](../13-game-design/GAME-DESIGN-DOCUMENT.md) (Hỏa/Thủy/Phong/
 - **Vũ khí**: chuỳ đá lớn hoặc găng chiến (không dùng vũ khí mảnh).
 - **Skill thường `tho_khien_da`** (buff SELF) — cast: dậm chân mạnh, **3 phiến đá trồi lên từ mặt đất** dựng thành khiên trước mặt; giữ nguyên trong suốt thời gian buff, nứt dần theo lượng damage đã chặn (2 mức nứt là đủ).
 - **Ultimate `tho_dia_chan`** (ENEMY) — cast: nhảy lên rồi giáng cả người xuống. Impact: **vết nứt lan trên mặt đất** theo chiều ngang + bụi thấp sát đất + **rung camera** (camera shake là hiệu ứng code, thuộc tier Medium/High §5, tier Low tắt).
-- **Prompt 3D**: `chibi ninja, 2.5 heads tall, heavy stone plate armor, bulky shoulders, thick leather chest guard, large stone mace, toon style, flat colors, side profile facing right, T-pose, low poly`
+- **Prompt 3D**: `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, heavy stone plate armor, bulky shoulders, thick leather chest guard, large stone mace, dark knee-length trousers, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology`
 
 ---
 
-⚠️ **Prompt 3D chỉ ra base mesh thô.** Model từ Hyper3D/Hunyuan luôn ra kiểu bán-tả-thực → bắt buộc toon hoá lại bằng `apply_toon()` và chỉnh tỷ lệ về chibi trước khi render ([BLENDER-SESSION-GUIDE §1](BLENDER-SESSION-GUIDE.md) bước 2). Đừng render thẳng.
+**Khung chung của 5 prompt trên** — đổi phần trang phục/vũ khí, giữ nguyên phần còn lại:
+
+```
+chibi ninja warrior character, 2.5 heads tall, big head, short limbs,
+<trang phục + vũ khí theo bậc>,
+dark knee-length trousers,
+clearly visible anime face: large glossy black eyes with white highlights,
+thin sharp eyebrows, small smiling mouth, spiky black hair,
+toon style, flat colors, T-pose, low poly, clean topology
+```
+
+Ba mệnh đề **không được bỏ**, mỗi cái mua bằng một lần hỏng thật ([BLENDER-SESSION-GUIDE §1.5](BLENDER-SESSION-GUIDE.md) bước B):
+
+- **Cả cụm mô tả khuôn mặt** — thiếu là ra nhân vật đầu trọc không mặt.
+- **`warrior character` + `dark knee-length trousers`** thay cho `boy` + chân trần — tổ hợp cũ bị Rodin chặn `IMAGE_CONTENT_VIOLATION`.
+- **KHÔNG có `side profile facing right`** — vô nghĩa với mesh 3D và làm mesh **dẹt theo chiều sâu**. (Cụm này là di sản thời pre-render sprite; ADR-031 bỏ hẳn khái niệm "hướng nướng vào tài sản".)
+
+⚠️ **Prompt chỉ ra base mesh thô.** Model Rodin trả về luôn kiểu bán-tả-thực → bắt buộc chuẩn hoá + toon hoá lại bằng `kage_text3d_kit` (`normalise` → `clean` → `toon_textured`) trước khi nghiệm thu ([BLENDER-SESSION-GUIDE §1.5](BLENDER-SESSION-GUIDE.md) bước C). Đừng render thẳng.
 
 ---
 
@@ -332,7 +349,7 @@ assets/exported/models/{low,med,high}/   # glTF đã decimate — KHÔNG commit 
 
 - `.blend` giữ **nhỏ** (không pack texture thừa, purge orphan trước khi save). Git LFS **đã bật** cho `assets/raw/**` (`.gitattributes`, 2026-08-01) — quota free tier có hạn, đừng commit thêm binary không cần thiết.
 - ⚠️ **Ngoại lệ quan trọng với nhánh 3D:** `.blend` chứa mesh sinh từ Rodin **không sinh lại được** — chạy lại prompt cũ ra model khác. Quy tắc "không commit thứ sinh lại được" **không** áp dụng cho chúng; mất là mất hẳn. Đổi lại, chúng buộc phải `pack_all()` texture nên nặng hơn nhiều (bản pilot Hỏa: 47 MB).
-- ⚠️ **Ngoại lệ cho luật "COMMIT .blend nguồn"**: nhân vật sinh từ mesh kit dựng lại nguyên vẹn bằng 1 dòng lệnh nên **không commit** hàng loạt — nguồn thật là spec dict + kit (text). Xem [ART-QUALITY-STANDARD §8](ART-QUALITY-STANDARD.md); chỉ `.blend` model tay mới là source of truth phải commit.
+- ⚠️ **Ngoại lệ cho luật "COMMIT .blend nguồn" — chỉ áp dụng cho thế hệ mesh kit**: asset dựng bằng `kage_mesh_kit.py` / `build_box_character.py` sinh lại nguyên vẹn từ 1 dòng lệnh nên **không commit** hàng loạt (nguồn thật là spec dict + kit, đều là text). **Không** áp dụng cho nhân vật Text→3D — xem gạch đầu dòng trên và [ART-QUALITY-STANDARD §8](ART-QUALITY-STANDARD.md).
 - `assets/raw/` vốn đã bị loại khỏi bản build theo [RESOURCE.md §2](../04-client/RESOURCE.md) — cấu trúc trên không đổi luật đó.
 
 ---
@@ -349,7 +366,7 @@ assets/exported/models/{low,med,high}/   # glTF đã decimate — KHÔNG commit 
 
 Lý do: client nhận asset qua **patch manifest** ([RESOURCE.md §9–§10](../04-client/RESOURCE.md)), không bao giờ nối DB; nhét blob vào Postgres chỉ làm phình DB/backup mà không ai đọc. Trang quản trị đọc metadata từ DB và **preview ảnh bằng đường dẫn** trỏ vào `assets/exported/`.
 
-### 8.2 Bảng đề xuất (⚠️ DB schema change — chỉ tạo Flyway migration khi chủ dự án duyệt thiết kế này)
+### 8.2 Bảng `art_asset` / `art_category` — **đã thi hành** (`V19__create_art_registry.sql`, 2026-08-01)
 
 **Danh mục là bảng riêng, phân cấp 2 tầng** — không dồn tất cả vào 1 cột enum: trang quản trị lọc/duyệt theo cây danh mục, và thêm loại mới không cần migration.
 
@@ -444,19 +461,65 @@ Mọi cột đường dẫn trong `art_asset` (`blend_path`, `render_dir`, `prev
 
 Suy ra thay vì lưu cứng để đổi tier hoặc đổi origin không phải cập nhật hàng loạt dòng DB.
 
-💡 **`preview_url` là để tối ưu danh sách, không phải vì bị giới hạn.** Xem §8.6 — trang quản trị xem được **toàn bộ** asset, kể cả animation chạy thật.
+💡 **`preview_url` là để tối ưu danh sách, không phải vì bị giới hạn.** Xem §8.7 — trang quản trị xem được **toàn bộ** asset, kể cả animation chạy thật.
 
 **Thi hành — không dựa vào trí nhớ con người**: bước cuối của `tools/asset-pipeline` **upsert** mọi asset vào `art_asset`, và **fail build nếu có file trong `assets/exported/` không truy ra được dòng DB tương ứng**. `ASSET-LOG.md` chỉ là sổ tay token-rẻ cho phiên AI; **DB là nguồn chuẩn** cho trang quản trị.
 
-> ⚠️ **TODO-OPUS (2026-08-03): §8 chưa phủ nhánh 3D.** Toàn bộ cột đường dẫn (`render_dir`,
-> `atlas_name`, `master_px`) và quy ước suy đường dẫn ở trên viết cho asset sprite. Model glTF
-> xuất vào `assets/exported/models/{low,med,high}/` ([§3.2](#32-sơ-đồ--nhánh-3d-nhân-vật--quái--npc))
-> chưa có chỗ đứng trong `art_asset` — ngày bước decimate/xuất glTF được code (§10), luật
-> "fail build nếu file không truy ra được dòng DB" sẽ tự vỡ. Cần thiết kế mở rộng schema
-> (ví dụ cột `model_path` hoặc bảng phụ theo tier) — **DB schema change, phải chờ chủ dự án duyệt**,
-> đừng sửa V19 tại chỗ.
+Bảng cột trên viết cho **nhánh 2D**. Nhánh 3D (nhân vật · quái · NPC sau [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)) giao model glTF chứ không giao atlas — xem §8.6.
 
-### 8.6 Trang quản trị xem được những gì
+### 8.6 Nhánh 3D trong `art_asset` — **thiết kế đề xuất, chờ chủ dự án duyệt**
+
+⚠️ **Đây là DB schema change** ([/CLAUDE.md §4](../../CLAUDE.md)) — mục này mô tả thiết kế, **chưa
+được thi hành**. Không sửa `V19` tại chỗ; khi được duyệt thì viết `V20__extend_art_asset_for_3d.sql`.
+
+**Vấn đề.** `blend_path`/`render_dir`/`preview_url`/`atlas_name`/`master_px` đều giả định sản phẩm
+giao là sprite trong atlas. Model glTF xuất vào `assets/exported/models/{low,med,high}/`
+([§3.2](#32-sơ-đồ--nhánh-3d-nhân-vật--quái--npc)) không có chỗ đứng trong bảng — nên ngày bước
+decimate/xuất glTF được code (§10), luật §8.5 "fail build nếu file trong `assets/exported/` không
+truy ra được dòng DB" sẽ **tự vỡ**: file model nào cũng là mồ côi.
+
+**Đề xuất: thêm cột vào `art_asset`, không tách bảng phụ.**
+
+| Cột mới | Kiểu | Ý nghĩa |
+|---|---|---|
+| `asset_kind` | `VARCHAR(8) NOT NULL DEFAULT 'SPRITE'` | `SPRITE` \| `MODEL` — quyết định nhóm cột nào có nghĩa, và pipeline soi thư mục nào khi kiểm mồ côi |
+| `model_name` | `VARCHAR(64)` | Tên gốc của model, ví dụ `char_ninja-fire`. Đường dẫn từng tier **suy ra** như atlas: `models/{low\|med\|high}/{model_name}.gltf` |
+| `tri_counts` | `JSONB` | `{"low":8000,"med":20000,"high":45000}` — số tam giác thật sau decimate từng tier |
+
+Ràng buộc chống lẫn nhánh (rẻ, bắt sai ngay lúc insert):
+
+```sql
+CONSTRAINT art_asset_kind_branch CHECK (
+    (asset_kind = 'SPRITE' AND model_name IS NULL AND tri_counts IS NULL)
+ OR (asset_kind = 'MODEL'  AND atlas_name IS NULL AND master_px  IS NULL))
+```
+
+Cột dùng chung, **không** đổi nghĩa giữa hai nhánh: `asset_key`, `category_id`, `element`, `status`,
+`blend_path`, `preview_url`, `actions`, `license`, `attribution`, `checksum`.
+`render_dir` giữ nguyên tên và vẫn dùng cho nhánh 3D, nhưng đổi *vai trò*: với `MODEL` nó là
+**bằng chứng nghiệm thu** ([ART-QUALITY-STANDARD §7](ART-QUALITY-STANDARD.md)), không phải nguồn để
+pack. Hai nhánh vì thế vẫn dùng chung trang quản trị và chung câu lọc theo category/element.
+
+**Vì sao thêm cột chứ không tách bảng `art_model`:**
+
+1. Nhánh 3D có **đúng cùng một hình dạng bài toán** với atlas — một cái tên + một quy ước sinh ra 3
+   đường dẫn tier. Đã giải bằng 1 cột cho atlas thì cũng là 1 cột cho model, chưa đủ để tách bảng.
+2. `art_asset` **vốn đã** là bảng cột-tuỳ-loại: `actions` null với icon, `atlas_name` null với asset
+   chưa pack. Thêm cột chỉ có nghĩa với một `asset_kind` là đúng khuôn đang có, không phải ngoại lệ mới.
+3. Trang quản trị liệt kê **toàn bộ kho** trong một lưới (§8.3/§8.7). Tách bảng biến mọi truy vấn
+   danh sách thành `LEFT JOIN` chỉ để lấy thêm 1–2 cột.
+4. `CHECK` ở trên cho lại đúng thứ mà tách bảng mua được (không thể điền nhầm cột chéo nhánh), với
+   giá 4 dòng SQL và không thêm bảng.
+
+**Việc kèm theo khi thi hành** (không được quên, nếu không luật §8.5 vẫn hở):
+
+- `ArtRegistryUpserter` đọc thêm `asset_kind` từ ASSET-LOG/manifest và điền `model_name`/`tri_counts`.
+- Bước kiểm mồ côi soi **cả hai** thư mục: `assets/exported/atlases/` (nhánh SPRITE) và
+  `assets/exported/models/` (nhánh MODEL).
+- `tri_counts` chính là số liệu để chốt **ngân sách tam giác** đang treo ở §4.4 — điền vào lúc
+  decimate thì không phải đo lại lần nữa.
+
+### 8.7 Trang quản trị xem được những gì
 
 **Không bị giới hạn ở ảnh tĩnh.** File `.atlas` của libGDX là **text thuần, đọc được**, không phải định dạng nhị phân đóng:
 
@@ -504,14 +567,19 @@ Nên trang quản trị **tự cắt được mọi vùng** bằng `canvas.drawI
 | 9 | **nginx đọc đĩa** phục vụ file tĩnh; không dùng object storage | §8.4 — nhanh hơn (`sendfile()` zero-copy), không thêm dependency, patcher vốn dùng URL HTTP nên không có lock-in để chống | **Chốt** 2026-08-01 (chủ dự án loại MinIO) |
 | 10 | VFX đặt tên `vfx_<skill_code>` khớp `SkillRegistry` | Asset map 1-1 với skill thật, không cần bảng tra | Đề xuất |
 | 11 | Mọi asset **bắt buộc** có dòng trong `art_asset` kèm đường dẫn; pipeline fail build nếu thiếu | §8.5 — chủ dự án yêu cầu quản toàn bộ kho đồ họa qua trang quản trị; ràng buộc bằng công cụ, không bằng trí nhớ | Đề xuất |
-| 12 | Pipeline xuất thêm **thumbnail rời** mỗi asset (`preview_url`) | §8.6 — chỉ để danh sách nhiều asset không phải tải atlas 4MB mỗi ô; **không** phải vì bị giới hạn hiển thị | Đề xuất |
-| 13 | Region trong atlas đặt tên `<asset_key>_<action>` + `index` (dạng libGDX gốc) | §8.6 — `atlas.findRegions()` gom được frame cho `Animation`; trang quản trị lọc cùng tiền tố. Đặt sai kiểu `..._idle_00` là hỏng cả hai phía | Đề xuất |
+| 12 | Pipeline xuất thêm **thumbnail rời** mỗi asset (`preview_url`) | §8.7 — chỉ để danh sách nhiều asset không phải tải atlas 4MB mỗi ô; **không** phải vì bị giới hạn hiển thị | Đề xuất |
+| 13 | Region trong atlas đặt tên `<asset_key>_<action>` + `index` (dạng libGDX gốc) | §8.7 — `atlas.findRegions()` gom được frame cho `Animation`; trang quản trị lọc cùng tiền tố. Đặt sai kiểu `..._idle_00` là hỏng cả hai phía | Đề xuất |
 
 ## 10. ADR cần tạo / quyết định treo
 
 - 🔀 **[ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) Accepted 2026-08-03** — nhân vật chuyển sang render 3D thời gian thực (2.5D). Thay quyết định #1 và #2 ở §9. **Hai việc treo do ADR này sinh ra:**
   - **Ngân sách tam giác chưa chốt** (§4.4). Mesh pilot 90k tam giác; phải đo frame time thật ở nhiều mức decimate rồi mới điền số, không đoán.
   - **Cách phòng vệ JitPack chưa chốt.** `gdx-gltf` chỉ phát hành qua JitPack, không có trên Maven Central. **Chưa được thêm vào `libs.versions.toml`** cho tới khi chốt.
+  - 🛑 **Mở rộng `art_asset` cho nhánh 3D — chờ chủ dự án duyệt.** Thiết kế đã viết đầy đủ ở §8.6
+    (3 cột `asset_kind`/`model_name`/`tri_counts` + `CHECK` chống lẫn nhánh, không tách bảng phụ).
+    Là **DB schema change** nên không tự thi hành ([/CLAUDE.md §4](../../CLAUDE.md)); duyệt xong thì
+    viết `V20__extend_art_asset_for_3d.sql`. **Chặn**: bước xuất glTF (§10 gạch đầu dòng trên) —
+    ngày bước đó chạy mà chưa có cột này thì luật §8.5 "không có asset mồ côi" hở với mọi model.
 - ✅ **ADR "Graphics Quality Tiers & Pre-render Pipeline"** — quyết định #3–#4 chốt qua thực tế đã triển khai (không tách ADR riêng, xem [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) cho phần phát hành).
 - ✅ **Migration registry** (§8.2): `V19__create_art_registry.sql` (2026-08-01) — `art_category` + seed cây danh mục + `art_asset`, verify thật qua Postgres 17.
 - **Lưu trữ file: không cần ADR** — §8.4 chốt nginx + đĩa, không thêm dependency nào.
