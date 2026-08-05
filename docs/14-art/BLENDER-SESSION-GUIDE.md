@@ -174,7 +174,7 @@ Thêm 1 dòng vào `assets/raw/ASSET-LOG.md`:
 
 ## 1.5. Trình tự sản xuất **nhân vật** (nhánh 3D — [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md))
 
-Chạy được hoàn toàn headless. Toàn bộ hàm nằm ở `tools/blender/kage_text3d_kit.py`.
+Toàn bộ hàm nằm ở `tools/blender/kage_text3d_kit.py`. Bước A–B cần phiên **có MCP** (import mesh qua tool `import_generated_asset`); từ bước C trở đi chạy headless hoàn toàn.
 
 ### Bước A · Bật Hyper3D bằng code (không cần bấm checkbox trong Blender)
 
@@ -205,7 +205,7 @@ requests.post("https://hyperhuman.deemos.com/api/v2/rodin",
 `poll_rodin_job_status`, rồi import bằng `import_generated_asset(name, task_uuid=...)` — tool MCP
 nhận `task_uuid` của job gọi tay bình thường.
 
-Ba cái bẫy ở bước này:
+Bốn cái bẫy ở bước này:
 
 - **`bbox_condition` làm hỏng tool MCP** → `Expecting value: line 1 column 1`. Bỏ tham số đó đi.
 - **API trả HTTP 201 kèm `{"error": ...}`** — status code không phản ánh lỗi, phải đọc body.
@@ -272,7 +272,7 @@ Toàn bộ mục 2.1, cộng thêm:
 - [ ] Silhouette **khác hẳn** quái thường — người chơi phải nhận ra "đây là boss" trong 1 frame.
 - [ ] Tông tối/tương phản mạnh hơn thế giới thường (art direction, The Eminence in Shadow).
 - [ ] Khung 512 nhưng vẫn cùng baseline: boss đứng cùng mặt đất với người chơi, không "lơ lửng".
-- [ ] Ngân sách atlas: 1 boss @1x 256px × ~33 frame ≈ **trọn 1 atlas 2048**. Boss phải có atlas **riêng**, không nhét chung zone.
+- [ ] ~~Ngân sách atlas: 1 boss @1x 256px × ~33 frame ≈ trọn 1 atlas 2048, atlas riêng~~ — **hết hiệu lực từ [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)**: boss thuộc nhánh 3D, giao model glTF, không còn atlas. Ràng buộc thay thế là **ngân sách tam giác** ([ART-PIPELINE §4.4](ART-PIPELINE.md), chưa chốt).
 
 ### 2.3 VFX skill (master 384)
 
@@ -297,8 +297,8 @@ Toàn bộ mục 2.1, cộng thêm:
 
 | Loại | `setup_scene(px=)` | Outline | Freestyle | Bộ action |
 |---|---|---|---|---|
-| Nhân vật/NPC/quái | 256 | **1.1px @1x** (đo thật, [ART-QUALITY-STANDARD §4](ART-QUALITY-STANDARD.md)) | Bật | Bộ chuẩn §4.2 |
-| Boss | 512 | ~1.1px @1x (chưa đo riêng — boss choán khung tương tự, kiểm lại khi làm boss đầu tiên) | Bật | Bộ chuẩn + action riêng của boss |
+| Nhân vật/NPC/quái | 256 (preview nghiệm thu) | Tra [ART-QUALITY-STANDARD §4](ART-QUALITY-STANDARD.md) mục 3 — kỹ thuật **và** số đo khác nhau theo thế hệ mesh, đừng chép số vào đây | **Tắt** với mesh Text→3D (dùng `add_inverted_hull_outline()`); chỉ bật cho mesh thủ tục cũ | Bộ chuẩn §4.2 |
+| Boss | 512 | như nhân vật (chưa đo riêng — kiểm lại khi làm boss đầu tiên) | như nhân vật | Bộ chuẩn + action riêng của boss |
 | VFX khối | 384 | 1.5px @1x | Bật | 1 action `skill_cast` |
 | VFX mềm (lửa/khói) | 384 | — | **Tắt** | 1 action `skill_cast` |
 | Icon | 128 | 2px @1x | Bật | Không (1 frame) |

@@ -20,7 +20,7 @@
 
 ## 0. Kỷ luật token cho phiên làm art
 
-Phiên làm art bằng Blender MCP **chỉ cần nạp**: tài liệu này + [ART-QUALITY-STANDARD.md](ART-QUALITY-STANDARD.md) (thước đo ĐẠT/KHÔNG ĐẠT — bắt buộc cho nhân vật/quái/NPC) + [tools/blender/](../../tools/blender/README.md). Không đọc docs khác (mọi ràng buộc liên quan đã được chưng cất vào §1).
+Phiên làm art bằng Blender MCP **chỉ cần nạp 4 file**: tài liệu này + [ART-QUALITY-STANDARD.md](ART-QUALITY-STANDARD.md) (thước đo ĐẠT/KHÔNG ĐẠT — bắt buộc cho nhân vật/quái/NPC) + [BLENDER-SESSION-GUIDE.md](BLENDER-SESSION-GUIDE.md) (thao tác từng bước) + [tools/blender/README.md](../../tools/blender/README.md) (contract script). Không đọc docs khác (mọi ràng buộc liên quan đã được chưng cất vào §1).
 
 ---
 
@@ -55,7 +55,7 @@ Từ [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md), pip
 | Trụ cột | Chuẩn | Nguồn tham chiếu |
 |---|---|---|
 | Tỷ lệ nhân vật | Chibi 2–2.5 đầu, đầu to, chi ngắn | Ninja School Online |
-| Đường nét | Outline đen, Freestyle. **Độ dày không phải hằng số** — tuỳ nhân vật chiếm bao nhiêu phần khung; số đo cho nhân vật chibi ở [ART-QUALITY-STANDARD §4](ART-QUALITY-STANDARD.md) | Ninja School Online |
+| Đường nét | Outline đen. **Không phải một kỹ thuật, cũng không phải một con số**: mesh thủ tục dùng Freestyle, mesh Text→3D dùng inverted hull — kỹ thuật + số đo ở [ART-QUALITY-STANDARD §4](ART-QUALITY-STANDARD.md) mục 3 (nguồn duy nhất) | Ninja School Online |
 | Màu | Cel 2–3 nấc (base + shadow + highlight), màu phẳng, bão hòa cao | Anime nói chung |
 | Readability | Silhouette phải nhận ra được ở 64px (Low tier); mọi asset duyệt ở cả @0.5x | Nguyên tắc mobile |
 | VFX skill | Kịch tính, aura/trail đậm, tương phản mạnh với nền; boss & bí cảnh tông tối hơn thế giới thường | The Eminence in Shadow |
@@ -143,6 +143,14 @@ Ba mệnh đề **không được bỏ**, mỗi cái mua bằng một lần hỏ
 - **KHÔNG có `side profile facing right`** — vô nghĩa với mesh 3D và làm mesh **dẹt theo chiều sâu**. (Cụm này là di sản thời pre-render sprite; ADR-031 bỏ hẳn khái niệm "hướng nướng vào tài sản".)
 
 ⚠️ **Prompt chỉ ra base mesh thô.** Model Rodin trả về luôn kiểu bán-tả-thực → bắt buộc chuẩn hoá + toon hoá lại bằng `kage_text3d_kit` (`normalise` → `clean` → `toon_textured`) trước khi nghiệm thu ([BLENDER-SESSION-GUIDE §1.5](BLENDER-SESSION-GUIDE.md) bước C). Đừng render thẳng.
+
+> 🔴 **TODO-OPUS — vũ khí trong prompt hay gắn rời?** 5 prompt trên đang tự mâu thuẫn: Phong/Lôi/Thổ
+> **nướng vũ khí vào mesh** (`twin short curved blades`, `long straight thin blade`, `large stone mace`)
+> còn Hỏa/Thủy thì không. Nướng vào mesh đi ngược §3.1 ("đổi trang bị rẻ — gắn mesh vào xương lúc chạy")
+> và luồng `attach_weapon()` ở [ART-QUALITY-STANDARD §7.2](ART-QUALITY-STANDARD.md) (Q7 FAIL → vũ khí
+> gắn rời là vòng B miễn phí; vũ khí trong mesh là vòng A tốn credit). Cần **quyết định một đường** rồi
+> sửa cả 5 prompt cho nhất quán — quyết định này trùng với việc treo "gắn vũ khí" ở §12.1 và có thể
+> phải đốt credit Rodin để test lại prompt, nên để Opus làm trọn gói, đừng sửa lẻ.
 
 ---
 
@@ -521,6 +529,8 @@ pack. Hai nhánh vì thế vẫn dùng chung trang quản trị và chung câu l
 
 ### 8.7 Trang quản trị xem được những gì
 
+> Mục này mô tả nhánh **SPRITE** (VFX · icon · môi trường · UI). Ví dụ `char_ninja-fire` bên dưới là minh hoạ từ thời pre-render — sau [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) nhân vật là `MODEL`, không còn nằm trong atlas; cơ chế parse `.atlas` vẫn nguyên giá trị cho mọi asset SPRITE.
+
 **Không bị giới hạn ở ảnh tĩnh.** File `.atlas` của libGDX là **text thuần, đọc được**, không phải định dạng nhị phân đóng:
 
 ```
@@ -549,6 +559,13 @@ Nên trang quản trị **tự cắt được mọi vùng** bằng `canvas.drawI
 
 ⚠️ **Không copy toạ độ region vào DB.** File `.atlas` đã là nguồn sự thật và đọc được bằng máy; nhân bản vào DB chỉ tạo thêm chỗ để lệch. DB giữ *asset là gì*, `.atlas` giữ *nó nằm đâu trong ảnh*.
 
+> 🔴 **TODO-OPUS — trang quản trị cho nhánh `MODEL` chưa thiết kế.** Toàn bộ mục này chỉ trả lời cho
+> asset SPRITE (parse `.atlas`, cắt canvas, chạy animation 12 fps). Với nhân vật/quái/boss là model glTF
+> thì "xem được gì, bằng cách nào" còn bỏ trống: dùng `preview_url` tĩnh? render turntable lúc export?
+> viewer `<model-viewer>`/three.js? so 3 tier bằng gì khi khác nhau là `tri_counts` chứ không phải ảnh?
+> Việc này **chặn bởi V20** (§8.6 đang chờ chủ dự án duyệt) — viết mục 8.8 hoặc mở rộng mục này khi V20
+> được duyệt, cùng lúc với bước xuất glTF.
+
 ---
 
 ## 9. Technical Decisions
@@ -562,8 +579,8 @@ Nên trang quản trị **tự cắt được mọi vùng** bằng `canvas.drawI
 | 5 | Animation 12fps on-twos, số frame cố định theo asset | Phong cách anime + ngân sách atlas; không phải setting | **Còn hiệu lực — chỉ cho VFX 2D**; nhân vật chạy theo fps thật |
 | 5b | Nhân vật xuất **glTF 2.0**, client nạp bằng `gdx-gltf`; vẻ ngoài cel do shader runtime | Blender xuất glTF sẵn trong core, không qua công cụ ngoài đã bỏ hoang | **Chốt** — [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) |
 | 6 | Script chuẩn trong `tools/blender/`, MCP chỉ gọi hàm | Kỷ luật token §6.1 | Đề xuất |
-| 7 | DB lưu **metadata** asset (bảng `art_asset`), binary ở file/patch | §8 — trang quản trị cần registry, client không nối DB | Đề xuất (chủ dự án đã yêu cầu có DB, thiết kế bảng chờ duyệt) |
-| 8 | Danh mục = bảng `art_category` phân cấp 2 tầng, asset gắn tầng lá | Chủ dự án yêu cầu chia category rõ ràng; thêm loại không cần migration | Đề xuất |
+| 7 | DB lưu **metadata** asset (bảng `art_asset`), binary ở file/patch | §8 — trang quản trị cần registry, client không nối DB | ✅ **Thi hành 2026-08-01** (`V19`, §8.2, verify Postgres thật); riêng phần mở rộng nhánh 3D (§8.6) chờ duyệt |
+| 8 | Danh mục = bảng `art_category` phân cấp 2 tầng, asset gắn tầng lá | Chủ dự án yêu cầu chia category rõ ràng; thêm loại không cần migration | ✅ **Thi hành 2026-08-01** (`V19`, seed 6 tầng 1 + 19 tầng 2) |
 | 9 | **nginx đọc đĩa** phục vụ file tĩnh; không dùng object storage | §8.4 — nhanh hơn (`sendfile()` zero-copy), không thêm dependency, patcher vốn dùng URL HTTP nên không có lock-in để chống | **Chốt** 2026-08-01 (chủ dự án loại MinIO) |
 | 10 | VFX đặt tên `vfx_<skill_code>` khớp `SkillRegistry` | Asset map 1-1 với skill thật, không cần bảng tra | Đề xuất |
 | 11 | Mọi asset **bắt buộc** có dòng trong `art_asset` kèm đường dẫn; pipeline fail build nếu thiếu | §8.5 — chủ dự án yêu cầu quản toàn bộ kho đồ họa qua trang quản trị; ràng buộc bằng công cụ, không bằng trí nhớ | Đề xuất |

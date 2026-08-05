@@ -9,7 +9,7 @@
 | Benchmark | **Ninja School Online** (TeaMobi) — mức tối thiểu phải đạt |
 | Liên quan | [ART-PIPELINE.md](ART-PIPELINE.md) (pipeline) · [BLENDER-SESSION-GUIDE.md](BLENDER-SESSION-GUIDE.md) (thao tác) · [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) (2.5D) |
 
-> Phân vai 3 tài liệu art: ART-PIPELINE = *pipeline & định hướng* · BLENDER-SESSION-GUIDE = *thao tác từng bước* · **file này = thước đo "đẹp"**. Phiên làm art nạp cả 3 (và chỉ 3).
+> Phân vai 3 tài liệu art: ART-PIPELINE = *pipeline & định hướng* · BLENDER-SESSION-GUIDE = *thao tác từng bước* · **file này = thước đo "đẹp"**. Phiên làm art nạp cả 3 + [tools/blender/README.md](../../tools/blender/README.md) (contract script) — đúng 4 file, không đọc thêm.
 
 > ⚠️ **Cập nhật 2026-08-03.** Nguồn mesh nhân vật đã đổi từ **mesh kit thủ tục** sang **Text→3D
 > (Hyper3D Rodin)** — chủ dự án duyệt hướng art trên bản pilot Hỏa cùng ngày. Bảng nghiệm thu
