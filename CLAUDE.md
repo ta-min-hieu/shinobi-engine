@@ -8,17 +8,21 @@
 
 ## 0. Trạng thái dự án (đọc trước tiên)
 
-**Phase 0-4 đã xong Exit Criteria** (Foundation → Engine Core → Network → Character/Map/Movement →
-Combat/Skill/Monster, xem checklist thật ở [ROADMAP.md](docs/11-process/ROADMAP.md)). Đang mở
-**Phase 5 — Inventory · Equipment · Shop**. Không code sang Phase 6+ (quest, guild...) khi Phase 5
-chưa đạt Exit Criteria — cùng nguyên tắc áp dụng cho mọi phase trước đó.
+**Phase 0-9 đã xong Exit Criteria** (Foundation → Engine Core → Network → Character/Map/Movement →
+Combat/Skill/Monster → Inventory/Equip/Shop → Quest/NPC (**MVP**) → Guild/Party/Trade →
+Dungeon/Boss/PvP → Optimization; checklist thật ở [ROADMAP.md](docs/11-process/ROADMAP.md)).
+Đang ở **Phase 10 — Release** (Closed Beta → Open Beta → RC → Production). Luật phase vẫn nguyên:
+không mở phase sau khi phase trước chưa đạt Exit Criteria.
+
+Phase 9 đóng 2026-07-30 kèm **2 caveat còn mở, không chặn**: CPU không tuyến tính theo N nên **không
+ngoại suy quá N=2000** (đo lại thật nếu vượt), và off-heap (~500-650KB/kết nối) chưa soak dài.
 
 3 quyết định nền tảng chốt từ Phase 0 (không đổi trừ khi có ADR revisit):
 - Package root: **`dev.kage`** ([ADR-012](docs/01-architecture/adr/ADR-012-Package-Root.md))
 - **Single-realm** + cột `realm_id` dự phòng ([ADR-010](docs/01-architecture/adr/ADR-010-Realm-Model.md))
 - Tick rate: **60Hz** — `FIXED_DT = 1/60s` ([ADR-018](docs/01-architecture/adr/ADR-018-Tick-Rate.md))
 
-Quyết định mới nhất: **GraalJS** làm scripting engine ([ADR-016](docs/01-architecture/adr/ADR-016-Scripting-Engine.md), Accepted 2026-07-20) — sandbox hiện ở mức `CONSTRAINED`-equivalent, CHƯA phải `ISOLATED`/`UNTRUSTED` thật (artifact `js-isolate-community` lỗi đóng gói upstream — xem ADR-016 "Kiểm chứng thêm khi code" trước khi build thêm trên giả định sandbox đã full-strength). Toàn bộ ADR Accepted: [adr/README.md](docs/01-architecture/adr/README.md).
+Quyết định mới nhất: **[ADR-031](docs/01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)** (Accepted 2026-08-03) — nhân vật/quái/NPC render **3D thời gian thực** qua camera orthographic khoá góc (2.5D), VFX/icon/UI vẫn sprite 2D. Ngân sách tam giác đã đo (5k/10k/20k), **nhưng `gdx-gltf` chưa được thêm vào `libs.versions.toml`** — chặn bởi [ADR-032](docs/01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md) đang **Proposed**. Lưu ý còn hiệu lực: sandbox GraalJS ([ADR-016](docs/01-architecture/adr/ADR-016-Scripting-Engine.md)) mới ở mức `CONSTRAINED`-equivalent, CHƯA phải `ISOLATED`/`UNTRUSTED` thật. Toàn bộ ADR: [adr/README.md](docs/01-architecture/adr/README.md).
 
 ⚠️ **Trước khi ghi `libs.versions.toml`: verify phiên bản thư viện thật** (Java 25, libGDX, Netty...), không copy số từ docs ([TECHNOLOGY-STACK](docs/01-architecture/TECHNOLOGY-STACK.md)).
 
@@ -73,7 +77,7 @@ Trả lời trong đầu (hoặc ra màn hình nếu thay đổi lớn) trước
 🛑 Đổi **protocol** (packet, opcode, field protobuf).
 🛑 Đổi **database schema**.
 🛑 Đổi **kiến trúc** (thay ECS, thay DI, thay transport...).
-🛑 Đụng vào bất kỳ mục nào đang liệt kê ở **"Quyết định chưa chốt"** trong [docs/README.md](docs/README.md).
+🛑 Đụng vào bất kỳ mục nào đang liệt kê ở **"🔴 ĐANG CHỜ CHỦ DỰ ÁN"** trong [docs/README.md](docs/README.md).
 🛑 Khi phát hiện thiết kế hiện tại có vấn đề → **mô tả vấn đề + đề xuất + chi phí refactor**, KHÔNG tự sửa.
 
 ---

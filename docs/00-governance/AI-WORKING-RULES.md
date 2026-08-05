@@ -99,7 +99,7 @@ Nếu thay đổi **lớn** (đụng nhiều module, đổi API), phải trả l
 
 🛑 Yêu cầu mơ hồ, có ≥2 cách hiểu.
 🛑 Yêu cầu mâu thuẫn với tài liệu hiện có.
-🛑 Cần đụng vào mục "Quyết định chưa chốt" ở [docs/README.md](../README.md).
+🛑 Cần đụng vào mục "🔴 ĐANG CHỜ CHỦ DỰ ÁN" ở [docs/README.md](../README.md).
 🛑 Phát hiện thiết kế hiện tại có vấn đề (Điều 48).
 
 ### 6.2 Dừng và YÊU CẦU ADR

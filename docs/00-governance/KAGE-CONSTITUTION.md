@@ -256,7 +256,7 @@ Một công việc chỉ được bắt đầu khi:
 - [ ] Đã xác định module bị ảnh hưởng.
 - [ ] Đã xác định có/không thay đổi: API · Database · Packet.
 - [ ] Đã xác định có/không cần ADR — nếu cần, **ADR phải Accepted trước**.
-- [ ] Không phụ thuộc quyết định đang treo (xem mục "Quyết định chưa chốt" ở [docs/README.md](../README.md)).
+- [ ] Không phụ thuộc quyết định đang treo (xem mục "🔴 ĐANG CHỜ CHỦ DỰ ÁN" ở [docs/README.md](../README.md)).
 - [ ] Có Acceptance Criteria đo được.
 
 **Thiếu bất kỳ mục nào → chưa được bắt đầu.**

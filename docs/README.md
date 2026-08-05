@@ -15,7 +15,7 @@
 | **Người mới** vào dự án | Theo thứ tự nhóm 00→13 bên dưới |
 | **Muốn biết game là gì** | [GAME-DESIGN-DOCUMENT.md](13-game-design/GAME-DESIGN-DOCUMENT.md) |
 | **Muốn biết vì sao chọn X** | [ADR Index](01-architecture/adr/README.md) |
-| **Cần bắt đầu code** | [ROADMAP.md](11-process/ROADMAP.md) — nhưng xem "Quyết định đang treo" trước |
+| **Cần bắt đầu code** | [ROADMAP.md](11-process/ROADMAP.md) — nhưng xem "🔴 ĐANG CHỜ CHỦ DỰ ÁN" trước |
 
 ---
 
@@ -100,7 +100,25 @@
 
 ## ⚠️ Quyết định đang treo — chốt trước khi code
 
-Đây là danh sách tổng hợp toàn bộ thứ **chưa quyết** (chủ dự án quyết, không phải AI). Sắp theo mức chặn.
+Đây là danh sách tổng hợp toàn bộ thứ **chưa quyết** (chủ dự án quyết, không phải AI).
+
+## 🔴 ĐANG CHỜ CHỦ DỰ ÁN — cập nhật 2026-08-05
+
+| # | Việc | Đang chặn gì | Đọc ở đâu |
+|---|---|---|---|
+| 1 | **ADR-032 — phòng vệ JitPack**: đóng gói `gdx-gltf` (318 KB, Apache-2.0) vào `third-party/m2/`, bỏ hẳn `jitpack.io` | Thêm `gdx-gltf` vào `libs.versions.toml` → nối `WorldScreen` sang `ModelBatch` → đo frame time còn thiếu → viết lại `RENDERING.md` cho nhánh 3D | [ADR-032](01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md) |
+| 2 | **V20 — 3 cột 3D cho `art_asset`** (`asset_kind`/`model_name`/`tri_counts` + `CHECK`). Đổi DB schema nên AI không tự làm | Luật "không có asset mồ côi" sẽ vỡ với mọi model khi bước xuất glTF chạy thật; và thiết kế trang quản trị cho asset `MODEL` | [ART-PIPELINE §8.6](14-art/ART-PIPELINE.md) |
+| 3 | **Desktop-first hay mobile-first** (câu hỏi cũ, chưa trả lời) | ADR-023 (mobile input) chưa viết được; ngân sách tam giác hiện chỉ đo cho desktop — có Android thì phải đo lại trên máy tầm thấp | [CLIENT.md §5](04-client/CLIENT.md) |
+| 4 | Font **Be Vietnam Pro** (OFL 1.1) — chỉ còn xác nhận hình thức, license đã kiểm tại nguồn + test glyph PASS | Không chặn gì | [RESOURCE.md §7](04-client/RESOURCE.md) |
+| 5 | i18n: có tiếng Anh ở MVP không · Mô hình kinh doanh | Chưa chặn phase nào | [GDD](13-game-design/GAME-DESIGN-DOCUMENT.md) |
+
+> **Ngoài 5 dòng trên, không còn gì chờ duyệt.** ADR-032 là ADR **duy nhất** còn `Proposed` — mọi ADR
+> khác đã Accepted (kiểm bằng dòng `Status` của từng file, 2026-08-05). Nếu tài liệu nào còn viết
+> "chờ chủ dự án Accept" cho ADR khác thì đó là chữ cũ sót lại, không phải việc thật.
+
+---
+
+## ✅ Đã chốt — lịch sử
 
 ### ✅ Đã chốt (2026-07-18) — không còn chặn Phase 0
 
@@ -148,14 +166,6 @@ Toàn bộ 4 ADR chặn Phase 3 đã Accepted — **Phase 3 đủ điều kiện
 |---|---|
 | **ZGC cho server** — soak test 2h14 thật: pause max 0.052ms, không leak | ✅ [ADR-019](01-architecture/adr/ADR-019-GC-Choice.md) |
 
-### 🟡 Chặn Phase sau
-
-| # | Quyết định | ADR |
-|---|---|---|
-| 7 | **Desktop-first hay mobile-first** (ảnh hưởng input/UI/launcher) | ADR-023 |
-| 16 | i18n: có tiếng Anh ở MVP không | — |
-| 17 | Mô hình kinh doanh | — |
-
 ### ✅ Đã chốt (2026-07-31)
 
 | Quyết định | ADR |
@@ -175,6 +185,12 @@ Toàn bộ 4 ADR chặn Phase 3 đã Accepted — **Phase 3 đủ điều kiện
 | **Graphics tier delivery**: đóng gói 1 tier (MEDIUM), tier khác tải theo yêu cầu | ✅ [ADR-028](01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) |
 | **`tools:asset-pipeline`** + `gdx-tools` TexturePacker | ✅ [ADR-029](01-architecture/adr/ADR-029-Asset-Pipeline-Tool.md) |
 
+### ✅ Đã chốt (2026-08-03)
+
+| Quyết định | ADR |
+|---|---|
+| **Nhân vật/quái/NPC render 3D thời gian thực** qua camera ortho khoá góc (2.5D); VFX/icon/UI vẫn sprite 2D | ✅ [ADR-031](01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) |
+
 ---
 
 ## Trạng thái
@@ -182,6 +198,6 @@ Toàn bộ 4 ADR chặn Phase 3 đã Accepted — **Phase 3 đủ điều kiện
 Tất cả tài liệu ở `Status: Draft`. Chuyển `Approved` chỉ khi chủ dự án xác nhận — AI không tự xác nhận thay chủ dự án ([Điều 45](00-governance/KAGE-CONSTITUTION.md)).
 
 **Việc cần làm tiếp theo của cả bộ docs:**
-1. ✅ Phase 0–4 đã code xong + đạt Exit Criteria (checklist thật ở [ROADMAP.md](11-process/ROADMAP.md)) — không còn "chỉ có docs".
+1. ✅ Phase 0–9 đã code xong + đạt Exit Criteria (checklist thật ở [ROADMAP.md](11-process/ROADMAP.md)) — dự án đang ở **Phase 10 Release**.
 2. ✅ [ADR-011](01-architecture/adr/ADR-011-Enforce-Dependency-Rules.md) (ArchUnit) Accepted (2026-08-01).
-3. Chốt dần các quyết định "🟡 Chặn Phase sau" (§ trên) theo tiến độ — Phase 5 hiện không bị ADR nào chặn.
+3. Trả lời 5 dòng ở "🔴 ĐANG CHỜ CHỦ DỰ ÁN" (§ trên) — dòng 1 và 2 đang chặn việc thật, dòng 3 là câu hỏi chiến lược để lâu.
