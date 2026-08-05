@@ -54,7 +54,7 @@
 [DOCKER.md](07-infrastructure/DOCKER.md) · [CI-CD.md](07-infrastructure/CI-CD.md) · [OBSERVABILITY.md](07-infrastructure/OBSERVABILITY.md) · [KUBERNETES.md](07-infrastructure/KUBERNETES.md) 🚧
 
 ### 08 · Security
-[SECURITY.md](08-security/SECURITY.md) · [OWASP.md](08-security/OWASP.md) 🚧
+[SECURITY.md](08-security/SECURITY.md) · [OWASP.md](08-security/OWASP.md)
 
 ### 09 · Performance
 [PERFORMANCE.md](09-performance/PERFORMANCE.md) · [JVM.md](09-performance/JVM.md) · [BENCHMARK.md](09-performance/BENCHMARK.md)
@@ -111,6 +111,7 @@
 | 3 | **Desktop-first hay mobile-first** (câu hỏi cũ, chưa trả lời) | ADR-023 (mobile input) chưa viết được; ngân sách tam giác hiện chỉ đo cho desktop — có Android thì phải đo lại trên máy tầm thấp | [CLIENT.md §5](04-client/CLIENT.md) |
 | 4 | Font **Be Vietnam Pro** (OFL 1.1) — chỉ còn xác nhận hình thức, license đã kiểm tại nguồn + test glyph PASS | Không chặn gì | [RESOURCE.md §7](04-client/RESOURCE.md) |
 | 5 | i18n: có tiếng Anh ở MVP không · Mô hình kinh doanh | Chưa chặn phase nào | [GDD](13-game-design/GAME-DESIGN-DOCUMENT.md) |
+| 6 | **GM/admin tool**: in-game command hay web app? mấy cấp quyền? tách service hay nhúng? | Chưa chặn — Closed Beta người quen vận hành bằng SQL tay được. Trả lời thì mới viết được [ADMIN.md](12-devtools/ADMIN.md) | [ADMIN.md](12-devtools/ADMIN.md) |
 
 > **Ngoài 5 dòng trên, không còn gì chờ duyệt.** ADR-032 là ADR **duy nhất** còn `Proposed` — mọi ADR
 > khác đã Accepted (kiểm bằng dòng `Status` của từng file, 2026-08-05). Nếu tài liệu nào còn viết

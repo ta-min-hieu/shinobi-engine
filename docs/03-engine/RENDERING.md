@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version | 1.1.0 |
+| Version | 1.2.0 |
 | Status | Draft |
 | Liên quan | [ENGINE.md](ENGINE.md), [ADR-002](../01-architecture/adr/ADR-002-Why-libGDX.md), [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) |
 
@@ -25,8 +25,9 @@
 | Nguyên tắc | Nghĩa là |
 |---|---|
 | **Rendering không chứa gameplay logic** | RenderingSystem chỉ đọc Component, không sửa |
-| **Ít draw call nhất có thể** | Draw call là chi phí chính của 2D rendering |
+| **Ít draw call nhất có thể** | Draw call là chi phí chính của **nhánh 2D** |
 | **Ít texture switch nhất có thể** | Đổi texture = flush batch |
+| **Trong ngân sách tam giác** | Chi phí chính của **nhánh 3D** — 5k/10k/20k mỗi nhân vật theo tier ([ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md)), **nhân đôi** khi ước tính vì lượt vẽ viền (§9.2) |
 | **Không allocation mỗi frame** | Điều 31 |
 
 ---
@@ -60,20 +61,31 @@ VFX vẽ đè sau — gom theo nhánh, đừng gom theo entity.
 
 | Thành phần | Chọn | Vì sao |
 |---|---|---|
-| Camera | `OrthographicCamera` | Game 2D side-view |
-| Viewport | `FitViewport` | ✅ [ADR-020](../01-architecture/adr/ADR-020-Viewport-Strategy.md) *(Proposed 2026-08-01, khớp code `WorldScreen` đã dùng từ Phase 1)* |
+| Camera | `OrthographicCamera` | Trình bày side-view; **vẫn đúng sau [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)** — 2.5D là 3D thật nhìn qua camera ortho khoá góc |
+| Viewport | `FitViewport` | ✅ [ADR-020](../01-architecture/adr/ADR-020-Viewport-Strategy.md) **Accepted 2026-08-01**, khớp code `WorldScreen` đã dùng từ Phase 1 |
 
-**Vấn đề đã quyết định** (xem ADR-020 để biết vì sao): game phải chạy trên tỉ lệ màn hình rất khác nhau (16:9 desktop, 20:9 điện thoại, tablet 4:3).
+**Vì sao FitViewport** (chi tiết ở ADR-020): game chạy trên tỉ lệ màn hình rất khác nhau (16:9 desktop, 20:9 điện thoại, tablet 4:3).
 
 | Viewport | Ưu | Nhược |
 |---|---|---|
-| `FitViewport` | Mọi người thấy **đúng cùng vùng chơi** → công bằng PvP | Có viền đen |
+| **`FitViewport`** ✅ | Mọi người thấy **đúng cùng vùng chơi** → công bằng PvP | Có viền đen |
 | `ExtendViewport` | Không viền đen, dùng hết màn hình | **Màn hình rộng thấy nhiều hơn** → lợi thế PvP không công bằng |
 | `ScreenViewport` | Sắc nét 1:1 | Màn hình lớn thấy nhiều hơn hẳn |
 
-⚠️ **Đây là quyết định gameplay, không phải kỹ thuật.** Ảnh hưởng cân bằng PvP. Cần chốt cùng [GDD](../13-game-design/GAME-DESIGN-DOCUMENT.md).
+Đây là **quyết định gameplay** (ảnh hưởng cân bằng PvP) nên viền đen được chấp nhận có chủ đích — công
+bằng thắng tận dụng hết màn hình. ADR-020 đã chốt, **không mở lại** nếu không có ADR revisit.
 
-**Đề xuất**: `ExtendViewport` với **giới hạn max** — mở rộng có kiểm soát, không cho màn hình siêu rộng thấy quá nhiều.
+### 3.1 Góc camera là hằng số runtime (ADR-031)
+
+Trước ADR-031, góc nhìn bị **nướng vào tài sản** (sprite chỉ render 1 hướng, trái = lật ảnh). Giờ model
+là 3D thật nên góc nhìn chỉ là tham số của camera:
+
+- Đổi góc = đổi **một hằng số**, không phải render lại 33 khung × 15 nhân vật.
+- Nhân vật **xoay tự do**; hết trò lật ngang ảnh.
+- Câu hỏi "nghiêng thuần 90° hay 3/4 35°" từng treo ở phiên art **tự tan** — nó không còn là thuộc
+  tính của tài sản.
+- ⚠️ Model vẫn phải quay mặt **+X** trong không gian gốc, nhưng vì rig/bảng pose giả định trục đó,
+  **không** vì đó là hướng nhìn trên màn ([ART-PIPELINE §4.3](../14-art/ART-PIPELINE.md)).
 
 **Camera follow**: có deadzone + lerp làm mượt, **không** bám cứng nhân vật (gây chóng mặt).
 
@@ -91,6 +103,24 @@ Sprite 32px  = 1 world unit  →  PIXELS_PER_UNIT = 32
 **Vì sao**: dùng pixel → đổi độ phân giải asset là đổi toàn bộ số liệu gameplay (tốc độ, tầm đánh). Dùng world unit → asset đổi, gameplay không đổi.
 
 Va chạm địa hình (`TerrainCollisionSystem`) cũng dùng chung world unit này cho `Aabb` — xem [PHYSICS.md §5](PHYSICS.md).
+
+**Model 3D quy về chiều cao 1.0, không phải pixel.** `kage_text3d_kit.normalise()` ép **mọi** nhân vật
+cao đúng `1.0` đơn vị Blender, chân ở `z=0` ([ART-PIPELINE §4.1](../14-art/ART-PIPELINE.md)) — nên
+chúng nhất quán với nhau theo thiết kế, không phụ thuộc mesh gốc to nhỏ ra sao.
+
+Nối hai hệ với nhau là **đúng một hệ số nhân, đặt một lần**:
+
+```
+chiều cao thế giới của nhân vật (world unit) = 1.0 (model) × CHARACTER_WORLD_HEIGHT
+```
+
+⚠️ **Hệ số đó phải dùng chung với hộp va chạm.** Nếu render scale một đằng, `Aabb` ở
+[PHYSICS.md §5](PHYSICS.md) một nẻo, nhân vật sẽ đứng lún hoặc lơ lửng so với địa hình — và lỗi kiểu
+này chỉ lộ ra khi có bản đồ thật. Đặt hằng số ở một chỗ, hai bên cùng đọc. **Giá trị cụ thể chưa chốt**:
+nó phụ thuộc kích thước tile bản đồ thật, mà chưa có bản đồ nào.
+
+Điều **không** đổi: gốc toạ độ model = **chân, giữa** — cùng quy ước pivot với sprite, nên baseline
+chung cho cả hai nhánh vẫn đúng.
 
 ---
 
@@ -190,9 +220,9 @@ glTF, không tốn thêm dependency thương mại nào.
 
 ## 9. Shader
 
-**MVP: dùng shader mặc định của SpriteBatch.**
+### 9.1 Nhánh 2D — shader mặc định là đủ
 
-Chỉ viết GLSL khi có nhu cầu gameplay thật:
+**Dùng shader mặc định của `SpriteBatch`.** Chỉ viết GLSL khi có nhu cầu gameplay thật:
 
 | Nhu cầu | Shader |
 |---|---|
@@ -201,17 +231,63 @@ Chỉ viết GLSL khi có nhu cầu gameplay thật:
 | Outline khi hover | Outline shader |
 | Lighting động | Xem §10 |
 
+### 9.2 Nhánh 3D — cel shader là **bắt buộc**, không phải tuỳ chọn
+
+Sau [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) đây không còn là "viết khi
+cần": model xuất ra **cố tình không mang** vẻ ngoài cel. `export_character_lods.py` bỏ vật liệu toon,
+far-shade và viền, chỉ giữ **base-color texture** ([ART-PIPELINE §6.4](../14-art/ART-PIPELINE.md) bước 9).
+Không có shader thì nhân vật hiện ra như model PBR bán-tả-thực, lệch hẳn khỏi VFX 2D vẽ đè lên nó.
+
+Hợp đồng vẻ ngoài là **chung cho cả hai nhánh** ([ART-QUALITY-STANDARD §4](../14-art/ART-QUALITY-STANDARD.md)) —
+VFX sprite và nhân vật 3D nằm cùng một khung hình nên phải cùng một ngôn ngữ hình ảnh.
+
+**Hai lượt vẽ, cả hai đã chứng minh được ở Blender nên không phải phát minh lại:**
+
+| Lượt | Làm gì | Bản Blender tương ứng |
+|---|---|---|
+| 1 — **viền** | Nhân bản mesh, đẩy đỉnh dọc pháp tuyến một khoảng, **lật normal + cull mặt trước**, tô đen phẳng | `add_inverted_hull_outline()` |
+| 2 — **thân** | `baseColor` texture **×** giá trị `N·L` đã **lượng tử hoá** thành 2–3 nấc (bậc thang, không nội suy) | `toon_textured()` |
+
+⚠️ **Bảng nấc ramp không dùng chung được giữa hai loại mesh.** Mesh có texture vẽ sẵn bóng dùng nấc
+đáy **0.80** (`TEXTURED_SHADE_STEPS`); dùng nhầm bảng của mesh phẳng màu (đáy 0.55) là **tối hai lần**
+và nhân vật xỉn hẳn. Đây là lỗi đã gặp thật ở khâu art.
+
+⚠️ **Không port `add_far_shade()`.** Nó làm tối chi ở phía xa để giả chiều sâu cho **một góc nhìn cố
+định** — vô nghĩa (và sai) khi nhân vật xoay được. Ánh sáng thật của lượt 2 đã lo phần đó.
+
+**Vì sao viền phải là hình học, không phải hậu kỳ**: viền hậu kỳ theo cạnh (Sobel trên depth/normal)
+sẽ vẽ viền cho **cả cảnh**; ta chỉ muốn viền quanh nhân vật. Vỏ lật normal chỉ tốn thêm 1 lượt vẽ trên
+đúng mesh đó, và đó cũng là lý do **ngân sách tam giác ở [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md)
+phải nhân đôi khi ước tính chi phí vẽ** (10k tam giác = 20k thực vẽ).
+
+⚠️ **Freestyle không tồn tại lúc runtime** — đó là bộ lọc render của Blender. May là khâu art đã bỏ
+Freestyle sang inverted hull vì lý do khác (nó vẽ viền cho **từng lọn tóc** trên mesh Text→3D), nên
+thứ đang dùng ở Blender vốn đã là thứ chuyển thẳng sang GLSL được.
+
+**Chưa verify được** cho tới khi có `gdx-gltf` ([ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md)
+đang chờ duyệt): độ dày viền quy đổi thế nào sang world unit khi camera zoom, và `ModelBatch` có cho
+chèn lượt vẽ thứ hai gọn không hay phải tự quản `ShaderProgram`.
+
 ⚠️ **Shader phải viết cho cả OpenGL ES** (Android) — cú pháp GLSL khác desktop. Test trên Android sớm, không để tới cuối.
 
 ---
 
 ## 10. Lighting
 
-**MVP: KHÔNG có lighting động.**
+**MVP: KHÔNG có lighting động.** [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)
+**không** đổi điều này — 2.5D không kéo theo lighting engine.
 
-Lý do: game 2D side-view kiểu Ninja School không cần. Thêm lighting = thêm render pass + shader phức tạp + chi phí mobile. Điều 9 (Simplicity) + Điều 10 (gameplay nào cần?).
+Lý do: game side-view kiểu Ninja School không cần. Thêm lighting = thêm render pass + shader phức tạp + chi phí mobile. Điều 9 (Simplicity) + Điều 10 (gameplay nào cần?).
 
-Nếu sau này cần (VD: bản đồ hang động tối): dùng **Box2DLights** (tích hợp sẵn libGDX) — đánh giá lại ở Phase 8 (dungeon), cần đo chi phí mobile.
+⚠️ **Đừng nhầm "không lighting động" với "không tính ánh sáng".** Cel shader ở §9.2 **có** tính `N·L`
+rồi lượng tử hoá — nhưng từ **một hướng sáng cố định là hằng số**, không phải nguồn sáng đặt được
+trong cảnh, không đổ bóng, không có render pass riêng. Chi phí bằng một phép nhân trong pixel shader.
+Đó là lý do bảng tier ở [ART-PIPELINE §5](../14-art/ART-PIPELINE.md) không có dòng shadow map / GI /
+SSR nào: **không có gì để bật thêm**.
+
+Nếu sau này cần lighting động thật (VD: bản đồ hang động tối): với nhánh 3D thì đã có sẵn pháp tuyến
+để làm, nhưng vẫn phải đo chi phí mobile và phải có ADR — **Box2DLights không dùng được cho model 3D**
+(nó là hệ thống 2D), nên phương án cũ ghi ở đây không còn áp dụng cho nhân vật.
 
 ---
 
@@ -259,6 +335,13 @@ Với map lớn nhiều entity: cân nhắc **spatial partition** (grid đơn gi
 
 **RenderingSystem là System cuối cùng trong tick, và chỉ đọc.**
 
+⚠️ **`ModelBatch` và `AnimationController` có nhiều bẫy cấp phát mỗi khung hơn `SpriteBatch`**
+([ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) Consequences) — `Renderable`,
+ma trận biến đổi và mảng xương rất dễ sinh rác mỗi khung nếu dùng ngây thơ. Luật "không `new` mỗi
+frame" (CLAUDE.md §6) **không** được nới ra cho nhánh 3D. Phải soi bằng benchmark thật khi nối
+`WorldScreen`, không suy đoán — đây là một trong những thứ chỉ đo được sau khi
+[ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md) được duyệt.
+
 ---
 
 ## Technical Decisions
@@ -274,6 +357,11 @@ Với map lớn nhiều entity: cân nhắc **spatial partition** (grid đơn gi
 | 7 | Particle **bắt buộc pool** + giới hạn số lượng | Mobile | Accepted |
 | 8 | Không spatial partition ở MVP cho tới khi đo thấy cần | Điều 30 | Accepted |
 | 9 | **`FitViewport`** — ảnh hưởng công bằng PvP | Là quyết định gameplay | ✅ [ADR-020](../01-architecture/adr/ADR-020-Viewport-Strategy.md) Accepted (2026-08-01) |
+| 10 | **Cel shader + viền inverted hull là BẮT BUỘC cho nhánh 3D**, không phải "viết khi cần" (§9.2) | Model xuất ra cố tình không mang vẻ ngoài cel — không có shader thì nhân vật hiện ra bán-tả-thực, lệch khỏi VFX 2D vẽ đè cùng khung | **Chốt** theo [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md); GLSL **chưa viết** |
+| 11 | Viền làm bằng **hình học** (vỏ lật normal), không phải hậu kỳ theo cạnh | Hậu kỳ vẽ viền cho cả cảnh; ta chỉ muốn viền quanh nhân vật. Đổi lại: chi phí vẽ **gấp đôi** số tam giác | **Chốt** — đã chứng minh ở khâu art |
+| 12 | **Không port `add_far_shade()`** sang runtime | Nó giả chiều sâu cho một góc nhìn cố định — sai khi nhân vật xoay được | **Chốt** |
+| 13 | Góc camera là **hằng số runtime**, không nướng vào tài sản (§3.1) | Đổi góc = đổi 1 hằng số thay vì render lại toàn bộ | **Chốt** — [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) |
+| 14 | Hệ số quy đổi chiều cao model (1.0) → world unit đặt **một chỗ**, dùng chung với `Aabb` va chạm | Lệch nhau = nhân vật lún đất hoặc lơ lửng, chỉ lộ khi có bản đồ thật | ⏳ Giá trị **chưa chốt** — chờ có tile bản đồ thật |
 
 ## ADR cần tạo
 
@@ -296,8 +384,12 @@ viết, VFX/icon/UI vẫn 2D — §"Việc cần làm tiếp theo" mục 4 là c
 1. ✅ **ADR-020 (Viewport) Accepted 2026-08-01** — hết treo.
 2. Phase 1: xác lập §4 (world unit) ngay từ đầu — đổi sau = đổi mọi số liệu gameplay.
 3. Test shader (§9) trên Android **sớm**, không để tới Phase 8 mới phát hiện GLSL không tương thích.
-4. 🔴 **Viết lại tài liệu này cho nhánh 3D** ([ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)
-   "Việc cần làm" #4): `ModelBatch` vs `SpriteBatch` không trộn được (mỗi lần đổi qua lại là một flush),
-   cel + viền inverted hull phải viết thành GLSL vì Freestyle không tồn tại lúc runtime, và cảnh báo
-   cấp phát mỗi khung của `AnimationController` (CLAUDE.md §6). **Chặn bởi** [ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md)
-   — chưa có `gdx-gltf` thì chưa viết được gì cụ thể hơn giả định.
+4. ✅ **Xong 2026-08-05** — tài liệu này đã phủ nhánh 3D ([ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)
+   "Việc cần làm" #4): §3.1 góc camera hằng số · §4 quy đổi chiều cao model · §8.1 skeletal ·
+   **§9.2 hợp đồng cel shader 2 lượt vẽ** · §10 phân biệt "không lighting động" với "không tính ánh
+   sáng" · §13 bẫy cấp phát của `ModelBatch`.
+5. 🔴 **Viết GLSL thật + đo** — cái còn thiếu giờ là **code**, không phải tài liệu. Ba thứ chỉ biết
+   được khi chạy: độ dày viền quy đổi sang world unit lúc camera zoom, `ModelBatch` có cho chèn lượt
+   vẽ thứ hai gọn không, và `AnimationController` cấp phát bao nhiêu mỗi khung. **Chặn bởi**
+   [ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md) — chưa có `gdx-gltf` thì
+   chưa chạy được gì.

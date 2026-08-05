@@ -323,7 +323,7 @@ Không còn — ADR-017, ADR-025 đã Accepted 2026-07-19. Xem [adr/README.md](.
 
 ## Tài liệu liên quan
 
-- [OWASP.md](OWASP.md) — ⏳ stub: dependency scan, SAST/DAST
+- [OWASP.md](OWASP.md) — ✅ dependency scan, secret scan, SAST, test thay DAST — đều đang chạy thật
 - [NETWORK.md](../05-server/NETWORK.md) — §5, §6, §7
 - [DATABASE.md](../05-server/DATABASE.md) — audit log, transaction
 - [SCRIPTING.md](../06-plugin/SCRIPTING.md) — §10

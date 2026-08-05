@@ -3,14 +3,26 @@
 | | |
 |---|---|
 | Status | 🚧 **STUB — CÓ CHỦ ĐÍCH** |
-| Blocked by | Cần server chạy có người chơi để quản trị |
-| Sẽ viết khi | [Phase 8–9](../11-process/ROADMAP.md) — khi vận hành playtest nội bộ quy mô thật |
+| Blocked by | **3 câu hỏi thiết kế chưa có lời đáp** (xem "Câu hỏi trước khi viết" bên dưới) — chủ dự án quyết, không phải AI |
+| Sẽ viết khi | Có câu trả lời cho 3 câu hỏi đó |
 
 ---
 
 ## Vì sao chưa viết
 
-Admin tool (GM command, dashboard, quản lý người chơi) chỉ cần khi **có người chơi để quản lý**. Trước Phase 3 không có gì để admin.
+> ⚠️ **Lý do chặn đã đổi (cập nhật 2026-08-05).** File này từng ghi "chờ tới Phase 8–9, cần server có
+> người chơi thật". Điều kiện đó **đã qua từ lâu** — Phase 8 và 9 đóng xong, dự án đang ở
+> [Phase 10 Release](../11-process/ROADMAP.md). Thứ thật sự còn chặn là **3 câu hỏi thiết kế ở cuối
+> file**, không phải tiến độ. Chúng là quyết định của chủ dự án ([/CLAUDE.md §4](../../CLAUDE.md)),
+> nên viết bừa một thiết kế lúc này là bịa ([AI-WORKING-RULES §13–14](../00-governance/AI-WORKING-RULES.md)).
+
+Admin tool (GM command, dashboard, quản lý người chơi) chỉ cần khi **có người chơi để quản lý** — điều kiện đó nay đã thoả.
+
+⚠️ **Một phần trang quản trị ĐÃ được thiết kế đầy đủ ở nơi khác**: mục quản lý kho đồ hoạ (duyệt asset
+theo cây danh mục, xem sprite/model, so tier, kiểm license) nằm ở
+[ART-PIPELINE §8.3 · §8.7 · §8.8](../14-art/ART-PIPELINE.md) và dựa trên bảng `art_asset` đã thi hành
+thật (`V19`). Khi viết file này, **trỏ sang đó chứ đừng chép lại** — hai bản mô tả cùng một màn hình
+sẽ lệch nhau ngay lần sửa đầu tiên.
 
 ---
 
@@ -50,11 +62,19 @@ Thứ để **sau**: dashboard đẹp, analytics, quản lý hàng loạt.
 5. Phân quyền GM (role-based)
 6. Bảo mật GM tool
 
-## Câu hỏi trước khi viết
+## Câu hỏi trước khi viết — 🔴 **đây mới là thứ đang chặn**
 
-- [ ] GM tool là in-game command, web app, hay cả hai?
-- [ ] Cần bao nhiêu cấp quyền GM?
-- [ ] Tách service riêng hay nhúng vào server?
+- [ ] **GM tool là in-game command, web app, hay cả hai?** Ảnh hưởng lớn nhất: web app kéo theo một
+      tầng HTTP + xác thực riêng ([ADR-009](../01-architecture/adr/ADR-009-Why-No-Spring-Boot.md) cấm
+      Spring MVC nên phải tự dựng trên Netty sẵn có), còn in-game command thì gần như miễn phí nhưng
+      không hiển thị được kho đồ hoạ (§ART-PIPELINE 8.7 giả định một trang web).
+- [ ] **Cần bao nhiêu cấp quyền GM?** 1 cấp (chỉ chủ dự án) là đủ cho Closed Beta người quen; nhiều
+      cấp chỉ cần khi có người ngoài hỗ trợ vận hành.
+- [ ] **Tách service riêng hay nhúng vào server?** Nhúng thì đơn giản nhưng làm bề mặt tấn công của
+      server game rộng ra; tách thì phải giải bài toán truy cập DB và triển khai riêng.
+
+> Ba câu này nằm ở mục "🔴 ĐANG CHỜ CHỦ DỰ ÁN" trong [docs/README.md](../README.md) khi được ưu tiên.
+> Hiện chúng **không chặn Phase 10** — Closed Beta người quen vận hành được bằng truy vấn SQL tay.
 
 ## Tài liệu liên quan
 

@@ -4,24 +4,25 @@
 
 | | |
 |---|---|
-| Status | 🚧 **STUB một phần** — §1–§2 làm được ngay, §3–§4 chờ có code |
-| Blocked by | Phần lớn nội dung cần **có code để quét** — dự án hiện chưa có dòng nào |
-| Sẽ hoàn thiện ở | [Phase 0](../11-process/ROADMAP.md) (dependency scan + secret scan) → Phase 3 (SAST) → Phase 4+ (fuzzing/authz test thay DAST) |
+| Status | ✅ **Đầy đủ** — §1–§4 đều đã triển khai và verify thật (cập nhật 2026-08-05) |
+| Lịch sử | Viết dưới dạng stub một phần khi dự án chưa có code; §1–§2 làm 2026-07-31/08-02, §3 wired 2026-07-30, §4 implement 2026-08-02 |
 
 > Tài liệu này về **công cụ quét tự động**. Nguyên tắc bảo mật thiết kế nằm ở [SECURITY.md](SECURITY.md).
 
 ---
 
-## Vì sao một phần là stub
+## Trạng thái từng mục
 
-| Mục | Làm được ngay? | Vì sao |
+| Mục | Trạng thái | Ở đâu |
 |---|---|---|
-| §1 Dependency Check | ✅ **Có** — chạy được từ Phase 0 | Quét `libs.versions.toml`, không cần code |
-| §2 Secret Scan | ✅ **Có** — bật ngay | Quét repo, không cần code |
-| §3 SAST | ⏳ Cần có code | Quét source — chưa có source |
-| §4 DAST | ⏳ Cần server chạy được | Quét app đang chạy — chưa có app |
+| §1 Dependency Check | ✅ Dependency graph + Dependabot alerts bật 2026-07-31 | GitHub Settings → Security |
+| §2 Secret Scan | ✅ gitleaks: pre-commit hook + CI job `secret-scan` (2026-08-02) | `.githooks/pre-commit`, `.github/workflows/ci.yml` |
+| §3 SAST | ✅ SpotBugs+find-sec-bugs / Error Prone / PMD / Checkstyle (2026-07-30) | `build-logic/.../kage.quality-conventions.gradle.kts` |
+| §4 DAST → test tự viết | ✅ 4/5 mục implement 2026-08-02, mục 5 không áp dụng | `SecurityIntegrationTest`, `ScriptSandboxSecurityTest` |
 
-Viết chi tiết §3–§4 bây giờ = bịa cấu hình cho code không tồn tại ([AI-WORKING-RULES.md §13–14](../00-governance/AI-WORKING-RULES.md)).
+> Tài liệu này từng là stub một phần vì §3–§4 cần code để quét mà lúc đó chưa có dòng nào. Điều kiện
+> đó đã hết từ lâu (Phase 0–9 xong) — nội dung dưới đây mô tả **cấu hình đang chạy thật**, không phải
+> dự định.
 
 ---
 
@@ -66,28 +67,54 @@ Quy tắc gate:
 
 ---
 
-## 3. SAST ⏳ (Phase 3+)
+## 3. SAST ✅ (đang chạy từ 2026-07-30)
 
-Static Application Security Testing — quét source tìm lỗ hổng.
+Static Application Security Testing — quét source tìm lỗ hổng. **Không còn là stub**: toàn bộ chuỗi
+đã wired trong `build-logic/src/main/kotlin/kage.quality-conventions.gradle.kts` và chạy mỗi lần
+`./gradlew build`. Chi tiết cấu hình chung: [STATIC-ANALYSIS.md](../10-quality/STATIC-ANALYSIS.md).
 
-**Đã có sẵn một phần** qua [STATIC-ANALYSIS.md](../10-quality/STATIC-ANALYSIS.md):
+### 3.1 Cấu hình thật
 
-| Công cụ hiện có | Bắt được |
+| Công cụ | Phiên bản | Cấu hình | Bắt được |
+|---|---|---|---|
+| **SpotBugs** + **`find-sec-bugs`** | `findsecbugs-plugin:1.14.0` | `effort = MAX`, `reportLevel = MEDIUM`, exclude ở `config/spotbugs/exclude.xml` | SQL injection, crypto yếu, path traversal, deserialization |
+| **Error Prone** | `error_prone_core:2.50.0` | severity mặc định của tool | Bug lúc compile, vài lớp lỗi bảo mật |
+| **PMD** | 7.26.0 | `config/pmd/ruleset.xml` | Pattern nguy hiểm |
+| **Checkstyle** | `config/checkstyle/checkstyle.xml` (test dùng `checkstyle-test.xml`, khác đúng 1 rule) | | Chuẩn code |
+
+⚠️ **`find-sec-bugs` là BẮT BUỘC, không phải tuỳ chọn.** [ADR-004](../01-architecture/adr/ADR-004-Why-PostgreSQL.md)
+chọn không dùng ORM ⇒ SQL do người viết tay ⇒ **không có framework nào che SQL injection**
+([SECURITY.md §11](SECURITY.md)). Đây là công cụ duy nhất trong chuỗi bắt được lớp lỗi đó.
+
+### 3.2 Quy tắc gate
+
+Build **fail** khi có finding — không có mức "cảnh báo rồi bỏ qua" cho SAST. Lý do ghi ở
+[STATIC-ANALYSIS.md §11](../10-quality/STATIC-ANALYSIS.md): gate mà không chặn thì sau vài tuần thành
+5000 warning không ai đọc, tệ hơn là không có gate.
+
+### 3.3 Suppression policy
+
+Chỉ qua `config/spotbugs/exclude.xml`, **mỗi mục phải kèm lý do bằng comment**. Không dùng
+`@SuppressFBWarnings` rải rác trong code — suppression tập trung một chỗ thì review được, rải rác thì không.
+
+### 3.4 Bài học thật khi wired (2026-07-30 → 2026-08-02)
+
+- **Error Prone không có check tên `AutoBoxing`.** STATIC-ANALYSIS.md từng ghi tên đó; build thật báo
+  `AutoBoxing is not a valid checker name`. Không tồn tại check chung bắt **mọi** autoboxing — chỉ có
+  vài check hẹp (`BoxedPrimitiveEquality`, `LockOnBoxedPrimitive`, `IdentityHashMapBoxing`...) và
+  chúng đã bật sẵn. Boxing trong hot path ([Điều 31](../00-governance/KAGE-CONSTITUTION.md)) vẫn phải
+  dựa vào review + JMH, **không công cụ tĩnh nào bắt hết**.
+- **Spotless phải khai ở root project** dù root không có code, và phải `targetExclude` thư mục
+  `build/generated/sources/proto/**` — nếu không nó format cả code protoc tự sinh.
+- **PMD 7.10.0 không hiểu JDK 25**, phải nâng lên 7.26.0 (`8087b61`, 2026-08-02). Trước đó CI phải
+  chạy `-x pmdMain -x pmdTest`; workaround đó nay đã gỡ hẳn.
+
+### 3.5 Đã cân nhắc và loại
+
+| Công cụ | Vì sao không dùng |
 |---|---|
-| **SpotBugs** + `find-sec-bugs` plugin | SQL injection, crypto yếu, path traversal |
-| **Error Prone** | Một số lỗi bảo mật |
-| **PMD** | Một số pattern nguy hiểm |
-
-**Cần bổ sung khi có code:**
-- `find-sec-bugs` plugin cho SpotBugs — **ưu tiên cao**, rẻ, bắt SQL injection (quan trọng vì [ADR-004](../01-architecture/adr/ADR-004-Why-PostgreSQL.md) không dùng ORM → ta tự viết SQL).
-- CodeQL (GitHub) — miễn phí cho repo công khai.
-- SonarQube — nếu có hạ tầng host.
-
-### TOC khi viết đầy đủ
-1. Cấu hình `find-sec-bugs`
-2. Quy tắc gate (finding nào chặn PR)
-3. Suppression policy
-4. False positive đã biết
+| **CodeQL** | Miễn phí cho repo **công khai**; repo này private trên gói free — cùng lý do khiến GitHub Secret Scanning không khả dụng (§2) |
+| **SonarQube** | Cần hạ tầng tự host; chuỗi hiện tại đã phủ các lớp lỗi chính, thêm SonarQube là thêm một server phải nuôi |
 
 ---
 
@@ -156,11 +183,19 @@ Trung thực: OWASP Top 10 viết cho **web app**. Không phải mục nào cũn
 
 | Phase | Việc |
 |---|---|
-| **0** | ✅ Secret scan (§2) — **trước commit đầu tiên** · ✅ Dependabot (§1) |
-| 0 | ✅ `find-sec-bugs` vào SpotBugs config |
+| **0** | ✅ Secret scan (§2) · ✅ Dependabot (§1). **Trung thực**: §2 bật 2026-08-02, tức **sau** vài trăm commit chứ không phải trước commit đầu — muộn vẫn hơn không |
+| 0 | ✅ `find-sec-bugs` vào SpotBugs config (2026-07-30) |
 | 3 | ✅ **implemented 2026-08-02** — Bộ test authorization/replay/rate-limit (§4) — `SecurityIntegrationTest` |
 | 4 | ✅ **implemented 2026-08-02** — Fuzzing packet (§4) — `SecurityIntegrationTest#shouldNotCrashOrHang_whenReceivingMalformedOrRandomFrames` |
-| 4+ | ⏳ CodeQL / SonarQube nếu cần |
+| 4+ | ❌ CodeQL / SonarQube — **đã loại**, lý do ở §3.5 |
+
+**Còn mở** (không phải stub, là việc thật chưa làm):
+
+| Việc | Vì sao còn mở |
+|---|---|
+| Test runtime xác nhận Redis `requirepass` chặn kết nối không auth | §5 dòng A05 — cấu hình đã có và verify bằng mắt, chưa có test tự động |
+| `sequenceId` **không** phải cơ chế chống replay dù [SECURITY.md §6](SECURITY.md) từng mô tả vậy | Đã sửa mô tả trong SECURITY.md (2026-08-02); Command có side-effect được `idempotencyKey` bảo vệ riêng nên **không phải lỗ hổng khai thác được** |
+| Chưa có xác thực mật khẩu | `ConnectRequest` chỉ có username — cắt giảm MVP có chủ đích. **Chỉ chấp nhận được cho Closed Beta người quen**; mở cho người lạ thì phải làm trước |
 
 ---
 
@@ -175,7 +210,9 @@ Trung thực: OWASP Top 10 viết cho **web app**. Không phải mục nào cũn
 | 5 | **DAST tiêu chuẩn (ZAP/Burp) không dùng** — game protocol nhị phân | Accepted — trung thực |
 | 6 | Thay DAST bằng **test tự viết**: fuzzing, authz, replay, sandbox escape | Accepted |
 | 7 | OWASP Top 10 **không áp dụng toàn bộ** — chỉ mục liên quan (§5) | Accepted |
-| 8 | SAST/DAST chi tiết chờ có code | ⏳ Stub |
+| 8 | ~~SAST/DAST chi tiết chờ có code~~ | ✅ Hết treo — §3 wired 2026-07-30, §4 implement 2026-08-02 |
+| 9 | **CodeQL và SonarQube đều loại** (§3.5) | Accepted — CodeQL chỉ free cho repo public, SonarQube cần server tự nuôi |
+| 10 | SAST gate **fail build**, không có mức "cảnh báo rồi bỏ qua" | Accepted — gate không chặn thì thành 5000 warning không ai đọc |
 
 ## ADR cần tạo
 

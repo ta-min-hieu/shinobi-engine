@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version | 0.4.0 |
+| Version | 0.5.0 |
 | Status | Draft |
 | Liên quan | [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) (2.5D — **đổi kiến trúc tài liệu này**) · [RESOURCE.md](../04-client/RESOURCE.md) · [RENDERING.md](../03-engine/RENDERING.md) · [GAME-DESIGN-DOCUMENT.md](../13-game-design/GAME-DESIGN-DOCUMENT.md) |
 
@@ -532,7 +532,7 @@ Suy ra thay vì lưu cứng để đổi tier hoặc đổi origin không phải
 
 **Thi hành — không dựa vào trí nhớ con người**: bước cuối của `tools/asset-pipeline` **upsert** mọi asset vào `art_asset`, và **fail build nếu có file trong `assets/exported/` không truy ra được dòng DB tương ứng**. `ASSET-LOG.md` chỉ là sổ tay token-rẻ cho phiên AI; **DB là nguồn chuẩn** cho trang quản trị.
 
-Bảng cột trên viết cho **nhánh 2D**. Nhánh 3D (nhân vật · quái · NPC sau [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)) giao model glTF chứ không giao atlas — xem §8.6.
+Bảng cột trên viết cho **nhánh 2D**. Nhánh 3D (nhân vật · quái · NPC sau [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)) giao model glTF chứ không giao atlas — xem §8.6 (schema) và §8.8 (trang quản trị).
 
 ### 8.6 Nhánh 3D trong `art_asset` — **thiết kế đề xuất, chờ chủ dự án duyệt**
 
@@ -623,12 +623,39 @@ Nên trang quản trị **tự cắt được mọi vùng** bằng `canvas.drawI
 
 ⚠️ **Không copy toạ độ region vào DB.** File `.atlas` đã là nguồn sự thật và đọc được bằng máy; nhân bản vào DB chỉ tạo thêm chỗ để lệch. DB giữ *asset là gì*, `.atlas` giữ *nó nằm đâu trong ảnh*.
 
-> 🔴 **TODO-OPUS — trang quản trị cho nhánh `MODEL` chưa thiết kế.** Toàn bộ mục này chỉ trả lời cho
-> asset SPRITE (parse `.atlas`, cắt canvas, chạy animation 12 fps). Với nhân vật/quái/boss là model glTF
-> thì "xem được gì, bằng cách nào" còn bỏ trống: dùng `preview_url` tĩnh? render turntable lúc export?
-> viewer `<model-viewer>`/three.js? so 3 tier bằng gì khi khác nhau là `tri_counts` chứ không phải ảnh?
-> Việc này **chặn bởi V20** (§8.6 đang chờ chủ dự án duyệt) — viết mục 8.8 hoặc mở rộng mục này khi V20
-> được duyệt, cùng lúc với bước xuất glTF.
+### 8.8 Trang quản trị xem asset `MODEL` — **thiết kế đề xuất, đi kèm V20**
+
+⚠️ Cùng trạng thái với [§8.6](#86-nhánh-3d-trong-art_asset--thiết-kế-đề-xuất-chờ-chủ-dự-án-duyệt): mô tả
+thiết kế, **chưa thi hành**. Không viết code trang quản trị khi `asset_kind` chưa tồn tại.
+
+**Điểm khác cốt lõi so với nhánh SPRITE**: với sprite, thứ mà tier thay đổi **nhìn thấy được trong
+ảnh** (@0.5x mờ hơn @1x). Với model, ba tier khác nhau ở **số tam giác và cỡ texture** — tức **con số,
+không phải pixel** ([§4.4](#44-ngân-sách-tam-giác-nhánh-3d) đo được: bản 5k và bản 93k *nhìn không
+phân biệt được*). Nên đặt 3 ảnh cạnh nhau để "so tier" là dùng sai công cụ: đúng cách là **một bảng số**.
+
+| Xem được | Cách | Dữ liệu lấy từ |
+|---|---|---|
+| Danh sách kho (chung cả 2 nhánh) | `preview_url` thumbnail — **không đổi**, đó là lý do cột này dùng chung | `art_asset.preview_url` |
+| **Bằng chứng nghiệm thu** | Contact sheet đã render lúc chấm Q1–Q12 ([ART-QUALITY-STANDARD §7](ART-QUALITY-STANDARD.md)) | `render_dir` — với `MODEL` cột này đổi *vai trò*, xem §8.6 |
+| **So 3 tier** | Bảng `tri_counts` × `texture_px` × dung lượng `.glb` | `model-meta.json` → `art_asset.tri_counts` |
+| Bộ action có thật trong model | Danh sách animation đọc từ sidecar, đối chiếu bộ chuẩn §4.2 | `model-meta.json.actions` |
+| Model từ **góc khác** góc nghiệm thu | Turntable — xem dưới | Chưa code |
+
+**Turntable là thứ nhánh sprite chưa từng cần.** Trước [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)
+mọi asset chỉ tồn tại ở đúng một góc nhìn, nên "nhìn từ góc khác" là câu hỏi vô nghĩa. Giờ nhân vật
+xoay tự do lúc chạy, và **mặt sau của mesh Rodin chưa từng được ai nghiệm thu** — vòng Q1–Q12 chấm trên
+`idle` nhìn nghiêng. Đề xuất: `export_character_lods.py` render thêm **8 frame quay quanh trục Z** vào
+`render_dir`, trang quản trị phát như ảnh động. Rẻ (dùng lại `kage_sprite_render`), không thêm dependency,
+và bịt đúng một lỗ nghiệm thu có thật.
+
+**Viewer 3D trong trình duyệt (`<model-viewer>` / three.js) — đề xuất KHÔNG làm**, ít nhất tới khi có
+nhu cầu thật: nó thêm một dependency JavaScript vào trang quản trị để trả lời câu hỏi mà turntable 8
+frame đã trả lời gần hết, trong khi thứ *thực sự* quyết định model đạt hay không là bảng số ở trên. Nếu
+sau này cần xoay/zoom tự do thì `.glb` là chuẩn mở nên mở lại lựa chọn này lúc nào cũng được — không có
+gì bị khoá.
+
+⚠️ **Không dựng viewer bằng cách giải nén `.glb` phía server.** Cùng lý do với luật "không copy toạ độ
+region vào DB" ở trên: file đã là nguồn sự thật, nhân bản ra chỗ khác chỉ tạo thêm chỗ để lệch.
 
 ---
 
@@ -658,7 +685,7 @@ Nên trang quản trị **tự cắt được mọi vùng** bằng `canvas.drawI
 - 🔀 **[ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) Accepted 2026-08-03** — nhân vật chuyển sang render 3D thời gian thực (2.5D). Thay quyết định #1 và #2 ở §9. **Hai việc treo do ADR này sinh ra:**
   - ✅ **Ngân sách tam giác — đã đo 2026-08-05** (§4.4): 5k/10k/20k tam giác cho low/med/high, đo trên mesh pilot bằng `measure_triangle_budget.py`. Còn thiếu **dòng frame time**, chờ client vẽ được model đầu tiên.
   - 📝 **Phòng vệ JitPack — đã có [ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md), chờ chủ dự án duyệt.** Kiểm chứng thật: `gdx-gltf` **không có trên Maven Central**, jar 318 KB, Apache-2.0, phụ thuộc bắc cầu duy nhất là `gdx` vốn đã có. Đề xuất đóng gói vào `third-party/m2/`. **Chưa được thêm vào `libs.versions.toml`** cho tới khi ADR-032 được duyệt.
-  - 🛑 **Mở rộng `art_asset` cho nhánh 3D — chờ chủ dự án duyệt.** Thiết kế đã viết đầy đủ ở §8.6
+  - 🛑 **Mở rộng `art_asset` cho nhánh 3D — chờ chủ dự án duyệt.** Thiết kế đã viết đầy đủ ở §8.6 (schema) + §8.8 (trang quản trị)
     (3 cột `asset_kind`/`model_name`/`tri_counts` + `CHECK` chống lẫn nhánh, không tách bảng phụ).
     Là **DB schema change** nên không tự thi hành ([/CLAUDE.md §4](../../CLAUDE.md)); duyệt xong thì
     viết `V20__extend_art_asset_for_3d.sql`. **Chặn**: bước xuất glTF (§10 gạch đầu dòng trên) —
