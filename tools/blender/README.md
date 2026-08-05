@@ -1,33 +1,64 @@
 # tools/blender — Script chuẩn cho pipeline Blender
 
-Tài liệu gốc: [docs/14-art/ART-PIPELINE.md](../../docs/14-art/ART-PIPELINE.md) (thiết kế) · [ART-QUALITY-STANDARD.md](../../docs/14-art/ART-QUALITY-STANDARD.md) (chuẩn ĐẠT/KHÔNG ĐẠT + mesh kit) · [BLENDER-SESSION-GUIDE.md](../../docs/14-art/BLENDER-SESSION-GUIDE.md) (thao tác từng bước). Phiên làm art nạp 3 file đó + file này, không đọc thêm.
+Tài liệu gốc: [docs/14-art/ART-PIPELINE.md](../../docs/14-art/ART-PIPELINE.md) (thiết kế) · [ART-QUALITY-STANDARD.md](../../docs/14-art/ART-QUALITY-STANDARD.md) (chuẩn ĐẠT/KHÔNG ĐẠT + vòng nghiệm thu) · [BLENDER-SESSION-GUIDE.md](../../docs/14-art/BLENDER-SESSION-GUIDE.md) (thao tác từng bước). Phiên làm art nạp 3 file đó + file này, không đọc thêm.
+
+> ⚠️ **Từ [ADR-031](../../docs/01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) (2026-08-03) pipeline chia 2 nhánh.**
+> **Nhân vật · quái · NPC** đi nhánh 3D: dựng bằng `kage_text3d_kit.py`, sản phẩm giao là **model glTF**,
+> ảnh render chỉ là bằng chứng nghiệm thu. **VFX · icon · UI** vẫn là nhánh 2D pre-render ra sprite.
+> Đọc đúng nhánh của thứ mình đang làm — phần lớn script dưới đây thuộc nhánh 2D.
 
 ## Script nào cho việc gì
 
 | Script | Dùng khi | Cần mở Blender? |
 |---|---|---|
-| `kage_mesh_kit.py` + `build_kage_character.py` | **Nhân vật / NPC / quái hình người** — cách làm chuẩn hiện nay | ❌ headless |
-| `kage_sprite_render.py` | Render preview 1 frame hoặc cả sheet, cho mọi loại asset | ❌ headless |
+| `kage_text3d_kit.py` | **Nhân vật / NPC / quái hình người — đường chính hiện nay** (nhánh 3D) | ✅ cho bước sinh+import mesh (tool MCP), ❌ từ bước chuẩn hoá trở đi |
+| `kage_sprite_render.py` | Render preview 1 frame hoặc cả sheet. Nhánh 2D: **là sản phẩm**. Nhánh 3D: **chỉ để nghiệm thu** | ❌ headless |
 | `make_contact_sheet.py` | Ghép nhiều frame thành 1 ảnh để nghiệm thu | ❌ headless |
 | `build_character_base.py` | Dựng lại `kage_character_base.blend` | ❌ headless |
 | `build_skill_vfx.py` · `build_item_icon.py` · `build_monster_dummy.py` · `build_npc_elder.py` | VFX / icon / placeholder thế hệ cũ | ❌ headless |
+| `kage_mesh_kit.py` | **Chỉ còn vũ khí · phụ kiện · rig · action** — phần dựng cơ thể đã bị thay | ❌ headless |
+| `build_kage_character.py` | ⚠️ **Thế hệ mesh kit đã bị bác** (~1/5 NSO, 2026-08-03) — chỉ để dựng lại file cũ; bảng `CHARACTERS` trong đó vẫn là **spec trang phục** tham chiếu cho prompt Text→3D | ❌ headless |
 | `build_box_character.py` | ⚠️ **Thế hệ box đã bị thay thế** — chỉ để dựng lại file cũ, không dùng cho asset mới | ❌ headless |
 | MCP (`execute_blender_code`) | Model tay: prop, tile, boss dị hình | ✅ |
 
 ---
 
-## `kage_mesh_kit.py` — thư viện dựng nhân vật chibi
+## `kage_text3d_kit.py` — nhân vật từ Text→3D (đường chính)
 
-Mặt tròn xoay + mặt + tóc + phụ kiện + vũ khí, rig **11 xương** (thêm `forearm_l/r`, `shin_l/r` so với rig cũ nên khuỷu/gối gập được), 7 action chuẩn. API đầy đủ: [ART-QUALITY-STANDARD §5](../../docs/14-art/ART-QUALITY-STANDARD.md).
+Nhận mesh do Hyper3D Rodin sinh → chuẩn hoá → rig → action → toon → viền. Trình tự lệnh đầy đủ kèm
+4 cái bẫy của REST API: [BLENDER-SESSION-GUIDE §1.5](../../docs/14-art/BLENDER-SESSION-GUIDE.md).
+Vòng nghiệm thu và ngân sách vòng: [ART-QUALITY-STANDARD §7](../../docs/14-art/ART-QUALITY-STANDARD.md).
 
-```bash
-# dựng .blend từ spec (bảng CHARACTERS trong build_kage_character.py)
-blender -b assets/raw/blender/kage_character_base.blend -P tools/blender/build_kage_character.py \
-  -- --element hoa --tier b1 --out assets/raw/blender/characters/hoa-b1.blend
-```
+| Hàm | Nhiệm vụ |
+|---|---|
+| `normalise(source_name, out_name)` | Cao 1.0, chân z=0, mặt +X — biến đổi ở cấp mesh data |
+| `clean(obj)` | Hàn đỉnh; glTF tách đỉnh theo seam UV, không hàn thì rig gãy |
+| `measure(obj)` | In số đo khớp thật của **mesh này** — không có hằng số chung |
+| `rig(obj, name, arm_y, leg_y, hip, chest, shoulder, elbow, wrist, knee)` | Rig 11 xương, tự chuyển `weight_by_proximity()` khi bone-heat gãy |
+| `author_scaled_actions(rig, gains=None)` | 7 action chuẩn, hiệu chỉnh biên độ theo `CHIBI_GAINS`, giữ nguyên nhịp bảng gốc |
+| `toon_textured(obj, shades=3)` | Toon cho mesh **có texture sẵn** — dùng nấc ramp riêng, không dùng bảng của mesh thủ tục |
+| `add_far_shade(obj)` · `add_inverted_hull_outline(obj, width_px_at_1x)` | Chiều sâu + viền. Viền gọi **sau** `fit_camera` |
+| `attach_weapon(rig, name, kind, offset, outline_px_at_1x)` | Vũ khí là object rời nên phải tự thêm viền riêng |
+
+⚠️ **`.blend` sinh ra không tái tạo được** — chạy lại đúng prompt cũ ra model khác. Save kèm
+`bpy.ops.file.pack_all()` (texture đến từ job cloud) và **commit** bản đã PASS.
+
+⚠️ **Decimate + xuất glTF chưa code** — ngân sách tam giác chưa chốt (ART-PIPELINE §4.4). Phiên art
+hiện dừng ở `.blend` đã nghiệm thu.
+
+---
+
+## `kage_mesh_kit.py` — vũ khí, phụ kiện, rig, action
+
+Phần **dựng cơ thể** của kit (`build_chibi_body` · `add_face` · `add_hair` · `assemble_character`)
+đã bị thay bởi Text→3D và **không dùng cho nhân vật mới**. Còn dùng nguyên vẹn: `build_rig` ·
+`build_weapon` · `add_accessory` · `add_motion_detail` · `author_actions` · `shade_hex`.
+API đầy đủ: [ART-QUALITY-STANDARD §5](../../docs/14-art/ART-QUALITY-STANDARD.md).
 
 Ràng buộc dễ sai, đã có trong code kèm lý do — đọc comment trước khi sửa số:
-`ARM_Y` phải lớn hơn nửa bề dày thân · outline nhân vật 1.1px@1x (không phải 2.5) · dấu xoay xương tính từ `axis × bone_direction` · góc pose cộng dồn theo chuỗi xương · không để hình học dưới `z=0`.
+`ARM_Y` phải lớn hơn nửa bề dày thân · dấu xoay xương tính từ `axis × bone_direction` · góc pose
+cộng dồn theo chuỗi xương · không để hình học dưới `z=0` · độ dày outline **không phải hằng số**,
+nguồn duy nhất là [ART-QUALITY-STANDARD §4](../../docs/14-art/ART-QUALITY-STANDARD.md) mục 3.
 
 ---
 
@@ -67,7 +98,7 @@ blender -b assets/raw/blender/characters/ninja-fire.blend -P tools/blender/kage_
 
 | Hàm | Nhiệm vụ |
 |---|---|
-| `setup_scene(px=256, outline_px_at_1x=2.5, samples=32)` | EEVEE, `film_transparent`, resolution px×px, Freestyle, sun key ~35° trên-trước-phải + fill yếu, camera Ortho trên trục −Y nhìn +Y. ⚠️ Tham số mặc định 2.5 là số cũ chưa kiểm chứng — nhân vật **luôn** truyền giá trị riêng, xem §Ràng buộc |
+| `setup_scene(px=256, outline_px_at_1x=2.5, samples=32)` | EEVEE, `film_transparent`, resolution px×px, Freestyle, sun key ~35° trên-trước-phải + fill yếu, camera Ortho trên trục −Y nhìn +Y. ⚠️ Mặc định 2.5 là số cũ chưa kiểm chứng — **luôn** truyền giá trị riêng, xem §Ràng buộc. Mesh Text→3D **tắt Freestyle** và dùng `add_inverted_hull_outline()` thay thế |
 | `make_toon_material(name, base_hex, shades=3)` | Diffuse → Shader-to-RGB → ColorRamp CONSTANT → Emission. Trả về material |
 | `apply_toon(obj, base_hex, shades=3)` | Thay toàn bộ material của mesh bằng 1 toon material |
 | `fit_camera(objects, margin=0.1, armature=None, actions=None, baseline=0.08)` | Quét **mọi frame của mọi action** để set `ortho_scale`; đặt camera sao cho chân (world z=0) luôn rơi đúng 1 hàng pixel cố định |
@@ -96,6 +127,7 @@ Sinh cùng lúc với sheet, là thứ `tools/asset-pipeline` đọc để upser
 ## Ràng buộc
 
 - Pivot chân-giữa: `baseline=0.08` → chân luôn ở `0.08 × px` tính từ đáy khung, **mọi asset** dùng chung mốc này.
-- Nền trong suốt · chỉ render hướng phải (+X) · **KHÔNG** downscale trong Blender (@1x/@0.5x là việc của `tools/asset-pipeline`).
-- Outline: **không có một con số cho mọi asset** — độ dày đúng phụ thuộc nhân vật chiếm bao nhiêu phần khung. Nhân vật chibi (master 256px, cao ~166px trong khung) đo được **1.1px@1x**; xem [ART-QUALITY-STANDARD §4](../../docs/14-art/ART-QUALITY-STANDARD.md) là nguồn duy nhất. Log in `outline=2.2px` cho nhân vật là **đúng** (1.1 × master scale 2).
+- Nền trong suốt · **KHÔNG** downscale trong Blender (@1x/@0.5x là việc của `tools/asset-pipeline`).
+- Model quay mặt **+X** trong không gian gốc. Sau ADR-031 đây **không còn là hướng nhìn trên màn** (góc camera là hằng số runtime, không nướng vào tài sản) — nhưng vẫn bắt buộc vì rig, bảng pose và `add_far_shade()` đều giả định trục này.
+- Outline: **không có một con số cho mọi asset**, và cũng không phải một kỹ thuật — mesh thủ tục dùng Freestyle, mesh Text→3D dùng inverted hull. Nguồn duy nhất cho số đo là [ART-QUALITY-STANDARD §4](../../docs/14-art/ART-QUALITY-STANDARD.md) mục 3; **đừng chép số vào đây**. Lưu ý khi đọc log: giá trị in ra là px ở master (@2x), tức gấp đôi số `@1x` trong tài liệu.
 - Engine EEVEE: **không hardcode tên**. Blender ≤4.1 và ≥5.0 dùng `BLENDER_EEVEE`, 4.2–4.5 dùng `BLENDER_EEVEE_NEXT` — script tự dò từ enum thật.
