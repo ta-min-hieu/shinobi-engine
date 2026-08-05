@@ -4,7 +4,7 @@
 |---|---|
 | Status | ✅ **Accepted** (2026-08-01, chủ dự án xác nhận qua chat) |
 | Date | 2026-08-01 |
-| Deciders | AI (Claude) đề xuất; chờ chủ dự án chốt |
+| Deciders | AI (Claude) đề xuất; chủ dự án Accept 2026-08-01 qua chat |
 | Related | [AI.md §5-§6](../../03-engine/AI.md), [ADR-006](ADR-006-Why-ECS.md) (Ashley, cùng lý do "bảo trì chậm"), [engine/CLAUDE.md](../../../engine/CLAUDE.md) ("AI quái: FSM đơn giản, không GOAP, không A* ở MVP") |
 
 ---

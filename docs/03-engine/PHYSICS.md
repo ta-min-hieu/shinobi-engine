@@ -154,8 +154,7 @@ GC lo hết. Cạm bẫy Box2D cũ (destroy body, sửa world giữa step, tunne
 
 ## ADR cần tạo
 
-✅ **ADR-021 đã viết + implement** (2026-08-01, Status: Proposed) —
-[ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md). Không còn ADR nào treo cho tài liệu này.
+Không còn. ✅ **[ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md) Accepted 2026-08-01**, đã implement.
 
 ## Tài liệu liên quan
 

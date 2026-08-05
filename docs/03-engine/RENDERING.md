@@ -277,9 +277,11 @@ Với map lớn nhiều entity: cân nhắc **spatial partition** (grid đơn gi
 
 ## ADR cần tạo
 
-✅ **ADR-020 đã viết** (2026-08-01, Status: Proposed) — xem §3 và
-[ADR-020](../01-architecture/adr/ADR-020-Viewport-Strategy.md). Không còn nằm trong danh sách "cần
-tạo" — chờ chủ dự án Accept, không phải chờ viết.
+Không còn. ✅ **[ADR-020](../01-architecture/adr/ADR-020-Viewport-Strategy.md) Accepted 2026-08-01** — xem §3.
+
+⚠️ Tài liệu này mô tả đường render **2D**. Từ [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)
+(Accepted 2026-08-03) nhân vật/quái/NPC render **3D thời gian thực** bằng `ModelBatch` + shader cel tự
+viết, VFX/icon/UI vẫn 2D — §"Việc cần làm tiếp theo" mục 4 là chỗ viết lại phần đó.
 
 ## Tài liệu liên quan
 
@@ -291,6 +293,11 @@ tạo" — chờ chủ dự án Accept, không phải chờ viết.
 
 ## Việc cần làm tiếp theo
 
-1. ✅ **ADR-020 (Viewport) đã viết** (2026-08-01) — chờ chủ dự án Accept.
+1. ✅ **ADR-020 (Viewport) Accepted 2026-08-01** — hết treo.
 2. Phase 1: xác lập §4 (world unit) ngay từ đầu — đổi sau = đổi mọi số liệu gameplay.
 3. Test shader (§9) trên Android **sớm**, không để tới Phase 8 mới phát hiện GLSL không tương thích.
+4. 🔴 **Viết lại tài liệu này cho nhánh 3D** ([ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)
+   "Việc cần làm" #4): `ModelBatch` vs `SpriteBatch` không trộn được (mỗi lần đổi qua lại là một flush),
+   cel + viền inverted hull phải viết thành GLSL vì Freestyle không tồn tại lúc runtime, và cảnh báo
+   cấp phát mỗi khung của `AnimationController` (CLAUDE.md §6). **Chặn bởi** [ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md)
+   — chưa có `gdx-gltf` thì chưa viết được gì cụ thể hơn giả định.

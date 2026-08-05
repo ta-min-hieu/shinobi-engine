@@ -192,8 +192,9 @@ public interface ResourceManager {
 
 ## 10. Patch & CDN
 
-✅ **[ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md) đề xuất 2026-08-01**
-(Status: Proposed, chờ chủ dự án chốt): đóng gói toàn bộ asset trong bản build cho suốt Closed Beta
+✅ **[ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md) Accepted 2026-08-01**
+(amend bởi [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) — đóng gói **1 tier
+MEDIUM** chứ không phải toàn bộ): gói asset trong bản build cho suốt Closed Beta
 Desktop, hoãn patch/CDN/Play Asset Delivery tới khi có Revisit Trigger cụ thể (Android được chốt là
 target thật, hoặc dung lượng asset thật đo được vượt ngưỡng gây trải nghiệm tệ). Lý do hoãn: repo hiện
 chưa có `assets/` thật nào để đo, và Android chưa phải target đã chốt — quyết định CDN/OBB/Play Asset
@@ -256,16 +257,16 @@ Trung thực về rủi ro:
 | 5 | Font qua **FreeType**, không bitmap font | Hỗ trợ uiScale | Accepted |
 | 6 | Tên file: không dấu, không hoa, không space | Lỗi cross-platform | Accepted |
 | 7 | Unload zone cũ **sau khi** zone mới load xong | Tránh màn hình trắng | Accepted |
-| 8 | **Đóng gói toàn bộ asset**, không patch/CDN, cho Closed Beta | Điều 9; chính thức hoá ở [ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md) | ⏳ Proposed (ADR-024) |
+| 8 | ~~Đóng gói **toàn bộ** asset~~ → đóng gói **đúng 1 tier MEDIUM**, LOW/HIGH tải theo yêu cầu | Điều 9; [ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md) chốt hoãn patch/CDN, [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) amend đúng điểm "toàn bộ" | ✅ Accepted 2026-08-01 (cả hai) |
 | 9 | `tools/asset-pipeline` là lớp đệm để thay editor được | Giảm rủi ro HyperLap2D | Accepted |
 | 10 | CI **fail** nếu vi phạm §4, §5, §6 | Điều 41 — máy kiểm, không dựa vào người nhớ | Accepted |
 | 11 | Font **Be Vietnam Pro** (OFL 1.1), bundle `assets/raw/fonts/BeVietnamPro-Regular.ttf` | Coverage tiếng Việt + license thương mại đã kiểm chứng tại nguồn (§7) | ✅ Đề xuất phiên 2026-08-02, chờ chủ dự án xác nhận |
 
 ## ADR cần tạo
 
-✅ **ADR-024 đã viết** (2026-08-01, Status: Proposed) — xem §10 và
-[ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md). Không còn nằm trong danh
-sách "cần tạo" — chờ chủ dự án Accept, không phải chờ viết.
+Không còn. ✅ **[ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md) Accepted 2026-08-01**
+(xem §10), amend bởi ✅ **[ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md)**
+cùng ngày: bản cài đóng gói **đúng 1 tier MEDIUM**, LOW/HIGH tải theo yêu cầu.
 
 ## Tài liệu liên quan
 

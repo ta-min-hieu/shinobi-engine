@@ -4,7 +4,7 @@
 |---|---|
 | Status | ✅ **Accepted** (2026-08-01, chủ dự án xác nhận qua chat) |
 | Date | 2026-08-01 |
-| Deciders | AI (Claude) đề xuất; chờ chủ dự án chốt |
+| Deciders | AI (Claude) đề xuất; chủ dự án Accept 2026-08-01 qua chat |
 | Related | [RENDERING.md §3](../../03-engine/RENDERING.md), [ADR-002](ADR-002-Why-libGDX.md) (libGDX), Điều 15 (Server Authority — tinh thần công bằng áp dụng cả phía client) |
 
 ---

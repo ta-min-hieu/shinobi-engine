@@ -4,7 +4,7 @@
 |---|---|
 | Status | ✅ **Accepted** (2026-08-01, chủ dự án xác nhận qua chat) |
 | Date | 2026-08-01 |
-| Deciders | AI (Claude) đề xuất; chờ chủ dự án chốt |
+| Deciders | AI (Claude) đề xuất; chủ dự án Accept 2026-08-01 qua chat |
 | Related | [PHYSICS.md](../../03-engine/PHYSICS.md) (đặc biệt §2, §3, §10 — cần rà lại sau ADR này, xem Consequences), [engine/CLAUDE.md](../../../engine/CLAUDE.md) ("Box2D KHÔNG dùng cho combat"), [ROADMAP.md Phase 3 Exit Criteria](../../11-process/ROADMAP.md) ("Speed hack / teleport bị server từ chối"), [ADR-024](ADR-024-Asset-Distribution-Strategy.md) (cùng nguyên nhân gốc: chưa có asset/map thật) |
 
 ---
