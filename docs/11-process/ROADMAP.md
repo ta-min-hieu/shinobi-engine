@@ -666,7 +666,7 @@ Closed Beta → Open Beta → Release Candidate → Production → Hotfix
 
 ## ADR cần tạo
 
-Xem [ADR Index](../01-architecture/adr/README.md) — **28 ADR Accepted** (gồm 010/012/018 chốt 2026-07-18, ADR-026 chốt 2026-07-24, ADR-014/015/019 chốt 2026-07-26/28, ADR-027 TLS chốt 2026-07-31; ADR-011/020/021/022/024/028/029/030 chốt 2026-08-01); ADR-007 **Superseded by ADR-030** (không xây Plugin System); chỉ còn **ADR-023** chưa viết (chờ chốt desktop-first hay mobile-first).
+Xem [ADR Index](../01-architecture/adr/README.md) — **29 ADR Accepted** (đếm lại bằng dòng `Status` của từng file, 2026-08-06: gồm 010/012/018 chốt 2026-07-18, ADR-026 chốt 2026-07-24, ADR-014/015/019 chốt 2026-07-26/28, ADR-027 TLS chốt 2026-07-31, ADR-011/020/021/022/024/028/029/030 chốt 2026-08-01, **ADR-031 chốt 2026-08-03**); ADR-007 **Superseded by ADR-030** (không xây Plugin System); **ADR-032** (phòng vệ JitPack cho `gdx-gltf`) là ADR **duy nhất** còn `Proposed` — xem mục 28 "Việc cần làm tiếp theo"; chỉ còn **ADR-023** chưa viết (chờ chốt desktop-first hay mobile-first).
 
 ## Tài liệu liên quan
 
@@ -820,3 +820,94 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **28 ADR Accepted** (gồm
       (Testcontainers, tái dùng container `--requirepass` có sẵn): xác nhận kết nối không password
       bị từ chối thật với `JedisAccessControlException: NOAUTH Authentication required.`,
       sanity-check bằng cách tạm bỏ `--requirepass` để xác nhận test fail đúng khi mất bảo vệ.
+24. Phase 10 — các đợt song song **khác** của ngày 2026-08-02 (mục 23 chỉ ghi đợt cuối; bổ sung ở đây
+    cho đủ, cùng cách chạy: worktree-isolated agent, main session review + merge):
+    - ✅ **PMD 7.10.0 → 7.26.0** (`8087b61`) — 7.10.0 ra trước khi PMD hỗ trợ JDK 25 nên nổ
+      `StackOverflowError` ở bước type-inference; gỡ hẳn workaround `-x pmdMain -x pmdTest` khỏi CI
+      và tài liệu. Trước đó (2026-08-01) `tools:load-test` đã theo dõi liên tục đỉnh
+      `kage_players_online` (`12a1a59`) — vá đúng lỗ công cụ làm hỏng lần đo N=2000, **bản thân phép
+      đo N=2000 vẫn CHƯA làm lại**.
+    - ✅ **Đợt quan sát/hạ tầng**: metric `kage.packet.size` (`95ad1d7`); verify index DB bằng
+      `EXPLAIN ANALYZE` thật (`d5f2a22` — không cần migration mới, nhưng doc sai **cả hai chiều**:
+      kê nhầm cột của bảng `mail`, và `audit_log` không có truy vấn SELECT nào); font tiếng Việt
+      **Be Vietnam Pro** (OFL 1.1) bật `gdx-freetype` thật (`c10b6fd`) — **Exit Criteria "tiếng Việt
+      có dấu hiển thị đúng" của Phase 1 tới đây mới thật sự xong**, trước đó chỉ được tick trên giấy.
+    - ✅ **Đợt security/ECS**: `SecurityIntegrationTest` tự viết thay DAST (authz/replay/rate-limit/
+      fuzzing, `d80012d`+`eb3c4bc`) — phát hiện thật: **`sequenceId` KHÔNG phải chốt chống replay**
+      dù tài liệu ghi vậy (không tồn tại state nào lưu nó), phòng vệ thật là `idempotencyKey`
+      (ADR-025); bộ test thoát sandbox GraalJS (`902ad8f`+`15a5432`) — **không tìm ra lỗ**, mức
+      CONSTRAINED-equivalent giữ nguyên; đo lại **Revisit Trigger ADR-006** bằng metric production
+      thật (`0320995`+`5f06d01`): ECS ăn **0,83% ngân sách 4ms @N=500** → trigger **CHƯA kích hoạt**,
+      giữ Ashley.
+    - ✅ **Đợt gitleaks/doc/hệ phái**: gitleaks pre-commit hook + CI job `secret-scan` (`1312877`,
+      OWASP.md §2 — thế chỗ GitHub Secret Scanning vốn không dùng được trên private + free tier);
+      viết lại SECURITY.md §6 theo phòng vệ replay **thật** thay vì `sequenceId` (`5f5f3be`, cùng
+      commit sửa luôn dòng ROADMAP còn ghi jlink là "Chưa làm" trong khi đã code từ `47293f7`);
+      hệ **Hỏa** đủ bộ 3 active + 1 Tuyệt Kỹ + 2 passive (`a4791cb`) — đóng scope cut ghi ở Phase 8,
+      **5/5 hệ phái giờ đủ kit**, không còn hệ nào chỉ có 1 skill.
+    - ✅ **Đợt observability tiếp theo**: `kage.db.query.duration` + `kage.db.transaction.failed`
+      (`6e1aca9`); tracing sâu mở sang `Buy`/`Sell`/`ConfirmTrade` (`e49fae4`); baseline đo thật cho
+      `LoginFailedSpike`/`GoldTotalSpike` (`e0681ca`) — chọn cách để ngỏ ngưỡng GoldTotalSpike thay
+      vì đoán số, và mục 23 là đợt đóng nốt nó.
+    - ✅ **JVM.md đối chiếu thực tế** (`061dbce`) — trạng thái ADR-019 + cờ JVM trong `server.Dockerfile`
+      thật, không chép lại số cũ. **Rà toàn bộ Command có side-effect theo ADR-025** và tìm thấy
+      **2 lỗ thật**: `EnhanceItemCommand` + `ClaimQuestRewardCommand` chưa có `idempotencyKey` —
+      đã vá (`4a7d7c0`).
+25. **Hướng art bị đổi hẳn (2026-08-03)** — bộ "gold standard" dựng bằng mesh kit thủ tục **bị chủ dự
+    án BÁC** (đạt ~1/5 so với benchmark Ninja School Online), đợt re-render 15 sheet **huỷ**. Thay
+    bằng **Text→3D (Hyper3D Rodin, tier Detail)** qua `kage_text3d_kit.py` mới (`aff3f55`); pilot Hỏa
+    được **duyệt cùng ngày** sau 3 vòng (`pilot_text3d_hoa_v2_*.png` là chuẩn so mới). Giữ lại từ thế
+    hệ cũ: rig 11 xương, vũ khí/phụ kiện, 7 action, bảng nghiệm thu Q1–Q12. 15 sheet khối hộp đang có
+    trở thành **PLACEHOLDER**, thay dần khi 14 nhân vật còn lại được sản xuất. Chi tiết + 6 lỗi render
+    thật: [ART-QUALITY-STANDARD §8](../14-art/ART-QUALITY-STANDARD.md).
+26. ✅ **[ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) Accepted 2026-08-03**
+    (`3d67a5f`, chủ dự án chốt qua chat) — nhân vật/quái/NPC **render 3D thời gian thực** qua camera
+    orthographic khoá góc (2.5D); VFX/icon/UI **vẫn sprite 2D**. Hệ quả lớn nhất cho pipeline:
+    **sản phẩm giao của nhánh nhân vật là model glTF, không còn là sprite sheet** — ảnh render chỉ
+    còn giá trị làm bằng chứng nghiệm thu, và bước hạ mẫu/pack atlas **không áp dụng** cho nhân vật
+    nữa (thu hẹp phạm vi [ADR-029](../01-architecture/adr/ADR-029-Asset-Pipeline-Tool.md), amend
+    [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md)). Lan toả sang 4 tài
+    liệu còn giả định sprite (`1c8a022`) + đợt sửa sau review (`d42a423`). ADR **tự đặt điều kiện
+    chặn cho chính nó**: phải chốt cách phòng vệ JitPack trước khi thật sự phụ thuộc `gdx-gltf`.
+27. ✅ **Sổ việc do ADR-031 sinh ra — đóng 2026-08-05** (7 commit, `72dc01c`…`ab27027`):
+    - **Ngân sách tam giác đo thật**, không còn ước lượng: mesh Rodin pilot Hỏa **93.165 tam giác**,
+      đo bằng `tools/blender/measure_triangle_budget.py` theo 2 lượt quét tách biệt (hình học ×
+      texture) rồi so từng pixel → chốt **5.000 / 10.000 / 20.000** tam giác cho Low/Medium/High
+      (0,59 / 1,38 / 3,60 MB `.glb`). Kết luận có số liệu: mesh 93k là **dư thừa**, và **hạ texture
+      rẻ hơn hạ mesh** (cùng mức lệch trung bình, texture 2048→512 lệch tối đa 0,30 còn mesh 93k→40k
+      lệch 0,76 — vỡ silhouette cục bộ). Xem [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md).
+    - **Bước E đã code** — `tools/blender/export_character_lods.py` sinh cả 3 tier `.glb` + sidecar
+      `model-meta.json` (`b98a940`).
+    - **Chốt cách gắn vũ khí**: vũ khí **luôn gắn rời vào xương**, không bao giờ nằm trong prompt
+      Rodin (mesh sinh ra là một khối hàn liền, skin theo khoảng cách — lưỡi dao vươn khỏi tay bị
+      chia qua nhiều xương và cong như cao su khi gập khuỷu). Trang phục thì ngược lại, vẫn nằm
+      trong prompt vì `item_template` chưa có cột hình ảnh nào để đổi lúc chạy.
+    - ⛔ **Chưa đóng hoàn toàn**: thiếu **dòng frame time** của điều kiện Revisit Trigger #1
+      (20 nhân vật trên màn) — đo được nó cần `gdx-gltf` trên classpath **và** đường render 3D trong
+      `client-core`, cả hai đều chưa có (xem mục 28).
+28. ⛔ **Đang chặn thật, chờ chủ dự án** (đồng bộ với ["🔴 ĐANG CHỜ CHỦ DỰ ÁN"](../README.md) cập nhật
+    2026-08-05 — đọc ở đó, không chép số liệu sang đây):
+    - **[ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md) — Proposed
+      (2026-08-05), ADR *duy nhất* còn treo.** Đề xuất đóng gói `gdx-gltf` vào `third-party/m2/` và
+      bỏ hẳn `jitpack.io` (kiểm chứng thật: không có trên Maven Central, jar 318 KB, Apache-2.0,
+      phụ thuộc bắc cầu duy nhất là `gdx` vốn đã có). **Chưa duyệt ⇒ `gdx-gltf` chưa được thêm vào
+      `libs.versions.toml` ⇒ chặn dây chuyền**: nối `WorldScreen` sang `ModelBatch` → đo frame time
+      (mục 27) → viết lại `RENDERING.md` cho nhánh 3D. Nói cách khác, **toàn bộ nhánh render 3D của
+      ADR-031 đang dừng ở đây**.
+    - **V20 — 3 cột 3D cho `art_asset`** (`asset_kind`/`model_name`/`tri_counts` + `CHECK` chống lẫn
+      nhánh, thiết kế đã viết đủ ở [ART-PIPELINE §8.6/§8.8](../14-art/ART-PIPELINE.md)). Là **đổi DB
+      schema** nên AI không tự thi hành ([/CLAUDE.md §4](../../CLAUDE.md)). Ngày bước E chạy thật mà
+      chưa có cột này thì luật "không có asset mồ côi" (§8.5) hở với **mọi** model.
+    - Câu hỏi **desktop-first hay mobile-first** vẫn chưa trả lời → ADR-023 vẫn chưa viết được, và
+      ngân sách tam giác ở mục 27 mới chỉ đo cho desktop.
+29. **Art — nhân vật Text→3D đầu tiên qua trọn vòng nghiệm thu (2026-08-06)**: `char_thuy-b1` là con
+    **đầu tiên sau pilot Hỏa** đi hết vòng §7.1 của
+    [ART-QUALITY-STANDARD](../14-art/ART-QUALITY-STANDARD.md) và chạy tiếp bước E — xuất được **3 LOD
+    glTF: 20.684 / 10.684 / 5.684 tam giác**, khớp ngân sách chốt ở mục 27.
+    - Tìm + sửa **6 lỗi thật trong pipeline art**, trong đó **3 lỗi nghiêm trọng**:
+      (a) `setup_scene()` bật lại Freestyle **vô điều kiện** ⇒ **mọi** preview nhân vật Text→3D ra
+      mảng đen — nghĩa là **vòng nghiệm thu §7.1 chưa từng chạy đúng lần nào cho nhánh ADR-031**;
+      (b) camera nghiệm thu vẫn là camera sprite **nhìn ngang**, trong khi pilot được duyệt ở **góc
+      3/4** ⇒ Q1–Q10 chấm sai đối tượng;
+      (c) bước E xuất glTF **chết khi chạy headless** — gọi `mode_set` trước khi gán active object.
+    - ⛔ **Chưa commit** tại thời điểm ghi mục này, nên không tra được trong `git log`.
