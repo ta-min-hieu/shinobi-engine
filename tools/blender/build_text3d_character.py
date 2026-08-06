@@ -161,7 +161,8 @@ def purge_foreign(source, element):
 
 
 def build(source, element, tier, weapon=None, color=None, accent=None,
-          outline_px=DEFAULT_OUTLINE_PX, weapon_offset=None, overrides=None):
+          outline_px=DEFAULT_OUTLINE_PX, weapon_offset=None, overrides=None,
+          motion=None, motion_color=None):
     purge_foreign(source, element)
     name = element.capitalize()
     obj = t3d.clean(t3d.normalise(source, name))
@@ -178,6 +179,11 @@ def build(source, element, tier, weapon=None, color=None, accent=None,
         action.use_fake_user = True
 
     ksr.setup_scene(px=256)
+    if motion:
+        # B3's moving accent. Placed off the measured shoulder, not a constant:
+        # the kit authored it against its own body plan (kage_text3d_kit).
+        t3d.attach_motion_detail(rig, element, motion, motion_color or color,
+                                 joints["shoulder"])
     if weapon:
         t3d.attach_weapon(rig, element, weapon, offset=weapon_offset or (0.0, 0.0, 0.0),
                           outline_px_at_1x=outline_px, color=color, accent=accent,

@@ -536,6 +536,42 @@ def seat_weapon(parts, body, max_span=0.55, clearance=0.005):
     return scale, shift
 
 
+# Where the kit's own body puts the shoulder (ART-QUALITY-STANDARD §3). The B3
+# motion accents are placed against this, so it is the yardstick for moving them
+# onto a body with different proportions.
+KIT_SHOULDER_Z = 0.56
+
+
+def attach_motion_detail(rig, name, kind, color, shoulder_z):
+    """Add the B3 moving accent, repositioned for a generated body.
+
+    `kage_mesh_kit.add_motion_detail` places each accent at absolute coordinates
+    measured off the procedural body — embers behind the head at z=0.72, the
+    water ring at the wrist at z=0.315, ribbons pivoting at z=0.545. A generated
+    body puts those joints somewhere else entirely, so unmoved the ribbons sprout
+    from the stomach and the wrist ring orbits empty air.
+
+    The accents are positioned by drivers on `location`, so the mesh cannot just
+    be translated the way a weapon can — overwriting the channel would delete the
+    animation. `delta_location` adds on top of the driven value instead, which
+    moves the whole orbit without touching what drives it.
+
+    Returns the parts and the vertical scale applied.
+    """
+    before = set(bpy.data.objects)
+    kit.add_motion_detail(rig, {"name": name}, kind, color)
+    parts = [obj for obj in bpy.data.objects if obj not in before]
+
+    scale = shoulder_z / KIT_SHOULDER_Z
+    for part in parts:
+        # Height is what differs most between the two body plans; the accent's
+        # own size stays as authored so it still reads at 83px.
+        part.delta_location = (0.0, 0.0, part.location.z * (scale - 1.0))
+    print("[t3d] motion detail {0}: {1} part(s), z-scale={2:.2f}".format(
+        kind, len(parts), scale))
+    return parts
+
+
 def add_inverted_hull_outline(obj, width_px_at_1x=1.2, scene=None):
     """Draw the ink line as a flipped, inflated shell instead of with Freestyle.
 
