@@ -281,6 +281,18 @@ CHIBI_GAINS = {
 }
 
 
+# Per-action overrides layered on CHIBI_GAINS. The global torso damping exists
+# because a Text->3D body is half head, and swinging it on the kit's angles
+# folds `attack` and `die` in half. `run` pays for that damping without getting
+# anything back: its forward lean is a constant offset, not a swing, and the
+# damping just stands the runner upright -- measured -6 degrees on char_thuy-b1
+# where ART-QUALITY-STANDARD Q11 asks for 8-15. Raising it only here keeps the
+# fix away from the two actions the damping was bought for.
+ACTION_GAINS = {
+    "run": {"pelvis": 1.02, "spine": 0.83},
+}
+
+
 def author_scaled_actions(rig, gains=None):
     """Author the kit's seven actions with per-bone amplitude re-fitted.
 
@@ -292,8 +304,12 @@ def author_scaled_actions(rig, gains=None):
     original = kit.pose_frame
 
     def scaled(target, frame, pose, **kwargs):
+        # `author_actions` assigns each action to the rig before posing it, so
+        # the rig itself says which one is being written right now.
+        action = getattr(rig.animation_data, "action", None)
+        per_action = ACTION_GAINS.get(action.name, {}) if action else {}
         return original(target, frame,
-                        {bone: angle * gains.get(bone, 1.0)
+                        {bone: angle * per_action.get(bone, gains.get(bone, 1.0))
                          for bone, angle in pose.items()},
                         **kwargs)
 

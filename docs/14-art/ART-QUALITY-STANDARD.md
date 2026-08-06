@@ -72,6 +72,13 @@ Chấm trên **PNG đã render** (không phải viewport), ở @1x rồi @0.5x. 
 
 Q11–Q12 chỉ chấm sau khi Q1–Q10 pass trên frame `idle`.
 
+⚠️ **Q11 chấm được bằng số, đừng chỉ nhìn.** Độ nghiêng thật của thân là góc cộng dồn
+`pelvis + spine` (§6). Đo trên `char_thuy-b1` cho thấy `run` nghiêng **−6°** trong khi Q11 đòi 8–15°
+— nhìn ảnh thì chỉ thấy "hơi thiếu lực", không ai đoán ra con số. Nguyên nhân: `CHIBI_GAINS` giảm
+biên độ thân để `attack`/`die` khỏi gập gãy, nhưng `run` **không swing thân** — nó giữ một độ nghiêng
+cố định, nên chỉ bị phạt mà không được lợi gì. Đã tách `ACTION_GAINS` riêng cho `run`
+(`kage_text3d_kit.py`): `run` lên −11°, `attack` và `die` **không đổi một độ nào**.
+
 **Chuẩn so sánh cuối**: đặt cạnh `assets/raw/reference/pilot_text3d_hoa_v2_actions.png` — asset mới không được "tụt cấp" so với ảnh này.
 
 ---
