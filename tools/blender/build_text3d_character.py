@@ -92,14 +92,21 @@ def auto_measure(obj):
     ankle_z, ankle_half, ankle_gap = leg_rows[min(1, len(leg_rows) - 1)]
     leg_y = (ankle_half + ankle_gap * 0.5) * 0.5
 
-    upper = [row for row in rows if hip < row[0] < top * 0.75 and row[3]]
-    neck_z, neck_half = min(((z, half) for z, half, _, _ in upper),
+    # Search the neck only where a neck can be: under the head, above the waist.
+    # Given the free run of everything above the hip it finds the *waist* instead
+    # on a bulky silhouette -- char_tho-b1 wears thick armour, so its narrowest
+    # slice above the hip is the belt, and the whole arm chain collapsed to
+    # chest=0.150 with the shoulder below it. The band below is where every mesh
+    # measured so far put its neck (Thuy .450, Phong .425, Loi .400).
+    neck_band = [row for row in rows if top * 0.30 <= row[0] <= top * 0.65 and row[3]]
+    neck_z, neck_half = min(((z, half) for z, half, _, _ in neck_band),
                             key=lambda pair: pair[1])
-    torso = [half for z, half, _, _ in upper if z < neck_z]
+    upper = [row for row in rows if hip < row[0] < neck_z and row[3]]
+    torso = [half for z, half, _, _ in upper]
     torso_half = sorted(torso)[len(torso) // 2] if torso else neck_half
 
     arm_rows = [(z, half) for z, half, _, _ in upper
-                if z < neck_z and half > torso_half * ARM_WIDTH_RATIO]
+                if half > torso_half * ARM_WIDTH_RATIO]
     if arm_rows:
         # The shoulder is NOT the widest arm slice. A generated character comes
         # back with its arms hanging, so the widest slices are the elbow and the
@@ -137,10 +144,15 @@ def purge_foreign(source, element):
     to forget once the mesh is already on screen.
     """
     keep = {source, element.capitalize(), element + "_Rig",
-            "KageCam", "KageKey", "KageFill",
             "guide_head", "guide_torso", "guide_legs"}
+    # Cameras and lights are kept by TYPE, never by name. The base file ships its
+    # camera as plain "Camera" while setup_scene creates "KageCam", so a name
+    # list silently deletes the scene camera and the next _ensure_camera dies on
+    # a removed StructRNA -- with an error naming neither the camera nor this.
     foreign = [obj for obj in bpy.context.scene.objects
-               if obj.name not in keep and not obj.name.startswith(element + "_")]
+               if obj.type not in {"CAMERA", "LIGHT"}
+               and obj.name not in keep
+               and not obj.name.startswith(element + "_")]
     for obj in foreign:
         bpy.data.objects.remove(obj, do_unlink=True)
     if foreign:
@@ -168,7 +180,8 @@ def build(source, element, tier, weapon=None, color=None, accent=None,
     ksr.setup_scene(px=256)
     if weapon:
         t3d.attach_weapon(rig, element, weapon, offset=weapon_offset or (0.0, 0.0, 0.0),
-                          outline_px_at_1x=outline_px, color=color, accent=accent)
+                          outline_px_at_1x=outline_px, color=color, accent=accent,
+                          body=obj)
     # The shell converts @1x pixels through the camera, so it can only be sized
     # once the camera is framed.
     ksr.fit_camera(ksr.renderable_meshes(bpy.context.scene), armature=rig,

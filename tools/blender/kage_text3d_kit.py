@@ -54,6 +54,14 @@ FAR_SHADE = 0.72
 
 FAR_GROUPS = frozenset({"arm_l", "forearm_l", "leg_l", "shin_l"})
 
+# How far a seated weapon must clear the body's own width, as a fraction of it,
+# so its silhouette reads separately from the character's (Q7).
+STICK_OUT = 0.30
+
+# Ceiling on that sideways push, as a fraction of body half-width, so the weapon
+# stays carried rather than floating alongside.
+STICK_OUT_CAP = 0.70
+
 
 def _local_bounds(mesh):
     lo = Vector((math.inf,) * 3)
@@ -401,7 +409,7 @@ def toon_textured(obj, shades=3, rim=0.0, steps=None):
 
 
 def attach_weapon(rig, name, kind, offset=(0.0, 0.0, 0.0), outline_px_at_1x=None,
-                  color=None, accent=None):
+                  color=None, accent=None, body=None):
     """Mount the element's weapon as its own mesh, rigidly bound to a bone.
 
     A generated body arrives as one welded lump with the weapon nowhere in it,
@@ -427,6 +435,8 @@ def attach_weapon(rig, name, kind, offset=(0.0, 0.0, 0.0), outline_px_at_1x=None
     (ART-QUALITY-STANDARD §5).
     """
     parts = kit.build_weapon(rig, {"name": name}, kind, color=color, accent=accent)
+    if body is not None:
+        seat_weapon(parts, body)
     for part in parts:
         if any(offset):
             for vertex in part.data.vertices:
@@ -437,6 +447,77 @@ def attach_weapon(rig, name, kind, offset=(0.0, 0.0, 0.0), outline_px_at_1x=None
         if outline_px_at_1x:
             add_inverted_hull_outline(part, width_px_at_1x=outline_px_at_1x)
     return parts
+
+
+def seat_weapon(parts, body, max_span=0.55, clearance=0.005):
+    """Scale a kit weapon down to this body and push it back against its surface.
+
+    `kage_mesh_kit` sizes and mounts weapons against the procedural torso, which
+    is both narrower and differently proportioned than anything Rodin returns.
+    Dropped onto a generated body unchanged they come out oversized and floating:
+    char_loi-b1's long blade rendered as a slab taller than the character and
+    detached behind it, char_tho-b1's mace as a pale lump over the chest.
+
+    Two corrections, both measured rather than guessed:
+
+    * anything spanning more than `max_span` of the body height is scaled about
+      its own centre until it does. ART-QUALITY-STANDARD §4 item 7 wants weapons
+      *over* true scale so they read at 83px, so this is a ceiling, not a fit.
+    * the whole weapon is then shifted along X until its front face touches the
+      body's surface within the height band it actually occupies, leaving
+      `clearance` so the outline shells do not z-fight.
+
+    Returns the (scale, shift) applied, so a caller can print or override it.
+    """
+    weapon_points = [part.matrix_world @ vertex.co
+                     for part in parts for vertex in part.data.vertices]
+    if not weapon_points:
+        return 1.0, 0.0
+    body_points = [body.matrix_world @ vertex.co for vertex in body.data.vertices]
+    body_height = max(p.z for p in body_points) - min(p.z for p in body_points)
+
+    span = max(max(p[axis] for p in weapon_points) - min(p[axis] for p in weapon_points)
+               for axis in range(3))
+    scale = min(1.0, max_span * body_height / span) if span else 1.0
+    centre = Vector((sum(p.x for p in weapon_points) / len(weapon_points),
+                     sum(p.y for p in weapon_points) / len(weapon_points),
+                     sum(p.z for p in weapon_points) / len(weapon_points)))
+    if scale < 1.0:
+        for part in parts:
+            part.data.transform(Matrix.Translation(-centre)
+                                @ Matrix.Scale(scale, 4)
+                                @ Matrix.Translation(centre))
+            part.data.update()
+        weapon_points = [part.matrix_world @ vertex.co
+                         for part in parts for vertex in part.data.vertices]
+
+    low_z = min(p.z for p in weapon_points)
+    high_z = max(p.z for p in weapon_points)
+    band = [p for p in body_points if low_z <= p.z <= high_z]
+    if not band:
+        return scale, 0.0
+    # The weapon rides behind the character, which faces +X.
+    shift = (min(p.x for p in band) - clearance) - min(p.x for p in weapon_points)
+    # Seating alone hides it: pressed flat against the back, the body occludes
+    # the whole weapon at the 3/4 preview angle and Q7 fails on all three of
+    # phong/loi/tho. Thuy's gourd reads because it hangs clear of the silhouette,
+    # so push the weapon sideways until it breaks the outline by `stick_out` of
+    # the body's own width. A weapon that cannot be seen is not equipment.
+    body_half_y = max(abs(p.y) for p in band)
+    weapon_edge_y = max(abs(p.y) for p in weapon_points)
+    side = 1.0 if sum(p.y for p in weapon_points) >= 0 else -1.0
+    # Capped, or a weapon that started centred gets thrown clear of the body and
+    # reads as floating rather than carried -- char_loi-b1's blade needed +0.365
+    # to clear on its own and hung in mid-air at that distance. Sticking out is
+    # for breaking the silhouette, not for leaving the character.
+    shift_y = side * min(body_half_y * STICK_OUT_CAP,
+                         max(0.0, body_half_y * (1.0 + STICK_OUT) - weapon_edge_y))
+    for part in parts:
+        part.data.transform(Matrix.Translation((shift, shift_y, 0.0)))
+        part.data.update()
+    print("[t3d] seat weapon: scale={0:.2f} shift_x={1:+.3f} shift_y={2:+.3f}".format(
+        scale, shift, shift_y))
+    return scale, shift
 
 
 def add_inverted_hull_outline(obj, width_px_at_1x=1.2, scene=None):
