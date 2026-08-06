@@ -101,7 +101,7 @@ Q11–Q12 chỉ chấm sau khi Q1–Q10 pass trên frame `idle`.
 2. Cơ thể dựng bằng **mặt tròn xoay** (`_revolve`/`_ellipsoid`/`_taper` trong kit) + `use_smooth`. Cel ramp `CONSTANT` vẫn cho mảng màu phẳng trên mesh trơn — "toon" không có nghĩa là "vuông". Không cần Subdivision modifier: kit sinh thẳng lưới đủ mịn (16–24 cạnh vòng), rẻ hơn và không đụng thứ tự modifier với Armature. *(Từ 2026-08-03 điều này áp dụng cho vũ khí/phụ kiện; cơ thể đến từ Text→3D và vốn đã trơn.)*
 3. **Outline không phải hằng số** — và cũng không phải **một** kỹ thuật:
    - Mesh **thủ tục** (kit): Freestyle, **1.1px@1x**. Art direction ghi 2.5px là sai — đo thật ở master 256px thì 2.5px phủ đen gần kín.
-   - Mesh **sinh từ Text→3D**: **không dùng Freestyle**. Trên mesh nhiều tóc, Freestyle vẽ contour cho *từng lọn* và mặt đầy nét đen rối. Dùng `add_inverted_hull_outline()` (shell lật normal, cull mặt trước), đo được **3.0px@1x**. Kỹ thuật này còn có lợi thế chuyển thẳng sang GLSL runtime được.
+   - Mesh **sinh từ Text→3D**: **không dùng Freestyle**. Trên mesh nhiều tóc, Freestyle vẽ contour cho *từng lọn* và mặt đầy nét đen rối. Dùng `add_inverted_hull_outline()` (shell lật normal, cull mặt trước). Kỹ thuật này còn có lợi thế chuyển thẳng sang GLSL runtime được. Độ dày **khác nhau giữa hai mesh cùng thế hệ**: pilot Hỏa đo được 3.0px@1x, nhưng chính con số đó phủ đen gần kín `char_thuy-b1` — mesh đó đo lại ra **1.2px@1x**. Vỏ shell phồng theo normal, nên mesh càng nhiều chi tiết mảnh (tóc, ngón) càng nhoè sớm. Đo từng con, kể cả trong cùng một thế hệ.
 
    Con số phải **đo lại cho từng thế hệ mesh**, đừng kế thừa.
 4. **Nấc cel ramp cũng không phải hằng số.** Mesh thủ tục dùng `SHADE_STEPS` (đáy 0.55) vì ramp *chính là* nguồn sáng tối duy nhất. Mesh có texture vẽ sẵn bóng thì dùng nhầm bảng đó là **tối hai lần** và nhân vật xỉn hẳn — dùng `TEXTURED_SHADE_STEPS` (đáy 0.80).
@@ -201,6 +201,14 @@ Toàn bộ chạy headless — **không cần mở Blender, không cần MCP** (
 **Bước 1 · Sinh mesh + chuẩn hoá + rig + action.** Theo [BLENDER-SESSION-GUIDE §1.5](BLENDER-SESSION-GUIDE.md)
 bước A–C. Đây là bước duy nhất tiêu credit Rodin. Prompt bám spec trang phục ở
 [ART-PIPELINE §2.3](ART-PIPELINE.md).
+
+⚠️ **Chấm ở góc 3/4, không phải góc nghiêng** (đo thật 2026-08-06 khi làm `char_thuy-b1`). Pilot Hỏa
+được duyệt trên `pilot_text3d_hoa_v2_goc_camera.png` — tức góc 3/4. Mesh Text→3D có khối tóc lớn, ở
+góc nghiêng thuần nó che kín mặt và Q1–Q10 thành không chấm được: cùng một file Thủy đọc ra "một
+mảng tối" ở 0° và hiện trọn mắt/lông mày/miệng ở 35°. `kage_sprite_render.py` nay **tự** dùng
+`ADR031_VIEW_YAW_DEG = 35°` cho file nhánh 3D (nhận diện qua modifier `KageOutline`) và giữ 0° cho
+asset sprite; ép tay bằng `--view-yaw`. ADR-031 để ngỏ góc runtime đúng như thiết kế — 35° ở đây chỉ
+là **góc nghiệm thu**, không khoá gì trong game.
 
 **Bước 2 · Chấm vòng A (chất lượng mesh) trên preview `idle`** — trước khi tinh chỉnh bất cứ thứ gì:
 

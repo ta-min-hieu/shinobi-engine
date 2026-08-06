@@ -60,6 +60,14 @@ DEFAULT_MARGIN = 0.10
 # Outline width in @1x pixels (ART-PIPELINE.md §2.1); scaled up for the master.
 DEFAULT_OUTLINE_PX_AT_1X = 2.5
 
+# How far the orthographic camera sits back. Distance does not change framing
+# under an orthographic projection; it only has to clear the geometry.
+CAMERA_DISTANCE = 10.0
+
+# Preview azimuth for the ADR-031 3D branch: the 3/4 view the pilot was approved
+# on. See `view_yaw_deg` for why characters cannot be judged in pure profile.
+ADR031_VIEW_YAW_DEG = 35.0
+
 # Cel ramp brightness steps, darkest first, as multipliers of the base colour.
 SHADE_STEPS = {
     2: (0.62, 1.0),
@@ -105,7 +113,26 @@ def _resolve_eevee_engine():
     raise RuntimeError("no EEVEE engine in this Blender build: " + str(available))
 
 
-def _ensure_camera(scene):
+def view_yaw_deg(scene, override=None):
+    """Azimuth to preview this .blend from, in degrees around the vertical axis.
+
+    Zero keeps the historical sprite view: on the -Y axis looking +Y, so a
+    character facing +X is seen in pure profile. That is right for everything
+    still delivered as a sprite, and wrong for characters since ADR-031 — the
+    approved pilot was signed off on the 3/4 view (`pilot_text3d_hoa_v2_goc_camera.png`),
+    and in profile a generated head hides its own face behind the hair, which
+    makes Q1-Q10 unscorable. ADR-031 names 3/4 35 degrees as the candidate and
+    leaves the runtime value open precisely because it is no longer baked in.
+
+    The 3D branch is identified the same way as its outline technique, so one
+    file can never be a character for one decision and a sprite for the other.
+    """
+    if override is not None:
+        return override
+    return ADR031_VIEW_YAW_DEG if uses_shell_outline(scene) else 0.0
+
+
+def _ensure_camera(scene, yaw_deg=0.0):
     camera = scene.camera
     if camera is None:
         camera_data = bpy.data.cameras.new("KageCam")
@@ -113,10 +140,13 @@ def _ensure_camera(scene):
         scene.collection.objects.link(camera)
         scene.camera = camera
     camera.data.type = "ORTHO"
-    # Sit on the -Y axis looking towards +Y, so a character facing +X is seen
-    # in profile facing screen-right.
-    camera.rotation_euler = (math.radians(90.0), 0.0, 0.0)
-    camera.location = (0.0, -10.0, camera.location.z)
+    # Orbit around the vertical axis, staying level and staying orthographic:
+    # at yaw 0 this is the old -Y axis view looking towards +Y.
+    yaw = math.radians(yaw_deg)
+    camera.rotation_euler = (math.radians(90.0), 0.0, yaw)
+    camera.location = (CAMERA_DISTANCE * math.sin(yaw),
+                       -CAMERA_DISTANCE * math.cos(yaw),
+                       camera.location.z)
     return camera
 
 
@@ -156,7 +186,19 @@ def _ensure_freestyle(scene, thickness_px):
     lineset.linestyle.thickness = thickness_px
 
 
-def setup_scene(px=256, outline_px_at_1x=DEFAULT_OUTLINE_PX_AT_1X, samples=32):
+def uses_shell_outline(scene):
+    """True when this .blend inks itself with `add_inverted_hull_outline`.
+
+    Detected from the modifier that function leaves behind rather than from a
+    flag, so a file can never disagree with itself about which of the two
+    outline techniques it uses (ART-QUALITY-STANDARD §4 item 3).
+    """
+    return any(obj.type == "MESH" and obj.modifiers.get("KageOutline") is not None
+               for obj in scene.objects)
+
+
+def setup_scene(px=256, outline_px_at_1x=DEFAULT_OUTLINE_PX_AT_1X, samples=32,
+                view_yaw=None):
     """Configure the whole scene for sprite rendering. Idempotent.
 
     px is the MASTER (@2x) resolution — 256 for characters, 512 for bosses,
@@ -177,8 +219,17 @@ def setup_scene(px=256, outline_px_at_1x=DEFAULT_OUTLINE_PX_AT_1X, samples=32):
         scene.eevee.taa_render_samples = samples
 
     # The outline is authored in @1x pixels but rendered on the @2x master.
-    _ensure_freestyle(scene, outline_px_at_1x * MASTER_SCALE)
-    _ensure_camera(scene)
+    if uses_shell_outline(scene):
+        # The file already draws its ink with an inverted hull. Freestyle on top
+        # of that is what turns a Text->3D character into a solid black blob:
+        # it contours every one of the generated hair locks. `setup_scene` runs
+        # again on every headless render, so honouring the file's technique has
+        # to happen here — `add_inverted_hull_outline` turning Freestyle off at
+        # authoring time is undone the moment the CLI renders the saved .blend.
+        scene.render.use_freestyle = False
+    else:
+        _ensure_freestyle(scene, outline_px_at_1x * MASTER_SCALE)
+    _ensure_camera(scene, view_yaw_deg(scene, view_yaw))
     # Key from the front-upper-right so the face (facing +X) stays lit.
     _ensure_sun(scene, "KageKey", (math.radians(35.0), 0.0, math.radians(35.0)), 3.0)
     # Fill from the opposite side, weak enough to stay inside the darkest band.
@@ -285,8 +336,23 @@ def _world_bounds(objects, depsgraph):
     return min_v, max_v
 
 
+def _half_width_across_view(low, high, yaw_rad):
+    """Half-extent of an axis-aligned box along the camera's horizontal axis.
+
+    At yaw 0 this is just the X extent, which is what the sheet pipeline always
+    measured. Once the camera orbits, world X stops being what the frame is wide
+    in, and fitting against it clips the character off the side of a 3/4 shot.
+    Projecting the four vertical edges of the box is conservative — a box is
+    never tighter than the mesh inside it — so a pose can be framed loosely but
+    never cropped.
+    """
+    cos_yaw, sin_yaw = math.cos(yaw_rad), math.sin(yaw_rad)
+    return max(abs(x * cos_yaw + y * sin_yaw)
+               for x in (low.x, high.x) for y in (low.y, high.y))
+
+
 def fit_camera(objects, margin=DEFAULT_MARGIN, armature=None, actions=None,
-               baseline=DEFAULT_BASELINE):
+               baseline=DEFAULT_BASELINE, yaw_deg=None):
     """Frame the character so no pose is ever clipped and feet stay put.
 
     Sweeps every frame of every action in `actions` (defaults to the standard
@@ -305,28 +371,29 @@ def fit_camera(objects, margin=DEFAULT_MARGIN, armature=None, actions=None,
 
     names = list(actions) if actions is not None else list(ACTION_SPEC)
     original_frame = scene.frame_current
-    min_x = min_z = math.inf
-    max_x = max_z = -math.inf
+    yaw = math.radians(view_yaw_deg(scene, yaw_deg))
+    min_z = math.inf
+    max_z = -math.inf
+    half_width = 0.0
 
     for frame in _iter_action_frames(armature, names):
         if frame is not None:
             scene.frame_set(frame)
             depsgraph = bpy.context.evaluated_depsgraph_get()
         low, high = _world_bounds(meshes, depsgraph)
-        min_x, max_x = min(min_x, low.x), max(max_x, high.x)
+        half_width = max(half_width, _half_width_across_view(low, high, yaw))
         min_z, max_z = min(min_z, low.z), max(max_z, high.z)
     scene.frame_set(original_frame)
 
-    # Horizontal extent is symmetric about x=0 to keep the pivot centred.
-    half_width = max(abs(min_x), abs(max_x))
+    # Horizontal extent is symmetric about the view axis to keep the pivot centred.
     needed_horizontal = (2.0 * half_width) / max(1e-6, 1.0 - 2.0 * margin)
     needed_up = max(0.0, max_z) / max(1e-6, 1.0 - baseline - margin)
     needed_down = max(0.0, -min_z) / max(1e-6, baseline)
     ortho_scale = max(needed_horizontal, needed_up, needed_down)
 
-    camera = _ensure_camera(scene)
+    camera = _ensure_camera(scene, math.degrees(yaw))
     camera.data.ortho_scale = ortho_scale
-    camera.location = (0.0, -10.0, ortho_scale * (0.5 - baseline))
+    camera.location.z = ortho_scale * (0.5 - baseline)
 
     # Anything below z=0 has to fit in the thin strip under the baseline, so a
     # pose that sinks through the floor costs 1/baseline (12.5x) of zoom and
@@ -422,9 +489,7 @@ def render_all_actions(armature, mapping=None, out_dir=".", objects=None):
     if not spec:
         raise RuntimeError("no standard actions found in this .blend")
 
-    meshes = objects if objects is not None else [
-        obj for obj in scene.objects if obj.type == "MESH"
-    ]
+    meshes = objects if objects is not None else renderable_meshes(scene)
     fit_camera(meshes, armature=armature, actions=list(spec))
 
     rendered = {}
@@ -447,6 +512,21 @@ def render_all_actions(armature, mapping=None, out_dir=".", objects=None):
         json.dump(meta, handle, indent=2, sort_keys=True)
     print("[kage] done: {0} actions -> {1}".format(len(rendered), out_dir))
     return meta
+
+
+def renderable_meshes(scene):
+    """Meshes the camera must frame — everything the render will actually show.
+
+    `hide_render` objects are excluded on purpose. A Text->3D character file
+    keeps the raw Rodin import beside the normalised copy (it cannot be
+    regenerated, see `kage_text3d_kit.normalise`), and that import still sits at
+    the generator's own scale and origin. Framing it drags the camera down to
+    whatever is below the floor: on the first Thuy build it alone pushed
+    ortho_scale from 1.47 to 11.86 and rendered the character as a speck. The
+    scale guides are hidden for the same reason.
+    """
+    return [obj for obj in scene.objects
+            if obj.type == "MESH" and not obj.hide_render]
 
 
 def find_armature():
@@ -478,6 +558,12 @@ def _cli_args(argv):
     parser.add_argument("--out", required=True, help="output directory")
     parser.add_argument("--px", type=int, default=256,
                         help="master (@2x) resolution, see ART-PIPELINE §4.1")
+    parser.add_argument("--view-yaw", type=float, default=None,
+                        help="preview azimuth in degrees around the vertical axis. "
+                             "Default: 0 for sprite assets, {0:.0f} (the approved "
+                             "3/4 view) for ADR-031 character files, detected from "
+                             "the outline technique the file uses.".format(
+                                 ADR031_VIEW_YAW_DEG))
     parser.add_argument("--outline-px", type=float, default=None,
                         help="outline width in @1x px. Default: keep whatever the .blend "
                              "was built with, because the right width depends on how big "
@@ -503,12 +589,13 @@ def _main():
         return
     args.outline_px = _resolve_outline(args.outline_px)
     if args.preview:
-        setup_scene(px=args.px, outline_px_at_1x=args.outline_px)
+        setup_scene(px=args.px, outline_px_at_1x=args.outline_px,
+                    view_yaw=args.view_yaw)
         armature = find_armature()
         # Frame the preview exactly as the sheet will be framed, so what gets
         # approved here is what comes out of the batch render.
-        fit_camera([obj for obj in bpy.context.scene.objects if obj.type == "MESH"],
-                   armature=armature)
+        fit_camera(renderable_meshes(bpy.context.scene), armature=armature,
+                   yaw_deg=args.view_yaw)
         frames = None
         if args.preview_frame is not None:
             action = bpy.data.actions[args.preview]
@@ -518,7 +605,8 @@ def _main():
                        action=args.preview, frame=frames, armature=armature)
         return
     if args.all_actions:
-        setup_scene(px=args.px, outline_px_at_1x=args.outline_px)
+        setup_scene(px=args.px, outline_px_at_1x=args.outline_px,
+                    view_yaw=args.view_yaw)
         render_all_actions(find_armature(), out_dir=args.out)
 
 

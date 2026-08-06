@@ -97,7 +97,7 @@ Khớp [GDD §4](../13-game-design/GAME-DESIGN-DOCUMENT.md) (Hỏa/Thủy/Phong/
 - **Vũ khí**: bình hồ lô đeo lưng + dải lụa nước (không phải kiếm — Thủy là hệ hỗ trợ).
 - **Skill thường `thuy_hoi_phuc`** (mục tiêu ALLY) — cast: chắp tay, cúi nhẹ. Impact: **cột nước dịu dâng từ chân lên** đồng đội, kèm vòng ripple ở mặt đất, tông `#7FD4FF` trong mờ. Tránh dùng màu xanh lá — dễ nhầm hệ Phong.
 - **Ultimate `thuy_thuy_trieu`** (ENEMY) — cast dài 4 frame: nước dâng quanh chân người thi triển. Impact: **sóng lớn quét ngang màn hình** từ trái sang phải, đối thủ trong sóng bị đẩy lùi; kết bằng màn nước rơi + ripple đọng 2 frame.
-- **Prompt 3D**: `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, flowing wide-sleeve robe, gourd flask on back, dark knee-length trousers, cloth wraps on feet, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology`
+- **Prompt 3D**: `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, flowing wide-sleeve robe, waist sash, dark knee-length trousers, cloth wraps on feet, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology`
 
 #### 🌪 Phong — *tốc độ, bạo kích*
 

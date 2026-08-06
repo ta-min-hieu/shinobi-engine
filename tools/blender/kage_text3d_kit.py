@@ -80,6 +80,14 @@ def normalise(source_name, out_name, yaw_deg=IMPORT_YAW_DEG):
     source = bpy.data.objects[source_name]
     obj = source.copy()
     obj.data = source.data.copy()
+    # Keep the raw import as the only fallback — the same prompt never returns
+    # the same mesh twice — but take it out of the render. It still sits at the
+    # generator's scale and origin, and `fit_camera` frames whatever renders.
+    # Hide it only after the copy exists, or the character inherits the flags.
+    source.hide_render = True
+    source.hide_viewport = True
+    obj.hide_render = False
+    obj.hide_viewport = False
     obj.name = out_name
     obj.data.name = out_name + "_Mesh"
     obj.matrix_world = Matrix.Identity(4)
@@ -99,12 +107,25 @@ def normalise(source_name, out_name, yaw_deg=IMPORT_YAW_DEG):
     return obj
 
 
-def clean(obj, distance=WELD_DISTANCE):
-    """Weld the glTF seam duplicates so bone-heat weighting can solve at all."""
-    bpy.ops.object.mode_set(mode="OBJECT")
+def _make_active(obj):
+    """Make `obj` the sole selected, active object, in OBJECT mode.
+
+    Order matters and is the whole point of this helper: `mode_set` polls the
+    active object, so calling it before setting one raises "Context missing
+    active object" the moment a file is opened headless with nothing active.
+    Inside an MCP session something is always active, which is why the operator
+    order here read as correct for as long as every caller was interactive.
+    """
+    bpy.context.view_layer.objects.active = obj
+    if obj.mode != "OBJECT":
+        bpy.ops.object.mode_set(mode="OBJECT")
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
-    bpy.context.view_layer.objects.active = obj
+
+
+def clean(obj, distance=WELD_DISTANCE):
+    """Weld the glTF seam duplicates so bone-heat weighting can solve at all."""
+    _make_active(obj)
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.mesh.remove_doubles(threshold=distance)
@@ -379,7 +400,8 @@ def toon_textured(obj, shades=3, rim=0.0, steps=None):
     return material
 
 
-def attach_weapon(rig, name, kind, offset=(0.0, 0.0, 0.0), outline_px_at_1x=None):
+def attach_weapon(rig, name, kind, offset=(0.0, 0.0, 0.0), outline_px_at_1x=None,
+                  color=None, accent=None):
     """Mount the element's weapon as its own mesh, rigidly bound to a bone.
 
     A generated body arrives as one welded lump with the weapon nowhere in it,
@@ -397,8 +419,14 @@ def attach_weapon(rig, name, kind, offset=(0.0, 0.0, 0.0), outline_px_at_1x=None
     Weapon parts are separate objects, so the body's outline modifier does not
     reach them — pass `outline_px_at_1x` to give them their own, or a sharp
     black-outlined character ends up holding an unoutlined blade.
+
+    `color`/`accent` reach `build_weapon` unchanged. They matter more here than
+    on a procedural body: a generated costume comes back in whatever neutral the
+    generator felt like, so on a Text->3D character the weapon is often the only
+    surface carrying the element's palette, which Q10 is scored on
+    (ART-QUALITY-STANDARD §5).
     """
-    parts = kit.build_weapon(rig, {"name": name}, kind)
+    parts = kit.build_weapon(rig, {"name": name}, kind, color=color, accent=accent)
     for part in parts:
         if any(offset):
             for vertex in part.data.vertices:
@@ -489,10 +517,7 @@ def decimate(obj, target_triangles):
     if before <= target_triangles:
         return before, before
 
-    bpy.ops.object.mode_set(mode="OBJECT")
-    bpy.ops.object.select_all(action="DESELECT")
-    obj.select_set(True)
-    bpy.context.view_layer.objects.active = obj
+    _make_active(obj)
 
     modifier = obj.modifiers.new("KageDecimate", "DECIMATE")
     modifier.decimate_type = "COLLAPSE"
