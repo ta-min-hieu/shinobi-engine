@@ -55,9 +55,25 @@ public final class WorldScreen implements GameScreen {
     private final KEntity localPlayer;
     private final Map<Long, KEntity> remoteCharacters = new HashMap<>();
 
+    /**
+     * Id dùng cho nhân vật của chính người chơi trong {@link CharacterModelRenderer}. Server đánh id
+     * cho nhân vật khác; nhân vật của mình chưa bao giờ cần id nên không có. 0 an toàn vì id thật
+     * sinh từ sequence của DB, luôn dương.
+     */
+    private static final long LOCAL_CHARACTER_ID = 0L;
+
+    /**
+     * ⚠️ Tạm thời: mọi nhân vật dùng chung một model. {@link CharacterSpawnedEvent} <b>không có</b>
+     * trường nào mô tả ngoại hình (hệ phái / bậc trang bị), nên client không có cách nào biết phải
+     * nạp model nào. Thêm trường đó là <b>đổi protocol</b> — phải dừng và hỏi chủ dự án
+     * (/CLAUDE.md §4), không tự làm ở đây.
+     */
+    private static final String PLACEHOLDER_MODEL_KEY = "char_thuy-b1";
+
     private final OrthographicCamera camera = new OrthographicCamera();
     private final Viewport viewport;
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
+    private final CharacterModelRenderer models = new CharacterModelRenderer();
 
     private float lastSentDirX;
     private float lastSentDirY;
@@ -76,11 +92,13 @@ public final class WorldScreen implements GameScreen {
         this.localPlayer = world.createEntity();
         localPlayer.add(new PositionComponent());
         localPlayer.add(new VelocityComponent());
+        models.addCharacter(LOCAL_CHARACTER_ID, PLACEHOLDER_MODEL_KEY);
     }
 
     @Override
     public void resize(int width, int height) {
         viewport.update(width, height, true);
+        models.resize(camera.viewportWidth, camera.viewportHeight);
     }
 
     @Override
@@ -144,6 +162,7 @@ public final class WorldScreen implements GameScreen {
         pos.prevY = pos.y;
         entity.add(pos);
         remoteCharacters.put(event.getCharacterId(), entity);
+        models.addCharacter(event.getCharacterId(), PLACEHOLDER_MODEL_KEY);
     }
 
     private void onCharacterMoved(CharacterMovedEvent event) {
@@ -163,6 +182,7 @@ public final class WorldScreen implements GameScreen {
         if (entity != null) {
             world.removeEntity(entity);
         }
+        models.removeCharacter(event.getCharacterId());
     }
 
     private void updateLocalMovementIntent() {
@@ -212,8 +232,36 @@ public final class WorldScreen implements GameScreen {
     @Override
     public void render(float alpha) {
         Gdx.gl.glClearColor(0.1f, 0.1f, 0.15f, 1f);
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+        // Depth buffer bắt buộc từ ADR-031: nhân vật là hình học 3D thật, thiếu depth thì thứ tự vẽ
+        // quyết định cái nào che cái nào — đúng thứ 2.5D phải bỏ.
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
 
+        if (models.isEnabled()) {
+            renderModels(alpha);
+        } else {
+            renderPlaceholderBoxes(alpha);
+        }
+    }
+
+    /** Nhánh 3D (ADR-031) — model glTF qua camera orthographic khoá góc. */
+    private void renderModels(float alpha) {
+        float localX = interpolatedX(localPlayer, alpha);
+        float localY = interpolatedY(localPlayer, alpha);
+        models.setCharacterPosition(LOCAL_CHARACTER_ID, localX, localY);
+        for (Map.Entry<Long, KEntity> entry : remoteCharacters.entrySet()) {
+            models.setCharacterPosition(
+                    entry.getKey(), interpolatedX(entry.getValue(), alpha), interpolatedY(entry.getValue(), alpha));
+        }
+        models.follow(localX, localY);
+        models.render(Gdx.graphics.getDeltaTime());
+    }
+
+    /**
+     * Hình thay thế thời trước ADR-031. Còn giữ vì model là tài sản sinh ra, không commit
+     * ([ART-PIPELINE §7](docs/14-art/ART-PIPELINE.md)) — bản checkout chưa chạy pipeline art vẫn
+     * phải chơi được, không phải màn hình đen.
+     */
+    private void renderPlaceholderBoxes(float alpha) {
         camera.update();
         shapeRenderer.setProjectionMatrix(camera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
@@ -229,13 +277,20 @@ public final class WorldScreen implements GameScreen {
         shapeRenderer.end();
     }
 
-    private void drawInterpolated(KEntity entity, float alpha) {
+    private static float interpolatedX(KEntity entity, float alpha) {
         PositionComponent pos = POSITION.get(entity);
-        float renderX = pos.prevX + ((pos.x - pos.prevX) * alpha);
-        float renderY = pos.prevY + ((pos.y - pos.prevY) * alpha);
+        return pos.prevX + ((pos.x - pos.prevX) * alpha);
+    }
+
+    private static float interpolatedY(KEntity entity, float alpha) {
+        PositionComponent pos = POSITION.get(entity);
+        return pos.prevY + ((pos.y - pos.prevY) * alpha);
+    }
+
+    private void drawInterpolated(KEntity entity, float alpha) {
         shapeRenderer.rect(
-                renderX - (WorldConstants.BOX_SIZE / 2f),
-                renderY - (WorldConstants.BOX_SIZE / 2f),
+                interpolatedX(entity, alpha) - (WorldConstants.BOX_SIZE / 2f),
+                interpolatedY(entity, alpha) - (WorldConstants.BOX_SIZE / 2f),
                 WorldConstants.BOX_SIZE,
                 WorldConstants.BOX_SIZE);
     }
@@ -243,5 +298,6 @@ public final class WorldScreen implements GameScreen {
     @Override
     public void dispose() {
         shapeRenderer.dispose();
+        models.dispose();
     }
 }
