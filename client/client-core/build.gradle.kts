@@ -15,6 +15,10 @@ dependencies {
     // Java, không cần native platform jar ở module này — native chỉ cần ở nơi thật sự chạy app
     // (client-desktop), theo đúng cách gdx-platform natives-desktop đã làm.
     api(libs.gdx.freetype)
+    // ADR-031 — nạp model glTF cho nhân vật/quái/NPC. Đến từ third-party/m2/ trong
+    // repo, không phải jitpack.io (ADR-032). `api` vì kiểu của gdx-gltf sẽ xuất hiện
+    // trong API render mà client-desktop nhìn thấy, giống gdx-freetype ngay trên.
+    api(libs.gdx.gltf)
     // Test cần native FreeType thật để generateFont()/hasGlyph() chạy (FontFactoryVietnameseGlyphTest)
     // — test JVM chạy trực tiếp trên desktop, không qua client-desktop, nên cần natives ở đây.
     testImplementation(variantOf(libs.gdx.freetype.platform) { classifier("natives-desktop") })

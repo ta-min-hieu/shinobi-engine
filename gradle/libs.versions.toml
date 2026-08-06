@@ -57,6 +57,14 @@ gdx-freetype-platform = { module = "com.badlogicgames.gdx:gdx-freetype-platform"
 gdx-box2d = { module = "com.badlogicgames.gdx:gdx-box2d", version.ref = "libgdx" }
 # ADR-029 — TexturePacker cho tools:asset-pipeline. Build-time only, không vào bundle game.
 gdx-tools = { module = "com.badlogicgames.gdx:gdx-tools", version.ref = "libgdx" }
+# ADR-031 — nạp model glTF cho nhánh render 3D thời gian thực (nhân vật/quái/NPC).
+# KHÔNG có trên Maven Central. Jar 318 KB Apache-2.0 đóng gói sẵn trong repo tại
+# third-party/m2/ theo ADR-032 (JitPack build theo yêu cầu ⇒ repo gốc mất là build
+# gãy vĩnh viễn). Kéo theo đúng 1 phụ thuộc bắc cầu: gdx 1.9.11 — dự án vốn đã có
+# gdx 1.14.2 nên không thêm gì mới vào graph.
+# ⚠️ libGDX 1.14.2 là phiên bản đã hoàn tác các thay đổi collection từng làm
+# gdx-gltf crash lúc chạy — đừng nâng libgdx tuỳ tiện (ADR-031 Consequences).
+gdx-gltf = { module = "com.github.mgsx-dev.gdx-gltf:gltf", version = "2.3.0" }
 # ⚠️ Ashley ECS: chỉ engine-ecs được dùng (ADR-006). ArchUnit chặn nơi khác.
 gdx-ashley = { module = "com.badlogicgames.ashley:ashley", version = "1.7.4" }  # ✅ latest (verified 07/2026)
 

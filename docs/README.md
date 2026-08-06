@@ -106,16 +106,18 @@
 
 | # | Việc | Đang chặn gì | Đọc ở đâu |
 |---|---|---|---|
-| 1 | **ADR-032 — phòng vệ JitPack**: đóng gói `gdx-gltf` (318 KB, Apache-2.0) vào `third-party/m2/`, bỏ hẳn `jitpack.io` | Thêm `gdx-gltf` vào `libs.versions.toml` → nối `WorldScreen` sang `ModelBatch` → đo frame time còn thiếu → viết lại `RENDERING.md` cho nhánh 3D | [ADR-032](01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md) |
+| ~~1~~ | ✅ **ADR-032 Accepted 2026-08-06 và đã thi hành cùng ngày** — `gdx-gltf` 2.3.0 nằm trong `third-party/m2/`, đã vào `libs.versions.toml` và `client-core`, resolve + compile được với `--offline` (tức lấy thật từ repo, không qua mạng). Còn lại của dây chuyền: nối `WorldScreen` sang `ModelBatch` → đo frame time → viết lại `RENDERING.md` cho nhánh 3D | Không còn chặn | [ADR-032](01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md) · [third-party/m2](../third-party/m2/README.md) |
 | 2 | **V20 — 3 cột 3D cho `art_asset`** (`asset_kind`/`model_name`/`tri_counts` + `CHECK`). Đổi DB schema nên AI không tự làm | Luật "không có asset mồ côi" sẽ vỡ với mọi model khi bước xuất glTF chạy thật; và thiết kế trang quản trị cho asset `MODEL` | [ART-PIPELINE §8.6](14-art/ART-PIPELINE.md) |
 | 3 | **Desktop-first hay mobile-first** (câu hỏi cũ, chưa trả lời) | ADR-023 (mobile input) chưa viết được; ngân sách tam giác hiện chỉ đo cho desktop — có Android thì phải đo lại trên máy tầm thấp | [CLIENT.md §5](04-client/CLIENT.md) |
 | 4 | Font **Be Vietnam Pro** (OFL 1.1) — chỉ còn xác nhận hình thức, license đã kiểm tại nguồn + test glyph PASS | Không chặn gì | [RESOURCE.md §7](04-client/RESOURCE.md) |
 | 5 | i18n: có tiếng Anh ở MVP không · Mô hình kinh doanh | Chưa chặn phase nào | [GDD](13-game-design/GAME-DESIGN-DOCUMENT.md) |
 | 6 | **GM/admin tool**: in-game command hay web app? mấy cấp quyền? tách service hay nhúng? | Chưa chặn — Closed Beta người quen vận hành bằng SQL tay được. Trả lời thì mới viết được [ADMIN.md](12-devtools/ADMIN.md) | [ADMIN.md](12-devtools/ADMIN.md) |
 
-> **Ngoài 5 dòng trên, không còn gì chờ duyệt.** ADR-032 là ADR **duy nhất** còn `Proposed` — mọi ADR
-> khác đã Accepted (kiểm bằng dòng `Status` của từng file, 2026-08-05). Nếu tài liệu nào còn viết
-> "chờ chủ dự án Accept" cho ADR khác thì đó là chữ cũ sót lại, không phải việc thật.
+> **Từ 2026-08-06 không còn ADR nào ở trạng thái `Proposed`** — ADR-032 là cái cuối cùng, đã Accepted.
+> Những dòng còn lại trong bảng là câu hỏi sản phẩm/vận hành, không phải ADR chờ duyệt. Đoạn dưới giữ
+> lại làm lịch sử của lần rà 2026-08-05: *"ADR-032 là ADR duy nhất còn `Proposed` — mọi ADR khác đã
+> Accepted."* Luật vẫn đúng nguyên: nếu tài liệu nào còn viết "chờ chủ dự án Accept" cho một ADR thì
+> **kiểm dòng `Status` của chính file ADR đó**, đừng tin chữ ở nơi khác.
 
 ---
 

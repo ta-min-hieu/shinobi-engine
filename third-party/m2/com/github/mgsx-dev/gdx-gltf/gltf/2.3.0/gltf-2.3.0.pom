@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <!-- do_not_remove: published-with-gradle-metadata -->
+<modelVersion>4.0.0</modelVersion>
+  <groupId>com.github.mgsx-dev.gdx-gltf</groupId>
+  <artifactId>gltf</artifactId>
+  <version>2.3.0</version>
+  <name>mgsx-dev/gdx-gltf</name>
+  <description>GLTF 2.0 3D format support and PBR shader implementation for LibGDX</description>
+  <url>https://github.com/mgsx-dev/gdx-gltf</url>
+  <inceptionYear>2018</inceptionYear>
+  <licenses>
+    <license>
+      <name>Apache License 2.0</name>
+      <url>https://api.github.com/licenses/apache-2.0</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <id>mgsx-dev</id>
+      <name>MGSX</name>
+      <email></email>
+    </developer>
+  </developers>
+  <scm>
+    <connection>scm:git://github.com/mgsx-dev/gdx-gltf.git</connection>
+    <developerConnection>scm:git://github.com/mgsx-dev/gdx-gltf.git</developerConnection>
+    <url>git://github.com/mgsx-dev/gdx-gltf.git</url>
+  </scm>
+  <dependencies>
+    <dependency>
+      <groupId>com.badlogicgames.gdx</groupId>
+      <artifactId>gdx</artifactId>
+      <version>1.9.11</version>
+      <scope>compile</scope>
+    </dependency>
+  </dependencies>
+</project>

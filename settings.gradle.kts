@@ -12,6 +12,12 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         mavenCentral()
+        // Kho Maven cục bộ nằm trong repo (ADR-032). Chỉ chứa gdx-gltf, thứ duy
+        // nhất dự án cần mà Maven Central không có. Đóng gói thay vì khai
+        // jitpack.io: JitPack build theo yêu cầu từ GitHub, nên repo gốc bị xoá
+        // là build gãy vĩnh viễn — rủi ro checksum không chặn được.
+        // Xem third-party/m2/README.md.
+        maven { url = uri(rootDir.resolve("third-party/m2")) }
         // libGDX Box2D/native đôi khi cần Sonatype snapshots — thêm khi cần, không thêm sẵn.
     }
     // Version Catalog tự nạp từ gradle/libs.versions.toml (không cần khai báo).

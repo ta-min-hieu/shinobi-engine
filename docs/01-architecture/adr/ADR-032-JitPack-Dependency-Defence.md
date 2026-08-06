@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | 📝 **Proposed** (2026-08-05) — chờ chủ dự án duyệt |
+| Status | ✅ **Accepted** (2026-08-06, chủ dự án xác nhận qua chat) — **đã thi hành cùng ngày**, xem [third-party/m2/README.md](../../../third-party/m2/README.md) |
 | Date | 2026-08-05 |
 | Deciders | Chủ dự án quyết; AI soạn + đo |
 | Related | Thi hành việc treo #2 của [ADR-031](ADR-031-25D-Realtime-3D-Rendering.md) · [TECHNOLOGY-STACK.md](../TECHNOLOGY-STACK.md) · [/CLAUDE.md §4](../../../CLAUDE.md) (thêm thư viện phải dừng hỏi) · Điều 36 |
