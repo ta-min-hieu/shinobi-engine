@@ -57,7 +57,8 @@ final class MetricsScraper {
      * body nên luôn đồng bộ thời gian với nhau (BENCHMARK.md §5.1, tránh lệch pha giữa 2 lần gọi
      * HTTP riêng).
      */
-    record MetricsSnapshot(double p50Millis, double p95Millis, double p99Millis, double playersOnline, double goldTotal) {
+    record MetricsSnapshot(
+            double p50Millis, double p95Millis, double p99Millis, double playersOnline, double goldTotal) {
         static final MetricsSnapshot UNAVAILABLE = new MetricsSnapshot(-1, -1, -1, -1, -1);
     }
 
