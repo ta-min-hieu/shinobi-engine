@@ -20,7 +20,7 @@
 | Dialog NPC | |
 | Chat box | |
 
-**UI có camera riêng, atlas riêng, layer riêng** ([RENDERING.md §6](../03-engine/RENDERING.md)).
+**UI có camera riêng, atlas riêng, layer riêng** ([RENDERING.md §9](../03-engine/RENDERING.md)).
 
 ---
 
@@ -225,7 +225,7 @@ if (current != lastHp) {
 ## Tài liệu liên quan
 
 - [CLIENT.md](CLIENT.md) — §5 input, §11 PlatformAdapter (nguồn `uiScale()`)
-- [RENDERING.md §6](../03-engine/RENDERING.md) — UI là layer riêng
+- [RENDERING.md §9](../03-engine/RENDERING.md) — UI là layer riêng
 - [RESOURCE.md](RESOURCE.md) — UI atlas, font
 - [NETWORK.md](../05-server/NETWORK.md) — `errorKey` cho i18n
 

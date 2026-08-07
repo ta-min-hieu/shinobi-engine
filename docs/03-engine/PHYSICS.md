@@ -87,7 +87,7 @@ mọi System khác.
 
 ## 5. Đơn vị
 
-World unit = mét, dùng chung với rendering ([RENDERING.md §4](RENDERING.md)) — nhân vật cao ~1.8
+World unit = mét, dùng chung với rendering ([RENDERING.md §5](RENDERING.md)) — nhân vật cao ~1.8
 unit. Giữ nguyên quy ước này dù không còn Box2D (đơn vị nhất quán vẫn cần cho mọi tính toán khoảng
 cách/AABB).
 
@@ -128,7 +128,7 @@ PASS (`TriggerZoneSystemTest`).
 ## 8. Tích hợp với ECS
 
 Không còn `PhysicsBodyComponent`/Box2D `Body` — chỉ có `PositionComponent` (đã có sẵn `prevX/prevY`
-cho render interpolation, RENDERING.md §7) và `TerrainCollisionSystem` đọc/ghi trực tiếp lên đó.
+cho render interpolation, RENDERING.md §10) và `TerrainCollisionSystem` đọc/ghi trực tiếp lên đó.
 
 **Ai là nguồn chân lý về vị trí?** Luôn là `PositionComponent`, ghi bởi `MovementSystem` rồi có thể
 bị `TerrainCollisionSystem` sửa lại (revert) NGAY TRONG CÙNG TICK trước khi bất kỳ System nào khác
@@ -160,7 +160,7 @@ Không còn. ✅ **[ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md) Ac
 
 - [ENGINE.md §4](ENGINE.md) — fixed timestep
 - [ECS.md §6](ECS.md) — thứ tự System
-- [RENDERING.md §4](RENDERING.md) — world unit dùng chung
+- [RENDERING.md §5](RENDERING.md) — world unit dùng chung
 - [GAMEPLAY.md](../05-server/GAMEPLAY.md) — combat tính thế nào (không qua va chạm)
 - [ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md) — quyết định + implementation đầy đủ
 

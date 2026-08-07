@@ -87,10 +87,12 @@ Chi tiết: [RESOURCE.md](RESOURCE.md). Ở mức client:
 ```
 Splash          → load asset tối thiểu (logo, font, thanh loading)
 Loading         → load UI atlas + asset dùng chung
-LoadingWorld    → load atlas của zone sắp vào, unload atlas zone cũ
+LoadingWorld    → load atlas + model .glb của zone sắp vào, unload zone cũ
 ```
 
 ⚠️ **Không** load toàn bộ asset lúc khởi động — mobile không đủ RAM, và thời gian khởi động sẽ tệ.
+
+⚠️ **Từ [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) (Accepted 2026-08-03) có hai loại tài sản phải nạp, không phải một**: atlas cho VFX/icon/UI, và **model glTF (`.glb`) cho nhân vật · quái · NPC**. Nạp `.glb` là **đọc đĩa + dựng texture** nên tuyệt đối không được nằm trong game loop — cùng luật với atlas. Chi tiết vòng đời model: [RENDERING.md §6](../03-engine/RENDERING.md).
 
 ---
 
@@ -274,6 +276,8 @@ public interface PlatformAdapter {
 
 ⚠️ **Đây là mục tiêu đề xuất, chưa verify.** Phải đo thật ở Phase 3 và điều chỉnh — không coi số này là sự thật ([AI-WORKING-RULES.md §14](../00-governance/AI-WORKING-RULES.md)).
 
+⚠️ **Dòng "draw call" chỉ còn đo được nửa vấn đề.** Sau [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md), nhân vật · quái · NPC không đi qua `SpriteBatch` nữa nên chi phí của chúng là **số tam giác**, không phải số draw call — ngân sách 5k/10k/20k tam giác mỗi nhân vật theo tier ở [RENDERING.md §7](../03-engine/RENDERING.md). Frame time GPU với 20 nhân vật trên màn **chưa ai đo**.
+
 ---
 
 ## Technical Decisions
@@ -297,7 +301,7 @@ public interface PlatformAdapter {
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
 | **ADR-023** | **Mobile input scheme** (joystick ảo / tap-to-move / D-pad) — ảnh hưởng cả UI lẫn gameplay | 🟡 Chặn Phase 2 nếu mobile-first |
-| **ADR-020** | Viewport strategy — [RENDERING.md §3](../03-engine/RENDERING.md) | 🟡 Chặn Phase 1 |
+| ~~**ADR-020**~~ | ✅ Viewport strategy — **Accepted 2026-08-01** (`FitViewport`), xem [RENDERING.md §4](../03-engine/RENDERING.md) | Hết chặn |
 
 ## Tài liệu liên quan
 

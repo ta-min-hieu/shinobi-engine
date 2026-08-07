@@ -147,12 +147,18 @@ Xem lại quyết định này khi **một trong ba** điều kiện sau xảy r
 ## Việc cần làm tiếp theo
 
 1. ✅ Chủ dự án đã Accept (2026-08-03, qua chat).
-2. 📝 Chốt cách phòng vệ JitPack **trước** khi thêm dependency thật → đã soạn
-   [ADR-032](ADR-032-JitPack-Dependency-Defence.md) (Proposed 2026-08-05), **chờ duyệt**.
+2. ✅ **Xong 2026-08-06** — cách phòng vệ JitPack chốt ở
+   [ADR-032](ADR-032-JitPack-Dependency-Defence.md) (**Accepted**, thi hành cùng ngày): `gdx-gltf`
+   đóng gói vào `third-party/m2/`, `jitpack.io` bỏ hẳn khỏi build. Điều kiện Revisit Trigger #3 ở
+   trên **tự vô hiệu**.
 3. ✅ **Đo poly budget — xong 2026-08-05.** Decimate mesh pilot xuống 5k/10k/20k/40k, so ảnh từng
    pixel, xuất `.glb` thật: ngưỡng 5k/10k/20k cho low/med/high, số liệu ở
    [ART-PIPELINE §4.4](../../14-art/ART-PIPELINE.md). Cảnh báo "mesh pilot 93k tam giác" ở phần
    Consequences là **đo đúng**. Phần **chưa** làm được: frame time GPU — cần chính việc #2 và #5 xong trước.
-4. Viết lại ART-PIPELINE §3 + RENDERING.md.
-5. Nối `WorldScreen` sang `ModelBatch` với đúng một nhân vật trước, rồi mới nhân rộng — đây cũng là
-   thứ mở khoá phép đo ở Revisit Trigger #1.
+4. ✅ **Xong** — ART-PIPELINE §3 viết lại 2026-08-03; [RENDERING.md](../../03-engine/RENDERING.md)
+   viết lại 2026-08-07 (v2.0.0, mô tả **cả hai** nhánh render + tình trạng code thật).
+5. ✅ **Đã nối** `WorldScreen` sang nhánh 3D (`df5ace2`) — `CharacterModelRenderer` dùng
+   `SceneManager` của gdx-gltf. ⛔ **Nhưng chưa ai nhìn thấy nó vẽ ra model thật**: `.glb` không
+   commit nên bản checkout sạch rơi về hình hộp thay thế. Revisit Trigger #1 **vẫn chưa đo được**.
+6. 🛑 **Cần chủ dự án**: `CharacterSpawnedEvent` không có trường mô tả ngoại hình ⇒ mọi nhân vật
+   đang nạp cùng một model. Thêm trường đó là **đổi protocol** ([/CLAUDE.md §4](../../../CLAUDE.md)).
