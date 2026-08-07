@@ -18,20 +18,36 @@ final class NamingValidator {
     // tầng 1 của ART-PIPELINE §8.2 nhưng chưa có asset nào — vẫn cho phép để không chặn tương lai.
     private static final Set<String> KNOWN_PREFIXES = Set.of("char_", "mob_", "vfx_", "icon_", "env_", "ui_");
 
+    // ADR-031: chỉ nhân vật · quái · NPC mới render 3D; VFX/icon/UI/môi trường vẫn là sprite 2D.
+    // File .glb mang prefix ngoài tập này = đặt nhầm thư mục hoặc hiểu nhầm ADR, không phải asset mới.
+    private static final Set<String> MODEL_PREFIXES = Set.of("char_", "mob_");
+
     private static final Pattern SAFE_NAME = Pattern.compile("^[a-z0-9_.-]+$");
 
     private NamingValidator() {}
 
     static void validate(AssetFolder asset) {
-        requireSafeName(asset.assetKey(), "asset_key");
-        if (KNOWN_PREFIXES.stream().noneMatch(asset.assetKey()::startsWith)) {
-            throw new AssetPipelineException("asset_key '" + asset.assetKey() + "' không khớp prefix danh mục nào ("
-                    + KNOWN_PREFIXES + ") — ART-PIPELINE.md §8.2");
-        }
+        validateAssetKey(asset.assetKey(), KNOWN_PREFIXES);
         if (asset.isStaticIcon()) {
             validateStaticIcon(asset);
         } else {
             validateAnimated(asset);
+        }
+    }
+
+    /**
+     * Nhánh 3D: tên file {@code .glb} bỏ đuôi phải là một {@code asset_key} hợp lệ y hệt nhánh 2D
+     * (cùng cột {@code art_asset.asset_key}, ART-PIPELINE.md §8) — không có quy ước riêng cho model.
+     */
+    static void validateModel(ScannedModel model) {
+        validateAssetKey(model.assetKey(), MODEL_PREFIXES);
+    }
+
+    private static void validateAssetKey(String assetKey, Set<String> allowedPrefixes) {
+        requireSafeName(assetKey, "asset_key");
+        if (allowedPrefixes.stream().noneMatch(assetKey::startsWith)) {
+            throw new AssetPipelineException("asset_key '" + assetKey + "' không khớp prefix danh mục nào ("
+                    + allowedPrefixes + ") — ART-PIPELINE.md §8.2");
         }
     }
 
