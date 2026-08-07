@@ -20,8 +20,9 @@ Admin tool (GM command, dashboard, quản lý người chơi) chỉ cần khi **
 
 ⚠️ **Một phần trang quản trị ĐÃ được thiết kế đầy đủ ở nơi khác**: mục quản lý kho đồ hoạ (duyệt asset
 theo cây danh mục, xem sprite/model, so tier, kiểm license) nằm ở
-[ART-PIPELINE §8.3 · §8.7 · §8.8](../14-art/ART-PIPELINE.md) và dựa trên bảng `art_asset` đã thi hành
-thật (`V19`). Khi viết file này, **trỏ sang đó chứ đừng chép lại** — hai bản mô tả cùng một màn hình
+[ART-PIPELINE §8.3 · §8.6 · §8.7 · §8.8](../14-art/ART-PIPELINE.md) và dựa trên bảng `art_asset` đã
+thi hành thật (`V19` cho nhánh sprite, `V20` cho nhánh model glTF — cả hai nhánh đã có dữ liệu thật
+trong bảng). Khi viết file này, **trỏ sang đó chứ đừng chép lại** — hai bản mô tả cùng một màn hình
 sẽ lệch nhau ngay lần sửa đầu tiên.
 
 ---

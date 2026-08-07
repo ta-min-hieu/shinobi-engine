@@ -22,15 +22,10 @@ import java.util.stream.Stream;
  *       decimate/xuất lại: bước đó thuộc Blender (ART-PIPELINE.md §6.4 bước 9).
  * </ul>
  *
- * <p>Rồi sinh {@code asset-manifest.json} cho cả hai nhánh → upsert {@code art_asset} (V19,
- * ART-PIPELINE §8.3) NẾU có cấu hình DB (biến môi trường {@code DB_PASSWORD} — xem
- * {@link ArtRegistryConfig}); không có thì bỏ qua bước upsert, không fail — cho phép duyệt atlas
- * cục bộ mà không cần Postgres đang chạy.
- *
- * <p>⚠️ Upsert hiện <b>chỉ chạy cho nhánh 2D</b>. Nhánh 3D cần cột {@code asset_kind}/
- * {@code model_name}/{@code tri_counts} mà {@code V19} chưa có; đó là DB schema change nên phải chờ
- * chủ dự án duyệt {@code V20} (ART-PIPELINE.md §8.6, /CLAUDE.md §4) — tool chỉ in cảnh báo rõ ràng
- * chứ không tự thêm cột, cũng không âm thầm nhét model vào cột của sprite.
+ * <p>Rồi sinh {@code asset-manifest.json} cho cả hai nhánh → upsert {@code art_asset} cho CẢ HAI
+ * nhánh (V19 + V20, ART-PIPELINE §8.3/§8.6) NẾU có cấu hình DB (biến môi trường {@code DB_PASSWORD}
+ * — xem {@link ArtRegistryConfig}); không có thì bỏ qua bước upsert, không fail — cho phép duyệt
+ * atlas cục bộ mà không cần Postgres đang chạy.
  */
 public final class AssetPipelineRunner {
 
@@ -45,7 +40,8 @@ public final class AssetPipelineRunner {
         assets.forEach(NamingValidator::validate);
         System.out.println("[asset-pipeline] validate tên: OK (" + assets.size() + "/" + assets.size() + ")");
 
-        List<ScannedModel> models = checkModels(exportedRoot.resolve("models"));
+        Path modelsRoot = exportedRoot.resolve("models");
+        List<ScannedModel> models = checkModels(modelsRoot);
 
         Path atlasesRoot = exportedRoot.resolve("atlases");
         packTier(assets, GraphicsTier.LOW, atlasesRoot);
@@ -57,8 +53,8 @@ public final class AssetPipelineRunner {
 
         ArtRegistryConfig dbConfig = ArtRegistryConfig.fromEnvironmentOrNull();
         if (dbConfig != null) {
-            ArtRegistryUpserter.upsertAll(assets, dbConfig);
-            warnModelsNotUpserted(models);
+            ArtRegistryUpserter.upsertSprites(assets, dbConfig);
+            ArtRegistryUpserter.upsertModels(models, modelsRoot, renderRoot, dbConfig);
         } else {
             System.out.println("[asset-pipeline] bỏ qua upsert art_asset (thiếu biến môi trường DB_PASSWORD)");
         }
@@ -88,15 +84,6 @@ public final class AssetPipelineRunner {
             System.out.println("[asset-pipeline] ngân sách tam giác: OK (" + models.size() + "/" + models.size() + ")");
         }
         return models;
-    }
-
-    private static void warnModelsNotUpserted(List<ScannedModel> models) {
-        if (models.isEmpty()) {
-            return;
-        }
-        System.out.println("[asset-pipeline] CHƯA upsert " + models.size()
-                + " model vào art_asset: bảng thiếu cột asset_kind/model_name/tri_counts."
-                + " Đây là DB schema change — chờ chủ dự án duyệt V20 (ART-PIPELINE.md §8.6).");
     }
 
     private static void packTier(List<AssetFolder> assets, GraphicsTier tier, Path atlasesRoot) {

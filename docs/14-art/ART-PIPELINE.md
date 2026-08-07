@@ -538,24 +538,23 @@ Suy ra thay vì lưu cứng để đổi tier hoặc đổi origin không phải
 
 Bảng cột trên viết cho **nhánh 2D**. Nhánh 3D (nhân vật · quái · NPC sau [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)) giao model glTF chứ không giao atlas — xem §8.6 (schema) và §8.8 (trang quản trị).
 
-### 8.6 Nhánh 3D trong `art_asset` — **thiết kế đề xuất, chờ chủ dự án duyệt**
+### 8.6 Nhánh 3D trong `art_asset` — **đã thi hành** (`V20__extend_art_asset_for_3d.sql`, 2026-08-07)
 
-⚠️ **Đây là DB schema change** ([/CLAUDE.md §4](../../CLAUDE.md)) — mục này mô tả thiết kế, **chưa
-được thi hành**. Không sửa `V19` tại chỗ; khi được duyệt thì viết `V20__extend_art_asset_for_3d.sql`.
+Chủ dự án duyệt 2026-08-07 (ngoại lệ tường minh cho lệnh cấm đổi DB schema ở
+[/CLAUDE.md §4](../../CLAUDE.md), chỉ áp cho đúng bảng `art_asset`). `V19` **không** bị sửa tại chỗ.
 
-**Vấn đề.** `blend_path`/`render_dir`/`preview_url`/`atlas_name`/`master_px` đều giả định sản phẩm
-giao là sprite trong atlas. Model glTF xuất vào `assets/exported/models/{low,med,high}/`
-([§3.2](#32-sơ-đồ--nhánh-3d-nhân-vật--quái--npc)) không có chỗ đứng trong bảng — nên ngày bước
-decimate/xuất glTF được code (§10), luật §8.5 "fail build nếu file trong `assets/exported/` không
-truy ra được dòng DB" sẽ **tự vỡ**: file model nào cũng là mồ côi.
+**Vấn đề đã giải.** `blend_path`/`render_dir`/`preview_url`/`atlas_name`/`master_px` đều giả định sản
+phẩm giao là sprite trong atlas. Model glTF xuất vào `assets/exported/models/{low,med,high}/`
+([§3.2](#32-sơ-đồ--nhánh-3d-nhân-vật--quái--npc)) không có chỗ đứng trong bảng, nên luật §8.5 "fail
+build nếu file trong `assets/exported/` không truy ra được dòng DB" **tự vỡ** với mọi file model.
 
-**Đề xuất: thêm cột vào `art_asset`, không tách bảng phụ.**
+**Cách giải: thêm cột vào `art_asset`, không tách bảng phụ.**
 
 | Cột mới | Kiểu | Ý nghĩa |
 |---|---|---|
-| `asset_kind` | `VARCHAR(8) NOT NULL DEFAULT 'SPRITE'` | `SPRITE` \| `MODEL` — quyết định nhóm cột nào có nghĩa, và pipeline soi thư mục nào khi kiểm mồ côi |
-| `model_name` | `VARCHAR(64)` | Tên gốc của model, ví dụ `char_ninja-fire`. Đường dẫn từng tier **suy ra** như atlas: `models/{low\|med\|high}/{model_name}.glb` |
-| `tri_counts` | `JSONB` | `{"low":5107,"med":10107,"high":20107}` — số tam giác thật sau decimate từng tier, đọc thẳng từ sidecar `model-meta.json` |
+| `asset_kind` | `VARCHAR(8) NOT NULL DEFAULT 'SPRITE'` | `SPRITE` \| `MODEL` — quyết định nhóm cột nào có nghĩa, và pipeline soi thư mục nào khi kiểm mồ côi. `DEFAULT 'SPRITE'` nên không phải backfill dòng cũ |
+| `model_name` | `VARCHAR(64)` | Tên gốc của model, ví dụ `char_hoa-b1`. Đường dẫn từng tier **suy ra** như atlas: `models/{low\|med\|high}/{model_name}.glb` |
+| `tri_counts` | `JSONB` | `{"low":5107,"med":10107,"high":20107}` — số tam giác thật của từng tier |
 
 Ràng buộc chống lẫn nhánh (rẻ, bắt sai ngay lúc insert):
 
@@ -565,11 +564,20 @@ CONSTRAINT art_asset_kind_branch CHECK (
  OR (asset_kind = 'MODEL'  AND atlas_name IS NULL AND master_px  IS NULL))
 ```
 
+Không cần liệt kê riêng danh sách giá trị hợp lệ của `asset_kind`: một giá trị thứ ba bất kỳ làm
+**cả hai** vế sai nên bị chính ràng buộc này bác (đã thử thật với `'FOO'`).
+
 Cột dùng chung, **không** đổi nghĩa giữa hai nhánh: `asset_key`, `category_id`, `element`, `status`,
-`blend_path`, `preview_url`, `actions`, `license`, `attribution`, `checksum`.
+`blend_path`, `preview_url`, `license`, `attribution`, `checksum`.
 `render_dir` giữ nguyên tên và vẫn dùng cho nhánh 3D, nhưng đổi *vai trò*: với `MODEL` nó là
 **bằng chứng nghiệm thu** ([ART-QUALITY-STANDARD §7](ART-QUALITY-STANDARD.md)), không phải nguồn để
 pack. Hai nhánh vì thế vẫn dùng chung trang quản trị và chung câu lọc theo category/element.
+
+⚠️ **`actions` là ngoại lệ: dòng `MODEL` để `NULL`.** Với sprite, `{"idle":4}` là số frame — dữ liệu
+không nằm sẵn trong file `.atlas`. Với model, bộ animation nằm ngay trong `.glb` và đã được liệt kê
+trong sidecar, nên chép vào DB là vi phạm đúng luật "không nhân bản dữ liệu đọc được bằng máy vào
+DB" mà §8.7 đặt ra cho toạ độ region. Trang quản trị đọc danh sách action từ sidecar (§8.8).
+`tri_counts` thì ngược lại — nó là dữ liệu **duy nhất** cho phép so 3 tier (§8.8) nên phải vào DB.
 
 **Vì sao thêm cột chứ không tách bảng `art_model`:**
 
@@ -582,14 +590,35 @@ pack. Hai nhánh vì thế vẫn dùng chung trang quản trị và chung câu l
 4. `CHECK` ở trên cho lại đúng thứ mà tách bảng mua được (không thể điền nhầm cột chéo nhánh), với
    giá 4 dòng SQL và không thêm bảng.
 
-**Việc kèm theo khi thi hành** (không được quên, nếu không luật §8.5 vẫn hở):
+**Một `asset_key` = một dòng, dù có 3 file `.glb`.** `asset_key` là `UNIQUE` từ `V19`, và ba tier chỉ
+khác nhau ở con số nằm gọn trong `tri_counts` — đúng cách `atlas_name` gói 3 atlas tier vào một cột ở
+nhánh 2D. `checksum` vì thế là SHA-256 của **cả bộ 3 file** nối theo thứ tự tier, không phải của một
+file, giống cách nhánh sprite gộp mọi frame PNG của một asset.
 
-- `ArtRegistryUpserter` đọc thêm `asset_kind` từ ASSET-LOG/manifest và điền `model_name`/`tri_counts`.
-- Bước kiểm mồ côi soi **cả hai** thư mục: `assets/exported/atlases/` (nhánh SPRITE) và
-  `assets/exported/models/` (nhánh MODEL).
-- `tri_counts` không phải đo lại: `export_character_lods.py` đã ghi sẵn nó (cùng `glb_bytes`,
-  `texture_px`, `actions`) vào sidecar **`<asset_key>.model-meta.json`** đặt cạnh thư mục model —
-  đúng vai trò `render-meta.json` giữ cho nhánh sprite.
+**Cách `ArtRegistryUpserter` điền từng cột** (thi hành 2026-08-07):
+
+- `asset_kind = 'MODEL'`, `model_name = asset_key`, `status = 'EXPORTED'` — file đã thật sự nằm trong
+  `assets/exported/`.
+- `tri_counts` lấy **số đo thật từ chính file `.glb`** (`GlbTriangleCounter`), không chép `tri_counts`
+  của sidecar: cái phải ghi vào DB là con số của file sắp ship, không phải con số Blender tự khai lúc
+  xuất. Hai nguồn này hiện **khớp nhau tuyệt đối** trên cả 45 file, nhưng chỉ số đo mới tự kiểm được.
+- `blend_path` đọc field `blend_file` của sidecar rồi cắt về đường dẫn tương đối gốc repo (§8.4).
+  ⚠️ **Không** suy bằng quy ước tên như nhánh 2D: quy ước "`asset_key` bỏ prefix = tên `.blend`" đúng
+  14/15 model nhưng **sai với `char_hoa-b1`**, vốn xuất từ `hoa-text3d-pilot.blend` (ASSET-LOG.md)
+  trong khi `hoa-b1.blend` cũng tồn tại và là file khác.
+- `render_dir` chỉ ghi khi thư mục bằng chứng có thật trên đĩa; chưa có contact sheet thì để `NULL`
+  còn hơn ghi một đường dẫn 404 mà trang quản trị lại tưởng là có bằng chứng.
+- Khi `DO UPDATE`, cột của nhánh kia bị ép `NULL` — một asset **có** chuyển từ `SPRITE` sang `MODEL`
+  (đúng chuyện đã xảy ra với nhân vật theo ADR-031), giữ giá trị cũ là vi phạm ngay `CHECK` ở trên.
+
+**Việc kèm theo còn hở** (nếu không luật §8.5 vẫn chưa kín):
+
+- Bước kiểm mồ côi phải soi **cả hai** thư mục: `assets/exported/atlases/` (nhánh SPRITE) và
+  `assets/exported/models/` (nhánh MODEL). **Chưa code** — pipeline hiện upsert đủ cả hai nhánh nhưng
+  chưa đối chiếu ngược từ file trên đĩa về dòng DB.
+- Sidecar **`<asset_key>.model-meta.json`** (`export_character_lods.py` ghi sẵn `tri_counts`,
+  `glb_bytes`, `texture_px`, `actions`, `blend_file`) là **đầu vào bắt buộc** của bước upsert — thiếu
+  file này thì fail build, đúng vai trò `render-meta.json` giữ cho nhánh sprite.
 
 ⚠️ **Đuôi file là `.glb`, không phải `.gltf`.** Xuất dạng một file tự chứa thay vì bộ ba
 `.gltf` + `.bin` + `.png`: patcher băm và phát **theo từng file** ([RESOURCE.md §9](../04-client/RESOURCE.md)),
@@ -627,10 +656,10 @@ Nên trang quản trị **tự cắt được mọi vùng** bằng `canvas.drawI
 
 ⚠️ **Không copy toạ độ region vào DB.** File `.atlas` đã là nguồn sự thật và đọc được bằng máy; nhân bản vào DB chỉ tạo thêm chỗ để lệch. DB giữ *asset là gì*, `.atlas` giữ *nó nằm đâu trong ảnh*.
 
-### 8.8 Trang quản trị xem asset `MODEL` — **thiết kế đề xuất, đi kèm V20**
+### 8.8 Trang quản trị xem asset `MODEL` — **thiết kế đề xuất**
 
-⚠️ Cùng trạng thái với [§8.6](#86-nhánh-3d-trong-art_asset--thiết-kế-đề-xuất-chờ-chủ-dự-án-duyệt): mô tả
-thiết kế, **chưa thi hành**. Không viết code trang quản trị khi `asset_kind` chưa tồn tại.
+⚠️ Phần **schema** đã thi hành (§8.6, `V20`) nên `asset_kind`/`model_name`/`tri_counts` đã đọc được
+thật. Riêng **trang quản trị** vẫn là thiết kế: cả `ADMIN.md` lẫn mục này chưa có dòng code nào.
 
 **Điểm khác cốt lõi so với nhánh SPRITE**: với sprite, thứ mà tier thay đổi **nhìn thấy được trong
 ảnh** (@0.5x mờ hơn @1x). Với model, ba tier khác nhau ở **số tam giác và cỡ texture** — tức **con số,
@@ -674,7 +703,7 @@ region vào DB" ở trên: file đã là nguồn sự thật, nhân bản ra ch�
 | 5 | Animation 12fps on-twos, số frame cố định theo asset | Phong cách anime + ngân sách atlas; không phải setting | **Còn hiệu lực — chỉ cho VFX 2D**; nhân vật chạy theo fps thật |
 | 5b | Nhân vật xuất **glTF 2.0**, client nạp bằng `gdx-gltf`; vẻ ngoài cel do shader runtime | Blender xuất glTF sẵn trong core, không qua công cụ ngoài đã bỏ hoang | **Chốt** — [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) |
 | 6 | Script chuẩn trong `tools/blender/`, MCP chỉ gọi hàm | Kỷ luật token §6.1 | Đề xuất |
-| 7 | DB lưu **metadata** asset (bảng `art_asset`), binary ở file/patch | §8 — trang quản trị cần registry, client không nối DB | ✅ **Thi hành 2026-08-01** (`V19`, §8.2, verify Postgres thật); riêng phần mở rộng nhánh 3D (§8.6) chờ duyệt |
+| 7 | DB lưu **metadata** asset (bảng `art_asset`), binary ở file/patch | §8 — trang quản trị cần registry, client không nối DB | ✅ **Thi hành 2026-08-01** (`V19`, §8.2, verify Postgres thật); phần mở rộng nhánh 3D ✅ **thi hành 2026-08-07** (`V20`, §8.6, 15 dòng `MODEL` upsert thật) |
 | 8 | Danh mục = bảng `art_category` phân cấp 2 tầng, asset gắn tầng lá | Chủ dự án yêu cầu chia category rõ ràng; thêm loại không cần migration | ✅ **Thi hành 2026-08-01** (`V19`, seed 6 tầng 1 + 19 tầng 2) |
 | 9 | **nginx đọc đĩa** phục vụ file tĩnh; không dùng object storage | §8.4 — nhanh hơn (`sendfile()` zero-copy), không thêm dependency, patcher vốn dùng URL HTTP nên không có lock-in để chống | **Chốt** 2026-08-01 (chủ dự án loại MinIO) |
 | 10 | VFX đặt tên `vfx_<skill_code>` khớp `SkillRegistry` | Asset map 1-1 với skill thật, không cần bảng tra | Đề xuất |
@@ -689,16 +718,16 @@ region vào DB" ở trên: file đã là nguồn sự thật, nhân bản ra ch�
 - 🔀 **[ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) Accepted 2026-08-03** — nhân vật chuyển sang render 3D thời gian thực (2.5D). Thay quyết định #1 và #2 ở §9. **Hai việc treo do ADR này sinh ra:**
   - ✅ **Ngân sách tam giác — đã đo 2026-08-05** (§4.4): 5k/10k/20k tam giác cho low/med/high, đo trên mesh pilot bằng `measure_triangle_budget.py`. Còn thiếu **dòng frame time**, chờ client vẽ được model đầu tiên.
   - 📝 **Phòng vệ JitPack — đã có [ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md), chờ chủ dự án duyệt.** Kiểm chứng thật: `gdx-gltf` **không có trên Maven Central**, jar 318 KB, Apache-2.0, phụ thuộc bắc cầu duy nhất là `gdx` vốn đã có. Đề xuất đóng gói vào `third-party/m2/`. **Chưa được thêm vào `libs.versions.toml`** cho tới khi ADR-032 được duyệt.
-  - 🛑 **Mở rộng `art_asset` cho nhánh 3D — chờ chủ dự án duyệt.** Thiết kế đã viết đầy đủ ở §8.6 (schema) + §8.8 (trang quản trị)
-    (3 cột `asset_kind`/`model_name`/`tri_counts` + `CHECK` chống lẫn nhánh, không tách bảng phụ).
-    Là **DB schema change** nên không tự thi hành ([/CLAUDE.md §4](../../CLAUDE.md)); duyệt xong thì
-    viết `V20__extend_art_asset_for_3d.sql`. **Chặn**: bước xuất glTF (§10 gạch đầu dòng trên) —
-    ngày bước đó chạy mà chưa có cột này thì luật §8.5 "không có asset mồ côi" hở với mọi model.
+  - ✅ **Mở rộng `art_asset` cho nhánh 3D — chủ dự án duyệt + thi hành 2026-08-07.**
+    `V20__extend_art_asset_for_3d.sql`: 3 cột `asset_kind`/`model_name`/`tri_counts` +
+    `CHECK art_asset_kind_branch`, không tách bảng phụ (§8.6). `ArtRegistryUpserter` đã upsert được
+    nhánh `MODEL`; verify thật trên Postgres 17: 15 dòng model / 45 file `.glb`, chạy 2 lần bất biến.
+    **Còn hở**: bước kiểm asset mồ côi chưa soi thư mục `assets/exported/models/`.
 - ✅ **ADR "Graphics Quality Tiers & Pre-render Pipeline"** — quyết định #3–#4 chốt qua thực tế đã triển khai (không tách ADR riêng, xem [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) cho phần phát hành).
-- ✅ **Migration registry** (§8.2): `V19__create_art_registry.sql` (2026-08-01) — `art_category` + seed cây danh mục + `art_asset`, verify thật qua Postgres 17.
+- ✅ **Migration registry** (§8.2): `V19__create_art_registry.sql` (2026-08-01) — `art_category` + seed cây danh mục + `art_asset`, verify thật qua Postgres 17. Nối tiếp: `V20__extend_art_asset_for_3d.sql` (2026-08-07, §8.6) mở bảng cho nhánh `MODEL`.
 - **Lưu trữ file: không cần ADR** — §8.4 chốt nginx + đĩa, không thêm dependency nào.
 - ✅ **Phát hành asset**: [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) Accepted (2026-08-01) — bản cài đóng gói **đúng 1 tier mặc định (MEDIUM)**, LOW/HIGH tải theo yêu cầu khi người chơi đổi mức đồ họa; client **luôn** gọi `ensureAssetsAvailable(tier)` kể cả khi asset có sẵn (chống nhánh code mục). Amend [ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md) ở đúng điểm "đóng gói toàn bộ"; phần hoãn CDN/OBB của ADR-024 vẫn giữ nguyên.
-- ✅ **`tools/asset-pipeline`**: [ADR-029](../01-architecture/adr/ADR-029-Asset-Pipeline-Tool.md) Accepted (2026-08-01) — module `tools:asset-pipeline` + `gdx-tools` TexturePacker đóng gói atlas, **đã nối** bước upsert `art_asset` (V19) qua `ArtRegistryUpserter`.
+- ✅ **`tools/asset-pipeline`**: [ADR-029](../01-architecture/adr/ADR-029-Asset-Pipeline-Tool.md) Accepted (2026-08-01) — module `tools:asset-pipeline` + `gdx-tools` TexturePacker đóng gói atlas, **đã nối** bước upsert `art_asset` cho **cả hai** nhánh qua `ArtRegistryUpserter` — sprite (V19) và model glTF (V20, §8.6).
 - **Treo**: có làm bộ atlas @2x cho desktop High không (tốn thêm dung lượng patch)? · Blender tooling không cần ADR dependency (chạy dev-time, không vào runtime game).
 - ✅ **Git LFS**: đã bật cho `assets/raw/**` từ 2026-08-01 (`.gitattributes`) — hết treo. Kỷ luật quota: xem §7 + [ART-QUALITY-STANDARD §8](ART-QUALITY-STANDARD.md).
 

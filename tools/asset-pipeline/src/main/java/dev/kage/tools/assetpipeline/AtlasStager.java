@@ -8,7 +8,7 @@ import java.util.Map;
 
 /**
  * Hạ mẫu + đổi tên phẳng mọi asset vào 1 thư mục staging cho 1 tier, đúng quy ước region name
- * ART-PIPELINE.md §8.6 (<asset_key>_<action> + index tăng dần cho asset nhiều frame, đúng
+ * ART-PIPELINE.md §8.7 (<asset_key>_<action> + index tăng dần cho asset nhiều frame, đúng
  * <asset_key> không hậu tố cho icon tĩnh) — TexturePacker tự nhận số cuối tên file làm index
  * (useIndexes mặc định true), nên chỉ cần đặt đúng tên file, không cần cấu hình gì thêm.
  *
