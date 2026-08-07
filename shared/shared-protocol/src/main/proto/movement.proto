@@ -5,6 +5,9 @@ package kage.protocol;
 option java_package = "dev.kage.protocol";
 option java_multiple_files = true;
 
+// Faction + CostumeTier — CharacterSpawnedEvent cần chúng để client biết nạp model nào (ADR-031).
+import "character.proto";
+
 // Packet Movement/World (NETWORK.md §4, dải 300-399). characterId lấy từ session gắn với
 // connection (server-gateway), KHÔNG có field characterId trong MoveCommand — đúng
 // "characterId từ session, không từ packet" (SECURITY.md §4, chống IDOR).
@@ -38,10 +41,20 @@ message CharacterMovedEvent {
 
 // Event: Server -> Client (OPCODE_CHARACTER_SPAWNED_EVENT). Nhân vật khác VỪA vào AoI (kết nối
 // mới hoặc đi tới gần) — client tạo entity render cho nó.
+//
+// faction + costume_tier là NGOẠI HÌNH, không phải chỉ số: client ghép chúng thành khoá asset
+// (`char_<hệ>-<bậc>`) để chọn model glTF phải nạp (ADR-031). Trước khi có 2 field này, MỌI nhân
+// vật đều hiện cùng một model vì client không có cách nào biết. Server vẫn là nguồn chân lý —
+// client KHÔNG tự chọn ngoại hình của người khác (Điều 15).
+//
+// Thêm field mới vào message đã có là TƯƠNG THÍCH NGƯỢC ở tầng dây (proto3), nên
+// ProtocolVersion.CURRENT giữ nguyên — đúng javadoc của chính lớp đó.
 message CharacterSpawnedEvent {
   int64 character_id = 1;
   float x = 2;
   float y = 3;
+  Faction faction = 4;
+  CostumeTier costume_tier = 5;
 }
 
 // Event: Server -> Client (OPCODE_CHARACTER_DESPAWNED_EVENT). Nhân vật khác VỪA rời AoI (ngắt

@@ -28,6 +28,8 @@ import dev.kage.engine.ecs.system.MovementSystem;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
+import dev.kage.protocol.CostumeTier;
+import dev.kage.protocol.Faction;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.Opcode;
@@ -62,14 +64,6 @@ public final class WorldScreen implements GameScreen {
      */
     private static final long LOCAL_CHARACTER_ID = 0L;
 
-    /**
-     * ⚠️ Tạm thời: mọi nhân vật dùng chung một model. {@link CharacterSpawnedEvent} <b>không có</b>
-     * trường nào mô tả ngoại hình (hệ phái / bậc trang bị), nên client không có cách nào biết phải
-     * nạp model nào. Thêm trường đó là <b>đổi protocol</b> — phải dừng và hỏi chủ dự án
-     * (/CLAUDE.md §4), không tự làm ở đây.
-     */
-    private static final String PLACEHOLDER_MODEL_KEY = "char_thuy-b1";
-
     private final OrthographicCamera camera = new OrthographicCamera();
     private final Viewport viewport;
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
@@ -78,7 +72,12 @@ public final class WorldScreen implements GameScreen {
     private float lastSentDirX;
     private float lastSentDirY;
 
-    public WorldScreen(EcsWorld world, InputMapper inputMapper, GameConnection connection) {
+    /**
+     * @param localFaction hệ phái của CHÍNH người chơi, lấy từ {@code CharacterSummary} lúc chọn
+     *     nhân vật — server không gửi {@link CharacterSpawnedEvent} cho chính mình (đã có
+     *     {@code MoveResponse}), nên đây là nguồn duy nhất để biết phải vẽ mình bằng model nào.
+     */
+    public WorldScreen(EcsWorld world, InputMapper inputMapper, GameConnection connection, Faction localFaction) {
         this.world = world;
         this.inputMapper = inputMapper;
         this.connection = connection;
@@ -92,7 +91,11 @@ public final class WorldScreen implements GameScreen {
         this.localPlayer = world.createEntity();
         localPlayer.add(new PositionComponent());
         localPlayer.add(new VelocityComponent());
-        models.addCharacter(LOCAL_CHARACTER_ID, PLACEHOLDER_MODEL_KEY);
+        // Bậc trang phục của chính mình cũng chưa suy được từ đâu (xem CharacterAppearance phía
+        // server) — dùng đúng giá trị mặc định server đang phát cho người khác, để mình và người
+        // khác nhìn thấy mình giống nhau.
+        models.addCharacter(
+                LOCAL_CHARACTER_ID, CharacterModelKey.of(localFaction, CostumeTier.COSTUME_TIER_UNSPECIFIED));
     }
 
     @Override
@@ -162,7 +165,7 @@ public final class WorldScreen implements GameScreen {
         pos.prevY = pos.y;
         entity.add(pos);
         remoteCharacters.put(event.getCharacterId(), entity);
-        models.addCharacter(event.getCharacterId(), PLACEHOLDER_MODEL_KEY);
+        models.addCharacter(event.getCharacterId(), CharacterModelKey.of(event.getFaction(), event.getCostumeTier()));
     }
 
     private void onCharacterMoved(CharacterMovedEvent event) {

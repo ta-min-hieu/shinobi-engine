@@ -53,6 +53,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     private final QuestFacade questFacade;
     private final GatewayNetworkMetrics networkMetrics;
     private final Map<Long, ChannelHandlerContext> contextsByCharacterId = new ConcurrentHashMap<>();
+    // Ngoại hình của nhân vật ĐANG kết nối, chụp một lần lúc chọn nhân vật. Ở đây chứ không ở
+    // server-world vì world chỉ biết vị trí và chỉ số — bắt nó mang thêm hệ phái/bậc trang phục
+    // là đẩy chuyện hiển thị xuống tầng gameplay, và WorldOutboundSink sẽ phải đổi chữ ký chỉ để
+    // chở dữ liệu mà tầng đó không dùng.
+    private final Map<Long, CharacterAppearance> appearanceByCharacterId = new ConcurrentHashMap<>();
     // Vị trí MỚI NHẤT của CHÍNH nhân vật (không phải nhân vật khác) — nguồn cho
     // CharacterPositionPersister lưu định kỳ + lúc logout (SERVER.md §8), cập nhật mỗi lần
     // onMoveAccepted (server-world xác nhận lệnh di chuyển của connection này).
@@ -70,12 +75,23 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     }
 
     void register(long characterId, ChannelHandlerContext ctx) {
+        register(characterId, ctx, CharacterAppearance.unknown());
+    }
+
+    /**
+     * Đăng ký kèm ngoại hình để {@link #onCharacterSpawned} nói được cho nhân vật khác biết phải vẽ
+     * model nào (ADR-031). Overload không có {@code appearance} ở trên dành cho test chỉ quan tâm
+     * đường đi của packet.
+     */
+    void register(long characterId, ChannelHandlerContext ctx, CharacterAppearance appearance) {
         contextsByCharacterId.put(characterId, ctx);
+        appearanceByCharacterId.put(characterId, appearance);
     }
 
     void unregister(long characterId) {
         contextsByCharacterId.remove(characterId);
         lastKnownPosition.remove(characterId);
+        appearanceByCharacterId.remove(characterId);
     }
 
     /**
@@ -155,10 +171,16 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         if (ctx == null) {
             return;
         }
+        // Nhân vật spawn có thể vừa ngắt kết nối giữa lúc AoI còn đang xử lý tick — khi đó không
+        // còn ngoại hình để tra, và unknown() để client tự chọn model thay thế thay vì bỏ vẽ.
+        CharacterAppearance appearance =
+                appearanceByCharacterId.getOrDefault(spawnedCharacterId, CharacterAppearance.unknown());
         CharacterSpawnedEvent event = CharacterSpawnedEvent.newBuilder()
                 .setCharacterId(spawnedCharacterId)
                 .setX(x)
                 .setY(y)
+                .setFaction(appearance.faction())
+                .setCostumeTier(appearance.costumeTier())
                 .build();
         send(ctx, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE, 0, event.toByteArray());
     }

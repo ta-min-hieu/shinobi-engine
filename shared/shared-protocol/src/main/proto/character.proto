@@ -20,6 +20,16 @@ enum Faction {
   FACTION_THO = 5;
 }
 
+// Bậc trang phục — B1 Học Viên → B2 Nhẫn Giả → B3 Thượng Nhẫn (ART-PIPELINE §4.2, tên gọi dùng
+// chung cho cả 5 hệ). Đây THUẦN ngoại hình: client dùng nó cùng Faction để suy ra model glTF phải
+// nạp (ADR-031), KHÔNG có chỉ số gameplay nào gắn vào bậc này.
+enum CostumeTier {
+  COSTUME_TIER_UNSPECIFIED = 0;
+  COSTUME_TIER_B1 = 1;
+  COSTUME_TIER_B2 = 2;
+  COSTUME_TIER_B3 = 3;
+}
+
 message CharacterSummary {
   int64 id = 1;
   string name = 2;

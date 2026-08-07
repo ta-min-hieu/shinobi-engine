@@ -36,10 +36,10 @@ public final class DesktopLauncher {
         // Chưa có màn hình Login/CharacterSelect Scene2D thật (NetworkBootstrap javadoc) — nếu
         // handshake lỗi (server chưa chạy, username không hợp lệ...), thoát thẳng với stack
         // trace thay vì UI báo lỗi, đủ cho lát cắt dev/test hiện tại.
-        long characterId = NetworkBootstrap.connectAndSelectCharacter(connection, username);
+        NetworkBootstrap.SelectedCharacter selected = NetworkBootstrap.connectAndSelectCharacter(connection, username);
 
         Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
-        config.setTitle("Project Kage — " + username + " (characterId=" + characterId + ")");
+        config.setTitle("Project Kage — " + username + " (characterId=" + selected.characterId() + ")");
         config.setWindowedMode(1280, 720);
         config.useVsync(true);
         // Foreground FPS không giới hạn tick logic — logic luôn cố định 60Hz (ENGINE.md §4).
@@ -50,7 +50,8 @@ public final class DesktopLauncher {
 
         KageEngine engine = new KageEngine(
                 platform,
-                kageEngine -> new WorldScreen(kageEngine.services().get(EcsWorld.class), inputMapper, connection));
+                kageEngine -> new WorldScreen(
+                        kageEngine.services().get(EcsWorld.class), inputMapper, connection, selected.faction()));
 
         new Lwjgl3Application(engine, config);
     }

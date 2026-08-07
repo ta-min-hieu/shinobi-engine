@@ -6,10 +6,12 @@ import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import dev.kage.protocol.CharacterSummary;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
 import dev.kage.protocol.CreateCharacterResponse;
+import dev.kage.protocol.Faction;
 import dev.kage.protocol.ListCharactersRequest;
 import dev.kage.protocol.ListCharactersResponse;
 import dev.kage.protocol.Opcode;
@@ -34,8 +36,16 @@ public final class NetworkBootstrap {
 
     private NetworkBootstrap() {}
 
-    /** @return {@code characterId} đã chọn — sẵn sàng để gameplay Command dùng ngay. */
-    public static long connectAndSelectCharacter(GameConnection connection, String username)
+    /**
+     * Nhân vật đã chọn xong handshake. Mang theo {@code faction} vì server KHÔNG gửi
+     * {@code CharacterSpawnedEvent} cho chính người chơi (nó đã có {@code MoveResponse}) — nếu
+     * không giữ lại ở đây thì client không còn nguồn nào để biết phải vẽ mình bằng model nào
+     * ([ADR-031](docs/01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)).
+     */
+    public record SelectedCharacter(long characterId, Faction faction) {}
+
+    /** @return nhân vật đã chọn — sẵn sàng để gameplay Command dùng ngay. */
+    public static SelectedCharacter connectAndSelectCharacter(GameConnection connection, String username)
             throws IOException, TimeoutException {
         awaitConnected(connection);
 
@@ -51,7 +61,8 @@ public final class NetworkBootstrap {
             throw new IOException("Đăng nhập thất bại cho username: " + username);
         }
 
-        long characterId = findOrCreateCharacter(connection, username);
+        CharacterSummary summary = findOrCreateCharacter(connection, username);
+        long characterId = summary.getId();
 
         SelectCharacterRequest selectRequest =
                 SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
@@ -64,10 +75,11 @@ public final class NetworkBootstrap {
         if (!selectResponse.getSuccess()) {
             throw new IOException("Chọn nhân vật thất bại: characterId=" + characterId);
         }
-        return characterId;
+        return new SelectedCharacter(characterId, summary.getFaction());
     }
 
-    private static long findOrCreateCharacter(GameConnection connection, String username) throws IOException {
+    private static CharacterSummary findOrCreateCharacter(GameConnection connection, String username)
+            throws IOException {
         byte[] listPayload = sendAndAwait(
                 connection,
                 Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE,
@@ -75,7 +87,7 @@ public final class NetworkBootstrap {
                 ListCharactersRequest.newBuilder().build().toByteArray());
         ListCharactersResponse listResponse = ListCharactersResponse.parseFrom(listPayload);
         if (listResponse.getCharactersCount() > 0) {
-            return listResponse.getCharacters(0).getId();
+            return listResponse.getCharacters(0);
         }
 
         // Character.validateName: chỉ chữ/số (feature-character/CLAUDE.md) — lọc username.
@@ -93,7 +105,7 @@ public final class NetworkBootstrap {
         if (!createResponse.getSuccess()) {
             throw new IOException("Tạo nhân vật thất bại cho username: " + username);
         }
-        return createResponse.getCharacter().getId();
+        return createResponse.getCharacter();
     }
 
     private static void awaitConnected(GameConnection connection) throws TimeoutException {

@@ -588,7 +588,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             boundCharacterId = characterId;
             // Đăng ký connection NÀY để world outbound (spawn/move/despawn — SERVER.md §6) tìm
             // đúng channel; attachCharacter chỉ enqueue, entity ECS thật tạo ở tick kế tiếp.
-            worldGateway.registry().register(characterId, ctx);
+            worldGateway
+                    .registry()
+                    .register(characterId, ctx, CharacterAppearance.of(toProtoFaction(character.faction())));
             PositionSnapshot spawn = characterFacade.loadPosition(characterId);
             CharacterStats stats = characterFacade.loadStats(characterId);
             CharacterBaseStats baseStats = new CharacterBaseStats(
