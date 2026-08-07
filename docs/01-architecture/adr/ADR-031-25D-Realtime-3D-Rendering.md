@@ -169,14 +169,22 @@ Xem lại quyết định này khi **một trong ba** điều kiện sau xảy r
 6. ✅ **Chủ dự án duyệt 2026-08-07** — `CharacterSpawnedEvent` đã có `faction` + `costume_tier`
    (`92e9f15`), mỗi hệ phái hiện đúng model của mình. `costume_tier` vẫn là hằng số `B1` vì gameplay
    chưa có khái niệm bậc trang bị nào để suy ra; protocol đã sẵn field cho lúc có.
-7. ⛔ **Khung hình lệch — CÒN MỞ.** Nhân vật nằm ở ~89% cả hai trục (góc dưới-phải) thay vì giữa
-   màn hình, dù `follow()` và `setCharacterPosition()` nhận **cùng một cặp toạ độ**; lệch tương
-   đương ~(+5,9, −3,9) world unit. Đã loại trừ bằng suy luận tĩnh: toán camera, `updateViewport`
-   của `SceneManager` (chỉ set `viewportWidth/Height` rồi `update`), và phép xoay Z-up. Nghi vấn
-   còn lại là **GL viewport / HDPI** — nhánh 3D không bao giờ gọi `viewport.apply()`, nên nó vẽ vào
-   viewport letterbox mà `FitViewport` đặt cho nhánh 2D. **Bước tiếp theo phải là in log
-   `Gdx.graphics.getWidth()` vs `getBackBufferWidth()` + vị trí camera thật — hết chỗ suy luận
-   tĩnh.** Revisit Trigger #1 (frame time GPU) vẫn chưa đo được cho tới khi việc này xong.
+7. ✅ **Đóng 2026-08-07 — KHÔNG PHẢI bug engine, là bug công cụ chụp màn hình.** In log thật
+   (`Gdx.graphics.getWidth/Height`, `getBackBufferWidth/Height`, `viewport.getScreenX/Y/Width/Height`,
+   `camera.position/direction/up`) xác nhận toán camera VÀ GL viewport đều đúng: resize log ra
+   `width=1280 height=720 backBufferW=1280 backBufferH=720 viewport.screen=(280,0) size=(720,720)`
+   (đúng letterbox `FitViewport` 10×10 đơn vị cho cửa sổ 1280×720), follow log ra
+   `camera.position=(9.93,14.19,10.0)` khớp chính xác phép tính tay từ `target=(0,0,0)` +
+   `VIEW_YAW_DEGREES`/`VIEW_PITCH_DEGREES`/`CAMERA_DISTANCE`. Script PowerShell chụp màn hình
+   (`PrintWindow`) dùng ở việc #5 chạy trong tiến trình KHÔNG khai báo DPI-aware, nên
+   `GetWindowRect` trả về toạ độ đã bị Windows chia theo tỉ lệ scale màn hình (ví dụ 1280×720 thật
+   báo về 745×448) — bitmap đích chỉ to bằng kích thước bị thu nhỏ đó nên `PrintWindow` chỉ chép
+   được góc trên-trái của khung hình thật, cắt cụt phần dưới-phải. Nhân vật vốn đã đứng đúng giữa
+   khung 1280×720 thật; ảnh cũ chỉ là ảnh bị **crop nhầm**, không phải camera lệch. Sửa script chụp
+   bằng `SetThreadDpiAwarenessContext(-4)` trước khi gọi `GetWindowRect`/`PrintWindow` → ảnh chụp
+   lại cho thấy nhân vật đúng giữa màn hình. Bài học: mọi tool chụp màn hình Win32 trên máy này
+   PHẢI khai báo DPI-aware trước. Revisit Trigger #1 (frame time GPU) vẫn CHƯA đo — không còn gì
+   chặn nó ngoài việc #8 (chỉ `char_hoa-b1` xuất đúng, các model khác vẫn vỡ vì bug `texCoord:-1`).
 8. ⛔ **Xuất lại 15 nhân vật × 3 tier** — bug `texCoord:-1` ở việc #5 nằm trong **mọi** file `.glb`
    đã sinh; mới xuất lại đúng `char_hoa-b1`. Lệnh mẫu ở đầu `export_character_lods.py`.
 9. 🛑 **Cần chủ dự án — ngân sách tam giác.** `TriangleBudgetValidator` (mới) fail **45/45** file:
