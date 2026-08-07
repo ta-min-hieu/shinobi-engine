@@ -7,6 +7,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Disposable;
 import net.mgsx.gltf.loaders.glb.GLBLoader;
@@ -55,6 +56,16 @@ public final class CharacterModelRenderer implements Disposable {
      * nó chỉ cần đủ để hình học nằm trong near/far.
      */
     private static final float CAMERA_DISTANCE = 20f;
+
+    /**
+     * Đổi hệ trục Y-up của glTF sang Z-up của thế giới. glTF 2.0 quy định Y là trục đứng và
+     * {@code export_character_lods.py} xuất đúng chuẩn đó ({@code export_yup=True}), còn thế giới
+     * Kage đi trên mặt phẳng XY với Z là trục đứng. Không xoay thì nhân vật nằm ngang và lệch hẳn
+     * khỏi tâm màn hình — đúng triệu chứng thấy được lần đầu chạy nhánh 3D thật.
+     *
+     * <p>Hằng số, không dựng lại mỗi frame (/CLAUDE.md §6).
+     */
+    private static final Matrix4 Y_UP_TO_Z_UP = new Matrix4().setToRotation(Vector3.X, 90f);
 
     private final SceneManager sceneManager;
     private final OrthographicCamera camera;
@@ -151,9 +162,10 @@ public final class CharacterModelRenderer implements Disposable {
     public void setCharacterPosition(long characterId, float x, float y) {
         Scene scene = scenesByCharacter.get(characterId);
         if (scene != null) {
-            // Model xuất ra đứng trên mặt phẳng XY của thế giới, gốc ở chân (bước E của pipeline
-            // art đảm bảo điều đó), nên chỉ tịnh tiến, không cần chỉnh độ cao.
-            scene.modelInstance.transform.setToTranslation(x, y, 0f);
+            // Gốc model nằm ở chân (bước E của pipeline art đảm bảo điều đó) nên không cần chỉnh
+            // độ cao — chỉ xoay về Z-up rồi tịnh tiến. `trn` ghi thẳng vào cột tịnh tiến, giữ
+            // nguyên phần xoay và không cấp phát gì.
+            scene.modelInstance.transform.set(Y_UP_TO_Z_UP).trn(x, y, 0f);
         }
     }
 
