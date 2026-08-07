@@ -62,6 +62,12 @@ STICK_OUT = 0.30
 # stays carried rather than floating alongside.
 STICK_OUT_CAP = 0.70
 
+# Flat colour the weapon meshes export with, since they carry no UV map and so
+# cannot sample the character texture (see `_untextured_material`). Dark steel
+# grey: it reads as a prop against every one of the five element palettes and
+# never competes with the character's own silhouette.
+WEAPON_BASE_COLOR = (0.22, 0.23, 0.26, 1.0)
+
 
 def _local_bounds(mesh):
     lo = Vector((math.inf,) * 3)
@@ -700,6 +706,30 @@ def _export_material(image, name):
     return material
 
 
+def _untextured_material(source_material, name):
+    """A copy of the export material with the image node cut away.
+
+    A mesh with no UV map cannot sample a texture, and Blender's glTF exporter
+    says so by writing `"texCoord": -1` on the material — a value glTF 2.0 does
+    not allow (texCoord indexes TEXCOORD_n, so it is non-negative). gdx-gltf
+    then builds `#define v_diffuseUV v_texCoord` with no set number and the
+    fragment shader fails to compile on `v_texCoord : undeclared identifier`,
+    which takes down every character on screen, not just the weapon.
+
+    The weapons are flat single-colour props, so dropping the texture costs
+    nothing visually. Giving them UVs instead would mean unwrapping four extra
+    meshes per character for one colour each.
+    """
+    material = source_material.copy()
+    material.name = name
+    tree = material.node_tree
+    for node in [n for n in tree.nodes if n.type == "TEX_IMAGE"]:
+        tree.nodes.remove(node)
+    principled = next(n for n in tree.nodes if n.type == "BSDF_PRINCIPLED")
+    principled.inputs["Base Color"].default_value = WEAPON_BASE_COLOR
+    return material
+
+
 def export_gltf(path, obj, armature, extras=(), texture_px=None):
     """Write one LOD as a self-contained .glb, ready for gdx-gltf.
 
@@ -728,13 +758,16 @@ def export_gltf(path, obj, armature, extras=(), texture_px=None):
         scaled.scale(texture_px, texture_px)
         image = scaled
     material = _export_material(image, "gltf_" + obj.name)
+    untextured = _untextured_material(material, "gltf_" + obj.name + "_flat")
 
     saved_materials = {}
     saved_outlines = {}
     for mesh_obj in exported:
         saved_materials[mesh_obj] = list(mesh_obj.data.materials)
         mesh_obj.data.materials.clear()
-        mesh_obj.data.materials.append(material)
+        # Chỉ mesh CÓ UV map mới nhận được material có texture — xem _untextured_material.
+        mesh_obj.data.materials.append(
+            material if mesh_obj.data.uv_layers else untextured)
         for polygon in mesh_obj.data.polygons:
             polygon.material_index = 0
         outline = mesh_obj.modifiers.get("KageOutline")
