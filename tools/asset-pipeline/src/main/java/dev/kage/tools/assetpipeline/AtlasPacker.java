@@ -25,7 +25,7 @@ final class AtlasPacker {
         settings.duplicatePadding = true; // chống bleed giữa các region khít nhau
         // useIndexes mặc định true — TexturePacker tự nhận số cuối tên file làm frame index,
         // gom "asset_key_action_00.png".."_NN.png" thành 1 region "asset_key_action" nhiều frame
-        // (ART-PIPELINE.md §8.6), đúng thứ AtlasStager đã đặt tên sẵn.
+        // (ART-PIPELINE.md §8.7), đúng thứ AtlasStager đã đặt tên sẵn.
 
         TexturePacker.process(settings, stagingDir.toString(), outputDir.toString(), PACK_FILE_NAME);
     }

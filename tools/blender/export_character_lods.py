@@ -4,7 +4,9 @@ BLENDER-SESSION-GUIDE §1.5 step E. Takes an accepted character .blend and
 produces one .glb per graphics tier plus a `model-meta.json` sidecar, which is
 to the 3D branch what `render-meta.json` is to the sprite branch — the file
 `tools/asset-pipeline` reads to fill the `art_asset` row (ART-PIPELINE §8.6,
-pending the V20 migration).
+migration V20). `blend_file` in the sidecar is load-bearing: it is the only
+record of which .blend a model really came from, and the upsert refuses to run
+without it rather than guess the name from the asset key.
 
     blender -b <char>.blend -P tools/blender/export_character_lods.py -- \
         --object Hoa_D --rig hoa_d_Rig \

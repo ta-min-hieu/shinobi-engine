@@ -902,10 +902,10 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **30 ADR Accepted** (đế
       vật đang nạp cùng một model**. Thêm trường đó là **đổi protocol** ([/CLAUDE.md §4](../../CLAUDE.md)).
 29. ⛔ **Đang chặn thật, chờ chủ dự án** (đồng bộ với ["🔴 ĐANG CHỜ CHỦ DỰ ÁN"](../README.md) —
     đọc ở đó, không chép số liệu sang đây):
-    - **V20 — 3 cột 3D cho `art_asset`** (`asset_kind`/`model_name`/`tri_counts` + `CHECK` chống lẫn
-      nhánh, thiết kế đã viết đủ ở [ART-PIPELINE §8.6/§8.8](../14-art/ART-PIPELINE.md)). Là **đổi DB
-      schema** nên AI không tự thi hành ([/CLAUDE.md §4](../../CLAUDE.md)). Ngày bước E chạy thật mà
-      chưa có cột này thì luật "không có asset mồ côi" (§8.5) hở với **mọi** model.
+    - ~~V20 — 3 cột 3D cho `art_asset`~~ ✅ **duyệt + thi hành 2026-08-07**
+      ([ART-PIPELINE §8.6](../14-art/ART-PIPELINE.md)): `asset_kind`/`model_name`/`tri_counts` +
+      `CHECK art_asset_kind_branch`, và `ArtRegistryUpserter` đã upsert được nhánh `MODEL`. **Còn
+      hở**: bước kiểm asset mồ côi chưa soi thư mục `assets/exported/models/`.
     - Câu hỏi **desktop-first hay mobile-first** vẫn chưa trả lời → ADR-023 vẫn chưa viết được, và
       ngân sách tam giác ở mục 27 mới chỉ đo cho desktop.
 30. **Art — nhân vật Text→3D đầu tiên qua trọn vòng nghiệm thu (2026-08-06)**: `char_thuy-b1` là con

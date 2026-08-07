@@ -19,7 +19,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Chạy toàn bộ pipeline thật trên PNG giả (không mock TexturePacker/ImageIO — TESTING.md §2 tinh
  * thần "test bằng thứ thật") để verify: hạ mẫu ra đúng kích thước, region name đúng quy ước
- * ART-PIPELINE.md §8.6, cả 3 tier đều xuất ra, manifest liệt kê đủ file kèm hash/size thật, và
+ * ART-PIPELINE.md §8.7, cả 3 tier đều xuất ra, manifest liệt kê đủ file kèm hash/size thật, và
  * nhánh 3D (ADR-031) vào được manifest kèm ngân sách tam giác đúng §4.4.
  */
 final class AssetPipelineIntegrationTest {

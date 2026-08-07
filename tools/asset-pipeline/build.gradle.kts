@@ -2,8 +2,8 @@
 // 3 tier (low/med/high) qua gdx-tools TexturePacker. Nhánh 3D (ADR-031): quét
 // assets/exported/models/{low,med,high}/*.glb, validate tên, đếm tam giác thật trong file glTF và
 // gác ngân sách ART-PIPELINE §4.4. Rồi sinh asset-manifest.json cho cả hai nhánh, upsert art_asset
-// (V19, ART-PIPELINE §8.3 — chạy sau khi V19__create_art_registry.sql được duyệt và áp dụng,
-// 2026-08-01; nhánh 3D CHƯA upsert được, chờ V20 theo §8.6).
+// cho cả hai nhánh (V19 cho sprite, V20 cho model glTF — ART-PIPELINE §8.3/§8.6; hai migration đó
+// phải được áp dụng trước, nếu không bước upsert lỗi rõ ràng chứ không âm thầm bỏ qua).
 // KHÔNG chạy trong game (REPOSITORY-STRUCTURE.md §2 "tools/* — CLI build-time"). Dùng thẳng
 // postgresql JDBC driver ở ĐÂY (không qua server-database) — Điều 23 "chỉ server-database chạm
 // JDBC" nói về module SERVER (gameplay production), không áp cho tools/* build-time; ArchUnit rule
