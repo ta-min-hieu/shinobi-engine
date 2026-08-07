@@ -350,11 +350,15 @@ graph LR
     Interp --> ECS["ECS Components<br/>(Position, Animation)"]
     Input["Input người chơi"] -->|"prediction cục bộ<br/>(chỉ hiển thị)"| ECS
     ECS --> Cull["Culling<br/>bỏ entity ngoài camera"]
-    Cull --> Batch["SpriteBatch<br/>gom draw call"]
+    Cull --> Model["SceneManager (gdx-gltf)<br/>nhân vật · quái · NPC (glTF)"]
+    Cull --> Batch["SpriteBatch<br/>VFX · icon · UI — gom draw call"]
+    Model --> GPU["GPU"]
     Batch --> GPU["GPU"]
 
     style Snap fill:#1d3557,color:#fff
 ```
+
+⚠️ **Hai nhánh render, không phải một** ([ADR-031](adr/ADR-031-25D-Realtime-3D-Rendering.md), Accepted 2026-08-03): nhân vật · quái · NPC là **model 3D thời gian thực** qua camera orthographic khoá góc; VFX kỹ năng · icon · UI vẫn là sprite 2D. Ranh giới và tình trạng code thật: [RENDERING.md §2](../03-engine/RENDERING.md).
 
 **Client prediction chỉ để làm mượt hình ảnh.** Server nói khác → client **sửa theo server**, không tranh cãi. Chi tiết: [RENDERING.md](../03-engine/RENDERING.md), [CLIENT.md](../04-client/CLIENT.md).
 

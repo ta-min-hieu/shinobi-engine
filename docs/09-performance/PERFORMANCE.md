@@ -206,7 +206,7 @@ Chi tiết: [DATABASE.md](../05-server/DATABASE.md).
 | Object Pool có thể làm GC tệ hơn | [JAVA-GUIDELINES.md §4.3](../02-coding-standards/JAVA-GUIDELINES.md) |
 | Escape analysis không đáng tin | [JAVA-GUIDELINES.md §4.2](../02-coding-standards/JAVA-GUIDELINES.md) |
 | Server chạy physics tốn CPU thật | [PHYSICS.md §3](../03-engine/PHYSICS.md) |
-| Sort Y xung đột với gom atlas | [RENDERING.md §5](../03-engine/RENDERING.md) |
+| Sort Y xung đột với gom atlas | [RENDERING.md §8](../03-engine/RENDERING.md) |
 | Quest kiểm tra mọi event → O(n×m) | [GAMEPLAY.md §9](../05-server/GAMEPLAY.md) |
 | Script chạy trong tick thread | [SCRIPTING.md §7](../06-plugin/SCRIPTING.md) |
 | Metric cardinality nổ | [OBSERVABILITY.md §4](../07-infrastructure/OBSERVABILITY.md) |

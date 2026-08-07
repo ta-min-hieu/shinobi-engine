@@ -37,7 +37,8 @@ assets/
 │   ├── environment/
 │   └── ui/
 └── exported/                  # Runtime asset — ĐƯỢC đóng gói
-    ├── atlases/
+    ├── atlases/               # nhánh 2D: VFX · icon · UI
+    ├── models/{low,med,high}/ # nhánh 3D: nhân vật · quái · NPC (.glb)
     ├── animations/
     ├── maps/
     ├── audio/
@@ -46,6 +47,8 @@ assets/
 ```
 
 ⚠️ **`hyperlap2d-projects/` và `raw/` phải bị loại khỏi bản build** (Gradle resource filter). Nếu không, bản game sẽ chứa file PSD hàng trăm MB.
+
+⚠️ **`exported/models/` là sản phẩm SINH RA, không commit** ([ART-PIPELINE §7](../14-art/ART-PIPELINE.md)) — một bản checkout sạch chưa chạy pipeline art sẽ **không có file `.glb` nào**. Client phải chịu được điều đó: `CharacterModelRenderer` tự tắt nhánh 3D và rơi về hình thay thế thay vì crash ([RENDERING.md §6](../03-engine/RENDERING.md)).
 
 ---
 
@@ -79,7 +82,8 @@ Bước 1–2 (art thô → sprite sheet) được sản xuất bằng Blender p
 
 | Loại | Convention | Ví dụ |
 |---|---|---|
-| Sprite | `<category>_<name>_<variant>.png` | `char_ninja-fire_idle.png` |
+| Sprite (VFX · icon · UI) | `<category>_<name>_<variant>.png` | `icon_kunai.png` |
+| **Model nhân vật/quái/NPC** | `<asset_key>.glb` trong `models/<tier>/` | `models/med/char_thuy-b1.glb` |
 | Animation | `<entity>_<action>.anim` | `ninja-fire_attack-01.anim` |
 | Atlas | `<zone-or-feature>.atlas` | `faction-fire-zone.atlas` |
 | Map | `<zone>.h2d` | `academy-hub.h2d` |
@@ -151,7 +155,7 @@ Bọc `AssetManager` của libGDX ([ENGINE.md §7](../03-engine/ENGINE.md)), th�
 
 ```java
 public interface ResourceManager {
-    void loadZone(String zoneId);        // load atlas + map + audio của zone
+    void loadZone(String zoneId);        // load atlas + model .glb + map + audio của zone
     void unloadZone(String zoneId);      // giải phóng
     boolean isLoaded(String zoneId);
     float progress();                     // cho LoadingScreen
