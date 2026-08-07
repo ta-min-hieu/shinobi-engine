@@ -157,8 +157,31 @@ Xem lại quyết định này khi **một trong ba** điều kiện sau xảy r
    Consequences là **đo đúng**. Phần **chưa** làm được: frame time GPU — cần chính việc #2 và #5 xong trước.
 4. ✅ **Xong** — ART-PIPELINE §3 viết lại 2026-08-03; [RENDERING.md](../../03-engine/RENDERING.md)
    viết lại 2026-08-07 (v2.0.0, mô tả **cả hai** nhánh render + tình trạng code thật).
-5. ✅ **Đã nối** `WorldScreen` sang nhánh 3D (`df5ace2`) — `CharacterModelRenderer` dùng
-   `SceneManager` của gdx-gltf. ⛔ **Nhưng chưa ai nhìn thấy nó vẽ ra model thật**: `.glb` không
-   commit nên bản checkout sạch rơi về hình hộp thay thế. Revisit Trigger #1 **vẫn chưa đo được**.
-6. 🛑 **Cần chủ dự án**: `CharacterSpawnedEvent` không có trường mô tả ngoại hình ⇒ mọi nhân vật
-   đang nạp cùng một model. Thêm trường đó là **đổi protocol** ([/CLAUDE.md §4](../../../CLAUDE.md)).
+5. ✅ **ĐÃ NHÌN THẤY CHẠY THẬT — 2026-08-07.** Client + server + Postgres/Redis thật, có ảnh chụp:
+   nhân vật Hoả đứng thẳng, có texture, thay cho hình hộp. Ba bug thật chỉ lộ ra khi chạy, không
+   test nào bắt được, đều đã sửa:
+   - Asset root chưa nối — `Gdx.files.internal` phân giải theo working directory, mà cwd mặc định
+     của task `run` là thư mục **subproject** (`27a2f12`).
+   - **`"texCoord": -1` trong MỌI file `.glb`** — mesh vũ khí không có UV map nhưng vẫn được gán
+     material có texture, Blender xuất ra giá trị glTF không hợp lệ, gdx-gltf sinh shader hỏng và
+     **sập cả màn hình**, không riêng vũ khí (`1b4bc61`).
+   - Model Y-up (đúng chuẩn glTF) trong thế giới Z-up ⇒ nhân vật nằm nghiêng (`0108857`).
+6. ✅ **Chủ dự án duyệt 2026-08-07** — `CharacterSpawnedEvent` đã có `faction` + `costume_tier`
+   (`92e9f15`), mỗi hệ phái hiện đúng model của mình. `costume_tier` vẫn là hằng số `B1` vì gameplay
+   chưa có khái niệm bậc trang bị nào để suy ra; protocol đã sẵn field cho lúc có.
+7. ⛔ **Khung hình lệch — CÒN MỞ.** Nhân vật nằm ở ~89% cả hai trục (góc dưới-phải) thay vì giữa
+   màn hình, dù `follow()` và `setCharacterPosition()` nhận **cùng một cặp toạ độ**; lệch tương
+   đương ~(+5,9, −3,9) world unit. Đã loại trừ bằng suy luận tĩnh: toán camera, `updateViewport`
+   của `SceneManager` (chỉ set `viewportWidth/Height` rồi `update`), và phép xoay Z-up. Nghi vấn
+   còn lại là **GL viewport / HDPI** — nhánh 3D không bao giờ gọi `viewport.apply()`, nên nó vẽ vào
+   viewport letterbox mà `FitViewport` đặt cho nhánh 2D. **Bước tiếp theo phải là in log
+   `Gdx.graphics.getWidth()` vs `getBackBufferWidth()` + vị trí camera thật — hết chỗ suy luận
+   tĩnh.** Revisit Trigger #1 (frame time GPU) vẫn chưa đo được cho tới khi việc này xong.
+8. ⛔ **Xuất lại 15 nhân vật × 3 tier** — bug `texCoord:-1` ở việc #5 nằm trong **mọi** file `.glb`
+   đã sinh; mới xuất lại đúng `char_hoa-b1`. Lệnh mẫu ở đầu `export_character_lods.py`.
+9. 🛑 **Cần chủ dự án — ngân sách tam giác.** `TriangleBudgetValidator` (mới) fail **45/45** file:
+   `export_character_lods.py` decimate **phần thân** đúng ngưỡng §4.4 rồi cộng thêm vũ khí không
+   decimate, nên mọi file rơi đúng vào `ngưỡng + vũ khí`. Hai đường: re-decimate xuống
+   `ngưỡng − vũ khí`, hoặc sửa [ART-PIPELINE §4.4](../../14-art/ART-PIPELINE.md) nói rõ ngưỡng
+   không tính extras. ⚠️ Validator chạy **trước** bước upsert nên `art_asset` **không thể** nạp
+   thật cho tới khi chốt.
