@@ -96,7 +96,7 @@ graph LR
 | `engine-core`: render loop + Screen/State | [ENGINE.md §3](../03-engine/ENGINE.md) |
 | ⚠️ **Fixed timestep + MAX_FRAME_TIME** | [ENGINE.md §4](../03-engine/ENGINE.md) |
 | `engine-ecs`: bọc Ashley ở mức **khái niệm** | [ECS.md §10](../03-engine/ECS.md) |
-| ⚠️ **World unit = mét** (không pixel) | [RENDERING.md §4](../03-engine/RENDERING.md) |
+| ⚠️ **World unit = mét** (không pixel) | [RENDERING.md §5](../03-engine/RENDERING.md) |
 | Input abstraction (`GameAction`, không phím) | [CLIENT.md §5](../04-client/CLIENT.md) |
 | `PlatformAdapter` | [CLIENT.md §11](../04-client/CLIENT.md) |
 | ⚠️ **Test font tiếng Việt có dấu** | [RESOURCE.md §7](../04-client/RESOURCE.md) |
@@ -666,7 +666,7 @@ Closed Beta → Open Beta → Release Candidate → Production → Hotfix
 
 ## ADR cần tạo
 
-Xem [ADR Index](../01-architecture/adr/README.md) — **29 ADR Accepted** (đếm lại bằng dòng `Status` của từng file, 2026-08-06: gồm 010/012/018 chốt 2026-07-18, ADR-026 chốt 2026-07-24, ADR-014/015/019 chốt 2026-07-26/28, ADR-027 TLS chốt 2026-07-31, ADR-011/020/021/022/024/028/029/030 chốt 2026-08-01, **ADR-031 chốt 2026-08-03**); ADR-007 **Superseded by ADR-030** (không xây Plugin System); **ADR-032** (phòng vệ JitPack cho `gdx-gltf`) là ADR **duy nhất** còn `Proposed` — xem mục 28 "Việc cần làm tiếp theo"; chỉ còn **ADR-023** chưa viết (chờ chốt desktop-first hay mobile-first).
+Xem [ADR Index](../01-architecture/adr/README.md) — **30 ADR Accepted** (đếm lại bằng dòng `Status` của từng file, 2026-08-07: gồm 010/012/018 chốt 2026-07-18, ADR-026 chốt 2026-07-24, ADR-014/015/019 chốt 2026-07-26/28, ADR-027 TLS chốt 2026-07-31, ADR-011/020/021/022/024/028/029/030 chốt 2026-08-01, **ADR-031 chốt 2026-08-03**, **ADR-032 chốt 2026-08-06**); ADR-007 **Superseded by ADR-030** (không xây Plugin System); **ADR-032** (phòng vệ JitPack cho `gdx-gltf`) **Accepted 2026-08-06** ⇒ **không còn ADR nào `Proposed`** — xem mục 28 "Việc cần làm tiếp theo"; chỉ còn **ADR-023** chưa viết (chờ chốt desktop-first hay mobile-first).
 
 ## Tài liệu liên quan
 
@@ -883,24 +883,32 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **29 ADR Accepted** (đế
       chia qua nhiều xương và cong như cao su khi gập khuỷu). Trang phục thì ngược lại, vẫn nằm
       trong prompt vì `item_template` chưa có cột hình ảnh nào để đổi lúc chạy.
     - ⛔ **Chưa đóng hoàn toàn**: thiếu **dòng frame time** của điều kiện Revisit Trigger #1
-      (20 nhân vật trên màn) — đo được nó cần `gdx-gltf` trên classpath **và** đường render 3D trong
-      `client-core`, cả hai đều chưa có (xem mục 28).
-28. ⛔ **Đang chặn thật, chờ chủ dự án** (đồng bộ với ["🔴 ĐANG CHỜ CHỦ DỰ ÁN"](../README.md) cập nhật
-    2026-08-05 — đọc ở đó, không chép số liệu sang đây):
-    - **[ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md) — Proposed
-      (2026-08-05), ADR *duy nhất* còn treo.** Đề xuất đóng gói `gdx-gltf` vào `third-party/m2/` và
-      bỏ hẳn `jitpack.io` (kiểm chứng thật: không có trên Maven Central, jar 318 KB, Apache-2.0,
-      phụ thuộc bắc cầu duy nhất là `gdx` vốn đã có). **Chưa duyệt ⇒ `gdx-gltf` chưa được thêm vào
-      `libs.versions.toml` ⇒ chặn dây chuyền**: nối `WorldScreen` sang `ModelBatch` → đo frame time
-      (mục 27) → viết lại `RENDERING.md` cho nhánh 3D. Nói cách khác, **toàn bộ nhánh render 3D của
-      ADR-031 đang dừng ở đây**.
+      (20 nhân vật trên màn). Hai điều kiện tiên quyết (`gdx-gltf` trên classpath, đường render 3D
+      trong `client-core`) **nay đã có** — cái còn thiếu là **model `.glb` thật trong bản chạy**,
+      xem mục 28.
+28. **Dây chuyền nhánh 3D — đã thông, còn thiếu phép đo** (cập nhật 2026-08-07):
+    - ✅ **[ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md) Accepted
+      2026-08-06 và đã thi hành cùng ngày** (`38daea2`): `gdx-gltf` 2.3.0 đóng gói vào
+      `third-party/m2/` dưới dạng kho Maven cục bộ, `jitpack.io` bỏ hẳn khỏi build, thư viện đã vào
+      `libs.versions.toml`. **Không còn ADR nào ở trạng thái `Proposed`.**
+    - ✅ **`WorldScreen` đã nối sang nhánh 3D** (`df5ace2`) — `CharacterModelRenderer` dùng
+      `SceneManager` của gdx-gltf qua camera orthographic khoá góc, và **`RENDERING.md` đã viết lại**
+      cho hai nhánh render.
+    - ⛔ **Còn thiếu**: chưa ai nhìn thấy nhánh 3D vẽ ra model thật — `.glb` là sản phẩm sinh ra,
+      không commit, nên bản checkout sạch rơi về hình hộp thay thế. Chưa chạy được thì chưa đo được
+      frame time (mục 27), chưa viết được cel shader, và chưa biết `SceneManager` cấp phát bao nhiêu
+      mỗi khung. Danh sách việc đầy đủ: [RENDERING.md "Việc cần làm tiếp theo"](../03-engine/RENDERING.md).
+    - 🛑 **Cần chủ dự án**: `CharacterSpawnedEvent` không có trường mô tả ngoại hình nên **mọi nhân
+      vật đang nạp cùng một model**. Thêm trường đó là **đổi protocol** ([/CLAUDE.md §4](../../CLAUDE.md)).
+29. ⛔ **Đang chặn thật, chờ chủ dự án** (đồng bộ với ["🔴 ĐANG CHỜ CHỦ DỰ ÁN"](../README.md) —
+    đọc ở đó, không chép số liệu sang đây):
     - **V20 — 3 cột 3D cho `art_asset`** (`asset_kind`/`model_name`/`tri_counts` + `CHECK` chống lẫn
       nhánh, thiết kế đã viết đủ ở [ART-PIPELINE §8.6/§8.8](../14-art/ART-PIPELINE.md)). Là **đổi DB
       schema** nên AI không tự thi hành ([/CLAUDE.md §4](../../CLAUDE.md)). Ngày bước E chạy thật mà
       chưa có cột này thì luật "không có asset mồ côi" (§8.5) hở với **mọi** model.
     - Câu hỏi **desktop-first hay mobile-first** vẫn chưa trả lời → ADR-023 vẫn chưa viết được, và
       ngân sách tam giác ở mục 27 mới chỉ đo cho desktop.
-29. **Art — nhân vật Text→3D đầu tiên qua trọn vòng nghiệm thu (2026-08-06)**: `char_thuy-b1` là con
+30. **Art — nhân vật Text→3D đầu tiên qua trọn vòng nghiệm thu (2026-08-06)**: `char_thuy-b1` là con
     **đầu tiên sau pilot Hỏa** đi hết vòng §7.1 của
     [ART-QUALITY-STANDARD](../14-art/ART-QUALITY-STANDARD.md) và chạy tiếp bước E — xuất được **3 LOD
     glTF: 20.684 / 10.684 / 5.684 tam giác**, khớp ngân sách chốt ở mục 27.

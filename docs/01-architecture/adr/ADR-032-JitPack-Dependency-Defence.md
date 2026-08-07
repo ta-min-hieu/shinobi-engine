@@ -126,10 +126,11 @@ Không. ADR này chính là ADR mà [ADR-031 §"ADR cần tạo"](ADR-031-25D-Re
 
 ## Việc cần làm tiếp theo
 
-1. 🛑 **Chủ dự án duyệt** — AI không tự Accept ADR.
-2. Tạo `third-party/m2/...`, commit jar + pom + LICENSE + README + checksum.
-3. Thêm `gdx-gltf` vào `libs.versions.toml` + repository cục bộ; verify `./gradlew build` **sau khi
-   ngắt mạng** để chứng minh không còn chạm JitPack.
-4. Sinh `gradle/verification-metadata.xml`.
-5. Nối `WorldScreen` sang `ModelBatch` với đúng một nhân vật ([ADR-031](ADR-031-25D-Realtime-3D-Rendering.md)
-   việc #5), rồi đo frame time để đóng nốt dòng còn trống ở ART-PIPELINE §4.4.
+1. ✅ **Chủ dự án đã Accept** (2026-08-06).
+2. ✅ `third-party/m2/...` đã có: jar + pom + LICENSE + README + checksum (`38daea2`).
+3. ✅ `gdx-gltf` đã vào `libs.versions.toml` + repository cục bộ; resolve + compile được với
+   `--offline`, tức lấy thật từ repo chứ không qua mạng.
+4. Sinh `gradle/verification-metadata.xml` — **chưa làm**.
+5. ✅ `WorldScreen` đã nối sang nhánh 3D (`df5ace2`). ⛔ Còn thiếu **phép đo frame time** để điền
+   dòng trống ở ART-PIPELINE §4.4 — chưa đo được vì chưa có `.glb` thật trong bản chạy, xem
+   [RENDERING.md §6](../../03-engine/RENDERING.md).
