@@ -16,3 +16,19 @@ dependencies {
 application {
     mainClass.set("dev.kage.client.desktop.DesktopLauncher")
 }
+
+// Asset root lúc chạy dev. `Gdx.files.internal` trên backend LWJGL3 phân giải TƯƠNG ĐỐI so với
+// working directory, mà working directory mặc định của task `run` là thư mục SUBPROJECT
+// (client/client-desktop/), không phải gốc repo — nên nếu không đặt ở đây thì mọi model/atlas đều
+// "không tồn tại" và CharacterModelRenderer sẽ lặng lẽ tắt nhánh 3D (ADR-031) rồi vẽ hình hộp.
+// `assets/exported/` là runtime asset root theo RESOURCE.md §2.
+tasks.named<JavaExec>("run") {
+    val assetRoot = rootProject.layout.projectDirectory.dir("assets/exported")
+    workingDir = assetRoot.asFile
+    doFirst {
+        // `assets/exported/` là sản phẩm sinh ra và bị .gitignore (ART-PIPELINE §7), nên checkout
+        // sạch chưa chạy pipeline art sẽ KHÔNG có thư mục này. Tạo rỗng để `run` vẫn chạy được —
+        // client tự rơi về hình thay thế, đúng hành vi đã thiết kế, thay vì gãy ở khâu Gradle.
+        workingDir.mkdirs()
+    }
+}
