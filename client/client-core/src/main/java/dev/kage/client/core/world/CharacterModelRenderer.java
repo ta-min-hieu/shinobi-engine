@@ -54,11 +54,10 @@ public final class CharacterModelRenderer implements Disposable {
     public static final float VIEW_PITCH_DEGREES = 30f;
 
     /**
-     * Tier hình học nạp lúc chạy. MEDIUM là mặc định cài đặt theo
-     * [ADR-028](docs/01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) — LOW/HIGH tải thêm
-     * khi người chơi đổi mức đồ hoạ, chưa nối ở lát cắt này.
+     * Thư mục con cố định chứa toàn bộ file glTF, {@code models/} — {@link #modelDirectory} nối
+     * thêm {@link GraphicsTier#folderName} phía sau để ra đường dẫn thật.
      */
-    private static final String MODEL_DIRECTORY = "models/med/";
+    private static final String MODEL_ROOT = "models/";
 
     /**
      * Xa camera bao nhiêu. Với phép chiếu orthographic, khoảng cách <b>không</b> đổi khung hình —
@@ -86,6 +85,14 @@ public final class CharacterModelRenderer implements Disposable {
     private final OrthographicCamera camera;
     private final ModelBatch outlineBatch;
     private final ModelBatch bodyBatch;
+
+    /**
+     * Đường dẫn thư mục model đã suy ra từ tier truyền vào constructor, tính đúng một lần
+     * (không phải mỗi lần {@link #addCharacter}). Đọc lại tier lúc chạy KHÔNG được hỗ trợ — xem
+     * {@link GraphicsTier} về lý do ({@code ensureAssetsAvailable(tier)} của ADR-028 chưa tồn tại).
+     */
+    private final String modelDirectory;
+
     private final Map<String, SceneAsset> assetsByKey = new HashMap<>();
     private final Map<Long, Scene> scenesByCharacter = new HashMap<>();
     private final Map<Long, AnimationState> animationStateByCharacter = new HashMap<>();
@@ -102,7 +109,14 @@ public final class CharacterModelRenderer implements Disposable {
     private final Vector3 target = new Vector3();
     private boolean enabled = true;
 
-    public CharacterModelRenderer() {
+    /**
+     * @param tier tier hình học đọc từ đĩa ({@link GraphicsTier}) — chỉ đọc MỘT LẦN ở đây, không đổi
+     *     được sau khi đã dựng ({@link GraphicsTier} giải thích lý do). {@code WorldScreen} truyền
+     *     tường minh {@link GraphicsTier#MEDIUM}, khớp "bản cài đóng gói đúng 1 tier mặc định
+     *     MEDIUM" của [ADR-028](docs/01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md).
+     */
+    public CharacterModelRenderer(GraphicsTier tier) {
+        this.modelDirectory = resolveModelDirectory(tier);
         this.camera = new OrthographicCamera();
         // Ống nhìn phải bao được cả nhân vật lẫn mặt đất phía sau nó. Orthographic nên near có thể
         // âm; để dương và lùi camera ra xa cho dễ suy luận.
@@ -114,6 +128,15 @@ public final class CharacterModelRenderer implements Disposable {
         // câu hỏi runtime #2). Cùng giá trị hướng sáng cũ, chỉ đổi chỗ đọc.
         this.outlineBatch = new ModelBatch(new CelOutlineShaderProvider());
         this.bodyBatch = new ModelBatch(new CelBodyShaderProvider());
+    }
+
+    /**
+     * Suy thư mục model từ tier — thuần hàm, không phụ thuộc GL, tách khỏi constructor để test được
+     * thẳng cho cả 3 tier mà không cần dựng {@link ModelBatch}/{@code OrthographicCamera} thật
+     * ({@code GraphicsTierTest}).
+     */
+    static String resolveModelDirectory(GraphicsTier tier) {
+        return MODEL_ROOT + tier.folderName + "/";
     }
 
     /**
@@ -155,7 +178,7 @@ public final class CharacterModelRenderer implements Disposable {
         }
         SceneAsset asset = assetsByKey.get(assetKey);
         if (asset == null) {
-            FileHandle file = Gdx.files.internal(MODEL_DIRECTORY + assetKey + ".glb");
+            FileHandle file = Gdx.files.internal(modelDirectory + assetKey + ".glb");
             if (!file.exists()) {
                 // Lần đầu thiếu model là tắt hẳn nhánh 3D, không phải cảnh báo mỗi lần spawn: thiếu
                 // một model gần như luôn có nghĩa là chưa chạy pipeline art, không phải hỏng một file.

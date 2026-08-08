@@ -86,7 +86,9 @@ public final class WorldScreen implements GameScreen {
     private final OrthographicCamera camera = new OrthographicCamera();
     private final Viewport viewport;
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
-    private final CharacterModelRenderer models = new CharacterModelRenderer();
+    // MEDIUM tường minh — bản cài đóng gói đúng 1 tier mặc định theo ADR-028, không phải để trống
+    // dựa vào default ngầm (không có default: CharacterModelRenderer bắt buộc tham số tier).
+    private final CharacterModelRenderer models = new CharacterModelRenderer(GraphicsTier.MEDIUM);
 
     private final CombatHudController combatHudController;
     private final CombatAnimationTrigger combatAnimationTrigger;

@@ -81,7 +81,9 @@ public final class CharacterModelFrameBenchmarkTool extends ApplicationAdapter {
 
     @Override
     public void create() {
-        models = new CharacterModelRenderer();
+        // MEDIUM: đúng tier mà pipeline art xuất mặc định và benchmark này đo (log lỗi dưới đây
+        // cũng nói rõ "models/med/") — không đổi ý nghĩa phép đo cũ, chỉ hết hardcode ở phía đọc.
+        models = new CharacterModelRenderer(GraphicsTier.MEDIUM);
         models.resize(VIEWPORT_UNITS, VIEWPORT_UNITS);
         spawnCharacterGrid();
         models.follow(0f, 0f);
