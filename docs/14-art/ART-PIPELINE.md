@@ -681,9 +681,29 @@ file, giống cách nhánh sprite gộp mọi frame PNG của một asset.
 
 **Việc kèm theo còn hở** (nếu không luật §8.5 vẫn chưa kín):
 
-- Bước kiểm mồ côi phải soi **cả hai** thư mục: `assets/exported/atlases/` (nhánh SPRITE) và
-  `assets/exported/models/` (nhánh MODEL). **Chưa code** — pipeline hiện upsert đủ cả hai nhánh nhưng
-  chưa đối chiếu ngược từ file trên đĩa về dòng DB.
+- ✅ **Bước kiểm mồ côi — thi hành 2026-08-08** (`OrphanAssetChecker`, chạy ngay sau
+  `ArtRegistryUpserter` trong `AssetPipelineRunner.main()`, cùng điều kiện "có `DB_PASSWORD`" như
+  upsert). Soi **cả hai** nhánh:
+  - **SPRITE** — đối chiếu với `assets/exported/atlases/`. Không tự phân tích lại từng file `.atlas`
+    để suy ngược `asset_key` (một atlas gộp nhiều `asset_key`, tên vùng bên trong còn thêm hậu tố
+    action — VD `char_ninja-fire_idle` — không phục hồi được `asset_key` gốc mà không lặp lại đúng
+    quy ước đặt tên vùng của `AtlasStager`); dùng thẳng danh sách asset đã quét ở
+    `assets/raw/render-out/` trong CÙNG lần chạy làm đại diện — đây chính xác là tập nguồn vừa được
+    đóng gói thành công vào atlas ở bước ngay trước đó (`packTier` đã fail build rồi nếu đóng gói lỗi).
+  - **MODEL** — đối chiếu trực tiếp với `assets/exported/models/`: mỗi `ScannedModel` là một file
+    `.glb` thật đã quét được ở đó, không cần suy gián tiếp như nhánh SPRITE.
+  - **Chiều 1 (fail build, đúng câu chữ §8.5)**: file trên đĩa không có dòng `art_asset` tương ứng
+    (theo `asset_kind`) → ném `AssetPipelineException` liệt kê rõ `asset_key` mồ côi.
+  - **Chiều 2 (chỉ cảnh báo, KHÔNG fail build)**: dòng `art_asset` không còn file trên đĩa tương ứng
+    (asset đã xoá khỏi đĩa nhưng dòng DB còn sót lại) — §8.5/§8.6 không nêu tường minh chiều này bằng
+    chữ, chỉ nói "fail build nếu **thiếu**" (chiều 1). Quyết định **không** fail build: một dòng DB cũ
+    (rác) không chặn được người khác build/deploy asset MỚI, khác hẳn việc thiếu đăng ký cho asset đã
+    vẽ xong (khoá được ngay hôm đó). Pipeline chỉ log cảnh báo liệt kê `asset_key` stale, chủ dự án tự
+    dọn tay hoặc quyết định sau — xem `OrphanAssetChecker` (`tools/asset-pipeline`).
+  - Verify thật qua Postgres 17 (Testcontainers, `OrphanAssetCheckerIntegrationTest`, migrate bằng
+    chính 2 file `V19`/`V20` đọc thẳng từ đĩa): cả 4 tình huống — khớp hoàn toàn (im lặng), mồ côi
+    SPRITE (fail build), mồ côi MODEL (fail build), stale DB row (chỉ cảnh báo) — đều có test thật,
+    không mock JDBC.
 - Sidecar **`<asset_key>.model-meta.json`** (`export_character_lods.py` ghi sẵn `tri_counts`,
   `glb_bytes`, `texture_px`, `actions`, `blend_file`) là **đầu vào bắt buộc** của bước upsert — thiếu
   file này thì fail build, đúng vai trò `render-meta.json` giữ cho nhánh sprite.
@@ -775,7 +795,7 @@ region vào DB" ở trên: file đã là nguồn sự thật, nhân bản ra ch�
 | 8 | Danh mục = bảng `art_category` phân cấp 2 tầng, asset gắn tầng lá | Chủ dự án yêu cầu chia category rõ ràng; thêm loại không cần migration | ✅ **Thi hành 2026-08-01** (`V19`, seed 6 tầng 1 + 19 tầng 2) |
 | 9 | **nginx đọc đĩa** phục vụ file tĩnh; không dùng object storage | §8.4 — nhanh hơn (`sendfile()` zero-copy), không thêm dependency, patcher vốn dùng URL HTTP nên không có lock-in để chống | **Chốt** 2026-08-01 (chủ dự án loại MinIO) |
 | 10 | VFX đặt tên `vfx_<skill_code>` khớp `SkillRegistry` | Asset map 1-1 với skill thật, không cần bảng tra | Đề xuất |
-| 11 | Mọi asset **bắt buộc** có dòng trong `art_asset` kèm đường dẫn; pipeline fail build nếu thiếu | §8.5 — chủ dự án yêu cầu quản toàn bộ kho đồ họa qua trang quản trị; ràng buộc bằng công cụ, không bằng trí nhớ | Đề xuất |
+| 11 | Mọi asset **bắt buộc** có dòng trong `art_asset` kèm đường dẫn; pipeline fail build nếu thiếu | §8.5 — chủ dự án yêu cầu quản toàn bộ kho đồ họa qua trang quản trị; ràng buộc bằng công cụ, không bằng trí nhớ | ✅ **Thi hành 2026-08-08** (`OrphanAssetChecker`, §8.6) — soi cả hai nhánh, verify thật qua Postgres 17 |
 | 12 | Pipeline xuất thêm **thumbnail rời** mỗi asset (`preview_url`) | §8.7 — chỉ để danh sách nhiều asset không phải tải atlas 4MB mỗi ô; **không** phải vì bị giới hạn hiển thị | Đề xuất |
 | 13 | Region trong atlas đặt tên `<asset_key>_<action>` + `index` (dạng libGDX gốc) | §8.7 — `atlas.findRegions()` gom được frame cho `Animation`; trang quản trị lọc cùng tiền tố. Đặt sai kiểu `..._idle_00` là hỏng cả hai phía | Đề xuất |
 | 14 | **Trang phục nướng vào mesh Text→3D; vũ khí luôn gắn rời lên xương** | §2.3 — ranh giới là "biến dạng theo thân hay không": vũ khí trong khối hàn liền sẽ bị `weight_by_proximity` bẻ cong khi gập khuỷu; ngoài ra Q7 FAIL thành vòng B miễn phí thay vì vòng A tốn credit. Trang phục chưa cần thay lúc chạy vì `item_template` không có cột hình ảnh | **Chốt** — suy ra từ [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) đã Accepted, không phải quyết định mới. Đảo lại khi `item_template` có cột hình ảnh |
@@ -790,7 +810,10 @@ region vào DB" ở trên: file đã là nguồn sự thật, nhân bản ra ch�
     `V20__extend_art_asset_for_3d.sql`: 3 cột `asset_kind`/`model_name`/`tri_counts` +
     `CHECK art_asset_kind_branch`, không tách bảng phụ (§8.6). `ArtRegistryUpserter` đã upsert được
     nhánh `MODEL`; verify thật trên Postgres 17: 15 dòng model / 45 file `.glb`, chạy 2 lần bất biến.
-    **Còn hở**: bước kiểm asset mồ côi chưa soi thư mục `assets/exported/models/`.
+    ✅ **Bước kiểm asset mồ côi — thi hành 2026-08-08** (`OrphanAssetChecker`): soi cả hai thư mục
+    `assets/exported/atlases/` và `assets/exported/models/`, fail build nếu đĩa có file mà DB không
+    có dòng tương ứng; dòng DB không còn file trên đĩa (stale) chỉ cảnh báo, không fail build (quyết
+    định trong lượt này, xem §8.6 "Việc kèm theo còn hở" để biết lý lẽ).
 - ✅ **ADR "Graphics Quality Tiers & Pre-render Pipeline"** — quyết định #3–#4 chốt qua thực tế đã triển khai (không tách ADR riêng, xem [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) cho phần phát hành).
 - ✅ **Migration registry** (§8.2): `V19__create_art_registry.sql` (2026-08-01) — `art_category` + seed cây danh mục + `art_asset`, verify thật qua Postgres 17. Nối tiếp: `V20__extend_art_asset_for_3d.sql` (2026-08-07, §8.6) mở bảng cho nhánh `MODEL`.
 - **Lưu trữ file: không cần ADR** — §8.4 chốt nginx + đĩa, không thêm dependency nào.

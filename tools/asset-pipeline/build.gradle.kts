@@ -16,6 +16,14 @@ plugins {
 dependencies {
     implementation(libs.gdx.tools)
     implementation(libs.postgresql)
+
+    // Test-only, thật (không mock JDBC) cho OrphanAssetCheckerIntegrationTest — bản Postgres
+    // throwaway qua Testcontainers, cùng bộ dùng ở server-database. KHÔNG project-depend vào
+    // server:server-database chỉ để lấy V19/V20: test đọc thẳng 2 file .sql thật của migration đó từ
+    // đĩa (xem systemProperty "kage.repoRoot" bên dưới) — schema art_category/art_asset không phụ
+    // thuộc bất kỳ migration nào khác (V1..V18), nên không cần chạy TOÀN BỘ lịch sử Flyway.
+    testImplementation(libs.bundles.test.integration)
+    testRuntimeOnly(libs.logback.classic)
 }
 application {
     mainClass.set("dev.kage.tools.assetpipeline.AssetPipelineRunner")
@@ -25,4 +33,10 @@ tasks.named<JavaExec>("run") {
     // (println thẳng, không qua logger) ra chữ mojibake dù nguồn UTF-8 đúng. JDK 18+ mới có
     // property stdout.encoding/stderr.encoding để ép console output UTF-8 không cần đổi code.
     jvmArgs("-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8")
+}
+tasks.named<Test>("test") {
+    // Gradle chạy test task với cwd = thư mục module (tools/asset-pipeline, đã có ghi chú "Gotcha"
+    // từ tools:asset-pipeline trước đây) — path tương đối tới server/server-database sẽ SAI nếu suy
+    // từ cwd. Truyền path TUYỆT ĐỐI qua system property để test không phụ thuộc cwd.
+    systemProperty("kage.repoRoot", rootProject.projectDir.absolutePath)
 }
