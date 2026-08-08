@@ -98,7 +98,7 @@ public final class WorldScreen implements GameScreen {
         this.world = context.world();
         this.inputMapper = context.inputMapper();
         this.connection = connection;
-        this.combatHudController = new CombatHudController(character.getId());
+        this.combatHudController = new CombatHudController(character.getId(), character.getFaction());
         this.viewport =
                 new FitViewport(WorldConstants.VIEWPORT_HEIGHT_UNITS, WorldConstants.VIEWPORT_HEIGHT_UNITS, camera);
 
@@ -115,6 +115,7 @@ public final class WorldScreen implements GameScreen {
         models.addCharacter(
                 LOCAL_CHARACTER_ID, CharacterModelKey.of(character.getFaction(), CostumeTier.COSTUME_TIER_UNSPECIFIED));
 
+        combatHud.setSkillLabel(combatHudController.skillNameKey());
         combatHud.setOnSkillClicked(this::onSkillButtonClicked);
     }
 
@@ -273,7 +274,7 @@ public final class WorldScreen implements GameScreen {
         }
         try {
             UseSkillCommand command = UseSkillCommand.newBuilder()
-                    .setSkillCode(CombatConstants.FIREBALL_SKILL_CODE)
+                    .setSkillCode(combatHudController.skillCode())
                     .setTargetEntityId(combatHudController.currentTargetId())
                     .build();
             connection.send(Opcode.OPCODE_USE_SKILL_COMMAND_VALUE, connection.nextSequenceId(), command.toByteArray());

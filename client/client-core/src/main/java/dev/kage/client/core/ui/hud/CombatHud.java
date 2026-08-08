@@ -68,7 +68,7 @@ public final class CombatHud implements Disposable {
         targetGroup.add(targetHpLabel).padTop(2f);
         targetGroup.setVisible(false);
 
-        this.skillButton = new TextButton(i18n.get("hud.skill.fireball"), skin.buttonStyle);
+        this.skillButton = new TextButton("", skin.buttonStyle);
         skillButton.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -99,6 +99,15 @@ public final class CombatHud implements Disposable {
 
     public void setOnSkillClicked(Runnable callback) {
         this.onSkillClicked = callback;
+    }
+
+    /**
+     * Đặt nhãn nút skill theo i18n key — gọi 1 lần lúc khởi tạo màn hình (caller đã biết hệ phái
+     * người chơi ngay từ đầu, không đổi giữa chừng như HP/mục tiêu nên không cần cache "lastValue"
+     * như các setter khác trong lớp này).
+     */
+    public void setSkillLabel(String i18nKey) {
+        skillButton.setText(i18n.get(i18nKey));
     }
 
     public void setPlayerHp(int current, int max) {
