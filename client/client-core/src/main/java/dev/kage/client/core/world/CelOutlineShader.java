@@ -29,12 +29,12 @@ import com.badlogic.gdx.graphics.glutils.ShaderProgram;
  * Công thức skin (nhân {@code u_bones[joint]} theo trọng số rồi cộng dồn) là idiom chuẩn của
  * libGDX/glTF, không phải phát minh riêng.
  *
- * <p>⚠️ <b>Không nhân thêm {@code u_worldTrans}</b> — phát hiện lúc chạy thật: với NodePart đã
- * skin, {@code Renderable.bones[i]} do gdx-gltf tính (Node#calculateBoneTransforms) đã LÀ
- * {@code jointNode.globalTransform * invBindTransform}, và {@code jointNode.globalTransform} tự nó
- * đã nhân dồn từ gốc {@code ModelInstance.transform} (root) xuống — nhân thêm
- * {@code u_worldTrans} (chính là root transform đó) sau khi skin là áp gấp đôi phép xoay
- * Y-up→Z-up, nhân vật lộn ngược/méo hẳn. Xác nhận bằng ảnh chụp thật, không phải suy đoán.
+ * <p>⚠️ <b>PHẢI nhân {@code u_worldTrans}</b> — xem javadoc {@link CelBodyShader} cho lý do đầy đủ
+ * (đọc thẳng {@code ModelInstance.getRenderable()} thật trong {@code gdx-1.14.2-sources.jar}): với
+ * {@code NodePart} có skin, {@code Renderable.worldTransform} = {@code ModelInstance.transform}
+ * (Y_UP_TO_Z_UP + vị trí), KHÔNG bao giờ nằm trong {@code bones[i]}. Bản trước (2026-08-08) bỏ phép
+ * nhân này dựa trên tiền đề sai ("bones đã ở world space") — đúng nguyên nhân gốc của bug "nằm ngang"
+ * ghi ở RENDERING.md §11.1.
  */
 final class CelOutlineShader extends BaseShader {
 
@@ -47,6 +47,7 @@ final class CelOutlineShader extends BaseShader {
             attribute vec2 a_boneWeight3;
 
             uniform mat4 u_projViewTrans;
+            uniform mat4 u_worldTrans;
             uniform mat4 u_bones[11]; // PHẢI khớp CelShadingConstants.RIG_BONE_COUNT — GLSL không đọc hằng số Java
             uniform float u_outlineThickness;
 
@@ -60,9 +61,10 @@ final class CelOutlineShader extends BaseShader {
                 skin += a_boneWeight2.y * u_bones[int(a_boneWeight2.x + 0.5)];
                 skin += a_boneWeight3.y * u_bones[int(a_boneWeight3.x + 0.5)];
 
-                // Skin matrix đã ở world space (xem javadoc class) — KHÔNG nhân thêm u_worldTrans.
-                vec4 skinnedPosition = skin * vec4(a_position, 1.0);
-                vec3 skinnedNormal = normalize((skin * vec4(a_normal, 0.0)).xyz);
+                // u_worldTrans PHẢI nhân — xem javadoc class. Đẩy viền dọc pháp tuyến SAU khi đã ở
+                // world space (đúng đơn vị world unit của u_outlineThickness).
+                vec4 skinnedPosition = u_worldTrans * (skin * vec4(a_position, 1.0));
+                vec3 skinnedNormal = normalize((u_worldTrans * (skin * vec4(a_normal, 0.0))).xyz);
                 vec3 expanded = skinnedPosition.xyz + skinnedNormal * u_outlineThickness;
                 gl_Position = u_projViewTrans * vec4(expanded, 1.0);
             }
@@ -114,6 +116,7 @@ final class CelOutlineShader extends BaseShader {
 
     @Override
     public void render(Renderable renderable) {
+        program.setUniformMatrix("u_worldTrans", renderable.worldTransform);
         int boneCount = Math.min(renderable.bones.length, CelShadingConstants.RIG_BONE_COUNT);
         for (int i = 0; i < boneCount; i++) {
             System.arraycopy(renderable.bones[i].val, 0, boneMatrices, i * 16, 16);

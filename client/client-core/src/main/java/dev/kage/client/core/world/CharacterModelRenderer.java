@@ -72,9 +72,20 @@ public final class CharacterModelRenderer implements Disposable {
      * Kage đi trên mặt phẳng XY với Z là trục đứng. Không xoay thì nhân vật nằm ngang và lệch hẳn
      * khỏi tâm màn hình — đúng triệu chứng thấy được lần đầu chạy nhánh 3D thật.
      *
+     * <p>⚠️ <b>Dấu là {@code -90f}, KHÔNG PHẢI {@code +90f}</b> — xác nhận bằng ảnh chụp thật qua
+     * {@code CharacterModelDebugTool}, không phải suy ra từ quy tắc bàn tay phải: {@code +90f} tính
+     * tay có vẻ đúng (Y+ cục bộ → Z+ thế giới) nhưng khi chạy thật (sau khi {@link CelBodyShader}/
+     * {@link CelOutlineShader} được sửa để nhân {@code u_worldTrans}, xem javadoc hai lớp đó) nhân
+     * vật đứng NGƯỢC ĐẦU XUỐNG ĐẤT — dấu hiệu quy ước xoay/handedness của
+     * {@code Matrix4#setToRotation} không khớp suy luận tay. {@code -90f} cho nhân vật đứng đúng
+     * chiều, đúng hướng, xác nhận qua idle lẫn run (RENDERING.md §11.1). Đây là nguyên nhân gốc THỨ
+     * HAI của bug "nằm ngang" — thứ nhất là thiếu {@code u_worldTrans} ở cel shader; sửa một mình
+     * dấu này (khi vẫn thiếu {@code u_worldTrans}) sẽ KHÔNG lộ ra vì cả mesh khi đó gần như không di
+     * chuyển đâu cả (skin ≈ identity, world transform bị bỏ qua hoàn toàn).
+     *
      * <p>Hằng số, không dựng lại mỗi frame (/CLAUDE.md §6).
      */
-    private static final Matrix4 Y_UP_TO_Z_UP = new Matrix4().setToRotation(Vector3.X, 90f);
+    private static final Matrix4 Y_UP_TO_Z_UP = new Matrix4().setToRotation(Vector3.X, -90f);
 
     /**
      * Thời gian chuyển mượt (giây) giữa 2 clip animation — không cắt cứng, tránh pop khi đổi tư thế
