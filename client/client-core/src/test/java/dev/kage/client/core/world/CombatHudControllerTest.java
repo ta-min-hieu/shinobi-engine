@@ -1,10 +1,12 @@
 package dev.kage.client.core.world;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
 
 import dev.kage.protocol.AttackResultEvent;
+import dev.kage.protocol.Faction;
 import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
@@ -28,7 +30,7 @@ class CombatHudControllerTest {
 
     @Test
     void onMonsterSpawned_autoTargetsWhenNoCurrentTarget() {
-        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID);
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
 
         long autoTargeted = controller.onMonsterSpawned(dummySpawned());
 
@@ -39,7 +41,7 @@ class CombatHudControllerTest {
 
     @Test
     void onMonsterSpawned_doesNotRetargetWhenTargetAlreadySet() {
-        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID);
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
         controller.onMonsterSpawned(dummySpawned());
 
         long secondMonsterId = -2L;
@@ -58,14 +60,14 @@ class CombatHudControllerTest {
 
     @Test
     void canUseSkill_falseWithoutTarget() {
-        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID);
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
 
         assertThat(controller.canUseSkill()).isFalse();
     }
 
     @Test
     void useSkill_startsCooldownAndSpendsChi_thenBlocksUntilCooldownElapses() {
-        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID);
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
         controller.onMonsterSpawned(dummySpawned());
 
         assertThat(controller.canUseSkill()).isTrue();
@@ -82,7 +84,7 @@ class CombatHudControllerTest {
 
     @Test
     void useSkill_blockedOnceChiExhausted() {
-        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID);
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
         controller.onMonsterSpawned(dummySpawned());
         int maxUses = CombatConstants.CHARACTER_MAX_CHI / CombatConstants.FIREBALL_CHI_COST;
 
@@ -97,7 +99,7 @@ class CombatHudControllerTest {
 
     @Test
     void onAttackResult_targetingSelf_updatesPlayerHp() {
-        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID);
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
 
         controller.onAttackResult(AttackResultEvent.newBuilder()
                 .setAttackerEntityId(MONSTER_ID)
@@ -112,7 +114,7 @@ class CombatHudControllerTest {
 
     @Test
     void onAttackResult_targetingTrackedMonster_updatesItsHp() {
-        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID);
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
         controller.onMonsterSpawned(dummySpawned());
 
         controller.onAttackResult(AttackResultEvent.newBuilder()
@@ -129,7 +131,7 @@ class CombatHudControllerTest {
 
     @Test
     void onSkillResult_killingCurrentTarget_removesMonsterAndClearsTarget() {
-        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID);
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
         controller.onMonsterSpawned(dummySpawned());
 
         controller.onSkillResult(SkillResultEvent.newBuilder()
@@ -148,7 +150,7 @@ class CombatHudControllerTest {
 
     @Test
     void onMonsterDespawned_removesMonsterAndClearsTargetIfCurrent() {
-        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID);
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
         controller.onMonsterSpawned(dummySpawned());
 
         controller.onMonsterDespawned(
@@ -160,7 +162,7 @@ class CombatHudControllerTest {
 
     @Test
     void onMonsterMoved_updatesPositionButKeepsHp() {
-        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID);
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
         controller.onMonsterSpawned(dummySpawned());
 
         controller.onMonsterMoved(MonsterMovedEvent.newBuilder()
@@ -177,7 +179,7 @@ class CombatHudControllerTest {
 
     @Test
     void hpUpdate_forUnrelatedEntity_isIgnoredSafely() {
-        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID);
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
 
         controller.onAttackResult(AttackResultEvent.newBuilder()
                 .setAttackerEntityId(999L)
@@ -189,5 +191,48 @@ class CombatHudControllerTest {
 
         assertThat(controller.playerHp()).isEqualTo(controller.playerMaxHp());
         assertThat(controller.monsters()).isEmpty();
+    }
+
+    @Test
+    void nonHoaFaction_resolvesItsOwnSlot0Skill_notFireball() {
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_THUY);
+
+        assertThat(controller.skillCode()).isEqualTo("thuy_song_du");
+        assertThat(controller.skillNameKey()).isEqualTo("hud.skill.thuy_song_du");
+        assertThat(controller.skillCode()).isNotEqualTo(CombatConstants.FIREBALL_SKILL_CODE);
+    }
+
+    @Test
+    void useSkill_forNonHoaFaction_spendsThatFactionsCooldownAndChi_notFireballs() {
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_THUY);
+        controller.onMonsterSpawned(dummySpawned());
+        CombatConstants.FactionSkill thuySkill = CombatConstants.FACTION_SKILLS.get(Faction.FACTION_THUY);
+
+        assertThat(controller.useSkill()).isTrue();
+
+        assertThat(controller.skillCooldownRemaining()).isEqualTo(thuySkill.cooldownSeconds());
+        assertThat(controller.skillCooldownRemaining()).isNotEqualTo(CombatConstants.FIREBALL_COOLDOWN_SECONDS);
+    }
+
+    @Test
+    void useSkill_forNonHoaFaction_blockedOnceThatFactionsChiExhausted() {
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_THUY);
+        controller.onMonsterSpawned(dummySpawned());
+        CombatConstants.FactionSkill thuySkill = CombatConstants.FACTION_SKILLS.get(Faction.FACTION_THUY);
+        int maxUses = CombatConstants.CHARACTER_MAX_CHI / thuySkill.chiCost();
+
+        for (int i = 0; i < maxUses; i++) {
+            assertThat(controller.useSkill()).isTrue();
+            controller.tick(thuySkill.cooldownSeconds());
+        }
+
+        assertThat(controller.canUseSkill()).isFalse(); // đủ hồi chiêu nhưng hết Khí
+        assertThat(controller.useSkill()).isFalse();
+    }
+
+    @Test
+    void constructor_rejectsFactionWithoutASlot0SkillMapping() {
+        assertThatThrownBy(() -> new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_UNSPECIFIED))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

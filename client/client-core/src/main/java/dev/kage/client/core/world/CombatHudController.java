@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import dev.kage.protocol.AttackResultEvent;
+import dev.kage.protocol.Faction;
 import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
@@ -28,6 +29,7 @@ final class CombatHudController {
     record MonsterState(String code, float x, float y, int hp, int maxHp) {}
 
     private final long localCharacterId;
+    private final CombatConstants.FactionSkill skill;
     private final Map<Long, MonsterState> monsters = new HashMap<>();
 
     private int playerHp = CombatConstants.CHARACTER_MAX_HP;
@@ -38,9 +40,16 @@ final class CombatHudController {
     /**
      * @param localCharacterId id nhân vật của chính người chơi — dùng để nhận ra
      *     {@code AttackResultEvent}/{@code SkillResultEvent} nào đang nhắm vào MÌNH thay vì quái.
+     * @param localFaction hệ phái của chính người chơi — quyết định skill slot 0 nào được gán cho
+     *     nút skill duy nhất của HUD ({@link CombatConstants#FACTION_SKILLS}), vì mỗi hệ phái chỉ
+     *     cast được skill của hệ mình (server-world.SkillSystem.isCasterEligible).
      */
-    CombatHudController(long localCharacterId) {
+    CombatHudController(long localCharacterId, Faction localFaction) {
         this.localCharacterId = localCharacterId;
+        this.skill = CombatConstants.FACTION_SKILLS.get(localFaction);
+        if (this.skill == null) {
+            throw new IllegalArgumentException("Không có skill slot 0 cho hệ phái: " + localFaction);
+        }
     }
 
     /**
@@ -116,7 +125,7 @@ final class CombatHudController {
     }
 
     boolean canUseSkill() {
-        return skillCooldownRemaining <= 0f && playerChi >= CombatConstants.FIREBALL_CHI_COST && currentTargetId != 0L;
+        return skillCooldownRemaining <= 0f && playerChi >= skill.chiCost() && currentTargetId != 0L;
     }
 
     /**
@@ -130,9 +139,19 @@ final class CombatHudController {
         if (!canUseSkill()) {
             return false;
         }
-        skillCooldownRemaining = CombatConstants.FIREBALL_COOLDOWN_SECONDS;
-        playerChi -= CombatConstants.FIREBALL_CHI_COST;
+        skillCooldownRemaining = skill.cooldownSeconds();
+        playerChi -= skill.chiCost();
         return true;
+    }
+
+    /** {@code skill_code} của skill slot 0 thuộc hệ phái người chơi — dùng để gửi {@code UseSkillCommand}. */
+    String skillCode() {
+        return skill.skillCode();
+    }
+
+    /** i18n key tên hiển thị của skill slot 0 thuộc hệ phái người chơi — dùng cho nhãn nút skill. */
+    String skillNameKey() {
+        return skill.nameKey();
     }
 
     int playerHp() {
