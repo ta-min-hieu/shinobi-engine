@@ -183,11 +183,22 @@ Xem lại quyết định này khi **một trong ba** điều kiện sau xảy r
    khung 1280×720 thật; ảnh cũ chỉ là ảnh bị **crop nhầm**, không phải camera lệch. Sửa script chụp
    bằng `SetThreadDpiAwarenessContext(-4)` trước khi gọi `GetWindowRect`/`PrintWindow` → ảnh chụp
    lại cho thấy nhân vật đúng giữa màn hình. Bài học: mọi tool chụp màn hình Win32 trên máy này
-   PHẢI khai báo DPI-aware trước. Revisit Trigger #1 (frame time GPU) vẫn CHƯA đo — không còn gì
-   chặn nó ngoài việc #8 (chỉ `char_hoa-b1` xuất đúng, các model khác vẫn vỡ vì bug `texCoord:-1`).
-8. ⛔ **Xuất lại 15 nhân vật × 3 tier** — bug `texCoord:-1` ở việc #5 nằm trong **mọi** file `.glb`
-   đã sinh; mới xuất lại đúng `char_hoa-b1`. Lệnh mẫu ở đầu `export_character_lods.py`.
-9. 🛑 **Cần chủ dự án — ngân sách tam giác.** `TriangleBudgetValidator` (mới) fail **45/45** file:
+   PHẢI khai báo DPI-aware trước. Revisit Trigger #1 (frame time GPU) vẫn CHƯA đo — việc #8 (chặn
+   trước đó) đã xong, chỉ còn việc #9 (ngân sách tam giác, chờ chủ dự án) đứng giữa.
+8. ✅ **Xong 2026-08-08 — xuất lại đủ 15 nhân vật × 3 tier (45 file).** Chạy qua Blender MCP: mở
+   từng `.blend`, tự nhận diện mesh thân bằng số vertex lớn nhất trong các mesh có modifier
+   `ARMATURE` (mesh vũ khí/phụ kiện nhỏ hơn nhiều, ~16-24 vertex so với ~44-48k của thân) — khớp
+   100% với ground truth đã biết của `char_hoa-b1` (object `Hoa_D`, rig `hoa_d_Rig`). Xác nhận
+   `hoa-b1.blend` (15 file `.blend` per-tier trên đĩa) **không phải** nguồn thật của `char_hoa-b1` —
+   sidecar `char_hoa-b1.model-meta.json` ghi rõ nguồn là `hoa-text3d-pilot.blend`; `hoa-b1.blend` là
+   file thừa không dùng tới. ⚠️ **Gotcha**: gọi `bpy.ops.wm.open_mainfile()` rồi thao tác luôn trong
+   CÙNG một lần gọi `execute_blender_code` làm `bpy.ops.object.modifier_move_up` báo lỗi "context is
+   incorrect" — phải tách `open_mainfile` và phần export/decimate thành **hai lần gọi MCP riêng**,
+   để Blender kịp ổn định context giữa hai bước. Grep xác nhận không còn `"texCoord":-1` trong bất
+   kỳ file nào trong 45 file. Chạy `tools:asset-pipeline` xác nhận cả 45 file đọc/đo tam giác được
+   bình thường (không sập nữa) — fail đúng vào ngân sách tam giác như việc #9 mô tả, không phải lỗi
+   mới.
+9. 🛑 **Cần chủ dự án — ngân sách tam giác.** `TriangleBudgetValidator` fail **45/45** file:
    `export_character_lods.py` decimate **phần thân** đúng ngưỡng §4.4 rồi cộng thêm vũ khí không
    decimate, nên mọi file rơi đúng vào `ngưỡng + vũ khí`. Hai đường: re-decimate xuống
    `ngưỡng − vũ khí`, hoặc sửa [ART-PIPELINE §4.4](../../14-art/ART-PIPELINE.md) nói rõ ngưỡng
