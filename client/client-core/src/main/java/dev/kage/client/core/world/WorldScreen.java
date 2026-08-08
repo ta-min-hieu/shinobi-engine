@@ -31,8 +31,8 @@ import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
+import dev.kage.protocol.CharacterSummary;
 import dev.kage.protocol.CostumeTier;
-import dev.kage.protocol.Faction;
 import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
@@ -85,19 +85,20 @@ public final class WorldScreen implements GameScreen {
     private float lastSentDirY;
 
     /**
-     * @param localFaction hệ phái của CHÍNH người chơi, lấy từ {@code CharacterSummary} lúc chọn
-     *     nhân vật — server không gửi {@link CharacterSpawnedEvent} cho chính mình (đã có
-     *     {@code MoveResponse}), nên đây là nguồn duy nhất để biết phải vẽ mình bằng model nào.
-     * @param characterId id nhân vật thật của chính mình (từ {@code CharacterSummary}) — cần để
-     *     nhận ra {@link AttackResultEvent}/{@link SkillResultEvent} nào đang nhắm vào MÌNH thay vì
-     *     quái ({@link #LOCAL_CHARACTER_ID} chỉ là sentinel nội bộ cho render, không phải id thật).
+     * @param context {@link EcsWorld} + {@link InputMapper} gộp lại (CODING-STANDARDS
+     *     ParameterNumber max=4) — xem {@link PlayContext}.
+     * @param character {@code CharacterSummary} của CHÍNH người chơi, nhận từ
+     *     {@code CharacterSelectScreen} lúc chọn/tạo xong. Mang theo {@code faction} vì server
+     *     KHÔNG gửi {@link CharacterSpawnedEvent} cho chính mình (đã có {@code MoveResponse}), nên
+     *     đây là nguồn duy nhất để biết phải vẽ mình bằng model nào; mang theo {@code id} để nhận ra
+     *     {@link AttackResultEvent}/{@link SkillResultEvent} nào đang nhắm vào MÌNH thay vì quái
+     *     ({@link #LOCAL_CHARACTER_ID} chỉ là sentinel nội bộ cho render, không phải id thật).
      */
-    public WorldScreen(
-            EcsWorld world, InputMapper inputMapper, GameConnection connection, Faction localFaction, long characterId) {
-        this.world = world;
-        this.inputMapper = inputMapper;
+    public WorldScreen(PlayContext context, GameConnection connection, CharacterSummary character) {
+        this.world = context.world();
+        this.inputMapper = context.inputMapper();
         this.connection = connection;
-        this.combatHudController = new CombatHudController(characterId);
+        this.combatHudController = new CombatHudController(character.getId());
         this.viewport =
                 new FitViewport(WorldConstants.VIEWPORT_HEIGHT_UNITS, WorldConstants.VIEWPORT_HEIGHT_UNITS, camera);
 
@@ -112,7 +113,7 @@ public final class WorldScreen implements GameScreen {
         // server) — dùng đúng giá trị mặc định server đang phát cho người khác, để mình và người
         // khác nhìn thấy mình giống nhau.
         models.addCharacter(
-                LOCAL_CHARACTER_ID, CharacterModelKey.of(localFaction, CostumeTier.COSTUME_TIER_UNSPECIFIED));
+                LOCAL_CHARACTER_ID, CharacterModelKey.of(character.getFaction(), CostumeTier.COSTUME_TIER_UNSPECIFIED));
 
         combatHud.setOnSkillClicked(this::onSkillButtonClicked);
     }
@@ -154,24 +155,8 @@ public final class WorldScreen implements GameScreen {
         try {
             int opcode = frame.header().opcode();
             byte[] payload = frame.payload();
-            if (opcode == Opcode.OPCODE_MOVE_RESPONSE_VALUE) {
-                onMoveResponse(MoveResponse.parseFrom(payload));
-            } else if (opcode == Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE) {
-                onCharacterSpawned(CharacterSpawnedEvent.parseFrom(payload));
-            } else if (opcode == Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE) {
-                onCharacterMoved(CharacterMovedEvent.parseFrom(payload));
-            } else if (opcode == Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE) {
-                onCharacterDespawned(CharacterDespawnedEvent.parseFrom(payload));
-            } else if (opcode == Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE) {
-                onMonsterSpawned(MonsterSpawnedEvent.parseFrom(payload));
-            } else if (opcode == Opcode.OPCODE_MONSTER_DESPAWNED_EVENT_VALUE) {
-                combatHudController.onMonsterDespawned(MonsterDespawnedEvent.parseFrom(payload));
-            } else if (opcode == Opcode.OPCODE_MONSTER_MOVED_EVENT_VALUE) {
-                combatHudController.onMonsterMoved(MonsterMovedEvent.parseFrom(payload));
-            } else if (opcode == Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE) {
-                combatHudController.onAttackResult(AttackResultEvent.parseFrom(payload));
-            } else if (opcode == Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE) {
-                combatHudController.onSkillResult(SkillResultEvent.parseFrom(payload));
+            if (!dispatchMovement(opcode, payload)) {
+                dispatchCombat(opcode, payload);
             }
             // Opcode khác (VD PongResponse của heartbeat) — không thuộc gameplay world, bỏ qua.
         } catch (InvalidProtocolBufferException e) {
@@ -179,6 +164,39 @@ public final class WorldScreen implements GameScreen {
                     "Payload protobuf không hợp lệ từ server: opcode={}",
                     frame.header().opcode(),
                     e);
+        }
+    }
+
+    // Tách dispatch() thành 2 nhóm (di chuyển/spawn nhân vật vs quái/combat) THUẦN để hạ cyclomatic
+    // complexity dưới ngưỡng PMD (methodReportLevel=10) — 1 chuỗi if-else 9 nhánh vượt ngưỡng, không
+    // phải đổi hành vi.
+    /** @return {@code true} nếu opcode thuộc nhóm di chuyển/spawn nhân vật, đã xử lý xong. */
+    private boolean dispatchMovement(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+        if (opcode == Opcode.OPCODE_MOVE_RESPONSE_VALUE) {
+            onMoveResponse(MoveResponse.parseFrom(payload));
+        } else if (opcode == Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE) {
+            onCharacterSpawned(CharacterSpawnedEvent.parseFrom(payload));
+        } else if (opcode == Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE) {
+            onCharacterMoved(CharacterMovedEvent.parseFrom(payload));
+        } else if (opcode == Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE) {
+            onCharacterDespawned(CharacterDespawnedEvent.parseFrom(payload));
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    private void dispatchCombat(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+        if (opcode == Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE) {
+            onMonsterSpawned(MonsterSpawnedEvent.parseFrom(payload));
+        } else if (opcode == Opcode.OPCODE_MONSTER_DESPAWNED_EVENT_VALUE) {
+            combatHudController.onMonsterDespawned(MonsterDespawnedEvent.parseFrom(payload));
+        } else if (opcode == Opcode.OPCODE_MONSTER_MOVED_EVENT_VALUE) {
+            combatHudController.onMonsterMoved(MonsterMovedEvent.parseFrom(payload));
+        } else if (opcode == Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE) {
+            combatHudController.onAttackResult(AttackResultEvent.parseFrom(payload));
+        } else if (opcode == Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE) {
+            combatHudController.onSkillResult(SkillResultEvent.parseFrom(payload));
         }
     }
 
@@ -240,8 +258,9 @@ public final class WorldScreen implements GameScreen {
 
     private void sendSetTarget(long targetEntityId) {
         try {
-            SetTargetCommand command =
-                    SetTargetCommand.newBuilder().setTargetEntityId(targetEntityId).build();
+            SetTargetCommand command = SetTargetCommand.newBuilder()
+                    .setTargetEntityId(targetEntityId)
+                    .build();
             connection.send(Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, connection.nextSequenceId(), command.toByteArray());
         } catch (IOException e) {
             LOG.debug("Gửi SetTargetCommand thất bại (mất kết nối tạm thời)", e);

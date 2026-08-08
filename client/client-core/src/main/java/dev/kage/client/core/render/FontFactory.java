@@ -29,6 +29,8 @@ public final class FontFactory {
     public static final String VIETNAMESE_CHARACTERS =
             " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`"
                     + "abcdefghijklmnopqrstuvwxyz{|}~"
+                    + "—" // Em dash — dùng rộng rãi trong văn phong Việt của UI (VD "A — B"), KHÔNG
+                    // nằm trong khối ASCII in được ở trên (chỉ có hyphen-minus U+002D).
                     + "ÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚÝàáâãèéêìíòóôõùúýĂăĐđĨĩŨũƠơƯư"
                     + "ẠạẢảẤấẦầẨẩẪẫẬậẮắẰằẲẳẴẵẶặẸẹẺẻẼẽẾếỀềỂểỄễỆệỈỉỊịỌọỎỏỐốỒồỔổỖỗỘộỚớỜờỞởỠỡỢợỤụỦủỨứỪừỬửỮữỰựỲỳỴỵỶỷỸỹ";
 

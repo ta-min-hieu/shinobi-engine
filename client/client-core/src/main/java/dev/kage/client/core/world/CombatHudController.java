@@ -54,7 +54,8 @@ final class CombatHudController {
     long onMonsterSpawned(MonsterSpawnedEvent event) {
         monsters.put(
                 event.getMonsterId(),
-                new MonsterState(event.getMonsterCode(), event.getX(), event.getY(), event.getCurrentHp(), event.getMaxHp()));
+                new MonsterState(
+                        event.getMonsterCode(), event.getX(), event.getY(), event.getCurrentHp(), event.getMaxHp()));
         if (currentTargetId == 0L) {
             currentTargetId = event.getMonsterId();
             return currentTargetId;
@@ -106,7 +107,8 @@ final class CombatHudController {
             return;
         }
         monsters.put(
-                targetEntityId, new MonsterState(existing.code(), existing.x(), existing.y(), currentHp, existing.maxHp()));
+                targetEntityId,
+                new MonsterState(existing.code(), existing.x(), existing.y(), currentHp, existing.maxHp()));
     }
 
     void tick(float deltaTime) {

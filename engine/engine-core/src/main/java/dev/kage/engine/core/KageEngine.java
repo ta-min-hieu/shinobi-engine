@@ -53,6 +53,12 @@ public final class KageEngine extends ApplicationAdapter {
     public void setScreen(GameScreen screen) {
         if (currentScreen != null) {
             currentScreen.hide();
+            // Dispose NGAY màn hình cũ, không đợi tới lúc thoát app — Login/CharacterSelect (mỗi
+            // cái tự sở hữu Stage+SpriteBatch+font riêng, xem client-core/screen/) chỉ sống một lần
+            // rồi bị thay bởi màn kế tiếp, không có registry/stack nào giữ lại để dispose sau
+            // (GameScreen javadoc: "Splash → Loading → Login → ... → InGame"). Không gọi ở đây thì
+            // texture/font native của màn cũ rò rỉ mỗi lần chuyển màn hình.
+            currentScreen.dispose();
         }
         currentScreen = screen;
         currentScreen.show();

@@ -211,4 +211,41 @@
         <Class name="dev.kage.tools.assetpipeline.AssetPipelineRunner"/>
         <Bug pattern="PATH_TRAVERSAL_IN"/>
     </Match>
+
+    <!-- PlayContext gộp EcsWorld+InputMapper cho chuỗi màn hình Login → CharacterSelect → World
+         (CODING-STANDARDS ParameterNumber max=4, xem javadoc class) — CÙNG lý do exclude EcsWorld
+         ở WorldScreen phía trên: cả 2 field là live shared singleton (world game loop đang mutate,
+         input source platform-specific), không phải value object, defensive-copy vô nghĩa. -->
+    <Match>
+        <Class name="dev.kage.client.core.world.PlayContext"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- LoginScreen/CharacterSelectScreen giữ tham chiếu KageEngine để gọi engine.setScreen(...)
+         chuyển màn hình tiếp theo (xem javadoc mỗi class) — composition-root singleton dùng cho
+         điều hướng, CÙNG bản chất "giữ tham chiếu DI, không phải value object" như *UseCase/*Ports
+         phía trên, chỉ khác domain (UI screen thay vì server use case). -->
+    <Match>
+        <Class name="~dev\.kage\.client\.core\.screen\.(LoginScreen|CharacterSelectScreen)"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- CombatHud.stage() lộ ra CÓ CHỦ ĐÍCH — WorldScreen cần đúng instance Stage đó để
+         Gdx.input.setInputProcessor(combatHud.stage()) (xem javadoc CombatHud + WorldScreen#show).
+         Stage Scene2D là live mutable UI scene, không phải value object, "copy phòng thủ" một Stage
+         là vô nghĩa (không thể clone GL resource + actor tree, và bản copy sẽ tách khỏi input thật). -->
+    <Match>
+        <Class name="dev.kage.client.core.ui.hud.CombatHud"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+    <!-- KageSkin.font() lộ BitmapFont dùng chung có chủ đích — public accessor cho caller cần vẽ
+         thủ công bằng đúng font đã nạp (VD Batch.draw ngoài Label/TextField có sẵn style). Font
+         FreeType native-backed, "copy phòng thủ" nghĩa là dựng lại nguyên glyph atlas tốn kém vô
+         ích cho một tài nguyên vốn sinh ra để CHIA SẺ (đúng tinh thần "atlas dùng chung" của
+         RENDERING.md, không phải sơ suất). -->
+    <Match>
+        <Class name="dev.kage.client.core.ui.theme.KageSkin"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
 </FindBugsFilter>

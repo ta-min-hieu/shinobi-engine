@@ -1,8 +1,5 @@
 package dev.kage.client.core.ui.hud;
 
-import java.util.Locale;
-
-import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
@@ -14,6 +11,7 @@ import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.I18NBundle;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
+import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.client.core.ui.theme.KageSkin;
 import dev.kage.client.core.ui.widget.HealthBar;
 
@@ -51,10 +49,9 @@ public final class CombatHud implements Disposable {
     private int lastTargetMaxHp = -1;
 
     public CombatHud() {
-        I18NBundle.setExceptionOnMissingKey(false); // tên quái lạ hiện "??key??" thay vì sập HUD.
         this.stage = new Stage(new ScreenViewport(), new SpriteBatch());
         this.skin = new KageSkin();
-        this.i18n = I18NBundle.createBundle(Gdx.files.internal("i18n/strings"), Locale.of("vi"), "UTF-8");
+        this.i18n = KageI18n.load();
 
         this.playerHealthBar = new HealthBar(skin);
         this.playerHpLabel = new Label("", skin.labelStyle);
