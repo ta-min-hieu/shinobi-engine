@@ -69,16 +69,28 @@ public interface WorldOutboundSink {
     void onAreaChatMessage(long targetCharacterId, long senderCharacterId, String senderName, String body);
 
     /**
-     * {@code defeatedCharacterId} (nhân vật, luôn DƯƠNG) vừa bị {@code killerEntityId} hạ gục —
-     * world CHÍNH chưa có cơ chế tử vong nhân vật (no-op ở {@code ConnectedCharacterRegistry}), chỉ
-     * có ý nghĩa THẬT trong Arena instance (Phase 8 lát cắt 4, {@code ArenaOutboundSink} chốt kết
-     * quả trận đấu). server-world không biết khái niệm "Arena" — chỉ báo SỰ KIỆN, giống
-     * {@link #onMonsterKilled} không biết inventory.
+     * {@code defeatedCharacterId} (nhân vật, luôn DƯƠNG) vừa bị {@code killerEntityId} hạ gục.
+     * World CHÍNH dùng sự kiện này để hồi sinh nhân vật (xem {@link #onCharacterRespawned}) —
+     * {@code ConnectedCharacterRegistry} không còn no-op nữa. Arena instance (Phase 8 lát cắt 4,
+     * {@code ArenaOutboundSink}) override để chốt kết quả trận đấu thay vì hồi sinh tại chỗ.
+     * server-world không biết khái niệm "Arena" — chỉ báo SỰ KIỆN, giống {@link #onMonsterKilled}
+     * không biết inventory.
      */
     void onCharacterDefeated(long defeatedCharacterId, long killerEntityId);
 
+    /**
+     * {@code respawn.characterId()} VỪA hồi sinh với HP/Chi đầy — chỉ world CHÍNH gọi (Arena/
+     * Dungeon có luồng kết thúc trận riêng, không hồi sinh tại chỗ). Không có tham số "ai gửi cho
+     * ai" như các {@code onXxx} khác vì luôn gửi cho ĐÚNG connection của {@code characterId} đó —
+     * cùng quy ước "ngầm định chính mình" như {@link #onMoveAccepted}.
+     */
+    void onCharacterRespawned(RespawnSnapshot respawn);
+
     /** Ảnh chụp trạng thái quái lúc phát {@link #onMonsterSpawned} — gộp tham số (STATIC-ANALYSIS.md). */
     record MonsterSnapshot(long monsterId, String monsterCode, float x, float y, int currentHp, int maxHp) {}
+
+    /** Ảnh chụp trạng thái nhân vật lúc phát {@link #onCharacterRespawned} — gộp tham số (STATIC-ANALYSIS.md). */
+    record RespawnSnapshot(long characterId, float x, float y, int currentHp, int maxHp, int currentChi, int maxChi) {}
 
     /** Ảnh chụp NPC lúc phát {@link #onNpcSpawned} — không có HP (NPC không combat, khác quái). */
     record NpcSnapshot(long npcId, String npcCode, float x, float y) {}

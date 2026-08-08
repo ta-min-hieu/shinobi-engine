@@ -15,6 +15,7 @@ import dev.kage.inventory.domain.ItemStack;
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
+import dev.kage.protocol.CharacterRespawnedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ChatMessageEvent;
@@ -342,13 +343,32 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     }
 
     /**
-     * World CHÍNH không có cơ chế tử vong nhân vật (xem javadoc {@code WorldOutboundSink}) — no-op
-     * có chủ đích. {@code ArenaOutboundSink} (Phase 8 lát cắt 4) override method này để chốt kết
-     * quả trận đấu; world chính KHÔNG đi qua nhánh đó.
+     * World CHÍNH không tự chốt gì ở đây — {@code WorldFacade} là nơi quyết định hồi sinh (gọi
+     * {@link #onCharacterRespawned} ngay sau đó), registry chỉ là đường ống gửi packet. Chốt kết
+     * quả trận đấu (Arena) route qua {@code ArenaOutboundSink} override method này, KHÔNG đi qua
+     * nhánh no-op này.
      */
     @Override
     public void onCharacterDefeated(long defeatedCharacterId, long killerEntityId) {
-        // Không làm gì — xem javadoc phía trên.
+        // Không làm gì — WorldFacade tự gọi onCharacterRespawned, xem javadoc phía trên.
+    }
+
+    @Override
+    public void onCharacterRespawned(WorldOutboundSink.RespawnSnapshot respawn) {
+        ChannelHandlerContext ctx = contextsByCharacterId.get(respawn.characterId());
+        if (ctx == null) {
+            return;
+        }
+        lastKnownPosition.put(respawn.characterId(), new PositionSnapshot(respawn.x(), respawn.y()));
+        CharacterRespawnedEvent event = CharacterRespawnedEvent.newBuilder()
+                .setX(respawn.x())
+                .setY(respawn.y())
+                .setCurrentHp(respawn.currentHp())
+                .setMaxHp(respawn.maxHp())
+                .setCurrentChi(respawn.currentChi())
+                .setMaxChi(respawn.maxChi())
+                .build();
+        send(ctx, Opcode.OPCODE_CHARACTER_RESPAWNED_EVENT_VALUE, 0, event.toByteArray());
     }
 
     @Override

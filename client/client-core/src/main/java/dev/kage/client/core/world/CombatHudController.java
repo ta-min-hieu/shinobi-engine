@@ -120,6 +120,18 @@ final class CombatHudController {
                 new MonsterState(existing.code(), existing.x(), existing.y(), currentHp, existing.maxHp()));
     }
 
+    /**
+     * HP/Khí vừa được server đặt lại (luôn về đầy) sau khi hồi sinh — xem
+     * {@code CharacterRespawnedEvent}. Xoá luôn mục tiêu đang nhắm: server cũng tự xoá
+     * {@code TargetComponent} của kẻ vừa hồi sinh (WorldFacade#respawnCharacter), nên client giữ
+     * mục tiêu cũ chỉ gây lệch hiển thị vô ích.
+     */
+    void onRespawn(int currentHp, int currentChi) {
+        playerHp = currentHp;
+        playerChi = currentChi;
+        currentTargetId = 0L;
+    }
+
     void tick(float deltaTime) {
         if (skillCooldownRemaining > 0f) {
             skillCooldownRemaining = Math.max(0f, skillCooldownRemaining - deltaTime);

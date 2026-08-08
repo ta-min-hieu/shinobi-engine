@@ -88,4 +88,9 @@ final class ArenaOutboundSink implements WorldOutboundSink {
     public void onCharacterDefeated(long defeatedCharacterId, long killerEntityId) {
         arenaInstanceRegistry.handleCharacterDefeated(defeatedCharacterId, killerEntityId);
     }
+
+    @Override
+    public void onCharacterRespawned(WorldOutboundSink.RespawnSnapshot respawn) {
+        registry.onCharacterRespawned(respawn);
+    }
 }

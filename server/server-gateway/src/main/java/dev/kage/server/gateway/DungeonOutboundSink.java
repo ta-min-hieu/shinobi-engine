@@ -87,4 +87,9 @@ final class DungeonOutboundSink implements WorldOutboundSink {
     public void onCharacterDefeated(long defeatedCharacterId, long killerEntityId) {
         registry.onCharacterDefeated(defeatedCharacterId, killerEntityId);
     }
+
+    @Override
+    public void onCharacterRespawned(WorldOutboundSink.RespawnSnapshot respawn) {
+        registry.onCharacterRespawned(respawn);
+    }
 }

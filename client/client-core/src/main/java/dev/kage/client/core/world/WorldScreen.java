@@ -30,6 +30,7 @@ import dev.kage.engine.ecs.system.MovementSystem;
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
+import dev.kage.protocol.CharacterRespawnedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.CharacterSummary;
 import dev.kage.protocol.CostumeTier;
@@ -181,6 +182,8 @@ public final class WorldScreen implements GameScreen {
             onCharacterMoved(CharacterMovedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE) {
             onCharacterDespawned(CharacterDespawnedEvent.parseFrom(payload));
+        } else if (opcode == Opcode.OPCODE_CHARACTER_RESPAWNED_EVENT_VALUE) {
+            onCharacterRespawned(CharacterRespawnedEvent.parseFrom(payload));
         } else {
             return false;
         }
@@ -248,6 +251,20 @@ public final class WorldScreen implements GameScreen {
             world.removeEntity(entity);
         }
         models.removeCharacter(event.getCharacterId());
+    }
+
+    /**
+     * CHÍNH nhân vật vừa hồi sinh (HP về 0 trước đó) — không có {@code character_id} trong packet
+     * (cùng quy ước "ngầm định chính mình" như {@link #onMoveResponse}). Snap vị trí NGAY, không
+     * nội suy — hồi sinh vốn là dịch chuyển tức thời, khác di chuyển thường.
+     */
+    private void onCharacterRespawned(CharacterRespawnedEvent event) {
+        PositionComponent pos = POSITION.get(localPlayer);
+        pos.x = event.getX();
+        pos.y = event.getY();
+        pos.prevX = pos.x;
+        pos.prevY = pos.y;
+        combatHudController.onRespawn(event.getCurrentHp(), event.getCurrentChi());
     }
 
     private void onMonsterSpawned(MonsterSpawnedEvent event) {

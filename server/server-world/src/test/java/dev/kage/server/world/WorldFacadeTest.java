@@ -69,6 +69,9 @@ class WorldFacadeTest {
 
     private record CharacterDefeated(long defeatedCharacterId, long killerEntityId) {}
 
+    private record CharacterRespawned(
+            long characterId, float x, float y, int currentHp, int maxHp, int currentChi, int maxChi) {}
+
     private static final class RecordingSink implements WorldOutboundSink {
         final List<Spawned> spawned = new CopyOnWriteArrayList<>();
         final List<Moved> moved = new CopyOnWriteArrayList<>();
@@ -84,6 +87,7 @@ class WorldFacadeTest {
         final List<SkillResult> skillResults = new CopyOnWriteArrayList<>();
         final List<AreaChatMessage> areaChatMessages = new CopyOnWriteArrayList<>();
         final List<CharacterDefeated> characterDefeated = new CopyOnWriteArrayList<>();
+        final List<CharacterRespawned> characterRespawned = new CopyOnWriteArrayList<>();
 
         @Override
         public void onMoveAccepted(long characterId, int sequenceId, float x, float y) {
@@ -178,6 +182,18 @@ class WorldFacadeTest {
         @Override
         public void onCharacterDefeated(long defeatedCharacterId, long killerEntityId) {
             characterDefeated.add(new CharacterDefeated(defeatedCharacterId, killerEntityId));
+        }
+
+        @Override
+        public void onCharacterRespawned(WorldOutboundSink.RespawnSnapshot respawn) {
+            characterRespawned.add(new CharacterRespawned(
+                    respawn.characterId(),
+                    respawn.x(),
+                    respawn.y(),
+                    respawn.currentHp(),
+                    respawn.maxHp(),
+                    respawn.currentChi(),
+                    respawn.maxChi()));
         }
     }
 
@@ -672,6 +688,62 @@ class WorldFacadeTest {
                         .filter(d -> d.defeatedCharacterId() == 2L)
                         .count())
                 .isEqualTo(1);
+    }
+
+    @Test
+    @Timeout(10)
+    void shouldRespawnCharacter_whenKilledInMainWorld() {
+        // World CHÍNH (spawnOverworldContent=true, field `world` mặc định) — hồi sinh tại chỗ ngay
+        // sau onCharacterDefeated (WorldFacade#respawnCharacter). Cùng cách hạ gục tức thời như
+        // shouldFireCharacterDefeated_whenCharacterKillsAnotherCharacter ở trên.
+        world.start();
+        world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
+        world.attachCharacter(2L, 1f, 0f, DEFAULT_STATS);
+        awaitTrue(() -> sink.spawned.size() >= 2);
+
+        world.applyEquipmentBonus(1L, 1000);
+        world.setTarget(1L, 2L);
+
+        awaitTrue(() -> sink.characterRespawned.stream().anyMatch(r -> r.characterId() == 2L));
+        CharacterRespawned respawn = sink.characterRespawned.stream()
+                .filter(r -> r.characterId() == 2L)
+                .findFirst()
+                .orElseThrow();
+        assertThat(respawn.currentHp()).isEqualTo(CombatConstants.CHARACTER_MAX_HP);
+        assertThat(respawn.maxHp()).isEqualTo(CombatConstants.CHARACTER_MAX_HP);
+        assertThat(respawn.currentChi()).isEqualTo(SkillConstants.CHARACTER_MAX_CHI);
+        assertThat(respawn.maxChi()).isEqualTo(SkillConstants.CHARACTER_MAX_CHI);
+
+        // Đánh lại 2L sau khi hồi sinh — HP đòn đầu phải bắt đầu lại từ MAX (đã reset thật trên
+        // HealthComponent, không chỉ báo sự kiện suông).
+        world.setTarget(1L, 2L);
+        awaitTrue(() -> sink.attackResults.stream()
+                .anyMatch(a -> a.defender() == 2L && a.hp() < CombatConstants.CHARACTER_MAX_HP));
+    }
+
+    @Test
+    @Timeout(10)
+    void shouldNotRespawnCharacter_whenDefeatedInDungeonOrArenaInstance() {
+        // spawnOverworldContent=false (dungeon/arena instance) — WorldFacade#respawnCharacter bị
+        // guard, chỉ world CHÍNH mới hồi sinh tại chỗ (Arena có luồng kết thúc trận riêng qua
+        // ArenaOutboundSink#onCharacterDefeated, KHÔNG hồi sinh ngay).
+        RecordingSink dungeonSink = new RecordingSink();
+        WorldFacade dungeonWorld = new WorldFacade(dungeonSink, false);
+        try {
+            dungeonWorld.start();
+            dungeonWorld.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
+            dungeonWorld.attachCharacter(2L, 1f, 0f, DEFAULT_STATS);
+            awaitTrue(() -> dungeonSink.spawned.size() >= 2);
+
+            dungeonWorld.applyEquipmentBonus(1L, 1000);
+            dungeonWorld.setTarget(1L, 2L);
+
+            awaitTrue(() -> dungeonSink.characterDefeated.stream().anyMatch(d -> d.defeatedCharacterId() == 2L));
+            sleepQuietly(500);
+            assertThat(dungeonSink.characterRespawned).isEmpty();
+        } finally {
+            dungeonWorld.stop();
+        }
     }
 
     @Test

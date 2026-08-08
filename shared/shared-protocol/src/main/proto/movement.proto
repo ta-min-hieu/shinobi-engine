@@ -62,3 +62,17 @@ message CharacterSpawnedEvent {
 message CharacterDespawnedEvent {
   int64 character_id = 1;
 }
+
+// Event: Server -> Client (OPCODE_CHARACTER_RESPAWNED_EVENT). CHÍNH nhân vật gửi lệnh vừa hồi
+// sinh sau khi HP về 0 — không có character_id, cùng quy ước "ngầm định là chính mình" như
+// MoveResponse. x/y là vị trí hồi sinh, current_hp/current_chi luôn bằng max (server tự đặt lại
+// toàn bộ khi hồi sinh) nhưng vẫn gửi cả 4 giá trị để client không tự đoán/hardcode — server luôn
+// là nguồn chân lý (Điều 15), kể cả với giá trị "hiển nhiên đầy".
+message CharacterRespawnedEvent {
+  float x = 1;
+  float y = 2;
+  int32 current_hp = 3;
+  int32 max_hp = 4;
+  int32 current_chi = 5;
+  int32 max_chi = 6;
+}

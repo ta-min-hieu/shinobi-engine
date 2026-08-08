@@ -64,11 +64,19 @@ public final class WorldFacade {
             ComponentMapper.getFor(CombatStatsComponent.class);
     private static final ComponentMapper<StatusEffectComponent> STATUS_EFFECT =
             ComponentMapper.getFor(StatusEffectComponent.class);
+    private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
+    private static final ComponentMapper<ChiComponent> CHI = ComponentMapper.getFor(ChiComponent.class);
 
     // Quái bù nhìn tập luyện — lát cắt 1 Phase 4, hardcode 1 quái, chưa có monster_template DB.
     private static final String TRAINING_DUMMY_CODE = "training_dummy";
     private static final float TRAINING_DUMMY_SPAWN_X = 5f;
     private static final float TRAINING_DUMMY_SPAWN_Y = 5f;
+
+    // Điểm hồi sinh mặc định (chưa có khái niệm "điểm hồi sinh theo khu vực"/thị trấn — MVP đầu
+    // tiên, xem ROADMAP.md Phase 10). Cách quái bù nhìn (5,5) ~7.07m — NGOÀI AiConstants
+    // AGGRO_RADIUS_METERS (6m), nhân vật không bị quái đánh lại ngay lúc vừa hồi sinh.
+    private static final float CHARACTER_RESPAWN_X = 0f;
+    private static final float CHARACTER_RESPAWN_Y = 0f;
 
     // NPC tĩnh mẫu — lát cắt 1 Phase 6, hardcode 1 NPC, chưa có npc_template DB (cùng lý do
     // TRAINING_DUMMY chưa đọc monster_template). Vị trí khác quái để dễ phân biệt lúc test bằng tay.
@@ -512,10 +520,19 @@ public final class WorldFacade {
             if (outcome.targetDied() && outcome.targetEntityId() < 0) {
                 handleMonsterDeath(outcome.targetEntityId(), outcome.attackerEntityId());
             } else if (outcome.targetDied() && outcome.targetEntityId() > 0) {
-                // Phase 8 lát cắt 4 (Arena) — chỉ có ý nghĩa thật trong duel instance, xem javadoc
-                // WorldOutboundSink#onCharacterDefeated. CombatSystem tự chặn đòn lặp lại (target
-                // đã chết → attacker tự bỏ chọn target ở lần xử lý kế), nên chỉ bắn đúng 1 lần.
+                // Arena (Phase 8 lát cắt 4) chốt kết quả trận đấu qua ArenaOutboundSink override —
+                // world CHÍNH hồi sinh tại chỗ ngay sau đó.
                 outboundSink.onCharacterDefeated(outcome.targetEntityId(), outcome.attackerEntityId());
+                // Nhân vật KHÔNG bị removeEntity() khi chết (khác quái — xem handleMonsterDeath),
+                // nên CombatSystem không tự nhận ra "mục tiêu đã biến mất" ở lần xử lý kế (targetHealth
+                // không còn null cũng không còn isDead() sau respawnCharacter reset HP). PHẢI tự xoá
+                // target của kẻ hạ gục ở đây, nếu không nó tự đánh lại y hệt nhân vật vừa hồi sinh mỗi
+                // khi hết cooldown — PHÁT HIỆN THẬT lúc thêm hồi sinh (unit test đột nhiên thấy
+                // onCharacterDefeated bắn 2 lần thay vì 1 trong lúc sleepQuietly chờ xác nhận).
+                clearAttackerTarget(outcome.attackerEntityId());
+                if (spawnOverworldContent) {
+                    respawnCharacter(outcome.targetEntityId());
+                }
             }
         }
     }
@@ -547,8 +564,53 @@ public final class WorldFacade {
             } else if (outcome.targetDied() && outcome.targetEntityId() > 0) {
                 // Xem giải thích đầy đủ ở handleCombatResults — cùng lý do, khác nguồn đòn (skill).
                 outboundSink.onCharacterDefeated(outcome.targetEntityId(), outcome.attackerEntityId());
+                clearAttackerTarget(outcome.attackerEntityId());
+                if (spawnOverworldContent) {
+                    respawnCharacter(outcome.targetEntityId());
+                }
             }
         }
+    }
+
+    /**
+     * Xoá mục tiêu đang nhắm của {@code attackerEntityId} ngay sau khi nó hạ gục 1 NHÂN VẬT — xem
+     * giải thích đầy đủ ở lời gọi trong {@link #handleCombatResults}.
+     */
+    private void clearAttackerTarget(long attackerEntityId) {
+        KEntity attacker = lookupEntity(attackerEntityId);
+        if (attacker != null) {
+            TARGET.get(attacker).targetEntityId = 0L;
+        }
+    }
+
+    /**
+     * Hồi sinh {@code characterId} (luôn DƯƠNG) tại {@link #CHARACTER_RESPAWN_X}/{@code Y} với
+     * HP/Chi đầy — gọi ngay sau {@link WorldOutboundSink#onCharacterDefeated} khi
+     * {@link #spawnOverworldContent} (Arena/Dungeon tự có luồng kết thúc trận riêng, không đi qua
+     * đây). Xoá mục tiêu đang nhắm để CombatSystem không tự đánh trả ngay lập tức tại điểm hồi
+     * sinh (quái mất mục tiêu tự bỏ đuổi qua leash range của AiSystem, không cần sửa AiSystem).
+     */
+    private void respawnCharacter(long characterId) {
+        KEntity entity = entitiesByCharacterId.get(characterId);
+        if (entity == null) {
+            return; // đã ngắt kết nối giữa lúc đòn hạ gục còn đang xử lý — bỏ qua an toàn.
+        }
+        PositionComponent position = POSITION.get(entity);
+        position.x = CHARACTER_RESPAWN_X;
+        position.y = CHARACTER_RESPAWN_Y;
+        position.prevX = position.x;
+        position.prevY = position.y;
+
+        HealthComponent health = HEALTH.get(entity);
+        health.current = health.max;
+
+        ChiComponent chi = CHI.get(entity);
+        chi.current = chi.max;
+
+        TARGET.get(entity).targetEntityId = 0L;
+
+        outboundSink.onCharacterRespawned(new WorldOutboundSink.RespawnSnapshot(
+                characterId, position.x, position.y, health.current, health.max, chi.current, chi.max));
     }
 
     /**

@@ -231,6 +231,41 @@ class CombatHudControllerTest {
     }
 
     @Test
+    void onRespawn_resetsHpChiAndClearsTarget() {
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+        controller.onMonsterSpawned(dummySpawned());
+        controller.useSkill(); // tốn Khí — để onRespawn có gì đó THẬT phải nạp lại.
+        controller.onAttackResult(AttackResultEvent.newBuilder()
+                .setAttackerEntityId(MONSTER_ID)
+                .setTargetEntityId(LOCAL_CHARACTER_ID)
+                .setDamage(100)
+                .setTargetCurrentHp(0)
+                .setTargetDied(true)
+                .build());
+        assertThat(controller.playerHp()).isZero();
+
+        controller.onRespawn(CombatConstants.CHARACTER_MAX_HP, CombatConstants.CHARACTER_MAX_CHI);
+
+        assertThat(controller.playerHp()).isEqualTo(CombatConstants.CHARACTER_MAX_HP);
+        assertThat(controller.currentTargetId()).isZero();
+        assertThat(controller.canUseSkill()).isFalse(); // hết mục tiêu sau khi hồi sinh
+
+        // Xác nhận Khí THẬT được nạp lại (không chỉ HP) — chờ hết hồi chiêu cũ (onRespawn KHÔNG
+        // reset cooldown, chỉ HP/Khí/mục tiêu), chọn lại mục tiêu rồi dùng skill lại được ngay dù
+        // vừa tốn Khí trước lúc chết.
+        controller.tick(CombatConstants.FIREBALL_COOLDOWN_SECONDS);
+        controller.onMonsterSpawned(MonsterSpawnedEvent.newBuilder()
+                .setMonsterId(-2L)
+                .setMonsterCode("training_dummy")
+                .setX(5f)
+                .setY(5f)
+                .setCurrentHp(50)
+                .setMaxHp(50)
+                .build());
+        assertThat(controller.useSkill()).isTrue();
+    }
+
+    @Test
     void constructor_rejectsFactionWithoutASlot0SkillMapping() {
         assertThatThrownBy(() -> new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_UNSPECIFIED))
                 .isInstanceOf(IllegalArgumentException.class);
