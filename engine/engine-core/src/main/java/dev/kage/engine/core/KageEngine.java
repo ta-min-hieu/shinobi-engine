@@ -62,6 +62,15 @@ public final class KageEngine extends ApplicationAdapter {
         }
         currentScreen = screen;
         currentScreen.show();
+        // libGDX chỉ gọi resize() của ApplicationListener 1 lần lúc app khởi động thật (khi màn hình
+        // ĐẦU TIÊN đang là currentScreen) và mỗi lần cửa sổ đổi kích thước thật — chuyển màn hình
+        // giữa chừng qua setScreen() (Login → CharacterSelect → World) không phải resize cửa sổ nên
+        // KHÔNG tự kích hoạt lại. Màn hình mới do đó không bao giờ nhận đúng kích thước nếu không
+        // gọi tay ở đây — Stage/ScreenViewport (Login/CharacterSelect/HUD) tự áp lại viewport mỗi
+        // frame nên "chịu được", còn FitViewport của WorldScreen thì không: camera.viewportWidth/
+        // Height ở trạng thái mặc định (0) cho tới lần resize() đầu tiên, khiến ma trận chiếu suy
+        // biến về 0 và không có gì render được — phát hiện thật bằng log, không suy luận tĩnh.
+        currentScreen.resize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
     }
 
     @Override
