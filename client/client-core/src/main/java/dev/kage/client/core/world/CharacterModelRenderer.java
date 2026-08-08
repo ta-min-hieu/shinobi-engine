@@ -7,6 +7,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.g3d.utils.AnimationController;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Disposable;
@@ -67,10 +68,18 @@ public final class CharacterModelRenderer implements Disposable {
      */
     private static final Matrix4 Y_UP_TO_Z_UP = new Matrix4().setToRotation(Vector3.X, 90f);
 
+    /**
+     * Thời gian chuyển mượt (giây) giữa 2 clip animation — không cắt cứng, tránh pop khi đổi tư thế
+     * ([RENDERING.md §11.1](docs/03-engine/RENDERING.md)). Áp dụng cho cả loop (idle↔run) lẫn
+     * one-shot (attack/hit/skill_cast) qua {@code AnimationController.animate}.
+     */
+    private static final float CLIP_TRANSITION_SECONDS = 0.15f;
+
     private final SceneManager sceneManager;
     private final OrthographicCamera camera;
     private final Map<String, SceneAsset> assetsByKey = new HashMap<>();
     private final Map<Long, Scene> scenesByCharacter = new HashMap<>();
+    private final Map<Long, AnimationState> animationStateByCharacter = new HashMap<>();
     private final Vector3 target = new Vector3();
     private boolean enabled = true;
 
@@ -149,6 +158,10 @@ public final class CharacterModelRenderer implements Disposable {
         Scene scene = new Scene(asset.scene);
         scenesByCharacter.put(characterId, scene);
         sceneManager.addScene(scene);
+        // Tư thế ban đầu là idle, đặt thẳng (không crossfade) vì chưa có gì để chuyển tiếp từ đó —
+        // tránh model đứng bind pose tĩnh (§6.5 mục 3 của RENDERING.md, giờ đã nối).
+        scene.animationController.setAnimation(CharacterAnimationClips.IDLE, -1);
+        animationStateByCharacter.put(characterId, new AnimationState(characterId));
     }
 
     public void removeCharacter(long characterId) {
@@ -156,6 +169,7 @@ public final class CharacterModelRenderer implements Disposable {
         if (scene != null) {
             sceneManager.removeScene(scene);
         }
+        animationStateByCharacter.remove(characterId);
     }
 
     /** Dời model của một nhân vật tới vị trí đã nội suy trong frame này. */
@@ -167,6 +181,114 @@ public final class CharacterModelRenderer implements Disposable {
             // nguyên phần xoay và không cấp phát gì.
             scene.modelInstance.transform.set(Y_UP_TO_Z_UP).trn(x, y, 0f);
         }
+    }
+
+    /**
+     * Đặt lại clip loop (idle/run) mong muốn của một nhân vật — gọi mỗi frame từ
+     * {@code WorldScreen}, giống {@link #setCharacterPosition}. Không cắt ngang một one-shot
+     * (attack/hit/die/skill_cast) đang chạy; clip loop chỉ được áp lại khi one-shot đó kết thúc
+     * (xem {@link AnimationState#onEnd}).
+     *
+     * @param moving true = {@link CharacterAnimationClips#RUN}, false = {@link
+     *     CharacterAnimationClips#IDLE} (RENDERING.md §11.1).
+     */
+    public void setCharacterMoving(long characterId, boolean moving) {
+        AnimationState state = animationStateByCharacter.get(characterId);
+        if (state == null || state.dead) {
+            return; // Chưa có Scene, hoặc đã chết — giữ nguyên tư thế die tới khi hồi sinh.
+        }
+        state.moving = moving;
+        if (!state.oneShotPlaying) {
+            applyLoopClip(state);
+        }
+    }
+
+    /** Đòn đánh thường — luôn phát dù trúng hay né (đó là động tác vung đòn, không phải kết quả). */
+    public void playAttack(long characterId) {
+        playOneShot(characterId, CharacterAnimationClips.ATTACK);
+    }
+
+    /** Phản ứng trúng đòn — KHÔNG gọi khi mục tiêu chết (dùng {@link #playDie} thay vào đó). */
+    public void playHit(long characterId) {
+        playOneShot(characterId, CharacterAnimationClips.HIT);
+    }
+
+    /** Dùng kỹ năng — cho cả người dùng skill lẫn (gián tiếp qua {@code WorldScreen}) không áp cho quái. */
+    public void playSkillCast(long characterId) {
+        playOneShot(characterId, CharacterAnimationClips.SKILL_CAST);
+    }
+
+    /**
+     * HP về 0 — phát một lần, dừng ở tư thế cuối (ART-PIPELINE §4.2: "không loop"), KHÔNG tự quay
+     * lại idle/run như các one-shot khác. Giữ nguyên tới khi {@link #resetAfterRespawn}.
+     */
+    public void playDie(long characterId) {
+        AnimationState state = animationStateByCharacter.get(characterId);
+        if (state == null) {
+            return;
+        }
+        state.dead = true;
+        playOneShotState(state, CharacterAnimationClips.DIE);
+    }
+
+    /**
+     * Nhân vật vừa hồi sinh — trả lại idle ngay lập tức (đặt thẳng, không crossfade, giống cách
+     * {@code WorldScreen.onCharacterRespawned} snap vị trí thay vì nội suy: hồi sinh là dịch chuyển
+     * tức thời, không phải chuyển tiếp mượt từ tư thế die).
+     */
+    public void resetAfterRespawn(long characterId) {
+        AnimationState state = animationStateByCharacter.get(characterId);
+        Scene scene = scenesByCharacter.get(characterId);
+        if (state == null || scene == null) {
+            return;
+        }
+        state.dead = false;
+        state.oneShotPlaying = false;
+        state.moving = false;
+        state.currentClip = CharacterAnimationClips.IDLE;
+        scene.animationController.setAnimation(CharacterAnimationClips.IDLE, -1);
+    }
+
+    /**
+     * True nếu clip {@code die} đang/đã phát và chưa {@link #resetAfterRespawn}. {@code WorldScreen}
+     * dùng cờ này để suy ra "nhân vật KHÁC vừa hồi sinh" từ gói di chuyển đầu tiên sau đó — giao
+     * thức không phát {@code CharacterRespawnedEvent} cho ai khác ngoài chính người hồi sinh.
+     */
+    public boolean isDead(long characterId) {
+        AnimationState state = animationStateByCharacter.get(characterId);
+        return state != null && state.dead;
+    }
+
+    private void applyLoopClip(AnimationState state) {
+        String desired = CharacterAnimationClips.loopingClipFor(state.moving);
+        if (desired.equals(state.currentClip)) {
+            return; // AnimationController restart clip từ đầu mỗi lần setAnimation/animate được gọi
+            // — tránh gọi lại khi clip mong muốn không đổi (mỗi frame gọi setCharacterMoving).
+        }
+        state.currentClip = desired;
+        Scene scene = scenesByCharacter.get(state.characterId);
+        scene.animationController.animate(desired, -1, 1f, null, CLIP_TRANSITION_SECONDS);
+    }
+
+    private void playOneShot(long characterId, String clip) {
+        AnimationState state = animationStateByCharacter.get(characterId);
+        if (state == null || state.dead) {
+            return; // Đã chết — không phát chồng animation khác lên xác tới khi hồi sinh.
+        }
+        playOneShotState(state, clip);
+    }
+
+    private void playOneShotState(AnimationState state, String clip) {
+        if (state.oneShotPlaying && clip.equals(state.currentClip)) {
+            // Cùng một one-shot đã đang chạy — bỏ qua thay vì restart giữa chừng. Xảy ra thật khi
+            // WorldScreen dự đoán skill_cast cục bộ lúc bấm nút rồi SkillResultEvent xác nhận tới
+            // ngay sau đó (CLIENT.md "Đúng cách": dự đoán animation chính mình là hợp lệ).
+            return;
+        }
+        state.oneShotPlaying = true;
+        state.currentClip = clip;
+        Scene scene = scenesByCharacter.get(state.characterId);
+        scene.animationController.animate(clip, 1, 1f, state, CLIP_TRANSITION_SECONDS);
     }
 
     /** Camera bám nhân vật của người chơi, giữ nguyên góc khoá. */
@@ -201,5 +323,37 @@ public final class CharacterModelRenderer implements Disposable {
         }
         assetsByKey.clear();
         scenesByCharacter.clear();
+        animationStateByCharacter.clear();
+    }
+
+    /**
+     * Trạng thái animation của MỘT nhân vật (clip hiện tại, có đang chạy one-shot không, đã chết
+     * chưa). Là {@code AnimationListener} luôn của chính nó thay vì cấp phát 1 listener riêng mỗi
+     * lần gọi {@link #playOneShot} — nghe xong 1 one-shot, tự áp lại clip loop mong muốn
+     * ({@link #applyLoopClip}), trừ khi vừa mới {@code die} (giữ nguyên tư thế cuối).
+     */
+    private final class AnimationState implements AnimationController.AnimationListener {
+        private final long characterId;
+        private String currentClip = CharacterAnimationClips.IDLE;
+        private boolean moving;
+        private boolean oneShotPlaying;
+        private boolean dead;
+
+        AnimationState(long characterId) {
+            this.characterId = characterId;
+        }
+
+        @Override
+        public void onEnd(AnimationController.AnimationDesc animation) {
+            oneShotPlaying = false;
+            if (!dead) {
+                applyLoopClip(this);
+            }
+        }
+
+        @Override
+        public void onLoop(AnimationController.AnimationDesc animation) {
+            // One-shot luôn chạy loopCount=1 (playOneShotState) — không bao giờ lặp, không cần xử lý.
+        }
     }
 }
