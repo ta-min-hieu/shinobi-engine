@@ -23,9 +23,10 @@ import java.util.stream.Stream;
  * </ul>
  *
  * <p>Rồi sinh {@code asset-manifest.json} cho cả hai nhánh → upsert {@code art_asset} cho CẢ HAI
- * nhánh (V19 + V20, ART-PIPELINE §8.3/§8.6) NẾU có cấu hình DB (biến môi trường {@code DB_PASSWORD}
- * — xem {@link ArtRegistryConfig}); không có thì bỏ qua bước upsert, không fail — cho phép duyệt
- * atlas cục bộ mà không cần Postgres đang chạy.
+ * nhánh (V19 + V20, ART-PIPELINE §8.3/§8.6) → {@link OrphanAssetChecker} đối chiếu ngược đĩa/DB, fail
+ * build nếu có file mồ côi (§8.5/§8.6) — TẤT CẢ NẾU có cấu hình DB (biến môi trường {@code
+ * DB_PASSWORD} — xem {@link ArtRegistryConfig}); không có thì bỏ qua cả ba bước, không fail — cho
+ * phép duyệt atlas cục bộ mà không cần Postgres đang chạy.
  */
 public final class AssetPipelineRunner {
 
@@ -55,6 +56,7 @@ public final class AssetPipelineRunner {
         if (dbConfig != null) {
             ArtRegistryUpserter.upsertSprites(assets, dbConfig);
             ArtRegistryUpserter.upsertModels(models, modelsRoot, renderRoot, dbConfig);
+            OrphanAssetChecker.check(assets, models, dbConfig);
         } else {
             System.out.println("[asset-pipeline] bỏ qua upsert art_asset (thiếu biến môi trường DB_PASSWORD)");
         }

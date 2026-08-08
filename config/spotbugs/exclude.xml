@@ -248,4 +248,14 @@
         <Class name="dev.kage.client.core.ui.theme.KageSkin"/>
         <Bug pattern="EI_EXPOSE_REP"/>
     </Match>
+
+    <!-- OrphanAssetCheckerIntegrationTest chạy nguyên văn 2 file migration THẬT (V19/V20) qua
+         Statement.execute(String) để dựng schema art_asset trên Postgres throwaway (Testcontainers,
+         xem javadoc applyMigration). Nội dung SQL đọc từ đúng 2 file .sql cố định nằm sẵn trong repo
+         (server/server-database/src/main/resources/db/migration), không phải input người dùng/mạng
+         — chỉ chạy build-time trong test, không phải đường dẫn production nào chạm SQL động thật. -->
+    <Match>
+        <Class name="dev.kage.tools.assetpipeline.OrphanAssetCheckerIntegrationTest"/>
+        <Bug pattern="SQL_INJECTION_JDBC"/>
+    </Match>
 </FindBugsFilter>
