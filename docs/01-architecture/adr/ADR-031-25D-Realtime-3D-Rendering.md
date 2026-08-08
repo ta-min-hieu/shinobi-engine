@@ -228,3 +228,14 @@ tiết ở [ART-PIPELINE §4.4](../../14-art/ART-PIPELINE.md).
     lần), nhưng "máy tham chiếu của dự án" nêu ở điều kiện #1 chưa từng được chốt spec cụ thể ở đâu
     trong docs — số đo trên máy dev (iGPU Intel) là bằng chứng thật đầu tiên, không phải phép đo trên
     máy tham chiếu đã duyệt (vì máy đó chưa tồn tại bằng văn bản).
+11. 🔴 **Kiểm chứng bằng mắt qua `WorldScreen` thật (không phải benchmark tool) — 2026-08-08, phiên
+    sau. PHÁT HIỆN BUG THẬT, chưa sửa.** Dựng lại môi trường dev đầy đủ (client + server-gateway TLS +
+    Postgres/Redis dev container), tạo nhân vật hệ Hỏa qua UI thật, quan sát idle/di chuyển/bị đánh
+    trúng. Cel shading + viền render đúng, nhưng **nhân vật hiện ra nằm ngang thay vì đứng thẳng** ở cả
+    ba trạng thái — khác ảnh xác nhận "đứng thẳng" của việc #5 (2026-08-07, nhưng đó là bind pose,
+    TRƯỚC khi animation được nối, `89f1e19`). Chi tiết đầy đủ + nghi vấn nguyên
+    nhân (node gốc `.glb` mang sẵn quaternion xoay ~35° quanh Y, trùng `VIEW_YAW_DEGREES`, nhưng chưa
+    đủ bằng chứng kết luận đó là nguyên nhân) ở
+    [RENDERING.md §11.1 "Kiểm chứng bằng mắt 2026-08-08"](../../03-engine/RENDERING.md). Revisit
+    Trigger #1 (frame time) **không** bị ảnh hưởng bởi bug này — đo hiệu năng vẫn đúng, chỉ tư thế sai.
+    **Không đóng ADR-031 hoàn toàn tới khi bug này được sửa và xác nhận lại bằng mắt.**

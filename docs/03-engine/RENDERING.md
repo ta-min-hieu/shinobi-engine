@@ -253,9 +253,9 @@ mỗi lần spawn) và trả quyền vẽ về cho hình hộp. Đây không ph�
 
 | # | Hạn chế | Vì sao chưa sửa |
 |---|---|---|
-| 1 | **Mọi nhân vật nạp cùng một model** (`char_thuy-b1`) | `CharacterSpawnedEvent` **không có** trường nào mô tả ngoại hình (hệ phái / bậc trang phục) nên client không có cách nào biết phải nạp model nào. Thêm trường đó là **đổi protocol** ⇒ phải dừng và hỏi chủ dự án ([/CLAUDE.md §4](../../CLAUDE.md)) |
+| 1 | ~~Mọi nhân vật nạp cùng một model~~ ✅ **Nạp đúng model theo hệ phái** (2026-08-07) | `CharacterSpawnedEvent` giờ mang `faction` + `costume_tier` (chủ dự án duyệt đổi protocol 2026-08-07, commit `92e9f15`). `WorldScreen` ghép hai trường đó qua `CharacterModelKey.of()` thành `assetKey` đúng hệ phái — cho cả nhân vật khác (`onCharacterSpawned`) lẫn chính mình lúc vào world. `costume_tier` vẫn hằng số B1 ở tầng gateway: gameplay chưa có khái niệm bậc trang phục để suy ra bậc thật |
 | 2 | **Tier hình học bị hardcode ở `models/med/`** | LOW/HIGH và đường `ensureAssetsAvailable(tier)` của [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) chưa được nối ở lát cắt này |
-| 3 | ~~Chưa phát action nào~~ ✅ **Đã nối** (2026-08-08) | Trạng thái gameplay quan sát được ở client → tên clip đã nối qua `CharacterAnimationClips`/`CombatAnimationTrigger`/`RemoteMotionTracker` — chi tiết ở §11.1. **Chưa kiểm chứng bằng mắt** (chưa chạy được GL thật ở môi trường viết code, xem §11.1) |
+| 3 | 🔴 **Nhân vật đứng/di chuyển/hit đều hiện ra NẰM NGANG, không đứng thẳng** | Kiểm chứng bằng mắt thật lần đầu (2026-08-08, cùng phiên với việc #10 của ADR-031) phát hiện bug thật — xem §11.1 "Kiểm chứng bằng mắt 2026-08-08" để biết chi tiết + ảnh mô tả + nghi vấn nguyên nhân. **KHÔNG phải** vấn đề cel shader (viền + shading render đúng, chỉ riêng tư thế sai) |
 | 4 | ~~Chưa có cel shader, chưa có lượt vẽ viền~~ ✅ **Đã viết** (2026-08-08) | `CelOutlineShader` + `CelBodyShader`, xem §12.2. `CharacterModelRenderer` không còn dùng ánh sáng mặc định gdx-gltf |
 | 5 | **Camera bám tuyệt đối**, chưa có deadzone/lerp (§4.1) | Chưa có gameplay nào ép phải làm; làm sớm là đoán |
 | 6 | ~~Chưa đo frame time~~ | ✅ **Đo xong 2026-08-08** (`CharacterModelFrameBenchmarkTool`) — điều kiện Revisit Trigger #1 của ADR-031 (20 nhân vật trên màn) **không** kích hoạt, xem [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md) cho số liệu + giới hạn của phép đo. ⚠️ Số ban đầu (p95 0,30ms) đo TRƯỚC khi hoà cel shader + animation; **đo lại sau khi hoà cả ba** cho p95 **0,52ms** (2 lượt vẽ/nhân vật thay vì 1) — vẫn cách xa ngưỡng 8ms hơn 15 lần, chưa có máy tham chiếu chính thức |
@@ -429,15 +429,38 @@ ràng buộc giao thức hiện có, không phải xác nhận trực tiếp —
 biết chính xác thời điểm người khác hồi sinh, đây là chỗ cần một field/event tường minh hơn (đổi
 protocol ⇒ hỏi chủ dự án).
 
-🟡 **Kiểm chứng một phần.** Đã build/test/checkstyle/PMD/SpotBugs xanh và xác minh cơ chế bằng cách đọc
-bytecode `AnimationController`/`Scene`/`SceneManager`/`AnimationsPlayer` thật trong `third-party/m2/`.
-Sau khi hoà chung với cel shader (§12.2) và chạy lại `CharacterModelFrameBenchmarkTool` trên GPU thật
-(20 nhân vật, `addCharacter()` tự đặt `idle` cho mỗi Scene) — **không crash, không exception**, animation
-loop chạy hết 6000 khung không lỗi. Nhưng benchmark đó KHÔNG gọi `setCharacterMoving`/`playAttack`/...
-nên **chưa xác nhận bằng mắt việc chuyển đổi clip** (idle↔run, one-shot→loop) mượt hay đúng — đó vẫn
-cần một lần chạy client thật qua `WorldScreen` (§6.1: "đường code đã có, kết quả hình ảnh chưa được
-kiểm chứng" — vẫn áp dụng cho phần CHUYỂN ĐỔI clip, không còn áp dụng cho việc animation có chạy hay
-không).
+🟡 **Kiểm chứng một phần (trước 2026-08-08, xem bản cập nhật ngay dưới).** Đã build/test/checkstyle/
+PMD/SpotBugs xanh và xác minh cơ chế bằng cách đọc bytecode
+`AnimationController`/`Scene`/`SceneManager`/`AnimationsPlayer` thật trong `third-party/m2/`. Sau khi
+hoà chung với cel shader (§12.2) và chạy lại `CharacterModelFrameBenchmarkTool` trên GPU thật (20 nhân
+vật, `addCharacter()` tự đặt `idle` cho mỗi Scene) — **không crash, không exception**, animation loop
+chạy hết 6000 khung không lỗi. Nhưng benchmark đó KHÔNG gọi `setCharacterMoving`/`playAttack`/... nên
+chưa xác nhận bằng mắt việc chuyển đổi clip mượt hay đúng.
+
+🔴 **Kiểm chứng bằng mắt 2026-08-08 — PHÁT HIỆN BUG THẬT, chưa sửa.** Dựng môi trường dev đầy đủ
+(client + server-gateway TLS thật + Postgres/Redis dev container, dev container riêng cổng 15432/56379
+không đụng container dự án khác), tạo nhân vật hệ Hỏa thật qua UI, quan sát trong `WorldScreen` thật
+(không phải benchmark tool). Kết quả: viền cel-shading + shading thân đều render đúng (silhouette rõ
+nét, không vỡ shader), nhưng **nhân vật hiện ra nằm ngang/úp sấp thay vì đứng thẳng** — xác nhận ở CẢ
+BA trạng thái quan sát được (idle lúc mới spawn HP 100/100, đang di chuyển, và sau khi bị hình nộm
+luyện tập đánh trúng tụt xuống HP 30/100) — cùng một hướng nằm ngang bất kể clip nào đang chạy, tức
+đây là lỗi tư thế GỐC, không phải lỗi riêng một clip. Khác hẳn ảnh chụp đã xác nhận 2026-08-07
+("nhân vật Hoả đứng thẳng") — ảnh đó chụp TRƯỚC khi animation được nối (`addCharacter` khi đó CHƯA gọi
+`setAnimation`, nhân vật hiện ra ở bind pose tĩnh của mesh, không phải qua `AnimationController`).
+
+Nghi vấn (chưa xác nhận, cần điều tra thêm — không đoán mò sửa): đọc thẳng chunk JSON của
+`char_hoa-b1.glb` thấy node gốc `hoa_d_Rig` (cha của mesh + toàn bộ xương) mang sẵn một quaternion xoay
+quanh trục Y ≈ 35° — trùng đúng `CharacterModelRenderer.VIEW_YAW_DEGREES`. Một mình phép xoay
+quanh trục đứng không đủ để giải thích dáng "nằm ngang" (chỉ xoay hướng nhìn, không đổ nhân vật), nên
+đây là MỘT đầu mối khả nghi, không phải nguyên nhân đã xác nhận — không loại trừ animation clip tự nó
+(dữ liệu keyframe) mới là nơi có trục sai, hoặc dữ liệu skin/bind-pose bị hỏng ở lần xuất lại 45 file
+2026-08-08 (`b774932`, mục #8/#9 ADR-031). Bind pose KHÔNG animation (đã xác nhận 2026-08-07) đứng
+đúng; MỌI trạng thái CÓ animation (đã xác nhận 2026-08-08) đều sai — thu hẹp nghi vấn về phía animation
+clip hoặc cách áp animation lên bind pose, nhưng chưa đủ bằng chứng để kết luận chắc.
+
+Môi trường verify đã dọn sạch (dừng+xoá `kage-pg-dev`/`kage-redis-dev`, kill client/server) — không để
+lại state. `WorldConstants.VIEWPORT_HEIGHT_UNITS` có sửa tạm xuống `2.5f` để phóng to quan sát rõ dáng
+nhân vật, đã revert lại `10f`, KHÔNG commit.
 
 **Không dùng Spine** — lý do license phí vẫn đúng, và giờ càng không cần: skeletal đã có sẵn trong
 glTF, không tốn thêm dependency thương mại nào.
@@ -716,9 +739,9 @@ Không có. Cả [ADR-020](../01-architecture/adr/ADR-020-Viewport-Strategy.md) 
 [ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md) (phòng vệ JitPack) đều đã
 **Accepted**.
 
-⚠️ Việc còn thiếu của nhánh 3D là **code và phép đo**, không phải quyết định kiến trúc — trừ **một**
-ngoại lệ cần chủ dự án: thêm trường mô tả ngoại hình vào `CharacterSpawnedEvent` là **đổi protocol**
-(§6.5 mục 1), AI không tự làm ([/CLAUDE.md §4](../../CLAUDE.md)).
+Việc còn thiếu của nhánh 3D là **code và phép đo**, không phải quyết định kiến trúc. Ngoại lệ trước đây
+cần chủ dự án — thêm trường mô tả ngoại hình vào `CharacterSpawnedEvent` — **đã duyệt và cài đặt**
+2026-08-07 (commit `92e9f15`, §6.5 mục 1).
 
 ## Tài liệu liên quan
 
@@ -734,9 +757,10 @@ ngoại lệ cần chủ dự án: thêm trường mô tả ngoại hình vào `
 
 ## Việc cần làm tiếp theo
 
-1. 🔴 **Nhìn thấy nhánh 3D chạy thật** — chạy pipeline art sinh `.glb` vào `assets/exported/models/med/`
-   rồi mở client và xác nhận model hiện ra thay vì hình hộp (§6.1). Chưa làm bước này thì mọi mục dưới
-   đều không đo được.
+1. ✅ **Nhìn thấy nhánh 3D chạy thật** — xong 2026-08-07 (bind pose, không animation) và lặp lại
+   2026-08-08 (có animation, cùng phiên đóng mục 4/8/9/10 của ADR-031). Model hiện ra thật, không phải
+   hình hộp. 🔴 Nhưng lần chạy 2026-08-08 lộ bug tư thế thật — xem mục 4 ngay dưới, KHÔNG đóng mục này
+   hoàn toàn tới khi bug đó được sửa và xác nhận lại.
 2. ✅ **Viết GLSL cel + lượt vẽ viền** theo hợp đồng §12.2 — xong 2026-08-08, ba câu hỏi runtime ở
    cuối mục đó đã có câu trả lời thật (câu hỏi #3 — cấp phát `AnimationController` — chỉ trả lời một
    phần, xem §12.2). Còn mở: test trên thiết bị/emulator Android thật (chỉ viết GLSL kiểu
@@ -748,17 +772,23 @@ ngoại lệ cần chủ dự án: thêm trường mô tả ngoại hình vào `
    khung** của `AnimationController` (§16) đo bằng JFR TRƯỚC khi hoà — 🟡 trả lời một phần, không phải
    bằng chứng "0 cấp phát" tuyệt đối, và chưa đo lại JFR riêng cho bản đã hoà, xem §12.2 mục 3 và
    ART-PIPELINE §4.4.
-4. ✅ **Nối trạng thái gameplay → clip animation** (§11.1) — 2026-08-08. `CharacterAnimationClips`
-   (vận tốc → idle/run, thuần hàm) + `RemoteMotionTracker` (suy di chuyển của người khác từ độ lệch vị
-   trí, không có field vận tốc trong giao thức) + `CombatAnimationTrigger` (attack/hit/skill_cast/die
-   từ `AttackResultEvent`/`SkillResultEvent`) đẩy vào `CharacterModelRenderer`, nơi thật sự điều khiển
-   `AnimationController` (crossfade 0.15s, one-shot tự quay lại loop qua `AnimationListener`, `die`
-   giữ tư thế cuối). **Chưa xác nhận bằng mắt** — phụ thuộc mục 1 (chưa ai nhìn thấy nhánh 3D chạy
-   thật) và môi trường code hoá không mở được cửa sổ GL desktop; xác nhận cơ chế đúng qua đọc bytecode
-   thư viện thật, không phải chạy hình. `jump` cố ý bỏ qua — `GameAction` chưa có ý định nhảy.
+4. 🔴 **Nối trạng thái gameplay → clip animation** (§11.1) — dây nối xong 2026-08-08.
+   `CharacterAnimationClips` (vận tốc → idle/run, thuần hàm) + `RemoteMotionTracker` (suy di chuyển của
+   người khác từ độ lệch vị trí, không có field vận tốc trong giao thức) + `CombatAnimationTrigger`
+   (attack/hit/skill_cast/die từ `AttackResultEvent`/`SkillResultEvent`) đẩy vào
+   `CharacterModelRenderer`, nơi thật sự điều khiển `AnimationController` (crossfade 0.15s, one-shot tự
+   quay lại loop qua `AnimationListener`, `die` giữ tư thế cuối). **Xác nhận bằng mắt 2026-08-08 —
+   BUG THẬT**: nhân vật hiện ra nằm ngang thay vì đứng thẳng ở CẢ BA trạng thái quan sát được (idle,
+   moving, hit) — chi tiết + nghi vấn nguyên nhân ở §11.1 "Kiểm chứng bằng mắt 2026-08-08". Bind pose
+   không animation (xác nhận đứng đúng 2026-08-07) vẫn đúng; lỗi chỉ xuất hiện khi có animation áp vào
+   — thu hẹp nghi vấn về animation clip/cách áp animation, chưa xác nhận chắc chắn. `jump` cố ý bỏ qua
+   — `GameAction` chưa có ý định nhảy.
 5. **Nối tier đồ hoạ** — bỏ đường dẫn `models/med/` hardcode, đi qua `ensureAssetsAvailable(tier)` của
    [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) (§6.5 mục 2).
-6. 🛑 **Chờ chủ dự án**: `CharacterSpawnedEvent` cần trường mô tả ngoại hình thì client mới nạp đúng
-   model cho từng hệ phái/bậc trang phục. Đổi protocol ⇒ không tự làm (§6.5 mục 1).
+6. ✅ **`CharacterSpawnedEvent` mang `faction` + `costume_tier`** — chủ dự án duyệt đổi protocol
+   2026-08-07, cài đặt ở commit `92e9f15` (§6.5 mục 1). Client dùng cả hai trường qua
+   `CharacterModelKey.of()` để nạp đúng model theo hệ phái, cho cả nhân vật khác
+   (`WorldScreen.onCharacterSpawned`) lẫn chính mình. `costume_tier` vẫn hằng số B1 ở tầng gateway —
+   gameplay chưa có khái niệm bậc trang phục để suy ra bậc thật.
 7. Test shader (§12) trên Android **sớm**, không để tới cuối.
 </content>
