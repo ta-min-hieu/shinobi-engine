@@ -198,9 +198,9 @@ Xem lại quyết định này khi **một trong ba** điều kiện sau xảy r
    kỳ file nào trong 45 file. Chạy `tools:asset-pipeline` xác nhận cả 45 file đọc/đo tam giác được
    bình thường (không sập nữa) — fail đúng vào ngân sách tam giác như việc #9 mô tả, không phải lỗi
    mới.
-9. 🛑 **Cần chủ dự án — ngân sách tam giác.** `TriangleBudgetValidator` fail **45/45** file:
-   `export_character_lods.py` decimate **phần thân** đúng ngưỡng §4.4 rồi cộng thêm vũ khí không
-   decimate, nên mọi file rơi đúng vào `ngưỡng + vũ khí`. Hai đường: re-decimate xuống
-   `ngưỡng − vũ khí`, hoặc sửa [ART-PIPELINE §4.4](../../14-art/ART-PIPELINE.md) nói rõ ngưỡng
-   không tính extras. ⚠️ Validator chạy **trước** bước upsert nên `art_asset` **không thể** nạp
-   thật cho tới khi chốt.
+9. ✅ **Đóng 2026-08-08.** Chủ dự án chốt: decimate xuống `ngưỡng − vũ khí` (giữ nguyên ý nghĩa
+   "ngưỡng" §4.4 = tổng đã ship, không sửa tài liệu). Sửa `export_character_lods.py` (`b774932`) rồi
+   xuất lại đủ 45 file qua Blender MCP cùng phiên. `tools:asset-pipeline` xác nhận
+   `ngân sách tam giác: OK (45/45)`, chạy hết tới bước đóng gói atlas + `xong ->` mà không lỗi (chỉ
+   bỏ qua upsert `art_asset` vì không có `DB_PASSWORD` lúc chạy — nạp thật khi có Postgres, không
+   phải lỗi). Revisit Trigger #1 (frame time GPU) giờ không còn gì chặn.
