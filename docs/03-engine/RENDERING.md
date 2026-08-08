@@ -254,7 +254,7 @@ mỗi lần spawn) và trả quyền vẽ về cho hình hộp. Đây không ph�
 | # | Hạn chế | Vì sao chưa sửa |
 |---|---|---|
 | 1 | ~~Mọi nhân vật nạp cùng một model~~ ✅ **Nạp đúng model theo hệ phái** (2026-08-07) | `CharacterSpawnedEvent` giờ mang `faction` + `costume_tier` (chủ dự án duyệt đổi protocol 2026-08-07, commit `92e9f15`). `WorldScreen` ghép hai trường đó qua `CharacterModelKey.of()` thành `assetKey` đúng hệ phái — cho cả nhân vật khác (`onCharacterSpawned`) lẫn chính mình lúc vào world. `costume_tier` vẫn hằng số B1 ở tầng gateway: gameplay chưa có khái niệm bậc trang phục để suy ra bậc thật |
-| 2 | **Tier hình học bị hardcode ở `models/med/`** | LOW/HIGH và đường `ensureAssetsAvailable(tier)` của [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) chưa được nối ở lát cắt này |
+| 2 | ~~Tier hình học bị hardcode ở `models/med/`~~ ✅ **Hết hardcode phía đọc file** (2026-08-08) | `CharacterModelRenderer` giờ nhận `GraphicsTier` (LOW/MEDIUM/HIGH) qua constructor và suy thư mục từ đó (`WorldScreen` truyền tường minh MEDIUM, khớp "bản cài đóng gói đúng 1 tier mặc định" của [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md)) — cả 3 thư mục `assets/exported/models/{low,med,high}/` đã có sẵn trên đĩa dev nên việc này có ý nghĩa thật ngay cả khi chưa có tải-theo-mạng. **Chưa xong**: `ensureAssetsAvailable(tier)`, đổi tier LÚC CHẠY (không UI, không lưu Preferences), và tải-theo-mạng của ADR-028 **vẫn chưa có ở bất kỳ đâu trong repo — kể cả nhánh sprite 2D** ([ART-PIPELINE §8.4](../14-art/ART-PIPELINE.md) mới là thiết kế, chưa code). Đừng đọc dòng này mà tưởng ADR-028 đã "xong" ở client — chỉ mới xong đúng phần đọc-tier-từ-đĩa |
 | 3 | 🔴 **Nhân vật đứng/di chuyển/hit đều hiện ra NẰM NGANG, không đứng thẳng** | Kiểm chứng bằng mắt thật lần đầu (2026-08-08, cùng phiên với việc #10 của ADR-031) phát hiện bug thật — xem §11.1 "Kiểm chứng bằng mắt 2026-08-08" để biết chi tiết + ảnh mô tả + nghi vấn nguyên nhân. **KHÔNG phải** vấn đề cel shader (viền + shading render đúng, chỉ riêng tư thế sai) |
 | 4 | ~~Chưa có cel shader, chưa có lượt vẽ viền~~ ✅ **Đã viết** (2026-08-08) | `CelOutlineShader` + `CelBodyShader`, xem §12.2. `CharacterModelRenderer` không còn dùng ánh sáng mặc định gdx-gltf |
 | 5 | **Camera bám tuyệt đối**, chưa có deadzone/lerp (§4.1) | Chưa có gameplay nào ép phải làm; làm sớm là đoán |
@@ -783,8 +783,12 @@ cần chủ dự án — thêm trường mô tả ngoại hình vào `CharacterS
    không animation (xác nhận đứng đúng 2026-08-07) vẫn đúng; lỗi chỉ xuất hiện khi có animation áp vào
    — thu hẹp nghi vấn về animation clip/cách áp animation, chưa xác nhận chắc chắn. `jump` cố ý bỏ qua
    — `GameAction` chưa có ý định nhảy.
-5. **Nối tier đồ hoạ** — bỏ đường dẫn `models/med/` hardcode, đi qua `ensureAssetsAvailable(tier)` của
-   [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) (§6.5 mục 2).
+5. ✅ **Hết hardcode `models/med/` phía đọc file — 2026-08-08** (§6.5 mục 2) — `GraphicsTier` +
+   `CharacterModelRenderer(GraphicsTier)`, `WorldScreen` truyền tường minh MEDIUM. **Còn mở, việc LỚN
+   HƠN, để dành**: `ensureAssetsAvailable(tier)`, UI/Preferences đổi tier lúc chạy, và tải-theo-mạng
+   thật của [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) — cần hạ tầng
+   chưa dựng (server phát asset qua nginx, [ART-PIPELINE §8.4](../14-art/ART-PIPELINE.md)) và quyết
+   định UI/UX của chủ dự án, không phải việc kỹ thuật nhỏ tự quyết được.
 6. ✅ **`CharacterSpawnedEvent` mang `faction` + `costume_tier`** — chủ dự án duyệt đổi protocol
    2026-08-07, cài đặt ở commit `92e9f15` (§6.5 mục 1). Client dùng cả hai trường qua
    `CharacterModelKey.of()` để nạp đúng model theo hệ phái, cho cả nhân vật khác
