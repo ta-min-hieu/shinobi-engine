@@ -242,7 +242,7 @@ mỗi lần spawn) và trả quyền vẽ về cho hình hộp. Đây không ph�
 | 3 | **Chưa phát action nào** | `Scene` được tạo nhưng không có clip nào được chọn ⇒ nhân vật đứng ở pose tĩnh. 7 action đã có trong `.glb`; việc còn thiếu là nối trạng thái gameplay → tên clip (§11.1) |
 | 4 | **Chưa có cel shader, chưa có lượt vẽ viền** | Đang dùng ánh sáng mặc định của gdx-gltf (1 directional + ambient) chứ **không** phải hợp đồng vẻ ngoài ở §12.2. Đây là khoảng cách lớn nhất giữa tài liệu và code hiện tại |
 | 5 | **Camera bám tuyệt đối**, chưa có deadzone/lerp (§4.1) | Chưa có gameplay nào ép phải làm; làm sớm là đoán |
-| 6 | **Chưa đo frame time** | Điều kiện Revisit Trigger #1 của ADR-031 (20 nhân vật trên màn) chỉ đo được khi có model thật để vẽ — xem §6.1 |
+| 6 | ~~Chưa đo frame time~~ | ✅ **Đo xong 2026-08-08** (`CharacterModelFrameBenchmarkTool`) — điều kiện Revisit Trigger #1 của ADR-031 (20 nhân vật trên màn) **không** kích hoạt, xem [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md) cho số liệu + giới hạn của phép đo (chưa cel shader/viền, chưa có máy tham chiếu chính thức) |
 
 ---
 
@@ -454,7 +454,13 @@ model, không phải bản thi hành hợp đồng này.
 
 1. Độ dày viền quy đổi thế nào sang world unit khi camera zoom.
 2. `SceneManager`/`ModelBatch` có cho chèn lượt vẽ thứ hai gọn không, hay phải tự quản `ShaderProgram`.
-3. `AnimationController` cấp phát bao nhiêu mỗi khung (§16).
+3. 🟡 `AnimationController` cấp phát bao nhiêu mỗi khung (§16) — **trả lời một phần, 2026-08-08**:
+   JFR (`jdk.ObjectAllocationSample`, có sẵn trong JDK) qua 6000 khung/20 nhân vật KHÔNG bắt được mẫu
+   cấp phát nào rơi vào `SceneManager`/`AnimationController` trong vòng lặp render — toàn bộ mẫu cấp
+   phát của lần chạy nằm trong `GLBLoader.load` (nạp asset một lần lúc khởi động). Vì lấy mẫu theo tốc
+   độ cấp phát (TLAB refill) chứ không theo thời gian, đây là tín hiệu thật cho "thấp hơn hẳn pha nạp
+   asset", **không** phải chứng minh "0 cấp phát tuyệt đối" (có thể bỏ sót cấp phát nhỏ/hiếm). Số liệu
+   đầy đủ + giới hạn phép đo ở [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md).
 
 ⚠️ **Shader phải viết cho cả OpenGL ES** (Android) — cú pháp GLSL khác desktop. Test trên Android sớm,
 không để tới cuối.
@@ -536,8 +542,14 @@ nhận được ở quy mô hiện tại; phải xem lại **cùng lúc** với 
 ⚠️ **`ModelBatch` và `AnimationController` có nhiều bẫy cấp phát mỗi khung hơn `SpriteBatch`**
 ([ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) Consequences) — `Renderable`,
 ma trận biến đổi và mảng xương rất dễ sinh rác mỗi khung nếu dùng ngây thơ. Luật "không `new` mỗi frame"
-([/CLAUDE.md §6](../../CLAUDE.md)) **không** được nới ra cho nhánh 3D. Phải soi bằng **benchmark thật**,
-không suy đoán — và phép đo đó vẫn chưa chạy được chừng nào chưa có model thật để vẽ (§6.1).
+([/CLAUDE.md §6](../../CLAUDE.md)) **không** được nới ra cho nhánh 3D.
+
+🟡 **Benchmark thật đã chạy 2026-08-08** (`CharacterModelFrameBenchmarkTool`, §6.5 việc #3) — JFR
+(`jdk.ObjectAllocationSample`) qua 6000 khung/20 nhân vật không bắt được mẫu cấp phát nào trong vòng
+lặp render (toàn bộ mẫu nằm trong pha nạp `.glb` một lần). Tín hiệu tốt nhưng **không** phải chứng minh
+tuyệt đối (lấy mẫu theo tốc độ cấp phát, có thể bỏ sót cấp phát nhỏ/hiếm) — xem giới hạn đầy đủ ở
+[ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md). Không đổi luật: vẫn cấm `new` mỗi khung trong code thật,
+đây chỉ là bằng chứng đo được, không phải giấy phép suy đoán ngược lại.
 
 ---
 
@@ -595,9 +607,11 @@ ngoại lệ cần chủ dự án: thêm trường mô tả ngoại hình vào `
    rồi mở client và xác nhận model hiện ra thay vì hình hộp (§6.1). Chưa làm bước này thì mọi mục dưới
    đều không đo được.
 2. 🔴 **Viết GLSL cel + lượt vẽ viền** theo hợp đồng §12.2, rồi trả lời ba câu hỏi runtime ở cuối mục đó.
-3. **Đo frame time với 20 nhân vật trên màn** — điền dòng còn trống ở
-   [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md) và đóng điều kiện Revisit Trigger #1 của ADR-031.
-   Đo kèm **cấp phát mỗi khung** của `SceneManager`/`AnimationController` (§16).
+3. ✅ **Đo frame time với 20 nhân vật trên màn — xong 2026-08-08** —
+   [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md): xa dưới ngưỡng 8ms của Revisit Trigger #1 (ADR-031),
+   kèm giới hạn thật (chưa cel shader/viền §12.2, chưa có máy tham chiếu chính thức). **Cấp phát mỗi
+   khung** của `SceneManager`/`AnimationController` (§16) đo bằng JFR — 🟡 trả lời một phần, không phải
+   bằng chứng "0 cấp phát" tuyệt đối, xem §12.2 mục 3 và ART-PIPELINE §4.4.
 4. **Nối trạng thái gameplay → clip animation** (§11.1) — hiện nhân vật đứng pose tĩnh.
 5. **Nối tier đồ hoạ** — bỏ đường dẫn `models/med/` hardcode, đi qua `ensureAssetsAvailable(tier)` của
    [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) (§6.5 mục 2).
