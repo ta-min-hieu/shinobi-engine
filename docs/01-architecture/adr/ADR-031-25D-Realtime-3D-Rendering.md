@@ -121,6 +121,18 @@ Xem lại quyết định này khi **một trong ba** điều kiện sau xảy r
 3. JitPack ngừng phục vụ artifact `com.github.mgsx-dev.gdx-gltf`, hoặc gdx-gltf không còn phát hành
    bản tương thích trong **12 tháng** kể từ lần libGDX phát hành lớn kế tiếp.
 
+**Trạng thái điều kiện #1 — đã đo, 2026-08-08 (KHÔNG kích hoạt).**
+`CharacterModelFrameBenchmarkTool` (`client-core/src/test/`, Gradle task `runFrameBenchmark`) dựng
+20 `Scene` qua đúng `CharacterModelRenderer` sản xuất, tier MEDIUM, cycle 15 tổ hợp hệ phái×bậc trang
+phục thật. Kết quả (2 lần chạy × 6000 khung, máy dev iGPU Intel `RaptorLake-S Mobile Graphics
+Controller`, `GL_VERSION 4.6.0`): **p95 0,30–0,31 ms, max 1,28–2,92 ms** — dưới ngưỡng 8 ms hơn 25 lần
+kể cả ở `max`. Số liệu đầy đủ + 4 giới hạn phải đọc trước khi coi trigger này "đóng vĩnh viễn" (chưa
+có máy tham chiếu chính thức của dự án, số đo trên shader mặc định gdx-gltf — chưa có cel shader/viền
+bắt buộc theo RENDERING §12.2 sẽ làm tăng chi phí, `CharacterModelRenderer` chưa cull, đo trên desktop
+không phải Android) ở [ART-PIPELINE §4.4](../../14-art/ART-PIPELINE.md). **Không tự ý coi là "đóng
+hoàn toàn"** — biên độ an toàn lớn (>25 lần) nhưng máy tham chiếu thật của dự án vẫn chưa được chủ dự
+án chốt spec; đây là số liệu thật đầu tiên để tham khảo, không phải lời tuyên bố cuối cùng thay chủ dự án.
+
 ---
 
 ## Technical Decisions
@@ -204,3 +216,9 @@ Xem lại quyết định này khi **một trong ba** điều kiện sau xảy r
    `ngân sách tam giác: OK (45/45)`, chạy hết tới bước đóng gói atlas + `xong ->` mà không lỗi (chỉ
    bỏ qua upsert `art_asset` vì không có `DB_PASSWORD` lúc chạy — nạp thật khi có Postgres, không
    phải lỗi). Revisit Trigger #1 (frame time GPU) giờ không còn gì chặn.
+10. ✅ **Đo frame time GPU thật — xong 2026-08-08, cùng phiên.** Xem "Trạng thái điều kiện #1" ở mục
+    Revisit Trigger phía trên và [ART-PIPELINE §4.4](../../14-art/ART-PIPELINE.md) cho số liệu đầy đủ +
+    giới hạn phép đo. Kết luận ngắn: **không kích hoạt** trigger (p95 ≈0,3 ms, dưới ngưỡng 8 ms hơn 25
+    lần), nhưng "máy tham chiếu của dự án" nêu ở điều kiện #1 chưa từng được chốt spec cụ thể ở đâu
+    trong docs — số đo trên máy dev (iGPU Intel) là bằng chứng thật đầu tiên, không phải phép đo trên
+    máy tham chiếu đã duyệt (vì máy đó chưa tồn tại bằng văn bản).

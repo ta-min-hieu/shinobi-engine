@@ -34,7 +34,7 @@ Từ [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md), pip
 2. **Hướng nhìn là hằng số runtime**, không nướng vào tài sản. Không còn "chỉ render hướng phải" và không còn trò flip sprite — nhân vật xoay được tự do.
 3. Xuất **glTF 2.0 dạng `.glb`** từ Blender (Blender xuất sẵn trong core, không qua công cụ ngoài). 3 mức đồ họa (§5) là **3 mức LOD của model + cỡ texture** — 5k/10k/20k tam giác, đo thật ở §4.4 — không phải 3 bộ atlas.
 4. Animation chạy đúng tần số khung hình thật của máy — **không còn trần 12 fps**. Đây là lý do chính đổi sang 2.5D.
-5. **Poly budget là ràng buộc thật, đã đo** (2026-08-05). Mesh text→3D ra ~93k tam giác; ngưỡng từng tier ở **§4.4** (5k/10k/20k). Còn thiếu đúng một mảnh: frame time thật, chờ client vẽ được model đầu tiên.
+5. **Poly budget là ràng buộc thật, đã đo** (2026-08-05). Mesh text→3D ra ~93k tam giác; ngưỡng từng tier ở **§4.4** (5k/10k/20k). Frame time GPU với 20 nhân vật **cũng đã đo** (2026-08-08, §4.4) — xa dưới ngưỡng 8ms của [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md), kèm giới hạn thật (chưa có cel shader/viền, chưa có máy tham chiếu chính thức — đọc §4.4).
 
 **Nhánh 2D — VFX kỹ năng · icon vật phẩm · UI** *(không đổi)*
 
@@ -316,12 +316,59 @@ Ba kết luận rút ra từ bảng trên:
   — mà silhouette chính là thứ Q10 chấm. Nên khi cần cắt dung lượng, cắt texture trước.
 - **Dung lượng hình học ≈ 35 byte/tam giác**, tuyến tính trong toàn dải đo.
 
-⚠️ **Chưa đo được frame time**, và ngân sách này **chưa đóng hoàn toàn**. Điều kiện #1 ở
-[ADR-031 "Revisit Trigger"](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) nói về GPU frame
-time với 20 nhân vật trên màn; đo được nó cần `gdx-gltf` trên classpath và đường render 3D trong
-`client-core`, **cả hai đều chưa có**. Bảng trên chốt phần *đo được hôm nay* (số tam giác, dung lượng,
-chất lượng ảnh); dòng frame time phải điền khi client vẽ được model đầu tiên. Ngân sách 5–10k khớp với
-mức ADR-031 đoán ban đầu — 20 nhân vật × 10k = **200k tam giác/khung**, thay vì 1,9 triệu.
+✅ **Frame time — đã đo 2026-08-08.** Công cụ
+`CharacterModelFrameBenchmarkTool` (`client-core/src/test/java/.../world/`, chạy qua Gradle task
+`runFrameBenchmark`, KHÔNG phải JUnit test — cần mở cửa sổ GL thật nên không chạy được trong CI
+headless) dựng 20 `Scene` qua đúng `CharacterModelRenderer` mà `WorldScreen` dùng, cycle đủ 15 tổ hợp
+hệ phái × bậc trang phục (5×3, khớp 15 file `.glb` thật dưới `models/med/`, nhân vật 16-20 lặp lại 5
+tổ hợp đầu), đo 6000 khung sau 300 khung warmup (hấp thụ biên dịch shader lần đầu), `FIXED_DT = 1/60s`.
+
+| | |
+|---|---|
+| Máy đo | Laptop dev, iGPU Intel — `GL_VENDOR=Intel`, `GL_RENDERER=Intel(R) RaptorLake-S Mobile Graphics Controller`, `GL_VERSION=4.6.0 - Build 32.0.101.6790` |
+| Frame time (ms), 2 lần chạy độc lập, 6000 khung/lần | min 0,180–0,189 · avg 0,243–0,247 · p95 0,302–0,314 · max 1,279–2,923 |
+| Ngưỡng Revisit Trigger #1 | **8 ms** |
+
+**Kết luận: xa dưới ngưỡng** (p95 cao nhất đo được ≈0,31 ms, dưới 8ms hơn 25 lần; kể cả `max` bất thường
+nhất — 2,923 ms, một khung lẻ có thể do GC/OS chen ngang, không lặp lại ở lần chạy thứ hai — vẫn dưới
+ngưỡng gần 3 lần) — Revisit Trigger #1 của ADR-031 **không kích hoạt** với số liệu này. Bốn giới hạn
+phải nói rõ, không giấu:
+
+- **"Máy tham chiếu của dự án" ở ADR-031 chưa từng được định nghĩa cụ thể** (không có spec CPU/GPU nào
+  chốt ở đâu trong docs) — máy đo ở đây chỉ là máy dev sẵn có, không phải máy đại diện đã duyệt. iGPU
+  Intel tầm trung/thấp, không phải GPU rời — biên độ an toàn >25 lần dưới ngưỡng phần nào bù lại việc
+  chưa có máy tham chiếu chính thức, nhưng không thay thế được việc chốt spec đó.
+- **Số đo trên shader MẶC ĐỊNH của gdx-gltf** (1 `DirectionalLightEx` + ambient), **chưa có** cel shader
+  + lượt vẽ viền inverted hull bắt buộc theo [RENDERING.md §12.2](../03-engine/RENDERING.md). Viền hình
+  học làm **gấp đôi** số tam giác vẽ (§4.4 trên, dòng ghi chú cũ) — phải đo lại sau khi GLSL đó viết
+  xong, số hiện tại là **sàn**, không phải số cuối.
+- `CharacterModelRenderer` **chưa cull gì** ([RENDERING §15](../03-engine/RENDERING.md)) — mọi `Scene`
+  đã thêm đều cập nhật mỗi khung bất kể có nằm trong camera hay không, nên số đo phản ánh đúng chi phí
+  "20 `Scene` trong `SceneManager`" mà Revisit Trigger #1 muốn biết, không phụ thuộc cách xếp lưới.
+- Đo trên desktop LWJGL3, **không phải Android** — Revisit Trigger #2 (máy tầm thấp, 10 nhân vật, 30fps
+  trên Android) là câu hỏi khác, vẫn treo, vẫn chờ ADR-023 (§ADR-031 "ADR cần tạo").
+
+**Cấp phát mỗi khung** (`SceneManager`/`AnimationController`, RENDERING §16) đo bằng HAI tín hiệu, không
+cái nào là profiler thật (CLAUDE.md §4 — không thêm dependency):
+
+1. `Runtime#totalMemory()-freeMemory()` quanh khối đo: dao động ~0,34–6,8 KB/khung nếu chia đều tuỳ lần
+   chạy — nhiễu GC thật, **không** phải phép đo chính xác, chỉ đủ để nói "không thấy tăng đều không
+   giới hạn" (không có dấu hiệu rò rỉ), không đủ để định lượng byte/khung.
+2. **JFR** (`-XX:StartFlightRecording`, có sẵn trong JDK, không phải dependency mới) bật kèm
+   `runFrameBenchmark`, đọc bằng `jfr print --events jdk.ObjectAllocationSample`. Kết quả: toàn bộ 253
+   mẫu cấp phát trong lần chạy đều nằm trong `GLBLoader.load(...)` (nạp `.glb` MỘT LẦN lúc khởi động,
+   ví dụ `NodeAnimationHack` cấp 1,2 MB lúc `AnimationLoader.load`) — **0 mẫu** rơi vào bất kỳ khung hình
+   nào trong 6000 khung đo (`grep` stack trace cho `SceneManager.render/update`,
+   `AnimationController`, `CharacterModelFrameBenchmarkTool.render` ra rỗng). Vì `ObjectAllocationSample`
+   lấy mẫu theo TLAB refill (tỉ lệ thuận với **tốc độ cấp phát**, không phải theo thời gian), 0 mẫu
+   trong ~1,5 giây/6000 khung render — so với 253 mẫu trong pha nạp asset chỉ vài trăm mili-giây — là
+   tín hiệu thật cho thấy tốc độ cấp phát trong vòng lặp render **thấp hơn hẳn** pha nạp asset. **Không**
+   phải bằng chứng toán học "0 cấp phát tuyệt đối" (lấy mẫu TLAB có thể bỏ sót cấp phát nhỏ/hiếm) — câu
+   hỏi ở [RENDERING §12.2 mục 3](../03-engine/RENDERING.md) coi là **trả lời một phần** (🟡), không phải
+   đóng hẳn.
+
+Ngân sách 5–10k khớp với mức ADR-031 đoán ban đầu — 20 nhân vật × 10k = **200k tam giác/khung**, thay vì
+1,9 triệu.
 
 ---
 
@@ -716,7 +763,7 @@ region vào DB" ở trên: file đã là nguồn sự thật, nhân bản ra ch�
 ## 10. ADR cần tạo / quyết định treo
 
 - 🔀 **[ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) Accepted 2026-08-03** — nhân vật chuyển sang render 3D thời gian thực (2.5D). Thay quyết định #1 và #2 ở §9. **Hai việc treo do ADR này sinh ra:**
-  - ✅ **Ngân sách tam giác — đã đo 2026-08-05** (§4.4): 5k/10k/20k tam giác cho low/med/high, đo trên mesh pilot bằng `measure_triangle_budget.py`. Còn thiếu **dòng frame time**, chờ client vẽ được model đầu tiên.
+  - ✅ **Ngân sách tam giác — đã đo 2026-08-05** (§4.4): 5k/10k/20k tam giác cho low/med/high, đo trên mesh pilot bằng `measure_triangle_budget.py`. **Dòng frame time — đã đo 2026-08-08** (§4.4, `CharacterModelFrameBenchmarkTool`): xa dưới ngưỡng 8ms Revisit Trigger #1, kèm giới hạn thật (chưa cel shader/viền, chưa có máy tham chiếu chính thức của dự án).
   - 📝 **Phòng vệ JitPack — đã có [ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md), chờ chủ dự án duyệt.** Kiểm chứng thật: `gdx-gltf` **không có trên Maven Central**, jar 318 KB, Apache-2.0, phụ thuộc bắc cầu duy nhất là `gdx` vốn đã có. Đề xuất đóng gói vào `third-party/m2/`. **Chưa được thêm vào `libs.versions.toml`** cho tới khi ADR-032 được duyệt.
   - ✅ **Mở rộng `art_asset` cho nhánh 3D — chủ dự án duyệt + thi hành 2026-08-07.**
     `V20__extend_art_asset_for_3d.sql`: 3 cột `asset_kind`/`model_name`/`tri_counts` +

@@ -882,10 +882,10 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **30 ADR Accepted** (đế
       Rodin (mesh sinh ra là một khối hàn liền, skin theo khoảng cách — lưỡi dao vươn khỏi tay bị
       chia qua nhiều xương và cong như cao su khi gập khuỷu). Trang phục thì ngược lại, vẫn nằm
       trong prompt vì `item_template` chưa có cột hình ảnh nào để đổi lúc chạy.
-    - ⛔ **Chưa đóng hoàn toàn**: thiếu **dòng frame time** của điều kiện Revisit Trigger #1
-      (20 nhân vật trên màn). Hai điều kiện tiên quyết (`gdx-gltf` trên classpath, đường render 3D
-      trong `client-core`) **nay đã có** — cái còn thiếu là **model `.glb` thật trong bản chạy**,
-      xem mục 28.
+    - ✅ **Đóng 2026-08-08**: dòng frame time của điều kiện Revisit Trigger #1 (20 nhân vật trên
+      màn) đã đo (`CharacterModelFrameBenchmarkTool`) — xa dưới ngưỡng 8ms, kèm giới hạn thật (chưa
+      cel shader/viền, chưa có máy tham chiếu chính thức của dự án). Xem
+      [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md).
 28. **Dây chuyền nhánh 3D — đã thông, còn thiếu phép đo** (cập nhật 2026-08-07):
     - ✅ **[ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md) Accepted
       2026-08-06 và đã thi hành cùng ngày** (`38daea2`): `gdx-gltf` 2.3.0 đóng gói vào
