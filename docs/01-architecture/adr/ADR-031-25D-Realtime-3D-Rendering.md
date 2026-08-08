@@ -228,14 +228,24 @@ tiết ở [ART-PIPELINE §4.4](../../14-art/ART-PIPELINE.md).
     lần), nhưng "máy tham chiếu của dự án" nêu ở điều kiện #1 chưa từng được chốt spec cụ thể ở đâu
     trong docs — số đo trên máy dev (iGPU Intel) là bằng chứng thật đầu tiên, không phải phép đo trên
     máy tham chiếu đã duyệt (vì máy đó chưa tồn tại bằng văn bản).
-11. 🔴 **Kiểm chứng bằng mắt qua `WorldScreen` thật (không phải benchmark tool) — 2026-08-08, phiên
-    sau. PHÁT HIỆN BUG THẬT, chưa sửa.** Dựng lại môi trường dev đầy đủ (client + server-gateway TLS +
-    Postgres/Redis dev container), tạo nhân vật hệ Hỏa qua UI thật, quan sát idle/di chuyển/bị đánh
-    trúng. Cel shading + viền render đúng, nhưng **nhân vật hiện ra nằm ngang thay vì đứng thẳng** ở cả
-    ba trạng thái — khác ảnh xác nhận "đứng thẳng" của việc #5 (2026-08-07, nhưng đó là bind pose,
-    TRƯỚC khi animation được nối, `89f1e19`). Chi tiết đầy đủ + nghi vấn nguyên
-    nhân (node gốc `.glb` mang sẵn quaternion xoay ~35° quanh Y, trùng `VIEW_YAW_DEGREES`, nhưng chưa
-    đủ bằng chứng kết luận đó là nguyên nhân) ở
-    [RENDERING.md §11.1 "Kiểm chứng bằng mắt 2026-08-08"](../../03-engine/RENDERING.md). Revisit
-    Trigger #1 (frame time) **không** bị ảnh hưởng bởi bug này — đo hiệu năng vẫn đúng, chỉ tư thế sai.
-    **Không đóng ADR-031 hoàn toàn tới khi bug này được sửa và xác nhận lại bằng mắt.**
+11. ✅ **Kiểm chứng bằng mắt qua `WorldScreen` thật — phát hiện bug thật 2026-08-08, ĐÃ SỬA phiên
+    sau (cùng ngày).** Dựng lại môi trường dev đầy đủ (client + server-gateway TLS + Postgres/Redis
+    dev container), tạo nhân vật hệ Hỏa qua UI thật, quan sát idle/di chuyển/bị đánh trúng. Cel
+    shading + viền render đúng, nhưng **nhân vật hiện ra nằm ngang thay vì đứng thẳng** ở cả ba trạng
+    thái — khác ảnh xác nhận "đứng thẳng" của việc #5 (2026-08-07, nhưng đó là bind pose, TRƯỚC khi
+    animation được nối, `89f1e19`).
+
+    Nghi vấn ban đầu (node gốc `.glb` mang sẵn quaternion xoay ~35° quanh Y, trùng `VIEW_YAW_DEGREES`)
+    **SAI, đã loại trừ hoàn toàn** — không phải asset/Blender, không cần re-export bất kỳ file `.glb`
+    nào trong 15 file. Nguyên nhân thật là **2 lỗi Java/GLSL** ở `client-core/world/`: (1)
+    `CelBodyShader`/`CelOutlineShader` cố ý bỏ nhân `u_worldTrans` dựa trên tiền đề sai (đã kiểm bằng
+    cách đọc thẳng `ModelInstance.getRenderable()` thật trong `gdx-1.14.2-sources.jar` — với mesh có
+    skin, `Renderable.worldTransform` = `ModelInstance.transform`, KHÔNG bao giờ nằm trong
+    `bones[i]`); (2) `CharacterModelRenderer.Y_UP_TO_Z_UP` có dấu sai (`+90f` thay vì `-90f`) — lỗi
+    này vô hại khi lỗi (1) còn tồn tại nên chưa từng lộ ra trước đó. Xác nhận sửa đúng bằng ảnh chụp
+    thật qua đúng đường vẽ production (không phải suy đoán), cả clip `idle` lẫn `run`. `./gradlew
+    build` xanh sau khi sửa. Chi tiết đầy đủ (từng bước điều tra + bằng chứng) ở
+    [RENDERING.md §11.1 "Kiểm chứng bằng mắt 2026-08-08"](../../03-engine/RENDERING.md), bao gồm cả
+    việc sửa lại nguyên văn chẩn đoán sai ban đầu ở §12.2 mục 2 (để làm bài học, không xoá lịch sử).
+    Revisit Trigger #1 (frame time) không bị ảnh hưởng bởi bug này lẫn cách sửa — đo hiệu năng vẫn
+    đúng.

@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version | 2.1.0 |
+| Version | 2.2.0 |
 | Status | Draft |
 | Liên quan | [ENGINE.md](ENGINE.md), [ADR-002](../01-architecture/adr/ADR-002-Why-libGDX.md), [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md), [ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md) |
 
@@ -27,6 +27,33 @@
 > animation, nên bỏ `SceneManager` không đụng gì tới animation. Đã build lại + chạy benchmark thật
 > trên bản hoà: p95 tăng nhẹ từ ~0.31ms lên **0.52ms/khung** (2 lượt vẽ thay vì 1), vẫn cách xa ngưỡng
 > 8ms hơn 15 lần.
+>
+> **Bản 2.2.0 (2026-08-08, phiên sau)** — **ĐÃ SỬA** bug "nằm ngang" ghi ở §11.1 (bản 2.1.0). Nguyên
+> nhân gốc thật KHÔNG phải asset/Blender: nghi vấn quaternion 35°Y ở node gốc `.glb` ghi trong bản
+> 2.1.0 **sai hoàn toàn** — đã loại trừ bằng cách đọc trực tiếp `Node`/`AnimationController` (đọc
+> nguồn thật trong `gdx-1.14.2-sources.jar`, không suy đoán) và xác nhận rotation đó cancel đúng ở
+> mọi frame animate. Nguyên nhân thật là **2 lỗi Java/GLSL** trong
+> `CelBodyShader`/`CelOutlineShader`/`CharacterModelRenderer`, không đụng gì tới 15 file `.glb` (không
+> cần re-export):
+>
+> 1. Hai shader cố ý BỎ nhân `u_worldTrans` trong vertex shader, dựa trên tiền đề sai rằng
+>    `Renderable.bones[i]` (skin matrix) đã bao gồm sẵn root transform. **Sai** — xác nhận bằng cách
+>    đọc thẳng `ModelInstance.getRenderable()` thật: với mesh có skin, `Renderable.worldTransform` =
+>    ĐÚNG `ModelInstance.transform` (không nhân `node.globalTransform`), và trường đó không bao giờ
+>    lọt vào `bones[i]` (`Node.calculateWorldTransform()` không đọc `ModelInstance.transform`). Bỏ
+>    `u_worldTrans` = bỏ luôn phép xoay `Y_UP_TO_Z_UP` và vị trí thế giới — mesh vẽ ra bằng toạ độ cục
+>    bộ Y-up thô, đúng triệu chứng "nằm ngang".
+> 2. `CharacterModelRenderer.Y_UP_TO_Z_UP` có DẤU SAI (`+90f` thay vì đúng `-90f`) — lỗi này **vô hại
+>    khi lỗi #1 còn tồn tại** (thiếu `u_worldTrans` thì dấu của nó không ảnh hưởng gì), nên chỉ lộ ra
+>    SAU khi sửa #1 (nhân vật đứng lộn ngược đầu xuống đất thay vì nằm ngang). Xác nhận dấu đúng bằng
+>    ảnh chụp thật, không suy luận quy tắc bàn tay phải (quy ước xoay của
+>    `Matrix4#setToRotation` không khớp trực giác tay ở đây).
+>
+> Xác nhận bằng `CharacterModelDebugTool` (công cụ chẩn đoán throwaway, đã xoá sau khi dùng xong) —
+> ảnh chụp `Lwjgl3Application` thật qua ĐÚNG đường vẽ production (`CharacterModelRenderer` +
+> `CelBodyShader`/`CelOutlineShader`), cả clip `idle` lẫn `run`, nhân vật đứng thẳng đúng hướng, có
+> viền, có shading bậc thang — không suy đoán tĩnh. `./gradlew build` xanh sau khi sửa. Chi tiết đầy
+> đủ ở §11.1.
 
 ---
 
@@ -255,7 +282,7 @@ mỗi lần spawn) và trả quyền vẽ về cho hình hộp. Đây không ph�
 |---|---|---|
 | 1 | ~~Mọi nhân vật nạp cùng một model~~ ✅ **Nạp đúng model theo hệ phái** (2026-08-07) | `CharacterSpawnedEvent` giờ mang `faction` + `costume_tier` (chủ dự án duyệt đổi protocol 2026-08-07, commit `92e9f15`). `WorldScreen` ghép hai trường đó qua `CharacterModelKey.of()` thành `assetKey` đúng hệ phái — cho cả nhân vật khác (`onCharacterSpawned`) lẫn chính mình lúc vào world. `costume_tier` vẫn hằng số B1 ở tầng gateway: gameplay chưa có khái niệm bậc trang phục để suy ra bậc thật |
 | 2 | ~~Tier hình học bị hardcode ở `models/med/`~~ ✅ **Hết hardcode phía đọc file** (2026-08-08) | `CharacterModelRenderer` giờ nhận `GraphicsTier` (LOW/MEDIUM/HIGH) qua constructor và suy thư mục từ đó (`WorldScreen` truyền tường minh MEDIUM, khớp "bản cài đóng gói đúng 1 tier mặc định" của [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md)) — cả 3 thư mục `assets/exported/models/{low,med,high}/` đã có sẵn trên đĩa dev nên việc này có ý nghĩa thật ngay cả khi chưa có tải-theo-mạng. **Chưa xong**: `ensureAssetsAvailable(tier)`, đổi tier LÚC CHẠY (không UI, không lưu Preferences), và tải-theo-mạng của ADR-028 **vẫn chưa có ở bất kỳ đâu trong repo — kể cả nhánh sprite 2D** ([ART-PIPELINE §8.4](../14-art/ART-PIPELINE.md) mới là thiết kế, chưa code). Đừng đọc dòng này mà tưởng ADR-028 đã "xong" ở client — chỉ mới xong đúng phần đọc-tier-từ-đĩa |
-| 3 | 🔴 **Nhân vật đứng/di chuyển/hit đều hiện ra NẰM NGANG, không đứng thẳng** | Kiểm chứng bằng mắt thật lần đầu (2026-08-08, cùng phiên với việc #10 của ADR-031) phát hiện bug thật — xem §11.1 "Kiểm chứng bằng mắt 2026-08-08" để biết chi tiết + ảnh mô tả + nghi vấn nguyên nhân. **KHÔNG phải** vấn đề cel shader (viền + shading render đúng, chỉ riêng tư thế sai) |
+| 3 | ~~Nhân vật đứng/di chuyển/hit đều hiện ra NẰM NGANG~~ ✅ **Đã sửa** (2026-08-08, phiên sau) | 2 lỗi Java/GLSL thật (`CelBodyShader`/`CelOutlineShader` thiếu `u_worldTrans` + dấu sai của `Y_UP_TO_Z_UP`), KHÔNG phải asset — xem §11.1 "Kiểm chứng bằng mắt 2026-08-08 (đã sửa)" |
 | 4 | ~~Chưa có cel shader, chưa có lượt vẽ viền~~ ✅ **Đã viết** (2026-08-08) | `CelOutlineShader` + `CelBodyShader`, xem §12.2. `CharacterModelRenderer` không còn dùng ánh sáng mặc định gdx-gltf |
 | 5 | **Camera bám tuyệt đối**, chưa có deadzone/lerp (§4.1) | Chưa có gameplay nào ép phải làm; làm sớm là đoán |
 | 6 | ~~Chưa đo frame time~~ | ✅ **Đo xong 2026-08-08** (`CharacterModelFrameBenchmarkTool`) — điều kiện Revisit Trigger #1 của ADR-031 (20 nhân vật trên màn) **không** kích hoạt, xem [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md) cho số liệu + giới hạn của phép đo. ⚠️ Số ban đầu (p95 0,30ms) đo TRƯỚC khi hoà cel shader + animation; **đo lại sau khi hoà cả ba** cho p95 **0,52ms** (2 lượt vẽ/nhân vật thay vì 1) — vẫn cách xa ngưỡng 8ms hơn 15 lần, chưa có máy tham chiếu chính thức |
@@ -437,7 +464,7 @@ vật, `addCharacter()` tự đặt `idle` cho mỗi Scene) — **không crash, 
 chạy hết 6000 khung không lỗi. Nhưng benchmark đó KHÔNG gọi `setCharacterMoving`/`playAttack`/... nên
 chưa xác nhận bằng mắt việc chuyển đổi clip mượt hay đúng.
 
-🔴 **Kiểm chứng bằng mắt 2026-08-08 — PHÁT HIỆN BUG THẬT, chưa sửa.** Dựng môi trường dev đầy đủ
+🔴→✅ **Kiểm chứng bằng mắt 2026-08-08 (đã sửa, phiên sau — xem đoạn "ĐÃ SỬA" cuối mục này).** Dựng môi trường dev đầy đủ
 (client + server-gateway TLS thật + Postgres/Redis dev container, dev container riêng cổng 15432/56379
 không đụng container dự án khác), tạo nhân vật hệ Hỏa thật qua UI, quan sát trong `WorldScreen` thật
 (không phải benchmark tool). Kết quả: viền cel-shading + shading thân đều render đúng (silhouette rõ
@@ -461,6 +488,65 @@ clip hoặc cách áp animation lên bind pose, nhưng chưa đủ bằng chứn
 Môi trường verify đã dọn sạch (dừng+xoá `kage-pg-dev`/`kage-redis-dev`, kill client/server) — không để
 lại state. `WorldConstants.VIEWPORT_HEIGHT_UNITS` có sửa tạm xuống `2.5f` để phóng to quan sát rõ dáng
 nhân vật, đã revert lại `10f`, KHÔNG commit.
+
+✅ **ĐÃ SỬA (2026-08-08, phiên sau).** Nghi vấn quaternion 35°Y ở trên **SAI HOÀN TOÀN** — không phải
+nguyên nhân, không đụng gì tới asset/Blender. Điều tra lại từ đầu, có bằng chứng thật ở mỗi bước
+(không suy đoán tĩnh):
+
+1. **Tái hiện lại bug** qua công cụ `CharacterModelDebugTool` (throwaway, đã xoá sau khi dùng —
+   dùng thẳng `CharacterModelRenderer` production, `addCharacter()` + `setAnimation(IDLE,-1)` giống
+   hệt luồng thật, chụp ảnh `Lwjgl3Application` thật bằng `ScreenUtils.getFrameBufferPixmap` +
+   `PixmapIO.writePNG`). Ảnh chụp xác nhận đúng triệu chứng đã báo cáo — nhân vật nằm ngang.
+2. **Loại trừ giả thuyết quaternion 35°Y**: đọc trực tiếp `BaseAnimationController.getRotationAtTime`
+   thật (`gdx-1.14.2-sources.jar`) — khi một `NodeAnimation` KHÔNG có kênh `rotation` (đúng trường hợp
+   node gốc `hoa_d_Rig`), hàm trả về `nodeAnim.node.rotation` (giữ nguyên giá trị bind pose hiện tại
+   của field, không reset về identity). Dump trực tiếp field `Node.rotation`/`localTransform`/
+   `globalTransform` của `hoa_d_Rig`/`Hoa_D_med`/`pelvis`/`leg_l` cả ở bind pose lẫn sau 3/60 khung
+   `idle` (qua `diagScene` độc lập, không qua `CharacterModelRenderer`) cho thấy toàn bộ cây Node vẫn
+   đúng như một nhân vật ĐỨNG THẲNG bình thường — không có gì "nằm ngang" ở tầng Node/animation.
+   Điều đó tự nó loại trừ animation clip/keyframe làm nguyên nhân.
+3. **Tìm đúng chỗ sai**: vì tầng Node đúng nhưng ảnh render vẫn sai, nghi ngờ chuyển sang tầng SHADER
+   (thứ duy nhất chưa kiểm — Node dump không phản ánh `ModelInstance.transform`/`u_worldTrans`, vốn
+   chỉ được gdx đưa vào lúc dựng `Renderable`). Đọc `CelBodyShader.java`/`CelOutlineShader.java` thấy
+   cả hai **cố ý bỏ nhân `u_worldTrans`** (comment cũ: "Renderable.bones[i] đã ở world space, nhân
+   thêm là áp gấp đôi phép xoay"). Đọc thẳng `ModelInstance.getRenderable()` thật
+   (`gdx-1.14.2-sources.jar`) để kiểm chứng, không tin comment cũ:
+   ```java
+   if (nodePart.bones == null && transform != null)
+       out.worldTransform.set(transform).mul(node.globalTransform);
+   else if (transform != null)
+       out.worldTransform.set(transform);      // nhánh mesh có skin — trường hợp của ta
+   ```
+   Với mesh có skin, `Renderable.worldTransform` = ĐÚNG `ModelInstance.transform` — KHÔNG bao giờ nhân
+   `node.globalTransform`, và `Node.calculateWorldTransform()` không bao giờ đọc `ModelInstance.transform`
+   (hai khái niệm tách biệt trong gdx, `ModelInstance.transform` chỉ được ghép vào ở đúng chỗ
+   `getRenderable()` này). Tiền đề của comment cũ — "bones đã ở world space" — **sai hoàn toàn**. Bỏ
+   `u_worldTrans` nghĩa là bỏ luôn `Y_UP_TO_Z_UP` VÀ vị trí thế giới; mesh vẽ ra bằng toạ độ cục bộ
+   Y-up thô — đúng triệu chứng "nằm ngang" (trục "cao" Y cục bộ của mesh nằm ngang trên mặt đất Z-up
+   của thế giới).
+4. **Sửa #1**: thêm `uniform mat4 u_worldTrans` vào cả hai vertex shader, nhân vào vị trí VÀ pháp
+   tuyến (`w=0` cho pháp tuyến để bỏ phần tịnh tiến — idiom chuẩn), set từ `renderable.worldTransform`
+   mỗi `render()`. Build lại, chụp ảnh lại: nhân vật KHÔNG còn nằm ngang, nhưng đứng LỘN NGƯỢC (đầu
+   xuống đất, chân lên trời) — tiến bộ thật (từ "nằm ngang" sang "chỉ lộn ngược theo 1 trục"), không
+   phải đã xong.
+5. **Sửa #2**: thử đổi dấu `CharacterModelRenderer.Y_UP_TO_Z_UP` từ `setToRotation(Vector3.X, 90f)`
+   sang `setToRotation(Vector3.X, -90f)`. Build lại, chụp ảnh lại: nhân vật đứng ĐÚNG — đầu lên, chân
+   xuống, mặt hướng đúng góc 3/4, thấy rõ băng đầu ninja + vũ khí sau lưng. `+90f` tính tay theo quy
+   tắc bàn tay phải cho kết quả "có vẻ đúng" (Y+ cục bộ → Z+ thế giới) nhưng SAI khi chạy thật — quy
+   ước xoay/handedness thật của `Matrix4#setToRotation` không khớp trực giác tay ở trường hợp này. Bug
+   #2 này **vô hại một mình** khi bug #1 còn tồn tại (thiếu `u_worldTrans` thì dấu của nó không ảnh
+   hưởng gì) nên chưa từng lộ ra ở bất kỳ lần kiểm chứng nào trước đây (kể cả ảnh "đứng thẳng"
+   2026-08-07, vốn là bind pose KHÔNG qua `u_worldTrans`/skin thật).
+6. **Xác nhận lại cả 2 clip**: chụp ảnh sau 60 khung `idle` VÀ sau khi chuyển sang `run`
+   (`setCharacterMoving(true)`) — cả hai đứng đúng, tư thế `run` khác rõ rệt so với `idle` (một chân
+   nhấc lên, tay vung), không phải ảnh tĩnh trùng lặp.
+7. **`./gradlew build`** (toàn bộ, không chỉ `check`) xanh sau khi sửa — checkstyle/PMD/SpotBugs/
+   Spotless/test đều qua ở `client-core`.
+
+**Không cần re-export bất kỳ file `.glb` nào** — cả 15 file (5 hệ phái × 3 bậc) đều KHÔNG liên quan,
+bug nằm 100% ở tầng Java/GLSL (`client-core/world/`). `CharacterModelDebugTool` (công cụ chẩn đoán)
+đã xoá sau khi dùng xong — bug-specific (hardcode tên node "hoa_d_Rig" v.v.), không có giá trị tái sử
+dụng chung như `CharacterModelFrameBenchmarkTool`.
 
 **Không dùng Spine** — lý do license phí vẫn đúng, và giờ càng không cần: skeletal đã có sẵn trong
 glTF, không tốn thêm dependency thương mại nào.
@@ -547,12 +633,18 @@ hư không, bắt được nhờ chụp ảnh màn hình thật qua một harnes
    (176) chỉ nạp 11/176 float đầu, phần còn lại giữ nguyên 0 từ mảng CPU, sụp ma trận skin của hầu hết
    xương về ma trận không, và nhân vật **biến mất hoàn toàn** — không log, không exception, chỉ là
    một khung hình trống.
-2. **Đừng nhân thêm `u_worldTrans` sau khi skin.** `Renderable.bones[i]` do gdx-gltf tính
-   (`Node#calculateBoneTransforms`) đã LÀ world space — mỗi `jointNode.globalTransform` tự nó nhân
-   dồn từ gốc `ModelInstance.transform` (root) xuống rồi. Nhân thêm `u_worldTrans` (chính là root
-   transform đó) sau khi skin là áp gấp đôi phép xoay Y-up→Z-up: nhân vật lộn ngược và méo hẳn hình,
-   lại không hề lỗi biên dịch hay runtime — chỉ sai hình. Sửa bằng cách bỏ hẳn `u_worldTrans` khỏi
-   pipeline vị trí/pháp tuyến của phần skin (xem GLSL trong `CelBodyShader`/`CelOutlineShader`).
+2. 🔴 **CHẨN ĐOÁN SAI, ghi lại nguyên văn để làm bài học — xem đoạn "ĐÃ SỬA" ở §11.1 cho kết luận
+   đúng.** Kết luận ban đầu (2026-08-08) ở dòng này: "Đừng nhân thêm `u_worldTrans` sau khi skin —
+   `Renderable.bones[i]` đã LÀ world space, nhân thêm là áp gấp đôi phép xoay Y-up→Z-up". Kết luận đó
+   **SAI HOÀN TOÀN** — chính là nguyên nhân gốc của bug "nằm ngang" bị treo suốt phần còn lại của
+   2026-08-08, chỉ tìm ra và sửa được ở phiên SAU (§11.1). Sự thật (đọc thẳng
+   `ModelInstance.getRenderable()` thật trong `gdx-1.14.2-sources.jar`, không suy đoán): với mesh có
+   skin, `Renderable.worldTransform` = ĐÚNG `ModelInstance.transform`, và `Node.calculateWorldTransform()`
+   KHÔNG BAO GIỜ đọc `ModelInstance.transform` — hai khái niệm hoàn toàn tách biệt trong gdx.
+   `u_worldTrans` **PHẢI** được nhân, không phải bỏ. Bài học: "chụp ảnh xác nhận" chỉ đáng tin khi thử
+   ĐỦ các khả năng (ở đây chỉ thử "có/không nhân `u_worldTrans`" với đúng MỘT dấu của
+   `Y_UP_TO_Z_UP` sai sẵn — kết quả "bỏ trông đỡ sai hơn" là so sánh giữa hai cấu hình đều sai, không
+   phải bằng chứng cấu hình đó đúng).
 
 📌 **Phát hiện thêm lúc chạy thật**: material xuất từ pipeline art đều đánh dấu `"doubleSided": true`
 (đo từ JSON của `.glb`, cả 2 material mỗi file) — `CelBodyShader` tôn trọng đúng cờ đó
@@ -616,6 +708,12 @@ cho thấy nhân vật hiện ra đúng hướng, có texture body cùng bảng 
 sáng-tối, không mượt), và đường viền đen quanh silhouette — cả ở khung nhìn cận lẫn khung nhìn
 gameplay thật (`VIEWPORT_HEIGHT_UNITS=10`). Harness đó KHÔNG committed (chỉ để xác minh). Đây là xác
 nhận cho **cel shader**; xác nhận bằng mắt cho **chuyển đổi clip animation** vẫn còn mở (§11.1).
+
+⚠️ **Không mâu thuẫn với bug "nằm ngang" tìm ra sau đó**: harness này rất có thể chưa từng gọi
+`setCharacterPosition()` (không có gameplay/server để cấp toạ độ) nên `ModelInstance.transform` vẫn ở
+giá trị mặc định — ma trận đơn vị. Ở trường hợp đó, có nhân `u_worldTrans` hay không (bug §11.1) đều
+cho kết quả GIỐNG HỆT nhau (nhân với ma trận đơn vị là phép không đổi) — nên "đúng hướng" ở đây không
+phải bằng chứng `u_worldTrans` hoạt động đúng, chỉ là chưa gặp trường hợp lộ bug.
 
 ---
 
@@ -772,17 +870,16 @@ cần chủ dự án — thêm trường mô tả ngoại hình vào `CharacterS
    khung** của `AnimationController` (§16) đo bằng JFR TRƯỚC khi hoà — 🟡 trả lời một phần, không phải
    bằng chứng "0 cấp phát" tuyệt đối, và chưa đo lại JFR riêng cho bản đã hoà, xem §12.2 mục 3 và
    ART-PIPELINE §4.4.
-4. 🔴 **Nối trạng thái gameplay → clip animation** (§11.1) — dây nối xong 2026-08-08.
+4. ✅ **Nối trạng thái gameplay → clip animation** (§11.1) — dây nối xong 2026-08-08.
    `CharacterAnimationClips` (vận tốc → idle/run, thuần hàm) + `RemoteMotionTracker` (suy di chuyển của
    người khác từ độ lệch vị trí, không có field vận tốc trong giao thức) + `CombatAnimationTrigger`
    (attack/hit/skill_cast/die từ `AttackResultEvent`/`SkillResultEvent`) đẩy vào
    `CharacterModelRenderer`, nơi thật sự điều khiển `AnimationController` (crossfade 0.15s, one-shot tự
    quay lại loop qua `AnimationListener`, `die` giữ tư thế cuối). **Xác nhận bằng mắt 2026-08-08 —
-   BUG THẬT**: nhân vật hiện ra nằm ngang thay vì đứng thẳng ở CẢ BA trạng thái quan sát được (idle,
-   moving, hit) — chi tiết + nghi vấn nguyên nhân ở §11.1 "Kiểm chứng bằng mắt 2026-08-08". Bind pose
-   không animation (xác nhận đứng đúng 2026-08-07) vẫn đúng; lỗi chỉ xuất hiện khi có animation áp vào
-   — thu hẹp nghi vấn về animation clip/cách áp animation, chưa xác nhận chắc chắn. `jump` cố ý bỏ qua
-   — `GameAction` chưa có ý định nhảy.
+   phát hiện bug thật (nằm ngang), ĐÃ SỬA cùng ngày (phiên sau)** — nguyên nhân là 2 lỗi Java/GLSL
+   (`CelBodyShader`/`CelOutlineShader` thiếu `u_worldTrans` + dấu sai của `Y_UP_TO_Z_UP`), không phải
+   animation clip hay asset; chi tiết + bằng chứng ở §11.1 "Kiểm chứng bằng mắt 2026-08-08 (đã sửa)".
+   `jump` cố ý bỏ qua — `GameAction` chưa có ý định nhảy.
 5. ✅ **Hết hardcode `models/med/` phía đọc file — 2026-08-08** (§6.5 mục 2) — `GraphicsTier` +
    `CharacterModelRenderer(GraphicsTier)`, `WorldScreen` truyền tường minh MEDIUM. **Còn mở, việc LỚN
    HƠN, để dành**: `ensureAssetsAvailable(tier)`, UI/Preferences đổi tier lúc chạy, và tải-theo-mạng

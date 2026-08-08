@@ -36,11 +36,27 @@ import net.mgsx.gltf.scene3d.attributes.PBRTextureAttribute;
  * {@code baseColorFactor} phẳng) theo material của TỪNG {@link Renderable} lúc {@link #render}, chứ
  * không giả định cả file dùng chung một kiểu vật liệu.
  *
- * <p>⚠️ <b>Không nhân thêm {@code u_worldTrans}</b> — cùng phát hiện chạy-thật ghi ở
- * {@link CelOutlineShader}: {@code Renderable.bones[i]} đã ở world space (gdx-gltf tính từ
- * {@code jointNode.globalTransform}, vốn đã nhân dồn root transform), nhân thêm world transform sau
- * skin là áp gấp đôi phép xoay Y-up→Z-up. Xác nhận bằng ảnh chụp thật (nhân vật lộn ngược khi còn
- * phép nhân thừa, đúng hướng khi bỏ).
+ * <p>⚠️ <b>PHẢI nhân {@code u_worldTrans}</b> — bản trước (2026-08-08) bỏ phép nhân này vì tưởng
+ * {@code Renderable.bones[i]} đã ở world space; SAI, xác nhận bằng cách đọc thẳng
+ * {@code ModelInstance.getRenderable()} thật trong {@code gdx-1.14.2-sources.jar}:
+ *
+ * <pre>
+ * if (nodePart.bones == null &amp;&amp; transform != null)
+ *     out.worldTransform.set(transform).mul(node.globalTransform);
+ * else if (transform != null)
+ *     out.worldTransform.set(transform);       // &lt;-- nhánh mesh có skin (trường hợp của ta)
+ * </pre>
+ *
+ * Với mesh có skin, {@code Renderable.worldTransform} = ĐÚNG {@code ModelInstance.transform} (không
+ * nhân {@code node.globalTransform}) — vì {@code Node.calculateBoneTransforms()} tính
+ * {@code bones[i] = jointGlobalTransform * invBindMatrix} và {@code Node.calculateWorldTransform()}
+ * KHÔNG BAO GIỜ đọc {@code ModelInstance.transform} (trường đó tách hẳn khỏi cây Node, chỉ được gdx
+ * đưa vào ở đúng chỗ {@code getRenderable()} này). Bỏ qua {@code u_worldTrans} nghĩa là bỏ luôn phép
+ * xoay {@code CharacterModelRenderer.Y_UP_TO_Z_UP} VÀ vị trí thế giới của nhân vật — mesh vẽ ra bằng
+ * toạ độ cục bộ Y-up thô, trục "cao" của mesh (Y cục bộ) nằm ngang trên mặt đất Z-up của thế giới —
+ * đúng triệu chứng "nằm ngang" đã ghi ở RENDERING.md §11.1. Xác nhận lại bằng ảnh chụp
+ * {@code CharacterModelDebugTool} thật, không phải suy đoán tĩnh — xem RENDERING.md §11.1 bản ghi
+ * 2026-08-08 (sửa).
  */
 final class CelBodyShader extends BaseShader {
 
@@ -54,6 +70,7 @@ final class CelBodyShader extends BaseShader {
             attribute vec2 a_boneWeight3;
 
             uniform mat4 u_projViewTrans;
+            uniform mat4 u_worldTrans;
             uniform mat4 u_bones[11]; // PHẢI khớp CelShadingConstants.RIG_BONE_COUNT
 
             varying vec3 v_normal;
@@ -66,10 +83,10 @@ final class CelBodyShader extends BaseShader {
                 skin += a_boneWeight2.y * u_bones[int(a_boneWeight2.x + 0.5)];
                 skin += a_boneWeight3.y * u_bones[int(a_boneWeight3.x + 0.5)];
 
-                // Skin matrix đã ở world space (xem javadoc class) — KHÔNG nhân thêm u_worldTrans,
-                // kể cả cho normal.
-                vec4 skinnedPosition = skin * vec4(a_position, 1.0);
-                vec3 skinnedNormal = (skin * vec4(a_normal, 0.0)).xyz;
+                // u_worldTrans là ModelInstance.transform (Y_UP_TO_Z_UP + vị trí thế giới) — PHẢI
+                // nhân, xem javadoc class. w=0 cho normal để bỏ phần tịnh tiến, đúng idiom chuẩn.
+                vec4 skinnedPosition = u_worldTrans * (skin * vec4(a_position, 1.0));
+                vec3 skinnedNormal = (u_worldTrans * (skin * vec4(a_normal, 0.0))).xyz;
 
                 gl_Position = u_projViewTrans * skinnedPosition;
                 v_normal = normalize(skinnedNormal);
@@ -155,6 +172,7 @@ final class CelBodyShader extends BaseShader {
 
     @Override
     public void render(Renderable renderable) {
+        program.setUniformMatrix("u_worldTrans", renderable.worldTransform);
         bindBones(renderable);
         bindMaterial(renderable);
         renderable.meshPart.render(program);
