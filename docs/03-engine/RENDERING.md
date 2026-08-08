@@ -239,7 +239,7 @@ mỗi lần spawn) và trả quyền vẽ về cho hình hộp. Đây không ph�
 |---|---|---|
 | 1 | **Mọi nhân vật nạp cùng một model** (`char_thuy-b1`) | `CharacterSpawnedEvent` **không có** trường nào mô tả ngoại hình (hệ phái / bậc trang phục) nên client không có cách nào biết phải nạp model nào. Thêm trường đó là **đổi protocol** ⇒ phải dừng và hỏi chủ dự án ([/CLAUDE.md §4](../../CLAUDE.md)) |
 | 2 | **Tier hình học bị hardcode ở `models/med/`** | LOW/HIGH và đường `ensureAssetsAvailable(tier)` của [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) chưa được nối ở lát cắt này |
-| 3 | **Chưa phát action nào** | `Scene` được tạo nhưng không có clip nào được chọn ⇒ nhân vật đứng ở pose tĩnh. 7 action đã có trong `.glb`; việc còn thiếu là nối trạng thái gameplay → tên clip (§11.1) |
+| 3 | ~~Chưa phát action nào~~ ✅ **Đã nối** (2026-08-08) | Trạng thái gameplay quan sát được ở client → tên clip đã nối qua `CharacterAnimationClips`/`CombatAnimationTrigger`/`RemoteMotionTracker` — chi tiết ở §11.1. **Chưa kiểm chứng bằng mắt** (chưa chạy được GL thật ở môi trường viết code, xem §11.1) |
 | 4 | **Chưa có cel shader, chưa có lượt vẽ viền** | Đang dùng ánh sáng mặc định của gdx-gltf (1 directional + ambient) chứ **không** phải hợp đồng vẻ ngoài ở §12.2. Đây là khoảng cách lớn nhất giữa tài liệu và code hiện tại |
 | 5 | **Camera bám tuyệt đối**, chưa có deadzone/lerp (§4.1) | Chưa có gameplay nào ép phải làm; làm sớm là đoán |
 | 6 | ~~Chưa đo frame time~~ | ✅ **Đo xong 2026-08-08** (`CharacterModelFrameBenchmarkTool`) — điều kiện Revisit Trigger #1 của ADR-031 (20 nhân vật trên màn) **không** kích hoạt, xem [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md) cho số liệu + giới hạn của phép đo (chưa cel shader/viền, chưa có máy tham chiếu chính thức) |
@@ -378,9 +378,42 @@ Client **nội suy giữa các khoá theo tần số khung hình thật** thay v
 lý do chính đổi sang 2.5D — bảng tier ở [ART-PIPELINE §5](../14-art/ART-PIPELINE.md) giờ mới có "FPS
 mục tiêu" thật.
 
-⚠️ **Chưa nối**: chưa có clip nào được chọn lúc chạy (§6.5 mục 3). Bộ 7 action chuẩn ở
-[ART-PIPELINE §4.2](../14-art/ART-PIPELINE.md); việc còn thiếu là ánh xạ trạng thái gameplay → tên clip,
-và nó phải nằm **ngoài** rendering (rendering chỉ đọc — §16).
+✅ **Đã nối** (2026-08-08, §6.5 mục 3 đóng). `Scene.animationController` (kiểu
+`com.badlogic.gdx.graphics.g3d.utils.AnimationController`, thư viện gốc chứ không phải lớp riêng của
+Kage) được điều khiển trực tiếp bằng `setAnimation`/`animate` — đã xác nhận bằng cách đọc bytecode
+`gltf-2.3.0.jar` thật (không suy đoán từ tài liệu thư viện) rằng field này được đăng ký vào
+`Scene.animations` (`AnimationsPlayer`) và được `SceneManager.update(deltaTime)` gọi `update()` mỗi
+khung — đúng như dòng "Cập nhật" ở bảng trên, không cần gọi gì thêm ngoài
+`CharacterModelRenderer.render()` đã có.
+
+Ánh xạ trạng thái gameplay → tên clip nằm **ngoài** rendering như tài liệu này từng yêu cầu — 3 lớp
+thuần, không phụ thuộc GL, ở `client-core/world/`:
+
+| Lớp | Vai trò |
+|---|---|
+| `CharacterAnimationClips` | Hàm thuần: vận tốc → `idle`/`run`, có test |
+| `RemoteMotionTracker` | Suy "đang di chuyển" cho nhân vật KHÁC từ độ lệch vị trí giữa 2 `CharacterMovedEvent` + timeout 0.2s (giao thức không có field vận tốc cho ai ngoài chính mình, cũng không có gói "đã dừng") — có test |
+| `CombatAnimationTrigger` | Dịch `AttackResultEvent`/`SkillResultEvent` → `attack`/`hit`/`skill_cast`/`die` cho CẢ nhân vật của mình lẫn người khác (event broadcast cho mọi người thấy mục tiêu trong AoI, không chỉ người gây ra) |
+
+`CharacterModelRenderer` sở hữu việc thật sự gọi `AnimationController` (state machine
+idle/run/one-shot per nhân vật, transition 0.15s qua `animate(..., transitionTime)`, one-shot dùng
+`AnimationListener` để tự quay lại clip loop khi xong — riêng `die` giữ nguyên tư thế cuối tới
+`resetAfterRespawn`). `jump` **không dùng** — `GameAction` chưa có ý định nhảy nào, tự thêm là việc AI
+không được tự quyết ([/CLAUDE.md §4](../../CLAUDE.md)).
+
+⚠️ **Nhân vật KHÁC hồi sinh không có tín hiệu tường minh**: `CharacterRespawnedEvent` chỉ gửi cho
+CHÍNH người hồi sinh (§ constructor/`onCharacterRespawned`), không broadcast cho ai khác đang thấy họ.
+`WorldScreen.onCharacterMoved` suy luận: nếu nhân vật đó đang ở tư thế `die`
+(`CharacterModelRenderer.isDead`) và có gói di chuyển mới tới, coi đó là hồi sinh. Đây là suy luận từ
+ràng buộc giao thức hiện có, không phải xác nhận trực tiếp — nếu sau này có nhu cầu gameplay khác cần
+biết chính xác thời điểm người khác hồi sinh, đây là chỗ cần một field/event tường minh hơn (đổi
+protocol ⇒ hỏi chủ dự án).
+
+🔴 **Chưa kiểm chứng bằng mắt.** Đã build/test/checkstyle/PMD/SpotBugs xanh và xác minh cơ chế bằng
+cách đọc bytecode `AnimationController`/`Scene`/`SceneManager`/`AnimationsPlayer` thật trong
+`third-party/m2/`, nhưng chưa mở được client thật lên màn hình để xác nhận idle/run chuyển đổi mượt
+(môi trường viết code không có cách điều khiển cửa sổ GL desktop). Vẫn còn nguyên câu cảnh báo ở §6.1:
+"đường code đã có, kết quả hình ảnh chưa được kiểm chứng" — giờ áp dụng thêm cho animation.
 
 **Không dùng Spine** — lý do license phí vẫn đúng, và giờ càng không cần: skeletal đã có sẵn trong
 glTF, không tốn thêm dependency thương mại nào.
@@ -612,7 +645,14 @@ ngoại lệ cần chủ dự án: thêm trường mô tả ngoại hình vào `
    kèm giới hạn thật (chưa cel shader/viền §12.2, chưa có máy tham chiếu chính thức). **Cấp phát mỗi
    khung** của `SceneManager`/`AnimationController` (§16) đo bằng JFR — 🟡 trả lời một phần, không phải
    bằng chứng "0 cấp phát" tuyệt đối, xem §12.2 mục 3 và ART-PIPELINE §4.4.
-4. **Nối trạng thái gameplay → clip animation** (§11.1) — hiện nhân vật đứng pose tĩnh.
+4. ✅ **Nối trạng thái gameplay → clip animation** (§11.1) — 2026-08-08. `CharacterAnimationClips`
+   (vận tốc → idle/run, thuần hàm) + `RemoteMotionTracker` (suy di chuyển của người khác từ độ lệch vị
+   trí, không có field vận tốc trong giao thức) + `CombatAnimationTrigger` (attack/hit/skill_cast/die
+   từ `AttackResultEvent`/`SkillResultEvent`) đẩy vào `CharacterModelRenderer`, nơi thật sự điều khiển
+   `AnimationController` (crossfade 0.15s, one-shot tự quay lại loop qua `AnimationListener`, `die`
+   giữ tư thế cuối). **Chưa xác nhận bằng mắt** — phụ thuộc mục 1 (chưa ai nhìn thấy nhánh 3D chạy
+   thật) và môi trường code hoá không mở được cửa sổ GL desktop; xác nhận cơ chế đúng qua đọc bytecode
+   thư viện thật, không phải chạy hình. `jump` cố ý bỏ qua — `GameAction` chưa có ý định nhảy.
 5. **Nối tier đồ hoạ** — bỏ đường dẫn `models/med/` hardcode, đi qua `ensureAssetsAvailable(tier)` của
    [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) (§6.5 mục 2).
 6. 🛑 **Chờ chủ dự án**: `CharacterSpawnedEvent` cần trường mô tả ngoại hình thì client mới nạp đúng

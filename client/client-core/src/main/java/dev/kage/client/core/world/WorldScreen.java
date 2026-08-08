@@ -66,6 +66,7 @@ public final class WorldScreen implements GameScreen {
     private final EcsWorld world;
     private final KEntity localPlayer;
     private final Map<Long, KEntity> remoteCharacters = new HashMap<>();
+    private final RemoteMotionTracker remoteMotionTracker = new RemoteMotionTracker();
 
     /**
      * Id dùng cho nhân vật của chính người chơi trong {@link CharacterModelRenderer}. Server đánh id
@@ -74,12 +75,21 @@ public final class WorldScreen implements GameScreen {
      */
     private static final long LOCAL_CHARACTER_ID = 0L;
 
+    /**
+     * Id THẬT của chính người chơi (từ DB, luôn dương) — dùng để nhận ra
+     * {@link AttackResultEvent}/{@link SkillResultEvent} nào nhắm vào MÌNH (khớp
+     * {@code attacker_entity_id}/{@code target_entity_id}) và quy đổi sang
+     * {@link #LOCAL_CHARACTER_ID} khi gọi {@link CharacterModelRenderer}.
+     */
+    private final long localCharacterId;
+
     private final OrthographicCamera camera = new OrthographicCamera();
     private final Viewport viewport;
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
     private final CharacterModelRenderer models = new CharacterModelRenderer();
 
     private final CombatHudController combatHudController;
+    private final CombatAnimationTrigger combatAnimationTrigger;
     private final CombatHud combatHud = new CombatHud();
 
     private float lastSentDirX;
@@ -99,7 +109,10 @@ public final class WorldScreen implements GameScreen {
         this.world = context.world();
         this.inputMapper = context.inputMapper();
         this.connection = connection;
+        this.localCharacterId = character.getId();
         this.combatHudController = new CombatHudController(character.getId(), character.getFaction());
+        this.combatAnimationTrigger = new CombatAnimationTrigger(
+                models, localCharacterId, LOCAL_CHARACTER_ID, remoteCharacters::containsKey);
         this.viewport =
                 new FitViewport(WorldConstants.VIEWPORT_HEIGHT_UNITS, WorldConstants.VIEWPORT_HEIGHT_UNITS, camera);
 
@@ -144,6 +157,7 @@ public final class WorldScreen implements GameScreen {
         processInboundPackets();
         updateLocalMovementIntent();
         combatHudController.tick(fixedDeltaTime);
+        remoteMotionTracker.tick(fixedDeltaTime);
     }
 
     private void processInboundPackets() {
@@ -198,10 +212,27 @@ public final class WorldScreen implements GameScreen {
         } else if (opcode == Opcode.OPCODE_MONSTER_MOVED_EVENT_VALUE) {
             combatHudController.onMonsterMoved(MonsterMovedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE) {
-            combatHudController.onAttackResult(AttackResultEvent.parseFrom(payload));
+            onAttackResult(AttackResultEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE) {
-            combatHudController.onSkillResult(SkillResultEvent.parseFrom(payload));
+            onSkillResult(SkillResultEvent.parseFrom(payload));
         }
+    }
+
+    /**
+     * Kết quả 1 đòn đánh thường THẬT — gửi cho MỌI nhân vật thấy mục tiêu trong AoI (combat.proto),
+     * nên {@code attacker_entity_id}/{@code target_entity_id} có thể là CHÍNH mình, người khác, hoặc
+     * quái. HP/hồi chiêu (HUD) và animation (model 3D) là 2 mối quan tâm tách biệt — xem
+     * {@link CombatAnimationTrigger}.
+     */
+    private void onAttackResult(AttackResultEvent event) {
+        combatHudController.onAttackResult(event);
+        combatAnimationTrigger.onAttackResult(event);
+    }
+
+    /** Kết quả 1 lần dùng skill THẬT — cùng hình dạng {@link AttackResultEvent}. */
+    private void onSkillResult(SkillResultEvent event) {
+        combatHudController.onSkillResult(event);
+        combatAnimationTrigger.onSkillResult(event);
     }
 
     private void onMoveResponse(MoveResponse response) {
@@ -243,6 +274,13 @@ public final class WorldScreen implements GameScreen {
         pos.y = event.getY();
         pos.prevX = pos.x;
         pos.prevY = pos.y;
+        remoteMotionTracker.onPositionUpdate(event.getCharacterId(), event.getX(), event.getY());
+        if (models.isDead(event.getCharacterId())) {
+            // Giao thức KHÔNG phát CharacterRespawnedEvent cho ai khác ngoài chính người hồi sinh
+            // (javadoc onCharacterRespawned) — vị trí đổi sau khi chết chỉ có thể là hồi sinh, nên
+            // coi gói di chuyển đầu tiên sau "die" là tín hiệu hồi sinh cho nhân vật KHÁC.
+            models.resetAfterRespawn(event.getCharacterId());
+        }
     }
 
     private void onCharacterDespawned(CharacterDespawnedEvent event) {
@@ -251,6 +289,7 @@ public final class WorldScreen implements GameScreen {
             world.removeEntity(entity);
         }
         models.removeCharacter(event.getCharacterId());
+        remoteMotionTracker.remove(event.getCharacterId());
     }
 
     /**
@@ -265,6 +304,7 @@ public final class WorldScreen implements GameScreen {
         pos.prevX = pos.x;
         pos.prevY = pos.y;
         combatHudController.onRespawn(event.getCurrentHp(), event.getCurrentChi());
+        models.resetAfterRespawn(LOCAL_CHARACTER_ID);
     }
 
     private void onMonsterSpawned(MonsterSpawnedEvent event) {
@@ -289,6 +329,11 @@ public final class WorldScreen implements GameScreen {
         if (!combatHudController.useSkill()) {
             return; // Chưa đủ điều kiện cục bộ (hồi chiêu/Khí/mục tiêu) — không gửi gì thừa.
         }
+        // Dự đoán CỤC BỘ animation (không phải kết quả gameplay) của chính mình — CLIENT.md §6 cho
+        // phép dự đoán "di chuyển/animation của chính mình". SkillResultEvent xác nhận tới sau sẽ
+        // gọi lại models.playSkillCast() lần nữa nhưng vô hại (playOneShotState bỏ qua nếu clip
+        // giống hệt đang chạy) — không có xung đột gameplay vì animation không quyết định gì.
+        models.playSkillCast(LOCAL_CHARACTER_ID);
         try {
             UseSkillCommand command = UseSkillCommand.newBuilder()
                     .setSkillCode(combatHudController.skillCode())
@@ -402,12 +447,23 @@ public final class WorldScreen implements GameScreen {
         float localX = interpolatedX(localPlayer, alpha);
         float localY = interpolatedY(localPlayer, alpha);
         models.setCharacterPosition(LOCAL_CHARACTER_ID, localX, localY);
+        models.setCharacterMoving(LOCAL_CHARACTER_ID, isLocalPlayerMoving());
         for (Map.Entry<Long, KEntity> entry : remoteCharacters.entrySet()) {
+            long characterId = entry.getKey();
             models.setCharacterPosition(
-                    entry.getKey(), interpolatedX(entry.getValue(), alpha), interpolatedY(entry.getValue(), alpha));
+                    characterId, interpolatedX(entry.getValue(), alpha), interpolatedY(entry.getValue(), alpha));
+            // Nhân vật khác không có VelocityComponent (chỉ nội suy vị trí, CLIENT.md §7) — suy
+            // "đang di chuyển" từ độ lệch vị trí giữa các CharacterMovedEvent thay vào đó.
+            models.setCharacterMoving(characterId, remoteMotionTracker.isMoving(characterId));
         }
         models.follow(localX, localY);
         models.render(Gdx.graphics.getDeltaTime());
+    }
+
+    /** Vận tốc dự đoán cục bộ (CLIENT.md §6) của chính mình — đủ để quyết định idle vs run. */
+    private boolean isLocalPlayerMoving() {
+        VelocityComponent velocity = VELOCITY.get(localPlayer);
+        return CharacterAnimationClips.isMoving(velocity.x, velocity.y);
     }
 
     /**
