@@ -111,8 +111,8 @@ public final class WorldScreen implements GameScreen {
         this.connection = connection;
         this.localCharacterId = character.getId();
         this.combatHudController = new CombatHudController(character.getId(), character.getFaction());
-        this.combatAnimationTrigger = new CombatAnimationTrigger(
-                models, localCharacterId, LOCAL_CHARACTER_ID, remoteCharacters::containsKey);
+        this.combatAnimationTrigger =
+                new CombatAnimationTrigger(models, localCharacterId, LOCAL_CHARACTER_ID, remoteCharacters::containsKey);
         this.viewport =
                 new FitViewport(WorldConstants.VIEWPORT_HEIGHT_UNITS, WorldConstants.VIEWPORT_HEIGHT_UNITS, camera);
 

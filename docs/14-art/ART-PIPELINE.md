@@ -338,10 +338,10 @@ phải nói rõ, không giấu:
   chốt ở đâu trong docs) — máy đo ở đây chỉ là máy dev sẵn có, không phải máy đại diện đã duyệt. iGPU
   Intel tầm trung/thấp, không phải GPU rời — biên độ an toàn >25 lần dưới ngưỡng phần nào bù lại việc
   chưa có máy tham chiếu chính thức, nhưng không thay thế được việc chốt spec đó.
-- **Số đo trên shader MẶC ĐỊNH của gdx-gltf** (1 `DirectionalLightEx` + ambient), **chưa có** cel shader
-  + lượt vẽ viền inverted hull bắt buộc theo [RENDERING.md §12.2](../03-engine/RENDERING.md). Viền hình
-  học làm **gấp đôi** số tam giác vẽ (§4.4 trên, dòng ghi chú cũ) — phải đo lại sau khi GLSL đó viết
-  xong, số hiện tại là **sàn**, không phải số cuối.
+- ~~Số đo trên shader MẶC ĐỊNH của gdx-gltf, chưa có cel shader + viền~~ — **đo lại 2026-08-08 sau khi
+  cel shader + viền inverted hull ([RENDERING.md §12.2](../03-engine/RENDERING.md)) hoà vào cùng bản**
+  (§4.4bis dưới): p95 tăng lên **0,52ms** (2 lượt vẽ/nhân vật thay vì 1, đúng như dự đoán "gấp đôi tam
+  giác"), vẫn cách xa ngưỡng 8ms hơn 15 lần.
 - `CharacterModelRenderer` **chưa cull gì** ([RENDERING §15](../03-engine/RENDERING.md)) — mọi `Scene`
   đã thêm đều cập nhật mỗi khung bất kể có nằm trong camera hay không, nên số đo phản ánh đúng chi phí
   "20 `Scene` trong `SceneManager`" mà Revisit Trigger #1 muốn biết, không phụ thuộc cách xếp lưới.
@@ -366,6 +366,27 @@ cái nào là profiler thật (CLAUDE.md §4 — không thêm dependency):
    phải bằng chứng toán học "0 cấp phát tuyệt đối" (lấy mẫu TLAB có thể bỏ sót cấp phát nhỏ/hiếm) — câu
    hỏi ở [RENDERING §12.2 mục 3](../03-engine/RENDERING.md) coi là **trả lời một phần** (🟡), không phải
    đóng hẳn.
+
+✅ **Đo lại sau khi hoà cel shader + animation, 2026-08-08 (cùng ngày, sau lần đo gốc ở trên).** Ba việc
+— cel shader/viền (RENDERING.md §12.2), animation clip (§11.1), và phép đo frame time gốc ở trên —
+được làm **song song** trên 3 worktree tách biệt rồi hoà thủ công vào nhau (cel shader bỏ hẳn
+`SceneManager` khỏi đường vẽ; animation cần `Scene#update()` chạy mỗi khung để advance
+`AnimationController` — hai việc tưởng xung đột kiến trúc nhưng hoà được sạch vì `Scene#update()`,
+không phải `SceneManager`, mới là thứ thật sự chạy animation). Build lại + chạy
+`runFrameBenchmark` trên chính bản đã hoà:
+
+| | |
+|---|---|
+| Máy đo | Cùng máy — `GL_VENDOR=Intel`, `GL_RENDERER=Intel(R) RaptorLake-S Mobile Graphics Controller` |
+| Frame time (ms), 1 lần chạy, 6000 khung | min 0,304 · avg 0,401 · **p95 0,523** · max 2,323 |
+
+**Vẫn dưới ngưỡng 8ms hơn 15 lần.** p95 tăng từ ~0,31ms lên 0,52ms — khớp đúng dự đoán "gấp đôi chi phí
+vẽ" của viền hình học (§12.2), không phải hồi quy bất ngờ. Giới hạn thứ hai ở danh sách trên (chưa có
+cel shader) coi như **đóng**; ba giới hạn còn lại (chưa có máy tham chiếu chính thức, chưa cull, chưa
+đo trên Android) vẫn mở nguyên. **Chưa chạy lại JFR riêng cho bản đã hoà** — phần "Cấp phát mỗi khung"
+dưới đây vẫn dựa trên phép đo TRƯỚC khi hoà (chưa có clip animation nào thật sự phát, chỉ bind pose
+tĩnh) nên câu trả lời cấp phát của `AnimationController` **chưa được xác nhận lại** ở trạng thái có
+animation thật chạy — chỉ có xác nhận **chức năng** (không crash, không exception qua 6000 khung).
 
 Ngân sách 5–10k khớp với mức ADR-031 đoán ban đầu — 20 nhân vật × 10k = **200k tam giác/khung**, thay vì
 1,9 triệu.

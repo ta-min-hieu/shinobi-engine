@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version | 2.0.0 |
+| Version | 2.1.0 |
 | Status | Draft |
 | Liên quan | [ENGINE.md](ENGINE.md), [ADR-002](../01-architecture/adr/ADR-002-Why-libGDX.md), [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md), [ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md) |
 
@@ -15,6 +15,18 @@
 > (Accepted 2026-08-03): **nhân vật · quái · NPC** render 3D thời gian thực qua camera orthographic
 > khoá góc; **VFX kỹ năng · icon · UI** vẫn là sprite 2D. Tài liệu này mô tả **cả hai nhánh** và nói rõ
 > chỗ nào đã có code, chỗ nào mới chỉ là hợp đồng thiết kế.
+>
+> **Bản 2.1.0 (2026-08-08)** — cel shader + viền inverted-hull ở §12.2 **đã viết và đã nhìn thấy chạy
+> thật** (ảnh chụp `Lwjgl3Application` thật): `CelOutlineShader` + `CelBodyShader` (+ 2
+> `ShaderProvider` tương ứng) thay hẳn ánh sáng mặc định gdx-gltf từng dùng tạm, và `SceneManager` bị
+> bỏ khỏi đường vẽ (§6.2). Cùng ngày, animation clip (§11.1) và phép đo frame time 20 nhân vật (§6.5
+> mục 6, [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md)) cũng xong — ba việc chạy **song song** trên 3
+> worktree tách biệt rồi hoà thủ công vào nhau, vì cel shader bỏ `SceneManager` trong khi animation
+> vẫn cần `Scene#update()` chạy `AnimationController` mỗi khung — hai việc tưởng xung đột nhưng **hoà
+> được sạch**: `Scene#update()` (không phải `SceneManager` bọc ngoài) mới là thứ thật sự advance
+> animation, nên bỏ `SceneManager` không đụng gì tới animation. Đã build lại + chạy benchmark thật
+> trên bản hoà: p95 tăng nhẹ từ ~0.31ms lên **0.52ms/khung** (2 lượt vẽ thay vì 1), vẫn cách xa ngưỡng
+> 8ms hơn 15 lần.
 
 ---
 
@@ -37,7 +49,7 @@
 | Đối tượng | Nhân vật · quái · NPC | VFX kỹ năng · icon vật phẩm · UI |
 | Định dạng tài sản | glTF 2.0 (`.glb`) | PNG đóng vào `TextureAtlas` |
 | Nạp bằng | `gdx-gltf` (§6.2) | `AssetManager` / `TextureAtlas` |
-| Vẽ bằng | `SceneManager` của gdx-gltf (bọc `ModelBatch`) | `SpriteBatch` |
+| Vẽ bằng | 2 `ModelBatch` thô + `ShaderProvider` tự viết (§12.2 — không phải `SceneManager.render()`, xem lý do ở đó) | `SpriteBatch` |
 | Animation | Skeletal, nội suy theo FPS thật (§11.1) | Frame-based 12 fps (§11.2) |
 | Thứ tự che nhau | **Depth buffer** (§9) | Sort theo layer + Y (§9) |
 
@@ -57,7 +69,7 @@ graph LR
     S["State (ECS Components)"] --> I["Interpolation<br/>alpha giữa 2 tick"]
     I --> C["Culling<br/>bỏ entity ngoài camera"]
     C --> Z["Sort theo layer + Y<br/>(chỉ nhánh 2D)"]
-    C --> M["SceneManager (gdx-gltf)<br/>nhân vật · quái · NPC (.glb)<br/>depth buffer lo che nhau"]
+    C --> M["2x ModelBatch cel shader<br/>nhân vật · quái · NPC (.glb)<br/>depth buffer lo che nhau"]
     Z --> B["SpriteBatch<br/>VFX · icon — gom draw call"]
     M --> G["GPU"]
     B --> G["GPU"]
@@ -205,8 +217,12 @@ jar vào [`third-party/m2/`](../../third-party/m2/README.md) như một kho Mave
 làm gdx-gltf crash lúc chạy. Cảnh báo này nằm ngay cạnh khai báo trong `libs.versions.toml` — đọc nó
 trước khi bump.
 
-Client dùng `SceneManager` của gdx-gltf (bọc `ModelBatch` + môi trường) chứ không dựng `ModelBatch`
-trần: `GLBLoader` → `SceneAsset` → `Scene`.
+Client dùng `GLBLoader` → `SceneAsset` → `Scene` của gdx-gltf để nạp asset + quản trạng thái skin/
+animation. ⚠️ **Khác bản trước 2026-08-08**: KHÔNG còn bọc thêm `SceneManager` — cel shader ở §12.2
+cần 2 lượt vẽ mà `SceneManager.render()` không có chỗ chèn, nên `CharacterModelRenderer` tự dựng
+`ModelBatch` trần + `ShaderProvider` riêng, xem lý do đầy đủ ở §12.2 câu hỏi runtime #2. Animation
+KHÔNG bị ảnh hưởng bởi việc này — `Scene#update()` (không phải `SceneManager`) mới là thứ thật sự
+chạy `AnimationController`, và `CharacterModelRenderer` vẫn gọi nó mỗi khung (§11.1).
 
 ### 6.3 Chia sẻ model giữa các entity (Flyweight)
 
@@ -240,9 +256,9 @@ mỗi lần spawn) và trả quyền vẽ về cho hình hộp. Đây không ph�
 | 1 | **Mọi nhân vật nạp cùng một model** (`char_thuy-b1`) | `CharacterSpawnedEvent` **không có** trường nào mô tả ngoại hình (hệ phái / bậc trang phục) nên client không có cách nào biết phải nạp model nào. Thêm trường đó là **đổi protocol** ⇒ phải dừng và hỏi chủ dự án ([/CLAUDE.md §4](../../CLAUDE.md)) |
 | 2 | **Tier hình học bị hardcode ở `models/med/`** | LOW/HIGH và đường `ensureAssetsAvailable(tier)` của [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md) chưa được nối ở lát cắt này |
 | 3 | ~~Chưa phát action nào~~ ✅ **Đã nối** (2026-08-08) | Trạng thái gameplay quan sát được ở client → tên clip đã nối qua `CharacterAnimationClips`/`CombatAnimationTrigger`/`RemoteMotionTracker` — chi tiết ở §11.1. **Chưa kiểm chứng bằng mắt** (chưa chạy được GL thật ở môi trường viết code, xem §11.1) |
-| 4 | **Chưa có cel shader, chưa có lượt vẽ viền** | Đang dùng ánh sáng mặc định của gdx-gltf (1 directional + ambient) chứ **không** phải hợp đồng vẻ ngoài ở §12.2. Đây là khoảng cách lớn nhất giữa tài liệu và code hiện tại |
+| 4 | ~~Chưa có cel shader, chưa có lượt vẽ viền~~ ✅ **Đã viết** (2026-08-08) | `CelOutlineShader` + `CelBodyShader`, xem §12.2. `CharacterModelRenderer` không còn dùng ánh sáng mặc định gdx-gltf |
 | 5 | **Camera bám tuyệt đối**, chưa có deadzone/lerp (§4.1) | Chưa có gameplay nào ép phải làm; làm sớm là đoán |
-| 6 | ~~Chưa đo frame time~~ | ✅ **Đo xong 2026-08-08** (`CharacterModelFrameBenchmarkTool`) — điều kiện Revisit Trigger #1 của ADR-031 (20 nhân vật trên màn) **không** kích hoạt, xem [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md) cho số liệu + giới hạn của phép đo (chưa cel shader/viền, chưa có máy tham chiếu chính thức) |
+| 6 | ~~Chưa đo frame time~~ | ✅ **Đo xong 2026-08-08** (`CharacterModelFrameBenchmarkTool`) — điều kiện Revisit Trigger #1 của ADR-031 (20 nhân vật trên màn) **không** kích hoạt, xem [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md) cho số liệu + giới hạn của phép đo. ⚠️ Số ban đầu (p95 0,30ms) đo TRƯỚC khi hoà cel shader + animation; **đo lại sau khi hoà cả ba** cho p95 **0,52ms** (2 lượt vẽ/nhân vật thay vì 1) — vẫn cách xa ngưỡng 8ms hơn 15 lần, chưa có máy tham chiếu chính thức |
 
 ---
 
@@ -264,9 +280,11 @@ Ba kết luận có ảnh hưởng trực tiếp tới rendering:
   đều còn hạ mesh **vỡ silhouette cục bộ**. Khi cần cắt dung lượng, cắt texture trước.
 - Dung lượng hình học ≈ **35 byte/tam giác**, tuyến tính trong toàn dải đo.
 
-⚠️ **Khi ước tính chi phí vẽ, nhân đôi số tam giác** nếu lượt vẽ viền ở §12.2 được thi hành — vỏ lật
-normal là một bản sao của chính mesh đó. Hiện lượt vẽ này **chưa có trong code**, nên con số 200k ở
-trên là chi phí của thân, chưa gồm viền.
+⚠️ **Khi ước tính chi phí vẽ, nhân đôi số tam giác** — lượt vẽ viền ở §12.2 **đã có trong code**
+(2026-08-08): vỏ lật normal là một bản sao đầy đủ của chính mesh đó, vẽ thêm một lượt `ModelBatch`
+riêng mỗi khung. Con số 200k ở trên vẫn là chi phí CHỈ của thân — cộng thêm ~200k cho viền ở tier
+Medium. [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md) đã đo lại với cả 2 lượt vẽ này (p95 0,52ms) —
+vẫn trong ngân sách.
 
 Ý nghĩa của tier **đổi** theo ADR-031 (từ "độ phân giải sprite" sang "mức LOD của model + kích thước
 texture") nhưng **cơ chế không đổi**: [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md)
@@ -372,7 +390,7 @@ Hai kiểu, chọn theo loại đối tượng ([ADR-031](../01-architecture/adr
 | Kiểu | **Skeletal** — rig 11 xương, 7 action, nạp từ glTF 2.0 |
 | Nguồn | Blender → `.glb` qua `export_character_lods.py` ([ART-PIPELINE §6.4](../14-art/ART-PIPELINE.md)) |
 | Nạp bằng | `gdx-gltf` (§6.2) |
-| Cập nhật | `SceneManager.update(deltaTime)` — **thời gian thực**, không phải `alpha` |
+| Cập nhật | `Scene#update(camera, deltaTime)` gọi trực tiếp (không qua `SceneManager` — bỏ từ 2026-08-08, xem §6.2/§12.2) — **thời gian thực**, không phải `alpha` |
 
 Client **nội suy giữa các khoá theo tần số khung hình thật** thay vì phát ảnh cố định ở 12 fps. Đây là
 lý do chính đổi sang 2.5D — bảng tier ở [ART-PIPELINE §5](../14-art/ART-PIPELINE.md) giờ mới có "FPS
@@ -382,9 +400,11 @@ mục tiêu" thật.
 `com.badlogic.gdx.graphics.g3d.utils.AnimationController`, thư viện gốc chứ không phải lớp riêng của
 Kage) được điều khiển trực tiếp bằng `setAnimation`/`animate` — đã xác nhận bằng cách đọc bytecode
 `gltf-2.3.0.jar` thật (không suy đoán từ tài liệu thư viện) rằng field này được đăng ký vào
-`Scene.animations` (`AnimationsPlayer`) và được `SceneManager.update(deltaTime)` gọi `update()` mỗi
-khung — đúng như dòng "Cập nhật" ở bảng trên, không cần gọi gì thêm ngoài
-`CharacterModelRenderer.render()` đã có.
+`Scene.animations` (`AnimationsPlayer`) và được `update()` mỗi khung. Việc này ban đầu code qua
+`SceneManager.update(deltaTime)` (gọi hộ mỗi `Scene` đã đăng ký), nhưng §12.2 (cel shader, xong cùng
+ngày) bỏ hẳn `SceneManager` — `CharacterModelRenderer.render()` giờ tự gọi thẳng
+`scene.update(camera, deltaTime)` cho từng `Scene` (§6.2), **kết quả giống hệt** vì đó luôn là method
+thật sự chạy animation, `SceneManager` chỉ là lớp bọc lặp hộ.
 
 Ánh xạ trạng thái gameplay → tên clip nằm **ngoài** rendering như tài liệu này từng yêu cầu — 3 lớp
 thuần, không phụ thuộc GL, ở `client-core/world/`:
@@ -409,11 +429,15 @@ ràng buộc giao thức hiện có, không phải xác nhận trực tiếp —
 biết chính xác thời điểm người khác hồi sinh, đây là chỗ cần một field/event tường minh hơn (đổi
 protocol ⇒ hỏi chủ dự án).
 
-🔴 **Chưa kiểm chứng bằng mắt.** Đã build/test/checkstyle/PMD/SpotBugs xanh và xác minh cơ chế bằng
-cách đọc bytecode `AnimationController`/`Scene`/`SceneManager`/`AnimationsPlayer` thật trong
-`third-party/m2/`, nhưng chưa mở được client thật lên màn hình để xác nhận idle/run chuyển đổi mượt
-(môi trường viết code không có cách điều khiển cửa sổ GL desktop). Vẫn còn nguyên câu cảnh báo ở §6.1:
-"đường code đã có, kết quả hình ảnh chưa được kiểm chứng" — giờ áp dụng thêm cho animation.
+🟡 **Kiểm chứng một phần.** Đã build/test/checkstyle/PMD/SpotBugs xanh và xác minh cơ chế bằng cách đọc
+bytecode `AnimationController`/`Scene`/`SceneManager`/`AnimationsPlayer` thật trong `third-party/m2/`.
+Sau khi hoà chung với cel shader (§12.2) và chạy lại `CharacterModelFrameBenchmarkTool` trên GPU thật
+(20 nhân vật, `addCharacter()` tự đặt `idle` cho mỗi Scene) — **không crash, không exception**, animation
+loop chạy hết 6000 khung không lỗi. Nhưng benchmark đó KHÔNG gọi `setCharacterMoving`/`playAttack`/...
+nên **chưa xác nhận bằng mắt việc chuyển đổi clip** (idle↔run, one-shot→loop) mượt hay đúng — đó vẫn
+cần một lần chạy client thật qua `WorldScreen` (§6.1: "đường code đã có, kết quả hình ảnh chưa được
+kiểm chứng" — vẫn áp dụng cho phần CHUYỂN ĐỔI clip, không còn áp dụng cho việc animation có chạy hay
+không).
 
 **Không dùng Spine** — lý do license phí vẫn đúng, và giờ càng không cần: skeletal đã có sẵn trong
 glTF, không tốn thêm dependency thương mại nào.
@@ -445,7 +469,7 @@ vô ích. Cùng một cạm bẫy với `SceneAsset`/`Scene` ở §6.3.
 | Outline khi hover | Outline shader |
 | Lighting động | Xem §13 |
 
-### 12.2 Nhánh 3D — hợp đồng cel shader (**đã chốt, CHƯA viết**)
+### 12.2 Nhánh 3D — hợp đồng cel shader (**đã chốt, ĐÃ viết** 2026-08-08)
 
 Sau [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) đây không còn là "viết khi
 cần": model xuất ra **cố tình không mang** vẻ ngoài cel. `export_character_lods.py` bỏ vật liệu toon,
@@ -478,25 +502,97 @@ vẽ viền cho **cả cảnh**; ta chỉ muốn viền quanh nhân vật. Vỏ 
 Freestyle sang inverted hull vì lý do khác (nó vẽ viền cho **từng lọn tóc** trên mesh Text→3D), nên thứ
 đang dùng ở Blender vốn đã là thứ chuyển thẳng sang GLSL được.
 
-🔴 **Khoảng cách giữa mục này và code**: hiện `CharacterModelRenderer` dùng đúng ánh sáng mặc định của
-gdx-gltf — một `DirectionalLightEx` chiếu từ trên-trước-phải (cùng hướng key light lúc nghiệm thu art)
-cộng ambient. Nó **không** lượng tử hoá, **không** có lượt vẽ viền. Đó là chỗ đứng tạm để nhìn thấy
-model, không phải bản thi hành hợp đồng này.
+✅ **Đã thi hành** (2026-08-08): `dev.kage.client.core.world` có thêm 5 class —
+[`CelOutlineShader`](../../client/client-core/src/main/java/dev/kage/client/core/world/CelOutlineShader.java)
++ [`CelOutlineShaderProvider`](../../client/client-core/src/main/java/dev/kage/client/core/world/CelOutlineShaderProvider.java)
+cho lượt viền,
+[`CelBodyShader`](../../client/client-core/src/main/java/dev/kage/client/core/world/CelBodyShader.java)
++ [`CelBodyShaderProvider`](../../client/client-core/src/main/java/dev/kage/client/core/world/CelBodyShaderProvider.java)
+cho lượt thân, cộng
+[`CelShadingConstants`](../../client/client-core/src/main/java/dev/kage/client/core/world/CelShadingConstants.java)
+gom hằng số dùng chung. `CharacterModelRenderer` **không còn** `DirectionalLightEx`/`Environment` của
+gdx-gltf — ánh sáng giờ là hằng số uniform đọc thẳng từ `CelShadingConstants.LIGHT_DIRECTION` (cùng
+giá trị hướng cũ, chỉ đổi chỗ đọc).
 
-**Ba thứ chỉ biết được khi chạy thật** (chưa ai đo):
+**Hai lỗi thật gặp lúc viết** (cả hai đều KHÔNG báo lỗi/không crash — chỉ render sai hoặc render ra
+hư không, bắt được nhờ chụp ảnh màn hình thật qua một harness `Lwjgl3Application` tạm, không phải
+đọc code suy luận):
 
-1. Độ dày viền quy đổi thế nào sang world unit khi camera zoom.
-2. `SceneManager`/`ModelBatch` có cho chèn lượt vẽ thứ hai gọn không, hay phải tự quản `ShaderProgram`.
-3. 🟡 `AnimationController` cấp phát bao nhiêu mỗi khung (§16) — **trả lời một phần, 2026-08-08**:
-   JFR (`jdk.ObjectAllocationSample`, có sẵn trong JDK) qua 6000 khung/20 nhân vật KHÔNG bắt được mẫu
-   cấp phát nào rơi vào `SceneManager`/`AnimationController` trong vòng lặp render — toàn bộ mẫu cấp
-   phát của lần chạy nằm trong `GLBLoader.load` (nạp asset một lần lúc khởi động). Vì lấy mẫu theo tốc
-   độ cấp phát (TLAB refill) chứ không theo thời gian, đây là tín hiệu thật cho "thấp hơn hẳn pha nạp
-   asset", **không** phải chứng minh "0 cấp phát tuyệt đối" (có thể bỏ sót cấp phát nhỏ/hiếm). Số liệu
-   đầy đủ + giới hạn phép đo ở [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md).
+1. **Tham số cuối của `ShaderProgram.setUniformMatrix4fv(name, buffer, offset, count)` là TỔNG SỐ
+   FLOAT, không phải số ma trận.** Đoán theo đúng chữ ký `glUniformMatrix4fv` gốc của OpenGL (count =
+   số ma trận) là SAI cho wrapper Java này — truyền `RIG_BONE_COUNT` (11) thay vì `boneMatrices.length`
+   (176) chỉ nạp 11/176 float đầu, phần còn lại giữ nguyên 0 từ mảng CPU, sụp ma trận skin của hầu hết
+   xương về ma trận không, và nhân vật **biến mất hoàn toàn** — không log, không exception, chỉ là
+   một khung hình trống.
+2. **Đừng nhân thêm `u_worldTrans` sau khi skin.** `Renderable.bones[i]` do gdx-gltf tính
+   (`Node#calculateBoneTransforms`) đã LÀ world space — mỗi `jointNode.globalTransform` tự nó nhân
+   dồn từ gốc `ModelInstance.transform` (root) xuống rồi. Nhân thêm `u_worldTrans` (chính là root
+   transform đó) sau khi skin là áp gấp đôi phép xoay Y-up→Z-up: nhân vật lộn ngược và méo hẳn hình,
+   lại không hề lỗi biên dịch hay runtime — chỉ sai hình. Sửa bằng cách bỏ hẳn `u_worldTrans` khỏi
+   pipeline vị trí/pháp tuyến của phần skin (xem GLSL trong `CelBodyShader`/`CelOutlineShader`).
 
-⚠️ **Shader phải viết cho cả OpenGL ES** (Android) — cú pháp GLSL khác desktop. Test trên Android sớm,
-không để tới cuối.
+📌 **Phát hiện thêm lúc chạy thật**: material xuất từ pipeline art đều đánh dấu `"doubleSided": true`
+(đo từ JSON của `.glb`, cả 2 material mỗi file) — `CelBodyShader` tôn trọng đúng cờ đó
+(`context.setCullFace(GL20.GL_NONE)`) thay vì áp `GL_BACK` mặc định, để không khoét lỗ xuyên phụ
+kiện/tóc mỏng khi xoay góc. Lượt viền (`CelOutlineShader`) vẫn cull `GL_FRONT` như hợp đồng — kỹ
+thuật vỏ lật normal cần đúng một mặt hiện ra, không liên quan tới cờ doubleSided của vật liệu gốc.
+
+📌 **Phát hiện lúc chạy thật, không có trong mô tả hợp đồng ban đầu**: mở thật các file
+`assets/exported/models/med/char_*.glb` (parse JSON chunk, không đoán) cho thấy **một file `.glb`
+nhân vật trộn cả hai loại mesh** — 4 mesh primitive mỗi file, nhưng chỉ **một** (thân người) có
+`TEXCOORD_0` + `baseColorTexture`; ba primitive còn lại (phụ kiện — VD "Gourd" của hệ Thuỷ) chỉ có
+`baseColorFactor` phẳng, không UV. `CelBodyShader` chọn bảng ramp VÀ nguồn màu (texture hay factor)
+theo **material của từng primitive lúc render**, không theo cả file. Xem
+`CelShadingConstants.FLAT_SHADE_STEPS` (đáy 0.55, khớp `kage_sprite_render.SHADE_STEPS[3]`).
+
+**Ba thứ chỉ biết được khi chạy thật — đã đo, câu trả lời thật:**
+
+1. **Độ dày viền quy đổi thế nào sang world unit khi camera zoom.** Runtime hiện **không có khái
+   niệm zoom**: `CharacterModelRenderer.CAMERA_DISTANCE` là hằng số (20), và kích thước ống nhìn
+   ortho lấy world unit cố định từ `FitViewport` (§4.2), không tính theo khung hình riêng từng nhân
+   vật như lúc render art (`add_inverted_hull_outline()` quy đổi qua `ortho_scale`/`resolution_x`
+   của MỘT camera fit-theo-khung, `kage_text3d_kit.py:600`). Vì vậy một **hằng số world-unit cố
+   định** (`CelShadingConstants.OUTLINE_THICKNESS_WORLD_UNITS = 0.012`) là lựa chọn đúng cho hiện
+   trạng — không có gì để "quy đổi theo zoom" vì không có zoom. Giá trị 0.012 hiệu chỉnh bằng mắt qua
+   ảnh chụp thật (nhìn rõ ở cả khung nhìn cận và khung nhìn gameplay thật `VIEWPORT_HEIGHT_UNITS=10`).
+   Nếu sau này có zoom thật, độ dày phải chia cho hệ số zoom để giữ bề rộng không đổi trên màn hình —
+   cùng công thức khâu art đã dùng.
+2. **`SceneManager`/`ModelBatch` có cho chèn lượt vẽ thứ hai gọn không, hay phải tự quản
+   `ShaderProgram`?** KHÔNG gọn — `SceneManager.render()` là một lượt vẽ nguyên khối qua một
+   `ShaderProvider` duy nhất, không có điểm chèn lượt thứ hai mà không fork nội bộ nó.
+   `CharacterModelRenderer` bỏ `SceneManager` khỏi đường VẼ (kể cả bookkeeping Scene — dùng thẳng
+   `com.badlogic.gdx.utils.Array<Scene>` của riêng nó để tránh 2 nguồn sự thật) và tự quản **2**
+   `ModelBatch` thô, mỗi cái một `ShaderProvider` tự viết. `net.mgsx.gltf.scene3d.scene.Scene`/
+   `SceneAsset`/`GLBLoader` của gdx-gltf **vẫn giữ nguyên** cho nạp asset + skin/animation bookkeeping
+   — chỉ RENDER là tự quản, không phải toàn bộ pipeline. Vì `Scene#update()` (không phải
+   `SceneManager`) mới là thứ chạy `AnimationController`, bỏ `SceneManager` **không** đụng tới
+   animation (§11.1) — xác nhận bằng benchmark thật chạy lại sau khi hoà cả hai việc.
+3. 🟡 `AnimationController` cấp phát bao nhiêu mỗi khung (§16) — **trả lời một phần**: phép đo JFR
+   gốc (`jdk.ObjectAllocationSample`, 2026-08-08) chạy TRƯỚC khi cel shader và animation clip được
+   hoà vào nhau — ở thời điểm đó chưa có clip nào thật sự phát (chỉ bind pose tĩnh) và vẫn còn dùng
+   `SceneManager` gốc. Kết quả: qua 6000 khung/20 nhân vật, KHÔNG bắt được mẫu cấp phát nào rơi vào
+   `SceneManager`/`AnimationController` trong vòng lặp render — toàn bộ mẫu cấp phát nằm trong
+   `GLBLoader.load` (nạp asset một lần lúc khởi động). Sau khi hoà cả cel shader (bỏ `SceneManager`)
+   lẫn animation clip thật (`setAnimation`/`animate` gọi thật ở `addCharacter`/one-shot), benchmark
+   được chạy lại **chức năng** (không crash, không exception qua 6000 khung, animation loop `idle`
+   chạy hết) nhưng **chưa phân tích lại mẫu JFR riêng cho bản hoà cuối** — số liệu p95 (0.52ms) đã
+   cập nhật, nhưng câu trả lời cấp phát vẫn dựa trên phép đo TRƯỚC khi hoà. Vì lấy mẫu theo tốc độ cấp
+   phát (TLAB refill) chứ không theo thời gian, đây là tín hiệu thật cho "thấp hơn hẳn pha nạp asset",
+   **không** phải chứng minh "0 cấp phát tuyệt đối". Số liệu đầy đủ + giới hạn phép đo ở
+   [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md).
+
+⚠️ **Shader phải viết cho cả OpenGL ES** (Android) — cú pháp GLSL khác desktop. GLSL viết theo phong
+cách ES 1.00 (không `#version`, `attribute`/`varying`, `gl_FragColor`) — cùng quy ước mọi shader mặc
+định của libGDX dùng, chạy được cả desktop GL lẫn ES mà không cần rẽ nhánh theo platform. **Chưa test
+trên thiết bị/emulator Android thật** trong lát cắt này — môi trường triển khai không có Android SDK
+kết nối thiết bị. Việc còn thiếu là test thật, không phải cú pháp.
+
+📌 **Xác nhận đã nhìn thấy chạy thật**: ảnh chụp `Lwjgl3Application` thật (không phải mô phỏng) qua
+một harness tạm dựng `CharacterModelRenderer` trực tiếp (bỏ qua server/login, gọi thẳng API public)
+cho thấy nhân vật hiện ra đúng hướng, có texture body cùng bảng ramp bậc thang (thấy rõ ranh giới
+sáng-tối, không mượt), và đường viền đen quanh silhouette — cả ở khung nhìn cận lẫn khung nhìn
+gameplay thật (`VIEWPORT_HEIGHT_UNITS=10`). Harness đó KHÔNG committed (chỉ để xác minh). Đây là xác
+nhận cho **cel shader**; xác nhận bằng mắt cho **chuyển đổi clip animation** vẫn còn mở (§11.1).
 
 ---
 
@@ -553,10 +649,12 @@ Với map lớn nhiều entity: cân nhắc **spatial partition** (grid đơn gi
 ⚠️ **Nhưng**: đừng làm spatial partition ở MVP nếu chưa đo thấy cần (Điều 30). Kiểm tra tuyến tính vài
 trăm entity là rất rẻ.
 
-⚠️ **Culling đắt hơn ở nhánh 3D.** Một nhân vật ngoài màn hình mà vẫn nằm trong `SceneManager` thì tốn
-cả cập nhật xương lẫn nộp `Renderable`, chứ không chỉ một quad bị bỏ như thời sprite. Hiện
-`CharacterModelRenderer` **chưa cull gì cả** — mọi `Scene` đã thêm đều được cập nhật mỗi khung. Chấp
-nhận được ở quy mô hiện tại; phải xem lại **cùng lúc** với phép đo frame time ở §6.5 mục 6.
+⚠️ **Culling đắt hơn ở nhánh 3D.** Một nhân vật ngoài màn hình mà vẫn nằm trong danh sách vẽ thì tốn
+cả cập nhật xương lẫn nộp `Renderable` — **gấp đôi** từ 2026-08-08 vì mỗi `Scene` giờ vẽ **2 lượt**
+(viền + thân, §12.2), không chỉ một quad bị bỏ như thời sprite. Hiện `CharacterModelRenderer` **chưa
+cull gì cả** — mọi `Scene` đã thêm đều được cập nhật VÀ vẽ cả 2 lượt mỗi khung. Đã đo với 20 nhân vật
++ cả 2 lượt vẽ (§6.5 mục 6, [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md)) — vẫn trong ngân sách ở
+quy mô hiện tại, culling chưa cần thiết.
 
 ---
 
@@ -599,7 +697,7 @@ tuyệt đối (lấy mẫu theo tốc độ cấp phát, có thể bỏ sót c�
 | 7 | Particle **bắt buộc pool** + giới hạn số lượng | Mobile | Accepted |
 | 8 | Không spatial partition ở MVP cho tới khi đo thấy cần | Điều 30 | Accepted |
 | 9 | **`FitViewport`** — ảnh hưởng công bằng PvP | Là quyết định gameplay | ✅ [ADR-020](../01-architecture/adr/ADR-020-Viewport-Strategy.md) Accepted (2026-08-01) |
-| 10 | **Cel shader + viền inverted hull là BẮT BUỘC cho nhánh 3D** (§12.2) | Model xuất ra cố tình không mang vẻ ngoài cel | **Chốt** theo ADR-031; GLSL **chưa viết** — code đang dùng ánh sáng mặc định gdx-gltf |
+| 10 | **Cel shader + viền inverted hull là BẮT BUỘC cho nhánh 3D** (§12.2) | Model xuất ra cố tình không mang vẻ ngoài cel | **Chốt** theo ADR-031; ✅ **GLSL đã viết** (2026-08-08) — `CelOutlineShader`/`CelBodyShader`, đã nhìn thấy chạy thật |
 | 11 | Viền làm bằng **hình học** (vỏ lật normal), không phải hậu kỳ theo cạnh | Hậu kỳ vẽ viền cho cả cảnh; ta chỉ muốn viền quanh nhân vật. Đổi lại: chi phí vẽ **gấp đôi** số tam giác | **Chốt** — đã chứng minh ở khâu art |
 | 12 | **Không port `add_far_shade()`** sang runtime | Giả chiều sâu cho một góc nhìn cố định — sai khi nhân vật xoay được | **Chốt** |
 | 13 | Góc camera là **hằng số runtime** (§4.1); giá trị hiện tại yaw 35° / pitch 30° | Đổi góc = đổi 1 hằng số thay vì render lại toàn bộ; 35° là góc nghiệm thu đã duyệt | **Chốt** cơ chế — con số để ngỏ |
@@ -639,12 +737,17 @@ ngoại lệ cần chủ dự án: thêm trường mô tả ngoại hình vào `
 1. 🔴 **Nhìn thấy nhánh 3D chạy thật** — chạy pipeline art sinh `.glb` vào `assets/exported/models/med/`
    rồi mở client và xác nhận model hiện ra thay vì hình hộp (§6.1). Chưa làm bước này thì mọi mục dưới
    đều không đo được.
-2. 🔴 **Viết GLSL cel + lượt vẽ viền** theo hợp đồng §12.2, rồi trả lời ba câu hỏi runtime ở cuối mục đó.
+2. ✅ **Viết GLSL cel + lượt vẽ viền** theo hợp đồng §12.2 — xong 2026-08-08, ba câu hỏi runtime ở
+   cuối mục đó đã có câu trả lời thật (câu hỏi #3 — cấp phát `AnimationController` — chỉ trả lời một
+   phần, xem §12.2). Còn mở: test trên thiết bị/emulator Android thật (chỉ viết GLSL kiểu
+   ES-tương-thích, chưa chạy thử trên GPU ES thật).
 3. ✅ **Đo frame time với 20 nhân vật trên màn — xong 2026-08-08** —
    [ART-PIPELINE §4.4](../14-art/ART-PIPELINE.md): xa dưới ngưỡng 8ms của Revisit Trigger #1 (ADR-031),
-   kèm giới hạn thật (chưa cel shader/viền §12.2, chưa có máy tham chiếu chính thức). **Cấp phát mỗi
-   khung** của `SceneManager`/`AnimationController` (§16) đo bằng JFR — 🟡 trả lời một phần, không phải
-   bằng chứng "0 cấp phát" tuyệt đối, xem §12.2 mục 3 và ART-PIPELINE §4.4.
+   kèm giới hạn thật (chưa có máy tham chiếu chính thức). Số đo lại **sau khi hoà cel shader (mục 2) +
+   animation (mục 4)**: p95 0.52ms (2 lượt vẽ/nhân vật thay vì 1), vẫn xa dưới ngưỡng. **Cấp phát mỗi
+   khung** của `AnimationController` (§16) đo bằng JFR TRƯỚC khi hoà — 🟡 trả lời một phần, không phải
+   bằng chứng "0 cấp phát" tuyệt đối, và chưa đo lại JFR riêng cho bản đã hoà, xem §12.2 mục 3 và
+   ART-PIPELINE §4.4.
 4. ✅ **Nối trạng thái gameplay → clip animation** (§11.1) — 2026-08-08. `CharacterAnimationClips`
    (vận tốc → idle/run, thuần hàm) + `RemoteMotionTracker` (suy di chuyển của người khác từ độ lệch vị
    trí, không có field vận tốc trong giao thức) + `CombatAnimationTrigger` (attack/hit/skill_cast/die

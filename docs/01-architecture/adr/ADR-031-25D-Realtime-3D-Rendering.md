@@ -133,6 +133,12 @@ không phải Android) ở [ART-PIPELINE §4.4](../../14-art/ART-PIPELINE.md). *
 hoàn toàn"** — biên độ an toàn lớn (>25 lần) nhưng máy tham chiếu thật của dự án vẫn chưa được chủ dự
 án chốt spec; đây là số liệu thật đầu tiên để tham khảo, không phải lời tuyên bố cuối cùng thay chủ dự án.
 
+**Cập nhật cùng ngày (2026-08-08), sau khi cel shader/viền (RENDERING §12.2) hoà vào cùng bản:** đo lại
+trên chính máy đó — **p95 0,52 ms**, tăng đúng bằng việc thêm lượt vẽ viền (2 lượt/nhân vật thay vì 1)
+như dự đoán ở giới hạn thứ hai phía trên, vẫn dưới ngưỡng 8 ms hơn 15 lần. Giới hạn "chưa có cel
+shader/viền" coi như đóng; 3 giới hạn còn lại (máy tham chiếu, culling, Android) vẫn mở nguyên. Chi
+tiết ở [ART-PIPELINE §4.4](../../14-art/ART-PIPELINE.md).
+
 ---
 
 ## Technical Decisions

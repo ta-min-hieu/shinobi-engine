@@ -5,17 +5,16 @@ import java.util.Map;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.files.FileHandle;
-import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.g3d.ModelBatch;
 import com.badlogic.gdx.graphics.g3d.utils.AnimationController;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Disposable;
 import net.mgsx.gltf.loaders.glb.GLBLoader;
-import net.mgsx.gltf.scene3d.lights.DirectionalLightEx;
 import net.mgsx.gltf.scene3d.scene.Scene;
 import net.mgsx.gltf.scene3d.scene.SceneAsset;
-import net.mgsx.gltf.scene3d.scene.SceneManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +29,15 @@ import org.slf4j.LoggerFactory;
  * phải phòng thủ thừa: model nằm ở {@code assets/exported/models/}, sinh ra từ pipeline art và
  * <b>không commit</b> ([ART-PIPELINE §7](docs/14-art/ART-PIPELINE.md)), nên một bản checkout sạch
  * chưa chạy pipeline sẽ không có chúng. Crash lúc khởi động ở trường hợp đó là sai.
+ *
+ * <p><b>Không dùng {@code SceneManager.render()}</b> (RENDERING.md §12.2 câu hỏi runtime #2) —
+ * {@code SceneManager} chỉ vẽ MỘT lượt bằng một {@code ShaderProvider} duy nhất, không có điểm chèn
+ * lượt vẽ thứ hai cho viền inverted-hull mà không fork nội bộ nó. Lớp này tự quản 2
+ * {@link ModelBatch} thô ({@link #outlineBatch}, {@link #bodyBatch}), mỗi cái một
+ * {@code ShaderProvider} riêng ({@link CelOutlineShaderProvider}, {@link CelBodyShaderProvider}), và
+ * tự lặp {@link #scenes} hai lần mỗi khung. Animation KHÔNG phụ thuộc {@code SceneManager} — chính
+ * {@link Scene#update} (gọi ở {@link #updateScenes}) mới là thứ chạy {@code AnimationController} bên
+ * trong, {@code SceneManager.update()} nguyên bản chỉ lặp gọi đúng method đó cho từng Scene đã đăng ký.
  */
 public final class CharacterModelRenderer implements Disposable {
 
@@ -75,32 +83,37 @@ public final class CharacterModelRenderer implements Disposable {
      */
     private static final float CLIP_TRANSITION_SECONDS = 0.15f;
 
-    private final SceneManager sceneManager;
     private final OrthographicCamera camera;
+    private final ModelBatch outlineBatch;
+    private final ModelBatch bodyBatch;
     private final Map<String, SceneAsset> assetsByKey = new HashMap<>();
     private final Map<Long, Scene> scenesByCharacter = new HashMap<>();
     private final Map<Long, AnimationState> animationStateByCharacter = new HashMap<>();
+    /**
+     * Danh sách vẽ song song với {@link #scenesByCharacter}, đồng bộ ở {@link #addCharacter}/
+     * {@link #removeCharacter}. Riêng vì {@code render()} lặp nó MỖI KHUNG (2 lượt vẽ + 1 lượt
+     * update) — lặp {@code java.util.Map#values()} bằng for-each cấp phát một {@code Iterator} MỚI
+     * mỗi lần gọi {@code .iterator()} (hành vi chuẩn của {@code java.util.HashMap}), phạm luật cấm
+     * allocation mỗi khung (/CLAUDE.md §6, RENDERING.md §16). {@code com.badlogic.gdx.utils.Array}
+     * lặp bằng chỉ số (for cổ điển) nên không cấp phát gì.
+     */
+    private final Array<Scene> scenes = new Array<>();
+
     private final Vector3 target = new Vector3();
     private boolean enabled = true;
 
     public CharacterModelRenderer() {
-        this.sceneManager = new SceneManager();
         this.camera = new OrthographicCamera();
         // Ống nhìn phải bao được cả nhân vật lẫn mặt đất phía sau nó. Orthographic nên near có thể
         // âm; để dương và lùi camera ra xa cho dễ suy luận.
         this.camera.near = 0.1f;
         this.camera.far = CAMERA_DISTANCE * 2f;
         applyLockedAngle();
-        sceneManager.setCamera(camera);
-
-        DirectionalLightEx key = new DirectionalLightEx();
-        // Chiếu từ trên-trước-phải, cùng hướng key light dùng lúc nghiệm thu art
-        // (kage_sprite_render.setup_scene) — để vẻ ngoài trong game khớp ảnh đã duyệt.
-        key.direction.set(-1f, -3f, -1f).nor();
-        key.color.set(Color.WHITE);
-        key.intensity = 3f;
-        sceneManager.environment.add(key);
-        sceneManager.setAmbientLight(0.6f);
+        // Ánh sáng KHÔNG còn nạp qua Environment/DirectionalLightEx của gdx-gltf PBR nữa — cel
+        // shader đọc thẳng CelShadingConstants.LIGHT_DIRECTION qua uniform (RENDERING.md §13, §12.2
+        // câu hỏi runtime #2). Cùng giá trị hướng sáng cũ, chỉ đổi chỗ đọc.
+        this.outlineBatch = new ModelBatch(new CelOutlineShaderProvider());
+        this.bodyBatch = new ModelBatch(new CelBodyShaderProvider());
     }
 
     /**
@@ -157,7 +170,7 @@ public final class CharacterModelRenderer implements Disposable {
         // transform và trạng thái animation riêng, còn mesh/texture chỉ nạp một lần.
         Scene scene = new Scene(asset.scene);
         scenesByCharacter.put(characterId, scene);
-        sceneManager.addScene(scene);
+        scenes.add(scene);
         // Tư thế ban đầu là idle, đặt thẳng (không crossfade) vì chưa có gì để chuyển tiếp từ đó —
         // tránh model đứng bind pose tĩnh (§6.5 mục 3 của RENDERING.md, giờ đã nối).
         scene.animationController.setAnimation(CharacterAnimationClips.IDLE, -1);
@@ -167,7 +180,7 @@ public final class CharacterModelRenderer implements Disposable {
     public void removeCharacter(long characterId) {
         Scene scene = scenesByCharacter.remove(characterId);
         if (scene != null) {
-            sceneManager.removeScene(scene);
+            scenes.removeValue(scene, true); // so sánh bằng ==, đúng vì mỗi Scene là 1 instance riêng
         }
         animationStateByCharacter.remove(characterId);
     }
@@ -311,18 +324,49 @@ public final class CharacterModelRenderer implements Disposable {
         if (!enabled) {
             return;
         }
-        sceneManager.update(deltaTime);
-        sceneManager.render();
+        updateScenes(deltaTime);
+
+        // Lượt 1 — viền: PHẢI vẽ trước lượt thân. Vỏ đẩy ra ngoài lớn hơn thân nên depth test (LEQUAL,
+        // mặc định) tự để thân đè lên phần viền nằm trong silhouette; chỉ còn lại đúng viền rìa ngoài
+        // (RENDERING.md §12.2).
+        outlineBatch.begin(camera);
+        for (int i = 0; i < scenes.size; i++) {
+            outlineBatch.render(scenes.get(i).modelInstance);
+        }
+        outlineBatch.end();
+
+        bodyBatch.begin(camera);
+        for (int i = 0; i < scenes.size; i++) {
+            bodyBatch.render(scenes.get(i).modelInstance);
+        }
+        bodyBatch.end();
+    }
+
+    /**
+     * Chạy {@code AnimationController} (bên trong {@link Scene#update}) VÀ ép tính lại transform
+     * xương mỗi khung. {@code Scene#update} một mình đủ để advance animation, nhưng gọi tường minh
+     * {@code calculateTransforms()} ở đây đảm bảo thay đổi {@code transform} gốc từ
+     * {@link #setCharacterPosition} luôn lan tới ma trận xương trong CÙNG khung hình — rẻ (1 mesh,
+     * {@value CelShadingConstants#RIG_BONE_COUNT} xương), không cấp phát, an toàn thừa còn hơn thiếu.
+     */
+    private void updateScenes(float deltaTime) {
+        for (int i = 0; i < scenes.size; i++) {
+            Scene scene = scenes.get(i);
+            scene.update(camera, deltaTime);
+            scene.modelInstance.calculateTransforms();
+        }
     }
 
     @Override
     public void dispose() {
-        sceneManager.dispose();
+        outlineBatch.dispose();
+        bodyBatch.dispose();
         for (SceneAsset asset : assetsByKey.values()) {
             asset.dispose();
         }
         assetsByKey.clear();
         scenesByCharacter.clear();
+        scenes.clear();
         animationStateByCharacter.clear();
     }
 
