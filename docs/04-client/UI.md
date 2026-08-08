@@ -40,24 +40,27 @@
 
 ## 3. Cấu trúc UI
 
+**Thực tế đã code** (2026-08-08, HUD combat + Login/CharacterSelect — lệch vài chỗ so với bản kế
+hoạch ban đầu, ghi lại đúng thực tế thay vì sửa code cho khớp doc cũ):
+
 ```
-client-core/ui/
-├── theme/
-│   ├── KageSkin.java           ← load skin, font
-│   └── UiConstants.java        ← khoảng cách, kích thước chuẩn
-├── widget/                     ← widget tái sử dụng
-│   ├── HealthBar.java
-│   ├── ItemSlot.java
-│   ├── CooldownIcon.java
-│   └── ...
-├── screen/                     ← màn hình đầy đủ
-│   ├── LoginScreenUi.java
-│   └── CharacterSelectUi.java
-└── hud/                        ← overlay khi đang chơi
-    ├── PlayerStatusHud.java
-    ├── SkillBarHud.java
-    └── ChatHud.java
+client-core/
+├── ui/
+│   ├── theme/
+│   │   ├── KageSkin.java        ← Skin thủ tục (mảng màu phẳng, chưa có atlas UI thật)
+│   │   └── KageI18n.java        ← nạp I18NBundle dùng chung (Login/CharacterSelect/CombatHud)
+│   ├── widget/
+│   │   └── HealthBar.java       ← ItemSlot/CooldownIcon CHƯA làm, chưa có consumer thật
+│   └── hud/
+│       └── CombatHud.java       ← gộp PlayerStatusHud+SkillBarHud (1 skill duy nhất, chưa
+│                                    tách — tách khi HUD có thêm bề mặt). ChatHud CHƯA làm.
+└── screen/                      ← GameScreen thật (KageEngine.setScreen), không nằm trong ui/
+    ├── LoginScreen.java         ← không phải "LoginScreenUi"
+    └── CharacterSelectScreen.java
 ```
+
+`UiConstants.java` chưa cần — 2 màn hình + 1 HUD hiện tại chưa đủ lặp lại số đo để đáng tách hằng
+số riêng (Điều 30, tránh abstraction thừa trước nhu cầu thật).
 
 ---
 
@@ -231,6 +234,12 @@ if (current != lastHp) {
 
 ## Việc cần làm tiếp theo
 
-1. **Phase 1: test font tiếng Việt có dấu** (§7) — phát hiện muộn sẽ phải đổi toàn bộ asset font.
-2. Chốt mobile-first hay desktop-first → mở khoá §6 và ADR-023.
-3. Xác lập hạ tầng i18n (§7) ngay Phase 1, kể cả khi chỉ có 1 ngôn ngữ.
+1. ✅ **Test font tiếng Việt có dấu** (§7) — `FontFactoryVietnameseGlyphTest`, xong từ Phase 1 (xác
+   nhận độc lập lại 2026-08-02). `LoginScreen`/`CharacterSelectScreen`/`CombatHud` (2026-08-08) là
+   consumer thật đầu tiên, render đúng ("Hỏa Cầu", "Hình nộm luyện tập"...).
+2. Chốt mobile-first hay desktop-first → mở khoá §6 và ADR-023. Vẫn CHƯA chốt — 2 màn hình +
+   HUD hiện tại (§3) mới build cho desktop, chưa test `uiScale()`/vùng chạm 48dp trên mobile thật.
+3. ✅ **Hạ tầng i18n** (§7) — `KageI18n`/`I18NBundle` + `strings_vi.properties`/`strings_en.properties`,
+   dùng thật trong cả 3 màn hình từ 2026-08-08. `strings_en.properties` có sẵn key nhưng CHƯA có
+   cách đổi ngôn ngữ lúc chạy (bundle Locale hard-code `vi`) — mục "MVP có tiếng Anh?" ở §7 vẫn
+   ⏳ chưa chốt.
