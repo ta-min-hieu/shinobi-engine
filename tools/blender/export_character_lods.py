@@ -60,7 +60,10 @@ def export_lods(source, armature, extras, asset_key, out_dir):
     tri_counts, byte_counts = {}, {}
     for tier, (budget, texture_px) in sorted(TIERS.items()):
         working = _copy_of(source, "{0}_{1}".format(source.name, tier))
-        _, after = t3d.decimate(working, budget)
+        # The budget in TIERS is the shipped TOTAL (ART-PIPELINE §4.4), extras included — decimate
+        # the body to budget minus what the un-decimated extras already cost, so body + extras
+        # lands back on budget instead of budget + extras.
+        _, after = t3d.decimate(working, budget - extra_triangles)
         path = os.path.join(out_dir, tier, asset_key + ".glb")
         byte_counts[tier] = t3d.export_gltf(
             path, working, armature, extras=extras, texture_px=texture_px)
