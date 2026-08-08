@@ -51,7 +51,11 @@ public final class DesktopLauncher {
         KageEngine engine = new KageEngine(
                 platform,
                 kageEngine -> new WorldScreen(
-                        kageEngine.services().get(EcsWorld.class), inputMapper, connection, selected.faction()));
+                        kageEngine.services().get(EcsWorld.class),
+                        inputMapper,
+                        connection,
+                        selected.faction(),
+                        selected.characterId()));
 
         new Lwjgl3Application(engine, config);
     }

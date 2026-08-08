@@ -176,6 +176,15 @@ public final class CharacterModelRenderer implements Disposable {
         camera.update();
     }
 
+    /**
+     * Ma trận chiếu kết hợp của camera 3D — cho {@code WorldScreen} vẽ thêm hình phẳng (VD hộp
+     * quái, chưa có model 3D) khớp đúng không gian chiếu với nhân vật thay vì dùng camera 2D phẳng
+     * không liên quan tới góc nhìn đã khoá.
+     */
+    public Matrix4 combined() {
+        return camera.combined;
+    }
+
     public void render(float deltaTime) {
         if (!enabled) {
             return;

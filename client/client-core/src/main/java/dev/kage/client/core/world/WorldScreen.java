@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -18,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import dev.kage.client.core.input.GameAction;
 import dev.kage.client.core.input.InputMapper;
 import dev.kage.client.core.net.GameConnection;
+import dev.kage.client.core.ui.hud.CombatHud;
 import dev.kage.engine.core.GameScreen;
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.EcsWorld;
@@ -25,14 +27,21 @@ import dev.kage.engine.ecs.KEntity;
 import dev.kage.engine.ecs.component.PositionComponent;
 import dev.kage.engine.ecs.component.VelocityComponent;
 import dev.kage.engine.ecs.system.MovementSystem;
+import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.CostumeTier;
 import dev.kage.protocol.Faction;
+import dev.kage.protocol.MonsterDespawnedEvent;
+import dev.kage.protocol.MonsterMovedEvent;
+import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.SetTargetCommand;
+import dev.kage.protocol.SkillResultEvent;
+import dev.kage.protocol.UseSkillCommand;
 import dev.kage.protocol.wire.PacketCodec;
 
 /**
@@ -69,6 +78,9 @@ public final class WorldScreen implements GameScreen {
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
     private final CharacterModelRenderer models = new CharacterModelRenderer();
 
+    private final CombatHudController combatHudController;
+    private final CombatHud combatHud = new CombatHud();
+
     private float lastSentDirX;
     private float lastSentDirY;
 
@@ -76,11 +88,16 @@ public final class WorldScreen implements GameScreen {
      * @param localFaction hệ phái của CHÍNH người chơi, lấy từ {@code CharacterSummary} lúc chọn
      *     nhân vật — server không gửi {@link CharacterSpawnedEvent} cho chính mình (đã có
      *     {@code MoveResponse}), nên đây là nguồn duy nhất để biết phải vẽ mình bằng model nào.
+     * @param characterId id nhân vật thật của chính mình (từ {@code CharacterSummary}) — cần để
+     *     nhận ra {@link AttackResultEvent}/{@link SkillResultEvent} nào đang nhắm vào MÌNH thay vì
+     *     quái ({@link #LOCAL_CHARACTER_ID} chỉ là sentinel nội bộ cho render, không phải id thật).
      */
-    public WorldScreen(EcsWorld world, InputMapper inputMapper, GameConnection connection, Faction localFaction) {
+    public WorldScreen(
+            EcsWorld world, InputMapper inputMapper, GameConnection connection, Faction localFaction, long characterId) {
         this.world = world;
         this.inputMapper = inputMapper;
         this.connection = connection;
+        this.combatHudController = new CombatHudController(characterId);
         this.viewport =
                 new FitViewport(WorldConstants.VIEWPORT_HEIGHT_UNITS, WorldConstants.VIEWPORT_HEIGHT_UNITS, camera);
 
@@ -96,18 +113,34 @@ public final class WorldScreen implements GameScreen {
         // khác nhìn thấy mình giống nhau.
         models.addCharacter(
                 LOCAL_CHARACTER_ID, CharacterModelKey.of(localFaction, CostumeTier.COSTUME_TIER_UNSPECIFIED));
+
+        combatHud.setOnSkillClicked(this::onSkillButtonClicked);
+    }
+
+    @Override
+    public void show() {
+        // Input di chuyển vẫn poll qua InputMapper (không đổi) — HUD combat là actor Scene2D đầu
+        // tiên của client, chưa ai khác đăng ký InputProcessor nên không tranh chấp.
+        Gdx.input.setInputProcessor(combatHud.stage());
+    }
+
+    @Override
+    public void hide() {
+        Gdx.input.setInputProcessor(null);
     }
 
     @Override
     public void resize(int width, int height) {
         viewport.update(width, height, true);
         models.resize(camera.viewportWidth, camera.viewportHeight);
+        combatHud.resize(width, height);
     }
 
     @Override
     public void fixedUpdate(float fixedDeltaTime) {
         processInboundPackets();
         updateLocalMovementIntent();
+        combatHudController.tick(fixedDeltaTime);
     }
 
     private void processInboundPackets() {
@@ -129,6 +162,16 @@ public final class WorldScreen implements GameScreen {
                 onCharacterMoved(CharacterMovedEvent.parseFrom(payload));
             } else if (opcode == Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE) {
                 onCharacterDespawned(CharacterDespawnedEvent.parseFrom(payload));
+            } else if (opcode == Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE) {
+                onMonsterSpawned(MonsterSpawnedEvent.parseFrom(payload));
+            } else if (opcode == Opcode.OPCODE_MONSTER_DESPAWNED_EVENT_VALUE) {
+                combatHudController.onMonsterDespawned(MonsterDespawnedEvent.parseFrom(payload));
+            } else if (opcode == Opcode.OPCODE_MONSTER_MOVED_EVENT_VALUE) {
+                combatHudController.onMonsterMoved(MonsterMovedEvent.parseFrom(payload));
+            } else if (opcode == Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE) {
+                combatHudController.onAttackResult(AttackResultEvent.parseFrom(payload));
+            } else if (opcode == Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE) {
+                combatHudController.onSkillResult(SkillResultEvent.parseFrom(payload));
             }
             // Opcode khác (VD PongResponse của heartbeat) — không thuộc gameplay world, bỏ qua.
         } catch (InvalidProtocolBufferException e) {
@@ -188,6 +231,38 @@ public final class WorldScreen implements GameScreen {
         models.removeCharacter(event.getCharacterId());
     }
 
+    private void onMonsterSpawned(MonsterSpawnedEvent event) {
+        long autoTargetId = combatHudController.onMonsterSpawned(event);
+        if (autoTargetId != 0L) {
+            sendSetTarget(autoTargetId);
+        }
+    }
+
+    private void sendSetTarget(long targetEntityId) {
+        try {
+            SetTargetCommand command =
+                    SetTargetCommand.newBuilder().setTargetEntityId(targetEntityId).build();
+            connection.send(Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, connection.nextSequenceId(), command.toByteArray());
+        } catch (IOException e) {
+            LOG.debug("Gửi SetTargetCommand thất bại (mất kết nối tạm thời)", e);
+        }
+    }
+
+    private void onSkillButtonClicked() {
+        if (!combatHudController.useSkill()) {
+            return; // Chưa đủ điều kiện cục bộ (hồi chiêu/Khí/mục tiêu) — không gửi gì thừa.
+        }
+        try {
+            UseSkillCommand command = UseSkillCommand.newBuilder()
+                    .setSkillCode(CombatConstants.FIREBALL_SKILL_CODE)
+                    .setTargetEntityId(combatHudController.currentTargetId())
+                    .build();
+            connection.send(Opcode.OPCODE_USE_SKILL_COMMAND_VALUE, connection.nextSequenceId(), command.toByteArray());
+        } catch (IOException e) {
+            LOG.debug("Gửi UseSkillCommand thất bại (mất kết nối tạm thời)", e);
+        }
+    }
+
     private void updateLocalMovementIntent() {
         float dirX = 0f;
         float dirY = 0f;
@@ -241,9 +316,48 @@ public final class WorldScreen implements GameScreen {
 
         if (models.isEnabled()) {
             renderModels(alpha);
+            drawMonsters(models.combined());
         } else {
             renderPlaceholderBoxes(alpha);
+            drawMonsters(camera.combined);
         }
+
+        syncCombatHud();
+        combatHud.render(Gdx.graphics.getDeltaTime());
+    }
+
+    /**
+     * Quái CHƯA có model 3D (art pipeline chưa nhắm tới quái) — vẽ hộp phẳng bằng đúng ma trận
+     * chiếu của nhánh render nhân vật đang hoạt động, để không lệch không gian chiếu (ADR-031 #7 —
+     * bài học "đo bằng log thật" cho lệch khung hình áp dụng y hệt ở đây, chỉ khác nguyên nhân).
+     */
+    private void drawMonsters(Matrix4 projection) {
+        Map<Long, CombatHudController.MonsterState> currentMonsters = combatHudController.monsters();
+        if (currentMonsters.isEmpty()) {
+            return;
+        }
+        shapeRenderer.setProjectionMatrix(projection);
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.setColor(Color.SCARLET);
+        for (CombatHudController.MonsterState monster : currentMonsters.values()) {
+            shapeRenderer.rect(
+                    monster.x() - (WorldConstants.BOX_SIZE / 2f),
+                    monster.y() - (WorldConstants.BOX_SIZE / 2f),
+                    WorldConstants.BOX_SIZE,
+                    WorldConstants.BOX_SIZE);
+        }
+        shapeRenderer.end();
+    }
+
+    private void syncCombatHud() {
+        combatHud.setPlayerHp(combatHudController.playerHp(), combatHudController.playerMaxHp());
+        CombatHudController.MonsterState target = combatHudController.targetState();
+        if (target != null) {
+            combatHud.setTarget(target.code(), target.hp(), target.maxHp());
+        } else {
+            combatHud.clearTarget();
+        }
+        combatHud.setSkillReady(combatHudController.canUseSkill());
     }
 
     /** Nhánh 3D (ADR-031) — model glTF qua camera orthographic khoá góc. */
@@ -302,5 +416,6 @@ public final class WorldScreen implements GameScreen {
     public void dispose() {
         shapeRenderer.dispose();
         models.dispose();
+        combatHud.dispose();
     }
 }
