@@ -85,6 +85,16 @@ class SelectCharacterUseCaseTest {
         public void updateFaction(long characterId, Faction faction) {
             throw new UnsupportedOperationException("không dùng trong test này");
         }
+
+        @Override
+        public long addExperience(long characterId, long amount) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public void saveLevel(long characterId, int level) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
     }
 
     @Test

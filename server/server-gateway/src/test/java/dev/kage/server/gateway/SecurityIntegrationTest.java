@@ -34,6 +34,7 @@ import dev.kage.account.domain.Transaction;
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.application.CharacterUseCases;
 import dev.kage.character.application.CreateCharacterUseCase;
+import dev.kage.character.application.GrantExperienceUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.character.application.SelectFactionUseCase;
@@ -136,7 +137,8 @@ class SecurityIntegrationTest {
         meterRegistry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
         GatewayNetworkMetrics networkMetrics = new GatewayNetworkMetrics(meterRegistry);
         GatewayObservability observability = new GatewayObservability(networkMetrics, GatewayTracing.disabled());
-        characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade, networkMetrics);
+        characterRegistry = new ConnectedCharacterRegistry(
+                inventoryFacade, questFacade, ExperienceGrantPort.disabled(), networkMetrics);
         WorldFacade firstChannelFacade = new WorldFacade(characterRegistry);
         firstChannelFacade.start();
         mainWorldChannels = new MainWorldChannelRegistry(characterRegistry, firstChannelFacade, meterRegistry);
@@ -754,6 +756,16 @@ class SecurityIntegrationTest {
             }
 
             @Override
+            public long addExperience(long characterId, long amount) {
+                throw new UnsupportedOperationException("không dùng trong test này");
+            }
+
+            @Override
+            public void saveLevel(long characterId, int level) {
+                throw new UnsupportedOperationException("không dùng trong test này");
+            }
+
+            @Override
             public void updateFaction(long characterId, Faction faction) {
                 // Không dùng ở file này.
             }
@@ -762,8 +774,12 @@ class SecurityIntegrationTest {
         ListCharactersUseCase listUseCase = new ListCharactersUseCase(characterPort);
         SelectCharacterUseCase selectUseCase = new SelectCharacterUseCase(characterPort);
         SelectFactionUseCase selectFactionUseCase = new SelectFactionUseCase(characterPort);
-        CharacterUseCases useCases =
-                new CharacterUseCases(createUseCase, listUseCase, selectUseCase, selectFactionUseCase);
+        CharacterUseCases useCases = new CharacterUseCases(
+                createUseCase,
+                listUseCase,
+                selectUseCase,
+                selectFactionUseCase,
+                new GrantExperienceUseCase(characterPort));
         return new CharacterFacade(useCases, characterPort);
     }
 

@@ -12,6 +12,7 @@ import dev.kage.account.application.LoginOrCreateAccountUseCase;
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.application.CharacterUseCases;
 import dev.kage.character.application.CreateCharacterUseCase;
+import dev.kage.character.application.GrantExperienceUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.character.application.SelectFactionUseCase;
@@ -180,8 +181,12 @@ public final class ServerDatabaseBootstrap {
         ListCharactersUseCase listUseCase = new ListCharactersUseCase(characterPort);
         SelectCharacterUseCase selectUseCase = new SelectCharacterUseCase(characterPort);
         SelectFactionUseCase selectFactionUseCase = new SelectFactionUseCase(characterPort);
-        CharacterUseCases useCases =
-                new CharacterUseCases(createUseCase, listUseCase, selectUseCase, selectFactionUseCase);
+        CharacterUseCases useCases = new CharacterUseCases(
+                createUseCase,
+                listUseCase,
+                selectUseCase,
+                selectFactionUseCase,
+                new GrantExperienceUseCase(characterPort));
         return new CharacterFacade(useCases, characterPort);
     }
 

@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import dev.kage.character.application.CharacterUseCases;
 import dev.kage.character.application.CreateCharacterUseCase;
+import dev.kage.character.application.GrantExperienceUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.character.application.SelectFactionUseCase;
@@ -24,6 +25,7 @@ public final class CharacterFacade {
     private final ListCharactersUseCase listCharactersUseCase;
     private final SelectCharacterUseCase selectCharacterUseCase;
     private final SelectFactionUseCase selectFactionUseCase;
+    private final GrantExperienceUseCase grantExperienceUseCase;
     // loadPosition/savePosition không có nghiệp vụ nào ngoài delegation thuần (characterId đã
     // được validate từ session ở gateway, không cần UseCase riêng chỉ để gọi thẳng Port — 3
     // UseCase còn lại có validate/orchestrate thật, đây thì không).
@@ -34,6 +36,7 @@ public final class CharacterFacade {
         this.listCharactersUseCase = useCases.listCharactersUseCase();
         this.selectCharacterUseCase = useCases.selectCharacterUseCase();
         this.selectFactionUseCase = useCases.selectFactionUseCase();
+        this.grantExperienceUseCase = useCases.grantExperienceUseCase();
         this.characterPort = characterPort;
     }
 
@@ -52,6 +55,16 @@ public final class CharacterFacade {
     /** GDD §4 "chọn hệ ở Lv10" (Phase 8) — {@code characterId} gateway đã verify sở hữu qua session. */
     public Character selectFaction(long characterId, Faction faction) {
         return selectFactionUseCase.execute(characterId, faction);
+    }
+
+    /**
+     * Cộng EXP sau khi hạ gục quái/nhận thưởng (2026-08-09) — trả về trạng thái vạch EXP mới để
+     * gateway phát {@code ExperienceChangedEvent}.
+     *
+     * @param amount {@code <= 0} = chỉ ĐỌC trạng thái hiện tại (dùng lúc vào world, chưa có EXP nào).
+     */
+    public GrantExperienceUseCase.Result grantExperience(long characterId, long amount) {
+        return grantExperienceUseCase.execute(characterId, amount);
     }
 
     public PositionSnapshot loadPosition(long characterId) {

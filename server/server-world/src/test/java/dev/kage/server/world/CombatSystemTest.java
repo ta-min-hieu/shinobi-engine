@@ -15,6 +15,7 @@ import dev.kage.server.world.component.AttackCooldownComponent;
 import dev.kage.server.world.component.CharacterIdComponent;
 import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
+import dev.kage.server.world.component.MonsterIdComponent;
 import dev.kage.server.world.component.StatusEffectComponent;
 import dev.kage.server.world.component.TargetComponent;
 
@@ -32,8 +33,32 @@ class CombatSystemTest {
 
     private static final long ATTACKER_ID = 1L;
     private static final long DEFENDER_ID = 2L;
+    /** ÂM — quái/NPC dùng không gian id âm (combat.proto), khác nhân vật luôn dương. */
+    private static final long MONSTER_ATTACKER_ID = -1L;
 
     private KEntity buildAttacker(EcsWorld world) {
+        KEntity entity = buildAttackerWithoutIdentity(world);
+        CharacterIdComponent id = new CharacterIdComponent();
+        id.characterId = ATTACKER_ID;
+        entity.add(id);
+        return entity;
+    }
+
+    /** Y hệt {@link #buildAttacker} nhưng mang {@link MonsterIdComponent} — quái vẫn TỰ đánh. */
+    private KEntity buildMonsterAttacker(EcsWorld world) {
+        KEntity entity = buildAttackerWithoutIdentity(world);
+        MonsterIdComponent id = new MonsterIdComponent();
+        id.monsterId = MONSTER_ATTACKER_ID;
+        entity.add(id);
+        return entity;
+    }
+
+    /**
+     * Phần chung: chính {@code CharacterIdComponent} vs {@code MonsterIdComponent} là thứ quyết
+     * định có tự đánh hay không (2026-08-09), nên hai builder chỉ được khác nhau đúng ở đó —
+     * {@code KEntity} không có {@code remove()} nên phải tách hàm chứ không gỡ component ra sau.
+     */
+    private KEntity buildAttackerWithoutIdentity(EcsWorld world) {
         KEntity entity = world.createEntity();
         entity.add(new PositionComponent());
         AttackCooldownComponent cooldown = new AttackCooldownComponent();
@@ -49,9 +74,6 @@ class CombatSystemTest {
         stats.critDamageMultiplier = 1.5f;
         stats.element = Element.NONE;
         entity.add(stats);
-        CharacterIdComponent id = new CharacterIdComponent();
-        id.characterId = ATTACKER_ID;
-        entity.add(id);
         entity.add(new StatusEffectComponent());
         return entity;
     }
@@ -76,6 +98,45 @@ class CombatSystemTest {
         return entity;
     }
 
+    /**
+     * Chính là điều chủ dự án phàn nàn 2026-08-09: "mới chọn vào chưa nhấn nút đánh mà quái đã mất
+     * hp". Nhân vật KHÔNG được tự đánh dù đã có mục tiêu, trong tầm, hết cooldown.
+     */
+    @Test
+    void shouldNotAttack_whenCharacterHasTargetButNeverRequestedAttack() {
+        EcsWorld world = new EcsWorld();
+        KEntity attacker = buildAttacker(world);
+        KEntity defender = buildDefender(world, true);
+        Map<Long, KEntity> byId = Map.of(ATTACKER_ID, attacker, DEFENDER_ID, defender);
+        CombatSystem combatSystem = new CombatSystem(byId::get);
+        world.addSystem(combatSystem);
+
+        for (int tick = 0; tick < 300; tick++) { // 5 giây ở 60Hz — thừa sức qua nhiều lần cooldown
+            world.update(1f / 60f);
+        }
+
+        assertThat(combatSystem.drainResults()).isEmpty();
+        assertThat(HEALTH.get(defender).current).isEqualTo(100);
+    }
+
+    /**
+     * Mặt kia của cùng một quyết định: QUÁI vẫn tự đánh. Bỏ auto cho cả hai phía là không con nào
+     * đánh người chơi nữa — người chơi bất tử, không phải điều chủ dự án yêu cầu.
+     */
+    @Test
+    void shouldStillAutoAttack_whenAttackerIsMonster() {
+        EcsWorld world = new EcsWorld();
+        KEntity attacker = buildMonsterAttacker(world);
+        KEntity defender = buildDefender(world, true);
+        Map<Long, KEntity> byId = Map.of(MONSTER_ATTACKER_ID, attacker, DEFENDER_ID, defender);
+        CombatSystem combatSystem = new CombatSystem(byId::get);
+        world.addSystem(combatSystem);
+
+        world.update(0.016f);
+
+        assertThat(combatSystem.drainResults()).hasSize(1);
+    }
+
     @Test
     void shouldAlwaysMissAutoAttack_whenDefenderAirborne() {
         EcsWorld world = new EcsWorld();
@@ -85,7 +146,10 @@ class CombatSystemTest {
         CombatSystem combatSystem = new CombatSystem(byId::get);
         world.addSystem(combatSystem);
 
+        // Người tấn công là NHÂN VẬT nên không tự đánh nữa (2026-08-09) — phải yêu cầu tường minh,
+        // đúng đường mà AttackCommand đi qua. world.update() vẫn cần chạy để cooldown đếm lùi.
         world.update(0.016f);
+        combatSystem.requestAttack(attacker);
 
         List<CombatSystem.AttackOutcome> results = combatSystem.drainResults();
         assertThat(results).hasSize(1);
@@ -104,6 +168,7 @@ class CombatSystemTest {
         world.addSystem(combatSystem);
 
         world.update(0.016f);
+        combatSystem.requestAttack(attacker); // xem test trên — nhân vật chỉ đánh khi được yêu cầu
 
         List<CombatSystem.AttackOutcome> results = combatSystem.drainResults();
         assertThat(results).hasSize(1);

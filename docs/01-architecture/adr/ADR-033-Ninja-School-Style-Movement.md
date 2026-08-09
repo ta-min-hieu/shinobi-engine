@@ -105,6 +105,9 @@ hoá mô hình nhảy (vd bỏ gia tốc thay đổi liên tục, dùng bảng c
 | 4 | Tên trường protocol cụ thể (`MoveCommand` mở rộng hay `JumpCommand` riêng) | ⏳ Mở — quyết lúc code |
 | 5 | "Đòn tầm thấp" là những đòn nào (danh sách skill/animation cụ thể) | ⏳ Mở — cần đối chiếu GDD |
 | 6 | Nội dung bản đồ pilot có bệ/chướng ngại | ⏳ Mở — việc art/level design riêng |
+| 7 | **Nhảy đôi**: giữ nút nhảy một lúc → cú thứ hai giữa không trung, CAO HƠN cú đầu | **Chốt** (chủ dự án, playtest 2026-08-09) |
+| 8 | Trần nhảy giữa không trung = 1 lần/mỗi lần rời đất, server đếm | **Chốt** — hệ quả bắt buộc của Điều 15, không có trần thì client sửa đổi bay vô hạn |
+| 9 | Chọn mục tiêu bằng CLICK CHUỘT vào quái; phím Enter = dùng skill đang chọn | **Chốt** (chủ dự án, playtest 2026-08-09) |
 
 ## ADR cần tạo
 
@@ -169,4 +172,29 @@ trúc mới, xử lý trong quá trình code + review bình thường.
    CHÍNH người chơi thấy mình nhảy đúng qua `MoveResponse`; người khác luôn thấy z=0). Hoãn có chủ ý ở
    lát cắt đầu vì kéo theo sửa `AreaOfInterestTracker.lastSyncedPosition` (hot path zero-allocation đã
    tối ưu kỹ, xem PHYSICS.md §9).
+9. ✅ **Nhảy đôi + chọn mục tiêu bằng chuột + Enter dùng skill xong 2026-08-09** (Technical Decisions
+   #7-#9, chủ dự án playtest lượt hai và nêu 2 thiếu sót: "chưa nhảy được 2 lần như Ninja School",
+   "chưa đánh được quái").
+
+   - **Nhảy đôi**: `PositionComponent.airJumpsUsed` (engine-ecs) đếm số cú nhảy giữa không trung kể
+     từ lần rời đất gần nhất; `VerticalMovementSystem` xoá về 0 lúc đáp đất — client và server dùng
+     CHUNG hệ này nên hạn mức reset giống hệt nhau, không cần thêm field nào trên dây.
+     `WorldFacade.handleJumpIntent` suy loại nhảy từ trạng thái THẬT (đứng đất → `JUMP_VELOCITY_MPS`
+     7 m/s; lơ lửng còn hạn mức → `AIR_JUMP_VELOCITY_MPS` 8 m/s, cao hơn đúng như chủ dự án mô tả).
+     Client kích hoạt cú thứ hai khi GIỮ nút quá `AIR_JUMP_HOLD_SECONDS` (0.3s — ngay trước đỉnh cú
+     đầu, `7/20` = 0.35s) HOẶC khi bấm lại giữa không trung; thời điểm là cảm giác điều khiển thuần
+     client, **số lần** mới là thứ server đếm.
+   - **Không đổi protocol**: vẫn đúng một `JumpCommand` rỗng (opcode 306) cho cả hai loại nhảy —
+     client không nói loại, server tự suy (Server Authority). Đây là lý do mục này KHÔNG cần ADR mới.
+   - **Chọn mục tiêu**: `MonsterPicker` bắt click theo KHÔNG GIAN MÀN HÌNH (chiếu vị trí quái ra rồi
+     so hộp bao 2D) thay vì ray-cast — quái chưa có model 3D để ray-cast vào, và cách này dùng chung
+     cho cả nhánh 3D lẫn nhánh hình thay thế. Con đang nhắm đổi màu vàng ngay trong thế giới.
+     `GameAction.USE_SKILL` (Enter) đi qua đúng đường của nút HUD, không nhân bản logic hồi chiêu/Khí.
+   - Verify thật: `JumpInputControllerTest` (7 test — luật nhảy client tách khỏi `WorldScreen` để
+     test được ở nhịp 60Hz thật), `VerticalMovementSystemTest` (+2 test hạn mức),
+     `MonsterPickerTest` (5 test), `CombatHudControllerTest` (+2 test chọn mục tiêu), và
+     `WorldFacadeTest.shouldAllowExactlyOneAirJump_whenJumpCommandSpammed` — spam 40 lệnh nhảy qua
+     tick loop 60Hz THẬT rồi đo đỉnh `z`: phải cao hơn đỉnh một cú nhảy đơn (1.225m) mà không vượt
+     trần hai cú (2.825m). Đã kiểm chứng cả hai chiều bằng mutation tay (đặt `MAX_AIR_JUMPS` = 0 và
+     = 99, test fail đúng như mong đợi) — không phải test chỉ xanh vì lỏng.
 </content>

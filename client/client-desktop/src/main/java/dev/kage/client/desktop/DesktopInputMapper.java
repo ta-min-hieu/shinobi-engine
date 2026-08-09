@@ -21,6 +21,13 @@ final class DesktopInputMapper implements InputMapper {
             // (chuẩn platformer, Ninja School Online dùng cả 2).
             case JUMP ->
                 Gdx.input.isKeyPressed(Keys.W) || Gdx.input.isKeyPressed(Keys.UP) || Gdx.input.isKeyPressed(Keys.SPACE);
+            // Enter (cả phím chính lẫn Enter bàn phím số) — đúng phím chủ dự án yêu cầu 2026-08-09.
+            case USE_SKILL -> Gdx.input.isKeyPressed(Keys.ENTER) || Gdx.input.isKeyPressed(Keys.NUMPAD_ENTER);
+            // Đánh thường: Z (ngón trái vẫn ở A/D được) hoặc Ctrl. KHÔNG dùng Space — đã là nhảy.
+            case ATTACK ->
+                Gdx.input.isKeyPressed(Keys.Z)
+                        || Gdx.input.isKeyPressed(Keys.CONTROL_LEFT)
+                        || Gdx.input.isKeyPressed(Keys.CONTROL_RIGHT);
         };
     }
 }

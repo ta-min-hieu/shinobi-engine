@@ -100,6 +100,16 @@ public final class PostgresCharacterAdapter implements CharacterPort {
             UPDATE character SET faction = ? WHERE id = ?
             """;
 
+    // RETURNING: cộng và đọc lại trong CÙNG một câu — không có cửa sổ để hai nguồn EXP chạy song
+    // song (giết quái, trao thưởng quest) ghi đè nhau. Xem CharacterPort#addExperience.
+    private static final String ADD_EXPERIENCE = """
+            UPDATE character SET exp = exp + ? WHERE id = ? RETURNING exp
+            """;
+
+    private static final String UPDATE_LEVEL = """
+            UPDATE character SET level = ? WHERE id = ?
+            """;
+
     @Override
     public List<Character> listByAccount(long accountId) {
         return JdbcOperations.query(dataSource, LIST_BY_ACCOUNT, PostgresCharacterAdapter::mapRow, accountId);
@@ -183,6 +193,18 @@ public final class PostgresCharacterAdapter implements CharacterPort {
     @Override
     public void savePosition(long characterId, float x, float y) {
         JdbcOperations.update(dataSource, SAVE_POSITION, x, y, characterId);
+    }
+
+    @Override
+    public long addExperience(long characterId, long amount) {
+        return JdbcOperations.queryOne(dataSource, ADD_EXPERIENCE, rs -> rs.getLong("exp"), amount, characterId)
+                .orElseThrow(() -> new DatabaseAccessException(
+                        "Không thấy nhân vật để cộng EXP: characterId=" + characterId, null));
+    }
+
+    @Override
+    public void saveLevel(long characterId, int level) {
+        JdbcOperations.update(dataSource, UPDATE_LEVEL, level, characterId);
     }
 
     @Override

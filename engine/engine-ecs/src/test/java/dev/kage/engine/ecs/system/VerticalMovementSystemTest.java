@@ -105,6 +105,38 @@ class VerticalMovementSystemTest {
         assertThat(POSITION.get(entity).z).isZero();
     }
 
+    /**
+     * Hạn mức nhảy giữa không trung (nhảy đôi, 2026-08-09) tính THEO MỖI LẦN rời đất — hệ này là
+     * nơi duy nhất biết khoảnh khắc đáp đất nên cũng là nơi xoá hạn mức. Hỏng chỗ này = người chơi
+     * chỉ nhảy đôi được đúng một lần rồi thôi cho tới khi hồi sinh.
+     */
+    @Test
+    void shouldResetAirJumpBudget_whenLanding() {
+        EcsWorld world = new EcsWorld();
+        world.addSystem(new VerticalMovementSystem(GRAVITY_MPS2));
+        KEntity entity = entityAt(world, 2f, false, 0f);
+        POSITION.get(entity).airJumpsUsed = 1; // đã tiêu hạn mức trong cú nhảy vừa rồi
+
+        world.update(1f); // đủ để rơi 2m và đáp đất
+
+        assertThat(POSITION.get(entity).grounded).isTrue();
+        assertThat(POSITION.get(entity).airJumpsUsed).isZero();
+    }
+
+    /** Còn đang lơ lửng thì hạn mức KHÔNG được tự đầy lại — nếu không, giữ nút = bay vô hạn. */
+    @Test
+    void shouldKeepAirJumpBudgetSpent_whileStillAirborne() {
+        EcsWorld world = new EcsWorld();
+        world.addSystem(new VerticalMovementSystem(GRAVITY_MPS2));
+        KEntity entity = entityAt(world, 10f, false, 0f);
+        POSITION.get(entity).airJumpsUsed = 1;
+
+        world.update(0.1f); // vẫn còn cách mặt đất rất xa
+
+        assertThat(POSITION.get(entity).grounded).isFalse();
+        assertThat(POSITION.get(entity).airJumpsUsed).isEqualTo(1);
+    }
+
     @Test
     void shouldFallPastPlatform_whenOutsideItsFootprint() {
         EcsWorld world = new EcsWorld();

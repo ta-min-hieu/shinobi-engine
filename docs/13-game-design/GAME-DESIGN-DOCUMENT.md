@@ -136,7 +136,9 @@ Slot: Vũ khí · Giáp · Mũ · Găng · Giày · Phụ kiện ×2
 
 ## 6. Combat
 
-Real-time side-view. Auto-target đánh thường; skill chủ động bằng phím 1–6 / chạm.
+Real-time side-view. Chọn mục tiêu bằng chuột rồi **BẤM** đánh thường (phím Z hoặc nút Đánh) —
+không còn auto-target sau [ADR-034](../01-architecture/adr/ADR-034-Manual-Attack-And-Experience.md)
+(chủ dự án quyết 2026-08-09); quái/boss thì vẫn tự đánh. Skill chủ động bằng phím 1–6 / chạm.
 
 | Loại | Nội dung |
 |---|---|

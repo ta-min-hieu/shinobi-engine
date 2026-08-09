@@ -57,12 +57,16 @@ public final class KageSkin implements Disposable {
 
     private static final Color CHI_BLUE = Color.valueOf("2979FF");
 
+    /** Vàng cam — vạch kinh nghiệm (2026-08-09). Khác hẳn đỏ Máu/xanh Khí để liếc là phân biệt. */
+    private static final Color EXP_AMBER = Color.valueOf("FFB300");
+
     /** Độ dày viền khung/nút, pixel — cùng một giá trị cho mọi khung để HUD nhất quán. */
     private static final int BORDER_PX = 2;
 
     public final Drawable healthFill;
     public final Drawable healthEmpty;
     public final Drawable chiFill;
+    public final Drawable expFill;
     /** Nền panel HUD — nâu đen, viền vàng đồng. Dùng cho cụm chỉ số/thanh skill. */
     public final Drawable panel;
     /** Ô skill vuông (viền vàng, nền tối) — kiểu thanh skill giữa dưới của Ninja School. */
@@ -91,6 +95,7 @@ public final class KageSkin implements Disposable {
         this.healthFill = solid(HEALTH_RED); // đỏ — thanh Máu (đổi từ xanh lá cho khớp Ninja School)
         this.healthEmpty = solid(Color.valueOf("2A1410")); // nâu rất tối — phần đã mất
         this.chiFill = solid(CHI_BLUE);
+        this.expFill = solid(EXP_AMBER);
 
         this.panel = framed(64, 64, PANEL_BACKGROUND, PANEL_BORDER);
         this.slot = framed(48, 48, Color.valueOf("20160BF0"), PANEL_BORDER);

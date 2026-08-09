@@ -131,11 +131,6 @@ final class FloatingCombatText implements Disposable {
         batch.dispose(); // KHÔNG dispose font — xem javadoc lớp, font thuộc về HUD
     }
 
-    /** Chiếu điểm thế giới sang toạ độ màn hình, ghi đè tại chỗ. */
-    interface WorldToScreen {
-        void project(Vector3 worldPositionInOut);
-    }
-
     /** Một số damage đang bay — tái dùng trong {@link #pool}, không bao giờ cấp phát lại. */
     private static final class Entry {
         private String text = "";

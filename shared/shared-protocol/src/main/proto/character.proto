@@ -88,3 +88,19 @@ message SelectFactionResponse {
   bool success = 1;
   string error_key = 2; // rỗng nếu success=true (NETWORK.md §107) — vd "error.level_too_low"
 }
+
+// Event: Server -> Client (OPCODE_EXPERIENCE_CHANGED_EVENT). Kinh nghiệm/cấp của CHÍNH người chơi
+// vừa đổi — chủ dự án yêu cầu 2026-08-09 ("không có vạch kinh nghiệm để biết bao giờ lên level").
+// Không có character_id: luôn là chính mình, cùng quy ước MoveResponse/CharacterRespawnedEvent.
+//
+// Gửi 2 thời điểm: NGAY sau khi vào world (để vạch có số ngay từ đầu, không phải chờ giết quái
+// mới hiện), và mỗi lần nhận EXP. Server gửi sẵn `exp_into_level`/`exp_for_next_level` thay vì để
+// client tự suy từ `exp` tổng — đường cong cấp độ là luật chơi, thuộc về server (Điều 15); client
+// đổi công thức cũng không đổi được gì ngoài cái vạch nó tự vẽ.
+message ExperienceChangedEvent {
+  int32 level = 1;
+  int64 total_exp = 2;         // tổng EXP tích luỹ từ đầu (khớp cột character.exp)
+  int64 exp_into_level = 3;    // đã đi được bao nhiêu trong cấp HIỆN TẠI
+  int64 exp_for_next_level = 4; // cần bao nhiêu để lên cấp kế; 0 = đã cấp tối đa
+  bool leveled_up = 5;         // true nếu chính lần này vừa lên cấp — client mừng cho ra mừng
+}

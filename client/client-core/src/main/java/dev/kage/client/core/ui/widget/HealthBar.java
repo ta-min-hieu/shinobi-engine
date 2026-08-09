@@ -18,13 +18,15 @@ public final class HealthBar extends Actor {
     /** Loại thanh — quyết định màu phần còn lại, tra từ {@link KageSkin} lúc vẽ. */
     public enum Kind {
         HEALTH,
-        CHI
+        CHI,
+        /** Vạch kinh nghiệm (2026-08-09) — cùng hình dạng, chỉ khác màu và ý nghĩa số. */
+        EXPERIENCE
     }
 
     private final KageSkin skin;
     private final Kind kind;
-    private int current;
-    private int max = 1;
+    private long current;
+    private long max = 1L;
 
     public HealthBar(KageSkin skin) {
         this(skin, Kind.HEALTH);
@@ -43,12 +45,20 @@ public final class HealthBar extends Actor {
     /**
      * Cập nhật giá trị hiển thị.
      *
-     * @param current HP hiện tại
-     * @param max HP tối đa (kẹp tối thiểu 1, tránh chia cho 0)
+     * @param current giá trị hiện tại (HP/Khí/EXP trong cấp)
+     * @param max giá trị đầy (kẹp tối thiểu 1, tránh chia cho 0)
      */
-    public void setValues(int current, int max) {
+    public void setValues(long current, long max) {
         this.current = current;
-        this.max = Math.max(1, max);
+        this.max = Math.max(1L, max);
+    }
+
+    private Drawable fillFor(Kind barKind) {
+        return switch (barKind) {
+            case CHI -> skin.chiFill;
+            case EXPERIENCE -> skin.expFill;
+            case HEALTH -> skin.healthFill;
+        };
     }
 
     @Override
@@ -59,9 +69,9 @@ public final class HealthBar extends Actor {
         float height = getHeight();
 
         skin.healthEmpty.draw(batch, x, y, width, height);
-        float ratio = MathUtils.clamp(current / (float) max, 0f, 1f);
+        float ratio = MathUtils.clamp((float) current / (float) max, 0f, 1f);
         if (ratio > 0f) {
-            Drawable fill = kind == Kind.CHI ? skin.chiFill : skin.healthFill;
+            Drawable fill = fillFor(kind);
             fill.draw(batch, x, y, width * ratio, height);
         }
     }

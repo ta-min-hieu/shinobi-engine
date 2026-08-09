@@ -34,6 +34,23 @@ final class WorldConstants {
      */
     static final float JUMP_VELOCITY_MPS = 7f;
 
+    /**
+     * Số lần được bật nhảy THÊM khi đang lơ lửng, mỗi lần rời mặt đất (nhảy đôi kiểu Ninja School
+     * Online — chủ dự án yêu cầu 2026-08-09). Đây là TRẦN do server áp: client tự quyết THỜI ĐIỂM
+     * gửi lệnh nhảy lần 2 (giữ nút một lúc), nhưng SỐ LẦN thì server đếm và chặn — không có trần
+     * này, một client sửa đổi gửi {@code JumpCommand} liên tục sẽ bay vô hạn (Điều 15).
+     */
+    static final int MAX_AIR_JUMPS = 1;
+
+    /**
+     * Vận tốc dọc của cú nhảy giữa không trung — CAO HƠN {@link #JUMP_VELOCITY_MPS} đúng như chủ dự
+     * án mô tả ("nhảy lần 2 cao hơn"). Trần độ cao tổng vẫn hữu hạn: nhảy đất tới đỉnh ≈1.25m, bồi
+     * thêm {@code 8²/(2·20)} = 1.6m ⇒ tối đa ≈2.85m nếu bấm đúng đỉnh — vẫn thấp hơn khoảng cách
+     * giữa các bậc demo đủ để leo, không biến thành bay tự do.
+     * {@code client-core.WorldConstants.AIR_JUMP_VELOCITY_MPS} PHẢI khớp (dự đoán cục bộ).
+     */
+    static final float AIR_JUMP_VELOCITY_MPS = 8f;
+
     // AoI sync TÁCH khỏi TICK_RATE (ADR-018 §Consequences/§Revisit Trigger: "giữ logic 60Hz, hạ
     // snapshot rate") — người chơi không phân biệt được vị trí người khác cập nhật mỗi 16ms hay
     // 50ms, nhưng AreaOfInterestTracker.sync() so cặp entity nên tần suất ảnh hưởng trực tiếp tới

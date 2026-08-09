@@ -29,6 +29,7 @@ import dev.kage.account.domain.Transaction;
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.application.CharacterUseCases;
 import dev.kage.character.application.CreateCharacterUseCase;
+import dev.kage.character.application.GrantExperienceUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.character.application.SelectFactionUseCase;
@@ -855,7 +856,11 @@ class GatewayPipelineTest {
         SelectCharacterUseCase selectCharacterUseCase = new SelectCharacterUseCase(characterPort);
         SelectFactionUseCase selectFactionUseCase = new SelectFactionUseCase(characterPort);
         CharacterUseCases useCases = new CharacterUseCases(
-                createCharacterUseCase, listCharactersUseCase, selectCharacterUseCase, selectFactionUseCase);
+                createCharacterUseCase,
+                listCharactersUseCase,
+                selectCharacterUseCase,
+                selectFactionUseCase,
+                new GrantExperienceUseCase(characterPort));
         CharacterFacade characterFacade = new CharacterFacade(useCases, characterPort);
 
         // WorldFacade KHÔNG start() ở đây — test này không verify movement/AoI, chỉ cần
@@ -877,8 +882,8 @@ class GatewayPipelineTest {
                 new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
         GatewayNetworkMetrics networkMetrics = new GatewayNetworkMetrics(meterRegistry);
         GatewayObservability observability = new GatewayObservability(networkMetrics, GatewayTracing.disabled());
-        ConnectedCharacterRegistry characterRegistry =
-                new ConnectedCharacterRegistry(inventoryFacade, questFacade, networkMetrics);
+        ConnectedCharacterRegistry characterRegistry = new ConnectedCharacterRegistry(
+                inventoryFacade, questFacade, characterFacade::grantExperience, networkMetrics);
         WorldFacade firstChannelFacade = new WorldFacade(characterRegistry);
         MainWorldChannelRegistry mainWorldChannels =
                 new MainWorldChannelRegistry(characterRegistry, firstChannelFacade, meterRegistry);
@@ -1015,6 +1020,16 @@ class GatewayPipelineTest {
                     Instant.now());
             characters.add(character);
             return character;
+        }
+
+        @Override
+        public long addExperience(long characterId, long amount) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public void saveLevel(long characterId, int level) {
+            throw new UnsupportedOperationException("không dùng trong test này");
         }
 
         @Override

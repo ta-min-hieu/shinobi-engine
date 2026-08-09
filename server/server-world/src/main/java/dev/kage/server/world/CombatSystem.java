@@ -18,12 +18,21 @@ import dev.kage.server.world.component.StatusEffectComponent;
 import dev.kage.server.world.component.TargetComponent;
 
 /**
- * Đánh thường TỰ ĐỘNG (GDD §6 "Auto-target đánh thường") — không phải {@code UseSkillCommand}
- * (script sandbox GraalJS theo ADR-016, lát cắt sau). Entity có {@link TargetComponent} +
- * {@link AttackCooldownComponent} (cả nhân vật lẫn quái đều có sẵn từ lúc spawn — xem
- * {@code WorldFacade}; {@code AiSystem} là bên GHI {@code targetEntityId} cho quái theo FSM,
- * AI.md §3) tự đánh mục tiêu khi hết cooldown, còn target hợp lệ (khác 0) và còn trong tầm, theo
- * pipeline damage đã chốt ({@link CombatConstants#resolveAttack}).
+ * Đánh thường — không phải {@code UseSkillCommand} (script sandbox GraalJS theo ADR-016).
+ *
+ * <p><b>Hai chế độ, có chủ đích khác nhau</b> (đổi 2026-08-09 theo yêu cầu chủ dự án sau
+ * playtest — trước đó MỌI entity đều tự đánh, GDD §6 "Auto-target đánh thường"):
+ *
+ * <ul>
+ *   <li><b>Người chơi</b> ({@link CharacterIdComponent}) — chỉ đánh khi có {@code AttackCommand}
+ *       ({@link #requestAttack}). Chủ dự án thấy máu quái tự tụt dù chưa bấm gì và quyết định
+ *       "phải bấm mới đánh". Cooldown vẫn đếm lùi mỗi tick như cũ.
+ *   <li><b>Quái/boss</b> — GIỮ NGUYÊN tự đánh mỗi khi hết cooldown ({@code AiSystem} là bên GHI
+ *       {@code targetEntityId} theo FSM, AI.md §3). Không có ai bấm nút hộ chúng.
+ * </ul>
+ *
+ * <p>Cả hai đi qua CÙNG một đường kiểm tra (cooldown → stun → mục tiêu còn sống → trong tầm) và
+ * cùng pipeline damage đã chốt ({@link CombatConstants#resolveAttack}).
  *
  * <p>KHÔNG gọi thẳng {@code WorldOutboundSink} — theo đúng pattern {@code WorldFacade} gọi sink
  * SAU khi cả tick chạy xong; kết quả tích trong hàng đợi nội bộ, {@link #drainResults()} lấy ra
@@ -78,6 +87,27 @@ final class CombatSystem extends IteratingKSystem {
     protected void processEntity(KEntity entity, float deltaTime) {
         AttackCooldownComponent cooldown = COOLDOWN.get(entity);
         cooldown.remainingSeconds -= deltaTime;
+        // Người chơi KHÔNG còn tự đánh (chủ dự án 2026-08-09) — chỉ đếm lùi cooldown ở đây, đòn
+        // thật ra khi có AttackCommand ({@link #requestAttack}). Quái/boss thì giữ nguyên tự đánh:
+        // chúng không có ai bấm nút hộ, bỏ auto ở đây là không con nào đánh người chơi nữa.
+        if (CHARACTER_ID.has(entity)) {
+            return;
+        }
+        tryAttackNow(entity, cooldown);
+    }
+
+    /**
+     * Người chơi bấm nút đánh ({@code AttackCommand}) — ra ĐÚNG một đòn nếu mọi điều kiện server
+     * kiểm đều đạt, ngược lại bỏ qua âm thầm (SECURITY.md: không trả lỗi cụ thể, tránh lộ ngưỡng).
+     *
+     * <p>Dùng CHUNG {@link #tryAttackNow} với đường tự đánh của quái — cooldown/tầm/stun/mục tiêu
+     * chết đều kiểm y hệt, nên spam gói không đánh nhanh hơn được: cooldown là của server.
+     */
+    void requestAttack(KEntity entity) {
+        tryAttackNow(entity, COOLDOWN.get(entity));
+    }
+
+    private void tryAttackNow(KEntity entity, AttackCooldownComponent cooldown) {
         if (cooldown.remainingSeconds > 0f) {
             return;
         }

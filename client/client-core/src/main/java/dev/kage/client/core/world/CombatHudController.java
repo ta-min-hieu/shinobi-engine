@@ -72,6 +72,22 @@ final class CombatHudController {
         return 0L;
     }
 
+    /**
+     * Người chơi CHỦ ĐỘNG chọn mục tiêu (click chuột vào quái — chủ dự án yêu cầu 2026-08-09), ghi
+     * đè mục tiêu tự chọn lúc quái spawn.
+     *
+     * @return {@code true} nếu id là quái đang theo dõi và mục tiêu đã đổi — caller phải gửi
+     *     {@code SetTargetCommand}. {@code false} khi click vào con đã biến mất, hoặc chọn lại đúng
+     *     con đang nhắm (không gửi gói thừa: server đã biết, cùng lý do {@link #useSkill}).
+     */
+    boolean selectTarget(long monsterId) {
+        if (!monsters.containsKey(monsterId) || currentTargetId == monsterId) {
+            return false;
+        }
+        currentTargetId = monsterId;
+        return true;
+    }
+
     void onMonsterDespawned(MonsterDespawnedEvent event) {
         monsters.remove(event.getMonsterId());
         if (currentTargetId == event.getMonsterId()) {

@@ -32,9 +32,13 @@ public final class CombatHud implements Disposable {
 
     private static final float BAR_WIDTH = 190f;
     private static final float BAR_HEIGHT = 20f;
+    private static final float EXP_BAR_HEIGHT = 12f;
     private static final float BADGE_SIZE = 52f;
     private static final float SLOT_SIZE = 46f;
     private static final float ACTION_BUTTON_SIZE = 96f;
+
+    /** Nút chiêu nhỏ hơn nút Đánh — thứ bậc thị giác: đánh thường là hành động chính (2026-08-09). */
+    private static final float SKILL_BUTTON_SIZE = 76f;
 
     private final Stage stage;
     private final KageSkin skin;
@@ -45,14 +49,18 @@ public final class CombatHud implements Disposable {
     private final Label playerHpLabel;
     private final HealthBar playerChiBar;
     private final Label playerChiLabel;
+    private final HealthBar expBar;
+    private final Label expLabel;
     private final Table targetGroup;
     private final Label targetNameLabel;
     private final HealthBar targetHealthBar;
     private final Label targetHpLabel;
     private final TextButton skillButton;
     private final Label skillNameLabel;
+    private final TextButton attackButton;
 
     private Runnable onSkillClicked;
+    private Runnable onAttackClicked;
 
     private int lastPlayerHp = -1;
     private int lastPlayerMaxHp = -1;
@@ -63,6 +71,8 @@ public final class CombatHud implements Disposable {
     private int lastLevel = -1;
     private int lastPlayerChi = -1;
     private int lastPlayerMaxChi = -1;
+    private long lastExpIntoLevel = -1L;
+    private long lastExpForNextLevel = -1L;
 
     /**
      * Bố cục theo ảnh Ninja School Online chủ dự án gửi (2026-08-09): cụm chỉ số góc trên-trái, mục
@@ -78,11 +88,14 @@ public final class CombatHud implements Disposable {
         this.playerHpLabel = new Label("", skin.statLabelStyle);
         this.playerChiBar = new HealthBar(skin, HealthBar.Kind.CHI);
         this.playerChiLabel = new Label("", skin.statLabelStyle);
+        this.expBar = new HealthBar(skin, HealthBar.Kind.EXPERIENCE);
+        this.expLabel = new Label("", skin.statLabelStyle);
         this.targetNameLabel = new Label("", skin.labelStyle);
         this.targetHealthBar = new HealthBar(skin);
         this.targetHpLabel = new Label("", skin.statLabelStyle);
         this.targetGroup = new Table();
         this.skillButton = new TextButton("", skin.roundButtonStyle);
+        this.attackButton = new TextButton("", skin.roundButtonStyle);
         this.skillNameLabel = new Label("", skin.statLabelStyle);
 
         // 4 Table độc lập cùng setFillParent(true) — mỗi cụm neo một góc, không có lưới chung.
@@ -114,7 +127,11 @@ public final class CombatHud implements Disposable {
                 .row();
         bars.add(overlay(playerChiBar, playerChiLabel))
                 .size(BAR_WIDTH, BAR_HEIGHT)
-                .padTop(4f);
+                .padTop(4f)
+                .row();
+        // Vạch kinh nghiệm (chủ dự án 2026-08-09: "không có vạch kinh nghiệm để biết bao giờ lên
+        // level à"). Mỏng hơn Máu/Khí — quan trọng nhưng không phải thứ phải liếc giữa lúc đánh.
+        bars.add(overlay(expBar, expLabel)).size(BAR_WIDTH, EXP_BAR_HEIGHT).padTop(4f);
 
         Table cluster = new Table();
         cluster.setBackground(skin.panel);
@@ -149,11 +166,24 @@ public final class CombatHud implements Disposable {
         Table hintBar = new Table();
         hintBar.add(hintSlot(i18n.get("hud.hint.left"))).size(SLOT_SIZE).padRight(8f);
         hintBar.add(hintSlot(i18n.get("hud.hint.right"))).size(SLOT_SIZE).padRight(8f);
-        hintBar.add(hintSlot(i18n.get("hud.hint.jump"))).size(SLOT_SIZE);
+        hintBar.add(hintSlot(i18n.get("hud.hint.jump"))).size(SLOT_SIZE).padRight(8f);
+        // 2 ô thêm 2026-08-09 cùng lượt với nhảy đôi/chọn mục tiêu bằng chuột: cả hai thao tác đều
+        // KHÔNG tự khám phá ra được (chủ dự án chơi thử và không biết là có), nên phải nói ra ở đây
+        // — đúng chỗ đã dùng để nói phím nào làm gì.
+        hintBar.add(hintSlot(i18n.get("hud.hint.target"))).size(SLOT_SIZE).padRight(8f);
+        hintBar.add(hintSlot(i18n.get("hud.hint.attack"))).size(SLOT_SIZE).padRight(8f);
+        hintBar.add(hintSlot(i18n.get("hud.hint.skill"))).size(SLOT_SIZE);
         return hintBar;
     }
 
-    /** GÓC DƯỚI-PHẢI: nút hành động tròn (như nút đánh của bản gốc) + biển tên skill phía trên. */
+    /**
+     * GÓC DƯỚI-PHẢI: hai nút tròn — <b>Chiêu</b> bên trái, <b>Đánh</b> bên phải — mỗi nút một biển
+     * tên phía trên.
+     *
+     * <p>Nút Đánh thêm 2026-08-09 khi chủ dự án đổi đánh thường sang bấm tay. Nó nằm NGOÀI CÙNG bên
+     * phải và to hơn nút chiêu: đó là nút bấm nhiều nhất trong trận, đúng chỗ ngón cái chạm tới
+     * trên cảm ứng (UI.md — nút ≥48dp) và đúng vị trí nút đánh của bản gốc Ninja School.
+     */
     private Table buildSkillCluster() {
         skillButton.addListener(new ClickListener() {
             @Override
@@ -163,16 +193,33 @@ public final class CombatHud implements Disposable {
                 }
             }
         });
+        attackButton.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                if (onAttackClicked != null) {
+                    onAttackClicked.run();
+                }
+            }
+        });
         skillNameLabel.setAlignment(Align.center);
-        // Khung nền cho tên skill — chữ trần trên nền map sáng (cỏ/tuyết) gần như không đọc được.
-        Table skillNamePlate = new Table();
-        skillNamePlate.setBackground(skin.panel);
-        skillNamePlate.add(skillNameLabel).pad(4f);
 
         Table cluster = new Table();
-        cluster.add(skillNamePlate).padBottom(6f).row();
-        cluster.add(skillButton).size(ACTION_BUTTON_SIZE);
+        cluster.add(namePlate(skillNameLabel)).padBottom(6f).padRight(10f);
+        cluster.add(namePlate(new Label(i18n.get("hud.action.attack"), skin.statLabelStyle)))
+                .padBottom(6f)
+                .row();
+        cluster.add(skillButton).size(SKILL_BUTTON_SIZE).padRight(10f);
+        cluster.add(attackButton).size(ACTION_BUTTON_SIZE);
         return cluster;
+    }
+
+    /** Khung nền cho biển tên — chữ trần trên nền map sáng (cỏ/tuyết) gần như không đọc được. */
+    private Table namePlate(Label label) {
+        label.setAlignment(Align.center);
+        Table plate = new Table();
+        plate.setBackground(skin.panel);
+        plate.add(label).pad(4f);
+        return plate;
     }
 
     /** Chồng nhãn số lên giữa thanh — kiểu Ninja School, số nằm TRONG thanh chứ không dưới thanh. */
@@ -197,6 +244,11 @@ public final class CombatHud implements Disposable {
 
     public void setOnSkillClicked(Runnable callback) {
         this.onSkillClicked = callback;
+    }
+
+    /** Nút Đánh (đánh thường) — luôn bấm được, server tự bỏ qua nếu chưa hết cooldown/ngoài tầm. */
+    public void setOnAttackClicked(Runnable callback) {
+        this.onAttackClicked = callback;
     }
 
     /** Cấp nhân vật hiện trên huy hiệu tròn góc trên-trái. */
@@ -239,6 +291,27 @@ public final class CombatHud implements Disposable {
         }
         lastSkillText = text;
         skillButton.setText(text);
+    }
+
+    /**
+     * Vạch kinh nghiệm (2026-08-09) — số hiển thị là tiến độ TRONG cấp hiện tại, không phải tổng
+     * EXP tích luỹ: "còn bao xa tới cấp sau" mới là câu hỏi người chơi đang hỏi.
+     *
+     * @param expForNextLevel {@code 0} = đã cấp tối đa, vẽ vạch đầy kèm nhãn riêng.
+     */
+    public void setExperience(long expIntoLevel, long expForNextLevel) {
+        if (expIntoLevel == lastExpIntoLevel && expForNextLevel == lastExpForNextLevel) {
+            return; // UI.md §9
+        }
+        lastExpIntoLevel = expIntoLevel;
+        lastExpForNextLevel = expForNextLevel;
+        if (expForNextLevel <= 0L) {
+            expBar.setValues(1L, 1L);
+            expLabel.setText(i18n.get("hud.exp.max"));
+            return;
+        }
+        expBar.setValues(expIntoLevel, expForNextLevel);
+        expLabel.setText(expIntoLevel + " / " + expForNextLevel);
     }
 
     public void setPlayerHp(int current, int max) {

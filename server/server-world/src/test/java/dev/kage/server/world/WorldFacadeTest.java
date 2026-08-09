@@ -250,6 +250,46 @@ class WorldFacadeTest {
     }
 
     /**
+     * Nhảy đôi (chủ dự án yêu cầu 2026-08-09): đúng MỘT cú nhảy thêm giữa không trung, cao hơn cú
+     * đầu — và spam lệnh nhảy KHÔNG cho bay vô hạn.
+     *
+     * <p>Đo bằng độ cao {@code z} lớn nhất từng thấy trong các ack (mỗi {@code JumpCommand} đều
+     * được ack kèm {@code z} hiện tại, kể cả khi bị từ chối — xem {@code handleJumpIntent}), vì
+     * {@code MoveAcceptedSnapshot} không mang {@code vz}. Hai ngưỡng đối lập nhau nên không có cách
+     * nào cùng đạt bằng ăn may: dưới cận trên = có trần thật, trên cận dưới = cú thứ hai có xảy ra.
+     */
+    @Test
+    void shouldAllowExactlyOneAirJump_whenJumpCommandSpammed() {
+        // Đỉnh lý thuyết của MỘT cú nhảy đất: v²/(2g) = 7²/40 = 1.225m.
+        float singleJumpApex = (WorldConstants.JUMP_VELOCITY_MPS * WorldConstants.JUMP_VELOCITY_MPS)
+                / (2f * WorldConstants.GRAVITY_MPS2);
+        // Trần tuyệt đối khi được nhảy thêm ĐÚNG 1 lần: đỉnh cú đầu + đỉnh cú thứ hai (8²/40 = 1.6m),
+        // đạt được chỉ khi bấm chính xác lúc đỉnh. Vượt mốc này = hạn mức không có tác dụng.
+        float doubleJumpCeiling = singleJumpApex
+                + ((WorldConstants.AIR_JUMP_VELOCITY_MPS * WorldConstants.AIR_JUMP_VELOCITY_MPS)
+                        / (2f * WorldConstants.GRAVITY_MPS2));
+
+        world.start();
+        world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
+        // Spam suốt ~0.4s — dài hơn thời gian tới đỉnh của cú thứ hai (8/20 = 0.4s) nên chắc chắn có
+        // ack lấy mẫu ở gần đỉnh, và đủ nhiều lệnh để phơi ra lỗi "không có trần" nếu hạn mức hỏng.
+        for (int sequenceId = 1; sequenceId <= 40; sequenceId++) {
+            world.enqueueJumpCommand(1L, sequenceId);
+            sleepQuietly(10);
+        }
+        awaitTrue(
+                () -> sink.accepted.stream().filter(a -> a.characterId() == 1L).count() >= 40);
+
+        float peakZ = (float) sink.accepted.stream()
+                .filter(a -> a.characterId() == 1L)
+                .mapToDouble(Accepted::z)
+                .max()
+                .orElseThrow();
+        assertThat(peakZ).isGreaterThan(singleJumpApex);
+        assertThat(peakZ).isLessThanOrEqualTo(doubleJumpCeiling);
+    }
+
+    /**
      * WorldTickScheduler (Phase 9 — thay "1 OS thread riêng/World" bằng pool CỐ ĐỊNH dùng chung):
      * số World khởi tạo ở đây CỐ TÌNH vượt xa số lõi CPU thông thường để xác nhận
      * {@code scheduleAtFixedRate} dùng chung không làm ĐÓI World nào — mọi World đều phải tự xử lý
@@ -412,9 +452,9 @@ class WorldFacadeTest {
                     dungeonSink.monsterSpawned.stream().anyMatch(m -> m.code().equals("sample_boss")));
             long bossId = dungeonSink.monsterSpawned.get(0).monsterId();
 
-            dungeonWorld.setTarget(1L, bossId);
-
-            awaitTrue(
+            targetAndAttackUntil(
+                    dungeonWorld,
+                    bossId,
                     () -> dungeonSink.monsterDespawned.stream().anyMatch(d -> d.monsterId() == bossId),
                     Duration.ofSeconds(25));
 
@@ -449,9 +489,9 @@ class WorldFacadeTest {
             long bossId = dungeonSink.monsterSpawned.get(0).monsterId();
 
             dungeonWorld.applyEquipmentBonus(1L, 1000); // đủ lớn để hạ gục BOSS_MAX_HP (320) ngay đòn đầu.
-            dungeonWorld.setTarget(1L, bossId);
 
-            awaitTrue(() -> dungeonSink.monsterDespawned.stream().anyMatch(d -> d.monsterId() == bossId));
+            targetAndAttackUntil(dungeonWorld, bossId, () -> dungeonSink.monsterDespawned.stream()
+                    .anyMatch(d -> d.monsterId() == bossId));
 
             // Chờ đủ lâu hơn MONSTER_RESPAWN_SECONDS (10s, hằng số dùng chung với world chính) rồi
             // xác nhận KHÔNG có spawn thứ 2 — khác awaitTrue (chờ 1 điều kiện TRỞ THÀNH true), ở
@@ -483,15 +523,14 @@ class WorldFacadeTest {
     }
 
     @Test
-    void shouldDealDamageAndEventuallyKillMonster_whenTargetSet() {
+    void shouldDealDamageAndEventuallyKillMonster_whenAttackCommandRepeated() {
         world.start();
         world.attachCharacter(1L, 5f, 6f, DEFAULT_STATS); // cách quái (5,5) đúng 1m — trong tầm đánh (2m)
         awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
         long monsterId = sink.monsterSpawned.get(0).monsterId();
 
-        world.setTarget(1L, monsterId);
-
-        awaitTrue(() -> sink.monsterDespawned.stream().anyMatch(d -> d.target() == 1L && d.monsterId() == monsterId));
+        targetAndAttackUntil(world, monsterId, () -> sink.monsterDespawned.stream()
+                .anyMatch(d -> d.target() == 1L && d.monsterId() == monsterId));
         // Đòn hạ gục PHẢI có targetDied=true — không chỉ despawn suông không rõ lý do.
         assertThat(sink.attackResults.stream().anyMatch(a -> a.defender() == monsterId && a.died()))
                 .isTrue();
@@ -507,8 +546,8 @@ class WorldFacadeTest {
         awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
         long firstMonsterId = sink.monsterSpawned.get(0).monsterId();
 
-        world.setTarget(1L, firstMonsterId);
-        awaitTrue(() -> sink.monsterDespawned.stream().anyMatch(d -> d.monsterId() == firstMonsterId));
+        targetAndAttackUntil(world, firstMonsterId, () -> sink.monsterDespawned.stream()
+                .anyMatch(d -> d.monsterId() == firstMonsterId));
 
         // Quái hồi sinh là entity MỚI (ID khác — WorldFacade không tái dùng ID đã cấp), đầy máu.
         // MONSTER_RESPAWN_SECONDS=10s > 5s mặc định của awaitTrue — dùng deadline dài hơn.
@@ -523,17 +562,19 @@ class WorldFacadeTest {
     }
 
     @Test
-    void shouldNotBypassAttackCooldown_bySpammingSetTargetCommand() {
-        // Chống cooldown hack BẰNG THIẾT KẾ (SECURITY.md §8) — client chỉ gửi ID mục tiêu, KHÔNG
-        // gửi cooldown/thời điểm đánh; gửi SetTargetCommand dồn dập không được rút ngắn khoảng
-        // cách giữa các đòn đánh thật (ATTACK_INTERVAL_SECONDS server giữ tuyệt đối).
+    void shouldNotBypassAttackCooldown_bySpammingAttackCommand() {
+        // Chống cooldown hack BẰNG THIẾT KẾ (SECURITY.md §8) — client chỉ gửi Ý ĐỊNH đánh, KHÔNG
+        // gửi cooldown/damage. Từ 2026-08-09 đánh thường phải bấm tay, nên đây thành đường tấn công
+        // THẬT SỰ đáng lo: một client sửa đổi gửi AttackCommand mỗi khung hình. ATTACK_INTERVAL
+        // của server phải giữ tuyệt đối bất kể gửi bao nhiêu gói.
         world.start();
         world.attachCharacter(1L, 5f, 6f, DEFAULT_STATS);
         awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
         long monsterId = sink.monsterSpawned.get(0).monsterId();
+        world.setTarget(1L, monsterId);
 
         for (int i = 0; i < 500; i++) {
-            world.setTarget(1L, monsterId); // spam — không phải input hợp lệ của UI thật nào
+            world.attack(1L); // spam — không phải input hợp lệ của UI thật nào
         }
 
         sleepQuietly(1200); // ~1.2s thật — ATK_SPEED placeholder = 1 đòn/giây (CombatConstants)
@@ -541,8 +582,7 @@ class WorldFacadeTest {
         long attacksLandedOnMonster = sink.attackResults.stream()
                 .filter(a -> a.defender() == monsterId && !a.miss())
                 .count();
-        // Đúng thiết kế: tối đa ~1-2 đòn trong 1.2s dù gửi 500 lệnh — KHÔNG phải 500 đòn (sẽ xảy
-        // ra nếu SetTargetCommand vô tình reset/rút ngắn cooldown).
+        // Đúng thiết kế: tối đa ~1-2 đòn trong 1.2s dù gửi 500 lệnh — KHÔNG phải 500 đòn.
         assertThat(attacksLandedOnMonster).isLessThanOrEqualTo(2);
     }
 
@@ -660,16 +700,16 @@ class WorldFacadeTest {
         world.attachCharacter(3L, -1f, 0f, LOI_STATS); // trung lập với Hỏa
         awaitTrue(() -> sink.spawned.size() >= 6); // 3 nhân vật thấy nhau đủ 2 chiều
 
-        world.setTarget(1L, 2L);
-        awaitTrue(() -> sink.attackResults.stream().anyMatch(a -> a.defender() == 2L && !a.miss()));
+        targetAndAttackUntil(
+                world, 2L, () -> sink.attackResults.stream().anyMatch(a -> a.defender() == 2L && !a.miss()));
         int damageVsPhong = sink.attackResults.stream()
                 .filter(a -> a.defender() == 2L && !a.miss())
                 .findFirst()
                 .orElseThrow()
                 .damage();
 
-        world.setTarget(1L, 3L);
-        awaitTrue(() -> sink.attackResults.stream().anyMatch(a -> a.defender() == 3L && !a.miss()));
+        targetAndAttackUntil(
+                world, 3L, () -> sink.attackResults.stream().anyMatch(a -> a.defender() == 3L && !a.miss()));
         int damageVsLoi = sink.attackResults.stream()
                 .filter(a -> a.defender() == 3L && !a.miss())
                 .findFirst()
@@ -692,9 +732,9 @@ class WorldFacadeTest {
         awaitTrue(() -> sink.spawned.size() >= 2);
 
         world.applyEquipmentBonus(1L, 1000); // đủ lớn để hạ gục CHARACTER_MAX_HP ngay đòn đầu.
-        world.setTarget(1L, 2L);
 
-        awaitTrue(() -> sink.characterDefeated.stream().anyMatch(d -> d.defeatedCharacterId() == 2L));
+        targetAndAttackUntil(
+                world, 2L, () -> sink.characterDefeated.stream().anyMatch(d -> d.defeatedCharacterId() == 2L));
         CharacterDefeated defeat = sink.characterDefeated.stream()
                 .filter(d -> d.defeatedCharacterId() == 2L)
                 .findFirst()
@@ -703,7 +743,10 @@ class WorldFacadeTest {
 
         // Đòn hạ gục chỉ bắn ĐÚNG 1 lần (CombatSystem tự bỏ chọn target sau khi thấy mục tiêu đã
         // chết — xem javadoc WorldFacade#handleCombatResults) dù nhân vật vẫn còn attach trong World.
-        sleepQuietly(1200);
+        // VẪN bấm đánh suốt 1.2s tiếp theo — giữ nguyên ý định gốc của test (CombatSystem tự bỏ
+        // chọn mục tiêu đã chết nên không có đòn thứ hai). Chỉ ngồi im chờ thì không kiểm được gì
+        // kể từ khi đánh thường phải bấm tay (2026-08-09).
+        attackFor(world, Duration.ofMillis(1200));
         assertThat(sink.characterDefeated.stream()
                         .filter(d -> d.defeatedCharacterId() == 2L)
                         .count())
@@ -722,9 +765,8 @@ class WorldFacadeTest {
         awaitTrue(() -> sink.spawned.size() >= 2);
 
         world.applyEquipmentBonus(1L, 1000);
-        world.setTarget(1L, 2L);
 
-        awaitTrue(() -> sink.characterRespawned.stream().anyMatch(r -> r.characterId() == 2L));
+        targetAndAttackUntil(world, 2L, () -> sink.characterRespawned.stream().anyMatch(r -> r.characterId() == 2L));
         CharacterRespawned respawn = sink.characterRespawned.stream()
                 .filter(r -> r.characterId() == 2L)
                 .findFirst()
@@ -736,8 +778,7 @@ class WorldFacadeTest {
 
         // Đánh lại 2L sau khi hồi sinh — HP đòn đầu phải bắt đầu lại từ MAX (đã reset thật trên
         // HealthComponent, không chỉ báo sự kiện suông).
-        world.setTarget(1L, 2L);
-        awaitTrue(() -> sink.attackResults.stream()
+        targetAndAttackUntil(world, 2L, () -> sink.attackResults.stream()
                 .anyMatch(a -> a.defender() == 2L && a.hp() < CombatConstants.CHARACTER_MAX_HP));
     }
 
@@ -756,9 +797,9 @@ class WorldFacadeTest {
             awaitTrue(() -> dungeonSink.spawned.size() >= 2);
 
             dungeonWorld.applyEquipmentBonus(1L, 1000);
-            dungeonWorld.setTarget(1L, 2L);
 
-            awaitTrue(() -> dungeonSink.characterDefeated.stream().anyMatch(d -> d.defeatedCharacterId() == 2L));
+            targetAndAttackUntil(dungeonWorld, 2L, () -> dungeonSink.characterDefeated.stream()
+                    .anyMatch(d -> d.defeatedCharacterId() == 2L));
             sleepQuietly(500);
             assertThat(dungeonSink.characterRespawned).isEmpty();
         } finally {
@@ -910,10 +951,10 @@ class WorldFacadeTest {
         long monsterId = sink.monsterSpawned.get(0).monsterId();
 
         world.applyEquipmentBonus(1L, 200);
-        world.setTarget(1L, monsterId);
 
-        // HIT% placeholder ~91% — chờ đòn trúng đầu tiên, không giả định đòn đầu chắc chắn trúng.
-        awaitTrue(() -> sink.attackResults.stream().anyMatch(a -> a.defender() == monsterId && !a.miss() && a.died()));
+        // HIT% placeholder ~91% — bấm đánh tới khi có đòn trúng, không giả định đòn đầu chắc trúng.
+        targetAndAttackUntil(world, monsterId, () -> sink.attackResults.stream()
+                .anyMatch(a -> a.defender() == monsterId && !a.miss() && a.died()));
     }
 
     @Test
@@ -965,6 +1006,43 @@ class WorldFacadeTest {
         // chính người quan sát trận đánh của người khác). Không quái nào đánh nhân vật 1 cả.
         assertThat(sink.attackResults.stream().anyMatch(a -> a.defender() == 1L))
                 .isFalse();
+    }
+
+    /**
+     * Nhắm {@code targetEntityId} rồi BẤM ĐÁNH liên tục tới khi {@code condition} đúng.
+     *
+     * <p>Thay cho {@code setTarget} + {@link #awaitTrue} thuần kể từ 2026-08-09: nhân vật KHÔNG tự
+     * đánh nữa (chủ dự án quyết sau playtest, xem {@code CombatSystem}), {@code setTarget} giờ chỉ
+     * còn nghĩa "nhắm ai". Luôn dùng nhân vật {@code 1L} — mọi test combat ở file này đều để
+     * {@code 1L} làm bên tấn công.
+     */
+    private static void targetAndAttackUntil(WorldFacade world, long targetEntityId, Supplier<Boolean> condition) {
+        targetAndAttackUntil(world, targetEntityId, condition, Duration.ofSeconds(5));
+    }
+
+    private static void targetAndAttackUntil(
+            WorldFacade world, long targetEntityId, Supplier<Boolean> condition, Duration timeout) {
+        world.setTarget(1L, targetEntityId);
+        Instant deadline = Instant.now().plus(timeout);
+        while (Instant.now().isBefore(deadline)) {
+            if (Boolean.TRUE.equals(condition.get())) {
+                return;
+            }
+            // Bấm dày hơn cooldown thật (1 đòn/giây) — thừa lệnh là no-op, nhưng thưa quá thì test
+            // dài lê thê chờ đúng nhịp. Cùng nhịp poll 10ms của awaitTrue.
+            world.attack(1L);
+            sleepQuietly(10);
+        }
+        throw new AssertionError("Điều kiện không đúng sau " + timeout + " vừa chờ vừa bấm đánh");
+    }
+
+    /** Bấm đánh liên tục ĐỦ {@code duration} — dùng để xác nhận một điều KHÔNG xảy ra dù vẫn bấm. */
+    private static void attackFor(WorldFacade world, Duration duration) {
+        Instant deadline = Instant.now().plus(duration);
+        while (Instant.now().isBefore(deadline)) {
+            world.attack(1L);
+            sleepQuietly(10);
+        }
     }
 
     /** Poll với timeout thay vì {@code Thread.sleep} cố định — tick loop chạy real-time 60Hz. */

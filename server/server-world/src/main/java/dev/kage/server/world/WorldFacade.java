@@ -310,9 +310,14 @@ public final class WorldFacade {
         inbox.add(new WorldCommand.JumpIntentCommand(characterId, sequenceId));
     }
 
-    /** GDD §6 "Auto-target đánh thường" — server tự đánh {@code targetEntityId} khi hết cooldown. */
+    /** Chỉ NHẮM mục tiêu — không tự đánh nữa từ 2026-08-09, xem {@link #attack} ({@code CombatSystem}). */
     public void setTarget(long characterId, long targetEntityId) {
         inbox.add(new WorldCommand.SetTargetCommand(characterId, targetEntityId));
+    }
+
+    /** Ra MỘT đòn đánh thường lên mục tiêu đang nhắm — server tự kiểm cooldown/tầm/stun. */
+    public void attack(long characterId) {
+        inbox.add(new WorldCommand.AttackIntentCommand(characterId));
     }
 
     /** GAMEPLAY.md §3-4 — dùng skill nhắm mục tiêu, server tự kiểm tra mọi điều kiện ({@code SkillSystem}). */
@@ -429,6 +434,7 @@ public final class WorldFacade {
                 case WorldCommand.MoveIntentCommand c -> handleMoveIntent(c);
                 case WorldCommand.JumpIntentCommand c -> handleJumpIntent(c);
                 case WorldCommand.SetTargetCommand c -> handleSetTarget(c.characterId(), c.targetEntityId());
+                case WorldCommand.AttackIntentCommand c -> handleAttackIntent(c.characterId());
                 case WorldCommand.UseSkillCommand c ->
                     handleUseSkill(c.characterId(), c.skillCode(), c.targetEntityId());
                 case WorldCommand.ApplyEquipmentBonusCommand c ->
@@ -527,10 +533,21 @@ public final class WorldFacade {
     }
 
     /**
-     * ADR-033 — áp lực nhảy NẾU đang grounded (bỏ qua an toàn nếu đang lơ lửng, KHÔNG double-jump
-     * ở lát cắt này). {@code VerticalMovementSystem} tự tích luỹ z/vz mỗi tick sau đó, hàm này chỉ
-     * đặt vận tốc ban đầu — cùng phân chia trách nhiệm với {@link #handleMoveIntent} (world đặt
-     * {@code VelocityComponent}, {@code MovementSystem} mới thật sự tích luỹ vị trí).
+     * ADR-033 — áp lực nhảy. {@code VerticalMovementSystem} tự tích luỹ z/vz mỗi tick sau đó, hàm
+     * này chỉ đặt vận tốc ban đầu — cùng phân chia trách nhiệm với {@link #handleMoveIntent} (world
+     * đặt {@code VelocityComponent}, {@code MovementSystem} mới thật sự tích luỹ vị trí).
+     *
+     * <p>Hai loại nhảy, cùng một {@code JumpCommand} (client không nói loại nào — Server Authority,
+     * server tự suy từ trạng thái THẬT của entity):
+     *
+     * <ul>
+     *   <li>Đang đứng đất → cú nhảy thường, {@link WorldConstants#JUMP_VELOCITY_MPS}.
+     *   <li>Đang lơ lửng và còn hạn mức → nhảy đôi kiểu Ninja School Online (chủ dự án yêu cầu
+     *       2026-08-09), {@link WorldConstants#AIR_JUMP_VELOCITY_MPS} CAO HƠN. Hạn mức
+     *       {@link WorldConstants#MAX_AIR_JUMPS} tính theo mỗi lần rời đất, tự reset lúc đáp đất
+     *       ({@code PositionComponent#airJumpsUsed}) — đây là thứ chặn client sửa đổi bay vô hạn.
+     *   <li>Hết hạn mức / đang bị stun → bỏ qua an toàn, vẫn ack để client reconcile sequenceId.
+     * </ul>
      */
     private void handleJumpIntent(WorldCommand.JumpIntentCommand intent) {
         KEntity entity = entitiesByCharacterId.get(intent.characterId());
@@ -538,9 +555,17 @@ public final class WorldFacade {
             return; // Race hiếm — cùng lý do handleMoveIntent.
         }
         PositionComponent position = POSITION.get(entity);
-        if (position.grounded && !StatusEffects.isStunned(STATUS_EFFECT.get(entity))) {
-            position.grounded = false;
-            position.vz = WorldConstants.JUMP_VELOCITY_MPS;
+        if (!StatusEffects.isStunned(STATUS_EFFECT.get(entity))) {
+            if (position.grounded) {
+                position.grounded = false;
+                position.vz = WorldConstants.JUMP_VELOCITY_MPS;
+                // Phòng thủ: hạn mức đã được VerticalMovementSystem xoá lúc đáp đất, đặt lại ở đây
+                // để cú nhảy đầu tiên sau khi attach (chưa đáp đất lần nào) cũng bắt đầu từ 0.
+                position.airJumpsUsed = 0;
+            } else if (position.airJumpsUsed < WorldConstants.MAX_AIR_JUMPS) {
+                position.airJumpsUsed++;
+                position.vz = WorldConstants.AIR_JUMP_VELOCITY_MPS;
+            }
         }
         outboundSink.onMoveAccepted(new WorldOutboundSink.MoveAcceptedSnapshot(
                 intent.characterId(), intent.sequenceId(), position.x, position.y, position.z, position.grounded));
@@ -555,6 +580,19 @@ public final class WorldFacade {
             return; // không tự nhắm chính mình; mục tiêu không tồn tại — bỏ qua an toàn.
         }
         TARGET.get(entity).targetEntityId = targetEntityId;
+    }
+
+    /**
+     * Người chơi bấm nút đánh (2026-08-09). Không kiểm gì thêm ở đây — {@code CombatSystem} sở hữu
+     * toàn bộ luật đánh thường (cooldown/tầm/stun/mục tiêu), cùng phân chia trách nhiệm với
+     * {@link #handleUseSkill} (đẩy thẳng cho {@code SkillSystem} tự validate).
+     */
+    private void handleAttackIntent(long characterId) {
+        KEntity entity = entitiesByCharacterId.get(characterId);
+        if (entity == null) {
+            return; // Race hiếm — cùng lý do handleMoveIntent.
+        }
+        combatSystem.requestAttack(entity);
     }
 
     private void handleUseSkill(long characterId, String skillCode, long targetEntityId) {

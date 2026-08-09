@@ -1,0 +1,129 @@
+package dev.kage.client.core.world;
+
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.math.Matrix4;
+import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.utils.Disposable;
+import com.badlogic.gdx.utils.I18NBundle;
+
+import dev.kage.client.core.ui.theme.KageI18n;
+import dev.kage.engine.ecs.component.PositionComponent;
+import dev.kage.protocol.AttackResultEvent;
+import dev.kage.protocol.SkillResultEvent;
+
+/**
+ * Phản hồi TẠI CHỖ khi một đòn đánh/skill kết thúc: số damage bay lên
+ * ({@link FloatingCombatText}) và hiệu ứng skill ({@link SkillVfxRenderer}), cả hai neo vào đúng vị
+ * trí mục tiêu. Song sinh với {@link CombatAnimationTrigger} (phản hồi trên MODEL nhân vật) — tách
+ * bạch cùng một kiểu: HUD, animation, và hiệu ứng tại chỗ là ba mối quan tâm khác nhau đọc chung
+ * một packet.
+ *
+ * <p>Gộp hai thứ này lại vì chúng dùng CHUNG một phép tra khó: "entity id này đang ở đâu trong thế
+ * giới" — mình (id dương khớp {@code localCharacterId}), quái (id âm, tra
+ * {@link CombatHudController}), hay một nhân vật khác ngoài tầm theo dõi (không biết vị trí → bỏ
+ * qua, không đoán). Trước khi tách ra, phép tra đó nằm lặp hai bản trong {@code WorldScreen}.
+ *
+ * <p>KHÔNG sở hữu {@link BitmapFont} — font thuộc về {@code CombatHud}, ở đây chỉ mượn để vẽ.
+ */
+final class CombatFeedbackPresenter implements Disposable {
+
+    // MEDIUM tường minh — bản cài đóng gói đúng 1 tier mặc định theo ADR-028, giống lý do
+    // CharacterModelRenderer của WorldScreen nhận tier tường minh chứ không có default ngầm.
+    private static final GraphicsTier VFX_TIER = GraphicsTier.MEDIUM;
+
+    private final long localCharacterId;
+    private final PositionComponent localPosition;
+    private final CombatHudController combat;
+    private final SkillVfxRenderer skillVfx = new SkillVfxRenderer(VFX_TIER);
+    private final FloatingCombatText floatingText;
+    // Bundle RIÊNG đúng quy ước KageI18n (mỗi nơi tự nạp, không dùng chung instance) — cần cho nhãn
+    // "Né!" của số damage bay lên.
+    private final I18NBundle i18n = KageI18n.load();
+    // Biến tạm TÁI DÙNG cho điểm neo — FloatingCombatText/SkillVfxRenderer đọc giá trị ngay trong
+    // lời gọi nên an toàn (Điều 31).
+    private final Vector3 anchor = new Vector3();
+
+    /**
+     * @param localPosition {@link PositionComponent} của CHÍNH người chơi — giữ tham chiếu thẳng
+     *     (không copy) là đúng: entity người chơi tạo một lần và không bao giờ đổi component, nên
+     *     tham chiếu này luôn là vị trí hiện tại.
+     */
+    CombatFeedbackPresenter(
+            long localCharacterId, PositionComponent localPosition, CombatHudController combat, BitmapFont font) {
+        this.localCharacterId = localCharacterId;
+        this.localPosition = localPosition;
+        this.combat = combat;
+        this.floatingText = new FloatingCombatText(font);
+    }
+
+    /** Đòn đánh thường — chỉ có số damage, không có hiệu ứng riêng. */
+    void onAttackResult(AttackResultEvent event) {
+        if (resolveAnchor(event.getTargetEntityId())) {
+            showNumber(event.getTargetEntityId(), event.getDamage(), event.getIsMiss());
+        }
+    }
+
+    /** Skill — hiệu ứng phát tại mục tiêu, kèm số damage như đòn thường. */
+    void onSkillResult(SkillResultEvent event) {
+        if (resolveAnchor(event.getTargetEntityId())) {
+            skillVfx.play(event.getSkillCode(), anchor.x, anchor.y, anchor.z);
+            showNumber(event.getTargetEntityId(), event.getDamage(), event.getIsMiss());
+        }
+    }
+
+    /**
+     * Ghi vị trí neo của {@code targetEntityId} vào {@link #anchor}.
+     *
+     * @return {@code false} nếu không biết entity này (nhân vật khác ngoài tầm theo dõi) — bỏ qua
+     *     cả số lẫn hiệu ứng, không đoán vị trí. Số của người khác cũng không phải thứ người chơi
+     *     cần thấy.
+     */
+    private boolean resolveAnchor(long targetEntityId) {
+        if (targetEntityId == localCharacterId) {
+            anchor.set(localPosition.x, localPosition.y, localPosition.z);
+            return true;
+        }
+        CombatHudController.MonsterState monster = combat.monsters().get(targetEntityId);
+        if (monster == null) {
+            return false;
+        }
+        anchor.set(monster.x(), monster.y(), 0f);
+        return true;
+    }
+
+    /**
+     * Màu phân biệt NGAY không cần đọc số: vàng = mình gây ra, đỏ = mình phải chịu, xám = né.
+     * {@link #anchor} phải vừa được {@link #resolveAnchor} ghi.
+     */
+    private void showNumber(long targetEntityId, int damage, boolean miss) {
+        if (miss) {
+            floatingText.show(i18n.get("hud.combat.miss"), FloatingCombatText.MISS, anchor);
+            return;
+        }
+        Color color =
+                targetEntityId == localCharacterId ? FloatingCombatText.DAMAGE_TAKEN : FloatingCombatText.DAMAGE_DEALT;
+        floatingText.show("-" + damage, color, anchor);
+    }
+
+    void resize(int width, int height) {
+        floatingText.resize(width, height);
+    }
+
+    /**
+     * @param projection ma trận của nhánh render đang hoạt động — hiệu ứng vẽ TRONG không gian thế
+     *     giới.
+     * @param projector cùng camera đó nhưng để chiếu ra màn hình — số damage vẽ ở không gian màn
+     *     hình cho chữ sắc nét (xem {@link FloatingCombatText}).
+     */
+    void render(float deltaTime, Matrix4 projection, WorldToScreen projector) {
+        skillVfx.render(deltaTime, projection);
+        floatingText.render(deltaTime, projector);
+    }
+
+    @Override
+    public void dispose() {
+        skillVfx.dispose();
+        floatingText.dispose(); // KHÔNG dispose font — thuộc về CombatHud, xem javadoc lớp.
+    }
+}

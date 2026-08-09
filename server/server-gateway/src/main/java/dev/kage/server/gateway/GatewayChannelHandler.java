@@ -55,6 +55,7 @@ import dev.kage.protocol.AcceptTradeRequestResponse;
 import dev.kage.protocol.ApproveGuildJoinRequestCommand;
 import dev.kage.protocol.ApproveGuildJoinRequestOutcome;
 import dev.kage.protocol.ApproveGuildJoinRequestResponse;
+import dev.kage.protocol.AttackCommand;
 import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.BuyItemResponse;
 import dev.kage.protocol.BuyOutcome;
@@ -325,6 +326,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_MOVE_COMMAND_VALUE, this::handleMoveCommand),
             Map.entry(Opcode.OPCODE_JUMP_COMMAND_VALUE, this::handleJumpCommand),
             Map.entry(Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, this::handleSetTargetCommand),
+            Map.entry(Opcode.OPCODE_ATTACK_COMMAND_VALUE, this::handleAttackCommand),
             Map.entry(Opcode.OPCODE_USE_SKILL_COMMAND_VALUE, this::handleUseSkillCommand),
             Map.entry(Opcode.OPCODE_EQUIP_ITEM_COMMAND_VALUE, this::handleEquipItemCommand),
             Map.entry(Opcode.OPCODE_UNEQUIP_ITEM_COMMAND_VALUE, this::handleUnequipItemCommand),
@@ -615,6 +617,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             SelectCharacterResponse response =
                     SelectCharacterResponse.newBuilder().setSuccess(true).build();
             send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            // Vạch EXP phải có số NGAY lúc vào world, không đợi giết con quái đầu tiên (2026-08-09).
+            // amount=0 = chỉ đọc, không ghi gì. Đang trên authExecutor (Virtual Thread) nên chạm DB
+            // ở đây an toàn, cùng lý do notifyFriendsPresenceChanged bên dưới.
+            worldGateway.registry().sendExperience(characterId, characterFacade.grantExperience(characterId, 0L));
             // Đang trên authExecutor (Virtual Thread) rồi — friendFacade.listFriends chạm DB, an
             // toàn gọi thẳng, không cần đẩy thêm 1 lớp executor nữa (khác channelInactive bên dưới).
             notifyFriendsPresenceChanged(characterId, true);
@@ -753,6 +759,22 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             return;
         }
         currentWorldFacade(characterId).setTarget(characterId, command.getTargetEntityId());
+    }
+
+    // AttackCommand KHÔNG chạm DB — chỉ enqueue vào server-world, xử lý thẳng trên EventLoop giống
+    // handleSetTargetCommand. Không rate limit riêng: cooldown đánh thường (CombatSystem, 1 đòn/
+    // giây) tự chặn tần suất THẬT — spam gói quá cooldown chỉ là no-op, cùng lý do UseSkillCommand
+    // bên dưới không có rate limit.
+    private void handleAttackCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        AttackCommand.parseFrom(payload); // message rỗng — parse chỉ để validate wire format.
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        currentWorldFacade(characterId).attack(characterId);
     }
 
     // UseSkillCommand KHÔNG chạm DB — chỉ enqueue vào server-world, xử lý thẳng trên EventLoop

@@ -23,4 +23,17 @@ public final class PositionComponent implements Component {
     public float prevZ;
     public float vz;
     public boolean grounded = true;
+
+    /**
+     * Số lần đã bật nhảy GIỮA KHÔNG TRUNG kể từ lần rời mặt đất gần nhất (nhảy đôi kiểu Ninja
+     * School Online — chủ dự án yêu cầu 2026-08-09, xem ADR-033). Chỉ có ý nghĩa khi
+     * {@code grounded == false}; {@code VerticalMovementSystem} tự đặt về 0 mỗi lần chạm đất, nên
+     * người đọc field này không cần tự dọn.
+     *
+     * <p>Đây là DỮ LIỆU trạng thái dọc như {@code vz}/{@code grounded}, không phải luật chơi:
+     * "được nhảy thêm mấy lần" là hằng số gameplay nằm ở {@code WorldConstants} của
+     * {@code server-world}/{@code client-core}, engine không biết ngưỡng đó (cùng lý do
+     * {@code VerticalMovementSystem} nhận gravity qua constructor).
+     */
+    public int airJumpsUsed;
 }

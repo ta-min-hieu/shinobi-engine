@@ -183,6 +183,17 @@
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
 
+    <!-- Cùng LÝ DO Y HỆT entry ngay trên, chỉ khác tầng: `*Facade` ở `api/` cũng giữ tham chiếu
+         Port cho những thao tác không có nghiệp vụ gì ngoài delegation (xem javadoc
+         CharacterFacade.characterPort). Defensive-copy một interface DI là vô nghĩa.
+         ⚠️ Xuất hiện 2026-08-09 khi thêm addExperience/saveLevel vào CharacterPort — SpotBugs chỉ
+         xếp interface vào loại "mutable" (và mới báo EI2) sau khi nó có đủ method ghi; code Facade
+         không hề đổi. Tức đây là ngưỡng phân loại của công cụ, không phải lỗi mới sinh ra. -->
+    <Match>
+        <Class name="~dev\.kage\.[a-z]+\.api\..*Facade"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
     <!-- Roll rơi đồ / cường hoá (gameplay, KHÔNG bảo mật) — sinh ở server đúng quy tắc
          (ENGINE.md §10, javadoc class), predictable PRNG đúng cho gameplay, không cần SecureRandom. -->
     <Match>

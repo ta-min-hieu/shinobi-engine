@@ -51,6 +51,7 @@ enum Opcode {
   OPCODE_SELECT_CHARACTER_RESPONSE = 205;
   OPCODE_SELECT_FACTION_REQUEST = 206;
   OPCODE_SELECT_FACTION_RESPONSE = 207;
+  OPCODE_EXPERIENCE_CHANGED_EVENT = 208; // vạch kinh nghiệm (chủ dự án 2026-08-09)
 
   // --- Movement / World (300-399) ---
   OPCODE_MOVE_COMMAND = 300;
@@ -69,6 +70,7 @@ enum Opcode {
   OPCODE_MONSTER_MOVED_EVENT = 404;
   OPCODE_USE_SKILL_COMMAND = 405;
   OPCODE_SKILL_RESULT_EVENT = 406;
+  OPCODE_ATTACK_COMMAND = 407; // đánh thường BẰNG TAY (chủ dự án 2026-08-09) — xem combat.proto
 
   // --- Inventory / Equipment (500-599) ---
   OPCODE_ITEM_GRANTED_EVENT = 500;

@@ -1,17 +1,17 @@
 package dev.kage.client.core.world;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
+import com.badlogic.gdx.InputAdapter;
+import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Matrix4;
-import com.badlogic.gdx.math.Vector3;
-import com.badlogic.gdx.utils.I18NBundle;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -22,7 +22,6 @@ import dev.kage.client.core.input.GameAction;
 import dev.kage.client.core.input.InputMapper;
 import dev.kage.client.core.net.GameConnection;
 import dev.kage.client.core.ui.hud.CombatHud;
-import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.engine.core.GameScreen;
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.EcsWorld;
@@ -38,16 +37,13 @@ import dev.kage.protocol.CharacterRespawnedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.CharacterSummary;
 import dev.kage.protocol.CostumeTier;
-import dev.kage.protocol.JumpCommand;
+import dev.kage.protocol.ExperienceChangedEvent;
 import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
-import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.Opcode;
-import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.SkillResultEvent;
-import dev.kage.protocol.UseSkillCommand;
 import dev.kage.protocol.wire.PacketCodec;
 
 /**
@@ -67,7 +63,7 @@ public final class WorldScreen implements GameScreen {
     private static final ComponentMapper<VelocityComponent> VELOCITY = ComponentMapper.getFor(VelocityComponent.class);
 
     private final InputMapper inputMapper;
-    private final GameConnection connection;
+    private final WorldCommandSender sender;
     private final EcsWorld world;
     private final KEntity localPlayer;
     private final Map<Long, KEntity> remoteCharacters = new HashMap<>();
@@ -88,8 +84,11 @@ public final class WorldScreen implements GameScreen {
      */
     private final long localCharacterId;
 
-    /** Cấp nhân vật, chụp lúc chọn nhân vật — chưa có gói lên cấp giữa trận nên không đổi runtime. */
-    private final int characterLevel;
+    /**
+     * Cấp nhân vật — khởi tạo từ lúc chọn nhân vật, sau đó server cập nhật qua
+     * {@link ExperienceChangedEvent} (từ 2026-08-09 đã lên cấp được thật giữa trận).
+     */
+    private int characterLevel;
 
     private final OrthographicCamera camera = new OrthographicCamera();
     private final Viewport viewport;
@@ -97,23 +96,46 @@ public final class WorldScreen implements GameScreen {
     // MEDIUM tường minh — bản cài đóng gói đúng 1 tier mặc định theo ADR-028, không phải để trống
     // dựa vào default ngầm (không có default: CharacterModelRenderer bắt buộc tham số tier).
     private final CharacterModelRenderer models = new CharacterModelRenderer(GraphicsTier.MEDIUM);
-    private final SkillVfxRenderer skillVfx = new SkillVfxRenderer(GraphicsTier.MEDIUM);
+
+    /**
+     * Chiếu điểm world sang màn hình bằng camera của nhánh render ĐANG hoạt động. Hai method
+     * reference dựng SẴN 1 lần thay vì viết {@code models::project} tại chỗ mỗi khung — mỗi lần
+     * đánh giá một method reference bắt biến (capture {@code models}) là một lần cấp phát, thứ bị
+     * cấm trong game loop (Điều 31).
+     */
+    private final WorldToScreen modelProjector = models::project;
+
+    private final WorldToScreen fallbackProjector = camera::project;
+
+    private final MonsterPicker monsterPicker = new MonsterPicker();
 
     private final CombatHudController combatHudController;
     private final CombatAnimationTrigger combatAnimationTrigger;
     private final CombatHud combatHud = new CombatHud();
-    private final FloatingCombatText floatingText = new FloatingCombatText(combatHud.font());
-    // Bundle RIÊNG đúng quy ước KageI18n (mỗi nơi tự nạp, không dùng chung instance) — cần cho nhãn
-    // "Né!" của số damage bay lên.
-    private final I18NBundle i18n = KageI18n.load();
-    // Biến tạm TÁI DÙNG cho điểm neo số damage — show() sao chép giá trị ngay nên an toàn (Điều 31).
-    private final Vector3 combatNumberAnchor = new Vector3();
+
+    /** Số damage + hiệu ứng skill neo tại vị trí mục tiêu — xem {@link CombatFeedbackPresenter}. */
+    private final CombatFeedbackPresenter combatFeedback;
+
+    /**
+     * HUD trước, thế giới sau: {@code Stage} trả {@code true} ở {@code touchDown} CHỈ KHI có actor
+     * thật nhận cú click, nên bấm nút skill không đồng thời bị hiểu là click chọn mục tiêu, còn
+     * click ra vùng trống của HUD thì rơi xuống {@link WorldTargetPicker} đúng như mong đợi.
+     */
+    private final InputMultiplexer inputProcessor;
 
     private float lastSentDirX;
-    // Edge-detection cho JUMP (ADR-033) — GameAction.JUMP là "đang giữ", nhưng nhảy chỉ áp lực 1
-    // lần lúc VỪA nhấn (rising edge), không lặp lại mỗi frame khi giữ phím (khác MOVE_LEFT/RIGHT,
-    // vốn là hướng liên tục).
-    private boolean jumpKeyWasPressed;
+
+    /**
+     * Toàn bộ trạng thái thời gian của nút nhảy (mép nhấn + đồng hồ giữ nút) — {@code GameAction}
+     * chỉ nói "đang giữ hay không", biến nó thành cú nhảy đơn/đôi là việc của lớp này.
+     */
+    private final JumpInputController jumpInput = new JumpInputController();
+
+    /** Edge-detection cho phím Enter — giữ phím không spam skill (nhảy có bộ đếm riêng ở {@link #jumpInput}). */
+    private boolean skillKeyWasPressed;
+
+    /** Phím Z + nút Đánh trên HUD gộp về một nguồn — xem {@link AttackInputController}. */
+    private final AttackInputController attackInput = new AttackInputController();
 
     /**
      * @param context {@link EcsWorld} + {@link InputMapper} gộp lại (CODING-STANDARDS
@@ -128,7 +150,7 @@ public final class WorldScreen implements GameScreen {
     public WorldScreen(PlayContext context, GameConnection connection, CharacterSummary character) {
         this.world = context.world();
         this.inputMapper = context.inputMapper();
-        this.connection = connection;
+        this.sender = new WorldCommandSender(connection);
         this.localCharacterId = character.getId();
         this.characterLevel = character.getLevel();
         this.combatHudController = new CombatHudController(character.getId(), character.getFaction());
@@ -157,15 +179,23 @@ public final class WorldScreen implements GameScreen {
         models.addCharacter(
                 LOCAL_CHARACTER_ID, CharacterModelKey.of(character.getFaction(), CostumeTier.COSTUME_TIER_UNSPECIFIED));
 
+        // SAU khi localPlayer tồn tại: presenter giữ tham chiếu thẳng tới PositionComponent của
+        // chính người chơi (xem javadoc constructor của nó).
+        this.combatFeedback = new CombatFeedbackPresenter(
+                localCharacterId, POSITION.get(localPlayer), combatHudController, combatHud.font());
+
         combatHud.setSkillLabel(combatHudController.skillNameKey());
         combatHud.setOnSkillClicked(this::onSkillButtonClicked);
+        combatHud.setOnAttackClicked(attackInput::onButtonClicked);
+        this.inputProcessor = new InputMultiplexer(combatHud.stage(), new WorldTargetPicker());
     }
 
     @Override
     public void show() {
-        // Input di chuyển vẫn poll qua InputMapper (không đổi) — HUD combat là actor Scene2D đầu
-        // tiên của client, chưa ai khác đăng ký InputProcessor nên không tranh chấp.
-        Gdx.input.setInputProcessor(combatHud.stage());
+        // Input di chuyển/nhảy/skill vẫn poll qua InputMapper (không đổi) — chỉ CLICK chọn mục tiêu
+        // mới cần InputProcessor, vì đó là sự kiện tại một điểm cụ thể chứ không phải trạng thái
+        // giữ/nhả để poll được.
+        Gdx.input.setInputProcessor(inputProcessor);
     }
 
     @Override
@@ -178,21 +208,23 @@ public final class WorldScreen implements GameScreen {
         viewport.update(width, height, true);
         models.resize(camera.viewportWidth, camera.viewportHeight);
         combatHud.resize(width, height);
-        floatingText.resize(width, height);
+        combatFeedback.resize(width, height);
     }
 
     @Override
     public void fixedUpdate(float fixedDeltaTime) {
         processInboundPackets();
         updateLocalMovementIntent();
-        updateJumpIntent();
+        updateJumpIntent(fixedDeltaTime);
+        updateAttackIntent(fixedDeltaTime);
+        updateSkillIntent();
         combatHudController.tick(fixedDeltaTime);
         remoteMotionTracker.tick(fixedDeltaTime);
     }
 
     private void processInboundPackets() {
         PacketCodec.Frame frame;
-        while ((frame = connection.pollInbound()) != null) {
+        while ((frame = sender.pollInbound()) != null) {
             dispatch(frame);
         }
     }
@@ -228,6 +260,8 @@ public final class WorldScreen implements GameScreen {
             onCharacterDespawned(CharacterDespawnedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_CHARACTER_RESPAWNED_EVENT_VALUE) {
             onCharacterRespawned(CharacterRespawnedEvent.parseFrom(payload));
+        } else if (opcode == Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE) {
+            onExperienceChanged(ExperienceChangedEvent.parseFrom(payload));
         } else {
             return false;
         }
@@ -257,60 +291,14 @@ public final class WorldScreen implements GameScreen {
     private void onAttackResult(AttackResultEvent event) {
         combatHudController.onAttackResult(event);
         combatAnimationTrigger.onAttackResult(event);
-        showCombatNumber(event.getTargetEntityId(), event.getDamage(), event.getIsMiss());
+        combatFeedback.onAttackResult(event);
     }
 
     /** Kết quả 1 lần dùng skill THẬT — cùng hình dạng {@link AttackResultEvent}. */
     private void onSkillResult(SkillResultEvent event) {
         combatHudController.onSkillResult(event);
         combatAnimationTrigger.onSkillResult(event);
-        playSkillVfxAtTarget(event.getSkillCode(), event.getTargetEntityId());
-        showCombatNumber(event.getTargetEntityId(), event.getDamage(), event.getIsMiss());
-    }
-
-    /**
-     * Số damage bay lên tại vị trí mục tiêu. Màu phân biệt NGAY không cần đọc số: vàng = mình gây
-     * ra, đỏ = mình phải chịu, xám = né. Mục tiêu ngoài tầm theo dõi (nhân vật khác) thì bỏ qua —
-     * không có vị trí để neo, và số của người khác cũng không phải thứ người chơi cần thấy.
-     */
-    private void showCombatNumber(long targetEntityId, int damage, boolean miss) {
-        boolean targetIsSelf = targetEntityId == localCharacterId;
-        if (targetIsSelf) {
-            PositionComponent pos = POSITION.get(localPlayer);
-            combatNumberAnchor.set(pos.x, pos.y, pos.z);
-        } else {
-            CombatHudController.MonsterState monster =
-                    combatHudController.monsters().get(targetEntityId);
-            if (monster == null) {
-                return;
-            }
-            combatNumberAnchor.set(monster.x(), monster.y(), 0f);
-        }
-
-        if (miss) {
-            floatingText.show(i18n.get("hud.combat.miss"), FloatingCombatText.MISS, combatNumberAnchor);
-            return;
-        }
-        Color color = targetIsSelf ? FloatingCombatText.DAMAGE_TAKEN : FloatingCombatText.DAMAGE_DEALT;
-        floatingText.show("-" + damage, color, combatNumberAnchor);
-    }
-
-    /**
-     * Phát hiệu ứng skill tại vị trí MỤC TIÊU. Mục tiêu có thể là quái (id âm — tra
-     * {@code combatHudController}) hoặc chính mình (id dương khớp {@link #localCharacterId}); id lạ
-     * (nhân vật khác ngoài tầm theo dõi) thì bỏ qua, không đoán vị trí.
-     */
-    private void playSkillVfxAtTarget(String skillCode, long targetEntityId) {
-        if (targetEntityId == localCharacterId) {
-            PositionComponent pos = POSITION.get(localPlayer);
-            skillVfx.play(skillCode, pos.x, pos.y, pos.z);
-            return;
-        }
-        CombatHudController.MonsterState monster =
-                combatHudController.monsters().get(targetEntityId);
-        if (monster != null) {
-            skillVfx.play(skillCode, monster.x(), monster.y(), 0f);
-        }
+        combatFeedback.onSkillResult(event);
     }
 
     private void onMoveResponse(MoveResponse response) {
@@ -328,6 +316,12 @@ public final class WorldScreen implements GameScreen {
             pos.z = response.getZ();
             pos.prevZ = pos.z;
             pos.grounded = response.getGrounded();
+            if (pos.grounded) {
+                // Server nói đang đứng đất ⇒ hạn mức nhảy đôi bên server CHẮC CHẮN đã reset
+                // (VerticalMovementSystem xoá lúc đáp đất) — theo server luôn, tránh trường hợp
+                // client tưởng còn nợ 1 lần nhảy giữa không trung dù đã đứng trên đất.
+                pos.airJumpsUsed = 0;
+            }
             // vz KHÔNG snap theo server — MoveResponse không mang vz (chỉ x/y/z/grounded, xem
             // movement.proto). Dự đoán cục bộ tiếp tục dùng vz hiện có, tự hội tụ đúng quỹ đạo ở
             // các tick sau vì VerticalMovementSystem chạy CÙNG công thức cả 2 phía (ADR-033) —
@@ -395,25 +389,25 @@ public final class WorldScreen implements GameScreen {
         pos.prevZ = 0f;
         pos.vz = 0f;
         pos.grounded = true;
+        pos.airJumpsUsed = 0;
         combatHudController.onRespawn(event.getCurrentHp(), event.getCurrentChi());
         models.resetAfterRespawn(LOCAL_CHARACTER_ID);
+    }
+
+    /**
+     * Vạch kinh nghiệm/cấp của CHÍNH mình vừa đổi (2026-08-09) — server gửi cả lúc vừa vào world
+     * (để vạch có số ngay) lẫn mỗi lần nhận EXP. Client KHÔNG tự tính đường cong: mọi con số ở đây
+     * là do server đưa (Điều 15).
+     */
+    private void onExperienceChanged(ExperienceChangedEvent event) {
+        characterLevel = event.getLevel();
+        combatHud.setExperience(event.getExpIntoLevel(), event.getExpForNextLevel());
     }
 
     private void onMonsterSpawned(MonsterSpawnedEvent event) {
         long autoTargetId = combatHudController.onMonsterSpawned(event);
         if (autoTargetId != 0L) {
-            sendSetTarget(autoTargetId);
-        }
-    }
-
-    private void sendSetTarget(long targetEntityId) {
-        try {
-            SetTargetCommand command = SetTargetCommand.newBuilder()
-                    .setTargetEntityId(targetEntityId)
-                    .build();
-            connection.send(Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, connection.nextSequenceId(), command.toByteArray());
-        } catch (IOException e) {
-            LOG.debug("Gửi SetTargetCommand thất bại (mất kết nối tạm thời)", e);
+            sender.setTarget(autoTargetId);
         }
     }
 
@@ -426,15 +420,7 @@ public final class WorldScreen implements GameScreen {
         // gọi lại models.playSkillCast() lần nữa nhưng vô hại (playOneShotState bỏ qua nếu clip
         // giống hệt đang chạy) — không có xung đột gameplay vì animation không quyết định gì.
         models.playSkillCast(LOCAL_CHARACTER_ID);
-        try {
-            UseSkillCommand command = UseSkillCommand.newBuilder()
-                    .setSkillCode(combatHudController.skillCode())
-                    .setTargetEntityId(combatHudController.currentTargetId())
-                    .build();
-            connection.send(Opcode.OPCODE_USE_SKILL_COMMAND_VALUE, connection.nextSequenceId(), command.toByteArray());
-        } catch (IOException e) {
-            LOG.debug("Gửi UseSkillCommand thất bại (mất kết nối tạm thời)", e);
-        }
+        sender.useSkill(combatHudController.skillCode(), combatHudController.currentTargetId());
     }
 
     /**
@@ -466,48 +452,66 @@ public final class WorldScreen implements GameScreen {
 
         if (normalizedDirX != lastSentDirX) {
             lastSentDirX = normalizedDirX;
-            sendMoveCommand(normalizedDirX, 0f);
-        }
-    }
-
-    private void sendMoveCommand(float dirX, float dirY) {
-        try {
-            MoveCommand command =
-                    MoveCommand.newBuilder().setDirX(dirX).setDirY(dirY).build();
-            connection.send(Opcode.OPCODE_MOVE_COMMAND_VALUE, connection.nextSequenceId(), command.toByteArray());
-        } catch (IOException e) {
-            // Mất kết nối tạm thời — bình thường (GameConnection tự reconnect), hướng mới nhất sẽ
-            // được gửi lại lần input đổi tiếp theo, không cần retry thủ công ở đây.
-            LOG.debug("Gửi MoveCommand thất bại (mất kết nối tạm thời)", e);
+            sender.moveDirection(normalizedDirX);
         }
     }
 
     /**
-     * ADR-033 — nhảy chỉ áp lực lúc VỪA nhấn (rising edge của {@link GameAction#JUMP}, xem
-     * {@link #jumpKeyWasPressed}), không lặp lại khi giữ phím. Dự đoán cục bộ NGAY (CLIENT.md §6)
-     * bằng cùng điều kiện {@code grounded} server sẽ kiểm — server vẫn là nguồn chân lý cuối cùng
-     * qua {@code MoveResponse} nếu dự đoán sai (VD lệnh nhảy trước đó chưa kịp server xử lý xong).
+     * ADR-033 + nhảy đôi (chủ dự án yêu cầu 2026-08-09) — luật nhảy nằm trong
+     * {@link JumpInputController}; ở đây chỉ nối input với mạng.
      */
-    private void updateJumpIntent() {
+    private void updateJumpIntent(float fixedDeltaTime) {
         boolean jumpPressed = inputMapper.isPressed(GameAction.JUMP);
-        if (jumpPressed && !jumpKeyWasPressed) {
-            PositionComponent pos = POSITION.get(localPlayer);
-            if (pos.grounded) {
-                pos.grounded = false;
-                pos.vz = WorldConstants.JUMP_VELOCITY_MPS;
-                sendJumpCommand();
-            }
+        if (jumpInput.update(jumpPressed, POSITION.get(localPlayer), fixedDeltaTime)) {
+            sender.jump();
         }
-        jumpKeyWasPressed = jumpPressed;
     }
 
-    private void sendJumpCommand() {
-        try {
-            JumpCommand command = JumpCommand.newBuilder().build();
-            connection.send(Opcode.OPCODE_JUMP_COMMAND_VALUE, connection.nextSequenceId(), command.toByteArray());
-        } catch (IOException e) {
-            LOG.debug("Gửi JumpCommand thất bại (mất kết nối tạm thời)", e);
+    /**
+     * Đánh thường BẰNG TAY (chủ dự án yêu cầu 2026-08-09) — phím Z hoặc nút Đánh trên HUD, gộp ở
+     * {@link AttackInputController}. Animation vung đòn phát NGAY tại chỗ (dự đoán cục bộ hợp lệ
+     * theo CLIENT.md §6 — animation không quyết định gameplay); kết quả thật tới sau qua
+     * {@code AttackResultEvent} và có thể là trượt/ngoài tầm, đó là chuyện của server.
+     */
+    private void updateAttackIntent(float fixedDeltaTime) {
+        if (attackInput.update(inputMapper.isPressed(GameAction.ATTACK), fixedDeltaTime)) {
+            models.playAttack(LOCAL_CHARACTER_ID);
+            sender.attack();
         }
+    }
+
+    /**
+     * Phím Enter = bấm nút skill (chủ dự án yêu cầu 2026-08-09) — đi qua ĐÚNG đường của nút chuột
+     * ({@link #onSkillButtonClicked}) chứ không nhân bản logic, nên hồi chiêu/Khí/mục tiêu được
+     * kiểm y hệt. Rising edge: giữ Enter không bắn skill liên tục.
+     */
+    private void updateSkillIntent() {
+        boolean skillPressed = inputMapper.isPressed(GameAction.USE_SKILL);
+        if (skillPressed && !skillKeyWasPressed) {
+            onSkillButtonClicked();
+        }
+        skillKeyWasPressed = skillPressed;
+    }
+
+    /**
+     * Click chuột trái vào một con quái = chọn nó làm mục tiêu (chủ dự án yêu cầu 2026-08-09).
+     *
+     * @param screenX toạ độ chuột thô từ {@code InputProcessor}.
+     * @param screenY toạ độ chuột thô ({@code InputProcessor} lấy gốc TRÊN-trái).
+     * @return {@code true} nếu click trúng một con quái — nuốt sự kiện, không để rơi tiếp xuống.
+     */
+    private boolean selectTargetAt(int screenX, int screenY) {
+        // Lật y sang quy ước GL của WorldToScreen (gốc DƯỚI-trái).
+        float glScreenY = Gdx.graphics.getHeight() - screenY;
+        WorldToScreen projector = models.isEnabled() ? modelProjector : fallbackProjector;
+        long monsterId = monsterPicker.pick(combatHudController.monsters(), screenX, glScreenY, projector);
+        if (monsterId == 0L) {
+            return false; // click vào chỗ trống — GIỮ NGUYÊN mục tiêu cũ, không bỏ chọn.
+        }
+        if (combatHudController.selectTarget(monsterId)) {
+            sender.setTarget(monsterId);
+        }
+        return true;
     }
 
     @Override
@@ -521,16 +525,14 @@ public final class WorldScreen implements GameScreen {
             renderModels(alpha);
             drawMonsters(models.combined());
             DemoPlatforms.render(shapeRenderer, models.combined());
-            // VFX vẽ SAU cùng trong nhánh 3D — hiệu ứng luôn hiện đè lên nhân vật/địa hình, đúng
+            // VFX/số damage vẽ SAU cùng trong nhánh 3D — luôn hiện đè lên nhân vật/địa hình, đúng
             // thứ tự "nhân vật vẽ trước, VFX vẽ đè sau" của RENDERING.md §2.
-            skillVfx.render(Gdx.graphics.getDeltaTime(), models.combined());
-            floatingText.render(Gdx.graphics.getDeltaTime(), models::project);
+            combatFeedback.render(Gdx.graphics.getDeltaTime(), models.combined(), modelProjector);
         } else {
             renderPlaceholderBoxes(alpha);
             drawMonsters(camera.combined);
             DemoPlatforms.render(shapeRenderer, camera.combined);
-            skillVfx.render(Gdx.graphics.getDeltaTime(), camera.combined);
-            floatingText.render(Gdx.graphics.getDeltaTime(), camera::project);
+            combatFeedback.render(Gdx.graphics.getDeltaTime(), camera.combined, fallbackProjector);
         }
 
         syncCombatHud();
@@ -547,12 +549,17 @@ public final class WorldScreen implements GameScreen {
         if (currentMonsters.isEmpty()) {
             return;
         }
+        long targetId = combatHudController.currentTargetId();
         // Depth test như DemoPlatforms — khối quái phải che/bị che đúng với nhân vật và bậc.
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
         shapeRenderer.setProjectionMatrix(projection);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        shapeRenderer.setColor(Color.SCARLET);
-        for (CombatHudController.MonsterState monster : currentMonsters.values()) {
+        for (Map.Entry<Long, CombatHudController.MonsterState> entry : currentMonsters.entrySet()) {
+            CombatHudController.MonsterState monster = entry.getValue();
+            // Con ĐANG NHẮM sáng vàng, còn lại đỏ — không có tín hiệu này thì click chọn mục tiêu
+            // (2026-08-09) không có phản hồi nào ngay tại chỗ quái đứng, người chơi phải liếc lên
+            // thanh máu mục tiêu ở giữa-trên màn hình mới biết mình vừa chọn trúng con nào.
+            shapeRenderer.setColor(entry.getKey() == targetId ? Color.GOLD : Color.SCARLET);
             // Khối ĐỨNG (cao theo trục Z) chứ không phải hình chữ nhật nằm trên mặt phẳng XY: từ
             // ADR-033 camera nhìn gần như ngang, hình nằm phẳng chiếu ra chỉ còn một vệt mỏng gần
             // như vô hình. `box` nhận toạ độ GÓC và tự đảo dấu depth (xem DemoPlatforms).
@@ -666,10 +673,24 @@ public final class WorldScreen implements GameScreen {
     public void dispose() {
         shapeRenderer.dispose();
         models.dispose();
-        skillVfx.dispose();
-        // TRƯỚC combatHud: floatingText mượn font của HUD, dispose HUD trước là kéo font ra khỏi
-        // dưới chân nó (dù ở đây floatingText không dùng font lúc dispose, giữ đúng thứ tự sở hữu).
-        floatingText.dispose();
+        // TRƯỚC combatHud: combatFeedback mượn font của HUD, dispose HUD trước là kéo font ra khỏi
+        // dưới chân nó (dù ở đây nó không dùng font lúc dispose, giữ đúng thứ tự sở hữu).
+        combatFeedback.dispose();
         combatHud.dispose();
+    }
+
+    /**
+     * Tầng input DƯỚI HUD trong {@link #inputProcessor} — chỉ quan tâm click chuột trái vào thế
+     * giới. Không xử lý phím: mọi phím vẫn poll qua {@link InputMapper} như trước (CLIENT.md §5),
+     * lớp này không được biết mã phím cụ thể.
+     */
+    private final class WorldTargetPicker extends InputAdapter {
+        @Override
+        public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+            if (button != Input.Buttons.LEFT) {
+                return false;
+            }
+            return selectTargetAt(screenX, screenY);
+        }
     }
 }

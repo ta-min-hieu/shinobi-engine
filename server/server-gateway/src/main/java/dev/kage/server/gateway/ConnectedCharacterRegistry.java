@@ -9,6 +9,9 @@ import java.util.concurrent.Executors;
 
 import io.netty.channel.ChannelHandlerContext;
 
+import dev.kage.character.application.GrantExperienceUseCase;
+import dev.kage.character.domain.ExperienceProgress;
+import dev.kage.character.domain.MonsterExperience;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.ItemStack;
@@ -20,6 +23,7 @@ import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ChatMessageEvent;
 import dev.kage.protocol.EffectKind;
+import dev.kage.protocol.ExperienceChangedEvent;
 import dev.kage.protocol.ItemGrantedEvent;
 import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
@@ -52,6 +56,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     private final InventoryFacade inventoryFacade;
     private final QuestFacade questFacade;
+    private final ExperienceGrantPort experienceGrant;
     private final GatewayNetworkMetrics networkMetrics;
     private final Map<Long, ChannelHandlerContext> contextsByCharacterId = new ConcurrentHashMap<>();
     // Ngoại hình của nhân vật ĐANG kết nối, chụp một lần lúc chọn nhân vật. Ở đây chứ không ở
@@ -69,9 +74,13 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     private final ExecutorService lootExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     ConnectedCharacterRegistry(
-            InventoryFacade inventoryFacade, QuestFacade questFacade, GatewayNetworkMetrics networkMetrics) {
+            InventoryFacade inventoryFacade,
+            QuestFacade questFacade,
+            ExperienceGrantPort experienceGrant,
+            GatewayNetworkMetrics networkMetrics) {
         this.inventoryFacade = inventoryFacade;
         this.questFacade = questFacade;
+        this.experienceGrant = experienceGrant;
         this.networkMetrics = networkMetrics;
     }
 
@@ -386,6 +395,41 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         // kích hoạt pub-sub thật (feature-quest/CLAUDE.md). Virtual Thread RIÊNG cho quest, không
         // chặn nhau với lootExecutor nếu 1 trong 2 chạm DB chậm.
         lootExecutor.execute(() -> processQuestBlocking(killerCharacterId, monsterCode));
+        // Cạnh loot/quest, cùng lý do tách Virtual Thread riêng: cộng EXP chạm DB. Thêm 2026-08-09
+        // khi chủ dự án hỏi vạch kinh nghiệm — trước đó giết quái KHÔNG cho EXP gì cả.
+        lootExecutor.execute(() -> grantExperienceBlocking(killerCharacterId, monsterCode));
+    }
+
+    /**
+     * Cộng EXP cho người hạ gục rồi báo vạch mới. Quái lạ (chưa khai báo EXP) cho 0 — bỏ qua sớm,
+     * không đụng DB chỉ để cộng số không.
+     */
+    private void grantExperienceBlocking(long killerCharacterId, String monsterCode) {
+        long reward = MonsterExperience.rewardFor(monsterCode);
+        if (reward <= 0L) {
+            return;
+        }
+        sendExperience(killerCharacterId, experienceGrant.grantExperience(killerCharacterId, reward));
+    }
+
+    /**
+     * Phát {@code ExperienceChangedEvent} cho chính người chơi đó. Mất kết nối giữa chừng thì EXP
+     * ĐÃ vào DB thật rồi, chỉ mất thông báo — cùng cách xử lý của {@link #grantLootBlocking}.
+     */
+    void sendExperience(long characterId, GrantExperienceUseCase.Result result) {
+        ChannelHandlerContext ctx = contextsByCharacterId.get(characterId);
+        if (ctx == null) {
+            return;
+        }
+        ExperienceProgress progress = result.progress();
+        ExperienceChangedEvent event = ExperienceChangedEvent.newBuilder()
+                .setLevel(progress.level())
+                .setTotalExp(progress.totalExp())
+                .setExpIntoLevel(progress.expIntoLevel())
+                .setExpForNextLevel(progress.expForNextLevel())
+                .setLeveledUp(result.leveledUp())
+                .build();
+        send(ctx, Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE, 0, event.toByteArray());
     }
 
     private void grantLootBlocking(long killerCharacterId, String monsterCode) {

@@ -20,6 +20,27 @@ final class WorldConstants {
 
     static final float JUMP_VELOCITY_MPS = 7f;
 
+    /**
+     * Nhảy đôi (chủ dự án yêu cầu 2026-08-09) — PHẢI khớp
+     * {@code server-world.WorldConstants.MAX_AIR_JUMPS}/{@code AIR_JUMP_VELOCITY_MPS}. Client chỉ
+     * dùng để dự đoán; server mới là nơi ĐẾM và chặn thật (WorldFacade#handleJumpIntent).
+     */
+    static final int MAX_AIR_JUMPS = 1;
+
+    static final float AIR_JUMP_VELOCITY_MPS = 8f;
+
+    /**
+     * Giữ nút nhảy liên tục bao lâu (giây) thì tự bung cú nhảy thứ hai — đây là CẢM GIÁC ĐIỀU
+     * KHIỂN thuần client ("giữ yên nút nhảy một lúc sẽ nhảy lần 2", lời chủ dự án 2026-08-09), KHÔNG
+     * có bản sao phía server: server chỉ đếm số lần, không quan tâm nhấn lúc nào.
+     *
+     * <p>0.3s chọn theo thời gian tới đỉnh của cú nhảy đầu ({@code JUMP_VELOCITY_MPS / GRAVITY_MPS2}
+     * = 0.35s) — bung ngay TRƯỚC đỉnh nên cú thứ hai nối tiếp mượt, không phải "khựng lại rồi nhảy".
+     * Nhả rồi bấm lại giữa không trung cũng kích hoạt được cú này (phản xạ platformer quen thuộc),
+     * xem {@code WorldScreen#updateJumpIntent}.
+     */
+    static final float AIR_JUMP_HOLD_SECONDS = 0.3f;
+
     static final float BOX_SIZE = 1f;
 
     /**

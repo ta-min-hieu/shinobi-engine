@@ -15,11 +15,25 @@ option java_multiple_files = true;
 // monster instance ID cấp ÂM (server-world tự cấp, từ -1 giảm dần). Không cần field "loại entity"
 // riêng — chỉ cần biết dấu. 0 = chưa chọn mục tiêu (không phải ID thật nào).
 
-// Command: Client -> Server (OPCODE_SET_TARGET_COMMAND). Người chơi CHỌN mục tiêu — server tự
-// động đánh theo ATK_SPEED khi còn trong tầm (GDD §6), KHÔNG phải lệnh "đánh 1 nhát". Không gửi
-// damage/cooldown — chỉ gửi Ý ĐỊNH (SECURITY.md §4), server tự tính tất cả.
+// Command: Client -> Server (OPCODE_SET_TARGET_COMMAND). Người chơi CHỌN mục tiêu.
+//
+// ⚠️ Từ 2026-08-09 (chủ dự án quyết sau playtest): chọn mục tiêu KHÔNG còn tự đánh nữa. Trước đó
+// server tự đánh theo ATK_SPEED khi mục tiêu trong tầm (GDD §6 "Auto-target đánh thường") — chủ
+// dự án thấy máu quái tự tụt dù chưa bấm gì và yêu cầu đổi thành "phải bấm mới đánh". Giờ lệnh này
+// chỉ ghi nhận NHẮM AI; muốn ra đòn phải gửi AttackCommand. Quái/boss thì KHÔNG đổi — chúng vẫn
+// tự đánh (AiSystem), nếu không thì không ai đánh người chơi cả.
 message SetTargetCommand {
   int64 target_entity_id = 1;
+}
+
+// Command: Client -> Server (OPCODE_ATTACK_COMMAND). Ý định ra MỘT đòn đánh thường lên mục tiêu
+// đang nhắm (2026-08-09, xem SetTargetCommand ở trên).
+//
+// KHÔNG có field: mục tiêu lấy từ TargetComponent phía server chứ không phải từ gói này — client
+// không được chọn đánh ai theo từng đòn, cùng nguyên tắc JumpCommand rỗng (Server Authority,
+// /CLAUDE.md §5). Server tự kiểm cooldown/tầm/stun; sai điều kiện thì bỏ qua ÂM THẦM, spam gói
+// không làm đánh nhanh hơn (cooldown là của server).
+message AttackCommand {
 }
 
 // Event: Server -> Client (OPCODE_ATTACK_RESULT_EVENT). Kết quả 1 đòn đánh THẬT (đã né/bạo

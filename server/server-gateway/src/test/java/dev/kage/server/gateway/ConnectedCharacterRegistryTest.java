@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -16,6 +17,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import dev.kage.character.application.GrantExperienceUseCase;
+import dev.kage.character.domain.ExperienceProgress;
 import dev.kage.inventory.api.EquipmentUseCases;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.application.AddItemUseCase;
@@ -36,6 +39,7 @@ import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
 import dev.kage.inventory.domain.Transaction;
+import dev.kage.protocol.ExperienceChangedEvent;
 import dev.kage.protocol.ItemGrantedEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.wire.PacketCodec;
@@ -100,13 +104,20 @@ class ConnectedCharacterRegistryTest {
     void shouldSendItemGrantedEvent_whenLootRolledSuccessfully() throws InvalidProtocolBufferException {
         // 100% -> tất định, không flaky
         registry = new ConnectedCharacterRegistry(
-                fakeInventoryFacade(100), fakeQuestFacade(), new GatewayNetworkMetrics(new SimpleMeterRegistry()));
+                fakeInventoryFacade(100),
+                fakeQuestFacade(),
+                ExperienceGrantPort.disabled(),
+                new GatewayNetworkMetrics(new SimpleMeterRegistry()));
         EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
         registry.register(1L, channel.pipeline().firstContext());
 
-        registry.onMonsterKilled(1L, "training_dummy");
+        // Quái KHÔNG có thưởng EXP (MonsterExperience) — cố ý: EmbeddedChannel không chịu nổi 2
+        // Virtual Thread cùng writeAndFlush (EmbeddedEventLoop không thread-safe, gói bị nuốt mất).
+        // Đó là giới hạn của bộ khung test, không phải của server thật — Netty channel thật cho
+        // phép ghi từ thread bất kỳ. Test EXP nằm riêng bên dưới, một luồng ghi một lúc.
+        registry.onMonsterKilled(1L, "quai_khong_co_exp");
 
-        PacketCodec.Frame frame = awaitOutboundFrame(channel);
+        PacketCodec.Frame frame = awaitOutboundFrame(channel, Opcode.OPCODE_ITEM_GRANTED_EVENT_VALUE);
         ItemGrantedEvent event = ItemGrantedEvent.parseFrom(frame.payload());
         assertThat(frame.header().opcode()).isEqualTo(Opcode.OPCODE_ITEM_GRANTED_EVENT_VALUE);
         assertThat(event.getItemTemplateId()).isEqualTo(100L);
@@ -114,17 +125,76 @@ class ConnectedCharacterRegistryTest {
     }
 
     @Test
-    void shouldSendNothing_whenLootNeverDrops() {
+    void shouldSendNoItemEvent_whenLootNeverDrops() {
         // 0% -> tất định không rơi gì
         registry = new ConnectedCharacterRegistry(
-                fakeInventoryFacade(0), fakeQuestFacade(), new GatewayNetworkMetrics(new SimpleMeterRegistry()));
+                fakeInventoryFacade(0),
+                fakeQuestFacade(),
+                ExperienceGrantPort.disabled(),
+                new GatewayNetworkMetrics(new SimpleMeterRegistry()));
+        EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(1L, channel.pipeline().firstContext());
+
+        registry.onMonsterKilled(1L, "quai_khong_co_exp"); // xem test trên về lý do không dùng quái thật
+
+        sleepQuietly(200); // đủ lâu để lootExecutor (Virtual Thread) chạy xong nếu (sai) có gửi gì
+        // KHÔNG assert "không có frame nào": từ 2026-08-09 giết quái LUÔN phát
+        // ExperienceChangedEvent (opcode 208) dù có rơi đồ hay không — đó là hành vi đúng, test này
+        // chỉ nói về LOOT nên phải lọc đúng loại gói thay vì đòi im lặng tuyệt đối.
+        assertThat(outboundOpcodes(channel)).doesNotContain(Opcode.OPCODE_ITEM_GRANTED_EVENT_VALUE);
+    }
+
+    /**
+     * Giết quái phải cộng EXP và báo vạch mới (2026-08-09) — trước đó giết quái KHÔNG cho EXP gì.
+     * Dùng {@code dropChancePercent=0} để chỉ có ĐÚNG một luồng ghi ra kênh (xem test loot ở trên).
+     */
+    @Test
+    void shouldSendExperienceChangedEvent_whenMonsterKilled() throws InvalidProtocolBufferException {
+        registry = new ConnectedCharacterRegistry(
+                fakeInventoryFacade(0),
+                fakeQuestFacade(),
+                (characterId, amount) ->
+                        new GrantExperienceUseCase.Result(new ExperienceProgress(3, 500L, 40L, 300L), true),
+                new GatewayNetworkMetrics(new SimpleMeterRegistry()));
         EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
         registry.register(1L, channel.pipeline().firstContext());
 
         registry.onMonsterKilled(1L, "training_dummy");
 
-        sleepQuietly(200); // đủ lâu để lootExecutor (Virtual Thread) chạy xong nếu (sai) có gửi gì
-        assertThat(channel.outboundMessages()).isEmpty();
+        PacketCodec.Frame frame = awaitOutboundFrame(channel, Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE);
+        ExperienceChangedEvent event = ExperienceChangedEvent.parseFrom(frame.payload());
+        assertThat(event.getLevel()).isEqualTo(3);
+        assertThat(event.getExpIntoLevel()).isEqualTo(40L);
+        assertThat(event.getExpForNextLevel()).isEqualTo(300L);
+        assertThat(event.getLeveledUp()).isTrue();
+    }
+
+    /** Quái chưa khai báo EXP không được phát gói EXP nào — bỏ qua sớm, không đụng cổng EXP. */
+    @Test
+    void shouldSendNoExperienceEvent_whenMonsterHasNoReward() {
+        registry = new ConnectedCharacterRegistry(
+                fakeInventoryFacade(0),
+                fakeQuestFacade(),
+                ExperienceGrantPort.disabled(),
+                new GatewayNetworkMetrics(new SimpleMeterRegistry()));
+        EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(1L, channel.pipeline().firstContext());
+
+        registry.onMonsterKilled(1L, "quai_khong_co_exp");
+
+        sleepQuietly(200);
+        assertThat(outboundOpcodes(channel)).doesNotContain(Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE);
+    }
+
+    /** Opcode của mọi frame đã ghi ra kênh — để assert theo LOẠI gói thay vì "có/không có gì". */
+    private static List<Integer> outboundOpcodes(EmbeddedChannel channel) {
+        List<Integer> opcodes = new ArrayList<>();
+        for (Object message : channel.outboundMessages()) {
+            if (message instanceof PacketCodec.Frame frame) {
+                opcodes.add(frame.header().opcode());
+            }
+        }
+        return opcodes;
     }
 
     private static InventoryFacade fakeInventoryFacade(int dropChancePercent) {
@@ -183,17 +253,25 @@ class ConnectedCharacterRegistryTest {
         return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
     }
 
-    /** onMonsterKilled đẩy việc sang Virtual Thread riêng (lootExecutor) — poll thay vì đọc ngay. */
-    private static PacketCodec.Frame awaitOutboundFrame(EmbeddedChannel channel) {
+    /**
+     * onMonsterKilled đẩy việc sang Virtual Thread riêng (lootExecutor) — poll thay vì đọc ngay.
+     *
+     * <p>Phải chờ ĐÚNG opcode chứ không phải frame đầu tiên: từ 2026-08-09 một cú giết quái sinh ra
+     * NHIỀU loại gói (rơi đồ, tiến độ quest, kinh nghiệm) từ các Virtual Thread chạy song song, thứ
+     * tự tới không xác định — lấy frame đầu tiên là test flaky.
+     */
+    private static PacketCodec.Frame awaitOutboundFrame(EmbeddedChannel channel, int expectedOpcode) {
         Instant deadline = Instant.now().plus(Duration.ofSeconds(4));
         while (Instant.now().isBefore(deadline)) {
             Object message = channel.readOutbound();
-            if (message instanceof PacketCodec.Frame frame) {
+            if (message instanceof PacketCodec.Frame frame && frame.header().opcode() == expectedOpcode) {
                 return frame;
             }
-            sleepQuietly(10);
+            if (message == null) {
+                sleepQuietly(10);
+            }
         }
-        throw new AssertionError("Không nhận được outbound frame nào sau khi chờ");
+        throw new AssertionError("Không nhận được outbound frame opcode=" + expectedOpcode + " sau khi chờ");
     }
 
     private static void sleepQuietly(long millis) {

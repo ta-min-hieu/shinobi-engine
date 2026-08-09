@@ -45,6 +45,19 @@ public interface CharacterPort {
     CharacterStats loadStats(long characterId);
 
     /**
+     * Cộng {@code amount} EXP và trả về trạng thái SAU khi cộng — một câu {@code UPDATE ...
+     * RETURNING} duy nhất để không có cửa sổ đọc-rồi-ghi (hai nguồn EXP chạy song song trên Virtual
+     * Thread khác nhau: giết quái và trao thưởng quest, xem {@code ExpPort}).
+     *
+     * <p>Trả về TỔNG EXP mới, không phải cấp: quy đổi ra cấp là việc của {@link ExperienceCurve}
+     * (luật chơi, không phải hạ tầng) — adapter DB không được biết đường cong.
+     */
+    long addExperience(long characterId, long amount);
+
+    /** Ghi lại cấp đã tính từ tổng EXP — gọi CHỈ KHI cấp thật sự đổi (xem {@code GrantExperienceUseCase}). */
+    void saveLevel(long characterId, int level);
+
+    /**
      * Ghi đè hệ phái (GDD §4 "chọn hệ ở Lv10", Phase 8) — 1 câu UPDATE đơn, không cần
      * {@link Transaction} (khác {@link #create}, không có ghi phụ nào trong cùng nguyên tử ở lát
      * cắt này — xem {@code SelectFactionUseCase} "Scope cut").

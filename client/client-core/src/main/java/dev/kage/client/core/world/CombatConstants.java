@@ -20,6 +20,13 @@ final class CombatConstants {
 
     static final int CHARACTER_MAX_CHI = 100;
 
+    /**
+     * Nhịp đánh thường, giây — bản sao của {@code server-world.CombatConstants.ATTACK_INTERVAL_SECONDS}.
+     * Chỉ dùng để giãn nhịp GỬI lệnh khi người chơi giữ nút Đánh ({@link AttackInputController}),
+     * không phải cooldown thật: server tự giữ cooldown và bỏ qua lệnh thừa.
+     */
+    static final float ATTACK_INTERVAL_SECONDS = 1f;
+
     static final String FIREBALL_SKILL_CODE = "fireball";
 
     static final float FIREBALL_COOLDOWN_SECONDS = 3f;

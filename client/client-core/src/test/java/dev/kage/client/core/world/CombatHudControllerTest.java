@@ -58,6 +58,36 @@ class CombatHudControllerTest {
         assertThat(controller.currentTargetId()).isEqualTo(MONSTER_ID);
     }
 
+    /** Click chuột chọn mục tiêu (2026-08-09) — phải GHI ĐÈ được con tự chọn lúc spawn. */
+    @Test
+    void selectTarget_overridesAutoTarget_andReportsWhetherCommandIsNeeded() {
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+        controller.onMonsterSpawned(dummySpawned());
+        long secondMonsterId = -2L;
+        controller.onMonsterSpawned(MonsterSpawnedEvent.newBuilder()
+                .setMonsterId(secondMonsterId)
+                .setMonsterCode("training_dummy")
+                .setX(6f)
+                .setY(5f)
+                .setCurrentHp(50)
+                .setMaxHp(50)
+                .build());
+
+        assertThat(controller.selectTarget(secondMonsterId)).isTrue();
+        assertThat(controller.currentTargetId()).isEqualTo(secondMonsterId);
+        // Chọn lại đúng con đang nhắm — không gửi gói thừa.
+        assertThat(controller.selectTarget(secondMonsterId)).isFalse();
+    }
+
+    @Test
+    void selectTarget_ignoresUnknownMonster() {
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+        controller.onMonsterSpawned(dummySpawned());
+
+        assertThat(controller.selectTarget(-999L)).isFalse();
+        assertThat(controller.currentTargetId()).isEqualTo(MONSTER_ID);
+    }
+
     @Test
     void canUseSkill_falseWithoutTarget() {
         CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);

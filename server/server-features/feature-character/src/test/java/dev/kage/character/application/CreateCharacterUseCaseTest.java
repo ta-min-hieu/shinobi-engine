@@ -87,6 +87,16 @@ class CreateCharacterUseCaseTest {
         }
 
         @Override
+        public long addExperience(long characterId, long amount) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public void saveLevel(long characterId, int level) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
         public void updateFaction(long characterId, Faction faction) {
             for (int i = 0; i < characters.size(); i++) {
                 Character c = characters.get(i);

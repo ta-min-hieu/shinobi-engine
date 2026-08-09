@@ -31,10 +31,16 @@ sealed interface WorldCommand {
     record JumpIntentCommand(long characterId, int sequenceId) implements WorldCommand {}
 
     /**
-     * Chọn mục tiêu chiến đấu (GDD §6 "Auto-target đánh thường") — server tự động đánh khi hết
-     * cooldown, KHÔNG phải lệnh "đánh 1 nhát" (xem {@code CombatSystem}).
+     * Chọn mục tiêu chiến đấu — chỉ ghi nhận NHẮM AI, KHÔNG tự ra đòn (đổi 2026-08-09, xem
+     * {@code CombatSystem}). Muốn đánh phải gửi tiếp {@link AttackIntentCommand}.
      */
     record SetTargetCommand(long characterId, long targetEntityId) implements WorldCommand {}
+
+    /**
+     * Ý định ra MỘT đòn đánh thường lên mục tiêu đang nhắm (2026-08-09) — không mang mục tiêu theo
+     * gói (world tự đọc {@code TargetComponent}), cùng lý do {@link JumpIntentCommand} rỗng.
+     */
+    record AttackIntentCommand(long characterId) implements WorldCommand {}
 
     /**
      * Dùng skill nhắm mục tiêu (GAMEPLAY.md §3-4) — {@code skillCode} do client gửi, server tự

@@ -73,6 +73,11 @@ public final class VerticalMovementSystem extends IteratingKSystem {
             pos.z = surface;
             pos.vz = 0f;
             pos.grounded = true;
+            // Chạm đất = xoá hạn mức nhảy giữa không trung (xem PositionComponent#airJumpsUsed).
+            // Đặt ở đây chứ không ở lớp gọi vì đây là NƠI DUY NHẤT biết chính xác khoảnh khắc đáp
+            // đất — client và server dùng chung hệ này nên hạn mức luôn reset giống hệt nhau, không
+            // cần đồng bộ thêm field nào qua mạng.
+            pos.airJumpsUsed = 0;
         } else {
             pos.grounded = false;
         }

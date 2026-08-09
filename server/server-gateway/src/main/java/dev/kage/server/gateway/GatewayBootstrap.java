@@ -82,7 +82,10 @@ public final class GatewayBootstrap {
         // characterRegistry là WorldOutboundSink thật — PHẢI tồn tại trước WorldFacade vì
         // WorldFacade cần sink lúc construct (SERVER.md §2: kết quả tick đi qua outbound queue).
         ConnectedCharacterRegistry characterRegistry = new ConnectedCharacterRegistry(
-                facades.inventoryFacade(), facades.contentFacades().questFacade(), metricsContext.networkMetrics());
+                facades.inventoryFacade(),
+                facades.contentFacades().questFacade(),
+                facades.characterFacade()::grantExperience,
+                metricsContext.networkMetrics());
         WorldContext worldContext = startWorld(characterRegistry, databaseBootstrap, metricsContext.meterRegistry());
         MainWorldChannelRegistry mainWorldChannels = worldContext.mainWorldChannels();
         CharacterPositionPersister positionPersister =

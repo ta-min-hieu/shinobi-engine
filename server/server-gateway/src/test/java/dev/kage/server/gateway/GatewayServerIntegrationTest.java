@@ -35,6 +35,7 @@ import dev.kage.account.domain.Transaction;
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.application.CharacterUseCases;
 import dev.kage.character.application.CreateCharacterUseCase;
+import dev.kage.character.application.GrantExperienceUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.character.application.SelectFactionUseCase;
@@ -66,6 +67,7 @@ import dev.kage.inventory.domain.ItemTemplatePort;
 import dev.kage.protocol.AcceptDuelCommand;
 import dev.kage.protocol.AcceptDuelOutcome;
 import dev.kage.protocol.AcceptDuelResponse;
+import dev.kage.protocol.AttackCommand;
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.BuyItemResponse;
@@ -183,7 +185,8 @@ class GatewayServerIntegrationTest {
                 new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
         GatewayNetworkMetrics networkMetrics = new GatewayNetworkMetrics(meterRegistry);
         GatewayObservability observability = new GatewayObservability(networkMetrics, GatewayTracing.disabled());
-        characterRegistry = new ConnectedCharacterRegistry(inventoryFacade, questFacade, networkMetrics);
+        characterRegistry = new ConnectedCharacterRegistry(
+                inventoryFacade, questFacade, ExperienceGrantPort.disabled(), networkMetrics);
         WorldFacade firstChannelFacade = new WorldFacade(characterRegistry);
         firstChannelFacade.start();
         mainWorldChannels = new MainWorldChannelRegistry(characterRegistry, firstChannelFacade, meterRegistry);
@@ -315,6 +318,16 @@ class GatewayServerIntegrationTest {
             }
 
             @Override
+            public long addExperience(long characterId, long amount) {
+                throw new UnsupportedOperationException("không dùng trong test này");
+            }
+
+            @Override
+            public void saveLevel(long characterId, int level) {
+                throw new UnsupportedOperationException("không dùng trong test này");
+            }
+
+            @Override
             public void updateFaction(long characterId, Faction faction) {
                 for (int i = 0; i < characters.size(); i++) {
                     Character c = characters.get(i);
@@ -340,8 +353,12 @@ class GatewayServerIntegrationTest {
         ListCharactersUseCase listUseCase = new ListCharactersUseCase(characterPort);
         SelectCharacterUseCase selectUseCase = new SelectCharacterUseCase(characterPort);
         SelectFactionUseCase selectFactionUseCase = new SelectFactionUseCase(characterPort);
-        CharacterUseCases useCases =
-                new CharacterUseCases(createUseCase, listUseCase, selectUseCase, selectFactionUseCase);
+        CharacterUseCases useCases = new CharacterUseCases(
+                createUseCase,
+                listUseCase,
+                selectUseCase,
+                selectFactionUseCase,
+                new GrantExperienceUseCase(characterPort));
         return new CharacterFacade(useCases, characterPort);
     }
 
@@ -1226,6 +1243,7 @@ class GatewayServerIntegrationTest {
             SetTargetCommand setTarget =
                     SetTargetCommand.newBuilder().setTargetEntityId(bossId).build();
             sendFrame(socket, Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, 31, setTarget.toByteArray());
+            startAttackSpammer(socket); // đánh thường phải bấm tay từ 2026-08-09
 
             // Boss phải dùng ÍT NHẤT 1 chiêu đặc biệt trước khi chết — đọc frame liên tục, phân
             // loại theo opcode, dừng khi thấy 1 trong 2 (hoặc boss chết trước, coi như thất bại).
@@ -1397,11 +1415,16 @@ class GatewayServerIntegrationTest {
             SetTargetCommand targetA =
                     SetTargetCommand.newBuilder().setTargetEntityId(characterA).build();
             sendFrame(socketB, Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, 42, targetA.toByteArray());
+            // Cả 2 phía bấm đánh — nhân vật không tự đánh nữa (2026-08-09), kể cả trong duel.
+            Thread spammerA = startAttackSpammer(socketA);
+            Thread spammerB = startAttackSpammer(socketB);
 
             DuelResultEvent resultForA = DuelResultEvent.parseFrom(
                     readUntilOpcode(inA, Opcode.OPCODE_DUEL_RESULT_EVENT_VALUE).payload());
             DuelResultEvent resultForB = DuelResultEvent.parseFrom(
                     readUntilOpcode(inB, Opcode.OPCODE_DUEL_RESULT_EVENT_VALUE).payload());
+            spammerA.interrupt(); // trận xong — ngừng bấm trước khi test gửi tiếp GetPvpRatingRequest
+            spammerB.interrupt();
             assertThat(resultForA).isEqualTo(resultForB);
             assertThat(java.util.Set.of(resultForA.getWinnerCharacterId(), resultForA.getLoserCharacterId()))
                     .containsExactlyInAnyOrder(characterA, characterB);
@@ -1527,6 +1550,7 @@ class GatewayServerIntegrationTest {
             SetTargetCommand setTarget =
                     SetTargetCommand.newBuilder().setTargetEntityId(monsterId).build();
             sendFrame(socket, Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, 12, setTarget.toByteArray());
+            startAttackSpammer(socket); // đánh thường phải bấm tay từ 2026-08-09
 
             // PHÁT HIỆN THẬT (Phase 8 lát cắt 2): quái giờ đánh trả CŨNG tới được client (trước đây
             // bị rơi mất với nhân vật chơi solo — xem WorldFacade.handleCombatResults) — 2 chiều
@@ -1869,13 +1893,52 @@ class GatewayServerIntegrationTest {
         return characterId;
     }
 
+    // synchronized trên chính socket: từ 2026-08-09 có luồng nền bấm đánh (startAttackSpammer) ghi
+    // song song với luồng test chính trên CÙNG socket — 2 lời gọi write() đan nhau sẽ cắt đôi một
+    // frame và hỏng cả dòng dữ liệu. Khoá ở đây thay vì bắt mọi chỗ gọi phải tự nhớ.
     private static void sendFrame(Socket socket, int opcode, int sequenceId, byte[] payload) throws Exception {
-        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-        PacketHeader header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
-        byte[] frame = PacketCodec.encodeFrame(header, payload);
-        out.writeInt(frame.length);
-        out.write(frame);
-        out.flush();
+        synchronized (socket) {
+            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+            PacketHeader header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
+            byte[] frame = PacketCodec.encodeFrame(header, payload);
+            out.writeInt(frame.length);
+            out.write(frame);
+            out.flush();
+        }
+    }
+
+    /**
+     * Bấm ĐÁNH nền — gửi {@code AttackCommand} đều đặn trên socket này tới khi bị {@code interrupt}
+     * hoặc socket đóng.
+     *
+     * <p>Cần từ 2026-08-09: đánh thường không còn tự động (chủ dự án quyết sau playtest, xem
+     * {@code CombatSystem}), mà các test này chờ ĐỌC frame nên không thể vừa đọc vừa bấm trên cùng
+     * một luồng. Nhịp 200ms dày hơn cooldown thật (1 đòn/giây) — lệnh thừa là no-op ở server.
+     */
+    // catch (Exception) là CỐ Ý: sendFrame khai báo `throws Exception`, và mọi lỗi ở luồng nền này
+    // đều có đúng một nghĩa — socket đã đóng vì test kết thúc. Không có gì để xử lý riêng, cũng
+    // không được để nó nổi lên làm hỏng test khác (cùng lý do WorldFacade.tickTask bọc Throwable).
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private static Thread startAttackSpammer(Socket socket) {
+        byte[] payload = AttackCommand.getDefaultInstance().toByteArray();
+        Thread spammer = new Thread(
+                () -> {
+                    for (int sequenceId = 9000; !Thread.currentThread().isInterrupted(); sequenceId++) {
+                        try {
+                            sendFrame(socket, Opcode.OPCODE_ATTACK_COMMAND_VALUE, sequenceId, payload);
+                            Thread.sleep(200);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            return; // test đã xong — kết thúc bình thường, không phải lỗi
+                        } catch (Exception e) {
+                            return; // socket đóng lúc test kết thúc — cùng lý do trên
+                        }
+                    }
+                },
+                "attack-spammer");
+        spammer.setDaemon(true);
+        spammer.start();
+        return spammer;
     }
 
     /** AoI Event tới bất kỳ lúc nào giữa các Response khác — đọc tới khi thấy đúng opcode cần. */
@@ -1947,8 +2010,8 @@ class GatewayServerIntegrationTest {
                 new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
         GatewayNetworkMetrics networkMetrics = new GatewayNetworkMetrics(meterRegistry);
         GatewayObservability observability = new GatewayObservability(networkMetrics, GatewayTracing.disabled());
-        ConnectedCharacterRegistry localCharacterRegistry =
-                new ConnectedCharacterRegistry(inventoryFacade, questFacade, networkMetrics);
+        ConnectedCharacterRegistry localCharacterRegistry = new ConnectedCharacterRegistry(
+                inventoryFacade, questFacade, ExperienceGrantPort.disabled(), networkMetrics);
         WorldFacade firstChannelFacade = new WorldFacade(localCharacterRegistry);
         firstChannelFacade.start();
         MainWorldChannelRegistry localMainWorldChannels =
@@ -2106,8 +2169,8 @@ class GatewayServerIntegrationTest {
                 new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
         GatewayNetworkMetrics networkMetrics = new GatewayNetworkMetrics(meterRegistry);
         GatewayObservability observability = new GatewayObservability(networkMetrics, tracing);
-        ConnectedCharacterRegistry localCharacterRegistry =
-                new ConnectedCharacterRegistry(inventoryFacade, questFacade, networkMetrics);
+        ConnectedCharacterRegistry localCharacterRegistry = new ConnectedCharacterRegistry(
+                inventoryFacade, questFacade, ExperienceGrantPort.disabled(), networkMetrics);
         WorldFacade firstChannelFacade = new WorldFacade(localCharacterRegistry);
         firstChannelFacade.start();
         MainWorldChannelRegistry localMainWorldChannels =
