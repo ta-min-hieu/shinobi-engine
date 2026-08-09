@@ -818,6 +818,146 @@ def export_gltf(path, obj, armature, extras=(), texture_px=None):
     return size
 
 
+def export_gltf_flat(path, obj, armature, extras=()):
+    """Write one .glb for a mesh built by hand out of flat-coloured parts.
+
+    Sibling of `export_gltf`, for the other half of the art pipeline. That one
+    serves a Text→3D character: one mesh, one UV map, one baked albedo, so it
+    collapses every slot onto a single textured material. A procedural asset
+    (`build_monster_dummy`, `build_npc_elder`) is the opposite shape — no UVs at
+    all, and its colours live in the material slots themselves, one per part.
+    Running it through `export_gltf` fails outright on the missing albedo, and
+    "fixing" that by collapsing the slots would flatten the whole model to one
+    colour: the training dummy would lose its red target patch and ship as a
+    plain brown stick.
+
+    So the slots survive here, each rebuilt as a plain Principled material — the
+    exporter writes one glTF primitive per material with a `baseColorFactor` and
+    no texture, which the client's cel shader already expects (`u_hasTexture`
+    off ⇒ `CelShadingConstants.FLAT_SHADE_STEPS`, the deeper ramp for meshes
+    with no painted shading of their own).
+
+    No texture node is created anywhere, which is also what keeps the
+    `"texCoord": -1` crash of `_untextured_material` out of reach: these meshes
+    have no UV layer, and a material that samples nothing cannot ask for a UV
+    set that does not exist.
+
+    Like `export_gltf`, everything is undone before returning — the caller keeps
+    working on the same scene for the next LOD.
+    """
+    exported = [obj] + list(extras)
+
+    saved_materials = {}
+    saved_outlines = {}
+    flat_materials = []
+    try:
+        for mesh_obj in exported:
+            saved_materials[mesh_obj] = list(mesh_obj.data.materials)
+            replacements = [_flat_material(slot, "gltf_flat_" + slot.name)
+                            for slot in mesh_obj.data.materials]
+            flat_materials.extend(replacements)
+            # Slot ORDER is the contract: polygon.material_index points into it
+            # and is never touched, so part-to-colour survives the swap.
+            for index, replacement in enumerate(replacements):
+                mesh_obj.data.materials[index] = replacement
+            outline = mesh_obj.modifiers.get("KageOutline")
+            if outline is not None:
+                saved_outlines[mesh_obj] = {
+                    "thickness": outline.thickness,
+                    "material_offset": outline.material_offset,
+                }
+                mesh_obj.modifiers.remove(outline)
+
+        bpy.ops.object.mode_set(mode="OBJECT")
+        bpy.ops.object.select_all(action="DESELECT")
+        for mesh_obj in exported:
+            mesh_obj.select_set(True)
+        armature.select_set(True)
+        bpy.context.view_layer.objects.active = armature
+
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        bpy.ops.export_scene.gltf(
+            filepath=path,
+            export_format="GLB",
+            use_selection=True,
+            export_apply=True,
+            export_skins=True,
+            export_animations=True,
+            export_animation_mode="ACTIONS",
+            export_yup=True,
+        )
+    finally:
+        for mesh_obj in exported:
+            for index, slot in enumerate(saved_materials.get(mesh_obj, [])):
+                mesh_obj.data.materials[index] = slot
+            saved = saved_outlines.get(mesh_obj)
+            if saved is not None:
+                restored = mesh_obj.modifiers.new("KageOutline", "SOLIDIFY")
+                restored.thickness = saved["thickness"]
+                restored.offset = 1.0
+                restored.use_flip_normals = True
+                restored.use_rim = False
+                restored.material_offset = saved["material_offset"]
+                restored.material_offset_rim = saved["material_offset"]
+        for material in flat_materials:
+            bpy.data.materials.remove(material)
+
+    size = os.path.getsize(path)
+    print("[t3d] export {0}: {1:.2f} MB flat slots={2}".format(
+        os.path.basename(path), size / (1024.0 * 1024.0), len(obj.data.materials)))
+    return size
+
+
+def _flat_material(toon_material, name):
+    """One Principled material carrying `toon_material`'s base colour, nothing else."""
+    base_hex = toon_material.get("kage_base_hex")
+    if base_hex is None:
+        # Guessing from the ColorRamp would work today only because
+        # SHADE_STEPS[n][-1] == 1.0; say so instead of silently shipping a
+        # wrong colour the day that stops being true.
+        raise RuntimeError(
+            "material '" + toon_material.name + "' has no kage_base_hex — build it with "
+            "kage_sprite_render.make_toon_material, or pass a textured model to export_gltf")
+
+    material = bpy.data.materials.new(name)
+    material.use_nodes = True
+    tree = material.node_tree
+    tree.nodes.clear()
+    output = tree.nodes.new("ShaderNodeOutputMaterial")
+    output.location = (400, 0)
+    principled = tree.nodes.new("ShaderNodeBsdfPrincipled")
+    principled.location = (100, 0)
+    principled.inputs["Metallic"].default_value = 0.0
+    principled.inputs["Roughness"].default_value = 1.0
+    principled.inputs["Base Color"].default_value = _display_rgb(base_hex) + (1.0,)
+    tree.links.new(principled.outputs["BSDF"], output.inputs["Surface"])
+    return material
+
+
+def _display_rgb(hex_color):
+    """The hex straight through, NOT `ksr.hex_to_linear`.
+
+    glTF says `baseColorFactor` is linear, and Blender's exporter passes a
+    Principled base colour through unchanged, so linearising here would be
+    spec-correct. It is still wrong for this client, and measurably so: the
+    training dummy's #8B5A2B shipped as (0.258, 0.102, 0.024) and rendered
+    almost black on screen.
+
+    The reason is that nothing downstream converts back. The cel shader reads
+    the albedo and writes it to the default framebuffer with no gamma step
+    (RENDERING.md §12.2 — it is a hand-written GLSL pair, not gdx-gltf's PBR
+    path), and the textured half of the pipeline feeds it PNG texels that GL
+    hands over as-is. So the one rule the shader actually follows is "albedo is
+    already display-space", and a flat colour has to arrive in the same space
+    its textured sibling does or the two halves of the same art style will not
+    match.
+    """
+    cleaned = hex_color.lstrip("#")
+    if len(cleaned) != 6:
+        raise ValueError("expected a 6-digit hex colour, got: " + hex_color)
+    return tuple(int(cleaned[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+
+
 def add_far_shade(obj, factor=FAR_SHADE):
     """Dim the limbs on the far side of a profile view.
 

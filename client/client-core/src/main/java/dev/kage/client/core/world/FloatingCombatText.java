@@ -87,7 +87,7 @@ final class FloatingCombatText implements Disposable {
 
     /**
      * @param projector chiếu điểm thế giới sang màn hình — truyền từ {@code WorldScreen} vì camera
-     *     đang hoạt động có thể là camera 3D ({@code CharacterModelRenderer}) hoặc camera 2D thay
+     *     đang hoạt động có thể là camera 3D ({@code WorldModelRenderer}) hoặc camera 2D thay
      *     thế, lớp này không cần biết cái nào.
      */
     void render(float deltaTime, WorldToScreen projector) {

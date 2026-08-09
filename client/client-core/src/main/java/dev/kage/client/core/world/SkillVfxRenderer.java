@@ -22,12 +22,12 @@ import org.slf4j.LoggerFactory;
  * Lớp này là chỗ nối còn thiếu đó.
  *
  * <p><b>Billboard hướng camera</b>: sprite phẳng phải luôn quay mặt về camera trong không gian 3D.
- * Nhờ camera đã bị ADR-033 khoá cứng góc ({@link CharacterModelRenderer#VIEW_YAW_DEGREES}/
- * {@link CharacterModelRenderer#VIEW_PITCH_DEGREES}), hệ trục billboard là HẰNG SỐ — tính một lần
+ * Nhờ camera đã bị ADR-033 khoá cứng góc ({@link WorldModelRenderer#VIEW_YAW_DEGREES}/
+ * {@link WorldModelRenderer#VIEW_PITCH_DEGREES}), hệ trục billboard là HẰNG SỐ — tính một lần
  * lúc dựng, không phải mỗi khung như billboard tổng quát.
  *
  * <p>Tự TẮT khi thiếu atlas (bản checkout chưa chạy pipeline art) thay vì crash — cùng nguyên tắc
- * với {@link CharacterModelRenderer}.
+ * với {@link WorldModelRenderer}.
  */
 final class SkillVfxRenderer implements Disposable {
 
@@ -41,7 +41,7 @@ final class SkillVfxRenderer implements Disposable {
 
     /**
      * Tâm hiệu ứng cao bao nhiêu so với gốc entity (gốc model nằm ở CHÂN — xem
-     * {@code CharacterModelRenderer.setCharacterPosition}). Đặt ngang thân giữa thay vì ngay chân,
+     * {@code WorldModelRenderer.setPosition}). Đặt ngang thân giữa thay vì ngay chân,
      * nếu không hiệu ứng trông như nổ dưới đất/lơ lửng trên đầu (đã thấy thật qua ảnh chụp).
      */
     private static final float VFX_ANCHOR_HEIGHT_UNITS = 0.9f;
@@ -183,16 +183,16 @@ final class SkillVfxRenderer implements Disposable {
 
     /** Trục "sang phải màn hình" = {@code direction × up}, cùng công thức camera đã khoá góc. */
     private static float[] screenRightAxis() {
-        double yaw = Math.toRadians(CharacterModelRenderer.VIEW_YAW_DEGREES);
-        double pitch = Math.toRadians(CharacterModelRenderer.VIEW_PITCH_DEGREES);
+        double yaw = Math.toRadians(WorldModelRenderer.VIEW_YAW_DEGREES);
+        double pitch = Math.toRadians(WorldModelRenderer.VIEW_PITCH_DEGREES);
         float[] right = {(float) (-Math.cos(yaw) * Math.cos(pitch)), (float) (Math.sin(yaw) * Math.cos(pitch)), 0f};
         return normalize(right);
     }
 
     /** Trục "lên trên màn hình" = {@code right × direction}. */
     private static float[] screenUpAxis(float[] right) {
-        double yaw = Math.toRadians(CharacterModelRenderer.VIEW_YAW_DEGREES);
-        double pitch = Math.toRadians(CharacterModelRenderer.VIEW_PITCH_DEGREES);
+        double yaw = Math.toRadians(WorldModelRenderer.VIEW_YAW_DEGREES);
+        double pitch = Math.toRadians(WorldModelRenderer.VIEW_PITCH_DEGREES);
         float dx = (float) (-Math.sin(yaw) * Math.cos(pitch));
         float dy = (float) (-Math.cos(yaw) * Math.cos(pitch));
         float dz = (float) -Math.sin(pitch);

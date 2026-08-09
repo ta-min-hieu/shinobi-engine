@@ -251,6 +251,12 @@ def make_toon_material(name, base_hex, shades=3):
     material = bpy.data.materials.get(name)
     if material is None:
         material = bpy.data.materials.new(name)
+    # The graph below is Emission-only — glTF cannot carry it, and the base
+    # colour is only recoverable from it by reading the last ColorRamp element
+    # and knowing that SHADE_STEPS[n][-1] happens to be 1.0. Record the input
+    # instead of leaving the 3D exporter to reverse-engineer the output:
+    # `kage_text3d_kit.export_gltf_flat` reads this back.
+    material["kage_base_hex"] = base_hex
     material.use_nodes = True
     tree = material.node_tree
     tree.nodes.clear()

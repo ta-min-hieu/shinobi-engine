@@ -473,6 +473,33 @@ Chạy headless bằng `tools/blender/kage_text3d_kit.py`. Không bước nào l
 
 ➡️ **Lệnh cụ thể từng bước, checklist nghiệm thu, và bảng lỗi thường gặp**: [BLENDER-SESSION-GUIDE.md](BLENDER-SESSION-GUIDE.md).
 
+### 6.5. Asset dựng tay: `--flat-materials` (từ 2026-08-09)
+
+Bảng trên mô tả đường Text→3D cho **nhân vật**. Quái/NPC hình khối đơn giản (cọc tập, trưởng làng) đi
+đường ngắn hơn — không có bước 1–5, `.blend` dựng thẳng bằng script procedural
+(`build_monster_dummy.py`, `build_npc_elder.py`) — nhưng vẫn dùng chung bước 9:
+
+```bash
+blender -b assets/raw/blender/monsters/training-dummy.blend -P tools/blender/export_character_lods.py -- \
+  --object Dummy_Body --rig Dummy_Rig --asset-key mob_training-dummy --flat-materials \
+  --out <ĐƯỜNG DẪN TUYỆT ĐỐI>/assets/exported/models
+```
+
+**Bắt buộc có `--flat-materials`.** Không có nó, `export_gltf()` gộp mọi material slot vào một material
+có texture — đúng cho một mesh Text→3D (một UV map, một albedo đã bake) và sai hoàn toàn ở đây: asset
+dựng tay không có UV nào cả (báo lỗi ngay tại `_diffuse_image`), và màu của nó nằm ở chính các slot, gộp
+lại là mất hết ranh giới màu giữa các bộ phận. Cờ này chuyển sang `export_gltf_flat()`: giữ nguyên slot,
+mỗi slot thành một Principled phẳng không texture — khớp nhánh `u_hasTexture == 0` của cel shader
+(`FLAT_SHADE_STEPS`, xem [RENDERING.md](../03-engine/RENDERING.md) §12.2).
+
+Điều kiện: mọi material phải dựng bằng `kage_sprite_render.make_toon_material()` — nó ghi lại màu gốc
+vào custom property `kage_base_hex`, thứ duy nhất khôi phục được màu từ một graph Emission mà glTF không
+chở nổi. Thiếu property → `export_gltf_flat` **ném lỗi thay vì đoán** (đoán từ phần tử cuối ColorRamp chỉ
+đúng chừng nào `SHADE_STEPS[n][-1]` còn bằng 1.0).
+
+⚠️ Màu ghi ra là **hex thẳng (không gian hiển thị)**, không phải linear như glTF quy định — lý do và
+bằng chứng ở [ASSET-LOG.md](../../assets/raw/ASSET-LOG.md), mục cập nhật 2026-08-09.
+
 ---
 
 ## 7. Tổ chức file & version control

@@ -1,6 +1,18 @@
 """Build the `training_dummy` monster (WorldFacade.TRAINING_DUMMY_CODE) —
-a stationary wooden training post, not a character: no legs/walk, only the
-3 actions a thing that never moves or attacks actually needs (idle, hit, die).
+a wooden training post hopping about on its stump.
+
+5 actions, not the 7 of a character: `idle`, `run`, `attack`, `hit`, `die`.
+The first version of this script shipped only 3 (idle/hit/die) on the premise
+that "a training target never moves or attacks". **That premise was wrong about
+this project's own server**: `WorldFacade.spawnTrainingDummy` gives the entity
+an `AiStateComponent` (patrol/chase, AI.md §3) and an `AttackCooldownComponent`,
+so the dummy really does chase the player and really does hit back. Rendering it
+frozen in `idle` while it closes distance is a lie the 3D branch cannot tell
+(2026-08-09).
+
+`jump` and `skill_cast` stay absent on purpose — no server code path makes a
+monster jump or cast, and the client tolerates a missing clip by falling back to
+`idle` (see `MonsterAnimationClips`), so authoring dead animation would be waste.
 
 Run headless (never in an MCP session — full file rebuild):
 
@@ -9,8 +21,8 @@ Run headless (never in an MCP session — full file rebuild):
       -- --out assets/raw/blender/monsters/training-dummy.blend
 
 2-bone rig: `base` (fixed, never posed) and `post` (parent of the whole
-wooden body+strawhead+crossbeam mesh) so idle/hit/die are just rotations of
-one bone — no need for the 7-bone character armature.
+wooden body+strawhead+crossbeam mesh) so every action is one bone's rotation
+plus the rig's own height — no need for the 7-bone character armature.
 """
 
 import math
@@ -120,6 +132,27 @@ def _author_actions(rig):
     _kf(rig, 1, 0.0)
     _kf(rig, 9, 2.0)
     _kf(rig, 16, 0.0)
+
+    # A post with no legs closes distance by HOPPING on its stump: the whole rig
+    # leaves the ground (base_z) while the body leans into the direction of
+    # travel. Two hops per loop so the cycle reads as scurrying at the 12-frame
+    # length the other looping clip (idle) sets the expectation for.
+    new_action("run")
+    _kf(rig, 1, 0.0, base_z=0.0)
+    _kf(rig, 4, 7.0, base_z=0.09)
+    _kf(rig, 7, 0.0, base_z=0.0)
+    _kf(rig, 10, 7.0, base_z=0.09)
+    _kf(rig, 13, 0.0, base_z=0.0)
+
+    # Lunge FORWARD then settle — positive degrees, the opposite sign of `hit`
+    # and `die`, which both lean away (mesh faces +X, ASSET-LOG "Quy ước bắt
+    # buộc"). Peak at frame 3 so the swing lands early and the recovery reads as
+    # the slow part, the same shape as the character rigs' `attack`.
+    new_action("attack")
+    _kf(rig, 1, 0.0)
+    _kf(rig, 3, 24.0, base_z=0.04)
+    _kf(rig, 6, 6.0)
+    _kf(rig, 10, 0.0)
 
     new_action("hit")  # recoil from impact
     _kf(rig, 1, 0.0)

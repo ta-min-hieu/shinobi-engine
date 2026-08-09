@@ -49,8 +49,17 @@ def _copy_of(obj, name):
     return duplicate
 
 
-def export_lods(source, armature, extras, asset_key, out_dir):
-    """Write one .glb per tier; return the sidecar dict."""
+def export_lods(source, armature, extras, asset_key, out_dir, flat_materials=False):
+    """Write one .glb per tier; return the sidecar dict.
+
+    `flat_materials` switches to the procedural-asset export path
+    (`kage_text3d_kit.export_gltf_flat`) — see that function for why a
+    hand-built mesh cannot go through the textured one. Such models are already
+    far below every tier budget, so the three tiers come out byte-identical;
+    they are still written per tier because `GraphicsTier` resolves a directory,
+    not a file, and a missing file is what disables the whole 3D branch client
+    side.
+    """
     source.data.calc_loop_triangles()
     extra_triangles = 0
     for extra in extras:
@@ -65,8 +74,11 @@ def export_lods(source, armature, extras, asset_key, out_dir):
         # lands back on budget instead of budget + extras.
         _, after = t3d.decimate(working, budget - extra_triangles)
         path = os.path.join(out_dir, tier, asset_key + ".glb")
-        byte_counts[tier] = t3d.export_gltf(
-            path, working, armature, extras=extras, texture_px=texture_px)
+        if flat_materials:
+            byte_counts[tier] = t3d.export_gltf_flat(path, working, armature, extras=extras)
+        else:
+            byte_counts[tier] = t3d.export_gltf(
+                path, working, armature, extras=extras, texture_px=texture_px)
         tri_counts[tier] = after + extra_triangles
         bpy.data.objects.remove(working, do_unlink=True)
 
@@ -75,7 +87,9 @@ def export_lods(source, armature, extras, asset_key, out_dir):
         "asset_kind": "MODEL",
         "source_triangles": len(source.data.loop_triangles) + extra_triangles,
         "tri_counts": tri_counts,
-        "texture_px": {tier: px for tier, (_, px) in TIERS.items()},
+        # No texture at all on the flat path — record 0, not the tier's texture
+        # edge, so the sidecar keeps describing the file that was actually written.
+        "texture_px": {tier: (0 if flat_materials else px) for tier, (_, px) in TIERS.items()},
         "glb_bytes": byte_counts,
         "actions": sorted(a.name for a in bpy.data.actions),
         "bones": len(armature.data.bones),
@@ -104,6 +118,10 @@ def _args(argv):
                         help="art_asset.asset_key, e.g. char_hoa-b1")
     parser.add_argument("--out", required=True,
                         help="absolute path to assets/exported/models")
+    parser.add_argument("--flat-materials", action="store_true",
+                        help="mesh was built by hand from flat-coloured parts "
+                             "(monsters, NPCs) instead of generated with a baked "
+                             "albedo — keep one material per part, export no texture")
     return parser.parse_args(argv[argv.index("--") + 1:])
 
 
@@ -114,7 +132,8 @@ def main():
         bpy.data.objects[args.rig],
         [bpy.data.objects[n] for n in args.extras.split(",") if n],
         args.asset_key,
-        args.out)
+        args.out,
+        flat_materials=args.flat_materials)
     print("[lod] === {0} ===".format(meta["asset_key"]))
     print("[lod] source {0} tris".format(meta["source_triangles"]))
     for tier in sorted(TIERS):

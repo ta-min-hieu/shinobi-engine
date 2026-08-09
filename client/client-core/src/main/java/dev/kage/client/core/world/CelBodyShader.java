@@ -52,7 +52,7 @@ import net.mgsx.gltf.scene3d.attributes.PBRTextureAttribute;
  * {@code bones[i] = jointGlobalTransform * invBindMatrix} và {@code Node.calculateWorldTransform()}
  * KHÔNG BAO GIỜ đọc {@code ModelInstance.transform} (trường đó tách hẳn khỏi cây Node, chỉ được gdx
  * đưa vào ở đúng chỗ {@code getRenderable()} này). Bỏ qua {@code u_worldTrans} nghĩa là bỏ luôn phép
- * xoay {@code CharacterModelRenderer.Y_UP_TO_Z_UP} VÀ vị trí thế giới của nhân vật — mesh vẽ ra bằng
+ * xoay {@code WorldModelRenderer.Y_UP_TO_Z_UP} VÀ vị trí thế giới của nhân vật — mesh vẽ ra bằng
  * toạ độ cục bộ Y-up thô, trục "cao" của mesh (Y cục bộ) nằm ngang trên mặt đất Z-up của thế giới —
  * đúng triệu chứng "nằm ngang" đã ghi ở RENDERING.md §11.1. Xác nhận lại bằng ảnh chụp
  * {@code CharacterModelDebugTool} thật, không phải suy đoán tĩnh — xem RENDERING.md §11.1 bản ghi

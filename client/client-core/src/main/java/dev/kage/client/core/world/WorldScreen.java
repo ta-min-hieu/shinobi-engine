@@ -70,7 +70,7 @@ public final class WorldScreen implements GameScreen {
     private final RemoteMotionTracker remoteMotionTracker = new RemoteMotionTracker();
 
     /**
-     * Id dùng cho nhân vật của chính người chơi trong {@link CharacterModelRenderer}. Server đánh id
+     * Id dùng cho nhân vật của chính người chơi trong {@link WorldModelRenderer}. Server đánh id
      * cho nhân vật khác; nhân vật của mình chưa bao giờ cần id nên không có. 0 an toàn vì id thật
      * sinh từ sequence của DB, luôn dương.
      */
@@ -80,7 +80,7 @@ public final class WorldScreen implements GameScreen {
      * Id THẬT của chính người chơi (từ DB, luôn dương) — dùng để nhận ra
      * {@link AttackResultEvent}/{@link SkillResultEvent} nào nhắm vào MÌNH (khớp
      * {@code attacker_entity_id}/{@code target_entity_id}) và quy đổi sang
-     * {@link #LOCAL_CHARACTER_ID} khi gọi {@link CharacterModelRenderer}.
+     * {@link #LOCAL_CHARACTER_ID} khi gọi {@link WorldModelRenderer}.
      */
     private final long localCharacterId;
 
@@ -94,8 +94,8 @@ public final class WorldScreen implements GameScreen {
     private final Viewport viewport;
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
     // MEDIUM tường minh — bản cài đóng gói đúng 1 tier mặc định theo ADR-028, không phải để trống
-    // dựa vào default ngầm (không có default: CharacterModelRenderer bắt buộc tham số tier).
-    private final CharacterModelRenderer models = new CharacterModelRenderer(GraphicsTier.MEDIUM);
+    // dựa vào default ngầm (không có default: WorldModelRenderer bắt buộc tham số tier).
+    private final WorldModelRenderer models = new WorldModelRenderer(GraphicsTier.MEDIUM);
 
     /**
      * Chiếu điểm world sang màn hình bằng camera của nhánh render ĐANG hoạt động. Hai method
@@ -108,6 +108,9 @@ public final class WorldScreen implements GameScreen {
     private final WorldToScreen fallbackProjector = camera::project;
 
     private final MonsterPicker monsterPicker = new MonsterPicker();
+
+    /** Toàn bộ phần hiển thị quái (model 3D, hộp thay thế, dấu mục tiêu) — xem {@link MonsterPresenter}. */
+    private final MonsterPresenter monsterPresenter = new MonsterPresenter(models);
 
     private final CombatHudController combatHudController;
     private final CombatAnimationTrigger combatAnimationTrigger;
@@ -154,8 +157,7 @@ public final class WorldScreen implements GameScreen {
         this.localCharacterId = character.getId();
         this.characterLevel = character.getLevel();
         this.combatHudController = new CombatHudController(character.getId(), character.getFaction());
-        this.combatAnimationTrigger =
-                new CombatAnimationTrigger(models, localCharacterId, LOCAL_CHARACTER_ID, remoteCharacters::containsKey);
+        this.combatAnimationTrigger = new CombatAnimationTrigger(models, localCharacterId, LOCAL_CHARACTER_ID);
         this.viewport =
                 new FitViewport(WorldConstants.VIEWPORT_HEIGHT_UNITS, WorldConstants.VIEWPORT_HEIGHT_UNITS, camera);
 
@@ -220,6 +222,7 @@ public final class WorldScreen implements GameScreen {
         updateSkillIntent();
         combatHudController.tick(fixedDeltaTime);
         remoteMotionTracker.tick(fixedDeltaTime);
+        monsterPresenter.tick(fixedDeltaTime);
     }
 
     private void processInboundPackets() {
@@ -272,9 +275,13 @@ public final class WorldScreen implements GameScreen {
         if (opcode == Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE) {
             onMonsterSpawned(MonsterSpawnedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_MONSTER_DESPAWNED_EVENT_VALUE) {
-            combatHudController.onMonsterDespawned(MonsterDespawnedEvent.parseFrom(payload));
+            MonsterDespawnedEvent despawned = MonsterDespawnedEvent.parseFrom(payload);
+            combatHudController.onMonsterDespawned(despawned);
+            monsterPresenter.onDespawned(despawned.getMonsterId());
         } else if (opcode == Opcode.OPCODE_MONSTER_MOVED_EVENT_VALUE) {
-            combatHudController.onMonsterMoved(MonsterMovedEvent.parseFrom(payload));
+            MonsterMovedEvent moved = MonsterMovedEvent.parseFrom(payload);
+            combatHudController.onMonsterMoved(moved);
+            monsterPresenter.onMoved(moved);
         } else if (opcode == Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE) {
             onAttackResult(AttackResultEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE) {
@@ -368,7 +375,7 @@ public final class WorldScreen implements GameScreen {
         if (entity != null) {
             world.removeEntity(entity);
         }
-        models.removeCharacter(event.getCharacterId());
+        models.remove(event.getCharacterId());
         remoteMotionTracker.remove(event.getCharacterId());
     }
 
@@ -409,6 +416,7 @@ public final class WorldScreen implements GameScreen {
 
     private void onMonsterSpawned(MonsterSpawnedEvent event) {
         long autoTargetId = combatHudController.onMonsterSpawned(event);
+        monsterPresenter.onSpawned(event);
         if (autoTargetId != 0L) {
             sender.setTarget(autoTargetId);
         }
@@ -446,7 +454,7 @@ public final class WorldScreen implements GameScreen {
 
         // Quay mặt theo chiều đi; dirX == 0 (đứng yên) GIỮ NGUYÊN hướng cũ, không quay về mặc định.
         if (normalizedDirX != 0f) {
-            models.setCharacterFacingRight(LOCAL_CHARACTER_ID, normalizedDirX > 0f);
+            models.setFacingRight(LOCAL_CHARACTER_ID, normalizedDirX > 0f);
         }
 
         VelocityComponent velocity = VELOCITY.get(localPlayer);
@@ -547,14 +555,14 @@ public final class WorldScreen implements GameScreen {
 
         if (models.isEnabled()) {
             renderModels(alpha);
-            drawMonsters(models.combined());
+            renderMonsters(models.combined());
             DemoPlatforms.render(shapeRenderer, models.combined());
             // VFX/số damage vẽ SAU cùng trong nhánh 3D — luôn hiện đè lên nhân vật/địa hình, đúng
             // thứ tự "nhân vật vẽ trước, VFX vẽ đè sau" của RENDERING.md §2.
             combatFeedback.render(Gdx.graphics.getDeltaTime(), models.combined(), modelProjector);
         } else {
             renderPlaceholderBoxes(alpha);
-            drawMonsters(camera.combined);
+            renderMonsters(camera.combined);
             DemoPlatforms.render(shapeRenderer, camera.combined);
             combatFeedback.render(Gdx.graphics.getDeltaTime(), camera.combined, fallbackProjector);
         }
@@ -564,39 +572,13 @@ public final class WorldScreen implements GameScreen {
     }
 
     /**
-     * Quái CHƯA có model 3D (art pipeline chưa nhắm tới quái) — vẽ hộp phẳng bằng đúng ma trận
-     * chiếu của nhánh render nhân vật đang hoạt động, để không lệch không gian chiếu (ADR-031 #7 —
-     * bài học "đo bằng log thật" cho lệch khung hình áp dụng y hệt ở đây, chỉ khác nguyên nhân).
+     * Phần vẽ quái mà {@link WorldModelRenderer} không lo được — hộp thay thế cho mã quái chưa có
+     * art, và dấu mục tiêu. Dùng ĐÚNG ma trận chiếu của nhánh render đang hoạt động để không lệch
+     * không gian chiếu so với model.
      */
-    private void drawMonsters(Matrix4 projection) {
-        Map<Long, CombatHudController.MonsterState> currentMonsters = combatHudController.monsters();
-        if (currentMonsters.isEmpty()) {
-            return;
-        }
-        long targetId = combatHudController.currentTargetId();
-        // Depth test như DemoPlatforms — khối quái phải che/bị che đúng với nhân vật và bậc.
-        Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
-        shapeRenderer.setProjectionMatrix(projection);
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        for (Map.Entry<Long, CombatHudController.MonsterState> entry : currentMonsters.entrySet()) {
-            CombatHudController.MonsterState monster = entry.getValue();
-            // Con ĐANG NHẮM sáng vàng, còn lại đỏ — không có tín hiệu này thì click chọn mục tiêu
-            // (2026-08-09) không có phản hồi nào ngay tại chỗ quái đứng, người chơi phải liếc lên
-            // thanh máu mục tiêu ở giữa-trên màn hình mới biết mình vừa chọn trúng con nào.
-            shapeRenderer.setColor(entry.getKey() == targetId ? Color.GOLD : Color.SCARLET);
-            // Khối ĐỨNG (cao theo trục Z) chứ không phải hình chữ nhật nằm trên mặt phẳng XY: từ
-            // ADR-033 camera nhìn gần như ngang, hình nằm phẳng chiếu ra chỉ còn một vệt mỏng gần
-            // như vô hình. `box` nhận toạ độ GÓC và tự đảo dấu depth (xem DemoPlatforms).
-            shapeRenderer.box(
-                    monster.x() - (WorldConstants.BOX_SIZE / 2f),
-                    monster.y() - (WorldConstants.BOX_SIZE / 2f),
-                    WorldConstants.MONSTER_HEIGHT_UNITS,
-                    WorldConstants.BOX_SIZE,
-                    WorldConstants.BOX_SIZE,
-                    WorldConstants.MONSTER_HEIGHT_UNITS);
-        }
-        shapeRenderer.end();
-        Gdx.gl.glDisable(GL20.GL_DEPTH_TEST);
+    private void renderMonsters(Matrix4 projection) {
+        monsterPresenter.render(
+                shapeRenderer, projection, combatHudController.monsters(), combatHudController.currentTargetId());
     }
 
     private void syncCombatHud() {
@@ -618,26 +600,29 @@ public final class WorldScreen implements GameScreen {
         float localX = interpolatedX(localPlayer, alpha);
         float localY = interpolatedY(localPlayer, alpha);
         float localZ = interpolatedZ(localPlayer, alpha);
-        models.setCharacterPosition(LOCAL_CHARACTER_ID, localX, localY, localZ);
-        models.setCharacterMoving(LOCAL_CHARACTER_ID, isLocalPlayerMoving());
+        models.setPosition(LOCAL_CHARACTER_ID, localX, localY, localZ);
+        models.setMoving(LOCAL_CHARACTER_ID, isLocalPlayerMoving());
         // ADR-033 — grounded là trạng thái dự đoán cục bộ/xác nhận qua MoveResponse, KHÔNG nội suy
         // (giống lý do isLocalPlayerMoving đọc VelocityComponent thẳng, không qua interpolation).
-        models.setCharacterAirborne(LOCAL_CHARACTER_ID, !POSITION.get(localPlayer).grounded);
+        models.setAirborne(LOCAL_CHARACTER_ID, !POSITION.get(localPlayer).grounded);
         for (Map.Entry<Long, KEntity> entry : remoteCharacters.entrySet()) {
             long characterId = entry.getKey();
-            models.setCharacterPosition(
+            models.setPosition(
                     characterId,
                     interpolatedX(entry.getValue(), alpha),
                     interpolatedY(entry.getValue(), alpha),
                     interpolatedZ(entry.getValue(), alpha));
             // Nhân vật khác không có VelocityComponent (chỉ nội suy vị trí, CLIENT.md §7) — suy
             // "đang di chuyển" từ độ lệch vị trí giữa các CharacterMovedEvent thay vào đó.
-            models.setCharacterMoving(characterId, remoteMotionTracker.isMoving(characterId));
+            models.setMoving(characterId, remoteMotionTracker.isMoving(characterId));
             // z/grounded CHƯA broadcast cho nhân vật khác qua CharacterMovedEvent (ADR-033, hoãn có
-            // chủ đích — xem movement.proto) — z luôn 0 mặc định, không gọi setCharacterAirborne
+            // chủ đích — xem movement.proto) — z luôn 0 mặc định, không gọi setAirborne
             // (giữ nguyên grounded=true mặc định), nên KHÔNG hiện người khác nhảy dù server đã mô
             // phỏng đúng cho họ.
         }
+        // Quái đi cùng lượt vẽ với nhân vật (cùng Scene list, cùng camera) — chỉ nguồn dữ liệu là
+        // khác: chúng không có entity ECS phía client, xem MonsterPresenter.sync.
+        monsterPresenter.sync(combatHudController.monsters(), localX);
         models.follow(localX, localY);
         models.render(Gdx.graphics.getDeltaTime());
     }

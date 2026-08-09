@@ -59,7 +59,7 @@ public final class HudPreviewTool extends ApplicationAdapter {
             Pixmap pixmap = ScreenUtils.getFrameBufferPixmap(
                     0, 0, Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight());
             Gdx.files.absolute(OUTPUT).parent().mkdirs();
-            // flipY=true BẮT BUỘC — xem CharacterModelRenderer.Y_UP_TO_Z_UP về lần dính bẫy này.
+            // flipY=true BẮT BUỘC — xem WorldModelRenderer.Y_UP_TO_Z_UP về lần dính bẫy này.
             PixmapIO.writePNG(Gdx.files.absolute(OUTPUT), pixmap, Deflater.DEFAULT_COMPRESSION, true);
             pixmap.dispose();
             LOG.info("Đã chụp {}", OUTPUT);

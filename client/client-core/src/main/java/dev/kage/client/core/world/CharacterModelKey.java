@@ -27,7 +27,7 @@ final class CharacterModelKey {
 
     // UNSPECIFIED/UNRECOGNIZED -> hoa: giống hệt cách server tự xử lý (GatewayChannelHandler
     // .toDomainFaction), và quan trọng hơn là nó luôn ra khoá TỒN TẠI. Trả về khoá không có file
-    // thì CharacterModelRenderer tắt hẳn nhánh 3D cho TOÀN BỘ phiên chơi, không chỉ cho nhân vật
+    // thì WorldModelRenderer tắt hẳn nhánh 3D cho TOÀN BỘ phiên chơi, không chỉ cho nhân vật
     // đó — hỏng một nhân vật không đáng đổi lấy chuyện cả màn hình quay về hình hộp.
     private static String factionSegment(Faction faction) {
         return switch (faction) {

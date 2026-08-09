@@ -29,7 +29,7 @@ import dev.kage.protocol.SkillResultEvent;
 final class CombatFeedbackPresenter implements Disposable {
 
     // MEDIUM tường minh — bản cài đóng gói đúng 1 tier mặc định theo ADR-028, giống lý do
-    // CharacterModelRenderer của WorldScreen nhận tier tường minh chứ không có default ngầm.
+    // WorldModelRenderer của WorldScreen nhận tier tường minh chứ không có default ngầm.
     private static final GraphicsTier VFX_TIER = GraphicsTier.MEDIUM;
 
     private final long localCharacterId;

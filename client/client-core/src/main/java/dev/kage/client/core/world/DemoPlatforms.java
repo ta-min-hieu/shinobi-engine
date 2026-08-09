@@ -65,7 +65,7 @@ final class DemoPlatforms {
 
     /**
      * Vẽ khối cho từng bệ bằng {@code projection} của nhánh render đang hoạt động (giống
-     * {@code WorldScreen.drawMonsters} — dùng sai ma trận là lệch hẳn không gian chiếu).
+     * {@code MonsterPresenter.render} — dùng sai ma trận là lệch hẳn không gian chiếu).
      *
      * <p>⚠️ {@link ShapeRenderer#box} nhận toạ độ GÓC (không phải tâm) và tự đảo dấu {@code depth}
      * (khối kéo dài xuống {@code -Z}). Nên truyền thẳng {@code topZ} làm {@code z} là đúng: mặt TRÊN

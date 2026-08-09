@@ -8,7 +8,7 @@ package dev.kage.client.core.world;
  * <p><b>Không</b> phải cùng kiểu với {@code dev.kage.tools.assetpipeline.GraphicsTier} (module
  * {@code tools:asset-pipeline}, dùng cho pipeline art lúc build) — {@code client-core} không phụ
  * thuộc {@code tools:asset-pipeline} (xem {@code client-core/build.gradle.kts}) nên đây là enum
- * RIÊNG, chỉ chứa đúng phần {@code folderName} mà {@link CharacterModelRenderer} cần để đọc file,
+ * RIÊNG, chỉ chứa đúng phần {@code folderName} mà {@link WorldModelRenderer} cần để đọc file,
  * không kéo theo {@code scaleOfMaster}/{@code maxTriangles} (thứ chỉ pipeline lúc build quan tâm).
  *
  * <p>Cố tình CHƯA có gì để đổi tier lúc chạy (không UI, không Preferences, không tải-theo-mạng) —

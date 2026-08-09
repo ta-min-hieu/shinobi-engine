@@ -28,7 +28,7 @@ public final class CharacterOrientationDebugTool extends ApplicationAdapter {
     private static final long CHARACTER_ID = 1L;
     private static final String OUTPUT_DIR = "E:/study/libgdx/shinobi-engine/.debug-orientation/";
 
-    private CharacterModelRenderer models;
+    private WorldModelRenderer models;
     private ShapeRenderer shapeRenderer;
     private SkillVfxRenderer skillVfx;
     private FloatingCombatText floatingText;
@@ -38,7 +38,7 @@ public final class CharacterOrientationDebugTool extends ApplicationAdapter {
 
     @Override
     public void create() {
-        models = new CharacterModelRenderer(GraphicsTier.MEDIUM);
+        models = new WorldModelRenderer(GraphicsTier.MEDIUM);
         // ĐÚNG khung nhìn của game thật (WorldConstants.VIEWPORT_HEIGHT_UNITS) — kiểm hiệu ứng ở
         // zoom khác zoom thật thì không kết luận được gì về kích thước/vị trí của nó trên màn.
         models.resize(10f, 10f);
@@ -56,8 +56,8 @@ public final class CharacterOrientationDebugTool extends ApplicationAdapter {
         }
         // Đứng trên NỀN ĐẤT ngay trước bệ đầu tiên (bệ 1 bắt đầu ở x=3) — thấy được cả nền, cả bậc,
         // cả tương quan độ cao trong một khung.
-        models.setCharacterPosition(CHARACTER_ID, 1f, 0f, 0f);
-        models.setCharacterMoving(CHARACTER_ID, false);
+        models.setPosition(CHARACTER_ID, 1f, 0f, 0f);
+        models.setMoving(CHARACTER_ID, false);
         models.follow(1f, 0f); // giống WorldScreen: camera bám đúng vị trí nhân vật
     }
 
@@ -67,14 +67,14 @@ public final class CharacterOrientationDebugTool extends ApplicationAdapter {
             return;
         }
         frame++;
-        // CharacterModelRenderer.render() KHÔNG tự clear (trách nhiệm của caller, xem javadoc) —
+        // WorldModelRenderer.render() KHÔNG tự clear (trách nhiệm của caller, xem javadoc) —
         // WorldScreen làm việc này ở render() thật, công cụ chẩn đoán này quên mất nên ảnh chụp lần
         // đầu ra toàn đen.
         Gdx.gl.glClearColor(0.1f, 0.1f, 0.15f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
-        // MỖI FRAME như WorldScreen.renderModels — setCharacterPosition mới là nơi áp ma trận hướng
+        // MỖI FRAME như WorldScreen.renderModels — setPosition mới là nơi áp ma trận hướng
         // mặt, gọi 1 lần lúc create() thì đổi hướng sau đó không có tác dụng gì (bẫy đã dính thật).
-        models.setCharacterPosition(CHARACTER_ID, 1f, 0f, 0f);
+        models.setPosition(CHARACTER_ID, 1f, 0f, 0f);
         models.render(1f / 60f);
         // ĐÚNG lớp production WorldScreen gọi (không phải bản chép tay) — ảnh chụp mới kiểm chứng
         // được hình học bệ thật.
@@ -85,7 +85,7 @@ public final class CharacterOrientationDebugTool extends ApplicationAdapter {
         if (frame == 90 && !idleCaptured) {
             capture("facing-right");
             idleCaptured = true;
-            models.setCharacterFacingRight(CHARACTER_ID, false);
+            models.setFacingRight(CHARACTER_ID, false);
             skillVfx.play("fireball", 1f, 0f, 0f); // ngay tại chân nhân vật, giống lúc trúng đòn
             floatingText.show("-152", FloatingCombatText.DAMAGE_DEALT, new com.badlogic.gdx.math.Vector3(1f, 0f, 0f));
             floatingText.show("Né!", FloatingCombatText.MISS, new com.badlogic.gdx.math.Vector3(2.4f, 0f, 0f));

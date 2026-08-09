@@ -54,7 +54,7 @@ final class CelShadingConstants {
      *
      * <p>Khâu art quy đổi độ dày viền theo px@1x qua {@code ortho_scale} của camera fit-theo-nhân-vật
      * ({@code add_inverted_hull_outline()}, {@code tools/blender/kage_text3d_kit.py:600}). Runtime
-     * KHÔNG có phép quy đổi tương đương: {@code CharacterModelRenderer.CAMERA_DISTANCE} là hằng số,
+     * KHÔNG có phép quy đổi tương đương: {@code WorldModelRenderer.CAMERA_DISTANCE} là hằng số,
      * và kích thước ống nhìn ortho lấy theo world unit cố định từ {@code FitViewport}
      * (RENDERING.md §4.2), không theo khung hình riêng từng nhân vật như lúc render art — nên không
      * có "zoom" nào để quy đổi. Hằng số world-unit cố định là lựa chọn ĐÚNG cho hiện trạng; nếu sau

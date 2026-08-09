@@ -19,16 +19,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Vẽ nhân vật bằng model glTF 3D thời gian thực qua camera orthographic khoá góc
+ * Vẽ mọi thứ có model glTF 3D trong thế giới — nhân vật VÀ quái — qua camera orthographic khoá góc
  * ([ADR-031](docs/01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)).
+ *
+ * <p>Khoá là {@code entity_id} của combat.proto, một không gian id DUY NHẤT đã tách sẵn dấu:
+ * <b>dương = nhân vật</b> (sequence DB), <b>âm = quái/NPC</b> ({@code WorldFacade.nextMonsterOrNpcId}
+ * đếm lùi từ −1), <b>0 = chính người chơi</b> (sentinel {@code WorldScreen.LOCAL_CHARACTER_ID} — id
+ * thật của mình không bao giờ đi qua đây). Nhờ vậy một map duy nhất chứa được cả hai loại mà không
+ * cần khoá ghép, và mọi thao tác sau khi đã gắn model (dời, quay mặt, phát animation, xoá) dùng
+ * chung đúng một API — chỉ lúc GẮN model mới phân biệt, xem {@link #addMonster} về lý do.
  *
  * <p>Góc camera là <b>hằng số runtime</b>, không nướng vào tài sản — đó là điều ADR-031 mua được khi
  * bỏ pre-render sprite. Đổi {@link #VIEW_YAW_DEGREES} là đổi cả game, không phải render lại asset nào.
  *
- * <p>Lớp này <b>tự tắt</b> khi không tìm thấy model và để {@link WorldScreen} vẽ hộp như cũ. Đó không
- * phải phòng thủ thừa: model nằm ở {@code assets/exported/models/}, sinh ra từ pipeline art và
- * <b>không commit</b> ([ART-PIPELINE §7](docs/14-art/ART-PIPELINE.md)), nên một bản checkout sạch
- * chưa chạy pipeline sẽ không có chúng. Crash lúc khởi động ở trường hợp đó là sai.
+ * <p>Lớp này <b>tự tắt</b> khi không tìm thấy model NHÂN VẬT và để {@link WorldScreen} vẽ hộp như cũ.
+ * Đó không phải phòng thủ thừa: model nằm ở {@code assets/exported/models/}, sinh ra từ pipeline art
+ * và <b>không commit</b> ([ART-PIPELINE §7](docs/14-art/ART-PIPELINE.md)), nên một bản checkout sạch
+ * chưa chạy pipeline sẽ không có chúng. Crash lúc khởi động ở trường hợp đó là sai. Thiếu model
+ * QUÁI thì chỉ con đó vẽ hộp — xem {@link #addMonster}.
  *
  * <p><b>Không dùng {@code SceneManager.render()}</b> (RENDERING.md §12.2 câu hỏi runtime #2) —
  * {@code SceneManager} chỉ vẽ MỘT lượt bằng một {@code ShaderProvider} duy nhất, không có điểm chèn
@@ -39,9 +47,9 @@ import org.slf4j.LoggerFactory;
  * {@link Scene#update} (gọi ở {@link #updateScenes}) mới là thứ chạy {@code AnimationController} bên
  * trong, {@code SceneManager.update()} nguyên bản chỉ lặp gọi đúng method đó cho từng Scene đã đăng ký.
  */
-public final class CharacterModelRenderer implements Disposable {
+public final class WorldModelRenderer implements Disposable {
 
-    private static final Logger LOG = LoggerFactory.getLogger(CharacterModelRenderer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(WorldModelRenderer.class);
 
     /**
      * Góc quay của CAMERA quanh trục đứng, độ.
@@ -170,11 +178,11 @@ public final class CharacterModelRenderer implements Disposable {
     private final String modelDirectory;
 
     private final Map<String, SceneAsset> assetsByKey = new HashMap<>();
-    private final Map<Long, Scene> scenesByCharacter = new HashMap<>();
-    private final Map<Long, AnimationState> animationStateByCharacter = new HashMap<>();
+    private final Map<Long, Scene> scenesById = new HashMap<>();
+    private final Map<Long, AnimationState> animationStateById = new HashMap<>();
     /**
-     * Danh sách vẽ song song với {@link #scenesByCharacter}, đồng bộ ở {@link #addCharacter}/
-     * {@link #removeCharacter}. Riêng vì {@code render()} lặp nó MỖI KHUNG (2 lượt vẽ + 1 lượt
+     * Danh sách vẽ song song với {@link #scenesById}, đồng bộ ở {@link #addCharacter}/
+     * {@link #remove}. Riêng vì {@code render()} lặp nó MỖI KHUNG (2 lượt vẽ + 1 lượt
      * update) — lặp {@code java.util.Map#values()} bằng for-each cấp phát một {@code Iterator} MỚI
      * mỗi lần gọi {@code .iterator()} (hành vi chuẩn của {@code java.util.HashMap}), phạm luật cấm
      * allocation mỗi khung (/CLAUDE.md §6, RENDERING.md §16). {@code com.badlogic.gdx.utils.Array}
@@ -191,7 +199,7 @@ public final class CharacterModelRenderer implements Disposable {
      *     tường minh {@link GraphicsTier#MEDIUM}, khớp "bản cài đóng gói đúng 1 tier mặc định
      *     MEDIUM" của [ADR-028](docs/01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md).
      */
-    public CharacterModelRenderer(GraphicsTier tier) {
+    public WorldModelRenderer(GraphicsTier tier) {
         this.modelDirectory = resolveModelDirectory(tier);
         this.camera = new OrthographicCamera();
         // Ống nhìn phải bao được cả nhân vật lẫn mặt đất phía sau nó. Orthographic nên near có thể
@@ -248,40 +256,92 @@ public final class CharacterModelRenderer implements Disposable {
      * @param assetKey khoá asset kiểu {@code char_thuy-b1}, khớp cột {@code asset_key} của
      *     {@code art_asset} ([ART-PIPELINE §8](docs/14-art/ART-PIPELINE.md)).
      */
-    public void addCharacter(long characterId, String assetKey) {
-        if (!enabled || scenesByCharacter.containsKey(characterId)) {
+    public void addCharacter(long id, String assetKey) {
+        if (!enabled || scenesById.containsKey(id)) {
             return;
         }
+        if (!attach(id, assetKey)) {
+            // Lần đầu thiếu model NHÂN VẬT là tắt hẳn nhánh 3D, không phải cảnh báo mỗi lần spawn:
+            // bộ 45 file nhân vật ra lò cùng một mẻ (ART-PIPELINE §7), thiếu một cái gần như luôn có
+            // nghĩa là chưa chạy pipeline art chứ không phải hỏng đúng một file. Quái thì ngược lại —
+            // xem {@link #addMonster}.
+            LOG.warn("Không thấy model nhân vật '{}' — nhánh 3D tắt, quay về hình thay thế", assetKey);
+            enabled = false;
+        }
+    }
+
+    /**
+     * Gắn model cho một con quái (2026-08-09). Cùng máy móc {@link #addCharacter} nhưng khác đúng
+     * một điều: <b>thiếu model quái KHÔNG tắt nhánh 3D</b>.
+     *
+     * <p>Lý do là thực tế của chính kho asset này: art quái chạy sau art nhân vật và chạy từng con
+     * một, nên "có model cho {@code training_dummy} mà chưa có cho {@code sample_boss}" là trạng
+     * thái BÌNH THƯỜNG chứ không phải dấu hiệu hỏng. Áp luật của {@link #addCharacter} vào đây sẽ
+     * biến một con boss chưa được vẽ thành lệnh tắt 3D cho toàn bộ nhân vật đang trên màn hình —
+     * hỏng nhiều hơn hẳn thứ nó bảo vệ.
+     *
+     * @return {@code true} nếu con quái này giờ có model thật để vẽ. {@code false} thì người gọi
+     *     phải tự vẽ hình thay thế CHO RIÊNG nó ({@code MonsterPresenter} vẽ hộp), phần còn lại của
+     *     thế giới vẫn 3D.
+     */
+    public boolean addMonster(long monsterId, String assetKey) {
+        if (!enabled) {
+            return false; // Không có nhánh 3D nào để gắn vào — người gọi vẽ hộp như trước ADR-031.
+        }
+        if (scenesById.containsKey(monsterId)) {
+            return true;
+        }
+        boolean attached = attach(monsterId, assetKey);
+        if (!attached) {
+            LOG.info("Chưa có model quái '{}' — con này vẽ bằng hộp, nhánh 3D giữ nguyên", assetKey);
+        }
+        return attached;
+    }
+
+    /**
+     * Nạp (hoặc dùng lại) {@code assetKey} rồi dựng một {@link Scene} riêng cho {@code id}.
+     *
+     * @return {@code false} khi không có file {@code .glb} — người gọi quyết định điều đó nghĩa là
+     *     gì, vì hậu quả khác nhau giữa nhân vật và quái.
+     */
+    private boolean attach(long id, String assetKey) {
         SceneAsset asset = assetsByKey.get(assetKey);
         if (asset == null) {
             FileHandle file = Gdx.files.internal(modelDirectory + assetKey + ".glb");
             if (!file.exists()) {
-                // Lần đầu thiếu model là tắt hẳn nhánh 3D, không phải cảnh báo mỗi lần spawn: thiếu
-                // một model gần như luôn có nghĩa là chưa chạy pipeline art, không phải hỏng một file.
-                LOG.warn("Không thấy model '{}' — nhánh 3D tắt, quay về hình thay thế", file.path());
-                enabled = false;
-                return;
+                return false;
             }
             asset = new GLBLoader().load(file);
             assetsByKey.put(assetKey, asset);
         }
-        // Mỗi nhân vật một Scene riêng nhưng dùng chung SceneAsset: model instance tách nhau để có
+        // Mỗi thực thể một Scene riêng nhưng dùng chung SceneAsset: model instance tách nhau để có
         // transform và trạng thái animation riêng, còn mesh/texture chỉ nạp một lần.
         Scene scene = new Scene(asset.scene);
-        scenesByCharacter.put(characterId, scene);
+        scenesById.put(id, scene);
         scenes.add(scene);
         // Tư thế ban đầu là idle, đặt thẳng (không crossfade) vì chưa có gì để chuyển tiếp từ đó —
         // tránh model đứng bind pose tĩnh (§6.5 mục 3 của RENDERING.md, giờ đã nối).
         scene.animationController.setAnimation(CharacterAnimationClips.IDLE, -1);
-        animationStateByCharacter.put(characterId, new AnimationState(characterId));
+        animationStateById.put(id, new AnimationState(id));
+        return true;
     }
 
-    public void removeCharacter(long characterId) {
-        Scene scene = scenesByCharacter.remove(characterId);
+    /**
+     * True nếu {@code id} đang có model 3D thật trên màn hình. Người gọi dùng để quyết định vẽ hình
+     * thay thế ({@code MonsterPresenter}) hay phát animation ({@link CombatAnimationTrigger}) —
+     * false có thể vì nhánh 3D đang tắt, vì con quái đó chưa có art, hoặc vì id không thuộc thực thể
+     * nào đang hiển thị.
+     */
+    public boolean hasModel(long id) {
+        return scenesById.containsKey(id);
+    }
+
+    public void remove(long id) {
+        Scene scene = scenesById.remove(id);
         if (scene != null) {
             scenes.removeValue(scene, true); // so sánh bằng ==, đúng vì mỗi Scene là 1 instance riêng
         }
-        animationStateByCharacter.remove(characterId);
+        animationStateById.remove(id);
     }
 
     /**
@@ -289,10 +349,10 @@ public final class CharacterModelRenderer implements Disposable {
      * (2026-08-08) — chiều cao lơ lửng khi nhảy; nhân vật KHÁC (chưa broadcast z qua
      * {@code CharacterMovedEvent}, xem movement.proto) luôn truyền {@code 0f}, hiện đúng như trước.
      */
-    public void setCharacterPosition(long characterId, float x, float y, float z) {
-        Scene scene = scenesByCharacter.get(characterId);
+    public void setPosition(long id, float x, float y, float z) {
+        Scene scene = scenesById.get(id);
         if (scene != null) {
-            AnimationState state = animationStateByCharacter.get(characterId);
+            AnimationState state = animationStateById.get(id);
             // Gốc model nằm ở chân (bước E của pipeline art đảm bảo điều đó) nên z=0 nghĩa là đứng
             // trên đất — chỉ xoay về Z-up (kèm yaw theo hướng mặt) rồi tịnh tiến. `trn` ghi thẳng
             // vào cột tịnh tiến, giữ nguyên phần xoay và không cấp phát gì.
@@ -307,8 +367,8 @@ public final class CharacterModelRenderer implements Disposable {
      * "hướng gần nhất" khi đứng yên: hàm này KHÔNG suy ra từ vận tốc, vì dừng lại phải giữ nguyên
      * mặt chứ không quay về mặc định.
      */
-    public void setCharacterFacingRight(long characterId, boolean facingRight) {
-        AnimationState state = animationStateByCharacter.get(characterId);
+    public void setFacingRight(long id, boolean facingRight) {
+        AnimationState state = animationStateById.get(id);
         if (state != null) {
             state.facingRight = facingRight;
         }
@@ -316,15 +376,15 @@ public final class CharacterModelRenderer implements Disposable {
 
     /**
      * Đặt lại clip loop (idle/run) mong muốn của một nhân vật — gọi mỗi frame từ
-     * {@code WorldScreen}, giống {@link #setCharacterPosition}. Không cắt ngang một one-shot
+     * {@code WorldScreen}, giống {@link #setPosition}. Không cắt ngang một one-shot
      * (attack/hit/die/skill_cast) đang chạy; clip loop chỉ được áp lại khi one-shot đó kết thúc
      * (xem {@link AnimationState#onEnd}).
      *
      * @param moving true = {@link CharacterAnimationClips#RUN}, false = {@link
      *     CharacterAnimationClips#IDLE} (RENDERING.md §11.1).
      */
-    public void setCharacterMoving(long characterId, boolean moving) {
-        AnimationState state = animationStateByCharacter.get(characterId);
+    public void setMoving(long id, boolean moving) {
+        AnimationState state = animationStateById.get(id);
         if (state == null || state.dead) {
             return; // Chưa có Scene, hoặc đã chết — giữ nguyên tư thế die tới khi hồi sinh.
         }
@@ -336,10 +396,10 @@ public final class CharacterModelRenderer implements Disposable {
 
     /**
      * Đặt lại trạng thái lơ lửng (ADR-033) — {@link CharacterAnimationClips#JUMP} ưu tiên cao nhất
-     * trong {@link #applyLoopClip}, cùng cơ chế/lý do với {@link #setCharacterMoving}.
+     * trong {@link #applyLoopClip}, cùng cơ chế/lý do với {@link #setMoving}.
      */
-    public void setCharacterAirborne(long characterId, boolean airborne) {
-        AnimationState state = animationStateByCharacter.get(characterId);
+    public void setAirborne(long id, boolean airborne) {
+        AnimationState state = animationStateById.get(id);
         if (state == null || state.dead) {
             return;
         }
@@ -350,26 +410,26 @@ public final class CharacterModelRenderer implements Disposable {
     }
 
     /** Đòn đánh thường — luôn phát dù trúng hay né (đó là động tác vung đòn, không phải kết quả). */
-    public void playAttack(long characterId) {
-        playOneShot(characterId, CharacterAnimationClips.ATTACK);
+    public void playAttack(long id) {
+        playOneShot(id, CharacterAnimationClips.ATTACK);
     }
 
     /** Phản ứng trúng đòn — KHÔNG gọi khi mục tiêu chết (dùng {@link #playDie} thay vào đó). */
-    public void playHit(long characterId) {
-        playOneShot(characterId, CharacterAnimationClips.HIT);
+    public void playHit(long id) {
+        playOneShot(id, CharacterAnimationClips.HIT);
     }
 
     /** Dùng kỹ năng — cho cả người dùng skill lẫn (gián tiếp qua {@code WorldScreen}) không áp cho quái. */
-    public void playSkillCast(long characterId) {
-        playOneShot(characterId, CharacterAnimationClips.SKILL_CAST);
+    public void playSkillCast(long id) {
+        playOneShot(id, CharacterAnimationClips.SKILL_CAST);
     }
 
     /**
      * HP về 0 — phát một lần, dừng ở tư thế cuối (ART-PIPELINE §4.2: "không loop"), KHÔNG tự quay
      * lại idle/run như các one-shot khác. Giữ nguyên tới khi {@link #resetAfterRespawn}.
      */
-    public void playDie(long characterId) {
-        AnimationState state = animationStateByCharacter.get(characterId);
+    public void playDie(long id) {
+        AnimationState state = animationStateById.get(id);
         if (state == null) {
             return;
         }
@@ -382,9 +442,9 @@ public final class CharacterModelRenderer implements Disposable {
      * {@code WorldScreen.onCharacterRespawned} snap vị trí thay vì nội suy: hồi sinh là dịch chuyển
      * tức thời, không phải chuyển tiếp mượt từ tư thế die).
      */
-    public void resetAfterRespawn(long characterId) {
-        AnimationState state = animationStateByCharacter.get(characterId);
-        Scene scene = scenesByCharacter.get(characterId);
+    public void resetAfterRespawn(long id) {
+        AnimationState state = animationStateById.get(id);
+        Scene scene = scenesById.get(id);
         if (state == null || scene == null) {
             return;
         }
@@ -401,31 +461,50 @@ public final class CharacterModelRenderer implements Disposable {
      * dùng cờ này để suy ra "nhân vật KHÁC vừa hồi sinh" từ gói di chuyển đầu tiên sau đó — giao
      * thức không phát {@code CharacterRespawnedEvent} cho ai khác ngoài chính người hồi sinh.
      */
-    public boolean isDead(long characterId) {
-        AnimationState state = animationStateByCharacter.get(characterId);
+    public boolean isDead(long id) {
+        AnimationState state = animationStateById.get(id);
         return state != null && state.dead;
     }
 
     private void applyLoopClip(AnimationState state) {
-        String desired = CharacterAnimationClips.loopingClipFor(state.airborne, state.moving);
+        Scene scene = scenesById.get(state.id);
+        String desired = clipOrIdle(scene, CharacterAnimationClips.loopingClipFor(state.airborne, state.moving));
         if (desired.equals(state.currentClip)) {
             return; // AnimationController restart clip từ đầu mỗi lần setAnimation/animate được gọi
-            // — tránh gọi lại khi clip mong muốn không đổi (mỗi frame gọi setCharacterMoving).
+            // — tránh gọi lại khi clip mong muốn không đổi (mỗi frame gọi setMoving).
         }
         state.currentClip = desired;
-        Scene scene = scenesByCharacter.get(state.characterId);
         scene.animationController.animate(desired, -1, 1f, null, CLIP_TRANSITION_SECONDS);
     }
 
-    private void playOneShot(long characterId, String clip) {
-        AnimationState state = animationStateByCharacter.get(characterId);
+    /**
+     * Đổi clip mong muốn thành clip model NÀY thật sự có, nếu không thì {@code idle}.
+     *
+     * <p>Bộ 7 clip của ART-PIPELINE §4.2 là chuẩn cho NHÂN VẬT; model khác hoàn toàn có thể mang ít
+     * hơn một cách chính đáng. {@code mob_training-dummy} có đúng 5 ({@code idle run attack hit die})
+     * — không {@code jump}, không {@code skill_cast}, vì không có đường code nào phía server làm quái
+     * nhảy hay niệm chiêu, và dựng animation chết là lãng phí công art.
+     *
+     * <p>Bắt buộc phải lọc chứ không thể "cứ gọi rồi tính": {@code AnimationController.animate} với
+     * tên clip không tồn tại ném {@code GdxRuntimeException} giữa game loop — một model thiếu clip sẽ
+     * đánh sập cả khung hình, không chỉ con quái đó. {@code idle} là lựa chọn thay thế an toàn duy
+     * nhất vì nó là clip DUY NHẤT mọi model đều phải có ({@link #attach} đặt nó ngay lúc gắn).
+     */
+    private static String clipOrIdle(Scene scene, String desired) {
+        return scene.modelInstance.getAnimation(desired) == null ? CharacterAnimationClips.IDLE : desired;
+    }
+
+    private void playOneShot(long id, String clip) {
+        AnimationState state = animationStateById.get(id);
         if (state == null || state.dead) {
             return; // Đã chết — không phát chồng animation khác lên xác tới khi hồi sinh.
         }
         playOneShotState(state, clip);
     }
 
-    private void playOneShotState(AnimationState state, String clip) {
+    private void playOneShotState(AnimationState state, String requestedClip) {
+        Scene scene = scenesById.get(state.id);
+        String clip = clipOrIdle(scene, requestedClip);
         if (state.oneShotPlaying && clip.equals(state.currentClip)) {
             // Cùng một one-shot đã đang chạy — bỏ qua thay vì restart giữa chừng. Xảy ra thật khi
             // WorldScreen dự đoán skill_cast cục bộ lúc bấm nút rồi SkillResultEvent xác nhận tới
@@ -434,7 +513,6 @@ public final class CharacterModelRenderer implements Disposable {
         }
         state.oneShotPlaying = true;
         state.currentClip = clip;
-        Scene scene = scenesByCharacter.get(state.characterId);
         scene.animationController.animate(clip, 1, 1f, state, CLIP_TRANSITION_SECONDS);
     }
 
@@ -446,9 +524,9 @@ public final class CharacterModelRenderer implements Disposable {
     }
 
     /**
-     * Ma trận chiếu kết hợp của camera 3D — cho {@code WorldScreen} vẽ thêm hình phẳng (VD hộp
-     * quái, chưa có model 3D) khớp đúng không gian chiếu với nhân vật thay vì dùng camera 2D phẳng
-     * không liên quan tới góc nhìn đã khoá.
+     * Ma trận chiếu kết hợp của camera 3D — cho người gọi vẽ thêm hình không phải model (bệ demo,
+     * dấu mục tiêu, hộp thay thế cho quái chưa có art) khớp đúng không gian chiếu với model thay vì
+     * dùng camera 2D phẳng không liên quan tới góc nhìn đã khoá.
      */
     public Matrix4 combined() {
         return camera.combined;
@@ -489,7 +567,7 @@ public final class CharacterModelRenderer implements Disposable {
      * Chạy {@code AnimationController} (bên trong {@link Scene#update}) VÀ ép tính lại transform
      * xương mỗi khung. {@code Scene#update} một mình đủ để advance animation, nhưng gọi tường minh
      * {@code calculateTransforms()} ở đây đảm bảo thay đổi {@code transform} gốc từ
-     * {@link #setCharacterPosition} luôn lan tới ma trận xương trong CÙNG khung hình — rẻ (1 mesh,
+     * {@link #setPosition} luôn lan tới ma trận xương trong CÙNG khung hình — rẻ (1 mesh,
      * {@value CelShadingConstants#RIG_BONE_COUNT} xương), không cấp phát, an toàn thừa còn hơn thiếu.
      */
     private void updateScenes(float deltaTime) {
@@ -508,9 +586,9 @@ public final class CharacterModelRenderer implements Disposable {
             asset.dispose();
         }
         assetsByKey.clear();
-        scenesByCharacter.clear();
+        scenesById.clear();
         scenes.clear();
-        animationStateByCharacter.clear();
+        animationStateById.clear();
     }
 
     /**
@@ -520,7 +598,7 @@ public final class CharacterModelRenderer implements Disposable {
      * ({@link #applyLoopClip}), trừ khi vừa mới {@code die} (giữ nguyên tư thế cuối).
      */
     private final class AnimationState implements AnimationController.AnimationListener {
-        private final long characterId;
+        private final long id;
         private String currentClip = CharacterAnimationClips.IDLE;
         private boolean moving;
         private boolean airborne;
@@ -530,8 +608,8 @@ public final class CharacterModelRenderer implements Disposable {
         // spawn khi chưa có lệnh di chuyển nào để suy ra hướng.
         private boolean facingRight = true;
 
-        AnimationState(long characterId) {
-            this.characterId = characterId;
+        AnimationState(long id) {
+            this.id = id;
         }
 
         @Override

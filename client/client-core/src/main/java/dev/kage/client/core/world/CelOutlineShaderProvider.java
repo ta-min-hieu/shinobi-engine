@@ -9,9 +9,9 @@ import com.badlogic.gdx.graphics.g3d.utils.BaseShaderProvider;
  * vật, không có biến thể theo material (RENDERING.md §12.2 — viền luôn đen phẳng, không phân biệt
  * texture hay flat-color).
  *
- * <p>Đây là điểm chèn CHÍNH mà {@link CharacterModelRenderer} dùng để thay thế lượt vẽ mặc định của
+ * <p>Đây là điểm chèn CHÍNH mà {@link WorldModelRenderer} dùng để thay thế lượt vẽ mặc định của
  * {@code SceneManager}: một {@code ModelBatch} riêng dựng bằng provider này, xem javadoc
- * {@link CharacterModelRenderer} cho lý do bỏ {@code SceneManager.render()}.
+ * {@link WorldModelRenderer} cho lý do bỏ {@code SceneManager.render()}.
  */
 final class CelOutlineShaderProvider extends BaseShaderProvider {
 

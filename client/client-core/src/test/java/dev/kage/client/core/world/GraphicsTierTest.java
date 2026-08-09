@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 
 /**
- * {@link CharacterModelRenderer#resolveModelDirectory} là đúng phần logic thuần cần test ở đây —
- * không cần dựng {@link CharacterModelRenderer} thật (constructor mở {@code ModelBatch}/shader,
+ * {@link WorldModelRenderer#resolveModelDirectory} là đúng phần logic thuần cần test ở đây —
+ * không cần dựng {@link WorldModelRenderer} thật (constructor mở {@code ModelBatch}/shader,
  * cần GL context; xem {@code CharacterModelFrameBenchmarkTool} cho công cụ thủ công có GL context
  * thật, RENDERING.md §6.5). Suy thư mục từ tier là phép nối chuỗi thuần, tách được khỏi đồ hoạ.
  *
@@ -18,19 +18,17 @@ class GraphicsTierTest {
 
     @Test
     void resolveModelDirectory_low() {
-        assertThat(CharacterModelRenderer.resolveModelDirectory(GraphicsTier.LOW))
-                .isEqualTo("models/low/");
+        assertThat(WorldModelRenderer.resolveModelDirectory(GraphicsTier.LOW)).isEqualTo("models/low/");
     }
 
     @Test
     void resolveModelDirectory_medium() {
-        assertThat(CharacterModelRenderer.resolveModelDirectory(GraphicsTier.MEDIUM))
+        assertThat(WorldModelRenderer.resolveModelDirectory(GraphicsTier.MEDIUM))
                 .isEqualTo("models/med/");
     }
 
     @Test
     void resolveModelDirectory_high() {
-        assertThat(CharacterModelRenderer.resolveModelDirectory(GraphicsTier.HIGH))
-                .isEqualTo("models/high/");
+        assertThat(WorldModelRenderer.resolveModelDirectory(GraphicsTier.HIGH)).isEqualTo("models/high/");
     }
 }

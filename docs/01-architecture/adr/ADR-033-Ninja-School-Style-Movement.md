@@ -187,7 +187,8 @@ trúc mới, xử lý trong quá trình code + review bình thường.
    - **Không đổi protocol**: vẫn đúng một `JumpCommand` rỗng (opcode 306) cho cả hai loại nhảy —
      client không nói loại, server tự suy (Server Authority). Đây là lý do mục này KHÔNG cần ADR mới.
    - **Chọn mục tiêu**: `MonsterPicker` bắt click theo KHÔNG GIAN MÀN HÌNH (chiếu vị trí quái ra rồi
-     so hộp bao 2D) thay vì ray-cast — quái chưa có model 3D để ray-cast vào, và cách này dùng chung
+     so hộp bao 2D) thay vì ray-cast — lúc đó quái chưa có model 3D để ray-cast vào (`training_dummy`
+     có model từ 2026-08-09, cách bắt vẫn giữ vì mã quái chưa có art phải click chọn được), và cách này dùng chung
      cho cả nhánh 3D lẫn nhánh hình thay thế. Con đang nhắm đổi màu vàng ngay trong thế giới.
      `GameAction.USE_SKILL` (Enter) đi qua đúng đường của nút HUD, không nhân bản logic hồi chiêu/Khí.
    - Verify thật: `JumpInputControllerTest` (7 test — luật nhảy client tách khỏi `WorldScreen` để

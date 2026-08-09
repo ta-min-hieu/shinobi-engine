@@ -27,12 +27,12 @@ import dev.kage.protocol.Faction;
  * {@code test}. Nằm ở {@code src/test} (không phải {@code src/main}) vì client-desktop production
  * KHÔNG cần biết công cụ đo này tồn tại (Điều 28 — launcher chỉ chứa gameplay thật).
  *
- * <p>Dùng chung {@link CharacterModelRenderer} + {@link CharacterModelKey} với {@link WorldScreen} —
+ * <p>Dùng chung {@link WorldModelRenderer} + {@link CharacterModelKey} với {@link WorldScreen} —
  * đo đúng đường vẽ thật, không phải mô phỏng riêng. Cycle qua đủ 15 tổ hợp hệ phái × bậc trang phục
  * (5 hệ × 3 bậc = đúng số file {@code .glb} thật dưới {@code assets/exported/models/med/}) để 20
  * nhân vật không dùng chung một {@code SceneAsset} — phản ánh đúng tình huống 20 người chơi khác
  * hệ phái/bậc trang phục đứng cạnh nhau, không phải 20 bản sao của cùng một model (rẻ hơn thật vì
- * chung {@code SceneAsset}, xem Flyweight ở {@link CharacterModelRenderer#addCharacter}).
+ * chung {@code SceneAsset}, xem Flyweight ở {@link WorldModelRenderer#addCharacter}).
  */
 public final class CharacterModelFrameBenchmarkTool extends ApplicationAdapter {
 
@@ -72,7 +72,7 @@ public final class CharacterModelFrameBenchmarkTool extends ApplicationAdapter {
      */
     private static final float VIEWPORT_UNITS = 30f;
 
-    private CharacterModelRenderer models;
+    private WorldModelRenderer models;
     private final float[] measuredFrameTimesMs = new float[MEASURED_FRAMES];
     private int measuredFrameIndex;
     private int totalFramesSeen;
@@ -83,16 +83,16 @@ public final class CharacterModelFrameBenchmarkTool extends ApplicationAdapter {
     public void create() {
         // MEDIUM: đúng tier mà pipeline art xuất mặc định và benchmark này đo (log lỗi dưới đây
         // cũng nói rõ "models/med/") — không đổi ý nghĩa phép đo cũ, chỉ hết hardcode ở phía đọc.
-        models = new CharacterModelRenderer(GraphicsTier.MEDIUM);
+        models = new WorldModelRenderer(GraphicsTier.MEDIUM);
         models.resize(VIEWPORT_UNITS, VIEWPORT_UNITS);
         spawnCharacterGrid();
         models.follow(0f, 0f);
 
         if (!models.isEnabled()) {
-            // CharacterModelRenderer tự tắt nhánh 3D khi thiếu .glb (xem Javadoc lớp đó) — đúng
+            // WorldModelRenderer tự tắt nhánh 3D khi thiếu .glb (xem Javadoc lớp đó) — đúng
             // hành vi production, nhưng với công cụ ĐO thì không có gì để đo, nên dừng rõ ràng thay
             // vì lặng lẽ báo "0ms" (điều CLAUDE.md cấm — không được bịa số liệu).
-            LOG.error("Không đo được: CharacterModelRenderer tắt nhánh 3D (thiếu .glb dưới"
+            LOG.error("Không đo được: WorldModelRenderer tắt nhánh 3D (thiếu .glb dưới"
                     + " models/med/). Chạy pipeline art (tools:asset-pipeline) trước khi chạy"
                     + " benchmark này.");
             Gdx.app.exit();
@@ -116,7 +116,7 @@ public final class CharacterModelFrameBenchmarkTool extends ApplicationAdapter {
             int row = i / GRID_COLUMNS;
             float x = (col - ((GRID_COLUMNS - 1) / 2f)) * GRID_SPACING_UNITS;
             float y = (row - ((rows - 1) / 2f)) * GRID_SPACING_UNITS;
-            models.setCharacterPosition(characterId, x, y, 0f);
+            models.setPosition(characterId, x, y, 0f);
         }
     }
 

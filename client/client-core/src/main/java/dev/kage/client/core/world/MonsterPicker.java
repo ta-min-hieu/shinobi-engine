@@ -11,11 +11,12 @@ import com.badlogic.gdx.math.Vector3;
  * sai, và không có cách nào đổi.
  *
  * <p><b>Bắt theo KHÔNG GIAN MÀN HÌNH, không ray-cast 3D</b>: chiếu vị trí quái ra màn hình rồi so
- * hộp bao 2D quanh điểm chiếu. Lý do là quái CHƯA có model 3D (vẽ bằng khối
- * {@code ShapeRenderer.box} trong {@code WorldScreen#drawMonsters}) nên không có hình học thật để
- * ray-cast vào; và cách này dùng chung được cho cả nhánh 3D lẫn nhánh hình thay thế, chỉ cần đổi
- * {@link WorldToScreen} truyền vào. Hệ quả tự nhiên: vùng bắt luôn co giãn đúng theo mức phóng của
- * camera, không cần hằng số pixel nào phụ thuộc độ phân giải.
+ * hộp bao 2D quanh điểm chiếu. Lý do ban đầu là quái chưa có model 3D nào để ray-cast vào; điều đó
+ * đã hết đúng từ 2026-08-09 ({@code mob_training-dummy}, xem {@link MonsterPresenter}) nhưng cách
+ * làm thì <b>vẫn giữ có chủ đích</b>, vì lý do thứ hai mới là lý do bền: một mã quái chưa có art vẫn
+ * phải click chọn được, và ray-cast thì không có gì để bắn vào. Cùng một phép bắt dùng chung cho cả
+ * nhánh 3D lẫn nhánh hình thay thế, chỉ đổi {@link WorldToScreen} truyền vào. Hệ quả tự nhiên: vùng
+ * bắt luôn co giãn đúng theo mức phóng của camera, không cần hằng số pixel nào phụ thuộc độ phân giải.
  *
  * <p>Không phụ thuộc GL — test được thẳng bằng một {@link WorldToScreen} giả
  * ({@code MonsterPickerTest}).

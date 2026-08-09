@@ -3,7 +3,7 @@ package dev.kage.client.core.world;
 /**
  * Ánh xạ trạng thái gameplay quan sát được ở client → tên clip animation
  * ([RENDERING.md §11.1](docs/03-engine/RENDERING.md)). Thuần hàm, không phụ thuộc libGDX/GL —
- * {@link CharacterModelRenderer} là nơi DUY NHẤT áp kết quả vào {@code AnimationController} thật,
+ * {@link WorldModelRenderer} là nơi DUY NHẤT áp kết quả vào {@code AnimationController} thật,
  * nên lớp này test được thẳng không cần context đồ hoạ.
  *
  * <p>Bộ 7 clip chuẩn theo [ART-PIPELINE §4.2](docs/14-art/ART-PIPELINE.md), xuất từ đúng 1 sidecar
