@@ -106,6 +106,25 @@ final class CombatFeedbackPresenter implements Disposable {
         floatingText.show("-" + damage, color, anchor);
     }
 
+    /**
+     * Chữ bay lên ngay trên đầu CHÍNH người chơi — dùng cho những thứ không phải damage: mừng lên
+     * cấp, và lời nhắc "vì sao đòn vừa bấm không xảy ra" (2026-08-09).
+     *
+     * <p>Neo vào người chơi chứ không phải góc màn hình: mắt người chơi đang ở nhân vật giữa lúc
+     * đánh nhau, thông báo nằm ở rìa màn hình thì đọc xong đã muộn.
+     *
+     * @param i18nKey khoá i18n, KHÔNG phải chuỗi hiển thị (client/CLAUDE.md — cấm hardcode chuỗi).
+     */
+    void showSelfNotice(String i18nKey, Color color) {
+        anchor.set(localPosition.x, localPosition.y, localPosition.z);
+        floatingText.show(i18n.get(i18nKey), color, anchor);
+    }
+
+    /** Vừa lên cấp — {@code leveled_up} của {@code ExperienceChangedEvent}. */
+    void showLevelUp() {
+        showSelfNotice("hud.exp.level_up", FloatingCombatText.LEVEL_UP);
+    }
+
     void resize(int width, int height) {
         floatingText.resize(width, height);
     }

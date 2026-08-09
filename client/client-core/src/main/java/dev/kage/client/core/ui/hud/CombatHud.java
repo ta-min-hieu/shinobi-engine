@@ -32,7 +32,14 @@ public final class CombatHud implements Disposable {
 
     private static final float BAR_WIDTH = 190f;
     private static final float BAR_HEIGHT = 20f;
-    private static final float EXP_BAR_HEIGHT = 12f;
+    /**
+     * Vạch EXP mỏng hơn Máu/Khí nhưng KHÔNG mỏng hơn được nữa: 12f (thử đầu tiên) làm nhãn số cao
+     * hơn ô chứa và tràn hẳn ra ngoài khung panel — thấy thật trên ảnh chụp preview 2026-08-09.
+     * Đi kèm {@link #EXP_LABEL_SCALE} thu nhỏ chữ cho vừa.
+     */
+    private static final float EXP_BAR_HEIGHT = 16f;
+
+    private static final float EXP_LABEL_SCALE = 0.7f;
     private static final float BADGE_SIZE = 52f;
     private static final float SLOT_SIZE = 46f;
     private static final float ACTION_BUTTON_SIZE = 96f;
@@ -90,6 +97,7 @@ public final class CombatHud implements Disposable {
         this.playerChiLabel = new Label("", skin.statLabelStyle);
         this.expBar = new HealthBar(skin, HealthBar.Kind.EXPERIENCE);
         this.expLabel = new Label("", skin.statLabelStyle);
+        this.expLabel.setFontScale(EXP_LABEL_SCALE);
         this.targetNameLabel = new Label("", skin.labelStyle);
         this.targetHealthBar = new HealthBar(skin);
         this.targetHpLabel = new Label("", skin.statLabelStyle);
@@ -203,14 +211,26 @@ public final class CombatHud implements Disposable {
         });
         skillNameLabel.setAlignment(Align.center);
 
+        // Mỗi nút một CỘT riêng (biển tên + nút), canh đáy: hai nút khác cỡ nằm chung một lưới 2
+        // hàng sẽ kéo hàng biển tên giãn theo nút cao nhất, để lại khoảng trống lơ lửng giữa tên và
+        // nút — thấy thật trên ảnh chụp preview 2026-08-09.
         Table cluster = new Table();
-        cluster.add(namePlate(skillNameLabel)).padBottom(6f).padRight(10f);
-        cluster.add(namePlate(new Label(i18n.get("hud.action.attack"), skin.statLabelStyle)))
-                .padBottom(6f)
-                .row();
-        cluster.add(skillButton).size(SKILL_BUTTON_SIZE).padRight(10f);
-        cluster.add(attackButton).size(ACTION_BUTTON_SIZE);
+        cluster.add(buttonColumn(namePlate(skillNameLabel), skillButton, SKILL_BUTTON_SIZE))
+                .bottom()
+                .padRight(10f);
+        cluster.add(buttonColumn(
+                        namePlate(new Label(i18n.get("hud.action.attack"), skin.statLabelStyle)),
+                        attackButton,
+                        ACTION_BUTTON_SIZE))
+                .bottom();
         return cluster;
+    }
+
+    private static Table buttonColumn(Table plate, TextButton button, float buttonSize) {
+        Table column = new Table();
+        column.add(plate).padBottom(6f).row();
+        column.add(button).size(buttonSize);
+        return column;
     }
 
     /** Khung nền cho biển tên — chữ trần trên nền map sáng (cỏ/tuyết) gần như không đọc được. */

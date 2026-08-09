@@ -402,6 +402,9 @@ public final class WorldScreen implements GameScreen {
     private void onExperienceChanged(ExperienceChangedEvent event) {
         characterLevel = event.getLevel();
         combatHud.setExperience(event.getExpIntoLevel(), event.getExpForNextLevel());
+        if (event.getLeveledUp()) {
+            combatFeedback.showLevelUp();
+        }
     }
 
     private void onMonsterSpawned(MonsterSpawnedEvent event) {
@@ -474,10 +477,31 @@ public final class WorldScreen implements GameScreen {
      * {@code AttackResultEvent} và có thể là trượt/ngoài tầm, đó là chuyện của server.
      */
     private void updateAttackIntent(float fixedDeltaTime) {
-        if (attackInput.update(inputMapper.isPressed(GameAction.ATTACK), fixedDeltaTime)) {
-            models.playAttack(LOCAL_CHARACTER_ID);
-            sender.attack();
+        if (!attackInput.update(inputMapper.isPressed(GameAction.ATTACK), fixedDeltaTime)) {
+            return;
         }
+        CombatHudController.MonsterState target = combatHudController.targetState();
+        if (target == null) {
+            // Không có mục tiêu thì server cũng không làm gì — nói ra thay vì im lặng, và KHÔNG gửi
+            // gói thừa (cùng lý do CombatHudController.useSkill không gửi khi chưa đủ điều kiện).
+            combatFeedback.showSelfNotice("hud.combat.no_target", FloatingCombatText.MISS);
+            return;
+        }
+        if (!withinAttackRange(target)) {
+            // VẪN gửi: client chỉ ĐOÁN tầm (xem CombatConstants.ATTACK_RANGE_METERS), server mới
+            // quyết. Nói cho người chơi biết lý do khả dĩ thay vì để họ bấm mãi không hiểu gì.
+            combatFeedback.showSelfNotice("hud.combat.out_of_range", FloatingCombatText.MISS);
+        }
+        models.playAttack(LOCAL_CHARACTER_ID);
+        sender.attack();
+    }
+
+    private boolean withinAttackRange(CombatHudController.MonsterState target) {
+        PositionComponent pos = POSITION.get(localPlayer);
+        float dx = target.x() - pos.x;
+        float dy = target.y() - pos.y;
+        // So bình phương — tránh Math.sqrt mỗi lần bấm đánh, và tránh cả sai số của phép căn.
+        return (dx * dx) + (dy * dy) <= CombatConstants.ATTACK_RANGE_METERS * CombatConstants.ATTACK_RANGE_METERS;
     }
 
     /**

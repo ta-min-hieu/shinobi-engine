@@ -27,6 +27,14 @@ final class CombatConstants {
      */
     static final float ATTACK_INTERVAL_SECONDS = 1f;
 
+    /**
+     * Tầm đánh thường, mét — bản sao của {@code server-world.CombatConstants.ATTACK_RANGE_METERS}.
+     * CHỈ dùng để nói cho người chơi biết "đang đứng xa quá" khi bấm đánh mà không thấy gì xảy ra;
+     * lệnh vẫn được GỬI dù client nghĩ là ngoài tầm — server mới là bên quyết định trúng/trượt, và
+     * vị trí hai bên có thể lệch tới {@code WorldConstants.RECONCILE_SNAP_THRESHOLD}.
+     */
+    static final float ATTACK_RANGE_METERS = 2f;
+
     static final String FIREBALL_SKILL_CODE = "fireball";
 
     static final float FIREBALL_COOLDOWN_SECONDS = 3f;

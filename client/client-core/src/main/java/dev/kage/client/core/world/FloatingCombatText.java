@@ -43,8 +43,11 @@ final class FloatingCombatText implements Disposable {
     /** Đỏ — damage NGƯỜI CHƠI phải nhận, phân biệt ngay bằng màu không cần đọc số. */
     static final Color DAMAGE_TAKEN = Color.valueOf("FF5A4A");
 
-    /** Trắng xám — né/trượt. */
+    /** Trắng xám — né/trượt, và cả lời nhắc "vì sao đòn vừa rồi không xảy ra" (2026-08-09). */
     static final Color MISS = Color.valueOf("D8D8D8");
+
+    /** Xanh lá sáng — LÊN CẤP. Màu duy nhất không dùng cho damage, để tin vui không lẫn với sát thương. */
+    static final Color LEVEL_UP = Color.valueOf("7CFF7C");
 
     private final BitmapFont font;
     private final SpriteBatch batch = new SpriteBatch();

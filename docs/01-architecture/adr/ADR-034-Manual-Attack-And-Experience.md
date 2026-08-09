@@ -117,5 +117,8 @@ Không. Các mục ⏳ ở trên là tham số nội dung, không phải quyết
 1. ⏳ **Chủ dự án cập nhật GDD §6** — bỏ "Auto-target đánh thường", ghi lại luật mới.
 2. ⏳ **Chốt số cân bằng EXP** (Technical Decisions #4/#5) sau khi chơi thử đủ lâu.
 3. ⏳ **Đo lại PvP** sau khi đổi sang bấm tay (Technical Decision #6).
-4. ⏳ **Hiệu ứng lên cấp** — `leveled_up` đã có trên dây nhưng client mới chỉ cập nhật số, chưa có
-   gì ăn mừng (chữ bay/âm thanh). Việc nhỏ, để lại khi có art/audio.
+4. 🟡 **Một phần — chữ bay xong 2026-08-09, chưa có âm thanh.** Lên cấp hiện chữ "LÊN CẤP!" xanh lá
+   trên đầu nhân vật (`CombatFeedbackPresenter.showLevelUp`). Cùng lượt, bấm đánh mà không có gì xảy
+   ra giờ cũng nói lý do ("Chưa chọn mục tiêu" / "Ngoài tầm đánh") thay vì im lặng — chính loại im
+   lặng đã khiến chủ dự án tưởng "chưa đánh được quái". Âm thanh để lại khi có audio pipeline.
+   ⚠️ Ba thông báo này CHƯA được nhìn thấy chạy thật, mới chỉ compile + build xanh.

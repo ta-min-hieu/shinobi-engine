@@ -57,8 +57,12 @@ public final class KageSkin implements Disposable {
 
     private static final Color CHI_BLUE = Color.valueOf("2979FF");
 
-    /** Vàng cam — vạch kinh nghiệm (2026-08-09). Khác hẳn đỏ Máu/xanh Khí để liếc là phân biệt. */
-    private static final Color EXP_AMBER = Color.valueOf("FFB300");
+    /**
+     * Vàng cam ĐẬM — vạch kinh nghiệm (2026-08-09). Khác hẳn đỏ Máu/xanh Khí để liếc là phân biệt.
+     * Tông đậm chứ không phải vàng sáng: số EXP màu trắng đè lên trên, thử FFB300 trước thì chữ
+     * chìm hẳn vào nền ở phần đã đầy (thấy thật trên ảnh chụp preview).
+     */
+    private static final Color EXP_AMBER = Color.valueOf("B26A00");
 
     /** Độ dày viền khung/nút, pixel — cùng một giá trị cho mọi khung để HUD nhất quán. */
     private static final int BORDER_PX = 2;

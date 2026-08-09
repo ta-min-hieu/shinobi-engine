@@ -38,6 +38,8 @@ public final class HudPreviewTool extends ApplicationAdapter {
         hud.setLevel(12);
         hud.setPlayerHp(72, 100);
         hud.setPlayerChi(45, 100);
+        // Vạch EXP (2026-08-09) — số thật của cấp 12 theo ExperienceCurve (100 × cấp = 1200).
+        hud.setExperience(430L, 1200L);
         hud.setTarget("training_dummy", 38, 60);
         // Trạng thái SẴN SÀNG — đây mới là trạng thái người chơi thấy phần lớn thời gian; xem
         // trước ở trạng thái hồi chiêu (nút xám) sẽ đánh giá sai độ nổi bật của nút.
