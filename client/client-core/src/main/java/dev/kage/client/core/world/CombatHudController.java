@@ -26,7 +26,7 @@ import dev.kage.protocol.SkillResultEvent;
 final class CombatHudController {
 
     /** Trạng thái 1 quái đã biết, tối thiểu để vẽ hộp + thanh máu (không phải ECS Component). */
-    record MonsterState(String code, float x, float y, int hp, int maxHp) {}
+    record MonsterState(String code, float x, float y, int hp, int maxHp) implements PickablePoint {}
 
     private final long localCharacterId;
     private final CombatConstants.FactionSkill skill;

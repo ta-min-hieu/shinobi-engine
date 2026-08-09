@@ -1,8 +1,5 @@
 package dev.kage.client.core.world;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
@@ -22,6 +19,7 @@ import dev.kage.client.core.input.GameAction;
 import dev.kage.client.core.input.InputMapper;
 import dev.kage.client.core.net.GameConnection;
 import dev.kage.client.core.ui.hud.CombatHud;
+import dev.kage.client.core.ui.hud.DialoguePanel;
 import dev.kage.engine.core.GameScreen;
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.EcsWorld;
@@ -68,8 +66,8 @@ public final class WorldScreen implements GameScreen {
     private final WorldCommandSender sender;
     private final EcsWorld world;
     private final KEntity localPlayer;
-    private final Map<Long, KEntity> remoteCharacters = new HashMap<>();
-    private final RemoteMotionTracker remoteMotionTracker = new RemoteMotionTracker();
+    /** Người chơi KHÁC — kho + model + idle/run, xem {@link RemoteCharacterPresenter}. */
+    private final RemoteCharacterPresenter remoteCharacters;
 
     /**
      * Id dùng cho nhân vật của chính người chơi trong {@link WorldModelRenderer}. Server đánh id
@@ -109,7 +107,7 @@ public final class WorldScreen implements GameScreen {
 
     private final WorldToScreen fallbackProjector = camera::project;
 
-    private final MonsterPicker monsterPicker = new MonsterPicker();
+    private final WorldEntityPicker entityPicker = new WorldEntityPicker();
 
     /** Toàn bộ phần hiển thị quái (model 3D, hộp thay thế, dấu mục tiêu) — xem {@link MonsterPresenter}. */
     private final MonsterPresenter monsterPresenter = new MonsterPresenter(models);
@@ -123,6 +121,12 @@ public final class WorldScreen implements GameScreen {
 
     /** Số damage + hiệu ứng skill neo tại vị trí mục tiêu — xem {@link CombatFeedbackPresenter}. */
     private final CombatFeedbackPresenter combatFeedback;
+
+    /** Khung hội thoại NPC — mượn skin của {@link #combatHud}, xem {@link DialoguePanel}. */
+    private final DialoguePanel dialoguePanel = new DialoguePanel(combatHud.skin());
+
+    /** Luồng hội thoại (trạng thái + mạng + panel) — xem {@link DialogueCoordinator}. */
+    private final DialogueCoordinator dialogue;
 
     /**
      * HUD trước, thế giới sau: {@code Stage} trả {@code true} ở {@code touchDown} CHỈ KHI có actor
@@ -163,6 +167,7 @@ public final class WorldScreen implements GameScreen {
         this.characterLevel = character.getLevel();
         this.combatHudController = new CombatHudController(character.getId(), character.getFaction());
         this.combatAnimationTrigger = new CombatAnimationTrigger(models, localCharacterId, LOCAL_CHARACTER_ID);
+        this.remoteCharacters = new RemoteCharacterPresenter(context.world(), models);
         this.viewport =
                 new FitViewport(WorldConstants.VIEWPORT_HEIGHT_UNITS, WorldConstants.VIEWPORT_HEIGHT_UNITS, camera);
 
@@ -191,10 +196,16 @@ public final class WorldScreen implements GameScreen {
         this.combatFeedback = new CombatFeedbackPresenter(
                 localCharacterId, POSITION.get(localPlayer), combatHudController, combatHud.font());
 
+        // SAU combatFeedback: coordinator mượn nó để hiện thông báo khi hội thoại kết thúc bằng
+        // nhánh nhận quest/mở cửa hàng.
+        this.dialogue = new DialogueCoordinator(dialoguePanel, sender, combatFeedback);
+
         combatHud.setSkillLabel(combatHudController.skillNameKey());
         combatHud.setOnSkillClicked(this::onSkillButtonClicked);
         combatHud.setOnAttackClicked(attackInput::onButtonClicked);
-        this.inputProcessor = new InputMultiplexer(combatHud.stage(), new WorldTargetPicker());
+        // Hội thoại TRƯỚC HUD trước thế giới: đang nói chuyện mà bấm trúng nút Đánh phía sau, hoặc
+        // click xuyên qua khung thoại để chọn mục tiêu, đều là hỏng.
+        this.inputProcessor = new InputMultiplexer(dialoguePanel.stage(), combatHud.stage(), new WorldTargetPicker());
     }
 
     @Override
@@ -208,6 +219,9 @@ public final class WorldScreen implements GameScreen {
     @Override
     public void hide() {
         Gdx.input.setInputProcessor(null);
+        // Khung hội thoại không được sống sót qua một lần rời màn hình — quay lại sẽ thấy nó treo ở
+        // node cũ trong khi server đã quên sạch cuộc nói chuyện đó.
+        dialogue.reset();
     }
 
     @Override
@@ -215,6 +229,7 @@ public final class WorldScreen implements GameScreen {
         viewport.update(width, height, true);
         models.resize(camera.viewportWidth, camera.viewportHeight);
         combatHud.resize(width, height);
+        dialoguePanel.resize(width, height);
         combatFeedback.resize(width, height);
     }
 
@@ -226,7 +241,7 @@ public final class WorldScreen implements GameScreen {
         updateAttackIntent(fixedDeltaTime);
         updateSkillIntent();
         combatHudController.tick(fixedDeltaTime);
-        remoteMotionTracker.tick(fixedDeltaTime);
+        remoteCharacters.tick(fixedDeltaTime);
         monsterPresenter.tick(fixedDeltaTime);
     }
 
@@ -241,7 +256,7 @@ public final class WorldScreen implements GameScreen {
         try {
             int opcode = frame.header().opcode();
             byte[] payload = frame.payload();
-            if (!dispatchMovement(opcode, payload)) {
+            if (!dialogue.dispatch(opcode, payload) && !dispatchMovement(opcode, payload)) {
                 dispatchCombat(opcode, payload);
             }
             // Opcode khác (VD PongResponse của heartbeat) — không thuộc gameplay world, bỏ qua.
@@ -261,11 +276,11 @@ public final class WorldScreen implements GameScreen {
         if (opcode == Opcode.OPCODE_MOVE_RESPONSE_VALUE) {
             onMoveResponse(MoveResponse.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE) {
-            onCharacterSpawned(CharacterSpawnedEvent.parseFrom(payload));
+            remoteCharacters.onSpawned(CharacterSpawnedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE) {
-            onCharacterMoved(CharacterMovedEvent.parseFrom(payload));
+            remoteCharacters.onMoved(CharacterMovedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE) {
-            onCharacterDespawned(CharacterDespawnedEvent.parseFrom(payload));
+            remoteCharacters.onDespawned(CharacterDespawnedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_CHARACTER_RESPAWNED_EVENT_VALUE) {
             onCharacterRespawned(CharacterRespawnedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE) {
@@ -343,49 +358,6 @@ public final class WorldScreen implements GameScreen {
             // các tick sau vì VerticalMovementSystem chạy CÙNG công thức cả 2 phía (ADR-033) —
             // follow-up nếu số liệu thật cho thấy cần đồng bộ cả vz.
         }
-    }
-
-    private void onCharacterSpawned(CharacterSpawnedEvent event) {
-        if (remoteCharacters.containsKey(event.getCharacterId())) {
-            return; // đã có — bỏ qua an toàn thay vì tạo entity trùng.
-        }
-        KEntity entity = world.createEntity();
-        PositionComponent pos = new PositionComponent();
-        pos.x = event.getX();
-        pos.y = event.getY();
-        pos.prevX = pos.x;
-        pos.prevY = pos.y;
-        entity.add(pos);
-        remoteCharacters.put(event.getCharacterId(), entity);
-        models.addCharacter(event.getCharacterId(), CharacterModelKey.of(event.getFaction(), event.getCostumeTier()));
-    }
-
-    private void onCharacterMoved(CharacterMovedEvent event) {
-        KEntity entity = remoteCharacters.get(event.getCharacterId());
-        if (entity == null) {
-            return; // Moved tới trước Spawned (hiếm qua TCP, nhưng an toàn bỏ qua thay vì crash).
-        }
-        PositionComponent pos = POSITION.get(entity);
-        pos.x = event.getX();
-        pos.y = event.getY();
-        pos.prevX = pos.x;
-        pos.prevY = pos.y;
-        remoteMotionTracker.onPositionUpdate(event.getCharacterId(), event.getX(), event.getY());
-        if (models.isDead(event.getCharacterId())) {
-            // Giao thức KHÔNG phát CharacterRespawnedEvent cho ai khác ngoài chính người hồi sinh
-            // (javadoc onCharacterRespawned) — vị trí đổi sau khi chết chỉ có thể là hồi sinh, nên
-            // coi gói di chuyển đầu tiên sau "die" là tín hiệu hồi sinh cho nhân vật KHÁC.
-            models.resetAfterRespawn(event.getCharacterId());
-        }
-    }
-
-    private void onCharacterDespawned(CharacterDespawnedEvent event) {
-        KEntity entity = remoteCharacters.remove(event.getCharacterId());
-        if (entity != null) {
-            world.removeEntity(entity);
-        }
-        models.remove(event.getCharacterId());
-        remoteMotionTracker.remove(event.getCharacterId());
     }
 
     /**
@@ -494,7 +466,9 @@ public final class WorldScreen implements GameScreen {
      * {@code AttackResultEvent} và có thể là trượt/ngoài tầm, đó là chuyện của server.
      */
     private void updateAttackIntent(float fixedDeltaTime) {
-        if (!attackInput.update(inputMapper.isPressed(GameAction.ATTACK), fixedDeltaTime)) {
+        // Đang nói chuyện thì phím Z/Enter thuộc về khung thoại, không phải về combat: người chơi
+        // đang đọc chữ, không nhắm ai. Vẫn cho đi lại/nhảy — đứng hình khi mở thoại còn khó chịu hơn.
+        if (dialogue.isOpen() || !attackInput.update(inputMapper.isPressed(GameAction.ATTACK), fixedDeltaTime)) {
             return;
         }
         CombatHudController.MonsterState target = combatHudController.targetState();
@@ -528,30 +502,44 @@ public final class WorldScreen implements GameScreen {
      */
     private void updateSkillIntent() {
         boolean skillPressed = inputMapper.isPressed(GameAction.USE_SKILL);
-        if (skillPressed && !skillKeyWasPressed) {
+        if (skillPressed && !skillKeyWasPressed && !dialogue.isOpen()) {
             onSkillButtonClicked();
         }
         skillKeyWasPressed = skillPressed;
     }
 
     /**
-     * Click chuột trái vào một con quái = chọn nó làm mục tiêu (chủ dự án yêu cầu 2026-08-09).
+     * Click chuột trái vào thế giới — trúng quái thì chọn làm mục tiêu (2026-08-09), trúng NPC thì
+     * bắt chuyện.
+     *
+     * <p>Thử QUÁI TRƯỚC: hai loại chỉ chồng nhau khi chúng đứng gần nhau trên màn hình, và trong
+     * tình huống đó việc gấp là đánh chứ không phải nói chuyện.
      *
      * @param screenX toạ độ chuột thô từ {@code InputProcessor}.
      * @param screenY toạ độ chuột thô ({@code InputProcessor} lấy gốc TRÊN-trái).
-     * @return {@code true} nếu click trúng một con quái — nuốt sự kiện, không để rơi tiếp xuống.
+     * @return {@code true} nếu click trúng thứ gì đó — nuốt sự kiện, không để rơi tiếp xuống.
      */
     private boolean selectTargetAt(int screenX, int screenY) {
         // Lật y sang quy ước GL của WorldToScreen (gốc DƯỚI-trái).
         float glScreenY = Gdx.graphics.getHeight() - screenY;
         WorldToScreen projector = models.isEnabled() ? modelProjector : fallbackProjector;
-        long monsterId = monsterPicker.pick(combatHudController.monsters(), screenX, glScreenY, projector);
-        if (monsterId == 0L) {
+        long monsterId = entityPicker.pick(combatHudController.monsters(), screenX, glScreenY, projector);
+        if (monsterId != 0L) {
+            if (combatHudController.selectTarget(monsterId)) {
+                sender.setTarget(monsterId);
+            }
+            return true;
+        }
+        return talkToNpcAt(screenX, glScreenY, projector);
+    }
+
+    private boolean talkToNpcAt(float screenX, float glScreenY, WorldToScreen projector) {
+        long npcId = entityPicker.pick(npcPresenter.npcs(), screenX, glScreenY, projector);
+        if (npcId == 0L) {
             return false; // click vào chỗ trống — GIỮ NGUYÊN mục tiêu cũ, không bỏ chọn.
         }
-        if (combatHudController.selectTarget(monsterId)) {
-            sender.setTarget(monsterId);
-        }
+        NpcPresenter.NpcState npc = npcPresenter.npcs().get(npcId);
+        dialogue.talkTo(npc.code());
         return true;
     }
 
@@ -578,6 +566,7 @@ public final class WorldScreen implements GameScreen {
 
         syncCombatHud();
         combatHud.render(Gdx.graphics.getDeltaTime());
+        dialoguePanel.render(Gdx.graphics.getDeltaTime());
     }
 
     /**
@@ -615,21 +604,7 @@ public final class WorldScreen implements GameScreen {
         // ADR-033 — grounded là trạng thái dự đoán cục bộ/xác nhận qua MoveResponse, KHÔNG nội suy
         // (giống lý do isLocalPlayerMoving đọc VelocityComponent thẳng, không qua interpolation).
         models.setAirborne(LOCAL_CHARACTER_ID, !POSITION.get(localPlayer).grounded);
-        for (Map.Entry<Long, KEntity> entry : remoteCharacters.entrySet()) {
-            long characterId = entry.getKey();
-            models.setPosition(
-                    characterId,
-                    interpolatedX(entry.getValue(), alpha),
-                    interpolatedY(entry.getValue(), alpha),
-                    interpolatedZ(entry.getValue(), alpha));
-            // Nhân vật khác không có VelocityComponent (chỉ nội suy vị trí, CLIENT.md §7) — suy
-            // "đang di chuyển" từ độ lệch vị trí giữa các CharacterMovedEvent thay vào đó.
-            models.setMoving(characterId, remoteMotionTracker.isMoving(characterId));
-            // z/grounded CHƯA broadcast cho nhân vật khác qua CharacterMovedEvent (ADR-033, hoãn có
-            // chủ đích — xem movement.proto) — z luôn 0 mặc định, không gọi setAirborne
-            // (giữ nguyên grounded=true mặc định), nên KHÔNG hiện người khác nhảy dù server đã mô
-            // phỏng đúng cho họ.
-        }
+        remoteCharacters.sync(alpha);
         // Quái đi cùng lượt vẽ với nhân vật (cùng Scene list, cùng camera) — chỉ nguồn dữ liệu là
         // khác: chúng không có entity ECS phía client, xem MonsterPresenter.sync.
         monsterPresenter.sync(combatHudController.monsters(), localX);
@@ -658,9 +633,7 @@ public final class WorldScreen implements GameScreen {
         drawInterpolated(localPlayer, alpha);
 
         shapeRenderer.setColor(Color.SKY);
-        for (KEntity entity : remoteCharacters.values()) {
-            drawInterpolated(entity, alpha);
-        }
+        remoteCharacters.renderPlaceholder(this::drawInterpolated, alpha);
 
         shapeRenderer.end();
     }
@@ -696,6 +669,8 @@ public final class WorldScreen implements GameScreen {
         // TRƯỚC combatHud: combatFeedback mượn font của HUD, dispose HUD trước là kéo font ra khỏi
         // dưới chân nó (dù ở đây nó không dùng font lúc dispose, giữ đúng thứ tự sở hữu).
         combatFeedback.dispose();
+        // TRƯỚC combatHud như combatFeedback, và cùng lý do: panel mượn skin của HUD.
+        dialoguePanel.dispose();
         combatHud.dispose();
     }
 

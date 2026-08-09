@@ -27,8 +27,13 @@ import dev.kage.protocol.NpcSpawnedEvent;
  */
 final class NpcPresenter {
 
-    /** Vị trí cố định của một NPC — {@code npc.proto} không có event nào đổi được nó. */
-    private record NpcState(float x, float y) {}
+    /**
+     * Vị trí cố định + mã của một NPC — {@code npc.proto} không có event nào đổi được vị trí. Mã đi
+     * kèm vì {@code TalkToNpcCommand} định danh NPC bằng {@code npc_code} chứ không bằng
+     * {@code npc_id} (dialogue.proto: "client đã biết mã này từ NpcSpawnedEvent"), nên lúc click
+     * phải tra ngược từ id ra mã.
+     */
+    record NpcState(String code, float x, float y) implements PickablePoint {}
 
     private static final float BOX_WIDTH_UNITS = 0.8f;
 
@@ -43,13 +48,18 @@ final class NpcPresenter {
     }
 
     void onSpawned(NpcSpawnedEvent event) {
-        npcs.put(event.getNpcId(), new NpcState(event.getX(), event.getY()));
+        npcs.put(event.getNpcId(), new NpcState(event.getNpcCode(), event.getX(), event.getY()));
         models.addMonsterOrNpc(event.getNpcId(), NpcModelKey.of(event.getNpcCode()));
     }
 
     void onDespawned(long npcId) {
         npcs.remove(npcId);
         models.remove(npcId);
+    }
+
+    /** Kho NPC đang hiển thị — cho {@link WorldEntityPicker} bắt click, chỉ đọc. */
+    Map<Long, NpcState> npcs() {
+        return npcs;
     }
 
     /**

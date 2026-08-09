@@ -8,11 +8,11 @@ import com.badlogic.gdx.math.Vector3;
 import org.junit.jupiter.api.Test;
 
 /**
- * {@link MonsterPicker} không đụng GL — chiếu bằng một {@link WorldToScreen} giả thay cho camera
+ * {@link WorldEntityPicker} không đụng GL — chiếu bằng một {@link WorldToScreen} giả thay cho camera
  * thật, nên chạy được trong test JVM thường (không cần context đồ hoạ), cùng lý do
  * {@code CombatHudControllerTest} test thẳng controller.
  */
-class MonsterPickerTest {
+class WorldEntityPickerTest {
 
     /**
      * Camera giả đơn giản nhất còn giữ đúng đặc tính quan trọng: 50 pixel mỗi world unit, {@code z}
@@ -39,19 +39,20 @@ class MonsterPickerTest {
     /** Tâm khối quái ở world x=0: màn hình x=400, y giữa chân (300) và đỉnh (380) = 340. */
     @Test
     void shouldPickMonsterUnderClick() {
-        assertThat(new MonsterPicker().pick(monstersAt(0f), 400f, 340f, FAKE_CAMERA))
+        assertThat(new WorldEntityPicker().pick(monstersAt(0f), 400f, 340f, FAKE_CAMERA))
                 .isEqualTo(-1L);
     }
 
     @Test
     void shouldReturnZero_whenClickingEmptySpace() {
-        assertThat(new MonsterPicker().pick(monstersAt(0f), 700f, 340f, FAKE_CAMERA))
+        assertThat(new WorldEntityPicker().pick(monstersAt(0f), 700f, 340f, FAKE_CAMERA))
                 .isZero();
     }
 
     @Test
     void shouldReturnZero_whenNoMonsters() {
-        assertThat(new MonsterPicker().pick(Map.of(), 400f, 340f, FAKE_CAMERA)).isZero();
+        assertThat(new WorldEntityPicker().pick(Map.of(), 400f, 340f, FAKE_CAMERA))
+                .isZero();
     }
 
     /**
@@ -63,16 +64,18 @@ class MonsterPickerTest {
     void shouldPickNearestToClick_whenTwoMonstersOverlap() {
         Map<Long, CombatHudController.MonsterState> monsters = monstersAt(0f, 1f);
 
-        assertThat(new MonsterPicker().pick(monsters, 445f, 340f, FAKE_CAMERA)).isEqualTo(-2L);
-        assertThat(new MonsterPicker().pick(monsters, 405f, 340f, FAKE_CAMERA)).isEqualTo(-1L);
+        assertThat(new WorldEntityPicker().pick(monsters, 445f, 340f, FAKE_CAMERA))
+                .isEqualTo(-2L);
+        assertThat(new WorldEntityPicker().pick(monsters, 405f, 340f, FAKE_CAMERA))
+                .isEqualTo(-1L);
     }
 
     /** Click vào chân/đỉnh khối vẫn phải ăn — người chơi nhắm vào cái mình THẤY, không vào tâm hình học. */
     @Test
     void shouldPickMonster_whenClickingItsFeetOrHead() {
-        assertThat(new MonsterPicker().pick(monstersAt(0f), 400f, 302f, FAKE_CAMERA))
+        assertThat(new WorldEntityPicker().pick(monstersAt(0f), 400f, 302f, FAKE_CAMERA))
                 .isEqualTo(-1L);
-        assertThat(new MonsterPicker().pick(monstersAt(0f), 400f, 378f, FAKE_CAMERA))
+        assertThat(new WorldEntityPicker().pick(monstersAt(0f), 400f, 378f, FAKE_CAMERA))
                 .isEqualTo(-1L);
     }
 }

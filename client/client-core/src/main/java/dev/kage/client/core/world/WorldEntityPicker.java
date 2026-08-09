@@ -19,9 +19,9 @@ import com.badlogic.gdx.math.Vector3;
  * bắt luôn co giãn đúng theo mức phóng của camera, không cần hằng số pixel nào phụ thuộc độ phân giải.
  *
  * <p>Không phụ thuộc GL — test được thẳng bằng một {@link WorldToScreen} giả
- * ({@code MonsterPickerTest}).
+ * ({@code WorldEntityPickerTest}).
  */
-final class MonsterPicker {
+final class WorldEntityPicker {
 
     /**
      * Nửa bề rộng vùng bắt, tính theo CHIỀU CAO chiếu ra màn hình của khối quái. Khối quái vuông
@@ -53,13 +53,13 @@ final class MonsterPicker {
      *     {@code 0} nếu click vào chỗ trống ({@code 0} không bao giờ là id thật — quái mang id ÂM,
      *     nhân vật id DƯƠNG, xem combat.proto).
      */
-    long pick(Map<Long, CombatHudController.MonsterState> monsters, float screenX, float screenY, WorldToScreen p) {
+    long pick(Map<Long, ? extends PickablePoint> entities, float screenX, float screenY, WorldToScreen p) {
         long best = 0L;
         // Điểm số = độ lệch chuẩn hoá so với tâm hộp bao; nhỏ hơn = gần tâm hơn. Dùng để phân xử khi
         // hai con chồng lên nhau trên màn hình (xảy ra thật: camera nhìn gần như ngang).
         float bestScore = Float.MAX_VALUE;
-        for (Map.Entry<Long, CombatHudController.MonsterState> entry : monsters.entrySet()) {
-            CombatHudController.MonsterState monster = entry.getValue();
+        for (Map.Entry<Long, ? extends PickablePoint> entry : entities.entrySet()) {
+            PickablePoint monster = entry.getValue();
             base.set(monster.x(), monster.y(), 0f);
             p.project(base);
             top.set(monster.x(), monster.y(), WorldConstants.MONSTER_HEIGHT_UNITS);

@@ -378,6 +378,15 @@ public final class CombatHud implements Disposable {
     }
 
     /**
+     * Bộ style dùng chung — cho {@code DialoguePanel} MƯỢN. HUD giữ quyền sở hữu: người mượn KHÔNG
+     * được dispose. Dựng {@link KageSkin} lần thứ hai là sinh lại toàn bộ font FreeType và mọi
+     * texture nền chỉ để có đúng cùng một bộ màu.
+     */
+    public KageSkin skin() {
+        return skin;
+    }
+
+    /**
      * Font dùng chung của HUD — cho {@code FloatingCombatText} MƯỢN để vẽ số damage, tránh nạp một
      * bản font thứ hai. HUD vẫn giữ quyền sở hữu: người mượn KHÔNG được dispose.
      */

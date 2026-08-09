@@ -250,6 +250,14 @@
         <Bug pattern="EI_EXPOSE_REP"/>
     </Match>
 
+    <!-- DialoguePanel.stage() — y hệt CombatHud ngay trên, và cùng một lý do: WorldScreen phải đưa
+         Stage vào InputMultiplexer (khung hội thoại nuốt click TRƯỚC HUD, xem javadoc DialoguePanel).
+         Cũng lộ KageSkin nhận từ constructor: đó là CHO MƯỢN có chủ đích, sở hữu vẫn ở CombatHud. -->
+    <Match>
+        <Class name="dev.kage.client.core.ui.hud.DialoguePanel"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
     <!-- KageSkin.font() lộ BitmapFont dùng chung có chủ đích — public accessor cho caller cần vẽ
          thủ công bằng đúng font đã nạp (VD Batch.draw ngoài Label/TextField có sẵn style). Font
          FreeType native-backed, "copy phòng thủ" nghĩa là dựng lại nguyên glyph atlas tốn kém vô

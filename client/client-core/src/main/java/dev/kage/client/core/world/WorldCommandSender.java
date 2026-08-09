@@ -10,7 +10,9 @@ import dev.kage.protocol.AttackCommand;
 import dev.kage.protocol.JumpCommand;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.SelectDialogueOptionCommand;
 import dev.kage.protocol.SetTargetCommand;
+import dev.kage.protocol.TalkToNpcCommand;
 import dev.kage.protocol.UseSkillCommand;
 import dev.kage.protocol.wire.PacketCodec;
 
@@ -67,6 +69,26 @@ final class WorldCommandSender {
                 .setTargetEntityId(targetEntityId)
                 .build();
         send(Opcode.OPCODE_USE_SKILL_COMMAND_VALUE, command.toByteArray(), "UseSkillCommand");
+    }
+
+    /** Bắt chuyện với NPC — server luôn trả node {@code "start"} (dialogue.proto). */
+    void talkToNpc(String npcCode) {
+        TalkToNpcCommand command =
+                TalkToNpcCommand.newBuilder().setNpcCode(npcCode).build();
+        send(Opcode.OPCODE_TALK_TO_NPC_COMMAND_VALUE, command.toByteArray(), "TalkToNpcCommand");
+    }
+
+    /**
+     * Chọn một lựa chọn trong node đang mở. Gửi CHỈ SỐ chứ không gửi {@code action} — server tự tra
+     * lại action thật từ script theo chỉ số (Điều 24, xem {@link DialogueController}).
+     */
+    void selectDialogueOption(String npcCode, String currentNodeId, int optionIndex) {
+        SelectDialogueOptionCommand command = SelectDialogueOptionCommand.newBuilder()
+                .setNpcCode(npcCode)
+                .setCurrentNodeId(currentNodeId)
+                .setOptionIndex(optionIndex)
+                .build();
+        send(Opcode.OPCODE_SELECT_DIALOGUE_OPTION_COMMAND_VALUE, command.toByteArray(), "SelectDialogueOptionCommand");
     }
 
     /** Gói tin đến từ server — {@code null} khi hàng đợi rỗng (xem {@link GameConnection}). */

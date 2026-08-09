@@ -27,6 +27,7 @@ public final class HudPreviewTool extends ApplicationAdapter {
     private static final String OUTPUT = "E:/study/libgdx/shinobi-engine/.debug-orientation/hud.png";
 
     private CombatHud hud;
+    private DialoguePanel dialoguePanel;
     private int frame;
 
     @Override
@@ -45,6 +46,18 @@ public final class HudPreviewTool extends ApplicationAdapter {
         // trước ở trạng thái hồi chiêu (nút xám) sẽ đánh giá sai độ nổi bật của nút.
         hud.setSkillState("hud.skill.fireball", 0f);
         hud.setSkillReady(true);
+
+        // Khung hội thoại (2026-08-09) — ĐÚNG nội dung cây town_elder.js, để bố cục phải chịu đúng
+        // độ dài câu tiếng Việt thật chứ không phải chuỗi ngắn tự bịa.
+        dialoguePanel = new DialoguePanel(hud.skin());
+        dialoguePanel.resize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        dialoguePanel.show(
+                "dialogue.town_elder.greeting",
+                java.util.List.of(
+                        "dialogue.option.ask_about_town",
+                        "dialogue.option.accept_quest_kill_dummies",
+                        "dialogue.option.open_shop",
+                        "dialogue.option.bye"));
     }
 
     @Override
@@ -54,6 +67,7 @@ public final class HudPreviewTool extends ApplicationAdapter {
         Gdx.gl.glClearColor(0.22f, 0.42f, 0.16f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         hud.render(1f / 60f);
+        dialoguePanel.render(1f / 60f);
         frame++;
         if (frame == 30) {
             Pixmap pixmap = ScreenUtils.getFrameBufferPixmap(
@@ -69,6 +83,9 @@ public final class HudPreviewTool extends ApplicationAdapter {
 
     @Override
     public void dispose() {
+        if (dialoguePanel != null) {
+            dialoguePanel.dispose(); // TRƯỚC hud: panel mượn skin của hud
+        }
         if (hud != null) {
             hud.dispose();
         }
