@@ -144,9 +144,12 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     }
 
     @Override
-    public void onMoveAccepted(long characterId, int sequenceId, float x, float y) {
-        lastKnownPosition.put(characterId, new PositionSnapshot(x, y));
-        sendMoveResponseWithoutTrackingPosition(characterId, sequenceId, x, y);
+    public void onMoveAccepted(WorldOutboundSink.MoveAcceptedSnapshot accepted) {
+        // z KHÔNG vào PositionSnapshot/DB (ADR-033) — nhân vật luôn hồi sinh/đăng nhập lại ở mặt
+        // đất z=0 (WorldFacade.respawnCharacter), nên trục dọc là trạng thái CHỈ SỐNG TRONG TICK,
+        // không cần bền vững. Chỉ x/y (mặt đất) mới cần cho CharacterPositionPersister.
+        lastKnownPosition.put(accepted.characterId(), new PositionSnapshot(accepted.x(), accepted.y()));
+        sendMoveResponseWithoutTrackingPosition(accepted);
     }
 
     /**
@@ -157,13 +160,18 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
      * cho nhân vật đã {@code detachCharacter} (đang ở dungeon), {@code lastKnownPosition} tự "đóng
      * băng" đúng ở toạ độ thật cuối cùng — không cần cờ "đang ở dungeon" nào thêm.
      */
-    void sendMoveResponseWithoutTrackingPosition(long characterId, int sequenceId, float x, float y) {
-        ChannelHandlerContext ctx = contextsByCharacterId.get(characterId);
+    void sendMoveResponseWithoutTrackingPosition(WorldOutboundSink.MoveAcceptedSnapshot accepted) {
+        ChannelHandlerContext ctx = contextsByCharacterId.get(accepted.characterId());
         if (ctx == null) {
             return; // đã ngắt kết nối giữa lúc lệnh còn trong hàng đợi world — bỏ qua an toàn.
         }
-        MoveResponse response = MoveResponse.newBuilder().setX(x).setY(y).build();
-        send(ctx, Opcode.OPCODE_MOVE_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        MoveResponse response = MoveResponse.newBuilder()
+                .setX(accepted.x())
+                .setY(accepted.y())
+                .setZ(accepted.z())
+                .setGrounded(accepted.grounded())
+                .build();
+        send(ctx, Opcode.OPCODE_MOVE_RESPONSE_VALUE, accepted.sequenceId(), response.toByteArray());
     }
 
     @Override

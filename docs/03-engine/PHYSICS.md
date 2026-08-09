@@ -4,17 +4,23 @@
 
 | | |
 |---|---|
-| Version | 2.0.0 |
-| Status | Draft — khớp lại với thực tế sau [ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md) (2026-08-01) |
-| Liên quan | [ENGINE.md](ENGINE.md), [ECS.md](ECS.md), [ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md) |
+| Version | 2.1.0 |
+| Status | Draft — cập nhật theo [ADR-033](../01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md) (2026-08-09) |
+| Liên quan | [ENGINE.md](ENGINE.md), [ECS.md](ECS.md), [ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md), [ADR-033](../01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md) |
 
 > ⚠️ **Đổi lớn 2026-08-01**: bản trước của tài liệu này mô tả một hệ thống Box2D đầy đủ (trọng lực,
 > nhảy, dốc, platform, sensor, collision layer bitmask) — **0% trong số đó từng được code**.
 > [ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md) xác nhận bằng cách đọc code thật (không
-> đoán): `engine/engine-physics` chưa từng có 1 dòng nào, `MovementSystem` chỉ là velocity thuần, và
-> game này (kiểu Ninja School — 2D side-view, **không phải platformer nhảy dốc**) chưa bao giờ cần
-> gravity/jump. Bản này viết lại cho khớp những gì **thật sự chạy**: `Aabb` +
-> `TerrainCollisionSystem` (engine-ecs), không Box2D.
+> đoán): `engine/engine-physics` chưa từng có 1 dòng nào, `MovementSystem` chỉ là velocity thuần.
+> Bản này viết lại cho khớp những gì **thật sự chạy**: `Aabb` + `TerrainCollisionSystem`
+> (engine-ecs), không Box2D.
+>
+> ⚠️ **Đổi lớn 2026-08-09 ([ADR-033](../01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md))**:
+> câu "game này chưa bao giờ cần gravity/jump" ở bản 2.0.0 **KHÔNG còn đúng** — chủ dự án đổi mô
+> hình di chuyển sang trái/phải + nhảy thật kiểu Ninja School Online. Trọng lực/nhảy giờ CÓ THẬT,
+> nhưng **vẫn không dùng Box2D** — `VerticalMovementSystem` (engine-ecs) tự viết, tiếp nối đúng tinh
+> thần ADR-021 (§9 dưới đây). Mọi câu "không nhảy/không trọng lực" ở các mục bên dưới là LỊCH SỬ
+> (giữ nguyên để hiểu bối cảnh quyết định cũ), không phải hiện trạng — xem §9.
 
 > ⚠️ **Quy tắc quan trọng nhất, không đổi**: va chạm địa hình **KHÔNG** dùng để tính damage/combat.
 > Combat là logic gameplay thuần ([GAMEPLAY.md](../05-server/GAMEPLAY.md)), tách biệt hoàn toàn khỏi
@@ -50,9 +56,9 @@ Gameplay (CombatSystem) →  "đòn đánh này có trúng không?", "gây bao n
 | — | Tầm đánh (range check — `CombatSystem` tự làm bằng distance) |
 | — | Aggro range (`AiSystem` tự làm bằng distance) |
 
-Không có trọng lực, không nhảy, không dốc/platform, không vật thể đẩy được, không raycast — game
-này không cần (side-view phẳng kiểu Ninja School, không phải platformer). Nếu GDD sau này đổi thể
-loại, đây là Revisit Trigger của ADR-021, không sửa trực tiếp tài liệu này trước.
+Không dốc, không vật thể đẩy được, không raycast — chưa ai cần. **Trọng lực/nhảy giờ CÓ THẬT**
+([ADR-033](../01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md), 2026-08-09) nhưng nằm ở
+`VerticalMovementSystem` RIÊNG, không phải `TerrainCollisionSystem` — hai hệ độc lập, xem §9.
 
 ---
 
@@ -139,6 +145,36 @@ GC lo hết. Cạm bẫy Box2D cũ (destroy body, sửa world giữa step, tunne
 
 ---
 
+## 9. Trục dọc / nhảy ([ADR-033](../01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md))
+
+Lần đầu tiên `PositionComponent` có `z`/`prevZ`/`vz`/`grounded` (trước ADR-033 chỉ `x`/`y`) —
+`VerticalMovementSystem` (engine-ecs, KHÔNG PHẢI `TerrainCollisionSystem`) tích luỹ trọng lực +
+đáp đất mỗi tick, tiếp nối đúng tinh thần ADR-021 (tự viết, không Box2D). Chạy ngay sau
+`MovementSystem`, trước `TerrainCollisionSystem` — cả 2 hệ độc lập hoàn toàn (một xử X/Y ngang, một
+xử Z dọc), không đọc/ghi chung field nào.
+
+| | |
+|---|---|
+| Trọng lực | Hằng số `WorldConstants.GRAVITY_MPS2` — truyền qua constructor (engine không biết số cụ thể, cùng lý do `MovementSystem` không biết `MOVE_SPEED_MPS`) |
+| Lực nhảy | `WorldConstants.JUMP_VELOCITY_MPS` — áp trực tiếp vào `vz` ở `WorldFacade.handleJumpIntent`, CHỈ khi `grounded=true` (không double-jump ở lát cắt này) |
+| Mặt đất | `z=0` phẳng, LUÔN là bệ ngầm định — an toàn khi chưa có map thật (giống obstacle rỗng của `TerrainCollisionSystem`) |
+| Bệ/platform | `Platform` record (`Aabb` footprint + `topZ`) — `VerticalMovementSystem.setPlatforms(...)`, mặc định RỖNG, chưa có map pilot nào gọi (ADR-033 "Việc cần làm tiếp theo" #7, việc art/level design riêng) |
+| Chống tunnel | Landing check chọn bệ **CAO NHẤT** có `topZ ≤ z đầu tick` phủ `(x,y)` — đúng dù `dt` lớn "xuyên" qua bệ trong 1 tick (test `VerticalMovementSystemTest`) |
+| Combat | `CombatSystem` đọc `target.grounded` — airborne (`grounded=false`) né TUYỆT ĐỐI đòn đánh thường (ghi đè RNG hit/dodge), CHỈ áp cho auto-attack, chưa áp skill (ADR-033 Technical Decision #5, mở) |
+| Đồng bộ nhân vật khác | ⚠️ CHƯA — `CharacterMovedEvent` chưa mang `z`/`grounded` (cố tình hoãn, xem movement.proto), nên client thấy nhân vật KHÁC luôn đứng z=0 dù server mô phỏng đúng cho họ |
+| DB | KHÔNG persist `z` — nhân vật luôn hồi sinh/đăng nhập ở mặt đất (`WorldFacade.respawnCharacter` reset `z=0`), nên trục dọc là trạng thái CHỈ SỐNG TRONG TICK |
+
+Đơn vị/world unit, thứ tự tick 60Hz, "entity là 1 điểm" (§5, §6) áp dụng y hệt cho trục dọc — không
+có khái niệm riêng "chiều cao hitbox".
+
+**Chi phí CPU (JMH, 2026-08-09, `VerticalMovementBenchmark`)** — kịch bản XẤU NHẤT (100% entity
+airborne cùng lúc, phi thực tế vì 1 lần nhảy chỉ ~0.7s): N=100 → 0.499µs, N=500 → 3.954µs, N=1000
+(tham chiếu Phase 9) → 6.532µs, N=5000 → 32.630µs — dưới 0.2% ngân sách tick 16.6ms ở mọi N. Đây là
+proxy cô lập 1 System (cùng phương pháp Revisit Trigger ADR-006), **chưa phải** đo
+`kage.tick.duration` production thật — xem ADR-033 "Việc cần làm tiếp theo" #6.
+
+---
+
 ## Technical Decisions
 
 | # | Quyết định | Lý do | Trạng thái |
@@ -151,10 +187,15 @@ GC lo hết. Cạm bẫy Box2D cũ (destroy body, sửa world giữa step, tunne
 | 6 | Entity là 1 điểm, không bán kính va chạm | Chưa có kích thước hitbox thật (art chưa tồn tại) | Accepted tạm thời — xem ADR-021 Revisit Trigger |
 | 7 | Obstacle mặc định RỖNG cho tới khi có map thật | Chưa có `assets/` nào (ADR-024) | Accepted |
 | 8 | Trigger zone/sensor: `TriggerZoneSystem` + callback trực tiếp, không `EventBus` | Nhất quán pattern callback đã có, `EventBus` chưa dùng ở đâu | ✅ Accepted, implemented — §7 |
+| 9 | Trọng lực/nhảy tự viết ở `VerticalMovementSystem` RIÊNG, không mở rộng `TerrainCollisionSystem` | 2 trục độc lập (ngang/dọc), không đọc/ghi chung field — gộp chung sẽ vi phạm "1 System 1 trách nhiệm" | ✅ Accepted, implemented — [ADR-033](../01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md), §9 |
+| 10 | Không double-jump ở lát cắt MVP | Đúng scope ADR-033 đã chốt (chỉ 1 lần nhảy/lượt grounded), tránh over-engineer trước khi có nhu cầu thật | Accepted tạm thời — mở lại nếu GDD sau này cần |
+| 11 | `z` KHÔNG persist DB | Nhân vật luôn hồi sinh/đăng nhập ở mặt đất — trục dọc là trạng thái CHỈ SỐNG TRONG TICK | Accepted |
 
 ## ADR cần tạo
 
-Không còn. ✅ **[ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md) Accepted 2026-08-01**, đã implement.
+Không còn. ✅ **[ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md) Accepted 2026-08-01** và
+**[ADR-033](../01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md) Accepted 2026-08-08**, cả
+2 đã implement.
 
 ## Tài liệu liên quan
 
@@ -163,13 +204,23 @@ Không còn. ✅ **[ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md) Ac
 - [RENDERING.md §5](RENDERING.md) — world unit dùng chung
 - [GAMEPLAY.md](../05-server/GAMEPLAY.md) — combat tính thế nào (không qua va chạm)
 - [ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md) — quyết định + implementation đầy đủ
+- [ADR-033](../01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md) — trục dọc/nhảy, §9
 
 ## Việc cần làm tiếp theo
 
-1. Khi asset pipeline (ADR-024) sản xuất map thật đầu tiên có tường → nạp `Aabb` obstacle thật qua
+1. [ADR-033] Broadcast `z`/`grounded` qua `CharacterMovedEvent` cho nhân vật KHÁC (§9 "Đồng bộ nhân
+   vật khác") — hoãn có chủ đích lúc viết lát cắt đầu, kéo theo sửa
+   `AreaOfInterestTracker.lastSyncedPosition` (hot path đã tối ưu allocation).
+2. [ADR-033] Nội dung map pilot có bệ/chướng ngại thật để `Platform`/"lên bệ cao" có ý nghĩa gameplay
+   — việc art/level design riêng, không phải kỹ thuật.
+3. [ADR-033] Đo lại `kage.tick.duration` ở N tham chiếu Phase 9 sau khi có `VerticalMovementSystem`
+   thật chạy production (Điều 9 — benchmark trước khi kết luận).
+4. [ADR-033] Phân loại "đòn nào coi là tầm thấp" chi tiết hơn cho skill (hiện chỉ auto-attack né được
+   airborne, `SkillSystem` chưa áp) — cần đối chiếu GDD.
+5. Khi asset pipeline (ADR-024) sản xuất map thật đầu tiên có tường → nạp `Aabb` obstacle thật qua
    `TerrainCollisionSystem.setObstacles(...)`, đo CPU cost thật (Điều 30).
-2. Trigger zone/sensor (§7) đã có cơ chế — còn thiếu: consumer thật đầu tiên (vd. vùng an toàn PvP)
+6. Trigger zone/sensor (§7) đã có cơ chế — còn thiếu: consumer thật đầu tiên (vd. vùng an toàn PvP)
    gọi `TriggerZoneSystem.setZones(...)` và gắn `TriggerZoneMembershipComponent` cho character khi
    attach, cùng lúc có map/zone data thật (ADR-024).
-3. Client-side prediction cho va chạm địa hình (bảng §3) — hiện client CHƯA dùng
+7. Client-side prediction cho va chạm địa hình (bảng §3) — hiện client CHƯA dùng
    `TerrainCollisionSystem` cục bộ; không cấp bách vì chưa có obstacle thật để dự đoán.

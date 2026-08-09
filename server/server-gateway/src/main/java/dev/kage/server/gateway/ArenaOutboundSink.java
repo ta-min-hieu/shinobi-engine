@@ -20,8 +20,8 @@ final class ArenaOutboundSink implements WorldOutboundSink {
     }
 
     @Override
-    public void onMoveAccepted(long characterId, int sequenceId, float x, float y) {
-        registry.sendMoveResponseWithoutTrackingPosition(characterId, sequenceId, x, y);
+    public void onMoveAccepted(WorldOutboundSink.MoveAcceptedSnapshot accepted) {
+        registry.sendMoveResponseWithoutTrackingPosition(accepted);
     }
 
     @Override

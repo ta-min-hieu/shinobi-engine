@@ -13,10 +13,11 @@ package dev.kage.server.world;
 public interface WorldOutboundSink {
 
     /**
-     * Server đã xử lý xong 1 {@code MoveCommand} — trả {@code MoveResponse} về ĐÚNG connection đã
-     * gửi lệnh, khớp {@code sequenceId} để client reconciliation (CLIENT.md §6).
+     * Server đã xử lý xong 1 {@code MoveCommand} HOẶC {@code JumpCommand} (ADR-033) — trả
+     * {@code MoveResponse} về ĐÚNG connection đã gửi lệnh, khớp {@code sequenceId} để client
+     * reconciliation (CLIENT.md §6).
      */
-    void onMoveAccepted(long characterId, int sequenceId, float x, float y);
+    void onMoveAccepted(MoveAcceptedSnapshot accepted);
 
     /** Nhân vật {@code spawnedCharacterId} VỪA vào AoI của {@code targetCharacterId}. */
     void onCharacterSpawned(long targetCharacterId, long spawnedCharacterId, float x, float y);
@@ -85,6 +86,13 @@ public interface WorldOutboundSink {
      * cùng quy ước "ngầm định chính mình" như {@link #onMoveAccepted}.
      */
     void onCharacterRespawned(RespawnSnapshot respawn);
+
+    /**
+     * Ảnh chụp vị trí sau khi xử lý {@code MoveCommand}/{@code JumpCommand} (ADR-033) — gộp tham số
+     * (STATIC-ANALYSIS.md, checkstyle {@code ParameterNumberCheck} max=4). {@code z}/{@code
+     * grounded} thêm ở ADR-033.
+     */
+    record MoveAcceptedSnapshot(long characterId, int sequenceId, float x, float y, float z, boolean grounded) {}
 
     /** Ảnh chụp trạng thái quái lúc phát {@link #onMonsterSpawned} — gộp tham số (STATIC-ANALYSIS.md). */
     record MonsterSnapshot(long monsterId, String monsterCode, float x, float y, int currentHp, int maxHp) {}

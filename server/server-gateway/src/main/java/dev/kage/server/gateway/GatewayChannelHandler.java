@@ -134,6 +134,7 @@ import dev.kage.protocol.InvitePartyMemberCommand;
 import dev.kage.protocol.InvitePartyMemberOutcome;
 import dev.kage.protocol.InvitePartyMemberResponse;
 import dev.kage.protocol.ItemRewardView;
+import dev.kage.protocol.JumpCommand;
 import dev.kage.protocol.KickGuildMemberCommand;
 import dev.kage.protocol.KickGuildMemberOutcome;
 import dev.kage.protocol.KickGuildMemberResponse;
@@ -322,6 +323,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, this::handleSelectCharacter),
             Map.entry(Opcode.OPCODE_SELECT_FACTION_REQUEST_VALUE, this::handleSelectFactionRequest),
             Map.entry(Opcode.OPCODE_MOVE_COMMAND_VALUE, this::handleMoveCommand),
+            Map.entry(Opcode.OPCODE_JUMP_COMMAND_VALUE, this::handleJumpCommand),
             Map.entry(Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, this::handleSetTargetCommand),
             Map.entry(Opcode.OPCODE_USE_SKILL_COMMAND_VALUE, this::handleUseSkillCommand),
             Map.entry(Opcode.OPCODE_EQUIP_ITEM_COMMAND_VALUE, this::handleEquipItemCommand),
@@ -710,6 +712,31 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         currentWorldFacade(characterId)
                 .enqueueMoveCommand(characterId, sequenceId, command.getDirX(), command.getDirY());
+    }
+
+    // ADR-033 — JumpCommand KHÔNG chạm DB/Redis, cùng lý do xử lý thẳng trên EventLoop như
+    // handleMoveCommand. Dùng CHUNG moveCommandRateLimiter (không tạo limiter riêng): nhảy là hành
+    // động di chuyển liên quan, và world tự chặn double-jump qua điều kiện grounded (WorldFacade.
+    // handleJumpIntent) nên rate limit riêng không thêm phòng thủ thật nào.
+    private void handleJumpCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        JumpCommand.parseFrom(payload); // message rỗng — parse chỉ để validate wire format.
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        if (!moveCommandRateLimiter.tryAcquire()) {
+            networkMetrics.recordRateLimitRejected("move");
+            LOG.warn("JumpCommand vượt rate limit: characterId={}", characterId);
+            if (moveCommandRateLimiter.shouldDisconnect()) {
+                LOG.warn("JumpCommand vượt rate limit liên tục — ngắt kết nối: characterId={}", characterId);
+                ctx.close();
+            }
+            return;
+        }
+        currentWorldFacade(characterId).enqueueJumpCommand(characterId, sequenceId);
     }
 
     // SetTargetCommand KHÔNG chạm DB — chỉ enqueue vào server-world (rẻ, thread-safe), xử lý

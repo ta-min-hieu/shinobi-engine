@@ -17,8 +17,10 @@ final class DesktopInputMapper implements InputMapper {
         return switch (action) {
             case MOVE_LEFT -> Gdx.input.isKeyPressed(Keys.A) || Gdx.input.isKeyPressed(Keys.LEFT);
             case MOVE_RIGHT -> Gdx.input.isKeyPressed(Keys.D) || Gdx.input.isKeyPressed(Keys.RIGHT);
-            case MOVE_UP -> Gdx.input.isKeyPressed(Keys.W) || Gdx.input.isKeyPressed(Keys.UP);
-            case MOVE_DOWN -> Gdx.input.isKeyPressed(Keys.S) || Gdx.input.isKeyPressed(Keys.DOWN);
+            // ADR-033 — phím Lên/W giờ là NHẢY thay vì di chuyển (đổi từ MOVE_UP), thêm Space
+            // (chuẩn platformer, Ninja School Online dùng cả 2).
+            case JUMP ->
+                Gdx.input.isKeyPressed(Keys.W) || Gdx.input.isKeyPressed(Keys.UP) || Gdx.input.isKeyPressed(Keys.SPACE);
         };
     }
 }

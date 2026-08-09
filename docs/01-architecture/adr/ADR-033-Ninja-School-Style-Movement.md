@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | 🟡 **Proposed** — chờ chủ dự án Accept trước khi đổi protocol/vật lý |
+| Status | 🟢 **Accepted** (2026-08-08, chủ dự án chốt qua chat) |
 | Date | 2026-08-08 |
 | Deciders | Chủ dự án chốt hướng (2026-08-08, qua chat, 2 câu hỏi lựa chọn scope); AI soạn |
 | Related | [ADR-021](ADR-021-Box2D-vs-AABB.md) (AABB tự viết, KHÔNG Box2D) · [ADR-031](ADR-031-25D-Realtime-3D-Rendering.md) (camera 2.5D khoá góc) · [ADR-018](ADR-018-Tick-Rate.md) (60Hz) · [PHYSICS.md](../../03-engine/PHYSICS.md) · [RENDERING.md §11.1](../../03-engine/RENDERING.md) |
@@ -120,17 +120,53 @@ trúc mới, xử lý trong quá trình code + review bình thường.
 
 ## Việc cần làm tiếp theo
 
-1. 🛑 **Chờ chủ dự án Accept ADR này** — AI không tự Accept thay chủ dự án (Điều 45,
-   [/CLAUDE.md](../../../CLAUDE.md)). Chưa Accept thì chưa đổi protocol/schema/vật lý.
-2. Sau Accept — thiết kế chi tiết lớp protocol (`MoveCommand`/`JumpCommand`, trường `z`/`vz`/
-   `grounded`) trước, vì mọi lớp khác (server physics, client input, combat) phụ thuộc hợp đồng này —
-   KHÔNG song song được ở bước này.
-3. Sau khi hợp đồng protocol chốt — server physics (trọng lực, vòng nhảy, va chạm bệ) và client input
-   (bỏ MOVE_UP/DOWN, thêm JUMP, dự đoán nhảy cục bộ, wire clip `jump`) có thể làm song song vì không
-   đụng chung file.
-4. Combat (đọc trạng thái airborne để né đòn tầm thấp) làm sau, phụ thuộc việc #3 phần server.
-5. Rà lại AI quái (ADR-022 FSM) có còn đúng hành vi khi người chơi chỉ còn 1 trục ngang.
-6. Đo lại `kage.tick.duration` ở N tham chiếu Phase 9 sau khi có vật lý nhảy thật (Điều 9 — benchmark
-   trước khi kết luận, không suy luận tĩnh).
-7. Nội dung bản đồ pilot có bệ/chướng ngại để việc "lên bệ cao" đo được — việc art/level design riêng.
+1. ✅ **Chủ dự án Accept 2026-08-08** (qua chat, cùng phiên soạn ADR).
+2. ✅ **Hợp đồng protocol chốt 2026-08-09** — `JumpCommand` (rỗng, opcode 306) + `MoveResponse` thêm
+   `z`/`grounded` (add-only, không đổi field `x`/`y` đang dùng — shared/CLAUDE.md). `MoveCommand.dir_y`
+   GIỮ NGUYÊN trên dây nhưng server-world bỏ qua giá trị này cho người chơi (Server Authority). Chi
+   tiết: `movement.proto`, `opcode_registry.proto`.
+3. ✅ **Server physics + client input xong 2026-08-09** — `VerticalMovementSystem` (engine-ecs, trọng
+   lực + đáp đất, có hỗ trợ `Platform` cho va chạm bệ dù chưa map nào dùng); `GameAction` bỏ
+   `MOVE_UP`/`MOVE_DOWN` thêm `JUMP`; `WorldScreen` dự đoán nhảy cục bộ + wire clip `jump` (ưu tiên
+   cao nhất trong `CharacterAnimationClips.loopingClipFor`). Verify thật: `VerticalMovementSystemTest`
+   (5 test), `WorldFacadeTest.shouldApplyJumpVelocity_...`, E2E qua socket thật
+   (`GatewayServerIntegrationTest.clientShouldBecomeAirborne_...`).
+4. ✅ **Combat xong 2026-08-09** — `CombatSystem` đọc `target.grounded`: airborne né TUYỆT ĐỐI đòn
+   đánh thường (ghi đè RNG), verify bằng `CombatSystemTest` (test trực tiếp System, không qua tick
+   loop thật — tránh flaky vì cửa sổ nhảy ~0.7s có thể không trùng đúng lúc quái hết cooldown 1s).
+   **CHƯA áp cho skill** (`SkillSystem`) — phân loại "đòn nào tầm thấp" cho skill vẫn mở (Technical
+   Decision #5), việc riêng khi có GDD chốt danh sách.
+5. ✅ **Rà AI quái xong 2026-08-09 — KHÔNG cần sửa code**: `AiSystem` (chase/patrol/return) chỉ đọc
+   `PositionComponent.x/y` của người chơi qua khoảng cách Euclid thuần (`findNearestCharacterInRange`,
+   `moveToward`) — không bao giờ đọc input axis/hướng di chuyển của người chơi, chỉ đọc vị trí HIỆN
+   TẠI. Quái vẫn đuổi/tấn công đúng bất kể người chơi di chuyển tự do hay chỉ còn 1 trục ngang, vì góc
+   nhìn của AI luôn là "người chơi đang ở đâu", không phải "người chơi di chuyển kiểu gì". Không có
+   z-term trong bất kỳ phép tính khoảng cách nào của AI — nghĩa là quái (luôn `grounded=true`, không
+   nhảy) coi người chơi đang lơ lửng như đang đứng tại `(x,y)` đó, không aggro/mất aggro theo độ cao.
+   Đây là hành vi CHẤP NHẬN ĐƯỢC cho lát cắt MVP (không phải bug), ghi lại làm Revisit Trigger nếu
+   sau này map pilot có bệ cao khiến "quái đánh trúng người chơi đang đứng trên bệ cao hẳn" trở thành
+   vấn đề UX thật.
+6. 🟡 **Một phần — JMH proxy đo 2026-08-09, CHƯA đo `kage.tick.duration` production thật.**
+   `VerticalMovementBenchmark` (engine-ecs, cùng phương pháp `EcsWorldUpdateBenchmark` dùng cho
+   Revisit Trigger ADR-006) cô lập đúng `VerticalMovementSystem`, kịch bản XẤU NHẤT (100% entity
+   airborne cùng lúc — thực tế không bao giờ xảy ra vì 1 lần nhảy chỉ ~0.7s):
+
+   | N | Chi phí đo thật | % ngân sách tick 16.6ms |
+   |---|---|---|
+   | 100 | 0.499 µs | ~0.003% |
+   | 500 | 3.954 µs | ~0.024% |
+   | 1000 (tham chiếu Phase 9) | 6.532 µs | ~0.039% |
+   | 5000 | 32.630 µs | ~0.197% |
+
+   Ngay ở kịch bản xấu nhất phi thực tế, chi phí vẫn nhỏ hơn 0.2% ngân sách ở mọi N đã đo — không có
+   dấu hiệu đáng lo. **Vẫn CHƯA đủ** theo đúng chuẩn Điều 9 đã áp dụng cho Revisit Trigger ADR-006
+   trước đây (đo `kage.tick.duration` THẬT qua `WorldTickScheduler` production, không phải JMH cô
+   lập 1 System) — số liệu JMH này là bằng chứng ủng hộ mạnh nhưng không thay thế, để lại làm việc
+   riêng khi có hạ tầng load-test rảnh (Testcontainers Postgres/Redis, `tools:load-test`).
+7. ⏳ **Chưa làm** — nội dung bản đồ pilot có bệ/chướng ngại để việc "lên bệ cao" đo được; việc
+   art/level design riêng, không phải kỹ thuật.
+8. ⏳ **Chưa làm** — broadcast `z`/`grounded` cho nhân vật KHÁC qua `CharacterMovedEvent` (hiện chỉ
+   CHÍNH người chơi thấy mình nhảy đúng qua `MoveResponse`; người khác luôn thấy z=0). Hoãn có chủ ý ở
+   lát cắt đầu vì kéo theo sửa `AreaOfInterestTracker.lastSyncedPosition` (hot path zero-allocation đã
+   tối ưu kỹ, xem PHYSICS.md §9).
 </content>

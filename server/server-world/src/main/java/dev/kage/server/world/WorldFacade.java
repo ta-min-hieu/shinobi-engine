@@ -21,6 +21,7 @@ import dev.kage.engine.ecs.component.VelocityComponent;
 import dev.kage.engine.ecs.system.MovementSystem;
 import dev.kage.engine.ecs.system.TerrainCollisionSystem;
 import dev.kage.engine.ecs.system.TriggerZoneSystem;
+import dev.kage.engine.ecs.system.VerticalMovementSystem;
 import dev.kage.server.world.component.AiStateComponent;
 import dev.kage.server.world.component.AttackCooldownComponent;
 import dev.kage.server.world.component.BossAiComponent;
@@ -192,6 +193,10 @@ public final class WorldFacade {
         // hành vi lặp mỗi tick như đánh thường) — thứ tự với CombatSystem không quan trọng.
         ecsWorld.addSystem(new AiSystem(entitiesByCharacterId::values, this::lookupEntity));
         ecsWorld.addSystem(new MovementSystem());
+        // Trục dọc (ADR-033) — chạy ngay sau MovementSystem (ngang), TRƯỚC TerrainCollisionSystem,
+        // cùng nhóm "áp chuyển động" của tick trước khi xử va chạm. Platform mặc định RỖNG — chưa
+        // có map pilot có bệ (ADR-033 #7), no-op an toàn (mọi entity rơi về z=0 phẳng như trước).
+        ecsWorld.addSystem(new VerticalMovementSystem(WorldConstants.GRAVITY_MPS2));
         // Obstacle mặc định RỖNG — chưa có map/asset thật (ADR-021). No-op an toàn cho tới khi có
         // nguồn map thật gọi setObstacles(...); giữ đúng thứ tự PHYSICS.md §4 (sau MovementSystem).
         ecsWorld.addSystem(new TerrainCollisionSystem());
@@ -239,6 +244,11 @@ public final class WorldFacade {
 
     public void enqueueMoveCommand(long characterId, int sequenceId, float dirX, float dirY) {
         inbox.add(new WorldCommand.MoveIntentCommand(characterId, sequenceId, dirX, dirY));
+    }
+
+    /** ADR-033 — ý định nhảy, world tự kiểm tra grounded lúc xử lý (xem {@link #handleJumpIntent}). */
+    public void enqueueJumpCommand(long characterId, int sequenceId) {
+        inbox.add(new WorldCommand.JumpIntentCommand(characterId, sequenceId));
     }
 
     /** GDD §6 "Auto-target đánh thường" — server tự đánh {@code targetEntityId} khi hết cooldown. */
@@ -356,6 +366,7 @@ public final class WorldFacade {
                     handleAttach(c.characterId(), c.spawnX(), c.spawnY(), c.baseStats());
                 case WorldCommand.DetachCharacterCommand c -> handleDetach(c.characterId());
                 case WorldCommand.MoveIntentCommand c -> handleMoveIntent(c);
+                case WorldCommand.JumpIntentCommand c -> handleJumpIntent(c);
                 case WorldCommand.SetTargetCommand c -> handleSetTarget(c.characterId(), c.targetEntityId());
                 case WorldCommand.UseSkillCommand c ->
                     handleUseSkill(c.characterId(), c.skillCode(), c.targetEntityId());
@@ -434,14 +445,39 @@ public final class WorldFacade {
             velocity.x = 0f;
             velocity.y = 0f;
         } else {
-            float[] direction = clampDirection(intent.dirX(), intent.dirY());
+            // ADR-033: người chơi chỉ còn di chuyển ngang (trái/phải) — dirY của intent BỊ BỎ QUA
+            // có chủ đích dù field còn tồn tại trên dây (movement.proto không được xoá field đang
+            // dùng, shared/CLAUDE.md). Server Authority: không tin client dù client cũ/hack còn gửi
+            // dirY khác 0. clampDirection vẫn nhận đủ 2 tham số để tái dùng nguyên logic chuẩn hoá.
+            float[] direction = clampDirection(intent.dirX(), 0f);
             float speed = WorldConstants.MOVE_SPEED_MPS * StatusEffects.moveSpeedMultiplier(STATUS_EFFECT.get(entity));
             velocity.x = direction[0] * speed;
             velocity.y = direction[1] * speed;
         }
 
         PositionComponent position = POSITION.get(entity);
-        outboundSink.onMoveAccepted(intent.characterId(), intent.sequenceId(), position.x, position.y);
+        outboundSink.onMoveAccepted(new WorldOutboundSink.MoveAcceptedSnapshot(
+                intent.characterId(), intent.sequenceId(), position.x, position.y, position.z, position.grounded));
+    }
+
+    /**
+     * ADR-033 — áp lực nhảy NẾU đang grounded (bỏ qua an toàn nếu đang lơ lửng, KHÔNG double-jump
+     * ở lát cắt này). {@code VerticalMovementSystem} tự tích luỹ z/vz mỗi tick sau đó, hàm này chỉ
+     * đặt vận tốc ban đầu — cùng phân chia trách nhiệm với {@link #handleMoveIntent} (world đặt
+     * {@code VelocityComponent}, {@code MovementSystem} mới thật sự tích luỹ vị trí).
+     */
+    private void handleJumpIntent(WorldCommand.JumpIntentCommand intent) {
+        KEntity entity = entitiesByCharacterId.get(intent.characterId());
+        if (entity == null) {
+            return; // Race hiếm — cùng lý do handleMoveIntent.
+        }
+        PositionComponent position = POSITION.get(entity);
+        if (position.grounded && !StatusEffects.isStunned(STATUS_EFFECT.get(entity))) {
+            position.grounded = false;
+            position.vz = WorldConstants.JUMP_VELOCITY_MPS;
+        }
+        outboundSink.onMoveAccepted(new WorldOutboundSink.MoveAcceptedSnapshot(
+                intent.characterId(), intent.sequenceId(), position.x, position.y, position.z, position.grounded));
     }
 
     private void handleSetTarget(long characterId, long targetEntityId) {
@@ -600,6 +636,12 @@ public final class WorldFacade {
         position.y = CHARACTER_RESPAWN_Y;
         position.prevX = position.x;
         position.prevY = position.y;
+        // ADR-033: nhân vật có thể chết giữa lúc đang lơ lửng (z>0, grounded=false) — hồi sinh PHẢI
+        // đặt lại cả trục dọc, không chỉ x/y, nếu không nhân vật hồi sinh lơ lửng giữa không trung.
+        position.z = 0f;
+        position.prevZ = 0f;
+        position.vz = 0f;
+        position.grounded = true;
 
         HealthComponent health = HEALTH.get(entity);
         health.current = health.max;

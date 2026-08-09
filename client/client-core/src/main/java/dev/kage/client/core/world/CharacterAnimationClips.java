@@ -7,14 +7,15 @@ package dev.kage.client.core.world;
  * nên lớp này test được thẳng không cần context đồ hoạ.
  *
  * <p>Bộ 7 clip chuẩn theo [ART-PIPELINE §4.2](docs/14-art/ART-PIPELINE.md), xuất từ đúng 1 sidecar
- * {@code .model-meta.json} cho mỗi model. {@code jump} cố ý KHÔNG có hằng số ở đây:
- * {@link dev.kage.client.core.input.GameAction} chưa có ý định nhảy nào — tự thêm input gameplay
- * mới ở tầng render là việc AI không được tự quyết ([/CLAUDE.md §4](../../../../../../../CLAUDE.md)).
+ * {@code .model-meta.json} cho mỗi model. {@code jump} giờ ĐÃ dùng (ADR-033, 2026-08-08) —
+ * {@link dev.kage.client.core.input.GameAction#JUMP} là ý định nhảy chính thức, gỡ đúng điều kiện
+ * chặn ghi ở bản trước đó của javadoc này.
  */
 final class CharacterAnimationClips {
 
     static final String IDLE = "idle";
     static final String RUN = "run";
+    static final String JUMP = "jump";
     static final String ATTACK = "attack";
     static final String HIT = "hit";
     static final String DIE = "die";
@@ -40,8 +41,15 @@ final class CharacterAnimationClips {
         return ((velocityX * velocityX) + (velocityY * velocityY)) > MOVING_SPEED_EPSILON_SQUARED;
     }
 
-    /** Clip loop tương ứng — {@link #RUN} khi đang di chuyển, ngược lại {@link #IDLE}. */
-    static String loopingClipFor(boolean moving) {
+    /**
+     * Clip loop tương ứng — {@link #JUMP} có ƯU TIÊN CAO NHẤT khi đang lơ lửng (ADR-033, bất kể
+     * {@code moving}: đang nhảy ngang vẫn phát {@code jump}, không phải {@code run}), ngược lại
+     * {@link #RUN} khi đang di chuyển, {@link #IDLE} khi đứng yên trên đất.
+     */
+    static String loopingClipFor(boolean airborne, boolean moving) {
+        if (airborne) {
+            return JUMP;
+        }
         return moving ? RUN : IDLE;
     }
 }

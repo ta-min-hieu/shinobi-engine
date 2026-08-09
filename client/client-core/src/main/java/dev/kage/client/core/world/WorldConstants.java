@@ -11,6 +11,15 @@ final class WorldConstants {
 
     static final float MOVE_SPEED_MPS = 5f;
 
+    /**
+     * ADR-033 — PHẢI khớp {@code server-world.WorldConstants.GRAVITY_MPS2}/{@code
+     * JUMP_VELOCITY_MPS}, cùng lý do {@code MOVE_SPEED_MPS}: chỉ dùng để dự đoán cục bộ, lệch chỉ
+     * gây sửa lại qua {@code MoveResponse}, không phải lỗ hổng (server luôn là nguồn chân lý).
+     */
+    static final float GRAVITY_MPS2 = 20f;
+
+    static final float JUMP_VELOCITY_MPS = 7f;
+
     static final float BOX_SIZE = 1f;
 
     static final float VIEWPORT_HEIGHT_UNITS = 10f;

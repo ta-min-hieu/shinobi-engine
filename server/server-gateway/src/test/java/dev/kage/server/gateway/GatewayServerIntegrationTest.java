@@ -113,6 +113,7 @@ import dev.kage.protocol.ExitDungeonOutcome;
 import dev.kage.protocol.ExitDungeonResponse;
 import dev.kage.protocol.GetPvpRatingRequest;
 import dev.kage.protocol.GetPvpRatingResponse;
+import dev.kage.protocol.JumpCommand;
 import dev.kage.protocol.ListShopItemsRequest;
 import dev.kage.protocol.ListShopItemsResponse;
 import dev.kage.protocol.MonsterSpawnedEvent;
@@ -1049,6 +1050,27 @@ class GatewayServerIntegrationTest {
                             .payload());
             assertThat(movedSeenByB.getCharacterId()).isEqualTo(characterA);
             assertThat(movedSeenByB.getX()).isGreaterThan(0f);
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void clientShouldBecomeAirborne_whenSendingJumpCommand_overRealSockets() throws Exception {
+        // ADR-033 — verify đúng giao thức dây (JumpCommand rỗng -> MoveResponse.grounded=false),
+        // không chỉ nội bộ WorldFacade (đã có WorldFacadeTest.shouldApplyJumpVelocity_...).
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(5000);
+            DataInputStream in = new DataInputStream(socket.getInputStream());
+            String suffix = UUID.randomUUID().toString().substring(0, 8);
+            connectCreateAndSelect(socket, in, "j" + suffix);
+
+            JumpCommand jumpCommand = JumpCommand.newBuilder().build();
+            sendFrame(socket, Opcode.OPCODE_JUMP_COMMAND_VALUE, 11, jumpCommand.toByteArray());
+
+            PacketCodec.Frame jumpResponseFrame = readUntilOpcode(in, Opcode.OPCODE_MOVE_RESPONSE_VALUE);
+            assertThat(jumpResponseFrame.header().sequenceId()).isEqualTo(11);
+            MoveResponse jumpResponse = MoveResponse.parseFrom(jumpResponseFrame.payload());
+            assertThat(jumpResponse.getGrounded()).isFalse();
         }
     }
 

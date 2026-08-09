@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| Version | 2.2.0 |
+| Version | 2.3.0 |
 | Status | Draft |
-| Liên quan | [ENGINE.md](ENGINE.md), [ADR-002](../01-architecture/adr/ADR-002-Why-libGDX.md), [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md), [ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md) |
+| Liên quan | [ENGINE.md](ENGINE.md), [ADR-002](../01-architecture/adr/ADR-002-Why-libGDX.md), [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md), [ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md), [ADR-033](../01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md) |
 
 > Rendering **chỉ chạy ở client**. Server không render ([ENGINE.md §9](ENGINE.md)).
 > Rendering là vùng **Clean Architecture không áp dụng** (Điều 25) — hiệu năng thắng abstraction.
@@ -54,6 +54,12 @@
 > `CelBodyShader`/`CelOutlineShader`), cả clip `idle` lẫn `run`, nhân vật đứng thẳng đúng hướng, có
 > viền, có shading bậc thang — không suy đoán tĩnh. `./gradlew build` xanh sau khi sửa. Chi tiết đầy
 > đủ ở §11.1.
+>
+> **Bản 2.3.0 (2026-08-09, [ADR-033](../01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md))**
+> — clip `jump` (§11.1, trước đó cố ý chưa dùng) giờ ĐÃ WIRE: `CharacterModelRenderer.setCharacterPosition`
+> nhận thêm `z` (chiều cao lơ lửng), `setCharacterAirborne` mới coi `jump` là clip LOOP ưu tiên cao
+> nhất. Chỉ CHÍNH người chơi hiện đúng — nhân vật khác chưa nhận `grounded`/`z` qua giao thức (xem
+> PHYSICS.md §9), luôn hiện đứng z=0 dù server mô phỏng nhảy đúng cho họ.
 
 ---
 
@@ -445,8 +451,11 @@ thuần, không phụ thuộc GL, ở `client-core/world/`:
 `CharacterModelRenderer` sở hữu việc thật sự gọi `AnimationController` (state machine
 idle/run/one-shot per nhân vật, transition 0.15s qua `animate(..., transitionTime)`, one-shot dùng
 `AnimationListener` để tự quay lại clip loop khi xong — riêng `die` giữ nguyên tư thế cuối tới
-`resetAfterRespawn`). `jump` **không dùng** — `GameAction` chưa có ý định nhảy nào, tự thêm là việc AI
-không được tự quyết ([/CLAUDE.md §4](../../CLAUDE.md)).
+`resetAfterRespawn`). `jump` **ĐÃ dùng** ([ADR-033](../01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md),
+2026-08-09) — `CharacterModelRenderer.setCharacterAirborne` coi nó như clip LOOP ưu tiên cao nhất
+(`CharacterAnimationClips.loopingClipFor`, ghi đè cả `run`/`idle` khi `grounded=false`), không phải
+one-shot như `attack`/`hit`. Chỉ áp cho CHÍNH người chơi ở lát cắt này — nhân vật khác chưa nhận được
+`grounded` qua giao thức (xem PHYSICS.md §9 "Đồng bộ nhân vật khác").
 
 ⚠️ **Nhân vật KHÁC hồi sinh không có tín hiệu tường minh**: `CharacterRespawnedEvent` chỉ gửi cho
 CHÍNH người hồi sinh (§ constructor/`onCharacterRespawned`), không broadcast cho ai khác đang thấy họ.

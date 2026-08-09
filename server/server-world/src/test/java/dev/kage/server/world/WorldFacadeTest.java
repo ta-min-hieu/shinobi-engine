@@ -36,7 +36,7 @@ class WorldFacadeTest {
 
     private record Despawned(long target, long despawned) {}
 
-    private record Accepted(long characterId, int sequenceId, float x, float y) {}
+    private record Accepted(long characterId, int sequenceId, float x, float y, float z, boolean grounded) {}
 
     private record MonsterSpawned(long target, long monsterId, String code, float x, float y, int hp, int maxHp) {}
 
@@ -90,8 +90,14 @@ class WorldFacadeTest {
         final List<CharacterRespawned> characterRespawned = new CopyOnWriteArrayList<>();
 
         @Override
-        public void onMoveAccepted(long characterId, int sequenceId, float x, float y) {
-            accepted.add(new Accepted(characterId, sequenceId, x, y));
+        public void onMoveAccepted(WorldOutboundSink.MoveAcceptedSnapshot snapshot) {
+            accepted.add(new Accepted(
+                    snapshot.characterId(),
+                    snapshot.sequenceId(),
+                    snapshot.x(),
+                    snapshot.y(),
+                    snapshot.z(),
+                    snapshot.grounded()));
         }
 
         @Override
@@ -227,6 +233,20 @@ class WorldFacadeTest {
 
         awaitTrue(() -> sink.accepted.stream().anyMatch(a -> a.characterId() == 1L && a.sequenceId() == 42));
         awaitTrue(() -> sink.moved.stream().anyMatch(m -> m.target() == 2L && m.moved() == 1L));
+    }
+
+    /** ADR-033 — nhảy thật: grounded chuyển false NGAY khi lệnh được xử lý (trước cả khi z kịp đổi). */
+    @Test
+    void shouldApplyJumpVelocity_whenCharacterGrounded() {
+        world.start();
+        world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
+        // Không cần chờ attach xử lý xong trước khi gọi enqueueJumpCommand — inbox là FIFO, cả 2
+        // lệnh cùng vào hàng đợi TRƯỚC lần tick đầu tiên xử lý, drainInbox() xử lý đúng thứ tự
+        // (attach trước, jump sau) trong CÙNG 1 lượt drain.
+        world.enqueueJumpCommand(1L, 7);
+
+        awaitTrue(() ->
+                sink.accepted.stream().anyMatch(a -> a.characterId() == 1L && a.sequenceId() == 7 && !a.grounded()));
     }
 
     /**

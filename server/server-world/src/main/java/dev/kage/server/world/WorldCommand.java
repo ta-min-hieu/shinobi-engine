@@ -25,6 +25,12 @@ sealed interface WorldCommand {
     record MoveIntentCommand(long characterId, int sequenceId, float dirX, float dirY) implements WorldCommand {}
 
     /**
+     * Ý định nhảy (ADR-033) — không mang theo lực/độ cao, world tự áp {@code JUMP_VELOCITY_MPS}
+     * NẾU đang grounded (bỏ qua an toàn nếu không, xem {@code WorldFacade.handleJumpIntent}).
+     */
+    record JumpIntentCommand(long characterId, int sequenceId) implements WorldCommand {}
+
+    /**
      * Chọn mục tiêu chiến đấu (GDD §6 "Auto-target đánh thường") — server tự động đánh khi hết
      * cooldown, KHÔNG phải lệnh "đánh 1 nhát" (xem {@code CombatSystem}).
      */

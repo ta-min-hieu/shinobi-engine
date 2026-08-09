@@ -219,14 +219,18 @@ public final class CharacterModelRenderer implements Disposable {
         animationStateByCharacter.remove(characterId);
     }
 
-    /** Dời model của một nhân vật tới vị trí đã nội suy trong frame này. */
-    public void setCharacterPosition(long characterId, float x, float y) {
+    /**
+     * Dời model của một nhân vật tới vị trí đã nội suy trong frame này. {@code z} thêm ở ADR-033
+     * (2026-08-08) — chiều cao lơ lửng khi nhảy; nhân vật KHÁC (chưa broadcast z qua
+     * {@code CharacterMovedEvent}, xem movement.proto) luôn truyền {@code 0f}, hiện đúng như trước.
+     */
+    public void setCharacterPosition(long characterId, float x, float y, float z) {
         Scene scene = scenesByCharacter.get(characterId);
         if (scene != null) {
-            // Gốc model nằm ở chân (bước E của pipeline art đảm bảo điều đó) nên không cần chỉnh
-            // độ cao — chỉ xoay về Z-up rồi tịnh tiến. `trn` ghi thẳng vào cột tịnh tiến, giữ
+            // Gốc model nằm ở chân (bước E của pipeline art đảm bảo điều đó) nên z=0 nghĩa là đứng
+            // trên đất — chỉ xoay về Z-up rồi tịnh tiến. `trn` ghi thẳng vào cột tịnh tiến, giữ
             // nguyên phần xoay và không cấp phát gì.
-            scene.modelInstance.transform.set(Y_UP_TO_Z_UP).trn(x, y, 0f);
+            scene.modelInstance.transform.set(Y_UP_TO_Z_UP).trn(x, y, z);
         }
     }
 
@@ -245,6 +249,21 @@ public final class CharacterModelRenderer implements Disposable {
             return; // Chưa có Scene, hoặc đã chết — giữ nguyên tư thế die tới khi hồi sinh.
         }
         state.moving = moving;
+        if (!state.oneShotPlaying) {
+            applyLoopClip(state);
+        }
+    }
+
+    /**
+     * Đặt lại trạng thái lơ lửng (ADR-033) — {@link CharacterAnimationClips#JUMP} ưu tiên cao nhất
+     * trong {@link #applyLoopClip}, cùng cơ chế/lý do với {@link #setCharacterMoving}.
+     */
+    public void setCharacterAirborne(long characterId, boolean airborne) {
+        AnimationState state = animationStateByCharacter.get(characterId);
+        if (state == null || state.dead) {
+            return;
+        }
+        state.airborne = airborne;
         if (!state.oneShotPlaying) {
             applyLoopClip(state);
         }
@@ -292,6 +311,7 @@ public final class CharacterModelRenderer implements Disposable {
         state.dead = false;
         state.oneShotPlaying = false;
         state.moving = false;
+        state.airborne = false;
         state.currentClip = CharacterAnimationClips.IDLE;
         scene.animationController.setAnimation(CharacterAnimationClips.IDLE, -1);
     }
@@ -307,7 +327,7 @@ public final class CharacterModelRenderer implements Disposable {
     }
 
     private void applyLoopClip(AnimationState state) {
-        String desired = CharacterAnimationClips.loopingClipFor(state.moving);
+        String desired = CharacterAnimationClips.loopingClipFor(state.airborne, state.moving);
         if (desired.equals(state.currentClip)) {
             return; // AnimationController restart clip từ đầu mỗi lần setAnimation/animate được gọi
             // — tránh gọi lại khi clip mong muốn không đổi (mỗi frame gọi setCharacterMoving).
@@ -414,6 +434,7 @@ public final class CharacterModelRenderer implements Disposable {
         private final long characterId;
         private String currentClip = CharacterAnimationClips.IDLE;
         private boolean moving;
+        private boolean airborne;
         private boolean oneShotPlaying;
         private boolean dead;
 

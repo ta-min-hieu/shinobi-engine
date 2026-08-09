@@ -32,7 +32,14 @@ class CharacterAnimationClipsTest {
 
     @Test
     void loopingClipFor_selectsRunWhenMovingIdleOtherwise() {
-        assertThat(CharacterAnimationClips.loopingClipFor(true)).isEqualTo(CharacterAnimationClips.RUN);
-        assertThat(CharacterAnimationClips.loopingClipFor(false)).isEqualTo(CharacterAnimationClips.IDLE);
+        assertThat(CharacterAnimationClips.loopingClipFor(false, true)).isEqualTo(CharacterAnimationClips.RUN);
+        assertThat(CharacterAnimationClips.loopingClipFor(false, false)).isEqualTo(CharacterAnimationClips.IDLE);
+    }
+
+    @Test
+    void loopingClipFor_selectsJump_regardlessOfMoving_whenAirborne() {
+        // ADR-033 — jump có ưu tiên cao nhất, kể cả khi đang nhảy NGANG (moving=true).
+        assertThat(CharacterAnimationClips.loopingClipFor(true, true)).isEqualTo(CharacterAnimationClips.JUMP);
+        assertThat(CharacterAnimationClips.loopingClipFor(true, false)).isEqualTo(CharacterAnimationClips.JUMP);
     }
 }

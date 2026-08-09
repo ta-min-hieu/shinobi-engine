@@ -27,6 +27,7 @@ import dev.kage.engine.ecs.KEntity;
 import dev.kage.engine.ecs.component.PositionComponent;
 import dev.kage.engine.ecs.component.VelocityComponent;
 import dev.kage.engine.ecs.system.MovementSystem;
+import dev.kage.engine.ecs.system.VerticalMovementSystem;
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
@@ -34,6 +35,7 @@ import dev.kage.protocol.CharacterRespawnedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.CharacterSummary;
 import dev.kage.protocol.CostumeTier;
+import dev.kage.protocol.JumpCommand;
 import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
@@ -95,7 +97,10 @@ public final class WorldScreen implements GameScreen {
     private final CombatHud combatHud = new CombatHud();
 
     private float lastSentDirX;
-    private float lastSentDirY;
+    // Edge-detection cho JUMP (ADR-033) — GameAction.JUMP là "đang giữ", nhưng nhảy chỉ áp lực 1
+    // lần lúc VỪA nhấn (rising edge), không lặp lại mỗi frame khi giữ phím (khác MOVE_LEFT/RIGHT,
+    // vốn là hướng liên tục).
+    private boolean jumpKeyWasPressed;
 
     /**
      * @param context {@link EcsWorld} + {@link InputMapper} gộp lại (CODING-STANDARDS
@@ -119,6 +124,9 @@ public final class WorldScreen implements GameScreen {
                 new FitViewport(WorldConstants.VIEWPORT_HEIGHT_UNITS, WorldConstants.VIEWPORT_HEIGHT_UNITS, camera);
 
         world.addSystem(new MovementSystem());
+        // ADR-033 — trục dọc chạy CÙNG công thức server (WorldConstants.GRAVITY_MPS2 phải khớp)
+        // để dự đoán cục bộ (CLIENT.md §6) khớp server, cùng lý do MovementSystem đã có ở trên.
+        world.addSystem(new VerticalMovementSystem(WorldConstants.GRAVITY_MPS2));
 
         // Spawn (0,0) khớp mặc định server-world.WorldConstants.SPAWN_X/Y — chưa có persistence
         // vị trí (server-world follow-up), MoveResponse đầu tiên sẽ tự sửa nếu lệch.
@@ -158,6 +166,7 @@ public final class WorldScreen implements GameScreen {
     public void fixedUpdate(float fixedDeltaTime) {
         processInboundPackets();
         updateLocalMovementIntent();
+        updateJumpIntent();
         combatHudController.tick(fixedDeltaTime);
         remoteMotionTracker.tick(fixedDeltaTime);
     }
@@ -241,13 +250,21 @@ public final class WorldScreen implements GameScreen {
         PositionComponent pos = POSITION.get(localPlayer);
         float dx = response.getX() - pos.x;
         float dy = response.getY() - pos.y;
-        if (Math.sqrt((dx * dx) + (dy * dy)) > WorldConstants.RECONCILE_SNAP_THRESHOLD) {
-            // Lệch lớn (mất gói MoveCommand trước đó, hoặc server điều chỉnh) — sửa NGAY theo
-            // server, không tranh cãi (Điều 15, CLIENT.md §6).
+        float dz = response.getZ() - pos.z;
+        if (Math.sqrt((dx * dx) + (dy * dy) + (dz * dz)) > WorldConstants.RECONCILE_SNAP_THRESHOLD) {
+            // Lệch lớn (mất gói MoveCommand/JumpCommand trước đó, hoặc server điều chỉnh) — sửa
+            // NGAY theo server, không tranh cãi (Điều 15, CLIENT.md §6).
             pos.x = response.getX();
             pos.y = response.getY();
             pos.prevX = pos.x;
             pos.prevY = pos.y;
+            pos.z = response.getZ();
+            pos.prevZ = pos.z;
+            pos.grounded = response.getGrounded();
+            // vz KHÔNG snap theo server — MoveResponse không mang vz (chỉ x/y/z/grounded, xem
+            // movement.proto). Dự đoán cục bộ tiếp tục dùng vz hiện có, tự hội tụ đúng quỹ đạo ở
+            // các tick sau vì VerticalMovementSystem chạy CÙNG công thức cả 2 phía (ADR-033) —
+            // follow-up nếu số liệu thật cho thấy cần đồng bộ cả vz.
         }
     }
 
@@ -305,6 +322,12 @@ public final class WorldScreen implements GameScreen {
         pos.y = event.getY();
         pos.prevX = pos.x;
         pos.prevY = pos.y;
+        // ADR-033 — hồi sinh LUÔN ở mặt đất (WorldFacade.respawnCharacter), reset cả trục dọc: có
+        // thể chết giữa lúc đang lơ lửng (z>0, grounded=false), không reset sẽ hồi sinh "bay".
+        pos.z = 0f;
+        pos.prevZ = 0f;
+        pos.vz = 0f;
+        pos.grounded = true;
         combatHudController.onRespawn(event.getCurrentHp(), event.getCurrentChi());
         models.resetAfterRespawn(LOCAL_CHARACTER_ID);
     }
@@ -347,35 +370,31 @@ public final class WorldScreen implements GameScreen {
         }
     }
 
+    /**
+     * ADR-033 — chỉ còn trái/phải (bỏ MOVE_UP/MOVE_DOWN, xem {@link GameAction}). {@code dirY} LUÔN
+     * gửi {@code 0f}: field còn tồn tại trên dây (movement.proto không xoá field đang dùng,
+     * shared/CLAUDE.md) nhưng server-world giờ bỏ qua nó (WorldFacade.handleMoveIntent) — giữ 0
+     * cục bộ để dự đoán khớp đúng những gì server THẬT SỰ áp dụng.
+     */
     private void updateLocalMovementIntent() {
         float dirX = 0f;
-        float dirY = 0f;
         if (inputMapper.isPressed(GameAction.MOVE_LEFT)) {
             dirX -= 1f;
         }
         if (inputMapper.isPressed(GameAction.MOVE_RIGHT)) {
             dirX += 1f;
         }
-        if (inputMapper.isPressed(GameAction.MOVE_DOWN)) {
-            dirY -= 1f;
-        }
-        if (inputMapper.isPressed(GameAction.MOVE_UP)) {
-            dirY += 1f;
-        }
-        // Chuẩn hoá CỤC BỘ giống hệt server (WorldFacade.clampDirection) — dự đoán khớp server
-        // ngay cả khi đi chéo, tránh dự đoán "nhanh hơn" rồi bị snap lại liên tục.
-        float length = (float) Math.sqrt((dirX * dirX) + (dirY * dirY));
-        float normalizedDirX = length > 1f ? dirX / length : dirX;
-        float normalizedDirY = length > 1f ? dirY / length : dirY;
+        // dirX chỉ có thể là -1/0/1 (2 flag loại trừ cùng lúc) — không cần chuẩn hoá độ dài như
+        // trước ADR-033 (khi còn 2 trục, đi chéo cần chia cho sqrt(2)).
+        float normalizedDirX = dirX;
 
         VelocityComponent velocity = VELOCITY.get(localPlayer);
         velocity.x = normalizedDirX * WorldConstants.MOVE_SPEED_MPS;
-        velocity.y = normalizedDirY * WorldConstants.MOVE_SPEED_MPS;
+        velocity.y = 0f;
 
-        if (normalizedDirX != lastSentDirX || normalizedDirY != lastSentDirY) {
+        if (normalizedDirX != lastSentDirX) {
             lastSentDirX = normalizedDirX;
-            lastSentDirY = normalizedDirY;
-            sendMoveCommand(normalizedDirX, normalizedDirY);
+            sendMoveCommand(normalizedDirX, 0f);
         }
     }
 
@@ -388,6 +407,34 @@ public final class WorldScreen implements GameScreen {
             // Mất kết nối tạm thời — bình thường (GameConnection tự reconnect), hướng mới nhất sẽ
             // được gửi lại lần input đổi tiếp theo, không cần retry thủ công ở đây.
             LOG.debug("Gửi MoveCommand thất bại (mất kết nối tạm thời)", e);
+        }
+    }
+
+    /**
+     * ADR-033 — nhảy chỉ áp lực lúc VỪA nhấn (rising edge của {@link GameAction#JUMP}, xem
+     * {@link #jumpKeyWasPressed}), không lặp lại khi giữ phím. Dự đoán cục bộ NGAY (CLIENT.md §6)
+     * bằng cùng điều kiện {@code grounded} server sẽ kiểm — server vẫn là nguồn chân lý cuối cùng
+     * qua {@code MoveResponse} nếu dự đoán sai (VD lệnh nhảy trước đó chưa kịp server xử lý xong).
+     */
+    private void updateJumpIntent() {
+        boolean jumpPressed = inputMapper.isPressed(GameAction.JUMP);
+        if (jumpPressed && !jumpKeyWasPressed) {
+            PositionComponent pos = POSITION.get(localPlayer);
+            if (pos.grounded) {
+                pos.grounded = false;
+                pos.vz = WorldConstants.JUMP_VELOCITY_MPS;
+                sendJumpCommand();
+            }
+        }
+        jumpKeyWasPressed = jumpPressed;
+    }
+
+    private void sendJumpCommand() {
+        try {
+            JumpCommand command = JumpCommand.newBuilder().build();
+            connection.send(Opcode.OPCODE_JUMP_COMMAND_VALUE, connection.nextSequenceId(), command.toByteArray());
+        } catch (IOException e) {
+            LOG.debug("Gửi JumpCommand thất bại (mất kết nối tạm thời)", e);
         }
     }
 
@@ -448,15 +495,26 @@ public final class WorldScreen implements GameScreen {
     private void renderModels(float alpha) {
         float localX = interpolatedX(localPlayer, alpha);
         float localY = interpolatedY(localPlayer, alpha);
-        models.setCharacterPosition(LOCAL_CHARACTER_ID, localX, localY);
+        float localZ = interpolatedZ(localPlayer, alpha);
+        models.setCharacterPosition(LOCAL_CHARACTER_ID, localX, localY, localZ);
         models.setCharacterMoving(LOCAL_CHARACTER_ID, isLocalPlayerMoving());
+        // ADR-033 — grounded là trạng thái dự đoán cục bộ/xác nhận qua MoveResponse, KHÔNG nội suy
+        // (giống lý do isLocalPlayerMoving đọc VelocityComponent thẳng, không qua interpolation).
+        models.setCharacterAirborne(LOCAL_CHARACTER_ID, !POSITION.get(localPlayer).grounded);
         for (Map.Entry<Long, KEntity> entry : remoteCharacters.entrySet()) {
             long characterId = entry.getKey();
             models.setCharacterPosition(
-                    characterId, interpolatedX(entry.getValue(), alpha), interpolatedY(entry.getValue(), alpha));
+                    characterId,
+                    interpolatedX(entry.getValue(), alpha),
+                    interpolatedY(entry.getValue(), alpha),
+                    interpolatedZ(entry.getValue(), alpha));
             // Nhân vật khác không có VelocityComponent (chỉ nội suy vị trí, CLIENT.md §7) — suy
             // "đang di chuyển" từ độ lệch vị trí giữa các CharacterMovedEvent thay vào đó.
             models.setCharacterMoving(characterId, remoteMotionTracker.isMoving(characterId));
+            // z/grounded CHƯA broadcast cho nhân vật khác qua CharacterMovedEvent (ADR-033, hoãn có
+            // chủ đích — xem movement.proto) — z luôn 0 mặc định, không gọi setCharacterAirborne
+            // (giữ nguyên grounded=true mặc định), nên KHÔNG hiện người khác nhảy dù server đã mô
+            // phỏng đúng cho họ.
         }
         models.follow(localX, localY);
         models.render(Gdx.graphics.getDeltaTime());
@@ -497,6 +555,12 @@ public final class WorldScreen implements GameScreen {
     private static float interpolatedY(KEntity entity, float alpha) {
         PositionComponent pos = POSITION.get(entity);
         return pos.prevY + ((pos.y - pos.prevY) * alpha);
+    }
+
+    /** ADR-033 — nội suy trục dọc giống hệt {@link #interpolatedX}/{@link #interpolatedY}. */
+    private static float interpolatedZ(KEntity entity, float alpha) {
+        PositionComponent pos = POSITION.get(entity);
+        return pos.prevZ + ((pos.z - pos.prevZ) * alpha);
     }
 
     private void drawInterpolated(KEntity entity, float alpha) {

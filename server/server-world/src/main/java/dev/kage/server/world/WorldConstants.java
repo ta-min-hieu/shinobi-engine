@@ -20,6 +20,20 @@ final class WorldConstants {
     /** Bán kính Area of Interest — placeholder, đo lại ở Phase 3/9 (SERVER.md §6, §11). */
     static final float AOI_RADIUS_METERS = 15f;
 
+    /**
+     * Gia tốc trọng trường trục {@code z} (ADR-033) — giá trị ĐỀ XUẤT để mở khoá lát cắt nhảy đầu
+     * tiên, CHƯA đo cảm giác rơi thật (chưa có map pilot có bệ để so sánh — cùng tinh thần
+     * {@code MOVE_SPEED_MPS} phía trên). {@code client-core.WorldConstants.GRAVITY_MPS2} PHẢI khớp.
+     */
+    static final float GRAVITY_MPS2 = 20f;
+
+    /**
+     * Vận tốc dọc tức thời khi bật nhảy (ADR-033) — với {@link #GRAVITY_MPS2} ở trên, đỉnh nhảy lý
+     * thuyết {@code v²/(2g)} ≈ 1.25m, đủ né đòn tầm thấp mà không cần map pilot mới xác nhận cảm
+     * giác. {@code client-core.WorldConstants.JUMP_VELOCITY_MPS} PHẢI khớp (dự đoán cục bộ).
+     */
+    static final float JUMP_VELOCITY_MPS = 7f;
+
     // AoI sync TÁCH khỏi TICK_RATE (ADR-018 §Consequences/§Revisit Trigger: "giữ logic 60Hz, hạ
     // snapshot rate") — người chơi không phân biệt được vị trí người khác cập nhật mỗi 16ms hay
     // 50ms, nhưng AreaOfInterestTracker.sync() so cặp entity nên tần suất ảnh hưởng trực tiếp tới

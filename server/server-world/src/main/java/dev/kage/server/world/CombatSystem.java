@@ -112,6 +112,14 @@ final class CombatSystem extends IteratingKSystem {
         CombatConstants.CombatStats defenderStats = StatusEffects.applyModifiers(
                 CombatConstants.toStats(COMBAT_STATS.get(target)), STATUS_EFFECT.get(target));
         CombatConstants.AttackResult result = CombatConstants.resolveAttack(attackerStats, defenderStats);
+        // ADR-033 Decision #4/#5: đánh thường (KHÔNG phải skill, xem SkillSystem) LUÔN bị coi là
+        // "đòn tầm thấp" ở lát cắt MVP này — nhân vật đang lơ lửng (grounded=false, đang nhảy) né
+        // TUYỆT ĐỐI, ghi đè RNG hit/dodge (xem CombatConstants.resolveAttack) thay vì cộng dồn xác
+        // suất. Phân loại "đòn nào coi là tầm thấp" chi tiết hơn (skill nào, chiêu boss nào) vẫn MỞ
+        // (ADR-033 Technical Decision #5 — cần đối chiếu GDD), chỉ áp cho auto-attack ở lát cắt này.
+        if (!POSITION.get(target).grounded) {
+            result = new CombatConstants.AttackResult(true, false, 0);
+        }
         int damageAfterShield = StatusEffects.absorbWithShield(STATUS_EFFECT.get(target), result.damage());
         targetHealth.current = Math.max(0, targetHealth.current - damageAfterShield);
 

@@ -19,20 +19,42 @@ import "character.proto";
 
 // Command: Client -> Server (OPCODE_MOVE_COMMAND). Gửi khi hướng di chuyển đổi (nhấn/nhả phím),
 // KHÔNG gửi liên tục mỗi frame.
+//
+// ADR-033 (2026-08-08): di chuyển người chơi chỉ còn trái/phải — dir_y GIỮ NGUYÊN trong message
+// (KHÔNG được đổi/xoá field protobuf đang dùng, shared/CLAUDE.md) nhưng server-world giờ LUÔN bỏ
+// qua giá trị này cho nhân vật người chơi (WorldFacade.handleMoveIntent ép dirY=0 — Server
+// Authority, không tin client dù field cũ còn tồn tại trên dây). Trục dọc giờ đi qua JumpCommand.
 message MoveCommand {
   float dir_x = 1;
   float dir_y = 2;
 }
 
+// Command: Client -> Server (OPCODE_JUMP_COMMAND, ADR-033). Ý ĐỊNH nhảy — không có field (giống
+// MoveCommand, characterId lấy từ session, chống IDOR). Server chỉ áp lực nhảy nếu nhân vật đang
+// grounded (WorldFacade.handleJumpIntent); gửi khi nhấn (rising edge), KHÔNG lặp lại khi giữ phím.
+message JumpCommand {}
+
 // Response: Server -> Client (OPCODE_MOVE_RESPONSE). Vị trí THẬT của CHÍNH nhân vật gửi lệnh —
-// dùng cho reconciliation phía client (CLIENT.md §6). Khớp sequenceId với MoveCommand tương ứng.
+// dùng cho reconciliation phía client (CLIENT.md §6). Khớp sequenceId với MoveCommand/JumpCommand
+// tương ứng (ADR-033: JumpCommand cũng được ack qua đúng response này, không cần packet riêng).
+//
+// z/grounded thêm ở ADR-033 (chỉ THÊM field, giữ nguyên số field x/y đã dùng — shared/CLAUDE.md).
 message MoveResponse {
   float x = 1;
   float y = 2;
+  float z = 3;
+  bool grounded = 4;
 }
 
 // Event: Server -> Client (OPCODE_CHARACTER_MOVED_EVENT). Vị trí nhân vật KHÁC trong AoI
 // (SERVER.md §6) — không gửi Event này cho chính nhân vật đó (nó đã có MoveResponse).
+//
+// ⚠️ ADR-033 (2026-08-08, lát cắt 1): CHƯA thêm z/grounded ở đây — nhân vật KHÁC luôn hiện z=0
+// (không thấy người khác nhảy) dù server đã mô phỏng trục dọc thật cho họ. Cố tình hoãn: thêm z
+// vào đây kéo theo sửa AreaOfInterestTracker.lastSyncedPosition (mảng float[2] tái dùng mỗi tick,
+// PHYSICS.md hot path đã tối ưu allocation) — để riêng thành 1 lượt sau khi cơ chế nhảy của CHÍNH
+// người chơi đã chạy đúng và đo được, tránh đổi 2 việc rủi ro cao cùng lúc. Xem ADR-033 "Việc cần
+// làm tiếp theo".
 message CharacterMovedEvent {
   int64 character_id = 1;
   float x = 2;

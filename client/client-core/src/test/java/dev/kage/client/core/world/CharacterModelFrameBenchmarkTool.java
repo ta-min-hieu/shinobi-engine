@@ -116,7 +116,7 @@ public final class CharacterModelFrameBenchmarkTool extends ApplicationAdapter {
             int row = i / GRID_COLUMNS;
             float x = (col - ((GRID_COLUMNS - 1) / 2f)) * GRID_SPACING_UNITS;
             float y = (row - ((rows - 1) / 2f)) * GRID_SPACING_UNITS;
-            models.setCharacterPosition(characterId, x, y);
+            models.setCharacterPosition(characterId, x, y, 0f);
         }
     }
 
