@@ -18,7 +18,7 @@ import java.util.Locale;
  *
  * <p>Hệ quả cố ý: mã quái CHƯA có art vẫn ra một khoá hợp lệ trỏ tới file không tồn tại
  * ({@code sample_boss} → {@code mob_sample-boss}, chưa vẽ tính đến 2026-08-09). Đó là trường hợp
- * {@link WorldModelRenderer#addMonster} xử lý được — vẽ hộp cho riêng con đó — nên ở đây không cần
+ * {@link WorldModelRenderer#addMonsterOrNpc} xử lý được — vẽ hộp cho riêng con đó — nên ở đây không cần
  * (và không thể) biết con nào đã có model.
  */
 final class MonsterModelKey {

@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import dev.kage.protocol.MonsterMovedEvent;
+import dev.kage.protocol.NpcSpawnedEvent;
 
 /**
  * Chụp ảnh quái đúng như game thật vẽ chúng — {@code ./gradlew :client:client-core:runMonsterPreview},
@@ -34,16 +35,16 @@ import dev.kage.protocol.MonsterMovedEvent;
  * quái ĐÃ có model ({@code training_dummy}), và quái CHƯA có model ({@code sample_boss}, vẫn là hộp
  * đỏ) — nếu nhánh fallback từng bị hỏng, ảnh này là chỗ thấy ngay.
  */
-public final class MonsterModelPreviewTool extends ApplicationAdapter {
+public final class WorldModelPreviewTool extends ApplicationAdapter {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MonsterModelPreviewTool.class);
+    private static final Logger LOG = LoggerFactory.getLogger(WorldModelPreviewTool.class);
 
     /**
      * Thư mục ảnh, tuyệt đối — cwd của công cụ là gốc asset ({@code assets/exported}, để
      * {@code Gdx.files.internal} tra được model), và đó là cây tài sản của pipeline art chứ không
      * phải chỗ đổ output. Task Gradle truyền đường dẫn thật vào.
      */
-    private static final String OUTPUT_DIR = System.getProperty("kage.preview.out", "build/preview-monster") + "/";
+    private static final String OUTPUT_DIR = System.getProperty("kage.preview.out", "build/preview-world") + "/";
 
     private static final long CHARACTER_ID = 1L;
 
@@ -52,16 +53,24 @@ public final class MonsterModelPreviewTool extends ApplicationAdapter {
 
     private static final long BOSS_ID = -2L;
 
+    private static final long ELDER_ID = -3L;
+
+    /** Mã NPC chưa có art — chứng minh nhánh hộp thay thế của NpcPresenter còn sống. */
+    private static final long UNDRAWN_NPC_ID = -4L;
+
     // Toàn bộ khung nằm TRƯỚC bệ demo đầu tiên (bắt đầu ở x=3, xem DemoPlatforms) — bệ vẽ đè lên
     // quái thì ảnh không còn chứng minh được gì về chính con quái, đúng bẫy đã gặp ở lượt chụp đầu.
-    private static final float PLAYER_X = -3f;
+    private static final float PLAYER_X = -3.5f;
     private static final float DUMMY_X = 0f;
     private static final float BOSS_X = 2f;
+    private static final float ELDER_X = -1.4f;
+    private static final float UNDRAWN_NPC_X = 3.6f;
 
     private final Map<Long, CombatHudController.MonsterState> monsters = new LinkedHashMap<>();
 
     private WorldModelRenderer models;
     private MonsterPresenter presenter;
+    private NpcPresenter npcPresenter;
     private ShapeRenderer shapeRenderer;
     private int frame;
 
@@ -73,6 +82,7 @@ public final class MonsterModelPreviewTool extends ApplicationAdapter {
         models.resize(WorldConstants.VIEWPORT_HEIGHT_UNITS, WorldConstants.VIEWPORT_HEIGHT_UNITS);
         shapeRenderer = new ShapeRenderer();
         presenter = new MonsterPresenter(models);
+        npcPresenter = new NpcPresenter(models);
 
         models.addCharacter(CHARACTER_ID, "char_hoa-b1");
         if (!models.isEnabled()) {
@@ -82,13 +92,28 @@ public final class MonsterModelPreviewTool extends ApplicationAdapter {
         }
         putMonster(DUMMY_ID, "training_dummy", DUMMY_X);
         putMonster(BOSS_ID, "sample_boss", BOSS_X);
+        putNpc(ELDER_ID, "town_elder", ELDER_X);
+        putNpc(UNDRAWN_NPC_ID, "shop_keeper", UNDRAWN_NPC_X);
         LOG.info(
                 "model quái: training_dummy={} sample_boss={} (sample_boss=false là ĐÚNG, chưa vẽ)",
                 models.hasModel(DUMMY_ID),
                 models.hasModel(BOSS_ID));
+        LOG.info(
+                "model NPC: town_elder={} shop_keeper={} (shop_keeper=false là ĐÚNG, mã NPC chưa tồn tại)",
+                models.hasModel(ELDER_ID),
+                models.hasModel(UNDRAWN_NPC_ID));
     }
 
-    /** Đi qua đúng {@link MonsterPresenter#onSpawned} thay vì tự gọi {@code addMonster}. */
+    private void putNpc(long npcId, String npcCode, float x) {
+        npcPresenter.onSpawned(NpcSpawnedEvent.newBuilder()
+                .setNpcId(npcId)
+                .setNpcCode(npcCode)
+                .setX(x)
+                .setY(0f)
+                .build());
+    }
+
+    /** Đi qua đúng {@link MonsterPresenter#onSpawned} thay vì tự gọi {@code addMonsterOrNpc}. */
     private void putMonster(long monsterId, String monsterCode, float x) {
         monsters.put(monsterId, new CombatHudController.MonsterState(monsterCode, x, 0f, 100, 100));
         presenter.onSpawned(dev.kage.protocol.MonsterSpawnedEvent.newBuilder()
@@ -115,10 +140,12 @@ public final class MonsterModelPreviewTool extends ApplicationAdapter {
         models.setPosition(CHARACTER_ID, PLAYER_X, 0f, 0f);
         // Y HỆT WorldScreen.renderModels: sync trước, follow, rồi render.
         presenter.sync(monsters, PLAYER_X);
-        models.follow(PLAYER_X + 2.5f, 0f); // lùi camera ra giữa để cả 3 đối tượng vào khung
+        npcPresenter.sync(PLAYER_X);
+        models.follow(PLAYER_X + 3.5f, 0f); // lùi camera ra giữa để cả 3 đối tượng vào khung
         models.render(1f / 60f);
         DemoPlatforms.render(shapeRenderer, models.combined());
         presenter.render(shapeRenderer, models.combined(), monsters, DUMMY_ID);
+        npcPresenter.render(shapeRenderer, models.combined());
         presenter.tick(1f / 60f);
 
         script();
@@ -185,6 +212,6 @@ public final class MonsterModelPreviewTool extends ApplicationAdapter {
         config.setTitle("Kage — xem model quái");
         config.setWindowedMode(1280, 720);
         config.setForegroundFPS(60);
-        new Lwjgl3Application(new MonsterModelPreviewTool(), config);
+        new Lwjgl3Application(new WorldModelPreviewTool(), config);
     }
 }

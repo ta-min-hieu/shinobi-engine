@@ -78,7 +78,7 @@ final class CombatAnimationTrigger {
     /**
      * Quy đổi id không gian chung nhân vật/quái sang khoá mà {@link WorldModelRenderer} dùng —
      * CHÍNH mình dùng {@link #localModelId}, mọi thứ khác (nhân vật KHÁC, quái) dùng thẳng
-     * {@code entity_id} thật, khớp khoá đã dùng lúc {@code addCharacter}/{@code addMonster}.
+     * {@code entity_id} thật, khớp khoá đã dùng lúc {@code addCharacter}/{@code addMonsterOrNpc}.
      */
     private long modelId(long entityId) {
         return entityId == localCharacterId ? localModelId : entityId;

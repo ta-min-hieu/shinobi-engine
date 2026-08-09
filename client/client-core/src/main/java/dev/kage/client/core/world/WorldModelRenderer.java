@@ -19,7 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Vẽ mọi thứ có model glTF 3D trong thế giới — nhân vật VÀ quái — qua camera orthographic khoá góc
+ * Vẽ mọi thứ có model glTF 3D trong thế giới — nhân vật, quái, NPC — qua camera orthographic khoá góc
  * ([ADR-031](docs/01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)).
  *
  * <p>Khoá là {@code entity_id} của combat.proto, một không gian id DUY NHẤT đã tách sẵn dấu:
@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
  * đếm lùi từ −1), <b>0 = chính người chơi</b> (sentinel {@code WorldScreen.LOCAL_CHARACTER_ID} — id
  * thật của mình không bao giờ đi qua đây). Nhờ vậy một map duy nhất chứa được cả hai loại mà không
  * cần khoá ghép, và mọi thao tác sau khi đã gắn model (dời, quay mặt, phát animation, xoá) dùng
- * chung đúng một API — chỉ lúc GẮN model mới phân biệt, xem {@link #addMonster} về lý do.
+ * chung đúng một API — chỉ lúc GẮN model mới phân biệt, xem {@link #addMonsterOrNpc} về lý do.
  *
  * <p>Góc camera là <b>hằng số runtime</b>, không nướng vào tài sản — đó là điều ADR-031 mua được khi
  * bỏ pre-render sprite. Đổi {@link #VIEW_YAW_DEGREES} là đổi cả game, không phải render lại asset nào.
@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * Đó không phải phòng thủ thừa: model nằm ở {@code assets/exported/models/}, sinh ra từ pipeline art
  * và <b>không commit</b> ([ART-PIPELINE §7](docs/14-art/ART-PIPELINE.md)), nên một bản checkout sạch
  * chưa chạy pipeline sẽ không có chúng. Crash lúc khởi động ở trường hợp đó là sai. Thiếu model
- * QUÁI thì chỉ con đó vẽ hộp — xem {@link #addMonster}.
+ * QUÁI thì chỉ con đó vẽ hộp — xem {@link #addMonsterOrNpc}.
  *
  * <p><b>Không dùng {@code SceneManager.render()}</b> (RENDERING.md §12.2 câu hỏi runtime #2) —
  * {@code SceneManager} chỉ vẽ MỘT lượt bằng một {@code ShaderProvider} duy nhất, không có điểm chèn
@@ -264,36 +264,40 @@ public final class WorldModelRenderer implements Disposable {
             // Lần đầu thiếu model NHÂN VẬT là tắt hẳn nhánh 3D, không phải cảnh báo mỗi lần spawn:
             // bộ 45 file nhân vật ra lò cùng một mẻ (ART-PIPELINE §7), thiếu một cái gần như luôn có
             // nghĩa là chưa chạy pipeline art chứ không phải hỏng đúng một file. Quái thì ngược lại —
-            // xem {@link #addMonster}.
+            // xem {@link #addMonsterOrNpc}.
             LOG.warn("Không thấy model nhân vật '{}' — nhánh 3D tắt, quay về hình thay thế", assetKey);
             enabled = false;
         }
     }
 
     /**
-     * Gắn model cho một con quái (2026-08-09). Cùng máy móc {@link #addCharacter} nhưng khác đúng
-     * một điều: <b>thiếu model quái KHÔNG tắt nhánh 3D</b>.
+     * Gắn model cho một con quái hoặc một NPC (2026-08-09). Cùng máy móc {@link #addCharacter} nhưng
+     * khác đúng một điều: <b>thiếu model ở đây KHÔNG tắt nhánh 3D</b>.
      *
-     * <p>Lý do là thực tế của chính kho asset này: art quái chạy sau art nhân vật và chạy từng con
-     * một, nên "có model cho {@code training_dummy} mà chưa có cho {@code sample_boss}" là trạng
-     * thái BÌNH THƯỜNG chứ không phải dấu hiệu hỏng. Áp luật của {@link #addCharacter} vào đây sẽ
-     * biến một con boss chưa được vẽ thành lệnh tắt 3D cho toàn bộ nhân vật đang trên màn hình —
-     * hỏng nhiều hơn hẳn thứ nó bảo vệ.
+     * <p>Tên method gộp quái với NPC theo đúng cách server gộp chúng
+     * ({@code WorldFacade.nextMonsterOrNpcId} cấp id cho cả hai từ một bộ đếm): với lớp này chúng
+     * giống hệt nhau — id âm, art làm từng con, không nhảy.
      *
-     * @return {@code true} nếu con quái này giờ có model thật để vẽ. {@code false} thì người gọi
-     *     phải tự vẽ hình thay thế CHO RIÊNG nó ({@code MonsterPresenter} vẽ hộp), phần còn lại của
-     *     thế giới vẫn 3D.
+     * <p>Lý do nới luật là thực tế của chính kho asset này: art quái/NPC chạy sau art nhân vật và
+     * chạy từng con một, nên "có model cho {@code training_dummy} mà chưa có cho {@code sample_boss}"
+     * là trạng thái BÌNH THƯỜNG chứ không phải dấu hiệu hỏng. Áp luật của {@link #addCharacter} vào
+     * đây sẽ biến một con boss chưa được vẽ thành lệnh tắt 3D cho toàn bộ nhân vật đang trên màn
+     * hình — hỏng nhiều hơn hẳn thứ nó bảo vệ.
+     *
+     * @return {@code true} nếu thực thể này giờ có model thật để vẽ. {@code false} thì người gọi
+     *     phải tự vẽ hình thay thế CHO RIÊNG nó ({@link MonsterPresenter}/{@link NpcPresenter} vẽ
+     *     hộp), phần còn lại của thế giới vẫn 3D.
      */
-    public boolean addMonster(long monsterId, String assetKey) {
+    public boolean addMonsterOrNpc(long entityId, String assetKey) {
         if (!enabled) {
             return false; // Không có nhánh 3D nào để gắn vào — người gọi vẽ hộp như trước ADR-031.
         }
-        if (scenesById.containsKey(monsterId)) {
+        if (scenesById.containsKey(entityId)) {
             return true;
         }
-        boolean attached = attach(monsterId, assetKey);
+        boolean attached = attach(entityId, assetKey);
         if (!attached) {
-            LOG.info("Chưa có model quái '{}' — con này vẽ bằng hộp, nhánh 3D giữ nguyên", assetKey);
+            LOG.info("Chưa có model '{}' — thực thể này vẽ bằng hộp, nhánh 3D giữ nguyên", assetKey);
         }
         return attached;
     }

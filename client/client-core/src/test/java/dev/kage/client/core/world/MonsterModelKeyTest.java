@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
  * {@link GraphicsTierTest} test {@code resolveModelDirectory} tách khỏi {@link WorldModelRenderer}.
  *
  * <p>Giá trị thật của bộ test này nằm ở chỗ khoá sinh ra phải khớp ĐÚNG tên file trên đĩa: sai một
- * dấu {@code _}/{@code -} thì {@code addMonster} chỉ lặng lẽ vẽ hộp và không có gì báo hỏng.
+ * dấu {@code _}/{@code -} thì {@code addMonsterOrNpc} chỉ lặng lẽ vẽ hộp và không có gì báo hỏng.
  */
 class MonsterModelKeyTest {
 
@@ -32,7 +32,7 @@ class MonsterModelKeyTest {
     @Test
     void mapsMonsterCodeThatHasNoArtYet() {
         // sample_boss chưa được vẽ tính tới 2026-08-09 — khoá vẫn phải hợp lệ và đoán được, việc
-        // "chưa có file" là chuyện của WorldModelRenderer.addMonster, không phải của lớp này.
+        // "chưa có file" là chuyện của WorldModelRenderer.addMonsterOrNpc, không phải của lớp này.
         assertThat(MonsterModelKey.of("sample_boss")).isEqualTo("mob_sample-boss");
     }
 

@@ -54,7 +54,7 @@ final class MonsterPresenter {
 
     /** Quái vào tầm nhìn — gắn model nếu mã quái đó đã có art, ngược lại nó sẽ được vẽ bằng hộp. */
     void onSpawned(MonsterSpawnedEvent event) {
-        models.addMonster(event.getMonsterId(), MonsterModelKey.of(event.getMonsterCode()));
+        models.addMonsterOrNpc(event.getMonsterId(), MonsterModelKey.of(event.getMonsterCode()));
         motionTracker.onPositionUpdate(event.getMonsterId(), event.getX(), event.getY());
     }
 

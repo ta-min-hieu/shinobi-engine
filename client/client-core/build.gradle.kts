@@ -76,18 +76,19 @@ tasks.register<JavaExec>("runHudPreview") {
     doFirst { workingDir.mkdirs() }
 }
 
-// Xem trước quái bằng ảnh, không cần server (~5s). KHÔNG throwaway: mỗi lần thêm/sửa một model quái
-// là một lần cần nhìn lại hướng mặt, kích thước và dấu mục tiêu — thứ build gate không bắt được.
-tasks.register<JavaExec>("runMonsterPreview") {
+// Xem trước thế giới bằng ảnh, không cần server (~5s). KHÔNG throwaway: mỗi lần thêm/sửa một model
+// quái hay NPC là một lần cần nhìn lại hướng mặt, kích thước và dấu mục tiêu — thứ build gate không
+// bắt được.
+tasks.register<JavaExec>("runWorldPreview") {
     group = "verification"
-    description = "Chụp ảnh quái (model 3D, hộp thay thế, dấu mục tiêu) với dữ liệu giả."
+    description = "Chụp ảnh nhân vật/quái/NPC (model 3D, hộp thay thế, dấu mục tiêu) với dữ liệu giả."
     classpath = sourceSets["test"].runtimeClasspath
-    mainClass.set("dev.kage.client.core.world.MonsterModelPreviewTool")
+    mainClass.set("dev.kage.client.core.world.WorldModelPreviewTool")
     // cwd = gốc asset: Gdx.files.internal("models/med/...") tính từ đây (bài học asset-root-cwd).
     val assetRoot = rootProject.layout.projectDirectory.dir("assets/exported")
     workingDir = assetRoot.asFile
     // Ảnh ra ngoài cây asset — assets/exported là tài sản pipeline art, không phải chỗ đổ output.
-    systemProperty("kage.preview.out", layout.buildDirectory.dir("preview-monster").get().asFile.absolutePath)
+    systemProperty("kage.preview.out", layout.buildDirectory.dir("preview-world").get().asFile.absolutePath)
     doFirst { workingDir.mkdirs() }
 }
 

@@ -42,6 +42,8 @@ import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.MoveResponse;
+import dev.kage.protocol.NpcDespawnedEvent;
+import dev.kage.protocol.NpcSpawnedEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SkillResultEvent;
 import dev.kage.protocol.wire.PacketCodec;
@@ -111,6 +113,9 @@ public final class WorldScreen implements GameScreen {
 
     /** Toàn bộ phần hiển thị quái (model 3D, hộp thay thế, dấu mục tiêu) — xem {@link MonsterPresenter}. */
     private final MonsterPresenter monsterPresenter = new MonsterPresenter(models);
+
+    /** NPC — server phát {@code NpcSpawnedEvent} từ Phase 6, client mới đọc từ 2026-08-09. */
+    private final NpcPresenter npcPresenter = new NpcPresenter(models);
 
     private final CombatHudController combatHudController;
     private final CombatAnimationTrigger combatAnimationTrigger;
@@ -286,6 +291,10 @@ public final class WorldScreen implements GameScreen {
             onAttackResult(AttackResultEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE) {
             onSkillResult(SkillResultEvent.parseFrom(payload));
+        } else if (opcode == Opcode.OPCODE_NPC_SPAWNED_EVENT_VALUE) {
+            npcPresenter.onSpawned(NpcSpawnedEvent.parseFrom(payload));
+        } else if (opcode == Opcode.OPCODE_NPC_DESPAWNED_EVENT_VALUE) {
+            npcPresenter.onDespawned(NpcDespawnedEvent.parseFrom(payload).getNpcId());
         }
     }
 
@@ -579,6 +588,7 @@ public final class WorldScreen implements GameScreen {
     private void renderMonsters(Matrix4 projection) {
         monsterPresenter.render(
                 shapeRenderer, projection, combatHudController.monsters(), combatHudController.currentTargetId());
+        npcPresenter.render(shapeRenderer, projection);
     }
 
     private void syncCombatHud() {
@@ -623,6 +633,7 @@ public final class WorldScreen implements GameScreen {
         // Quái đi cùng lượt vẽ với nhân vật (cùng Scene list, cùng camera) — chỉ nguồn dữ liệu là
         // khác: chúng không có entity ECS phía client, xem MonsterPresenter.sync.
         monsterPresenter.sync(combatHudController.monsters(), localX);
+        npcPresenter.sync(localX);
         models.follow(localX, localY);
         models.render(Gdx.graphics.getDeltaTime());
     }
