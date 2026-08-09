@@ -3,8 +3,6 @@ package dev.kage.client.core.world;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import dev.kage.client.core.ui.hud.DialoguePanel;
-import dev.kage.protocol.AcceptQuestOutcome;
-import dev.kage.protocol.AcceptQuestResponse;
 import dev.kage.protocol.DialogueNodeResponse;
 import dev.kage.protocol.Opcode;
 
@@ -37,15 +35,20 @@ final class DialogueCoordinator {
     private final WorldCommandSender sender;
     private final CombatFeedbackPresenter feedback;
 
+    private final QuestCoordinator quests;
+
     /**
-     * @param feedback dùng để hiện thông báo nổi khi hội thoại kết thúc bằng một nhánh KHÔNG phải
-     *     node (nhận quest, mở cửa hàng) — cùng kênh với "Chưa chọn mục tiêu"/"Ngoài tầm đánh", nên
-     *     người chơi đọc mọi phản hồi tức thời ở cùng một chỗ.
+     * @param feedback hiện thông báo nổi khi hội thoại kết thúc bằng một nhánh KHÔNG phải node (mở
+     *     cửa hàng) — cùng kênh với "Chưa chọn mục tiêu"/"Ngoài tầm đánh", nên người chơi đọc mọi
+     *     phản hồi tức thời ở cùng một chỗ.
+     * @param quests nhận {@code action} của lựa chọn vừa bấm, để lấy mã nhiệm vụ.
      */
-    DialogueCoordinator(DialoguePanel panel, WorldCommandSender sender, CombatFeedbackPresenter feedback) {
+    DialogueCoordinator(
+            DialoguePanel panel, WorldCommandSender sender, CombatFeedbackPresenter feedback, QuestCoordinator quests) {
         this.panel = panel;
         this.sender = sender;
         this.feedback = feedback;
+        this.quests = quests;
         panel.setOnOptionSelected(this::onOptionSelected);
         // ESC chỉ dọn UI được; trạng thái hội thoại nằm ở controller nên phải dọn theo, nếu không
         // beginTalk lần sau sẽ bị chính cuộc cũ chặn lại (isOpen vẫn true) và NPC hoá ra "câm".
@@ -84,7 +87,10 @@ final class DialogueCoordinator {
             return false;
         }
         if (opcode == Opcode.OPCODE_ACCEPT_QUEST_RESPONSE_VALUE) {
-            onQuestAccepted(AcceptQuestResponse.parseFrom(payload));
+            // CHỈ đóng khung thoại. Việc cập nhật nhiệm vụ là của QuestCoordinator, và nó đã nhận
+            // cùng gói này TRƯỚC khi tới đây (xem WorldScreen.dispatch) — trả true ở đây không giấu
+            // mất gói của ai cả.
+            closePanel();
             return true;
         }
         if (opcode == Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE) {
@@ -102,29 +108,13 @@ final class DialogueCoordinator {
         panel.show(controller.textKey(), controller.optionLabelKeys());
     }
 
-    private void onQuestAccepted(AcceptQuestResponse response) {
-        closePanel();
-        feedback.showSelfNotice(noticeKeyFor(response.getOutcome()), colorFor(response.getOutcome()));
-    }
-
-    private static String noticeKeyFor(AcceptQuestOutcome outcome) {
-        return switch (outcome) {
-            case ACCEPT_QUEST_OUTCOME_OK -> "dialogue.notice.quest_accepted";
-            case ACCEPT_QUEST_OUTCOME_ALREADY_ACCEPTED -> "dialogue.notice.quest_already_accepted";
-            default -> "dialogue.notice.quest_failed";
-        };
-    }
-
-    private static com.badlogic.gdx.graphics.Color colorFor(AcceptQuestOutcome outcome) {
-        return outcome == AcceptQuestOutcome.ACCEPT_QUEST_OUTCOME_OK
-                ? FloatingCombatText.LEVEL_UP
-                : FloatingCombatText.MISS;
-    }
-
     private void onOptionSelected(int optionIndex) {
         if (!controller.isSelectableOption(optionIndex)) {
             return;
         }
+        // Mã nhiệm vụ chỉ có trong `action` của chính lựa chọn này — đọc TRƯỚC khi gửi, vì gói trả
+        // lời (AcceptQuestResponse) không mang mã, xem QuestCoordinator.
+        quests.onDialogueOptionSelected(controller.optionAction(optionIndex));
         sender.selectDialogueOption(controller.npcCode(), controller.currentNodeId(), optionIndex);
     }
 

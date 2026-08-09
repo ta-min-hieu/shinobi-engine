@@ -18,9 +18,10 @@ import dev.kage.protocol.DialogueOptionView;
  * tự tra lại {@code action} thật từ script theo chỉ số đó và KHÔNG tin client gửi thẳng action
  * (Điều 24). Gửi chỉ số kèm sai {@code current_node_id} là chọn nhầm nhánh của cây hội thoại.
  *
- * <p>Lớp này KHÔNG biết {@code action} nghĩa là gì — {@link DialogueOptionView#getAction()} có tới
- * trong gói và cố tình bị bỏ qua ở đây, đúng như dialogue.proto ghi ("chỉ để client hiển thị").
- * Hội thoại đi tiếp tới đâu là do gói TRẢ VỀ quyết định, không phải do client đoán trước.
+ * <p>Lớp này KHÔNG dùng {@code action} để điều hướng — hội thoại đi tiếp tới đâu là do gói TRẢ VỀ
+ * quyết định, không phải do client đoán trước từ {@link DialogueOptionView#getAction()}. Trường đó
+ * vẫn được GIỮ để đọc ({@link #optionAction}), đúng như dialogue.proto cho phép ("chỉ để client hiển
+ * thị"); cái bị cấm là gửi nó ngược lại server, và điều đó không xảy ra ở đâu cả.
  */
 final class DialogueController {
 
@@ -31,6 +32,17 @@ final class DialogueController {
     private String currentNodeId = "";
     private String textKey = "";
     private final List<String> optionLabelKeys = new ArrayList<>();
+
+    /**
+     * {@code action} của từng lựa chọn, song song với {@link #optionLabelKeys}.
+     *
+     * <p>Giữ lại CHỈ để đọc, không bao giờ gửi đi — dialogue.proto nói rõ trường này "chỉ để client
+     * hiển thị, KHÔNG gửi lại khi chọn". Người dùng thật của nó là {@code QuestCoordinator}: mã
+     * nhiệm vụ nằm trong {@code "accept_quest:<code>"} và KHÔNG có ở bất kỳ chỗ nào khác —
+     * {@code AcceptQuestResponse} chỉ mang {@code outcome}, nên không đọc ở đây thì client vĩnh viễn
+     * không biết mình vừa nhận nhiệm vụ nào.
+     */
+    private final List<String> optionActions = new ArrayList<>();
 
     /**
      * Người chơi vừa click một NPC — ghi nhớ mã NPC NGAY, trước khi server trả lời.
@@ -49,6 +61,7 @@ final class DialogueController {
         this.currentNodeId = "";
         this.textKey = "";
         optionLabelKeys.clear();
+        optionActions.clear();
         return true;
     }
 
@@ -57,8 +70,10 @@ final class DialogueController {
         currentNodeId = response.getNodeId();
         textKey = response.getTextKey();
         optionLabelKeys.clear();
+        optionActions.clear();
         for (DialogueOptionView option : response.getOptionsList()) {
             optionLabelKeys.add(option.getLabelKey());
+            optionActions.add(option.getAction());
         }
     }
 
@@ -73,6 +88,7 @@ final class DialogueController {
         currentNodeId = "";
         textKey = "";
         optionLabelKeys.clear();
+        optionActions.clear();
     }
 
     boolean isOpen() {
@@ -109,5 +125,13 @@ final class DialogueController {
      */
     boolean isSelectableOption(int index) {
         return isOpen() && index >= 0 && index < optionLabelKeys.size();
+    }
+
+    /**
+     * {@code action} của một lựa chọn — chuỗi RỖNG nếu chỉ số không hợp lệ. Xem
+     * {@link #optionActions} về việc chỉ được đọc, không được gửi lại.
+     */
+    String optionAction(int index) {
+        return isSelectableOption(index) ? optionActions.get(index) : "";
     }
 }

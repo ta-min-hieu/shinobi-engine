@@ -66,8 +66,16 @@ public final class CombatHud implements Disposable {
     private final Label skillNameLabel;
     private final TextButton attackButton;
 
+    /** Cụm nhiệm vụ (góc TRÊN-PHẢI) — ẩn hẳn khi không theo dõi nhiệm vụ nào. */
+    private final Table questGroup;
+
+    private final Label questNameLabel;
+    private final Label questStatusLabel;
+    private final TextButton claimQuestButton;
+
     private Runnable onSkillClicked;
     private Runnable onAttackClicked;
+    private Runnable onClaimQuestClicked;
 
     private int lastPlayerHp = -1;
     private int lastPlayerMaxHp = -1;
@@ -105,10 +113,15 @@ public final class CombatHud implements Disposable {
         this.skillButton = new TextButton("", skin.roundButtonStyle);
         this.attackButton = new TextButton("", skin.roundButtonStyle);
         this.skillNameLabel = new Label("", skin.statLabelStyle);
+        this.questNameLabel = new Label("", skin.labelStyle);
+        this.questStatusLabel = new Label("", skin.statLabelStyle);
+        this.claimQuestButton = new TextButton(i18n.get("quest.action.claim"), skin.buttonStyle);
+        this.questGroup = new Table();
 
-        // 4 Table độc lập cùng setFillParent(true) — mỗi cụm neo một góc, không có lưới chung.
+        // 5 Table độc lập cùng setFillParent(true) — mỗi cụm neo một góc, không có lưới chung.
         stage.addActor(anchored(buildPlayerCluster(), Align.topLeft));
         stage.addActor(anchored(buildTargetCluster(), Align.top));
+        stage.addActor(anchored(buildQuestCluster(), Align.topRight));
         stage.addActor(anchored(buildHintBar(), Align.bottom));
         stage.addActor(anchored(buildSkillCluster(), Align.bottomRight));
     }
@@ -160,6 +173,31 @@ public final class CombatHud implements Disposable {
         targetGroup.pad(8f);
         targetGroup.setVisible(false);
         return targetGroup;
+    }
+
+    /**
+     * Góc TRÊN-PHẢI: nhiệm vụ đang theo dõi + nút lĩnh thưởng.
+     *
+     * <p>KHÔNG có "đã giết 2/3": server cố ý không gửi tiến độ từng bước (quest.proto — chỉ phát
+     * khi quest VỪA chuyển COMPLETED, để không quá tải World tick), nên con số đó đơn giản là không
+     * tồn tại ở phía client. Hiện "Đang làm" là tất cả những gì nói được mà không bịa.
+     */
+    private Table buildQuestCluster() {
+        claimQuestButton.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                if (onClaimQuestClicked != null) {
+                    onClaimQuestClicked.run();
+                }
+            }
+        });
+        questGroup.setBackground(skin.panel);
+        questGroup.add(questNameLabel).row();
+        questGroup.add(questStatusLabel).padTop(2f).row();
+        questGroup.add(claimQuestButton).padTop(6f).growX();
+        questGroup.pad(8f);
+        questGroup.setVisible(false);
+        return questGroup;
     }
 
     /**
@@ -371,6 +409,37 @@ public final class CombatHud implements Disposable {
 
     public void setSkillReady(boolean ready) {
         skillButton.setDisabled(!ready); // Button tự chặn click khi disabled, không cần gate thêm.
+    }
+
+    /**
+     * Hiện nhiệm vụ đang theo dõi.
+     *
+     * @param questCode mã nhiệm vụ — tra tên hiển thị qua khoá {@code quest.name.<code>}; thiếu bản
+     *     dịch thì hiện chính mã, cùng lý do {@code DialoguePanel} làm vậy (nội dung nhiệm vụ nằm
+     *     trong script GraalJS phía server, bản dịch nằm ở client, hai nhịp cập nhật khác nhau).
+     * @param completed true = đã xong, bật nút lĩnh thưởng.
+     */
+    public void setQuest(String questCode, boolean completed) {
+        questNameLabel.setText(translateOrKey("quest.name." + questCode));
+        questStatusLabel.setText(i18n.get(completed ? "quest.status.completed" : "quest.status.in_progress"));
+        claimQuestButton.setVisible(completed);
+        questGroup.setVisible(true);
+    }
+
+    public void clearQuest() {
+        questGroup.setVisible(false);
+    }
+
+    public void setOnClaimQuestClicked(Runnable listener) {
+        this.onClaimQuestClicked = listener;
+    }
+
+    private String translateOrKey(String key) {
+        try {
+            return i18n.get(key);
+        } catch (java.util.MissingResourceException e) {
+            return key;
+        }
     }
 
     public Stage stage() {

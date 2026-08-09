@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 
 import dev.kage.client.core.net.GameConnection;
 import dev.kage.protocol.AttackCommand;
+import dev.kage.protocol.ClaimQuestRewardCommand;
 import dev.kage.protocol.JumpCommand;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.Opcode;
@@ -89,6 +90,21 @@ final class WorldCommandSender {
                 .setOptionIndex(optionIndex)
                 .build();
         send(Opcode.OPCODE_SELECT_DIALOGUE_OPTION_COMMAND_VALUE, command.toByteArray(), "SelectDialogueOptionCommand");
+    }
+
+    /**
+     * Lĩnh thưởng nhiệm vụ.
+     *
+     * @param idempotencyKey UUID do client sinh, GIỮ NGUYÊN qua các lần thử lại cùng một lần lĩnh
+     *     (ADR-025) — server enforce unique trong CÙNG transaction với hiệu ứng thật (EXP + vật phẩm
+     *     + đổi status), xem {@link QuestTracker#claimKey()}.
+     */
+    void claimQuestReward(String questCode, String idempotencyKey) {
+        ClaimQuestRewardCommand command = ClaimQuestRewardCommand.newBuilder()
+                .setQuestCode(questCode)
+                .setIdempotencyKey(idempotencyKey)
+                .build();
+        send(Opcode.OPCODE_CLAIM_QUEST_REWARD_COMMAND_VALUE, command.toByteArray(), "ClaimQuestRewardCommand");
     }
 
     /** Gói tin đến từ server — {@code null} khi hàng đợi rỗng (xem {@link GameConnection}). */

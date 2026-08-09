@@ -128,6 +128,9 @@ public final class WorldScreen implements GameScreen {
     /** Luồng hội thoại (trạng thái + mạng + panel) — xem {@link DialogueCoordinator}. */
     private final DialogueCoordinator dialogue;
 
+    /** Vòng đời nhiệm vụ: nhận → hoàn thành → lĩnh thưởng — xem {@link QuestCoordinator}. */
+    private final QuestCoordinator quests;
+
     /**
      * HUD trước, thế giới sau: {@code Stage} trả {@code true} ở {@code touchDown} CHỈ KHI có actor
      * thật nhận cú click, nên bấm nút skill không đồng thời bị hiểu là click chọn mục tiêu, còn
@@ -198,7 +201,8 @@ public final class WorldScreen implements GameScreen {
 
         // SAU combatFeedback: coordinator mượn nó để hiện thông báo khi hội thoại kết thúc bằng
         // nhánh nhận quest/mở cửa hàng.
-        this.dialogue = new DialogueCoordinator(dialoguePanel, sender, combatFeedback);
+        this.quests = new QuestCoordinator(combatHud, sender, combatFeedback);
+        this.dialogue = new DialogueCoordinator(dialoguePanel, sender, combatFeedback, quests);
 
         combatHud.setSkillLabel(combatHudController.skillNameKey());
         combatHud.setOnSkillClicked(this::onSkillButtonClicked);
@@ -256,7 +260,12 @@ public final class WorldScreen implements GameScreen {
         try {
             int opcode = frame.header().opcode();
             byte[] payload = frame.payload();
-            if (!dialogue.dispatch(opcode, payload) && !dispatchMovement(opcode, payload)) {
+            // quests TRƯỚC dialogue, và KHÔNG dùng else-if giữa hai cái: AcceptQuestResponse có
+            // nghĩa với CẢ HAI (cập nhật nhiệm vụ vs đóng khung thoại). Dừng ở cái đầu tiên trả true
+            // sẽ làm mất đúng một trong hai việc.
+            boolean handled = quests.dispatch(opcode, payload);
+            handled |= dialogue.dispatch(opcode, payload);
+            if (!handled && !dispatchMovement(opcode, payload)) {
                 dispatchCombat(opcode, payload);
             }
             // Opcode khác (VD PongResponse của heartbeat) — không thuộc gameplay world, bỏ qua.

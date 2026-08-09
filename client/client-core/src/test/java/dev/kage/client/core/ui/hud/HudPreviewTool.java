@@ -46,6 +46,9 @@ public final class HudPreviewTool extends ApplicationAdapter {
         // trước ở trạng thái hồi chiêu (nút xám) sẽ đánh giá sai độ nổi bật của nút.
         hud.setSkillState("hud.skill.fireball", 0f);
         hud.setSkillReady(true);
+        // Nhiệm vụ ĐÃ HOÀN THÀNH — trạng thái duy nhất có thêm nút, tức là trạng thái dễ vỡ bố cục
+        // nhất trong hai trạng thái của cụm này.
+        hud.setQuest("kill_training_dummies", true);
 
         // Khung hội thoại (2026-08-09) — ĐÚNG nội dung cây town_elder.js, để bố cục phải chịu đúng
         // độ dài câu tiếng Việt thật chứ không phải chuỗi ngắn tự bịa.

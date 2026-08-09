@@ -120,6 +120,19 @@ final class CombatFeedbackPresenter implements Disposable {
         floatingText.show(i18n.get(i18nKey), color, anchor);
     }
 
+    /**
+     * Như {@link #showSelfNotice} nhưng nhận chuỗi ĐÃ dựng sẵn.
+     *
+     * <p>Không phá luật "cấm hardcode chuỗi hiển thị": dùng cho những dòng mà phần chữ đến từ DỮ
+     * LIỆU server chứ không phải từ code — mã vật phẩm + số lượng của phần thưởng nhiệm vụ
+     * ({@code kunai x5}). Không có khoá i18n nào dịch được một mã do server đặt ra lúc chạy; bảng
+     * tên vật phẩm là việc của túi đồ, thứ client còn chưa có.
+     */
+    void showSelfText(String text, Color color) {
+        anchor.set(localPosition.x, localPosition.y, localPosition.z);
+        floatingText.show(text, color, anchor);
+    }
+
     /** Vừa lên cấp — {@code leveled_up} của {@code ExperienceChangedEvent}. */
     void showLevelUp() {
         showSelfNotice("hud.exp.level_up", FloatingCombatText.LEVEL_UP);
