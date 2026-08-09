@@ -1,12 +1,17 @@
 package dev.kage.client.core.ui.hud;
 
+import java.util.Locale;
+
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.Stack;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
+import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.I18NBundle;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
@@ -25,20 +30,27 @@ import dev.kage.client.core.ui.widget.HealthBar;
  */
 public final class CombatHud implements Disposable {
 
-    private static final float BAR_WIDTH = 200f;
-    private static final float BAR_HEIGHT = 24f;
+    private static final float BAR_WIDTH = 190f;
+    private static final float BAR_HEIGHT = 20f;
+    private static final float BADGE_SIZE = 52f;
+    private static final float SLOT_SIZE = 46f;
+    private static final float ACTION_BUTTON_SIZE = 96f;
 
     private final Stage stage;
     private final KageSkin skin;
     private final I18NBundle i18n;
 
+    private final Label levelLabel;
     private final HealthBar playerHealthBar;
     private final Label playerHpLabel;
+    private final HealthBar playerChiBar;
+    private final Label playerChiLabel;
     private final Table targetGroup;
     private final Label targetNameLabel;
     private final HealthBar targetHealthBar;
     private final Label targetHpLabel;
     private final TextButton skillButton;
+    private final Label skillNameLabel;
 
     private Runnable onSkillClicked;
 
@@ -47,28 +59,102 @@ public final class CombatHud implements Disposable {
     private String lastTargetCode;
     private int lastTargetHp = -1;
     private int lastTargetMaxHp = -1;
+    private String lastSkillText;
+    private int lastLevel = -1;
+    private int lastPlayerChi = -1;
+    private int lastPlayerMaxChi = -1;
 
+    /**
+     * Bố cục theo ảnh Ninja School Online chủ dự án gửi (2026-08-09): cụm chỉ số góc trên-trái, mục
+     * tiêu giữa-trên, gợi ý phím giữa-dưới, nút hành động tròn góc dưới-phải.
+     */
     public CombatHud() {
         this.stage = new Stage(new ScreenViewport(), new SpriteBatch());
         this.skin = new KageSkin();
         this.i18n = KageI18n.load();
 
+        this.levelLabel = new Label("1", skin.statLabelStyle);
         this.playerHealthBar = new HealthBar(skin);
-        this.playerHpLabel = new Label("", skin.labelStyle);
-        Table playerGroup = new Table();
-        playerGroup.add(playerHealthBar).size(BAR_WIDTH, BAR_HEIGHT).row();
-        playerGroup.add(playerHpLabel).padTop(2f);
-
+        this.playerHpLabel = new Label("", skin.statLabelStyle);
+        this.playerChiBar = new HealthBar(skin, HealthBar.Kind.CHI);
+        this.playerChiLabel = new Label("", skin.statLabelStyle);
         this.targetNameLabel = new Label("", skin.labelStyle);
         this.targetHealthBar = new HealthBar(skin);
-        this.targetHpLabel = new Label("", skin.labelStyle);
+        this.targetHpLabel = new Label("", skin.statLabelStyle);
         this.targetGroup = new Table();
-        targetGroup.add(targetNameLabel).row();
-        targetGroup.add(targetHealthBar).size(BAR_WIDTH, BAR_HEIGHT).row();
-        targetGroup.add(targetHpLabel).padTop(2f);
-        targetGroup.setVisible(false);
+        this.skillButton = new TextButton("", skin.roundButtonStyle);
+        this.skillNameLabel = new Label("", skin.statLabelStyle);
 
-        this.skillButton = new TextButton("", skin.buttonStyle);
+        // 4 Table độc lập cùng setFillParent(true) — mỗi cụm neo một góc, không có lưới chung.
+        stage.addActor(anchored(buildPlayerCluster(), Align.topLeft));
+        stage.addActor(anchored(buildTargetCluster(), Align.top));
+        stage.addActor(anchored(buildHintBar(), Align.bottom));
+        stage.addActor(anchored(buildSkillCluster(), Align.bottomRight));
+    }
+
+    /** Bọc một cụm vào {@link Table} phủ toàn màn hình, neo về góc {@code align}. */
+    private static Table anchored(Table content, int align) {
+        Table container = new Table();
+        container.setFillParent(true);
+        container.align(align).add(content).pad(14f);
+        return container;
+    }
+
+    /** Góc TRÊN-TRÁI: huy hiệu cấp (tròn) + thanh Máu + thanh Khí. */
+    private Table buildPlayerCluster() {
+        levelLabel.setAlignment(Align.center);
+        Table levelBadge = new Table();
+        levelBadge.setBackground(skin.roundButton);
+        levelBadge.add(levelLabel);
+
+        // Số ĐÈ LÊN thanh (Stack) thay vì nằm dòng riêng — giống bản gốc, tiết kiệm chiều cao.
+        Table bars = new Table();
+        bars.add(overlay(playerHealthBar, playerHpLabel))
+                .size(BAR_WIDTH, BAR_HEIGHT)
+                .row();
+        bars.add(overlay(playerChiBar, playerChiLabel))
+                .size(BAR_WIDTH, BAR_HEIGHT)
+                .padTop(4f);
+
+        Table cluster = new Table();
+        cluster.setBackground(skin.panel);
+        cluster.add(levelBadge).size(BADGE_SIZE).padRight(8f);
+        cluster.add(bars);
+        cluster.pad(8f);
+        return cluster;
+    }
+
+    /** GIỮA-TRÊN: tên + thanh máu mục tiêu. Ẩn cho tới khi có mục tiêu. */
+    private Table buildTargetCluster() {
+        targetGroup.setBackground(skin.panel);
+        targetGroup.add(targetNameLabel).row();
+        targetGroup
+                .add(overlay(targetHealthBar, targetHpLabel))
+                .size(BAR_WIDTH, BAR_HEIGHT)
+                .padTop(4f);
+        targetGroup.pad(8f);
+        targetGroup.setVisible(false);
+        return targetGroup;
+    }
+
+    /**
+     * GIỮA-DƯỚI: ô vuông kiểu thanh skill, nội dung là phím điều khiển. Bản gốc có 5 ô skill; ở đây
+     * mới có 1 skill chủ động nên dùng chỗ này để nói cho người chơi biết phím nào làm gì (trước đó
+     * không có chỗ nào nói cả).
+     *
+     * <p>Nhãn tiếng Việt qua i18n, KHÔNG dùng ký tự mũi tên ←/→: font Be Vietnam Pro không có glyph
+     * đó nên chữ bị cắt cụt (đã thấy thật trên ảnh chụp preview).
+     */
+    private Table buildHintBar() {
+        Table hintBar = new Table();
+        hintBar.add(hintSlot(i18n.get("hud.hint.left"))).size(SLOT_SIZE).padRight(8f);
+        hintBar.add(hintSlot(i18n.get("hud.hint.right"))).size(SLOT_SIZE).padRight(8f);
+        hintBar.add(hintSlot(i18n.get("hud.hint.jump"))).size(SLOT_SIZE);
+        return hintBar;
+    }
+
+    /** GÓC DƯỚI-PHẢI: nút hành động tròn (như nút đánh của bản gốc) + biển tên skill phía trên. */
+    private Table buildSkillCluster() {
         skillButton.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -77,37 +163,82 @@ public final class CombatHud implements Disposable {
                 }
             }
         });
+        skillNameLabel.setAlignment(Align.center);
+        // Khung nền cho tên skill — chữ trần trên nền map sáng (cỏ/tuyết) gần như không đọc được.
+        Table skillNamePlate = new Table();
+        skillNamePlate.setBackground(skin.panel);
+        skillNamePlate.add(skillNameLabel).pad(4f);
 
-        // 3 Table độc lập, mỗi cái setFillParent(true) — HUD combat tối thiểu này không có bố cục
-        // chung dạng lưới (thanh máu mình góc trên-trái, mục tiêu giữa-trên, nút skill giữa-dưới).
-        Table playerContainer = new Table();
-        playerContainer.setFillParent(true);
-        playerContainer.top().left().add(playerGroup).pad(16f);
+        Table cluster = new Table();
+        cluster.add(skillNamePlate).padBottom(6f).row();
+        cluster.add(skillButton).size(ACTION_BUTTON_SIZE);
+        return cluster;
+    }
 
-        Table targetContainer = new Table();
-        targetContainer.setFillParent(true);
-        targetContainer.top().add(targetGroup).padTop(16f);
+    /** Chồng nhãn số lên giữa thanh — kiểu Ninja School, số nằm TRONG thanh chứ không dưới thanh. */
+    private static Stack overlay(HealthBar bar, Label label) {
+        label.setAlignment(Align.center);
+        Stack stack = new Stack();
+        stack.add(bar);
+        stack.add(label);
+        return stack;
+    }
 
-        Table skillContainer = new Table();
-        skillContainer.setFillParent(true);
-        skillContainer.bottom().add(skillButton).size(120f, 48f).padBottom(24f);
-
-        stage.addActor(playerContainer);
-        stage.addActor(targetContainer);
-        stage.addActor(skillContainer);
+    /** Ô vuông gợi ý phím — hình dáng giống ô skill của bản gốc, nội dung là phím điều khiển. */
+    private Table hintSlot(String text) {
+        Label label = new Label(text, skin.statLabelStyle);
+        label.setAlignment(Align.center);
+        label.setFontScale(0.65f);
+        Table slot = new Table();
+        slot.setBackground(skin.slot);
+        slot.add(label).expand().center();
+        return slot;
     }
 
     public void setOnSkillClicked(Runnable callback) {
         this.onSkillClicked = callback;
     }
 
-    /**
-     * Đặt nhãn nút skill theo i18n key — gọi 1 lần lúc khởi tạo màn hình (caller đã biết hệ phái
-     * người chơi ngay từ đầu, không đổi giữa chừng như HP/mục tiêu nên không cần cache "lastValue"
-     * như các setter khác trong lớp này).
-     */
+    /** Cấp nhân vật hiện trên huy hiệu tròn góc trên-trái. */
+    public void setLevel(int level) {
+        if (level == lastLevel) {
+            return; // UI.md §9
+        }
+        lastLevel = level;
+        levelLabel.setText(String.valueOf(level));
+    }
+
+    public void setPlayerChi(int current, int max) {
+        if (current == lastPlayerChi && max == lastPlayerMaxChi) {
+            return; // UI.md §9
+        }
+        lastPlayerChi = current;
+        lastPlayerMaxChi = max;
+        playerChiBar.setValues(current, max);
+        playerChiLabel.setText(current + " / " + max);
+    }
+
+    /** Đặt nhãn nút skill theo i18n key, trạng thái sẵn sàng — xem {@link #setSkillState}. */
     public void setSkillLabel(String i18nKey) {
-        skillButton.setText(i18n.get(i18nKey));
+        setSkillState(i18nKey, 0f);
+    }
+
+    /**
+     * Nhãn nút skill kèm ĐẾM NGƯỢC hồi chiêu — người chơi thấy được đang dùng skill nào VÀ khi nào
+     * dùng lại được. Trước đó nút chỉ mang tên tĩnh: bấm xong không có phản hồi nào trên màn hình,
+     * không phân biệt được "đã dùng, đang hồi" với "bấm hụt" (chủ dự án phản hồi thật 2026-08-09,
+     * cùng lượt với việc hiệu ứng skill chưa từng được vẽ — xem {@code SkillVfxRenderer}).
+     */
+    public void setSkillState(String i18nKey, float cooldownRemainingSeconds) {
+        skillNameLabel.setText(i18n.get(i18nKey));
+        // Nút TRÒN nhỏ không đủ chỗ cho tên + số: tên nằm nhãn phía trên, trong nút chỉ còn đếm
+        // ngược (rỗng khi sẵn sàng — nút sáng lên là đủ tín hiệu "dùng được").
+        String text = cooldownRemainingSeconds > 0f ? String.format(Locale.ROOT, "%.1f", cooldownRemainingSeconds) : "";
+        if (text.equals(lastSkillText)) {
+            return; // UI.md §9 — chỉ setText khi giá trị thực sự đổi.
+        }
+        lastSkillText = text;
+        skillButton.setText(text);
     }
 
     public void setPlayerHp(int current, int max) {
@@ -151,6 +282,14 @@ public final class CombatHud implements Disposable {
 
     public Stage stage() {
         return stage;
+    }
+
+    /**
+     * Font dùng chung của HUD — cho {@code FloatingCombatText} MƯỢN để vẽ số damage, tránh nạp một
+     * bản font thứ hai. HUD vẫn giữ quyền sở hữu: người mượn KHÔNG được dispose.
+     */
+    public BitmapFont font() {
+        return skin.font();
     }
 
     public void resize(int width, int height) {

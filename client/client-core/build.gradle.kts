@@ -60,3 +60,28 @@ tasks.register<JavaExec>("runFrameBenchmark") {
         workingDir.mkdirs()
     }
 }
+
+// THROWAWAY (2026-08-09) — chẩn đoán báo cáo "nhân vật bị lộn ngược" sau khi wire clip jump
+// (ADR-033). Xoá cùng CharacterOrientationDebugTool.java sau khi dùng xong, cùng tinh thần
+// runFrameBenchmark phía trên (ảnh chụp thật, không suy đoán — RENDERING.md §11.1).
+// THROWAWAY (2026-08-09) — xem trước bố cục HUD bằng ảnh, không cần chạy server. Xoá cùng
+// HudPreviewTool.java khi giao diện đã chốt.
+tasks.register<JavaExec>("runHudPreview") {
+    group = "verification"
+    description = "Chụp ảnh bố cục CombatHud với dữ liệu giả (THROWAWAY)."
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("dev.kage.client.core.ui.hud.HudPreviewTool")
+    val assetRoot = rootProject.layout.projectDirectory.dir("assets/exported")
+    workingDir = assetRoot.asFile
+    doFirst { workingDir.mkdirs() }
+}
+
+tasks.register<JavaExec>("runOrientationDebug") {
+    group = "verification"
+    description = "Chụp clip idle + jump của model để chẩn đoán bug lộn ngược (THROWAWAY)."
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("dev.kage.client.core.world.CharacterOrientationDebugTool")
+    val assetRoot = rootProject.layout.projectDirectory.dir("assets/exported")
+    workingDir = assetRoot.asFile
+    doFirst { workingDir.mkdirs() }
+}

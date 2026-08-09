@@ -51,13 +51,23 @@ public final class VerticalMovementSystem extends IteratingKSystem {
     protected void processEntity(KEntity entity, float deltaTime) {
         PositionComponent pos = POSITION.get(entity);
         pos.prevZ = pos.z;
+
         if (pos.grounded && pos.vz == 0f) {
-            return; // Đường tắt cho đa số entity (đứng yên trên đất) — không tính gì mỗi tick.
+            // Đang đứng yên theo trục dọc — nhưng PHẢI kiểm tra mặt đỡ ngay dưới vị trí (x, y) HIỆN
+            // TẠI, không được thoát sớm vô điều kiện: entity đi ngang (MovementSystem chạy TRƯỚC hệ
+            // này trong cùng tick) có thể vừa rời khỏi mép bệ. Thoát sớm ở đó = đi ra khỏi bệ vẫn
+            // lơ lửng giữa không trung mãi mãi, vì không tick nào bật lại được trọng lực.
+            if (pos.z <= groundSurfaceBelow(pos.x, pos.y, pos.z)) {
+                return; // Vẫn có bệ/mặt đất đỡ — đường tắt thật sự (đa số entity mỗi tick).
+            }
+            pos.grounded = false; // Vừa rời mép bệ — bắt đầu rơi ngay tick này.
         }
 
         pos.vz -= gravityMps2 * deltaTime;
         pos.z += pos.vz * deltaTime;
 
+        // Dùng prevZ (độ cao ĐẦU tick) chứ không phải z mới: entity rơi nhanh có thể vượt qua cả
+        // mặt bệ trong 1 tick, xét theo prevZ mới bắt được bệ nó đã "xuyên" qua (chống tunnel).
         float surface = groundSurfaceBelow(pos.x, pos.y, pos.prevZ);
         if (pos.z <= surface) {
             pos.z = surface;

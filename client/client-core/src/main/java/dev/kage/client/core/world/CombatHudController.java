@@ -172,6 +172,15 @@ final class CombatHudController {
         return playerHp;
     }
 
+    /** Khí hiện tại — HUD kiểu Ninja School hiện thanh Khí ngay dưới thanh Máu. */
+    int playerChi() {
+        return playerChi;
+    }
+
+    int playerMaxChi() {
+        return CombatConstants.CHARACTER_MAX_CHI;
+    }
+
     int playerMaxHp() {
         return CombatConstants.CHARACTER_MAX_HP;
     }

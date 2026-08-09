@@ -22,6 +22,12 @@ final class WorldConstants {
 
     static final float BOX_SIZE = 1f;
 
+    /**
+     * Chiều cao khối thay thế của quái (ADR-033) — quái CHƯA có model 3D, vẽ bằng khối đứng cao
+     * xấp xỉ nhân vật (~1.8) để nhìn ra là một sinh vật đứng trên đất, không phải vệt phẳng.
+     */
+    static final float MONSTER_HEIGHT_UNITS = 1.6f;
+
     static final float VIEWPORT_HEIGHT_UNITS = 10f;
 
     /**

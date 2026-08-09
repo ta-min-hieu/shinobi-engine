@@ -10,6 +10,8 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Matrix4;
+import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.utils.I18NBundle;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -20,6 +22,7 @@ import dev.kage.client.core.input.GameAction;
 import dev.kage.client.core.input.InputMapper;
 import dev.kage.client.core.net.GameConnection;
 import dev.kage.client.core.ui.hud.CombatHud;
+import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.engine.core.GameScreen;
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.EcsWorld;
@@ -85,16 +88,26 @@ public final class WorldScreen implements GameScreen {
      */
     private final long localCharacterId;
 
+    /** Cấp nhân vật, chụp lúc chọn nhân vật — chưa có gói lên cấp giữa trận nên không đổi runtime. */
+    private final int characterLevel;
+
     private final OrthographicCamera camera = new OrthographicCamera();
     private final Viewport viewport;
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
     // MEDIUM tường minh — bản cài đóng gói đúng 1 tier mặc định theo ADR-028, không phải để trống
     // dựa vào default ngầm (không có default: CharacterModelRenderer bắt buộc tham số tier).
     private final CharacterModelRenderer models = new CharacterModelRenderer(GraphicsTier.MEDIUM);
+    private final SkillVfxRenderer skillVfx = new SkillVfxRenderer(GraphicsTier.MEDIUM);
 
     private final CombatHudController combatHudController;
     private final CombatAnimationTrigger combatAnimationTrigger;
     private final CombatHud combatHud = new CombatHud();
+    private final FloatingCombatText floatingText = new FloatingCombatText(combatHud.font());
+    // Bundle RIÊNG đúng quy ước KageI18n (mỗi nơi tự nạp, không dùng chung instance) — cần cho nhãn
+    // "Né!" của số damage bay lên.
+    private final I18NBundle i18n = KageI18n.load();
+    // Biến tạm TÁI DÙNG cho điểm neo số damage — show() sao chép giá trị ngay nên an toàn (Điều 31).
+    private final Vector3 combatNumberAnchor = new Vector3();
 
     private float lastSentDirX;
     // Edge-detection cho JUMP (ADR-033) — GameAction.JUMP là "đang giữ", nhưng nhảy chỉ áp lực 1
@@ -117,6 +130,7 @@ public final class WorldScreen implements GameScreen {
         this.inputMapper = context.inputMapper();
         this.connection = connection;
         this.localCharacterId = character.getId();
+        this.characterLevel = character.getLevel();
         this.combatHudController = new CombatHudController(character.getId(), character.getFaction());
         this.combatAnimationTrigger =
                 new CombatAnimationTrigger(models, localCharacterId, LOCAL_CHARACTER_ID, remoteCharacters::containsKey);
@@ -126,7 +140,11 @@ public final class WorldScreen implements GameScreen {
         world.addSystem(new MovementSystem());
         // ADR-033 — trục dọc chạy CÙNG công thức server (WorldConstants.GRAVITY_MPS2 phải khớp)
         // để dự đoán cục bộ (CLIENT.md §6) khớp server, cùng lý do MovementSystem đã có ở trên.
-        world.addSystem(new VerticalMovementSystem(WorldConstants.GRAVITY_MPS2));
+        VerticalMovementSystem verticalMovementSystem = new VerticalMovementSystem(WorldConstants.GRAVITY_MPS2);
+        // Cùng bộ bệ với server (WorldFacade.DEMO_PLATFORMS) — BẮT BUỘC, xem javadoc
+        // DemoPlatforms.physics() về hậu quả nếu thiếu (nhân vật rơi xuyên bệ ở phía client).
+        verticalMovementSystem.setPlatforms(DemoPlatforms.physics());
+        world.addSystem(verticalMovementSystem);
 
         // Spawn (0,0) khớp mặc định server-world.WorldConstants.SPAWN_X/Y — chưa có persistence
         // vị trí (server-world follow-up), MoveResponse đầu tiên sẽ tự sửa nếu lệch.
@@ -160,6 +178,7 @@ public final class WorldScreen implements GameScreen {
         viewport.update(width, height, true);
         models.resize(camera.viewportWidth, camera.viewportHeight);
         combatHud.resize(width, height);
+        floatingText.resize(width, height);
     }
 
     @Override
@@ -238,12 +257,60 @@ public final class WorldScreen implements GameScreen {
     private void onAttackResult(AttackResultEvent event) {
         combatHudController.onAttackResult(event);
         combatAnimationTrigger.onAttackResult(event);
+        showCombatNumber(event.getTargetEntityId(), event.getDamage(), event.getIsMiss());
     }
 
     /** Kết quả 1 lần dùng skill THẬT — cùng hình dạng {@link AttackResultEvent}. */
     private void onSkillResult(SkillResultEvent event) {
         combatHudController.onSkillResult(event);
         combatAnimationTrigger.onSkillResult(event);
+        playSkillVfxAtTarget(event.getSkillCode(), event.getTargetEntityId());
+        showCombatNumber(event.getTargetEntityId(), event.getDamage(), event.getIsMiss());
+    }
+
+    /**
+     * Số damage bay lên tại vị trí mục tiêu. Màu phân biệt NGAY không cần đọc số: vàng = mình gây
+     * ra, đỏ = mình phải chịu, xám = né. Mục tiêu ngoài tầm theo dõi (nhân vật khác) thì bỏ qua —
+     * không có vị trí để neo, và số của người khác cũng không phải thứ người chơi cần thấy.
+     */
+    private void showCombatNumber(long targetEntityId, int damage, boolean miss) {
+        boolean targetIsSelf = targetEntityId == localCharacterId;
+        if (targetIsSelf) {
+            PositionComponent pos = POSITION.get(localPlayer);
+            combatNumberAnchor.set(pos.x, pos.y, pos.z);
+        } else {
+            CombatHudController.MonsterState monster =
+                    combatHudController.monsters().get(targetEntityId);
+            if (monster == null) {
+                return;
+            }
+            combatNumberAnchor.set(monster.x(), monster.y(), 0f);
+        }
+
+        if (miss) {
+            floatingText.show(i18n.get("hud.combat.miss"), FloatingCombatText.MISS, combatNumberAnchor);
+            return;
+        }
+        Color color = targetIsSelf ? FloatingCombatText.DAMAGE_TAKEN : FloatingCombatText.DAMAGE_DEALT;
+        floatingText.show("-" + damage, color, combatNumberAnchor);
+    }
+
+    /**
+     * Phát hiệu ứng skill tại vị trí MỤC TIÊU. Mục tiêu có thể là quái (id âm — tra
+     * {@code combatHudController}) hoặc chính mình (id dương khớp {@link #localCharacterId}); id lạ
+     * (nhân vật khác ngoài tầm theo dõi) thì bỏ qua, không đoán vị trí.
+     */
+    private void playSkillVfxAtTarget(String skillCode, long targetEntityId) {
+        if (targetEntityId == localCharacterId) {
+            PositionComponent pos = POSITION.get(localPlayer);
+            skillVfx.play(skillCode, pos.x, pos.y, pos.z);
+            return;
+        }
+        CombatHudController.MonsterState monster =
+                combatHudController.monsters().get(targetEntityId);
+        if (monster != null) {
+            skillVfx.play(skillCode, monster.x(), monster.y(), 0f);
+        }
     }
 
     private void onMoveResponse(MoveResponse response) {
@@ -388,6 +455,11 @@ public final class WorldScreen implements GameScreen {
         // trước ADR-033 (khi còn 2 trục, đi chéo cần chia cho sqrt(2)).
         float normalizedDirX = dirX;
 
+        // Quay mặt theo chiều đi; dirX == 0 (đứng yên) GIỮ NGUYÊN hướng cũ, không quay về mặc định.
+        if (normalizedDirX != 0f) {
+            models.setCharacterFacingRight(LOCAL_CHARACTER_ID, normalizedDirX > 0f);
+        }
+
         VelocityComponent velocity = VELOCITY.get(localPlayer);
         velocity.x = normalizedDirX * WorldConstants.MOVE_SPEED_MPS;
         velocity.y = 0f;
@@ -448,9 +520,17 @@ public final class WorldScreen implements GameScreen {
         if (models.isEnabled()) {
             renderModels(alpha);
             drawMonsters(models.combined());
+            DemoPlatforms.render(shapeRenderer, models.combined());
+            // VFX vẽ SAU cùng trong nhánh 3D — hiệu ứng luôn hiện đè lên nhân vật/địa hình, đúng
+            // thứ tự "nhân vật vẽ trước, VFX vẽ đè sau" của RENDERING.md §2.
+            skillVfx.render(Gdx.graphics.getDeltaTime(), models.combined());
+            floatingText.render(Gdx.graphics.getDeltaTime(), models::project);
         } else {
             renderPlaceholderBoxes(alpha);
             drawMonsters(camera.combined);
+            DemoPlatforms.render(shapeRenderer, camera.combined);
+            skillVfx.render(Gdx.graphics.getDeltaTime(), camera.combined);
+            floatingText.render(Gdx.graphics.getDeltaTime(), camera::project);
         }
 
         syncCombatHud();
@@ -467,27 +547,38 @@ public final class WorldScreen implements GameScreen {
         if (currentMonsters.isEmpty()) {
             return;
         }
+        // Depth test như DemoPlatforms — khối quái phải che/bị che đúng với nhân vật và bậc.
+        Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
         shapeRenderer.setProjectionMatrix(projection);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
         shapeRenderer.setColor(Color.SCARLET);
         for (CombatHudController.MonsterState monster : currentMonsters.values()) {
-            shapeRenderer.rect(
+            // Khối ĐỨNG (cao theo trục Z) chứ không phải hình chữ nhật nằm trên mặt phẳng XY: từ
+            // ADR-033 camera nhìn gần như ngang, hình nằm phẳng chiếu ra chỉ còn một vệt mỏng gần
+            // như vô hình. `box` nhận toạ độ GÓC và tự đảo dấu depth (xem DemoPlatforms).
+            shapeRenderer.box(
                     monster.x() - (WorldConstants.BOX_SIZE / 2f),
                     monster.y() - (WorldConstants.BOX_SIZE / 2f),
+                    WorldConstants.MONSTER_HEIGHT_UNITS,
                     WorldConstants.BOX_SIZE,
-                    WorldConstants.BOX_SIZE);
+                    WorldConstants.BOX_SIZE,
+                    WorldConstants.MONSTER_HEIGHT_UNITS);
         }
         shapeRenderer.end();
+        Gdx.gl.glDisable(GL20.GL_DEPTH_TEST);
     }
 
     private void syncCombatHud() {
         combatHud.setPlayerHp(combatHudController.playerHp(), combatHudController.playerMaxHp());
+        combatHud.setPlayerChi(combatHudController.playerChi(), combatHudController.playerMaxChi());
+        combatHud.setLevel(characterLevel);
         CombatHudController.MonsterState target = combatHudController.targetState();
         if (target != null) {
             combatHud.setTarget(target.code(), target.hp(), target.maxHp());
         } else {
             combatHud.clearTarget();
         }
+        combatHud.setSkillState(combatHudController.skillNameKey(), combatHudController.skillCooldownRemaining());
         combatHud.setSkillReady(combatHudController.canUseSkill());
     }
 
@@ -575,6 +666,10 @@ public final class WorldScreen implements GameScreen {
     public void dispose() {
         shapeRenderer.dispose();
         models.dispose();
+        skillVfx.dispose();
+        // TRƯỚC combatHud: floatingText mượn font của HUD, dispose HUD trước là kéo font ra khỏi
+        // dưới chân nó (dù ở đây floatingText không dùng font lúc dispose, giữ đúng thứ tự sở hữu).
+        floatingText.dispose();
         combatHud.dispose();
     }
 }

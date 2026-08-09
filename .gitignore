@@ -53,3 +53,7 @@ assets/exported/
 # Protobuf generated (sinh lúc build, không commit — TECHNOLOGY-STACK.md §5)
 **/generated/
 **/generated-sources/
+
+# Ảnh chụp của công cụ chẩn đoán render/HUD (runOrientationDebug, runHudPreview) — sinh lại được
+# bất cứ lúc nào, chỉ dùng để đối chiếu bằng mắt trong lúc sửa, không phải tài sản dự án.
+.debug-orientation/

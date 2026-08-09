@@ -18,7 +18,9 @@ import dev.kage.engine.ecs.EcsWorld;
 import dev.kage.engine.ecs.KEntity;
 import dev.kage.engine.ecs.component.PositionComponent;
 import dev.kage.engine.ecs.component.VelocityComponent;
+import dev.kage.engine.ecs.system.Aabb;
 import dev.kage.engine.ecs.system.MovementSystem;
+import dev.kage.engine.ecs.system.Platform;
 import dev.kage.engine.ecs.system.TerrainCollisionSystem;
 import dev.kage.engine.ecs.system.TriggerZoneSystem;
 import dev.kage.engine.ecs.system.VerticalMovementSystem;
@@ -68,10 +70,23 @@ public final class WorldFacade {
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
     private static final ComponentMapper<ChiComponent> CHI = ComponentMapper.getFor(ChiComponent.class);
 
-    // Quái bù nhìn tập luyện — lát cắt 1 Phase 4, hardcode 1 quái, chưa có monster_template DB.
+    // Quái bù nhìn tập luyện — hardcode, chưa có monster_template DB.
     private static final String TRAINING_DUMMY_CODE = "training_dummy";
-    private static final float TRAINING_DUMMY_SPAWN_X = 5f;
-    private static final float TRAINING_DUMMY_SPAWN_Y = 5f;
+
+    /**
+     * Vị trí X của các quái, đặt RẢI dọc đường chơi ({@code y = CHARACTER_PLAY_LINE_Y}).
+     *
+     * <p>⚠️ Trước ADR-033 chỉ có 1 quái ở {@code (5, 5)} — sau khi di chuyển bị khoá vào trục X,
+     * người chơi (luôn {@code y=0}) KHÔNG BAO GIỜ tới gần hơn 5m được, trong khi tầm đánh chỉ
+     * {@code CombatConstants.ATTACK_RANGE_METERS} = 2m. Combat chỉ còn "hoạt động" nhờ quái tự đuổi
+     * theo tới tận nơi — người chơi không thể chủ động tấn công. Đặt đúng đường chơi là hệ quả bắt
+     * buộc của việc thu trục, không phải thêm nội dung tuỳ hứng.
+     *
+     * <p>Xen kẽ với bậc nhảy demo ({@link #DEMO_PLATFORMS}: 3-7, 9-13, 15-19) để vừa đánh vừa leo,
+     * và cách điểm hồi sinh {@code (0,0)} xa hơn {@code AiConstants.AGGRO_RADIUS_METERS} (6m) để
+     * nhân vật vừa hồi sinh không bị đánh ngay.
+     */
+    private static final float[] MONSTER_SPAWN_X = {8f, 14f, 21f, 27f};
 
     // Điểm hồi sinh mặc định (chưa có khái niệm "điểm hồi sinh theo khu vực"/thị trấn — MVP đầu
     // tiên, xem ROADMAP.md Phase 10). Cách quái bù nhìn (5,5) ~7.07m — NGOÀI AiConstants
@@ -79,11 +94,40 @@ public final class WorldFacade {
     private static final float CHARACTER_RESPAWN_X = 0f;
     private static final float CHARACTER_RESPAWN_Y = 0f;
 
+    /**
+     * Toạ độ Y DUY NHẤT mà nhân vật người chơi tồn tại (ADR-033 — di chuyển chỉ còn trục X). Mọi
+     * địa hình/bệ định nghĩa quanh giá trị này; xem {@link #handleAttach} về lý do ép cứng.
+     */
+    private static final float CHARACTER_PLAY_LINE_Y = 0f;
+
     // NPC tĩnh mẫu — lát cắt 1 Phase 6, hardcode 1 NPC, chưa có npc_template DB (cùng lý do
     // TRAINING_DUMMY chưa đọc monster_template). Vị trí khác quái để dễ phân biệt lúc test bằng tay.
     private static final String SAMPLE_NPC_CODE = "town_elder";
+    // ADR-033 — PHẢI nằm trên đường chơi: NPC là entity TĨNH (không đuổi theo như quái), nên đặt
+    // lệch khỏi y=0 nghĩa là người chơi vĩnh viễn không bao giờ tới đủ gần để tương tác.
     private static final float SAMPLE_NPC_SPAWN_X = -5f;
-    private static final float SAMPLE_NPC_SPAWN_Y = -5f;
+    private static final float SAMPLE_NPC_SPAWN_Y = CHARACTER_PLAY_LINE_Y;
+
+    // Bệ demo (ADR-033 "Việc cần làm tiếp theo" #7 — hardcode thủ công để chủ dự án TỰ TEST chạy
+    // nhảy leo bậc, KHÔNG phải map pilot thật/art chốt; việc đó vẫn còn mở).
+    //
+    // THANG BẬC NỔI, đi lên được bằng nhảy nối tiếp — số liệu tính từ WorldConstants: đỉnh nhảy lý
+    // thuyết = JUMP_VELOCITY_MPS²/(2·GRAVITY_MPS2) = 7²/40 = 1.225m mỗi lần nhảy, tầm bay ngang
+    // ≈ MOVE_SPEED_MPS × 2·JUMP_VELOCITY_MPS/GRAVITY_MPS2 = 5 × 0.7 = 3.5m. Nên: bậc 1 (0.8m) với
+    // tới từ mặt đất; bậc 2 (1.5m) với tới từ bậc 1 (0.8+1.225=2.02); bậc 3 (2.2m) từ bậc 2
+    // (1.5+1.225=2.72). Khe hở 2m giữa các bậc < 3.5m tầm bay ⇒ nhảy qua được.
+    //
+    // ⚠️ Bệ NỔI trên không, cố ý: VerticalMovementSystem chỉ chặn khi entity RƠI TỪ TRÊN XUỐNG
+    // (one-way platform, giống Ninja School), còn TerrainCollisionSystem thì chưa biết trục Z nên
+    // không chặn được cạnh bên theo độ cao. Bệ đặt sát đất sẽ khiến nhân vật đi XUYÊN qua khối đặc
+    // trông như lỗi; bệ nổi thì "đi bên dưới" là hành vi đúng và dễ hiểu.
+    // Bề sâu theo Y chỉ 1.5m (±0.75 quanh đường chơi y=0): đủ để contains(x, 0) luôn đúng, nhưng
+    // không dày tới mức khối chiếu ra màn hình thành mảng cao che mất nhân vật (camera ngẩng 30°
+    // biến bề sâu Y thành chiều cao trên màn — đã thấy thật qua ảnh chụp lúc để ±2m).
+    private static final List<Platform> DEMO_PLATFORMS = List.of(
+            new Platform(new Aabb(3f, -0.75f, 7f, 0.75f), 0.8f),
+            new Platform(new Aabb(9f, -0.75f, 13f, 0.75f), 1.5f),
+            new Platform(new Aabb(15f, -0.75f, 19f, 0.75f), 2.2f));
 
     // Boss mẫu (Phase 8 lát cắt 2) — spawn trong tầm AiConstants.AGGRO_RADIUS_METERS (6m) tính từ
     // điểm vào dungeon (DungeonInstanceRegistry.DUNGEON_ENTRY_SPAWN, 0,0) để party aggro ngay khi
@@ -122,7 +166,17 @@ public final class WorldFacade {
     // MonsterMovedEvent. Bắt bằng test thật (`shouldChaseAndAttackBack_whenCharacterEntersAggroRange`
     // đột nhiên treo vô hạn chờ MonsterMovedEvent sau khi thêm NPC), không phải đoán trước.
     private long nextMonsterOrNpcId = -1;
-    private float monsterRespawnCountdownSeconds = -1f; // < 0 = quái đang sống, không đếm ngược.
+    // Đếm ngược hồi sinh THEO TỪNG điểm spawn (< 0 = quái ở đó đang sống). Mảng cố định, không cấp
+    // phát lại — cùng tinh thần "không allocation trong tick" (Điều 31).
+    private final float[] monsterRespawnCountdownSeconds = newAliveCountdowns();
+    // monsterId -> chỉ số điểm spawn, để hồi sinh đúng chỗ cũ. Boss KHÔNG có entry ở đây.
+    private final Map<Long, Integer> spawnIndexByMonsterId = new HashMap<>();
+
+    private static float[] newAliveCountdowns() {
+        float[] countdowns = new float[MONSTER_SPAWN_X.length];
+        java.util.Arrays.fill(countdowns, -1f);
+        return countdowns;
+    }
 
     // AoI sync chạy chậm hơn tick loop (WorldConstants.AOI_SYNC_INTERVAL_TICKS) — chỉ đếm tick,
     // KHÔNG dùng đồng hồ thật (đơn giản, không trôi lệch tích luỹ như Timer/Duration).
@@ -194,9 +248,14 @@ public final class WorldFacade {
         ecsWorld.addSystem(new AiSystem(entitiesByCharacterId::values, this::lookupEntity));
         ecsWorld.addSystem(new MovementSystem());
         // Trục dọc (ADR-033) — chạy ngay sau MovementSystem (ngang), TRƯỚC TerrainCollisionSystem,
-        // cùng nhóm "áp chuyển động" của tick trước khi xử va chạm. Platform mặc định RỖNG — chưa
-        // có map pilot có bệ (ADR-033 #7), no-op an toàn (mọi entity rơi về z=0 phẳng như trước).
-        ecsWorld.addSystem(new VerticalMovementSystem(WorldConstants.GRAVITY_MPS2));
+        // cùng nhóm "áp chuyển động" của tick trước khi xử va chạm. World chính (spawnOverworldContent)
+        // nạp DEMO_PLATFORMS để chủ dự án tự test nhảy được — dungeon/arena vẫn RỖNG (chưa có map
+        // pilot thật, ADR-033 #7), no-op an toàn ở đó (mọi entity rơi về z=0 phẳng như trước).
+        VerticalMovementSystem verticalMovementSystem = new VerticalMovementSystem(WorldConstants.GRAVITY_MPS2);
+        if (spawnOverworldContent) {
+            verticalMovementSystem.setPlatforms(DEMO_PLATFORMS);
+        }
+        ecsWorld.addSystem(verticalMovementSystem);
         // Obstacle mặc định RỖNG — chưa có map/asset thật (ADR-021). No-op an toàn cho tới khi có
         // nguồn map thật gọi setObstacles(...); giữ đúng thứ tự PHYSICS.md §4 (sau MovementSystem).
         ecsWorld.addSystem(new TerrainCollisionSystem());
@@ -310,7 +369,9 @@ public final class WorldFacade {
             if (!contentSpawned) {
                 contentSpawned = true;
                 if (spawnOverworldContent) {
-                    spawnTrainingDummy();
+                    for (int i = 0; i < MONSTER_SPAWN_X.length; i++) {
+                        spawnTrainingDummy(i);
+                    }
                     spawnNpc(); // NPC tĩnh, không chết/hồi sinh — spawn 1 lần duy nhất, khác quái.
                 }
             }
@@ -387,7 +448,12 @@ public final class WorldFacade {
 
         PositionComponent position = new PositionComponent();
         position.x = spawnX;
-        position.y = spawnY;
+        // ADR-033 — KÉO VỀ ĐƯỜNG CHƠI: di chuyển giờ khoá vào đúng trục X, không lệnh nào đổi được
+        // Y nữa. Nhân vật có `pos_y` đã lưu khác 0 (từ thời đi tự do 4 hướng, DB vẫn giữ nguyên) sẽ
+        // kẹt VĨNH VIỄN ngoài đường chơi — không bao giờ chạm được bệ/địa hình nào vốn đều định
+        // nghĩa quanh y=0. Bỏ qua `spawnY` là hệ quả bắt buộc của việc thu trục, không phải mất dữ
+        // liệu tuỳ tiện: giá trị cũ không còn ý nghĩa gameplay nào trong mô hình mới.
+        position.y = CHARACTER_PLAY_LINE_Y;
         position.prevX = position.x;
         position.prevY = position.y;
         entity.add(position);
@@ -699,8 +765,10 @@ public final class WorldFacade {
         // Chỉ world chính hồi sinh quái bù nhìn — dungeon (spawnOverworldContent=false) không có
         // khái niệm training dummy; PHÁT HIỆN THẬT (Phase 8 lát cắt 2): thiếu guard này, boss chết
         // trong dungeon sẽ vô tình lên lịch spawnTrainingDummy() (sai nội dung, sai world).
-        if (spawnOverworldContent) {
-            monsterRespawnCountdownSeconds = CombatConstants.MONSTER_RESPAWN_SECONDS;
+        // `spawnIndex == null` với BOSS (spawn qua spawnBossEntity, không thuộc điểm spawn nào).
+        Integer spawnIndex = spawnIndexByMonsterId.remove(monsterId);
+        if (spawnOverworldContent && spawnIndex != null) {
+            monsterRespawnCountdownSeconds[spawnIndex] = CombatConstants.MONSTER_RESPAWN_SECONDS;
         }
 
         // killerEntityId ÂM nghĩa là quái khác hạ gục quái này — chưa từng xảy ra (quái không nhắm
@@ -710,24 +778,29 @@ public final class WorldFacade {
         }
     }
 
+    /** Đếm ngược hồi sinh RIÊNG cho từng điểm spawn — quái này chết không kéo theo quái khác. */
     private void tickMonsterRespawn(float deltaTime) {
-        if (monsterRespawnCountdownSeconds < 0f) {
-            return; // quái đang sống — không đếm ngược.
-        }
-        monsterRespawnCountdownSeconds -= deltaTime;
-        if (monsterRespawnCountdownSeconds <= 0f) {
-            monsterRespawnCountdownSeconds = -1f;
-            spawnTrainingDummy();
+        for (int i = 0; i < monsterRespawnCountdownSeconds.length; i++) {
+            if (monsterRespawnCountdownSeconds[i] < 0f) {
+                continue; // quái ở điểm này đang sống — không đếm ngược.
+            }
+            monsterRespawnCountdownSeconds[i] -= deltaTime;
+            if (monsterRespawnCountdownSeconds[i] <= 0f) {
+                monsterRespawnCountdownSeconds[i] = -1f;
+                spawnTrainingDummy(i);
+            }
         }
     }
 
-    private void spawnTrainingDummy() {
+    /** @param spawnIndex chỉ số trong {@link #MONSTER_SPAWN_X} — nhớ lại để hồi sinh ĐÚNG chỗ cũ. */
+    private void spawnTrainingDummy(int spawnIndex) {
         KEntity entity = ecsWorld.createEntity();
         long monsterId = nextMonsterOrNpcId--;
+        float spawnX = MONSTER_SPAWN_X[spawnIndex];
 
         PositionComponent position = new PositionComponent();
-        position.x = TRAINING_DUMMY_SPAWN_X;
-        position.y = TRAINING_DUMMY_SPAWN_Y;
+        position.x = spawnX;
+        position.y = CHARACTER_PLAY_LINE_Y;
         position.prevX = position.x;
         position.prevY = position.y;
         entity.add(position);
@@ -748,14 +821,15 @@ public final class WorldFacade {
         entity.add(monsterIdComponent);
 
         AiStateComponent aiState = new AiStateComponent();
-        aiState.spawnX = TRAINING_DUMMY_SPAWN_X;
-        aiState.spawnY = TRAINING_DUMMY_SPAWN_Y;
+        aiState.spawnX = spawnX;
+        aiState.spawnY = CHARACTER_PLAY_LINE_Y;
         entity.add(aiState);
         entity.add(new TargetComponent()); // AiSystem ghi khi Chase/Attack; CombatSystem đọc để đánh trả
         entity.add(new AttackCooldownComponent());
         entity.add(new StatusEffectComponent());
 
         entitiesByMonsterId.put(monsterId, entity);
+        spawnIndexByMonsterId.put(monsterId, spawnIndex);
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
         // không cần thông báo thủ công (giống hệt attach nhân vật, xem AreaOfInterestTracker).
     }

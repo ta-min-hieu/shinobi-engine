@@ -951,11 +951,12 @@ class WorldFacadeTest {
     @Test
     void shouldNotAggro_whenCharacterOutsideAggroRange() {
         world.start();
-        // Cách quái (5,5) đúng 20m — ngoài AiConstants.AGGRO_RADIUS_METERS (6m) NHƯNG vẫn trong
-        // WorldConstants.AOI_RADIUS_METERS (15f)... KHÔNG, 20m cũng ngoài AOI nên sẽ không thấy
-        // quái spawn — dùng khoảng cách 10m: ngoài aggro (6m), trong AOI (15m) để verify KHÔNG bị
-        // đuổi dù thấy quái trên màn hình.
-        world.attachCharacter(1L, 5f, 15f, DEFAULT_STATS);
+        // ADR-033: KHÔNG tách được bằng trục Y nữa (attach ép y về đường chơi — xem
+        // WorldFacade.CHARACTER_PLAY_LINE_Y), phải tách bằng trục X. Quái gần nhất ở x=8
+        // (WorldFacade.MONSTER_SPAWN_X), nên đứng ở x=0 cách 8m: NGOÀI
+        // AiConstants.AGGRO_RADIUS_METERS (6m) nhưng TRONG WorldConstants.AOI_RADIUS_METERS (15m)
+        // — verify thấy quái trên màn hình mà vẫn không bị đuổi.
+        world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
         awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
 
         sleepQuietly(500); // đủ lâu để AiSystem chạy nhiều tick nếu (sai) có aggro

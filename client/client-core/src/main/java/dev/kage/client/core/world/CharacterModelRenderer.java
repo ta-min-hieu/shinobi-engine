@@ -44,11 +44,46 @@ public final class CharacterModelRenderer implements Disposable {
     private static final Logger LOG = LoggerFactory.getLogger(CharacterModelRenderer.class);
 
     /**
-     * Góc quay quanh trục đứng, độ. 35° là góc 3/4 mà chủ dự án duyệt bản pilot art
-     * ([ART-QUALITY-STANDARD §7.1](docs/14-art/ART-QUALITY-STANDARD.md)); ở góc nghiêng thuần, khối
-     * tóc của mesh sinh từ Text→3D che kín mặt.
+     * Góc quay của CAMERA quanh trục đứng, độ.
+     *
+     * <p>⚠️ <b>PHẢI là 180°</b> kể từ [ADR-033](docs/01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md)
+     * (2026-08-09) — đây KHÔNG còn là lựa chọn thẩm mỹ tự do như thời ADR-031. Người chơi giờ chỉ di
+     * chuyển trên trục world {@code X}, nên trục đó BẮT BUỘC phải nằm ngang trên màn hình, đúng
+     * chiều: {@code right = direction × up} phải có thành phần {@code x} DƯƠNG.
+     *
+     * <p>Với công thức {@link #applyLockedAngle}, {@code right = (-cos(yaw)·cos(pitch), sin(yaw)·cos(pitch), 0)}
+     * ⇒ điều kiện trên thành {@code cos(yaw) < 0}. Giá trị cũ <b>35°</b> vi phạm
+     * ({@code cos35 = +0.82}): world {@code +X} chiếu thành hướng sang TRÁI màn hình — bấm phải thì
+     * nhân vật chạy sang trái, và còn trôi chéo xuống ~19° vì {@code +X} cũng có thành phần dọc.
+     * Chủ dự án phát hiện ngay khi test tay. {@code 180°} cho {@code right = (+1, 0, 0)} chuẩn xác:
+     * đi ngang tuyệt đối, nhảy lên tuyệt đối — đúng cảm giác side-scroller của ADR-033.
+     *
+     * <p>Góc 3/4 của NHÂN VẬT mà chủ dự án duyệt ở
+     * [ART-QUALITY-STANDARD §7.1](docs/14-art/ART-QUALITY-STANDARD.md) không mất đi — nó chuyển sang
+     * {@link #MODEL_YAW_DEGREES} (xoay MODEL thay vì xoay camera), tách bạch hai mối quan tâm vốn bị
+     * gộp làm một: "nhân vật trông nghiêng bao nhiêu" vs "trục gameplay nằm đâu trên màn hình".
      */
-    public static final float VIEW_YAW_DEGREES = 35f;
+    public static final float VIEW_YAW_DEGREES = 180f;
+
+    /**
+     * Hiệu chỉnh độ nghiêng CÓ SẴN trong chính model, độ — xoay thêm góc này thì nhân vật mới nhìn
+     * THẲNG vào camera.
+     *
+     * <p><b>Đo bằng ảnh chụp, không suy từ quy ước glTF</b>: render ở yaw {@code 0°} cho thấy nhân
+     * vật đã nghiêng sẵn ~45° sang phải chứ KHÔNG chính diện (suy luận Blender→glTF "nhân vật hướng
+     * −Y" không đúng với bộ model của dự án này — pipeline art dựng nhân vật ở tư thế nghiêng sẵn).
+     * Nhầm điểm gốc này làm mọi phép đối xứng trái/phải lệch đi 45°, sinh ra triệu chứng khó hiểu:
+     * {@code −35°} ra gần chính diện còn {@code +35°} ra LƯNG, dù hai góc chỉ cách nhau 70°.
+     */
+    private static final float MODEL_BASE_YAW_CORRECTION = -45f;
+
+    /**
+     * Góc 3/4 tính TỪ hướng chính diện (sau khi đã trừ {@link #MODEL_BASE_YAW_CORRECTION}) — giữ
+     * dáng đã duyệt ở ART-QUALITY-STANDARD §7.1 sau khi {@link #VIEW_YAW_DEGREES} bị ADR-033 khoá
+     * cứng vào 180°. Ở góc nghiêng thuần (90°), khối tóc của mesh sinh từ Text→3D che kín mặt — đó
+     * là lý do bản pilot chọn 3/4 ngay từ đầu.
+     */
+    private static final float MODEL_YAW_DEGREES = 35f;
 
     /** Độ ngẩng của camera. Đủ để thấy mặt đất mà không thành góc nhìn từ trên xuống. */
     public static final float VIEW_PITCH_DEGREES = 30f;
@@ -71,20 +106,50 @@ public final class CharacterModelRenderer implements Disposable {
      * Kage đi trên mặt phẳng XY với Z là trục đứng. Không xoay thì nhân vật nằm ngang và lệch hẳn
      * khỏi tâm màn hình — đúng triệu chứng thấy được lần đầu chạy nhánh 3D thật.
      *
-     * <p>⚠️ <b>Dấu là {@code -90f}, KHÔNG PHẢI {@code +90f}</b> — xác nhận bằng ảnh chụp thật qua
-     * {@code CharacterModelDebugTool}, không phải suy ra từ quy tắc bàn tay phải: {@code +90f} tính
-     * tay có vẻ đúng (Y+ cục bộ → Z+ thế giới) nhưng khi chạy thật (sau khi {@link CelBodyShader}/
-     * {@link CelOutlineShader} được sửa để nhân {@code u_worldTrans}, xem javadoc hai lớp đó) nhân
-     * vật đứng NGƯỢC ĐẦU XUỐNG ĐẤT — dấu hiệu quy ước xoay/handedness của
-     * {@code Matrix4#setToRotation} không khớp suy luận tay. {@code -90f} cho nhân vật đứng đúng
-     * chiều, đúng hướng, xác nhận qua idle lẫn run (RENDERING.md §11.1). Đây là nguyên nhân gốc THỨ
-     * HAI của bug "nằm ngang" — thứ nhất là thiếu {@code u_worldTrans} ở cel shader; sửa một mình
-     * dấu này (khi vẫn thiếu {@code u_worldTrans}) sẽ KHÔNG lộ ra vì cả mesh khi đó gần như không di
-     * chuyển đâu cả (skin ≈ identity, world transform bị bỏ qua hoàn toàn).
+     * <p>⚠️ <b>Dấu là {@code +90f}</b> — khớp ĐÚNG quy tắc bàn tay phải: xoay quanh {@code X} một
+     * góc {@code +90°} đưa {@code +Y} cục bộ (đầu nhân vật, quy ước Y-up của glTF) về {@code +Z} thế
+     * giới (trời); {@code -90f} đưa nó về {@code -Z} (đất) tức LỘN NGƯỢC.
+     *
+     * <p><b>Lịch sử — đừng lặp lại</b>: bản 2026-08-08 từng đổi hằng số này thành {@code -90f} và
+     * ghi rằng "ảnh chụp thật bác bỏ quy tắc bàn tay phải". Kết luận đó SAI, và sai vì <b>công cụ
+     * chụp</b> chứ không phải vì engine: {@code ScreenUtils.getFrameBufferPixmap} trả dữ liệu THÔ
+     * của GL (dòng 0 = đáy màn hình) còn PNG quy ước dòng 0 = đỉnh, nên ảnh lưu ra bị LẬT DỌC —
+     * nhân vật đang lộn ngược trên màn hình lại hiện "đứng thẳng" trong ảnh. Chủ dự án phát hiện
+     * bằng mắt trên game thật (2026-08-09); chụp lại với {@code flipY=true} xác nhận {@code -90f}
+     * cho nhân vật chúc đầu xuống đất. Bài học lặp lại lần thứ hai của dự án (lần đầu:
+     * script chụp không nhận biết DPI, RENDERING.md §11.1) — <b>ảnh chụp chỉ đáng tin khi đường
+     * chụp đã được kiểm chứng</b>; khi ảnh mâu thuẫn với phép toán rõ ràng, nghi ngờ cái chụp trước.
      *
      * <p>Hằng số, không dựng lại mỗi frame (/CLAUDE.md §6).
      */
-    private static final Matrix4 Y_UP_TO_Z_UP = new Matrix4().setToRotation(Vector3.X, -90f);
+    private static final Matrix4 Y_UP_TO_Z_UP = new Matrix4().setToRotation(Vector3.X, 90f);
+
+    /**
+     * Phép xoay áp cho model khi nhân vật hướng SANG PHẢI: đổi hệ trục ({@link #Y_UP_TO_Z_UP}) RỒI
+     * xoay yaw quanh trục đứng world ({@link #MODEL_YAW_DEGREES}). Thứ tự nhân {@code Rz · Rx} —
+     * đọc từ phải sang: đỉnh mesh đi qua {@code Rx} trước (về Z-up), rồi mới {@code Rz} (quay mặt).
+     * Đảo thứ tự là xoay quanh trục sai hoàn toàn.
+     *
+     * <p>Hằng số, dựng 1 lần — không tạo {@code Matrix4} mỗi frame (/CLAUDE.md §6).
+     */
+    private static final Matrix4 ORIENTATION_FACING_RIGHT = new Matrix4()
+            .setToRotation(Vector3.Z, MODEL_BASE_YAW_CORRECTION + MODEL_YAW_DEGREES)
+            .mul(Y_UP_TO_Z_UP);
+
+    /**
+     * Hướng SANG TRÁI — ảnh gương của {@link #ORIENTATION_FACING_RIGHT} qua mặt phẳng màn hình,
+     * tức <b>{@code −yaw}</b>.
+     *
+     * <p>Đối xứng phải LẤY QUANH HƯỚNG CHÍNH DIỆN, tức quanh {@link #MODEL_BASE_YAW_CORRECTION},
+     * chứ không quanh 0: {@code base + yaw} ↔ {@code base − yaw}. Lấy đối xứng quanh 0 (sai lầm ban
+     * đầu) làm một bên thành 3/4 mặt trước còn bên kia thành LƯNG, vì điểm gốc lệch 45°.
+     *
+     * <p>Không dùng scale âm để lật: nó đảo chiều pháp tuyến, hỏng cel shading và viền inverted-hull
+     * (RENDERING.md §12.2).
+     */
+    private static final Matrix4 ORIENTATION_FACING_LEFT = new Matrix4()
+            .setToRotation(Vector3.Z, MODEL_BASE_YAW_CORRECTION - MODEL_YAW_DEGREES)
+            .mul(Y_UP_TO_Z_UP);
 
     /**
      * Thời gian chuyển mượt (giây) giữa 2 clip animation — không cắt cứng, tránh pop khi đổi tư thế
@@ -227,10 +292,25 @@ public final class CharacterModelRenderer implements Disposable {
     public void setCharacterPosition(long characterId, float x, float y, float z) {
         Scene scene = scenesByCharacter.get(characterId);
         if (scene != null) {
+            AnimationState state = animationStateByCharacter.get(characterId);
             // Gốc model nằm ở chân (bước E của pipeline art đảm bảo điều đó) nên z=0 nghĩa là đứng
-            // trên đất — chỉ xoay về Z-up rồi tịnh tiến. `trn` ghi thẳng vào cột tịnh tiến, giữ
-            // nguyên phần xoay và không cấp phát gì.
-            scene.modelInstance.transform.set(Y_UP_TO_Z_UP).trn(x, y, z);
+            // trên đất — chỉ xoay về Z-up (kèm yaw theo hướng mặt) rồi tịnh tiến. `trn` ghi thẳng
+            // vào cột tịnh tiến, giữ nguyên phần xoay và không cấp phát gì.
+            Matrix4 orientation =
+                    state == null || state.facingRight ? ORIENTATION_FACING_RIGHT : ORIENTATION_FACING_LEFT;
+            scene.modelInstance.transform.set(orientation).trn(x, y, z);
+        }
+    }
+
+    /**
+     * Hướng mặt nhân vật theo chiều di chuyển (ADR-033 — side-scroller 1 trục). Người gọi tự giữ
+     * "hướng gần nhất" khi đứng yên: hàm này KHÔNG suy ra từ vận tốc, vì dừng lại phải giữ nguyên
+     * mặt chứ không quay về mặc định.
+     */
+    public void setCharacterFacingRight(long characterId, boolean facingRight) {
+        AnimationState state = animationStateByCharacter.get(characterId);
+        if (state != null) {
+            state.facingRight = facingRight;
         }
     }
 
@@ -374,6 +454,15 @@ public final class CharacterModelRenderer implements Disposable {
         return camera.combined;
     }
 
+    /**
+     * Chiếu một điểm THẾ GIỚI sang toạ độ MÀN HÌNH, ghi đè tại chỗ (không cấp phát — Điều 31).
+     * Dùng cho thứ neo theo world nhưng phải vẽ ở không gian màn hình để chữ sắc nét, VD số damage
+     * bay lên ({@code FloatingCombatText}).
+     */
+    public void project(Vector3 worldPosition) {
+        camera.project(worldPosition);
+    }
+
     public void render(float deltaTime) {
         if (!enabled) {
             return;
@@ -437,6 +526,9 @@ public final class CharacterModelRenderer implements Disposable {
         private boolean airborne;
         private boolean oneShotPlaying;
         private boolean dead;
+        // Mặc định quay phải — khớp hướng đi mặc định của side-scroller, và là giá trị hợp lý lúc
+        // spawn khi chưa có lệnh di chuyển nào để suy ra hướng.
+        private boolean facingRight = true;
 
         AnimationState(long characterId) {
             this.characterId = characterId;

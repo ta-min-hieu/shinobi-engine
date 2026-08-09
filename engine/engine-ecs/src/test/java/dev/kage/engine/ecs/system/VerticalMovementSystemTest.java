@@ -81,6 +81,30 @@ class VerticalMovementSystemTest {
         assertThat(POSITION.get(entity).grounded).isTrue();
     }
 
+    /**
+     * Bug THẬT chủ dự án phát hiện khi test tay (2026-08-09): đứng trên bệ rồi đi ngang ra khỏi mép
+     * thì lơ lửng giữa không trung mãi mãi, vì {@code processEntity} thoát sớm vô điều kiện khi
+     * {@code grounded && vz == 0} nên trọng lực không bao giờ bật lại.
+     */
+    @Test
+    void shouldStartFalling_whenWalkingOffPlatformEdge() {
+        EcsWorld world = new EcsWorld();
+        VerticalMovementSystem vertical = new VerticalMovementSystem(GRAVITY_MPS2);
+        vertical.setPlatforms(List.of(new Platform(new Aabb(-2f, -2f, 2f, 2f), 3f)));
+        world.addSystem(vertical);
+        KEntity entity = entityAt(world, 3f, true, 0f); // đang ĐỨNG YÊN trên mặt bệ (z = topZ)
+
+        world.update(0.1f);
+        assertThat(POSITION.get(entity).z).isEqualTo(3f); // trong footprint — vẫn được đỡ
+        assertThat(POSITION.get(entity).grounded).isTrue();
+
+        POSITION.get(entity).x = 50f; // MovementSystem đưa ra ngoài mép bệ trong tick kế tiếp
+        world.update(1f);
+
+        assertThat(POSITION.get(entity).grounded).isTrue(); // đã rơi xuống và đáp đất
+        assertThat(POSITION.get(entity).z).isZero();
+    }
+
     @Test
     void shouldFallPastPlatform_whenOutsideItsFootprint() {
         EcsWorld world = new EcsWorld();

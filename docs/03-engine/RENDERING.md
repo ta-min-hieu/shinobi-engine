@@ -60,6 +60,23 @@
 > nhận thêm `z` (chiều cao lơ lửng), `setCharacterAirborne` mới coi `jump` là clip LOOP ưu tiên cao
 > nhất. Chỉ CHÍNH người chơi hiện đúng — nhân vật khác chưa nhận `grounded`/`z` qua giao thức (xem
 > PHYSICS.md §9), luôn hiện đứng z=0 dù server mô phỏng nhảy đúng cho họ.
+>
+> 🔴 **Bản 2.3.1 (2026-08-09, cùng ngày) — SỬA LẠI kết luận SAI của bản 2.2.0**: `Y_UP_TO_Z_UP` quay
+> về **`+90f`** (bản 2.2.0 đổi thành `-90f` và ghi rằng "ảnh chụp bác bỏ quy tắc bàn tay phải").
+> Chủ dự án phát hiện bằng mắt trên game thật: nhân vật **lộn ngược, chân chỉa lên trời**. Nguyên
+> nhân của kết luận sai là **công cụ chụp**, không phải engine —
+> `ScreenUtils.getFrameBufferPixmap` trả dữ liệu THÔ của GL (dòng 0 = ĐÁY màn hình) trong khi PNG
+> quy ước dòng 0 = ĐỈNH, và `PixmapIO.writePNG` bản 2 tham số mặc định `flipY=false`. Ảnh lưu ra bị
+> **lật dọc**, khiến nhân vật đang lộn ngược hiện ra "đứng thẳng". Chụp lại với `flipY=true` xác
+> nhận ngay. Phép toán độc lập cũng nói đúng điều đó từ đầu: xoay quanh `X` một góc `+90°` (bàn tay
+> phải) đưa `+Y` cục bộ → `+Z` thế giới; `-90°` đưa nó xuống `-Z`.
+>
+> ⚠️ **Luật rút ra (lần thứ HAI dự án dính đúng loại bẫy này** — lần đầu là script chụp không nhận
+> biết DPI, §11.1): *ảnh chụp chỉ là bằng chứng khi ĐƯỜNG CHỤP đã được kiểm chứng*. Khi ảnh mâu
+> thuẫn với một phép toán rõ ràng (quy tắc bàn tay phải, ma trận chiếu), **nghi ngờ công cụ chụp
+> trước, đừng ghi đè phép toán**. Kiểm chứng đường chụp bằng một vật thể BẤT ĐỐI XỨNG đã biết chiều
+> (VD chữ, hoặc chính nhân vật có đầu/chân phân biệt rõ) trước khi tin bất kỳ kết luận nào rút ra
+> từ nó.
 
 ---
 
