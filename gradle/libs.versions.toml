@@ -38,7 +38,7 @@ findsecbugs = "1.14.0"            # ✅ latest verify 07/2026 — SpotBugs plugi
 
 # --- Gradle plugins ---
 spotless = "8.9.0"                 # ✅ latest verify 07/2026 — Gradle 9 OK từ 8.5.0 (CHANGES.md, min Gradle 8.1 từ 8.1.0)
-spotbugsPlugin = "6.5.9"          # ✅ SpotBugs Gradle plugin 07/2026
+spotbugsPlugin = "6.5.10"          # ✅ SpotBugs Gradle plugin 07/2026
 errorpronePlugin = "5.1.0"        # ✅ latest verify 07/2026 — net.ltgt.errorprone (khớp PR Dependabot đang chờ)
 protobufPlugin = "0.10.0"         # ✅ latest 07/2026 — com.google.protobuf Gradle plugin
 jmhPlugin = "0.7.3"                # ✅ latest (verified 07/2026, no release since 01/2025) — me.champeau.jmh
