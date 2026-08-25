@@ -275,6 +275,14 @@
          giữa màn hình nên phải nuốt click TRƯỚC chat và HUD), thứ chỉ đặt được cho cả một Stage. -->
     <Match>
         <Class name="dev.kage.client.core.ui.hud.PartyPanel"/>
+    <!-- FriendPanel.stage() — lần thứ tư cùng một lý do (CombatHud, DialoguePanel, ChatPanel ngay
+         trên): WorldScreen phải đưa đúng instance Stage đó vào InputMultiplexer để đặt thứ tự nuốt
+         input, thứ chỉ đặt được cho cả một Stage chứ không cho một actor bên trong (xem javadoc
+         FriendPanel + WorldScreen#buildInputProcessor). Cửa sổ bạn bè còn cần thứ tự đó hơn cả:
+         nó đứng TRƯỚC ChatPanel để nuốt phím trong lúc người chơi đang gõ tên. Vẫn giữ <Match>
+         riêng thay vì gộp regex, cùng lý do đã ghi ở entry ChatPanel. -->
+    <Match>
+        <Class name="dev.kage.client.core.ui.hud.FriendPanel"/>
         <Bug pattern="EI_EXPOSE_REP"/>
     </Match>
 

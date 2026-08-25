@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 
 import dev.kage.client.core.net.GameConnection;
 import dev.kage.protocol.AcceptPartyInviteCommand;
+import dev.kage.protocol.AcceptFriendRequestCommand;
 import dev.kage.protocol.AttackCommand;
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ClaimQuestRewardCommand;
@@ -21,8 +22,15 @@ import dev.kage.protocol.ListPendingPartyInvitesRequest;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.RejectPartyInviteCommand;
+import dev.kage.protocol.ListFriendsRequest;
+import dev.kage.protocol.ListPendingFriendRequestsRequest;
+import dev.kage.protocol.MoveCommand;
+import dev.kage.protocol.Opcode;
+import dev.kage.protocol.RejectFriendRequestCommand;
+import dev.kage.protocol.RemoveFriendCommand;
 import dev.kage.protocol.SelectDialogueOptionCommand;
 import dev.kage.protocol.SendChatMessageCommand;
+import dev.kage.protocol.SendFriendRequestCommand;
 import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.TalkToNpcCommand;
 import dev.kage.protocol.UseSkillCommand;
@@ -212,6 +220,63 @@ final class WorldCommandSender {
                 Opcode.OPCODE_LIST_PENDING_PARTY_INVITES_REQUEST_VALUE,
                 ListPendingPartyInvitesRequest.newBuilder().build().toByteArray(),
                 "ListPendingPartyInvitesRequest");
+    /**
+     * Gửi lời mời kết bạn theo TÊN.
+     *
+     * <p>Tên chứ không phải id là do giao thức quy định (friend.proto): server-gateway tự tra
+     * {@code CharacterFacade.findByName} trước khi gọi feature-friend, nên client không cần — và
+     * không được — tự đoán id của người kia (Điều 24). Sai tên thì server trả
+     * {@code TARGET_NOT_FOUND}.
+     */
+    void sendFriendRequest(String targetName) {
+        SendFriendRequestCommand command =
+                SendFriendRequestCommand.newBuilder().setTargetName(targetName).build();
+        send(Opcode.OPCODE_SEND_FRIEND_REQUEST_COMMAND_VALUE, command.toByteArray(), "SendFriendRequestCommand");
+    }
+
+    /**
+     * Chấp nhận một lời mời.
+     *
+     * @param friendshipId id của LỜI MỜI, lấy từ {@code ListPendingFriendRequestsResponse} — server
+     *     tự kiểm người chấp nhận có đúng là người được mời hay không (chống IDOR), client chỉ vọng
+     *     lại con số đã nhận.
+     */
+    void acceptFriendRequest(long friendshipId) {
+        AcceptFriendRequestCommand command = AcceptFriendRequestCommand.newBuilder()
+                .setFriendshipId(friendshipId)
+                .build();
+        send(Opcode.OPCODE_ACCEPT_FRIEND_REQUEST_COMMAND_VALUE, command.toByteArray(), "AcceptFriendRequestCommand");
+    }
+
+    /** Từ chối một lời mời — cùng quy ước {@code friendshipId} với {@link #acceptFriendRequest}. */
+    void rejectFriendRequest(long friendshipId) {
+        RejectFriendRequestCommand command = RejectFriendRequestCommand.newBuilder()
+                .setFriendshipId(friendshipId)
+                .build();
+        send(Opcode.OPCODE_REJECT_FRIEND_REQUEST_COMMAND_VALUE, command.toByteArray(), "RejectFriendRequestCommand");
+    }
+
+    /** Xoá một người khỏi danh sách bạn — theo TÊN, cùng lý do {@link #sendFriendRequest}. */
+    void removeFriend(String targetName) {
+        RemoveFriendCommand command =
+                RemoveFriendCommand.newBuilder().setTargetName(targetName).build();
+        send(Opcode.OPCODE_REMOVE_FRIEND_COMMAND_VALUE, command.toByteArray(), "RemoveFriendCommand");
+    }
+
+    /** Hỏi trọn danh sách bạn bè. Gói rỗng — người hỏi lấy từ session phía server (Điều 24). */
+    void listFriends() {
+        send(
+                Opcode.OPCODE_LIST_FRIENDS_REQUEST_VALUE,
+                ListFriendsRequest.newBuilder().build().toByteArray(),
+                "ListFriendsRequest");
+    }
+
+    /** Hỏi trọn danh sách lời mời đang chờ — cùng hình dạng {@link #listFriends}. */
+    void listPendingFriendRequests() {
+        send(
+                Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_REQUEST_VALUE,
+                ListPendingFriendRequestsRequest.newBuilder().build().toByteArray(),
+                "ListPendingFriendRequestsRequest");
     }
 
     /** Gói tin đến từ server — {@code null} khi hàng đợi rỗng (xem {@link GameConnection}). */

@@ -22,6 +22,7 @@ import dev.kage.client.core.ui.hud.ChatPanel;
 import dev.kage.client.core.ui.hud.CombatHud;
 import dev.kage.client.core.ui.hud.DialoguePanel;
 import dev.kage.client.core.ui.hud.PartyPanel;
+import dev.kage.client.core.ui.hud.FriendPanel;
 import dev.kage.engine.core.GameScreen;
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.EcsWorld;
@@ -141,6 +142,11 @@ public final class WorldScreen implements GameScreen {
 
     /** Luồng nhóm (thành viên + lời mời + mạng) — xem {@link PartyCoordinator}. */
     private final PartyCoordinator party;
+    /** Cửa sổ bạn bè — mượn skin của {@link #combatHud} như {@link #chatPanel}. */
+    private final FriendPanel friendPanel = new FriendPanel(combatHud.skin());
+
+    /** Luồng bạn bè (danh sách + lời mời + mạng) — xem {@link FriendCoordinator}. */
+    private final FriendCoordinator friends;
 
     /** Vòng đời nhiệm vụ: nhận → hoàn thành → lĩnh thưởng — xem {@link QuestCoordinator}. */
     private final QuestCoordinator quests;
@@ -216,6 +222,7 @@ public final class WorldScreen implements GameScreen {
         this.chat = new ChatCoordinator(chatPanel, sender);
         // SAU chat: coordinator nhóm mượn nhật ký chat làm chỗ báo lý do lệnh thất bại.
         this.party = new PartyCoordinator(partyPanel, sender, chat);
+        this.friends = new FriendCoordinator(friendPanel, sender, combatFeedback, this::isTextInputActive);
 
         combatHud.setSkillLabel(combatHudController.skillNameKey());
         combatHud.setOnSkillClicked(this::onSkillButtonClicked);
@@ -234,9 +241,12 @@ public final class WorldScreen implements GameScreen {
      * của HUD vẫn rơi xuống {@link WorldTargetPicker} đúng như mong đợi.
      */
     private InputMultiplexer buildInputProcessor() {
+        // Cửa sổ bạn bè đứng TRƯỚC chat: cả hai mở ô nhập bằng một phím ở keyUp, và cái đứng trước
+        // là cái duy nhất chặn được phím của cái kia (xem FriendPanel#installKeyHandling).
         return new InputMultiplexer(
                 dialoguePanel.stage(),
                 partyPanel.stage(),
+                friendPanel.stage(),
                 chatPanel.stage(),
                 combatHud.stage(),
                 new WorldTargetPicker());
@@ -258,6 +268,7 @@ public final class WorldScreen implements GameScreen {
         dialogue.reset();
         chat.reset();
         party.reset();
+        friends.reset();
     }
 
     @Override
@@ -268,6 +279,7 @@ public final class WorldScreen implements GameScreen {
         dialoguePanel.resize(width, height);
         chatPanel.resize(width, height);
         partyPanel.resize(width, height);
+        friendPanel.resize(width, height);
         combatFeedback.resize(width, height);
     }
 
@@ -301,6 +313,7 @@ public final class WorldScreen implements GameScreen {
             handled |= dialogue.dispatch(opcode, payload);
             handled |= chat.dispatch(opcode, payload);
             handled |= party.dispatch(opcode, payload);
+            handled |= friends.dispatch(opcode, payload);
             if (!handled && !dispatchMovement(opcode, payload)) {
                 dispatchCombat(opcode, payload);
             }
@@ -471,14 +484,36 @@ public final class WorldScreen implements GameScreen {
      * hàm thì không thể sót một loại input nào; rải {@code if} ở từng chỗ đọc thì sót là chuyện sớm
      * muộn.
      *
-     * <p>Cùng lý do y hệt cho cửa sổ Nhóm: nó có ô nhập tên người mời.
+     * <p>Cùng lý do y hệt cho mọi cửa sổ có ô nhập chữ (Nhóm, Bạn bè) — xem
+     * {@link #isTextInputActive()}.
      *
      * <p>Trả {@code false} đều tay cho MỌI action cũng chính là thứ làm nhân vật <b>dừng lại</b>
      * trên server: {@link #updateLocalMovementIntent} thấy hướng đổi thành 0 và tự gửi
      * {@code MoveCommand} một lần — không cần đường dừng riêng.
      */
     private boolean isPressed(GameAction action) {
-        return !chat.isComposing() && !party.isOpen() && inputMapper.isPressed(action);
+        return !isTextInputActive() && inputMapper.isPressed(action);
+    }
+
+    /**
+     * Có khung nào đang nhận chữ gõ vào, hoặc đang chờ người chơi đọc/bấm hay không.
+     *
+     * <p><b>Nguồn chân lý DUY NHẤT</b> cho hai câu hỏi vốn là một: "phím vừa bấm là ý định gameplay
+     * hay là một ký tự?" ({@link #isPressed}) và "phím vừa bấm có được phép mở thêm một cửa sổ nữa
+     * không?" (mỗi panel hỏi qua {@code setCanOpen}).
+     *
+     * <p>Phải tập trung ở ĐÂY vì mỗi khung có {@code Stage} riêng, và <b>một {@code Stage} không
+     * nhìn thấy keyboard focus của {@code Stage} khác</b>. Hệ quả là một bug có thật, tìm ra lúc gộp
+     * ba luồng làm song song: {@code InputMultiplexer} chuyển {@code keyUp} xuống tầng dưới cho tới
+     * khi có ai trả {@code true}, mà mỗi panel chỉ nhận ra phím mở của CHÍNH nó — nên gõ chữ "p"
+     * trong ô chat sẽ bật cửa sổ Nhóm, và gõ chữ "t" trong ô tên bạn bè sẽ bật ô chat. Panel này
+     * không cần biết panel kia tồn tại; tất cả chỉ hỏi cùng một câu ở cùng một chỗ.
+     *
+     * <p>Khung hội thoại NPC nằm trong danh sách dù không có ô nhập nào: đang đọc lời thoại thì phím
+     * cũng không phải ý định gameplay, và mở đè một cửa sổ khác lên là hỏng.
+     */
+    private boolean isTextInputActive() {
+        return chat.isComposing() || dialogue.isOpen() || party.isOpen() || friends.isOpen();
     }
 
     /**
@@ -609,6 +644,7 @@ public final class WorldScreen implements GameScreen {
         // trong InputMultiplexer) chứ không đóng ô chat đang giữ keyboard focus.
         chat.closeComposer();
         party.close();
+        friends.close();
         dialogue.talkTo(npc.code());
         return true;
     }
@@ -638,6 +674,7 @@ public final class WorldScreen implements GameScreen {
         combatHud.render(Gdx.graphics.getDeltaTime());
         chatPanel.render(Gdx.graphics.getDeltaTime());
         partyPanel.render(Gdx.graphics.getDeltaTime());
+        friendPanel.render(Gdx.graphics.getDeltaTime());
         dialoguePanel.render(Gdx.graphics.getDeltaTime());
     }
 
@@ -745,6 +782,7 @@ public final class WorldScreen implements GameScreen {
         dialoguePanel.dispose();
         chatPanel.dispose();
         partyPanel.dispose();
+        friendPanel.dispose();
         combatHud.dispose();
     }
 
