@@ -64,6 +64,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-032](ADR-032-JitPack-Dependency-Defence.md) | Đóng gói `gdx-gltf` vào `third-party/m2/` làm kho Maven cục bộ, bỏ hẳn `jitpack.io` khỏi build | 📝 **Proposed** *(2026-08-05)* | Gỡ việc treo #2 của [ADR-031](ADR-031-25D-Realtime-3D-Rendering.md); jar đo thật 318 KB, Apache-2.0, phụ thuộc bắc cầu duy nhất là `gdx` vốn đã có |
 | [ADR-033](ADR-033-Ninja-School-Style-Movement.md) | Đổi mô hình di chuyển sang trái/phải + nhảy thật kiểu Ninja School Online — bỏ di chuyển lên/xuống, nhảy né được đòn tầm thấp/lên bệ cao | 🟢 **Accepted** *(2026-08-08)* | Đổi protocol (`MoveCommand`) + đổi mô hình vật lý (trục Z thật lần đầu); kế thừa [ADR-021](ADR-021-Box2D-vs-AABB.md) (không Box2D) |
 | [ADR-034](ADR-034-Manual-Attack-And-Experience.md) | Đánh thường phải BẤM mới ra đòn (bỏ auto-target cho người chơi, quái vẫn tự đánh) + hệ thống kinh nghiệm/lên cấp đầu tiên | 🟢 **Accepted** *(2026-08-09)* | Chủ dự án quyết sau playtest; thêm opcode 407/208, mâu thuẫn GDD §6 cho tới khi GDD được sửa |
+| [ADR-035](ADR-035-Client-State-Sync-Opcodes.md) | Lấp 4 khoảng trống đồng bộ trạng thái: liệt kê túi đồ (507/508), catalog vật phẩm (509/510), số vàng (209), nhật ký nhiệm vụ (610/611) | 📝 **Proposed** *(2026-08-25)* | Chặn giao diện túi đồ/trang bị/cửa hàng/nhật ký nhiệm vụ. Chỉ THÊM 7 opcode, không đổi message đang chạy, không đổi schema DB. **Chủ dự án cần quyết Technical Decision #2** (catalog gửi qua mạng hay đóng gói tĩnh) |
 
 ---
 
