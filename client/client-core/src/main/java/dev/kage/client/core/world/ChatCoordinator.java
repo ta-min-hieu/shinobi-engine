@@ -61,6 +61,23 @@ final class ChatCoordinator {
     }
 
     /**
+     * Ghi một dòng hệ thống vào nhật ký chat — lối vào cho các luồng KHÁC muốn nói một câu bằng chữ
+     * ({@code PartyCoordinator} dùng để báo lý do lệnh nhóm thất bại).
+     *
+     * @param text chữ ĐÃ dịch (người gọi có bundle của mình, xem {@code PartyCoordinator})
+     */
+    void showSystemNotice(String text) {
+        controller.appendSystem(text);
+        refreshLines();
+    }
+
+    /** Người chơi vừa vào/rời nhóm — kênh Nhóm xuất hiện/biến mất, xem {@code ChatController}. */
+    void setPartyAvailable(boolean available) {
+        controller.setPartyAvailable(available);
+        refreshChannelLabel();
+    }
+
+    /**
      * Định tuyến một gói có thể thuộc luồng chat.
      *
      * @return {@code true} nếu gói đã được xử lý ở đây.

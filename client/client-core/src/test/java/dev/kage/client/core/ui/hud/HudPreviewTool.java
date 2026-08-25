@@ -26,9 +26,23 @@ public final class HudPreviewTool extends ApplicationAdapter {
     private static final Logger LOG = LoggerFactory.getLogger(HudPreviewTool.class);
     private static final String OUTPUT = "E:/study/libgdx/shinobi-engine/.debug-orientation/hud.png";
 
+    /**
+     * Ảnh THỨ HAI. Hai cửa sổ che giữa màn hình (hội thoại NPC và Nhóm) không bao giờ mở cùng lúc
+     * trong game thật — {@code WorldScreen.talkToNpcAt} đóng cửa sổ Nhóm trước khi mở khung thoại —
+     * nên chụp cả hai vào một ảnh chỉ cho ra một cái đè lên cái kia, không kiểm được bố cục của cái
+     * bị che. Chụp làm hai lượt là cách duy nhất nhìn thấy cả hai.
+     */
+    private static final String OUTPUT_PARTY = "E:/study/libgdx/shinobi-engine/.debug-orientation/hud-party.png";
+
+    /** Khung chụp ảnh thứ nhất — đủ để Scene2D layout xong và font FreeType nạp xong. */
+    private static final int FIRST_SHOT_FRAME = 30;
+
+    private static final int SECOND_SHOT_FRAME = 60;
+
     private CombatHud hud;
     private DialoguePanel dialoguePanel;
     private ChatPanel chatPanel;
+    private PartyPanel partyPanel;
     private int frame;
 
     @Override
@@ -85,6 +99,22 @@ public final class HudPreviewTool extends ApplicationAdapter {
                         ChatPanel.LineKind.SYSTEM,
                         ChatPanel.LineKind.AREA));
         chatPanel.openComposer();
+
+        // Cửa sổ Nhóm (2026-08-25) — trạng thái ĐẦY ĐỦ NHẤT: đang là trưởng nhóm (có nút Đuổi cạnh
+        // mỗi thành viên) VÀ đang có lời mời chờ trả lời. Đó là trạng thái nhiều actor nhất, tức là
+        // trạng thái duy nhất đủ để thấy bố cục có vỡ hay không.
+        partyPanel = new PartyPanel(hud.skin());
+        partyPanel.resize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        partyPanel.setContent(
+                "Nhóm 3 người — bạn là trưởng nhóm.",
+                java.util.List.of(
+                        new PartyPanel.MemberRow("KageHoa (trưởng nhóm)", "KageHoa", true),
+                        new PartyPanel.MemberRow("ThuyLong", "ThuyLong", true),
+                        new PartyPanel.MemberRow("PhongVanTuyetNguyet", "PhongVanTuyetNguyet", false)),
+                true,
+                java.util.List.of(new PartyPanel.InviteRow(77L, "Lời mời vào nhóm #5")));
+        partyPanel.setActionsEnabled(true, true);
+        partyPanel.openForPreview();
     }
 
     @Override
@@ -95,18 +125,28 @@ public final class HudPreviewTool extends ApplicationAdapter {
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         hud.render(1f / 60f);
         chatPanel.render(1f / 60f);
+        partyPanel.render(1f / 60f);
         dialoguePanel.render(1f / 60f);
         frame++;
-        if (frame == 30) {
-            Pixmap pixmap = ScreenUtils.getFrameBufferPixmap(
-                    0, 0, Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight());
-            Gdx.files.absolute(OUTPUT).parent().mkdirs();
-            // flipY=true BẮT BUỘC — xem WorldModelRenderer.Y_UP_TO_Z_UP về lần dính bẫy này.
-            PixmapIO.writePNG(Gdx.files.absolute(OUTPUT), pixmap, Deflater.DEFAULT_COMPRESSION, true);
-            pixmap.dispose();
-            LOG.info("Đã chụp {}", OUTPUT);
+        if (frame == FIRST_SHOT_FRAME) {
+            capture(OUTPUT);
+            // Đổi vai: giấu khung thoại đi để lượt sau nhìn thấy trọn cửa sổ Nhóm.
+            dialoguePanel.hide();
+            partyPanel.openForPreview();
+        } else if (frame == SECOND_SHOT_FRAME) {
+            capture(OUTPUT_PARTY);
             Gdx.app.exit();
         }
+    }
+
+    private static void capture(String path) {
+        Pixmap pixmap = ScreenUtils.getFrameBufferPixmap(
+                0, 0, Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight());
+        Gdx.files.absolute(path).parent().mkdirs();
+        // flipY=true BẮT BUỘC — xem WorldModelRenderer.Y_UP_TO_Z_UP về lần dính bẫy này.
+        PixmapIO.writePNG(Gdx.files.absolute(path), pixmap, Deflater.DEFAULT_COMPRESSION, true);
+        pixmap.dispose();
+        LOG.info("Đã chụp {}", path);
     }
 
     @Override
@@ -116,6 +156,9 @@ public final class HudPreviewTool extends ApplicationAdapter {
         }
         if (chatPanel != null) {
             chatPanel.dispose(); // TRƯỚC hud, cùng lý do dialoguePanel
+        }
+        if (partyPanel != null) {
+            partyPanel.dispose();
         }
         if (hud != null) {
             hud.dispose();

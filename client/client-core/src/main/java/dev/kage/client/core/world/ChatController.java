@@ -64,6 +64,12 @@ final class ChatController {
     private ChatChannel channel = DEFAULT_CHANNEL;
 
     /**
+     * Có đang ở trong một nhóm hay không — quyết định kênh Nhóm có nằm trong vòng xoay của
+     * {@link #toggleChannel()} hay không. Do {@code PartyCoordinator} cập nhật.
+     */
+    private boolean partyAvailable;
+
+    /**
      * Một dòng trong nhật ký. {@code senderName} rỗng = dòng của hệ thống (báo lỗi gửi), không phải
      * của người chơi nào — widget dựa vào đó để không vẽ dấu hai chấm thừa.
      */
@@ -133,15 +139,33 @@ final class ChatController {
     }
 
     /**
-     * Đổi kênh gửi mặc định. Chỉ xoay vòng Thế giới ↔ Khu vực: Bang hội/Party đòi người chơi đã ở
-     * trong một bang/party, mà client chưa nối opcode nào của hai module đó — bày ra kênh chỉ để
-     * server trả {@code NOT_IN_GUILD} là bày ra một nút hỏng. Kênh riêng đi qua {@code /w}
-     * ({@link #compose}) vì nó cần thêm một tham số mà nút xoay vòng không mang được.
+     * Người chơi vừa vào/rời một nhóm — kênh Nhóm xuất hiện/biến mất khỏi vòng xoay theo đó.
+     *
+     * <p>Không bày kênh Nhóm ra khi chưa vào nhóm nào: một nút chỉ để nhận {@code NOT_IN_PARTY} là
+     * một nút hỏng. Và nếu đang CHỌN kênh Nhóm mà vừa rời nhóm thì phải rơi về Thế giới ngay — bằng
+     * không câu tiếp theo gõ vào sẽ bay đi rồi bật lại lỗi, trong khi người chơi tưởng mình đang nói
+     * với ai đó.
+     */
+    void setPartyAvailable(boolean available) {
+        partyAvailable = available;
+        if (!available && channel == ChatChannel.CHAT_CHANNEL_PARTY) {
+            channel = DEFAULT_CHANNEL;
+        }
+    }
+
+    /**
+     * Đổi kênh gửi mặc định: Thế giới → Khu vực → (Nhóm nếu đang ở trong nhóm) → Thế giới.
+     *
+     * <p>Bang hội vẫn KHÔNG có trong vòng xoay: client chưa nối một opcode nào của Guild (700-799)
+     * nên không vào bang được để mà nhắn. Kênh riêng đi qua {@code /w} ({@link #compose}) vì nó cần
+     * thêm một tham số mà nút xoay vòng không mang được.
      */
     void toggleChannel() {
-        channel = channel == ChatChannel.CHAT_CHANNEL_WORLD
-                ? ChatChannel.CHAT_CHANNEL_AREA
-                : ChatChannel.CHAT_CHANNEL_WORLD;
+        channel = switch (channel) {
+            case CHAT_CHANNEL_WORLD -> ChatChannel.CHAT_CHANNEL_AREA;
+            case CHAT_CHANNEL_AREA -> partyAvailable ? ChatChannel.CHAT_CHANNEL_PARTY : DEFAULT_CHANNEL;
+            default -> DEFAULT_CHANNEL;
+        };
     }
 
     ChatChannel channel() {
@@ -180,6 +204,7 @@ final class ChatController {
     void clear() {
         lines.clear();
         channel = DEFAULT_CHANNEL;
+        partyAvailable = false;
     }
 
     /**

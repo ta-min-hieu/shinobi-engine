@@ -6,12 +6,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import dev.kage.client.core.net.GameConnection;
+import dev.kage.protocol.AcceptPartyInviteCommand;
 import dev.kage.protocol.AttackCommand;
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ClaimQuestRewardCommand;
+import dev.kage.protocol.CreatePartyCommand;
+import dev.kage.protocol.GetMyPartyRequest;
+import dev.kage.protocol.InvitePartyMemberCommand;
 import dev.kage.protocol.JumpCommand;
+import dev.kage.protocol.KickPartyMemberCommand;
+import dev.kage.protocol.LeavePartyCommand;
+import dev.kage.protocol.ListPartyMembersRequest;
+import dev.kage.protocol.ListPendingPartyInvitesRequest;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.RejectPartyInviteCommand;
 import dev.kage.protocol.SelectDialogueOptionCommand;
 import dev.kage.protocol.SendChatMessageCommand;
 import dev.kage.protocol.SetTargetCommand;
@@ -128,6 +137,81 @@ final class WorldCommandSender {
                 .setBody(body)
                 .build();
         send(Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE, command.toByteArray(), "SendChatMessageCommand");
+    }
+
+    // --- Nhóm (party.proto, dải 1300-1399) ----------------------------------------------------
+    // Ba lệnh HỎI ở cuối cụm không đổi gì cả — chúng tồn tại vì party.proto KHÔNG có event đẩy nào,
+    // nên trạng thái nhóm chỉ đúng đúng lúc vừa hỏi xong (xem javadoc PartyController).
+
+    /** Tạo nhóm mới, tự làm trưởng nhóm. Gói rỗng — server tự biết ai gửi (party.proto). */
+    void createParty() {
+        send(
+                Opcode.OPCODE_CREATE_PARTY_COMMAND_VALUE,
+                CreatePartyCommand.newBuilder().build().toByteArray(),
+                "CreatePartyCommand");
+    }
+
+    /**
+     * Mời một nhân vật vào nhóm THEO TÊN. Server tự tra tên và trả {@code TARGET_NOT_FOUND} nếu sai
+     * — client KHÔNG kiểm trước (Điều 24), cùng cách {@code sendChatMessage} làm với kênh riêng.
+     */
+    void invitePartyMember(String targetName) {
+        InvitePartyMemberCommand command =
+                InvitePartyMemberCommand.newBuilder().setTargetName(targetName).build();
+        send(Opcode.OPCODE_INVITE_PARTY_MEMBER_COMMAND_VALUE, command.toByteArray(), "InvitePartyMemberCommand");
+    }
+
+    /** @param inviteId lấy từ {@code PendingPartyInviteView} — client không tự sinh id nào. */
+    void acceptPartyInvite(long inviteId) {
+        AcceptPartyInviteCommand command =
+                AcceptPartyInviteCommand.newBuilder().setInviteId(inviteId).build();
+        send(Opcode.OPCODE_ACCEPT_PARTY_INVITE_COMMAND_VALUE, command.toByteArray(), "AcceptPartyInviteCommand");
+    }
+
+    /** @param inviteId xem {@link #acceptPartyInvite(long)}. */
+    void rejectPartyInvite(long inviteId) {
+        RejectPartyInviteCommand command =
+                RejectPartyInviteCommand.newBuilder().setInviteId(inviteId).build();
+        send(Opcode.OPCODE_REJECT_PARTY_INVITE_COMMAND_VALUE, command.toByteArray(), "RejectPartyInviteCommand");
+    }
+
+    /**
+     * Rời nhóm. Dùng chung cho CẢ trưởng nhóm lẫn thành viên thường — trưởng rời thì server tự thăng
+     * người vào sớm nhất, không có lệnh giải tán riêng (party.proto).
+     */
+    void leaveParty() {
+        send(
+                Opcode.OPCODE_LEAVE_PARTY_COMMAND_VALUE,
+                LeavePartyCommand.newBuilder().build().toByteArray(),
+                "LeavePartyCommand");
+    }
+
+    /** Đuổi một thành viên THEO TÊN — xem {@link #invitePartyMember(String)} về việc gửi tên. */
+    void kickPartyMember(String targetName) {
+        KickPartyMemberCommand command =
+                KickPartyMemberCommand.newBuilder().setTargetName(targetName).build();
+        send(Opcode.OPCODE_KICK_PARTY_MEMBER_COMMAND_VALUE, command.toByteArray(), "KickPartyMemberCommand");
+    }
+
+    void getMyParty() {
+        send(
+                Opcode.OPCODE_GET_MY_PARTY_REQUEST_VALUE,
+                GetMyPartyRequest.newBuilder().build().toByteArray(),
+                "GetMyPartyRequest");
+    }
+
+    void listPartyMembers() {
+        send(
+                Opcode.OPCODE_LIST_PARTY_MEMBERS_REQUEST_VALUE,
+                ListPartyMembersRequest.newBuilder().build().toByteArray(),
+                "ListPartyMembersRequest");
+    }
+
+    void listPendingPartyInvites() {
+        send(
+                Opcode.OPCODE_LIST_PENDING_PARTY_INVITES_REQUEST_VALUE,
+                ListPendingPartyInvitesRequest.newBuilder().build().toByteArray(),
+                "ListPendingPartyInvitesRequest");
     }
 
     /** Gói tin đến từ server — {@code null} khi hàng đợi rỗng (xem {@link GameConnection}). */

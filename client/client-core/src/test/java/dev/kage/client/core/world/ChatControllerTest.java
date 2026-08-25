@@ -29,15 +29,58 @@ class ChatControllerTest {
     }
 
     @Test
-    @DisplayName("Đổi kênh xoay vòng Thế giới ↔ Khu vực, không chạm Bang hội/Party")
-    void togglesBetweenWorldAndArea() {
+    @DisplayName("Chưa vào nhóm: xoay vòng Thế giới ↔ Khu vực, không có kênh Nhóm")
+    void togglesBetweenWorldAndAreaWhenPartyless() {
         assertThat(controller.channel()).isEqualTo(ChatChannel.CHAT_CHANNEL_WORLD);
 
         controller.toggleChannel();
         assertThat(controller.channel()).isEqualTo(ChatChannel.CHAT_CHANNEL_AREA);
 
+        // Kênh Nhóm KHÔNG được xuất hiện ở đây — một nút chỉ để nhận NOT_IN_PARTY là nút hỏng.
         controller.toggleChannel();
         assertThat(controller.channel()).isEqualTo(ChatChannel.CHAT_CHANNEL_WORLD);
+    }
+
+    @Test
+    @DisplayName("Đang trong nhóm: kênh Nhóm chen vào giữa Khu vực và Thế giới")
+    void includesPartyChannelWhenInParty() {
+        controller.setPartyAvailable(true);
+
+        controller.toggleChannel();
+        assertThat(controller.channel()).isEqualTo(ChatChannel.CHAT_CHANNEL_AREA);
+
+        controller.toggleChannel();
+        assertThat(controller.channel()).isEqualTo(ChatChannel.CHAT_CHANNEL_PARTY);
+
+        controller.toggleChannel();
+        assertThat(controller.channel()).isEqualTo(ChatChannel.CHAT_CHANNEL_WORLD);
+    }
+
+    @Test
+    @DisplayName("Rời nhóm trong lúc ĐANG chọn kênh Nhóm thì rơi về Thế giới ngay")
+    void fallsBackToWorldWhenLeavingPartyOnPartyChannel() {
+        controller.setPartyAvailable(true);
+        controller.toggleChannel();
+        controller.toggleChannel();
+        assertThat(controller.channel()).isEqualTo(ChatChannel.CHAT_CHANNEL_PARTY);
+
+        // Không rơi về thì câu tiếp theo gõ vào sẽ bay đi rồi bật lại lỗi, trong khi người chơi
+        // tưởng mình đang nói với nhóm.
+        controller.setPartyAvailable(false);
+
+        assertThat(controller.channel()).isEqualTo(ChatChannel.CHAT_CHANNEL_WORLD);
+    }
+
+    @Test
+    @DisplayName("Đang ở kênh Khu vực mà rời nhóm thì KHÔNG bị kéo về Thế giới oan")
+    void keepsAreaChannelWhenLeavingParty() {
+        controller.setPartyAvailable(true);
+        controller.toggleChannel();
+        assertThat(controller.channel()).isEqualTo(ChatChannel.CHAT_CHANNEL_AREA);
+
+        controller.setPartyAvailable(false);
+
+        assertThat(controller.channel()).isEqualTo(ChatChannel.CHAT_CHANNEL_AREA);
     }
 
     @Test
