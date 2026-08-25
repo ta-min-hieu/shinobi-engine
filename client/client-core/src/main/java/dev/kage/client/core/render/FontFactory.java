@@ -1,5 +1,7 @@
 package dev.kage.client.core.render;
 
+import java.util.BitSet;
+
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
@@ -33,6 +35,36 @@ public final class FontFactory {
                     // nằm trong khối ASCII in được ở trên (chỉ có hyphen-minus U+002D).
                     + "ÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚÝàáâãèéêìíòóôõùúýĂăĐđĨĩŨũƠơƯư"
                     + "ẠạẢảẤấẦầẨẩẪẫẬậẮắẰằẲẳẴẵẶặẸẹẺẻẼẽẾếỀềỂểỄễỆệỈỉỊịỌọỎỏỐốỒồỔổỖỗỘộỚớỜờỞởỠỡỢợỤụỦủỨứỪừỬửỮữỰựỲỳỴỵỶỷỸỹ";
+
+    /**
+     * Tập code point có glyph, dựng SẴN một lần từ {@link #VIETNAMESE_CHARACTERS} — tra bằng
+     * {@link #canRender(char)} thay vì {@code indexOf} tuyến tính trên chuỗi ~250 ký tự mỗi lần.
+     */
+    private static final BitSet RENDERABLE = renderableSet();
+
+    private static BitSet renderableSet() {
+        BitSet set = new BitSet();
+        for (int index = 0; index < VIETNAMESE_CHARACTERS.length(); index++) {
+            set.set(VIETNAMESE_CHARACTERS.charAt(index));
+        }
+        return set;
+    }
+
+    /**
+     * Ký tự này có hiện ra được bằng font UI hay không.
+     *
+     * <p>Cần thiết vì {@link BitmapFont} sinh từ {@link #VIETNAMESE_CHARACTERS} <b>im lặng bỏ qua</b>
+     * mọi glyph ngoài tập đó — chữ biến mất chứ không có ô vuông thay thế, cũng không có exception.
+     * Vô hại khi mọi chuỗi hiển thị đều đến từ bundle i18n do chính dự án viết; thành cái bẫy thật
+     * ngay khi màn hình bắt đầu hiện <b>chữ do người chơi khác gõ</b> (khung chat) — người nhận sẽ
+     * thấy một tin nhắn cụt lủn mà không hiểu vì sao.
+     *
+     * @param character ký tự cần kiểm tra
+     * @return {@code true} nếu font UI vẽ được ký tự này
+     */
+    public static boolean canRender(char character) {
+        return RENDERABLE.get(character);
+    }
 
     private FontFactory() {}
 

@@ -7,19 +7,21 @@ import org.slf4j.LoggerFactory;
 
 import dev.kage.client.core.net.GameConnection;
 import dev.kage.protocol.AttackCommand;
+import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ClaimQuestRewardCommand;
 import dev.kage.protocol.JumpCommand;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SelectDialogueOptionCommand;
+import dev.kage.protocol.SendChatMessageCommand;
 import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.TalkToNpcCommand;
 import dev.kage.protocol.UseSkillCommand;
 import dev.kage.protocol.wire.PacketCodec;
 
 /**
- * Gửi Ý ĐỊNH của người chơi lên server (CLIENT.md §1 — client không bao giờ gửi KẾT QUẢ). Gom cả
- * năm lệnh gameplay về một chỗ vì chúng chia sẻ đúng một quyết định đáng nhớ: <b>mất kết nối tạm
+ * Gửi Ý ĐỊNH của người chơi lên server (CLIENT.md §1 — client không bao giờ gửi KẾT QUẢ). Gom mọi
+ * lệnh gameplay về một chỗ vì chúng chia sẻ đúng một quyết định đáng nhớ: <b>mất kết nối tạm
  * thời KHÔNG phải lỗi</b>.
  *
  * <p>{@link GameConnection} tự kết nối lại; ý định mới nhất sẽ được gửi ở lần người chơi thao tác
@@ -105,6 +107,27 @@ final class WorldCommandSender {
                 .setIdempotencyKey(idempotencyKey)
                 .build();
         send(Opcode.OPCODE_CLAIM_QUEST_REWARD_COMMAND_VALUE, command.toByteArray(), "ClaimQuestRewardCommand");
+    }
+
+    /**
+     * Gửi một tin nhắn chat.
+     *
+     * <p>KHÔNG có {@code idempotency_key} và đó là đúng: gửi trùng một tin nhắn chỉ làm nó hiện hai
+     * lần, không trừ vàng cũng không đổi trạng thái nào (khác {@code BuyItemCommand}/
+     * {@code ClaimQuestRewardCommand}, ADR-025) — thêm khoá vào đây là trả giá cho một rủi ro không
+     * tồn tại.
+     *
+     * @param targetName chỉ có nghĩa với {@link ChatChannel#CHAT_CHANNEL_PRIVATE}; chuỗi rỗng cho
+     *     mọi kênh khác. Server tự tra nhân vật theo tên và trả
+     *     {@code TARGET_NOT_FOUND}/{@code TARGET_OFFLINE} — client KHÔNG kiểm trước (Điều 24).
+     */
+    void sendChatMessage(ChatChannel channel, String targetName, String body) {
+        SendChatMessageCommand command = SendChatMessageCommand.newBuilder()
+                .setChannel(channel)
+                .setTargetName(targetName)
+                .setBody(body)
+                .build();
+        send(Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE, command.toByteArray(), "SendChatMessageCommand");
     }
 
     /** Gói tin đến từ server — {@code null} khi hàng đợi rỗng (xem {@link GameConnection}). */

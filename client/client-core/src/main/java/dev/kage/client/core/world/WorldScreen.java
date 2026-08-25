@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import dev.kage.client.core.input.GameAction;
 import dev.kage.client.core.input.InputMapper;
 import dev.kage.client.core.net.GameConnection;
+import dev.kage.client.core.ui.hud.ChatPanel;
 import dev.kage.client.core.ui.hud.CombatHud;
 import dev.kage.client.core.ui.hud.DialoguePanel;
 import dev.kage.engine.core.GameScreen;
@@ -128,14 +129,16 @@ public final class WorldScreen implements GameScreen {
     /** Luồng hội thoại (trạng thái + mạng + panel) — xem {@link DialogueCoordinator}. */
     private final DialogueCoordinator dialogue;
 
+    /** Khung chat — mượn skin của {@link #combatHud} như {@link #dialoguePanel}. */
+    private final ChatPanel chatPanel = new ChatPanel(combatHud.skin(), ChatController.MAX_LINES);
+
+    /** Luồng chat (nhật ký + kênh + mạng) — xem {@link ChatCoordinator}. */
+    private final ChatCoordinator chat;
+
     /** Vòng đời nhiệm vụ: nhận → hoàn thành → lĩnh thưởng — xem {@link QuestCoordinator}. */
     private final QuestCoordinator quests;
 
-    /**
-     * HUD trước, thế giới sau: {@code Stage} trả {@code true} ở {@code touchDown} CHỈ KHI có actor
-     * thật nhận cú click, nên bấm nút skill không đồng thời bị hiểu là click chọn mục tiêu, còn
-     * click ra vùng trống của HUD thì rơi xuống {@link WorldTargetPicker} đúng như mong đợi.
-     */
+    /** Xem {@link #buildInputProcessor()} về thứ tự nuốt input. */
     private final InputMultiplexer inputProcessor;
 
     private float lastSentDirX;
@@ -203,13 +206,26 @@ public final class WorldScreen implements GameScreen {
         // nhánh nhận quest/mở cửa hàng.
         this.quests = new QuestCoordinator(combatHud, sender, combatFeedback);
         this.dialogue = new DialogueCoordinator(dialoguePanel, sender, combatFeedback, quests);
+        this.chat = new ChatCoordinator(chatPanel, sender);
 
         combatHud.setSkillLabel(combatHudController.skillNameKey());
         combatHud.setOnSkillClicked(this::onSkillButtonClicked);
         combatHud.setOnAttackClicked(attackInput::onButtonClicked);
-        // Hội thoại TRƯỚC HUD trước thế giới: đang nói chuyện mà bấm trúng nút Đánh phía sau, hoặc
-        // click xuyên qua khung thoại để chọn mục tiêu, đều là hỏng.
-        this.inputProcessor = new InputMultiplexer(dialoguePanel.stage(), combatHud.stage(), new WorldTargetPicker());
+        this.inputProcessor = buildInputProcessor();
+    }
+
+    /**
+     * Thứ tự nuốt input: hội thoại → chat → HUD → thế giới.
+     *
+     * <p>Hội thoại đứng đầu vì đang nói chuyện mà bấm trúng nút Đánh phía sau, hoặc click xuyên qua
+     * khung thoại để chọn mục tiêu, đều là hỏng. Chat đứng trên HUD vì click vào nhật ký chat không
+     * được rơi xuống tầng thế giới thành lệnh chọn mục tiêu. HUD trên thế giới vì {@code Stage} chỉ
+     * trả {@code true} ở {@code touchDown} khi có actor thật nhận cú click, nên bấm vào vùng trống
+     * của HUD vẫn rơi xuống {@link WorldTargetPicker} đúng như mong đợi.
+     */
+    private InputMultiplexer buildInputProcessor() {
+        return new InputMultiplexer(
+                dialoguePanel.stage(), chatPanel.stage(), combatHud.stage(), new WorldTargetPicker());
     }
 
     @Override
@@ -226,6 +242,7 @@ public final class WorldScreen implements GameScreen {
         // Khung hội thoại không được sống sót qua một lần rời màn hình — quay lại sẽ thấy nó treo ở
         // node cũ trong khi server đã quên sạch cuộc nói chuyện đó.
         dialogue.reset();
+        chat.reset();
     }
 
     @Override
@@ -234,6 +251,7 @@ public final class WorldScreen implements GameScreen {
         models.resize(camera.viewportWidth, camera.viewportHeight);
         combatHud.resize(width, height);
         dialoguePanel.resize(width, height);
+        chatPanel.resize(width, height);
         combatFeedback.resize(width, height);
     }
 
@@ -265,6 +283,7 @@ public final class WorldScreen implements GameScreen {
             // sẽ làm mất đúng một trong hai việc.
             boolean handled = quests.dispatch(opcode, payload);
             handled |= dialogue.dispatch(opcode, payload);
+            handled |= chat.dispatch(opcode, payload);
             if (!handled && !dispatchMovement(opcode, payload)) {
                 dispatchCombat(opcode, payload);
             }
@@ -425,6 +444,25 @@ public final class WorldScreen implements GameScreen {
     }
 
     /**
+     * Phím gameplay, đã trừ đi lúc người chơi đang gõ chat.
+     *
+     * <p>MỌI chỗ đọc input đi qua đây thay vì gọi thẳng {@link InputMapper} — và đó là điểm mấu
+     * chốt, không phải chuyện gọn gàng. Phím gameplay được <b>poll</b> qua
+     * {@code Gdx.input.isKeyPressed} chứ không nhận qua {@code InputProcessor}, tức là chúng đi vòng
+     * qua lưng {@code InputMultiplexer}: {@code Stage} của khung chat có nuốt phím hay không cũng
+     * không ngăn được chữ "a" vừa gõ đồng thời làm nhân vật chạy sang trái. Chặn tập trung ở một
+     * hàm thì không thể sót một loại input nào; rải {@code if} ở từng chỗ đọc thì sót là chuyện sớm
+     * muộn.
+     *
+     * <p>Trả {@code false} đều tay cho MỌI action cũng chính là thứ làm nhân vật <b>dừng lại</b>
+     * trên server: {@link #updateLocalMovementIntent} thấy hướng đổi thành 0 và tự gửi
+     * {@code MoveCommand} một lần — không cần đường dừng riêng.
+     */
+    private boolean isPressed(GameAction action) {
+        return !chat.isComposing() && inputMapper.isPressed(action);
+    }
+
+    /**
      * ADR-033 — chỉ còn trái/phải (bỏ MOVE_UP/MOVE_DOWN, xem {@link GameAction}). {@code dirY} LUÔN
      * gửi {@code 0f}: field còn tồn tại trên dây (movement.proto không xoá field đang dùng,
      * shared/CLAUDE.md) nhưng server-world giờ bỏ qua nó (WorldFacade.handleMoveIntent) — giữ 0
@@ -432,10 +470,10 @@ public final class WorldScreen implements GameScreen {
      */
     private void updateLocalMovementIntent() {
         float dirX = 0f;
-        if (inputMapper.isPressed(GameAction.MOVE_LEFT)) {
+        if (isPressed(GameAction.MOVE_LEFT)) {
             dirX -= 1f;
         }
-        if (inputMapper.isPressed(GameAction.MOVE_RIGHT)) {
+        if (isPressed(GameAction.MOVE_RIGHT)) {
             dirX += 1f;
         }
         // dirX chỉ có thể là -1/0/1 (2 flag loại trừ cùng lúc) — không cần chuẩn hoá độ dài như
@@ -462,7 +500,7 @@ public final class WorldScreen implements GameScreen {
      * {@link JumpInputController}; ở đây chỉ nối input với mạng.
      */
     private void updateJumpIntent(float fixedDeltaTime) {
-        boolean jumpPressed = inputMapper.isPressed(GameAction.JUMP);
+        boolean jumpPressed = isPressed(GameAction.JUMP);
         if (jumpInput.update(jumpPressed, POSITION.get(localPlayer), fixedDeltaTime)) {
             sender.jump();
         }
@@ -477,7 +515,7 @@ public final class WorldScreen implements GameScreen {
     private void updateAttackIntent(float fixedDeltaTime) {
         // Đang nói chuyện thì phím Z/Enter thuộc về khung thoại, không phải về combat: người chơi
         // đang đọc chữ, không nhắm ai. Vẫn cho đi lại/nhảy — đứng hình khi mở thoại còn khó chịu hơn.
-        if (dialogue.isOpen() || !attackInput.update(inputMapper.isPressed(GameAction.ATTACK), fixedDeltaTime)) {
+        if (dialogue.isOpen() || !attackInput.update(isPressed(GameAction.ATTACK), fixedDeltaTime)) {
             return;
         }
         CombatHudController.MonsterState target = combatHudController.targetState();
@@ -510,7 +548,7 @@ public final class WorldScreen implements GameScreen {
      * kiểm y hệt. Rising edge: giữ Enter không bắn skill liên tục.
      */
     private void updateSkillIntent() {
-        boolean skillPressed = inputMapper.isPressed(GameAction.USE_SKILL);
+        boolean skillPressed = isPressed(GameAction.USE_SKILL);
         if (skillPressed && !skillKeyWasPressed && !dialogue.isOpen()) {
             onSkillButtonClicked();
         }
@@ -548,6 +586,9 @@ public final class WorldScreen implements GameScreen {
             return false; // click vào chỗ trống — GIỮ NGUYÊN mục tiêu cũ, không bỏ chọn.
         }
         NpcPresenter.NpcState npc = npcPresenter.npcs().get(npcId);
+        // Hai khung nhập liệu cùng mở là một cái bẫy phím: ESC sẽ đóng khung thoại (nó đứng trước
+        // trong InputMultiplexer) chứ không đóng ô chat đang giữ keyboard focus.
+        chat.closeComposer();
         dialogue.talkTo(npc.code());
         return true;
     }
@@ -575,6 +616,7 @@ public final class WorldScreen implements GameScreen {
 
         syncCombatHud();
         combatHud.render(Gdx.graphics.getDeltaTime());
+        chatPanel.render(Gdx.graphics.getDeltaTime());
         dialoguePanel.render(Gdx.graphics.getDeltaTime());
     }
 
@@ -680,6 +722,7 @@ public final class WorldScreen implements GameScreen {
         combatFeedback.dispose();
         // TRƯỚC combatHud như combatFeedback, và cùng lý do: panel mượn skin của HUD.
         dialoguePanel.dispose();
+        chatPanel.dispose();
         combatHud.dispose();
     }
 

@@ -28,6 +28,7 @@ public final class HudPreviewTool extends ApplicationAdapter {
 
     private CombatHud hud;
     private DialoguePanel dialoguePanel;
+    private ChatPanel chatPanel;
     private int frame;
 
     @Override
@@ -61,6 +62,29 @@ public final class HudPreviewTool extends ApplicationAdapter {
                         "dialogue.option.accept_quest_kill_dummies",
                         "dialogue.option.open_shop",
                         "dialogue.option.bye"));
+
+        // Khung chat (2026-08-25) — nhật ký ĐẦY (8 dòng, trần thật của ChatController) + ô nhập
+        // đang mở: hai thứ cùng lúc là trạng thái CAO NHẤT của khung này, tức là trạng thái duy
+        // nhất đủ để thấy nó có đè lên thanh gợi ý phím hay nút Đánh hay không.
+        chatPanel = new ChatPanel(hud.skin(), 6);
+        chatPanel.resize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        chatPanel.setChannelLabel("Thế giới"); // nhãn DÀI NHẤT — nút phải chứa nổi nó, xem preview cũ
+        chatPanel.setLines(
+                java.util.List.of(
+                        "Nhấn T để chat. /w <tên> <nội dung> = nhắn riêng.",
+                        "[Thế giới] KageHoa: có ai đi bãi tập không, mình thiếu 2 con nữa là xong nhiệm vụ",
+                        "[Khu vực] PhongVan: ai bán kunai rẻ không",
+                        "[Riêng] ThoSon: ê, lát nữa lập nhóm nhé",
+                        "Nhắn chậm thôi!",
+                        "[Khu vực] KageHoa: xong rồi, cảm ơn cả nhà — hẹn gặp lại!"),
+                java.util.List.of(
+                        ChatPanel.LineKind.SYSTEM,
+                        ChatPanel.LineKind.WORLD,
+                        ChatPanel.LineKind.AREA,
+                        ChatPanel.LineKind.PRIVATE,
+                        ChatPanel.LineKind.SYSTEM,
+                        ChatPanel.LineKind.AREA));
+        chatPanel.openComposer();
     }
 
     @Override
@@ -70,6 +94,7 @@ public final class HudPreviewTool extends ApplicationAdapter {
         Gdx.gl.glClearColor(0.22f, 0.42f, 0.16f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         hud.render(1f / 60f);
+        chatPanel.render(1f / 60f);
         dialoguePanel.render(1f / 60f);
         frame++;
         if (frame == 30) {
@@ -88,6 +113,9 @@ public final class HudPreviewTool extends ApplicationAdapter {
     public void dispose() {
         if (dialoguePanel != null) {
             dialoguePanel.dispose(); // TRƯỚC hud: panel mượn skin của hud
+        }
+        if (chatPanel != null) {
+            chatPanel.dispose(); // TRƯỚC hud, cùng lý do dialoguePanel
         }
         if (hud != null) {
             hud.dispose();

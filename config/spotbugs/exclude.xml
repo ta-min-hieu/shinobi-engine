@@ -258,6 +258,18 @@
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
 
+    <!-- ChatPanel.stage() — lần thứ ba cùng một lý do (CombatHud, DialoguePanel ngay trên):
+         WorldScreen phải đưa đúng instance Stage đó vào InputMultiplexer để đặt thứ tự nuốt input,
+         thứ chỉ đặt được cho cả một Stage chứ không cho một actor bên trong (xem javadoc ChatPanel
+         + WorldScreen#buildInputProcessor). Stage Scene2D là live mutable UI scene, không phải value
+         object. Ba lần lặp lại nhưng vẫn giữ 3 <Match> riêng thay vì gộp regex: STATIC-ANALYSIS.md
+         §10 đòi suppress HẸP NHẤT, và một regex `~.*Panel|Hud` sẽ tự động tha cho mọi widget HUD
+         viết sau này mà không ai kịp nhìn lại. -->
+    <Match>
+        <Class name="dev.kage.client.core.ui.hud.ChatPanel"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
     <!-- KageSkin.font() lộ BitmapFont dùng chung có chủ đích — public accessor cho caller cần vẽ
          thủ công bằng đúng font đã nạp (VD Batch.draw ngoài Label/TextField có sẵn style). Font
          FreeType native-backed, "copy phòng thủ" nghĩa là dựng lại nguyên glyph atlas tốn kém vô

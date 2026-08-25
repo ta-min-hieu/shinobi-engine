@@ -1,0 +1,182 @@
+package dev.kage.client.core.world;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import com.badlogic.gdx.utils.I18NBundle;
+import com.google.protobuf.InvalidProtocolBufferException;
+
+import dev.kage.client.core.ui.hud.ChatPanel;
+import dev.kage.client.core.ui.theme.KageI18n;
+import dev.kage.protocol.ChatChannel;
+import dev.kage.protocol.ChatMessageEvent;
+import dev.kage.protocol.Opcode;
+import dev.kage.protocol.SendChatMessageResponse;
+
+/**
+ * Nối {@link ChatController} (trạng thái), {@link ChatPanel} (hiển thị) và {@link WorldCommandSender}
+ * (mạng) thành khung chat chạy được (2026-08-25) — cùng hình dạng {@link DialogueCoordinator}, và
+ * cùng lý do tồn tại: {@code WorldScreen} đang ở ĐÚNG trần {@code CyclomaticComplexity} của PMD.
+ *
+ * <p>Kênh Bang hội/Party (chat.proto có, server có) cố tình KHÔNG bày ra: client chưa nối một opcode
+ * nào của Guild (700-799) hay Party (1300-1399), nên người chơi không thể vào bang/party để mà nhắn
+ * — bày kênh ra chỉ để nhận {@code NOT_IN_GUILD} là bày ra một nút hỏng.
+ */
+final class ChatCoordinator {
+
+    private final ChatController controller = new ChatController();
+    private final ChatPanel panel;
+    private final WorldCommandSender sender;
+    private final I18NBundle i18n = KageI18n.load();
+
+    /** Đệm dựng sẵn cho {@link ChatPanel#setLines} — chỉ đổi khi CÓ TIN MỚI, không phải mỗi khung. */
+    private final List<String> renderedLines = new ArrayList<>();
+
+    private final List<ChatPanel.LineKind> lineKinds = new ArrayList<>();
+
+    ChatCoordinator(ChatPanel panel, WorldCommandSender sender) {
+        this.panel = panel;
+        this.sender = sender;
+        panel.setOnSend(this::onSend);
+        panel.setOnChannelToggle(this::onChannelToggle);
+        refreshChannelLabel();
+        // Dòng đầu tiên của nhật ký là hướng dẫn: phím T và cú pháp /w không xuất hiện ở đâu khác
+        // trên màn hình (thanh gợi ý của CombatHud chỉ có phím gameplay), nên không nói ra ở đây thì
+        // khung chat coi như không tồn tại với người chơi lần đầu.
+        controller.appendSystem(text("chat.hint.open"));
+        refreshLines();
+    }
+
+    /**
+     * Đang gõ hay không — {@code WorldScreen} phải chặn MỌI phím gameplay khi câu này đúng, xem
+     * {@link ChatPanel#isComposing()}.
+     */
+    boolean isComposing() {
+        return panel.isComposing();
+    }
+
+    /** Đóng ô nhập (mở hội thoại NPC, rời màn hình) — nhật ký vẫn giữ nguyên. */
+    void closeComposer() {
+        panel.closeComposer();
+    }
+
+    /**
+     * Định tuyến một gói có thể thuộc luồng chat.
+     *
+     * @return {@code true} nếu gói đã được xử lý ở đây.
+     */
+    boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+        if (opcode == Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE) {
+            controller.onMessage(ChatMessageEvent.parseFrom(payload));
+            refreshLines();
+            return true;
+        }
+        if (opcode == Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE) {
+            onSendResponse(SendChatMessageResponse.parseFrom(payload));
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Kết quả lệnh gửi. {@code OK} không có gì để nói — tin nhắn tự hiện ra qua
+     * {@link ChatMessageEvent} mà server dội về, KỂ CẢ cho chính người gửi (chat.proto: Thế giới gửi
+     * toàn server, Khu vực gửi cho mọi quan sát viên AoI "gồm cả người gửi").
+     *
+     * <p>Ngoại lệ là kênh RIÊNG: server chỉ gửi cho đúng một người nhận, nên người gửi KHÔNG bao giờ
+     * thấy tin của chính mình. Chỗ này cố tình bỏ trống thay vì tự bịa dòng "đã gửi tới X" — client
+     * không có {@code target_name} lúc nhận response (chat.proto: {@code SendChatMessageResponse}
+     * chỉ mang {@code outcome}), và đoán bừa là đúng loại lỗi mà giao thức bày ra để mắc phải.
+     */
+    private void onSendResponse(SendChatMessageResponse response) {
+        ChatController.outcomeMessageKey(response.getOutcome()).ifPresent(messageKey -> {
+            controller.appendSystem(text(messageKey));
+            refreshLines();
+        });
+    }
+
+    private void onSend(String typed) {
+        ChatController.ComposeResult result = controller.compose(typed);
+        switch (result) {
+            case ChatController.ComposeResult.Send send ->
+                sender.sendChatMessage(send.channel(), send.targetName(), send.body());
+            case ChatController.ComposeResult.Reject reject -> {
+                controller.appendSystem(text(reject.messageKey()));
+                refreshLines();
+            }
+            case ChatController.ComposeResult.Nothing ignored -> {
+                // Ô nhập rỗng — đã đóng rồi, không có gì để làm.
+            }
+        }
+    }
+
+    private void onChannelToggle() {
+        controller.toggleChannel();
+        refreshChannelLabel();
+    }
+
+    private void refreshChannelLabel() {
+        panel.setChannelLabel(text(channelNameKey(controller.channel())));
+    }
+
+    private void refreshLines() {
+        renderedLines.clear();
+        lineKinds.clear();
+        for (ChatController.Line line : controller.lines()) {
+            renderedLines.add(render(line));
+            lineKinds.add(kindOf(line.channel()));
+        }
+        panel.setLines(renderedLines, lineKinds);
+    }
+
+    /**
+     * Ghép một dòng hiển thị: {@code [Kênh] Tên: nội dung}. Tên rỗng = dòng của hệ thống, không có
+     * người gửi nào để mà nêu tên.
+     */
+    private String render(ChatController.Line line) {
+        if (line.senderName().isEmpty()) {
+            return line.body();
+        }
+        return "[" + text(channelNameKey(line.channel())) + "] " + line.senderName() + ": " + line.body();
+    }
+
+    private static String channelNameKey(ChatChannel channel) {
+        return switch (channel) {
+            case CHAT_CHANNEL_WORLD -> "chat.channel.world";
+            case CHAT_CHANNEL_AREA -> "chat.channel.area";
+            case CHAT_CHANNEL_PRIVATE -> "chat.channel.private";
+            case CHAT_CHANNEL_GUILD -> "chat.channel.guild";
+            case CHAT_CHANNEL_PARTY -> "chat.channel.party";
+            // Không gửi được nhưng NHẬN được: server mới hơn client thêm kênh mới, hoặc dòng hệ
+            // thống (không thuộc kênh nào). Cả hai đều cần một cái tên để không vỡ bố cục.
+            case CHAT_CHANNEL_UNSPECIFIED, UNRECOGNIZED -> "chat.channel.system";
+        };
+    }
+
+    private static ChatPanel.LineKind kindOf(ChatChannel channel) {
+        return switch (channel) {
+            case CHAT_CHANNEL_AREA -> ChatPanel.LineKind.AREA;
+            case CHAT_CHANNEL_PRIVATE -> ChatPanel.LineKind.PRIVATE;
+            case CHAT_CHANNEL_WORLD, CHAT_CHANNEL_GUILD, CHAT_CHANNEL_PARTY -> ChatPanel.LineKind.WORLD;
+            case CHAT_CHANNEL_UNSPECIFIED, UNRECOGNIZED -> ChatPanel.LineKind.SYSTEM;
+        };
+    }
+
+    /** Tra bản dịch, thiếu thì hiện thẳng khoá — cùng lý do {@code DialoguePanel#text}. */
+    private String text(String key) {
+        try {
+            return i18n.get(key);
+        } catch (java.util.MissingResourceException e) {
+            return key;
+        }
+    }
+
+    /** Rời màn hình/mất kết nối — nhật ký của một phiên chơi không được sống sót sang phiên sau. */
+    void reset() {
+        controller.clear();
+        panel.closeComposer();
+        refreshChannelLabel();
+        controller.appendSystem(text("chat.hint.open"));
+        refreshLines();
+    }
+}
