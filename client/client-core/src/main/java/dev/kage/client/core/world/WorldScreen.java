@@ -23,6 +23,7 @@ import dev.kage.client.core.ui.hud.CombatHud;
 import dev.kage.client.core.ui.hud.DialoguePanel;
 import dev.kage.client.core.ui.hud.PartyPanel;
 import dev.kage.client.core.ui.hud.FriendPanel;
+import dev.kage.client.core.ui.hud.GuildPanel;
 import dev.kage.engine.core.GameScreen;
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.EcsWorld;
@@ -147,6 +148,11 @@ public final class WorldScreen implements GameScreen {
 
     /** Luồng bạn bè (danh sách + lời mời + mạng) — xem {@link FriendCoordinator}. */
     private final FriendCoordinator friends;
+    /** Khung bang hội (phím G) — mượn skin của {@link #combatHud} như {@link #chatPanel}. */
+    private final GuildPanel guildPanel = new GuildPanel(combatHud.skin());
+
+    /** Luồng bang hội (tạo/xin gia nhập/duyệt/đuổi + mạng) — xem {@link GuildCoordinator}. */
+    private final GuildCoordinator guild;
 
     /** Vòng đời nhiệm vụ: nhận → hoàn thành → lĩnh thưởng — xem {@link QuestCoordinator}. */
     private final QuestCoordinator quests;
@@ -223,6 +229,7 @@ public final class WorldScreen implements GameScreen {
         // SAU chat: coordinator nhóm mượn nhật ký chat làm chỗ báo lý do lệnh thất bại.
         this.party = new PartyCoordinator(partyPanel, sender, chat);
         this.friends = new FriendCoordinator(friendPanel, sender, combatFeedback, this::isTextInputActive);
+        this.guild = new GuildCoordinator(guildPanel, sender, this::isTextInputActive);
 
         combatHud.setSkillLabel(combatHudController.skillNameKey());
         combatHud.setOnSkillClicked(this::onSkillButtonClicked);
@@ -231,11 +238,13 @@ public final class WorldScreen implements GameScreen {
     }
 
     /**
-     * Thứ tự nuốt input: hội thoại → nhóm → chat → HUD → thế giới.
+     * Thứ tự nuốt input: hội thoại → nhóm → bạn bè → bang hội → chat → HUD → thế giới.
      *
      * <p>Hội thoại đứng đầu vì đang nói chuyện mà bấm trúng nút Đánh phía sau, hoặc click xuyên qua
-     * khung thoại để chọn mục tiêu, đều là hỏng. Cửa sổ Nhóm nằm ngay sau nó vì nó che GIỮA màn
-     * hình, đè lên cả chat lẫn HUD. Chat đứng trên HUD vì click vào nhật ký chat không
+     * khung thoại để chọn mục tiêu, đều là hỏng. Ba cửa sổ che GIỮA màn hình (Nhóm, Bạn bè, Bang
+     * hội) đứng ngay sau vì chúng đè lên cả chat lẫn HUD; thứ tự GIỮA ba cái với nhau không quan
+     * trọng — {@link #isTextInputActive()} đảm bảo không bao giờ có hai cái cùng mở. Chat đứng trên
+     * HUD vì click vào nhật ký chat không
      * được rơi xuống tầng thế giới thành lệnh chọn mục tiêu. HUD trên thế giới vì {@code Stage} chỉ
      * trả {@code true} ở {@code touchDown} khi có actor thật nhận cú click, nên bấm vào vùng trống
      * của HUD vẫn rơi xuống {@link WorldTargetPicker} đúng như mong đợi.
@@ -247,6 +256,7 @@ public final class WorldScreen implements GameScreen {
                 dialoguePanel.stage(),
                 partyPanel.stage(),
                 friendPanel.stage(),
+                guildPanel.stage(),
                 chatPanel.stage(),
                 combatHud.stage(),
                 new WorldTargetPicker());
@@ -269,6 +279,7 @@ public final class WorldScreen implements GameScreen {
         chat.reset();
         party.reset();
         friends.reset();
+        guild.reset();
     }
 
     @Override
@@ -280,6 +291,7 @@ public final class WorldScreen implements GameScreen {
         chatPanel.resize(width, height);
         partyPanel.resize(width, height);
         friendPanel.resize(width, height);
+        guildPanel.resize(width, height);
         combatFeedback.resize(width, height);
     }
 
@@ -314,6 +326,7 @@ public final class WorldScreen implements GameScreen {
             handled |= chat.dispatch(opcode, payload);
             handled |= party.dispatch(opcode, payload);
             handled |= friends.dispatch(opcode, payload);
+            handled |= guild.dispatch(opcode, payload);
             if (!handled && !dispatchMovement(opcode, payload)) {
                 dispatchCombat(opcode, payload);
             }
@@ -474,7 +487,7 @@ public final class WorldScreen implements GameScreen {
     }
 
     /**
-     * Phím gameplay, đã trừ đi lúc người chơi đang gõ chat.
+     * Phím gameplay, đã trừ đi lúc người chơi đang gõ chat hoặc đang mở khung bang hội.
      *
      * <p>MỌI chỗ đọc input đi qua đây thay vì gọi thẳng {@link InputMapper} — và đó là điểm mấu
      * chốt, không phải chuyện gọn gàng. Phím gameplay được <b>poll</b> qua
@@ -513,7 +526,7 @@ public final class WorldScreen implements GameScreen {
      * cũng không phải ý định gameplay, và mở đè một cửa sổ khác lên là hỏng.
      */
     private boolean isTextInputActive() {
-        return chat.isComposing() || dialogue.isOpen() || party.isOpen() || friends.isOpen();
+        return chat.isComposing() || dialogue.isOpen() || party.isOpen() || friends.isOpen() || guild.isOpen();
     }
 
     /**
@@ -645,6 +658,7 @@ public final class WorldScreen implements GameScreen {
         chat.closeComposer();
         party.close();
         friends.close();
+        guild.close();
         dialogue.talkTo(npc.code());
         return true;
     }
@@ -675,6 +689,7 @@ public final class WorldScreen implements GameScreen {
         chatPanel.render(Gdx.graphics.getDeltaTime());
         partyPanel.render(Gdx.graphics.getDeltaTime());
         friendPanel.render(Gdx.graphics.getDeltaTime());
+        guildPanel.render(Gdx.graphics.getDeltaTime());
         dialoguePanel.render(Gdx.graphics.getDeltaTime());
     }
 
@@ -783,6 +798,7 @@ public final class WorldScreen implements GameScreen {
         chatPanel.dispose();
         partyPanel.dispose();
         friendPanel.dispose();
+        guildPanel.dispose();
         combatHud.dispose();
     }
 

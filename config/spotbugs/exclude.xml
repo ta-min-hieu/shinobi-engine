@@ -284,6 +284,15 @@
     <Match>
         <Class name="dev.kage.client.core.ui.hud.FriendPanel"/>
         <Bug pattern="EI_EXPOSE_REP"/>
+    <!-- GuildPanel.stage() — lần thứ tư cùng một lý do (CombatHud, DialoguePanel, ChatPanel ngay
+         trên): WorldScreen phải đưa đúng instance Stage đó vào InputMultiplexer để đặt thứ tự nuốt
+         input, thứ chỉ đặt được cho cả một Stage chứ không cho một actor bên trong (xem javadoc
+         GuildPanel + WorldScreen#buildInputProcessor). Cũng lộ KageSkin nhận từ constructor: CHO
+         MƯỢN có chủ đích, sở hữu vẫn ở CombatHud — cùng lý do DialoguePanel. Vẫn giữ <Match> riêng
+         thay vì gộp regex, cùng lập luận đã ghi ở ChatPanel. -->
+    <Match>
+        <Class name="dev.kage.client.core.ui.hud.GuildPanel"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
 
     <!-- KageSkin.font() lộ BitmapFont dùng chung có chủ đích — public accessor cho caller cần vẽ

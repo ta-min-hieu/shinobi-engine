@@ -31,6 +31,24 @@ import dev.kage.protocol.RemoveFriendCommand;
 import dev.kage.protocol.SelectDialogueOptionCommand;
 import dev.kage.protocol.SendChatMessageCommand;
 import dev.kage.protocol.SendFriendRequestCommand;
+import dev.kage.protocol.ApproveGuildJoinRequestCommand;
+import dev.kage.protocol.AttackCommand;
+import dev.kage.protocol.ChatChannel;
+import dev.kage.protocol.ClaimQuestRewardCommand;
+import dev.kage.protocol.CreateGuildCommand;
+import dev.kage.protocol.DisbandGuildCommand;
+import dev.kage.protocol.GetMyGuildRequest;
+import dev.kage.protocol.JumpCommand;
+import dev.kage.protocol.KickGuildMemberCommand;
+import dev.kage.protocol.LeaveGuildCommand;
+import dev.kage.protocol.ListGuildMembersRequest;
+import dev.kage.protocol.ListPendingGuildJoinRequestsRequest;
+import dev.kage.protocol.MoveCommand;
+import dev.kage.protocol.Opcode;
+import dev.kage.protocol.RejectGuildJoinRequestCommand;
+import dev.kage.protocol.SelectDialogueOptionCommand;
+import dev.kage.protocol.SendChatMessageCommand;
+import dev.kage.protocol.SendGuildJoinRequestCommand;
 import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.TalkToNpcCommand;
 import dev.kage.protocol.UseSkillCommand;
@@ -277,6 +295,104 @@ final class WorldCommandSender {
                 Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_REQUEST_VALUE,
                 ListPendingFriendRequestsRequest.newBuilder().build().toByteArray(),
                 "ListPendingFriendRequestsRequest");
+    /**
+     * Tạo bang mới — người tạo tự thành trưởng bang (guild.proto).
+     *
+     * <p>KHÔNG có {@code idempotency_key}, và khác {@code sendChatMessage} thì ở đây đó là một
+     * KHOẢNG TRỐNG chứ không phải quyết định: gửi trùng lệnh này sẽ tạo bang thứ hai nếu lần đầu đã
+     * kịp thực thi mà response mất trên đường về. Giao thức không cho client làm gì hơn — không tự
+     * vá được ở phía này (xem {@link GuildController} về các khoảng trống của guild.proto).
+     */
+    void createGuild(String name) {
+        CreateGuildCommand command =
+                CreateGuildCommand.newBuilder().setName(name).build();
+        send(Opcode.OPCODE_CREATE_GUILD_COMMAND_VALUE, command.toByteArray(), "CreateGuildCommand");
+    }
+
+    /**
+     * Xin gia nhập theo TÊN BANG (không phải id) — guild.proto cố ý như vậy, cùng lý do
+     * {@code target_name} ở friend.proto. Server tự tra tên và trả {@code GUILD_NOT_FOUND} nếu sai,
+     * client KHÔNG kiểm trước (Điều 24).
+     */
+    void sendGuildJoinRequest(String guildName) {
+        SendGuildJoinRequestCommand command =
+                SendGuildJoinRequestCommand.newBuilder().setGuildName(guildName).build();
+        send(Opcode.OPCODE_SEND_GUILD_JOIN_REQUEST_COMMAND_VALUE, command.toByteArray(), "SendGuildJoinRequestCommand");
+    }
+
+    /** Duyệt một đơn xin gia nhập. Server tự kiểm mình có phải trưởng bang không (Điều 15). */
+    void approveGuildJoinRequest(long requestId) {
+        ApproveGuildJoinRequestCommand command = ApproveGuildJoinRequestCommand.newBuilder()
+                .setRequestId(requestId)
+                .build();
+        send(
+                Opcode.OPCODE_APPROVE_GUILD_JOIN_REQUEST_COMMAND_VALUE,
+                command.toByteArray(),
+                "ApproveGuildJoinRequestCommand");
+    }
+
+    /** Từ chối một đơn xin gia nhập — server XOÁ dòng đơn, không giữ lịch sử (V14). */
+    void rejectGuildJoinRequest(long requestId) {
+        RejectGuildJoinRequestCommand command = RejectGuildJoinRequestCommand.newBuilder()
+                .setRequestId(requestId)
+                .build();
+        send(
+                Opcode.OPCODE_REJECT_GUILD_JOIN_REQUEST_COMMAND_VALUE,
+                command.toByteArray(),
+                "RejectGuildJoinRequestCommand");
+    }
+
+    /** Rời bang — gói rỗng, server lấy nhân vật từ SESSION chứ không từ packet (guild.proto). */
+    void leaveGuild() {
+        send(
+                Opcode.OPCODE_LEAVE_GUILD_COMMAND_VALUE,
+                LeaveGuildCommand.newBuilder().build().toByteArray(),
+                "LeaveGuildCommand");
+    }
+
+    /** Giải tán bang — gói rỗng như {@link #leaveGuild()}; chỉ trưởng bang làm được, server quyết. */
+    void disbandGuild() {
+        send(
+                Opcode.OPCODE_DISBAND_GUILD_COMMAND_VALUE,
+                DisbandGuildCommand.newBuilder().build().toByteArray(),
+                "DisbandGuildCommand");
+    }
+
+    /** Đuổi một thành viên theo TÊN — guild.proto dùng {@code target_name}, xem {@link #sendGuildJoinRequest}. */
+    void kickGuildMember(String targetName) {
+        KickGuildMemberCommand command =
+                KickGuildMemberCommand.newBuilder().setTargetName(targetName).build();
+        send(Opcode.OPCODE_KICK_GUILD_MEMBER_COMMAND_VALUE, command.toByteArray(), "KickGuildMemberCommand");
+    }
+
+    /**
+     * Hỏi bang của mình.
+     *
+     * <p>Ba hàm {@code requestGuild*} dưới đây là cách DUY NHẤT client biết trạng thái bang: guild.proto
+     * không có event đẩy nào, nên bị đuổi/được duyệt/bang giải tán đều im lặng tuyệt đối. Xem
+     * {@link GuildCoordinator} về việc hỏi lại sau MỌI lệnh đổi trạng thái.
+     */
+    void requestMyGuild() {
+        send(
+                Opcode.OPCODE_GET_MY_GUILD_REQUEST_VALUE,
+                GetMyGuildRequest.newBuilder().build().toByteArray(),
+                "GetMyGuildRequest");
+    }
+
+    /** Hỏi danh sách thành viên — server trả rỗng nếu mình không ở bang nào. */
+    void requestGuildMembers() {
+        send(
+                Opcode.OPCODE_LIST_GUILD_MEMBERS_REQUEST_VALUE,
+                ListGuildMembersRequest.newBuilder().build().toByteArray(),
+                "ListGuildMembersRequest");
+    }
+
+    /** Hỏi đơn đang chờ duyệt — server trả rỗng nếu mình không phải trưởng bang. */
+    void requestPendingGuildJoinRequests() {
+        send(
+                Opcode.OPCODE_LIST_PENDING_GUILD_JOIN_REQUESTS_REQUEST_VALUE,
+                ListPendingGuildJoinRequestsRequest.newBuilder().build().toByteArray(),
+                "ListPendingGuildJoinRequestsRequest");
     }
 
     /** Gói tin đến từ server — {@code null} khi hàng đợi rỗng (xem {@link GameConnection}). */
