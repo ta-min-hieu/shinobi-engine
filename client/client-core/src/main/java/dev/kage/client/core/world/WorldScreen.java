@@ -21,9 +21,9 @@ import dev.kage.client.core.net.GameConnection;
 import dev.kage.client.core.ui.hud.ChatPanel;
 import dev.kage.client.core.ui.hud.CombatHud;
 import dev.kage.client.core.ui.hud.DialoguePanel;
-import dev.kage.client.core.ui.hud.PartyPanel;
 import dev.kage.client.core.ui.hud.FriendPanel;
 import dev.kage.client.core.ui.hud.GuildPanel;
+import dev.kage.client.core.ui.hud.PartyPanel;
 import dev.kage.engine.core.GameScreen;
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.EcsWorld;
@@ -226,15 +226,29 @@ public final class WorldScreen implements GameScreen {
         this.quests = new QuestCoordinator(combatHud, sender, combatFeedback);
         this.dialogue = new DialogueCoordinator(dialoguePanel, sender, combatFeedback, quests);
         this.chat = new ChatCoordinator(chatPanel, sender);
-        // SAU chat: coordinator nhóm mượn nhật ký chat làm chỗ báo lý do lệnh thất bại.
+        // SAU chat: cả ba coordinator dưới đây mượn nhật ký chat/chữ nổi làm chỗ báo lý do thất bại.
         this.party = new PartyCoordinator(partyPanel, sender, chat);
-        this.friends = new FriendCoordinator(friendPanel, sender, combatFeedback, this::isTextInputActive);
-        this.guild = new GuildCoordinator(guildPanel, sender, this::isTextInputActive);
+        this.friends = new FriendCoordinator(friendPanel, sender, combatFeedback, this::noTextInputActive);
+        this.guild = new GuildCoordinator(guildPanel, sender, this::noTextInputActive);
+        wireHud();
+        this.inputProcessor = buildInputProcessor();
+    }
 
+    /**
+     * Nối HUD và cổng mở-cửa-sổ. Tách khỏi constructor thuần để giữ nó dưới ngưỡng
+     * {@code MethodLength} của Checkstyle — mỗi khung mới thêm vào lại đẩy constructor lên một dòng,
+     * và nó đã chạm trần đúng ba lần trong một ngày.
+     *
+     * <p>{@link #noTextInputActive()} là cổng CHUNG cho mọi khung mở bằng phím, kể cả chat. Truyền
+     * cùng MỘT hàm cho tất cả là điều quan trọng: hai cực khác nhau ở hai chỗ đã sinh ra một lỗi thật
+     * (cửa sổ chỉ mở được đúng lúc đáng lẽ phải bị chặn) — xem {@link #isTextInputActive()}.
+     */
+    private void wireHud() {
         combatHud.setSkillLabel(combatHudController.skillNameKey());
         combatHud.setOnSkillClicked(this::onSkillButtonClicked);
         combatHud.setOnAttackClicked(attackInput::onButtonClicked);
-        this.inputProcessor = buildInputProcessor();
+        partyPanel.setCanOpen(this::noTextInputActive);
+        chatPanel.setCanOpen(this::noTextInputActive);
     }
 
     /**
@@ -525,6 +539,11 @@ public final class WorldScreen implements GameScreen {
      * <p>Khung hội thoại NPC nằm trong danh sách dù không có ô nhập nào: đang đọc lời thoại thì phím
      * cũng không phải ý định gameplay, và mở đè một cửa sổ khác lên là hỏng.
      */
+    /** Dạng phủ định của {@link #isTextInputActive()} — cổng {@code setCanOpen} của các panel. */
+    private boolean noTextInputActive() {
+        return !isTextInputActive();
+    }
+
     private boolean isTextInputActive() {
         return chat.isComposing() || dialogue.isOpen() || party.isOpen() || friends.isOpen() || guild.isOpen();
     }

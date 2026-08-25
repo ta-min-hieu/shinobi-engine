@@ -1,6 +1,7 @@
 package dev.kage.client.core.ui.hud;
 
 import java.util.List;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.LongConsumer;
 
@@ -79,6 +80,9 @@ public final class PartyPanel implements Disposable {
     private LongConsumer onRejectInvite;
     private Runnable onOpened;
 
+    /** Xem {@link #setCanOpen}. Mặc định LUÔN cho mở, để lớp này tự chạy được trong test/preview. */
+    private BooleanSupplier canOpen = () -> true;
+
     /**
      * @param skin bộ style MƯỢN của {@link CombatHud} — lớp này KHÔNG dispose nó, cùng quy ước
      *     {@link DialoguePanel}/{@link ChatPanel}.
@@ -133,15 +137,31 @@ public final class PartyPanel implements Disposable {
         return row;
     }
 
-    /** Phím P bật/tắt, ESC đóng — xem {@link #TOGGLE_KEY}. */
+    /**
+     * Phím P bật/tắt, ESC đóng — xem {@link #TOGGLE_KEY}.
+     *
+     * <p><b>Đang mở thì NUỐT mọi {@code keyUp}</b>, không riêng phím P. Đây là chỗ hai ô nhập chữ
+     * nằm trên hai {@code Stage} khác nhau đâm vào nhau: {@code InputMultiplexer} chuyển
+     * {@code keyUp} xuống tầng dưới cho tới khi có ai trả {@code true}, mà mỗi panel chỉ nhận ra
+     * phím mở của CHÍNH nó — không nuốt thì gõ chữ "t" vào ô tên người mời sẽ bật thêm ô chat.
+     *
+     * <p>Chiều ngược lại ({@code WorldScreen} đang gõ chat mà bấm "p") do {@link #setCanOpen} chặn.
+     * Hai cơ chế cho hai chiều, và không panel nào phải biết panel nào tồn tại.
+     */
     private void installKeyHandling() {
         stage.addListener(new InputListener() {
             @Override
             public boolean keyUp(InputEvent event, int keycode) {
-                if (keycode != TOGGLE_KEY) {
+                if (isOpen()) {
+                    if (keycode == TOGGLE_KEY) {
+                        close();
+                    }
+                    return true; // nuốt: không để phím rơi xuống panel khác đang chờ phím mở của nó
+                }
+                if (keycode != TOGGLE_KEY || !canOpen.getAsBoolean()) {
                     return false;
                 }
-                toggle();
+                open();
                 return true;
             }
 
@@ -157,21 +177,25 @@ public final class PartyPanel implements Disposable {
     }
 
     /**
-     * Bật/tắt.
+     * Mở cửa sổ.
      *
      * <p>Bật ở {@code keyUp} cùng lý do {@link ChatPanel}: giữ phím sinh chuỗi sự kiện lặp, và ngay
      * khi {@link #nameField} nhận keyboard focus thì những lần lặp còn lại chảy thẳng vào ô nhập.
      */
-    private void toggle() {
-        if (isOpen()) {
-            close();
-            return;
-        }
+    private void open() {
         window.setVisible(true);
         nameField.setText("");
         // Hỏi lại server NGAY lúc mở: party.proto không có event đẩy nào, nên mọi thứ đang hiện đều
         // là ảnh chụp cũ — có thể đã bị kick từ lúc nào không biết (xem javadoc PartyController).
         fire(onOpened);
+    }
+
+    /**
+     * Điều kiện được phép MỞ, hỏi ngay trước khi mở. Đóng thì không hỏi — người chơi phải luôn thoát
+     * ra được. {@code WorldScreen} truyền vào câu hỏi "không khung nào khác đang nhận chữ gõ".
+     */
+    public void setCanOpen(BooleanSupplier condition) {
+        this.canOpen = condition;
     }
 
     /**

@@ -55,15 +55,15 @@ final class GuildCoordinator {
     private final List<GuildPanel.RequestRow> requestRows = new ArrayList<>();
 
     /**
-     * @param composingChat khung chat có đang mở ô nhập không. Chữ "g" người chơi gõ trong ô chat
+     * @param canOpen khung chat có đang mở ô nhập không. Chữ "g" người chơi gõ trong ô chat
      *     cũng rơi tới {@code Stage} của {@link GuildPanel} và sẽ mở khung bang hội nếu không ai
-     *     chặn — xem {@link GuildPanel#setCanOpen}. Nhận qua tham số chứ không tự hỏi
+     *     được phép mở — xem {@link GuildPanel#setCanOpen}. Nhận qua tham số chứ không tự hỏi
      *     {@code ChatCoordinator}: hai luồng này ngang hàng nhau, không cái nào sở hữu cái nào.
      */
-    GuildCoordinator(GuildPanel panel, WorldCommandSender sender, BooleanSupplier composingChat) {
+    GuildCoordinator(GuildPanel panel, WorldCommandSender sender, BooleanSupplier canOpen) {
         this.panel = panel;
         this.sender = sender;
-        panel.setCanOpen(() -> !composingChat.getAsBoolean());
+        panel.setCanOpen(canOpen);
         panel.setOnRefresh(this::refresh);
         panel.setOnCreate(typed -> submitName(typed, sender::createGuild));
         panel.setOnJoin(typed -> submitName(typed, sender::sendGuildJoinRequest));

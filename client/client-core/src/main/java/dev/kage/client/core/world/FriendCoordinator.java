@@ -61,18 +61,15 @@ final class FriendCoordinator {
     private final List<FriendPanel.RequestRow> requestRows = new ArrayList<>();
 
     /**
-     * @param openBlocked lúc nào KHÔNG được mở cửa sổ bằng phím — xem
-     *     {@link FriendPanel#setOpenBlocked}.
+     * @param canOpen lúc nào ĐƯỢC PHÉP mở cửa sổ bằng phím — xem
+     *     {@link FriendPanel#setCanOpen}.
      */
     FriendCoordinator(
-            FriendPanel panel,
-            WorldCommandSender sender,
-            CombatFeedbackPresenter feedback,
-            BooleanSupplier openBlocked) {
+            FriendPanel panel, WorldCommandSender sender, CombatFeedbackPresenter feedback, BooleanSupplier canOpen) {
         this.panel = panel;
         this.sender = sender;
         this.feedback = feedback;
-        panel.setOpenBlocked(openBlocked);
+        panel.setCanOpen(canOpen);
         panel.setOnSendRequest(this::onSendRequest);
         panel.setOnAccept(this::onAccept);
         panel.setOnReject(this::onReject);

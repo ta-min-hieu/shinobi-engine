@@ -211,6 +211,12 @@ public final class GuildPanel implements Disposable {
         footer.add(disbandButton).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
         footer.add(actionButton("guild.action.refresh", () -> fire(onOpened))).width(ROW_BUTTON_WIDTH_PX);
         section.add(footer).width(PANEL_WIDTH_PX).left().padTop(10f).row();
+        // Cách ĐÓNG phải nằm ngay trên cửa sổ, cùng lý do PartyPanel/FriendPanel đã có dòng này:
+        // cửa sổ che giữa màn hình và chặn toàn bộ phím gameplay, mở nhầm mà không biết thoát ra là
+        // một bế tắc thật.
+        Label hint = new Label(text("guild.hint.close"), skin.labelStyle);
+        hint.setColor(SECTION_COLOR);
+        section.add(hint).width(PANEL_WIDTH_PX).left().padTop(8f).row();
         return section;
     }
 

@@ -34,15 +34,27 @@ public final class HudPreviewTool extends ApplicationAdapter {
      */
     private static final String OUTPUT_PARTY = "E:/study/libgdx/shinobi-engine/.debug-orientation/hud-party.png";
 
+    /** Ảnh THỨ BA — cửa sổ Bạn bè. Cũng neo giữa màn hình nên cũng phải chụp riêng. */
+    private static final String OUTPUT_FRIEND = "E:/study/libgdx/shinobi-engine/.debug-orientation/hud-friend.png";
+
+    /** Ảnh THỨ TƯ — cửa sổ Bang hội. */
+    private static final String OUTPUT_GUILD = "E:/study/libgdx/shinobi-engine/.debug-orientation/hud-guild.png";
+
     /** Khung chụp ảnh thứ nhất — đủ để Scene2D layout xong và font FreeType nạp xong. */
     private static final int FIRST_SHOT_FRAME = 30;
 
     private static final int SECOND_SHOT_FRAME = 60;
 
+    private static final int THIRD_SHOT_FRAME = 90;
+
+    private static final int FOURTH_SHOT_FRAME = 120;
+
     private CombatHud hud;
     private DialoguePanel dialoguePanel;
     private ChatPanel chatPanel;
     private PartyPanel partyPanel;
+    private FriendPanel friendPanel;
+    private GuildPanel guildPanel;
     private int frame;
 
     @Override
@@ -115,6 +127,28 @@ public final class HudPreviewTool extends ApplicationAdapter {
                 java.util.List.of(new PartyPanel.InviteRow(77L, "Lời mời vào nhóm #5")));
         partyPanel.setActionsEnabled(true, true);
         partyPanel.openForPreview();
+
+        // Bạn bè + Bang hội (2026-08-25, làm ở luồng song song) — dựng ở đây để BỐ CỤC của chúng
+        // cũng bị nhìn bằng ảnh chứ không chỉ bằng build xanh.
+        friendPanel = new FriendPanel(hud.skin());
+        friendPanel.resize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        friendPanel.setFriends(java.util.List.of(
+                new FriendPanel.FriendRow("ThuyLong", true),
+                new FriendPanel.FriendRow("PhongVanTuyetNguyet", false),
+                new FriendPanel.FriendRow("ThoSon", true)));
+        friendPanel.setPendingRequests(java.util.List.of(new FriendPanel.RequestRow("LoiDien")));
+        friendPanel.setNotice("Đã gửi lời mời kết bạn.");
+
+        guildPanel = new GuildPanel(hud.skin());
+        guildPanel.resize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        guildPanel.setStatus("Bang Hắc Long — 3 thành viên, bạn là bang chủ.");
+        guildPanel.setMembers(
+                java.util.List.of(
+                        new GuildPanel.MemberRow("KageHoa (bang chủ)", "KageHoa", false),
+                        new GuildPanel.MemberRow("ThuyLong", "ThuyLong", true),
+                        new GuildPanel.MemberRow("PhongVanTuyetNguyet", "PhongVanTuyetNguyet", true)),
+                "");
+        guildPanel.setPendingRequests(java.util.List.of(new GuildPanel.RequestRow(12L, "LoiDien xin gia nhập")), "");
     }
 
     @Override
@@ -126,6 +160,8 @@ public final class HudPreviewTool extends ApplicationAdapter {
         hud.render(1f / 60f);
         chatPanel.render(1f / 60f);
         partyPanel.render(1f / 60f);
+        friendPanel.render(1f / 60f);
+        guildPanel.render(1f / 60f);
         dialoguePanel.render(1f / 60f);
         frame++;
         if (frame == FIRST_SHOT_FRAME) {
@@ -135,6 +171,14 @@ public final class HudPreviewTool extends ApplicationAdapter {
             partyPanel.openForPreview();
         } else if (frame == SECOND_SHOT_FRAME) {
             capture(OUTPUT_PARTY);
+            partyPanel.close();
+            friendPanel.open();
+        } else if (frame == THIRD_SHOT_FRAME) {
+            capture(OUTPUT_FRIEND);
+            friendPanel.close();
+            guildPanel.open();
+        } else if (frame == FOURTH_SHOT_FRAME) {
+            capture(OUTPUT_GUILD);
             Gdx.app.exit();
         }
     }
@@ -159,6 +203,12 @@ public final class HudPreviewTool extends ApplicationAdapter {
         }
         if (partyPanel != null) {
             partyPanel.dispose();
+        }
+        if (friendPanel != null) {
+            friendPanel.dispose();
+        }
+        if (guildPanel != null) {
+            guildPanel.dispose();
         }
         if (hud != null) {
             hud.dispose();

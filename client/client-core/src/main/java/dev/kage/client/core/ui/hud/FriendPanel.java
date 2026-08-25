@@ -68,6 +68,13 @@ public final class FriendPanel implements Disposable {
 
     private static final float NAME_COLUMN_WIDTH_PX = 250f;
 
+    /**
+     * Cột tên HẸP HƠN ở dòng bạn bè, vì dòng đó còn phải chứa chữ "Trực tuyến"/"Ngoại tuyến" bên
+     * cạnh. Dùng chung một bề rộng với dòng lời mời thì tên dài đẩy chữ trạng thái ra ngoài khung và
+     * nó bị cắt cụt thành "Ng" — thấy thật trên ảnh {@code runHudPreview}.
+     */
+    private static final float FRIEND_NAME_COLUMN_WIDTH_PX = 210f;
+
     private static final float ACTION_BUTTON_WIDTH_PX = 92f;
 
     /** Trần ký tự ô nhập tên — khớp {@code FriendController.MAX_NAME_LENGTH} (world/ không với tới). */
@@ -103,8 +110,8 @@ public final class FriendPanel implements Disposable {
     private IntConsumer onRemove;
     private Runnable onOpened;
 
-    /** Xem {@link #setOpenBlocked}. Mặc định KHÔNG chặn để lớp này tự chạy được trong test/preview. */
-    private BooleanSupplier openBlocked = () -> false;
+    /** Xem {@link #setCanOpen}. Mặc định LUÔN cho mở, để lớp này tự chạy được trong test/preview. */
+    private BooleanSupplier canOpen = () -> true;
 
     /**
      * @param skin bộ style MƯỢN của {@link CombatHud} — lớp này KHÔNG dispose nó, cùng quy ước
@@ -216,7 +223,7 @@ public final class FriendPanel implements Disposable {
                 if (isOpen()) {
                     return true;
                 }
-                if (keycode != OPEN_KEY || openBlocked.getAsBoolean()) {
+                if (keycode != OPEN_KEY || !canOpen.getAsBoolean()) {
                     return false;
                 }
                 open();
@@ -239,8 +246,8 @@ public final class FriendPanel implements Disposable {
      * đang nói chuyện với NPC. Cần thiết vì phím F chỉ là một ký tự bình thường trong ô nhập của
      * người ta, mà {@code Stage} này không nhìn thấy được keyboard focus của {@code Stage} khác.
      */
-    public void setOpenBlocked(BooleanSupplier blocked) {
-        this.openBlocked = blocked;
+    public void setCanOpen(BooleanSupplier condition) {
+        this.canOpen = condition;
     }
 
     /** Tên người chơi vừa gõ xong (Enter hoặc nút) — có thể rỗng, lọc là việc của controller. */
@@ -349,10 +356,18 @@ public final class FriendPanel implements Disposable {
 
     private Table friendRow(FriendRow row, int index) {
         Table line = new Table();
-        String status = text(row.online() ? "friend.status.online" : "friend.status.offline");
-        Label label = new Label(displayName(row.displayName()) + "  " + status, skin.labelStyle);
+        // Tên và trạng thái là HAI ô riêng, không phải một chuỗi ghép: tên do người khác đặt nên độ
+        // dài không đoán trước được, và nếu ghép chung thì tên dài sẽ đẩy chữ trạng thái ra khỏi
+        // khung. Tên có dấu "…" khi tràn; trạng thái thì LUÔN hiện đủ vì nó là thông tin, không phải
+        // trang trí.
+        Label label = new Label(displayName(row.displayName()), skin.labelStyle);
+        label.setEllipsis(true);
         label.setColor(row.online() ? ONLINE_COLOR : OFFLINE_COLOR);
-        line.add(label).width(NAME_COLUMN_WIDTH_PX).left();
+        Label status =
+                new Label(text(row.online() ? "friend.status.online" : "friend.status.offline"), skin.labelStyle);
+        status.setColor(row.online() ? ONLINE_COLOR : OFFLINE_COLOR);
+        line.add(label).width(FRIEND_NAME_COLUMN_WIDTH_PX).left();
+        line.add(status).padLeft(ROW_GAP_PX).left().expandX();
         line.add(button("friend.action.remove", () -> fire(onRemove, index)))
                 .width(ACTION_BUTTON_WIDTH_PX)
                 .padLeft(ROW_GAP_PX);

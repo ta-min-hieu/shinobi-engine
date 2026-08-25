@@ -2,6 +2,7 @@ package dev.kage.client.core.ui.hud;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 import com.badlogic.gdx.Input;
@@ -96,6 +97,9 @@ public final class ChatPanel implements Disposable {
 
     private Runnable onChannelToggle;
 
+    /** Xem {@link #setCanOpen}. Mặc định LUÔN cho mở, để lớp này tự chạy được trong test/preview. */
+    private BooleanSupplier canOpen = () -> true;
+
     /**
      * @param skin bộ style MƯỢN của {@link CombatHud} — lớp này KHÔNG dispose nó, cùng quy ước
      *     {@link DialoguePanel}.
@@ -174,7 +178,7 @@ public final class ChatPanel implements Disposable {
         stage.addListener(new InputListener() {
             @Override
             public boolean keyUp(InputEvent event, int keycode) {
-                if (keycode != OPEN_KEY || isComposing()) {
+                if (keycode != OPEN_KEY || isComposing() || !canOpen.getAsBoolean()) {
                     return false;
                 }
                 openComposer();
@@ -224,6 +228,14 @@ public final class ChatPanel implements Disposable {
         if (onSend != null) {
             onSend.accept(typed);
         }
+    }
+
+    /**
+     * Điều kiện được phép MỞ ô nhập, hỏi ngay trước khi mở — chặn chiều "đang mở một cửa sổ khác mà
+     * bấm T". Chiều ngược lại do chính các cửa sổ đó nuốt {@code keyUp} khi đang mở.
+     */
+    public void setCanOpen(BooleanSupplier condition) {
+        this.canOpen = condition;
     }
 
     /** Chuỗi người chơi vừa gõ xong (bấm Enter) — có thể rỗng, lọc là việc của controller. */
