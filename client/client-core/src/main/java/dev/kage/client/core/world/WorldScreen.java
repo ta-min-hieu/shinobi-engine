@@ -23,6 +23,7 @@ import dev.kage.client.core.ui.hud.CombatHud;
 import dev.kage.client.core.ui.hud.DialoguePanel;
 import dev.kage.client.core.ui.hud.FriendPanel;
 import dev.kage.client.core.ui.hud.GuildPanel;
+import dev.kage.client.core.ui.hud.MailPanel;
 import dev.kage.client.core.ui.hud.PartyPanel;
 import dev.kage.engine.core.GameScreen;
 import dev.kage.engine.ecs.ComponentMapper;
@@ -154,6 +155,12 @@ public final class WorldScreen implements GameScreen {
     /** Luồng bang hội (tạo/xin gia nhập/duyệt/đuổi + mạng) — xem {@link GuildCoordinator}. */
     private final GuildCoordinator guild;
 
+    /** Hòm thư (phím M) — mượn skin của {@link #combatHud} như {@link #chatPanel}. */
+    private final MailPanel mailPanel = new MailPanel(combatHud.skin());
+
+    /** Luồng thư (đọc/nhận/xoá/soạn + mạng) — xem {@link MailCoordinator}. */
+    private final MailCoordinator mail;
+
     /** Vòng đời nhiệm vụ: nhận → hoàn thành → lĩnh thưởng — xem {@link QuestCoordinator}. */
     private final QuestCoordinator quests;
 
@@ -230,6 +237,7 @@ public final class WorldScreen implements GameScreen {
         this.party = new PartyCoordinator(partyPanel, sender, chat);
         this.friends = new FriendCoordinator(friendPanel, sender, combatFeedback, this::noTextInputActive);
         this.guild = new GuildCoordinator(guildPanel, sender, this::noTextInputActive);
+        this.mail = new MailCoordinator(mailPanel, sender, combatFeedback, this::noTextInputActive);
         wireHud();
         this.inputProcessor = buildInputProcessor();
     }
@@ -271,6 +279,7 @@ public final class WorldScreen implements GameScreen {
                 partyPanel.stage(),
                 friendPanel.stage(),
                 guildPanel.stage(),
+                mailPanel.stage(),
                 chatPanel.stage(),
                 combatHud.stage(),
                 new WorldTargetPicker());
@@ -294,6 +303,7 @@ public final class WorldScreen implements GameScreen {
         party.reset();
         friends.reset();
         guild.reset();
+        mail.reset();
     }
 
     @Override
@@ -306,6 +316,7 @@ public final class WorldScreen implements GameScreen {
         partyPanel.resize(width, height);
         friendPanel.resize(width, height);
         guildPanel.resize(width, height);
+        mailPanel.resize(width, height);
         combatFeedback.resize(width, height);
     }
 
@@ -341,6 +352,7 @@ public final class WorldScreen implements GameScreen {
             handled |= party.dispatch(opcode, payload);
             handled |= friends.dispatch(opcode, payload);
             handled |= guild.dispatch(opcode, payload);
+            handled |= mail.dispatch(opcode, payload);
             if (!handled && !dispatchMovement(opcode, payload)) {
                 dispatchCombat(opcode, payload);
             }
@@ -545,7 +557,12 @@ public final class WorldScreen implements GameScreen {
     }
 
     private boolean isTextInputActive() {
-        return chat.isComposing() || dialogue.isOpen() || party.isOpen() || friends.isOpen() || guild.isOpen();
+        return chat.isComposing()
+                || dialogue.isOpen()
+                || party.isOpen()
+                || friends.isOpen()
+                || guild.isOpen()
+                || mail.isOpen();
     }
 
     /**
@@ -678,6 +695,7 @@ public final class WorldScreen implements GameScreen {
         party.close();
         friends.close();
         guild.close();
+        mail.close();
         dialogue.talkTo(npc.code());
         return true;
     }
@@ -709,6 +727,7 @@ public final class WorldScreen implements GameScreen {
         partyPanel.render(Gdx.graphics.getDeltaTime());
         friendPanel.render(Gdx.graphics.getDeltaTime());
         guildPanel.render(Gdx.graphics.getDeltaTime());
+        mailPanel.render(Gdx.graphics.getDeltaTime());
         dialoguePanel.render(Gdx.graphics.getDeltaTime());
     }
 
@@ -818,6 +837,7 @@ public final class WorldScreen implements GameScreen {
         partyPanel.dispose();
         friendPanel.dispose();
         guildPanel.dispose();
+        mailPanel.dispose();
         combatHud.dispose();
     }
 
