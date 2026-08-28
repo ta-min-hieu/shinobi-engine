@@ -80,6 +80,22 @@ final class RemoteCharacterPresenter {
         motionTracker.remove(event.getCharacterId());
     }
 
+    /**
+     * Gỡ MỌI người chơi khác đang hiển thị — dùng khi chính mình vừa đổi World (vào/ra hầm ngục).
+     *
+     * <p>Cần có vì giao thức không phát despawn cho NGƯỜI ĐI: {@code AreaOfInterestTracker.onDetach}
+     * chỉ báo despawn của người rời đi cho những người ở lại, không báo ngược lại (xem
+     * {@code DungeonController}). Không gỡ thì dân làng đứng nguyên trong hầm ngục.
+     */
+    void clear() {
+        for (Map.Entry<Long, KEntity> entry : entities.entrySet()) {
+            world.removeEntity(entry.getValue());
+            models.remove(entry.getKey());
+            motionTracker.remove(entry.getKey());
+        }
+        entities.clear();
+    }
+
     /** True nếu {@code characterId} là một người chơi KHÁC đang hiển thị. */
     boolean isPresent(long characterId) {
         return entities.containsKey(characterId);

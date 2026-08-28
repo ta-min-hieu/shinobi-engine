@@ -57,6 +57,18 @@ final class NpcPresenter {
         models.remove(npcId);
     }
 
+    /**
+     * Gỡ MỌI NPC đang hiển thị — dùng khi người chơi vừa đổi World (vào/ra hầm ngục). Giao thức
+     * không phát {@code NpcDespawnedEvent} cho NPC của world cũ trong tình huống đó (xem
+     * {@code DungeonController}), mà NPC lại là thứ đứng im nên càng lộ nếu còn sót.
+     */
+    void clear() {
+        for (long npcId : npcs.keySet()) {
+            models.remove(npcId);
+        }
+        npcs.clear();
+    }
+
     /** Kho NPC đang hiển thị — cho {@link WorldEntityPicker} bắt click, chỉ đọc. */
     Map<Long, NpcState> npcs() {
         return npcs;

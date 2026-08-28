@@ -79,6 +79,8 @@ public final class PartyPanel implements Disposable {
     private LongConsumer onAcceptInvite;
     private LongConsumer onRejectInvite;
     private Runnable onOpened;
+    private Runnable onEnterDungeon;
+    private Runnable onExitDungeon;
 
     /** Xem {@link #setCanOpen}. Mặc định LUÔN cho mở, để lớp này tự chạy được trong test/preview. */
     private BooleanSupplier canOpen = () -> true;
@@ -113,6 +115,7 @@ public final class PartyPanel implements Disposable {
         window.add(memberList).width(PANEL_WIDTH_PX).padTop(8f).growX().row();
         window.add(inviteList).width(PANEL_WIDTH_PX).padTop(8f).growX().row();
         window.add(buildActionRow()).width(PANEL_WIDTH_PX).padTop(12f).growX().row();
+        window.add(buildDungeonRow()).width(PANEL_WIDTH_PX).padTop(12f).growX().row();
         // Cách ĐÓNG phải nằm ngay trên cửa sổ. Không có nó thì người chơi mở nhầm một cửa sổ che
         // giữa màn hình và không biết làm sao thoát ra — cùng loại bế tắc mà ESC của DialoguePanel
         // sinh ra để phòng.
@@ -126,6 +129,30 @@ public final class PartyPanel implements Disposable {
         stage.addActor(container);
         window.setVisible(false);
         installKeyHandling();
+    }
+
+    /**
+     * Hàng hầm ngục (2026-08-27, dungeon.proto dải 1500-1503) — nằm TRONG cửa sổ Nhóm vì lát cắt
+     * hầm ngục hiện tại gắn chặt với nhóm ({@code ENTER_DUNGEON_OUTCOME_NOT_IN_PARTY}).
+     *
+     * <p><b>Cả hai nút LUÔN bấm được</b>, cố ý, khác {@link #setActionsEnabled} vốn tắt bớt nút chắc
+     * chắn hỏng:
+     *
+     * <ul>
+     *   <li>Vào: chưa vào nhóm thì server trả {@code NOT_IN_PARTY} và người chơi đọc được lý do —
+     *       tốt hơn một cái nút xám không giải thích gì.
+     *   <li>Rời: server kéo CẢ nhóm vào instance nhưng chỉ báo cho người bấm nút, nên một thành viên
+     *       bị kéo theo hoàn toàn không biết mình đang ở trong hầm ngục. Tắt nút Rời theo trạng thái
+     *       mà client tưởng là đúng sẽ nhốt đúng những người đó lại. Đây là lối thoát DUY NHẤT của
+     *       họ (xem {@code DungeonController}).
+     * </ul>
+     */
+    private Table buildDungeonRow() {
+        Table row = new Table();
+        row.add(new Label(text("dungeon.section"), skin.labelStyle)).growX().left();
+        row.add(button("dungeon.action.enter", () -> fire(onEnterDungeon))).padRight(6f);
+        row.add(button("dungeon.action.exit", () -> fire(onExitDungeon)));
+        return row;
     }
 
     private Table buildActionRow() {
@@ -246,6 +273,19 @@ public final class PartyPanel implements Disposable {
 
     public void setOnKick(Consumer<String> listener) {
         this.onKick = listener;
+    }
+
+    /**
+     * Người chơi bấm Vào hầm ngục — chỗ nghe tự biết {@code dungeon_code} nào, panel thì không
+     * (widget chỉ vẽ, UI.md §4). Xem {@link #buildDungeonRow()}.
+     */
+    public void setOnEnterDungeon(Runnable listener) {
+        this.onEnterDungeon = listener;
+    }
+
+    /** Người chơi bấm Rời hầm ngục — gói rỗng phía dưới, xem {@link #buildDungeonRow()}. */
+    public void setOnExitDungeon(Runnable listener) {
+        this.onExitDungeon = listener;
     }
 
     public void setOnAcceptInvite(LongConsumer listener) {

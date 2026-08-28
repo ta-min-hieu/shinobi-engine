@@ -67,6 +67,20 @@ final class MonsterPresenter {
         motionTracker.remove(monsterId);
     }
 
+    /**
+     * Gỡ model + bộ đếm chuyển động của một loạt quái cùng lúc — dùng khi người chơi vừa đổi World
+     * (vào/ra hầm ngục), nơi giao thức không phát {@code MonsterDespawnedEvent} nào cho quái của
+     * world cũ (xem {@code DungeonController}).
+     *
+     * <p>Nhận danh sách id từ ngoài thay vì tự giữ kho: kho quái nằm ở
+     * {@link CombatHudController#monsters()} — lớp này cố ý không nhân bản nó (xem {@link #sync}).
+     */
+    void clear(Iterable<Long> monsterIds) {
+        for (long monsterId : monsterIds) {
+            onDespawned(monsterId);
+        }
+    }
+
     /** Gọi mỗi {@code fixedUpdate} — đếm ngược timeout "đã dừng" của {@link RemoteMotionTracker}. */
     void tick(float fixedDeltaTime) {
         motionTracker.tick(fixedDeltaTime);
