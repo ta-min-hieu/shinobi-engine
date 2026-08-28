@@ -803,18 +803,19 @@ class GatewayPipelineTest {
                 return false;
             }
         };
-        dev.kage.mail.domain.GoldPort mailGoldPort = (tx, characterId, amount) -> {};
-        dev.kage.mail.domain.InventoryGatewayPort mailInventoryGatewayPort =
-                (tx, characterId, itemTemplateId, quantity) -> true;
         dev.kage.mail.domain.AuditPort mailAuditPort = (tx, characterId, action, detailJson) -> {};
         dev.kage.mail.domain.IdempotencyPort mailIdempotencyPort = (tx, idempotencyKey) -> {};
         dev.kage.mail.domain.TransactionRunner mailTx = action -> action.accept(null);
-        dev.kage.mail.application.SendMailUseCase sendMailUseCase =
-                new dev.kage.mail.application.SendMailUseCase(mailRepositoryPort, mailTx);
         dev.kage.mail.application.ListMailUseCase listMailUseCase =
                 new dev.kage.mail.application.ListMailUseCase(mailRepositoryPort);
         dev.kage.mail.application.MailPorts mailPorts = new dev.kage.mail.application.MailPorts(
-                mailRepositoryPort, mailGoldPort, mailInventoryGatewayPort, mailAuditPort, mailIdempotencyPort);
+                mailRepositoryPort,
+                new FakeMailGoldPort(),
+                new FakeMailInventoryGatewayPort(),
+                mailAuditPort,
+                mailIdempotencyPort);
+        dev.kage.mail.application.SendMailUseCase sendMailUseCase =
+                new dev.kage.mail.application.SendMailUseCase(mailPorts, mailTx);
         dev.kage.mail.application.ClaimMailUseCase claimMailUseCase =
                 new dev.kage.mail.application.ClaimMailUseCase(mailPorts, mailTx);
         dev.kage.mail.application.DeleteMailUseCase deleteMailUseCase =
@@ -1370,5 +1371,33 @@ class GatewayPipelineTest {
         byte[] bytes = new byte[length];
         combined.readBytes(bytes);
         return PacketCodec.decodeFrame(bytes);
+    }
+
+    /** Người gửi luôn "đủ tiền" — test này không kiểm nghiệp vụ ký quỹ (xem MailIntegrationTest). */
+    private static final class FakeMailGoldPort implements dev.kage.mail.domain.GoldPort {
+        @Override
+        public boolean deductGold(dev.kage.mail.domain.Transaction tx, long characterId, long amount) {
+            return true;
+        }
+
+        @Override
+        public void creditGold(dev.kage.mail.domain.Transaction tx, long characterId, long amount) {
+            // không cần ghi nhận gì ở test này
+        }
+    }
+
+    /** Túi đồ luôn "đủ chỗ và đủ món" — cùng lý do FakeMailGoldPort. */
+    private static final class FakeMailInventoryGatewayPort implements dev.kage.mail.domain.InventoryGatewayPort {
+        @Override
+        public boolean grantItem(
+                dev.kage.mail.domain.Transaction tx, long characterId, long itemTemplateId, int quantity) {
+            return true;
+        }
+
+        @Override
+        public boolean consumeItem(
+                dev.kage.mail.domain.Transaction tx, long characterId, long itemTemplateId, int quantity) {
+            return true;
+        }
     }
 }

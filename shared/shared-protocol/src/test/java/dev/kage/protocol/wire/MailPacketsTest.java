@@ -67,6 +67,47 @@ class MailPacketsTest {
         assertThat(parsed.getOutcome()).isEqualTo(SendMailOutcome.SEND_MAIL_OUTCOME_RECIPIENT_NOT_FOUND);
     }
 
+    /**
+     * 6 giá trị THÊM 2026-08-28 (ký quỹ vàng/vật phẩm lúc gửi). Chốt SỐ của từng giá trị: NETWORK.md
+     * §6 cấm đổi số đang dùng, và một client cũ đọc sai số enum sẽ hiện nhầm lý do mà KHÔNG báo lỗi.
+     */
+    @Test
+    void shouldKeepSendMailOutcomeNumbersStable() {
+        assertThat(SendMailOutcome.SEND_MAIL_OUTCOME_UNSPECIFIED.getNumber()).isZero();
+        assertThat(SendMailOutcome.SEND_MAIL_OUTCOME_OK.getNumber()).isEqualTo(1);
+        assertThat(SendMailOutcome.SEND_MAIL_OUTCOME_RECIPIENT_NOT_FOUND.getNumber())
+                .isEqualTo(2);
+        assertThat(SendMailOutcome.SEND_MAIL_OUTCOME_INSUFFICIENT_GOLD.getNumber())
+                .isEqualTo(3);
+        assertThat(SendMailOutcome.SEND_MAIL_OUTCOME_ATTACHMENT_NOT_OWNED.getNumber())
+                .isEqualTo(4);
+        assertThat(SendMailOutcome.SEND_MAIL_OUTCOME_INVALID_GOLD_AMOUNT.getNumber())
+                .isEqualTo(5);
+        assertThat(SendMailOutcome.SEND_MAIL_OUTCOME_INVALID_ATTACHMENT.getNumber())
+                .isEqualTo(6);
+        assertThat(SendMailOutcome.SEND_MAIL_OUTCOME_SUBJECT_TOO_LONG.getNumber())
+                .isEqualTo(7);
+        assertThat(SendMailOutcome.SEND_MAIL_OUTCOME_BODY_TOO_LONG.getNumber()).isEqualTo(8);
+    }
+
+    @Test
+    void shouldRoundTripEachNewSendMailOutcome() throws InvalidProtocolBufferException {
+        for (SendMailOutcome outcome : SendMailOutcome.values()) {
+            if (outcome == SendMailOutcome.UNRECOGNIZED) {
+                continue;
+            }
+            SendMailResponse response =
+                    SendMailResponse.newBuilder().setOutcome(outcome).build();
+            PacketHeader header = new PacketHeader(Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE, ProtocolVersion.CURRENT, 9);
+
+            byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
+            SendMailResponse parsed = SendMailResponse.parseFrom(
+                    PacketCodec.decodeFrame(frameBytes).payload());
+
+            assertThat(parsed.getOutcome()).isEqualTo(outcome);
+        }
+    }
+
     @Test
     void shouldRoundTripListMailRequest() throws InvalidProtocolBufferException {
         ListMailRequest request = ListMailRequest.newBuilder().build();

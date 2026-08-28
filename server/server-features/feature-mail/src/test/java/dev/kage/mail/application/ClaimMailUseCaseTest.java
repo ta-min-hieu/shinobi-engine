@@ -197,6 +197,11 @@ class ClaimMailUseCaseTest {
         private long creditedAmount;
 
         @Override
+        public boolean deductGold(Transaction tx, long characterId, long amount) {
+            throw new UnsupportedOperationException("nhận thư không trừ vàng của ai");
+        }
+
+        @Override
         public void creditGold(Transaction tx, long characterId, long amount) {
             creditedAmount += amount;
         }
@@ -214,6 +219,11 @@ class ClaimMailUseCaseTest {
         public boolean grantItem(Transaction tx, long characterId, long itemTemplateId, int quantity) {
             grantedCalls++;
             return shouldSucceed;
+        }
+
+        @Override
+        public boolean consumeItem(Transaction tx, long characterId, long itemTemplateId, int quantity) {
+            throw new UnsupportedOperationException("nhận thư không trừ item của ai");
         }
     }
 
