@@ -25,6 +25,7 @@ import dev.kage.client.core.ui.hud.DuelPanel;
 import dev.kage.client.core.ui.hud.FactionPanel;
 import dev.kage.client.core.ui.hud.FriendPanel;
 import dev.kage.client.core.ui.hud.GuildPanel;
+import dev.kage.client.core.ui.hud.MailPanel;
 import dev.kage.client.core.ui.hud.PartyPanel;
 import dev.kage.engine.core.GameScreen;
 import dev.kage.engine.ecs.ComponentMapper;
@@ -169,6 +170,11 @@ public final class WorldScreen implements GameScreen {
 
     /** Luồng hầm ngục (opcode 1500-1503) — nút nằm trong {@link #partyPanel}, xem {@link DungeonCoordinator}. */
     private final DungeonCoordinator dungeon;
+    /** Hòm thư (phím M) — mượn skin của {@link #combatHud} như {@link #chatPanel}. */
+    private final MailPanel mailPanel = new MailPanel(combatHud.skin());
+
+    /** Luồng thư (đọc/nhận/xoá/soạn + mạng) — xem {@link MailCoordinator}. */
+    private final MailCoordinator mail;
 
     /** Vòng đời nhiệm vụ: nhận → hoàn thành → lĩnh thưởng — xem {@link QuestCoordinator}. */
     private final QuestCoordinator quests;
@@ -231,8 +237,7 @@ public final class WorldScreen implements GameScreen {
         this.combatFeedback = new CombatFeedbackPresenter(
                 localCharacterId, POSITION.get(localPlayer), combatHudController, combatHud.font());
 
-        // SAU combatFeedback: coordinator mượn nó để hiện thông báo khi hội thoại kết thúc bằng
-        // nhánh nhận quest/mở cửa hàng.
+        // SAU combatFeedback: coordinator mượn nó để báo khi hội thoại kết thúc bằng quest/cửa hàng.
         this.quests = new QuestCoordinator(combatHud, sender, combatFeedback);
         this.dialogue = new DialogueCoordinator(dialoguePanel, sender, combatFeedback, quests);
         this.chat = new ChatCoordinator(chatPanel, sender);
@@ -247,6 +252,7 @@ public final class WorldScreen implements GameScreen {
                 sender,
                 combatFeedback,
                 new LocalCharacterAppearance(models, combatHudController, LOCAL_CHARACTER_ID));
+        this.mail = new MailCoordinator(mailPanel, sender, combatFeedback, this::noTextInputActive);
         wireHud(character);
         this.inputProcessor = buildInputProcessor();
     }
@@ -316,6 +322,7 @@ public final class WorldScreen implements GameScreen {
                 guildPanel.stage(),
                 duelPanel.stage(),
                 factionPanel.stage(),
+                mailPanel.stage(),
                 chatPanel.stage(),
                 combatHud.stage(),
                 new WorldTargetPicker());
@@ -342,6 +349,7 @@ public final class WorldScreen implements GameScreen {
         duel.reset();
         faction.reset();
         dungeon.reset();
+        mail.reset();
     }
 
     @Override
@@ -356,6 +364,7 @@ public final class WorldScreen implements GameScreen {
         guildPanel.resize(width, height);
         duelPanel.resize(width, height);
         factionPanel.resize(width, height);
+        mailPanel.resize(width, height);
         combatFeedback.resize(width, height);
     }
 
@@ -397,6 +406,7 @@ public final class WorldScreen implements GameScreen {
             // ErrorResponse dùng chung, chỉ nối lại đúng yêu cầu được bằng sequenceId ở header —
             // xem FactionCoordinator.
             handled |= faction.dispatch(frame);
+            handled |= mail.dispatch(opcode, payload);
             if (!handled && !dispatchMovement(opcode, payload)) {
                 dispatchCombat(opcode, payload);
             }
@@ -605,7 +615,8 @@ public final class WorldScreen implements GameScreen {
                 || friends.isOpen()
                 || guild.isOpen()
                 || duel.isOpen()
-                || faction.isOpen();
+                || faction.isOpen()
+                || mail.isOpen();
     }
 
     /** Dạng phủ định của {@link #isTextInputActive()} — cổng {@code setCanOpen} của các panel. */
@@ -750,6 +761,7 @@ public final class WorldScreen implements GameScreen {
         guild.close();
         duel.close();
         faction.close();
+        mail.close();
         dialogue.talkTo(npc.code());
         return true;
     }
@@ -783,6 +795,7 @@ public final class WorldScreen implements GameScreen {
         guildPanel.render(Gdx.graphics.getDeltaTime());
         duelPanel.render(Gdx.graphics.getDeltaTime());
         factionPanel.render(Gdx.graphics.getDeltaTime());
+        mailPanel.render(Gdx.graphics.getDeltaTime());
         dialoguePanel.render(Gdx.graphics.getDeltaTime());
     }
 
@@ -894,6 +907,7 @@ public final class WorldScreen implements GameScreen {
         guildPanel.dispose();
         duelPanel.dispose();
         factionPanel.dispose();
+        mailPanel.dispose();
         combatHud.dispose();
     }
 

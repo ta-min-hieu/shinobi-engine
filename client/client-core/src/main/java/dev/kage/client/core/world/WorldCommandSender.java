@@ -13,10 +13,12 @@ import dev.kage.protocol.ApproveGuildJoinRequestCommand;
 import dev.kage.protocol.AttackCommand;
 import dev.kage.protocol.ChallengeDuelCommand;
 import dev.kage.protocol.ChatChannel;
+import dev.kage.protocol.ClaimMailCommand;
 import dev.kage.protocol.ClaimQuestRewardCommand;
 import dev.kage.protocol.CreateGuildCommand;
 import dev.kage.protocol.CreatePartyCommand;
 import dev.kage.protocol.DeclineDuelCommand;
+import dev.kage.protocol.DeleteMailCommand;
 import dev.kage.protocol.DisbandGuildCommand;
 import dev.kage.protocol.EnterDungeonCommand;
 import dev.kage.protocol.ExitDuelCommand;
@@ -33,6 +35,7 @@ import dev.kage.protocol.LeaveGuildCommand;
 import dev.kage.protocol.LeavePartyCommand;
 import dev.kage.protocol.ListFriendsRequest;
 import dev.kage.protocol.ListGuildMembersRequest;
+import dev.kage.protocol.ListMailRequest;
 import dev.kage.protocol.ListPartyMembersRequest;
 import dev.kage.protocol.ListPendingFriendRequestsRequest;
 import dev.kage.protocol.ListPendingGuildJoinRequestsRequest;
@@ -48,6 +51,7 @@ import dev.kage.protocol.SelectFactionRequest;
 import dev.kage.protocol.SendChatMessageCommand;
 import dev.kage.protocol.SendFriendRequestCommand;
 import dev.kage.protocol.SendGuildJoinRequestCommand;
+import dev.kage.protocol.SendMailCommand;
 import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.TalkToNpcCommand;
 import dev.kage.protocol.UseSkillCommand;
@@ -503,6 +507,67 @@ final class WorldCommandSender {
                 SelectFactionRequest.newBuilder().setFaction(faction).build();
         send(Opcode.OPCODE_SELECT_FACTION_REQUEST_VALUE, sequenceId, request.toByteArray(), "SelectFactionRequest");
         return sequenceId;
+    }
+
+    // -------------------------------------------------------------------------------------------
+    // Thư (mail.proto, dải 900-908) — xem MailCoordinator.
+    // -------------------------------------------------------------------------------------------
+
+    /**
+     * Gửi một lá thư.
+     *
+     * <p>KHÔNG có {@code idempotency_key} vì mail.proto không có trường đó cho lệnh này. Hệ quả
+     * thật: mất kết nối đúng lúc rồi bấm Gửi lại sẽ ra HAI lá thư — khó chịu, nhưng không đổi tài
+     * sản của ai (khác {@code ClaimMailCommand}, thứ CÓ khoá). Thêm khoá vào đây là đổi protocol,
+     * nằm ngoài quyền của client (/CLAUDE.md §4).
+     *
+     * @param draft đã qua {@code MailController.compose} — độ dài và số vàng đã hợp lệ ở mức client.
+     */
+    void sendMail(MailController.Draft draft) {
+        SendMailCommand command = SendMailCommand.newBuilder()
+                .setRecipientName(draft.recipientName())
+                .setSubject(draft.subject())
+                .setBody(draft.body())
+                .setGoldAmount(draft.goldAmount())
+                .build();
+        send(Opcode.OPCODE_SEND_MAIL_COMMAND_VALUE, command.toByteArray(), "SendMailCommand");
+    }
+
+    /**
+     * Hỏi trọn hòm thư. Đây là cách DUY NHẤT client biết trong hòm có gì: mail.proto chỉ đẩy
+     * {@code NewMailEvent} (một cái id trần, chỉ cho người nhận đang online) — xem
+     * {@link MailCoordinator} về việc hỏi lại sau MỌI lệnh đổi trạng thái.
+     */
+    void listMail() {
+        send(
+                Opcode.OPCODE_LIST_MAIL_REQUEST_VALUE,
+                ListMailRequest.newBuilder().build().toByteArray(),
+                "ListMailRequest");
+    }
+
+    /**
+     * Nhận vàng/vật phẩm đính kèm của một lá thư.
+     *
+     * @param idempotencyKey UUID do client sinh, GIỮ NGUYÊN qua các lần thử lại cùng một lần nhận
+     *     (ADR-025) — server enforce unique trong CÙNG transaction với hiệu ứng thật (cộng vàng +
+     *     cấp vật phẩm + đánh dấu claimed), xem {@link MailController#beginClaim}.
+     */
+    void claimMail(long mailId, String idempotencyKey) {
+        ClaimMailCommand command = ClaimMailCommand.newBuilder()
+                .setMailId(mailId)
+                .setIdempotencyKey(idempotencyKey)
+                .build();
+        send(Opcode.OPCODE_CLAIM_MAIL_COMMAND_VALUE, command.toByteArray(), "ClaimMailCommand");
+    }
+
+    /**
+     * Xoá một lá thư. KHÔNG có {@code idempotency_key} và ở đây đó là đủ: xoá hai lần cùng một lá
+     * chỉ cho ra {@code DELETE_MAIL_OUTCOME_NOT_FOUND} ở lần thứ hai, không mất mát gì.
+     */
+    void deleteMail(long mailId) {
+        DeleteMailCommand command =
+                DeleteMailCommand.newBuilder().setMailId(mailId).build();
+        send(Opcode.OPCODE_DELETE_MAIL_COMMAND_VALUE, command.toByteArray(), "DeleteMailCommand");
     }
 
     /** Gói tin đến từ server — {@code null} khi hàng đợi rỗng (xem {@link GameConnection}). */
