@@ -6,17 +6,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import dev.kage.client.core.net.GameConnection;
+import dev.kage.protocol.AcceptDuelCommand;
 import dev.kage.protocol.AcceptFriendRequestCommand;
 import dev.kage.protocol.AcceptPartyInviteCommand;
 import dev.kage.protocol.ApproveGuildJoinRequestCommand;
 import dev.kage.protocol.AttackCommand;
+import dev.kage.protocol.ChallengeDuelCommand;
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ClaimQuestRewardCommand;
 import dev.kage.protocol.CreateGuildCommand;
 import dev.kage.protocol.CreatePartyCommand;
+import dev.kage.protocol.DeclineDuelCommand;
 import dev.kage.protocol.DisbandGuildCommand;
+import dev.kage.protocol.ExitDuelCommand;
 import dev.kage.protocol.GetMyGuildRequest;
 import dev.kage.protocol.GetMyPartyRequest;
+import dev.kage.protocol.GetPvpRatingRequest;
 import dev.kage.protocol.InvitePartyMemberCommand;
 import dev.kage.protocol.JumpCommand;
 import dev.kage.protocol.KickGuildMemberCommand;
@@ -387,6 +392,64 @@ final class WorldCommandSender {
                 Opcode.OPCODE_LIST_PENDING_GUILD_JOIN_REQUESTS_REQUEST_VALUE,
                 ListPendingGuildJoinRequestsRequest.newBuilder().build().toByteArray(),
                 "ListPendingGuildJoinRequestsRequest");
+    }
+
+    // --- Đấu tay đôi + xếp hạng PvP (arena.proto, dải 1600-1611 và 1200-1201) -------------------
+
+    /**
+     * Thách đấu một nhân vật theo TÊN.
+     *
+     * <p>Tên chứ không phải id là do giao thức quy định (arena.proto: "Thách đấu bằng TÊN [...]
+     * server tự tra CharacterFacade.findByName TRƯỚC khi gọi ArenaInstanceRegistry"), cùng quy ước
+     * {@link #sendFriendRequest}/{@link #invitePartyMember}. Hệ quả với client: người trên màn hình
+     * chỉ có {@code character_id} ({@code CharacterSpawnedEvent} không mang tên), nên phải tra tên
+     * từ chỗ khác — xem {@link DuelController} về sổ tên và khoảng trống này.
+     */
+    void challengeDuel(String targetName) {
+        ChallengeDuelCommand command =
+                ChallengeDuelCommand.newBuilder().setTargetName(targetName).build();
+        send(Opcode.OPCODE_CHALLENGE_DUEL_COMMAND_VALUE, command.toByteArray(), "ChallengeDuelCommand");
+    }
+
+    /** @param challengeId lấy từ {@code DuelChallengeReceivedEvent} — client không tự sinh id nào. */
+    void acceptDuel(long challengeId) {
+        AcceptDuelCommand command =
+                AcceptDuelCommand.newBuilder().setChallengeId(challengeId).build();
+        send(Opcode.OPCODE_ACCEPT_DUEL_COMMAND_VALUE, command.toByteArray(), "AcceptDuelCommand");
+    }
+
+    /** @param challengeId xem {@link #acceptDuel(long)}. */
+    void declineDuel(long challengeId) {
+        DeclineDuelCommand command =
+                DeclineDuelCommand.newBuilder().setChallengeId(challengeId).build();
+        send(Opcode.OPCODE_DECLINE_DUEL_COMMAND_VALUE, command.toByteArray(), "DeclineDuelCommand");
+    }
+
+    /**
+     * Bỏ cuộc giữa chừng. Gói rỗng — server tự tra nhân vật đang ở trận nào (arena.proto).
+     *
+     * <p>KHÁC {@code ExitDungeonCommand}: đây tính THUA THẬT và mất điểm MMR, nên nút gọi tới nó
+     * chỉ được bày ra khi đang thật sự ở trong một trận (xem {@code DuelPanel}).
+     */
+    void exitDuel() {
+        send(
+                Opcode.OPCODE_EXIT_DUEL_COMMAND_VALUE,
+                ExitDuelCommand.newBuilder().build().toByteArray(),
+                "ExitDuelCommand");
+    }
+
+    /**
+     * Hỏi điểm xếp hạng PvP của CHÍNH mình. Gói rỗng — người hỏi lấy từ session phía server.
+     *
+     * <p>Đây là đường DUY NHẤT client biết điểm của mình: arena.proto không có event nào đẩy điểm
+     * mới, {@code DuelResultEvent} chỉ mang điểm của đúng trận vừa xong. Vì vậy phải hỏi lại mỗi lần
+     * mở cửa sổ và sau mỗi trận (xem {@link DuelCoordinator}).
+     */
+    void requestPvpRating() {
+        send(
+                Opcode.OPCODE_GET_PVP_RATING_REQUEST_VALUE,
+                GetPvpRatingRequest.newBuilder().build().toByteArray(),
+                "GetPvpRatingRequest");
     }
 
     /** Gói tin đến từ server — {@code null} khi hàng đợi rỗng (xem {@link GameConnection}). */
