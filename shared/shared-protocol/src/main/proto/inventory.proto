@@ -91,3 +91,66 @@ message EnhanceItemCommand {
 message EnhanceItemResponse {
   EnhanceOutcome outcome = 1;
 }
+
+// -----------------------------------------------------------------------------------------------
+// ADR-035 (Accepted 2026-08-27) — lấp khoảng trống "client không có ảnh chụp túi đồ / catalog item".
+// Phần dưới CHỈ THÊM: không message/field nào ở trên bị đổi, xoá hay đánh deprecated (NETWORK.md
+// §6), protocolVersion KHÔNG tăng.
+// -----------------------------------------------------------------------------------------------
+
+// Command: Client -> Server (OPCODE_LIST_INVENTORY_REQUEST = 507). Không field — characterId lấy
+// từ session (SECURITY.md §4, chống IDOR), cùng khuôn ListCharactersRequest.
+message ListInventoryRequest {
+}
+
+// 1 dòng túi đồ. item_id là inventory_item.id THẬT — đây chính là thứ EquipItemCommand và
+// SellItemCommand cần, và là lý do gốc phải có packet này.
+message InventoryItemView {
+  int64 item_id = 1;
+  int64 item_template_id = 2;
+  int32 quantity = 3;
+  int32 enhance_level = 4;
+  int32 slot_index = 5;
+}
+
+// Response: Server -> Client (OPCODE_LIST_INVENTORY_RESPONSE = 508). Ảnh chụp TOÀN BỘ túi tại thời
+// điểm hỏi. `capacity` là hằng số phía code (không phải cột DB — xem V4), gửi kèm để client vẽ đủ ô
+// trống mà không phải tự đoán.
+message ListInventoryResponse {
+  repeated InventoryItemView items = 1;
+  int32 capacity = 2;
+  repeated EquippedSlotView equipped = 3; // slot nào đang mặc item_id nào
+}
+
+message EquippedSlotView {
+  EquipmentSlot slot = 1;
+  int64 item_id = 2;
+}
+
+// 1 dòng catalog. KHÔNG mang tên hiển thị và KHÔNG mang icon: tên tra qua name_key trong bundle
+// i18n phía client, icon tra qua code trong atlas (ADR-028). Server chỉ gửi thứ server sở hữu.
+// Mang CẢ id lẫn code vì protocol hiện tham chiếu vật phẩm bằng cả hai kiểu (ItemGrantedEvent dùng
+// id, ItemRewardView của quest.proto dùng code) — catalog phải tra được cả hai chiều.
+message ItemCatalogEntry {
+  int64 id = 1;
+  string code = 2;
+  string name_key = 3;
+  int32 max_stack = 4;
+  EquipmentSlot equip_slot = 5; // UNSPECIFIED = không mặc được (khớp equip_slot NULL trong DB)
+  int32 bonus_atk = 6;
+}
+
+// Command: Client -> Server (OPCODE_GET_ITEM_CATALOG_REQUEST = 509). Client gửi version nó đang
+// cache (rỗng nếu chưa có gì). Server so, khớp thì trả về rỗng và client dùng lại bản cũ.
+message GetItemCatalogRequest {
+  string known_version = 1;
+}
+
+// Response: Server -> Client (OPCODE_ITEM_CATALOG_RESPONSE = 510).
+// unchanged=true  -> entries RỖNG, client giữ nguyên cache.
+// unchanged=false -> entries là TOÀN BỘ catalog mới (thay hẳn, không cộng dồn).
+message ItemCatalogResponse {
+  bool unchanged = 1;
+  string version = 2; // hash nội dung catalog; server tính, client chỉ lưu và gửi lại
+  repeated ItemCatalogEntry entries = 3;
+}

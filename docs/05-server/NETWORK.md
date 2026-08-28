@@ -81,7 +81,7 @@ Dải số cố định theo domain — tránh đụng độ khi nhiều ngườ
 | 300–399 | Movement / World |
 | 400–499 | Combat / Skill |
 | 500–599 | Inventory / Equipment |
-| 600–699 | Quest |
+| 600–699 | Quest / NPC / Dialogue |
 | 700–799 | Guild |
 | 800–899 | Chat |
 | 900–999 | Mail |
@@ -95,6 +95,18 @@ Dải số cố định theo domain — tránh đụng độ khi nhiều ngườ
 | 1700+ | Dự trữ — không dùng khi chưa cập nhật bảng này |
 
 **Nguồn chân lý thật**: `shared-protocol/src/main/proto/opcode_registry.proto`. Tài liệu này là bản tóm tắt — **lệch nhau thì file `.proto` thắng**.
+
+Tổng opcode đã cấp phát (không tính `OPCODE_UNSPECIFIED`): **157** (2026-08-27).
+Lượt cấp gần nhất — [ADR-035](../01-architecture/adr/ADR-035-Client-State-Sync-Opcodes.md) (Accepted 2026-08-27), 150 → 157:
+
+| Opcode | Số | Dải |
+|---|---|---|
+| `OPCODE_GOLD_CHANGED_EVENT` | 209 | Character |
+| `OPCODE_LIST_INVENTORY_REQUEST` / `_RESPONSE` | 507 / 508 | Inventory |
+| `OPCODE_GET_ITEM_CATALOG_REQUEST` / `OPCODE_ITEM_CATALOG_RESPONSE` | 509 / 510 | Inventory |
+| `OPCODE_LIST_QUESTS_REQUEST` / `_RESPONSE` | 610 / 611 | Quest |
+
+> **511 để trống có chủ ý** — dành sẵn cho `ITEM_REMOVED_EVENT` (ADR-035 Revisit Trigger #3). Đừng cấp số này cho packet khác.
 
 ---
 

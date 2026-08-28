@@ -11,7 +11,10 @@ import dev.kage.protocol.ClaimQuestRewardCommand;
 import dev.kage.protocol.ClaimQuestRewardOutcome;
 import dev.kage.protocol.ClaimQuestRewardResponse;
 import dev.kage.protocol.ItemRewardView;
+import dev.kage.protocol.ListQuestsRequest;
+import dev.kage.protocol.ListQuestsResponse;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.QuestLogEntry;
 import dev.kage.protocol.QuestStatus;
 import dev.kage.protocol.QuestStatusChangedEvent;
 
@@ -90,5 +93,62 @@ class QuestPacketsTest {
         assertThat(parsed.getItemsGrantedList()).hasSize(1);
         assertThat(parsed.getItemsGranted(0).getItemTemplateCode()).isEqualTo("kunai");
         assertThat(parsed.getItemsGranted(0).getQuantity()).isEqualTo(5);
+    }
+
+    // --- ADR-035 (Accepted 2026-08-27): nhật ký nhiệm vụ 610/611 ---
+
+    @Test
+    void shouldRoundTripListQuestsRequest() throws InvalidProtocolBufferException {
+        ListQuestsRequest request = ListQuestsRequest.newBuilder().build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_LIST_QUESTS_REQUEST_VALUE, ProtocolVersion.CURRENT, 6);
+
+        byte[] frameBytes = PacketCodec.encodeFrame(header, request.toByteArray());
+        PacketCodec.Frame decoded = PacketCodec.decodeFrame(frameBytes);
+
+        // Không field nào (characterId từ session) — round-trip vẫn phải giữ nguyên header.
+        assertThat(decoded.header()).isEqualTo(header);
+        assertThat(ListQuestsRequest.parseFrom(decoded.payload())).isEqualTo(request);
+    }
+
+    @Test
+    void shouldRoundTripQuestLogEntry() throws InvalidProtocolBufferException {
+        QuestLogEntry entry = QuestLogEntry.newBuilder()
+                .setQuestCode("kill_training_dummies")
+                .setStatus(QuestStatus.QUEST_STATUS_IN_PROGRESS)
+                .build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_LIST_QUESTS_RESPONSE_VALUE, ProtocolVersion.CURRENT, 6);
+
+        byte[] frameBytes = PacketCodec.encodeFrame(header, entry.toByteArray());
+        QuestLogEntry parsed =
+                QuestLogEntry.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+
+        assertThat(parsed.getQuestCode()).isEqualTo("kill_training_dummies");
+        assertThat(parsed.getStatus()).isEqualTo(QuestStatus.QUEST_STATUS_IN_PROGRESS);
+    }
+
+    @Test
+    void shouldRoundTripListQuestsResponse_includingClaimedQuests() throws InvalidProtocolBufferException {
+        ListQuestsResponse response = ListQuestsResponse.newBuilder()
+                .addQuests(QuestLogEntry.newBuilder()
+                        .setQuestCode("kill_training_dummies")
+                        .setStatus(QuestStatus.QUEST_STATUS_COMPLETED)
+                        .build())
+                // CLAIMED phải nằm trong response (ADR-035 Decision-4) — lọc phía server thì client
+                // không phân biệt được "chưa từng nhận" với "đã trả".
+                .addQuests(QuestLogEntry.newBuilder()
+                        .setQuestCode("talk_to_town_elder")
+                        .setStatus(QuestStatus.QUEST_STATUS_CLAIMED)
+                        .build())
+                .build();
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_LIST_QUESTS_RESPONSE_VALUE, ProtocolVersion.CURRENT, 6);
+
+        byte[] frameBytes = PacketCodec.encodeFrame(header, response.toByteArray());
+        ListQuestsResponse parsed =
+                ListQuestsResponse.parseFrom(PacketCodec.decodeFrame(frameBytes).payload());
+
+        assertThat(parsed.getQuestsList()).hasSize(2);
+        assertThat(parsed.getQuests(0).getQuestCode()).isEqualTo("kill_training_dummies");
+        assertThat(parsed.getQuests(0).getStatus()).isEqualTo(QuestStatus.QUEST_STATUS_COMPLETED);
+        assertThat(parsed.getQuests(1).getStatus()).isEqualTo(QuestStatus.QUEST_STATUS_CLAIMED);
     }
 }

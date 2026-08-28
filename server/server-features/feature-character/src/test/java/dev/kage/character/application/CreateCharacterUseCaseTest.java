@@ -46,6 +46,11 @@ class CreateCharacterUseCaseTest {
         }
 
         @Override
+        public long loadGold(long characterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
         public List<Character> listByAccount(long accountId) {
             return characters.stream().filter(c -> c.accountId() == accountId).toList();
         }

@@ -73,3 +73,27 @@ message ClaimQuestRewardResponse {
   int64 exp_granted = 2;
   repeated ItemRewardView items_granted = 3;
 }
+
+// -----------------------------------------------------------------------------------------------
+// ADR-035 (Accepted 2026-08-27) — nhật ký nhiệm vụ. CHỈ THÊM, không đổi message nào ở trên
+// (NETWORK.md §6); ItemRewardView giữ nguyên vẹn kể cả sự chênh id-vs-code (Technical Decision #8).
+// -----------------------------------------------------------------------------------------------
+
+// Command: Client -> Server (OPCODE_LIST_QUESTS_REQUEST = 610). Không field — characterId từ session.
+message ListQuestsRequest {
+}
+
+// 1 dòng nhật ký. quest_code là thứ ClaimQuestRewardCommand bắt buộc phải có, và hiện client chỉ
+// lấy được nó từ chuỗi action của hội thoại lúc nhận — đây chính là gói gỡ bế tắc đó.
+// KHÔNG mang progress_json: nó là chuỗi đục do script tự quản (quest.proto dòng 10), Java không đọc
+// được và client không hiển thị được. Giữ nguyên ranh giới đó.
+message QuestLogEntry {
+  string quest_code = 1;
+  QuestStatus status = 2;
+}
+
+// Response: Server -> Client (OPCODE_LIST_QUESTS_RESPONSE = 611). Gồm cả quest đã CLAIMED để client
+// biết không mời lại — lọc phía server thì client không phân biệt được "chưa từng nhận" với "đã trả".
+message ListQuestsResponse {
+  repeated QuestLogEntry quests = 1;
+}

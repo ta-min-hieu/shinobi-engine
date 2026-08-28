@@ -36,6 +36,9 @@ import dev.kage.guild.api.GuildFacade;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.EquipmentSlotType;
+import dev.kage.inventory.domain.InventorySnapshot;
+import dev.kage.inventory.domain.ItemCatalog;
+import dev.kage.inventory.domain.ItemStack;
 import dev.kage.mail.api.MailFacade;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.protocol.AcceptDuelCommand;
@@ -111,6 +114,7 @@ import dev.kage.protocol.EnterDungeonResponse;
 import dev.kage.protocol.EquipItemCommand;
 import dev.kage.protocol.EquipItemResponse;
 import dev.kage.protocol.EquipmentSlot;
+import dev.kage.protocol.EquippedSlotView;
 import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.ExitDuelCommand;
 import dev.kage.protocol.ExitDuelOutcome;
@@ -122,6 +126,7 @@ import dev.kage.protocol.Faction;
 import dev.kage.protocol.FriendOfflineEvent;
 import dev.kage.protocol.FriendOnlineEvent;
 import dev.kage.protocol.FriendView;
+import dev.kage.protocol.GetItemCatalogRequest;
 import dev.kage.protocol.GetMyGuildRequest;
 import dev.kage.protocol.GetMyGuildResponse;
 import dev.kage.protocol.GetMyPartyRequest;
@@ -131,9 +136,11 @@ import dev.kage.protocol.GetPvpRatingResponse;
 import dev.kage.protocol.GetTradeStatusRequest;
 import dev.kage.protocol.GetTradeStatusResponse;
 import dev.kage.protocol.GuildMemberView;
+import dev.kage.protocol.InventoryItemView;
 import dev.kage.protocol.InvitePartyMemberCommand;
 import dev.kage.protocol.InvitePartyMemberOutcome;
 import dev.kage.protocol.InvitePartyMemberResponse;
+import dev.kage.protocol.ItemCatalogResponse;
 import dev.kage.protocol.ItemRewardView;
 import dev.kage.protocol.JumpCommand;
 import dev.kage.protocol.KickGuildMemberCommand;
@@ -154,6 +161,8 @@ import dev.kage.protocol.ListFriendsRequest;
 import dev.kage.protocol.ListFriendsResponse;
 import dev.kage.protocol.ListGuildMembersRequest;
 import dev.kage.protocol.ListGuildMembersResponse;
+import dev.kage.protocol.ListInventoryRequest;
+import dev.kage.protocol.ListInventoryResponse;
 import dev.kage.protocol.ListMailRequest;
 import dev.kage.protocol.ListMailResponse;
 import dev.kage.protocol.ListPartyMembersRequest;
@@ -164,6 +173,8 @@ import dev.kage.protocol.ListPendingGuildJoinRequestsRequest;
 import dev.kage.protocol.ListPendingGuildJoinRequestsResponse;
 import dev.kage.protocol.ListPendingPartyInvitesRequest;
 import dev.kage.protocol.ListPendingPartyInvitesResponse;
+import dev.kage.protocol.ListQuestsRequest;
+import dev.kage.protocol.ListQuestsResponse;
 import dev.kage.protocol.ListShopItemsRequest;
 import dev.kage.protocol.ListShopItemsResponse;
 import dev.kage.protocol.MailAttachmentView;
@@ -276,6 +287,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // NETWORK.md §13 (đề xuất, chưa verify): MoveCommand ≤ tick rate (30/giây).
     private static final int MAX_MOVE_COMMANDS_PER_SECOND = 30;
 
+    // Khoá i18n cho GoldChangedEvent lúc vừa vào world (ADR-035 Decision-3) — KHÔNG phải câu tiếng
+    // Việt cứng. Các lý do còn lại (mua/bán/cường hoá/thư/giao dịch) do adapter server-database đặt,
+    // xem GoldLedger javadoc vì sao chúng nằm ở đó chứ không ở đây.
+    private static final String REASON_ENTER_WORLD = "gold.reason.enter_world";
+
     private final AccountFacade accountFacade;
     private final CharacterFacade characterFacade;
     private final InventoryFacade inventoryFacade;
@@ -331,6 +347,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_EQUIP_ITEM_COMMAND_VALUE, this::handleEquipItemCommand),
             Map.entry(Opcode.OPCODE_UNEQUIP_ITEM_COMMAND_VALUE, this::handleUnequipItemCommand),
             Map.entry(Opcode.OPCODE_ENHANCE_ITEM_COMMAND_VALUE, this::handleEnhanceItemCommand),
+            Map.entry(Opcode.OPCODE_LIST_INVENTORY_REQUEST_VALUE, this::handleListInventoryRequest),
+            Map.entry(Opcode.OPCODE_GET_ITEM_CATALOG_REQUEST_VALUE, this::handleGetItemCatalogRequest),
+            Map.entry(Opcode.OPCODE_LIST_QUESTS_REQUEST_VALUE, this::handleListQuestsRequest),
             Map.entry(Opcode.OPCODE_LIST_SHOP_ITEMS_REQUEST_VALUE, this::handleListShopItemsRequest),
             Map.entry(Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, this::handleBuyItemCommand),
             Map.entry(Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, this::handleSellItemCommand),
@@ -617,10 +636,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             SelectCharacterResponse response =
                     SelectCharacterResponse.newBuilder().setSuccess(true).build();
             send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
-            // Vạch EXP phải có số NGAY lúc vào world, không đợi giết con quái đầu tiên (2026-08-09).
-            // amount=0 = chỉ đọc, không ghi gì. Đang trên authExecutor (Virtual Thread) nên chạm DB
-            // ở đây an toàn, cùng lý do notifyFriendsPresenceChanged bên dưới.
-            worldGateway.registry().sendExperience(characterId, characterFacade.grantExperience(characterId, 0L));
+            sendInitialSelfState(characterId);
             // Đang trên authExecutor (Virtual Thread) rồi — friendFacade.listFriends chạm DB, an
             // toàn gọi thẳng, không cần đẩy thêm 1 lớp executor nữa (khác channelInactive bên dưới).
             notifyFriendsPresenceChanged(characterId, true);
@@ -632,6 +648,24 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             LOG.error("Chọn nhân vật thất bại: lỗi không mong đợi", e);
             sendError(ctx, sequenceId, 500, "error.select_character_failed");
         }
+    }
+
+    /**
+     * Hai chỉ số VÔ HƯỚNG của chính người chơi phải có số NGAY lúc vào world, không đợi sự kiện đầu
+     * tiên: vạch EXP (2026-08-09) và số vàng (ADR-035 Decision-3 — "người chơi chỉ phát hiện mình
+     * nghèo sau khi bấm mua"). Cả hai chỉ ĐỌC, không ghi gì.
+     *
+     * <p>Tách thành method riêng để {@code handleSelectCharacterBlocking} không vượt Checkstyle
+     * MethodLength. Đang trên {@code authExecutor} (Virtual Thread) nên chạm DB ở đây an toàn.
+     */
+    private void sendInitialSelfState(long characterId) {
+        // amount=0 = chỉ đọc trạng thái hiện tại, không cộng gì (xem GrantExperienceUseCase).
+        worldGateway.registry().sendExperience(characterId, characterFacade.grantExperience(characterId, 0L));
+        // delta=0: đây là ĐỒNG BỘ số dư, không phải một lần vàng đổi. Mọi lần đổi THẬT tự phát từ
+        // GoldLedger (server-database) qua GoldChangeListener, không đi qua đây.
+        worldGateway
+                .registry()
+                .sendGoldChanged(characterId, characterFacade.loadGold(characterId), 0L, REASON_ENTER_WORLD);
     }
 
     // SelectFactionRequest chạm DB (findById + UPDATE) — cần authExecutor, cùng pattern
@@ -917,6 +951,133 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private static EnhanceOutcome toProtoOutcome(InventoryFacade.EnhanceResult result) {
         return ENHANCE_OUTCOME_MAPPING.get(result);
+    }
+
+    // --- ADR-035 (Accepted 2026-08-27): 3 request đọc-thuần mở khoá túi đồ/catalog/nhật ký quest ---
+    // Cả 3 chạm DB (feature-inventory / feature-quest) nên đẩy sang Virtual Thread, KHÔNG chặn
+    // EventLoop — cùng pattern handleListShopItemsRequest/handleListFriendsRequest ngay dưới đây.
+    // characterId LUÔN lấy từ boundCharacterId (session), KHÔNG bao giờ từ payload: 2 trong 3 packet
+    // này cố ý không có field nào (SECURITY.md §4, chống IDOR).
+
+    private void handleListInventoryRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ListInventoryRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleListInventoryBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleListInventoryBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        InventorySnapshot snapshot = inventoryFacade.listInventory(characterId);
+        ListInventoryResponse.Builder response = ListInventoryResponse.newBuilder()
+                .setCapacity(snapshot.inventory().capacity());
+        List<ItemStack> items = snapshot.inventory().items();
+        for (int slotIndex = 0; slotIndex < items.size(); slotIndex++) {
+            ItemStack stack = items.get(slotIndex);
+            // slot_index = VỊ TRÍ trong danh sách, đúng bằng giá trị PostgresInventoryAdapter ghi
+            // vào cột slot_index lúc save (nó cũng đánh số theo vị trí) — không có nguồn thứ hai.
+            response.addItems(InventoryItemView.newBuilder()
+                    .setItemId(stack.id())
+                    .setItemTemplateId(stack.itemTemplateId())
+                    .setQuantity(stack.quantity())
+                    .setEnhanceLevel(stack.enhanceLevel())
+                    .setSlotIndex(slotIndex)
+                    .build());
+        }
+        snapshot.equipment()
+                .slots()
+                .forEach((slot, itemId) -> response.addEquipped(EquippedSlotView.newBuilder()
+                        .setSlot(toProtoSlot(slot))
+                        .setItemId(itemId)
+                        .build()));
+        send(
+                ctx,
+                Opcode.OPCODE_LIST_INVENTORY_RESPONSE_VALUE,
+                sequenceId,
+                response.build().toByteArray());
+    }
+
+    private void handleGetItemCatalogRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        GetItemCatalogRequest request = GetItemCatalogRequest.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleGetItemCatalogBlocking(ctx, sequenceId, request.getKnownVersion()));
+    }
+
+    /**
+     * SERVER phán quyết cache của client còn hợp lệ hay không (ADR-035 Decision-2, phương án A′) —
+     * client chỉ gửi lại chuỗi nó đang giữ, không tự kết luận gì. Khớp thì trả {@code unchanged} +
+     * danh sách RỖNG (vài chục byte); không khớp thì gửi TOÀN BỘ catalog (thay hẳn, không cộng dồn).
+     */
+    private void handleGetItemCatalogBlocking(ChannelHandlerContext ctx, int sequenceId, String knownVersion) {
+        ItemCatalog catalog = inventoryFacade.itemCatalog();
+        boolean unchanged = catalog.version().equals(knownVersion);
+        ItemCatalogResponse.Builder response =
+                ItemCatalogResponse.newBuilder().setUnchanged(unchanged).setVersion(catalog.version());
+        if (!unchanged) {
+            catalog.entries()
+                    .forEach(entry -> response.addEntries(dev.kage.protocol.ItemCatalogEntry.newBuilder()
+                            .setId(entry.id())
+                            .setCode(entry.code())
+                            .setNameKey(entry.nameKey())
+                            .setMaxStack(entry.maxStack())
+                            // equipSlot null (item không mặc được) -> UNSPECIFIED, khớp equip_slot NULL trong DB.
+                            .setEquipSlot(toProtoSlot(entry.equipSlot()))
+                            .setBonusAtk(entry.bonusAtk())
+                            .build()));
+        }
+        send(
+                ctx,
+                Opcode.OPCODE_ITEM_CATALOG_RESPONSE_VALUE,
+                sequenceId,
+                response.build().toByteArray());
+    }
+
+    private void handleListQuestsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ListQuestsRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        authExecutor.execute(() -> handleListQuestsBlocking(ctx, sequenceId, characterId));
+    }
+
+    private void handleListQuestsBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        ListQuestsResponse.Builder response = ListQuestsResponse.newBuilder();
+        for (dev.kage.quest.domain.QuestLogEntry entry : questFacade.listQuests(characterId)) {
+            response.addQuests(dev.kage.protocol.QuestLogEntry.newBuilder()
+                    .setQuestCode(entry.questCode())
+                    .setStatus(toProtoQuestStatus(entry.status()))
+                    .build());
+        }
+        send(
+                ctx,
+                Opcode.OPCODE_LIST_QUESTS_RESPONSE_VALUE,
+                sequenceId,
+                response.build().toByteArray());
+    }
+
+    private static final Map<dev.kage.quest.domain.QuestStatus, dev.kage.protocol.QuestStatus> QUEST_STATUS_MAPPING =
+            Map.of(
+                    dev.kage.quest.domain.QuestStatus.IN_PROGRESS,
+                            dev.kage.protocol.QuestStatus.QUEST_STATUS_IN_PROGRESS,
+                    dev.kage.quest.domain.QuestStatus.COMPLETED, dev.kage.protocol.QuestStatus.QUEST_STATUS_COMPLETED,
+                    dev.kage.quest.domain.QuestStatus.CLAIMED, dev.kage.protocol.QuestStatus.QUEST_STATUS_CLAIMED);
+
+    private static dev.kage.protocol.QuestStatus toProtoQuestStatus(dev.kage.quest.domain.QuestStatus status) {
+        return QUEST_STATUS_MAPPING.get(status);
     }
 
     private void handleListShopItemsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -2868,6 +3029,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     /** {@code null} nếu client gửi giá trị enum không hợp lệ (VD {@code UNSPECIFIED}/{@code UNRECOGNIZED}). */
     private static EquipmentSlotType toDomainSlot(EquipmentSlot slot) {
         return SLOT_MAPPING.get(slot);
+    }
+
+    // Chiều ngược của SLOT_MAPPING (ADR-035: ListInventoryResponse.equipped + ItemCatalogEntry cần
+    // đi từ domain ra proto). Dựng từ CHÍNH bảng trên thay vì gõ lại 7 dòng đối xứng — hai bảng
+    // viết tay là hai bảng có thể lệch nhau.
+    private static final Map<EquipmentSlotType, EquipmentSlot> PROTO_SLOT_MAPPING = SLOT_MAPPING.entrySet().stream()
+            .collect(java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getValue, Map.Entry::getKey));
+
+    /** {@code null} (item không mặc được, {@code equip_slot} NULL trong DB) -> {@code UNSPECIFIED}. */
+    private static EquipmentSlot toProtoSlot(EquipmentSlotType slot) {
+        return slot == null ? EquipmentSlot.EQUIPMENT_SLOT_UNSPECIFIED : PROTO_SLOT_MAPPING.get(slot);
     }
 
     private static String toErrorKey(InventoryFacade.EquipResult result) {

@@ -71,6 +71,7 @@ public final class JdbcTransactionRunner {
         try {
             action.accept(connection);
             connection.commit();
+            GoldLedger.publishCommitted(connection);
         } catch (RuntimeException e) {
             rollbackQuietly(connection);
             throw e;
@@ -82,6 +83,7 @@ public final class JdbcTransactionRunner {
         try {
             T result = action.apply(connection);
             connection.commit();
+            GoldLedger.publishCommitted(connection);
             return result;
         } catch (RuntimeException e) {
             rollbackQuietly(connection);
@@ -93,6 +95,9 @@ public final class JdbcTransactionRunner {
         // Đếm NGAY khi action ném RuntimeException (transaction coi như thất bại), bất kể bản thân
         // rollback() có thành công hay không — OBSERVABILITY.md §3.3 kage.db.transaction.failed.
         metricsPort.recordTransactionFailed();
+        // Vàng có thể đã bị trừ trong transaction này rồi mới abort (VD BuyItemUseCase: trừ tiền
+        // xong phát hiện túi đầy) — vứt thay đổi đã ghi tạm, KHÔNG báo số dư chưa từng tồn tại.
+        GoldLedger.discardPending(connection);
         try {
             connection.rollback();
         } catch (SQLException e) {

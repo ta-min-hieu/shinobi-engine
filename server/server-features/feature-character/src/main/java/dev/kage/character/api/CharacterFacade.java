@@ -79,6 +79,15 @@ public final class CharacterFacade {
         return characterPort.loadStats(characterId);
     }
 
+    /**
+     * Số dư vàng hiện tại — gateway đọc đúng một lần lúc nhân vật vào world để phát
+     * {@code GoldChangedEvent} đầu tiên (ADR-035 Decision-3: "cửa hàng phải có số ngay, không phải
+     * chờ giao dịch đầu tiên"). Mọi lần vàng ĐỔI sau đó tự phát từ hạ tầng, không qua đây.
+     */
+    public long loadGold(long characterId) {
+        return characterPort.loadGold(characterId);
+    }
+
     /** Tra nhân vật theo tên — dùng cho kết bạn/gửi thư theo tên (feature-friend, feature-mail). */
     public Optional<Character> findByName(String name) {
         return characterPort.findByName(name);

@@ -24,6 +24,7 @@ import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ChatMessageEvent;
 import dev.kage.protocol.EffectKind;
 import dev.kage.protocol.ExperienceChangedEvent;
+import dev.kage.protocol.GoldChangedEvent;
 import dev.kage.protocol.ItemGrantedEvent;
 import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
@@ -430,6 +431,29 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 .setLeveledUp(result.leveledUp())
                 .build();
         send(ctx, Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    /**
+     * Phát {@code GoldChangedEvent} cho chính người chơi đó (ADR-035 Decision-3). Bị gọi từ HAI
+     * chỗ, và chỉ hai: {@code GatewayBootstrap} nối vào {@code GoldChangeListener} của
+     * server-database (mọi lần vàng ĐỔI, sau khi commit), và {@code GatewayChannelHandler} lúc
+     * nhân vật vừa vào world (đồng bộ số dư đầu tiên, {@code delta=0}).
+     *
+     * <p>Offline thì bỏ qua an toàn: vàng ĐÃ vào DB thật, chỉ mất thông báo — và vì {@code gold} là
+     * số dư TUYỆT ĐỐI nên lần đăng nhập kế tự sửa lại, không tích luỹ sai lệch. Cùng cách xử lý của
+     * {@link #sendExperience}.
+     */
+    void sendGoldChanged(long characterId, long gold, long delta, String reasonKey) {
+        ChannelHandlerContext ctx = contextsByCharacterId.get(characterId);
+        if (ctx == null) {
+            return;
+        }
+        GoldChangedEvent event = GoldChangedEvent.newBuilder()
+                .setGold(gold)
+                .setDelta(delta)
+                .setReasonKey(reasonKey)
+                .build();
+        send(ctx, Opcode.OPCODE_GOLD_CHANGED_EVENT_VALUE, 0, event.toByteArray());
     }
 
     private void grantLootBlocking(long killerCharacterId, String monsterCode) {

@@ -3,10 +3,12 @@ package dev.kage.server.database.quest;
 import java.sql.Connection;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import javax.sql.DataSource;
 
+import dev.kage.quest.domain.QuestLogEntry;
 import dev.kage.quest.domain.QuestProgress;
 import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestStatus;
@@ -29,6 +31,17 @@ public final class PostgresQuestProgressAdapter implements QuestProgressPort {
                           updated_at = EXCLUDED.updated_at
             """;
 
+    // JOIN quest_template để trả quest_code (khoá client dùng) thay vì quest_template_id —
+    // ClaimQuestRewardCommand nhận code. KHÔNG select progress_json: chuỗi đục do script tự quản,
+    // cố ý không đi qua dây (ADR-035 Decision-4).
+    private static final String LIST_LOG = """
+            SELECT t.code AS quest_code, p.status
+              FROM character_quest_progress p
+              JOIN quest_template t ON t.id = p.quest_template_id
+             WHERE p.character_id = ?
+             ORDER BY t.code
+            """;
+
     private final DataSource dataSource;
 
     public PostgresQuestProgressAdapter(DataSource dataSource) {
@@ -47,6 +60,15 @@ public final class PostgresQuestProgressAdapter implements QuestProgressPort {
                         rs.getString("progress_json")),
                 characterId,
                 questTemplateId);
+    }
+
+    @Override
+    public List<QuestLogEntry> listLog(long characterId) {
+        return JdbcOperations.query(
+                dataSource,
+                LIST_LOG,
+                rs -> new QuestLogEntry(rs.getString("quest_code"), QuestStatus.valueOf(rs.getString("status"))),
+                characterId);
     }
 
     @Override

@@ -45,6 +45,16 @@ public interface CharacterPort {
     CharacterStats loadStats(long characterId);
 
     /**
+     * Số dư vàng hiện tại ({@code character_stat.gold}, V7) — ĐỌC THUẦN, dùng để phát
+     * {@code GoldChangedEvent} đầu tiên ngay lúc vào world (ADR-035 Decision-3).
+     *
+     * <p>KHÔNG phải đường ĐỔI vàng: mọi thay đổi đi qua {@code GoldPort}/{@code TradeGoldPort} của
+     * feature tương ứng, và đi qua đúng MỘT chỗ ở hạ tầng ({@code GoldLedger} trong server-database)
+     * để không đường nào phát thiếu sự kiện.
+     */
+    long loadGold(long characterId);
+
+    /**
      * Cộng {@code amount} EXP và trả về trạng thái SAU khi cộng — một câu {@code UPDATE ...
      * RETURNING} duy nhất để không có cửa sổ đọc-rồi-ghi (hai nguồn EXP chạy song song trên Virtual
      * Thread khác nhau: giết quái và trao thưởng quest, xem {@code ExpPort}).
