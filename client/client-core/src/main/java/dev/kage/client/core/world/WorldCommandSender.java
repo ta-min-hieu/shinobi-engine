@@ -6,17 +6,25 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import dev.kage.client.core.net.GameConnection;
+import dev.kage.protocol.AcceptDuelCommand;
 import dev.kage.protocol.AcceptFriendRequestCommand;
 import dev.kage.protocol.AcceptPartyInviteCommand;
 import dev.kage.protocol.ApproveGuildJoinRequestCommand;
 import dev.kage.protocol.AttackCommand;
+import dev.kage.protocol.ChallengeDuelCommand;
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ClaimQuestRewardCommand;
 import dev.kage.protocol.CreateGuildCommand;
 import dev.kage.protocol.CreatePartyCommand;
+import dev.kage.protocol.DeclineDuelCommand;
 import dev.kage.protocol.DisbandGuildCommand;
+import dev.kage.protocol.EnterDungeonCommand;
+import dev.kage.protocol.ExitDuelCommand;
+import dev.kage.protocol.ExitDungeonCommand;
+import dev.kage.protocol.Faction;
 import dev.kage.protocol.GetMyGuildRequest;
 import dev.kage.protocol.GetMyPartyRequest;
+import dev.kage.protocol.GetPvpRatingRequest;
 import dev.kage.protocol.InvitePartyMemberCommand;
 import dev.kage.protocol.JumpCommand;
 import dev.kage.protocol.KickGuildMemberCommand;
@@ -36,6 +44,7 @@ import dev.kage.protocol.RejectGuildJoinRequestCommand;
 import dev.kage.protocol.RejectPartyInviteCommand;
 import dev.kage.protocol.RemoveFriendCommand;
 import dev.kage.protocol.SelectDialogueOptionCommand;
+import dev.kage.protocol.SelectFactionRequest;
 import dev.kage.protocol.SendChatMessageCommand;
 import dev.kage.protocol.SendFriendRequestCommand;
 import dev.kage.protocol.SendGuildJoinRequestCommand;
@@ -389,14 +398,125 @@ final class WorldCommandSender {
                 "ListPendingGuildJoinRequestsRequest");
     }
 
+    // --- Đấu tay đôi + xếp hạng PvP (arena.proto, dải 1600-1611 và 1200-1201) -------------------
+
+    /**
+     * Thách đấu một nhân vật theo TÊN.
+     *
+     * <p>Tên chứ không phải id là do giao thức quy định (arena.proto: "Thách đấu bằng TÊN [...]
+     * server tự tra CharacterFacade.findByName TRƯỚC khi gọi ArenaInstanceRegistry"), cùng quy ước
+     * {@link #sendFriendRequest}/{@link #invitePartyMember}. Hệ quả với client: người trên màn hình
+     * chỉ có {@code character_id} ({@code CharacterSpawnedEvent} không mang tên), nên phải tra tên
+     * từ chỗ khác — xem {@link DuelController} về sổ tên và khoảng trống này.
+     */
+    void challengeDuel(String targetName) {
+        ChallengeDuelCommand command =
+                ChallengeDuelCommand.newBuilder().setTargetName(targetName).build();
+        send(Opcode.OPCODE_CHALLENGE_DUEL_COMMAND_VALUE, command.toByteArray(), "ChallengeDuelCommand");
+    }
+
+    /** @param challengeId lấy từ {@code DuelChallengeReceivedEvent} — client không tự sinh id nào. */
+    void acceptDuel(long challengeId) {
+        AcceptDuelCommand command =
+                AcceptDuelCommand.newBuilder().setChallengeId(challengeId).build();
+        send(Opcode.OPCODE_ACCEPT_DUEL_COMMAND_VALUE, command.toByteArray(), "AcceptDuelCommand");
+    }
+
+    /** @param challengeId xem {@link #acceptDuel(long)}. */
+    void declineDuel(long challengeId) {
+        DeclineDuelCommand command =
+                DeclineDuelCommand.newBuilder().setChallengeId(challengeId).build();
+        send(Opcode.OPCODE_DECLINE_DUEL_COMMAND_VALUE, command.toByteArray(), "DeclineDuelCommand");
+    }
+
+    /**
+     * Bỏ cuộc giữa chừng. Gói rỗng — server tự tra nhân vật đang ở trận nào (arena.proto).
+     *
+     * <p>KHÁC {@code ExitDungeonCommand}: đây tính THUA THẬT và mất điểm MMR, nên nút gọi tới nó
+     * chỉ được bày ra khi đang thật sự ở trong một trận (xem {@code DuelPanel}).
+     */
+    void exitDuel() {
+        send(
+                Opcode.OPCODE_EXIT_DUEL_COMMAND_VALUE,
+                ExitDuelCommand.newBuilder().build().toByteArray(),
+                "ExitDuelCommand");
+    }
+
+    /**
+     * Hỏi điểm xếp hạng PvP của CHÍNH mình. Gói rỗng — người hỏi lấy từ session phía server.
+     *
+     * <p>Đây là đường DUY NHẤT client biết điểm của mình: arena.proto không có event nào đẩy điểm
+     * mới, {@code DuelResultEvent} chỉ mang điểm của đúng trận vừa xong. Vì vậy phải hỏi lại mỗi lần
+     * mở cửa sổ và sau mỗi trận (xem {@link DuelCoordinator}).
+     */
+    void requestPvpRating() {
+        send(
+                Opcode.OPCODE_GET_PVP_RATING_REQUEST_VALUE,
+                GetPvpRatingRequest.newBuilder().build().toByteArray(),
+                "GetPvpRatingRequest");
+    }
+
+    // --- Hầm ngục (dungeon.proto, dải 1500-1503) ----------------------------------------------
+    // Không có idempotencyKey ở cả hai lệnh, và đó là quyết định chứ không phải khoảng trống:
+    // vào/ra hầm ngục không sinh hiệu ứng kinh tế trùng lặp được nên ADR-025 không áp (dungeon.proto
+    // nói thẳng điều này). Gửi trùng EnterDungeonCommand chỉ nhận về ALREADY_IN_DUNGEON.
+
+    /**
+     * Kéo CẢ NHÓM vào một instance hầm ngục.
+     *
+     * <p>⚠️ Lệnh này đổi World của cả những người KHÁC trong nhóm, nhưng chỉ máy này nhận được
+     * {@code EnterDungeonResponse} — xem {@link DungeonController} về khoảng trống đó.
+     *
+     * @param dungeonCode {@link DungeonController#DUNGEON_CODE}. Server tra lại và trả
+     *     {@code UNKNOWN_DUNGEON} nếu sai — client KHÔNG kiểm trước (Điều 24).
+     */
+    void enterDungeon(String dungeonCode) {
+        EnterDungeonCommand command =
+                EnterDungeonCommand.newBuilder().setDungeonCode(dungeonCode).build();
+        send(Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, command.toByteArray(), "EnterDungeonCommand");
+    }
+
+    /** Rời hầm ngục hiện tại — gói RỖNG, server tự tra nhân vật này đang ở instance nào (dungeon.proto). */
+    void exitDungeon() {
+        send(
+                Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE,
+                ExitDungeonCommand.newBuilder().build().toByteArray(),
+                "ExitDungeonCommand");
+    }
+
+    /**
+     * Chọn/đổi hệ phái (character.proto, cần Lv10). Gói KHÔNG mang {@code character_id} — server lấy
+     * từ session đã bound lúc {@code SelectCharacterRequest} (chống IDOR, Điều 24).
+     *
+     * <p><b>Hàm DUY NHẤT ở lớp này trả về {@code sequenceId}</b>, và nó bắt buộc phải trả: server
+     * báo thất bại qua {@code ErrorResponse} — một gói dùng chung cho cả giao thức — nên
+     * {@code related_sequence_id} là thứ duy nhất nối một lỗi về đúng yêu cầu đã gửi. Xem
+     * {@link FactionCoordinator}.
+     *
+     * @return {@code sequenceId} đã dùng để gửi. Vẫn trả về bình thường khi mất kết nối (lệnh bị
+     *     nuốt như mọi lệnh khác ở lớp này) — chỗ gọi sẽ đơn giản là không bao giờ nhận được gói
+     *     trả lời nào mang số đó, đúng như khi gói đi lạc trên đường.
+     */
+    int selectFaction(Faction faction) {
+        int sequenceId = connection.nextSequenceId();
+        SelectFactionRequest request =
+                SelectFactionRequest.newBuilder().setFaction(faction).build();
+        send(Opcode.OPCODE_SELECT_FACTION_REQUEST_VALUE, sequenceId, request.toByteArray(), "SelectFactionRequest");
+        return sequenceId;
+    }
+
     /** Gói tin đến từ server — {@code null} khi hàng đợi rỗng (xem {@link GameConnection}). */
     PacketCodec.Frame pollInbound() {
         return connection.pollInbound();
     }
 
     private void send(int opcode, byte[] payload, String commandName) {
+        send(opcode, connection.nextSequenceId(), payload, commandName);
+    }
+
+    private void send(int opcode, int sequenceId, byte[] payload, String commandName) {
         try {
-            connection.send(opcode, connection.nextSequenceId(), payload);
+            connection.send(opcode, sequenceId, payload);
         } catch (IOException e) {
             LOG.debug("Gửi {} thất bại (mất kết nối tạm thời)", commandName, e);
         }

@@ -710,6 +710,11 @@ class SecurityIntegrationTest {
             }
 
             @Override
+            public long loadGold(long characterId) {
+                return 0L; // test này không kiểm tra vàng — nhân vật mới vốn có 0 (V7 DEFAULT 0)
+            }
+
+            @Override
             public List<Character> listByAccount(long accountId) {
                 return characters.stream()
                         .filter(c -> c.accountId() == accountId)
@@ -956,7 +961,13 @@ class SecurityIntegrationTest {
         EnhancePorts enhancePorts =
                 new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort, idempotencyPort);
         EnhanceItemUseCase enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
-        return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
+        return new InventoryFacade(
+                new dev.kage.inventory.api.ItemAcquisitionUseCases(addItemUseCase, grantLootUseCase),
+                equipmentUseCases,
+                enhanceItemUseCase,
+                new dev.kage.inventory.api.InventoryQueryUseCases(
+                        new dev.kage.inventory.application.ListInventoryUseCase(inventoryPort, equipmentPort),
+                        new dev.kage.inventory.application.GetItemCatalogUseCase(itemTemplatePort)));
     }
 
     private dev.kage.dialogue.api.DialogueFacade fakeDialogueFacade() {
@@ -993,7 +1004,10 @@ class SecurityIntegrationTest {
         dev.kage.quest.application.ClaimQuestRewardUseCase claimQuestRewardUseCase =
                 new dev.kage.quest.application.ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx);
         return new dev.kage.quest.api.QuestFacade(
-                acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
+                acceptQuestUseCase,
+                processMonsterKilledUseCase,
+                claimQuestRewardUseCase,
+                new dev.kage.quest.application.ListQuestsUseCase(progressPort));
     }
 
     private static dev.kage.friend.api.FriendFacade fakeFriendFacade() {

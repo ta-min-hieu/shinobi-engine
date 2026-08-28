@@ -6,10 +6,14 @@ import dev.kage.inventory.application.AddItemUseCase;
 import dev.kage.inventory.application.ComputeEquipmentBonusUseCase;
 import dev.kage.inventory.application.EnhanceItemUseCase;
 import dev.kage.inventory.application.EquipItemUseCase;
+import dev.kage.inventory.application.GetItemCatalogUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
+import dev.kage.inventory.application.ListInventoryUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
 import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.EquipmentSlotType;
+import dev.kage.inventory.domain.InventorySnapshot;
+import dev.kage.inventory.domain.ItemCatalog;
 import dev.kage.inventory.domain.ItemStack;
 
 /**
@@ -25,18 +29,22 @@ public final class InventoryFacade {
     private final UnequipItemUseCase unequipItemUseCase;
     private final ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase;
     private final EnhanceItemUseCase enhanceItemUseCase;
+    private final ListInventoryUseCase listInventoryUseCase;
+    private final GetItemCatalogUseCase getItemCatalogUseCase;
 
     public InventoryFacade(
-            AddItemUseCase addItemUseCase,
-            GrantLootUseCase grantLootUseCase,
+            ItemAcquisitionUseCases acquisitionUseCases,
             EquipmentUseCases equipmentUseCases,
-            EnhanceItemUseCase enhanceItemUseCase) {
-        this.addItemUseCase = addItemUseCase;
-        this.grantLootUseCase = grantLootUseCase;
+            EnhanceItemUseCase enhanceItemUseCase,
+            InventoryQueryUseCases queryUseCases) {
+        this.addItemUseCase = acquisitionUseCases.addItemUseCase();
+        this.grantLootUseCase = acquisitionUseCases.grantLootUseCase();
         this.equipItemUseCase = equipmentUseCases.equipItemUseCase();
         this.unequipItemUseCase = equipmentUseCases.unequipItemUseCase();
         this.computeEquipmentBonusUseCase = equipmentUseCases.computeEquipmentBonusUseCase();
         this.enhanceItemUseCase = enhanceItemUseCase;
+        this.listInventoryUseCase = queryUseCases.listInventoryUseCase();
+        this.getItemCatalogUseCase = queryUseCases.getItemCatalogUseCase();
     }
 
     /**
@@ -108,6 +116,25 @@ public final class InventoryFacade {
             case INSUFFICIENT_GOLD -> EnhanceResult.INSUFFICIENT_GOLD;
             case DUPLICATE_REQUEST -> EnhanceResult.DUPLICATE_REQUEST;
         };
+    }
+
+    /**
+     * Ảnh chụp TOÀN BỘ túi đồ + trang bị đang mặc của {@code characterId} (ADR-035 Decision-1) —
+     * nguồn DUY NHẤT để client biết {@code inventory_item.id} thật sau khi đăng nhập lại, thứ mà
+     * {@code EquipItemCommand}/{@code SellItemCommand} bắt buộc phải có.
+     */
+    public InventorySnapshot listInventory(long characterId) {
+        return listInventoryUseCase.execute(characterId);
+    }
+
+    /**
+     * Toàn bộ catalog vật phẩm + {@code version} là hash nội dung do server tính (ADR-035
+     * Decision-2, phương án A′) — gateway so {@code version} này với bản client gửi lên để quyết
+     * gửi lại hay báo {@code unchanged}. Có cache trong bộ nhớ, xem
+     * {@link GetItemCatalogUseCase} cho điều kiện làm mất hiệu lực.
+     */
+    public ItemCatalog itemCatalog() {
+        return getItemCatalogUseCase.execute();
     }
 
     public enum Result {

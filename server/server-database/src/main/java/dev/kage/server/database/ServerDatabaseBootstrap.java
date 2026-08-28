@@ -42,12 +42,16 @@ import dev.kage.guild.application.RejectGuildJoinRequestUseCase;
 import dev.kage.guild.application.SendGuildJoinRequestUseCase;
 import dev.kage.inventory.api.EquipmentUseCases;
 import dev.kage.inventory.api.InventoryFacade;
+import dev.kage.inventory.api.InventoryQueryUseCases;
+import dev.kage.inventory.api.ItemAcquisitionUseCases;
 import dev.kage.inventory.application.AddItemUseCase;
 import dev.kage.inventory.application.ComputeEquipmentBonusUseCase;
 import dev.kage.inventory.application.EnhanceItemUseCase;
 import dev.kage.inventory.application.EnhancePorts;
 import dev.kage.inventory.application.EquipItemUseCase;
+import dev.kage.inventory.application.GetItemCatalogUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
+import dev.kage.inventory.application.ListInventoryUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
 import dev.kage.mail.api.MailFacade;
 import dev.kage.mail.application.ClaimMailUseCase;
@@ -70,6 +74,7 @@ import dev.kage.pvp.api.PvpFacade;
 import dev.kage.quest.api.QuestFacade;
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
+import dev.kage.quest.application.ListQuestsUseCase;
 import dev.kage.quest.application.ProcessMonsterKilledUseCase;
 import dev.kage.quest.application.QuestRewardPorts;
 import dev.kage.server.database.account.JdbcAccountTransactionRunner;
@@ -211,7 +216,13 @@ public final class ServerDatabaseBootstrap {
         EnhancePorts enhancePorts =
                 new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort, idempotencyPort);
         EnhanceItemUseCase enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, transactionRunner);
-        return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
+        InventoryQueryUseCases queryUseCases = new InventoryQueryUseCases(
+                new ListInventoryUseCase(inventoryPort, equipmentPort), new GetItemCatalogUseCase(itemTemplatePort));
+        return new InventoryFacade(
+                new ItemAcquisitionUseCases(addItemUseCase, grantLootUseCase),
+                equipmentUseCases,
+                enhanceItemUseCase,
+                queryUseCases);
     }
 
     /**
@@ -225,6 +236,18 @@ public final class ServerDatabaseBootstrap {
         refs.addAll(new PostgresQuestTemplateAdapter(dataSource).listAllScriptRefs());
         refs.addAll(new PostgresNpcTemplateAdapter(dataSource).listAllDialogueScriptRefs());
         return refs;
+    }
+
+    /**
+     * Nối bên nghe "vàng vừa đổi" (ADR-035 Decision-3) — {@code server-gateway} gọi 1 LẦN lúc khởi
+     * động để biến mỗi {@link GoldChange} thành {@code GoldChangedEvent} gửi cho đúng người chơi.
+     *
+     * <p>Đặt ở đây thay vì để gateway gọi thẳng {@code GoldLedger} để giữ nguyên tính chất
+     * "composition root chỉ chạm MỘT lớp của server-database" (xem javadoc lớp này). Chưa gọi thì
+     * vàng vẫn đổi đúng trong DB, chỉ là client không được báo.
+     */
+    public void configureGoldChangeListener(GoldChangeListener listener) {
+        GoldLedger.configureListener(listener);
     }
 
     /**
@@ -297,7 +320,11 @@ public final class ServerDatabaseBootstrap {
         QuestRewardPorts rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort, idempotencyPort);
         ClaimQuestRewardUseCase claimQuestRewardUseCase =
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, transactionRunner);
-        return new QuestFacade(acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
+        return new QuestFacade(
+                acceptQuestUseCase,
+                processMonsterKilledUseCase,
+                claimQuestRewardUseCase,
+                new ListQuestsUseCase(progressPort));
     }
 
     public FriendFacade wireFriendFacade() {

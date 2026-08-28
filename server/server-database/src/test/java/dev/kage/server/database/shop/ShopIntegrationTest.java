@@ -188,6 +188,83 @@ class ShopIntegrationTest {
         return new SellItemUseCase(newPorts(), new JdbcShopTransactionRunner(dataSource));
     }
 
+    // ===== ADR-035 Decision-3 — GoldLedger là ĐIỂM PHÁT DUY NHẤT của GoldChangedEvent =====
+    // Ba test dưới đây dùng CHÍNH 3 kịch bản đã có ở trên (mua được / thiếu tiền / túi đầy rồi
+    // rollback), chỉ soi thêm một câu hỏi: bên nghe có được báo ĐÚNG số lần, ĐÚNG số dư không.
+    // Rủi ro lớn nhất ADR nêu ra là "bỏ sót một đường đổi vàng"; rủi ro thứ hai, ít ai nghĩ tới, là
+    // báo cho một số dư ĐÃ BỊ ROLLBACK — cả hai đều im lặng nếu không có test.
+
+    // ArrayList thường, KHÔNG cần đồng bộ hoá: GoldLedger phát trên CHÍNH thread vừa chạy
+    // transaction (ngay sau commit), mà ở test này đó là thread JUnit — một luồng ghi duy nhất.
+    private final List<dev.kage.server.database.GoldChange> recordedGoldChanges =
+            new ArrayList<dev.kage.server.database.GoldChange>();
+
+    @org.junit.jupiter.api.BeforeEach
+    void recordGoldChanges() {
+        recordedGoldChanges.clear();
+        dev.kage.server.database.GoldLedger.configureListener(recordedGoldChanges::add);
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void stopRecordingGoldChanges() {
+        // Listener là state TĨNH (cùng khuôn DbMetricsPort) — không gỡ ra thì test kế thừa lại nó.
+        dev.kage.server.database.GoldLedger.configureListener(dev.kage.server.database.GoldChangeListener.NO_OP);
+    }
+
+    @Test
+    void shouldPublishOneGoldChange_whenBuyCommits() {
+        long characterId = createFreshCharacter("GoldEventBuy");
+        grantGold(characterId, 100);
+
+        newBuyUseCase().execute(characterId, kunaiTemplateId, 2, newIdempotencyKey()); // 2*5 = 10 gold
+
+        assertThat(recordedGoldChanges).hasSize(1);
+        dev.kage.server.database.GoldChange change = recordedGoldChanges.get(0);
+        assertThat(change.characterId()).isEqualTo(characterId);
+        assertThat(change.gold()).isEqualTo(90L); // SỐ DƯ TUYỆT ĐỐI sau thay đổi, không phải delta
+        assertThat(change.delta()).isEqualTo(-10L);
+        assertThat(change.reasonKey()).isEqualTo("gold.reason.buy_item"); // khoá i18n, không phải câu tiếng Việt
+    }
+
+    @Test
+    void shouldPublishNothing_whenBuyFailsForInsufficientGold() {
+        long characterId = createFreshCharacter("GoldEventPoor");
+        grantGold(characterId, 1);
+
+        newBuyUseCase().execute(characterId, kunaiTemplateId, 2, newIdempotencyKey());
+
+        // "Không đủ tiền" KHÔNG phải một lần vàng đổi — UPDATE có điều kiện không khớp dòng nào.
+        assertThat(recordedGoldChanges).isEmpty();
+    }
+
+    @Test
+    void shouldPublishNothing_whenTransactionRollsBackAfterDeductingGold() {
+        long characterId = createFreshCharacter("GoldEvtRollbk");
+        fillInventoryToCapacity(characterId);
+        grantGold(characterId, 1_000_000);
+
+        newBuyUseCase().execute(characterId, kunaiTemplateId, 1, newIdempotencyKey());
+
+        // Gold ĐÃ bị trừ bên trong transaction rồi mới abort vì túi đầy. Báo ở thời điểm UPDATE sẽ
+        // gửi cho client một số dư KHÔNG BAO GIỜ tồn tại — đây là lý do phải chờ commit mới phát.
+        assertThat(recordedGoldChanges).isEmpty();
+        assertThat(readGold(characterId)).isEqualTo(1_000_000);
+    }
+
+    @Test
+    void shouldPublishGoldChange_whenSellCredits() {
+        long characterId = createFreshCharacter("GoldEventSell");
+        long itemId = persistOneItem(characterId, kunaiTemplateId, 3);
+
+        newSellUseCase().execute(characterId, itemId, 3, newIdempotencyKey()); // 3 * 2 = 6 gold
+
+        assertThat(recordedGoldChanges).hasSize(1);
+        // Chiều CỘNG cũng phải phát — bán xong mà số vàng trên màn hình không nhúc nhích là bug im lặng.
+        assertThat(recordedGoldChanges.get(0).delta()).isEqualTo(6L);
+        assertThat(recordedGoldChanges.get(0).gold()).isEqualTo(6L);
+        assertThat(recordedGoldChanges.get(0).reasonKey()).isEqualTo("gold.reason.sell_item");
+    }
+
     @Test
     void shouldDeductGoldAndGrantItem_whenBuyWithEnoughGold() {
         long characterId = createFreshCharacter("BuyRich");

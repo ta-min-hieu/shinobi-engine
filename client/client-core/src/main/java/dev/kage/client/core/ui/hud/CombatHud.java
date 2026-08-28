@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.ui.Cell;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Stack;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
@@ -69,9 +70,24 @@ public final class CombatHud implements Disposable {
     /** Cụm nhiệm vụ (góc TRÊN-PHẢI) — ẩn hẳn khi không theo dõi nhiệm vụ nào. */
     private final Table questGroup;
 
+    /** Biển "đang đấu tay đôi" (rìa TRÁI, giữa chiều cao) — ẩn hẳn khi không ở trong trận nào. */
+    private final Table duelGroup;
+
+    private final Label duelLabel;
+
     private final Label questNameLabel;
     private final Label questStatusLabel;
     private final TextButton claimQuestButton;
+
+    /** Cụm "đang ở trong hầm ngục" — xem {@link #setDungeonBanner}. Ẩn cho tới khi có gì để nói. */
+    private final Table dungeonGroup;
+
+    private final Label dungeonLabel;
+
+    private final Label dungeonHintLabel;
+
+    /** Ô chứa {@link #dungeonGroup} trong cột góc trên-phải — xem {@link #buildTopRightColumn()}. */
+    private Cell<Table> dungeonCell;
 
     private Runnable onSkillClicked;
     private Runnable onAttackClicked;
@@ -83,6 +99,7 @@ public final class CombatHud implements Disposable {
     private int lastTargetHp = -1;
     private int lastTargetMaxHp = -1;
     private String lastSkillText;
+    private String lastDuelText;
     private int lastLevel = -1;
     private int lastPlayerChi = -1;
     private int lastPlayerMaxChi = -1;
@@ -117,11 +134,17 @@ public final class CombatHud implements Disposable {
         this.questStatusLabel = new Label("", skin.statLabelStyle);
         this.claimQuestButton = new TextButton(i18n.get("quest.action.claim"), skin.buttonStyle);
         this.questGroup = new Table();
+        this.duelLabel = new Label("", skin.labelStyle);
+        this.duelGroup = new Table();
+        this.dungeonLabel = new Label("", skin.labelStyle);
+        this.dungeonHintLabel = new Label("", skin.statLabelStyle);
+        this.dungeonGroup = new Table();
 
-        // 5 Table độc lập cùng setFillParent(true) — mỗi cụm neo một góc, không có lưới chung.
+        // 6 Table độc lập cùng setFillParent(true) — mỗi cụm neo một góc, không có lưới chung.
         stage.addActor(anchored(buildPlayerCluster(), Align.topLeft));
         stage.addActor(anchored(buildTargetCluster(), Align.top));
-        stage.addActor(anchored(buildQuestCluster(), Align.topRight));
+        stage.addActor(anchored(buildTopRightColumn(), Align.topRight));
+        stage.addActor(anchored(buildDuelBanner(), Align.left));
         stage.addActor(anchored(buildHintBar(), Align.bottom));
         stage.addActor(anchored(buildSkillCluster(), Align.bottomRight));
     }
@@ -176,7 +199,33 @@ public final class CombatHud implements Disposable {
     }
 
     /**
-     * Góc TRÊN-PHẢI: nhiệm vụ đang theo dõi + nút lĩnh thưởng.
+     * Góc TRÊN-PHẢI, một CỘT: dải hầm ngục ở trên, cụm nhiệm vụ ở dưới.
+     *
+     * <p>Cột chung chứ không phải hai {@code Table} cùng {@code setFillParent(true)} neo cùng góc —
+     * hai cái như thế sẽ vẽ chồng lên nhau, không xếp dọc.
+     */
+    private Table buildTopRightColumn() {
+        buildDungeonCluster();
+        Table column = new Table();
+        // GỠ actor ra khỏi ô thay vì setVisible(false): một Table của scene2d vẫn dành chỗ theo kích
+        // thước ưa thích của con nó dù con đang ẩn, nên hai cái Label rỗng bên trong sẽ đẩy cụm
+        // nhiệm vụ tụt xuống ~2 dòng suốt cả phiên chơi ngoài hầm ngục. Ô rỗng thì cao 0.
+        this.dungeonCell = column.add((Table) null).right();
+        column.row();
+        column.add(buildQuestCluster()).right().padTop(8f).row();
+        return column;
+    }
+
+    /** Dải "đang ở trong hầm ngục" — xem {@link #setDungeonBanner} về việc vì sao nó phải thường trực. */
+    private void buildDungeonCluster() {
+        dungeonGroup.setBackground(skin.panel);
+        dungeonGroup.add(dungeonLabel).row();
+        dungeonGroup.add(dungeonHintLabel).padTop(2f).row();
+        dungeonGroup.pad(8f);
+    }
+
+    /**
+     * Cụm nhiệm vụ đang theo dõi + nút lĩnh thưởng (nằm dưới dải hầm ngục trong cột góc trên-phải).
      *
      * <p>KHÔNG có "đã giết 2/3": server cố ý không gửi tiến độ từng bước (quest.proto — chỉ phát
      * khi quest VỪA chuyển COMPLETED, để không quá tải World tick), nên con số đó đơn giản là không
@@ -198,6 +247,24 @@ public final class CombatHud implements Disposable {
         questGroup.pad(8f);
         questGroup.setVisible(false);
         return questGroup;
+    }
+
+    /**
+     * RÌA TRÁI, giữa chiều cao: biển "đang đấu tay đôi với X" (2026-08-27).
+     *
+     * <p>Rìa trái vì bốn góc + cạnh trên + cạnh dưới đã có chủ, và vì đây là thứ phải NHÌN THẤY
+     * suốt trận chứ không phải liếc một lần: đang trong trận đấu tay đôi thì mọi thứ khác trên HUD
+     * (mục tiêu, nhiệm vụ) vẫn hiện y hệt lúc thường, không có gì nói cho người chơi biết mình đang
+     * ở trong một trận đấu tính điểm.
+     *
+     * <p>Tên đối thủ do NGƯỜI KHÁC đặt nên chuỗi truyền vào phải đã qua {@code ChatController
+     * .sanitize} — {@code DuelCoordinator} lo việc đó, HUD chỉ vẽ (UI.md §4).
+     */
+    private Table buildDuelBanner() {
+        duelGroup.setBackground(skin.panel);
+        duelGroup.add(duelLabel).pad(8f);
+        duelGroup.setVisible(false);
+        return duelGroup;
     }
 
     /**
@@ -428,6 +495,47 @@ public final class CombatHud implements Disposable {
 
     public void clearQuest() {
         questGroup.setVisible(false);
+    }
+
+    /**
+     * Bật biển "đang đấu tay đôi" (2026-08-27).
+     *
+     * @param text chuỗi ĐÃ dịch và ĐÃ sanitize — HUD không tra i18n cho dữ liệu đến từ mạng, cùng
+     *     quy ước {@code GuildPanel#setStatus} (tên đối thủ do người khác đặt, khoá i18n không dịch
+     *     được một cái tên).
+     */
+    public void setDuelStatus(String text) {
+        if (text.equals(lastDuelText)) {
+            return; // UI.md §9 — chỉ setText khi giá trị thực sự đổi.
+        }
+        lastDuelText = text;
+        duelLabel.setText(text);
+        duelGroup.setVisible(true);
+    }
+
+    /** Trận đấu kết thúc — biển biến mất hẳn, không để lại tên đối thủ cũ treo trên màn hình. */
+    public void clearDuelStatus() {
+        lastDuelText = null;
+        duelGroup.setVisible(false);
+    }
+
+    /**
+     * Dải chữ "đang ở trong hầm ngục" (2026-08-27) — hiện thường trực ở góc trên-phải, ngay trên
+     * cụm nhiệm vụ.
+     *
+     * <p>Phải là dấu hiệu THƯỜNG TRỰC chứ không phải một dòng thoáng qua trong nhật ký chat: hầm
+     * ngục lát cắt này là một map TRỐNG (ADR-026 — chỉ chứng minh cơ chế tách world), nên nhìn bằng
+     * mắt không có cách nào phân biệt nó với world chính. Không nói ra thì người chơi đứng trong
+     * instance mà tưởng nút vừa bấm không ăn.
+     *
+     * @param banner chuỗi ĐÃ dịch, hoặc RỖNG để giấu cả cụm — panel không tự tra i18n cho một trạng
+     *     thái nó không theo dõi (UI.md §4).
+     * @param exitHint dòng nhỏ bên dưới nói cách ra, cũng đã dịch sẵn.
+     */
+    public void setDungeonBanner(String banner, String exitHint) {
+        dungeonLabel.setText(banner);
+        dungeonHintLabel.setText(exitHint);
+        dungeonCell.setActor(banner.isEmpty() ? null : dungeonGroup);
     }
 
     public void setOnClaimQuestClicked(Runnable listener) {

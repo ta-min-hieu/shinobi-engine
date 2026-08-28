@@ -264,6 +264,218 @@ class GatewayPipelineTest {
         assertThat(characterPort.findById(characterId).orElseThrow().faction()).isEqualTo(Faction.HOA); // không đổi
     }
 
+    // ================= ADR-035 (Accepted 2026-08-27) — 4 opcode đồng bộ trạng thái =================
+
+    @Test
+    void shouldListInventoryWithEquippedSlots_afterSelectingCharacter() throws InvalidProtocolBufferException {
+        InventoryFacade inventoryFacade = fakeInventoryFacade(
+                List.of(
+                        new dev.kage.inventory.domain.ItemStack(42L, 2L, 1, 3),
+                        new dev.kage.inventory.domain.ItemStack(43L, 1L, 5, 0)),
+                Map.of(dev.kage.inventory.domain.EquipmentSlotType.WEAPON, 42L),
+                List.of());
+        EmbeddedChannel channel = newPipeline(new FakeCharacterPort(), inventoryFacade, fakeQuestFacade());
+        connect(channel, "invtest1");
+        long characterId = createCharacter(channel, "InvHero", 2);
+        selectCharacter(channel, characterId, 3);
+
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_LIST_INVENTORY_REQUEST_VALUE, ProtocolVersion.CURRENT, 4),
+                dev.kage.protocol.ListInventoryRequest.newBuilder().build().toByteArray());
+        PacketCodec.Frame frame = readOutboundFrame(channel);
+
+        assertThat(frame.header().opcode()).isEqualTo(Opcode.OPCODE_LIST_INVENTORY_RESPONSE_VALUE);
+        assertThat(frame.header().sequenceId()).isEqualTo(4);
+        dev.kage.protocol.ListInventoryResponse response =
+                dev.kage.protocol.ListInventoryResponse.parseFrom(frame.payload());
+        assertThat(response.getCapacity()).isEqualTo(20);
+        assertThat(response.getItemsList())
+                .extracting(dev.kage.protocol.InventoryItemView::getItemId)
+                .containsExactly(42L, 43L);
+        // slot_index = vị trí trong danh sách, đúng cách PostgresInventoryAdapter đánh số lúc save.
+        assertThat(response.getItems(0).getSlotIndex()).isZero();
+        assertThat(response.getItems(1).getSlotIndex()).isEqualTo(1);
+        assertThat(response.getItems(0).getEnhanceLevel()).isEqualTo(3);
+        // Trang bị đi CÙNG response túi đồ — không có LIST_EQUIPMENT riêng (ADR-035 Decision-1).
+        assertThat(response.getEquippedList()).hasSize(1);
+        assertThat(response.getEquipped(0).getSlot()).isEqualTo(dev.kage.protocol.EquipmentSlot.EQUIPMENT_SLOT_WEAPON);
+        assertThat(response.getEquipped(0).getItemId()).isEqualTo(42L);
+    }
+
+    @Test
+    void shouldRejectListInventory_whenNoCharacterBoundToSession() {
+        EmbeddedChannel channel = newPipeline();
+        connect(channel, "invtest2"); // đã đăng nhập nhưng CHƯA chọn nhân vật
+
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_LIST_INVENTORY_REQUEST_VALUE, ProtocolVersion.CURRENT, 2),
+                dev.kage.protocol.ListInventoryRequest.newBuilder().build().toByteArray());
+
+        // characterId CHỈ đến từ session — packet không có field nào để mượn (SECURITY.md §4).
+        assertThat(readOutboundFrame(channel).header().opcode()).isEqualTo(Opcode.OPCODE_ERROR_VALUE);
+    }
+
+    @Test
+    void shouldSendFullItemCatalog_whenClientHasNoCachedVersion() throws InvalidProtocolBufferException {
+        InventoryFacade inventoryFacade = fakeInventoryFacade(
+                List.of(),
+                Map.of(),
+                List.of(
+                        new dev.kage.inventory.domain.ItemCatalogEntry(1L, "kunai", "item.kunai.name", 99, null, 0),
+                        new dev.kage.inventory.domain.ItemCatalogEntry(
+                                2L,
+                                "wooden_sword",
+                                "item.wooden_sword.name",
+                                1,
+                                dev.kage.inventory.domain.EquipmentSlotType.WEAPON,
+                                5)));
+        EmbeddedChannel channel = newPipeline(new FakeCharacterPort(), inventoryFacade, fakeQuestFacade());
+        connect(channel, "cattest1");
+        selectCharacter(channel, createCharacter(channel, "CatHero", 2), 3);
+
+        dev.kage.protocol.ItemCatalogResponse response = requestCatalog(channel, "", 4);
+
+        assertThat(response.getUnchanged()).isFalse();
+        assertThat(response.getVersion()).isNotBlank();
+        assertThat(response.getEntriesList())
+                .extracting(dev.kage.protocol.ItemCatalogEntry::getCode)
+                .containsExactly("kunai", "wooden_sword");
+        // Item không mặc được (equip_slot NULL trong DB) -> UNSPECIFIED, không phải bỏ trống ngầm.
+        assertThat(response.getEntries(0).getEquipSlot())
+                .isEqualTo(dev.kage.protocol.EquipmentSlot.EQUIPMENT_SLOT_UNSPECIFIED);
+        assertThat(response.getEntries(1).getEquipSlot())
+                .isEqualTo(dev.kage.protocol.EquipmentSlot.EQUIPMENT_SLOT_WEAPON);
+        assertThat(response.getEntries(1).getBonusAtk()).isEqualTo(5);
+        // KHÔNG có tên hiển thị/icon — chỉ name_key để client tra bundle i18n (ADR-035 Decision-3).
+        assertThat(response.getEntries(1).getNameKey()).isEqualTo("item.wooden_sword.name");
+    }
+
+    /**
+     * Nhánh {@code unchanged=true} chỉ chạy từ lần đăng nhập THỨ HAI trở đi — ADR-035 cảnh báo rõ
+     * là nó dễ mục nếu không có test riêng, nên test này CỐ Ý tồn tại dù trông thừa.
+     */
+    @Test
+    void shouldReportUnchanged_whenClientAlreadyHasCurrentCatalogVersion() throws InvalidProtocolBufferException {
+        InventoryFacade inventoryFacade = fakeInventoryFacade(
+                List.of(),
+                Map.of(),
+                List.of(new dev.kage.inventory.domain.ItemCatalogEntry(1L, "kunai", "item.kunai.name", 99, null, 0)));
+        EmbeddedChannel channel = newPipeline(new FakeCharacterPort(), inventoryFacade, fakeQuestFacade());
+        connect(channel, "cattest2");
+        selectCharacter(channel, createCharacter(channel, "CatHero2", 2), 3);
+
+        String version = requestCatalog(channel, "", 4).getVersion(); // "lần đăng nhập thứ nhất"
+        dev.kage.protocol.ItemCatalogResponse second = requestCatalog(channel, version, 5); // lần thứ hai
+
+        assertThat(second.getUnchanged()).isTrue();
+        assertThat(second.getEntriesList()).isEmpty(); // client giữ nguyên cache, không tải lại
+        assertThat(second.getVersion()).isEqualTo(version);
+    }
+
+    @Test
+    void shouldSendFullCatalog_whenClientSendsStaleVersion() throws InvalidProtocolBufferException {
+        InventoryFacade inventoryFacade = fakeInventoryFacade(
+                List.of(),
+                Map.of(),
+                List.of(new dev.kage.inventory.domain.ItemCatalogEntry(1L, "kunai", "item.kunai.name", 99, null, 0)));
+        EmbeddedChannel channel = newPipeline(new FakeCharacterPort(), inventoryFacade, fakeQuestFacade());
+        connect(channel, "cattest3");
+        selectCharacter(channel, createCharacter(channel, "CatHero3", 2), 3);
+
+        dev.kage.protocol.ItemCatalogResponse response = requestCatalog(channel, "version-cu-roi", 4);
+
+        // SERVER phán quyết, không phải client: version lạ thì gửi lại TOÀN BỘ (thay hẳn, không cộng dồn).
+        assertThat(response.getUnchanged()).isFalse();
+        assertThat(response.getEntriesList()).hasSize(1);
+    }
+
+    @Test
+    void shouldListQuestsIncludingClaimed_soRewardSurvivesRelog() throws InvalidProtocolBufferException {
+        dev.kage.quest.api.QuestFacade questFacade = fakeQuestFacade(List.of(
+                new dev.kage.quest.domain.QuestLogEntry(
+                        "kill_training_dummies", dev.kage.quest.domain.QuestStatus.COMPLETED),
+                new dev.kage.quest.domain.QuestLogEntry(
+                        "talk_to_town_elder", dev.kage.quest.domain.QuestStatus.CLAIMED)));
+        EmbeddedChannel channel = newPipeline(new FakeCharacterPort(), fakeInventoryFacade(), questFacade);
+        connect(channel, "questtest1");
+        selectCharacter(channel, createCharacter(channel, "QuestHero", 2), 3);
+
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_LIST_QUESTS_REQUEST_VALUE, ProtocolVersion.CURRENT, 4),
+                dev.kage.protocol.ListQuestsRequest.newBuilder().build().toByteArray());
+        PacketCodec.Frame frame = readOutboundFrame(channel);
+
+        assertThat(frame.header().opcode()).isEqualTo(Opcode.OPCODE_LIST_QUESTS_RESPONSE_VALUE);
+        dev.kage.protocol.ListQuestsResponse response = dev.kage.protocol.ListQuestsResponse.parseFrom(frame.payload());
+        // quest_code sống sót qua relog — đây chính là thứ ClaimQuestRewardCommand bắt buộc phải có.
+        assertThat(response.getQuestsList())
+                .extracting(dev.kage.protocol.QuestLogEntry::getQuestCode)
+                .containsExactly("kill_training_dummies", "talk_to_town_elder");
+        assertThat(response.getQuests(0).getStatus()).isEqualTo(dev.kage.protocol.QuestStatus.QUEST_STATUS_COMPLETED);
+        // CLAIMED phải có mặt: lọc phía server thì client không phân biệt "chưa nhận" với "đã trả".
+        assertThat(response.getQuests(1).getStatus()).isEqualTo(dev.kage.protocol.QuestStatus.QUEST_STATUS_CLAIMED);
+    }
+
+    @Test
+    void shouldRejectListQuests_whenNoCharacterBoundToSession() {
+        EmbeddedChannel channel = newPipeline();
+        connect(channel, "questtest2");
+
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_LIST_QUESTS_REQUEST_VALUE, ProtocolVersion.CURRENT, 2),
+                dev.kage.protocol.ListQuestsRequest.newBuilder().build().toByteArray());
+
+        assertThat(readOutboundFrame(channel).header().opcode()).isEqualTo(Opcode.OPCODE_ERROR_VALUE);
+    }
+
+    @Test
+    void shouldPushGoldBalance_immediatelyAfterEnteringWorld() throws InvalidProtocolBufferException {
+        FakeCharacterPort characterPort = new FakeCharacterPort();
+        EmbeddedChannel channel = newPipeline(characterPort);
+        connect(channel, "goldtest1");
+        long characterId = createCharacter(channel, "GoldHero", 2);
+        characterPort.goldByCharacterId.put(characterId, 1234L);
+
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, ProtocolVersion.CURRENT, 3),
+                SelectCharacterRequest.newBuilder()
+                        .setCharacterId(characterId)
+                        .build()
+                        .toByteArray());
+        List<PacketCodec.Frame> frames = readOutboundFrames(channel);
+
+        // Người chơi phải thấy số vàng TRƯỚC khi bấm mua, thay vì học bằng cách bị INSUFFICIENT_GOLD.
+        PacketCodec.Frame goldFrame = frames.stream()
+                .filter(candidate -> candidate.header().opcode() == Opcode.OPCODE_GOLD_CHANGED_EVENT_VALUE)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Không có GoldChangedEvent sau khi vào world"));
+        dev.kage.protocol.GoldChangedEvent event = dev.kage.protocol.GoldChangedEvent.parseFrom(goldFrame.payload());
+        assertThat(event.getGold()).isEqualTo(1234L);
+        assertThat(event.getDelta()).isZero(); // đồng bộ số dư, không phải một lần vàng đổi
+        assertThat(event.getReasonKey()).isEqualTo("gold.reason.enter_world");
+        // Response của chính lệnh phải đi TRƯỚC event kèm theo (NETWORK.md §5 correlation).
+        assertThat(frames.get(0).header().opcode()).isEqualTo(Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE);
+    }
+
+    private static dev.kage.protocol.ItemCatalogResponse requestCatalog(
+            EmbeddedChannel channel, String knownVersion, int sequenceId) throws InvalidProtocolBufferException {
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_GET_ITEM_CATALOG_REQUEST_VALUE, ProtocolVersion.CURRENT, sequenceId),
+                dev.kage.protocol.GetItemCatalogRequest.newBuilder()
+                        .setKnownVersion(knownVersion)
+                        .build()
+                        .toByteArray());
+        PacketCodec.Frame frame = readOutboundFrame(channel);
+        assertThat(frame.header().opcode()).isEqualTo(Opcode.OPCODE_ITEM_CATALOG_RESPONSE_VALUE);
+        return dev.kage.protocol.ItemCatalogResponse.parseFrom(frame.payload());
+    }
+
     // Chưa có cơ chế cộng EXP/lên cấp giữa phiên thật (chỉ qua ClaimQuestRewardUseCase, ngoài phạm
     // vi test này) — seed thẳng level vào Fake Port để test được nhánh "đủ Lv10" (SelectFactionUseCase).
     private static void bumpLevel(FakeCharacterPort characterPort, long characterId, int level) {
@@ -327,10 +539,21 @@ class GatewayPipelineTest {
     // WorldFacade không start() ở test này (xem newPipeline) nên onMonsterKilled không bao giờ
     // thật sự bị gọi — Fake rỗng chỉ để thoả constructor, không kiểm tra hành vi ở đây.
     private static InventoryFacade fakeInventoryFacade() {
+        return fakeInventoryFacade(List.of(), Map.of(), List.of());
+    }
+
+    /**
+     * Bản seed sẵn dữ liệu — dùng cho test LIST_INVENTORY/GET_ITEM_CATALOG (ADR-035). Overload
+     * không tham số ở trên giữ nguyên cho ~15 test cũ vốn không quan tâm túi đồ.
+     */
+    private static InventoryFacade fakeInventoryFacade(
+            List<dev.kage.inventory.domain.ItemStack> seededItems,
+            Map<dev.kage.inventory.domain.EquipmentSlotType, Long> seededEquipment,
+            List<dev.kage.inventory.domain.ItemCatalogEntry> seededCatalog) {
         InventoryPort inventoryPort = new InventoryPort() {
             @Override
             public Optional<Inventory> findByCharacter(long characterId) {
-                return Optional.of(new Inventory(characterId, 20, List.of()));
+                return Optional.of(new Inventory(characterId, 20, seededItems));
             }
 
             @Override
@@ -353,11 +576,16 @@ class GatewayPipelineTest {
             public Optional<Long> findIdByCode(String code) {
                 return Optional.empty();
             }
+
+            @Override
+            public List<dev.kage.inventory.domain.ItemCatalogEntry> listCatalog() {
+                return List.copyOf(seededCatalog); // SpotBugs EI: Fake không được lộ list gốc ra ngoài
+            }
         };
         EquipmentPort equipmentPort = new EquipmentPort() {
             @Override
             public Optional<Equipment> findByCharacter(long characterId) {
-                return Optional.of(new Equipment(characterId, Map.of()));
+                return Optional.of(new Equipment(characterId, seededEquipment));
             }
 
             @Override
@@ -377,7 +605,13 @@ class GatewayPipelineTest {
         EnhancePorts enhancePorts =
                 new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort, idempotencyPort);
         EnhanceItemUseCase enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
-        return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
+        return new InventoryFacade(
+                new dev.kage.inventory.api.ItemAcquisitionUseCases(addItemUseCase, grantLootUseCase),
+                equipmentUseCases,
+                enhanceItemUseCase,
+                new dev.kage.inventory.api.InventoryQueryUseCases(
+                        new dev.kage.inventory.application.ListInventoryUseCase(inventoryPort, equipmentPort),
+                        new dev.kage.inventory.application.GetItemCatalogUseCase(itemTemplatePort)));
     }
 
     // Shop không dùng trong test này — fake tối thiểu để compile (cùng convention fakeInventoryFacade).
@@ -444,6 +678,11 @@ class GatewayPipelineTest {
 
     // Quest không dùng trong test này — fake tối thiểu để compile (cùng convention fakeDialogueFacade).
     private static dev.kage.quest.api.QuestFacade fakeQuestFacade() {
+        return fakeQuestFacade(List.of());
+    }
+
+    /** Bản seed sẵn nhật ký — dùng cho test LIST_QUESTS (ADR-035 Decision-4). */
+    private static dev.kage.quest.api.QuestFacade fakeQuestFacade(List<dev.kage.quest.domain.QuestLogEntry> seededLog) {
         dev.kage.quest.domain.QuestProgressPort progressPort = new dev.kage.quest.domain.QuestProgressPort() {
             @Override
             public Optional<dev.kage.quest.domain.QuestProgress> find(long characterId, long questTemplateId) {
@@ -452,6 +691,11 @@ class GatewayPipelineTest {
 
             @Override
             public void save(dev.kage.quest.domain.Transaction tx, dev.kage.quest.domain.QuestProgress progress) {}
+
+            @Override
+            public List<dev.kage.quest.domain.QuestLogEntry> listLog(long characterId) {
+                return List.copyOf(seededLog); // SpotBugs EI: cùng lý do listCatalog() ở fakeInventoryFacade
+            }
         };
         dev.kage.quest.domain.QuestTemplatePort templatePort = questCode -> Optional.empty();
         dev.kage.quest.domain.ExpPort expPort = (tx, characterId, amount) -> {};
@@ -470,7 +714,10 @@ class GatewayPipelineTest {
         dev.kage.quest.application.ClaimQuestRewardUseCase claimQuestRewardUseCase =
                 new dev.kage.quest.application.ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx);
         return new dev.kage.quest.api.QuestFacade(
-                acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
+                acceptQuestUseCase,
+                processMonsterKilledUseCase,
+                claimQuestRewardUseCase,
+                new dev.kage.quest.application.ListQuestsUseCase(progressPort));
     }
 
     // Friend không dùng trong test này — fake tối thiểu để compile (cùng convention fakeQuestFacade).
@@ -836,6 +1083,17 @@ class GatewayPipelineTest {
     }
 
     private static EmbeddedChannel newPipeline(FakeCharacterPort characterPort) {
+        return newPipeline(characterPort, fakeInventoryFacade(), fakeQuestFacade());
+    }
+
+    /**
+     * Bản nhận sẵn 2 Facade đã seed dữ liệu — dùng cho test ADR-035 (LIST_INVENTORY /
+     * GET_ITEM_CATALOG / LIST_QUESTS cần Fake trả về thứ gì đó, không phải rỗng).
+     */
+    private static EmbeddedChannel newPipeline(
+            FakeCharacterPort characterPort,
+            InventoryFacade seededInventoryFacade,
+            dev.kage.quest.api.QuestFacade seededQuestFacade) {
         // ⚠️ Phải khớp CHÍNH XÁC pipeline thật trong GatewayBootstrap — lệch ở đây là test giả.
         // CỐ Ý bỏ qua SslHandler (ADR-027) — EmbeddedChannel không mô phỏng handshake TLS thật
         // tiện lợi, và đây là test framing/handler logic ở tầng plaintext. TLS thật (handshake,
@@ -867,10 +1125,10 @@ class GatewayPipelineTest {
         // attachCharacter() (gọi trong handleSelectCharacterBlocking) không ném lỗi khi enqueue
         // vào hàng đợi chưa có ai drain (không tạo/rò rỉ thread tick cho mỗi test). Tương tự,
         // positionPersister không start() — save() (nếu bị gọi) chạy trực tiếp, không cần scheduler.
-        InventoryFacade inventoryFacade = fakeInventoryFacade();
+        InventoryFacade inventoryFacade = seededInventoryFacade;
         dev.kage.shop.api.ShopFacade shopFacade = fakeShopFacade();
         dev.kage.dialogue.api.DialogueFacade dialogueFacade = fakeDialogueFacade();
-        dev.kage.quest.api.QuestFacade questFacade = fakeQuestFacade();
+        dev.kage.quest.api.QuestFacade questFacade = seededQuestFacade;
         dev.kage.friend.api.FriendFacade friendFacade = fakeFriendFacade();
         dev.kage.mail.api.MailFacade mailFacade = fakeMailFacade();
         dev.kage.chat.api.ChatFacade chatFacade = fakeChatFacade();
@@ -981,6 +1239,15 @@ class GatewayPipelineTest {
             return new CharacterStats(10, 10, 10, 10);
         }
 
+        // ADR-035: gold trong Fake là MỘT ô nhớ chung, đủ cho test "vào world thì được báo số dư"
+        // (test tự seed qua goldByCharacterId trước khi selectCharacter).
+        final Map<Long, Long> goldByCharacterId = new HashMap<Long, Long>();
+
+        @Override
+        public long loadGold(long characterId) {
+            return goldByCharacterId.getOrDefault(characterId, 0L);
+        }
+
         @Override
         public List<Character> listByAccount(long accountId) {
             return characters.stream().filter(c -> c.accountId() == accountId).toList();
@@ -1061,6 +1328,28 @@ class GatewayPipelineTest {
         buf.writeInt(frameBytes.length);
         buf.writeBytes(frameBytes);
         channel.writeInbound(buf);
+    }
+
+    /**
+     * MỌI frame server đã ghi ra, không chỉ frame đầu — {@link #readOutboundFrame} cố ý bỏ phần
+     * sau (đủ cho test request/response), nhưng ADR-035 cần thấy EVENT bắn KÈM sau response (VD
+     * GoldChangedEvent ngay sau SelectCharacterResponse).
+     */
+    private static List<PacketCodec.Frame> readOutboundFrames(EmbeddedChannel channel) {
+        ByteBuf combined = Unpooled.buffer();
+        ByteBuf part;
+        while ((part = channel.readOutbound()) != null) {
+            combined.writeBytes(part);
+            part.release();
+        }
+        List<PacketCodec.Frame> frames = new ArrayList<PacketCodec.Frame>();
+        while (combined.readableBytes() >= 4) {
+            int length = combined.readInt();
+            byte[] bytes = new byte[length];
+            combined.readBytes(bytes);
+            frames.add(PacketCodec.decodeFrame(bytes));
+        }
+        return frames;
     }
 
     private static PacketCodec.Frame readOutboundFrame(EmbeddedChannel channel) {

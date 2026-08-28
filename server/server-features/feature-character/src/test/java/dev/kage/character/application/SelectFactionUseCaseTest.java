@@ -74,6 +74,11 @@ class SelectFactionUseCaseTest {
         }
 
         @Override
+        public long loadGold(long characterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
         public long addExperience(long characterId, long amount) {
             throw new UnsupportedOperationException("không dùng trong test này");
         }

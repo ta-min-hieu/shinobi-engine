@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| Status | 📝 **Proposed** (2026-08-25) — **chờ chủ dự án quyết**, đặc biệt câu hỏi catalog ở §Decision-2 |
+| Status | ✅ **Accepted** (2026-08-27) — chủ dự án duyệt **nguyên đề xuất**: cả 7 opcode, catalog theo phương án **A′**. Đề xuất viết 2026-08-25 |
 | Date | 2026-08-25 |
-| Deciders | Chủ dự án quyết; AI đo + soạn |
+| Deciders | Chủ dự án quyết (2026-08-27); AI đo + soạn |
 | Related | [NETWORK.md §4, §6](../../05-server/NETWORK.md) (dải opcode + luật tương thích ngược) · [ADR-028](ADR-028-Graphics-Tier-Asset-Delivery.md) (giao asset theo tier) · [ADR-025](ADR-025-Idempotency.md) · [ADR-034](ADR-034-Manual-Attack-And-Experience.md) (tiền lệ "server đẩy chỉ số của chính mình") · [/CLAUDE.md §4](../../../CLAUDE.md) (đổi protocol phải dừng hỏi) |
 
 ---
@@ -71,8 +71,11 @@ nửa, và nửa hiển thị vốn đã thuộc về client:
 Nên thứ duy nhất bắt buộc phải đi qua dây là **ánh xạ `id` → `code`** cộng vài số nhỏ. Không phải
 tên, không phải icon. Điều này thu hẹp câu hỏi đánh đổi rất nhiều (§Decision-2).
 
-Hiện trạng hai đầu còn trống: bundle i18n có **0** khoá `item.*`, và 3 icon vật phẩm mới chỉ có
-nguồn `.blend` (`assets/raw/blender/props/`), chưa render ra atlas.
+Hiện trạng: bundle i18n có **0** khoá `item.*` — nửa "tên" thật sự còn trống.
+
+> **Đính chính 2026-08-27** (bản viết 2026-08-25 ghi sai): 3 icon vật phẩm **đã render và đã vào
+> atlas** ở cả 3 tier — `assets/exported/atlases/{low,med,high}/main.atlas` có sẵn 3 vùng
+> `icon_kunai`, `icon_wooden_sword`, `icon_enhance_protection_charm`. Chỉ còn nợ khoá i18n.
 
 **Mâu thuẫn tham chiếu đang tồn tại** (cần chốt luôn trong ADR này): 4 message tham chiếu vật phẩm
 bằng `item_template_id` kiểu `int64` (`ItemGrantedEvent`, `ShopListingView`, `BuyItemCommand`,
@@ -371,9 +374,9 @@ Trigger.
   rắc lời gọi ở từng use-case.
 - Client phải giữ cache catalog qua các phiên (đĩa) và xử lý nhánh `unchanged`; nhánh này chỉ chạy
   từ lần đăng nhập thứ hai nên **dễ mục nếu không có test riêng**.
-- Nợ nội dung lộ ra ngay khi có giao diện: bundle i18n cần khoá `item.*` (hiện **0**), và 3 icon vật
-  phẩm cần render từ `.blend` ra atlas. Có catalog mà thiếu hai thứ này thì túi đồ hiện ô trống
-  không tên.
+- Nợ nội dung lộ ra ngay khi có giao diện: bundle i18n cần khoá `item.*` (hiện **0**). Icon thì
+  **không** nợ — đã có sẵn trong atlas cả 3 tier (xem đính chính ở §Context). Có catalog mà thiếu
+  khoá i18n thì túi đồ hiện ô có icon nhưng không tên.
 - Sự chênh id-vs-code trong protocol **vẫn còn** sau ADR này — được vá chứ chưa được sửa.
 - Một `SELECT` túi đồ mỗi lần mở màn hình. Chạy trên Virtual Thread như các truy vấn khác, không
   đụng tick thread; chưa đo, và ở mức tần suất này chưa có lý do phải đo.
@@ -396,13 +399,13 @@ Xem lại nếu:
 
 | # | Quyết định | Trạng thái |
 |---|---|---|
-| 1 | Thêm `LIST_INVENTORY` 507/508, gồm cả trang bị trong cùng response | 📝 Đề xuất — chờ chủ dự án |
-| 2 | Catalog vật phẩm theo **A′**: gửi qua mạng + `version` do server phán quyết | 📝 Đề xuất — **đây là câu hỏi chính cần quyết** |
-| 3 | Catalog mang **cả** `id` lẫn `code`, KHÔNG mang tên hiển thị và icon | 📝 Đề xuất — hệ quả của việc `name_key`/icon vốn đã ở phía client |
-| 4 | `GOLD_CHANGED_EVENT` = 209, dải Character, khuôn `ExperienceChangedEvent` | 📝 Đề xuất |
-| 5 | Vàng gửi số dư **tuyệt đối** kèm delta, không gửi riêng delta | 📝 Đề xuất |
-| 6 | `LIST_QUESTS` 610/611, KHÔNG mang `progress_json` | 📝 Đề xuất |
-| 7 | Không đổi message đang chạy, không tăng `protocolVersion` | 📝 Đề xuất — hệ quả bắt buộc của NETWORK.md §6 |
+| 1 | Thêm `LIST_INVENTORY` 507/508, gồm cả trang bị trong cùng response | ✅ Chốt 2026-08-27 |
+| 2 | Catalog vật phẩm theo **A′**: gửi qua mạng + `version` do server phán quyết | ✅ Chốt 2026-08-27 — chủ dự án chọn A′, không chọn B |
+| 3 | Catalog mang **cả** `id` lẫn `code`, KHÔNG mang tên hiển thị và icon | ✅ Chốt 2026-08-27 — hệ quả của việc `name_key`/icon vốn đã ở phía client |
+| 4 | `GOLD_CHANGED_EVENT` = 209, dải Character, khuôn `ExperienceChangedEvent` | ✅ Chốt 2026-08-27 |
+| 5 | Vàng gửi số dư **tuyệt đối** kèm delta, không gửi riêng delta | ✅ Chốt 2026-08-27 |
+| 6 | `LIST_QUESTS` 610/611, KHÔNG mang `progress_json` | ✅ Chốt 2026-08-27 |
+| 7 | Không đổi message đang chạy, không tăng `protocolVersion` | ✅ Chốt 2026-08-27 — hệ quả bắt buộc của NETWORK.md §6 |
 | 8 | Thống nhất id-vs-code trong toàn protocol | ⏳ **Mở** — cố ý để ngoài phạm vi ADR này |
 
 ## ADR cần tạo
@@ -427,8 +430,8 @@ Xem lại nếu:
 
 ## Việc cần làm tiếp theo
 
-1. 🔴 **Chủ dự án quyết Technical Decision #2** (catalog: A′ / B / C). Sáu quyết định còn lại khá
-   thẳng; đây là cái duy nhất có đánh đổi thật.
+1. ✅ **Chủ dự án đã quyết 2026-08-27**: duyệt nguyên đề xuất, catalog theo **A′**. Không còn quyết
+   định nào treo trong ADR này (ngoài #8 vốn cố ý để ngoài phạm vi).
 2. ⏳ Sau khi Accepted: ghi 7 opcode vào `opcode_registry.proto`, thêm message vào `inventory.proto`
    / `character.proto` / `quest.proto`, kèm round-trip test mỗi message.
 3. ⏳ Cập nhật bảng [NETWORK.md §4](../../05-server/NETWORK.md) — hiện ghi dải 600-699 là "Quest",
@@ -436,6 +439,6 @@ Xem lại nếu:
 4. ⏳ Tìm **một** điểm phát duy nhất cho `GoldChangedEvent` trước khi viết handler — rắc lời gọi ở
    từng use-case là cách chắc chắn sẽ sót đường.
 5. ⏳ Nợ nội dung chặn giao diện, làm song song được: thêm khoá `item.*` vào
-   `strings_vi/en.properties` (hiện 0 khoá), và render 3 icon vật phẩm từ
-   `assets/raw/blender/props/` ra atlas.
+   `strings_vi/en.properties` (hiện 0 khoá). ~~Render icon~~ — kiểm lại 2026-08-27 thì icon **đã có**
+   trong atlas cả 3 tier, không phải việc phải làm.
 6. ⏳ Sau khi có 4 màn hình này, đo lại độ phủ opcode client — con số 40/150 hôm nay là mốc so sánh.

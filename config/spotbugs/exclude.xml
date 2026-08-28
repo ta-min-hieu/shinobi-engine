@@ -205,6 +205,16 @@
         <Bug pattern="PREDICTABLE_RANDOM"/>
     </Match>
 
+    <!-- InventorySnapshot (ADR-035 Decision-1) là ẢNH CHỤP đọc-một-lần: use-case dựng nó, gateway
+         đọc xong rồi vứt, không ai giữ lại. SpotBugs báo EI/EI2 vì record ôm hai aggregate có
+         method ghi (Inventory/Equipment) — đúng theo định nghĩa công cụ, nhưng defensive-copy ở đây
+         mua đúng con số không: bản sao cũng lỗi thời ngay khi transaction kế tiếp chạy, và giá trị
+         của gói tin nằm ở chỗ nó là ảnh chụp tại MỘT thời điểm chứ không phải một view sống. -->
+    <Match>
+        <Class name="dev.kage.inventory.domain.InventorySnapshot"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
     <!-- Fake*Port trong test là test double (capture tham chiếu để assert lại) — không phải state
          thật cần bảo vệ, defensive-copy vô nghĩa trong test fake. Khớp mọi nested Fake*Port bên
          trong class Test (cùng lý do sẽ lặp lại ở feature khác dùng cùng pattern test double). -->
@@ -298,6 +308,26 @@
     <Match>
         <Class name="dev.kage.client.core.ui.hud.GuildPanel"/>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- DuelPanel.stage() — lần thứ sáu cùng một lý do (CombatHud, DialoguePanel, ChatPanel,
+         FriendPanel, GuildPanel ngay trên): WorldScreen phải đưa đúng instance Stage đó vào
+         InputMultiplexer để đặt thứ tự nuốt input, thứ chỉ đặt được cho cả một Stage chứ không cho
+         một actor bên trong (xem javadoc DuelPanel + WorldScreen#buildInputProcessor). Vẫn giữ
+         <Match> riêng thay vì gộp regex, cùng lập luận đã ghi ở ChatPanel. -->
+    <Match>
+        <Class name="dev.kage.client.core.ui.hud.DuelPanel"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- FactionPanel.stage() — lần thứ bảy cùng một lý do (CombatHud, DialoguePanel, ChatPanel,
+         PartyPanel/FriendPanel/GuildPanel ngay trên): WorldScreen phải đưa đúng instance Stage đó
+         vào InputMultiplexer để đặt thứ tự nuốt input, thứ chỉ đặt được cho cả một Stage chứ không
+         cho một actor bên trong (xem javadoc FactionPanel + WorldScreen#buildInputProcessor). Vẫn
+         giữ <Match> riêng thay vì gộp regex, cùng lập luận đã ghi ở ChatPanel. -->
+    <Match>
+        <Class name="dev.kage.client.core.ui.hud.FactionPanel"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
     </Match>
 
     <!-- KageSkin.font() lộ BitmapFont dùng chung có chủ đích — public accessor cho caller cần vẽ

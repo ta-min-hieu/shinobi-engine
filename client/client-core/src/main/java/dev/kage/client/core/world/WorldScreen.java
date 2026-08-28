@@ -21,6 +21,8 @@ import dev.kage.client.core.net.GameConnection;
 import dev.kage.client.core.ui.hud.ChatPanel;
 import dev.kage.client.core.ui.hud.CombatHud;
 import dev.kage.client.core.ui.hud.DialoguePanel;
+import dev.kage.client.core.ui.hud.DuelPanel;
+import dev.kage.client.core.ui.hud.FactionPanel;
 import dev.kage.client.core.ui.hud.FriendPanel;
 import dev.kage.client.core.ui.hud.GuildPanel;
 import dev.kage.client.core.ui.hud.PartyPanel;
@@ -154,6 +156,20 @@ public final class WorldScreen implements GameScreen {
     /** Luồng bang hội (tạo/xin gia nhập/duyệt/đuổi + mạng) — xem {@link GuildCoordinator}. */
     private final GuildCoordinator guild;
 
+    /** Cửa sổ đấu tay đôi (phím K) — mượn skin của {@link #combatHud} như {@link #guildPanel}. */
+    private final DuelPanel duelPanel = new DuelPanel(combatHud.skin());
+
+    /** Luồng đấu tay đôi + xếp hạng PvP (arena.proto) — xem {@link DuelCoordinator}. */
+    private final DuelCoordinator duel;
+    /** Khung chọn hệ phái ở Lv10 (phím H) — mượn skin của {@link #combatHud} như {@link #chatPanel}. */
+    private final FactionPanel factionPanel = new FactionPanel(combatHud.skin());
+
+    /** Luồng chọn hệ phái (opcode 206/207) — xem {@link FactionCoordinator}. */
+    private final FactionCoordinator faction;
+
+    /** Luồng hầm ngục (opcode 1500-1503) — nút nằm trong {@link #partyPanel}, xem {@link DungeonCoordinator}. */
+    private final DungeonCoordinator dungeon;
+
     /** Vòng đời nhiệm vụ: nhận → hoàn thành → lĩnh thưởng — xem {@link QuestCoordinator}. */
     private final QuestCoordinator quests;
 
@@ -197,11 +213,10 @@ public final class WorldScreen implements GameScreen {
                 new FitViewport(WorldConstants.VIEWPORT_HEIGHT_UNITS, WorldConstants.VIEWPORT_HEIGHT_UNITS, camera);
 
         world.addSystem(new MovementSystem());
-        // ADR-033 — trục dọc chạy CÙNG công thức server (WorldConstants.GRAVITY_MPS2 phải khớp)
-        // để dự đoán cục bộ (CLIENT.md §6) khớp server, cùng lý do MovementSystem đã có ở trên.
+        // ADR-033 — trục dọc chạy CÙNG công thức server (GRAVITY_MPS2 khớp) để dự đoán cục bộ
+        // (CLIENT.md §6) khớp server; và CÙNG bộ bệ với server (WorldFacade.DEMO_PLATFORMS) —
+        // BẮT BUỘC, xem javadoc DemoPlatforms.physics() về hậu quả nếu thiếu (rơi xuyên bệ).
         VerticalMovementSystem verticalMovementSystem = new VerticalMovementSystem(WorldConstants.GRAVITY_MPS2);
-        // Cùng bộ bệ với server (WorldFacade.DEMO_PLATFORMS) — BẮT BUỘC, xem javadoc
-        // DemoPlatforms.physics() về hậu quả nếu thiếu (nhân vật rơi xuyên bệ ở phía client).
         verticalMovementSystem.setPlatforms(DemoPlatforms.physics());
         world.addSystem(verticalMovementSystem);
 
@@ -210,11 +225,6 @@ public final class WorldScreen implements GameScreen {
         this.localPlayer = world.createEntity();
         localPlayer.add(new PositionComponent());
         localPlayer.add(new VelocityComponent());
-        // Bậc trang phục của chính mình cũng chưa suy được từ đâu (xem CharacterAppearance phía
-        // server) — dùng đúng giá trị mặc định server đang phát cho người khác, để mình và người
-        // khác nhìn thấy mình giống nhau.
-        models.addCharacter(
-                LOCAL_CHARACTER_ID, CharacterModelKey.of(character.getFaction(), CostumeTier.COSTUME_TIER_UNSPECIFIED));
 
         // SAU khi localPlayer tồn tại: presenter giữ tham chiếu thẳng tới PositionComponent của
         // chính người chơi (xem javadoc constructor của nó).
@@ -230,7 +240,14 @@ public final class WorldScreen implements GameScreen {
         this.party = new PartyCoordinator(partyPanel, sender, chat);
         this.friends = new FriendCoordinator(friendPanel, sender, combatFeedback, this::noTextInputActive);
         this.guild = new GuildCoordinator(guildPanel, sender, this::noTextInputActive);
-        wireHud();
+        this.duel = new DuelCoordinator(duelPanel, combatHud, sender, combatFeedback);
+        this.dungeon = new DungeonCoordinator(partyPanel, combatHud, sender, chat);
+        this.faction = new FactionCoordinator(
+                factionPanel,
+                sender,
+                combatFeedback,
+                new LocalCharacterAppearance(models, combatHudController, LOCAL_CHARACTER_ID));
+        wireHud(character);
         this.inputProcessor = buildInputProcessor();
     }
 
@@ -242,13 +259,39 @@ public final class WorldScreen implements GameScreen {
      * <p>{@link #noTextInputActive()} là cổng CHUNG cho mọi khung mở bằng phím, kể cả chat. Truyền
      * cùng MỘT hàm cho tất cả là điều quan trọng: hai cực khác nhau ở hai chỗ đã sinh ra một lỗi thật
      * (cửa sổ chỉ mở được đúng lúc đáng lẽ phải bị chặn) — xem {@link #isTextInputActive()}.
+     *
+     * @param character {@code CharacterSummary} của chính người chơi: cấp + hệ phái là hai thứ DUY
+     *     NHẤT ngoài HUD cần nối ở đây (model 3D của mình vẽ theo hệ phái, và bước chọn hệ phái ở
+     *     Lv10 mở ra theo cấp) — cả hai đến từ server, không phải client suy.
      */
-    private void wireHud() {
+    private void wireHud(CharacterSummary character) {
         combatHud.setSkillLabel(combatHudController.skillNameKey());
         combatHud.setOnSkillClicked(this::onSkillButtonClicked);
         combatHud.setOnAttackClicked(attackInput::onButtonClicked);
         partyPanel.setCanOpen(this::noTextInputActive);
         chatPanel.setCanOpen(this::noTextInputActive);
+        duelPanel.setCanOpen(this::noTextInputActive);
+        // Cổng của khung chọn hệ có THÊM một vế so với các khung khác — xem
+        // FactionCoordinator#setOpenGate (chỉ bày lối vào cho nhân vật còn được mời chọn).
+        faction.setOpenGate(this::noTextInputActive);
+        faction.onCharacterState(character.getLevel(), character.getFaction());
+        // Vứt sạch view của world cũ rồi xin lại vị trí của chính mình — LÝ DO đầy đủ (giao thức
+        // không có gói "đổi World" nào) nằm ở DungeonCoordinator#setOnWorldChanged. Gửi lại ĐÚNG
+        // hướng đang đi chứ không phải 0: MoveResponse chỉ được phát như ack cho MoveCommand, nên
+        // đây là cách duy nhất hỏi "tôi đang ở đâu" bằng gói đã có, mà không đổi ý định nào cả.
+        dungeon.setOnWorldChanged(() -> {
+            remoteCharacters.clear();
+            npcPresenter.clear();
+            monsterPresenter.clear(combatHudController.monsters().keySet());
+            combatHudController.clearMonsters();
+            sender.moveDirection(lastSentDirX);
+        });
+        // Bậc trang phục của chính mình chưa suy được từ đâu (xem CharacterAppearance phía server) —
+        // dùng đúng giá trị mặc định server đang phát cho người khác, để mình và người khác nhìn
+        // thấy mình giống nhau. Đổi hệ phái giữa trận đi lại ĐÚNG đường này
+        // (LocalCharacterAppearance#applyFaction), nên nó nằm cạnh phần wiring.
+        models.addCharacter(
+                LOCAL_CHARACTER_ID, CharacterModelKey.of(character.getFaction(), CostumeTier.COSTUME_TIER_UNSPECIFIED));
     }
 
     /**
@@ -271,6 +314,8 @@ public final class WorldScreen implements GameScreen {
                 partyPanel.stage(),
                 friendPanel.stage(),
                 guildPanel.stage(),
+                duelPanel.stage(),
+                factionPanel.stage(),
                 chatPanel.stage(),
                 combatHud.stage(),
                 new WorldTargetPicker());
@@ -294,6 +339,9 @@ public final class WorldScreen implements GameScreen {
         party.reset();
         friends.reset();
         guild.reset();
+        duel.reset();
+        faction.reset();
+        dungeon.reset();
     }
 
     @Override
@@ -306,6 +354,8 @@ public final class WorldScreen implements GameScreen {
         partyPanel.resize(width, height);
         friendPanel.resize(width, height);
         guildPanel.resize(width, height);
+        duelPanel.resize(width, height);
+        factionPanel.resize(width, height);
         combatFeedback.resize(width, height);
     }
 
@@ -341,6 +391,12 @@ public final class WorldScreen implements GameScreen {
             handled |= party.dispatch(opcode, payload);
             handled |= friends.dispatch(opcode, payload);
             handled |= guild.dispatch(opcode, payload);
+            handled |= duel.dispatch(opcode, payload);
+            handled |= dungeon.dispatch(opcode, payload);
+            // Nhận cả KHUNG chứ không chỉ (opcode, payload): thất bại của lệnh đổi hệ về qua
+            // ErrorResponse dùng chung, chỉ nối lại đúng yêu cầu được bằng sequenceId ở header —
+            // xem FactionCoordinator.
+            handled |= faction.dispatch(frame);
             if (!handled && !dispatchMovement(opcode, payload)) {
                 dispatchCombat(opcode, payload);
             }
@@ -475,6 +531,9 @@ public final class WorldScreen implements GameScreen {
     private void onExperienceChanged(ExperienceChangedEvent event) {
         characterLevel = event.getLevel();
         combatHud.setExperience(event.getExpIntoLevel(), event.getExpForNextLevel());
+        // Cấp là ĐIỀU KIỆN của bước chọn hệ phái (Lv10, GDD §4) — đây là gói tin DUY NHẤT báo cấp
+        // đổi giữa phiên chơi, nên cũng là chỗ duy nhất lối vào đó có thể mở ra.
+        faction.onLevel(event.getLevel());
         if (event.getLeveledUp()) {
             combatFeedback.showLevelUp();
         }
@@ -539,13 +598,19 @@ public final class WorldScreen implements GameScreen {
      * <p>Khung hội thoại NPC nằm trong danh sách dù không có ô nhập nào: đang đọc lời thoại thì phím
      * cũng không phải ý định gameplay, và mở đè một cửa sổ khác lên là hỏng.
      */
+    private boolean isTextInputActive() {
+        return chat.isComposing()
+                || dialogue.isOpen()
+                || party.isOpen()
+                || friends.isOpen()
+                || guild.isOpen()
+                || duel.isOpen()
+                || faction.isOpen();
+    }
+
     /** Dạng phủ định của {@link #isTextInputActive()} — cổng {@code setCanOpen} của các panel. */
     private boolean noTextInputActive() {
         return !isTextInputActive();
-    }
-
-    private boolean isTextInputActive() {
-        return chat.isComposing() || dialogue.isOpen() || party.isOpen() || friends.isOpen() || guild.isOpen();
     }
 
     /**
@@ -663,7 +728,12 @@ public final class WorldScreen implements GameScreen {
             }
             return true;
         }
-        return talkToNpcAt(screenX, glScreenY, projector);
+        // Người chơi khác đứng CUỐI trong ba loại: quái và NPC là thứ click cả ngày, còn thách đấu
+        // là việc hiếm. Click chọn chỉ CHỌN chứ không gửi lời thách đấu nào, và id 0 (click vào chỗ
+        // trống) được xử lý bên trong coordinator — xem {@link DuelCoordinator#onCharacterPicked}.
+        return talkToNpcAt(screenX, glScreenY, projector)
+                || duel.onCharacterPicked(
+                        entityPicker.pick(remoteCharacters.characters(), screenX, glScreenY, projector));
     }
 
     private boolean talkToNpcAt(float screenX, float glScreenY, WorldToScreen projector) {
@@ -678,6 +748,8 @@ public final class WorldScreen implements GameScreen {
         party.close();
         friends.close();
         guild.close();
+        duel.close();
+        faction.close();
         dialogue.talkTo(npc.code());
         return true;
     }
@@ -709,6 +781,8 @@ public final class WorldScreen implements GameScreen {
         partyPanel.render(Gdx.graphics.getDeltaTime());
         friendPanel.render(Gdx.graphics.getDeltaTime());
         guildPanel.render(Gdx.graphics.getDeltaTime());
+        duelPanel.render(Gdx.graphics.getDeltaTime());
+        factionPanel.render(Gdx.graphics.getDeltaTime());
         dialoguePanel.render(Gdx.graphics.getDeltaTime());
     }
 
@@ -818,6 +892,8 @@ public final class WorldScreen implements GameScreen {
         partyPanel.dispose();
         friendPanel.dispose();
         guildPanel.dispose();
+        duelPanel.dispose();
+        factionPanel.dispose();
         combatHud.dispose();
     }
 

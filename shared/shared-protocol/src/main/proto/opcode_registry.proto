@@ -52,6 +52,7 @@ enum Opcode {
   OPCODE_SELECT_FACTION_REQUEST = 206;
   OPCODE_SELECT_FACTION_RESPONSE = 207;
   OPCODE_EXPERIENCE_CHANGED_EVENT = 208; // vạch kinh nghiệm (chủ dự án 2026-08-09)
+  OPCODE_GOLD_CHANGED_EVENT = 209; // số vàng của chính mình (ADR-035, Accepted 2026-08-27)
 
   // --- Movement / World (300-399) ---
   OPCODE_MOVE_COMMAND = 300;
@@ -80,6 +81,13 @@ enum Opcode {
   OPCODE_UNEQUIP_ITEM_RESPONSE = 504;
   OPCODE_ENHANCE_ITEM_COMMAND = 505;
   OPCODE_ENHANCE_ITEM_RESPONSE = 506;
+  // ADR-035 (Accepted 2026-08-27) — 4 số dưới đây mở khoá giao diện túi đồ/trang bị/cửa hàng.
+  OPCODE_LIST_INVENTORY_REQUEST = 507;
+  OPCODE_LIST_INVENTORY_RESPONSE = 508;
+  OPCODE_GET_ITEM_CATALOG_REQUEST = 509;
+  OPCODE_ITEM_CATALOG_RESPONSE = 510;
+  // 511 để TRỐNG CÓ CHỦ Ý — dành sẵn cho ITEM_REMOVED_EVENT (ADR-035 Revisit Trigger #3, chỉ
+  // thêm khi ĐO thấy việc hỏi lại toàn bộ túi sau mỗi hành động tốn thật). ĐỪNG cấp cho packet khác.
 
   // --- Quest / NPC / Dialogue (600-699) ---
   OPCODE_NPC_SPAWNED_EVENT = 600;
@@ -92,6 +100,9 @@ enum Opcode {
   OPCODE_QUEST_STATUS_CHANGED_EVENT = 607;
   OPCODE_CLAIM_QUEST_REWARD_COMMAND = 608;
   OPCODE_CLAIM_QUEST_REWARD_RESPONSE = 609;
+  // ADR-035 — nhật ký nhiệm vụ; gỡ bế tắc "nhận quest rồi relog là mất thưởng vĩnh viễn".
+  OPCODE_LIST_QUESTS_REQUEST = 610;
+  OPCODE_LIST_QUESTS_RESPONSE = 611;
 
   // --- Guild (700-799) ---
   OPCODE_CREATE_GUILD_COMMAND = 700;

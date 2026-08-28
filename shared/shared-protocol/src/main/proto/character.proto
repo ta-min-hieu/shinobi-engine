@@ -104,3 +104,17 @@ message ExperienceChangedEvent {
   int64 exp_for_next_level = 4; // cần bao nhiêu để lên cấp kế; 0 = đã cấp tối đa
   bool leveled_up = 5;         // true nếu chính lần này vừa lên cấp — client mừng cho ra mừng
 }
+
+// Event: Server -> Client (OPCODE_GOLD_CHANGED_EVENT = 209). Vàng của CHÍNH người chơi vừa đổi.
+// Không có character_id: luôn là chính mình, cùng quy ước ExperienceChangedEvent (ADR-034).
+//
+// Gửi NGAY sau khi vào world (để cửa hàng có số ngay, không phải chờ giao dịch đầu tiên) và mỗi lần
+// vàng đổi: mua/bán, cường hoá, nhận thư, giao dịch, thưởng nhiệm vụ.
+//
+// `gold` là số dư TUYỆT ĐỐI sau thay đổi, không phải delta — mất một gói giữa chừng thì gói kế tự
+// sửa lại, không tích luỹ sai lệch.
+message GoldChangedEvent {
+  int64 gold = 1;
+  int64 delta = 2;  // chênh lệch của chính lần này (âm = tiêu); thuần để client hiện "-500"
+  string reason_key = 3; // vd "gold.reason.buy_item" — i18n key, KHÔNG phải câu tiếng Việt cứng
+}

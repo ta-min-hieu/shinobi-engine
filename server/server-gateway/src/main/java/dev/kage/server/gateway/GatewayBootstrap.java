@@ -68,13 +68,7 @@ public final class GatewayBootstrap {
                 new ServerDatabaseBootstrap(new MicrometerDbMetricsPort(metricsContext.meterRegistry()));
         GatewayFacades facades = wireFacades(databaseBootstrap);
 
-        // SCRIPTING.md §8 — fail fast lúc khởi động, KHÔNG đợi người chơi phát hiện lỗi cú pháp
-        // script. Gom script_ref từ DB (quest/dialogue) + hằng số Java (skill, chưa DB-driven).
-        ArrayList<String> scriptRefs = new ArrayList<String>();
-        scriptRefs.addAll(databaseBootstrap.listContentScriptRefs());
-        scriptRefs.addAll(WorldFacade.listSkillScriptResources());
-        scriptRefs.addAll(WorldFacade.listBossScriptResources());
-        new ScriptValidator(new ScriptSandbox(SCRIPT_VALIDATION_STATEMENT_LIMIT)).validateAll(scriptRefs);
+        validateContentScripts(databaseBootstrap);
 
         GatewayObservability observability =
                 new GatewayObservability(metricsContext.networkMetrics(), new GatewayTracing());
@@ -86,6 +80,7 @@ public final class GatewayBootstrap {
                 facades.contentFacades().questFacade(),
                 facades.characterFacade()::grantExperience,
                 metricsContext.networkMetrics());
+        wireGoldChangeNotifications(databaseBootstrap, characterRegistry);
         WorldContext worldContext = startWorld(characterRegistry, databaseBootstrap, metricsContext.meterRegistry());
         MainWorldChannelRegistry mainWorldChannels = worldContext.mainWorldChannels();
         CharacterPositionPersister positionPersister =
@@ -106,6 +101,36 @@ public final class GatewayBootstrap {
                 observability,
                 databaseBootstrap);
         server.awaitTermination();
+    }
+
+    /**
+     * SCRIPTING.md §8 — fail fast lúc khởi động, KHÔNG đợi người chơi phát hiện lỗi cú pháp script.
+     * Gom {@code script_ref} từ DB (quest/dialogue) + hằng số Java (skill, chưa DB-driven).
+     *
+     * <p>Tách khỏi {@code main()} để giữ dưới giới hạn Checkstyle MethodLength (cùng lý do
+     * {@link #wireFacades}/{@link #startWorld}).
+     */
+    private static void validateContentScripts(ServerDatabaseBootstrap databaseBootstrap) {
+        ArrayList<String> scriptRefs = new ArrayList<String>();
+        scriptRefs.addAll(databaseBootstrap.listContentScriptRefs());
+        scriptRefs.addAll(WorldFacade.listSkillScriptResources());
+        scriptRefs.addAll(WorldFacade.listBossScriptResources());
+        new ScriptValidator(new ScriptSandbox(SCRIPT_VALIDATION_STATEMENT_LIMIT)).validateAll(scriptRefs);
+    }
+
+    /**
+     * ADR-035 Decision-3 — ĐIỂM DUY NHẤT nối "vàng vừa đổi" ({@code GoldLedger} ở server-database,
+     * chỗ duy nhất ghi được {@code character_stat.gold}) với "gửi packet"
+     * ({@link ConnectedCharacterRegistry}).
+     *
+     * <p>KHÔNG use-case nào tự bắn {@code GoldChangedEvent}: rắc lời gọi ở từng chỗ (mua, bán,
+     * cường hoá, nhận thư, giao dịch) là cách chắc chắn sẽ sót một đường, và sót thì client hiện số
+     * cũ mà không có lỗi nào để lần ra.
+     */
+    private static void wireGoldChangeNotifications(
+            ServerDatabaseBootstrap databaseBootstrap, ConnectedCharacterRegistry characterRegistry) {
+        databaseBootstrap.configureGoldChangeListener(change -> characterRegistry.sendGoldChanged(
+                change.characterId(), change.gold(), change.delta(), change.reasonKey()));
     }
 
     /**

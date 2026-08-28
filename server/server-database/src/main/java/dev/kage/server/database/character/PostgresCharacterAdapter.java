@@ -96,6 +96,12 @@ public final class PostgresCharacterAdapter implements CharacterPort {
             SELECT str, agi, int_, vit FROM character_stat WHERE character_id = ?
             """;
 
+    // ĐỌC THUẦN. Mọi câu GHI vào character_stat.gold nằm ở dev.kage.server.database.GoldLedger và
+    // chỉ ở đó (ADR-035 Decision-3) — đừng thêm UPDATE gold vào file này.
+    private static final String LOAD_GOLD = """
+            SELECT gold FROM character_stat WHERE character_id = ?
+            """;
+
     private static final String UPDATE_FACTION = """
             UPDATE character SET faction = ? WHERE id = ?
             """;
@@ -220,6 +226,13 @@ public final class PostgresCharacterAdapter implements CharacterPort {
                         rs -> new CharacterStats(
                                 rs.getInt("str"), rs.getInt("agi"), rs.getInt("int_"), rs.getInt("vit")),
                         characterId)
+                .orElseThrow(() ->
+                        new DatabaseAccessException("Nhân vật không có chỉ số: characterId=" + characterId, null));
+    }
+
+    @Override
+    public long loadGold(long characterId) {
+        return JdbcOperations.queryOne(dataSource, LOAD_GOLD, rs -> rs.getLong("gold"), characterId)
                 .orElseThrow(() ->
                         new DatabaseAccessException("Nhân vật không có chỉ số: characterId=" + characterId, null));
     }

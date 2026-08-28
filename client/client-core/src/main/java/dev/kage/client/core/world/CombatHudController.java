@@ -29,7 +29,15 @@ final class CombatHudController {
     record MonsterState(String code, float x, float y, int hp, int maxHp) implements PickablePoint {}
 
     private final long localCharacterId;
-    private final CombatConstants.FactionSkill skill;
+
+    /**
+     * Skill slot 0 theo hệ phái hiện tại. KHÔNG {@code final} kể từ 2026-08-27: hệ phái đổi được
+     * giữa phiên chơi ({@code SelectFactionRequest} ở Lv10), và mỗi hệ chỉ cast được skill của hệ
+     * mình ({@code server-world.SkillSystem.isCasterEligible}) — giữ nguyên skill cũ là bày ra một
+     * nút mà server chắc chắn từ chối. Xem {@link #onFactionChanged}.
+     */
+    private CombatConstants.FactionSkill skill;
+
     private final Map<Long, MonsterState> monsters = new HashMap<>();
 
     private int playerHp = CombatConstants.CHARACTER_MAX_HP;
@@ -46,10 +54,39 @@ final class CombatHudController {
      */
     CombatHudController(long localCharacterId, Faction localFaction) {
         this.localCharacterId = localCharacterId;
-        this.skill = CombatConstants.FACTION_SKILLS.get(localFaction);
-        if (this.skill == null) {
-            throw new IllegalArgumentException("Không có skill slot 0 cho hệ phái: " + localFaction);
+        this.skill = skillFor(localFaction);
+    }
+
+    /**
+     * Server vừa XÁC NHẬN nhân vật đã đổi sang {@code faction} (opcode 207, khớp {@code sequenceId})
+     * — đổi nút skill của HUD theo. Không có đường nào khác gọi được hàm này: client không tự phong
+     * hệ phái cho mình (xem {@link FactionController}).
+     *
+     * <p>Hồi chiêu đang đếm dở KHÔNG được xoá: nó là bản sao dự đoán của cooldown phía server
+     * (GAMEPLAY.md §3), và server chỉ theo dõi {@code SkillCooldownComponent} của nhân vật chứ
+     * không reset nó khi đổi hệ. Xoá ở đây sẽ khiến nút sáng lên sớm hơn thật.
+     */
+    void onFactionChanged(Faction faction) {
+        this.skill = skillFor(faction);
+    }
+
+    private static CombatConstants.FactionSkill skillFor(Faction faction) {
+        CombatConstants.FactionSkill found = CombatConstants.FACTION_SKILLS.get(faction);
+        if (found == null) {
+            throw new IllegalArgumentException("Không có skill slot 0 cho hệ phái: " + faction);
         }
+        return found;
+    }
+
+    /**
+     * Quên sạch mọi con quái đang theo dõi — dùng khi nhân vật vừa ĐỔI World (vào/ra hầm ngục), nơi
+     * quái của world cũ không còn tồn tại với máy này nữa mà giao thức lại không phát despawn nào
+     * (xem {@code DungeonController}). Xoá luôn mục tiêu: nhắm một con quái ở world khác là gửi
+     * {@code AttackCommand} vào hư không.
+     */
+    void clearMonsters() {
+        monsters.clear();
+        currentTargetId = 0L;
     }
 
     /**

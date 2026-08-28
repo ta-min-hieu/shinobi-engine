@@ -5,7 +5,9 @@ import java.util.Optional;
 
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
+import dev.kage.quest.application.ListQuestsUseCase;
 import dev.kage.quest.application.ProcessMonsterKilledUseCase;
+import dev.kage.quest.domain.QuestLogEntry;
 import dev.kage.quest.domain.QuestStatus;
 
 /**
@@ -20,14 +22,17 @@ public final class QuestFacade {
     private final AcceptQuestUseCase acceptQuestUseCase;
     private final ProcessMonsterKilledUseCase processMonsterKilledUseCase;
     private final ClaimQuestRewardUseCase claimQuestRewardUseCase;
+    private final ListQuestsUseCase listQuestsUseCase;
 
     public QuestFacade(
             AcceptQuestUseCase acceptQuestUseCase,
             ProcessMonsterKilledUseCase processMonsterKilledUseCase,
-            ClaimQuestRewardUseCase claimQuestRewardUseCase) {
+            ClaimQuestRewardUseCase claimQuestRewardUseCase,
+            ListQuestsUseCase listQuestsUseCase) {
         this.acceptQuestUseCase = acceptQuestUseCase;
         this.processMonsterKilledUseCase = processMonsterKilledUseCase;
         this.claimQuestRewardUseCase = claimQuestRewardUseCase;
+        this.listQuestsUseCase = listQuestsUseCase;
     }
 
     public AcceptResult acceptQuest(long characterId, String questCode) {
@@ -65,6 +70,18 @@ public final class QuestFacade {
                 .map(item -> new ItemReward(item.itemTemplateCode(), item.quantity()))
                 .toList();
         return new ClaimResult(outcome, result.expGranted(), items);
+    }
+
+    /**
+     * Nhật ký nhiệm vụ (ADR-035 Decision-4) — GỒM CẢ quest đã CLAIMED.
+     *
+     * <p>Trả thẳng {@link QuestLogEntry} của {@code domain/} thay vì khai báo record riêng ở Facade
+     * như {@link QuestStatusChange}: record đó CHỈ để không lộ type của {@code application/} ra
+     * ngoài, còn kiểu {@code domain/} thì Facade này vốn đã lộ sẵn ({@link QuestStatus} nằm trong
+     * chính {@link QuestStatusChange}). Thêm một bản sao y hệt chỉ để đổi tên package là trùng lặp thuần.
+     */
+    public List<QuestLogEntry> listQuests(long characterId) {
+        return listQuestsUseCase.execute(characterId);
     }
 
     public enum AcceptResult {

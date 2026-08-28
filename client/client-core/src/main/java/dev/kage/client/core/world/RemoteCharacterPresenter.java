@@ -30,6 +30,10 @@ final class RemoteCharacterPresenter {
     private final EcsWorld world;
     private final WorldModelRenderer models;
     private final Map<Long, KEntity> entities = new HashMap<>();
+
+    /** Cùng tập người chơi với {@link #entities}, dạng click chuột vào được — xem {@link #characters()}. */
+    private final Map<Long, CharacterPoint> pickables = new HashMap<>();
+
     private final RemoteMotionTracker motionTracker = new RemoteMotionTracker();
 
     RemoteCharacterPresenter(EcsWorld world, WorldModelRenderer models) {
@@ -49,6 +53,7 @@ final class RemoteCharacterPresenter {
         position.prevY = position.y;
         entity.add(position);
         entities.put(event.getCharacterId(), entity);
+        pickables.put(event.getCharacterId(), new CharacterPoint(entity));
         models.addCharacter(event.getCharacterId(), CharacterModelKey.of(event.getFaction(), event.getCostumeTier()));
     }
 
@@ -73,6 +78,7 @@ final class RemoteCharacterPresenter {
 
     void onDespawned(CharacterDespawnedEvent event) {
         KEntity entity = entities.remove(event.getCharacterId());
+        pickables.remove(event.getCharacterId());
         if (entity != null) {
             world.removeEntity(entity);
         }
@@ -80,9 +86,37 @@ final class RemoteCharacterPresenter {
         motionTracker.remove(event.getCharacterId());
     }
 
+    /**
+     * Gỡ MỌI người chơi khác đang hiển thị — dùng khi chính mình vừa đổi World (vào/ra hầm ngục).
+     *
+     * <p>Cần có vì giao thức không phát despawn cho NGƯỜI ĐI: {@code AreaOfInterestTracker.onDetach}
+     * chỉ báo despawn của người rời đi cho những người ở lại, không báo ngược lại (xem
+     * {@code DungeonController}). Không gỡ thì dân làng đứng nguyên trong hầm ngục.
+     */
+    void clear() {
+        for (Map.Entry<Long, KEntity> entry : entities.entrySet()) {
+            world.removeEntity(entry.getValue());
+            models.remove(entry.getKey());
+            motionTracker.remove(entry.getKey());
+        }
+        entities.clear();
+    }
+
     /** True nếu {@code characterId} là một người chơi KHÁC đang hiển thị. */
     boolean isPresent(long characterId) {
         return entities.containsKey(characterId);
+    }
+
+    /**
+     * Người chơi khác dưới dạng điểm click chuột vào được — cho {@link WorldEntityPicker}, thứ đã
+     * bắt quái và NPC theo đúng phép chiếu này (2026-08-27, thêm cho luồng thách đấu tay đôi).
+     *
+     * <p>Không sinh {@link java.util.Map} mới mỗi lần gọi: {@link #pickables} được vá đúng lúc
+     * spawn/despawn, và mỗi phần tử đọc thẳng {@link PositionComponent} nên vị trí không bao giờ
+     * lệch với bản đang vẽ — cùng lý do {@code MonsterPresenter} không nhân bản kho quái (Điều 31).
+     */
+    Map<Long, ? extends PickablePoint> characters() {
+        return pickables;
     }
 
     void tick(float fixedDeltaTime) {
@@ -115,6 +149,26 @@ final class RemoteCharacterPresenter {
     void renderPlaceholder(PlaceholderBoxRenderer renderer, float alpha) {
         for (KEntity entity : entities.values()) {
             renderer.draw(entity, alpha);
+        }
+    }
+
+    /**
+     * Một người chơi khác, nhìn qua con mắt của {@link WorldEntityPicker}.
+     *
+     * <p>Đọc {@code x}/{@code y} TẠI CHỖ từ entity thay vì chép lại toạ độ: chép là tạo ra một bản
+     * thứ hai phải nhớ cập nhật ở mọi đường vào ({@code onMoved} hôm nay, và mọi đường khác ngày
+     * mai) — hai bản sao vị trí lệch nhau là cách chắc chắn để click trúng chỗ nhân vật ĐÃ đứng.
+     */
+    private record CharacterPoint(KEntity entity) implements PickablePoint {
+
+        @Override
+        public float x() {
+            return POSITION.get(entity).x;
+        }
+
+        @Override
+        public float y() {
+            return POSITION.get(entity).y;
         }
     }
 

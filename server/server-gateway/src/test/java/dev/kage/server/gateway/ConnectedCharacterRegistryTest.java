@@ -90,7 +90,11 @@ class ConnectedCharacterRegistryTest {
                 new QuestRewardPorts(expPort, inventoryGrantPort, auditPort, questIdempotencyPort);
         ClaimQuestRewardUseCase claimQuestRewardUseCase =
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx);
-        return new QuestFacade(acceptQuestUseCase, processMonsterKilledUseCase, claimQuestRewardUseCase);
+        return new QuestFacade(
+                acceptQuestUseCase,
+                processMonsterKilledUseCase,
+                claimQuestRewardUseCase,
+                new dev.kage.quest.application.ListQuestsUseCase(progressPort));
     }
 
     @AfterEach
@@ -186,6 +190,50 @@ class ConnectedCharacterRegistryTest {
         assertThat(outboundOpcodes(channel)).doesNotContain(Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE);
     }
 
+    /**
+     * Đầu ra của điểm phát duy nhất (ADR-035 Decision-3): {@code GoldLedger} ở server-database báo
+     * "vàng vừa đổi", {@code GatewayBootstrap} nối thẳng vào method này. Test ở đây kiểm ĐÚNG mắt
+     * xích cuối — biến số dư thành packet gửi cho đúng người.
+     */
+    @Test
+    void shouldSendGoldChangedEvent_toTheOwningCharacter() throws InvalidProtocolBufferException {
+        registry = new ConnectedCharacterRegistry(
+                fakeInventoryFacade(0),
+                fakeQuestFacade(),
+                ExperienceGrantPort.disabled(),
+                new GatewayNetworkMetrics(new SimpleMeterRegistry()));
+        EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(1L, channel.pipeline().firstContext());
+
+        registry.sendGoldChanged(1L, 90L, -10L, "gold.reason.buy_item");
+
+        PacketCodec.Frame frame = awaitOutboundFrame(channel, Opcode.OPCODE_GOLD_CHANGED_EVENT_VALUE);
+        dev.kage.protocol.GoldChangedEvent event = dev.kage.protocol.GoldChangedEvent.parseFrom(frame.payload());
+        assertThat(event.getGold()).isEqualTo(90L);
+        assertThat(event.getDelta()).isEqualTo(-10L);
+        assertThat(event.getReasonKey()).isEqualTo("gold.reason.buy_item");
+    }
+
+    /**
+     * Người chơi ngắt kết nối giữa lúc giao dịch commit là chuyện bình thường — vàng ĐÃ vào DB
+     * thật, chỉ mất thông báo. Ném ở đây sẽ làm {@code GoldLedger} tưởng giao dịch hỏng.
+     */
+    @Test
+    void shouldIgnoreGoldChange_whenCharacterAlreadyDisconnected() {
+        registry = new ConnectedCharacterRegistry(
+                fakeInventoryFacade(0),
+                fakeQuestFacade(),
+                ExperienceGrantPort.disabled(),
+                new GatewayNetworkMetrics(new SimpleMeterRegistry()));
+        EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(1L, channel.pipeline().firstContext());
+        registry.unregister(1L);
+
+        registry.sendGoldChanged(1L, 90L, -10L, "gold.reason.buy_item"); // không được ném
+
+        assertThat(outboundOpcodes(channel)).doesNotContain(Opcode.OPCODE_GOLD_CHANGED_EVENT_VALUE);
+    }
+
     /** Opcode của mọi frame đã ghi ra kênh — để assert theo LOẠI gói thay vì "có/không có gì". */
     private static List<Integer> outboundOpcodes(EmbeddedChannel channel) {
         List<Integer> opcodes = new ArrayList<>();
@@ -250,7 +298,13 @@ class ConnectedCharacterRegistryTest {
         EnhancePorts enhancePorts =
                 new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort, idempotencyPort);
         EnhanceItemUseCase enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
-        return new InventoryFacade(addItemUseCase, grantLootUseCase, equipmentUseCases, enhanceItemUseCase);
+        return new InventoryFacade(
+                new dev.kage.inventory.api.ItemAcquisitionUseCases(addItemUseCase, grantLootUseCase),
+                equipmentUseCases,
+                enhanceItemUseCase,
+                new dev.kage.inventory.api.InventoryQueryUseCases(
+                        new dev.kage.inventory.application.ListInventoryUseCase(inventoryPort, equipmentPort),
+                        new dev.kage.inventory.application.GetItemCatalogUseCase(itemTemplatePort)));
     }
 
     /**

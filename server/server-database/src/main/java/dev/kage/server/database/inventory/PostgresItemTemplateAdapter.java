@@ -2,11 +2,13 @@ package dev.kage.server.database.inventory;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Optional;
 
 import javax.sql.DataSource;
 
 import dev.kage.inventory.domain.EquipmentSlotType;
+import dev.kage.inventory.domain.ItemCatalogEntry;
 import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
 import dev.kage.server.database.JdbcOperations;
@@ -20,6 +22,12 @@ public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
 
     private static final String FIND_ID_BY_CODE = """
             SELECT id FROM item_template WHERE code = ?
+            """;
+
+    // ORDER BY id để thứ tự trả về ổn định giữa các lần chạy — ItemCatalog vẫn tự sắp lại trước khi
+    // băm (không phụ thuộc DB), nhưng dữ liệu ổn định sẵn thì dễ soi khi debug.
+    private static final String LIST_CATALOG = """
+            SELECT id, code, name_key, max_stack, equip_slot, bonus_atk FROM item_template ORDER BY id
             """;
 
     private final DataSource dataSource;
@@ -36,6 +44,22 @@ public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
     @Override
     public Optional<Long> findIdByCode(String code) {
         return JdbcOperations.queryOne(dataSource, FIND_ID_BY_CODE, rs -> rs.getLong("id"), code);
+    }
+
+    @Override
+    public List<ItemCatalogEntry> listCatalog() {
+        return JdbcOperations.query(dataSource, LIST_CATALOG, PostgresItemTemplateAdapter::mapCatalogRow);
+    }
+
+    private static ItemCatalogEntry mapCatalogRow(ResultSet rs) throws SQLException {
+        String equipSlot = rs.getString("equip_slot");
+        return new ItemCatalogEntry(
+                rs.getLong("id"),
+                rs.getString("code"),
+                rs.getString("name_key"),
+                rs.getInt("max_stack"),
+                equipSlot == null ? null : EquipmentSlotType.valueOf(equipSlot),
+                rs.getInt("bonus_atk"));
     }
 
     private static ItemTemplate mapRow(ResultSet rs) throws SQLException {
