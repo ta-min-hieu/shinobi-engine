@@ -346,9 +346,9 @@ public final class ServerDatabaseBootstrap {
         PostgresMailAuditAdapter auditPort = new PostgresMailAuditAdapter();
         PostgresMailIdempotencyAdapter idempotencyPort = new PostgresMailIdempotencyAdapter();
         JdbcMailTransactionRunner transactionRunner = new JdbcMailTransactionRunner(dataSource);
-        SendMailUseCase sendMailUseCase = new SendMailUseCase(repositoryPort, transactionRunner);
-        ListMailUseCase listMailUseCase = new ListMailUseCase(repositoryPort);
         MailPorts ports = new MailPorts(repositoryPort, goldPort, inventoryGatewayPort, auditPort, idempotencyPort);
+        SendMailUseCase sendMailUseCase = new SendMailUseCase(ports, transactionRunner);
+        ListMailUseCase listMailUseCase = new ListMailUseCase(repositoryPort);
         ClaimMailUseCase claimMailUseCase = new ClaimMailUseCase(ports, transactionRunner);
         DeleteMailUseCase deleteMailUseCase = new DeleteMailUseCase(repositoryPort);
         return new MailFacade(sendMailUseCase, listMailUseCase, claimMailUseCase, deleteMailUseCase);

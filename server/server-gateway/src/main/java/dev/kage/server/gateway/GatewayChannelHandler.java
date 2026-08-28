@@ -2700,17 +2700,39 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 command.getBody(),
                 command.getGoldAmount(),
                 attachments);
-        long mailId = mailFacade.sendMail(request);
+        // characterId lấy từ SESSION (không phải packet) — nên senderId KHÔNG BAO GIỜ null ở đường
+        // này, và ký quỹ vàng/vật phẩm trong SendMailUseCase luôn chạy. Đường "thư hệ thống miễn
+        // ký quỹ" chỉ với tới được từ code server.
+        MailFacade.SendOutcome outcome = mailFacade.sendMail(request);
         SendMailResponse response = SendMailResponse.newBuilder()
-                .setOutcome(SendMailOutcome.SEND_MAIL_OUTCOME_OK)
-                .setMailId(mailId)
+                .setOutcome(toProtoOutcome(outcome.result()))
+                .setMailId(outcome.mailId())
                 .build();
         send(ctx, Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE, sequenceId, response.toByteArray());
-        NewMailEvent event = NewMailEvent.newBuilder().setMailId(mailId).build();
+        if (outcome.result() != MailFacade.SendResult.OK) {
+            // Không có thư nào được tạo — báo "có thư mới" lúc này sẽ khiến người nhận gọi
+            // ListMailRequest và không thấy gì.
+            return;
+        }
+        NewMailEvent event =
+                NewMailEvent.newBuilder().setMailId(outcome.mailId()).build();
         worldGateway
                 .registry()
                 .sendToCharacterIfOnline(
                         recipient.get().id(), Opcode.OPCODE_NEW_MAIL_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    private static final Map<MailFacade.SendResult, SendMailOutcome> SEND_MAIL_OUTCOME_MAPPING = Map.of(
+            MailFacade.SendResult.OK, SendMailOutcome.SEND_MAIL_OUTCOME_OK,
+            MailFacade.SendResult.INSUFFICIENT_GOLD, SendMailOutcome.SEND_MAIL_OUTCOME_INSUFFICIENT_GOLD,
+            MailFacade.SendResult.ATTACHMENT_NOT_OWNED, SendMailOutcome.SEND_MAIL_OUTCOME_ATTACHMENT_NOT_OWNED,
+            MailFacade.SendResult.INVALID_GOLD_AMOUNT, SendMailOutcome.SEND_MAIL_OUTCOME_INVALID_GOLD_AMOUNT,
+            MailFacade.SendResult.INVALID_ATTACHMENT, SendMailOutcome.SEND_MAIL_OUTCOME_INVALID_ATTACHMENT,
+            MailFacade.SendResult.SUBJECT_TOO_LONG, SendMailOutcome.SEND_MAIL_OUTCOME_SUBJECT_TOO_LONG,
+            MailFacade.SendResult.BODY_TOO_LONG, SendMailOutcome.SEND_MAIL_OUTCOME_BODY_TOO_LONG);
+
+    private static SendMailOutcome toProtoOutcome(MailFacade.SendResult result) {
+        return SEND_MAIL_OUTCOME_MAPPING.get(result);
     }
 
     private void handleListMailRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)

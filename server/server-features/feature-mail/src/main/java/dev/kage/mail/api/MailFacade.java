@@ -6,8 +6,9 @@ import dev.kage.mail.application.ClaimMailUseCase;
 import dev.kage.mail.application.DeleteMailUseCase;
 import dev.kage.mail.application.ListMailUseCase;
 import dev.kage.mail.application.SendMailUseCase;
-import dev.kage.mail.domain.MailAttachment;
-import dev.kage.mail.domain.NewMail;
+import dev.kage.mail.domain.Mail;
+import dev.kage.mail.domain.MailAttachmentDraft;
+import dev.kage.mail.domain.MailDraft;
 
 /**
  * API công khai của {@code feature-mail} — module khác (server-gateway) CHỈ gọi qua đây, không
@@ -32,19 +33,37 @@ public final class MailFacade {
         this.deleteMailUseCase = deleteMailUseCase;
     }
 
-    /** Gửi thư — LUÔN thành công (recipientId đã được gateway xác nhận tồn tại trước khi gọi). */
-    public long sendMail(SendMailRequest request) {
-        List<MailAttachment> domainAttachments = request.attachments().stream()
-                .map(a -> new MailAttachment(a.itemTemplateId(), a.quantity()))
+    /**
+     * Gửi thư — KHÔNG còn "luôn thành công" từ 2026-08-28: vàng/vật phẩm đính kèm bị trừ khỏi
+     * người gửi trong cùng transaction với việc tạo thư, nên có nhánh trượt (xem {@link SendResult}).
+     * {@code recipientId} vẫn do gateway xác nhận tồn tại trước khi gọi.
+     */
+    public SendOutcome sendMail(SendMailRequest request) {
+        List<MailAttachmentDraft> draftAttachments = request.attachments().stream()
+                .map(a -> new MailAttachmentDraft(a.itemTemplateId(), a.quantity()))
                 .toList();
-        NewMail newMail = new NewMail(
+        MailDraft draft = new MailDraft(
                 request.senderId(),
                 request.recipientId(),
                 request.subject(),
                 request.body(),
                 request.goldAmount(),
-                domainAttachments);
-        return sendMailUseCase.execute(newMail).id();
+                draftAttachments);
+        SendMailUseCase.SendResult result = sendMailUseCase.execute(draft);
+        return new SendOutcome(
+                toSendResult(result.outcome()), result.mail().map(Mail::id).orElse(0L));
+    }
+
+    private static SendResult toSendResult(SendMailUseCase.SendOutcome outcome) {
+        return switch (outcome) {
+            case OK -> SendResult.OK;
+            case INSUFFICIENT_GOLD -> SendResult.INSUFFICIENT_GOLD;
+            case ATTACHMENT_NOT_OWNED -> SendResult.ATTACHMENT_NOT_OWNED;
+            case INVALID_GOLD_AMOUNT -> SendResult.INVALID_GOLD_AMOUNT;
+            case INVALID_ATTACHMENT -> SendResult.INVALID_ATTACHMENT;
+            case SUBJECT_TOO_LONG -> SendResult.SUBJECT_TOO_LONG;
+            case BODY_TOO_LONG -> SendResult.BODY_TOO_LONG;
+        };
     }
 
     public List<MailView> listMail(long characterId) {
@@ -79,6 +98,19 @@ public final class MailFacade {
             case NOT_FOUND -> DeleteResult.NOT_FOUND;
             case MUST_CLAIM_FIRST -> DeleteResult.MUST_CLAIM_FIRST;
         };
+    }
+
+    /** {@code mailId == 0} khi {@code result != OK} — không có thư nào được tạo. */
+    public record SendOutcome(SendResult result, long mailId) {}
+
+    public enum SendResult {
+        OK,
+        INSUFFICIENT_GOLD,
+        ATTACHMENT_NOT_OWNED,
+        INVALID_GOLD_AMOUNT,
+        INVALID_ATTACHMENT,
+        SUBJECT_TOO_LONG,
+        BODY_TOO_LONG
     }
 
     public enum ClaimResult {
