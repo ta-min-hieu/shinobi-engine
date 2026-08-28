@@ -239,7 +239,7 @@ class ShopIntegrationTest {
 
     @Test
     void shouldPublishNothing_whenTransactionRollsBackAfterDeductingGold() {
-        long characterId = createFreshCharacter("GoldEventRollback");
+        long characterId = createFreshCharacter("GoldEvtRollbk");
         fillInventoryToCapacity(characterId);
         grantGold(characterId, 1_000_000);
 

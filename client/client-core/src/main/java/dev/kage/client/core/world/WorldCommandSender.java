@@ -18,7 +18,10 @@ import dev.kage.protocol.CreateGuildCommand;
 import dev.kage.protocol.CreatePartyCommand;
 import dev.kage.protocol.DeclineDuelCommand;
 import dev.kage.protocol.DisbandGuildCommand;
+import dev.kage.protocol.EnterDungeonCommand;
 import dev.kage.protocol.ExitDuelCommand;
+import dev.kage.protocol.ExitDungeonCommand;
+import dev.kage.protocol.Faction;
 import dev.kage.protocol.GetMyGuildRequest;
 import dev.kage.protocol.GetMyPartyRequest;
 import dev.kage.protocol.GetPvpRatingRequest;
@@ -41,6 +44,7 @@ import dev.kage.protocol.RejectGuildJoinRequestCommand;
 import dev.kage.protocol.RejectPartyInviteCommand;
 import dev.kage.protocol.RemoveFriendCommand;
 import dev.kage.protocol.SelectDialogueOptionCommand;
+import dev.kage.protocol.SelectFactionRequest;
 import dev.kage.protocol.SendChatMessageCommand;
 import dev.kage.protocol.SendFriendRequestCommand;
 import dev.kage.protocol.SendGuildJoinRequestCommand;
@@ -452,14 +456,67 @@ final class WorldCommandSender {
                 "GetPvpRatingRequest");
     }
 
+    // --- Hầm ngục (dungeon.proto, dải 1500-1503) ----------------------------------------------
+    // Không có idempotencyKey ở cả hai lệnh, và đó là quyết định chứ không phải khoảng trống:
+    // vào/ra hầm ngục không sinh hiệu ứng kinh tế trùng lặp được nên ADR-025 không áp (dungeon.proto
+    // nói thẳng điều này). Gửi trùng EnterDungeonCommand chỉ nhận về ALREADY_IN_DUNGEON.
+
+    /**
+     * Kéo CẢ NHÓM vào một instance hầm ngục.
+     *
+     * <p>⚠️ Lệnh này đổi World của cả những người KHÁC trong nhóm, nhưng chỉ máy này nhận được
+     * {@code EnterDungeonResponse} — xem {@link DungeonController} về khoảng trống đó.
+     *
+     * @param dungeonCode {@link DungeonController#DUNGEON_CODE}. Server tra lại và trả
+     *     {@code UNKNOWN_DUNGEON} nếu sai — client KHÔNG kiểm trước (Điều 24).
+     */
+    void enterDungeon(String dungeonCode) {
+        EnterDungeonCommand command =
+                EnterDungeonCommand.newBuilder().setDungeonCode(dungeonCode).build();
+        send(Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, command.toByteArray(), "EnterDungeonCommand");
+    }
+
+    /** Rời hầm ngục hiện tại — gói RỖNG, server tự tra nhân vật này đang ở instance nào (dungeon.proto). */
+    void exitDungeon() {
+        send(
+                Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE,
+                ExitDungeonCommand.newBuilder().build().toByteArray(),
+                "ExitDungeonCommand");
+    }
+
+    /**
+     * Chọn/đổi hệ phái (character.proto, cần Lv10). Gói KHÔNG mang {@code character_id} — server lấy
+     * từ session đã bound lúc {@code SelectCharacterRequest} (chống IDOR, Điều 24).
+     *
+     * <p><b>Hàm DUY NHẤT ở lớp này trả về {@code sequenceId}</b>, và nó bắt buộc phải trả: server
+     * báo thất bại qua {@code ErrorResponse} — một gói dùng chung cho cả giao thức — nên
+     * {@code related_sequence_id} là thứ duy nhất nối một lỗi về đúng yêu cầu đã gửi. Xem
+     * {@link FactionCoordinator}.
+     *
+     * @return {@code sequenceId} đã dùng để gửi. Vẫn trả về bình thường khi mất kết nối (lệnh bị
+     *     nuốt như mọi lệnh khác ở lớp này) — chỗ gọi sẽ đơn giản là không bao giờ nhận được gói
+     *     trả lời nào mang số đó, đúng như khi gói đi lạc trên đường.
+     */
+    int selectFaction(Faction faction) {
+        int sequenceId = connection.nextSequenceId();
+        SelectFactionRequest request =
+                SelectFactionRequest.newBuilder().setFaction(faction).build();
+        send(Opcode.OPCODE_SELECT_FACTION_REQUEST_VALUE, sequenceId, request.toByteArray(), "SelectFactionRequest");
+        return sequenceId;
+    }
+
     /** Gói tin đến từ server — {@code null} khi hàng đợi rỗng (xem {@link GameConnection}). */
     PacketCodec.Frame pollInbound() {
         return connection.pollInbound();
     }
 
     private void send(int opcode, byte[] payload, String commandName) {
+        send(opcode, connection.nextSequenceId(), payload, commandName);
+    }
+
+    private void send(int opcode, int sequenceId, byte[] payload, String commandName) {
         try {
-            connection.send(opcode, connection.nextSequenceId(), payload);
+            connection.send(opcode, sequenceId, payload);
         } catch (IOException e) {
             LOG.debug("Gửi {} thất bại (mất kết nối tạm thời)", commandName, e);
         }
