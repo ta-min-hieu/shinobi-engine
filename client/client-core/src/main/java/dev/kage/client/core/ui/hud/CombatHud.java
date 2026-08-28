@@ -69,6 +69,11 @@ public final class CombatHud implements Disposable {
     /** Cụm nhiệm vụ (góc TRÊN-PHẢI) — ẩn hẳn khi không theo dõi nhiệm vụ nào. */
     private final Table questGroup;
 
+    /** Biển "đang đấu tay đôi" (rìa TRÁI, giữa chiều cao) — ẩn hẳn khi không ở trong trận nào. */
+    private final Table duelGroup;
+
+    private final Label duelLabel;
+
     private final Label questNameLabel;
     private final Label questStatusLabel;
     private final TextButton claimQuestButton;
@@ -83,6 +88,7 @@ public final class CombatHud implements Disposable {
     private int lastTargetHp = -1;
     private int lastTargetMaxHp = -1;
     private String lastSkillText;
+    private String lastDuelText;
     private int lastLevel = -1;
     private int lastPlayerChi = -1;
     private int lastPlayerMaxChi = -1;
@@ -117,11 +123,14 @@ public final class CombatHud implements Disposable {
         this.questStatusLabel = new Label("", skin.statLabelStyle);
         this.claimQuestButton = new TextButton(i18n.get("quest.action.claim"), skin.buttonStyle);
         this.questGroup = new Table();
+        this.duelLabel = new Label("", skin.labelStyle);
+        this.duelGroup = new Table();
 
-        // 5 Table độc lập cùng setFillParent(true) — mỗi cụm neo một góc, không có lưới chung.
+        // 6 Table độc lập cùng setFillParent(true) — mỗi cụm neo một góc, không có lưới chung.
         stage.addActor(anchored(buildPlayerCluster(), Align.topLeft));
         stage.addActor(anchored(buildTargetCluster(), Align.top));
         stage.addActor(anchored(buildQuestCluster(), Align.topRight));
+        stage.addActor(anchored(buildDuelBanner(), Align.left));
         stage.addActor(anchored(buildHintBar(), Align.bottom));
         stage.addActor(anchored(buildSkillCluster(), Align.bottomRight));
     }
@@ -198,6 +207,24 @@ public final class CombatHud implements Disposable {
         questGroup.pad(8f);
         questGroup.setVisible(false);
         return questGroup;
+    }
+
+    /**
+     * RÌA TRÁI, giữa chiều cao: biển "đang đấu tay đôi với X" (2026-08-27).
+     *
+     * <p>Rìa trái vì bốn góc + cạnh trên + cạnh dưới đã có chủ, và vì đây là thứ phải NHÌN THẤY
+     * suốt trận chứ không phải liếc một lần: đang trong trận đấu tay đôi thì mọi thứ khác trên HUD
+     * (mục tiêu, nhiệm vụ) vẫn hiện y hệt lúc thường, không có gì nói cho người chơi biết mình đang
+     * ở trong một trận đấu tính điểm.
+     *
+     * <p>Tên đối thủ do NGƯỜI KHÁC đặt nên chuỗi truyền vào phải đã qua {@code ChatController
+     * .sanitize} — {@code DuelCoordinator} lo việc đó, HUD chỉ vẽ (UI.md §4).
+     */
+    private Table buildDuelBanner() {
+        duelGroup.setBackground(skin.panel);
+        duelGroup.add(duelLabel).pad(8f);
+        duelGroup.setVisible(false);
+        return duelGroup;
     }
 
     /**
@@ -428,6 +455,28 @@ public final class CombatHud implements Disposable {
 
     public void clearQuest() {
         questGroup.setVisible(false);
+    }
+
+    /**
+     * Bật biển "đang đấu tay đôi" (2026-08-27).
+     *
+     * @param text chuỗi ĐÃ dịch và ĐÃ sanitize — HUD không tra i18n cho dữ liệu đến từ mạng, cùng
+     *     quy ước {@code GuildPanel#setStatus} (tên đối thủ do người khác đặt, khoá i18n không dịch
+     *     được một cái tên).
+     */
+    public void setDuelStatus(String text) {
+        if (text.equals(lastDuelText)) {
+            return; // UI.md §9 — chỉ setText khi giá trị thực sự đổi.
+        }
+        lastDuelText = text;
+        duelLabel.setText(text);
+        duelGroup.setVisible(true);
+    }
+
+    /** Trận đấu kết thúc — biển biến mất hẳn, không để lại tên đối thủ cũ treo trên màn hình. */
+    public void clearDuelStatus() {
+        lastDuelText = null;
+        duelGroup.setVisible(false);
     }
 
     public void setOnClaimQuestClicked(Runnable listener) {

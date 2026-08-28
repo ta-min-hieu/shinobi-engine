@@ -21,6 +21,7 @@ import dev.kage.client.core.net.GameConnection;
 import dev.kage.client.core.ui.hud.ChatPanel;
 import dev.kage.client.core.ui.hud.CombatHud;
 import dev.kage.client.core.ui.hud.DialoguePanel;
+import dev.kage.client.core.ui.hud.DuelPanel;
 import dev.kage.client.core.ui.hud.FriendPanel;
 import dev.kage.client.core.ui.hud.GuildPanel;
 import dev.kage.client.core.ui.hud.PartyPanel;
@@ -154,6 +155,12 @@ public final class WorldScreen implements GameScreen {
     /** Luồng bang hội (tạo/xin gia nhập/duyệt/đuổi + mạng) — xem {@link GuildCoordinator}. */
     private final GuildCoordinator guild;
 
+    /** Cửa sổ đấu tay đôi (phím K) — mượn skin của {@link #combatHud} như {@link #guildPanel}. */
+    private final DuelPanel duelPanel = new DuelPanel(combatHud.skin());
+
+    /** Luồng đấu tay đôi + xếp hạng PvP (arena.proto) — xem {@link DuelCoordinator}. */
+    private final DuelCoordinator duel;
+
     /** Vòng đời nhiệm vụ: nhận → hoàn thành → lĩnh thưởng — xem {@link QuestCoordinator}. */
     private final QuestCoordinator quests;
 
@@ -230,6 +237,7 @@ public final class WorldScreen implements GameScreen {
         this.party = new PartyCoordinator(partyPanel, sender, chat);
         this.friends = new FriendCoordinator(friendPanel, sender, combatFeedback, this::noTextInputActive);
         this.guild = new GuildCoordinator(guildPanel, sender, this::noTextInputActive);
+        this.duel = new DuelCoordinator(duelPanel, combatHud, sender, combatFeedback);
         wireHud();
         this.inputProcessor = buildInputProcessor();
     }
@@ -249,6 +257,7 @@ public final class WorldScreen implements GameScreen {
         combatHud.setOnAttackClicked(attackInput::onButtonClicked);
         partyPanel.setCanOpen(this::noTextInputActive);
         chatPanel.setCanOpen(this::noTextInputActive);
+        duelPanel.setCanOpen(this::noTextInputActive);
     }
 
     /**
@@ -271,6 +280,7 @@ public final class WorldScreen implements GameScreen {
                 partyPanel.stage(),
                 friendPanel.stage(),
                 guildPanel.stage(),
+                duelPanel.stage(),
                 chatPanel.stage(),
                 combatHud.stage(),
                 new WorldTargetPicker());
@@ -294,6 +304,7 @@ public final class WorldScreen implements GameScreen {
         party.reset();
         friends.reset();
         guild.reset();
+        duel.reset();
     }
 
     @Override
@@ -306,6 +317,7 @@ public final class WorldScreen implements GameScreen {
         partyPanel.resize(width, height);
         friendPanel.resize(width, height);
         guildPanel.resize(width, height);
+        duelPanel.resize(width, height);
         combatFeedback.resize(width, height);
     }
 
@@ -341,6 +353,7 @@ public final class WorldScreen implements GameScreen {
             handled |= party.dispatch(opcode, payload);
             handled |= friends.dispatch(opcode, payload);
             handled |= guild.dispatch(opcode, payload);
+            handled |= duel.dispatch(opcode, payload);
             if (!handled && !dispatchMovement(opcode, payload)) {
                 dispatchCombat(opcode, payload);
             }
@@ -545,7 +558,12 @@ public final class WorldScreen implements GameScreen {
     }
 
     private boolean isTextInputActive() {
-        return chat.isComposing() || dialogue.isOpen() || party.isOpen() || friends.isOpen() || guild.isOpen();
+        return chat.isComposing()
+                || dialogue.isOpen()
+                || party.isOpen()
+                || friends.isOpen()
+                || guild.isOpen()
+                || duel.isOpen();
     }
 
     /**
@@ -663,7 +681,12 @@ public final class WorldScreen implements GameScreen {
             }
             return true;
         }
-        return talkToNpcAt(screenX, glScreenY, projector);
+        // Người chơi khác đứng CUỐI trong ba loại: quái và NPC là thứ click cả ngày, còn thách đấu
+        // là việc hiếm. Click chọn chỉ CHỌN chứ không gửi lời thách đấu nào, và id 0 (click vào chỗ
+        // trống) được xử lý bên trong coordinator — xem {@link DuelCoordinator#onCharacterPicked}.
+        return talkToNpcAt(screenX, glScreenY, projector)
+                || duel.onCharacterPicked(
+                        entityPicker.pick(remoteCharacters.characters(), screenX, glScreenY, projector));
     }
 
     private boolean talkToNpcAt(float screenX, float glScreenY, WorldToScreen projector) {
@@ -678,6 +701,7 @@ public final class WorldScreen implements GameScreen {
         party.close();
         friends.close();
         guild.close();
+        duel.close();
         dialogue.talkTo(npc.code());
         return true;
     }
@@ -709,6 +733,7 @@ public final class WorldScreen implements GameScreen {
         partyPanel.render(Gdx.graphics.getDeltaTime());
         friendPanel.render(Gdx.graphics.getDeltaTime());
         guildPanel.render(Gdx.graphics.getDeltaTime());
+        duelPanel.render(Gdx.graphics.getDeltaTime());
         dialoguePanel.render(Gdx.graphics.getDeltaTime());
     }
 
@@ -818,6 +843,7 @@ public final class WorldScreen implements GameScreen {
         partyPanel.dispose();
         friendPanel.dispose();
         guildPanel.dispose();
+        duelPanel.dispose();
         combatHud.dispose();
     }
 

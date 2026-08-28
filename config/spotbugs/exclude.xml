@@ -300,6 +300,16 @@
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
 
+    <!-- DuelPanel.stage() — lần thứ sáu cùng một lý do (CombatHud, DialoguePanel, ChatPanel,
+         FriendPanel, GuildPanel ngay trên): WorldScreen phải đưa đúng instance Stage đó vào
+         InputMultiplexer để đặt thứ tự nuốt input, thứ chỉ đặt được cho cả một Stage chứ không cho
+         một actor bên trong (xem javadoc DuelPanel + WorldScreen#buildInputProcessor). Vẫn giữ
+         <Match> riêng thay vì gộp regex, cùng lập luận đã ghi ở ChatPanel. -->
+    <Match>
+        <Class name="dev.kage.client.core.ui.hud.DuelPanel"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
     <!-- KageSkin.font() lộ BitmapFont dùng chung có chủ đích — public accessor cho caller cần vẽ
          thủ công bằng đúng font đã nạp (VD Batch.draw ngoài Label/TextField có sẵn style). Font
          FreeType native-backed, "copy phòng thủ" nghĩa là dựng lại nguyên glyph atlas tốn kém vô
