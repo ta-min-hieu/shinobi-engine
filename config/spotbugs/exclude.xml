@@ -205,6 +205,16 @@
         <Bug pattern="PREDICTABLE_RANDOM"/>
     </Match>
 
+    <!-- InventorySnapshot (ADR-035 Decision-1) là ẢNH CHỤP đọc-một-lần: use-case dựng nó, gateway
+         đọc xong rồi vứt, không ai giữ lại. SpotBugs báo EI/EI2 vì record ôm hai aggregate có
+         method ghi (Inventory/Equipment) — đúng theo định nghĩa công cụ, nhưng defensive-copy ở đây
+         mua đúng con số không: bản sao cũng lỗi thời ngay khi transaction kế tiếp chạy, và giá trị
+         của gói tin nằm ở chỗ nó là ảnh chụp tại MỘT thời điểm chứ không phải một view sống. -->
+    <Match>
+        <Class name="dev.kage.inventory.domain.InventorySnapshot"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
     <!-- Fake*Port trong test là test double (capture tham chiếu để assert lại) — không phải state
          thật cần bảo vệ, defensive-copy vô nghĩa trong test fake. Khớp mọi nested Fake*Port bên
          trong class Test (cùng lý do sẽ lặp lại ở feature khác dùng cùng pattern test double). -->

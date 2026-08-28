@@ -22,23 +22,34 @@ class GetItemCatalogUseCaseTest {
             new ItemCatalogEntry(2L, "wooden_sword", "item.wooden_sword.name", 1, EquipmentSlotType.WEAPON, 5);
 
     private static ItemTemplatePort fakePort(List<ItemCatalogEntry> entries, AtomicInteger readCount) {
-        return new ItemTemplatePort() {
-            @Override
-            public Optional<ItemTemplate> findById(long itemTemplateId) {
-                return Optional.empty();
-            }
+        return new FakeItemTemplatePort(entries, readCount);
+    }
 
-            @Override
-            public Optional<Long> findIdByCode(String code) {
-                return Optional.empty();
-            }
+    /**
+     * Test double có TÊN chứ không phải class vô danh: quy ước {@code Fake*} là thứ file loại trừ
+     * SpotBugs bắt theo mẫu {@code ~.*Test$Fake.*} (xem config/spotbugs/exclude.xml) — class vô danh
+     * ra tên {@code Test$1}, không khớp mẫu, và EI_EXPOSE_REP sẽ làm đỏ build vì fake trả thẳng
+     * danh sách nhận từ ngoài. Trong test thì đó chính là ĐIỀU MONG MUỐN (giữ tham chiếu để assert),
+     * nên sửa tên chứ không nới rộng luật loại trừ.
+     */
+    private record FakeItemTemplatePort(List<ItemCatalogEntry> entries, AtomicInteger readCount)
+            implements ItemTemplatePort {
 
-            @Override
-            public List<ItemCatalogEntry> listCatalog() {
-                readCount.incrementAndGet();
-                return entries;
-            }
-        };
+        @Override
+        public Optional<ItemTemplate> findById(long itemTemplateId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<Long> findIdByCode(String code) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<ItemCatalogEntry> listCatalog() {
+            readCount.incrementAndGet();
+            return entries;
+        }
     }
 
     @Test
