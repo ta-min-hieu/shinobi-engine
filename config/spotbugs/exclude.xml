@@ -371,6 +371,17 @@
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
 
+    <!-- QuestLogPanel.stage() — lần thứ chín cùng một lý do (CombatHud, DialoguePanel, ChatPanel,
+         PartyPanel, FriendPanel, GuildPanel, DuelPanel, FactionPanel, MailPanel ngay trên):
+         WorldScreen phải đưa đúng instance Stage đó vào InputMultiplexer để đặt thứ tự nuốt input,
+         thứ chỉ đặt được cho cả một Stage chứ không cho một actor bên trong (xem javadoc
+         QuestLogPanel + WorldScreen#buildInputProcessor). Vẫn giữ <Match> riêng thay vì gộp regex,
+         cùng lập luận đã ghi ở ChatPanel. -->
+    <Match>
+        <Class name="dev.kage.client.core.ui.hud.QuestLogPanel"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
     <!-- KageSkin.font() lộ BitmapFont dùng chung có chủ đích — public accessor cho caller cần vẽ
          thủ công bằng đúng font đã nạp (VD Batch.draw ngoài Label/TextField có sẵn style). Font
          FreeType native-backed, "copy phòng thủ" nghĩa là dựng lại nguyên glyph atlas tốn kém vô

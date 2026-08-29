@@ -45,6 +45,7 @@ import dev.kage.protocol.ListPartyMembersRequest;
 import dev.kage.protocol.ListPendingFriendRequestsRequest;
 import dev.kage.protocol.ListPendingGuildJoinRequestsRequest;
 import dev.kage.protocol.ListPendingPartyInvitesRequest;
+import dev.kage.protocol.ListQuestsRequest;
 import dev.kage.protocol.ListShopItemsRequest;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.Opcode;
@@ -153,6 +154,19 @@ final class WorldCommandSender {
                 .setIdempotencyKey(idempotencyKey)
                 .build();
         send(Opcode.OPCODE_CLAIM_QUEST_REWARD_COMMAND_VALUE, command.toByteArray(), "ClaimQuestRewardCommand");
+    }
+
+    /**
+     * Hỏi trọn nhật ký nhiệm vụ (opcode 610, ADR-035). Gói rỗng — characterId lấy từ session
+     * (quest.proto). Đây là cách DUY NHẤT client biết nhiệm vụ nào đã hoàn thành TRƯỚC phiên chơi
+     * hiện tại — xem {@link QuestCoordinator} về việc hỏi lại lúc vào world/mở cửa sổ/sau mỗi lệnh
+     * đổi trạng thái, đúng gói vá bug "nhận nhiệm vụ → relog → mất thưởng vĩnh viễn".
+     */
+    void listQuests() {
+        send(
+                Opcode.OPCODE_LIST_QUESTS_REQUEST_VALUE,
+                ListQuestsRequest.newBuilder().build().toByteArray(),
+                "ListQuestsRequest");
     }
 
     /**

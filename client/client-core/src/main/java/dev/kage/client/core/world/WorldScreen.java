@@ -27,6 +27,7 @@ import dev.kage.client.core.ui.hud.GuildPanel;
 import dev.kage.client.core.ui.hud.InventoryPanel;
 import dev.kage.client.core.ui.hud.MailPanel;
 import dev.kage.client.core.ui.hud.PartyPanel;
+import dev.kage.client.core.ui.hud.QuestLogPanel;
 import dev.kage.client.core.ui.hud.ShopPanel;
 import dev.kage.engine.core.GameScreen;
 import dev.kage.engine.ecs.ComponentMapper;
@@ -182,6 +183,8 @@ public final class WorldScreen implements GameScreen {
 
     /** Luồng cửa hàng (mua/bán + catalog/vàng + mạng) — xem {@link ShopCoordinator}. */
     private final ShopCoordinator shop;
+    /** Nhật ký nhiệm vụ (phím J, ADR-035) — mượn skin của {@link #combatHud} như {@link #mailPanel}. */
+    private final QuestLogPanel questLogPanel = new QuestLogPanel(combatHud.skin());
 
     /** Vòng đời nhiệm vụ: nhận → hoàn thành → lĩnh thưởng — xem {@link QuestCoordinator}. */
     private final QuestCoordinator quests;
@@ -236,7 +239,7 @@ public final class WorldScreen implements GameScreen {
                 localCharacterId, POSITION.get(localPlayer), combatHudController, combatHud.font());
 
         // SAU combatFeedback: quests mượn nó để báo khi hoàn thành/lĩnh thưởng.
-        this.quests = new QuestCoordinator(combatHud, sender, combatFeedback);
+        this.quests = new QuestCoordinator(combatHud, questLogPanel, sender, combatFeedback);
         this.dialogue = new DialogueCoordinator(dialoguePanel, sender, quests);
         this.chat = new ChatCoordinator(chatPanel, sender);
         // SAU chat: cả ba coordinator dưới đây mượn nhật ký chat/chữ nổi làm chỗ báo lý do thất bại.
@@ -349,7 +352,7 @@ public final class WorldScreen implements GameScreen {
     private void registerPanels() {
         panels.register(itemCatalog);
         panels.register(gold);
-        panels.register(quests);
+        panels.register(questLogPanel, quests);
         panels.register(dialoguePanel, dialogue);
         panels.register(partyPanel, party);
         panels.register(friendPanel, friends);
@@ -384,6 +387,7 @@ public final class WorldScreen implements GameScreen {
         partyPanel.setCanOpen(panels::noneOpen);
         chatPanel.setCanOpen(panels::noneOpen);
         duelPanel.setCanOpen(panels::noneOpen);
+        questLogPanel.setCanOpen(panels::noneOpen);
         // Cổng của khung chọn hệ có THÊM một vế so với các khung khác — xem
         // FactionCoordinator#setOpenGate (chỉ bày lối vào cho nhân vật còn được mời chọn).
         faction.setOpenGate(panels::noneOpen);
@@ -426,6 +430,7 @@ public final class WorldScreen implements GameScreen {
         // Hỏi catalog ở show() chứ không phải constructor: lúc dựng màn hình kết nối có thể chưa sẵn
         // sàng, còn show() là thời điểm màn hình thật sự bắt đầu sống.
         itemCatalog.request();
+        quests.requestLog();
     }
 
     @Override
