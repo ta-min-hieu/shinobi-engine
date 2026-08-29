@@ -43,6 +43,11 @@ dependencies {
     // KHÔNG dùng logstash-logback-encoder (thư viện ngoài không có trong TECHNOLOGY-STACK.md), nên
     // cần API Logback lúc COMPILE, không chỉ lúc chạy.
     implementation("ch.qos.logback:logback-classic:1.5.31")
+    // PostgreSQL thật cho MonsterLootChainIntegrationTest — chuỗi "quái chết → rơi đồ → vào túi →
+    // ItemGrantedEvent" chỉ chứng minh được khi đi qua DB thật, mà ConnectedCharacterRegistry là
+    // package-private nên test PHẢI nằm ở module này (server-database không thấy nó). Cùng bundle
+    // Testcontainers server-database đã dùng, không phải thư viện mới (libs.versions.toml).
+    testImplementation(libs.bundles.test.integration)
 }
 application {
     mainClass.set("dev.kage.server.gateway.GatewayBootstrap")
