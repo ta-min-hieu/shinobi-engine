@@ -29,6 +29,7 @@ import dev.kage.client.core.ui.hud.MailPanel;
 import dev.kage.client.core.ui.hud.PartyPanel;
 import dev.kage.client.core.ui.hud.QuestLogPanel;
 import dev.kage.client.core.ui.hud.ShopPanel;
+import dev.kage.client.core.ui.hud.TradePanel;
 import dev.kage.engine.core.GameScreen;
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.EcsWorld;
@@ -183,6 +184,12 @@ public final class WorldScreen implements GameScreen {
 
     /** Luồng cửa hàng (mua/bán + catalog/vàng + mạng) — xem {@link ShopCoordinator}. */
     private final ShopCoordinator shop;
+
+    /** Giao dịch giữa hai người chơi (phím N) — mượn skin của {@link #combatHud} như {@link #mailPanel}. */
+    private final TradePanel tradePanel = new TradePanel(combatHud.skin());
+
+    /** Luồng giao dịch (mời/chào/xác nhận + mạng) — xem {@link TradeCoordinator}. */
+    private final TradeCoordinator trade;
     /** Nhật ký nhiệm vụ (phím J, ADR-035) — mượn skin của {@link #combatHud} như {@link #mailPanel}. */
     private final QuestLogPanel questLogPanel = new QuestLogPanel(combatHud.skin());
 
@@ -257,6 +264,7 @@ public final class WorldScreen implements GameScreen {
         this.mail = new MailCoordinator(mailPanel, sender, combatFeedback, panels::noneOpen);
         this.inventory = buildInventory();
         this.shop = buildShop();
+        this.trade = new TradeCoordinator(tradePanel, sender, itemCatalog, panels::noneOpen);
         this.intents = buildIntents();
         registerPanels();
         wireHud(character);
@@ -362,6 +370,7 @@ public final class WorldScreen implements GameScreen {
         panels.register(mailPanel, mail);
         panels.register(inventoryPanel, inventory);
         panels.register(shopPanel, shop);
+        panels.register(tradePanel, trade);
         panels.register(chatPanel, chat);
         panels.register(dungeon);
         panels.register(combatHud);
@@ -392,6 +401,8 @@ public final class WorldScreen implements GameScreen {
         // nhưng lệnh Bán thuộc về cửa hàng (nó giữ khoá idempotency của ADR-025). Hai luồng không
         // biết nhau; chỗ này nối chúng lại.
         inventory.setOnSellRequested(shop::sellOne);
+        // Cùng khuôn nút Bán: món đồ nằm ở túi đồ, còn phiên giao dịch nằm ở luồng giao dịch.
+        inventory.setOnOfferRequested(trade::offerItem, trade::inTrade);
         // Cổng của khung chọn hệ có THÊM một vế so với các khung khác — xem
         // FactionCoordinator#setOpenGate (chỉ bày lối vào cho nhân vật còn được mời chọn).
         faction.setOpenGate(panels::noneOpen);

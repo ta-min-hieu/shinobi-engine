@@ -115,11 +115,13 @@ public final class InventoryPanel implements HudWindow {
     private final Label detailLabel;
     private final TextButton equipButton;
     private final TextButton sellButton;
+    private final TextButton offerButton;
     private final Table equipmentList;
 
     private LongConsumer onSelect;
     private Runnable onEquipSelected;
     private Runnable onSellSelected;
+    private Runnable onOfferSelected;
     private IntConsumer onUnequip;
     private Runnable onOpened;
 
@@ -149,6 +151,7 @@ public final class InventoryPanel implements HudWindow {
         this.detailLabel = wrappingLabel(ROW_COLOR);
         this.equipButton = actionButton("inventory.action.equip", () -> fire(onEquipSelected));
         this.sellButton = actionButton("inventory.action.sell", () -> fire(onSellSelected));
+        this.offerButton = actionButton("inventory.action.offer", () -> fire(onOfferSelected));
         this.equipmentList = new Table();
 
         this.panel = buildPanel();
@@ -228,13 +231,15 @@ public final class InventoryPanel implements HudWindow {
     private Table buildDetailSection() {
         Table section = new Table();
         section.add(detailLabel)
-                .width(PANEL_WIDTH_PX - (2f * ROW_BUTTON_WIDTH_PX) - 12f)
+                .width(PANEL_WIDTH_PX - (3f * ROW_BUTTON_WIDTH_PX) - 18f)
                 .left()
                 .padRight(6f);
         section.add(equipButton).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
-        section.add(sellButton).width(ROW_BUTTON_WIDTH_PX);
+        section.add(sellButton).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
+        section.add(offerButton).width(ROW_BUTTON_WIDTH_PX);
         equipButton.setVisible(false);
         sellButton.setVisible(false);
+        offerButton.setVisible(false);
         return section;
     }
 
@@ -418,10 +423,27 @@ public final class InventoryPanel implements HudWindow {
      *     không là việc của SERVER</b> ({@code SELL_OUTCOME_ITEM_NOT_SELLABLE}, Điều 24) — client
      *     không có bảng giá bán của từng món để mà đoán trước.
      */
-    public void showDetail(String detailText, boolean canEquip, boolean canSell) {
+    public void showDetail(String detailText, boolean canEquip, Actions actions) {
         detailLabel.setText(detailText);
         equipButton.setVisible(canEquip);
-        sellButton.setVisible(canSell);
+        sellButton.setVisible(actions.canSell());
+        offerButton.setVisible(actions.canOffer());
+    }
+
+    /**
+     * Hai nút phụ thuộc trạng thái NGOÀI túi đồ. Gói thành record vì {@code showDetail} đã chạm
+     * ngưỡng {@code ParameterNumber} của Checkstyle (max=4) — cùng lý do {@code PlayContext} tồn tại.
+     *
+     * @param canSell luôn bật khi đã chọn một món: bán được hay không là phán quyết của SERVER
+     *     ({@code SELL_OUTCOME_ITEM_NOT_SELLABLE}, Điều 24)
+     * @param canOffer chỉ bật khi ĐANG ở trong một phiên giao dịch — khác {@code canSell}, đây là
+     *     thứ client biết chắc, và bày một nút chỉ để nhận về "bạn không ở phiên nào" là vô nghĩa
+     */
+    public record Actions(boolean canSell, boolean canOffer) {}
+
+    /** Người chơi bấm Giao dịch trên item đang chọn — đưa món đó vào lời chào. */
+    public void setOnOfferSelected(Runnable listener) {
+        this.onOfferSelected = listener;
     }
 
     /**

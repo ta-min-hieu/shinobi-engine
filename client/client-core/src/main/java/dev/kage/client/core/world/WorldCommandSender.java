@@ -1,6 +1,7 @@
 package dev.kage.client.core.world;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,13 +10,16 @@ import dev.kage.client.core.net.GameConnection;
 import dev.kage.protocol.AcceptDuelCommand;
 import dev.kage.protocol.AcceptFriendRequestCommand;
 import dev.kage.protocol.AcceptPartyInviteCommand;
+import dev.kage.protocol.AcceptTradeRequestCommand;
 import dev.kage.protocol.ApproveGuildJoinRequestCommand;
 import dev.kage.protocol.AttackCommand;
 import dev.kage.protocol.BuyItemCommand;
+import dev.kage.protocol.CancelTradeCommand;
 import dev.kage.protocol.ChallengeDuelCommand;
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ClaimMailCommand;
 import dev.kage.protocol.ClaimQuestRewardCommand;
+import dev.kage.protocol.ConfirmTradeCommand;
 import dev.kage.protocol.CreateGuildCommand;
 import dev.kage.protocol.CreatePartyCommand;
 import dev.kage.protocol.DeclineDuelCommand;
@@ -31,6 +35,7 @@ import dev.kage.protocol.GetItemCatalogRequest;
 import dev.kage.protocol.GetMyGuildRequest;
 import dev.kage.protocol.GetMyPartyRequest;
 import dev.kage.protocol.GetPvpRatingRequest;
+import dev.kage.protocol.GetTradeStatusRequest;
 import dev.kage.protocol.InvitePartyMemberCommand;
 import dev.kage.protocol.JumpCommand;
 import dev.kage.protocol.KickGuildMemberCommand;
@@ -53,6 +58,7 @@ import dev.kage.protocol.RejectFriendRequestCommand;
 import dev.kage.protocol.RejectGuildJoinRequestCommand;
 import dev.kage.protocol.RejectPartyInviteCommand;
 import dev.kage.protocol.RemoveFriendCommand;
+import dev.kage.protocol.RequestTradeCommand;
 import dev.kage.protocol.SelectDialogueOptionCommand;
 import dev.kage.protocol.SelectFactionRequest;
 import dev.kage.protocol.SellItemCommand;
@@ -61,7 +67,9 @@ import dev.kage.protocol.SendFriendRequestCommand;
 import dev.kage.protocol.SendGuildJoinRequestCommand;
 import dev.kage.protocol.SendMailCommand;
 import dev.kage.protocol.SetTargetCommand;
+import dev.kage.protocol.SetTradeOfferCommand;
 import dev.kage.protocol.TalkToNpcCommand;
+import dev.kage.protocol.TradeOfferItemInput;
 import dev.kage.protocol.UnequipItemCommand;
 import dev.kage.protocol.UseSkillCommand;
 import dev.kage.protocol.wire.PacketCodec;
@@ -697,6 +705,90 @@ final class WorldCommandSender {
                 .setIdempotencyKey(idempotencyKey)
                 .build();
         send(Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, command.toByteArray(), "SellItemCommand");
+    }
+
+    // -------------------------------------------------------------------------------------------
+    // Giao dịch (trade.proto, dải 1400-1414) — xem TradeCoordinator. "Hệ thống nguy hiểm nhất"
+    // (GAMEPLAY.md §8): mọi lệnh dưới đây chỉ là Ý ĐỊNH, server xác thực lại TOÀN BỘ lúc thi hành.
+    // -------------------------------------------------------------------------------------------
+
+    /**
+     * Mời một người chơi giao dịch, theo TÊN.
+     *
+     * @param targetName server tự tra {@code CharacterFacade.findByName} rồi trả
+     *     {@code TARGET_NOT_FOUND} nếu sai — client KHÔNG kiểm trước (Điều 24), cùng khuôn
+     *     {@code sendFriendRequest}.
+     */
+    void requestTrade(String targetName) {
+        RequestTradeCommand command =
+                RequestTradeCommand.newBuilder().setTargetName(targetName).build();
+        send(Opcode.OPCODE_REQUEST_TRADE_COMMAND_VALUE, command.toByteArray(), "RequestTradeCommand");
+    }
+
+    /** Chấp nhận một lời mời giao dịch. */
+    void acceptTradeRequest(long sessionId) {
+        AcceptTradeRequestCommand command =
+                AcceptTradeRequestCommand.newBuilder().setSessionId(sessionId).build();
+        send(Opcode.OPCODE_ACCEPT_TRADE_REQUEST_COMMAND_VALUE, command.toByteArray(), "AcceptTradeRequestCommand");
+    }
+
+    /**
+     * Từ chối một lời mời, HOẶC huỷ một phiên đang mở — trade.proto dùng CHUNG một lệnh cho cả hai
+     * (giao dịch luôn đúng hai người nên không có khái niệm đuổi ai ra).
+     */
+    void cancelTrade(long sessionId) {
+        CancelTradeCommand command =
+                CancelTradeCommand.newBuilder().setSessionId(sessionId).build();
+        send(Opcode.OPCODE_CANCEL_TRADE_COMMAND_VALUE, command.toByteArray(), "CancelTradeCommand");
+    }
+
+    /**
+     * Đặt lại TOÀN BỘ lời chào của mình — thay hẳn lời chào cũ, KHÔNG cộng dồn (trade.proto). Gửi
+     * lệnh này SAU KHI đối phương đã xác nhận sẽ reset CẢ HAI cờ confirmed; đó là hàng rào chống
+     * lừa đảo của GAMEPLAY.md §8 và nó nằm ở SERVER, client không làm gì để có nó.
+     *
+     * @param items {@code inventory_item.id} THẬT + số lượng. Server KHÔNG khoá item lúc chào và
+     *     xác thực lại quyền sở hữu lúc THI HÀNH — món bán mất giữa chừng sẽ làm
+     *     {@code ConfirmTradeCommand} trả {@code OFFER_INVALID}, không phải lệnh này.
+     */
+    void setTradeOffer(long sessionId, long goldAmount, List<TradeController.OfferItem> items) {
+        SetTradeOfferCommand.Builder command =
+                SetTradeOfferCommand.newBuilder().setSessionId(sessionId).setGoldAmount(goldAmount);
+        for (TradeController.OfferItem item : items) {
+            command.addItems(TradeOfferItemInput.newBuilder()
+                    .setItemId(item.itemId())
+                    .setQuantity(item.quantity())
+                    .build());
+        }
+        send(Opcode.OPCODE_SET_TRADE_OFFER_COMMAND_VALUE, command.build().toByteArray(), "SetTradeOfferCommand");
+    }
+
+    /**
+     * Xác nhận giao dịch — lệnh DUY NHẤT ở feature-trade có thể chuyển vàng/vật phẩm thật, và vì
+     * vậy là lệnh duy nhất mang {@code idempotency_key} (ADR-025).
+     *
+     * @param idempotencyKey UUID do client sinh, GIỮ NGUYÊN qua các lần thử lại cùng một lần xác
+     *     nhận — xem {@link TradeController#beginConfirm}.
+     */
+    void confirmTrade(long sessionId, String idempotencyKey) {
+        ConfirmTradeCommand command = ConfirmTradeCommand.newBuilder()
+                .setSessionId(sessionId)
+                .setIdempotencyKey(idempotencyKey)
+                .build();
+        send(Opcode.OPCODE_CONFIRM_TRADE_COMMAND_VALUE, command.toByteArray(), "ConfirmTradeCommand");
+    }
+
+    /**
+     * Hỏi trọn trạng thái phiên giao dịch. Gói RỖNG — server tra theo nhân vật của session.
+     *
+     * <p>Đây là cách DUY NHẤT client biết nội dung một phiên: {@code TradeUpdatedEvent} cố ý không
+     * mang trạng thái, nó chỉ nói "có gì đó đổi rồi" (trade.proto).
+     */
+    void getTradeStatus() {
+        send(
+                Opcode.OPCODE_GET_TRADE_STATUS_REQUEST_VALUE,
+                GetTradeStatusRequest.newBuilder().build().toByteArray(),
+                "GetTradeStatusRequest");
     }
 
     private void send(int opcode, byte[] payload, String commandName) {

@@ -67,6 +67,16 @@ final class InventoryCoordinator implements WindowFlow {
      */
     private LongConsumer onSellRequested = itemId -> {};
 
+    /**
+     * Người chơi bấm Giao dịch — {@code WorldScreen} nối vào {@code TradeCoordinator}, cùng lý do
+     * {@link #onSellRequested}: túi đồ chỉ biết {@code inventory_item.id}, còn phiên giao dịch và
+     * khoá idempotency của nó thuộc về luồng giao dịch.
+     */
+    private LongConsumer onOfferRequested = itemId -> {};
+
+    /** Có đang ở trong một phiên giao dịch không — quyết định có bày nút Giao dịch hay không. */
+    private BooleanSupplier inTrade = () -> false;
+
     /** Đệm dựng sẵn cho {@link InventoryPanel#setItems} — chỉ đổi khi server vừa trả lời. */
     private final List<InventoryPanel.ItemRow> itemRows = new ArrayList<>();
 
@@ -88,6 +98,7 @@ final class InventoryCoordinator implements WindowFlow {
         panel.setOnSelect(this::onSelect);
         panel.setOnEquipSelected(this::onEquipSelected);
         panel.setOnSellSelected(this::onSellSelected);
+        panel.setOnOfferSelected(this::onOfferSelected);
         panel.setOnUnequip(this::onUnequip);
         panel.setStatus(text("inventory.hint.open"));
         panel.setGold(goldText());
@@ -99,6 +110,16 @@ final class InventoryCoordinator implements WindowFlow {
     /** Xem {@link #onSellRequested} — {@code WorldScreen} nối lời gọi này sang cửa hàng. */
     void setOnSellRequested(LongConsumer listener) {
         this.onSellRequested = listener;
+    }
+
+    /**
+     * Xem {@link #onOfferRequested} — {@code WorldScreen} nối sang luồng giao dịch.
+     *
+     * @param inTrade nguồn chân lý về "đang ở phiên giao dịch nào không", đọc từ chính luồng đó
+     */
+    void setOnOfferRequested(LongConsumer listener, BooleanSupplier inTrade) {
+        this.onOfferRequested = listener;
+        this.inTrade = inTrade;
     }
 
     @Override
@@ -176,6 +197,11 @@ final class InventoryCoordinator implements WindowFlow {
      */
     private void onSellSelected() {
         controller.selected().ifPresent(item -> onSellRequested.accept(item.itemId()));
+    }
+
+    /** Bấm Giao dịch trên item đang chọn — đưa ĐÚNG MỘT món vào lời chào, cùng lý do nút Bán. */
+    private void onOfferSelected() {
+        controller.selected().ifPresent(item -> onOfferRequested.accept(item.itemId()));
     }
 
     /** Nói ra kết quả một lệnh, rồi hỏi lại server — cùng {@link MailCoordinator#settle}. */
@@ -266,9 +292,13 @@ final class InventoryCoordinator implements WindowFlow {
                             EquipmentSlot slot = itemCatalog.equipSlot(item.itemTemplateId());
                             boolean equippable = slot != EquipmentSlot.EQUIPMENT_SLOT_UNSPECIFIED;
                             boolean alreadyEquipped = equippable && controller.equippedItemId(slot) == item.itemId();
-                            panel.showDetail(itemDisplayText(item), equippable && !alreadyEquipped, true);
+                            panel.showDetail(
+                                    itemDisplayText(item),
+                                    equippable && !alreadyEquipped,
+                                    new InventoryPanel.Actions(true, inTrade.getAsBoolean()));
                         },
-                        () -> panel.showDetail(text("inventory.detail.none"), false, false));
+                        () -> panel.showDetail(
+                                text("inventory.detail.none"), false, new InventoryPanel.Actions(false, false)));
     }
 
     /** Tên + số lượng + mức cường hoá của một item, ghép sẵn thành một chuỗi hiển thị. */

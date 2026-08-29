@@ -362,6 +362,12 @@
         <Bug pattern="EI_EXPOSE_REP"/>
     </Match>
 
+    <!-- TradePanel.stage() — lần thứ mười một cùng một lý do, xem ChatPanel/ShopPanel ngay trên. -->
+    <Match>
+        <Class name="dev.kage.client.core.ui.hud.TradePanel"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
     <!-- ShopCoordinator.SharedFeeds gộp ItemCatalogCoordinator+GoldCoordinator để hạ tham số
          constructor của ShopCoordinator xuống dưới ngưỡng ParameterNumber (max=4, xem javadoc
          record) — CÙNG lý do exclude PlayContext phía trên: cả 2 field là coordinator SỐNG do
