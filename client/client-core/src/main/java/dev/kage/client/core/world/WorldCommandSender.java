@@ -21,6 +21,8 @@ import dev.kage.protocol.DeclineDuelCommand;
 import dev.kage.protocol.DeleteMailCommand;
 import dev.kage.protocol.DisbandGuildCommand;
 import dev.kage.protocol.EnterDungeonCommand;
+import dev.kage.protocol.EquipItemCommand;
+import dev.kage.protocol.EquipmentSlot;
 import dev.kage.protocol.ExitDuelCommand;
 import dev.kage.protocol.ExitDungeonCommand;
 import dev.kage.protocol.Faction;
@@ -36,6 +38,7 @@ import dev.kage.protocol.LeaveGuildCommand;
 import dev.kage.protocol.LeavePartyCommand;
 import dev.kage.protocol.ListFriendsRequest;
 import dev.kage.protocol.ListGuildMembersRequest;
+import dev.kage.protocol.ListInventoryRequest;
 import dev.kage.protocol.ListMailRequest;
 import dev.kage.protocol.ListPartyMembersRequest;
 import dev.kage.protocol.ListPendingFriendRequestsRequest;
@@ -55,6 +58,7 @@ import dev.kage.protocol.SendGuildJoinRequestCommand;
 import dev.kage.protocol.SendMailCommand;
 import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.TalkToNpcCommand;
+import dev.kage.protocol.UnequipItemCommand;
 import dev.kage.protocol.UseSkillCommand;
 import dev.kage.protocol.wire.PacketCodec;
 
@@ -591,6 +595,44 @@ final class WorldCommandSender {
         GetItemCatalogRequest request =
                 GetItemCatalogRequest.newBuilder().setKnownVersion(knownVersion).build();
         send(Opcode.OPCODE_GET_ITEM_CATALOG_REQUEST_VALUE, request.toByteArray(), "GetItemCatalogRequest");
+    }
+
+    // -------------------------------------------------------------------------------------------
+    // Túi đồ + trang bị (inventory.proto, ADR-035 opcode 507/508 + opcode 501-504 có sẵn từ lâu
+    // nhưng client chưa từng dùng) — xem InventoryCoordinator.
+    // -------------------------------------------------------------------------------------------
+
+    /**
+     * Hỏi trọn ảnh chụp túi đồ + trang bị. Đây là cách DUY NHẤT client biết trong túi có gì:
+     * inventory.proto không có event đẩy nào báo "túi vừa đổi" (khác {@code NewMailEvent}), nên phải
+     * hỏi lại sau MỌI lệnh có thể đổi túi (nhặt đồ, mặc, gỡ) — xem {@link InventoryCoordinator}.
+     */
+    void listInventory() {
+        send(
+                Opcode.OPCODE_LIST_INVENTORY_REQUEST_VALUE,
+                ListInventoryRequest.newBuilder().build().toByteArray(),
+                "ListInventoryRequest");
+    }
+
+    /**
+     * Mặc một item vào slot.
+     *
+     * @param itemId {@code inventory_item.id} THẬT, lấy từ {@code ListInventoryResponse} — KHÔNG
+     *     phải vị trí trong túi.
+     * @param slot suy từ catalog vật phẩm ({@code item_template.equip_slot}) phía client để gửi kèm
+     *     lệnh; server tự kiểm lại item có đúng thuộc slot này không (Điều 24), không tin client.
+     */
+    void equipItem(long itemId, EquipmentSlot slot) {
+        EquipItemCommand command =
+                EquipItemCommand.newBuilder().setItemId(itemId).setSlot(slot).build();
+        send(Opcode.OPCODE_EQUIP_ITEM_COMMAND_VALUE, command.toByteArray(), "EquipItemCommand");
+    }
+
+    /** Gỡ trang bị khỏi slot — item vẫn còn trong túi đồ, không bị xoá (inventory.proto). */
+    void unequipItem(EquipmentSlot slot) {
+        UnequipItemCommand command =
+                UnequipItemCommand.newBuilder().setSlot(slot).build();
+        send(Opcode.OPCODE_UNEQUIP_ITEM_COMMAND_VALUE, command.toByteArray(), "UnequipItemCommand");
     }
 
     private void send(int opcode, byte[] payload, String commandName) {

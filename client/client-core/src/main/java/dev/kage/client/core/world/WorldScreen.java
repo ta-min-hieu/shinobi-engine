@@ -24,6 +24,7 @@ import dev.kage.client.core.ui.hud.DuelPanel;
 import dev.kage.client.core.ui.hud.FactionPanel;
 import dev.kage.client.core.ui.hud.FriendPanel;
 import dev.kage.client.core.ui.hud.GuildPanel;
+import dev.kage.client.core.ui.hud.InventoryPanel;
 import dev.kage.client.core.ui.hud.MailPanel;
 import dev.kage.client.core.ui.hud.PartyPanel;
 import dev.kage.engine.core.GameScreen;
@@ -170,6 +171,12 @@ public final class WorldScreen implements GameScreen {
     /** Luồng thư (đọc/nhận/xoá/soạn + mạng) — xem {@link MailCoordinator}. */
     private final MailCoordinator mail;
 
+    /** Túi đồ + trang bị (phím I) — mượn skin của {@link #combatHud} như {@link #mailPanel}. */
+    private final InventoryPanel inventoryPanel = new InventoryPanel(combatHud.skin());
+
+    /** Luồng túi đồ (mặc/gỡ/liệt kê + mạng) — xem {@link InventoryCoordinator}. */
+    private final InventoryCoordinator inventory;
+
     /** Vòng đời nhiệm vụ: nhận → hoàn thành → lĩnh thưởng — xem {@link QuestCoordinator}. */
     private final QuestCoordinator quests;
 
@@ -239,6 +246,7 @@ public final class WorldScreen implements GameScreen {
                 new LocalCharacterAppearance(models, combatHudController, WorldConstants.LOCAL_CHARACTER_ID));
         this.itemCatalog = new ItemCatalogCoordinator(sender);
         this.mail = new MailCoordinator(mailPanel, sender, combatFeedback, panels::noneOpen);
+        this.inventory = createInventoryCoordinator();
         // SAU dialogue: đánh/skill bị chặn khi đang đọc lời thoại, xem LocalIntentContext#dialogueOpen.
         this.intents = new LocalIntentSender(new LocalIntentSender.LocalIntentContext(
                 inputMapper,
@@ -279,6 +287,17 @@ public final class WorldScreen implements GameScreen {
     }
 
     /**
+     * Tách khỏi constructor THUẦN để giữ nó dưới ngưỡng {@code MethodLength} của Checkstyle — cùng
+     * lý do {@link #wireHud} — không phải đổi hành vi. {@link InventoryCoordinator.DataSources} gộp
+     * {@code itemCatalog}+{@code gold} vì constructor kia đã chạm ngưỡng {@code ExcessiveParameterList}
+     * của PMD (config/pmd, minimum=5), cùng lý do {@link PlayContext} tồn tại.
+     */
+    private InventoryCoordinator createInventoryCoordinator() {
+        return new InventoryCoordinator(
+                inventoryPanel, sender, new InventoryCoordinator.DataSources(itemCatalog, gold), panels::noneOpen);
+    }
+
+    /**
      * Đăng ký mọi khung HUD vào {@link #panels}. <b>Thứ tự ở đây là thứ tự nuốt input</b>, từ trên
      * xuống — {@link PanelHub} suy ra thứ tự vẽ (ngược lại) và thứ tự dọn tài nguyên (xuôi) từ đúng
      * một danh sách này, xem javadoc của nó.
@@ -312,6 +331,7 @@ public final class WorldScreen implements GameScreen {
         panels.register(duelPanel, duel);
         panels.register(factionPanel, faction);
         panels.register(mailPanel, mail);
+        panels.register(inventoryPanel, inventory);
         panels.register(chatPanel, chat);
         panels.register(dungeon);
         panels.register(combatHud);
