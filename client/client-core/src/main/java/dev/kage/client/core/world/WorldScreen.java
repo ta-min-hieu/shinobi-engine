@@ -174,6 +174,15 @@ public final class WorldScreen implements GameScreen {
     private final QuestCoordinator quests;
 
     /**
+     * Catalog vật phẩm (ADR-035, 509/510) — DỮ LIỆU NỀN không có cửa sổ riêng, mọi giao diện đụng
+     * vật phẩm tra vào đây để hiện tên thay vì "Vật phẩm #7". Xem {@link ItemCatalogCoordinator}.
+     */
+    private final ItemCatalogCoordinator itemCatalog;
+
+    /** Số vàng của chính người chơi (ADR-035, 209) — cũng là dữ liệu nền, xem {@link GoldCoordinator}. */
+    private final GoldCoordinator gold = new GoldCoordinator();
+
+    /**
      * Sổ đăng ký MỘT chỗ cho mọi khung HUD — vẽ/đổi kích thước/dọn/định tuyến gói/cổng phím. Xem
      * {@link PanelHub} về lý do tồn tại và về thứ tự đăng ký.
      */
@@ -228,6 +237,7 @@ public final class WorldScreen implements GameScreen {
                 sender,
                 combatFeedback,
                 new LocalCharacterAppearance(models, combatHudController, WorldConstants.LOCAL_CHARACTER_ID));
+        this.itemCatalog = new ItemCatalogCoordinator(sender);
         this.mail = new MailCoordinator(mailPanel, sender, combatFeedback, panels::noneOpen);
         // SAU dialogue: đánh/skill bị chặn khi đang đọc lời thoại, xem LocalIntentContext#dialogueOpen.
         this.intents = new LocalIntentSender(new LocalIntentSender.LocalIntentContext(
@@ -292,6 +302,8 @@ public final class WorldScreen implements GameScreen {
      * đầu tiên nhận.
      */
     private void registerPanels() {
+        panels.register(itemCatalog);
+        panels.register(gold);
         panels.register(quests);
         panels.register(dialoguePanel, dialogue);
         panels.register(partyPanel, party);
@@ -364,6 +376,9 @@ public final class WorldScreen implements GameScreen {
         // mới cần InputProcessor, vì đó là sự kiện tại một điểm cụ thể chứ không phải trạng thái
         // giữ/nhả để poll được.
         Gdx.input.setInputProcessor(inputProcessor);
+        // Hỏi catalog ở show() chứ không phải constructor: lúc dựng màn hình kết nối có thể chưa sẵn
+        // sàng, còn show() là thời điểm màn hình thật sự bắt đầu sống.
+        itemCatalog.request();
     }
 
     @Override

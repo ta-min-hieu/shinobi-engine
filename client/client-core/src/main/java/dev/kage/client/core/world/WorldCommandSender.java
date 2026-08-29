@@ -24,6 +24,7 @@ import dev.kage.protocol.EnterDungeonCommand;
 import dev.kage.protocol.ExitDuelCommand;
 import dev.kage.protocol.ExitDungeonCommand;
 import dev.kage.protocol.Faction;
+import dev.kage.protocol.GetItemCatalogRequest;
 import dev.kage.protocol.GetMyGuildRequest;
 import dev.kage.protocol.GetMyPartyRequest;
 import dev.kage.protocol.GetPvpRatingRequest;
@@ -573,6 +574,23 @@ final class WorldCommandSender {
     /** Gói tin đến từ server — {@code null} khi hàng đợi rỗng (xem {@link GameConnection}). */
     PacketCodec.Frame pollInbound() {
         return connection.pollInbound();
+    }
+
+    // -------------------------------------------------------------------------------------------
+    // Catalog vật phẩm (inventory.proto, ADR-035 opcode 509/510) — xem ItemCatalogCoordinator.
+    // -------------------------------------------------------------------------------------------
+
+    /**
+     * Hỏi catalog vật phẩm.
+     *
+     * @param knownVersion chuỗi version client đang cache, rỗng nếu chưa có gì. Server phán quyết:
+     *     khớp thì trả {@code unchanged=true} với danh sách RỖNG, và client giữ nguyên bản cũ
+     *     (phương án A′ của ADR-035).
+     */
+    void requestItemCatalog(String knownVersion) {
+        GetItemCatalogRequest request =
+                GetItemCatalogRequest.newBuilder().setKnownVersion(knownVersion).build();
+        send(Opcode.OPCODE_GET_ITEM_CATALOG_REQUEST_VALUE, request.toByteArray(), "GetItemCatalogRequest");
     }
 
     private void send(int opcode, byte[] payload, String commandName) {
