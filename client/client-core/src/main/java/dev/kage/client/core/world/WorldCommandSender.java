@@ -11,6 +11,7 @@ import dev.kage.protocol.AcceptFriendRequestCommand;
 import dev.kage.protocol.AcceptPartyInviteCommand;
 import dev.kage.protocol.ApproveGuildJoinRequestCommand;
 import dev.kage.protocol.AttackCommand;
+import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.ChallengeDuelCommand;
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ClaimMailCommand;
@@ -41,6 +42,7 @@ import dev.kage.protocol.ListPartyMembersRequest;
 import dev.kage.protocol.ListPendingFriendRequestsRequest;
 import dev.kage.protocol.ListPendingGuildJoinRequestsRequest;
 import dev.kage.protocol.ListPendingPartyInvitesRequest;
+import dev.kage.protocol.ListShopItemsRequest;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.RejectFriendRequestCommand;
@@ -49,6 +51,7 @@ import dev.kage.protocol.RejectPartyInviteCommand;
 import dev.kage.protocol.RemoveFriendCommand;
 import dev.kage.protocol.SelectDialogueOptionCommand;
 import dev.kage.protocol.SelectFactionRequest;
+import dev.kage.protocol.SellItemCommand;
 import dev.kage.protocol.SendChatMessageCommand;
 import dev.kage.protocol.SendFriendRequestCommand;
 import dev.kage.protocol.SendGuildJoinRequestCommand;
@@ -591,6 +594,53 @@ final class WorldCommandSender {
         GetItemCatalogRequest request =
                 GetItemCatalogRequest.newBuilder().setKnownVersion(knownVersion).build();
         send(Opcode.OPCODE_GET_ITEM_CATALOG_REQUEST_VALUE, request.toByteArray(), "GetItemCatalogRequest");
+    }
+
+    // -------------------------------------------------------------------------------------------
+    // Cửa hàng (shop.proto, dải 1000-1005) — xem ShopCoordinator.
+    // -------------------------------------------------------------------------------------------
+
+    /**
+     * Hỏi trọn danh mục cửa hàng. Gói RỖNG — shop.proto chưa gắn NPC/vị trí cụ thể (cửa hàng TOÀN
+     * CỤC), server luôn trả toàn bộ danh mục.
+     */
+    void listShopItems() {
+        send(
+                Opcode.OPCODE_LIST_SHOP_ITEMS_REQUEST_VALUE,
+                ListShopItemsRequest.newBuilder().build().toByteArray(),
+                "ListShopItemsRequest");
+    }
+
+    /**
+     * Mua vật phẩm. Server tự tra {@code buy_price} hiện tại theo {@code item_template_id} trong
+     * {@code shop_item}, KHÔNG tin giá/tổng tiền từ client (Điều 24, shop.proto).
+     *
+     * @param idempotencyKey UUID do client sinh, GIỮ NGUYÊN qua các lần thử lại cùng một lần mua
+     *     (ADR-025) — server enforce unique trong CÙNG transaction với hiệu ứng thật (trừ gold + cộng
+     *     vật phẩm), xem {@link ShopController}.
+     */
+    void buyItem(long itemTemplateId, int quantity, String idempotencyKey) {
+        BuyItemCommand command = BuyItemCommand.newBuilder()
+                .setItemTemplateId(itemTemplateId)
+                .setQuantity(quantity)
+                .setIdempotencyKey(idempotencyKey)
+                .build();
+        send(Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, command.toByteArray(), "BuyItemCommand");
+    }
+
+    /**
+     * Bán vật phẩm. {@code itemId} là {@code inventory_item.id} THẬT (không phải mã vật phẩm) — server
+     * tự tính tiền theo {@code sell_price} hiện tại, KHÔNG tin số liệu từ client (Điều 24, shop.proto).
+     *
+     * @param idempotencyKey xem {@link #buyItem} — cùng luật ADR-025.
+     */
+    void sellItem(long itemId, int quantity, String idempotencyKey) {
+        SellItemCommand command = SellItemCommand.newBuilder()
+                .setItemId(itemId)
+                .setQuantity(quantity)
+                .setIdempotencyKey(idempotencyKey)
+                .build();
+        send(Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, command.toByteArray(), "SellItemCommand");
     }
 
     private void send(int opcode, byte[] payload, String commandName) {

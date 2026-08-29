@@ -26,6 +26,7 @@ import dev.kage.client.core.ui.hud.FriendPanel;
 import dev.kage.client.core.ui.hud.GuildPanel;
 import dev.kage.client.core.ui.hud.MailPanel;
 import dev.kage.client.core.ui.hud.PartyPanel;
+import dev.kage.client.core.ui.hud.ShopPanel;
 import dev.kage.engine.core.GameScreen;
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.EcsWorld;
@@ -170,6 +171,12 @@ public final class WorldScreen implements GameScreen {
     /** Luồng thư (đọc/nhận/xoá/soạn + mạng) — xem {@link MailCoordinator}. */
     private final MailCoordinator mail;
 
+    /** Cửa hàng (phím B, hoặc từ hội thoại NPC) — mượn skin của {@link #combatHud} như {@link #mailPanel}. */
+    private final ShopPanel shopPanel = new ShopPanel(combatHud.skin());
+
+    /** Luồng cửa hàng (mua/bán + catalog/vàng + mạng) — xem {@link ShopCoordinator}. */
+    private final ShopCoordinator shop;
+
     /** Vòng đời nhiệm vụ: nhận → hoàn thành → lĩnh thưởng — xem {@link QuestCoordinator}. */
     private final QuestCoordinator quests;
 
@@ -222,9 +229,9 @@ public final class WorldScreen implements GameScreen {
         this.combatFeedback = new CombatFeedbackPresenter(
                 localCharacterId, POSITION.get(localPlayer), combatHudController, combatHud.font());
 
-        // SAU combatFeedback: coordinator mượn nó để báo khi hội thoại kết thúc bằng quest/cửa hàng.
+        // SAU combatFeedback: quests mượn nó để báo khi hoàn thành/lĩnh thưởng.
         this.quests = new QuestCoordinator(combatHud, sender, combatFeedback);
-        this.dialogue = new DialogueCoordinator(dialoguePanel, sender, combatFeedback, quests);
+        this.dialogue = new DialogueCoordinator(dialoguePanel, sender, quests);
         this.chat = new ChatCoordinator(chatPanel, sender);
         // SAU chat: cả ba coordinator dưới đây mượn nhật ký chat/chữ nổi làm chỗ báo lý do thất bại.
         this.party = new PartyCoordinator(partyPanel, sender, chat);
@@ -239,6 +246,7 @@ public final class WorldScreen implements GameScreen {
                 new LocalCharacterAppearance(models, combatHudController, WorldConstants.LOCAL_CHARACTER_ID));
         this.itemCatalog = new ItemCatalogCoordinator(sender);
         this.mail = new MailCoordinator(mailPanel, sender, combatFeedback, panels::noneOpen);
+        this.shop = buildShop();
         // SAU dialogue: đánh/skill bị chặn khi đang đọc lời thoại, xem LocalIntentContext#dialogueOpen.
         this.intents = new LocalIntentSender(new LocalIntentSender.LocalIntentContext(
                 inputMapper,
@@ -279,14 +287,25 @@ public final class WorldScreen implements GameScreen {
     }
 
     /**
+     * Tách khỏi constructor để giữ nó dưới ngưỡng {@code MethodLength} của Checkstyle (max=50) —
+     * PHẢI gọi SAU khi {@link #itemCatalog} đã gán: cửa hàng tra tên vật phẩm và hiện số vàng qua
+     * hai luồng nền đó (ADR-035), xem {@link ShopCoordinator.SharedFeeds}.
+     */
+    private ShopCoordinator buildShop() {
+        ShopCoordinator.SharedFeeds feeds = new ShopCoordinator.SharedFeeds(itemCatalog, gold);
+        return new ShopCoordinator(shopPanel, sender, feeds, panels::noneOpen);
+    }
+
+    /**
      * Đăng ký mọi khung HUD vào {@link #panels}. <b>Thứ tự ở đây là thứ tự nuốt input</b>, từ trên
      * xuống — {@link PanelHub} suy ra thứ tự vẽ (ngược lại) và thứ tự dọn tài nguyên (xuôi) từ đúng
      * một danh sách này, xem javadoc của nó.
      *
      * <p>Hội thoại đứng đầu vì đang nói chuyện mà bấm trúng nút Đánh phía sau, hoặc click xuyên qua
-     * khung thoại để chọn mục tiêu, đều là hỏng. Bốn cửa sổ che GIỮA màn hình (Nhóm, Bạn bè, Bang
-     * hội, Đấu, Hệ phái, Thư) đứng ngay sau vì chúng đè lên cả chat lẫn HUD; thứ tự GIỮA chúng với
-     * nhau không quan trọng — {@link PanelHub#isAnyOpen()} đảm bảo không bao giờ có hai cái cùng mở.
+     * khung thoại để chọn mục tiêu, đều là hỏng. Các cửa sổ che GIỮA màn hình (Nhóm, Bạn bè, Bang
+     * hội, Đấu, Hệ phái, Thư, Cửa hàng) đứng ngay sau vì chúng đè lên cả chat lẫn HUD; thứ tự GIỮA
+     * chúng với nhau không quan trọng — {@link PanelHub#isAnyOpen()} đảm bảo không bao giờ có hai
+     * cái cùng mở.
      *
      * <p>Cửa sổ bạn bè đứng TRƯỚC chat: cả hai mở ô nhập bằng một phím ở {@code keyUp}, và cái đứng
      * trước là cái duy nhất chặn được phím của cái kia (xem {@code FriendPanel#installKeyHandling}).
@@ -312,6 +331,7 @@ public final class WorldScreen implements GameScreen {
         panels.register(duelPanel, duel);
         panels.register(factionPanel, faction);
         panels.register(mailPanel, mail);
+        panels.register(shopPanel, shop);
         panels.register(chatPanel, chat);
         panels.register(dungeon);
         panels.register(combatHud);

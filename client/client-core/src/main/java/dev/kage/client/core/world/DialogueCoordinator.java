@@ -28,27 +28,24 @@ import dev.kage.protocol.wire.PacketCodec;
  * ({@code GetDialogueNodeUseCase} tra lại cây script mỗi lần gọi), nên không có "quay lại node cũ"
  * để mà chờ. Client vì vậy phải tự đóng panel và nói ra chuyện gì vừa xảy ra — im lặng đóng khung
  * hội thoại là đúng thứ đã làm chủ dự án tưởng combat hỏng hôm 2026-08-09.
+ *
+ * <p>⚠️ Constructor KHÔNG còn nhận {@code CombatFeedbackPresenter} (bỏ 2026-08-29): tham số đó chỉ
+ * từng phục vụ đúng một câu thông báo nổi "chưa mở được cửa hàng", và câu đó hết lý do tồn tại từ
+ * lúc {@link ShopCoordinator} có thật (nó tự mở cửa sổ cửa hàng, không cần lớp này nói hộ gì nữa) —
+ * xem nhánh {@code OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE} ở {@link #dispatch(int, byte[])}.
  */
 final class DialogueCoordinator implements WindowFlow {
 
     private final DialogueController controller = new DialogueController();
     private final DialoguePanel panel;
     private final WorldCommandSender sender;
-    private final CombatFeedbackPresenter feedback;
 
     private final QuestCoordinator quests;
 
-    /**
-     * @param feedback hiện thông báo nổi khi hội thoại kết thúc bằng một nhánh KHÔNG phải node (mở
-     *     cửa hàng) — cùng kênh với "Chưa chọn mục tiêu"/"Ngoài tầm đánh", nên người chơi đọc mọi
-     *     phản hồi tức thời ở cùng một chỗ.
-     * @param quests nhận {@code action} của lựa chọn vừa bấm, để lấy mã nhiệm vụ.
-     */
-    DialogueCoordinator(
-            DialoguePanel panel, WorldCommandSender sender, CombatFeedbackPresenter feedback, QuestCoordinator quests) {
+    /** @param quests nhận {@code action} của lựa chọn vừa bấm, để lấy mã nhiệm vụ. */
+    DialogueCoordinator(DialoguePanel panel, WorldCommandSender sender, QuestCoordinator quests) {
         this.panel = panel;
         this.sender = sender;
-        this.feedback = feedback;
         this.quests = quests;
         panel.setOnOptionSelected(this::onOptionSelected);
         // ESC chỉ dọn UI được; trạng thái hội thoại nằm ở controller nên phải dọn theo, nếu không
@@ -101,10 +98,11 @@ final class DialogueCoordinator implements WindowFlow {
             return true;
         }
         if (opcode == Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE) {
-            // Client chưa có giao diện cửa hàng. Đóng hội thoại + nói thẳng là chưa mở được, thay vì
-            // để người chơi bấm "Cho tôi xem hàng" rồi không có gì xảy ra cả.
+            // Cửa hàng thật đã có (2026-08-29, ShopCoordinator) — luồng đó đăng ký RIÊNG ở PanelHub
+            // và nhận CÙNG gói này qua PanelHub#dispatch (hỏi MỌI luồng, không dừng ở luồng đầu tiên
+            // trả true), nên nó tự mở cửa sổ cửa hàng mà không cần lớp này gọi tới. Ở đây chỉ cần
+            // đóng khung thoại — hội thoại đã kết thúc, dù cửa hàng có mở lên hay không.
             closePanel();
-            feedback.showSelfNotice("dialogue.notice.shop_unavailable", FloatingCombatText.MISS);
             return true;
         }
         return false;
