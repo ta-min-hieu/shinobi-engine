@@ -27,13 +27,6 @@ import dev.kage.protocol.wire.PacketCodec;
  * do tương tự nút Mặc cũng ẨN khi chưa có catalog: không biết item có mặc được không thì không đoán.
  * Tra vào {@link GoldCoordinator} để hiện số vàng cạnh tiêu đề — túi đồ là chỗ ĐẦU TIÊN dùng tới nó.
  *
- * <p>⚠️ {@link ItemCatalogCoordinator#setOnCatalogChanged} chỉ giữ ĐÚNG MỘT listener (xem javadoc
- * lớp đó). Nếu một giao diện khác cũng cần nghe sự kiện này (cửa hàng, đang làm song song lúc lớp
- * này ra đời) thì HAI lời gọi {@code setOnCatalogChanged} sẽ giẫm lên nhau — chỗ gọi sau thắng, chỗ
- * gọi trước mất khả năng vẽ lại khi catalog về muộn. Đây là rủi ro tích hợp CÓ THẬT cần người gộp
- * tay xử lý (gộp hai listener thành một, hoặc đổi {@code ItemCatalogCoordinator} sang danh sách
- * listener) — không tự sửa {@code ItemCatalogCoordinator} ở lát cắt này (ngoài phạm vi được giao).
- *
  * <p><b>Luật một dòng: hỏi lại server sau MỌI lệnh đổi trạng thái</b> (xem {@link #settle}), cùng
  * {@link MailCoordinator}/{@link GuildCoordinator}: client không tự cộng/trừ item hay đổi map trang
  * bị theo suy đoán, kể cả khi lệnh vừa gửi trả OK.
@@ -87,9 +80,8 @@ final class InventoryCoordinator implements WindowFlow {
         panel.setOnUnequip(this::onUnequip);
         panel.setStatus(text("inventory.hint.open"));
         panel.setGold(goldText());
-        // Xem cảnh báo ở javadoc lớp về rủi ro giẫm listener với một giao diện khác.
-        itemCatalog.setOnCatalogChanged(this::refreshView);
-        gold.setOnGoldChanged(amount -> panel.setGold(goldText()));
+        itemCatalog.addCatalogListener(this::refreshView);
+        gold.addGoldListener(amount -> panel.setGold(goldText()));
         refreshView();
     }
 

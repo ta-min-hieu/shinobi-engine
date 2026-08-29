@@ -1,5 +1,7 @@
 package dev.kage.client.core.world;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -27,19 +29,27 @@ final class ItemCatalogCoordinator implements WindowFlow {
     private final ItemCatalog catalog = new ItemCatalog();
     private final WorldCommandSender sender;
 
-    /** Chạy mỗi lần catalog vừa thay đổi — giao diện đang mở phải vẽ lại tên. */
-    private Runnable onCatalogChanged = () -> {};
+    /**
+     * Chạy mỗi lần catalog vừa thay đổi — giao diện đang mở phải vẽ lại tên.
+     *
+     * <p>DANH SÁCH chứ không phải một listener: túi đồ, cửa hàng và hòm thư đều tra vào catalog
+     * cùng lúc. Một ô listener duy nhất thì lời gọi sau giẫm lên lời gọi trước và giao diện thua sẽ
+     * IM LẶNG không bao giờ vẽ lại khi catalog về muộn — đúng loại lỗi không ai nhìn ra được.
+     */
+    private final List<Runnable> catalogListeners = new ArrayList<>();
 
     ItemCatalogCoordinator(WorldCommandSender sender) {
         this.sender = sender;
     }
 
     /**
-     * @param listener chạy khi catalog vừa đổi nội dung. Nhiều giao diện cùng cần thì chỗ gọi tự gộp
-     *     — lớp này giữ đúng một listener, đúng như các coordinator khác.
+     * Đăng ký thêm một chỗ cần vẽ lại khi catalog đổi. Gọi được nhiều lần từ nhiều giao diện — mọi
+     * listener đều chạy, không cái nào giẫm lên cái nào.
+     *
+     * @param listener chạy khi catalog vừa đổi nội dung
      */
-    void setOnCatalogChanged(Runnable listener) {
-        this.onCatalogChanged = listener;
+    void addCatalogListener(Runnable listener) {
+        catalogListeners.add(listener);
     }
 
     /** Hỏi catalog. Gọi lúc vào thế giới; gọi lại là vô hại (server trả {@code unchanged}). */
@@ -53,7 +63,9 @@ final class ItemCatalogCoordinator implements WindowFlow {
             return false;
         }
         if (catalog.adopt(ItemCatalogResponse.parseFrom(frame.payload()))) {
-            onCatalogChanged.run();
+            for (Runnable listener : catalogListeners) {
+                listener.run();
+            }
         }
         return true;
     }

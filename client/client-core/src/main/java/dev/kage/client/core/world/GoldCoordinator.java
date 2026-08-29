@@ -1,5 +1,7 @@
 package dev.kage.client.core.world;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.LongConsumer;
 
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -27,13 +29,21 @@ final class GoldCoordinator implements WindowFlow {
 
     private boolean received;
 
-    private LongConsumer onGoldChanged = amount -> {};
+    /**
+     * DANH SÁCH chứ không phải một listener: túi đồ và cửa hàng đều hiện số vàng cùng lúc. Một ô
+     * listener duy nhất thì lời gọi sau giẫm lên lời gọi trước và giao diện thua sẽ IM LẶNG hiện số
+     * cũ mãi mãi — cùng lý do {@link ItemCatalogCoordinator} giữ danh sách.
+     */
+    private final List<LongConsumer> goldListeners = new ArrayList<>();
 
     private GoldNoticeListener onGoldNotice = (delta, reasonKey) -> {};
 
-    /** Nhận số dư mới mỗi lần vàng đổi, kể cả gói đầu tiên lúc vào world. */
-    void setOnGoldChanged(LongConsumer listener) {
-        this.onGoldChanged = listener;
+    /**
+     * Đăng ký thêm một chỗ cần biết số dư mới, kể cả gói đầu tiên lúc vào world. Gọi được nhiều lần
+     * từ nhiều giao diện — mọi listener đều chạy, không cái nào giẫm lên cái nào.
+     */
+    void addGoldListener(LongConsumer listener) {
+        goldListeners.add(listener);
     }
 
     /** Nhận phần "vì sao" của mỗi lần đổi, để hiện "-500 · Mua vật phẩm" cho người chơi. */
@@ -59,7 +69,9 @@ final class GoldCoordinator implements WindowFlow {
         GoldChangedEvent event = GoldChangedEvent.parseFrom(frame.payload());
         gold = event.getGold();
         received = true;
-        onGoldChanged.accept(gold);
+        for (LongConsumer listener : goldListeners) {
+            listener.accept(gold);
+        }
         // delta == 0 là gói chào lúc vào world (server chỉ báo số dư), không có gì để nói ra.
         if (event.getDelta() != 0L) {
             onGoldNotice.onGoldChanged(event.getDelta(), event.getReasonKey());
