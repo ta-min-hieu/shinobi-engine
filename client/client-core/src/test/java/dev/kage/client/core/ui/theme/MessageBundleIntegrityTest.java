@@ -16,8 +16,10 @@ import java.util.TreeSet;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import dev.kage.client.core.render.FontFactory;
+
 /**
- * Gác hai thứ mà không có gì khác trong build bắt được — bundle i18n không được biên dịch, nên mọi
+ * Gác bốn thứ mà không có gì khác trong build bắt được — bundle i18n không được biên dịch, nên mọi
  * hư hỏng trong đó chỉ lộ ra khi người chơi nhìn thấy chữ sai trên màn hình.
  *
  * <p><b>Bài học có thật, không phải phòng xa.</b> Vòng gộp song song 2026-08-28 để lọt nguyên ba
@@ -66,6 +68,32 @@ class MessageBundleIntegrityTest {
                 assertThat(properties.getProperty(key).trim())
                         .as("%s: khoá %s có giá trị rỗng", bundle, key)
                         .isNotEmpty();
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Mọi ký tự trong bundle đều có glyph — font UI là tập ĐÓNG, thiếu là mất chữ trong im lặng")
+    void everyCharacterHasAGlyph() {
+        for (String bundle : BUNDLES) {
+            Properties properties = load(bundle);
+            for (String key : properties.stringPropertyNames()) {
+                String value = properties.getProperty(key);
+                for (int index = 0; index < value.length(); index++) {
+                    char character = value.charAt(index);
+                    if (Character.isISOControl(character)) {
+                        // Xuống dòng/tab là ký tự BỐ CỤC do Label tự xử lý, không phải chữ cần vẽ —
+                        // hud.hint.jump có một dòng xuống thật. Đòi glyph cho chúng là dương tính giả.
+                        continue;
+                    }
+                    assertThat(FontFactory.canRender(character))
+                            .as(
+                                    "%s: khoá %s chứa ký tự U+%04X ('%c') không có trong"
+                                            + " FontFactory.VIETNAMESE_CHARACTERS — BitmapFont sẽ BỎ QUA nó"
+                                            + " và người chơi đọc một câu thiếu chữ, không có lỗi nào được báo",
+                                    bundle, key, (int) character, character)
+                            .isTrue();
+                }
             }
         }
     }

@@ -117,10 +117,19 @@ final class ShopCoordinator implements WindowFlow {
     }
 
     /** Danh mục vừa về — xem javadoc lớp về hai lối vào chụm lại đây. */
+    /**
+     * Danh mục vừa về. Hiện cửa sổ bằng {@link ShopPanel#showListings()} chứ KHÔNG phải
+     * {@link ShopPanel#open()}: {@code open()} hỏi lại danh mục, mà chính gói trả lời của lần hỏi đó
+     * lại chạy vào đây — thành vòng lặp vô tận bắn gói liên tục lên server và khiến ESC không bao
+     * giờ đóng được cửa sổ. Lỗi này đã lọt tới lúc chạy thật.
+     *
+     * <p>Mở ở đây là ĐÚNG chứ không thừa: server tự gửi gói này khi người chơi chọn "Cho tôi xem
+     * hàng" trong hội thoại NPC, lúc client chưa hề mở cửa sổ nào.
+     */
     private void onListings(ListShopItemsResponse response) {
         controller.onListings(response);
         refreshListings();
-        panel.open();
+        panel.showListings();
     }
 
     private void onBuy(long itemTemplateId) {

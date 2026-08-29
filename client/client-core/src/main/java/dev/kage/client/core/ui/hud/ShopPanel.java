@@ -280,10 +280,29 @@ public final class ShopPanel implements HudWindow {
      * giữ đúng MỘT đường mở duy nhất thay vì hai đường có hành vi khác nhau.
      */
     public void open() {
+        if (panel.isVisible()) {
+            // Mở lại khi ĐANG mở là không làm gì. Không phải cho gọn: onOpened hỏi lại danh mục,
+            // và gói trả lời lại gọi showListings() — nếu đường đó quay về open() thì thành vòng
+            // lặp vô tận vừa bắn gói liên tục lên server vừa khiến ESC không bao giờ đóng được cửa
+            // sổ (gói kế tiếp mở lại ngay). Đã xảy ra THẬT, xem showListings().
+            return;
+        }
         panel.setVisible(true);
         if (onOpened != null) {
             onOpened.run();
         }
+    }
+
+    /**
+     * Hiện cửa sổ vì danh mục VỪA VỀ từ server — khác {@link #open()} ở chỗ KHÔNG hỏi lại danh mục.
+     *
+     * <p>Đây là lối vào của đường mở từ hội thoại NPC: người chơi bấm "Cho tôi xem hàng", server tự
+     * gửi {@code ListShopItemsResponse} mà client chưa hỏi. Dùng {@link #open()} ở đó là tự hỏi
+     * thêm một vòng thừa, và trước khi có bộ chặn trong {@code open()} thì đó là một vòng lặp vô
+     * tận thật.
+     */
+    public void showListings() {
+        panel.setVisible(true);
     }
 
     public void close() {
