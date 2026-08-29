@@ -25,6 +25,7 @@ import dev.kage.protocol.CreatePartyCommand;
 import dev.kage.protocol.DeclineDuelCommand;
 import dev.kage.protocol.DeleteMailCommand;
 import dev.kage.protocol.DisbandGuildCommand;
+import dev.kage.protocol.EnhanceItemCommand;
 import dev.kage.protocol.EnterDungeonCommand;
 import dev.kage.protocol.EquipItemCommand;
 import dev.kage.protocol.EquipmentSlot;
@@ -658,6 +659,26 @@ final class WorldCommandSender {
         UnequipItemCommand command =
                 UnequipItemCommand.newBuilder().setSlot(slot).build();
         send(Opcode.OPCODE_UNEQUIP_ITEM_COMMAND_VALUE, command.toByteArray(), "UnequipItemCommand");
+    }
+
+    /**
+     * Cường hoá một item (GAMEPLAY.md §7.1). Client KHÔNG gửi chi phí, tỉ lệ hay cấp hiện tại: server
+     * tự tra {@code enhance_level} thật rồi tính theo {@code EnhancementTable} (Điều 24,
+     * inventory.proto) — client cũng vì thế không hiện trước con số nào, xem {@link InventoryPanel}.
+     *
+     * @param itemId {@code inventory_item.id} THẬT, lấy từ {@code ListInventoryResponse}.
+     * @param useProtection người chơi CHỦ ĐỘNG chọn có tiêu "Bảo Vệ" hay không; server chỉ thật sự
+     *     tiêu khi roll THẤT BẠI ở mức đủ cao VÀ trong túi còn bùa, không tiêu nếu thành công.
+     * @param idempotencyKey xem {@link #buyItem} — cùng luật ADR-025, và cùng lý do: cường hoá TRỪ
+     *     VÀNG THẬT nên một lần bấm không được biến thành hai lần trừ.
+     */
+    void enhanceItem(long itemId, boolean useProtection, String idempotencyKey) {
+        EnhanceItemCommand command = EnhanceItemCommand.newBuilder()
+                .setItemId(itemId)
+                .setUseProtection(useProtection)
+                .setIdempotencyKey(idempotencyKey)
+                .build();
+        send(Opcode.OPCODE_ENHANCE_ITEM_COMMAND_VALUE, command.toByteArray(), "EnhanceItemCommand");
     }
 
     // -------------------------------------------------------------------------------------------

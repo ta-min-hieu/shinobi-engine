@@ -11,6 +11,7 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.ui.TextField;
 import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
@@ -67,6 +68,9 @@ public final class KageSkin implements Disposable {
     /** Độ dày viền khung/nút, pixel — cùng một giá trị cho mọi khung để HUD nhất quán. */
     private static final int BORDER_PX = 2;
 
+    /** Bề rộng thanh cuộn dọc — xem {@link #scrollPaneStyle}. */
+    private static final float SCROLLBAR_WIDTH_PX = 10f;
+
     public final Drawable healthFill;
     public final Drawable healthEmpty;
     public final Drawable chiFill;
@@ -91,6 +95,15 @@ public final class KageSkin implements Disposable {
     public final TextButton.TextButtonStyle roundButtonStyle;
 
     public final TextField.TextFieldStyle textFieldStyle;
+
+    /**
+     * Vùng cuộn cho danh sách dài (túi đồ, trang bị). Chỉ có thanh cuộn DỌC: mọi danh sách trong
+     * HUD đều rộng cố định theo khung chứa, không có gì để cuộn ngang.
+     *
+     * <p>Không có {@code background}: vùng cuộn luôn nằm TRONG một khung đã có nền
+     * ({@link #panel}), thêm một lớp nền nữa chỉ làm tối chồng lên tối.
+     */
+    public final ScrollPane.ScrollPaneStyle scrollPaneStyle;
 
     public KageSkin() {
         FileHandle fontFile = Gdx.files.internal(FONT_PATH);
@@ -127,6 +140,8 @@ public final class KageSkin implements Disposable {
         roundButtonStyle.fontColor = Color.valueOf("FFE9B0");
         roundButtonStyle.disabledFontColor = Color.GRAY;
 
+        this.scrollPaneStyle = buildScrollPaneStyle();
+
         this.textFieldStyle = new TextField.TextFieldStyle();
         textFieldStyle.font = font;
         textFieldStyle.fontColor = Color.WHITE;
@@ -135,6 +150,31 @@ public final class KageSkin implements Disposable {
         textFieldStyle.selection = solid(Color.valueOf("2A4D69"));
         textFieldStyle.messageFont = font;
         textFieldStyle.messageFontColor = Color.LIGHT_GRAY;
+    }
+
+    /**
+     * Tách khỏi constructor để nó không vượt ngưỡng {@code MethodLength} của Checkstyle (max=50) —
+     * cùng lý do {@code CombatHud} tách từng cụm ra hàm riêng.
+     *
+     * <p>BẮT BUỘC đặt {@code minWidth}: {@link #solid} sinh drawable từ ảnh 1x1, mà {@link ScrollPane}
+     * lấy ĐÚNG {@code minWidth} của drawable làm bề rộng thanh cuộn — để nguyên thì thanh cuộn rộng
+     * 1px, nhìn như không có (thấy bằng ảnh chụp {@code HudPreviewTool}, build xanh không nói gì).
+     */
+    private ScrollPane.ScrollPaneStyle buildScrollPaneStyle() {
+        ScrollPane.ScrollPaneStyle style = new ScrollPane.ScrollPaneStyle();
+        style.vScroll = sized(solid(Color.valueOf("2A1C0C80")), SCROLLBAR_WIDTH_PX); // rãnh: nâu tối, mờ
+        style.vScrollKnob = sized(solid(PANEL_BORDER), SCROLLBAR_WIDTH_PX); // tay kéo: vàng đồng của viền
+        return style;
+    }
+
+    /**
+     * Ép bề rộng/chiều cao tối thiểu cho một drawable sinh từ ảnh 1x1 — xem {@link #scrollPaneStyle}
+     * về việc vì sao thiếu bước này thì thanh cuộn mỏng 1px.
+     */
+    private static Drawable sized(Drawable drawable, float minWidth) {
+        drawable.setMinWidth(minWidth);
+        drawable.setMinHeight(minWidth);
+        return drawable;
     }
 
     /**

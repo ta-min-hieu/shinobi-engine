@@ -18,6 +18,7 @@ import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
@@ -71,6 +72,29 @@ public final class InventoryPanel implements HudWindow {
 
     private static final float ROW_BUTTON_WIDTH_PX = 84f;
 
+    /**
+     * Nút trong hàng hành động rộng hơn {@link #ROW_BUTTON_WIDTH_PX}: nhãn dài nhất ở đó là
+     * "Giao dịch"/"Cường hoá", và ở 84px chúng bị CẮT MẤT CHỮ tràn ra ngoài viền khung — thấy bằng
+     * ảnh chụp {@code HudPreviewTool}, không thấy bằng build xanh.
+     */
+    private static final float ACTION_BUTTON_WIDTH_PX = 104f;
+
+    /** Công tắc Bảo Vệ mang cả nhãn lẫn trạng thái ("Bảo vệ: Tắt") nên rộng hơn nút thường. */
+    private static final float PROTECTION_BUTTON_WIDTH_PX = 150f;
+
+    /**
+     * Chiều cao CỐ ĐỊNH của vùng cuộn danh sách túi, và của vùng cuộn khu trang bị.
+     *
+     * <p>Vì sao phải chặn cứng: khung này để cả hai danh sách tự nở theo nội dung thì ở trạng thái
+     * túi đầy nó cao <b>1238px</b> — đo bằng {@code HudPreviewTool#preferredHeight}, trong khi cửa
+     * sổ game là 720px. Nghĩa là người chơi có túi đầy KHÔNG với tới nổi khu trang bị lẫn hàng nút
+     * bên dưới. Hai con số dưới đây giữ tổng chiều cao khung nằm gọn trong màn hình 720p ở trạng
+     * thái tệ nhất; phần dài hơn thì cuộn.
+     */
+    private static final float ITEM_LIST_HEIGHT_PX = 190f;
+
+    private static final float EQUIPMENT_LIST_HEIGHT_PX = 130f;
+
     private static final float ICON_SIZE_PX = 32f;
 
     /** Vàng đồng nhạt — tiêu đề mục, cùng tông viền HUD của {@link KageSkin}. */
@@ -116,12 +140,16 @@ public final class InventoryPanel implements HudWindow {
     private final TextButton equipButton;
     private final TextButton sellButton;
     private final TextButton offerButton;
+    private final TextButton enhanceButton;
+    private final TextButton protectionButton;
     private final Table equipmentList;
 
     private LongConsumer onSelect;
     private Runnable onEquipSelected;
     private Runnable onSellSelected;
     private Runnable onOfferSelected;
+    private Runnable onEnhanceSelected;
+    private Runnable onToggleProtection;
     private IntConsumer onUnequip;
     private Runnable onOpened;
 
@@ -152,6 +180,8 @@ public final class InventoryPanel implements HudWindow {
         this.equipButton = actionButton("inventory.action.equip", () -> fire(onEquipSelected));
         this.sellButton = actionButton("inventory.action.sell", () -> fire(onSellSelected));
         this.offerButton = actionButton("inventory.action.offer", () -> fire(onOfferSelected));
+        this.enhanceButton = actionButton("inventory.action.enhance", () -> fire(onEnhanceSelected));
+        this.protectionButton = actionButton("inventory.action.protection_off", () -> fire(onToggleProtection));
         this.equipmentList = new Table();
 
         this.panel = buildPanel();
@@ -180,21 +210,44 @@ public final class InventoryPanel implements HudWindow {
                 .padTop(10f)
                 .row();
         table.add(capacityLabel).width(PANEL_WIDTH_PX).left().row();
-        table.add(itemList).width(PANEL_WIDTH_PX).growX().padTop(4f).row();
-        table.add(buildDetailSection())
+        table.add(scrollable(itemList))
                 .width(PANEL_WIDTH_PX)
+                .height(ITEM_LIST_HEIGHT_PX)
                 .growX()
-                .padTop(10f)
+                .padTop(4f)
                 .row();
+        table.add(detailLabel).width(PANEL_WIDTH_PX).left().padTop(10f).row();
+        table.add(buildActionRow()).width(PANEL_WIDTH_PX).growX().padTop(6f).row();
         table.add(sectionTitle("inventory.section.equipment"))
                 .width(PANEL_WIDTH_PX)
                 .left()
                 .padTop(10f)
                 .row();
-        table.add(equipmentList).width(PANEL_WIDTH_PX).growX().padTop(4f).row();
+        table.add(scrollable(equipmentList))
+                .width(PANEL_WIDTH_PX)
+                .height(EQUIPMENT_LIST_HEIGHT_PX)
+                .growX()
+                .padTop(4f)
+                .row();
         table.add(closeHint()).width(PANEL_WIDTH_PX).left().padTop(8f).row();
         table.setVisible(false);
         return table;
+    }
+
+    /**
+     * Bọc một danh sách vào vùng cuộn dọc, chiều cao do ô chứa quyết định (xem
+     * {@link #ITEM_LIST_HEIGHT_PX}).
+     *
+     * <p>{@code setScrollingDisabled(true, false)} khoá hẳn trục ngang: danh sách rộng đúng bằng
+     * khung nên cuộn ngang chỉ tạo ra một cú trượt nhầm. {@code setFadeScrollBars(false)} giữ thanh
+     * cuộn LUÔN hiện — thanh tự mờ đi làm người chơi không biết dưới còn đồ.
+     */
+    private ScrollPane scrollable(Table content) {
+        ScrollPane pane = new ScrollPane(content, skin.scrollPaneStyle);
+        pane.setScrollingDisabled(true, false);
+        pane.setFadeScrollBars(false);
+        pane.setOverscroll(false, false);
+        return pane;
     }
 
     /** Tự TẮT icon khi thiếu atlas (bản checkout chưa chạy pipeline art) — cùng {@code SkillVfxRenderer}. */
@@ -225,22 +278,32 @@ public final class InventoryPanel implements HudWindow {
     }
 
     /**
-     * Mục chi tiết: tên đầy đủ của item đang chọn + nút Mặc (ẩn khi item không mặc được) + nút Bán
-     * (ẩn khi chưa chọn item nào).
+     * Hàng hành động của item ĐANG CHỌN: Mặc · Bán 1 · Giao dịch · Cường hoá · công tắc Bảo Vệ.
+     * Toàn bộ ẩn cho tới khi người chơi chọn một món (xem {@link #showDetail}).
+     *
+     * <p>Nằm ở HÀNG RIÊNG, dưới tên món, chứ không cùng dòng với nó: năm ô điều khiển cạnh một nhãn
+     * tên không đủ chỗ trong {@link #PANEL_WIDTH_PX}, và cách bố trí cũ đã làm hai nút bị cắt mất
+     * chữ. Chiều rộng cộng lại (84+84+104+104+150 + 4×6 khoảng cách = 550) vừa khít 560px.
+     *
+     * <p><b>KHÔNG hiện chi phí hay tỉ lệ cường hoá</b>: bảng {@code EnhancementTable} sống phía
+     * server và không packet nào gửi nó sang client, nên mọi con số hiện ở đây đều là bịa (Điều 24).
+     * Người chơi biết kết quả qua dòng trạng thái, biết vàng đã trừ qua {@code GoldChangedEvent} —
+     * cả hai đều do server nói.
      */
-    private Table buildDetailSection() {
-        Table section = new Table();
-        section.add(detailLabel)
-                .width(PANEL_WIDTH_PX - (3f * ROW_BUTTON_WIDTH_PX) - 18f)
-                .left()
-                .padRight(6f);
-        section.add(equipButton).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
-        section.add(sellButton).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
-        section.add(offerButton).width(ROW_BUTTON_WIDTH_PX);
+    private Table buildActionRow() {
+        Table row = new Table();
+        row.add(equipButton).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
+        row.add(sellButton).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
+        row.add(offerButton).width(ACTION_BUTTON_WIDTH_PX).padRight(6f);
+        row.add(enhanceButton).width(ACTION_BUTTON_WIDTH_PX).padRight(6f);
+        row.add(protectionButton).width(PROTECTION_BUTTON_WIDTH_PX);
+        row.add().expandX(); // đẩy cả cụm về TRÁI, thẳng hàng với tên món ở dòng trên
         equipButton.setVisible(false);
         sellButton.setVisible(false);
         offerButton.setVisible(false);
-        return section;
+        enhanceButton.setVisible(false);
+        protectionButton.setVisible(false);
+        return row;
     }
 
     private Table closeHint() {
@@ -248,7 +311,7 @@ public final class InventoryPanel implements HudWindow {
         Label hint = new Label(text("inventory.hint.close"), skin.labelStyle);
         hint.setColor(SECTION_COLOR);
         row.add(hint).left().expandX().padRight(6f);
-        row.add(actionButton("inventory.action.refresh", () -> fire(onOpened))).width(ROW_BUTTON_WIDTH_PX);
+        row.add(actionButton("inventory.action.refresh", () -> fire(onOpened))).width(ACTION_BUTTON_WIDTH_PX);
         return row;
     }
 
@@ -419,31 +482,52 @@ public final class InventoryPanel implements HudWindow {
      * @param detailText chuỗi ĐÃ dịch (tên đầy đủ + số lượng + mức cường hoá), hoặc lời mời chọn một
      *     item khi chưa chọn gì.
      * @param canEquip có bày nút Mặc hay không (item không mặc được theo catalog, hoặc chưa chọn gì).
-     * @param canSell có bày nút Bán hay không. Chỉ hỏi "đã chọn item nào chưa": <b>bán được hay
-     *     không là việc của SERVER</b> ({@code SELL_OUTCOME_ITEM_NOT_SELLABLE}, Điều 24) — client
-     *     không có bảng giá bán của từng món để mà đoán trước.
+     * @param actions ba nút còn lại (Bán/Giao dịch/Cường hoá) — xem {@link Actions}.
      */
     public void showDetail(String detailText, boolean canEquip, Actions actions) {
         detailLabel.setText(detailText);
         equipButton.setVisible(canEquip);
         sellButton.setVisible(actions.canSell());
         offerButton.setVisible(actions.canOffer());
+        enhanceButton.setVisible(actions.canEnhance());
+        protectionButton.setVisible(actions.canEnhance());
     }
 
     /**
-     * Hai nút phụ thuộc trạng thái NGOÀI túi đồ. Gói thành record vì {@code showDetail} đã chạm
+     * Ba nút phụ thuộc trạng thái NGOÀI ô chi tiết. Gói thành record vì {@code showDetail} đã chạm
      * ngưỡng {@code ParameterNumber} của Checkstyle (max=4) — cùng lý do {@code PlayContext} tồn tại.
      *
      * @param canSell luôn bật khi đã chọn một món: bán được hay không là phán quyết của SERVER
      *     ({@code SELL_OUTCOME_ITEM_NOT_SELLABLE}, Điều 24)
      * @param canOffer chỉ bật khi ĐANG ở trong một phiên giao dịch — khác {@code canSell}, đây là
      *     thứ client biết chắc, và bày một nút chỉ để nhận về "bạn không ở phiên nào" là vô nghĩa
+     * @param canEnhance cùng luật {@code canSell}: bật với MỌI món đang chọn. Cường hoá được hay
+     *     không (đã +15? đủ vàng?) là phán quyết của SERVER ({@code ENHANCE_OUTCOME_MAX_LEVEL},
+     *     {@code ENHANCE_OUTCOME_INSUFFICIENT_GOLD}) — client không có bảng chi phí để đoán trước
      */
-    public record Actions(boolean canSell, boolean canOffer) {}
+    public record Actions(boolean canSell, boolean canOffer, boolean canEnhance) {}
 
     /** Người chơi bấm Giao dịch trên item đang chọn — đưa món đó vào lời chào. */
     public void setOnOfferSelected(Runnable listener) {
         this.onOfferSelected = listener;
+    }
+
+    /** Người chơi bấm Cường hoá trên item đang chọn. */
+    public void setOnEnhanceSelected(Runnable listener) {
+        this.onEnhanceSelected = listener;
+    }
+
+    /** Người chơi gạt công tắc Bảo Vệ — panel KHÔNG tự giữ trạng thái, xem {@link #setProtection}. */
+    public void setOnToggleProtection(Runnable listener) {
+        this.onToggleProtection = listener;
+    }
+
+    /**
+     * Vẽ lại nhãn công tắc Bảo Vệ. Trạng thái bật/tắt sống ở coordinator chứ không ở widget (UI.md
+     * §4) — panel chỉ đổi chữ trên nút theo lời nó được bảo.
+     */
+    public void setProtection(boolean on) {
+        protectionButton.setText(text(on ? "inventory.action.protection_on" : "inventory.action.protection_off"));
     }
 
     /**
@@ -499,6 +583,15 @@ public final class InventoryPanel implements HudWindow {
         } catch (java.util.MissingResourceException e) {
             return key;
         }
+    }
+
+    /**
+     * Chiều cao khung MUỐN có ở trạng thái hiện tại. Chỉ dùng cho {@code HudPreviewTool}: khung này
+     * chưa có {@code ScrollPane} (xem {@code InventoryController.MAX_VISIBLE_SLOTS}), nên "túi đầy
+     * có tràn khỏi màn hình không" là một con số phải ĐO, không phải một cảm giác nhìn ảnh.
+     */
+    float preferredHeight() {
+        return panel.getPrefHeight();
     }
 
     @Override

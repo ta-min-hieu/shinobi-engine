@@ -40,6 +40,10 @@ public final class HudPreviewTool extends ApplicationAdapter {
     /** Ảnh THỨ TƯ — cửa sổ Bang hội. */
     private static final String OUTPUT_GUILD = "E:/study/libgdx/shinobi-engine/.debug-orientation/hud-guild.png";
 
+    /** Ảnh THỨ NĂM — túi đồ + trang bị, gồm hàng Cường hoá (2026-08-29). Cũng neo giữa nên chụp riêng. */
+    private static final String OUTPUT_INVENTORY =
+            "E:/study/libgdx/shinobi-engine/.debug-orientation/hud-inventory.png";
+
     /** Khung chụp ảnh thứ nhất — đủ để Scene2D layout xong và font FreeType nạp xong. */
     private static final int FIRST_SHOT_FRAME = 30;
 
@@ -49,12 +53,21 @@ public final class HudPreviewTool extends ApplicationAdapter {
 
     private static final int FOURTH_SHOT_FRAME = 120;
 
+    private static final int FIFTH_SHOT_FRAME = 150;
+
+    /**
+     * Khớp {@code InventoryController.MAX_VISIBLE_SLOTS} (package khác nên không tham chiếu thẳng
+     * được). Lệch nhau thì con số đo ở đây không nói về trạng thái thật — sửa bên kia thì sửa cả đây.
+     */
+    private static final int MAX_VISIBLE_SLOTS_PREVIEW = 10;
+
     private CombatHud hud;
     private DialoguePanel dialoguePanel;
     private ChatPanel chatPanel;
     private PartyPanel partyPanel;
     private FriendPanel friendPanel;
     private GuildPanel guildPanel;
+    private InventoryPanel inventoryPanel;
     private int frame;
 
     @Override
@@ -76,6 +89,9 @@ public final class HudPreviewTool extends ApplicationAdapter {
         // Nhiệm vụ ĐÃ HOÀN THÀNH — trạng thái duy nhất có thêm nút, tức là trạng thái dễ vỡ bố cục
         // nhất trong hai trạng thái của cụm này.
         hud.setQuest("kill_training_dummies", true);
+        // Độ trễ đường truyền (2026-08-29, opcode PONG) — con số 3 chữ số là trường hợp RỘNG nhất
+        // mà cột phải phải chứa nổi, hẹp hơn thì không kiểm được gì.
+        hud.setLatency(148L);
 
         // Khung hội thoại (2026-08-09) — ĐÚNG nội dung cây town_elder.js, để bố cục phải chịu đúng
         // độ dài câu tiếng Việt thật chứ không phải chuỗi ngắn tự bịa.
@@ -149,6 +165,41 @@ public final class HudPreviewTool extends ApplicationAdapter {
                         new GuildPanel.MemberRow("PhongVanTuyetNguyet", "PhongVanTuyetNguyet", true)),
                 "");
         guildPanel.setPendingRequests(java.util.List.of(new GuildPanel.RequestRow(12L, "LoiDien xin gia nhập")), "");
+
+        buildInventoryPreview();
+    }
+
+    /**
+     * Túi đồ ở trạng thái ĐẦY ĐỦ NHẤT: đã chọn một món (bày cả bốn nút Mặc/Bán/Giao dịch/Cường hoá
+     * + công tắc Bảo Vệ), đang trong phiên giao dịch, và có món ĐANG MẶC ở nhiều ô. Đó là trạng
+     * thái nhiều actor nhất trên một hàng, tức là trạng thái duy nhất đủ để thấy bố cục có vỡ không.
+     *
+     * <p>Tách khỏi {@link #create()} để giữ nó dưới ngưỡng {@code MethodLength} của Checkstyle.
+     */
+    private void buildInventoryPreview() {
+        inventoryPanel = new InventoryPanel(hud.skin());
+        inventoryPanel.resize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        inventoryPanel.setGold("1.240 vàng");
+        inventoryPanel.setStatus("Cường hoá thất bại — Bảo vệ đã chặn rớt cấp, tiêu 1 bùa.");
+        // TÚI ĐẦY: đúng MAX_VISIBLE_SLOTS dòng + dòng "còn n món chưa hiện" + cả 7 ô đều có đồ. Đây
+        // là trạng thái CAO NHẤT khung này có thể đạt — khung chưa có ScrollPane nên nó cũng là
+        // trạng thái duy nhất trả lời được câu "túi đầy thì có tràn khỏi màn hình không".
+        java.util.List<InventoryPanel.ItemRow> full = new java.util.ArrayList<>();
+        for (int index = 0; index < MAX_VISIBLE_SLOTS_PREVIEW; index++) {
+            full.add(new InventoryPanel.ItemRow(index + 1L, "kunai", "Phi tiêu x99"));
+        }
+        full.set(0, new InventoryPanel.ItemRow(1L, "wooden_sword", "Kiếm gỗ +9"));
+        inventoryPanel.setItems(full, MAX_VISIBLE_SLOTS_PREVIEW + "/30 ô", "... còn 4 vật phẩm nữa chưa hiện.");
+        inventoryPanel.setEquipment(java.util.List.of(
+                new InventoryPanel.EquipmentRow(1, "Vũ khí", "Kiếm gỗ +9", true),
+                new InventoryPanel.EquipmentRow(2, "Áo giáp", "Áo vải thô", true),
+                new InventoryPanel.EquipmentRow(3, "Mũ", "Khăn trùm đầu", true),
+                new InventoryPanel.EquipmentRow(4, "Găng tay", "Bao tay vải", true),
+                new InventoryPanel.EquipmentRow(5, "Giày", "Giày rơm", true),
+                new InventoryPanel.EquipmentRow(6, "Trang sức 1", "Vòng gỗ", true),
+                new InventoryPanel.EquipmentRow(7, "Trang sức 2", "(Trống)", false)));
+        inventoryPanel.setProtection(true);
+        inventoryPanel.showDetail("Kiếm gỗ +9", true, new InventoryPanel.Actions(true, true, true));
     }
 
     @Override
@@ -162,6 +213,7 @@ public final class HudPreviewTool extends ApplicationAdapter {
         partyPanel.render(1f / 60f);
         friendPanel.render(1f / 60f);
         guildPanel.render(1f / 60f);
+        inventoryPanel.render(1f / 60f);
         dialoguePanel.render(1f / 60f);
         frame++;
         if (frame == FIRST_SHOT_FRAME) {
@@ -179,6 +231,14 @@ public final class HudPreviewTool extends ApplicationAdapter {
             guildPanel.open();
         } else if (frame == FOURTH_SHOT_FRAME) {
             capture(OUTPUT_GUILD);
+            guildPanel.close();
+            inventoryPanel.open();
+        } else if (frame == FIFTH_SHOT_FRAME) {
+            capture(OUTPUT_INVENTORY);
+            LOG.info(
+                    "Túi đồ ở trạng thái ĐẦY cao {}px, màn hình cao {}px",
+                    inventoryPanel.preferredHeight(),
+                    Gdx.graphics.getHeight());
             Gdx.app.exit();
         }
     }
@@ -209,6 +269,9 @@ public final class HudPreviewTool extends ApplicationAdapter {
         }
         if (guildPanel != null) {
             guildPanel.dispose();
+        }
+        if (inventoryPanel != null) {
+            inventoryPanel.dispose();
         }
         if (hud != null) {
             hud.dispose();

@@ -168,6 +168,9 @@ public final class WorldScreen implements GameScreen {
 
     /** Luồng hầm ngục (opcode 1500-1503) — nút nằm trong {@link #partyPanel}, xem {@link DungeonCoordinator}. */
     private final DungeonCoordinator dungeon;
+
+    /** Hai gói mức kết nối (PONG, server tắt) — không có cửa sổ, xem {@link ConnectionCoordinator}. */
+    private final ConnectionCoordinator connection;
     /** Hòm thư (phím M) — mượn skin của {@link #combatHud} như {@link #chatPanel}. */
     private final MailPanel mailPanel = new MailPanel(combatHud.skin());
 
@@ -255,6 +258,7 @@ public final class WorldScreen implements GameScreen {
         this.guild = new GuildCoordinator(guildPanel, sender, panels::noneOpen);
         this.duel = new DuelCoordinator(duelPanel, combatHud, sender, combatFeedback);
         this.dungeon = new DungeonCoordinator(partyPanel, combatHud, sender, chat);
+        this.connection = new ConnectionCoordinator(combatHud, chat);
         this.faction = new FactionCoordinator(
                 factionPanel,
                 sender,
@@ -315,12 +319,16 @@ public final class WorldScreen implements GameScreen {
     /**
      * Tách khỏi constructor THUẦN để giữ nó dưới ngưỡng {@code MethodLength} của Checkstyle — cùng
      * lý do {@link #wireHud} — không phải đổi hành vi. {@link InventoryCoordinator.DataSources} gộp
-     * {@code itemCatalog}+{@code gold} vì constructor kia đã chạm ngưỡng {@code ExcessiveParameterList}
-     * của PMD (config/pmd, minimum=5), cùng lý do {@link PlayContext} tồn tại.
+     * {@code itemCatalog}+{@code gold}+{@code chat} vì constructor kia đã chạm ngưỡng
+     * {@code ExcessiveParameterList} của PMD (config/pmd, minimum=5), cùng lý do {@link PlayContext}
+     * tồn tại. PHẢI gọi SAU khi {@link #chat} đã gán: túi đồ báo "vừa nhặt được gì" vào nhật ký chat.
      */
     private InventoryCoordinator buildInventory() {
         return new InventoryCoordinator(
-                inventoryPanel, sender, new InventoryCoordinator.DataSources(itemCatalog, gold), panels::noneOpen);
+                inventoryPanel,
+                sender,
+                new InventoryCoordinator.DataSources(itemCatalog, gold, chat),
+                panels::noneOpen);
     }
 
     /**
@@ -373,6 +381,7 @@ public final class WorldScreen implements GameScreen {
         panels.register(tradePanel, trade);
         panels.register(chatPanel, chat);
         panels.register(dungeon);
+        panels.register(connection);
         panels.register(combatHud);
     }
 

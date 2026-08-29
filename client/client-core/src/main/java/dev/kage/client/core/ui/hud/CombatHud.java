@@ -83,6 +83,9 @@ public final class CombatHud implements HudWindow {
 
     private final Label dungeonLabel;
 
+    /** Độ trễ đường truyền, đo từ {@code PongResponse} — xem {@link #setLatency(long)}. */
+    private final Label latencyLabel;
+
     private final Label dungeonHintLabel;
 
     /** Ô chứa {@link #dungeonGroup} trong cột góc trên-phải — xem {@link #buildTopRightColumn()}. */
@@ -104,6 +107,9 @@ public final class CombatHud implements HudWindow {
     private int lastPlayerMaxChi = -1;
     private long lastExpIntoLevel = -1L;
     private long lastExpForNextLevel = -1L;
+
+    /** -1 = chưa nhận nhịp heartbeat nào, xem {@link #clearLatency()}. */
+    private long lastLatencyMs = -1L;
 
     /**
      * Bố cục theo ảnh Ninja School Online chủ dự án gửi (2026-08-09): cụm chỉ số góc trên-trái, mục
@@ -138,6 +144,8 @@ public final class CombatHud implements HudWindow {
         this.dungeonLabel = new Label("", skin.labelStyle);
         this.dungeonHintLabel = new Label("", skin.statLabelStyle);
         this.dungeonGroup = new Table();
+        this.latencyLabel = new Label(i18n.get("hud.latency_unknown"), skin.statLabelStyle);
+        this.latencyLabel.setFontScale(EXP_LABEL_SCALE);
 
         // 6 Table độc lập cùng setFillParent(true) — mỗi cụm neo một góc, không có lưới chung.
         stage.addActor(anchored(buildPlayerCluster(), Align.topLeft));
@@ -206,6 +214,9 @@ public final class CombatHud implements HudWindow {
     private Table buildTopRightColumn() {
         buildDungeonCluster();
         Table column = new Table();
+        // Độ trễ nằm trên cùng cột phải: một dòng chữ nhỏ, LUÔN có chỗ (khác dải hầm ngục bên dưới)
+        // — nó có chữ ngay từ khung hình đầu ("— ms"), nên không có ô rỗng nào để đội bố cục về sau.
+        column.add(latencyLabel).right().row();
         // GỠ actor ra khỏi ô thay vì setVisible(false): một Table của scene2d vẫn dành chỗ theo kích
         // thước ưa thích của con nó dù con đang ẩn, nên hai cái Label rỗng bên trong sẽ đẩy cụm
         // nhiệm vụ tụt xuống ~2 dòng suốt cả phiên chơi ngoài hầm ngục. Ô rỗng thì cao 0.
@@ -213,6 +224,27 @@ public final class CombatHud implements HudWindow {
         column.row();
         column.add(buildQuestCluster()).right().padTop(8f).row();
         return column;
+    }
+
+    /**
+     * Round-trip time của nhịp heartbeat vừa về (system.proto {@code PONG}) — con số DUY NHẤT trên
+     * HUD nói về đường truyền chứ không về nhân vật.
+     *
+     * <p>Bỏ qua khi trùng giá trị đang hiện: {@code Label#setText} dựng lại glyph layout, và độ trễ
+     * đứng yên là trường hợp thường gặp nhất.
+     */
+    public void setLatency(long roundTripMs) {
+        if (roundTripMs == lastLatencyMs) {
+            return;
+        }
+        lastLatencyMs = roundTripMs;
+        latencyLabel.setText(i18n.format("hud.latency", roundTripMs));
+    }
+
+    /** Quay về "chưa biết" — rời màn hình/mất kết nối, xem {@code ConnectionCoordinator#reset}. */
+    public void clearLatency() {
+        lastLatencyMs = -1L;
+        latencyLabel.setText(i18n.get("hud.latency_unknown"));
     }
 
     /** Dải "đang ở trong hầm ngục" — xem {@link #setDungeonBanner} về việc vì sao nó phải thường trực. */

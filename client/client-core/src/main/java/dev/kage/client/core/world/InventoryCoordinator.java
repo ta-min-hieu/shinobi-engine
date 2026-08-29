@@ -10,9 +10,11 @@ import com.google.protobuf.InvalidProtocolBufferException;
 
 import dev.kage.client.core.ui.hud.InventoryPanel;
 import dev.kage.client.core.ui.theme.KageI18n;
+import dev.kage.protocol.EnhanceItemResponse;
 import dev.kage.protocol.EquipItemResponse;
 import dev.kage.protocol.EquipmentSlot;
 import dev.kage.protocol.ItemCatalogEntry;
+import dev.kage.protocol.ItemGrantedEvent;
 import dev.kage.protocol.ListInventoryResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SellItemResponse;
@@ -29,6 +31,9 @@ import dev.kage.protocol.wire.PacketCodec;
  * do tương tự nút Mặc cũng ẨN khi chưa có catalog: không biết item có mặc được không thì không đoán.
  * Tra vào {@link GoldCoordinator} để hiện số vàng cạnh tiêu đề — túi đồ là chỗ ĐẦU TIÊN dùng tới nó.
  *
+ * <p>Cường hoá (opcode 505/506, GAMEPLAY.md §7.1) cũng đi qua đây — xem {@link #onEnhanceSelected}
+ * về việc vì sao lệnh này do chính túi đồ gửi trong khi Bán/Giao dịch thì không.
+ *
  * <p><b>Luật một dòng: hỏi lại server sau MỌI lệnh đổi trạng thái</b> (xem {@link #settle}), cùng
  * {@link MailCoordinator}/{@link GuildCoordinator}: client không tự cộng/trừ item hay đổi map trang
  * bị theo suy đoán, kể cả khi lệnh vừa gửi trả OK.
@@ -40,7 +45,7 @@ final class InventoryCoordinator implements WindowFlow {
      * ngưỡng {@code ExcessiveParameterList} của PMD (config/pmd, minimum=5) — cùng lý do
      * {@link PlayContext} gộp {@code EcsWorld}+{@code InputMapper}.
      */
-    record DataSources(ItemCatalogCoordinator itemCatalog, GoldCoordinator gold) {}
+    record DataSources(ItemCatalogCoordinator itemCatalog, GoldCoordinator gold, ChatCoordinator notices) {}
 
     /** 7 slot trang bị THẬT — loại {@code EQUIPMENT_SLOT_UNSPECIFIED} (sentinel, không dùng cho lệnh thật). */
     private static final List<EquipmentSlot> REAL_SLOTS = List.of(
@@ -57,6 +62,10 @@ final class InventoryCoordinator implements WindowFlow {
     private final WorldCommandSender sender;
     private final ItemCatalogCoordinator itemCatalog;
     private final GoldCoordinator gold;
+
+    /** Kênh báo "vừa nhặt được gì" — xem {@link #onItemGranted}. */
+    private final ChatCoordinator notices;
+
     private final I18NBundle i18n = KageI18n.load();
 
     /**
@@ -93,12 +102,16 @@ final class InventoryCoordinator implements WindowFlow {
         this.sender = sender;
         this.itemCatalog = dataSources.itemCatalog();
         this.gold = dataSources.gold();
+        this.notices = dataSources.notices();
         panel.setCanOpen(canOpen);
         panel.setOnRefresh(this::onOpened);
         panel.setOnSelect(this::onSelect);
         panel.setOnEquipSelected(this::onEquipSelected);
         panel.setOnSellSelected(this::onSellSelected);
         panel.setOnOfferSelected(this::onOfferSelected);
+        panel.setOnEnhanceSelected(this::onEnhanceSelected);
+        panel.setOnToggleProtection(this::onToggleProtection);
+        panel.setProtection(controller.useProtection());
         panel.setOnUnequip(this::onUnequip);
         panel.setStatus(text("inventory.hint.open"));
         panel.setGold(goldText());
@@ -155,6 +168,14 @@ final class InventoryCoordinator implements WindowFlow {
             onSellSettled(SellItemResponse.parseFrom(payload));
             return true;
         }
+        if (opcode == Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE) {
+            onEnhanceSettled(EnhanceItemResponse.parseFrom(payload));
+            return true;
+        }
+        if (opcode == Opcode.OPCODE_ITEM_GRANTED_EVENT_VALUE) {
+            onItemGranted(ItemGrantedEvent.parseFrom(payload));
+            return true;
+        }
         return false;
     }
 
@@ -202,6 +223,74 @@ final class InventoryCoordinator implements WindowFlow {
     /** Bấm Giao dịch trên item đang chọn — đưa ĐÚNG MỘT món vào lời chào, cùng lý do nút Bán. */
     private void onOfferSelected() {
         controller.selected().ifPresent(item -> onOfferRequested.accept(item.itemId()));
+    }
+
+    /**
+     * Bấm Cường hoá trên item đang chọn (GAMEPLAY.md §7.1).
+     *
+     * <p>Khác nút Bán và nút Giao dịch, lệnh này do CHÍNH túi đồ gửi: {@code EnhanceItemCommand}
+     * không thuộc luồng nào khác, nên khoá idempotency của nó (ADR-025) ở đây là đúng chỗ — một lệnh
+     * phải có ĐÚNG một chủ.
+     */
+    private void onEnhanceSelected() {
+        controller
+                .selected()
+                .ifPresent(item -> sender.enhanceItem(
+                        item.itemId(), controller.useProtection(), controller.beginEnhance(item.itemId())));
+    }
+
+    /**
+     * Gạt công tắc Bảo Vệ — chỉ đổi ý định cho LẦN BẤM SAU, không gửi gì đi.
+     *
+     * <p>Lời giải thích ("tiêu 1 bùa để chặn rớt cấp") nói ra ở DÒNG TRẠNG THÁI đúng lúc người chơi
+     * vừa bật, thay vì một dòng chữ thường trực trong khung: khung túi đồ đã cao sát mép màn hình
+     * (xem {@link InventoryPanel#preferredHeight()}), và một câu hướng dẫn chỉ có nghĩa ngay lúc
+     * quyết định thì không đáng chiếm chỗ vĩnh viễn.
+     */
+    private void onToggleProtection() {
+        boolean on = controller.toggleProtection();
+        panel.setProtection(on);
+        panel.setStatus(text(on ? "inventory.hint.protection" : "inventory.hint.protection_off"));
+    }
+
+    /**
+     * Kết quả một lần cường hoá. Xoá khoá idempotency TRƯỚC khi hỏi lại túi (cùng
+     * {@code ShopController#onBuySettled}: lệnh đã có kết luận thì lần bấm sau là một canh bạc mới).
+     *
+     * <p>Vàng đã trừ KHÔNG cập nhật ở đây: server phát {@code GoldChangedEvent} riêng sau khi commit
+     * (ADR-035 Decision-3, {@code GatewayBootstrap}) và {@link GoldCoordinator} là chỗ duy nhất nghe
+     * nó — client không tự trừ theo bảng chi phí nó không có.
+     */
+    private void onEnhanceSettled(EnhanceItemResponse response) {
+        controller.onEnhanceSettled();
+        settle(InventoryController.enhanceMessageKey(response.getOutcome()).orElse("inventory.error.unknown"));
+    }
+
+    /**
+     * Server vừa cộng THẬT một vật phẩm vào túi (nhặt đồ, thưởng nhiệm vụ, mua hàng) — gói này chỉ
+     * được gửi SAU khi item đã vào túi thành công (inventory.proto), không phải "quái vừa rơi gì".
+     *
+     * <p>Trước hôm nay client bỏ qua nó trong im lặng: giết quái xong không có một dòng nào báo, và
+     * túi đồ đang mở vẫn hiện ảnh chụp cũ. Hai việc ở đây sửa đúng hai chuyện đó.
+     *
+     * <p>Chỉ hỏi lại túi khi cửa sổ ĐANG MỞ: một lần rơi đồ có thể sinh nhiều gói liên tiếp
+     * ({@code GrantLootUseCase} trả cả danh sách), và hỏi lại toàn bộ túi cho một cửa sổ không ai
+     * nhìn là tốn băng thông đúng lúc đang đánh nhau. Lần mở sau tự hỏi lại (xem {@link #onOpened}).
+     */
+    private void onItemGranted(ItemGrantedEvent event) {
+        notices.showSystemNotice(itemGrantedText(event));
+        if (panel.isOpen()) {
+            sender.listInventory();
+        }
+    }
+
+    /** "Nhận được Kunai x2" — tên tra qua catalog, chưa có thì hiện dạng số, KHÔNG bịa (Điều 24). */
+    private String itemGrantedText(ItemGrantedEvent event) {
+        String name = itemCatalog
+                .nameKey(event.getItemTemplateId())
+                .map(this::text)
+                .orElseGet(() -> format("inventory.label.raw_item", event.getItemTemplateId()));
+        return format2("inventory.notice.item_granted", name, event.getQuantity());
     }
 
     /** Nói ra kết quả một lệnh, rồi hỏi lại server — cùng {@link MailCoordinator#settle}. */
@@ -295,10 +384,10 @@ final class InventoryCoordinator implements WindowFlow {
                             panel.showDetail(
                                     itemDisplayText(item),
                                     equippable && !alreadyEquipped,
-                                    new InventoryPanel.Actions(true, inTrade.getAsBoolean()));
+                                    new InventoryPanel.Actions(true, inTrade.getAsBoolean(), true));
                         },
                         () -> panel.showDetail(
-                                text("inventory.detail.none"), false, new InventoryPanel.Actions(false, false)));
+                                text("inventory.detail.none"), false, new InventoryPanel.Actions(false, false, false)));
     }
 
     /** Tên + số lượng + mức cường hoá của một item, ghép sẵn thành một chuỗi hiển thị. */
@@ -388,6 +477,7 @@ final class InventoryCoordinator implements WindowFlow {
         controller.clear();
         panel.close();
         panel.setStatus(text("inventory.hint.open"));
+        panel.setProtection(controller.useProtection());
         refreshView();
     }
 }

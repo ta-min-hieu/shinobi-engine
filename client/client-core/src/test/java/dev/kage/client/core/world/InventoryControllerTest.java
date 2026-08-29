@@ -7,6 +7,7 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import dev.kage.protocol.EnhanceOutcome;
 import dev.kage.protocol.EquipmentSlot;
 import dev.kage.protocol.EquippedSlotView;
 import dev.kage.protocol.InventoryItemView;
@@ -166,6 +167,112 @@ class InventoryControllerTest {
         assertThat(controller.selected()).isEmpty();
         assertThat(controller.equippedItemId(EquipmentSlot.EQUIPMENT_SLOT_WEAPON))
                 .isZero();
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Cường hoá (opcode 505/506) — trạng thái Bảo Vệ + khoá idempotency + bảng tra outcome.
+    // ---------------------------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("Bảo Vệ mặc định TẮT — bùa là vật phẩm tiêu hao, không tự tiêu hộ người chơi")
+    void protectionDefaultsOff() {
+        assertThat(controller.useProtection()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Gạt công tắc Bảo Vệ đổi trạng thái và trả về trạng thái MỚI")
+    void togglesProtection() {
+        assertThat(controller.toggleProtection()).isTrue();
+        assertThat(controller.useProtection()).isTrue();
+        assertThat(controller.toggleProtection()).isFalse();
+        assertThat(controller.useProtection()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Bấm Cường hoá lại trên CÙNG item khi lệnh chưa có kết luận giữ NGUYÊN khoá — đó là thử lại")
+    void reusesEnhanceKeyWhilePending() {
+        String first = controller.beginEnhance(5L);
+
+        assertThat(controller.beginEnhance(5L)).isEqualTo(first);
+        assertThat(controller.pendingEnhanceItemId()).isEqualTo(5L);
+    }
+
+    @Test
+    @DisplayName("Gạt Bảo Vệ giữa chừng KHÔNG cấp khoá mới — vẫn là cùng một lần cường hoá đang treo")
+    void protectionToggleDoesNotChangePendingKey() {
+        String first = controller.beginEnhance(5L);
+        controller.toggleProtection();
+
+        assertThat(controller.beginEnhance(5L)).isEqualTo(first);
+    }
+
+    @Test
+    @DisplayName("Đổi sang item khác là ý định MỚI — khoá mới")
+    void newKeyForAnotherItem() {
+        String first = controller.beginEnhance(5L);
+
+        assertThat(controller.beginEnhance(6L)).isNotEqualTo(first);
+    }
+
+    @Test
+    @DisplayName("Lệnh đã có kết luận thì lần bấm sau là canh bạc MỚI — khoá mới, kể cả cùng item")
+    void newKeyAfterSettle() {
+        String first = controller.beginEnhance(5L);
+        controller.onEnhanceSettled();
+
+        assertThat(controller.pendingEnhanceItemId()).isZero();
+        assertThat(controller.beginEnhance(5L)).isNotEqualTo(first);
+    }
+
+    @Test
+    @DisplayName("Cả 8 outcome THẬT của EnhanceOutcome đều có câu để nói ra")
+    void mapsEveryRealEnhanceOutcome() {
+        for (EnhanceOutcome outcome : EnhanceOutcome.values()) {
+            if (outcome == EnhanceOutcome.ENHANCE_OUTCOME_UNSPECIFIED || outcome == EnhanceOutcome.UNRECOGNIZED) {
+                continue;
+            }
+            assertThat(InventoryController.enhanceMessageKey(outcome))
+                    .as("%s chưa có khoá i18n", outcome)
+                    .isPresent();
+        }
+    }
+
+    @Test
+    @DisplayName("UNSPECIFIED (server MỚI HƠN client) trả rỗng, không đoán bừa")
+    void unspecifiedEnhanceOutcomeIsUnmapped() {
+        assertThat(InventoryController.enhanceMessageKey(EnhanceOutcome.ENHANCE_OUTCOME_UNSPECIFIED))
+                .isEmpty();
+        assertThat(InventoryController.enhanceMessageKey(EnhanceOutcome.UNRECOGNIZED))
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("Mọi khoá i18n của bảng cường hoá có mặt THẬT trong cả hai bundle")
+    void everyEnhanceMessageKeyExists() {
+        java.util.Properties vietnamese = bundle("strings_vi.properties");
+        java.util.Properties english = bundle("strings_en.properties");
+        for (EnhanceOutcome outcome : EnhanceOutcome.values()) {
+            InventoryController.enhanceMessageKey(outcome).ifPresent(key -> {
+                assertThat(vietnamese.getProperty(key))
+                        .as("thiếu %s trong bundle vi", key)
+                        .isNotNull();
+                assertThat(english.getProperty(key))
+                        .as("thiếu %s trong bundle en", key)
+                        .isNotNull();
+            });
+        }
+    }
+
+    @Test
+    @DisplayName("clear() cũng trả Bảo Vệ về TẮT và xoá khoá đang treo")
+    void clearResetsEnhanceState() {
+        controller.toggleProtection();
+        controller.beginEnhance(5L);
+
+        controller.clear();
+
+        assertThat(controller.useProtection()).isFalse();
+        assertThat(controller.pendingEnhanceItemId()).isZero();
     }
 
     // ---------------------------------------------------------------------------------------------

@@ -7,7 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
+import dev.kage.protocol.EnhanceOutcome;
 import dev.kage.protocol.EquipmentSlot;
 import dev.kage.protocol.EquippedSlotView;
 import dev.kage.protocol.InventoryItemView;
@@ -17,8 +19,10 @@ import dev.kage.protocol.ListInventoryResponse;
  * Trạng thái túi đồ + trang bị (ADR-035, opcode 507/508) — thuần Java, không libGDX/GL, test được
  * thẳng như {@link MailController} (UI.md §4: controller giữ trạng thái, widget chỉ vẽ).
  *
- * <p>Giữ đúng bốn thứ: <b>danh sách vật phẩm</b> server vừa trả về, <b>sức chứa</b> túi, <b>slot nào
- * đang mặc item nào</b>, và <b>vật phẩm đang chọn</b> để xem chi tiết/mặc.
+ * <p>Giữ đúng sáu thứ: <b>danh sách vật phẩm</b> server vừa trả về, <b>sức chứa</b> túi, <b>slot nào
+ * đang mặc item nào</b>, <b>vật phẩm đang chọn</b> để xem chi tiết/mặc, <b>khoá idempotency của lệnh
+ * cường hoá đang treo</b> (ADR-025 — cường hoá trừ vàng THẬT, cùng lý do {@link ShopController} giữ
+ * khoá của lệnh Mua/Bán), và <b>cờ "có tiêu Bảo Vệ không"</b> người chơi đang bật.
  *
  * <p><b>Item đang mặc VẪN nằm trong {@code items}.</b> {@code equipment_slot.inventory_item_id}
  * (V5__add_equipment.sql) tham chiếu tới {@code inventory_item} chứ KHÔNG xoá dòng đó khi mặc, nên
@@ -69,6 +73,14 @@ final class InventoryController {
 
     /** Item đang xem chi tiết trong khung, 0 = chưa chọn cái nào. */
     private long selectedItemId;
+
+    /** Xem {@link #beginEnhance(long)} — 0 / rỗng khi không có lệnh cường hoá nào đang treo. */
+    private long pendingEnhanceItemId;
+
+    private String pendingEnhanceKey = "";
+
+    /** Xem {@link #useProtection()} — mặc định TẮT. */
+    private boolean useProtection;
 
     /**
      * Ảnh chụp túi mới từ server — THAY hoàn toàn, không trộn với bản cũ, cùng luật
@@ -146,11 +158,94 @@ final class InventoryController {
         return KNOWN_ERROR_KEYS.contains(serverErrorKey) ? Optional.of(serverErrorKey) : Optional.empty();
     }
 
-    /** Rời màn hình/mất kết nối — túi của một phiên chơi không được sống sót sang phiên sau. */
+    // ---------------------------------------------------------------------------------------------
+    // Cường hoá (inventory.proto, opcode 505/506 — GAMEPLAY.md §7.1).
+    //
+    // Client KHÔNG giữ bảng chi phí/tỉ lệ: EnhancementTable sống phía server và không có packet nào
+    // gửi nó sang đây, nên hiện một con số ở client là bịa (Điều 24). Kết quả một lần cường hoá đọc
+    // được HẾT từ EnhanceOutcome, kể cả nhánh "thất bại nhưng Bảo Vệ đã chặn rớt cấp".
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Có tiêu "Bảo Vệ" khi cường hoá thất bại hay không. MẶC ĐỊNH TẮT: bùa là vật phẩm tiêu hao mua
+     * bằng vàng, bật sẵn hộ người chơi là tiêu tài sản của họ mà họ không chọn.
+     */
+    boolean useProtection() {
+        return useProtection;
+    }
+
+    /** Người chơi bấm công tắc Bảo Vệ — trả về trạng thái MỚI. */
+    boolean toggleProtection() {
+        useProtection = !useProtection;
+        return useProtection;
+    }
+
+    /**
+     * Khoá idempotency cho một lệnh Cường hoá (ADR-025) — cùng luật {@code ShopController#beginBuy}:
+     * bấm lại trên ĐÚNG item đang treo là "tự thử lại cùng một lần cường hoá" nên giữ nguyên khoá cũ;
+     * bấm sau khi lệnh cũ đã có kết luận ({@link #onEnhanceSettled}) là một canh bạc MỚI và phải có
+     * khoá mới.
+     *
+     * <p>Cờ Bảo Vệ CỐ TÌNH không nằm trong danh tính của khoá (khác cặp {@code (item, quantity)} của
+     * lệnh Mua): gạt công tắc rồi bấm lại trong lúc lệnh cũ chưa có kết luận vẫn là cùng MỘT lần
+     * cường hoá, và server đã quyết theo cờ của gói ĐẦU TIÊN nó nhận — cấp khoá mới lúc đó chỉ tạo ra
+     * lần trừ vàng thứ hai.
+     */
+    String beginEnhance(long itemId) {
+        if (pendingEnhanceItemId != itemId || pendingEnhanceKey.isEmpty()) {
+            pendingEnhanceItemId = itemId;
+            pendingEnhanceKey = UUID.randomUUID().toString();
+        }
+        return pendingEnhanceKey;
+    }
+
+    /** Lệnh Cường hoá đang treo đã có kết luận — xoá khoá kể cả khi hỏng, cùng {@code ShopController}. */
+    void onEnhanceSettled() {
+        pendingEnhanceItemId = 0L;
+        pendingEnhanceKey = "";
+    }
+
+    /** Vật phẩm của lệnh Cường hoá đang treo — 0 khi không có lệnh nào treo. Chỉ dùng để test. */
+    long pendingEnhanceItemId() {
+        return pendingEnhanceItemId;
+    }
+
+    /**
+     * Bảng tra khoá i18n cho từng {@code EnhanceOutcome} — cùng cách {@code ShopController} làm, và
+     * cùng lý do: một biểu thức switch phủ hết một enum protobuf tự nó vượt trần
+     * {@code CyclomaticComplexity} của PMD.
+     *
+     * <p>{@code UNSPECIFIED}/{@code UNRECOGNIZED} CỐ TÌNH vắng mặt: cả hai rơi vào
+     * {@link Optional#empty()} và chỗ gọi dịch thành {@code inventory.error.unknown} — kết quả của một
+     * server MỚI HƠN client, chỉ có thể nói ra là không hiểu, không đoán bừa (Điều 24).
+     */
+    private static final Map<EnhanceOutcome, String> ENHANCE_MESSAGE_KEYS = Map.of(
+            EnhanceOutcome.ENHANCE_OUTCOME_SUCCESS, "inventory.enhance.success",
+            EnhanceOutcome.ENHANCE_OUTCOME_FAILED_NO_DROP, "inventory.enhance.failed_no_drop",
+            EnhanceOutcome.ENHANCE_OUTCOME_FAILED_DROPPED, "inventory.enhance.failed_dropped",
+            EnhanceOutcome.ENHANCE_OUTCOME_FAILED_PROTECTED, "inventory.enhance.failed_protected",
+            EnhanceOutcome.ENHANCE_OUTCOME_ITEM_NOT_FOUND, "inventory.enhance.item_not_found",
+            EnhanceOutcome.ENHANCE_OUTCOME_MAX_LEVEL, "inventory.enhance.max_level",
+            EnhanceOutcome.ENHANCE_OUTCOME_INSUFFICIENT_GOLD, "inventory.enhance.insufficient_gold",
+            EnhanceOutcome.ENHANCE_OUTCOME_DUPLICATE_REQUEST, "inventory.enhance.duplicate_request");
+
+    /** Xem {@link #ENHANCE_MESSAGE_KEYS} về hai giá trị cố tình không có mặt trong bảng. */
+    static Optional<String> enhanceMessageKey(EnhanceOutcome outcome) {
+        return Optional.ofNullable(ENHANCE_MESSAGE_KEYS.get(outcome));
+    }
+
+    /**
+     * Rời màn hình/mất kết nối — túi của một phiên chơi không được sống sót sang phiên sau.
+     *
+     * <p>Cờ Bảo Vệ cũng về mặc định TẮT: đó là một ý định của phiên chơi vừa rồi, không phải một
+     * thiết lập người chơi đã lưu.
+     */
     void clear() {
         items.clear();
         capacity = 0;
         equipped.clear();
         selectedItemId = 0L;
+        useProtection = false;
+        onEnhanceSettled();
     }
 }
