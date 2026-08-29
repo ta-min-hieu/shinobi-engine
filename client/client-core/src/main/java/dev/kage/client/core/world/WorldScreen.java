@@ -27,6 +27,7 @@ import dev.kage.client.core.ui.hud.FriendPanel;
 import dev.kage.client.core.ui.hud.GuildPanel;
 import dev.kage.client.core.ui.hud.MailPanel;
 import dev.kage.client.core.ui.hud.PartyPanel;
+import dev.kage.client.core.ui.hud.QuestLogPanel;
 import dev.kage.engine.core.GameScreen;
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.EcsWorld;
@@ -176,6 +177,9 @@ public final class WorldScreen implements GameScreen {
     /** Luồng thư (đọc/nhận/xoá/soạn + mạng) — xem {@link MailCoordinator}. */
     private final MailCoordinator mail;
 
+    /** Nhật ký nhiệm vụ (phím J, ADR-035) — mượn skin của {@link #combatHud} như {@link #mailPanel}. */
+    private final QuestLogPanel questLogPanel = new QuestLogPanel(combatHud.skin());
+
     /** Vòng đời nhiệm vụ: nhận → hoàn thành → lĩnh thưởng — xem {@link QuestCoordinator}. */
     private final QuestCoordinator quests;
 
@@ -238,7 +242,7 @@ public final class WorldScreen implements GameScreen {
                 localCharacterId, POSITION.get(localPlayer), combatHudController, combatHud.font());
 
         // SAU combatFeedback: coordinator mượn nó để báo khi hội thoại kết thúc bằng quest/cửa hàng.
-        this.quests = new QuestCoordinator(combatHud, sender, combatFeedback);
+        this.quests = new QuestCoordinator(combatHud, questLogPanel, sender, combatFeedback);
         this.dialogue = new DialogueCoordinator(dialoguePanel, sender, combatFeedback, quests);
         this.chat = new ChatCoordinator(chatPanel, sender);
         // SAU chat: cả ba coordinator dưới đây mượn nhật ký chat/chữ nổi làm chỗ báo lý do thất bại.
@@ -277,6 +281,7 @@ public final class WorldScreen implements GameScreen {
         partyPanel.setCanOpen(this::noTextInputActive);
         chatPanel.setCanOpen(this::noTextInputActive);
         duelPanel.setCanOpen(this::noTextInputActive);
+        questLogPanel.setCanOpen(this::noTextInputActive);
         // Cổng của khung chọn hệ có THÊM một vế so với các khung khác — xem
         // FactionCoordinator#setOpenGate (chỉ bày lối vào cho nhân vật còn được mời chọn).
         faction.setOpenGate(this::noTextInputActive);
@@ -323,6 +328,7 @@ public final class WorldScreen implements GameScreen {
                 duelPanel.stage(),
                 factionPanel.stage(),
                 mailPanel.stage(),
+                questLogPanel.stage(),
                 chatPanel.stage(),
                 combatHud.stage(),
                 new WorldTargetPicker());
@@ -350,6 +356,7 @@ public final class WorldScreen implements GameScreen {
         faction.reset();
         dungeon.reset();
         mail.reset();
+        quests.reset();
     }
 
     @Override
@@ -365,6 +372,7 @@ public final class WorldScreen implements GameScreen {
         duelPanel.resize(width, height);
         factionPanel.resize(width, height);
         mailPanel.resize(width, height);
+        questLogPanel.resize(width, height);
         combatFeedback.resize(width, height);
     }
 
@@ -616,7 +624,8 @@ public final class WorldScreen implements GameScreen {
                 || guild.isOpen()
                 || duel.isOpen()
                 || faction.isOpen()
-                || mail.isOpen();
+                || mail.isOpen()
+                || quests.isOpen();
     }
 
     /** Dạng phủ định của {@link #isTextInputActive()} — cổng {@code setCanOpen} của các panel. */
@@ -762,6 +771,7 @@ public final class WorldScreen implements GameScreen {
         duel.close();
         faction.close();
         mail.close();
+        quests.close();
         dialogue.talkTo(npc.code());
         return true;
     }
@@ -796,6 +806,7 @@ public final class WorldScreen implements GameScreen {
         duelPanel.render(Gdx.graphics.getDeltaTime());
         factionPanel.render(Gdx.graphics.getDeltaTime());
         mailPanel.render(Gdx.graphics.getDeltaTime());
+        questLogPanel.render(Gdx.graphics.getDeltaTime());
         dialoguePanel.render(Gdx.graphics.getDeltaTime());
     }
 
@@ -908,6 +919,7 @@ public final class WorldScreen implements GameScreen {
         duelPanel.dispose();
         factionPanel.dispose();
         mailPanel.dispose();
+        questLogPanel.dispose();
         combatHud.dispose();
     }
 
