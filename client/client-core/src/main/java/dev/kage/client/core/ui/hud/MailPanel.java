@@ -377,7 +377,10 @@ public final class MailPanel implements HudWindow {
      */
     public void open() {
         panel.setVisible(true);
-        stage.setKeyboardFocus(recipientField);
+        // KHÔNG tự chiếm keyboard focus khi mở. {@code TextField} của libGDX chỉ vẽ
+        // messageText khi KHÔNG có focus, nên tự lấy focus là tự xoá mất chữ gợi ý của chính
+        // ô đó — người chơi nhìn thấy một ô trống không nhãn, không biết phải gõ gì vào.
+        // Thấy tận mắt lúc playtest 2026-08-29: bốn panel cùng dính một dòng lệnh này.
         fire(onOpened);
     }
 

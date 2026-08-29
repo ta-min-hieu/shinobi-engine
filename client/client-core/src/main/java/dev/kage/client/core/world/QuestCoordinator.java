@@ -82,7 +82,7 @@ final class QuestCoordinator implements WindowFlow {
         hud.setOnClaimQuestClicked(this::claimReward);
         panel.setOnRefresh(this::onLogOpened);
         panel.setOnClaim(this::claimFromLog);
-        panel.setStatus(text("questlog.hint.close"));
+        panel.setStatus(text("questlog.hint.open"));
     }
 
     /**
@@ -363,7 +363,7 @@ final class QuestCoordinator implements WindowFlow {
     public void reset() {
         tracker.reset();
         panel.close();
-        panel.setStatus(text("questlog.hint.close"));
+        panel.setStatus(text("questlog.hint.open"));
         refreshLogView();
         syncHud();
         pendingAcceptQuestCode = "";
