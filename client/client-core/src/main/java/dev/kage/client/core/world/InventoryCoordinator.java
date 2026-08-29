@@ -3,6 +3,7 @@ package dev.kage.client.core.world;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BooleanSupplier;
+import java.util.function.LongConsumer;
 
 import com.badlogic.gdx.utils.I18NBundle;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -14,6 +15,7 @@ import dev.kage.protocol.EquipmentSlot;
 import dev.kage.protocol.ItemCatalogEntry;
 import dev.kage.protocol.ListInventoryResponse;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.SellItemResponse;
 import dev.kage.protocol.UnequipItemResponse;
 import dev.kage.protocol.wire.PacketCodec;
 
@@ -57,6 +59,14 @@ final class InventoryCoordinator implements WindowFlow {
     private final GoldCoordinator gold;
     private final I18NBundle i18n = KageI18n.load();
 
+    /**
+     * Người chơi bấm Bán — {@code WorldScreen} nối vào {@code ShopCoordinator}. Túi đồ KHÔNG tự gửi
+     * {@code SellItemCommand}: khoá idempotency của lệnh Bán (ADR-025) do {@code ShopController}
+     * giữ, và một lệnh phải có ĐÚNG một chủ. Túi đồ chỉ biết {@code inventory_item.id} — thứ mà
+     * cửa hàng cần và không có cách nào tự lấy.
+     */
+    private LongConsumer onSellRequested = itemId -> {};
+
     /** Đệm dựng sẵn cho {@link InventoryPanel#setItems} — chỉ đổi khi server vừa trả lời. */
     private final List<InventoryPanel.ItemRow> itemRows = new ArrayList<>();
 
@@ -77,12 +87,18 @@ final class InventoryCoordinator implements WindowFlow {
         panel.setOnRefresh(this::onOpened);
         panel.setOnSelect(this::onSelect);
         panel.setOnEquipSelected(this::onEquipSelected);
+        panel.setOnSellSelected(this::onSellSelected);
         panel.setOnUnequip(this::onUnequip);
         panel.setStatus(text("inventory.hint.open"));
         panel.setGold(goldText());
         itemCatalog.addCatalogListener(this::refreshView);
         gold.addGoldListener(amount -> panel.setGold(goldText()));
         refreshView();
+    }
+
+    /** Xem {@link #onSellRequested} — {@code WorldScreen} nối lời gọi này sang cửa hàng. */
+    void setOnSellRequested(LongConsumer listener) {
+        this.onSellRequested = listener;
     }
 
     @Override
@@ -114,6 +130,10 @@ final class InventoryCoordinator implements WindowFlow {
             onUnequipSettled(UnequipItemResponse.parseFrom(payload));
             return true;
         }
+        if (opcode == Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE) {
+            onSellSettled(SellItemResponse.parseFrom(payload));
+            return true;
+        }
         return false;
     }
 
@@ -136,6 +156,26 @@ final class InventoryCoordinator implements WindowFlow {
                         ? "inventory.notice.unequipped"
                         : InventoryController.errorMessageKey(response.getErrorKey())
                                 .orElse("inventory.error.unknown"));
+    }
+
+    /**
+     * Kết quả Bán. {@code ShopCoordinator} cũng nhận gói này và nói kết quả ra khung cửa hàng —
+     * {@link PanelHub#dispatch} hỏi MỌI luồng nên không ai giấu gói của ai. Nói lại ở đây là CẦN,
+     * không phải thừa: người chơi bấm Bán từ túi đồ thì khung cửa hàng thường đang đóng.
+     *
+     * <p>Bảng khoá i18n mượn thẳng của {@link ShopController} thay vì chép lại: cùng một
+     * {@code SellOutcome} phải đọc ra cùng một câu, dù bấm Bán từ đâu.
+     */
+    private void onSellSettled(SellItemResponse response) {
+        settle(ShopController.sellMessageKey(response.getOutcome()).orElse("shop.error.unknown"));
+    }
+
+    /**
+     * Bấm Bán trên item đang chọn. Bán ĐÚNG MỘT món mỗi lần bấm (xem {@code inventory.action.sell})
+     * — túi đồ không có ô nhập số lượng, và bán nhầm cả chồng đồ là thứ không hoàn tác được.
+     */
+    private void onSellSelected() {
+        controller.selected().ifPresent(item -> onSellRequested.accept(item.itemId()));
     }
 
     /** Nói ra kết quả một lệnh, rồi hỏi lại server — cùng {@link MailCoordinator#settle}. */
@@ -211,7 +251,10 @@ final class InventoryCoordinator implements WindowFlow {
     /**
      * Chi tiết item đang chọn + có bày nút Mặc hay không.
      *
-     * <p>ẨN nút khi chưa có catalog (Điều 24: không biết thì không đoán) VÀ khi item đang chọn ĐÃ
+     * <p>Nút Bán bày ra với MỌI item đang chọn — bán được hay không là việc của server
+     * ({@code SELL_OUTCOME_ITEM_NOT_SELLABLE}), client không có bảng giá bán để đoán trước.
+     *
+     * <p>ẨN nút Mặc khi chưa có catalog (Điều 24: không biết thì không đoán) VÀ khi item đang chọn ĐÃ
      * đang mặc đúng slot đó — bày ra lúc đó là bày một nút chỉ để mặc lại chính nó, vô nghĩa với
      * người chơi dù server vẫn xử lý được (OK, không hỏng).
      */
@@ -223,9 +266,9 @@ final class InventoryCoordinator implements WindowFlow {
                             EquipmentSlot slot = itemCatalog.equipSlot(item.itemTemplateId());
                             boolean equippable = slot != EquipmentSlot.EQUIPMENT_SLOT_UNSPECIFIED;
                             boolean alreadyEquipped = equippable && controller.equippedItemId(slot) == item.itemId();
-                            panel.showDetail(itemDisplayText(item), equippable && !alreadyEquipped);
+                            panel.showDetail(itemDisplayText(item), equippable && !alreadyEquipped, true);
                         },
-                        () -> panel.showDetail(text("inventory.detail.none"), false));
+                        () -> panel.showDetail(text("inventory.detail.none"), false, false));
     }
 
     /** Tên + số lượng + mức cường hoá của một item, ghép sẵn thành một chuỗi hiển thị. */

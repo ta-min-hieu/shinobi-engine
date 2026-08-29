@@ -114,10 +114,12 @@ public final class InventoryPanel implements HudWindow {
     private final Table itemList;
     private final Label detailLabel;
     private final TextButton equipButton;
+    private final TextButton sellButton;
     private final Table equipmentList;
 
     private LongConsumer onSelect;
     private Runnable onEquipSelected;
+    private Runnable onSellSelected;
     private IntConsumer onUnequip;
     private Runnable onOpened;
 
@@ -146,33 +148,10 @@ public final class InventoryPanel implements HudWindow {
         this.itemList = new Table();
         this.detailLabel = wrappingLabel(ROW_COLOR);
         this.equipButton = actionButton("inventory.action.equip", () -> fire(onEquipSelected));
+        this.sellButton = actionButton("inventory.action.sell", () -> fire(onSellSelected));
         this.equipmentList = new Table();
 
-        this.panel = new Table();
-        panel.setBackground(skin.panel);
-        panel.pad(PANEL_PAD_PX);
-        panel.add(titleRow()).width(PANEL_WIDTH_PX).left().row();
-        panel.add(statusLabel).width(PANEL_WIDTH_PX).left().padTop(6f).row();
-        panel.add(sectionTitle("inventory.section.items"))
-                .width(PANEL_WIDTH_PX)
-                .left()
-                .padTop(10f)
-                .row();
-        panel.add(capacityLabel).width(PANEL_WIDTH_PX).left().row();
-        panel.add(itemList).width(PANEL_WIDTH_PX).growX().padTop(4f).row();
-        panel.add(buildDetailSection())
-                .width(PANEL_WIDTH_PX)
-                .growX()
-                .padTop(10f)
-                .row();
-        panel.add(sectionTitle("inventory.section.equipment"))
-                .width(PANEL_WIDTH_PX)
-                .left()
-                .padTop(10f)
-                .row();
-        panel.add(equipmentList).width(PANEL_WIDTH_PX).growX().padTop(4f).row();
-        panel.add(closeHint()).width(PANEL_WIDTH_PX).left().padTop(8f).row();
-        panel.setVisible(false);
+        this.panel = buildPanel();
 
         Table container = new Table();
         container.setFillParent(true);
@@ -180,6 +159,39 @@ public final class InventoryPanel implements HudWindow {
         stage.addActor(container);
 
         installKeyHandling();
+    }
+
+    /**
+     * Dựng thân cửa sổ. Tách khỏi constructor THUẦN để giữ nó dưới ngưỡng {@code MethodLength} của
+     * Checkstyle — PHẢI gọi SAU khi mọi widget con đã gán, vì nó xếp chính chúng vào bảng.
+     */
+    private Table buildPanel() {
+        Table table = new Table();
+        table.setBackground(skin.panel);
+        table.pad(PANEL_PAD_PX);
+        table.add(titleRow()).width(PANEL_WIDTH_PX).left().row();
+        table.add(statusLabel).width(PANEL_WIDTH_PX).left().padTop(6f).row();
+        table.add(sectionTitle("inventory.section.items"))
+                .width(PANEL_WIDTH_PX)
+                .left()
+                .padTop(10f)
+                .row();
+        table.add(capacityLabel).width(PANEL_WIDTH_PX).left().row();
+        table.add(itemList).width(PANEL_WIDTH_PX).growX().padTop(4f).row();
+        table.add(buildDetailSection())
+                .width(PANEL_WIDTH_PX)
+                .growX()
+                .padTop(10f)
+                .row();
+        table.add(sectionTitle("inventory.section.equipment"))
+                .width(PANEL_WIDTH_PX)
+                .left()
+                .padTop(10f)
+                .row();
+        table.add(equipmentList).width(PANEL_WIDTH_PX).growX().padTop(4f).row();
+        table.add(closeHint()).width(PANEL_WIDTH_PX).left().padTop(8f).row();
+        table.setVisible(false);
+        return table;
     }
 
     /** Tự TẮT icon khi thiếu atlas (bản checkout chưa chạy pipeline art) — cùng {@code SkillVfxRenderer}. */
@@ -209,15 +221,20 @@ public final class InventoryPanel implements HudWindow {
         return row;
     }
 
-    /** Mục chi tiết: tên đầy đủ của item đang chọn + nút Mặc (ẩn khi item không mặc được). */
+    /**
+     * Mục chi tiết: tên đầy đủ của item đang chọn + nút Mặc (ẩn khi item không mặc được) + nút Bán
+     * (ẩn khi chưa chọn item nào).
+     */
     private Table buildDetailSection() {
         Table section = new Table();
         section.add(detailLabel)
-                .width(PANEL_WIDTH_PX - ROW_BUTTON_WIDTH_PX - 6f)
+                .width(PANEL_WIDTH_PX - (2f * ROW_BUTTON_WIDTH_PX) - 12f)
                 .left()
                 .padRight(6f);
-        section.add(equipButton).width(ROW_BUTTON_WIDTH_PX);
+        section.add(equipButton).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
+        section.add(sellButton).width(ROW_BUTTON_WIDTH_PX);
         equipButton.setVisible(false);
+        sellButton.setVisible(false);
         return section;
     }
 
@@ -324,6 +341,11 @@ public final class InventoryPanel implements HudWindow {
         this.onEquipSelected = listener;
     }
 
+    /** Người chơi bấm Bán trên item đang chọn. */
+    public void setOnSellSelected(Runnable listener) {
+        this.onSellSelected = listener;
+    }
+
     /** Số slot ({@code EquipmentSlot.getNumber()}) người chơi vừa bấm Gỡ. */
     public void setOnUnequip(IntConsumer listener) {
         this.onUnequip = listener;
@@ -392,10 +414,14 @@ public final class InventoryPanel implements HudWindow {
      * @param detailText chuỗi ĐÃ dịch (tên đầy đủ + số lượng + mức cường hoá), hoặc lời mời chọn một
      *     item khi chưa chọn gì.
      * @param canEquip có bày nút Mặc hay không (item không mặc được theo catalog, hoặc chưa chọn gì).
+     * @param canSell có bày nút Bán hay không. Chỉ hỏi "đã chọn item nào chưa": <b>bán được hay
+     *     không là việc của SERVER</b> ({@code SELL_OUTCOME_ITEM_NOT_SELLABLE}, Điều 24) — client
+     *     không có bảng giá bán của từng món để mà đoán trước.
      */
-    public void showDetail(String detailText, boolean canEquip) {
+    public void showDetail(String detailText, boolean canEquip, boolean canSell) {
         detailLabel.setText(detailText);
         equipButton.setVisible(canEquip);
+        sellButton.setVisible(canSell);
     }
 
     /**

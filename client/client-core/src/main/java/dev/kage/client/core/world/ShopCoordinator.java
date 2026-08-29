@@ -63,6 +63,9 @@ final class ShopCoordinator implements WindowFlow {
      * {@code EI_EXPOSE_REP}/{@code EI_EXPOSE_REP2} dành cho {@code PlayContext}, cùng lý do áp dụng
      * ở đây).
      */
+    /** Số lượng của một lần bấm Bán trong túi đồ — xem {@link #sellOne(long)}. */
+    private static final int SINGLE_ITEM = 1;
+
     record SharedFeeds(ItemCatalogCoordinator itemCatalog, GoldCoordinator gold) {}
 
     /**
@@ -157,14 +160,28 @@ final class ShopCoordinator implements WindowFlow {
     }
 
     /**
-     * Bán một vật phẩm THẬT — xem cảnh báo "chưa có nút bấm" ở javadoc lớp. Giao diện túi đồ gọi hàm
-     * này khi người chơi bấm Bán trên một món trong túi.
+     * Bán ĐÚNG MỘT món — lối vào của nút Bán trong giao diện túi đồ (nối ở
+     * {@code WorldScreen#wireHud}).
+     *
+     * <p>Vì sao một chứ không phải cả chồng: túi đồ không có ô nhập số lượng, và bán nhầm cả chồng
+     * đồ là thứ không hoàn tác được. Ô số lượng của {@link ShopPanel} KHÔNG dùng ở đây có chủ đích —
+     * người chơi bấm Bán từ túi đồ thường không mở cửa hàng, nên con số đó không nằm trước mắt họ.
+     *
+     * @param itemId {@code inventory_item.id} THẬT của món trong túi — thứ duy nhất
+     *     {@code SellItemCommand} chấp nhận, và chỉ giao diện túi đồ mới có
+     */
+    void sellOne(long itemId) {
+        sellItem(itemId, SINGLE_ITEM);
+    }
+
+    /**
+     * Bán một vật phẩm THẬT.
      *
      * @param itemId {@code inventory_item.id} THẬT của món trong túi (server tự tra lại giá, KHÔNG
      *     tin số nào từ client — Điều 24).
      * @param quantity số lượng muốn bán.
      */
-    void sellItem(long itemId, int quantity) {
+    private void sellItem(long itemId, int quantity) {
         sender.sellItem(itemId, quantity, controller.beginSell(itemId, quantity));
     }
 

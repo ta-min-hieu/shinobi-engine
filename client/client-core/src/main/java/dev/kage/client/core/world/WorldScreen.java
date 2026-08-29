@@ -388,6 +388,10 @@ public final class WorldScreen implements GameScreen {
         chatPanel.setCanOpen(panels::noneOpen);
         duelPanel.setCanOpen(panels::noneOpen);
         questLogPanel.setCanOpen(panels::noneOpen);
+        // Nút Bán sống trong túi đồ (chỉ ở đó mới có inventory_item.id THẬT mà SellItemCommand đòi)
+        // nhưng lệnh Bán thuộc về cửa hàng (nó giữ khoá idempotency của ADR-025). Hai luồng không
+        // biết nhau; chỗ này nối chúng lại.
+        inventory.setOnSellRequested(shop::sellOne);
         // Cổng của khung chọn hệ có THÊM một vế so với các khung khác — xem
         // FactionCoordinator#setOpenGate (chỉ bày lối vào cho nhân vật còn được mời chọn).
         faction.setOpenGate(panels::noneOpen);
