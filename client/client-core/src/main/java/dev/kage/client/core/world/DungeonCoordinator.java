@@ -13,6 +13,7 @@ import dev.kage.protocol.EnterDungeonResponse;
 import dev.kage.protocol.ExitDungeonOutcome;
 import dev.kage.protocol.ExitDungeonResponse;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.wire.PacketCodec;
 
 /**
  * Nối {@link DungeonController} (trạng thái), {@link PartyPanel}/{@link CombatHud} (hiển thị) và
@@ -27,7 +28,7 @@ import dev.kage.protocol.Opcode;
  * với nhóm ({@code ENTER_DUNGEON_OUTCOME_NOT_IN_PARTY}), và một cửa sổ mới chỉ để chứa hai cái nút
  * là thêm một phím tắt nữa cho người chơi phải nhớ mà không đổi được gì.
  */
-final class DungeonCoordinator {
+final class DungeonCoordinator implements WindowFlow {
 
     private final DungeonController controller = new DungeonController();
     private final CombatHud hud;
@@ -80,7 +81,12 @@ final class DungeonCoordinator {
      *
      * @return {@code true} nếu gói đã được xử lý ở đây.
      */
-    boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+    @Override
+    public boolean dispatch(PacketCodec.Frame frame) throws InvalidProtocolBufferException {
+        return dispatch(frame.header().opcode(), frame.payload());
+    }
+
+    private boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
         if (opcode == Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE) {
             settleEnter(EnterDungeonResponse.parseFrom(payload).getOutcome());
             return true;
@@ -145,7 +151,8 @@ final class DungeonCoordinator {
     }
 
     /** Rời màn hình/mất kết nối — trạng thái của một phiên chơi không sống sót sang phiên sau. */
-    void reset() {
+    @Override
+    public void reset() {
         controller.clear();
         refreshBanner();
     }

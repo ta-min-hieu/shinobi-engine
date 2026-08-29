@@ -95,11 +95,11 @@
 
     <!-- So sánh float bằng != có chủ đích: phát hiện "hướng di chuyển đổi so với lần gửi trước" để
          tránh gửi lại lệnh move dư thừa (giảm băng thông) — cả 2 giá trị đến từ CÙNG 1 phép tính
-         xác định (sqrt/chia) trên input rời rạc, không phải so sánh 2 giá trị trôi dạt độc lập.
-         Trường hợp xấu nhất nếu có sai số nổi: gửi thêm 1 gói tin thừa thỉnh thoảng, không phải lỗi
-         gameplay. -->
+         xác định trên input rời rạc (dirX chỉ nhận -1/0/1), không phải so sánh 2 giá trị trôi dạt
+         độc lập. Trường hợp xấu nhất nếu có sai số nổi: gửi thêm 1 gói tin thừa thỉnh thoảng, không
+         phải lỗi gameplay. -->
     <Match>
-        <Class name="dev.kage.client.core.world.WorldScreen"/>
+        <Class name="dev.kage.client.core.world.LocalIntentSender"/>
         <Bug pattern="FE_FLOATING_POINT_EQUALITY"/>
     </Match>
 

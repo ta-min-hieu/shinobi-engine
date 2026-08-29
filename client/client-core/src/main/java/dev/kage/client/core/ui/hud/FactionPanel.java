@@ -16,7 +16,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.Align;
-import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.I18NBundle;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
@@ -36,7 +35,7 @@ import dev.kage.client.core.ui.theme.KageSkin;
  * §4): nó không biết {@code Faction} là gì, không dựng packet — nó nhận các dòng ĐÃ dịch sẵn và báo
  * ra CHỈ SỐ dòng người chơi vừa bấm, đúng cách {@link PartyPanel.InviteRow} báo ra {@code inviteId}.
  */
-public final class FactionPanel implements Disposable {
+public final class FactionPanel implements HudWindow {
 
     /**
      * Phím mở. H = "hệ (phái)"; T/F/G/P đã có chủ (chat, bạn bè, bang hội, nhóm). Nằm ở đây chứ
@@ -230,14 +229,17 @@ public final class FactionPanel implements Disposable {
         }
     }
 
+    @Override
     public Stage stage() {
         return stage;
     }
 
+    @Override
     public void resize(int width, int height) {
         stage.getViewport().update(width, height, true);
     }
 
+    @Override
     public void render(float deltaTime) {
         stage.act(deltaTime);
         stage.draw();

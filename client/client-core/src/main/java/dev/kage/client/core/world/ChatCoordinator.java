@@ -12,6 +12,7 @@ import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ChatMessageEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SendChatMessageResponse;
+import dev.kage.protocol.wire.PacketCodec;
 
 /**
  * Nối {@link ChatController} (trạng thái), {@link ChatPanel} (hiển thị) và {@link WorldCommandSender}
@@ -22,7 +23,7 @@ import dev.kage.protocol.SendChatMessageResponse;
  * nào của Guild (700-799) hay Party (1300-1399), nên người chơi không thể vào bang/party để mà nhắn
  * — bày kênh ra chỉ để nhận {@code NOT_IN_GUILD} là bày ra một nút hỏng.
  */
-final class ChatCoordinator {
+final class ChatCoordinator implements WindowFlow {
 
     private final ChatController controller = new ChatController();
     private final ChatPanel panel;
@@ -48,15 +49,18 @@ final class ChatCoordinator {
     }
 
     /**
-     * Đang gõ hay không — {@code WorldScreen} phải chặn MỌI phím gameplay khi câu này đúng, xem
-     * {@link ChatPanel#isComposing()}.
+     * "Mở" với khung chat nghĩa là <b>ô nhập đang nhận chữ</b>, không phải nhật ký đang hiện: nhật
+     * ký luôn hiện và không bao giờ chiếm bàn phím. Khi câu này đúng, mọi phím gameplay phải bị chặn
+     * — xem {@link PanelHub#isAnyOpen()} và {@link ChatPanel#isComposing()}.
      */
-    boolean isComposing() {
+    @Override
+    public boolean isOpen() {
         return panel.isComposing();
     }
 
     /** Đóng ô nhập (mở hội thoại NPC, rời màn hình) — nhật ký vẫn giữ nguyên. */
-    void closeComposer() {
+    @Override
+    public void close() {
         panel.closeComposer();
     }
 
@@ -82,7 +86,12 @@ final class ChatCoordinator {
      *
      * @return {@code true} nếu gói đã được xử lý ở đây.
      */
-    boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+    @Override
+    public boolean dispatch(PacketCodec.Frame frame) throws InvalidProtocolBufferException {
+        return dispatch(frame.header().opcode(), frame.payload());
+    }
+
+    private boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
         if (opcode == Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE) {
             controller.onMessage(ChatMessageEvent.parseFrom(payload));
             refreshLines();
@@ -189,7 +198,8 @@ final class ChatCoordinator {
     }
 
     /** Rời màn hình/mất kết nối — nhật ký của một phiên chơi không được sống sót sang phiên sau. */
-    void reset() {
+    @Override
+    public void reset() {
         controller.clear();
         panel.closeComposer();
         refreshChannelLabel();

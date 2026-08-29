@@ -13,7 +13,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.Align;
-import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.I18NBundle;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
@@ -29,7 +28,7 @@ import dev.kage.client.core.ui.widget.HealthBar;
  * <p>CHỈ nhận dữ liệu qua setter, không tự đọc ECS/state gameplay (UI.md §4, §10) — caller
  * ({@code WorldScreen}, dựa trên {@code CombatHudController}) gọi các setter này mỗi tick.
  */
-public final class CombatHud implements Disposable {
+public final class CombatHud implements HudWindow {
 
     private static final float BAR_WIDTH = 190f;
     private static final float BAR_HEIGHT = 20f;
@@ -550,6 +549,7 @@ public final class CombatHud implements Disposable {
         }
     }
 
+    @Override
     public Stage stage() {
         return stage;
     }
@@ -571,10 +571,12 @@ public final class CombatHud implements Disposable {
         return skin.font();
     }
 
+    @Override
     public void resize(int width, int height) {
         stage.getViewport().update(width, height, true);
     }
 
+    @Override
     public void render(float deltaTime) {
         stage.act(deltaTime);
         stage.draw();

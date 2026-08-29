@@ -16,6 +16,7 @@ import dev.kage.protocol.ListMailResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SendMailOutcome;
 import dev.kage.protocol.SendMailResponse;
+import dev.kage.protocol.wire.PacketCodec;
 
 /**
  * Nối {@link MailController} (trạng thái), {@link MailPanel} (hiển thị) và
@@ -38,7 +39,7 @@ import dev.kage.protocol.SendMailResponse;
  * lỗ đó thật sự cần một trường "số thư chưa đọc" trong gói đăng nhập, tức phải sửa .proto — nằm
  * ngoài quyền của client.
  */
-final class MailCoordinator {
+final class MailCoordinator implements WindowFlow {
 
     private final MailController controller = new MailController();
     private final MailPanel panel;
@@ -80,12 +81,14 @@ final class MailCoordinator {
      * Cửa sổ đang mở hay không — {@code WorldScreen} phải chặn MỌI phím gameplay khi câu này đúng,
      * xem {@link MailPanel#isOpen()}.
      */
-    boolean isOpen() {
+    @Override
+    public boolean isOpen() {
         return panel.isOpen();
     }
 
     /** Đóng cửa sổ (mở hội thoại NPC, rời màn hình) — hòm thư đã tải vẫn giữ nguyên. */
-    void close() {
+    @Override
+    public void close() {
         panel.close();
     }
 
@@ -94,7 +97,12 @@ final class MailCoordinator {
      *
      * @return {@code true} nếu gói đã được xử lý ở đây.
      */
-    boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+    @Override
+    public boolean dispatch(PacketCodec.Frame frame) throws InvalidProtocolBufferException {
+        return dispatch(frame.header().opcode(), frame.payload());
+    }
+
+    private boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
         if (opcode == Opcode.OPCODE_LIST_MAIL_RESPONSE_VALUE) {
             controller.onMailList(ListMailResponse.parseFrom(payload));
             refreshView();
@@ -320,7 +328,8 @@ final class MailCoordinator {
     }
 
     /** Rời màn hình/mất kết nối — hòm thư của một phiên chơi không được sống sót sang phiên sau. */
-    void reset() {
+    @Override
+    public void reset() {
         controller.clear();
         panel.close();
         panel.clearComposer();

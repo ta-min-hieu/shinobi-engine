@@ -26,6 +26,7 @@ import dev.kage.protocol.ListGuildMembersResponse;
 import dev.kage.protocol.ListPartyMembersResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PartyMemberView;
+import dev.kage.protocol.wire.PacketCodec;
 
 /**
  * Nối {@link DuelController} (trạng thái), {@link DuelPanel} + {@link CombatHud} (hiển thị) và
@@ -47,7 +48,7 @@ import dev.kage.protocol.PartyMemberView;
  * các cặp (id, tên) — xem {@link #learnNames}. Nghe lỏm chứ không chiếm: những gói đó vẫn trả
  * {@code false} để coordinator thật của chúng xử lý bình thường.
  */
-final class DuelCoordinator {
+final class DuelCoordinator implements WindowFlow {
 
     private final DuelController controller = new DuelController();
     private final DuelPanel panel;
@@ -82,12 +83,14 @@ final class DuelCoordinator {
      * Cửa sổ có đang mở không — {@code WorldScreen} phải chặn MỌI phím gameplay khi câu này đúng,
      * xem {@link DuelPanel#isOpen()}.
      */
-    boolean isOpen() {
+    @Override
+    public boolean isOpen() {
         return panel.isOpen();
     }
 
     /** Đóng cửa sổ (mở hội thoại NPC, rời màn hình) — trạng thái trận vẫn giữ nguyên. */
-    void close() {
+    @Override
+    public void close() {
         panel.close();
     }
 
@@ -129,7 +132,12 @@ final class DuelCoordinator {
      * @return {@code true} nếu gói đã được xử lý XONG ở đây. Gói chỉ được "nghe lỏm" để nhặt tên
      *     luôn trả {@code false}: chúng thuộc về coordinator khác.
      */
-    boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+    @Override
+    public boolean dispatch(PacketCodec.Frame frame) throws InvalidProtocolBufferException {
+        return dispatch(frame.header().opcode(), frame.payload());
+    }
+
+    private boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
         learnNames(opcode, payload);
         return dispatchDuelEvent(opcode, payload) || dispatchCommandResponse(opcode, payload);
     }
@@ -381,7 +389,8 @@ final class DuelCoordinator {
     }
 
     /** Rời màn hình/mất kết nối — trạng thái đấu của một phiên chơi không sống sót sang phiên sau. */
-    void reset() {
+    @Override
+    public void reset() {
         controller.clear();
         panel.close();
         panel.setStatus(text("duel.hint.open"));

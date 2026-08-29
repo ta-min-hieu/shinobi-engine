@@ -15,7 +15,6 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import dev.kage.client.core.input.GameAction;
 import dev.kage.client.core.input.InputMapper;
 import dev.kage.client.core.net.GameConnection;
 import dev.kage.client.core.ui.hud.ChatPanel;
@@ -77,17 +76,10 @@ public final class WorldScreen implements GameScreen {
     private final RemoteCharacterPresenter remoteCharacters;
 
     /**
-     * Id dùng cho nhân vật của chính người chơi trong {@link WorldModelRenderer}. Server đánh id
-     * cho nhân vật khác; nhân vật của mình chưa bao giờ cần id nên không có. 0 an toàn vì id thật
-     * sinh từ sequence của DB, luôn dương.
-     */
-    private static final long LOCAL_CHARACTER_ID = 0L;
-
-    /**
      * Id THẬT của chính người chơi (từ DB, luôn dương) — dùng để nhận ra
      * {@link AttackResultEvent}/{@link SkillResultEvent} nào nhắm vào MÌNH (khớp
      * {@code attacker_entity_id}/{@code target_entity_id}) và quy đổi sang
-     * {@link #LOCAL_CHARACTER_ID} khi gọi {@link WorldModelRenderer}.
+     * {@link WorldConstants#LOCAL_CHARACTER_ID} khi gọi {@link WorldModelRenderer}.
      */
     private final long localCharacterId;
 
@@ -98,7 +90,9 @@ public final class WorldScreen implements GameScreen {
     private int characterLevel;
 
     private final OrthographicCamera camera = new OrthographicCamera();
-    private final Viewport viewport;
+
+    private final Viewport viewport =
+            new FitViewport(WorldConstants.VIEWPORT_HEIGHT_UNITS, WorldConstants.VIEWPORT_HEIGHT_UNITS, camera);
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
     // MEDIUM tường minh — bản cài đóng gói đúng 1 tier mặc định theo ADR-028, không phải để trống
     // dựa vào default ngầm (không có default: WorldModelRenderer bắt buộc tham số tier).
@@ -179,22 +173,17 @@ public final class WorldScreen implements GameScreen {
     /** Vòng đời nhiệm vụ: nhận → hoàn thành → lĩnh thưởng — xem {@link QuestCoordinator}. */
     private final QuestCoordinator quests;
 
+    /**
+     * Sổ đăng ký MỘT chỗ cho mọi khung HUD — vẽ/đổi kích thước/dọn/định tuyến gói/cổng phím. Xem
+     * {@link PanelHub} về lý do tồn tại và về thứ tự đăng ký.
+     */
+    private final PanelHub panels = new PanelHub();
+
     /** Xem {@link #buildInputProcessor()} về thứ tự nuốt input. */
     private final InputMultiplexer inputProcessor;
 
-    private float lastSentDirX;
-
-    /**
-     * Toàn bộ trạng thái thời gian của nút nhảy (mép nhấn + đồng hồ giữ nút) — {@code GameAction}
-     * chỉ nói "đang giữ hay không", biến nó thành cú nhảy đơn/đôi là việc của lớp này.
-     */
-    private final JumpInputController jumpInput = new JumpInputController();
-
-    /** Edge-detection cho phím Enter — giữ phím không spam skill (nhảy có bộ đếm riêng ở {@link #jumpInput}). */
-    private boolean skillKeyWasPressed;
-
-    /** Phím Z + nút Đánh trên HUD gộp về một nguồn — xem {@link AttackInputController}. */
-    private final AttackInputController attackInput = new AttackInputController();
+    /** Phím → ý định gửi lên server (đi lại/nhảy/đánh/skill) — xem {@link LocalIntentSender}. */
+    private final LocalIntentSender intents;
 
     /**
      * @param context {@link EcsWorld} + {@link InputMapper} gộp lại (CODING-STANDARDS
@@ -204,7 +193,7 @@ public final class WorldScreen implements GameScreen {
      *     KHÔNG gửi {@link CharacterSpawnedEvent} cho chính mình (đã có {@code MoveResponse}), nên
      *     đây là nguồn duy nhất để biết phải vẽ mình bằng model nào; mang theo {@code id} để nhận ra
      *     {@link AttackResultEvent}/{@link SkillResultEvent} nào đang nhắm vào MÌNH thay vì quái
-     *     ({@link #LOCAL_CHARACTER_ID} chỉ là sentinel nội bộ cho render, không phải id thật).
+     *     ({@link WorldConstants#LOCAL_CHARACTER_ID} chỉ là sentinel nội bộ cho render, không phải id thật).
      */
     public WorldScreen(PlayContext context, GameConnection connection, CharacterSummary character) {
         this.world = context.world();
@@ -213,24 +202,11 @@ public final class WorldScreen implements GameScreen {
         this.localCharacterId = character.getId();
         this.characterLevel = character.getLevel();
         this.combatHudController = new CombatHudController(character.getId(), character.getFaction());
-        this.combatAnimationTrigger = new CombatAnimationTrigger(models, localCharacterId, LOCAL_CHARACTER_ID);
+        this.combatAnimationTrigger =
+                new CombatAnimationTrigger(models, localCharacterId, WorldConstants.LOCAL_CHARACTER_ID);
         this.remoteCharacters = new RemoteCharacterPresenter(context.world(), models);
-        this.viewport =
-                new FitViewport(WorldConstants.VIEWPORT_HEIGHT_UNITS, WorldConstants.VIEWPORT_HEIGHT_UNITS, camera);
-
-        world.addSystem(new MovementSystem());
-        // ADR-033 — trục dọc chạy CÙNG công thức server (GRAVITY_MPS2 khớp) để dự đoán cục bộ
-        // (CLIENT.md §6) khớp server; và CÙNG bộ bệ với server (WorldFacade.DEMO_PLATFORMS) —
-        // BẮT BUỘC, xem javadoc DemoPlatforms.physics() về hậu quả nếu thiếu (rơi xuyên bệ).
-        VerticalMovementSystem verticalMovementSystem = new VerticalMovementSystem(WorldConstants.GRAVITY_MPS2);
-        verticalMovementSystem.setPlatforms(DemoPlatforms.physics());
-        world.addSystem(verticalMovementSystem);
-
-        // Spawn (0,0) khớp mặc định server-world.WorldConstants.SPAWN_X/Y — chưa có persistence
-        // vị trí (server-world follow-up), MoveResponse đầu tiên sẽ tự sửa nếu lệch.
-        this.localPlayer = world.createEntity();
-        localPlayer.add(new PositionComponent());
-        localPlayer.add(new VelocityComponent());
+        installMovementSystems();
+        this.localPlayer = spawnLocalPlayer();
 
         // SAU khi localPlayer tồn tại: presenter giữ tham chiếu thẳng tới PositionComponent của
         // chính người chơi (xem javadoc constructor của nó).
@@ -243,18 +219,90 @@ public final class WorldScreen implements GameScreen {
         this.chat = new ChatCoordinator(chatPanel, sender);
         // SAU chat: cả ba coordinator dưới đây mượn nhật ký chat/chữ nổi làm chỗ báo lý do thất bại.
         this.party = new PartyCoordinator(partyPanel, sender, chat);
-        this.friends = new FriendCoordinator(friendPanel, sender, combatFeedback, this::noTextInputActive);
-        this.guild = new GuildCoordinator(guildPanel, sender, this::noTextInputActive);
+        this.friends = new FriendCoordinator(friendPanel, sender, combatFeedback, panels::noneOpen);
+        this.guild = new GuildCoordinator(guildPanel, sender, panels::noneOpen);
         this.duel = new DuelCoordinator(duelPanel, combatHud, sender, combatFeedback);
         this.dungeon = new DungeonCoordinator(partyPanel, combatHud, sender, chat);
         this.faction = new FactionCoordinator(
                 factionPanel,
                 sender,
                 combatFeedback,
-                new LocalCharacterAppearance(models, combatHudController, LOCAL_CHARACTER_ID));
-        this.mail = new MailCoordinator(mailPanel, sender, combatFeedback, this::noTextInputActive);
+                new LocalCharacterAppearance(models, combatHudController, WorldConstants.LOCAL_CHARACTER_ID));
+        this.mail = new MailCoordinator(mailPanel, sender, combatFeedback, panels::noneOpen);
+        // SAU dialogue: đánh/skill bị chặn khi đang đọc lời thoại, xem LocalIntentContext#dialogueOpen.
+        this.intents = new LocalIntentSender(new LocalIntentSender.LocalIntentContext(
+                inputMapper,
+                sender,
+                models,
+                localPlayer,
+                combatHudController,
+                combatFeedback,
+                panels::noneOpen,
+                dialogue::isOpen));
+        registerPanels();
         wireHud(character);
         this.inputProcessor = buildInputProcessor();
+    }
+
+    /**
+     * Hai hệ di chuyển của client, chạy CÙNG công thức với server để dự đoán cục bộ (CLIENT.md §6)
+     * khớp — ADR-033 cho trục dọc: {@code GRAVITY_MPS2} khớp, và CÙNG bộ bệ với server
+     * ({@code WorldFacade.DEMO_PLATFORMS}) là BẮT BUỘC, xem javadoc {@link DemoPlatforms#physics()}
+     * về hậu quả nếu thiếu (rơi xuyên bệ).
+     */
+    private void installMovementSystems() {
+        world.addSystem(new MovementSystem());
+        VerticalMovementSystem verticalMovementSystem = new VerticalMovementSystem(WorldConstants.GRAVITY_MPS2);
+        verticalMovementSystem.setPlatforms(DemoPlatforms.physics());
+        world.addSystem(verticalMovementSystem);
+    }
+
+    /**
+     * Spawn (0,0) khớp mặc định {@code server-world.WorldConstants.SPAWN_X/Y} — chưa có persistence
+     * vị trí (server-world follow-up), {@code MoveResponse} đầu tiên sẽ tự sửa nếu lệch.
+     */
+    private KEntity spawnLocalPlayer() {
+        KEntity entity = world.createEntity();
+        entity.add(new PositionComponent());
+        entity.add(new VelocityComponent());
+        return entity;
+    }
+
+    /**
+     * Đăng ký mọi khung HUD vào {@link #panels}. <b>Thứ tự ở đây là thứ tự nuốt input</b>, từ trên
+     * xuống — {@link PanelHub} suy ra thứ tự vẽ (ngược lại) và thứ tự dọn tài nguyên (xuôi) từ đúng
+     * một danh sách này, xem javadoc của nó.
+     *
+     * <p>Hội thoại đứng đầu vì đang nói chuyện mà bấm trúng nút Đánh phía sau, hoặc click xuyên qua
+     * khung thoại để chọn mục tiêu, đều là hỏng. Bốn cửa sổ che GIỮA màn hình (Nhóm, Bạn bè, Bang
+     * hội, Đấu, Hệ phái, Thư) đứng ngay sau vì chúng đè lên cả chat lẫn HUD; thứ tự GIỮA chúng với
+     * nhau không quan trọng — {@link PanelHub#isAnyOpen()} đảm bảo không bao giờ có hai cái cùng mở.
+     *
+     * <p>Cửa sổ bạn bè đứng TRƯỚC chat: cả hai mở ô nhập bằng một phím ở {@code keyUp}, và cái đứng
+     * trước là cái duy nhất chặn được phím của cái kia (xem {@code FriendPanel#installKeyHandling}).
+     * Chat đứng trên HUD vì click vào nhật ký chat không được rơi xuống tầng thế giới thành lệnh
+     * chọn mục tiêu. HUD đăng ký CUỐI CÙNG vì hai lý do cùng chỉ về một hướng: nó phải nhận input
+     * sau mọi cửa sổ, và nó là chủ của {@code KageSkin} mà mọi panel mượn, nên nó phải là thứ trả
+     * tài nguyên sau cùng.
+     *
+     * <p>{@code quests} và {@code dungeon} không có cửa sổ riêng ({@link QuestCoordinator} vẽ vào
+     * HUD, {@link DungeonCoordinator} vẽ vào khung Nhóm) nên chỉ đăng ký phần luồng gói. Quests đăng
+     * ký TRƯỚC dialogue có chủ đích: {@code AcceptQuestResponse} có nghĩa với CẢ HAI (cập nhật
+     * nhiệm vụ vs đóng khung thoại), và {@link PanelHub#dispatch} hỏi cả hai chứ không dừng ở cái
+     * đầu tiên nhận.
+     */
+    private void registerPanels() {
+        panels.register(quests);
+        panels.register(dialoguePanel, dialogue);
+        panels.register(partyPanel, party);
+        panels.register(friendPanel, friends);
+        panels.register(guildPanel, guild);
+        panels.register(duelPanel, duel);
+        panels.register(factionPanel, faction);
+        panels.register(mailPanel, mail);
+        panels.register(chatPanel, chat);
+        panels.register(dungeon);
+        panels.register(combatHud);
     }
 
     /**
@@ -262,9 +310,9 @@ public final class WorldScreen implements GameScreen {
      * {@code MethodLength} của Checkstyle — mỗi khung mới thêm vào lại đẩy constructor lên một dòng,
      * và nó đã chạm trần đúng ba lần trong một ngày.
      *
-     * <p>{@link #noTextInputActive()} là cổng CHUNG cho mọi khung mở bằng phím, kể cả chat. Truyền
+     * <p>{@link PanelHub#noneOpen()} là cổng CHUNG cho mọi khung mở bằng phím, kể cả chat. Truyền
      * cùng MỘT hàm cho tất cả là điều quan trọng: hai cực khác nhau ở hai chỗ đã sinh ra một lỗi thật
-     * (cửa sổ chỉ mở được đúng lúc đáng lẽ phải bị chặn) — xem {@link #isTextInputActive()}.
+     * (cửa sổ chỉ mở được đúng lúc đáng lẽ phải bị chặn) — xem {@link PanelHub#isAnyOpen()}.
      *
      * @param character {@code CharacterSummary} của chính người chơi: cấp + hệ phái là hai thứ DUY
      *     NHẤT ngoài HUD cần nối ở đây (model 3D của mình vẽ theo hệ phái, và bước chọn hệ phái ở
@@ -272,14 +320,14 @@ public final class WorldScreen implements GameScreen {
      */
     private void wireHud(CharacterSummary character) {
         combatHud.setSkillLabel(combatHudController.skillNameKey());
-        combatHud.setOnSkillClicked(this::onSkillButtonClicked);
-        combatHud.setOnAttackClicked(attackInput::onButtonClicked);
-        partyPanel.setCanOpen(this::noTextInputActive);
-        chatPanel.setCanOpen(this::noTextInputActive);
-        duelPanel.setCanOpen(this::noTextInputActive);
+        combatHud.setOnSkillClicked(intents::onSkillButtonClicked);
+        combatHud.setOnAttackClicked(intents::onAttackButtonClicked);
+        partyPanel.setCanOpen(panels::noneOpen);
+        chatPanel.setCanOpen(panels::noneOpen);
+        duelPanel.setCanOpen(panels::noneOpen);
         // Cổng của khung chọn hệ có THÊM một vế so với các khung khác — xem
         // FactionCoordinator#setOpenGate (chỉ bày lối vào cho nhân vật còn được mời chọn).
-        faction.setOpenGate(this::noTextInputActive);
+        faction.setOpenGate(panels::noneOpen);
         faction.onCharacterState(character.getLevel(), character.getFaction());
         // Vứt sạch view của world cũ rồi xin lại vị trí của chính mình — LÝ DO đầy đủ (giao thức
         // không có gói "đổi World" nào) nằm ở DungeonCoordinator#setOnWorldChanged. Gửi lại ĐÚNG
@@ -290,42 +338,24 @@ public final class WorldScreen implements GameScreen {
             npcPresenter.clear();
             monsterPresenter.clear(combatHudController.monsters().keySet());
             combatHudController.clearMonsters();
-            sender.moveDirection(lastSentDirX);
+            intents.resendDirection();
         });
         // Bậc trang phục của chính mình chưa suy được từ đâu (xem CharacterAppearance phía server) —
         // dùng đúng giá trị mặc định server đang phát cho người khác, để mình và người khác nhìn
         // thấy mình giống nhau. Đổi hệ phái giữa trận đi lại ĐÚNG đường này
         // (LocalCharacterAppearance#applyFaction), nên nó nằm cạnh phần wiring.
         models.addCharacter(
-                LOCAL_CHARACTER_ID, CharacterModelKey.of(character.getFaction(), CostumeTier.COSTUME_TIER_UNSPECIFIED));
+                WorldConstants.LOCAL_CHARACTER_ID,
+                CharacterModelKey.of(character.getFaction(), CostumeTier.COSTUME_TIER_UNSPECIFIED));
     }
 
-    /**
-     * Thứ tự nuốt input: hội thoại → nhóm → bạn bè → bang hội → chat → HUD → thế giới.
-     *
-     * <p>Hội thoại đứng đầu vì đang nói chuyện mà bấm trúng nút Đánh phía sau, hoặc click xuyên qua
-     * khung thoại để chọn mục tiêu, đều là hỏng. Ba cửa sổ che GIỮA màn hình (Nhóm, Bạn bè, Bang
-     * hội) đứng ngay sau vì chúng đè lên cả chat lẫn HUD; thứ tự GIỮA ba cái với nhau không quan
-     * trọng — {@link #isTextInputActive()} đảm bảo không bao giờ có hai cái cùng mở. Chat đứng trên
-     * HUD vì click vào nhật ký chat không
-     * được rơi xuống tầng thế giới thành lệnh chọn mục tiêu. HUD trên thế giới vì {@code Stage} chỉ
-     * trả {@code true} ở {@code touchDown} khi có actor thật nhận cú click, nên bấm vào vùng trống
-     * của HUD vẫn rơi xuống {@link WorldTargetPicker} đúng như mong đợi.
-     */
+    /** Thứ tự nuốt input do {@link #registerPanels()} quyết định; thế giới luôn đứng cuối cùng. */
     private InputMultiplexer buildInputProcessor() {
-        // Cửa sổ bạn bè đứng TRƯỚC chat: cả hai mở ô nhập bằng một phím ở keyUp, và cái đứng trước
-        // là cái duy nhất chặn được phím của cái kia (xem FriendPanel#installKeyHandling).
-        return new InputMultiplexer(
-                dialoguePanel.stage(),
-                partyPanel.stage(),
-                friendPanel.stage(),
-                guildPanel.stage(),
-                duelPanel.stage(),
-                factionPanel.stage(),
-                mailPanel.stage(),
-                chatPanel.stage(),
-                combatHud.stage(),
-                new WorldTargetPicker());
+        InputMultiplexer multiplexer = new InputMultiplexer(panels.stages());
+        // Tầng thế giới đứng SAU mọi Stage: Stage chỉ trả true ở touchDown khi có actor thật nhận cú
+        // click, nên bấm vào vùng trống của HUD vẫn rơi xuống đây đúng như mong đợi.
+        multiplexer.addProcessor(new WorldTargetPicker());
+        return multiplexer;
     }
 
     @Override
@@ -341,40 +371,21 @@ public final class WorldScreen implements GameScreen {
         Gdx.input.setInputProcessor(null);
         // Khung hội thoại không được sống sót qua một lần rời màn hình — quay lại sẽ thấy nó treo ở
         // node cũ trong khi server đã quên sạch cuộc nói chuyện đó.
-        dialogue.reset();
-        chat.reset();
-        party.reset();
-        friends.reset();
-        guild.reset();
-        duel.reset();
-        faction.reset();
-        dungeon.reset();
-        mail.reset();
+        panels.resetAll();
     }
 
     @Override
     public void resize(int width, int height) {
         viewport.update(width, height, true);
         models.resize(camera.viewportWidth, camera.viewportHeight);
-        combatHud.resize(width, height);
-        dialoguePanel.resize(width, height);
-        chatPanel.resize(width, height);
-        partyPanel.resize(width, height);
-        friendPanel.resize(width, height);
-        guildPanel.resize(width, height);
-        duelPanel.resize(width, height);
-        factionPanel.resize(width, height);
-        mailPanel.resize(width, height);
+        panels.resize(width, height);
         combatFeedback.resize(width, height);
     }
 
     @Override
     public void fixedUpdate(float fixedDeltaTime) {
         processInboundPackets();
-        updateLocalMovementIntent();
-        updateJumpIntent(fixedDeltaTime);
-        updateAttackIntent(fixedDeltaTime);
-        updateSkillIntent();
+        intents.tick(fixedDeltaTime);
         combatHudController.tick(fixedDeltaTime);
         remoteCharacters.tick(fixedDeltaTime);
         monsterPresenter.tick(fixedDeltaTime);
@@ -389,25 +400,12 @@ public final class WorldScreen implements GameScreen {
 
     private void dispatch(PacketCodec.Frame frame) {
         try {
+            if (panels.dispatch(frame)) {
+                return;
+            }
             int opcode = frame.header().opcode();
             byte[] payload = frame.payload();
-            // quests TRƯỚC dialogue, và KHÔNG dùng else-if giữa hai cái: AcceptQuestResponse có
-            // nghĩa với CẢ HAI (cập nhật nhiệm vụ vs đóng khung thoại). Dừng ở cái đầu tiên trả true
-            // sẽ làm mất đúng một trong hai việc.
-            boolean handled = quests.dispatch(opcode, payload);
-            handled |= dialogue.dispatch(opcode, payload);
-            handled |= chat.dispatch(opcode, payload);
-            handled |= party.dispatch(opcode, payload);
-            handled |= friends.dispatch(opcode, payload);
-            handled |= guild.dispatch(opcode, payload);
-            handled |= duel.dispatch(opcode, payload);
-            handled |= dungeon.dispatch(opcode, payload);
-            // Nhận cả KHUNG chứ không chỉ (opcode, payload): thất bại của lệnh đổi hệ về qua
-            // ErrorResponse dùng chung, chỉ nối lại đúng yêu cầu được bằng sequenceId ở header —
-            // xem FactionCoordinator.
-            handled |= faction.dispatch(frame);
-            handled |= mail.dispatch(opcode, payload);
-            if (!handled && !dispatchMovement(opcode, payload)) {
+            if (!dispatchMovement(opcode, payload)) {
                 dispatchCombat(opcode, payload);
             }
             // Opcode khác (VD PongResponse của heartbeat) — không thuộc gameplay world, bỏ qua.
@@ -530,7 +528,7 @@ public final class WorldScreen implements GameScreen {
         pos.grounded = true;
         pos.airJumpsUsed = 0;
         combatHudController.onRespawn(event.getCurrentHp(), event.getCurrentChi());
-        models.resetAfterRespawn(LOCAL_CHARACTER_ID);
+        models.resetAfterRespawn(WorldConstants.LOCAL_CHARACTER_ID);
     }
 
     /**
@@ -557,177 +555,6 @@ public final class WorldScreen implements GameScreen {
         }
     }
 
-    private void onSkillButtonClicked() {
-        if (!combatHudController.useSkill()) {
-            return; // Chưa đủ điều kiện cục bộ (hồi chiêu/Khí/mục tiêu) — không gửi gì thừa.
-        }
-        // Dự đoán CỤC BỘ animation (không phải kết quả gameplay) của chính mình — CLIENT.md §6 cho
-        // phép dự đoán "di chuyển/animation của chính mình". SkillResultEvent xác nhận tới sau sẽ
-        // gọi lại models.playSkillCast() lần nữa nhưng vô hại (playOneShotState bỏ qua nếu clip
-        // giống hệt đang chạy) — không có xung đột gameplay vì animation không quyết định gì.
-        models.playSkillCast(LOCAL_CHARACTER_ID);
-        sender.useSkill(combatHudController.skillCode(), combatHudController.currentTargetId());
-    }
-
-    /**
-     * Phím gameplay, đã trừ đi lúc người chơi đang gõ chat hoặc đang mở khung bang hội.
-     *
-     * <p>MỌI chỗ đọc input đi qua đây thay vì gọi thẳng {@link InputMapper} — và đó là điểm mấu
-     * chốt, không phải chuyện gọn gàng. Phím gameplay được <b>poll</b> qua
-     * {@code Gdx.input.isKeyPressed} chứ không nhận qua {@code InputProcessor}, tức là chúng đi vòng
-     * qua lưng {@code InputMultiplexer}: {@code Stage} của khung chat có nuốt phím hay không cũng
-     * không ngăn được chữ "a" vừa gõ đồng thời làm nhân vật chạy sang trái. Chặn tập trung ở một
-     * hàm thì không thể sót một loại input nào; rải {@code if} ở từng chỗ đọc thì sót là chuyện sớm
-     * muộn.
-     *
-     * <p>Cùng lý do y hệt cho mọi cửa sổ có ô nhập chữ (Nhóm, Bạn bè) — xem
-     * {@link #isTextInputActive()}.
-     *
-     * <p>Trả {@code false} đều tay cho MỌI action cũng chính là thứ làm nhân vật <b>dừng lại</b>
-     * trên server: {@link #updateLocalMovementIntent} thấy hướng đổi thành 0 và tự gửi
-     * {@code MoveCommand} một lần — không cần đường dừng riêng.
-     */
-    private boolean isPressed(GameAction action) {
-        return !isTextInputActive() && inputMapper.isPressed(action);
-    }
-
-    /**
-     * Có khung nào đang nhận chữ gõ vào, hoặc đang chờ người chơi đọc/bấm hay không.
-     *
-     * <p><b>Nguồn chân lý DUY NHẤT</b> cho hai câu hỏi vốn là một: "phím vừa bấm là ý định gameplay
-     * hay là một ký tự?" ({@link #isPressed}) và "phím vừa bấm có được phép mở thêm một cửa sổ nữa
-     * không?" (mỗi panel hỏi qua {@code setCanOpen}).
-     *
-     * <p>Phải tập trung ở ĐÂY vì mỗi khung có {@code Stage} riêng, và <b>một {@code Stage} không
-     * nhìn thấy keyboard focus của {@code Stage} khác</b>. Hệ quả là một bug có thật, tìm ra lúc gộp
-     * ba luồng làm song song: {@code InputMultiplexer} chuyển {@code keyUp} xuống tầng dưới cho tới
-     * khi có ai trả {@code true}, mà mỗi panel chỉ nhận ra phím mở của CHÍNH nó — nên gõ chữ "p"
-     * trong ô chat sẽ bật cửa sổ Nhóm, và gõ chữ "t" trong ô tên bạn bè sẽ bật ô chat. Panel này
-     * không cần biết panel kia tồn tại; tất cả chỉ hỏi cùng một câu ở cùng một chỗ.
-     *
-     * <p>Khung hội thoại NPC nằm trong danh sách dù không có ô nhập nào: đang đọc lời thoại thì phím
-     * cũng không phải ý định gameplay, và mở đè một cửa sổ khác lên là hỏng.
-     */
-    private boolean isTextInputActive() {
-        return chat.isComposing()
-                || dialogue.isOpen()
-                || party.isOpen()
-                || friends.isOpen()
-                || guild.isOpen()
-                || duel.isOpen()
-                || faction.isOpen()
-                || mail.isOpen();
-    }
-
-    /** Dạng phủ định của {@link #isTextInputActive()} — cổng {@code setCanOpen} của các panel. */
-    private boolean noTextInputActive() {
-        return !isTextInputActive();
-    }
-
-    /**
-     * ADR-033 — chỉ còn trái/phải (bỏ MOVE_UP/MOVE_DOWN, xem {@link GameAction}). {@code dirY} LUÔN
-     * gửi {@code 0f}: field còn tồn tại trên dây (movement.proto không xoá field đang dùng,
-     * shared/CLAUDE.md) nhưng server-world giờ bỏ qua nó (WorldFacade.handleMoveIntent) — giữ 0
-     * cục bộ để dự đoán khớp đúng những gì server THẬT SỰ áp dụng.
-     */
-    private void updateLocalMovementIntent() {
-        float dirX = 0f;
-        if (isPressed(GameAction.MOVE_LEFT)) {
-            dirX -= 1f;
-        }
-        if (isPressed(GameAction.MOVE_RIGHT)) {
-            dirX += 1f;
-        }
-        // dirX chỉ có thể là -1/0/1 (2 flag loại trừ cùng lúc) — không cần chuẩn hoá độ dài như
-        // trước ADR-033 (khi còn 2 trục, đi chéo cần chia cho sqrt(2)).
-        float normalizedDirX = dirX;
-
-        // Quay mặt theo chiều đi; dirX == 0 (đứng yên) GIỮ NGUYÊN hướng cũ, không quay về mặc định.
-        if (normalizedDirX != 0f) {
-            models.setFacingRight(LOCAL_CHARACTER_ID, normalizedDirX > 0f);
-        }
-
-        VelocityComponent velocity = VELOCITY.get(localPlayer);
-        velocity.x = normalizedDirX * WorldConstants.MOVE_SPEED_MPS;
-        velocity.y = 0f;
-
-        if (normalizedDirX != lastSentDirX) {
-            lastSentDirX = normalizedDirX;
-            sender.moveDirection(normalizedDirX);
-        }
-    }
-
-    /**
-     * ADR-033 + nhảy đôi (chủ dự án yêu cầu 2026-08-09) — luật nhảy nằm trong
-     * {@link JumpInputController}; ở đây chỉ nối input với mạng.
-     */
-    private void updateJumpIntent(float fixedDeltaTime) {
-        boolean jumpPressed = isPressed(GameAction.JUMP);
-        if (jumpInput.update(jumpPressed, POSITION.get(localPlayer), fixedDeltaTime)) {
-            sender.jump();
-        }
-    }
-
-    /**
-     * Đánh thường BẰNG TAY (chủ dự án yêu cầu 2026-08-09) — phím Z hoặc nút Đánh trên HUD, gộp ở
-     * {@link AttackInputController}. Animation vung đòn phát NGAY tại chỗ (dự đoán cục bộ hợp lệ
-     * theo CLIENT.md §6 — animation không quyết định gameplay); kết quả thật tới sau qua
-     * {@code AttackResultEvent} và có thể là trượt/ngoài tầm, đó là chuyện của server.
-     */
-    private void updateAttackIntent(float fixedDeltaTime) {
-        // Đang nói chuyện thì phím Z/Enter thuộc về khung thoại, không phải về combat: người chơi
-        // đang đọc chữ, không nhắm ai. Vẫn cho đi lại/nhảy — đứng hình khi mở thoại còn khó chịu hơn.
-        if (dialogue.isOpen() || !attackInput.update(isPressed(GameAction.ATTACK), fixedDeltaTime)) {
-            return;
-        }
-        CombatHudController.MonsterState target = combatHudController.targetState();
-        if (target == null) {
-            // Không có mục tiêu thì server cũng không làm gì — nói ra thay vì im lặng, và KHÔNG gửi
-            // gói thừa (cùng lý do CombatHudController.useSkill không gửi khi chưa đủ điều kiện).
-            combatFeedback.showSelfNotice("hud.combat.no_target", FloatingCombatText.MISS);
-            return;
-        }
-        if (!withinAttackRange(target)) {
-            // VẪN gửi: client chỉ ĐOÁN tầm (xem CombatConstants.ATTACK_RANGE_METERS), server mới
-            // quyết. Nói cho người chơi biết lý do khả dĩ thay vì để họ bấm mãi không hiểu gì.
-            combatFeedback.showSelfNotice("hud.combat.out_of_range", FloatingCombatText.MISS);
-        }
-        models.playAttack(LOCAL_CHARACTER_ID);
-        sender.attack();
-    }
-
-    private boolean withinAttackRange(CombatHudController.MonsterState target) {
-        PositionComponent pos = POSITION.get(localPlayer);
-        float dx = target.x() - pos.x;
-        float dy = target.y() - pos.y;
-        // So bình phương — tránh Math.sqrt mỗi lần bấm đánh, và tránh cả sai số của phép căn.
-        return (dx * dx) + (dy * dy) <= CombatConstants.ATTACK_RANGE_METERS * CombatConstants.ATTACK_RANGE_METERS;
-    }
-
-    /**
-     * Phím Enter = bấm nút skill (chủ dự án yêu cầu 2026-08-09) — đi qua ĐÚNG đường của nút chuột
-     * ({@link #onSkillButtonClicked}) chứ không nhân bản logic, nên hồi chiêu/Khí/mục tiêu được
-     * kiểm y hệt. Rising edge: giữ Enter không bắn skill liên tục.
-     */
-    private void updateSkillIntent() {
-        boolean skillPressed = isPressed(GameAction.USE_SKILL);
-        if (skillPressed && !skillKeyWasPressed && !dialogue.isOpen()) {
-            onSkillButtonClicked();
-        }
-        skillKeyWasPressed = skillPressed;
-    }
-
-    /**
-     * Click chuột trái vào thế giới — trúng quái thì chọn làm mục tiêu (2026-08-09), trúng NPC thì
-     * bắt chuyện.
-     *
-     * <p>Thử QUÁI TRƯỚC: hai loại chỉ chồng nhau khi chúng đứng gần nhau trên màn hình, và trong
-     * tình huống đó việc gấp là đánh chứ không phải nói chuyện.
-     *
-     * @param screenX toạ độ chuột thô từ {@code InputProcessor}.
-     * @param screenY toạ độ chuột thô ({@code InputProcessor} lấy gốc TRÊN-trái).
-     * @return {@code true} nếu click trúng thứ gì đó — nuốt sự kiện, không để rơi tiếp xuống.
-     */
     private boolean selectTargetAt(int screenX, int screenY) {
         // Lật y sang quy ước GL của WorldToScreen (gốc DƯỚI-trái).
         float glScreenY = Gdx.graphics.getHeight() - screenY;
@@ -755,13 +582,7 @@ public final class WorldScreen implements GameScreen {
         NpcPresenter.NpcState npc = npcPresenter.npcs().get(npcId);
         // Hai khung nhập liệu cùng mở là một cái bẫy phím: ESC sẽ đóng khung thoại (nó đứng trước
         // trong InputMultiplexer) chứ không đóng ô chat đang giữ keyboard focus.
-        chat.closeComposer();
-        party.close();
-        friends.close();
-        guild.close();
-        duel.close();
-        faction.close();
-        mail.close();
+        panels.closeAll();
         dialogue.talkTo(npc.code());
         return true;
     }
@@ -788,15 +609,7 @@ public final class WorldScreen implements GameScreen {
         }
 
         syncCombatHud();
-        combatHud.render(Gdx.graphics.getDeltaTime());
-        chatPanel.render(Gdx.graphics.getDeltaTime());
-        partyPanel.render(Gdx.graphics.getDeltaTime());
-        friendPanel.render(Gdx.graphics.getDeltaTime());
-        guildPanel.render(Gdx.graphics.getDeltaTime());
-        duelPanel.render(Gdx.graphics.getDeltaTime());
-        factionPanel.render(Gdx.graphics.getDeltaTime());
-        mailPanel.render(Gdx.graphics.getDeltaTime());
-        dialoguePanel.render(Gdx.graphics.getDeltaTime());
+        panels.render(Gdx.graphics.getDeltaTime());
     }
 
     /**
@@ -829,11 +642,11 @@ public final class WorldScreen implements GameScreen {
         float localX = interpolatedX(localPlayer, alpha);
         float localY = interpolatedY(localPlayer, alpha);
         float localZ = interpolatedZ(localPlayer, alpha);
-        models.setPosition(LOCAL_CHARACTER_ID, localX, localY, localZ);
-        models.setMoving(LOCAL_CHARACTER_ID, isLocalPlayerMoving());
+        models.setPosition(WorldConstants.LOCAL_CHARACTER_ID, localX, localY, localZ);
+        models.setMoving(WorldConstants.LOCAL_CHARACTER_ID, isLocalPlayerMoving());
         // ADR-033 — grounded là trạng thái dự đoán cục bộ/xác nhận qua MoveResponse, KHÔNG nội suy
         // (giống lý do isLocalPlayerMoving đọc VelocityComponent thẳng, không qua interpolation).
-        models.setAirborne(LOCAL_CHARACTER_ID, !POSITION.get(localPlayer).grounded);
+        models.setAirborne(WorldConstants.LOCAL_CHARACTER_ID, !POSITION.get(localPlayer).grounded);
         remoteCharacters.sync(alpha);
         // Quái đi cùng lượt vẽ với nhân vật (cùng Scene list, cùng camera) — chỉ nguồn dữ liệu là
         // khác: chúng không có entity ECS phía client, xem MonsterPresenter.sync.
@@ -899,16 +712,9 @@ public final class WorldScreen implements GameScreen {
         // TRƯỚC combatHud: combatFeedback mượn font của HUD, dispose HUD trước là kéo font ra khỏi
         // dưới chân nó (dù ở đây nó không dùng font lúc dispose, giữ đúng thứ tự sở hữu).
         combatFeedback.dispose();
-        // TRƯỚC combatHud như combatFeedback, và cùng lý do: panel mượn skin của HUD.
-        dialoguePanel.dispose();
-        chatPanel.dispose();
-        partyPanel.dispose();
-        friendPanel.dispose();
-        guildPanel.dispose();
-        duelPanel.dispose();
-        factionPanel.dispose();
-        mailPanel.dispose();
-        combatHud.dispose();
+        // Panel mượn skin của CombatHud nên phải trả tài nguyên trước chủ skin — PanelHub dọn
+        // theo đúng thứ tự đăng ký, và HUD đăng ký cuối cùng chính vì vậy.
+        panels.dispose();
     }
 
     /**

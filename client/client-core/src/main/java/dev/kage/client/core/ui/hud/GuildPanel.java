@@ -18,7 +18,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.ui.TextField;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.Align;
-import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.I18NBundle;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
@@ -44,7 +43,7 @@ import dev.kage.client.core.ui.theme.KageSkin;
  * Chữ tĩnh của chính khung (tiêu đề, nhãn nút) thì tra i18n tại chỗ theo khoá CỐ ĐỊNH của lớp này —
  * cùng cách {@link DialoguePanel} làm, vì đó là chữ của giao diện chứ không phải dữ liệu từ mạng.
  */
-public final class GuildPanel implements Disposable {
+public final class GuildPanel implements HudWindow {
 
     /**
      * Phím mở khung. Nằm ở đây chứ không ở {@code GameAction} vì đây KHÔNG phải ý định gameplay —
@@ -497,14 +496,17 @@ public final class GuildPanel implements Disposable {
         }
     }
 
+    @Override
     public Stage stage() {
         return stage;
     }
 
+    @Override
     public void resize(int width, int height) {
         stage.getViewport().update(width, height, true);
     }
 
+    @Override
     public void render(float deltaTime) {
         stage.act(deltaTime);
         stage.draw();

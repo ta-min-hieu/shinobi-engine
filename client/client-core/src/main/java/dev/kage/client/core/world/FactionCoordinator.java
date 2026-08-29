@@ -36,7 +36,7 @@ import dev.kage.protocol.wire.PacketCodec;
  * phép kết luận là <i>"server đã chấp nhận ĐÚNG yêu cầu số N của tôi"</i> — xem
  * {@link FactionController} về ba giới hạn còn lại của giao thức này.
  */
-final class FactionCoordinator {
+final class FactionCoordinator implements WindowFlow {
 
     /** Không có yêu cầu nào đang treo. 0 an toàn: {@code GameConnection} đánh số từ 1. */
     private static final int NO_PENDING = 0;
@@ -108,11 +108,13 @@ final class FactionCoordinator {
     }
 
     /** Cửa sổ đang mở hay không — {@code WorldScreen} chặn phím gameplay khi đúng. */
-    boolean isOpen() {
+    @Override
+    public boolean isOpen() {
         return panel.isOpen();
     }
 
-    void close() {
+    @Override
+    public void close() {
         panel.close();
     }
 
@@ -123,7 +125,8 @@ final class FactionCoordinator {
      * @return {@code true} nếu khung đã được xử lý ở đây. {@code ErrorResponse} của luồng KHÁC trả
      *     {@code false}: opcode 5 dùng chung cho cả giao thức, nuốt hết là cướp gói của người khác.
      */
-    boolean dispatch(PacketCodec.Frame frame) throws InvalidProtocolBufferException {
+    @Override
+    public boolean dispatch(PacketCodec.Frame frame) throws InvalidProtocolBufferException {
         int opcode = frame.header().opcode();
         if (opcode == Opcode.OPCODE_SELECT_FACTION_RESPONSE_VALUE) {
             return onResponse(frame.header().sequenceId(), SelectFactionResponse.parseFrom(frame.payload()));
@@ -208,7 +211,8 @@ final class FactionCoordinator {
     }
 
     /** Rời màn hình/mất kết nối — trạng thái của một phiên chơi không sống sót sang phiên sau. */
-    void reset() {
+    @Override
+    public void reset() {
         controller.clear();
         clearPending();
         announcedEligible = false;

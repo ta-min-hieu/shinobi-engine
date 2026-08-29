@@ -13,7 +13,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.Align;
-import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.I18NBundle;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
@@ -35,7 +34,7 @@ import dev.kage.client.core.ui.theme.KageSkin;
  * <p>Mọi chữ đều tra qua i18n theo khoá server gửi ({@code text_key}/{@code label_key}) — client
  * không bao giờ hiển thị chuỗi thô từ mạng (client/CLAUDE.md "Hardcode chuỗi hiển thị").
  */
-public final class DialoguePanel implements Disposable {
+public final class DialoguePanel implements HudWindow {
 
     private static final float PANEL_WIDTH_PX = 720f;
 
@@ -183,14 +182,17 @@ public final class DialoguePanel implements Disposable {
         }
     }
 
+    @Override
     public Stage stage() {
         return stage;
     }
 
+    @Override
     public void resize(int width, int height) {
         stage.getViewport().update(width, height, true);
     }
 
+    @Override
     public void render(float deltaTime) {
         stage.act(deltaTime);
         stage.draw();

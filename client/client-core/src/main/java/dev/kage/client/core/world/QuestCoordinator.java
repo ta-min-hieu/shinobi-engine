@@ -11,6 +11,7 @@ import dev.kage.protocol.ClaimQuestRewardResponse;
 import dev.kage.protocol.ItemRewardView;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.QuestStatusChangedEvent;
+import dev.kage.protocol.wire.PacketCodec;
 
 /**
  * Vòng đời một nhiệm vụ ở phía client (2026-08-09): nhận → server báo hoàn thành → lĩnh thưởng.
@@ -24,7 +25,7 @@ import dev.kage.protocol.QuestStatusChangedEvent;
  * Đó là lý do HUD chỉ hiện trạng thái chứ không hiện "đã giết 2/3" — con số đó nằm trong
  * {@code progress_json} mà giao thức cố ý không gửi.
  */
-final class QuestCoordinator {
+final class QuestCoordinator implements WindowFlow {
 
     /**
      * Tiền tố của {@code action} mở đầu một nhiệm vụ, khớp {@code town_elder.js} và
@@ -68,7 +69,12 @@ final class QuestCoordinator {
      *
      * @return {@code true} nếu gói thuộc luồng nhiệm vụ và đã xử lý xong.
      */
-    boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+    @Override
+    public boolean dispatch(PacketCodec.Frame frame) throws InvalidProtocolBufferException {
+        return dispatch(frame.header().opcode(), frame.payload());
+    }
+
+    private boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
         if (opcode == Opcode.OPCODE_ACCEPT_QUEST_RESPONSE_VALUE) {
             onAcceptResponse(AcceptQuestResponse.parseFrom(payload));
             return true;

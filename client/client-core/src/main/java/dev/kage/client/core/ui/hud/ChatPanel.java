@@ -19,7 +19,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextField;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.Align;
-import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
 import dev.kage.client.core.render.FontFactory;
@@ -37,7 +36,7 @@ import dev.kage.client.core.ui.theme.KageSkin;
  * người chơi vừa gõ qua {@link #setOnSend}. {@code ChatController} + {@code ChatCoordinator} lo phần
  * còn lại.
  */
-public final class ChatPanel implements Disposable {
+public final class ChatPanel implements HudWindow {
 
     /**
      * Phím mở ô nhập. Nằm ở đây chứ không ở {@code GameAction} vì đây KHÔNG phải ý định gameplay —
@@ -328,14 +327,17 @@ public final class ChatPanel implements Disposable {
         };
     }
 
+    @Override
     public Stage stage() {
         return stage;
     }
 
+    @Override
     public void resize(int width, int height) {
         stage.getViewport().update(width, height, true);
     }
 
+    @Override
     public void render(float deltaTime) {
         stage.act(deltaTime);
         stage.draw();

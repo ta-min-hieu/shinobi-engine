@@ -19,7 +19,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextField;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.Align;
-import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.I18NBundle;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
@@ -41,7 +40,7 @@ import dev.kage.client.core.ui.theme.KageSkin;
  * {@code ChatController.sanitize} đổi ký tự không vẽ được thành {@code ?}, gửi ngược chuỗi đó lên
  * server là gửi một cái tên KHÁC với tên thật.
  */
-public final class FriendPanel implements Disposable {
+public final class FriendPanel implements HudWindow {
 
     /**
      * Phím mở cửa sổ. Nằm ở đây chứ không ở {@code GameAction} vì đây KHÔNG phải ý định gameplay —
@@ -441,14 +440,17 @@ public final class FriendPanel implements Disposable {
         }
     }
 
+    @Override
     public Stage stage() {
         return stage;
     }
 
+    @Override
     public void resize(int width, int height) {
         stage.getViewport().update(width, height, true);
     }
 
+    @Override
     public void render(float deltaTime) {
         stage.act(deltaTime);
         stage.draw();

@@ -5,6 +5,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import dev.kage.client.core.ui.hud.DialoguePanel;
 import dev.kage.protocol.DialogueNodeResponse;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.wire.PacketCodec;
 
 /**
  * Nối {@link DialogueController} (trạng thái), {@link DialoguePanel} (hiển thị) và
@@ -28,7 +29,7 @@ import dev.kage.protocol.Opcode;
  * để mà chờ. Client vì vậy phải tự đóng panel và nói ra chuyện gì vừa xảy ra — im lặng đóng khung
  * hội thoại là đúng thứ đã làm chủ dự án tưởng combat hỏng hôm 2026-08-09.
  */
-final class DialogueCoordinator {
+final class DialogueCoordinator implements WindowFlow {
 
     private final DialogueController controller = new DialogueController();
     private final DialoguePanel panel;
@@ -62,7 +63,8 @@ final class DialogueCoordinator {
         }
     }
 
-    boolean isOpen() {
+    @Override
+    public boolean isOpen() {
         return controller.isOpen();
     }
 
@@ -71,7 +73,12 @@ final class DialogueCoordinator {
      *
      * @return {@code true} nếu gói đã được xử lý ở đây — người gọi dừng, không định tuyến tiếp.
      */
-    boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+    @Override
+    public boolean dispatch(PacketCodec.Frame frame) throws InvalidProtocolBufferException {
+        return dispatch(frame.header().opcode(), frame.payload());
+    }
+
+    private boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
         if (opcode == Opcode.OPCODE_DIALOGUE_NODE_RESPONSE_VALUE) {
             onNode(DialogueNodeResponse.parseFrom(payload));
             return true;
@@ -124,7 +131,8 @@ final class DialogueCoordinator {
     }
 
     /** Đóng hội thoại khi rời màn hình/mất kết nối — panel không được sống sót qua một phiên chơi. */
-    void reset() {
+    @Override
+    public void reset() {
         closePanel();
     }
 }

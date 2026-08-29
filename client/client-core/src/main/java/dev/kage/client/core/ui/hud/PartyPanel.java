@@ -18,7 +18,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.ui.TextField;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.Align;
-import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.I18NBundle;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
@@ -36,7 +35,7 @@ import dev.kage.client.core.ui.theme.KageSkin;
  * <p>{@code Stage} RIÊNG cùng lý do {@link DialoguePanel}/{@link ChatPanel}. Widget chỉ VẼ (UI.md
  * §4): nó không biết lệnh nào hợp lệ, chỉ báo ra ý định qua các {@code setOn*}.
  */
-public final class PartyPanel implements Disposable {
+public final class PartyPanel implements HudWindow {
 
     /**
      * Phím bật/tắt cửa sổ. Nằm ở đây chứ không ở {@code GameAction} cùng lập luận với ESC của
@@ -400,14 +399,17 @@ public final class PartyPanel implements Disposable {
         }
     }
 
+    @Override
     public Stage stage() {
         return stage;
     }
 
+    @Override
     public void resize(int width, int height) {
         stage.getViewport().update(width, height, true);
     }
 
+    @Override
     public void render(float deltaTime) {
         stage.act(deltaTime);
         stage.draw();

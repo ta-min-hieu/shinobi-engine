@@ -22,6 +22,7 @@ import dev.kage.protocol.RejectFriendRequestResponse;
 import dev.kage.protocol.RemoveFriendOutcome;
 import dev.kage.protocol.RemoveFriendResponse;
 import dev.kage.protocol.SendFriendRequestResponse;
+import dev.kage.protocol.wire.PacketCodec;
 
 /**
  * Nối {@link FriendController} (trạng thái), {@link FriendPanel} (hiển thị) và
@@ -40,7 +41,7 @@ import dev.kage.protocol.SendFriendRequestResponse;
  *       nào gọi tên họ, chỉ có cách hỏi lại (xem {@link #onPresenceChanged}).
  * </ul>
  */
-final class FriendCoordinator {
+final class FriendCoordinator implements WindowFlow {
 
     private final FriendController controller = new FriendController();
     private final FriendPanel panel;
@@ -81,12 +82,14 @@ final class FriendCoordinator {
      * Cửa sổ đang mở hay không — {@code WorldScreen} phải chặn MỌI phím gameplay khi câu này đúng,
      * xem {@link FriendPanel#isOpen()}.
      */
-    boolean isOpen() {
+    @Override
+    public boolean isOpen() {
         return panel.isOpen();
     }
 
     /** Đóng cửa sổ (mở hội thoại NPC, rời màn hình) — danh sách đang giữ vẫn nguyên. */
-    void close() {
+    @Override
+    public void close() {
         panel.close();
     }
 
@@ -99,7 +102,12 @@ final class FriendCoordinator {
      *
      * @return {@code true} nếu gói đã được xử lý ở đây.
      */
-    boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+    @Override
+    public boolean dispatch(PacketCodec.Frame frame) throws InvalidProtocolBufferException {
+        return dispatch(frame.header().opcode(), frame.payload());
+    }
+
+    private boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
         if (opcode == Opcode.OPCODE_LIST_FRIENDS_RESPONSE_VALUE) {
             controller.onFriendList(ListFriendsResponse.parseFrom(payload));
             refreshRows();
@@ -261,7 +269,8 @@ final class FriendCoordinator {
     }
 
     /** Rời màn hình/mất kết nối — danh sách của một phiên chơi không sống sót sang phiên sau. */
-    void reset() {
+    @Override
+    public void reset() {
         controller.clear();
         panel.close();
         refreshRows();

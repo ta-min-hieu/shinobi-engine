@@ -9,6 +9,13 @@ package dev.kage.client.core.world;
  */
 final class WorldConstants {
 
+    /**
+     * Id dùng cho nhân vật của CHÍNH người chơi trong {@code WorldModelRenderer}. Server đánh id cho
+     * nhân vật khác; nhân vật của mình chưa bao giờ cần id nên không có. 0 an toàn vì id thật sinh
+     * từ sequence của DB, luôn dương — đây là sentinel nội bộ cho render, KHÔNG phải id thật.
+     */
+    static final long LOCAL_CHARACTER_ID = 0L;
+
     static final float MOVE_SPEED_MPS = 5f;
 
     /**

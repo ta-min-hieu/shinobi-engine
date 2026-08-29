@@ -17,7 +17,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextField;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.Align;
-import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.I18NBundle;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
@@ -42,7 +41,7 @@ import dev.kage.client.core.ui.theme.KageSkin;
  * người chơi vừa bấm — trừ ô nhập tên, thứ duy nhất chuỗi đi RA từ đây (người chơi tự gõ, chưa qua
  * sanitize nên vẫn là tên thật).
  */
-public final class DuelPanel implements Disposable {
+public final class DuelPanel implements HudWindow {
 
     /**
      * Phím mở cửa sổ. Nằm ở đây chứ không ở {@code GameAction} vì đây KHÔNG phải ý định gameplay —
@@ -445,14 +444,17 @@ public final class DuelPanel implements Disposable {
         }
     }
 
+    @Override
     public Stage stage() {
         return stage;
     }
 
+    @Override
     public void resize(int width, int height) {
         stage.getViewport().update(width, height, true);
     }
 
+    @Override
     public void render(float deltaTime) {
         stage.act(deltaTime);
         stage.draw();

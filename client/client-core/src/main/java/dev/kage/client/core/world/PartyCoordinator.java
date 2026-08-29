@@ -19,6 +19,7 @@ import dev.kage.protocol.ListPartyMembersResponse;
 import dev.kage.protocol.ListPendingPartyInvitesResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.RejectPartyInviteResponse;
+import dev.kage.protocol.wire.PacketCodec;
 
 /**
  * Nối {@link PartyController} (trạng thái), {@link PartyPanel} (hiển thị) và
@@ -34,7 +35,7 @@ import dev.kage.protocol.RejectPartyInviteResponse;
  * đã là nơi người chơi đọc mọi phản hồi bằng chữ, và câu trả lời cho "sao mời không được" thường
  * nằm cạnh chính cuộc trò chuyện dẫn tới lời mời đó.
  */
-final class PartyCoordinator {
+final class PartyCoordinator implements WindowFlow {
 
     private final PartyController controller = new PartyController();
     private final PartyPanel panel;
@@ -66,11 +67,13 @@ final class PartyCoordinator {
     }
 
     /** Cửa sổ đang mở hay không — {@code WorldScreen} chặn phím gameplay khi đúng. */
-    boolean isOpen() {
+    @Override
+    public boolean isOpen() {
         return panel.isOpen();
     }
 
-    void close() {
+    @Override
+    public void close() {
         panel.close();
     }
 
@@ -86,7 +89,12 @@ final class PartyCoordinator {
      *
      * @return {@code true} nếu gói đã được xử lý ở đây.
      */
-    boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+    @Override
+    public boolean dispatch(PacketCodec.Frame frame) throws InvalidProtocolBufferException {
+        return dispatch(frame.header().opcode(), frame.payload());
+    }
+
+    private boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
         return dispatchState(opcode, payload) || dispatchOutcome(opcode, payload);
     }
 
@@ -181,7 +189,8 @@ final class PartyCoordinator {
     }
 
     /** Rời màn hình/mất kết nối — ảnh chụp của một phiên chơi không sống sót sang phiên sau. */
-    void reset() {
+    @Override
+    public void reset() {
         controller.clear();
         panel.close();
         redraw();

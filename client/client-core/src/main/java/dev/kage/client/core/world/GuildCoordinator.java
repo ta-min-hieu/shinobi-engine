@@ -22,6 +22,7 @@ import dev.kage.protocol.ListPendingGuildJoinRequestsResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.RejectGuildJoinRequestResponse;
 import dev.kage.protocol.SendGuildJoinRequestResponse;
+import dev.kage.protocol.wire.PacketCodec;
 
 /**
  * Nối {@link GuildController} (trạng thái), {@link GuildPanel} (hiển thị) và
@@ -42,7 +43,7 @@ import dev.kage.protocol.SendGuildJoinRequestResponse;
  * khỏi bang trong lúc khung đang mở thì phải bấm Làm mới (hoặc đóng/mở lại) mới biết. Đóng lỗ đó
  * thật sự cần một event đẩy phía server, tức cần sửa .proto — nằm ngoài quyền của client.
  */
-final class GuildCoordinator {
+final class GuildCoordinator implements WindowFlow {
 
     private final GuildController controller = new GuildController();
     private final GuildPanel panel;
@@ -80,12 +81,14 @@ final class GuildCoordinator {
      * Khung có đang mở không — {@code WorldScreen} phải chặn MỌI phím gameplay khi câu này đúng, xem
      * {@link GuildPanel#isOpen()}.
      */
-    boolean isOpen() {
+    @Override
+    public boolean isOpen() {
         return panel.isOpen();
     }
 
     /** Đóng khung (mở hội thoại NPC, rời màn hình) — trạng thái đã tải vẫn giữ nguyên. */
-    void close() {
+    @Override
+    public void close() {
         panel.close();
     }
 
@@ -98,7 +101,12 @@ final class GuildCoordinator {
      *
      * @return {@code true} nếu gói đã được xử lý ở đây.
      */
-    boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+    @Override
+    public boolean dispatch(PacketCodec.Frame frame) throws InvalidProtocolBufferException {
+        return dispatch(frame.header().opcode(), frame.payload());
+    }
+
+    private boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
         return dispatchQueryResponse(opcode, payload) || dispatchCommandResponse(opcode, payload);
     }
 
@@ -267,7 +275,8 @@ final class GuildCoordinator {
     }
 
     /** Rời màn hình/mất kết nối — trạng thái bang của một phiên chơi không được sống sót sang phiên sau. */
-    void reset() {
+    @Override
+    public void reset() {
         controller.clear();
         panel.close();
         panel.setStatus(text("guild.hint.open"));
