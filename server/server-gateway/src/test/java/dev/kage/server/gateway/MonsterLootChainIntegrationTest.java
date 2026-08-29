@@ -442,20 +442,36 @@ class MonsterLootChainIntegrationTest {
     }
 
     /**
-     * Ghim tỉ lệ rơi của {@code training_dummy} thành 100% / đúng 1 cái trong container test — xem
-     * javadoc lớp về lý do phải chốt tính ngẫu nhiên bằng dữ liệu. Migration V4 (50%, 1-3 cái) giữ
-     * nguyên, không đụng tới.
+     * Ghim bảng rơi của {@code training_dummy} trong container test thành ĐÚNG MỘT dòng (kunai) ở
+     * 100% / đúng 1 cái — xem javadoc lớp về lý do phải chốt tính ngẫu nhiên bằng dữ liệu. Migration
+     * V4 (50%, 1-3 cái) giữ nguyên, không đụng tới.
+     *
+     * <p><b>Phải XOÁ các dòng khác, không chỉ sửa tỉ lệ.</b> Bản đầu chỉ {@code UPDATE ... SET
+     * drop_chance_percent = 100} cho cả bảng; hôm sau V21 thêm hai dòng rơi nữa cho cùng con quái và
+     * test lập tức đỏ ("Expected size: 1 but was: 3") — vì cả ba dòng đều bị đẩy lên 100%. Xoá hết
+     * trừ một dòng làm test miễn nhiễm với mọi lần thêm nội dung sau này.
      */
     private static void forceDeterministicTrainingDummyDrop() {
-        String sql = """
+        String deleteOthers = """
+                DELETE FROM drop_table_entry
+                 WHERE drop_table_id = (SELECT id FROM drop_table WHERE code = ?)
+                   AND item_template_id <> (SELECT id FROM item_template WHERE code = ?)
+                """;
+        String pinRemaining = """
                 UPDATE drop_table_entry
                    SET drop_chance_percent = 100, min_quantity = 1, max_quantity = 1
                  WHERE drop_table_id = (SELECT id FROM drop_table WHERE code = ?)
                 """;
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, TRAINING_DUMMY_CODE);
-            assertThat(statement.executeUpdate()).isPositive();
+        try (Connection connection = dataSource.getConnection()) {
+            try (PreparedStatement statement = connection.prepareStatement(deleteOthers)) {
+                statement.setString(1, TRAINING_DUMMY_CODE);
+                statement.setString(2, KUNAI_CODE);
+                statement.executeUpdate(); // 0 dòng bị xoá là hợp lệ: bảng có thể chỉ có mỗi kunai
+            }
+            try (PreparedStatement statement = connection.prepareStatement(pinRemaining)) {
+                statement.setString(1, TRAINING_DUMMY_CODE);
+                assertThat(statement.executeUpdate()).isPositive();
+            }
         } catch (SQLException e) {
             throw new IllegalStateException("Lỗi test-only ghim tỉ lệ rơi đồ", e);
         }
