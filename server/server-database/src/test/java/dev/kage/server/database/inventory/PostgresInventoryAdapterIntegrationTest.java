@@ -153,8 +153,11 @@ class PostgresInventoryAdapterIntegrationTest {
 
         List<DropTableEntry> entries = adapter.findEntries("training_dummy");
 
-        assertThat(entries).hasSize(1);
-        assertThat(entries.get(0).dropChancePercent()).isEqualTo(50);
+        // V4 seed 1 entry (kunai 50%), V21 thêm 2 entry nội dung (iron_scrap 30%, novice_wraps 5%).
+        // KHÔNG khẳng định theo entries.get(0): FIND_ENTRIES không có ORDER BY nên thứ tự tuỳ DB —
+        // so theo TẬP tỉ lệ thay vì theo vị trí.
+        assertThat(entries).hasSize(3);
+        assertThat(entries).extracting(DropTableEntry::dropChancePercent).containsExactlyInAnyOrder(50, 30, 5);
     }
 
     @Test

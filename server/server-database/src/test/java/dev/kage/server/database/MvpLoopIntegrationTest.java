@@ -70,10 +70,10 @@ import dev.kage.server.database.quest.PostgresQuestTemplateAdapter;
  * (VD {@code ConnectedCharacterRegistry.onMonsterKilled} gọi CẢ {@code GrantLootUseCase} lẫn
  * {@code ProcessMonsterKilledUseCase} cạnh nhau mỗi lần quái chết, test này lặp lại đúng thứ tự đó).
  *
- * <p>{@code training_dummy} chỉ rơi {@code kunai} (không mặc được) — dùng {@code wooden_sword}
- * (grant thẳng qua {@code AddItemUseCase}, không phải loot) để verify mặc đồ + cường hoá, đúng
- * cách {@code EnhanceItemUseCaseIntegrationTest}/{@code PostgresEquipmentAdapterIntegrationTest}
- * đã làm — bảng rơi đồ MVP chưa có vũ khí rơi được (GAMEPLAY.md §5 chưa mở rộng).
+ * <p>Bảng rơi của {@code training_dummy} KHÔNG có vũ khí (kunai + iron_scrap + novice_wraps sau
+ * V21, không món nào {@code equip_slot = WEAPON}) — dùng {@code wooden_sword} (grant thẳng qua
+ * {@code AddItemUseCase}, không phải loot) để verify mặc đồ + cường hoá, đúng cách
+ * {@code EnhanceItemUseCaseIntegrationTest}/{@code PostgresEquipmentAdapterIntegrationTest} đã làm.
  */
 @Testcontainers
 class MvpLoopIntegrationTest {
@@ -242,11 +242,13 @@ class MvpLoopIntegrationTest {
         assertThat(statusChange).isPresent();
         assertThat(statusChange.get().status()).isEqualTo(QuestStatus.COMPLETED);
 
-        // 5. Nhặt đồ — training_dummy chỉ rơi kunai (50% mỗi lần, 10 lần thử), gần như chắc chắn
-        // rơi được ít nhất 1 lần thật (không mock random).
+        // 5. Nhặt đồ — training_dummy rơi kunai 50% mỗi lần (V4) cộng iron_scrap 30% / novice_wraps
+        // 5% (V21); riêng kunai qua 10 lần thử đã gần như chắc chắn rơi ít nhất 1 lần thật
+        // (không mock random).
         assertThat(allLoot).isNotEmpty();
 
-        // 6. Mặc đồ — training_dummy không rơi vũ khí (chỉ kunai, không equip_slot), grant thẳng
+        // 6. Mặc đồ — training_dummy KHÔNG rơi vũ khí (bảng rơi của nó không có món equip_slot =
+        // WEAPON nào, kể cả sau V21), grant thẳng
         // wooden_sword để verify mặc đồ + cường hoá (đúng cách EnhanceItemUseCaseIntegrationTest
         // đã làm, KHÔNG phải hạn chế của test này).
         AddItemUseCase.AddItemResult addResult =
