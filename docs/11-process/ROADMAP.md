@@ -108,8 +108,15 @@ graph LR
 **ADR cần trước Phase 1**: ✅ ADR-018 (tick rate 60Hz — đã chốt) · ⏳ ADR-020 (viewport)
 
 **Exit Criteria:**
-- [ ] Chạy `client-desktop` → nhân vật hiển thị, di chuyển bằng bàn phím
-- [ ] Asset load qua pipeline thật (không file tạm)
+- [x] Chạy `client-desktop` → nhân vật hiển thị, di chuyển bằng bàn phím — **nhìn thấy chạy thật
+      2026-08-07** (`27a2f12`/`0108857`/`1b4bc61`, xem mục 31) và **chơi thật nhiều vòng** từ
+      2026-08-09 tới 2026-08-29 (mục 35, 39). Ô này bị bỏ trống suốt Phase 1-9 vì nhánh render chưa
+      bao giờ vẽ ra được nhân vật thật, không phải vì input chưa xong.
+- [x] Asset load qua pipeline thật (không file tạm) — `tools:asset-pipeline` xuất
+      `assets/exported/` (atlas + `.glb` 3 tier + `asset-manifest.json`) và client đọc thẳng từ đó
+      (`27a2f12` chỉ cwd của task `run` sang đúng gốc asset; `fec30ef` tra thư mục model theo
+      `GraphicsTier`). ⚠️ **Chỉ đúng cho đường đọc**: `ensureAssetsAvailable(tier)` của ADR-028
+      (giao asset theo mạng) **vẫn chưa tồn tại ở đâu trong repo** — xem mục 34.
 - [x] Tiếng Việt có dấu hiển thị đúng — font **Be Vietnam Pro** (OFL 1.1) bundle +
       `dev.kage.client.core.render.FontFactory` (FreeType, `client-core`) + test tự động
       `FontFactoryVietnameseGlyphTest` chứng minh `hasGlyph()` PASS cho toàn bộ 6 thanh điệu tiếng
@@ -666,7 +673,23 @@ Closed Beta → Open Beta → Release Candidate → Production → Hotfix
 
 ## ADR cần tạo
 
-Xem [ADR Index](../01-architecture/adr/README.md) — **30 ADR Accepted** (đếm lại bằng dòng `Status` của từng file, 2026-08-07: gồm 010/012/018 chốt 2026-07-18, ADR-026 chốt 2026-07-24, ADR-014/015/019 chốt 2026-07-26/28, ADR-027 TLS chốt 2026-07-31, ADR-011/020/021/022/024/028/029/030 chốt 2026-08-01, **ADR-031 chốt 2026-08-03**, **ADR-032 chốt 2026-08-06**); ADR-007 **Superseded by ADR-030** (không xây Plugin System); **ADR-032** (phòng vệ JitPack cho `gdx-gltf`) **Accepted 2026-08-06** ⇒ **không còn ADR nào `Proposed`** — xem mục 28 "Việc cần làm tiếp theo"; chỉ còn **ADR-023** chưa viết (chờ chốt desktop-first hay mobile-first).
+Xem [ADR Index](../01-architecture/adr/README.md) — **33 Accepted · 1 Superseded · 1 Proposed** trên
+tổng **35 file ADR** (đếm lại bằng dòng `Status` của **từng file**, 2026-08-29: gồm 010/012/018 chốt
+2026-07-18, ADR-026 chốt 2026-07-24, ADR-014/015/019 chốt 2026-07-26/28, ADR-027 TLS chốt 2026-07-31,
+ADR-011/020/021/022/024/028/029/030 chốt 2026-08-01, **ADR-031 chốt 2026-08-03**, **ADR-032 chốt
+2026-08-06**, **ADR-033 chốt 2026-08-08**, **ADR-034 chốt 2026-08-09**, **ADR-035 chốt 2026-08-27**).
+ADR-007 **Superseded by ADR-030** (không xây Plugin System). **ADR-036 là ADR `Proposed` duy nhất**
+(2026-08-29) — câu "không còn ADR nào `Proposed`" đúng từ 2026-08-06 đến 2026-08-28, **nay đã sai**.
+Vẫn chỉ còn **ADR-023** chưa viết (chờ chốt desktop-first hay mobile-first).
+
+Bốn ADR mới so với lần đếm trước (2026-08-07):
+
+| ADR | Nội dung | Trạng thái | Ghi ở mục |
+|---|---|---|---|
+| [ADR-033](../01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md) | Di chuyển trái/phải + nhảy thật kiểu Ninja School Online, bỏ đi tự do 4 hướng | Accepted 2026-08-08 | 35 |
+| [ADR-034](../01-architecture/adr/ADR-034-Manual-Attack-And-Experience.md) | Đánh thường phải BẤM mới ra đòn + hệ thống kinh nghiệm/lên cấp đầu tiên | Accepted 2026-08-09 | 35 |
+| [ADR-035](../01-architecture/adr/ADR-035-Client-State-Sync-Opcodes.md) | 7 opcode lấp 4 khoảng trống đồng bộ trạng thái client (catalog theo **A′**) | Accepted 2026-08-27 | 37, 38 |
+| [ADR-036](../01-architecture/adr/ADR-036-Equipment-Stats-And-Enhancement-Effect.md) | 4 cột chỉ số cho `item_template` + làm cho cường hoá thật sự có tác dụng | 🟡 **Proposed** 2026-08-29 | 29, 40 |
 
 ## Tài liệu liên quan
 
@@ -901,13 +924,66 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **30 ADR Accepted** (đế
     - 🛑 **Cần chủ dự án**: `CharacterSpawnedEvent` không có trường mô tả ngoại hình nên **mọi nhân
       vật đang nạp cùng một model**. Thêm trường đó là **đổi protocol** ([/CLAUDE.md §4](../../CLAUDE.md)).
 29. ⛔ **Đang chặn thật, chờ chủ dự án** (đồng bộ với ["🔴 ĐANG CHỜ CHỦ DỰ ÁN"](../README.md) —
-    đọc ở đó, không chép số liệu sang đây):
+    đọc ở đó, không chép số liệu sang đây; **rà lại 2026-08-29**):
     - ~~V20 — 3 cột 3D cho `art_asset`~~ ✅ **duyệt + thi hành 2026-08-07**
       ([ART-PIPELINE §8.6](../14-art/ART-PIPELINE.md)): `asset_kind`/`model_name`/`tri_counts` +
-      `CHECK art_asset_kind_branch`, và `ArtRegistryUpserter` đã upsert được nhánh `MODEL`. **Còn
-      hở**: bước kiểm asset mồ côi chưa soi thư mục `assets/exported/models/`.
+      `CHECK art_asset_kind_branch`, và `ArtRegistryUpserter` đã upsert được nhánh `MODEL`.
+      ~~**Còn hở**: bước kiểm asset mồ côi chưa soi thư mục `assets/exported/models/`~~ ✅ **cũng đã
+      đóng 2026-08-08** (`5a389e9`, xem mục 34) — `OrphanAssetChecker` soi **cả hai** thư mục.
+      **Khoản này đóng hoàn toàn, không còn phần nào chờ chủ dự án.**
     - Câu hỏi **desktop-first hay mobile-first** vẫn chưa trả lời → ADR-023 vẫn chưa viết được, và
-      ngân sách tam giác ở mục 27 mới chỉ đo cho desktop.
+      ngân sách tam giác ở mục 27 mới chỉ đo cho desktop. **Đây là khoản chặn cũ duy nhất còn mở.**
+    - 🆕 **[ADR-036](../01-architecture/adr/ADR-036-Equipment-Stats-And-Enhancement-Effect.md)
+      (Proposed 2026-08-29) — trang bị và cường hoá hiện gần như không có ý nghĩa cơ học.** Ba lỗ
+      cùng chạm một bảng `item_template`, cả ba đều đọc từ code và **kiểm bằng chơi thật**, không
+      suy đoán:
+      (a) `bonus_atk` là cột chỉ số **duy nhất** (từ V6), nên 15 món V21 vừa seed phải chọn giữa hai
+      cái sai — để 6/7 ô trang bị vô nghĩa, hoặc cho **áo giáp cộng ATK** (V21 chọn cái thứ hai kèm
+      ghi chú trong chính file migration). Trong khi đó `CombatConstants.deriveCombatStats` đã tính
+      đủ DEF/RES và công thức damage đã dùng chúng thật — chỉ là **không có đường nào để trang bị
+      chạm tới**, `GatewayChannelHandler` chỉ chuyển đúng một con số sang world.
+      (b) **Cường hoá KHÔNG làm gì cả**: `ComputeEquipmentBonusUseCase` không đọc
+      `item.enhanceLevel()`; grep toàn server cho thấy `enhanceLevel` chỉ xuất hiện ở đường ghi/đọc
+      DB và ở packet gửi client, **không một công thức chỉ số nào đọc nó**. Chơi thật 2026-08-29:
+      `steel_katana` +0 → +7, `audit_log` đủ 9 lượt, **trừ đúng 8.900 vàng, chỉ số không đổi gì**.
+      Nghĩa là trọn bộ `EnhanceItemUseCase` + bảng tỉ lệ + bùa Bảo Vệ + enum 8 outcome hiện là **một
+      cỗ máy đốt vàng không có đầu ra**. Nếu chủ dự án **bác** đề xuất thì phải **gỡ nút Cường hoá
+      khỏi client** — để nguyên một nút đốt vàng không tác dụng là tệ hơn cả hai lựa chọn.
+      (c) Điều kiện `level/faction yêu cầu` mà [GAMEPLAY.md §7](../05-server/GAMEPLAY.md) mô tả cho
+      `EquipItemUseCase` **không tồn tại** vì không có cột — nhân vật **Cấp 1** đủ vàng là mặc trọn
+      bộ "Hạ Nhẫn" (+49 ATK so với ATK gốc ~30).
+      Đề xuất chạm **cả schema DB lẫn protocol** ⇒ [/CLAUDE.md §4](../../CLAUDE.md), AI không tự thi
+      hành. **Câu hỏi phụ cần trả lời cùng**: `bonus_hp` đụng vào
+      `CombatConstants.CHARACTER_MAX_HP = 100` (hằng số placeholder, GDD chưa chốt công thức HP) —
+      chấp nhận `maxHp = 100 + bonus_hp` như một placeholder mới, hay tách `bonus_hp` ra khỏi đợt
+      này và chỉ làm DEF/RES?
+    - ~~**`drop_table` im lặng khi mã quái không khớp**~~ ✅ **đã sửa 2026-08-29, KHÔNG còn là nợ.**
+      `ConnectedCharacterRegistry#onMonsterKilled` truyền thẳng `monsterCode` làm `dropTableCode`, và
+      `findEntries` trả rỗng cho **cả hai** trường hợp "quái cố ý không rơi gì" và "mã không khớp
+      dòng nào" — nên một con quái mới gõ sai mã sẽ **không rơi đồ vĩnh viễn mà không ai biết**.
+      `PostgresDropTableAdapter` nay phân biệt hai trường hợp đó và ghi **WARN một lần cho mỗi mã
+      lạ** (INFO nếu bảng có thật nhưng chưa có entry — đó có thể là cố ý). Không đổi kiểu trả về,
+      không ném lỗi: một mã sai không đáng làm sập lượt giết quái. Truy vấn kiểm tra thứ hai chỉ
+      chạy khi danh sách rỗng và chỉ một lần mỗi mã, nên đường chạy bình thường **không tốn thêm
+      lượt đi DB nào**, và tập mã đã cảnh báo chặn Điều 31 (không log theo nhịp gameplay).
+    - ⚠️ **Đổi hệ phái xong người khác vẫn thấy model cũ — đã sửa MỘT NỬA (2026-08-29).**
+      `ConnectedCharacterRegistry.updateAppearance` khiến mọi `CharacterSpawnedEvent` phát về **sau**
+      lúc đổi mang hệ phái MỚI; trước đó ảnh chụp ngoại hình chốt lúc chọn nhân vật nên sai cho tới
+      khi người chơi **đăng nhập lại**. **Phần còn mở**: người đang NHÌN THẤY nhân vật ngay tại thời
+      điểm đổi vẫn thấy model cũ cho tới khi nhân vật rời rồi vào lại tầm nhìn của họ.
+      ⚠️ **Nửa còn lại KHÔNG chỉ là "server chưa gửi lại" — client cũng chặn**:
+      `RemoteCharacterPresenter.onSpawned` **bỏ qua** một `CharacterSpawnedEvent` cho nhân vật đã có
+      mặt (`if (entities.containsKey(...)) return;` — cố ý, để không tạo entity trùng). Nghĩa là dù
+      server có phát lại spawn cho những người đang nhìn thấy, **model vẫn KHÔNG đổi**. Đóng hẳn thì
+      phải chọn **một trong ba, và cả ba đều là quyết định chứ không phải vá**:
+      (1) server gửi **despawn + spawn** cho mọi observer (dùng `AreaOfInterestTracker.observersOf`)
+      — không đổi protocol, nhưng nhân vật sẽ **"nháy" mất-hiện một khung hình** ở máy người khác;
+      (2) client **cập nhật model khi nhận spawn lặp** thay vì bỏ qua — không đổi protocol, nhưng
+      **phá thế bất biến "spawn = tạo mới"** mà chính comment ở đó đang dựa vào;
+      (3) thêm **event "ngoại hình vừa đổi"** — sạch nhất, nhưng **đổi protocol** (§4).
+    - Bốn câu hỏi sản phẩm/vận hành khác vẫn mở ở [docs/README.md](../README.md) (xác nhận hình thức
+      font Be Vietnam Pro · có tiếng Anh ở MVP không · mô hình kinh doanh · GM/admin tool là
+      in-game command hay web app) — **không cái nào chặn phase**.
 30. **Art — nhân vật Text→3D đầu tiên qua trọn vòng nghiệm thu (2026-08-06)**: `char_thuy-b1` là con
     **đầu tiên sau pilot Hỏa** đi hết vòng §7.1 của
     [ART-QUALITY-STANDARD](../14-art/ART-QUALITY-STANDARD.md) và chạy tiếp bước E — xuất được **3 LOD
@@ -918,4 +994,436 @@ Xem [ADR Index](../01-architecture/adr/README.md) — **30 ADR Accepted** (đế
       (b) camera nghiệm thu vẫn là camera sprite **nhìn ngang**, trong khi pilot được duyệt ở **góc
       3/4** ⇒ Q1–Q10 chấm sai đối tượng;
       (c) bước E xuất glTF **chết khi chạy headless** — gọi `mode_set` trước khi gán active object.
-    - ⛔ **Chưa commit** tại thời điểm ghi mục này, nên không tra được trong `git log`.
+    - ~~⛔ **Chưa commit** tại thời điểm ghi mục này, nên không tra được trong `git log`.~~ ✅ Đã
+      commit cùng ngày: `3bb80ca` (Thuỷ + Phong B1 kèm 6 lỗi pipeline), rồi `62a07ba` (đủ B1 cả 5
+      hệ, vũ khí đặt theo phép đo), `3584eb0`, `a83deb6` (B2), `20d4015` + `35feabe` (B3 — **đủ 15
+      nhân vật**), `360062b`.
+
+31. **Nhánh 3D đi từ "đã nối" tới "đã nhìn thấy chạy" (2026-08-07)** — đóng **cả ⛔ lẫn 🛑** của mục 28:
+    - ✅ **Ba lỗi thật chặn nhánh 3D, không cái nào là lỗi asset**: task `run` của Gradle lấy thư mục
+      subproject làm cwd nên `Gdx.files.internal` không thấy `assets/exported/` ⇒ renderer **âm thầm
+      tắt nhánh 3D** và vẽ hộp thay thế (`27a2f12`); vật liệu có texture bị gán cho mesh vũ khí
+      **không có UV** ⇒ Blender ghi `"texCoord": -1` (glTF 2.0 cấm, `texCoord` đánh chỉ số
+      `TEXCOORD_n` nên không âm), gdx-gltf đọc lại sinh shader hỏng và **cả màn hình nhân vật sập**,
+      không riêng vũ khí — **đây chính là thứ khiến nhánh 3D chưa bao giờ được nhìn thấy chạy**
+      (`1b4bc61`); glTF quy ước Y-up còn thế giới Kage đi trên mặt phẳng XY với Z-up nên model nằm
+      nghiêng (`0108857`).
+    - ✅ **Ghi nhận đã nhìn thấy chạy** (`c3e8918`), và **mục "khung hình lệch tâm" đóng lại vì đó
+      KHÔNG phải lỗi engine** (`c521af3`): log thật (vị trí/hướng camera, hình chữ nhật GL viewport)
+      khớp chính xác phép tính tay; thủ phạm là script chụp PowerShell `PrintWindow` **không nhận
+      biết DPI** nên `GetWindowRect` trả về khung đã bị thu nhỏ và chỉ chép được góc trên-trái của
+      khung 1280x720 thật, làm một nhân vật vốn đã ở giữa trông như lệch xuống góc dưới-phải.
+    - ✅ **🛑 của mục 28 đã được chủ dự án duyệt và thi hành cùng ngày** — `CharacterSpawnedEvent`
+      mang thêm `faction` + `costume_tier` (`92e9f15`), chấm dứt tình trạng **mọi nhân vật nạp cùng
+      một model**. Gateway chụp ngoại hình một lần lúc chọn nhân vật rồi tra lại khi AoI báo spawn;
+      `server-world` **không bị đụng tới** — nó biết vị trí và chỉ số, luồn dữ liệu ngoại hình qua
+      `WorldOutboundSink` sẽ bắt tầng gameplay chở dữ liệu render mà nó không bao giờ đọc. Thêm
+      field vào message proto3 đang chạy là tương thích dây nên `ProtocolVersion.CURRENT` giữ nguyên
+      1. **Chưa làm**: `costume_tier` vẫn là hằng B1 — art có đủ cả 3 tier nhưng gameplay chưa có
+      khái niệm bậc trang bị để suy ra, và bịa ra một cái là quyết định game design.
+    - ✅ **`tools:asset-pipeline` mọc nhánh 3D** (`c9d7e63`, `3075dc1`): quét
+      `assets/exported/models/{low,med,high}`, đếm tam giác **thật sự có trong file** bằng cách đọc
+      **chỉ chunk JSON** của `.glb` (model 3,7MB tốn vài KB để soi), gãy build khi vượt ngân sách
+      tier. Ngân sách đặt trên chính `GraphicsTier` chứ không tạo enum tier thứ hai — ba mức đồ hoạ
+      là **một khái niệm**, chỉ khác đơn vị giữa hai nhánh (tỉ lệ ảnh cho sprite, tam giác cho
+      model). Số khớp **chính xác cả 45 giá trị `tri_counts`** trong sidecar. Vi phạm được gom báo
+      **một lượt** thay vì gãy ở file đầu tiên — nhờ vậy nhìn ra ngay là bản xuất hiện tại lệch một
+      **lượng cố định mỗi nhân vật**, không phải lệch ngẫu nhiên từng file (dẫn thẳng tới mục 32).
+    - ✅ **V20 + `art_asset` nhận nhánh MODEL** (`bbff6b1`, `4ce1e99`) — `asset_kind`/`model_name`/
+      `tri_counts` + `CHECK art_asset_kind_branch`, verify thật trên Postgres 17 (V20 áp qua Flyway
+      thật lên trên dữ liệu V19 sẵn có **và** trên container rỗng, 84 test `server-database` xanh; 15
+      dòng model phủ 45 phép đo tier; chạy lần hai md5 payload không đổi; `CHECK` từ chối đủ 4 hình
+      dạng lai giữa hai nhánh). Một dòng cho mỗi `asset_key` dù có 3 file `.glb`, vì ba tier chỉ
+      khác nhau một con số và con số đó nằm vừa trong `tri_counts`. **Phát hiện thật**: quy ước đặt
+      tên suy ra `blend_path` **nói dối ở đúng 1/15 model** (`char_hoa-b1` xuất từ
+      `hoa-text3d-pilot.blend` trong khi `hoa-b1.blend` cũng tồn tại) — một cột sinh ra để render
+      lại được asset mà trỏ sai file thì vô giá trị, nên nó đọc từ sidecar. `render_dir` chỉ ghi khi
+      contact sheet nghiệm thu **thật sự có trên đĩa** (3 model chưa có): một đường dẫn 404 đọc
+      giống bằng chứng trong khi không phải.
+    - ✅ Tài liệu theo sau: `RENDERING.md` viết lại quanh **hai nhánh render** (`ce6417e`, `4b74d74`,
+      `0af35e5`) và gỡ các dòng còn ghi ADR-032 là `Proposed` ở TECHNOLOGY-STACK/ROADMAP/hai sổ ADR
+      (`537b9d9`).
+
+32. ✅ **Ngân sách tam giác đạt 45/45 — sổ việc của ADR-031 đóng hoàn toàn (2026-08-08)**: xuất lại cả
+    15 nhân vật × 3 tier qua phiên Blender MCP, xác nhận 45 file `.glb` hết `texCoord` sai và nạp
+    được — pipeline chuyển từ "sập ngay" sang "gãy đúng ở lỗi ngân sách đã biết" (`9e7e0c5`); chủ dự
+    án chốt **ngân sách là TỔNG xuất xưởng, tính cả vũ khí**, nên script hạ mesh thân theo *ngân
+    sách trừ tam giác vũ khí* (`b774932`); xuất lại lần cuối, `tools:asset-pipeline` báo **"ngân
+    sách tam giác: OK (45/45)"** và chạy sạch qua bước pack atlas (`a4e58bd`). Mục #8 và #9 — hai
+    mục cuối trong sổ của ADR-031 — đóng. Cùng commit đó dọn luôn đoạn `/CLAUDE.md` §0 vẫn ghi
+    `gdx-gltf` chưa nối và ADR-032 còn `Proposed`, **cả hai đã xong từ nhiều ngày trước**.
+
+33. **Client có giao diện thật lần đầu (2026-08-08)** — trước ngày này client không có gì ngoài di
+    chuyển thô:
+    - ✅ **HUD combat đầu tiên** (`334ff1e`): mặt Scene2D thật đầu tiên (Stage/Skin/widget, chủ đề
+      màu phẳng dựng runtime nên chưa cần asset art), thanh Máu/Khí, mục tiêu, nút chiêu. Dải opcode
+      400-406 sẵn sàng trên dây từ Phase 4 mà **không một dòng client nào tiêu thụ**. Kiểm chứng
+      trọn vòng với server + Postgres + Redis thật — và **một giả định sai bị sửa bằng log packet
+      tạm chứ không phải phỏng đoán**: hình nộm luyện tập **có đánh trả**.
+    - ✅ **Nút chiêu tra theo hệ phái người chơi** (`9f7809a`) — trước đó hardcode `fireball` cho mọi
+      hệ, nghĩa là 4/5 hệ bấm nút thì server **âm thầm bỏ `UseSkillCommand`**.
+    - ✅ **Màn Đăng nhập + Chọn nhân vật** (`76a9967`): bỏ bắt tay chặn luồng trước khi cửa sổ mở,
+      thay bằng luồng Scene2D thật theo đúng nếp poll-trong-`fixedUpdate` mà `WorldScreen` đã dùng,
+      không bao giờ chặn luồng render. Kèm rò rỉ thật đã vá: `KageEngine.setScreen` trước đây chỉ gọi
+      `hide()` chứ **không `dispose()`** màn hình cũ, nên Stage/font của Login/CharacterSelect rò mỗi
+      lần chuyển màn. Cũng dọn các vi phạm checkstyle/PMD/SpotBugs còn sót từ `334ff1e` — commit HUD
+      đó **chưa bao giờ thật sự chạy qua gate `check` đầy đủ**.
+    - ✅ **Lỗi hồi quy thật do chính luồng mới sinh ra** (`198c44a`): libGDX chỉ gọi `resize()` lúc app
+      khởi động thật và khi cửa sổ đổi kích thước — **không bao giờ khi đổi Screen giữa phiên**. Đi
+      qua Đăng nhập → Chọn nhân vật → Thế giới thì `FitViewport` và camera của renderer còn nguyên
+      giá trị mặc định 0, ma trận chiếu sụp về không: **thế giới đen trơn trong khi HUD vẫn đúng**
+      (Stage tự áp viewport của nó mỗi khung bất kể). Tìm ra bằng cách **tái hiện sống rồi log
+      `viewportWidth/Height` lúc `show()`** — xác nhận 0/0 trước khi sửa — chứ không suy từ triệu
+      chứng.
+    - ✅ **Hồi sinh khi HP về 0 ở thế giới chính** (`27a376a`): trước đó `onCharacterDefeated` là
+      no-op ngoài Arena nên nhân vật **nằm chết vĩnh viễn**. Thêm `CharacterRespawnedEvent` (305),
+      chỉ áp cho world chính (Arena/Dungeon giữ luồng kết thúc trận riêng). Kèm **1 bug thật lộ ra
+      khi test chính nó**: kẻ hạ gục không xoá mục tiêu tự đánh của mình, nên đối tượng vừa hồi sinh
+      **bị giết lại mỗi chu kỳ đánh** thay vì trận kết thúc gọn.
+    - ✅ `UI.md` đồng bộ lại với thứ **thật sự** được xây (`d36b668`) — cây file §3 vẫn còn là bản kế
+      hoạch trước khi code, và 2 mục "Việc cần làm tiếp theo" đã xong từ phiên trước mà chưa ai đánh
+      dấu.
+
+34. **Vòng song song #7 và #8 — render, hoạt ảnh, và một chẩn đoán sai bị lật lại (2026-08-08)**:
+    - ✅ **Đo frame time thật, đóng Revisit Trigger #1 của ADR-031** (`5d9446d`): 20 nhân vật đi qua
+      đúng `CharacterModelRenderer` production, quay vòng đủ 15 tổ hợp hệ phái × bậc trang phục tier
+      med, đo 6000 khung sau warmup trên phần cứng thật (iGPU Intel RaptorLake-S Mobile, GL 4.6) —
+      **p95 0,30-0,31ms, max 1,28-2,92ms, xa dưới ngưỡng 8ms**. Là công cụ chẩn đoán thủ công chứ
+      không phải test JUnit (cần GL context thật) nên chạy qua task `runFrameBenchmark`, **không bao
+      giờ chạy trong CI headless**. Kiểm cấp phát mỗi khung bằng JFR (có sẵn trong JDK, không thêm
+      dependency): 0 mẫu rơi vào vòng lặp render so với 253 mẫu lúc nạp `.glb` — **tín hiệu thật
+      nhưng KHÔNG phải bằng chứng cấp phát bằng 0**, lấy mẫu theo TLAB bỏ sót cấp phát nhỏ/thưa. Ghi
+      kèm giới hạn trung thực: chưa có máy tham chiếu chính thức, chưa cel shader/viền, chưa culling,
+      desktop chứ không phải Android.
+    - ✅ **Hoạt ảnh nối vào trạng thái gameplay** (`89f1e19`) — model đứng nguyên tư thế bind vì
+      renderer nạp `Scene` cho mỗi nhân vật mà **không bao giờ chạy `AnimationController`**. Nhân vật
+      KHÁC không có trường vận tốc nào trên dây và server **không bao giờ gửi gói "đã dừng"**, nên
+      `RemoteMotionTracker` suy ra chuyển động từ hiệu vị trí giữa các `CharacterMovedEvent` cộng
+      timeout. Xác minh dây nối gdx-gltf bằng cách **dịch ngược `gltf-2.3.0.jar` đã vendored** thay
+      vì tin tài liệu. Hồi sinh của nhân vật ở xa không có tín hiệu giao thức nào nên suy từ
+      `CharacterMovedEvent` đầu tiên sau `die`.
+    - ✅ **Cel shader + viền vỏ lộn** (`a08f5ef`) — **xung đột thật khi gộp**: nhánh cel shader **bỏ
+      hẳn `SceneManager`** để đổi sang hai lượt `ModelBatch` thô, gộp máy móc thì hoạt ảnh vừa vào
+      sẽ **chết im lặng**. Hoá ra `Scene#update()` — **không phải `SceneManager`** — mới là thứ đẩy
+      `AnimationController`, nên bỏ `SceneManager` là an toàn và **giữ được cả hai**; đo lại trên GPU
+      thật p95 0,30ms → 0,52ms, vẫn dưới ngân sách 8ms hơn 15 lần.
+    - ✅ **Nhân vật nằm ngang — HAI lỗi thật trong Java/GLSL, KHÔNG phải asset** (`7cce995`): nghi ngờ
+      ghi ở ADR-031 note #11 (một phép xoay Y 35° bake sẵn trong node gốc của rig) được điều tra và
+      **loại bỏ hoàn toàn**. Thủ phạm thứ nhất: `CelBodyShader`/`CelOutlineShader` **cố ý bỏ nhân
+      `u_worldTrans`** dựa trên tiền đề sai là `Renderable.bones[i]` đã gồm biến đổi gốc — bác bỏ
+      bằng cách **đọc thẳng `gdx-1.14.2-sources.jar`**: với `NodePart` có skin,
+      `Renderable.worldTransform` bằng đúng `ModelInstance.transform` và
+      `Node.calculateWorldTransform()` **không hề đọc** `ModelInstance.transform`. Bỏ `u_worldTrans`
+      tức là bỏ **cả** phép đổi Y-up→Z-up **lẫn** vị trí thế giới của nhân vật ⇒ mesh vẽ trong toạ độ
+      cục bộ Y-up thô, đúng nghĩa "nằm bẹp". Thủ phạm thứ hai: `Y_UP_TO_Z_UP` sai dấu (+90f thay vì
+      -90f) — **vô hại chừng nào lỗi thứ nhất còn đó** (dấu của một ma trận bị bỏ qua thì không có
+      nghĩa gì), nên chỉ lộ ra sau khi vá lỗi #1. Không phải xuất lại `.glb` nào.
+      ⚠️ **Kết luận -90f này về sau bị lật lại lần nữa — xem mục 35, và đó mới là câu chuyện thật.**
+    - ✅ **Thư mục model tra theo `GraphicsTier`** thay vì hardcode `models/med/` (`fec30ef`), với một
+      enum tier **cục bộ của client** tách khỏi enum của `tools:asset-pipeline` (client-core không
+      phụ thuộc module đó). Phạm vi cố ý hẹp — không đổi tier lúc chạy, không màn hình cài đặt,
+      không lưu Preferences, không tải asset qua mạng — và `RENDERING.md` được sửa để **nói thẳng
+      rằng `ensureAssetsAvailable(tier)` của ADR-028 vẫn chưa tồn tại ở đâu trong repo**, để không ai
+      nhầm đây là ADR-028 đã xong phía client.
+    - ✅ **Kiểm asset mồ côi** (`5a389e9`) — đóng nốt chỗ hở ghi ở mục 29: `OrphanAssetChecker` đối
+      chiếu đĩa với `art_asset` theo **cả hai chiều** cho **cả hai** thư mục `atlases/` và `models/`,
+      gãy build khi đĩa có file không có dòng DB.
+    - ✅ Bug tư thế nằm ngang được ghi lại kèm **đề xuất ADR-033** (di chuyển kiểu Ninja School
+      Online) ngay trong ngày (`0c3a77a`).
+
+35. **ADR-033 + ba vòng playtest của chủ dự án (2026-08-09) — bài học đắt nhất trong cả đợt**:
+    - ✅ **[ADR-033](../01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md) Accepted
+      2026-08-08**, thi hành ở `328b019`: bỏ di chuyển tự do 4 hướng, đổi sang trái/phải + **nhảy
+      thật có tác dụng gameplay** (né đòn tầm thấp, lên bệ cao). `JumpCommand` (306) +
+      `MoveResponse` thêm `z`/`grounded` (chỉ thêm, giữ nguyên field đang dùng);
+      `VerticalMovementSystem` tự viết theo ADR-021 (**không Box2D**); `CombatSystem` cho đòn thường
+      né TUYỆT ĐỐI khi mục tiêu đang trên không. Kiểm chứng đủ tầng — unit, integration, **E2E qua
+      socket thật**, và JMH cho thấy **<0,2% ngân sách tick 16,6ms ở N=5000 kịch bản xấu nhất**. AI
+      quái (ADR-022) rà lại và **không cần sửa**: nó chỉ đọc `(x,y)` hiện tại, không phụ thuộc trục
+      di chuyển.
+    - ⛔ **Nhưng bản build đó — xanh toàn bộ test — KHÔNG chơi được.** Chủ dự án test tay và báo 3
+      lỗi; truy ra **3 nguyên nhân khác nhau, trong đó 2 cái là do lượt trước tự tin sai**
+      (`c24668a`):
+      (a) **Nhân vật lộn ngược.** `Y_UP_TO_Z_UP` quay lại +90f — **bản sửa ở mục 34 đổi sang -90f là
+      SAI**. Lý do kết luận sai lần đó là **CÔNG CỤ CHỤP, không phải engine**:
+      `ScreenUtils.getFrameBufferPixmap` trả dữ liệu GL thô (dòng 0 = đáy màn hình) còn PNG quy ước
+      dòng 0 = đỉnh, và `writePNG` bản 2 tham số mặc định `flipY=false` ⇒ ảnh lưu ra **bị lật dọc**,
+      nên một nhân vật lộn ngược hiện ra thành "đứng thẳng". Phép toán bàn tay phải **đúng ngay từ
+      đầu**. Đây là **lần thứ hai** dự án dính đúng cái bẫy đường chụp (lần đầu ở `c521af3`, mục
+      31) — nay thành luật trong `RENDERING.md`: **ảnh chụp chỉ là bằng chứng khi ĐƯỜNG CHỤP đã được
+      kiểm chứng**.
+      (b) **Điều khiển ngược.** Camera yaw 35° làm `right` = `(-0,71, +0,50, 0)`, tức world +X chiếu
+      ra thành hướng **sang TRÁI màn hình**, lại còn lệch chéo 19°. **Không phải lỗi của ADR-031** —
+      hồi đó đi tự do 2 chiều nên không trục nào đặc biệt; ADR-033 khoá di chuyển vào **một trục**
+      nên camera **buộc** phải thoả `cos(yaw) < 0`. Đổi camera về 180° và chuyển góc 3/4 của nhân
+      vật sang **xoay MODEL**, tách "nhân vật nghiêng bao nhiêu" khỏi "trục gameplay nằm đâu trên
+      màn hình". **Khoá một trục gameplay cũng là ràng buộc góc phương vị của camera** — hệ quả
+      không hiển nhiên cho tới khi có người thật cầm bàn phím.
+      (c) **Bậc vô nghĩa — 2 lỗi chồng nhau.** `VerticalMovementSystem` thoát sớm **vô điều kiện**
+      khi `grounded && vz == 0` nên đi ra khỏi mép bậc là **lơ lửng vĩnh viễn**; và client có bản
+      `VerticalMovementSystem` riêng để dự đoán nhưng **chưa nạp danh sách bệ**, lệch 0,8m < ngưỡng
+      snap 1,0m nên **không bao giờ được sửa** — mắt luôn thấy rơi xuyên bệ. Bài học chung: **hệ
+      thống dự đoán ở client phải được cho ăn cùng dữ liệu thế giới với server.**
+      Cùng gốc rễ "thu trục": quái đứng ở y=5 mà người chơi khoá ở y=0, tầm đánh 2m ⇒ **không bao giờ
+      chủ động đánh được** (chỉ "chạy" nhờ quái tự đuổi tới); NPC tĩnh ở y=-5 thì **vĩnh viễn không
+      tương tác được**. Và **17 sprite VFX đã nằm trong atlas từ lâu mà không một dòng code client
+      nào tham chiếu tới** — dùng chiêu thì màn hình không hiện gì.
+    - ✅ **[ADR-034](../01-architecture/adr/ADR-034-Manual-Attack-And-Experience.md) Accepted
+      2026-08-09** — chủ dự án quyết ngay trong phiên playtest, sau khi thấy máu quái tụt mà mình
+      không bấm gì (`2111b1d`): nhảy đôi (server đếm và chặn số lần nhảy, đó mới là thứ ngăn client
+      sửa đổi bay lên trời), click chọn mục tiêu, `AttackCommand` (407) — đánh thường **phải bấm mới
+      ra đòn** cho người chơi, quái vẫn tự đánh — và **hệ thống kinh nghiệm đầu tiên**
+      (`ExperienceChangedEvent` 208): `character.exp`/`level` có từ **V2 mà chưa ai đọc**, nên EXP
+      nhiệm vụ tích từ Phase 6 tới giờ mới được tính. **Không đổi schema.** Test giới hạn nhảy đôi
+      được **kiểm bằng đột biến hai chiều** (đặt `MAX_AIR_JUMPS` = 0 và = 99 đều làm test đỏ).
+    - ✅ **Nói cho người chơi biết chuyện gì vừa xảy ra** (`c0f66c4`) — phòng đúng lớp phàn nàn đã đẻ
+      ra ADR-034: chữ "LÊN CẤP!" (cờ `leveled_up` đã có sẵn trên dây, **client đang vứt đi**), và lý
+      do đánh hụt. Ngoài tầm vẫn **GỬI** lệnh đi: client chỉ **đoán** tầm đánh, server vẫn là bên
+      phán quyết. Hai lỗi bố cục do **ảnh chụp HUD bắt được chứ không phải build**: số EXP tràn hẳn
+      khỏi khung ở thanh 12px, và hai nút tròn khác cỡ trong cùng lưới 2 hàng kéo giãn hàng biển tên.
+    - ⚠️ **Từ đây `WorldScreen` ngồi đúng trần PMD CyclomaticComplexity của lớp** — `2111b1d` đã phải
+      tách `JumpInputController`/`AttackInputController`/`CombatFeedbackPresenter`/
+      `WorldCommandSender`. Trần này còn bị chạm thêm 4 lần nữa trước khi được gỡ thật ở mục 39.
+
+36. **Quái/NPC hết vô hình, và vòng nhiệm vụ của Phase 6 lần đầu chạy được (2026-08-09)**:
+    - ✅ **Quái có model 3D** (`0ee7a60`) — trước đó quái **luôn** là một khối hộp đỏ
+      `ShapeRenderer`, vì pipeline art 3D chỉ từng nhắm tới nhân vật. Mở **đường xuất `.glb` thứ
+      hai** (`--flat-materials`) cho asset dựng tay: `export_character_lods.py` giả định 1 mesh + 1
+      UV + 1 albedo đã bake nên **gộp mọi material slot**, làm mất mảng bia đỏ. **Bẫy không gian màu
+      thật**: `baseColorFactor` phải ghi theo màu **HIỂN THỊ**, không phải linear như spec glTF — bản
+      đúng spec cho ra con quái **gần như đen kịt** trên màn hình (kết luận từ ảnh chụp, không suy
+      đoán), vì không có bước gamma nào ở cuối đường. Và `animate()` với clip không tồn tại **ném
+      `GdxRuntimeException` giữa game loop** — một model thiếu clip đánh sập cả khung hình ⇒
+      `clipOrIdle`. Cũng sửa một tiền đề sai của script dựng bia tập từ 2026-08-01 ("bia tập không di
+      chuyển, không phản công"): `WorldFacade.spawnTrainingDummy` gắn cả `AiStateComponent` lẫn
+      `AttackCooldownComponent`.
+    - ✅ **NPC hiện ra** (`1c8b906`) — server phát `NpcSpawnedEvent` từ Phase 6 nhưng **không một dòng
+      client nào đọc nó**, nên ông trưởng làng — **cửa vào toàn bộ hệ hội thoại và nhiệm vụ đã làm
+      xong từ Phase 6** — chưa bao giờ hiện lên màn hình. Hộp thay thế của NPC màu xanh ngọc chứ
+      không đỏ như quái: "đánh được hay nói chuyện được" là phân biệt đáng đọc ngay từ xa, và **một
+      mã NPC chưa có art phải HIỆN RA chứ không được biến mất** — vô hình đúng là thứ vừa sửa xong.
+    - ✅ **Nói chuyện được với NPC** (`57aa10d`, dải 602-605) rồi **đóng trọn vòng nhiệm vụ**
+      (`239bdfa`, dải 606-609): nói chuyện → nhận → giết 3 hình nộm → HUD báo hoàn thành → lĩnh 500
+      EXP + 5 kunai. **Cả hai dải trước đó chưa từng được client dùng một gói nào** dù server xong từ
+      Phase 6. Một chỗ suýt mất việc âm thầm: `AcceptQuestResponse` có nghĩa với **CẢ HAI**
+      coordinator (cập nhật nhiệm vụ vs đóng khung thoại) nên `WorldScreen` gọi cả hai chứ không
+      dừng ở cái đầu tiên trả `true` — **một `else if` quen tay sẽ nuốt mất một trong hai việc**.
+      Khoá idempotency (ADR-025) sinh **một lần rồi giữ nguyên** qua các lần thử lại của cùng một lần
+      lĩnh; sinh mới mỗi lần bấm sẽ biến chính cơ chế chống trùng thành vô dụng.
+    - 🛑 **Lỗ giao thức thật phát hiện ngay tại đây**: `quest_code` chỉ đến từ chuỗi `action` của lựa
+      chọn hội thoại, và **không opcode nào hỏi được "tôi đang làm nhiệm vụ gì"** ⇒ **nhận nhiệm vụ
+      rồi đăng nhập lại là mất thưởng VĨNH VIỄN**, dù server nhớ đủ. Ghi lại chứ **không tự vá** —
+      vá là thêm opcode = đổi protocol (§4). Đây chính là **Khoảng trống 4** mà ADR-035 sau này lấp,
+      và bug thật sự được sửa ở mục 39.
+
+37. **Tầng xã hội client (2026-08-25)** — bốn hệ thống server đã xong từ Phase 6-7 mà client phủ
+    **0 opcode**:
+    - ✅ Chat (`2b70d51`, 800-802), Nhóm (`7aa0eb6`, 1300-1317), Bạn bè (`f174942`, 1100-1113), Bang
+      hội (`9d6b14a`, 700-719). Cùng một bộ ba lớp cho cả bốn: controller **thuần Java test được** /
+      panel **chỉ vẽ**, Stage riêng để đặt thứ tự nuốt input / coordinator nối trạng thái + mạng.
+    - ✅ **Hai bẫy thật của khung chat**: phím gameplay được **POLL** qua `Gdx.input.isKeyPressed`,
+      tức đi vòng qua lưng `InputProcessor` — Stage của khung chat nuốt phím **cũng không ngăn được**
+      chữ "a" vừa gõ đồng thời làm nhân vật chạy sang trái. Và **font UI là một tập glyph ĐÓNG**: vô
+      hại khi mọi chữ đến từ bundle i18n của mình, thành bẫy thật **ngay khi màn hình bắt đầu hiện
+      chữ do NGƯỜI KHÁC gõ** ⇒ `FontFactory.canRender(char)` dùng cho cả bộ lọc ô nhập lẫn sanitize
+      chữ đến. Hệ quả kéo theo ở Bạn bè: tên phải giữ **HAI bản** — bản THẬT để gửi lên server và bản
+      đã sanitize để hiện ra, vì `RemoveFriendCommand` nhận `target_name`, gửi bản hiển thị lên là
+      gửi **một cái tên KHÁC** và người bạn có tên chứa ký tự lạ sẽ **không bao giờ xoá được**.
+    - ✅ **Ba bug thật chỉ lộ ra khi gộp 3 luồng song song** (`187024f`) — không luồng nào tự thấy
+      được vì mỗi luồng chỉ nhìn thấy panel của chính nó: (1) **phím mở cửa sổ rò sang nhau** — gõ
+      "p" trong ô chat bật cửa sổ Nhóm, gõ "t" trong ô tên bạn bè bật ô chat; ba luồng nghĩ ra ba
+      cách chữa khác nhau (một cái chưa chữa gì), nay gộp về **MỘT** nguồn chân lý
+      `WorldScreen.isTextInputActive()`. (2) **Hai cực ngược nhau trên cùng một API** —
+      `setOpenBlocked` (true = chặn) vs `setCanOpen` (true = cho phép), và một coordinator còn **tự
+      đảo dấu bên trong**: truyền cùng một supplier cho cả hai cho ra hai hành vi trái ngược, cửa sổ
+      **chỉ mở được đúng lúc đáng lẽ phải bị chặn**. (3) Chính script gộp xung đột **cắt mất 2 thẻ
+      `</Match>`** trong `config/spotbugs/exclude.xml` — **SpotBugs im lặng bỏ qua CẢ FILE hỏng**,
+      nên mọi exclusion mất tác dụng cùng lúc và chỉ lộ ra vì gate bắt đầu báo những lỗi vốn đã được
+      duyệt từ lâu.
+    - ✅ **[ADR-035](../01-architecture/adr/ADR-035-Client-State-Sync-Opcodes.md) viết Proposed**
+      (`01a7db0`): client mới dùng **40/150 opcode** và **0/7 opcode dải Inventory**; đề xuất 7 opcode
+      lấp 4 khoảng trống, trong đó Khoảng trống 4 chính là bug mất thưởng sau relog ở mục 36. Khuyến
+      nghị catalog theo **A′** (gửi qua mạng kèm `version` do server phán quyết) chứ **không** đóng
+      gói tĩnh như ADR-028: catalog chỉ nặng kilobyte nhưng đổi mỗi lần cân bằng game, và lệch phiên
+      bản thì **hiện chỉ số sai trong im lặng**.
+    - ✅ Sửa dòng chỉ mục ADR-032 ghi `Proposed` trong khi chính file ADR ghi `Accepted` (`5baebe8`) —
+      **lỗi sổ sách, không phải mâu thuẫn cần quyết**; nhân đó đối chiếu **cả 34 ADR** giữa ô
+      `Status` trong từng file và cột trạng thái trong bảng, sau thay đổi không còn dòng nào lệch.
+    - ⛔ **Khoảng trống giao thức ghi lại chứ không tự vá**: `party.proto` và `guild.proto` **không có
+      một event đẩy nào** — bị mời vào nhóm, bị đuổi, đơn xin được duyệt, bang bị giải tán: client
+      **không được báo gì hết**. Vì vậy toàn bộ trạng thái ở client là **ẢNH CHỤP**, coordinator hỏi
+      lại server sau **MỌI** lệnh (kể cả lệnh hỏng — một lệnh hỏng vì "đã ở trong nhóm rồi" **chính
+      là bằng chứng ảnh chụp đang sai"**), và không chỗ nào suy trạng thái mới từ một chữ OK
+      (Điều 15).
+
+38. **Vòng song song #9 — ADR-035 vào code, và một lỗ ĐÚC VÀNG thật (2026-08-28)** (`f685824`,
+    `fb86621`, `393fc41`; độ phủ opcode client **92/151 → 121/158**):
+    - ✅ **ADR-035 Accepted 2026-08-27** (`f9fa566`) — chủ dự án duyệt **nguyên đề xuất**: cả 7 opcode,
+      catalog theo **A′**; 7/8 Technical Decision chốt (#8 — thống nhất id-vs-code toàn protocol —
+      vốn cố ý ngoài phạm vi, vẫn Mở). Cùng commit **đính chính một chỗ SAI trong chính ADR**: bản
+      viết 2026-08-25 ghi "3 icon vật phẩm mới chỉ có nguồn `.blend`", kiểm lại thì icon **đã có**
+      trong atlas cả 3 tier. Thi hành ở `783131f`: LIST_INVENTORY 507/508, ITEM_CATALOG 509/510,
+      GOLD_CHANGED_EVENT 209, LIST_QUESTS 610/611 — **chỉ THÊM**, không đổi message đang chạy, không
+      đổi schema, không tăng `protocolVersion`; **511 cố ý để trống** cho `ITEM_REMOVED_EVENT` sau
+      này. `GoldLedger` thành **điểm ghi `character_stat.gold` DUY NHẤT**, có test quét mã nguồn gác.
+    - 🔴 **Lỗ đúc vàng và nhân bản vật phẩm qua hòm thư** (`63b277c`) — lỗi nghiêm trọng nhất tìm được
+      trong cả đợt: `SendMailUseCase` chỉ có `MailRepositoryPort`, nên `gold_amount` và danh sách
+      đính kèm đi **thẳng từ packet client vào bảng `mail`/`mail_item` mà không ai bị trừ gì**, trong
+      khi `ClaimMailUseCase` **cộng vàng thật và cấp item thật**. Tự gửi thư cho chính mình rồi nhận
+      = **đúc vàng từ không khí**; gửi cùng một món cho 10 người = **nhân bản 10 lần**. Vi phạm
+      thẳng Server Authority. Vá bằng **ký quỹ tài sản người gửi trong CÙNG transaction** với
+      `INSERT INTO mail` (thiếu ở bước nào thì rollback cả phần đã trừ), đi qua `GoldLedger` nên
+      người gửi nhận `GoldChangedEvent`. Test: 20 test Postgres thật gồm **test hồi quy chống đúc
+      vàng** và test bảo toàn tổng vàng giữa hai người. **Chủ dự án quyết thứ tự: bịt lỗ server
+      trước, gộp giao diện hòm thư sau** — vì chính giao diện đó là thứ khiến lỗ này với tới được từ
+      client thật.
+    - ✅ Hòm thư (`d22c9f2`, 900-908), đấu tay đôi + xếp hạng PvP (`8103d2f`, 1600-1611 + 1200-1201),
+      hầm ngục (`4eed8ac`, 1500-1503) và chọn hệ phái Lv10 (206/207).
+    - ✅ Ba thứ chặn gộp được dọn (`0d1e00a`), trong đó **`kage_character_base.blend` là file DUY NHẤT
+      trong 44 file `.blend` bị lưu dạng raw** trong khi `.gitattributes` bắt cả `assets/raw/**` qua
+      LFS — hệ quả: **mọi worktree và mọi clone mới thấy nó "modified" vĩnh viễn**. Nội dung KHÔNG
+      đổi (md5 và số byte khớp trước/sau), chỉ chuyển chỗ lưu; phải dùng `git add --renormalize` vì
+      `git add` thường bỏ qua do stat cache nói file không đổi nên clean filter không chạy
+      (`593a26c`).
+    - ⛔ **Khoảng trống nói thẳng ra chứ không tự vá**: đính kèm thư chỉ mang `item_template_id` (đúng
+      là Khoảng trống 2 của ADR-035, khi đó còn Proposed) nên hiện "Vật phẩm #12 x3" — **không bịa
+      tên, không tự thêm opcode catalog**; `MailView.sender_id` là id trần nên hiện "Người chơi #42";
+      `ClaimMailResponse`/`DeleteMailResponse` **không mang `mail_id`** nên hai lệnh chồng nhau không
+      phân biệt được. Đấu tay đôi: `ChallengeDuelCommand` thách theo **TÊN** mà
+      `CharacterSpawnedEvent` không mang tên nhân vật ⇒ client bù bằng sổ tên LRU 64 dòng nhặt từ
+      chat/bạn/nhóm/bang. Hầm ngục: **chỉ người GỬI lệnh nhận `EnterDungeonResponse`**, các thành
+      viên còn lại **bị server kéo sang World khác trong im lặng tuyệt đối** — nên nút "Rời hầm ngục"
+      **luôn bấm được**, đó là lối thoát duy nhất của họ.
+    - ⚠️ **Hai chỗ SERVER KHÔNG VALIDATE mà client đang là hàng rào duy nhất** (mô tả, không tự sửa):
+      `subject`/`body` vượt `VARCHAR(64)`/`VARCHAR(1024)` thành `SQLException` trong `authExecutor`
+      **chứ không phải outcome**, và `gold_amount` có `CHECK (>= 0)` nhưng **không ai kiểm trước**.
+      Client chặn cả hai để người chơi không vấp vào hố, nhưng đó **KHÔNG thay được validate phía
+      server**. (Bản vá `63b277c` sau đó đã bịt phần này bằng `MailDraft` + 6 outcome mới.)
+    - ⚠️ **Ký quỹ chỉ nhận món chưa cường hoá** (`enhance_level = 0`): `mail_item` và
+      `MailAttachmentView` không chở `enhance_level` nên gửi một món +7 sẽ **xoá mức cường hoá vĩnh
+      viễn**. Mở ra cần đổi schema + protocol ⇒ chờ chủ dự án.
+    - ⚠️ **`WorldScreen` chạm trần Checkstyle MethodLength LẦN THỨ TƯ** và PMD CyclomaticComplexity
+      của lớp lên **đúng 80** (ngưỡng đỏ) — **tách hàm nào cũng làm đỏ**, đã thử và đo, nên nhánh gộp
+      phải gộp lại một dòng chú thích. Ghi rõ lúc đó: lớp này cần tách thật, và đó là thay đổi kiến
+      trúc tầng client. Cũng ở đúng điểm giao hai luồng, **test của nhánh hòm thư bắt được một lỗi
+      thật**: bản vá server thêm 6 giá trị `SendMailOutcome` mà client **chưa có khoá i18n nào**,
+      người chơi sẽ đọc "không rõ lỗi" đúng vào lúc cần biết vì sao gửi hụt.
+
+39. **Vòng #10 — bốn màn hình ADR-035 và playtest SỐNG 9 màn hình (2026-08-29)**:
+    - ✅ **Gỡ trần `WorldScreen` TRƯỚC, làm giao diện sau** (`8015bac`): mỗi tính năng có cửa sổ riêng
+      phải được nhắc tên ở **chín chỗ rời rạc**, nên bốn màn hình còn lại của ADR-035 **không có chỗ
+      để cắm vào**. `PanelHub` — sổ đăng ký MỘT chỗ cho mọi khung HUD: thứ tự đăng ký là thứ tự nuốt
+      input, thứ tự vẽ **suy ngược** (khung nhận input trước là khung nằm trên cùng), thứ tự dispose
+      **suy xuôi** (panel mượn skin của `CombatHud` nên phải trả tài nguyên trước chủ skin). Thêm một
+      cửa sổ mới giờ tốn **đúng một dòng và 0 điểm cyclomatic complexity**. `WorldScreen` 928 → 734
+      dòng, tổng complexity **81 → 63**.
+    - 🔴 **Dấu xung đột git lọt thẳng lên master** ở vòng gộp hôm trước (`393fc41`) — ba dòng
+      dấu xung đột chuẩn của git (ba dòng `HEAD` / phân cách / tên nhánh) nằm trong **CẢ HAI** bundle
+      i18n — chính tài liệu này cố ý **không viết ra nguyên văn** ba chuỗi ký tự đó, để phép grep
+      quét dấu xung đột trên toàn cây không báo nhầm ở đây. **Không gì bắt được**: file
+      `.properties` không được biên dịch, `Properties.load` **nuốt dòng rác thành khoá vô nghĩa thay
+      vì báo lỗi**, và không test nào đọc toàn bộ bundle. Nội dung hai nhánh đều đúng và bổ sung cho
+      nhau — chỉ ba dòng dấu là rác. Gỡ xong: 274 khoá mỗi bundle, khớp nhau chính xác; và
+      `MessageBundleIntegrityTest` gác **ba thứ** từ nay (không dấu xung đột, hai bundle cùng tập
+      khoá, không khoá nào rỗng) — `80cf536`. **Bài học: build xanh vẫn có thể giấu rác; grep dấu
+      xung đột trên TOÀN cây khi gộp song song.**
+    - ✅ Hai mảnh **dữ liệu nền dùng chung** tách ra trước để hai giao diện không viết một thứ hai lần
+      (`771838f`): `ItemCatalog` (509/510 — version do **SERVER** phán quyết theo A′, client chỉ lưu
+      chuỗi server gửi rồi gửi trả; `unchanged=true` nghĩa là **giữ nguyên bản cũ, KHÔNG phải catalog
+      rỗng**) và `GoldCoordinator` (209 — số dư **TUYỆT ĐỐI** từ server, client **không bao giờ** tự
+      cộng trừ theo giá món hàng nó vừa bấm mua; mất một gói thì gói kế tự sửa lại).
+    - ✅ Túi đồ + trang bị (`74c9d56`, 501-504/507-508), cửa hàng (`81fa74f`, 1000-1005), nhật ký
+      nhiệm vụ (`b327d0a`, 610/611) — **và chính bug mất thưởng sau relog ở mục 36 được SỬA THẬT**,
+      có test tái hiện đúng kịch bản (nhận → vứt tracker mô phỏng relog → `ListQuestsResponse` →
+      lĩnh được). Icon tra atlas MEDIUM theo `item_template.code`, **để trống khi thiếu vùng chứ
+      không vẽ hộp màu bịa**. Cửa hàng cũng gỡ được một chỗ nuốt gói: `DialogueCoordinator` từng nuốt
+      `ListShopItemsResponse` thành câu "chưa mở được cửa hàng" — `PanelHub#dispatch` phát gói cho
+      **MỌI** luồng nên không ai giấu gói của ai.
+    - ✅ **Hai agent song song cùng tự phát hiện một lỗi và cùng báo lên đúng chỗ** (`f487598`):
+      `ItemCatalogCoordinator`/`GoldCoordinator` chỉ có **đúng MỘT ô listener**, nên lời gọi sau giẫm
+      lên lời gọi trước và giao diện **thua IM LẶNG** — không lỗi, không log, chỉ sai (catalog về
+      muộn thì không bao giờ vẽ lại; số vàng cũ hiện mãi mãi).
+    - 🔴 **Playtest sống 9 màn hình bắt được lỗi KẸT CỨNG giao diện mà 1000+ test không thấy**
+      (`bbbfaf4`): `ShopCoordinator.onListings()` gọi `panel.open()`, `open()` chạy
+      `onOpened = listShopItems()`, server trả lời, `onListings()` **lại gọi `open()`**… Mở cửa hàng
+      bằng phím B = **không đóng được (dù panel ghi "Nhấn ESC để đóng"), không mở được cửa sổ khác,
+      không đi lại, không đánh** — kèm spam `ListShopItemsRequest` liên tục lên server. Cùng lượt:
+      dòng gợi ý chỉ nói phím T và P nên **sáu cửa sổ mới không có cách nào để người chơi biết là
+      chúng tồn tại**; và `MessageBundleIntegrityTest` thêm phép gác "mọi ký tự trong bundle phải nằm
+      trong tập glyph của `FontFactory`" — **bắt được ngay lỗi đầu tiên**: dấu chấm giữa (U+00B7) vừa
+      định dùng làm dấu phân cách trong chính dòng gợi ý đó, **nó sẽ biến mất không dấu vết**.
+    - ✅ **Ô nhập trống không nhãn — hoá ra ở BỐN panel, không phải một** (`1b09fc3`): hòm thư, bang
+      hội, bạn bè và đấu tay đôi đều gọi `setKeyboardFocus(field)` ngay khi mở, mà `TextField` của
+      libGDX **chỉ vẽ `messageText` khi KHÔNG có focus** ⇒ **tự lấy focus là tự xoá mất chữ gợi ý của
+      chính mình**: người chơi nhìn thấy một ô trống trơn cạnh nút "Lập bang"/"Kết bạn"/"Thách đấu".
+      Kèm dòng gợi ý của nhật ký nhiệm vụ hiện hai lần và nói sai (J **không** đóng được, chỉ ESC).
+    - ✅ Nút **Bán** nối vào túi đồ (`8cd4ab1`) — `SellItemCommand` đòi `inventory_item.id` THẬT mà chỉ
+      giao diện túi đồ mới biết số đó; xác minh **trọn vòng bằng cách chơi thật + đối chiếu DB** (mua
+      Kunai 500→495, bán 1 → 497 đúng giá bán 2, `inventory_item` còn 0 dòng). Bán **đúng một món mỗi
+      lần bấm** vì bán nhầm cả chồng đồ là thứ không hoàn tác được.
+    - ✅ **Giao dịch giữa hai người chơi, đủ 15/15 opcode `trade.proto`** (`50e10fc`) — server có đủ 36
+      lớp `feature-trade` từ Phase 7, client trước đó phủ **0/15**. Xác minh bằng **HAI client chạy
+      song song**. Đây là "hệ thống nguy hiểm nhất" (GAMEPLAY.md §8): trò lừa kinh điển là đổi lời
+      chào ngay trước khi đối phương bấm xác nhận. Server đã chặn bằng cách reset cả hai cờ mỗi lần
+      lời chào đổi — **nhưng người chơi chỉ tin được điều đó nếu họ THẤY cờ rơi về chưa-xác-nhận**,
+      nên cờ hiện thành CHỮ, không rút thành một dấu nhỏ. Cố ý **không** giữ "lời chào nháp" song
+      song với `my_items` của server: `SetTradeOfferCommand` đặt lại TOÀN BỘ lời chào chứ không cộng
+      dồn, nên hai bản sao của cùng một thứ sẽ lệch nhau **đúng vào lúc quan trọng nhất**.
+
+40. **Đóng độ phủ opcode client và nội dung vật phẩm (2026-08-29)**:
+    - ✅ **V21 — 15 `item_template` phủ đủ 7 ô trang bị** (`684cc31`, `eecd199`): cả game trước đó chỉ
+      có **3 dòng `item_template`** — 6/7 ô trang bị **không có gì để mặc**, cửa hàng bán 3 mặt hàng,
+      quái chỉ rơi kunai. V21 **chỉ seed dữ liệu, KHÔNG đổi schema**: hai bậc đồ ("Tập Sự", "Hạ
+      Nhẫn") phủ mọi `EquipmentSlot`, hai loại nguyên liệu quái biến lượt giết thành vàng, `shop_item`
+      cho tất cả, và `drop_table_entry` cho **hai con quái thật sự tồn tại**. Bất biến giữ nguyên:
+      `buy_price > sell_price` ở **mọi** dòng (bằng không là vàng vô hạn), bảng rơi giữ ngắn
+      (`Inventory.add` **không bao giờ gộp chồng**, túi 20 ô). **Cố ý không có bình máu** — chưa có
+      use case `UseItem` nào, thêm vào là nội dung chết. Hạn chế đã biết và **cố ý không lách**: chỉ
+      cộng ATK (xem mục 29 / ADR-036).
+    - ✅ **Test tích hợp chứng minh trọn vòng rơi đồ** (`1e0f431`, `eb3105e`): quái chết → roll bảng
+      rơi → dòng `inventory_item` **thật** → `ItemGrantedEvent`. Trước đó chuỗi này chỉ được phủ bởi
+      **ba mảnh rời, không mảnh nào chạm mảnh kế tiếp** — `WorldFacadeTest` dừng ở "sink đã được báo
+      ai hạ gục" (sink giả); `ConnectedCharacterRegistryTest` dùng `InventoryPort` giả mà `save()`
+      **trả về chính object nhận vào**, nên `ItemGrantedEvent.item_id` **luôn bằng 0 ở đó — và chưa
+      bao giờ được assert**; `MvpLoopIntegrationTest` gọi thẳng `GrantLootUseCase` trên Postgres
+      thật, **bỏ qua cả world lẫn gateway**. Test mới nối chúng lại: hình nộm bị giết thật bên trong
+      `WorldFacade` 60Hz đang chạy, đồ rơi vào `inventory_item` của **đúng người hạ gục**
+      (Testcontainers). Ngẫu nhiên được ghim bằng **DỮ LIỆU chứ không phải mock** (`LootRoller` gọi
+      thẳng `ThreadLocalRandom` một cách cố ý, nên test viết lại `drop_table_entry` **trong chính
+      container dùng một lần** — không đụng migration nào). Kênh client dùng `LocalChannel` trên
+      `EventLoopGroup` **thật** thay vì `EmbeddedChannel`: một cú giết toả ra **ba virtual thread
+      cộng luồng tick**, mà `EmbeddedEventLoop` chạy inline trên luồng gọi nên **âm thầm đánh rơi
+      packet**. Cũng phủ nhánh túi đầy (đồ **mất im lặng**, không event, không dòng DB — hành vi tạm
+      thời đã ghi trong tài liệu) và nhánh mất kết nối trước khi báo. Kiểm bằng **đột biến**: thay
+      `setItemId(stack.id())` bằng `setItemId(0L)` làm test mới đỏ.
+    - ✅ **Cường hoá vật phẩm + 3 opcode hạ tầng cuối ⇒ độ phủ opcode client 152/157 → 157/157**
+      (`4e38401`): ENHANCE_ITEM 505/506, `ITEM_GRANTED_EVENT` (trước đó **bị bỏ qua im lặng**, nên
+      giết quái xong client **không báo gì cả**), `PONG` + `SERVER_SHUTTING_DOWN_EVENT` (thời gian
+      khứ hồi đo **chỉ bằng đồng hồ của chính client**, `server_timestamp_ms` cố ý không dùng). Khoá
+      idempotency (ADR-025) **cố ý KHÔNG đổi** khi bật/tắt bùa Bảo Vệ giữa chừng — vẫn là **cùng một
+      lần cường hoá**, khoá mới ở đó nghĩa là **bị trừ vàng lần thứ hai**. **Không hiện chi phí hay
+      tỉ lệ thành công**: `EnhancementTable` nằm ở server và không packet nào chở nó sang client, mọi
+      con số ở đây sẽ là **bịa** (Điều 24). Xác minh **sống** với server thật (TLS, Postgres thật):
+      +0 → +7 trên katana thép, vàng trừ **đúng theo `EnhancementTable`**, **9 dòng `audit_log` cho 9
+      lần bấm** (không tính tiền hai lần), và cả nhánh thất bại lẫn nhánh Bảo Vệ đều hiện dòng riêng.
+    - ✅ **Hai lỗi bố cục túi đồ mà 1000+ test và MỌI static check bỏ sót**, chỉ thấy khi chụp
+      `HudPreviewTool` ở **trạng thái xấu nhất**: nhãn "Giao dịch"/"Cường hoá" **rộng hơn nút 84px
+      nên bị cắt chữ** (hàng nút hành động chuyển sang hàng riêng theo bề rộng thật); và **túi đầy
+      thì cửa sổ đòi 1238px trên màn hình 720px**, đẩy khu trang bị và hàng nút **ra ngoài tầm với**
+      ⇒ `KageSkin` thêm `ScrollPaneStyle`, cả hai danh sách cuộn được, còn **668px**. Ghi lại một bẫy
+      cụ thể: `solid()` dựng drawable từ ảnh **1x1** và `ScrollPane` lấy bề rộng thanh cuộn **thẳng
+      từ `minWidth` của drawable** — không `setMinWidth` thì thanh cuộn **rộng 1px**.
+    - ✅ Gộp hai luồng song song làm test rơi đồ **đỏ** dù **cả hai nhánh đều xanh khi đứng riêng**
+      (`214bc00`): V21 thêm 2 dòng `drop_table_entry` cho `training_dummy` trong khi phần dựng của
+      test đẩy **cả bảng** lên 100% ⇒ ba món rơi ở chỗ nó chờ một. Sửa bằng cách **xoá mọi dòng trừ
+      kunai rồi mới ghim**, để test **miễn nhiễm với nội dung tương lai** thay vì dính vào việc
+      migration tình cờ seed bao nhiêu dòng.
+    - ⛔ **Ba khoản nợ sinh ra hoặc chạm tới trong ngày, ghi đầy đủ ở mục 29**: chỉ số trang bị +
+      cường hoá không có tác dụng ⇒ **ADR-036 Proposed** (đang chờ chủ dự án); `drop_table` im lặng
+      khi mã quái không khớp ⇒ **đã sửa**; đổi hệ phái xong người khác thấy model cũ ⇒ **đã sửa một
+      nửa**.
+    - ⛔ **Vẫn CHƯA làm, không phải thiếu sót**: toàn bộ quy trình Closed Beta → Open Beta → RC →
+      Production ở bảng §Phase 10 **vẫn chưa bắt đầu**, TLS thật trong `docker-compose.prod.yml` và
+      cert Production thật vẫn thiếu (mục 22 vẫn nguyên hiệu lực); phép đo lại **N=2000** vẫn chưa
+      chạy dù công cụ đã vá từ 2026-08-01 (mục 24); và **`WorldScreen` chỉ mới hết chật, chưa hết
+      lớn** — `PanelHub` mua thêm chỗ chứ không đổi kiến trúc tầng client.
