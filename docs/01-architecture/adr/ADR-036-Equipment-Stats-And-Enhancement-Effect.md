@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | 🟡 **Proposed** (2026-08-29) — chờ chủ dự án quyết. AI đo + soạn, KHÔNG tự thi hành |
+| Status | 🟢 **Accepted** (2026-08-30) — chủ dự án duyệt trọn D1-D5 + chấp nhận `maxHp = 100 + bonus_hp`. ĐÃ THI HÀNH |
 | Date | 2026-08-29 |
 | Deciders | Chủ dự án quyết; AI đo + soạn |
 | Related | [GAMEPLAY.md §2, §7, §7.1](../../05-server/GAMEPLAY.md) · [ADR-035](ADR-035-Client-State-Sync-Opcodes.md) (catalog vật phẩm gửi qua mạng) · [NETWORK.md §6](../../05-server/NETWORK.md) (luật tương thích ngược) · [DATABASE.md](../../05-server/DATABASE.md) · [/CLAUDE.md §4](../../../CLAUDE.md) (đổi schema DB + protocol phải dừng hỏi) |
@@ -79,7 +79,9 @@ lần đụng protocol — trong khi câu hỏi thực chất chỉ có một: *
 
 ## Decision
 
-> ⚠️ **Chưa được duyệt.** Mục này là ĐỀ XUẤT để chủ dự án quyết, không phải việc đã chốt.
+> ✅ **Đã duyệt 2026-08-30.** Chủ dự án chọn "duyệt trọn D1-D5" và, cho câu hỏi phụ, chọn
+> "chấp nhận `maxHp = 100 + bonus_hp` như placeholder mới". Toàn bộ mục này đã được thi hành —
+> xem "Việc cần làm tiếp theo" ở cuối để biết cái gì đã xong và cái gì cố ý để lại.
 
 **D1 — Thêm 4 cột vào `item_template`** (migration mới, chỉ THÊM cột có `DEFAULT`, không đổi cột
 đang chạy, không đụng dữ liệu cũ):
@@ -97,6 +99,11 @@ NULL là một cột chưa cần. Thêm khi có bộ đồ riêng hệ phái đ�
 **D2 — `EquipmentBonus` mang 4 trường thay vì 1**, `applyEquipmentBonus` chuyển cả 4 sang
 `server-world` (đổi `WorldCommand.ApplyEquipmentBonusCommand` — API nội bộ, không phải protocol).
 
+> 📝 **Chi tiết lúc thi hành**: `server-world` KHÔNG được import `feature-inventory` (Điều 23), nên
+> 4 con số đi qua một record riêng của `server-world` — `EquipmentBonusSnapshot` — và gateway dịch
+> `EquipmentBonus` → `EquipmentBonusSnapshot`. Truyền 4 số rời thì `applyEquipmentBonus` thành 5
+> tham số, vượt ngưỡng Checkstyle `ParameterNumber` (max=4).
+
 **D3 — Cường hoá cộng theo PHẦN TRĂM chỉ số gốc của chính món đó**, không cộng số tuyệt đối:
 
 ```
@@ -110,8 +117,19 @@ mới đáng 20.000 vàng ở cấp cuối. Số tuyệt đối thì cường ho
 `ENHANCE_STEP` đặt cạnh `EnhancementTable` (feature-inventory/domain) — cùng chỗ với tỉ lệ và chi
 phí, để một lần cân bằng chỉ phải mở một file.
 
-**D4 — `EquipItemUseCase` kiểm `required_level`**, trả `error.level_too_low` (khoá i18n mới, đúng
-khuôn ba `error_key` Equip/Unequip đang có — xem `InventoryController.KNOWN_ERROR_KEYS` phía client).
+**D4 — `EquipItemUseCase` kiểm `required_level`**, trả `error.equip_level_too_low` (khoá i18n mới,
+đúng khuôn ba `error_key` Equip/Unequip đang có — xem `InventoryController.KNOWN_ERROR_KEYS` phía
+client).
+
+> 📝 **Sửa lúc thi hành**: bản Proposed viết `error.level_too_low`. Khoá đó **đã có chủ** — luồng
+> CHỌN HỆ PHÁI dùng nó với câu "Chưa đủ cấp 10 để chọn hệ phái"
+> (`GatewayChannelHandler` dòng ~722, `strings_vi.properties`). Dùng chung sẽ hiện sai câu cho một
+> trong hai luồng, nên khoá thật là `error.equip_level_too_low`.
+
+`characterLevel` do **gateway đọc từ DB** (`CharacterFacade.findById(...).level()`) rồi truyền vào
+use case, KHÔNG phải một `Port` mới của `feature-inventory`: cấp nhân vật thuộc
+`feature-character`, và `GatewayChannelHandler` vốn đã là nơi nối hai module (cùng khuôn với
+`computeEquipmentBonus` → `WorldFacade`). Con số đó không bao giờ đến từ client.
 
 **D5 — Protocol: THÊM 4 field vào `ItemCatalogEntry`** (`inventory.proto`), số field mới `7..10`,
 KHÔNG đụng field `1..6` đang chạy, **KHÔNG tăng `protocolVersion`** — đúng luật additive của
@@ -199,11 +217,34 @@ Không. ADR này tự đứng được; không sinh ra quyết định kiến tr
 
 ## Việc cần làm tiếp theo
 
-1. **Chủ dự án quyết**: duyệt/bác D1-D5, và trả lời câu hỏi phụ về `bonus_hp` vs
-   `CHARACTER_MAX_HP` placeholder.
-2. Nếu duyệt: migration thêm 4 cột → mở rộng `EquipmentBonus`/`ApplyEquipmentBonusCommand` →
-   `ComputeEquipmentBonusUseCase` đọc `enhanceLevel` → `EquipItemUseCase` kiểm `required_level` →
-   thêm 4 field `ItemCatalogEntry` → migration chỉnh lại số liệu 15 món V21 → client hiện chỉ số
-   trong ô chi tiết túi đồ.
-3. Nếu bác D3 (chọn phương án E): **gỡ nút Cường hoá khỏi `InventoryPanel`** — để nguyên một nút
-   đốt vàng không tác dụng là tệ hơn cả hai lựa chọn.
+### ✅ Đã xong (2026-08-30, cùng ngày duyệt)
+
+1. **Migration V22** — 4 cột mới (chỉ THÊM, có `DEFAULT`) + cân bằng lại số liệu 16 món
+   (15 của V21 + `wooden_sword`): vũ khí cộng ATK, giáp/mũ/giày cộng DEF/RES/HP,
+   `required_level` 1 cho "Tập Sự" và 5 cho "Hạ Nhẫn".
+2. `ItemTemplate`/`EquipmentBonus`/`ItemCatalogEntry` mang đủ 4 chỉ số; `PostgresItemTemplateAdapter`
+   đọc 4 cột mới.
+3. `EnhancementTable.ENHANCE_STEP` + `enhancedBonus(base, level)`; `ComputeEquipmentBonusUseCase`
+   nhân hệ số **cho TỪNG món theo cấp cường hoá của chính món đó** rồi mới cộng lại.
+4. `EquipmentBonusSnapshot` (server-world) + `WorldFacade` áp DEF/RES thật và nâng máu tối đa;
+   máu hiện tại dịch theo đúng độ chênh, chặn dưới ở 1 (gỡ đồ +HP không được giết người chơi),
+   không đụng nhân vật đang chết.
+5. `EquipItemUseCase` kiểm `required_level` → `error.equip_level_too_low`, có ở cả 2 bundle i18n.
+6. Protocol: 4 field `7..10` của `ItemCatalogEntry`, `protocolVersion` **không** tăng.
+7. Client: ô chi tiết túi đồ hiện "Chỉ số gốc: …" + "Cần Cấp N"; vạch máu lấy **máu tối đa của
+   server** từ `CharacterRespawnedEvent.max_hp` (field vốn đã có trên dây, client trước đây nhận
+   rồi vứt) thay vì hằng số `CHARACTER_MAX_HP`.
+
+### ⏳ Cố ý để lại (không chặn)
+
+- **Máu tối đa lúc ĐĂNG NHẬP**: chưa gói nào mang HP/HP-tối-đa của CHÍNH mình lúc vào world
+  (grep `current_hp` trong `.proto` — chỉ có ở quái và ở sự kiện hồi sinh). Giữa lúc vào game và
+  lần hồi sinh đầu tiên, mẫu số vạch máu có thể lệch nếu đang mặc đồ `+HP`. Sửa đúng cần thêm
+  field vào gói trạng thái ban đầu — ngoài phạm vi ADR này ("không thêm opcode, không đổi message
+  đang chạy").
+- **Client KHÔNG hiện chỉ số hiệu dụng sau cường hoá**, chỉ hiện chỉ số GỐC kèm nhãn "gốc":
+  `ENHANCE_STEP` sống ở server và không gói nào gửi nó sang client, nên client tự nhân là bịa
+  (Điều 24 — cùng lý do bảng chi phí cường hoá vắng mặt ở client).
+- **Món ĐANG MẶC không bị gỡ khi `required_level` đổi**: phép kiểm chỉ chạy lúc MẶC. Cố ý — tước
+  đồ khỏi nhân vật đang chơi vì một lần cân bằng là tệ hơn.
+- `ENHANCE_STEP = 0,10` và toàn bộ số liệu V22 **chưa qua playtest**.

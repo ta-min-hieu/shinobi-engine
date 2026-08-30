@@ -618,7 +618,7 @@ public final class WorldScreen implements GameScreen {
         pos.vz = 0f;
         pos.grounded = true;
         pos.airJumpsUsed = 0;
-        combatHudController.onRespawn(event.getCurrentHp(), event.getCurrentChi());
+        combatHudController.onRespawn(event.getCurrentHp(), event.getMaxHp(), event.getCurrentChi());
         models.resetAfterRespawn(WorldConstants.LOCAL_CHARACTER_ID);
     }
 

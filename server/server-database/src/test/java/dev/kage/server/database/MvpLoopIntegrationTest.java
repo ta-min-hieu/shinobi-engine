@@ -261,8 +261,9 @@ class MvpLoopIntegrationTest {
                 .orElseThrow()
                 .id();
 
+        // Cấp 1 — wooden_sword có required_level = 1 (V22), nhân vật mới mặc được ngay.
         EquipItemUseCase.EquipItemResult equipResult =
-                newEquipItemUseCase().execute(characterId, swordItemId, EquipmentSlotType.WEAPON);
+                newEquipItemUseCase().execute(characterId, swordItemId, EquipmentSlotType.WEAPON, 1);
         assertThat(equipResult).isEqualTo(EquipItemUseCase.EquipItemResult.OK);
 
         // 7. Cường hoá vũ khí vừa mặc.

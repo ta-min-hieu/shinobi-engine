@@ -72,13 +72,19 @@ public final class InventoryFacade {
 
     /**
      * Mặc item {@code itemId} (ID thật của {@code inventory_item}, không phải vị trí) vào
-     * {@code targetSlot} — server tự kiểm tra item thuộc đúng nhân vật + đúng loại slot.
+     * {@code targetSlot} — server tự kiểm tra item thuộc đúng nhân vật + đúng loại slot + nhân vật
+     * đủ cấp ({@code item_template.required_level}, ADR-036 D4).
+     *
+     * @param characterLevel cấp hiện tại của nhân vật, chỗ gọi ĐỌC TỪ DB (không nhận từ client) —
+     *     xem javadoc {@link dev.kage.inventory.application.EquipItemUseCase} về lý do không dùng
+     *     port riêng
      */
-    public EquipResult equipItem(long characterId, long itemId, EquipmentSlotType targetSlot) {
-        return switch (equipItemUseCase.execute(characterId, itemId, targetSlot)) {
+    public EquipResult equipItem(long characterId, long itemId, EquipmentSlotType targetSlot, int characterLevel) {
+        return switch (equipItemUseCase.execute(characterId, itemId, targetSlot, characterLevel)) {
             case OK -> EquipResult.OK;
             case ITEM_NOT_FOUND -> EquipResult.ITEM_NOT_FOUND;
             case WRONG_SLOT -> EquipResult.WRONG_SLOT;
+            case LEVEL_TOO_LOW -> EquipResult.LEVEL_TOO_LOW;
         };
     }
 
@@ -145,7 +151,9 @@ public final class InventoryFacade {
     public enum EquipResult {
         OK,
         ITEM_NOT_FOUND,
-        WRONG_SLOT
+        WRONG_SLOT,
+        /** Nhân vật chưa đủ {@code item_template.required_level} (ADR-036 D4). */
+        LEVEL_TOO_LOW
     }
 
     public enum UnequipResult {

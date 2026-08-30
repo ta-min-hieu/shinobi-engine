@@ -1,9 +1,8 @@
 package dev.kage.inventory.domain;
 
 /**
- * Một dòng catalog vật phẩm — TOÀN BỘ 6 cột của {@code item_template} (V4/V5/V6), khác
- * {@link ItemTemplate} vốn cố ý chỉ mang phần "mặc đồ"/"tính chỉ số" ({@code equipSlot},
- * {@code bonusAtk}).
+ * Một dòng catalog vật phẩm — TOÀN BỘ 10 cột của {@code item_template} (V4/V5/V6/V22), khác
+ * {@link ItemTemplate} vốn cố ý chỉ mang phần "mặc đồ"/"tính chỉ số".
  *
  * <p>Hai record cùng đọc một bảng nhưng phục vụ hai việc khác hẳn nhau: {@link ItemTemplate} là
  * dữ liệu 1 item mà UseCase gameplay cần lúc chạy; record này là dữ liệu TRA CỨU gửi trọn gói cho
@@ -14,9 +13,22 @@ package dev.kage.inventory.domain;
  * bundle của nó), icon tra theo {@code code} trong atlas (ADR-028). Server chỉ gửi thứ server sở hữu.
  *
  * <p>{@code equipSlot == null} nghĩa là item KHÔNG mặc được (khớp {@code equip_slot} NULL trong DB).
+ *
+ * <p>Bốn chỉ số + {@code requiredLevel} có mặt ở đây để CLIENT hiện được ô chi tiết vật phẩm
+ * ("+10 DEF, cần Cấp 5") mà không phải đoán — ADR-036 D5 thêm chúng vào
+ * {@code ItemCatalogEntry} của {@code inventory.proto} theo đúng luật additive của NETWORK.md §6.
  */
 public record ItemCatalogEntry(
-        long id, String code, String nameKey, int maxStack, EquipmentSlotType equipSlot, int bonusAtk) {
+        long id,
+        String code,
+        String nameKey,
+        int maxStack,
+        EquipmentSlotType equipSlot,
+        int bonusAtk,
+        int bonusDef,
+        int bonusRes,
+        int bonusHp,
+        int requiredLevel) {
 
     public ItemCatalogEntry {
         if (id <= 0) {
@@ -30,6 +42,9 @@ public record ItemCatalogEntry(
         }
         if (maxStack <= 0) {
             throw new IllegalArgumentException("maxStack phải > 0: " + maxStack);
+        }
+        if (requiredLevel < 1) {
+            throw new IllegalArgumentException("requiredLevel phải >= 1: " + requiredLevel);
         }
     }
 }

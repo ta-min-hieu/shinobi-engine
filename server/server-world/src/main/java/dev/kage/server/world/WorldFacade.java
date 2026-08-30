@@ -329,11 +329,12 @@ public final class WorldFacade {
      * GAMEPLAY.md §2/§7 "tính lại chỉ số dẫn xuất khi đổi trang bị" — gọi lại MỖI lần trang bị đổi
      * (mặc/gỡ đồ) VÀ ngay sau khi attach (lúc chọn nhân vật, cùng lúc chỉ số nền được gửi vào —
      * {@code GatewayChannelHandler} chịu trách nhiệm gọi đúng lúc, server-world không tự biết
-     * feature-inventory). {@code bonusAtk} là TỔNG cộng dồn hiện tại từ MỌI item đang mặc (không
-     * phải delta) — feature-inventory tính lại từ đầu mỗi lần, tránh trôi số nếu gọi sai thứ tự.
+     * feature-inventory). Cả 4 chỉ số là TỔNG cộng dồn hiện tại từ MỌI item đang mặc (không phải
+     * delta, và ĐÃ nhân hệ số cường hoá của từng món — ADR-036 D2/D3) — feature-inventory tính lại
+     * từ đầu mỗi lần, tránh trôi số nếu gọi sai thứ tự.
      */
-    public void applyEquipmentBonus(long characterId, int bonusAtk) {
-        inbox.add(new WorldCommand.ApplyEquipmentBonusCommand(characterId, bonusAtk));
+    public void applyEquipmentBonus(long characterId, EquipmentBonusSnapshot bonus) {
+        inbox.add(new WorldCommand.ApplyEquipmentBonusCommand(characterId, bonus));
     }
 
     /** GAMEPLAY.md §10 — chat kênh Khu vực, cần {@code aoiTracker} nên phải qua tick thread. */
@@ -437,8 +438,7 @@ public final class WorldFacade {
                 case WorldCommand.AttackIntentCommand c -> handleAttackIntent(c.characterId());
                 case WorldCommand.UseSkillCommand c ->
                     handleUseSkill(c.characterId(), c.skillCode(), c.targetEntityId());
-                case WorldCommand.ApplyEquipmentBonusCommand c ->
-                    handleApplyEquipmentBonus(c.characterId(), c.bonusAtk());
+                case WorldCommand.ApplyEquipmentBonusCommand c -> handleApplyEquipmentBonus(c);
                 case WorldCommand.AreaChatMessageCommand c ->
                     handleAreaChatMessage(c.characterId(), c.senderName(), c.body());
                 case WorldCommand.SpawnBossCommand ignored -> spawnBossEntity();
@@ -616,7 +616,8 @@ public final class WorldFacade {
         }
     }
 
-    private void handleApplyEquipmentBonus(long characterId, int bonusAtk) {
+    private void handleApplyEquipmentBonus(WorldCommand.ApplyEquipmentBonusCommand command) {
+        long characterId = command.characterId();
         KEntity entity = entitiesByCharacterId.get(characterId);
         CharacterBaseStats baseStats = baseStatsByCharacterId.get(characterId);
         if (entity == null || baseStats == null) {
@@ -624,7 +625,32 @@ public final class WorldFacade {
         }
         CombatStatsComponent combatStats = COMBAT_STATS.get(entity);
         CombatConstants.CombatStats derived = CombatConstants.deriveCombatStats(baseStats);
-        combatStats.atk = derived.atk() + bonusAtk; // LUÔN tính lại từ nền, không cộng dồn (xem javadoc)
+        // LUÔN tính lại từ nền, không cộng dồn (xem javadoc applyEquipmentBonus).
+        EquipmentBonusSnapshot bonus = command.bonus();
+        combatStats.atk = derived.atk() + bonus.atk();
+        combatStats.def = derived.def() + bonus.def();
+        combatStats.res = derived.res() + bonus.res();
+        applyMaxHpBonus(entity, bonus.hp());
+    }
+
+    /**
+     * ADR-036: {@code bonus_hp} cộng vào MÁU TỐI ĐA, trên nền
+     * {@link CombatConstants#CHARACTER_MAX_HP} (vẫn là placeholder — GDD chưa chốt công thức HP;
+     * chủ dự án chấp nhận {@code maxHp = 100 + bonusHp} như placeholder mới khi duyệt ADR).
+     *
+     * <p>Máu HIỆN TẠI dịch theo đúng ĐỘ CHÊNH của máu tối đa, không đặt lại về đầy: mặc đồ +HP
+     * không được là một nút hồi máu miễn phí giữa trận, và gỡ đồ +HP không được giết người chơi
+     * (chặn dưới ở 1). Nhân vật đang chết ({@code current <= 0}) thì KHÔNG đụng vào máu hiện tại —
+     * {@code respawnCharacter} mới là chỗ hồi sinh, và nó tự đọc {@code health.max} mới.
+     */
+    private void applyMaxHpBonus(KEntity entity, int bonusHp) {
+        HealthComponent health = HEALTH.get(entity);
+        int newMax = Math.max(1, CombatConstants.CHARACTER_MAX_HP + bonusHp);
+        int delta = newMax - health.max;
+        health.max = newMax;
+        if (delta != 0 && health.current > 0) {
+            health.current = Math.clamp((long) health.current + delta, 1, newMax);
+        }
     }
 
     private void handleCombatResults(List<CombatSystem.AttackOutcome> results) {

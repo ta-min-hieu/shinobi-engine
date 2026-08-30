@@ -274,7 +274,8 @@ class CombatHudControllerTest {
                 .build());
         assertThat(controller.playerHp()).isZero();
 
-        controller.onRespawn(CombatConstants.CHARACTER_MAX_HP, CombatConstants.CHARACTER_MAX_CHI);
+        controller.onRespawn(
+                CombatConstants.CHARACTER_MAX_HP, CombatConstants.CHARACTER_MAX_HP, CombatConstants.CHARACTER_MAX_CHI);
 
         assertThat(controller.playerHp()).isEqualTo(CombatConstants.CHARACTER_MAX_HP);
         assertThat(controller.currentTargetId()).isZero();
@@ -299,5 +300,30 @@ class CombatHudControllerTest {
     void constructor_rejectsFactionWithoutASlot0SkillMapping() {
         assertThatThrownBy(() -> new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_UNSPECIFIED))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void shouldTakeMaxHpFromServer_notFromClientConstant() {
+        // ADR-036: bonus_hp của trang bị nâng MÁU TỐI ĐA, nên mẫu số vạch máu không còn là hằng số
+        // phía client. CharacterRespawnedEvent vốn ĐÃ mang max_hp (movement.proto field 4) —
+        // trước đây client nhận rồi vứt đi.
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+        assertThat(controller.playerMaxHp()).isEqualTo(CombatConstants.CHARACTER_MAX_HP);
+
+        controller.onRespawn(158, 158, CombatConstants.CHARACTER_MAX_CHI);
+
+        assertThat(controller.playerMaxHp()).isEqualTo(158);
+        assertThat(controller.playerHp()).isEqualTo(158);
+    }
+
+    @Test
+    void shouldKeepKnownMaxHp_whenServerSendsZero() {
+        // Server CŨ chưa gửi field này ⇒ 0 (mặc định proto3). Lấy 0 làm máu tối đa là chia cho 0 ở
+        // vạch máu — giữ giá trị đang biết thay vì tin một con số rỗng.
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+
+        controller.onRespawn(100, 0, CombatConstants.CHARACTER_MAX_CHI);
+
+        assertThat(controller.playerMaxHp()).isEqualTo(CombatConstants.CHARACTER_MAX_HP);
     }
 }

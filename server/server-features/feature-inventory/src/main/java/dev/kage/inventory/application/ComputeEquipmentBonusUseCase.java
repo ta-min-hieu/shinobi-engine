@@ -1,5 +1,6 @@
 package dev.kage.inventory.application;
 
+import dev.kage.inventory.domain.EnhancementTable;
 import dev.kage.inventory.domain.Equipment;
 import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.EquipmentPort;
@@ -37,6 +38,9 @@ public final class ComputeEquipmentBonusUseCase {
                 .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
 
         int totalBonusAtk = 0;
+        int totalBonusDef = 0;
+        int totalBonusRes = 0;
+        int totalBonusHp = 0;
         for (long itemId : equipment.slots().values()) {
             ItemStack item = inventory.findItem(itemId).orElse(null);
             if (item == null) {
@@ -47,8 +51,15 @@ public final class ComputeEquipmentBonusUseCase {
             if (template == null) {
                 continue;
             }
-            totalBonusAtk += template.bonusAtk();
+            // ADR-036 D3 — cường hoá khuếch đại chỉ số GỐC của CHÍNH món đó, tính riêng từng món
+            // rồi mới cộng lại. Cộng tổng trước rồi mới nhân hệ số là SAI: mỗi món có cấp cường
+            // hoá riêng, một món +10 không được kéo theo cả bộ đồ +0.
+            int enhanceLevel = item.enhanceLevel();
+            totalBonusAtk += EnhancementTable.enhancedBonus(template.bonusAtk(), enhanceLevel);
+            totalBonusDef += EnhancementTable.enhancedBonus(template.bonusDef(), enhanceLevel);
+            totalBonusRes += EnhancementTable.enhancedBonus(template.bonusRes(), enhanceLevel);
+            totalBonusHp += EnhancementTable.enhancedBonus(template.bonusHp(), enhanceLevel);
         }
-        return new EquipmentBonus(totalBonusAtk);
+        return new EquipmentBonus(totalBonusAtk, totalBonusDef, totalBonusRes, totalBonusHp);
     }
 }

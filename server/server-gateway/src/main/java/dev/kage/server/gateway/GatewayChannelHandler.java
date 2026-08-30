@@ -245,6 +245,7 @@ import dev.kage.pvp.api.PvpFacade;
 import dev.kage.pvp.application.GetPvpRatingUseCase;
 import dev.kage.quest.api.QuestFacade;
 import dev.kage.server.world.CharacterBaseStats;
+import dev.kage.server.world.EquipmentBonusSnapshot;
 import dev.kage.server.world.WorldFacade;
 import dev.kage.shop.api.ShopFacade;
 import dev.kage.trade.api.TradeFacade;
@@ -631,8 +632,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // GAMEPLAY.md §2 "tính lại chỉ số dẫn xuất khi đổi trang bị" — áp dụng NGAY lúc attach,
             // không chỉ lúc equip/unequip sau đó, nếu không nhân vật mặc đồ từ phiên trước sẽ mất
             // bonus khi đăng nhập lại (server-world không tự biết feature-inventory).
-            EquipmentBonus equipmentBonus = inventoryFacade.computeEquipmentBonus(characterId);
-            channelFacade.applyEquipmentBonus(characterId, equipmentBonus.bonusAtk());
+            channelFacade.applyEquipmentBonus(characterId, currentEquipmentBonus(characterId));
             SelectCharacterResponse response =
                     SelectCharacterResponse.newBuilder().setSuccess(true).build();
             send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
@@ -648,6 +648,20 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             LOG.error("Chọn nhân vật thất bại: lỗi không mong đợi", e);
             sendError(ctx, sequenceId, 500, "error.select_character_failed");
         }
+    }
+
+    /**
+     * Cầu nối {@code feature-inventory} → {@code server-world} cho chỉ số trang bị (ADR-036 D2).
+     * server-world KHÔNG biết feature nào tồn tại (Điều 23), nên bản dịch {@code EquipmentBonus} →
+     * {@link EquipmentBonusSnapshot} phải nằm ở gateway — đúng chỗ đã dịch mọi thứ khác giữa 2 bên.
+     *
+     * <p>Gọi ở BA nơi và chỉ ba nơi đó: lúc attach (nếu thiếu, đồ mặc từ phiên trước mất tác dụng
+     * khi đăng nhập lại), lúc mặc đồ thành công, lúc gỡ đồ thành công. Chạm DB — chỉ gọi trên
+     * {@code authExecutor} (Virtual Thread), không bao giờ trên EventLoop.
+     */
+    private EquipmentBonusSnapshot currentEquipmentBonus(long characterId) {
+        EquipmentBonus bonus = inventoryFacade.computeEquipmentBonus(characterId);
+        return new EquipmentBonusSnapshot(bonus.bonusAtk(), bonus.bonusDef(), bonus.bonusRes(), bonus.bonusHp());
     }
 
     /**
@@ -850,12 +864,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 400, "error.invalid_equipment_slot");
             return;
         }
-        InventoryFacade.EquipResult result = inventoryFacade.equipItem(characterId, command.getItemId(), slot);
+        // ADR-036 D4 — cấp nhân vật ĐỌC TỪ DB ngay tại đây, không lấy từ client và không cache:
+        // người chơi có thể vừa lên cấp xong (GrantExperienceUseCase) trong cùng phiên.
+        int characterLevel =
+                characterFacade.findById(characterId).map(Character::level).orElse(0);
+        InventoryFacade.EquipResult result =
+                inventoryFacade.equipItem(characterId, command.getItemId(), slot, characterLevel);
         if (result == InventoryFacade.EquipResult.OK) {
             // GAMEPLAY.md §2 — mặc đồ xong phải tính lại chỉ số dẫn xuất NGAY, không đợi lần
             // attach kế tiếp (server-world không tự biết trang bị vừa đổi).
-            EquipmentBonus equipmentBonus = inventoryFacade.computeEquipmentBonus(characterId);
-            currentWorldFacade(characterId).applyEquipmentBonus(characterId, equipmentBonus.bonusAtk());
+            currentWorldFacade(characterId).applyEquipmentBonus(characterId, currentEquipmentBonus(characterId));
         }
         EquipItemResponse response = EquipItemResponse.newBuilder()
                 .setSuccess(result == InventoryFacade.EquipResult.OK)
@@ -886,8 +904,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         InventoryFacade.UnequipResult result = inventoryFacade.unequipItem(characterId, slot);
         if (result == InventoryFacade.UnequipResult.OK) {
-            EquipmentBonus equipmentBonus = inventoryFacade.computeEquipmentBonus(characterId);
-            currentWorldFacade(characterId).applyEquipmentBonus(characterId, equipmentBonus.bonusAtk());
+            currentWorldFacade(characterId).applyEquipmentBonus(characterId, currentEquipmentBonus(characterId));
         }
         UnequipItemResponse response = UnequipItemResponse.newBuilder()
                 .setSuccess(result == InventoryFacade.UnequipResult.OK)
@@ -1037,6 +1054,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             // equipSlot null (item không mặc được) -> UNSPECIFIED, khớp equip_slot NULL trong DB.
                             .setEquipSlot(toProtoSlot(entry.equipSlot()))
                             .setBonusAtk(entry.bonusAtk())
+                            .setBonusDef(entry.bonusDef())
+                            .setBonusRes(entry.bonusRes())
+                            .setBonusHp(entry.bonusHp())
+                            .setRequiredLevel(entry.requiredLevel())
                             .build()));
         }
         send(
@@ -3073,6 +3094,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case OK -> "";
             case ITEM_NOT_FOUND -> "error.item_not_found";
             case WRONG_SLOT -> "error.wrong_equipment_slot";
+            // KHÔNG dùng lại "error.level_too_low": khoá đó đã thuộc về CHỌN HỆ PHÁI ("chưa đủ
+            // cấp 10 để chọn hệ phái") — dùng chung sẽ hiện sai câu cho một trong hai luồng.
+            case LEVEL_TOO_LOW -> "error.equip_level_too_low";
         };
     }
 

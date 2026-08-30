@@ -323,13 +323,18 @@ class GatewayPipelineTest {
                 List.of(),
                 Map.of(),
                 List.of(
-                        new dev.kage.inventory.domain.ItemCatalogEntry(1L, "kunai", "item.kunai.name", 99, null, 0),
+                        new dev.kage.inventory.domain.ItemCatalogEntry(
+                                1L, "kunai", "item.kunai.name", 99, null, 0, 0, 0, 0, 1),
                         new dev.kage.inventory.domain.ItemCatalogEntry(
                                 2L,
                                 "wooden_sword",
                                 "item.wooden_sword.name",
                                 1,
                                 dev.kage.inventory.domain.EquipmentSlotType.WEAPON,
+                                5,
+                                0,
+                                0,
+                                0,
                                 5)));
         EmbeddedChannel channel = newPipeline(new FakeCharacterPort(), inventoryFacade, fakeQuestFacade());
         connect(channel, "cattest1");
@@ -348,6 +353,9 @@ class GatewayPipelineTest {
         assertThat(response.getEntries(1).getEquipSlot())
                 .isEqualTo(dev.kage.protocol.EquipmentSlot.EQUIPMENT_SLOT_WEAPON);
         assertThat(response.getEntries(1).getBonusAtk()).isEqualTo(5);
+        // ADR-036 D5 — 4 field mới (7..10) thật sự đi qua dây, không chỉ tồn tại trong .proto.
+        assertThat(response.getEntries(1).getRequiredLevel()).isEqualTo(5);
+        assertThat(response.getEntries(0).getRequiredLevel()).isEqualTo(1);
         // KHÔNG có tên hiển thị/icon — chỉ name_key để client tra bundle i18n (ADR-035 Decision-3).
         assertThat(response.getEntries(1).getNameKey()).isEqualTo("item.wooden_sword.name");
     }
@@ -361,7 +369,8 @@ class GatewayPipelineTest {
         InventoryFacade inventoryFacade = fakeInventoryFacade(
                 List.of(),
                 Map.of(),
-                List.of(new dev.kage.inventory.domain.ItemCatalogEntry(1L, "kunai", "item.kunai.name", 99, null, 0)));
+                List.of(new dev.kage.inventory.domain.ItemCatalogEntry(
+                        1L, "kunai", "item.kunai.name", 99, null, 0, 0, 0, 0, 1)));
         EmbeddedChannel channel = newPipeline(new FakeCharacterPort(), inventoryFacade, fakeQuestFacade());
         connect(channel, "cattest2");
         selectCharacter(channel, createCharacter(channel, "CatHero2", 2), 3);
@@ -379,7 +388,8 @@ class GatewayPipelineTest {
         InventoryFacade inventoryFacade = fakeInventoryFacade(
                 List.of(),
                 Map.of(),
-                List.of(new dev.kage.inventory.domain.ItemCatalogEntry(1L, "kunai", "item.kunai.name", 99, null, 0)));
+                List.of(new dev.kage.inventory.domain.ItemCatalogEntry(
+                        1L, "kunai", "item.kunai.name", 99, null, 0, 0, 0, 0, 1)));
         EmbeddedChannel channel = newPipeline(new FakeCharacterPort(), inventoryFacade, fakeQuestFacade());
         connect(channel, "cattest3");
         selectCharacter(channel, createCharacter(channel, "CatHero3", 2), 3);

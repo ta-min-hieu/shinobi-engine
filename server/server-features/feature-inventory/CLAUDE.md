@@ -7,9 +7,10 @@
 ```
 api/            InventoryFacade · EquipmentUseCases (gộp tham số, tránh vượt 4 — Checkstyle)
 application/    AddItemUseCase · GrantLootUseCase · EquipItemUseCase · UnequipItemUseCase
-                ComputeEquipmentBonusUseCase (đọc thuần, tổng bonusAtk từ mọi item đang mặc)
+                ComputeEquipmentBonusUseCase (đọc thuần, tổng 4 chỉ số × hệ số cường hoá từng món)
 domain/         Inventory (aggregate) · Equipment (aggregate RIÊNG) · ItemStack (VO)
-                DropTableEntry (VO) · ItemTemplate (VO, equipSlot + bonusAtk) · EquipmentBonus (VO)
+                DropTableEntry (VO) · ItemTemplate (VO, equipSlot + 4 chỉ số + requiredLevel)
+                EquipmentBonus (VO, 4 chỉ số) · ItemCatalogEntry (VO, 10 cột item_template)
                 InventoryPort · EquipmentPort · DropTablePort · ItemTemplatePort
                 Transaction · TransactionRunner · CharacterInventoryNotFoundException
 ```
@@ -215,3 +216,25 @@ hiệu ứng cộng dồn (xem `EquipItemUseCase`/`UnequipItemUseCase`, không g
 
 ## Test
 `domain/` test **không mock**. `application/` test với **Fake Port** (không Mockito).
+
+### ADR-036 (Accepted 2026-08-30): trang bị có 4 chỉ số, cường hoá có tác dụng thật
+
+Ba lỗ cùng chạm `item_template`, vá cùng một lượt — đọc ADR-036 cho lập luận đầy đủ, đây chỉ là
+những gì ảnh hưởng tới cách viết code trong module này:
+
+- **`ItemTemplate` giờ 7 thành phần** (`bonusDef`/`bonusRes`/`bonusHp`/`requiredLevel` mới,
+  migration **V22**) — javadoc YAGNI cũ ("chỉ có bonusAtk, thêm khi có item thật cần") đã HẾT
+  hiệu lực: V21 chính là "item thật cần" đó. `EquipmentBonus` cũng 4 trường.
+- **`EnhancementTable.enhancedBonus(base, level)`** là chỗ DUY NHẤT biết công thức cường hoá
+  (`base × (1 + 0,10 × level)`). `ComputeEquipmentBonusUseCase` gọi nó cho **TỪNG món** rồi mới
+  cộng lại — cộng tổng trước rồi nhân là SAI, mỗi món có cấp cường hoá riêng.
+- **`EquipItemUseCase.execute` nhận thêm `characterLevel`** thay vì có `CharacterPort` riêng: cấp
+  nhân vật thuộc `feature-character`, `GatewayChannelHandler` đọc từ DB rồi truyền vào — cùng
+  khuôn với `computeEquipmentBonus` → `WorldFacade`. Con số đó KHÔNG BAO GIỜ đến từ client.
+- **`server-world` không nhận `EquipmentBonus`** (Điều 23 — nó không được biết module này tồn
+  tại): gateway dịch sang `dev.kage.server.world.EquipmentBonusSnapshot`. Cũng vì
+  `applyEquipmentBonus(characterId, 4 số rời)` là 5 tham số, vượt Checkstyle `ParameterNumber`.
+- **Khoá lỗi là `error.equip_level_too_low`, KHÔNG phải `error.level_too_low`** — khoá sau đã
+  thuộc về luồng chọn hệ phái ("chưa đủ cấp 10"). ADR bản Proposed ghi sai tên, đã ghi chú lại
+  trong chính ADR.
+

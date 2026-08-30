@@ -49,10 +49,11 @@ sealed interface WorldCommand {
     record UseSkillCommand(long characterId, String skillCode, long targetEntityId) implements WorldCommand {}
 
     /**
-     * Tính lại chỉ số dẫn xuất theo trang bị (GAMEPLAY.md §2/§7) — {@code bonusAtk} là TỔNG cộng
-     * dồn hiện tại từ mọi item đang mặc, gateway (feature-inventory) tự tính lại từ đầu mỗi lần.
+     * Tính lại chỉ số dẫn xuất theo trang bị (GAMEPLAY.md §2/§7) — cả 4 chỉ số là TỔNG cộng dồn
+     * hiện tại từ mọi item đang mặc (ĐÃ tính hệ số cường hoá từng món, ADR-036 D2/D3), gateway
+     * (feature-inventory) tự tính lại từ đầu mỗi lần. {@code bonusHp} cộng vào MÁU TỐI ĐA.
      */
-    record ApplyEquipmentBonusCommand(long characterId, int bonusAtk) implements WorldCommand {}
+    record ApplyEquipmentBonusCommand(long characterId, EquipmentBonusSnapshot bonus) implements WorldCommand {}
 
     /**
      * Chat kênh Khu vực (GAMEPLAY.md §10, Phase 6 lát cắt 6) — CHỈ kênh này cần world tick (đọc

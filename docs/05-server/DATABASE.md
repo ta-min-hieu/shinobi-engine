@@ -41,7 +41,7 @@
 
 | Bảng | Cột chính | Ghi chú |
 |---|---|---|
-| `item_template` | `id, code, name_key, category, base_stats_json, max_stack` | **Tĩnh** — sửa qua tool thiết kế, không qua gameplay. `name_key` cho i18n |
+| `item_template` | `id, code, name_key, max_stack, equip_slot, bonus_atk, bonus_def, bonus_res, bonus_hp, required_level` | **Tĩnh** — sửa qua migration, không qua gameplay. `name_key` cho i18n. ⚠️ **Cột thật khác thiết kế gốc**: không có `category` (chưa ai cần) và **không có `base_stats_json`** — 4 chỉ số là 4 CỘT (ADR-036 D1 loại phương án JSON vì dự án chưa có thư viện JSON nào trong TECHNOLOGY-STACK; cùng lập luận đã dùng cho `drop_table_entry`). Migration: V4 → V5 (`equip_slot`) → V6 (`bonus_atk`) → **V22** (3 chỉ số còn lại + `required_level`) |
 | `inventory_item` | `id, character_id, item_template_id, quantity, enhance_level, slot_index` | **Động** — 1 dòng = 1 stack |
 | `equipment_slot` | `character_id, slot_type, inventory_item_id (nullable)` | `slot_type`: WEAPON/ARMOR/HELMET/GLOVE/BOOT/ACCESSORY_1/ACCESSORY_2 |
 

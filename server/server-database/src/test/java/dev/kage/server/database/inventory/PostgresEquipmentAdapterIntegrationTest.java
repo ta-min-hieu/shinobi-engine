@@ -103,6 +103,39 @@ class PostgresEquipmentAdapterIntegrationTest {
     }
 
     @Test
+    void shouldReadFourStatColumnsAndRequiredLevel_fromV22() {
+        // ADR-036 / migration V22 — 4 cột mới phải ĐỌC được từ Postgres THẬT, không chỉ tồn tại
+        // trong record Java. Chọn genin_vest vì nó là ví dụ rõ nhất của cái V22 sinh ra để sửa:
+        // trước V22 nó cộng 7 ATK (một cái áo giáp làm người ta đánh mạnh hơn), nay cộng DEF/RES/HP
+        // và KHÔNG cộng ATK.
+        PostgresItemTemplateAdapter adapter = new PostgresItemTemplateAdapter(dataSource);
+        long geninVestId = findItemTemplateIdByCode("genin_vest"); // seed V21, cân bằng lại ở V22
+
+        ItemTemplate vest = adapter.findById(geninVestId).orElseThrow();
+
+        assertThat(vest.equipSlot()).isEqualTo(EquipmentSlotType.ARMOR);
+        assertThat(vest.bonusAtk()).isZero();
+        assertThat(vest.bonusDef()).isEqualTo(10);
+        assertThat(vest.bonusRes()).isEqualTo(6);
+        assertThat(vest.bonusHp()).isEqualTo(20);
+        assertThat(vest.requiredLevel()).isEqualTo(5);
+    }
+
+    @Test
+    void shouldDefaultRequiredLevelToOne_forItemsPredatingV22() {
+        // Cột thêm kèm DEFAULT nên dữ liệu CŨ không phải backfill: kunai (V4, không mặc được) vẫn
+        // hợp lệ và required_level = 1, không phải 0 hay NULL.
+        PostgresItemTemplateAdapter adapter = new PostgresItemTemplateAdapter(dataSource);
+        long kunaiId = findItemTemplateIdByCode("kunai");
+
+        ItemTemplate kunai = adapter.findById(kunaiId).orElseThrow();
+
+        assertThat(kunai.isEquippable()).isFalse();
+        assertThat(kunai.requiredLevel()).isEqualTo(1);
+        assertThat(kunai.bonusDef()).isZero();
+    }
+
+    @Test
     void shouldPersistEquippedItem_acrossSaveAndLoad() {
         long characterId = createFreshCharacter("EquipPersist");
         long woodenSwordId = findItemTemplateIdByCode("wooden_sword");

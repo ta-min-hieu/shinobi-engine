@@ -689,7 +689,7 @@ Bốn ADR mới so với lần đếm trước (2026-08-07):
 | [ADR-033](../01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md) | Di chuyển trái/phải + nhảy thật kiểu Ninja School Online, bỏ đi tự do 4 hướng | Accepted 2026-08-08 | 35 |
 | [ADR-034](../01-architecture/adr/ADR-034-Manual-Attack-And-Experience.md) | Đánh thường phải BẤM mới ra đòn + hệ thống kinh nghiệm/lên cấp đầu tiên | Accepted 2026-08-09 | 35 |
 | [ADR-035](../01-architecture/adr/ADR-035-Client-State-Sync-Opcodes.md) | 7 opcode lấp 4 khoảng trống đồng bộ trạng thái client (catalog theo **A′**) | Accepted 2026-08-27 | 37, 38 |
-| [ADR-036](../01-architecture/adr/ADR-036-Equipment-Stats-And-Enhancement-Effect.md) | 4 cột chỉ số cho `item_template` + làm cho cường hoá thật sự có tác dụng | 🟡 **Proposed** 2026-08-29 | 29, 40 |
+| [ADR-036](../01-architecture/adr/ADR-036-Equipment-Stats-And-Enhancement-Effect.md) | 4 cột chỉ số cho `item_template` + làm cho cường hoá thật sự có tác dụng | ✅ **Accepted** 2026-08-30, đã thi hành | 29, 40, 41 |
 
 ## Tài liệu liên quan
 
@@ -933,30 +933,15 @@ Bốn ADR mới so với lần đếm trước (2026-08-07):
       **Khoản này đóng hoàn toàn, không còn phần nào chờ chủ dự án.**
     - Câu hỏi **desktop-first hay mobile-first** vẫn chưa trả lời → ADR-023 vẫn chưa viết được, và
       ngân sách tam giác ở mục 27 mới chỉ đo cho desktop. **Đây là khoản chặn cũ duy nhất còn mở.**
-    - 🆕 **[ADR-036](../01-architecture/adr/ADR-036-Equipment-Stats-And-Enhancement-Effect.md)
-      (Proposed 2026-08-29) — trang bị và cường hoá hiện gần như không có ý nghĩa cơ học.** Ba lỗ
-      cùng chạm một bảng `item_template`, cả ba đều đọc từ code và **kiểm bằng chơi thật**, không
-      suy đoán:
-      (a) `bonus_atk` là cột chỉ số **duy nhất** (từ V6), nên 15 món V21 vừa seed phải chọn giữa hai
-      cái sai — để 6/7 ô trang bị vô nghĩa, hoặc cho **áo giáp cộng ATK** (V21 chọn cái thứ hai kèm
-      ghi chú trong chính file migration). Trong khi đó `CombatConstants.deriveCombatStats` đã tính
-      đủ DEF/RES và công thức damage đã dùng chúng thật — chỉ là **không có đường nào để trang bị
-      chạm tới**, `GatewayChannelHandler` chỉ chuyển đúng một con số sang world.
-      (b) **Cường hoá KHÔNG làm gì cả**: `ComputeEquipmentBonusUseCase` không đọc
-      `item.enhanceLevel()`; grep toàn server cho thấy `enhanceLevel` chỉ xuất hiện ở đường ghi/đọc
-      DB và ở packet gửi client, **không một công thức chỉ số nào đọc nó**. Chơi thật 2026-08-29:
-      `steel_katana` +0 → +7, `audit_log` đủ 9 lượt, **trừ đúng 8.900 vàng, chỉ số không đổi gì**.
-      Nghĩa là trọn bộ `EnhanceItemUseCase` + bảng tỉ lệ + bùa Bảo Vệ + enum 8 outcome hiện là **một
-      cỗ máy đốt vàng không có đầu ra**. Nếu chủ dự án **bác** đề xuất thì phải **gỡ nút Cường hoá
-      khỏi client** — để nguyên một nút đốt vàng không tác dụng là tệ hơn cả hai lựa chọn.
-      (c) Điều kiện `level/faction yêu cầu` mà [GAMEPLAY.md §7](../05-server/GAMEPLAY.md) mô tả cho
-      `EquipItemUseCase` **không tồn tại** vì không có cột — nhân vật **Cấp 1** đủ vàng là mặc trọn
-      bộ "Hạ Nhẫn" (+49 ATK so với ATK gốc ~30).
-      Đề xuất chạm **cả schema DB lẫn protocol** ⇒ [/CLAUDE.md §4](../../CLAUDE.md), AI không tự thi
-      hành. **Câu hỏi phụ cần trả lời cùng**: `bonus_hp` đụng vào
-      `CombatConstants.CHARACTER_MAX_HP = 100` (hằng số placeholder, GDD chưa chốt công thức HP) —
-      chấp nhận `maxHp = 100 + bonus_hp` như một placeholder mới, hay tách `bonus_hp` ra khỏi đợt
-      này và chỉ làm DEF/RES?
+    - ~~**[ADR-036](../01-architecture/adr/ADR-036-Equipment-Stats-And-Enhancement-Effect.md) —
+      trang bị và cường hoá không có ý nghĩa cơ học**~~ ✅ **Accepted + thi hành 2026-08-30, KHÔNG
+      còn là nợ.** Ba lỗ (chỉ có cột `bonus_atk` ⇒ áo giáp cộng ATK; `enhance_level` không được đọc
+      ở bất kỳ công thức chỉ số nào ⇒ +0→+7 trừ 8.900 vàng mà chỉ số không đổi; `required_level`
+      được tài liệu mô tả mà không tồn tại) đều đã vá trong **một lượt**: migration **V22** +
+      `EnhancementTable.enhancedBonus` + `EquipmentBonusSnapshot` + 4 field additive của
+      `ItemCatalogEntry`. Chi tiết ở **mục 41**. Nợ CÒN LẠI sau đợt này, cố ý và đã ghi trong ADR:
+      chưa gói nào mang HP/HP-tối-đa của chính mình **lúc đăng nhập** (chỉ có ở sự kiện hồi sinh),
+      và `ENHANCE_STEP = 0,10` cùng toàn bộ số liệu V22 **chưa qua playtest**.
     - ~~**`drop_table` im lặng khi mã quái không khớp**~~ ✅ **đã sửa 2026-08-29, KHÔNG còn là nợ.**
       `ConnectedCharacterRegistry#onMonsterKilled` truyền thẳng `monsterCode` làm `dropTableCode`, và
       `findEntries` trả rỗng cho **cả hai** trường hợp "quái cố ý không rơi gì" và "mã không khớp
@@ -1427,3 +1412,42 @@ Bốn ADR mới so với lần đếm trước (2026-08-07):
       cert Production thật vẫn thiếu (mục 22 vẫn nguyên hiệu lực); phép đo lại **N=2000** vẫn chưa
       chạy dù công cụ đã vá từ 2026-08-01 (mục 24); và **`WorldScreen` chỉ mới hết chật, chưa hết
       lớn** — `PanelHub` mua thêm chỗ chứ không đổi kiến trúc tầng client.
+
+41. **ADR-036 thi hành — trang bị có chỉ số thật, cường hoá có tác dụng thật (2026-08-30)**:
+    - ✅ **Chủ dự án duyệt trọn D1-D5** + câu hỏi phụ "chấp nhận `maxHp = 100 + bonus_hp` như
+      placeholder mới". ADR-036 chuyển **Proposed → Accepted** và thi hành **cùng ngày** ⇒ không
+      còn ADR `Proposed` nào.
+    - ✅ **Migration V22** — `bonus_def`/`bonus_res`/`bonus_hp`/`required_level` (chỉ THÊM cột có
+      `DEFAULT`, không backfill), rồi **cân bằng lại 16 món** (15 của V21 + `wooden_sword`) cho chỉ
+      số về đúng chỗ: vũ khí cộng ATK, giáp/mũ/giày cộng DEF/RES/HP, găng lai, trang sức nghiêng
+      RES/HP. Trọn bộ "Hạ Nhẫn" kèm katana: ATK 30→59, DEF 20→43, RES 15→39, HP 100→158.
+      `required_level` 1 cho "Tập Sự", **5** cho "Hạ Nhẫn" — trước đó Cấp 1 đủ vàng là mặc cả bộ.
+    - ✅ **Cường hoá thôi là cỗ máy đốt vàng không đầu ra**: `EnhancementTable.enhancedBonus` áp
+      `base × (1 + 0,10 × cấp)` cho **cả 4 chỉ số**, tính cho **TỪNG món theo cấp của chính món
+      đó** rồi mới cộng lại (cộng tổng trước rồi nhân là sai — mỗi món một cấp riêng). Cường hoá
+      **khuếch đại chứ không tạo chỉ số từ hư vô**: món `bonus_def = 0` thì +15 vẫn 0 DEF, có test
+      riêng cho đúng điều đó.
+    - ✅ **DEF/RES/HP thật sự tới được ECS**: `EquipmentBonusSnapshot` (record của `server-world`,
+      vì module đó **không được import `feature-inventory`**, và vì 4 số rời làm
+      `applyEquipmentBonus` thành 5 tham số — vượt Checkstyle `ParameterNumber`). Máu hiện tại dịch
+      theo đúng **độ chênh** của máu tối đa, **chặn dưới ở 1**: gỡ áo +HP lúc máu thấp không được
+      giết người chơi, mặc áo +HP giữa trận không được là nút hồi máu miễn phí. Nhân vật đang chết
+      thì không đụng tới — `respawnCharacter` tự đọc `health.max` mới.
+    - ✅ **Protocol additive đúng luật**: 4 field `7..10` của `ItemCatalogEntry`, field `1..6`
+      nguyên vẹn, **`protocolVersion` KHÔNG tăng**, không thêm opcode nào.
+    - ⚠️ **Khoá i18n trong ADR bản Proposed viết SAI và bị bắt lúc thi hành**: `error.level_too_low`
+      **đã có chủ** — luồng chọn hệ phái dùng nó với câu "Chưa đủ cấp 10 để chọn hệ phái". Thêm
+      trùng khoá vào `.properties` là **im lặng ghi đè** câu của luồng kia (khoá sau thắng), không
+      test nào bắt. Khoá thật: `error.equip_level_too_low`.
+    - ✅ **Vạch máu client hết hardcode**: `CharacterRespawnedEvent.max_hp` **đã nằm trên dây từ
+      lâu** nhưng client nhận rồi vứt, và `playerMaxHp()` trả thẳng hằng số `CHARACTER_MAX_HP` —
+      với `bonus_hp` thì mẫu số đó sai. Nay lấy số của server, và `maxHp <= 0` (server cũ chưa gửi
+      field) thì **giữ giá trị đang biết** thay vì chia cho 0.
+    - ⚠️ **Nợ cố ý để lại**: chưa gói nào mang HP/HP-tối-đa của **chính mình lúc ĐĂNG NHẬP** (grep
+      `current_hp` trong `.proto` — chỉ có ở quái và ở sự kiện hồi sinh), nên giữa lúc vào game và
+      lần hồi sinh đầu tiên mẫu số vạch máu vẫn có thể lệch nếu đang mặc đồ `+HP`. Sửa đúng cần
+      thêm field vào gói trạng thái ban đầu, **ngoài phạm vi ADR-036** ("không thêm opcode, không
+      đổi message đang chạy"). Và client **cố ý chỉ hiện chỉ số GỐC** kèm nhãn "Chỉ số gốc":
+      `ENHANCE_STEP` sống ở server, client tự nhân là bịa (Điều 24).
+    - ⚠️ **`ENHANCE_STEP = 0,10` và toàn bộ số liệu V22 CHƯA qua playtest** — đúng thân phận mà
+      bảng tỉ lệ §7.1 từng có.

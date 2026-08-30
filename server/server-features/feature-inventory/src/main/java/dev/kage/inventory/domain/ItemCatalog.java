@@ -53,6 +53,14 @@ public record ItemCatalog(String version, List<ItemCatalogEntry> entries) {
                     .append(entry.equipSlot() == null ? "" : entry.equipSlot().name())
                     .append(FIELD_SEPARATOR)
                     .append(entry.bonusAtk())
+                    .append(FIELD_SEPARATOR)
+                    .append(entry.bonusDef())
+                    .append(FIELD_SEPARATOR)
+                    .append(entry.bonusRes())
+                    .append(FIELD_SEPARATOR)
+                    .append(entry.bonusHp())
+                    .append(FIELD_SEPARATOR)
+                    .append(entry.requiredLevel())
                     .append(RECORD_SEPARATOR);
         }
         return HexFormat.of().formatHex(digest(canonical.toString()));

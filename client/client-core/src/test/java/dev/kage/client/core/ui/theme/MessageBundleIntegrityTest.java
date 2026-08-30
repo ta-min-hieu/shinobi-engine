@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import dev.kage.client.core.render.FontFactory;
 
 /**
- * Gác bốn thứ mà không có gì khác trong build bắt được — bundle i18n không được biên dịch, nên mọi
+ * Gác năm thứ mà không có gì khác trong build bắt được — bundle i18n không được biên dịch, nên mọi
  * hư hỏng trong đó chỉ lộ ra khi người chơi nhìn thấy chữ sai trên màn hình.
  *
  * <p><b>Bài học có thật, không phải phòng xa.</b> Vòng gộp song song 2026-08-28 để lọt nguyên ba
@@ -27,6 +27,13 @@ import dev.kage.client.core.render.FontFactory;
  * vào CẢ HAI bundle và commit thẳng lên master. Build vẫn xanh, 948 test vẫn xanh: file
  * {@code .properties} không được biên dịch, {@code Properties.load} nuốt gọn dòng rác thành một khoá
  * vô nghĩa thay vì báo lỗi, và không test nào đọc toàn bộ bundle. Test này đọc.
+ *
+ * <p><b>Bài học có thật thứ hai (2026-08-30).</b> Thi hành ADR-036 suýt thêm một khoá
+ * {@code error.level_too_low} thứ hai vào cả hai bundle — khoá đó ĐÃ thuộc về luồng chọn hệ phái
+ * ("Chưa đủ cấp 10 để chọn hệ phái"). {@link Properties#load} lấy dòng SAU CÙNG và vứt dòng trước
+ * mà không kêu một tiếng, nên hậu quả sẽ là luồng chọn hệ phái im lặng hiện câu của luồng mặc đồ.
+ * Ba kiểm tra cũ đều xanh với lỗi đó: tập khoá vẫn khớp nhau, không khoá nào rỗng, chữ vẫn có
+ * glyph. {@link #hasNoDuplicateKey()} là chỗ bắt.
  *
  * <p>Kiểm tra thứ hai — hai bundle phải có ĐÚNG cùng tập khoá — bắt lỗi phổ biến hơn nhiều: thêm
  * chữ tiếng Việt mà quên bản tiếng Anh thì người chơi đổi ngôn ngữ sẽ thấy đúng cái khoá trần
@@ -57,6 +64,22 @@ class MessageBundleIntegrityTest {
     @DisplayName("Bundle tiếng Việt và tiếng Anh có ĐÚNG cùng tập khoá")
     void bundlesHaveIdenticalKeys() {
         assertThat(keys("strings_vi.properties")).isEqualTo(keys("strings_en.properties"));
+    }
+
+    @Test
+    @DisplayName("Không khoá nào bị khai báo hai lần — Properties.load lấy dòng sau và nuốt dòng trước")
+    void hasNoDuplicateKey() {
+        for (String bundle : BUNDLES) {
+            List<String> declared = declaredKeysInFileOrder(bundle);
+            SortedSet<String> unique = new TreeSet<>(declared);
+            assertThat(declared)
+                    .as(
+                            "%s khai báo %d dòng khoá nhưng chỉ có %d khoá khác nhau — khoá trùng bị"
+                                    + " ghi đè trong im lặng, câu của chỗ khai báo TRƯỚC biến mất khỏi giao diện"
+                                    + " mà không có lỗi nào được báo",
+                            bundle, declared.size(), unique.size())
+                    .hasSize(unique.size());
+        }
     }
 
     @Test
@@ -96,6 +119,23 @@ class MessageBundleIntegrityTest {
                 }
             }
         }
+    }
+
+    /**
+     * Mọi khoá ĐƯỢC KHAI BÁO trong file, theo thứ tự xuất hiện và GIỮ NGUYÊN bản trùng — khác
+     * {@link #keys} vốn đi qua {@link Properties} nên bản trùng đã bị gộp mất từ trước.
+     *
+     * <p>Đọc thô bằng tay là cố ý: chính việc {@code Properties} âm thầm gộp trùng là thứ cần bắt.
+     * Bundle của dự án chỉ dùng khuôn {@code khoá=giá trị} một dòng, không có dòng nối bằng dấu
+     * chéo ngược, không có {@code khoá:giá trị} — nếu khuôn đó đổi thì hàm này phải đổi theo.
+     */
+    private static List<String> declaredKeysInFileOrder(String bundle) {
+        return lines(bundle).stream()
+                .map(String::strip)
+                .filter(line -> !line.isEmpty() && !line.startsWith("#") && !line.startsWith("!"))
+                .filter(line -> line.indexOf('=') > 0)
+                .map(line -> line.substring(0, line.indexOf('=')).strip())
+                .toList();
     }
 
     private static SortedSet<String> keys(String bundle) {

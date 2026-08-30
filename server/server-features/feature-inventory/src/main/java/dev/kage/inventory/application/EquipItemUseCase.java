@@ -14,7 +14,13 @@ import dev.kage.inventory.domain.TransactionRunner;
 /**
  * Mặc trang bị (GAMEPLAY.md §7, DATABASE.md §2.2). Điều phối: đọc túi đồ (item có tồn tại, thuộc
  * đúng nhân vật không — Điều 24, không tin {@code itemId} từ client) → đọc {@code item_template}
- * (đúng slot không) → gọi domain {@link dev.kage.inventory.domain.Equipment#equip} → lưu.
+ * (đúng slot không, đủ CẤP không — ADR-036 D4) → gọi domain
+ * {@link dev.kage.inventory.domain.Equipment#equip} → lưu.
+ *
+ * <p><b>{@code characterLevel} do CHỖ GỌI truyền vào</b>, không phải một port mới của module này:
+ * cấp nhân vật thuộc {@code feature-character}, và {@code GatewayChannelHandler} vốn đã là nơi nối
+ * hai module (cùng khuôn với {@code computeEquipmentBonus} → {@code WorldFacade}). Con số đó luôn
+ * đọc từ DB phía server, KHÔNG bao giờ nhận từ client (Điều 15/24).
  *
  * <p>Constructor Injection tường minh — không DI container, không field injection (ADR-009).
  */
@@ -36,7 +42,13 @@ public final class EquipItemUseCase {
         this.tx = tx;
     }
 
-    public EquipItemResult execute(long characterId, long itemId, EquipmentSlotType targetSlot) {
+    /**
+     * Mặc {@code itemId} vào {@code targetSlot}, hoặc trả về lý do KHÔNG mặc được.
+     *
+     * @param characterLevel cấp HIỆN TẠI của nhân vật, server tự đọc từ DB — so với
+     *     {@code item_template.required_level} (ADR-036 D4)
+     */
+    public EquipItemResult execute(long characterId, long itemId, EquipmentSlotType targetSlot, int characterLevel) {
         Inventory inventory = inventoryPort
                 .findByCharacter(characterId)
                 .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
@@ -53,6 +65,11 @@ public final class EquipItemUseCase {
         if (template.equipSlot() != targetSlot) {
             return EquipItemResult.WRONG_SLOT;
         }
+        // ADR-036 D4 — GAMEPLAY.md §7 mô tả phép kiểm này từ lâu nhưng nó KHÔNG tồn tại được cho
+        // tới khi có cột required_level: trước đó nhân vật Cấp 1 đủ vàng là mặc trọn bộ "Hạ Nhẫn".
+        if (characterLevel < template.requiredLevel()) {
+            return EquipItemResult.LEVEL_TOO_LOW;
+        }
 
         Equipment equipment = equipmentPort
                 .findByCharacter(characterId)
@@ -65,6 +82,7 @@ public final class EquipItemUseCase {
     public enum EquipItemResult {
         OK,
         ITEM_NOT_FOUND,
-        WRONG_SLOT
+        WRONG_SLOT,
+        LEVEL_TOO_LOW
     }
 }

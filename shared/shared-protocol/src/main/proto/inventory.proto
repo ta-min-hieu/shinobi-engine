@@ -138,6 +138,17 @@ message ItemCatalogEntry {
   int32 max_stack = 4;
   EquipmentSlot equip_slot = 5; // UNSPECIFIED = không mặc được (khớp equip_slot NULL trong DB)
   int32 bonus_atk = 6;
+  // ADR-036 D5 — 4 field THÊM (7..10), field 1..6 giữ NGUYÊN, protocolVersion KHÔNG tăng
+  // (luật additive NETWORK.md §6). Client cũ bỏ qua field lạ; client mới nói chuyện với server cũ
+  // nhận 0/0/0/0 — mặc định proto3, hiện đúng cái nó biết thay vì bịa.
+  //
+  // Chỉ số ở đây là chỉ số GỐC của item_template, CHƯA nhân hệ số cường hoá của một món cụ thể —
+  // catalog là dữ liệu TĨNH dùng chung mọi người chơi. Chỉ số hiệu dụng do SERVER tính
+  // (ComputeEquipmentBonusUseCase + EnhancementTable.enhancedBonus), client không tự suy ra.
+  int32 bonus_def = 7;
+  int32 bonus_res = 8;
+  int32 bonus_hp = 9;
+  int32 required_level = 10; // cấp tối thiểu để MẶC được; 0 nghĩa là server cũ chưa gửi field này
 }
 
 // Command: Client -> Server (OPCODE_GET_ITEM_CATALOG_REQUEST = 509). Client gửi version nó đang

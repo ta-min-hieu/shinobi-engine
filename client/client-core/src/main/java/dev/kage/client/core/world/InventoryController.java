@@ -55,8 +55,11 @@ final class InventoryController {
      * Ba {@code error_key} THẬT server phát cho Equip/Unequip hôm nay — xem javadoc lớp về việc
      * inventory.proto không có enum outcome cho hai lệnh này.
      */
-    private static final Set<String> KNOWN_ERROR_KEYS =
-            Set.of("error.item_not_found", "error.wrong_equipment_slot", "error.slot_not_equipped");
+    private static final Set<String> KNOWN_ERROR_KEYS = Set.of(
+            "error.item_not_found",
+            "error.wrong_equipment_slot",
+            "error.slot_not_equipped",
+            "error.equip_level_too_low");
 
     /**
      * Một dòng túi đồ.

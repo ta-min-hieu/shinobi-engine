@@ -2,6 +2,7 @@ package dev.kage.client.core.world;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.StringJoiner;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongConsumer;
 
@@ -390,7 +391,7 @@ final class InventoryCoordinator implements WindowFlow {
                                 text("inventory.detail.none"), false, new InventoryPanel.Actions(false, false, false)));
     }
 
-    /** Tên + số lượng + mức cường hoá của một item, ghép sẵn thành một chuỗi hiển thị. */
+    /** Tên + số lượng + mức cường hoá + chỉ số gốc + cấp yêu cầu, ghép sẵn thành chuỗi hiển thị. */
     private String itemDisplayText(InventoryController.Item item) {
         String name = itemCatalog
                 .nameKey(item.itemTemplateId())
@@ -403,7 +404,44 @@ final class InventoryCoordinator implements WindowFlow {
         if (item.enhanceLevel() > 0) {
             builder.append(' ').append(format("inventory.label.enhance", item.enhanceLevel()));
         }
+        appendStats(builder, item);
         return builder.toString();
+    }
+
+    /**
+     * Bốn chỉ số + cấp yêu cầu của item đang chọn (ADR-036 D5, field 7..10 của
+     * {@code ItemCatalogEntry}). Bỏ hẳn dòng này khi chưa có catalog hoặc item không cộng chỉ số
+     * nào — không hiện "ATK +0" cho một hòn sắt vụn.
+     *
+     * <p>Đây là chỉ số GỐC của loại vật phẩm, KHÔNG phải chỉ số hiệu dụng sau cường hoá: hệ số
+     * cường hoá ({@code EnhancementTable.ENHANCE_STEP}) sống ở server và không có gói nào gửi nó
+     * sang đây, nên client tự nhân là bịa (Điều 24 — cùng lý do bảng chi phí cường hoá không được
+     * hiện ở client). Nhãn nói rõ "chỉ số gốc" để người chơi không hiểu nhầm.
+     */
+    private void appendStats(StringBuilder builder, InventoryController.Item item) {
+        ItemCatalogEntry entry = itemCatalog.byId(item.itemTemplateId()).orElse(null);
+        if (entry == null) {
+            return;
+        }
+        StringJoiner stats = new StringJoiner(", ");
+        appendStat(stats, "inventory.stat.atk", entry.getBonusAtk());
+        appendStat(stats, "inventory.stat.def", entry.getBonusDef());
+        appendStat(stats, "inventory.stat.res", entry.getBonusRes());
+        appendStat(stats, "inventory.stat.hp", entry.getBonusHp());
+        if (stats.length() > 0) {
+            builder.append('\n').append(format("inventory.label.base_stats", stats.toString()));
+        }
+        // required_level = 0 nghĩa là server CŨ chưa gửi field này (mặc định proto3), không phải
+        // "cần Cấp 0" — im lặng bỏ qua thay vì hiện một con số sai.
+        if (entry.getRequiredLevel() > 1) {
+            builder.append('\n').append(format("inventory.label.required_level", entry.getRequiredLevel()));
+        }
+    }
+
+    private void appendStat(StringJoiner stats, String key, int value) {
+        if (value != 0) {
+            stats.add(format(key, value));
+        }
     }
 
     /** {@code item_template.code} để tra icon (ADR-028) — rỗng khi chưa có catalog, panel để trống. */

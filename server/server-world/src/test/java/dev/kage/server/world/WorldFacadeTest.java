@@ -488,7 +488,8 @@ class WorldFacadeTest {
                     dungeonSink.monsterSpawned.stream().anyMatch(m -> m.code().equals("sample_boss")));
             long bossId = dungeonSink.monsterSpawned.get(0).monsterId();
 
-            dungeonWorld.applyEquipmentBonus(1L, 1000); // đủ lớn để hạ gục BOSS_MAX_HP (320) ngay đòn đầu.
+            // đủ lớn để hạ gục BOSS_MAX_HP (320) ngay đòn đầu.
+            dungeonWorld.applyEquipmentBonus(1L, new EquipmentBonusSnapshot(1000, 0, 0, 0));
 
             targetAndAttackUntil(dungeonWorld, bossId, () -> dungeonSink.monsterDespawned.stream()
                     .anyMatch(d -> d.monsterId() == bossId));
@@ -731,7 +732,8 @@ class WorldFacadeTest {
         world.attachCharacter(2L, 1f, 0f, DEFAULT_STATS);
         awaitTrue(() -> sink.spawned.size() >= 2);
 
-        world.applyEquipmentBonus(1L, 1000); // đủ lớn để hạ gục CHARACTER_MAX_HP ngay đòn đầu.
+        // đủ lớn để hạ gục CHARACTER_MAX_HP ngay đòn đầu.
+        world.applyEquipmentBonus(1L, new EquipmentBonusSnapshot(1000, 0, 0, 0));
 
         targetAndAttackUntil(
                 world, 2L, () -> sink.characterDefeated.stream().anyMatch(d -> d.defeatedCharacterId() == 2L));
@@ -764,7 +766,7 @@ class WorldFacadeTest {
         world.attachCharacter(2L, 1f, 0f, DEFAULT_STATS);
         awaitTrue(() -> sink.spawned.size() >= 2);
 
-        world.applyEquipmentBonus(1L, 1000);
+        world.applyEquipmentBonus(1L, new EquipmentBonusSnapshot(1000, 0, 0, 0));
 
         targetAndAttackUntil(world, 2L, () -> sink.characterRespawned.stream().anyMatch(r -> r.characterId() == 2L));
         CharacterRespawned respawn = sink.characterRespawned.stream()
@@ -796,7 +798,7 @@ class WorldFacadeTest {
             dungeonWorld.attachCharacter(2L, 1f, 0f, DEFAULT_STATS);
             awaitTrue(() -> dungeonSink.spawned.size() >= 2);
 
-            dungeonWorld.applyEquipmentBonus(1L, 1000);
+            dungeonWorld.applyEquipmentBonus(1L, new EquipmentBonusSnapshot(1000, 0, 0, 0));
 
             targetAndAttackUntil(dungeonWorld, 2L, () -> dungeonSink.characterDefeated.stream()
                     .anyMatch(d -> d.defeatedCharacterId() == 2L));
@@ -950,11 +952,74 @@ class WorldFacadeTest {
         awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
         long monsterId = sink.monsterSpawned.get(0).monsterId();
 
-        world.applyEquipmentBonus(1L, 200);
+        world.applyEquipmentBonus(1L, new EquipmentBonusSnapshot(200, 0, 0, 0));
 
         // HIT% placeholder ~91% — bấm đánh tới khi có đòn trúng, không giả định đòn đầu chắc trúng.
         targetAndAttackUntil(world, monsterId, () -> sink.attackResults.stream()
                 .anyMatch(a -> a.defender() == monsterId && !a.miss() && a.died()));
+    }
+
+    @Test
+    @Timeout(10)
+    void shouldRaiseMaxHp_whenEquipmentGrantsBonusHp() {
+        // ADR-036: bonus_hp cộng vào MÁU TỐI ĐA trên nền CHARACTER_MAX_HP (placeholder, chủ dự án
+        // chấp nhận maxHp = 100 + bonus_hp khi duyệt ADR). Đọc qua RespawnSnapshot vì đó là chỗ
+        // DUY NHẤT máu tối đa của nhân vật đi ra ngoài world — cũng chứng minh luôn hồi sinh dùng
+        // máu tối đa MỚI chứ không phải hằng số.
+        world.start();
+        world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
+        world.attachCharacter(2L, 1f, 0f, DEFAULT_STATS);
+        awaitTrue(() -> sink.spawned.size() >= 2);
+
+        world.applyEquipmentBonus(2L, new EquipmentBonusSnapshot(0, 0, 0, 58));
+        world.applyEquipmentBonus(1L, new EquipmentBonusSnapshot(1000, 0, 0, 0)); // đủ để hạ gục ngay
+
+        targetAndAttackUntil(world, 2L, () -> sink.characterRespawned.stream().anyMatch(r -> r.characterId() == 2L));
+        CharacterRespawned respawn = sink.characterRespawned.stream()
+                .filter(r -> r.characterId() == 2L)
+                .findFirst()
+                .orElseThrow();
+        assertThat(respawn.maxHp()).isEqualTo(CombatConstants.CHARACTER_MAX_HP + 58);
+        assertThat(respawn.currentHp()).isEqualTo(CombatConstants.CHARACTER_MAX_HP + 58);
+    }
+
+    @Test
+    @Timeout(10)
+    void shouldReduceIncomingDamage_whenEquipmentGrantsBonusDef() {
+        // ADR-036: giáp cộng DEF THẬT (trước ADR này không có đường nào để trang bị chạm DEF —
+        // V21 phải cho áo giáp cộng ATK). mitigation = 100/(100+DEF): DEF nền 20 ⇒ nhận ~83%
+        // damage; +200 DEF ⇒ DEF 220 ⇒ chỉ còn ~31%.
+        //
+        // MỘT người đánh (1L), HAI mục tiêu giống hệt nhau (2L có giáp, 3L không) — chênh lệch chỉ
+        // có thể do DEF. Không so với một con số cứng vì damage còn nhánh crit/miss ngẫu nhiên.
+        world.start();
+        world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
+        world.attachCharacter(2L, 1f, 0f, DEFAULT_STATS);
+        world.attachCharacter(3L, 2f, 0f, DEFAULT_STATS);
+        awaitTrue(() -> sink.spawned.size() >= 3);
+
+        world.applyEquipmentBonus(2L, new EquipmentBonusSnapshot(0, 200, 0, 0));
+
+        targetAndAttackUntil(world, 2L, () -> firstCleanHitDamageFrom1L(2L) > 0);
+        targetAndAttackUntil(world, 3L, () -> firstCleanHitDamageFrom1L(3L) > 0);
+
+        assertThat(firstCleanHitDamageFrom1L(2L)).isLessThan(firstCleanHitDamageFrom1L(3L));
+    }
+
+    /**
+     * Damage của đòn ĐẦU TIÊN trúng gọn (không miss, không crit) mà {@code defenderId} nhận TỪ 1L.
+     *
+     * <p>Lọc theo NGƯỜI TẤN CÔNG là bắt buộc, không phải cho chắc: world chính có quái tự đi tìm
+     * người đánh (AiSystem), nên đòn đầu tiên trúng một nhân vật rất có thể là của QUÁI
+     * (MONSTER_STATS atk=8) chứ không phải của 1L (atk 30) — chính cái đó làm bản đầu của test này
+     * đỏ với hai con số không so sánh được với nhau.
+     */
+    private int firstCleanHitDamageFrom1L(long defenderId) {
+        return sink.attackResults.stream()
+                .filter(a -> a.attacker() == 1L && a.defender() == defenderId && !a.miss() && !a.crit())
+                .mapToInt(AttackResult::damage)
+                .findFirst()
+                .orElse(0);
     }
 
     @Test

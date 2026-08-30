@@ -82,17 +82,20 @@ class EquipItemUseCaseTest {
 
     private static final TransactionRunner DIRECT_TX = action -> action.accept(null);
 
+    /** Đủ cao để mọi test CŨ không vướng phép kiểm cấp mới của ADR-036. */
+    private static final int CHARACTER_LEVEL = 50;
+
     @Test
     void shouldEquip_whenItemBelongsToCharacterAndMatchesSlot() {
         FakeInventoryPort inventoryPort = new FakeInventoryPort(
                 new Inventory(CHARACTER_ID, 20, List.of(new ItemStack(WEAPON_ITEM_ID, WEAPON_TEMPLATE_ID, 1, 0))));
-        FakeItemTemplatePort templatePort = new FakeItemTemplatePort(
-                Map.of(WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 5)));
+        FakeItemTemplatePort templatePort = new FakeItemTemplatePort(Map.of(
+                WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 5, 0, 0, 0, 1)));
         FakeEquipmentPort equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
         EquipItemUseCase useCase = new EquipItemUseCase(inventoryPort, templatePort, equipmentPort, DIRECT_TX);
 
         EquipItemUseCase.EquipItemResult result =
-                useCase.execute(CHARACTER_ID, WEAPON_ITEM_ID, EquipmentSlotType.WEAPON);
+                useCase.execute(CHARACTER_ID, WEAPON_ITEM_ID, EquipmentSlotType.WEAPON, CHARACTER_LEVEL);
 
         assertThat(result).isEqualTo(EquipItemUseCase.EquipItemResult.OK);
         assertThat(equipmentPort.saved.equippedItemId(EquipmentSlotType.WEAPON)).contains(WEAPON_ITEM_ID);
@@ -105,7 +108,8 @@ class EquipItemUseCaseTest {
         FakeEquipmentPort equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
         EquipItemUseCase useCase = new EquipItemUseCase(inventoryPort, templatePort, equipmentPort, DIRECT_TX);
 
-        EquipItemUseCase.EquipItemResult result = useCase.execute(CHARACTER_ID, 999L, EquipmentSlotType.WEAPON);
+        EquipItemUseCase.EquipItemResult result =
+                useCase.execute(CHARACTER_ID, 999L, EquipmentSlotType.WEAPON, CHARACTER_LEVEL);
 
         assertThat(result).isEqualTo(EquipItemUseCase.EquipItemResult.ITEM_NOT_FOUND);
         assertThat(equipmentPort.saved).isNull();
@@ -116,15 +120,51 @@ class EquipItemUseCaseTest {
         // Item là WEAPON nhưng người chơi cố mặc vào slot ARMOR — server tự kiểm tra, không tin client.
         FakeInventoryPort inventoryPort = new FakeInventoryPort(
                 new Inventory(CHARACTER_ID, 20, List.of(new ItemStack(WEAPON_ITEM_ID, WEAPON_TEMPLATE_ID, 1, 0))));
-        FakeItemTemplatePort templatePort = new FakeItemTemplatePort(
-                Map.of(WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 5)));
+        FakeItemTemplatePort templatePort = new FakeItemTemplatePort(Map.of(
+                WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 5, 0, 0, 0, 1)));
         FakeEquipmentPort equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
         EquipItemUseCase useCase = new EquipItemUseCase(inventoryPort, templatePort, equipmentPort, DIRECT_TX);
 
         EquipItemUseCase.EquipItemResult result =
-                useCase.execute(CHARACTER_ID, WEAPON_ITEM_ID, EquipmentSlotType.ARMOR);
+                useCase.execute(CHARACTER_ID, WEAPON_ITEM_ID, EquipmentSlotType.ARMOR, CHARACTER_LEVEL);
 
         assertThat(result).isEqualTo(EquipItemUseCase.EquipItemResult.WRONG_SLOT);
         assertThat(equipmentPort.saved).isNull();
+    }
+
+    @Test
+    void shouldRejectEquip_whenCharacterLevelBelowRequiredLevel() {
+        // ADR-036 D4 — GAMEPLAY.md §7 mô tả phép kiểm này từ lâu nhưng nó KHÔNG tồn tại được cho
+        // tới khi item_template có cột required_level (V22): trước đó một nhân vật Cấp 1 đủ vàng
+        // là mặc trọn bộ "Hạ Nhẫn".
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(
+                new Inventory(CHARACTER_ID, 20, List.of(new ItemStack(WEAPON_ITEM_ID, WEAPON_TEMPLATE_ID, 1, 0))));
+        FakeItemTemplatePort templatePort = new FakeItemTemplatePort(Map.of(
+                WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 18, 0, 0, 0, 5)));
+        FakeEquipmentPort equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
+        EquipItemUseCase useCase = new EquipItemUseCase(inventoryPort, templatePort, equipmentPort, DIRECT_TX);
+
+        EquipItemUseCase.EquipItemResult result =
+                useCase.execute(CHARACTER_ID, WEAPON_ITEM_ID, EquipmentSlotType.WEAPON, 4);
+
+        assertThat(result).isEqualTo(EquipItemUseCase.EquipItemResult.LEVEL_TOO_LOW);
+        assertThat(equipmentPort.saved).isNull();
+    }
+
+    @Test
+    void shouldEquip_whenCharacterLevelExactlyMeetsRequiredLevel() {
+        // Biên: "đủ cấp" là >=, không phải >. Cấp 5 mặc được đồ yêu cầu Cấp 5.
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(
+                new Inventory(CHARACTER_ID, 20, List.of(new ItemStack(WEAPON_ITEM_ID, WEAPON_TEMPLATE_ID, 1, 0))));
+        FakeItemTemplatePort templatePort = new FakeItemTemplatePort(Map.of(
+                WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 18, 0, 0, 0, 5)));
+        FakeEquipmentPort equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
+        EquipItemUseCase useCase = new EquipItemUseCase(inventoryPort, templatePort, equipmentPort, DIRECT_TX);
+
+        EquipItemUseCase.EquipItemResult result =
+                useCase.execute(CHARACTER_ID, WEAPON_ITEM_ID, EquipmentSlotType.WEAPON, 5);
+
+        assertThat(result).isEqualTo(EquipItemUseCase.EquipItemResult.OK);
+        assertThat(equipmentPort.saved.equippedItemId(EquipmentSlotType.WEAPON)).contains(WEAPON_ITEM_ID);
     }
 }

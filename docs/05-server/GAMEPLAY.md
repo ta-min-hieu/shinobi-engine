@@ -134,8 +134,29 @@ Clean Architecture ([REPOSITORY-STRUCTURE.md §4](../01-architecture/REPOSITORY-
 |---|---|
 | `AddItemUseCase` | Kiểm tra túi đầy, stack |
 | `MoveItemUseCase` | Kiểm tra slot hợp lệ |
-| `EquipItemUseCase` | Kiểm tra level/faction yêu cầu → **tính lại chỉ số dẫn xuất** (§2) |
+| `EquipItemUseCase` | ✅ Kiểm `required_level` (ADR-036, V22) → **tính lại chỉ số dẫn xuất** (§2). ⚠️ CHƯA kiểm faction — `required_faction` cố ý chưa có cột, chờ bộ đồ riêng hệ phái đầu tiên |
 | `EnhanceItemUseCase` | ✅ **Đã code** (2026-07-23) — ⚠️ **Transaction bắt buộc** — tốn gold + đổi enhance_level |
+
+### 7.0 Chỉ số của trang bị — ADR-036 (Accepted 2026-08-30)
+
+`item_template` mang **4 cột chỉ số** + 1 cột điều kiện (migration **V22**):
+
+| Cột | Vào đâu |
+|---|---|
+| `bonus_atk` | ATK — damage đòn thường |
+| `bonus_def` | DEF — giảm damage đòn thường, `mitigation = 100/(100+DEF)` |
+| `bonus_res` | RES — giảm damage skill, cùng công thức |
+| `bonus_hp` | **MÁU TỐI ĐA**: `maxHp = CHARACTER_MAX_HP + bonus_hp` |
+| `required_level` | cấp tối thiểu để MẶC được |
+
+Quy ước đặt số (V22): **vũ khí** cộng ATK và không cộng phòng thủ; **giáp/mũ/giày** cộng
+DEF/RES/HP và không cộng ATK; **găng** là món lai; **trang sức** nghiêng RES/HP kèm chút ATK.
+
+⚠️ `CHARACTER_MAX_HP = 100` **vẫn là placeholder** (GDD chưa chốt công thức HP tối đa) — chủ dự án
+chấp nhận `100 + bonus_hp` như placeholder MỚI khi duyệt ADR-036, không phải công thức cuối cùng.
+
+⚠️ Phép kiểm `required_level` chỉ chạy **lúc MẶC**: đổi số trong migration KHÔNG gỡ đồ khỏi nhân
+vật đang mặc sẵn. Cố ý.
 
 ⚠️ **Cường hoá là nơi dễ mất tài sản nhất**: trừ gold thành công nhưng ghi `enhance_level` thất bại = người chơi mất tài sản. **Bắt buộc transaction** ([DATABASE.md §5](DATABASE.md)) + **audit log** (`audit_log`, migration V7).
 
@@ -162,6 +183,23 @@ GDD chỉ ghi "tỉ lệ giảm dần, có Bảo Vệ chống rớt cấp từ +
 | +12→+13 | 10% | 10000 | **Rớt 1 cấp** |
 | +13→+14 | 8% | 14000 | **Rớt 1 cấp** |
 | +14→+15 | 5% | 20000 | **Rớt 1 cấp** |
+
+**Cường hoá cộng bao nhiêu chỉ số** (ADR-036 D3, thi hành 2026-08-30) — trước ngày đó bảng trên
+mô tả trọn vẹn CHI PHÍ mà không có một dòng nào nói LỢI ÍCH, và đúng là không có lợi ích nào:
+`enhance_level` không được đọc ở bất kỳ công thức chỉ số nào (đo bằng chơi thật: `steel_katana`
++0→+7, trừ 8.900 vàng, chỉ số không đổi).
+
+```
+bonus_hiệu_dụng = bonus_gốc × (1 + ENHANCE_STEP × enhance_level)
+```
+
+`ENHANCE_STEP = 0,10` (`EnhancementTable`, cùng file với bảng trên) ⇒ +15 là ×2,5. Áp cho **cả 4
+chỉ số** và cho **TỪNG món theo cấp của chính món đó**, không phải cho tổng cả bộ. Cường hoá
+**khuếch đại**, không tạo chỉ số từ hư vô: món có `bonus_def = 0` thì +15 vẫn 0 DEF.
+
+⚠️ Client **không** hiện chỉ số hiệu dụng, chỉ hiện chỉ số GỐC kèm nhãn "Chỉ số gốc" —
+`ENHANCE_STEP` sống ở server và không gói nào gửi nó sang client, cùng lý do bảng chi phí ở trên
+không có mặt ở client (Điều 24).
 
 **Gold**: cột `character_stat.gold` (migration V7) — đặt ở `character_stat` (không phải
 `character`) vì bảng này vốn đã tách riêng do tần suất ghi/đọc cao (DATABASE.md §2.1), và gold đổi

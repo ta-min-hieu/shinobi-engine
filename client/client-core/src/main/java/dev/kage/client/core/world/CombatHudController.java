@@ -41,6 +41,20 @@ final class CombatHudController {
     private final Map<Long, MonsterState> monsters = new HashMap<>();
 
     private int playerHp = CombatConstants.CHARACTER_MAX_HP;
+    /**
+     * MÁU TỐI ĐA của chính người chơi. Kể từ ADR-036 con số này KHÔNG còn là hằng số: trang bị có
+     * {@code bonus_hp} nâng nó lên ({@code maxHp = 100 + bonus_hp}, server tính). Giá trị khởi tạo
+     * chỉ là phỏng đoán ban đầu để vạch máu có mẫu số ngay lúc vào world; nó được THAY bằng số
+     * THẬT của server ngay khi {@code CharacterRespawnedEvent} đầu tiên tới.
+     *
+     * <p>⚠️ Nợ đã biết, không phải quên: chưa gói nào mang HP/HP tối đa của CHÍNH mình lúc ĐĂNG
+     * NHẬP (grep {@code current_hp} trong proto — chỉ có ở quái và ở sự kiện hồi sinh). Nên giữa
+     * lúc vào game và lần hồi sinh đầu tiên, mẫu số có thể lệch nếu người chơi đang mặc đồ +HP.
+     * Sửa đúng cần một field mới trong gói trạng thái ban đầu — ngoài phạm vi ADR-036 (ADR đó chốt
+     * "không thêm opcode, không đổi message đang chạy").
+     */
+    private int playerMaxHp = CombatConstants.CHARACTER_MAX_HP;
+
     private int playerChi = CombatConstants.CHARACTER_MAX_CHI;
     private float skillCooldownRemaining;
     private long currentTargetId;
@@ -179,8 +193,13 @@ final class CombatHudController {
      * {@code TargetComponent} của kẻ vừa hồi sinh (WorldFacade#respawnCharacter), nên client giữ
      * mục tiêu cũ chỉ gây lệch hiển thị vô ích.
      */
-    void onRespawn(int currentHp, int currentChi) {
+    void onRespawn(int currentHp, int maxHp, int currentChi) {
         playerHp = currentHp;
+        // ADR-036: máu tối đa phụ thuộc trang bị, nên LẤY của server thay vì đọc hằng số client.
+        // maxHp <= 0 nghĩa là server cũ chưa gửi field (mặc định proto3) — giữ giá trị đang có.
+        if (maxHp > 0) {
+            playerMaxHp = maxHp;
+        }
         playerChi = currentChi;
         currentTargetId = 0L;
     }
@@ -235,7 +254,7 @@ final class CombatHudController {
     }
 
     int playerMaxHp() {
-        return CombatConstants.CHARACTER_MAX_HP;
+        return playerMaxHp;
     }
 
     long currentTargetId() {

@@ -17,7 +17,8 @@ import dev.kage.server.database.JdbcOperations;
 public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
 
     private static final String FIND_BY_ID = """
-            SELECT id, equip_slot, bonus_atk FROM item_template WHERE id = ?
+            SELECT id, equip_slot, bonus_atk, bonus_def, bonus_res, bonus_hp, required_level
+              FROM item_template WHERE id = ?
             """;
 
     private static final String FIND_ID_BY_CODE = """
@@ -27,7 +28,9 @@ public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
     // ORDER BY id để thứ tự trả về ổn định giữa các lần chạy — ItemCatalog vẫn tự sắp lại trước khi
     // băm (không phụ thuộc DB), nhưng dữ liệu ổn định sẵn thì dễ soi khi debug.
     private static final String LIST_CATALOG = """
-            SELECT id, code, name_key, max_stack, equip_slot, bonus_atk FROM item_template ORDER BY id
+            SELECT id, code, name_key, max_stack, equip_slot,
+                   bonus_atk, bonus_def, bonus_res, bonus_hp, required_level
+              FROM item_template ORDER BY id
             """;
 
     private final DataSource dataSource;
@@ -59,7 +62,11 @@ public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
                 rs.getString("name_key"),
                 rs.getInt("max_stack"),
                 equipSlot == null ? null : EquipmentSlotType.valueOf(equipSlot),
-                rs.getInt("bonus_atk"));
+                rs.getInt("bonus_atk"),
+                rs.getInt("bonus_def"),
+                rs.getInt("bonus_res"),
+                rs.getInt("bonus_hp"),
+                rs.getInt("required_level"));
     }
 
     private static ItemTemplate mapRow(ResultSet rs) throws SQLException {
@@ -67,6 +74,10 @@ public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
         return new ItemTemplate(
                 rs.getLong("id"),
                 equipSlot == null ? null : EquipmentSlotType.valueOf(equipSlot),
-                rs.getInt("bonus_atk"));
+                rs.getInt("bonus_atk"),
+                rs.getInt("bonus_def"),
+                rs.getInt("bonus_res"),
+                rs.getInt("bonus_hp"),
+                rs.getInt("required_level"));
     }
 }

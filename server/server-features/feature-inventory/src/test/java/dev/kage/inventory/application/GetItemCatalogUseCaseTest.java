@@ -17,9 +17,10 @@ import dev.kage.inventory.domain.ItemTemplatePort;
 /** ADR-035 Decision-2 (phương án A′) — catalog + {@code version} là hash NỘI DUNG do server tính. */
 class GetItemCatalogUseCaseTest {
 
-    private static final ItemCatalogEntry KUNAI = new ItemCatalogEntry(1L, "kunai", "item.kunai.name", 99, null, 0);
-    private static final ItemCatalogEntry SWORD =
-            new ItemCatalogEntry(2L, "wooden_sword", "item.wooden_sword.name", 1, EquipmentSlotType.WEAPON, 5);
+    private static final ItemCatalogEntry KUNAI =
+            new ItemCatalogEntry(1L, "kunai", "item.kunai.name", 99, null, 0, 0, 0, 0, 1);
+    private static final ItemCatalogEntry SWORD = new ItemCatalogEntry(
+            2L, "wooden_sword", "item.wooden_sword.name", 1, EquipmentSlotType.WEAPON, 5, 0, 0, 0, 1);
 
     private static ItemTemplatePort fakePort(List<ItemCatalogEntry> entries, AtomicInteger readCount) {
         return new FakeItemTemplatePort(entries, readCount);
@@ -87,8 +88,8 @@ class GetItemCatalogUseCaseTest {
     @Test
     void shouldChangeVersion_whenABalanceNumberChanges() {
         ItemCatalog before = ItemCatalog.of(List.of(SWORD));
-        ItemCatalog after = ItemCatalog.of(List.of(
-                new ItemCatalogEntry(2L, "wooden_sword", "item.wooden_sword.name", 1, EquipmentSlotType.WEAPON, 12)));
+        ItemCatalog after = ItemCatalog.of(List.of(new ItemCatalogEntry(
+                2L, "wooden_sword", "item.wooden_sword.name", 1, EquipmentSlotType.WEAPON, 12, 0, 0, 0, 1)));
 
         // Đây chính là lý do chọn A′ thay vì đóng gói tĩnh: chỉnh cân bằng là version tự đổi, client
         // nhận số mới ở lần đăng nhập kế — không ai phải nhớ bump phiên bản bằng tay.
@@ -99,8 +100,8 @@ class GetItemCatalogUseCaseTest {
     void shouldProduceDifferentVersion_whenFieldBoundaryShifts() {
         // Bẫy kinh điển của hash nối chuỗi: hai catalog khác nhau băm ra cùng chuỗi vì thiếu ký tự
         // phân tách. "ab"+"c" và "a"+"bc" phải ra hai version khác nhau.
-        ItemCatalog first = ItemCatalog.of(List.of(new ItemCatalogEntry(1L, "ab", "c", 1, null, 0)));
-        ItemCatalog second = ItemCatalog.of(List.of(new ItemCatalogEntry(1L, "a", "bc", 1, null, 0)));
+        ItemCatalog first = ItemCatalog.of(List.of(new ItemCatalogEntry(1L, "ab", "c", 1, null, 0, 0, 0, 0, 1)));
+        ItemCatalog second = ItemCatalog.of(List.of(new ItemCatalogEntry(1L, "a", "bc", 1, null, 0, 0, 0, 0, 1)));
 
         assertThat(first.version()).isNotEqualTo(second.version());
     }
