@@ -33,7 +33,7 @@
 | [ARCHITECTURE.md](01-architecture/ARCHITECTURE.md) | ⭐ Quan trọng nhất — C4, layer, luồng, scale |
 | [REPOSITORY-STRUCTURE.md](01-architecture/REPOSITORY-STRUCTURE.md) | Module Gradle, dependency rule |
 | [TECHNOLOGY-STACK.md](01-architecture/TECHNOLOGY-STACK.md) | Công nghệ nào, version, vì sao, khi nào thay |
-| [ADR Index](01-architecture/adr/README.md) | 9 ADR + 10 ADR đang chờ |
+| [ADR Index](01-architecture/adr/README.md) | 35 file ADR — **33 Accepted · 1 Superseded · 1 Proposed** (đếm 2026-08-29 bằng dòng `Status` từng file); ADR-023 chưa viết |
 
 ### 02 · Coding Standards
 [CODING-STANDARDS.md](02-coding-standards/CODING-STANDARDS.md) · [JAVA-GUIDELINES.md](02-coding-standards/JAVA-GUIDELINES.md) · [CODE-REVIEW.md](02-coding-standards/CODE-REVIEW.md)
@@ -102,7 +102,7 @@
 
 Đây là danh sách tổng hợp toàn bộ thứ **chưa quyết** (chủ dự án quyết, không phải AI).
 
-## 🔴 ĐANG CHỜ CHỦ DỰ ÁN — cập nhật 2026-08-05
+## 🔴 ĐANG CHỜ CHỦ DỰ ÁN — cập nhật 2026-08-29
 
 | # | Việc | Đang chặn gì | Đọc ở đâu |
 |---|---|---|---|
@@ -112,12 +112,15 @@
 | 4 | Font **Be Vietnam Pro** (OFL 1.1) — chỉ còn xác nhận hình thức, license đã kiểm tại nguồn + test glyph PASS | Không chặn gì | [RESOURCE.md §7](04-client/RESOURCE.md) |
 | 5 | i18n: có tiếng Anh ở MVP không · Mô hình kinh doanh | Chưa chặn phase nào | [GDD](13-game-design/GAME-DESIGN-DOCUMENT.md) |
 | 6 | **GM/admin tool**: in-game command hay web app? mấy cấp quyền? tách service hay nhúng? | Chưa chặn — Closed Beta người quen vận hành bằng SQL tay được. Trả lời thì mới viết được [ADMIN.md](12-devtools/ADMIN.md) | [ADMIN.md](12-devtools/ADMIN.md) |
+| **7** | 🆕 **[ADR-036](01-architecture/adr/ADR-036-Equipment-Stats-And-Enhancement-Effect.md) — Proposed 2026-08-29.** Trang bị và cường hoá gần như không có ý nghĩa cơ học: `item_template` chỉ có **một** cột chỉ số (`bonus_atk` từ V6) nên 15 món V21 vừa seed **cho áo giáp cộng ATK**; `ComputeEquipmentBonusUseCase` **không đọc `enhanceLevel`** nên cường hoá `steel_katana` +0→+7 trừ **8.900 vàng mà chỉ số không đổi gì** (chơi thật 2026-08-29); và điều kiện `required_level`/`required_faction` mà GAMEPLAY.md §7 mô tả **không tồn tại** vì không có cột. Đề xuất D1-D5 chạm **cả schema DB lẫn protocol** ⇒ [/CLAUDE.md §4](../CLAUDE.md). **Câu hỏi phụ phải trả lời cùng**: `bonus_hp` đụng vào `CombatConstants.CHARACTER_MAX_HP = 100` (placeholder, GDD chưa chốt công thức HP) — chấp nhận `maxHp = 100 + bonus_hp` như placeholder mới, hay tách `bonus_hp` ra và chỉ làm DEF/RES? ⚠️ Nếu **bác** đề xuất thì phải **gỡ nút Cường hoá khỏi client** — để nguyên một nút đốt vàng không tác dụng là tệ hơn cả hai lựa chọn | Không chặn phase, nhưng **vòng lặp cốt lõi "giết quái → bán đồ → cường hoá → đánh khoẻ hơn" đang ĐỨT** | [ADR-036](01-architecture/adr/ADR-036-Equipment-Stats-And-Enhancement-Effect.md) · [ROADMAP mục 29](11-process/ROADMAP.md) |
+| **8** | 🆕 **Đổi hệ phái xong, người ĐANG nhìn thấy vẫn thấy model cũ** — đã sửa **một nửa** 2026-08-29 (`ConnectedCharacterRegistry.updateAppearance` khiến mọi `CharacterSpawnedEvent` phát về **sau** mang hệ phái mới; trước đó sai cho tới khi đăng nhập lại). Nửa còn lại **client cũng chặn**: `RemoteCharacterPresenter.onSpawned` **bỏ qua** spawn cho nhân vật đã có mặt (cố ý, tránh entity trùng), nên server có phát lại cũng vô ích. Ba lựa chọn, **cả ba đều là quyết định chứ không phải vá**: (1) server gửi **despawn + spawn** cho mọi observer qua `AreaOfInterestTracker.observersOf` — không đổi protocol nhưng nhân vật **"nháy" một khung hình**; (2) client **cập nhật model khi nhận spawn lặp** — không đổi protocol nhưng **phá thế bất biến "spawn = tạo mới"**; (3) thêm **event "ngoại hình vừa đổi"** — sạch nhất nhưng **đổi protocol** (§4) | Chỉ là lỗi hiển thị, không chặn phase | [ROADMAP mục 29](11-process/ROADMAP.md) |
 
-> **Từ 2026-08-06 không còn ADR nào ở trạng thái `Proposed`** — ADR-032 là cái cuối cùng, đã Accepted.
-> Những dòng còn lại trong bảng là câu hỏi sản phẩm/vận hành, không phải ADR chờ duyệt. Đoạn dưới giữ
-> lại làm lịch sử của lần rà 2026-08-05: *"ADR-032 là ADR duy nhất còn `Proposed` — mọi ADR khác đã
-> Accepted."* Luật vẫn đúng nguyên: nếu tài liệu nào còn viết "chờ chủ dự án Accept" cho một ADR thì
-> **kiểm dòng `Status` của chính file ADR đó**, đừng tin chữ ở nơi khác.
+> ⚠️ **Câu "không còn ADR nào `Proposed`" nay ĐÃ SAI.** Nó đúng từ 2026-08-06 (ADR-032 là cái cuối
+> cùng được Accept) đến 2026-08-28; từ **2026-08-29 ADR-036 là ADR `Proposed` duy nhất** — xem dòng 7.
+> Đếm chuẩn 2026-08-29: **33 Accepted · 1 Superseded (ADR-007) · 1 Proposed (ADR-036)** trên tổng 35
+> file; chỉ **ADR-023** là chưa viết. Luật vẫn đúng nguyên: nếu tài liệu nào còn viết "chờ chủ dự án
+> Accept" cho một ADR thì **kiểm dòng `Status` của chính file ADR đó**, đừng tin chữ ở nơi khác —
+> chính cái bẫy đó đã bắt được lỗi sổ sách ADR-032 ngày 2026-08-25.
 
 ---
 
