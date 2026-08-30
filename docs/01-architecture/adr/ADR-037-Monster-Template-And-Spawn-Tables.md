@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | 🟢 **Accepted** (2026-08-30) — chủ dự án duyệt D1-D7, chọn **module `feature-monster`** (Technical Decision 3) và **duyệt field `model_key`** (Technical Decision 5). ĐANG THI HÀNH |
+| Status | 🟢 **Accepted** (2026-08-30) — chủ dự án duyệt D1-D7, chọn **module `feature-monster`** và **duyệt field `model_key`**. ĐÃ THI HÀNH và **ĐÃ PLAYTEST**: bảng D6 khớp từng ô (ROADMAP mục 44) |
 | Date | 2026-08-30 |
 | Deciders | Chủ dự án quyết; AI đo + soạn |
 | Related | [ADR-036](ADR-036-Equipment-Stats-And-Enhancement-Effect.md) (chỉ số trang bị — chính playtest của nó sinh ra ADR này) · [ADR-034](ADR-034-Manual-Attack-And-Experience.md) (EXP hardcode, tự nhận là tạm) · [AI.md §10](../../03-engine/AI.md) · [DATABASE.md §2.2](../../05-server/DATABASE.md) · [GAMEPLAY.md §5](../../05-server/GAMEPLAY.md) · [/CLAUDE.md §4](../../../CLAUDE.md) (đổi schema + protocol + THÊM MODULE đều phải dừng hỏi) |
@@ -319,5 +319,10 @@ tham số AI theo loài, và `npc_template`.
    adapter → `MonsterCatalogSnapshot` + `WorldFacade` đọc catalog thay hằng số → sửa
    `WorldFacadeTest` → `exp_reward` thay `MonsterExperience` → field `model_key` + client →
    i18n 2 bundle → **sửa DATABASE.md §2.2 và AI.md §10**.
-3. Sau khi chạy: **playtest lại**, đo đúng bảng "số đòn chịu được" ở D6 — đó mới là lúc biết số
-   DEF/RES của V22 đúng hay sai, và là lý do cả ADR này tồn tại.
+3. ✅ **Đã playtest 2026-08-30 — bảng D6 khớp TỪNG Ô** (ROADMAP mục 44). Đo thật: quỷ đá gây
+   **−33 / −28 / −22** cho người không giáp / bộ Hạ Nhẫn +0 / +15, tức chịu được **3 → 6 → 11**
+   đòn, đúng con số D6 dự đoán. Cướp lang thang **−18** (không giáp) và **−12** (+15). Máu tối đa
+   **100 / 158 / 245**. **Số DEF/RES của V22 nay đã kiểm chứng được, và chúng đúng** — đó là lý do
+   cả ADR này tồn tại.
+4. Còn lại: **art riêng cho `wandering_bandit` và `stone_ogre`** (hiện dùng chung
+   `mob_training-dummy`), và tham số AI theo loài (D7).

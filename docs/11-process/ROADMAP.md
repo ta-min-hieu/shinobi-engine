@@ -1533,3 +1533,31 @@ Bốn ADR mới so với lần đếm trước (2026-08-07):
     - ⚠️ **Số của hai loài mới CHƯA playtest** — đúng thân phận mà `ENHANCE_STEP` và bảng tỉ lệ §7.1
       từng có. Việc tiếp theo là chơi thật đúng bảng "số đòn chịu được" ở ADR-037 D6; đó mới là lúc
       biết DEF/RES của V22 đúng hay sai.
+
+44. **PLAYTEST 3 loài quái mới — bảng D6 của ADR-037 khớp TỪNG Ô (2026-08-30)**:
+    - ✅ Chơi thật trên server thật (V23 do Flyway áp lúc khởi động). **Tám phép đo, tám lần khớp
+      công thức**, không lần nào lệch:
+      | Đo | Kết quả | `100/(100+DEF)` |
+      |---|---|---|
+      | Cướp lang thang (atk 22) đánh người KHÔNG giáp | **−18** | `22×100/120 = 18,3` ✓ |
+      | Quỷ đá (atk 40) đánh người KHÔNG giáp | **−33** | `40×100/120 = 33,3` ✓ |
+      | Quỷ đá đánh bộ Hạ Nhẫn **+0** | **−28** | DEF 43 ⇒ `40×100/143 = 28,0` ✓ |
+      | Quỷ đá đánh bộ Hạ Nhẫn **+15** | **−22** | DEF 78 ⇒ `40×100/178 = 22,5` ✓ |
+      | Cướp lang thang đánh bộ **+15** | **−12** | `22×100/178 = 12,4` ✓ |
+      | Máu tối đa, không giáp / +0 / +15 | **100 / 158 / 245** | ✓ |
+    - ✅ **Tiến trình phòng thủ lần đầu ĐỌC ĐƯỢC**, đúng bảng ADR-037 D6 dự đoán: chịu được
+      **3 → 6 → 11 đòn** của quỷ đá. So với hình nộm (15/26/61 — ba con số đều là "không bao giờ
+      chết"), đây là lần đầu mặc giáp có nghĩa trong game. **Số DEF/RES của V22 nay đã kiểm chứng
+      được — và chúng đúng.**
+    - ✅ Tên i18n loài mới hiện đúng ("Cướp lang thang 90 / 90"), máu tối đa của quái đọc từ
+      `monster_template`, `model_key` dùng chung không gây hộp đỏ.
+    - ✅ **Xác nhận bản vá vạch máu của ADR-036 chạy trong đời thật**: đăng nhập với bộ giáp +0 hiện
+      thẳng `102 / 158`, không còn `102 / 100` như trước — tức field `SelectCharacterResponse.max_hp`
+      đi đúng đường.
+    - 🔧 **Bẫy mất nhiều thời gian nhất, và là một PHÉP ĐO SAI suýt báo cáo nhầm**: hai lượt đo đầu
+      kết luận "quỷ đá KHÔNG spawn" — sai hoàn toàn. Server ghi `character.pos_x` lúc ngắt kết nối
+      **MUỘN hơn** vài giây so với lúc tiến trình client bị kill, nên `UPDATE ... pos_x=34` bị bản
+      ghi trễ đè lại thành `-7,58`; nhân vật vào world ở chỗ cũ, cách quỷ đá 40m. Cách sửa đã đưa
+      vào công thức playtest: **poll `pos_x` tới khi nó NGỪNG đổi** rồi mới UPDATE, và kiểm lại
+      ngay trước khi đăng nhập. Bài học chung: camera bám nhân vật nên "không thấy quái" KHÔNG phải
+      bằng chứng quái không tồn tại.
