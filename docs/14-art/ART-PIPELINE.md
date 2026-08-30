@@ -500,6 +500,32 @@ chở nổi. Thiếu property → `export_gltf_flat` **ném lỗi thay vì đoá
 ⚠️ Màu ghi ra là **hex thẳng (không gian hiển thị)**, không phải linear như glTF quy định — lý do và
 bằng chứng ở [ASSET-LOG.md](../../assets/raw/ASSET-LOG.md), mục cập nhật 2026-08-09.
 
+### 6.6. Quái sinh bằng Text→3D, chạy headless (từ 2026-08-30)
+
+Quái hình người/hình thú thì §6.5 không đủ — nó cần đúng đường §6.4. Khác biệt duy nhất so với nhân
+vật là **không cần phiên blender-mcp**: job Rodin trả `.glb` về đĩa, và `build_text3d_monster.py` tự
+import file đó rồi chạy trọn bước 2–8 trong một lệnh.
+
+```bash
+# 1. Sinh mesh: POST https://hyperhuman.deemos.com/api/v2/rodin (§6.3), tải .glb về
+# 2-8. Dựng .blend hoàn chỉnh, headless
+blender -b assets/raw/blender/kage_character_base.blend -P tools/blender/build_text3d_monster.py --   --glb <ĐƯỜNG DẪN TUYỆT ĐỐI>/stone_ogre.glb --code stone_ogre   --out <TUYỆT ĐỐI>/assets/raw/blender/monsters/stone-ogre.blend
+# 9. Ba LOD — tên object/rig lấy theo mã quái: stone_ogre -> StoneOgre / stoneogre_Rig
+blender -b assets/raw/blender/monsters/stone-ogre.blend -P tools/blender/export_character_lods.py --   --object StoneOgre --rig stoneogre_Rig --asset-key mob_stone-ogre   --out <TUYỆT ĐỐI>/assets/exported/models
+```
+
+`--code` là `monster_code` y như server biết (`monster_template`, ADR-037), vì client suy khoá asset
+từ chính nó bằng một phép biến đổi thuần (`MonsterModelKey`: `stone_ogre` → `mob_stone-ogre`). Đặt
+tên lệch một chữ là model có mà không con quái nào tìm ra, và **không có lỗi nào được in ra** — con
+đó lặng lẽ vẽ bằng hộp đỏ.
+
+**`--extras all` cho asset nhiều part.** Một nhân vật Text→3D là một thân + ba mảnh vũ khí, liệt kê
+tay được. Một asset dựng bằng `kage_mesh_kit` là 40 part, và danh sách viết tay ở đó **thiếu một part
+mà không có gì báo**. Cờ này lấy mọi mesh còn lại đang bám cùng rig. Kèm theo: khi các part chiếm quá
+phần của chúng trong ngân sách §4.4, `export_character_lods.py` cho thân **và** mọi part đủ lớn cùng
+chịu một tỉ lệ decimate chung (part ≤ 64 tris được miễn) — decimate mỗi thân là không bao giờ chạm
+nổi trần `low`.
+
 ---
 
 ## 7. Tổ chức file & version control

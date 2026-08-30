@@ -324,5 +324,10 @@ tham số AI theo loài, và `npc_template`.
    đòn, đúng con số D6 dự đoán. Cướp lang thang **−18** (không giáp) và **−12** (+15). Máu tối đa
    **100 / 158 / 245**. **Số DEF/RES của V22 nay đã kiểm chứng được, và chúng đúng** — đó là lý do
    cả ADR này tồn tại.
-4. Còn lại: **art riêng cho `wandering_bandit` và `stone_ogre`** (hiện dùng chung
-   `mob_training-dummy`), và tham số AI theo loài (D7).
+4. ✅ **Art riêng cho `wandering_bandit` và `stone_ogre` — xong 2026-08-30.** `mob_stone-ogre`
+   sinh bằng Text→3D (Rodin `tier=Detail`); `mob_wandering-bandit` dựng bằng `kage_mesh_kit` vì
+   key Rodin hết hạn mức giữa chừng — bản tạm có chủ đích, thay bằng một lệnh khi có key. Ba
+   loài giờ phân biệt được bằng mắt, ảnh chụp qua `./gradlew :client:client-core:runWorldPreview`.
+   Chi tiết + bẫy: [ASSET-LOG.md](../../../assets/raw/ASSET-LOG.md) mục 2026-08-30; quy trình:
+   [ART-PIPELINE §6.6](../../14-art/ART-PIPELINE.md).
+5. Còn lại: **tham số AI theo loài (D7)** — aggro/leash/tốc độ đuổi vẫn dùng chung `AiConstants`.

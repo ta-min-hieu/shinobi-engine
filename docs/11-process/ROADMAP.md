@@ -77,11 +77,27 @@ graph LR
 | JFR + GC log bật sẵn | [JVM.md](../09-performance/JVM.md) |
 
 **Exit Criteria:**
-- [ ] `./gradlew build` xanh trên CI
-- [ ] Mọi module ở §1 REPOSITORY-STRUCTURE tồn tại (có thể rỗng)
-- [ ] ArchUnit chạy (dù chưa có gì để kiểm)
-- [ ] `docker compose up` dựng được PostgreSQL + cache
-- [ ] ~~Secret scanning hoạt động~~ — **KHÔNG khả dụng** (repo private, cần GitHub Advanced Security
+- [x] `./gradlew build` xanh trên CI — `.github/workflows/ci.yml` chạy ba bước tách rời
+      (`build -x test` → `checkstyleMain spotlessCheck spotbugsMain pmdMain pmdTest` → `test`, tức
+      ArchUnit nằm trong bước cuối) cộng job `gitleaks` quét toàn bộ lịch sử. Lần chạy CI xanh gần
+      nhất ghi nhận được là mẻ Dependabot 2026-07-31; **kiểm chứng ngày 2026-08-30 là chạy đầy đủ
+      tại máy** (345 task, có Docker), không phải trên runner.
+- [ ] Mọi module ở §1 REPOSITORY-STRUCTURE tồn tại (có thể rỗng) — **CỐ Ý KHÔNG TICK.** Rà thật
+      2026-08-30: `settings.gradle.kts` có **29 module**, §1 liệt kê 5 cái **chưa tồn tại**
+      (`client-android`, `client-ios`, `tools/content-editor`, `feature-auction`,
+      `feature-ranking`) và **không liệt kê 4 cái đang có** (`feature-party`, `feature-trade`,
+      `feature-pvp`, `feature-monster`). Đây là **lệch tài liệu ↔ thực tế**, không phải việc chưa
+      làm: `client-android`/`client-ios` treo theo ADR-023 (mobile input, chưa viết), auction/
+      ranking là nội dung chưa mở. **Cần chủ dự án chọn**: sửa §1 theo thực tế, hay dựng module
+      rỗng cho đủ. Không tự chọn bên nào (CLAUDE.md §14).
+- [x] ArchUnit chạy (dù chưa có gì để kiểm) — `quality/architecture-tests`
+      (`DependencyRuleTest`, **9 rule**) chạy trong `./gradlew test` và có bước CI riêng đặt tên
+      thẳng "Unit test + ArchUnit (ADR-011)".
+- [x] `docker compose up` dựng được PostgreSQL + cache — `deploy/docker/docker-compose.yml`
+      (postgres:17 có healthcheck `pg_isready`, redis:8 bắt buộc `CACHE_PASSWORD`). Không phải suy
+      từ file: hai container `docker-postgres-1` + `docker-cache-1` **đang chạy** lúc rà, và chính
+      chúng là DB mà Flyway áp V23 lên trong buổi playtest ADR-037 cùng ngày.
+- [x] ~~Secret scanning hoạt động~~ — **KHÔNG khả dụng** (repo private, cần GitHub Advanced Security
       trả phí — phát hiện thật 2026-07-31, không phải thiếu sót). Đã bật thay thế: Dependency graph +
       Dependabot alerts (miễn phí). Xem [OWASP.md §2](../08-security/OWASP.md), [BUILD.md](../../BUILD.md).
 
@@ -123,7 +139,16 @@ graph LR
       Việt qua cmap FreeType thật (2026-08-02, xem [RESOURCE.md §7](../04-client/RESOURCE.md)).
       ⚠️ Chỉ chứng minh glyph TỒN TẠI trong font — chưa có màn hình UI thật render lên nền cho
       người xem, việc đó nằm ngoài phạm vi checkbox này.
-- [ ] Fixed timestep hoạt động (FPS đổi không ảnh hưởng tốc độ nhân vật)
+- [x] Fixed timestep hoạt động (FPS đổi không ảnh hưởng tốc độ nhân vật) — **2026-08-30**:
+      `engine/engine-core` từ trước tới nay **không có test nào**, nên ô này chỉ có bằng chứng
+      "đọc code". Nay có `KageEngineFixedTimestepTest` (**9 test**, không cần GL: `Gdx.graphics`
+      thay bằng `Proxy`). Ba tính chất đo được:
+      **(1)** một giây mô phỏng ở 20 FPS ra **59** tick, ở 120 FPS ra **60** — lệch đúng 1 tick vì
+      `FIXED_DT` là float 1/60 làm tròn LÊN (0,016666668), tức 0,0001%, không phải lỗi logic;
+      **(2)** một frame 2 giây (GC pause) bị `MAX_FRAME_TIME` kẹp còn **≤15 tick** thay vì 120 —
+      đúng thứ chống "spiral of death"; **(3)** `alpha` luôn nằm trong [0,1) qua các frame lẻ.
+      Kèm hai test cho `setScreen` (show + **resize** màn hình mới, dispose màn cũ) — chốt lại lỗi
+      thật 2026-08-08 (màn hình vào bằng chuyển màn có ma trận chiếu suy biến về 0).
 
 ⚠️ **Bốn thứ ở Phase 1 cực đắt để sửa sau**: fixed timestep · world unit · input abstraction · tách rendering khỏi `engine-ecs`.
 
@@ -147,9 +172,15 @@ graph LR
 **ADR cần trước Phase 2**: ADR-022 (gdx-ai) · ADR-023 (mobile input, nếu mobile-first). ADR-016 (scripting — GraalJS) đã Accepted 2026-07-20.
 
 **Exit Criteria:**
-- [ ] Client kết nối server, ping/pong hoạt động
-- [ ] Mất kết nối → reconnect có backoff
-- [ ] Protocol round-trip test pass
+- [x] Client kết nối server, ping/pong hoạt động —
+      `GatewayServerIntegrationTest.clientShouldReceivePong_overRealSocket` (socket THẬT, không
+      `EmbeddedChannel`), cộng `serverShouldAcceptMultipleConnectionsConcurrently`.
+- [x] Mất kết nối → reconnect có backoff — `GameConnection.RECONNECT_BACKOFF_SECONDS` +
+      `GameConnectionReconnectTest.shouldReconnect_afterServerAppearsOnSamePort` (dựng server giả
+      trên đúng cổng cũ rồi chờ client tự nối lại).
+- [x] Protocol round-trip test pass — **17 file** dưới `shared-protocol/src/test/.../wire/`, gồm
+      `PacketCodecTest` (khung + header) và một file cho mỗi nhóm gói tin
+      (`CombatPacketsTest`, `InventoryPacketsTest`, …).
 
 ---
 
@@ -174,10 +205,26 @@ graph LR
 **ADR cần trước Phase 3**: ✅ ADR-005 (Redis) · ✅ ADR-013 (Flyway) · ✅ ADR-017 (auth token) · ✅ **ADR-025 (idempotency)** — cả 4 đã Accepted 2026-07-19, Phase 3 đủ điều kiện mở.
 
 **Exit Criteria:**
-- [ ] 2 client kết nối cùng server, thấy nhau di chuyển
-- [ ] Dữ liệu persist qua restart server
-- [ ] Speed hack / teleport bị server từ chối
-- [ ] Test authz pass (client A không điều khiển được nhân vật B)
+- [x] 2 client kết nối cùng server, thấy nhau di chuyển —
+      `GatewayServerIntegrationTest.twoClientsShouldSeeEachOtherMove_overRealSockets`, và **đã chơi
+      thật bằng hai client song song** ngày 2026-08-29 (buổi kiểm giao dịch, mục 41).
+- [x] Dữ liệu persist qua restart server —
+      `GatewayServerIntegrationTest.shouldSavePosition_whenServerShutsDownWhileClientConnected`
+      (đường graceful shutdown, SERVER.md §10) cộng bộ integration test Postgres thật
+      (`PostgresCharacterAdapterIntegrationTest` và các adapter khác, Testcontainers). Đăng nhập
+      lại sau khi tắt server đã làm nhiều lần trong các buổi playtest từ 2026-08-09.
+- [x] Speed hack / teleport bị server từ chối — **chặn bằng THIẾT KẾ GIAO THỨC chứ không bằng bộ
+      lọc**: `MoveCommand` chỉ có `dir_x`/`dir_y` (hướng), `JumpCommand` **rỗng hoàn toàn**, không
+      gói client→server nào mang toạ độ — nên "teleport" không biểu diễn nổi trên dây, và tốc độ
+      là hằng số phía server. Phần còn lại (spam lệnh để đi nhanh hơn) do rate limit chặn:
+      `SecurityIntegrationTest.shouldRejectMoveCommands_pastRateLimitThreshold_andIncrementMetric`
+      và `shouldDisconnectConnection_whenMoveRateLimitViolatedForSustainedPeriod`.
+- [x] Test authz pass (client A không điều khiển được nhân vật B) —
+      `SecurityIntegrationTest.shouldRejectSelectCharacter_whenCharacterBelongsToAnotherAccount`
+      (cộng cặp `shouldRejectAuthenticatedCommand_beforeAnyLogin` /
+      `_afterLoginButBeforeCharacterSelected`); `characterId` lấy từ session, không từ gói tin.
+      ⚠️ **Chưa đóng**: chống replay — `moveCommand_sequenceIdIsNotEnforcedAsReplayGuard_documentedGap`
+      ghi thẳng rằng `sequenceId` KHÔNG phải bộ chặn phát lại (phát hiện 2026-08-02, vẫn mở).
 
 ⚠️ **AoI phải làm ngay Phase 3** — thêm sau khi đã có state sync là refactor lớn.
 
@@ -1561,3 +1608,91 @@ Bốn ADR mới so với lần đếm trước (2026-08-07):
       vào công thức playtest: **poll `pos_x` tới khi nó NGỪNG đổi** rồi mới UPDATE, và kiểm lại
       ngay trước khi đăng nhập. Bài học chung: camera bám nhân vật nên "không thấy quái" KHÔNG phải
       bằng chứng quái không tồn tại.
+
+45. **ART CHO 2 LOÀI QUÁI MỚI — hết cảnh ba loài trông y hệt nhau (2026-08-30)**:
+    - ✅ **`mob_stone-ogre`**: con quái đầu tiên của dự án đi qua Text→3D (Hyper3D Rodin,
+      `tier=Detail`, 93 560 tris nguồn → LOD 20 000 / 10 000 / 5 000, texture 2048/1024/512).
+      Thân đá xám nứt + vai rêu + mắt hổ phách.
+    - ✅ **Script mới `tools/blender/build_text3d_monster.py`** — và đây là phần đáng giữ hơn cả
+      model: bước A/B của BLENDER-SESSION-GUIDE §1.5 (sinh + import) xưa nay **bắt buộc phải có
+      Blender GUI mở** cho phiên blender-mcp. Job Rodin trả `.glb` về đĩa, nên script tự import và
+      chạy trọn bước 2–8 headless bằng MỘT lệnh. 15 nhân vật trước đây đều phải qua phiên GUI.
+    - ⚠️ **`mob_wandering-bandit` KHÔNG đi Text→3D, và đó là một hạn chế ngoài tầm**: prompt nhân
+      vật người bị Rodin trả `IMAGE_CONTENT_VIOLATION` hai lần, rồi key dùng thử trả
+      `API_INSUFFICIENT_FUNDS`. Bản đang ship dựng bằng `kage_mesh_kit` (`build_monster_bandit.py`,
+      40 part, rig 11-bone, 7 action) — chất lượng "mesh kit" chứ không phải Text→3D, **bản tạm có
+      chủ đích**: thay bằng bản sinh chỉ tốn đúng một lệnh, vì mọi bước sau mesh đều dùng chung.
+    - ✅ **Hai lỗi thật của `export_character_lods.py`, đã vá**: (1) `--extras` liệt kê tay 40 part
+      thì **thiếu `bandit_SashTail` mà không có gì báo** ⇒ thêm `--extras all`; (2) ngân sách §4.4
+      chỉ decimate thân, mà asset kit có thân chiếm 3% số tam giác ⇒ tier `low` ra ~5 800/trần
+      5 000. Nay thân và mọi part đủ lớn cùng chịu một tỉ lệ chung, part ≤ 64 tris được miễn (cắt
+      4 tam giác của một cái hộp là biến nó thành cái nêm).
+    - ⚠️ **Suýt nới trần cho một vi phạm KHÔNG có thật**: import ngược `.glb` vào Blender rồi cộng
+      `loop_triangles` ra 5 080 cho quỷ đá tier `low` ("vượt trần 5 000"). Số đúng — thứ
+      `TriangleBudgetValidator` thật sự đếm trên file đã ship — là **đúng 5 000**. Chỉ tin
+      `./gradlew :tools:asset-pipeline:run`.
+    - ✅ **Đã NHÌN THẤY chạy thật**: `./gradlew :client:client-core:runWorldPreview` (công cụ nay
+      dựng cả 3 loài cạnh nhau theo thứ tự sát thương 8/22/40 + hộp đỏ `sample_boss` chứng minh
+      nhánh fallback còn sống). Ba loài phân biệt được ngay từ silhouette.
+    - ⚠️ Còn lại của ADR-037: **tham số AI theo loài (D7)**.
+
+46. **RÀ EXIT CRITERIA PHASE 0-3 — 12/13 ô tick, CÓ BẰNG CHỨNG TỪNG Ô (2026-08-30)**:
+    - Nợ sổ sách cũ: bốn phase đầu tuyên bố đóng bằng prose nhưng gần như không ô nào được tick.
+      Lượt rà này **không tick bừa** — mỗi ô nay dẫn tên test hoặc tên file thật, đọc ngay tại ô.
+    - ✅ **Bằng chứng đã có sẵn, chỉ chưa ai viết vào**: ping/pong, reconnect-backoff, round-trip
+      17 file `wire/*PacketsTest`, hai client thấy nhau di chuyển, persist qua shutdown, authz
+      chọn nhân vật của tài khoản khác — tất cả đều là test đang chạy trong `./gradlew build`.
+    - ✅ **Chống speed hack/teleport hoá ra là chuyện THIẾT KẾ, không phải bộ lọc**: `MoveCommand`
+      chỉ mang hướng, `JumpCommand` rỗng, không gói client→server nào mang toạ độ — teleport không
+      biểu diễn nổi trên dây. Ghi lại vào chính ô đó để lần sau không ai đi tìm "bộ lọc chống
+      teleport" không tồn tại.
+    - 🆕 **Ô Phase 1 "fixed timestep hoạt động" nay có test THẬT** (`KageEngineFixedTimestepTest`,
+      9 test) — `engine-core` trước đó là module **không có test nào**, xem mục ngay dưới.
+    - ⚠️ **Một ô CỐ Ý để trống**: "mọi module ở §1 REPOSITORY-STRUCTURE tồn tại". §1 liệt kê 5
+      module chưa tồn tại và bỏ sót 4 module đang có — lệch **tài liệu ↔ thực tế**, và sửa bên nào
+      là quyết định của chủ dự án (`docs/README.md` mục 10), không phải của AI.
+
+47. **`engine-core` có bộ test đầu tiên (2026-08-30)**:
+    - `KageEngineFixedTimestepTest` — 9 test, chạy **không cần GL context**: `Gdx.graphics` là
+      interface nên thay bằng `java.lang.reflect.Proxy`, đó chính là lý do module này bỏ trống lâu
+      như vậy (ai cũng tưởng phải kéo LWJGL vào mới test được vòng render).
+    - Số đo đáng nhớ: 20 FPS ra **59** tick/giây, 120 FPS ra **60** — lệch 1 tick vì `FIXED_DT`
+      là float 1/60 **làm tròn LÊN**. Ba test đầu viết theo kiểu "phải bằng đúng bội số" đã ĐỎ vì
+      chính lý do đó; sửa test chứ không sửa engine, và ghi luôn con số vào comment. Bài học:
+      **test bám đúng ranh giới bội số của một hằng số float là test đang đo lỗi làm tròn của
+      chính nó**.
+    - Kèm hai test gác `setScreen` (show + resize màn mới, hide + dispose màn cũ) — hai lỗi thật
+      đã trả giá: ma trận chiếu suy biến 2026-08-08, và rò rỉ Stage/SpriteBatch mỗi lần chuyển màn.
+
+48. **V24 + PLAYTEST: art quái mới ĐÃ NHÌN THẤY TRONG GAME THẬT (2026-08-30)**:
+    - 🔴 **Khoảng trống suýt lọt**: art xong, `.glb` nằm đúng chỗ, `MonsterModelKey` đúng — mà
+      trong game vẫn là ba cái cọc gỗ. Lý do: `monster_template.model_key` của V23 ghi
+      `mob_training-dummy` cho CẢ BA loài, và client chỉ tự suy khoá từ `monster_code` khi field
+      đó RỖNG. Server luôn gửi cột này ⇒ art mới không con quái nào dùng. **Migration V24** (hai
+      câu `UPDATE`, không đổi schema) trả hai loài về model của chính chúng.
+    - ✅ Test gác đúng khoảng trống đó: `shouldGiveEachSpeciesItsOwnModel` (Postgres thật,
+      Testcontainers) — mỗi loài một `model_key` riêng, hình nộm giữ nguyên làm hàng đối chứng.
+    - ✅ **Chơi thật**: server bật TLS + Flyway áp V24, client đăng nhập, đi bộ dọc trục X.
+      **Cướp lang thang hiện đúng model riêng** (áo da nâu, búi tóc, trường đao) và đánh trúng
+      **−18** — khớp `22×100/120` đúng như bảng ADR-037 D6. **Quỷ đá** cũng hiện model đá xám vai
+      rêu khi đuổi theo.
+    - ⚠️ **Phát hiện phụ về giao diện, chưa sửa**: khung chat chiếm hẳn **một phần ba trái** màn
+      hình, nên con quái đang đánh mình từ bên trái **bị che hoàn toàn** — người chơi thấy chữ
+      "−18" bay lên mà không thấy ai đánh. Không phải lỗi render (đi qua nó là thấy ngay), nhưng
+      là thứ đáng sửa khi làm lại bố cục HUD.
+    - 🔧 Công thức playtest bổ sung: `Add-Type` của PowerShell **bị chặn ghi .dll** trên máy này
+      (`BadImageFormatException` / `Access to the path ... is denied`), nên bộ điều khiển cửa sổ
+      viết lại bằng **Python `ctypes`** (`user32`/`gdi32`, PrintWindow + tự ghi PNG bằng `zlib`) —
+      không cần biên dịch gì, chạy ổn định.
+
+49. **Khung chat tự ẩn + client thật CÓ LOG (2026-08-30)**:
+    - 🔴 Bug tìm ra bằng chính buổi playtest mục 48: nhật ký chat rộng 420px neo trái-dưới **che
+      hẳn một phần ba trái vùng chơi**, và con quái đánh mình từ bên trái nằm gọn sau nó. Người
+      chơi thấy "−18" bay lên mà không thấy ai đánh.
+    - ✅ `ChatPanel` nay **tự ẩn sau 12 giây im lặng** (ô nhập đóng); dòng mới hoặc phím T là hiện
+      lại ngay. Đã chụp trước/sau: cùng một khung cảnh, sau 12 giây thấy rõ hình nộm bên trái và
+      cướp lang thang bên phải — hai con trước đó bị che. Luật chung ghi vào UI.md §10.1.
+    - ✅ **`client-desktop` nay có backend log** (`runtimeOnly logback-classic`). Trước đó SLF4J rơi
+      về NOP: **mọi dòng log của client biến mất**, kể cả câu "Chưa có model '<khoá>' — vẽ bằng
+      hộp" — đúng câu cần đọc nhất khi chẩn đoán một con quái ra hình hộp đỏ. Cả buổi playtest
+      trước phải đoán mò vì client im lặng tuyệt đối.
