@@ -51,6 +51,19 @@ public final class ChatPanel implements HudWindow {
 
     private static final float PANEL_WIDTH_PX = 420f;
 
+    /**
+     * Bao lâu không có dòng mới thì nhật ký tự ẩn (ô nhập đang đóng).
+     *
+     * <p>Không phải chuyện thẩm mỹ, và cũng không phải "cho giống game khác": khung này rộng 420px
+     * neo TRÁI-dưới, tức nó che hẳn <b>một phần ba trái</b> vùng chơi ở cửa sổ 1280px — và con quái
+     * đang đánh mình thường đứng đúng sau nó. Buổi playtest 2026-08-30 thấy chữ "−18" bay lên mà
+     * không thấy ai đánh, và suýt kết luận nhầm là art quái không hiện (ROADMAP mục 48).
+     *
+     * <p>12 giây: đủ dài để đọc hết một dòng vừa tới, đủ ngắn để không che lúc đánh nhau. Dòng mới
+     * hoặc mở ô nhập (phím T) là hiện lại ngay.
+     */
+    private static final float IDLE_HIDE_SECONDS = 12f;
+
     private static final float PANEL_PAD_PX = 10f;
 
     private static final float LEFT_MARGIN_PX = 14f;
@@ -93,6 +106,9 @@ public final class ChatPanel implements HudWindow {
     private final TextField input;
 
     private Consumer<String> onSend;
+
+    /** Giây kể từ dòng chat gần nhất. Bắt đầu ở "đã lâu lắm rồi" nên khung rỗng không tự hiện. */
+    private float sinceLastLine = Float.MAX_VALUE;
 
     private Runnable onChannelToggle;
 
@@ -265,6 +281,9 @@ public final class ChatPanel implements HudWindow {
     }
 
     public void closeComposer() {
+        // Đếm lại từ 0: vừa đóng ô nhập mà nhật ký biến mất ngay thì người chơi mất luôn câu mình
+        // vừa gửi khỏi tầm mắt (xem IDLE_HIDE_SECONDS).
+        sinceLastLine = 0f;
         composer.setVisible(false);
         input.setText("");
         // Bỏ focus THẬT: ô nhập còn giữ keyboard focus là còn nuốt phím dù đã ẩn đi.
@@ -307,6 +326,8 @@ public final class ChatPanel implements HudWindow {
             label.setText(renderedLines.get(skipped + source));
             label.setColor(colorOf(channelNames.get(skipped + source)));
         }
+        // Dòng mới ⇒ hiện lại và đếm giờ từ đầu (xem IDLE_HIDE_SECONDS).
+        sinceLastLine = 0f;
         panel.setVisible(!renderedLines.isEmpty() || isComposing());
     }
 
@@ -339,6 +360,14 @@ public final class ChatPanel implements HudWindow {
 
     @Override
     public void render(float deltaTime) {
+        // Cộng dồn ở render chứ không ở fixedUpdate: đây là thời gian NGƯỜI XEM cảm nhận, không
+        // phải thời gian mô phỏng — và lớp này không có đường nào vào vòng tick logic.
+        if (sinceLastLine < Float.MAX_VALUE) {
+            sinceLastLine += deltaTime;
+        }
+        if (!isComposing() && sinceLastLine > IDLE_HIDE_SECONDS) {
+            panel.setVisible(false);
+        }
         stage.act(deltaTime);
         stage.draw();
     }

@@ -200,6 +200,21 @@ if (current != lastHp) {
 | Đọc ECS trực tiếp từ widget | §4 |
 | Hardcode chuỗi hiển thị | §7 |
 | Hardcode toạ độ tuyệt đối | §6 |
+| **Khung HUD che vùng chơi vô thời hạn** | Xem ngay dưới |
+
+### 10.1. Khung HUD không được đứng che vùng chơi mãi (2026-08-30)
+
+Nhật ký chat rộng 420px neo trái-dưới, tức nó che hẳn **một phần ba trái** vùng chơi ở cửa sổ
+1280px — và con quái đang đánh mình thường đứng đúng sau nó. Buổi playtest 2026-08-30 (ROADMAP mục
+48) thấy chữ "−18" bay lên mà không thấy ai đánh, và suýt kết luận nhầm rằng art quái mới không
+hiện.
+
+Luật rút ra, áp cho MỌI khung HUD đứng đè lên vùng chơi: **có thông tin mới thì hiện, im lặng quá
+lâu thì tự ẩn**. `ChatPanel.IDLE_HIDE_SECONDS` (12 giây) là bản đầu tiên thi hành luật này; dòng mới
+hoặc phím mở ô nhập là hiện lại ngay.
+
+⚠️ Đây là thứ **build gate không bắt được**: không test nào đỏ, chỉ có mắt người nhìn ảnh chụp mới
+thấy. Cùng loại với bẫy "vạch máu 139/100" và "khung túi đồ tràn màn hình" đã trả giá trước đó.
 
 ---
 

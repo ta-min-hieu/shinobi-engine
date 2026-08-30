@@ -12,6 +12,12 @@ dependencies {
     // Native FreeType — client-core khai báo gdx-freetype (API thuần Java), launcher thật quyết
     // định native platform nào cần (cùng lý do gdx-platform natives-desktop ở trên).
     implementation(variantOf(libs.gdx.freetype.platform) { classifier("natives-desktop") })
+    // Backend log CHO BẢN CHẠY THẬT. Không có nó, SLF4J rơi về NOP và MỌI dòng log của client biến
+    // mất — kể cả "Chưa có model '<khoá>' — thực thể này vẽ bằng hộp" của WorldModelRenderer, đúng
+    // câu cần đọc nhất khi một con quái ra hình hộp đỏ. Phát hiện thật trong buổi playtest
+    // 2026-08-30: chẩn đoán phải đoán mò vì client im lặng tuyệt đối ("No SLF4J providers were
+    // found"). runtimeOnly: không dòng code nào import logback, chỉ cần nó có mặt lúc chạy.
+    runtimeOnly(libs.logback.classic)
 }
 application {
     mainClass.set("dev.kage.client.desktop.DesktopLauncher")
