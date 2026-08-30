@@ -693,6 +693,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             ChannelHandlerContext ctx, int sequenceId, long characterId, SelectFactionRequest request) {
         try {
             characterFacade.selectFaction(characterId, toDomainFaction(request.getFaction()));
+            // Ngoại hình cache ở registry được ghi MỘT LẦN lúc vào world — không cập nhật ở đây thì
+            // mọi CharacterSpawnedEvent phát về sau vẫn mang hệ phái CŨ, xem
+            // ConnectedCharacterRegistry#updateAppearance.
+            worldGateway.registry().updateAppearance(characterId, CharacterAppearance.of(request.getFaction()));
             SelectFactionResponse response =
                     SelectFactionResponse.newBuilder().setSuccess(true).build();
             send(ctx, Opcode.OPCODE_SELECT_FACTION_RESPONSE_VALUE, sequenceId, response.toByteArray());

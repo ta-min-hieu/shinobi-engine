@@ -166,4 +166,19 @@ class PostgresInventoryAdapterIntegrationTest {
 
         assertThat(adapter.findEntries("does_not_exist")).isEmpty();
     }
+
+    /**
+     * Mã lạ vẫn phải trả rỗng ổn định qua NHIỀU lần gọi. Có test riêng vì lần gọi đầu đi thêm một
+     * truy vấn phụ để phân biệt "mã không tồn tại" với "bảng rỗng" (xem
+     * {@code PostgresDropTableAdapter#warnOnceIfCodeMissing}); lần thứ hai phải bỏ qua truy vấn đó
+     * mà kết quả không đổi.
+     */
+    @Test
+    void shouldStayEmptyAndNotThrow_whenUnknownCodeQueriedRepeatedly() {
+        PostgresDropTableAdapter adapter = new PostgresDropTableAdapter(dataSource);
+
+        assertThat(adapter.findEntries("typo_monster_code")).isEmpty();
+        assertThat(adapter.findEntries("typo_monster_code")).isEmpty();
+        assertThat(adapter.findEntries("typo_monster_code")).isEmpty();
+    }
 }

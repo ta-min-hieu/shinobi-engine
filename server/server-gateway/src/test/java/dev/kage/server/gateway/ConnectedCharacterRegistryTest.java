@@ -234,6 +234,59 @@ class ConnectedCharacterRegistryTest {
         assertThat(outboundOpcodes(channel)).doesNotContain(Opcode.OPCODE_GOLD_CHANGED_EVENT_VALUE);
     }
 
+    /**
+     * Đổi hệ phái giữa phiên chơi (opcode 206) phải đổi luôn ngoại hình mà registry đang giữ.
+     *
+     * <p>Trước bản vá 2026-08-29, {@code appearanceByCharacterId} chỉ được ghi một lần lúc
+     * {@code register()}, nên MỌI {@code CharacterSpawnedEvent} phát sau khi đổi hệ phái vẫn mang hệ
+     * CŨ — kể cả cho người chơi vừa đi tới lần đầu — cho tới khi nhân vật đó đăng nhập lại.
+     */
+    @Test
+    void shouldSpawnWithTheNewFaction_afterAppearanceUpdated() throws InvalidProtocolBufferException {
+        registry = new ConnectedCharacterRegistry(
+                fakeInventoryFacade(0),
+                fakeQuestFacade(),
+                ExperienceGrantPort.disabled(),
+                new GatewayNetworkMetrics(new SimpleMeterRegistry()));
+        EmbeddedChannel observer = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(1L, observer.pipeline().firstContext());
+        EmbeddedChannel changed = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(
+                2L, changed.pipeline().firstContext(), CharacterAppearance.of(dev.kage.protocol.Faction.FACTION_HOA));
+
+        registry.updateAppearance(2L, CharacterAppearance.of(dev.kage.protocol.Faction.FACTION_THUY));
+        registry.onCharacterSpawned(1L, 2L, 3f, 4f);
+
+        PacketCodec.Frame frame = awaitOutboundFrame(observer, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE);
+        dev.kage.protocol.CharacterSpawnedEvent event =
+                dev.kage.protocol.CharacterSpawnedEvent.parseFrom(frame.payload());
+        assertThat(event.getFaction()).isEqualTo(dev.kage.protocol.Faction.FACTION_THUY);
+    }
+
+    /**
+     * Nhân vật đã ngắt kết nối thì cập nhật ngoại hình phải KHÔNG tạo lại bản ghi — nếu không,
+     * {@code appearanceByCharacterId} rò rỉ một dòng cho mỗi lần đổi hệ phái của người đã thoát, và
+     * lần đăng nhập sau {@code register()} mới là nguồn chân lý.
+     */
+    @Test
+    void shouldNotResurrectAppearance_whenCharacterAlreadyDisconnected() throws InvalidProtocolBufferException {
+        registry = new ConnectedCharacterRegistry(
+                fakeInventoryFacade(0),
+                fakeQuestFacade(),
+                ExperienceGrantPort.disabled(),
+                new GatewayNetworkMetrics(new SimpleMeterRegistry()));
+        EmbeddedChannel observer = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(1L, observer.pipeline().firstContext());
+
+        registry.updateAppearance(2L, CharacterAppearance.of(dev.kage.protocol.Faction.FACTION_THUY));
+        registry.onCharacterSpawned(1L, 2L, 3f, 4f);
+
+        PacketCodec.Frame frame = awaitOutboundFrame(observer, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE);
+        dev.kage.protocol.CharacterSpawnedEvent event =
+                dev.kage.protocol.CharacterSpawnedEvent.parseFrom(frame.payload());
+        assertThat(event.getFaction()).isEqualTo(dev.kage.protocol.Faction.FACTION_UNSPECIFIED);
+    }
+
     /** Opcode của mọi frame đã ghi ra kênh — để assert theo LOẠI gói thay vì "có/không có gì". */
     private static List<Integer> outboundOpcodes(EmbeddedChannel channel) {
         List<Integer> opcodes = new ArrayList<>();

@@ -99,6 +99,25 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         appearanceByCharacterId.put(characterId, appearance);
     }
 
+    /**
+     * Ngoại hình vừa đổi giữa phiên chơi (đổi hệ phái — {@code SelectFactionRequest}, opcode 206).
+     *
+     * <p><b>Vì sao bắt buộc phải có.</b> {@link #appearanceByCharacterId} chỉ được ghi MỘT LẦN lúc
+     * {@link #register}, nghĩa là lúc nhân vật vào world. Đổi hệ phái xong mà không cập nhật ở đây
+     * thì mọi {@code CharacterSpawnedEvent} phát về sau — kể cả cho người chơi VỪA đi tới lần đầu
+     * — vẫn mang hệ phái CŨ, cho tới khi chính nhân vật đó thoát ra và đăng nhập lại.
+     *
+     * <p>Không đụng tới người đang NHÌN THẤY nhân vật này ngay lúc gạch: họ đã nhận
+     * {@code CharacterSpawnedEvent} rồi và giao thức chưa có event "ngoại hình vừa đổi". Họ sẽ thấy
+     * model mới khi nhân vật rời rồi vào lại tầm nhìn của họ — xem sổ nợ ở bản bàn giao.
+     *
+     * <p>Bỏ qua nếu nhân vật không còn kết nối: không có gì để giữ, và lần đăng nhập sau
+     * {@link #register} tự đọc lại hệ phái thật từ DB.
+     */
+    void updateAppearance(long characterId, CharacterAppearance appearance) {
+        appearanceByCharacterId.computeIfPresent(characterId, (id, previous) -> appearance);
+    }
+
     void unregister(long characterId) {
         contextsByCharacterId.remove(characterId);
         lastKnownPosition.remove(characterId);
