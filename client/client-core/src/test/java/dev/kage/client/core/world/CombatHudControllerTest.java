@@ -326,4 +326,28 @@ class CombatHudControllerTest {
 
         assertThat(controller.playerMaxHp()).isEqualTo(CombatConstants.CHARACTER_MAX_HP);
     }
+
+    @Test
+    void shouldTakeMaxHpFromEnterWorld_beforeAnyEventArrives() {
+        // ADR-036 hậu kiểm (playtest 2026-08-30): trước khi SelectCharacterResponse mang max_hp,
+        // mẫu số vạch máu kẹt ở CHARACTER_MAX_HP trong khi tử số là số THẬT của server — người chơi
+        // mặc đồ +HP nhìn thấy "139 / 100", thanh máu tràn, cho tới lần hồi sinh đầu tiên.
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+
+        controller.onEnterWorld(245, 245);
+
+        assertThat(controller.playerMaxHp()).isEqualTo(245);
+        assertThat(controller.playerHp()).isEqualTo(245);
+    }
+
+    @Test
+    void shouldIgnoreEnterWorldVitals_whenServerSendsZeroMaxHp() {
+        // Server CŨ chưa có field (mặc định proto3) — giữ phỏng đoán đang có thay vì chia cho 0.
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+
+        controller.onEnterWorld(0, 0);
+
+        assertThat(controller.playerMaxHp()).isEqualTo(CombatConstants.CHARACTER_MAX_HP);
+        assertThat(controller.playerHp()).isEqualTo(CombatConstants.CHARACTER_MAX_HP);
+    }
 }

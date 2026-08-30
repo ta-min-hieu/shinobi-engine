@@ -287,7 +287,7 @@ public final class CharacterSelectScreen implements GameScreen {
                 failWithGenericError();
                 return;
             }
-            engine.setScreen(new WorldScreen(context, connection, pendingSelection));
+            engine.setScreen(new WorldScreen(context, connection, pendingSelection, response));
         } catch (InvalidProtocolBufferException e) {
             LOG.warn("SelectCharacterResponse không hợp lệ", e);
             failWithGenericError();

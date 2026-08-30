@@ -237,11 +237,14 @@ Không. ADR này tự đứng được; không sinh ra quyết định kiến tr
 
 ### ⏳ Cố ý để lại (không chặn)
 
-- **Máu tối đa lúc ĐĂNG NHẬP**: chưa gói nào mang HP/HP-tối-đa của CHÍNH mình lúc vào world
-  (grep `current_hp` trong `.proto` — chỉ có ở quái và ở sự kiện hồi sinh). Giữa lúc vào game và
-  lần hồi sinh đầu tiên, mẫu số vạch máu có thể lệch nếu đang mặc đồ `+HP`. Sửa đúng cần thêm
-  field vào gói trạng thái ban đầu — ngoài phạm vi ADR này ("không thêm opcode, không đổi message
-  đang chạy").
+- ~~**Máu tối đa lúc ĐĂNG NHẬP**~~ ✅ **đã sửa cùng ngày sau khi PLAYTEST bắt được.** Nợ này hoá ra
+  nặng hơn mô tả ban đầu: không phải "mẫu số có thể lệch" mà là **tử số LỚN HƠN mẫu số** —
+  vạch máu hiện `139 / 100` và tràn khung, vì tử số là số thật của server còn mẫu số kẹt ở
+  `CHARACTER_MAX_HP`. Chủ dự án duyệt thêm field: `SelectCharacterResponse` nay mang
+  `current_hp = 3` / `max_hp = 4` (additive, field `1..2` nguyên vẹn, `protocolVersion` KHÔNG
+  tăng, không thêm opcode). Công thức máu tối đa chỉ có MỘT bản —
+  `WorldFacade.characterMaxHp(EquipmentBonusSnapshot)` — gateway hỏi hàm đó chứ không tự cộng
+  `100 + bonus_hp`. Chi tiết đo đạc ở ROADMAP mục 42.
 - **Client KHÔNG hiện chỉ số hiệu dụng sau cường hoá**, chỉ hiện chỉ số GỐC kèm nhãn "gốc":
   `ENHANCE_STEP` sống ở server và không gói nào gửi nó sang client, nên client tự nhân là bịa
   (Điều 24 — cùng lý do bảng chi phí cường hoá vắng mặt ở client).

@@ -74,6 +74,18 @@ message SelectCharacterRequest {
 message SelectCharacterResponse {
   bool success = 1;
   string error_key = 2; // rỗng nếu success=true (NETWORK.md §107)
+  // Máu của CHÍNH mình ngay khi vào world — field THÊM (3..4), field 1..2 giữ nguyên,
+  // protocolVersion KHÔNG tăng (luật additive NETWORK.md §6). Không có character_id: luôn là chính
+  // mình, cùng quy ước ExperienceChangedEvent/GoldChangedEvent.
+  //
+  // Vì sao cần: từ ADR-036, `bonus_hp` của trang bị nâng MÁU TỐI ĐA thật, nên 100 không còn là
+  // hằng số client tự biết. Trước field này, mẫu số vạch máu kẹt ở 100 trong khi tử số là số thật
+  // của server ⇒ playtest 2026-08-30 thấy "139 / 100", thanh máu tràn, và chỉ tự đúng sau lần hồi
+  // sinh ĐẦU TIÊN (CharacterRespawnedEvent vốn đã mang max_hp).
+  //
+  // Chỉ gửi khi success=true; success=false thì cả hai bằng 0 và client phải bỏ qua.
+  int32 current_hp = 3;
+  int32 max_hp = 4;
 }
 
 // Command: Client -> Server (OPCODE_SELECT_FACTION_REQUEST). Chọn/đổi hệ phái khi nhân vật đủ

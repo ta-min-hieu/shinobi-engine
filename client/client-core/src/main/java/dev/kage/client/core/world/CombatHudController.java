@@ -47,11 +47,9 @@ final class CombatHudController {
      * chỉ là phỏng đoán ban đầu để vạch máu có mẫu số ngay lúc vào world; nó được THAY bằng số
      * THẬT của server ngay khi {@code CharacterRespawnedEvent} đầu tiên tới.
      *
-     * <p>⚠️ Nợ đã biết, không phải quên: chưa gói nào mang HP/HP tối đa của CHÍNH mình lúc ĐĂNG
-     * NHẬP (grep {@code current_hp} trong proto — chỉ có ở quái và ở sự kiện hồi sinh). Nên giữa
-     * lúc vào game và lần hồi sinh đầu tiên, mẫu số có thể lệch nếu người chơi đang mặc đồ +HP.
-     * Sửa đúng cần một field mới trong gói trạng thái ban đầu — ngoài phạm vi ADR-036 (ADR đó chốt
-     * "không thêm opcode, không đổi message đang chạy").
+     * <p>Giá trị thật đến từ HAI chỗ, cả hai đều của server: {@link #onEnterWorld} lúc vào world
+     * ({@code SelectCharacterResponse.max_hp}) và {@link #onRespawn} mỗi lần hồi sinh
+     * ({@code CharacterRespawnedEvent.max_hp}).
      */
     private int playerMaxHp = CombatConstants.CHARACTER_MAX_HP;
 
@@ -193,6 +191,23 @@ final class CombatHudController {
      * {@code TargetComponent} của kẻ vừa hồi sinh (WorldFacade#respawnCharacter), nên client giữ
      * mục tiêu cũ chỉ gây lệch hiển thị vô ích.
      */
+    /**
+     * Máu của chính mình NGAY khi vào world ({@code SelectCharacterResponse}, ADR-036 hậu kiểm) —
+     * gọi một lần trước sự kiện đầu tiên. Trước khi có gói này, mẫu số vạch máu kẹt ở
+     * {@code CHARACTER_MAX_HP} trong khi tử số là số thật của server, nên người chơi mặc đồ +HP
+     * nhìn thấy "139 / 100" cho tới lần hồi sinh đầu tiên (playtest 2026-08-30).
+     *
+     * <p>{@code maxHp <= 0} nghĩa là server CŨ chưa gửi field — giữ nguyên phỏng đoán đang có thay
+     * vì chia cho 0.
+     */
+    void onEnterWorld(int currentHp, int maxHp) {
+        if (maxHp <= 0) {
+            return;
+        }
+        playerMaxHp = maxHp;
+        playerHp = Math.clamp(currentHp, 0, maxHp);
+    }
+
     void onRespawn(int currentHp, int maxHp, int currentChi) {
         playerHp = currentHp;
         // ADR-036: máu tối đa phụ thuộc trang bị, nên LẤY của server thay vì đọc hằng số client.

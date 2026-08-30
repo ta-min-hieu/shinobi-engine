@@ -632,9 +632,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // GAMEPLAY.md §2 "tính lại chỉ số dẫn xuất khi đổi trang bị" — áp dụng NGAY lúc attach,
             // không chỉ lúc equip/unequip sau đó, nếu không nhân vật mặc đồ từ phiên trước sẽ mất
             // bonus khi đăng nhập lại (server-world không tự biết feature-inventory).
-            channelFacade.applyEquipmentBonus(characterId, currentEquipmentBonus(characterId));
-            SelectCharacterResponse response =
-                    SelectCharacterResponse.newBuilder().setSuccess(true).build();
+            EquipmentBonusSnapshot bonus = currentEquipmentBonus(characterId);
+            channelFacade.applyEquipmentBonus(characterId, bonus);
+            SelectCharacterResponse response = enterWorldResponse(bonus);
             send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
             sendInitialSelfState(characterId);
             // Đang trên authExecutor (Virtual Thread) rồi — friendFacade.listFriends chạm DB, an
@@ -648,6 +648,28 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             LOG.error("Chọn nhân vật thất bại: lỗi không mong đợi", e);
             sendError(ctx, sequenceId, 500, "error.select_character_failed");
         }
+    }
+
+    /**
+     * Gói "vào world thành công" kèm MÁU của người chơi (ADR-036 hậu kiểm, playtest 2026-08-30).
+     *
+     * <p>Client PHẢI biết máu tối đa ngay tại đây: từ ADR-036 nó phụ thuộc trang bị, nên nếu thiếu
+     * thì vạch máu hiện {@code "139 / 100"} — tử số là số thật của server, mẫu số là hằng số client
+     * tự đoán — cho tới lần hồi sinh đầu tiên. Entity ECS lúc này mới chỉ được XẾP HÀNG (tạo ở tick
+     * kế tiếp) nên không hỏi world được; hỏi CÔNG THỨC thay vì hỏi entity, và công thức chỉ có đúng
+     * một bản ({@link WorldFacade#characterMaxHp}).
+     *
+     * <p>{@code currentHp = maxHp} vì {@code handleAttach} LUÔN cho nhân vật vào world với máu đầy:
+     * máu hiện tại chưa được lưu qua phiên ({@code character_stat.current_hp} có cột nhưng world
+     * không đọc). Khi nào HP được lưu thật thì đổi ĐÚNG chỗ này.
+     */
+    private static SelectCharacterResponse enterWorldResponse(EquipmentBonusSnapshot bonus) {
+        int maxHp = WorldFacade.characterMaxHp(bonus);
+        return SelectCharacterResponse.newBuilder()
+                .setSuccess(true)
+                .setCurrentHp(maxHp)
+                .setMaxHp(maxHp)
+                .build();
     }
 
     /**

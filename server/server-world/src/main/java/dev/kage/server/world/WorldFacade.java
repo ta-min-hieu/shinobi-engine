@@ -337,6 +337,23 @@ public final class WorldFacade {
         inbox.add(new WorldCommand.ApplyEquipmentBonusCommand(characterId, bonus));
     }
 
+    /**
+     * Máu TỐI ĐA của một nhân vật với chỉ số trang bị đã cho — nguồn chân lý DUY NHẤT của con số
+     * này (ADR-036: {@code CHARACTER_MAX_HP} + {@code bonus_hp}, đã tính cường hoá).
+     *
+     * <p>Công khai vì {@code server-gateway} phải gửi con số đó cho client NGAY trong
+     * {@code SelectCharacterResponse}: entity ECS mới chỉ được xếp hàng lúc đó, chưa tồn tại để hỏi.
+     * Để gateway tự cộng {@code 100 + bonusHp} là tạo ra bản sao thứ hai của công thức, và bản sao
+     * đó sẽ lệch trong im lặng ngay lần đầu GDD chốt công thức HP thật.
+     */
+    public static int characterMaxHp(EquipmentBonusSnapshot bonus) {
+        return characterMaxHp(bonus.hp());
+    }
+
+    private static int characterMaxHp(int bonusHp) {
+        return Math.max(1, CombatConstants.CHARACTER_MAX_HP + bonusHp);
+    }
+
     /** GAMEPLAY.md §10 — chat kênh Khu vực, cần {@code aoiTracker} nên phải qua tick thread. */
     public void enqueueAreaChatMessage(long characterId, String senderName, String body) {
         inbox.add(new WorldCommand.AreaChatMessageCommand(characterId, senderName, body));
@@ -645,7 +662,7 @@ public final class WorldFacade {
      */
     private void applyMaxHpBonus(KEntity entity, int bonusHp) {
         HealthComponent health = HEALTH.get(entity);
-        int newMax = Math.max(1, CombatConstants.CHARACTER_MAX_HP + bonusHp);
+        int newMax = characterMaxHp(bonusHp);
         int delta = newMax - health.max;
         health.max = newMax;
         if (delta != 0 && health.current > 0) {

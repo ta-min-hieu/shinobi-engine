@@ -53,6 +53,7 @@ import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.NpcDespawnedEvent;
 import dev.kage.protocol.NpcSpawnedEvent;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.SelectCharacterResponse;
 import dev.kage.protocol.SkillResultEvent;
 import dev.kage.protocol.wire.PacketCodec;
 
@@ -229,14 +230,25 @@ public final class WorldScreen implements GameScreen {
      *     đây là nguồn duy nhất để biết phải vẽ mình bằng model nào; mang theo {@code id} để nhận ra
      *     {@link AttackResultEvent}/{@link SkillResultEvent} nào đang nhắm vào MÌNH thay vì quái
      *     ({@link WorldConstants#LOCAL_CHARACTER_ID} chỉ là sentinel nội bộ cho render, không phải id thật).
+     * @param enterWorld chính gói {@code SelectCharacterResponse} vừa nhận — mang máu/máu tối đa
+     *     của người chơi lúc vào world (ADR-036 hậu kiểm). Truyền cả gói thay vì hai số rời vì
+     *     constructor đã chạm ngưỡng Checkstyle {@code ParameterNumber} (max=4), và vì đây cùng
+     *     khuôn với {@code character}: một message protocol đi thẳng vào màn hình.
      */
-    public WorldScreen(PlayContext context, GameConnection connection, CharacterSummary character) {
+    public WorldScreen(
+            PlayContext context,
+            GameConnection connection,
+            CharacterSummary character,
+            SelectCharacterResponse enterWorld) {
         this.world = context.world();
         this.inputMapper = context.inputMapper();
         this.sender = new WorldCommandSender(connection);
         this.localCharacterId = character.getId();
         this.characterLevel = character.getLevel();
         this.combatHudController = new CombatHudController(character.getId(), character.getFaction());
+        // Máu tối đa phụ thuộc trang bị từ ADR-036 nên KHÔNG còn là hằng số client tự biết — lấy
+        // ngay của server, đừng đợi sự kiện đầu tiên (xem CombatHudController#onEnterWorld).
+        this.combatHudController.onEnterWorld(enterWorld.getCurrentHp(), enterWorld.getMaxHp());
         this.combatAnimationTrigger =
                 new CombatAnimationTrigger(models, localCharacterId, WorldConstants.LOCAL_CHARACTER_ID);
         this.remoteCharacters = new RemoteCharacterPresenter(context.world(), models);

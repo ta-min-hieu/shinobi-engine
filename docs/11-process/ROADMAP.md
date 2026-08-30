@@ -1451,3 +1451,49 @@ Bốn ADR mới so với lần đếm trước (2026-08-07):
       `ENHANCE_STEP` sống ở server, client tự nhân là bịa (Điều 24).
     - ⚠️ **`ENHANCE_STEP = 0,10` và toàn bộ số liệu V22 CHƯA qua playtest** — đúng thân phận mà
       bảng tỉ lệ §7.1 từng có.
+
+42. **PLAYTEST cân bằng ADR-036 — chơi thật, đo bằng số trên HUD (2026-08-30)**:
+    - ✅ **Cả năm cơ chế của ADR-036 đã được nhìn thấy chạy thật** trên server thật (TLS, Postgres
+      thật, migration V22 do Flyway áp lúc khởi động) chứ không chỉ trong test:
+      | Đo | Kết quả | Đối chiếu công thức |
+      |---|---|---|
+      | Sát thương tay không lên hình nộm | **29** (50→21) | `ATK 30 × 100/(100+5) = 28,6` ✓ |
+      | Sát thương hình nộm gây ra, không giáp | **−7** | `8 × 100/(100+20) = 6,7` ✓ |
+      | Máu tối đa, bộ Hạ Nhẫn **+0** | **158** | `100 + 58` ✓ |
+      | Sát thương nhận, bộ Hạ Nhẫn **+0** | **−6** | DEF 43 ⇒ `8 × 100/143 = 5,6` ✓ |
+      | Máu tối đa, bộ Hạ Nhẫn **+15** | **245** | `100 + 145` (58 × 2,5, làm tròn TỪNG món) ✓ |
+      | Sát thương nhận, bộ Hạ Nhẫn **+15** | **−4** | DEF 78 ⇒ `8 × 100/178 = 4,5` ✓ |
+      Cặp **158 → 245** là bằng chứng dứt điểm rằng cường hoá **đã có tác dụng thật**: cùng một bộ
+      giáp, chỉ khác `enhance_level`, máu tối đa đổi đúng hệ số `×(1 + 0,10 × cấp)`.
+    - ✅ **`required_level` chặn thật, có câu tiếng Việt đúng**: nhân vật **Cấp 1** bấm Mặc
+      `Katana Thép +7` (yêu cầu Cấp 5) nhận "Chưa đủ cấp để mặc vật phẩm này.", ô Vũ khí vẫn
+      (Trống). Nâng lên Cấp 5 thì mặc được ngay, không cần đăng nhập lại (gateway đọc cấp từ DB
+      mỗi lần).
+    - ✅ **Ô túi đồ hiện đúng dòng mới**: "Katana Thép +7 / Chỉ số gốc: Công +18 / Cần Cấp 5".
+    - 🔴 **LỖI THẬT DO CHÍNH ĐỢT NÀY SINH RA — vạch máu hiện `139 / 100`.** Trước ADR-036 máu tối đa
+      luôn là hằng số 100 nên mẫu số không bao giờ sai; nay `bonus_hp` nâng máu tối đa thật mà
+      **không gói nào mang máu tối đa của CHÍNH mình lúc ĐĂNG NHẬP** (`grep current_hp` trong
+      `.proto` chỉ ra quái và `CharacterRespawnedEvent`). Hệ quả nhìn thấy được: tử số là số THẬT
+      của server (139/209/128) còn mẫu số kẹt ở 100 ⇒ **tử số lớn hơn mẫu số**, thanh máu tràn.
+      Tự sửa đúng sau lần hồi sinh ĐẦU TIÊN (`158 / 158`, `89 / 245`) — tức bản vá client đọc
+      `max_hp` từ sự kiện hồi sinh chạy đúng, chỉ thiếu đúng đường lúc đăng nhập.
+      ✅ **Chủ dự án duyệt và đã sửa cùng ngày**: `SelectCharacterResponse` nay mang
+      `current_hp`/`max_hp` (field 3..4, additive, `protocolVersion` KHÔNG tăng, không thêm
+      opcode). Công thức máu tối đa gom về MỘT chỗ — `WorldFacade.characterMaxHp` — thay vì để
+      gateway tự cộng `100 + bonus_hp` và tạo bản sao thứ hai sẽ lệch trong im lặng khi GDD chốt
+      công thức HP thật.
+    - ⚠️ **Phát hiện cân bằng: `bonus_def` gần như vô nghĩa với nội dung hiện có, `bonus_hp` áp
+      đảo.** Quái duy nhất trong game có `atk = 8`, mà giảm damage là nhân
+      (`100/(100+DEF)`) nên trọn bộ Hạ Nhẫn (10.900 vàng) chỉ đổi 7 → 6 sát thương mỗi đòn (−14%),
+      trong khi cùng bộ đó cộng **+58 máu** (+58%). Cường hoá lên +15 cũng chỉ đưa 7 → 4 nhưng đưa
+      máu lên 245. Nghĩa là **mọi con số DEF/RES đặt trong V22 hiện không kiểm chứng được bằng
+      gameplay** — cần quái mạnh hơn trước khi cân DEF, không phải chỉnh DEF trước.
+    - ⚠️ **Nội dung mỏng làm tiến trình trang bị chỉ có 2 nấc**: hình nộm 50 máu chết trong **2 đòn**
+      tay không và **1 đòn** với Katana +7. Không đủ chỗ để thấy khác biệt giữa các bậc đồ.
+    - ⚠️ **Chưa chẩn đoán**: có lúc quái đánh trúng người chơi từ vị trí **client không vẽ gì** và
+      không bấm chọn được (thử 6 điểm quanh nhân vật đều "Ngoài tầm đánh"). Có thể chỉ là sprite bị
+      nhân vật che, chưa đủ bằng chứng để kết luận là lỗi — ghi lại để lần sau soi.
+    - 🔧 **Mẹo công cụ đắt nhất buổi**: `keybd_event` GIỮ phím chỉ ăn nếu cửa sổ được kích hoạt bằng
+      một cú **bấm chuột thật** trước đó; chỉ gọi `SetForegroundWindow` thì phím vào nhỏ giọt
+      (giữ 3 giây chỉ đi được 0,9m trong khi `MOVE_SPEED_MPS = 5`). Bấm chuột vào vùng trống rồi
+      mới giữ phím là chạy đúng tốc độ.
