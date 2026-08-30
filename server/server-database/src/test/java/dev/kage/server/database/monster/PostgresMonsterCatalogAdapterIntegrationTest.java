@@ -74,11 +74,24 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
 
     @Test
     void shouldPointEverySpeciesAtAModelKey() {
-        // Ba loài dùng CHUNG một model là nợ art đã ghi trong V23 — test này gác cái khác: không
-        // loài nào được thiếu model_key, vì rỗng nghĩa là client rơi về suy từ code và ra hộp.
+        // Không loài nào được thiếu model_key: rỗng nghĩa là client rơi về suy từ code và ra hộp.
         assertThat(new PostgresMonsterCatalogAdapter(dataSource).listTemplates())
                 .isNotEmpty()
                 .allSatisfy(template -> assertThat(template.modelKey()).isNotBlank());
+    }
+
+    @Test
+    void shouldGiveEachSpeciesItsOwnModel() {
+        // V23 cho cả ba loài dùng CHUNG `mob_training-dummy` (nợ art, ghi rõ trong migration đó);
+        // V24 trả hai loài mới về model của chính chúng khi art đã vẽ xong (2026-08-30).
+        //
+        // Ô test này gác đúng khoảng trống đã suýt lọt: art nằm trên đĩa, `MonsterModelKey` phía
+        // client đúng, mọi test khác xanh — mà trong game vẫn là ba cái cọc gỗ giống hệt nhau, vì
+        // server luôn GỬI cột này và client chỉ tự suy khi nó rỗng.
+        assertThat(findByCode("wandering_bandit").modelKey()).isEqualTo("mob_wandering-bandit");
+        assertThat(findByCode("stone_ogre").modelKey()).isEqualTo("mob_stone-ogre");
+        // Hình nộm là hàng đối chứng của V23 — không đợt nào được lặng lẽ đổi nó.
+        assertThat(findByCode("training_dummy").modelKey()).isEqualTo("mob_training-dummy");
     }
 
     @Test
