@@ -39,6 +39,54 @@ TIERS = {
 }
 
 
+# Smallest share of a tier budget the body may be squeezed to before the extras
+# are decimated as well. A generated character is one big body plus three small
+# weapon parts, and shrinking the body alone is right there. A mesh-kit
+# character is the opposite shape — `wandering_bandit` is 40 parts and its torso
+# is 3% of them — so body-only decimation cannot reach the low tier at all: with
+# only the torso shrinking, the low .glb shipped ~5800 triangles against a 5000
+# ceiling, which `TriangleBudgetValidator` fails on, correctly.
+BODY_SHARE_FLOOR = 0.25
+
+# Parts at or below this are left whole. A scarf tail is one box: twelve
+# triangles. Decimating it "proportionally" to eight turns the box into a wedge,
+# which is a visible shape change bought for four triangles out of five
+# thousand. Measured on the first `wandering_bandit` low tier, which did exactly
+# that to the sash tail, the scarf tail and the blade guard.
+MIN_PART_TRIANGLES = 64
+
+
+def _triangles(obj):
+    obj.data.calc_loop_triangles()
+    return len(obj.data.loop_triangles)
+
+
+def _shrink_together(body, extras, tier, budget, extra_triangles):
+    """Decimate body and every big-enough part by one shared ratio.
+
+    Returns (body triangles, part copies) — the caller owns the copies, since
+    the originals have to survive for the next tier.
+
+    One shared ratio rather than "take it all out of the biggest part": every
+    part is already at the poly count its own shape needs, so spending the whole
+    cut on one of them is what turns a hand into a wedge. Parts under
+    `MIN_PART_TRIANGLES` sit out and their triangles come off the pool first, so
+    the ratio the rest pay is honest.
+    """
+    part_triangles = [_triangles(extra) for extra in extras]
+    fixed = sum(count for count in part_triangles if count <= MIN_PART_TRIANGLES)
+    pool = _triangles(body) + extra_triangles - fixed
+    ratio = (budget - fixed) / float(pool) if pool > 0 else 1.0
+    copies = []
+    for extra, count in zip(extras, part_triangles):
+        copy = _copy_of(extra, "{0}_{1}".format(extra.name, tier))
+        if count > MIN_PART_TRIANGLES:
+            t3d.decimate(copy, max(MIN_PART_TRIANGLES, int(count * ratio)))
+        copies.append(copy)
+    _, after = t3d.decimate(body, max(4, int(_triangles(body) * ratio)))
+    return after, copies
+
+
 def _copy_of(obj, name):
     if name in bpy.data.objects:
         bpy.data.objects.remove(bpy.data.objects[name], do_unlink=True)
@@ -69,18 +117,25 @@ def export_lods(source, armature, extras, asset_key, out_dir, flat_materials=Fal
     tri_counts, byte_counts = {}, {}
     for tier, (budget, texture_px) in sorted(TIERS.items()):
         working = _copy_of(source, "{0}_{1}".format(source.name, tier))
-        # The budget in TIERS is the shipped TOTAL (ART-PIPELINE §4.4), extras included — decimate
-        # the body to budget minus what the un-decimated extras already cost, so body + extras
-        # lands back on budget instead of budget + extras.
-        _, after = t3d.decimate(working, budget - extra_triangles)
+        if extra_triangles <= budget * (1.0 - BODY_SHARE_FLOOR):
+            # The budget in TIERS is the shipped TOTAL (ART-PIPELINE §4.4), extras included —
+            # decimate the body to budget minus what the un-decimated extras already cost, so body
+            # + extras lands back on budget instead of budget + extras.
+            _, after = t3d.decimate(working, budget - extra_triangles)
+            tier_extras = extras
+        else:
+            after, tier_extras = _shrink_together(working, extras, tier, budget, extra_triangles)
         path = os.path.join(out_dir, tier, asset_key + ".glb")
         if flat_materials:
-            byte_counts[tier] = t3d.export_gltf_flat(path, working, armature, extras=extras)
+            byte_counts[tier] = t3d.export_gltf_flat(path, working, armature, extras=tier_extras)
         else:
             byte_counts[tier] = t3d.export_gltf(
-                path, working, armature, extras=extras, texture_px=texture_px)
-        tri_counts[tier] = after + extra_triangles
+                path, working, armature, extras=tier_extras, texture_px=texture_px)
+        tri_counts[tier] = after + sum(_triangles(extra) for extra in tier_extras)
         bpy.data.objects.remove(working, do_unlink=True)
+        for extra in tier_extras:
+            if extra not in extras:
+                bpy.data.objects.remove(extra, do_unlink=True)
 
     meta = {
         "asset_key": asset_key,
@@ -113,7 +168,10 @@ def _args(argv):
     parser.add_argument("--rig", required=True, help="armature name")
     parser.add_argument("--extras", default="",
                         help="comma-separated rigid meshes bound to the same rig "
-                             "(weapon parts) — exported, never decimated")
+                             "(weapon parts) — exported, never decimated. `all` takes "
+                             "every other mesh on the rig, which is what a mesh-kit "
+                             "asset needs: `wandering_bandit` is 40 parts, and the "
+                             "hand-written list left `bandit_SashTail` out silently")
     parser.add_argument("--asset-key", required=True,
                         help="art_asset.asset_key, e.g. char_hoa-b1")
     parser.add_argument("--out", required=True,
@@ -125,12 +183,31 @@ def _args(argv):
     return parser.parse_args(argv[argv.index("--") + 1:])
 
 
+def _extra_objects(spec, body, armature):
+    """Resolve `--extras`: an explicit list, or every other mesh on this rig.
+
+    A generated character has one body and three weapon parts, so naming them is
+    fine. A mesh-kit character is forty separate parts, and naming those by hand
+    is how `bandit_SashTail` got left out of the first `wandering_bandit` export
+    — the .glb came out one mesh short and nothing failed, because a missing
+    extra is indistinguishable from an extra that was never wanted.
+    """
+    if spec != "all":
+        return [bpy.data.objects[name] for name in spec.split(",") if name]
+    return [obj for obj in bpy.data.objects
+            if obj.type == "MESH" and obj is not body and not obj.hide_render
+            and (obj.parent is armature
+                 or any(mod.type == "ARMATURE" and mod.object is armature
+                        for mod in obj.modifiers))]
+
+
 def main():
     args = _args(sys.argv)
     meta = export_lods(
         bpy.data.objects[args.object],
         bpy.data.objects[args.rig],
-        [bpy.data.objects[n] for n in args.extras.split(",") if n],
+        _extra_objects(args.extras, bpy.data.objects[args.object],
+                       bpy.data.objects[args.rig]),
         args.asset_key,
         args.out,
         flat_materials=args.flat_materials)
