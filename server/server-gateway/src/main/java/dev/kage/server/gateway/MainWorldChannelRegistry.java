@@ -11,6 +11,7 @@ import java.util.Set;
 import io.micrometer.core.instrument.MeterRegistry;
 
 import dev.kage.server.world.CharacterBaseStats;
+import dev.kage.server.world.MonsterCatalogSnapshot;
 import dev.kage.server.world.WorldFacade;
 
 /**
@@ -75,6 +76,7 @@ final class MainWorldChannelRegistry {
 
     private final ConnectedCharacterRegistry registry;
     private final MeterRegistry meterRegistry;
+    private final MonsterCatalogSnapshot monsterCatalog;
     private final List<Channel> channels = new ArrayList<>();
     private final Map<Long, Channel> channelByCharacterId = new HashMap<>();
 
@@ -84,9 +86,13 @@ final class MainWorldChannelRegistry {
      * cho MỌI khu vực mở thêm sau ({@link #openChannel}) — xem javadoc lớp "Metrics".
      */
     MainWorldChannelRegistry(
-            ConnectedCharacterRegistry registry, WorldFacade firstChannelFacade, MeterRegistry meterRegistry) {
+            ConnectedCharacterRegistry registry,
+            WorldFacade firstChannelFacade,
+            MeterRegistry meterRegistry,
+            MonsterCatalogSnapshot monsterCatalog) {
         this.registry = registry;
         this.meterRegistry = meterRegistry;
+        this.monsterCatalog = monsterCatalog;
         channels.add(new Channel(firstChannelFacade, DEFAULT_CAPACITY));
     }
 
@@ -173,7 +179,10 @@ final class MainWorldChannelRegistry {
     }
 
     private Channel openChannel(int capacity) {
-        WorldFacade facade = new WorldFacade(registry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG));
+        // Khu vực mở thêm là CÙNG map chính nên phải có CÙNG quái — dùng lại catalog đã nạp một
+        // lần ở GatewayBootstrap, không đọc lại DB (ADR-037).
+        WorldFacade facade = new WorldFacade(
+                registry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG), monsterCatalog);
         facade.start();
         Channel channel = new Channel(facade, capacity);
         channels.add(channel);

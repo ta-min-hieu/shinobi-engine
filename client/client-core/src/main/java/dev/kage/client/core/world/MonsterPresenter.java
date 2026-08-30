@@ -52,9 +52,18 @@ final class MonsterPresenter {
         this.models = models;
     }
 
-    /** Quái vào tầm nhìn — gắn model nếu mã quái đó đã có art, ngược lại nó sẽ được vẽ bằng hộp. */
+    /**
+     * Quái vào tầm nhìn — gắn model nếu mã quái đó đã có art, ngược lại nó sẽ được vẽ bằng hộp.
+     *
+     * <p>Ưu tiên {@code model_key} server gửi (ADR-037): nó cho phép nhiều loài dùng CHUNG một
+     * model trong lúc chờ art riêng, thứ mà phép biến đổi thuần {@link MonsterModelKey} không làm
+     * được. Field rỗng ⇒ suy từ {@code monster_code} như trước — đó là trường hợp của server cũ và
+     * của boss (vẫn hardcode, ADR-037 D7).
+     */
     void onSpawned(MonsterSpawnedEvent event) {
-        models.addMonsterOrNpc(event.getMonsterId(), MonsterModelKey.of(event.getMonsterCode()));
+        String modelKey =
+                event.getModelKey().isEmpty() ? MonsterModelKey.of(event.getMonsterCode()) : event.getModelKey();
+        models.addMonsterOrNpc(event.getMonsterId(), modelKey);
         motionTracker.onPositionUpdate(event.getMonsterId(), event.getX(), event.getY());
     }
 

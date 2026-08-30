@@ -11,7 +11,7 @@ package dev.kage.character.domain;
  * GDD, chủ dự án chốt sau — sửa ở ĐÚNG một chỗ này.
  *
  * <p>Tuyến tính có chủ đích ({@code 100 × cấp hiện tại}): cấp 1→2 tốn 100, 2→3 tốn 200... Với quái
- * bù nhìn cho {@value MonsterExperience#TRAINING_DUMMY_EXP} EXP thì cấp đầu tiên mất 5 con — đủ
+ * bù nhìn cho 20 EXP ({@code monster_template.exp_reward}) thì cấp đầu tiên mất 5 con — đủ
  * nhanh để chủ dự án THẤY vạch chạy và thấy lên cấp thật trong một lần chơi thử, đó mới là thứ
  * đang cần nghiệm thu. Cấp số nhân sẽ đúng "cảm giác MMO" hơn nhưng làm lần lên cấp đầu tiên biến
  * mất khỏi tầm với của một buổi test.

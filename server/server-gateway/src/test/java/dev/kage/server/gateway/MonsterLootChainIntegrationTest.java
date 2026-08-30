@@ -88,6 +88,7 @@ import dev.kage.server.database.quest.PostgresQuestProgressAdapter;
 import dev.kage.server.database.quest.PostgresQuestTemplateAdapter;
 import dev.kage.server.world.CharacterBaseStats;
 import dev.kage.server.world.Element;
+import dev.kage.server.world.TickMetricsPort;
 import dev.kage.server.world.WorldFacade;
 
 /**
@@ -197,7 +198,7 @@ class MonsterLootChainIntegrationTest {
         OutboundFrameCollector killerFrames = registerCharacter(killerId);
         OutboundFrameCollector witnessFrames = registerCharacter(witnessId);
 
-        world = new WorldFacade(registry);
+        world = new WorldFacade(registry, true, TickMetricsPort.NO_OP, TestMonsterCatalogs.trainingGround());
         world.start();
         world.attachCharacter(killerId, SPAWN_X, SPAWN_Y, DEFAULT_STATS);
 
@@ -246,7 +247,7 @@ class MonsterLootChainIntegrationTest {
         OutboundFrameCollector frames = registerCharacter(characterId);
 
         assertThat(inventoryFacade.grantLoot(characterId, TRAINING_DUMMY_CODE)).isEmpty();
-        registry.onMonsterKilled(characterId, TRAINING_DUMMY_CODE);
+        registry.onMonsterKilled(characterId, TRAINING_DUMMY_CODE, 0L);
 
         // Không có tín hiệu "đã chạy xong" nào để chờ khi kết quả đúng là KHÔNG có gì xảy ra —
         // chờ đủ lâu cho Virtual Thread chạy hết rồi mới khẳng định, cùng cách ConnectedCharacter
@@ -267,7 +268,7 @@ class MonsterLootChainIntegrationTest {
         OutboundFrameCollector frames = registerCharacter(characterId);
         registry.unregister(characterId);
 
-        registry.onMonsterKilled(characterId, TRAINING_DUMMY_CODE);
+        registry.onMonsterKilled(characterId, TRAINING_DUMMY_CODE, 0L);
 
         awaitInventoryRowCount(characterId, 1, Duration.ofSeconds(5));
         assertThat(opcodesOf(frames)).doesNotContain(Opcode.OPCODE_ITEM_GRANTED_EVENT_VALUE);

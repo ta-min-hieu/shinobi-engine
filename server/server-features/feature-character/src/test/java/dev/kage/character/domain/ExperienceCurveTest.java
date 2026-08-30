@@ -60,11 +60,4 @@ class ExperienceCurveTest {
     void shouldTreatNegativeExperienceAsZero() {
         assertThat(ExperienceCurve.progressOf(-5L).level()).isEqualTo(1);
     }
-
-    @Test
-    void shouldRewardKnownMonsters_andIgnoreUnknownCode() {
-        assertThat(MonsterExperience.rewardFor("training_dummy")).isEqualTo(MonsterExperience.TRAINING_DUMMY_EXP);
-        assertThat(MonsterExperience.rewardFor("sample_boss")).isEqualTo(MonsterExperience.SAMPLE_BOSS_EXP);
-        assertThat(MonsterExperience.rewardFor("chua_khai_bao")).isZero();
-    }
 }

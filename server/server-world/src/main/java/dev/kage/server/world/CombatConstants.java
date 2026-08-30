@@ -42,28 +42,23 @@ final class CombatConstants {
 
     // Hệ số derive GDD §5 — placeholder, chưa playtest.
     private static final float CRIT_DAMAGE_MULTIPLIER = 1.5f; // 150% cố định ở MVP
+
+    /**
+     * Bản công khai-trong-package của {@link #CRIT_DAMAGE_MULTIPLIER} để {@code WorldFacade} dựng
+     * chỉ số quái đọc từ DB (ADR-037). {@code monster_template} CHƯA có cột riêng cho hệ số này —
+     * mọi loài dùng chung 150% như trước, thêm cột khi có loài thật cần khác đi.
+     */
+    static final float CRIT_DAMAGE_MULTIPLIER_DEFAULT = CRIT_DAMAGE_MULTIPLIER;
+
     private static final float MIN_HIT_PERCENT = 0.5f;
     private static final float MAX_HIT_PERCENT = 1.0f;
     private static final float MAX_DODGE_PERCENT = 0.3f;
     private static final float MAX_CRIT_PERCENT = 0.5f;
     private static final int MIN_DAMAGE_FLOOR = 1; // tránh damage=0 vô nghĩa khi giáp/kháng rất cao
 
-    // Quái bù nhìn TỰ ĐÁNH TRẢ khi bị AiSystem đưa vào Attack (AI.md §3) — atk/def placeholder,
-    // chưa có monster_template DB-driven (lát cắt sau mới per-loại-quái). skillDmg=0 vì quái chưa
-    // cast skill ở lát cắt này; res placeholder cùng độ lớn với def (làm mục tiêu hợp lệ cho skill).
-    static final CombatStats MONSTER_STATS =
-            new CombatStats(8, 0, 5, 3, 0.90f, 0f, 0f, CRIT_DAMAGE_MULTIPLIER, Element.NONE);
-
-    // Boss (Phase 8 lát cắt 2, BossAiSystem) — def/res cao hơn MONSTER_STATS (boss "trâu" hơn),
-    // atk dùng làm ctx.base_atk cho script sample_boss.js tính damage chiêu đặc biệt (script
-    // KHÔNG dùng skillDmg — boss là hệ vật lý ở lát cắt này, chưa gán hệ phái).
-    //
-    // ⚠️ atk CỐ Ý thấp (không "cân bằng boss thật") — PHÁT HIỆN THẬT (test thời gian thực nhiều
-    // pha): CHARACTER_MAX_HP=100 là hằng số CỐ ĐỊNH toàn cục; atk cao hơn khiến nhân vật test chết
-    // TRƯỚC khi boss chết (AiSystem đưa boss về RETURN khi mục tiêu chết → BossAiSystem vĩnh viễn
-    // không còn quyết định gì, dù CombatSystem của nhân vật đã chết vẫn tiếp tục đánh trả — bug có
-    // sẵn, ngoài phạm vi lát cắt này). Giữ atk thấp để trận đấu 1-boss-1-nhân-vật luôn có người
-    // thắng đúng phía (nhân vật) trong lúc chưa có cơ chế tử vong nhân vật.
+    // Chỉ số quái thường KHÔNG còn ở đây: từ ADR-037 chúng đọc từ `monster_template` và tới
+    // server-world qua MonsterCatalogSnapshot. Boss thì VẪN hardcode (ADR-037 D7 hoãn có chủ đích:
+    // boss có script GraalJS + BossAiSystem riêng, kéo vào bảng là một quyết định khác).
     static final CombatStats BOSS_STATS =
             new CombatStats(3, 0, 10, 8, 0.95f, 0f, 0.05f, CRIT_DAMAGE_MULTIPLIER, Element.NONE);
     // Đủ lớn để MỖI pha (đặc biệt pha enrage <30% HP) có vài giây thời gian thực trước khi boss
@@ -75,8 +70,8 @@ final class CombatConstants {
 
     static final float ATTACK_INTERVAL_SECONDS = 1f; // ATK_SPEED placeholder — 1 đòn/giây
     static final float ATTACK_RANGE_METERS = 2f;
-    static final int MONSTER_MAX_HP = 50;
-    static final float MONSTER_RESPAWN_SECONDS = 10f;
+    // MONSTER_MAX_HP và MONSTER_RESPAWN_SECONDS đã chuyển thành cột `monster_template.max_hp` và
+    // `monster_spawn.respawn_seconds` (ADR-037) — mỗi điểm spawn có nhịp hồi sinh riêng.
 
     private CombatConstants() {}
 

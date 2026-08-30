@@ -193,7 +193,7 @@ Theo Điều 27, hành vi AI **không hardcode**:
 | Phần | Ở đâu |
 |---|---|
 | FSM engine (chuyển trạng thái) | Java — `engine-ecs` / `server-world` |
-| **Tham số** (aggro range, tốc độ đuổi, cooldown skill) | **Config data** — `monster_template` ([DATABASE.md](../05-server/DATABASE.md)) |
+| **Tham số** (aggro range, tốc độ đuổi, cooldown skill) | **Config data** — `monster_template` ([DATABASE.md](../05-server/DATABASE.md)). ⚠️ **CHƯA đúng tính đến 2026-08-30**: [ADR-037](../01-architecture/adr/ADR-037-Monster-Template-And-Spawn-Tables.md) đưa chỉ số/EXP/vị trí vào DB nhưng **hoãn tham số AI** (D7) — chúng vẫn là hằng số trong `AiConstants`, mọi loài dùng chung |
 | Hành vi Boss phức tạp | **Script** ([SCRIPTING.md](../06-plugin/SCRIPTING.md)) |
 
 **Phân định**: FSM là *cơ chế* (Java, nhanh). Tham số và hành vi đặc biệt là *nội dung* (data/script, sửa không rebuild).

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | 🟡 **Proposed** (2026-08-30) — chờ chủ dự án quyết. AI đo + soạn, KHÔNG tự thi hành |
+| Status | 🟢 **Accepted** (2026-08-30) — chủ dự án duyệt D1-D7, chọn **module `feature-monster`** (Technical Decision 3) và **duyệt field `model_key`** (Technical Decision 5). ĐANG THI HÀNH |
 | Date | 2026-08-30 |
 | Deciders | Chủ dự án quyết; AI đo + soạn |
 | Related | [ADR-036](ADR-036-Equipment-Stats-And-Enhancement-Effect.md) (chỉ số trang bị — chính playtest của nó sinh ra ADR này) · [ADR-034](ADR-034-Manual-Attack-And-Experience.md) (EXP hardcode, tự nhận là tạm) · [AI.md §10](../../03-engine/AI.md) · [DATABASE.md §2.2](../../05-server/DATABASE.md) · [GAMEPLAY.md §5](../../05-server/GAMEPLAY.md) · [/CLAUDE.md §4](../../../CLAUDE.md) (đổi schema + protocol + THÊM MODULE đều phải dừng hỏi) |
@@ -82,9 +82,10 @@ Alternatives A.
 
 ## Decision
 
-> ⚠️ **Chưa được duyệt.** Mục này là ĐỀ XUẤT để chủ dự án quyết, không phải việc đã chốt.
-> Phạm vi đã được chủ dự án chốt trước khi soạn: **template + spawn + EXP**, tham số AI để đợt sau;
-> và **loài mới dùng tạm model đã có**, không chờ art.
+> ✅ **Đã duyệt 2026-08-30.** Phạm vi chốt trước khi soạn: **template + spawn + EXP**, tham số AI để
+> đợt sau; **loài mới dùng tạm model đã có**. Hai câu §4 còn treo trong bản Proposed đã có trả lời:
+> chủ dự án chọn **thêm module `feature-monster`** (không dùng Alternatives C) và **duyệt field
+> `model_key` trên `MonsterSpawnedEvent`**.
 
 ### D1 — `monster_template`: cột quan hệ, KHÔNG JSON
 
@@ -286,13 +287,13 @@ D6 là **đề xuất khởi điểm chưa playtest**, đúng thân phận mà b
 
 | # | Quyết định | Trạng thái |
 |---|---|---|
-| 1 | `monster_template` cột quan hệ, KHÔNG JSON — đi ngược DATABASE.md §2.2, phải sửa doc đó | Proposed |
-| 2 | `monster_spawn` riêng, có `world_code`; ràng buộc `pos_y = 0` + cách điểm hồi sinh > 6m | Proposed |
-| 3 | Gateway dịch, world nhận record thuần; **module `feature-monster` mới** (hoặc Alternatives C) | Chờ chủ dự án |
-| 4 | `exp_reward` thành cột; xoá `MonsterExperience` | Proposed |
-| 5 | `model_key` thành cột **và** một field additive trên `MonsterSpawnedEvent` | Chờ chủ dự án |
-| 6 | Ba loài khởi điểm; `training_dummy` giữ NGUYÊN số cũ | Proposed |
-| 7 | Tham số AI, boss, `npc_template` KHÔNG làm đợt này | Proposed |
+| 1 | `monster_template` cột quan hệ, KHÔNG JSON — đi ngược DATABASE.md §2.2, phải sửa doc đó | Accepted |
+| 2 | `monster_spawn` riêng, có `world_code`; ràng buộc `pos_y = 0` + cách điểm hồi sinh > 6m | Accepted |
+| 3 | Gateway dịch, world nhận record thuần; **module `feature-monster` mới** | ✅ Accepted — chủ dự án chọn module mới, KHÔNG dùng Alternatives C |
+| 4 | `exp_reward` thành cột; xoá `MonsterExperience` | Accepted |
+| 5 | `model_key` thành cột **và** một field additive trên `MonsterSpawnedEvent` | ✅ Accepted |
+| 6 | Ba loài khởi điểm; `training_dummy` giữ NGUYÊN số cũ | Accepted |
+| 7 | Tham số AI, boss, `npc_template` KHÔNG làm đợt này | Accepted |
 
 ## ADR cần tạo
 

@@ -38,11 +38,14 @@ public interface WorldOutboundSink {
     void onMonsterMoved(long targetCharacterId, long monsterId, float x, float y);
 
     /**
+     * @param expReward EXP thưởng ({@code monster_template.exp_reward}, ADR-037 D4) — server-world
+     *     chỉ CHỞ con số này ra, không dùng tới nó, đúng như nó chở {@code monsterCode}
+     *
      * Quái {@code monsterCode} VỪA bị {@code killerCharacterId} hạ gục — server-world không biết
      * DB/inventory (server/CLAUDE.md), nên chỉ báo SỰ KIỆN; việc roll rơi đồ + cộng vào túi thật
      * xảy ra ở gateway (nơi có {@code InventoryFacade}, GAMEPLAY.md §5).
      */
-    void onMonsterKilled(long killerCharacterId, String monsterCode);
+    void onMonsterKilled(long killerCharacterId, String monsterCode, long expReward);
 
     /** NPC {@code npc.npcId()} VỪA vào AoI của {@code targetCharacterId} (Phase 6 §9 — NPC tĩnh). */
     void onNpcSpawned(long targetCharacterId, NpcSnapshot npc);
@@ -95,7 +98,8 @@ public interface WorldOutboundSink {
     record MoveAcceptedSnapshot(long characterId, int sequenceId, float x, float y, float z, boolean grounded) {}
 
     /** Ảnh chụp trạng thái quái lúc phát {@link #onMonsterSpawned} — gộp tham số (STATIC-ANALYSIS.md). */
-    record MonsterSnapshot(long monsterId, String monsterCode, float x, float y, int currentHp, int maxHp) {}
+    record MonsterSnapshot(
+            long monsterId, String monsterCode, String modelKey, float x, float y, int currentHp, int maxHp) {}
 
     /** Ảnh chụp trạng thái nhân vật lúc phát {@link #onCharacterRespawned} — gộp tham số (STATIC-ANALYSIS.md). */
     record RespawnSnapshot(long characterId, float x, float y, int currentHp, int maxHp, int currentChi, int maxChi) {}

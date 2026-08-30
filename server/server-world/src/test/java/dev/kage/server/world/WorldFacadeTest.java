@@ -138,7 +138,7 @@ class WorldFacadeTest {
         }
 
         @Override
-        public void onMonsterKilled(long killerCharacterId, String monsterCode) {
+        public void onMonsterKilled(long killerCharacterId, String monsterCode, long expReward) {
             monsterKilled.add(new MonsterKilled(killerCharacterId, monsterCode));
         }
 
@@ -204,7 +204,8 @@ class WorldFacadeTest {
     }
 
     private final RecordingSink sink = new RecordingSink();
-    private final WorldFacade world = new WorldFacade(sink);
+    private final WorldFacade world =
+            new WorldFacade(sink, true, TickMetricsPort.NO_OP, TestMonsterCatalogs.trainingGround());
 
     @AfterEach
     void stopWorld() {

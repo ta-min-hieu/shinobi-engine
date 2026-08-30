@@ -70,23 +70,12 @@ public final class WorldFacade {
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
     private static final ComponentMapper<ChiComponent> CHI = ComponentMapper.getFor(ChiComponent.class);
 
-    // Quái bù nhìn tập luyện — hardcode, chưa có monster_template DB.
-    private static final String TRAINING_DUMMY_CODE = "training_dummy";
-
-    /**
-     * Vị trí X của các quái, đặt RẢI dọc đường chơi ({@code y = CHARACTER_PLAY_LINE_Y}).
-     *
-     * <p>⚠️ Trước ADR-033 chỉ có 1 quái ở {@code (5, 5)} — sau khi di chuyển bị khoá vào trục X,
-     * người chơi (luôn {@code y=0}) KHÔNG BAO GIỜ tới gần hơn 5m được, trong khi tầm đánh chỉ
-     * {@code CombatConstants.ATTACK_RANGE_METERS} = 2m. Combat chỉ còn "hoạt động" nhờ quái tự đuổi
-     * theo tới tận nơi — người chơi không thể chủ động tấn công. Đặt đúng đường chơi là hệ quả bắt
-     * buộc của việc thu trục, không phải thêm nội dung tuỳ hứng.
-     *
-     * <p>Xen kẽ với bậc nhảy demo ({@link #DEMO_PLATFORMS}: 3-7, 9-13, 15-19) để vừa đánh vừa leo,
-     * và cách điểm hồi sinh {@code (0,0)} xa hơn {@code AiConstants.AGGRO_RADIUS_METERS} (6m) để
-     * nhân vật vừa hồi sinh không bị đánh ngay.
-     */
-    private static final float[] MONSTER_SPAWN_X = {8f, 14f, 21f, 27f};
+    // Vị trí quái KHÔNG còn nằm ở đây: từ ADR-037 chúng đọc từ `monster_spawn` và tới đây qua
+    // MonsterCatalogSnapshot. Hai ràng buộc CŨ vẫn nguyên hiệu lực và nay do DB gác (CHECK +
+    // comment ở migration V23), không phải do hằng số Java: quái phải nằm trên đường chơi
+    // (y = CHARACTER_PLAY_LINE_Y — ADR-033 khoá di chuyển vào trục X, quái lệch y là quái người
+    // chơi không bao giờ chạm tới), và phải cách điểm hồi sinh (0,0) xa hơn
+    // AiConstants.AGGRO_RADIUS_METERS để nhân vật vừa hồi sinh không bị đánh ngay.
 
     // Điểm hồi sinh mặc định (chưa có khái niệm "điểm hồi sinh theo khu vực"/thị trấn — MVP đầu
     // tiên, xem ROADMAP.md Phase 10). Cách quái bù nhìn (5,5) ~7.07m — NGOÀI AiConstants
@@ -168,12 +157,12 @@ public final class WorldFacade {
     private long nextMonsterOrNpcId = -1;
     // Đếm ngược hồi sinh THEO TỪNG điểm spawn (< 0 = quái ở đó đang sống). Mảng cố định, không cấp
     // phát lại — cùng tinh thần "không allocation trong tick" (Điều 31).
-    private final float[] monsterRespawnCountdownSeconds = newAliveCountdowns();
+    private final float[] monsterRespawnCountdownSeconds;
     // monsterId -> chỉ số điểm spawn, để hồi sinh đúng chỗ cũ. Boss KHÔNG có entry ở đây.
     private final Map<Long, Integer> spawnIndexByMonsterId = new HashMap<>();
 
-    private static float[] newAliveCountdowns() {
-        float[] countdowns = new float[MONSTER_SPAWN_X.length];
+    private static float[] newAliveCountdowns(int spawnPointCount) {
+        float[] countdowns = new float[spawnPointCount];
         java.util.Arrays.fill(countdowns, -1f);
         return countdowns;
     }
@@ -193,6 +182,12 @@ public final class WorldFacade {
     private boolean contentSpawned;
     private long fixedDtNanos;
     private final boolean spawnOverworldContent;
+    /**
+     * Loài quái + điểm spawn world này được phép dựng (ADR-037). {@link MonsterCatalogSnapshot#EMPTY}
+     * ⇒ world không có con quái nào — đúng hành vi dungeon/arena, và là mặc định của mọi overload
+     * constructor cũ để chỗ gọi phải NÓI RÕ khi muốn có quái.
+     */
+    private final MonsterCatalogSnapshot monsterCatalog;
 
     /**
      * Toàn bộ resource script skill (hardcode, chưa DB-driven — xem {@link SkillConstants}) —
@@ -232,7 +227,27 @@ public final class WorldFacade {
      * này — capacity planning ưu tiên World chính trước, xem ROADMAP.md Phase 9).
      */
     public WorldFacade(WorldOutboundSink outboundSink, boolean spawnOverworldContent, TickMetricsPort tickMetricsPort) {
+        this(outboundSink, spawnOverworldContent, tickMetricsPort, MonsterCatalogSnapshot.EMPTY);
+    }
+
+    /**
+     * {@code monsterCatalog} (ADR-037) — loài quái + điểm spawn, ĐỌC TỪ DB bởi
+     * {@code server-gateway} rồi dịch sang record thuần. {@code server-world} không được biết DB
+     * (Điều 23) và {@code server-database} thậm chí không phụ thuộc module này, nên tiêm vào là
+     * đường DUY NHẤT — đúng khuôn ADR-036 đã dựng cho {@link EquipmentBonusSnapshot}.
+     *
+     * <p>Catalog rỗng ⇒ không spawn quái nào, kể cả khi {@code spawnOverworldContent = true}: hai
+     * cờ này trả lời hai câu khác nhau (có bệ/NPC/hồi sinh nhân vật hay không, và có quái gì).
+     */
+    public WorldFacade(
+            WorldOutboundSink outboundSink,
+            boolean spawnOverworldContent,
+            TickMetricsPort tickMetricsPort,
+            MonsterCatalogSnapshot monsterCatalog) {
         this.outboundSink = outboundSink;
+        this.monsterCatalog = monsterCatalog;
+        this.monsterRespawnCountdownSeconds =
+                newAliveCountdowns(monsterCatalog.spawnPoints().size());
         this.spawnOverworldContent = spawnOverworldContent;
         this.tickMetricsPort = tickMetricsPort;
         this.systemTimingListener = tickMetricsPort::recordSystemDuration;
@@ -392,8 +407,8 @@ public final class WorldFacade {
             if (!contentSpawned) {
                 contentSpawned = true;
                 if (spawnOverworldContent) {
-                    for (int i = 0; i < MONSTER_SPAWN_X.length; i++) {
-                        spawnTrainingDummy(i);
+                    for (int i = 0; i < monsterCatalog.spawnPoints().size(); i++) {
+                        spawnMonster(i);
                     }
                     spawnNpc(); // NPC tĩnh, không chết/hồi sinh — spawn 1 lần duy nhất, khác quái.
                 }
@@ -840,22 +855,25 @@ public final class WorldFacade {
         if (entity == null) {
             return; // đã xử lý (nhiều đòn hạ gục cùng tick — CombatSystem tự chặn đòn thứ 2, xem javadoc).
         }
-        String monsterCode = MONSTER.get(entity).monsterCode; // đọc TRƯỚC removeEntity — sau đó component mất.
+        MonsterComponent killedMonster = MONSTER.get(entity); // đọc TRƯỚC removeEntity — sau đó component mất.
+        String monsterCode = killedMonster.monsterCode;
+        long expReward = killedMonster.expReward;
         aoiTracker.onMonsterDetach(monsterId);
         ecsWorld.removeEntity(entity);
         // Chỉ world chính hồi sinh quái bù nhìn — dungeon (spawnOverworldContent=false) không có
         // khái niệm training dummy; PHÁT HIỆN THẬT (Phase 8 lát cắt 2): thiếu guard này, boss chết
-        // trong dungeon sẽ vô tình lên lịch spawnTrainingDummy() (sai nội dung, sai world).
+        // trong dungeon sẽ vô tình lên lịch spawnMonster() (sai nội dung, sai world).
         // `spawnIndex == null` với BOSS (spawn qua spawnBossEntity, không thuộc điểm spawn nào).
         Integer spawnIndex = spawnIndexByMonsterId.remove(monsterId);
         if (spawnOverworldContent && spawnIndex != null) {
-            monsterRespawnCountdownSeconds[spawnIndex] = CombatConstants.MONSTER_RESPAWN_SECONDS;
+            monsterRespawnCountdownSeconds[spawnIndex] =
+                    monsterCatalog.spawnPoints().get(spawnIndex).respawnSeconds();
         }
 
         // killerEntityId ÂM nghĩa là quái khác hạ gục quái này — chưa từng xảy ra (quái không nhắm
         // quái, xem AiSystem) nhưng chặn phòng thủ, rơi đồ chỉ dành cho NGƯỜI CHƠI.
         if (killerEntityId > 0) {
-            outboundSink.onMonsterKilled(killerEntityId, monsterCode);
+            outboundSink.onMonsterKilled(killerEntityId, monsterCode, expReward);
         }
     }
 
@@ -868,34 +886,47 @@ public final class WorldFacade {
             monsterRespawnCountdownSeconds[i] -= deltaTime;
             if (monsterRespawnCountdownSeconds[i] <= 0f) {
                 monsterRespawnCountdownSeconds[i] = -1f;
-                spawnTrainingDummy(i);
+                spawnMonster(i);
             }
         }
     }
 
-    /** @param spawnIndex chỉ số trong {@link #MONSTER_SPAWN_X} — nhớ lại để hồi sinh ĐÚNG chỗ cũ. */
-    private void spawnTrainingDummy(int spawnIndex) {
+    /**
+     * Spawn con quái của điểm spawn thứ {@code spawnIndex} (ADR-037 — loài, chỉ số, vị trí và thời
+     * gian hồi sinh đều đọc từ {@link #monsterCatalog}, không còn hằng số nào ở đây).
+     *
+     * @param spawnIndex chỉ số trong {@code monsterCatalog.spawnPoints()} — nhớ lại để hồi sinh
+     *     ĐÚNG chỗ cũ, đúng loài cũ
+     */
+    private void spawnMonster(int spawnIndex) {
+        MonsterCatalogSnapshot.MonsterSpawnDefinition spawn =
+                monsterCatalog.spawnPoints().get(spawnIndex);
+        MonsterCatalogSnapshot.MonsterSpecies loai =
+                monsterCatalog.find(spawn.monsterCode()).orElse(null);
+        if (loai == null) {
+            // MonsterCatalogSnapshot.of đã lọc điểm spawn trỏ tới loài lạ, nên tới đây nghĩa là
+            // catalog được dựng tay không nhất quán — bỏ qua an toàn thay vì làm chết tick thread.
+            return;
+        }
         KEntity entity = ecsWorld.createEntity();
         long monsterId = nextMonsterOrNpcId--;
-        float spawnX = MONSTER_SPAWN_X[spawnIndex];
+        float spawnX = spawn.posX();
 
         PositionComponent position = new PositionComponent();
         position.x = spawnX;
-        position.y = CHARACTER_PLAY_LINE_Y;
+        position.y = spawn.posY();
         position.prevX = position.x;
         position.prevY = position.y;
         entity.add(position);
         entity.add(new VelocityComponent()); // AiSystem set vận tốc theo FSM (AI.md §3)
 
         HealthComponent health = new HealthComponent();
-        health.current = CombatConstants.MONSTER_MAX_HP;
-        health.max = CombatConstants.MONSTER_MAX_HP;
+        health.current = loai.maxHp();
+        health.max = loai.maxHp();
         entity.add(health);
 
-        MonsterComponent monster = new MonsterComponent();
-        monster.monsterCode = TRAINING_DUMMY_CODE;
-        entity.add(monster);
-        entity.add(toComponent(CombatConstants.MONSTER_STATS));
+        entity.add(toMonsterComponent(loai));
+        entity.add(toComponent(toStats(loai.combat())));
 
         MonsterIdComponent monsterIdComponent = new MonsterIdComponent();
         monsterIdComponent.monsterId = monsterId;
@@ -903,7 +934,7 @@ public final class WorldFacade {
 
         AiStateComponent aiState = new AiStateComponent();
         aiState.spawnX = spawnX;
-        aiState.spawnY = CHARACTER_PLAY_LINE_Y;
+        aiState.spawnY = spawn.posY();
         entity.add(aiState);
         entity.add(new TargetComponent()); // AiSystem ghi khi Chase/Attack; CombatSystem đọc để đánh trả
         entity.add(new AttackCooldownComponent());
@@ -913,6 +944,44 @@ public final class WorldFacade {
         spawnIndexByMonsterId.put(monsterId, spawnIndex);
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
         // không cần thông báo thủ công (giống hệt attach nhân vật, xem AreaOfInterestTracker).
+    }
+
+    /** Danh tính loài trên entity: mã trên dây, khoá art, và EXP mà world chỉ chở ra ngoài. */
+    private static MonsterComponent toMonsterComponent(MonsterCatalogSnapshot.MonsterSpecies loai) {
+        MonsterComponent monster = new MonsterComponent();
+        monster.monsterCode = loai.code();
+        monster.modelKey = loai.modelKey();
+        monster.expReward = loai.expReward();
+        return monster;
+    }
+
+    /**
+     * Số thuần của một loài ({@link MonsterCatalogSnapshot.MonsterCombatNumbers}) → chỉ số chiến
+     * đấu nội bộ. Phần trăm chia 100 ở ĐÂY, đúng một chỗ.
+     *
+     * <p>{@code element} lạ (dữ liệu config gõ sai) bị coi là {@link Element#NONE} thay vì ném
+     * lỗi: một chuỗi sai chính tả trong bảng cân bằng không đáng làm cả world không khởi động
+     * được — cùng tinh thần "điểm spawn trỏ tới loài lạ thì bỏ qua" ở
+     * {@link MonsterCatalogSnapshot#of}.
+     */
+    private static CombatConstants.CombatStats toStats(MonsterCatalogSnapshot.MonsterCombatNumbers combat) {
+        Element element;
+        try {
+            element = Element.valueOf(combat.element());
+        } catch (IllegalArgumentException e) {
+            LOG.warn("monster_template.element không hợp lệ: {} — dùng NONE", combat.element(), e);
+            element = Element.NONE;
+        }
+        return new CombatConstants.CombatStats(
+                combat.atk(),
+                combat.skillDmg(),
+                combat.def(),
+                combat.res(),
+                combat.hitPercent() / 100f,
+                combat.dodgePercent() / 100f,
+                combat.critPercent() / 100f,
+                CombatConstants.CRIT_DAMAGE_MULTIPLIER_DEFAULT,
+                element);
     }
 
     private void spawnBossEntity() {
@@ -934,6 +1003,10 @@ public final class WorldFacade {
 
         MonsterComponent monster = new MonsterComponent();
         monster.monsterCode = BossConstants.BOSS_CODE;
+        // Boss giữ hardcode (ADR-037 D7) nên không có model_key từ DB — để rỗng, client tự suy
+        // bằng MonsterModelKey đúng như trước ADR-037.
+        monster.modelKey = "";
+        monster.expReward = BossConstants.BOSS_EXP_REWARD;
         entity.add(monster);
         entity.add(toComponent(CombatConstants.BOSS_STATS));
 
@@ -952,7 +1025,7 @@ public final class WorldFacade {
 
         entitiesByMonsterId.put(monsterId, entity);
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
-        // không cần thông báo thủ công (giống hệt spawnTrainingDummy).
+        // không cần thông báo thủ công (giống hệt spawnMonster).
     }
 
     private void spawnNpc() {
@@ -966,7 +1039,7 @@ public final class WorldFacade {
         position.prevY = position.y;
         entity.add(position);
         // KHÔNG VelocityComponent/HealthComponent/AiStateComponent — NPC tĩnh, không di chuyển,
-        // không combat (khác spawnTrainingDummy).
+        // không combat (khác spawnMonster).
 
         NpcComponent npc = new NpcComponent();
         npc.npcCode = SAMPLE_NPC_CODE;

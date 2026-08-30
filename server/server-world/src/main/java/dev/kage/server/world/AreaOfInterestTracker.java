@@ -248,7 +248,13 @@ final class AreaOfInterestTracker {
             sink.onMonsterSpawned(
                     characterId,
                     new WorldOutboundSink.MonsterSnapshot(
-                            monsterId, monster.monsterCode, monsterPos.x, monsterPos.y, health.current, health.max));
+                            monsterId,
+                            monster.monsterCode,
+                            monster.modelKey,
+                            monsterPos.x,
+                            monsterPos.y,
+                            health.current,
+                            health.max));
         } else if (!within && wasVisible) {
             visibleTo.get(characterId).remove(monsterId);
             sink.onMonsterDespawned(characterId, monsterId);

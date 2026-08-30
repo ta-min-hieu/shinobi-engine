@@ -22,10 +22,12 @@ import dev.kage.friend.api.FriendFacade;
 import dev.kage.guild.api.GuildFacade;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.mail.api.MailFacade;
+import dev.kage.monster.domain.MonsterSpawnPoint;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.pvp.api.PvpFacade;
 import dev.kage.quest.api.QuestFacade;
 import dev.kage.server.database.ServerDatabaseBootstrap;
+import dev.kage.server.world.MonsterCatalogSnapshot;
 import dev.kage.server.world.WorldFacade;
 import dev.kage.shop.api.ShopFacade;
 import dev.kage.trade.api.TradeFacade;
@@ -270,11 +272,15 @@ public final class GatewayBootstrap {
         Gauge.builder("kage.db.pool.pending", databaseBootstrap, ServerDatabaseBootstrap::poolPendingThreads)
                 .description("Số thread đang chờ pool có connection trống — >0 kéo dài nghĩa là pool quá nhỏ")
                 .register(meterRegistry);
-        WorldFacade firstChannelFacade =
-                new WorldFacade(characterRegistry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG_MAIN));
+        // ADR-037 — quái đọc từ DB. Nạp MỘT LẦN ở đây rồi chia cho mọi khu vực của world chính:
+        // config tĩnh, và đọc lại mỗi lần mở khu vực là mở một đường DB thứ hai cho cùng dữ liệu.
+        MonsterCatalogSnapshot monsterCatalog =
+                MonsterCatalogLoader.load(databaseBootstrap.wireMonsterFacade(), MonsterSpawnPoint.MAIN_WORLD_CODE);
+        WorldFacade firstChannelFacade = new WorldFacade(
+                characterRegistry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG_MAIN), monsterCatalog);
         firstChannelFacade.start();
         MainWorldChannelRegistry mainWorldChannels =
-                new MainWorldChannelRegistry(characterRegistry, firstChannelFacade, meterRegistry);
+                new MainWorldChannelRegistry(characterRegistry, firstChannelFacade, meterRegistry, monsterCatalog);
         return new WorldContext(mainWorldChannels, metricsHttpServer);
     }
 

@@ -1497,3 +1497,39 @@ Bốn ADR mới so với lần đếm trước (2026-08-07):
       một cú **bấm chuột thật** trước đó; chỉ gọi `SetForegroundWindow` thì phím vào nhỏ giọt
       (giữ 3 giây chỉ đi được 0,9m trong khi `MOVE_SPEED_MPS = 5`). Bấm chuột vào vùng trống rồi
       mới giữ phím là chạy đúng tốc độ.
+
+43. **ADR-037 thi hành — quái đọc từ DB, thay bốn chỗ hardcode (2026-08-30)**:
+    - ✅ **Migration V23**: `monster_template` (15 cột) + `monster_spawn`. **Cột quan hệ, KHÔNG
+      JSON** — đi NGƯỢC đặc tả gốc DATABASE.md §2.2, đã sửa lại tài liệu đó thay vì sửa code theo
+      nó. Đo lại đúng Revisit Trigger của ADR-036 ("quá 6 chỉ số thì đo lại JSON") chứ không viện
+      tiền lệ suông: cái giá không đổi (một dependency mới, §4), còn `stats_json` gõ sai khoá thì
+      **im lặng thành 0**. `CHECK pos_y = 0` biến ràng buộc ADR-033 từ comment thành luật DB.
+    - ✅ **Bốn chỗ hardcode gom về một bảng**: `CombatConstants.MONSTER_STATS`/`MONSTER_MAX_HP`/
+      `MONSTER_RESPAWN_SECONDS` biến mất; `MONSTER_SPAWN_X` biến mất; **`MonsterExperience` bị XOÁ**
+      (bảng tra Java mà javadoc của chính nó gọi là tạm). `AiConstants` là chỗ duy nhất còn lại,
+      hoãn có chủ đích (D7) và đã ghi chú vào AI.md §10 vì tài liệu đó mô tả sai hiện trạng.
+    - ✅ **Module `feature-monster`** + `PostgresMonsterCatalogAdapter` + `MonsterCatalogLoader`
+      (gateway dịch) + `MonsterCatalogSnapshot` (record thuần của world). Hình dạng này KHÔNG tuỳ
+      chọn: `server-database` **không phụ thuộc** `server-world`, chỉ gateway phụ thuộc cả hai —
+      đúng ràng buộc đã buộc ADR-036 dịch `EquipmentBonus` → `EquipmentBonusSnapshot`.
+    - ✅ **EXP đi cùng lượt báo "quái chết"** thay vì tra lại: `onMonsterKilled(..., expReward)`.
+      Tra lại ở gateway là mở đường đọc thứ hai cho cùng dữ liệu, **và** là tham số thứ năm cho
+      `ConnectedCharacterRegistry` — vốn đã chạm trần Checkstyle với 15 chỗ dựng.
+    - ✅ **Protocol**: một field additive `model_key` trên `MonsterSpawnedEvent`, `protocolVersion`
+      KHÔNG tăng, không thêm opcode. Field rỗng ⇒ client suy từ `monster_code` như cũ
+      (`MonsterModelKey`), nên **server cũ vẫn chạy với client mới** — và boss (giữ hardcode) đi
+      đúng nhánh đó.
+    - ⚠️ **Chỗ suýt sai, bắt được lúc thi hành**: bản đầu cho `MonsterSpecies` mang thẳng
+      `CombatConstants.CombatStats`. Kiểu đó **package-private**, nên đó là một API công khai mà
+      gateway không gọi được — và là rò rỉ nội tình combat ra khỏi module. Đổi sang mang SỐ THUẦN,
+      `WorldFacade` tự dựng `CombatStats`; phần trăm chia 100 đúng một chỗ.
+    - ✅ **Nội dung**: 3 loài. `training_dummy` **giữ NGUYÊN mọi con số cũ** (hàng đối chứng — có
+      test Postgres gác riêng); thêm `wandering_bandit` (atk 22) và `stone_ogre` (atk 40, 200 máu)
+      để phòng thủ lần đầu đọc được: không giáp chịu 3 đòn, bộ Hạ Nhẫn +0 chịu 6, +15 chịu 11 (so
+      với hình nộm: 15/26/61 — ba con số đều là "không bao giờ chết").
+    - ⚠️ **Nợ art nhìn thấy được**: cả ba loài dùng CHUNG `mob_training-dummy`, hai loài mới trông y
+      hệt hình nộm cho tới khi có `.glb` riêng. Chủ dự án chọn thế để cân bằng chạy được ngay thay
+      vì chờ art. Khoá i18n đã thêm ở CẢ HAI bundle.
+    - ⚠️ **Số của hai loài mới CHƯA playtest** — đúng thân phận mà `ENHANCE_STEP` và bảng tỉ lệ §7.1
+      từng có. Việc tiếp theo là chơi thật đúng bảng "số đòn chịu được" ở ADR-037 D6; đó mới là lúc
+      biết DEF/RES của V22 đúng hay sai.

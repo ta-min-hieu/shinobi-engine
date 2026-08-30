@@ -56,7 +56,8 @@
 
 | Bảng | Cột chính | Ghi chú |
 |---|---|---|
-| `monster_template` | `id, code, name_key, level, base_stats_json, ai_params_json, drop_table_id` | `ai_params_json`: aggro range, tốc độ đuổi... ([AI.md §10](../03-engine/AI.md)) |
+| `monster_template` | `id, code, name_key, model_key, level, max_hp, atk, skill_dmg, def, res, hit_percent, dodge_percent, crit_percent, element, exp_reward, drop_table_id` | **Tĩnh**, nạp lúc khởi động. ⚠️ **CỘT QUAN HỆ, KHÔNG JSON** — đặc tả gốc ghi `base_stats_json`/`ai_params_json` nhưng dự án không có thư viện JSON nào; [ADR-037](../01-architecture/adr/ADR-037-Monster-Template-And-Spawn-Tables.md) D1 quyết ngược lại, cùng lập luận đã dùng cho `drop_table_entry` và ADR-036. ⚠️ **`ai_params` CHƯA có** (ADR-037 D7 hoãn) — tham số AI vẫn ở `AiConstants` |
+| `monster_spawn` | `id, monster_template_id (FK), world_code, pos_x, pos_y, respawn_seconds` | **Tĩnh** — loài nào đứng ở đâu. `CHECK pos_y = 0` (ADR-033 khoá di chuyển vào trục X). Migration V23 |
 | `drop_table` | `id, entries_json` | Tỉ lệ rơi đồ — **config, không code** |
 
 ### 2.5 Quest

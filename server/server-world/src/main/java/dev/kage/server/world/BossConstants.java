@@ -12,6 +12,14 @@ package dev.kage.server.world;
 final class BossConstants {
 
     static final String BOSS_CODE = "sample_boss";
+
+    /**
+     * EXP hạ gục boss. Ở lại đây chứ không vào {@code monster_template} vì ADR-037 D7 giữ NGUYÊN
+     * boss dạng hardcode (nó có script GraalJS + {@code BossAiSystem} riêng). Giá trị giữ đúng con
+     * số cũ của {@code MonsterExperience.SAMPLE_BOSS_EXP} — gấp 10 quái thường, đáng công cả party.
+     */
+    static final long BOSS_EXP_REWARD = 200L;
+
     static final String BOSS_SCRIPT_RESOURCE = "/scripts/boss/sample_boss.js";
 
     // AI.md §9 "không giả định chạy mỗi tick" — hỏi script mỗi 0.5s, không mỗi tick (60Hz).

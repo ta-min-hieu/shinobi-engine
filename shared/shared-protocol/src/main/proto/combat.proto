@@ -58,6 +58,18 @@ message MonsterSpawnedEvent {
   float y = 4;
   int32 current_hp = 5;
   int32 max_hp = 6;
+  // ADR-037 D5 — field THÊM (7), field 1..6 giữ NGUYÊN, protocolVersion KHÔNG tăng (luật additive
+  // NETWORK.md §6). Khoá art của loài (`monster_template.model_key`).
+  //
+  // Vì sao cần: client vốn suy model bằng một PHÉP BIẾN ĐỔI THUẦN từ monster_code
+  // (MonsterModelKey: training_dummy -> mob_training-dummy), và file đó CỐ Ý không phải bảng tra
+  // ("client không nên là bên thứ ba phải đồng ý mỗi lần thêm một con quái"). Phép biến đổi thuần
+  // không cho hai loài KHÁC NHAU dùng chung một model, mà đó chính là thứ cần trong lúc chờ art
+  // riêng cho từng loài.
+  //
+  // RỖNG = server cũ chưa gửi, hoặc loài giữ hardcode (boss): client suy như cũ. Nên field này là
+  // bổ sung, không phải thay thế — server cũ vẫn chạy với client mới.
+  string model_key = 7;
 }
 
 // Event: Server -> Client (OPCODE_MONSTER_DESPAWNED_EVENT). Quái VỪA chết hoặc rời AoI — client

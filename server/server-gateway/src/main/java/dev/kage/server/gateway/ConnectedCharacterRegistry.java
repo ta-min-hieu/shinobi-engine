@@ -11,7 +11,6 @@ import io.netty.channel.ChannelHandlerContext;
 
 import dev.kage.character.application.GrantExperienceUseCase;
 import dev.kage.character.domain.ExperienceProgress;
-import dev.kage.character.domain.MonsterExperience;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.ItemStack;
@@ -262,6 +261,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 .setY(monster.y())
                 .setCurrentHp(monster.currentHp())
                 .setMaxHp(monster.maxHp())
+                .setModelKey(monster.modelKey())
                 .build();
         send(ctx, Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE, 0, event.toByteArray());
     }
@@ -409,7 +409,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     }
 
     @Override
-    public void onMonsterKilled(long killerCharacterId, String monsterCode) {
+    public void onMonsterKilled(long killerCharacterId, String monsterCode, long expReward) {
         lootExecutor.execute(() -> grantLootBlocking(killerCharacterId, monsterCode));
         // Cạnh grantLoot, KHÔNG qua EventBus (engine-ecs) — 1 nguồn duy nhất chưa tới ngưỡng đáng
         // kích hoạt pub-sub thật (feature-quest/CLAUDE.md). Virtual Thread RIÊNG cho quest, không
@@ -417,15 +417,17 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         lootExecutor.execute(() -> processQuestBlocking(killerCharacterId, monsterCode));
         // Cạnh loot/quest, cùng lý do tách Virtual Thread riêng: cộng EXP chạm DB. Thêm 2026-08-09
         // khi chủ dự án hỏi vạch kinh nghiệm — trước đó giết quái KHÔNG cho EXP gì cả.
-        lootExecutor.execute(() -> grantExperienceBlocking(killerCharacterId, monsterCode));
+        lootExecutor.execute(() -> grantExperienceBlocking(killerCharacterId, expReward));
     }
 
     /**
-     * Cộng EXP cho người hạ gục rồi báo vạch mới. Quái lạ (chưa khai báo EXP) cho 0 — bỏ qua sớm,
-     * không đụng DB chỉ để cộng số không.
+     * Cộng EXP cho người hạ gục rồi báo vạch mới. Quái chưa khai EXP cho 0 — bỏ qua sớm, không đụng
+     * DB chỉ để cộng số không (giữ nguyên hành vi cũ của {@code MonsterExperience}).
+     *
+     * <p>ADR-037 D4: con số này đến TỪ {@code monster_template.exp_reward} và được world chở theo
+     * lượt báo "quái chết", thay cho bảng tra Java {@code MonsterExperience} nay đã bị xoá.
      */
-    private void grantExperienceBlocking(long killerCharacterId, String monsterCode) {
-        long reward = MonsterExperience.rewardFor(monsterCode);
+    private void grantExperienceBlocking(long killerCharacterId, long reward) {
         if (reward <= 0L) {
             return;
         }

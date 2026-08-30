@@ -59,6 +59,7 @@ import dev.kage.mail.application.DeleteMailUseCase;
 import dev.kage.mail.application.ListMailUseCase;
 import dev.kage.mail.application.MailPorts;
 import dev.kage.mail.application.SendMailUseCase;
+import dev.kage.monster.api.MonsterFacade;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.party.application.AcceptPartyInviteUseCase;
 import dev.kage.party.application.CreatePartyUseCase;
@@ -99,6 +100,7 @@ import dev.kage.server.database.mail.PostgresMailGoldAdapter;
 import dev.kage.server.database.mail.PostgresMailIdempotencyAdapter;
 import dev.kage.server.database.mail.PostgresMailInventoryGatewayAdapter;
 import dev.kage.server.database.mail.PostgresMailRepositoryAdapter;
+import dev.kage.server.database.monster.PostgresMonsterCatalogAdapter;
 import dev.kage.server.database.party.PostgresPartyAdapter;
 import dev.kage.server.database.pvp.PostgresPvpRatingAdapter;
 import dev.kage.server.database.quest.JdbcQuestTransactionRunner;
@@ -387,6 +389,11 @@ public final class ServerDatabaseBootstrap {
 
     public PvpFacade wirePvpFacade() {
         return new PvpFacade(new PostgresPvpRatingAdapter(dataSource));
+    }
+
+    /** ADR-037 — {@code monster_template}/{@code monster_spawn}, đọc thuần, nạp một lần lúc khởi động. */
+    public MonsterFacade wireMonsterFacade() {
+        return new MonsterFacade(new PostgresMonsterCatalogAdapter(dataSource));
     }
 
     public TradeFacade wireTradeFacade() {

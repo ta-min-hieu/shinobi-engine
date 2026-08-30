@@ -55,8 +55,8 @@ final class ArenaOutboundSink implements WorldOutboundSink {
     }
 
     @Override
-    public void onMonsterKilled(long killerCharacterId, String monsterCode) {
-        registry.onMonsterKilled(killerCharacterId, monsterCode);
+    public void onMonsterKilled(long killerCharacterId, String monsterCode, long expReward) {
+        registry.onMonsterKilled(killerCharacterId, monsterCode, expReward);
     }
 
     @Override

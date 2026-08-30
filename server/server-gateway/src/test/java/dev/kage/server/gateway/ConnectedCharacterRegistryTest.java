@@ -119,7 +119,7 @@ class ConnectedCharacterRegistryTest {
         // Virtual Thread cùng writeAndFlush (EmbeddedEventLoop không thread-safe, gói bị nuốt mất).
         // Đó là giới hạn của bộ khung test, không phải của server thật — Netty channel thật cho
         // phép ghi từ thread bất kỳ. Test EXP nằm riêng bên dưới, một luồng ghi một lúc.
-        registry.onMonsterKilled(1L, "quai_khong_co_exp");
+        registry.onMonsterKilled(1L, "quai_khong_co_exp", 0L);
 
         PacketCodec.Frame frame = awaitOutboundFrame(channel, Opcode.OPCODE_ITEM_GRANTED_EVENT_VALUE);
         ItemGrantedEvent event = ItemGrantedEvent.parseFrom(frame.payload());
@@ -139,7 +139,7 @@ class ConnectedCharacterRegistryTest {
         EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
         registry.register(1L, channel.pipeline().firstContext());
 
-        registry.onMonsterKilled(1L, "quai_khong_co_exp"); // xem test trên về lý do không dùng quái thật
+        registry.onMonsterKilled(1L, "quai_khong_co_exp", 0L); // xem test trên về lý do không dùng quái thật
 
         sleepQuietly(200); // đủ lâu để lootExecutor (Virtual Thread) chạy xong nếu (sai) có gửi gì
         // KHÔNG assert "không có frame nào": từ 2026-08-09 giết quái LUÔN phát
@@ -163,7 +163,9 @@ class ConnectedCharacterRegistryTest {
         EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
         registry.register(1L, channel.pipeline().firstContext());
 
-        registry.onMonsterKilled(1L, "training_dummy");
+        // EXP > 0 mới phát sự kiện — 0 là "quái chưa khai EXP", nhánh bỏ qua sớm (xem
+        // grantExperienceBlocking). Từ ADR-037 con số này do world chở tới, không tra bảng nữa.
+        registry.onMonsterKilled(1L, "training_dummy", 20L);
 
         PacketCodec.Frame frame = awaitOutboundFrame(channel, Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE);
         ExperienceChangedEvent event = ExperienceChangedEvent.parseFrom(frame.payload());
@@ -184,7 +186,7 @@ class ConnectedCharacterRegistryTest {
         EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
         registry.register(1L, channel.pipeline().firstContext());
 
-        registry.onMonsterKilled(1L, "quai_khong_co_exp");
+        registry.onMonsterKilled(1L, "quai_khong_co_exp", 0L);
 
         sleepQuietly(200);
         assertThat(outboundOpcodes(channel)).doesNotContain(Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE);
