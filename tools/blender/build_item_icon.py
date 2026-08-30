@@ -482,9 +482,15 @@ def build_and_render(item_code, out_blend_dir, out_render_dir):
 
     os.makedirs(out_blend_dir, exist_ok=True)
     blend_path = os.path.join(out_blend_dir, item_code + ".blend")
-    bpy.ops.wm.save_as_mainfile(filepath=blend_path)
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(blend_path))
 
-    render_dir = os.path.join(out_render_dir, "icon_" + item_code)
+    # os.path.abspath is NOT optional here. On Windows Blender resolves a
+    # relative render filepath against the DRIVE ROOT, not against the process
+    # cwd -- so passing a relative --out-render silently writes the PNGs to a
+    # mirror tree at the root of C: and leaves the real output directory empty,
+    # while still printing a "Saved:" line for every frame. Found the hard way
+    # on 2026-08-30 while re-rendering the V21 batch from the committed sources.
+    render_dir = os.path.abspath(os.path.join(out_render_dir, "icon_" + item_code))
     os.makedirs(render_dir, exist_ok=True)
     scene.render.filepath = os.path.join(render_dir, "icon")
     bpy.ops.render.render(write_still=True)

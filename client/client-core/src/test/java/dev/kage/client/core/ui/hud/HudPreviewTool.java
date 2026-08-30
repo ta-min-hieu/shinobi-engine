@@ -184,11 +184,20 @@ public final class HudPreviewTool extends ApplicationAdapter {
         // TÚI ĐẦY: đúng MAX_VISIBLE_SLOTS dòng + dòng "còn n món chưa hiện" + cả 7 ô đều có đồ. Đây
         // là trạng thái CAO NHẤT khung này có thể đạt — khung chưa có ScrollPane nên nó cũng là
         // trạng thái duy nhất trả lời được câu "túi đầy thì có tràn khỏi màn hình không".
+        // Mã icon lấy từ V21 chứ không phải 3 mã cũ: đây là chỗ DUY NHẤT chứng minh vùng
+        // icon_<code> mới thật sự có trong atlas và client tra ra được (2026-08-30).
         java.util.List<InventoryPanel.ItemRow> full = new java.util.ArrayList<>();
+        String[] codes = {
+            "steel_katana", "genin_vest", "genin_headband", "genin_wraps", "genin_sandals",
+            "genin_bracelet", "genin_necklace", "novice_vest", "iron_scrap", "chakra_shard"
+        };
+        String[] names = {
+            "Katana Thép +9", "Áo Giáp Hạ Nhẫn", "Mũ Trụ Hạ Nhẫn", "Găng Tay Hạ Nhẫn", "Giày Hạ Nhẫn",
+            "Vòng Tay Hạ Nhẫn", "Dây Chuyền Hạ Nhẫn", "Áo Vải Tập Sự", "Sắt Vụn x40", "Mảnh Chakra x7"
+        };
         for (int index = 0; index < MAX_VISIBLE_SLOTS_PREVIEW; index++) {
-            full.add(new InventoryPanel.ItemRow(index + 1L, "kunai", "Phi tiêu x99"));
+            full.add(new InventoryPanel.ItemRow(index + 1L, codes[index], names[index]));
         }
-        full.set(0, new InventoryPanel.ItemRow(1L, "wooden_sword", "Kiếm gỗ +9"));
         inventoryPanel.setItems(full, MAX_VISIBLE_SLOTS_PREVIEW + "/30 ô", "... còn 4 vật phẩm nữa chưa hiện.");
         inventoryPanel.setEquipment(java.util.List.of(
                 new InventoryPanel.EquipmentRow(1, "Vũ khí", "Kiếm gỗ +9", true),
