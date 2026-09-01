@@ -182,9 +182,30 @@ mask phủ rộng hơn chiếc băng rất nhiều. Đo được: hộp bao vùn
 `(30,103)–(1006,912)`, tức gần trọn tấm; ảnh diff cũng có vài đốm ở mí mắt. Nói cách khác nó tô
 đúng chiếc băng **và** vài chỗ xám trung tính khác trên đầu.
 
-**Việc còn thiếu để chốt #2**: siết mask từ "cả đầu" xuống "trán" bằng **vị trí đỉnh** trong không
-gian đầu (phần trên + phía trước hộp sọ), thứ có sẵn ngay cạnh trọng số xương. Ước tính nhỏ, nhưng
-là việc thật và phải chụp lại để nghiệm thu.
+### 4.7. Đã thử BỐN cách siết mask — không cách nào tự động hoàn toàn mà chạy được
+
+Sau khi phát hiện mask "cả đầu" quá rộng, đã thử lần lượt và **đo lại bằng ảnh mỗi lần**:
+
+| Cách | Kết quả đo | Vì sao hỏng |
+|---|---|---|
+| Ngưỡng xám cố định (110–200) | vùng đổi trải gần trọn texture | Bỏ sót mặt **bắt sáng** của tấm (~240), tô lan chỗ khác |
+| Lọc theo **cụm độ cao** (dải Z) | 5.832 → 1.864 px, hộp bao còn **20×79** | Gọn nhưng **cắt mất chính tấm** — tấm là hình chữ nhật CAO, không phải vành mỏng; chỉ tô được một sọc bên trái |
+| **Mảng liên thông** + phủ hộp bao | tô được ~một nửa tấm | Hoạ tiết khắc và đinh tán chia tấm thành nhiều mảnh vụn |
+| Nới trần độ sáng lên 250 | mảng lớn nhất **nhảy sang vùng khác** | Ở dải sáng đó, lòng trắng mắt/highlight lớn hơn cả tấm |
+
+Ảnh phóng to vùng texture cho thấy rõ vì sao khó: tấm kim loại có **mặt bắt sáng gần trắng, vùng
+trong bóng xám trung, đinh tán đen, và một hoạ tiết khắc tối ngang màu tóc** — bốn dải giá trị
+khác nhau, mỗi dải lại trùng với một bộ phận khác trên đầu.
+
+**Kết luận: đừng cố dò tự động.** Thiết kế đúng là **CHỈ ĐIỂM** — người mở texture trong UV editor
+của Blender, đọc một toạ độ nằm trên tấm kim loại, truyền vào `--seed u,v`; từ đó phép loang theo
+"giống kim loại" + phủ hộp bao làm nốt, và nó chắc chắn. Chi phí: **15 lần chỉ điểm cho 15 nhân
+vật** — rẻ hơn nhiều so với một heuristic không đáng tin.
+
+**Việc còn thiếu để chốt #2**: chế độ `--seed` đã cài xong, nhưng **chưa xác định được quy ước
+`u,v` thật** — thử mù 4 tổ hợp lật trục đều rơi ngoài vùng đầu, tức quy ước V giữa texture xuất ra
+và ảnh trong `.blend` không như suy luận. Việc này **mở UV editor ra là thấy ngay**, đoán mò thì
+không. Script ở `tools/blender/strip_headband.py`, ghi rõ trạng thái ở đầu file.
 
 **Không có file nguồn nào bị sửa trong đợt thử này** — thao tác trên `.blend` tạm ngoài repo, và
 model xuất ra đã được khôi phục, xác minh bằng cách đếm lại đúng **7.861** px xám như bản gốc.
@@ -252,5 +273,5 @@ Không. Đợt 3 nằm trong phạm vi [ADR-038](../01-architecture/adr/ADR-038-
 1. ✅ Phép đo cấu trúc (§4.3) + phép khoanh vùng theo xương (§4.4) đã chạy xong 2026-09-01 — không cần Blender, không tốn hạn mức. Hai kết luận vội của bản đầu đã được sửa ở §4.4 và §4.5.
 2. Chủ dự án tick bảng §5: **#2 là ô quan trọng nhất** — cộng #3, #4, #5.
 3. ✅ Không cần addon MCP: Blender chạy **nền qua dòng lệnh** là đủ, trọn vòng đã chạy thật (§4.6).
-4. Việc kỹ thuật còn lại của #2: **siết mask từ "cả đầu" xuống "trán"** bằng vị trí đỉnh, rồi mới chạy hàng loạt 15 nhân vật × 3 tier và chụp nghiệm thu.
+4. Việc kỹ thuật còn lại của #2 (§4.7): **mở texture trong UV editor của Blender, đọc toạ độ `u,v` của tấm kim loại** cho 1 nhân vật để chốt quy ước trục, rồi lấy nốt 14 toạ độ còn lại và chạy hàng loạt 15 nhân vật × 3 tier + chụp nghiệm thu. Đây là việc **cần mắt người nhìn một lần**, không đoán mò được.
 5. #3 (`char_town-elder` → Chu Hoành) là việc DUY NHẤT còn cần Rodin, nên cần chủ dự án gật trước.
