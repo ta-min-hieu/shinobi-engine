@@ -69,7 +69,7 @@
 [EDITOR.md](12-devtools/EDITOR.md) · [ADMIN.md](12-devtools/ADMIN.md) · [LAUNCHER.md](12-devtools/LAUNCHER.md) — *stub có chủ đích*
 
 ### 13 · Game Design
-[GAME-DESIGN-DOCUMENT.md](13-game-design/GAME-DESIGN-DOCUMENT.md)
+[GAME-DESIGN-DOCUMENT.md](13-game-design/GAME-DESIGN-DOCUMENT.md) — cơ chế (theme tu tiên từ [ADR-038](01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md)) · [STORY.md](13-game-design/STORY.md) — cốt truyện & lore (SSOT tường thuật, bố cục chờ duyệt)
 
 ### 14 · Art
 [ART-PIPELINE.md](14-art/ART-PIPELINE.md) — Blender → **model glTF cho nhân vật (2.5D, [ADR-031](01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md))** + pre-render sprite cho VFX/icon, art direction, 3 mức cấu hình đồ họa client · [BLENDER-SESSION-GUIDE.md](14-art/BLENDER-SESSION-GUIDE.md) — lệnh từng bước, checklist nghiệm thu, bảng lỗi · [ART-QUALITY-STANDARD.md](14-art/ART-QUALITY-STANDARD.md) — thước đo ĐẠT/KHÔNG ĐẠT (benchmark Ninja School Online)
@@ -102,10 +102,11 @@
 
 Đây là danh sách tổng hợp toàn bộ thứ **chưa quyết** (chủ dự án quyết, không phải AI).
 
-## 🔴 ĐANG CHỜ CHỦ DỰ ÁN — cập nhật 2026-08-30 (chiều)
+## 🔴 ĐANG CHỜ CHỦ DỰ ÁN — cập nhật 2026-09-01
 
 | # | Việc | Đang chặn gì | Đọc ở đâu |
 |---|---|---|---|
+| ~~11~~ | ✅ **[ADR-038](01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md) Accepted 2026-09-01 — game ĐỔI BỐI CẢNH sang TU TIÊN** (Phàm Nhân Tu Tiên-style): re-theme tường thuật + tên hiển thị, KHÔNG đổi cơ chế/protocol/DB/tên code. Chủ dự án duyệt trọn: D1-D9, thang **6 cảnh giới × 9 tầng** (Luyện Khí→Trúc Cơ→Tử Phủ→Kim Đan→Nguyên Anh→Hoá Thần), bố cục [STORY.md](13-game-design/STORY.md) §1–§8, và 2 tên riêng "Huyền Thương"/"Thanh Hư Tông". Đợt 1 (docs) XONG | Còn 🔶 TODO-OPUS (không chặn phase): STORY chi tiết §3–§6 → Đợt 2 (i18n + DB seed + quest bám STORY) → Đợt 3 (art audit) + D8 (quét ~74 chỗ "ninja" trong docs cũ) | [ADR-038](01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md) · [GDD v0.3.0](13-game-design/GAME-DESIGN-DOCUMENT.md) · [STORY.md](13-game-design/STORY.md) |
 | ~~1~~ | ✅ **ADR-032 Accepted 2026-08-06 và đã thi hành cùng ngày** — `gdx-gltf` 2.3.0 nằm trong `third-party/m2/`, đã vào `libs.versions.toml` và `client-core`, resolve + compile được với `--offline` (tức lấy thật từ repo, không qua mạng). `WorldScreen` **đã nối** sang nhánh 3D (`df5ace2`) và `RENDERING.md` **đã viết lại** cho hai nhánh render (2026-08-07). Còn lại: chạy pipeline art sinh `.glb` để **nhìn thấy** nó chạy → đo frame time → viết GLSL cel | Không còn chặn | [ADR-032](01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md) · [third-party/m2](../third-party/m2/README.md) |
 | ~~2~~ | ✅ **V20 duyệt + thi hành 2026-08-07, bước kiểm mồ côi thi hành 2026-08-08 — ĐÓNG HOÀN TOÀN** — `V20__extend_art_asset_for_3d.sql` thêm `asset_kind`/`model_name`/`tri_counts` + `CHECK art_asset_kind_branch`; `ArtRegistryUpserter` upsert được nhánh `MODEL` (verify thật trên Postgres 17: 15 dòng / 45 file `.glb`, chạy 2 lần bất biến). `OrphanAssetChecker` soi **cả hai** thư mục `assets/exported/atlases/` và `assets/exported/models/`, fail build nếu đĩa có file mồ côi; dòng DB không còn file trên đĩa (stale) chỉ cảnh báo — verify thật qua Postgres 17 (Testcontainers) | Không còn chặn | [ART-PIPELINE §8.6](14-art/ART-PIPELINE.md) |
 | 3 | **Desktop-first hay mobile-first** (câu hỏi cũ, chưa trả lời) | ADR-023 (mobile input) chưa viết được; ngân sách tam giác hiện chỉ đo cho desktop — có Android thì phải đo lại trên máy tầm thấp | [CLIENT.md §5](04-client/CLIENT.md) |
@@ -119,8 +120,8 @@
 
 > ⚠️ Câu "không còn ADR nào `Proposed`" đã sai **hai lần trong hai ngày** (ADR-036 rồi ADR-037), nên
 > đừng tin chữ ở đây: kiểm dòng `Status` của từng file ADR.
-> Đếm chuẩn cuối ngày 2026-08-30: **35 Accepted · 1 Superseded (ADR-007) · 0 Proposed** trên tổng 36
-> file; chỉ **ADR-023** là chưa viết. Luật vẫn đúng nguyên: nếu tài liệu nào còn viết "chờ chủ dự án
+> Đếm chuẩn 2026-09-01: **36 Accepted · 1 Superseded (ADR-007) · 0 Proposed** (ADR-038 tu tiên Accepted
+> trong ngày) trên tổng 37 file; chỉ **ADR-023** là chưa viết. Luật vẫn đúng nguyên: nếu tài liệu nào còn viết "chờ chủ dự án
 > Accept" cho một ADR thì **kiểm dòng `Status` của chính file ADR đó**, đừng tin chữ ở nơi khác —
 > chính cái bẫy đó đã bắt được lỗi sổ sách ADR-032 ngày 2026-08-25.
 

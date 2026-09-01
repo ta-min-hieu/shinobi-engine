@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version | 1.0.0 |
+| Version | 1.1.0 — thuật ngữ gameplay đổi theo theme tu tiên ([ADR-038](01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md)) |
 | Status | Draft |
 
 > Đảm bảo mọi tài liệu, code, commit dùng **cùng một thuật ngữ** cho cùng khái niệm.
@@ -53,36 +53,48 @@
 
 ## 2. Gameplay
 
-| Tiếng Việt | EN | Ghi chú |
+> ⚠️ Từ v1.1.0 (theme tu tiên — [ADR-038](01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md)):
+> cột "Tiếng Việt" là **tên hiển thị mới**; cột "EN" là **tên code/DB — GIỮ NGUYÊN**, không đổi
+> theo theme. Class/opcode/schema tiếp tục dùng đúng cột EN cũ.
+
+| Tiếng Việt (tu tiên) | EN (code/DB — không đổi) | Ghi chú |
 |---|---|---|
-| Hệ phái | Faction (Element) | Hỏa/Thủy/Phong/Lôi/Thổ = Fire/Water/Wind/Thunder/Earth |
-| Khí | Chi | `current_chi` — resource pool |
-| Chuyển Sinh | Rebirth | `rebirth_count` |
-| Điểm Nguồn | Origin Point | Bonus vĩnh viễn khi rebirth |
-| Đá Chuyển Hệ | Faction Change Stone | Đổi hệ phái |
-| Cường hoá | Enhancement | `enhance_level` +0→+15 |
-| Bảo Vệ (cuộn) | Protect Scroll | Chống rớt cấp cường hoá |
-| Khảm Ngọc | Gem Socketing | Post-MVP |
-| Bộ trang bị | Set | Bonus 4/6/8 món |
-| Tuyệt Kỹ | Ultimate Skill | Lv50 |
-| Kỹ năng chủ động | Active Skill | — |
-| Kỹ năng bị động | Passive Skill | — |
+| Linh căn | Faction (Element) | Hỏa/Thủy/Phong/Lôi/Thổ = Fire/Water/Wind/Thunder/Earth; Phong/Lôi = dị linh căn (tên cũ: Hệ phái) |
+| Linh Lực | Chi | `current_chi` — resource pool (tên cũ: Khí) |
+| Tu Vi | Experience (EXP) | `experience` — điểm kinh nghiệm |
+| Cảnh giới | Realm (display của Level) | Luyện Khí/Trúc Cơ/Tử Phủ/Kim Đan/Nguyên Anh/Hoá Thần — **mỗi cảnh giới 9 tầng** (Sơ/Trung/Hậu kỳ = 1–3/4–6/7–9); chỉ là cách trình bày Lv1–100 ([ADR-038 D2](01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md)) |
+| Độ Kiếp Chuyển Thế | Rebirth | `rebirth_count` (tên cũ: Chuyển Sinh) |
+| Đạo Vận | Origin Point | Bonus vĩnh viễn khi rebirth (tên cũ: Điểm Nguồn) |
+| Tẩy Căn Đan | Faction Change Stone | Đổi linh căn (tên cũ: Đá Chuyển Hệ) |
+| Linh Thạch | Gold | `gold` — tiền tệ chính (tên cũ: Vàng) |
+| Tôi luyện | Enhancement | `enhance_level` +0→+15 (tên cũ: Cường hoá) |
+| Hộ Linh Phù | Protect Scroll | Chống rớt cấp tôi luyện (tên cũ: cuộn Bảo Vệ) |
+| Khảm Linh Ngọc | Gem Socketing | Post-MVP |
+| Pháp khí | Equipment | `item_template` (tên cũ: Trang bị) |
+| Bộ pháp khí | Set | Bonus 4/6/8 món |
+| Công pháp | Skill | `skill_template` (tên cũ: Kỹ năng) |
+| Thần Thông | Ultimate Skill | Lv50 — Tử Phủ tầng 7 (tên cũ: Tuyệt Kỹ) |
+| Pháp thuật (chủ động) | Active Skill | — |
+| Tâm pháp (bị động) | Passive Skill | — |
 | Hồi chiêu | Cooldown | Server giữ, không tin client |
-| Học Viện Ninja | Ninja Academy (Hub) | Safe zone |
-| Lãnh Địa Hệ Phái | Faction Zone | Luyện cấp |
-| Vùng Tranh Chấp | Contested Zone | PvP mở |
-| Bí Cảnh | Dungeon (Instance) | Party-scoped |
+| Tông môn (hub) | Sect (Hub) | Safe zone — Thanh Hư Tông (tên cũ: Học Viện Ninja / Ninja Academy) |
+| Đệ tử tạp dịch / ngoại môn / nội môn | Outer/Inner Disciple | Bậc tường thuật, không phải cơ chế |
+| Linh Mạch | Faction Zone | Luyện cấp theo nguyên tố (tên cũ: Lãnh Địa Hệ Phái) |
+| Hoang Vực | Contested Zone | PvP mở (tên cũ: Vùng Tranh Chấp) |
+| Bí Cảnh | Dungeon (Instance) | Party-scoped — tên cũ giữ nguyên, đã chuẩn tu tiên |
 | Chế độ khó | Hard Mode | — |
-| Boss Thế Giới | World Boss | Theo lịch |
-| Quái tinh anh | Elite Monster | — |
+| Yêu Vương | World Boss | Theo lịch (tên cũ: Boss Thế Giới) |
+| Yêu thú | Monster | `monster_template` (tên cũ: Quái) |
+| Yêu thú tinh anh | Elite Monster | — |
+| Khinh công | (movement flavor) | Cơ chế nhảy [ADR-033](01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md) — chỉ đổi cách gọi |
 | Bảng rơi đồ | Drop Table | Config |
 | Bang hội | Guild | Từ Lv25 |
 | Chiếm Lãnh Địa | Guild Territory War | Post-MVP |
 | Tổ đội | Party | 2–5 người |
 | Đấu trường | Arena (ranked 1v1) | MMR/season |
 | Chiến trường | Battlefield (5v5 objective) | — |
-| Thú cưng | Pet | Post-MVP |
-| Cưỡi (thú) | Mount | Chỉ tốc độ + thẩm mỹ |
+| Linh thú | Pet | Post-MVP (tên cũ: Thú cưng) |
+| Phi kiếm / Linh cầm | Mount | Chỉ tốc độ + thẩm mỹ (tên cũ: Cưỡi thú) |
 | Thời trang | Cosmetic / Fashion | Pay-for-cosmetic |
 | Đấu giá | Auction House | Post-MVP |
 | Thư | Mail | — |
