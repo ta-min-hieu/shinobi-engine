@@ -28,8 +28,9 @@ vốn đã trung tính về đề tài.
 > ✅ **Cập nhật cuối ngày 2026-09-01 — phần nhân vật đã XONG.** Soi bảng ứng viên của cả 15 nhân
 > vật cho thấy **chỉ `char_hoa-b1` đội băng trán ninja** (§4.10) — nó là con pilot Text→3D đầu
 > tiên, 14 con sinh sau không có. Tấm kim loại đã được xoá khỏi nguồn `.blend`, xuất lại đủ 3
-> tier, kiểm bằng mắt trong game. **0 lượt Rodin.** Còn lại đúng ba việc, tất cả ở §5: `char_town-elder`
-> (#3, cần Rodin) và hai cái icon (#4, #5).
+> tier, kiểm bằng mắt trong game. **0 lượt Rodin.** Còn lại **bốn** việc, tất cả ở §5:
+> `char_town-elder` (#3, cần Rodin), hai cái icon (#4, #5), và một câu hỏi thẩm mỹ mới phát hiện
+> — giáp kim loại của `char_tho-b3` (#7).
 
 ---
 
@@ -251,9 +252,19 @@ loại" loang lớn nhất, xếp cạnh nhau), nhìn một lần, chỉ ra ô n
 
 **Chỉ ĐÚNG MỘT nhân vật có băng trán ninja: `char_hoa-b1`.**
 
-Đã soi bảng ứng viên của cả 15 con. Ở `char_hoa-b1`, ô lớn nhất là tấm kim loại thật — hình chữ
-nhật bạc, có đinh tán và hoạ tiết khắc, nằm trên nền vải đỏ; 5 ô còn lại đều là mắt. Ở **mọi nhân
-vật khác**, không ô nào là tấm kim loại: toàn mặt, mắt, da, vạt áo.
+Đã soi bảng ứng viên của **cả 15 con, từng cái một**. Ở `char_hoa-b1`, ô lớn nhất là tấm kim loại
+thật — hình chữ nhật bạc, có đinh tán và **hoạ tiết khắc**, nằm trên nền vải đỏ; 5 ô còn lại đều
+là mắt. Ở 13 con khác, không ô nào là kim loại: toàn mặt, mắt, da, vạt áo. Đáng chú ý `char_thuy-b1`
+mặc **đạo bào trắng vạt chéo có đai** — hợp tu tiên đến mức không phải nghĩ.
+
+⚠️ **Đính chính (soi nốt sau khi đã commit): `char_tho-b3` CŨNG có tấm kim loại.** Nhưng chúng là
+những **tấm giáp xám bo góc, bốn đinh tán, KHÔNG có hoạ tiết khắc** — trông như mũ/giáp chứ không
+phải băng trán ninja, và giáp trên một nhân vật hệ Thổ (thể tu) thì hợp cả hai đề tài. Bản trước
+của mục này viết "chỉ một nhân vật có" là **nói quá**: đúng phải là *chỉ một nhân vật có băng trán
+NINJA*; còn `char_tho-b3` có kim loại nhưng chưa rõ có phải thứ cần bỏ hay không.
+
+🔴 **Cần chủ dự án nhìn**: `char_tho-b3` — giáp/mũ kim loại giữ hay bỏ? Tôi nghiêng về **giữ**
+(giáp không mang dấu hiệu đề tài nào), nhưng đây là quyết định thẩm mỹ, không phải kỹ thuật.
 
 Số liệu khớp với mắt nhìn: vùng "giống kim loại" lớn nhất của `char_hoa-b1` là **10.020 px** — một
 mảng nhỏ, biên rõ. Ở các con khác con số nhảy lên 39.000–115.000 px, tức bộ dò đang bám vào những
@@ -288,6 +299,7 @@ Script để ở `tools/blender/strip_headband.py` kèm ghi chú trạng thái n
 | 4 | Sửa `icon_genin_headband` → mũ vải ngoại môn | 1 icon, dựng tay | ⬜ |
 | 5 | Sửa `icon_steel_katana` → trường kiếm thẳng | 1 icon, dựng tay | ⬜ Hay chấp nhận đao cong? |
 | 6 | 17 VFX + 16 icon + 3 quái | **0** | Không cần quyết — giữ nguyên |
+| 7 | 🔴 `char_tho-b3` có **tấm giáp/mũ kim loại** trên đầu (§4.10 đính chính) — bo góc, 4 đinh tán, KHÔNG hoạ tiết khắc | Nếu bỏ: 1 lần chỉ điểm + xuất lại, **0 hạn mức Rodin** | ⬜ Giữ hay bỏ? **Tôi nghiêng về GIỮ** — giáp không mang dấu hiệu đề tài, và hệ Thổ là thể tu |
 
 **Đề xuất của tôi**: làm #2 trước — nó không tốn hạn mức, và phép khoanh vùng theo xương đã được
 kiểm chứng trên 4/5 hệ (§4.4). Xuất lại xong thì chụp `runWorldPreview` xem khối lồi trên trán có
