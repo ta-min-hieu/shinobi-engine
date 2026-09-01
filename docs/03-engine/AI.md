@@ -56,7 +56,7 @@ stateDiagram-v2
     Chase --> Dead: HP <= 0
 ```
 
-**Tại sao FSM đủ cho 95% quái**: quái Ninja School không cần thông minh. Nó cần: đứng yên → thấy người → đuổi → đánh → mất mục tiêu thì về. Hết. Behavior Tree cho việc này là over-engineering (Điều 9).
+**Tại sao FSM đủ cho 95% quái**: yêu thú trong một game side-view không cần thông minh. Nó cần: đứng yên → thấy người → đuổi → đánh → mất mục tiêu thì về. Hết. Behavior Tree cho việc này là over-engineering (Điều 9).
 
 ```java
 public final class AiStateComponent implements Component {
@@ -144,7 +144,7 @@ GOAP (Goal-Oriented Action Planning) được nhắc trong đề xuất tài li�
 | Địa hình nhiều tầng, platform | A* trên grid |
 | Bản đồ lớn, nhiều quái | A* + cache đường đi + giới hạn số lần tìm/tick |
 
-⚠️ **Không làm A* ở MVP nếu chưa cần** (Điều 9). Ninja School side-view: quái phần lớn đi thẳng tới người chơi trên mặt đất phẳng. A* là chi phí không cần thiết.
+⚠️ **Không làm A* ở MVP nếu chưa cần** (Điều 9). Side-view khoá trục X ([ADR-033](../01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md)): quái phần lớn đi thẳng tới người chơi trên mặt đất phẳng. A* là chi phí không cần thiết.
 
 **Nếu cần A*:**
 - Grid dựa trên collision map, **không** tính lại mỗi tick.

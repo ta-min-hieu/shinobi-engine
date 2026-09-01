@@ -84,11 +84,11 @@ Bước 1–2 (art thô → sprite sheet) được sản xuất bằng Blender p
 |---|---|---|
 | Sprite (VFX · icon · UI) | `<category>_<name>_<variant>.png` | `icon_kunai.png` |
 | **Model nhân vật/quái/NPC** | `<asset_key>.glb` trong `models/<tier>/` | `models/med/char_thuy-b1.glb` |
-| Animation | `<entity>_<action>.anim` | `ninja-fire_attack-01.anim` |
+| Animation | `<entity>_<action>.anim` | `char_hoa-b1_attack-01.anim` |
 | Atlas | `<zone-or-feature>.atlas` | `faction-fire-zone.atlas` |
-| Map | `<zone>.h2d` | `academy-hub.h2d` |
+| Map | `<zone>.h2d` | `sect-hub.h2d` |
 | SFX | `sfx_<name>.ogg` | `sfx_skill-fireball.ogg` |
-| BGM | `bgm_<zone>.ogg` | `bgm_academy-hub.ogg` |
+| BGM | `bgm_<zone>.ogg` | `bgm_sect-hub.ogg` |
 
 **Cấm**: khoảng trắng · tiếng Việt có dấu · chữ hoa (một số filesystem phân biệt hoa/thường, một số không → lỗi chỉ xuất hiện trên Linux/CI).
 

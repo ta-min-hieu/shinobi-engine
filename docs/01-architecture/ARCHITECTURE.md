@@ -48,7 +48,7 @@ graph TB
     GM["👤 Game Master<br/>(vận hành)"]
     Dev["👤 Nhà phát triển<br/>(build content)"]
 
-    Kage["🎮 Project Kage<br/>2D Ninja MMORPG<br/>Java 25"]
+    Kage["🎮 Project Kage<br/>MMORPG tu tiên 2.5D<br/>Java 25"]
 
     Payment["💳 Cổng thanh toán<br/>(chưa chốt — xem GDD §84)"]
     CDN["📦 CDN<br/>(phát hành asset/patch)"]

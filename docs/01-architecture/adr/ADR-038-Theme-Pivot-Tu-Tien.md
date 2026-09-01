@@ -143,6 +143,33 @@ trong DB seed" ở D7.2 dựa trên một giả định sai về nơi chữ đư
 script sản phẩm chỉ được kiểm bởi `DialogueIntegrationTest` vốn cần Postgres, tức là im lặng biến
 mất mỗi khi máy không bật Docker.
 
+### D11 — Playtest thật (2026-09-01, sau khi bật Docker)
+
+Chơi thật trên server + Postgres + Redis thật. **1099/1099 test xanh** (lần đầu tính cả 197 test
+Postgres, gồm `DialogueIntegrationTest` chạy đúng `town_elder.js` sản phẩm). Ảnh chụp từng bước.
+
+| Đã NHÌN THẤY chạy | Bằng chứng |
+|---|---|
+| Cảnh giới ở màn chọn nhân vật | "Kagemaru — Hỏa (**Luyện Khí 1**)" |
+| Điều kiện dùng pháp khí theo cảnh giới | "Trường Kiếm Thép +7 · **Cần Luyện Khí tầng 3**" (cấp 5 ⇒ tầng 3 ✓) |
+| Hội thoại Chu Hoành + trọn 3 node arc 1 | Lời chào, "Đây là Thanh Hư Tông…", "Tu luyện có thứ tự: Luyện Khí, rồi Trúc Cơ…", "Ta kẹt ở Kim Đan bốn mươi năm…" |
+| Nhận nhiệm vụ qua hội thoại | HUD "**Đập Mộc Nhân — Đang làm**" |
+| Giết quái → rơi đồ → tên vật phẩm mới | Chat "**Nhận được Phi Đao x1.**" |
+| Túi đồ | "Túi đồ **41.100 linh thạch**", "Hộ Linh Phù x3", ô "**Pháp khí / Đạo bào / Hộ thủ**" |
+| Cửa hàng | "**Tàng Bảo Các  Linh thạch: 41.100**", trọn bộ "Tạp Dịch" |
+| Tên quái / chiêu / gợi ý phím | "Mộc nhân luyện công", "Hỏa Cầu Thuật", "B mua bán… K luận kiếm" |
+
+**Playtest bắt được một lỗi tràn do chính đợt này gây ra**: dòng cửa hàng ghép
+`"<tên> — Mua: X  Bán: Y"` trong một nhãn KHÔNG xuống dòng, nên "Khăn Buộc Tóc Tạp Dịch" (22 ký tự)
+nuốt luôn giá bán ("… Bá…"). Rút ba tên dài nhất xuống ≤17 ký tự — mốc **đo được** từ
+"Băng Tay Tạp Dịch" vốn hiện đủ — và ghi trần đó vào ngay bundle. Đã chụp lại xác nhận hết tràn.
+
+**Chưa chứng minh bằng chơi tay**: đủ 3 mạng quái để nhiệm vụ chuyển "Hoàn thành" rồi lĩnh thưởng.
+Đánh nhau bằng input giả tuột mục tiêu và chết giữa chừng (giới hạn đã biết của công cụ playtest,
+không phải lỗi game) — nhưng chuỗi nhận → đếm → hoàn thành → lĩnh thưởng thì `QuestIntegrationTest`
+đã kiểm trọn trên Postgres thật với đúng script sản phẩm, và hai chuỗi chữ của bước lĩnh thưởng
+vốn KHÔNG bị đợt này đụng tới.
+
 ### D9 — Cốt truyện có tài liệu SSOT riêng: [STORY.md](../../13-game-design/STORY.md)
 
 Cốt truyện KHÔNG nằm rải trong GDD — tách thành **STORY.md** (bố cục §1–§8 đã đề xuất, chờ chủ dự
@@ -188,12 +215,16 @@ lúc này. Tên "Kage" trên repo/branding lệch theme cho tới khi chủ dự
 2. ✅ Đợt 1 đã soạn kèm: [GDD v0.3.0](../../13-game-design/GAME-DESIGN-DOCUMENT.md) + [GLOSSARY](../../GLOSSARY.md) + khung [STORY.md](../../13-game-design/STORY.md).
 3. ✅ STORY.md §1–§8 viết đầy đủ (v0.2.0, 2026-09-01) — nội dung chờ chủ dự án duyệt.
 4. ✅ Đợt 2 xong 2026-09-01 — xem D10.
-5. ⏳ **Playtest thật chưa chạy được**: máy chưa bật Docker nên không dựng nổi Postgres/Redis cho
-   server. Chữ mới đã xem bằng ảnh chụp `runHudPreview`, nhưng vòng "đăng nhập → nói chuyện với
-   Chu Hoành → nhận nhiệm vụ → đập mộc nhân → nhận thưởng" thì CHƯA ai chơi thử. Cùng lý do,
-   `DialogueIntegrationTest`/`QuestIntegrationTest` (Postgres thật) không chạy được trong đợt này.
-6. 🔶 TODO-OPUS: Đợt 3 (art audit ninja → tu tiên) — D7.3.
-7. 🔶 TODO-OPUS: quét docs còn lại — D8.
+5. ✅ Playtest thật xong 2026-09-01 — xem D11. 1099/1099 test xanh (gồm 197 test Postgres).
+6. 🔶 TODO-OPUS: Đợt 3 (art audit ninja → tu tiên) — D7.3. **Đọc [ART-QUALITY-STANDARD §1](../../14-art/ART-QUALITY-STANDARD.md) trước**:
+   thước đo nghiệm thu cũ đòi nhân vật "vẫn nhận ra là ninja", tức là nó sẽ đánh trượt mọi asset tu
+   tiên đúng đề tài. Đã sửa 2026-09-01, nhưng đây là loại bẫy chỉ lộ ra khi bắt tay làm.
+7. ✅ D8 xong phần thật sự lệch (2026-09-01): `docs/README` (dòng mô tả dự án), `ARCHITECTURE` (sơ
+   đồ), `KAGE-CONSTITUTION Điều 5`, `AI.md`, `RENDERING.md`, `RESOURCE.md` (ví dụ đặt tên),
+   `ART-QUALITY-STANDARD`. **Phần CÒN LẠI cố ý GIỮ**: link tới `ADR-033-Ninja-School-Style-Movement.md`
+   (tên file thật), các bản ghi playtest cũ trong ROADMAP nhắc "bộ Hạ Nhẫn" (số đo lịch sử — sửa là
+   làm sai hồ sơ), và `BLENDER-SESSION-GUIDE` (bản ghi lệnh đã chạy thật). Con số "74 chỗ" ở D8 gộp
+   cả ba nhóm đó nên nghe lớn hơn việc thật rất nhiều.
 8. 💡 Đề xuất (CHƯA làm, cần chủ dự án gật): quest thứ hai của arc 1 — "đêm trực gặp tán tu cường
    đạo" (STORY.md §6 arc 1 cao trào). Chặn kỹ thuật có thật: `feature-quest/CLAUDE.md` quy định
    **quest thứ hai theo dõi giết quái thì BẮT BUỘC tổng quát hoá `ProcessMonsterKilledUseCase.TRACKED_QUEST_CODE`

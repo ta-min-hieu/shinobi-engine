@@ -67,9 +67,11 @@ Project Kage không đơn thuần là một game. Mục tiêu là xây dựng:
 
 ### Điều 5. Mission
 
-Gameplay đầu tiên lấy cảm hứng từ thể loại 2D anime ninja MMORPG (Ninja School Online và tương tự), nhưng **toàn bộ kiến trúc phải đủ tổng quát** để hỗ trợ nhiều thể loại game 2D trong tương lai.
+Gameplay đầu tiên lấy cảm hứng từ thể loại **tu tiên / tiên hiệp** (dòng *Phàm Nhân Tu Tiên* và tương tự), trên khung cơ chế side-view kế thừa dòng game hành động 2D, nhưng **toàn bộ kiến trúc phải đủ tổng quát** để hỗ trợ nhiều thể loại game 2D trong tương lai.
 
 Cảm hứng ≠ sao chép. Không sao chép IP, tên riêng, cốt truyện, asset của bất kỳ sản phẩm nào.
+
+> Điều này được sửa 2026-09-01 theo [ADR-038](../01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md): bối cảnh chuyển từ ninja học viện sang tu tiên. Câu chữ về **tính tổng quát của kiến trúc** không đổi — chính nó là lý do đợt đổi bối cảnh không phải đụng tới một dòng cơ chế nào.
 
 ### Điều 6. Definition of Success
 

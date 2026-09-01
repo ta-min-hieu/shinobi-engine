@@ -748,7 +748,7 @@ phải bằng chứng `u_worldTrans` hoạt động đúng, chỉ là chưa gặ
 **MVP: KHÔNG có lighting động.** [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)
 **không** đổi điều này — 2.5D không kéo theo lighting engine.
 
-Lý do: game side-view kiểu Ninja School không cần. Thêm lighting = thêm render pass + shader phức tạp +
+Lý do: game side-view góc khoá như game này không cần. Thêm lighting = thêm render pass + shader phức tạp +
 chi phí mobile. Điều 9 (Simplicity) + Điều 10 (gameplay nào cần?).
 
 ⚠️ **Đừng nhầm "không lighting động" với "không tính ánh sáng".** Cel shader ở §12.2 **có** tính `N·L`

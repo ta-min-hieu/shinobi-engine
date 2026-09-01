@@ -6,7 +6,8 @@
 |---|---|
 | Version | 1.3.0 |
 | Status | Draft |
-| Benchmark | **Ninja School Online** (TeaMobi) — mức tối thiểu phải đạt |
+| Version | 1.4.0 — đề tài chuyển sang tu tiên ([ADR-038](../01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md)), thước đo kỹ thuật giữ nguyên |
+| Benchmark | **Ninja School Online** (TeaMobi) — mức tối thiểu về ĐỘ HOÀN THIỆN, không phải về đề tài (xem §1) |
 | Liên quan | [ART-PIPELINE.md](ART-PIPELINE.md) (pipeline) · [BLENDER-SESSION-GUIDE.md](BLENDER-SESSION-GUIDE.md) (thao tác) · [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md) (2.5D) |
 
 > Phân vai 3 tài liệu art: ART-PIPELINE = *pipeline & định hướng* · BLENDER-SESSION-GUIDE = *thao tác từng bước* · **file này = thước đo "đẹp"**. Phiên làm art nạp cả 3 + [tools/blender/README.md](../../tools/blender/README.md) (contract script) — đúng 4 file, không đọc thêm.
@@ -45,7 +46,15 @@ AI chưa từng thấy game này nên quy ra đặc điểm cụ thể. NSO là 
 | Vũ khí nhìn ra hình | Vũ khí có hình dạng thật, không phải hộp |
 | Pose động: nghiêng người, khuỵu gối | Khuỷu/gối gập thật (rig 11 xương), có anticipation + follow-through (§6) |
 
-**Một câu cho mọi phiên art**: *nhân vật phải trông như chú ninja chibi trong anime — không phải robot ghép từ hộp.*
+**Một câu cho mọi phiên art**: *nhân vật phải trông như một tu sĩ chibi trong anime — không phải robot ghép từ hộp.*
+
+> ⚠️ **Cập nhật 2026-09-01 ([ADR-038](../01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md)).**
+> NSO vẫn là benchmark **MỨC ĐỘ HOÀN THIỆN** (chibi 2.5 đầu, mặt đọc được, nhiều mảng màu, pose
+> động) — đó là thước đo tay nghề, không phải thước đo đề tài. Nhưng **ĐỀ TÀI đã đổi sang tu
+> tiên**: trang phục là đạo bào / áo vải tạp dịch chứ không phải đồ ninja, vũ khí là kiếm/phất
+> trần/pháp khí chứ không phải kunai, phụ kiện là ngọc bội / dây bùa chứ không phải băng trán.
+> Bảng đặc điểm ngay trên và Q10 §2 đã được sửa theo. Đây KHÔNG phải chuyện chữ nghĩa: bản Q10 cũ
+> đòi "vẫn nhận ra là ninja", tức là nó sẽ **đánh trượt mọi asset tu tiên đúng đề tài**.
 
 Ảnh chuẩn đã duyệt (2026-08-03, pilot Text→3D): `assets/raw/reference/pilot_text3d_hoa_v2_actions.png` · `pilot_text3d_hoa_v2_goc_camera.png`. Bộ `gold_char_hoa_b1.png` / `gold_5elements_b3.png` (thế hệ mesh kit) **đã bị chủ dự án bác** cùng ngày — chỉ giữ làm lịch sử, không dùng làm chuẩn so.
 
@@ -66,7 +75,7 @@ Chấm trên **PNG đã render** (không phải viewport), ở @1x rồi @0.5x. 
 | Q7 | Vũ khí đọc được đúng loại ở **@1x** (§2.3 ART-PIPELINE) | Nhìn riêng vũ khí ở 128px |
 | Q8 | Cel shading ≥ 2 nấc thấy rõ trên thân (không phẳng lì, không gradient mượt) | Nhìn vùng ngực/bụng |
 | Q9 | Outline liền mạch, KHÔNG dồn thành mảng đen | Nhìn tổng thể |
-| Q10 | @0.5x 64px: vẫn nhận ra là ninja + biết hệ nào | Thu nhỏ 50% |
+| Q10 | @0.5x 64px: vẫn nhận ra là một tu sĩ + biết linh căn nào | Thu nhỏ 50% |
 | Q11 | `run`: thân nghiêng trước 8–15°, khuỷu + gối **gập**, có frame 2 chân rời đất | Xem `run_01` + `run_02` |
 | Q12 | `attack`: `attack_00`/`attack_01` lấy đà (rút về), `attack_02` vung hết tầm | Xem `attack_00` + `attack_02` |
 
