@@ -155,7 +155,7 @@ lúc này. Tên "Kage" trên repo/branding lệch theme cho tới khi chủ dự
 
 1. ✅ Accepted 2026-09-01 (chủ dự án duyệt trọn D1–D9 + bố cục STORY.md + 2 tên riêng).
 2. ✅ Đợt 1 đã soạn kèm: [GDD v0.3.0](../../13-game-design/GAME-DESIGN-DOCUMENT.md) + [GLOSSARY](../../GLOSSARY.md) + khung [STORY.md](../../13-game-design/STORY.md).
-3. 🔶 TODO-OPUS: viết chi tiết STORY.md §3–§6 (bố cục đã duyệt) — D9.
-4. 🔶 TODO-OPUS: Đợt 2 (i18n + DB seed + quest script bám STORY.md) — D7.2.
+3. ✅ STORY.md §1–§8 viết đầy đủ (v0.2.0, 2026-09-01) — nội dung chờ chủ dự án duyệt.
+4. 🔶 TODO-OPUS: Đợt 2 (i18n + DB seed + quest script bám STORY.md §8) — D7.2.
 5. 🔶 TODO-OPUS: Đợt 3 (art audit ninja → tu tiên) — D7.3.
 6. 🔶 TODO-OPUS: quét docs còn lại — D8.

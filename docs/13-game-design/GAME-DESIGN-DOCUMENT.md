@@ -339,6 +339,6 @@ Xem §12 — còn ADR-023 (mobile input). ADR-038 ✅ Accepted 2026-09-01.
 ## Việc cần làm tiếp theo
 
 1. ✅ [ADR-038](../01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md) Accepted 2026-09-01 — GDD 0.3.0 này là Đợt 1 của nó.
-2. 🔶 **TODO-OPUS** — viết chi tiết [STORY.md](STORY.md) §3–§6, rồi Đợt 2: i18n client + tên item/quái/NPC/skill trong DB seed + quest bám STORY.
+2. ✅ [STORY.md](STORY.md) v0.2.0 viết đầy đủ (2026-09-01). 🔶 **TODO-OPUS** — Đợt 2: i18n client + tên item/quái/NPC/skill trong DB seed + quest bám STORY §8.
 3. 🔶 **TODO-OPUS** — Đợt 3: audit art ninja → tu tiên (15 nhân vật, 3 yêu thú, 17 VFX).
 4. Playtest cân bằng hệ số §4/§5-6 — TOÀN BỘ hệ số hiện tại là placeholder (không đổi so với 0.2.0).
