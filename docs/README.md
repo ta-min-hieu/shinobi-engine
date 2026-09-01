@@ -72,7 +72,7 @@ MMORPG **tu tiên** side-view 2.5D ([ADR-038](01-architecture/adr/ADR-038-Theme-
 [GAME-DESIGN-DOCUMENT.md](13-game-design/GAME-DESIGN-DOCUMENT.md) — cơ chế (theme tu tiên từ [ADR-038](01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md)) · [STORY.md](13-game-design/STORY.md) — cốt truyện & lore (SSOT tường thuật, bố cục chờ duyệt)
 
 ### 14 · Art
-[ART-PIPELINE.md](14-art/ART-PIPELINE.md) — Blender → **model glTF cho nhân vật (2.5D, [ADR-031](01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md))** + pre-render sprite cho VFX/icon, art direction, 3 mức cấu hình đồ họa client · [BLENDER-SESSION-GUIDE.md](14-art/BLENDER-SESSION-GUIDE.md) — lệnh từng bước, checklist nghiệm thu, bảng lỗi · [ART-QUALITY-STANDARD.md](14-art/ART-QUALITY-STANDARD.md) — thước đo ĐẠT/KHÔNG ĐẠT (benchmark Ninja School Online)
+[ART-PIPELINE.md](14-art/ART-PIPELINE.md) — Blender → **model glTF cho nhân vật (2.5D, [ADR-031](01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md))** + pre-render sprite cho VFX/icon, art direction, 3 mức cấu hình đồ họa client · [BLENDER-SESSION-GUIDE.md](14-art/BLENDER-SESSION-GUIDE.md) — lệnh từng bước, checklist nghiệm thu, bảng lỗi · [ART-QUALITY-STANDARD.md](14-art/ART-QUALITY-STANDARD.md) — thước đo ĐẠT/KHÔNG ĐẠT (NSO là benchmark ĐỘ HOÀN THIỆN; đề tài là tu tiên) · [ART-AUDIT-TU-TIEN.md](14-art/ART-AUDIT-TU-TIEN.md) — **rà asset cho Đợt 3: giữ gì / sửa gì / làm lại gì, kèm bảng quyết định**
 
 ### Xuyên suốt
 [GLOSSARY.md](GLOSSARY.md) — thuật ngữ Việt–Anh

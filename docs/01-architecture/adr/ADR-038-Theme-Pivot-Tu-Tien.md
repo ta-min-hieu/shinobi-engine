@@ -216,16 +216,21 @@ lúc này. Tên "Kage" trên repo/branding lệch theme cho tới khi chủ dự
 3. ✅ STORY.md §1–§8 viết đầy đủ (v0.2.0, 2026-09-01) — nội dung chờ chủ dự án duyệt.
 4. ✅ Đợt 2 xong 2026-09-01 — xem D10.
 5. ✅ Playtest thật xong 2026-09-01 — xem D11. 1099/1099 test xanh (gồm 197 test Postgres).
-6. 🔶 TODO-OPUS: Đợt 3 (art audit ninja → tu tiên) — D7.3. **Đọc [ART-QUALITY-STANDARD §1](../../14-art/ART-QUALITY-STANDARD.md) trước**:
-   thước đo nghiệm thu cũ đòi nhân vật "vẫn nhận ra là ninja", tức là nó sẽ đánh trượt mọi asset tu
-   tiên đúng đề tài. Đã sửa 2026-09-01, nhưng đây là loại bẫy chỉ lộ ra khi bắt tay làm.
-7. ✅ D8 xong phần thật sự lệch (2026-09-01): `docs/README` (dòng mô tả dự án), `ARCHITECTURE` (sơ
+6. ✅ **Đợt 3 — phần RÀ SOÁT xong 2026-09-01**: [ART-AUDIT-TU-TIEN.md](../../14-art/ART-AUDIT-TU-TIEN.md).
+   Kết quả ngược hẳn với dự đoán của D7.3: **33/37 nhóm asset dùng lại nguyên vẹn** (toàn bộ 17 VFX,
+   16/18 icon, cả 3 quái). Đề tài ninja gần như chỉ nằm ở MỘT chi tiết — băng trán có tấm kim loại.
+   Và phép đo cấu trúc `.glb` cho thấy nó là **dải màu tách bạch trong texture**, gỡ được bằng đổi
+   màu chứ không phải sinh lại model ⇒ **0 lượt Rodin cho 15 nhân vật**. Còn chờ chủ dự án tick
+   bảng §5 của bản rà soát. Cũng đã gỡ bẫy: thước đo nghiệm thu cũ đòi nhân vật "vẫn nhận ra là
+   ninja", nó sẽ đánh trượt mọi asset tu tiên đúng đề tài.
+7. 🔶 Đợt 3 — phần THI HÀNH: chờ bảng §5 của bản rà soát được tick.
+8. ✅ D8 xong phần thật sự lệch (2026-09-01): `docs/README` (dòng mô tả dự án), `ARCHITECTURE` (sơ
    đồ), `KAGE-CONSTITUTION Điều 5`, `AI.md`, `RENDERING.md`, `RESOURCE.md` (ví dụ đặt tên),
    `ART-QUALITY-STANDARD`. **Phần CÒN LẠI cố ý GIỮ**: link tới `ADR-033-Ninja-School-Style-Movement.md`
    (tên file thật), các bản ghi playtest cũ trong ROADMAP nhắc "bộ Hạ Nhẫn" (số đo lịch sử — sửa là
    làm sai hồ sơ), và `BLENDER-SESSION-GUIDE` (bản ghi lệnh đã chạy thật). Con số "74 chỗ" ở D8 gộp
    cả ba nhóm đó nên nghe lớn hơn việc thật rất nhiều.
-8. 💡 Đề xuất (CHƯA làm, cần chủ dự án gật): quest thứ hai của arc 1 — "đêm trực gặp tán tu cường
+9. 💡 Đề xuất (CHƯA làm, cần chủ dự án gật): quest thứ hai của arc 1 — "đêm trực gặp tán tu cường
    đạo" (STORY.md §6 arc 1 cao trào). Chặn kỹ thuật có thật: `feature-quest/CLAUDE.md` quy định
    **quest thứ hai theo dõi giết quái thì BẮT BUỘC tổng quát hoá `ProcessMonsterKilledUseCase.TRACKED_QUEST_CODE`
    trước** (hiện hardcode đúng một mã), và cần thêm dòng `quest_template` ⇒ một migration. Cả hai
