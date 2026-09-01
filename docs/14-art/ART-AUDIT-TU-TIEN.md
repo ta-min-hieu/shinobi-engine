@@ -202,10 +202,45 @@ của Blender, đọc một toạ độ nằm trên tấm kim loại, truyền v
 "giống kim loại" + phủ hộp bao làm nốt, và nó chắc chắn. Chi phí: **15 lần chỉ điểm cho 15 nhân
 vật** — rẻ hơn nhiều so với một heuristic không đáng tin.
 
-**Việc còn thiếu để chốt #2**: chế độ `--seed` đã cài xong, nhưng **chưa xác định được quy ước
-`u,v` thật** — thử mù 4 tổ hợp lật trục đều rơi ngoài vùng đầu, tức quy ước V giữa texture xuất ra
-và ảnh trong `.blend` không như suy luận. Việc này **mở UV editor ra là thấy ngay**, đoán mò thì
-không. Script ở `tools/blender/strip_headband.py`, ghi rõ trạng thái ở đầu file.
+### 4.8. ✅ ĐÃ GIẢI XONG — và không cần mắt người
+
+Bản trước của mục này kết luận "phải mở UV editor mới biết toạ độ". **Sai nốt.** Ba việc gỡ được
+hết bằng máy:
+
+1. **Xuất ảnh theo đúng hệ toạ độ của script** (`--dump`): mọi tranh cãi về quy ước lật trục V
+   biến mất — toạ độ đọc trên ảnh đó dùng thẳng được.
+2. **Hạt giống tự bám** sang pixel hợp lệ gần nhất. Lý do bốn lần chỉ điểm ĐÚNG vẫn bị từ chối:
+   tấm kim loại có **hoạ tiết khắc ở chính giữa**, nên trọng tâm rơi vào chỗ tối; và mask (dựng
+   bằng cách đóng dấu quanh từng đỉnh) có **lỗ rỗ** ở những đảo UV thưa đỉnh.
+3. **Loang KHÔNG đòi hỏi mask**. Chính lỗ rỗ đó chặn đứt phép loang giữa tấm — lần đầu chỉ phủ
+   được 1/8 tấm. Hạt giống đã neo đúng chỗ rồi, đi theo "giống kim loại" là đủ và không nhảy sang
+   đảo khác.
+
+Thêm hai chi tiết phải đúng thì màu mới đúng: lấy màu vải từ **một vành cách hộp bao 3–12 px**
+(sát mép ra màu trắng của viền tấm; lấy sau khi nới hộp bao ra màu đen của tóc), và **ưu tiên màu
+có sắc độ**.
+
+**Kết quả trên `char_hoa-b1`, đã nhìn tận mắt**: tấm kim loại — cả đinh tán lẫn hoạ tiết khắc —
+**biến mất hoàn toàn**, thay bằng vải đỏ trơn `(0.824, 0.11, 0.18)` lấy từ chính chiếc băng. Trong
+game ở cỡ thật, nhân vật đội một dải khăn đỏ trơn; khối lồi còn lại trên mesh **không lộ**.
+
+### 4.9. Tự động chọn hạt giống: đúng trên Hỏa B1, SAI trên Hỏa B2
+
+Đã thử nốt một bước tự động hoá (`--auto`): coi tấm kim loại là vùng "giống kim loại" **loang ra
+lớn nhất**. Trên `char_hoa-b1` nó đúng — 10.020 px, bỏ xa ứng viên kế tiếp (2.409, chính là lòng
+trắng mắt mà cách đếm ở §4.7 đã chọn nhầm.)
+
+**Nhưng trên `char_hoa-b2` nó sai**: chọn ra một vùng 48.384 px và lấy màu thay gần trắng
+`(0.957, 0.882, 0.816)` — màu da, không phải vải băng. Tức là ở nhân vật đó có một mảng sáng nhạt
+lớn hơn cả tấm kim loại.
+
+**Đây là lần thứ bảy một luật chung bị chính phép đo bác bỏ, và nó đủ để rút ra kết luận:** 15
+nhân vật do Rodin sinh độc lập, mỗi con một bảng màu và một cách tô bóng, nên **không có heuristic
+chung nào đáng tin**. Đừng thử cái thứ tám.
+
+**Cách chắc chắn, và rẻ**: mỗi nhân vật xuất một ảnh `--dump` (đúng hệ toạ độ của script), nhìn
+một lần, đọc toạ độ tấm kim loại, chạy `--seed u,v`. **15 lần nhìn cho 15 nhân vật.** Phần còn lại
+— loang, hộp bao, chọn màu vải, xuất lại 3 tier — đã tự động và đã kiểm chứng.
 
 **Không có file nguồn nào bị sửa trong đợt thử này** — thao tác trên `.blend` tạm ngoài repo, và
 model xuất ra đã được khôi phục, xác minh bằng cách đếm lại đúng **7.861** px xám như bản gốc.
@@ -221,7 +256,7 @@ Script để ở `tools/blender/strip_headband.py` kèm ghi chú trạng thái n
 | # | Việc | Chi phí ĐO ĐƯỢC | Cần quyết |
 |---|---|---|---|
 | ~~1~~ | ~~Băng trán rời hay dính?~~ | ✅ **Đã đo 2026-09-01** — dính mesh nhưng tách bạch trong texture (§4.3) | Xong |
-| 2 | Bỏ băng trán khỏi 15 nhân vật: khoanh vùng đầu theo **trọng số xương** (§4.4) rồi tô lại ảnh đóng gói **trong `.blend`**, xuất lại | **0 hạn mức Rodin**; cần 1 phiên Blender; phép khoanh vùng đã kiểm chứng | ⬜ Đồng ý hướng này? (đánh đổi: khối lồi trên trán vẫn còn trên mesh) |
+| 2 | Bỏ băng trán khỏi 15 nhân vật bằng `strip_headband.py --seed` | **0 hạn mức Rodin**. Công cụ ĐÃ CHẠY XONG và **đã kiểm chứng bằng mắt trên `char_hoa-b1`** (§4.8): tấm kim loại + đinh tán + hoạ tiết khắc biến mất, thay bằng vải đỏ trơn. Còn 14 nhân vật, mỗi con cần đúng **một lần nhìn** để đọc toạ độ hạt giống (§4.9) | ⬜ **Nhìn ảnh trước/sau rồi gật** — 15 file nguồn `.blend` sẽ bị sửa (revert được, chúng nằm trong git LFS) |
 | 2b | *Hoặc* sinh lại 15 nhân vật cho sạch hẳn khối lồi | **15 lượt Rodin** + 15 vòng nghiệm thu | ⬜ Chỉ chọn nếu #2 nhìn không đạt |
 | 3 | Làm mới `char_town-elder` thành Chu Hoành | 1 lượt Rodin + 1 vòng nghiệm thu | ⬜ Đồng ý tiêu hạn mức? |
 | 4 | Sửa `icon_genin_headband` → mũ vải ngoại môn | 1 icon, dựng tay | ⬜ |

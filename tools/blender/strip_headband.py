@@ -2,23 +2,20 @@
 
     blender -b <char>.blend -P strip_headband.py -- --seed u,v [--save-as out.blend] [--dry]
 
-TRANG THAI 2026-09-01: CHUA DUNG DUOC HANG LOAT. Da chay tron vong that (Blender headless ->
-to lai anh dong goi -> luu .blend -> export_character_lods.py -> render -> diff bang may),
-0 luot Rodin, va da chung minh duoc hai thu:
+TRANG THAI 2026-09-01: CHAY DUOC va DA KIEM CHUNG BANG MAT tren char_hoa-b1 — tam kim loai,
+dinh tan va hoa tiet khac bien mat, thay bang vai do tron lay tu chinh chiec bang; trong game
+o co that khoi loi con lai tren mesh KHONG lo. 0 luot Rodin.
 
-  1. Khoanh vung theo TRONG SO XUONG ('head') hoat dong; luat mau toan cuc thi KHONG
-     (bat trung ao Thuy 55k px, mat tam kim loai o Tho/Loi). Xem ART-AUDIT §4.4.
-  2. Do TIM tam kim loai hoan toan tu dong thi KHONG hoi tu. Da thu bon cach:
-     nguong xam co dinh (bo sot phan bat sang), cum do cao (cat mat tam vi tam la hinh
-     chu nhat cao chu khong phai vanh mong), mang lien thong (chi phu duoc mot phan),
-     va noi tran do sang (mang lon nhat nhay sang vung khac han). Xem ART-AUDIT §4.6.
+CACH DUNG (moi nhan vat can DUNG MOT lan nhin):
+  1. Xuat anh theo he toa do cua script de doc toa do (xem docs/14-art/ART-AUDIT-TU-TIEN §4.8).
+  2. Chay voi --seed u,v tro vao tam kim loai.
+  3. Xuat lai bang export_character_lods.py, roi runWorldPreview de nghiem thu.
 
-Vi vay thiet ke dung la CHI DIEM: nguoi mo texture trong UV editor cua Blender, doc mot toa
-do nam tren tam kim loai, truyen qua --seed. Tu do phep loang + hop bao lam not, va no chac
-chan. VIEC CON LAI: xac dinh quy uoc u,v that (thu mu 4 toa do deu truot vung dau — quy uoc
-V giua texture xuat ra va anh trong .blend khong nhu suy luan), roi chay 15 nhan vat.
+KHONG dung --auto de chay hang loat: no dung tren char_hoa-b1 (10.020 px, mau do) nhung SAI
+tren char_hoa-b2 (48.384 px, mau da). Bay lan thu mot luat chung deu bi phep do bac bo — 15
+nhan vat do Rodin sinh doc lap, moi con mot bang mau. Xem ART-AUDIT §4.9.
 
-CHUA duoc ap dung cho bat ky .blend nao trong repo.
+CHUA duoc ap dung cho bat ky .blend nao trong repo (cho chu du an gat sau khi nhin anh truoc/sau).
 """
 import sys, math
 import bpy
@@ -65,6 +62,12 @@ if obj is None or img is None:
     print("KAGE-RESULT skip lydo=khong-tim-thay-than-hoac-anh")
     sys.exit(0)
 
+# In luon tham so ma export_character_lods.py can, de driver khong phai doan ten object/rig.
+rig = next((o.name for o in bpy.data.objects if o.type == 'ARMATURE'), '')
+extras = [o.name for o in bpy.data.objects
+          if o.type == 'MESH' and o is not obj and o.data.materials and not o.name.startswith('guide_')]
+print('KAGE-PARAMS object=%s rig=%s extras=%s' % (obj.name, rig, ','.join(extras)))
+
 head_idx = obj.vertex_groups['head'].index
 head_verts = set()
 for v in obj.data.vertices:
@@ -102,23 +105,86 @@ for poly in obj.data.polygons:
                 zmap[k] = z
 
 buf = list(img.pixels)   # RGBA float, dai W*H*4
-# Loang tu DIEM CHI DAN: tu hat giong, lan sang moi pixel lien ke con "giong kim loai"
-# (bao hoa thap), BAT KE do sang — nho vay ca phan bat sang lan phan trong bong deu vao, ma
-# khong lan sang long trang mat hay highlight o dao UV khac vi chung khong lien thong.
-if SEED is None:
-    print("KAGE-RESULT need-seed  (chay lai voi --seed u,v tro vao tam kim loai)")
-    sys.exit(0)
-sx = min(W - 1, max(0, int(SEED[0] * W)))
-sy = min(H - 1, max(0, int(SEED[1] * H)))
-seed_k = sy * W + sx
-if not mask[seed_k]:
-    print("KAGE-RESULT seed-ngoai-vung-dau u=%.4f v=%.4f" % SEED)
-    sys.exit(0)
 
 def metallic(k):
     i = k * 4
     r, g, b = buf[i] * 255, buf[i+1] * 255, buf[i+2] * 255
     return (max(r, g, b) - min(r, g, b)) <= 26 and max(r, g, b) >= 90
+# Loang tu DIEM CHI DAN: tu hat giong, lan sang moi pixel lien ke con "giong kim loai"
+# (bao hoa thap), BAT KE do sang — nho vay ca phan bat sang lan phan trong bong deu vao, ma
+# khong lan sang long trang mat hay highlight o dao UV khac vi chung khong lien thong.
+def flood_from(k0, collect=False):
+    """Loang theo 'giong kim loai' tu mot pixel. Tra ve (kich thuoc, hop bao, vung)."""
+    reg = bytearray(W * H)
+    st = [k0]; reg[k0] = 1
+    y0, x0 = divmod(k0, W)
+    mnx = mxx = x0; mny = mxy = y0; sz = 0
+    while st:
+        k = st.pop(); sz += 1
+        y, x = divmod(k, W)
+        if x < mnx: mnx = x
+        if x > mxx: mxx = x
+        if y < mny: mny = y
+        if y > mxy: mxy = y
+        for dy in (-1, 0, 1):
+            yy = y + dy
+            if yy < 0 or yy >= H: continue
+            for dx in (-1, 0, 1):
+                xx = x + dx
+                if xx < 0 or xx >= W: continue
+                k2 = yy * W + xx
+                if not reg[k2] and metallic(k2):
+                    reg[k2] = 1; st.append(k2)
+    return sz, (mnx, mny, mxx, mxy), (reg if collect else None)
+
+if SEED is None:
+    # --auto: tam kim loai la vung "giong kim loai" LOANG RA LON NHAT trong vung dau.
+    # Kiem chung tren char_hoa-b1: tam loang ra 10.020 px, con long trang mat — dao lon nhat
+    # neu chi dem trong mask — chi ra vai nghin. Dem theo phep loang phan biet duoc hai thu do.
+    seeds = []
+    seen_seed = bytearray(W * H)
+    for k in range(W * H):
+        if not mask[k] or seen_seed[k] or not metallic(k):
+            continue
+        sz, box, reg = flood_from(k, collect=True)
+        for j in range(W * H):
+            if reg[j]: seen_seed[j] = 1
+        seeds.append((sz, k, box))
+    if not seeds:
+        print("KAGE-RESULT khong-thay-vung-kim-loai-nao")
+        sys.exit(0)
+    seeds.sort(reverse=True)
+    for sz, k, box in seeds[:4]:
+        print("KAGE-AUTO ung_vien size=%-7d tam=(%d,%d) hop=%s" % (sz, k % W, k // W, box))
+    _, best_k, _ = seeds[0]
+    sy, sx = divmod(best_k, W)
+    print("KAGE-AUTO chon u,v=%.4f,%.4f" % (sx / W, sy / H))
+else:
+    sx = min(W - 1, max(0, int(SEED[0] * W)))
+    sy = min(H - 1, max(0, int(SEED[1] * H)))
+
+# Hat giong bam sang pixel hop le GAN NHAT thay vi doi hoi trung phoc.
+# Ly do co that: tam kim loai co HOA TIET KHAC o chinh giua, nen trong tam cua vung sang
+# roi vao cho toi ay — va mask (dung bang cach dong dau quanh tung dinh) con co lo tha o
+# nhung dao UV thua dinh. Doi hoi trung phoc lam ca bon lan chi diem dung deu bi tu choi.
+seed_k = None
+for radius in range(0, 40):
+    for dy in range(-radius, radius + 1):
+        yy = sy + dy
+        if yy < 0 or yy >= H: continue
+        for dx in range(-radius, radius + 1):
+            if radius and max(abs(dx), abs(dy)) != radius: continue
+            xx = sx + dx
+            if xx < 0 or xx >= W: continue
+            k = yy * W + xx
+            if mask[k] and metallic(k):
+                seed_k = k; break
+        if seed_k is not None: break
+    if seed_k is not None: break
+if seed_k is None:
+    print("KAGE-RESULT khong-thay-pixel-kim-loai-quanh-seed u=%.4f v=%.4f" % SEED)
+    sys.exit(0)
+sy, sx = divmod(seed_k, W)
 
 region = bytearray(W * H)
 stack = [seed_k]; region[seed_k] = 1
@@ -137,7 +203,10 @@ while stack:
             xx = x + dx
             if xx < 0 or xx >= W: continue
             k2 = yy * W + xx
-            if not region[k2] and mask[k2] and metallic(k2):
+            # KHONG doi hoi mask[k2]: mask dung bang cach dong dau quanh tung dinh nen no RO,
+            # va lo rong chan dut phep loang giua tam kim loai (do that: chi phu duoc 1/8 tam).
+            # Hat giong da neo dung cho roi; "giong kim loai" du de khong nhay sang dao khac.
+            if not region[k2] and metallic(k2):
                 region[k2] = 1; stack.append(k2)
 
 grey_only = bytes(region)
@@ -151,63 +220,22 @@ print("KAGE-SEED loang=%d hop_bao=(%d,%d)-(%d,%d) phu=%d" % (size, minx, miny, m
 
 
 
-comp_id = [0] * (W * H)
-comps = []
-for k0 in range(W * H):
-    if not plate[k0] or comp_id[k0]:
-        continue
-    cid = len(comps) + 1
-    stack = [k0]; comp_id[k0] = cid
-    minx = maxx = k0 % W; miny = maxy = k0 // W; size = 0
-    while stack:
-        k = stack.pop(); size += 1
-        y, x = divmod(k, W)
-        if x < minx: minx = x
-        if x > maxx: maxx = x
-        if y < miny: miny = y
-        if y > maxy: maxy = y
-        for dy in (-1, 0, 1):
-            yy = y + dy
-            if yy < 0 or yy >= H: continue
-            for dx in (-1, 0, 1):
-                xx = x + dx
-                if xx < 0 or xx >= W: continue
-                k2 = yy * W + xx
-                if plate[k2] and not comp_id[k2]:
-                    comp_id[k2] = cid; stack.append(k2)
-    comps.append((size, minx, miny, maxx, maxy))
-comps.sort(reverse=True)
-biggest = comps[0][0]
-keep = [c for c in comps if c[0] >= biggest * 0.25]
-PAD = 2
-fillbox = bytearray(W * H)
-n = 0
-for _, minx, miny, maxx, maxy in keep:
-    for y in range(max(0, miny - PAD), min(H, maxy + PAD + 1)):
-        for x in range(max(0, minx - PAD), min(W, maxx + PAD + 1)):
-            k = y * W + x
-            if not fillbox[k]:
-                fillbox[k] = 1; n += 1
-plate = fillbox
-print("KAGE-NARROW dao=%d giu=%d lon_nhat=%d phu_tron_hop_bao=%d" % (len(comps), len(keep), biggest, n))
-if n == 0:
-    print("KAGE-RESULT none-sau-khi-siet vung_dau=%d" % marked)
-    sys.exit(0)
-
+# Lay mau vai tu MOT VANH ben ngoai hop bao, khong phai tu sat mep tam kim loai:
+# ngay sat mep la duong vien toi cua chinh tam, con vai bang thi nam xa hon vai pixel.
+# Da dinh: lay sat mep cho ra mau gan TRANG, lay sau khi noi hop bao cho ra mau DEN (toc).
 votes = Counter()
-for k in range(W * H):
-    if not grey_only[k]: continue
-    y, x = divmod(k, W)
-    for dy in (-1, 0, 1):
-        yy = y + dy
-        if yy < 0 or yy >= H: continue
-        for dx in (-1, 0, 1):
-            xx = x + dx
-            if xx < 0 or xx >= W: continue
-            k2 = yy * W + xx
-            if grey_only[k2] or not mask[k2]: continue
-            i2 = k2 * 4
-            votes[(round(buf[i2], 3), round(buf[i2+1], 3), round(buf[i2+2], 3))] += 1
+INNER, OUTER = 3, 12
+for y in range(max(0, miny - OUTER), min(H, maxy + OUTER + 1)):
+    for x in range(max(0, minx - OUTER), min(W, maxx + OUTER + 1)):
+        inside_inner = (minx - INNER <= x <= maxx + INNER) and (miny - INNER <= y <= maxy + INNER)
+        if inside_inner:
+            continue
+        k = y * W + x
+        if grey_only[k] or not mask[k]:
+            continue
+        i = k * 4
+        votes[(round(buf[i], 3), round(buf[i+1], 3), round(buf[i+2], 3))] += 1
+
 if not votes:
     print("KAGE-RESULT nofill plate=%d" % n)
     sys.exit(0)
