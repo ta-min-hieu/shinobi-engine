@@ -167,6 +167,29 @@ Hai hệ quả, cả hai đều quan trọng:
 
 **Vẫn là 0 lượt Rodin** — chỉ đổi chỗ làm, từ "sửa file xuất ra" sang "sửa nguồn rồi xuất lại".
 
+### 4.6. Đã chạy thử TRỌN VÒNG trong Blender — chạy được, nhưng mask còn quá rộng
+
+Ngày 2026-09-01 đã dựng và chạy hết vòng, **không cần addon MCP** (Blender chạy nền qua dòng lệnh,
+đúng cách dự án vốn dùng): mở `.blend` → khoanh vùng → tô lại ảnh đóng gói → lưu ra `.blend` tạm →
+`export_character_lods.py` → `runWorldPreview` → so ảnh trước/sau bằng máy.
+
+**Chạy được thật**: 5.832 pixel tấm kim loại trong ảnh nguồn 2048², màu thay tự chọn ra
+`(0.396, 0.31, 0.278)` — chính tông nâu của dải da chiếc băng. Ảnh diff cho thấy thay đổi rơi
+**đúng vào dải băng trán**. Không tốn lượt Rodin nào.
+
+**Nhưng chưa đủ chính xác để chạy hàng loạt.** Xương `head` bao **cả đầu** — tóc, mặt, tai — nên
+mask phủ rộng hơn chiếc băng rất nhiều. Đo được: hộp bao vùng pixel thay đổi trên texture 1024 là
+`(30,103)–(1006,912)`, tức gần trọn tấm; ảnh diff cũng có vài đốm ở mí mắt. Nói cách khác nó tô
+đúng chiếc băng **và** vài chỗ xám trung tính khác trên đầu.
+
+**Việc còn thiếu để chốt #2**: siết mask từ "cả đầu" xuống "trán" bằng **vị trí đỉnh** trong không
+gian đầu (phần trên + phía trước hộp sọ), thứ có sẵn ngay cạnh trọng số xương. Ước tính nhỏ, nhưng
+là việc thật và phải chụp lại để nghiệm thu.
+
+**Không có file nguồn nào bị sửa trong đợt thử này** — thao tác trên `.blend` tạm ngoài repo, và
+model xuất ra đã được khôi phục, xác minh bằng cách đếm lại đúng **7.861** px xám như bản gốc.
+Script để ở `tools/blender/strip_headband.py` kèm ghi chú trạng thái ngay đầu file.
+
 ⚠️ `char_town-elder.glb` **không có texture nào cả** (đọc file báo thiếu hẳn mảng `images`) — khớp
 đúng với ảnh render: nó là khối hộp phẳng thật, không phải model bị mất texture. Xác nhận §4.1.
 
@@ -207,6 +230,7 @@ Xem [BLENDER-SESSION-GUIDE](BLENDER-SESSION-GUIDE.md).
 | 1 | VFX/icon/quái trung tính về đề tài — Đợt 3 KHÔNG đụng tới | 🟡 đề xuất |
 | 2 | 15 nhân vật SỬA bằng tô lại texture, không sinh lại | 🟡 đề xuất |
 | 2b | Khoanh vùng tấm kim loại bằng **trọng số xương**, KHÔNG bằng luật màu | ✅ **đã kiểm chứng** (§4.4) — luật màu đã thử và HỎNG trên Thủy/Thổ/Lôi |
+| 2c | Trọn vòng Blender headless (tô lại → xuất lại → render → diff) chạy được, 0 lượt Rodin | ✅ **đã chạy thật** (§4.6) — còn phải siết mask từ "cả đầu" xuống "trán" |
 | 3 | `char_town-elder` làm mới, lý do là chất lượng chứ không phải đề tài | 🟡 đề xuất |
 | 4 | Không bấm lượt Rodin nào trước khi chốt xong bảng §5 | 🟡 đề xuất |
 | 5 | Đo cấu trúc `.glb` bằng cách đọc chunk JSON, không cần mở Blender | ✅ đã dùng thật — nên dùng lại mỗi khi cần biết model có gì bên trong |
@@ -227,5 +251,6 @@ Không. Đợt 3 nằm trong phạm vi [ADR-038](../01-architecture/adr/ADR-038-
 
 1. ✅ Phép đo cấu trúc (§4.3) + phép khoanh vùng theo xương (§4.4) đã chạy xong 2026-09-01 — không cần Blender, không tốn hạn mức. Hai kết luận vội của bản đầu đã được sửa ở §4.4 và §4.5.
 2. Chủ dự án tick bảng §5: **#2 là ô quan trọng nhất** — cộng #3, #4, #5.
-3. **Bật Blender + addon** — từ đây trở đi mọi việc thi hành đều cần nó, kể cả #2 (texture nằm trong `.blend`).
-4. Trong phiên Blender: chạy khoanh vùng §4.4 trên ảnh đóng gói → tô lại → xuất lại 15 nhân vật × 3 tier → `runWorldPreview` → nhìn khối lồi trên trán có lộ không → quyết #2b.
+3. ✅ Không cần addon MCP: Blender chạy **nền qua dòng lệnh** là đủ, trọn vòng đã chạy thật (§4.6).
+4. Việc kỹ thuật còn lại của #2: **siết mask từ "cả đầu" xuống "trán"** bằng vị trí đỉnh, rồi mới chạy hàng loạt 15 nhân vật × 3 tier và chụp nghiệm thu.
+5. #3 (`char_town-elder` → Chu Hoành) là việc DUY NHẤT còn cần Rodin, nên cần chủ dự án gật trước.
