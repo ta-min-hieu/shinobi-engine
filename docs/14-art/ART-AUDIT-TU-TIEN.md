@@ -113,13 +113,59 @@ Hai điều quan trọng suy ra:
    texture, **mảng xám sáng 0,75% đó không thể là thứ gì khác ngoài tấm kim loại trên trán**.
    Đổi màu nó không đụng tới lưỡi dao, tóc, hay quần áo.
 
-⇒ **Cách rẻ nhất là ĐỔI MÀU TEXTURE, không phải sinh lại model**: thay dải xám sáng bằng màu vải
-của chính chiếc băng đó, trên 15 texture. **0 lượt Rodin, 0 phẫu thuật mesh, không cần Blender.**
+⇒ Hướng đúng là **ĐỔI MÀU TEXTURE, không sinh lại model** — nhưng cách khoanh vùng phải chuẩn hơn
+"bắt theo màu", xem §4.4.
 
-⚠️ **Còn một điều chưa kiểm và phải kiểm bằng MẮT trước khi chốt**: hình khối lồi của tấm kim loại
-vẫn còn trên mesh. Ở cỡ trong game (nhân vật cao ~100px) nó nhiều khả năng đọc thành nút buộc vải,
-nhưng "nhiều khả năng" không phải bằng chứng — đổi màu 1 texture rồi chụp bằng
-`runWorldPreview` là biết ngay, và đó là việc rẻ.
+### 4.4. ⚠️ SỬA LẠI §4.3: luật màu toàn cục KHÔNG tổng quát được (đo 2026-09-01)
+
+Bản đầu của tài liệu này kết luận "dải xám sáng 0,75% chỉ có thể là tấm kim loại" và đề xuất đổi
+màu theo luật đó cho cả 15 nhân vật. **Kết luận ấy đúng với Hỏa và sai với các hệ khác** — nó được
+đo trên MỘT nhân vật rồi suy ra cho 15. Chạy thử (chế độ khô, không ghi file) mới lộ:
+
+| Nhân vật | Pixel lọt luật màu toàn cục | Thực chất |
+|---|---|---|
+| `char_hoa-b1` | 7.861 | phần lớn là tấm kim loại ✓ |
+| `char_thuy-b1` | **55.484** | ❌ chủ yếu là **áo xanh-trắng nhạt** của Thủy |
+| `char_tho-b1` | 5.766 | lẫn tông đất |
+| `char_phong-b1` | 13.869 | lẫn tông sáng |
+| `char_loi-b1` | 1.437 | thiếu |
+
+Siết ngưỡng cho "trung tính hơn" cũng không cứu được: Thổ còn **186**, Lôi còn **159** — tức là
+ngưỡng chặt lại vứt mất chính tấm kim loại của hai hệ đó. **Không tồn tại một ngưỡng màu chung.**
+Mỗi nhân vật do Rodin sinh độc lập nên có bảng màu riêng.
+
+**Cách khoanh vùng ĐÚNG — và đã kiểm chứng: dùng TRỌNG SỐ XƯƠNG.** Mesh thân có `JOINTS_0`/
+`WEIGHTS_0` và rig 11 xương, trong đó có xương `head`. Chỉ rasterise những tam giác có cả ba đỉnh
+gắn chủ yếu vào `head` → ra đúng vùng đầu trong không gian UV. Trong vùng đó, thứ duy nhất mang màu
+xám trung tính sáng là tấm kim loại (tóc đen, da hồng, khăn đỏ đều không phải). Kết quả nhất quán
+hẳn:
+
+| Nhân vật | Xám **trong vùng đầu** |
+|---|---|
+| Hỏa | 1.875 |
+| Thủy | 942 |
+| Thổ | 893 |
+| Lôi | 599 |
+
+Dải 599–1.875 thay cho dải 599–55.484: **phép khoanh vùng theo xương hoạt động**, luật màu thì không.
+
+### 4.5. ⚠️ SỬA LẠI lần hai: KHÔNG được sửa file trong `assets/exported/`
+
+`assets/exported/` nằm trong `.gitignore` (dòng 51). Model `.glb` ở đó là **sản phẩm build**, sinh
+ra từ `assets/raw/blender/characters/*.blend` — và **texture được đóng gói BÊN TRONG file `.blend`**,
+không có file ảnh rời nào để sửa.
+
+Hai hệ quả, cả hai đều quan trọng:
+
+1. **Sửa `.glb` xuất ra là công cốc**: lần xuất Blender kế tiếp ghi đè, băng trán quay lại. Nó cũng
+   không có trong git nên không revert được bằng `git checkout` — bài học trả giá thật trong lúc
+   soạn tài liệu này (may là phép ghi lại `.glb` chỉ THÊM ảnh mới vào cuối buffer chứ không xoá ảnh
+   cũ, nên khôi phục được bằng cách trỏ `images[0].bufferView` về chỗ cũ; đã xác minh: đếm lại đúng
+   7.861 px như bản gốc).
+2. **Việc thật phải làm TRONG Blender**: chạy phép khoanh vùng §4.4 trên ảnh đóng gói của từng
+   `.blend`, tô lại, rồi xuất lại 15 nhân vật × 3 tier.
+
+**Vẫn là 0 lượt Rodin** — chỉ đổi chỗ làm, từ "sửa file xuất ra" sang "sửa nguồn rồi xuất lại".
 
 ⚠️ `char_town-elder.glb` **không có texture nào cả** (đọc file báo thiếu hẳn mảng `images`) — khớp
 đúng với ảnh render: nó là khối hộp phẳng thật, không phải model bị mất texture. Xác nhận §4.1.
@@ -131,16 +177,20 @@ nhưng "nhiều khả năng" không phải bằng chứng — đổi màu 1 text
 | # | Việc | Chi phí ĐO ĐƯỢC | Cần quyết |
 |---|---|---|---|
 | ~~1~~ | ~~Băng trán rời hay dính?~~ | ✅ **Đã đo 2026-09-01** — dính mesh nhưng tách bạch trong texture (§4.3) | Xong |
-| 2 | Bỏ băng trán khỏi 15 nhân vật bằng **đổi màu texture** | **0 hạn mức Rodin**, script chạy hàng loạt | ⬜ Đồng ý hướng này? (rẻ nhất, nhưng giữ lại khối lồi trên trán) |
+| 2 | Bỏ băng trán khỏi 15 nhân vật: khoanh vùng đầu theo **trọng số xương** (§4.4) rồi tô lại ảnh đóng gói **trong `.blend`**, xuất lại | **0 hạn mức Rodin**; cần 1 phiên Blender; phép khoanh vùng đã kiểm chứng | ⬜ Đồng ý hướng này? (đánh đổi: khối lồi trên trán vẫn còn trên mesh) |
 | 2b | *Hoặc* sinh lại 15 nhân vật cho sạch hẳn khối lồi | **15 lượt Rodin** + 15 vòng nghiệm thu | ⬜ Chỉ chọn nếu #2 nhìn không đạt |
 | 3 | Làm mới `char_town-elder` thành Chu Hoành | 1 lượt Rodin + 1 vòng nghiệm thu | ⬜ Đồng ý tiêu hạn mức? |
 | 4 | Sửa `icon_genin_headband` → mũ vải ngoại môn | 1 icon, dựng tay | ⬜ |
 | 5 | Sửa `icon_steel_katana` → trường kiếm thẳng | 1 icon, dựng tay | ⬜ Hay chấp nhận đao cong? |
 | 6 | 17 VFX + 16 icon + 3 quái | **0** | Không cần quyết — giữ nguyên |
 
-**Đề xuất của tôi**: làm #2 trước (rẻ, đảo ngược được vì texture nằm trong `.glb` và pipeline dựng
-lại được từ nguồn), chụp `runWorldPreview` xem khối lồi có lộ không, rồi mới quyết có cần #2b.
-Không bấm lượt Rodin nào cho tới lúc đó — trừ #3, vốn phải sinh lại bất kể đề tài.
+**Đề xuất của tôi**: làm #2 trước — nó không tốn hạn mức, và phép khoanh vùng theo xương đã được
+kiểm chứng trên 4/5 hệ (§4.4). Xuất lại xong thì chụp `runWorldPreview` xem khối lồi trên trán có
+lộ ở cỡ trong game không, rồi mới quyết có cần #2b. Không bấm lượt Rodin nào cho tới lúc đó — trừ
+#3, vốn phải sinh lại bất kể đề tài.
+
+⚠️ **Cả #2 lẫn #3 đều cần Blender đang chạy kèm addon.** Kiểm 2026-09-01: chưa chạy, nên phần thi
+hành của Đợt 3 dừng ở đây. Mọi thứ KHÔNG cần Blender trong tài liệu này thì đã làm xong.
 
 ⚠️ **Bẫy hạn mức Rodin đã dính một lần** (2026-08-30, art 2 loài quái): hết hạn mức giữa chừng thì
 phiên art đứt đoạn và phải chờ. Chốt danh sách TRƯỚC khi bấm lượt đầu tiên.
@@ -155,10 +205,12 @@ Xem [BLENDER-SESSION-GUIDE](BLENDER-SESSION-GUIDE.md).
 | # | Quyết định | Trạng thái |
 |---|---|---|
 | 1 | VFX/icon/quái trung tính về đề tài — Đợt 3 KHÔNG đụng tới | 🟡 đề xuất |
-| 2 | 15 nhân vật SỬA bằng đổi màu texture, không sinh lại | 🟡 đề xuất — **phép đo §4.3 đã chứng minh là làm được** |
+| 2 | 15 nhân vật SỬA bằng tô lại texture, không sinh lại | 🟡 đề xuất |
+| 2b | Khoanh vùng tấm kim loại bằng **trọng số xương**, KHÔNG bằng luật màu | ✅ **đã kiểm chứng** (§4.4) — luật màu đã thử và HỎNG trên Thủy/Thổ/Lôi |
 | 3 | `char_town-elder` làm mới, lý do là chất lượng chứ không phải đề tài | 🟡 đề xuất |
 | 4 | Không bấm lượt Rodin nào trước khi chốt xong bảng §5 | 🟡 đề xuất |
 | 5 | Đo cấu trúc `.glb` bằng cách đọc chunk JSON, không cần mở Blender | ✅ đã dùng thật — nên dùng lại mỗi khi cần biết model có gì bên trong |
+| 6 | Sửa art phải sửa **nguồn `.blend`**, không sửa `assets/exported/` (gitignore, là build artifact) | ✅ **đã trả giá một lần** (§4.5) |
 
 ## ADR cần tạo
 
@@ -173,7 +225,7 @@ Không. Đợt 3 nằm trong phạm vi [ADR-038](../01-architecture/adr/ADR-038-
 
 ## Việc cần làm tiếp theo
 
-1. ✅ Phép đo quyết định (§4.3) đã chạy xong 2026-09-01 — không cần Blender, không tốn hạn mức.
-2. Chủ dự án tick bảng §5: **#2 là ô quan trọng nhất** (đổi màu texture, rẻ) — cộng #3, #4, #5.
-3. Sau khi tick #2: đổi màu 15 texture → `runWorldPreview` → nhìn khối lồi trên trán có lộ không.
-4. Bật Blender + addon **chỉ khi** đã chốt #3 (hoặc #2b) — trước đó không cần.
+1. ✅ Phép đo cấu trúc (§4.3) + phép khoanh vùng theo xương (§4.4) đã chạy xong 2026-09-01 — không cần Blender, không tốn hạn mức. Hai kết luận vội của bản đầu đã được sửa ở §4.4 và §4.5.
+2. Chủ dự án tick bảng §5: **#2 là ô quan trọng nhất** — cộng #3, #4, #5.
+3. **Bật Blender + addon** — từ đây trở đi mọi việc thi hành đều cần nó, kể cả #2 (texture nằm trong `.blend`).
+4. Trong phiên Blender: chạy khoanh vùng §4.4 trên ảnh đóng gói → tô lại → xuất lại 15 nhân vật × 3 tier → `runWorldPreview` → nhìn khối lồi trên trán có lộ không → quyết #2b.
