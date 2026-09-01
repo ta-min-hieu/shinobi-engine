@@ -2,20 +2,18 @@
 
     blender -b <char>.blend -P strip_headband.py -- --seed u,v [--save-as out.blend] [--dry]
 
-TRANG THAI 2026-09-01: CHAY DUOC va DA KIEM CHUNG BANG MAT tren char_hoa-b1 — tam kim loai,
-dinh tan va hoa tiet khac bien mat, thay bang vai do tron lay tu chinh chiec bang; trong game
-o co that khoi loi con lai tren mesh KHONG lo. 0 luot Rodin.
+DA DUNG THAT 2026-09-01 tren char_hoa-b1 (hoa-text3d-pilot.blend), seed 0.8281,0.1929:
+tam kim loai + dinh tan + hoa tiet khac bien mat, thay bang vai do tron lay tu chinh chiec
+bang; kiem bang mat trong game, khoi loi con lai tren mesh KHONG lo. 0 luot Rodin.
 
-CACH DUNG (moi nhan vat can DUNG MOT lan nhin):
-  1. Xuat anh theo he toa do cua script de doc toa do (xem docs/14-art/ART-AUDIT-TU-TIEN §4.8).
-  2. Chay voi --seed u,v tro vao tam kim loai.
-  3. Xuat lai bang export_character_lods.py, roi runWorldPreview de nghiem thu.
+⚠️ VA DO LA NHAN VAT DUY NHAT CAN NO. Soi bang ung vien cua ca 15 nhan vat: chi char_hoa-b1
+co bang tran ninja (no la con pilot Text->3D dau tien); 14 con sinh sau khong co. Xem
+docs/14-art/ART-AUDIT-TU-TIEN.md §4.10. Giu script nay lai phong khi co asset moi dinh lai
+loi cu, dung de chay hang loat.
 
-KHONG dung --auto de chay hang loat: no dung tren char_hoa-b1 (10.020 px, mau do) nhung SAI
-tren char_hoa-b2 (48.384 px, mau da). Bay lan thu mot luat chung deu bi phep do bac bo — 15
-nhan vat do Rodin sinh doc lap, moi con mot bang mau. Xem ART-AUDIT §4.9.
-
-CHUA duoc ap dung cho bat ky .blend nao trong repo (cho chu du an gat sau khi nhin anh truoc/sau).
+KHONG dung --auto: dung tren char_hoa-b1 nhung SAI tren char_hoa-b2 (bat trung mang da).
+Bay lan thu mot luat mau chung deu bi phep do bac bo — moi nhan vat Rodin sinh doc lap.
+Cach dung dung: xuat bang ung vien, nhin MOT lan, roi --seed u,v.
 """
 import sys, math
 import bpy

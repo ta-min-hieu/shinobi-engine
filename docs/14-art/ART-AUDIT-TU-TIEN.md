@@ -25,6 +25,12 @@ Lý do: đề tài ninja gần như chỉ nằm ở **đúng một chi tiết h�
 kim loại**. Mọi thứ khác (thân chibi, khăn quàng, áo nâu, hiệu ứng nguyên tố, cọc gỗ, quái đá)
 vốn đã trung tính về đề tài.
 
+> ✅ **Cập nhật cuối ngày 2026-09-01 — phần nhân vật đã XONG.** Soi bảng ứng viên của cả 15 nhân
+> vật cho thấy **chỉ `char_hoa-b1` đội băng trán ninja** (§4.10) — nó là con pilot Text→3D đầu
+> tiên, 14 con sinh sau không có. Tấm kim loại đã được xoá khỏi nguồn `.blend`, xuất lại đủ 3
+> tier, kiểm bằng mắt trong game. **0 lượt Rodin.** Còn lại đúng ba việc, tất cả ở §5: `char_town-elder`
+> (#3, cần Rodin) và hai cái icon (#4, #5).
+
 ---
 
 ## 2. VFX — giữ 100%
@@ -238,9 +244,29 @@ lớn hơn cả tấm kim loại.
 nhân vật do Rodin sinh độc lập, mỗi con một bảng màu và một cách tô bóng, nên **không có heuristic
 chung nào đáng tin**. Đừng thử cái thứ tám.
 
-**Cách chắc chắn, và rẻ**: mỗi nhân vật xuất một ảnh `--dump` (đúng hệ toạ độ của script), nhìn
-một lần, đọc toạ độ tấm kim loại, chạy `--seed u,v`. **15 lần nhìn cho 15 nhân vật.** Phần còn lại
-— loang, hộp bao, chọn màu vải, xuất lại 3 tier — đã tự động và đã kiểm chứng.
+**Cách chắc chắn, và rẻ**: mỗi nhân vật xuất một **bảng ứng viên đã cắt sẵn** (các vùng "giống kim
+loại" loang lớn nhất, xếp cạnh nhau), nhìn một lần, chỉ ra ô nào là tấm kim loại, chạy `--seed u,v`.
+
+### 4.10. 🎯 Và soi 15 bảng đó ra kết quả quan trọng nhất của cả Đợt 3
+
+**Chỉ ĐÚNG MỘT nhân vật có băng trán ninja: `char_hoa-b1`.**
+
+Đã soi bảng ứng viên của cả 15 con. Ở `char_hoa-b1`, ô lớn nhất là tấm kim loại thật — hình chữ
+nhật bạc, có đinh tán và hoạ tiết khắc, nằm trên nền vải đỏ; 5 ô còn lại đều là mắt. Ở **mọi nhân
+vật khác**, không ô nào là tấm kim loại: toàn mặt, mắt, da, vạt áo.
+
+Số liệu khớp với mắt nhìn: vùng "giống kim loại" lớn nhất của `char_hoa-b1` là **10.020 px** — một
+mảng nhỏ, biên rõ. Ở các con khác con số nhảy lên 39.000–115.000 px, tức bộ dò đang bám vào những
+mảng da/vải lớn chứ không phải một chi tiết kim khí.
+
+**Lý do:** `char_hoa-b1` đến từ `hoa-text3d-pilot.blend` — **con pilot đầu tiên** của hướng Text→3D
+(2026-08-03). 14 nhân vật còn lại sinh sau, với prompt không có băng trán.
+
+⇒ **Việc art của nhân vật trong Đợt 3 là MỘT con, không phải mười lăm** — và nó đã làm xong.
+
+Nhân tiện, bảng tham số xuất (tra ngược từ chính các `.glb`) cho thấy vũ khí cũng đã ổn: chỉ Hỏa
+cầm kunai (đọc được là "phi đao"), còn Lôi cầm trường kiếm, Phong song đao, Thổ chuỳ, và Thủy
+**hồ lô** — thứ hợp tu tiên đến mức không cần đụng vào.
 
 **Không có file nguồn nào bị sửa trong đợt thử này** — thao tác trên `.blend` tạm ngoài repo, và
 model xuất ra đã được khôi phục, xác minh bằng cách đếm lại đúng **7.861** px xám như bản gốc.
@@ -256,7 +282,7 @@ Script để ở `tools/blender/strip_headband.py` kèm ghi chú trạng thái n
 | # | Việc | Chi phí ĐO ĐƯỢC | Cần quyết |
 |---|---|---|---|
 | ~~1~~ | ~~Băng trán rời hay dính?~~ | ✅ **Đã đo 2026-09-01** — dính mesh nhưng tách bạch trong texture (§4.3) | Xong |
-| 2 | Bỏ băng trán khỏi 15 nhân vật bằng `strip_headband.py --seed` | **0 hạn mức Rodin**. Công cụ ĐÃ CHẠY XONG và **đã kiểm chứng bằng mắt trên `char_hoa-b1`** (§4.8): tấm kim loại + đinh tán + hoạ tiết khắc biến mất, thay bằng vải đỏ trơn. Còn 14 nhân vật, mỗi con cần đúng **một lần nhìn** để đọc toạ độ hạt giống (§4.9) | ⬜ **Nhìn ảnh trước/sau rồi gật** — 15 file nguồn `.blend` sẽ bị sửa (revert được, chúng nằm trong git LFS) |
+| ~~2~~ | ✅ **XONG 2026-09-01** — bỏ băng trán ninja. Hoá ra **chỉ `char_hoa-b1` có** (§4.10), và đã sửa: `hoa-text3d-pilot.blend` được tô lại rồi xuất lại đủ 3 tier, kiểm bằng mắt trong game — nhân vật đội dải khăn đỏ trơn, tấm kim loại + đinh tán + hoạ tiết khắc biến mất | **0 hạn mức Rodin**, 1 file nguồn bị sửa (git LFS, revert được) | Không còn gì để quyết |
 | 2b | *Hoặc* sinh lại 15 nhân vật cho sạch hẳn khối lồi | **15 lượt Rodin** + 15 vòng nghiệm thu | ⬜ Chỉ chọn nếu #2 nhìn không đạt |
 | 3 | Làm mới `char_town-elder` thành Chu Hoành | 1 lượt Rodin + 1 vòng nghiệm thu | ⬜ Đồng ý tiêu hạn mức? |
 | 4 | Sửa `icon_genin_headband` → mũ vải ngoại môn | 1 icon, dựng tay | ⬜ |
