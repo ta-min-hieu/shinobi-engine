@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import dev.kage.client.core.net.GameConnection;
+import dev.kage.client.core.ui.theme.CultivationRealm;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.client.core.ui.theme.KageSkin;
 import dev.kage.client.core.world.PlayContext;
@@ -53,6 +54,23 @@ public final class CharacterSelectScreen implements GameScreen {
         AWAITING_SELECT_RESPONSE,
         FAILED
     }
+
+    /**
+     * Bề rộng một dòng nhân vật.
+     *
+     * <p>Nới từ 340px lên 440px khi cấp độ chuyển sang hiển thị bằng CẢNH GIỚI (ADR-038 D2). Dòng
+     * này là một {@code TextButton} bề rộng CỐ ĐỊNH, chữ không xuống dòng, nên nó phải chứa được
+     * trường hợp DÀI NHẤT chứ không phải trường hợp thường gặp: tên nhân vật tối đa 16 ký tự +
+     * linh căn dài nhất ("Phong") + cảnh giới dài nhất ("Nguyên Anh 9") ≈ 38 ký tự. Ở cỡ chữ HUD
+     * (~9,7px/ký tự, đo trên ảnh chụp {@code runHudPreview}) là ~369px — vượt 340px cũ.
+     *
+     * <p>⚠️ Bề rộng cũ vốn ĐÃ sát trần trước đợt này: "(Cấp 100)" cho ra ~330px trên cùng cái tên
+     * 16 ký tự đó. Nới thêm là trả lại khoảng thở cho cả hai, không riêng cảnh giới.
+     */
+    private static final float CHARACTER_ROW_WIDTH_PX = 440f;
+
+    /** Khung chứa rộng hơn dòng đúng 20px — giữ nguyên tỉ lệ lề của bố cục cũ (360 so với 340). */
+    private static final float CHARACTER_LIST_WIDTH_PX = 460f;
 
     private final KageEngine engine;
     private final PlayContext context;
@@ -101,7 +119,10 @@ public final class CharacterSelectScreen implements GameScreen {
         root.setFillParent(true);
         root.top();
         root.add(titleLabel).padTop(32f).padBottom(16f).row();
-        root.add(characterListTable).width(360f).padBottom(24f).row();
+        root.add(characterListTable)
+                .width(CHARACTER_LIST_WIDTH_PX)
+                .padBottom(24f)
+                .row();
         root.add(newCharacterNameField).width(280f).height(48f).padBottom(12f).row();
         root.add(createButton).size(200f, 48f).padBottom(12f).row();
         root.add(statusLabel);
@@ -120,7 +141,7 @@ public final class CharacterSelectScreen implements GameScreen {
                     "charselect.character.summary",
                     character.getName(),
                     factionLabel(character.getFaction()),
-                    character.getLevel());
+                    realmLabel(character.getLevel()));
             TextButton row = new TextButton(rowText, skin.buttonStyle);
             row.addListener(new ClickListener() {
                 @Override
@@ -128,8 +149,30 @@ public final class CharacterSelectScreen implements GameScreen {
                     onCharacterRowClicked(character);
                 }
             });
-            characterListTable.add(row).size(340f, 44f).padBottom(8f).row();
+            characterListTable
+                    .add(row)
+                    .size(CHARACTER_ROW_WIDTH_PX, 44f)
+                    .padBottom(8f)
+                    .row();
         }
+    }
+
+    /**
+     * Cấp độ hiện ra dưới dạng CẢNH GIỚI — ADR-038 D2
+     * ({@code docs/01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md}).
+     *
+     * <p>Dùng bản NGẮN ({@code realm.tier_short} → "Luyện Khí 6") chứ không phải bản đầy đủ: dòng
+     * này nằm trong một {@code TextButton} bề rộng CỐ ĐỊNH (xem {@link #CHARACTER_ROW_WIDTH_PX})
+     * cùng với tên nhân vật (tối đa 16 ký tự) và tên linh căn. Bản đầy đủ ("Nguyên Anh tầng 9")
+     * dài thêm 5 ký tự nữa, đủ để đẩy trường hợp tên dài nhất tràn khỏi nút ngay cả sau khi đã
+     * nới — đo ở trạng thái tệ nhất, không phải ở tên nhân vật ngắn của mình.
+     */
+    private String realmLabel(int level) {
+        CultivationRealm realm = CultivationRealm.of(level);
+        String realmName = i18n.get(realm.nameKey());
+        return realm.perfected()
+                ? i18n.format("realm.perfect", realmName)
+                : i18n.format("realm.tier_short", realmName, realm.tier());
     }
 
     private String factionLabel(Faction faction) {

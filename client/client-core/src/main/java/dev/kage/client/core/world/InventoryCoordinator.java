@@ -10,6 +10,7 @@ import com.badlogic.gdx.utils.I18NBundle;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import dev.kage.client.core.ui.hud.InventoryPanel;
+import dev.kage.client.core.ui.theme.CultivationRealm;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.EnhanceItemResponse;
 import dev.kage.protocol.EquipItemResponse;
@@ -434,8 +435,23 @@ final class InventoryCoordinator implements WindowFlow {
         // required_level = 0 nghĩa là server CŨ chưa gửi field này (mặc định proto3), không phải
         // "cần Cấp 0" — im lặng bỏ qua thay vì hiện một con số sai.
         if (entry.getRequiredLevel() > 1) {
-            builder.append('\n').append(format("inventory.label.required_level", entry.getRequiredLevel()));
+            String required = realmLabel(entry.getRequiredLevel());
+            builder.append('\n').append(format("inventory.label.required_level", required));
         }
+    }
+
+    /**
+     * Điều kiện cấp độ hiện ra dưới dạng CẢNH GIỚI — ADR-038 D2
+     * ({@code docs/01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md}).
+     *
+     * <p>Bản ĐẦY ĐỦ ({@code realm.tier} → "Luyện Khí tầng 5") chứ không phải bản ngắn như dòng chọn
+     * nhân vật: khung chi tiết vật phẩm xuống dòng tự do, không bị bó trong một nút rộng cố định,
+     * và đây là câu người chơi phải đọc để biết mình còn thiếu bao xa.
+     */
+    private String realmLabel(int level) {
+        CultivationRealm realm = CultivationRealm.of(level);
+        String realmName = text(realm.nameKey());
+        return realm.perfected() ? format("realm.perfect", realmName) : format2("realm.tier", realmName, realm.tier());
     }
 
     private void appendStat(StringJoiner stats, String key, int value) {

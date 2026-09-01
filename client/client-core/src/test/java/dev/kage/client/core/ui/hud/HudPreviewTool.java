@@ -84,7 +84,9 @@ public final class HudPreviewTool extends ApplicationAdapter {
         hud.setTarget("training_dummy", 38, 60);
         // Trạng thái SẴN SÀNG — đây mới là trạng thái người chơi thấy phần lớn thời gian; xem
         // trước ở trạng thái hồi chiêu (nút xám) sẽ đánh giá sai độ nổi bật của nút.
-        hud.setSkillState("hud.skill.fireball", 0f);
+        // Tên chiêu DÀI NHẤT trong 5 hệ, không phải chiêu của hệ mặc định: nhãn tên chiêu nở theo
+        // chữ và đẩy cả cụm nút góc phải, nên xem trước bằng cái ngắn là không đo được gì.
+        hud.setSkillState("hud.skill.tho_trong_kich", 0f);
         hud.setSkillReady(true);
         // Nhiệm vụ ĐÃ HOÀN THÀNH — trạng thái duy nhất có thêm nút, tức là trạng thái dễ vỡ bố cục
         // nhất trong hai trạng thái của cụm này.

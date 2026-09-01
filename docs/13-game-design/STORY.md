@@ -321,6 +321,7 @@ Không — tường thuật thuộc thẩm quyền GDD/STORY. [ADR-038](../01-ar
 
 ## Việc cần làm tiếp theo
 
-1. **Chủ dự án đọc + duyệt nội dung v0.2.0** (nhất là: chân tướng Đại Kiếp §3.2, twist Tô Vân Nhi §5, lời giải rebirth §6 arc 6).
-2. 🔶 **TODO-OPUS** — Đợt 2 ADR-038: viết quest script theo arc (bắt đầu arc 1 — khớp nội dung Lv1–18 đang có trong game) + i18n + DB seed rename, tuân §8.
-3. Khi thêm NPC/địa danh/thế lực mới trong quest → cập nhật §4/§5 cùng PR.
+1. **Chủ dự án đọc + duyệt nội dung v0.2.0** (nhất là: chân tướng Đại Kiếp §3.2, twist Tô Vân Nhi §5, lời giải rebirth §6 arc 6) — chữ đã viết nhưng chưa ai gật.
+2. ✅ **Arc 1 đã có mặt trong game** (Đợt 2 ADR-038, 2026-09-01): Chu Hoành nói đúng giọng §5; cây hội thoại `town_elder.js` phủ §6 arc 1 (tông môn → cảnh giới → thân thế trưởng lão); quest `kill_training_dummies` khai `// STORY: arc-1 §6` theo §8. Nhịp hé lộ §8 quy tắc 2 được **gác bằng test** (`TownElderDialogueTreeTest`).
+3. 🔶 Arc 2 trở đi chưa có nội dung trong game. Quest thứ hai của arc 1 (cao trào "đêm trực gặp tán tu cường đạo") bị **chặn kỹ thuật** — xem mục 8 phần "Việc cần làm tiếp theo" của [ADR-038](../01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md).
+4. Khi thêm NPC/địa danh/thế lực mới trong quest → cập nhật §4/§5 cùng PR.

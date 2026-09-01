@@ -98,9 +98,9 @@ migration, không tăng `protocolVersion`, không đổi module.**
 
 ### D7 — Thứ tự thi hành (3 đợt, đợt sau cần đợt trước)
 
-1. **Đợt 1 — Tài liệu** (ADR này + GDD v0.3.0 + GLOSSARY): làm ngay khi Accept. ✅ Đã soạn kèm ADR.
-2. **Đợt 2 — Chuỗi hiển thị**: i18n client + tên item/quái/NPC/skill trong DB seed + script quest.
-   Chỉ sửa **giá trị** chuỗi/row, không sửa key, không sửa schema. 🔶 **TODO-OPUS** (nhiều file, cần rà từng chuỗi).
+1. **Đợt 1 — Tài liệu** (ADR này + GDD v0.3.0 + GLOSSARY + STORY.md): ✅ **XONG 2026-09-01**.
+2. **Đợt 2 — Chuỗi hiển thị**: i18n client + tên item/quái/NPC/skill + script quest/hội thoại.
+   ✅ **XONG 2026-09-01** — chi tiết ở D10 dưới đây.
 3. **Đợt 3 — Art**: model 15 nhân vật + 3 quái + 17 VFX đang là phong cách ninja. Đánh giá
    từng asset: giữ (đa số VFX nguyên tố dùng lại được) / sửa (trang phục) / làm mới (quái →
    yêu thú). 🔶 **TODO-OPUS** (tốn Rodin quota + acceptance loop, xem [ART-PIPELINE.md](../../14-art/ART-PIPELINE.md)).
@@ -111,6 +111,37 @@ GDD + GLOSSARY làm ở Đợt 1. Còn lại — GAMEPLAY.md, UI.md, CLIENT.md, 
 ROADMAP.md, ART-*.md, KAGE-CONSTITUTION.md (1 chỗ), CLAUDE.md gốc — đa số là nhắc tên thể loại
 trong ví dụ/lịch sử, sửa dần không chặn gì. 🔶 **TODO-OPUS** (quét `ninja|Ninja|Học Viện|Kagesekai`
 toàn cây docs). **ADR cũ (031, 033, 034...) là hồ sơ lịch sử — KHÔNG sửa.**
+
+### D10 — Đợt 2 đã thi hành thế nào (2026-09-01, bổ sung sau khi Accept)
+
+**Phát hiện làm Đợt 2 nhẹ hơn dự kiến: DB KHÔNG chứa chữ hiển thị nào.** Mọi bảng seed
+(`item_template`, `monster_template`, `npc_template`) chỉ giữ cột `name_key` trỏ sang bundle i18n —
+xác minh bằng `grep name_key` trên toàn bộ 24 migration. Vì vậy **Đợt 2 không cần migration nào**,
+đúng như D5 đã đòi; toàn bộ tên hiển thị đổi trong hai file `.properties`. Câu "tên item/quái/NPC
+trong DB seed" ở D7.2 dựa trên một giả định sai về nơi chữ được lưu.
+
+Đã sửa:
+
+| Vùng | Nội dung |
+|---|---|
+| `strings_vi/en.properties` | ~90 giá trị: 5 chiêu, 3 loài quái, 20 vật phẩm, 7 ô trang bị, vàng→**linh thạch**, cường hoá→**tôi luyện**, hầm ngục→**bí cảnh**, cửa hàng→**Tàng Bảo Các**, đấu tay đôi→**Luận Kiếm**, hệ phái→**linh căn**, LÊN CẤP→**ĐỘT PHÁ**. **Không khoá nào bị đổi tên** (D7.2) |
+| `town_elder.js` | Trưởng lão **Chu Hoành**, nội dung arc 1; thêm 3 node (tông môn → cảnh giới → thân thế trưởng lão). Bốn lựa chọn của node `start` giữ nguyên thứ tự vì `option_index` là VỊ TRÍ |
+| `kill_training_dummies.js` | Khai `// STORY: arc-1 §6` theo STORY.md §8; ba con số cân bằng KHÔNG đổi |
+| `CultivationRealm` (mới) | Ánh xạ cấp→cảnh giới của D2, thuần tuý, 20 test; dùng ở màn chọn nhân vật + điều kiện mặc pháp khí |
+| `npc.town_elder.name` | Khoá đã nằm trong DB từ V10 nhưng **chưa từng có dòng i18n** — tham chiếu treo, nay đã viết |
+
+**Hai bẫy bố cục đo được bằng ảnh chụp, không đoán:**
+
+1. Tên chiêu "Cuồng Phong Quyết" (17 ký tự) làm nở nhãn tên chiêu (không có bề rộng cố định) và
+   đẩy cả cụm nút góc phải — rút còn "Cuồng Phong". Trần thực tế ~14 ký tự, đã ghi vào bundle.
+2. Dòng chọn nhân vật là nút rộng cố định **340px** và vốn ĐÃ sát trần từ trước ("(Cấp 100)" trên
+   tên 16 ký tự ≈ 330px); thêm cảnh giới thì vượt. Nới lên 440px.
+
+**Hai test mới gác nội dung** (cả hai chạy không cần Docker — chính là vấn đề chúng vá):
+`CultivationRealmTest` ghim bảng ánh xạ D2 theo từng mốc GDD, và `TownElderDialogueTreeTest` chạy
+**script sản phẩm thật** để bắt node cụt / action trỏ vào hư không / lộ nội dung arc sau. Trước đó
+script sản phẩm chỉ được kiểm bởi `DialogueIntegrationTest` vốn cần Postgres, tức là im lặng biến
+mất mỗi khi máy không bật Docker.
 
 ### D9 — Cốt truyện có tài liệu SSOT riêng: [STORY.md](../../13-game-design/STORY.md)
 
@@ -156,6 +187,15 @@ lúc này. Tên "Kage" trên repo/branding lệch theme cho tới khi chủ dự
 1. ✅ Accepted 2026-09-01 (chủ dự án duyệt trọn D1–D9 + bố cục STORY.md + 2 tên riêng).
 2. ✅ Đợt 1 đã soạn kèm: [GDD v0.3.0](../../13-game-design/GAME-DESIGN-DOCUMENT.md) + [GLOSSARY](../../GLOSSARY.md) + khung [STORY.md](../../13-game-design/STORY.md).
 3. ✅ STORY.md §1–§8 viết đầy đủ (v0.2.0, 2026-09-01) — nội dung chờ chủ dự án duyệt.
-4. 🔶 TODO-OPUS: Đợt 2 (i18n + DB seed + quest script bám STORY.md §8) — D7.2.
-5. 🔶 TODO-OPUS: Đợt 3 (art audit ninja → tu tiên) — D7.3.
-6. 🔶 TODO-OPUS: quét docs còn lại — D8.
+4. ✅ Đợt 2 xong 2026-09-01 — xem D10.
+5. ⏳ **Playtest thật chưa chạy được**: máy chưa bật Docker nên không dựng nổi Postgres/Redis cho
+   server. Chữ mới đã xem bằng ảnh chụp `runHudPreview`, nhưng vòng "đăng nhập → nói chuyện với
+   Chu Hoành → nhận nhiệm vụ → đập mộc nhân → nhận thưởng" thì CHƯA ai chơi thử. Cùng lý do,
+   `DialogueIntegrationTest`/`QuestIntegrationTest` (Postgres thật) không chạy được trong đợt này.
+6. 🔶 TODO-OPUS: Đợt 3 (art audit ninja → tu tiên) — D7.3.
+7. 🔶 TODO-OPUS: quét docs còn lại — D8.
+8. 💡 Đề xuất (CHƯA làm, cần chủ dự án gật): quest thứ hai của arc 1 — "đêm trực gặp tán tu cường
+   đạo" (STORY.md §6 arc 1 cao trào). Chặn kỹ thuật có thật: `feature-quest/CLAUDE.md` quy định
+   **quest thứ hai theo dõi giết quái thì BẮT BUỘC tổng quát hoá `ProcessMonsterKilledUseCase.TRACKED_QUEST_CODE`
+   trước** (hiện hardcode đúng một mã), và cần thêm dòng `quest_template` ⇒ một migration. Cả hai
+   vượt khỏi phạm vi "chỉ đổi tường thuật" của ADR này.
