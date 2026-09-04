@@ -498,16 +498,27 @@ def _shift(geometry, translate):
 
 
 def add_face(rig, spec, style="default"):
-    """One eye, one brow and a mouth on the near cheek of the head.
+    """Eye, brow and mouth stuck on the head. Parented to the head bone and kept
+    out of Freestyle so the ink line does not swallow the pupil.
 
-    Only one of each: this is a true profile view, the far-side features are
-    behind the skull. Everything is parented to the head bone and excluded from
-    Freestyle so the ink line does not swallow the pupil.
+    `style="frontal"` mirrors the eye and brow onto the far cheek as well. The
+    single-sided default is correct for the profile view these assets were first
+    judged in, and WRONG in the game: the client camera is a 3/4 view (ADR-031),
+    both cheeks are on screen, and a one-eyed face reads as a face with
+    something missing. Verified by rendering through the client itself
+    (`runWorldPreview`, 2026-09-03), not in Blender — the Blender preview looks
+    fine at yaw 0 and hides the problem completely.
+
+    Left single-sided by default rather than flipped for everyone, because
+    `wandering_bandit` shipped and was accepted with the one-eyed face and
+    changing it is not this task's business. It would benefit from `frontal`
+    too.
     """
     name = spec["name"]
     hair_color = spec["hair"]["color"]
     eye_color = spec.get("eye_color", "#2B2B33")
     wide = 1.15 if style == "wide" else 1.0
+    frontal = style == "frontal"
     parts = []
 
     # Sit the features below the hairline add_hair() cuts at z=0.856, or the
@@ -540,6 +551,23 @@ def add_face(rig, spec, style="default"):
         rig, name + "_Mouth",
         _transform(mouth_verts, (mouth_x, head_surface_y(mouth_x, mouth_z, 0.003), mouth_z)),
         mouth_faces, shade_hex(spec["skin"], 0.45), "head", shades=2))
+
+    if frontal:
+        far = len(parts)
+        far_sclera = _transform(sclera_verts,
+                                (eye_x, -head_surface_y(eye_x, eye_z, 0.004), eye_z))
+        parts.append(_new_part(rig, name + "_EyeWhiteFar", far_sclera, sclera_faces,
+                               "#FFFFFF", "head", shades=2))
+        far_pupil = _transform(pupil_verts,
+                               (pupil_x, -head_surface_y(pupil_x, pupil_z, 0.014), pupil_z))
+        parts.append(_new_part(rig, name + "_PupilFar", far_pupil, pupil_faces,
+                               eye_color, "head", shades=2))
+        far_brow = _transform(brow_verts,
+                              (brow_x, -head_surface_y(brow_x, brow_z, 0.004), brow_z),
+                              rotate_y_deg=-12.0)
+        parts.append(_new_part(rig, name + "_BrowFar", far_brow, brow_faces,
+                               hair_color, "head", shades=2))
+        _exclude_from_outline(parts[far + 1])
 
     # The sclera and the brow keep their ink line — an outlined eye and a solid
     # brow are the anime read. Only the pupil and mouth, both already dark and
@@ -582,6 +610,15 @@ HAIR_STYLES = {
         (0.090, 0.048, -4, -0.020, 0.980),
         (0.060, 0.030, 40, 0.130, 0.870),
         (0.058, 0.030, -92, -0.158, 0.828),
+    ],
+    # An elder's 髻: a short fat knob, not a spike. The spike generator lathes
+    # a profile that ends at radius 0, so a LONG entry always comes to a point
+    # — read as a horn on a white-haired head. Keeping length below the base
+    # radius times about 1.4 keeps it round.
+    "topknot_bun": [
+        (0.072, 0.056, -2, -0.012, 0.982),
+        (0.046, 0.026, 54, 0.142, 0.848),
+        (0.044, 0.026, -96, -0.162, 0.832),
     ],
 }
 
@@ -722,8 +759,118 @@ def _acc_cloak(rig, name, color, bone):
     return [_new_part(rig, name + "_Cloak", trimmed, faces, color, "spine", shades=3)]
 
 
+def _acc_beard(rig, name, color, bone):
+    """Chin beard, moustache and jaw mass — what makes a chibi read as OLD.
+
+    Three pieces, and the jaw mass is the one that is easy to leave out and
+    cannot be: a cone starting at the chin point alone hangs in space, because
+    the head is an ellipsoid and its surface has already curved away by then.
+    The mass bridges jawline to beard so the silhouette is continuous.
+
+    Sized against the MOUTH, not against the head: the first pass used a jaw
+    ellipsoid reaching z=0.740 and it covered `add_face`'s mouth at z=0.706, so
+    the elder rendered with no face at all — the exact Q2 failure this whole
+    rebuild exists to fix. Keep the jaw mass topping out below 0.700.
+
+    All three ride the `head` bone: a beard that stayed behind when the head
+    turned would be worse than no beard at all.
+    """
+    jaw_verts, jaw_faces = _ellipsoid(0.076, 0.076, 0.052, rings=10, segments=18)
+    parts = [_new_part(rig, name + "_BeardJaw",
+                       _transform(jaw_verts, (0.062, 0.0, 0.648)),
+                       jaw_faces, color, "head", shades=2)]
+
+    # Swept forward (-14 deg) rather than hanging plumb: a vertical beard stays
+    # inside the head's own silhouette and reads as long side hair. The tip has
+    # to clear the chest in +X before the shape says "beard".
+    fall_verts, fall_faces = _taper(-0.190, 0.0, 0.020, 0.068, segments=16)
+    parts.append(_new_part(rig, name + "_BeardFall",
+                           _transform(fall_verts, (0.108, 0.0, 0.650), rotate_y_deg=-14.0),
+                           fall_faces, color, "head", shades=3))
+
+    mo_verts, mo_faces = _ellipsoid(0.044, 0.032, 0.017, rings=8, segments=16)
+    parts.append(_new_part(rig, name + "_Moustache",
+                           _transform(mo_verts, (0.136, 0.0, 0.734)),
+                           mo_faces, color, "head", shades=2))
+    return parts
+
+
+def _acc_long_robe(rig, name, color, bone):
+    """Floor-length robe: a flared skirt from the waist down, swallowing the legs.
+
+    Hem stops at z=0.055 rather than 0.0 on purpose — the shoes stay visible, so
+    the figure still has a contact point with the ground instead of appearing to
+    float. Bound rigidly to `pelvis`, not to the legs: a stiff robe should swing
+    with the hips as one piece, and skinning it to `leg_l`/`leg_r` would tear it
+    down the middle the moment the walk cycle plays.
+    """
+    verts, faces = _revolve(
+        [(0.055, 0.192, 0.170), (0.150, 0.182, 0.160),
+         (0.262, 0.152, 0.132), (0.362, 0.132, 0.114)], 22)
+    return [_new_part(rig, name + "_Robe", verts, faces, color, "pelvis", shades=3)]
+
+
+def _acc_robe_sash(rig, name, color, bone):
+    """Waist sash sized to go OUTSIDE `long_robe`, not inside it.
+
+    `_acc_sash` sits at radius 0.132 around z=0.26, which is correct on a bare
+    chibi and completely invisible under a robe whose skirt is 0.15-0.19 wide at
+    that height — the elder's first build spent two mesh parts on a belt nobody
+    could ever see. This one rides the robe's own waistline (its top ring is at
+    z=0.362, radius 0.132) and clears it.
+
+    Bound to `pelvis` like the robe rather than to `spine`: the two have to move
+    as one piece, and it is the torso rising out of the sash at an angle that
+    sells the stoop.
+    """
+    belt = _revolve([(0.344, 0.144, 0.126), (0.400, 0.146, 0.128)], 22)
+    parts = [_new_part(rig, name + "_RobeSash", *belt, color_hex=color,
+                       bone="pelvis", shades=2)]
+    knot_verts, knot_faces = _ellipsoid(0.040, 0.030, 0.038, rings=8, segments=14)
+    parts.append(_new_part(rig, name + "_RobeSashKnot",
+                           _transform(knot_verts, (0.132, 0.0, 0.368)),
+                           knot_faces, color, "pelvis", shades=2))
+    return parts
+
+
+def _acc_robe_hem(rig, name, color, bone):
+    """Band around the bottom edge of `long_robe`.
+
+    Exists because an accent at the waist does not survive: the wide sleeves
+    hang from z=0.27 to z=0.46 and swallow the sash from every angle except
+    dead-on profile, leaving about two pixels of colour at game size. The hem is
+    the one band on a robed figure that nothing can occlude, and a contrasting
+    hem is what a Daoist robe actually has.
+    """
+    band = _revolve([(0.052, 0.196, 0.174), (0.100, 0.194, 0.172)], 22)
+    return [_new_part(rig, name + "_RobeHem", *band, color_hex=color,
+                      bone="pelvis", shades=2)]
+
+
+def _acc_wide_sleeves(rig, name, color, bone):
+    """Wide hanging sleeves — the other half of the Daoist robe read.
+
+    Flares the WRONG way round on purpose: radius is larger at the wrist than at
+    the elbow, which is what a hanging sleeve does and what a bracer does not.
+    """
+    parts = []
+    for side, sign in (("l", 1.0), ("r", -1.0)):
+        sleeve = _taper(Z_WRIST - 0.030, Z_ELBOW + 0.030, 0.082, 0.056, cap=False)
+        tone = shade_hex(color, FAR_SHADE) if side == "l" else color
+        parts.append(_new_part(
+            rig, "{0}_Sleeve_{1}".format(name, side),
+            *_shift(sleeve, (0.0, sign * ARM_Y, 0.0)),
+            color_hex=tone, bone="forearm_" + side, shades=2))
+    return parts
+
+
 _ACCESSORY_BUILDERS = {
     "headband": _acc_headband,
+    "beard": _acc_beard,
+    "long_robe": _acc_long_robe,
+    "wide_sleeves": _acc_wide_sleeves,
+    "robe_sash": _acc_robe_sash,
+    "robe_hem": _acc_robe_hem,
     "scarf": _acc_scarf,
     "sash": _acc_sash,
     "shoulder_plate": _acc_shoulder_plate,
@@ -1137,7 +1284,7 @@ name            str, prefix for every datablock (e.g. 'hoa_b1')
 skin            hex
 eye_color       hex, optional (default near-black)
 hair            {"style": one of HAIR_STYLES, "color": hex}
-face_style      'default' | 'wide', optional
+face_style      'default' | 'wide' | 'frontal' (mirrors eye+brow), optional
 cloth           {"torso": hex, "pelvis": hex, "legs": hex}
 shoe            hex, optional (defaults to a darkened trouser colour)
 accessories     [{"kind": one of _ACCESSORY_BUILDERS, "color": hex, "bone": optional}]

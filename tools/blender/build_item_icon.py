@@ -66,6 +66,11 @@ RUST = "#8A5A3C"
 CHAKRA = "#3FC8DC"
 CHAKRA_CORE = "#A8F2FA"
 
+# Tua kiếm — the tassel that hangs off a jian pommel. It is the single strongest
+# "Chinese straight sword, not a katana" cue at 64x64, so it gets a colour of
+# its own rather than borrowing one of the cloth tones.
+TASSEL_RED = "#B0302E"
+
 
 def _clear_scene():
     for obj in list(bpy.data.objects):
@@ -110,6 +115,24 @@ def _gem_obj(name, half_x, half_y, half_z, loc=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0
              (0.0, 0.0, half_z), (0.0, 0.0, -half_z)]
     faces = [(0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4),
              (1, 0, 5), (2, 1, 5), (3, 2, 5), (0, 3, 5)]
+    return _link(name, verts, faces, loc, rot)
+
+
+def _frustum_obj(name, half_x_bottom, half_x_top, half_y, half_z,
+                 loc=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0)):
+    """Box whose top face is narrower than its bottom one.
+
+    Needed because Freestyle draws a crease at every slab boundary: a dome
+    approximated by stacking boxes of decreasing width renders as a visible
+    staircase, not a curve. One tapered solid has one outline, and that outline
+    is what makes a shape read as headwear at 64x64.
+    """
+    verts = [(-half_x_bottom, -half_y, -half_z), (half_x_bottom, -half_y, -half_z),
+             (half_x_bottom, half_y, -half_z), (-half_x_bottom, half_y, -half_z),
+             (-half_x_top, -half_y, half_z), (half_x_top, -half_y, half_z),
+             (half_x_top, half_y, half_z), (-half_x_top, half_y, half_z)]
+    faces = [(3, 2, 1, 0), (4, 5, 6, 7), (0, 1, 5, 4),
+             (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
     return _link(name, verts, faces, loc, rot)
 
 
@@ -242,9 +265,46 @@ def build_novice_headband():
     return _headband(NOVICE_CLOTH, NOVICE_TRIM, None)
 
 
+def _outer_sect_cap(band_hex, cloth_hex, pin_hex):
+    """"Mũ Ngoại Môn" silhouette: a dark brow band carrying a jade, a cloth
+    crown above it, and a gold hairpin driven through the crown.
+
+    Deliberately NOT `_headband`: that shape's whole point was the forehead
+    plate, and ADR-038 removes it. A flat band with the plate taken off is just
+    `novice_headband` in different colours, which at 64x64 is no icon at all.
+
+    Two shape rules this had to learn, both from a first attempt that rendered
+    as one navy blob wearing a gold stripe:
+
+      * the crown must be LIGHTER than the band and the top brim WIDER than the
+        crown. Same-tone stacked boxes merge into a single mass, and a brim that
+        flares outwards is what makes the outline read "hat" instead of "box".
+      * no hanging cloth tails at all. One tail on the right turned the icon
+        into a pistol grip; two symmetric ones turned it into a pair of legs.
+        Freestyle outlines every object separately, so a small detached shape
+        never fuses into the mass it is meant to hang off.
+    """
+    band = _box_obj("Band", 0.268, 0.058, 0.052, loc=(0.0, 0.0, -0.176))
+    apply_toon(band, band_hex, shades=2)
+    jade = _gem_obj("Jade", 0.086, 0.050, 0.100, loc=(0.0, -0.080, -0.176))
+    apply_toon(jade, GEM_BLUE, shades=3)
+
+    crown = _frustum_obj("Crown", 0.208, 0.104, 0.070, 0.168, loc=(0.0, 0.0, 0.046))
+    apply_toon(crown, cloth_hex, shades=3)
+
+    pin = _box_obj("Pin", 0.238, 0.022, 0.022, loc=(0.0, -0.084, 0.062), rot=_tilt(-8))
+    apply_toon(pin, pin_hex, shades=3)
+    bead = _box_obj("PinBead", 0.044, 0.036, 0.044, loc=(-0.238, -0.086, 0.096))
+    apply_toon(bead, pin_hex, shades=2)
+    return 0.80
+
+
 def build_genin_headband():
-    # Mũ Trụ Hạ Nhẫn — the hitai-ate: steel forehead plate with two gold rivets.
-    return _headband(GENIN_CLOTH, GENIN_DARK, STEEL)
+    # Mũ Ngoại Môn — cloth cap, jade brow stone, gold hairpin. No metal forehead
+    # plate: that was the hitai-ate, the one unmistakably ninja object in the
+    # whole icon set (ART-AUDIT-TU-TIEN §3, decision §5 #4). The jade is what
+    # buys back the "this tier costs 1200 gold" signal the steel used to carry.
+    return _outer_sect_cap(GENIN_DARK, GENIN_CLOTH, GOLD)
 
 
 def _wraps(cloth_hex, wrap_hex, knuckle_hex):
@@ -394,21 +454,47 @@ def build_genin_necklace():
 
 
 def build_steel_katana():
-    """Katana Thép — tier-2 WEAPON. Reads apart from `wooden_sword` by material
-    (bright steel + gold tsuba, not pale wood) and by the leaning blade."""
-    blade = _box_obj("Blade", 0.050, 0.025, 0.270, loc=(0.045, -0.050, 0.175), rot=_tilt(9))
+    """Trường Kiếm Thép — tier-2 WEAPON, a straight double-edged jian.
+
+    The item CODE stays `steel_katana` (ADR-038 D5: business keys do not move),
+    but nothing about the drawing may still say katana. Three things carried the
+    old read and all three are gone (ART-AUDIT-TU-TIEN §5 #5):
+
+      * the kink — blade leaned +9 deg, grip leaned -6 deg, so the two met at an
+        angle and the eye filled in a curve. Both are dead straight now and share
+        one axis.
+      * the tsuba — a wide slab right under the blade. Replaced by a narrow
+        crossguard bar with two quillons swept down towards the grip.
+      * the ito wrap — three stacked bands down the grip. Two plain rings now.
+
+    And one thing is added rather than removed, because taking cues away only
+    gets you to "generic sword": the pommel tassel, which no katana has.
+    """
+    blade = _box_obj("Blade", 0.070, 0.026, 0.225, loc=(0.0, -0.050, 0.224))
     apply_toon(blade, STEEL_BRIGHT, shades=3)
-    guard = _box_obj("Guard", 0.118, 0.046, 0.030, loc=(0.005, -0.050, -0.135))
+    tip = _box_obj("Tip", 0.036, 0.024, 0.048, loc=(0.0, -0.050, 0.497))
+    apply_toon(tip, STEEL_BRIGHT, shades=3)
+
+    guard = _box_obj("Guard", 0.152, 0.048, 0.030, loc=(0.0, -0.050, -0.040))
     apply_toon(guard, GOLD, shades=3)
-    handle = _box_obj("Handle", 0.040, 0.042, 0.140, loc=(-0.020, -0.050, -0.290), rot=_tilt(-6))
+    for side in (-1, 1):
+        quillon = _box_obj("Quillon%d" % side, 0.032, 0.044, 0.050,
+                           loc=(side * 0.140, -0.050, -0.088), rot=_tilt(side * 26))
+        apply_toon(quillon, GOLD, shades=2)
+
+    handle = _box_obj("Handle", 0.044, 0.044, 0.120, loc=(0.0, -0.050, -0.200))
     apply_toon(handle, GENIN_DARK, shades=2)
-    for index, height in enumerate((-0.200, -0.290, -0.380)):
-        wrap = _box_obj("Wrap%d" % index, 0.044, 0.048, 0.016,
-                        loc=(-0.020 + 0.010 * index, -0.050, height), rot=_tilt(-6))
-        apply_toon(wrap, GOLD, shades=2)
-    pommel = _box_obj("Pommel", 0.050, 0.050, 0.030, loc=(-0.008, -0.050, -0.442), rot=_tilt(-6))
+    ring = _box_obj("Ring", 0.052, 0.048, 0.020, loc=(0.0, -0.050, -0.200))
+    apply_toon(ring, GOLD, shades=2)
+    pommel = _box_obj("Pommel", 0.058, 0.052, 0.032, loc=(0.0, -0.050, -0.372))
     apply_toon(pommel, GOLD, shades=2)
-    return 1.0
+
+    knot = _box_obj("TasselKnot", 0.036, 0.038, 0.034, loc=(0.0, -0.058, -0.430))
+    apply_toon(knot, TASSEL_RED, shades=2)
+    fall = _box_obj("TasselFall", 0.034, 0.036, 0.082, loc=(0.056, -0.060, -0.490),
+                    rot=_tilt(28))
+    apply_toon(fall, TASSEL_RED, shades=3)
+    return 1.18
 
 
 def build_iron_scrap():

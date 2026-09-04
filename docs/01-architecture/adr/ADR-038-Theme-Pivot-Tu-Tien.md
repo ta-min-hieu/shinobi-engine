@@ -220,10 +220,28 @@ lúc này. Tên "Kage" trên repo/branding lệch theme cho tới khi chủ dự
    Kết quả ngược hẳn với dự đoán của D7.3: **33/37 nhóm asset dùng lại nguyên vẹn** (toàn bộ 17 VFX,
    16/18 icon, cả 3 quái). Đề tài ninja gần như chỉ nằm ở MỘT chi tiết — băng trán có tấm kim loại.
    Và phép đo cấu trúc `.glb` cho thấy nó là **dải màu tách bạch trong texture**, gỡ được bằng đổi
-   màu chứ không phải sinh lại model ⇒ **0 lượt Rodin cho 15 nhân vật**. Còn chờ chủ dự án tick
-   bảng §5 của bản rà soát. Cũng đã gỡ bẫy: thước đo nghiệm thu cũ đòi nhân vật "vẫn nhận ra là
+   màu chứ không phải sinh lại model ⇒ **0 lượt Rodin cho 15 nhân vật**. Cũng đã gỡ bẫy: thước đo nghiệm thu cũ đòi nhân vật "vẫn nhận ra là
    ninja", nó sẽ đánh trượt mọi asset tu tiên đúng đề tài.
-7. 🔶 Đợt 3 — phần THI HÀNH: chờ bảng §5 của bản rà soát được tick.
+7. ✅ **Đợt 3 — phần THI HÀNH xong 2026-09-03.** Chủ dự án đã tick đủ **7/7** dòng bảng §5. Kết quả:
+   băng trán ninja gỡ khỏi `char_hoa-b1` (2026-09-01 — và hoá ra **chỉ 1/15** nhân vật từng đội nó);
+   `icon_genin_headband` băng trán hitai-ate → **mũ vải Ngoại Môn**; `icon_steel_katana` katana →
+   **trường kiếm thẳng + tua kiếm**; `char_town-elder` **dựng lại thành trưởng lão Chu Hoành**
+   (43 part, LOD 7 622/7 622/4 998, thay khối hộp không mặt vốn chưa bao giờ đạt
+   ART-QUALITY-STANDARD §2 — nợ có từ 2026-08-01, không do pivot sinh ra); giáp kim loại của
+   `char_tho-b3` **GIỮ**. Ngân sách tam giác 57/57. Mã vật phẩm và `asset_key` **không đổi một chữ**
+   (D5).
+
+   **Tổng cộng Đợt 3 tiêu 0 lượt Rodin.** Chủ dự án ĐÃ đồng ý chi cho ông lão, nhưng khoá dùng thử
+   trả `API_INSUFFICIENT_FUNDS` — API từ chối trước khi sinh nên không mất credit. Ông lão đi đường
+   `kage_mesh_kit` (offline, tất định); đổi sang bản Rodin sau này tốn đúng một lệnh. ⛔ **Việc duy
+   nhất còn treo của Đợt 3: một khoá Hyper3D trả tiền**, và nó KHÔNG chặn gì — bản đang chạy dùng
+   được.
+
+   Bài học đắt nhất, đáng nhớ cho mọi asset nhân vật sau này: **ảnh preview Blender không thay được
+   `./gradlew :client:client-core:runWorldPreview`**. Ở yaw 0 trong Blender mặt ông lão đẹp; qua bộ
+   dựng thật của client (camera chúc xuống theo ADR-031) thì vòm tóc che kín mặt — đúng lỗi Q2 mà
+   cả lần dựng lại sinh ra để sửa. Chi tiết: [ASSET-LOG.md](../../../assets/raw/ASSET-LOG.md) mục
+   2026-09-03.
 8. ✅ D8 xong phần thật sự lệch (2026-09-01): `docs/README` (dòng mô tả dự án), `ARCHITECTURE` (sơ
    đồ), `KAGE-CONSTITUTION Điều 5`, `AI.md`, `RENDERING.md`, `RESOURCE.md` (ví dụ đặt tên),
    `ART-QUALITY-STANDARD`. **Phần CÒN LẠI cố ý GIỮ**: link tới `ADR-033-Ninja-School-Style-Movement.md`

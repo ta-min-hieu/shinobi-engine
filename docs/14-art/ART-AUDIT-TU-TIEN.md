@@ -4,8 +4,8 @@
 
 | | |
 |---|---|
-| Version | 1.0.0 |
-| Status | Draft — **chờ chủ dự án quyết từng dòng ở §5** |
+| Version | 2.0.0 |
+| Status | **XONG — cả 7 dòng §5 đã quyết và đã thi hành (2026-09-03)** |
 | Ngày đo | 2026-09-01 |
 | Liên quan | [ADR-038 D7.3](../01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md) (Đợt 3) · [ART-QUALITY-STANDARD](ART-QUALITY-STANDARD.md) (thước đo) · [ART-PIPELINE](ART-PIPELINE.md) (cách làm) · [STORY.md §7](../13-game-design/STORY.md) (lore từng thực thể) |
 
@@ -13,6 +13,25 @@
 > **không hoàn lại được**, nên phải biết chính xác cần sinh bao nhiêu món trước khi bấm.
 > Mọi phán xét dưới đây dựa trên ảnh chụp/render THẬT của asset đang nằm trong repo, không phải
 > trên tên file.
+
+---
+
+## 0. Trạng thái cuối (2026-09-03) — ĐÃ ĐÓNG
+
+Cả **7 dòng** của bảng quyết định §5 đã được chủ dự án quyết và đã thi hành:
+
+| # | Quyết | Kết quả |
+|---|---|---|
+| 1, 2, 6 | — | Đã xong từ 2026-09-01 (băng trán ninja chỉ có ở `char_hoa-b1`, đã xoá) |
+| 3 | Làm mới `char_town-elder` | ✅ Dựng lại bằng mesh kit — **0 lượt Rodin**, khoá dùng thử hết quỹ (§5.1) |
+| 4 | Sửa `icon_genin_headband` | ✅ Mũ vải Ngoại Môn thay hitai-ate |
+| 5 | Sửa `icon_steel_katana` | ✅ Trường kiếm thẳng + tua kiếm |
+| 7 | `char_tho-b3` giữ hay bỏ giáp | ✅ **GIỮ** (theo khuyến nghị) |
+| 2b | Sinh lại 15 nhân vật | Không chọn — #2 nhìn đạt |
+
+Chi tiết thi hành + 5 bài học của lần dựng lại ông lão: [ASSET-LOG.md](../../assets/raw/ASSET-LOG.md),
+mục cập nhật 2026-09-03. Việc duy nhất còn treo là **khoá Hyper3D trả tiền** nếu muốn bản Rodin
+cho `char_town-elder` — chỉ chủ tài khoản làm được.
 
 ---
 
@@ -295,25 +314,52 @@ Script để ở `tools/blender/strip_headband.py` kèm ghi chú trạng thái n
 | ~~1~~ | ~~Băng trán rời hay dính?~~ | ✅ **Đã đo 2026-09-01** — dính mesh nhưng tách bạch trong texture (§4.3) | Xong |
 | ~~2~~ | ✅ **XONG 2026-09-01** — bỏ băng trán ninja. Hoá ra **chỉ `char_hoa-b1` có** (§4.10), và đã sửa: `hoa-text3d-pilot.blend` được tô lại rồi xuất lại đủ 3 tier, kiểm bằng mắt trong game — nhân vật đội dải khăn đỏ trơn, tấm kim loại + đinh tán + hoạ tiết khắc biến mất | **0 hạn mức Rodin**, 1 file nguồn bị sửa (git LFS, revert được) | Không còn gì để quyết |
 | 2b | *Hoặc* sinh lại 15 nhân vật cho sạch hẳn khối lồi | **15 lượt Rodin** + 15 vòng nghiệm thu | ⬜ Chỉ chọn nếu #2 nhìn không đạt |
-| 3 | Làm mới `char_town-elder` thành Chu Hoành | 1 lượt Rodin + 1 vòng nghiệm thu | ⬜ Đồng ý tiêu hạn mức? |
-| 4 | Sửa `icon_genin_headband` → mũ vải ngoại môn | 1 icon, dựng tay | ⬜ |
-| 5 | Sửa `icon_steel_katana` → trường kiếm thẳng | 1 icon, dựng tay | ⬜ Hay chấp nhận đao cong? |
+| 3 | Làm mới `char_town-elder` thành Chu Hoành | **0 lượt Rodin** (xem §5.1) + 1 vòng nghiệm thu | ✅ **XONG 2026-09-03** — chủ dự án đồng ý tiêu hạn mức, nhưng khoá dùng thử hết quỹ nên làm bằng mesh kit. 43 part, 7 622 tris, có mặt/tóc/râu/đạo bào/đai ngọc |
+| 4 | Sửa `icon_genin_headband` → mũ vải ngoại môn | 1 icon, dựng tay | ✅ **XONG 2026-09-03** — mũ vải chóp cụt + ngọc + trâm vàng. Kiểm ở 64px trong atlas đã đóng gói thật |
+| 5 | Sửa `icon_steel_katana` → trường kiếm thẳng | 1 icon, dựng tay | ✅ **XONG 2026-09-03** — chủ dự án chọn nắn thẳng. Lưỡi + chuôi cùng trục, hộ thủ hẹp thay tsuba, thêm tua kiếm đỏ |
 | 6 | 17 VFX + 16 icon + 3 quái | **0** | Không cần quyết — giữ nguyên |
-| 7 | 🔴 `char_tho-b3` có **tấm giáp/mũ kim loại** trên đầu (§4.10 đính chính) — bo góc, 4 đinh tán, KHÔNG hoạ tiết khắc | Nếu bỏ: 1 lần chỉ điểm + xuất lại, **0 hạn mức Rodin** | ⬜ Giữ hay bỏ? **Tôi nghiêng về GIỮ** — giáp không mang dấu hiệu đề tài, và hệ Thổ là thể tu |
+| 7 | `char_tho-b3` có **tấm giáp/mũ kim loại** trên đầu (§4.10 đính chính) — bo góc, 4 đinh tán, KHÔNG hoạ tiết khắc | 0 | ✅ **GIỮ** — chủ dự án quyết 2026-09-03, theo khuyến nghị. Không có việc phải làm |
+
+### 5.1. Rodin từ chối trước khi sinh — và vì sao điều đó KHÔNG chặn #3
+
+Chủ dự án đã đồng ý tiêu hạn mức cho #3. Bắn **đúng một** lượt, đúng bộ tham số thật
+(`tier=Detail quality=high use_hyper=true TAPose=true material=PBR`), không dò vòng lặp — theo
+luật rút ra ngày 2026-08-30. Kết quả:
+
+```
+HTTP 201
+{"error":"API_INSUFFICIENT_FUNDS"}
+```
+
+**Không tiêu đồng credit nào**: API từ chối trước khi sinh. Khoá `vibecoding` mà
+`bpy.ops.blendermcp.set_hyper3d_free_trial_api_key()` cấp là **quỹ dùng chung**, và nó đã cạn từ
+2026-08-30 (`wandering_bandit` dính đúng bức tường này).
+
+Hai điều đáng ghi lại:
+
+1. **Không cần Blender GUI, cũng không cần phiên MCP** để gọi Rodin. Cảnh báo ở §5 ("Blender phải
+   đang chạy kèm addon") **nay đã sai**: addon vẫn nạp trong `blender -b`, nên lấy khoá bằng
+   `bpy.ops` rồi POST thẳng bằng `urllib` là đủ. Toàn bộ đường Rodin chạy headless được.
+2. **#3 không bị chặn** — nó chỉ đổi đường. Mesh kit là bản offline tất định và mọi bước sau mesh
+   dùng chung với đường sinh, nên bản Rodin về sau tốn **đúng một lệnh** để thay.
+
+⛔ **Việc duy nhất còn cần chủ dự án**: một khoá Hyper3D **trả tiền** nếu muốn bản Rodin. Đây là
+thứ chỉ chủ tài khoản làm được, không phải việc AI tự chạy.
+
 
 **Đề xuất của tôi**: làm #2 trước — nó không tốn hạn mức, và phép khoanh vùng theo xương đã được
 kiểm chứng trên 4/5 hệ (§4.4). Xuất lại xong thì chụp `runWorldPreview` xem khối lồi trên trán có
 lộ ở cỡ trong game không, rồi mới quyết có cần #2b. Không bấm lượt Rodin nào cho tới lúc đó — trừ
 #3, vốn phải sinh lại bất kể đề tài.
 
-⚠️ **Cả #2 lẫn #3 đều cần Blender đang chạy kèm addon.** Kiểm 2026-09-01: chưa chạy, nên phần thi
-hành của Đợt 3 dừng ở đây. Mọi thứ KHÔNG cần Blender trong tài liệu này thì đã làm xong.
+~~⚠️ Cả #2 lẫn #3 đều cần Blender đang chạy kèm addon.~~ **SAI, đã bác bỏ 2026-09-03** — xem §5.1.
+Mọi thứ trong Đợt 3 chạy được headless: dựng icon, dựng nhân vật, xuất LOD, và cả gọi API Rodin.
 
 ⚠️ **Bẫy hạn mức Rodin đã dính một lần** (2026-08-30, art 2 loài quái): hết hạn mức giữa chừng thì
 phiên art đứt đoạn và phải chờ. Chốt danh sách TRƯỚC khi bấm lượt đầu tiên.
 
-⚠️ **Blender phải đang chạy kèm addon** thì công cụ MCP mới nối được — kiểm 2026-09-01: chưa chạy.
-Xem [BLENDER-SESSION-GUIDE](BLENDER-SESSION-GUIDE.md).
+⚠️ Công cụ **MCP** thì đúng là cần Blender GUI — nhưng Đợt 3 **không dùng MCP ở bước nào**.
+Xem [BLENDER-SESSION-GUIDE](BLENDER-SESSION-GUIDE.md) và §5.1.
 
 ---
 
@@ -321,12 +367,12 @@ Xem [BLENDER-SESSION-GUIDE](BLENDER-SESSION-GUIDE.md).
 
 | # | Quyết định | Trạng thái |
 |---|---|---|
-| 1 | VFX/icon/quái trung tính về đề tài — Đợt 3 KHÔNG đụng tới | 🟡 đề xuất |
-| 2 | 15 nhân vật SỬA bằng tô lại texture, không sinh lại | 🟡 đề xuất |
+| 1 | VFX/icon/quái trung tính về đề tài — Đợt 3 KHÔNG đụng tới | ✅ **đã áp dụng** — 17 VFX + 16/18 icon + 3 quái giữ nguyên, 0 việc |
+| 2 | 15 nhân vật SỬA bằng tô lại texture, không sinh lại | ✅ **đã làm 2026-09-01** — và hoá ra chỉ **1/15** con cần sửa (§4.10) |
 | 2b | Khoanh vùng tấm kim loại bằng **trọng số xương**, KHÔNG bằng luật màu | ✅ **đã kiểm chứng** (§4.4) — luật màu đã thử và HỎNG trên Thủy/Thổ/Lôi |
 | 2c | Trọn vòng Blender headless (tô lại → xuất lại → render → diff) chạy được, 0 lượt Rodin | ✅ **đã chạy thật** (§4.6) — còn phải siết mask từ "cả đầu" xuống "trán" |
-| 3 | `char_town-elder` làm mới, lý do là chất lượng chứ không phải đề tài | 🟡 đề xuất |
-| 4 | Không bấm lượt Rodin nào trước khi chốt xong bảng §5 | 🟡 đề xuất |
+| 3 | `char_town-elder` làm mới, lý do là chất lượng chứ không phải đề tài | ✅ **đã làm 2026-09-03** — chủ dự án duyệt; dựng bằng mesh kit vì Rodin hết quỹ (§5.1) |
+| 4 | Không bấm lượt Rodin nào trước khi chốt xong bảng §5 | ✅ **đã tuân thủ** — bắn đúng 1 lượt sau khi chủ dự án gật, và API từ chối trước khi sinh nên tốn 0 credit (§5.1) |
 | 5 | Đo cấu trúc `.glb` bằng cách đọc chunk JSON, không cần mở Blender | ✅ đã dùng thật — nên dùng lại mỗi khi cần biết model có gì bên trong |
 | 6 | Sửa art phải sửa **nguồn `.blend`**, không sửa `assets/exported/` (gitignore, là build artifact) | ✅ **đã trả giá một lần** (§4.5) |
 
@@ -343,8 +389,14 @@ Không. Đợt 3 nằm trong phạm vi [ADR-038](../01-architecture/adr/ADR-038-
 
 ## Việc cần làm tiếp theo
 
-1. ✅ Phép đo cấu trúc (§4.3) + phép khoanh vùng theo xương (§4.4) đã chạy xong 2026-09-01 — không cần Blender, không tốn hạn mức. Hai kết luận vội của bản đầu đã được sửa ở §4.4 và §4.5.
-2. Chủ dự án tick bảng §5: **#2 là ô quan trọng nhất** — cộng #3, #4, #5.
-3. ✅ Không cần addon MCP: Blender chạy **nền qua dòng lệnh** là đủ, trọn vòng đã chạy thật (§4.6).
-4. Việc kỹ thuật còn lại của #2 (§4.7): **mở texture trong UV editor của Blender, đọc toạ độ `u,v` của tấm kim loại** cho 1 nhân vật để chốt quy ước trục, rồi lấy nốt 14 toạ độ còn lại và chạy hàng loạt 15 nhân vật × 3 tier + chụp nghiệm thu. Đây là việc **cần mắt người nhìn một lần**, không đoán mò được.
-5. #3 (`char_town-elder` → Chu Hoành) là việc DUY NHẤT còn cần Rodin, nên cần chủ dự án gật trước.
+Đợt 3 **đã đóng** — xem §0. Chỉ còn hai thứ, và cả hai đều không phải việc kỹ thuật:
+
+1. ⛔ **Khoá Hyper3D trả tiền**, nếu chủ dự án muốn bản Rodin cho `char_town-elder` thay bản mesh
+   kit đang chạy. Khoá dùng thử đã cạn (§5.1). Chỉ chủ tài khoản làm được. Khi có khoá thì việc
+   thay tốn **đúng một lệnh** `build_text3d_monster.py --code town_elder --glb ...`.
+2. `wandering_bandit` cũng nên bật `face_style="frontal"` (mắt soi gương sang má kia) vì cùng dính
+   đúng vấn đề camera 3/4 mà ông lão vừa sửa — nhưng nó đã nghiệm thu với một mắt và **không thuộc
+   phạm vi Đợt 3**, ghi lại để khỏi quên.
+
+Các mục cũ của bản 1.0.0 (chủ dự án tick bảng §5; chỉ điểm toạ độ UV cho 15 nhân vật) **đã hết hiệu
+lực**: bảng §5 đã tick xong, và phép chỉ điểm UV hoá ra chỉ cần cho đúng một nhân vật (§4.10).
