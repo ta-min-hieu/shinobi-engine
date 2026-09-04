@@ -11,12 +11,17 @@ class MonsterTemplateTest {
         return new MonsterStats(1, 50, 8, 0, 5, 3, 90, 0, 0, "NONE");
     }
 
+    /** Bộ mặc định của dự án trước ADR-039 — bằng đúng `AiConstants.DEFAULTS` và DEFAULT của V25. */
+    private static MonsterAiParams ai() {
+        return new MonsterAiParams(6f, 10f, 3f, 1.5f, 3f, 3f);
+    }
+
     @Test
     void shouldAcceptTemplateWithoutDropTable() {
         // dropTableCode null = loài không rơi gì. Hợp lệ, không phải lỗi — adapter dùng LEFT JOIN
         // đúng vì lý do này (INNER JOIN sẽ nuốt mất cả loài khỏi catalog).
-        MonsterTemplate template =
-                new MonsterTemplate("stone_ogre", "hud.monster.stone_ogre", "mob_training-dummy", stats(), 90L, null);
+        MonsterTemplate template = new MonsterTemplate(
+                "stone_ogre", "hud.monster.stone_ogre", "mob_training-dummy", stats(), ai(), 90L, null);
 
         assertThat(template.dropTableCode()).isNull();
         assertThat(template.expReward()).isEqualTo(90L);
@@ -24,17 +29,17 @@ class MonsterTemplateTest {
 
     @Test
     void shouldRejectBlankIdentifiers() {
-        assertThatThrownBy(() -> new MonsterTemplate(" ", "n", "m", stats(), 0L, null))
+        assertThatThrownBy(() -> new MonsterTemplate(" ", "n", "m", stats(), ai(), 0L, null))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new MonsterTemplate("c", " ", "m", stats(), 0L, null))
+        assertThatThrownBy(() -> new MonsterTemplate("c", " ", "m", stats(), ai(), 0L, null))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new MonsterTemplate("c", "n", " ", stats(), 0L, null))
+        assertThatThrownBy(() -> new MonsterTemplate("c", "n", " ", stats(), ai(), 0L, null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void shouldRejectNegativeExpReward() {
-        assertThatThrownBy(() -> new MonsterTemplate("c", "n", "m", stats(), -1L, null))
+        assertThatThrownBy(() -> new MonsterTemplate("c", "n", "m", stats(), ai(), -1L, null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

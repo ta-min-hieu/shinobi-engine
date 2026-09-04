@@ -193,10 +193,27 @@ Theo Điều 27, hành vi AI **không hardcode**:
 | Phần | Ở đâu |
 |---|---|
 | FSM engine (chuyển trạng thái) | Java — `engine-ecs` / `server-world` |
-| **Tham số** (aggro range, tốc độ đuổi, cooldown skill) | **Config data** — `monster_template` ([DATABASE.md](../05-server/DATABASE.md)). ⚠️ **CHƯA đúng tính đến 2026-08-30**: [ADR-037](../01-architecture/adr/ADR-037-Monster-Template-And-Spawn-Tables.md) đưa chỉ số/EXP/vị trí vào DB nhưng **hoãn tham số AI** (D7) — chúng vẫn là hằng số trong `AiConstants`, mọi loài dùng chung |
+| **Tham số mô tả TÍNH CÁCH một loài** (aggro, leash, tốc độ đuổi/tuần tra, bán kính tuần tra, thời gian đứng yên) | **Config data** — sáu cột trên `monster_template` ([DATABASE.md §2.4](../05-server/DATABASE.md)), tới `AiSystem` qua `AiParamsComponent`. ✅ Đúng kể từ [ADR-039](../01-architecture/adr/ADR-039-Per-Species-AI-Parameters.md) (trước đó [ADR-037](../01-architecture/adr/ADR-037-Monster-Template-And-Spawn-Tables.md) D7 hoãn có chủ đích) |
+| **Con số giữ BẤT BIẾN của FSM** (epsilon "đã tới nơi", van chống kẹt tuần tra) | **Java** — `AiConstants`, cạnh chính FSM. Cố ý **KHÔNG** vào DB: xem §10.1 |
 | Hành vi Boss phức tạp | **Script** ([SCRIPTING.md](../06-plugin/SCRIPTING.md)) |
 
 **Phân định**: FSM là *cơ chế* (Java, nhanh). Tham số và hành vi đặc biệt là *nội dung* (data/script, sửa không rebuild).
+
+### 10.1 Ranh giới "nội dung" và "cơ chế" — hai con số ở lại code
+
+⚠️ Bản trước của mục này ghi gọn *"tham số AI là config"*, và câu đó **nói quá**: ba ví dụ nó liệt kê
+đều là nội dung, nhưng câu tổng quát thì phủ lên **mọi** con số trong `AiSystem`.
+[ADR-039](../01-architecture/adr/ADR-039-Per-Species-AI-Parameters.md) D1 thu hẹp lại:
+
+| Con số | Ở đâu | Vì sao |
+|---|---|---|
+| aggro / leash / tốc độ đuổi / tốc độ tuần tra / bán kính tuần tra / thời gian đứng yên | **DB** | Mô tả **tính cách một loài** — câu hỏi thiết kế trò chơi. `aggro = 0` nghĩa là loài thụ động, không bao giờ gây hấn (đó là cách `training_dummy` thôi đuổi theo người chơi) |
+| `ARRIVAL_THRESHOLD_METERS` | **Java** | **Epsilon hình học**: giá trị đúng là hàm của `FIXED_DT` và tốc độ, không phải của loài. Đặt 0 ⇒ quái không bao giờ "tới nơi", rung quanh điểm spawn vĩnh viễn, **không có gì báo lỗi** |
+| `MAX_PATROL_DURATION_SECONDS` | **Java** | **Van an toàn** chống kẹt. Van mà người dùng chỉnh được thì không còn là van |
+
+⚠️ **Tương tác đã biết, cố ý không dựng `CHECK`**: `patrol_radius_meters / patrol_speed_mps` vượt
+`MAX_PATROL_DURATION_SECONDS` (5s) thì quái không bao giờ TỚI điểm tuần tra — nó luôn hết giờ giữa
+đường rồi về Idle. Hỏng lành. Không viết `CHECK` vì `CHECK` đó phải nhúng hằng số Java vào schema.
 
 ---
 
@@ -211,7 +228,7 @@ Theo Điều 27, hành vi AI **không hardcode**:
 | 5 | Nếu có A*: **bắt buộc giới hạn số lần tìm/tick** | Chống spike CPU | Accepted |
 | 6 | Navigation data là **một phần của map data**, không tính runtime | Rẻ hơn | Accepted |
 | 7 | AI thiết kế để **cho phép time-slicing** ngay từ đầu | Không giả định chạy mỗi tick | Accepted |
-| 8 | Tham số AI là **config**, không phải code | Điều 27 | Accepted |
+| 8 | Tham số mô tả **tính cách loài** là config (DB); con số giữ **bất biến FSM** ở lại code | Điều 27 — nhưng có ranh giới, xem §10.1 | Accepted — thu hẹp bởi [ADR-039](../01-architecture/adr/ADR-039-Per-Species-AI-Parameters.md) D1b (câu cũ "tham số AI là config" nói quá) |
 | 9 | Boss AI dùng **Script** (GraalJS) | Điều 27; số boss ít nên chi phí script không đáng | Accepted — [ADR-016](../01-architecture/adr/ADR-016-Scripting-Engine.md) |
 | 10 | **Không dùng gdx-ai cho FSM** | Bảo trì chậm; FSM tự viết < 100 dòng | ✅ [ADR-022](../01-architecture/adr/ADR-022-Custom-FSM-No-Gdx-Ai.md) Accepted (2026-08-01) |
 
@@ -226,7 +243,9 @@ Theo Điều 27, hành vi AI **không hardcode**:
 - [ECS.md](ECS.md) — AISystem trong thứ tự tick
 - [SCRIPTING.md](../06-plugin/SCRIPTING.md) — Boss script chạy thế nào
 - [GAMEPLAY.md](../05-server/GAMEPLAY.md) — quái, boss trong gameplay
-- [DATABASE.md](../05-server/DATABASE.md) — `monster_template` chứa tham số AI
+- [DATABASE.md §2.4](../05-server/DATABASE.md) — `monster_template` chứa tham số AI (sáu cột, V25)
+- [ADR-039](../01-architecture/adr/ADR-039-Per-Species-AI-Parameters.md) — tham số AI theo loài;
+  ranh giới nội dung/cơ chế ở §10.1
 - [PERFORMANCE.md](../09-performance/PERFORMANCE.md) — ngân sách AI
 
 ## Việc cần làm tiếp theo
@@ -235,3 +254,7 @@ Theo Điều 27, hành vi AI **không hardcode**:
 2. Phase 4: làm FSM đơn giản nhất chạy được — **không** làm A*, **không** làm Behavior Tree cho tới khi có boss thật (Phase 8).
 3. ✅ Phase 8 lát cắt 2 (2026-07-25): Boss AI bằng script GraalJS đã code xong (`BossAiSystem`, 2 pha `heavy_strike`/`enrage`) — xem [ROADMAP.md Phase 8](../11-process/ROADMAP.md). Summon minion (Phase 2 trong sơ đồ §4) để dành lát cắt sau.
 4. Phase 9: đo chi phí AI, áp dụng §9 time-slicing **nếu** số liệu cho thấy cần.
+5. ✅ Tham số AI theo loài — [ADR-039](../01-architecture/adr/ADR-039-Per-Species-AI-Parameters.md)
+   (migration V25, sáu cột trên `monster_template`). Món nợ còn lại đã đặt tên: **tầm đánh theo
+   loài** (`CombatConstants.ATTACK_RANGE_METERS`, cho quái bắn xa) — đụng cả tầm đánh của nhân vật
+   nên là một ADR riêng.

@@ -24,6 +24,7 @@ import dev.kage.engine.ecs.system.Platform;
 import dev.kage.engine.ecs.system.TerrainCollisionSystem;
 import dev.kage.engine.ecs.system.TriggerZoneSystem;
 import dev.kage.engine.ecs.system.VerticalMovementSystem;
+import dev.kage.server.world.component.AiParamsComponent;
 import dev.kage.server.world.component.AiStateComponent;
 import dev.kage.server.world.component.AttackCooldownComponent;
 import dev.kage.server.world.component.BossAiComponent;
@@ -74,12 +75,13 @@ public final class WorldFacade {
     // MonsterCatalogSnapshot. Hai ràng buộc CŨ vẫn nguyên hiệu lực và nay do DB gác (CHECK +
     // comment ở migration V23), không phải do hằng số Java: quái phải nằm trên đường chơi
     // (y = CHARACTER_PLAY_LINE_Y — ADR-033 khoá di chuyển vào trục X, quái lệch y là quái người
-    // chơi không bao giờ chạm tới), và phải cách điểm hồi sinh (0,0) xa hơn
-    // AiConstants.AGGRO_RADIUS_METERS để nhân vật vừa hồi sinh không bị đánh ngay.
+    // chơi không bao giờ chạm tới), và phải cách điểm hồi sinh (0,0) xa hơn tầm aggro của loài
+    // đặt ở đó (monster_template.aggro_radius_meters, ADR-039) để nhân vật vừa hồi sinh không bị
+    // đánh ngay — ràng buộc này NHẸ đi kể từ ADR-039 D4: `training_dummy` nay có aggro = 0.
 
     // Điểm hồi sinh mặc định (chưa có khái niệm "điểm hồi sinh theo khu vực"/thị trấn — MVP đầu
-    // tiên, xem ROADMAP.md Phase 10). Cách quái bù nhìn (5,5) ~7.07m — NGOÀI AiConstants
-    // AGGRO_RADIUS_METERS (6m), nhân vật không bị quái đánh lại ngay lúc vừa hồi sinh.
+    // tiên, xem ROADMAP.md Phase 10). Quái gần nhất ở x=8, tức 8m — ngoài tầm aggro mặc định (6m),
+    // và từ ADR-039 D4 con quái ở đó còn là loài THỤ ĐỘNG (aggro 0) nên không đuổi theo gì cả.
     private static final float CHARACTER_RESPAWN_X = 0f;
     private static final float CHARACTER_RESPAWN_Y = 0f;
 
@@ -118,7 +120,7 @@ public final class WorldFacade {
             new Platform(new Aabb(9f, -0.75f, 13f, 0.75f), 1.5f),
             new Platform(new Aabb(15f, -0.75f, 19f, 0.75f), 2.2f));
 
-    // Boss mẫu (Phase 8 lát cắt 2) — spawn trong tầm AiConstants.AGGRO_RADIUS_METERS (6m) tính từ
+    // Boss mẫu (Phase 8 lát cắt 2) — spawn trong tầm aggro mặc định (AiConstants.DEFAULTS, 6m) từ
     // điểm vào dungeon (DungeonInstanceRegistry.DUNGEON_ENTRY_SPAWN, 0,0) để party aggro ngay khi
     // tới gần, không cần cơ chế "instant aggro lúc mở dungeon" riêng.
     private static final float BOSS_SPAWN_X = 3f;
@@ -932,10 +934,8 @@ public final class WorldFacade {
         monsterIdComponent.monsterId = monsterId;
         entity.add(monsterIdComponent);
 
-        AiStateComponent aiState = new AiStateComponent();
-        aiState.spawnX = spawnX;
-        aiState.spawnY = spawn.posY();
-        entity.add(aiState);
+        entity.add(newAiState(spawnX, spawn.posY()));
+        entity.add(toAiParams(loai.ai())); // ADR-039 — tham số FSM THEO LOÀI, không còn hằng số chung
         entity.add(new TargetComponent()); // AiSystem ghi khi Chase/Attack; CombatSystem đọc để đánh trả
         entity.add(new AttackCooldownComponent());
         entity.add(new StatusEffectComponent());
@@ -944,6 +944,31 @@ public final class WorldFacade {
         spawnIndexByMonsterId.put(monsterId, spawnIndex);
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
         // không cần thông báo thủ công (giống hệt attach nhân vật, xem AreaOfInterestTracker).
+    }
+
+    /** Trạng thái FSM ban đầu — nhớ điểm spawn để {@code AiSystem} biết chỗ quay về (Return). */
+    private static AiStateComponent newAiState(float spawnX, float spawnY) {
+        AiStateComponent aiState = new AiStateComponent();
+        aiState.spawnX = spawnX;
+        aiState.spawnY = spawnY;
+        return aiState;
+    }
+
+    /**
+     * Số thuần tham số AI của một loài → Component bất biến gắn lên entity (ADR-039 D5).
+     *
+     * <p>Dựng đúng MỘT LẦN lúc spawn, cố ý: {@code AiSystem} chạy cho mọi quái mỗi tick ở 60Hz, nên
+     * tra tham số theo mã loài trong tick sẽ là một lần tra {@code HashMap} cộng một
+     * {@code Optional} mới cho mỗi con quái mỗi tick — /CLAUDE.md §6 cấm thẳng.
+     */
+    private static AiParamsComponent toAiParams(MonsterCatalogSnapshot.MonsterAiNumbers ai) {
+        return new AiParamsComponent(
+                ai.aggroRadiusMeters(),
+                ai.leashRadiusMeters(),
+                ai.chaseSpeedMps(),
+                ai.patrolSpeedMps(),
+                ai.patrolRadiusMeters(),
+                ai.idleDurationSeconds());
     }
 
     /** Danh tính loài trên entity: mã trên dây, khoá art, và EXP mà world chỉ chở ra ngoài. */
@@ -1014,10 +1039,11 @@ public final class WorldFacade {
         monsterIdComponent.monsterId = monsterId;
         entity.add(monsterIdComponent);
 
-        AiStateComponent aiState = new AiStateComponent();
-        aiState.spawnX = BOSS_SPAWN_X;
-        aiState.spawnY = BOSS_SPAWN_Y;
-        entity.add(aiState);
+        entity.add(newAiState(BOSS_SPAWN_X, BOSS_SPAWN_Y));
+        // Boss KHÔNG có hàng trong monster_template (ADR-037 D7 giữ boss hardcode: nó có
+        // BossAiSystem + script GraalJS riêng), nên tham số FSM lấy thẳng bộ mặc định — TƯỜNG MINH
+        // ở đây thay vì một đường lui ngầm trong AiSystem (ADR-039 D6).
+        entity.add(AiConstants.DEFAULTS);
         entity.add(new TargetComponent()); // AiSystem ghi khi Chase/Attack; CombatSystem đọc để đánh trả
         entity.add(new AttackCooldownComponent());
         entity.add(new StatusEffectComponent());

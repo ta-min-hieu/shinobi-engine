@@ -1,13 +1,14 @@
 # CLAUDE.md — feature-monster
 
 > Kế thừa [server/CLAUDE.md](../../CLAUDE.md). Auto-load khi sửa `feature-monster/**`.
-> Sinh ra bởi [ADR-037](../../../docs/01-architecture/adr/ADR-037-Monster-Template-And-Spawn-Tables.md).
+> Sinh ra bởi [ADR-037](../../../docs/01-architecture/adr/ADR-037-Monster-Template-And-Spawn-Tables.md);
+> mở rộng bởi [ADR-039](../../../docs/01-architecture/adr/ADR-039-Per-Species-AI-Parameters.md) (tham số AI theo loài).
 
 ## Cấu trúc
 
 ```
 api/       MonsterFacade — đọc thuần, KHÔNG use case nào
-domain/    MonsterTemplate · MonsterStats · MonsterSpawnPoint (VO) · MonsterCatalogPort
+domain/    MonsterTemplate · MonsterStats · MonsterAiParams · MonsterSpawnPoint (VO) · MonsterCatalogPort
 ```
 
 **Không có `application/`** — và đó là chủ ý, không phải thiếu sót: module này chỉ tra cứu config
@@ -28,11 +29,17 @@ khác" là thêm một lớp không làm gì.
   không bao giờ trúng, và không có gì báo — có test gác.
 - **`dropTableCode` được phép `null`** (loài không rơi gì) ⇒ adapter dùng `LEFT JOIN`. `INNER JOIN`
   sẽ âm thầm nuốt cả loài đó khỏi catalog, tức quái biến mất khỏi thế giới vì thiếu bảng rơi.
+- **Tham số AI CHỈ có SÁU trong tám hằng của `AiConstants`** (ADR-039 D1): aggro/leash/tốc độ
+  đuổi/tốc độ tuần tra/bán kính tuần tra/thời gian đứng yên là **nội dung** ⇒ vào DB.
+  `ARRIVAL_THRESHOLD_METERS` (epsilon hình học) và `MAX_PATROL_DURATION_SECONDS` (van chống kẹt) là
+  **cơ chế** ⇒ ở lại `server-world`. Đừng "hoàn thiện" bằng cách thêm nốt hai cột đó.
+- **`aggroRadiusMeters == 0` là giá trị HỢP LỆ**, nghĩa là loài thụ động, không bao giờ gây hấn
+  (`training_dummy`). Đừng thêm `CHECK > 0` hay cờ `is_passive`.
 
-## Cố ý CHƯA làm (ADR-037 D7)
+## Cố ý CHƯA làm
 
-- **Tham số AI theo loài** (aggro/leash/tốc độ đuổi) — vẫn ở `AiConstants`, mọi loài dùng chung.
-  AI.md §10 mô tả chúng thuộc bảng này; tài liệu đó đã được ghi chú là chưa đúng.
+- **Tầm đánh theo loài** (`CombatConstants.ATTACK_RANGE_METERS`, cho quái bắn xa) — đụng cả tầm
+  đánh của nhân vật nên là một ADR riêng (ADR-039 D7).
 - **Boss** (`sample_boss`) giữ hardcode: nó có script GraalJS + `BossAiSystem` riêng.
 - **`npc_template`** — cùng loại nợ, NPC không có chỉ số chiến đấu nên không gộp bừa vào đây.
 

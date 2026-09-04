@@ -11,6 +11,7 @@ import dev.kage.engine.ecs.IteratingKSystem;
 import dev.kage.engine.ecs.KEntity;
 import dev.kage.engine.ecs.component.PositionComponent;
 import dev.kage.engine.ecs.component.VelocityComponent;
+import dev.kage.server.world.component.AiParamsComponent;
 import dev.kage.server.world.component.AiState;
 import dev.kage.server.world.component.AiStateComponent;
 import dev.kage.server.world.component.CharacterIdComponent;
@@ -20,23 +21,31 @@ import dev.kage.server.world.component.TargetComponent;
 
 /**
  * FSM quái thường (AI.md §3): Idle &lt;-&gt; Patrol (hết giờ chờ/tới điểm), Idle/Patrol -&gt; Chase
- * (phát hiện người chơi trong {@link AiConstants#AGGRO_RADIUS_METERS}) -&gt; Attack (vào tầm đánh)
- * -&gt; Chase (mục tiêu lùi xa) hoặc Return (ra khỏi {@link AiConstants#LEASH_RADIUS_METERS} tính
- * từ điểm spawn) -&gt; Idle. KHÔNG có trạng thái {@code DEAD} riêng — quái chết bị
- * {@code WorldFacade} xoá entity ngay trong tick đó, {@code AiSystem} tự nhiên dừng xử lý entity
- * đã biến mất, không cần chuyển trạng thái thủ công.
+ * (phát hiện người chơi trong {@link AiParamsComponent#aggroRadiusMeters()}) -&gt; Attack (vào tầm
+ * đánh) -&gt; Chase (mục tiêu lùi xa) hoặc Return (ra khỏi
+ * {@link AiParamsComponent#leashRadiusMeters()} tính từ điểm spawn) -&gt; Idle. KHÔNG có trạng thái
+ * {@code DEAD} riêng — quái chết bị {@code WorldFacade} xoá entity ngay trong tick đó,
+ * {@code AiSystem} tự nhiên dừng xử lý entity đã biến mất, không cần chuyển trạng thái thủ công.
+ *
+ * <p><b>Tham số đọc THEO LOÀI</b> kể từ ADR-039: mọi con số điều khiển FSM lấy từ
+ * {@link AiParamsComponent} của chính entity đang xét, không còn từ hằng số dùng chung.
+ * {@link AiConstants} chỉ còn giữ hai hằng CƠ CHẾ (epsilon "đã tới nơi" + van chống kẹt) và bộ mặc
+ * định. {@code AiParamsComponent} nằm trong {@code Family} một cách có chủ đích: một entity có
+ * {@code AiStateComponent} mà thiếu tham số không phải "quái chạy bằng mặc định" — nó là entity
+ * dựng sai, và ECS gác giúp bằng cách đơn giản không coi nó là entity AI.
  *
  * <p>AiSystem CHỈ set {@link VelocityComponent} (di chuyển) và {@link TargetComponent} (chọn mục
  * tiêu) — {@code MovementSystem} tích luỹ vị trí từ vận tốc, {@code CombatSystem} thực sự gây
  * damage khi đã ở Attack (quái có đủ {@code TargetComponent}/{@code AttackCooldownComponent} như
  * nhân vật nên tự bị 2 System đó "cuốn vào", không cần sửa gì ở 2 System kia — xem
- * {@code WorldFacade.spawnTrainingDummy}).
+ * {@code WorldFacade.spawnMonster}).
  */
 final class AiSystem extends IteratingKSystem {
 
     private static final ComponentMapper<PositionComponent> POSITION = ComponentMapper.getFor(PositionComponent.class);
     private static final ComponentMapper<VelocityComponent> VELOCITY = ComponentMapper.getFor(VelocityComponent.class);
     private static final ComponentMapper<AiStateComponent> AI_STATE = ComponentMapper.getFor(AiStateComponent.class);
+    private static final ComponentMapper<AiParamsComponent> AI_PARAMS = ComponentMapper.getFor(AiParamsComponent.class);
     private static final ComponentMapper<TargetComponent> TARGET = ComponentMapper.getFor(TargetComponent.class);
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
     private static final ComponentMapper<CharacterIdComponent> CHARACTER_ID =
@@ -55,7 +64,11 @@ final class AiSystem extends IteratingKSystem {
      */
     AiSystem(Supplier<Collection<KEntity>> characterEntities, LongFunction<KEntity> entityLookup) {
         super(Family.all(
-                        PositionComponent.class, VelocityComponent.class, AiStateComponent.class, TargetComponent.class)
+                        PositionComponent.class,
+                        VelocityComponent.class,
+                        AiStateComponent.class,
+                        AiParamsComponent.class,
+                        TargetComponent.class)
                 .get());
         this.characterEntities = characterEntities;
         this.entityLookup = entityLookup;
@@ -72,38 +85,41 @@ final class AiSystem extends IteratingKSystem {
             return;
         }
         AiStateComponent ai = AI_STATE.get(entity);
+        // Tra tham số theo loài: ComponentMapper, O(1), KHÔNG cấp phát (/CLAUDE.md §6) — khác hẳn
+        // với việc tra catalog theo chuỗi mỗi tick, xem javadoc AiParamsComponent.
+        AiParamsComponent params = AI_PARAMS.get(entity);
         switch (ai.state) {
-            case IDLE -> tickIdle(entity, ai, deltaTime);
-            case PATROL -> tickPatrol(entity, ai, deltaTime);
-            case CHASE -> tickChase(entity, ai);
+            case IDLE -> tickIdle(entity, ai, params, deltaTime);
+            case PATROL -> tickPatrol(entity, ai, params, deltaTime);
+            case CHASE -> tickChase(entity, ai, params);
             case ATTACK -> tickAttack(entity, ai);
-            case RETURN -> tickReturn(entity, ai);
+            case RETURN -> tickReturn(entity, ai, params);
             default -> throw new IllegalStateException("AiState không xử lý: " + ai.state);
         }
     }
 
-    private void tickIdle(KEntity entity, AiStateComponent ai, float deltaTime) {
+    private void tickIdle(KEntity entity, AiStateComponent ai, AiParamsComponent params, float deltaTime) {
         VelocityComponent velocity = VELOCITY.get(entity);
         velocity.x = 0f;
         velocity.y = 0f;
 
-        KEntity nearestPlayer = findNearestCharacterInRange(POSITION.get(entity), AiConstants.AGGRO_RADIUS_METERS);
+        KEntity nearestPlayer = findNearestCharacterInRange(POSITION.get(entity), params.aggroRadiusMeters());
         if (nearestPlayer != null) {
             startChasing(ai, TARGET.get(entity), nearestPlayer);
             return;
         }
 
         ai.stateTimer += deltaTime;
-        if (ai.stateTimer >= AiConstants.IDLE_DURATION_SECONDS) {
-            startPatrolling(ai);
+        if (ai.stateTimer >= params.idleDurationSeconds()) {
+            startPatrolling(ai, params);
         }
     }
 
-    private void tickPatrol(KEntity entity, AiStateComponent ai, float deltaTime) {
+    private void tickPatrol(KEntity entity, AiStateComponent ai, AiParamsComponent params, float deltaTime) {
         PositionComponent position = POSITION.get(entity);
         VelocityComponent velocity = VELOCITY.get(entity);
 
-        KEntity nearestPlayer = findNearestCharacterInRange(position, AiConstants.AGGRO_RADIUS_METERS);
+        KEntity nearestPlayer = findNearestCharacterInRange(position, params.aggroRadiusMeters());
         if (nearestPlayer != null) {
             startChasing(ai, TARGET.get(entity), nearestPlayer);
             return;
@@ -119,10 +135,10 @@ final class AiSystem extends IteratingKSystem {
             ai.stateTimer = 0f;
             return;
         }
-        moveToward(entity, ai.patrolTargetX, ai.patrolTargetY, AiConstants.PATROL_SPEED_MPS);
+        moveToward(entity, ai.patrolTargetX, ai.patrolTargetY, params.patrolSpeedMps());
     }
 
-    private void tickChase(KEntity entity, AiStateComponent ai) {
+    private void tickChase(KEntity entity, AiStateComponent ai, AiParamsComponent params) {
         TargetComponent target = TARGET.get(entity);
         KEntity targetEntity = entityLookup.apply(target.targetEntityId);
         if (targetEntity == null || HEALTH.get(targetEntity).isDead()) {
@@ -131,7 +147,7 @@ final class AiSystem extends IteratingKSystem {
         }
 
         PositionComponent position = POSITION.get(entity);
-        if (distance(position.x, position.y, ai.spawnX, ai.spawnY) > AiConstants.LEASH_RADIUS_METERS) {
+        if (distance(position.x, position.y, ai.spawnX, ai.spawnY) > params.leashRadiusMeters()) {
             startReturning(ai, target, VELOCITY.get(entity));
             return;
         }
@@ -145,7 +161,7 @@ final class AiSystem extends IteratingKSystem {
             ai.state = AiState.ATTACK;
             return;
         }
-        moveToward(entity, targetPosition.x, targetPosition.y, AiConstants.CHASE_SPEED_MPS);
+        moveToward(entity, targetPosition.x, targetPosition.y, params.chaseSpeedMps());
     }
 
     private void tickAttack(KEntity entity, AiStateComponent ai) {
@@ -166,7 +182,7 @@ final class AiSystem extends IteratingKSystem {
         }
     }
 
-    private void tickReturn(KEntity entity, AiStateComponent ai) {
+    private void tickReturn(KEntity entity, AiStateComponent ai, AiParamsComponent params) {
         PositionComponent position = POSITION.get(entity);
         if (distance(position.x, position.y, ai.spawnX, ai.spawnY) <= AiConstants.ARRIVAL_THRESHOLD_METERS) {
             VelocityComponent velocity = VELOCITY.get(entity);
@@ -178,7 +194,7 @@ final class AiSystem extends IteratingKSystem {
             ai.stateTimer = 0f;
             return;
         }
-        moveToward(entity, ai.spawnX, ai.spawnY, AiConstants.CHASE_SPEED_MPS);
+        moveToward(entity, ai.spawnX, ai.spawnY, params.chaseSpeedMps());
     }
 
     private void startChasing(AiStateComponent ai, TargetComponent target, KEntity characterEntity) {
@@ -194,15 +210,27 @@ final class AiSystem extends IteratingKSystem {
         velocity.y = 0f;
     }
 
-    private void startPatrolling(AiStateComponent ai) {
+    private void startPatrolling(AiStateComponent ai, AiParamsComponent params) {
+        // patrolRadiusMeters = 0 ⇒ điểm tuần tra TRÙNG điểm spawn ⇒ tickPatrol thấy "đã tới nơi"
+        // ngay tick sau và về IDLE với vận tốc 0: con quái đứng nguyên tại chỗ, không cần trạng
+        // thái mới hay nhánh riêng (ADR-039 D4 — cây cọc luyện công).
         double angle = ThreadLocalRandom.current().nextDouble(0, Math.PI * 2);
-        ai.patrolTargetX = ai.spawnX + (float) (Math.cos(angle) * AiConstants.PATROL_RADIUS_METERS);
-        ai.patrolTargetY = ai.spawnY + (float) (Math.sin(angle) * AiConstants.PATROL_RADIUS_METERS);
+        ai.patrolTargetX = ai.spawnX + (float) (Math.cos(angle) * params.patrolRadiusMeters());
+        ai.patrolTargetY = ai.spawnY + (float) (Math.sin(angle) * params.patrolRadiusMeters());
         ai.state = AiState.PATROL;
         ai.stateTimer = 0f;
     }
 
+    /**
+     * @param range 0 (hoặc âm) = loài THỤ ĐỘNG, không bao giờ gây hấn (ADR-039 D4). Nhánh này phải
+     *     tường minh chứ không được để nó "tự đúng" nhờ phép so sánh bên dưới: với
+     *     {@code range == 0} vòng lặp vẫn aggro một người chơi đứng ĐÚNG toạ độ con quái, và vẫn
+     *     quét toàn bộ danh sách người chơi mỗi tick cho mỗi con quái thụ động.
+     */
     private KEntity findNearestCharacterInRange(PositionComponent position, float range) {
+        if (range <= 0f) {
+            return null;
+        }
         KEntity nearest = null;
         double nearestDistance = range;
         for (KEntity character : characterEntities.get()) {

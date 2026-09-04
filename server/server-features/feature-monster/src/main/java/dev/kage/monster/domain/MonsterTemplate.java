@@ -6,8 +6,9 @@ package dev.kage.monster.domain;
  *
  * <p>Trước ADR-037 những con số này nằm rải ở BỐN chỗ hardcode: {@code CombatConstants}
  * (chỉ số + máu), {@code WorldFacade.MONSTER_SPAWN_X} (vị trí), {@code MonsterExperience} (EXP,
- * một bảng tra Java mà javadoc của chính nó gọi là tạm), và {@code AiConstants} (tham số AI —
- * chỗ DUY NHẤT còn hardcode sau đợt này, ADR-037 D7 hoãn có chủ đích).
+ * một bảng tra Java mà javadoc của chính nó gọi là tạm), và {@code AiConstants} (tham số AI).
+ * Chỗ thứ tư đóng lại ở ADR-039 D1 — xem {@link MonsterAiParams}; {@code AiConstants} nay chỉ còn
+ * hai hằng CƠ CHẾ (epsilon "đã tới nơi" + van chống kẹt) và bộ mặc định.
  *
  * <p>{@code hitPercent}/{@code dodgePercent}/{@code critPercent} là SỐ NGUYÊN 0..100 (chia 100 khi
  * dựng chỉ số chiến đấu) — cân bằng bằng phần trăm nguyên dễ đọc hơn {@code 0.9f}, và tránh so sánh
@@ -18,7 +19,13 @@ package dev.kage.monster.domain;
  * cả đường {@code onMonsterKilled}); FK trong DB vẫn là thứ bảo đảm code đó có thật.
  */
 public record MonsterTemplate(
-        String code, String nameKey, String modelKey, MonsterStats stats, long expReward, String dropTableCode) {
+        String code,
+        String nameKey,
+        String modelKey,
+        MonsterStats stats,
+        MonsterAiParams aiParams,
+        long expReward,
+        String dropTableCode) {
 
     public MonsterTemplate {
         requireText(code, "code");
@@ -26,6 +33,9 @@ public record MonsterTemplate(
         requireText(modelKey, "modelKey");
         if (stats == null) {
             throw new IllegalArgumentException("stats không được null");
+        }
+        if (aiParams == null) {
+            throw new IllegalArgumentException("aiParams không được null");
         }
         if (expReward < 0) {
             throw new IllegalArgumentException("expReward không được âm: " + expReward);
