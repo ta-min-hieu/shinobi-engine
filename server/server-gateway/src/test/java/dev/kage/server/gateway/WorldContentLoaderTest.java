@@ -10,6 +10,7 @@ import dev.kage.dialogue.api.NpcPlacementFacade;
 import dev.kage.dialogue.domain.NpcPlacement;
 import dev.kage.dialogue.domain.NpcPlacementPort;
 import dev.kage.monster.api.MonsterFacade;
+import dev.kage.monster.domain.MonsterAiParams;
 import dev.kage.monster.domain.MonsterCatalogPort;
 import dev.kage.monster.domain.MonsterSpawnPoint;
 import dev.kage.monster.domain.MonsterStats;
@@ -31,6 +32,8 @@ class WorldContentLoaderTest {
                         "hud.monster.training_dummy",
                         "mob_training-dummy",
                         new MonsterStats(1, 50, 8, 0, 5, 3, 90, 0, 0, "NONE"),
+                        // Đúng số V25 seed cho cọc tập: thụ động (ADR-039 D4).
+                        new MonsterAiParams(0f, 10f, 3f, 1.5f, 0f, 3f),
                         20L,
                         null));
             }
