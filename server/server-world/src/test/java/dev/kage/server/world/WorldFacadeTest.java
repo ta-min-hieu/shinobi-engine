@@ -1073,10 +1073,13 @@ class WorldFacadeTest {
 
     @Test
     void shouldChaseAndAttackBack_whenCharacterEntersAggroRange() {
-        // AI.md §3: quái Idle -> Chase khi phát hiện người chơi (AiConstants.AGGRO_RADIUS_METERS
-        // = 6m), rồi -> Attack khi vào tầm đánh. KHÔNG gọi world.setTarget — nhân vật đứng yên,
-        // hoàn toàn thụ động, để chứng minh CHÍNH quái chủ động đuổi + đánh, không phải do người
-        // chơi tấn công trước.
+        // AI.md §3: quái Idle -> Chase khi phát hiện người chơi (aggro theo LOÀI kể từ ADR-039;
+        // fixture `trainingGround()` dùng bộ mặc định 6m), rồi -> Attack khi vào tầm đánh. KHÔNG
+        // gọi world.setTarget — nhân vật đứng yên, hoàn toàn thụ động, để chứng minh CHÍNH quái
+        // chủ động đuổi + đánh, không phải do người chơi tấn công trước.
+        //
+        // ⚠️ Test này kiểm CƠ CHẾ FSM, không kiểm con hình nộm: `training_dummy` thật trong DB nay
+        // là loài THỤ ĐỘNG (ADR-039 D4) — xem shouldNeverAggro_whenSpeciesHasZeroAggroRadius.
         world.start();
         world.attachCharacter(1L, 5f, 9f, DEFAULT_STATS); // cách quái (5,5) 4m — trong aggro, ngoài tầm đánh
         awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
@@ -1104,12 +1107,43 @@ class WorldFacadeTest {
     }
 
     @Test
+    void shouldNeverAggro_whenSpeciesHasZeroAggroRadius() {
+        // ADR-039 D4 — `training_dummy` THẬT trong monster_template nay có aggro_radius = 0, tức
+        // cây cọc luyện công thôi rời cọc đuổi theo người chơi (lỗi sống từ Phase 4, khi thế giới
+        // có ĐÚNG MỘT loài quái nên "quái" và "hình nộm" là cùng một thứ).
+        //
+        // Đứng ĐÈ LÊN con quái (x=8): khoảng cách 0 — trong tầm đánh, trong mọi tầm aggro tưởng
+        // tượng được. Nếu nó còn gây hấn thì đây là chỗ chắc chắn bắt được, kể cả khi nhánh "thụ
+        // động" bị viết hớ thành phép so sánh `d <= 0`.
+        RecordingSink passiveSink = new RecordingSink();
+        WorldFacade passiveWorld =
+                new WorldFacade(passiveSink, true, TickMetricsPort.NO_OP, TestMonsterCatalogs.passiveTrainingGround());
+        try {
+            passiveWorld.start();
+            passiveWorld.attachCharacter(1L, 8f, 0f, DEFAULT_STATS);
+            awaitTrue(() -> passiveSink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));
+
+            sleepQuietly(500); // đủ lâu để AiSystem chạy nhiều chục tick nếu (sai) có aggro
+
+            assertThat(passiveSink.attackResults.stream().anyMatch(a -> a.defender() == 1L))
+                    .isFalse();
+            // Và nó cũng KHÔNG lang thang: patrol_radius = 0 ⇒ điểm tuần tra TRÙNG điểm spawn, nên
+            // mọi vị trí từng phát ra vẫn là đúng x=8 (assert theo GIÁ TRỊ chứ không phải "không có
+            // sự kiện nào" — AoI có thể phát một sự kiện lúc đồng bộ lần đầu).
+            assertThat(passiveSink.monsterMoved)
+                    .allSatisfy(m -> assertThat(m.x()).isEqualTo(8f));
+        } finally {
+            passiveWorld.stop();
+        }
+    }
+
+    @Test
     void shouldNotAggro_whenCharacterOutsideAggroRange() {
         world.start();
         // ADR-033: KHÔNG tách được bằng trục Y nữa (attach ép y về đường chơi — xem
         // WorldFacade.CHARACTER_PLAY_LINE_Y), phải tách bằng trục X. Quái gần nhất ở x=8
-        // (WorldFacade.MONSTER_SPAWN_X), nên đứng ở x=0 cách 8m: NGOÀI
-        // AiConstants.AGGRO_RADIUS_METERS (6m) nhưng TRONG WorldConstants.AOI_RADIUS_METERS (15m)
+        // (fixture `trainingGround()`), nên đứng ở x=0 cách 8m: NGOÀI tầm aggro của fixture đó
+        // (6m) nhưng TRONG WorldConstants.AOI_RADIUS_METERS (15m)
         // — verify thấy quái trên màn hình mà vẫn không bị đuổi.
         world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
         awaitTrue(() -> sink.monsterSpawned.stream().anyMatch(m -> m.target() == 1L));

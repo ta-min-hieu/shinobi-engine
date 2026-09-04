@@ -5,6 +5,7 @@ import java.util.List;
 import dev.kage.dialogue.api.NpcPlacementFacade;
 import dev.kage.dialogue.domain.NpcPlacement;
 import dev.kage.monster.api.MonsterFacade;
+import dev.kage.monster.domain.MonsterAiParams;
 import dev.kage.monster.domain.MonsterSpawnPoint;
 import dev.kage.monster.domain.MonsterStats;
 import dev.kage.monster.domain.MonsterTemplate;
@@ -62,6 +63,14 @@ final class WorldContentLoader {
 
     private static MonsterCatalogSnapshot.MonsterSpecies toSpecies(MonsterTemplate template) {
         MonsterStats stats = template.stats();
+        MonsterAiParams ai = template.aiParams();
+        MonsterCatalogSnapshot.MonsterAiNumbers aiNumbers = new MonsterCatalogSnapshot.MonsterAiNumbers(
+                ai.aggroRadiusMeters(),
+                ai.leashRadiusMeters(),
+                ai.chaseSpeedMps(),
+                ai.patrolSpeedMps(),
+                ai.patrolRadiusMeters(),
+                ai.idleDurationSeconds());
         MonsterCatalogSnapshot.MonsterCombatNumbers combat = new MonsterCatalogSnapshot.MonsterCombatNumbers(
                 stats.atk(),
                 stats.skillDmg(),
@@ -72,7 +81,7 @@ final class WorldContentLoader {
                 stats.critPercent(),
                 stats.element());
         return new MonsterCatalogSnapshot.MonsterSpecies(
-                template.code(), template.modelKey(), stats.maxHp(), template.expReward(), combat);
+                template.code(), template.modelKey(), stats.maxHp(), template.expReward(), combat, aiNumbers);
     }
 
     private static MonsterCatalogSnapshot.MonsterSpawnDefinition toSpawnDefinition(MonsterSpawnPoint spawn) {

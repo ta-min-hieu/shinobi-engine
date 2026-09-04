@@ -6,6 +6,7 @@ import java.util.List;
 
 import javax.sql.DataSource;
 
+import dev.kage.monster.domain.MonsterAiParams;
 import dev.kage.monster.domain.MonsterCatalogPort;
 import dev.kage.monster.domain.MonsterSpawnPoint;
 import dev.kage.monster.domain.MonsterStats;
@@ -23,7 +24,9 @@ public final class PostgresMonsterCatalogAdapter implements MonsterCatalogPort {
     private static final String LIST_TEMPLATES = """
             SELECT mt.code, mt.name_key, mt.model_key, mt.level, mt.max_hp, mt.atk, mt.skill_dmg,
                    mt.def, mt.res, mt.hit_percent, mt.dodge_percent, mt.crit_percent, mt.element,
-                   mt.exp_reward, dt.code AS drop_table_code
+                   mt.exp_reward, mt.aggro_radius_meters, mt.leash_radius_meters, mt.chase_speed_mps,
+                   mt.patrol_speed_mps, mt.patrol_radius_meters, mt.idle_duration_seconds,
+                   dt.code AS drop_table_code
               FROM monster_template mt
               LEFT JOIN drop_table dt ON dt.id = mt.drop_table_id
              ORDER BY mt.id
@@ -71,8 +74,20 @@ public final class PostgresMonsterCatalogAdapter implements MonsterCatalogPort {
                 rs.getString("name_key"),
                 rs.getString("model_key"),
                 stats,
+                mapAiParams(rs),
                 rs.getLong("exp_reward"),
                 rs.getString("drop_table_code"));
+    }
+
+    /** Sáu cột AI của V25 (ADR-039 D1) — hai hằng CƠ CHẾ còn lại cố ý không có trong bảng. */
+    private static MonsterAiParams mapAiParams(ResultSet rs) throws SQLException {
+        return new MonsterAiParams(
+                rs.getFloat("aggro_radius_meters"),
+                rs.getFloat("leash_radius_meters"),
+                rs.getFloat("chase_speed_mps"),
+                rs.getFloat("patrol_speed_mps"),
+                rs.getFloat("patrol_radius_meters"),
+                rs.getFloat("idle_duration_seconds"));
     }
 
     private static MonsterSpawnPoint mapSpawnPoint(ResultSet rs) throws SQLException {

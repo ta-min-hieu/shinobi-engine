@@ -68,7 +68,29 @@ public record MonsterCatalogSnapshot(Map<String, MonsterSpecies> species, List<M
      * thay vì làm chết world (xem {@code WorldFacade#toStats}).
      */
     public record MonsterSpecies(
-            String code, String modelKey, int maxHp, long expReward, MonsterCombatNumbers combat) {}
+            String code,
+            String modelKey,
+            int maxHp,
+            long expReward,
+            MonsterCombatNumbers combat,
+            MonsterAiNumbers ai) {}
+
+    /**
+     * Tham số AI thô của một loài (ADR-039 D1) — SÁU con số, không phải tám.
+     *
+     * <p>{@code ARRIVAL_THRESHOLD_METERS} và {@code MAX_PATROL_DURATION_SECONDS} cố ý KHÔNG ở đây:
+     * chúng là cơ chế của FSM (epsilon hình học + van chống kẹt), ở lại {@link AiConstants}.
+     *
+     * <p>{@code aggroRadiusMeters == 0} nghĩa là <b>không bao giờ gây hấn</b> — {@link AiSystem} có
+     * nhánh tường minh cho nó, không để nó "tự đúng" nhờ phép so sánh.
+     */
+    public record MonsterAiNumbers(
+            float aggroRadiusMeters,
+            float leashRadiusMeters,
+            float chaseSpeedMps,
+            float patrolSpeedMps,
+            float patrolRadiusMeters,
+            float idleDurationSeconds) {}
 
     /** Chỉ số chiến đấu thô của một loài — gộp lại để {@link MonsterSpecies} không quá dài. */
     public record MonsterCombatNumbers(

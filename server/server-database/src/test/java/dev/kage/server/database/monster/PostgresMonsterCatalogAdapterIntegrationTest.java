@@ -1,7 +1,11 @@
 package dev.kage.server.database.monster;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Duration;
 import java.util.List;
 
@@ -14,6 +18,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
+import dev.kage.monster.domain.MonsterAiParams;
 import dev.kage.monster.domain.MonsterSpawnPoint;
 import dev.kage.monster.domain.MonsterTemplate;
 import dev.kage.server.database.DatabaseConfig;
@@ -21,8 +26,8 @@ import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.PostgresDataSourceFactory;
 
 /**
- * PostgreSQL THẬT qua Testcontainers — chứng minh migration V23 (ADR-037) ÁP ĐƯỢC, không chỉ phân
- * tích cú pháp được, và adapter đọc đúng cái nó seed.
+ * PostgreSQL THẬT qua Testcontainers — chứng minh migration V23 (ADR-037) và V25 (ADR-039) ÁP ĐƯỢC,
+ * không chỉ phân tích cú pháp được, và adapter đọc đúng cái chúng seed.
  */
 @Testcontainers
 class PostgresMonsterCatalogAdapterIntegrationTest {
@@ -107,6 +112,50 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
                 .allSatisfy(spawn -> assertThat(spawn.respawnSeconds()).isPositive());
         // Bốn vị trí cũ giữ nguyên; chỉ loài đứng ở đó đổi, cộng thêm quỷ đá ở xa nhất.
         assertThat(spawns).extracting(MonsterSpawnPoint::posX).containsExactly(8f, 14f, 21f, 27f, 34f);
+    }
+
+    @Test
+    void shouldKeepAiParamsUnchangedForEverySpeciesButTheTrainingDummy() {
+        // ADR-039 D2 — ràng buộc CỨNG của V25: mỗi DEFAULT bằng ĐÚNG hằng số đang chạy trong
+        // AiConstants, nên chạy migration xong game hành xử y hệt. Ô test này là thứ bắt được nếu
+        // một đợt sau lỡ đổi DEFAULT mà quên đổi AiConstants (hoặc ngược lại).
+        for (String code : List.of("wandering_bandit", "stone_ogre")) {
+            MonsterAiParams ai = findByCode(code).aiParams();
+            assertThat(ai.aggroRadiusMeters()).isEqualTo(6f);
+            assertThat(ai.leashRadiusMeters()).isEqualTo(10f);
+            assertThat(ai.chaseSpeedMps()).isEqualTo(3f);
+            assertThat(ai.patrolSpeedMps()).isEqualTo(1.5f);
+            assertThat(ai.patrolRadiusMeters()).isEqualTo(3f);
+            assertThat(ai.idleDurationSeconds()).isEqualTo(3f);
+            assertThat(ai.isPassive()).isFalse();
+        }
+    }
+
+    @Test
+    void shouldMakeTrainingDummyPassive() {
+        // ADR-039 D4 — ngoại lệ có chủ đích DUY NHẤT của V25: cây "Mộc nhân luyện công" thôi rời
+        // cọc đuổi theo người chơi 3 m/s. Gỡ được bằng một câu UPDATE nếu chủ dự án đổi ý.
+        MonsterAiParams ai = findByCode("training_dummy").aiParams();
+
+        assertThat(ai.isPassive()).isTrue();
+        assertThat(ai.aggroRadiusMeters()).isZero();
+        assertThat(ai.patrolRadiusMeters()).isZero();
+        // Phần còn lại giữ mặc định: nó vẫn quay về được nếu vì lý do gì bị đẩy khỏi chỗ.
+        assertThat(ai.chaseSpeedMps()).isEqualTo(3f);
+        assertThat(ai.leashRadiusMeters()).isEqualTo(10f);
+    }
+
+    @Test
+    void shouldRejectLeashSmallerThanAggro() throws SQLException {
+        // ADR-039 D3 — bất biến mà một cặp HẰNG SỐ CHUNG không bao giờ vi phạm được, nhưng dữ liệu
+        // thì chỉ cách một lần gõ sai: leash < aggro ⇒ quái dao động Chase/Return vô hạn.
+        try (Connection connection = dataSource.getConnection();
+                Statement statement = connection.createStatement()) {
+            assertThatThrownBy(() -> statement.executeUpdate(
+                            "UPDATE monster_template SET leash_radius_meters = 1 WHERE code = 'stone_ogre'"))
+                    .isInstanceOf(SQLException.class)
+                    .hasMessageContaining("monster_template_ai_leash_covers_aggro");
+        }
     }
 
     @Test
