@@ -188,11 +188,11 @@ class GatewayServerIntegrationTest {
         GatewayObservability observability = new GatewayObservability(networkMetrics, GatewayTracing.disabled());
         characterRegistry = new ConnectedCharacterRegistry(
                 inventoryFacade, questFacade, ExperienceGrantPort.disabled(), networkMetrics);
-        WorldFacade firstChannelFacade =
-                new WorldFacade(characterRegistry, true, TickMetricsPort.NO_OP, TestMonsterCatalogs.trainingGround());
+        WorldFacade firstChannelFacade = new WorldFacade(
+                characterRegistry, true, TickMetricsPort.NO_OP, TestWorldContents.trainingGroundWithElder());
         firstChannelFacade.start();
         mainWorldChannels = new MainWorldChannelRegistry(
-                characterRegistry, firstChannelFacade, meterRegistry, TestMonsterCatalogs.trainingGround());
+                characterRegistry, firstChannelFacade, meterRegistry, TestWorldContents.trainingGroundWithElder());
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         DungeonInstanceRegistry dungeonInstanceRegistry =
@@ -2031,10 +2031,10 @@ class GatewayServerIntegrationTest {
         ConnectedCharacterRegistry localCharacterRegistry = new ConnectedCharacterRegistry(
                 inventoryFacade, questFacade, ExperienceGrantPort.disabled(), networkMetrics);
         WorldFacade firstChannelFacade = new WorldFacade(
-                localCharacterRegistry, true, TickMetricsPort.NO_OP, TestMonsterCatalogs.trainingGround());
+                localCharacterRegistry, true, TickMetricsPort.NO_OP, TestWorldContents.trainingGroundWithElder());
         firstChannelFacade.start();
         MainWorldChannelRegistry localMainWorldChannels = new MainWorldChannelRegistry(
-                localCharacterRegistry, firstChannelFacade, meterRegistry, TestMonsterCatalogs.trainingGround());
+                localCharacterRegistry, firstChannelFacade, meterRegistry, TestWorldContents.trainingGroundWithElder());
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(characterFacade, localCharacterRegistry, Duration.ofMinutes(5));
         DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
@@ -2191,10 +2191,10 @@ class GatewayServerIntegrationTest {
         ConnectedCharacterRegistry localCharacterRegistry = new ConnectedCharacterRegistry(
                 inventoryFacade, questFacade, ExperienceGrantPort.disabled(), networkMetrics);
         WorldFacade firstChannelFacade = new WorldFacade(
-                localCharacterRegistry, true, TickMetricsPort.NO_OP, TestMonsterCatalogs.trainingGround());
+                localCharacterRegistry, true, TickMetricsPort.NO_OP, TestWorldContents.trainingGroundWithElder());
         firstChannelFacade.start();
         MainWorldChannelRegistry localMainWorldChannels = new MainWorldChannelRegistry(
-                localCharacterRegistry, firstChannelFacade, meterRegistry, TestMonsterCatalogs.trainingGround());
+                localCharacterRegistry, firstChannelFacade, meterRegistry, TestWorldContents.trainingGroundWithElder());
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(characterFacade, localCharacterRegistry, Duration.ofMinutes(5));
         DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(

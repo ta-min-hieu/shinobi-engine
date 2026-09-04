@@ -74,7 +74,7 @@ import dev.kage.protocol.SelectFactionResponse;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
-import dev.kage.server.world.MonsterCatalogSnapshot;
+import dev.kage.server.world.WorldContentCatalog;
 import dev.kage.server.world.WorldFacade;
 
 /**
@@ -1156,7 +1156,7 @@ class GatewayPipelineTest {
                 inventoryFacade, questFacade, characterFacade::grantExperience, networkMetrics);
         WorldFacade firstChannelFacade = new WorldFacade(characterRegistry);
         MainWorldChannelRegistry mainWorldChannels = new MainWorldChannelRegistry(
-                characterRegistry, firstChannelFacade, meterRegistry, MonsterCatalogSnapshot.EMPTY);
+                characterRegistry, firstChannelFacade, meterRegistry, WorldContentCatalog.EMPTY);
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         DungeonInstanceRegistry dungeonInstanceRegistry =

@@ -20,7 +20,8 @@ khác" là thêm một lớp không làm gì.
   §182 xếp nó cùng nhóm `item_template`). Đổi cân bằng ⇒ migration + khởi động lại.
 - **Module này KHÔNG biết `server-world` tồn tại**, và ngược lại. `server-database` thậm chí không
   phụ thuộc `server-world` — chỉ `server-gateway` phụ thuộc cả hai, nên nó là nơi dịch
-  `MonsterTemplate` → `MonsterCatalogSnapshot` (`MonsterCatalogLoader`). Đúng khuôn ADR-036 đã dựng
+  `MonsterTemplate` → `MonsterCatalogSnapshot` (`WorldContentLoader`, đổi tên từ `MonsterCatalogLoader`
+  ở ADR-040 vì nó nạp cả NPC). Đúng khuôn ADR-036 đã dựng
   cho `EquipmentBonus` → `EquipmentBonusSnapshot`.
 - **`element` là CHUỖI**, không phải enum: enum `Element` sống ở `server-world`. Gateway/world dịch;
   chuỗi lạ bị coi là `NONE` chứ không làm chết world (`WorldFacade#toStats`).
@@ -34,7 +35,11 @@ khác" là thêm một lớp không làm gì.
 - **Tham số AI theo loài** (aggro/leash/tốc độ đuổi) — vẫn ở `AiConstants`, mọi loài dùng chung.
   AI.md §10 mô tả chúng thuộc bảng này; tài liệu đó đã được ghi chú là chưa đúng.
 - **Boss** (`sample_boss`) giữ hardcode: nó có script GraalJS + `BossAiSystem` riêng.
-- **`npc_template`** — cùng loại nợ, NPC không có chỉ số chiến đấu nên không gộp bừa vào đây.
+- ~~**`npc_template`**~~ — nợ này KHÔNG còn thuộc về đây. Nó đã có ADR riêng
+  ([ADR-040](../../../docs/01-architecture/adr/ADR-040-NPC-Template-And-Placement.md), 🟡 Proposed)
+  và được thi hành trong **`feature-dialogue`** (module đã sở hữu `npc_template` từ V10), không phải
+  module này. NPC không có chỉ số chiến đấu, không bảng rơi, không hồi sinh — gộp vào đây sẽ là
+  bảng chung mà hơn nửa cột là `NULL` cho mọi hàng NPC (ADR-040 Alternatives E).
 
 ## Test
 `domain/` test **không mock**. Adapter thật có test Postgres qua Testcontainers ở `server-database`.

@@ -1,6 +1,7 @@
 package dev.kage.server.world;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -205,7 +206,7 @@ class WorldFacadeTest {
 
     private final RecordingSink sink = new RecordingSink();
     private final WorldFacade world =
-            new WorldFacade(sink, true, TickMetricsPort.NO_OP, TestMonsterCatalogs.trainingGround());
+            new WorldFacade(sink, true, TickMetricsPort.NO_OP, TestWorldContents.trainingGroundWithElder());
 
     @AfterEach
     void stopWorld() {
@@ -406,10 +407,57 @@ class WorldFacadeTest {
     void shouldSpawnNpc_toCharacterNearby() {
         world.start();
 
-        world.attachCharacter(1L, -5f, -6f, DEFAULT_STATS); // gần NPC mẫu (spawn cố định (-5,-5))
+        // Trưởng lão ở (-5, 0) — từ ADR-040 con số này đến từ catalog (TestWorldContents), không
+        // còn là hằng số SAMPLE_NPC_SPAWN_X trong WorldFacade.
+        world.attachCharacter(1L, -5f, -6f, DEFAULT_STATS);
 
         awaitTrue(() -> sink.npcSpawned.stream()
                 .anyMatch(n -> n.target() == 1L && n.code().equals("town_elder")));
+    }
+
+    @Test
+    void shouldSpawnEveryNpcFromCatalog_atTheCoordinatesTheCatalogGives() {
+        // ADR-040 — thước đo thật của cả đợt: mã VÀ vị trí NPC đến từ dữ liệu, không từ hằng số.
+        // Dùng hai NPC ở hai chỗ KHÁC hằng số cũ (-5, 0); nếu WorldFacade còn hardcode ở đâu đó thì
+        // test này đỏ, còn shouldSpawnNpc_toCharacterNearby vẫn xanh (nó trùng số cũ).
+        RecordingSink dataSink = new RecordingSink();
+        NpcCatalogSnapshot twoNpcs = new NpcCatalogSnapshot(List.of(
+                new NpcCatalogSnapshot.NpcPlacementDefinition("sect_gatekeeper", 30f, 0f),
+                new NpcCatalogSnapshot.NpcPlacementDefinition("herb_trader", 31f, 0f)));
+        WorldFacade dataWorld = new WorldFacade(
+                dataSink, true, TickMetricsPort.NO_OP, new WorldContentCatalog(MonsterCatalogSnapshot.EMPTY, twoNpcs));
+        try {
+            dataWorld.start();
+            dataWorld.attachCharacter(1L, 30f, 0f, DEFAULT_STATS);
+
+            awaitTrue(() ->
+                    dataSink.npcSpawned.stream().filter(n -> n.target() == 1L).count() == 2);
+            assertThat(dataSink.npcSpawned)
+                    .filteredOn(n -> n.target() == 1L)
+                    .extracting(NpcSpawned::code, NpcSpawned::x, NpcSpawned::y)
+                    .containsExactlyInAnyOrder(tuple("sect_gatekeeper", 30f, 0f), tuple("herb_trader", 31f, 0f));
+        } finally {
+            dataWorld.stop();
+        }
+    }
+
+    @Test
+    void shouldSpawnNoNpc_whenCatalogHasNone_evenOnTheMainWorld() {
+        // Hai cờ trả lời hai câu khác nhau: spawnOverworldContent=true vẫn cho bệ + hồi sinh nhân
+        // vật, nhưng catalog rỗng nghĩa là không NPC nào — đúng như đã đúng với quái từ ADR-037.
+        RecordingSink emptySink = new RecordingSink();
+        WorldFacade emptyWorld = new WorldFacade(
+                emptySink, true, TickMetricsPort.NO_OP, WorldContentCatalog.ofMonsters(MonsterCatalogSnapshot.EMPTY));
+        try {
+            emptyWorld.start();
+            emptyWorld.attachCharacter(1L, -5f, 0f, DEFAULT_STATS);
+            emptyWorld.attachCharacter(2L, -5f, 1f, DEFAULT_STATS);
+
+            awaitTrue(() -> emptySink.spawned.size() >= 2); // world vẫn tick + AoI hoạt động
+            assertThat(emptySink.npcSpawned).isEmpty();
+        } finally {
+            emptyWorld.stop();
+        }
     }
 
     @Test

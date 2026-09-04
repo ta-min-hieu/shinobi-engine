@@ -229,6 +229,9 @@ D6 là **đề xuất khởi điểm chưa playtest**, đúng thân phận mà b
   `sample_boss.js` và `BossAiSystem` riêng, kéo nó vào bảng là một quyết định khác.
 - **`npc_template`** — cùng loại nợ (`SAMPLE_NPC_CODE` hardcode) nhưng NPC không có chỉ số chiến đấu;
   không gộp bừa vào để ADR khỏi phình.
+  ➜ **Đã có ADR riêng: [ADR-040](ADR-040-NPC-Template-And-Placement.md)** (🟡 Proposed 2026-09-03) —
+  giữ `npc_template` của V10, thêm `npc_spawn`; **không** cột `role`, **không** `model_key`, **không**
+  đổi protocol.
 
 ---
 
@@ -279,7 +282,10 @@ D6 là **đề xuất khởi điểm chưa playtest**, đúng thân phận mà b
 - Khi boss thứ hai xuất hiện ⇒ mở lại "boss giữ hardcode".
 - Khi số cột chỉ số vượt ~20, hoặc khi dự án **đã có** thư viện JSON vì lý do khác ⇒ đo lại
   Alternatives A (lúc đó cái giá của nó đã khác).
-- Khi có `npc_template` ⇒ xem xét gộp quy ước `model_key`/`name_key` cho cả hai loại thực thể.
+- ~~Khi có `npc_template` ⇒ xem xét gộp quy ước `model_key`/`name_key` cho cả hai loại thực thể.~~
+  ✅ **Đã trả lời ở [ADR-040](ADR-040-NPC-Template-And-Placement.md) D5: KHÔNG gộp.** Quái cần
+  `model_key` vì ba loài dùng chung một model; NPC không có nhu cầu đó, nên `NpcModelKey` (phép biến
+  đổi thuần) ở lại và `NpcSpawnedEvent` không đổi. Mở lại nếu hai NPC cần chung một model.
 
 ---
 
@@ -299,6 +305,9 @@ D6 là **đề xuất khởi điểm chưa playtest**, đúng thân phận mà b
 
 Không. ADR này tự đứng được. Nhưng nó **để lại hai nợ đã đặt tên**, mỗi cái là một ADR sau nếu làm:
 tham số AI theo loài, và `npc_template`.
+
+- `npc_template` ➜ **[ADR-040](ADR-040-NPC-Template-And-Placement.md)** (🟡 Proposed 2026-09-03).
+- Tham số AI theo loài ➜ vẫn mở (xem "Việc cần làm tiếp theo" mục 5).
 
 ## Tài liệu liên quan
 

@@ -6,10 +6,22 @@
 
 ```
 api/            DialogueFacade (+ SelectOptionResult sealed: Node/OpenShop/Ended/NotFound)
+                NpcPlacementFacade — "world này có NPC nào, đứng ở đâu" (ADR-040)
 application/    GetDialogueNodeUseCase (chạy script qua ScriptSandbox, không giữ state)
-domain/         DialogueNode · DialogueOption (VO) · NpcTemplatePort
+domain/         DialogueNode · DialogueOption · NpcPlacement (VO)
+                NpcTemplatePort (npc_template) · NpcPlacementPort (npc_spawn)
 resources/      scripts/dialogue/*.js — NỘI DUNG THẬT (Điều 27), Java chỉ trích xuất
 ```
+
+⚠️ **Module này de facto là "nội dung tĩnh của NPC", không chỉ hội thoại** — nó sở hữu
+`npc_template` (từ V10) và `npc_spawn` (từ V26). Tên module vì thế hơi lệch nghĩa; tách thành
+`feature-npc` là Alternatives B của
+[ADR-040](../../../docs/01-architecture/adr/ADR-040-NPC-Template-And-Placement.md) — rẻ (mọi thứ đã
+sau Port) nhưng thêm module là việc /CLAUDE.md §4 bắt dừng hỏi.
+
+**Hai facade, không phải một, và đó là chủ ý**: `DialogueFacade` bị gọi từ handler packet **trong
+lúc chơi**; `NpcPlacementFacade` bị gọi **đúng một lần lúc khởi động** từ composition root. Gộp
+chung một lớp là để một cái tên gợi ý sai về lúc nào được gọi.
 
 Chiều: `api → application → domain`. `domain/` không import `engine-scripting` (chỉ
 `application/` — engine-scripting là thư viện engine dùng chung, hợp lệ ở application layer, khác
@@ -84,10 +96,25 @@ sau này cần ràng buộc thật, cần thêm cơ chế đọc snapshot vị t
 ❌ SQL/JDBC/Redis client trong module này (Điều 23 — enforce bằng ArchUnit)
 ❌ `domain/` biết PostgreSQL hay GraalJS
 
+## `NpcPlacementFacade` — bố trí NPC (ADR-040, 2026-09-03)
+
+- Đọc-thuần `npc_spawn`, **nạp MỘT LẦN lúc khởi động**, không có đường nóng. Dời NPC ⇒ migration +
+  khởi động lại (Điều 27: "DB = tham số").
+- `server-gateway` dịch `NpcPlacement` → `NpcCatalogSnapshot` của `server-world` (`WorldContentLoader`)
+  — module này **KHÔNG biết `server-world` tồn tại**, và `server-database` cũng không phụ thuộc nó.
+  Đúng khuôn ADR-036/ADR-037 đã dựng.
+- **Không có `role`**: vai trò NPC (giao nhiệm vụ, mở cửa hàng) do **cây hội thoại** phát biểu — xem
+  `town_elder.js` có cả `accept_quest:` lẫn `open_shop`. Thêm cột `role` là ghi cùng sự thật ở chỗ
+  thứ hai mà không có gì bắt hai chỗ khớp nhau.
+- **Không có `model_key`**: client suy khoá art bằng phép biến đổi thuần (`NpcModelKey`). Thêm cột
+  chỉ có nghĩa nếu gửi qua dây, tức đổi protocol (ADR-040 D5 — chưa cần).
+- `posY` phải là 0 (ADR-033); DB có `CHECK`, record là hàng rào thứ hai.
+
 ## Test
 
 `domain/` test không mock. `application/`/`api/` test với Fake `NpcTemplatePort` + script TEST
 riêng (`test_fixture.js`/`test_fixture_shop.js`, KHÔNG phải `town_elder.js` sản phẩm). Postgres
 thật (`server-database/.../dialogue/DialogueIntegrationTest`) verify ĐÚNG script sản phẩm
-(`town_elder.js`) qua migration V10 thật. Socket thật (`GatewayServerIntegrationTest`) verify nhánh
+(`town_elder.js`) qua migration V10 thật; `NpcPlacementIntegrationTest` verify seed V26 khớp TỪNG SỐ
+với ba hằng số `SAMPLE_NPC_*` cũ (ADR-040 D4 — "di trú không đổi hành vi"). Socket thật (`GatewayServerIntegrationTest`) verify nhánh
 NPC không tồn tại (Fake port luôn rỗng) — nghiệp vụ node/nhánh/mở-shop đã phủ ở tầng dưới.

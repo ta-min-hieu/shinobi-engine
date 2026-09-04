@@ -89,13 +89,11 @@ public final class WorldFacade {
      */
     private static final float CHARACTER_PLAY_LINE_Y = 0f;
 
-    // NPC tĩnh mẫu — lát cắt 1 Phase 6, hardcode 1 NPC, chưa có npc_template DB (cùng lý do
-    // TRAINING_DUMMY chưa đọc monster_template). Vị trí khác quái để dễ phân biệt lúc test bằng tay.
-    private static final String SAMPLE_NPC_CODE = "town_elder";
-    // ADR-033 — PHẢI nằm trên đường chơi: NPC là entity TĨNH (không đuổi theo như quái), nên đặt
-    // lệch khỏi y=0 nghĩa là người chơi vĩnh viễn không bao giờ tới đủ gần để tương tác.
-    private static final float SAMPLE_NPC_SPAWN_X = -5f;
-    private static final float SAMPLE_NPC_SPAWN_Y = CHARACTER_PLAY_LINE_Y;
+    // Mã + vị trí NPC KHÔNG còn nằm ở đây: từ ADR-040 chúng đọc từ `npc_spawn` và tới đây qua
+    // NpcCatalogSnapshot. Ràng buộc CŨ vẫn nguyên hiệu lực và nay do DB gác (CHECK ở migration
+    // V26), không phải do hằng số Java: NPC phải nằm trên đường chơi (y = CHARACTER_PLAY_LINE_Y —
+    // ADR-033 khoá di chuyển vào trục X; NPC là entity TĨNH nên đặt lệch y nghĩa là người chơi
+    // vĩnh viễn không bao giờ tới đủ gần để tương tác).
 
     // Bệ demo (ADR-033 "Việc cần làm tiếp theo" #7 — hardcode thủ công để chủ dự án TỰ TEST chạy
     // nhảy leo bậc, KHÔNG phải map pilot thật/art chốt; việc đó vẫn còn mở).
@@ -190,6 +188,12 @@ public final class WorldFacade {
     private final MonsterCatalogSnapshot monsterCatalog;
 
     /**
+     * NPC tĩnh world này đặt (ADR-040). {@link NpcCatalogSnapshot#EMPTY} ⇒ world không có NPC nào —
+     * đúng hành vi dungeon/arena, và là mặc định của mọi overload constructor cũ.
+     */
+    private final NpcCatalogSnapshot npcCatalog;
+
+    /**
      * Toàn bộ resource script skill (hardcode, chưa DB-driven — xem {@link SkillConstants}) —
      * dùng cho validate script lúc khởi động (SCRIPTING.md §8). {@code static} vì đây là config
      * cố định, không phụ thuộc instance {@link WorldFacade} nào.
@@ -227,25 +231,29 @@ public final class WorldFacade {
      * này — capacity planning ưu tiên World chính trước, xem ROADMAP.md Phase 9).
      */
     public WorldFacade(WorldOutboundSink outboundSink, boolean spawnOverworldContent, TickMetricsPort tickMetricsPort) {
-        this(outboundSink, spawnOverworldContent, tickMetricsPort, MonsterCatalogSnapshot.EMPTY);
+        this(outboundSink, spawnOverworldContent, tickMetricsPort, WorldContentCatalog.EMPTY);
     }
 
     /**
-     * {@code monsterCatalog} (ADR-037) — loài quái + điểm spawn, ĐỌC TỪ DB bởi
+     * {@code content} (ADR-037 cho quái, ADR-040 cho NPC) — nội dung tĩnh của world, ĐỌC TỪ DB bởi
      * {@code server-gateway} rồi dịch sang record thuần. {@code server-world} không được biết DB
      * (Điều 23) và {@code server-database} thậm chí không phụ thuộc module này, nên tiêm vào là
      * đường DUY NHẤT — đúng khuôn ADR-036 đã dựng cho {@link EquipmentBonusSnapshot}.
      *
-     * <p>Catalog rỗng ⇒ không spawn quái nào, kể cả khi {@code spawnOverworldContent = true}: hai
-     * cờ này trả lời hai câu khác nhau (có bệ/NPC/hồi sinh nhân vật hay không, và có quái gì).
+     * <p>Quái và NPC đi CHUNG một tham số vì constructor này đã dùng hết 4 tham số, đúng trần
+     * Checkstyle {@code ParameterNumber} (ADR-040 D6) — xem {@link WorldContentCatalog}.
+     *
+     * <p>Catalog rỗng ⇒ không spawn quái/NPC nào, kể cả khi {@code spawnOverworldContent = true}:
+     * hai cờ này trả lời hai câu khác nhau (có bệ/hồi sinh nhân vật hay không, và có nội dung gì).
      */
     public WorldFacade(
             WorldOutboundSink outboundSink,
             boolean spawnOverworldContent,
             TickMetricsPort tickMetricsPort,
-            MonsterCatalogSnapshot monsterCatalog) {
+            WorldContentCatalog content) {
         this.outboundSink = outboundSink;
-        this.monsterCatalog = monsterCatalog;
+        this.monsterCatalog = content.monsters();
+        this.npcCatalog = content.npcs();
         this.monsterRespawnCountdownSeconds =
                 newAliveCountdowns(monsterCatalog.spawnPoints().size());
         this.spawnOverworldContent = spawnOverworldContent;
@@ -410,7 +418,11 @@ public final class WorldFacade {
                     for (int i = 0; i < monsterCatalog.spawnPoints().size(); i++) {
                         spawnMonster(i);
                     }
-                    spawnNpc(); // NPC tĩnh, không chết/hồi sinh — spawn 1 lần duy nhất, khác quái.
+                    // NPC tĩnh, không chết/hồi sinh — spawn 1 lần duy nhất, khác quái (không có
+                    // spawnIndex nào phải nhớ lại, xem NpcCatalogSnapshot).
+                    for (int i = 0; i < npcCatalog.placements().size(); i++) {
+                        spawnNpc(npcCatalog.placements().get(i));
+                    }
                 }
             }
 
@@ -1028,13 +1040,19 @@ public final class WorldFacade {
         // không cần thông báo thủ công (giống hệt spawnMonster).
     }
 
-    private void spawnNpc() {
+    /**
+     * Đặt một NPC tĩnh (ADR-040 — mã và vị trí đọc từ {@link #npcCatalog}, không còn hằng số nào ở
+     * đây).
+     *
+     * @param placement một hàng của {@code npc_spawn} đã dịch sang record thuần
+     */
+    private void spawnNpc(NpcCatalogSnapshot.NpcPlacementDefinition placement) {
         KEntity entity = ecsWorld.createEntity();
         long npcId = nextMonsterOrNpcId--;
 
         PositionComponent position = new PositionComponent();
-        position.x = SAMPLE_NPC_SPAWN_X;
-        position.y = SAMPLE_NPC_SPAWN_Y;
+        position.x = placement.posX();
+        position.y = placement.posY();
         position.prevX = position.x;
         position.prevY = position.y;
         entity.add(position);
@@ -1042,7 +1060,7 @@ public final class WorldFacade {
         // không combat (khác spawnMonster).
 
         NpcComponent npc = new NpcComponent();
-        npc.npcCode = SAMPLE_NPC_CODE;
+        npc.npcCode = placement.npcCode();
         entity.add(npc);
 
         entitiesByNpcId.put(npcId, entity);
