@@ -720,16 +720,23 @@ Closed Beta → Open Beta → Release Candidate → Production → Hotfix
 
 ## ADR cần tạo
 
-Xem [ADR Index](../01-architecture/adr/README.md) — **33 Accepted · 1 Superseded · 1 Proposed** trên
-tổng **35 file ADR** (đếm lại bằng dòng `Status` của **từng file**, 2026-08-29: gồm 010/012/018 chốt
-2026-07-18, ADR-026 chốt 2026-07-24, ADR-014/015/019 chốt 2026-07-26/28, ADR-027 TLS chốt 2026-07-31,
-ADR-011/020/021/022/024/028/029/030 chốt 2026-08-01, **ADR-031 chốt 2026-08-03**, **ADR-032 chốt
-2026-08-06**, **ADR-033 chốt 2026-08-08**, **ADR-034 chốt 2026-08-09**, **ADR-035 chốt 2026-08-27**).
-ADR-007 **Superseded by ADR-030** (không xây Plugin System). **ADR-036 là ADR `Proposed` duy nhất**
-(2026-08-29) — câu "không còn ADR nào `Proposed`" đúng từ 2026-08-06 đến 2026-08-28, **nay đã sai**.
-Vẫn chỉ còn **ADR-023** chưa viết (chờ chốt desktop-first hay mobile-first).
+Xem [ADR Index](../01-architecture/adr/README.md) — **36 Accepted · 1 Superseded · 0 Proposed** trên
+tổng **37 file ADR** (đếm lại 2026-09-03 bằng dòng `Status` của **từng file một**, không suy từ bảng
+index: gồm 010/012/018 chốt 2026-07-18, ADR-026 chốt 2026-07-24, ADR-014/015/019 chốt 2026-07-26/28,
+ADR-027 TLS chốt 2026-07-31, ADR-011/020/021/022/024/028/029/030 chốt 2026-08-01, **ADR-031 chốt
+2026-08-03**, **ADR-032 chốt 2026-08-06**, **ADR-033 chốt 2026-08-08**, **ADR-034 chốt 2026-08-09**,
+**ADR-035 chốt 2026-08-27**, **ADR-036 + ADR-037 chốt 2026-08-30**, **ADR-038 (pivot tu tiên) chốt
+2026-09-01**). ADR-007 **Superseded by ADR-030** (không xây Plugin System). Con số cũ ở đây
+("**33 Accepted · 1 Superseded · 1 Proposed** trên 35 file", đếm 2026-08-29) **đã sai** vì ADR-036 đã
+được Accept 2026-08-30 và ADR-037/038 ra đời sau lần đếm đó. Vẫn chỉ còn **ADR-023** chưa viết (chờ
+chốt desktop-first hay mobile-first).
 
-Bốn ADR mới so với lần đếm trước (2026-08-07):
+> ⚠️ **Con số trên là số ĐẾM ĐƯỢC lúc 2026-09-03, chưa phải số cuối.** Có **2 ADR nữa đang được
+> soạn ở hai luồng song song** — ADR-039 (tham số AI theo loài) và ADR-040 (`npc_template`) — cả hai
+> dự kiến vào ở trạng thái `Proposed` và **chưa có trong lần đếm này**. Đừng đoán con số sau khi gộp:
+> đếm lại bằng dòng `Status` của từng file.
+
+Sáu ADR mới so với lần đếm trước (2026-08-07):
 
 | ADR | Nội dung | Trạng thái | Ghi ở mục |
 |---|---|---|---|
@@ -737,6 +744,8 @@ Bốn ADR mới so với lần đếm trước (2026-08-07):
 | [ADR-034](../01-architecture/adr/ADR-034-Manual-Attack-And-Experience.md) | Đánh thường phải BẤM mới ra đòn + hệ thống kinh nghiệm/lên cấp đầu tiên | Accepted 2026-08-09 | 35 |
 | [ADR-035](../01-architecture/adr/ADR-035-Client-State-Sync-Opcodes.md) | 7 opcode lấp 4 khoảng trống đồng bộ trạng thái client (catalog theo **A′**) | Accepted 2026-08-27 | 37, 38 |
 | [ADR-036](../01-architecture/adr/ADR-036-Equipment-Stats-And-Enhancement-Effect.md) | 4 cột chỉ số cho `item_template` + làm cho cường hoá thật sự có tác dụng | ✅ **Accepted** 2026-08-30, đã thi hành | 29, 40, 41 |
+| [ADR-037](../01-architecture/adr/ADR-037-Monster-Template-And-Spawn-Tables.md) | `monster_template` + `monster_spawn` đọc từ DB, module `feature-monster` | ✅ **Accepted** 2026-08-30, đã thi hành + đã playtest | 43, 44 |
+| [ADR-038](../01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md) | Đổi bối cảnh ninja → **tu tiên**: chỉ tường thuật + chuỗi hiển thị, không đụng cơ chế/protocol/DB | ✅ **Accepted** 2026-09-01, Đợt 1+2+3 đã thi hành | 50, 51 |
 
 ## Tài liệu liên quan
 
@@ -1696,3 +1705,86 @@ Bốn ADR mới so với lần đếm trước (2026-08-07):
       về NOP: **mọi dòng log của client biến mất**, kể cả câu "Chưa có model '<khoá>' — vẽ bằng
       hộp" — đúng câu cần đọc nhất khi chẩn đoán một con quái ra hình hộp đỏ. Cả buổi playtest
       trước phải đoán mò vì client im lặng tuyệt đối.
+
+50. **ADR-038 — game ĐỔI BỐI CẢNH sang TU TIÊN; Đợt 1 + Đợt 2 + playtest + D8 (2026-09-01)**:
+    - Chủ dự án quyết đổi từ "ninja học viện" sang **tu tiên** (kiểu *Phàm Nhân Tu Tiên*).
+      Nguyên tắc thi hành là **"re-theme, không re-build"**: chỉ đổi tường thuật + chuỗi hiển thị,
+      **KHÔNG** đổi cơ chế / protocol / schema DB / tên class. Không migration nào, `protocolVersion`
+      không tăng, không module nào đổi —
+      [ADR-038](../01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md) Accepted cùng ngày.
+    - ✅ **Đợt 1 (tài liệu)**: GDD v0.3.0 + [GLOSSARY](../GLOSSARY.md) v1.1.0 +
+      [STORY.md](../13-game-design/STORY.md) v0.2.0 — **SSOT cốt truyện**, §1–§8 viết đầy đủ; từ
+      đây mọi quest/NPC/tên vùng phải map về một arc trong đó (luật viết quest ở §8). Lv1–100 giữ
+      nguyên cơ chế, chỉ **hiển thị** thành **6 cảnh giới × 9 tầng** (Luyện Khí → Trúc Cơ → Tử Phủ
+      → Kim Đan → Nguyên Anh → Hoá Thần).
+    - 🎯 **Phát hiện làm Đợt 2 nhẹ hơn hẳn kế hoạch: DB KHÔNG chứa chữ hiển thị nào.** Mọi bảng seed
+      (`item_template`, `monster_template`, `npc_template`) chỉ giữ cột `name_key` trỏ sang bundle
+      i18n — xác minh bằng `grep name_key` trên **cả 24 migration**. Kế hoạch ban đầu (D7.2) dựa
+      trên giả định sai là phải sửa tên item/quái/NPC trong DB seed. Thực tế: ~90 chuỗi vi/en đổi
+      gọn trong hai file `.properties`, **không khoá nào bị đổi tên**.
+    - ✅ Kèm theo: hội thoại arc 1 của trưởng lão **Chu Hoành** (`town_elder.js`, thêm 3 node),
+      `CultivationRealm` mới (ánh xạ cấp → cảnh giới, thuần tuý, 20 test), và khoá
+      `npc.town_elder.name` — nằm trong DB từ **V10** nhưng **chưa từng có dòng i18n**, tức tham
+      chiếu treo suốt từ đó tới nay.
+    - 🔴 **Ba lỗi tràn bố cục, bắt bằng ẢNH CHỤP chứ không đoán**: (1) tên chiêu "Cuồng Phong Quyết"
+      (17 ký tự) làm nở nhãn và đẩy lệch cả cụm nút góc phải — trần thật ~14 ký tự; (2) nút chọn
+      nhân vật rộng **cố định 340px** vốn ĐÃ sát trần từ trước ("(Cấp 100)" trên tên 16 ký tự ≈
+      330px), thêm cảnh giới thì vượt — nới lên 440px; (3) dòng cửa hàng ghép
+      `"<tên> — Mua: X  Bán: Y"` trong một nhãn KHÔNG xuống dòng, nên tên 22 ký tự nuốt luôn giá
+      bán ("… Bá…") — rút ba tên dài nhất xuống ≤17 ký tự. Cả ba trần độ dài đã ghi thẳng vào
+      bundle để lần sau không phải đo lại.
+    - ✅ **Đã PLAYTEST thật** (server + Postgres + Redis thật, ADR-038 D11, ảnh chụp từng bước):
+      cảnh giới ở màn chọn nhân vật ("Luyện Khí 1"), điều kiện dùng pháp khí theo tầng ("Cần Luyện
+      Khí tầng 3"), trọn 3 node hội thoại Chu Hoành, nhận nhiệm vụ ("Đập Mộc Nhân — Đang làm"),
+      "Nhận được Phi Đao x1.", Tàng Bảo Các, túi đồ tính bằng **linh thạch**.
+      **1099/1099 test xanh**, lần đầu tính cả **197 test Postgres**.
+    - ⚠️ **Một mắt xích CHƯA chứng minh bằng chơi tay**: đủ 3 mạng quái để nhiệm vụ chuyển "Hoàn
+      thành" rồi lĩnh thưởng — input giả tuột mục tiêu và chết giữa chừng (giới hạn đã biết của
+      công cụ playtest, không phải lỗi game). Chuỗi nhận → đếm → hoàn thành → lĩnh thưởng vẫn được
+      `QuestIntegrationTest` kiểm trọn trên Postgres thật với đúng script sản phẩm.
+    - ✅ **Hai test mới gác nội dung, cả hai chạy KHÔNG cần Docker** — chính là lỗ mà chúng vá:
+      `CultivationRealmTest` ghim bảng cấp → cảnh giới theo từng mốc GDD, và
+      `TownElderDialogueTreeTest` chạy **script sản phẩm thật** để bắt node cụt / action trỏ vào hư
+      không / lộ nội dung arc sau. Trước đó script sản phẩm chỉ được kiểm bởi
+      `DialogueIntegrationTest` vốn cần Postgres, tức **im lặng biến mất mỗi khi máy không bật
+      Docker**.
+    - ✅ **D8 (quét chữ "ninja" trong docs) xong phần thật sự lệch**: `docs/README` (dòng mô tả dự
+      án), `ARCHITECTURE` (sơ đồ), `KAGE-CONSTITUTION` Điều 5, `AI.md`, `RENDERING.md`,
+      `RESOURCE.md`, `ART-QUALITY-STANDARD`. **Phần còn lại cố ý GIỮ**: link tới
+      `ADR-033-Ninja-School-Style-Movement.md` (tên file thật), các bản ghi playtest cũ trong chính
+      tài liệu này nhắc "bộ Hạ Nhẫn"/"Katana Thép +7" (**số đo lịch sử — sửa là làm sai hồ sơ**), và
+      `BLENDER-SESSION-GUIDE` (bản ghi lệnh đã chạy thật). Con số "74 chỗ nhắc ninja" ở D8 gộp cả ba
+      nhóm đó nên nghe lớn hơn việc thật rất nhiều.
+
+51. **Đợt 3 (art) của ADR-038 — XONG 2026-09-03, còn treo đúng MỘT thứ chỉ chủ dự án làm được**:
+    - Cả **7 dòng bảng quyết định §5** của
+      [ART-AUDIT-TU-TIEN.md](../14-art/ART-AUDIT-TU-TIEN.md) đã được chủ dự án quyết và đã thi hành.
+    - 🎯 **Kết quả ngược hẳn dự đoán của kế hoạch (D7.3 đoán "15 nhân vật + 3 quái + 17 VFX đều là
+      phong cách ninja")**: soi từng con một thì **chỉ 1/15 nhân vật từng đội băng trán ninja** —
+      `char_hoa-b1`, đúng con pilot Text→3D đầu tiên (2026-08-03); 14 con sinh sau dùng prompt không
+      có băng trán. Băng trán **đã xoá**.
+    - ✅ Hai icon đã sửa, **mã vật phẩm giữ nguyên** (ADR-038 D5 — không đụng DB/protocol, chỉ đổi
+      hình): `icon_genin_headband` từ băng trán hitai-ate → **mũ vải Ngoại Môn** (mũ chóp cụt +
+      ngọc + trâm vàng); `icon_steel_katana` từ katana → **trường kiếm thẳng + tua kiếm đỏ**.
+    - ✅ `char_town-elder` **dựng lại hoàn toàn** thành trưởng lão Chu Hoành. Lý do là **chất lượng
+      chứ không phải đề tài**: bản cũ chưa bao giờ đạt
+      [ART-QUALITY-STANDARD §2](../14-art/ART-QUALITY-STANDARD.md) — không mặt, một vùng màu, thân
+      hộp trần (đọc `.glb` cũ thấy **thiếu hẳn mảng `images`**, tức nó chưa từng có texture nào) —
+      **nợ mang từ 2026-08-01**. Bản mới: **43 part, 7.622 tris nguồn** → LOD **7.622 / 7.622 /
+      4.998**.
+    - ✅ Giáp/mũ kim loại của `char_tho-b3`: chủ dự án quyết **GIỮ** (tấm bo góc, 4 đinh tán, KHÔNG
+      hoạ tiết khắc — không mang dấu hiệu đề tài nào, và hệ Thổ vốn là thể tu).
+    - ✅ **Ngân sách tam giác vẫn đạt: 57/57 file** (chuẩn ART-PIPELINE §4.4).
+    - 🔴 **Phát hiện đáng ghi nhất: ảnh preview trong Blender KHÔNG thay được
+      `./gradlew :client:client-core:runWorldPreview`.** Trong Blender mặt ông lão đẹp; qua bộ dựng
+      **thật** của client (camera ortho chúc xuống theo
+      [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)) thì **vòm tóc che kín
+      mặt**. Chỉ nhìn qua bộ dựng thật mới thấy — cùng họ với những lần "đường chụp ảnh đánh bại
+      phép toán đúng" đã trả giá trước đây (mục 31, 35).
+    - ⚠️ **0 lượt Rodin tiêu tốn — nhưng KHÔNG phải vì không cần.** Chủ dự án **ĐÃ đồng ý** tiêu hạn
+      mức cho `char_town-elder`; khoá dùng thử `vibecoding` trả `API_INSUFFICIENT_FUNDS`, tức API từ
+      chối **trước** khi sinh nên không mất credit nào. Ông lão được dựng bằng đường `kage_mesh_kit`
+      (offline, tất định) thay thế.
+    - 🔶 **Còn treo, chỉ chủ dự án làm được**: muốn bản Rodin cho `char_town-elder` thì cần **khoá
+      Hyper3D trả tiền**. Đây là việc **duy nhất** của Đợt 3 chưa đóng — xem
+      [docs/README.md](../README.md) mục 12.
