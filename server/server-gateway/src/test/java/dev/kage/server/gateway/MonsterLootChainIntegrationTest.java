@@ -198,7 +198,7 @@ class MonsterLootChainIntegrationTest {
         OutboundFrameCollector killerFrames = registerCharacter(killerId);
         OutboundFrameCollector witnessFrames = registerCharacter(witnessId);
 
-        world = new WorldFacade(registry, true, TickMetricsPort.NO_OP, TestMonsterCatalogs.trainingGround());
+        world = new WorldFacade(registry, true, TickMetricsPort.NO_OP, TestWorldContents.trainingGroundWithElder());
         world.start();
         world.attachCharacter(killerId, SPAWN_X, SPAWN_Y, DEFAULT_STATS);
 

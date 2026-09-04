@@ -86,7 +86,7 @@ import dev.kage.protocol.SendChatMessageResponse;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
-import dev.kage.server.world.MonsterCatalogSnapshot;
+import dev.kage.server.world.WorldContentCatalog;
 import dev.kage.server.world.WorldFacade;
 
 /**
@@ -143,7 +143,7 @@ class SecurityIntegrationTest {
         WorldFacade firstChannelFacade = new WorldFacade(characterRegistry);
         firstChannelFacade.start();
         mainWorldChannels = new MainWorldChannelRegistry(
-                characterRegistry, firstChannelFacade, meterRegistry, MonsterCatalogSnapshot.EMPTY);
+                characterRegistry, firstChannelFacade, meterRegistry, WorldContentCatalog.EMPTY);
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         DungeonInstanceRegistry dungeonInstanceRegistry =

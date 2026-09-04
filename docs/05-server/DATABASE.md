@@ -56,7 +56,7 @@
 
 | Bảng | Cột chính | Ghi chú |
 |---|---|---|
-| `monster_template` | `id, code, name_key, model_key, level, max_hp, atk, skill_dmg, def, res, hit_percent, dodge_percent, crit_percent, element, exp_reward, drop_table_id` | **Tĩnh**, nạp lúc khởi động. ⚠️ **CỘT QUAN HỆ, KHÔNG JSON** — đặc tả gốc ghi `base_stats_json`/`ai_params_json` nhưng dự án không có thư viện JSON nào; [ADR-037](../01-architecture/adr/ADR-037-Monster-Template-And-Spawn-Tables.md) D1 quyết ngược lại, cùng lập luận đã dùng cho `drop_table_entry` và ADR-036. ⚠️ **`ai_params` CHƯA có** (ADR-037 D7 hoãn) — tham số AI vẫn ở `AiConstants` |
+| `monster_template` | `id, code, name_key, model_key, level, max_hp, atk, skill_dmg, def, res, hit_percent, dodge_percent, crit_percent, element, exp_reward, drop_table_id` **+ 6 cột AI**: `aggro_radius_meters, leash_radius_meters, chase_speed_mps, patrol_speed_mps, patrol_radius_meters, idle_duration_seconds` | **Tĩnh**, nạp lúc khởi động. ⚠️ **CỘT QUAN HỆ, KHÔNG JSON** — đặc tả gốc ghi `base_stats_json`/`ai_params_json` nhưng dự án không có thư viện JSON nào; [ADR-037](../01-architecture/adr/ADR-037-Monster-Template-And-Spawn-Tables.md) D1 quyết ngược lại, cùng lập luận đã dùng cho `drop_table_entry` và ADR-036. Sáu cột AI vào từ migration **V25** ([ADR-039](../01-architecture/adr/ADR-039-Per-Species-AI-Parameters.md)) — `aggro_radius_meters = 0` nghĩa là **loài thụ động, không bao giờ gây hấn**. `CHECK` gác `leash >= aggro` (nhỏ hơn ⇒ quái dao động Chase/Return vô hạn) và `patrol_radius <= leash`. ⚠️ **Chỉ 6/8 hằng của `AiConstants` vào bảng**: epsilon "đã tới nơi" và van chống kẹt tuần tra là **cơ chế**, cố ý ở lại code — [AI.md §10.1](../03-engine/AI.md) |
 | `monster_spawn` | `id, monster_template_id (FK), world_code, pos_x, pos_y, respawn_seconds` | **Tĩnh** — loài nào đứng ở đâu. `CHECK pos_y = 0` (ADR-033 khoá di chuyển vào trục X). Migration V23 |
 | `drop_table` | `id, entries_json` | Tỉ lệ rơi đồ — **config, không code** |
 
@@ -88,6 +88,17 @@
 |---|---|---|
 | `shop_item` | `item_template_id (PK, FK item_template), buy_price, sell_price` | **Tĩnh** — danh mục shop toàn cục (chưa gắn NPC/vị trí). `buy_price`/`sell_price` độc lập nhau, không phải % cố định. ✅ Migrate V8 (2026-07-23) |
 
+### 2.9 NPC
+
+| Bảng | Cột chính | Ghi chú |
+|---|---|---|
+| `npc_template` | `id, code, name_key, dialogue_script_ref` | **Tĩnh** — NPC này LÀ AI và NÓI GÌ. `code` là danh tính trên dây (`TalkToNpcCommand.npc_code`). `dialogue_script_ref` là **đường dẫn classpath resource** tới cây hội thoại trong jar `feature-dialogue`, KHÔNG phải FK: không có bảng script để trỏ tới, và cái gác đã có thật — `ScriptValidator` nạp mọi ref lúc khởi động, ref sai ⇒ **server không boot** (SCRIPTING.md §8). ✅ Migrate V10 (2026-07-23) |
+| `npc_spawn` | `id, npc_template_id (FK), world_code, pos_x, pos_y` | **Tĩnh** — NPC nào đứng ở đâu. `CHECK pos_y = 0` ([ADR-033](../01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md) khoá di chuyển vào trục X). ⚠️ **KHÔNG có `respawn_seconds`** — khác `monster_spawn` có chủ đích: NPC không chết. ⚠️ **KHÔNG có cột `role`** — vai trò (giao nhiệm vụ / mở cửa hàng) do **cây hội thoại** phát biểu, không nhân đôi vào DB ([ADR-040](../01-architecture/adr/ADR-040-NPC-Template-And-Placement.md) D3). Migration V26 |
+
+⚠️ **`model_key` CHƯA có** cho NPC (ADR-040 D5 — khác `monster_template`): client tự suy khoá art
+bằng phép biến đổi thuần (`NpcModelKey`: `town_elder` → `char_town-elder`). Thêm cột chỉ có nghĩa khi
+đồng thời gửi nó qua dây, tức **đổi protocol** — chưa có nhu cầu nào đòi điều đó.
+
 ---
 
 ## 3. ERD
@@ -109,6 +120,8 @@ erDiagram
     character ||--o{ guild_member : "thuộc"
     character ||--o{ audit_log : "sinh"
     monster_template ||--o| drop_table : "rơi theo"
+    monster_template ||--o{ monster_spawn : "đặt ở"
+    npc_template ||--o{ npc_spawn : "đặt ở"
 ```
 
 ---

@@ -14,7 +14,8 @@ class MonsterCatalogSnapshotTest {
                 "mob_" + code,
                 50,
                 20L,
-                new MonsterCatalogSnapshot.MonsterCombatNumbers(8, 0, 5, 3, 90, 0, 0, "NONE"));
+                new MonsterCatalogSnapshot.MonsterCombatNumbers(8, 0, 5, 3, 90, 0, 0, "NONE"),
+                new MonsterCatalogSnapshot.MonsterAiNumbers(6f, 10f, 3f, 1.5f, 3f, 3f));
     }
 
     @Test

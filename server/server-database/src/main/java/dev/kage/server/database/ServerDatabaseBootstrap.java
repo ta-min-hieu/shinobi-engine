@@ -19,6 +19,7 @@ import dev.kage.character.application.SelectFactionUseCase;
 import dev.kage.chat.api.ChatFacade;
 import dev.kage.chat.application.SendChatMessageUseCase;
 import dev.kage.dialogue.api.DialogueFacade;
+import dev.kage.dialogue.api.NpcPlacementFacade;
 import dev.kage.dialogue.application.GetDialogueNodeUseCase;
 import dev.kage.friend.api.FriendFacade;
 import dev.kage.friend.application.AcceptFriendRequestUseCase;
@@ -83,6 +84,7 @@ import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
 import dev.kage.server.database.chat.PostgresChatAuditAdapter;
+import dev.kage.server.database.dialogue.PostgresNpcPlacementAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcTemplateAdapter;
 import dev.kage.server.database.friend.PostgresFriendAdapter;
 import dev.kage.server.database.guild.PostgresGuildAdapter;
@@ -306,6 +308,15 @@ public final class ServerDatabaseBootstrap {
         PostgresNpcTemplateAdapter npcTemplatePort = new PostgresNpcTemplateAdapter(dataSource);
         GetDialogueNodeUseCase getDialogueNodeUseCase = new GetDialogueNodeUseCase(npcTemplatePort);
         return new DialogueFacade(getDialogueNodeUseCase);
+    }
+
+    /**
+     * ADR-040 — {@code npc_spawn}, đọc thuần, nạp một lần lúc khởi động (cùng khuôn
+     * {@link #wireMonsterFacade()}). Tách khỏi {@link #wireDialogueFacade()} vì hai facade phục vụ
+     * hai thời điểm khác nhau: hội thoại chạy trong lúc chơi, bố trí NPC chỉ đọc lúc dựng world.
+     */
+    public NpcPlacementFacade wireNpcPlacementFacade() {
+        return new NpcPlacementFacade(new PostgresNpcPlacementAdapter(dataSource));
     }
 
     public QuestFacade wireQuestFacade() {

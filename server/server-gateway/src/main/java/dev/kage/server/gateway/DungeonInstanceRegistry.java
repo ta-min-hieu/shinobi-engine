@@ -25,7 +25,8 @@ import dev.kage.server.world.WorldFacade;
  * là lúc tách ra module riêng.
  *
  * <p>Chỉ 1 dungeon hardcode ({@link #DUNGEON_CODE}) — cùng phong cách
- * {@code WorldFacade.TRAINING_DUMMY_CODE}/{@code SAMPLE_NPC_CODE}. Bất kỳ thành viên nào gửi
+ * {@code BossConstants.BOSS_CODE} — quái và NPC đã thoát khỏi hardcode (ADR-037/ADR-040), dungeon
+ * thì chưa. Bất kỳ thành viên nào gửi
  * {@code EnterDungeonCommand} sẽ kéo THEO CẢ party đang online vào CHUNG 1 instance (GAMEPLAY.md
  * §6 "Mỗi party 1 instance riêng") — không cần leader riêng cho hành động này ở lát cắt 1.
  *
