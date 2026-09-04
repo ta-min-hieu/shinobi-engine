@@ -720,8 +720,7 @@ Closed Beta → Open Beta → Release Candidate → Production → Hotfix
 
 ## ADR cần tạo
 
-Xem [ADR Index](../01-architecture/adr/README.md) — **36 Accepted · 1 Superseded · 0 Proposed** trên
-tổng **37 file ADR** (đếm lại 2026-09-03 bằng dòng `Status` của **từng file một**, không suy từ bảng
+Xem [ADR Index](../01-architecture/adr/README.md) — **36 Accepted · 2 Proposed · 1 Superseded** trên tổng **39 file ADR** (đếm lại 2026-09-04 bằng dòng `Status` của **từng file một**, không suy từ bảng
 index: gồm 010/012/018 chốt 2026-07-18, ADR-026 chốt 2026-07-24, ADR-014/015/019 chốt 2026-07-26/28,
 ADR-027 TLS chốt 2026-07-31, ADR-011/020/021/022/024/028/029/030 chốt 2026-08-01, **ADR-031 chốt
 2026-08-03**, **ADR-032 chốt 2026-08-06**, **ADR-033 chốt 2026-08-08**, **ADR-034 chốt 2026-08-09**,
@@ -731,10 +730,10 @@ ADR-027 TLS chốt 2026-07-31, ADR-011/020/021/022/024/028/029/030 chốt 2026-0
 được Accept 2026-08-30 và ADR-037/038 ra đời sau lần đếm đó. Vẫn chỉ còn **ADR-023** chưa viết (chờ
 chốt desktop-first hay mobile-first).
 
-> ⚠️ **Con số trên là số ĐẾM ĐƯỢC lúc 2026-09-03, chưa phải số cuối.** Có **2 ADR nữa đang được
-> soạn ở hai luồng song song** — ADR-039 (tham số AI theo loài) và ADR-040 (`npc_template`) — cả hai
-> dự kiến vào ở trạng thái `Proposed` và **chưa có trong lần đếm này**. Đừng đoán con số sau khi gộp:
-> đếm lại bằng dòng `Status` của từng file.
+> ✅ **Đã gộp và đếm lại 2026-09-04**: **ADR-039** (tham số AI theo loài, migration V25) và
+> **ADR-040** (`npc_template`, migration V26) đã lên master ở trạng thái `Proposed` — chúng là hai
+> `Proposed` duy nhất, và **chờ chủ dự án Accept**. ⚠️ Cả hai migration **chưa từng chạy qua
+> Postgres thật** (Docker tắt lúc làm), nên đừng coi chúng là đã kiểm chứng.
 
 Sáu ADR mới so với lần đếm trước (2026-08-07):
 
