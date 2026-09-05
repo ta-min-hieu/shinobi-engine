@@ -11,7 +11,7 @@
 
 ## Context
 
-[ADR-024](ADR-024-Asset-Distribution-Strategy.md) (Proposed, 2026-08-01) khuyến nghị **đóng gói toàn bộ asset trong bản build** và hoãn patch/CDN, với lý do trung thực: lúc viết, repo **không có asset thật nào để đo dung lượng**, và Android chưa được chốt là target.
+[ADR-024](ADR-024-Asset-Distribution-Strategy.md) (**Accepted** 2026-08-01; ADR này amend nó) khuyến nghị **đóng gói toàn bộ asset trong bản build** và hoãn patch/CDN, với lý do trung thực: lúc viết, repo **không có asset thật nào để đo dung lượng**, và Android chưa được chốt là target.
 
 Cùng ngày, [ART-PIPELINE.md §5](../../14-art/ART-PIPELINE.md) chốt thiết kế **3 mức cấu hình đồ họa** (LOW `@0.5x` · MEDIUM `@1x` · HIGH `@1x` + hiệu ứng) — mỗi mức là một **bộ atlas riêng**, sinh từ cùng một bản master `@2x`.
 
@@ -32,7 +32,7 @@ Chủ dự án muốn giảm dung lượng bản cài ban đầu. Ràng buộc b
 
 | Phương án | Ưu điểm | Nhược điểm | Vì sao chọn / không chọn |
 |---|---|---|---|
-| **A. Đóng gói cả 3 tier** (ADR-024 nguyên bản) | Đơn giản nhất (Điều 9); chơi ngay, không cần mạng; không có nhánh code nào có thể hỏng | Bản cài phồng ~3× trong khi mỗi máy dùng 1 bộ; lãng phí băng thông tải game lẫn dung lượng đĩa; chạm trần 150MB của Google Play sớm hơn nhiều nếu sau này ra Android | **Không chọn** — lãng phí có thể tránh được mà không đổi lại lợi ích tương xứng |
+| **A. Đóng gói cả 3 tier** (ADR-024 nguyên bản) | Đơn giản nhất (Điều 9); chơi ngay, không cần mạng; không có nhánh code nào có thể hỏng | Bản cài phồng ~3× trong khi mỗi máy dùng 1 bộ (**đo thật 2026-09-05: 4×** — models 84MB gói cả ba so với 21MB chỉ MEDIUM; low 9,1 · med 21 · high 54); lãng phí băng thông tải game lẫn dung lượng đĩa; chạm trần 150MB của Google Play sớm hơn nhiều nếu sau này ra Android | **Không chọn** — lãng phí có thể tránh được mà không đổi lại lợi ích tương xứng |
 | **B. Bản nhẹ hoàn toàn, tải tất cả lúc chạy lần đầu** | Bản cài nhỏ nhất | **Màn hình chờ tải chắn ngay lần mở đầu tiên** — điểm rơi người chơi lớn nhất; game không chạy được nếu offline; hỏng mạng giữa chừng là hỏng trải nghiệm đầu tiên | **Không chọn** — tối ưu sai thứ: dung lượng cài đặt đổi lấy ấn tượng đầu |
 | **C. Hai kiểu build (đầy đủ / nhẹ) chọn lúc build** | Linh hoạt; hoà giải được ADR-024 | Hai cấu hình phát hành = hai thứ phải kiểm thử; nếu Closed Beta chỉ dùng bản đầy đủ thì **nhánh "tải" sẽ mục vì không ai chạy** | **Không chọn làm phương án chính** — nhưng cờ build vẫn có thể thêm sau như biến thể của D (xem "Mở rộng") |
 | **D. Đóng gói 1 tier mặc định + tải tier khác theo yêu cầu** ✅ | Giảm ~⅔ dung lượng asset so với A; **chơi được ngay, không có màn hình chờ lần đầu**; chỉ người chủ động chọn Ultra/Low mới phải chờ — và họ sẵn lòng chờ vì tự chọn; nhánh tải chạy trên đường code chung nên không mục | Vẫn phải viết code tải + xử lý lỗi mạng; người đổi tier phải chờ một lần | **Chọn** — đạt mục tiêu giảm dung lượng mà không đánh đổi ấn tượng đầu |
@@ -59,7 +59,8 @@ Chủ dự án muốn giảm dung lượng bản cài ban đầu. Ràng buộc b
 - Hạ tầng phát hành — nginx serve `assets/exported/` ([ART-PIPELINE §8.4](../../14-art/ART-PIPELINE.md)).
 - **Không** ảnh hưởng server/gameplay: tier chỉ tồn tại phía client, Server Authority không bị đụng.
 
-**Quan hệ với ADR-024:** ADR này **amend** ADR-024 ở đúng một điểm — "đóng gói toàn bộ" đổi thành "đóng gói tier mặc định". Phần còn lại của ADR-024 (**hoãn CDN/OBB/Play Asset Delivery** tới khi Android được chốt) **vẫn giữ nguyên hiệu lực**. Nếu chủ dự án Accept ADR-028 thì ADR-024 cần cập nhật Status thành "Amended by ADR-028", không phải Superseded.
+**Quan hệ với ADR-024:** ADR này **amend** ADR-024 ở đúng một điểm — "đóng gói toàn bộ" đổi thành "đóng gói tier mặc định". Phần còn lại của ADR-024 (**hoãn CDN/OBB/Play Asset Delivery** tới khi Android được chốt) **vẫn giữ nguyên hiệu lực**. ~~Nếu chủ dự án Accept ADR-028 thì ADR-024 cần cập nhật Status thành "Amended by ADR-028", không phải Superseded.~~
+✅ **XONG 2026-09-05** — Status của ADR-024 nay ghi "Amended by ADR-028". Việc này lẽ ra phải làm ngay lúc ADR-028 được Accept (2026-08-01) nhưng bị bỏ sót hơn một tháng: một ADR tự dặn việc cho ADR khác thì **không có gì tự nhắc**, phải làm ngay trong lượt Accept.
 
 ## Revisit Trigger
 
@@ -69,6 +70,7 @@ Xem lại quyết định này khi **bất kỳ** điều kiện nào sau đây 
 2. **Chênh lệch dung lượng giữa tier lớn nhất và nhỏ nhất < 20%** — lúc đó tách tier không còn tiết kiệm đáng kể, quay về đóng gói cả 3 cho đơn giản (Điều 9).
 3. **Tỷ lệ người chơi đổi mức đồ họa > 50%** — nếu đa số phải tải thêm ngay, chọn sai tier mặc định; cân nhắc phát hiện cấu hình máy lúc cài thay vì cố định MEDIUM.
 4. **Android được chốt là target thật** — kích hoạt lại phần ADR-024 đang hoãn (OBB/Play Asset Delivery), có thể thay thế hoàn toàn cơ chế tải tự viết.
+   *(2026-09-05: [ADR-023](ADR-023-Desktop-First-Input.md) chốt **desktop-first**, Android là Post-MVP ⇒ trigger này chỉ nổ khi chính ADR-023 được xem lại.)*
 
 ## Mở rộng có thể làm sau (không thuộc phạm vi ADR này)
 

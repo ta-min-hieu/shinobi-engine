@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Status | ✅ **Accepted** (2026-08-01, chủ dự án xác nhận qua chat) |
+| Status | ✅ **Accepted** (2026-08-01) · ✏️ **Amended by [ADR-028](ADR-028-Graphics-Tier-Asset-Delivery.md)** (2026-08-01) — "đóng gói TOÀN BỘ" đổi thành "đóng gói TIER MẶC ĐỊNH". Phần hoãn CDN/OBB/Play Asset Delivery **giữ nguyên hiệu lực**. |
 | Date | 2026-08-01 |
 | Deciders | AI (Claude) đề xuất; chủ dự án Accept 2026-08-01 qua chat |
-| Related | [RESOURCE.md §9, §10](../../04-client/RESOURCE.md), [TECHNOLOGY-STACK.md](../TECHNOLOGY-STACK.md) (dòng "Android — cần chốt mobile-first hay desktop-first"), ADR-023 *(chưa viết — câu hỏi mobile input song song, xem [README.md](README.md) "ADR cần tạo")*, [GIT-WORKFLOW.md](../../11-process/GIT-WORKFLOW.md) (Closed Beta trước Production), [ROADMAP.md Phase 10](../../11-process/ROADMAP.md) |
+| Related | [RESOURCE.md §9, §10](../../04-client/RESOURCE.md), [TECHNOLOGY-STACK.md](../TECHNOLOGY-STACK.md) (dòng "Android — cần chốt mobile-first hay desktop-first"), [ADR-023](ADR-023-Desktop-First-Input.md) *(desktop-first, Accepted 2026-09-05 — trả lời câu hỏi nền tảng mà ADR này từng phải chờ)*, [GIT-WORKFLOW.md](../../11-process/GIT-WORKFLOW.md) (Closed Beta trước Production), [ROADMAP.md Phase 10](../../11-process/ROADMAP.md) |
 
 ---
 
@@ -27,6 +27,11 @@ chốt câu hỏi mobile-first hay desktop-first", và hiện chỉ có `client-
 module Android nào). Câu hỏi "OBB hay Play Asset Delivery, giới hạn 150MB Google Play" trong §10 phụ
 thuộc hoàn toàn vào quyết định đó — chưa chốt nền tảng thì chưa thể chốt cơ chế phân phối riêng cho
 nền tảng đó.
+
+> ✅ **Cập nhật 2026-09-05 — câu hỏi nền tảng ĐÃ ĐÓNG.** [ADR-023](ADR-023-Desktop-First-Input.md)
+> chốt **desktop-first**; Android là Post-MVP và sẽ cần ADR riêng. Nghĩa là phần hoãn ở đây không
+> còn là "chờ một câu hỏi mở" mà là **một quyết định đã đóng kèm điều kiện mở lại rõ ràng**
+> (Revisit Trigger #1 bên dưới). Đoạn văn trên giữ nguyên làm hồ sơ bối cảnh lúc viết.
 
 Điều 30 (đo trước khi tối ưu, xem [BENCHMARK.md](../../09-performance/BENCHMARK.md)) và bài học rút ra
 ở Phase 9 (không ngoại suy một quyết định lớn từ dữ liệu chưa tồn tại — capacity-planning phải dựa số
@@ -78,11 +83,17 @@ Closed Beta Desktop không thực sự bị chặn bởi câu hỏi CDN/mobile, 
 
 ## Revisit Trigger
 
-- **Khi Android được chốt là target thật** (câu hỏi mở ở TECHNOLOGY-STACK.md, không phải quyết định
-  của ADR này) → bắt buộc đánh giá lại Phương án C (Play Asset Delivery) với số liệu dung lượng thật
-  lúc đó, viết ADR riêng hoặc Superseded ADR này.
+- **Khi Android được chốt là target thật** → bắt buộc đánh giá lại Phương án C (Play Asset
+  Delivery) với số liệu dung lượng thật lúc đó, viết ADR riêng hoặc Superseded ADR này.
+  *(2026-09-05: nay do [ADR-023](ADR-023-Desktop-First-Input.md) làm chủ — Android là Post-MVP, nên
+  trigger này chỉ nổ khi chính ADR-023 được xem lại. Không còn là câu hỏi mở lơ lửng.)*
 - **Khi tổng dung lượng asset đóng gói (đo thật, không ước tính) vượt quá mức làm bản cài/bản cập nhật
-  trở thành trải nghiệm tệ cho Closed Beta tester thật** (chưa có ngưỡng cụ thể — phải đo trước khi
+  trở thành trải nghiệm tệ cho Closed Beta tester thật** — ⏹️ **ĐO 2026-09-05, KHÔNG kích hoạt**:
+  `assets/exported` tổng **87MB**, trong đó models 84MB chia ba tier (**low 9,1MB · med 21MB ·
+  high 54MB**) và atlases 3,2MB. Theo ADR-028 chỉ **tier mặc định MEDIUM** đi kèm bản cài ⇒ phần
+  đóng gói thực tế là **~24MB**, thừa sức chấp nhận cho Closed Beta desktop. *(Ghi chú: ADR-028 ước
+  "phồng ~3×" nếu gói cả ba tier; đo thật là **4×** — 84MB so với 21MB, vì HIGH nặng gấp 2,5 lần
+  MEDIUM.)* (chưa có ngưỡng cụ thể — phải đo trước khi
   định con số, Điều 30; ví dụ cách đo: theo dõi kích thước `assets/` sau khi pipeline HyperLap2D
   (RESOURCE.md §3) sản xuất ra ≥1 zone thật) → cân nhắc lại Phương án B.
 - **Khi tần suất cần cập nhật asset độc lập với code trở thành gánh nặng vận hành thật** (không phải
