@@ -7,7 +7,9 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.sql.DataSource;
 
@@ -110,8 +112,48 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         assertThat(spawns).allSatisfy(spawn -> assertThat(spawn.posY()).isZero());
         assertThat(spawns)
                 .allSatisfy(spawn -> assertThat(spawn.respawnSeconds()).isPositive());
-        // Bốn vị trí cũ giữ nguyên; chỉ loài đứng ở đó đổi, cộng thêm quỷ đá ở xa nhất.
-        assertThat(spawns).extracting(MonsterSpawnPoint::posX).containsExactly(8f, 14f, 21f, 27f, 34f);
+        // V29 giãn ba điểm CÓ AGGRO ra xa nhau (21 / 34 / 47) — xem
+        // shouldKeepAggroSpawnsApartEnoughToPullOneAtATime. Hai cọc gỗ (aggro 0) giữ nguyên chỗ cũ.
+        assertThat(spawns).extracting(MonsterSpawnPoint::posX).containsExactly(8f, 14f, 21f, 34f, 47f);
+    }
+
+    /**
+     * V29 (ROADMAP mục 57) — hàng rào HÌNH HỌC, không phải hàng rào chỉ số.
+     *
+     * <p>Một điểm {@code p} kéo được CẢ HAI con {@code A} và {@code B} khi {@code |p-A| <= aggroA}
+     * và {@code |p-B| <= aggroB}, tức khi {@code |A-B| <= aggroA + aggroB}. Trước V29,
+     * {@code wandering_bandit} nằm ở 21 và 27 (cách 6, tổng aggro 12) nên MỌI vị trí ở giữa kéo cả
+     * hai và sát thương nhận vào gấp đôi — quest {@code night_watch_bandit} lại dẫn người chơi vào
+     * đúng đoạn đó. {@code stone_ogre} ở 34 cũng chồng lên con thứ hai y như vậy.
+     *
+     * <p>Ô test này gác luật chung thay vì gác ba con số, nên thêm loài mới hay dời điểm spawn đều
+     * bị soi lại. Quái {@code isPassive} (mộc nhân, aggro 0) không tham gia: chúng không tự đánh ai.
+     */
+    @Test
+    void shouldKeepAggroSpawnsApartEnoughToPullOneAtATime() {
+        PostgresMonsterCatalogAdapter adapter = new PostgresMonsterCatalogAdapter(dataSource);
+        Map<String, Float> aggroByCode = new HashMap<>();
+        for (MonsterTemplate template : adapter.listTemplates()) {
+            aggroByCode.put(template.code(), template.aiParams().aggroRadiusMeters());
+        }
+
+        List<MonsterSpawnPoint> aggressive = adapter.listSpawnPoints(MonsterSpawnPoint.MAIN_WORLD_CODE).stream()
+                .filter(spawn -> aggroByCode.getOrDefault(spawn.monsterCode(), 0f) > 0f)
+                .toList();
+
+        assertThat(aggressive).hasSize(3); // 2 tán tu + 1 quỷ đá
+        for (int i = 0; i < aggressive.size(); i++) {
+            for (int j = i + 1; j < aggressive.size(); j++) {
+                MonsterSpawnPoint first = aggressive.get(i);
+                MonsterSpawnPoint second = aggressive.get(j);
+                float reachOfBoth = aggroByCode.get(first.monsterCode()) + aggroByCode.get(second.monsterCode());
+                assertThat(Math.abs(first.posX() - second.posX()))
+                        .as(
+                                "%s@%.0f và %s@%.0f phải cách nhau hơn %.0fm, nếu không đoạn giữa kéo cả hai",
+                                first.monsterCode(), first.posX(), second.monsterCode(), second.posX(), reachOfBoth)
+                        .isGreaterThan(reachOfBoth);
+            }
+        }
     }
 
     @Test

@@ -80,27 +80,28 @@ class NightWatchDuelBalanceTest {
     }
 
     /**
-     * ĐÂY mới là chỗ trận đấu thật sự vỡ, và nó KHÔNG nằm ở chỉ số con quái: hai điểm spawn
-     * {@code wandering_bandit} đặt ở {@code x = 21} và {@code x = 27} (V25, {@code monster_spawn}),
-     * đúng bằng {@code aggro_radius_meters = 6} của loài này. Nghĩa là **mọi vị trí trong đoạn
-     * [21, 27] đều nằm trong tầm aggro của CẢ HAI** — người chơi đi làm quest gần như chắc chắn kéo
-     * hai con cùng lúc, và lúc đó sát thương nhận vào GẤP ĐÔI (34/giây thay vì 17).
+     * ĐÂY mới là chỗ trận đấu từng vỡ, và nó KHÔNG nằm ở chỉ số con quái: trước V29 hai điểm spawn
+     * {@code wandering_bandit} đặt ở {@code x = 21} và {@code x = 27} — cách nhau đúng 6m trong khi
+     * TỔNG tầm aggro của hai con là 12m, nên mọi vị trí ở giữa kéo cả hai và sát thương nhận vào
+     * gấp đôi (34/giây thay vì 17). Quest {@code night_watch_bandit} lại dẫn người chơi vào đúng
+     * đoạn đó.
      *
-     * <p>Test này khoá con số hình học đó lại: sửa spawn hay sửa {@code aggro_radius} đều sẽ làm nó
-     * đỏ, và người sửa buộc phải nhìn lại phép tính này thay vì đổi mù.
+     * <p>V29 giãn thành 21 / 34 / 47. Ô test này giữ lại PHÉP TÍNH để nó không bị quên; còn dữ liệu
+     * thật thì {@code PostgresMonsterCatalogAdapterIntegrationTest
+     * .shouldKeepAggroSpawnsApartEnoughToPullOneAtATime} gác, vì toạ độ sống trong DB chứ không
+     * trong code.
      */
     @Test
-    @DisplayName("Hai điểm spawn tán tu cách nhau ĐÚNG bằng bán kính aggro — đoạn giữa kéo cả hai con")
-    void twoBanditSpawnsOverlapTheirOwnAggroRadius() {
-        float firstSpawnX = 21f;
-        float secondSpawnX = 27f;
+    @DisplayName("Hai con cùng kéo được khi khoảng cách KHÔNG vượt tổng tầm aggro — luật của V29")
+    void twoAggressiveSpawnsPullTogetherWhenCloserThanTheirCombinedAggro() {
         float aggroRadiusMeters = 6f;
+        float combinedReach = aggroRadiusMeters + aggroRadiusMeters;
 
-        float gap = secondSpawnX - firstSpawnX;
-
-        assertThat(gap).isEqualTo(aggroRadiusMeters);
-        // Không có ĐIỂM NÀO giữa hai con mà chỉ một con nhìn thấy mình: khoảng cách tới con gần
-        // nhất luôn ≤ 3m, và tới con xa nhất luôn ≤ 6m = vẫn trong tầm aggro.
-        assertThat(gap).isLessThanOrEqualTo(2 * aggroRadiusMeters);
+        // Bố cục CŨ (21 và 27): 6 <= 12 ⇒ có vị trí kéo cả hai.
+        assertThat(27f - 21f).isLessThanOrEqualTo(combinedReach);
+        // Bố cục V29 (21 và 34): 13 > 12 ⇒ không vị trí nào kéo được cả hai.
+        assertThat(34f - 21f).isGreaterThan(combinedReach);
+        // Và quỷ đá cũng phải rời ra theo, nếu không lỗi chỉ dời sang cặp tán tu #2 + quỷ đá.
+        assertThat(47f - 34f).isGreaterThan(combinedReach);
     }
 }

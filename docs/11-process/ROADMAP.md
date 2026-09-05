@@ -1983,3 +1983,26 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
     - 💡 **Bài học, lần thứ HAI trong cùng một ngày** (xem mục 55): tôi lại suýt ghi một kết luận
       thiết kế dựa trên quan sát màn hình. Khác biệt lần này là dừng lại trước khi đổi số. **Với
       câu hỏi cân bằng, hỏi công thức trước — nó tái lập được, còn buổi chơi tay thì không.**
+
+58. **V29 — giãn các điểm spawn CÓ AGGRO; và một giới hạn của tôi cần ghi thẳng ra (2026-09-05)**:
+    - Chủ dự án chọn **giãn điểm spawn** (không hạ chỉ số quái, xem mục 57). Luật chốt: hai điểm
+      spawn có aggro phải cách nhau **hơn tổng tầm aggro của cả hai** — vì một điểm `p` kéo được cả
+      A lẫn B đúng khi `|A-B| <= aggroA + aggroB`.
+    - **V29** xếp lại cả cụm, KHÔNG chỉ cặp tán tu: `stone_ogre` (x=34) cũng chỉ cách con tán tu thứ
+      hai 7m nên cũng chồng aggro — giãn mỗi cặp tán tu mà bỏ qua nó chỉ là **dời lỗi sang chỗ
+      khác**. Bố cục mới: **21 / 34 / 47**. Mộc nhân (aggro 0) giữ nguyên 8 và 14.
+    - ✅ Đã chạy qua Postgres thật (Testcontainers, 10/10 xanh) và đã áp lên DB dev — `monster_spawn`
+      giờ đọc ra đúng `8, 14, 21, 34, 47`.
+    - ✅ Hàng rào mới gác **LUẬT** chứ không gác ba con số:
+      `PostgresMonsterCatalogAdapterIntegrationTest.shouldKeepAggroSpawnsApartEnoughToPullOneAtATime`
+      duyệt MỌI cặp spawn có aggro đọc từ DB — thêm loài mới hay dời điểm spawn đều bị soi lại.
+      **1160 test xanh, 0 skip.**
+    - 🔶 **Chưa kiểm chứng được TRONG GAME, và tôi ghi rõ thay vì nói vòng**: vào world ở x=24 (lẽ ra
+      chỉ một con trong tầm) thì màn hình vẫn hiện HAI con tán tu cạnh nhau, và tôi **không phân
+      giải được** bằng ảnh chụp — chúng có thể là con ở 34 đang đuổi trong bán kính leash 10m, cũng
+      có thể là thứ khác. Sau hai lần bị chính ảnh chụp đánh lừa trong cùng ngày (mục 55, mục 57),
+      tôi **dừng ở đây thay vì đoán tiếp**.
+    - 🛠 **Việc cần làm để đóng dứt điểm**: dựng một client HEADLESS trên nền `tools/load-test`
+      (`SimulatedPlayer` đã nói đúng giao thức thật) để ĐỌC `MonsterSpawnedEvent`/`AttackResultEvent`
+      thành SỐ — vị trí từng con quái và máu từng đòn. Buổi chơi tay không đủ phân giải cho câu hỏi
+      thời gian thực; đây là công cụ đúng cho lớp câu hỏi đó.
