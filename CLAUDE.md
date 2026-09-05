@@ -26,9 +26,14 @@ mục "ĐO LẠI N=2000 THẬT") đã trả lời cả hai, và kết quả **x�
   **tra cứu Component qua `HashMap` (~17-25%)**, rồi AoI (~19%), `AiSystem` quét tuyến tính (~9%),
   và **`recordSystemDuration` — tức đo đạc — ăn ~7%**. Đích tối ưu rẻ nhất là gỡ đo đạc khỏi vòng
   nóng; đổi cách truy cập Component thì **cần ADR** (§4).
+- ⚠️ **`kage.tick.duration` chỉ nhìn thấy ~4% CPU của server** (đo thẳng `_count`/`_sum`: 4509
+  tick/giây × 49µs = 0,22 lõi, trong khi tiến trình ăn 5,7 lõi). ⇒ **"tick p99 thấp" KHÔNG phải
+  bằng chứng còn dư sức chứa.**
 - ⚠️ **Đo capacity PHẢI xác minh cờ JVM trước khi đo.** `./gradlew run`/`installDist` mặc định là
   cấu hình DEV (`leakDetection=paranoid` + G1) — tốn thêm ~32% CPU và làm p95 xấu đi hàng trăm lần
   so với cấu hình production. Lần chạy đầu của chính phép đo này đã dính đúng bẫy đó.
+- ⚠️ **Mọi con số "N lỗi" của load test trước 2026-09-05 đều không tin được** — công cụ đọc frame
+  theo thứ tự, không kiểm opcode, nên lỗi bắt tay bị trộn vào lỗi quá tải. Đã vá.
 
 3 quyết định nền tảng chốt từ Phase 0 (không đổi trừ khi có ADR revisit):
 - Package root: **`dev.kage`** ([ADR-012](docs/01-architecture/adr/ADR-012-Package-Root.md))

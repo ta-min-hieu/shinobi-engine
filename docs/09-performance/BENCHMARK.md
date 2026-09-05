@@ -430,12 +430,25 @@ Chỉ **7,3% mẫu Netty có khung `dev.kage` nào** — 92,7% còn lại là h�
 #### Hai điều CHƯA giải thích được (không bịa)
 
 - **Profile chạy ở N=1000, không phải N=2000.** Tỉ lệ 63/37 có thể đổi ở chỗ siêu tuyến tính lộ ra.
-- **Mâu thuẫn chưa gỡ**: `kage.tick.duration` bọc TRỌN `tickOnce()` (đã đọc code: `WorldFacade:431-434`,
-  gồm cả AoI sync) và cho p99 = 0,44ms; nhưng `world-tick-pool` chiếm 63% của ~5,7 lõi ≈ 3,6 lõi,
-  tức ~1,2ms CPU cho mỗi tick trong số 3000 tick/giây (50 world × 60Hz). **Lệch ~10-20 lần.** Hoặc
-  metric đang báo thiếu, hoặc JFR lấy mẫu theo luồng nên pool có nhiều luồng hơn bị đếm trội (tick
-  pool = 32 luồng, Netty ít hơn). **Chưa xác định được cái nào** ⇒ coi tỉ lệ 63/37 là **định hướng,
-  không phải con số chính xác**; phần chia nhỏ BÊN TRONG mỗi pool thì không dính vấn đề này.
+- **Mâu thuẫn chưa gỡ, nhưng đã đo được một nửa chắc chắn.** Đọc thẳng `_count`/`_sum` của
+  `kage_tick_duration_seconds` trong cửa sổ ổn định 150s ở N=1000: **676.390 tick** (⇒ **4509
+  tick/giây** ≈ 75 world × 60Hz) và tổng **33,35 giây** thời gian tick ⇒ **trung bình 49 µs/tick**,
+  tức **0,22 lõi**. Cùng lúc đó tiến trình ăn **~5,7 lõi**.
+
+  ⇒ **`kage.tick.duration` chỉ nhìn thấy ~4% CPU của server.** Kết luận này KHÔNG phụ thuộc vào JFR
+  và là điều quan trọng nhất rút ra: **"tick p99 0,44ms nên server khoẻ" KHÔNG phải bằng chứng còn
+  dư sức chứa** — nó là phát biểu về 4% CPU, không phải về 100%. OBSERVABILITY.md §3.1 gọi đây là
+  "metric duy nhất mà không có nó thì không biết server có khoẻ không"; đúng là cần, nhưng **một
+  mình nó không đủ**.
+
+  Phần chưa gỡ: JFR gán 63% mẫu cho `world-tick-pool` ≈ 3,6 lõi, lệch ~16 lần so với 0,22 lõi mà
+  metric báo. Đã LOẠI TRỪ hai giả thuyết bằng chính dữ liệu profile: (a) chi phí bộ máy lập lịch —
+  chỉ **2,7%** mẫu nằm trong `ScheduledThreadPoolExecutor`/`DelayedWorkQueue`; (b) tick thread làm
+  việc ngoài vùng bấm giờ — các mẫu "ngoài `tickOnce`" hoá ra chỉ là **stack bị cắt cụt** (khung
+  trên cùng của chúng là `Entity.getComponent`, `HashMap.getNode`, tức vẫn trong tick). Cũng đã đọc
+  `WorldFacade.tickTask` và xác nhận bộ đếm giờ bọc trọn `tickOnce()`. **Chưa có lời giải** ⇒ coi
+  tỉ lệ 63/37 là **định hướng, không phải con số chính xác**; phần chia nhỏ BÊN TRONG mỗi pool thì
+  không dính vấn đề này.
 - Đã loại trừ một giả thuyết: khu vực rỗng KHÔNG bị bỏ quên mà vẫn tick —
   `MainWorldChannelRegistry.closeIfEmptyOverflowChannel` có dừng và gỡ chúng thật.
 
@@ -461,6 +474,31 @@ Cấu hình dev tốn **thêm ~32% CPU**, **giảm ~32% thông lượng**, và l
 ⇒ **Quy tắc: mọi phép đo capacity PHẢI xác minh cờ JVM thật trước khi đo** (`jcmd <pid> VM.flags` +
 `jcmd <pid> VM.system_properties | grep leakDetection`). Một bảng số đo sai cấu hình còn tệ hơn không
 có bảng nào — và mục này suýt nữa đã công bố đúng thứ đó.
+
+### ⛔ Công cụ đo đã HỎNG THEO HAI CÁCH — mọi con số "N lỗi" ở trên phải đọc lại
+
+Phát hiện khi thử đo lại: một lần chạy trả về **1000/1000 lỗi** và trông y hệt server sập vì tải.
+Không phải. `SimulatedPlayer.connectCreateSelect` đọc frame **theo THỨ TỰ, không kiểm opcode**, nên:
+
+1. **Server từ chối → client hiểu nhầm thành lỗi mạng.** `ErrorResponse` bị đem parse thành
+   `ConnectResponse` ⇒ `InvalidWireTypeException` ⇒ đếm vào cùng `errorCount` với lỗi quá tải. Lý do
+   thật, sau khi vá: **`409 error.character_limit_exceeded`** — công cụ **tạo nhân vật mới mỗi lần
+   chạy** trên cùng account `loadtest<N>`, nên nó **tự hỏng dần qua các lần chạy** cho tới khi chạm
+   trần số nhân vật. Đây cũng là nguồn của **~5000 nhân vật rác** trong DB dev.
+2. **Bắt tay không độc quyền dòng byte.** `handleSelectCharacterBlocking` gọi `register()` +
+   `attachCharacter()` TRƯỚC khi gửi `SelectCharacterResponse`, nên world đẩy
+   `CHARACTER_SPAWNED_EVENT` (303) và `CHAT_MESSAGE_EVENT` (802) xuống trước. Đo được **431 + 63**
+   client dính đúng cảnh này ở N=1000. Client THẬT điều phối theo opcode nên không sao — chỉ công
+   cụ đọc theo vị trí mới hỏng.
+
+**Đã vá cả hai** (`expectFrame` đòi đúng opcode, bỏ qua sự kiện đẩy xen giữa, và nêu thẳng
+`error_key` của server; `reuseOrCreateCharacter` dùng lại nhân vật sẵn có). Kết quả cùng kịch bản
+vừa hỏng 1000/1000: **1000/1000 online, 0 lỗi, DB không tăng thêm một nhân vật nào**, băng thông
+86/2795 KB/s (khớp 90/2870 của 2026-07-29).
+
+⚠️ **Hệ quả: mọi con số "lỗi" trong §5.1 — kể cả "66 lỗi" ở N=2000 của bảng cũ và 1677/9560 của lần
+đo hôm nay — đều TRỘN LẪN lỗi bắt tay với lỗi quá tải, và không nên dùng làm bằng chứng về sức
+chứa.** Các con số CPU/băng thông/độ trễ thì không bị ảnh hưởng (đo trên những client ĐÃ vào được).
 
 ### Việc CHƯA làm / giới hạn phương pháp (Điều 30)
 
