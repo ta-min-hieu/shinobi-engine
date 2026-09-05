@@ -208,8 +208,9 @@ public final class ServerDatabaseBootstrap {
         PostgresAuditAdapter auditPort = new PostgresAuditAdapter();
         PostgresInventoryIdempotencyAdapter idempotencyPort = new PostgresInventoryIdempotencyAdapter();
         JdbcInventoryTransactionRunner transactionRunner = new JdbcInventoryTransactionRunner(dataSource);
-        AddItemUseCase addItemUseCase = new AddItemUseCase(inventoryPort, transactionRunner);
-        GrantLootUseCase grantLootUseCase = new GrantLootUseCase(dropTablePort, inventoryPort, transactionRunner);
+        AddItemUseCase addItemUseCase = new AddItemUseCase(inventoryPort, itemTemplatePort, transactionRunner);
+        GrantLootUseCase grantLootUseCase =
+                new GrantLootUseCase(dropTablePort, inventoryPort, itemTemplatePort, transactionRunner);
         EquipItemUseCase equipItemUseCase =
                 new EquipItemUseCase(inventoryPort, itemTemplatePort, equipmentPort, transactionRunner);
         UnequipItemUseCase unequipItemUseCase = new UnequipItemUseCase(equipmentPort, transactionRunner);

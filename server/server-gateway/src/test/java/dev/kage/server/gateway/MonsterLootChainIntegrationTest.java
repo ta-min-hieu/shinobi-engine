@@ -125,6 +125,9 @@ class MonsterLootChainIntegrationTest {
     private static final int POSTGRES_PORT = 5432;
     private static final String TRAINING_DUMMY_CODE = "training_dummy";
     private static final String KUNAI_CODE = "kunai";
+
+    /** {@code max_stack = 1} (có {@code equip_slot}) — xem javadoc {@link #nonStackableTemplateId}. */
+    private static final String NON_STACKABLE_CODE = "wooden_sword";
     /** {@code PostgresInventoryAdapter.DEFAULT_CAPACITY} — private bên đó, lặp lại để test nhánh túi đầy. */
     private static final int INVENTORY_CAPACITY = 20;
     /** Nhân vật đứng cách quái mẫu (5,5) đúng 1m — trong tầm đánh 2m, y hệt {@code WorldFacadeTest}. */
@@ -141,6 +144,15 @@ class MonsterLootChainIntegrationTest {
     static DataSource dataSource;
     static long accountId;
     static long kunaiTemplateId;
+
+    /**
+     * Món KHÔNG xếp chồng ({@code max_stack = 1}), dùng để làm ĐẦY túi thật.
+     *
+     * <p>Trước 2026-09-05 test này đổ 20 lần {@code kunai x1} để chiếm 20 ô — chỉ chạy được vì
+     * {@code Inventory.add()} chưa gộp chồng. Nay 20 phi đao gộp thành MỘT ô, nên muốn túi đầy
+     * phải dùng trang bị (luật của chủ dự án: trang bị không xếp chồng).
+     */
+    static long nonStackableTemplateId;
 
     private EventLoopGroup eventLoopGroup;
     private ConnectedCharacterRegistry registry;
@@ -163,6 +175,7 @@ class MonsterLootChainIntegrationTest {
         accountTx.inTransaction(tx -> accountHolder[0] = accountAdapter.findOrCreate(tx, "lootchaintester"));
         accountId = accountHolder[0].id();
         kunaiTemplateId = findItemTemplateIdByCode(KUNAI_CODE);
+        nonStackableTemplateId = findItemTemplateIdByCode(NON_STACKABLE_CODE);
         forceDeterministicTrainingDummyDrop();
     }
 
@@ -240,7 +253,7 @@ class MonsterLootChainIntegrationTest {
         long characterId = createFreshCharacter("LootBagFull");
         InventoryFacade inventoryFacade = realInventoryFacade();
         for (int i = 0; i < INVENTORY_CAPACITY; i++) {
-            assertThat(inventoryFacade.addItem(characterId, ItemStack.newItem(kunaiTemplateId, 1, 0)))
+            assertThat(inventoryFacade.addItem(characterId, ItemStack.newItem(nonStackableTemplateId, 1, 0)))
                     .isEqualTo(InventoryFacade.Result.OK);
         }
         assertThat(readInventoryRows(characterId)).hasSize(INVENTORY_CAPACITY);
@@ -397,9 +410,12 @@ class MonsterLootChainIntegrationTest {
                 new PostgresInventoryIdempotencyAdapter());
         return new InventoryFacade(
                 new ItemAcquisitionUseCases(
-                        new AddItemUseCase(inventoryPort, transactionRunner),
+                        new AddItemUseCase(inventoryPort, itemTemplatePort, transactionRunner),
                         new GrantLootUseCase(
-                                new PostgresDropTableAdapter(dataSource), inventoryPort, transactionRunner)),
+                                new PostgresDropTableAdapter(dataSource),
+                                inventoryPort,
+                                itemTemplatePort,
+                                transactionRunner)),
                 equipmentUseCases,
                 new EnhanceItemUseCase(enhancePorts, transactionRunner),
                 new InventoryQueryUseCases(

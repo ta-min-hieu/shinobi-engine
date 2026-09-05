@@ -72,8 +72,8 @@ class ComputeEquipmentBonusUseCaseTest {
         EquipmentPort equipmentPort =
                 fakeEquipmentPort(Map.of(EquipmentSlotType.WEAPON, 1L, EquipmentSlotType.ARMOR, 2L));
         ItemTemplatePort itemTemplatePort = fakeItemTemplatePort(itemTemplateId -> switch ((int) itemTemplateId) {
-            case 100 -> Optional.of(new ItemTemplate(100L, EquipmentSlotType.WEAPON, 5, 0, 0, 0, 1));
-            case 200 -> Optional.of(new ItemTemplate(200L, EquipmentSlotType.ARMOR, 3, 0, 0, 0, 1));
+            case 100 -> Optional.of(new ItemTemplate(100L, EquipmentSlotType.WEAPON, 1, 5, 0, 0, 0, 1));
+            case 200 -> Optional.of(new ItemTemplate(200L, EquipmentSlotType.ARMOR, 1, 3, 0, 0, 0, 1));
             default -> Optional.empty();
         });
         ComputeEquipmentBonusUseCase useCase =
@@ -122,8 +122,8 @@ class ComputeEquipmentBonusUseCaseTest {
         EquipmentPort equipmentPort =
                 fakeEquipmentPort(Map.of(EquipmentSlotType.WEAPON, 1L, EquipmentSlotType.ARMOR, 2L));
         ItemTemplatePort itemTemplatePort = fakeItemTemplatePort(itemTemplateId -> switch ((int) itemTemplateId) {
-            case 100 -> Optional.of(new ItemTemplate(100L, EquipmentSlotType.WEAPON, 18, 0, 0, 0, 5));
-            case 200 -> Optional.of(new ItemTemplate(200L, EquipmentSlotType.ARMOR, 0, 10, 6, 20, 5));
+            case 100 -> Optional.of(new ItemTemplate(100L, EquipmentSlotType.WEAPON, 1, 18, 0, 0, 0, 5));
+            case 200 -> Optional.of(new ItemTemplate(200L, EquipmentSlotType.ARMOR, 1, 0, 10, 6, 20, 5));
             default -> Optional.empty();
         });
         ComputeEquipmentBonusUseCase useCase =
@@ -148,8 +148,8 @@ class ComputeEquipmentBonusUseCaseTest {
         EquipmentPort equipmentPort =
                 fakeEquipmentPort(Map.of(EquipmentSlotType.WEAPON, 1L, EquipmentSlotType.ARMOR, 2L));
         ItemTemplatePort itemTemplatePort = fakeItemTemplatePort(itemTemplateId -> switch ((int) itemTemplateId) {
-            case 100 -> Optional.of(new ItemTemplate(100L, EquipmentSlotType.WEAPON, 20, 0, 0, 0, 1));
-            case 200 -> Optional.of(new ItemTemplate(200L, EquipmentSlotType.ARMOR, 0, 10, 0, 0, 1));
+            case 100 -> Optional.of(new ItemTemplate(100L, EquipmentSlotType.WEAPON, 1, 20, 0, 0, 0, 1));
+            case 200 -> Optional.of(new ItemTemplate(200L, EquipmentSlotType.ARMOR, 1, 0, 10, 0, 0, 1));
             default -> Optional.empty();
         });
         ComputeEquipmentBonusUseCase useCase =

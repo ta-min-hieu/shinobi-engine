@@ -927,9 +927,6 @@ class SecurityIntegrationTest {
             }
         };
         DropTablePort dropTablePort = dropTableCode -> List.<DropTableEntry>of();
-        AddItemUseCase addItemUseCase = new AddItemUseCase(inventoryPort, action -> action.accept(null));
-        GrantLootUseCase grantLootUseCase =
-                new GrantLootUseCase(dropTablePort, inventoryPort, action -> action.accept(null));
         ItemTemplatePort itemTemplatePort = new ItemTemplatePort() {
             @Override
             public Optional<ItemTemplate> findById(long itemTemplateId) {
@@ -941,6 +938,10 @@ class SecurityIntegrationTest {
                 return Optional.empty();
             }
         };
+        AddItemUseCase addItemUseCase =
+                new AddItemUseCase(inventoryPort, itemTemplatePort, action -> action.accept(null));
+        GrantLootUseCase grantLootUseCase =
+                new GrantLootUseCase(dropTablePort, inventoryPort, itemTemplatePort, action -> action.accept(null));
         EquipmentPort equipmentPort = new EquipmentPort() {
             @Override
             public Optional<Equipment> findByCharacter(long characterId) {

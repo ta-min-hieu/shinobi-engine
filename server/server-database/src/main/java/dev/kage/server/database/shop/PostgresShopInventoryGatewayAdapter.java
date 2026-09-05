@@ -6,6 +6,7 @@ import java.util.Optional;
 import javax.sql.DataSource;
 
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.inventory.InventoryStackMerge;
 import dev.kage.shop.domain.InventoryGatewayPort;
 import dev.kage.shop.domain.OwnedItem;
 import dev.kage.shop.domain.Transaction;
@@ -66,6 +67,12 @@ public final class PostgresShopInventoryGatewayAdapter implements InventoryGatew
     @Override
     public boolean grantItem(Transaction tx, long characterId, long itemTemplateId, int quantity) {
         Connection connection = ((JdbcTransaction) tx).connection();
+        // Gộp chồng TRƯỚC: mua thêm phi đao phải cộng vào chồng đang có, không ăn ô mới (và vì thế
+        // cũng không cần kiểm sức chứa). Xem InventoryStackMerge — mua hàng là 1 trong 3 đường cấp
+        // vật phẩm, sửa luật xếp chồng ở domain thôi là chưa đủ.
+        if (InventoryStackMerge.mergeIntoExistingStack(connection, characterId, itemTemplateId, quantity)) {
+            return true;
+        }
         int existingCount = JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId)
                 .orElse(0);
         if (existingCount >= DEFAULT_CAPACITY) {

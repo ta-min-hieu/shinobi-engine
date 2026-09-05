@@ -17,7 +17,7 @@ import dev.kage.server.database.JdbcOperations;
 public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
 
     private static final String FIND_BY_ID = """
-            SELECT id, equip_slot, bonus_atk, bonus_def, bonus_res, bonus_hp, required_level
+            SELECT id, equip_slot, max_stack, bonus_atk, bonus_def, bonus_res, bonus_hp, required_level
               FROM item_template WHERE id = ?
             """;
 
@@ -74,6 +74,7 @@ public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
         return new ItemTemplate(
                 rs.getLong("id"),
                 equipSlot == null ? null : EquipmentSlotType.valueOf(equipSlot),
+                rs.getInt("max_stack"),
                 rs.getInt("bonus_atk"),
                 rs.getInt("bonus_def"),
                 rs.getInt("bonus_res"),

@@ -191,12 +191,15 @@ class MvpLoopIntegrationTest {
         return new GrantLootUseCase(
                 new PostgresDropTableAdapter(dataSource),
                 new PostgresInventoryAdapter(dataSource),
+                new PostgresItemTemplateAdapter(dataSource),
                 new JdbcInventoryTransactionRunner(dataSource));
     }
 
     private static AddItemUseCase newAddItemUseCase() {
         return new AddItemUseCase(
-                new PostgresInventoryAdapter(dataSource), new JdbcInventoryTransactionRunner(dataSource));
+                new PostgresInventoryAdapter(dataSource),
+                new PostgresItemTemplateAdapter(dataSource),
+                new JdbcInventoryTransactionRunner(dataSource));
     }
 
     private static EquipItemUseCase newEquipItemUseCase() {

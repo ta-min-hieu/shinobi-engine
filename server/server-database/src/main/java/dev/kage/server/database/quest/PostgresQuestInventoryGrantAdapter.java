@@ -6,6 +6,7 @@ import java.util.Optional;
 import dev.kage.quest.domain.QuestInventoryGrantPort;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.inventory.InventoryStackMerge;
 
 /**
  * Hiện thực {@link QuestInventoryGrantPort} trên PostgreSQL — SQL riêng cho {@code inventory_item}
@@ -40,6 +41,10 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
                 connection, FIND_ITEM_TEMPLATE_ID_BY_CODE, rs -> rs.getLong("id"), itemTemplateCode);
         if (itemTemplateId.isEmpty()) {
             return false;
+        }
+        // Gộp chồng TRƯỚC — cùng lý do ở PostgresShopInventoryGatewayAdapter, xem InventoryStackMerge.
+        if (InventoryStackMerge.mergeIntoExistingStack(connection, characterId, itemTemplateId.get(), quantity)) {
+            return true;
         }
         int existingCount = JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId)
                 .orElse(0);

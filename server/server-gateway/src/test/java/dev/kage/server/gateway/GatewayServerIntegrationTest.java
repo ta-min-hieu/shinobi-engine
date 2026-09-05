@@ -385,10 +385,6 @@ class GatewayServerIntegrationTest {
             }
         };
         DropTablePort dropTablePort = dropTableCode -> List.<DropTableEntry>of();
-        AddItemUseCase addItemUseCase = new AddItemUseCase(inventoryPort, action -> action.accept(null));
-        GrantLootUseCase grantLootUseCase =
-                new GrantLootUseCase(dropTablePort, inventoryPort, action -> action.accept(null));
-        // Equip/unequip không dùng trong test này — fake tối thiểu để compile.
         ItemTemplatePort itemTemplatePort = new ItemTemplatePort() {
             @Override
             public Optional<ItemTemplate> findById(long itemTemplateId) {
@@ -400,6 +396,11 @@ class GatewayServerIntegrationTest {
                 return Optional.empty();
             }
         };
+        AddItemUseCase addItemUseCase =
+                new AddItemUseCase(inventoryPort, itemTemplatePort, action -> action.accept(null));
+        GrantLootUseCase grantLootUseCase =
+                new GrantLootUseCase(dropTablePort, inventoryPort, itemTemplatePort, action -> action.accept(null));
+        // Equip/unequip không dùng trong test này — fake tối thiểu để compile.
         EquipmentPort equipmentPort = new EquipmentPort() {
             @Override
             public Optional<Equipment> findByCharacter(long characterId) {

@@ -9,9 +9,12 @@ import org.junit.jupiter.api.Test;
 
 import dev.kage.inventory.domain.DropTableEntry;
 import dev.kage.inventory.domain.DropTablePort;
+import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.inventory.domain.ItemStack;
+import dev.kage.inventory.domain.ItemTemplate;
+import dev.kage.inventory.domain.ItemTemplatePort;
 import dev.kage.inventory.domain.Transaction;
 import dev.kage.inventory.domain.TransactionRunner;
 
@@ -52,6 +55,22 @@ class GrantLootUseCaseTest {
 
     private static final TransactionRunner DIRECT_TX = action -> action.accept(null);
 
+    /** {@link ItemTemplatePort} có 2 method ⇒ không phải functional interface, phải dựng tay. */
+    private static ItemTemplatePort templatePortWithMaxStack(int maxStack) {
+        return new ItemTemplatePort() {
+            @Override
+            public Optional<ItemTemplate> findById(long itemTemplateId) {
+                return Optional.of(new ItemTemplate(
+                        itemTemplateId, maxStack == 1 ? EquipmentSlotType.WEAPON : null, maxStack, 0, 0, 0, 0, 1));
+            }
+
+            @Override
+            public Optional<Long> findIdByCode(String code) {
+                return Optional.empty();
+            }
+        };
+    }
+
     @Test
     void shouldGrantItem_whenEntryAlwaysDrops() {
         // dropChancePercent=100 -> luôn rơi, tránh flaky theo random thật (LootRoller dùng
@@ -60,7 +79,8 @@ class GrantLootUseCaseTest {
         FakeDropTablePort dropTablePort = new FakeDropTablePort(entries);
         Inventory inventory = new Inventory(1L, 10, List.of());
         FakeInventoryPort inventoryPort = new FakeInventoryPort(inventory);
-        GrantLootUseCase useCase = new GrantLootUseCase(dropTablePort, inventoryPort, DIRECT_TX);
+        GrantLootUseCase useCase =
+                new GrantLootUseCase(dropTablePort, inventoryPort, templatePortWithMaxStack(1), DIRECT_TX);
 
         List<ItemStack> granted = useCase.execute(1L, "any_code");
 
@@ -75,7 +95,8 @@ class GrantLootUseCaseTest {
         FakeDropTablePort dropTablePort = new FakeDropTablePort(entries);
         Inventory inventory = new Inventory(1L, 10, List.of());
         FakeInventoryPort inventoryPort = new FakeInventoryPort(inventory);
-        GrantLootUseCase useCase = new GrantLootUseCase(dropTablePort, inventoryPort, DIRECT_TX);
+        GrantLootUseCase useCase =
+                new GrantLootUseCase(dropTablePort, inventoryPort, templatePortWithMaxStack(1), DIRECT_TX);
 
         List<ItemStack> granted = useCase.execute(1L, "any_code");
 
@@ -106,7 +127,8 @@ class GrantLootUseCaseTest {
                 return new Inventory(inv.characterId(), inv.capacity(), withRealId);
             }
         };
-        GrantLootUseCase useCase = new GrantLootUseCase(dropTablePort, inventoryPort, DIRECT_TX);
+        GrantLootUseCase useCase =
+                new GrantLootUseCase(dropTablePort, inventoryPort, templatePortWithMaxStack(1), DIRECT_TX);
 
         List<ItemStack> granted = useCase.execute(1L, "any_code");
 
@@ -124,7 +146,8 @@ class GrantLootUseCaseTest {
         FakeDropTablePort dropTablePort = new FakeDropTablePort(entries);
         Inventory inventory = new Inventory(1L, 1, List.of());
         FakeInventoryPort inventoryPort = new FakeInventoryPort(inventory);
-        GrantLootUseCase useCase = new GrantLootUseCase(dropTablePort, inventoryPort, DIRECT_TX);
+        GrantLootUseCase useCase =
+                new GrantLootUseCase(dropTablePort, inventoryPort, templatePortWithMaxStack(1), DIRECT_TX);
 
         List<ItemStack> granted = useCase.execute(1L, "any_code");
 

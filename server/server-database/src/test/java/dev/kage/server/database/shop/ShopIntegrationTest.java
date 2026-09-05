@@ -141,12 +141,20 @@ class ShopIntegrationTest {
     }
 
     /** Điền túi đồ tới đầy (DEFAULT_CAPACITY=20) — dùng để test nhánh {@code INVENTORY_FULL}. */
+    /**
+     * Làm ĐẦY túi bằng món KHÔNG xếp chồng.
+     *
+     * <p>Trước 2026-09-05 hàm này đổ 20 dòng {@code kunai x1} — chỉ "đầy" vì hồi đó không có gộp
+     * chồng. Nay mua thêm phi đao sẽ cộng vào một trong 20 dòng đó (1 + 1 ≤ 99) và mua THÀNH CÔNG,
+     * nên túi không còn đầy theo nghĩa mà hai test dưới cần. Trang bị ({@code max_stack = 1}) mới
+     * chiếm ô thật.
+     */
     private static void fillInventoryToCapacity(long characterId) {
         PostgresInventoryAdapter inventoryAdapter = new PostgresInventoryAdapter(dataSource);
         JdbcInventoryTransactionRunner inventoryTx = new JdbcInventoryTransactionRunner(dataSource);
         ArrayList<dev.kage.inventory.domain.ItemStack> stacks = new ArrayList<dev.kage.inventory.domain.ItemStack>();
         for (int i = 0; i < 20; i++) {
-            stacks.add(dev.kage.inventory.domain.ItemStack.newItem(kunaiTemplateId, 1, 0));
+            stacks.add(dev.kage.inventory.domain.ItemStack.newItem(woodenSwordTemplateId, 1, 0));
         }
         dev.kage.inventory.domain.Inventory inventory =
                 new dev.kage.inventory.domain.Inventory(characterId, 20, List.copyOf(stacks));
