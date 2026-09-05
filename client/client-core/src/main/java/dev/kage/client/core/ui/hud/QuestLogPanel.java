@@ -67,8 +67,22 @@ public final class QuestLogPanel implements HudWindow {
 
     private static final float ROW_PAD_PX = 4f;
 
-    /** Bề rộng CỐ ĐỊNH cho nút Lĩnh thưởng trên từng dòng — nhãn dài ngắn khác nhau không làm cột nhảy. */
-    private static final float ROW_BUTTON_WIDTH_PX = 96f;
+    /**
+     * Bề rộng TỐI THIỂU của nút trên từng dòng — cột không nhảy khi nhãn ngắn, nhưng nhãn dài thì
+     * nút nở ra theo.
+     *
+     * <p>⚠️ Trước 2026-09-05 đây là bề rộng CỐ ĐỊNH ({@code .width(...)}). Playtest chụp được hậu
+     * quả: nhãn tiếng Việt "Nhận thưởng" cần ~125px nên **chữ tràn ra NGOÀI nền nút ở cả hai phía**
+     * — nút vẽ 96px, chữ thò ra hai bên, trông như lỗi vẽ. Nhãn tiếng Anh ("Claim reward") và
+     * "Làm mới" thì vừa, nên chỉ nhìn một ngôn ngữ/một nút là không thấy.
+     *
+     * <p>Bài học chung cho mọi panel: bề rộng CỐ ĐỊNH tính theo mắt trên MỘT chuỗi là bẫy — chuỗi
+     * dịch sang ngôn ngữ khác dài ngắn tuỳ ý. Dùng tối thiểu + để nút tự đo.
+     */
+    private static final float ROW_BUTTON_MIN_WIDTH_PX = 96f;
+
+    /** Đệm trái/phải trong lòng nút — nền nút ({@code KageSkin.buttonStyle.up}) không tự có padding. */
+    private static final float BUTTON_TEXT_PAD_PX = 14f;
 
     /** Bề rộng cột chữ của một dòng nhiệm vụ — chừa đúng chỗ cho nút bên phải. */
     private static final float ROW_TEXT_WIDTH_PX = 340f;
@@ -159,12 +173,13 @@ public final class QuestLogPanel implements HudWindow {
         Label hint = new Label(text("questlog.hint.close"), skin.labelStyle);
         hint.setColor(SECTION_COLOR);
         row.add(hint).left().expandX().padRight(6f);
-        row.add(actionButton("questlog.action.refresh", () -> fire(onOpened))).width(ROW_BUTTON_WIDTH_PX);
+        row.add(actionButton("questlog.action.refresh", () -> fire(onOpened))).minWidth(ROW_BUTTON_MIN_WIDTH_PX);
         return row;
     }
 
     private TextButton actionButton(String labelKey, Runnable action) {
         TextButton button = new TextButton(text(labelKey), skin.buttonStyle);
+        button.padLeft(BUTTON_TEXT_PAD_PX).padRight(BUTTON_TEXT_PAD_PX);
         button.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
@@ -288,10 +303,10 @@ public final class QuestLogPanel implements HudWindow {
         if (row.claimable()) {
             questList
                     .add(actionButton("questlog.action.claim", () -> emit(row.questCode())))
-                    .width(ROW_BUTTON_WIDTH_PX)
+                    .minWidth(ROW_BUTTON_MIN_WIDTH_PX)
                     .padBottom(ROW_PAD_PX);
         } else {
-            questList.add().width(ROW_BUTTON_WIDTH_PX).padBottom(ROW_PAD_PX);
+            questList.add().minWidth(ROW_BUTTON_MIN_WIDTH_PX).padBottom(ROW_PAD_PX);
         }
         questList.row();
     }
