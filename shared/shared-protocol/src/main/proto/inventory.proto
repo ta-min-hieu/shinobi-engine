@@ -43,6 +43,21 @@ message EquipItemCommand {
 message EquipItemResponse {
   bool success = 1;
   string error_key = 2; // rỗng nếu success=true (NETWORK.md §107)
+  // ADR-043 — máu của CHÍNH mình sau khi đổi trang bị. Field THÊM, field cũ giữ nguyên,
+  // `protocolVersion` KHÔNG tăng (luật additive NETWORK.md §6) — cùng tiền lệ ADR-036/041.
+  //
+  // Vì sao cần: `bonus_hp` nâng MÁU TỐI ĐA thật (ADR-036), server cập nhật `HealthComponent.max`
+  // ngay trong tick mặc/gỡ đồ — nhưng trước field này KHÔNG gói nào chở con số mới về client,
+  // nên thanh máu kẹt ở giá trị lúc VÀO WORLD cho tới lần hồi sinh ĐẦU TIÊN. Playtest
+  // 2026-09-05: mặc trọn bộ `novice_*` (+18 máu) mà HUD vẫn `100 / 100`.
+  //
+  // Máu HIỆN TẠI đi kèm vì nó cũng đổi: server DỊCH máu hiện tại theo độ chênh của máu tối đa
+  // (mặc đồ +HP không phải nút hồi máu, gỡ đồ không được giết người chơi).
+  //
+  // Chỉ có nghĩa khi thao tác THÀNH CÔNG; thất bại thì cả hai bằng 0 và client phải bỏ qua
+  // (`max_hp <= 0` ⇒ giữ nguyên giá trị đang có, không đoán — cùng khuôn server cũ chưa gửi field).
+  int32 current_hp = 3;
+  int32 max_hp = 4;
 }
 
 // Command: Client -> Server (OPCODE_UNEQUIP_ITEM_COMMAND). Gỡ trang bị khỏi slot — item vẫn còn
@@ -55,6 +70,21 @@ message UnequipItemCommand {
 message UnequipItemResponse {
   bool success = 1;
   string error_key = 2;
+  // ADR-043 — máu của CHÍNH mình sau khi đổi trang bị. Field THÊM, field cũ giữ nguyên,
+  // `protocolVersion` KHÔNG tăng (luật additive NETWORK.md §6) — cùng tiền lệ ADR-036/041.
+  //
+  // Vì sao cần: `bonus_hp` nâng MÁU TỐI ĐA thật (ADR-036), server cập nhật `HealthComponent.max`
+  // ngay trong tick mặc/gỡ đồ — nhưng trước field này KHÔNG gói nào chở con số mới về client,
+  // nên thanh máu kẹt ở giá trị lúc VÀO WORLD cho tới lần hồi sinh ĐẦU TIÊN. Playtest
+  // 2026-09-05: mặc trọn bộ `novice_*` (+18 máu) mà HUD vẫn `100 / 100`.
+  //
+  // Máu HIỆN TẠI đi kèm vì nó cũng đổi: server DỊCH máu hiện tại theo độ chênh của máu tối đa
+  // (mặc đồ +HP không phải nút hồi máu, gỡ đồ không được giết người chơi).
+  //
+  // Chỉ có nghĩa khi thao tác THÀNH CÔNG; thất bại thì cả hai bằng 0 và client phải bỏ qua
+  // (`max_hp <= 0` ⇒ giữ nguyên giá trị đang có, không đoán — cùng khuôn server cũ chưa gửi field).
+  int32 current_hp = 3;
+  int32 max_hp = 4;
 }
 
 // Cường hoá (GAMEPLAY.md §7.1, Phase 5 lát cắt 5) có NHIỀU hơn 2 kết quả có ý nghĩa khác nhau với
@@ -90,6 +120,21 @@ message EnhanceItemCommand {
 // Response: Server -> Client (OPCODE_ENHANCE_ITEM_RESPONSE).
 message EnhanceItemResponse {
   EnhanceOutcome outcome = 1;
+  // ADR-043 — máu của CHÍNH mình sau khi đổi trang bị. Field THÊM, field cũ giữ nguyên,
+  // `protocolVersion` KHÔNG tăng (luật additive NETWORK.md §6) — cùng tiền lệ ADR-036/041.
+  //
+  // Vì sao cần: `bonus_hp` nâng MÁU TỐI ĐA thật (ADR-036), server cập nhật `HealthComponent.max`
+  // ngay trong tick mặc/gỡ đồ — nhưng trước field này KHÔNG gói nào chở con số mới về client,
+  // nên thanh máu kẹt ở giá trị lúc VÀO WORLD cho tới lần hồi sinh ĐẦU TIÊN. Playtest
+  // 2026-09-05: mặc trọn bộ `novice_*` (+18 máu) mà HUD vẫn `100 / 100`.
+  //
+  // Máu HIỆN TẠI đi kèm vì nó cũng đổi: server DỊCH máu hiện tại theo độ chênh của máu tối đa
+  // (mặc đồ +HP không phải nút hồi máu, gỡ đồ không được giết người chơi).
+  //
+  // Chỉ có nghĩa khi thao tác THÀNH CÔNG; thất bại thì cả hai bằng 0 và client phải bỏ qua
+  // (`max_hp <= 0` ⇒ giữ nguyên giá trị đang có, không đoán — cùng khuôn server cũ chưa gửi field).
+  int32 current_hp = 2;
+  int32 max_hp = 3;
 }
 
 // -----------------------------------------------------------------------------------------------

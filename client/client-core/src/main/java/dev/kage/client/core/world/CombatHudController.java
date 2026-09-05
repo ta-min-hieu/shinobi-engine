@@ -208,6 +208,20 @@ final class CombatHudController {
         playerHp = Math.clamp(currentHp, 0, maxHp);
     }
 
+    /**
+     * ADR-043 — máu tối đa mới sau khi mặc/gỡ/tôi luyện trang bị. Máu HIỆN TẠI không đi kèm: server
+     * dịch nó theo độ chênh nhưng gateway không đọc được (xem javadoc
+     * {@code GatewayChannelHandler#applyEquipmentBonusAndComputeMaxHp}), nên ở đây chỉ CẮT tử số cho
+     * khỏi vượt mẫu số mới — gỡ đồ +HP không được làm vạch máu tràn ra ngoài khung.
+     */
+    void onOwnMaxHpChanged(int maxHp) {
+        if (maxHp <= 0) {
+            return;
+        }
+        playerMaxHp = maxHp;
+        playerHp = Math.min(playerHp, maxHp);
+    }
+
     void onRespawn(int currentHp, int maxHp, int currentChi) {
         playerHp = currentHp;
         // ADR-036: máu tối đa phụ thuộc trang bị, nên LẤY của server thay vì đọc hằng số client.

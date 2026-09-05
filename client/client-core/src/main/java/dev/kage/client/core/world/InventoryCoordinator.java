@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.StringJoiner;
 import java.util.function.BooleanSupplier;
+import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
 import com.badlogic.gdx.utils.I18NBundle;
@@ -87,6 +88,14 @@ final class InventoryCoordinator implements WindowFlow {
 
     /** Có đang ở trong một phiên giao dịch không — quyết định có bày nút Giao dịch hay không. */
     private BooleanSupplier inTrade = () -> false;
+
+    /**
+     * MÁU TỐI ĐA mới sau khi đổi trang bị (ADR-043) — {@code WorldScreen} nối sang
+     * {@code CombatHudController}. Đi qua một consumer thay vì cầm thẳng HUD vì hàm dựng lớp này đã
+     * chạm trần 4 tham số của Checkstyle, và vì đúng khuôn {@link #onSellRequested}/
+     * {@link #onOfferRequested}: túi đồ báo ra một sự kiện, ai quan tâm thì tự đăng ký.
+     */
+    private IntConsumer onMaxHpChanged = maxHp -> {};
 
     /** Đệm dựng sẵn cho {@link InventoryPanel#setItems} — chỉ đổi khi server vừa trả lời. */
     private final List<InventoryPanel.ItemRow> itemRows = new ArrayList<>();
@@ -187,6 +196,7 @@ final class InventoryCoordinator implements WindowFlow {
      * javadoc {@link InventoryController}.
      */
     private void onEquipSettled(EquipItemResponse response) {
+        publishMaxHp(response.getMaxHp());
         settle(
                 response.getSuccess()
                         ? "inventory.notice.equipped"
@@ -195,11 +205,31 @@ final class InventoryCoordinator implements WindowFlow {
     }
 
     private void onUnequipSettled(UnequipItemResponse response) {
+        publishMaxHp(response.getMaxHp());
         settle(
                 response.getSuccess()
                         ? "inventory.notice.unequipped"
                         : InventoryController.errorMessageKey(response.getErrorKey())
                                 .orElse("inventory.error.unknown"));
+    }
+
+    /**
+     * ADR-043 — máu tối đa phụ thuộc trang bị từ ADR-036, nên mọi lần mặc/gỡ/tôi luyện thành công
+     * đều đổi nó. Trước gói này, vạch máu kẹt ở con số lúc VÀO WORLD cho tới lần hồi sinh đầu tiên:
+     * mặc trọn bộ +18 máu mà HUD vẫn ghi {@code 100 / 100} (playtest 2026-09-05).
+     *
+     * <p>{@code maxHp <= 0} = server không gửi (thao tác thất bại, hoặc server cũ) ⇒ giữ nguyên,
+     * không đoán — cùng khuôn {@code CombatHudController.onEnterWorld}/{@code onRespawn}.
+     */
+    private void publishMaxHp(int maxHp) {
+        if (maxHp > 0) {
+            onMaxHpChanged.accept(maxHp);
+        }
+    }
+
+    /** {@code WorldScreen} nối vào {@code CombatHudController} — xem {@link #publishMaxHp}. */
+    void setOnMaxHpChanged(IntConsumer listener) {
+        this.onMaxHpChanged = listener;
     }
 
     /**
@@ -264,6 +294,7 @@ final class InventoryCoordinator implements WindowFlow {
      * nó — client không tự trừ theo bảng chi phí nó không có.
      */
     private void onEnhanceSettled(EnhanceItemResponse response) {
+        publishMaxHp(response.getMaxHp());
         controller.onEnhanceSettled();
         settle(InventoryController.enhanceMessageKey(response.getOutcome()).orElse("inventory.error.unknown"));
     }

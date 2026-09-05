@@ -1609,6 +1609,9 @@ class GatewayServerIntegrationTest {
                     readUntilOpcode(in, Opcode.OPCODE_EQUIP_ITEM_RESPONSE_VALUE).payload());
             assertThat(response.getSuccess()).isFalse();
             assertThat(response.getErrorKey()).isEqualTo("error.item_not_found");
+            // ADR-043 D4 — thao tác THẤT BẠI thì KHÔNG gửi máu: 0 nghĩa là "giữ nguyên số của bạn",
+            // client không được lấy 0 làm mẫu số vạch máu.
+            assertThat(response.getMaxHp()).isZero();
         }
     }
 
@@ -1631,6 +1634,7 @@ class GatewayServerIntegrationTest {
                             .payload());
             assertThat(response.getSuccess()).isFalse(); // slot rỗng — không có gì để gỡ
             assertThat(response.getErrorKey()).isEqualTo("error.slot_not_equipped");
+            assertThat(response.getMaxHp()).isZero(); // ADR-043 D4 — thất bại thì không gửi máu
         }
     }
 

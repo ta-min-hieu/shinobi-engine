@@ -677,6 +677,37 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     /**
+     * Chỉ có HAI kết quả tôi luyện thực sự đổi {@code enhance_level} — và do đó đổi chỉ số: thành
+     * công (lên 1 cấp) và thất bại-rớt-cấp (xuống 1 cấp). Sáu kết quả còn lại để nguyên món đồ.
+     */
+    private static boolean enhanceChangedStats(InventoryFacade.EnhanceResult result) {
+        return result == InventoryFacade.EnhanceResult.SUCCESS
+                || result == InventoryFacade.EnhanceResult.FAILED_DROPPED;
+    }
+
+    /**
+     * Tính lại chỉ số trang bị cho world VÀ trả về MÁU TỐI ĐA mới để gửi cho client (ADR-043).
+     *
+     * <p><b>Vì sao KHÔNG đọc thẳng entity</b>: {@link WorldFacade#applyEquipmentBonus} đẩy lệnh vào
+     * hàng đợi của vòng tick, nên ngay sau lời gọi này {@code HealthComponent} vẫn còn số CŨ. Hỏi
+     * CÔNG THỨC ({@link WorldFacade#characterMaxHp}) thay vì hỏi entity — đúng cách
+     * {@code enterWorldResponse} đã làm, và công thức đó chỉ có MỘT bản (ADR-043 D5, phương án (a)
+     * chủ dự án chọn).
+     *
+     * <p>⚠️ <b>Giới hạn có ý thức của phương án (a)</b>: máu HIỆN TẠI thì gateway KHÔNG biết — nó
+     * nằm trong {@code HealthComponent} của luồng tick và world không có đường đọc đồng bộ nào. Nên
+     * {@code current_hp} bỏ trống (0 = "giữ nguyên số của bạn"). Hệ quả còn lại: server dịch máu
+     * hiện tại theo độ chênh của máu tối đa, nên trong chốc lát client hiển thị TỬ SỐ cũ (vd
+     * {@code 100 / 118}) cho tới gói mang HP tiếp theo. MẪU SỐ — thứ sai trước ADR-043 — nay đúng
+     * ngay. Muốn đúng cả tử số thì phải làm phương án (b) của D5 (đợi tick).
+     */
+    private int applyEquipmentBonusAndComputeMaxHp(long characterId) {
+        EquipmentBonusSnapshot bonus = currentEquipmentBonus(characterId);
+        currentWorldFacade(characterId).applyEquipmentBonus(characterId, bonus);
+        return WorldFacade.characterMaxHp(bonus);
+    }
+
+    /**
      * Cầu nối {@code feature-inventory} → {@code server-world} cho chỉ số trang bị (ADR-036 D2).
      * server-world KHÔNG biết feature nào tồn tại (Điều 23), nên bản dịch {@code EquipmentBonus} →
      * {@link EquipmentBonusSnapshot} phải nằm ở gateway — đúng chỗ đã dịch mọi thứ khác giữa 2 bên.
@@ -896,14 +927,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 characterFacade.findById(characterId).map(Character::level).orElse(0);
         InventoryFacade.EquipResult result =
                 inventoryFacade.equipItem(characterId, command.getItemId(), slot, characterLevel);
+        int maxHp = 0;
         if (result == InventoryFacade.EquipResult.OK) {
             // GAMEPLAY.md §2 — mặc đồ xong phải tính lại chỉ số dẫn xuất NGAY, không đợi lần
             // attach kế tiếp (server-world không tự biết trang bị vừa đổi).
-            currentWorldFacade(characterId).applyEquipmentBonus(characterId, currentEquipmentBonus(characterId));
+            maxHp = applyEquipmentBonusAndComputeMaxHp(characterId);
         }
         EquipItemResponse response = EquipItemResponse.newBuilder()
                 .setSuccess(result == InventoryFacade.EquipResult.OK)
                 .setErrorKey(toErrorKey(result))
+                .setMaxHp(maxHp)
                 .build();
         send(ctx, Opcode.OPCODE_EQUIP_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
@@ -929,12 +962,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             return;
         }
         InventoryFacade.UnequipResult result = inventoryFacade.unequipItem(characterId, slot);
+        int maxHp = 0;
         if (result == InventoryFacade.UnequipResult.OK) {
-            currentWorldFacade(characterId).applyEquipmentBonus(characterId, currentEquipmentBonus(characterId));
+            maxHp = applyEquipmentBonusAndComputeMaxHp(characterId);
         }
         UnequipItemResponse response = UnequipItemResponse.newBuilder()
                 .setSuccess(result == InventoryFacade.UnequipResult.OK)
                 .setErrorKey(result == InventoryFacade.UnequipResult.OK ? "" : "error.slot_not_equipped")
+                .setMaxHp(maxHp)
                 .build();
         send(ctx, Opcode.OPCODE_UNEQUIP_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
@@ -976,8 +1011,15 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     request.command().getIdempotencyKey());
             networkMetrics.recordEnhanceResult(result.name());
             span.setAttribute("result", result.name());
+            // ADR-043 — tôi luyện ĐỔI `enhance_level`, mà ADR-036 D2/D3 nhân hệ số cường hoá thẳng
+            // vào `bonus_hp`/`bonus_atk`. Trước 2026-09-05 nhánh này KHÔNG HỀ gọi
+            // `applyEquipmentBonus`, nên tôi luyện một món ĐANG MẶC không đổi chỉ số thật cho tới
+            // lần đăng nhập sau — sai ở CHÍNH SERVER, không chỉ ở hiển thị. Cùng luật GAMEPLAY.md
+            // §2 mà mặc/gỡ đồ đã tuân từ ADR-036.
+            int maxHp = enhanceChangedStats(result) ? applyEquipmentBonusAndComputeMaxHp(request.characterId()) : 0;
             EnhanceItemResponse response = EnhanceItemResponse.newBuilder()
                     .setOutcome(toProtoOutcome(result))
+                    .setMaxHp(maxHp)
                     .build();
             send(ctx, Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE, request.sequenceId(), response.toByteArray());
         } finally {

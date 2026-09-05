@@ -350,4 +350,48 @@ class CombatHudControllerTest {
         assertThat(controller.playerMaxHp()).isEqualTo(CombatConstants.CHARACTER_MAX_HP);
         assertThat(controller.playerHp()).isEqualTo(CombatConstants.CHARACTER_MAX_HP);
     }
+
+    /**
+     * ADR-043 — nửa SAU của bug ADR-036. Mặc đồ giữa world đổi máu tối đa thật ở server ngay lập
+     * tức, nhưng trước ADR-043 không gói nào chở con số đó về, nên vạch máu kẹt ở giá trị lúc VÀO
+     * WORLD cho tới lần hồi sinh đầu tiên: playtest 2026-09-05 mặc trọn bộ +18 máu mà HUD vẫn ghi
+     * "100 / 100".
+     */
+    @Test
+    void shouldTakeNewMaxHp_whenEquipmentChangesMidWorld() {
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+        controller.onEnterWorld(100, 100);
+
+        controller.onOwnMaxHpChanged(118);
+
+        assertThat(controller.playerMaxHp()).isEqualTo(118);
+        // Tử số KHÔNG tự nhảy theo: server dịch nó theo độ chênh nhưng gateway không đọc được máu
+        // hiện tại (ADR-043 D5 phương án (a)) — client giữ số của mình tới gói mang HP tiếp theo.
+        assertThat(controller.playerHp()).isEqualTo(100);
+    }
+
+    @Test
+    void shouldClampCurrentHp_whenUnequippingShrinksMaxHp() {
+        // Gỡ đồ +HP: mẫu số tụt xuống dưới tử số đang có ⇒ vạch máu sẽ TRÀN ra ngoài khung nếu
+        // không cắt. Cùng họ lỗi hiển thị "139 / 100" mà ADR-036 đã gặp một lần.
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+        controller.onEnterWorld(118, 118);
+
+        controller.onOwnMaxHpChanged(100);
+
+        assertThat(controller.playerMaxHp()).isEqualTo(100);
+        assertThat(controller.playerHp()).isEqualTo(100);
+    }
+
+    @Test
+    void shouldIgnoreMaxHpChange_whenServerSendsZero() {
+        // 0 = thao tác THẤT BẠI (hoặc server cũ chưa có field) — giữ nguyên, không chia cho 0.
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+        controller.onEnterWorld(118, 118);
+
+        controller.onOwnMaxHpChanged(0);
+
+        assertThat(controller.playerMaxHp()).isEqualTo(118);
+        assertThat(controller.playerHp()).isEqualTo(118);
+    }
 }

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | 🟡 **Proposed** — chờ chủ dự án duyệt (AI không tự Accept, CLAUDE.md §1). |
+| Status | ✅ **Accepted** (2026-09-05) — chủ dự án duyệt, **chọn cách (a)** ở D5 (tính lại bằng `WorldFacade.characterMaxHp`, không chờ tick). |
 | Date | 2026-09-05 |
 | Deciders | Chủ dự án quyết; AI soạn |
 | Related | [ADR-036](ADR-036-Equipment-Stat-Bonuses.md) (nguồn của `bonus_hp`) · [ADR-041](ADR-041-Spawn-Position-In-Enter-World.md) (cùng hình dạng: field additive vá một khoảng trống đồng bộ) · [NETWORK.md §6](../../05-server/NETWORK.md) (luật additive) |
@@ -49,7 +49,7 @@ biết lúc nào đủ sức đánh con quái đang giết mình — chính tìn
 
 ---
 
-## Decision (ĐỀ XUẤT — chưa thi hành)
+## Decision
 
 **D1.** Thêm field **additive** vào ba message đã có, KHÔNG thêm opcode mới:
 
@@ -71,7 +71,7 @@ thất bại thì cả hai bằng 0.
 **D5.** ⚠️ **VẤN ĐỀ THẬT PHẢI GIẢI TRONG LÚC THI HÀNH**: `applyEquipmentBonus` **đẩy lệnh vào
 `inbox`** của vòng tick, nên lúc gateway dựng response thì `HealthComponent` **CHƯA được cập nhật**.
 Đọc thẳng entity ngay sau khi gọi sẽ trả về số CŨ — tức vá xong vẫn sai, chỉ sai tinh vi hơn. Hai
-hướng, chọn luôn lúc duyệt:
+hướng — **chủ dự án chọn (a)**:
 
 - **(a)** Tính lại bằng `WorldFacade.characterMaxHp(bonus)` — hàm `static`, là **nguồn chân lý duy
   nhất** của công thức này và gateway ĐÃ dùng đúng nó cho `SelectCharacterResponse`. Rẻ, không phải
@@ -132,6 +132,7 @@ Không.
 
 ## Việc cần làm tiếp theo
 
-1. **Chủ dự án duyệt/từ chối**, và chọn (a) hay (b) ở D5.
-2. Nếu duyệt: thêm field → 3 handler gateway → client → **playtest sống** (mặc đồ giữa world, thanh
-   máu phải đổi ngay, không cần chết).
+1. ✅ **Chủ dự án duyệt 2026-09-05, chọn cách (a).**
+2. ✅ **ĐÃ THI HÀNH cùng ngày**: 6 field additive → 3 handler gateway → `InventoryCoordinator`
+   → `CombatHudController`.
+3. ✅ **ĐÃ PLAYTEST SỐNG**: mặc/gỡ đồ giữa world, thanh máu đổi **ngay**, không cần chết.

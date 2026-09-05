@@ -440,6 +440,10 @@ public final class WorldScreen implements GameScreen {
         inventory.setOnSellRequested(shop::sellOne);
         // Cùng khuôn nút Bán: món đồ nằm ở túi đồ, còn phiên giao dịch nằm ở luồng giao dịch.
         inventory.setOnOfferRequested(trade::offerItem, trade::inTrade);
+        // ADR-043 — mặc/gỡ/tôi luyện đổi MÁU TỐI ĐA (ADR-036), và túi đồ là nơi nhận được con
+        // số mới trước tiên. Thiếu dòng này thì vạch máu kẹt ở giá trị lúc VÀO WORLD cho tới lần
+        // hồi sinh đầu tiên — playtest 2026-09-05 thấy `100 / 100` dù đã mặc trọn bộ +18 máu.
+        inventory.setOnMaxHpChanged(combatHudController::onOwnMaxHpChanged);
         // Cổng của khung chọn hệ có THÊM một vế so với các khung khác — xem
         // FactionCoordinator#setOpenGate (chỉ bày lối vào cho nhân vật còn được mời chọn).
         faction.setOpenGate(panels::noneOpen);
