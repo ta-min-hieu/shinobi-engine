@@ -430,6 +430,68 @@ class GatewayPipelineTest {
         assertThat(response.getQuests(1).getStatus()).isEqualTo(dev.kage.protocol.QuestStatus.QUEST_STATUS_CLAIMED);
     }
 
+    /**
+     * EXP thưởng quest đi thẳng vào {@code character.exp} qua {@code PostgresQuestExpAdapter},
+     * KHÔNG qua {@code GrantExperienceUseCase} — nên nếu gateway không tự đẩy lại trạng thái EXP
+     * sau khi nhận thưởng thì vạch trên HUD đứng im tới lần đăng nhập sau.
+     *
+     * <p>Playtest 2026-09-05 gặp đúng thế: nhận 500 EXP mà HUD vẫn 20/200. Test này khoá lại bản
+     * sửa — xoá lời gọi đẩy EXP trong {@code handleClaimQuestRewardBlocking} là test đỏ.
+     */
+    @Test
+    void shouldPushExperienceState_afterClaimingQuestReward() throws InvalidProtocolBufferException {
+        EmbeddedChannel channel = newPipeline(new FakeCharacterPort(), fakeInventoryFacade(), claimableQuestFacade());
+        connect(channel, "questclaim1");
+        // selectCharacter dùng readOutboundFrame (bỏ phần sau) nên hàng đợi outbound sạch sau đây.
+        selectCharacter(channel, createCharacter(channel, "ClaimHero", 2), 3);
+
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_CLAIM_QUEST_REWARD_COMMAND_VALUE, ProtocolVersion.CURRENT, 4),
+                dev.kage.protocol.ClaimQuestRewardCommand.newBuilder()
+                        .setQuestCode(CLAIMABLE_QUEST_CODE)
+                        .setIdempotencyKey(UUID.randomUUID().toString())
+                        .build()
+                        .toByteArray());
+
+        List<PacketCodec.Frame> frames = readOutboundFrames(channel);
+        assertThat(frames)
+                .as("phải có CẢ phản hồi lẫn sự kiện EXP")
+                .extracting(frame -> frame.header().opcode())
+                .contains(
+                        Opcode.OPCODE_CLAIM_QUEST_REWARD_RESPONSE_VALUE, Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE);
+
+        PacketCodec.Frame response = frames.stream()
+                .filter(frame -> frame.header().opcode() == Opcode.OPCODE_CLAIM_QUEST_REWARD_RESPONSE_VALUE)
+                .findFirst()
+                .orElseThrow();
+        assertThat(dev.kage.protocol.ClaimQuestRewardResponse.parseFrom(response.payload())
+                        .getOutcome())
+                .isEqualTo(dev.kage.protocol.ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_OK);
+    }
+
+    @Test
+    void shouldNotPushExperienceState_whenClaimIsRejected() throws InvalidProtocolBufferException {
+        // fakeQuestFacade() có templatePort rỗng ⇒ QUEST_NOT_FOUND: không được đẩy EXP cho một lần
+        // nhận thưởng THẤT BẠI, nếu không client sẽ thấy vạch nhấp nháy vô cớ.
+        EmbeddedChannel channel = newPipeline(new FakeCharacterPort(), fakeInventoryFacade(), fakeQuestFacade());
+        connect(channel, "questclaim2");
+        selectCharacter(channel, createCharacter(channel, "NoClaimHero", 2), 3);
+
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_CLAIM_QUEST_REWARD_COMMAND_VALUE, ProtocolVersion.CURRENT, 4),
+                dev.kage.protocol.ClaimQuestRewardCommand.newBuilder()
+                        .setQuestCode("khong_ton_tai")
+                        .setIdempotencyKey(UUID.randomUUID().toString())
+                        .build()
+                        .toByteArray());
+
+        assertThat(readOutboundFrames(channel))
+                .extracting(frame -> frame.header().opcode())
+                .containsExactly(Opcode.OPCODE_CLAIM_QUEST_REWARD_RESPONSE_VALUE);
+    }
+
     @Test
     void shouldRejectListQuests_whenNoCharacterBoundToSession() {
         EmbeddedChannel channel = newPipeline();
@@ -688,6 +750,47 @@ class GatewayPipelineTest {
     }
 
     // Quest không dùng trong test này — fake tối thiểu để compile (cùng convention fakeDialogueFacade).
+    /** Mã quest dùng cho test nhận thưởng — script thật nằm ở resources của feature-quest. */
+    private static final String CLAIMABLE_QUEST_CODE = "kill_training_dummies";
+
+    /**
+     * Quest facade mà {@code claimReward} THÀNH CÔNG: có template trỏ vào script thật và một tiến
+     * độ đã COMPLETED. Khác {@link #fakeQuestFacade()} (templatePort rỗng ⇒ luôn QUEST_NOT_FOUND).
+     */
+    private static dev.kage.quest.api.QuestFacade claimableQuestFacade() {
+        long templateId = 1L;
+        dev.kage.quest.domain.QuestTemplate template =
+                new dev.kage.quest.domain.QuestTemplate(templateId, "/scripts/quest/kill_training_dummies.js");
+        dev.kage.quest.domain.QuestProgressPort progressPort = new dev.kage.quest.domain.QuestProgressPort() {
+            @Override
+            public Optional<dev.kage.quest.domain.QuestProgress> find(long characterId, long questTemplateId) {
+                return Optional.of(new dev.kage.quest.domain.QuestProgress(
+                        characterId, questTemplateId, dev.kage.quest.domain.QuestStatus.COMPLETED, "{\"killed\":3}"));
+            }
+
+            @Override
+            public void save(dev.kage.quest.domain.Transaction tx, dev.kage.quest.domain.QuestProgress progress) {}
+
+            @Override
+            public List<dev.kage.quest.domain.QuestLogEntry> listLog(long characterId) {
+                return List.of();
+            }
+        };
+        dev.kage.quest.domain.QuestTemplatePort templatePort =
+                questCode -> CLAIMABLE_QUEST_CODE.equals(questCode) ? Optional.of(template) : Optional.empty();
+        dev.kage.quest.application.QuestRewardPorts rewardPorts = new dev.kage.quest.application.QuestRewardPorts(
+                (tx, characterId, amount) -> {},
+                (tx, characterId, itemTemplateCode, quantity) -> true,
+                (tx, characterId, action, detailJson) -> {},
+                (t, idempotencyKey) -> {});
+        dev.kage.quest.domain.TransactionRunner tx = action -> action.accept(null);
+        return new dev.kage.quest.api.QuestFacade(
+                new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx),
+                new dev.kage.quest.application.ProcessMonsterKilledUseCase(progressPort, templatePort, tx),
+                new dev.kage.quest.application.ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx),
+                new dev.kage.quest.application.ListQuestsUseCase(progressPort));
+    }
+
     private static dev.kage.quest.api.QuestFacade fakeQuestFacade() {
         return fakeQuestFacade(List.of());
     }
