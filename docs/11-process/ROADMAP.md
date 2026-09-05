@@ -1857,3 +1857,52 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       "bị vật cản chặn". Đã vá `kage_ui.py` bằng `AttachThreadInput` + **thoát hẳn nếu không chiếm
       được focus**, thay vì báo thành công giả. Đây là lần thứ ba đường chụp/điều khiển ảnh
       đánh lừa phân tích đúng (xem mục 31, 35).
+
+53. **Ba lỗi PLAYTEST SỐNG bắt được ở mục 52 — sửa hết, hai cái phải qua ADR (2026-09-05)**:
+    - ✅ **Bảng theo dõi nhiệm vụ trống trơn sau mỗi lần đăng nhập lại.** `QuestTracker` giữ hai cách
+      đọc trên cùng một dữ liệu; ô "đang theo dõi" chỉ sống trong phiên, và `onQuestsListed` chỉ đồng
+      bộ nó khi nó **đã** trỏ tới một mã — tức sau relog thì không bao giờ. Dữ liệu KHÔNG thiếu
+      (nhật ký 611 về đủ), chỉ là không ai đọc nó sang. Nay nhận lại một quest từ nhật ký, **ưu tiên
+      quest HOÀN THÀNH** (đang chờ người chơi bấm Lĩnh thưởng) hơn quest đang làm. 3 test + kiểm
+      chứng sống.
+    - ✅ **Cuộn túi đồ chỉ ăn sau khi đã BẤM vào khung.** Bẫy libGDX: `Stage` gửi sự kiện lăn tới
+      `scrollFocus`, mà `ScrollPane` chỉ tự giành `scrollFocus` trong `touchDown` của chính nó. Túi
+      10 món, khung hiện 3, lăn chuột không nhúc nhích. Nay rê chuột vào là giành. Kèm một chỉnh
+      cấu hình đúng chỗ: Checkstyle `ParameterNumber` nay bỏ qua method `@Override` — chữ ký do thư
+      viện đặt, rule này nói về API MÌNH thiết kế.
+    - ✅ **[ADR-043](../01-architecture/adr/ADR-043-Push-Max-Hp-On-Equipment-Change.md) Accepted +
+      thi hành + kiểm chứng sống**: mặc đồ giữa world mà thanh máu không đổi cho tới khi chết một
+      lần. **Server KHÔNG sai** — `applyEquipmentBonus` cập nhật `HealthComponent.max` ngay trong
+      tick đó; khoảng trống nằm ở GIAO THỨC (không gói nào chở máu tối đa của chính mình ngoài lúc
+      vào world và lúc hồi sinh). Đây **đúng là nửa sau của bug ADR-036** từng sửa (`139 / 100`) —
+      lần đó chỉ vá thời điểm vào world. Thêm field additive vào 3 response, `protocolVersion` không
+      tăng. Gỡ áo: **118/118 → 110/110 ngay**, không cần chết.
+      - 🐛 **Lỗi SERVER bắt được trên đường**: nhánh tôi luyện **chưa bao giờ gọi
+        `applyEquipmentBonus`**, nên cường hoá một món ĐANG MẶC không đổi chỉ số thật cho tới lần
+        đăng nhập sau — sai ở chính server, không chỉ ở hiển thị. Đã sửa cùng lúc.
+      - ⚠️ **Giới hạn có ý thức của phương án (a)** chủ dự án chọn: gateway không đọc được máu HIỆN
+        TẠI (nó nằm trong luồng tick, world không có đường đọc đồng bộ), nên TỬ SỐ trễ một nhịp
+        (`110 / 118`) tới gói mang HP tiếp theo. Mẫu số — thứ sai trước đó — nay đúng ngay.
+    - 🔴 **Còn 1 lỗi CHƯA truy ra**: nhân vật bò ~0,3 m/s thay vì 5 m/s ở vài vị trí quanh khu bệ
+      nhảy demo (tái hiện được, hai lần). `TerrainCollisionSystem` đang no-op (obstacle rỗng),
+      `MovementSystem` không có va chạm entity ⇒ **chưa có giả thuyết nào được chứng minh**.
+
+54. **[ADR-044](../01-architecture/adr/ADR-044-Quest-Prerequisite-Enforcement.md) — thứ tự quest được
+    thi hành, bằng một cột không ai từng đọc (2026-09-05)**:
+    - `quest_template.prerequisite_quest_id` có từ **V11** (Phase 6) và suốt từ đó **không dữ liệu
+      nào dùng, không code nào đọc**. V28 là dòng đầu tiên dùng nó ⇒ nhu cầu thật đã tới. Trước bản
+      này, nhân vật cấp 1 mới tinh nhận được quest "trực đêm" mà chưa đập cái mộc nhân nào.
+    - Chủ dự án chốt hai điểm: mốc là **`CLAIMED`** (đánh xong mà chưa quay lại lĩnh thưởng thì chuỗi
+      kể chuyện chưa đóng), và **KHÔNG** giấu lựa chọn hội thoại — NPC vẫn hỏi, **server** từ chối
+      kèm lý do (Điều 15, và giữ `feature-dialogue` không phải biết gì về quest).
+    - Thi hành xuyên 6 tầng, **không migration**: `QuestTemplate` (`OptionalLong`) →
+      `AcceptQuestUseCase` → adapter → `ACCEPT_QUEST_OUTCOME_PREREQUISITE_NOT_MET = 4` (chỉ THÊM giá
+      trị enum, `protocolVersion` không tăng) → gateway → i18n vi/en.
+    - 🐛 **Bẫy JDBC sập ngay trong lần thi hành**: bản mapper đầu gọi `rs.wasNull()` **bên trong lời
+      gọi constructor**, tức SAU `getLong("id")` và `getString("script_ref")` — nên nó trả lời về
+      `script_ref` (không bao giờ NULL) và **mọi quest trông như có tiên quyết id = 0**, chặn sạch
+      cả quest mở màn. **8 test bắt ngay.** `wasNull()` nói về lần đọc cột GẦN NHẤT; chụp lấy NGAY.
+    - Test: khẳng định cũ **đã đảo đúng như nó tự hẹn** (`shouldStillAccept...NotEnforcedYet` →
+      `shouldRejectNightWatch_when...`), cộng 3 test mới. **1157 test xanh, 0 skip.**
+    - ✅ **Kiểm chứng sống**: nhân vật cấp 1 mới tạo hỏi Chu Hoành xin trực đêm → hiện đúng
+      **"Phải xong nhiệm vụ trước đã."**, và `character_quest_progress` **0 dòng**.
