@@ -1116,8 +1116,11 @@ class WorldFacadeTest {
         // tượng được. Nếu nó còn gây hấn thì đây là chỗ chắc chắn bắt được, kể cả khi nhánh "thụ
         // động" bị viết hớ thành phép so sánh `d <= 0`.
         RecordingSink passiveSink = new RecordingSink();
-        WorldFacade passiveWorld =
-                new WorldFacade(passiveSink, true, TickMetricsPort.NO_OP, TestMonsterCatalogs.passiveTrainingGround());
+        WorldFacade passiveWorld = new WorldFacade(
+                passiveSink,
+                true,
+                TickMetricsPort.NO_OP,
+                WorldContentCatalog.ofMonsters(TestMonsterCatalogs.passiveTrainingGround()));
         try {
             passiveWorld.start();
             passiveWorld.attachCharacter(1L, 8f, 0f, DEFAULT_STATS);
