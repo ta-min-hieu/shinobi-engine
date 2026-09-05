@@ -1,12 +1,11 @@
 package dev.kage.quest.application;
 
-import java.util.Optional;
+import java.util.ArrayList;
+import java.util.List;
 
 import dev.kage.quest.domain.QuestProgress;
 import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestStatus;
-import dev.kage.quest.domain.QuestTemplate;
-import dev.kage.quest.domain.QuestTemplatePort;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.quest.domain.TransactionRunner;
 
@@ -16,48 +15,61 @@ import dev.kage.quest.domain.TransactionRunner;
  * (engine-ecs) — EventBus tồn tại nhưng chưa dùng ở đâu (1 nguồn duy nhất, chưa tới ngưỡng đáng
  * kích hoạt pub-sub thật, xem feature-quest/CLAUDE.md).
  *
- * <p>⚠️ PLACEHOLDER (chỉ 1 quest ở lát cắt này) — kiểm tra ĐÚNG {@link #TRACKED_QUEST_CODE}, chưa
- * quét mọi quest IN_PROGRESS của nhân vật theo loại sự kiện (GAMEPLAY.md §9: "cần index quest theo
- * loại sự kiện, không quét tuyến tính" — đo/tổng quát hoá khi có quest thứ 2 thật).
+ * <p><b>Tổng quát hoá 2026-09-05.</b> Trước đây lớp này hardcode ĐÚNG MỘT mã quest
+ * ({@code kill_training_dummies}) — placeholder có chủ đích, và feature-quest/CLAUDE.md ra điều
+ * kiện rõ: <i>"khi có quest thứ 2 THEO DÕI GIẾT QUÁI, bắt buộc tổng quát hoá tra cứu này trước,
+ * không copy-paste thêm hằng số hardcode thứ 2"</i>. Quest thứ hai của arc 1 (STORY.md §6 —
+ * "đêm trực gặp tán tu cường đạo") chính là lúc đó, nên tổng quát hoá đi TRƯỚC nội dung.
+ *
+ * <p><b>Java KHÔNG biết quest nào quan tâm quái nào.</b> Mỗi quest đang làm được chạy hook
+ * {@code on_event} và chính script tự quyết sự kiện có liên quan không
+ * ({@code event.monster_code === "..."}). Đây là Điều 27: Java là cơ chế, Script là nội dung. Nếu
+ * Java lọc theo {@code monster_code} thì nội dung quest rò rỉ vào code, và thêm quest sẽ phải sửa
+ * Java — đúng thứ kiến trúc script sinh ra để tránh.
+ *
+ * <p>⚠️ Vẫn CHƯA phải "index quest theo loại sự kiện" (GAMEPLAY.md §9). Phạm vi quét nay bị chặn
+ * bởi số quest ĐANG LÀM của một người chơi thay vì một hằng số hardcode — xem
+ * {@link QuestProgressPort#listInProgress}.
  */
 public final class ProcessMonsterKilledUseCase {
 
-    private static final String TRACKED_QUEST_CODE = "kill_training_dummies";
     private static final String MONSTER_KILLED_EVENT_TYPE = "monster_killed";
 
     private final QuestProgressPort progressPort;
-    private final QuestTemplatePort templatePort;
     private final TransactionRunner tx;
     private final QuestScriptRunner scriptRunner = new QuestScriptRunner();
 
-    public ProcessMonsterKilledUseCase(
-            QuestProgressPort progressPort, QuestTemplatePort templatePort, TransactionRunner tx) {
+    public ProcessMonsterKilledUseCase(QuestProgressPort progressPort, TransactionRunner tx) {
         this.progressPort = progressPort;
-        this.templatePort = templatePort;
         this.tx = tx;
     }
 
-    /** {@code Optional.empty()} nếu nhân vật không có quest này IN_PROGRESS HOẶC chưa hoàn thành. */
-    public Optional<QuestStatusChange> execute(long characterId, String monsterCode) {
-        QuestTemplate template = templatePort.findByCode(TRACKED_QUEST_CODE).orElse(null);
-        if (template == null) {
-            return Optional.empty();
+    /**
+     * Chạy hook {@code on_event} của mọi quest đang làm cho một lần giết quái.
+     *
+     * @return những quest VỪA chuyển sang COMPLETED trong chính lần giết này — rỗng nếu không quest
+     *     nào đổi trạng thái. Danh sách chứ không phải {@code Optional}: một con quái có thể là mục
+     *     tiêu cuối của nhiều quest cùng lúc, và bỏ sót cái thứ hai nghĩa là người chơi không được
+     *     báo quest đã xong.
+     */
+    public List<QuestStatusChange> execute(long characterId, String monsterCode) {
+        List<QuestProgressPort.ActiveQuest> active = progressPort.listInProgress(characterId);
+        if (active.isEmpty()) {
+            return List.of();
         }
-        QuestProgress progress = progressPort.find(characterId, template.id()).orElse(null);
-        if (progress == null || progress.status() != QuestStatus.IN_PROGRESS) {
-            return Optional.empty();
+        ArrayList<QuestStatusChange> completed = new ArrayList<QuestStatusChange>();
+        for (QuestProgressPort.ActiveQuest quest : active) {
+            QuestScriptRunner.HookEffects effects = scriptRunner.runEvent(
+                    quest.scriptRef(), quest.progressJson(), MONSTER_KILLED_EVENT_TYPE, monsterCode);
+            QuestStatus newStatus = effects.completed() ? QuestStatus.COMPLETED : QuestStatus.IN_PROGRESS;
+            tx.inTransaction((Transaction t) -> progressPort.save(
+                    t, new QuestProgress(characterId, quest.questTemplateId(), newStatus, effects.progressJson())));
+            if (effects.completed()) {
+                // Chỉ báo khi HOÀN THÀNH — không push sự kiện cho mỗi lần tiến độ tăng.
+                completed.add(new QuestStatusChange(quest.questCode(), QuestStatus.COMPLETED));
+            }
         }
-
-        QuestScriptRunner.HookEffects effects = scriptRunner.runEvent(
-                template.scriptRef(), progress.progressJson(), MONSTER_KILLED_EVENT_TYPE, monsterCode);
-        QuestStatus newStatus = effects.completed() ? QuestStatus.COMPLETED : QuestStatus.IN_PROGRESS;
-        tx.inTransaction((Transaction t) ->
-                progressPort.save(t, new QuestProgress(characterId, template.id(), newStatus, effects.progressJson())));
-
-        if (!effects.completed()) {
-            return Optional.empty(); // KHÔNG push sự kiện cho mỗi lần tick tiến độ — chỉ khi hoàn thành.
-        }
-        return Optional.of(new QuestStatusChange(TRACKED_QUEST_CODE, QuestStatus.COMPLETED));
+        return List.copyOf(completed);
     }
 
     public record QuestStatusChange(String questCode, QuestStatus status) {}

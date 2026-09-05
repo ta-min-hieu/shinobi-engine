@@ -1,7 +1,6 @@
 package dev.kage.quest.api;
 
 import java.util.List;
-import java.util.Optional;
 
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
@@ -45,13 +44,16 @@ public final class QuestFacade {
 
     /**
      * Gọi TỪ {@code ConnectedCharacterRegistry.onMonsterKilled} (world tick thread, cạnh
-     * {@code InventoryFacade.grantLoot} đã có) — trả {@code Optional} có giá trị CHỈ khi quest VỪA
-     * chuyển sang COMPLETED (không push sự kiện cho mỗi lần tiến độ tăng).
+     * {@code InventoryFacade.grantLoot} đã có) — chỉ trả những quest VỪA chuyển sang COMPLETED
+     * (không push sự kiện cho mỗi lần tiến độ tăng).
+     *
+     * <p>Trả DANH SÁCH thay vì {@code Optional} từ 2026-09-05: một con quái có thể là mục tiêu cuối
+     * của nhiều quest cùng lúc kể từ khi có quest thứ hai theo dõi giết quái.
      */
-    public Optional<QuestStatusChange> onMonsterKilled(long characterId, String monsterCode) {
-        return processMonsterKilledUseCase
-                .execute(characterId, monsterCode)
-                .map(change -> new QuestStatusChange(change.questCode(), change.status()));
+    public List<QuestStatusChange> onMonsterKilled(long characterId, String monsterCode) {
+        return processMonsterKilledUseCase.execute(characterId, monsterCode).stream()
+                .map(change -> new QuestStatusChange(change.questCode(), change.status()))
+                .toList();
     }
 
     /** {@code idempotencyKey} (ADR-025) — client sinh UUID, giữ nguyên khi tự retry. */

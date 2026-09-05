@@ -330,7 +330,7 @@ public final class ServerDatabaseBootstrap {
         JdbcQuestTransactionRunner transactionRunner = new JdbcQuestTransactionRunner(dataSource);
         AcceptQuestUseCase acceptQuestUseCase = new AcceptQuestUseCase(progressPort, templatePort, transactionRunner);
         ProcessMonsterKilledUseCase processMonsterKilledUseCase =
-                new ProcessMonsterKilledUseCase(progressPort, templatePort, transactionRunner);
+                new ProcessMonsterKilledUseCase(progressPort, transactionRunner);
         QuestRewardPorts rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort, idempotencyPort);
         ClaimQuestRewardUseCase claimQuestRewardUseCase =
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, transactionRunner);

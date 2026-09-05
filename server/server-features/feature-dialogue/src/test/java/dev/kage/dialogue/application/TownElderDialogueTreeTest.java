@@ -67,9 +67,41 @@ class TownElderDialogueTreeTest {
         assertThat(aboutSect.textKey()).isEqualTo("dialogue.town_elder.about_town");
         assertThat(aboutSect.options())
                 .extracting(DialogueOption::action)
-                .containsExactly("about_realm", "about_elder", "end");
+                .containsExactly("about_realm", "about_elder", "night_watch", "end");
         assertThat(node("about_realm").textKey()).isEqualTo("dialogue.town_elder.about_realm");
         assertThat(node("about_elder").textKey()).isEqualTo("dialogue.town_elder.about_elder");
+    }
+
+    /**
+     * Cao trào arc 1 (STORY.md §6) — quest THỨ HAI của game, và là lý do
+     * {@code ProcessMonsterKilledUseCase} phải bỏ hardcode một-mã-quest.
+     *
+     * <p>Nhánh này mọc XUỐNG DƯỚI qua {@code about_town} chứ không chen vào {@code start}: bốn lựa
+     * chọn của {@code start} bị khoá bởi {@code option_index} (test ngay trên).
+     */
+    @Test
+    @DisplayName("Phiên trực đêm nhận được quest thứ hai, và nhận đúng mã night_watch_bandit")
+    void nightWatchBranchOffersTheSecondQuest() {
+        DialogueNode nightWatch = node("night_watch");
+
+        assertThat(nightWatch.textKey()).isEqualTo("dialogue.town_elder.night_watch");
+        assertThat(nightWatch.options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:night_watch_bandit", "about_town", "end");
+    }
+
+    /**
+     * STORY.md §8 quy tắc 2 — nhịp hé lộ: arc 1 chỉ GIEO MẦM. Chu Hoành không được nói vượt nhịp,
+     * kể cả úp mở. Test này gác cả cây, nên thêm nhánh mới mà lỡ miệng là đỏ ngay.
+     */
+    @Test
+    @DisplayName("Không node nào của arc 1 nhắc tới bí mật của arc sau")
+    void arcOneNeverMentionsLaterSecrets() {
+        for (DialogueNode visited : reachableNodes()) {
+            assertThat(visited.textKey())
+                    .as("node \"%s\" nhắc tới thứ thuộc arc sau", visited.nodeId())
+                    .doesNotContain("thien_mon", "huyet_sa", "dai_kiep", "ngoc_co");
+        }
     }
 
     @Test

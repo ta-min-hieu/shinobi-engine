@@ -42,6 +42,18 @@ public final class PostgresQuestProgressAdapter implements QuestProgressPort {
              ORDER BY t.code
             """;
 
+    /**
+     * Quest đang làm + script + tiến độ, lọc IN_PROGRESS ngay trong SQL (xem javadoc
+     * {@code QuestProgressPort.listInProgress}).
+     */
+    private static final String LIST_IN_PROGRESS = """
+            SELECT p.quest_template_id, t.code AS quest_code, t.script_ref, p.progress_json
+              FROM character_quest_progress p
+              JOIN quest_template t ON t.id = p.quest_template_id
+             WHERE p.character_id = ? AND p.status = 'IN_PROGRESS'
+             ORDER BY p.quest_template_id
+            """;
+
     private final DataSource dataSource;
 
     public PostgresQuestProgressAdapter(DataSource dataSource) {
@@ -68,6 +80,19 @@ public final class PostgresQuestProgressAdapter implements QuestProgressPort {
                 dataSource,
                 LIST_LOG,
                 rs -> new QuestLogEntry(rs.getString("quest_code"), QuestStatus.valueOf(rs.getString("status"))),
+                characterId);
+    }
+
+    @Override
+    public List<QuestProgressPort.ActiveQuest> listInProgress(long characterId) {
+        return JdbcOperations.query(
+                dataSource,
+                LIST_IN_PROGRESS,
+                rs -> new QuestProgressPort.ActiveQuest(
+                        rs.getLong("quest_template_id"),
+                        rs.getString("quest_code"),
+                        rs.getString("script_ref"),
+                        rs.getString("progress_json")),
                 characterId);
     }
 

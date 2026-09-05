@@ -247,7 +247,43 @@ public final class InventoryPanel implements HudWindow {
         pane.setScrollingDisabled(true, false);
         pane.setFadeScrollBars(false);
         pane.setOverscroll(false, false);
+        claimScrollFocusOnHover(pane);
         return pane;
+    }
+
+    /**
+     * Cho lăn chuột ăn ngay khi RÊ vào vùng cuộn, không bắt phải bấm một phát trước.
+     *
+     * <p>Bẫy của libGDX: {@code Stage} gửi sự kiện lăn tới {@code scrollFocus}, mà {@link ScrollPane}
+     * chỉ tự giành {@code scrollFocus} trong {@code touchDown} của chính nó. Chưa bấm vào trong
+     * khung thì {@code scrollFocus} còn {@code null} và mọi cú lăn rơi vào {@code root} — người chơi
+     * thấy đúng cảnh "có thanh cuộn, có đồ ở dưới, lăn chuột không nhúc nhích". Bắt được lúc
+     * PLAYTEST SỐNG 2026-09-05 với túi 10 món trong khi khung chỉ hiện 3 — test không thấy được vì
+     * không test nào giả lập con trỏ chuột.
+     *
+     * <p>Trả {@code scrollFocus} về {@code null} lúc rời khung để lăn chuột ngoài cửa sổ không còn
+     * âm thầm cuộn danh sách này.
+     */
+    // PMD ExcessiveParameterList: chu ky enter/exit do Scene2D quyet dinh, khong sua duoc.
+    @SuppressWarnings("PMD.ExcessiveParameterList")
+    private static void claimScrollFocusOnHover(ScrollPane pane) {
+        pane.addListener(new InputListener() {
+            @Override
+            public void enter(InputEvent event, float x, float y, int pointer, Actor fromActor) {
+                if (pointer == -1 && pane.getStage() != null) { // -1 = con trỏ chuột, không phải ngón chạm
+                    pane.getStage().setScrollFocus(pane);
+                }
+            }
+
+            @Override
+            public void exit(InputEvent event, float x, float y, int pointer, Actor toActor) {
+                // Xoa vo dieu kien: Scene2D ban exit cua vung cu TRUOC enter cua vung moi, nen khong
+                // co nguy co xoa nham focus mot ScrollPane khac vua gianh duoc.
+                if (pointer == -1 && pane.getStage() != null) {
+                    pane.getStage().setScrollFocus(null);
+                }
+            }
+        });
     }
 
     /** Tự TẮT icon khi thiếu atlas (bản checkout chưa chạy pipeline art) — cùng {@code SkillVfxRenderer}. */

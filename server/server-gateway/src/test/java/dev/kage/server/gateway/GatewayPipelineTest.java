@@ -817,7 +817,7 @@ class GatewayPipelineTest {
         dev.kage.quest.domain.TransactionRunner tx = action -> action.accept(null);
         return new dev.kage.quest.api.QuestFacade(
                 new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx),
-                new dev.kage.quest.application.ProcessMonsterKilledUseCase(progressPort, templatePort, tx),
+                new dev.kage.quest.application.ProcessMonsterKilledUseCase(progressPort, tx),
                 new dev.kage.quest.application.ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx),
                 new dev.kage.quest.application.ListQuestsUseCase(progressPort));
     }
@@ -852,7 +852,7 @@ class GatewayPipelineTest {
         dev.kage.quest.application.AcceptQuestUseCase acceptQuestUseCase =
                 new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx);
         dev.kage.quest.application.ProcessMonsterKilledUseCase processMonsterKilledUseCase =
-                new dev.kage.quest.application.ProcessMonsterKilledUseCase(progressPort, templatePort, tx);
+                new dev.kage.quest.application.ProcessMonsterKilledUseCase(progressPort, tx);
         dev.kage.quest.domain.IdempotencyPort questIdempotencyPort = (t, idempotencyKey) -> {};
         dev.kage.quest.application.QuestRewardPorts rewardPorts = new dev.kage.quest.application.QuestRewardPorts(
                 expPort, inventoryGrantPort, auditPort, questIdempotencyPort);

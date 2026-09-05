@@ -2,7 +2,6 @@ package dev.kage.server.gateway;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -495,20 +494,23 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     }
 
     private void processQuestBlocking(long killerCharacterId, String monsterCode) {
-        Optional<QuestFacade.QuestStatusChange> statusChange =
-                questFacade.onMonsterKilled(killerCharacterId, monsterCode);
-        if (statusChange.isEmpty()) {
+        // DANH SÁCH từ 2026-09-05: một con quái có thể là mục tiêu cuối của nhiều quest cùng lúc
+        // kể từ khi có quest thứ hai theo dõi giết quái — phát đủ, đừng chỉ lấy cái đầu.
+        List<QuestFacade.QuestStatusChange> completed = questFacade.onMonsterKilled(killerCharacterId, monsterCode);
+        if (completed.isEmpty()) {
             return; // không có quest IN_PROGRESS liên quan, hoặc chưa hoàn thành — không báo gì.
         }
         ChannelHandlerContext ctx = contextsByCharacterId.get(killerCharacterId);
         if (ctx == null) {
             return; // đã ngắt kết nối — tiến độ đã lưu DB thật, chỉ mất thông báo.
         }
-        QuestStatusChangedEvent event = QuestStatusChangedEvent.newBuilder()
-                .setQuestCode(statusChange.get().questCode())
-                .setStatus(toProtoStatus(statusChange.get().status()))
-                .build();
-        send(ctx, Opcode.OPCODE_QUEST_STATUS_CHANGED_EVENT_VALUE, 0, event.toByteArray());
+        for (QuestFacade.QuestStatusChange statusChange : completed) {
+            QuestStatusChangedEvent event = QuestStatusChangedEvent.newBuilder()
+                    .setQuestCode(statusChange.questCode())
+                    .setStatus(toProtoStatus(statusChange.status()))
+                    .build();
+            send(ctx, Opcode.OPCODE_QUEST_STATUS_CHANGED_EVENT_VALUE, 0, event.toByteArray());
+        }
     }
 
     private static final Map<dev.kage.quest.domain.QuestStatus, QuestStatus> QUEST_STATUS_MAPPING = Map.of(

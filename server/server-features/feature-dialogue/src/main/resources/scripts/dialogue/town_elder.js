@@ -39,6 +39,22 @@
         options: [
             { label_key: "dialogue.option.ask_about_realm", action: "about_realm" },
             { label_key: "dialogue.option.ask_about_elder", action: "about_elder" },
+            { label_key: "dialogue.option.ask_night_watch", action: "night_watch" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    // CAO TRÀO arc 1 (STORY.md §6): phiên trực đêm — quest thứ hai của game. Mọc xuống dưới qua
+    // `about_town` chứ KHÔNG chen vào `start`: 4 lựa chọn của `start` bị khoá bởi option_index
+    // (xem đầu file + TownElderDialogueTreeTest).
+    //
+    // Nhịp hé lộ (§8 quy tắc 2): Chu Hoành chỉ nói tới chuyện trước mắt — linh thảo bị trộm, ai đó
+    // lảng vảng ngoài rào. Ông KHÔNG được nhắc Huyết Sa Giáo (arc 2 mới lộ), càng không nhắc
+    // Thiên Môn hay mảnh ngọc cổ.
+    night_watch: {
+        text_key: "dialogue.town_elder.night_watch",
+        options: [
+            { label_key: "dialogue.option.accept_quest_night_watch", action: "accept_quest:night_watch_bandit" },
+            { label_key: "dialogue.option.back", action: "about_town" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]
     },

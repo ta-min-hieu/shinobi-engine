@@ -439,7 +439,7 @@ class MonsterLootChainIntegrationTest {
                 new PostgresQuestIdempotencyAdapter());
         return new QuestFacade(
                 new AcceptQuestUseCase(progressPort, templatePort, transactionRunner),
-                new ProcessMonsterKilledUseCase(progressPort, templatePort, transactionRunner),
+                new ProcessMonsterKilledUseCase(progressPort, transactionRunner),
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, transactionRunner),
                 new ListQuestsUseCase(progressPort));
     }

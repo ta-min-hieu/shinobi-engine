@@ -169,9 +169,7 @@ class MvpLoopIntegrationTest {
 
     private static ProcessMonsterKilledUseCase newProcessMonsterKilledUseCase() {
         return new ProcessMonsterKilledUseCase(
-                new PostgresQuestProgressAdapter(dataSource),
-                new PostgresQuestTemplateAdapter(dataSource),
-                new JdbcQuestTransactionRunner(dataSource));
+                new PostgresQuestProgressAdapter(dataSource), new JdbcQuestTransactionRunner(dataSource));
     }
 
     private static ClaimQuestRewardUseCase newClaimQuestRewardUseCase() {
@@ -234,10 +232,10 @@ class MvpLoopIntegrationTest {
         Optional<ProcessMonsterKilledUseCase.QuestStatusChange> statusChange = Optional.empty();
         for (int i = 0; i < SIMULATED_KILLS_FOR_LOOT; i++) {
             allLoot.addAll(newGrantLootUseCase().execute(characterId, "training_dummy"));
-            Optional<ProcessMonsterKilledUseCase.QuestStatusChange> change =
+            List<ProcessMonsterKilledUseCase.QuestStatusChange> change =
                     newProcessMonsterKilledUseCase().execute(characterId, "training_dummy");
-            if (change.isPresent()) {
-                statusChange = change;
+            if (!change.isEmpty()) {
+                statusChange = Optional.of(change.get(0));
             }
         }
 

@@ -8,7 +8,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import javax.sql.DataSource;
@@ -44,12 +43,17 @@ import dev.kage.server.database.character.PostgresCharacterAdapter;
  * Test bằng PostgreSQL THẬT qua Testcontainers — verify migration V11 (quest_template/
  * character_quest_progress) + toàn bộ vòng đời quest THẬT bằng script sản phẩm
  * (kill_training_dummies.js, seed V11): nhận → giết 3 lần → hoàn thành → nhận thưởng, atomically.
+ *
+ * <p>Từ 2026-09-05 lớp này phủ CẢ quest thứ hai ({@code night_watch_bandit}, seed V28,
+ * night_watch_bandit.js). Hai quest cùng một lớp test vì {@code @Container} là static — tách lớp
+ * riêng sẽ dựng thêm một Postgres nữa cho toàn bộ suite, đắt hơn hẳn phần đọc dễ thu được.
  */
 @Testcontainers
 class QuestIntegrationTest {
 
     private static final int POSTGRES_PORT = 5432;
     private static final String QUEST_CODE = "kill_training_dummies";
+    private static final String NIGHT_WATCH_CODE = "night_watch_bandit";
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
@@ -113,6 +117,45 @@ class QuestIntegrationTest {
         }
     }
 
+    /**
+     * Tổng số lượng của MỘT mã vật phẩm (không phải số dòng): {@code enhance_protection_charm} là
+     * đồ xếp chồng được, nên phần thưởng có thể gộp vào dòng sẵn có thay vì sinh dòng mới —
+     * {@link #countInventoryRows} sẽ không thấy gì cả nếu chỉ đếm dòng.
+     */
+    private static int countItemQuantity(long characterId, String itemCode) {
+        String sql = "SELECT COALESCE(SUM(ii.quantity), 0) FROM inventory_item ii"
+                + " JOIN item_template it ON it.id = ii.item_template_id"
+                + " WHERE ii.character_id = ? AND it.code = ?";
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, characterId);
+            statement.setString(2, itemCode);
+            try (ResultSet rs = statement.executeQuery()) {
+                rs.next();
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Lỗi test-only đếm vật phẩm: " + itemCode, e);
+        }
+    }
+
+    /** {@code quest_template.code} của quest tiên quyết, hoặc {@code null} nếu quest không có. */
+    private static String prerequisiteCodeOf(String questCode) {
+        String sql = "SELECT pre.code FROM quest_template q"
+                + " LEFT JOIN quest_template pre ON pre.id = q.prerequisite_quest_id"
+                + " WHERE q.code = ?";
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, questCode);
+            try (ResultSet rs = statement.executeQuery()) {
+                rs.next();
+                return rs.getString(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Lỗi test-only đọc prerequisite: " + questCode, e);
+        }
+    }
+
     private static AcceptQuestUseCase newAcceptUseCase() {
         QuestProgressPort progressPort = new PostgresQuestProgressAdapter(dataSource);
         QuestTemplatePort templatePort = new PostgresQuestTemplateAdapter(dataSource);
@@ -122,9 +165,9 @@ class QuestIntegrationTest {
 
     private static ProcessMonsterKilledUseCase newProcessUseCase() {
         QuestProgressPort progressPort = new PostgresQuestProgressAdapter(dataSource);
-        QuestTemplatePort templatePort = new PostgresQuestTemplateAdapter(dataSource);
         TransactionRunner tx = new JdbcQuestTransactionRunner(dataSource);
-        return new ProcessMonsterKilledUseCase(progressPort, templatePort, tx);
+        // Không cần QuestTemplatePort nữa: use case đọc scriptRef ngay từ listInProgress (2026-09-05).
+        return new ProcessMonsterKilledUseCase(progressPort, tx);
     }
 
     private static ClaimQuestRewardUseCase newClaimUseCase() {
@@ -151,17 +194,13 @@ class QuestIntegrationTest {
         assertThat(acceptResult).isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
 
         // Kịch bản thật (kill_training_dummies.js) cần giết 3 lần mới hoàn thành.
-        Optional<ProcessMonsterKilledUseCase.QuestStatusChange> afterFirst =
+        assertThat(newProcessUseCase().execute(characterId, "training_dummy")).isEmpty();
+        assertThat(newProcessUseCase().execute(characterId, "training_dummy")).isEmpty();
+        List<ProcessMonsterKilledUseCase.QuestStatusChange> afterThird =
                 newProcessUseCase().execute(characterId, "training_dummy");
-        assertThat(afterFirst).isEmpty();
-        Optional<ProcessMonsterKilledUseCase.QuestStatusChange> afterSecond =
-                newProcessUseCase().execute(characterId, "training_dummy");
-        assertThat(afterSecond).isEmpty();
-        Optional<ProcessMonsterKilledUseCase.QuestStatusChange> afterThird =
-                newProcessUseCase().execute(characterId, "training_dummy");
-        assertThat(afterThird).isPresent();
-        assertThat(afterThird.get().questCode()).isEqualTo(QUEST_CODE);
-        assertThat(afterThird.get().status()).isEqualTo(QuestStatus.COMPLETED);
+        assertThat(afterThird).hasSize(1);
+        assertThat(afterThird.get(0).questCode()).isEqualTo(QUEST_CODE);
+        assertThat(afterThird.get(0).status()).isEqualTo(QuestStatus.COMPLETED);
 
         long expBefore = readExp(characterId);
         int itemsBefore = countInventoryRows(characterId);
@@ -185,7 +224,8 @@ class QuestIntegrationTest {
         // thật trong DB (V11 seed), không phải danh sách tự khai trong code.
         List<String> scriptRefs = new PostgresQuestTemplateAdapter(dataSource).listAllScriptRefs();
 
-        assertThat(scriptRefs).contains("/scripts/quest/kill_training_dummies.js");
+        assertThat(scriptRefs)
+                .contains("/scripts/quest/kill_training_dummies.js", "/scripts/quest/night_watch_bandit.js");
     }
 
     @Test
@@ -232,5 +272,97 @@ class QuestIntegrationTest {
                         ClaimQuestRewardUseCase.ClaimResult.Outcome.DUPLICATE_REQUEST);
         assertThat(readExp(characterId)).isEqualTo(expAfterFirstClaim); // KHÔNG cộng EXP lần 2
         assertThat(countInventoryRows(characterId)).isEqualTo(itemsAfterFirstClaim); // KHÔNG cấp item lần 2
+    }
+
+    /**
+     * Vòng đời TRỌN VẸN của quest thứ hai qua script sản phẩm thật (night_watch_bandit.js, seed
+     * V28). Đây là quest THỨ HAI theo dõi giết quái của dự án — trước 2026-09-05 nó KHÔNG THỂ chạy:
+     * {@code ProcessMonsterKilledUseCase} hardcode đúng một mã quest nên script này không bao giờ
+     * nhận được {@code on_event}. Test này là bằng chứng phần tổng quát hoá đó chạy thật, xuyên
+     * Postgres, chứ không chỉ xanh trên Fake Port.
+     */
+    @Test
+    void shouldPlayNightWatchLifecycle_withRealScript() {
+        long characterId = createFreshCharacter("NightWatch1");
+
+        assertThat(newAcceptUseCase().execute(characterId, NIGHT_WATCH_CODE))
+                .isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
+
+        // Giết nhầm loài: CHÍNH SCRIPT lọc theo event.monster_code, Java không lọc (Điều 27).
+        assertThat(newProcessUseCase().execute(characterId, "training_dummy")).isEmpty();
+
+        List<ProcessMonsterKilledUseCase.QuestStatusChange> afterBandit =
+                newProcessUseCase().execute(characterId, "wandering_bandit");
+        assertThat(afterBandit).hasSize(1);
+        assertThat(afterBandit.get(0).questCode()).isEqualTo(NIGHT_WATCH_CODE);
+        assertThat(afterBandit.get(0).status()).isEqualTo(QuestStatus.COMPLETED);
+
+        long expBefore = readExp(characterId);
+        int charmsBefore = countItemQuantity(characterId, "enhance_protection_charm");
+
+        ClaimQuestRewardUseCase.ClaimResult claim =
+                newClaimUseCase().execute(characterId, NIGHT_WATCH_CODE, newIdempotencyKey());
+
+        assertThat(claim.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
+        assertThat(claim.expGranted()).isEqualTo(800L);
+        assertThat(readExp(characterId)).isEqualTo(expBefore + 800L);
+        assertThat(countItemQuantity(characterId, "enhance_protection_charm")).isEqualTo(charmsBefore + 1);
+    }
+
+    /**
+     * Cú giết ĐI TỚI ĐÚNG quest quan tâm nó, khi người chơi đang làm NHIỀU quest cùng lúc — đây là
+     * chỗ bản hardcode cũ sai: nó chỉ tra một mã quest, nên quest kia không bao giờ nhúc nhích.
+     */
+    @Test
+    void shouldRouteKillToTheQuestThatCaresAboutIt_whenTwoQuestsAreInProgress() {
+        long characterId = createFreshCharacter("NightWatch2");
+        newAcceptUseCase().execute(characterId, QUEST_CODE);
+        newAcceptUseCase().execute(characterId, NIGHT_WATCH_CODE);
+
+        List<ProcessMonsterKilledUseCase.QuestStatusChange> afterBandit =
+                newProcessUseCase().execute(characterId, "wandering_bandit");
+
+        // Chỉ quest "trực đêm" xong; quest đập mộc nhân KHÔNG bị cú giết này chạm tới.
+        assertThat(afterBandit)
+                .extracting(ProcessMonsterKilledUseCase.QuestStatusChange::questCode)
+                .containsExactly(NIGHT_WATCH_CODE);
+
+        // Và quest kia vẫn chạy bình thường sau đó — không bị cú giết trên làm hỏng tiến độ.
+        assertThat(newProcessUseCase().execute(characterId, "training_dummy")).isEmpty();
+        assertThat(newProcessUseCase().execute(characterId, "training_dummy")).isEmpty();
+        assertThat(newProcessUseCase().execute(characterId, "training_dummy"))
+                .extracting(ProcessMonsterKilledUseCase.QuestStatusChange::questCode)
+                .containsExactly(QUEST_CODE);
+    }
+
+    /**
+     * V28 phải trỏ {@code prerequisite_quest_id} về {@code kill_training_dummies} bằng cách TRA
+     * THEO {@code code}, không hardcode số 1 (id do {@code GENERATED ALWAYS AS IDENTITY} cấp).
+     *
+     * <p>⚠️ Test này chỉ verify DỮ LIỆU. Cột này CHƯA được đọc ở bất kỳ đâu trong code — xem
+     * {@link #shouldStillAcceptNightWatch_becausePrerequisiteIsNotEnforcedYet}.
+     */
+    @Test
+    void shouldSeedNightWatch_withPrerequisiteResolvedByCode() {
+        assertThat(prerequisiteCodeOf(NIGHT_WATCH_CODE)).isEqualTo(QUEST_CODE);
+        assertThat(prerequisiteCodeOf(QUEST_CODE)).isNull();
+    }
+
+    /**
+     * Ghi nhận TRUNG THỰC lỗ hổng đang có, không phải mong muốn: {@code prerequisite_quest_id} tồn
+     * tại từ V11 và V28 là dòng ĐẦU TIÊN dùng nó, nhưng KHÔNG có code nào đọc cột này — người chơi
+     * nhận được quest "trực đêm" mà chưa từng đập mộc nhân, ngược thứ tự STORY.md §6.
+     *
+     * <p>Test này sẽ ĐỎ khi ai đó thi hành điều kiện tiên quyết — đó là dấu hiệu ĐÚNG, lúc đó sửa
+     * test thành khẳng định chiều ngược lại. Thi hành nó thêm một outcome mới vào protocol nên là
+     * quyết định của chủ dự án (CLAUDE.md §4), không phải việc lặng lẽ sửa kèm.
+     */
+    @Test
+    void shouldStillAcceptNightWatch_becausePrerequisiteIsNotEnforcedYet() {
+        long characterId = createFreshCharacter("NightWatch3");
+
+        AcceptQuestUseCase.AcceptResult result = newAcceptUseCase().execute(characterId, NIGHT_WATCH_CODE);
+
+        assertThat(result).isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
     }
 }

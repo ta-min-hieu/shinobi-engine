@@ -1814,3 +1814,46 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
     - 🔶 **Còn treo, chỉ chủ dự án làm được**: muốn bản Rodin cho `char_town-elder` thì cần **khoá
       Hyper3D trả tiền**. Đây là việc **duy nhất** của Đợt 3 chưa đóng — xem
       [docs/README.md](../README.md) mục 12.
+
+52. **QUEST THỨ HAI của cả dự án — gỡ hardcode TRƯỚC, rồi mới viết nội dung (2026-09-05)**:
+    - `ProcessMonsterKilledUseCase` từng **hardcode đúng một mã quest** (`kill_training_dummies`).
+      Chính `feature-quest/CLAUDE.md` đã tự đặt điều kiện: *"khi có quest thứ 2 THEO DÕI GIẾT QUÁI,
+      bắt buộc tổng quát hoá tra cứu này trước"*. Điều kiện đó xảy ra, và đã làm đúng thứ tự:
+      `QuestProgressPort.listInProgress` (lọc `status = 'IN_PROGRESS'` **trong SQL**) trả mọi quest
+      đang làm kèm `scriptRef` + `progress_json`; use case chạy `on_event` cho từng cái và trả
+      `List<QuestStatusChange>`. **Java KHÔNG lọc theo `monster_code`** — chính script quyết (Điều 27),
+      nên thêm quest mới không phải sửa một dòng Java nào.
+    - Nội dung: **V28** seed `night_watch_bandit` (`prerequisite_quest_id` tra theo `code`, không
+      hardcode id), script `night_watch_bandit.js` (đuổi 1 tán tu → 800 EXP + 1 Hộ Linh Phù), nhánh
+      hội thoại mới của Chu Hoành, 4 khoá i18n vi/en. Đúng cao trào arc 1 của
+      [STORY.md](../13-game-design/STORY.md) §6.
+    - ✅ **Bằng chứng tất định**: `QuestIntegrationTest` +4 test qua **Postgres thật** và **script
+      sản phẩm thật** — vòng đời đầy đủ, giết nhầm loài bị bỏ qua, seed V28 đúng, và **một cú
+      giết đi tới đúng quest quan tâm nó khi đang làm HAI quest** (chỗ bản cũ sai). 1148 test xanh.
+    - ✅ **PLAYTEST SỐNG phần đầu chuỗi**: hỏi Chu Hoành → nhánh mới → nhận quest → DB hiện
+      `night_watch_bandit / IN_PROGRESS / {"repelled":0}`, HUD hiện "Phiên Trực Đêm — Đang làm".
+      Xếp chồng cũng đúng luật chủ dự án đặt: "Hộ Linh Phù x3"/"Phi Đao x19" gộp một dòng, còn
+      6 món trang bị mua cùng lúc nằm 6 dòng riêng.
+    - 🔴 **Bốn phát hiện thật từ buổi chơi, test KHÔNG thấy cái nào**:
+      1. **Cuộn túi đồ chỉ ăn sau khi ĐÃ BẤM vào khung.** Túi 10 món, khung hiện 3, lăn chuột
+         không nhúc ních — `Stage` gửi sự kiện lăn tới `scrollFocus`, mà `ScrollPane` chỉ tự giành
+         `scrollFocus` trong `touchDown` của chính nó. **ĐÃ SỬA** (rê chuột vào là giành).
+      2. **Bonus trang bị không ăn ngay lúc mặc**: mặc đủ 6 món (+18 máu) mà thanh máu vẫn
+         `100/100`; chỉ sau khi hồi sinh mới thành `118/118`. **CHƯA SỮA** — cần truy nguyên.
+      3. **Bảng theo dõi quest không hiện lúc ĐĂNG NHẬP**, chỉ hiện sau sự kiện đổi trạng thái
+         trong phiên. Vào lại game là mất dấu quest đang làm. **CHƯA SỮA**.
+      4. **Nhân vật bò ~0,3 m/s thay vì 5 m/s** ở vài vị trí quanh khu bệ nhảy demo (tái hiện
+         được, hai lần, cùng khu). **CHƯA truy ra nguyên nhân** — `TerrainCollisionSystem` đang
+         no-op (obstacle rỗng) và `MovementSystem` không có va chạm entity, nên **không đoán
+         nguyên nhân ở đây**.
+    - ⚠️ **Lỗ hổng ghi nhận, không tự vá**: `prerequisite_quest_id` có từ V11, V28 là dòng ĐẦU
+      TIÊN dùng nó, nhưng **không code nào đọc cột này** — nhận được quest "trực đêm" mà chưa
+      từng đập mộc nhân. Thi hành nó = thêm outcome từ chối mới = đổi protocol (CLAUDE.md §4)
+      → **chờ chủ dự án quyết**. Test
+      `shouldStillAcceptNightWatch_becausePrerequisiteIsNotEnforcedYet` khoá hành vi hiện tại để
+      nó ĐỎ đúng lúc ai đó sửa.
+    - 💡 **Bài học công cụ**: `SetForegroundWindow` **thất bại IM LẶNG** khi tiến trình gọi không ở
+      foreground — phím bay sang cửa sổ khác, hai ảnh chụp **giống hệt nhau** và trông y hệt
+      "bị vật cản chặn". Đã vá `kage_ui.py` bằng `AttachThreadInput` + **thoát hẳn nếu không chiếm
+      được focus**, thay vì báo thành công giả. Đây là lần thứ ba đường chụp/điều khiển ảnh
+      đánh lừa phân tích đúng (xem mục 31, 35).

@@ -72,14 +72,24 @@ nhận `itemTemplateId` — quest script author nội dung bằng code ổn đ�
 Checkstyle `RegexpSingleline` cấm hậu tố `Info` (CLAUDE.md §11). Đổi tên ngay khi build báo lỗi,
 không đợi review — khớp tiền lệ `ItemTemplate` (feature-inventory).
 
-## `ProcessMonsterKilledUseCase.TRACKED_QUEST_CODE` — hardcode có chủ đích
+## `ProcessMonsterKilledUseCase` — hardcode ĐÃ GỠ (2026-09-05)
 
-Hardcode `"kill_training_dummies"` — CHỈ tra đúng 1 quest này mỗi lần quái chết, không quét toàn bộ
-`character_quest_progress` của người chơi. Đây là placeholder khớp cảnh báo hiệu năng đã ghi ở
-GAMEPLAY.md §9 (đầu mục Quest, viết từ trước lát cắt này): "cần index quest theo loại sự kiện,
-không quét tuyến tính — đo ở Phase 6". **Khi có quest thứ 2 THEO DÕI GIẾT QUÁI, bắt buộc tổng quát
-hoá tra cứu này trước** (vd tra theo `monster_code` → danh sách quest liên quan), không copy-paste
-thêm hằng số hardcode thứ 2.
+~~Hardcode `"kill_training_dummies"` — CHỈ tra đúng 1 quest này mỗi lần quái chết.~~ Điều kiện mà
+mục này tự đặt ra (*"khi có quest thứ 2 THEO DÕI GIẾT QUÁI, bắt buộc tổng quát hoá tra cứu này
+trước, không copy-paste thêm hằng số hardcode thứ 2"*) **đã xảy ra**: quest thứ hai của arc 1
+(STORY.md §6 — "đêm trực gặp tán tu cường đạo"). Tổng quát hoá đi TRƯỚC nội dung, đúng như đã hứa.
+
+Nay `QuestProgressPort.listInProgress(characterId)` trả mọi quest ĐANG LÀM kèm `scriptRef` +
+`progress_json`, và use case chạy hook `on_event` cho từng cái.
+
+**Java KHÔNG lọc theo `monster_code`** — chính script quyết sự kiện có liên quan không
+(`event.monster_code === "..."`). Đây là Điều 27: lọc trong Java sẽ rò rỉ nội dung quest vào code
+và bắt phải sửa Java mỗi lần thêm quest — đúng thứ kiến trúc script sinh ra để tránh.
+
+⚠️ **Vẫn CHƯA phải "index quest theo loại sự kiện"** mà GAMEPLAY.md §9 mong muốn. Nhưng phạm vi
+quét nay bị chặn bởi **số quest ĐANG LÀM của một người chơi** (nhỏ, có trần thực tế) thay vì một
+hằng số hardcode, và bộ lọc `status = 'IN_PROGRESS'` nằm trong SQL nên quest đã CLAIMED — thứ chỉ
+tăng theo đời nhân vật — không bao giờ được trả về. Đo lại khi một nhân vật ôm hàng chục quest cùng lúc.
 
 ## Tích hợp Dialogue — không phá ranh giới 2 module
 
@@ -113,7 +123,8 @@ trả `ClaimResult.Outcome.DUPLICATE_REQUEST` (`ClaimQuestRewardOutcome.CLAIM_QU
 
 ❌ SQL/JDBC/Redis client trong module này (Điều 23 — enforce bằng ArchUnit)
 ❌ `domain/` biết PostgreSQL hay GraalJS
-❌ Quét toàn bộ quest của người chơi mỗi lần có sự kiện (xem `TRACKED_QUEST_CODE` ở trên)
+❌ Quét toàn bộ bảng `character_quest_progress` mỗi lần có sự kiện — chỉ quét quest ĐANG LÀM của
+   ĐÚNG người chơi đó (xem mục `ProcessMonsterKilledUseCase` ở trên)
 
 ## Test
 
@@ -124,3 +135,23 @@ thật (`kill_training_dummies.js`): nhận → 3 lần giết → hoàn thành 
 `character.exp`/`inventory_item` bằng SQL trực tiếp, cộng 2 case từ chối (nhận trùng, nhận thưởng
 trước khi hoàn thành). Socket thật (`GatewayServerIntegrationTest`) verify outcome
 `QUEST_NOT_FOUND` (Fake `QuestTemplatePort` luôn rỗng) — nghiệp vụ vòng đời thật đã phủ ở tầng dưới.
+
+Từ 2026-09-05 CÙNG lớp đó phủ luôn **quest thứ hai** (`night_watch_bandit.js`, seed V28) — 4 test
+nữa, và chúng mới là bằng chứng phần tổng quát hoá ở trên chạy thật chứ không chỉ xanh trên Fake:
+vòng đời đầy đủ (800 EXP + 1 `enhance_protection_charm`, đếm theo TỔNG `quantity` chứ không đếm
+DÒNG vì bùa xếp chồng được), giết nhầm loài thì script tự bỏ qua, và **một cú giết đi tới đúng
+quest quan tâm nó khi người chơi đang làm HAI quest cùng lúc** — đúng chỗ bản hardcode cũ sai.
+Chung một lớp vì `@Container` là static: tách lớp riêng sẽ dựng thêm một Postgres cho cả suite.
+
+## ⚠️ `prerequisite_quest_id` CÓ trong DB nhưng KHÔNG ai đọc
+
+Cột này có từ V11; **V28 là dòng đầu tiên trong lịch sử dự án dùng nó** (`night_watch_bandit` trỏ về
+`kill_training_dummies`, tra theo `code`). Nhưng `AcceptQuestUseCase` **không hề đọc cột này** — grep
+`prerequisite` toàn `feature-quest` + `server-database` chỉ ra đúng một javadoc. Nghĩa là người chơi
+nhận được quest "trực đêm" mà chưa từng đập mộc nhân, **ngược thứ tự STORY.md §6**.
+
+Đây là ghi nhận, KHÔNG phải mong muốn.
+`QuestIntegrationTest.shouldStillAcceptNightWatch_becausePrerequisiteIsNotEnforcedYet` khoá đúng
+hành vi hiện tại và sẽ ĐỎ khi ai đó thi hành — dấu hiệu đúng, lúc đó đảo khẳng định lại.
+**Không tự thi hành**: thêm một outcome từ chối mới là đổi protocol (CLAUDE.md §4), phải hỏi
+chủ dự án trước.

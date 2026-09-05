@@ -59,6 +59,10 @@
         </module>
         <module name="ParameterNumber">
             <property name="max" value="4"/>
+            <!-- Method @Override KHONG tu dat duoc chu ky: chu ky do thu vien (vd InputListener.enter
+                 cua Scene2D, 5 tham so) quyet dinh. Rule nay noi ve API MINH thiet ke, nen bo qua
+                 override thay vi bat lap trinh vien viet @SuppressWarnings vo nghia. -->
+            <property name="ignoreOverriddenMethods" value="true"/>
         </module>
 
         <!-- Bug-prone -->
