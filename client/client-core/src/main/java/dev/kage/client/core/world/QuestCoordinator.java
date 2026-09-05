@@ -180,6 +180,9 @@ final class QuestCoordinator implements WindowFlow {
         return switch (outcome) {
             case ACCEPT_QUEST_OUTCOME_OK -> "quest.notice.accepted";
             case ACCEPT_QUEST_OUTCOME_ALREADY_ACCEPTED -> "quest.notice.already_accepted";
+            // ADR-044 — nói ĐÚNG lý do. "Không nhận được nhiệm vụ" cho người chơi biết là hỏng
+            // nhưng không biết phải làm gì; câu này chỉ thẳng sang việc còn dở.
+            case ACCEPT_QUEST_OUTCOME_PREREQUISITE_NOT_MET -> "quest.notice.prerequisite_not_met";
             default -> "quest.notice.accept_failed";
         };
     }

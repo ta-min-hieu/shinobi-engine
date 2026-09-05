@@ -182,6 +182,17 @@ class QuestIntegrationTest {
         return new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx);
     }
 
+    /**
+     * ADR-044 — quest 2 nay đòi quest 1 đã CLAIMED. Mọi test cần quest 2 đều phải đi qua đây.
+     */
+    private static void claimTrainingDummies(long characterId) {
+        newAcceptUseCase().execute(characterId, QUEST_CODE);
+        newProcessUseCase().execute(characterId, "training_dummy");
+        newProcessUseCase().execute(characterId, "training_dummy");
+        newProcessUseCase().execute(characterId, "training_dummy");
+        newClaimUseCase().execute(characterId, QUEST_CODE, newIdempotencyKey());
+    }
+
     private static String newIdempotencyKey() {
         return UUID.randomUUID().toString();
     }
@@ -284,6 +295,7 @@ class QuestIntegrationTest {
     @Test
     void shouldPlayNightWatchLifecycle_withRealScript() {
         long characterId = createFreshCharacter("NightWatch1");
+        claimTrainingDummies(characterId); // ADR-044 — quest 2 khoá sau quest 1
 
         assertThat(newAcceptUseCase().execute(characterId, NIGHT_WATCH_CODE))
                 .isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
@@ -316,7 +328,14 @@ class QuestIntegrationTest {
     @Test
     void shouldRouteKillToTheQuestThatCaresAboutIt_whenTwoQuestsAreInProgress() {
         long characterId = createFreshCharacter("NightWatch2");
-        newAcceptUseCase().execute(characterId, QUEST_CODE);
+        // ADR-044 — phải xong quest 1 mới mở được quest 2; rồi nhận LẠI quest 1 thì không được nữa
+        // (ALREADY_ACCEPTED), nên test này dùng quest 1 của một nhân vật khác làm quest thứ hai
+        // đang chạy song song là không được. Thay bằng: quest 2 đang làm, quest 1 làm LẠI từ đầu
+        // không khả thi ⇒ chỉ cần HAI quest cùng IN_PROGRESS, và cách duy nhất là nhận quest 2
+        // TRƯỚC khi lĩnh thưởng quest 1... cũng bị ADR-044 chặn. Nên: nhận quest 1, xong, lĩnh
+        // thưởng, nhận quest 2 — rồi verify cú giết đi tới ĐÚNG quest đang làm và KHÔNG đụng quest
+        // đã CLAIMED.
+        claimTrainingDummies(characterId);
         newAcceptUseCase().execute(characterId, NIGHT_WATCH_CODE);
 
         List<ProcessMonsterKilledUseCase.QuestStatusChange> afterBandit =
@@ -327,12 +346,10 @@ class QuestIntegrationTest {
                 .extracting(ProcessMonsterKilledUseCase.QuestStatusChange::questCode)
                 .containsExactly(NIGHT_WATCH_CODE);
 
-        // Và quest kia vẫn chạy bình thường sau đó — không bị cú giết trên làm hỏng tiến độ.
+        // Và quest ĐÃ LĨNH THƯỞNG không bị cú giết nào chạm tới nữa: listInProgress lọc theo
+        // status='IN_PROGRESS' ngay trong SQL, nên quest CLAIMED — thứ chỉ tăng theo đời nhân vật —
+        // không bao giờ được nạp lại.
         assertThat(newProcessUseCase().execute(characterId, "training_dummy")).isEmpty();
-        assertThat(newProcessUseCase().execute(characterId, "training_dummy")).isEmpty();
-        assertThat(newProcessUseCase().execute(characterId, "training_dummy"))
-                .extracting(ProcessMonsterKilledUseCase.QuestStatusChange::questCode)
-                .containsExactly(QUEST_CODE);
     }
 
     /**
@@ -349,20 +366,58 @@ class QuestIntegrationTest {
     }
 
     /**
-     * Ghi nhận TRUNG THỰC lỗ hổng đang có, không phải mong muốn: {@code prerequisite_quest_id} tồn
-     * tại từ V11 và V28 là dòng ĐẦU TIÊN dùng nó, nhưng KHÔNG có code nào đọc cột này — người chơi
-     * nhận được quest "trực đêm" mà chưa từng đập mộc nhân, ngược thứ tự STORY.md §6.
+     * ADR-044 (Accepted 2026-09-05) — ĐẢO NGƯỢC khẳng định cũ. Bản trước của test này ghi nhận
+     * trung thực rằng {@code prerequisite_quest_id} KHÔNG được thi hành, và nói rõ nó "sẽ ĐỎ khi ai
+     * đó thi hành — đó là dấu hiệu ĐÚNG". Việc đó vừa xảy ra.
      *
-     * <p>Test này sẽ ĐỎ khi ai đó thi hành điều kiện tiên quyết — đó là dấu hiệu ĐÚNG, lúc đó sửa
-     * test thành khẳng định chiều ngược lại. Thi hành nó thêm một outcome mới vào protocol nên là
-     * quyết định của chủ dự án (CLAUDE.md §4), không phải việc lặng lẽ sửa kèm.
+     * <p>Nhân vật mới tinh chưa đập mộc nhân nào ⇒ không nhận được quest "trực đêm".
      */
     @Test
-    void shouldStillAcceptNightWatch_becausePrerequisiteIsNotEnforcedYet() {
+    void shouldRejectNightWatch_whenTrainingDummiesNotClaimedYet() {
         long characterId = createFreshCharacter("NightWatch3");
 
         AcceptQuestUseCase.AcceptResult result = newAcceptUseCase().execute(characterId, NIGHT_WATCH_CODE);
 
+        assertThat(result).isEqualTo(AcceptQuestUseCase.AcceptResult.PREREQUISITE_NOT_MET);
+    }
+
+    /**
+     * Mốc là CLAIMED chứ KHÔNG phải COMPLETED (chủ dự án chốt 2026-09-05): đánh xong 3 mộc nhân mà
+     * chưa quay lại lĩnh thưởng thì chuỗi kể chuyện chưa đóng, và Chu Hoành chưa có cớ giao việc mới.
+     */
+    @Test
+    void shouldStillRejectNightWatch_whenPrerequisiteIsCompletedButNotClaimed() {
+        long characterId = createFreshCharacter("NightWatch4");
+        newAcceptUseCase().execute(characterId, QUEST_CODE);
+        newProcessUseCase().execute(characterId, "training_dummy");
+        newProcessUseCase().execute(characterId, "training_dummy");
+        newProcessUseCase().execute(characterId, "training_dummy"); // COMPLETED, chưa CLAIMED
+
+        AcceptQuestUseCase.AcceptResult result = newAcceptUseCase().execute(characterId, NIGHT_WATCH_CODE);
+
+        assertThat(result).isEqualTo(AcceptQuestUseCase.AcceptResult.PREREQUISITE_NOT_MET);
+    }
+
+    /** Lĩnh thưởng xong quest 1 thì quest 2 mở khoá — đúng thứ tự STORY.md §6. */
+    @Test
+    void shouldAcceptNightWatch_onceTrainingDummiesIsClaimed() {
+        long characterId = createFreshCharacter("NightWatch5");
+        newAcceptUseCase().execute(characterId, QUEST_CODE);
+        newProcessUseCase().execute(characterId, "training_dummy");
+        newProcessUseCase().execute(characterId, "training_dummy");
+        newProcessUseCase().execute(characterId, "training_dummy");
+        newClaimUseCase().execute(characterId, QUEST_CODE, newIdempotencyKey());
+
+        AcceptQuestUseCase.AcceptResult result = newAcceptUseCase().execute(characterId, NIGHT_WATCH_CODE);
+
         assertThat(result).isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
+    }
+
+    /** Quest KHÔNG có tiên quyết giữ nguyên hành vi cũ — ADR-044 D6, không được chặn nhầm. */
+    @Test
+    void shouldStillAcceptQuestWithoutPrerequisite_forABrandNewCharacter() {
+        long characterId = createFreshCharacter("NightWatch6");
+
+        assertThat(newAcceptUseCase().execute(characterId, QUEST_CODE)).isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
     }
 }

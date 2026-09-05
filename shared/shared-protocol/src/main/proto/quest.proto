@@ -20,6 +20,13 @@ enum AcceptQuestOutcome {
   ACCEPT_QUEST_OUTCOME_OK = 1;
   ACCEPT_QUEST_OUTCOME_QUEST_NOT_FOUND = 2;
   ACCEPT_QUEST_OUTCOME_ALREADY_ACCEPTED = 3;
+  // ADR-044 — quest tiên quyết (`quest_template.prerequisite_quest_id`) chưa LĨNH THƯỞNG xong.
+  // Chỉ THÊM giá trị enum, không đổi/xoá giá trị nào ⇒ `protocolVersion` KHÔNG tăng
+  // (NETWORK.md §6). Client cũ rơi vào nhánh "không rõ" sẵn có, không vỡ.
+  //
+  // KHÔNG gộp vào QUEST_NOT_FOUND: quest CÓ THẬT, chỉ là chưa tới lượt — nói "không có nhiệm
+  // vụ này" là nói dối người chơi về một thứ họ sẽ nhận được sau vài phút nữa.
+  ACCEPT_QUEST_OUTCOME_PREREQUISITE_NOT_MET = 4;
 }
 
 // Response: Server -> Client (OPCODE_ACCEPT_QUEST_RESPONSE).

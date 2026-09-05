@@ -39,6 +39,7 @@ public final class QuestFacade {
             case OK -> AcceptResult.OK;
             case QUEST_NOT_FOUND -> AcceptResult.QUEST_NOT_FOUND;
             case ALREADY_ACCEPTED -> AcceptResult.ALREADY_ACCEPTED;
+            case PREREQUISITE_NOT_MET -> AcceptResult.PREREQUISITE_NOT_MET;
         };
     }
 
@@ -89,7 +90,9 @@ public final class QuestFacade {
     public enum AcceptResult {
         OK,
         QUEST_NOT_FOUND,
-        ALREADY_ACCEPTED
+        ALREADY_ACCEPTED,
+        /** ADR-044 — quest tiên quyết chưa lĩnh thưởng xong. */
+        PREREQUISITE_NOT_MET
     }
 
     public enum ClaimOutcome {

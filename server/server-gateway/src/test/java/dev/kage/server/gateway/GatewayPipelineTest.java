@@ -790,8 +790,8 @@ class GatewayPipelineTest {
      */
     private static dev.kage.quest.api.QuestFacade claimableQuestFacade() {
         long templateId = 1L;
-        dev.kage.quest.domain.QuestTemplate template =
-                new dev.kage.quest.domain.QuestTemplate(templateId, "/scripts/quest/kill_training_dummies.js");
+        dev.kage.quest.domain.QuestTemplate template = dev.kage.quest.domain.QuestTemplate.withoutPrerequisite(
+                templateId, "/scripts/quest/kill_training_dummies.js");
         dev.kage.quest.domain.QuestProgressPort progressPort = new dev.kage.quest.domain.QuestProgressPort() {
             @Override
             public Optional<dev.kage.quest.domain.QuestProgress> find(long characterId, long questTemplateId) {

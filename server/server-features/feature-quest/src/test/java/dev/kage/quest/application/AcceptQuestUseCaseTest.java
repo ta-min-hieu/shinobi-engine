@@ -25,7 +25,7 @@ class AcceptQuestUseCaseTest {
         @Override
         public Optional<QuestTemplate> findByCode(String questCode) {
             return QUEST_CODE.equals(questCode)
-                    ? Optional.of(new QuestTemplate(TEMPLATE_ID, SCRIPT_REF))
+                    ? Optional.of(QuestTemplate.withoutPrerequisite(TEMPLATE_ID, SCRIPT_REF))
                     : Optional.empty();
         }
     }

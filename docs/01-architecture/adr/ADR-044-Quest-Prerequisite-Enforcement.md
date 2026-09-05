@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | 🟡 **Proposed** — chờ chủ dự án duyệt (AI không tự Accept, CLAUDE.md §1). |
+| Status | ✅ **Accepted** (2026-09-05) — chủ dự án duyệt và trả lời cả hai câu hỏi: mốc là **`CLAIMED`**, và **KHÔNG** giấu lựa chọn hội thoại. |
 | Date | 2026-09-05 |
 | Deciders | Chủ dự án quyết; AI soạn |
 | Related | [STORY.md §6, §8](../../13-game-design/STORY.md) (thứ tự arc 1) · [ADR-035](ADR-035-Client-State-Sync-Opcodes.md) (tiền lệ thêm outcome/opcode cho nhật ký quest) · [feature-quest/CLAUDE.md](../../../server/server-features/feature-quest/CLAUDE.md) |
@@ -39,9 +39,11 @@ sai ("không có nhiệm vụ này") cho một tình huống hoàn toàn khác.
 
 ---
 
-## Decision (ĐỀ XUẤT — chưa thi hành)
+## Decision
 
-**D1.** `QuestTemplate` (VO của `domain/`) mang thêm `Optional<Long> prerequisiteQuestId`.
+**D1.** `QuestTemplate` (VO của `domain/`) mang thêm `OptionalLong prerequisiteQuestId` —
+`OptionalLong` chứ không phải `Long` có thể null (Điều 11 cấm `null`) và không phải
+`Optional<Long>` (khỏi boxing một giá trị đọc mỗi lần nhận quest).
 `PostgresQuestTemplateAdapter` đọc cột đã có; **không migration nào**.
 
 **D2.** `AcceptQuestUseCase` từ chối khi quest tiên quyết **chưa ở trạng thái `CLAIMED`**, trả
@@ -49,12 +51,13 @@ sai ("không có nhiệm vụ này") cho một tình huống hoàn toàn khác.
 
 ⚠️ **Chọn mốc `CLAIMED`, không phải `COMPLETED`** — quest 1 chưa lĩnh thưởng thì chuỗi kể chuyện
 chưa đóng (người chơi chưa quay lại gặp Chu Hoành), và `CLAIMED` là trạng thái cuối duy nhất không
-bao giờ lùi. Đây là **quyết định gameplay**, cần chủ dự án xác nhận — xem "Câu hỏi cho chủ dự án".
+bao giờ lùi. Đây là **quyết định gameplay**; chủ dự án đã xác nhận `CLAIMED` (2026-09-05).
 
 **D3.** Protocol: thêm `ACCEPT_QUEST_OUTCOME_PREREQUISITE_NOT_MET = 4` vào `AcceptQuestOutcome`.
 Chỉ THÊM giá trị enum, không đổi/xoá giá trị nào ⇒ `protocolVersion` **KHÔNG tăng** (NETWORK.md §6).
 
-**D4.** Client: thêm khoá i18n `quest.accept_outcome.prerequisite_not_met` vi/en. Client cũ nhận giá
+**D4.** Client: thêm khoá i18n `quest.notice.prerequisite_not_met` vi/en (cùng họ
+`quest.notice.*` với các câu nhận quest khác) — *"Phải xong nhiệm vụ trước đã."* Client cũ nhận giá
 trị lạ đã có sẵn nhánh "không rõ" (cùng khuôn `claimOutcomeMessageKey`), nên không vỡ.
 
 **D5.** **KHÔNG giấu lựa chọn hội thoại.** NPC vẫn bày câu hỏi; server mới là nơi từ chối (Điều 15 —
@@ -69,7 +72,7 @@ hội thoại là một tính năng riêng, tốn hơn nhiều, và cần ADR ri
 
 | Phương án | Ưu | Nhược | Chọn? |
 |---|---|---|---|
-| **A. Thi hành ở `AcceptQuestUseCase` + outcome mới** (đề xuất) | Một chỗ duy nhất, đúng tầng (nghiệp vụ nhận quest); dùng đúng cột DB đã có; người chơi đọc được câu ĐÚNG | Thêm một giá trị enum vào protocol; thêm một vòng tra DB mỗi lần nhận quest (hiếm, không phải đường nóng) | **Đề xuất** |
+| **A. Thi hành ở `AcceptQuestUseCase` + outcome mới** (ĐÃ CHỌN) | Một chỗ duy nhất, đúng tầng (nghiệp vụ nhận quest); dùng đúng cột DB đã có; người chơi đọc được câu ĐÚNG | Thêm một giá trị enum vào protocol; thêm một vòng tra DB mỗi lần nhận quest (hiếm, không phải đường nóng) | **Chọn** |
 | B. Để nguyên, chỉ sửa comment V28 cho khỏi ngụ ý | 0 công, 0 rủi ro | Mọi quest có thứ tự kể chuyện đều dựa vào may mắn; STORY.md §8 sẽ mâu thuẫn với thứ đang chạy | Không — chủ dự án đã chọn thi hành |
 | C. Ẩn lựa chọn hội thoại khi chưa đủ điều kiện | Người chơi không thấy thứ mình không dùng được | Client/dialogue phải biết trạng thái quest ⇒ phá ranh giới 2 module mà `feature-dialogue`/`feature-quest` cố ý giữ; và vẫn phải chặn ở server (Điều 15) nên là công VIỆC THÊM chứ không thay thế | Không bây giờ — có thể làm sau, trên nền A |
 | D. Gộp vào `QUEST_NOT_FOUND` | Không đổi protocol | Nói dối người chơi: "không có nhiệm vụ này" cho một quest có thật | Không |
@@ -92,12 +95,12 @@ tình cờ bấm đúng thứ tự. Cột `prerequisite_quest_id` thôi là dữ
 
 ---
 
-## Câu hỏi cho chủ dự án
+## Câu hỏi cho chủ dự án — ĐÃ TRẢ LỜI (2026-09-05)
 
-1. **Mốc là `CLAIMED` hay `COMPLETED`?** (D2 — tôi khuyên `CLAIMED`: chuỗi kể chuyện chỉ đóng khi
-   người chơi quay lại gặp NPC lĩnh thưởng.)
-2. Có muốn **ẩn luôn lựa chọn hội thoại** (phương án C) không, hay để NPC vẫn hỏi và server từ chối?
-   (Tôi khuyên để sau — nó là tính năng riêng, tốn hơn nhiều.)
+1. **Mốc là `CLAIMED`** (không phải `COMPLETED`) — chuỗi kể chuyện chỉ đóng khi người chơi quay lại
+   gặp NPC lĩnh thưởng.
+2. **KHÔNG giấu lựa chọn hội thoại** — NPC vẫn hỏi, server từ chối kèm lý do (Điều 15). Việc ẩn
+   lựa chọn để sau, cần ADR riêng nếu làm.
 
 ---
 
@@ -128,7 +131,13 @@ Nếu sau này muốn lọc lựa chọn hội thoại theo điều kiện (phư
 
 ## Việc cần làm tiếp theo
 
-1. **Chủ dự án duyệt/từ chối**, và trả lời 2 câu hỏi ở trên.
-2. Nếu duyệt: VO → use case → adapter → outcome protocol → gateway → i18n → **đảo khẳng định của
-   `QuestIntegrationTest.shouldStillAcceptNightWatch_becausePrerequisiteIsNotEnforcedYet`** (test đó
-   sinh ra để ĐỎ đúng lúc này) → playtest sống bằng một nhân vật mới tinh.
+1. ✅ **Chủ dự án duyệt 2026-09-05** và chốt cả hai câu hỏi.
+2. ✅ **ĐÃ THI HÀNH cùng ngày** xuyên 6 tầng: `QuestTemplate` (`OptionalLong`) → `AcceptQuestUseCase`
+   → `PostgresQuestTemplateAdapter` → `AcceptQuestOutcome = 4` → gateway → i18n vi/en.
+3. ✅ **Test**: khẳng định cũ đã ĐẢO (đúng như nó tự hẹn), cộng 3 test mới — chưa làm quest 1 thì bị
+   từ chối, làm XONG mà chưa lĩnh thưởng vẫn bị từ chối, lĩnh xong mới mở khoá.
+4. 🐛 **Lỗi bắt được lúc thi hành, đáng ghi**: bản mapper đầu tiên gọi `rs.wasNull()` BÊN TRONG lời
+   gọi constructor — tức SAU `getLong("id")` và `getString("script_ref")` — nên nó trả lời về
+   `script_ref` (không bao giờ NULL) và **mọi quest đều trông như có tiên quyết id = 0**, chặn sạch
+   cả quest mở màn. 8 test bắt ngay. `wasNull()` nói về **lần đọc cột GẦN NHẤT**; phải chụp lấy
+   NGAY.

@@ -8,12 +8,13 @@ class QuestTemplateTest {
 
     @Test
     void shouldRejectNonPositiveId() {
-        assertThatThrownBy(() -> new QuestTemplate(0, "/scripts/quest/x.js"))
+        assertThatThrownBy(() -> QuestTemplate.withoutPrerequisite(0, "/scripts/quest/x.js"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void shouldRejectBlankScriptRef() {
-        assertThatThrownBy(() -> new QuestTemplate(1, " ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> QuestTemplate.withoutPrerequisite(1, " "))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

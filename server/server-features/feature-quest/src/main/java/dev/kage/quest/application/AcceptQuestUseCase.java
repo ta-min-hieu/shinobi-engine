@@ -30,6 +30,9 @@ public final class AcceptQuestUseCase {
         if (progressPort.find(characterId, template.id()).isPresent()) {
             return AcceptResult.ALREADY_ACCEPTED;
         }
+        if (!prerequisiteMet(characterId, template)) {
+            return AcceptResult.PREREQUISITE_NOT_MET;
+        }
 
         QuestScriptRunner.HookEffects effects = scriptRunner.runAccept(template.scriptRef());
         tx.inTransaction((Transaction t) -> progressPort.save(
@@ -37,9 +40,31 @@ public final class AcceptQuestUseCase {
         return AcceptResult.OK;
     }
 
+    /**
+     * ADR-044 — quest tiên quyết phải ở trạng thái {@link QuestStatus#CLAIMED}.
+     *
+     * <p>Vì sao CLAIMED chứ không phải COMPLETED (chủ dự án chốt 2026-09-05): chuỗi kể chuyện chỉ
+     * đóng khi người chơi QUAY LẠI gặp NPC lĩnh thưởng, và CLAIMED là trạng thái cuối duy nhất
+     * không bao giờ lùi.
+     *
+     * <p>⚠️ KHÔNG kiểm bắc cầu: chuỗi A→B→C chỉ kiểm B khi nhận C. Đủ, vì muốn có B thì đã phải qua
+     * A — nhưng ghi ra để không ai tưởng nó soi cả chuỗi.
+     */
+    private boolean prerequisiteMet(long characterId, QuestTemplate template) {
+        if (template.prerequisiteQuestId().isEmpty()) {
+            return true;
+        }
+        return progressPort
+                .find(characterId, template.prerequisiteQuestId().getAsLong())
+                .filter(progress -> progress.status() == QuestStatus.CLAIMED)
+                .isPresent();
+    }
+
     public enum AcceptResult {
         OK,
         QUEST_NOT_FOUND,
-        ALREADY_ACCEPTED
+        ALREADY_ACCEPTED,
+        /** ADR-044 — quest tiên quyết chưa lĩnh thưởng xong. */
+        PREREQUISITE_NOT_MET
     }
 }

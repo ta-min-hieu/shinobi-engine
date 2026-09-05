@@ -143,15 +143,23 @@ DÒNG vì bùa xếp chồng được), giết nhầm loài thì script tự b�
 quest quan tâm nó khi người chơi đang làm HAI quest cùng lúc** — đúng chỗ bản hardcode cũ sai.
 Chung một lớp vì `@Container` là static: tách lớp riêng sẽ dựng thêm một Postgres cho cả suite.
 
-## ⚠️ `prerequisite_quest_id` CÓ trong DB nhưng KHÔNG ai đọc
+## `prerequisite_quest_id` — ĐÃ THI HÀNH (ADR-044, 2026-09-05)
 
-Cột này có từ V11; **V28 là dòng đầu tiên trong lịch sử dự án dùng nó** (`night_watch_bandit` trỏ về
-`kill_training_dummies`, tra theo `code`). Nhưng `AcceptQuestUseCase` **không hề đọc cột này** — grep
-`prerequisite` toàn `feature-quest` + `server-database` chỉ ra đúng một javadoc. Nghĩa là người chơi
-nhận được quest "trực đêm" mà chưa từng đập mộc nhân, **ngược thứ tự STORY.md §6**.
+Cột có từ V11, **V28 là dòng dữ liệu đầu tiên dùng nó**, và cùng ngày
+[ADR-044](../../../docs/01-architecture/adr/ADR-044-Quest-Prerequisite-Enforcement.md) được duyệt:
+`AcceptQuestUseCase` nay từ chối bằng `AcceptResult.PREREQUISITE_NOT_MET` nếu quest tiên quyết chưa
+ở trạng thái **`CLAIMED`**.
 
-Đây là ghi nhận, KHÔNG phải mong muốn.
-`QuestIntegrationTest.shouldStillAcceptNightWatch_becausePrerequisiteIsNotEnforcedYet` khoá đúng
-hành vi hiện tại và sẽ ĐỎ khi ai đó thi hành — dấu hiệu đúng, lúc đó đảo khẳng định lại.
-**Không tự thi hành**: thêm một outcome từ chối mới là đổi protocol (CLAUDE.md §4), phải hỏi
-chủ dự án trước.
+**`CLAIMED` chứ không phải `COMPLETED`** (chủ dự án chốt): đánh xong mà chưa quay lại lĩnh thưởng
+thì chuỗi kể chuyện chưa đóng, và `CLAIMED` là trạng thái cuối duy nhất không bao giờ lùi.
+
+**KHÔNG giấu lựa chọn hội thoại** — NPC vẫn bày câu hỏi, server mới là nơi từ chối (Điều 15). Giữ
+`feature-dialogue` không phải biết gì về trạng thái quest.
+
+⚠️ **KHÔNG kiểm bắc cầu**: chuỗi A→B→C chỉ kiểm B khi nhận C. Đủ dùng (muốn có B thì đã phải qua A)
+nhưng đừng tưởng nó soi cả chuỗi.
+
+⚠️ **Bẫy JDBC đã sập một lần ngay trong lần thi hành này**: `rs.wasNull()` nói về **lần đọc cột GẦN
+NHẤT**. Gọi nó bên trong lời gọi constructor — sau `getLong("id")`/`getString("script_ref")` — làm
+nó trả lời về `script_ref` (không bao giờ NULL), nên MỌI quest trông như có tiên quyết `id = 0` và
+cả quest mở màn cũng bị chặn. Chụp `wasNull()` vào biến NGAY sau `getLong` của đúng cột đó.

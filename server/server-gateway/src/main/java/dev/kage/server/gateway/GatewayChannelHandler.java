@@ -1379,9 +1379,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private static final Map<QuestFacade.AcceptResult, AcceptQuestOutcome> ACCEPT_QUEST_OUTCOME_MAPPING = Map.of(
-            QuestFacade.AcceptResult.OK, AcceptQuestOutcome.ACCEPT_QUEST_OUTCOME_OK,
-            QuestFacade.AcceptResult.QUEST_NOT_FOUND, AcceptQuestOutcome.ACCEPT_QUEST_OUTCOME_QUEST_NOT_FOUND,
-            QuestFacade.AcceptResult.ALREADY_ACCEPTED, AcceptQuestOutcome.ACCEPT_QUEST_OUTCOME_ALREADY_ACCEPTED);
+            QuestFacade.AcceptResult.OK,
+            AcceptQuestOutcome.ACCEPT_QUEST_OUTCOME_OK,
+            QuestFacade.AcceptResult.QUEST_NOT_FOUND,
+            AcceptQuestOutcome.ACCEPT_QUEST_OUTCOME_QUEST_NOT_FOUND,
+            QuestFacade.AcceptResult.ALREADY_ACCEPTED,
+            AcceptQuestOutcome.ACCEPT_QUEST_OUTCOME_ALREADY_ACCEPTED,
+            QuestFacade.AcceptResult.PREREQUISITE_NOT_MET,
+            AcceptQuestOutcome.ACCEPT_QUEST_OUTCOME_PREREQUISITE_NOT_MET);
 
     private static AcceptQuestOutcome toProtoOutcome(QuestFacade.AcceptResult result) {
         return ACCEPT_QUEST_OUTCOME_MAPPING.get(result);
