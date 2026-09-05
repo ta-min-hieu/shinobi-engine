@@ -21,11 +21,15 @@ mục "ĐO LẠI N=2000 THẬT") đã trả lời cả hai, và kết quả **x�
   **0,0056 → 0,0105 lõi** khi N gấp đôi ⇒ **tuyệt đối không ngoại suy tuyến tính cho N>2000**.
 - **Off-heap KHÔNG phải trục chính**: `Other`/DirectByteBuffer đứng yên ~256→263MB từ N=1000 sang
   N=2000. Trục RAM thật là **Java heap ứ đọng**, và nó **trả lại hết khi tải rút — KHÔNG rò rỉ**.
-- **Đã profile bằng JFR (N=1000, cấu hình production)**: `world-tick-pool` **62,9%** CPU,
-  `nioEventLoopGroup` 36,7% ⇒ **mô phỏng tốn gấp đôi mạng**. Trong tick, khoản lớn nhất là
-  **tra cứu Component qua `HashMap` (~17-25%)**, rồi AoI (~19%), `AiSystem` quét tuyến tính (~9%),
-  và **`recordSystemDuration` — tức đo đạc — ăn ~7%**. Đích tối ưu rẻ nhất là gỡ đo đạc khỏi vòng
-  nóng; đổi cách truy cập Component thì **cần ADR** (§4).
+- **Đo CPU thật theo luồng (`jdk.ThreadCPULoad`, N=1000, cấu hình production): `nioEventLoopGroup`
+  ~90% CPU, `world-tick-pool` chỉ ~3%.** Mô phỏng gần như miễn phí. Trong Netty: **TLS ~39%**,
+  cấp phát buffer ~28%, ghi socket ~21% — **cả ba là chi phí THEO GÓI**; protobuf chỉ 0,9%.
+  Nguyên nhân: `ctx.writeAndFlush` cho TỪNG message ⇒ **59.760 gói/giây, trung bình 48 byte**
+  ở N=1000, mỗi gói thành một TLS record + một syscall. ⇒ **Đích tối ưu duy nhất đáng làm là
+  GIẢM SỐ GÓI** (gộp flush / gộp nội dung AoI) — **cần ADR** (§4). Tối ưu ECS/AoI/AI là vô nghĩa,
+  chúng nằm trong 3%.
+- ⚠️ **`jdk.ExecutionSample` đếm MẪU, KHÔNG đo CPU.** Dùng nó để so sánh giữa các pool đã cho ra
+  kết luận NGƯỢC HẲN (và đã lỡ ghi vào tài liệu). Quy trách nhiệm CPU thì dùng `jdk.ThreadCPULoad`.
 - ⚠️ **`kage.tick.duration` chỉ nhìn thấy ~4% CPU của server** (đo thẳng `_count`/`_sum`: 4509
   tick/giây × 49µs = 0,22 lõi, trong khi tiến trình ăn 5,7 lõi). ⇒ **"tick p99 thấp" KHÔNG phải
   bằng chứng còn dư sức chứa.**

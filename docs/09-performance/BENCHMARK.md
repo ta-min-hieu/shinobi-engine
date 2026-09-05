@@ -383,74 +383,87 @@ lúc tải đã rút — đúng lỗi timing mà chính mục trên đã tự th
 (DirectByteBuffer/Netty) = **263MB** ở N≈2000, gần **y hệt** 256MB đã đo ở N=1000. Nó **đứng yên**
 khi N gấp đôi. Trục RAM đáng lo là **Java heap ứ đọng ở đường gửi ra**, không phải buffer Netty.
 
-### Nút thắt nằm ở đâu — ĐÃ PROFILE, và giả thuyết ban đầu SAI
+### Nút thắt nằm ở đâu — ĐO XONG, sau HAI lần kết luận sai
 
-⛔ **Bản đầu của mục này (viết cùng ngày, trước khi profile) kết luận: "nút thắt ở đường gửi ra, đừng
-tối ưu tick loop". JFR bác bỏ điều đó.** Giữ lại lời sai ở đây làm hồ sơ — nó được suy ra từ số liệu
-+ kiến trúc mà KHÔNG có stack trace, đúng thứ Điều 30 cảnh báo.
+Mục này đã bị viết lại **ba lần trong cùng một ngày**. Giữ nguyên vết để lần sau khỏi đi lại:
 
-**Cách đo**: `JFR.start settings=profile delay=115s duration=90s` (dùng `delay` của chính JFR — KHÔNG
-gate qua `/metrics` được, vì chính nó chết ở tải cao, xem mục dưới). Cấu hình production, N=1000,
-3374 mẫu `jdk.ExecutionSample`.
+1. **Lần 1 (suy luận, không profile)**: "nút thắt ở đường gửi ra". Không có bằng chứng.
+2. **Lần 2 (`jdk.ExecutionSample`)**: bác bỏ lần 1 — "`world-tick-pool` 62,9% CPU, mô phỏng tốn gấp
+   đôi mạng". **Sai**: **số MẪU không phải thời gian CPU**. Bộ lấy mẫu bắt luồng ở trạng thái
+   RUNNABLE theo chu kỳ, nên pool 32 luồng thức dậy 4509 lần/giây (mỗi lần 49µs) bị đếm trội hẳn
+   so với vài luồng Netty chạy liên tục.
+3. **Lần 3 (`jdk.ThreadCPULoad` — CPU THẬT theo từng luồng, không lấy mẫu)**: quay lại kết luận
+   lần 1, lần này có số.
 
-| Nhóm luồng | % mẫu CPU |
-|---|---|
-| **`world-tick-pool`** (mô phỏng) | **62,9%** |
-| `nioEventLoopGroup` (mạng + TLS) | 36,7% |
-| còn lại (JFR, Hikari, HTTP) | 0,4% |
-
-**Mô phỏng tốn GẤP ĐÔI mạng, không phải ngược lại.**
-
-#### Trong `world-tick-pool` (khung trên cùng — nơi CPU thật sự chạy)
-
-| % | Khung | Nghĩa |
+| Nhóm luồng | CPU thật (N=1000) | Tỉ trọng |
 |---|---|---|
-| **17,6%** | `java.util.HashMap.getNode` | **tra cứu Component**. Cộng với `Entity.getComponent` (6,9%) và `ComponentMapper.get` (8,9% khung `dev.kage` sâu nhất) ⇒ **truy cập component qua HashMap là khoản chi lớn nhất của cả server** |
-| 13,4% | `EcsWorld.update` | duyệt hệ thống/entity |
-| 8,1% | `AiSystem.findNearestCharacterInRange` | quét tuyến tính tìm mục tiêu, mỗi quái mỗi tick |
-| **7,3%** | `MicrometerTickMetricsPort.recordSystemDuration` | **đo đạc nằm trong vòng nóng** (kèm `LongAdder.add` 3,2% khung trên cùng) |
-| 5,8% | `StatusEffects.isStunned` | |
-| ~19% cộng dồn | `AreaOfInterestTracker.*` (`syncCharacterPair` 8,9 + `sync` 3,7 + `buildGrid` 3,4 + `syncCharacterMonsterPair` 3,3) | AoI vẫn O(n²) theo javadoc của chính nó |
+| **`nioEventLoopGroup`** | **4,65-6,49 lõi** | **~90%** |
+| `world-tick-pool` | **0,13-0,25 lõi** | ~3% |
+| còn lại (JIT, ForkJoin, JFR) | ~0,3 lõi | ~7% |
 
-#### Trong `nioEventLoopGroup`
+Tổng 5,1-7,0 lõi — **khớp** với 5,7 lõi đo từ ngoài bằng `TotalProcessorTime`. Và 0,13-0,25 lõi
+**khớp** với 0,22 lõi mà `kage.tick.duration` tự báo (4509 tick/giây × 49µs). Hai phép đo độc lập
+đồng ý ⇒ **metric không hề báo thiếu; chính `ExecutionSample` mới là thứ đánh lừa.**
 
-Chỉ **7,3% mẫu Netty có khung `dev.kage` nào** — 92,7% còn lại là hạ tầng: cấp phát buffer pooled
-(~8%), **mã hoá AES-GCM của TLS (~6%:** `GaloisCounterMode$GCMEncrypt` 3,3 + `GCTR` 1,8 +
-`MessageDigest.isEqual` 2,7**)**, `SocketDispatcher.write0` 2,7%.
+⚠️ **Nhưng hệ quả cho vận hành vẫn nguyên**: `kage.tick.duration` mô tả **3% CPU của server**, nên
+**"tick p99 0,44ms, còn thừa 97% ngân sách" KHÔNG phải bằng chứng còn dư sức chứa** — 90% chi phí
+nằm ở chỗ metric đó không nhìn thấy. OBSERVABILITY.md §3.1 gọi nó là "metric duy nhất mà không có
+nó thì không biết server có khoẻ không"; đúng là cần, nhưng **một mình nó không đủ**, và chính phiên
+này đã dựa vào nó như thể đủ. Số liệu thô: cửa sổ ổn định 150s ở N=1000 cho **676.390 tick**
+(4509/giây ≈ 75 world × 60Hz) tổng **33,35 giây** ⇒ trung bình **49 µs/tick**.
 
-#### Bốn đích tối ưu có bằng chứng, xếp theo tỉ lệ lợi ích/rủi ro
+#### Mô phỏng gần như MIỄN PHÍ; tiền nằm hết ở đường gửi
 
-1. **Bỏ `recordSystemDuration` khỏi vòng nóng (hoặc lấy mẫu thưa) — ~7% CPU, rủi ro gần bằng 0.**
-   Đây là đo đạc tự nó ăn CPU đáng kể; OBSERVABILITY.md cần biết.
-2. **Truy cập Component không qua HashMap — ~17-25% CPU.** Đây là vấn đề ECS kinh điển và chạm
-   `engine-ecs`/Ashley ⇒ **cần ADR** (CLAUDE.md §4, đổi kiến trúc).
-3. **`AreaOfInterestTracker` ~19%** — javadoc của chính nó đã ghi O(n²).
-4. **`AiSystem.findNearestCharacterInRange` ~9%** — dùng chung spatial grid với AoI thay vì quét riêng.
+Chia nhỏ CPU của Netty theo **toàn bộ stack** (không chỉ khung trên cùng), quy ra lõi:
 
-#### Hai điều CHƯA giải thích được (không bịa)
+| Hạng mục | % của Netty | ~lõi | |
+|---|---|---|---|
+| **TLS / mã hoá** | **39,5%** | **~2,13** | khoản chi lớn nhất của cả server |
+| **Cấp phát buffer Netty** | 27,7% | ~1,49 | 1 buffer pooled cho mỗi gói tí hon |
+| **Ghi socket / event loop** | 20,7% | ~1,12 | 1 syscall cho mỗi gói |
+| Đo đạc/tracing | 2,9% | ~0,16 | |
+| Mã dự án khác | 2,7% | ~0,15 | |
+| **Protobuf** | **0,9%** | **~0,05** | **không đáng kể** |
 
-- **Profile chạy ở N=1000, không phải N=2000.** Tỉ lệ 63/37 có thể đổi ở chỗ siêu tuyến tính lộ ra.
-- **Mâu thuẫn chưa gỡ, nhưng đã đo được một nửa chắc chắn.** Đọc thẳng `_count`/`_sum` của
-  `kage_tick_duration_seconds` trong cửa sổ ổn định 150s ở N=1000: **676.390 tick** (⇒ **4509
-  tick/giây** ≈ 75 world × 60Hz) và tổng **33,35 giây** thời gian tick ⇒ **trung bình 49 µs/tick**,
-  tức **0,22 lõi**. Cùng lúc đó tiến trình ăn **~5,7 lõi**.
+**Ba hạng mục đầu = ~88% CPU của Netty ≈ 79% CPU toàn server, và cả ba đều là chi phí THEO GÓI,
+không phải theo byte.**
 
-  ⇒ **`kage.tick.duration` chỉ nhìn thấy ~4% CPU của server.** Kết luận này KHÔNG phụ thuộc vào JFR
-  và là điều quan trọng nhất rút ra: **"tick p99 0,44ms nên server khoẻ" KHÔNG phải bằng chứng còn
-  dư sức chứa** — nó là phát biểu về 4% CPU, không phải về 100%. OBSERVABILITY.md §3.1 gọi đây là
-  "metric duy nhất mà không có nó thì không biết server có khoẻ không"; đúng là cần, nhưng **một
-  mình nó không đủ**.
+#### Nguyên nhân: `writeAndFlush` cho TỪNG gói một
 
-  Phần chưa gỡ: JFR gán 63% mẫu cho `world-tick-pool` ≈ 3,6 lõi, lệch ~16 lần so với 0,22 lõi mà
-  metric báo. Đã LOẠI TRỪ hai giả thuyết bằng chính dữ liệu profile: (a) chi phí bộ máy lập lịch —
-  chỉ **2,7%** mẫu nằm trong `ScheduledThreadPoolExecutor`/`DelayedWorkQueue`; (b) tick thread làm
-  việc ngoài vùng bấm giờ — các mẫu "ngoài `tickOnce`" hoá ra chỉ là **stack bị cắt cụt** (khung
-  trên cùng của chúng là `Entity.getComponent`, `HashMap.getNode`, tức vẫn trong tick). Cũng đã đọc
-  `WorldFacade.tickTask` và xác nhận bộ đếm giờ bọc trọn `tickOnce()`. **Chưa có lời giải** ⇒ coi
-  tỉ lệ 63/37 là **định hướng, không phải con số chính xác**; phần chia nhỏ BÊN TRONG mỗi pool thì
-  không dính vấn đề này.
-- Đã loại trừ một giả thuyết: khu vực rỗng KHÔNG bị bỏ quên mà vẫn tick —
-  `MainWorldChannelRegistry.closeIfEmptyOverflowChannel` có dừng và gỡ chúng thật.
+Đo `kage_packet_sent_total` ở N=1000, cửa sổ ổn định 100 giây: **5.976.044 gói ⇒ 59.760 gói/giây**.
+Băng thông cùng lúc ~2870 KB/s ⇒ **trung bình 48 byte/gói**.
+
+`ConnectedCharacterRegistry:531` và `GatewayChannelHandler:3174` đều gọi `ctx.writeAndFlush(...)`
+cho **mỗi** message. Mỗi lần flush ⇒ **một TLS record riêng** (kèm ~29 byte overhead + dựng GCM +
+MAC) và **một syscall `write()` riêng**, cho tải trọng 48 byte.
+
+Phép chia sát thực tế: 2,13 lõi ÷ 59.760 gói/giây = **~36 µs CPU cho TLS mỗi gói**. AES-GCM có
+AES-NI mã hoá ở mức GB/s, nên 48 byte lẽ ra là **nano**giây. ⇒ chi phí gần như TOÀN BỘ là
+**overhead mỗi record**, không phải mã hoá dữ liệu.
+
+#### Hệ quả cho việc tối ưu — và cải chính khuyến nghị cũ của mục này
+
+⛔ **Bốn "đích tối ưu" mà bản trước liệt kê (tra Component qua `HashMap` ~17-25%, AoI ~19%,
+`AiSystem` ~9%, `recordSystemDuration` ~7%) đều nằm TRONG 3% CPU của tick pool.** Quy ra toàn server
+chúng chỉ là ~0,5% / ~0,6% / ~0,3% / ~0,2%. **Tối ưu chúng gần như vô nghĩa.** Đặc biệt khuyến nghị
+"gỡ `recordSystemDuration` khỏi vòng nóng — thắng ~7%" là **sai một bậc độ lớn**: thực tế ~0,2%.
+
+✅ **Đích DUY NHẤT đáng làm: giảm SỐ LƯỢNG gói gửi ra.** Ba khoản chi lớn nhất đều tính theo gói,
+nên gộp gói tấn công cả ba cùng lúc. Hai hướng, không loại trừ nhau:
+- **Gộp flush** (Netty có sẵn `FlushConsolidationHandler`): giữ nguyên message, chỉ flush một lần
+  mỗi vòng event loop ⇒ nhiều message dồn vào **một** TLS record + **một** syscall.
+- **Gộp nội dung AoI**: một message chứa vị trí của N thực thể thay vì N message. Ở AoI 20Hz với
+  ~19 hàng xóm, đây là mức giảm ~19 lần về số gói.
+
+⚠️ Cả hai **chạm đường ghi của gateway** (và hướng thứ hai đổi cả protocol) ⇒ **cần ADR**
+(/CLAUDE.md §4). Không tự sửa ở đây.
+
+#### Bài học phương pháp (đắt nhất trong ngày)
+
+**`jdk.ExecutionSample` đếm MẪU, không đo CPU. Muốn quy trách nhiệm CPU thì dùng `jdk.ThreadCPULoad`.**
+Hai kết luận trái ngược nhau đã được viết vào tài liệu này trước khi có phép đo đúng. Phần chia nhỏ
+BÊN TRONG một pool thì `ExecutionSample` vẫn dùng được (mọi luồng trong pool cùng đặc tính) — chỉ
+so sánh GIỮA các pool mới sai.
 
 ### Phát hiện phụ, nhưng đáng sửa: observability CHẾT đúng lúc cần nhất
 
@@ -514,7 +527,8 @@ chứa.** Các con số CPU/băng thông/độ trễ thì không bị ảnh hư�
   hướng nguy hiểm.
 - ~~Chưa profile (JFR)~~ **✅ ĐÃ PROFILE — và nó bác bỏ giả thuyết "đường gửi ra"; xem mục "Nút thắt
   nằm ở đâu" ở trên.** Còn thiếu: profile ở **N=2000** (mới có ở N=1000), và gỡ mâu thuẫn giữa
-  `kage.tick.duration` p99 với tỉ trọng CPU của `world-tick-pool`.
+  `kage.tick.duration` p99 với tỉ trọng CPU của `world-tick-pool` — **✅ đã gỡ bằng
+  `jdk.ThreadCPULoad`: metric đúng, `ExecutionSample` sai.**
 - Các lần chạy để lại **~2000 account / ~3000 nhân vật rác** trong DB dev (không xoá — thao tác phá
   huỷ, cần chủ dự án gật).
 
