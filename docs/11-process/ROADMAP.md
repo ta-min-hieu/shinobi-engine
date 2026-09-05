@@ -1462,6 +1462,17 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       cường hoá không có tác dụng ⇒ **ADR-036 Proposed** (đang chờ chủ dự án); `drop_table` im lặng
       khi mã quái không khớp ⇒ **đã sửa**; đổi hệ phái xong người khác thấy model cũ ⇒ **đã sửa một
       nửa**.
+    - ⛔ **`item_template.max_stack` là cột TRANG TRÍ — vật phẩm KHÔNG hề xếp chồng** (phát hiện
+      2026-09-05 khi playtest cửa hàng). `kunai` có `max_stack = 99`, nhưng một nhân vật test đang
+      giữ **5 dòng `inventory_item` riêng** cho 17 phi đao (2+3+1+5+5+1) — mua thêm 1 cái tốn thêm
+      MỘT Ô. `Inventory.add()` luôn `items.add(stack)`, không tìm chồng cùng loại, không đọc
+      `max_stack`; cột đó chỉ được đọc để **gửi cho client hiển thị**. Với túi 20 ô, người chơi
+      nhặt vài lần là đầy.
+      **Chi phí sửa (vì sao KHÔNG tự làm, /CLAUDE.md §4):** (a) `ItemStack`/`Inventory` chưa biết
+      `maxStack`, phải nối dây từ catalog vào domain; (b) **`GrantLootUseCase` PHỤ THUỘC vào việc
+      `add()` luôn append** — nó lấy `items().size() - 1` làm chỉ số món vừa thêm để phát
+      `ITEM_GRANTED`, gộp chồng sẽ phá logic đó; (c) đổi sức chứa túi hiệu dụng ⇒ là quyết định
+      gameplay. **Cần chủ dự án quyết có làm bây giờ không.**
     - ⛔ **Vẫn CHƯA làm, không phải thiếu sót**: toàn bộ quy trình Closed Beta → Open Beta → RC →
       Production ở bảng §Phase 10 **vẫn chưa bắt đầu**, TLS thật trong `docker-compose.prod.yml` và
       cert Production thật vẫn thiếu (mục 22 vẫn nguyên hiệu lực); ~~phép đo lại **N=2000** vẫn chưa
