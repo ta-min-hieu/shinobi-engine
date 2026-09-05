@@ -232,7 +232,7 @@ Chi tiết: [DATABASE.md](../05-server/DATABASE.md).
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
 | ✅ **ADR-018** | **Tick rate = 60Hz** (16.6ms/tick) — đã chốt | [ADR-018](../01-architecture/adr/ADR-018-Tick-Rate.md) |
-| **ADR-019** | Chọn GC (§5) | 🟢 Chặn Phase 9 |
+| ~~**ADR-019**~~ | ✅ **Accepted 2026-07-28 (ZGC)** — [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md) | Hết chặn |
 
 ## Tài liệu liên quan
 

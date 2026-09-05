@@ -199,7 +199,7 @@ Package root chính thức: **`dev.kage`**. Đây là định danh kỹ thuật 
 
 | ADR | Nội dung | Trạng thái |
 |---|---|---|
-| **ADR-011** | Cơ chế enforce dependency rule (§3) | ❌ Cần trước Phase 0 |
+| ~~**ADR-011**~~ | ✅ **Accepted 2026-08-01** — [ADR-011](adr/ADR-011-Enforce-Dependency-Rules.md) | Hết chặn |
 | **ADR-012** | Package root `dev.kage` (§6) | ✅ Accepted |
 
 ## Tài liệu liên quan

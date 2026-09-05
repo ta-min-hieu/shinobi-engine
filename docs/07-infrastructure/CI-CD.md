@@ -260,7 +260,7 @@ Chi tiết: [GIT-WORKFLOW.md](../11-process/GIT-WORKFLOW.md).
 
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
-| **ADR-011** | **ArchUnit rules cụ thể** (§4) — quan trọng nhất | 🔴 **Chặn Phase 0** |
+| ~~**ADR-011**~~ | ✅ **Accepted 2026-08-01** — [ADR-011](../01-architecture/adr/ADR-011-Enforce-Dependency-Rules.md); ArchUnit chạy trong CI từ Phase 0 | Hết chặn |
 
 ## Tài liệu liên quan
 

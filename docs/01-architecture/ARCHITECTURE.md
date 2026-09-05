@@ -450,7 +450,7 @@ Kiến trúc này cố tình để ngỏ các điểm thay thế sau:
 | [ADR-006](adr/ADR-006-Why-ECS.md) | Vì sao ECS + vì sao Ashley trước | ✅ Đã có |
 | [ADR-008](adr/ADR-008-Why-EventDriven.md) | Vì sao Event-Driven, và giới hạn của nó | ✅ Đã có |
 | [ADR-010](adr/ADR-010-Realm-Model.md) | Single-realm + `realm_id` dự phòng — §6, §14 | ✅ Accepted |
-| **ADR-011** | Cách enforce dependency rule (§8) bằng Gradle | ❌ Cần tạo đầu Phase 0 |
+| ~~**ADR-011**~~ | ✅ **Accepted 2026-08-01** — [ADR-011](adr/ADR-011-Enforce-Dependency-Rules.md); ArchUnit chạy thật từ Phase 0 | Hết chặn |
 
 ## Tài liệu liên quan
 

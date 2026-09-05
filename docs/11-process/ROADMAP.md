@@ -730,10 +730,12 @@ ADR-027 TLS chốt 2026-07-31, ADR-011/020/021/022/024/028/029/030 chốt 2026-0
 được Accept 2026-08-30 và ADR-037/038 ra đời sau lần đếm đó. **ADR-023 nay ĐÃ VIẾT** (Accepted 2026-09-05,
 desktop-first) ⇒ chỉ mục HẾT ô "chưa viết".
 
-> ✅ **Đã gộp và đếm lại 2026-09-04**: **ADR-039** (tham số AI theo loài, migration V25) và
-> **ADR-040** (`npc_template`, migration V26) đã lên master ở trạng thái `Proposed` — chúng là hai
-> `Proposed` duy nhất, và **chờ chủ dự án Accept**. ⚠️ Cả hai migration **chưa từng chạy qua
-> Postgres thật** (Docker tắt lúc làm), nên đừng coi chúng là đã kiểm chứng.
+> ~~✅ **Đã gộp và đếm lại 2026-09-04**: ADR-039 và ADR-040 đã lên master ở trạng thái `Proposed`,
+> chờ chủ dự án Accept; cả hai migration **chưa từng chạy qua Postgres thật** (Docker tắt lúc làm).~~
+> ✅ **CẬP NHẬT 2026-09-05**: cả hai **đã Accepted**, và **V25/V26 đã chạy qua Postgres thật** —
+> V25 kèm playtest sống (đứng đè lên cọc 20 giây, 0 sát thương; `wandering_bandit` vẫn đuổi và đánh
+> −18), V26 kèm kiểm chứng bằng mắt (Chu Hoành đúng `(-5, 0)`, nói chuyện được). Chỉ còn **ADR-042**
+> ở trạng thái `Proposed` và nó **hoãn có chủ đích**, không phải chờ duyệt.
 
 Sáu ADR mới so với lần đếm trước (2026-08-07):
 

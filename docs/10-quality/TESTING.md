@@ -229,7 +229,7 @@ void khongChoTanCong_khiMucTieuNgoaiTam() { }   // tiếng Việt cũng OK cho t
 
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
-| **ADR-011** | ArchUnit rules (§3) | 🔴 Chặn Phase 0 |
+| ~~**ADR-011**~~ | ✅ **Accepted 2026-08-01** — [ADR-011](../01-architecture/adr/ADR-011-Enforce-Dependency-Rules.md) | Hết chặn |
 
 ## Tài liệu liên quan
 

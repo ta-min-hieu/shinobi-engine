@@ -234,7 +234,7 @@ FFM cho phép truy cập bộ nhớ ngoài heap và gọi native code không c�
 
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
-| **ADR-019** | Chọn GC (G1 vs ZGC vs Shenandoah) — cần số liệu Phase 9 | 🟢 Thấp — chặn Phase 9 |
+| ~~**ADR-019**~~ | ✅ **Accepted 2026-07-28 (ZGC)** — [ADR-019](../01-architecture/adr/ADR-019-GC-Choice.md), có số liệu soak test thật | Hết chặn |
 | ✅ **ADR-018** | Tick rate server **60Hz** (16.6ms/tick) — đã chốt | Accepted |
 
 ## Tài liệu liên quan

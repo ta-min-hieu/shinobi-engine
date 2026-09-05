@@ -236,7 +236,7 @@ Theo Điều 27, hành vi AI **không hardcode**:
 
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
-| **ADR-022** | Dùng gdx-ai hay tự viết FSM/pathfinding (§5) | 🟡 Chặn Phase 2 |
+| ~~**ADR-022**~~ | ✅ **Accepted 2026-08-01 (tự viết FSM)** — [ADR-022](../01-architecture/adr/ADR-022-Custom-FSM-No-Gdx-Ai.md). Bảng §10 phía trên đã ghi đúng từ lâu, chỉ mục này sót lại | Hết chặn |
 
 ## Tài liệu liên quan
 

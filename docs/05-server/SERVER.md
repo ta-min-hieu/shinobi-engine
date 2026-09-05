@@ -247,7 +247,7 @@ Không có bước này → mất toàn bộ dữ liệu chưa ghi ở §8.
 |---|---|---|
 | ✅ **ADR-018** | **Tick rate 60Hz** — §3, §4, §11 | Accepted |
 | ✅ **ADR-010** | Single-realm + `realm_id` dự phòng — §9, scale | Accepted |
-| **ADR-011** | Enforce ranh giới module §1 | 🔴 Chặn Phase 0 |
+| ~~**ADR-011**~~ | ✅ **Accepted 2026-08-01** — [ADR-011](../01-architecture/adr/ADR-011-Enforce-Dependency-Rules.md) | Hết chặn |
 
 ## Tài liệu liên quan
 
