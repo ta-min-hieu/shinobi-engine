@@ -1,5 +1,6 @@
 package dev.kage.character.application;
 
+import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.ExperienceCurve;
 import dev.kage.character.domain.ExperienceProgress;
@@ -22,28 +23,48 @@ public final class GrantExperienceUseCase {
     }
 
     /**
-     * @param amount lượng EXP cộng thêm; {@code <= 0} thì chỉ ĐỌC trạng thái hiện tại, không ghi gì
-     *     — đó là cách gateway lấy số để gửi vạch EXP lần đầu lúc vào world.
+     * @param amount lượng EXP cộng thêm; {@code <= 0} thì KHÔNG cộng gì — đó là cách gateway lấy số
+     *     để gửi vạch EXP lúc vào world và sau khi nhận thưởng quest. ⚠️ Không cộng KHÔNG có nghĩa
+     *     là không ghi: nhánh này vẫn hoà giải cột {@code level} nếu nó lệch (xem
+     *     {@link #reconcileStoredLevel}).
      * @return trạng thái SAU khi cộng, kèm {@code leveledUp} để client biết có ăn mừng hay không.
      */
     public Result execute(long characterId, long amount) {
-        ExperienceProgress before = ExperienceCurve.progressOf(characterPort
-                .findById(characterId)
-                .orElseThrow(() -> new CharacterNotFoundException(characterId))
-                .exp());
+        Character character =
+                characterPort.findById(characterId).orElseThrow(() -> new CharacterNotFoundException(characterId));
+        ExperienceProgress before = ExperienceCurve.progressOf(character.exp());
         if (amount <= 0L) {
+            reconcileStoredLevel(characterId, character.level(), before.level());
             return new Result(before, false);
         }
 
         ExperienceProgress after = ExperienceCurve.progressOf(characterPort.addExperience(characterId, amount));
         boolean leveledUp = after.level() > before.level();
-        if (leveledUp) {
-            // Chỉ ghi cột level khi thật sự đổi — mỗi lần giết quái mà UPDATE thêm một cột không
-            // đổi giá trị là ghi thừa vào bảng nóng nhất của game (server/CLAUDE.md: item/gold ghi
-            // ngay, thứ khác ghi định kỳ).
-            characterPort.saveLevel(characterId, after.level());
-        }
+        reconcileStoredLevel(characterId, character.level(), after.level());
         return new Result(after, leveledUp);
+    }
+
+    /**
+     * Ghi cột {@code character.level} khi và CHỈ khi nó lệch với cấp suy ra từ {@code exp}.
+     *
+     * <p><b>Vì sao so với cột ĐANG LƯU chứ không so trước/sau lần cộng này</b> (sửa 2026-09-05):
+     * bản cũ chỉ ghi khi {@code after.level() > before.level()}, tức chỉ khi CHÍNH lần cộng này
+     * vượt mốc. Nhưng EXP thưởng quest đi thẳng vào {@code character.exp} qua
+     * {@code PostgresQuestExpAdapter}, KHÔNG qua use case này — nên cột {@code level} tụt lại và
+     * phép so trước/sau **không bao giờ phát hiện ra**. Playtest 2026-09-05: nhận 500 EXP thưởng
+     * quest, {@code exp} thành 620 (đúng ra là cấp 4) mà cột {@code level} nằm im ở 2, và chỉ tự
+     * nhảy khi một lần giết quái sau đó tình cờ vượt mốc — khi ấy nó NHẢY CÓC, bỏ qua các cấp giữa.
+     *
+     * <p>Cột lệch không phải chuyện hiển thị suông: {@code CharacterSummary.level} (màn chọn nhân
+     * vật) và {@code CharacterLevelComponent} (cổng Tuyệt Kỹ Lv50) đều đọc cột này.
+     *
+     * <p>Vẫn giữ nguyên tinh thần tối ưu cũ — không UPDATE khi giá trị không đổi — chỉ đổi phép so
+     * cho ĐÚNG: so với thứ đang nằm trong DB, không phải với một mốc phái sinh.
+     */
+    private void reconcileStoredLevel(long characterId, int storedLevel, int derivedLevel) {
+        if (storedLevel != derivedLevel) {
+            characterPort.saveLevel(characterId, derivedLevel);
+        }
     }
 
     /** @param leveledUp true nếu CHÍNH lần cộng này làm đổi cấp (có thể nhảy nhiều cấp một lúc). */

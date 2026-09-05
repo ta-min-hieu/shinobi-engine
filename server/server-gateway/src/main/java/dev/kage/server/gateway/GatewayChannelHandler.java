@@ -1371,6 +1371,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 Opcode.OPCODE_CLAIM_QUEST_REWARD_RESPONSE_VALUE,
                 sequenceId,
                 responseBuilder.build().toByteArray());
+        if (result.outcome() == QuestFacade.ClaimOutcome.OK) {
+            // EXP thưởng quest đi thẳng vào `character.exp` qua PostgresQuestExpAdapter, KHÔNG qua
+            // GrantExperienceUseCase, nên client không hề biết vạch EXP đã đổi: playtest 2026-09-05
+            // thấy nhận 500 EXP mà HUD vẫn đứng ở 20/200 cho tới khi đăng nhập lại (lúc đó
+            // sendInitialSelfState mới đồng bộ). amount=0 = CHỈ ĐỌC trạng thái hiện tại rồi gửi,
+            // đúng cách sendInitialSelfState làm lúc vào world — không cộng thêm lần nữa.
+            worldGateway.registry().sendExperience(characterId, characterFacade.grantExperience(characterId, 0L));
+        }
     }
 
     private static final Map<QuestFacade.ClaimOutcome, ClaimQuestRewardOutcome> CLAIM_QUEST_REWARD_OUTCOME_MAPPING =
