@@ -24,10 +24,11 @@ mục "ĐO LẠI N=2000 THẬT") đã trả lời cả hai, và kết quả **x�
 - **Đo CPU thật theo luồng (`jdk.ThreadCPULoad`, N=1000, cấu hình production): `nioEventLoopGroup`
   ~90% CPU, `world-tick-pool` chỉ ~3%.** Mô phỏng gần như miễn phí. Trong Netty: **TLS ~39%**,
   cấp phát buffer ~28%, ghi socket ~21% — **cả ba là chi phí THEO GÓI**; protobuf chỉ 0,9%.
-  Nguyên nhân: `ctx.writeAndFlush` cho TỪNG message ⇒ **59.760 gói/giây, trung bình 48 byte**
-  ở N=1000, mỗi gói thành một TLS record + một syscall. ⇒ **Đích tối ưu duy nhất đáng làm là
-  GIẢM SỐ GÓI** (gộp flush / gộp nội dung AoI) — **cần ADR** (§4). Tối ưu ECS/AoI/AI là vô nghĩa,
-  chúng nằm trong 3%.
+  Nguyên nhân: **59.760 gói/giây, trung bình 48 byte** ở N=1000, mỗi gói một TLS record + một
+  syscall + một buffer. ⇒ **Đích duy nhất đáng làm là GIẢM SỐ GÓI** — **cần ADR** (§4). Tối ưu
+  ECS/AoI/AI là vô nghĩa, chúng nằm trong 3%. **Gộp flush đã dựng thử và bị số đo bác bỏ** (~3%,
+  trong nhiễu — mỗi kết nối chỉ ~60 gói/giây nên không có gì để gộp). TLS đắt vì SSLEngine của JDK
+  gọi `Cipher.init` cho MỖI record (TLS 1.3) — đặc tính JDK, không phải lỗi dự án.
 - ⚠️ **`jdk.ExecutionSample` đếm MẪU, KHÔNG đo CPU.** Dùng nó để so sánh giữa các pool đã cho ra
   kết luận NGƯỢC HẲN (và đã lỡ ghi vào tài liệu). Quy trách nhiệm CPU thì dùng `jdk.ThreadCPULoad`.
 - ⚠️ **`kage.tick.duration` chỉ nhìn thấy ~4% CPU của server** (đo thẳng `_count`/`_sum`: 4509

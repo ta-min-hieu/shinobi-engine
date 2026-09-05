@@ -416,17 +416,28 @@ này đã dựa vào nó như thể đủ. Số liệu thô: cửa sổ ổn đ�
 
 Chia nhỏ CPU của Netty theo **toàn bộ stack** (không chỉ khung trên cùng), quy ra lõi:
 
-| Hạng mục | % của Netty | ~lõi | |
+⚠️ **Bảng đầu tiên tôi đưa ra ở đây (TLS 39,5% / buffer 27,7% / socket 20,7%) đã bị RÚT.** Nó phân
+loại mỗi mẫu theo "có khung thuộc nhóm X ở BẤT KỲ đâu trong stack", xét theo thứ tự ưu tiên với TLS
+đứng đầu ⇒ **mọi thứ SslHandler gọi xuống đều bị dán nhãn TLS**, kể cả khi chu kỳ CPU thật sự cháy ở
+lớp cấp phát buffer bên dưới. Bảng đúng dưới đây phân loại theo **khung TRÊN CÙNG** (self time) —
+cách duy nhất trả lời được "chu kỳ CPU cháy ở đâu".
+
+| Hạng mục (theo khung trên cùng) | % của Netty | ~lõi | |
 |---|---|---|---|
-| **TLS / mã hoá** | **39,5%** | **~2,13** | khoản chi lớn nhất của cả server |
-| **Cấp phát buffer Netty** | 27,7% | ~1,49 | 1 buffer pooled cho mỗi gói tí hon |
-| **Ghi socket / event loop** | 20,7% | ~1,12 | 1 syscall cho mỗi gói |
-| Đo đạc/tracing | 2,9% | ~0,16 | |
-| Mã dự án khác | 2,7% | ~0,15 | |
+| **Cấp phát / trả buffer pooled** | **22,4%** | **~1,14** | **khoản chi lớn nhất** — 1 buffer mỗi gói |
+| Pipeline / event loop Netty | 19,1% | ~0,97 | |
+| **Mã hoá THẬT (AES/GCM/MAC)** | 15,9% | ~0,81 | |
+| Khung SSLEngine (không phải mã hoá) | 11,0% | ~0,56 | |
+| Syscall | 4,6% | ~0,23 | |
+| Mã dự án | 3,1% | ~0,16 | |
+| Còn lại (rải rác) | 24,0% | ~1,22 | |
 | **Protobuf** | **0,9%** | **~0,05** | **không đáng kể** |
 
-**Ba hạng mục đầu = ~88% CPU của Netty ≈ 79% CPU toàn server, và cả ba đều là chi phí THEO GÓI,
-không phải theo byte.**
+⇒ **Toàn bộ TLS = mã hoá thật + khung SSLEngine ≈ 26,9% ≈ 1,37 lõi**, KHÔNG phải 2,13 lõi như bản
+đầu. Con số "~36µs TLS mỗi gói" ở trên vì thế phải đọc lại thành **~23µs**. Vẫn rất lớn cho 48 byte.
+
+**Điểm chung của ba khoản lớn nhất (buffer, pipeline, TLS): tất cả đều tính THEO GÓI, không theo
+byte.**
 
 #### Nguyên nhân: `writeAndFlush` cho TỪNG gói một
 
@@ -467,9 +478,18 @@ Prototype đã gỡ; `master` không mang thay đổi nào của nó.
 message mang nhiều thực thể, giảm ~2/3 số gói) — **đổi protocol ⇒ cần ADR**
 ([ADR-042](../01-architecture/adr/ADR-042-Outbound-Packet-Batching.md), /CLAUDE.md §4).
 
-⚠️ **Câu hỏi còn mở, nên trả lời TRƯỚC**: 2,13 lõi ÷ 59.760 gói/giây = **~36 µs CPU cho TLS mỗi gói
-48 byte**. AES-GCM có AES-NI lẽ ra tốn nanogiây. Nếu đường TLS có chỗ bệnh lý thì sửa đúng chỗ đó rẻ
-hơn nhiều so với đổi protocol. **Chưa điều tra.**
+✅ **Câu hỏi "vì sao TLS đắt thế" ĐÃ TRẢ LỜI**: trong nhóm mẫu còn lại có
+**`javax.crypto.Cipher.init(...)` chiếm 1,69% CPU của Netty, gọi thẳng từ
+`sun.security.ssl.SSLCipher$T13GcmWriteCipherGenerator$GcmWriteCipher.encrypt`**. Tức
+**SSLEngine của JDK khởi tạo lại đối tượng `Cipher` cho MỖI TLS record** ở TLS 1.3 (mỗi record cần
+nonce mới). `Cipher.init` tốn key schedule + tra provider — chi phí **cố định mỗi record**, hoàn toàn
+độc lập với 48 byte dữ liệu. Cùng lý do khiến `GCTR.doFinal`/`MessageDigest.isEqual` hiện lên như
+khung nóng thay vì một intrinsic AES-NI duy nhất.
+
+⇒ **Không có "lỗi bệnh lý" nào để vá trong mã dự án — đây là đặc tính của SSLEngine JDK với record
+nhỏ và nhiều.** Hai đường đi tiếp, cả hai đều cần chủ dự án quyết:
+1. **Gửi ít record hơn** (gộp nội dung AoI — [ADR-042](../01-architecture/adr/ADR-042-Outbound-Packet-Batching.md) D3).
+2. **Đổi provider TLS sang OpenSSL/BoringSSL** qua `netty-tcnative` — thư viện MỚI ⇒ 🛑 CLAUDE.md §4.
 
 #### Bài học phương pháp (đắt nhất trong ngày)
 
