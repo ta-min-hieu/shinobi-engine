@@ -2,7 +2,9 @@
 
 | | |
 |---|---|
-| Status | 🟡 **Proposed** (2026-09-05) — **D1 đã dựng thử và ĐO: gần như không ăn thua, xem §"Đã thử D1". Đề xuất nay xoay sang D3.** Chờ chủ dự án duyệt. AI **không** tự Accept. |
+| Status | ⏸️ **Proposed — chủ dự án quyết HOÃN (2026-09-05)** |
+| Vì sao hoãn | Ở N=1000 server dùng **5,3/32 lõi**, trễ gói p95 **0,8ms**, **0 lỗi** — chưa phải vấn đề ở quy mô Closed Beta; chỉ thành vấn đề từ ~N=2000. D1 (gộp flush) đã dựng thử và **bị số đo bác bỏ**; phần còn lại (D3) là **đổi protocol**, không đáng làm khi chưa cần. Giữ ADR làm hồ sơ: khi nào cần thì số đo đã có sẵn, không phải đo lại từ đầu. |
+| Mở lại khi | Đo được **N ≥ 1500** thật với `nioEventLoopGroup` vượt ~70% CPU, hoặc trước khi mở Open Beta đông người. |
 | Date | 2026-09-05 |
 | Deciders | Chủ dự án quyết; AI đo + soạn |
 | Related | [BENCHMARK.md §5.1](../../09-performance/BENCHMARK.md) (toàn bộ số liệu dưới đây) · [ADR-027](ADR-027-TLS-Transport-Security.md) (TLS — nay là khoản chi CPU lớn nhất) · [ADR-019](ADR-019-Garbage-Collector.md) · [KAGE-CONSTITUTION Điều 30](../../00-governance/KAGE-CONSTITUTION.md) (benchmark trước, refactor sau) · [/CLAUDE.md §4](../../../CLAUDE.md) (đổi đường ghi gateway / protocol ⇒ dừng, viết ADR) · [/CLAUDE.md §9](../../../CLAUDE.md) |
