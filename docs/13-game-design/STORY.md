@@ -4,8 +4,8 @@
 
 | | |
 |---|---|
-| Version | 0.2.0 — §1–§8 viết đầy đủ theo bố cục đã duyệt 2026-09-01 |
-| Status | Draft — nội dung chờ chủ dự án đọc + duyệt (bố cục đã duyệt cùng [ADR-038](../01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md)) |
+| Version | **1.0.0** — §1–§8, nội dung duyệt nguyên trạng 2026-09-05 |
+| Status | ✅ **Approved** (2026-09-05) — chủ dự án đọc và **duyệt nguyên trạng**: chân tướng Đại Kiếp §3.2, twist Tô Vân Nhi §5, lời giải rebirth §6 arc 6, và cả ba điểm được nêu ra để soi kỹ (xuất thân cố định của người chơi ở §5; twist Tô Vân Nhi không rẽ nhánh cơ chế ở MVP; mới arc 1 tồn tại trong code). Bố cục đã duyệt trước đó cùng [ADR-038](../01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md) 2026-09-01. |
 | Liên quan | [GDD](GAME-DESIGN-DOCUMENT.md) — cơ chế · [ADR-038](../01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md) — quyết định re-theme tu tiên · [GLOSSARY.md](../GLOSSARY.md) — thuật ngữ |
 
 > [GDD](GAME-DESIGN-DOCUMENT.md) trả lời "chơi thế nào"; tài liệu này trả lời "**vì sao thế giới
@@ -321,7 +321,7 @@ Không — tường thuật thuộc thẩm quyền GDD/STORY. [ADR-038](../01-ar
 
 ## Việc cần làm tiếp theo
 
-1. **Chủ dự án đọc + duyệt nội dung v0.2.0** (nhất là: chân tướng Đại Kiếp §3.2, twist Tô Vân Nhi §5, lời giải rebirth §6 arc 6) — chữ đã viết nhưng chưa ai gật.
+1. ~~Chủ dự án đọc + duyệt nội dung v0.2.0~~ ✅ **XONG 2026-09-05 — duyệt nguyên trạng**, không sửa mục nào. Tài liệu lên **v1.0.0**. Từ đây mọi thay đổi §1–§6 (tiền đề, bí mật trục chính, thế lực, nhân vật, arc) là **đổi SSOT tường thuật** — phải hỏi lại chủ dự án, không tự sửa; §7/§8 thì thêm dòng cùng PR như luật đã ghi.
 2. ✅ **Arc 1 đã có mặt trong game** (Đợt 2 ADR-038, 2026-09-01): Chu Hoành nói đúng giọng §5; cây hội thoại `town_elder.js` phủ §6 arc 1 (tông môn → cảnh giới → thân thế trưởng lão); quest `kill_training_dummies` khai `// STORY: arc-1 §6` theo §8. Nhịp hé lộ §8 quy tắc 2 được **gác bằng test** (`TownElderDialogueTreeTest`).
 3. 🔶 Arc 2 trở đi chưa có nội dung trong game. Quest thứ hai của arc 1 (cao trào "đêm trực gặp tán tu cường đạo") bị **chặn kỹ thuật** — xem mục 8 phần "Việc cần làm tiếp theo" của [ADR-038](../01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md).
 4. Khi thêm NPC/địa danh/thế lực mới trong quest → cập nhật §4/§5 cùng PR.

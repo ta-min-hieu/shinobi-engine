@@ -213,7 +213,7 @@ lúc này. Tên "Kage" trên repo/branding lệch theme cho tới khi chủ dự
 
 1. ✅ Accepted 2026-09-01 (chủ dự án duyệt trọn D1–D9 + bố cục STORY.md + 2 tên riêng).
 2. ✅ Đợt 1 đã soạn kèm: [GDD v0.3.0](../../13-game-design/GAME-DESIGN-DOCUMENT.md) + [GLOSSARY](../../GLOSSARY.md) + khung [STORY.md](../../13-game-design/STORY.md).
-3. ✅ STORY.md §1–§8 viết đầy đủ (v0.2.0, 2026-09-01) — nội dung chờ chủ dự án duyệt.
+3. ✅ STORY.md §1–§8 viết đầy đủ (2026-09-01) — **nội dung được chủ dự án duyệt NGUYÊN TRẠNG 2026-09-05, tài liệu lên v1.0.0**. Không còn gì treo ở đây.
 4. ✅ Đợt 2 xong 2026-09-01 — xem D10.
 5. ✅ Playtest thật xong 2026-09-01 — xem D11. 1099/1099 test xanh (gồm 197 test Postgres).
 6. ✅ **Đợt 3 — phần RÀ SOÁT xong 2026-09-01**: [ART-AUDIT-TU-TIEN.md](../../14-art/ART-AUDIT-TU-TIEN.md).
