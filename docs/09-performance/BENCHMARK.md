@@ -448,15 +448,28 @@ AES-NI mã hoá ở mức GB/s, nên 48 byte lẽ ra là **nano**giây. ⇒ chi 
 chúng chỉ là ~0,5% / ~0,6% / ~0,3% / ~0,2%. **Tối ưu chúng gần như vô nghĩa.** Đặc biệt khuyến nghị
 "gỡ `recordSystemDuration` khỏi vòng nóng — thắng ~7%" là **sai một bậc độ lớn**: thực tế ~0,2%.
 
-✅ **Đích DUY NHẤT đáng làm: giảm SỐ LƯỢNG gói gửi ra.** Ba khoản chi lớn nhất đều tính theo gói,
-nên gộp gói tấn công cả ba cùng lúc. Hai hướng, không loại trừ nhau:
-- **Gộp flush** (Netty có sẵn `FlushConsolidationHandler`): giữ nguyên message, chỉ flush một lần
-  mỗi vòng event loop ⇒ nhiều message dồn vào **một** TLS record + **một** syscall.
-- **Gộp nội dung AoI**: một message chứa vị trí của N thực thể thay vì N message. Ở AoI 20Hz với
-  ~19 hàng xóm, đây là mức giảm ~19 lần về số gói.
+✅ **Đích DUY NHẤT đáng làm: giảm SỐ LƯỢNG gói gửi ra.** Ba khoản chi lớn nhất đều tính theo gói.
 
-⚠️ Cả hai **chạm đường ghi của gateway** (và hướng thứ hai đổi cả protocol) ⇒ **cần ADR**
-(/CLAUDE.md §4). Không tự sửa ở đây.
+⛔ **Hướng "gộp flush" ĐÃ DỰNG THỬ VÀ BỊ SỐ ĐO BÁC BỎ** (cùng ngày). `FlushConsolidationHandler(256,
+true)` đặt ngay sau `SslHandler`, đo cùng kịch bản/cấu hình:
+
+| | Tổng CPU | `nioEventLoopGroup` | Cơ cấu trong Netty |
+|---|---|---|---|
+| Baseline | 5,52 lõi | 5,09 lõi (92,3%) | TLS 39,5% · buffer 27,7% |
+| + gộp flush | 5,36 lõi | 4,87 lõi (91,0%) | TLS **39,7%** · buffer 26,1% |
+
+Giảm ~2,9% — **nằm trong nhiễu**, và tỉ trọng TLS **không đổi** ⇒ số TLS record hầu như không giảm.
+**Vì sao**: 59.760 gói/giây ÷ 1000 kết nối = **~60 gói/giây MỖI kết nối**, cách nhau ~16ms — gộp
+flush chỉ ăn thua khi nhiều message tới **cùng một kết nối** sát nhau, ở đây **không có gì để gộp**.
+Prototype đã gỡ; `master` không mang thay đổi nào của nó.
+
+⇒ Chi phí là **theo MESSAGE**, không phải theo lần flush. Đường còn lại là **gộp nội dung AoI** (một
+message mang nhiều thực thể, giảm ~2/3 số gói) — **đổi protocol ⇒ cần ADR**
+([ADR-042](../01-architecture/adr/ADR-042-Outbound-Packet-Batching.md), /CLAUDE.md §4).
+
+⚠️ **Câu hỏi còn mở, nên trả lời TRƯỚC**: 2,13 lõi ÷ 59.760 gói/giây = **~36 µs CPU cho TLS mỗi gói
+48 byte**. AES-GCM có AES-NI lẽ ra tốn nanogiây. Nếu đường TLS có chỗ bệnh lý thì sửa đúng chỗ đó rẻ
+hơn nhiều so với đổi protocol. **Chưa điều tra.**
 
 #### Bài học phương pháp (đắt nhất trong ngày)
 
