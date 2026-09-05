@@ -1957,3 +1957,29 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
     - 💡 **Bẫy thao tác đã ngốn 3 mạng**: khung mục tiêu trên HUD có thể vẫn đang khoá **con quái
       cũ** trong khi mình tưởng đã chọn con mới — lúc đó `Z` bay vào khoảng không và trông y hệt
       "đánh hụt". **Luôn xác nhận tên trên khung mục tiêu TRƯỚC khi đánh.**
+
+57. **Suýt hạ nhầm chỉ số con quái — công thức nói ngược lại lời tôi báo (2026-09-05)**:
+    - Mục 56 kết luận "cấp 4 mặc trọn bộ Tạp Dịch vẫn chết 3 lần ⇒ cân bằng chưa đạt", và chủ dự án
+      đã chọn phương án **hạ sức tán tu** dựa trên đó. Trước khi đổi một con số nào, tôi hỏi lại
+      CÔNG THỨC thay vì hỏi màn hình — và nó **bác bỏ tiền đề của chính tôi**:
+
+      | Tình huống | Người chơi cần | Tán tu cần | Kết quả |
+      |---|---|---|---|
+      | Cấp 4 **có** trọn bộ Tạp Dịch | **3 nhát** (34 sát thương/nhát) | **7 nhát** (17 sát thương/nhát) | thắng thoải mái |
+      | Cấp 4 **tay không** | **4 nhát** (30 → 27 sau giáp) | **6 nhát** (18 sát thương/nhát) | thắng, nhưng sát nút |
+
+      Hai bên dùng CHUNG `ATTACK_INTERVAL_SECONDS = 1` (1 đòn/giây) nên "ít nhát hơn" cũng chính là
+      "chết sau" — không cần mô phỏng thời gian.
+    - ⇒ **Chỉ số của `wandering_bandit` KHÔNG phải vấn đề.** Hạ nó theo kết luận cũ sẽ làm hỏng một
+      trận đấu vốn đã cân, để chữa một triệu chứng có nguyên nhân khác.
+    - 🎯 **Nguyên nhân thật, và nó nằm ở HÌNH HỌC chứ không ở chỉ số**: hai điểm spawn
+      `wandering_bandit` đặt ở **x=21 và x=27** (V25), đúng bằng **`aggro_radius_meters = 6`** của
+      loài này. Nghĩa là **mọi vị trí trong đoạn [21, 27] đều nằm trong tầm aggro của CẢ HAI con** —
+      người chơi đi làm quest gần như chắc chắn kéo hai con cùng lúc, và sát thương nhận vào **gấp
+      đôi: 34/giây thay vì 17**. Con số đó khớp đúng với cảnh chết trong ~3 giây từ máu gần đầy.
+    - ✅ `NightWatchDuelBalanceTest` (3 test, `server-world`) khoá cả phép tính tay đôi lẫn con số
+      hình học đó lại — sửa spawn hay sửa `aggro_radius` là test đỏ, buộc người sửa nhìn lại phép
+      tính thay vì đổi mù. **1160 test xanh, 0 skip.**
+    - 💡 **Bài học, lần thứ HAI trong cùng một ngày** (xem mục 55): tôi lại suýt ghi một kết luận
+      thiết kế dựa trên quan sát màn hình. Khác biệt lần này là dừng lại trước khi đổi số. **Với
+      câu hỏi cân bằng, hỏi công thức trước — nó tái lập được, còn buổi chơi tay thì không.**
