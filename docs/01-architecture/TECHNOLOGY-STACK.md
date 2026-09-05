@@ -138,7 +138,7 @@ Các số phiên bản trong tài liệu này là **baseline đề xuất tại 
 | Nền tảng | Backend | Ưu tiên | Ghi chú |
 |---|---|---|---|
 | Windows / Linux / macOS | LWJGL3 | **#1 — mục tiêu MVP** | — |
-| Android | libGDX Android backend | #2 | Cần chốt câu hỏi mobile-first hay desktop-first |
+| Android | libGDX Android backend | #2 | **Post-MVP.** Câu hỏi nền tảng đã chốt: **desktop-first** ([ADR-023](adr/ADR-023-Desktop-First-Input.md), Accepted 2026-09-05). Làm mobile thật thì cần một ADR riêng cho sơ đồ nhập liệu cảm ứng — KHÔNG thiết kế trước (Điều 9) |
 | iOS | RoboVM | #3 | ⚠️ Chi phí cao: cần máy macOS để build |
 | Web (GWT/TeaVM) | — | Ngoài scope | Cân nhắc lại nếu cần demo trình duyệt |
 

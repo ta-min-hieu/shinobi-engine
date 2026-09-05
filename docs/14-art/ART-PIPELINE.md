@@ -345,8 +345,10 @@ phải nói rõ, không giấu:
 - `CharacterModelRenderer` **chưa cull gì** ([RENDERING §15](../03-engine/RENDERING.md)) — mọi `Scene`
   đã thêm đều cập nhật mỗi khung bất kể có nằm trong camera hay không, nên số đo phản ánh đúng chi phí
   "20 `Scene` trong `SceneManager`" mà Revisit Trigger #1 muốn biết, không phụ thuộc cách xếp lưới.
-- Đo trên desktop LWJGL3, **không phải Android** — Revisit Trigger #2 (máy tầm thấp, 10 nhân vật, 30fps
-  trên Android) là câu hỏi khác, vẫn treo, vẫn chờ ADR-023 (§ADR-031 "ADR cần tạo").
+- Đo trên desktop LWJGL3, **không phải Android** — và từ 2026-09-05 điều đó là ĐÚNG NỀN TẢNG chứ
+  không còn là thiếu sót: [ADR-023](../01-architecture/adr/ADR-023-Desktop-First-Input.md) chốt
+  **desktop-first**, nên Revisit Trigger #2 của ADR-031 (máy Android tầm thấp) không thể kích hoạt
+  cho tới khi Android được chốt là target thật.
 
 **Cấp phát mỗi khung** (`SceneManager`/`AnimationController`, RENDERING §16) đo bằng HAI tín hiệu, không
 cái nào là profiler thật (CLAUDE.md §4 — không thêm dependency):

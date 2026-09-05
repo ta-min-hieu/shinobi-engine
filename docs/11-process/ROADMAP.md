@@ -87,7 +87,7 @@ graph LR
       (`client-android`, `client-ios`, `tools/content-editor`, `feature-auction`,
       `feature-ranking`) và **không liệt kê 4 cái đang có** (`feature-party`, `feature-trade`,
       `feature-pvp`, `feature-monster`). Đây là **lệch tài liệu ↔ thực tế**, không phải việc chưa
-      làm: `client-android`/`client-ios` treo theo ADR-023 (mobile input, chưa viết), auction/
+      làm: `client-android`/`client-ios` là **Post-MVP** theo ADR-023 (desktop-first, Accepted 2026-09-05), auction/
       ranking là nội dung chưa mở. **Cần chủ dự án chọn**: sửa §1 theo thực tế, hay dựng module
       rỗng cho đủ. Không tự chọn bên nào (CLAUDE.md §14).
 - [x] ArchUnit chạy (dù chưa có gì để kiểm) — `quality/architecture-tests`
@@ -727,8 +727,8 @@ ADR-027 TLS chốt 2026-07-31, ADR-011/020/021/022/024/028/029/030 chốt 2026-0
 **ADR-035 chốt 2026-08-27**, **ADR-036 + ADR-037 chốt 2026-08-30**, **ADR-038 (pivot tu tiên) chốt
 2026-09-01**). ADR-007 **Superseded by ADR-030** (không xây Plugin System). Con số cũ ở đây
 ("**33 Accepted · 1 Superseded · 1 Proposed** trên 35 file", đếm 2026-08-29) **đã sai** vì ADR-036 đã
-được Accept 2026-08-30 và ADR-037/038 ra đời sau lần đếm đó. Vẫn chỉ còn **ADR-023** chưa viết (chờ
-chốt desktop-first hay mobile-first).
+được Accept 2026-08-30 và ADR-037/038 ra đời sau lần đếm đó. **ADR-023 nay ĐÃ VIẾT** (Accepted 2026-09-05,
+desktop-first) ⇒ chỉ mục HẾT ô "chưa viết".
 
 > ✅ **Đã gộp và đếm lại 2026-09-04**: **ADR-039** (tham số AI theo loài, migration V25) và
 > **ADR-040** (`npc_template`, migration V26) đã lên master ở trạng thái `Proposed` — chúng là hai

@@ -122,17 +122,20 @@ if (input.isPressed(GameAction.JUMP)) jump();
 
 → Đổi từ bàn phím sang cảm ứng = đổi ánh xạ, **không đụng gameplay** (Điều 28).
 
-**Ánh xạ mặc định:**
+**Ánh xạ THẬT** (đọc từ `DesktopInputMapper` — [ADR-023](../01-architecture/adr/ADR-023-Desktop-First-Input.md): desktop là sơ đồ CHÍNH):
 
-| Action | Desktop | Mobile |
+| Action | Phím | Ghi chú |
 |---|---|---|
-| MOVE_LEFT/RIGHT | A/D hoặc ←/→ | Joystick ảo |
-| JUMP | Space | Nút |
-| ATTACK | J hoặc chuột trái | Nút |
-| SKILL_1..6 | 1–6 | Nút vòng |
-| INVENTORY | I | Nút HUD |
+| `MOVE_LEFT` / `MOVE_RIGHT` | **A** / **D** (hoặc ← / →) | Chỉ trục X — [ADR-033](../01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md) bỏ MOVE_UP/DOWN |
+| `JUMP` | **W** (hoặc ↑, Space) | ADR-033 — nhảy có tác dụng gameplay thật |
+| `ATTACK` | **Z** (hoặc nút Đánh trên HUD) | Giữ được, tự lặp — [ADR-034](../01-architecture/adr/ADR-034-Manual-Attack-And-Click-Target.md) |
+| `USE_SKILL` | **Enter** (hoặc numpad Enter) | Một nút skill, không phải dãy 1–6 |
+| Chọn mục tiêu | **Chuột trái** vào quái/NPC | ADR-034 — KHÔNG có tương đương cảm ứng một-đổi-một |
+| Mở 11 cửa sổ HUD | **T** chat · **I** túi đồ · **B** mua bán · **N** giao dịch · **J** nhiệm vụ · **M** thư · **P** nhóm · **F** bạn · **G** bang · **K** luận kiếm · **H** hệ phái | Phím chữ, không đi qua `GameAction`: đây không phải ý định gameplay |
 
-⚠️ **Mobile input là quyết định thiết kế lớn chưa chốt** — joystick ảo? tap-to-move? Ảnh hưởng cả UI lẫn gameplay. Phụ thuộc câu hỏi "desktop-first hay mobile-first" ([GDD](../13-game-design/GAME-DESIGN-DOCUMENT.md)).
+⚠️ Bảng cũ ở đây từng ghi `Space`/`J`/`SKILL_1..6` — **sai so với code** kể từ ADR-033/034. Sửa 2026-09-05.
+
+✅ **Nền tảng đã chốt: desktop-first** ([ADR-023](../01-architecture/adr/ADR-023-Desktop-First-Input.md), Accepted 2026-09-05). Sơ đồ cảm ứng KHÔNG thiết kế trước (Điều 9) — khi nào làm mobile thật thì cần một ADR riêng, phạm vi tối thiểu: sơ đồ nhập liệu cảm ứng, bố cục lại HUD theo vùng chạm tối thiểu, và xem lại [ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md)/[ADR-028](../01-architecture/adr/ADR-028-Asset-Delivery-Tiers.md).
 
 ---
 
@@ -293,14 +296,14 @@ public interface PlatformAdapter {
 | 7 | **Không tự retry Command có side-effect** | Tránh mua đồ 2 lần | Accepted |
 | 8 | Giá trị gameplay **không** lưu ở client | Điều 15 — sửa được = hack | Accepted |
 | 9 | Giới hạn SFX đồng thời | Tránh vỡ tiếng khi đông người | Accepted |
-| 10 | **Mobile input scheme chưa chốt** | Quyết định thiết kế lớn | ⏳ Chờ |
+| 10 | ~~Mobile input scheme chưa chốt~~ **Desktop-first** | ADR-023 Accepted 2026-09-05 | ✅ Accepted |
 | 11 | Ngân sách §12 **chưa verify** | Phải đo thật ở Phase 3 | ⏳ Tạm thời |
 
 ## ADR cần tạo
 
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
-| **ADR-023** | **Mobile input scheme** (joystick ảo / tap-to-move / D-pad) — ảnh hưởng cả UI lẫn gameplay | 🟡 Chặn Phase 2 nếu mobile-first |
+| ~~**ADR-023**~~ | ✅ **Desktop-first — Accepted 2026-09-05**, xem [ADR-023](../01-architecture/adr/ADR-023-Desktop-First-Input.md). Sơ đồ cảm ứng để dành cho ADR riêng khi làm mobile thật | Hết chặn |
 | ~~**ADR-020**~~ | ✅ Viewport strategy — **Accepted 2026-08-01** (`FitViewport`), xem [RENDERING.md §4](../03-engine/RENDERING.md) | Hết chặn |
 
 ## Tài liệu liên quan
@@ -313,6 +316,6 @@ public interface PlatformAdapter {
 
 ## Việc cần làm tiếp theo
 
-1. Chốt **desktop-first hay mobile-first** — đang chặn ADR-023 và ảnh hưởng toàn bộ §5, §12.
+1. ~~Chốt desktop-first hay mobile-first~~ ✅ **XONG 2026-09-05 — desktop-first** ([ADR-023](../01-architecture/adr/ADR-023-Desktop-First-Input.md)); §5 đã cập nhật theo ánh xạ THẬT.
 2. Phase 1: xác lập §5 (input abstraction) và §11 (PlatformAdapter) ngay — nhét `if (Android)` vào gameplay là thứ rất khó gỡ sau.
 3. Phase 3: **đo thật** §12 trên thiết bị Android tầm trung, cập nhật lại số liệu.

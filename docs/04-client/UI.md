@@ -237,7 +237,7 @@ thấy. Cùng loại với bẫy "vạch máu 139/100" và "khung túi đồ tr�
 
 | ADR | Nội dung | Ưu tiên |
 |---|---|---|
-| **ADR-023** | Mobile input scheme — ảnh hưởng trực tiếp HUD layout (§6) | 🟡 Chặn Phase 2 |
+| ~~**ADR-023**~~ | ✅ **Desktop-first — Accepted 2026-09-05** ([ADR-023](../01-architecture/adr/ADR-023-Desktop-First-Input.md)). HUD §6 thiết kế cho bàn phím + chuột; bố cục cảm ứng để dành cho ADR riêng khi làm mobile thật | Hết chặn |
 | — | Nếu Phase 8 thấy Scene2D không kham nổi UI MMORPG → ADR đánh giá thư viện khác | 🟢 Chờ dữ liệu |
 
 ## Tài liệu liên quan

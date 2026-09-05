@@ -126,9 +126,12 @@ MMORPG **tu tiên** side-view 2.5D ([ADR-038](01-architecture/adr/ADR-038-Theme-
 > Đếm lại 2026-09-03 (đọc dòng `Status` của **từng file một**, không suy từ bảng index): **36 Accepted ·
 > 1 Superseded (ADR-007) · 0 Proposed** trên tổng **37 file**; chỉ **ADR-023** là chưa viết. Số này khớp
 > đúng lần đếm 2026-09-01 — không ADR nào đổi trạng thái giữa hai lần.
-> ✅ **Đã đếm lại sau khi gộp (2026-09-04)**: ADR-039 (tham số AI theo loài) và ADR-040
-> (`npc_template`) đã vào master ở trạng thái `Proposed` ⇒ nay là **40 Accepted · 1 Proposed (hoãn) · 1 Superseded** trên tổng **42 file ADR** (ADR-041 + ADR-042 thêm 2026-09-05; ADR-039/040/041 Accepted 2026-09-05). Cả hai
-> **chờ chủ dự án Accept**. Luật vẫn đúng nguyên: nếu tài liệu nào còn viết "chờ chủ dự án
+> *(Câu "chỉ ADR-023 chưa viết" là ghi chép của NGÀY 2026-09-03 và nay đã lỗi thời: ADR-023 được
+> viết + Accepted 2026-09-05, desktop-first. Giữ nguyên dòng trên làm hồ sơ.)*
+> ✅ **Đếm lại 2026-09-05 (mới nhất)**: **40 Accepted · 1 Proposed (HOÃN có chủ đích) · 1 Superseded**
+> trên tổng **42 file ADR**. Chủ dự án Accept ADR-039/040/041 và chốt ADR-023 (desktop-first) cùng
+> ngày; ADR-042 hoãn kèm điều kiện mở lại đo được. **Chỉ mục HẾT ô "chưa viết"** — lần đầu kể từ
+> Phase 0. Luật vẫn đúng nguyên: nếu tài liệu nào còn viết "chờ chủ dự án
 > Accept" cho một ADR thì **kiểm dòng `Status` của chính file ADR đó**, đừng tin chữ ở nơi khác —
 > chính cái bẫy đó đã bắt được lỗi sổ sách ADR-032 ngày 2026-08-25.
 

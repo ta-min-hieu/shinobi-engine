@@ -37,8 +37,9 @@ Ràng buộc cần cân nhắc kèm:
 - **Tổ hợp trang bị.** Hiện `item_template` không có cột hình ảnh nào — trang bị chỉ là chỉ số. Nếu
   sau này muốn trang bị *nhìn thấy được*, sprite nướng sẵn nổ theo tổ hợp (đã 15 sheet chỉ cho
   5 hệ × 3 bậc), còn model 3D chỉ là gắn thêm mesh vào xương.
-- **Mobile chưa chốt.** [ADR-023](README.md) (mobile input) vẫn chưa viết vì Android chưa được
-  quyết là target. Poly budget của phương án 3D phụ thuộc trực tiếp vào câu đó.
+- ~~**Mobile chưa chốt.**~~ ✅ **Đã chốt 2026-09-05**: [ADR-023](ADR-023-Desktop-First-Input.md)
+  chọn **desktop-first**, Android là Post-MVP. Poly budget của phương án 3D vì thế tính theo mục
+  tiêu desktop — đây từng là ẩn số lớn nhất của quyết định này.
 - **VFX và icon không nên đổi.** Repo đã có **17 bộ VFX kỹ năng** và **3 icon vật phẩm** dựng theo
   đường sprite. Làm lại chúng thành hệ hạt 3D là một khối lượng công việc riêng, không nằm trong
   vấn đề mà ADR này giải quyết.
@@ -116,8 +117,11 @@ Xem lại quyết định này khi **một trong ba** điều kiện sau xảy r
 
 1. Benchmark client với **20 nhân vật trên màn** cho frame time GPU **> 8 ms** trên máy tham chiếu
    của dự án, sau khi đã decimate xuống ngưỡng đã chốt.
-2. Android được chốt là target **và** máy tầm thấp trong danh sách hỗ trợ không giữ nổi **30 fps**
-   ở 10 nhân vật trên màn.
+2. ~~Android được chốt là target **và** máy tầm thấp không giữ nổi **30 fps** ở 10 nhân vật.~~
+   **KHÔNG THỂ KÍCH HOẠT kể từ 2026-09-05**: [ADR-023](ADR-023-Desktop-First-Input.md) chốt
+   **desktop-first**, Android là Post-MVP và sẽ cần ADR riêng. Ngân sách tam giác vì thế tính theo
+   mục tiêu DESKTOP, không phải mẫu số chung với điện thoại. Điều kiện này **sống lại** đúng lúc
+   Android được chốt là target thật (Revisit Trigger của chính ADR-023).
 3. JitPack ngừng phục vụ artifact `com.github.mgsx-dev.gdx-gltf`, hoặc gdx-gltf không còn phát hành
    bản tương thích trong **12 tháng** kể từ lần libGDX phát hành lớn kế tiếp.
 
@@ -150,8 +154,11 @@ tiết ở [ART-PIPELINE §4.4](../../14-art/ART-PIPELINE.md).
 
 ## ADR cần tạo
 
-- **ADR-023** (mobile input) vẫn đang chặn: poly budget ở Revisit Trigger #2 không đóng được chừng
-  nào Android chưa được chốt là target hay không.
+- ~~**ADR-023** (mobile input) vẫn đang chặn: poly budget ở Revisit Trigger #2 không đóng được~~
+  ✅ **HẾT CHẶN 2026-09-05** — [ADR-023](ADR-023-Desktop-First-Input.md) chốt desktop-first, nên
+  ngân sách tam giác nay có mục tiêu rõ (máy để bàn) thay vì phải chờ mẫu số chung với mobile.
+  Điều kiện #2 của Revisit Trigger chuyển sang trạng thái không-thể-kích-hoạt cho tới khi Android
+  được chốt là target thật.
 - Cần một ADR riêng nếu chọn cách phòng vệ JitPack bằng vendor jar vào repo (đụng chính sách
   dependency).
 
