@@ -121,7 +121,10 @@ class QuestTrackerTest {
     void logMakesACompletedQuestClaimableByCode() {
         tracker.onQuestsListed(listQuestsResponse("kill_training_dummies", QuestStatus.QUEST_STATUS_COMPLETED));
 
-        assertThat(tracker.isTracking()).isFalse(); // KHÔNG đi qua onAccepted() — đúng ý "log độc lập"
+        // Từ 2026-09-05 nhật ký CÓ nhận lại ô "đang theo dõi" khi nó đang trống (xem
+        // QuestTracker#adoptFromLog) — đó là cách HUD góc màn hình sống sót qua relog. Ý "log độc
+        // lập" vẫn nguyên: lĩnh thưởng theo MÃ không hề đi qua hai trường đó, hai dòng dưới chứng minh.
+        assertThat(tracker.isTracking()).isTrue();
         assertThat(tracker.isClaimable("kill_training_dummies")).isTrue();
         assertThat(tracker.questLog())
                 .containsExactly(
@@ -166,6 +169,57 @@ class QuestTrackerTest {
         assertThat(afterRelog.questLog())
                 .containsExactly(
                         new QuestTracker.LoggedQuest("kill_training_dummies", QuestStatus.QUEST_STATUS_CLAIMED));
+    }
+
+    /**
+     * LỖI THẬT bắt được khi PLAYTEST SỐNG 2026-09-05: đăng nhập giữa chừng một nhiệm vụ thì HUD
+     * góc màn hình TRỐNG TRƠN — không còn dấu vết nào cho thấy mình đang làm gì, cho tới khi tình
+     * cờ bấm J. Dữ liệu không thiếu (nhật ký 611 về đủ); chỉ là không ai đọc nó sang ô "đang theo dõi".
+     */
+    @Test
+    @DisplayName("LỖI THẬT: relog giữa chừng nhiệm vụ — nhật ký phải đưa lại nó lên HUD góc màn hình")
+    void adoptsAnInProgressQuestFromTheLogAfterRelog() {
+        QuestTracker afterRelog = new QuestTracker();
+        assertThat(afterRelog.isTracking()).isFalse(); // phiên mới: hai trường trong phiên trống
+
+        afterRelog.onQuestsListed(listQuestsResponse("night_watch_bandit", QuestStatus.QUEST_STATUS_IN_PROGRESS));
+
+        assertThat(afterRelog.isTracking()).isTrue();
+        assertThat(afterRelog.questCode()).isEqualTo("night_watch_bandit");
+        assertThat(afterRelog.status()).isEqualTo(QuestStatus.QUEST_STATUS_IN_PROGRESS);
+        assertThat(afterRelog.isClaimable()).isFalse(); // chưa xong thì chưa có gì để lĩnh
+    }
+
+    /** Nhiệm vụ XONG đang chờ bấm Lĩnh thưởng thắng nhiệm vụ đang làm: nó cần người chơi LÀM một việc. */
+    @Test
+    @DisplayName("Nhận lại từ nhật ký ưu tiên nhiệm vụ HOÀN THÀNH hơn nhiệm vụ đang làm")
+    void adoptsTheCompletedQuestFirst() {
+        QuestTracker afterRelog = new QuestTracker();
+
+        afterRelog.onQuestsListed(ListQuestsResponse.newBuilder()
+                .addQuests(QuestLogEntry.newBuilder()
+                        .setQuestCode("kill_training_dummies")
+                        .setStatus(QuestStatus.QUEST_STATUS_IN_PROGRESS)
+                        .build())
+                .addQuests(QuestLogEntry.newBuilder()
+                        .setQuestCode("night_watch_bandit")
+                        .setStatus(QuestStatus.QUEST_STATUS_COMPLETED)
+                        .build())
+                .build());
+
+        assertThat(afterRelog.questCode()).isEqualTo("night_watch_bandit"); // dù đứng SAU trong danh sách
+        assertThat(afterRelog.isClaimable()).isTrue();
+    }
+
+    /** Nhiệm vụ đã lĩnh xong không đáng chiếm chỗ HUD — không còn việc gì để làm với nó. */
+    @Test
+    @DisplayName("Nhật ký toàn nhiệm vụ đã lĩnh thưởng thì HUD góc màn hình vẫn trống")
+    void doesNotAdoptAlreadyClaimedQuests() {
+        QuestTracker afterRelog = new QuestTracker();
+
+        afterRelog.onQuestsListed(listQuestsResponse("kill_training_dummies", QuestStatus.QUEST_STATUS_CLAIMED));
+
+        assertThat(afterRelog.isTracking()).isFalse();
     }
 
     @Test

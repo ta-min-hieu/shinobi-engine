@@ -123,6 +123,41 @@ final class QuestTracker {
         // bản MỚI hơn (VD nhiệm vụ hoàn thành đúng lúc cửa sổ nhật ký đang mở).
         if (isTracking() && log.containsKey(questCode)) {
             status = log.get(questCode);
+            return;
+        }
+        adoptFromLog();
+    }
+
+    /**
+     * Chưa theo dõi gì mà nhật ký có nhiệm vụ đang dở ⇒ nhận lại một cái lên HUD góc màn hình.
+     *
+     * <p><b>LỖI THẬT, PLAYTEST SỐNG 2026-09-05 bắt được.</b> Hai trường {@link #questCode}/
+     * {@link #status} chỉ sống trong phiên, và trước thay đổi này {@link #onQuestsListed} chỉ đồng bộ
+     * chúng khi chúng ĐÃ trỏ tới một mã — tức sau relog thì không bao giờ. Kết quả: đăng nhập lại
+     * giữa chừng một nhiệm vụ là **góc màn hình trống trơn**, không còn dấu vết nào cho thấy mình
+     * đang làm gì, cho tới khi tình cờ bấm J. Nhật ký thì VẪN đúng — dữ liệu có sẵn ở đây, chỉ
+     * là không ai đọc nó sang.
+     *
+     * <p>Ưu tiên quest ĐÃ HOÀN THÀNH trước quest đang làm: cái đó đang chờ người chơi **làm một
+     * việc** (bấm Lĩnh thưởng), còn cái kia chỉ là thông tin. Cùng hạng thì lấy cái đầu tiên theo
+     * thứ tự server trả về — HUD góc màn hình cố ý chỉ hiện MỘT nhiệm vụ (xem javadoc lớp), phần
+     * còn lại xem ở phím J.
+     */
+    private void adoptFromLog() {
+        String inProgress = "";
+        for (Map.Entry<String, QuestStatus> entry : log.entrySet()) {
+            if (entry.getValue() == QuestStatus.QUEST_STATUS_COMPLETED) {
+                questCode = entry.getKey();
+                status = entry.getValue();
+                return;
+            }
+            if (inProgress.isEmpty() && entry.getValue() == QuestStatus.QUEST_STATUS_IN_PROGRESS) {
+                inProgress = entry.getKey();
+            }
+        }
+        if (!inProgress.isEmpty()) {
+            questCode = inProgress;
+            status = QuestStatus.QUEST_STATUS_IN_PROGRESS;
         }
     }
 
