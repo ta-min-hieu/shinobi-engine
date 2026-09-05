@@ -1931,3 +1931,29 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
     - 💡 **Bài học, và là lần thứ TƯ cùng một họ** (mục 31, 35, 52): *đường quan sát sai đánh bại phân
       tích đúng*. Một lỗi ghi vào tài liệu mà không có số đo sẽ khiến người sau đi săn ma. **Không ghi
       "lỗi" vào ROADMAP nếu chưa có một con số tái lập được.**
+
+56. **QUEST 2 ĐÃ CHẠY TRỌN VÒNG TRONG GAME THẬT — và cân bằng của nó thì chưa đạt (2026-09-05)**:
+    - Mục 52 mới kiểm chứng sống được nửa đầu (hỏi NPC → nhận quest). Nửa sau — **giết tán tu →
+      script `on_event` → hoàn thành → lĩnh thưởng** — nay đã nhìn thấy chạy thật, đo bằng SQL:
+
+      | Mốc | Bằng chứng |
+      |---|---|
+      | Giết `wandering_bandit` | `progress_json` `{"repelled":0}` → **`{"repelled":1}`**, status **COMPLETED** |
+      | HUD | "Phiên Trực Đêm — **Đã hoàn thành**" + nút **Nhận thưởng** hiện ra |
+      | Lĩnh thưởng | EXP **695 → 1495** = **đúng +800**; Hộ Linh Phù **3 → 4** (GỘP vào chồng sẵn có, không sinh dòng mới); status → **CLAIMED** |
+      | Ăn theo | `character.level` **4 → 5** và thanh EXP nhảy sang **495/500** ngay trong phiên — đúng hai bản vá của mục 52 (đẩy EXP sau khi lĩnh thưởng, và chữa cột `level` tụt lại) |
+
+    - Đây là lần đầu **cả hai** quest của dự án được nhìn thấy chạy hết vòng đời trong game thật.
+    - 🔴 **CÂN BẰNG CHƯA ĐẠT — cần chủ dự án quyết.** Với nhân vật cấp 4 mặc **trọn bộ `novice_*`**
+      (Công +7, Giáp +7, Kháng +5, Máu +18 ⇒ 118 máu, ~35 sát thương/nhát), tôi **chết 3 lần liên
+      tiếp** trước con tán tu. Số của nó: **90 máu, atk 22, def 10**, và nó đánh nhanh hơn nhịp
+      1 đòn/giây của người chơi. Muốn kiểm chứng chuỗi quest, tôi phải **tạm nâng `str`/`vit` lên
+      400** rồi trả lại 10 ngay sau đó (đã trả).
+      - Ba đường sửa, đều là quyết định gameplay: (a) hạ `atk`/nhịp đánh của `wandering_bandit`,
+        (b) đẩy quest 2 ra sau một mốc cấp/trang bị cao hơn, (c) để nguyên và coi đây là tường
+        chắn có chủ ý. **Không tự chọn.**
+      - ⚠️ Nghịch lý đáng chú ý: `steel_katana +7` (Công +18) **đang nằm sẵn trong túi** nhưng
+        **đòi Luyện Khí tầng 3** nên đúng lúc cần nhất thì không mặc được.
+    - 💡 **Bẫy thao tác đã ngốn 3 mạng**: khung mục tiêu trên HUD có thể vẫn đang khoá **con quái
+      cũ** trong khi mình tưởng đã chọn con mới — lúc đó `Z` bay vào khoảng không và trông y hệt
+      "đánh hụt". **Luôn xác nhận tên trên khung mục tiêu TRƯỚC khi đánh.**
