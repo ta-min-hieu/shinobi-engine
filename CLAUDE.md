@@ -14,8 +14,21 @@ Dungeon/Boss/PvP → Optimization; checklist thật ở [ROADMAP.md](docs/11-pro
 Đang ở **Phase 10 — Release** (Closed Beta → Open Beta → RC → Production). Luật phase vẫn nguyên:
 không mở phase sau khi phase trước chưa đạt Exit Criteria.
 
-Phase 9 đóng 2026-07-30 kèm **2 caveat còn mở, không chặn**: CPU không tuyến tính theo N nên **không
-ngoại suy quá N=2000** (đo lại thật nếu vượt), và off-heap (~500-650KB/kết nối) chưa soak dài.
+Phase 9 đóng 2026-07-30 kèm 2 caveat; **đo lại thật 2026-09-05** ([BENCHMARK §5.1](docs/09-performance/BENCHMARK.md),
+mục "ĐO LẠI N=2000 THẬT") đã trả lời cả hai, và kết quả **xấu hơn tài liệu cũ ghi**:
+- **CPU ở N=2000 = 20,9 lõi** (cấu hình production: ZGC + `leakDetection=simple`), không phải ~7,3
+  như bảng cũ — **sai ~3 lần**. Số N=1000 cũ (6,12) thì tái lập tốt. Chi phí mỗi người chơi tăng
+  **0,0056 → 0,0105 lõi** khi N gấp đôi ⇒ **tuyệt đối không ngoại suy tuyến tính cho N>2000**.
+- **Off-heap KHÔNG phải trục chính**: `Other`/DirectByteBuffer đứng yên ~256→263MB từ N=1000 sang
+  N=2000. Trục RAM thật là **Java heap ứ đọng**, và nó **trả lại hết khi tải rút — KHÔNG rò rỉ**.
+- **Đã profile bằng JFR (N=1000, cấu hình production)**: `world-tick-pool` **62,9%** CPU,
+  `nioEventLoopGroup` 36,7% ⇒ **mô phỏng tốn gấp đôi mạng**. Trong tick, khoản lớn nhất là
+  **tra cứu Component qua `HashMap` (~17-25%)**, rồi AoI (~19%), `AiSystem` quét tuyến tính (~9%),
+  và **`recordSystemDuration` — tức đo đạc — ăn ~7%**. Đích tối ưu rẻ nhất là gỡ đo đạc khỏi vòng
+  nóng; đổi cách truy cập Component thì **cần ADR** (§4).
+- ⚠️ **Đo capacity PHẢI xác minh cờ JVM trước khi đo.** `./gradlew run`/`installDist` mặc định là
+  cấu hình DEV (`leakDetection=paranoid` + G1) — tốn thêm ~32% CPU và làm p95 xấu đi hàng trăm lần
+  so với cấu hình production. Lần chạy đầu của chính phép đo này đã dính đúng bẫy đó.
 
 3 quyết định nền tảng chốt từ Phase 0 (không đổi trừ khi có ADR revisit):
 - Package root: **`dev.kage`** ([ADR-012](docs/01-architecture/adr/ADR-012-Package-Root.md))

@@ -241,7 +241,7 @@ CPU (lõi)                        = KHÔNG fit được 1 đường thẳng đá
 | 100 | 144MB ✅ đo thật | 0.26 lõi ✅ đo thật | 9.5 / 47 KB/s ✅ đo thật | 0 |
 | 500 | 122MB ✅ đo thật | 1.57 lõi ✅ đo thật | 46 / 800 KB/s ✅ đo thật | 0 |
 | 1000 | 110MB ✅ đo thật | 6.12 lõi ✅ đo thật | 90 / 2870 KB/s ✅ đo thật | 0 |
-| 2000 | 144MB ✅ đo thật (§5.1 mới) | ~7.3 lõi ⚠️ số cũ §5.4, không cùng buổi đo | ~168 / ~11100 KB/s ✅ đo thật | 66 |
+| 2000 | ~~144MB~~ ❌ **SAI — đo lại 2026-09-05: heap chạm trần (ZGC dùng 2,58GB), ứ đọng chứ không rò rỉ** | ~~~7.3 lõi~~ ❌ **SAI ~3 lần — đo lại 2026-09-05 cấu hình production: 20,9 lõi** | ~168 / ~11100 KB/s ✅ đo thật | 66 |
 
 ⚠️ **"Băng thông client (gửi/nhận)"** là góc nhìn CLIENT (gửi = client→server, nhận = server→client)
 — NGƯỢC hướng với cột "Băng thông (ra/vào)" ở bảng công thức CŨ phía trên (đo từ góc nhìn SERVER: ra
@@ -259,8 +259,11 @@ lỗi mà §5.4/§5.7 lần này phát hiện) chứ không phải heap sống t
 rõ rệt** (0.26→1.57→6.12 lõi, KHÔNG tuyến tính — độ dốc tăng dần, không giảm) — đây mới là trục cần
 capacity-planning thật, không phải RAM.
 
-**Việc CHƯA làm lúc viết đoạn trên** (Điều 30): (1) chưa đo lại N=2000 trong CÙNG 1 buổi (số 7.3
-lõi/144MB tái dùng từ §5.4/lần đo lỡ, không hoàn toàn cùng điều kiện dù cùng máy/code); (2) ~~chưa
+⛔ **Hai ô N=2000 trên đã bị bác bỏ bằng phép đo lại ngày 2026-09-05 (ramp, cùng buổi với N=1000)
+— xem mục "ĐO LẠI N=2000 THẬT" cuối §5.1.** Giữ số cũ gạch ngang làm hồ sơ, không dùng để lên kế hoạch.
+
+**Việc CHƯA làm lúc viết đoạn trên** (Điều 30): (1) ~~chưa đo lại N=2000 trong CÙNG 1 buổi~~
+**✅ ĐÃ ĐO 2026-09-05 — và cả hai số cũ đều sai, xem cuối §5.1**; (2) ~~chưa
 tách bạch RAM off-heap (Netty buffer/connection)~~ **✅ ĐÃ ĐO — xem ngay bên dưới**; (3) chưa biết
 nguyên nhân "gửi" thấp hơn ngoại suy cũ; (4) độ dốc CPU không đều giữa các cặp điểm (N=100-500 vs
 N=500-1000) nghĩa là CHƯA CÓ công thức ngoại suy an toàn cho N>2000 — **PHẢI đo thật trước khi trả
@@ -333,6 +336,149 @@ sẵn của `report()` — không thêm vòng polling thứ 2) suốt cả lần
 running-max. **Chỉ lỗ hổng công cụ được vá — CHƯA đo lại N=2000 thật**: lần chạy N=2000 ở trên vẫn
 là kết quả hỏng, chưa bị xoá (Điều 30); việc xác nhận tuyến tính off-heap ở N=2000 vẫn là việc CHƯA
 làm, cần 1 lần chạy thật riêng (có thể dùng ramp thay vì burst-connect) mới đóng được.
+
+---
+
+✅ **ĐO LẠI N=2000 THẬT — 2026-09-05.** Đóng khoản nợ mở từ 2026-08-01. Máy đo: cùng máy §5.1
+(i9-14900HX, 32 luồng logic, 32GB). Ramp thay cho burst-connect; `kage_players_online` lấy mẫu
+**liên tục 15s/lần**; CPU đo bằng `TotalProcessorTime` của **riêng tiến trình server** (CPU của bộ
+sinh tải không bị tính nhầm vào). Server chạy qua `installDist` để đặt được `JAVA_OPTS`.
+
+⚠️ **Đo HAI cấu hình, vì lần chạy đầu đã đo nhầm cấu hình DEV.** Đây là bài học riêng, ghi lại đầy
+đủ ở cuối mục. Cấu hình production lấy từ `deploy/docker/server.Dockerfile:155`.
+
+| | GC | Netty leak detection | Heap tối đa |
+|---|---|---|---|
+| **PROD** (số chính thức dưới đây) | ZGC | `simple` | 16GB (`MaxRAMPercentage=50`, production thật dùng 75 — hạ cho an toàn trên máy 32GB) |
+| DEV (`./gradlew run`, `installDist` mặc định) | G1 | **`paranoid`** | 8GB (mặc định 25% RAM) |
+
+### Kết quả — cấu hình PRODUCTION (dùng số này để lên kế hoạch)
+
+| N (đỉnh thật) | CPU (lõi, trung vị lúc giữ tải) | Lõi / người chơi | Tick p99 | Trễ gói p95 / p99 | Lỗi client | Băng thông client (gửi/nhận) |
+|---|---|---|---|---|---|---|
+| **950** | **5,3** | 0,0056 | 0,41-0,44ms | 0,8ms / 3,9-14,7ms | 50 (đứng yên) | 82 / 2700 KB/s |
+| **1997** | **20,9** | **0,0105** | *(không đọc được, xem dưới)* | 21ms / 3,8s | 1677 (gần như đứng yên) | 121 / 8957 KB/s |
+
+### Bốn kết luận
+
+**1. Số N=1000 cũ ĐÚNG; số N=2000 cũ SAI ~3 lần.** Bảng 2026-07-29 ghi N=1000 = 6,12 lõi — lần này
+đo được 5,3 lõi ở N=950 (quy về N=1000 ≈ 5,6). **Tái lập tốt.** Nhưng ô N=2000 ghi `~7,3 lõi` thì
+thực đo là **20,9 lõi**. Ô đó vốn đã tự dán nhãn *"số cũ §5.4, không cùng buổi đo"* — nay xác nhận
+nó sai, không phải chỉ là "không cùng buổi".
+
+**2. CPU siêu tuyến tính, nay đo được trong CÙNG process, CÙNG buổi, CÙNG cấu hình production.**
+Chi phí mỗi người chơi **0,0056 → 0,0105 lõi** khi N tăng gấp đôi: **xấu đi 1,9 lần**. Ở N=2000
+server ăn ~21/32 luồng ≈ **65% toàn máy**. Cảnh báo "CPU rất có thể cũng không tuyến tính" viết
+2026-07-26 nay **có số đo xác nhận**, không còn là phỏng đoán. ⇒ **Ngoại suy tuyến tính cho N>2000
+sẽ đánh giá THẤP chi phí.**
+
+**3. Câu "RAM sống gần như phẳng 110-144MB xuyên suốt N=100→2000" KHÔNG đúng ở N=2000, nhưng đây là
+ỨNG ĐỌNG chứ không phải rò rỉ.** Ở N≈2000: ZGC `used` = **2,58GB**, heap committed **chạm trần**
+(16GB), WorkingSet 16,6GB; cấu hình DEV/G1 thì heap sống **4,6GB** và cũng chạm trần (8GB). Cả hai
+**trả lại hết khi tải rút**: đo trên G1 sau khi `online=0` + ép GC hai lần → heap sống về **565MB**,
+committed co **8,1GB → 2,0GB**. Số "144MB ✅ đo thật" cho N=2000 ở bảng cũ gần như chắc chắn chụp
+lúc tải đã rút — đúng lỗi timing mà chính mục trên đã tự thú ở phép đo off-heap.
+
+**4. Off-heap KHÔNG phải trục chính, và "~500-650KB/kết nối" không ngoại suy được.** NMT `Other`
+(DirectByteBuffer/Netty) = **263MB** ở N≈2000, gần **y hệt** 256MB đã đo ở N=1000. Nó **đứng yên**
+khi N gấp đôi. Trục RAM đáng lo là **Java heap ứ đọng ở đường gửi ra**, không phải buffer Netty.
+
+### Nút thắt nằm ở đâu — ĐÃ PROFILE, và giả thuyết ban đầu SAI
+
+⛔ **Bản đầu của mục này (viết cùng ngày, trước khi profile) kết luận: "nút thắt ở đường gửi ra, đừng
+tối ưu tick loop". JFR bác bỏ điều đó.** Giữ lại lời sai ở đây làm hồ sơ — nó được suy ra từ số liệu
++ kiến trúc mà KHÔNG có stack trace, đúng thứ Điều 30 cảnh báo.
+
+**Cách đo**: `JFR.start settings=profile delay=115s duration=90s` (dùng `delay` của chính JFR — KHÔNG
+gate qua `/metrics` được, vì chính nó chết ở tải cao, xem mục dưới). Cấu hình production, N=1000,
+3374 mẫu `jdk.ExecutionSample`.
+
+| Nhóm luồng | % mẫu CPU |
+|---|---|
+| **`world-tick-pool`** (mô phỏng) | **62,9%** |
+| `nioEventLoopGroup` (mạng + TLS) | 36,7% |
+| còn lại (JFR, Hikari, HTTP) | 0,4% |
+
+**Mô phỏng tốn GẤP ĐÔI mạng, không phải ngược lại.**
+
+#### Trong `world-tick-pool` (khung trên cùng — nơi CPU thật sự chạy)
+
+| % | Khung | Nghĩa |
+|---|---|---|
+| **17,6%** | `java.util.HashMap.getNode` | **tra cứu Component**. Cộng với `Entity.getComponent` (6,9%) và `ComponentMapper.get` (8,9% khung `dev.kage` sâu nhất) ⇒ **truy cập component qua HashMap là khoản chi lớn nhất của cả server** |
+| 13,4% | `EcsWorld.update` | duyệt hệ thống/entity |
+| 8,1% | `AiSystem.findNearestCharacterInRange` | quét tuyến tính tìm mục tiêu, mỗi quái mỗi tick |
+| **7,3%** | `MicrometerTickMetricsPort.recordSystemDuration` | **đo đạc nằm trong vòng nóng** (kèm `LongAdder.add` 3,2% khung trên cùng) |
+| 5,8% | `StatusEffects.isStunned` | |
+| ~19% cộng dồn | `AreaOfInterestTracker.*` (`syncCharacterPair` 8,9 + `sync` 3,7 + `buildGrid` 3,4 + `syncCharacterMonsterPair` 3,3) | AoI vẫn O(n²) theo javadoc của chính nó |
+
+#### Trong `nioEventLoopGroup`
+
+Chỉ **7,3% mẫu Netty có khung `dev.kage` nào** — 92,7% còn lại là hạ tầng: cấp phát buffer pooled
+(~8%), **mã hoá AES-GCM của TLS (~6%:** `GaloisCounterMode$GCMEncrypt` 3,3 + `GCTR` 1,8 +
+`MessageDigest.isEqual` 2,7**)**, `SocketDispatcher.write0` 2,7%.
+
+#### Bốn đích tối ưu có bằng chứng, xếp theo tỉ lệ lợi ích/rủi ro
+
+1. **Bỏ `recordSystemDuration` khỏi vòng nóng (hoặc lấy mẫu thưa) — ~7% CPU, rủi ro gần bằng 0.**
+   Đây là đo đạc tự nó ăn CPU đáng kể; OBSERVABILITY.md cần biết.
+2. **Truy cập Component không qua HashMap — ~17-25% CPU.** Đây là vấn đề ECS kinh điển và chạm
+   `engine-ecs`/Ashley ⇒ **cần ADR** (CLAUDE.md §4, đổi kiến trúc).
+3. **`AreaOfInterestTracker` ~19%** — javadoc của chính nó đã ghi O(n²).
+4. **`AiSystem.findNearestCharacterInRange` ~9%** — dùng chung spatial grid với AoI thay vì quét riêng.
+
+#### Hai điều CHƯA giải thích được (không bịa)
+
+- **Profile chạy ở N=1000, không phải N=2000.** Tỉ lệ 63/37 có thể đổi ở chỗ siêu tuyến tính lộ ra.
+- **Mâu thuẫn chưa gỡ**: `kage.tick.duration` bọc TRỌN `tickOnce()` (đã đọc code: `WorldFacade:431-434`,
+  gồm cả AoI sync) và cho p99 = 0,44ms; nhưng `world-tick-pool` chiếm 63% của ~5,7 lõi ≈ 3,6 lõi,
+  tức ~1,2ms CPU cho mỗi tick trong số 3000 tick/giây (50 world × 60Hz). **Lệch ~10-20 lần.** Hoặc
+  metric đang báo thiếu, hoặc JFR lấy mẫu theo luồng nên pool có nhiều luồng hơn bị đếm trội (tick
+  pool = 32 luồng, Netty ít hơn). **Chưa xác định được cái nào** ⇒ coi tỉ lệ 63/37 là **định hướng,
+  không phải con số chính xác**; phần chia nhỏ BÊN TRONG mỗi pool thì không dính vấn đề này.
+- Đã loại trừ một giả thuyết: khu vực rỗng KHÔNG bị bỏ quên mà vẫn tick —
+  `MainWorldChannelRegistry.closeIfEmptyOverflowChannel` có dừng và gỡ chúng thật.
+
+### Phát hiện phụ, nhưng đáng sửa: observability CHẾT đúng lúc cần nhất
+
+Ở N=2000, endpoint `/metrics` (cổng 9404) **ngừng trả lời**: bộ sinh tải ghi `serverTickMs=-1.0`
+(giá trị sentinel khi scrape hỏng) và bộ lấy mẫu của lần đo này đọc `kage_players_online` lỗi ở
+9/17 mẫu. Nghĩa là **ở đúng đỉnh tải — lúc cần số liệu nhất — Prometheus sẽ không thu được gì**.
+Chưa điều tra nguyên nhân (nghi cùng gốc với nút thắt ghi mạng: HTTP server metrics đói luồng).
+
+### ⛔ Bài học phương pháp: LẦN CHẠY ĐẦU CỦA CHÍNH LẦN ĐO NÀY ĐÃ ĐO NHẦM CẤU HÌNH DEV
+
+`applicationDefaultJvmArgs` của `server-gateway` đặt `-Dio.netty.leakDetection.level=paranoid` (có
+chủ đích, cho dev). Production ghi đè bằng `simple` + ZGC ở `server.Dockerfile`. Chạy `installDist`
+mà không đặt `JAVA_OPTS` thì **được cấu hình DEV**, và `paranoid` là chế độ gỡ lỗi rất đắt.
+
+| | CPU N≈2000 | Trễ gói p95 / p99 | Lỗi client | Băng thông nhận |
+|---|---|---|---|---|
+| PROD (ZGC + `simple`) | **20,9 lõi** | **21ms** / 3,8s | 1677, đứng yên | 8957 KB/s |
+| DEV (G1 + `paranoid`) | 27,5 lõi | **1-8 GIÂY** / 10-18 GIÂY | 9560, **vẫn tăng** | 6096 KB/s |
+
+Cấu hình dev tốn **thêm ~32% CPU**, **giảm ~32% thông lượng**, và làm p95 xấu đi **hàng trăm lần**.
+⇒ **Quy tắc: mọi phép đo capacity PHẢI xác minh cờ JVM thật trước khi đo** (`jcmd <pid> VM.flags` +
+`jcmd <pid> VM.system_properties | grep leakDetection`). Một bảng số đo sai cấu hình còn tệ hơn không
+có bảng nào — và mục này suýt nữa đã công bố đúng thứ đó.
+
+### Việc CHƯA làm / giới hạn phương pháp (Điều 30)
+
+- ⚠️ **Bộ sinh tải chạy CÙNG MÁY với server.** Ở N=2000 server đã ăn ~21/32 luồng nên bộ sinh tải bị
+  đói CPU. Phần "trễ p99 3,8s" và "1677 lỗi" **KHÔNG tách bạch được** giữa *server không kịp* và
+  *bộ sinh tải bị bỏ đói*. **Con số CPU thì vững** (đo riêng tiến trình server). Muốn kết luận chắc
+  về chất lượng dịch vụ ở N=2000 phải sinh tải từ **máy khác** — giới hạn này đúng cho MỌI lần đo
+  N=2000 từ trước tới nay, chỉ là lần này nó lộ rõ.
+- Dùng `MaxRAMPercentage=50` thay vì 75 của production thật (an toàn trên máy 32GB đang chạy cả bộ
+  sinh tải). Heap chạm trần ở cả hai cấu hình ⇒ trần cao hơn có thể chỉ dời điểm chạm, không sửa gốc.
+- Không phải mọi client đều vào được: 950/1000 và 1997/2000.
+- Vẫn **KHÔNG có công thức ngoại suy** cho N>2000, và nay biết chắc ngoại suy tuyến tính sẽ sai theo
+  hướng nguy hiểm.
+- ~~Chưa profile (JFR)~~ **✅ ĐÃ PROFILE — và nó bác bỏ giả thuyết "đường gửi ra"; xem mục "Nút thắt
+  nằm ở đâu" ở trên.** Còn thiếu: profile ở **N=2000** (mới có ở N=1000), và gỡ mâu thuẫn giữa
+  `kage.tick.duration` p99 với tỉ trọng CPU của `world-tick-pool`.
+- Các lần chạy để lại **~2000 account / ~3000 nhân vật rác** trong DB dev (không xoá — thao tác phá
+  huỷ, cần chủ dự án gật).
 
 ### 5.2 AoI spatial-grid sharding (Phase 9, 2026-07-28)
 

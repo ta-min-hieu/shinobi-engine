@@ -720,7 +720,7 @@ Closed Beta → Open Beta → Release Candidate → Production → Hotfix
 
 ## ADR cần tạo
 
-Xem [ADR Index](../01-architecture/adr/README.md) — **36 Accepted · 2 Proposed · 1 Superseded** trên tổng **39 file ADR** (đếm lại 2026-09-04 bằng dòng `Status` của **từng file một**, không suy từ bảng
+Xem [ADR Index](../01-architecture/adr/README.md) — **36 Accepted · 3 Proposed · 1 Superseded** trên tổng **40 file ADR** (đếm lại 2026-09-05 bằng dòng `Status` của **từng file một**, không suy từ bảng
 index: gồm 010/012/018 chốt 2026-07-18, ADR-026 chốt 2026-07-24, ADR-014/015/019 chốt 2026-07-26/28,
 ADR-027 TLS chốt 2026-07-31, ADR-011/020/021/022/024/028/029/030 chốt 2026-08-01, **ADR-031 chốt
 2026-08-03**, **ADR-032 chốt 2026-08-06**, **ADR-033 chốt 2026-08-08**, **ADR-034 chốt 2026-08-09**,
@@ -1464,8 +1464,13 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       nửa**.
     - ⛔ **Vẫn CHƯA làm, không phải thiếu sót**: toàn bộ quy trình Closed Beta → Open Beta → RC →
       Production ở bảng §Phase 10 **vẫn chưa bắt đầu**, TLS thật trong `docker-compose.prod.yml` và
-      cert Production thật vẫn thiếu (mục 22 vẫn nguyên hiệu lực); phép đo lại **N=2000** vẫn chưa
-      chạy dù công cụ đã vá từ 2026-08-01 (mục 24); và **`WorldScreen` chỉ mới hết chật, chưa hết
+      cert Production thật vẫn thiếu (mục 22 vẫn nguyên hiệu lực); ~~phép đo lại **N=2000** vẫn chưa
+      chạy~~ **✅ ĐÃ ĐO 2026-09-05 (cấu hình production, ZGC + `leakDetection=simple`): CPU N=2000
+      = 20,9 lõi, không phải ~7,3 — sai ~3 lần (số N=1000 cũ thì tái lập tốt). Heap chạm trần,
+      nhưng là ứ đọng chứ không rò rỉ. **Đã profile JFR**: `world-tick-pool` 62,9% CPU vs Netty
+      36,7% — mô phỏng tốn gấp đôi mạng; khoản lớn nhất là tra cứu Component qua `HashMap`, và
+      **đo đạc (`recordSystemDuration`) tự nó ăn ~7%**. Xem
+      [BENCHMARK §5.1](../09-performance/BENCHMARK.md) mục "ĐO LẠI N=2000 THẬT"**; và **`WorldScreen` chỉ mới hết chật, chưa hết
       lớn** — `PanelHub` mua thêm chỗ chứ không đổi kiến trúc tầng client.
 
 41. **ADR-036 thi hành — trang bị có chỉ số thật, cường hoá có tác dụng thật (2026-08-30)**:
