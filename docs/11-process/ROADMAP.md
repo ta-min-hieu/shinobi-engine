@@ -1883,9 +1883,9 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       - ⚠️ **Giới hạn có ý thức của phương án (a)** chủ dự án chọn: gateway không đọc được máu HIỆN
         TẠI (nó nằm trong luồng tick, world không có đường đọc đồng bộ), nên TỬ SỐ trễ một nhịp
         (`110 / 118`) tới gói mang HP tiếp theo. Mẫu số — thứ sai trước đó — nay đúng ngay.
-    - 🔴 **Còn 1 lỗi CHƯA truy ra**: nhân vật bò ~0,3 m/s thay vì 5 m/s ở vài vị trí quanh khu bệ
-      nhảy demo (tái hiện được, hai lần). `TerrainCollisionSystem` đang no-op (obstacle rỗng),
-      `MovementSystem` không có va chạm entity ⇒ **chưa có giả thuyết nào được chứng minh**.
+    - ⬜ **Lỗi thứ tư TÔI BÁO NHẦM — đã rút lại cùng ngày, xem mục 55.** "Nhân vật bò ~0,3 m/s"
+      là suy ra từ ẢNH CHỤP, không phải từ số đo. Đo lại bằng `pos_x` thật: **đúng 5,00 m/s ở cả
+      ba phép đo**, kể cả xuyên khu bệ nhảy và ngay sau khi giết quái. Không có lỗi nào ở đây.
 
 54. **[ADR-044](../01-architecture/adr/ADR-044-Quest-Prerequisite-Enforcement.md) — thứ tự quest được
     thi hành, bằng một cột không ai từng đọc (2026-09-05)**:
@@ -1906,3 +1906,28 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       `shouldRejectNightWatch_when...`), cộng 3 test mới. **1157 test xanh, 0 skip.**
     - ✅ **Kiểm chứng sống**: nhân vật cấp 1 mới tạo hỏi Chu Hoành xin trực đêm → hiện đúng
       **"Phải xong nhiệm vụ trước đã."**, và `character_quest_progress` **0 dòng**.
+
+55. **RÚT LẠI một lỗi tôi tự báo — đo mới biết game không sai (2026-09-05)**:
+    - Mục 53 ghi "nhân vật bò ~0,3 m/s thay vì 5 m/s quanh khu bệ nhảy demo, tái hiện được hai lần".
+      **Sai.** Cả hai lần đó tôi suy tốc độ từ khoảng dịch chuyển GIỮA HAI ẢNH CHỤP — mà camera bám
+      nhân vật nên mọi suy luận vị trí từ ảnh đều không hội tụ (đã tự ghi nhận điều đó ở chính mục
+      52, rồi vẫn dựa vào nó để kết luận).
+    - **Cách đo đúng**: đặt `character.pos_x` về một giá trị BIẾT TRƯỚC → vào world → giữ D đúng
+      2000ms → tắt client → đọc `pos_x` (server ghi vị trí lúc ngắt kết nối). Quãng đường ra bằng
+      SỐ, không qua pixel nào.
+    - **Ba phép đo, ba lần đúng 5,00 m/s**:
+
+      | Bài đo | Bắt đầu | Sau 2000ms | Quãng đường |
+      |---|---|---|---|
+      | Đối chứng, xa mọi bệ | `-25` | `-15,00` | **10,00 m** |
+      | Xuyên khu bệ nhảy (3–7, 9–13) | `1` | `11,00` | **10,00 m** |
+      | Ngay sau khi giết mộc nhân (đúng trạng thái lúc báo kẹt: khung thông báo "Nhận được Phi Đao x2." đang hiện) | `6` | `16,08` | **10,08 m** |
+
+    - **Nguyên nhân thật**: bộ điều khiển cửa sổ của tôi, không phải game — cùng họ với bẫy
+      `SetForegroundWindow` thất bại im lặng đã ghi ở mục 52. Trước khi kết luận thì đã kịp đọc
+      `TerrainCollisionSystem` (no-op, obstacle rỗng), `MovementSystem` (không có va chạm entity),
+      `VerticalMovementSystem` (chỉ chạm trục z) và tầng đối chiếu client — **không cái nào chặn được
+      trục x**, và đó lẽ ra đã là dấu hiệu đủ rõ để đi đo thay vì ghi một lỗi vào tài liệu.
+    - 💡 **Bài học, và là lần thứ TƯ cùng một họ** (mục 31, 35, 52): *đường quan sát sai đánh bại phân
+      tích đúng*. Một lỗi ghi vào tài liệu mà không có số đo sẽ khiến người sau đi săn ma. **Không ghi
+      "lỗi" vào ROADMAP nếu chưa có một con số tái lập được.**
