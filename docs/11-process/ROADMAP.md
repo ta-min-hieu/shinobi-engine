@@ -720,7 +720,7 @@ Closed Beta → Open Beta → Release Candidate → Production → Hotfix
 
 ## ADR cần tạo
 
-Xem [ADR Index](../01-architecture/adr/README.md) — **36 Accepted · 4 Proposed · 1 Superseded** trên tổng **41 file ADR** (đếm lại 2026-09-05 bằng dòng `Status` của **từng file một**, không suy từ bảng
+Xem [ADR Index](../01-architecture/adr/README.md) — **39 Accepted · 1 Proposed · 1 Superseded** trên tổng **41 file ADR** (đếm lại 2026-09-05 bằng dòng `Status` của **từng file một**, không suy từ bảng
 index: gồm 010/012/018 chốt 2026-07-18, ADR-026 chốt 2026-07-24, ADR-014/015/019 chốt 2026-07-26/28,
 ADR-027 TLS chốt 2026-07-31, ADR-011/020/021/022/024/028/029/030 chốt 2026-08-01, **ADR-031 chốt
 2026-08-03**, **ADR-032 chốt 2026-08-06**, **ADR-033 chốt 2026-08-08**, **ADR-034 chốt 2026-08-09**,

@@ -253,7 +253,7 @@ public final class WorldScreen implements GameScreen {
                 new CombatAnimationTrigger(models, localCharacterId, WorldConstants.LOCAL_CHARACTER_ID);
         this.remoteCharacters = new RemoteCharacterPresenter(context.world(), models);
         installMovementSystems();
-        this.localPlayer = spawnLocalPlayer();
+        this.localPlayer = spawnLocalPlayer(enterWorld);
 
         // SAU khi localPlayer tồn tại: presenter giữ tham chiếu thẳng tới PositionComponent của
         // chính người chơi (xem javadoc constructor của nó).
@@ -301,12 +301,28 @@ public final class WorldScreen implements GameScreen {
     }
 
     /**
-     * Spawn (0,0) khớp mặc định {@code server-world.WorldConstants.SPAWN_X/Y} — chưa có persistence
-     * vị trí (server-world follow-up), {@code MoveResponse} đầu tiên sẽ tự sửa nếu lệch.
+     * Dựng nhân vật của CHÍNH mình ở đúng chỗ server nói (ADR-041).
+     *
+     * <p>⚠️ Trước 2026-09-05 hàm này dùng {@code new PositionComponent()} — tức (0,0) — với javadoc
+     * giải thích rằng "chưa có persistence vị trí, MoveResponse đầu tiên sẽ tự sửa nếu lệch". Lúc
+     * viết câu đó ĐÚNG. Persistence vị trí sau đó đã có thật, còn giả định thì ở lại; và cái van an
+     * toàn của nó ("MoveResponse tự sửa") chính là thứ giấu lỗi đi, vì gói đó chỉ tới khi người chơi
+     * BẤM PHÍM ĐI. Ai đứng yên thì thấy sai chỗ: playtest đăng nhập ở x=8, x=-3, x=-5 cho ra khung
+     * hình giống nhau từng pixel, và con quái đứng ngay dưới chân thì đánh trúng được nhưng không
+     * hiện trên màn hình (nó được vẽ ở toạ độ THẬT, còn camera thì ở 0).
+     *
+     * <p>Bài học chung: một giả định có ghi chú tử tế vẫn mục khi tiền đề của nó biến mất.
      */
-    private KEntity spawnLocalPlayer() {
+    private KEntity spawnLocalPlayer(SelectCharacterResponse enterWorld) {
         KEntity entity = world.createEntity();
-        entity.add(new PositionComponent());
+        PositionComponent position = new PositionComponent();
+        position.x = enterWorld.getSpawnX();
+        position.y = enterWorld.getSpawnY();
+        // prev = hiện tại: không có gì để nội suy ở frame đầu, để lệch sẽ thấy nhân vật trượt một
+        // đoạn từ (0,0) tới chỗ thật ngay khi vừa vào world.
+        position.prevX = position.x;
+        position.prevY = position.y;
+        entity.add(position);
         entity.add(new VelocityComponent());
         return entity;
     }

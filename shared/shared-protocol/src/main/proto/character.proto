@@ -86,6 +86,20 @@ message SelectCharacterResponse {
   // Chỉ gửi khi success=true; success=false thì cả hai bằng 0 và client phải bỏ qua.
   int32 current_hp = 3;
   int32 max_hp = 4;
+  // ADR-041 — vị trí server ĐÃ nạp và attach cho nhân vật này. Field THÊM (5..6), field 1..4 giữ
+  // nguyên, protocolVersion KHÔNG tăng (cùng luật additive và cùng message với current_hp/max_hp).
+  //
+  // Vì sao cần: client dựng `localPlayer` bằng `new PositionComponent()` = (0,0) rồi tự chữa bằng
+  // MoveResponse ĐẦU TIÊN — mà gói đó chỉ tới khi người chơi bấm phím đi. Ai đứng yên thì thấy sai
+  // chỗ: playtest 2026-09-05 đăng nhập ở x=8, x=-3, x=-5 cho ra khung hình GIỐNG NHAU TỪNG PIXEL,
+  // và con quái đứng ngay dưới chân thì đánh trúng được nhưng KHÔNG hiện trên màn hình.
+  //
+  // Không có z/grounded: lúc vào world luôn là mặt đất (ADR-033), thêm field chỉ để mang hằng số
+  // là mở rộng bề mặt protocol không đổi lấy gì (ADR-041 D4).
+  //
+  // Chỉ gửi khi success=true; success=false thì cả hai bằng 0 và client phải bỏ qua.
+  float spawn_x = 5;
+  float spawn_y = 6;
 }
 
 // Command: Client -> Server (OPCODE_SELECT_FACTION_REQUEST). Chọn/đổi hệ phái khi nhân vật đủ

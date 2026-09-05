@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | 🟡 **Proposed** (2026-09-03) — chờ chủ dự án duyệt D1–D7. AI **không** tự Accept. |
+| Status | ✅ **Accepted** (2026-09-05) — chủ dự án duyệt trọn D1–D7. Migration V26 đã chạy qua Postgres thật và kiểm chứng bằng mắt: Chu Hoành đứng đúng `(-5, 0)`, bấm vào nói chuyện được. |
 | Date | 2026-09-03 |
 | Deciders | Chủ dự án quyết; AI đo + soạn |
 | Related | [ADR-037](ADR-037-Monster-Template-And-Spawn-Tables.md) (khuôn mẫu đã duyệt cho đúng loại việc này; ADR này trả **nợ thứ hai** nó đặt tên) · [ADR-036](ADR-036-Equipment-Stats-And-Enhancement-Effect.md) (khuôn `EquipmentBonusSnapshot`) · [ADR-033](ADR-033-Ninja-School-Style-Movement.md) (khoá di chuyển vào trục X) · [ADR-038](ADR-038-Theme-Pivot-Tu-Tien.md) (tường thuật tu tiên — NPC là Chu Hoành) · [GAMEPLAY.md §9.2](../../05-server/GAMEPLAY.md) · [DATABASE.md](../../05-server/DATABASE.md) · [/CLAUDE.md §4](../../../CLAUDE.md) (đổi schema DB ⇒ dừng, viết ADR) |

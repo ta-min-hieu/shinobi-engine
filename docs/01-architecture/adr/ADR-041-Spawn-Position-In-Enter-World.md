@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | 🟡 **Proposed** (2026-09-05) — chờ chủ dự án duyệt D1–D4. AI **không** tự Accept. |
+| Status | ✅ **Accepted** (2026-09-05) — chủ dự án duyệt trọn D1–D4. |
 | Date | 2026-09-05 |
 | Deciders | Chủ dự án quyết; AI phát hiện khi playtest + soạn |
 | Related | [ADR-036](ADR-036-Equipment-Stats-And-Enhancement-Effect.md) (tiền lệ THÊM field vào chính `SelectCharacterResponse`, không tăng `protocolVersion`) · [ADR-033](ADR-033-Ninja-School-Style-Movement.md) (khoá di chuyển vào trục X) · [ADR-035](ADR-035-Client-State-Sync-Opcodes.md) (khuôn "lấp khoảng trống đồng bộ trạng thái client") · [ADR-040](ADR-040-NPC-Template-And-Placement.md) (NPC ở `(-5, 0)` — hàng đối chứng của phát hiện này) · [KAGE-CONSTITUTION Điều 24](../../00-governance/KAGE-CONSTITUTION.md) (Server Authority) · [/CLAUDE.md §4](../../../CLAUDE.md) (đổi protocol ⇒ dừng, viết ADR) |

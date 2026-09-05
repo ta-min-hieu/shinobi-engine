@@ -438,6 +438,36 @@ class GatewayPipelineTest {
      * <p>Playtest 2026-09-05 gặp đúng thế: nhận 500 EXP mà HUD vẫn 20/200. Test này khoá lại bản
      * sửa — xoá lời gọi đẩy EXP trong {@code handleClaimQuestRewardBlocking} là test đỏ.
      */
+    /**
+     * ADR-041 — {@code SelectCharacterResponse} phải mang vị trí THẬT, không để client đoán (0,0).
+     *
+     * <p>Playtest 2026-09-05: đăng nhập ở x=8, x=-3, x=-5 cho ra khung hình giống nhau từng pixel,
+     * và con quái đứng ngay dưới chân thì đánh trúng được nhưng không hiện trên màn hình. Test này
+     * chốt phần server: bỏ hai lời gọi {@code setSpawnX/setSpawnY} là đỏ.
+     */
+    @Test
+    void shouldCarrySpawnPosition_inSelectCharacterResponse() throws InvalidProtocolBufferException {
+        FakeCharacterPort characterPort = new FakeCharacterPort();
+        EmbeddedChannel channel = newPipeline(characterPort, fakeInventoryFacade(), fakeQuestFacade());
+        connect(channel, "spawnpos1");
+        long characterId = createCharacter(channel, "SpawnHero", 2);
+        // Nhân vật đã đi chơi phiên trước rồi thoát ở một chỗ KHÔNG phải gốc toạ độ.
+        characterPort.savePosition(characterId, 8f, 0f);
+
+        SelectCharacterRequest request =
+                SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, ProtocolVersion.CURRENT, 3),
+                request.toByteArray());
+
+        SelectCharacterResponse response =
+                SelectCharacterResponse.parseFrom(readOutboundFrame(channel).payload());
+        assertThat(response.getSuccess()).isTrue();
+        assertThat(response.getSpawnX()).isEqualTo(8f);
+        assertThat(response.getSpawnY()).isEqualTo(0f);
+    }
+
     @Test
     void shouldPushExperienceState_afterClaimingQuestReward() throws InvalidProtocolBufferException {
         EmbeddedChannel channel = newPipeline(new FakeCharacterPort(), fakeInventoryFacade(), claimableQuestFacade());

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | 🟡 **Proposed** (2026-09-04) — chờ chủ dự án duyệt/bác D1–D7. **Chưa Accepted.** |
+| Status | ✅ **Accepted** (2026-09-05) — chủ dự án duyệt trọn D1–D7. Migration V25 đã chạy qua Postgres thật và playtest sống xác nhận D4 (đứng đè lên cọc 20 giây, 0 sát thương; `wandering_bandit` vẫn đuổi và đánh −18). |
 | Date | 2026-09-04 |
 | Deciders | Chủ dự án quyết; AI đo + soạn |
 | Related | [ADR-037](ADR-037-Monster-Template-And-Spawn-Tables.md) (D7 hoãn đúng việc này) · [ADR-036](ADR-036-Equipment-Stats-And-Enhancement-Effect.md) (khuôn `EquipmentBonusSnapshot` mà đường dữ liệu đi theo) · [ADR-033](ADR-033-Ninja-School-Style-Movement.md) (khoá trục X) · [ADR-022](ADR-022-Custom-FSM-No-Gdx-Ai.md) (FSM tự viết) · [AI.md §10](../../03-engine/AI.md) · [DATABASE.md §2.4](../../05-server/DATABASE.md) · [/CLAUDE.md §4](../../../CLAUDE.md) (đổi schema DB ⇒ dừng, tạo ADR) |

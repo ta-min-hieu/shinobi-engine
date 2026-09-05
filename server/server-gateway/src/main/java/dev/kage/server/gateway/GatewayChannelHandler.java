@@ -634,7 +634,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // bonus khi đăng nhập lại (server-world không tự biết feature-inventory).
             EquipmentBonusSnapshot bonus = currentEquipmentBonus(characterId);
             channelFacade.applyEquipmentBonus(characterId, bonus);
-            SelectCharacterResponse response = enterWorldResponse(bonus);
+            SelectCharacterResponse response = enterWorldResponse(bonus, spawn);
             send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
             sendInitialSelfState(characterId);
             // Đang trên authExecutor (Virtual Thread) rồi — friendFacade.listFriends chạm DB, an
@@ -663,12 +663,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * máu hiện tại chưa được lưu qua phiên ({@code character_stat.current_hp} có cột nhưng world
      * không đọc). Khi nào HP được lưu thật thì đổi ĐÚNG chỗ này.
      */
-    private static SelectCharacterResponse enterWorldResponse(EquipmentBonusSnapshot bonus) {
+    private static SelectCharacterResponse enterWorldResponse(EquipmentBonusSnapshot bonus, PositionSnapshot spawn) {
         int maxHp = WorldFacade.characterMaxHp(bonus);
         return SelectCharacterResponse.newBuilder()
                 .setSuccess(true)
                 .setCurrentHp(maxHp)
                 .setMaxHp(maxHp)
+                // ADR-041 — ĐÚNG snapshot vừa dùng để attachCharacter, không đọc DB lần hai: một
+                // lần đọc, hai chỗ dùng, nên world và client không thể lệch nhau.
+                .setSpawnX(spawn.x())
+                .setSpawnY(spawn.y())
                 .build();
     }
 
