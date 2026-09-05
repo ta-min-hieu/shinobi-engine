@@ -30,7 +30,10 @@ import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
 import dev.kage.protocol.CreateCharacterRequest;
 import dev.kage.protocol.CreateCharacterResponse;
+import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.ItemGrantedEvent;
+import dev.kage.protocol.ListCharactersRequest;
+import dev.kage.protocol.ListCharactersResponse;
 import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.Opcode;
@@ -96,6 +99,13 @@ final class SimulatedPlayer implements Runnable {
     /** 1 dòng {@code ItemGrantedEvent} chưa bán — {@code itemId} là {@code inventory_item.id} thật. */
     private record OwnedItem(long itemId, int quantity) {}
 
+    /**
+     * Trần số frame "không phải cái đang chờ" được bỏ qua trong lúc bắt tay. Đủ rộng cho lưu lượng
+     * AoI/chat ở N=2000 (đo thật: tệ nhất chỉ vài frame), đủ hẹp để không treo vô hạn nếu server
+     * thật sự quên trả lời.
+     */
+    private static final int MAX_FRAMES_SKIPPED_WHILE_WAITING = 200;
+
     private final String host;
     private final int port;
     private final String username;
@@ -152,21 +162,90 @@ final class SimulatedPlayer implements Runnable {
         ConnectRequest connectRequest =
                 ConnectRequest.newBuilder().setUsername(username).build();
         sendFrame(Opcode.OPCODE_CONNECT_REQUEST_VALUE, connectRequest.toByteArray());
-        ConnectResponse.parseFrom(readFrame(in).payload());
+        ConnectResponse.parseFrom(expectFrame(in, Opcode.OPCODE_CONNECT_RESPONSE_VALUE, "ConnectResponse")
+                .payload());
 
+        SelectCharacterRequest selectRequest = SelectCharacterRequest.newBuilder()
+                .setCharacterId(reuseOrCreateCharacter(in))
+                .build();
+        sendFrame(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, selectRequest.toByteArray());
+        // Nội dung không quan trọng ở đây, nhưng OPCODE thì có: xem javadoc expectFrame.
+        expectFrame(in, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, "SelectCharacterResponse");
+    }
+
+    /**
+     * DÙNG LẠI nhân vật sẵn có của account, chỉ tạo mới khi chưa có (2026-09-05).
+     *
+     * <p><b>Vì sao:</b> tên account là {@code loadtest<N>} cố định giữa các lần chạy, còn bản cũ
+     * thì LẦN NÀO CŨNG {@code CreateCharacterRequest}. Mỗi lần chạy đẻ thêm 1 nhân vật cho cùng
+     * account, nên load test <b>tự hỏng dần</b>: đến khi chạm trần số nhân vật, server trả
+     * {@code 409 error.character_limit_exceeded} và <b>100% client hỏng bắt tay</b> — nhìn y hệt
+     * server sập vì tải. Đã xảy ra thật (1000/1000 lỗi) và làm mọi con số "N lỗi" trong
+     * BENCHMARK.md §5.1 trở nên mơ hồ, vì chúng trộn lẫn lỗi bắt tay với lỗi quá tải.
+     *
+     * <p>Hệ quả phụ đáng kể: mỗi lần chạy trước đây để lại hàng nghìn nhân vật rác trong DB. Nay
+     * lần chạy thứ hai trở đi <b>không tạo thêm gì cả</b>.
+     *
+     * @return id nhân vật để {@code SelectCharacterRequest} dùng
+     */
+    private long reuseOrCreateCharacter(DataInputStream in) throws IOException {
+        sendFrame(
+                Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE,
+                ListCharactersRequest.getDefaultInstance().toByteArray());
+        ListCharactersResponse existing = ListCharactersResponse.parseFrom(
+                expectFrame(in, Opcode.OPCODE_LIST_CHARACTERS_RESPONSE_VALUE, "ListCharactersResponse")
+                        .payload());
+        if (existing.getCharactersCount() > 0) {
+            return existing.getCharacters(0).getId();
+        }
         CreateCharacterRequest createRequest = CreateCharacterRequest.newBuilder()
                 .setName("Load" + UUID.randomUUID().toString().replace("-", "").substring(0, 8))
                 .setIdempotencyKey(UUID.randomUUID().toString())
                 .build();
         sendFrame(Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, createRequest.toByteArray());
-        CreateCharacterResponse createResponse =
-                CreateCharacterResponse.parseFrom(readFrame(in).payload());
+        return CreateCharacterResponse.parseFrom(
+                        expectFrame(in, Opcode.OPCODE_CREATE_CHARACTER_RESPONSE_VALUE, "CreateCharacterResponse")
+                                .payload())
+                .getCharacter()
+                .getId();
+    }
 
-        SelectCharacterRequest selectRequest = SelectCharacterRequest.newBuilder()
-                .setCharacterId(createResponse.getCharacter().getId())
-                .build();
-        sendFrame(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, selectRequest.toByteArray());
-        readFrame(in); // SelectCharacterResponse — nội dung không quan trọng ở đây.
+    /**
+     * Đọc tới khi gặp đúng opcode mong đợi, BỎ QUA sự kiện server tự đẩy xuống xen giữa.
+     *
+     * <p><b>Hai lỗi của bản cũ, cùng một chỗ (phát hiện 2026-09-05 khi đo capacity):</b>
+     *
+     * <p>(1) Bản cũ đọc frame theo THỨ TỰ rồi {@code parseFrom} thẳng payload, không kiểm opcode.
+     * Server trả {@code ErrorResponse} thì client đem byte đó parse thành {@code ConnectResponse}
+     * và nổ {@code InvalidWireTypeException}, bị đếm vào cùng {@code errorCount} với lỗi QUÁ TẢI
+     * ⇒ <b>không phân biệt được "server quá tải" với "server từ chối và nói rõ lý do"</b>. Một lần
+     * chạy thật cho 1000/1000 lỗi kiểu này (409 {@code error.character_limit_exceeded}) và trông y
+     * hệt sập vì tải.
+     *
+     * <p>(2) Bắt tay KHÔNG độc quyền dòng byte. {@code handleSelectCharacterBlocking} gọi
+     * {@code registry().register()} và {@code attachCharacter()} TRƯỚC khi gửi
+     * {@code SelectCharacterResponse}, nên world có thể đẩy {@code CHARACTER_SPAWNED_EVENT} (303)
+     * hay {@code CHAT_MESSAGE_EVENT} (802) xuống trước. Ở N=1000 đo được 431+63 client dính đúng
+     * cảnh này. Client THẬT điều phối theo opcode nên không sao — chỉ công cụ này đọc theo vị trí
+     * mới hỏng. Vì vậy: bỏ qua, đừng coi là lỗi.
+     *
+     * <p>{@code ErrorResponse} thì KHÔNG bỏ qua — đó là câu trả lời cho chính yêu cầu vừa gửi.
+     */
+    private PacketCodec.Frame expectFrame(DataInputStream in, int expectedOpcode, String what) throws IOException {
+        for (int skipped = 0; skipped < MAX_FRAMES_SKIPPED_WHILE_WAITING; skipped++) {
+            PacketCodec.Frame frame = readFrame(in);
+            int actual = frame.header().opcode();
+            if (actual == expectedOpcode) {
+                return frame;
+            }
+            if (actual == Opcode.OPCODE_ERROR_VALUE) {
+                ErrorResponse error = ErrorResponse.parseFrom(frame.payload());
+                throw new IOException("Server từ chối lúc chờ " + what + ": mã " + error.getErrorCode() + " ("
+                        + error.getErrorKey() + ")");
+            }
+        }
+        throw new IOException("Không thấy " + what + " (opcode " + expectedOpcode + ") sau "
+                + MAX_FRAMES_SKIPPED_WHILE_WAITING + " frame — server đẩy sự kiện liên tục hoặc đã bỏ quên phản hồi");
     }
 
     /** Best-effort — dummy tập luyện luôn trong AoI ngay sau spawn (server-world WorldFacade), vài frame đầu là đủ. */
