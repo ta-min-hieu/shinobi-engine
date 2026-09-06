@@ -71,6 +71,13 @@ CHAKRA_CORE = "#A8F2FA"
 # its own rather than borrowing one of the cloth tones.
 TASSEL_RED = "#B0302E"
 
+# Ngọc cổ — celadon jade, warm and desaturated, nothing like `chakra_shard`'s
+# cyan. Three values because a single flat green plate has no readable form at
+# 64x64; the gold below is the bore of the bi disc it broke off.
+JADE = "#5FA986"
+JADE_PALE = "#A8D9BE"
+JADE_DARK = "#3F7A5E"
+
 
 def _clear_scene():
     for obj in list(bpy.data.objects):
@@ -134,6 +141,51 @@ def _frustum_obj(name, half_x_bottom, half_x_top, half_y, half_z,
     faces = [(3, 2, 1, 0), (4, 5, 6, 7), (0, 1, 5, 4),
              (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
     return _link(name, verts, faces, loc, rot)
+
+
+def _prism_obj(name, profile_xz, half_y, loc=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0)):
+    """Extrude an arbitrary 2D outline (screen plane) into one solid.
+
+    The escape hatch from the staircase trap: Freestyle draws its ink line per
+    OBJECT, so a shape assembled from several overlapping boxes renders with the
+    seams of every box (`icon_genin_headband`, ASSET-LOG 2026-09-03). Anything
+    whose silhouette is not a box, a frustum, an octahedron or a torus has to be
+    ONE mesh, and this is how one gets built.
+
+    `profile_xz` is a list of (x, z) in screen coordinates, ordered
+    counter-clockwise as the camera sees it (right, then up). That winding is
+    what makes the front cap face the camera: with the camera on -Y, a
+    screen-CCW polygon has normal -Y.
+    """
+    count = len(profile_xz)
+    verts = [(x, -half_y, z) for x, z in profile_xz]
+    verts += [(x, half_y, z) for x, z in profile_xz]
+    faces = [tuple(range(count)), tuple(reversed(range(count, 2 * count)))]
+    for i in range(count):
+        j = (i + 1) % count
+        # (front_i, back_i, back_j, front_j) — the other winding points the side
+        # walls inwards, which the toon shader renders as an unlit black band.
+        faces.append((i, count + i, count + j, j))
+    return _link(name, verts, faces, loc, rot)
+
+
+def _arc_band(radius_outer, radius_inner, degrees_from, degrees_to, segments=14):
+    """Outline of a slice cut out of a flat ring — a bi-disc fragment.
+
+    Outer edge swept counter-clockwise, inner edge swept back, closed by the two
+    straight radial cuts. Those two straight edges against two curved ones are
+    the whole read: they are what a break in a made object looks like, and a
+    plain trapezoid has none of it.
+    """
+    outer = []
+    inner = []
+    for index in range(segments + 1):
+        t = index / float(segments)
+        angle = math.radians(degrees_from + (degrees_to - degrees_from) * t)
+        cos_a, sin_a = math.cos(angle), math.sin(angle)
+        outer.append((radius_outer * cos_a, radius_outer * sin_a))
+        inner.append((radius_inner * cos_a, radius_inner * sin_a))
+    return outer + list(reversed(inner))
 
 
 def _ring_obj(name, major_r, minor_r, loc=(0.0, 0.0, 0.0), major_seg=16, minor_seg=6):
@@ -529,6 +581,53 @@ def build_chakra_shard():
     return 0.84
 
 
+def build_ancient_jade_shard():
+    """Mảnh Ngọc Cổ — a broken piece of a jade bi disc (V30, quest 3 reward).
+
+    Three things it must NOT be confused with, which is what every shape choice
+    below is for:
+
+      * `chakra_shard` is the other "shard" in the bag and is a tall cyan
+        octahedron. This one is a FLAT PLATE in warm green — different form,
+        different temperature, so the two never trade places at 64x64.
+      * `iron_scrap` is a loose pile. This is ONE object with one chip: it is
+        `max_stack = 1`, a unique relic, and the bag should say so.
+      * A generic gem. The gold arc of the bi disc's bore is the single cue that
+        turns "green rock" into "piece of something old and made" — which is what
+        the item is in the story (STORY.md §6, the arc-1 McGuffin).
+
+    Shape: a real slice of the ring, cut by `_arc_band` — two curved edges and
+    two straight radial breaks. The first attempt was a tapered plate with a
+    whole gold torus beside it and read as a bell hanging off a keyring; the
+    fragment has to BE part of a circle, not stand next to one.
+    """
+    span = (-62.0, 92.0)
+    body = _prism_obj("Shard", _arc_band(0.440, 0.190, *span), 0.055,
+                      loc=(-0.150, 0.000, -0.090), rot=_tilt(12))
+    apply_toon(body, JADE, shades=3)
+
+    # Gold on the bore edge only — the polished inside of a made disc, and the
+    # one cue that stops this reading as a plain green rock. Sits proud of the
+    # jade towards the camera so the cel ramp never merges the two.
+    bore = _prism_obj("Bore", _arc_band(0.255, 0.190, span[0] + 3.0, span[1] - 3.0),
+                      0.030, loc=(-0.150, -0.032, -0.090), rot=_tilt(12))
+    apply_toon(bore, GOLD, shades=2)
+
+    # Highlight on the top of the arc only, not a full concentric band: a band
+    # would be a third ring and turn the icon into a target, while a short bright
+    # wedge just reads as light catching the stone.
+    sheen = _prism_obj("Sheen", _arc_band(0.400, 0.270, 34.0, 88.0), 0.026,
+                       loc=(-0.150, -0.048, -0.090), rot=_tilt(12))
+    apply_toon(sheen, JADE_PALE, shades=2)
+
+    # The one loose chip, touching the lower break so it reads as "just came off
+    # this", not as a second item in the slot (`max_stack = 1`).
+    chip = _gem_obj("Chip", 0.088, 0.050, 0.110, loc=(0.243, -0.055, -0.400),
+                    rot=_tilt(28))
+    apply_toon(chip, JADE_DARK, shades=3)
+    return 1.02
+
+
 ITEMS = {
     "kunai": build_kunai,
     "wooden_sword": build_wooden_sword,
@@ -551,6 +650,8 @@ ITEMS = {
     # V21 — nguyên liệu (equip_slot NULL)
     "iron_scrap": build_iron_scrap,
     "chakra_shard": build_chakra_shard,
+    # V30 — phần thưởng nhiệm vụ 3 (không bán, không rơi, max_stack 1)
+    "ancient_jade_shard": build_ancient_jade_shard,
 }
 
 

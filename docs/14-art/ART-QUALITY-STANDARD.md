@@ -143,9 +143,9 @@ cố định, nên chỉ bị phạt mà không được lợi gì. Đã tách `
 |---|---|
 | `build_rig(name)` | Rig **11 xương**: `pelvis spine head arm_l/r forearm_l/r leg_l/r shin_l/r`. Toạ độ khớp chung giữ nguyên như rig 7 xương cũ nên baseline/pivot không đổi |
 | `build_chibi_body(rig, spec)` | Đầu, cổ, thân, hông, 2 tay, 2 chân (kèm khớp cầu vai/khuỷu/gối, bàn tay, bàn chân) |
-| `add_face(rig, spec, style)` | Mắt + con ngươi + lông mày + miệng phía +X. `style`: `default` \| `wide` |
-| `add_hair(rig, spec, style)` | `spiky_short` \| `spiky_long` \| `bang` \| `topknot` |
-| `add_accessory(rig, spec, kind, color, bone)` | `headband` `scarf` `sash` `shoulder_plate` `chest_plate` `thigh_guard` `arm_wrap` `cloak` |
+| `add_face(rig, spec, style)` | Mắt + con ngươi + lông mày + miệng phía +X. `style`: `default` \| `wide` \| `frontal` (soi gương mắt+mày sang má kia — camera client là 3/4) \| `none` (không dựng mặt; dành cho construct đeo `stone_visor`) |
+| `add_hair(rig, spec, style, cap)` | `spiky_short` \| `spiky_long` \| `bang` \| `topknot` \| `topknot_bun` \| `carved_crest`. `cap=False` bỏ hẳn hai khối tóc (vòm + gáy) — bắt buộc cho đầu trọc, xem javadoc hàm |
+| `add_accessory(rig, spec, kind, color, bone, accent)` | `headband` `scarf` `sash` `shoulder_plate` `chest_plate` `thigh_guard` `arm_wrap` `cloak` `beard` `long_robe` `wide_sleeves` `robe_sash` `robe_hem` `stone_visor` `stone_tablet` `bamboo_slips`. `accent` là màu THỨ HAI, chỉ truyền cho builder nào khai báo nhận nó |
 | `build_weapon(rig, spec, kind, ...)` | `kunai` `gourd` `twin_blades` `long_blade` `stone_mace` |
 | `add_motion_detail(rig, spec, kind, color)` | B3: `embers` `water_ring` `ribbons` `spark` `stone_shards` |
 | `author_actions(rig)` | 7 action chuẩn, pose theo §6 |

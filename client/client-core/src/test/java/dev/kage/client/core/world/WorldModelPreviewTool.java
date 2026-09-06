@@ -32,8 +32,9 @@ import dev.kage.protocol.NpcSpawnedEvent;
  * tay lại phép vẽ.
  *
  * <p>Khung hình cố ý đặt cạnh nhau những thứ phải phân biệt được: nhân vật (đã có model từ
- * ADR-031), ba loài quái ĐÃ có model ({@code training_dummy}, {@code wandering_bandit},
- * {@code stone_ogre} — trước 2026-08-30 cả ba dùng chung một model và trông y hệt nhau), và quái
+ * ADR-031), bốn loài quái ĐÃ có model ({@code training_dummy}, {@code wandering_bandit},
+ * {@code stone_ogre}, {@code archive_warden} — trước 2026-08-30 ba loài đầu dùng chung một model và
+ * trông y hệt nhau, rồi V30 lặp lại đúng chuyện đó với loài thứ tư cho tới V31), và quái
  * CHƯA có model ({@code sample_boss}, vẫn là hộp đỏ) — nếu nhánh fallback từng bị hỏng, ảnh này là
  * chỗ thấy ngay.
  */
@@ -65,6 +66,13 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
 
     private static final long OGRE_ID = -6L;
 
+    /**
+     * Loài của V30. Đứng NGAY CẠNH quỷ đá có chủ đích: V30 cho nó mượn {@code mob_stone-ogre} và ghi
+     * đó là nợ nhìn thấy được, V31 trả nợ — câu hỏi duy nhất ảnh này phải trả lời là hai con đá đó
+     * còn lẫn vào nhau nữa không.
+     */
+    private static final long WARDEN_ID = -7L;
+
     // Toàn bộ khung nằm TRƯỚC bệ demo đầu tiên (bắt đầu ở x=3, xem DemoPlatforms) — bệ vẽ đè lên
     // quái thì ảnh không còn chứng minh được gì về chính con quái, đúng bẫy đã gặp ở lượt chụp đầu.
     // Ba loài quái đứng CẠNH NHAU (dummy/bandit/ogre) chứ không rải ra: câu hỏi mà ảnh này phải trả
@@ -73,9 +81,10 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
     private static final float DUMMY_X = -1.6f;
     private static final float BANDIT_X = -0.4f;
     private static final float OGRE_X = 0.9f;
-    private static final float BOSS_X = 2.2f;
+    private static final float WARDEN_X = 2.1f;
+    private static final float BOSS_X = 3.4f;
     private static final float ELDER_X = -3.0f;
-    private static final float UNDRAWN_NPC_X = 3.5f;
+    private static final float UNDRAWN_NPC_X = 4.7f;
 
     private final Map<Long, CombatHudController.MonsterState> monsters = new LinkedHashMap<>();
 
@@ -104,15 +113,17 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         putMonster(DUMMY_ID, "training_dummy", DUMMY_X);
         putMonster(BANDIT_ID, "wandering_bandit", BANDIT_X);
         putMonster(OGRE_ID, "stone_ogre", OGRE_X);
+        putMonster(WARDEN_ID, "archive_warden", WARDEN_X);
         putMonster(BOSS_ID, "sample_boss", BOSS_X);
         putNpc(ELDER_ID, "town_elder", ELDER_X);
         putNpc(UNDRAWN_NPC_ID, "shop_keeper", UNDRAWN_NPC_X);
         LOG.info(
-                "model quái: training_dummy={} wandering_bandit={} stone_ogre={} sample_boss={} "
-                        + "(sample_boss=false là ĐÚNG, chưa vẽ)",
+                "model quái: training_dummy={} wandering_bandit={} stone_ogre={} archive_warden={} "
+                        + "sample_boss={} (sample_boss=false là ĐÚNG, chưa vẽ)",
                 models.hasModel(DUMMY_ID),
                 models.hasModel(BANDIT_ID),
                 models.hasModel(OGRE_ID),
+                models.hasModel(WARDEN_ID),
                 models.hasModel(BOSS_ID));
         LOG.info(
                 "model NPC: town_elder={} shop_keeper={} (shop_keeper=false là ĐÚNG, mã NPC chưa tồn tại)",
