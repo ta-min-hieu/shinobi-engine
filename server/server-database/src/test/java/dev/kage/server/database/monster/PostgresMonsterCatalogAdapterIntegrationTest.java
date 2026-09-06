@@ -36,6 +36,13 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
 
     private static final int POSTGRES_PORT = 5432;
 
+    /**
+     * Bản sao của {@code CombatConstants.ATTACK_RANGE_METERS} (server-world). Chép số chứ không
+     * import: {@code server-database} KHÔNG được phụ thuộc {@code server-world} (ADR-037) — ràng
+     * buộc đó chi phối mọi đường dữ liệu world.
+     */
+    private static final float MELEE_ATTACK_RANGE_METERS = 2f;
+
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
             new PostgreSQLContainer<>(DockerImageName.parse("postgres:17")).withStartupTimeout(Duration.ofMinutes(2));
@@ -134,8 +141,14 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
                 .allSatisfy(spawn -> assertThat(spawn.respawnSeconds()).isPositive());
         // V29 giãn ba điểm CÓ AGGRO ra xa nhau (21 / 34 / 47) — xem
         // shouldKeepAggroSpawnsApartEnoughToPullOneAtATime. Hai cọc gỗ (aggro 0) giữ nguyên chỗ cũ.
-        // V30 nối thêm hai thạch vệ của quest 3 ở 60 và 73, tiếp tục đúng bước 13m của V29.
-        assertThat(spawns).extracting(MonsterSpawnPoint::posX).containsExactly(8f, 14f, 21f, 34f, 47f, 60f, 73f);
+        // V30 thêm hai thạch vệ của quest 3; V32 dời chúng sang PHÍA TÂY (-33 / -20) sau khi
+        // playtest đo được đường đi phía đông tốn 65 máu — xem
+        // shouldLeaveEveryAggroSpawnAQuietPlaceToFightIn và ROADMAP mục 62/63.
+        // KHÔNG khớp theo thứ tự: adapter trả về theo id (thứ tự chèn của các migration), không
+        // theo trục x — V32 dời hai thạch vệ sang âm nên hai thứ tự đó nay khác hẳn nhau.
+        assertThat(spawns)
+                .extracting(MonsterSpawnPoint::posX)
+                .containsExactlyInAnyOrder(-33f, -20f, 8f, 14f, 21f, 34f, 47f);
     }
 
     /**
@@ -150,6 +163,52 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
      * <p>Ô test này gác luật chung thay vì gác ba con số, nên thêm loài mới hay dời điểm spawn đều
      * bị soi lại. Quái {@code isPassive} (mộc nhân, aggro 0) không tham gia: chúng không tự đánh ai.
      */
+    /**
+     * ROADMAP mục 62 — hàng rào thứ HAI về hình học, sinh ra từ một buổi playtest đo được.
+     *
+     * <p>{@link #shouldKeepAggroSpawnsApartEnoughToPullOneAtATime} chỉ bảo đảm người chơi ĐI NGANG
+     * không kéo hai con cùng lúc. Nhưng lúc họ ĐỨNG LẠI ĐÁNH tại một điểm spawn thì thứ quyết định
+     * là <b>tầm đuổi</b> ({@code leashRadiusMeters}) của con bên cạnh, không phải tầm aggro: quái A
+     * rời spawn của nó xa nhất {@code leashA}, rồi còn với thêm {@code ATTACK_RANGE_METERS}.
+     *
+     * <p>Đã trả giá thật: V30 đặt thạch vệ ở x=60 trong khi quỷ đá spawn ở x=47 có leash 10 ⇒ nó
+     * đuổi tới x=57 và <b>ra đòn kết liễu</b> trong lúc người chơi đánh thạch vệ. Luật cũ không
+     * thấy gì vì 13m &gt; 12m tổng aggro.
+     */
+    @Test
+    void shouldLeaveEveryAggroSpawnAQuietPlaceToFightIn() {
+        PostgresMonsterCatalogAdapter adapter = new PostgresMonsterCatalogAdapter(dataSource);
+        Map<String, Float> leashByCode = new HashMap<>();
+        Map<String, Float> aggroByCode = new HashMap<>();
+        for (MonsterTemplate template : adapter.listTemplates()) {
+            leashByCode.put(template.code(), template.aiParams().leashRadiusMeters());
+            aggroByCode.put(template.code(), template.aiParams().aggroRadiusMeters());
+        }
+
+        List<MonsterSpawnPoint> aggressive = adapter.listSpawnPoints(MonsterSpawnPoint.MAIN_WORLD_CODE).stream()
+                .filter(spawn -> aggroByCode.getOrDefault(spawn.monsterCode(), 0f) > 0f)
+                .toList();
+
+        for (MonsterSpawnPoint standing : aggressive) {
+            for (MonsterSpawnPoint neighbour : aggressive) {
+                if (standing == neighbour) {
+                    continue;
+                }
+                float reach = leashByCode.get(neighbour.monsterCode()) + MELEE_ATTACK_RANGE_METERS;
+                assertThat(Math.abs(standing.posX() - neighbour.posX()))
+                        .as(
+                                "đánh nhau ở %s@%.0f thì %s@%.0f đuổi tới nơi được (leash %.0f + tầm đánh %.0f)",
+                                standing.monsterCode(),
+                                standing.posX(),
+                                neighbour.monsterCode(),
+                                neighbour.posX(),
+                                leashByCode.get(neighbour.monsterCode()),
+                                MELEE_ATTACK_RANGE_METERS)
+                        .isGreaterThan(reach);
+            }
+        }
+    }
+
     @Test
     void shouldKeepAggroSpawnsApartEnoughToPullOneAtATime() {
         PostgresMonsterCatalogAdapter adapter = new PostgresMonsterCatalogAdapter(dataSource);
