@@ -14,3 +14,21 @@ dependencies {
 application {
     mainClass.set("dev.kage.tools.loadtest.LoadTestRunner")
 }
+
+// gameProbe — client HEADLESS QUAN SÁT (ROADMAP mục 58). Cùng module vì nó nói ĐÚNG tầng dây của
+// SimulatedPlayer (GameConnection dùng chung); thêm module mới cho việc này là chuyện phải hỏi chủ
+// dự án (CLAUDE.md §4) và cũng không mua thêm được gì.
+//
+// Chạy:
+//   ./gradlew :tools:load-test:gameProbe --args="--username=kagetest --moveToX=24 --observeSeconds=15"
+// hoặc (khi shell nuốt mất --args):
+//   ./gradlew :tools:load-test:gameProbe -Pargs="--username=kagetest --moveToX=24"
+tasks.register<JavaExec>("gameProbe") {
+    group = "verification"
+    description = "Client headless quan sát: giải mã sự kiện world thành SỐ (vị trí quái, sát thương từng đòn)"
+    mainClass.set("dev.kage.tools.loadtest.probe.GameProbe")
+    classpath = sourceSets["main"].runtimeClasspath
+    if (project.hasProperty("args")) {
+        args((project.property("args") as String).split(" ").filter { it.isNotBlank() })
+    }
+}

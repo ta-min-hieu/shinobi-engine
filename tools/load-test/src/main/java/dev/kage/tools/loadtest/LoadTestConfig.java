@@ -1,12 +1,9 @@
 package dev.kage.tools.loadtest;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
- * Cấu hình 1 lần chạy — parse từ {@code --key=value} (không dùng thư viện CLI parser ngoài, Điều 9:
- * ~10 tham số không đáng thêm dependency). Mặc định là SOAK TEST 2 giờ (BENCHMARK.md §5 "Soak test
- * quan trọng hơn peak test"), không phải peak test ngắn — đổi {@code durationSeconds} cho peak test.
+ * Cấu hình 1 lần chạy — parse từ {@code --key=value} qua {@link CommandLineArguments}. Mặc định là
+ * SOAK TEST 2 giờ (BENCHMARK.md §5 "Soak test quan trọng hơn peak test"), không phải peak test
+ * ngắn — đổi {@code durationSeconds} cho peak test.
  */
 record LoadTestConfig(
         String host,
@@ -30,27 +27,16 @@ record LoadTestConfig(
     private static final int DEFAULT_REPORT_INTERVAL_SECONDS = 60;
 
     static LoadTestConfig parse(String[] args) {
-        Map<String, String> raw = new HashMap<>();
-        for (String arg : args) {
-            int eq = arg.indexOf('=');
-            if (arg.startsWith("--") && eq > 2) {
-                raw.put(arg.substring(2, eq), arg.substring(eq + 1));
-            }
-        }
+        CommandLineArguments raw = CommandLineArguments.parse(args);
         return new LoadTestConfig(
-                raw.getOrDefault("host", DEFAULT_HOST),
-                intArg(raw, "port", DEFAULT_PORT),
-                intArg(raw, "metricsPort", DEFAULT_METRICS_PORT),
-                intArg(raw, "initialClients", DEFAULT_INITIAL_CLIENTS),
-                intArg(raw, "maxClients", DEFAULT_MAX_CLIENTS),
-                intArg(raw, "rampStepClients", DEFAULT_RAMP_STEP_CLIENTS),
-                intArg(raw, "rampStepIntervalSeconds", DEFAULT_RAMP_STEP_INTERVAL_SECONDS),
-                intArg(raw, "durationSeconds", DEFAULT_DURATION_SECONDS),
-                intArg(raw, "reportIntervalSeconds", DEFAULT_REPORT_INTERVAL_SECONDS));
-    }
-
-    private static int intArg(Map<String, String> raw, String key, int defaultValue) {
-        String value = raw.get(key);
-        return value == null ? defaultValue : Integer.parseInt(value);
+                raw.text("host", DEFAULT_HOST),
+                raw.integer("port", DEFAULT_PORT),
+                raw.integer("metricsPort", DEFAULT_METRICS_PORT),
+                raw.integer("initialClients", DEFAULT_INITIAL_CLIENTS),
+                raw.integer("maxClients", DEFAULT_MAX_CLIENTS),
+                raw.integer("rampStepClients", DEFAULT_RAMP_STEP_CLIENTS),
+                raw.integer("rampStepIntervalSeconds", DEFAULT_RAMP_STEP_INTERVAL_SECONDS),
+                raw.integer("durationSeconds", DEFAULT_DURATION_SECONDS),
+                raw.integer("reportIntervalSeconds", DEFAULT_REPORT_INTERVAL_SECONDS));
     }
 }

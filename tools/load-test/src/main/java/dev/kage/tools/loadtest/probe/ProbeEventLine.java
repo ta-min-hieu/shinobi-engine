@@ -1,0 +1,204 @@
+package dev.kage.tools.loadtest.probe;
+
+import java.util.Locale;
+import java.util.Optional;
+
+import com.google.protobuf.InvalidProtocolBufferException;
+
+import dev.kage.protocol.AttackResultEvent;
+import dev.kage.protocol.CharacterDespawnedEvent;
+import dev.kage.protocol.CharacterMovedEvent;
+import dev.kage.protocol.CharacterRespawnedEvent;
+import dev.kage.protocol.CharacterSpawnedEvent;
+import dev.kage.protocol.ErrorResponse;
+import dev.kage.protocol.ExperienceChangedEvent;
+import dev.kage.protocol.GoldChangedEvent;
+import dev.kage.protocol.ItemGrantedEvent;
+import dev.kage.protocol.MonsterDespawnedEvent;
+import dev.kage.protocol.MonsterMovedEvent;
+import dev.kage.protocol.MonsterSpawnedEvent;
+import dev.kage.protocol.MoveResponse;
+import dev.kage.protocol.NpcDespawnedEvent;
+import dev.kage.protocol.NpcSpawnedEvent;
+import dev.kage.protocol.Opcode;
+import dev.kage.protocol.SkillResultEvent;
+import dev.kage.protocol.wire.PacketCodec;
+
+/**
+ * Biến 1 frame nhận được thành MỘT DÒNG có cấu trúc (TSV) — đây là toàn bộ giá trị của probe:
+ * ROADMAP mục 58 ghi rõ ba lần trong ngày 2026-09-05 kết luận từ ảnh chụp màn hình đã sai hoặc
+ * không phân giải được, nên câu trả lời phải là SỐ đọc thẳng từ dây.
+ *
+ * <p>Định dạng: {@code <ms từ lúc bắt đầu>\t<opcode>\t<TÊN>\t<k=v k=v ...>}. TSV chứ không phải
+ * JSON vì công cụ tiêu thụ chính là {@code grep}/mắt người, và mỗi dòng phải đọc được không cần
+ * parser.
+ *
+ * <p>Hàm THUẦN, không I/O — vì thế test được không cần server (xem {@code ProbeEventLineTest}).
+ */
+final class ProbeEventLine {
+
+    private static final String SEPARATOR = "\t";
+    private static final String OPCODE_NAME_PREFIX = "OPCODE_";
+
+    private ProbeEventLine() {}
+
+    /**
+     * @param elapsedMillis mốc thời gian nhận, tính từ lúc probe bắt đầu
+     * @throws InvalidProtocolBufferException nếu payload không khớp message của opcode đó — KHÔNG
+     *     nuốt: opcode nói một đằng payload một nẻo là bug giao thức thật, phải nổ ra
+     */
+    static String format(long elapsedMillis, PacketCodec.Frame frame) throws InvalidProtocolBufferException {
+        int opcode = frame.header().opcode();
+        return elapsedMillis
+                + SEPARATOR
+                + opcode
+                + SEPARATOR
+                + name(opcode)
+                + SEPARATOR
+                + describe(opcode, frame.payload());
+    }
+
+    /** Tên opcode đã bỏ tiền tố {@code OPCODE_}; {@code UNKNOWN} nếu số không có trong registry. */
+    static String name(int opcode) {
+        Opcode known = Opcode.forNumber(opcode);
+        if (known == null) {
+            return "UNKNOWN";
+        }
+        String rawName = known.name();
+        return rawName.startsWith(OPCODE_NAME_PREFIX) ? rawName.substring(OPCODE_NAME_PREFIX.length()) : rawName;
+    }
+
+    private static String describe(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+        Optional<String> combat = describeCombat(opcode, payload);
+        if (combat.isPresent()) {
+            return combat.get();
+        }
+        Optional<String> movement = describeMovement(opcode, payload);
+        if (movement.isPresent()) {
+            return movement.get();
+        }
+        // Opcode chưa giải mã vẫn được ghi ra (tên + số byte) thay vì bỏ im lặng — probe phải cho
+        // thấy CÓ GÌ ĐÓ đã tới, kể cả khi nó chưa biết đọc.
+        return describeSelfState(opcode, payload).orElseGet(() -> "payloadBytes=" + payload.length);
+    }
+
+    private static Optional<String> describeCombat(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+        return switch (opcode) {
+            case Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE -> Optional.of(attack(AttackResultEvent.parseFrom(payload)));
+            case Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE -> Optional.of(skill(SkillResultEvent.parseFrom(payload)));
+            case Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE ->
+                Optional.of(monsterSpawn(MonsterSpawnedEvent.parseFrom(payload)));
+            case Opcode.OPCODE_MONSTER_MOVED_EVENT_VALUE ->
+                Optional.of(monsterMove(MonsterMovedEvent.parseFrom(payload)));
+            case Opcode.OPCODE_MONSTER_DESPAWNED_EVENT_VALUE ->
+                Optional.of(
+                        "monsterId=" + MonsterDespawnedEvent.parseFrom(payload).getMonsterId());
+            default -> Optional.empty();
+        };
+    }
+
+    private static Optional<String> describeMovement(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+        return switch (opcode) {
+            case Opcode.OPCODE_MOVE_RESPONSE_VALUE -> Optional.of(moveResponse(MoveResponse.parseFrom(payload)));
+            case Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE ->
+                Optional.of(characterSpawn(CharacterSpawnedEvent.parseFrom(payload)));
+            case Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE ->
+                Optional.of(characterMove(CharacterMovedEvent.parseFrom(payload)));
+            case Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE ->
+                Optional.of("characterId="
+                        + CharacterDespawnedEvent.parseFrom(payload).getCharacterId());
+            case Opcode.OPCODE_CHARACTER_RESPAWNED_EVENT_VALUE ->
+                Optional.of(respawn(CharacterRespawnedEvent.parseFrom(payload)));
+            default -> Optional.empty();
+        };
+    }
+
+    private static Optional<String> describeSelfState(int opcode, byte[] payload)
+            throws InvalidProtocolBufferException {
+        return switch (opcode) {
+            case Opcode.OPCODE_NPC_SPAWNED_EVENT_VALUE -> Optional.of(npcSpawn(NpcSpawnedEvent.parseFrom(payload)));
+            case Opcode.OPCODE_NPC_DESPAWNED_EVENT_VALUE ->
+                Optional.of("npcId=" + NpcDespawnedEvent.parseFrom(payload).getNpcId());
+            case Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE ->
+                Optional.of(experience(ExperienceChangedEvent.parseFrom(payload)));
+            case Opcode.OPCODE_GOLD_CHANGED_EVENT_VALUE -> Optional.of(gold(GoldChangedEvent.parseFrom(payload)));
+            case Opcode.OPCODE_ITEM_GRANTED_EVENT_VALUE -> Optional.of(item(ItemGrantedEvent.parseFrom(payload)));
+            case Opcode.OPCODE_ERROR_VALUE -> Optional.of(error(ErrorResponse.parseFrom(payload)));
+            default -> Optional.empty();
+        };
+    }
+
+    private static String attack(AttackResultEvent event) {
+        return "attacker=" + event.getAttackerEntityId() + " target=" + event.getTargetEntityId() + " damage="
+                + event.getDamage() + " crit=" + event.getIsCrit() + " miss=" + event.getIsMiss() + " targetHp="
+                + event.getTargetCurrentHp() + " targetDied=" + event.getTargetDied();
+    }
+
+    private static String skill(SkillResultEvent event) {
+        return "skill=" + event.getSkillCode() + " effect=" + event.getEffectKind() + " attacker="
+                + event.getAttackerEntityId() + " target=" + event.getTargetEntityId() + " magnitude="
+                + event.getDamage() + " crit=" + event.getIsCrit() + " miss=" + event.getIsMiss() + " targetHp="
+                + event.getTargetCurrentHp() + " targetDied=" + event.getTargetDied();
+    }
+
+    private static String monsterSpawn(MonsterSpawnedEvent event) {
+        return "monsterId=" + event.getMonsterId() + " code=" + event.getMonsterCode() + " model="
+                + event.getModelKey() + " x=" + meters(event.getX()) + " y=" + meters(event.getY()) + " hp="
+                + event.getCurrentHp() + "/" + event.getMaxHp();
+    }
+
+    private static String monsterMove(MonsterMovedEvent event) {
+        return "monsterId=" + event.getMonsterId() + " x=" + meters(event.getX()) + " y=" + meters(event.getY());
+    }
+
+    private static String moveResponse(MoveResponse response) {
+        return "x=" + meters(response.getX()) + " y=" + meters(response.getY()) + " z=" + meters(response.getZ())
+                + " grounded=" + response.getGrounded();
+    }
+
+    private static String characterSpawn(CharacterSpawnedEvent event) {
+        return "characterId=" + event.getCharacterId() + " x=" + meters(event.getX()) + " y=" + meters(event.getY())
+                + " faction=" + event.getFaction() + " costume=" + event.getCostumeTier();
+    }
+
+    private static String characterMove(CharacterMovedEvent event) {
+        return "characterId=" + event.getCharacterId() + " x=" + meters(event.getX()) + " y=" + meters(event.getY());
+    }
+
+    private static String respawn(CharacterRespawnedEvent event) {
+        return "x=" + meters(event.getX()) + " y=" + meters(event.getY()) + " hp=" + event.getCurrentHp() + "/"
+                + event.getMaxHp() + " chi=" + event.getCurrentChi() + "/" + event.getMaxChi();
+    }
+
+    private static String npcSpawn(NpcSpawnedEvent event) {
+        return "npcId=" + event.getNpcId() + " code=" + event.getNpcCode() + " x=" + meters(event.getX()) + " y="
+                + meters(event.getY());
+    }
+
+    private static String experience(ExperienceChangedEvent event) {
+        return "level=" + event.getLevel() + " totalExp=" + event.getTotalExp() + " intoLevel="
+                + event.getExpIntoLevel() + " forNext=" + event.getExpForNextLevel() + " leveledUp="
+                + event.getLeveledUp();
+    }
+
+    private static String gold(GoldChangedEvent event) {
+        return "gold=" + event.getGold() + " delta=" + event.getDelta() + " reason=" + event.getReasonKey();
+    }
+
+    private static String item(ItemGrantedEvent event) {
+        return "itemId=" + event.getItemId() + " quantity=" + event.getQuantity();
+    }
+
+    private static String error(ErrorResponse response) {
+        return "code=" + response.getErrorCode() + " key=" + response.getErrorKey();
+    }
+
+    /**
+     * {@link Locale#ROOT} là bắt buộc, không phải thói quen: máy dev của dự án chạy locale Việt
+     * Nam, {@code %.2f} mặc định in "24,00" — dấu phẩy sẽ phá luôn định dạng của dòng và làm mọi
+     * phép so sánh số sau đó thành rác.
+     */
+    static String meters(float value) {
+        return String.format(Locale.ROOT, "%.2f", value);
+    }
+}
