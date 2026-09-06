@@ -4,8 +4,8 @@
 
 | | |
 |---|---|
-| Version | 1.0.0 |
-| Status | Draft |
+| Version | 1.1.0 |
+| Status | Draft — §1 rà lại theo thực tế 2026-09-06 |
 | Luật gốc | [Hiến pháp Điều 21–24](../00-governance/KAGE-CONSTITUTION.md#chương-v--nguyên-tắc-kiến-trúc) |
 
 > Đây là hình dạng cụ thể của [ARCHITECTURE.md §8](ARCHITECTURE.md). Không tạo module ngoài cấu trúc này khi chưa có ADR.
@@ -13,6 +13,11 @@
 ---
 
 ## 1. Cây thư mục gốc
+
+> **Cây dưới đây là THỰC TẾ** — mọi module ở đây đều có trong `settings.gradle.kts` và build được
+> ngay hôm nay (rà lại 2026-09-06). Module *dự kiến* nằm riêng ở [§1.1](#11-module-dự-kiến-chưa-tồn-tại)
+> để không ai đọc nhầm kế hoạch thành hiện trạng — chính chỗ lệch đó đã giữ một ô Exit Criteria của
+> Phase 0 trống suốt từ 2026-08-30.
 
 ```
 shinobi-engine/
@@ -25,6 +30,7 @@ shinobi-engine/
 │       └── kage.test-conventions.gradle.kts
 ├── gradle/
 │   └── libs.versions.toml          # Version Catalog — nguồn version DUY NHẤT
+├── third-party/m2/                 # Repo Maven cục bộ cho dependency vendored (ADR-032)
 │
 ├── shared/
 │   ├── shared-protocol/            # Packet/DTO (protobuf + Record wrapper)
@@ -38,9 +44,7 @@ shinobi-engine/
 │
 ├── client/
 │   ├── client-core/                # Gameplay + UI đặc thù game, platform-agnostic
-│   ├── client-desktop/             # Launcher LWJGL3
-│   ├── client-android/             # Launcher Android
-│   └── client-ios/                 # Launcher iOS (giai đoạn sau)
+│   └── client-desktop/             # Launcher LWJGL3 — sơ đồ điều khiển CHÍNH (ADR-023 desktop-first)
 │
 ├── server/
 │   ├── server-gateway/             # Netty: accept, auth, session, rate-limit, routing
@@ -50,25 +54,29 @@ shinobi-engine/
 │       ├── feature-account/
 │       ├── feature-character/
 │       ├── feature-inventory/
-│       ├── feature-dialogue/
-│       ├── feature-guild/
-│       ├── feature-quest/
 │       ├── feature-shop/
-│       ├── feature-mail/
+│       ├── feature-dialogue/
+│       ├── feature-quest/
 │       ├── feature-friend/
+│       ├── feature-mail/
 │       ├── feature-chat/
-│       ├── feature-auction/
-│       └── feature-ranking/
+│       ├── feature-guild/
+│       ├── feature-party/
+│       ├── feature-trade/
+│       ├── feature-pvp/
+│       └── feature-monster/        # ADR-037 — monster_template + monster_spawn
+│
+├── quality/
+│   └── architecture-tests/         # ArchUnit (ADR-011) — enforce dependency rule
 │
 ├── tools/
-│   ├── asset-pipeline/             # CLI export/pack/validate asset
-│   ├── content-editor/             # Editor quest/item/skill (Phase xa — xem EDITOR.md)
+│   ├── asset-pipeline/             # CLI export/pack/validate asset (ADR-029)
+│   ├── blender/                    # Script Blender của dây chuyền art (KHÔNG phải Gradle module)
 │   └── load-test/                  # Client giả lập qua socket thật (BENCHMARK.md §5, Phase 9 lát cắt 2)
 │
 ├── assets/
-│   ├── hyperlap2d-projects/        # Project gốc — KHÔNG đóng gói vào game
-│   ├── raw/                        # Art nguồn (PSD/AI) — KHÔNG đóng gói vào game
-│   └── exported/                   # Runtime asset — đóng gói vào game
+│   ├── raw/                        # Art nguồn (.blend/PSD) — KHÔNG đóng gói vào game
+│   └── exported/                   # Runtime asset — SINH RA từ assets/raw, gitignore (build output)
 │
 ├── deploy/
 │   ├── docker/
@@ -77,7 +85,26 @@ shinobi-engine/
 └── docs/
 ```
 
-Mỗi thư mục cấp 2 trở lên là **một Gradle module** (`:engine:engine-core`, `:server:server-features:feature-inventory`).
+Mỗi thư mục cấp 2 trở lên **có trong `settings.gradle.kts`** là một Gradle module
+(`:engine:engine-core`, `:server:server-features:feature-inventory`). Ngoại lệ có chủ ý:
+`tools/blender/` chứa script Python chạy trong Blender, `third-party/m2/` là repo Maven, `assets/`
+và `deploy/` không phải code Java — không cái nào là Gradle module.
+
+### 1.1. Module dự kiến (CHƯA tồn tại)
+
+Không cái nào trong bảng này có trong `settings.gradle.kts`. **Đừng dựng module rỗng cho đủ danh
+sách** — chủ dự án đã quyết như vậy 2026-09-06: 5 thư mục code chết làm mọi lần build đắt thêm mà
+không phục vụ ai, và hai cái đầu còn đi ngược [ADR-023](adr/ADR-023-Desktop-First-Input.md)
+(desktop-first) vừa Accepted.
+
+| Module dự kiến | Điều kiện để tồn tại |
+|---|---|
+| `client/client-android`, `client/client-ios` | Post-MVP. Cần **ADR riêng** cho sơ đồ điều khiển cảm ứng — ADR-023 chốt mobile KHÔNG nằm trong MVP |
+| `server/server-features/feature-auction` | Khi nhà đấu giá được thiết kế (dải opcode 1000–1099 đã chừa sẵn) |
+| `server/server-features/feature-ranking` | Khi bảng xếp hạng được thiết kế (dải opcode 1200–1299 đã chừa sẵn) |
+| `tools/content-editor` | Phase xa — xem [EDITOR.md](../12-devtools/EDITOR.md) |
+
+Thêm module mới **phải qua ADR** (CLAUDE.md §4) — kể cả module đã nằm trong bảng này.
 
 ---
 

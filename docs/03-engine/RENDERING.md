@@ -854,6 +854,7 @@ tuyệt đối (lấy mẫu theo tốc độ cấp phát, có thể bỏ sót c�
 | 17 | Thiếu `.glb` ⇒ **tự tắt nhánh 3D**, rơi về hình hộp, không crash (§6.4) | Model là sản phẩm sinh ra, không commit — checkout sạch vẫn phải chạy được | **Chốt** — đã có trong code |
 | 18 | `gdx-gltf` lấy từ kho Maven **trong repo**, không qua JitPack | Rủi ro **sẵn có**, không phải toàn vẹn — checksum không cứu được build khi repo gốc biến mất | ✅ [ADR-032](../01-architecture/adr/ADR-032-JitPack-Dependency-Defence.md) Accepted 2026-08-06, **đã thi hành** |
 | 19 | **Khoá libGDX ở 1.14.2** | Bản đã hoàn tác thay đổi collection từng làm gdx-gltf crash lúc chạy | **Chốt** theo ADR-031 |
+| 20 | Model đổi giữa phiên thì **thay tại chỗ**, không despawn rồi spawn lại | Giữ hướng mặt + trạng thái chết, và giữ thế bất biến "spawn = tạo mới" ở client (thứ đang chặn entity trùng) | [ADR-045](../01-architecture/adr/ADR-045-Appearance-Changed-Event.md) — `WorldModelRenderer.replaceCharacterModel`, opcode 307 |
 
 ## ADR cần tạo
 

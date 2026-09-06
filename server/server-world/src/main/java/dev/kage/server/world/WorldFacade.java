@@ -385,6 +385,14 @@ public final class WorldFacade {
     }
 
     /**
+     * ADR-045 — ngoại hình vừa đổi; cần {@code aoiTracker} nên phải qua tick thread, y hệt chat
+     * kênh Khu vực. Gọi từ {@code server-gateway} ngay sau khi đổi hệ phái thành công.
+     */
+    public void enqueueAppearanceChanged(long characterId) {
+        inbox.add(new WorldCommand.AppearanceChangedCommand(characterId));
+    }
+
+    /**
      * Spawn 1 boss hardcode (Phase 8 lát cắt 2, {@link BossConstants#BOSS_CODE}) — gọi bởi
      * {@code DungeonInstanceRegistry} ngay sau khi tạo dungeon World mới. World chính KHÔNG tự
      * gọi hàm này (giữ đúng ranh giới lát cắt 1: server-world không biết khái niệm "dungeon", chỉ
@@ -487,6 +495,7 @@ public final class WorldFacade {
                 case WorldCommand.ApplyEquipmentBonusCommand c -> handleApplyEquipmentBonus(c);
                 case WorldCommand.AreaChatMessageCommand c ->
                     handleAreaChatMessage(c.characterId(), c.senderName(), c.body());
+                case WorldCommand.AppearanceChangedCommand c -> handleAppearanceChanged(c.characterId());
                 case WorldCommand.SpawnBossCommand ignored -> spawnBossEntity();
             }
         }
@@ -659,6 +668,23 @@ public final class WorldFacade {
         observers.add(characterId); // người gửi luôn thấy tin nhắn của chính mình.
         for (long observerId : observers) {
             outboundSink.onAreaChatMessage(observerId, characterId, senderName, body);
+        }
+    }
+
+    /**
+     * ADR-045 — báo cho mọi người đang NHÌN THẤY nhân vật này rằng ngoại hình vừa đổi.
+     *
+     * <p>Khác {@link #handleAreaChatMessage} ở đúng một điểm: KHÔNG tự thêm chính nhân vật vào tập
+     * nhận. Người vừa đổi hệ phái đã thay model của mình ngay khi nhận {@code SelectFactionResponse}
+     * (opcode 207) — gửi thêm một gói nữa cho họ vừa thừa vừa dựng lên đường quyền lực thứ hai cho
+     * cùng một việc.
+     */
+    private void handleAppearanceChanged(long characterId) {
+        if (!entitiesByCharacterId.containsKey(characterId)) {
+            return; // đã ngắt kết nối giữa lúc lệnh còn trong hàng đợi — bỏ qua an toàn.
+        }
+        for (long observerId : aoiTracker.observersOf(characterId)) {
+            outboundSink.onCharacterAppearanceChanged(observerId, characterId);
         }
     }
 

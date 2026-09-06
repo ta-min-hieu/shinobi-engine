@@ -68,4 +68,13 @@ sealed interface WorldCommand {
      * (world-command nội bộ, giống mọi command khác ở đây).
      */
     record SpawnBossCommand() implements WorldCommand {}
+
+    /**
+     * Ngoại hình của {@code characterId} vừa đổi (đổi hệ phái — ADR-045). Command này CHỈ mang id:
+     * server-world không biết "hệ phái"/"bậc trang phục" là gì và không được biết (ngoại hình sống
+     * ở {@code ConnectedCharacterRegistry}, xem javadoc {@code appearanceByCharacterId}). Việc duy
+     * nhất của world là trả lời "ai đang nhìn thấy nhân vật này" — thứ chỉ đọc được trên tick
+     * thread, cùng lý do {@link AreaChatMessageCommand} tồn tại.
+     */
+    record AppearanceChangedCommand(long characterId) implements WorldCommand {}
 }

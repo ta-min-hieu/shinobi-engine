@@ -82,14 +82,14 @@ graph LR
       ArchUnit nằm trong bước cuối) cộng job `gitleaks` quét toàn bộ lịch sử. Lần chạy CI xanh gần
       nhất ghi nhận được là mẻ Dependabot 2026-07-31; **kiểm chứng ngày 2026-08-30 là chạy đầy đủ
       tại máy** (345 task, có Docker), không phải trên runner.
-- [ ] Mọi module ở §1 REPOSITORY-STRUCTURE tồn tại (có thể rỗng) — **CỐ Ý KHÔNG TICK.** Rà thật
-      2026-08-30: `settings.gradle.kts` có **29 module**, §1 liệt kê 5 cái **chưa tồn tại**
-      (`client-android`, `client-ios`, `tools/content-editor`, `feature-auction`,
-      `feature-ranking`) và **không liệt kê 4 cái đang có** (`feature-party`, `feature-trade`,
-      `feature-pvp`, `feature-monster`). Đây là **lệch tài liệu ↔ thực tế**, không phải việc chưa
-      làm: `client-android`/`client-ios` là **Post-MVP** theo ADR-023 (desktop-first, Accepted 2026-09-05), auction/
-      ranking là nội dung chưa mở. **Cần chủ dự án chọn**: sửa §1 theo thực tế, hay dựng module
-      rỗng cho đủ. Không tự chọn bên nào (CLAUDE.md §14).
+- [x] Mọi module ở §1 REPOSITORY-STRUCTURE tồn tại — **ĐÓNG 2026-09-06** bằng cách chủ dự án chọn:
+      **sửa tài liệu theo thực tế**, KHÔNG dựng module rỗng cho đủ danh sách (5 thư mục code chết
+      làm mọi lần build đắt thêm mà không phục vụ ai; `client-android`/`client-ios` còn đi ngược
+      [ADR-023](../01-architecture/adr/ADR-023-Desktop-First-Input.md) desktop-first vừa Accepted).
+      §1 nay liệt kê đúng cây thật (bổ sung `feature-party`/`feature-trade`/`feature-pvp`/
+      `feature-monster`, `quality/architecture-tests`, `third-party/m2/`, `tools/blender/`), và 4
+      module dự kiến chuyển xuống **§1.1 "chưa tồn tại"** kèm điều kiện để được sinh ra. Ô này từng
+      là ô DUY NHẤT còn trống của Phase 0–3.
 - [x] ArchUnit chạy (dù chưa có gì để kiểm) — `quality/architecture-tests`
       (`DependencyRuleTest`, **9 rule**) chạy trong `./gradlew test` và có bước CI riêng đặt tên
       thẳng "Unit test + ArchUnit (ADR-011)".
@@ -1686,6 +1686,7 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
     - ⚠️ **Một ô CỐ Ý để trống**: "mọi module ở §1 REPOSITORY-STRUCTURE tồn tại". §1 liệt kê 5
       module chưa tồn tại và bỏ sót 4 module đang có — lệch **tài liệu ↔ thực tế**, và sửa bên nào
       là quyết định của chủ dự án (`docs/README.md` mục 10), không phải của AI.
+      ✅ **ĐÃ ĐÓNG 2026-09-06**: chủ dự án chọn sửa tài liệu theo thực tế — xem ô Phase 0 phía trên.
 
 47. **`engine-core` có bộ test đầu tiên (2026-08-30)**:
     - `KageEngineFixedTimestepTest` — 9 test, chạy **không cần GL context**: `Gdx.graphics` là
@@ -2006,3 +2007,33 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       (`SimulatedPlayer` đã nói đúng giao thức thật) để ĐỌC `MonsterSpawnedEvent`/`AttackResultEvent`
       thành SỐ — vị trí từng con quái và máu từng đòn. Buổi chơi tay không đủ phân giải cho câu hỏi
       thời gian thực; đây là công cụ đúng cho lớp câu hỏi đó.
+
+60. **[ADR-045](../01-architecture/adr/ADR-045-Appearance-Changed-Event.md) — người ĐANG đứng cạnh
+    cũng phải thấy model mới; và ô Exit Criteria cuối cùng của Phase 0 (2026-09-06)**:
+    - **Nửa sau của bug đổi hệ phái** (dòng #8 bảng "🔴 ĐANG CHỜ CHỦ DỰ ÁN"). Nửa trước vá 2026-08-29
+      chỉ sửa CACHE ngoại hình nên người tới SAU thấy đúng; người **đang quan sát** vẫn thấy model cũ
+      vì client cố ý bỏ qua `CharacterSpawnedEvent` lặp (thế bất biến "spawn = tạo mới" — thứ đang
+      chặn entity trùng, không phải lỗi).
+    - Chủ dự án chọn **phương án C: event riêng** và **Accept ADR-045 cùng ngày** —
+      `CharacterAppearanceChangedEvent`, opcode **307**,
+      chỉ THÊM nên `protocolVersion` KHÔNG tăng (đúng tiền lệ ADR-035).
+    - Đường đi giữ nguyên ranh giới kiến trúc: `server-world` **không biết** "ngoại hình" là gì, nó
+      chỉ trả lời "ai đang nhìn thấy ai" (`observersOf`); gateway mới tra hệ phái. Client thêm
+      `WorldModelRenderer.replaceCharacterModel` — thay model **tại chỗ**, GIỮ hướng mặt và trạng
+      thái chết, nên thế bất biến ở trên còn nguyên.
+    - **Chính người đổi KHÔNG nhận event**: model của họ đã đổi từ opcode 207
+      (`LocalCharacterAppearance`). Gửi thêm vừa là gói thừa (ngược ADR-042) vừa dựng đường quyền
+      lực thứ hai cho cùng một việc.
+    - ✅ **Kiểm chứng bằng SỐ chứ không bằng ảnh chụp** (đúng bài học mục 55/57):
+      `GatewayServerIntegrationTest.observerShouldGetNewFaction_whenAnotherCharacterChangesItInPlace`
+      — hai socket THẬT, A đứng nhìn, B lên Lv10 rồi đổi sang Thuỷ, A nhận đúng opcode 307 mang
+      `FACTION_THUY`. Cộng 4 test đơn vị (2 world: gửi cho observer / KHÔNG dội lại người đổi;
+      2 gateway: nội dung gói / không gửi khi không tra được ngoại hình). **1166 test xanh, 0 skip.**
+    - 🔶 **Nửa client chưa nhìn thấy chạy thật**: đường `replaceCharacterModel` mới chỉ có test ở
+      tầng dưới nó. Cần playtest hai client song song (công thức bàn giao 2026-08-29) trước khi ghi
+      là đã kiểm chứng sống.
+    - ✅ **Ô Exit Criteria cuối cùng của Phase 0–3 đã đóng**: "mọi module ở §1 REPOSITORY-STRUCTURE
+      tồn tại". Chủ dự án chọn **sửa tài liệu theo thực tế** thay vì dựng 5 module rỗng —
+      `REPOSITORY-STRUCTURE.md` §1 nay là cây THẬT (thêm `feature-party`/`feature-trade`/
+      `feature-pvp`/`feature-monster`, `quality/architecture-tests`, `third-party/m2/`,
+      `tools/blender/`), và 4 module dự kiến chuyển xuống **§1.1** kèm điều kiện để được sinh ra.

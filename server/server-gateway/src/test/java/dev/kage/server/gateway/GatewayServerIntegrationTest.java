@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -330,28 +331,42 @@ class GatewayServerIntegrationTest {
                 throw new UnsupportedOperationException("không dùng trong test này");
             }
 
+            // Thi hành thật (không ném) từ ADR-045: test đổi hệ phái cần nhân vật đạt Lv10, và
+            // trong file này không có đường lên cấp nào khác — giết quái tới cấp 10 qua socket
+            // thật sẽ mất hàng chục giây cho một thứ không phải chủ đề của test.
             @Override
             public void saveLevel(long characterId, int level) {
-                throw new UnsupportedOperationException("không dùng trong test này");
+                replaceCharacter(characterId, c -> new Character(
+                        c.id(),
+                        c.accountId(),
+                        c.realmId(),
+                        c.name(),
+                        c.faction(),
+                        level,
+                        c.exp(),
+                        c.rebirthCount(),
+                        c.createdAt()));
             }
 
             @Override
             public void updateFaction(long characterId, Faction faction) {
+                replaceCharacter(characterId, c -> new Character(
+                        c.id(),
+                        c.accountId(),
+                        c.realmId(),
+                        c.name(),
+                        faction,
+                        c.level(),
+                        c.exp(),
+                        c.rebirthCount(),
+                        c.createdAt()));
+            }
+
+            private void replaceCharacter(long characterId, UnaryOperator<Character> update) {
                 for (int i = 0; i < characters.size(); i++) {
-                    Character c = characters.get(i);
-                    if (c.id() == characterId) {
-                        characters.set(
-                                i,
-                                new Character(
-                                        c.id(),
-                                        c.accountId(),
-                                        c.realmId(),
-                                        c.name(),
-                                        faction,
-                                        c.level(),
-                                        c.exp(),
-                                        c.rebirthCount(),
-                                        c.createdAt()));
+                    Character existing = characters.get(i);
+                    if (existing.id() == characterId) {
+                        characters.set(i, update.apply(existing));
                         return;
                     }
                 }
@@ -1039,6 +1054,54 @@ class GatewayServerIntegrationTest {
             // Mỗi kết nối nhận ĐÚNG pong của mình — không lẫn giữa các connection (SERVER.md §1).
             assertThat(pongA.getClientTimestampMs()).isEqualTo(111L);
             assertThat(pongB.getClientTimestampMs()).isEqualTo(222L);
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void observerShouldGetNewFaction_whenAnotherCharacterChangesItInPlace() throws Exception {
+        // ADR-045 — nửa CÒN LẠI của bug "đổi hệ phái xong, người đang đứng cạnh vẫn thấy model cũ".
+        // Nửa trước (2026-08-29) chỉ vá cache ngoại hình nên chỉ người tới SAU mới thấy đúng; đây
+        // là đường đi thật của nửa sau, qua chính giao thức dây: A đứng nhìn, B đổi hệ phái, A phải
+        // nhận opcode 307 mang hệ phái MỚI mà không cần B rời rồi vào lại tầm nhìn.
+        try (Socket socketA = new Socket("127.0.0.1", server.port());
+                Socket socketB = new Socket("127.0.0.1", server.port())) {
+            socketA.setSoTimeout(5000);
+            socketB.setSoTimeout(5000);
+            DataInputStream inA = new DataInputStream(socketA.getInputStream());
+            DataInputStream inB = new DataInputStream(socketB.getInputStream());
+
+            String suffix = UUID.randomUUID().toString().substring(0, 8);
+            long characterA = connectCreateAndSelect(socketA, inA, "c" + suffix);
+            long characterB = connectCreateAndSelect(socketB, inB, "d" + suffix);
+
+            // Cùng spawn ở (0,0) — phải THẤY NHAU trước đã, nếu không thì test chỉ đang chứng minh
+            // "không ai quan sát thì không ai nhận gì".
+            CharacterSpawnedEvent spawnSeenByA =
+                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
+                            .payload());
+            assertThat(spawnSeenByA.getCharacterId()).isEqualTo(characterB);
+            assertThat(spawnSeenByA.getFaction()).isEqualTo(dev.kage.protocol.Faction.FACTION_HOA);
+
+            // Đổi hệ phái đòi Lv10 (SelectFactionUseCase) và file này không có đường lên cấp nào —
+            // seed thẳng vào Port, đúng cách GatewayPipelineTest đã làm cho hai test hệ phái ở đó.
+            characterPort.saveLevel(characterB, 10);
+            dev.kage.protocol.SelectFactionRequest factionRequest = dev.kage.protocol.SelectFactionRequest.newBuilder()
+                    .setFaction(dev.kage.protocol.Faction.FACTION_THUY)
+                    .build();
+            sendFrame(socketB, Opcode.OPCODE_SELECT_FACTION_REQUEST_VALUE, 20, factionRequest.toByteArray());
+            assertThat(dev.kage.protocol.SelectFactionResponse.parseFrom(
+                                    readUntilOpcode(inB, Opcode.OPCODE_SELECT_FACTION_RESPONSE_VALUE)
+                                            .payload())
+                            .getSuccess())
+                    .isTrue();
+
+            dev.kage.protocol.CharacterAppearanceChangedEvent seenByA =
+                    dev.kage.protocol.CharacterAppearanceChangedEvent.parseFrom(
+                            readUntilOpcode(inA, Opcode.OPCODE_CHARACTER_APPEARANCE_CHANGED_EVENT_VALUE)
+                                    .payload());
+            assertThat(seenByA.getCharacterId()).isEqualTo(characterB);
+            assertThat(seenByA.getFaction()).isEqualTo(dev.kage.protocol.Faction.FACTION_THUY);
         }
     }
 

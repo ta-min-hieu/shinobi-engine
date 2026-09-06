@@ -7,6 +7,7 @@ import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.EcsWorld;
 import dev.kage.engine.ecs.KEntity;
 import dev.kage.engine.ecs.component.PositionComponent;
+import dev.kage.protocol.CharacterAppearanceChangedEvent;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
@@ -55,6 +56,24 @@ final class RemoteCharacterPresenter {
         entities.put(event.getCharacterId(), entity);
         pickables.put(event.getCharacterId(), new CharacterPoint(entity));
         models.addCharacter(event.getCharacterId(), CharacterModelKey.of(event.getFaction(), event.getCostumeTier()));
+    }
+
+    /**
+     * Ngoại hình của một nhân vật khác vừa đổi (ADR-045, opcode 307) — thay model TẠI CHỖ.
+     *
+     * <p>Không đi qua {@link #onSpawned}: entity, vị trí, hướng mặt và trạng thái chết đều phải
+     * giữ nguyên, và thế bất biến "spawn = tạo mới" ở {@link #onSpawned} phải còn nguyên vẹn (đó
+     * chính là thứ chặn entity trùng).
+     *
+     * <p>Bỏ qua nếu chưa thấy nhân vật này: event tới trước spawn thì lần spawn sau đã mang ngoại
+     * hình mới rồi ({@code ConnectedCharacterRegistry.updateAppearance}), không có gì để vá.
+     */
+    void onAppearanceChanged(CharacterAppearanceChangedEvent event) {
+        if (!entities.containsKey(event.getCharacterId())) {
+            return;
+        }
+        models.replaceCharacterModel(
+                event.getCharacterId(), CharacterModelKey.of(event.getFaction(), event.getCostumeTier()));
     }
 
     void onMoved(CharacterMovedEvent event) {

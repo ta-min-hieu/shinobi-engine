@@ -14,6 +14,7 @@ import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.protocol.AttackResultEvent;
+import dev.kage.protocol.CharacterAppearanceChangedEvent;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterRespawnedEvent;
@@ -105,9 +106,10 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
      * thì mọi {@code CharacterSpawnedEvent} phát về sau — kể cả cho người chơi VỪA đi tới lần đầu
      * — vẫn mang hệ phái CŨ, cho tới khi chính nhân vật đó thoát ra và đăng nhập lại.
      *
-     * <p>Không đụng tới người đang NHÌN THẤY nhân vật này ngay lúc gạch: họ đã nhận
-     * {@code CharacterSpawnedEvent} rồi và giao thức chưa có event "ngoại hình vừa đổi". Họ sẽ thấy
-     * model mới khi nhân vật rời rồi vào lại tầm nhìn của họ — xem sổ nợ ở bản bàn giao.
+     * <p>Chỉ vá CACHE. Người đang NHÌN THẤY nhân vật này lúc đổi được báo bằng đường khác —
+     * {@link #onCharacterAppearanceChanged} (ADR-045), phát từ world tick sau khi hỏi AoI ai đang
+     * quan sát. Hai nửa phải có cả hai: thiếu nửa này thì người tới sau thấy model cũ, thiếu nửa
+     * kia thì người đang đứng cạnh thấy model cũ.
      *
      * <p>Bỏ qua nếu nhân vật không còn kết nối: không có gì để giữ, và lần đăng nhập sau
      * {@link #register} tự đọc lại hệ phái thật từ DB.
@@ -376,6 +378,30 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 .setBody(body)
                 .build();
         send(ctx, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    /**
+     * ADR-045 — ngoại hình của {@code changedCharacterId} vừa đổi; đây là chỗ DUY NHẤT biết ngoại
+     * hình đó là gì ({@link #appearanceByCharacterId}), nên server-world chỉ gửi id sang.
+     *
+     * <p>Không dùng {@link CharacterAppearance#unknown()} thay thế như {@link #onCharacterSpawned}:
+     * ở đó "không tra được" nghĩa là nhân vật vừa ngắt kết nối và client vẫn cần MỘT model để vẽ;
+     * ở đây không tra được nghĩa là không có gì để đổi, và gửi {@code unknown} sẽ làm người quan
+     * sát thay model ĐANG ĐÚNG bằng model thay thế.
+     */
+    @Override
+    public void onCharacterAppearanceChanged(long targetCharacterId, long changedCharacterId) {
+        ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
+        CharacterAppearance appearance = appearanceByCharacterId.get(changedCharacterId);
+        if (ctx == null || appearance == null) {
+            return;
+        }
+        CharacterAppearanceChangedEvent event = CharacterAppearanceChangedEvent.newBuilder()
+                .setCharacterId(changedCharacterId)
+                .setFaction(appearance.faction())
+                .setCostumeTier(appearance.costumeTier())
+                .build();
+        send(ctx, Opcode.OPCODE_CHARACTER_APPEARANCE_CHANGED_EVENT_VALUE, 0, event.toByteArray());
     }
 
     /**

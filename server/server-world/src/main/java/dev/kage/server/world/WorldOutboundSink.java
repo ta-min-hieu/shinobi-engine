@@ -73,6 +73,14 @@ public interface WorldOutboundSink {
     void onAreaChatMessage(long targetCharacterId, long senderCharacterId, String senderName, String body);
 
     /**
+     * Ngoại hình của {@code changedCharacterId} vừa đổi (ADR-045) — gửi cho {@code targetCharacterId}
+     * (1 quan sát viên AoI của nhân vật đó, GỒM cả chính họ). Không có tham số ngoại hình: chỉ
+     * implementation ở tầng gateway mới biết hệ phái/bậc trang phục hiện tại, đúng như
+     * {@link #onAreaChatMessage} không nhận {@code ChatFacade}.
+     */
+    void onCharacterAppearanceChanged(long targetCharacterId, long changedCharacterId);
+
+    /**
      * {@code defeatedCharacterId} (nhân vật, luôn DƯƠNG) vừa bị {@code killerEntityId} hạ gục.
      * World CHÍNH dùng sự kiện này để hồi sinh nhân vật (xem {@link #onCharacterRespawned}) —
      * {@code ConnectedCharacterRegistry} không còn no-op nữa. Arena instance (Phase 8 lát cắt 4,

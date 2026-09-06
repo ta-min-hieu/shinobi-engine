@@ -340,6 +340,44 @@ public final class WorldModelRenderer implements Disposable {
         return scenesById.containsKey(id);
     }
 
+    /**
+     * Thay model của một nhân vật ĐANG hiển thị bằng model khác, giữ nguyên chỗ đứng của nó trong
+     * thế giới (ADR-045 — đổi hệ phái giữa phiên chơi).
+     *
+     * <p>Khác {@link #remove} + {@link #addCharacter} ở đúng chỗ quan trọng: hướng mặt và trạng
+     * thái "đang nằm chết" được chép sang model mới. Gỡ rồi gắn lại trần sẽ làm nhân vật đang quay
+     * trái bật về quay phải, và làm một xác chết đứng dậy tư thế idle.
+     *
+     * <p>Vị trí KHÔNG cần chép: {@code WorldScreen} gọi {@link #setPosition} cho mọi thực thể mỗi
+     * khung hình, nên model mới vào đúng chỗ ngay khung kế tiếp.
+     *
+     * @return {@code true} nếu đã thay thật. {@code false} khi nhánh 3D đang tắt, khi {@code id}
+     *     không có model nào trên màn hình (không có gì để thay), hoặc khi model mới thiếu file —
+     *     trường hợp cuối giữ nguyên model CŨ thay vì bỏ nhân vật khỏi màn hình.
+     */
+    public boolean replaceCharacterModel(long id, String assetKey) {
+        AnimationState previous = animationStateById.get(id);
+        if (!enabled || previous == null) {
+            return false;
+        }
+        boolean facingRight = previous.facingRight;
+        boolean dead = previous.dead;
+        Scene existing = scenesById.get(id);
+        remove(id);
+        if (!attach(id, assetKey)) {
+            LOG.warn("Không thấy model nhân vật '{}' — giữ nguyên model đang hiện", assetKey);
+            scenesById.put(id, existing);
+            scenes.add(existing);
+            animationStateById.put(id, previous);
+            return false;
+        }
+        animationStateById.get(id).facingRight = facingRight;
+        if (dead) {
+            playDie(id); // tự đặt lại cờ dead + dừng ở tư thế cuối của clip die.
+        }
+        return true;
+    }
+
     public void remove(long id) {
         Scene scene = scenesById.remove(id);
         if (scene != null) {

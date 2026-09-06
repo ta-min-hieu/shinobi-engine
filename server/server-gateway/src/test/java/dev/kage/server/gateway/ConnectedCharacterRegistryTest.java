@@ -288,6 +288,50 @@ class ConnectedCharacterRegistryTest {
         assertThat(event.getFaction()).isEqualTo(dev.kage.protocol.Faction.FACTION_UNSPECIFIED);
     }
 
+    /** ADR-045 — người quan sát nhận đúng hệ phái MỚI, không phải hệ phái lúc họ nhìn thấy lần đầu. */
+    @Test
+    void shouldSendNewFactionToObserver_whenAppearanceChanged() throws InvalidProtocolBufferException {
+        registry = new ConnectedCharacterRegistry(
+                fakeInventoryFacade(0),
+                fakeQuestFacade(),
+                ExperienceGrantPort.disabled(),
+                new GatewayNetworkMetrics(new SimpleMeterRegistry()));
+        EmbeddedChannel observer = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(1L, observer.pipeline().firstContext());
+        EmbeddedChannel changed = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(
+                2L, changed.pipeline().firstContext(), CharacterAppearance.of(dev.kage.protocol.Faction.FACTION_HOA));
+
+        registry.updateAppearance(2L, CharacterAppearance.of(dev.kage.protocol.Faction.FACTION_THUY));
+        registry.onCharacterAppearanceChanged(1L, 2L);
+
+        PacketCodec.Frame frame = awaitOutboundFrame(observer, Opcode.OPCODE_CHARACTER_APPEARANCE_CHANGED_EVENT_VALUE);
+        dev.kage.protocol.CharacterAppearanceChangedEvent event =
+                dev.kage.protocol.CharacterAppearanceChangedEvent.parseFrom(frame.payload());
+        assertThat(event.getCharacterId()).isEqualTo(2L);
+        assertThat(event.getFaction()).isEqualTo(dev.kage.protocol.Faction.FACTION_THUY);
+    }
+
+    /**
+     * Không tra được ngoại hình (nhân vật vừa ngắt kết nối) thì KHÔNG gửi gì — khác
+     * {@code onCharacterSpawned}, nơi {@code unknown()} là câu trả lời đúng vì client vẫn cần một
+     * model để vẽ. Ở đây gửi {@code unknown} sẽ thay model ĐANG ĐÚNG bằng model thay thế.
+     */
+    @Test
+    void shouldSendNothing_whenAppearanceOfChangedCharacterIsUnknown() {
+        registry = new ConnectedCharacterRegistry(
+                fakeInventoryFacade(0),
+                fakeQuestFacade(),
+                ExperienceGrantPort.disabled(),
+                new GatewayNetworkMetrics(new SimpleMeterRegistry()));
+        EmbeddedChannel observer = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(1L, observer.pipeline().firstContext());
+
+        registry.onCharacterAppearanceChanged(1L, 2L);
+
+        assertThat(outboundOpcodes(observer)).doesNotContain(Opcode.OPCODE_CHARACTER_APPEARANCE_CHANGED_EVENT_VALUE);
+    }
+
     /** Opcode của mọi frame đã ghi ra kênh — để assert theo LOẠI gói thay vì "có/không có gì". */
     private static List<Integer> outboundOpcodes(EmbeddedChannel channel) {
         List<Integer> opcodes = new ArrayList<>();

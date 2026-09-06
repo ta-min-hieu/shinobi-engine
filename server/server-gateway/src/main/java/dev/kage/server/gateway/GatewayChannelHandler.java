@@ -768,6 +768,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // mọi CharacterSpawnedEvent phát về sau vẫn mang hệ phái CŨ, xem
             // ConnectedCharacterRegistry#updateAppearance.
             worldGateway.registry().updateAppearance(characterId, CharacterAppearance.of(request.getFaction()));
+            // ADR-045 — người ĐANG nhìn thấy nhân vật này (và chính họ) mới biết model đã đổi. Phải
+            // đi qua hàng đợi world vì AoI chỉ đọc được trên tick thread. Chưa vào World nào thì
+            // không có ai đang nhìn — bỏ qua, lần vào world sau CharacterSpawnedEvent đã mang hệ
+            // phái mới nhờ updateAppearance ở dòng trên.
+            currentWorldFacadeIfPresent(characterId).ifPresent(facade -> facade.enqueueAppearanceChanged(characterId));
             SelectFactionResponse response =
                     SelectFactionResponse.newBuilder().setSuccess(true).build();
             send(ctx, Opcode.OPCODE_SELECT_FACTION_RESPONSE_VALUE, sequenceId, response.toByteArray());
@@ -793,13 +798,21 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * CHỦ Ý ở {@code ArenaInstanceRegistry} javadoc) nên thứ tự kiểm tra không quan trọng.
      */
     private WorldFacade currentWorldFacade(long characterId) {
+        return currentWorldFacadeIfPresent(characterId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Nhân vật online nhưng không thuộc World nào — characterId=" + characterId));
+    }
+
+    /**
+     * Như {@link #currentWorldFacade} nhưng RỖNG thay vì ném, cho những đường đi hợp lệ cả khi
+     * nhân vật chưa vào World nào — ví dụ đổi hệ phái ngay sau khi chọn nhân vật (ADR-045).
+     */
+    private Optional<WorldFacade> currentWorldFacadeIfPresent(long characterId) {
         return worldGateway
                 .dungeonInstanceRegistry()
                 .worldFacadeFor(characterId)
                 .or(() -> worldGateway.arenaInstanceRegistry().worldFacadeFor(characterId))
-                .or(() -> worldGateway.mainWorldChannels().worldFacadeFor(characterId))
-                .orElseThrow(() -> new IllegalStateException(
-                        "Nhân vật online nhưng không thuộc World nào — characterId=" + characterId));
+                .or(() -> worldGateway.mainWorldChannels().worldFacadeFor(characterId));
     }
 
     // MoveCommand KHÔNG chạm DB/Redis — chỉ enqueue vào server-world (rẻ, thread-safe), nên xử

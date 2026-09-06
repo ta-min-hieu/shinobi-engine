@@ -85,6 +85,11 @@ final class ArenaOutboundSink implements WorldOutboundSink {
     }
 
     @Override
+    public void onCharacterAppearanceChanged(long targetCharacterId, long changedCharacterId) {
+        registry.onCharacterAppearanceChanged(targetCharacterId, changedCharacterId);
+    }
+
+    @Override
     public void onCharacterDefeated(long defeatedCharacterId, long killerEntityId) {
         arenaInstanceRegistry.handleCharacterDefeated(defeatedCharacterId, killerEntityId);
     }

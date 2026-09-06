@@ -39,6 +39,7 @@ import dev.kage.engine.ecs.component.VelocityComponent;
 import dev.kage.engine.ecs.system.MovementSystem;
 import dev.kage.engine.ecs.system.VerticalMovementSystem;
 import dev.kage.protocol.AttackResultEvent;
+import dev.kage.protocol.CharacterAppearanceChangedEvent;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterRespawnedEvent;
@@ -551,6 +552,8 @@ public final class WorldScreen implements GameScreen {
             remoteCharacters.onSpawned(CharacterSpawnedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE) {
             remoteCharacters.onMoved(CharacterMovedEvent.parseFrom(payload));
+        } else if (opcode == Opcode.OPCODE_CHARACTER_APPEARANCE_CHANGED_EVENT_VALUE) {
+            remoteCharacters.onAppearanceChanged(CharacterAppearanceChangedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE) {
             remoteCharacters.onDespawned(CharacterDespawnedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_CHARACTER_RESPAWNED_EVENT_VALUE) {

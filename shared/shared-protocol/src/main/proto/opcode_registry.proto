@@ -62,6 +62,10 @@ enum Opcode {
   OPCODE_CHARACTER_DESPAWNED_EVENT = 304;
   OPCODE_CHARACTER_RESPAWNED_EVENT = 305;
   OPCODE_JUMP_COMMAND = 306; // ADR-033 — nhảy thật kiểu Ninja School Online.
+  // ADR-045 — ngoại hình của MỘT nhân vật khác vừa đổi (đổi hệ phái giữa phiên). Nằm ở dải
+  // Movement/World chứ không phải Character (200-299) vì nó nói về một nhân vật KHÁC trong world,
+  // cùng nhóm với spawn/despawn/respawn ở trên.
+  OPCODE_CHARACTER_APPEARANCE_CHANGED_EVENT = 307;
 
   // --- Combat / Skill (400-499) ---
   OPCODE_SET_TARGET_COMMAND = 400;

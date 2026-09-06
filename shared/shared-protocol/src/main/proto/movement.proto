@@ -98,3 +98,16 @@ message CharacterRespawnedEvent {
   int32 current_chi = 5;
   int32 max_chi = 6;
 }
+
+// Event: Server -> Client (OPCODE_CHARACTER_APPEARANCE_CHANGED_EVENT, ADR-045). Ngoại hình của
+// MỘT nhân vật đang trong tầm nhìn vừa đổi (đổi hệ phái giữa phiên chơi) — client thay model TẠI
+// CHỖ, KHÔNG despawn rồi spawn lại: entity/vị trí/trạng thái động tác phải giữ nguyên, và thế bất
+// biến "spawn = tạo mới" ở RemoteCharacterPresenter phải còn nguyên vẹn.
+//
+// Chính người vừa đổi cũng nhận event này (server tự thêm họ vào tập nhận) — nếu không, họ là
+// người DUY NHẤT không thấy model mới của mình cho tới lần đăng nhập sau.
+message CharacterAppearanceChangedEvent {
+  int64 character_id = 1;
+  Faction faction = 2;
+  CostumeTier costume_tier = 3;
+}

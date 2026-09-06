@@ -84,6 +84,11 @@ final class DungeonOutboundSink implements WorldOutboundSink {
     }
 
     @Override
+    public void onCharacterAppearanceChanged(long targetCharacterId, long changedCharacterId) {
+        registry.onCharacterAppearanceChanged(targetCharacterId, changedCharacterId);
+    }
+
+    @Override
     public void onCharacterDefeated(long defeatedCharacterId, long killerEntityId) {
         registry.onCharacterDefeated(defeatedCharacterId, killerEntityId);
     }

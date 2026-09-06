@@ -68,6 +68,8 @@ class WorldFacadeTest {
 
     private record AreaChatMessage(long target, long senderCharacterId, String senderName, String body) {}
 
+    private record AppearanceChanged(long target, long changedCharacterId) {}
+
     private record CharacterDefeated(long defeatedCharacterId, long killerEntityId) {}
 
     private record CharacterRespawned(
@@ -87,6 +89,7 @@ class WorldFacadeTest {
         final List<AttackResult> attackResults = new CopyOnWriteArrayList<>();
         final List<SkillResult> skillResults = new CopyOnWriteArrayList<>();
         final List<AreaChatMessage> areaChatMessages = new CopyOnWriteArrayList<>();
+        final List<AppearanceChanged> appearanceChanges = new CopyOnWriteArrayList<>();
         final List<CharacterDefeated> characterDefeated = new CopyOnWriteArrayList<>();
         final List<CharacterRespawned> characterRespawned = new CopyOnWriteArrayList<>();
 
@@ -184,6 +187,11 @@ class WorldFacadeTest {
         @Override
         public void onAreaChatMessage(long targetCharacterId, long senderCharacterId, String senderName, String body) {
             areaChatMessages.add(new AreaChatMessage(targetCharacterId, senderCharacterId, senderName, body));
+        }
+
+        @Override
+        public void onCharacterAppearanceChanged(long targetCharacterId, long changedCharacterId) {
+            appearanceChanges.add(new AppearanceChanged(targetCharacterId, changedCharacterId));
         }
 
         @Override
@@ -1104,6 +1112,37 @@ class WorldFacadeTest {
                         && m.body().equals("xin chào khu vực")));
         awaitTrue(() -> sink.areaChatMessages.stream()
                 .anyMatch(m -> m.target() == 1L && m.senderCharacterId() == 1L)); // người gửi tự thấy tin của mình
+    }
+
+    // ADR-045 — người ĐANG nhìn thấy nhân vật phải được báo khi ngoại hình đổi. Hai test dưới khoá
+    // đúng hai nửa của quyết định: gửi cho người quan sát, và KHÔNG gửi lại cho chính người đổi
+    // (client của họ đã tự thay model khi nhận SelectFactionResponse — ADR-045 D4).
+    @Test
+    void shouldTellObservers_whenAppearanceChanged() {
+        world.start();
+        world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
+        world.attachCharacter(2L, 0f, 0f, DEFAULT_STATS); // cùng vị trí — chắc chắn trong AOI nhau
+        awaitTrue(() -> sink.spawned.size() >= 2);
+
+        world.enqueueAppearanceChanged(1L);
+
+        awaitTrue(
+                () -> sink.appearanceChanges.stream().anyMatch(c -> c.target() == 2L && c.changedCharacterId() == 1L));
+    }
+
+    @Test
+    void shouldNotEchoAppearanceChange_backToTheCharacterWhoChanged() {
+        world.start();
+        world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
+        world.attachCharacter(2L, 0f, 0f, DEFAULT_STATS);
+        awaitTrue(() -> sink.spawned.size() >= 2);
+
+        world.enqueueAppearanceChanged(1L);
+
+        // Chờ nửa KIA tới trước rồi mới khẳng định phủ định — nếu không, test xanh chỉ vì lệnh chưa
+        // ra khỏi hàng đợi (cùng bẫy "khẳng định phủ định trên hệ bất đồng bộ" ở các test AoI khác).
+        awaitTrue(() -> sink.appearanceChanges.stream().anyMatch(c -> c.target() == 2L));
+        assertThat(sink.appearanceChanges).noneMatch(c -> c.target() == 1L);
     }
 
     @Test
