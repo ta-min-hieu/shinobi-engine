@@ -80,6 +80,22 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
     }
 
     @Test
+    void shouldSeedTheArchiveWardenExactlyAsTheBalanceTableSays() {
+        // V30 — loài của quest 3 (`clear_old_archive`). Bốn số này KHÔNG tuỳ ý: chúng được chọn từ
+        // phép tính ở `OldArchiveDuelBalanceTest` (server-world), lớp duy nhất trả lời "quest 3 có
+        // qua nổi bằng đường chơi thường không". Trôi một số ở đây là phá phép tính bên đó trong im
+        // lặng, vì lớp kia đọc hằng số của chính nó chứ không đọc DB.
+        MonsterTemplate warden = findByCode("archive_warden");
+
+        assertThat(warden.stats().maxHp()).isEqualTo(120);
+        assertThat(warden.stats().atk()).isEqualTo(26);
+        assertThat(warden.stats().def()).isEqualTo(14);
+        assertThat(warden.stats().res()).isEqualTo(10);
+        assertThat(warden.expReward()).isEqualTo(55L);
+        assertThat(warden.dropTableCode()).isEqualTo("archive_warden");
+    }
+
+    @Test
     void shouldPointEverySpeciesAtAModelKey() {
         // Không loài nào được thiếu model_key: rỗng nghĩa là client rơi về suy từ code và ra hộp.
         assertThat(new PostgresMonsterCatalogAdapter(dataSource).listTemplates())
@@ -99,6 +115,10 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         assertThat(findByCode("stone_ogre").modelKey()).isEqualTo("mob_stone-ogre");
         // Hình nộm là hàng đối chứng của V23 — không đợt nào được lặng lẽ đổi nó.
         assertThat(findByCode("training_dummy").modelKey()).isEqualTo("mob_training-dummy");
+        // V30 mở LẠI món nợ đó một lần nữa, có chủ đích và ghi rõ: `archive_warden` mượn model của
+        // quỷ đá (cùng dòng máy móc Linh Triều nên còn hợp lý), nên trong game hai loài trông y hệt
+        // nhau. Khẳng định nó ở đây để nợ này nằm trong test chứ không nằm trong trí nhớ ai đó.
+        assertThat(findByCode("archive_warden").modelKey()).isEqualTo("mob_stone-ogre");
     }
 
     @Test
@@ -106,7 +126,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         List<MonsterSpawnPoint> spawns =
                 new PostgresMonsterCatalogAdapter(dataSource).listSpawnPoints(MonsterSpawnPoint.MAIN_WORLD_CODE);
 
-        assertThat(spawns).hasSize(5);
+        assertThat(spawns).hasSize(7);
         // ADR-033 — quái lệch khỏi y=0 là quái người chơi không bao giờ chạm tới. DB có CHECK,
         // đây là hàng rào thứ hai và cũng là tài liệu sống cho ràng buộc đó.
         assertThat(spawns).allSatisfy(spawn -> assertThat(spawn.posY()).isZero());
@@ -114,7 +134,8 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
                 .allSatisfy(spawn -> assertThat(spawn.respawnSeconds()).isPositive());
         // V29 giãn ba điểm CÓ AGGRO ra xa nhau (21 / 34 / 47) — xem
         // shouldKeepAggroSpawnsApartEnoughToPullOneAtATime. Hai cọc gỗ (aggro 0) giữ nguyên chỗ cũ.
-        assertThat(spawns).extracting(MonsterSpawnPoint::posX).containsExactly(8f, 14f, 21f, 34f, 47f);
+        // V30 nối thêm hai thạch vệ của quest 3 ở 60 và 73, tiếp tục đúng bước 13m của V29.
+        assertThat(spawns).extracting(MonsterSpawnPoint::posX).containsExactly(8f, 14f, 21f, 34f, 47f, 60f, 73f);
     }
 
     /**
@@ -141,7 +162,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
                 .filter(spawn -> aggroByCode.getOrDefault(spawn.monsterCode(), 0f) > 0f)
                 .toList();
 
-        assertThat(aggressive).hasSize(3); // 2 tán tu + 1 quỷ đá
+        assertThat(aggressive).hasSize(5); // 2 tán tu + 1 quỷ đá + 2 thạch vệ (V30)
         for (int i = 0; i < aggressive.size(); i++) {
             for (int j = i + 1; j < aggressive.size(); j++) {
                 MonsterSpawnPoint first = aggressive.get(i);
@@ -161,7 +182,10 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         // ADR-039 D2 — ràng buộc CỨNG của V25: mỗi DEFAULT bằng ĐÚNG hằng số đang chạy trong
         // AiConstants, nên chạy migration xong game hành xử y hệt. Ô test này là thứ bắt được nếu
         // một đợt sau lỡ đổi DEFAULT mà quên đổi AiConstants (hoặc ngược lại).
-        for (String code : List.of("wandering_bandit", "stone_ogre")) {
+        // `archive_warden` (V30) nằm trong danh sách này vì migration đó CỐ Ý không cho nó tính
+        // cách AI riêng — cùng lý do V25 §4 đã ghi cho hai loài trước: đặt số chưa playtest cùng
+        // lúc với việc thêm nội dung là trộn hai thứ phải kiểm riêng.
+        for (String code : List.of("wandering_bandit", "stone_ogre", "archive_warden")) {
             MonsterAiParams ai = findByCode(code).aiParams();
             assertThat(ai.aggroRadiusMeters()).isEqualTo(6f);
             assertThat(ai.leashRadiusMeters()).isEqualTo(10f);

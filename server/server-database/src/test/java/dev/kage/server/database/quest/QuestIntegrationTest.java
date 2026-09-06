@@ -54,6 +54,7 @@ class QuestIntegrationTest {
     private static final int POSTGRES_PORT = 5432;
     private static final String QUEST_CODE = "kill_training_dummies";
     private static final String NIGHT_WATCH_CODE = "night_watch_bandit";
+    private static final String OLD_ARCHIVE_CODE = "clear_old_archive";
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
@@ -236,7 +237,10 @@ class QuestIntegrationTest {
         List<String> scriptRefs = new PostgresQuestTemplateAdapter(dataSource).listAllScriptRefs();
 
         assertThat(scriptRefs)
-                .contains("/scripts/quest/kill_training_dummies.js", "/scripts/quest/night_watch_bandit.js");
+                .contains(
+                        "/scripts/quest/kill_training_dummies.js",
+                        "/scripts/quest/night_watch_bandit.js",
+                        "/scripts/quest/clear_old_archive.js");
     }
 
     @Test
@@ -419,5 +423,88 @@ class QuestIntegrationTest {
         long characterId = createFreshCharacter("NightWatch6");
 
         assertThat(newAcceptUseCase().execute(characterId, QUEST_CODE)).isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Quest THỨ BA — `clear_old_archive` (seed V30, STORY.md §6 arc 1 nhịp "gieo mầm").
+    //
+    // Giá trị thật của khối test này KHÔNG phải là "quest 3 chạy". Nó là bằng chứng rằng thêm một
+    // quest theo dõi giết quái nay là việc của DỮ LIỆU: migration + script + i18n, không một dòng
+    // Java sản phẩm nào bị sửa. Quest 2 mới chỉ chứng minh được điều đó MỘT lần, ngay sau đợt gỡ
+    // hardcode; quest 3 là lần thứ hai, trên một loài quái cũng hoàn toàn mới.
+    // ---------------------------------------------------------------------------------------
+
+    /** Đưa nhân vật qua trọn quest 1 + quest 2 — điều kiện ADR-044 để mở quest 3. */
+    private static void claimNightWatch(long characterId) {
+        claimTrainingDummies(characterId);
+        newAcceptUseCase().execute(characterId, NIGHT_WATCH_CODE);
+        newProcessUseCase().execute(characterId, "wandering_bandit");
+        newClaimUseCase().execute(characterId, NIGHT_WATCH_CODE, newIdempotencyKey());
+    }
+
+    @Test
+    void shouldPlayOldArchiveLifecycle_withRealScript() {
+        long characterId = createFreshCharacter("OldArchive1");
+        claimNightWatch(characterId); // ADR-044 — quest 3 khoá sau quest 2
+
+        assertThat(newAcceptUseCase().execute(characterId, OLD_ARCHIVE_CODE))
+                .isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
+
+        // Giết nhầm loài — kể cả loài của ĐÚNG quest liền trước — không nhúc nhích: CHÍNH SCRIPT
+        // lọc theo event.monster_code, Java không lọc (Điều 27).
+        assertThat(newProcessUseCase().execute(characterId, "wandering_bandit")).isEmpty();
+
+        // Script đòi HAI cỗ, nên con thứ nhất chưa đóng quest.
+        assertThat(newProcessUseCase().execute(characterId, "archive_warden")).isEmpty();
+
+        List<ProcessMonsterKilledUseCase.QuestStatusChange> afterSecond =
+                newProcessUseCase().execute(characterId, "archive_warden");
+        assertThat(afterSecond).hasSize(1);
+        assertThat(afterSecond.get(0).questCode()).isEqualTo(OLD_ARCHIVE_CODE);
+        assertThat(afterSecond.get(0).status()).isEqualTo(QuestStatus.COMPLETED);
+
+        long expBefore = readExp(characterId);
+        int shardsBefore = countItemQuantity(characterId, "ancient_jade_shard");
+
+        ClaimQuestRewardUseCase.ClaimResult claim =
+                newClaimUseCase().execute(characterId, OLD_ARCHIVE_CODE, newIdempotencyKey());
+
+        assertThat(claim.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
+        assertThat(claim.expGranted()).isEqualTo(1200L);
+        assertThat(readExp(characterId)).isEqualTo(expBefore + 1200L);
+        // Mảnh ngọc cổ là McGuffin của cả truyện (STORY.md §6 arc 1) — nó phải NẰM THẬT trong túi,
+        // không phải chỉ là một câu trong script.
+        assertThat(countItemQuantity(characterId, "ancient_jade_shard")).isEqualTo(shardsBefore + 1);
+    }
+
+    /** V30 phải tra `night_watch_bandit` theo `code`, không hardcode id (khuôn V28). */
+    @Test
+    void shouldSeedOldArchive_withPrerequisitePointingAtTheNightWatch() {
+        assertThat(prerequisiteCodeOf(OLD_ARCHIVE_CODE)).isEqualTo(NIGHT_WATCH_CODE);
+    }
+
+    @Test
+    void shouldRejectOldArchive_whenNightWatchNotClaimedYet() {
+        long characterId = createFreshCharacter("OldArchive2");
+        claimTrainingDummies(characterId); // xong quest 1, nhưng chưa đụng quest 2
+
+        assertThat(newAcceptUseCase().execute(characterId, OLD_ARCHIVE_CODE))
+                .isEqualTo(AcceptQuestUseCase.AcceptResult.PREREQUISITE_NOT_MET);
+    }
+
+    /**
+     * ADR-044 Consequences ghi rõ chuỗi quest KHÔNG tự kiểm bắc cầu: nhận quest 3 chỉ kiểm quest 2.
+     * Ở đây điều đó không tạo lỗ hổng nào — muốn CLAIMED quest 2 thì đã phải qua quest 1 — nhưng ô
+     * test này ghim đúng phạm vi ấy lại, để không ai đọc nhầm thành "kiểm cả chuỗi".
+     */
+    @Test
+    void shouldOnlyCheckTheImmediatePrerequisite_notTheWholeChain() {
+        long characterId = createFreshCharacter("OldArchive3");
+        claimNightWatch(characterId);
+
+        assertThat(prerequisiteCodeOf(OLD_ARCHIVE_CODE)).isEqualTo(NIGHT_WATCH_CODE);
+        assertThat(prerequisiteCodeOf(NIGHT_WATCH_CODE)).isEqualTo(QUEST_CODE);
+        assertThat(newAcceptUseCase().execute(characterId, OLD_ARCHIVE_CODE))
+                .isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
     }
 }

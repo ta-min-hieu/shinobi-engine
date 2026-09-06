@@ -40,6 +40,7 @@
             { label_key: "dialogue.option.ask_about_realm", action: "about_realm" },
             { label_key: "dialogue.option.ask_about_elder", action: "about_elder" },
             { label_key: "dialogue.option.ask_night_watch", action: "night_watch" },
+            { label_key: "dialogue.option.ask_old_archive", action: "old_archive" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]
     },
@@ -54,6 +55,23 @@
         text_key: "dialogue.town_elder.night_watch",
         options: [
             { label_key: "dialogue.option.accept_quest_night_watch", action: "accept_quest:night_watch_bandit" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    // GIEO MẦM arc 1 (STORY.md §6): dọn góc Tàng Thư Đường bỏ hoang — quest thứ BA của game. Cũng
+    // mọc xuống dưới qua `about_town`, cùng lý do với `night_watch` (option_index của `start` bị
+    // khoá). Nó là lựa chọn ÁP CHÓT của `about_town`, đặt sau `night_watch` để đọc đúng thứ tự kể.
+    //
+    // Nhịp hé lộ (§8 quy tắc 2): Chu Hoành chỉ nói về VIỆC DỌN DẸP và về mấy cỗ máy cũ còn cựa
+    // quậy. Ông KHÔNG biết — và tuyệt đối không được nhắc — mảnh ngọc cổ mà người chơi sẽ nhặt
+    // được ở đó (phần thưởng quest, clear_old_archive.js); nó chỉ là "vật may mắn" ở arc 1, tới
+    // arc 3 mới phát sáng. Ông cũng không nhắc Linh Triều hay Thiên Môn: với ông đó là "đồ cổ của
+    // người xưa", không hơn.
+    old_archive: {
+        text_key: "dialogue.town_elder.old_archive",
+        options: [
+            { label_key: "dialogue.option.accept_quest_old_archive", action: "accept_quest:clear_old_archive" },
             { label_key: "dialogue.option.back", action: "about_town" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]
