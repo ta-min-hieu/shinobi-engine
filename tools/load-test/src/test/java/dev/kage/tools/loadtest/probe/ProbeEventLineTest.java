@@ -8,8 +8,17 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import org.junit.jupiter.api.Test;
 
 import dev.kage.protocol.AttackResultEvent;
+import dev.kage.protocol.ClaimQuestRewardOutcome;
+import dev.kage.protocol.ClaimQuestRewardResponse;
+import dev.kage.protocol.DialogueNodeResponse;
+import dev.kage.protocol.DialogueOptionView;
+import dev.kage.protocol.InventoryItemView;
+import dev.kage.protocol.ItemRewardView;
+import dev.kage.protocol.ListInventoryResponse;
 import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.QuestStatus;
+import dev.kage.protocol.QuestStatusChangedEvent;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
@@ -69,13 +78,86 @@ final class ProbeEventLineTest {
                         + "attacker=3 target=-3 damage=17 crit=true miss=false targetHp=103 targetDied=false");
     }
 
-    /** Opcode chưa giải mã vẫn phải hiện ra — im lặng bỏ qua là cách chắc chắn để bỏ sót bằng chứng. */
+    /**
+     * Opcode chưa giải mã vẫn phải hiện ra — im lặng bỏ qua là cách chắc chắn để bỏ sót bằng chứng.
+     *
+     * <p>Dùng gói cửa hàng chứ không dùng {@code LIST_INVENTORY_RESPONSE} như bản đầu: từ
+     * 2026-09-06 túi đồ ĐÃ có bộ giải mã (kịch bản nhiệm vụ), nên nó không còn là ví dụ "chưa biết
+     * đọc" nữa.
+     */
     @Test
     void shouldStillEmitLine_forOpcodeWithoutDecoder() throws InvalidProtocolBufferException {
         String line =
-                ProbeEventLine.format(7L, frameOf(Opcode.OPCODE_LIST_INVENTORY_RESPONSE_VALUE, new byte[] {1, 2, 3}));
+                ProbeEventLine.format(7L, frameOf(Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE, new byte[] {1, 2, 3}));
 
-        assertThat(line).isEqualTo("7\t508\tLIST_INVENTORY_RESPONSE\tpayloadBytes=3");
+        assertThat(line).isEqualTo("7\t1001\tLIST_SHOP_ITEMS_RESPONSE\tpayloadBytes=3");
+    }
+
+    @Test
+    void shouldDecodeDialogueNode_withNodeIdAndOptionCount() throws InvalidProtocolBufferException {
+        DialogueNodeResponse response = DialogueNodeResponse.newBuilder()
+                .setNodeId("start")
+                .setTextKey("dialogue.town_elder.greeting")
+                .addOptions(DialogueOptionView.newBuilder()
+                        .setLabelKey("dialogue.option.bye")
+                        .setAction("end"))
+                .build();
+
+        String line =
+                ProbeEventLine.format(10L, frameOf(Opcode.OPCODE_DIALOGUE_NODE_RESPONSE_VALUE, response.toByteArray()));
+
+        assertThat(line.split("\t"))
+                .containsExactly(
+                        "10",
+                        "603",
+                        "DIALOGUE_NODE_RESPONSE",
+                        "node=start text=dialogue.town_elder.greeting options=1");
+    }
+
+    @Test
+    void shouldDecodeQuestStatusChange() throws InvalidProtocolBufferException {
+        QuestStatusChangedEvent event = QuestStatusChangedEvent.newBuilder()
+                .setQuestCode("night_watch_bandit")
+                .setStatus(QuestStatus.QUEST_STATUS_COMPLETED)
+                .build();
+
+        String line = ProbeEventLine.format(
+                11L, frameOf(Opcode.OPCODE_QUEST_STATUS_CHANGED_EVENT_VALUE, event.toByteArray()));
+
+        assertThat(line)
+                .isEqualTo("11\t607\tQUEST_STATUS_CHANGED_EVENT\tquest=night_watch_bandit"
+                        + " status=QUEST_STATUS_COMPLETED");
+    }
+
+    @Test
+    void shouldDecodeClaimRewardWithGrantedExpAndItemCount() throws InvalidProtocolBufferException {
+        ClaimQuestRewardResponse response = ClaimQuestRewardResponse.newBuilder()
+                .setOutcome(ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_OK)
+                .setExpGranted(120L)
+                .addItemsGranted(ItemRewardView.newBuilder()
+                        .setItemTemplateCode("novice_sword")
+                        .setQuantity(1))
+                .build();
+
+        String line = ProbeEventLine.format(
+                12L, frameOf(Opcode.OPCODE_CLAIM_QUEST_REWARD_RESPONSE_VALUE, response.toByteArray()));
+
+        assertThat(line)
+                .isEqualTo("12\t609\tCLAIM_QUEST_REWARD_RESPONSE\toutcome=CLAIM_QUEST_REWARD_OUTCOME_OK"
+                        + " expGranted=120 items=1");
+    }
+
+    @Test
+    void shouldDecodeInventorySnapshotCounts() throws InvalidProtocolBufferException {
+        ListInventoryResponse response = ListInventoryResponse.newBuilder()
+                .addItems(InventoryItemView.newBuilder().setItemId(11L).setItemTemplateId(100L))
+                .setCapacity(30)
+                .build();
+
+        String line = ProbeEventLine.format(
+                13L, frameOf(Opcode.OPCODE_LIST_INVENTORY_RESPONSE_VALUE, response.toByteArray()));
+
+        assertThat(line).isEqualTo("13\t508\tLIST_INVENTORY_RESPONSE\titems=1 capacity=30 equipped=0");
     }
 
     @Test

@@ -14,6 +14,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterRespawnedEvent;
 import dev.kage.protocol.CharacterSummary;
+import dev.kage.protocol.ExperienceChangedEvent;
 import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
@@ -52,6 +53,14 @@ final class WorldObservation {
             long lastUpdateMillis,
             boolean inAreaOfInterest) {}
 
+    /**
+     * EXP của CHÍNH mình lần gần nhất server đẩy xuống ({@code ExperienceChangedEvent}).
+     *
+     * <p>Không có gói nào để HỎI EXP (protocol chỉ đẩy khi đổi), nên đây là nguồn DUY NHẤT — và vì
+     * thế nó rỗng cho tới sự kiện đầu tiên. Kịch bản nhiệm vụ báo cáo đúng như vậy thay vì bịa số 0.
+     */
+    record ExperienceSnapshot(int level, long totalExp, long expIntoLevel, long expForNextLevel) {}
+
     /** Một đòn đánh THẬT đã quan sát được. {@code skillCode} rỗng = đánh thường. */
     record DamageEvent(
             long elapsedMillis,
@@ -69,15 +78,18 @@ final class WorldObservation {
 
     private long playerCharacterId;
     private String playerName = "";
+    private int playerLevelAtLogin;
     private float playerX;
     private float playerY;
     private int playerCurrentHp;
     private int playerMaxHp;
+    private ExperienceSnapshot latestExperience;
 
     /** Trạng thái ban đầu lấy từ chính {@code SelectCharacterResponse} (ADR-041 spawn_x/spawn_y). */
     void enterWorld(CharacterSummary summary, SelectCharacterResponse response) {
         this.playerCharacterId = summary.getId();
         this.playerName = summary.getName();
+        this.playerLevelAtLogin = summary.getLevel();
         this.playerX = response.getSpawnX();
         this.playerY = response.getSpawnY();
         this.playerCurrentHp = response.getCurrentHp();
@@ -129,6 +141,11 @@ final class WorldObservation {
                 playerY = event.getY();
                 playerCurrentHp = event.getCurrentHp();
                 playerMaxHp = event.getMaxHp();
+            }
+            case Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE -> {
+                ExperienceChangedEvent event = ExperienceChangedEvent.parseFrom(payload);
+                latestExperience = new ExperienceSnapshot(
+                        event.getLevel(), event.getTotalExp(), event.getExpIntoLevel(), event.getExpForNextLevel());
             }
             default -> {
                 return false;
@@ -254,6 +271,16 @@ final class WorldObservation {
         return playerX;
     }
 
+    /** Cấp độ server khai trong {@code ListCharactersResponse} lúc chọn nhân vật. */
+    int playerLevelAtLogin() {
+        return playerLevelAtLogin;
+    }
+
+    /** Rỗng khi chưa có {@code ExperienceChangedEvent} nào — xem javadoc {@link ExperienceSnapshot}. */
+    Optional<ExperienceSnapshot> latestExperience() {
+        return Optional.ofNullable(latestExperience);
+    }
+
     List<MonsterSighting> monstersInAreaOfInterest() {
         return monsters.values().stream()
                 .filter(MonsterSighting::inAreaOfInterest)
@@ -289,9 +316,27 @@ final class WorldObservation {
                         playerCurrentHp,
                         playerMaxHp))
                 .append(System.lineSeparator());
+        appendExperienceSection(report);
         appendMonsterSection(report);
         appendDamageSection(report);
         return report.toString();
+    }
+
+    private void appendExperienceSection(StringBuilder report) {
+        report.append("EXP: ")
+                .append(latestExperience()
+                        .map(exp -> String.format(
+                                Locale.ROOT,
+                                "cấp=%d tổng=%d trongCấp=%d cầnLênCấp=%d",
+                                exp.level(),
+                                exp.totalExp(),
+                                exp.expIntoLevel(),
+                                exp.expForNextLevel()))
+                        // Không bịa 0: server chỉ đẩy EXPERIENCE_CHANGED khi EXP ĐỔI, im lặng
+                        // nghĩa là "chưa đo được", không phải "bằng không".
+                        .orElse("chưa có EXPERIENCE_CHANGED nào trong lượt này (cấp lúc đăng nhập=" + playerLevelAtLogin
+                                + ")"))
+                .append(System.lineSeparator());
     }
 
     private void appendMonsterSection(StringBuilder report) {

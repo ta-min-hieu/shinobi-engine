@@ -1,5 +1,6 @@
 package dev.kage.tools.loadtest.probe;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.OptionalDouble;
 import java.util.OptionalLong;
@@ -22,6 +23,7 @@ import dev.kage.tools.loadtest.CommandLineArguments;
  * @param attackTarget {@code none} | {@code nearest} | id thực thể cụ thể (số, âm = quái)
  * @param attackIntervalMillis nhịp gửi {@code AttackCommand} (cooldown thật do server giữ)
  * @param observeSeconds thời gian đứng đọc sự kiện sau khi đã tới chỗ
+ * @param quest kịch bản nhiệm vụ (nói chuyện NPC / lĩnh thưởng / in nhật ký) — xem {@link QuestPlan}
  */
 public record ProbeConfig(
         String host,
@@ -32,7 +34,32 @@ public record ProbeConfig(
         OptionalDouble moveToX,
         String attackTarget,
         int attackIntervalMillis,
-        int observeSeconds) {
+        int observeSeconds,
+        QuestPlan quest) {
+
+    /**
+     * Phần kịch bản NHIỆM VỤ của một lần chạy probe — tách khỏi {@link ProbeConfig} để chữ ký
+     * record không vượt ngưỡng {@code ParameterNumber} và để nhóm tham số đi cùng nhau nằm cùng
+     * chỗ (cùng cách {@code GameConnection.GatewayEndpoint} gộp địa chỉ gateway).
+     *
+     * @param npcCode NPC để mở hội thoại ({@code TalkToNpcCommand}); rỗng = không nói chuyện
+     * @param dialogueChoices đường đi trong cây hội thoại, mỗi phần tử là CHỈ SỐ lựa chọn (số) hoặc
+     *     KHOÁ ({@code action} hay {@code label_key}) — xem {@link DialogueChoice}
+     * @param claimQuestCode quest để gửi {@code ClaimQuestRewardCommand}; rỗng = không lĩnh thưởng
+     * @param report {@code true} = in nhật ký nhiệm vụ + túi đồ ngay cả khi không làm gì khác
+     */
+    public record QuestPlan(String npcCode, List<String> dialogueChoices, String claimQuestCode, boolean report) {
+
+        /** Danh sách bước bất biến — record không tự copy, mà lệnh gọi có thể truyền list sống. */
+        public QuestPlan {
+            dialogueChoices = List.copyOf(dialogueChoices);
+        }
+
+        /** {@code true} khi có ít nhất một việc phải làm trước khi vào vòng quan sát. */
+        public boolean isRequested() {
+            return report || !npcCode.isEmpty() || !claimQuestCode.isEmpty();
+        }
+    }
 
     /** Giá trị {@code attackTarget} nghĩa là "không đánh, chỉ quan sát". */
     public static final String ATTACK_TARGET_NONE = "none";
@@ -58,7 +85,12 @@ public record ProbeConfig(
                 raw.optionalDouble("moveToX"),
                 raw.text("attackTarget", ATTACK_TARGET_NONE).toLowerCase(Locale.ROOT),
                 raw.integer("attackIntervalMillis", DEFAULT_ATTACK_INTERVAL_MILLIS),
-                raw.integer("observeSeconds", DEFAULT_OBSERVE_SECONDS));
+                raw.integer("observeSeconds", DEFAULT_OBSERVE_SECONDS),
+                new QuestPlan(
+                        raw.text("talkToNpc", ""),
+                        raw.list("dialogueChoices"),
+                        raw.text("claimQuest", ""),
+                        raw.flag("questReport", false)));
     }
 
     /** {@code true} khi người dùng muốn probe tự chọn con gần nhất trong AoI. */

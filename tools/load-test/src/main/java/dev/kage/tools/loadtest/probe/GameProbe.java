@@ -35,6 +35,15 @@ import dev.kage.tools.loadtest.GameConnection;
  * ./gradlew :tools:load-test:gameProbe --args="--username=kagetest --characterId=3 --moveToX=24 --observeSeconds=15"
  * }</pre>
  *
+ * <p><b>Kịch bản NHIỆM VỤ</b> (2026-09-06) — cùng công cụ, thêm {@link QuestScenario}: nói chuyện
+ * NPC, đi theo cây hội thoại, nhận nhiệm vụ, lĩnh thưởng, rồi in chênh lệch nhật ký/túi đồ/EXP.
+ *
+ * <pre>{@code
+ * ./gradlew :tools:load-test:gameProbe --args="--username=kagetest --characterId=3 \
+ *     --talkToNpc=town_elder --dialogueChoices=about_town,night_watch,accept_quest:night_watch_bandit \
+ *     --observeSeconds=1"
+ * }</pre>
+ *
  * <p>Kết quả ra stdout: mỗi frame nhận được là 1 dòng TSV ({@link ProbeEventLine}), cuối cùng là
  * báo cáo tổng kết ({@link WorldObservation#renderReport()}). Chuyển hướng ra file bằng {@code >}
  * nếu cần đọc lại — probe cố ý KHÔNG tự ghi file, để không phải nhận đường dẫn từ tham số (cwd của
@@ -87,6 +96,9 @@ public final class GameProbe {
             enterWorld(connection, config, session, observation);
             if (config.moveToX().isPresent()) {
                 walkTo(connection, observation, session, config.moveToX().getAsDouble());
+            }
+            if (config.quest().isRequested()) {
+                new QuestScenario(connection, session, observation).run(config.quest());
             }
             observe(connection, config, session, observation);
         }
