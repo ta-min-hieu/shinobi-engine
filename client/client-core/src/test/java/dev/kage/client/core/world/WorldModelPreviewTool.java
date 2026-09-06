@@ -73,18 +73,28 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
      */
     private static final long WARDEN_ID = -7L;
 
+    /**
+     * Loài của V33, và lần THỨ BA dự án đi đúng vào cùng một cái bẫy: nó mượn
+     * {@code mob_archive-warden} y như V30 mượn {@code mob_stone-ogre} và V23 mượn
+     * {@code mob_training-dummy}. Đặt nó ngay cạnh thạch vệ — và cả hai cạnh quỷ đá — vì khung này
+     * nay phải trả lời một câu khó hơn trước: BA cỗ máy đá cùng một dòng dõi có còn phân biệt được
+     * không, khi lore bắt chúng phải giống nhau ở mức nào đó.
+     */
+    private static final long TRIAL_ID = -8L;
+
     // Toàn bộ khung nằm TRƯỚC bệ demo đầu tiên (bắt đầu ở x=3, xem DemoPlatforms) — bệ vẽ đè lên
     // quái thì ảnh không còn chứng minh được gì về chính con quái, đúng bẫy đã gặp ở lượt chụp đầu.
     // Ba loài quái đứng CẠNH NHAU (dummy/bandit/ogre) chứ không rải ra: câu hỏi mà ảnh này phải trả
     // lời là "có phân biệt được không", và thứ tự đó là thứ tự sát thương 8/22/40.
     private static final float PLAYER_X = -4.4f;
-    private static final float DUMMY_X = -1.6f;
-    private static final float BANDIT_X = -0.4f;
-    private static final float OGRE_X = 0.9f;
-    private static final float WARDEN_X = 2.1f;
-    private static final float BOSS_X = 3.4f;
+    private static final float DUMMY_X = -2.0f;
+    private static final float BANDIT_X = -0.85f;
+    private static final float OGRE_X = 0.3f;
+    private static final float WARDEN_X = 1.45f;
+    private static final float TRIAL_X = 2.6f;
+    private static final float BOSS_X = 3.75f;
     private static final float ELDER_X = -3.0f;
-    private static final float UNDRAWN_NPC_X = 4.7f;
+    private static final float UNDRAWN_NPC_X = 4.9f;
 
     private final Map<Long, CombatHudController.MonsterState> monsters = new LinkedHashMap<>();
 
@@ -114,16 +124,18 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         putMonster(BANDIT_ID, "wandering_bandit", BANDIT_X);
         putMonster(OGRE_ID, "stone_ogre", OGRE_X);
         putMonster(WARDEN_ID, "archive_warden", WARDEN_X);
+        putMonster(TRIAL_ID, "trial_construct", TRIAL_X);
         putMonster(BOSS_ID, "sample_boss", BOSS_X);
         putNpc(ELDER_ID, "town_elder", ELDER_X);
         putNpc(UNDRAWN_NPC_ID, "shop_keeper", UNDRAWN_NPC_X);
         LOG.info(
                 "model quái: training_dummy={} wandering_bandit={} stone_ogre={} archive_warden={} "
-                        + "sample_boss={} (sample_boss=false là ĐÚNG, chưa vẽ)",
+                        + "trial_construct={} sample_boss={} (sample_boss=false là ĐÚNG, chưa vẽ)",
                 models.hasModel(DUMMY_ID),
                 models.hasModel(BANDIT_ID),
                 models.hasModel(OGRE_ID),
                 models.hasModel(WARDEN_ID),
+                models.hasModel(TRIAL_ID),
                 models.hasModel(BOSS_ID));
         LOG.info(
                 "model NPC: town_elder={} shop_keeper={} (shop_keeper=false là ĐÚNG, mã NPC chưa tồn tại)",
@@ -168,7 +180,7 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         // Y HỆT WorldScreen.renderModels: sync trước, follow, rồi render.
         presenter.sync(monsters, PLAYER_X);
         npcPresenter.sync(PLAYER_X);
-        models.follow(PLAYER_X + 4.0f, 0f); // lùi camera ra giữa để cả 7 đối tượng vào khung
+        models.follow(PLAYER_X + 4.65f, 0f); // lùi camera ra giữa để cả 8 đối tượng vào khung
         models.render(1f / 60f);
         DemoPlatforms.render(shapeRenderer, models.combined());
         presenter.render(shapeRenderer, models.combined(), monsters, DUMMY_ID);

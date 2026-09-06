@@ -26,6 +26,7 @@ import dev.kage.monster.domain.MonsterTemplate;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.PostgresDataSourceFactory;
+import dev.kage.server.database.inventory.PostgresDropTableAdapter;
 
 /**
  * PostgreSQL THẬT qua Testcontainers — chứng minh migration V23 (ADR-037) và V25 (ADR-039) ÁP ĐƯỢC,
@@ -103,6 +104,35 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
     }
 
     @Test
+    void shouldSeedTheTrialConstructExactlyAsTheBalanceTableSays() {
+        // V33 — loài của quest 4 (`awakening_trial`), nhịp ĐÓNG arc 1. Cùng lý do với thạch vệ ở
+        // trên: các số này được chọn từ phép tính ở `AwakeningTrialBalanceTest` (server-world), và
+        // lớp đó đọc hằng số của chính nó chứ không đọc DB — nên chỉ có ô này giữ hai bên khớp nhau.
+        MonsterTemplate construct = findByCode("trial_construct");
+
+        assertThat(construct.stats().maxHp()).isEqualTo(130); // DAI nhất arc 1
+        assertThat(construct.stats().atk()).isEqualTo(15); // mà đánh NHẸ nhất trong bốn loài biết đánh
+        assertThat(construct.stats().def()).isEqualTo(10);
+        assertThat(construct.stats().hitPercent()).isEqualTo(85); // thấp nhất — nó nương tay
+        assertThat(construct.expReward()).isEqualTo(80L);
+    }
+
+    /**
+     * Loài ĐẦU TIÊN cố ý không rơi gì (V33 §1): cỗ máy khảo hạch là tài sản tông môn.
+     *
+     * <p>Vẫn phải có MỘT dòng {@code drop_table} rỗng mang đúng mã loài, vì đường chạy thật tra
+     * bảng rơi bằng MÃ QUÁI ({@code InventoryFacade.grantLoot}) và
+     * {@code PostgresDropTableAdapter} phân biệt "bảng có mà rỗng" (INFO, cố ý) với "không có bảng"
+     * (WARN, chắc gõ sai mã). Ô này giữ cho một thiết kế cố ý khỏi trượt vào cảnh báo dành cho lỗi.
+     */
+    @Test
+    void shouldGiveTheTrialConstructAnEmptyDropTable_notAMissingOne() {
+        assertThat(findByCode("trial_construct").dropTableCode()).isEqualTo("trial_construct");
+        assertThat(new PostgresDropTableAdapter(dataSource).findEntries("trial_construct"))
+                .isEmpty();
+    }
+
+    @Test
     void shouldPointEverySpeciesAtAModelKey() {
         // Không loài nào được thiếu model_key: rỗng nghĩa là client rơi về suy từ code và ra hộp.
         assertThat(new PostgresMonsterCatalogAdapter(dataSource).listTemplates())
@@ -129,6 +159,32 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         // Và quỷ đá KHÔNG được đổi theo — hai loài dùng chung một khoá đúng là thứ V31 vừa gỡ.
         assertThat(findByCode("archive_warden").modelKey())
                 .isNotEqualTo(findByCode("stone_ogre").modelKey());
+        // V33 mở lại món nợ LẦN THỨ BA (cỗ khảo hạch mượn model thạch vệ); V34 trả nó trong cùng
+        // ngày. Ba lần cùng một vòng — thêm loài, mượn model, ghi nợ, trả nợ — nên từ đây ô test
+        // này gác CẢ BỐN loài chứ không chỉ những loài đã từng lỗi.
+        assertThat(findByCode("trial_construct").modelKey()).isEqualTo("mob_trial-construct");
+        assertThat(findByCode("trial_construct").modelKey())
+                .isNotEqualTo(findByCode("archive_warden").modelKey());
+    }
+
+    /**
+     * Hàng rào CHUNG, thay cho việc liệt kê từng cặp: KHÔNG loài nào được dùng chung khoá model.
+     *
+     * <p>{@link #shouldGiveEachSpeciesItsOwnModel()} khẳng định từng khoá một, nên nó chỉ bắt được
+     * những món nợ mà người viết test đã BIẾT là có. Ba lần liên tiếp (V23, V30, V33) một loài mới
+     * ra đời có nợ art là đủ để nói rằng lần thứ tư cũng sẽ tới — và lần đó sẽ không có ai nhớ mà
+     * thêm dòng khẳng định. Ô này thì tự bắt.
+     *
+     * <p>⚠️ Nó CỐ Ý đỏ khi một loài mới mượn model. Đó không phải phiền toái mà là mục đích: món nợ
+     * phải hiện ra ở CI ngay lúc nó sinh ra, chứ không nằm trong một dòng comment SQL mà cả tháng
+     * sau mới có người đọc lại. Cách xử lý đúng khi nó đỏ là dựng art rồi thêm migration đổi
+     * {@code model_key} — mất khoảng một giờ, và V31/V34 đều đã làm đúng vậy trong cùng ngày.
+     */
+    @Test
+    void shouldNotLetAnyTwoSpeciesShareAModelKey() {
+        List<MonsterTemplate> templates = new PostgresMonsterCatalogAdapter(dataSource).listTemplates();
+
+        assertThat(templates).extracting(MonsterTemplate::modelKey).doesNotHaveDuplicates();
     }
 
     @Test
@@ -136,7 +192,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         List<MonsterSpawnPoint> spawns =
                 new PostgresMonsterCatalogAdapter(dataSource).listSpawnPoints(MonsterSpawnPoint.MAIN_WORLD_CODE);
 
-        assertThat(spawns).hasSize(7);
+        assertThat(spawns).hasSize(8);
         // ADR-033 — quái lệch khỏi y=0 là quái người chơi không bao giờ chạm tới. DB có CHECK,
         // đây là hàng rào thứ hai và cũng là tài liệu sống cho ràng buộc đó.
         assertThat(spawns).allSatisfy(spawn -> assertThat(spawn.posY()).isZero());
@@ -146,12 +202,14 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         // shouldKeepAggroSpawnsApartEnoughToPullOneAtATime. Hai cọc gỗ (aggro 0) giữ nguyên chỗ cũ.
         // V30 thêm hai thạch vệ của quest 3; V32 dời chúng sang PHÍA TÂY (-33 / -20) sau khi
         // playtest đo được đường đi phía đông tốn 65 máu — xem
-        // shouldLeaveEveryAggroSpawnAQuietPlaceToFightIn và ROADMAP mục 62/63.
+        // shouldLeaveEveryAggroSpawnAQuietPlaceToFightIn và ROADMAP mục 62/63. V33 thêm sân khảo
+        // hạch của quest 4 ở -47, xa hơn nữa về phía tây (cách thạch vệ gần nhất 14m > 12m, thoả
+        // cả hai luật hình học).
         // KHÔNG khớp theo thứ tự: adapter trả về theo id (thứ tự chèn của các migration), không
         // theo trục x — V32 dời hai thạch vệ sang âm nên hai thứ tự đó nay khác hẳn nhau.
         assertThat(spawns)
                 .extracting(MonsterSpawnPoint::posX)
-                .containsExactlyInAnyOrder(-33f, -20f, 8f, 14f, 21f, 34f, 47f);
+                .containsExactlyInAnyOrder(-47f, -33f, -20f, 8f, 14f, 21f, 34f, 47f);
     }
 
     /**
@@ -226,7 +284,8 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
                 .filter(spawn -> aggroByCode.getOrDefault(spawn.monsterCode(), 0f) > 0f)
                 .toList();
 
-        assertThat(aggressive).hasSize(5); // 2 tán tu + 1 quỷ đá + 2 thạch vệ (V30)
+        // 2 tán tu + 1 quỷ đá + 2 thạch vệ (V30) + 1 cỗ khảo hạch (V33). Mộc nhân aggro 0, không tính.
+        assertThat(aggressive).hasSize(6);
         for (int i = 0; i < aggressive.size(); i++) {
             for (int j = i + 1; j < aggressive.size(); j++) {
                 MonsterSpawnPoint first = aggressive.get(i);

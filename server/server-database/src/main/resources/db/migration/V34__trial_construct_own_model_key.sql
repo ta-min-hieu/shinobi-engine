@@ -1,0 +1,24 @@
+-- V34 — `trial_construct` trỏ về model của chính nó. Trả nợ art mà V33 tự ghi ra, TRONG NGÀY.
+--
+-- V33 §2 cố ý cho loài mới mượn `mob_archive-warden` và viết thẳng "NỢ NHÌN THẤY ĐƯỢC", đúng cách
+-- V23 làm với ba loài của ADR-037 và V30 làm với thạch vệ. Đây là lần thứ BA dự án đi vào cùng một
+-- vòng: thêm loài → mượn model → ghi nợ → trả nợ bằng một câu UPDATE. Vòng đó chạy đúng, nhưng
+-- đáng ghi ra rằng nó đã lặp ba lần.
+--
+-- Art: `mob_trial-construct`, dựng bằng `kage_mesh_kit`
+-- (`tools/blender/build_monster_trial_construct.py`) — xem ASSET-LOG.md mục 2026-09-06 và
+-- ART-PIPELINE §6.5. 4.986 tam giác cả ba tier, dưới ngưỡng low 5.000 (§4.4).
+--
+-- ⚠️ Vì sao PHẢI có migration này chứ không phải "client tự suy ra" — y hệt V24 và V31: client chỉ
+-- suy khoá từ `monster_code` (`MonsterModelKey`) khi `MonsterSpawnedEvent.model_key` RỖNG, mà
+-- server thì LUÔN gửi giá trị của cột này. Chừng nào cột còn ghi `mob_archive-warden` thì file .glb
+-- mới nằm trên đĩa mà không con quái nào dùng: art đúng, code đúng, và trong game cỗ khảo hạch vẫn
+-- là một con thạch vệ thứ ba.
+--
+-- ⚠️ Và lần này biết chắc điều đó xảy ra thật, không phải suy đoán: V31 nằm im không được áp trên DB
+-- dev gần một ngày (ROADMAP mục 65), suốt thời gian đó `archive_warden` vẫn gửi `mob_stone-ogre`
+-- xuống client dù art đã commit xong.
+--
+-- Không đổi schema: đúng một câu UPDATE. `archive_warden` giữ nguyên khoá của nó.
+
+UPDATE monster_template SET model_key = 'mob_trial-construct' WHERE code = 'trial_construct';
