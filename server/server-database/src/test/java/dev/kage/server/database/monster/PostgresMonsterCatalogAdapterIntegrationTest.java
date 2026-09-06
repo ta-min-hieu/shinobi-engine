@@ -192,11 +192,13 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
                 .filter(spawn -> aggroByCode.getOrDefault(spawn.monsterCode(), 0f) > 0f)
                 .toList();
 
-        for (MonsterSpawnPoint standing : aggressive) {
-            for (MonsterSpawnPoint neighbour : aggressive) {
-                if (standing == neighbour) {
-                    continue;
+        for (int i = 0; i < aggressive.size(); i++) {
+            for (int j = 0; j < aggressive.size(); j++) {
+                if (i == j) {
+                    continue; // so bằng CHỈ SỐ, không bằng tham chiếu — hai điểm spawn có thể bằng nhau về giá trị
                 }
+                MonsterSpawnPoint standing = aggressive.get(i);
+                MonsterSpawnPoint neighbour = aggressive.get(j);
                 float reach = leashByCode.get(neighbour.monsterCode()) + MELEE_ATTACK_RANGE_METERS;
                 assertThat(Math.abs(standing.posX() - neighbour.posX()))
                         .as(

@@ -2205,3 +2205,34 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       `ArtRegistryUpserter` chỉ chạy khi có `DB_PASSWORD`, và biến đó lại đang kích hoạt đúng cái lỗi
       có sẵn ở mục 61. Không cần INSERT tay — pipeline làm việc đó ở lần chạy có DB kế tiếp, và
       `OrphanAssetChecker` chạy SAU `ArtRegistryUpserter` nên hai file mới không thể thành mồ côi.
+
+64. **V32 — dời thạch vệ sang PHÍA TÂY, và luật hình học thứ HAI (2026-09-06)**:
+    - Chủ dự án chọn phương án dời spawn sau khi xem số đo ở mục 62c. **V32**: `archive_warden`
+      từ **60 / 73** sang **-20 / -33**.
+    - **Vì sao phía tây**: lời thoại của chính Chu Hoành nói *"góc phía TÂY Tàng Thư Đường"* trong
+      khi V30 lại đặt spawn ở phía ĐÔNG, sau lưng cả hai tán tu lẫn quỷ đá. Phía tây chỉ có trưởng
+      lão ở x=-5 (NPC, không đánh ai) ⇒ đường đi sạch. Bản đồ nay khớp lời thoại.
+    - ✅ **Đo lại bằng `gameProbe`, chạy thật ba lượt**:
+
+      | Lượt | Đường đi | Máu lúc chạm mặt thạch vệ | Kết quả trận |
+      |---|---|---|---|
+      | Đông (cũ), lượt 1 | 0 → 58 | **53/118** (mất 65 dọc đường) | **chết** |
+      | Đông (cũ), lượt 2 | 0 → 58 | **53/118** | **chết** — đòn kết liễu của QUỶ ĐÁ |
+      | **Tây (V32), lượt 1** | 0 → -19 | **118/118** — 0 sát thương dọc đường | thua sát nút: **né hụt 2/5 nhát** |
+      | **Tây (V32), lượt 2** | 0 → -19 | 118/118 | **THẮNG** — 4 nhát × 32, còn **38/118** |
+
+    - ⇒ Đường đi nay **miễn phí**, và trận đấu đúng như bảng của V30 dự tính: 4 nhát hạ 120 máu,
+      chịu lại 4 nhát × 20. **Nhưng nó là trận sát nút**: người chơi bắn 91% trúng (`hitPercent =
+      (90 + agi × 0,1)/100`), thạch vệ 93% — hụt hai nhát là thua. Đây là **biên độ may rủi có
+      thật**, ghi ra để lần cân bằng sau biết mà đo, không phải để đoán.
+    - ✅ **Luật hình học thứ HAI, khoá bằng test** —
+      `PostgresMonsterCatalogAdapterIntegrationTest.shouldLeaveEveryAggroSpawnAQuietPlaceToFightIn`:
+      với MỌI cặp điểm spawn có aggro, khoảng cách phải lớn hơn **leash của con bên cạnh + tầm đánh
+      2m**. Luật V29 (theo tầm AGGRO) chỉ hứa "đi ngang không kéo hai con"; **đứng lại đánh** thì
+      tầm ĐUỔI mới là thứ quyết định — chính chỗ đó đã để quỷ đá@47 (leash 10 ⇒ với tới 57) ra đòn
+      kết liễu người chơi đang đánh thạch vệ@60.
+    - 🔧 Gộp luôn hai luồng song song cùng ngày: **công cụ `gameProbe` nay đo được TRỌN vòng đời
+      nhiệm vụ** (hội thoại 602–606, nhật ký 610/611, lĩnh thưởng 608/609, túi đồ 507/508) và
+      **lỗi build-đỏ-theo-biến-môi-trường ở mục 61 đã sửa** (cấu hình registry thành THAM SỐ, chỉ
+      `main()` đọc môi trường; thêm `AssetPipelineRegistryBranchIntegrationTest` chạy nhánh Postgres
+      mà trước nay chưa test nào chạm tới). **1229 test xanh, 0 skip.**
