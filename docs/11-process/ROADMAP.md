@@ -2003,7 +2003,9 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       giải được** bằng ảnh chụp — chúng có thể là con ở 34 đang đuổi trong bán kính leash 10m, cũng
       có thể là thứ khác. Sau hai lần bị chính ảnh chụp đánh lừa trong cùng ngày (mục 55, mục 57),
       tôi **dừng ở đây thay vì đoán tiếp**.
-    - 🛠 **Việc cần làm để đóng dứt điểm**: dựng một client HEADLESS trên nền `tools/load-test`
+    - ✅ **ĐÃ ĐÓNG 2026-09-06 bằng số đo thật** — xem mục 61: ở x=24 có hai con tán tu trong tầm
+      nhìn nhưng **chỉ một con bị kéo aggro**, con kia đi tuần và gây 0 sát thương.
+    - 🛠 **Việc cần làm để đóng dứt điểm** (đã làm, xem mục 61): dựng một client HEADLESS trên nền `tools/load-test`
       (`SimulatedPlayer` đã nói đúng giao thức thật) để ĐỌC `MonsterSpawnedEvent`/`AttackResultEvent`
       thành SỐ — vị trí từng con quái và máu từng đòn. Buổi chơi tay không đủ phân giải cho câu hỏi
       thời gian thực; đây là công cụ đúng cho lớp câu hỏi đó.
@@ -2075,7 +2077,7 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       `GatewayServerIntegrationTest.observerShouldGetNewFaction_whenAnotherCharacterChangesItInPlace`
       — hai socket THẬT, A đứng nhìn, B lên Lv10 rồi đổi sang Thuỷ, A nhận đúng opcode 307 mang
       `FACTION_THUY`. Cộng 4 test đơn vị (2 world: gửi cho observer / KHÔNG dội lại người đổi;
-      2 gateway: nội dung gói / không gửi khi không tra được ngoại hình). **1166 test xanh, 0 skip.**
+      2 gateway: nội dung gói / không gửi khi không tra được ngoại hình).
     - 🔶 **Nửa client chưa nhìn thấy chạy thật**: đường `replaceCharacterModel` mới chỉ có test ở
       tầng dưới nó. Cần playtest hai client song song (công thức bàn giao 2026-08-29) trước khi ghi
       là đã kiểm chứng sống.
@@ -2084,3 +2086,45 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       `REPOSITORY-STRUCTURE.md` §1 nay là cây THẬT (thêm `feature-party`/`feature-trade`/
       `feature-pvp`/`feature-monster`, `quality/architecture-tests`, `third-party/m2/`,
       `tools/blender/`), và 4 module dự kiến chuyển xuống **§1.1** kèm điều kiện để được sinh ra.
+
+61. **Client HEADLESS đọc thế giới thành SỐ — và câu hỏi treo của mục 58 đã có câu trả lời
+    (2026-09-06)**:
+    - Mục 58 dừng lại ở chỗ *"vào world ở x=24 thì màn hình vẫn hiện HAI con tán tu, và tôi không
+      phân giải được bằng ảnh chụp"*. Công cụ đúng cho lớp câu hỏi đó nay đã có: **`tools:load-test`
+      thêm nhánh `gameProbe`** — một client không giao diện, nói ĐÚNG giao thức dây thật (TLS +
+      protobuf, dùng chung tầng `GameConnection` mới tách ra khỏi `SimulatedPlayer`), giải mã 16
+      opcode thành dòng TSV có mốc thời gian, rồi in báo cáo: từng con quái ở đâu, cách bao xa, ai
+      đánh ai, mỗi đòn bao nhiêu sát thương.
+
+      ```
+      ./gradlew :tools:load-test:gameProbe --args="--username=kagetest --characterId=3 --moveToX=24 --observeSeconds=15"
+      ```
+
+    - ✅ **ĐO THẬT ở x=24** (`Kagemaru`, quan sát 8 giây, không đánh trả):
+
+      | id | loài | vị trí cuối | k/c gần nhất cả lượt | có đánh mình không |
+      |---|---|---|---|---|
+      | -2 | `training_dummy` | (14,00, 0,00) | 10,00 m | không (aggro 0) |
+      | **-3** | `wandering_bandit` (spawn 21) | (22,22, −0,91) | **1,19 m** | **có — 9/9 đòn** |
+      | **-4** | `wandering_bandit` (spawn 34) | (31,69, 1,41) | **7,82 m** | **không, 0 đòn** |
+      | — | `stone_ogre` (spawn 47) | ngoài AoI 15 m | — | không xuất hiện |
+
+    - ⇒ **Ảnh chụp KHÔNG sai — suy luận từ nó mới sai.** Ở x=24 đúng là nhìn thấy hai con tán tu,
+      nhưng chỉ **một** con bị kéo aggro; con thứ hai chỉ **đi tuần** (x giảm 34,17→31,69 trong khi
+      y tăng 0→1,41, tức đi LỆCH khỏi người chơi đứng ở y=0), không bao giờ vào trong 6 m và không
+      gây một điểm sát thương nào. Toàn bộ 9 đòn đều `attacker=-3`, 17 sát thương/đòn, máu 118→16.
+      **V29 làm đúng việc nó định làm** — ô 🔶 của mục 58 đóng.
+    - Lượt đo thứ hai (đứng x=14, `--attackTarget=nearest`) khoá luôn bảng sát thương hai chiều:
+      `3 → -2` 35 sát thương, rồi **53 chí mạng = 35 × 1,5** hạ mộc nhân, kèm `EXPERIENCE_CHANGED
+      leveledUp=true` và `ITEM_GRANTED`; sau đó `-3` hạ người chơi và `CHARACTER_RESPAWNED
+      hp=118/118`.
+    - 💡 **Bài học nối tiếp mục 55/57**: ba lần trong ngày 2026-09-05 tôi bị chính đường quan sát
+      đánh lừa, và lần nào cách thoát cũng là *đi tìm một con số tái lập được*. Nay câu hỏi
+      "quanh mình có gì" đã có đường đo riêng, không phải đường mắt nhìn.
+    - ✅ **Sau khi gộp cả ba luồng của ngày (quest 3 · ADR-045 · gameProbe): `./gradlew build`
+      BUILD SUCCESSFUL, 1200 test, 0 fail, 0 skip**, Docker bật (1161 trước đợt này).
+    - 🐛 **Một lỗi có sẵn phát hiện trên đường, KHÔNG sửa** (báo theo CLAUDE.md §4):
+      `./gradlew build` **ĐỎ nếu biến `DB_PASSWORD` đang có trong shell** — `AssetPipelineIntegrationTest`
+      khi đó rẽ vào nhánh upsert `art_asset` và đòi sidecar `<key>.model-meta.json` mà chính fixture
+      của nó không bao giờ ghi. Test dễ vỡ ở `tools:asset-pipeline`, không liên quan module nào của
+      đợt này.

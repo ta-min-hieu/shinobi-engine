@@ -14,9 +14,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.UnaryOperator;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.UnaryOperator;
 
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.sdk.common.CompletableResultCode;
@@ -336,30 +336,34 @@ class GatewayServerIntegrationTest {
             // thật sẽ mất hàng chục giây cho một thứ không phải chủ đề của test.
             @Override
             public void saveLevel(long characterId, int level) {
-                replaceCharacter(characterId, c -> new Character(
-                        c.id(),
-                        c.accountId(),
-                        c.realmId(),
-                        c.name(),
-                        c.faction(),
-                        level,
-                        c.exp(),
-                        c.rebirthCount(),
-                        c.createdAt()));
+                replaceCharacter(
+                        characterId,
+                        c -> new Character(
+                                c.id(),
+                                c.accountId(),
+                                c.realmId(),
+                                c.name(),
+                                c.faction(),
+                                level,
+                                c.exp(),
+                                c.rebirthCount(),
+                                c.createdAt()));
             }
 
             @Override
             public void updateFaction(long characterId, Faction faction) {
-                replaceCharacter(characterId, c -> new Character(
-                        c.id(),
-                        c.accountId(),
-                        c.realmId(),
-                        c.name(),
-                        faction,
-                        c.level(),
-                        c.exp(),
-                        c.rebirthCount(),
-                        c.createdAt()));
+                replaceCharacter(
+                        characterId,
+                        c -> new Character(
+                                c.id(),
+                                c.accountId(),
+                                c.realmId(),
+                                c.name(),
+                                faction,
+                                c.level(),
+                                c.exp(),
+                                c.rebirthCount(),
+                                c.createdAt()));
             }
 
             private void replaceCharacter(long characterId, UnaryOperator<Character> update) {
@@ -1082,6 +1086,10 @@ class GatewayServerIntegrationTest {
                             .payload());
             assertThat(spawnSeenByA.getCharacterId()).isEqualTo(characterB);
             assertThat(spawnSeenByA.getFaction()).isEqualTo(dev.kage.protocol.Faction.FACTION_HOA);
+            CharacterSpawnedEvent spawnSeenByB =
+                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
+                            .payload());
+            assertThat(spawnSeenByB.getCharacterId()).isEqualTo(characterA);
 
             // Đổi hệ phái đòi Lv10 (SelectFactionUseCase) và file này không có đường lên cấp nào —
             // seed thẳng vào Port, đúng cách GatewayPipelineTest đã làm cho hai test hệ phái ở đó.
