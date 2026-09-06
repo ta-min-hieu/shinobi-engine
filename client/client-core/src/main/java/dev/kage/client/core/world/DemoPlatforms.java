@@ -39,8 +39,19 @@ final class DemoPlatforms {
      * Dải nền đất minh hoạ ({@code z=0}) — {@code minX, maxX}. Vật lý coi mặt đất phẳng {@code z=0}
      * là VÔ HẠN ({@code VerticalMovementSystem.GROUND_Z}), nên dải này chỉ để mắt có mốc, không
      * phải biên thật; đi quá dải vẫn đứng trên đất bình thường.
+     *
+     * <p><b>Dải này phải PHỦ HẾT mọi điểm spawn</b>, và đó là một luật đã bị vi phạm trong im lặng
+     * hai lần: bản đầu để {@code -30}, rồi V32 dời thạch vệ sang {@code -33}/{@code -20} và V33
+     * thêm sân khảo hạch ở {@code -47}. Vật lý không hề gì (mặt đất vô hạn), nhưng người chơi đi
+     * sang tây thì thấy mình và lũ quái đứng lơ lửng trong khoảng đen — nhìn y như lỗi render.
+     * Playtest 2026-09-06 bắt được. Đầu tây nay là {@code -55}: phủ sân khảo hạch {@code -47} còn
+     * dư 8m. Đầu đông {@code 60} vẫn phủ quỷ đá {@code 47}.
+     *
+     * <p>⚠️ Thêm điểm spawn ngoài đoạn {@code [-55, 60]} thì phải nới dải này CÙNG migration —
+     * `monster_spawn` sống trong DB còn hai số này là hằng số client, không có gì nối chúng lại
+     * ngoài dòng ghi chú này. Khi có map thật (ADR-033 #7) thì cả lớp này biến mất.
      */
-    private static final float GROUND_MIN_X = -30f;
+    private static final float GROUND_MIN_X = -55f;
 
     private static final float GROUND_MAX_X = 60f;
 
