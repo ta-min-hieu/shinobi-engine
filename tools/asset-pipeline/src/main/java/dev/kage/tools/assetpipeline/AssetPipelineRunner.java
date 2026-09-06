@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
@@ -32,10 +33,31 @@ public final class AssetPipelineRunner {
 
     private AssetPipelineRunner() {}
 
+    /** Đọc {@code DB_PASSWORD} từ môi trường rồi giao cho {@link #run} — xem javadoc ở đó. */
     public static void main(String[] args) {
-        Path renderRoot = argOrDefault(args, "--render-root", Path.of("assets/raw/render-out"));
-        Path exportedRoot = argOrDefault(args, "--exported-root", Path.of("assets/exported"));
+        run(
+                argOrDefault(args, "--render-root", Path.of("assets/raw/render-out")),
+                argOrDefault(args, "--exported-root", Path.of("assets/exported")),
+                ArtRegistryConfig.fromEnvironment());
+    }
 
+    /**
+     * Chạy trọn pipeline với nhánh registry do NGƯỜI GỌI chọn — {@code main} lấy từ môi trường, test
+     * truyền thẳng.
+     *
+     * <p><b>Vì sao cấu hình DB là THAM SỐ chứ không đọc thẳng môi trường ở đây</b> (lỗi thật, ghi
+     * ROADMAP mục 61): bản cũ gọi {@code ArtRegistryConfig.fromEnvironmentOrNull()} ngay giữa thân
+     * hàm, nên {@code AssetPipelineIntegrationTest} rẽ nhánh theo biến môi trường của MÁY chạy —
+     * {@code ./gradlew build} xanh trên máy sạch và ĐỎ trên đúng cái shell đã export
+     * {@code DB_PASSWORD} để chạy server dev (test rơi vào nhánh upsert rồi đòi sidecar
+     * {@code <asset_key>.model-meta.json}). Một tham số tường minh làm kết quả test chỉ phụ thuộc
+     * thứ test tự khai, và mở luôn đường cho test nhánh registry chạy trên Postgres throwaway
+     * ({@code AssetPipelineRegistryBranchIntegrationTest}) — điều mà bản cũ không làm được, xem
+     * javadoc {@code OrphanAssetCheckerIntegrationTest}.
+     *
+     * @param registry rỗng = bỏ qua upsert + kiểm mồ côi (duyệt atlas cục bộ không cần Postgres)
+     */
+    static void run(Path renderRoot, Path exportedRoot, Optional<ArtRegistryConfig> registry) {
         List<AssetFolder> assets = AssetScanner.scan(renderRoot);
         System.out.println("[asset-pipeline] tìm thấy " + assets.size() + " asset trong " + renderRoot);
         assets.forEach(NamingValidator::validate);
@@ -52,8 +74,8 @@ public final class AssetPipelineRunner {
         Path manifestPath = exportedRoot.resolve("asset-manifest.json");
         ManifestWriter.writeManifest(exportedRoot, manifestPath, models);
 
-        ArtRegistryConfig dbConfig = ArtRegistryConfig.fromEnvironmentOrNull();
-        if (dbConfig != null) {
+        if (registry.isPresent()) {
+            ArtRegistryConfig dbConfig = registry.get();
             ArtRegistryUpserter.upsertSprites(assets, dbConfig);
             ArtRegistryUpserter.upsertModels(models, modelsRoot, renderRoot, dbConfig);
             OrphanAssetChecker.check(assets, models, dbConfig);
