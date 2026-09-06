@@ -2236,3 +2236,121 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       **lỗi build-đỏ-theo-biến-môi-trường ở mục 61 đã sửa** (cấu hình registry thành THAM SỐ, chỉ
       `main()` đọc môi trường; thêm `AssetPipelineRegistryBranchIntegrationTest` chạy nhánh Postgres
       mà trước nay chưa test nào chạm tới). **1229 test xanh, 0 skip.**
+65. **QUEST THỨ TƯ — arc 1 ĐÓNG LẠI, và một lỗi Flyway chỉ có DB dev mới dính (2026-09-06)**:
+    - **`awakening_trial` — "Khảo Hạch Thức Tỉnh Linh Căn"** (seed **V33**), nhịp ĐÓNG của arc 1
+      theo [STORY.md §6](../13-game-design/STORY.md) nguyên văn: *"được đặc cách dự khảo hạch →
+      thức tỉnh linh căn (Lv10)"*, mở khoá *"chọn hệ (Lv10)"*. Tiên quyết `clear_old_archive`, mốc
+      `CLAIMED` (ADR-044). Arc 1 nay có đủ bốn nhịp: việc vặt → cao trào đêm trực → gieo mầm →
+      khảo hạch.
+    - **Quest thứ BA liên tiếp không tốn một dòng Java sản phẩm nào** (V28 → V30 → V33): migration
+      + script + nhánh hội thoại + i18n. Lời hứa "thêm quest = dữ liệu" của đợt gỡ hardcode
+      2026-09-05 và của ADR-037 vẫn đứng.
+    - 🆕 **Quest ĐẦU TIÊN có một mốc CƠ CHẾ nằm sau nó** — và đó là chỗ nó khác ba quest trước.
+      Chu Hoành hứa thức tỉnh linh căn; thứ thi hành lời hứa đó là
+      `SelectFactionUseCase.MIN_LEVEL = 10`. Nếu lĩnh thưởng xong mà vẫn Cấp 9 thì quest nói dối.
+      Nên **1800 EXP là con số CHỌN TỪ RÀNG BUỘC**, không phải chọn rồi mới đi kiểm: đường chơi
+      TỐI THIỂU (chỉ EXP quest + đúng số quái mà chính các quest bắt hạ) cộng lại 2.785 trước khi
+      lĩnh, cần ≥ 4.500 ⇒ thưởng ≥ 1.715. Khoá bằng
+      `QuestIntegrationTest.shouldLandExactlyAtLevelTen_afterTheWholeArcOneChain` — nó chơi cả bốn
+      quest qua use case thật, đọc `exp_reward` **thẳng từ DB** và suy cấp bằng chính
+      `ExperienceCurve`, nên hạ EXP một loài quái hay sửa `give_exp` đều làm nó đỏ.
+    - **Loài mới `trial_construct` — "Trắc Linh Thạch Nhân"**, và nó bẻ trục thiết kế: ba loài biết
+      đánh trước nó đi theo một hướng duy nhất là mạnh dần (8 → 22 → 26 → 40); con này **máu cao
+      nhất arc 1 (130) mà đòn nhẹ nhất (15)**, `hit_percent` cũng thấp nhất (85). Nó ĐO chứ không
+      giết — đúng luận đề của Chu Hoành. Loài đầu tiên **cố ý không rơi gì** (bảng rơi RỖNG chứ
+      không phải thiếu bảng: đường chạy thật tra `drop_table.code` bằng **mã quái**, và
+      `PostgresDropTableAdapter` phân biệt "rỗng ⇒ INFO, cố ý" với "không có ⇒ WARN, chắc gõ sai").
+    - ✅ **Chỉ số chọn từ SỐ ĐO, không từ máu đầy** — đây là bài học V32 được áp dụng TRƯỚC chứ
+      không phải sau. Đo bằng `gameProbe` trước khi viết migration: đi bộ x=0 → x=-47 tốn **đúng 40
+      máu** (mỗi thạch vệ một nhát × 20) ⇒ tới nơi còn **78/118**. Đó mới là đầu vào của bài toán.
+
+      | Tình huống | người chơi cần | cỗ máy cần | biên |
+      |---|---|---|---|
+      | máu đầy 118 | 4 nhát | 10 nhát | +6 |
+      | **tới nơi với 78 (đường chơi thật)** | **4 nhát** | **7 nhát** | **+3** |
+      | tay không, tới nơi với 56 | 5 nhát | 5 nhát | hoà = chết |
+
+      Biên 3 nhát là CHỦ ĐÍCH: mục 64 ghi lại rằng quest 3 thắng sát nút và hụt hai nhát là thua.
+      Nhịp đóng của một arc không nên là một lần tung đồng xu. Cái khó của quest 4 nằm ở QUÃNG
+      ĐƯỜNG, và **lời thoại nói thẳng điều đó với người chơi** thay vì để họ tự phát hiện giữa
+      đường như V30 từng làm.
+    - ✅ **PLAYTEST SỐNG, trọn vòng, bằng `gameProbe`**: nhận qua hội thoại thật (`about_town` →
+      `awakening_trial` → `accept_quest`) → đi bộ tới -46 → hạ cỗ máy **4 nhát × 34** → `COMPLETED`
+      → lĩnh thưởng **+1800 EXP đúng, 0 vật phẩm đúng** → **Cấp 8 → 10**, cột `character.level`
+      trong DB cũng thành 10. Kết trận còn **38/118**; đường đi lượt này chỉ tốn 20 (một thạch vệ
+      đánh trúng, một hụt — chúng bắn 93%).
+    - 🐛 **Bẫy Flyway chỉ DB dev mới dính, tìm ra vì server không khởi động nổi**: `V31` (art thạch
+      vệ) **chưa bao giờ chạy** trên DB dev, trong khi `V32` đã chạy — số hiệu V31 được *dành sẵn*
+      cho một luồng art song song và luồng đó về đích SAU. Flyway thấy "resolved migration not
+      applied: 31" và từ chối chạy. DB mới tinh (CI, deploy) không dính vì Flyway chạy theo thứ tự
+      phiên bản. **Hệ quả thật, và nó giải thích một chuyện đang treo**: cột `model_key` của
+      `archive_warden` vẫn là `mob_stone-ogre` suốt từ hôm qua, tức **art mới chưa từng lên dây**
+      dù file `.glb` đã có và migration đã commit. Đã chữa DB dev bằng cách chạy tay V31 + chèn
+      dòng lịch sử với checksum tính đúng thuật toán Flyway (kiểm chứng bằng cách tính lại checksum
+      của V30/V32 và so với DB: khớp tuyệt đối). Nay `MONSTER_SPAWNED_EVENT` gửi
+      `model=mob_archive-warden` thật — đã nhìn thấy trên dây.
+      ⚠️ **Bài học**: giữ chỗ số hiệu migration cho một luồng song song là an toàn với DB mới,
+      nhưng **DB đang chạy sẽ kẹt cứng** nếu số hiệu sau về đích trước. Lần sau: đánh số theo thứ
+      tự VỀ ĐÍCH, đừng đặt chỗ trước.
+    - 🧹 **Một test xanh mô tả bản đồ không còn tồn tại** — `OldArchiveDuelBalanceTest
+      .theNewArchiveSpawnsKeepTheDuelOneOnOne` vẫn ghi thạch vệ ở `60`/`73` suốt từ khi V32 dời
+      chúng sang `-20`/`-33`. Nó vẫn xanh vì ba phép trừ là số học thuần. Đây là dạng mục ruỗng khó
+      thấy nhất: không có gì đỏ để mách. Đã sửa cả số lẫn tên ô test.
+    - 📄 [STORY.md §7](../13-game-design/STORY.md) thêm dòng cho loài mới (§8 quy tắc 3 — cùng PR).
+      🔴 **Một lỗ hổng hệ thống báo cáo riêng cho chủ dự án** (dòng 17 bảng "ĐANG CHỜ CHỦ DỰ ÁN"):
+      **arc 1 KHÔNG có hồi máu nào cả**. Quest 4 né được vì nó chỉ có MỘT trận; quest 3 thì không
+      (cần hạ 2 thạch vệ mà hạ xong con đầu còn 38/118).
+66. **PLAYTEST bằng CLIENT THẬT — art thạch vệ cuối cùng cũng nhìn thấy, và một lỗ nền đất (2026-09-06)**:
+    - Đóng nốt việc treo từ hôm qua (*"art mới chỉ thấy qua ảnh dựng client, chưa thấy trong một
+      trận đánh thật"*). Mở server + `client-desktop` thật, đăng nhập, đứng cạnh từng con:
+      - ✅ **`mob_archive-warden` dựng ra model đá thật, KHÔNG phải hộp đỏ thay thế** — cho CẢ
+        `archive_warden` lẫn `trial_construct` (hai loài dùng chung khoá model, nợ art V33 khai
+        sẵn). Đây là lần đầu art đó lên màn hình: nó chỉ vừa lên dây được sau khi chữa lỗi Flyway
+        ở mục 65.
+      - ✅ Tên tu tiên mới hiện đúng trên khung mục tiêu: **"Trắc Linh Thạch Nhân"**, **"Thạch vệ
+        Tàng Thư"**.
+      - ✅ Số sát thương khớp bảng cân bằng **trên màn hình**, không phải chỉ trong test: thạch vệ
+        **−20**, cỗ khảo hạch **−12**.
+      - ✅ Màn chọn nhân vật hiện **"Kagemaru — Hoả (Luyện Khí 5)"** — Cấp 10 ánh xạ đúng thành
+        *Luyện Khí tầng 5*, tức khớp CHÍNH lời thoại `about_realm` của Chu Hoành (*"Tới Luyện Khí
+        tầng năm thì đo được linh căn"*). Tường thuật và cơ chế gặp nhau trên màn hình.
+      - ℹ️ Hộp vàng lơ lửng trên đầu quái **không phải lỗi**: `MonsterPresenter.drawTargetMarker`
+        (`Color.GOLD`) — dấu hiệu mục tiêu đang chọn.
+    - 🐛 **Lỗi thật bắt được, và nó do chính V32/V33 gây ra**: `DemoPlatforms.GROUND_MIN_X = -30`,
+      trong khi V32 dời thạch vệ sang **-33** và V33 đặt sân khảo hạch ở **-47**. Vật lý không hề
+      gì (mặt đất `z=0` là VÔ HẠN, `VerticalMovementSystem.GROUND_Z`) nên **không test nào đỏ** —
+      nhưng người chơi đi sang tây thì thấy mình và lũ quái **đứng lơ lửng trong khoảng đen**,
+      nhìn y như lỗi render. Đã nới đầu tây `-30 → -55` (phủ sân khảo hạch còn dư 8m) và ghi luật
+      vào javadoc: **thêm điểm spawn ngoài `[-55, 60]` thì phải nới dải này CÙNG migration**, vì
+      `monster_spawn` sống trong DB còn hai số kia là hằng số client — không có gì nối chúng lại.
+    - 🔴 **Lỗ hổng hồi máu: nhìn thấy chứ không phải tính ra.** Trong một buổi playtest ~15 phút,
+      nhân vật **chết BA lần**, cả ba đều vì đứng cạnh quái mà không có cách nào hồi máu — không
+      phải vì đánh thua. Đây là bằng chứng sống cho dòng **17** bảng "🔴 ĐANG CHỜ CHỦ DỰ ÁN".
+67. **ART cho cỗ khảo hạch — trả nợ V33 TRONG CÙNG NGÀY, và một hàng rào để không nợ lần thứ tư (2026-09-06)**:
+    - `mob_trial-construct` ("Trắc Linh Thạch Nhân") dựng bằng `kage_mesh_kit` chạy headless
+      (`tools/blender/build_monster_trial_construct.py`) — **36 part, 4.986 tam giác cả ba tier**,
+      dưới ngưỡng low 5.000 của ART-PIPELINE §4.4. **V34** lật `model_key` sang khoá đó.
+      Rodin vẫn `API_INSUFFICIENT_FUNDS` (dòng #12 bảng chờ chủ dự án), nên vẫn đi đường kit —
+      offline, tất định, và mọi bước sau mesh đều dùng chung nên đổi sang `.glb` thật sau này
+      không phải sửa gì khác.
+    - 🎨 **Bài học lớn nhất: ở 50px, "xám nhạt hơn một bậc" KHÔNG PHẢI là một khác biệt.**
+      Bản đầu chọn đá vôi nhạt hơn granite của thạch vệ đúng một bậc; `runWorldPreview` bác bỏ
+      thẳng — hai con vẫn lẫn nhau và cỗ khảo hạch đọc ra như *"thạch vệ bị lấy mất đồ"*. Bản thứ
+      hai không nhích màu nữa mà **đảo ngược BỐ CỤC SÁNG-TỐI**: thạch vệ là *thân tối + một mảng
+      sáng* (bia đá trắng), cỗ khảo hạch là *thân ngọc sáng + các chi tiết tối* (mũ sắt, kính che,
+      tấm ngực, nẹp tay). Đảo bố cục sống sót qua cả ba phép thử mà nhích màu không qua nổi: thu
+      nhỏ, chuyển xám, nhìn trong một giây. **Và nó đúng lore hơn** — 測靈 thạch trong thể loại này
+      là ngọc nhạt chứ không phải granite.
+    - 📏 **Một thứ đã thử, đã ĐO, và đã gỡ**: thêm `cloak` cho đỡ "trơn". `_acc_cloak` treo SAU
+      lưng mà camera client nhìn gần chính diện ⇒ **bị che kín trong MỌI khung** (idle/run/attack/
+      die), tốn **116 tam giác** và vẽ ra đúng con số không. Đã gỡ, và ghi lại làm câu hỏi để ngỏ:
+      bốn nhân vật B3 trong `build_kage_character.py` cũng mặc `cloak` — đáng kiểm xem chúng có
+      đang trả cùng cái phí đó không.
+    - 🚧 **Hàng rào CI mới, và lý do nó phải là hàng rào CHUNG**: `PostgresMonsterCatalogAdapter
+      IntegrationTest.shouldNotLetAnyTwoSpeciesShareAModelKey` — không loài nào được dùng chung
+      `model_key`. Ba lần liên tiếp (V23 → V30 → V33) một loài mới ra đời kèm nợ art là đủ để biết
+      lần thứ tư sẽ tới, và lần đó sẽ không có ai nhớ mà thêm một dòng khẳng định riêng. Ô test cũ
+      chỉ bắt được những món nợ người viết test ĐÃ BIẾT là có; ô mới tự bắt.
+    - ✅ `WorldModelPreviewTool` nay dựng CẢ BỐN loài có model cạnh nhau — khung đó sinh ra để trả
+      lời đúng một câu, và câu đó vừa khó lên: **ba cỗ máy đá cùng một dòng dõi** có còn phân biệt
+      được không, khi lore bắt chúng phải giống nhau ở mức nào đó.
