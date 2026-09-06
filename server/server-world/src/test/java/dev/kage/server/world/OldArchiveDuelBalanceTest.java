@@ -158,13 +158,21 @@ class OldArchiveDuelBalanceTest {
      * trận tay đôi chỉ đúng khi người chơi thật sự đánh MỘT con.
      */
     @Test
-    @DisplayName("Hai điểm spawn thạch vệ (60, 73) và quỷ đá (47) không cặp nào kéo được cả hai")
+    @DisplayName("Hai điểm spawn thạch vệ (-20, -33) đủ xa nhau và đủ xa mọi hàng xóm CÓ AGGRO")
     void theNewArchiveSpawnsKeepTheDuelOneOnOne() {
         float aggroRadiusMeters = 6f; // mặc định V25, thạch vệ giữ nguyên
         float combinedReach = aggroRadiusMeters + aggroRadiusMeters;
 
-        assertThat(60f - 47f).isGreaterThan(combinedReach);
-        assertThat(73f - 60f).isGreaterThan(combinedReach);
-        assertThat(73f - 47f).isGreaterThan(combinedReach);
+        // ⚠️ Ba con số của bản đầu (60/73 cạnh quỷ đá 47) đã CHẾT từ V32: playtest đo được đường đi
+        // phía đông tốn 65 máu, và quỷ đá@47 với leash 10 còn ra đòn kết liễu người chơi đang đánh
+        // thạch vệ@60. Chủ dự án chọn dời cả hai sang phía TÂY (-20 / -33) — nơi lời thoại của Chu
+        // Hoành vốn đã nói từ đầu. Test này giữ nguyên tên mà không đổi số suốt một ngày: nó VẪN
+        // XANH vì ba phép trừ kia là số học thuần, chỉ có điều chúng không còn nói về thế giới thật.
+        // Đó là dạng mục ruỗng khó thấy nhất — test xanh mô tả một bản đồ không còn tồn tại.
+        assertThat(Math.abs(-20f - (-33f))).isGreaterThan(combinedReach);
+        // Hàng xóm CÓ AGGRO gần nhất về hai phía: sân khảo hạch @-47 (V33) và tán tu @21 (V29).
+        // Mộc nhân @8/@14 không tính — aggro 0, chúng không bao giờ tự đánh ai.
+        assertThat(Math.abs(-33f - (-47f))).isGreaterThan(combinedReach);
+        assertThat(Math.abs(-20f - 21f)).isGreaterThan(combinedReach);
     }
 }

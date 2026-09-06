@@ -41,6 +41,7 @@
             { label_key: "dialogue.option.ask_about_elder", action: "about_elder" },
             { label_key: "dialogue.option.ask_night_watch", action: "night_watch" },
             { label_key: "dialogue.option.ask_old_archive", action: "old_archive" },
+            { label_key: "dialogue.option.ask_awakening_trial", action: "awakening_trial" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]
     },
@@ -72,6 +73,28 @@
         text_key: "dialogue.town_elder.old_archive",
         options: [
             { label_key: "dialogue.option.accept_quest_old_archive", action: "accept_quest:clear_old_archive" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    // NHỊP ĐÓNG arc 1 (STORY.md §6): kỳ khảo hạch thức tỉnh linh căn — quest thứ TƯ của game, và
+    // là quest đầu tiên có một mốc CƠ CHẾ nằm ngay sau nó (Cấp 10 ⇒ mở khoá chọn hệ phái,
+    // `SelectFactionUseCase.MIN_LEVEL`). Cũng mọc xuống dưới qua `about_town`, cùng lý do với
+    // `night_watch`/`old_archive` (option_index của `start` bị khoá).
+    //
+    // Nhịp hé lộ (§8 quy tắc 2): Chu Hoành nói về KỲ THI và về việc chính ông đứng ra bảo lãnh.
+    // Ông KHÔNG được nhắc mảnh ngọc cổ người chơi vừa nhặt ở quest 3 (ông không biết nó tồn tại —
+    // xem `old_archive`), không nhắc Thiên Môn, không nhắc Huyết Sa. Linh căn thức tỉnh vì người
+    // chơi trụ được, không vì di vật nào — đó chính là luận đề ở nhánh `about_elder`.
+    //
+    // ⚠️ Lời thoại NÓI THẲNG rằng quãng đường tới sân khảo hạch là một phần bài thi. Đó không phải
+    // câu văn cho đẹp: sân ở x=-47, đi từ tông môn tới đó phải lách qua hai cỗ thạch vệ và tốn 40
+    // máu ĐO ĐƯỢC (V33 §3). V30 từng để người chơi tự phát hiện chuyện đó giữa đường và trả giá
+    // bằng một buổi playtest — lần này bản đồ và lời thoại nói cùng một câu ngay từ đầu.
+    awakening_trial: {
+        text_key: "dialogue.town_elder.awakening_trial",
+        options: [
+            { label_key: "dialogue.option.accept_quest_awakening_trial", action: "accept_quest:awakening_trial" },
             { label_key: "dialogue.option.back", action: "about_town" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]

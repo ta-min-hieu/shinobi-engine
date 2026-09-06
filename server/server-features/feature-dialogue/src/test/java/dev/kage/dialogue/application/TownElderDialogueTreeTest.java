@@ -67,7 +67,7 @@ class TownElderDialogueTreeTest {
         assertThat(aboutSect.textKey()).isEqualTo("dialogue.town_elder.about_town");
         assertThat(aboutSect.options())
                 .extracting(DialogueOption::action)
-                .containsExactly("about_realm", "about_elder", "night_watch", "old_archive", "end");
+                .containsExactly("about_realm", "about_elder", "night_watch", "old_archive", "awakening_trial", "end");
         assertThat(node("about_realm").textKey()).isEqualTo("dialogue.town_elder.about_realm");
         assertThat(node("about_elder").textKey()).isEqualTo("dialogue.town_elder.about_elder");
     }
@@ -105,6 +105,25 @@ class TownElderDialogueTreeTest {
         assertThat(oldArchive.options())
                 .extracting(DialogueOption::action)
                 .containsExactly("accept_quest:clear_old_archive", "about_town", "end");
+    }
+
+    /**
+     * Nhịp ĐÓNG của arc 1 (STORY.md §6) — quest THỨ TƯ, và là quest đầu tiên có một mốc CƠ CHẾ nằm
+     * ngay sau nó: lĩnh thưởng xong là Cấp 10, tức là {@code SelectFactionUseCase.MIN_LEVEL} mở
+     * khoá chọn hệ phái. Phép tính giữ lời hứa đó nằm ở
+     * {@code QuestIntegrationTest.shouldLandExactlyAtLevelTen_afterTheWholeArcOneChain}.
+     *
+     * <p>Nhánh cũng mọc xuống dưới qua {@code about_town}, cùng lý do với ba nhánh quest kia.
+     */
+    @Test
+    @DisplayName("Nhánh khảo hạch nhận được quest thứ tư, và nhận đúng mã awakening_trial")
+    void awakeningTrialBranchOffersTheFourthQuest() {
+        DialogueNode trial = node("awakening_trial");
+
+        assertThat(trial.textKey()).isEqualTo("dialogue.town_elder.awakening_trial");
+        assertThat(trial.options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:awakening_trial", "about_town", "end");
     }
 
     /**

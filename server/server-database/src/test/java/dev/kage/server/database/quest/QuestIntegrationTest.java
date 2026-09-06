@@ -20,7 +20,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import dev.kage.account.domain.Account;
+import dev.kage.character.application.GrantExperienceUseCase;
 import dev.kage.character.domain.Character;
+import dev.kage.character.domain.ExperienceCurve;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.quest.application.AcceptQuestUseCase;
@@ -55,6 +57,7 @@ class QuestIntegrationTest {
     private static final String QUEST_CODE = "kill_training_dummies";
     private static final String NIGHT_WATCH_CODE = "night_watch_bandit";
     private static final String OLD_ARCHIVE_CODE = "clear_old_archive";
+    private static final String AWAKENING_TRIAL_CODE = "awakening_trial";
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
@@ -137,6 +140,40 @@ class QuestIntegrationTest {
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Lỗi test-only đếm vật phẩm: " + itemCode, e);
+        }
+    }
+
+    /**
+     * {@code monster_template.exp_reward} đọc THẲNG từ seed — không chép số vào test.
+     *
+     * <p>Đây là điểm khác biệt của {@link #shouldLandExactlyAtLevelTen_afterTheWholeArcOneChain()}
+     * so với một phép tính tay: hạ chỉ số EXP của một loài quái trong migration sau sẽ làm test đó
+     * đỏ, đúng như nó phải thế — quest 4 hứa một mốc CẤP ĐỘ, và mốc đó phụ thuộc vào cả EXP quái.
+     */
+    private static long expRewardOf(String monsterCode) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
+                        connection.prepareStatement("SELECT exp_reward FROM monster_template WHERE code = ?")) {
+            statement.setString(1, monsterCode);
+            try (ResultSet rs = statement.executeQuery()) {
+                rs.next();
+                return rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Lỗi test-only đọc exp_reward: " + monsterCode, e);
+        }
+    }
+
+    private static int readLevel(long characterId) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement("SELECT level FROM character WHERE id = ?")) {
+            statement.setLong(1, characterId);
+            try (ResultSet rs = statement.executeQuery()) {
+                rs.next();
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Lỗi test-only đọc level: characterId=" + characterId, e);
         }
     }
 
@@ -240,7 +277,8 @@ class QuestIntegrationTest {
                 .contains(
                         "/scripts/quest/kill_training_dummies.js",
                         "/scripts/quest/night_watch_bandit.js",
-                        "/scripts/quest/clear_old_archive.js");
+                        "/scripts/quest/clear_old_archive.js",
+                        "/scripts/quest/awakening_trial.js");
     }
 
     @Test
@@ -506,5 +544,135 @@ class QuestIntegrationTest {
         assertThat(prerequisiteCodeOf(NIGHT_WATCH_CODE)).isEqualTo(QUEST_CODE);
         assertThat(newAcceptUseCase().execute(characterId, OLD_ARCHIVE_CODE))
                 .isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Quest THỨ TƯ — `awakening_trial` (seed V33, STORY.md §6 arc 1 nhịp ĐÓNG).
+    //
+    // Khác ba quest trước ở đúng một điểm, và điểm đó là lý do khối test này tồn tại: quest 4 có
+    // một mốc CƠ CHẾ nằm ngay sau nó. Lời thoại của Chu Hoành hứa "thức tỉnh linh căn", mà thứ mở
+    // khoá chọn hệ phái là `SelectFactionUseCase.MIN_LEVEL = 10`. Nếu người chơi lĩnh thưởng xong
+    // mà vẫn Cấp 9 thì quest đã nói dối — và không một test nào của ba quest trước bắt được điều
+    // đó, vì trước nay chưa quest nào hứa hẹn gì ngoài EXP.
+    // ---------------------------------------------------------------------------------------
+
+    /** Đưa nhân vật qua trọn quest 1 + 2 + 3 — điều kiện ADR-044 để mở quest 4. */
+    private static void claimOldArchive(long characterId) {
+        claimNightWatch(characterId);
+        newAcceptUseCase().execute(characterId, OLD_ARCHIVE_CODE);
+        newProcessUseCase().execute(characterId, "archive_warden");
+        newProcessUseCase().execute(characterId, "archive_warden");
+        newClaimUseCase().execute(characterId, OLD_ARCHIVE_CODE, newIdempotencyKey());
+    }
+
+    @Test
+    void shouldPlayAwakeningTrialLifecycle_withRealScript() {
+        long characterId = createFreshCharacter("Awakening1");
+        claimOldArchive(characterId); // ADR-044 — quest 4 khoá sau quest 3
+
+        assertThat(newAcceptUseCase().execute(characterId, AWAKENING_TRIAL_CODE))
+                .isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
+
+        // Hạ nhầm loài — kể cả loài của đúng quest liền trước, thứ người chơi vừa đi ngang qua trên
+        // đường tới sân khảo hạch — không nhúc nhích: CHÍNH SCRIPT lọc theo event.monster_code.
+        assertThat(newProcessUseCase().execute(characterId, "archive_warden")).isEmpty();
+
+        // MỘT trận, không phải hai — xem awakening_trial.js về vì sao N = 1 là quyết định cơ chế
+        // chứ không chỉ là tường thuật.
+        List<ProcessMonsterKilledUseCase.QuestStatusChange> afterTrial =
+                newProcessUseCase().execute(characterId, "trial_construct");
+        assertThat(afterTrial).hasSize(1);
+        assertThat(afterTrial.get(0).questCode()).isEqualTo(AWAKENING_TRIAL_CODE);
+        assertThat(afterTrial.get(0).status()).isEqualTo(QuestStatus.COMPLETED);
+
+        long expBefore = readExp(characterId);
+        int itemsBefore = countInventoryRows(characterId);
+
+        ClaimQuestRewardUseCase.ClaimResult claim =
+                newClaimUseCase().execute(characterId, AWAKENING_TRIAL_CODE, newIdempotencyKey());
+
+        assertThat(claim.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
+        assertThat(claim.expGranted()).isEqualTo(1800L);
+        assertThat(readExp(characterId)).isEqualTo(expBefore + 1800L);
+        // Quest DUY NHẤT của arc 1 không thưởng vật phẩm: phần thưởng là chính cái mốc Cấp 10 mà
+        // nó đưa người chơi tới (V33 §4). Túi đồ phải KHÔNG đổi.
+        assertThat(countInventoryRows(characterId)).isEqualTo(itemsBefore);
+    }
+
+    /** V33 phải tra `clear_old_archive` theo `code`, không hardcode id (khuôn V28/V30). */
+    @Test
+    void shouldSeedAwakeningTrial_withPrerequisitePointingAtTheOldArchive() {
+        assertThat(prerequisiteCodeOf(AWAKENING_TRIAL_CODE)).isEqualTo(OLD_ARCHIVE_CODE);
+    }
+
+    @Test
+    void shouldRejectAwakeningTrial_whenOldArchiveNotClaimedYet() {
+        long characterId = createFreshCharacter("Awakening2");
+        claimNightWatch(characterId); // xong quest 1+2, nhưng chưa đụng quest 3
+
+        assertThat(newAcceptUseCase().execute(characterId, AWAKENING_TRIAL_CODE))
+                .isEqualTo(AcceptQuestUseCase.AcceptResult.PREREQUISITE_NOT_MET);
+    }
+
+    /**
+     * LỜI HỨA CỦA ARC 1, kiểm bằng đường chơi TỐI THIỂU.
+     *
+     * <p>Chu Hoành hứa kỳ khảo hạch sẽ thức tỉnh linh căn; cơ chế thực hiện lời hứa đó là
+     * {@code SelectFactionUseCase.MIN_LEVEL = 10} và {@code FactionController.MIN_LEVEL = 10} (cửa
+     * sổ chọn hệ ở client chỉ mở khi đủ cấp). Test này đi ĐÚNG con đường ít EXP nhất mà một người
+     * chơi có thể đi qua arc 1 — chỉ EXP thưởng quest + đúng số quái mà chính các quest bắt hạ,
+     * KHÔNG cày thêm con nào — rồi hỏi: lĩnh thưởng xong, họ có Cấp 10 không?
+     *
+     * <p>Ba thứ đều là THẬT chứ không phải bản sao chép trong test: EXP thưởng đến từ script sản
+     * phẩm (qua {@link ClaimQuestRewardUseCase}), EXP quái đọc từ {@code monster_template} của
+     * migration, và cấp độ suy ra bằng chính {@link ExperienceCurve} mà server dùng. Đổi bất kỳ cái
+     * nào trong ba thứ đó — hạ EXP một loài quái, sửa {@code give_exp}, đổi đường cong — đều làm ô
+     * này đỏ, và đó chính là việc nó sinh ra để làm.
+     *
+     * <p>⚠️ Đường đi ở đây mô phỏng ĐÚNG thứ tự production: mỗi cú hạ quái vừa đẩy tiến độ quest
+     * ({@code ProcessMonsterKilledUseCase}) vừa cộng EXP ({@code GrantExperienceUseCase}) — hai
+     * việc mà {@code ConnectedCharacterRegistry.onMonsterKilled} bắn song song; còn sau mỗi lần
+     * lĩnh thưởng thì gateway gọi {@code grantExperience(id, 0)} để hoà giải cột {@code level}
+     * (EXP thưởng quest đi thẳng vào {@code character.exp}, không qua use case — xem javadoc
+     * {@code GrantExperienceUseCase.reconcileStoredLevel}).
+     */
+    @Test
+    void shouldLandExactlyAtLevelTen_afterTheWholeArcOneChain() {
+        long characterId = createFreshCharacter("ArcOneMinimal");
+
+        playQuest(characterId, QUEST_CODE, "training_dummy", 3);
+        playQuest(characterId, NIGHT_WATCH_CODE, "wandering_bandit", 1);
+        playQuest(characterId, OLD_ARCHIVE_CODE, "archive_warden", 2);
+        playQuest(characterId, AWAKENING_TRIAL_CODE, "trial_construct", 1);
+
+        long expected = 500L
+                + 3 * expRewardOf("training_dummy")
+                + 800L
+                + expRewardOf("wandering_bandit")
+                + 1200L
+                + 2 * expRewardOf("archive_warden")
+                + 1800L
+                + expRewardOf("trial_construct");
+        assertThat(readExp(characterId)).isEqualTo(expected);
+
+        // Cấp 10 cần 4.500 EXP tích luỹ, Cấp 11 cần 5.500 (ExperienceCurve tuyến tính 100 × cấp).
+        // Đường tối thiểu về đích ở 4.585 — qua mốc, chưa tới mốc sau.
+        assertThat(ExperienceCurve.progressOf(readExp(characterId)).level()).isEqualTo(10);
+        assertThat(readLevel(characterId)).isEqualTo(10); // cột level THẬT, thứ SelectFactionUseCase đọc
+    }
+
+    /** Nhận → hạ đủ số quái (mỗi cú vừa đẩy quest vừa cộng EXP) → lĩnh thưởng → hoà giải cột level. */
+    private static void playQuest(long characterId, String questCode, String monsterCode, int kills) {
+        GrantExperienceUseCase experience = new GrantExperienceUseCase(new PostgresCharacterAdapter(dataSource));
+        assertThat(newAcceptUseCase().execute(characterId, questCode)).isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
+        for (int i = 0; i < kills; i++) {
+            newProcessUseCase().execute(characterId, monsterCode);
+            experience.execute(characterId, expRewardOf(monsterCode));
+        }
+        assertThat(newClaimUseCase()
+                        .execute(characterId, questCode, newIdempotencyKey())
+                        .outcome())
+                .isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
+        experience.execute(characterId, 0L);
     }
 }

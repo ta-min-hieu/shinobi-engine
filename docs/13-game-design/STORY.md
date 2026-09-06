@@ -265,6 +265,7 @@ mới = thêm dòng cùng PR (như luật GLOSSARY §4):
 | Tán tu cường đạo (`wandering_bandit`) | Tu sĩ không tông môn, sống bằng cướp ở rìa linh mạch |
 | Thạch quái (`stone_ogre`) | Máy móc hộ mạch của Linh Triều mất kiểm soát sau Đại Kiếp |
 | Thạch vệ Tàng Thư (`archive_warden`) | Cùng dòng máy móc Linh Triều, bản nhỏ dựng để canh thư khố; chủ chết từ ngàn năm trước, chúng vẫn canh — nên đánh cả người của tông |
+| Trắc Linh Thạch Nhân (`trial_construct`) | Cũng dòng máy móc Linh Triều, nhưng là cỗ tông môn NHẶT VỀ VÀ SỬA LẠI để làm bạn đánh trong kỳ khảo hạch: nó đo linh khí đệ tử duy trì được, nên đánh nhẹ mà rất dai. Đứng ở sân khảo hạch sau lưng Tàng Thư Đường cũ |
 | Chết → hồi sinh tại hub | Đệ tử mang **hộ mệnh ngọc** của tông: thân tan thì hồn về núi, tông môn tái tụ thân thể (tổn thất = rơi tu vi/đồ tuỳ cơ chế) |
 | Nhiệm vụ ngày | Công việc tông môn: gánh nước, tuần sơn, hái linh thảo, trông lò luyện đan |
 | Nhiệm vụ bang | Nhiệm vụ Đường/bang hội giao theo tuần |
