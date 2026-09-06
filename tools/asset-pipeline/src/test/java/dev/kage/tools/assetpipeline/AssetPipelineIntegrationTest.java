@@ -10,6 +10,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
 
 import javax.imageio.ImageIO;
 
@@ -21,6 +22,13 @@ import org.junit.jupiter.api.io.TempDir;
  * thần "test bằng thứ thật") để verify: hạ mẫu ra đúng kích thước, region name đúng quy ước
  * ART-PIPELINE.md §8.7, cả 3 tier đều xuất ra, manifest liệt kê đủ file kèm hash/size thật, và
  * nhánh 3D (ADR-031) vào được manifest kèm ngân sách tam giác đúng §4.4.
+ *
+ * <p><b>Nhánh registry là KHÔNG</b> — mọi test ở đây truyền {@code Optional.empty()} cho
+ * {@link AssetPipelineRunner#run}, tức "chạy pipeline không có Postgres", đúng thứ chúng nó kiểm.
+ * Bản cũ gọi {@code AssetPipelineRunner.main} nên nhánh registry do BIẾN MÔI TRƯỜNG của máy chạy
+ * quyết định: shell nào có {@code DB_PASSWORD} (VD shell đang chạy server dev) thì {@code ./gradlew
+ * build} đỏ, shell sạch thì xanh — lỗi thật ghi ở ROADMAP mục 61. Nhánh CÓ registry được kiểm ở
+ * {@link AssetPipelineRegistryBranchIntegrationTest} bằng Postgres throwaway, không bằng may rủi.
  */
 final class AssetPipelineIntegrationTest {
 
@@ -38,10 +46,7 @@ final class AssetPipelineIntegrationTest {
         writeStaticIcon(renderRoot, "icon_test-item");
         Path exportedRoot = tempRoot.resolve("exported");
 
-        AssetPipelineRunner.main(new String[] {
-            "--render-root", renderRoot.toString(),
-            "--exported-root", exportedRoot.toString(),
-        });
+        AssetPipelineRunner.run(renderRoot, exportedRoot, Optional.empty());
 
         Path atlasesRoot = exportedRoot.resolve("atlases");
         for (String tier : new String[] {"low", "med", "high"}) {
@@ -67,10 +72,7 @@ final class AssetPipelineIntegrationTest {
         Path exportedRoot = tempRoot.resolve("exported");
         writeModel(exportedRoot, GraphicsTier.MEDIUM, "char_test-hero", 900);
 
-        AssetPipelineRunner.main(new String[] {
-            "--render-root", renderRoot.toString(),
-            "--exported-root", exportedRoot.toString(),
-        });
+        AssetPipelineRunner.run(renderRoot, exportedRoot, Optional.empty());
 
         String manifest = Files.readString(exportedRoot.resolve("asset-manifest.json"));
         assertThat(manifest)
@@ -88,19 +90,28 @@ final class AssetPipelineIntegrationTest {
         int overBudgetVertices = (GraphicsTier.LOW.maxTriangles + 1) * 3;
         writeModel(exportedRoot, GraphicsTier.LOW, "char_test-hero", overBudgetVertices);
 
-        assertThatThrownBy(() -> AssetPipelineRunner.main(new String[] {
-                    "--render-root", renderRoot.toString(),
-                    "--exported-root", exportedRoot.toString(),
-                }))
+        assertThatThrownBy(() -> AssetPipelineRunner.run(renderRoot, exportedRoot, Optional.empty()))
                 .isInstanceOf(AssetPipelineException.class)
                 .hasMessageContaining("vượt ngân sách tam giác");
     }
 
-    /** File {@code .glb} tối thiểu: header + chunk JSON thật, không có chunk BIN (xem counter test). */
+    /**
+     * File {@code .glb} tối thiểu: header + chunk JSON thật, không có chunk BIN (xem counter test),
+     * KÈM sidecar {@code <asset_key>.model-meta.json} bắt buộc của ART-PIPELINE.md §8.6.
+     *
+     * <p>Sidecar không dùng tới ở nhánh không-registry, nhưng bản cũ thiếu nó là fixture SAI so với
+     * đĩa thật: {@code export_character_lods.py} luôn ghi hai thứ cùng nhau, model {@code .glb}
+     * đứng một mình là trạng thái không tồn tại trong dây chuyền. Cùng khuôn
+     * {@code OrphanAssetCheckerIntegrationTest#writeModelAsset}.
+     */
     private static void writeModel(Path exportedRoot, GraphicsTier tier, String assetKey, int indexCount)
             throws IOException {
-        Path tierDir = exportedRoot.resolve("models").resolve(tier.folderName);
+        Path modelsRoot = exportedRoot.resolve("models");
+        Path tierDir = modelsRoot.resolve(tier.folderName);
         Files.createDirectories(tierDir);
+        Files.writeString(
+                modelsRoot.resolve(assetKey + ".model-meta.json"),
+                "{ \"blend_file\": \"assets/raw/blender/" + assetKey + ".blend\" }");
         // Nối chuỗi chứ không dùng text block + formatted(): SpotBugs coi text block nhiều dòng
         // truyền cho formatted() là format string và bắt lỗi "%n thay vì \n" — ở đây là JSON, không
         // phải chuỗi in ra màn hình, nên tránh format string luôn cho gọn.

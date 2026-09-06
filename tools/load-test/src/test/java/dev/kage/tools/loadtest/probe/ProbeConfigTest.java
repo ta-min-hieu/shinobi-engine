@@ -84,4 +84,54 @@ final class ProbeConfigTest {
 
         assertThatThrownBy(config::explicitAttackTargetId).isInstanceOf(NumberFormatException.class);
     }
+
+    @Test
+    void shouldNotRunQuestScenario_whenNoQuestArgumentGiven() {
+        ProbeConfig config = ProbeConfig.parse(new String[] {"--moveToX=24"});
+
+        assertThat(config.quest().isRequested()).isFalse();
+        assertThat(config.quest().npcCode()).isEmpty();
+        assertThat(config.quest().dialogueChoices()).isEmpty();
+        assertThat(config.quest().claimQuestCode()).isEmpty();
+    }
+
+    @Test
+    void shouldReadWholeQuestScenario() {
+        ProbeConfig config = ProbeConfig.parse(new String[] {
+            "--talkToNpc=town_elder",
+            "--dialogueChoices=about_town, night_watch ,accept_quest:night_watch_bandit",
+            "--claimQuest=kill_training_dummies",
+            "--questReport=true"
+        });
+
+        assertThat(config.quest().isRequested()).isTrue();
+        assertThat(config.quest().npcCode()).isEqualTo("town_elder");
+        // Khoảng trắng quanh dấu phẩy bị cắt: gõ tay trong shell là chuyện thường, và một bước
+        // " night_watch" thừa dấu cách sẽ không khớp action nào rồi nổ vì lý do hoàn toàn sai.
+        assertThat(config.quest().dialogueChoices())
+                .containsExactly("about_town", "night_watch", "accept_quest:night_watch_bandit");
+        assertThat(config.quest().claimQuestCode()).isEqualTo("kill_training_dummies");
+        assertThat(config.quest().report()).isTrue();
+    }
+
+    @Test
+    void shouldRunQuestScenario_whenOnlyReportRequested() {
+        assertThat(ProbeConfig.parse(new String[] {"--questReport=true"})
+                        .quest()
+                        .isRequested())
+                .isTrue();
+        assertThat(ProbeConfig.parse(new String[] {"--questReport=false"})
+                        .quest()
+                        .isRequested())
+                .isFalse();
+    }
+
+    /** Chỉ số hay khoá đều là một BƯỚC — parse giữ nguyên chuỗi, việc dịch nghĩa thuộc DialogueChoice. */
+    @Test
+    void shouldKeepNumericDialogueStepsAsWrittenText() {
+        assertThat(ProbeConfig.parse(new String[] {"--dialogueChoices=0,1,3"})
+                        .quest()
+                        .dialogueChoices())
+                .containsExactly("0", "1", "3");
+    }
 }

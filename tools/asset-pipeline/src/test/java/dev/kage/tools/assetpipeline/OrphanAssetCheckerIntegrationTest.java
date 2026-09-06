@@ -7,7 +7,6 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,7 +16,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.List;
-import java.util.TimeZone;
 
 import javax.imageio.ImageIO;
 
@@ -37,11 +35,11 @@ import org.testcontainers.utility.DockerImageName;
  * {@code server:server-database} chỉ để chạy Flyway — hai migration này không phụ thuộc bất kỳ bảng
  * nào khác nên chạy trực tiếp 2 file .sql là đủ, xem build.gradle.kts).
  *
- * <p>Không gọi {@link AssetPipelineRunner#main} — cấu hình DB của pipeline chỉ đọc từ biến môi
- * trường thật ({@link ArtRegistryConfig#fromEnvironmentOrNull()}), không override được từ trong JVM
- * test. Gọi thẳng {@link ArtRegistryUpserter} (để seed dòng DB) rồi {@link OrphanAssetChecker#check}
- * — đúng ranh giới của lớp đang test, cùng phong cách {@code ArtRegistryUpserter} package-private
- * dùng trực tiếp trong test đã có ở module này.
+ * <p>Không gọi cả pipeline mà gọi thẳng {@link ArtRegistryUpserter} (để seed dòng DB) rồi
+ * {@link OrphanAssetChecker#check} — đúng ranh giới của lớp đang test: ba trong bốn ca ở đây cần
+ * trạng thái đĩa/DB LỆCH NHAU, mà một lần chạy pipeline trọn vẹn thì luôn upsert đúng thứ nó vừa
+ * quét nên không dựng được sự lệch đó. Nhánh registry của cả pipeline có test riêng:
+ * {@link AssetPipelineRegistryBranchIntegrationTest}.
  */
 @Testcontainers
 class OrphanAssetCheckerIntegrationTest {
@@ -56,23 +54,13 @@ class OrphanAssetCheckerIntegrationTest {
 
     @BeforeAll
     static void migrate() throws SQLException {
-        // Cùng phát hiện thật ghi ở ArtRegistryUpserter/OrphanAssetChecker: phải ép UTC TRƯỚC khi mở
-        // connection đầu tiên, không chỉ trước khi upsert — máy dev múi giờ khác UTC khiến Postgres
-        // FATAL ngay lúc connect, kể cả cho connection chỉ dùng để chạy migration.
-        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         dbConfig = new ArtRegistryConfig(
                 POSTGRES.getHost(),
                 POSTGRES.getMappedPort(POSTGRES_PORT),
                 POSTGRES.getDatabaseName(),
                 POSTGRES.getUsername(),
                 POSTGRES.getPassword());
-        Path repoRoot = Path.of(System.getProperty("kage.repoRoot"));
-        Path migrationDir = repoRoot.resolve("server/server-database/src/main/resources/db/migration");
-        try (Connection connection =
-                DriverManager.getConnection(dbConfig.jdbcUrl(), dbConfig.user(), dbConfig.password())) {
-            applyMigration(connection, migrationDir.resolve("V19__create_art_registry.sql"));
-            applyMigration(connection, migrationDir.resolve("V20__extend_art_asset_for_3d.sql"));
-        }
+        ArtRegistrySchema.applyTo(dbConfig);
     }
 
     // Container/schema dùng CHUNG cho cả class (dựng Postgres throwaway tốn giây, không phải mili
@@ -84,25 +72,6 @@ class OrphanAssetCheckerIntegrationTest {
                         DriverManager.getConnection(dbConfig.jdbcUrl(), dbConfig.user(), dbConfig.password());
                 Statement statement = connection.createStatement()) {
             statement.execute("DELETE FROM art_asset");
-        }
-    }
-
-    private static void applyMigration(Connection connection, Path migrationFile) throws SQLException {
-        String sql;
-        try {
-            sql = Files.readString(migrationFile);
-        } catch (IOException e) {
-            throw new UncheckedIOException(
-                    "Không đọc được migration thật (test cần chạy từ repo có "
-                            + "server/server-database, đường dẫn thử: " + migrationFile + ")",
-                    e);
-        }
-        try (Statement statement = connection.createStatement()) {
-            // pgjdbc gửi cả chuỗi nhiều lệnh ngăn bằng ";" qua simple query protocol khi dùng
-            // Statement (không phải PreparedStatement) — đủ để chạy nguyên văn 1 file migration
-            // không cần Flyway, và các INSERT phụ thuộc lẫn nhau bằng subquery (art_category cha/con)
-            // vẫn thấy đúng thứ tự vì Postgres chạy tuần tự trong cùng một message.
-            statement.execute(sql);
         }
     }
 

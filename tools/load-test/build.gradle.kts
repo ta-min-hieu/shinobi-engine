@@ -23,9 +23,18 @@ application {
 //   ./gradlew :tools:load-test:gameProbe --args="--username=kagetest --moveToX=24 --observeSeconds=15"
 // hoặc (khi shell nuốt mất --args):
 //   ./gradlew :tools:load-test:gameProbe -Pargs="--username=kagetest --moveToX=24"
+//
+// Kịch bản NHIỆM VỤ (2026-09-06, probe.QuestScenario) — vòng đời quest đo được không cần giao diện,
+// dùng đúng opcode đã có (602/603/604/605/606 hội thoại, 607/610/611 nhật ký, 608/609 lĩnh thưởng,
+// 507/508 túi đồ). Mỗi bước của --dialogueChoices là CHỈ SỐ lựa chọn hoặc KHOÁ (action/label_key):
+//   ./gradlew :tools:load-test:gameProbe --args="--username=kagetest --characterId=3 \
+//       --talkToNpc=town_elder --dialogueChoices=accept_quest:kill_training_dummies --observeSeconds=1"
+//   ./gradlew :tools:load-test:gameProbe --args="--username=kagetest --characterId=3 \
+//       --claimQuest=kill_training_dummies --observeSeconds=1"
+//   ./gradlew :tools:load-test:gameProbe --args="--username=kagetest --questReport=true --observeSeconds=1"
 tasks.register<JavaExec>("gameProbe") {
     group = "verification"
-    description = "Client headless quan sát: giải mã sự kiện world thành SỐ (vị trí quái, sát thương từng đòn)"
+    description = "Client headless quan sát: giải mã sự kiện world thành SỐ (vị trí quái, sát thương, vòng đời quest)"
     mainClass.set("dev.kage.tools.loadtest.probe.GameProbe")
     classpath = sourceSets["main"].runtimeClasspath
     if (project.hasProperty("args")) {

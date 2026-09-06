@@ -5,15 +5,20 @@ import java.util.Optional;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 
+import dev.kage.protocol.AcceptQuestResponse;
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterRespawnedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
+import dev.kage.protocol.ClaimQuestRewardResponse;
+import dev.kage.protocol.DialogueNodeResponse;
 import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.ExperienceChangedEvent;
 import dev.kage.protocol.GoldChangedEvent;
 import dev.kage.protocol.ItemGrantedEvent;
+import dev.kage.protocol.ListInventoryResponse;
+import dev.kage.protocol.ListQuestsResponse;
 import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
@@ -21,6 +26,7 @@ import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.NpcDespawnedEvent;
 import dev.kage.protocol.NpcSpawnedEvent;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.QuestStatusChangedEvent;
 import dev.kage.protocol.SkillResultEvent;
 import dev.kage.protocol.wire.PacketCodec;
 
@@ -77,9 +83,57 @@ final class ProbeEventLine {
         if (movement.isPresent()) {
             return movement.get();
         }
+        Optional<String> selfState = describeSelfState(opcode, payload);
+        if (selfState.isPresent()) {
+            return selfState.get();
+        }
         // Opcode chưa giải mã vẫn được ghi ra (tên + số byte) thay vì bỏ im lặng — probe phải cho
         // thấy CÓ GÌ ĐÓ đã tới, kể cả khi nó chưa biết đọc.
-        return describeSelfState(opcode, payload).orElseGet(() -> "payloadBytes=" + payload.length);
+        return describeQuest(opcode, payload).orElseGet(() -> "payloadBytes=" + payload.length);
+    }
+
+    /**
+     * Vòng đời nhiệm vụ + túi đồ ({@link QuestScenario}) — hội thoại 603/605/606, nhật ký 607/611,
+     * lĩnh thưởng 609, túi đồ 508. Chỉ SỐ và KHOÁ: nội dung chữ nằm ở bundle i18n phía client, server
+     * không gửi và probe không bịa.
+     */
+    private static Optional<String> describeQuest(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+        return switch (opcode) {
+            case Opcode.OPCODE_DIALOGUE_NODE_RESPONSE_VALUE ->
+                Optional.of(dialogueNode(DialogueNodeResponse.parseFrom(payload)));
+            case Opcode.OPCODE_DIALOGUE_ENDED_RESPONSE_VALUE -> Optional.of("dialogueEnded=true");
+            case Opcode.OPCODE_ACCEPT_QUEST_RESPONSE_VALUE ->
+                Optional.of("outcome="
+                        + AcceptQuestResponse.parseFrom(payload).getOutcome().name());
+            case Opcode.OPCODE_QUEST_STATUS_CHANGED_EVENT_VALUE ->
+                Optional.of(questStatus(QuestStatusChangedEvent.parseFrom(payload)));
+            case Opcode.OPCODE_CLAIM_QUEST_REWARD_RESPONSE_VALUE ->
+                Optional.of(claimReward(ClaimQuestRewardResponse.parseFrom(payload)));
+            case Opcode.OPCODE_LIST_QUESTS_RESPONSE_VALUE ->
+                Optional.of("quests=" + ListQuestsResponse.parseFrom(payload).getQuestsCount());
+            case Opcode.OPCODE_LIST_INVENTORY_RESPONSE_VALUE ->
+                Optional.of(inventory(ListInventoryResponse.parseFrom(payload)));
+            default -> Optional.empty();
+        };
+    }
+
+    private static String dialogueNode(DialogueNodeResponse response) {
+        return "node=" + response.getNodeId() + " text=" + response.getTextKey() + " options="
+                + response.getOptionsCount();
+    }
+
+    private static String questStatus(QuestStatusChangedEvent event) {
+        return "quest=" + event.getQuestCode() + " status=" + event.getStatus().name();
+    }
+
+    private static String claimReward(ClaimQuestRewardResponse response) {
+        return "outcome=" + response.getOutcome().name() + " expGranted=" + response.getExpGranted() + " items="
+                + response.getItemsGrantedCount();
+    }
+
+    private static String inventory(ListInventoryResponse response) {
+        return "items=" + response.getItemsCount() + " capacity=" + response.getCapacity() + " equipped="
+                + response.getEquippedCount();
     }
 
     private static Optional<String> describeCombat(int opcode, byte[] payload) throws InvalidProtocolBufferException {

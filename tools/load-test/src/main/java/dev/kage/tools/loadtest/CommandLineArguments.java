@@ -1,6 +1,9 @@
 package dev.kage.tools.loadtest;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalDouble;
 
@@ -38,6 +41,37 @@ public final class CommandLineArguments {
 
     public String text(String key, String defaultValue) {
         return values.getOrDefault(key, defaultValue);
+    }
+
+    /**
+     * Danh sách ngăn bằng dấu phẩy, đã bỏ khoảng trắng thừa và bỏ phần tử rỗng.
+     *
+     * @return rỗng khi tham số không được truyền HOẶC truyền chuỗi rỗng — với danh sách thì hai
+     *     trường hợp đó nghĩa như nhau ("không có bước nào"), khác {@link #optionalDouble}
+     */
+    public List<String> list(String key) {
+        String value = values.get(key);
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(item -> !item.isEmpty())
+                .toList();
+    }
+
+    /**
+     * Cờ bật/tắt: {@code true}/{@code 1}/{@code yes} là bật, mọi giá trị khác là tắt.
+     *
+     * @param defaultValue giá trị khi tham số không được truyền
+     */
+    public boolean flag(String key, boolean defaultValue) {
+        String value = values.get(key);
+        if (value == null) {
+            return defaultValue;
+        }
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        return "true".equals(normalized) || "1".equals(normalized) || "yes".equals(normalized);
     }
 
     /** @throws NumberFormatException nếu người dùng gõ sai kiểu — dừng ngay còn hơn chạy với số bịa */
