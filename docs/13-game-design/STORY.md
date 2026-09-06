@@ -264,6 +264,7 @@ mới = thêm dòng cùng PR (như luật GLOSSARY §4):
 | Hình nộm luyện công (`training_dummy`) | Bãi luyện công ngoại môn của tông |
 | Tán tu cường đạo (`wandering_bandit`) | Tu sĩ không tông môn, sống bằng cướp ở rìa linh mạch |
 | Thạch quái (`stone_ogre`) | Máy móc hộ mạch của Linh Triều mất kiểm soát sau Đại Kiếp |
+| Thạch vệ Tàng Thư (`archive_warden`) | Cùng dòng máy móc Linh Triều, bản nhỏ dựng để canh thư khố; chủ chết từ ngàn năm trước, chúng vẫn canh — nên đánh cả người của tông |
 | Chết → hồi sinh tại hub | Đệ tử mang **hộ mệnh ngọc** của tông: thân tan thì hồn về núi, tông môn tái tụ thân thể (tổn thất = rơi tu vi/đồ tuỳ cơ chế) |
 | Nhiệm vụ ngày | Công việc tông môn: gánh nước, tuần sơn, hái linh thảo, trông lò luyện đan |
 | Nhiệm vụ bang | Nhiệm vụ Đường/bang hội giao theo tuần |
@@ -323,5 +324,5 @@ Không — tường thuật thuộc thẩm quyền GDD/STORY. [ADR-038](../01-ar
 
 1. ~~Chủ dự án đọc + duyệt nội dung v0.2.0~~ ✅ **XONG 2026-09-05 — duyệt nguyên trạng**, không sửa mục nào. Tài liệu lên **v1.0.0**. Từ đây mọi thay đổi §1–§6 (tiền đề, bí mật trục chính, thế lực, nhân vật, arc) là **đổi SSOT tường thuật** — phải hỏi lại chủ dự án, không tự sửa; §7/§8 thì thêm dòng cùng PR như luật đã ghi.
 2. ✅ **Arc 1 đã có mặt trong game** (Đợt 2 ADR-038, 2026-09-01): Chu Hoành nói đúng giọng §5; cây hội thoại `town_elder.js` phủ §6 arc 1 (tông môn → cảnh giới → thân thế trưởng lão); quest `kill_training_dummies` khai `// STORY: arc-1 §6` theo §8. Nhịp hé lộ §8 quy tắc 2 được **gác bằng test** (`TownElderDialogueTreeTest`).
-3. 🔶 Arc 2 trở đi chưa có nội dung trong game. Quest thứ hai của arc 1 (cao trào "đêm trực gặp tán tu cường đạo") bị **chặn kỹ thuật** — xem mục 8 phần "Việc cần làm tiếp theo" của [ADR-038](../01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md).
+3. ✅ **Ba nhịp của arc 1 đã có mặt trong game**: việc vặt mở màn (`kill_training_dummies`, V11), cao trào "đêm trực gặp tán tu cường đạo" (`night_watch_bandit`, V28, 2026-09-05), và nhịp gieo mầm "dọn góc Tàng Thư Đường bỏ hoang → nhặt mảnh ngọc cổ" (`clear_old_archive`, V30, 2026-09-06). Thứ tự được thi hành bằng máy qua `prerequisite_quest_id` ([ADR-044](../01-architecture/adr/ADR-044-Quest-Prerequisite-Enforcement.md)). 🔶 Còn thiếu của arc 1: khảo hạch thức tỉnh linh căn (Lv10) — mốc đóng arc. Arc 2 trở đi chưa có nội dung nào.
 4. Khi thêm NPC/địa danh/thế lực mới trong quest → cập nhật §4/§5 cùng PR.

@@ -2006,3 +2006,50 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       (`SimulatedPlayer` đã nói đúng giao thức thật) để ĐỌC `MonsterSpawnedEvent`/`AttackResultEvent`
       thành SỐ — vị trí từng con quái và máu từng đòn. Buổi chơi tay không đủ phân giải cho câu hỏi
       thời gian thực; đây là công cụ đúng cho lớp câu hỏi đó.
+
+59. **QUEST THỨ BA — và lần đầu một quest mới KHÔNG tốn một dòng Java nào (2026-09-06)**:
+    - Nội dung: **`clear_old_archive`** — "Dọn Thư Khố Cũ", nhịp **GIEO MẦM** của arc 1
+      ([STORY.md](../13-game-design/STORY.md) §6): Chu Hoành sai đệ tử dọn góc tây Tàng Thư Đường bỏ
+      hoang, nơi mấy cỗ máy canh sách của người xưa vẫn còn cựa quậy. Hạ **2 thạch vệ** → **1200
+      EXP + Mảnh Ngọc Cổ**. Mảnh ngọc chính là **McGuffin xuyên truyện** mà §6 mô tả; arc 1 nó chỉ
+      là "vật may mắn", nên **Chu Hoành không biết và không được nhắc tới nó** (§8 quy tắc 2 —
+      `TownElderDialogueTreeTest` gác cả cây bằng danh sách từ cấm).
+    - `prerequisite_quest_id` trỏ `night_watch_bandit`, mốc CLAIMED (ADR-044). Ba nhịp arc 1 giờ
+      chạy đúng thứ tự bằng máy: đập mộc nhân → trực đêm → dọn thư khố.
+    - ✅ **KHÔNG SỬA MỘT DÒNG JAVA SẢN PHẨM NÀO** — `git diff --stat` chỉ có migration + 1 script
+      quest + 1 nhánh hội thoại + 12 khoá i18n vi/en + test + tài liệu. Đây là thứ đợt gỡ hardcode
+      ở mục 52 đã hứa, và quest 3 là lần **kiểm chứng thứ hai** của lời hứa đó — lần này còn kèm
+      một **loài quái hoàn toàn mới**, thứ mà ADR-037 hứa cũng chỉ là dữ liệu. Cả hai lời hứa đứng
+      vững.
+    - **Cân bằng tính bằng CÔNG THỨC TRƯỚC, không phải chọn số rồi mới đi kiểm** (bài học mục 57).
+      Loài mới `archive_warden` (HP 120 · ATK 26 · DEF 14 · RES 10, Cấp 5) được chọn từ bảng dưới,
+      với `hit = round(atk × 100 / (100 + def))` và hai bên chung nhịp `ATTACK_INTERVAL_SECONDS = 1`:
+
+      | Nhân vật | Đối thủ | người chơi cần | quái cần | kết quả |
+      |---|---|---|---|---|
+      | trọn bộ Tạp Dịch (700 vàng) | tán tu (quest 2) | 3 nhát | 7 nhát | thắng thoải mái |
+      | trọn bộ Tạp Dịch | **thạch vệ (quest 3)** | **4 nhát** | **6 nhát** | **thắng, sát hơn** |
+      | TAY KHÔNG | **thạch vệ** | **5 nhát** | **5 nhát** | **hoà = chết** |
+      | trọn bộ Tạp Dịch | quỷ đá | 7 nhát | 4 nhát | THUA |
+
+    - ⚠️ **Vì sao KHÔNG dùng lại `stone_ogre`** (loài mạnh nhất đang có, và chưa quest nào dùng):
+      hàng cuối bảng. Hạ nó cần trọn bộ "Hạ Nhẫn" = **10.900 vàng** ≈ **900 mạng tán tu** — không
+      phải "đường chơi thường" của arc 1 theo bất kỳ nghĩa nào. Phép tính này được khoá lại thành
+      một ô test (`OldArchiveDuelBalanceTest.theStoneOgreWouldHaveBeenUnbeatableForThisArc`) để lần
+      sau không ai phải tính lại.
+    - ✅ **Luật hình học V29 áp nguyên vẹn cho hai điểm spawn mới**: 47 → **60** → **73**, mỗi bước
+      13m > tổng aggro 12m. Hàng rào `shouldKeepAggroSpawnsApartEnoughToPullOneAtATime` duyệt cả 5
+      điểm có aggro và vẫn xanh — đúng như mục 58 nói nó sẽ làm khi có loài mới.
+    - ✅ **1172 test xanh, 0 skip, Docker BẬT** — `server-database` chạy đủ 132 test (17/18 lớp là
+      `@Testcontainers`, tức Postgres thật), **0 bị bỏ qua**; đây chính là chỗ `./gradlew build`
+      biết báo xanh GIẢ khi Docker tắt, nên số skip được đếm chứ không được đoán. Chi tiết:
+      `QuestIntegrationTest` 12→16, `PostgresMonsterCatalogAdapterIntegrationTest` 10→11,
+      `TownElderDialogueTreeTest` +1, `OldArchiveDuelBalanceTest` +5.
+    - 🔶 **CHƯA playtest sống** — mọi khẳng định ở trên là công thức + test, không phải buổi chơi.
+      Ba thứ chỉ buổi chơi mới trả lời được: (1) đi từ x=21 ra x=60 có phải chạy ngang quỷ đá ở 47
+      không chết không; (2) 20 giây hồi sinh của thạch vệ có làm quest 3 thành ngồi chờ không;
+      (3) mảnh ngọc cổ hiện trong túi ra sao khi **chưa có icon**.
+    - 💡 **Hai món nợ ghi thẳng ra, không giấu**: `archive_warden` **mượn model của quỷ đá**
+      (`mob_stone-ogre`) nên trong game hai loài trông y hệt nhau — khoá lại bằng test để nợ nằm
+      trong CI chứ không nằm trong trí nhớ ai; và `ancient_jade_shard` **chưa có icon**
+      (`InventoryPanel` vẽ ô trống, không bịa hộp màu).

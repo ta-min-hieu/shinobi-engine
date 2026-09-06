@@ -67,7 +67,7 @@ class TownElderDialogueTreeTest {
         assertThat(aboutSect.textKey()).isEqualTo("dialogue.town_elder.about_town");
         assertThat(aboutSect.options())
                 .extracting(DialogueOption::action)
-                .containsExactly("about_realm", "about_elder", "night_watch", "end");
+                .containsExactly("about_realm", "about_elder", "night_watch", "old_archive", "end");
         assertThat(node("about_realm").textKey()).isEqualTo("dialogue.town_elder.about_realm");
         assertThat(node("about_elder").textKey()).isEqualTo("dialogue.town_elder.about_elder");
     }
@@ -88,6 +88,23 @@ class TownElderDialogueTreeTest {
         assertThat(nightWatch.options())
                 .extracting(DialogueOption::action)
                 .containsExactly("accept_quest:night_watch_bandit", "about_town", "end");
+    }
+
+    /**
+     * Nhịp "gieo mầm" của arc 1 (STORY.md §6) — quest THỨ BA của game, và là quest đầu tiên được
+     * thêm vào mà KHÔNG phải sửa một dòng Java sản phẩm nào (V30 + một script + một nhánh ở đây).
+     *
+     * <p>Nhánh cũng mọc xuống dưới qua {@code about_town}, cùng lý do với {@code night_watch}.
+     */
+    @Test
+    @DisplayName("Nhánh thư khố bỏ hoang nhận được quest thứ ba, và nhận đúng mã clear_old_archive")
+    void oldArchiveBranchOffersTheThirdQuest() {
+        DialogueNode oldArchive = node("old_archive");
+
+        assertThat(oldArchive.textKey()).isEqualTo("dialogue.town_elder.old_archive");
+        assertThat(oldArchive.options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:clear_old_archive", "about_town", "end");
     }
 
     /**
