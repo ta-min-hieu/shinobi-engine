@@ -143,6 +143,6 @@ Không.
 3. ✅ **Kiểm chứng đường DÂY bằng hai socket thật**:
    `GatewayServerIntegrationTest.observerShouldGetNewFaction_whenAnotherCharacterChangesItInPlace`
    — A đứng nhìn, B lên Lv10 rồi đổi sang Thuỷ, A nhận đúng opcode 307 mang `FACTION_THUY`.
-4. 🔶 **CHƯA kiểm chứng sống nửa CLIENT** (`replaceCharacterModel` trên màn hình thật). Cần hai
-   client song song — công thức ở bản bàn giao 2026-08-29. Ghi rõ ở đây để không ai đọc nhầm test
-   tầng dây thành bằng chứng hình ảnh.
+4. ✅ **ĐÃ KIỂM CHỨNG SỐNG nửa CLIENT cùng ngày** (ROADMAP mục 62a): hai client song song, A đứng
+   nhìn, B (Lv10) bấm **H** chọn **Thuỷ** ⇒ trên màn hình A, model của B **đổi tại chỗ**, không
+   biến mất rồi hiện lại, không đổi vị trí. `character.faction` = `THUY` trong DB.

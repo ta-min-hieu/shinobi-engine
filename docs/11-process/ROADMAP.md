@@ -2128,3 +2128,49 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       khi đó rẽ vào nhánh upsert `art_asset` và đòi sidecar `<key>.model-meta.json` mà chính fixture
       của nó không bao giờ ghi. Test dễ vỡ ở `tools:asset-pipeline`, không liên quan module nào của
       đợt này.
+
+62. **PLAYTEST SỐNG hai thứ vừa làm — một cái ĐÚNG, một cái lộ ra lỗ cân bằng đo được (2026-09-06)**:
+
+    **(a) ADR-045 — nửa CLIENT nay đã NHÌN THẤY chạy thật.** Hai client song song trên cùng máy:
+    client A (`Kagemaru`) đứng yên nhìn, client B (`tanthua44`, Lv10) bấm **H** → "Thức tỉnh linh
+    căn" → chọn **Thuỷ**. Trên màn hình A, nhân vật B **đổi từ model Hoả sang model Thuỷ ngay tại
+    chỗ**, không biến mất rồi hiện lại, không đổi vị trí. `character.faction` = `THUY` trong DB.
+    ⇒ Cả hai nửa của ADR-045 (đường dây + đường hiển thị) đã kiểm chứng xong.
+
+    **(b) Quest 3 `clear_old_archive` — VÒNG ĐỜI NỘI DUNG chạy trọn, đo bằng SQL:**
+
+    | Mốc | Bằng chứng |
+    |---|---|
+    | Nhận qua hội thoại | Chu Hoành: "Ngươi dọn giúp ta hai cỗ..." → `IN_PROGRESS`, `{"cleared":0}` |
+    | HUD | "Dọn Thư Khố Cũ — Đang làm" ở khung theo dõi + nhật ký (J) |
+    | Giết 2 thạch vệ | `{"cleared":1}` → `{"cleared":2}` → **COMPLETED** (script `on_event` chạy đúng) |
+    | Lĩnh thưởng | EXP **1625 → 2825 = đúng +1200**, cấp **6 → 8**, status **CLAIMED** |
+    | Vật phẩm | `ancient_jade_shard` **x1** trong `inventory_item` |
+
+    **(c) 🔴 CÂN BẰNG: quãng ĐƯỜNG ĐI mới là thứ giết người chơi, không phải con quái.** Đo hai
+    lần bằng `gameProbe`, **kết quả trùng khít**: đi bộ từ x=0 tới x≈58 với nhân vật cấp 6 mặc trọn
+    bộ Tạp Dịch mất **65 máu** trước khi chạm mặt thạch vệ:
+
+    | Nguồn | Sát thương | Máu còn |
+    |---|---|---|
+    | Tán tu (spawn 21) | 17 | 101 |
+    | Tán tu (spawn 34) | 17 | 84 |
+    | **Quỷ đá (spawn 47)** | **31** | **53** |
+    | Thạch vệ (spawn 60) | 20 × 3 | **0 — chết** |
+
+    - **Phép tính tay đôi thì ĐÚNG y như bảng của V30**: người chơi đánh **32**/nhát (4 nhát hạ 120
+      máu), thạch vệ đánh **20**/nhát (6 nhát hạ 118 máu). Ở máu đầy thì thắng. Vấn đề là **tới nơi
+      chỉ còn 53 máu**, tức chịu được 2 nhát.
+    - **Không có hồi máu ngoài chiến đấu** — `grep` toàn `server-world` + `engine`: KHÔNG có system
+      nào hồi máu theo thời gian. Máu chỉ đầy lại khi CHẾT rồi hồi sinh.
+    - 🎯 **Và một lỗ hình học mà luật V29 KHÔNG bắt được**: V29 giãn spawn theo **tầm aggro**
+      (6+6=12 < 13m), nhưng khi người chơi **ĐỨNG LẠI ĐÁNH** thì thứ quyết định là **tầm đuổi
+      (leash) = 10m**. Quỷ đá ở x=47 đuổi được tới **x=57**, mà thạch vệ thứ nhất spawn ở **x=60**
+      — lần đo thứ hai, chính **quỷ đá là con ra đòn kết liễu** trong lúc người chơi đang đánh thạch
+      vệ. Luật "hai điểm spawn cách nhau > tổng aggro" là điều kiện ĐỦ để không kéo hai con cùng
+      lúc, nhưng KHÔNG đủ để có một chỗ đánh nhau yên tĩnh.
+    - **Cần chủ dự án quyết** (Điều 15 + bài học mục 57 — không tự đổi số cân bằng): (a) dời điểm
+      spawn thạch vệ ra xa quỷ đá hơn (≥ tầm đuổi + tầm đánh), (b) hạ `leash_radius_meters` của quỷ
+      đá, (c) thêm hồi máu ngoài chiến đấu, (d) coi đây là tường chắn có chủ ý và để nguyên.
+    - ⚠️ Để kiểm chứng phần NỘI DUNG ở (b), tôi tạm nâng `str`/`vit` lên 400 rồi **trả lại 10 ngay
+      sau đó** (đã kiểm lại bằng SQL). Mọi con số ở (c) đo TRƯỚC khi nâng, trên chỉ số thật.
