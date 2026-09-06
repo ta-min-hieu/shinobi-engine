@@ -122,10 +122,13 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         assertThat(findByCode("stone_ogre").modelKey()).isEqualTo("mob_stone-ogre");
         // Hình nộm là hàng đối chứng của V23 — không đợt nào được lặng lẽ đổi nó.
         assertThat(findByCode("training_dummy").modelKey()).isEqualTo("mob_training-dummy");
-        // V30 mở LẠI món nợ đó một lần nữa, có chủ đích và ghi rõ: `archive_warden` mượn model của
-        // quỷ đá (cùng dòng máy móc Linh Triều nên còn hợp lý), nên trong game hai loài trông y hệt
-        // nhau. Khẳng định nó ở đây để nợ này nằm trong test chứ không nằm trong trí nhớ ai đó.
-        assertThat(findByCode("archive_warden").modelKey()).isEqualTo("mob_stone-ogre");
+        // V30 mở LẠI món nợ đó một lần nữa (thạch vệ mượn model quỷ đá) và ô test này khoá nó lại
+        // để nợ nằm trong CI chứ không nằm trong trí nhớ ai đó. V31 trả nợ: art riêng đã dựng
+        // (`mob_archive-warden`, ASSET-LOG 2026-09-06), nên khẳng định đổi theo.
+        assertThat(findByCode("archive_warden").modelKey()).isEqualTo("mob_archive-warden");
+        // Và quỷ đá KHÔNG được đổi theo — hai loài dùng chung một khoá đúng là thứ V31 vừa gỡ.
+        assertThat(findByCode("archive_warden").modelKey())
+                .isNotEqualTo(findByCode("stone_ogre").modelKey());
     }
 
     @Test

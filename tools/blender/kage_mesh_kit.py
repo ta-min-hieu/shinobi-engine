@@ -184,6 +184,23 @@ def _box(half_x, half_y, z_lo, z_hi):
     return verts, faces
 
 
+def _merge(pieces):
+    """Concatenate several (verts, faces) into one, offsetting each face index.
+
+    A bundle of identical slats or a row of engraved grooves is ONE material and
+    ONE rigid part; splitting it into a mesh object each would multiply the part
+    count (and so the Freestyle outline passes) for nothing. `export_character_lods`
+    also treats every object as a decimation candidate, and a six-triangle sliver
+    is exactly what its `MIN_PART_TRIANGLES` floor exists to protect.
+    """
+    verts, faces = [], []
+    for piece_verts, piece_faces in pieces:
+        offset = len(verts)
+        verts.extend(piece_verts)
+        faces.extend(tuple(index + offset for index in face) for face in piece_faces)
+    return verts, faces
+
+
 def _blade(length, width, thickness, curve_deg=0.0, taper=0.25, sections=8):
     """A sword/knife blade swept along an arc, pointing +Z from the origin.
 
@@ -517,6 +534,12 @@ def add_face(rig, spec, style="default"):
     name = spec["name"]
     hair_color = spec["hair"]["color"]
     eye_color = spec.get("eye_color", "#2B2B33")
+    if style == "none":
+        # A construct has no anime face to author; it gets a `stone_visor`
+        # instead. Leaving these four parts on under a visor would put a pair of
+        # white sclera specks on the far edges of the skull — the shape they take
+        # when a profile-authored face is seen head-on.
+        return []
     wide = 1.15 if style == "wide" else 1.0
     frontal = style == "frontal"
     parts = []
@@ -620,10 +643,22 @@ HAIR_STYLES = {
         (0.046, 0.026, 54, 0.142, 0.848),
         (0.044, 0.026, -96, -0.162, 0.832),
     ],
+    # A carved stone crest, for constructs: a row of blunt knobs along the crown
+    # instead of hair. Same trick as `topknot_bun` — every length stays under
+    # about 1.4x its own base radius, because the spike generator lathes to a
+    # point and a pointed knob on a stone head reads as a horn. Pair it with a
+    # dark-stone hair colour: `add_hair`'s cap then becomes the carved helm that
+    # gives the face a brow line, not a wig.
+    "carved_crest": [
+        (0.062, 0.050, -8, -0.010, 0.978),
+        (0.058, 0.046, -46, -0.078, 0.938),
+        (0.052, 0.042, -80, -0.146, 0.868),
+        (0.048, 0.038, 30, 0.108, 0.900),
+    ],
 }
 
 
-def add_hair(rig, spec, style="spiky_short"):
+def add_hair(rig, spec, style="spiky_short", cap=True):
     """A hair cap over the skull plus swept spikes.
 
     Two pieces rather than one blob: a dome cut at the brow line, which gives
@@ -631,6 +666,14 @@ def add_hair(rig, spec, style="spiky_short"):
     nape, because hair hangs lower at the back than at the front. Cheaper and
     far more robust than booleaning a real haircut, and at sprite scale it
     reads the same.
+
+    `cap=False` drops both masses and keeps only the swept shapes — for a head
+    that has no hair on it at all, such as a carved construct. It is not a style
+    preference: the dome is cut at the brow line for a camera looking level at
+    the character, and the client's camera looks DOWN (ADR-031), so on a bald
+    stone skull the dome's front edge becomes a brim that covers the whole face.
+    That is the same failure the elder's hair caused (ASSET-LOG 2026-09-03,
+    lesson 4), seen again through `runWorldPreview` and not in Blender.
     """
     if style not in HAIR_STYLES:
         raise KeyError("unknown hair style '{0}'; have {1}".format(
@@ -639,15 +682,16 @@ def add_hair(rig, spec, style="spiky_short"):
     color = spec["hair"]["color"]
     parts = []
 
-    cap_verts, cap_faces = _dome(0.197, 0.178, 0.207, z_min_frac=0.19, segments=24)
-    parts.append(_new_part(rig, name + "_HairCap",
-                           _transform(cap_verts, HEAD_CENTER),
-                           cap_faces, color, "head"))
+    if cap:
+        cap_verts, cap_faces = _dome(0.197, 0.178, 0.207, z_min_frac=0.19, segments=24)
+        parts.append(_new_part(rig, name + "_HairCap",
+                               _transform(cap_verts, HEAD_CENTER),
+                               cap_faces, color, "head"))
 
-    nape_verts, nape_faces = _ellipsoid(0.126, 0.174, 0.148, rings=10, segments=20)
-    parts.append(_new_part(rig, name + "_HairNape",
-                           _transform(nape_verts, (-0.086, 0.0, 0.778)),
-                           nape_faces, color, "head"))
+        nape_verts, nape_faces = _ellipsoid(0.126, 0.174, 0.148, rings=10, segments=20)
+        parts.append(_new_part(rig, name + "_HairNape",
+                               _transform(nape_verts, (-0.086, 0.0, 0.778)),
+                               nape_faces, color, "head"))
 
     for index, (length, radius, tilt, anchor_x, anchor_z) in enumerate(HAIR_STYLES[style]):
         spike_verts, spike_faces = _revolve(
@@ -663,14 +707,22 @@ def add_hair(rig, spec, style="spiky_short"):
 # --- Accessories -------------------------------------------------------------
 
 
-def add_accessory(rig, spec, kind, color, bone=None):
-    """One costume piece. See ART-QUALITY-STANDARD.md §5 for the vocabulary."""
+def add_accessory(rig, spec, kind, color, bone=None, accent=None):
+    """One costume piece. See ART-QUALITY-STANDARD.md §5 for the vocabulary.
+
+    `accent` is a second colour for the pieces that need one (a stele's engraved
+    columns, a bundle's binding cord). It is passed on ONLY when the caller asked
+    for it, so the thirteen builders whose art has already shipped and been
+    accepted keep their four-argument signature and cannot be broken by this.
+    """
     name = spec["name"]
     builder = _ACCESSORY_BUILDERS.get(kind)
     if builder is None:
         raise KeyError("unknown accessory '{0}'; have {1}".format(
             kind, sorted(_ACCESSORY_BUILDERS)))
-    return builder(rig, name, color, bone)
+    if accent is None:
+        return builder(rig, name, color, bone)
+    return builder(rig, name, color, bone, accent)
 
 
 def _acc_headband(rig, name, color, bone):
@@ -864,8 +916,117 @@ def _acc_wide_sleeves(rig, name, color, bone):
     return parts
 
 
+def _acc_stone_visor(rig, name, color, bone, accent=None):
+    """A machine's face: a recessed band round the skull with two lit slots.
+
+    Pairs with `face_style="none"`. `add_face` builds an anime face for a PROFILE
+    view — eye, brow and mouth all sit on one cheek at |y| near the head's own
+    half-depth — and the client draws characters closer to head-on than that
+    (`WorldModelRenderer.MODEL_YAW_DEGREES`), which pushes both eyes out onto the
+    silhouette edges. On a haired head the fringe hides that; on a bare stone
+    skull it leaves two white specks stuck to the ears.
+
+    A band round the whole head has no such angle: it is a ring, so it presents
+    the same width from every yaw the locked camera can produce. `accent` lights
+    the two slots, and they are the only warm colour above the waist, which is
+    what makes the head the first thing the eye lands on.
+    """
+    band = _revolve([(0.760, 0.198, 0.180), (0.824, 0.198, 0.180)], 24)
+    parts = [_new_part(rig, name + "_Visor", *band, color_hex=color, bone="head",
+                       shades=2, smooth=False)]
+
+    lights = []
+    for offset_y in (-0.058, 0.058):
+        verts, faces = _box(0.022, 0.026, 0.776, 0.812)
+        lights.append((_transform(verts, (0.182, offset_y, 0.0)), faces))
+    parts.append(_new_part(rig, name + "_VisorLights", *_merge(lights),
+                           color_hex=accent or shade_hex(color, 1.6),
+                           bone="head", shades=2, smooth=False))
+    # Same rule as the pupil in `add_face`: an ink line as wide as the lit slot
+    # itself turns the glow into a black smudge.
+    _exclude_from_outline(parts[1])
+    return parts
+
+
+def _acc_stone_tablet(rig, name, color, bone, accent=None):
+    """A stele slab strapped flat across the chest, with engraved columns.
+
+    Built as a BOX, not as the ellipsoid `chest_plate` uses: a stele is a cut
+    stone and its silhouette has to have corners, otherwise it reads as one more
+    piece of armour. Faceted (`smooth=False`) for the same reason.
+
+    The slab is deliberately a lighter tone than whatever torso it sits on — two
+    stone-grey blocks of the same value stack into one lump at 64px, the lesson
+    `icon_genin_headband` paid for three times (ASSET-LOG 2026-09-03).
+
+    `accent` colours the engraved columns; without one they fall back to a
+    darkened slab tone, which is what a real chisel cut looks like.
+    """
+    slab_x, slab_half_x = 0.118, 0.024
+    slab_verts, slab_faces = _box(slab_half_x, 0.078, 0.368, 0.556)
+    parts = [_new_part(rig, name + "_Tablet",
+                       _transform(slab_verts, (slab_x, 0.0, 0.0)), slab_faces,
+                       color, "spine", shades=2, smooth=False)]
+
+    # Vertical columns, the way the writing on a stele actually runs. Horizontal
+    # bars at this size read as a ladder, which is a machine part, not a text.
+    groove_verts, groove_faces = _box(0.006, 0.006, 0.390, 0.534)
+    grooves = _merge([
+        (_transform(groove_verts, (slab_x + slab_half_x, offset_y, 0.0)), groove_faces)
+        for offset_y in (-0.045, -0.015, 0.015, 0.045)])
+    parts.append(_new_part(rig, name + "_TabletGlyphs", *grooves,
+                           color_hex=accent or shade_hex(color, 0.55),
+                           bone="spine", shades=2, smooth=False))
+    return parts
+
+
+def _acc_bamboo_slips(rig, name, color, bone, accent=None):
+    """A fan of bound bamboo slips (thẻ tre) rising off the back.
+
+    The archive read, and it has to live in the SILHOUETTE to survive.
+
+    ⚠️ **Spread along Y, not along X-Z.** Two builds were thrown away learning
+    that. The first fanned the slips up and back off the spine in the screen
+    plane, which is the shape a bundle of slips actually has and is invisible in
+    this game: `WorldModelRenderer` draws characters close to head-on
+    (`MODEL_YAW_DEGREES` 35 against a base correction of -45), so anything mounted
+    behind the spine hides behind the body no matter how far back it is pushed.
+    The second build made the fan half again as long and it disappeared exactly
+    the same way. What clears a head-on body is WIDTH: the torso is 0.114 deep
+    and the pauldrons reach |y| = 0.187, so the outer slats sit past 0.20 and are
+    the only part of this piece the camera is guaranteed to see.
+
+    Separate slats rather than one plank: Freestyle inks each disconnected shell
+    inside the mesh, so the gaps come back as drawn lines and the shape says
+    "bound strips" instead of "board". The two cords say it again, and stop the
+    mat reading as a set of wings.
+
+    `accent` is the binding cord — the only warm-on-warm break in the bundle, so
+    it stays a real second colour rather than a shade of the slats.
+    """
+    back_x = -0.150
+    slats = []
+    for index in range(7):
+        verts, faces = _box(0.026, 0.030, 0.345, 0.665)
+        slats.append((_transform(verts, (back_x, -0.225 + index * 0.075, 0.0)), faces))
+    parts = [_new_part(rig, name + "_BambooSlips", *_merge(slats), color_hex=color,
+                       bone="spine", shades=2, smooth=False)]
+
+    cords = []
+    for cord_z in (0.400, 0.610):
+        verts, faces = _box(0.014, 0.262, cord_z, cord_z + 0.036)
+        cords.append((_transform(verts, (back_x - 0.030, 0.0, 0.0)), faces))
+    parts.append(_new_part(rig, name + "_BambooCord", *_merge(cords),
+                           color_hex=accent or shade_hex(color, 0.55),
+                           bone="spine", shades=2, smooth=False))
+    return parts
+
+
 _ACCESSORY_BUILDERS = {
     "headband": _acc_headband,
+    "stone_visor": _acc_stone_visor,
+    "stone_tablet": _acc_stone_tablet,
+    "bamboo_slips": _acc_bamboo_slips,
     "beard": _acc_beard,
     "long_robe": _acc_long_robe,
     "wide_sleeves": _acc_wide_sleeves,
@@ -1263,10 +1424,10 @@ def assemble_character(spec):
     rig = build_rig(spec["name"])
     build_chibi_body(rig, spec)
     add_face(rig, spec, style=spec.get("face_style", "default"))
-    add_hair(rig, spec, style=spec["hair"]["style"])
+    add_hair(rig, spec, style=spec["hair"]["style"], cap=spec["hair"].get("cap", True))
     for accessory in spec.get("accessories", []):
         add_accessory(rig, spec, accessory["kind"], accessory["color"],
-                      accessory.get("bone"))
+                      accessory.get("bone"), accessory.get("accent"))
     if spec.get("weapon"):
         build_weapon(rig, spec, spec["weapon"],
                      color=spec.get("weapon_color"),
@@ -1283,11 +1444,14 @@ CHARACTER_SPEC_KEYS = """
 name            str, prefix for every datablock (e.g. 'hoa_b1')
 skin            hex
 eye_color       hex, optional (default near-black)
-hair            {"style": one of HAIR_STYLES, "color": hex}
-face_style      'default' | 'wide' | 'frontal' (mirrors eye+brow), optional
+hair            {"style": one of HAIR_STYLES, "color": hex,
+                 "cap": False to drop the hair masses — see add_hair}
+face_style      'default' | 'wide' | 'frontal' (mirrors eye+brow) | 'none', optional
+                'none' builds no face at all — for a construct wearing a stone_visor
 cloth           {"torso": hex, "pelvis": hex, "legs": hex}
 shoe            hex, optional (defaults to a darkened trouser colour)
-accessories     [{"kind": one of _ACCESSORY_BUILDERS, "color": hex, "bone": optional}]
+accessories     [{"kind": one of _ACCESSORY_BUILDERS, "color": hex, "bone": optional,
+                 "accent": hex, optional second colour — see add_accessory}]
 weapon          one of _WEAPON_BUILDERS, or None
 weapon_color    hex, optional   weapon_grip hex, optional
 motion_detail   {"kind": embers|water_ring|ribbons|spark|stone_shards, "color": hex}

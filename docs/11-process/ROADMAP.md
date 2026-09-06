@@ -2174,3 +2174,34 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       đá, (c) thêm hồi máu ngoài chiến đấu, (d) coi đây là tường chắn có chủ ý và để nguyên.
     - ⚠️ Để kiểm chứng phần NỘI DUNG ở (b), tôi tạm nâng `str`/`vit` lên 400 rồi **trả lại 10 ngay
       sau đó** (đã kiểm lại bằng SQL). Mọi con số ở (c) đo TRƯỚC khi nâng, trên chỉ số thật.
+
+63. **Trả hai món nợ art mà V30 tự ghi ra — quái quest 3 có model riêng, mảnh ngọc có icon
+    (2026-09-06)**:
+    - Mục 59 đóng quest 3 kèm hai nợ nói thẳng: `archive_warden` **mượn model quỷ đá**
+      (`mob_stone-ogre`) nên trong game hai loài trông y hệt nhau, và `ancient_jade_shard`
+      **chưa có icon** nên `InventoryPanel` vẽ ô trống. Cả hai nay đã trả.
+    - ✅ **`mob_archive-warden`** — dựng bằng `kage_mesh_kit`
+      (`tools/blender/build_monster_archive_warden.py`), 38 part, **5.140 tam giác nguồn → LOD
+      5.140 / 5.140 / 4.988**, không texture, 0,24 MB. **Ngân sách tam giác nay 60/60 file đạt
+      chuẩn** §4.4 (57 trước đợt này). **0 lượt Rodin** — khoá vẫn `API_INSUFFICIENT_FUNDS`, đúng
+      bức tường `wandering_bandit` và `town_elder` đã gặp; đường kit là bản offline tất định và mọi
+      bước sau mesh dùng chung, nên có khoá trả tiền thì đổi art là một lệnh.
+    - ✅ **`icon_ancient_jade_shard`** — vào đúng atlas `atlases/{low,med}/main.atlas` mà
+      `InventoryPanel` tra (vùng `icon_<code>`), 64×64 ở tier MEDIUM.
+    - ✅ **V31**: một câu `UPDATE monster_template SET model_key = 'mob_archive-warden'`. Không đổi
+      schema. Ô test khoá nợ (`shouldGiveEachSpeciesItsOwnModel`) đổi theo, và **thêm một khẳng
+      định mới**: khoá của thạch vệ phải KHÁC khoá của quỷ đá — đó mới là thứ V31 vừa gỡ.
+    - ✅ **Đã NHÌN THẤY, không phải suy ra**: `runWorldPreview` chụp qua đúng
+      `MonsterPresenter`/`WorldModelRenderer` mà `WorldScreen` dùng — thạch vệ đứng ngay cạnh quỷ đá
+      trong khung và không còn lẫn được; icon thì soi thẳng vùng 64×64 đã đóng gói trong `main.png`.
+    - 💡 **Ba bài học, cả ba do ảnh dựng thật bác bỏ chứ không phải Blender** (chi tiết + số đo ở
+      [ASSET-LOG.md](../../assets/raw/ASSET-LOG.md) mục 2026-09-06): vòm tóc che kín mặt **lần thứ
+      hai**; bỏ vòm rồi thì mặt anime của kit trượt ra hai mép sọ vì nó được dựng cho góc NGHIÊNG
+      còn client vẽ gần chính diện; và **thứ gắn sau lưng thì camera chính diện không thấy, đẩy ra
+      xa bao nhiêu cũng vậy** — thứ vượt được một cái thân là BỀ NGANG, không phải chiều sâu.
+    - 🔶 **CHƯA playtest sống** — bằng chứng là ảnh dựng của client + ảnh atlas, không phải một trận
+      đánh thạch vệ và một lần mở túi đồ trong game.
+    - 🔶 **Dòng `art_asset` cho hai asset mới CHƯA được ghi vào một DB thật** trong đợt này:
+      `ArtRegistryUpserter` chỉ chạy khi có `DB_PASSWORD`, và biến đó lại đang kích hoạt đúng cái lỗi
+      có sẵn ở mục 61. Không cần INSERT tay — pipeline làm việc đó ở lần chạy có DB kế tiếp, và
+      `OrphanAssetChecker` chạy SAU `ArtRegistryUpserter` nên hai file mới không thể thành mồ côi.
