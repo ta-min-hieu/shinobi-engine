@@ -65,6 +65,7 @@ include(":server:server-features:feature-party")
 include(":server:server-features:feature-trade")
 include(":server:server-features:feature-pvp")
 include(":server:server-features:feature-monster")
+include(":server:server-features:feature-world")   // ADR-046 D3 — hình học bản đồ (safe_zone)
 
 // ---- quality ----
 include(":quality:architecture-tests")   // ArchUnit (ADR-011) — enforce dependency rule

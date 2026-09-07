@@ -76,6 +76,9 @@ enum Opcode {
   OPCODE_USE_SKILL_COMMAND = 405;
   OPCODE_SKILL_RESULT_EVENT = 406;
   OPCODE_ATTACK_COMMAND = 407; // đánh thường BẰNG TAY (chủ dự án 2026-08-09) — xem combat.proto
+  // ADR-046 — HP của một entity vừa đổi mà KHÔNG do đòn đánh nào (hồi máu ngoài chiến đấu,
+  // vùng an toàn, đan dược, quái về tới điểm spawn). Xem combat.proto HealthChangedEvent.
+  OPCODE_HEALTH_CHANGED_EVENT = 408;
 
   // --- Inventory / Equipment (500-599) ---
   OPCODE_ITEM_GRANTED_EVENT = 500;
@@ -90,6 +93,13 @@ enum Opcode {
   OPCODE_LIST_INVENTORY_RESPONSE = 508;
   OPCODE_GET_ITEM_CATALOG_REQUEST = 509;
   OPCODE_ITEM_CATALOG_RESPONSE = 510;
+
+  // ADR-046 D5 — dùng vật phẩm (đan dược hồi máu). Máu mới KHÔNG về trong response mà qua
+  // OPCODE_HEALTH_CHANGED_EVENT (408): world là bất đồng bộ, xem ADR-046 D5.
+  // ⚠️ 512/513 chứ không phải 511/512: ADR-046 D5 lấy 511 trước rồi mới thấy dòng giữ chỗ ngay
+  // dưới đây. Số 511 GIỮ NGUYÊN chỗ trống của nó.
+  OPCODE_USE_ITEM_COMMAND = 512;
+  OPCODE_USE_ITEM_RESPONSE = 513;
   // 511 để TRỐNG CÓ CHỦ Ý — dành sẵn cho ITEM_REMOVED_EVENT (ADR-035 Revisit Trigger #3, chỉ
   // thêm khi ĐO thấy việc hỏi lại toàn bộ túi sau mỗi hành động tốn thật). ĐỪNG cấp cho packet khác.
 

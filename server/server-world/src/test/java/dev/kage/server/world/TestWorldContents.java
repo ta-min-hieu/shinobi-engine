@@ -26,7 +26,8 @@ final class TestWorldContents {
 
     /** Nội dung world chính y như trước ADR-037 + ADR-040. */
     static WorldContentCatalog trainingGroundWithElder() {
-        return new WorldContentCatalog(TestMonsterCatalogs.trainingGround(), townElderOnly());
+        return new WorldContentCatalog(
+                TestMonsterCatalogs.trainingGround(), townElderOnly(), SafeZoneCatalogSnapshot.EMPTY);
     }
 
     /** Chỉ trưởng lão, không quái — cho test chỉ quan tâm tới NPC. */

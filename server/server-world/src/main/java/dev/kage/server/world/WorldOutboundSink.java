@@ -81,6 +81,14 @@ public interface WorldOutboundSink {
     void onCharacterAppearanceChanged(long targetCharacterId, long changedCharacterId);
 
     /**
+     * Máu của {@code health.entityId()} vừa đổi mà KHÔNG do đòn đánh nào (ADR-046 D1) — hồi máu
+     * ngoài chiến đấu, vùng an toàn, quái về tới điểm spawn, hoặc đan dược. Gửi cho
+     * {@code targetCharacterId} (1 quan sát viên AoI của entity đó, GỒM cả chính nó nếu là nhân
+     * vật), cùng luật phát như {@link #onAttackResult}.
+     */
+    void onHealthChanged(long targetCharacterId, HealthSnapshot health);
+
+    /**
      * {@code defeatedCharacterId} (nhân vật, luôn DƯƠNG) vừa bị {@code killerEntityId} hạ gục.
      * World CHÍNH dùng sự kiện này để hồi sinh nhân vật (xem {@link #onCharacterRespawned}) —
      * {@code ConnectedCharacterRegistry} không còn no-op nữa. Arena instance (Phase 8 lát cắt 4,
@@ -111,6 +119,13 @@ public interface WorldOutboundSink {
 
     /** Ảnh chụp trạng thái nhân vật lúc phát {@link #onCharacterRespawned} — gộp tham số (STATIC-ANALYSIS.md). */
     record RespawnSnapshot(long characterId, float x, float y, int currentHp, int maxHp, int currentChi, int maxChi) {}
+
+    /**
+     * Ảnh chụp máu lúc phát {@link #onHealthChanged} (ADR-046 D1).
+     *
+     * @param entityId DƯƠNG = {@code characterId}, ÂM = {@code monsterId} (combat.proto)
+     */
+    record HealthSnapshot(long entityId, int currentHp, int maxHp) {}
 
     /** Ảnh chụp NPC lúc phát {@link #onNpcSpawned} — không có HP (NPC không combat, khác quái). */
     record NpcSnapshot(long npcId, String npcCode, float x, float y) {}

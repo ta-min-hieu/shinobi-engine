@@ -61,7 +61,16 @@ class GrantLootUseCaseTest {
             @Override
             public Optional<ItemTemplate> findById(long itemTemplateId) {
                 return Optional.of(new ItemTemplate(
-                        itemTemplateId, maxStack == 1 ? EquipmentSlotType.WEAPON : null, maxStack, 0, 0, 0, 0, 1));
+                        itemTemplateId,
+                        maxStack == 1 ? EquipmentSlotType.WEAPON : null,
+                        maxStack,
+                        0,
+                        0,
+                        0,
+                        0,
+                        1,
+                        null,
+                        0));
             }
 
             @Override

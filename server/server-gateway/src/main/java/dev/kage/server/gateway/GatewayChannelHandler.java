@@ -34,11 +34,13 @@ import dev.kage.dialogue.domain.DialogueOption;
 import dev.kage.friend.api.FriendFacade;
 import dev.kage.guild.api.GuildFacade;
 import dev.kage.inventory.api.InventoryFacade;
+import dev.kage.inventory.application.UseItemUseCase;
 import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.InventorySnapshot;
 import dev.kage.inventory.domain.ItemCatalog;
 import dev.kage.inventory.domain.ItemStack;
+import dev.kage.inventory.domain.ItemUseEffect;
 import dev.kage.mail.api.MailFacade;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.protocol.AcceptDuelCommand;
@@ -237,6 +239,8 @@ import dev.kage.protocol.TradeRequestedEvent;
 import dev.kage.protocol.TradeUpdatedEvent;
 import dev.kage.protocol.UnequipItemCommand;
 import dev.kage.protocol.UnequipItemResponse;
+import dev.kage.protocol.UseItemCommand;
+import dev.kage.protocol.UseItemResponse;
 import dev.kage.protocol.UseSkillCommand;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
@@ -348,6 +352,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_EQUIP_ITEM_COMMAND_VALUE, this::handleEquipItemCommand),
             Map.entry(Opcode.OPCODE_UNEQUIP_ITEM_COMMAND_VALUE, this::handleUnequipItemCommand),
             Map.entry(Opcode.OPCODE_ENHANCE_ITEM_COMMAND_VALUE, this::handleEnhanceItemCommand),
+            Map.entry(Opcode.OPCODE_USE_ITEM_COMMAND_VALUE, this::handleUseItemCommand),
             Map.entry(Opcode.OPCODE_LIST_INVENTORY_REQUEST_VALUE, this::handleListInventoryRequest),
             Map.entry(Opcode.OPCODE_GET_ITEM_CATALOG_REQUEST_VALUE, this::handleGetItemCatalogRequest),
             Map.entry(Opcode.OPCODE_LIST_QUESTS_REQUEST_VALUE, this::handleListQuestsRequest),
@@ -1040,6 +1045,65 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
     }
 
+    /**
+     * ADR-046 D5 — dùng vật phẩm (đan dược). Chạm DB (trừ một cái trong túi + audit) nên đẩy sang
+     * Virtual Thread, KHÔNG chặn EventLoop — cùng pattern {@link #handleEnhanceItemCommand}.
+     */
+    private void handleUseItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        UseItemCommand command = UseItemCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        long inventoryItemId = command.getInventoryItemId();
+        authExecutor.execute(() -> handleUseItemBlocking(ctx, sequenceId, characterId, inventoryItemId));
+    }
+
+    /**
+     * Hai nửa của một lần uống đan: {@code feature-inventory} trừ món (transaction + audit) rồi trả
+     * về hiệu ứng, {@code server-world} cộng máu. Gateway là chỗ DUY NHẤT nối được hai bên — cùng
+     * hình dạng {@code onMonsterKilled} → {@code grantLoot}.
+     *
+     * <p>Máu mới KHÔNG đi kèm response: hàng đợi world là bất đồng bộ nên lúc này lệnh còn chưa
+     * chạy (bẫy đã trả giá ở ADR-043). Client nhận số mới qua {@code HealthChangedEvent} (408).
+     */
+    private void handleUseItemBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, long inventoryItemId) {
+        UseItemUseCase.UseItemResult result = inventoryFacade.useItem(characterId, inventoryItemId);
+        if (result.outcome() == UseItemUseCase.Outcome.OK && result.effect() == ItemUseEffect.HEAL_HP) {
+            // RỖNG nếu nhân vật vừa rớt mạng giữa chừng — món đã trừ rồi, nhưng không có entity
+            // nào để cộng máu và cũng không còn ai để gửi gói. Không phải lỗi, đừng ném.
+            currentWorldFacadeIfPresent(characterId)
+                    .ifPresent(facade -> facade.enqueueHealCharacter(characterId, result.value()));
+        }
+        UseItemResponse response = UseItemResponse.newBuilder()
+                .setSuccess(result.outcome() == UseItemUseCase.Outcome.OK)
+                .setErrorKey(useItemErrorKey(result.outcome()))
+                .setRemainingQuantity(result.remainingQuantity())
+                .build();
+        send(ctx, Opcode.OPCODE_USE_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private static dev.kage.protocol.ItemUseEffect toProtoUseEffect(ItemUseEffect effect) {
+        if (effect == null) {
+            return dev.kage.protocol.ItemUseEffect.ITEM_USE_EFFECT_UNSPECIFIED;
+        }
+        return switch (effect) {
+            case HEAL_HP -> dev.kage.protocol.ItemUseEffect.ITEM_USE_EFFECT_HEAL_HP;
+        };
+    }
+
+    private static String useItemErrorKey(UseItemUseCase.Outcome outcome) {
+        return switch (outcome) {
+            case OK -> "";
+            case ITEM_NOT_FOUND -> "error.item_not_found";
+            case NOT_USABLE -> "error.item_not_usable";
+        };
+    }
+
     // Bảng tra thay switch 6 nhánh (PMD CyclomaticComplexity — cùng lý do SLOT_MAPPING bên dưới).
     private static final Map<InventoryFacade.EnhanceResult, EnhanceOutcome> ENHANCE_OUTCOME_MAPPING = Map.of(
             InventoryFacade.EnhanceResult.SUCCESS, EnhanceOutcome.ENHANCE_OUTCOME_SUCCESS,
@@ -1139,6 +1203,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             .setBonusRes(entry.bonusRes())
                             .setBonusHp(entry.bonusHp())
                             .setRequiredLevel(entry.requiredLevel())
+                            // ADR-046 D5 — useEffect null (món không dùng được) -> UNSPECIFIED,
+                            // khớp use_effect NULL trong DB, cùng luật equipSlot ở trên.
+                            .setUseEffect(toProtoUseEffect(entry.useEffect()))
+                            .setUseValue(entry.useValue())
                             .build()));
         }
         send(

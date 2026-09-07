@@ -61,6 +61,10 @@ public record ItemCatalog(String version, List<ItemCatalogEntry> entries) {
                     .append(entry.bonusHp())
                     .append(FIELD_SEPARATOR)
                     .append(entry.requiredLevel())
+                    .append(FIELD_SEPARATOR)
+                    .append(entry.useEffect() == null ? "" : entry.useEffect().name())
+                    .append(FIELD_SEPARATOR)
+                    .append(entry.useValue())
                     .append(RECORD_SEPARATOR);
         }
         return HexFormat.of().formatHex(digest(canonical.toString()));

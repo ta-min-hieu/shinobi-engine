@@ -2,7 +2,6 @@ package dev.kage.client.core.world;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.StringJoiner;
 import java.util.function.BooleanSupplier;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
@@ -11,17 +10,18 @@ import com.badlogic.gdx.utils.I18NBundle;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import dev.kage.client.core.ui.hud.InventoryPanel;
-import dev.kage.client.core.ui.theme.CultivationRealm;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.EnhanceItemResponse;
 import dev.kage.protocol.EquipItemResponse;
 import dev.kage.protocol.EquipmentSlot;
 import dev.kage.protocol.ItemCatalogEntry;
 import dev.kage.protocol.ItemGrantedEvent;
+import dev.kage.protocol.ItemUseEffect;
 import dev.kage.protocol.ListInventoryResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SellItemResponse;
 import dev.kage.protocol.UnequipItemResponse;
+import dev.kage.protocol.UseItemResponse;
 import dev.kage.protocol.wire.PacketCodec;
 
 /**
@@ -71,6 +71,9 @@ final class InventoryCoordinator implements WindowFlow {
 
     private final I18NBundle i18n = KageI18n.load();
 
+    /** Ghép chuỗi ô chi tiết vật phẩm — tách ra 2026-09-07, xem javadoc {@link InventoryItemText}. */
+    private final InventoryItemText itemText;
+
     /**
      * Người chơi bấm Bán — {@code WorldScreen} nối vào {@code ShopCoordinator}. Túi đồ KHÔNG tự gửi
      * {@code SellItemCommand}: khoá idempotency của lệnh Bán (ADR-025) do {@code ShopController}
@@ -112,12 +115,15 @@ final class InventoryCoordinator implements WindowFlow {
         this.panel = panel;
         this.sender = sender;
         this.itemCatalog = dataSources.itemCatalog();
+        this.itemText = new InventoryItemText(
+                itemTemplateId -> itemCatalog.byId(itemTemplateId).orElse(null), this::itemNameOrFallback);
         this.gold = dataSources.gold();
         this.notices = dataSources.notices();
         panel.setCanOpen(canOpen);
         panel.setOnRefresh(this::onOpened);
         panel.setOnSelect(this::onSelect);
         panel.setOnEquipSelected(this::onEquipSelected);
+        panel.setOnUseSelected(this::onUseSelected);
         panel.setOnSellSelected(this::onSellSelected);
         panel.setOnOfferSelected(this::onOfferSelected);
         panel.setOnEnhanceSelected(this::onEnhanceSelected);
@@ -181,6 +187,10 @@ final class InventoryCoordinator implements WindowFlow {
         }
         if (opcode == Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE) {
             onEnhanceSettled(EnhanceItemResponse.parseFrom(payload));
+            return true;
+        }
+        if (opcode == Opcode.OPCODE_USE_ITEM_RESPONSE_VALUE) {
+            onUseSettled(UseItemResponse.parseFrom(payload));
             return true;
         }
         if (opcode == Opcode.OPCODE_ITEM_GRANTED_EVENT_VALUE) {
@@ -269,6 +279,24 @@ final class InventoryCoordinator implements WindowFlow {
                 .selected()
                 .ifPresent(item -> sender.enhanceItem(
                         item.itemId(), controller.useProtection(), controller.beginEnhance(item.itemId())));
+    }
+
+    /** Bấm "Dùng" trên item đang chọn (ADR-046 D5) — đan dược. */
+    private void onUseSelected() {
+        controller.selected().ifPresent(item -> sender.useItem(item.itemId()));
+    }
+
+    /**
+     * Kết quả Dùng. KHÔNG đụng tới thanh máu ở đây: máu mới tới bằng {@code HealthChangedEvent}
+     * (opcode 408) do {@code CombatHudController} xử lý — gói này chỉ nói món đã tiêu hay chưa.
+     * Hỏi lại túi đồ vì số lượng vừa đổi (inventory.proto không có event đẩy "túi vừa đổi").
+     */
+    private void onUseSettled(UseItemResponse response) {
+        settle(
+                response.getSuccess()
+                        ? "inventory.notice.used"
+                        : InventoryController.errorMessageKey(response.getErrorKey())
+                                .orElse("inventory.error.unknown"));
     }
 
     /**
@@ -373,7 +401,7 @@ final class InventoryCoordinator implements WindowFlow {
         itemRows.clear();
         for (int index = 0; index < shown; index++) {
             InventoryController.Item item = all.get(index);
-            itemRows.add(new InventoryPanel.ItemRow(item.itemId(), iconCodeOf(item), itemDisplayText(item)));
+            itemRows.add(new InventoryPanel.ItemRow(item.itemId(), iconCodeOf(item), itemText.describe(item)));
         }
         panel.setItems(itemRows, capacityText(all.size()), listNotice(all.size(), all.size() - shown));
         refreshEquipment();
@@ -388,7 +416,7 @@ final class InventoryCoordinator implements WindowFlow {
                     ? text("inventory.slot.empty")
                     : controller
                             .byId(equippedItemId)
-                            .map(this::itemDisplayText)
+                            .map(itemText::describe)
                             .orElseGet(() -> format("inventory.label.raw_item", equippedItemId));
             equipmentRows.add(new InventoryPanel.EquipmentRow(
                     slot.getNumber(), text(slotNameKey(slot)), displayText, equippedItemId != 0L));
@@ -410,85 +438,40 @@ final class InventoryCoordinator implements WindowFlow {
         controller
                 .selected()
                 .ifPresentOrElse(
-                        item -> {
-                            EquipmentSlot slot = itemCatalog.equipSlot(item.itemTemplateId());
-                            boolean equippable = slot != EquipmentSlot.EQUIPMENT_SLOT_UNSPECIFIED;
-                            boolean alreadyEquipped = equippable && controller.equippedItemId(slot) == item.itemId();
-                            panel.showDetail(
-                                    itemDisplayText(item),
-                                    equippable && !alreadyEquipped,
-                                    new InventoryPanel.Actions(true, inTrade.getAsBoolean(), true));
-                        },
+                        item -> panel.showDetail(
+                                itemText.describe(item),
+                                primaryActionFor(item),
+                                new InventoryPanel.Actions(true, inTrade.getAsBoolean(), true)),
                         () -> panel.showDetail(
-                                text("inventory.detail.none"), false, new InventoryPanel.Actions(false, false, false)));
+                                text("inventory.detail.none"),
+                                InventoryPanel.PrimaryAction.NONE,
+                                new InventoryPanel.Actions(false, false, false)));
     }
 
-    /** Tên + số lượng + mức cường hoá + chỉ số gốc + cấp yêu cầu, ghép sẵn thành chuỗi hiển thị. */
-    private String itemDisplayText(InventoryController.Item item) {
-        String name = itemCatalog
-                .nameKey(item.itemTemplateId())
+    /**
+     * "Mặc" hay "Dùng" — hai thứ loại trừ nhau ({@code ItemTemplate} cấm một món vừa mặc được vừa
+     * dùng được), nên chúng dùng chung một ô nút (ADR-046 D5).
+     *
+     * <p>ẨN nút Mặc khi item đang chọn ĐÃ mặc đúng slot đó: bày ra lúc đó là bày một nút chỉ để
+     * mặc lại chính nó, vô nghĩa với người chơi dù server vẫn xử lý được (OK, không hỏng).
+     */
+    private InventoryPanel.PrimaryAction primaryActionFor(InventoryController.Item item) {
+        if (itemCatalog.useEffect(item.itemTemplateId()) != ItemUseEffect.ITEM_USE_EFFECT_UNSPECIFIED) {
+            return InventoryPanel.PrimaryAction.USE;
+        }
+        EquipmentSlot slot = itemCatalog.equipSlot(item.itemTemplateId());
+        if (slot == EquipmentSlot.EQUIPMENT_SLOT_UNSPECIFIED || controller.equippedItemId(slot) == item.itemId()) {
+            return InventoryPanel.PrimaryAction.NONE;
+        }
+        return InventoryPanel.PrimaryAction.EQUIP;
+    }
+
+    /** Tên đã dịch của vật phẩm; dạng số khi chưa có catalog — client KHÔNG bịa tên (Điều 24). */
+    private String itemNameOrFallback(long itemTemplateId) {
+        return itemCatalog
+                .nameKey(itemTemplateId)
                 .map(this::text)
-                .orElseGet(() -> format("inventory.label.raw_item", item.itemTemplateId()));
-        StringBuilder builder = new StringBuilder(name);
-        if (item.quantity() > 1) {
-            builder.append(' ').append(format("inventory.label.quantity", item.quantity()));
-        }
-        if (item.enhanceLevel() > 0) {
-            builder.append(' ').append(format("inventory.label.enhance", item.enhanceLevel()));
-        }
-        appendStats(builder, item);
-        return builder.toString();
-    }
-
-    /**
-     * Bốn chỉ số + cấp yêu cầu của item đang chọn (ADR-036 D5, field 7..10 của
-     * {@code ItemCatalogEntry}). Bỏ hẳn dòng này khi chưa có catalog hoặc item không cộng chỉ số
-     * nào — không hiện "ATK +0" cho một hòn sắt vụn.
-     *
-     * <p>Đây là chỉ số GỐC của loại vật phẩm, KHÔNG phải chỉ số hiệu dụng sau cường hoá: hệ số
-     * cường hoá ({@code EnhancementTable.ENHANCE_STEP}) sống ở server và không có gói nào gửi nó
-     * sang đây, nên client tự nhân là bịa (Điều 24 — cùng lý do bảng chi phí cường hoá không được
-     * hiện ở client). Nhãn nói rõ "chỉ số gốc" để người chơi không hiểu nhầm.
-     */
-    private void appendStats(StringBuilder builder, InventoryController.Item item) {
-        ItemCatalogEntry entry = itemCatalog.byId(item.itemTemplateId()).orElse(null);
-        if (entry == null) {
-            return;
-        }
-        StringJoiner stats = new StringJoiner(", ");
-        appendStat(stats, "inventory.stat.atk", entry.getBonusAtk());
-        appendStat(stats, "inventory.stat.def", entry.getBonusDef());
-        appendStat(stats, "inventory.stat.res", entry.getBonusRes());
-        appendStat(stats, "inventory.stat.hp", entry.getBonusHp());
-        if (stats.length() > 0) {
-            builder.append('\n').append(format("inventory.label.base_stats", stats.toString()));
-        }
-        // required_level = 0 nghĩa là server CŨ chưa gửi field này (mặc định proto3), không phải
-        // "cần Cấp 0" — im lặng bỏ qua thay vì hiện một con số sai.
-        if (entry.getRequiredLevel() > 1) {
-            String required = realmLabel(entry.getRequiredLevel());
-            builder.append('\n').append(format("inventory.label.required_level", required));
-        }
-    }
-
-    /**
-     * Điều kiện cấp độ hiện ra dưới dạng CẢNH GIỚI — ADR-038 D2
-     * ({@code docs/01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md}).
-     *
-     * <p>Bản ĐẦY ĐỦ ({@code realm.tier} → "Luyện Khí tầng 5") chứ không phải bản ngắn như dòng chọn
-     * nhân vật: khung chi tiết vật phẩm xuống dòng tự do, không bị bó trong một nút rộng cố định,
-     * và đây là câu người chơi phải đọc để biết mình còn thiếu bao xa.
-     */
-    private String realmLabel(int level) {
-        CultivationRealm realm = CultivationRealm.of(level);
-        String realmName = text(realm.nameKey());
-        return realm.perfected() ? format("realm.perfect", realmName) : format2("realm.tier", realmName, realm.tier());
-    }
-
-    private void appendStat(StringJoiner stats, String key, int value) {
-        if (value != 0) {
-            stats.add(format(key, value));
-        }
+                .orElseGet(() -> format("inventory.label.raw_item", itemTemplateId));
     }
 
     /** {@code item_template.code} để tra icon (ADR-028) — rỗng khi chưa có catalog, panel để trống. */

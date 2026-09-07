@@ -75,6 +75,11 @@ final class ArenaOutboundSink implements WorldOutboundSink {
     }
 
     @Override
+    public void onHealthChanged(long targetCharacterId, WorldOutboundSink.HealthSnapshot health) {
+        registry.onHealthChanged(targetCharacterId, health);
+    }
+
+    @Override
     public void onSkillResult(long targetCharacterId, WorldOutboundSink.SkillOutcome outcome) {
         registry.onSkillResult(targetCharacterId, outcome);
     }

@@ -137,7 +137,15 @@ public final class InventoryPanel implements HudWindow {
     private final Label capacityLabel;
     private final Table itemList;
     private final Label detailLabel;
-    private final TextButton equipButton;
+    /**
+     * MỘT ô nút cho hành động chính của món đang chọn: "Mặc" với trang bị, "Dùng" với đan dược
+     * (ADR-046 D5). Dùng chung một ô chứ không thêm ô thứ sáu vì hàng hành động đã rộng 550px
+     * trong khung 560px — thêm một nút 84px là tràn ra ngoài nền, đúng lỗi đã bắt được ở
+     * {@code QuestLogPanel}. Và hai hành động này KHÔNG BAO GIỜ cùng có nghĩa: {@code ItemTemplate}
+     * cấm một món vừa mặc được vừa dùng được.
+     */
+    private final TextButton primaryButton;
+
     private final TextButton sellButton;
     private final TextButton offerButton;
     private final TextButton enhanceButton;
@@ -146,6 +154,7 @@ public final class InventoryPanel implements HudWindow {
 
     private LongConsumer onSelect;
     private Runnable onEquipSelected;
+    private Runnable onUseSelected;
     private Runnable onSellSelected;
     private Runnable onOfferSelected;
     private Runnable onEnhanceSelected;
@@ -158,6 +167,9 @@ public final class InventoryPanel implements HudWindow {
      * hình còn khung nào khác, xem {@link #setCanOpen}.
      */
     private BooleanSupplier canOpen = () -> true;
+
+    /** Nút chính đang mang nghĩa gì — xem {@link #showDetail}. */
+    private PrimaryAction primaryAction = PrimaryAction.NONE;
 
     /**
      * @param skin bộ style MƯỢN của {@code CombatHud} — lớp này KHÔNG dispose nó, cùng quy ước
@@ -177,7 +189,7 @@ public final class InventoryPanel implements HudWindow {
 
         this.itemList = new Table();
         this.detailLabel = wrappingLabel(ROW_COLOR);
-        this.equipButton = actionButton("inventory.action.equip", () -> fire(onEquipSelected));
+        this.primaryButton = actionButton("inventory.action.equip", this::firePrimaryAction);
         this.sellButton = actionButton("inventory.action.sell", () -> fire(onSellSelected));
         this.offerButton = actionButton("inventory.action.offer", () -> fire(onOfferSelected));
         this.enhanceButton = actionButton("inventory.action.enhance", () -> fire(onEnhanceSelected));
@@ -314,7 +326,7 @@ public final class InventoryPanel implements HudWindow {
     }
 
     /**
-     * Hàng hành động của item ĐANG CHỌN: Mặc · Bán 1 · Giao dịch · Cường hoá · công tắc Bảo Vệ.
+     * Hàng hành động của item ĐANG CHỌN: Mặc/Dùng · Bán 1 · Giao dịch · Cường hoá · công tắc Bảo Vệ.
      * Toàn bộ ẩn cho tới khi người chơi chọn một món (xem {@link #showDetail}).
      *
      * <p>Nằm ở HÀNG RIÊNG, dưới tên món, chứ không cùng dòng với nó: năm ô điều khiển cạnh một nhãn
@@ -328,13 +340,13 @@ public final class InventoryPanel implements HudWindow {
      */
     private Table buildActionRow() {
         Table row = new Table();
-        row.add(equipButton).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
+        row.add(primaryButton).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
         row.add(sellButton).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
         row.add(offerButton).width(ACTION_BUTTON_WIDTH_PX).padRight(6f);
         row.add(enhanceButton).width(ACTION_BUTTON_WIDTH_PX).padRight(6f);
         row.add(protectionButton).width(PROTECTION_BUTTON_WIDTH_PX);
         row.add().expandX(); // đẩy cả cụm về TRÁI, thẳng hàng với tên món ở dòng trên
-        equipButton.setVisible(false);
+        primaryButton.setVisible(false);
         sellButton.setVisible(false);
         offerButton.setVisible(false);
         enhanceButton.setVisible(false);
@@ -520,13 +532,33 @@ public final class InventoryPanel implements HudWindow {
      * @param canEquip có bày nút Mặc hay không (item không mặc được theo catalog, hoặc chưa chọn gì).
      * @param actions ba nút còn lại (Bán/Giao dịch/Cường hoá) — xem {@link Actions}.
      */
-    public void showDetail(String detailText, boolean canEquip, Actions actions) {
+    public void showDetail(String detailText, PrimaryAction primary, Actions actions) {
         detailLabel.setText(detailText);
-        equipButton.setVisible(canEquip);
+        this.primaryAction = primary;
+        primaryButton.setVisible(primary != PrimaryAction.NONE);
+        if (primary != PrimaryAction.NONE) {
+            primaryButton.setText(
+                    text(primary == PrimaryAction.EQUIP ? "inventory.action.equip" : "inventory.action.use"));
+        }
         sellButton.setVisible(actions.canSell());
         offerButton.setVisible(actions.canOffer());
         enhanceButton.setVisible(actions.canEnhance());
         protectionButton.setVisible(actions.canEnhance());
+    }
+
+    /**
+     * Hành động chính của món đang chọn. Ba trạng thái loại trừ nhau — xem javadoc
+     * {@link #primaryButton} về lý do chúng dùng chung một ô nút.
+     */
+    public enum PrimaryAction {
+        /** Không chọn món nào, hoặc món không mặc được cũng không dùng được. */
+        NONE,
+        EQUIP,
+        USE
+    }
+
+    private void firePrimaryAction() {
+        fire(primaryAction == PrimaryAction.USE ? onUseSelected : onEquipSelected);
     }
 
     /**
@@ -542,6 +574,11 @@ public final class InventoryPanel implements HudWindow {
      *     {@code ENHANCE_OUTCOME_INSUFFICIENT_GOLD}) — client không có bảng chi phí để đoán trước
      */
     public record Actions(boolean canSell, boolean canOffer, boolean canEnhance) {}
+
+    /** Người chơi bấm "Dùng" trên item đang chọn (ADR-046 D5 — đan dược). */
+    public void setOnUseSelected(Runnable listener) {
+        this.onUseSelected = listener;
+    }
 
     /** Người chơi bấm Giao dịch trên item đang chọn — đưa món đó vào lời chào. */
     public void setOnOfferSelected(Runnable listener) {

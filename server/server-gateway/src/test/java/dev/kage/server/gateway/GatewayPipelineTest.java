@@ -325,7 +325,7 @@ class GatewayPipelineTest {
                 Map.of(),
                 List.of(
                         new dev.kage.inventory.domain.ItemCatalogEntry(
-                                1L, "kunai", "item.kunai.name", 99, null, 0, 0, 0, 0, 1),
+                                1L, "kunai", "item.kunai.name", 99, null, 0, 0, 0, 0, 1, null, 0),
                         new dev.kage.inventory.domain.ItemCatalogEntry(
                                 2L,
                                 "wooden_sword",
@@ -336,7 +336,9 @@ class GatewayPipelineTest {
                                 0,
                                 0,
                                 0,
-                                5)));
+                                5,
+                                null,
+                                0)));
         EmbeddedChannel channel = newPipeline(new FakeCharacterPort(), inventoryFacade, fakeQuestFacade());
         connect(channel, "cattest1");
         selectCharacter(channel, createCharacter(channel, "CatHero", 2), 3);
@@ -371,7 +373,7 @@ class GatewayPipelineTest {
                 List.of(),
                 Map.of(),
                 List.of(new dev.kage.inventory.domain.ItemCatalogEntry(
-                        1L, "kunai", "item.kunai.name", 99, null, 0, 0, 0, 0, 1)));
+                        1L, "kunai", "item.kunai.name", 99, null, 0, 0, 0, 0, 1, null, 0)));
         EmbeddedChannel channel = newPipeline(new FakeCharacterPort(), inventoryFacade, fakeQuestFacade());
         connect(channel, "cattest2");
         selectCharacter(channel, createCharacter(channel, "CatHero2", 2), 3);
@@ -390,7 +392,7 @@ class GatewayPipelineTest {
                 List.of(),
                 Map.of(),
                 List.of(new dev.kage.inventory.domain.ItemCatalogEntry(
-                        1L, "kunai", "item.kunai.name", 99, null, 0, 0, 0, 0, 1)));
+                        1L, "kunai", "item.kunai.name", 99, null, 0, 0, 0, 0, 1, null, 0)));
         EmbeddedChannel channel = newPipeline(new FakeCharacterPort(), inventoryFacade, fakeQuestFacade());
         connect(channel, "cattest3");
         selectCharacter(channel, createCharacter(channel, "CatHero3", 2), 3);
@@ -712,7 +714,10 @@ class GatewayPipelineTest {
         return new InventoryFacade(
                 new dev.kage.inventory.api.ItemAcquisitionUseCases(addItemUseCase, grantLootUseCase),
                 equipmentUseCases,
-                enhanceItemUseCase,
+                new dev.kage.inventory.api.ItemActionUseCases(
+                        enhanceItemUseCase,
+                        new dev.kage.inventory.application.UseItemUseCase(
+                                inventoryPort, itemTemplatePort, auditPort, action -> action.accept(null))),
                 new dev.kage.inventory.api.InventoryQueryUseCases(
                         new dev.kage.inventory.application.ListInventoryUseCase(inventoryPort, equipmentPort),
                         new dev.kage.inventory.application.GetItemCatalogUseCase(itemTemplatePort)));

@@ -1,6 +1,8 @@
 package dev.kage.server.world;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.LongFunction;
 import java.util.function.Supplier;
@@ -16,6 +18,7 @@ import dev.kage.server.world.component.AiState;
 import dev.kage.server.world.component.AiStateComponent;
 import dev.kage.server.world.component.CharacterIdComponent;
 import dev.kage.server.world.component.HealthComponent;
+import dev.kage.server.world.component.MonsterIdComponent;
 import dev.kage.server.world.component.StatusEffectComponent;
 import dev.kage.server.world.component.TargetComponent;
 
@@ -53,8 +56,14 @@ final class AiSystem extends IteratingKSystem {
     private static final ComponentMapper<StatusEffectComponent> STATUS_EFFECT =
             ComponentMapper.getFor(StatusEffectComponent.class);
 
+    private static final ComponentMapper<MonsterIdComponent> MONSTER_ID =
+            ComponentMapper.getFor(MonsterIdComponent.class);
+
     private final Supplier<Collection<KEntity>> characterEntities;
     private final LongFunction<KEntity> entityLookup;
+
+    /** Quái vừa về tới điểm spawn và lành lại (ADR-046 D4) — {@code WorldFacade} drain mỗi tick. */
+    private final List<HealthChange> pendingHealthChanges = new ArrayList<>();
 
     /**
      * @param characterEntities quét MỌI nhân vật đang online để tìm mục tiêu aggro gần nhất — chấp
@@ -72,6 +81,16 @@ final class AiSystem extends IteratingKSystem {
                 .get());
         this.characterEntities = characterEntities;
         this.entityLookup = entityLookup;
+    }
+
+    /** Cùng khuôn {@code CombatSystem.drainResults} — kết quả tick lấy ra SAU {@code ecsWorld.update()}. */
+    List<HealthChange> drainHealthChanges() {
+        if (pendingHealthChanges.isEmpty()) {
+            return List.of();
+        }
+        List<HealthChange> results = List.copyOf(pendingHealthChanges);
+        pendingHealthChanges.clear();
+        return results;
     }
 
     @Override
@@ -192,9 +211,27 @@ final class AiSystem extends IteratingKSystem {
             position.y = ai.spawnY;
             ai.state = AiState.IDLE;
             ai.stateTimer = 0f;
+            healToFullOnArrival(entity);
             return;
         }
         moveToward(entity, ai.spawnX, ai.spawnY, params.chaseSpeedMps());
+    }
+
+    /**
+     * ADR-046 D4 — quái về tới điểm spawn thì lành lại HẾT. Không có bước này thì "đánh vài nhát,
+     * chạy ra khỏi leash, quay lại đánh tiếp con máu thấp" là chiến thuật tối ưu của MỌI trận, và
+     * nó trở thành lỗ hổng thật đúng lúc người chơi được hồi máu ngoài chiến đấu (D2).
+     *
+     * <p>Chỉ phát {@code HealthChange} khi máu THỰC SỰ thiếu: con quái tuần tra qua lại mà chưa ai
+     * đụng tới không được phép sinh ra gói nào (cam kết trần số gói với ADR-042).
+     */
+    private void healToFullOnArrival(KEntity entity) {
+        HealthComponent health = HEALTH.get(entity);
+        if (health == null || health.current >= health.max) {
+            return;
+        }
+        health.current = health.max;
+        pendingHealthChanges.add(new HealthChange(MONSTER_ID.get(entity).monsterId, health.current, health.max));
     }
 
     private void startChasing(AiStateComponent ai, TargetComponent target, KEntity characterEntity) {

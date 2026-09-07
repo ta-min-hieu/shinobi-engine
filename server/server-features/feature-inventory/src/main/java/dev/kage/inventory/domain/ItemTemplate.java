@@ -27,7 +27,9 @@ public record ItemTemplate(
         int bonusDef,
         int bonusRes,
         int bonusHp,
-        int requiredLevel) {
+        int requiredLevel,
+        ItemUseEffect useEffect,
+        int useValue) {
 
     public ItemTemplate {
         if (id <= 0) {
@@ -41,6 +43,12 @@ public record ItemTemplate(
         }
         if (maxStack < 1) {
             throw new IllegalArgumentException("maxStack phải >= 1: " + maxStack);
+        }
+        if (useEffect != null && equipSlot != null) {
+            throw new IllegalArgumentException("item mặc được thì không dùng được: " + equipSlot + "/" + useEffect);
+        }
+        if (useEffect != null && useValue <= 0) {
+            throw new IllegalArgumentException("item dùng được phải có useValue > 0: " + useValue);
         }
         if (equipSlot != null && maxStack != 1) {
             // Luật của chủ dự án: trang bị KHÔNG xếp chồng, tiêu hao/nhiệm vụ/sự kiện thì có.
@@ -56,5 +64,10 @@ public record ItemTemplate(
     /** Có gộp được nhiều cái vào 1 ô túi không — kéo theo từ {@link #maxStack}. */
     public boolean isStackable() {
         return maxStack > 1;
+    }
+
+    /** ADR-046 D5 — bấm "Dùng" trên món này có làm gì không. */
+    public boolean isUsable() {
+        return useEffect != null;
     }
 }

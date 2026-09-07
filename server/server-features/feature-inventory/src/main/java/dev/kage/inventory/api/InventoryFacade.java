@@ -10,6 +10,7 @@ import dev.kage.inventory.application.GetItemCatalogUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.inventory.application.ListInventoryUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
+import dev.kage.inventory.application.UseItemUseCase;
 import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.InventorySnapshot;
@@ -29,20 +30,22 @@ public final class InventoryFacade {
     private final UnequipItemUseCase unequipItemUseCase;
     private final ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase;
     private final EnhanceItemUseCase enhanceItemUseCase;
+    private final UseItemUseCase useItemUseCase;
     private final ListInventoryUseCase listInventoryUseCase;
     private final GetItemCatalogUseCase getItemCatalogUseCase;
 
     public InventoryFacade(
             ItemAcquisitionUseCases acquisitionUseCases,
             EquipmentUseCases equipmentUseCases,
-            EnhanceItemUseCase enhanceItemUseCase,
+            ItemActionUseCases actionUseCases,
             InventoryQueryUseCases queryUseCases) {
         this.addItemUseCase = acquisitionUseCases.addItemUseCase();
         this.grantLootUseCase = acquisitionUseCases.grantLootUseCase();
         this.equipItemUseCase = equipmentUseCases.equipItemUseCase();
         this.unequipItemUseCase = equipmentUseCases.unequipItemUseCase();
         this.computeEquipmentBonusUseCase = equipmentUseCases.computeEquipmentBonusUseCase();
-        this.enhanceItemUseCase = enhanceItemUseCase;
+        this.enhanceItemUseCase = actionUseCases.enhanceItemUseCase();
+        this.useItemUseCase = actionUseCases.useItemUseCase();
         this.listInventoryUseCase = queryUseCases.listInventoryUseCase();
         this.getItemCatalogUseCase = queryUseCases.getItemCatalogUseCase();
     }
@@ -122,6 +125,17 @@ public final class InventoryFacade {
             case INSUFFICIENT_GOLD -> EnhanceResult.INSUFFICIENT_GOLD;
             case DUPLICATE_REQUEST -> EnhanceResult.DUPLICATE_REQUEST;
         };
+    }
+
+    /**
+     * Dùng MỘT món tiêu hao (ADR-046 D5 — đan dược). Trừ trong túi + ghi audit; hiệu ứng THẬT
+     * (cộng máu) do chỗ gọi áp qua {@code WorldFacade} — {@code feature-inventory} không biết
+     * {@code server-world} tồn tại.
+     *
+     * @return hiệu ứng cần áp + số cái còn lại; {@code outcome != OK} nghĩa là không trừ gì cả
+     */
+    public UseItemUseCase.UseItemResult useItem(long characterId, long inventoryItemId) {
+        return useItemUseCase.execute(characterId, inventoryItemId);
     }
 
     /**

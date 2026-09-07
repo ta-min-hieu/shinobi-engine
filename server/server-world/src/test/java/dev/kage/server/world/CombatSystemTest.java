@@ -13,6 +13,7 @@ import dev.kage.engine.ecs.KEntity;
 import dev.kage.engine.ecs.component.PositionComponent;
 import dev.kage.server.world.component.AttackCooldownComponent;
 import dev.kage.server.world.component.CharacterIdComponent;
+import dev.kage.server.world.component.CombatRecencyComponent;
 import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterIdComponent;
@@ -30,6 +31,8 @@ class CombatSystemTest {
 
     private static final ComponentMapper<PositionComponent> POSITION = ComponentMapper.getFor(PositionComponent.class);
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
+    private static final ComponentMapper<CombatRecencyComponent> RECENCY =
+            ComponentMapper.getFor(CombatRecencyComponent.class);
 
     private static final long ATTACKER_ID = 1L;
     private static final long DEFENDER_ID = 2L;
@@ -175,5 +178,30 @@ class CombatSystemTest {
         // hitPercent=1, dodgePercent=0 ở buildDefender/buildAttacker — đòn LUÔN trúng khi grounded.
         assertThat(results.get(0).miss()).isFalse();
         assertThat(results.get(0).damage()).isGreaterThan(0);
+    }
+
+    /**
+     * ADR-046 D2 — một đòn đánh phải đẩy CẢ HAI bên ra khỏi trạng thái "ngoài chiến đấu". Chỉ đánh
+     * dấu bên chịu đòn là kẻ tấn công vừa đánh vừa tự hồi máu; chỉ đánh dấu kẻ tấn công là người bị
+     * đánh hồi máu ngay giữa lúc bị đánh.
+     */
+    @Test
+    void shouldMarkBothSidesInCombat_soNeitherRegeneratesRightAfterATrade() {
+        EcsWorld world = new EcsWorld();
+        KEntity attacker = buildAttacker(world);
+        KEntity defender = buildDefender(world, true);
+        attacker.add(new CombatRecencyComponent());
+        defender.add(new CombatRecencyComponent());
+        RECENCY.get(attacker).secondsSinceCombat = 999f;
+        RECENCY.get(defender).secondsSinceCombat = 999f;
+        Map<Long, KEntity> byId = Map.of(ATTACKER_ID, attacker, DEFENDER_ID, defender);
+        CombatSystem combatSystem = new CombatSystem(byId::get);
+        world.addSystem(combatSystem);
+
+        world.update(0.016f);
+        combatSystem.requestAttack(attacker);
+
+        assertThat(RECENCY.get(attacker).secondsSinceCombat).isZero();
+        assertThat(RECENCY.get(defender).secondsSinceCombat).isZero();
     }
 }

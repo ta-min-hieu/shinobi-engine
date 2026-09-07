@@ -72,6 +72,8 @@ class WorldFacadeTest {
 
     private record CharacterDefeated(long defeatedCharacterId, long killerEntityId) {}
 
+    private record HealthChanged(long target, long entityId, int currentHp, int maxHp) {}
+
     private record CharacterRespawned(
             long characterId, float x, float y, int currentHp, int maxHp, int currentChi, int maxChi) {}
 
@@ -91,6 +93,7 @@ class WorldFacadeTest {
         final List<AreaChatMessage> areaChatMessages = new CopyOnWriteArrayList<>();
         final List<AppearanceChanged> appearanceChanges = new CopyOnWriteArrayList<>();
         final List<CharacterDefeated> characterDefeated = new CopyOnWriteArrayList<>();
+        final List<HealthChanged> healthChanges = new CopyOnWriteArrayList<>();
         final List<CharacterRespawned> characterRespawned = new CopyOnWriteArrayList<>();
 
         @Override
@@ -192,6 +195,12 @@ class WorldFacadeTest {
         @Override
         public void onCharacterAppearanceChanged(long targetCharacterId, long changedCharacterId) {
             appearanceChanges.add(new AppearanceChanged(targetCharacterId, changedCharacterId));
+        }
+
+        @Override
+        public void onHealthChanged(long targetCharacterId, WorldOutboundSink.HealthSnapshot health) {
+            healthChanges.add(
+                    new HealthChanged(targetCharacterId, health.entityId(), health.currentHp(), health.maxHp()));
         }
 
         @Override
@@ -433,7 +442,10 @@ class WorldFacadeTest {
                 new NpcCatalogSnapshot.NpcPlacementDefinition("sect_gatekeeper", 30f, 0f),
                 new NpcCatalogSnapshot.NpcPlacementDefinition("herb_trader", 31f, 0f)));
         WorldFacade dataWorld = new WorldFacade(
-                dataSink, true, TickMetricsPort.NO_OP, new WorldContentCatalog(MonsterCatalogSnapshot.EMPTY, twoNpcs));
+                dataSink,
+                true,
+                TickMetricsPort.NO_OP,
+                new WorldContentCatalog(MonsterCatalogSnapshot.EMPTY, twoNpcs, SafeZoneCatalogSnapshot.EMPTY));
         try {
             dataWorld.start();
             dataWorld.attachCharacter(1L, 30f, 0f, DEFAULT_STATS);
@@ -446,6 +458,44 @@ class WorldFacadeTest {
                     .containsExactlyInAnyOrder(tuple("sect_gatekeeper", 30f, 0f), tuple("herb_trader", 31f, 0f));
         } finally {
             dataWorld.stop();
+        }
+    }
+
+    /**
+     * ADR-046 D3 — bước vào vùng an toàn tông môn thì hồi đầy máu ngay. Đây cũng là lần ĐẦU TIÊN
+     * {@code TriggerZoneSystem} (dựng từ 2026-08-01) chạy thật với một zone khác rỗng.
+     *
+     * <p>Vùng đặt ở [0, 5] và nhân vật vào world ở x=8, ngay trên đầu một con hình nộm HUNG DỮ
+     * (fixture {@code trainingGround}) — nó đánh vài nhát để máu tụt thật, rồi nhân vật đi 3m về
+     * tây là vào vùng. Cả kịch bản gói trong ~2 giây, ngắn hơn hẳn 8 giây chờ của hồi máu ngoài
+     * chiến đấu (D2), nên gói "đầy máu" bắt được ở đây CHỈ có thể đến từ vùng an toàn.
+     */
+    @Test
+    void shouldHealToFullImmediately_whenCharacterWalksIntoASafeZone() {
+        RecordingSink zoneSink = new RecordingSink();
+        WorldContentCatalog withZone = new WorldContentCatalog(
+                TestMonsterCatalogs.trainingGround(),
+                NpcCatalogSnapshot.EMPTY,
+                new SafeZoneCatalogSnapshot(
+                        List.of(new SafeZoneCatalogSnapshot.SafeZoneDefinition("sect_grounds", 0f, -10f, 5f, 10f))));
+        WorldFacade zoneWorld = new WorldFacade(zoneSink, true, TickMetricsPort.NO_OP, withZone);
+        try {
+            zoneWorld.start();
+            zoneWorld.attachCharacter(1L, 8f, 0f, DEFAULT_STATS);
+
+            // Chờ máu tụt THẬT — không giả định con hình nộm đánh trúng ngay nhát đầu (HIT% 90%).
+            awaitTrue(() -> zoneSink.attackResults.stream().anyMatch(a -> a.defender() == 1L && !a.miss()));
+            assertThat(zoneSink.healthChanges).isEmpty(); // chưa vào vùng thì chưa có gì để báo
+
+            zoneWorld.enqueueMoveCommand(1L, 1, -1f, 0f); // đi TÂY: 3m ở 5 m/s ≈ 0,6 giây
+
+            awaitTrue(() ->
+                    zoneSink.healthChanges.stream().anyMatch(h -> h.entityId() == 1L && h.currentHp() == h.maxHp()));
+            assertThat(zoneSink.healthChanges)
+                    .filteredOn(h -> h.entityId() == 1L)
+                    .allMatch(h -> h.target() == 1L, "chính người vừa hồi máu phải nhận được gói");
+        } finally {
+            zoneWorld.stop();
         }
     }
 

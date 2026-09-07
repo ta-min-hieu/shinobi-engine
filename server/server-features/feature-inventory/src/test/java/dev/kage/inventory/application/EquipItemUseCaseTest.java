@@ -90,7 +90,8 @@ class EquipItemUseCaseTest {
         FakeInventoryPort inventoryPort = new FakeInventoryPort(
                 new Inventory(CHARACTER_ID, 20, List.of(new ItemStack(WEAPON_ITEM_ID, WEAPON_TEMPLATE_ID, 1, 0))));
         FakeItemTemplatePort templatePort = new FakeItemTemplatePort(Map.of(
-                WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 1, 5, 0, 0, 0, 1)));
+                WEAPON_TEMPLATE_ID,
+                new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 1, 5, 0, 0, 0, 1, null, 0)));
         FakeEquipmentPort equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
         EquipItemUseCase useCase = new EquipItemUseCase(inventoryPort, templatePort, equipmentPort, DIRECT_TX);
 
@@ -121,7 +122,8 @@ class EquipItemUseCaseTest {
         FakeInventoryPort inventoryPort = new FakeInventoryPort(
                 new Inventory(CHARACTER_ID, 20, List.of(new ItemStack(WEAPON_ITEM_ID, WEAPON_TEMPLATE_ID, 1, 0))));
         FakeItemTemplatePort templatePort = new FakeItemTemplatePort(Map.of(
-                WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 1, 5, 0, 0, 0, 1)));
+                WEAPON_TEMPLATE_ID,
+                new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 1, 5, 0, 0, 0, 1, null, 0)));
         FakeEquipmentPort equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
         EquipItemUseCase useCase = new EquipItemUseCase(inventoryPort, templatePort, equipmentPort, DIRECT_TX);
 
@@ -140,7 +142,8 @@ class EquipItemUseCaseTest {
         FakeInventoryPort inventoryPort = new FakeInventoryPort(
                 new Inventory(CHARACTER_ID, 20, List.of(new ItemStack(WEAPON_ITEM_ID, WEAPON_TEMPLATE_ID, 1, 0))));
         FakeItemTemplatePort templatePort = new FakeItemTemplatePort(Map.of(
-                WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 1, 18, 0, 0, 0, 5)));
+                WEAPON_TEMPLATE_ID,
+                new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 1, 18, 0, 0, 0, 5, null, 0)));
         FakeEquipmentPort equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
         EquipItemUseCase useCase = new EquipItemUseCase(inventoryPort, templatePort, equipmentPort, DIRECT_TX);
 
@@ -157,7 +160,8 @@ class EquipItemUseCaseTest {
         FakeInventoryPort inventoryPort = new FakeInventoryPort(
                 new Inventory(CHARACTER_ID, 20, List.of(new ItemStack(WEAPON_ITEM_ID, WEAPON_TEMPLATE_ID, 1, 0))));
         FakeItemTemplatePort templatePort = new FakeItemTemplatePort(Map.of(
-                WEAPON_TEMPLATE_ID, new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 1, 18, 0, 0, 0, 5)));
+                WEAPON_TEMPLATE_ID,
+                new ItemTemplate(WEAPON_TEMPLATE_ID, EquipmentSlotType.WEAPON, 1, 18, 0, 0, 0, 5, null, 0)));
         FakeEquipmentPort equipmentPort = new FakeEquipmentPort(new Equipment(CHARACTER_ID, Map.of()));
         EquipItemUseCase useCase = new EquipItemUseCase(inventoryPort, templatePort, equipmentPort, DIRECT_TX);
 

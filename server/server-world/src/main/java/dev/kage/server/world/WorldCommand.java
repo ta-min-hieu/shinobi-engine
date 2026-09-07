@@ -77,4 +77,15 @@ sealed interface WorldCommand {
      * thread, cùng lý do {@link AreaChatMessageCommand} tồn tại.
      */
     record AppearanceChangedCommand(long characterId) implements WorldCommand {}
+
+    /**
+     * Hồi {@code amount} máu cho {@code characterId} (ADR-046 D5 — đan dược). World KHÔNG biết
+     * "vật phẩm" là gì: {@code feature-inventory} đã trừ số lượng trong transaction của nó rồi,
+     * việc còn lại chỉ là cộng máu — đúng hình dạng {@link ApplyEquipmentBonusCommand} (world nhận
+     * SỐ đã tính sẵn, không nhận trang bị).
+     *
+     * <p>Vào qua hàng đợi chứ không gọi thẳng: mọi thứ sửa ECS state đều phải chạy trên tick thread
+     * (server/CLAUDE.md, ba ranh giới thread), còn lệnh này đến từ Virtual Thread xử lý gói.
+     */
+    record HealCharacterCommand(long characterId, int amount) implements WorldCommand {}
 }

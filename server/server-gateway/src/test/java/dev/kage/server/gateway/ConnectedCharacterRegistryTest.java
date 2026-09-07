@@ -400,7 +400,10 @@ class ConnectedCharacterRegistryTest {
         return new InventoryFacade(
                 new dev.kage.inventory.api.ItemAcquisitionUseCases(addItemUseCase, grantLootUseCase),
                 equipmentUseCases,
-                enhanceItemUseCase,
+                new dev.kage.inventory.api.ItemActionUseCases(
+                        enhanceItemUseCase,
+                        new dev.kage.inventory.application.UseItemUseCase(
+                                inventoryPort, itemTemplatePort, auditPort, action -> action.accept(null))),
                 new dev.kage.inventory.api.InventoryQueryUseCases(
                         new dev.kage.inventory.application.ListInventoryUseCase(inventoryPort, equipmentPort),
                         new dev.kage.inventory.application.GetItemCatalogUseCase(itemTemplatePort)));

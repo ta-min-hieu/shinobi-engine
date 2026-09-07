@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.Faction;
+import dev.kage.protocol.HealthChangedEvent;
 import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
@@ -393,5 +394,61 @@ class CombatHudControllerTest {
 
         assertThat(controller.playerMaxHp()).isEqualTo(118);
         assertThat(controller.playerHp()).isEqualTo(118);
+    }
+
+    // --- ADR-046 D1 — HealthChangedEvent (opcode 408) ---
+
+    @Test
+    void shouldRaiseThePlayerBar_whenHealthChangesWithoutAnyAttack() {
+        // Trước ADR-046, HP chỉ đổi khi có AttackResultEvent/SkillResultEvent nhắm vào mình — máu
+        // hồi ngoài chiến đấu thì vạch máu ĐỨNG IM tới đòn đánh kế tiếp.
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+        controller.onEnterWorld(38, 118);
+
+        controller.onHealthChanged(HealthChangedEvent.newBuilder()
+                .setEntityId(LOCAL_CHARACTER_ID)
+                .setCurrentHp(76)
+                .setMaxHp(118)
+                .build());
+
+        assertThat(controller.playerHp()).isEqualTo(76);
+        assertThat(controller.playerMaxHp()).isEqualTo(118);
+    }
+
+    @Test
+    void shouldHealTheMonsterBar_whenItGetsBackToItsSpawnPoint() {
+        // ADR-046 D4 — quái về nhà thì đầy máu. Không có nhánh này, người chơi quay lại thấy một
+        // vạch máu gần cạn trong khi server đã hồi đầy cho nó.
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+        controller.onMonsterSpawned(MonsterSpawnedEvent.newBuilder()
+                .setMonsterId(MONSTER_ID)
+                .setMonsterCode("stone_ogre")
+                .setCurrentHp(12)
+                .setMaxHp(50)
+                .build());
+
+        controller.onHealthChanged(HealthChangedEvent.newBuilder()
+                .setEntityId(MONSTER_ID)
+                .setCurrentHp(50)
+                .setMaxHp(50)
+                .build());
+
+        assertThat(controller.monsters().get(MONSTER_ID).hp()).isEqualTo(50);
+    }
+
+    @Test
+    void shouldKeepKnownMaxHp_whenHealthChangedCarriesZero() {
+        // Cùng luật onRespawn/onEnterWorld: 0 là "server cũ chưa gửi", không phải máu tối đa bằng 0.
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+        controller.onEnterWorld(50, 118);
+
+        controller.onHealthChanged(HealthChangedEvent.newBuilder()
+                .setEntityId(LOCAL_CHARACTER_ID)
+                .setCurrentHp(60)
+                .setMaxHp(0)
+                .build());
+
+        assertThat(controller.playerHp()).isEqualTo(60);
+        assertThat(controller.playerMaxHp()).isEqualTo(118);
     }
 }

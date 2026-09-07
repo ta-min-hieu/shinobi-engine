@@ -73,6 +73,28 @@ final class CombatConstants {
     // MONSTER_MAX_HP và MONSTER_RESPAWN_SECONDS đã chuyển thành cột `monster_template.max_hp` và
     // `monster_spawn.respawn_seconds` (ADR-037) — mỗi điểm spawn có nhịp hồi sinh riêng.
 
+    // ---------------------------------------------------------------------------------------
+    // Hồi máu ngoài chiến đấu — ADR-046 D2. Chỉ áp cho NHÂN VẬT; quái lành lại bằng đường khác
+    // (về tới điểm spawn thì đầy máu, AiSystem — ADR-046 D4).
+    // ---------------------------------------------------------------------------------------
+
+    /** Bao lâu không đánh ai VÀ không bị ai đánh thì bắt đầu hồi máu. */
+    static final float REGEN_DELAY_SECONDS = 8f;
+
+    /**
+     * Phần máu TỐI ĐA hồi mỗi giây khi đã ngoài chiến đấu — tỉ lệ chứ không phải số tuyệt đối, vì
+     * máu tối đa không còn là hằng số kể từ ADR-036 ({@code bonus_hp} của trang bị nâng nó lên).
+     * Với 118 máu: ~3,5 máu/giây ⇒ 38→118 mất ~23 giây.
+     */
+    static final float REGEN_FRACTION_PER_SECOND = 0.03f;
+
+    /**
+     * Trần phát {@code HealthChangedEvent} của hồi máu: nhiều nhất 1 gói/giây/entity, và CHỈ khi
+     * máu thực sự đổi ⇒ người đang đầy máu phát 0 gói. Con số này là cam kết với ADR-042 (đang
+     * muốn GIẢM số gói) — không phải tham số cân bằng gameplay.
+     */
+    static final float REGEN_EMIT_INTERVAL_SECONDS = 1f;
+
     private CombatConstants() {}
 
     /** Bonus passive TĨNH theo hệ phái (GDD §5 "2 passive/hệ") — cộng THẲNG vào chỉ số derive,

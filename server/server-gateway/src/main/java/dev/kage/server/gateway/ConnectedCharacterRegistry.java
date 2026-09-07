@@ -24,6 +24,7 @@ import dev.kage.protocol.ChatMessageEvent;
 import dev.kage.protocol.EffectKind;
 import dev.kage.protocol.ExperienceChangedEvent;
 import dev.kage.protocol.GoldChangedEvent;
+import dev.kage.protocol.HealthChangedEvent;
 import dev.kage.protocol.ItemGrantedEvent;
 import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
@@ -353,6 +354,20 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 .setEffectKind(toProtoEffectKind(outcome.effectKind()))
                 .build();
         send(ctx, Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    @Override
+    public void onHealthChanged(long targetCharacterId, WorldOutboundSink.HealthSnapshot health) {
+        ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
+        if (ctx == null) {
+            return;
+        }
+        HealthChangedEvent event = HealthChangedEvent.newBuilder()
+                .setEntityId(health.entityId())
+                .setCurrentHp(health.currentHp())
+                .setMaxHp(health.maxHp())
+                .build();
+        send(ctx, Opcode.OPCODE_HEALTH_CHANGED_EVENT_VALUE, 0, event.toByteArray());
     }
 
     private static EffectKind toProtoEffectKind(dev.kage.server.world.SkillEffectKind effectKind) {

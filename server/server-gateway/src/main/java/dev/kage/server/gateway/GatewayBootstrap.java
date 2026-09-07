@@ -272,12 +272,13 @@ public final class GatewayBootstrap {
         Gauge.builder("kage.db.pool.pending", databaseBootstrap, ServerDatabaseBootstrap::poolPendingThreads)
                 .description("Số thread đang chờ pool có connection trống — >0 kéo dài nghĩa là pool quá nhỏ")
                 .register(meterRegistry);
-        // ADR-037 (quái) + ADR-040 (NPC) — nội dung tĩnh đọc từ DB. Nạp MỘT LẦN ở đây rồi chia cho
-        // mọi khu vực của world chính: config tĩnh, và đọc lại mỗi lần mở khu vực là mở một đường
-        // DB thứ hai cho cùng dữ liệu.
+        // ADR-037 (quái) + ADR-040 (NPC) + ADR-046 D3 (vùng an toàn) — nội dung tĩnh đọc từ DB.
+        // Nạp MỘT LẦN ở đây rồi chia cho mọi khu vực của world chính: config tĩnh, và đọc lại mỗi
+        // lần mở khu vực là mở một đường DB thứ hai cho cùng dữ liệu.
         WorldContentCatalog worldContent = WorldContentLoader.load(
                 databaseBootstrap.wireMonsterFacade(),
                 databaseBootstrap.wireNpcPlacementFacade(),
+                databaseBootstrap.wireWorldGeometryFacade(),
                 MonsterSpawnPoint.MAIN_WORLD_CODE);
         WorldFacade firstChannelFacade = new WorldFacade(
                 characterRegistry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG_MAIN), worldContent);

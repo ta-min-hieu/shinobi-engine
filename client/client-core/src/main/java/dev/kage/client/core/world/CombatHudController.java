@@ -6,6 +6,7 @@ import java.util.Map;
 
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.Faction;
+import dev.kage.protocol.HealthChangedEvent;
 import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
@@ -17,11 +18,14 @@ import dev.kage.protocol.SkillResultEvent;
  * (widget/controller tách biệt — UI.md §4, §10). Không phụ thuộc libGDX/GL nên test được thẳng,
  * không cần context đồ hoạ.
  *
- * <p>Server không gửi gói đồng bộ HP/Khí/hồi chiêu nào (GAMEPLAY.md §3) — HP/Khí bắt đầu ở mức đầy
- * và chỉ được SỬA LẠI bằng số thật mỗi khi có {@link AttackResultEvent}/{@link SkillResultEvent}
- * nhắm vào mình; hồi chiêu là đếm ngược cục bộ hoàn toàn dự đoán, có thể lệch với server (chấp nhận
- * được — server luôn tự kiểm tra lại, lệch chỉ khiến nút bật/tắt sai thời điểm, xem
- * {@link CombatConstants}).
+ * <p>Khí và hồi chiêu KHÔNG có gói đồng bộ nào (GAMEPLAY.md §3): chúng bắt đầu ở mức đầy và hồi
+ * chiêu là đếm ngược cục bộ hoàn toàn dự đoán, có thể lệch với server (chấp nhận được — server luôn
+ * tự kiểm tra lại, lệch chỉ khiến nút bật/tắt sai thời điểm, xem {@link CombatConstants}).
+ *
+ * <p><b>HP thì CÓ</b>, kể từ ADR-046: ngoài {@link AttackResultEvent}/{@link SkillResultEvent} nhắm
+ * vào mình, còn {@link HealthChangedEvent} cho mọi lần máu đổi mà không do đòn đánh (hồi máu ngoài
+ * chiến đấu, vùng an toàn, quái lành lại, đan dược). Trước ADR đó, máu hồi mà vạch máu đứng im tới
+ * đòn đánh kế tiếp — đúng họ bug ADR-043 đã phải sửa một lần.
  */
 final class CombatHudController {
 
@@ -159,6 +163,24 @@ final class CombatHudController {
 
     void onSkillResult(SkillResultEvent event) {
         applyHpUpdate(event.getTargetEntityId(), event.getTargetCurrentHp(), event.getTargetDied());
+    }
+
+    /**
+     * ADR-046 D1 — máu của một entity vừa đổi mà KHÔNG do đòn đánh nào (hồi máu ngoài chiến đấu,
+     * vùng an toàn, quái về tới điểm spawn, đan dược).
+     *
+     * <p>Đi CHUNG {@link #applyHpUpdate} với đòn đánh, chỉ khác một chỗ: {@code died} luôn
+     * {@code false} — không nguồn hồi máu nào giết ai, và event này KHÔNG bao giờ mang HP = 0
+     * (server chỉ phát khi máu vừa TĂNG).
+     *
+     * <p>Máu tối đa cũng được cập nhật khi entity là chính mình: đây là gói ĐẦU TIÊN có thể tới sau
+     * khi trang bị đổi {@code max}, và vạch máu lấy mẫu số từ đó (cùng họ bug ADR-043 đã sửa).
+     */
+    void onHealthChanged(HealthChangedEvent event) {
+        if (event.getEntityId() == localCharacterId && event.getMaxHp() > 0) {
+            playerMaxHp = event.getMaxHp();
+        }
+        applyHpUpdate(event.getEntityId(), event.getCurrentHp(), false);
     }
 
     // Dùng chung cho AttackResultEvent/SkillResultEvent — cả 2 mang đúng 3 field cần: ai bị nhắm,

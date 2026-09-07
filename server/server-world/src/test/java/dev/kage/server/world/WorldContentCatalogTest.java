@@ -28,9 +28,10 @@ class WorldContentCatalogTest {
     void shouldRejectNull_soCallersUseEmptyInstead() {
         // null ở đây sẽ nổ muộn trong tick thread (nơi 1 exception từng đóng băng cả world) thay vì
         // nổ ngay lúc dựng — nên chặn ở constructor.
-        assertThatThrownBy(() -> new WorldContentCatalog(null, NpcCatalogSnapshot.EMPTY))
+        assertThatThrownBy(() -> new WorldContentCatalog(null, NpcCatalogSnapshot.EMPTY, SafeZoneCatalogSnapshot.EMPTY))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new WorldContentCatalog(MonsterCatalogSnapshot.EMPTY, null))
+        assertThatThrownBy(() ->
+                        new WorldContentCatalog(MonsterCatalogSnapshot.EMPTY, null, SafeZoneCatalogSnapshot.EMPTY))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

@@ -9,6 +9,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import dev.kage.protocol.EquipmentSlot;
 import dev.kage.protocol.ItemCatalogEntry;
 import dev.kage.protocol.ItemCatalogResponse;
+import dev.kage.protocol.ItemUseEffect;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.wire.PacketCodec;
 
@@ -90,6 +91,16 @@ final class ItemCatalogCoordinator implements WindowFlow {
 
     EquipmentSlot equipSlot(long itemTemplateId) {
         return catalog.equipSlot(itemTemplateId);
+    }
+
+    /** Xem {@link ItemCatalog#useEffect(long)} — UNSPECIFIED nghĩa là không bày nút "Dùng". */
+    ItemUseEffect useEffect(long itemTemplateId) {
+        return catalog.useEffect(itemTemplateId);
+    }
+
+    /** Xem {@link ItemCatalog#useValue(long)}. */
+    int useValue(long itemTemplateId) {
+        return catalog.useValue(itemTemplateId);
     }
 
     /**

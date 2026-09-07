@@ -11,11 +11,15 @@ import dev.kage.monster.domain.MonsterStats;
 import dev.kage.monster.domain.MonsterTemplate;
 import dev.kage.server.world.MonsterCatalogSnapshot;
 import dev.kage.server.world.NpcCatalogSnapshot;
+import dev.kage.server.world.SafeZoneCatalogSnapshot;
 import dev.kage.server.world.WorldContentCatalog;
+import dev.kage.world.api.WorldGeometryFacade;
+import dev.kage.world.domain.SafeZone;
 
 /**
- * Dịch nội dung tĩnh của world — quái ({@code feature-monster}, ADR-037) và NPC
- * ({@code feature-dialogue}, ADR-040) — sang record thuần của {@code server-world}.
+ * Dịch nội dung tĩnh của world — quái ({@code feature-monster}, ADR-037), NPC
+ * ({@code feature-dialogue}, ADR-040) và vùng an toàn ({@code feature-world}, ADR-046 D3) — sang
+ * record thuần của {@code server-world}.
  *
  * <p>Cầu nối này phải nằm ở gateway và không nằm chỗ nào khác được: {@code server-world} không được
  * biết DB (Điều 23), còn {@code server-database} thậm chí <b>không phụ thuộc</b>
@@ -39,8 +43,26 @@ final class WorldContentLoader {
      *     ({@link NpcPlacement#MAIN_WORLD_CODE}) vì đó là CÙNG một world; chỗ gọi truyền một giá
      *     trị duy nhất cho cả hai, và có test khoá hai hằng số đó bằng nhau
      */
-    static WorldContentCatalog load(MonsterFacade monsterFacade, NpcPlacementFacade npcFacade, String worldCode) {
-        return new WorldContentCatalog(loadMonsters(monsterFacade, worldCode), loadNpcs(npcFacade, worldCode));
+    static WorldContentCatalog load(
+            MonsterFacade monsterFacade,
+            NpcPlacementFacade npcFacade,
+            WorldGeometryFacade geometryFacade,
+            String worldCode) {
+        return new WorldContentCatalog(
+                loadMonsters(monsterFacade, worldCode),
+                loadNpcs(npcFacade, worldCode),
+                loadSafeZones(geometryFacade, worldCode));
+    }
+
+    private static SafeZoneCatalogSnapshot loadSafeZones(WorldGeometryFacade geometryFacade, String worldCode) {
+        return new SafeZoneCatalogSnapshot(geometryFacade.listSafeZones(worldCode).stream()
+                .map(WorldContentLoader::toSafeZoneDefinition)
+                .toList());
+    }
+
+    private static SafeZoneCatalogSnapshot.SafeZoneDefinition toSafeZoneDefinition(SafeZone zone) {
+        return new SafeZoneCatalogSnapshot.SafeZoneDefinition(
+                zone.code(), zone.minX(), zone.minY(), zone.maxX(), zone.maxY());
     }
 
     private static MonsterCatalogSnapshot loadMonsters(MonsterFacade monsterFacade, String worldCode) {

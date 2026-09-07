@@ -1,5 +1,6 @@
 package dev.kage.server.world;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,9 +18,11 @@ import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.EcsWorld;
 import dev.kage.engine.ecs.KEntity;
 import dev.kage.engine.ecs.component.PositionComponent;
+import dev.kage.engine.ecs.component.TriggerZoneMembershipComponent;
 import dev.kage.engine.ecs.component.VelocityComponent;
 import dev.kage.engine.ecs.system.Aabb;
 import dev.kage.engine.ecs.system.MovementSystem;
+import dev.kage.engine.ecs.system.NamedZone;
 import dev.kage.engine.ecs.system.Platform;
 import dev.kage.engine.ecs.system.TerrainCollisionSystem;
 import dev.kage.engine.ecs.system.TriggerZoneSystem;
@@ -31,6 +34,7 @@ import dev.kage.server.world.component.BossAiComponent;
 import dev.kage.server.world.component.CharacterIdComponent;
 import dev.kage.server.world.component.CharacterLevelComponent;
 import dev.kage.server.world.component.ChiComponent;
+import dev.kage.server.world.component.CombatRecencyComponent;
 import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterComponent;
@@ -70,6 +74,8 @@ public final class WorldFacade {
             ComponentMapper.getFor(StatusEffectComponent.class);
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
     private static final ComponentMapper<ChiComponent> CHI = ComponentMapper.getFor(ChiComponent.class);
+    private static final ComponentMapper<CharacterIdComponent> CHARACTER_ID =
+            ComponentMapper.getFor(CharacterIdComponent.class);
 
     // Vị trí quái KHÔNG còn nằm ở đây: từ ADR-037 chúng đọc từ `monster_spawn` và tới đây qua
     // MonsterCatalogSnapshot. Hai ràng buộc CŨ vẫn nguyên hiệu lực và nay do DB gác (CHECK +
@@ -135,6 +141,20 @@ public final class WorldFacade {
     private final CombatSystem combatSystem;
     private final SkillSystem skillSystem;
     private final BossAiSystem bossAiSystem;
+    private final HealthRegenSystem healthRegenSystem;
+
+    /**
+     * Giữ tham chiếu (khác trước: dựng thẳng trong {@code addSystem}) vì ADR-046 D4 cần drain
+     * "quái nào vừa về nhà và lành lại" sau mỗi tick, y hệt {@link #combatSystem}.
+     */
+    private final AiSystem aiSystem;
+
+    /**
+     * Máu vừa đổi bởi thứ KHÔNG phải một System (ADR-046): vùng an toàn (D3 — {@code
+     * TriggerZoneSystem} gọi callback NGAY trong tick) và đan dược (D5 — lệnh từ hàng đợi). Tích ở
+     * đây rồi phát sau {@code ecsWorld.update()}, như mọi kết quả tick khác.
+     */
+    private final List<HealthChange> pendingHealthChanges = new ArrayList<>();
 
     // Chỉ tick thread được đọc/ghi các map/field này (không đồng bộ hoá) — đúng ranh giới "ECS
     // state chỉ sửa trên tick thread" (SERVER.md §2).
@@ -263,6 +283,8 @@ public final class WorldFacade {
         this.systemTimingListener = tickMetricsPort::recordSystemDuration;
         this.aoiTracker = new AreaOfInterestTracker(outboundSink);
         this.combatSystem = new CombatSystem(this::lookupEntity);
+        this.healthRegenSystem = new HealthRegenSystem();
+        this.aiSystem = new AiSystem(entitiesByCharacterId::values, this::lookupEntity);
         this.skillSystem = new SkillSystem(this::lookupEntity);
         this.bossAiSystem = new BossAiSystem(this::lookupEntity);
         // Thứ tự ĐÚNG ECS.md §6 (InputCommandSystem -> AISystem -> MovementSystem -> ... ->
@@ -270,7 +292,7 @@ public final class WorldFacade {
         // tầm đánh — đổi thứ tự = đổi behavior (engine/CLAUDE.md). SkillSystem/BossAiSystem chỉ
         // đếm ngược cooldown mỗi tick (hành động thật là lệnh rời rạc/điều kiện nội bộ, không phải
         // hành vi lặp mỗi tick như đánh thường) — thứ tự với CombatSystem không quan trọng.
-        ecsWorld.addSystem(new AiSystem(entitiesByCharacterId::values, this::lookupEntity));
+        ecsWorld.addSystem(aiSystem);
         ecsWorld.addSystem(new MovementSystem());
         // Trục dọc (ADR-033) — chạy ngay sau MovementSystem (ngang), TRƯỚC TerrainCollisionSystem,
         // cùng nhóm "áp chuyển động" của tick trước khi xử va chạm. World chính (spawnOverworldContent)
@@ -284,10 +306,7 @@ public final class WorldFacade {
         // Obstacle mặc định RỖNG — chưa có map/asset thật (ADR-021). No-op an toàn cho tới khi có
         // nguồn map thật gọi setObstacles(...); giữ đúng thứ tự PHYSICS.md §4 (sau MovementSystem).
         ecsWorld.addSystem(new TerrainCollisionSystem());
-        // Zone mặc định RỖNG + chưa entity nào mang TriggerZoneMembershipComponent — chưa có
-        // consumer thật (vùng an toàn PvP, tương tác NPC...) wire vào, xây trước cơ chế để dùng
-        // sau (PHYSICS.md §7). No-op an toàn, cùng tinh thần TerrainCollisionSystem phía trên.
-        ecsWorld.addSystem(new TriggerZoneSystem());
+        ecsWorld.addSystem(newSafeZoneSystem(content.safeZones()));
         ecsWorld.addSystem(combatSystem);
         ecsWorld.addSystem(skillSystem);
         ecsWorld.addSystem(bossAiSystem);
@@ -295,6 +314,10 @@ public final class WorldFacade {
         // chỉ mutate remainingSeconds/magnitude tại chỗ, các System khác ĐỌC StatusEffectComponent
         // lúc resolve riêng (StatusEffects helper), không qua processEntity của System này.
         ecsWorld.addSystem(new StatusEffectSystem());
+        // Hồi máu ngoài chiến đấu (ADR-046 D2) — chạy SAU Combat/Skill/Boss trong cùng tick: các
+        // System đó vừa đặt secondsSinceCombat = 0 cho ai vừa dính damage, nên nhánh "chưa tới giờ
+        // hồi" thấy đúng số của tick này chứ không phải của tick trước.
+        ecsWorld.addSystem(healthRegenSystem);
     }
 
     /** Bắt đầu lịch tick trên {@link WorldTickScheduler} — gọi 1 lần lúc khởi động server. */
@@ -393,6 +416,17 @@ public final class WorldFacade {
     }
 
     /**
+     * ADR-046 D5 — đan dược: hồi {@code amount} máu cho nhân vật. Gọi từ {@code server-gateway}
+     * SAU khi {@code feature-inventory} đã trừ số lượng trong transaction của nó.
+     *
+     * <p>Không trả về máu mới: {@code inbox} là bất đồng bộ nên lúc hàm này return, lệnh còn chưa
+     * chạy. Client nhận số mới qua {@code HealthChangedEvent} (opcode 408) — xem ADR-046 D5.
+     */
+    public void enqueueHealCharacter(long characterId, int amount) {
+        inbox.add(new WorldCommand.HealCharacterCommand(characterId, amount));
+    }
+
+    /**
      * Spawn 1 boss hardcode (Phase 8 lát cắt 2, {@link BossConstants#BOSS_CODE}) — gọi bởi
      * {@code DungeonInstanceRegistry} ngay sau khi tạo dungeon World mới. World chính KHÔNG tự
      * gọi hàm này (giữ đúng ranh giới lát cắt 1: server-world không biết khái niệm "dungeon", chỉ
@@ -466,6 +500,9 @@ public final class WorldFacade {
             handleCombatResults(combatSystem.drainResults());
             handleSkillResults(skillSystem.drainResults());
             handleBossResults(bossAiSystem.drainResults());
+            handleHealthChanges(healthRegenSystem.drainResults()); // ADR-046 D2
+            handleHealthChanges(aiSystem.drainHealthChanges()); // ADR-046 D4
+            handleHealthChanges(drainHealthChangeQueue()); // ADR-046 D3 + D5
             tickMonsterRespawn(WorldConstants.FIXED_DT);
             // O(n²) — chạy chậm hơn tick loop (WorldConstants.AOI_SYNC_INTERVAL_TICKS), xem
             // javadoc AreaOfInterestTracker + WorldConstants.AOI_SYNC_RATE_HZ. Combat/skill/boss
@@ -496,6 +533,7 @@ public final class WorldFacade {
                 case WorldCommand.AreaChatMessageCommand c ->
                     handleAreaChatMessage(c.characterId(), c.senderName(), c.body());
                 case WorldCommand.AppearanceChangedCommand c -> handleAppearanceChanged(c.characterId());
+                case WorldCommand.HealCharacterCommand c -> handleHealCharacter(c.characterId(), c.amount());
                 case WorldCommand.SpawnBossCommand ignored -> spawnBossEntity();
             }
         }
@@ -541,6 +579,8 @@ public final class WorldFacade {
         chi.current = SkillConstants.CHARACTER_MAX_CHI; // placeholder — chưa nối character_stat.current_chi DB
         chi.max = SkillConstants.CHARACTER_MAX_CHI;
         entity.add(chi);
+
+        addRecoveryComponents(entity);
 
         entitiesByCharacterId.put(characterId, entity);
         baseStatsByCharacterId.put(characterId, baseStats);
@@ -771,6 +811,101 @@ public final class WorldFacade {
                 if (spawnOverworldContent) {
                     respawnCharacter(outcome.targetEntityId());
                 }
+            }
+        }
+    }
+
+    /**
+     * ADR-046 D3 — consumer THẬT đầu tiên của {@link TriggerZoneSystem} (dựng từ 2026-08-01, tới
+     * giờ vẫn no-op): bước vào vùng an toàn tông môn thì hồi đầy máu.
+     *
+     * <p>World nào không khai vùng nào (dungeon/arena, và mọi test không quan tâm) vẫn no-op y như
+     * trước — {@code TriggerZoneSystem} thoát sớm khi danh sách zone rỗng.
+     */
+    private TriggerZoneSystem newSafeZoneSystem(SafeZoneCatalogSnapshot safeZones) {
+        TriggerZoneSystem system = new TriggerZoneSystem(this::onSafeZoneEntered, (entity, zoneId) -> {});
+        system.setZones(toNamedZones(safeZones));
+        return system;
+    }
+
+    /**
+     * ADR-046 — hồi máu ngoài chiến đấu (D2) và vùng an toàn (D3) đều là chuyện của NHÂN VẬT; quái
+     * không mang hai component này (chúng lành lại theo D4, và không ai quan tâm quái đứng trong
+     * vùng nào).
+     */
+    private static void addRecoveryComponents(KEntity entity) {
+        entity.add(new CombatRecencyComponent());
+        entity.add(new TriggerZoneMembershipComponent());
+    }
+
+    /** ADR-046 D3 — dịch vùng an toàn của world sang kiểu của {@code engine-ecs} (một lần, lúc dựng). */
+    private static List<NamedZone> toNamedZones(SafeZoneCatalogSnapshot safeZones) {
+        return safeZones.zones().stream()
+                .map(zone -> new NamedZone(zone.code(), new Aabb(zone.minX(), zone.minY(), zone.maxX(), zone.maxY())))
+                .toList();
+    }
+
+    /**
+     * ADR-046 D3 — bước VÀO vùng an toàn thì hồi đầy máu ngay (chủ dự án chọn "về tông môn hồi
+     * đầy", không phải hồi dần). Callback này chạy NGAY trong tick ({@code TriggerZoneSystem}), nên
+     * chỉ được sửa component + xếp hàng, tuyệt đối không gọi sink (SERVER.md §2).
+     *
+     * <p>Đã đầy máu thì KHÔNG phát gói nào: đi qua đi lại cổng tông môn là chuyện thường ngày, và
+     * mỗi lần bước vào lại đẻ một gói là đúng thứ ADR-042 đang muốn tránh.
+     */
+    private void onSafeZoneEntered(KEntity entity, String zoneId) {
+        HealthComponent health = HEALTH.get(entity);
+        if (health == null || health.isDead() || health.current >= health.max) {
+            return;
+        }
+        health.current = health.max;
+        pendingHealthChanges.add(new HealthChange(CHARACTER_ID.get(entity).characterId, health.current, health.max));
+    }
+
+    /**
+     * ADR-046 D5 — cộng máu từ đan dược. Không vượt {@code max}, không cứu người đã chết (hồi sinh
+     * là việc của {@link #respawnCharacter}), không phát gói nếu máu không thực sự đổi (uống thuốc
+     * lúc đầy máu thì {@code feature-inventory} đã từ chối trước rồi — đây là hàng rào thứ hai).
+     */
+    private void handleHealCharacter(long characterId, int amount) {
+        KEntity entity = entitiesByCharacterId.get(characterId);
+        if (entity == null || amount <= 0) {
+            return;
+        }
+        HealthComponent health = HEALTH.get(entity);
+        if (health.isDead() || health.current >= health.max) {
+            return;
+        }
+        health.current = Math.min(health.max, health.current + amount);
+        pendingHealthChanges.add(new HealthChange(characterId, health.current, health.max));
+    }
+
+    private List<HealthChange> drainHealthChangeQueue() {
+        if (pendingHealthChanges.isEmpty()) {
+            return List.of();
+        }
+        List<HealthChange> results = List.copyOf(pendingHealthChanges);
+        pendingHealthChanges.clear();
+        return results;
+    }
+
+    /**
+     * ADR-046 D1 — phát {@code HealthChangedEvent} cho mọi người đang thấy entity đó trong AoI.
+     *
+     * <p>Cùng luật quan sát viên như {@code handleCombatResults}: {@code observersOf} chỉ khớp cặp
+     * NHÂN VẬT–NHÂN VẬT, nên nhân vật chơi solo phải được thêm vào tay — không thì chính người vừa
+     * hồi máu là người duy nhất KHÔNG biết mình vừa hồi máu.
+     */
+    private void handleHealthChanges(List<HealthChange> changes) {
+        for (HealthChange change : changes) {
+            WorldOutboundSink.HealthSnapshot snapshot =
+                    new WorldOutboundSink.HealthSnapshot(change.entityId(), change.currentHp(), change.maxHp());
+            Set<Long> observers = aoiTracker.observersOf(change.entityId());
+            if (change.entityId() > 0) {
+                observers.add(change.entityId());
+            }
+            for (long observerId : observers) {
+                outboundSink.onHealthChanged(observerId, snapshot);
             }
         }
     }

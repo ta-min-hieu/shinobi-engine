@@ -17,6 +17,10 @@ package dev.kage.inventory.domain;
  * <p>Bốn chỉ số + {@code requiredLevel} có mặt ở đây để CLIENT hiện được ô chi tiết vật phẩm
  * ("+10 DEF, cần Cấp 5") mà không phải đoán — ADR-036 D5 thêm chúng vào
  * {@code ItemCatalogEntry} của {@code inventory.proto} theo đúng luật additive của NETWORK.md §6.
+ *
+ * <p>{@code useEffect}/{@code useValue} thêm ở ADR-046 D5, cùng lý do và cùng luật: không có
+ * chúng, client phải bày nút "Dùng" với MỌI món rồi chờ server từ chối, và ô chi tiết không nói
+ * được "hồi 50 máu". {@code null} = món không dùng được.
  */
 public record ItemCatalogEntry(
         long id,
@@ -28,7 +32,9 @@ public record ItemCatalogEntry(
         int bonusDef,
         int bonusRes,
         int bonusHp,
-        int requiredLevel) {
+        int requiredLevel,
+        ItemUseEffect useEffect,
+        int useValue) {
 
     public ItemCatalogEntry {
         if (id <= 0) {
@@ -45,6 +51,9 @@ public record ItemCatalogEntry(
         }
         if (requiredLevel < 1) {
             throw new IllegalArgumentException("requiredLevel phải >= 1: " + requiredLevel);
+        }
+        if (useEffect != null && useValue <= 0) {
+            throw new IllegalArgumentException("item dùng được phải có useValue > 0: " + useValue);
         }
     }
 }

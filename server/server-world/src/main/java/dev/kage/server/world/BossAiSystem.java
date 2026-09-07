@@ -22,6 +22,7 @@ import dev.kage.engine.scripting.ScriptSandbox;
 import dev.kage.server.world.component.AiState;
 import dev.kage.server.world.component.AiStateComponent;
 import dev.kage.server.world.component.BossAiComponent;
+import dev.kage.server.world.component.CombatRecencyComponent;
 import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterIdComponent;
@@ -49,6 +50,8 @@ final class BossAiSystem extends IteratingKSystem {
     private static final ComponentMapper<AiStateComponent> AI_STATE = ComponentMapper.getFor(AiStateComponent.class);
     private static final ComponentMapper<TargetComponent> TARGET = ComponentMapper.getFor(TargetComponent.class);
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
+    private static final ComponentMapper<CombatRecencyComponent> RECENCY =
+            ComponentMapper.getFor(CombatRecencyComponent.class);
     private static final ComponentMapper<CombatStatsComponent> COMBAT_STATS =
             ComponentMapper.getFor(CombatStatsComponent.class);
     private static final ComponentMapper<BossAiComponent> BOSS_AI = ComponentMapper.getFor(BossAiComponent.class);
@@ -150,6 +153,11 @@ final class BossAiSystem extends IteratingKSystem {
                 CombatConstants.resolveSkillAttack(attackerStats, defenderStats, decision.rawDamage());
         HealthComponent targetHealth = HEALTH.get(targetEntity);
         targetHealth.current = Math.max(0, targetHealth.current - result.damage());
+        // ADR-046 D2 — chiêu boss cũng chặn hồi máu ngoài chiến đấu, y hệt đòn thường. Boss là quái
+        // (không mang component này), nên chỉ đánh dấu bên chịu đòn.
+        if (RECENCY.has(targetEntity)) {
+            RECENCY.get(targetEntity).secondsSinceCombat = 0f;
+        }
 
         pendingResults.add(new BossActionOutcome(
                 decision.action(),

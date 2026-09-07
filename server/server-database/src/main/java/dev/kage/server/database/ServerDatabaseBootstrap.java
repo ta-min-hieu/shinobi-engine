@@ -45,6 +45,7 @@ import dev.kage.inventory.api.EquipmentUseCases;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.api.InventoryQueryUseCases;
 import dev.kage.inventory.api.ItemAcquisitionUseCases;
+import dev.kage.inventory.api.ItemActionUseCases;
 import dev.kage.inventory.application.AddItemUseCase;
 import dev.kage.inventory.application.ComputeEquipmentBonusUseCase;
 import dev.kage.inventory.application.EnhanceItemUseCase;
@@ -54,6 +55,7 @@ import dev.kage.inventory.application.GetItemCatalogUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.inventory.application.ListInventoryUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
+import dev.kage.inventory.application.UseItemUseCase;
 import dev.kage.mail.api.MailFacade;
 import dev.kage.mail.application.ClaimMailUseCase;
 import dev.kage.mail.application.DeleteMailUseCase;
@@ -127,6 +129,7 @@ import dev.kage.server.database.trade.PostgresTradeGoldAdapter;
 import dev.kage.server.database.trade.PostgresTradeIdempotencyAdapter;
 import dev.kage.server.database.trade.PostgresTradeInventoryAdapter;
 import dev.kage.server.database.trade.PostgresTradeSessionAdapter;
+import dev.kage.server.database.world.PostgresSafeZoneAdapter;
 import dev.kage.shop.api.ShopFacade;
 import dev.kage.shop.application.BuyItemUseCase;
 import dev.kage.shop.application.ListShopItemsUseCase;
@@ -141,6 +144,7 @@ import dev.kage.trade.application.RequestTradeUseCase;
 import dev.kage.trade.application.SetTradeOfferUseCase;
 import dev.kage.trade.application.TradePorts;
 import dev.kage.trade.application.TradeUseCases;
+import dev.kage.world.api.WorldGeometryFacade;
 
 /**
  * Composition root — nơi DUY NHẤT lắp ráp Facade thật (Adapter + UseCase + TransactionRunner)
@@ -221,12 +225,14 @@ public final class ServerDatabaseBootstrap {
         EnhancePorts enhancePorts =
                 new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort, idempotencyPort);
         EnhanceItemUseCase enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, transactionRunner);
+        UseItemUseCase useItemUseCase =
+                new UseItemUseCase(inventoryPort, itemTemplatePort, auditPort, transactionRunner);
         InventoryQueryUseCases queryUseCases = new InventoryQueryUseCases(
                 new ListInventoryUseCase(inventoryPort, equipmentPort), new GetItemCatalogUseCase(itemTemplatePort));
         return new InventoryFacade(
                 new ItemAcquisitionUseCases(addItemUseCase, grantLootUseCase),
                 equipmentUseCases,
-                enhanceItemUseCase,
+                new ItemActionUseCases(enhanceItemUseCase, useItemUseCase),
                 queryUseCases);
     }
 
@@ -406,6 +412,11 @@ public final class ServerDatabaseBootstrap {
     /** ADR-037 — {@code monster_template}/{@code monster_spawn}, đọc thuần, nạp một lần lúc khởi động. */
     public MonsterFacade wireMonsterFacade() {
         return new MonsterFacade(new PostgresMonsterCatalogAdapter(dataSource));
+    }
+
+    /** ADR-046 D3 — {@code safe_zone}, đọc thuần, nạp một lần lúc khởi động (cùng khuôn quái/NPC). */
+    public WorldGeometryFacade wireWorldGeometryFacade() {
+        return new WorldGeometryFacade(new PostgresSafeZoneAdapter(dataSource));
     }
 
     public TradeFacade wireTradeFacade() {

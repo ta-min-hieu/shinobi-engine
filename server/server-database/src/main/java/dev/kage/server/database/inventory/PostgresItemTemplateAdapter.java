@@ -11,13 +11,15 @@ import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.ItemCatalogEntry;
 import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
+import dev.kage.inventory.domain.ItemUseEffect;
 import dev.kage.server.database.JdbcOperations;
 
 /** Hiện thực {@link ItemTemplatePort} trên PostgreSQL — đọc thuần, {@code item_template} là config tĩnh. */
 public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
 
     private static final String FIND_BY_ID = """
-            SELECT id, equip_slot, max_stack, bonus_atk, bonus_def, bonus_res, bonus_hp, required_level
+            SELECT id, equip_slot, max_stack, bonus_atk, bonus_def, bonus_res, bonus_hp, required_level,
+                   use_effect, use_value
               FROM item_template WHERE id = ?
             """;
 
@@ -29,7 +31,8 @@ public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
     // băm (không phụ thuộc DB), nhưng dữ liệu ổn định sẵn thì dễ soi khi debug.
     private static final String LIST_CATALOG = """
             SELECT id, code, name_key, max_stack, equip_slot,
-                   bonus_atk, bonus_def, bonus_res, bonus_hp, required_level
+                   bonus_atk, bonus_def, bonus_res, bonus_hp, required_level,
+                   use_effect, use_value
               FROM item_template ORDER BY id
             """;
 
@@ -66,7 +69,9 @@ public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
                 rs.getInt("bonus_def"),
                 rs.getInt("bonus_res"),
                 rs.getInt("bonus_hp"),
-                rs.getInt("required_level"));
+                rs.getInt("required_level"),
+                parseUseEffect(rs.getString("use_effect")),
+                rs.getInt("use_value"));
     }
 
     private static ItemTemplate mapRow(ResultSet rs) throws SQLException {
@@ -79,6 +84,26 @@ public final class PostgresItemTemplateAdapter implements ItemTemplatePort {
                 rs.getInt("bonus_def"),
                 rs.getInt("bonus_res"),
                 rs.getInt("bonus_hp"),
-                rs.getInt("required_level"));
+                rs.getInt("required_level"),
+                parseUseEffect(rs.getString("use_effect")),
+                rs.getInt("use_value"));
+    }
+
+    /**
+     * ADR-046 D5 — {@code NULL} nghĩa là món không dùng được. Giá trị LẠ (dữ liệu tay viết sai
+     * trong migration) cũng coi là không dùng được thay vì ném {@code IllegalArgumentException}:
+     * một chuỗi gõ nhầm không được phép làm sập đường nạp túi đồ của mọi người chơi. Cùng luật mà
+     * {@code WorldFacade#toStats} áp cho {@code element} lạ của quái (ADR-037).
+     */
+    private static ItemUseEffect parseUseEffect(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        for (ItemUseEffect effect : ItemUseEffect.values()) {
+            if (effect.name().equals(raw)) {
+                return effect;
+            }
+        }
+        return null;
     }
 }

@@ -8,6 +8,7 @@ import java.util.Optional;
 import dev.kage.protocol.EquipmentSlot;
 import dev.kage.protocol.ItemCatalogEntry;
 import dev.kage.protocol.ItemCatalogResponse;
+import dev.kage.protocol.ItemUseEffect;
 
 /**
  * Bản sao catalog vật phẩm phía client (ADR-035, opcode 509/510) — tra {@code item_template_id} ra
@@ -88,6 +89,22 @@ final class ItemCatalog {
         return byId(itemTemplateId)
                 .map(ItemCatalogEntry::getEquipSlot)
                 .orElse(EquipmentSlot.EQUIPMENT_SLOT_UNSPECIFIED);
+    }
+
+    /**
+     * Hiệu ứng khi DÙNG vật phẩm (ADR-046 D5); {@code UNSPECIFIED} nghĩa là KHÔNG dùng được — cả
+     * khi món thật sự không dùng được lẫn khi chưa có catalog. Cả hai đều dẫn tới cùng một hành vi
+     * đúng: không bày nút "Dùng" (Điều 24 — chưa biết thì không đoán).
+     */
+    ItemUseEffect useEffect(long itemTemplateId) {
+        return byId(itemTemplateId)
+                .map(ItemCatalogEntry::getUseEffect)
+                .orElse(ItemUseEffect.ITEM_USE_EFFECT_UNSPECIFIED);
+    }
+
+    /** Độ lớn hiệu ứng dùng — với {@code HEAL_HP} là số máu hồi. 0 nếu món không dùng được. */
+    int useValue(long itemTemplateId) {
+        return byId(itemTemplateId).map(ItemCatalogEntry::getUseValue).orElse(0);
     }
 
     /** Toàn bộ catalog, để giao diện cửa hàng/túi đồ duyệt. Thứ tự KHÔNG bảo đảm. */

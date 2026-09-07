@@ -11,6 +11,7 @@ import dev.kage.engine.ecs.KEntity;
 import dev.kage.engine.ecs.component.PositionComponent;
 import dev.kage.server.world.component.AttackCooldownComponent;
 import dev.kage.server.world.component.CharacterIdComponent;
+import dev.kage.server.world.component.CombatRecencyComponent;
 import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterIdComponent;
@@ -53,6 +54,8 @@ final class CombatSystem extends IteratingKSystem {
             ComponentMapper.getFor(CombatStatsComponent.class);
     private static final ComponentMapper<StatusEffectComponent> STATUS_EFFECT =
             ComponentMapper.getFor(StatusEffectComponent.class);
+    private static final ComponentMapper<CombatRecencyComponent> RECENCY =
+            ComponentMapper.getFor(CombatRecencyComponent.class);
 
     /** Kết quả 1 đòn đánh đã xảy ra thật trong tick này — {@code WorldFacade} drain để phát AoI. */
     record AttackOutcome(
@@ -152,6 +155,10 @@ final class CombatSystem extends IteratingKSystem {
         }
         int damageAfterShield = StatusEffects.absorbWithShield(STATUS_EFFECT.get(target), result.damage());
         targetHealth.current = Math.max(0, targetHealth.current - damageAfterShield);
+        // ADR-046 D2 — CẢ HAI bên vừa dính tới chiến đấu, kể cả khi đòn này hụt: đứng cạnh một con
+        // quái đang vung trượt vẫn là đang đánh nhau, không phải đang nghỉ.
+        markInCombat(attacker);
+        markInCombat(target);
 
         long attackerId = entityId(attacker);
         pendingResults.add(new AttackOutcome(
@@ -162,6 +169,17 @@ final class CombatSystem extends IteratingKSystem {
                 result.miss(),
                 targetHealth.current,
                 targetHealth.isDead()));
+    }
+
+    /**
+     * Chặn hồi máu ngoài chiến đấu trong {@link CombatConstants#REGEN_DELAY_SECONDS} giây tới
+     * (ADR-046 D2). Quái KHÔNG mang component này (chúng lành lại bằng đường khác — ADR-046 D4),
+     * nên phải hỏi {@code has} trước.
+     */
+    private static void markInCombat(KEntity entity) {
+        if (RECENCY.has(entity)) {
+            RECENCY.get(entity).secondsSinceCombat = 0f;
+        }
     }
 
     /** ID nghiệp vụ THẬT của entity (dương = characterId, âm = monsterId) — attacker có thể là 1 trong 2. */

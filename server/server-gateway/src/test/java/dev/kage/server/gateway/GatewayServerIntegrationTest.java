@@ -142,6 +142,8 @@ import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.TalkToNpcCommand;
 import dev.kage.protocol.UnequipItemCommand;
 import dev.kage.protocol.UnequipItemResponse;
+import dev.kage.protocol.UseItemCommand;
+import dev.kage.protocol.UseItemResponse;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
@@ -446,7 +448,10 @@ class GatewayServerIntegrationTest {
         return new InventoryFacade(
                 new dev.kage.inventory.api.ItemAcquisitionUseCases(addItemUseCase, grantLootUseCase),
                 equipmentUseCases,
-                enhanceItemUseCase,
+                new dev.kage.inventory.api.ItemActionUseCases(
+                        enhanceItemUseCase,
+                        new dev.kage.inventory.application.UseItemUseCase(
+                                inventoryPort, itemTemplatePort, auditPort, action -> action.accept(null))),
                 new dev.kage.inventory.api.InventoryQueryUseCases(
                         new dev.kage.inventory.application.ListInventoryUseCase(inventoryPort, equipmentPort),
                         new dev.kage.inventory.application.GetItemCatalogUseCase(itemTemplatePort)));
@@ -1731,6 +1736,31 @@ class GatewayServerIntegrationTest {
                     EnhanceItemResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE)
                             .payload());
             assertThat(response.getOutcome()).isEqualTo(EnhanceOutcome.ENHANCE_OUTCOME_ITEM_NOT_FOUND);
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void clientShouldReceiveUseItemResponse_overRealSockets() throws Exception {
+        // ADR-046 D5. Cùng lý do với clientShouldReceiveEnhanceItemResponse_overRealSockets:
+        // fakeInventoryFacade() luôn trả túi đồ RỖNG nên id=1 chắc chắn không tồn tại — test đúng
+        // nhánh ITEM_NOT_FOUND, verify dây thật (opcode 511 dispatch → decode → Virtual Thread →
+        // encode 512). Nhánh uống thành công đã phủ ở UseItemUseCaseTest + HealingPillIntegrationTest.
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(5000);
+            DataInputStream in = new DataInputStream(socket.getInputStream());
+            connectCreateAndSelect(
+                    socket, in, "useitem" + UUID.randomUUID().toString().substring(0, 5));
+
+            UseItemCommand useCommand =
+                    UseItemCommand.newBuilder().setInventoryItemId(1L).build();
+            sendFrame(socket, Opcode.OPCODE_USE_ITEM_COMMAND_VALUE, 11, useCommand.toByteArray());
+
+            UseItemResponse response = UseItemResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_USE_ITEM_RESPONSE_VALUE).payload());
+            assertThat(response.getSuccess()).isFalse();
+            assertThat(response.getErrorKey()).isEqualTo("error.item_not_found");
+            assertThat(response.getRemainingQuantity()).isZero();
         }
     }
 

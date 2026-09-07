@@ -417,7 +417,10 @@ class MonsterLootChainIntegrationTest {
                                 itemTemplatePort,
                                 transactionRunner)),
                 equipmentUseCases,
-                new EnhanceItemUseCase(enhancePorts, transactionRunner),
+                new dev.kage.inventory.api.ItemActionUseCases(
+                        new EnhanceItemUseCase(enhancePorts, transactionRunner),
+                        new dev.kage.inventory.application.UseItemUseCase(
+                                inventoryPort, itemTemplatePort, new PostgresAuditAdapter(), transactionRunner)),
                 new InventoryQueryUseCases(
                         new ListInventoryUseCase(inventoryPort, equipmentPort),
                         new GetItemCatalogUseCase(itemTemplatePort)));

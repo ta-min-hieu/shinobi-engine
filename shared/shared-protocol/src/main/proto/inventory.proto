@@ -43,6 +43,7 @@ message EquipItemCommand {
 message EquipItemResponse {
   bool success = 1;
   string error_key = 2; // rỗng nếu success=true (NETWORK.md §107)
+
   // ADR-043 — máu của CHÍNH mình sau khi đổi trang bị. Field THÊM, field cũ giữ nguyên,
   // `protocolVersion` KHÔNG tăng (luật additive NETWORK.md §6) — cùng tiền lệ ADR-036/041.
   //
@@ -70,6 +71,7 @@ message UnequipItemCommand {
 message UnequipItemResponse {
   bool success = 1;
   string error_key = 2;
+
   // ADR-043 — máu của CHÍNH mình sau khi đổi trang bị. Field THÊM, field cũ giữ nguyên,
   // `protocolVersion` KHÔNG tăng (luật additive NETWORK.md §6) — cùng tiền lệ ADR-036/041.
   //
@@ -120,6 +122,7 @@ message EnhanceItemCommand {
 // Response: Server -> Client (OPCODE_ENHANCE_ITEM_RESPONSE).
 message EnhanceItemResponse {
   EnhanceOutcome outcome = 1;
+
   // ADR-043 — máu của CHÍNH mình sau khi đổi trang bị. Field THÊM, field cũ giữ nguyên,
   // `protocolVersion` KHÔNG tăng (luật additive NETWORK.md §6) — cùng tiền lệ ADR-036/041.
   //
@@ -172,6 +175,13 @@ message EquippedSlotView {
   int64 item_id = 2;
 }
 
+// Vật phẩm này làm gì khi được DÙNG (ADR-046 D5) — khớp cột `item_template.use_effect` và enum
+// Java `ItemUseEffect`. UNSPECIFIED = không dùng được, đúng trạng thái của mọi trang bị/nguyên liệu.
+enum ItemUseEffect {
+  ITEM_USE_EFFECT_UNSPECIFIED = 0;
+  ITEM_USE_EFFECT_HEAL_HP = 1;
+}
+
 // 1 dòng catalog. KHÔNG mang tên hiển thị và KHÔNG mang icon: tên tra qua name_key trong bundle
 // i18n phía client, icon tra qua code trong atlas (ADR-028). Server chỉ gửi thứ server sở hữu.
 // Mang CẢ id lẫn code vì protocol hiện tham chiếu vật phẩm bằng cả hai kiểu (ItemGrantedEvent dùng
@@ -194,6 +204,15 @@ message ItemCatalogEntry {
   int32 bonus_res = 8;
   int32 bonus_hp = 9;
   int32 required_level = 10; // cấp tối thiểu để MẶC được; 0 nghĩa là server cũ chưa gửi field này
+  // ADR-046 D5 — 2 field THÊM (11..12), field 1..10 giữ NGUYÊN, protocolVersion KHÔNG tăng (cùng
+  // luật additive NETWORK.md §6 mà ADR-036 D5 đã dùng cho 7..10).
+  //
+  // Vì sao client cần biết: không có hai field này, nút "Dùng" phải bày ra với MỌI món rồi chờ
+  // server trả `error.item_not_usable` — và ô chi tiết không nói được "hồi 50 máu", con số duy
+  // nhất khiến người chơi quyết định uống hay không. Client KHÔNG tự áp hiệu ứng: nó chỉ hiện, còn
+  // máu vẫn do server tính và báo qua HealthChangedEvent (Điều 24).
+  ItemUseEffect use_effect = 11; // UNSPECIFIED = không dùng được (khớp use_effect NULL trong DB)
+  int32 use_value = 12; // độ lớn hiệu ứng — với HEAL_HP là số máu hồi
 }
 
 // Command: Client -> Server (OPCODE_GET_ITEM_CATALOG_REQUEST = 509). Client gửi version nó đang
@@ -209,4 +228,32 @@ message ItemCatalogResponse {
   bool unchanged = 1;
   string version = 2; // hash nội dung catalog; server tính, client chỉ lưu và gửi lại
   repeated ItemCatalogEntry entries = 3;
+}
+
+// -----------------------------------------------------------------------------------------------
+// ADR-046 D5 (Accepted 2026-09-07) — dùng vật phẩm. Phần dưới CHỈ THÊM (NETWORK.md §6),
+// protocolVersion KHÔNG tăng.
+// -----------------------------------------------------------------------------------------------
+
+// Command: Client -> Server (OPCODE_USE_ITEM_COMMAND = 512). `inventory_item_id` là
+// `inventory_item.id` THẬT (không phải vị trí ô túi), cùng quy ước EnhanceItemCommand.
+// characterId lấy từ SESSION — server tự kiểm món đó có thuộc về người gửi hay không (chống IDOR,
+// SECURITY.md §4).
+//
+// KHÔNG có field "dùng bao nhiêu cái": mỗi lệnh tiêu ĐÚNG một cái. Cho client chọn số lượng là mở
+// đường cho "uống 20 viên trong một gói" mà không đổi lấy gì — bấm 20 lần là 20 gói, và mỗi gói
+// server đều kiểm lại.
+message UseItemCommand {
+  int64 inventory_item_id = 1;
+}
+
+// Response: Server -> Client (OPCODE_USE_ITEM_RESPONSE = 513).
+//
+// ⚠️ KHÔNG mang HP. `WorldFacade.inbox` là bất đồng bộ: đọc entity ngay sau khi xếp lệnh hồi máu
+// vào hàng đợi sẽ ra số CŨ — đúng cái bẫy đã trả giá một lần ở ADR-043. Máu mới về client bằng
+// HealthChangedEvent (opcode 408, combat.proto), và đó chính là lý do event đó tồn tại.
+message UseItemResponse {
+  bool success = 1;
+  string error_key = 2; // rỗng nếu success=true (NETWORK.md §107)
+  int32 remaining_quantity = 3; // số cái CÒN LẠI trong ô túi sau khi dùng; 0 = ô đã biến mất
 }

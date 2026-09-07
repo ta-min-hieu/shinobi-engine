@@ -47,6 +47,7 @@ import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.CharacterSummary;
 import dev.kage.protocol.CostumeTier;
 import dev.kage.protocol.ExperienceChangedEvent;
+import dev.kage.protocol.HealthChangedEvent;
 import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
@@ -581,6 +582,9 @@ public final class WorldScreen implements GameScreen {
             onAttackResult(AttackResultEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE) {
             onSkillResult(SkillResultEvent.parseFrom(payload));
+        } else if (opcode == Opcode.OPCODE_HEALTH_CHANGED_EVENT_VALUE) {
+            // ADR-046 D1 — chỉ HUD, KHÔNG có animation/số bay: không ai vừa bị đánh cả.
+            combatHudController.onHealthChanged(HealthChangedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_NPC_SPAWNED_EVENT_VALUE) {
             npcPresenter.onSpawned(NpcSpawnedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_NPC_DESPAWNED_EVENT_VALUE) {

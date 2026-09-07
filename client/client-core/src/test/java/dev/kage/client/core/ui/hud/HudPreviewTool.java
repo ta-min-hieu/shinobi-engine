@@ -187,14 +187,16 @@ public final class HudPreviewTool extends ApplicationAdapter {
         // là trạng thái CAO NHẤT khung này có thể đạt — khung chưa có ScrollPane nên nó cũng là
         // trạng thái duy nhất trả lời được câu "túi đầy thì có tràn khỏi màn hình không".
         // Mã icon lấy từ V21 chứ không phải 3 mã cũ: đây là chỗ DUY NHẤT chứng minh vùng
-        // icon_<code> mới thật sự có trong atlas và client tra ra được (2026-08-30).
+        // icon_<code> mới thật sự có trong atlas và client tra ra được (2026-08-30). Ô đầu nay là
+        // `minor_healing_pill` (V36, ADR-046 D5) — icon MỚI NHẤT luôn nên đứng ở đây, vì nó là cái
+        // chưa ai từng nhìn thấy ở cỡ ô túi.
         java.util.List<InventoryPanel.ItemRow> full = new java.util.ArrayList<>();
         String[] codes = {
-            "steel_katana", "genin_vest", "genin_headband", "genin_wraps", "genin_sandals",
+            "minor_healing_pill", "genin_vest", "genin_headband", "genin_wraps", "genin_sandals",
             "genin_bracelet", "genin_necklace", "novice_vest", "iron_scrap", "chakra_shard"
         };
         String[] names = {
-            "Katana Thép +9", "Áo Giáp Hạ Nhẫn", "Mũ Trụ Hạ Nhẫn", "Găng Tay Hạ Nhẫn", "Giày Hạ Nhẫn",
+            "Tiểu Hồi Nguyên Đan x3", "Áo Giáp Hạ Nhẫn", "Mũ Trụ Hạ Nhẫn", "Găng Tay Hạ Nhẫn", "Giày Hạ Nhẫn",
             "Vòng Tay Hạ Nhẫn", "Dây Chuyền Hạ Nhẫn", "Áo Vải Tập Sự", "Sắt Vụn x40", "Mảnh Chakra x7"
         };
         for (int index = 0; index < MAX_VISIBLE_SLOTS_PREVIEW; index++) {
@@ -210,7 +212,14 @@ public final class HudPreviewTool extends ApplicationAdapter {
                 new InventoryPanel.EquipmentRow(6, "Trang sức 1", "Vòng gỗ", true),
                 new InventoryPanel.EquipmentRow(7, "Trang sức 2", "(Trống)", false)));
         inventoryPanel.setProtection(true);
-        inventoryPanel.showDetail("Kiếm gỗ +9", true, new InventoryPanel.Actions(true, true, true));
+        // ADR-046 D5 — chọn ĐAN DƯỢC chứ không phải trang bị: đây là chỗ DUY NHẤT nhìn thấy nút
+        // "Dùng" (nó dùng CHUNG ô nút với "Mặc", xem javadoc InventoryPanel#primaryButton) và cũng
+        // là chỗ duy nhất kiểm được nhãn tiếng Việt có tràn ra ngoài nền nút hay không —
+        // đúng lỗi đã bắt ở QuestLogPanel. Dòng "Hồi 50 máu" đến từ ItemCatalogEntry.use_value.
+        inventoryPanel.showDetail(
+                "Tiểu Hồi Nguyên Đan x3" + System.lineSeparator() + "Hồi 50 máu",
+                InventoryPanel.PrimaryAction.USE,
+                new InventoryPanel.Actions(true, true, true));
     }
 
     @Override

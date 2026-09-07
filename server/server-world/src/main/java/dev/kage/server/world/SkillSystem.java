@@ -22,6 +22,7 @@ import dev.kage.engine.scripting.ScriptExecutionException;
 import dev.kage.engine.scripting.ScriptSandbox;
 import dev.kage.server.world.component.CharacterLevelComponent;
 import dev.kage.server.world.component.ChiComponent;
+import dev.kage.server.world.component.CombatRecencyComponent;
 import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.SkillCooldownComponent;
@@ -75,7 +76,11 @@ final class SkillSystem extends IteratingKSystem {
     private record ScriptEffect(String effect, double value, String stat, double duration, double armorPierce) {}
 
     /** Gộp tham số 1 lần cast ĐÃ resolve xong mục tiêu — tránh vượt giới hạn 4 tham số/method. */
-    private record CastContext(SkillDefinition definition, long casterId, long targetId, KEntity target) {}
+    private record CastContext(
+            SkillDefinition definition, long casterId, long targetId, KEntity caster, KEntity target) {}
+
+    private static final ComponentMapper<CombatRecencyComponent> RECENCY =
+            ComponentMapper.getFor(CombatRecencyComponent.class);
 
     private final LongFunction<KEntity> entityLookup;
     private final ScriptSandbox scriptSandbox = new ScriptSandbox(SkillConstants.SCRIPT_MAX_STATEMENTS);
@@ -209,7 +214,7 @@ final class SkillSystem extends IteratingKSystem {
                 && distance(POSITION.get(caster), POSITION.get(target)) > definition.rangeMeters()) {
             return null;
         }
-        return new CastContext(definition, casterId, resolvedTargetId, target);
+        return new CastContext(definition, casterId, resolvedTargetId, caster, target);
     }
 
     private void applyScriptEffect(
@@ -232,6 +237,12 @@ final class SkillSystem extends IteratingKSystem {
         HealthComponent targetHealth = HEALTH.get(ctx.target());
         int damageAfterShield = StatusEffects.absorbWithShield(targetStatus, result.damage());
         targetHealth.current = Math.max(0, targetHealth.current - damageAfterShield);
+        // ADR-046 D2 — chỉ nhánh DAMAGE chặn hồi máu, cùng luật với đòn đánh thường
+        // (CombatSystem.markInCombat). Buff/khiên/hồi máu cho đồng đội KHÔNG tính là đang đánh
+        // nhau: chúng không đụng tới máu của ai theo hướng xấu, và tính vào đó thì một người hệ
+        // Thuỷ tự khiên cho mình lại tự hoãn hồi máu của chính mình.
+        markInCombat(ctx.caster());
+        markInCombat(ctx.target());
 
         pendingResults.add(new SkillOutcome(
                 ctx.definition().code(),
@@ -243,6 +254,13 @@ final class SkillSystem extends IteratingKSystem {
                 targetHealth.current,
                 targetHealth.isDead(),
                 SkillEffectKind.DAMAGE));
+    }
+
+    /** Xem {@code CombatSystem.markInCombat} — quái KHÔNG mang component này (ADR-046 D4). */
+    private static void markInCombat(KEntity entity) {
+        if (RECENCY.has(entity)) {
+            RECENCY.get(entity).secondsSinceCombat = 0f;
+        }
     }
 
     private void applyHeal(CastContext ctx, ScriptEffect scriptEffect) {

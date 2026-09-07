@@ -72,6 +72,7 @@ import dev.kage.protocol.SetTradeOfferCommand;
 import dev.kage.protocol.TalkToNpcCommand;
 import dev.kage.protocol.TradeOfferItemInput;
 import dev.kage.protocol.UnequipItemCommand;
+import dev.kage.protocol.UseItemCommand;
 import dev.kage.protocol.UseSkillCommand;
 import dev.kage.protocol.wire.PacketCodec;
 
@@ -679,6 +680,24 @@ final class WorldCommandSender {
                 .setIdempotencyKey(idempotencyKey)
                 .build();
         send(Opcode.OPCODE_ENHANCE_ITEM_COMMAND_VALUE, command.toByteArray(), "EnhanceItemCommand");
+    }
+
+    /**
+     * Dùng MỘT món tiêu hao (ADR-046 D5 — đan dược hồi máu).
+     *
+     * <p>Không có {@code idempotencyKey} như {@link #enhanceItem}: lệnh này không trừ vàng, và một
+     * lần retry chỉ tốn thêm một viên đan của chính người chơi — không đáng một bảng idempotency
+     * ghi DB cho mọi trận đánh.
+     *
+     * <p>Máu mới KHÔNG về trong {@code UseItemResponse} mà qua {@code HealthChangedEvent} (opcode
+     * 408): hàng đợi world phía server là bất đồng bộ — xem ADR-046 D5.
+     *
+     * @param inventoryItemId {@code inventory_item.id} THẬT, không phải vị trí trong túi
+     */
+    void useItem(long inventoryItemId) {
+        UseItemCommand command =
+                UseItemCommand.newBuilder().setInventoryItemId(inventoryItemId).build();
+        send(Opcode.OPCODE_USE_ITEM_COMMAND_VALUE, command.toByteArray(), "UseItemCommand");
     }
 
     // -------------------------------------------------------------------------------------------

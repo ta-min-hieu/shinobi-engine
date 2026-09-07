@@ -125,3 +125,22 @@ message SkillResultEvent {
   bool target_died = 8;
   EffectKind effect_kind = 9;
 }
+
+// Event: Server -> Client (OPCODE_HEALTH_CHANGED_EVENT). Máu của một entity vừa đổi mà KHÔNG do
+// đòn đánh nào — ADR-046. Bốn nguồn dùng CHUNG event này: hồi máu ngoài chiến đấu (D2), bước vào
+// vùng an toàn tông môn (D3), quái về tới điểm spawn thì lành lại (D4), và đan dược (D5).
+//
+// Gửi cho MỌI nhân vật đang thấy entity đó trong AoI, y hệt AttackResultEvent.
+//
+// KHÔNG có field "vì sao": vạch máu không quan tâm lý do, và số "+N" client tự lấy được bằng hiệu
+// với giá trị đang giữ. Thêm enum lý do là mở rộng bề mặt protocol để đổi lấy thứ client tự tính
+// được (ADR-046 D1).
+//
+// Vì sao cần event RIÊNG: trước ADR-046, client chỉ biết HP qua AttackResultEvent/SkillResultEvent
+// (javadoc CombatHudController nói thẳng "server không gửi gói đồng bộ HP nào") — máu hồi mà không
+// có gói nào mang tin đi thì vạch máu đứng im tới đòn đánh kế tiếp.
+message HealthChangedEvent {
+  int64 entity_id = 1; // DƯƠNG = nhân vật, ÂM = quái — cùng quy ước với target_entity_id ở trên
+  int32 current_hp = 2;
+  int32 max_hp = 3;
+}
