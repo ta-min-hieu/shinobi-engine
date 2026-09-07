@@ -74,6 +74,13 @@ TASSEL_RED = "#B0302E"
 # Ngọc cổ — celadon jade, warm and desaturated, nothing like `chakra_shard`'s
 # cyan. Three values because a single flat green plate has no readable form at
 # 64x64; the gold below is the bore of the bi disc it broke off.
+# ADR-046 D5 — đan dược. Đan sa (cinnabar) đỏ cam ấm: KHÔNG màu nào trong bộ icon đang ở vùng
+# này (sắt xám, chakra xanh lơ, ngọc xanh lục, vải bậc Tập Sự nâu nhạt), nên ba viên tròn đỏ không
+# bao giờ tráo chỗ với món khác ở 64x64.
+PILL = "#D24B33"
+PILL_SHEEN = "#F7C9B4"
+PILL_DARK = "#8E2E1F"
+
 JADE = "#5FA986"
 JADE_PALE = "#A8D9BE"
 JADE_DARK = "#3F7A5E"
@@ -186,6 +193,17 @@ def _arc_band(radius_outer, radius_inner, degrees_from, degrees_to, segments=14)
         outer.append((radius_outer * cos_a, radius_outer * sin_a))
         inner.append((radius_inner * cos_a, radius_inner * sin_a))
     return outer + list(reversed(inner))
+
+
+def _disc(radius, segments=18):
+    """Outline of a circle, screen-CCW — dùng với {@code _prism_obj} thành một viên tròn dẹt.
+
+    Không có primitive hình cầu nào trong bộ này, và cũng không cần: ở 64x64 một khối trụ nhìn
+    thẳng mặt ĐỌC RA hình tròn y hệt hình cầu, mà lại là MỘT mesh nên Freestyle chỉ vẽ đúng một
+    đường viền (xem javadoc `_prism_obj` về bẫy đường nối).
+    """
+    return [(radius * math.cos(2.0 * math.pi * i / segments),
+             radius * math.sin(2.0 * math.pi * i / segments)) for i in range(segments)]
 
 
 def _ring_obj(name, major_r, minor_r, loc=(0.0, 0.0, 0.0), major_seg=16, minor_seg=6):
@@ -628,6 +646,45 @@ def build_ancient_jade_shard():
     return 1.02
 
 
+def build_minor_healing_pill():
+    """Tiểu Hồi Nguyên Đan — ba viên đan tròn, một to hai nhỏ (V36, ADR-046 D5).
+
+    Ba thứ quyết định hình dạng, tất cả đều là "đừng lẫn với món khác trong túi":
+
+      * **TRÒN.** Mọi icon đang có đều góc cạnh: hộp, tháp cụt, bát diện, tấm dẹt.
+        Một cụm hình tròn là bố cục sáng-tối khác hẳn, và đó là thứ đọc được ở 50px
+        chứ không phải màu (bài học `mob_trial-construct` 2026-09-06).
+      * **BA viên, không phải một.** `max_stack = 20` — món này xếp chồng, và ô túi
+        phải nói ra điều đó, cùng lý do `iron_scrap` là một đống chứ không phải một
+        mảnh. Nhưng khác `iron_scrap` ở chỗ ba viên ĐỀU NHAU và tròn: đống sắt vụn
+        là phế liệu, đan dược là thứ được luyện ra.
+      * **KHÔNG có bình/hồ lô.** Hồ lô là biểu tượng tu tiên mạnh hơn, nhưng tên món
+        là "Đan" — vẽ cái bình là vẽ vật chứa chứ không phải vật phẩm, và người chơi
+        sẽ hỏi vì sao uống một cái bình. Để dành hồ lô cho món "bình đan" của arc 2.
+
+    Viên lớn nghiêng nhẹ và có vệt sáng lệch lên trái để không đọc ra "nút bấm phẳng".
+    """
+    main = _prism_obj("Pill", _disc(0.300), 0.140, loc=(0.000, 0.000, 0.105), rot=_tilt(-8))
+    apply_toon(main, PILL, shades=3)
+
+    # Vệt sáng NHỎ và LỆCH hẳn lên trái. Bản đầu để nó to gần bằng viên và gần tâm ⇒ đọc ra một
+    # cái lỗ trên viên đan, không phải ánh sáng phản chiếu.
+    sheen = _prism_obj("Sheen", _disc(0.082), 0.040, loc=(-0.108, -0.160, 0.205), rot=_tilt(-8))
+    apply_toon(sheen, PILL_SHEEN, shades=2)
+
+    # Hai viên sau phải TÁCH RỜI silhouette của viên chính, không chỉ "ở phía sau". Bản đầu đặt
+    # chúng chạm vào viên to: Freestyle vẽ viền theo OBJECT nên ba đường viền dính lại thành MỘT
+    # khối, và ở 64x64 cả cụm đọc ra một con bọ có hai chân. Khoảng cách tâm phải LỚN HƠN tổng hai
+    # bán kính — đó là điều kiện để mắt còn thấy ba vật thể chứ không phải một.
+    back_left = _prism_obj("PillLeft", _disc(0.170), 0.110, loc=(-0.372, 0.130, -0.300),
+                           rot=_tilt(16))
+    apply_toon(back_left, PILL_DARK, shades=3)
+    back_right = _prism_obj("PillRight", _disc(0.190), 0.110, loc=(0.378, 0.100, -0.278),
+                            rot=_tilt(-21))
+    apply_toon(back_right, PILL_DARK, shades=3)
+    return 1.22
+
+
 ITEMS = {
     "kunai": build_kunai,
     "wooden_sword": build_wooden_sword,
@@ -652,6 +709,8 @@ ITEMS = {
     "chakra_shard": build_chakra_shard,
     # V30 — phần thưởng nhiệm vụ 3 (không bán, không rơi, max_stack 1)
     "ancient_jade_shard": build_ancient_jade_shard,
+    # V36 — đan dược hồi máu (ADR-046 D5), món DÙNG ĐƯỢC đầu tiên của game
+    "minor_healing_pill": build_minor_healing_pill,
 }
 
 

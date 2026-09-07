@@ -16,6 +16,7 @@ import dev.kage.protocol.DialogueNodeResponse;
 import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.ExperienceChangedEvent;
 import dev.kage.protocol.GoldChangedEvent;
+import dev.kage.protocol.HealthChangedEvent;
 import dev.kage.protocol.ItemGrantedEvent;
 import dev.kage.protocol.ListInventoryResponse;
 import dev.kage.protocol.ListQuestsResponse;
@@ -139,6 +140,7 @@ final class ProbeEventLine {
     private static Optional<String> describeCombat(int opcode, byte[] payload) throws InvalidProtocolBufferException {
         return switch (opcode) {
             case Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE -> Optional.of(attack(AttackResultEvent.parseFrom(payload)));
+            case Opcode.OPCODE_HEALTH_CHANGED_EVENT_VALUE -> Optional.of(health(HealthChangedEvent.parseFrom(payload)));
             case Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE -> Optional.of(skill(SkillResultEvent.parseFrom(payload)));
             case Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE ->
                 Optional.of(monsterSpawn(MonsterSpawnedEvent.parseFrom(payload)));
@@ -186,6 +188,11 @@ final class ProbeEventLine {
         return "attacker=" + event.getAttackerEntityId() + " target=" + event.getTargetEntityId() + " damage="
                 + event.getDamage() + " crit=" + event.getIsCrit() + " miss=" + event.getIsMiss() + " targetHp="
                 + event.getTargetCurrentHp() + " targetDied=" + event.getTargetDied();
+    }
+
+    /** ADR-046 — máu đổi mà không do đòn đánh nào. Không có "ai gây ra": đó là chủ ý của D1. */
+    private static String health(HealthChangedEvent event) {
+        return "entity=" + event.getEntityId() + " hp=" + event.getCurrentHp() + "/" + event.getMaxHp();
     }
 
     private static String skill(SkillResultEvent event) {

@@ -15,6 +15,7 @@ import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterRespawnedEvent;
 import dev.kage.protocol.CharacterSummary;
 import dev.kage.protocol.ExperienceChangedEvent;
+import dev.kage.protocol.HealthChangedEvent;
 import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
@@ -82,6 +83,10 @@ final class WorldObservation {
     private float playerX;
     private float playerY;
     private int playerCurrentHp;
+
+    /** Số gói {@code HealthChangedEvent} đã nhận — ADR-046 chốt trần ≤1/giây/entity, đây là chỗ ĐO nó. */
+    private int healthChanges;
+
     private int playerMaxHp;
     private ExperienceSnapshot latestExperience;
 
@@ -142,6 +147,7 @@ final class WorldObservation {
                 playerCurrentHp = event.getCurrentHp();
                 playerMaxHp = event.getMaxHp();
             }
+            case Opcode.OPCODE_HEALTH_CHANGED_EVENT_VALUE -> onHealthChanged(HealthChangedEvent.parseFrom(payload));
             case Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE -> {
                 ExperienceChangedEvent event = ExperienceChangedEvent.parseFrom(payload);
                 latestExperience = new ExperienceSnapshot(
@@ -252,6 +258,28 @@ final class WorldObservation {
         }
     }
 
+    /**
+     * ADR-046 — máu đổi mà KHÔNG do đòn đánh nào (hồi ngoài chiến đấu, vùng an toàn, đan dược, quái
+     * về tới điểm spawn). Không có nhánh này thì probe hoàn toàn MÙ với mọi thứ ADR-046 làm: con số
+     * máu cuối báo cáo sẽ là số của đòn đánh cuối cùng, đúng cái bug mà chính ADR đó sửa ở client.
+     */
+    private void onHealthChanged(HealthChangedEvent event) {
+        healthChanges++;
+        if (event.getEntityId() == playerCharacterId) {
+            playerCurrentHp = event.getCurrentHp();
+            if (event.getMaxHp() > 0) {
+                playerMaxHp = event.getMaxHp();
+            }
+            return;
+        }
+        MonsterSighting target = monsters.get(event.getEntityId());
+        if (target != null) {
+            monsters.put(
+                    event.getEntityId(),
+                    withPresence(target, event.getCurrentHp(), target.lastUpdateMillis(), target.inAreaOfInterest()));
+        }
+    }
+
     private static MonsterSighting withPresence(
             MonsterSighting sighting, int currentHp, long lastUpdateMillis, boolean inAreaOfInterest) {
         return new MonsterSighting(
@@ -315,6 +343,8 @@ final class WorldObservation {
                         playerY,
                         playerCurrentHp,
                         playerMaxHp))
+                .append(System.lineSeparator());
+        report.append(String.format(Locale.ROOT, "Gói hồi máu (408) đã nhận: %d", healthChanges))
                 .append(System.lineSeparator());
         appendExperienceSection(report);
         appendMonsterSection(report);

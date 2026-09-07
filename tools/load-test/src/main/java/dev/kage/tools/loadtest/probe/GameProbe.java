@@ -75,6 +75,9 @@ public final class GameProbe {
 
     private static final int MILLIS_PER_SECOND = 1000;
 
+    /** Đủ cho vài chục tick 60Hz — hàng đợi world xử lý lệnh hồi máu rồi phát 408 ngay tick sau. */
+    private static final long HEAL_SETTLE_MILLIS = 1500;
+
     private GameProbe() {}
 
     /**
@@ -101,6 +104,24 @@ public final class GameProbe {
                 new QuestScenario(connection, session, observation).run(config.quest());
             }
             observe(connection, config, session, observation);
+            // Uống thuốc SAU vòng quan sát: máu không được lưu vào DB (thoát ra vào lại là đầy),
+            // nên muốn thấy đan dược làm gì thì phải đánh mất máu TRƯỚC, trong cùng phiên này.
+            if (!config.useItemCode().isEmpty()) {
+                new UseItemScenario(connection, session).run(config.useItemCode());
+                drainForMillis(connection, HEAL_SETTLE_MILLIS); // đợi HealthChangedEvent (408) tới
+            }
+            // Đi bộ LẦN HAI, sau khi đã mất máu — thứ duy nhất làm vùng an toàn (ADR-046 D3) quan
+            // sát được: nó chỉ kích hoạt khi BƯỚC VÀO vùng, mà lần đi bộ đầu xảy ra lúc còn đầy máu.
+            if (config.returnToX().isPresent()) {
+                walkTo(connection, observation, session, config.returnToX().getAsDouble());
+            }
+            // Cửa sổ ĐỨNG YÊN KHÔNG ĐÁNH AI — thứ duy nhất làm hồi máu ngoài chiến đấu (ADR-046 D2)
+            // quan sát được: nó đòi 8 giây không gây và không chịu damage, mà vòng observe ở trên
+            // thì vừa đánh vừa bị đánh.
+            if (config.settleSeconds() > 0) {
+                session.note("đứng yên " + config.settleSeconds() + "s để đo hồi máu ngoài chiến đấu");
+                drainForMillis(connection, (long) config.settleSeconds() * MILLIS_PER_SECOND);
+            }
         }
         session.print(observation.renderReport());
     }
@@ -203,6 +224,19 @@ public final class GameProbe {
                         AttackCommand.getDefaultInstance().toByteArray());
                 nextAttackAt = System.currentTimeMillis() + config.attackIntervalMillis();
             }
+            readOneFrameOrWait(connection);
+        }
+    }
+
+    /**
+     * Đọc tiếp trong {@code millis} mili-giây rồi thôi — dùng sau một lệnh có hiệu ứng ĐI QUA
+     * HÀNG ĐỢI WORLD ({@code enqueueHealCharacter}), nơi kết quả tới bằng một event RIÊNG chứ không
+     * nằm trong response (ADR-046 D5). Không có bước này thì probe đóng socket trước khi 408 kịp tới
+     * và báo cáo sẽ nói "máu không đổi" — sai, và sai theo hướng khó nghi ngờ nhất.
+     */
+    private static void drainForMillis(GameConnection connection, long millis) throws IOException {
+        long endAt = System.currentTimeMillis() + millis;
+        while (System.currentTimeMillis() < endAt) {
             readOneFrameOrWait(connection);
         }
     }

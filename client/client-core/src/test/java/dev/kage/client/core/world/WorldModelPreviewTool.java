@@ -96,6 +96,48 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
     private static final float ELDER_X = -3.0f;
     private static final float UNDRAWN_NPC_X = 4.9f;
 
+    /**
+     * Phép so A/B của ÁO CHOÀNG (câu hỏi để ngỏ từ 2026-09-06): bốn trong năm bộ B3 mặc
+     * {@code cloak}, mà chính phụ kiện đó vừa bị GỠ khỏi cỗ khảo hạch vì camera client nhìn gần
+     * chính diện nên áo choàng treo SAU lưng bị che kín trong MỌI khung — tốn 116 tam giác mà vẽ ra
+     * đúng con số không.
+     *
+     * <p><b>Hai ảnh CÙNG một entity, CÙNG một chỗ đứng</b>, chỉ đổi model bằng
+     * {@code replaceCharacterModel} — chứ không phải hai nhân vật đứng cạnh nhau. Lần thử đầu xếp
+     * cạnh nhau và ảnh KHÔNG kết luận được gì: ở cỡ thật, mảng tối bên hông có thể là áo choàng mà
+     * cũng có thể là vũ khí, và hai khối lệch nhau vài pixel thì không diff được. Cùng chỗ đứng thì
+     * mọi pixel khác nhau giữa hai ảnh CHỈ có thể là cloak — {@code _accessories_for} cộng dồn theo
+     * bậc, nên B3 = B2 + đúng một món đó.
+     *
+     * <p>Chọn hệ LÔI, và KHÔNG chọn hệ THỔ dù thoạt nhìn thổ tương phản mạnh hơn: {@code char_tho-b3}
+     * đã được DỰNG LẠI thành giáp kim loại xám (ART-AUDIT-TU-TIEN §5 dòng #7, chủ dự án chốt "GIỮ"),
+     * nên nó KHÔNG còn là "b2 + đúng một cái cloak" và mọi phép so trên nó đo nhầm sang bộ giáp.
+     * Đây là bẫy đã dính thật: ảnh đầu tiên của phép đo này là thổ, và nó suýt cho ra kết luận sai.
+     * Lôi thì cloak {@code #3B2A5C} gần bằng GIÁ TRỊ với tóc {@code #1E1B2B} — trường hợp TỆ NHẤT.
+     *
+     * <p>⚠️ <b>Hai entity dựng CÙNG MỘT KHUNG</b> rồi thay nhau đứng vào chỗ chụp, chứ không phải
+     * đổi model của một entity giữa hai lần chụp. Bản đầu làm cách sau và phép đo HỎNG: hai ảnh
+     * cách nhau 10 khung nên nhân vật đã trôi sang tư thế idle khác, và 2.959 pixel "khác nhau" đếm
+     * được khi đó là TỔNG của áo choàng cộng độ trôi tư thế — không tách ra được. Dựng cùng lúc thì
+     * hai model chạy animation đồng pha.
+     */
+    private static final long CLOAK_TEST_ID = 10L;
+
+    /** Entity thứ hai, dựng CÙNG LÚC với entity thứ nhất — xem {@link #startCloakTest()}. */
+    private static final long CLOAK_TEST_ID_WITH = 11L;
+
+    /** Chỗ đứng "ngoài khung": entity nào đang không được chụp thì dời ra đây. */
+    private static final float CLOAK_TEST_OFFSCREEN_X = 500f;
+
+    private static final String CLOAK_TEST_WITHOUT = "char_loi-b2";
+
+    private static final String CLOAK_TEST_WITH = "char_loi-b3";
+
+    private static final float CLOAK_TEST_X = 18.0f;
+
+    /** Từ khung này trở đi kịch bản chuyển sang phép so áo choàng — xem {@link #cloakScript()}. */
+    private static final int CLOAK_TEST_FIRST_FRAME = 96;
+
     private final Map<Long, CombatHudController.MonsterState> monsters = new LinkedHashMap<>();
 
     private WorldModelRenderer models;
@@ -103,6 +145,9 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
     private NpcPresenter npcPresenter;
     private ShapeRenderer shapeRenderer;
     private int frame;
+
+    /** Từ khung này trở đi, cảnh chỉ còn phép so áo choàng — xem {@link #CLOAK_TEST_ID}. */
+    private boolean showingCloakTest;
 
     @Override
     public void create() {
@@ -176,6 +221,12 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         Gdx.gl.glClearColor(0.1f, 0.1f, 0.15f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
 
+        if (showingCloakTest) {
+            renderCloakTest();
+            script();
+            return;
+        }
+
         models.setPosition(CHARACTER_ID, PLAYER_X, 0f, 0f);
         // Y HỆT WorldScreen.renderModels: sync trước, follow, rồi render.
         presenter.sync(monsters, PLAYER_X);
@@ -195,6 +246,10 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
      * đúng khung đầu (crossfade 0.15s = 9 khung) — chụp quá sớm thì mọi tư thế trông như nhau.
      */
     private void script() {
+        if (frame >= CLOAK_TEST_FIRST_FRAME) {
+            cloakScript();
+            return;
+        }
         switch (frame) {
             case 60 -> capture("1-idle-va-fallback");
             case 61 -> feedMovement();
@@ -203,7 +258,30 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
             case 82 -> capture("3-attack");
             case 83 -> models.playDie(DUMMY_ID);
             case 95 -> capture("4-die");
-            case 100 -> Gdx.app.exit();
+            default -> {
+                /* các khung còn lại chỉ để animation chạy tiếp */
+            }
+        }
+    }
+
+    /**
+     * Nửa sau của kịch bản: phép so A/B áo choàng. Tách khỏi {@link #script()} vì gộp chung làm
+     * switch vượt trần {@code CyclomaticComplexity} của PMD — cùng bức tường mà
+     * {@code InventoryCoordinator} đâm vào hôm nay.
+     */
+    private void cloakScript() {
+        switch (frame) {
+            case CLOAK_TEST_FIRST_FRAME -> startCloakTest();
+            case 110 -> capture("5a-loi-b2-khong-ao-choang");
+            // Chụp NGAY khung sau: một khung 60Hz là độ trôi idle nhỏ nhất có thể, và cả hai model
+            // đã chạy cùng số khung kể từ lúc dựng nên chúng đồng pha.
+            case 111 -> swapCloakTest();
+            case 112 -> capture("5b-loi-b3-co-ao-choang");
+            // ĐỐI CHỨNG: CÙNG một model, cách 2 khung — đúng khoảng cách thời gian giữa 5a và 5b.
+            // Không có ô này thì mọi con số "pixel khác nhau" ở trên đều lẫn độ trôi tư thế idle, và
+            // đó chính là lỗi đã làm hỏng phép đo lần đầu.
+            case 114 -> capture("5c-doi-chung-cung-model-2-khung-sau");
+            case 120 -> Gdx.app.exit();
             default -> {
                 /* các khung còn lại chỉ để animation chạy tiếp */
             }
@@ -222,6 +300,33 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
                 .setY(0f)
                 .build());
         monsters.put(DUMMY_ID, new CombatHudController.MonsterState("training_dummy", DUMMY_X + 0.5f, 0f, 100, 100));
+    }
+
+    /**
+     * Bỏ cả cảnh cũ ra khỏi khung rồi dựng MỘT nhân vật thử ở {@link #CLOAK_TEST_X}. Không tháo
+     * entity nào: chỉ dời camera — presenter tự thôi vẽ những gì ngoài AoI, đúng như trong game thật.
+     */
+    private void startCloakTest() {
+        models.addCharacter(CLOAK_TEST_ID, CLOAK_TEST_WITHOUT);
+        models.addCharacter(CLOAK_TEST_ID_WITH, CLOAK_TEST_WITH);
+        models.setPosition(CLOAK_TEST_ID, CLOAK_TEST_X, 0f, 0f);
+        models.setPosition(CLOAK_TEST_ID_WITH, CLOAK_TEST_OFFSCREEN_X, 0f, 0f);
+        monsters.clear();
+        showingCloakTest = true;
+        LOG.info("so áo choàng: {} (không cloak) vs {} (có cloak)", CLOAK_TEST_WITHOUT, CLOAK_TEST_WITH);
+    }
+
+    /** Đổi ca: bộ CÓ áo choàng bước vào đúng chỗ bộ không có vừa đứng. */
+    private void swapCloakTest() {
+        models.setPosition(CLOAK_TEST_ID, CLOAK_TEST_OFFSCREEN_X, 0f, 0f);
+        models.setPosition(CLOAK_TEST_ID_WITH, CLOAK_TEST_X, 0f, 0f);
+    }
+
+    private void renderCloakTest() {
+        presenter.sync(monsters, CLOAK_TEST_X);
+        npcPresenter.sync(CLOAK_TEST_X);
+        models.follow(CLOAK_TEST_X, 0f);
+        models.render(1f / 60f);
     }
 
     private void capture(String name) {

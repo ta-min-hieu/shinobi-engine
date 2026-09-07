@@ -35,6 +35,9 @@ public record ProbeConfig(
         String attackTarget,
         int attackIntervalMillis,
         int observeSeconds,
+        String useItemCode,
+        OptionalDouble returnToX,
+        int settleSeconds,
         QuestPlan quest) {
 
     /**
@@ -86,6 +89,9 @@ public record ProbeConfig(
                 raw.text("attackTarget", ATTACK_TARGET_NONE).toLowerCase(Locale.ROOT),
                 raw.integer("attackIntervalMillis", DEFAULT_ATTACK_INTERVAL_MILLIS),
                 raw.integer("observeSeconds", DEFAULT_OBSERVE_SECONDS),
+                raw.text("useItemCode", ""),
+                raw.optionalDouble("returnToX"),
+                raw.integer("settleSeconds", 0),
                 new QuestPlan(
                         raw.text("talkToNpc", ""),
                         raw.list("dialogueChoices"),
