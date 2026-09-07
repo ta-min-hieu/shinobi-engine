@@ -2354,3 +2354,126 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
     - ✅ `WorldModelPreviewTool` nay dựng CẢ BỐN loài có model cạnh nhau — khung đó sinh ra để trả
       lời đúng một câu, và câu đó vừa khó lên: **ba cỗ máy đá cùng một dòng dõi** có còn phân biệt
       được không, khi lore bắt chúng phải giống nhau ở mức nào đó.
+68. **[ADR-046](../01-architecture/adr/ADR-046-Health-Recovery.md) — HỒI MÁU, đóng việc chặn duy nhất còn lại (2026-09-07)**:
+    - Chủ dự án chọn **CẢ BA hướng** của dòng 17 bảng "🔴 ĐANG CHỜ CHỦ DỰ ÁN" và Accept ADR nguyên
+      trạng. Dòng 17 đã gạch.
+    - ⚠️ **Một đánh giá cũ của tôi bị chính việc đọc code bác bỏ.** Dòng 17 viết "(a) hồi máu ngoài
+      chiến đấu: KHÔNG đổi protocol, rẻ nhất". Sai: javadoc `CombatHudController` nói thẳng *"server
+      không gửi gói đồng bộ HP/Khí/hồi chiêu nào"* — client chỉ biết máu qua `AttackResultEvent`/
+      `SkillResultEvent`. Máu hồi mà không gói nào chở tin đi thì **vạch máu đứng im tới đòn đánh
+      kế tiếp**, đúng họ bug ADR-043 đã phải sửa một lần. **Cả ba hướng đều cần protocol** ⇒ gộp
+      vào MỘT ADR thay vì ba, và một event duy nhất phục vụ cả ba.
+    - **D1 — opcode 408 `HealthChangedEvent`** (`entity_id` dương = nhân vật / âm = quái, `current_hp`,
+      `max_hp`), gửi cho mọi quan sát viên AoI y hệt `AttackResultEvent`. Không có field "vì sao":
+      vạch máu không quan tâm lý do, và số "+N" client tự lấy bằng hiệu. `protocolVersion` KHÔNG tăng.
+    - **D2 — `HealthRegenSystem`**: ngoài chiến đấu 8 giây thì hồi 3% máu tối đa mỗi giây (118 máu ⇒
+      38→118 mất ~23 giây). `CombatRecencyComponent` mang cả đồng hồ chiến đấu lẫn **phần lẻ tích
+      luỹ** — ở 60Hz mỗi tick chỉ hồi ~0,06 máu, cộng thẳng vào một `int` là làm tròn xuống 0 và máu
+      KHÔNG BAO GIỜ hồi. Trần phát gói **≤1/giây/entity, và 0 khi đầy máu** — cam kết với ADR-042.
+    - **D3 — bảng `safe_zone` + module MỚI `feature-world`** (chủ dự án chọn "module mới" thay vì
+      nhét vào `feature-monster`). Bước vào tông môn `[-15, 5]` ⇒ đầy máu ngay. Đây là **consumer
+      thật đầu tiên của `TriggerZoneSystem`**, dựng từ 2026-08-01 và no-op suốt hơn một tháng.
+      `feature-world` là chỗ ở tương lai của bệ nhảy (`DEMO_PLATFORMS`) và **dải nền đất** — thứ
+      đang hardcode phía CLIENT và là nguồn của bug quái lơ lửng ở mục 66.
+    - **D4 — quái lành lại khi về tới điểm spawn.** Không nằm trong yêu cầu, nhưng bỏ qua thì lỗ
+      hổng đang NGỦ trở thành chiến thuật tối ưu của mọi trận: `tickReturn` vốn không đụng `HealthComponent`,
+      nên "đánh vài nhát → chạy ra khỏi leash → quay lại đánh tiếp con máu thấp" là vô hạn ngay khi
+      người chơi có D2. Hai cơ chế cho hai loại entity: quái đang ĐUỔI mà chưa đánh trúng ai vẫn là
+      "ngoài chiến đấu" theo nghĩa đen, nên cho chúng dùng chung D2 là quái vừa chạy vừa hồi máu.
+    - **D5 — đan dược**: opcode **512/513**, hai cột `use_effect`/`use_value` trên `item_template`
+      (V36) + `minor_healing_pill` "Tiểu Hồi Nguyên Đan" (hồi 50 máu, chồng 20, mua 80 vàng).
+      `UseItemResponse` **KHÔNG mang HP** — `WorldFacade.inbox` bất đồng bộ, đọc entity ngay sau khi
+      xếp lệnh sẽ ra số CŨ (bẫy đã trả giá ở ADR-043); máu mới về bằng 408. Món này **xoá điều kiện
+      mà V21 §3 tự đặt ra** ("CỐ Ý KHÔNG thêm thuốc hồi máu: server CHƯA có UseItemUseCase nào").
+    - 🎨 **Icon `icon_minor_healing_pill` trả nợ art TRONG NGÀY** — ba viên đan tròn đỏ đan sa,
+      nguyên thuỷ mới `_disc`. Hai bản hỏng trước khi đạt, cả hai đều là bài học hình khối đã gặp:
+      ba viên chạm nhau thì Freestyle vẽ **một** silhouette và cụm đọc ra "con bọ hai chân"; vệt
+      sáng to và gần tâm đọc ra "cái lỗ". Xem [ASSET-LOG](../../assets/raw/ASSET-LOG.md) 2026-09-07.
+    - 🧪 **Cân bằng sẽ phải đọc lại**: mọi số đo trận đấu trước hôm nay ("thắng còn 38/118") giờ có
+      nghĩa "thắng còn 38/118 **rồi hồi lại trong 23 giây**". Các test cân bằng không phải sửa số —
+      chúng đo một trận đơn lẻ và không cho thời gian trôi ngoài chiến đấu — nhưng ý nghĩa gameplay
+      của chúng thì đổi.
+    - ✅ **PLAYTEST SỐNG cùng ngày, qua `gameProbe` + socket TLS thật + Postgres thật** — cả bốn
+      nguồn đều để lại một con số trên dây:
+      * **D2**: đòn cuối t=7674ms → gói 408 đầu tiên t=**16775ms** (9,1 giây sau — khớp 8s chờ),
+        rồi **đúng một gói mỗi ~1,13 giây**, máu 50→54→58→62→66→70→74 = **+4 mỗi nhịp**
+        (3% × 118 = 3,54/giây × 1,13s = 4,0 ✔). Trần số gói của ADR-042 đo được, không phải hứa.
+      * **D3**: đòn cuối t=6144ms (67/118) → t=**9192ms** một gói duy nhất **118/118**. Nhảy thẳng
+        67→118 chỉ **3 giây** sau đòn cuối ⇒ NẰM TRONG cửa sổ chờ 8s, regen không giải thích được;
+        đúng lúc đường về cắt qua biên đông x=5 của `sect_grounds`.
+      * **D4**: `408 entity=-7 hp=120/120` — thạch vệ bỏ cuộc, về tới điểm spawn, lành lại.
+      * **D5**: `dùng minor_healing_pill: success=true cònLại=1` + `408 entity=3 hp=6→56` = **+50**.
+    - 🧰 **`gameProbe` mọc thêm ba tham số**, cả ba đều sinh ra từ một hạn chế THẬT của công cụ:
+      `--useItemCode` (tra code→templateId qua catalog rồi →ô túi; **máu không được lưu vào DB nên
+      phải mất máu và uống thuốc trong CÙNG một phiên**), `--settleSeconds` (đứng yên KHÔNG đánh ai
+      — vòng `observe` vừa đánh vừa bị đánh nên D2 không bao giờ quan sát được trong đó), và
+      `--returnToX` (đi bộ LẦN HAI sau khi đã mất máu — D3 chỉ kích hoạt lúc BƯỚC VÀO vùng, mà lần
+      đi bộ đầu luôn xảy ra lúc còn đầy máu). Báo cáo thêm dòng "Gói hồi máu (408) đã nhận: N".
+    - ⚠️ **Quan sát cân bằng, KHÔNG phải lỗi**: nhân vật vẫn chết 3 lần trong các lượt probe — nhưng
+      cả ba đều vì *đứng yên trong tầm aggro của con quái vừa hồi sinh* (probe không biết chạy),
+      không phải vì "không có cách hồi máu". Khác hẳn ba lần chết ngày 2026-09-06.
+    - 🐛 **Bẫy môi trường, không phải bug sản phẩm**: DB dev từ chối khởi động vì Flyway báo lệch
+      checksum **V33** (bản áp ngày 2026-09-06 khác bản đã commit — nhiều khả năng áp từ một
+      worktree agent trước khi commit chốt). Đã `repair` bằng cách cập nhật checksum. Kiểm lại:
+      V34/V35/V36 áp sạch trên DB dev, `safe_zone` có đúng một hàng `[-15, 5]`, `minor_healing_pill`
+      id=20 `HEAL_HP`/50.
+    - ✅ **Icon đã vào `art_asset`**: `icon_minor_healing_pill` / `SPRITE` /
+      `assets/raw/blender/props/minor_healing_pill.blend` (nhánh 2D: 55 dòng upsert).
+      ⚠️ **Nhánh 3D của pipeline DỪNG ở máy này vì một hiện vật CỤC BỘ, không phải lỗi sản phẩm**:
+      `assets/exported/models/char_hoa-b1.model-meta.json` ghi `blend_file` trỏ vào thư mục tạm của
+      một PHIÊN LÀM VIỆC CŨ (`.../Temp/claude/.../scratchpad/final_hoa-b1.blend`), mà
+      `ART-PIPELINE §8.4` bắt `blend_path` phải nằm dưới `assets/raw/`. `assets/exported/` là build
+      output đã gitignore nên hiện vật này không có trong repo — ai gặp thì xuất lại model từ
+      `.blend` gốc. **Hệ quả: bước kiểm asset mồ côi CHƯA chạy trong đợt này.**
+    - ✅ **ĐO LẠI QUEST 3 với hồi máu bật** — và **trận đấu tự nó không đổi một chút nào**: 4 nhát ×
+      32 hạ thạch vệ 120 máu, nhận lại 4 × 20 ⇒ **còn đúng 38/118**, khớp TỪNG SỐ với phép đo
+      2026-09-06. Cái đổi là chuyện xảy ra SAU đó: gói 408 đầu tiên ở t=16599ms (9,1s sau đòn cuối),
+      máu 38→42→46→…→78 trong **10,2 giây**; theo nhịp đo được thì 38→118 mất **~23 giây**.
+      **Quest 3 nay hoàn thành được mà không cần chết** — hôm qua thì không.
+    - ⚠️ **Căng thẳng cân bằng MỚI, đo được chứ không đoán**: `monster_spawn.respawn_seconds` của
+      thạch vệ là **20 giây**, mà hồi đầy máu mất **~23 giây** — **hồi máu CHẬM HƠN hồi sinh của
+      quái**. Đứng nguyên tại chỗ vừa đánh thì con vừa chết quay lại lúc người chơi mới ~78/118
+      (probe chết đúng kiểu đó ở t=27532ms, con `-10` spawn lại ngay x=-20). Người chơi thật phải
+      **lùi ra khỏi tầm đuổi rồi mới đứng chờ** — chuyện bình thường của thể loại, nhưng nay nó là
+      một luật CÓ THẬT của bản đồ này, và là thứ luật "chỗ đánh nhau yên tĩnh" (mục 62c/63) chưa nói tới:
+      luật cũ nói về chỗ ĐÁNH, luật này nói về chỗ NGHỈ.
+    - ✅ **Đã nhìn nút "Dùng" bằng MẮT** (`runHudPreview` → `.debug-orientation/hud-inventory.png`):
+      nhãn nằm gọn trong nền nút (không tràn như lỗi `QuestLogPanel` từng mắc), hàng 5 nút vẫn vừa
+      560px, dòng **"Hồi 50 máu"** hiện đúng từ `ItemCatalogEntry.use_value`, icon
+      `icon_minor_healing_pill` đọc được ở cỡ ô túi. Ô đầu của khung xem trước nay LUÔN là icon mới
+      nhất — nó là cái chưa ai từng nhìn thấy ở cỡ thật.
+    - 🔴 **Trả lời câu hỏi để ngỏ về ÁO CHOÀNG của bốn bộ B3 — và câu trả lời NGƯỢC với dự đoán.**
+      Mục 67 gỡ `_acc_cloak` khỏi cỗ khảo hạch vì nó bị che kín trong MỌI khung, rồi để ngỏ "bốn
+      nhân vật B3 có đang trả cùng cái phí đó không". Đo xong: **KHÔNG — áo choàng trên nhân vật
+      hiện rất rõ, và ĐÓ mới là vấn đề.** Nó không đọc ra là áo choàng: nó dính vào khối tóc thành
+      một cái "mũ" tối bè ra hai vai và **ăn mất khuôn mặt** (`char_loi-b2` có mặt đọc được;
+      `char_loi-b3` thì mặt bị vùi hẳn — cloak `#3B2A5C` gần bằng GIÁ TRỊ với tóc `#1E1B2B`).
+      Hoả và Thuỷ nhẹ hơn nhưng cùng kiểu. **Lần thứ BA của lỗi "khối tối che mặt"** (ông lão
+      2026-09-03, thạch vệ 2026-09-06, nay là áo choàng).
+      Số đo, qua đúng camera game (`runWorldPreview` khung 5a/5b): silhouette Lôi **3.003 → 3.365
+      pixel (+362)**, Thổ 2.971 → 3.250 (+279), **đối chứng CÙNG model cách đúng 2 khung: −2**.
+      Dòng đối chứng là dòng quyết định — không có nó thì "pixel khác nhau" chỉ là tổng của áo
+      choàng cộng độ trôi tư thế idle, và bản đo ĐẦU của tôi đúng là đã lẫn hai thứ đó.
+    - 🐛 **Và một tiền đề của tôi thì SAI — sửa lại ở đây thay vì để nó trôi.** Bản đầu của mục này
+      quy nguyên nhân cho `_acc_cloak` trong `kage_mesh_kit.py` và đề xuất "đổi `cloak` thành
+      `scarf` trong bảng `CHARACTERS`". Đọc thẳng chunk JSON của `.glb` mới thấy mỗi nhân vật là
+      **MỘT mesh thân duy nhất** (`Loi_Mesh.003`, `Tho_Mesh.004`…) cộng vài prop rời (vũ khí, đốm
+      lửa, tia điện) — **không có part `_Cloak` nào**. Áo choàng nằm BÊN TRONG mesh thân, đúng như
+      ASSET-LOG 2026-08-06 mô tả ("áo choàng tím rìa răng cưa"): nhân vật đi đường **Text→3D** từ
+      2026-08-03 (ADR-031), còn `build_kage_character.py` là thế hệ mesh-kit CŨ (2026-08-01) và
+      **không còn mô tả file nào đang chạy**. ⇒ **Không có "cái cloak" nào để gỡ khỏi bảng.**
+      Cũng vậy, `char_tho-b3` KHÔNG hề "được dựng lại thành giáp kim loại" — nó là **"giáp đá khối"**
+      từ chính lượt Text→3D 2026-08-06; ART-AUDIT §5 dòng #7 chỉ quyết **GIỮ** và ghi "không có việc
+      phải làm".
+    - 🔴 **CẦN CHỦ DỰ ÁN QUYẾT, với lựa chọn THẬT** (không phải ba hướng tôi đưa lúc đầu — cả ba đều
+      dựa trên tiền đề sai): sửa hình dạng thân đòi **dựng lại mesh qua Text→3D**, mà khoá Rodin
+      đang `API_INSUFFICIENT_FUNDS` — chính **dòng #12** của bảng chờ. Nên: **(i)** chờ khoá trả phí
+      rồi dựng lại ba thân B3 với prompt giữ mặt thoáng; **(ii)** nắn tay `.blend` (file "không sinh
+      lại được" theo BLENDER-SESSION-GUIDE §D, rủi ro cao); **(iii)** chấp nhận — B3 là trang phục
+      cấp cao, chưa người chơi nào chạm tới, và nó không chặn gì. Tôi nghiêng về **(iii) tới khi có
+      khoá**, tức gộp việc này vào dòng #12.
+    - 🧰 **`WorldModelPreviewTool` nay có khung thứ 5: phép so A/B của phụ kiện** — hai entity dựng
+      CÙNG một khung rồi thay nhau đứng vào ĐÚNG một chỗ, cộng một ảnh **đối chứng cùng model**.
+      Đây là khuôn dùng lại được cho mọi câu hỏi "món này có vẽ ra pixel nào không", và bài học kèm
+      theo: **đếm DIỆN TÍCH silhouette, đừng đếm "pixel khác nhau"** — đại lượng sau lẫn độ trôi
+      animation, đại lượng trước thì không (±2 pixel qua 2 khung).

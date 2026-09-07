@@ -238,3 +238,29 @@ những gì ảnh hưởng tới cách viết code trong module này:
   thuộc về luồng chọn hệ phái ("chưa đủ cấp 10"). ADR bản Proposed ghi sai tên, đã ghi chú lại
   trong chính ADR.
 
+
+### ADR-046 D5 (Accepted 2026-09-07): vật phẩm DÙNG ĐƯỢC đầu tiên — đan dược hồi máu
+
+- **`ItemTemplate` giờ 9 thành phần** (`useEffect`/`useValue` mới, migration **V36**).
+  `useEffect == null` = món KHÔNG dùng được, tức trạng thái của MỌI hàng trước đó. Enum
+  `ItemUseEffect` chỉ có `HEAL_HP` và **cố ý không có `NONE`**: "không dùng được" không phải một
+  hiệu ứng, và enum có nhánh NONE luôn kết thúc bằng việc quên kiểm nó ở đâu đó.
+- **Một món KHÔNG được vừa mặc được vừa dùng được** — chặn ở compact constructor VÀ ở `CHECK` của
+  V36. Dùng xong thì món biến mất, mà nó đang nằm trên người thì đó là một ô trang bị rỗng không ai
+  giải thích được.
+- **`InventoryFacade` vẫn ĐÚNG 4 tham số**: `UseItemUseCase` vào chung `ItemActionUseCases` với
+  `EnhanceItemUseCase` ("thao tác lên MỘT món đang trong túi"), đúng như ghi chú của lát cắt 4 đã
+  dặn trước — không thêm tham số thứ 5.
+- **`UseItemUseCase` chỉ làm NỬA việc**: kiểm sở hữu + trừ một cái + audit, rồi TRẢ VỀ hiệu ứng.
+  Cộng máu là của `server-world`; chỗ nối hai nửa là `server-gateway`. Module này vẫn không biết
+  `WorldFacade` tồn tại.
+- **KHÔNG kiểm "đang đầy máu thì đừng uống"** — máu sống trong ECS và đường tới đó bất đồng bộ, nên
+  hỏi rồi mới trừ là một cuộc đua. Client tự chặn nút (nó có sẵn số máu trong HUD); ép gói qua thì
+  mất một viên đan của CHÍNH người chơi, không khai thác được gì.
+- **Không có `idempotencyKey`** (khác `EnhanceItemUseCase`): lệnh này không trừ gold, và một lần
+  retry chỉ tốn thêm một viên đan. Thêm bảng idempotency cho mỗi lần uống thuốc là chi phí ghi DB
+  cho mọi trận đánh.
+- **`ItemCatalogEntry` giờ 12 thành phần** (`useEffect`/`useValue`, field 11..12 của proto) — không
+  có chúng, client phải bày nút "Dùng" với MỌI món rồi chờ server từ chối, và ô chi tiết không nói
+  được "hồi 50 máu". ⚠️ Cột mới phải nối vào **CẢ HAI** đường đọc của `PostgresItemTemplateAdapter`
+  (`findById` cho gameplay, `listCatalog` cho client) — có test Postgres khoá cả hai.

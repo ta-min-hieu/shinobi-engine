@@ -80,6 +80,32 @@ Response + Event cho các client liên quan (trong AoI)
 
 ⚠️ **Lực Chiến** (GDD §5) chỉ là giá trị hiển thị/xếp hạng tính SAU khi đã có đủ chỉ số dẫn xuất — không bao giờ dùng ngược lại để tính damage hay bất kỳ quyết định gameplay nào khác (một chiều: stat → Lực Chiến, không có chiều ngược).
 
+### 3.1. Hồi máu (ADR-046)
+
+Trước 2026-09-07 **không có nguồn hồi máu nào ngoài chiến đấu** — playtest thật chết ba lần trong
+15 phút vì đúng lý do đó. Nay có bốn đường, và cả bốn báo về client bằng **một** gói duy nhất
+(`HealthChangedEvent`, opcode 408):
+
+| Nguồn | Ai được | Cơ chế | Ở đâu |
+|---|---|---|---|
+| Ngoài chiến đấu | **Nhân vật** | 8 giây không gây/chịu damage ⇒ hồi 3% máu tối đa mỗi giây | `HealthRegenSystem` (`server-world`) |
+| Vùng an toàn | **Nhân vật** | Bước VÀO vùng ⇒ đầy máu ngay | bảng `safe_zone` (`feature-world`) + `TriggerZoneSystem` |
+| Đan dược | **Nhân vật** | Dùng 1 món có `item_template.use_effect = HEAL_HP` | `UseItemUseCase` (`feature-inventory`) → `WorldFacade.enqueueHealCharacter` |
+| Về tới điểm spawn | **Quái** | Chạm điểm spawn sau khi Return ⇒ đầy máu | `AiSystem.tickReturn` |
+
+**Vì sao quái KHÔNG dùng chung cơ chế "ngoài chiến đấu"**: con quái đang ĐUỔI mà chưa đánh trúng ai
+vẫn là "ngoài chiến đấu" theo nghĩa đen, nên nó sẽ vừa chạy vừa hồi máu. Hai loại entity, hai cơ chế.
+
+**Vì sao quái PHẢI lành lại**: không có nó, "đánh vài nhát → chạy ra khỏi leash → quay lại đánh tiếp
+con máu thấp" là chiến thuật tối ưu của mọi trận, ngay khi người chơi được hồi máu ngoài chiến đấu.
+
+⚠️ **Trần số gói** (cam kết với ADR-042): hồi máu chạy mỗi tick nhưng chỉ BÁO nhiều nhất **1
+lần/giây/entity**, và **0 gói khi đầy máu** — trạng thái thường của mọi người chơi.
+
+⚠️ **Không kiểm "đang đầy máu thì đừng uống" ở phía server**: máu sống trong ECS và đường tới đó là
+hàng đợi bất đồng bộ, nên hỏi rồi mới trừ là một cuộc đua. Client tự chặn nút; ép gói qua thì mất
+một viên đan của chính người chơi, không khai thác được gì.
+
 ---
 
 ## 4. Skill

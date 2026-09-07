@@ -96,8 +96,22 @@ Dải số cố định theo domain — tránh đụng độ khi nhiều ngườ
 
 **Nguồn chân lý thật**: `shared-protocol/src/main/proto/opcode_registry.proto`. Tài liệu này là bản tóm tắt — **lệch nhau thì file `.proto` thắng**.
 
-Tổng opcode đã cấp phát (không tính `OPCODE_UNSPECIFIED`): **157** (2026-08-27).
-Lượt cấp gần nhất — [ADR-035](../01-architecture/adr/ADR-035-Client-State-Sync-Opcodes.md) (Accepted 2026-08-27), 150 → 157:
+Tổng opcode đã cấp phát (không tính `OPCODE_UNSPECIFIED`): **161** (2026-09-07).
+
+Lượt cấp gần nhất — [ADR-046](../01-architecture/adr/ADR-046-Health-Recovery.md) (Accepted 2026-09-07), 158 → 161:
+
+| Opcode | Số | Dải |
+|---|---|---|
+| `OPCODE_HEALTH_CHANGED_EVENT` | 408 | Combat |
+| `OPCODE_USE_ITEM_COMMAND` / `_RESPONSE` | 512 / 513 | Inventory |
+
+> ⚠️ **512/513 chứ không phải 511/512**: bản thi hành đầu lấy 511, rồi mới thấy dòng giữ chỗ ngay
+> dưới. Số **511 vẫn để trống** cho `ITEM_REMOVED_EVENT`.
+
+Trước đó — [ADR-045](../01-architecture/adr/ADR-045-Appearance-Changed-Event.md) (2026-09-06) cấp
+`OPCODE_CHARACTER_APPEARANCE_CHANGED_EVENT` = 307 (157 → 158).
+
+Và [ADR-035](../01-architecture/adr/ADR-035-Client-State-Sync-Opcodes.md) (Accepted 2026-08-27), 150 → 157:
 
 | Opcode | Số | Dải |
 |---|---|---|
