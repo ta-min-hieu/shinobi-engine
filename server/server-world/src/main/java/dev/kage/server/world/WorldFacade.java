@@ -124,6 +124,28 @@ public final class WorldFacade {
             new Platform(new Aabb(9f, -0.75f, 13f, 0.75f), 1.5f),
             new Platform(new Aabb(15f, -0.75f, 19f, 0.75f), 2.2f));
 
+    /**
+     * Chỉ đọc — ba bệ nhảy demo của world chính (ADR-033 #7).
+     *
+     * <p><b>Vì sao lộ ra ngoài (2026-09-09).</b> Chúng là KHỐI 3D thật có depth test, nên một điểm
+     * spawn rơi vào khoảng {@code x} của một bệ sẽ bị bệ VẼ ĐÈ LÊN trong client. Chuyện đó vừa xảy
+     * ra thật: V37 bản đầu đặt NPC {@code senior_sister} ở {@code x=4}, tức giữa bệ thứ nhất
+     * {@code [3,7]}, và trong client cô bị vùi tới cổ — trong khi mọi test đều xanh và
+     * {@code runWorldPreview} cũng không thấy (công cụ đó đặt entity theo toạ độ của RIÊNG nó,
+     * không đọc {@code npc_spawn}).
+     *
+     * <p>Hằng số này là thứ DUY NHẤT nối "bệ ở đâu" với dữ liệu spawn trong DB, nên
+     * {@code SpawnGeometryIntegrationTest} (server-gateway — module duy nhất thấy được cả hai) đọc
+     * nó để gác mọi dòng {@code npc_spawn}/{@code monster_spawn}. Cùng họ với bài học dải nền đất
+     * {@code [-55, 60]}: một hằng số hình học không nối gì với DB thì sớm muộn cũng lệch.
+     *
+     * <p>⚠️ Trả về danh sách BẤT BIẾN của chính cấu hình đang chạy — không phải bản sao chép tay.
+     * Khi có map pilot thật thì cả hằng số này lẫn hàng rào kia đều biến mất cùng nhau.
+     */
+    public static List<Platform> demoPlatforms() {
+        return DEMO_PLATFORMS;
+    }
+
     // Boss mẫu (Phase 8 lát cắt 2) — spawn trong tầm aggro mặc định (AiConstants.DEFAULTS, 6m) từ
     // điểm vào dungeon (DungeonInstanceRegistry.DUNGEON_ENTRY_SPAWN, 0,0) để party aggro ngay khi
     // tới gần, không cần cơ chế "instant aggro lúc mở dungeon" riêng.
