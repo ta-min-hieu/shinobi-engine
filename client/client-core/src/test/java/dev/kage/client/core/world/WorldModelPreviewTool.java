@@ -82,6 +82,18 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
      */
     private static final long TRIAL_ID = -8L;
 
+    /**
+     * NPC THỨ HAI của dự án (V37) — Tô Vân Nhi. Đứng NGAY CẠNH Chu Hoành có chủ đích, và câu hỏi
+     * khung này phải trả lời là câu đã hỏi ba lần với ba cỗ máy đá, nay hỏi cho người: hai NPC cùng
+     * mặc đạo bào Thanh Hư, đứng cùng một sân, ở cỡ thật có lẫn vào nhau không?
+     *
+     * <p>Model của cô dựng theo luật "đảo bố cục sáng-tối" (áo SÁNG + tóc TỐI, ngược hẳn ông lão áo
+     * TỐI + tóc TRẮNG) chứ không phải "cùng bộ đồ, đổi màu" — xem `build_npc_senior_sister.py`. Ảnh
+     * này là chỗ DUY NHẤT chứng minh được luật đó có hiệu lực, vì nó chụp qua chính bộ dựng của
+     * client (camera chúc xuống), thứ đã ba lần bác bỏ ảnh Blender.
+     */
+    private static final long SISTER_ID = -9L;
+
     // Toàn bộ khung nằm TRƯỚC bệ demo đầu tiên (bắt đầu ở x=3, xem DemoPlatforms) — bệ vẽ đè lên
     // quái thì ảnh không còn chứng minh được gì về chính con quái, đúng bẫy đã gặp ở lượt chụp đầu.
     // Ba loài quái đứng CẠNH NHAU (dummy/bandit/ogre) chứ không rải ra: câu hỏi mà ảnh này phải trả
@@ -93,7 +105,10 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
     private static final float WARDEN_X = 1.45f;
     private static final float TRIAL_X = 2.6f;
     private static final float BOSS_X = 3.75f;
-    private static final float ELDER_X = -3.0f;
+    // Hai NPC xếp sát nhau hơn hàng quái (0,8 thay vì 1,15): chúng mảnh hơn hẳn ba cỗ máy đá, và
+    // câu hỏi "có lẫn vào nhau không" chỉ trả lời được khi chúng thật sự đứng cạnh nhau.
+    private static final float ELDER_X = -3.55f;
+    private static final float SISTER_X = -2.75f;
     private static final float UNDRAWN_NPC_X = 4.9f;
 
     /**
@@ -172,6 +187,7 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         putMonster(TRIAL_ID, "trial_construct", TRIAL_X);
         putMonster(BOSS_ID, "sample_boss", BOSS_X);
         putNpc(ELDER_ID, "town_elder", ELDER_X);
+        putNpc(SISTER_ID, "senior_sister", SISTER_X);
         putNpc(UNDRAWN_NPC_ID, "shop_keeper", UNDRAWN_NPC_X);
         LOG.info(
                 "model quái: training_dummy={} wandering_bandit={} stone_ogre={} archive_warden={} "
@@ -183,8 +199,10 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
                 models.hasModel(TRIAL_ID),
                 models.hasModel(BOSS_ID));
         LOG.info(
-                "model NPC: town_elder={} shop_keeper={} (shop_keeper=false là ĐÚNG, mã NPC chưa tồn tại)",
+                "model NPC: town_elder={} senior_sister={} shop_keeper={} "
+                        + "(shop_keeper=false là ĐÚNG, mã NPC chưa tồn tại)",
                 models.hasModel(ELDER_ID),
+                models.hasModel(SISTER_ID),
                 models.hasModel(UNDRAWN_NPC_ID));
     }
 
