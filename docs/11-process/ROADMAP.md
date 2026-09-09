@@ -2477,3 +2477,77 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       Đây là khuôn dùng lại được cho mọi câu hỏi "món này có vẽ ra pixel nào không", và bài học kèm
       theo: **đếm DIỆN TÍCH silhouette, đừng đếm "pixel khác nhau"** — đại lượng sau lẫn độ trôi
       animation, đại lượng trước thì không (±2 pixel qua 2 khung).
+
+69. **MỤC TIÊU QUEST LOẠI THỨ HAI — "đi gặp NPC"; NPC thứ hai; arc 2 MỞ (2026-09-09)**:
+    - Bàn giao 2026-09-07 xếp hai việc đáng làm nhất là **(1) arc 2** và **(2) thêm loại mục tiêu
+      quest**. Đợt này làm CẢ HAI trong một nhịp, vì chúng là cùng một việc: nhịp mở arc 2 theo
+      [STORY §6](../13-game-design/STORY.md) là *"đi tìm sư tỷ Tô Vân Nhi"*, mà mục tiêu đó không
+      tồn tại trong game — suốt từ 2026-07-23 mọi quest đều cùng một khuôn "giết N con".
+    - 🔁 **Tổng quát hoá đi TRƯỚC nội dung — lần thứ HAI, cùng một luật.**
+      `ProcessMonsterKilledUseCase` → `ProcessQuestEventUseCase` với hai lối vào
+      (`monsterKilled`/`npcTalked`) và một `dispatch` dùng chung; `runEvent` nhận `Map` thay vì
+      `(eventType, monsterCode)`. Lần một (mục 52, 2026-09-05) gỡ hằng số mã quest; lần này gỡ giả
+      định "chỉ có một loại sự kiện". Bản sao thứ hai của vòng lặp quét quest là chỗ hai đường xử lý
+      âm thầm trôi khỏi nhau.
+    - ✅ **KHÔNG thêm opcode nào, `protocolVersion` không tăng.** `TalkToNpcCommand` (601) và
+      `QuestStatusChangedEvent` (612) đã có từ Phase 6; cái thiếu chỉ là nhánh nối hai đầu qua
+      `feature-quest`. Đây là bài học ADR-046 áp NGƯỢC lại: hỏi "đã có đường nào chưa" TRƯỚC khi
+      kết luận phải đổi protocol.
+    - 🧩 **V37** — NPC thứ hai (`senior_sister`, **x=2**) + quest thứ năm (`report_to_outer_sect`,
+      tiên quyết `awakening_trial` CLAIMED). Vị trí phải thoả BỐN ràng buộc, và tôi chỉ kiểm ba —
+      xem gạch đầu dòng ngay dưới.
+    - 🎨 **NPC thứ hai bằng `kage_mesh_kit`, 0 lượt Rodin.** Lần đầu nhánh NPC phải làm HAI hình
+      phân biệt nhau, và câu trả lời là luật đã học ở `archive_warden` vs `stone_ogre`: **đảo bố cục
+      SÁNG-TỐI, đừng nhích màu** (ông lão áo TỐI + tóc TRẮNG · cô áo SÁNG + tóc ĐEN).
+      `runWorldPreview` bác **hai** lựa chọn trước khi ra bản dùng được: kiểu tóc `bang` (tóc mái
+      đóng kín vùng mắt ở camera chúc xuống) và góc cằm −20 (chưa đủ, phải −30) — và **một mình mỗi
+      thứ đều không đủ**.
+    - 🔴 **Khai thẳng, chưa sửa: mọi nhân vật dựng bằng mesh-kit đều KHÔNG có mắt ở camera client.**
+      Không phải lỗi của riêng NPC mới — `char_town-elder` (ship 2026-09-03) có đúng khuôn mặt đó ở
+      đúng khoảng cách đó. Nhân vật người chơi không dính vì chúng đi Text→3D có texture mặt bake
+      sẵn. ⇒ Lập luận cụ thể nhất tới giờ cho **dòng #12** (khoá Rodin trả phí).
+    - 🔴 **Phát hiện thêm, KHÔNG tự sửa (§4)**: `char_hoa-b1` **không có `.blend` nguồn trong repo**
+      — dòng **#20** mới của bảng chờ. Đây là chẩn đoán thật của thứ bàn giao 2026-09-07 mới ghi là
+      "hiện vật cục bộ", và nó cùng loại với phát hiện áo choàng B3: các `.blend`/script mesh-kit
+      **không còn mô tả thứ đang chạy**.
+    - 🔴 **Câu hỏi thiết kế mới, dòng #19**: quãng **Lv10–18 không có nội dung nào** (STORY xếp arc 1
+      ở Lv1–18 nhưng cả chuỗi arc 1 dừng ĐÚNG Cấp 10, và Cấp 10 là ràng buộc cố ý của V33). Quest 5
+      **cố ý không lấp** bằng một cục EXP to — 200 EXP là con số NHỎ NHẤT game, chọn từ ràng buộc
+      ngược: đây là quest đầu tiên KHÔNG tốn gì (đi 4 mét trong vùng an toàn), nên nó không được là
+      quest có lãi/rủi ro tốt nhất.
+    - 🐛 **LUẬT HÌNH HỌC THỨ TƯ, và tôi đã vi phạm nó ngay lần đầu.** Bản đầu của V37 đặt NPC ở
+      **x=4** sau khi kiểm ba ràng buộc (vùng an toàn V35, tầm aggro V29, tầm đuổi V32) — cả ba đều
+      xanh. Trong **client thật** thì cô bị **bệ nhảy demo vẽ đè lên tới cổ**: `DEMO_PLATFORMS`
+      chiếm x ∈ **[3,7] · [9,13] · [15,19]** và chúng là khối 3D có depth test. Ba thứ nói "ổn"
+      trong khi nó hỏng: không test nào biết khái niệm bệ nhảy; `runWorldPreview` đặt entity theo
+      toạ độ của RIÊNG nó nên không đọc `npc_spawn` (javadoc của chính nó có dòng "toàn bộ khung nằm
+      TRƯỚC bệ demo đầu tiên" — nó đã tự tránh cái bẫy này cho riêng mình từ lâu); và ba ràng buộc
+      kia thì đúng thật. **Chỉ client thật mới nói ra.** Cùng họ với lỗi dải nền đất `[-55, 60]`
+      (mục 66): một hằng số hình học phía client không nối gì với dữ liệu spawn trong DB.
+      ⇒ Dời sang **x=2**, mở `WorldFacade.demoPlatforms()`, và dựng hàng rào bằng máy
+      `SpawnGeometryIntegrationTest` (server-gateway — module DUY NHẤT thấy được cả hai đầu, vì
+      **server-database không được phụ thuộc server-world**). Nó đọc MỌI dòng `npc_spawn`/
+      `monster_spawn` từ Postgres thật. Ghi chú: mọi điểm spawn quái có sẵn vốn đã lọt khe giữa các
+      bệ (8 nằm giữa 7 và 9; 14 giữa 13 và 15) — bất biến đúng từ trước, chỉ chưa ai viết ra.
+    - 🐛 **MÓN DÙNG ĐƯỢC DUY NHẤT CỦA GAME KHÔNG DÙNG ĐƯỢC** — bắt được trong cùng buổi chơi thật,
+      và nó KHÔNG phải lỗi của đợt này. `InventoryController.MAX_VISIBLE_SLOTS = 10` cắt danh sách
+      túi đúng 10 dòng; nhân vật 14 món thấy dòng *"còn 4 vật phẩm nữa chưa hiện"* và **không có
+      cách nào chạm tới 4 món đó** (chúng không được dựng ra, nên cuộn cũng vô ích). Món thứ 14 là
+      `minor_healing_pill` — tức là **ADR-046 ship xong hai ngày trước thì món đan dược trở thành
+      bấm-không-tới ngay khi túi quá 10 ô**.
+      Lý do của trần đó — *"KageSkin chưa có style ScrollPane nào, danh sách dài hơn sẽ đội khung
+      cao vượt màn hình"* — **đã CHẾT**: `KageSkin.scrollPaneStyle` có thật, `InventoryPanel` bọc
+      danh sách trong `ScrollPane` thật, và ô chứa có chiều cao CỐ ĐỊNH. Nâng trần lên **60** (ba
+      lần sức chứa túi 20) + test gác ràng buộc THẬT ("trần phải > sức chứa túi"), và viết lại
+      javadoc theo lý do đúng. ⚠️ `MailController.MAX_VISIBLE_ROWS` và `ShopPanel` còn chép lại đúng
+      lý do đã chết đó — **chưa sửa**, mỗi cái là một khung khác cần đo riêng.
+    - ✅ **PLAYTEST SỐNG bằng CLIENT THẬT, đóng hai việc treo từ 2026-09-07.** Trọn vòng bằng CHUỘT:
+      nói chuyện Chu Hoành → nhánh ngoại môn → nhận quest → đi bộ sang đông → bấm vào Tô Vân Nhi →
+      khung nhiệm vụ lật sang "Đã hoàn thành" + nút "Nhận thưởng" → bấm → **EXP 200/1100 → 400/1100**.
+      Và nút **"Dùng"**: máu 98/118 → bấm → *"Đã dùng vật phẩm."*, **118/118**, đan **x5 → x4**.
+      Hai NPC đứng cạnh nhau đọc ra hai người khác hẳn — luật đảo bố cục sáng-tối có hiệu lực ở cỡ thật.
+    - 🧪 Test mới: 5 test `npc_talked` ở `feature-quest`, 4 test Postgres thật cho vòng đời quest 5,
+      2 test dây thật ở `GatewayPipelineTest` (lệnh nói chuyện vào → node hội thoại ra →
+      `QuestStatusChangedEvent` ngay sau, ĐÚNG thứ tự đó), `ProductionDialogueTreesTest` (ba bất
+      biến cấu trúc của cây hội thoại nay chạy cho MỌI NPC thay vì chỉ ông lão),
+      `SpawnGeometryIntegrationTest`, và một ô gác trần túi đồ.

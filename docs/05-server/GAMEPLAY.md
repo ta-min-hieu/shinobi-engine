@@ -413,7 +413,7 @@ dòng = NOT_STARTED):
 ```mermaid
 graph LR
     A["Dialogue: accept_quest:code"] -->|AcceptQuestUseCase| B["IN_PROGRESS<br/>on_accept hook"]
-    B -->|onMonsterKilled → ProcessMonsterKilledUseCase<br/>on_event hook| B
+    B -->|onMonsterKilled / onNpcTalked → ProcessQuestEventUseCase<br/>on_event hook| B
     B -->|effects.completed| C["COMPLETED"]
     C -->|ClaimQuestRewardCommand → ClaimQuestRewardUseCase<br/>on_claim hook| D["CLAIMED"]
 ```
@@ -427,10 +427,11 @@ dialogue vì không đọc `Value` trả về). `progress_json` là **chuỗi đ
 tránh phải thêm thư viện JSON phía Java — sẽ phải dừng hỏi theo CLAUDE.md §4). Chi tiết đầy đủ +
 lý do từng quyết định: `feature-quest/CLAUDE.md`.
 
-⚠️ **`ProcessMonsterKilledUseCase.TRACKED_QUEST_CODE` hardcode 1 quest** (`kill_training_dummies`)
-— placeholder có chủ đích cho lát cắt này (đúng cảnh báo hiệu năng đã ghi ở đầu §9: "cần index
-quest theo loại sự kiện, không quét tuyến tính"). Khi có quest thứ 2 PHẢI tổng quát hoá tra cứu này
-trước khi thêm quest mới, không copy-paste thêm hardcode.
+~~⚠️ **`ProcessMonsterKilledUseCase.TRACKED_QUEST_CODE` hardcode 1 quest**~~ — **ĐÃ GỠ 2026-09-05**,
+đúng điều kiện mà chính dòng này đặt ra (quest thứ hai theo dõi giết quái). Lớp đó nay đọc mọi quest
+IN_PROGRESS qua `QuestProgressPort.listInProgress` và để CHÍNH SCRIPT lọc. Cảnh báo hiệu năng ở đầu
+§9 vẫn còn hiệu lực: phạm vi quét nay bị chặn bởi số quest ĐANG LÀM của một người chơi, chưa phải
+index theo loại sự kiện.
 
 **Protocol** (opcode 606-609, dải Quest/NPC/Dialogue 600-699, `quest.proto`): không có
 `AcceptQuestCommand` — nhận quest đi qua `SelectDialogueOptionCommand` với action
@@ -439,6 +440,42 @@ trước khi thêm quest mới, không copy-paste thêm hardcode.
 nguyên tắc "open_shop" đã dùng ở §9.2) → `AcceptQuestResponse`.
 `QuestStatusChangedEvent{quest_code, status}` phát khi hoàn thành (không phát mỗi lần tick tiến độ).
 `ClaimQuestRewardCommand{quest_code}` → `ClaimQuestRewardResponse{outcome, exp_granted, items_granted[]}`.
+
+### 9.4 Mục tiêu quest loại THỨ HAI — "đi gặp NPC" (✅ Đã code, 2026-09-09)
+
+Từ 2026-07-23 tới 2026-09-06 mọi quest của game đều cùng MỘT khuôn: đếm `monster_code`. Nhịp mở
+arc 2 (STORY.md §6 — Ngoại Môn) cần một mục tiêu khác hẳn: *đi tìm một người*. Đây là lần đầu
+`feature-quest` phải phân biệt **loại** sự kiện, không chỉ **nội dung** sự kiện.
+
+**Tổng quát hoá đi TRƯỚC nội dung — lần thứ hai.** `ProcessMonsterKilledUseCase` đổi tên thành
+`ProcessQuestEventUseCase` với hai lối vào (`monsterKilled` / `npcTalked`) và một `dispatch` dùng
+chung. Copy-paste vòng lặp quét quest thành bản thứ hai là dựng sẵn chỗ cho hai đường xử lý âm thầm
+trôi khỏi nhau — cùng lý do đã gỡ hardcode mã quest hồi 2026-09-05.
+
+| | Sự kiện quái chết | Sự kiện nói chuyện |
+|---|---|---|
+| Bắn từ | `ConnectedCharacterRegistry.onMonsterKilled` (world tick → `lootExecutor`) | `GatewayChannelHandler.handleTalkToNpcBlocking` (`authExecutor`) |
+| Trường trong JS | `event.type`, `event.monster_code` | `event.type`, `event.npc_code` |
+| Tần suất | mỗi con quái ĐÚNG một lần | **LẶP LẠI** mỗi lần mở lời |
+
+**KHÔNG thêm opcode nào.** Lệnh vào đã có từ Phase 6 (`TalkToNpcCommand` 601) và đường báo ra cũng
+vậy (`QuestStatusChangedEvent` 612); cái thiếu chỉ là nhánh nối hai đầu qua `feature-quest`.
+`protocolVersion` không tăng. Đây là bài học ADR-046 áp ngược lại: hỏi "client ĐÃ có đường nào chưa"
+TRƯỚC khi kết luận có phải đổi protocol hay không.
+
+**Ba luật của mục tiêu loại này**, mỗi luật đều có test gác:
+
+1. **Mốc đặt ở lúc MỞ LỜI, không ở một lựa chọn thoại.** "Đi gặp X" hoàn thành khi người chơi đứng
+   trước X; bắt họ bấm đúng một nhánh thoại thì mục tiêu thật sự trở thành "bấm đúng nút".
+2. **Vì thế sự kiện LẶP LẠI ⇒ tiến độ phải là một CỜ, không phải bộ đếm.** Script viết `+= 1` ở đây
+   sẽ tự đếm số lần chào hỏi.
+3. **NPC không tồn tại thì không có sự kiện nào cả.** Nhánh 404 của `startDialogue` cắt trước đường
+   quest — client bịa một mã NPC không đẩy được tiến độ (Điều 3).
+
+**Một tối ưu kèm theo, sinh ra từ chính thay đổi này**: từ khi có hai loại sự kiện, MỌI quest đang
+làm nhận MỌI sự kiện, nên phần lớn lần chạy hook trả lại đúng chuỗi `progress_json` cũ.
+`ProcessQuestEventUseCase` nay **bỏ hẳn lần ghi** khi tiến độ không đổi và quest chưa hoàn thành —
+nếu không, số transaction rỗng sẽ tăng theo tích (số quest đang làm × số sự kiện).
 
 ---
 

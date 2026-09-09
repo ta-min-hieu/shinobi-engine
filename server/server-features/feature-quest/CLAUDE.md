@@ -163,3 +163,35 @@ nhưng đừng tưởng nó soi cả chuỗi.
 NHẤT**. Gọi nó bên trong lời gọi constructor — sau `getLong("id")`/`getString("script_ref")` — làm
 nó trả lời về `script_ref` (không bao giờ NULL), nên MỌI quest trông như có tiên quyết `id = 0` và
 cả quest mở màn cũng bị chặn. Chụp `wasNull()` vào biến NGAY sau `getLong` của đúng cột đó.
+
+## `ProcessQuestEventUseCase` — LOẠI sự kiện thứ hai (2026-09-09)
+
+Lớp này trước tên `ProcessMonsterKilledUseCase`. Nó đã bị tổng quát hoá HAI lần, và cả hai lần đều
+theo cùng một luật do chính mục trên đặt ra: **cơ chế đi trước nội dung, không copy-paste bản thứ hai**.
+
+| Lần | Điều kiện kích hoạt | Thứ bị gỡ |
+|---|---|---|
+| 1 (2026-09-05) | quest thứ HAI theo dõi giết quái | hằng số mã quest hardcode |
+| 2 (2026-09-09) | mục tiêu quest loại THỨ HAI (`npc_talked`, nhịp mở arc 2) | giả định "chỉ có một loại sự kiện" |
+
+`runEvent` nay nhận `Map<String,Object>` chứ không phải `(eventType, monsterCode)`: tham số thứ hai
+chỉ có nghĩa với đúng một loại sự kiện, nên thêm loại thứ hai bằng cách thêm tham số thứ ba là con
+đường thẳng tới một chữ ký toàn `null`. Mỗi loại mang bộ trường RIÊNG (`monster_code` / `npc_code`);
+đọc một trường không có trong map trả `undefined` (`ProxyObject.fromMap` khai `hasMember` theo
+`containsKey`), nên script không vỡ khi nhận sự kiện loại khác — **nhưng mọi script vẫn PHẢI kiểm
+`event.type` TRƯỚC**, đó là thứ duy nhất phân biệt được hai loại.
+
+### Ba thứ riêng của mục tiêu "đi gặp NPC"
+
+1. **Mốc ở lúc MỞ LỜI** (`TalkToNpcCommand`), không ở một lựa chọn thoại — nếu không, mục tiêu
+   "tìm ra người" biến thành "bấm đúng nút". Hệ quả: sự kiện **LẶP LẠI**.
+2. **Tiến độ là CỜ, không phải bộ đếm.** `report_to_outer_sect.js` ghi `reported = true`. Viết
+   `+= 1` là quest tự đếm số lần chào hỏi.
+3. **Không thêm opcode nào.** `TalkToNpcCommand` (601) và `QuestStatusChangedEvent` (612) đã có từ
+   Phase 6; chỉ thiếu nhánh nối. `protocolVersion` không tăng.
+
+### Bỏ ghi khi tiến độ KHÔNG đổi
+
+Từ khi có hai loại sự kiện, mỗi quest đang làm nhận MỌI sự kiện, nên nhánh "không liên quan" trở
+thành nhánh thường gặp nhất. `dispatch` bỏ hẳn lần `save` khi script trả lại đúng chuỗi cũ và chưa
+`complete()` — không thì số transaction rỗng tăng theo tích (số quest × số sự kiện).
