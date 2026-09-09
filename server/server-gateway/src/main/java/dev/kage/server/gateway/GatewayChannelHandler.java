@@ -190,6 +190,7 @@ import dev.kage.protocol.PendingGuildJoinRequestView;
 import dev.kage.protocol.PendingPartyInviteView;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
+import dev.kage.protocol.QuestStatusChangedEvent;
 import dev.kage.protocol.RejectFriendRequestCommand;
 import dev.kage.protocol.RejectFriendRequestOutcome;
 import dev.kage.protocol.RejectFriendRequestResponse;
@@ -1396,10 +1397,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleTalkToNpcBlocking(ctx, sequenceId, command));
+        authExecutor.execute(() -> handleTalkToNpcBlocking(ctx, sequenceId, characterId, command));
     }
 
-    private void handleTalkToNpcBlocking(ChannelHandlerContext ctx, int sequenceId, TalkToNpcCommand command) {
+    private void handleTalkToNpcBlocking(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, TalkToNpcCommand command) {
         Optional<DialogueNode> node = dialogueFacade.startDialogue(command.getNpcCode());
         if (node.isEmpty()) {
             sendError(ctx, sequenceId, 404, "error.npc_not_found");
@@ -1410,6 +1412,29 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 Opcode.OPCODE_DIALOGUE_NODE_RESPONSE_VALUE,
                 sequenceId,
                 toResponse(node.get()).toByteArray());
+        pushQuestProgressFromTalking(ctx, characterId, command.getNpcCode());
+    }
+
+    /**
+     * Mục tiêu quest loại THỨ HAI — "đi gặp X" (2026-09-09, nhịp mở arc 2). Chạy SAU khi cây hội
+     * thoại đã đi ra dây: người chơi phải thấy NPC nói gì trước, thông báo hoàn thành quest tới sau.
+     *
+     * <p>⚠️ NPC KHÔNG TỒN TẠI thì không có sự kiện nào cả — nhánh {@code node.isEmpty()} phía trên
+     * đã {@code return}. Nói cách khác quest chỉ nhích khi hội thoại THẬT SỰ mở được, không nhích
+     * khi client gửi một mã NPC bịa ra (Điều 3 — server phán quyết, không tin client).
+     *
+     * <p>Cùng hình dạng {@code ConnectedCharacterRegistry.processQuestBlocking} (đường quái chết):
+     * {@code sequenceId = 0} vì đây là sự kiện server tự đẩy, không phải phản hồi cho lệnh nào.
+     */
+    private void pushQuestProgressFromTalking(ChannelHandlerContext ctx, long characterId, String npcCode) {
+        List<QuestFacade.QuestStatusChange> completed = questFacade.onNpcTalked(characterId, npcCode);
+        for (QuestFacade.QuestStatusChange statusChange : completed) {
+            QuestStatusChangedEvent event = QuestStatusChangedEvent.newBuilder()
+                    .setQuestCode(statusChange.questCode())
+                    .setStatus(toProtoQuestStatus(statusChange.status()))
+                    .build();
+            send(ctx, Opcode.OPCODE_QUEST_STATUS_CHANGED_EVENT_VALUE, 0, event.toByteArray());
+        }
     }
 
     private void handleSelectDialogueOptionCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)

@@ -1002,8 +1002,8 @@ class SecurityIntegrationTest {
 
         dev.kage.quest.application.AcceptQuestUseCase acceptQuestUseCase =
                 new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx);
-        dev.kage.quest.application.ProcessMonsterKilledUseCase processMonsterKilledUseCase =
-                new dev.kage.quest.application.ProcessMonsterKilledUseCase(progressPort, tx);
+        dev.kage.quest.application.ProcessQuestEventUseCase processQuestEventUseCase =
+                new dev.kage.quest.application.ProcessQuestEventUseCase(progressPort, tx);
         dev.kage.quest.domain.IdempotencyPort questIdempotencyPort = (t, idempotencyKey) -> {};
         dev.kage.quest.application.QuestRewardPorts rewardPorts = new dev.kage.quest.application.QuestRewardPorts(
                 expPort, inventoryGrantPort, auditPort, questIdempotencyPort);
@@ -1011,7 +1011,7 @@ class SecurityIntegrationTest {
                 new dev.kage.quest.application.ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx);
         return new dev.kage.quest.api.QuestFacade(
                 acceptQuestUseCase,
-                processMonsterKilledUseCase,
+                processQuestEventUseCase,
                 claimQuestRewardUseCase,
                 new dev.kage.quest.application.ListQuestsUseCase(progressPort));
     }

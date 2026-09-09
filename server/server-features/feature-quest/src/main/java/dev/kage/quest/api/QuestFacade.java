@@ -5,7 +5,7 @@ import java.util.List;
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
 import dev.kage.quest.application.ListQuestsUseCase;
-import dev.kage.quest.application.ProcessMonsterKilledUseCase;
+import dev.kage.quest.application.ProcessQuestEventUseCase;
 import dev.kage.quest.domain.QuestLogEntry;
 import dev.kage.quest.domain.QuestStatus;
 
@@ -19,17 +19,17 @@ import dev.kage.quest.domain.QuestStatus;
 public final class QuestFacade {
 
     private final AcceptQuestUseCase acceptQuestUseCase;
-    private final ProcessMonsterKilledUseCase processMonsterKilledUseCase;
+    private final ProcessQuestEventUseCase processQuestEventUseCase;
     private final ClaimQuestRewardUseCase claimQuestRewardUseCase;
     private final ListQuestsUseCase listQuestsUseCase;
 
     public QuestFacade(
             AcceptQuestUseCase acceptQuestUseCase,
-            ProcessMonsterKilledUseCase processMonsterKilledUseCase,
+            ProcessQuestEventUseCase processQuestEventUseCase,
             ClaimQuestRewardUseCase claimQuestRewardUseCase,
             ListQuestsUseCase listQuestsUseCase) {
         this.acceptQuestUseCase = acceptQuestUseCase;
-        this.processMonsterKilledUseCase = processMonsterKilledUseCase;
+        this.processQuestEventUseCase = processQuestEventUseCase;
         this.claimQuestRewardUseCase = claimQuestRewardUseCase;
         this.listQuestsUseCase = listQuestsUseCase;
     }
@@ -52,7 +52,27 @@ public final class QuestFacade {
      * của nhiều quest cùng lúc kể từ khi có quest thứ hai theo dõi giết quái.
      */
     public List<QuestStatusChange> onMonsterKilled(long characterId, String monsterCode) {
-        return processMonsterKilledUseCase.execute(characterId, monsterCode).stream()
+        return toStatusChanges(processQuestEventUseCase.monsterKilled(characterId, monsterCode));
+    }
+
+    /**
+     * Gọi TỪ {@code GatewayChannelHandler.handleTalkToNpcBlocking} (authExecutor, cạnh
+     * {@code DialogueFacade.startDialogue} đã có) — mục tiêu quest loại THỨ HAI của dự án
+     * ("đi gặp X"), thêm 2026-09-09 cho nhịp mở arc 2.
+     *
+     * <p>⚠️ KHÔNG thêm opcode nào cho việc này. Lệnh vào đã có sẵn ({@code TalkToNpcCommand} 601, từ
+     * Phase 6) và đường báo ra cũng vậy ({@code QuestStatusChangedEvent} 612) — cái thiếu chỉ là
+     * nhánh nối hai đầu đó qua feature-quest. Đúng bài học đã trả giá ở ADR-046: hỏi "client ĐÃ có
+     * đường nào nhận thứ này chưa" TRƯỚC khi kết luận có phải đổi protocol hay không.
+     *
+     * <p>Trả cùng dạng {@link #onMonsterKilled}: chỉ những quest VỪA chuyển sang COMPLETED.
+     */
+    public List<QuestStatusChange> onNpcTalked(long characterId, String npcCode) {
+        return toStatusChanges(processQuestEventUseCase.npcTalked(characterId, npcCode));
+    }
+
+    private static List<QuestStatusChange> toStatusChanges(List<ProcessQuestEventUseCase.QuestStatusChange> changes) {
+        return changes.stream()
                 .map(change -> new QuestStatusChange(change.questCode(), change.status()))
                 .toList();
     }

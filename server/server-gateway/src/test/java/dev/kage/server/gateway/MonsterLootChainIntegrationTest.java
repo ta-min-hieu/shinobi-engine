@@ -62,7 +62,7 @@ import dev.kage.quest.api.QuestFacade;
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
 import dev.kage.quest.application.ListQuestsUseCase;
-import dev.kage.quest.application.ProcessMonsterKilledUseCase;
+import dev.kage.quest.application.ProcessQuestEventUseCase;
 import dev.kage.quest.application.QuestRewardPorts;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
@@ -442,7 +442,7 @@ class MonsterLootChainIntegrationTest {
                 new PostgresQuestIdempotencyAdapter());
         return new QuestFacade(
                 new AcceptQuestUseCase(progressPort, templatePort, transactionRunner),
-                new ProcessMonsterKilledUseCase(progressPort, transactionRunner),
+                new ProcessQuestEventUseCase(progressPort, transactionRunner),
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, transactionRunner),
                 new ListQuestsUseCase(progressPort));
     }

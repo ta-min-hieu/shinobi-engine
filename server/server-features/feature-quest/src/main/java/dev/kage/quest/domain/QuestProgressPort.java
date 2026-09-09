@@ -26,7 +26,7 @@ public interface QuestProgressPort {
 
     /**
      * Mọi quest đang IN_PROGRESS của nhân vật, kèm {@code scriptRef} để chạy hook ngay — dùng cho
-     * {@code ProcessMonsterKilledUseCase}.
+     * {@code ProcessQuestEventUseCase}.
      *
      * <p><b>Vì sao có (2026-09-05).</b> Trước đây use case đó hardcode ĐÚNG MỘT mã quest
      * ({@code kill_training_dummies}) — placeholder có chủ đích, và feature-quest/CLAUDE.md ghi rõ

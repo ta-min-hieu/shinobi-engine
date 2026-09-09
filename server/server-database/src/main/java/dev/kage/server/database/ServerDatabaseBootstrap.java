@@ -79,7 +79,7 @@ import dev.kage.quest.api.QuestFacade;
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
 import dev.kage.quest.application.ListQuestsUseCase;
-import dev.kage.quest.application.ProcessMonsterKilledUseCase;
+import dev.kage.quest.application.ProcessQuestEventUseCase;
 import dev.kage.quest.application.QuestRewardPorts;
 import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
@@ -335,14 +335,14 @@ public final class ServerDatabaseBootstrap {
         PostgresQuestIdempotencyAdapter idempotencyPort = new PostgresQuestIdempotencyAdapter();
         JdbcQuestTransactionRunner transactionRunner = new JdbcQuestTransactionRunner(dataSource);
         AcceptQuestUseCase acceptQuestUseCase = new AcceptQuestUseCase(progressPort, templatePort, transactionRunner);
-        ProcessMonsterKilledUseCase processMonsterKilledUseCase =
-                new ProcessMonsterKilledUseCase(progressPort, transactionRunner);
+        ProcessQuestEventUseCase processQuestEventUseCase =
+                new ProcessQuestEventUseCase(progressPort, transactionRunner);
         QuestRewardPorts rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort, idempotencyPort);
         ClaimQuestRewardUseCase claimQuestRewardUseCase =
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, transactionRunner);
         return new QuestFacade(
                 acceptQuestUseCase,
-                processMonsterKilledUseCase,
+                processQuestEventUseCase,
                 claimQuestRewardUseCase,
                 new ListQuestsUseCase(progressPort));
     }

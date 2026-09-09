@@ -2,13 +2,7 @@ package dev.kage.dialogue.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,16 +20,13 @@ import dev.kage.dialogue.domain.DialogueOption;
  * bị BỎ QUA trong im lặng còn build vẫn xanh — nghĩa là nội dung hội thoại có thể hỏng mà không ai
  * biết. Cây này không cần DB để đọc: {@code NpcTemplatePort} chỉ trả về một đường dẫn classpath.
  *
- * <p><b>Thứ được gác.</b> Ngoài nội dung, hai bất biến cấu trúc mà chính javadoc của
- * {@code DialoguePanel} gọi tên là bẫy có thật:
+ * <p><b>Thứ được gác ở ĐÂY: nội dung.</b> Đúng lời thoại nào, đúng mã quest nào, đúng thứ tự lựa
+ * chọn nào — những thứ chỉ đúng với riêng Chu Hoành.
  *
- * <ul>
- *   <li><b>Không node nào cụt.</b> Mọi lối ra khỏi khung hội thoại đều là một lựa chọn trong cây
- *       này; một node quên nhánh {@code end} sẽ NHỐT người chơi trong khung thoại. Rủi ro đó tăng
- *       thẳng theo số node, mà đợt này vừa thêm ba node arc 1.
- *   <li><b>Không action nào trỏ vào hư không.</b> Gõ sai một mã node trong script là một lỗi câm:
- *       không compiler nào bắt, người chơi bấm vào thì hội thoại đứng im.
- * </ul>
+ * <p><b>Thứ KHÔNG còn ở đây (2026-09-09).</b> Ba bất biến CẤU TRÚC (không node cụt, không action
+ * trỏ vào hư không, không lộ nội dung arc sau) đã chuyển sang {@link ProductionDialogueTreesTest}
+ * và nay chạy cho MỌI NPC sản phẩm. Chúng nằm ở đây khi thế giới chỉ có một NPC; NPC thứ hai
+ * ({@code senior_sister}, V37) làm lộ ra rằng chúng chưa bao giờ là chuyện riêng của ông lão.
  */
 class TownElderDialogueTreeTest {
 
@@ -67,14 +58,21 @@ class TownElderDialogueTreeTest {
         assertThat(aboutSect.textKey()).isEqualTo("dialogue.town_elder.about_town");
         assertThat(aboutSect.options())
                 .extracting(DialogueOption::action)
-                .containsExactly("about_realm", "about_elder", "night_watch", "old_archive", "awakening_trial", "end");
+                .containsExactly(
+                        "about_realm",
+                        "about_elder",
+                        "night_watch",
+                        "old_archive",
+                        "awakening_trial",
+                        "outer_sect",
+                        "end");
         assertThat(node("about_realm").textKey()).isEqualTo("dialogue.town_elder.about_realm");
         assertThat(node("about_elder").textKey()).isEqualTo("dialogue.town_elder.about_elder");
     }
 
     /**
      * Cao trào arc 1 (STORY.md §6) — quest THỨ HAI của game, và là lý do
-     * {@code ProcessMonsterKilledUseCase} phải bỏ hardcode một-mã-quest.
+     * {@code ProcessQuestEventUseCase} phải bỏ hardcode một-mã-quest.
      *
      * <p>Nhánh này mọc XUỐNG DƯỚI qua {@code about_town} chứ không chen vào {@code start}: bốn lựa
      * chọn của {@code start} bị khoá bởi {@code option_index} (test ngay trên).
@@ -127,97 +125,24 @@ class TownElderDialogueTreeTest {
     }
 
     /**
-     * STORY.md §8 quy tắc 2 — nhịp hé lộ: arc 1 chỉ GIEO MẦM. Chu Hoành không được nói vượt nhịp,
-     * kể cả úp mở. Test này gác cả cây, nên thêm nhánh mới mà lỡ miệng là đỏ ngay.
-     */
-    @Test
-    @DisplayName("Không node nào của arc 1 nhắc tới bí mật của arc sau")
-    void arcOneNeverMentionsLaterSecrets() {
-        for (DialogueNode visited : reachableNodes()) {
-            assertThat(visited.textKey())
-                    .as("node \"%s\" nhắc tới thứ thuộc arc sau", visited.nodeId())
-                    .doesNotContain("thien_mon", "huyet_sa", "dai_kiep", "ngoc_co");
-        }
-    }
-
-    @Test
-    @DisplayName("Mọi action điều hướng đều trỏ tới một node CÓ THẬT — mã node gõ sai là lỗi câm")
-    void everyNavigationActionResolvesToARealNode() {
-        for (DialogueNode visited : reachableNodes()) {
-            for (DialogueOption option : visited.options()) {
-                if (isNavigation(option)) {
-                    assertThat(useCase.execute(NPC_CODE, option.action()))
-                            .as(
-                                    "node \"%s\" có lựa chọn \"%s\" trỏ tới node \"%s\" không tồn tại"
-                                            + " — người chơi bấm vào thì hội thoại đứng im",
-                                    visited.nodeId(), option.labelKey(), option.action())
-                            .isPresent();
-                }
-            }
-        }
-    }
-
-    @Test
-    @DisplayName("Không node nào NHỐT người chơi — mọi node đều có ít nhất một lối thoát")
-    void everyNodeOffersAWayOut() {
-        for (DialogueNode visited : reachableNodes()) {
-            assertThat(visited.options())
-                    .as("node \"%s\" không có lựa chọn nào kết thúc hội thoại", visited.nodeId())
-                    .anyMatch(option -> DialogueOption.ACTION_END.equals(option.action()));
-        }
-    }
-
-    @Test
-    @DisplayName("Nhịp hé lộ arc 1: chưa node nào được chạm tới bí mật của arc 3 và arc 5")
-    void arcOneDoesNotLeakLaterArcs() {
-        // STORY.md §8 quy tắc 2 là luật NỘI DUNG, nên chỉ khoá i18n mới kiểm được ở tầng này —
-        // chữ thật nằm bên bundle client. Đủ để bắt việc thêm nhầm một node của arc sau vào cây
-        // NPC mở màn, đó mới là lỗi thật sự dễ xảy ra.
-        List<String> forbidden = List.of("thien_mon", "dai_kiep", "jade_shard", "betrayal");
-        for (DialogueNode visited : reachableNodes()) {
-            assertThat(forbidden)
-                    .as("node \"%s\" (khoá %s) chạm tới nội dung của arc sau", visited.nodeId(), visited.textKey())
-                    .noneMatch(secret -> visited.textKey().contains(secret));
-        }
-    }
-
-    /**
-     * Duyệt rộng toàn cây từ {@code start}, đi theo mọi action điều hướng.
+     * Nhịp MỞ của arc 2 (STORY.md §6 — Ngoại Môn), thêm 2026-09-09: Chu Hoành BÀN GIAO người chơi
+     * cho Tô Vân Nhi. Đây là node đầu tiên của cây này KHÔNG thuộc arc 1.
      *
-     * <p>Node không đọc được thì BỎ QUA thay vì làm hỏng phép duyệt: chính
-     * {@link #everyNavigationActionResolvesToARealNode()} mới là chỗ tố cáo nó, và nó nói rõ node
-     * nào trỏ đi đâu — hữu ích hơn nhiều một lỗi chung chung phát ra từ hàm duyệt.
+     * <p>Cũng mọc xuống dưới qua {@code about_town} — bốn lựa chọn của {@code start} vẫn bị khoá bởi
+     * {@code option_index} (test đầu lớp này), và luật đó không đổi vì đổi arc.
+     *
+     * <p>Ba bất biến cấu trúc của cây (không node cụt, không action trỏ vào hư không, không lộ arc
+     * sau) nay nằm ở {@link ProductionDialogueTreesTest} và chạy cho CẢ HAI NPC.
      */
-    private List<DialogueNode> reachableNodes() {
-        List<DialogueNode> visited = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
-        Deque<String> queue = new ArrayDeque<>();
-        queue.add(DialogueNode.START_NODE_ID);
-        seen.add(DialogueNode.START_NODE_ID);
-        while (!queue.isEmpty()) {
-            String nodeId = queue.removeFirst();
-            Optional<DialogueNode> current = useCase.execute(NPC_CODE, nodeId);
-            if (current.isEmpty()) {
-                continue;
-            }
-            visited.add(current.get());
-            for (DialogueOption option : current.get().options()) {
-                if (isNavigation(option) && seen.add(option.action())) {
-                    queue.addLast(option.action());
-                }
-            }
-        }
-        assertThat(visited)
-                .as("không đọc nổi cả node start của %s", PRODUCTION_SCRIPT_REF)
-                .isNotEmpty();
-        return visited;
-    }
+    @Test
+    @DisplayName("Nhánh ngoại môn nhận được quest thứ năm, và nhận đúng mã report_to_outer_sect")
+    void outerSectBranchOffersTheFifthQuest() {
+        DialogueNode outerSect = node("outer_sect");
 
-    /** Action nào là "đi tới node khác" — ba dạng còn lại do gateway xử lý, không phải node. */
-    private static boolean isNavigation(DialogueOption option) {
-        return !DialogueOption.ACTION_END.equals(option.action())
-                && !DialogueOption.ACTION_OPEN_SHOP.equals(option.action())
-                && !option.action().startsWith(DialogueOption.ACTION_ACCEPT_QUEST_PREFIX);
+        assertThat(outerSect.textKey()).isEqualTo("dialogue.town_elder.outer_sect");
+        assertThat(outerSect.options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:report_to_outer_sect", "about_town", "end");
     }
 
     private DialogueNode node(String nodeId) {

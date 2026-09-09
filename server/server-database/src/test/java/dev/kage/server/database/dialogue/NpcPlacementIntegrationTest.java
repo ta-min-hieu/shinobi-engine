@@ -54,18 +54,52 @@ class NpcPlacementIntegrationTest {
         FlywayMigrator.migrate(dataSource);
     }
 
+    /**
+     * ⚠️ Test này TỪNG khẳng định {@code hasSize(1)} — "thế giới có đúng một NPC". Đó không phải thứ
+     * nó muốn gác (ADR-040 D4 gác việc ông lão không bị XÊ DỊCH), mà chỉ là mô tả tình cờ đúng suốt
+     * từ Phase 6 tới V37. NPC thứ hai (`senior_sister`) làm nó đỏ, và đỏ vì một lý do sai. Nay nó
+     * lọc ra đúng ông lão rồi kiểm ông lão.
+     */
     @Test
     void shouldSeedTownElder_atExactlyTheOldHardcodedSpot() {
         List<NpcPlacement> placements =
                 new PostgresNpcPlacementAdapter(dataSource).listPlacements(NpcPlacement.MAIN_WORLD_CODE);
 
-        assertThat(placements).hasSize(1);
-        NpcPlacement elder = placements.get(0);
-        assertThat(elder.npcCode()).isEqualTo("town_elder");
-        assertThat(elder.posX()).isEqualTo(OLD_HARDCODED_X);
-        // ADR-033: người chơi luôn ở y=0, nên NPC lệch y là NPC không bao giờ nói chuyện được.
-        assertThat(elder.posY()).isZero();
-        assertThat(elder.worldCode()).isEqualTo(NpcPlacement.MAIN_WORLD_CODE);
+        assertThat(placements)
+                .filteredOn(npc -> "town_elder".equals(npc.npcCode()))
+                .singleElement()
+                .satisfies(elder -> {
+                    assertThat(elder.posX()).isEqualTo(OLD_HARDCODED_X);
+                    // ADR-033: người chơi luôn ở y=0, nên NPC lệch y là NPC không bao giờ nói chuyện được.
+                    assertThat(elder.posY()).isZero();
+                    assertThat(elder.worldCode()).isEqualTo(NpcPlacement.MAIN_WORLD_CODE);
+                });
+    }
+
+    /**
+     * NPC THỨ HAI (V37) — Tô Vân Nhi, mở arc 2. x=2 không phải con số tuỳ ý: nó phải thoả BỐN ràng
+     * buộc (V37 §2) — trong vùng an toàn {@code sect_grounds} ([-15, 5], V35), ngoài tầm với của
+     * thạch vệ @ -20 (luật V32), cách xa hàng xóm phía đông, và **không đứng trong một bệ nhảy
+     * demo**.
+     *
+     * <p>Hai phương án đã bị bác, cả hai đều "trông thì ổn": **x=-9** (chỉ cách thạch vệ 11, trượt
+     * luật V32) và **x=4** (nằm GIỮA bệ nhảy [3,7] — trong client thật cô bị khối bệ vẽ đè tới cổ).
+     * Ràng buộc thứ tư có hàng rào riêng ở {@code SpawnGeometryIntegrationTest}; ô này chỉ ghim con
+     * số, để một lần "dịch cho gần ông lão" sau này phải đọc lý do.
+     */
+    @Test
+    void shouldSeedSeniorSister_insideTheSafeZoneAndOutOfWardenReach() {
+        List<NpcPlacement> placements =
+                new PostgresNpcPlacementAdapter(dataSource).listPlacements(NpcPlacement.MAIN_WORLD_CODE);
+
+        assertThat(placements)
+                .filteredOn(npc -> "senior_sister".equals(npc.npcCode()))
+                .singleElement()
+                .satisfies(sister -> {
+                    assertThat(sister.posX()).isEqualTo(2f);
+                    assertThat(sister.posY()).isZero();
+                    assertThat(sister.worldCode()).isEqualTo(NpcPlacement.MAIN_WORLD_CODE);
+                });
     }
 
     @Test

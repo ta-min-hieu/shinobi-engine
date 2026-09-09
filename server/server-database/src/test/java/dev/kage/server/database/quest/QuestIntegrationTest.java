@@ -27,7 +27,7 @@ import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
-import dev.kage.quest.application.ProcessMonsterKilledUseCase;
+import dev.kage.quest.application.ProcessQuestEventUseCase;
 import dev.kage.quest.application.QuestRewardPorts;
 import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestStatus;
@@ -58,6 +58,7 @@ class QuestIntegrationTest {
     private static final String NIGHT_WATCH_CODE = "night_watch_bandit";
     private static final String OLD_ARCHIVE_CODE = "clear_old_archive";
     private static final String AWAKENING_TRIAL_CODE = "awakening_trial";
+    private static final String REPORT_TO_OUTER_SECT_CODE = "report_to_outer_sect";
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
@@ -201,11 +202,11 @@ class QuestIntegrationTest {
         return new AcceptQuestUseCase(progressPort, templatePort, tx);
     }
 
-    private static ProcessMonsterKilledUseCase newProcessUseCase() {
+    private static ProcessQuestEventUseCase newProcessUseCase() {
         QuestProgressPort progressPort = new PostgresQuestProgressAdapter(dataSource);
         TransactionRunner tx = new JdbcQuestTransactionRunner(dataSource);
         // Không cần QuestTemplatePort nữa: use case đọc scriptRef ngay từ listInProgress (2026-09-05).
-        return new ProcessMonsterKilledUseCase(progressPort, tx);
+        return new ProcessQuestEventUseCase(progressPort, tx);
     }
 
     private static ClaimQuestRewardUseCase newClaimUseCase() {
@@ -225,9 +226,9 @@ class QuestIntegrationTest {
      */
     private static void claimTrainingDummies(long characterId) {
         newAcceptUseCase().execute(characterId, QUEST_CODE);
-        newProcessUseCase().execute(characterId, "training_dummy");
-        newProcessUseCase().execute(characterId, "training_dummy");
-        newProcessUseCase().execute(characterId, "training_dummy");
+        newProcessUseCase().monsterKilled(characterId, "training_dummy");
+        newProcessUseCase().monsterKilled(characterId, "training_dummy");
+        newProcessUseCase().monsterKilled(characterId, "training_dummy");
         newClaimUseCase().execute(characterId, QUEST_CODE, newIdempotencyKey());
     }
 
@@ -243,10 +244,12 @@ class QuestIntegrationTest {
         assertThat(acceptResult).isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
 
         // Kịch bản thật (kill_training_dummies.js) cần giết 3 lần mới hoàn thành.
-        assertThat(newProcessUseCase().execute(characterId, "training_dummy")).isEmpty();
-        assertThat(newProcessUseCase().execute(characterId, "training_dummy")).isEmpty();
-        List<ProcessMonsterKilledUseCase.QuestStatusChange> afterThird =
-                newProcessUseCase().execute(characterId, "training_dummy");
+        assertThat(newProcessUseCase().monsterKilled(characterId, "training_dummy"))
+                .isEmpty();
+        assertThat(newProcessUseCase().monsterKilled(characterId, "training_dummy"))
+                .isEmpty();
+        List<ProcessQuestEventUseCase.QuestStatusChange> afterThird =
+                newProcessUseCase().monsterKilled(characterId, "training_dummy");
         assertThat(afterThird).hasSize(1);
         assertThat(afterThird.get(0).questCode()).isEqualTo(QUEST_CODE);
         assertThat(afterThird.get(0).status()).isEqualTo(QuestStatus.COMPLETED);
@@ -305,9 +308,9 @@ class QuestIntegrationTest {
     void shouldRejectDuplicateClaim_whenIdempotencyKeyReused() {
         long characterId = createFreshCharacter("QuestPlayer4");
         newAcceptUseCase().execute(characterId, QUEST_CODE);
-        newProcessUseCase().execute(characterId, "training_dummy");
-        newProcessUseCase().execute(characterId, "training_dummy");
-        newProcessUseCase().execute(characterId, "training_dummy");
+        newProcessUseCase().monsterKilled(characterId, "training_dummy");
+        newProcessUseCase().monsterKilled(characterId, "training_dummy");
+        newProcessUseCase().monsterKilled(characterId, "training_dummy");
         String key = newIdempotencyKey();
         newClaimUseCase().execute(characterId, QUEST_CODE, key); // lần đầu — nhận thưởng thật
 
@@ -330,7 +333,7 @@ class QuestIntegrationTest {
     /**
      * Vòng đời TRỌN VẸN của quest thứ hai qua script sản phẩm thật (night_watch_bandit.js, seed
      * V28). Đây là quest THỨ HAI theo dõi giết quái của dự án — trước 2026-09-05 nó KHÔNG THỂ chạy:
-     * {@code ProcessMonsterKilledUseCase} hardcode đúng một mã quest nên script này không bao giờ
+     * {@code ProcessQuestEventUseCase} hardcode đúng một mã quest nên script này không bao giờ
      * nhận được {@code on_event}. Test này là bằng chứng phần tổng quát hoá đó chạy thật, xuyên
      * Postgres, chứ không chỉ xanh trên Fake Port.
      */
@@ -343,10 +346,11 @@ class QuestIntegrationTest {
                 .isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
 
         // Giết nhầm loài: CHÍNH SCRIPT lọc theo event.monster_code, Java không lọc (Điều 27).
-        assertThat(newProcessUseCase().execute(characterId, "training_dummy")).isEmpty();
+        assertThat(newProcessUseCase().monsterKilled(characterId, "training_dummy"))
+                .isEmpty();
 
-        List<ProcessMonsterKilledUseCase.QuestStatusChange> afterBandit =
-                newProcessUseCase().execute(characterId, "wandering_bandit");
+        List<ProcessQuestEventUseCase.QuestStatusChange> afterBandit =
+                newProcessUseCase().monsterKilled(characterId, "wandering_bandit");
         assertThat(afterBandit).hasSize(1);
         assertThat(afterBandit.get(0).questCode()).isEqualTo(NIGHT_WATCH_CODE);
         assertThat(afterBandit.get(0).status()).isEqualTo(QuestStatus.COMPLETED);
@@ -380,18 +384,19 @@ class QuestIntegrationTest {
         claimTrainingDummies(characterId);
         newAcceptUseCase().execute(characterId, NIGHT_WATCH_CODE);
 
-        List<ProcessMonsterKilledUseCase.QuestStatusChange> afterBandit =
-                newProcessUseCase().execute(characterId, "wandering_bandit");
+        List<ProcessQuestEventUseCase.QuestStatusChange> afterBandit =
+                newProcessUseCase().monsterKilled(characterId, "wandering_bandit");
 
         // Chỉ quest "trực đêm" xong; quest đập mộc nhân KHÔNG bị cú giết này chạm tới.
         assertThat(afterBandit)
-                .extracting(ProcessMonsterKilledUseCase.QuestStatusChange::questCode)
+                .extracting(ProcessQuestEventUseCase.QuestStatusChange::questCode)
                 .containsExactly(NIGHT_WATCH_CODE);
 
         // Và quest ĐÃ LĨNH THƯỞNG không bị cú giết nào chạm tới nữa: listInProgress lọc theo
         // status='IN_PROGRESS' ngay trong SQL, nên quest CLAIMED — thứ chỉ tăng theo đời nhân vật —
         // không bao giờ được nạp lại.
-        assertThat(newProcessUseCase().execute(characterId, "training_dummy")).isEmpty();
+        assertThat(newProcessUseCase().monsterKilled(characterId, "training_dummy"))
+                .isEmpty();
     }
 
     /**
@@ -431,9 +436,9 @@ class QuestIntegrationTest {
     void shouldStillRejectNightWatch_whenPrerequisiteIsCompletedButNotClaimed() {
         long characterId = createFreshCharacter("NightWatch4");
         newAcceptUseCase().execute(characterId, QUEST_CODE);
-        newProcessUseCase().execute(characterId, "training_dummy");
-        newProcessUseCase().execute(characterId, "training_dummy");
-        newProcessUseCase().execute(characterId, "training_dummy"); // COMPLETED, chưa CLAIMED
+        newProcessUseCase().monsterKilled(characterId, "training_dummy");
+        newProcessUseCase().monsterKilled(characterId, "training_dummy");
+        newProcessUseCase().monsterKilled(characterId, "training_dummy"); // COMPLETED, chưa CLAIMED
 
         AcceptQuestUseCase.AcceptResult result = newAcceptUseCase().execute(characterId, NIGHT_WATCH_CODE);
 
@@ -445,9 +450,9 @@ class QuestIntegrationTest {
     void shouldAcceptNightWatch_onceTrainingDummiesIsClaimed() {
         long characterId = createFreshCharacter("NightWatch5");
         newAcceptUseCase().execute(characterId, QUEST_CODE);
-        newProcessUseCase().execute(characterId, "training_dummy");
-        newProcessUseCase().execute(characterId, "training_dummy");
-        newProcessUseCase().execute(characterId, "training_dummy");
+        newProcessUseCase().monsterKilled(characterId, "training_dummy");
+        newProcessUseCase().monsterKilled(characterId, "training_dummy");
+        newProcessUseCase().monsterKilled(characterId, "training_dummy");
         newClaimUseCase().execute(characterId, QUEST_CODE, newIdempotencyKey());
 
         AcceptQuestUseCase.AcceptResult result = newAcceptUseCase().execute(characterId, NIGHT_WATCH_CODE);
@@ -476,7 +481,7 @@ class QuestIntegrationTest {
     private static void claimNightWatch(long characterId) {
         claimTrainingDummies(characterId);
         newAcceptUseCase().execute(characterId, NIGHT_WATCH_CODE);
-        newProcessUseCase().execute(characterId, "wandering_bandit");
+        newProcessUseCase().monsterKilled(characterId, "wandering_bandit");
         newClaimUseCase().execute(characterId, NIGHT_WATCH_CODE, newIdempotencyKey());
     }
 
@@ -490,13 +495,15 @@ class QuestIntegrationTest {
 
         // Giết nhầm loài — kể cả loài của ĐÚNG quest liền trước — không nhúc nhích: CHÍNH SCRIPT
         // lọc theo event.monster_code, Java không lọc (Điều 27).
-        assertThat(newProcessUseCase().execute(characterId, "wandering_bandit")).isEmpty();
+        assertThat(newProcessUseCase().monsterKilled(characterId, "wandering_bandit"))
+                .isEmpty();
 
         // Script đòi HAI cỗ, nên con thứ nhất chưa đóng quest.
-        assertThat(newProcessUseCase().execute(characterId, "archive_warden")).isEmpty();
+        assertThat(newProcessUseCase().monsterKilled(characterId, "archive_warden"))
+                .isEmpty();
 
-        List<ProcessMonsterKilledUseCase.QuestStatusChange> afterSecond =
-                newProcessUseCase().execute(characterId, "archive_warden");
+        List<ProcessQuestEventUseCase.QuestStatusChange> afterSecond =
+                newProcessUseCase().monsterKilled(characterId, "archive_warden");
         assertThat(afterSecond).hasSize(1);
         assertThat(afterSecond.get(0).questCode()).isEqualTo(OLD_ARCHIVE_CODE);
         assertThat(afterSecond.get(0).status()).isEqualTo(QuestStatus.COMPLETED);
@@ -560,8 +567,8 @@ class QuestIntegrationTest {
     private static void claimOldArchive(long characterId) {
         claimNightWatch(characterId);
         newAcceptUseCase().execute(characterId, OLD_ARCHIVE_CODE);
-        newProcessUseCase().execute(characterId, "archive_warden");
-        newProcessUseCase().execute(characterId, "archive_warden");
+        newProcessUseCase().monsterKilled(characterId, "archive_warden");
+        newProcessUseCase().monsterKilled(characterId, "archive_warden");
         newClaimUseCase().execute(characterId, OLD_ARCHIVE_CODE, newIdempotencyKey());
     }
 
@@ -575,12 +582,13 @@ class QuestIntegrationTest {
 
         // Hạ nhầm loài — kể cả loài của đúng quest liền trước, thứ người chơi vừa đi ngang qua trên
         // đường tới sân khảo hạch — không nhúc nhích: CHÍNH SCRIPT lọc theo event.monster_code.
-        assertThat(newProcessUseCase().execute(characterId, "archive_warden")).isEmpty();
+        assertThat(newProcessUseCase().monsterKilled(characterId, "archive_warden"))
+                .isEmpty();
 
         // MỘT trận, không phải hai — xem awakening_trial.js về vì sao N = 1 là quyết định cơ chế
         // chứ không chỉ là tường thuật.
-        List<ProcessMonsterKilledUseCase.QuestStatusChange> afterTrial =
-                newProcessUseCase().execute(characterId, "trial_construct");
+        List<ProcessQuestEventUseCase.QuestStatusChange> afterTrial =
+                newProcessUseCase().monsterKilled(characterId, "trial_construct");
         assertThat(afterTrial).hasSize(1);
         assertThat(afterTrial.get(0).questCode()).isEqualTo(AWAKENING_TRIAL_CODE);
         assertThat(afterTrial.get(0).status()).isEqualTo(QuestStatus.COMPLETED);
@@ -630,7 +638,7 @@ class QuestIntegrationTest {
      * này đỏ, và đó chính là việc nó sinh ra để làm.
      *
      * <p>⚠️ Đường đi ở đây mô phỏng ĐÚNG thứ tự production: mỗi cú hạ quái vừa đẩy tiến độ quest
-     * ({@code ProcessMonsterKilledUseCase}) vừa cộng EXP ({@code GrantExperienceUseCase}) — hai
+     * ({@code ProcessQuestEventUseCase}) vừa cộng EXP ({@code GrantExperienceUseCase}) — hai
      * việc mà {@code ConnectedCharacterRegistry.onMonsterKilled} bắn song song; còn sau mỗi lần
      * lĩnh thưởng thì gateway gọi {@code grantExperience(id, 0)} để hoà giải cột {@code level}
      * (EXP thưởng quest đi thẳng vào {@code character.exp}, không qua use case — xem javadoc
@@ -661,12 +669,121 @@ class QuestIntegrationTest {
         assertThat(readLevel(characterId)).isEqualTo(10); // cột level THẬT, thứ SelectFactionUseCase đọc
     }
 
+    // ---------------------------------------------------------------------------------------
+    // Quest THỨ NĂM — `report_to_outer_sect` (seed V37, STORY.md §6 arc 2 nhịp MỞ).
+    //
+    // Quest ĐẦU TIÊN của dự án không đếm quái. Nó chạy trên loại sự kiện thứ hai (`npc_talked`),
+    // nên khối test này gác đúng thứ mà bốn quest trước chưa bao giờ phải gác: hai loại sự kiện
+    // không được lẫn vào nhau, và một sự kiện LẶP LẠI không được làm tiến độ trôi.
+    // ---------------------------------------------------------------------------------------
+
+    /** Đưa nhân vật qua trọn arc 1 (quest 1→4) — điều kiện ADR-044 để mở quest 5. */
+    private static void claimAwakeningTrial(long characterId) {
+        claimOldArchive(characterId);
+        newAcceptUseCase().execute(characterId, AWAKENING_TRIAL_CODE);
+        newProcessUseCase().monsterKilled(characterId, "trial_construct");
+        newClaimUseCase().execute(characterId, AWAKENING_TRIAL_CODE, newIdempotencyKey());
+    }
+
+    @Test
+    void shouldPlayReportToOuterSectLifecycle_withRealScript() {
+        long characterId = createFreshCharacter("OuterSect1");
+        claimAwakeningTrial(characterId); // ADR-044 — arc 2 chỉ mở khi arc 1 đã ĐÓNG
+
+        assertThat(newAcceptUseCase().execute(characterId, REPORT_TO_OUTER_SECT_CODE))
+                .isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
+
+        // Giết cả thế giới cũng không xong quest này — script lọc theo event.type TRƯỚC.
+        assertThat(newProcessUseCase().monsterKilled(characterId, "trial_construct"))
+                .isEmpty();
+        // Nói chuyện với ĐÚNG người mở quest cũng không xong — nó hỏi Tô Vân Nhi, không hỏi ông lão.
+        assertThat(newProcessUseCase().npcTalked(characterId, "town_elder")).isEmpty();
+
+        List<ProcessQuestEventUseCase.QuestStatusChange> afterTalk =
+                newProcessUseCase().npcTalked(characterId, "senior_sister");
+        assertThat(afterTalk).hasSize(1);
+        assertThat(afterTalk.get(0).questCode()).isEqualTo(REPORT_TO_OUTER_SECT_CODE);
+        assertThat(afterTalk.get(0).status()).isEqualTo(QuestStatus.COMPLETED);
+
+        long expBefore = readExp(characterId);
+        int itemsBefore = countInventoryRows(characterId);
+
+        ClaimQuestRewardUseCase.ClaimResult claim =
+                newClaimUseCase().execute(characterId, REPORT_TO_OUTER_SECT_CODE, newIdempotencyKey());
+
+        assertThat(claim.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
+        assertThat(claim.expGranted()).isEqualTo(200L);
+        assertThat(readExp(characterId)).isEqualTo(expBefore + 200L);
+        // 2 viên Tiểu Hồi Nguyên Đan — món quà sư tỷ cho đàn em, và cũng là lần đầu game TỰ đưa
+        // đan dược vào tay người chơi mà không bắt mua (V36 bán 80 vàng/viên).
+        // ⚠️ Đếm SỐ LƯỢNG chứ không chỉ đếm dòng: `minor_healing_pill` có `max_stack = 20` nên hai
+        // viên nằm gọn trong MỘT dòng — đúng cái bẫy mà `countItemQuantity` được viết ra để tránh.
+        assertThat(countInventoryRows(characterId)).isEqualTo(itemsBefore + 1);
+        assertThat(countItemQuantity(characterId, "minor_healing_pill")).isEqualTo(2);
+    }
+
+    /**
+     * Sự kiện {@code npc_talked} LẶP LẠI mỗi lần người chơi mở lời — mốc đặt ở lúc MỞ LỜI, không ở
+     * một lựa chọn thoại (xem {@code QuestFacade.onNpcTalked}). Tiến độ vì thế là một CỜ; nếu ai đó
+     * sửa script thành bộ đếm thì ô này bắt được ngay, vì lần nói chuyện thứ hai sẽ ghi ra một
+     * {@code progress_json} khác.
+     */
+    @Test
+    void shouldStayIdempotent_whenTalkingToTheSameNpcTwice() {
+        long characterId = createFreshCharacter("OuterSect2");
+        claimAwakeningTrial(characterId);
+        newAcceptUseCase().execute(characterId, REPORT_TO_OUTER_SECT_CODE);
+
+        newProcessUseCase().npcTalked(characterId, "senior_sister");
+        String progressAfterFirst = readProgressJson(characterId, REPORT_TO_OUTER_SECT_CODE);
+        newProcessUseCase().npcTalked(characterId, "senior_sister");
+
+        assertThat(readProgressJson(characterId, REPORT_TO_OUTER_SECT_CODE)).isEqualTo(progressAfterFirst);
+    }
+
+    /** V37 phải tra `awakening_trial` theo `code`, không hardcode id (khuôn V28/V30/V33). */
+    @Test
+    void shouldSeedReportToOuterSect_withPrerequisitePointingAtTheAwakeningTrial() {
+        assertThat(prerequisiteCodeOf(REPORT_TO_OUTER_SECT_CODE)).isEqualTo(AWAKENING_TRIAL_CODE);
+    }
+
+    @Test
+    void shouldRejectReportToOuterSect_whenAwakeningTrialNotClaimedYet() {
+        long characterId = createFreshCharacter("OuterSect3");
+        claimOldArchive(characterId); // xong quest 1+2+3, nhưng chưa đụng khảo hạch
+
+        assertThat(newAcceptUseCase().execute(characterId, REPORT_TO_OUTER_SECT_CODE))
+                .isEqualTo(AcceptQuestUseCase.AcceptResult.PREREQUISITE_NOT_MET);
+    }
+
+    private static String readProgressJson(long characterId, String questCode) {
+        String sql = """
+                SELECT p.progress_json
+                  FROM character_quest_progress p
+                  JOIN quest_template q ON q.id = p.quest_template_id
+                 WHERE p.character_id = ? AND q.code = ?
+                """;
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, characterId);
+            statement.setString(2, questCode);
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next())
+                        .as("không có dòng tiến độ cho quest %s", questCode)
+                        .isTrue();
+                return rs.getString(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("đọc progress_json thất bại", e);
+        }
+    }
+
     /** Nhận → hạ đủ số quái (mỗi cú vừa đẩy quest vừa cộng EXP) → lĩnh thưởng → hoà giải cột level. */
     private static void playQuest(long characterId, String questCode, String monsterCode, int kills) {
         GrantExperienceUseCase experience = new GrantExperienceUseCase(new PostgresCharacterAdapter(dataSource));
         assertThat(newAcceptUseCase().execute(characterId, questCode)).isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
         for (int i = 0; i < kills; i++) {
-            newProcessUseCase().execute(characterId, monsterCode);
+            newProcessUseCase().monsterKilled(characterId, monsterCode);
             experience.execute(characterId, expRewardOf(monsterCode));
         }
         assertThat(newClaimUseCase()

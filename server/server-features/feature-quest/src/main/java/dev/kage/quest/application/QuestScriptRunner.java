@@ -54,8 +54,22 @@ final class QuestScriptRunner {
         return run(scriptRef, "on_accept", "", null);
     }
 
-    HookEffects runEvent(String scriptRef, String currentProgressJson, String eventType, String monsterCode) {
-        Map<String, Object> event = Map.<String, Object>of("type", eventType, "monster_code", monsterCode);
+    /**
+     * Chạy {@code on_event} với MỘT sự kiện đã đóng gói sẵn.
+     *
+     * <p>⚠️ {@code event} là map các trường sẽ hiện ra trong JS dưới dạng {@code event.<tên>}, và
+     * mỗi loại sự kiện mang bộ trường RIÊNG ({@code monster_killed} mang {@code monster_code},
+     * {@code npc_talked} mang {@code npc_code}) — KHÔNG phải một bộ trường chung nhồi giá trị rỗng.
+     * Đọc một trường không có trong map trả về {@code undefined} chứ không ném lỗi
+     * ({@code ProxyObject.fromMap} khai {@code hasMember} theo {@code containsKey}), nên script của
+     * quest loại này không vỡ khi nhận sự kiện loại kia — nhưng mọi script vẫn phải kiểm
+     * {@code event.type} TRƯỚC, vì đó là thứ duy nhất phân biệt được hai loại sự kiện.
+     *
+     * <p>Vì sao là {@code Map} chứ không phải hai tham số {@code (eventType, monsterCode)} như bản
+     * trước 2026-09-09: tham số thứ hai chỉ có nghĩa với đúng một loại sự kiện, nên thêm loại thứ
+     * hai bằng cách thêm tham số thứ ba là con đường dẫn thẳng tới một chữ ký toàn {@code null}.
+     */
+    HookEffects runEvent(String scriptRef, String currentProgressJson, Map<String, Object> event) {
         return run(scriptRef, "on_event", currentProgressJson, event);
     }
 

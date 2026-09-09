@@ -34,7 +34,7 @@ import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
-import dev.kage.quest.application.ProcessMonsterKilledUseCase;
+import dev.kage.quest.application.ProcessQuestEventUseCase;
 import dev.kage.quest.application.QuestRewardPorts;
 import dev.kage.quest.domain.QuestStatus;
 import dev.kage.server.database.account.JdbcAccountTransactionRunner;
@@ -68,7 +68,7 @@ import dev.kage.server.database.quest.PostgresQuestTemplateAdapter;
  * <p>KHÔNG đi qua {@code WorldFacade}/AI/Netty (đã verify riêng ở {@code WorldFacadeTest}/
  * {@code GatewayServerIntegrationTest}) — gọi thẳng UseCase như production code thật sự gọi
  * (VD {@code ConnectedCharacterRegistry.onMonsterKilled} gọi CẢ {@code GrantLootUseCase} lẫn
- * {@code ProcessMonsterKilledUseCase} cạnh nhau mỗi lần quái chết, test này lặp lại đúng thứ tự đó).
+ * {@code ProcessQuestEventUseCase} cạnh nhau mỗi lần quái chết, test này lặp lại đúng thứ tự đó).
  *
  * <p>Bảng rơi của {@code training_dummy} KHÔNG có vũ khí (kunai + iron_scrap + novice_wraps sau
  * V21, không món nào {@code equip_slot = WEAPON}) — dùng {@code wooden_sword} (grant thẳng qua
@@ -167,8 +167,8 @@ class MvpLoopIntegrationTest {
                 new JdbcQuestTransactionRunner(dataSource));
     }
 
-    private static ProcessMonsterKilledUseCase newProcessMonsterKilledUseCase() {
-        return new ProcessMonsterKilledUseCase(
+    private static ProcessQuestEventUseCase newProcessQuestEventUseCase() {
+        return new ProcessQuestEventUseCase(
                 new PostgresQuestProgressAdapter(dataSource), new JdbcQuestTransactionRunner(dataSource));
     }
 
@@ -226,14 +226,14 @@ class MvpLoopIntegrationTest {
         assertThat(acceptResult).isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
 
         // 3. Đánh quái nhiều lần — mỗi lần giết, production code gọi CẢ GrantLootUseCase lẫn
-        // ProcessMonsterKilledUseCase cạnh nhau (xem ConnectedCharacterRegistry.onMonsterKilled).
+        // ProcessQuestEventUseCase cạnh nhau (xem ConnectedCharacterRegistry.onMonsterKilled).
         // kill_training_dummies.js cần đúng 3 lần giết mới hoàn thành (QuestIntegrationTest).
         List<ItemStack> allLoot = new ArrayList<>();
-        Optional<ProcessMonsterKilledUseCase.QuestStatusChange> statusChange = Optional.empty();
+        Optional<ProcessQuestEventUseCase.QuestStatusChange> statusChange = Optional.empty();
         for (int i = 0; i < SIMULATED_KILLS_FOR_LOOT; i++) {
             allLoot.addAll(newGrantLootUseCase().execute(characterId, "training_dummy"));
-            List<ProcessMonsterKilledUseCase.QuestStatusChange> change =
-                    newProcessMonsterKilledUseCase().execute(characterId, "training_dummy");
+            List<ProcessQuestEventUseCase.QuestStatusChange> change =
+                    newProcessQuestEventUseCase().monsterKilled(characterId, "training_dummy");
             if (!change.isEmpty()) {
                 statusChange = Optional.of(change.get(0));
             }

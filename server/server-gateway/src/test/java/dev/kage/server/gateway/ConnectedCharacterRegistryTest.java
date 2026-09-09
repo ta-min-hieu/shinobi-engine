@@ -46,7 +46,7 @@ import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.quest.api.QuestFacade;
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
-import dev.kage.quest.application.ProcessMonsterKilledUseCase;
+import dev.kage.quest.application.ProcessQuestEventUseCase;
 import dev.kage.quest.application.QuestRewardPorts;
 import dev.kage.quest.domain.ExpPort;
 import dev.kage.quest.domain.QuestInventoryGrantPort;
@@ -83,7 +83,7 @@ class ConnectedCharacterRegistryTest {
         dev.kage.quest.domain.TransactionRunner tx = action -> action.accept(null);
 
         AcceptQuestUseCase acceptQuestUseCase = new AcceptQuestUseCase(progressPort, templatePort, tx);
-        ProcessMonsterKilledUseCase processMonsterKilledUseCase = new ProcessMonsterKilledUseCase(progressPort, tx);
+        ProcessQuestEventUseCase processQuestEventUseCase = new ProcessQuestEventUseCase(progressPort, tx);
         dev.kage.quest.domain.IdempotencyPort questIdempotencyPort = (t, idempotencyKey) -> {};
         QuestRewardPorts rewardPorts =
                 new QuestRewardPorts(expPort, inventoryGrantPort, auditPort, questIdempotencyPort);
@@ -91,7 +91,7 @@ class ConnectedCharacterRegistryTest {
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx);
         return new QuestFacade(
                 acceptQuestUseCase,
-                processMonsterKilledUseCase,
+                processQuestEventUseCase,
                 claimQuestRewardUseCase,
                 new dev.kage.quest.application.ListQuestsUseCase(progressPort));
     }

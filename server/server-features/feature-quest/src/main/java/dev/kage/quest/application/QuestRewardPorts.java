@@ -8,7 +8,7 @@ import dev.kage.quest.domain.QuestInventoryGrantPort;
 /**
  * Gộp 4 Port chỉ {@link ClaimQuestRewardUseCase} cần (trao thưởng) — tránh constructor quá 4 tham
  * số (Checkstyle ParameterNumber) khi cộng thêm {@code QuestProgressPort}/{@code QuestTemplatePort}
- * đã dùng chung với {@link AcceptQuestUseCase}/{@link ProcessMonsterKilledUseCase}, cùng tinh thần
+ * đã dùng chung với {@link AcceptQuestUseCase}/{@link ProcessQuestEventUseCase}, cùng tinh thần
  * {@code ShopPorts}/{@code EnhancePorts}. {@code idempotencyPort} thêm 2026-08-02 (ADR-025 retrofit
  * — nhận thưởng trao EXP/item thật giống ClaimMailCommand nhưng chưa enforce lúc code lát cắt gốc).
  */

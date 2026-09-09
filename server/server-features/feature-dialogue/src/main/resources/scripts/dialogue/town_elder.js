@@ -42,6 +42,7 @@
             { label_key: "dialogue.option.ask_night_watch", action: "night_watch" },
             { label_key: "dialogue.option.ask_old_archive", action: "old_archive" },
             { label_key: "dialogue.option.ask_awakening_trial", action: "awakening_trial" },
+            { label_key: "dialogue.option.ask_outer_sect", action: "outer_sect" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]
     },
@@ -95,6 +96,24 @@
         text_key: "dialogue.town_elder.awakening_trial",
         options: [
             { label_key: "dialogue.option.accept_quest_awakening_trial", action: "accept_quest:awakening_trial" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    // ⚠️ NODE ĐẦU TIÊN CỦA ARC 2 (STORY.md §6 — Ngoại Môn) trong cây này, và cũng là chỗ Chu Hoành
+    // BÀN GIAO người chơi cho người khác. Tới đây arc 1 đã đóng: khảo hạch xong, linh căn đã thức
+    // tỉnh, thân phận tạp dịch hết hiệu lực. Ông không còn là người giao việc chính nữa.
+    //
+    // Nhịp hé lộ (§8 quy tắc 2): arc 2 mở bằng chuyện THỨ HẠNG và TÀI NGUYÊN — nguyên văn §6 arc 2:
+    // "tài nguyên tu luyện ngoại môn phân phát theo thứ hạng — người chơi phải cày từ đáy bảng".
+    // Chu Hoành ĐƯỢC nói về chuyện đó và về Tô Vân Nhi (§5). Ông KHÔNG được nhắc chuỗi đệ tử mất
+    // tích, càng không nhắc hai chữ Huyết Sa — §6 xếp cả hai vào TWIST giữa arc 2, không phải chỗ
+    // mở màn. Bạch Kính Chi thì để chính Tô Vân Nhi kể (senior_sister.js), vì cô là người đang
+    // chịu trận, còn ông lão thì không.
+    outer_sect: {
+        text_key: "dialogue.town_elder.outer_sect",
+        options: [
+            { label_key: "dialogue.option.accept_quest_report_to_outer_sect", action: "accept_quest:report_to_outer_sect" },
             { label_key: "dialogue.option.back", action: "about_town" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]

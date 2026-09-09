@@ -470,6 +470,69 @@ class GatewayPipelineTest {
         assertThat(response.getSpawnY()).isEqualTo(0f);
     }
 
+    /**
+     * Mục tiêu quest loại THỨ HAI đi trọn DÂY THẬT: lệnh {@code TalkToNpcCommand} vào → cây hội
+     * thoại ra → và ngay sau đó là {@code QuestStatusChangedEvent} báo quest xong.
+     *
+     * <p>⚠️ Đây là chỗ HAI NỬA GẶP NHAU. Logic tiến độ đã có test riêng (feature-quest, và Postgres
+     * thật ở QuestIntegrationTest), nhưng cả hai đều gọi thẳng use case. Test này là chỗ duy nhất
+     * chứng minh nhánh nối trong {@code GatewayChannelHandler} có thật sự được gọi — và nó dùng CẢ
+     * script hội thoại lẫn script quest SẢN PHẨM, không phải fixture.
+     */
+    @Test
+    void shouldPushQuestStatusChanged_afterTalkingToTheQuestNpc() throws InvalidProtocolBufferException {
+        EmbeddedChannel channel = newPipeline(
+                new FakeCharacterPort(), fakeInventoryFacade(), npcTalkQuestFacade(), talkableDialogueFacade());
+        connect(channel, "npctalk1");
+        selectCharacter(channel, createCharacter(channel, "TalkHero", 2), 3);
+
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_TALK_TO_NPC_COMMAND_VALUE, ProtocolVersion.CURRENT, 4),
+                dev.kage.protocol.TalkToNpcCommand.newBuilder()
+                        .setNpcCode(TALKABLE_NPC_CODE)
+                        .build()
+                        .toByteArray());
+
+        List<PacketCodec.Frame> frames = readOutboundFrames(channel);
+        // THỨ TỰ có nghĩa: người chơi phải thấy NPC nói gì TRƯỚC, thông báo quest xong tới sau.
+        assertThat(frames)
+                .extracting(frame -> frame.header().opcode())
+                .containsExactly(
+                        Opcode.OPCODE_DIALOGUE_NODE_RESPONSE_VALUE, Opcode.OPCODE_QUEST_STATUS_CHANGED_EVENT_VALUE);
+
+        dev.kage.protocol.QuestStatusChangedEvent event = dev.kage.protocol.QuestStatusChangedEvent.parseFrom(
+                frames.get(1).payload());
+        assertThat(event.getQuestCode()).isEqualTo(NPC_TALK_QUEST_CODE);
+        assertThat(event.getStatus()).isEqualTo(dev.kage.protocol.QuestStatus.QUEST_STATUS_COMPLETED);
+        // Sự kiện server tự đẩy ⇒ sequenceId = 0, không phải 4 của lệnh vào.
+        assertThat(frames.get(1).header().sequenceId()).isZero();
+    }
+
+    /**
+     * NPC KHÔNG TỒN TẠI thì quest KHÔNG được nhích. Client bịa một mã NPC là chuyện phải giả định
+     * (Điều 3 — server phán quyết), và nhánh 404 phải cắt trước cả đường quest.
+     */
+    @Test
+    void shouldNotTouchQuestProgress_whenTalkingToUnknownNpc() throws InvalidProtocolBufferException {
+        EmbeddedChannel channel = newPipeline(
+                new FakeCharacterPort(), fakeInventoryFacade(), npcTalkQuestFacade(), talkableDialogueFacade());
+        connect(channel, "npctalk2");
+        selectCharacter(channel, createCharacter(channel, "NoTalkHero", 2), 3);
+
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_TALK_TO_NPC_COMMAND_VALUE, ProtocolVersion.CURRENT, 4),
+                dev.kage.protocol.TalkToNpcCommand.newBuilder()
+                        .setNpcCode("khong_ton_tai")
+                        .build()
+                        .toByteArray());
+
+        assertThat(readOutboundFrames(channel))
+                .extracting(frame -> frame.header().opcode())
+                .containsExactly(Opcode.OPCODE_ERROR_VALUE);
+    }
+
     @Test
     void shouldPushExperienceState_afterClaimingQuestReward() throws InvalidProtocolBufferException {
         EmbeddedChannel channel = newPipeline(new FakeCharacterPort(), fakeInventoryFacade(), claimableQuestFacade());
@@ -785,6 +848,58 @@ class GatewayPipelineTest {
         return new dev.kage.dialogue.api.DialogueFacade(useCase);
     }
 
+    /** NPC dùng cho test mục tiêu "đi gặp X" — cùng mã và cùng script THẬT mà migration V37 seed. */
+    private static final String TALKABLE_NPC_CODE = "senior_sister";
+
+    /** Quest ĐANG LÀM có mục tiêu {@code npc_talked} — script sản phẩm `report_to_outer_sect.js`. */
+    private static final String NPC_TALK_QUEST_CODE = "report_to_outer_sect";
+
+    /** Tiến độ khởi điểm mà `report_to_outer_sect.js` ghi ra ở `on_accept` — CỜ, không phải bộ đếm. */
+    private static final String INITIAL_NPC_PROGRESS = "{\"reported\":false}";
+
+    /**
+     * Dialogue facade MỞ ĐƯỢC lời với {@link #TALKABLE_NPC_CODE} — khác {@link #fakeDialogueFacade()}
+     * (NpcTemplatePort rỗng ⇒ luôn 404). Trỏ vào script SẢN PHẨM, cùng lý do
+     * {@link #claimableQuestFacade()} trỏ vào script quest sản phẩm.
+     */
+    private static dev.kage.dialogue.api.DialogueFacade talkableDialogueFacade() {
+        dev.kage.dialogue.domain.NpcTemplatePort npcTemplatePort = npcCode -> TALKABLE_NPC_CODE.equals(npcCode)
+                ? Optional.of("/scripts/dialogue/senior_sister.js")
+                : Optional.empty();
+        return new dev.kage.dialogue.api.DialogueFacade(
+                new dev.kage.dialogue.application.GetDialogueNodeUseCase(npcTemplatePort));
+    }
+
+    private static dev.kage.quest.api.QuestFacade npcTalkQuestFacade() {
+        dev.kage.quest.domain.QuestProgressPort progressPort = new dev.kage.quest.domain.QuestProgressPort() {
+            @Override
+            public Optional<dev.kage.quest.domain.QuestProgress> find(long characterId, long questTemplateId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public void save(dev.kage.quest.domain.Transaction tx, dev.kage.quest.domain.QuestProgress progress) {}
+
+            @Override
+            public List<dev.kage.quest.domain.QuestProgressPort.ActiveQuest> listInProgress(long characterId) {
+                return List.of(new dev.kage.quest.domain.QuestProgressPort.ActiveQuest(
+                        1L, NPC_TALK_QUEST_CODE, "/scripts/quest/report_to_outer_sect.js", INITIAL_NPC_PROGRESS));
+            }
+        };
+        dev.kage.quest.domain.TransactionRunner tx = action -> action.accept(null);
+        dev.kage.quest.domain.QuestTemplatePort templatePort = questCode -> Optional.empty();
+        dev.kage.quest.application.QuestRewardPorts rewardPorts = new dev.kage.quest.application.QuestRewardPorts(
+                (t, characterId, amount) -> {},
+                (t, characterId, itemTemplateCode, quantity) -> true,
+                (t, characterId, action, detailJson) -> {},
+                (t, idempotencyKey) -> {});
+        return new dev.kage.quest.api.QuestFacade(
+                new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx),
+                new dev.kage.quest.application.ProcessQuestEventUseCase(progressPort, tx),
+                new dev.kage.quest.application.ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx),
+                new dev.kage.quest.application.ListQuestsUseCase(progressPort));
+    }
+
     // Quest không dùng trong test này — fake tối thiểu để compile (cùng convention fakeDialogueFacade).
     /** Mã quest dùng cho test nhận thưởng — script thật nằm ở resources của feature-quest. */
     private static final String CLAIMABLE_QUEST_CODE = "kill_training_dummies";
@@ -822,7 +937,7 @@ class GatewayPipelineTest {
         dev.kage.quest.domain.TransactionRunner tx = action -> action.accept(null);
         return new dev.kage.quest.api.QuestFacade(
                 new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx),
-                new dev.kage.quest.application.ProcessMonsterKilledUseCase(progressPort, tx),
+                new dev.kage.quest.application.ProcessQuestEventUseCase(progressPort, tx),
                 new dev.kage.quest.application.ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx),
                 new dev.kage.quest.application.ListQuestsUseCase(progressPort));
     }
@@ -856,8 +971,8 @@ class GatewayPipelineTest {
 
         dev.kage.quest.application.AcceptQuestUseCase acceptQuestUseCase =
                 new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx);
-        dev.kage.quest.application.ProcessMonsterKilledUseCase processMonsterKilledUseCase =
-                new dev.kage.quest.application.ProcessMonsterKilledUseCase(progressPort, tx);
+        dev.kage.quest.application.ProcessQuestEventUseCase processQuestEventUseCase =
+                new dev.kage.quest.application.ProcessQuestEventUseCase(progressPort, tx);
         dev.kage.quest.domain.IdempotencyPort questIdempotencyPort = (t, idempotencyKey) -> {};
         dev.kage.quest.application.QuestRewardPorts rewardPorts = new dev.kage.quest.application.QuestRewardPorts(
                 expPort, inventoryGrantPort, auditPort, questIdempotencyPort);
@@ -865,7 +980,7 @@ class GatewayPipelineTest {
                 new dev.kage.quest.application.ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx);
         return new dev.kage.quest.api.QuestFacade(
                 acceptQuestUseCase,
-                processMonsterKilledUseCase,
+                processQuestEventUseCase,
                 claimQuestRewardUseCase,
                 new dev.kage.quest.application.ListQuestsUseCase(progressPort));
     }
@@ -1245,6 +1360,15 @@ class GatewayPipelineTest {
             FakeCharacterPort characterPort,
             InventoryFacade seededInventoryFacade,
             dev.kage.quest.api.QuestFacade seededQuestFacade) {
+        return newPipeline(characterPort, seededInventoryFacade, seededQuestFacade, fakeDialogueFacade());
+    }
+
+    /** Bản nhận thêm DialogueFacade — cần cho test mục tiêu quest "đi gặp X" (2026-09-09). */
+    private static EmbeddedChannel newPipeline(
+            FakeCharacterPort characterPort,
+            InventoryFacade seededInventoryFacade,
+            dev.kage.quest.api.QuestFacade seededQuestFacade,
+            dev.kage.dialogue.api.DialogueFacade seededDialogueFacade) {
         // ⚠️ Phải khớp CHÍNH XÁC pipeline thật trong GatewayBootstrap — lệch ở đây là test giả.
         // CỐ Ý bỏ qua SslHandler (ADR-027) — EmbeddedChannel không mô phỏng handshake TLS thật
         // tiện lợi, và đây là test framing/handler logic ở tầng plaintext. TLS thật (handshake,
@@ -1278,7 +1402,7 @@ class GatewayPipelineTest {
         // positionPersister không start() — save() (nếu bị gọi) chạy trực tiếp, không cần scheduler.
         InventoryFacade inventoryFacade = seededInventoryFacade;
         dev.kage.shop.api.ShopFacade shopFacade = fakeShopFacade();
-        dev.kage.dialogue.api.DialogueFacade dialogueFacade = fakeDialogueFacade();
+        dev.kage.dialogue.api.DialogueFacade dialogueFacade = seededDialogueFacade;
         dev.kage.quest.api.QuestFacade questFacade = seededQuestFacade;
         dev.kage.friend.api.FriendFacade friendFacade = fakeFriendFacade();
         dev.kage.mail.api.MailFacade mailFacade = fakeMailFacade();
