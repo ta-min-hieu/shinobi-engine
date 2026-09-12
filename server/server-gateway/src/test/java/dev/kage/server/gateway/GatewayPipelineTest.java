@@ -880,6 +880,16 @@ class GatewayPipelineTest {
             @Override
             public void save(dev.kage.quest.domain.Transaction tx, dev.kage.quest.domain.QuestProgress progress) {}
 
+            // Từ 2026-09-11 dispatch ghi bằng compare-and-set; không có sự kiện nào khác chen vào ở
+            // đây nên lần ghi luôn thành công.
+            @Override
+            public boolean saveIfUnchanged(
+                    dev.kage.quest.domain.Transaction tx,
+                    dev.kage.quest.domain.QuestProgress progress,
+                    String expectedProgressJson) {
+                return true;
+            }
+
             @Override
             public List<dev.kage.quest.domain.QuestProgressPort.ActiveQuest> listInProgress(long characterId) {
                 return List.of(new dev.kage.quest.domain.QuestProgressPort.ActiveQuest(
@@ -895,7 +905,11 @@ class GatewayPipelineTest {
                 (t, idempotencyKey) -> {});
         return new dev.kage.quest.api.QuestFacade(
                 new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx),
-                new dev.kage.quest.application.ProcessQuestEventUseCase(progressPort, tx),
+                new dev.kage.quest.application.ProcessQuestEventUseCase(
+                        progressPort,
+                        (t, characterId, itemTemplateCode, quantity) -> false,
+                        (t, characterId, action, detailJson) -> {},
+                        tx),
                 new dev.kage.quest.application.ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx),
                 new dev.kage.quest.application.ListQuestsUseCase(progressPort));
     }
@@ -937,7 +951,11 @@ class GatewayPipelineTest {
         dev.kage.quest.domain.TransactionRunner tx = action -> action.accept(null);
         return new dev.kage.quest.api.QuestFacade(
                 new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx),
-                new dev.kage.quest.application.ProcessQuestEventUseCase(progressPort, tx),
+                new dev.kage.quest.application.ProcessQuestEventUseCase(
+                        progressPort,
+                        (t, characterId, itemTemplateCode, quantity) -> false,
+                        (t, characterId, action, detailJson) -> {},
+                        tx),
                 new dev.kage.quest.application.ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx),
                 new dev.kage.quest.application.ListQuestsUseCase(progressPort));
     }
@@ -972,7 +990,8 @@ class GatewayPipelineTest {
         dev.kage.quest.application.AcceptQuestUseCase acceptQuestUseCase =
                 new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx);
         dev.kage.quest.application.ProcessQuestEventUseCase processQuestEventUseCase =
-                new dev.kage.quest.application.ProcessQuestEventUseCase(progressPort, tx);
+                new dev.kage.quest.application.ProcessQuestEventUseCase(
+                        progressPort, (t, characterId, itemTemplateCode, quantity) -> false, auditPort, tx);
         dev.kage.quest.domain.IdempotencyPort questIdempotencyPort = (t, idempotencyKey) -> {};
         dev.kage.quest.application.QuestRewardPorts rewardPorts = new dev.kage.quest.application.QuestRewardPorts(
                 expPort, inventoryGrantPort, auditPort, questIdempotencyPort);

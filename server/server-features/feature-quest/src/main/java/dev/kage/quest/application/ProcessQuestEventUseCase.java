@@ -3,7 +3,14 @@ package dev.kage.quest.application;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import dev.kage.quest.domain.AuditPort;
+import dev.kage.quest.domain.QuestItemTakePort;
 import dev.kage.quest.domain.QuestProgress;
 import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestStatus;
@@ -23,6 +30,13 @@ import dev.kage.quest.domain.TransactionRunner;
  * áp cho lần một: <i>tổng quát hoá đi TRƯỚC nội dung, không copy-paste thêm một bản sao thứ hai của
  * chính vòng lặp này</i>. Bản sao đó sẽ là chỗ hai đường xử lý âm thầm trôi khỏi nhau.
  *
+ * <p><b>Mục tiêu loại THỨ BA — "mang vật X tới NPC Y" (2026-09-11).</b> KHÔNG thêm lối vào hay loại
+ * sự kiện nào: nó đi trên chính sự kiện {@code npc_talked}, cộng MỘT hiệu ứng mới —
+ * {@code ctx.take_item(code, qty)}. Lấy đồ là ĐIỀU KIỆN của cả lần chạy hook: tiến độ mới và mọi lần
+ * lấy đồ ghi trong CÙNG một transaction; thiếu một món thì rollback hết (xem {@link #write}). Kiểm
+ * túi lúc giao nghĩa là chỉ nhìn TRẠNG THÁI, không nhìn đồ tới bằng đường nào — nên không phải móc
+ * vào năm đường cấp vật phẩm (rơi đồ, cửa hàng, thưởng quest, hòm thư, giao dịch).
+ *
  * <p><b>Java KHÔNG biết quest nào quan tâm sự kiện nào</b> — kể cả LOẠI sự kiện. Mỗi quest đang làm
  * đều được chạy hook {@code on_event} và chính script tự quyết ({@code event.type === "npc_talked"
  * && event.npc_code === "..."}). Đây là Điều 27: Java là cơ chế, Script là nội dung. Java mà lọc
@@ -34,15 +48,33 @@ import dev.kage.quest.domain.TransactionRunner;
  */
 public final class ProcessQuestEventUseCase {
 
+    private static final Logger LOG = LoggerFactory.getLogger(ProcessQuestEventUseCase.class);
+
     private static final String MONSTER_KILLED_EVENT_TYPE = "monster_killed";
     private static final String NPC_TALKED_EVENT_TYPE = "npc_talked";
 
+    /** {@code audit_log.action} cho mỗi lần một quest lấy đồ khỏi túi — cạnh {@code QUEST_CLAIM}. */
+    static final String ITEM_TAKEN_AUDIT_ACTION = "QUEST_ITEM_TAKEN";
+
+    /**
+     * Số lần chạy lại hook khi một sự kiện KHÁC của cùng nhân vật đã ghi tiến độ giữa lúc đọc và lúc
+     * ghi ({@link QuestProgressPort#saveIfUnchanged} trả {@code false}). Xung đột cần hai sự kiện của
+     * CÙNG một người rơi vào CÙNG một quest trong vài mili-giây; ba lần liền là dấu hiệu có gì đó
+     * sai chứ không phải tải cao — khi đó bỏ sự kiện (không ghi, không lấy đồ) và ghi log.
+     */
+    private static final int MAX_WRITE_ATTEMPTS = 3;
+
     private final QuestProgressPort progressPort;
+    private final QuestItemTakePort itemTakePort;
+    private final AuditPort auditPort;
     private final TransactionRunner tx;
     private final QuestScriptRunner scriptRunner = new QuestScriptRunner();
 
-    public ProcessQuestEventUseCase(QuestProgressPort progressPort, TransactionRunner tx) {
+    public ProcessQuestEventUseCase(
+            QuestProgressPort progressPort, QuestItemTakePort itemTakePort, AuditPort auditPort, TransactionRunner tx) {
         this.progressPort = progressPort;
+        this.itemTakePort = itemTakePort;
+        this.auditPort = auditPort;
         this.tx = tx;
     }
 
@@ -67,6 +99,9 @@ public final class ProcessQuestEventUseCase {
      * thật sự trở thành "bấm đúng nút", không phải "tìm ra người". Sự kiện vì thế lặp lại mỗi lần
      * nói chuyện — script phải tự chịu được điều đó (đặt cờ, đừng cộng dồn).
      *
+     * <p>Cũng là sự kiện mang mục tiêu "mang vật X tới NPC Y": script gọi {@code ctx.take_item} khi
+     * gặp đúng người; người chơi chưa mang đủ đồ thì lần mở lời đó không để lại dấu vết gì.
+     *
      * @return như {@link #monsterKilled}
      */
     public List<QuestStatusChange> npcTalked(long characterId, String npcCode) {
@@ -80,23 +115,122 @@ public final class ProcessQuestEventUseCase {
         }
         ArrayList<QuestStatusChange> completed = new ArrayList<QuestStatusChange>();
         for (QuestProgressPort.ActiveQuest quest : active) {
-            QuestScriptRunner.HookEffects effects =
-                    scriptRunner.runEvent(quest.scriptRef(), quest.progressJson(), event);
-            if (!effects.completed() && effects.progressJson().equals(quest.progressJson())) {
-                // Sự kiện này không liên quan tới quest này — script trả lại đúng chuỗi tiến độ cũ.
-                // Bỏ qua hẳn lần ghi thay vì ghi đè giá trị y hệt: từ khi có LOẠI sự kiện thứ hai,
-                // mỗi quest đang làm nhận MỌI sự kiện, nên phần lớn lần chạy rơi vào nhánh này.
-                continue;
-            }
-            QuestStatus newStatus = effects.completed() ? QuestStatus.COMPLETED : QuestStatus.IN_PROGRESS;
-            tx.inTransaction((Transaction t) -> progressPort.save(
-                    t, new QuestProgress(characterId, quest.questTemplateId(), newStatus, effects.progressJson())));
-            if (effects.completed()) {
+            if (applyEvent(characterId, quest, event)) {
                 // Chỉ báo khi HOÀN THÀNH — không push sự kiện cho mỗi lần tiến độ tăng.
                 completed.add(new QuestStatusChange(quest.questCode(), QuestStatus.COMPLETED));
             }
         }
         return List.copyOf(completed);
+    }
+
+    /**
+     * Chạy hook cho MỘT quest rồi ghi kết quả; xung đột thì đọc lại và chạy lại trên tiến độ mới.
+     *
+     * @return {@code true} nếu lần này đã GHI quest xuống trạng thái COMPLETED
+     */
+    private boolean applyEvent(long characterId, QuestProgressPort.ActiveQuest quest, Map<String, Object> event) {
+        String observed = quest.progressJson();
+        for (int attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt++) {
+            QuestScriptRunner.HookEffects effects = scriptRunner.runEvent(quest.scriptRef(), observed, event);
+            if (effects.scriptFailed()) {
+                // Hiệu ứng DỞ DANG (có thể đã kịp gọi take_item/save_progress trước chỗ lỗi) — bỏ hết.
+                return false;
+            }
+            if (!effects.completed() && effects.progressJson().equals(observed)) {
+                // Sự kiện này không liên quan tới quest này — script trả lại đúng chuỗi tiến độ cũ.
+                // Bỏ qua hẳn lần ghi thay vì ghi đè giá trị y hệt: từ khi có LOẠI sự kiện thứ hai,
+                // mỗi quest đang làm nhận MỌI sự kiện, nên phần lớn lần chạy rơi vào nhánh này.
+                // Hệ quả có chủ đích: take_item mà tiến độ không đổi thì cũng KHÔNG lấy đồ.
+                return false;
+            }
+            WriteOutcome outcome = write(characterId, quest.questTemplateId(), observed, effects);
+            if (outcome == WriteOutcome.WRITTEN) {
+                return effects.completed();
+            }
+            if (outcome == WriteOutcome.ITEMS_MISSING) {
+                return false;
+            }
+            Optional<QuestProgress> fresh = progressPort.find(characterId, quest.questTemplateId());
+            if (fresh.isEmpty() || fresh.get().status() != QuestStatus.IN_PROGRESS) {
+                // Sự kiện kia đã đóng quest này (vd một lần giao đồ song song đã xong trước) — không
+                // còn gì để làm, và tuyệt đối không được lấy đồ lần thứ hai.
+                return false;
+            }
+            observed = fresh.get().progressJson();
+        }
+        LOG.warn(
+                "Bỏ sự kiện quest sau {} lần xung đột ghi liên tiếp: characterId={}, questTemplateId={}",
+                MAX_WRITE_ATTEMPTS,
+                characterId,
+                quest.questTemplateId());
+        return false;
+    }
+
+    /**
+     * Ghi tiến độ + lấy đồ + audit trong MỘT transaction.
+     *
+     * <p>Thứ tự có chủ đích: compare-and-set tiến độ ĐẦU TIÊN. Trên Postgres, câu {@code UPDATE} đó
+     * khoá dòng tiến độ — một lần giao đồ song song của cùng người chơi phải chờ lần này commit, rồi
+     * thấy {@code progress_json} đã khác và nhận {@code 0} dòng. Đó là chỗ duy nhất ngăn đồ bị trừ
+     * hai lần cho một lần giao. Xung đột thì chưa có gì bị ghi, transaction commit rỗng.
+     */
+    private WriteOutcome write(
+            long characterId,
+            long questTemplateId,
+            String expectedProgressJson,
+            QuestScriptRunner.HookEffects effects) {
+        QuestStatus newStatus = effects.completed() ? QuestStatus.COMPLETED : QuestStatus.IN_PROGRESS;
+        QuestProgress next = new QuestProgress(characterId, questTemplateId, newStatus, effects.progressJson());
+        AtomicBoolean written = new AtomicBoolean(false);
+        try {
+            tx.inTransaction((Transaction t) -> {
+                if (!progressPort.saveIfUnchanged(t, next, expectedProgressJson)) {
+                    return;
+                }
+                for (QuestScriptRunner.ItemTake take : effects.itemTakes()) {
+                    takeOrRollback(t, characterId, questTemplateId, take);
+                }
+                written.set(true);
+            });
+        } catch (ItemsMissingException e) {
+            // Transaction đã rollback: lần ghi tiến độ và mọi lần lấy đồ trước món thiếu đều bị huỷ.
+            return WriteOutcome.ITEMS_MISSING;
+        }
+        return written.get() ? WriteOutcome.WRITTEN : WriteOutcome.CONFLICT;
+    }
+
+    private void takeOrRollback(
+            Transaction t, long characterId, long questTemplateId, QuestScriptRunner.ItemTake take) {
+        if (!itemTakePort.takeItemByCode(t, characterId, take.itemTemplateCode(), take.quantity())) {
+            throw new ItemsMissingException();
+        }
+        auditPort.log(t, characterId, ITEM_TAKEN_AUDIT_ACTION, itemTakenDetailJson(questTemplateId, take));
+    }
+
+    private static String itemTakenDetailJson(long questTemplateId, QuestScriptRunner.ItemTake take) {
+        return "{\"questTemplateId\":%d,\"itemCode\":\"%s\",\"quantity\":%d}"
+                .formatted(questTemplateId, take.itemTemplateCode(), take.quantity());
+    }
+
+    private enum WriteOutcome {
+        WRITTEN,
+        /** Một sự kiện khác đã ghi tiến độ trước — chưa ghi gì, đọc lại rồi chạy lại hook. */
+        CONFLICT,
+        /** Người chơi không mang đủ đồ — đã rollback, sự kiện coi như không xảy ra với quest này. */
+        ITEMS_MISSING
+    }
+
+    /**
+     * Cách DUY NHẤT để bảo {@link TransactionRunner} rollback mà không phải lỗi thật: runner commit
+     * khi khối lệnh chạy xong, rollback khi nó ném. Không bao giờ thoát ra khỏi {@link #write}.
+     */
+    private static final class ItemsMissingException extends RuntimeException {
+
+        private static final long serialVersionUID = 1L;
+
+        ItemsMissingException() {
+            super("không đủ vật phẩm để giao", null, false, false);
+        }
     }
 
     public record QuestStatusChange(String questCode, QuestStatus status) {}

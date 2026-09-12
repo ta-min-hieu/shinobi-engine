@@ -83,7 +83,8 @@ class ConnectedCharacterRegistryTest {
         dev.kage.quest.domain.TransactionRunner tx = action -> action.accept(null);
 
         AcceptQuestUseCase acceptQuestUseCase = new AcceptQuestUseCase(progressPort, templatePort, tx);
-        ProcessQuestEventUseCase processQuestEventUseCase = new ProcessQuestEventUseCase(progressPort, tx);
+        ProcessQuestEventUseCase processQuestEventUseCase = new ProcessQuestEventUseCase(
+                progressPort, (t, characterId, itemTemplateCode, quantity) -> false, auditPort, tx);
         dev.kage.quest.domain.IdempotencyPort questIdempotencyPort = (t, idempotencyKey) -> {};
         QuestRewardPorts rewardPorts =
                 new QuestRewardPorts(expPort, inventoryGrantPort, auditPort, questIdempotencyPort);

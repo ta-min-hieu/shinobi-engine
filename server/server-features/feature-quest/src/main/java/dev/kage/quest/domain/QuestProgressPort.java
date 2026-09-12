@@ -13,6 +13,27 @@ public interface QuestProgressPort {
     void save(Transaction tx, QuestProgress progress);
 
     /**
+     * Ghi tiến độ mới CHỈ KHI dòng vẫn còn {@code IN_PROGRESS} với ĐÚNG {@code expectedProgressJson}
+     * — compare-and-set, dùng cho {@code ProcessQuestEventUseCase}.
+     *
+     * <p><b>Vì sao có (2026-09-11).</b> Sự kiện của CÙNG một nhân vật chạy song song: mỗi con quái chết
+     * là một Virtual Thread riêng ({@code ConnectedCharacterRegistry.lootExecutor}), nói chuyện NPC
+     * lại chạy trên {@code authExecutor}. Với {@link #save} (upsert mù), hai sự kiện cùng đọc một
+     * tiến độ rồi cùng ghi ⇒ một lần bị mất. Với quest đếm quái, cái giá là một cú giết không được
+     * tính; với quest GIAO ĐỒ, cái giá là đồ bị trừ HAI lần cho một lần giao. Lần ghi có điều kiện
+     * này biến "ghi đè mù" thành "phát hiện được xung đột" — người gọi đọc lại rồi chạy lại hook.
+     *
+     * @return {@code false} nếu dòng đã bị một lần ghi khác đổi đi (hoặc không còn IN_PROGRESS) —
+     *     khi đó KHÔNG ghi gì
+     */
+    default boolean saveIfUnchanged(Transaction tx, QuestProgress progress, String expectedProgressJson) {
+        // KHÔNG có mặc định "vô hại" cho một lần GHI: trả true mà không ghi là âm thầm làm mất tiến
+        // độ. Fake/anonymous class không đi qua ProcessQuestEventUseCase thì không bao giờ tới đây;
+        // adapter thật bắt buộc override (QuestIntegrationTest gác).
+        throw new UnsupportedOperationException("saveIfUnchanged chưa được hiện thực ở " + getClass());
+    }
+
+    /**
      * MỌI dòng nhật ký của nhân vật, GỒM CẢ {@code CLAIMED} (ADR-035 Decision-4) — lọc phía server
      * thì client không phân biệt được "chưa từng nhận" với "đã trả xong". Trả {@code questCode}
      * (adapter tự join {@code quest_template}), không phải {@code questTemplateId}.

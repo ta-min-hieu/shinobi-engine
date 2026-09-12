@@ -54,6 +54,7 @@ import dev.kage.server.database.quest.PostgresQuestAuditAdapter;
 import dev.kage.server.database.quest.PostgresQuestExpAdapter;
 import dev.kage.server.database.quest.PostgresQuestIdempotencyAdapter;
 import dev.kage.server.database.quest.PostgresQuestInventoryGrantAdapter;
+import dev.kage.server.database.quest.PostgresQuestItemTakeAdapter;
 import dev.kage.server.database.quest.PostgresQuestProgressAdapter;
 import dev.kage.server.database.quest.PostgresQuestTemplateAdapter;
 
@@ -169,7 +170,10 @@ class MvpLoopIntegrationTest {
 
     private static ProcessQuestEventUseCase newProcessQuestEventUseCase() {
         return new ProcessQuestEventUseCase(
-                new PostgresQuestProgressAdapter(dataSource), new JdbcQuestTransactionRunner(dataSource));
+                new PostgresQuestProgressAdapter(dataSource),
+                new PostgresQuestItemTakeAdapter(),
+                new PostgresQuestAuditAdapter(),
+                new JdbcQuestTransactionRunner(dataSource));
     }
 
     private static ClaimQuestRewardUseCase newClaimQuestRewardUseCase() {

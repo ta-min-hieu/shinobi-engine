@@ -65,6 +65,11 @@ public final class QuestFacade {
      * nhánh nối hai đầu đó qua feature-quest. Đúng bài học đã trả giá ở ADR-046: hỏi "client ĐÃ có
      * đường nào nhận thứ này chưa" TRƯỚC khi kết luận có phải đổi protocol hay không.
      *
+     * <p>Cũng mang mục tiêu loại THỨ BA ("mang vật X tới NPC Y", 2026-09-11): script gọi
+     * {@code ctx.take_item} khi gặp đúng người, và đồ bị lấy khỏi túi trong cùng transaction với lần
+     * ghi tiến độ. Vẫn không có opcode mới — cửa sổ túi đồ tự hỏi lại {@code ListInventoryRequest}
+     * mỗi lần mở.
+     *
      * <p>Trả cùng dạng {@link #onMonsterKilled}: chỉ những quest VỪA chuyển sang COMPLETED.
      */
     public List<QuestStatusChange> onNpcTalked(long characterId, String npcCode) {

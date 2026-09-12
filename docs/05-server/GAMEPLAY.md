@@ -477,6 +477,45 @@ làm nhận MỌI sự kiện, nên phần lớn lần chạy hook trả lại �
 `ProcessQuestEventUseCase` nay **bỏ hẳn lần ghi** khi tiến độ không đổi và quest chưa hoàn thành —
 nếu không, số transaction rỗng sẽ tăng theo tích (số quest đang làm × số sự kiện).
 
+### 9.5 Mục tiêu quest loại THỨ BA — "mang vật X tới NPC Y" (✅ Cơ chế đã code, 2026-09-11)
+
+Cho twist arc 2 (STORY.md §6 — đệ tử ngoại môn mất tích: người chơi lần ra dấu vết rồi mang về).
+**Chỉ có cơ chế**; nội dung arc 2 thật còn chờ chủ dự án chốt dải Lv10–18.
+
+**Chọn "giao đồ cho NPC" chứ không phải "có được vật X".** Game có NĂM đường đưa vật phẩm vào túi
+(rơi đồ, cửa hàng, thưởng quest, hòm thư, giao dịch), bốn đường sau ghi thẳng SQL. Mục tiêu "có
+được X" phải móc vào cả năm, và vẫn sai ở hai chỗ: vật đã nằm trong túi TRƯỚC khi nhận quest thì
+không bao giờ bắn sự kiện, và nhặt xong đem bán thì quest vẫn xong. Giao đồ thì kiểm **trạng thái
+túi lúc giao** — đồ tới bằng đường nào cũng được tính, không đường cấp nào phải sửa.
+
+**Không thêm opcode, lối vào hay loại sự kiện nào.** Nó đi trên chính `npc_talked` (§9.4), cộng
+một hiệu ứng script mới: `ctx.take_item(code, qty)` — chỉ có ở `on_event`. Client không cần đường
+mới: `QuestStatusChangedEvent` báo hoàn thành, còn cửa sổ túi đồ hỏi lại `ListInventoryRequest`
+mỗi lần mở.
+
+**Ba luật**, mỗi luật có test gác (`ProcessQuestEventUseCaseTest` + Postgres thật ở
+`QuestIntegrationTest`):
+
+1. **Lấy đồ là ĐIỀU KIỆN của cả lần chạy hook.** Tiến độ mới và mọi lần lấy đồ ghi trong MỘT
+   transaction; thiếu một món là rollback hết — món đã lấy trước đó quay về túi, cờ tiến độ không
+   được ghi.
+2. **Tiến độ là CỜ** (`delivered`), điều kiện có `!progress.delivered` — sự kiện lặp lại, không
+   được đòi đồ lần hai.
+3. **Không bao giờ giao hai lần.** Lần ghi tiến độ là compare-and-set
+   (`QuestProgressPort.saveIfUnchanged`, `UPDATE … WHERE progress_json = ?`); lần mở lời song song
+   thứ hai thấy tiến độ đã khác, đọc lại, và không lấy đồ.
+
+Chỉ lấy vật **không đang mặc và chưa cường hoá**; gom được từ nhiều dòng (túi cũ phân mảnh). Mỗi lần
+lấy ghi `audit_log` action `QUEST_ITEM_TAKEN`.
+
+**Lợi ích phụ:** compare-and-set áp cho MỌI sự kiện quest, nên nó sửa luôn một lỗi mất cập nhật có
+từ trước: hai con quái chết cùng nhịp là hai Virtual Thread, cả hai đọc `counter = 0`, cả hai ghi
+`1`. Nay lần ghi sau đọc lại và đếm tiếp.
+
+⚠️ Mốc là lúc **mở lời** nên đồ bị lấy ngay khi mở lời với đúng NPC. Nội dung nên dùng vật phẩm
+dành riêng cho quest; giao một món người chơi có thể còn muốn giữ (đan dược…) là quyết định thiết
+kế cần cân nhắc.
+
 ---
 
 ## 10. Chat
