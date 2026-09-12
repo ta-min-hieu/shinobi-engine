@@ -2598,6 +2598,22 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       cùng khuôn `DuelStartedEvent`, `protocolVersion` KHÔNG tăng); **E** là phương án duy nhất không
       đổi protocol nhưng đổi LUẬT CHƠI. Test tái hiện để `@Disabled` chờ quyết định. Kèm phát hiện
       phụ: **người GỬI cũng có khe thứ tự** response-vs-spawn (sửa được không đổi protocol).
+    - ✅ **PLAYTEST SỐNG bằng CLIENT THẬT (2026-09-12)** — đúng thứ đợt này sửa:
+      **Tàng Bảo Các** mở bằng B, danh mục **cuộn được tới đáy**, dòng cuối là *Tiểu Hồi Nguyên Đan —
+      Mua: 80* (món **19/19**, tức món trước đây nằm ngoài trần 8). Bấm **Mua** → khung báo *"Đã mua
+      vật phẩm."*, Linh thạch **40.535 → 40.455** ngay trên khung. Ba nguồn khớp nhau: DB
+      (`character_stat.gold` −80, `minor_healing_pill` **4 → 5**), `audit_log`
+      (`SHOP_BUY {"itemTemplateId":20,"quantity":1,"goldCost":80}`), và màn hình. Túi đồ cũng cuộn tới
+      cuối và hiện **Tiểu Hồi Nguyên Đan x5**. Log client: **0 ERROR/WARN, 0 model thiếu**.
+    - 🐛 **Phát hiện trong lúc playtest, CHƯA sửa — nhãn khu "Trang bị" của túi đồ bị cắt chữ.**
+      Trên màn hình là *"áp khí"* và *"o bào"*, trong khi bundle ghi **"Pháp khí"**/**"Đạo bào"**; nút
+      **Gỡ** cũng cụt ở mép phải. **Không phải hồi quy của đợt này** — ảnh chụp 2026-09-09 (trước khi
+      gom `ScrollingList`) có **đúng cùng lỗi**, và hàm cuộn cũ giống hệt hàm mới về tham số. Nguyên
+      nhân: một hàng trang bị = nhãn slot **cố định 140px** + mô tả (dòng dài nhất ~370px) + nút 84px
+      + đệm, **vượt `PANEL_WIDTH_PX = 560`**; vùng cuộn khoá trục ngang nên bảng con rộng hơn viewport
+      bị căn giữa và **tràn ra CẢ HAI mép**. Hàng vật phẩm không dính vì chuỗi ngắn hơn. Cùng họ với
+      bẫy nút bề rộng cố định (mục 53) — và `runHudLayoutCheck` **không bắt được** vì nó chỉ đo CHIỀU
+      CAO, không đo tràn NGANG.
     - ⚠️ **Bẫy quy trình, dính hai lần trong một buổi**: `./gradlew build | tail` **nuốt mã thoát của
       Gradle** — lần chạy đầu báo `exit code 0` trong khi build THẤT BẠI. Ghi log ra file rồi
       `echo $?` ngay sau lệnh, đừng đọc kết luận từ mấy dòng cuối đã qua đường ống.
