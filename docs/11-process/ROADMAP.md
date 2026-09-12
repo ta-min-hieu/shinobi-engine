@@ -2643,3 +2643,41 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
     - ⚠️ Và hai lỗi SpotBugs chỉ `./gradlew build` đầy đủ mới bắt (test module nào cũng xanh):
       `Path.getFileName()` có thể null, và một `static long` dùng chung giữa các luồng test thiếu
       `volatile`.
+
+71. **QUEST THỨ SÁU — arc 2 có việc để làm, và mục tiêu "mang vật tới NPC" lần đầu vào nội dung thật (2026-09-12)**:
+    - **V38** — vật phẩm `outer_sect_tally` (Thẻ Bài Ngoại Môn), một dòng rơi **100%** từ `wandering_bandit`,
+      và quest `recover_outer_sect_tallies` khoá sau quest 5 (`prerequisite_quest_id`, ADR-044).
+      **Chỉ thêm dữ liệu** — không cột mới, không bảng mới: lần thứ NĂM liên tiếp (V28 → V30 → V33 →
+      V37 → V38) một quest mới không tốn một dòng Java NỘI DUNG nào. Cơ chế nó cần đã dựng trước ở
+      tầng cơ chế hôm 2026-09-11 (mục 70), đúng luật "cơ chế đi trước nội dung" — lần thứ BA.
+    - 📖 **Nhịp cốt truyện (STORY §6 arc 2 + §8 quy tắc 2)**: quest nằm ở nhịp VIỆC VẶT ("đứng vững ở
+      ngoại môn") và chỉ **gieo mầm** cho twist — một trong hai thẻ bài là của Lý Tam, đứa mấy hôm
+      không thấy về, và lời giải thích CHÍNH THỨC là nó bỏ trốn (đúng nguyên văn §6: *"không phải bỏ
+      trốn như Hình Đường kết luận"*). KHÔNG một chữ nào về hang luyện công, hút tu vi, hay Huyết Sa.
+    - ⚖️ **Cân bằng chọn từ tương quan**: quest 2 (1 tán tu, đi 21m) = 800; quest 3 (2 thạch vệ dai
+      gấp rưỡi) = 1.200; quest này (2 tán tu, đi 34m, người chơi nay Cấp 10 + có trang bị) = **1.000**.
+      Rơi **100%** chứ không phải một tỉ lệ nào khác: tỉ lệ < 100% biến số trận phải đánh thành biến
+      ngẫu nhiên và phép cân bằng theo quãng đường + số nhát chịu đòn hết nghĩa. Đường tối thiểu:
+      4.585 + 200 + 2 × 35 + 1.000 = **5.855** ⇒ đóng quest ở **Cấp 11**.
+    - 🧪 **PLAYTEST bằng `gameProbe`, trọn vòng, ba nguồn khớp nhau**: nhận quest qua hội thoại THẬT
+      (hai bước: `about_work` → `accept_quest:...`) ⇒ IN_PROGRESS; hạ 2 tán tu ⇒ **2 thẻ bài vào túi**;
+      **chỉ MỞ LỜI** với Tô Vân Nhi ⇒ opcode 607 `QUEST_STATUS_CHANGED status=COMPLETED` (không có nút
+      nộp — đúng thiết kế); lĩnh thưởng ⇒ **+1.000 EXP, Cấp 11 → 12**. DB: thẻ bài còn **0**,
+      `progress_json = {"delivered":true}`; `audit_log` có `QUEST_ITEM_TAKEN {"quantity":2}` rồi
+      `QUEST_CLAIM {"expGranted":1000}`.
+    - 📏 Số đo kèm theo, đáng giữ cho lần cân bằng sau: tán tu đánh **17/nhát**, người chơi đánh
+      **34/nhát**; trong một lượt đo máu người chơi tụt tới **6/118** trước khi hạ được con thứ hai.
+      Đường đi này KHÔNG phải đi dạo, dù người chơi đã Cấp 11.
+    - 🧱 **Test phải TÁCH LỚP, và chính PMD bắt**: thêm 6 test vào `QuestIntegrationTest` đẩy lớp đó
+      lên **86 điểm CyclomaticComplexity** (trần 80). Javadoc lớp cũ nói "tách lớp riêng thì dựng
+      thêm một Postgres nữa, đắt hơn" — lập luận đó có TRẦN và nay đã chạm. Quest 6 vì thế sống ở
+      `OuterSectTallyQuestIntegrationTest`, đúng khuôn mọi lớp test tích hợp khác của module
+      (guild/friend/inventory/dialogue: mỗi vùng một lớp, mỗi lớp một container).
+    - ✅ **Hai test cây thoại của Tô Vân Nhi ĐỎ đúng lúc, và chúng đúng**: một ô khoá "node start có
+      ĐÚNG 4 lựa chọn theo thứ tự" (vì `option_index` trên dây là VỊ TRÍ), ô kia khoá "không nhánh
+      nào nhận quest". Thêm nhánh giao việc làm sai cả hai — đó là test gác làm đúng việc của nó, nên
+      cập nhật CÓ CHỦ ĐÍCH: lựa chọn mới đặt ngay TRƯỚC `end` (xê dịch đúng một index), và ô thứ hai
+      viết lại thành "ĐÚNG MỘT lựa chọn nhận quest, và KHÔNG lựa chọn nào NỘP quest" — vì mốc của cả
+      hai quest của cô đều nằm ở lúc MỞ LỜI.
+    - 🔴 **Dòng #19 KHÔNG đóng**: quest này thu hẹp khoảng lệch Lv10–18 đúng **một cấp**. Lấp trọn
+      quãng đó (nhiệm vụ ngày? thêm quest? đổi đường cong EXP?) vẫn là quyết định của chủ dự án.

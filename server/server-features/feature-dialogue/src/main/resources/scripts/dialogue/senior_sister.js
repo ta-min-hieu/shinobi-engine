@@ -18,10 +18,17 @@
 //   · và tuyệt đối không một câu nào úp mở về việc chính cô là tai mắt bị ép buộc (twist arc 5).
 //     Ở arc 2 cô che chở đàn em một cách THẬT LÒNG; viết cô thành kẻ đang diễn là hỏng cả cú twist.
 //
-// text_key/label_key là khoá i18n. action: tên node khác (điều hướng) hoặc "end" (kết thúc).
-// Cây này CHƯA có nhánh nhận quest — quest `report_to_outer_sect` nhận từ Chu Hoành và hoàn thành
-// bằng chính việc MỞ LỜI với cô (mục tiêu `npc_talked`, ProcessQuestEventUseCase), không phải bằng
-// một lựa chọn thoại. Xem javadoc `QuestFacade.onNpcTalked` về lý do đặt mốc ở lúc mở lời.
+// text_key/label_key là khoá i18n. action: tên node khác (điều hướng), "end" (kết thúc), hoặc
+// "accept_quest:<code>" (nhận quest — GAMEPLAY.md §9.3).
+//
+// Quest `report_to_outer_sect` KHÔNG nhận ở đây: nó nhận từ Chu Hoành và hoàn thành bằng chính việc
+// MỞ LỜI với cô (mục tiêu `npc_talked`), không phải bằng một lựa chọn thoại — xem javadoc
+// `QuestFacade.onNpcTalked`. Nhánh `about_work` bên dưới thì NGƯỢC LẠI: đó là quest 6, cô là người
+// GIAO, nên nó phải là một lựa chọn thoại có ý thức của người chơi.
+//
+// ⚠️ Và cùng một cây thoại này còn là chỗ NỘP quest 6 (mục tiêu "mang vật X tới NPC Y"): người chơi
+// mở lời với cô lần nữa là đủ, KHÔNG phải bấm đúng một lựa chọn. Đừng thêm option "nộp thẻ bài" —
+// mốc nằm ở lúc mở lời, và một nút nộp riêng sẽ biến mục tiêu "mang về" thành "bấm đúng nút".
 ({
     start: {
         text_key: "dialogue.senior_sister.greeting",
@@ -29,6 +36,7 @@
             { label_key: "dialogue.option.ask_outer_sect_rank", action: "about_rank" },
             { label_key: "dialogue.option.ask_rival", action: "about_rival" },
             { label_key: "dialogue.option.ask_senior_sister", action: "about_herself" },
+            { label_key: "dialogue.option.ask_outer_sect_work", action: "about_work" },
             { label_key: "dialogue.option.bye_senior_sister", action: "end" }
         ]
     },
@@ -58,6 +66,19 @@
     about_herself: {
         text_key: "dialogue.senior_sister.about_herself",
         options: [
+            { label_key: "dialogue.option.back_senior_sister", action: "start" },
+            { label_key: "dialogue.option.bye_senior_sister", action: "end" }
+        ]
+    },
+    // §6 arc 2 "Xung đột" (việc vặt ngoại môn) + GIEO MẦM cho twist "đệ tử mất tích": một thẻ bài
+    // mang tên đứa mấy hôm không thấy về, và lời giải thích CHÍNH THỨC là nó bỏ trốn — đúng nguyên
+    // văn §6 ("không phải bỏ trốn như Hình Đường kết luận"). Cô tin lời đó thật lòng ở arc 2.
+    // KHÔNG được nhắc: hang luyện công, hút tu vi, Huyết Sa (nhịp sau của arc, §8 quy tắc 2).
+    about_work: {
+        text_key: "dialogue.senior_sister.about_work",
+        options: [
+            { label_key: "dialogue.option.accept_quest_outer_sect_tallies",
+              action: "accept_quest:recover_outer_sect_tallies" },
             { label_key: "dialogue.option.back_senior_sister", action: "start" },
             { label_key: "dialogue.option.bye_senior_sister", action: "end" }
         ]

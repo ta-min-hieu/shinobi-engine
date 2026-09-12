@@ -59,6 +59,11 @@ import dev.kage.server.database.character.PostgresCharacterAdapter;
  * <p>Từ 2026-09-05 lớp này phủ CẢ quest thứ hai ({@code night_watch_bandit}, seed V28,
  * night_watch_bandit.js). Hai quest cùng một lớp test vì {@code @Container} là static — tách lớp
  * riêng sẽ dựng thêm một Postgres nữa cho toàn bộ suite, đắt hơn hẳn phần đọc dễ thu được.
+ *
+ * <p>⚠️ Lập luận đó có TRẦN, và quest thứ sáu đã chạm: thêm khối của nó vào đây làm lớp vượt
+ * ngưỡng {@code CyclomaticComplexity} của PMD (tính cho cả lớp). Vì vậy quest 6 sống ở
+ * {@link OuterSectTallyQuestIntegrationTest} — quest thứ bảy trở đi cũng nên tách theo vùng
+ * nghiệp vụ như vậy, đừng cố nhét tiếp vào đây.
  */
 @Testcontainers
 class QuestIntegrationTest {
@@ -797,6 +802,7 @@ class QuestIntegrationTest {
     // chờ chủ dự án, và cơ chế thì không nên phải chờ theo.
     // =============================================================================================
 
+    // ---------------------------------------------------------------------------------------
     private static final String DELIVERY_CODE = "it_deliver_to_senior_sister";
     private static final String DELIVERY_SCRIPT_REF = "/scripts/quest/it_fixture_delivery.js";
     private static final String ITEM_TAKEN_AUDIT_ACTION = "QUEST_ITEM_TAKEN";
