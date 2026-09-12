@@ -93,7 +93,8 @@ final class WorldContentLoader {
                 ai.chaseSpeedMps(),
                 ai.patrolSpeedMps(),
                 ai.patrolRadiusMeters(),
-                ai.idleDurationSeconds());
+                ai.idleDurationSeconds(),
+                ai.retaliates());
         MonsterCatalogSnapshot.MonsterCombatNumbers combat = new MonsterCatalogSnapshot.MonsterCombatNumbers(
                 stats.atk(),
                 stats.skillDmg(),

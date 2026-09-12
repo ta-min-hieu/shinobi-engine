@@ -1175,7 +1175,8 @@ public final class WorldFacade {
                 ai.chaseSpeedMps(),
                 ai.patrolSpeedMps(),
                 ai.patrolRadiusMeters(),
-                ai.idleDurationSeconds());
+                ai.idleDurationSeconds(),
+                ai.retaliates());
     }
 
     /** Danh tính loài trên entity: mã trên dây, khoá art, và EXP mà world chỉ chở ra ngoài. */

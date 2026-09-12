@@ -27,6 +27,7 @@ public final class PostgresMonsterCatalogAdapter implements MonsterCatalogPort {
                    mt.def, mt.res, mt.hit_percent, mt.dodge_percent, mt.crit_percent, mt.element,
                    mt.exp_reward, mt.aggro_radius_meters, mt.leash_radius_meters, mt.chase_speed_mps,
                    mt.patrol_speed_mps, mt.patrol_radius_meters, mt.idle_duration_seconds,
+                   mt.retaliates,
                    mt.is_boss, mt.ai_script_ref, mt.ai_decision_interval_seconds,
                    mt.ai_skill_cooldown_seconds,
                    dt.code AS drop_table_code
@@ -120,7 +121,10 @@ public final class PostgresMonsterCatalogAdapter implements MonsterCatalogPort {
                 mapBossBehaviour(rs));
     }
 
-    /** Sáu cột AI của V25 (ADR-039 D1) — hai hằng CƠ CHẾ còn lại cố ý không có trong bảng. */
+    /**
+     * Sáu cột AI của V25 (ADR-039 D1) cộng {@code retaliates} của V43 (ADR-049) — hai hằng CƠ CHẾ
+     * còn lại cố ý không có trong bảng.
+     */
     private static MonsterAiParams mapAiParams(ResultSet rs) throws SQLException {
         return new MonsterAiParams(
                 rs.getFloat("aggro_radius_meters"),
@@ -128,7 +132,8 @@ public final class PostgresMonsterCatalogAdapter implements MonsterCatalogPort {
                 rs.getFloat("chase_speed_mps"),
                 rs.getFloat("patrol_speed_mps"),
                 rs.getFloat("patrol_radius_meters"),
-                rs.getFloat("idle_duration_seconds"));
+                rs.getFloat("idle_duration_seconds"),
+                rs.getBoolean("retaliates"));
     }
 
     private static MonsterSpawnPoint mapSpawnPoint(ResultSet rs) throws SQLException {

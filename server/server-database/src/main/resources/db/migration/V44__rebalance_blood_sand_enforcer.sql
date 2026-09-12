@@ -1,0 +1,83 @@
+-- V44 — CÂN BẰNG LẠI CHẤP SỰ HÌNH VÂN SƠN sau khi hắn biết đánh trả (ADR-049).
+--
+-- =============================================================================================
+-- VÌ SAO LÀ MIGRATION MỚI CHỨ KHÔNG SỬA V41
+-- =============================================================================================
+-- V41 đã COMMIT và đã push (`79268aa`). Luật của dự án chỉ cho sửa tại chỗ một migration khi nó
+-- còn chưa commit; qua mốc đó thì mọi thay đổi phải là một version mới, nếu không mỗi máy đã chạy
+-- V41 sẽ kẹt checksum. Đây đúng là tình huống đó.
+--
+-- =============================================================================================
+-- SỐ CŨ SAI VÌ TÔI QUÊN CHÍNH CÁI SCRIPT CỦA HẮN
+-- =============================================================================================
+-- Bảng cân bằng ở V41 tính "5 nhát mỗi bên" **chỉ dựa trên đòn thường**, rồi tự trấn an bằng câu
+-- "hắn đứng trong vùng an toàn nên người chơi tới nơi máu đầy". Playtest 2026-09-12 (lượt đầu tiên
+-- hắn thật sự đánh trả, sau ADR-049) bác thẳng:
+--
+--   t=2350ms  người chơi  -> boss   33   (boss 150 -> 117)
+--   t=2353ms  boss -> người chơi    24   (máu 118 -> 94)     ← đánh trả, ADR-049 chạy
+--   t=2513ms  boss heavy_strike     hụt                      ← pha CẢI TRANG (×1.6)
+--   t=3366ms  boss -> người chơi    35   (chí mạng)  -> 59
+--   t=4382ms  boss -> người chơi    24               -> 35
+--   t=4587ms  boss enrage           55               -> 0    ← LỘ NGUYÊN HÌNH (×2.2), CHẾT
+--
+-- Người chơi chết ở giây 4,6 trong khi boss mới xuống 150 -> 51. Trận này KHÔNG thắng được.
+--
+-- Công thức rút ra TỪ SỐ ĐO (không phải từ giấy). Trong một trận dài N giây, boss gây:
+--
+--   normal   : N × (atk × 0,80)        — đo: atk 30 ⇒ 24 mỗi đòn, mỗi ~1 giây
+--   heavy    : atk × 1,60 × 0,83       — chiêu pha cải trang, hồi 4 giây
+--   enrage   : atk × 2,20 × 0,83       — đo: raw 66 ⇒ 55 thật; nổ ĐÚNG MỘT LẦN khi máu < 55%
+--
+-- Với N = 4 (số giây người chơi cần để hạ 120 máu ở 33 sát thương/nhát):
+--
+--   tổng ≈ atk × (3,20 + 1,33 + 1,83) = **atk × 6,36**
+--
+-- ⇒ atk 30 cho **191 sát thương** so với 118 máu người chơi. Thua chắc, đúng như đã đo.
+--
+-- =============================================================================================
+-- SỐ MỚI: `atk = 15`, `max_hp = 120`
+-- =============================================================================================
+--   · `max_hp` 150 -> **120**: người chơi 33 sát thương/nhát ⇒ ĐÚNG 4 nhát (132 ≥ 120), tức trận
+--     dài ~4 giây. Đủ dài để cả hai pha của script kịp xuất hiện, đủ ngắn để không thành trận cày.
+--   · `atk` 30 -> **12** và `ai_skill_cooldown_seconds` 4,0 -> **7,0** (xem LƯỢT ĐO THỨ HAI bên dưới).
+--
+-- ⚠️ `atk = 15` trông YẾU cạnh kẻ canh hang (atk 26, V40) và đó là CHỦ ĐÍCH: sát thương của con này
+-- nằm ở CHIÊU chứ không ở đòn thường — hai chiêu cộng lại đã bằng 3,16 lần một đòn thường. Hạ
+-- multiplier trong script thay vì hạ atk sẽ làm hỏng chính thứ phân biệt hai pha của hắn.
+--
+-- =============================================================================================
+-- LƯỢT ĐO THỨ HAI (`atk = 15`) — VẪN THUA, và nó chỉ ra chỗ mô hình trên còn thiếu
+-- =============================================================================================
+--   118 -> 106 (12) -> 86 (heavy 20) -> 74 (12) -> 62 (12) -> 34 (enrage 28) -> 16 (crit 18)
+--       -> 4 (12) -> 0 (12)    — chết ở giây 5,4; boss còn 21/120.
+--
+-- Ba thứ mô hình "atk × 6,36" bỏ sót, cả ba đều đọc được từ nhật ký:
+--   1. **Boss mở màn bằng `heavy_strike` ngay giây 0,7** — chiêu sẵn sàng từ đầu trận, không phải
+--      đợi hồi. Nên trận nào cũng có ít nhất một chiêu, kể cả trận rất ngắn.
+--   2. **Chiêu KHÔNG thay thế đòn thường** — hắn vẫn đánh thường đều đặn ~1 giây/nhát, chiêu là
+--      đòn CỘNG THÊM.
+--   3. **Mỗi nhát hụt của người chơi kéo dài trận thêm một giây = thêm một đòn thường ăn vào.**
+--      Lượt này người chơi hụt 2/5 nhát (tỉ lệ trúng 95% — xui, nhưng "xui" là thứ phải sống sót
+--      được), nên trận dài 5,4 giây thay vì 4, và chiêu THỨ HAI kịp nổ lúc ~4,7 giây.
+--
+-- ⇒ Biến thiên nằm ở **chiêu thứ hai**, không nằm ở đòn thường. Nên sửa bằng HAI cột, không phải một:
+--
+--   · `atk` -> **12**: đòn thường 10, heavy 16, enrage 22.
+--   · `ai_skill_cooldown_seconds` -> **7,0**: một trận ~5 giây chỉ còn ĐÚNG MỘT `heavy_strike`.
+--     Đây chính là thứ ADR-048 D4 mở cột ra để làm, và nó khớp luôn tường thuật đã ghi ở V41:
+--     một kẻ cải trang không thể ra chiêu Huyết Sa liên tục giữa tông môn mà không lộ.
+--
+--   Dự đoán: trận 5 giây ⇒ 5 × 10 + 16 + 22 ≈ **88** ⇒ thắng còn khoảng **30/118**; trận may
+--   (4,2 giây) ⇒ ~80 ⇒ còn ~38. Chịu được MỘT nhát hụt mà không lật kết quả — đó là điều lượt
+--   `atk = 15` không làm được.
+--
+-- ⚠️ VẪN LÀ SỐ TRÊN GIẤY CHO TỚI LƯỢT ĐO KẾ TIẾP. Quest 8 cần ba lượt mới chốt được; đây mới là
+-- lượt thứ ba của con này. Nếu lượt đo bác, sửa SỐ chứ đừng sửa kỳ vọng.
+-- ---------------------------------------------------------------------------------------------
+
+UPDATE monster_template
+   SET max_hp = 120,
+       atk = 12,
+       ai_skill_cooldown_seconds = 7.0
+ WHERE code = 'blood_sand_enforcer';

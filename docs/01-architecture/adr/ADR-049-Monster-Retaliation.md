@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | 🟡 **Proposed** (2026-09-12) — chủ dự án đã CHỌN hướng này khi được hỏi; chờ Accept chính thức. AI không tự Accept. |
+| Status | ✅ **Accepted** (2026-09-12) — chủ dự án duyệt trọn D1–D7. Thi hành ngay cùng ngày. |
 | Date | 2026-09-12 |
 | Deciders | Chủ dự án quyết; AI soạn |
 | Related | [ADR-039](ADR-039-Monster-Ai-Params-Per-Species.md) (**D4 cố ý làm cọc tập THỤ ĐỘNG — ràng buộc chi phối ADR này**) · [ADR-048](ADR-048-Boss-Into-Data-Tables.md) (boss vào bảng dữ liệu; chính nó lộ ra lỗ hổng) · [ADR-037](ADR-037-Monster-Template-And-Spawn-Tables.md) · [AI.md §3](../../05-server/AI.md) |
@@ -145,7 +145,7 @@ phải được gác bằng test, không suy luận.
 
 ## Việc cần làm tiếp theo
 
-1. **Chủ dự án Accept hoặc từ chối** (đã chọn hướng khi được hỏi 2026-09-12; còn thiếu dòng Status).
+1. ~~Chủ dự án Accept hoặc từ chối~~ ✅ **Accepted 2026-09-12**, thi hành ngay cùng ngày.
 2. Migration V43 (`retaliates` + bật cho `blood_sand_enforcer`), luồng dữ liệu bốn chặng, đặt mục
    tiêu khi dính damage ở cả hai đường (đòn thường + kỹ năng), test gác.
 3. Playtest lại quest 9 — lần này phải thấy `heavy_strike` và `enrage` trong nhật ký.

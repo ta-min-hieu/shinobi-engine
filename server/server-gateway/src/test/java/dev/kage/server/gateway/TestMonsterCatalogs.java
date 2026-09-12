@@ -31,7 +31,7 @@ final class TestMonsterCatalogs {
      * các {@code DEFAULT} của migration V25.
      */
     static final MonsterCatalogSnapshot.MonsterAiNumbers AGGRESSIVE_AI =
-            new MonsterCatalogSnapshot.MonsterAiNumbers(6f, 10f, 3f, 1.5f, 3f, 3f);
+            new MonsterCatalogSnapshot.MonsterAiNumbers(6f, 10f, 3f, 1.5f, 3f, 3f, false);
 
     private static final float[] SPAWN_X = {8f, 14f, 21f, 27f};
 

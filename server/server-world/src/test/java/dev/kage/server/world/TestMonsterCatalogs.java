@@ -30,7 +30,7 @@ final class TestMonsterCatalogs {
      * các {@code DEFAULT} của migration V25.
      */
     static final MonsterCatalogSnapshot.MonsterAiNumbers AGGRESSIVE_AI =
-            new MonsterCatalogSnapshot.MonsterAiNumbers(6f, 10f, 3f, 1.5f, 3f, 3f);
+            new MonsterCatalogSnapshot.MonsterAiNumbers(6f, 10f, 3f, 1.5f, 3f, 3f, false);
 
     private static final float[] SPAWN_X = {8f, 14f, 21f, 27f};
 
@@ -65,7 +65,7 @@ final class TestMonsterCatalogs {
                 TRAINING_DUMMY_MAX_HP,
                 20L,
                 new MonsterCatalogSnapshot.MonsterCombatNumbers(8, 0, 5, 3, 90, 0, 0, "NONE"),
-                new MonsterCatalogSnapshot.MonsterAiNumbers(0f, 10f, 3f, 1.5f, 0f, 3f),
+                new MonsterCatalogSnapshot.MonsterAiNumbers(0f, 10f, 3f, 1.5f, 0f, 3f, false),
                 null); // không phải boss (ADR-048)
         return MonsterCatalogSnapshot.of(
                 List.of(dummy),
@@ -97,5 +97,30 @@ final class TestMonsterCatalogs {
                 AGGRESSIVE_AI,
                 new MonsterCatalogSnapshot.MonsterBossNumbers("/scripts/boss/sample_boss.js", 0.5f, 3.0f));
         return MonsterCatalogSnapshot.of(List.of(boss), List.of());
+    }
+
+    /** Loài canh gác của test ADR-049 — mã riêng để không lẫn với cọc tập. */
+    static final String STANDING_SENTRY_CODE = "standing_sentry";
+
+    /**
+     * Một con ĐỨNG YÊN và KHÔNG BAO GIỜ gây sự (aggro 0, patrol 0) — khác nhau duy nhất ở
+     * {@code retaliates}. Đây đúng là hình dạng của chấp sự Hình Vân Sơn (V41+V43), và là cặp đối
+     * chứng để hai ô test ADR-049 chỉ khác nhau ĐÚNG một biến.
+     *
+     * <p>Máu 200 và {@code def/res = 0} cho người chơi hạ được trong vài nhát mà vẫn sống đủ lâu để
+     * kịp đánh trả; đặt ở x=3 để nhân vật gắn vào lúc test đã nằm trong tầm đánh 2m.
+     */
+    static MonsterCatalogSnapshot standingSentry(boolean retaliates) {
+        MonsterCatalogSnapshot.MonsterSpecies sentry = new MonsterCatalogSnapshot.MonsterSpecies(
+                STANDING_SENTRY_CODE,
+                "mob_training-dummy",
+                200,
+                10L,
+                new MonsterCatalogSnapshot.MonsterCombatNumbers(12, 0, 0, 0, 100, 0, 0, "NONE"),
+                new MonsterCatalogSnapshot.MonsterAiNumbers(0f, 10f, 3f, 1.5f, 0f, 3f, retaliates),
+                null);
+        return MonsterCatalogSnapshot.of(
+                List.of(sentry),
+                List.of(new MonsterCatalogSnapshot.MonsterSpawnDefinition(STANDING_SENTRY_CODE, 3f, 0f, 10f)));
     }
 }

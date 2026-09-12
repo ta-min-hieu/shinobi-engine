@@ -27,6 +27,9 @@ package dev.kage.monster.domain;
  * @param patrolSpeedMps tốc độ khi đi tuần
  * @param patrolRadiusMeters bán kính chọn điểm tuần tra quanh spawn; 0 = đứng nguyên tại chỗ
  * @param idleDurationSeconds đứng yên bao lâu rồi mới đi tuần
+ * @param retaliates bị đánh thì có đặt mục tiêu là kẻ vừa đánh và đuổi theo không (ADR-049). Chỉ có
+ *     nghĩa THẬT với loài {@code aggroRadiusMeters == 0}: loài hung dữ thì đã tự đuổi rồi. Đây là
+ *     thứ cho phép một loài vừa "không gây sự với ai đi ngang" vừa "không phải bao cát"
  */
 public record MonsterAiParams(
         float aggroRadiusMeters,
@@ -34,7 +37,8 @@ public record MonsterAiParams(
         float chaseSpeedMps,
         float patrolSpeedMps,
         float patrolRadiusMeters,
-        float idleDurationSeconds) {
+        float idleDurationSeconds,
+        boolean retaliates) {
 
     public MonsterAiParams {
         requireNonNegative(aggroRadiusMeters, "aggroRadiusMeters");
@@ -54,7 +58,13 @@ public record MonsterAiParams(
         }
     }
 
-    /** {@code aggroRadiusMeters == 0} — loài này không bao giờ chủ động tấn công (ADR-039 D4). */
+    /**
+     * {@code aggroRadiusMeters == 0} — loài này không bao giờ chủ động tấn công (ADR-039 D4).
+     *
+     * <p>⚠️ "Không chủ động" KHÔNG còn đồng nghĩa với "không bao giờ đánh": từ ADR-049 một loài thụ
+     * động vẫn đánh trả nếu khai {@code retaliates}. Trước đó hai thứ này là một, và đó chính là
+     * lý do boss cao trào arc 2 từng đứng im chịu đánh.
+     */
     public boolean isPassive() {
         return aggroRadiusMeters == 0f;
     }

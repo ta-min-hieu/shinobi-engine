@@ -159,6 +159,9 @@ final class CombatSystem extends IteratingKSystem {
         // quái đang vung trượt vẫn là đang đánh nhau, không phải đang nghỉ.
         markInCombat(attacker);
         markInCombat(target);
+        // ADR-049 — loài khai `retaliates` bị đánh thì đuổi theo kẻ vừa đánh, kể cả khi aggro = 0.
+        // Đây là đường THỨ HAI đặt TargetComponent; AiSystem không còn độc quyền chuyện đó.
+        Retaliation.onAttacked(target, attacker);
 
         long attackerId = entityId(attacker);
         pendingResults.add(new AttackOutcome(

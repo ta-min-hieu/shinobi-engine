@@ -108,7 +108,8 @@ public record MonsterCatalogSnapshot(Map<String, MonsterSpecies> species, List<M
             float chaseSpeedMps,
             float patrolSpeedMps,
             float patrolRadiusMeters,
-            float idleDurationSeconds) {}
+            float idleDurationSeconds,
+            boolean retaliates) {}
 
     /** Chỉ số chiến đấu thô của một loài — gộp lại để {@link MonsterSpecies} không quá dài. */
     public record MonsterCombatNumbers(

@@ -811,24 +811,30 @@ class WorldFacadeTest {
         // Dùng đánh thường (không phải skill) để tránh nhánh "đòn kết liễu" của fireball.js (dựa
         // theo %HP mục tiêu) làm nhiễu phép so sánh. DEF của Phong/Lôi bằng nhau (không hệ nào có
         // passive +DEF ở lát cắt này) nên chênh lệch damage CHỈ có thể tới từ hệ số khắc chế.
+        //
+        // ⚠️ PHẢI loại cả đòn CHÍ MẠNG, không chỉ đòn hụt — flake bắt được 2026-09-12: một cú crit
+        // vào Lôi cho 38 trong khi đòn thường vào Phong cho 29, và ô test đỏ dù công thức đúng.
+        // Con số khớp chính xác: crit ×1.5 ⇒ 25,3 × 1,5 = 38, còn 25,3 × 1,15 = 29,1. Tỉ lệ crit
+        // chỉ 1%/đòn (agi 10 × 0,1 / 100) nên nó hiếm, và "hiếm" là thứ làm ô này đỏ ngẫu nhiên
+        // trong CI chứ không phải thứ làm nó an toàn.
         world.start();
         world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS); // Hỏa
         world.attachCharacter(2L, 1f, 0f, PHONG_STATS); // bị Hỏa khắc
         world.attachCharacter(3L, -1f, 0f, LOI_STATS); // trung lập với Hỏa
         awaitTrue(() -> sink.spawned.size() >= 6); // 3 nhân vật thấy nhau đủ 2 chiều
 
-        targetAndAttackUntil(
-                world, 2L, () -> sink.attackResults.stream().anyMatch(a -> a.defender() == 2L && !a.miss()));
+        targetAndAttackUntil(world, 2L, () -> sink.attackResults.stream()
+                .anyMatch(a -> a.defender() == 2L && !a.miss() && !a.crit()));
         int damageVsPhong = sink.attackResults.stream()
-                .filter(a -> a.defender() == 2L && !a.miss())
+                .filter(a -> a.defender() == 2L && !a.miss() && !a.crit())
                 .findFirst()
                 .orElseThrow()
                 .damage();
 
-        targetAndAttackUntil(
-                world, 3L, () -> sink.attackResults.stream().anyMatch(a -> a.defender() == 3L && !a.miss()));
+        targetAndAttackUntil(world, 3L, () -> sink.attackResults.stream()
+                .anyMatch(a -> a.defender() == 3L && !a.miss() && !a.crit()));
         int damageVsLoi = sink.attackResults.stream()
-                .filter(a -> a.defender() == 3L && !a.miss())
+                .filter(a -> a.defender() == 3L && !a.miss() && !a.crit())
                 .findFirst()
                 .orElseThrow()
                 .damage();
@@ -1265,6 +1271,77 @@ class WorldFacadeTest {
      * còn nghĩa "nhắm ai". Luôn dùng nhân vật {@code 1L} — mọi test combat ở file này đều để
      * {@code 1L} làm bên tấn công.
      */
+    /**
+     * ADR-049 — loài khai {@code retaliates} BỊ ĐÁNH là đánh trả, dù {@code aggro = 0}.
+     *
+     * <p>PHÁT HIỆN THẬT (playtest quest 9, 2026-09-12): trước ADR này, boss cao trào arc 2 đứng im
+     * chịu 5 nhát, người chơi còn nguyên 118/118, và trọn script hai pha của nó chưa chạy một dòng
+     * — vì {@code AiSystem} đặt mục tiêu ở ĐÚNG MỘT chỗ là vòng quét aggro, nên {@code aggro = 0}
+     * nghĩa là "không bao giờ tự vệ" chứ không chỉ "không chủ động gây hấn".
+     *
+     * <p>Ô này và ô ngay dưới là CẶP ĐỐI CHỨNG: cùng một loài, cùng một kịch bản, khác nhau đúng
+     * một biến boolean. Thiếu ô đối chứng thì "nó đánh trả" có thể chỉ là aggro thường hoạt động.
+     */
+    @Test
+    @Timeout(25)
+    void shouldFightBack_whenAttacked_andSpeciesRetaliates() {
+        RecordingSink sink = new RecordingSink();
+        WorldFacade world =
+                new WorldFacade(sink, true, TickMetricsPort.NO_OP, TestWorldContents.withStandingSentry(true));
+        try {
+            world.start();
+            world.attachCharacter(1L, 3f, 0f, DEFAULT_STATS); // đứng ngay cạnh con canh gác @3
+            awaitTrue(() -> sink.monsterSpawned.stream()
+                    .anyMatch(m -> m.code().equals(TestMonsterCatalogs.STANDING_SENTRY_CODE)));
+            long sentryId = sink.monsterSpawned.get(0).monsterId();
+
+            targetAndAttackUntil(
+                    world,
+                    sentryId,
+                    () -> sink.attackResults.stream().anyMatch(a -> a.attacker() == sentryId),
+                    Duration.ofSeconds(20));
+
+            assertThat(sink.attackResults.stream().anyMatch(a -> a.attacker() == sentryId && a.defender() == 1L))
+                    .as("loài khai retaliates phải đánh trả kẻ vừa đánh nó")
+                    .isTrue();
+        } finally {
+            world.stop();
+        }
+    }
+
+    /** Đối chứng của ô trên: CÙNG loài, {@code retaliates = false} ⇒ phải đứng im chịu đánh. */
+    @Test
+    @Timeout(25)
+    void shouldStayPassive_whenAttacked_andSpeciesDoesNotRetaliate() {
+        RecordingSink sink = new RecordingSink();
+        WorldFacade world =
+                new WorldFacade(sink, true, TickMetricsPort.NO_OP, TestWorldContents.withStandingSentry(false));
+        try {
+            world.start();
+            world.attachCharacter(1L, 3f, 0f, DEFAULT_STATS);
+            awaitTrue(() -> sink.monsterSpawned.stream()
+                    .anyMatch(m -> m.code().equals(TestMonsterCatalogs.STANDING_SENTRY_CODE)));
+            long sentryId = sink.monsterSpawned.get(0).monsterId();
+
+            // Đánh nó đủ nhiều nhát để nếu có đường đánh trả nào thì nó đã kích hoạt rồi.
+            targetAndAttackUntil(
+                    world,
+                    sentryId,
+                    () -> sink.attackResults.stream()
+                                    .filter(a -> a.defender() == sentryId && !a.miss())
+                                    .count()
+                            >= 3,
+                    Duration.ofSeconds(20));
+            sleepQuietly(1500);
+
+            assertThat(sink.attackResults.stream().noneMatch(a -> a.attacker() == sentryId))
+                    .as("ADR-039 D4 — loài KHÔNG khai retaliates phải đứng im, đây là hàng rào của cọc tập")
+                    .isTrue();
+        } finally {
+            world.stop();
+        }
+    }
+
     private static void targetAndAttackUntil(WorldFacade world, long targetEntityId, Supplier<Boolean> condition) {
         targetAndAttackUntil(world, targetEntityId, condition, Duration.ofSeconds(5));
     }

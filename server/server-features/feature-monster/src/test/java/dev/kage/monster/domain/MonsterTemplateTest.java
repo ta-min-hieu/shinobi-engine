@@ -13,7 +13,7 @@ class MonsterTemplateTest {
 
     /** Bộ mặc định của dự án trước ADR-039 — bằng đúng `AiConstants.DEFAULTS` và DEFAULT của V25. */
     private static MonsterAiParams ai() {
-        return new MonsterAiParams(6f, 10f, 3f, 1.5f, 3f, 3f);
+        return new MonsterAiParams(6f, 10f, 3f, 1.5f, 3f, 3f, false);
     }
 
     @Test

@@ -40,4 +40,9 @@ final class TestWorldContents {
     static WorldContentCatalog dungeonWithBoss() {
         return WorldContentCatalog.ofMonsters(TestMonsterCatalogs.dungeonBoss());
     }
+
+    /** World chỉ có MỘT con canh gác đứng yên — cặp đối chứng của ADR-049 (xem TestMonsterCatalogs). */
+    static WorldContentCatalog withStandingSentry(boolean retaliates) {
+        return WorldContentCatalog.ofMonsters(TestMonsterCatalogs.standingSentry(retaliates));
+    }
 }

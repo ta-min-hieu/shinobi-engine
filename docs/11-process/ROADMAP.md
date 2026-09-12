@@ -2892,3 +2892,32 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
     - 📖 **Tên hiển thị giữ vỏ bọc**: thanh máu đọc "Chấp sự Hình Vân Sơn", không phải danh phận
       thật của hắn — lộ mặt là việc của script, không phải của cái tên.
 
+76. **[ADR-049](../01-architecture/adr/ADR-049-Monster-Retaliation.md) — QUÁI ĐÁNH TRẢ; cao trào arc 2 thành một trận đấu thật (2026-09-12)**:
+    - ✅ **Accepted và thi hành trong cùng ngày.** Cột `retaliates` (V43, mặc định `false`) + một
+      đường đặt mục tiêu MỚI khi dính damage. Trước đó `AiSystem` là nơi DUY NHẤT đặt
+      `TargetComponent`, nên `aggro = 0` không chỉ nghĩa "không gây sự" mà là **không bao giờ tự vệ**.
+    - 🧩 **Cơ chế nằm gọn trong một lớp `Retaliation`** để ADR-049 D5 (áp cho CẢ đòn thường lẫn kỹ
+      năng) không thể lệch: `CombatSystem` và `SkillSystem` mỗi bên tốn đúng MỘT dòng gọi.
+    - 🧪 **Cặp test ĐỐI CHỨNG**: cùng một loài canh gác (aggro 0, patrol 0), khác nhau **đúng một
+      biến boolean** — `retaliates=true` phải đánh trả, `false` phải đứng im. Ô thứ hai chính là
+      hàng rào giữ ADR-039 D4 (cọc luyện công thụ động có chủ đích) khỏi bị đợt này phá.
+    - ⚖️ **BA lượt đo mới chốt được cân bằng**, và mỗi lượt bác một giả định khác của tôi:
+      · **Lượt 1** (`atk 30`, máu 150): người chơi **chết ở giây 4,6**, boss mới xuống 150 → 51.
+        Bảng cân bằng ở V41 tính "5 nhát mỗi bên" mà **quên hẳn chiêu trong script của chính hắn**.
+      · **Lượt 2** (`atk 15`): vẫn chết, ở giây 5,4, boss còn 21/120. Ba thứ mô hình
+        "atk × 6,36" bỏ sót: chiêu **sẵn sàng ngay đầu trận** (nổ lúc giây 0,7), chiêu **cộng thêm**
+        chứ không thay đòn thường, và **mỗi nhát hụt kéo dài trận thêm một giây = thêm một đòn ăn
+        vào** — lượt đó hụt 2/5 nhát nên chiêu THỨ HAI kịp nổ.
+      · **Lượt 3** (`atk 12` + `ai_skill_cooldown_seconds` 4 → **7**): **THẮNG, còn 35/118**, dù hụt
+        tới 3 nhát. Biến thiên nằm ở chiêu thứ hai chứ không ở đòn thường, nên sửa bằng HAI cột.
+      📌 Đây là lần đầu `ai_decision_interval_seconds`/`ai_skill_cooldown_seconds` được dùng đúng thứ
+      ADR-048 D4 mở cột ra để làm: **chỉnh nhịp boss bằng DỮ LIỆU, không sửa script, không sửa Java.**
+    - 🗃️ **V44 là migration MỚI chứ không sửa V41**, vì V41 đã commit + push (`79268aa`). Qua mốc đó
+      thì sửa tại chỗ là làm kẹt checksum của mọi máy đã chạy nó.
+    - 🐛 **Vá một flake CÓ SẴN bắt được dọc đường**:
+      `shouldDealMoreDamage_whenAttackerElementCountersDefenderElement` lọc đòn hụt nhưng **không lọc
+      đòn CHÍ MẠNG**. Chạy lại 3 lượt: 1 đỏ / 2 xanh. Con số khớp chính xác — crit ×1.5 ⇒ 25,3 × 1,5
+      = 38 (Lôi) trong khi 25,3 × 1,15 = 29,1 (Phong), nên ô test đỏ dù công thức khắc chế đúng. Tỉ
+      lệ crit chỉ **1%/đòn** (agi 10 × 0,1 / 100) — hiếm, và "hiếm" là thứ làm CI đỏ ngẫu nhiên chứ
+      không phải thứ làm ô test an toàn.
+

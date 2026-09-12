@@ -40,7 +40,7 @@ final class AiConstants {
      * Bộ tham số mặc định — bằng ĐÚNG các hằng số dùng chung trước ADR-039, và bằng đúng các
      * {@code DEFAULT} của V25. Đổi ở đây mà không đổi migration là làm hai nguồn chân lý lệch nhau.
      */
-    static final AiParamsComponent DEFAULTS = new AiParamsComponent(6f, 10f, 3f, 1.5f, 3f, 3f);
+    static final AiParamsComponent DEFAULTS = new AiParamsComponent(6f, 10f, 3f, 1.5f, 3f, 3f, false);
 
     private AiConstants() {}
 }

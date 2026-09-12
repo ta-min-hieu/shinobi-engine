@@ -28,6 +28,8 @@ import dev.kage.engine.ecs.Component;
  * @param patrolSpeedMps tốc độ khi đi tuần
  * @param patrolRadiusMeters bán kính chọn điểm tuần tra quanh spawn; 0 = đứng nguyên tại chỗ
  * @param idleDurationSeconds đứng yên bao lâu rồi mới đi tuần
+ * @param retaliates ADR-049 — bị đánh thì đặt mục tiêu là kẻ vừa đánh và đuổi theo, KỂ CẢ khi
+ *     {@code aggroRadiusMeters == 0}
  */
 public record AiParamsComponent(
         float aggroRadiusMeters,
@@ -35,10 +37,14 @@ public record AiParamsComponent(
         float chaseSpeedMps,
         float patrolSpeedMps,
         float patrolRadiusMeters,
-        float idleDurationSeconds)
+        float idleDurationSeconds,
+        boolean retaliates)
         implements Component {
 
-    /** Loài này không bao giờ chủ động tấn công (ADR-039 D4). */
+    /**
+     * Loài này không bao giờ chủ động tấn công (ADR-039 D4) — KHÔNG có nghĩa là nó không đánh trả,
+     * xem {@code retaliates} (ADR-049).
+     */
     public boolean isPassive() {
         return aggroRadiusMeters == 0f;
     }

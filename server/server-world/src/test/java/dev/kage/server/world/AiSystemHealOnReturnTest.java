@@ -52,7 +52,7 @@ class AiSystemHealOnReturnTest {
         ai.spawnX = SPAWN_X;
         ai.spawnY = 0f;
         entity.add(ai);
-        entity.add(new AiParamsComponent(6f, 10f, 3f, 1.5f, 3f, 3f));
+        entity.add(new AiParamsComponent(6f, 10f, 3f, 1.5f, 3f, 3f, false));
         entity.add(new TargetComponent());
 
         HealthComponent health = new HealthComponent();

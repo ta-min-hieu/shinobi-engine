@@ -243,6 +243,9 @@ final class SkillSystem extends IteratingKSystem {
         // Thuỷ tự khiên cho mình lại tự hoãn hồi máu của chính mình.
         markInCombat(ctx.caster());
         markInCombat(ctx.target());
+        // ADR-049 D5 — áp cho CẢ đòn kỹ năng, không riêng đòn thường: một con boss chỉ đánh trả khi
+        // bị đánh thường còn đứng im khi ăn kỹ năng là luật chơi không ai đoán được.
+        Retaliation.onAttacked(ctx.target(), ctx.caster());
 
         pendingResults.add(new SkillOutcome(
                 ctx.definition().code(),
