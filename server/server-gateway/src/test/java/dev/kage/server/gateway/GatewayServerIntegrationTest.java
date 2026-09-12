@@ -199,8 +199,11 @@ class GatewayServerIntegrationTest {
                 characterRegistry, firstChannelFacade, meterRegistry, TestWorldContents.trainingGroundWithElder());
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
-        DungeonInstanceRegistry dungeonInstanceRegistry =
-                new DungeonInstanceRegistry(characterRegistry, characterFacade, partyFacade, mainWorldChannels);
+        DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
+                characterRegistry,
+                new DungeonInstanceRegistry.DungeonFacades(characterFacade, partyFacade),
+                mainWorldChannels,
+                TestWorldContents.withBoss());
         ArenaInstanceRegistry arenaInstanceRegistry =
                 new ArenaInstanceRegistry(characterRegistry, characterFacade, pvpFacade, mainWorldChannels);
         WorldGateway worldGateway = new WorldGateway(
@@ -2333,7 +2336,10 @@ class GatewayServerIntegrationTest {
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(characterFacade, localCharacterRegistry, Duration.ofMinutes(5));
         DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
-                localCharacterRegistry, characterFacade, localPartyFacade, localMainWorldChannels);
+                localCharacterRegistry,
+                new DungeonInstanceRegistry.DungeonFacades(characterFacade, localPartyFacade),
+                localMainWorldChannels,
+                TestWorldContents.withBoss());
         ArenaInstanceRegistry arenaInstanceRegistry = new ArenaInstanceRegistry(
                 localCharacterRegistry, characterFacade, localPvpFacade, localMainWorldChannels);
         WorldGateway worldGateway = new WorldGateway(
@@ -2493,7 +2499,10 @@ class GatewayServerIntegrationTest {
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(characterFacade, localCharacterRegistry, Duration.ofMinutes(5));
         DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
-                localCharacterRegistry, characterFacade, localPartyFacade, localMainWorldChannels);
+                localCharacterRegistry,
+                new DungeonInstanceRegistry.DungeonFacades(characterFacade, localPartyFacade),
+                localMainWorldChannels,
+                TestWorldContents.withBoss());
         ArenaInstanceRegistry arenaInstanceRegistry = new ArenaInstanceRegistry(
                 localCharacterRegistry, characterFacade, localPvpFacade, localMainWorldChannels);
         WorldGateway worldGateway = new WorldGateway(

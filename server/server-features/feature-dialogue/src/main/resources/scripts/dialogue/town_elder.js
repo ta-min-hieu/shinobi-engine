@@ -44,6 +44,7 @@
             { label_key: "dialogue.option.ask_awakening_trial", action: "awakening_trial" },
             { label_key: "dialogue.option.ask_outer_sect", action: "outer_sect" },
             { label_key: "dialogue.option.ask_missing_disciple", action: "missing_disciple" },
+            { label_key: "dialogue.option.ask_confront_steward", action: "confront_steward" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]
     },
@@ -148,6 +149,27 @@
     missing_disciple: {
         text_key: "dialogue.town_elder.missing_disciple",
         options: [
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    // ⚠️ CAO TRÀO arc 2 (STORY.md §6) — quest THỨ CHÍN, và là chỗ arc 2 đóng. Nối thẳng vào
+    // `missing_disciple` bên trên: ông lão không tin cái sổ ở quest 7, và đây là lúc ông biết vì
+    // sao cái sổ đóng nhanh như vậy.
+    //
+    // Nhịp hé lộ (§8 quy tắc 2): tới ĐÂY Chu Hoành mới được chỉ đích danh Hình Vân Sơn, vì cao
+    // trào arc 2 CHÍNH LÀ "hộ pháp Huyết Sa cải trang làm chấp sự". Ông vẫn KHÔNG được nhắc:
+    //   · Thiên Môn / chân tướng Đại Kiếp — arc 3 gieo nghi, arc 6 mới lộ;
+    //   · chuyện trong tông có nội gián CẤP TRƯỞNG LÃO — arc 3 twist, danh tính giữ tới arc 5;
+    //   · và tuyệt đối không chạm tới Tô Vân Nhi (twist arc 5).
+    // Ông nói được đúng thứ ông suy ra ĐƯỢC từ vật chứng trong tay: cái lệnh phù quest 8 mang về
+    // trùng dấu với người đã ký đóng hồ sơ. Đó là suy luận của một ông già cẩn thận, không phải
+    // lời tiên tri.
+    confront_steward: {
+        text_key: "dialogue.town_elder.confront_steward",
+        options: [
+            { label_key: "dialogue.option.accept_quest_confront_steward",
+              action: "accept_quest:confront_the_steward" },
             { label_key: "dialogue.option.back", action: "about_town" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]

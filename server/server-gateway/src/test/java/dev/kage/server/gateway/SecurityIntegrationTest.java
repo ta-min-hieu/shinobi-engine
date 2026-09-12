@@ -146,8 +146,11 @@ class SecurityIntegrationTest {
                 characterRegistry, firstChannelFacade, meterRegistry, WorldContentCatalog.EMPTY);
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
-        DungeonInstanceRegistry dungeonInstanceRegistry =
-                new DungeonInstanceRegistry(characterRegistry, characterFacade, partyFacade, mainWorldChannels);
+        DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
+                characterRegistry,
+                new DungeonInstanceRegistry.DungeonFacades(characterFacade, partyFacade),
+                mainWorldChannels,
+                TestWorldContents.withBoss());
         ArenaInstanceRegistry arenaInstanceRegistry =
                 new ArenaInstanceRegistry(characterRegistry, characterFacade, pvpFacade, mainWorldChannels);
         WorldGateway worldGateway = new WorldGateway(

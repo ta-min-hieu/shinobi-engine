@@ -40,7 +40,8 @@ class WorldContentLoaderTest {
                         // Đúng số V25 seed cho cọc tập: thụ động (ADR-039 D4).
                         new MonsterAiParams(0f, 10f, 3f, 1.5f, 0f, 3f),
                         20L,
-                        null));
+                        null,
+                        null)); // không drop table, và không phải boss (ADR-048)
             }
 
             @Override

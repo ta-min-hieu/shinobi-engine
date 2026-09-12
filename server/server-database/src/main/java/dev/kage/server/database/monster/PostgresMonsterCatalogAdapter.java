@@ -7,6 +7,7 @@ import java.util.List;
 import javax.sql.DataSource;
 
 import dev.kage.monster.domain.MonsterAiParams;
+import dev.kage.monster.domain.MonsterBossBehaviour;
 import dev.kage.monster.domain.MonsterCatalogPort;
 import dev.kage.monster.domain.MonsterSpawnPoint;
 import dev.kage.monster.domain.MonsterStats;
@@ -26,10 +27,26 @@ public final class PostgresMonsterCatalogAdapter implements MonsterCatalogPort {
                    mt.def, mt.res, mt.hit_percent, mt.dodge_percent, mt.crit_percent, mt.element,
                    mt.exp_reward, mt.aggro_radius_meters, mt.leash_radius_meters, mt.chase_speed_mps,
                    mt.patrol_speed_mps, mt.patrol_radius_meters, mt.idle_duration_seconds,
+                   mt.is_boss, mt.ai_script_ref, mt.ai_decision_interval_seconds,
+                   mt.ai_skill_cooldown_seconds,
                    dt.code AS drop_table_code
               FROM monster_template mt
               LEFT JOIN drop_table dt ON dt.id = mt.drop_table_id
              ORDER BY mt.id
+            """;
+
+    /**
+     * Mọi {@code ai_script_ref} đang khai trong bảng (ADR-048) — {@code ScriptValidator} duyệt hết
+     * lúc khởi động, cùng cách nó duyệt script quest và hội thoại (SCRIPTING.md §8).
+     *
+     * <p>Vì sao cần: trước ADR-048, {@code BossAiSystem} nạp script lúc dựng system nên một đường
+     * dẫn sai làm server chết ngay. Nay script nạp LÚC BOSS SPAWN, tức lỗi sẽ nổ giữa trận đấu —
+     * fail fast phải chuyển sang đây, nếu không ADR này đánh đổi một lỗi ồn lấy một lỗi im.
+     */
+    private static final String LIST_BOSS_SCRIPT_REFS = """
+            SELECT ai_script_ref FROM monster_template
+             WHERE ai_script_ref IS NOT NULL
+             ORDER BY id
             """;
 
     private static final String LIST_SPAWN_POINTS = """
@@ -51,10 +68,33 @@ public final class PostgresMonsterCatalogAdapter implements MonsterCatalogPort {
         return JdbcOperations.query(dataSource, LIST_TEMPLATES, PostgresMonsterCatalogAdapter::mapTemplate);
     }
 
+    /** Xem {@link #LIST_BOSS_SCRIPT_REFS}. Không thuộc {@code MonsterCatalogPort}: đây là việc của
+     * composition root lúc khởi động, không phải của gameplay. */
+    public List<String> listAllBossScriptRefs() {
+        return JdbcOperations.query(dataSource, LIST_BOSS_SCRIPT_REFS, rs -> rs.getString("ai_script_ref"));
+    }
+
     @Override
     public List<MonsterSpawnPoint> listSpawnPoints(String worldCode) {
         return JdbcOperations.query(
                 dataSource, LIST_SPAWN_POINTS, PostgresMonsterCatalogAdapter::mapSpawnPoint, worldCode);
+    }
+
+    /**
+     * Hành vi boss, hoặc {@code null} với quái FSM thường (ADR-048 D2).
+     *
+     * <p>KHÔNG đoán lại ràng buộc của DB ở đây: {@code monster_template_boss_needs_script} (V41) đã
+     * chặn cả hai chiều sai — {@code is_boss} mà thiếu script, và script mà không phải boss — nên
+     * một hàng đọc lên chỉ có hai hình dạng hợp lệ.
+     */
+    private static MonsterBossBehaviour mapBossBehaviour(ResultSet rs) throws SQLException {
+        if (!rs.getBoolean("is_boss")) {
+            return null;
+        }
+        return new MonsterBossBehaviour(
+                rs.getString("ai_script_ref"),
+                rs.getFloat("ai_decision_interval_seconds"),
+                rs.getFloat("ai_skill_cooldown_seconds"));
     }
 
     private static MonsterTemplate mapTemplate(ResultSet rs) throws SQLException {
@@ -76,7 +116,8 @@ public final class PostgresMonsterCatalogAdapter implements MonsterCatalogPort {
                 stats,
                 mapAiParams(rs),
                 rs.getLong("exp_reward"),
-                rs.getString("drop_table_code"));
+                rs.getString("drop_table_code"),
+                mapBossBehaviour(rs));
     }
 
     /** Sáu cột AI của V25 (ADR-039 D1) — hai hằng CƠ CHẾ còn lại cố ý không có trong bảng. */

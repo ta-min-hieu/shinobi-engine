@@ -63,11 +63,16 @@ sealed interface WorldCommand {
     record AreaChatMessageCommand(long characterId, String senderName, String body) implements WorldCommand {}
 
     /**
-     * Spawn 1 boss hardcode ({@code BossConstants.BOSS_CODE}, Phase 8 lát cắt 2) — gọi từ
-     * {@code DungeonInstanceRegistry} ngay sau khi tạo dungeon World, KHÔNG phải lệnh từ client
-     * (world-command nội bộ, giống mọi command khác ở đây).
+     * Spawn một boss theo MÃ LOÀI (ADR-048 D6).
+     *
+     * <p>Trước đây lệnh này không có tham số vì cả dự án chỉ có một boss hardcode. Nay mã đi kèm
+     * lệnh, nên hầm ngục chọn được boss của nó và world chính spawn boss qua `monster_spawn` như
+     * mọi loài khác — {@code server-world} vẫn không biết khái niệm "dungeon", chỉ biết "có ai bảo
+     * spawn con nào".
+     *
+     * @param bossCode mã trong {@code monster_template}, ví dụ {@code sample_boss}
      */
-    record SpawnBossCommand() implements WorldCommand {}
+    record SpawnBossCommand(String bossCode) implements WorldCommand {}
 
     /**
      * Ngoại hình của {@code characterId} vừa đổi (đổi hệ phái — ADR-045). Command này CHỈ mang id:

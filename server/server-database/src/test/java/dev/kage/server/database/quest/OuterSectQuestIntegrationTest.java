@@ -72,6 +72,9 @@ class OuterSectQuestIntegrationTest {
     private static final String TALISMAN_ITEM_CODE = "blood_sand_talisman";
     private static final String SCOUT = "blood_sand_scout";
     private static final long CAVE_QUEST_EXP = 1600L;
+    private static final String CONFRONT_QUEST_CODE = "confront_the_steward";
+    private static final String ENFORCER = "blood_sand_enforcer";
+    private static final long CONFRONT_QUEST_EXP = 2000L;
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
@@ -333,6 +336,84 @@ class OuterSectQuestIntegrationTest {
     @Test
     void shouldSeedAbandonedCave_withPrerequisitePointingAtTheTrailQuest() {
         assertThat(prerequisiteCodeOf(CAVE_QUEST_CODE)).isEqualTo(TRAIL_QUEST_CODE);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Quest THỨ CHÍN — `confront_the_steward` (V42): CAO TRÀO arc 2, hai bước (hạ chấp sự → báo
+    // lại). Con boss là một hàng `monster_template` như mọi loài khác kể từ ADR-048, nên ở tầng
+    // test nó không khác gì `blood_sand_scout` — đó chính là điều ADR đó hứa.
+    // ------------------------------------------------------------------------------------------
+
+    @Test
+    void shouldPlayConfrontTheStewardLifecycle_withRealScript() {
+        long characterId = createFreshCharacter("Steward1");
+        claimCaveQuest(characterId);
+
+        assertThat(newAcceptUseCase().execute(characterId, CONFRONT_QUEST_CODE))
+                .isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
+
+        newProcessUseCase().monsterKilled(characterId, ENFORCER);
+        long expBefore = readExp(characterId);
+
+        List<ProcessQuestEventUseCase.QuestStatusChange> afterReport =
+                newProcessUseCase().npcTalked(characterId, SENIOR_SISTER);
+
+        assertThat(afterReport).hasSize(1);
+        assertThat(afterReport.get(0).questCode()).isEqualTo(CONFRONT_QUEST_CODE);
+        assertThat(afterReport.get(0).status()).isEqualTo(QuestStatus.COMPLETED);
+
+        ClaimQuestRewardUseCase.ClaimResult claim =
+                newClaimUseCase().execute(characterId, CONFRONT_QUEST_CODE, newIdempotencyKey());
+
+        assertThat(claim.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
+        assertThat(claim.expGranted()).isEqualTo(CONFRONT_QUEST_EXP);
+        assertThat(readExp(characterId)).isEqualTo(expBefore + CONFRONT_QUEST_EXP);
+    }
+
+    /**
+     * Thứ tự hai bước: báo tin TRƯỚC khi hạ được hắn thì không tính.
+     *
+     * <p>Không phải ô test lý thuyết — Tô Vân Nhi là NPC người chơi mở lời liên tục suốt arc 2
+     * (cô giao quest 6/7/8 và nhận nộp quest 6/8), nên nếu bước 2 không có điều kiện đứng trước
+     * thì quest này tự xong ngay lần mở lời kế tiếp mà người chơi chưa gặp chấp sự lần nào.
+     */
+    @Test
+    void shouldNotComplete_whenReportingBeforeFellingTheSteward() {
+        long characterId = createFreshCharacter("Steward2");
+        claimCaveQuest(characterId);
+        newAcceptUseCase().execute(characterId, CONFRONT_QUEST_CODE);
+
+        assertThat(newProcessUseCase().npcTalked(characterId, SENIOR_SISTER)).isEmpty();
+
+        // Và sau khi hạ hắn thì đúng một lần mở lời nữa là xong — bước 1 không bị mất vì lần báo hụt.
+        newProcessUseCase().monsterKilled(characterId, ENFORCER);
+        assertThat(newProcessUseCase().npcTalked(characterId, SENIOR_SISTER))
+                .singleElement()
+                .satisfies(change -> assertThat(change.status()).isEqualTo(QuestStatus.COMPLETED));
+    }
+
+    @Test
+    void shouldSeedConfrontTheSteward_withPrerequisitePointingAtTheCaveQuest() {
+        assertThat(prerequisiteCodeOf(CONFRONT_QUEST_CODE)).isEqualTo(CAVE_QUEST_CODE);
+    }
+
+    @Test
+    void shouldRejectConfrontTheSteward_whenCaveQuestNotClaimedYet() {
+        long characterId = createFreshCharacter("Steward3");
+        claimTrailQuest(characterId); // mới hết quest 7 — quest 8 chưa lĩnh thưởng
+
+        assertThat(newAcceptUseCase().execute(characterId, CONFRONT_QUEST_CODE))
+                .isEqualTo(AcceptQuestUseCase.AcceptResult.PREREQUISITE_NOT_MET);
+    }
+
+    /** Quest 5 + 6 + 7 + 8 — điều kiện ADR-044 để mở quest 9. */
+    private static void claimCaveQuest(long characterId) {
+        claimTrailQuest(characterId);
+        newAcceptUseCase().execute(characterId, CAVE_QUEST_CODE);
+        insertItem(characterId, TALISMAN_ITEM_CODE, 1);
+        newProcessUseCase().monsterKilled(characterId, SCOUT);
+        newProcessUseCase().npcTalked(characterId, SENIOR_SISTER);
+        newClaimUseCase().execute(characterId, CAVE_QUEST_CODE, newIdempotencyKey());
     }
 
     /** Quest 5 + 6 + 7 — điều kiện ADR-044 để mở quest 8. */

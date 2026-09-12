@@ -56,17 +56,9 @@ final class CombatConstants {
     private static final float MAX_CRIT_PERCENT = 0.5f;
     private static final int MIN_DAMAGE_FLOOR = 1; // tránh damage=0 vô nghĩa khi giáp/kháng rất cao
 
-    // Chỉ số quái thường KHÔNG còn ở đây: từ ADR-037 chúng đọc từ `monster_template` và tới
-    // server-world qua MonsterCatalogSnapshot. Boss thì VẪN hardcode (ADR-037 D7 hoãn có chủ đích:
-    // boss có script GraalJS + BossAiSystem riêng, kéo vào bảng là một quyết định khác).
-    static final CombatStats BOSS_STATS =
-            new CombatStats(3, 0, 10, 8, 0.95f, 0f, 0.05f, CRIT_DAMAGE_MULTIPLIER, Element.NONE);
-    // Đủ lớn để MỖI pha (đặc biệt pha enrage <30% HP) có vài giây thời gian thực trước khi boss
-    // chết — PHÁT HIỆN THẬT: 180 quá thấp, đòn hạ gục thường rơi ĐÚNG vào lúc vừa chạm ngưỡng 30%,
-    // BossAiSystem (throttle 0.5s) không kịp có cơ hội quyết định trước khi entity bị xoá. Vẫn đủ
-    // nhỏ để trận đấu thời gian thực xong trong ~12s (test thật, không mock tick) — cùng lý do
-    // MONSTER_RESPAWN_SECONDS chọn nhỏ cho test, không phải số cân bằng gameplay.
-    static final int BOSS_MAX_HP = 320;
+    // Chỉ số quái thường KHÔNG còn ở đây từ ADR-037, và chỉ số BOSS cũng thôi từ ADR-048: cả hai
+    // đọc từ `monster_template` rồi tới server-world qua MonsterCatalogSnapshot. `BOSS_STATS` và
+    // `BOSS_MAX_HP` cũ đã chuyển nguyên trạng thành một hàng dữ liệu (V41) — xem ADR-048 D5.
 
     static final float ATTACK_INTERVAL_SECONDS = 1f; // ATK_SPEED placeholder — 1 đòn/giây
     static final float ATTACK_RANGE_METERS = 2f;

@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongFunction;
 
 import org.slf4j.Logger;
@@ -39,9 +40,11 @@ import dev.kage.server.world.component.TargetComponent;
  * cộng thêm quyết định "dùng chiêu đặc biệt ngay bây giờ không" khi boss đang {@link AiState#ATTACK}
  * (đã vào tầm, do {@code AiSystem} tự set).
  *
- * <p>Throttle hỏi script mỗi {@link BossConstants#DECISION_INTERVAL_SECONDS} (AI.md §9 "không giả
- * định chạy mỗi tick"), KHÔNG mỗi tick 60Hz — script vài dòng if/return vẫn rẻ nhưng số boss có thể
- * tăng, thiết kế cho phép throttle ngay từ đầu.
+ * <p>Throttle hỏi script mỗi {@code ai_decision_interval_seconds} — nhịp RIÊNG của từng boss, đọc
+ * từ {@code monster_template} và mang theo trên {@link BossAiComponent} (ADR-048 D4), KHÔNG mỗi
+ * tick 60Hz (AI.md §9 "không giả định chạy mỗi tick"). Trước ADR-048 đây là một hằng số Java, nên
+ * MỌI boss buộc phải suy nghĩ cùng một nhịp — con thứ hai của cốt truyện là kẻ cải trang, hắn cần
+ * nhịp khác con máy móc của Phase 8.
  */
 final class BossAiSystem extends IteratingKSystem {
 
@@ -73,7 +76,17 @@ final class BossAiSystem extends IteratingKSystem {
 
     private final LongFunction<KEntity> entityLookup;
     private final ScriptSandbox scriptSandbox = new ScriptSandbox(BossConstants.SCRIPT_MAX_STATEMENTS);
-    private final String bossScript = loadScript(BossConstants.BOSS_SCRIPT_RESOURCE);
+
+    /**
+     * Script theo ĐƯỜNG DẪN, không phải một chuỗi duy nhất (ADR-048 D3).
+     *
+     * <p>Trước đây lớp này giữ `bossScript` nạp lúc khởi tạo, nên cả tiến trình chỉ có MỘT hành vi
+     * boss — boss thứ hai không có chỗ nào khai hành vi riêng, và cách "sửa" hiển nhiên là một
+     * {@code if (monsterCode.equals(...))}, đúng thứ Điều 27 sinh ra để tránh. Cache theo ref cùng
+     * khuôn {@code QuestScriptRunner.scriptSourceCache}: script không đổi lúc chạy.
+     */
+    private final Map<String, String> scriptByRef = new ConcurrentHashMap<>();
+
     private final List<BossActionOutcome> pendingResults = new ArrayList<>();
 
     /** @param entityLookup tra KEntity theo entity ID (nhân vật DƯƠNG hoặc quái ÂM — combat.proto). */
@@ -87,8 +100,10 @@ final class BossAiSystem extends IteratingKSystem {
                         PositionComponent.class)
                 .get());
         this.entityLookup = entityLookup;
-        // SCRIPTING.md §8: validate script lúc khởi động, fail fast — cùng lý do SkillSystem.
-        evalScript(0.0, false, false, 0.0);
+        // ⚠️ KHÔNG còn validate script ở đây, và đó là hệ quả có ý thức của ADR-048: lúc dựng system
+        // chưa biết boss nào sẽ spawn nên chưa có ref nào để nạp. Fail fast chuyển sang
+        // `ScriptValidator` lúc khởi động server — cùng chỗ đã duyệt script quest và hội thoại
+        // (SCRIPTING.md §8).
     }
 
     List<BossActionOutcome> drainResults() {
@@ -110,7 +125,7 @@ final class BossAiSystem extends IteratingKSystem {
             bossAi.decisionCooldownSeconds -= deltaTime;
             return;
         }
-        bossAi.decisionCooldownSeconds = BossConstants.DECISION_INTERVAL_SECONDS;
+        bossAi.decisionCooldownSeconds = bossAi.decisionIntervalSeconds;
 
         if (AI_STATE.get(entity).state != AiState.ATTACK) {
             return; // chưa vào tầm/chưa có mục tiêu hợp lệ — AiSystem lo phần này.
@@ -124,8 +139,8 @@ final class BossAiSystem extends IteratingKSystem {
         }
 
         ScriptDecision decision = evalScript(
+                bossAi,
                 healthPercent(HEALTH.get(entity)),
-                bossAi.enraged,
                 bossAi.heavyStrikeCooldownSeconds <= 0f,
                 CombatConstants.toStats(COMBAT_STATS.get(entity)).atk());
         applyDecision(entity, targetEntity, targetEntityId, decision);
@@ -145,7 +160,7 @@ final class BossAiSystem extends IteratingKSystem {
         } else if (!"heavy_strike".equals(decision.action())) {
             return; // script trả action lạ (lỗi/không mong đợi) — bỏ qua an toàn, không hardcode giả định.
         }
-        bossAi.heavyStrikeCooldownSeconds = BossConstants.HEAVY_STRIKE_COOLDOWN_SECONDS;
+        bossAi.heavyStrikeCooldownSeconds = bossAi.skillCooldownSeconds;
 
         CombatConstants.CombatStats attackerStats = CombatConstants.toStats(COMBAT_STATS.get(entity));
         CombatConstants.CombatStats defenderStats = CombatConstants.toStats(COMBAT_STATS.get(targetEntity));
@@ -170,22 +185,29 @@ final class BossAiSystem extends IteratingKSystem {
                 targetHealth.isDead()));
     }
 
+    /**
+     * Nhận thẳng {@link BossAiComponent} thay vì rải {@code scriptRef} + {@code alreadyEnraged}
+     * thành hai tham số rời — cùng cách {@link #applyDecision} đã tự tra lại component để giữ dưới
+     * trần 4 tham số (Checkstyle ParameterNumber). ADR-048 thêm {@code scriptRef} vào đây và đó là
+     * tham số thứ NĂM; gói cả hai về component là đường duy nhất không dựng thêm một kiểu chỉ để
+     * đếm tham số.
+     */
     private ScriptDecision evalScript(
-            double hpPercent, boolean alreadyEnraged, boolean heavyStrikeReady, double baseAtk) {
+            BossAiComponent bossAi, double hpPercent, boolean heavyStrikeReady, double baseAtk) {
         Map<String, Object> ctx = Map.<String, Object>of(
                 "hp_percent", hpPercent,
-                "already_enraged", alreadyEnraged,
+                "already_enraged", bossAi.enraged,
                 "heavy_strike_ready", heavyStrikeReady,
                 "base_atk", baseAtk);
         try {
             return scriptSandbox.eval(
-                    bossScript,
+                    scriptByRef.computeIfAbsent(bossAi.scriptRef, BossAiSystem::loadScript),
                     Map.of("ctx", ctx),
                     value -> new ScriptDecision(
                             value.getMember("action").asString(),
                             value.getMember("raw_damage").asDouble()));
         } catch (ScriptExecutionException e) {
-            LOG.error("Script boss '{}' lỗi lúc chạy — coi như basic_attack", BossConstants.BOSS_CODE, e);
+            LOG.error("Script boss '{}' lỗi lúc chạy — coi như basic_attack", bossAi.scriptRef, e);
             return new ScriptDecision("basic_attack", 0.0);
         }
     }

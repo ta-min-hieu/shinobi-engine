@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | 🟡 **Proposed** (2026-09-12) — chủ dự án đã CHỌN HƯỚNG này khi được hỏi, nhưng **chưa Accept ADR**. AI không tự Accept; chưa thi hành một dòng nào. |
+| Status | ✅ **Accepted** (2026-09-12) — chủ dự án duyệt trọn D1–D8. Thi hành ngay cùng ngày. |
 | Date | 2026-09-12 |
 | Deciders | Chủ dự án quyết; AI soạn |
 | Related | [ADR-037](ADR-037-Monster-Template-And-Spawn-Tables.md) (**D7 hoãn boss, và tự đặt điều kiện mở lại**) · [ADR-016](ADR-016-Scripting-Engine.md) (GraalJS — hành vi là script) · [ADR-026](ADR-026-Dungeon-Instance-Model.md) (boss hiện chỉ sống trong hầm ngục) · [ADR-047](ADR-047-Dungeon-Entered-Event.md) (đang Proposed — chạm cùng vùng hầm ngục) · [GAMEPLAY.md §6](../../05-server/GAMEPLAY.md) · [DATABASE.md §2.2](../../05-server/DATABASE.md) |
@@ -60,8 +60,6 @@ ADR-037 đã dặn phải mở lại.
 
 ## Decision
 
-*(Đề xuất — chờ chủ dự án Accept. Chủ dự án đã chọn HƯỚNG khi được hỏi 2026-09-12.)*
-
 **D1. Boss là một dòng `monster_template` như mọi loài khác**, phân biệt bằng cột mới `is_boss`.
 Không dựng bảng `boss_template` riêng: boss dùng chung TOÀN BỘ cột đang có (`max_hp`, `atk`, `def`,
 `res`, `exp_reward`, `model_key`, `level`, `drop_table_id`, tham số AI), chỉ khác ở hành vi.
@@ -99,7 +97,7 @@ có (chấp sự nói chuyện rồi trở mặt). Cắt cảnh thật sẽ cầ
 
 | Phương án | Ưu | Nhược | Kết luận |
 |---|---|---|---|
-| **A. Kéo vào `monster_template` + `ai_script_ref`** (khuyến nghị) | Boss thứ ba trở đi chỉ tốn dữ liệu; boss hết ra hộp thay thế; đúng câu ADR-037 tự dặn | Đổi schema (3 cột); một thay đổi Java ở `BossAiSystem` | **Chọn** |
+| **A. Kéo vào `monster_template` + `ai_script_ref`** (khuyến nghị) | Boss thứ ba trở đi chỉ tốn dữ liệu; boss hết ra hộp thay thế; đúng câu ADR-037 tự dặn | Đổi schema (4 cột); một thay đổi Java ở `BossAiSystem` | **Chọn** |
 | **B. Bảng `boss_template` riêng** | Tách bạch "boss" khỏi "quái" | Nhân đôi 9 cột đang dùng chung, và mọi đường đọc quái phải học thêm một nguồn thứ hai. Boss KHÁC quái ở hành vi, không ở dữ liệu | Không |
 | **C. Giữ hardcode, thêm `if` cho boss thứ hai** | Nhanh nhất hôm nay | Nhân đôi đúng phần ADR-037 dặn phải mở lại; boss thứ ba lại thêm một `if` nữa; vẫn phải tự viết đường spawn world chính | Không |
 | **D. Script hoá cả chỉ số boss** | Nhất quán "script = nội dung" | ADR-037 đã bác đúng lập luận này cho quái: chỉ số là **dữ liệu bảng**, script hoá một hàng số là chọn công cụ nặng nhất cho việc nhẹ nhất | Không |
@@ -112,11 +110,13 @@ có (chấp sự nói chuyện rồi trở mặt). Cắt cảnh thật sẽ cầ
 nhất; boss có `model_key` nên thôi là thực thể duy nhất còn vẽ bằng hộp; hầm ngục chọn được boss
 riêng thay vì luôn là `sample_boss`.
 
-**Đánh đổi:** 3 cột mới trên `monster_template` (2 trong đó chỉ có nghĩa với boss — NULL với quái
-thường); `BossAiSystem` phải cache script theo ref thay vì giữ một chuỗi.
+**Đánh đổi:** **4** cột mới trên `monster_template` — `is_boss`, `ai_script_ref` và hai cột nhịp AI;
+ba cột sau chỉ có nghĩa với boss (NULL/mặc định với quái thường). `BossAiSystem` phải cache script
+theo ref thay vì giữ một chuỗi. *(Bản Proposed viết "3 cột" ở mục này trong khi D2+D4 khai bốn —
+đếm sót, sửa lúc thi hành.)*
 
-**Module bị ảnh hưởng:** `server-database` (migration + adapter đọc 3 cột), `feature-monster`
-(`MonsterTemplate` thêm 3 field), `server-world` (`BossAiSystem` nạp theo ref; `spawnBossEntity`
+**Module bị ảnh hưởng:** `server-database` (migration + adapter đọc 4 cột), `feature-monster`
+(`MonsterTemplate` thêm 4 field), `server-world` (`BossAiSystem` nạp theo ref; `spawnBossEntity`
 hợp nhất với đường spawn thường; `BossConstants`/`CombatConstants.BOSS_STATS` teo lại còn mặc định).
 **Không đụng protocol. Không đụng client.**
 
@@ -150,7 +150,7 @@ socket thật). Chúng là hàng rào của lần chuyển này — phải xanh 
 
 ## Việc cần làm tiếp theo
 
-1. **Chủ dự án Accept hoặc từ chối** — AI không tự Accept (luật dự án).
-2. Nếu Accept: migration (3 cột + chuyển `sample_boss` + boss arc 2), `BossAiSystem` nạp theo ref,
+1. ~~Chủ dự án Accept hoặc từ chối~~ ✅ **Accepted 2026-09-12**, thi hành ngay cùng ngày.
+2. Migration (3 cột + chuyển `sample_boss` + boss arc 2), `BossAiSystem` nạp theo ref,
    hợp nhất đường spawn, rồi quest 9 (script + thoại chấp sự trở mặt + i18n + test + playtest).
 3. Quest 9 **không** chờ cắt cảnh (D8).

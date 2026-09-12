@@ -6,6 +6,7 @@ import dev.kage.dialogue.api.NpcPlacementFacade;
 import dev.kage.dialogue.domain.NpcPlacement;
 import dev.kage.monster.api.MonsterFacade;
 import dev.kage.monster.domain.MonsterAiParams;
+import dev.kage.monster.domain.MonsterBossBehaviour;
 import dev.kage.monster.domain.MonsterSpawnPoint;
 import dev.kage.monster.domain.MonsterStats;
 import dev.kage.monster.domain.MonsterTemplate;
@@ -103,7 +104,28 @@ final class WorldContentLoader {
                 stats.critPercent(),
                 stats.element());
         return new MonsterCatalogSnapshot.MonsterSpecies(
-                template.code(), template.modelKey(), stats.maxHp(), template.expReward(), combat, aiNumbers);
+                template.code(),
+                template.modelKey(),
+                stats.maxHp(),
+                template.expReward(),
+                combat,
+                aiNumbers,
+                toBossNumbers(template));
+    }
+
+    /**
+     * Hành vi boss chép qua ranh giới module, hoặc {@code null} với quái FSM thường (ADR-048).
+     *
+     * <p>Cùng lập luận đã dùng cho chỉ số và tham số AI: {@code server-world} nhận SỐ THÔ, không
+     * nhận kiểu domain của {@code feature-monster}.
+     */
+    private static MonsterCatalogSnapshot.MonsterBossNumbers toBossNumbers(MonsterTemplate template) {
+        MonsterBossBehaviour behaviour = template.bossBehaviour();
+        if (behaviour == null) {
+            return null;
+        }
+        return new MonsterCatalogSnapshot.MonsterBossNumbers(
+                behaviour.scriptRef(), behaviour.decisionIntervalSeconds(), behaviour.skillCooldownSeconds());
     }
 
     private static MonsterCatalogSnapshot.MonsterSpawnDefinition toSpawnDefinition(MonsterSpawnPoint spawn) {

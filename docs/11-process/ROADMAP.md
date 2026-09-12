@@ -2797,3 +2797,98 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
     - ✅ **Ba ô test đếm/liệt kê đỏ đúng lúc** và đều là hàng rào thật: số điểm spawn (8→9), số loài
       hung hãn (6→7), và một ô LIỆT KÊ từng toạ độ spawn — ô cuối là thứ bắt được rằng x=66 chỉ hợp
       lệ SAU khi nền đất nới, nên nó được cập nhật kèm nguyên cớ chứ không chỉ thêm một con số.
+
+74. **[ADR-048](../01-architecture/adr/ADR-048-Boss-Into-Data-Tables.md) — BOSS VÀO BẢNG DỮ LIỆU; boss thứ hai của dự án (2026-09-12)**:
+    - ✅ **Accepted và thi hành trong cùng ngày.** Điều kiện mở lại không phải do tôi nghĩ ra: chính
+      ADR-037 D7 hoãn boss kèm đúng một câu Revisit Trigger — *"khi boss thứ hai xuất hiện ⇒ mở lại"*
+      — và cao trào arc 2 là boss thứ hai.
+    - 🧩 **Chỗ thật sự chặn là MỘT, không phải bốn.** Boss hardcode ở bốn nơi, nhưng ba nơi đầu chỉ
+      là SỐ (`BossConstants`, `CombatConstants.BOSS_STATS`, `WorldFacade.BOSS_SPAWN_X`). Nơi thứ tư
+      mới là tường: `BossAiSystem` nạp **đúng một** script lúc khởi tạo, nên boss thứ hai không có
+      đường nào khai hành vi riêng. Thay đổi Java ở tầng cơ chế gói gọn trong đó — cache script
+      **theo `ai_script_ref`**, cùng khuôn `QuestScriptRunner.scriptSourceCache`.
+    - 🗃️ **V41 — 4 cột** (`is_boss`, `ai_script_ref`, `ai_decision_interval_seconds`,
+      `ai_skill_cooldown_seconds`) + một CHECK bắt "boss thì phải có script, quái thường thì không".
+      Hai cột nhịp là dữ liệu chứ không phải logic, và boss thứ hai cần đúng điều đó: hắn quyết định
+      mỗi **0,4s** và hồi chiêu **4,0s**, khác con máy móc của Phase 8 (0,5 / 3,0).
+    - ✅ **`sample_boss` chuyển NGUYÊN TRẠNG, và ba test Phase 8 là hàng rào** (D5): chúng xanh mà
+      **không sửa một kỳ vọng nào**, kể cả ô đánh xuyên hai pha qua socket thật. Đó là bằng chứng
+      việc chuyển không đổi hành vi, chứ không phải chúng lỗi thời.
+    - 🕳️ **Một cái bẫy IM LẶNG suýt lọt**: World của hầm ngục xưa nay dựng bằng
+      `new WorldFacade(sink, false)` ⇒ catalog **RỖNG**. Trước ADR-048 vẫn spawn được boss vì chỉ số
+      là hằng số Java; sau ADR-048 thì hầm ngục sẽ **âm thầm rỗng**. Phải luồn catalog qua
+      `DungeonInstanceRegistry` — vướng trần 4 tham số nên gói hai facade vào `DungeonFacades` và
+      thêm `MainWorldChannelRegistry.worldContent()`.
+    - 🐛 **Lỗi tôi tự gây, và cách nó trốn được compiler:** xoá `listBossScriptResources()` nhưng để
+      lại khối javadoc **chưa đóng `*/`** ⇒ comment nuốt trọn constructor `WorldFacade(sink)` một
+      tham số. `server-world` **vẫn compile** (một comment ăn mất code là Java hợp lệ), nên chỉ
+      `server-gateway` đỏ với "no suitable constructor" — và javac không liệt kê ctor đó trong danh
+      sách ứng viên, đó mới là manh mối. 📌 **Xoá một method thì xoá cả javadoc của nó; một
+      "constructor biến mất khỏi danh sách ứng viên" là dấu hiệu bị comment nuốt, không phải bị xoá.**
+    - 🧪 **Một ô test hoá ra xưa nay VÔ NGHĨA**: `shouldNotSpawnTrainingDummyOrNpc_whenCreatedForDungeonInstance`
+      dựng World bằng ctor catalog-rỗng rồi khẳng định "không có gì spawn" — dĩ nhiên không, vì không
+      có gì để spawn. Nay nó được cấp nội dung world chính ĐẦY ĐỦ, nên hai assertion "rỗng" mới thật
+      sự gác cái guard `spawnOverworldContent`.
+    - 🔒 **Fail-fast không mất, chỉ dời chỗ**: `BossAiSystem` không validate script lúc dựng nữa
+      (lúc đó chưa biết boss nào sẽ spawn), nên `ai_script_ref` được duyệt ở `ScriptValidator` lúc
+      khởi động qua một truy vấn mới — cùng chỗ đã duyệt script quest và hội thoại. Nếu không làm
+      bước này thì ADR đã đổi một lỗi ỒN ÀO lúc khởi động lấy một lỗi CÂM giữa trận.
+    - 🎨 **Art riêng cho boss mới** (`mob_blood-sand-enforcer`, mesh kit, 0 lượt Rodin) vì
+      `shouldNotLetAnyTwoSpeciesShareAModelKey` đỏ đúng như javadoc của nó hứa — lần thứ hai trong
+      cùng một ngày ô test đó bắt đúng thứ nó sinh ra để bắt. **Đề bài ngược với mọi quái khác**:
+      hắn phải đọc ra *chấp sự tông môn*, không phải *kẻ địch*, nếu không twist hỏng trước khi hội
+      thoại kịp kể — nên hắn được đo với hai NPC tông môn chứ không phải với thám tử Huyết Sa, và
+      màu đỏ thế lực cố ý chỉ là MỘT vệt (đúng hex sash của thám tử) thay vì hai chỗ như luật cũ.
+    - 🔧 **Đính chính một cách đọc số trong ASSET-LOG** (của chính mục 73): *"LOD thấp chỉ dư 18 tam
+      giác ⇒ thêm một phụ kiện là vượt ngưỡng"* là đọc sai. Quét cả 24 model: **11 model nằm ĐÚNG
+      5.000**, 5 model nằm 4.999 — vì exporter **decimate tier thấp XUỐNG cho bằng ngân sách**
+      (`GEOMETRY_TARGETS`), nên con số đó không bao giờ vượt được và độ sát trần **không nói gì** về
+      việc model có quá nhiều chi tiết. Giá thật của một phụ kiện thêm là **mất nét sau decimate**,
+      không phải vượt ngân sách.
+    - 🎭 **Tên hiển thị giữ vỏ bọc**: thanh máu đọc **"Chấp sự Hình Vân Sơn"** / *"Steward Xing
+      Yunshan"*, không phải danh phận thật — gọi đúng tên hắn ở đó là tự khai twist trước khi script
+      kịp lộ mặt.
+    - 🔴 **Bảng chờ chủ dự án, dòng mới**: tên riêng **"Hình Vân Sơn"** phải khai vào STORY.md §4/§5
+      (§8 quy tắc 3), mà §1–§6 là SSOT tường thuật AI không được tự sửa. Đây là dòng thứ hai cùng
+      loại, sau "Lý Tam" của quest 7.
+    - ⏭️ **Quest 9 chưa làm** — ADR-048 chỉ mở đường (boss là dữ liệu, spawn qua `monster_spawn`,
+      hầm ngục chọn được boss). Cắt cảnh nằm ngoài phạm vi (D8): cao trào kể bằng cây hội thoại.
+
+75. **QUEST THỨ CHÍN — cao trào arc 2; và playtest bác BA giả định trong MỘT lượt (2026-09-12)**:
+    - ✅ **Vòng đời quest chạy trọn qua dây thật**: nhận từ Chu Hoành (nhánh `confront_steward` mới,
+      lựa chọn `[7]` của `about_town`) → hạ chấp sự → báo Tô Vân Nhi → lĩnh thưởng **+2.000 EXP**.
+      DB đọc ra `{"felled":true,"reported":true}`, trạng thái `CLAIMED`. Nhân vật test lên **Cấp 16**
+      vì đã cày thêm từ trước — **đường tối thiểu vẫn là Cấp 15** (8.895 + 300 + 2.000 = 11.195).
+    - 🧩 **V42 là migration nội dung NHẸ NHẤT của cả chuỗi: đúng MỘT lệnh INSERT.** Không loài mới,
+      không điểm spawn, không vật phẩm — vì ADR-048 đã kéo boss vào bảng ở V41. Đó chính là lời hứa
+      "boss thứ ba trở đi chỉ tốn dữ liệu", và nó tới ngay trong cùng ngày. Tổng cộng **tám**
+      migration nội dung liên tiếp không sửa một dòng Java nội dung nào.
+    - 🐛 **Giả định bị bác #1 — boss ĐI LANG THANG khỏi chỗ đứng.** V41 cho hắn `aggro = 0` nhưng để
+      `patrol_radius = 3` như mọi loài. Playtest: spawn ở x=-12,84 rồi trôi tới -9,64 (cách người
+      chơi 9,77m) nên không đánh trúng được. Một chấp sự đứng gác phải khai **cả hai** bằng 0 — đúng
+      khuôn `training_dummy` (V25 §3). 📌 Chép "khuôn thụ động" mà chỉ chép một nửa.
+    - 🐛 **Giả định bị bác #2 — "vùng an toàn chặn thạch vệ".** V41 bản đầu đặt hắn ở x=-12 và tôi
+      viết thẳng vào migration rằng vùng an toàn `sect_grounds` [-15, 5] giữ cho thạch vệ không với
+      tới. **SAI: vùng an toàn chỉ HỒI MÁU lúc bước vào (ADR-046 D3), nó không chặn aggro.** Playtest:
+      thạch vệ đuổi vào trong vùng và đánh chết người chơi ở x=-12 — 6 đòn × 20, 118 → 0, chưa chạm
+      vào boss một nhát. Lượt đó còn nhận ĐÚNG 0 gói 408, tức phần hồi máu cũng không bù được gì.
+      ⇒ Chuỗi số ĐO ĐƯỢC thay cho lập luận: thạch vệ spawn -20, patrol ±3 ⇒ mép đông -17; aggro 6 ⇒
+      phát hiện tới **-11**; leash 10 ⇒ đuổi tới **-10**. Người chơi đứng -12 cách mép đông đúng 5m
+      < 6m nên bị phát hiện. Dời chấp sự về **x=-8** (cách mép phát hiện 3m) thì lượt đo sau thạch vệ
+      **không rời -21 một mét nào**.
+    - 🐛 **Giả định bị bác #3 — và đây là cái không sửa được bằng dữ liệu: BOSS KHÔNG ĐÁNH TRẢ.**
+      Lượt đo ở x=-8: người chơi hạ hắn bằng **5 nhát, 8 giây, máu 118/118 nguyên vẹn**, và **không
+      một lần** `heavy_strike` hay `enrage`. Trọn script hai pha vừa viết chưa chạy dòng nào. Chuỗi
+      nguyên nhân: `aggro_radius = 0` ⇒ FSM không bao giờ vào `ATTACK` ⇒ `BossAiSystem` (chỉ chạy khi
+      `ATTACK`) không bao giờ được gọi. **`AiSystem` đặt mục tiêu ở đúng MỘT chỗ — vòng quét aggro**,
+      nên aggro 0 không chỉ nghĩa là "không gây sự" mà là "không bao giờ tự vệ".
+    - ⛔ **Không tự sửa vì đụng schema + cơ chế** ⇒ [ADR-049](../01-architecture/adr/ADR-049-Monster-Retaliation.md)
+      **Proposed**, dòng **#23** của bảng chờ. Ba lý do không sửa được bằng dữ liệu, đều đã đo:
+      trục chơi MỘT chiều (ADR-033) nên "đi ngang" là đi xuyên qua đúng toạ độ đó ⇒ aggro > 0 là
+      đánh cả người chơi **arc 1** (Cấp ~8) bằng boss Cấp 12 atk 30; không có chỗ vắng nào trên trục;
+      và cho MỌI quái đánh trả là **phá ADR-039 D4** (cọc tập thụ động có chủ đích). Chủ dự án đã
+      chọn hướng **cột `retaliates` mặc định `false`** — chờ dòng Status rồi mới thi hành.
+    - 🎨 **Art riêng cho boss** (`mob_blood-sand-enforcer`) — xem mục 74 và ASSET-LOG cùng ngày.
+    - 📖 **Tên hiển thị giữ vỏ bọc**: thanh máu đọc "Chấp sự Hình Vân Sơn", không phải danh phận
+      thật của hắn — lộ mặt là việc của script, không phải của cái tên.
+

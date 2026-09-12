@@ -73,7 +73,25 @@ public record MonsterCatalogSnapshot(Map<String, MonsterSpecies> species, List<M
             int maxHp,
             long expReward,
             MonsterCombatNumbers combat,
-            MonsterAiNumbers ai) {}
+            MonsterAiNumbers ai,
+            MonsterBossNumbers boss) {
+
+        /** Loài có AI kịch bản hay không — {@code false} nghĩa là chạy FSM thường (ADR-048). */
+        public boolean isBoss() {
+            return boss != null;
+        }
+    }
+
+    /**
+     * Hành vi kịch bản của một loài boss (ADR-048) — {@code null} với quái thường.
+     *
+     * <p>Cùng lý do {@link MonsterCombatNumbers} không mang {@code CombatStats}: đây là SỐ THÔ chép
+     * qua ranh giới module, không phải kiểu nội bộ của {@code feature-monster}. {@code scriptRef} là
+     * đường dẫn classpath; {@code WorldFacade} chép nó vào {@code BossAiComponent} lúc spawn, và
+     * {@code BossAiSystem} nạp theo đó — nhờ vậy mỗi boss có hành vi riêng mà Java không biết boss
+     * nào tồn tại.
+     */
+    public record MonsterBossNumbers(String scriptRef, float decisionIntervalSeconds, float skillCooldownSeconds) {}
 
     /**
      * Tham số AI thô của một loài (ADR-039 D1) — SÁU con số, không phải tám.

@@ -44,7 +44,8 @@ final class TestMonsterCatalogs {
                 TRAINING_DUMMY_MAX_HP,
                 20L,
                 new MonsterCatalogSnapshot.MonsterCombatNumbers(8, 0, 5, 3, 90, 0, 0, "NONE"),
-                AGGRESSIVE_AI);
+                AGGRESSIVE_AI,
+                null); // không phải boss (ADR-048)
         List<MonsterCatalogSnapshot.MonsterSpawnDefinition> spawns = new java.util.ArrayList<>();
         for (float x : SPAWN_X) {
             spawns.add(new MonsterCatalogSnapshot.MonsterSpawnDefinition(
@@ -64,10 +65,37 @@ final class TestMonsterCatalogs {
                 TRAINING_DUMMY_MAX_HP,
                 20L,
                 new MonsterCatalogSnapshot.MonsterCombatNumbers(8, 0, 5, 3, 90, 0, 0, "NONE"),
-                new MonsterCatalogSnapshot.MonsterAiNumbers(0f, 10f, 3f, 1.5f, 0f, 3f));
+                new MonsterCatalogSnapshot.MonsterAiNumbers(0f, 10f, 3f, 1.5f, 0f, 3f),
+                null); // không phải boss (ADR-048)
         return MonsterCatalogSnapshot.of(
                 List.of(dummy),
                 List.of(new MonsterCatalogSnapshot.MonsterSpawnDefinition(
                         TRAINING_DUMMY_CODE, SPAWN_X[0], 0f, TRAINING_DUMMY_RESPAWN_SECONDS)));
+    }
+
+    /** Mã boss Phase 8 — nguyên văn {@code BossConstants.BOSS_CODE} cũ, nay là một hàng V41. */
+    static final String SAMPLE_BOSS_CODE = "sample_boss";
+
+    /**
+     * Danh mục CHỈ có boss — nội dung của một World hầm ngục (ADR-048).
+     *
+     * <p>Không có {@code MonsterSpawnDefinition} nào: boss vào world bằng lệnh
+     * {@code spawnBoss(mã)}, không qua {@code monster_spawn} (ADR-048 D6). Trước ADR-048 World
+     * hầm ngục chạy với catalog RỖNG vì chỉ số boss là hằng số Java; nay thiếu hàng này thì
+     * {@code spawnBoss} tra không ra mã và hầm ngục rỗng.
+     *
+     * <p>Từng con số chép đúng V41, vốn chép đúng {@code CombatConstants.BOSS_STATS} +
+     * {@code BOSS_MAX_HP} trước đó (ADR-048 D5) — nên test Phase 8 giữ nguyên kỳ vọng.
+     */
+    static MonsterCatalogSnapshot dungeonBoss() {
+        MonsterCatalogSnapshot.MonsterSpecies boss = new MonsterCatalogSnapshot.MonsterSpecies(
+                SAMPLE_BOSS_CODE,
+                "mob_sample-boss",
+                320,
+                200L,
+                new MonsterCatalogSnapshot.MonsterCombatNumbers(3, 0, 10, 8, 95, 0, 5, "NONE"),
+                AGGRESSIVE_AI,
+                new MonsterCatalogSnapshot.MonsterBossNumbers("/scripts/boss/sample_boss.js", 0.5f, 3.0f));
+        return MonsterCatalogSnapshot.of(List.of(boss), List.of());
     }
 }

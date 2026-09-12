@@ -66,6 +66,7 @@ class TownElderDialogueTreeTest {
                         "awakening_trial",
                         "outer_sect",
                         "missing_disciple",
+                        "confront_steward",
                         "end");
         assertThat(node("about_realm").textKey()).isEqualTo("dialogue.town_elder.about_realm");
         assertThat(node("about_elder").textKey()).isEqualTo("dialogue.town_elder.about_elder");
@@ -144,6 +145,24 @@ class TownElderDialogueTreeTest {
         assertThat(outerSect.options())
                 .extracting(DialogueOption::action)
                 .containsExactly("accept_quest:report_to_outer_sect", "about_town", "end");
+    }
+
+    /**
+     * CAO TRÀO arc 2 (STORY.md §6) — quest THỨ CHÍN, chỗ arc 2 đóng.
+     *
+     * <p>Nhánh nối thẳng vào {@code missing_disciple}: ở quest 7 ông lão nói ông không tin cái sổ,
+     * ở đây ông biết vì sao cái sổ đóng nhanh như vậy. Cũng mọc xuống dưới qua {@code about_town},
+     * cùng luật {@code option_index} với năm nhánh quest trước.
+     */
+    @Test
+    @DisplayName("Nhánh đối chất nhận được quest thứ chín, và nhận đúng mã confront_the_steward")
+    void confrontStewardBranchOffersTheNinthQuest() {
+        DialogueNode confront = node("confront_steward");
+
+        assertThat(confront.textKey()).isEqualTo("dialogue.town_elder.confront_steward");
+        assertThat(confront.options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:confront_the_steward", "about_town", "end");
     }
 
     private DialogueNode node(String nodeId) {

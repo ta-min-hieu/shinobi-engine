@@ -192,7 +192,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         List<MonsterSpawnPoint> spawns =
                 new PostgresMonsterCatalogAdapter(dataSource).listSpawnPoints(MonsterSpawnPoint.MAIN_WORLD_CODE);
 
-        assertThat(spawns).hasSize(9);
+        assertThat(spawns).hasSize(10);
         // ADR-033 — quái lệch khỏi y=0 là quái người chơi không bao giờ chạm tới. DB có CHECK,
         // đây là hàng rào thứ hai và cũng là tài liệu sống cho ràng buộc đó.
         assertThat(spawns).allSatisfy(spawn -> assertThat(spawn.posY()).isZero());
@@ -212,9 +212,20 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         // duy nhất chưa quest nào dùng nên dời được mà không phá quest cũ nào. Đó là điểm spawn đầu tiên phải
         // ĐỢI nền đất nới ra mới đặt được: đo bằng máy thì cả đoạn [-55, 60] cũ không còn khe nào
         // hợp lệ cho một loài aggro 6, nên `DemoPlatforms.GROUND_MAX_X` đi 60 → 85 cùng đợt.
+        // V41 thêm chấp sự Hình Vân Sơn ở -8 (aggro 0, patrol 0 — hắn ĐỨNG YÊN).
+        //
+        // ⚠️ Bản đầu đặt hắn ở -12 và PLAYTEST BÁC (2026-09-12): thạch vệ @-20 đuổi tới tận đó và
+        // đánh chết người chơi trước khi chạm được vào boss. Lập luận sai là "vùng an toàn
+        // `sect_grounds` [-15, 5] chặn nó" — **vùng an toàn chỉ HỒI MÁU lúc bước vào (ADR-046 D3),
+        // nó KHÔNG chặn aggro**. Con số thật: thạch vệ spawn -20, patrol ±3 ⇒ mép đông -17;
+        // aggro 6 ⇒ phát hiện tới -11; leash 10 ⇒ đuổi tới -10. x=-8 cách mép phát hiện 3m.
+        //
+        // ⚠️ Và hai ô test hình học bên dưới KHÔNG gác điểm này (chúng chỉ soi loài có aggro > 0),
+        // nên nếu ngày nào đó hắn được cho aggro thì chúng vẫn im. Chỗ duy nhất ghi lại ràng buộc
+        // là đúng dòng toạ độ này.
         assertThat(spawns)
                 .extracting(MonsterSpawnPoint::posX)
-                .containsExactlyInAnyOrder(-47f, -33f, -20f, 8f, 14f, 21f, 34f, 66f, 80f);
+                .containsExactlyInAnyOrder(-47f, -33f, -20f, -8f, 8f, 14f, 21f, 34f, 66f, 80f);
     }
 
     /**

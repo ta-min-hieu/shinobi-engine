@@ -37,4 +37,15 @@ final class TestWorldContents {
         return new NpcCatalogSnapshot(
                 List.of(new NpcCatalogSnapshot.NpcPlacementDefinition(TOWN_ELDER_CODE, TOWN_ELDER_X, TOWN_ELDER_Y)));
     }
+
+    /**
+     * Nội dung world chính cho test có HẦM NGỤC — thêm boss vào danh mục quái (ADR-048).
+     *
+     * <p>{@code DungeonInstanceRegistry} dựng World hầm ngục TỪ catalog world chính, nên boss phải
+     * có mặt ở đây thì {@code spawnBoss()} mới tra ra mã.
+     */
+    static WorldContentCatalog withBoss() {
+        return new WorldContentCatalog(
+                TestMonsterCatalogs.trainingGroundWithBoss(), townElderOnly(), SafeZoneCatalogSnapshot.EMPTY);
+    }
 }

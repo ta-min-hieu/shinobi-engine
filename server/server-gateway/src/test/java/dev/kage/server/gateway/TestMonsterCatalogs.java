@@ -45,12 +45,51 @@ final class TestMonsterCatalogs {
                 TRAINING_DUMMY_MAX_HP,
                 20L,
                 new MonsterCatalogSnapshot.MonsterCombatNumbers(8, 0, 5, 3, 90, 0, 0, "NONE"),
-                AGGRESSIVE_AI);
+                AGGRESSIVE_AI,
+                null); // không phải boss (ADR-048)
         List<MonsterCatalogSnapshot.MonsterSpawnDefinition> spawns = new java.util.ArrayList<>();
         for (float x : SPAWN_X) {
             spawns.add(new MonsterCatalogSnapshot.MonsterSpawnDefinition(
                     TRAINING_DUMMY_CODE, x, 0f, TRAINING_DUMMY_RESPAWN_SECONDS));
         }
         return MonsterCatalogSnapshot.of(List.of(dummy), spawns);
+    }
+
+    /** Mã boss hầm ngục mẫu — phải khớp {@code DungeonInstanceRegistry.DUNGEON_BOSS_CODE}. */
+    static final String SAMPLE_BOSS_CODE = "sample_boss";
+
+    /**
+     * Sân tập KÈM boss hầm ngục (ADR-048).
+     *
+     * <p>Trước ADR-048, World hầm ngục dựng với catalog RỖNG vẫn spawn được boss vì chỉ số boss là
+     * hằng số Java. Nay boss là một hàng {@code monster_template}: catalog thiếu boss ⇒ hầm ngục
+     * rỗng và ba test Phase 8 đỏ. Đây là chỗ duy nhất nói ra điều đó cho mọi test gateway.
+     *
+     * <p>Boss KHÔNG có {@code MonsterSpawnDefinition}: hầm ngục spawn hắn bằng lệnh
+     * {@code spawnBoss(mã)} chứ không qua {@code monster_spawn} (ADR-048 D6).
+     */
+    static MonsterCatalogSnapshot trainingGroundWithBoss() {
+        MonsterCatalogSnapshot ground = trainingGround();
+        List<MonsterCatalogSnapshot.MonsterSpecies> species =
+                new java.util.ArrayList<>(ground.species().values());
+        species.add(sampleBoss());
+        return MonsterCatalogSnapshot.of(species, ground.spawnPoints());
+    }
+
+    /**
+     * Boss Phase 8 — từng con số chép đúng V41, vốn chép đúng hằng số Java trước đó (ADR-048 D5).
+     *
+     * <p>{@code atk = 3} KHÔNG phải lỗi gõ: sát thương của hắn đến gần như toàn bộ từ CHIÊU trong
+     * script ({@code base_atk} nhân hệ số), không phải từ đánh thường.
+     */
+    private static MonsterCatalogSnapshot.MonsterSpecies sampleBoss() {
+        return new MonsterCatalogSnapshot.MonsterSpecies(
+                SAMPLE_BOSS_CODE,
+                "mob_sample-boss",
+                320,
+                200L,
+                new MonsterCatalogSnapshot.MonsterCombatNumbers(3, 0, 10, 8, 95, 0, 5, "NONE"),
+                AGGRESSIVE_AI,
+                new MonsterCatalogSnapshot.MonsterBossNumbers("/scripts/boss/sample_boss.js", 0.5f, 3.0f));
     }
 }

@@ -35,4 +35,9 @@ final class TestWorldContents {
         return new NpcCatalogSnapshot(
                 List.of(new NpcCatalogSnapshot.NpcPlacementDefinition(TOWN_ELDER_CODE, TOWN_ELDER_X, TOWN_ELDER_Y)));
     }
+
+    /** Nội dung một World HẦM NGỤC: chỉ boss, không NPC, không vùng an toàn (ADR-048). */
+    static WorldContentCatalog dungeonWithBoss() {
+        return WorldContentCatalog.ofMonsters(TestMonsterCatalogs.dungeonBoss());
+    }
 }

@@ -25,7 +25,8 @@ public record MonsterTemplate(
         MonsterStats stats,
         MonsterAiParams aiParams,
         long expReward,
-        String dropTableCode) {
+        String dropTableCode,
+        MonsterBossBehaviour bossBehaviour) {
 
     public MonsterTemplate {
         requireText(code, "code");
@@ -40,6 +41,14 @@ public record MonsterTemplate(
         if (expReward < 0) {
             throw new IllegalArgumentException("expReward không được âm: " + expReward);
         }
+        // bossBehaviour == null là HỢP LỆ và là trường hợp thường gặp: quái FSM không có AI kịch
+        // bản (ADR-048 D2). DB đã gác chiều ngược lại bằng CHECK `monster_template_boss_needs_script`
+        // — is_boss mà thiếu script thì không ghi được, nên ở đây không cần đoán lại.
+    }
+
+    /** Loài này có AI kịch bản hay không — {@code false} nghĩa là chạy FSM thường như mọi quái. */
+    public boolean isBoss() {
+        return bossBehaviour != null;
     }
 
     private static void requireText(String value, String field) {

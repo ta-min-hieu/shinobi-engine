@@ -21,7 +21,7 @@ class MonsterTemplateTest {
         // dropTableCode null = loài không rơi gì. Hợp lệ, không phải lỗi — adapter dùng LEFT JOIN
         // đúng vì lý do này (INNER JOIN sẽ nuốt mất cả loài khỏi catalog).
         MonsterTemplate template = new MonsterTemplate(
-                "stone_ogre", "hud.monster.stone_ogre", "mob_training-dummy", stats(), ai(), 90L, null);
+                "stone_ogre", "hud.monster.stone_ogre", "mob_training-dummy", stats(), ai(), 90L, null, null);
 
         assertThat(template.dropTableCode()).isNull();
         assertThat(template.expReward()).isEqualTo(90L);
@@ -29,17 +29,17 @@ class MonsterTemplateTest {
 
     @Test
     void shouldRejectBlankIdentifiers() {
-        assertThatThrownBy(() -> new MonsterTemplate(" ", "n", "m", stats(), ai(), 0L, null))
+        assertThatThrownBy(() -> new MonsterTemplate(" ", "n", "m", stats(), ai(), 0L, null, null))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new MonsterTemplate("c", " ", "m", stats(), ai(), 0L, null))
+        assertThatThrownBy(() -> new MonsterTemplate("c", " ", "m", stats(), ai(), 0L, null, null))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new MonsterTemplate("c", "n", " ", stats(), ai(), 0L, null))
+        assertThatThrownBy(() -> new MonsterTemplate("c", "n", " ", stats(), ai(), 0L, null, null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void shouldRejectNegativeExpReward() {
-        assertThatThrownBy(() -> new MonsterTemplate("c", "n", "m", stats(), ai(), -1L, null))
+        assertThatThrownBy(() -> new MonsterTemplate("c", "n", "m", stats(), ai(), -1L, null, null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -63,5 +63,30 @@ class MonsterTemplateTest {
     void shouldRejectNonPositiveRespawnSeconds() {
         assertThatThrownBy(() -> new MonsterSpawnPoint("c", MonsterSpawnPoint.MAIN_WORLD_CODE, 8f, 0f, 0f))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    /**
+     * ADR-048 — hành vi boss VẮNG MẶT là trường hợp thường (mọi quái FSM), nên {@code isBoss()}
+     * phải nói đúng cả hai chiều. Đây là thứ quyết định một loài có được cấp {@code BossAiComponent}
+     * lúc spawn hay không, và nếu nó sai theo chiều "false" thì boss đứng im như quái thường —
+     * không có gì đỏ, chỉ có một trận đấu nhạt.
+     */
+    @Test
+    void shouldReportBossOnlyWhenBehaviourPresent() {
+        MonsterTemplate quaiThuong = new MonsterTemplate("stone_ogre", "n", "m", stats(), ai(), 90L, null, null);
+        assertThat(quaiThuong.isBoss()).isFalse();
+        assertThat(quaiThuong.bossBehaviour()).isNull();
+
+        MonsterTemplate boss = new MonsterTemplate(
+                "sample_boss",
+                "n",
+                "m",
+                stats(),
+                ai(),
+                200L,
+                null,
+                new MonsterBossBehaviour("/scripts/boss/sample_boss.js", 0.5f, 3.0f));
+        assertThat(boss.isBoss()).isTrue();
+        assertThat(boss.bossBehaviour().scriptRef()).isEqualTo("/scripts/boss/sample_boss.js");
     }
 }

@@ -246,14 +246,7 @@ public final class WorldFacade {
         return SkillRegistry.allScriptResources();
     }
 
-    /**
-     * Toàn bộ resource script boss (hardcode, chưa DB-driven — xem {@link BossConstants}) — dùng
-     * cho validate script lúc khởi động (SCRIPTING.md §8), cùng lý do {@link #listSkillScriptResources}.
-     */
-    public static List<String> listBossScriptResources() {
-        return List.of(BossConstants.BOSS_SCRIPT_RESOURCE);
-    }
-
+    /** World chính: có nội dung overworld (quái/NPC) và hồi sinh nhân vật tại chỗ. */
     public WorldFacade(WorldOutboundSink outboundSink) {
         this(outboundSink, true);
     }
@@ -449,13 +442,17 @@ public final class WorldFacade {
     }
 
     /**
-     * Spawn 1 boss hardcode (Phase 8 lát cắt 2, {@link BossConstants#BOSS_CODE}) — gọi bởi
-     * {@code DungeonInstanceRegistry} ngay sau khi tạo dungeon World mới. World chính KHÔNG tự
-     * gọi hàm này (giữ đúng ranh giới lát cắt 1: server-world không biết khái niệm "dungeon", chỉ
-     * biết "có ai bảo spawn boss hay không").
+     * Spawn boss theo MÃ LOÀI (ADR-048 D6) — gọi bởi {@code DungeonInstanceRegistry} ngay sau khi
+     * tạo dungeon World mới. World chính KHÔNG tự gọi hàm này (giữ đúng ranh giới: server-world
+     * không biết khái niệm "dungeon", chỉ biết "có ai bảo spawn con nào").
+     *
+     * <p>Mã phải có trong catalog tiêm vào constructor và phải là một hàng {@code is_boss} — nếu
+     * không, lệnh bị bỏ qua kèm log lỗi thay vì dựng một thực thể nửa vời.
+     *
+     * @param bossCode mã trong {@code monster_template}, ví dụ {@code sample_boss}
      */
-    public void spawnBoss() {
-        inbox.add(new WorldCommand.SpawnBossCommand());
+    public void spawnBoss(String bossCode) {
+        inbox.add(new WorldCommand.SpawnBossCommand(bossCode));
     }
 
     /**
@@ -556,7 +553,7 @@ public final class WorldFacade {
                     handleAreaChatMessage(c.characterId(), c.senderName(), c.body());
                 case WorldCommand.AppearanceChangedCommand c -> handleAppearanceChanged(c.characterId());
                 case WorldCommand.HealCharacterCommand c -> handleHealCharacter(c.characterId(), c.amount());
-                case WorldCommand.SpawnBossCommand ignored -> spawnBossEntity();
+                case WorldCommand.SpawnBossCommand c -> spawnBossEntity(c.bossCode());
             }
         }
     }
@@ -1134,11 +1131,26 @@ public final class WorldFacade {
         entity.add(new TargetComponent()); // AiSystem ghi khi Chase/Attack; CombatSystem đọc để đánh trả
         entity.add(new AttackCooldownComponent());
         entity.add(new StatusEffectComponent());
+        addBossAiIfBoss(entity, loai);
 
         entitiesByMonsterId.put(monsterId, entity);
         spawnIndexByMonsterId.put(monsterId, spawnIndex);
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
         // không cần thông báo thủ công (giống hệt attach nhân vật, xem AreaOfInterestTracker).
+    }
+
+    /**
+     * ADR-048 — loài khai {@code is_boss} thì có AI kịch bản, kể cả khi nó đứng ở một điểm
+     * {@code monster_spawn} bình thường của world chính. Đây là chỗ boss world chính ra đời mà
+     * không cần một đường spawn riêng nào.
+     *
+     * <p>Tách khỏi {@link #spawnMonster(int)} để giữ hàm đó dưới trần Checkstyle MethodLength —
+     * cùng lý do {@code BossAiSystem.applyDecision} đã tách khỏi {@code processEntity}.
+     */
+    private void addBossAiIfBoss(KEntity entity, MonsterCatalogSnapshot.MonsterSpecies loai) {
+        if (loai.isBoss()) {
+            entity.add(newBossAi(loai.boss()));
+        }
     }
 
     /** Trạng thái FSM ban đầu — nhớ điểm spawn để {@code AiSystem} biết chỗ quay về (Return). */
@@ -1167,6 +1179,15 @@ public final class WorldFacade {
     }
 
     /** Danh tính loài trên entity: mã trên dây, khoá art, và EXP mà world chỉ chở ra ngoài. */
+    /** Chép hành vi boss từ catalog vào component — {@code BossAiSystem} chỉ đọc từ đây (ADR-048 D3). */
+    private static BossAiComponent newBossAi(MonsterCatalogSnapshot.MonsterBossNumbers boss) {
+        BossAiComponent component = new BossAiComponent();
+        component.scriptRef = boss.scriptRef();
+        component.decisionIntervalSeconds = boss.decisionIntervalSeconds();
+        component.skillCooldownSeconds = boss.skillCooldownSeconds();
+        return component;
+    }
+
     private static MonsterComponent toMonsterComponent(MonsterCatalogSnapshot.MonsterSpecies loai) {
         MonsterComponent monster = new MonsterComponent();
         monster.monsterCode = loai.code();
@@ -1204,7 +1225,27 @@ public final class WorldFacade {
                 element);
     }
 
-    private void spawnBossEntity() {
+    /**
+     * Spawn boss theo MÃ LOÀI, tại chỗ cố định của instance (ADR-048 D6).
+     *
+     * <p>Dùng cho hầm ngục — nơi KHÔNG có {@code monster_spawn} nào. Boss của world chính thì đi
+     * đường bình thường qua {@link #spawnMonsterEntity}, và {@link BossAiComponent} được gắn ở đó
+     * theo {@code species.isBoss()}; đây không phải hai cơ chế, chỉ là hai nguồn toạ độ.
+     *
+     * <p>⚠️ Mọi chỉ số nay đọc từ catalog. World nhận catalog RỖNG (hầm ngục trước ADR-048) sẽ
+     * không tra được mã ⇒ không spawn gì, và log nói rõ lý do thay vì im lặng.
+     */
+    private void spawnBossEntity(String bossCode) {
+        MonsterCatalogSnapshot.MonsterSpecies loai =
+                monsterCatalog.find(bossCode).orElse(null);
+        if (loai == null || !loai.isBoss()) {
+            LOG.error(
+                    "Không spawn được boss '{}': {} — kiểm monster_template.is_boss/ai_script_ref và"
+                            + " catalog truyền vào World này",
+                    bossCode,
+                    loai == null ? "không có trong catalog" : "loài này không phải boss");
+            return;
+        }
         KEntity entity = ecsWorld.createEntity();
         long monsterId = nextMonsterOrNpcId--;
 
@@ -1217,32 +1258,23 @@ public final class WorldFacade {
         entity.add(new VelocityComponent()); // AiSystem set vận tốc theo FSM (AI.md §3)
 
         HealthComponent health = new HealthComponent();
-        health.current = CombatConstants.BOSS_MAX_HP;
-        health.max = CombatConstants.BOSS_MAX_HP;
+        health.current = loai.maxHp();
+        health.max = loai.maxHp();
         entity.add(health);
 
-        MonsterComponent monster = new MonsterComponent();
-        monster.monsterCode = BossConstants.BOSS_CODE;
-        // Boss giữ hardcode (ADR-037 D7) nên không có model_key từ DB — để rỗng, client tự suy
-        // bằng MonsterModelKey đúng như trước ADR-037.
-        monster.modelKey = "";
-        monster.expReward = BossConstants.BOSS_EXP_REWARD;
-        entity.add(monster);
-        entity.add(toComponent(CombatConstants.BOSS_STATS));
+        entity.add(toMonsterComponent(loai));
+        entity.add(toComponent(toStats(loai.combat())));
 
         MonsterIdComponent monsterIdComponent = new MonsterIdComponent();
         monsterIdComponent.monsterId = monsterId;
         entity.add(monsterIdComponent);
 
         entity.add(newAiState(BOSS_SPAWN_X, BOSS_SPAWN_Y));
-        // Boss KHÔNG có hàng trong monster_template (ADR-037 D7 giữ boss hardcode: nó có
-        // BossAiSystem + script GraalJS riêng), nên tham số FSM lấy thẳng bộ mặc định — TƯỜNG MINH
-        // ở đây thay vì một đường lui ngầm trong AiSystem (ADR-039 D6).
-        entity.add(AiConstants.DEFAULTS);
+        entity.add(toAiParams(loai.ai()));
         entity.add(new TargetComponent()); // AiSystem ghi khi Chase/Attack; CombatSystem đọc để đánh trả
         entity.add(new AttackCooldownComponent());
         entity.add(new StatusEffectComponent());
-        entity.add(new BossAiComponent()); // BossAiSystem đọc/ghi — cooldown chiêu đặc biệt + cờ enrage
+        entity.add(newBossAi(loai.boss()));
 
         entitiesByMonsterId.put(monsterId, entity);
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —

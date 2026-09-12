@@ -116,7 +116,6 @@ public final class GatewayBootstrap {
         ArrayList<String> scriptRefs = new ArrayList<String>();
         scriptRefs.addAll(databaseBootstrap.listContentScriptRefs());
         scriptRefs.addAll(WorldFacade.listSkillScriptResources());
-        scriptRefs.addAll(WorldFacade.listBossScriptResources());
         new ScriptValidator(new ScriptSandbox(SCRIPT_VALIDATION_STATEMENT_LIMIT)).validateAll(scriptRefs);
     }
 
@@ -199,9 +198,11 @@ public final class GatewayBootstrap {
             CharacterPositionPersister positionPersister) {
         DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
                 characterRegistry,
-                facades.characterFacade(),
-                facades.contentFacades().socialFacades().partyFacade(),
-                mainWorldChannels);
+                new DungeonInstanceRegistry.DungeonFacades(
+                        facades.characterFacade(),
+                        facades.contentFacades().socialFacades().partyFacade()),
+                mainWorldChannels,
+                mainWorldChannels.worldContent());
         ArenaInstanceRegistry arenaInstanceRegistry = new ArenaInstanceRegistry(
                 characterRegistry,
                 facades.characterFacade(),

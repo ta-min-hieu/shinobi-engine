@@ -522,8 +522,14 @@ class WorldFacadeTest {
     void shouldNotSpawnTrainingDummyOrNpc_whenCreatedForDungeonInstance() {
         // ADR-026 — dungeon instance (spawnOverworldContent=false) khởi động RỖNG, khác world
         // chính. Dùng WorldFacade RIÊNG (không phải field `world` dùng chung ở các test khác).
+        //
+        // ⚠️ Catalog ở đây là nội dung world chính ĐẦY ĐỦ (4 hình nộm + trưởng lão), CỐ Ý. Trước
+        // ADR-048 test này dựng World bằng ctor 2 tham số ⇒ catalog RỖNG ⇒ nó không chứng minh gì
+        // cả: không có gì để spawn thì dĩ nhiên không có gì spawn. Có nội dung thật thì hai
+        // assertion "rỗng" bên dưới mới thật sự gác cái guard `spawnOverworldContent`.
         RecordingSink dungeonSink = new RecordingSink();
-        WorldFacade dungeonWorld = new WorldFacade(dungeonSink, false);
+        WorldFacade dungeonWorld =
+                new WorldFacade(dungeonSink, false, TickMetricsPort.NO_OP, TestWorldContents.trainingGroundWithElder());
         try {
             dungeonWorld.start();
             // Toạ độ giống hệt quái bù nhìn (5,5)/NPC mẫu (-5,-5) của world chính NẾU có spawn —
@@ -540,17 +546,19 @@ class WorldFacadeTest {
     }
 
     @Test
-    @Timeout(30) // Trận đấu boss thời gian thực ~12-13s (BOSS_MAX_HP=320) — dài hơn @Timeout(10) lớp.
+    @Timeout(
+            30) // Trận đấu boss thời gian thực ~12-13s (320 máu, nay là cột max_hp của V41) — dài hơn @Timeout(10) lớp.
     void shouldFightThroughAllPhases_whenBossEngaged() {
         // Phase 8 lát cắt 2 — boss trong dungeon instance (spawnOverworldContent=false, giống
         // test shouldNotSpawnTrainingDummyOrNpc...). Verify CẢ 2 chiêu đặc biệt (heavy_strike <70%
         // HP, enrage <30% HP) xuất hiện thật trước khi boss chết, và chết KHÔNG kích hoạt respawn
         // kiểu training dummy (PHÁT HIỆN THẬT lát cắt này — xem WorldFacade.handleMonsterDeath).
         RecordingSink dungeonSink = new RecordingSink();
-        WorldFacade dungeonWorld = new WorldFacade(dungeonSink, false);
+        WorldFacade dungeonWorld =
+                new WorldFacade(dungeonSink, false, TickMetricsPort.NO_OP, TestWorldContents.dungeonWithBoss());
         try {
             dungeonWorld.start();
-            dungeonWorld.spawnBoss();
+            dungeonWorld.spawnBoss(TestMonsterCatalogs.SAMPLE_BOSS_CODE);
             // Attach TRƯỚC khi chờ monsterSpawned — AoI chỉ báo spawn khi có NHÂN VẬT ở gần để
             // thông báo (aoiTracker.sync() so cặp nhân vật-quái, không tự báo quái "mồ côi" không
             // ai quan sát). Spawn cách boss (3,0) đúng 1m — trong tầm đánh (2m) VÀ tầm aggro (6m).
@@ -586,10 +594,11 @@ class WorldFacadeTest {
         // nhanh bằng applyEquipmentBonus (cùng pattern shouldOneShotMonster_...) để tách biệt
         // khỏi kịch bản nhiều pha ở test trên, tránh @Timeout dài gấp đôi không cần thiết.
         RecordingSink dungeonSink = new RecordingSink();
-        WorldFacade dungeonWorld = new WorldFacade(dungeonSink, false);
+        WorldFacade dungeonWorld =
+                new WorldFacade(dungeonSink, false, TickMetricsPort.NO_OP, TestWorldContents.dungeonWithBoss());
         try {
             dungeonWorld.start();
-            dungeonWorld.spawnBoss();
+            dungeonWorld.spawnBoss(TestMonsterCatalogs.SAMPLE_BOSS_CODE);
             dungeonWorld.attachCharacter(1L, 3f, 1f, DEFAULT_STATS);
             awaitTrue(() ->
                     dungeonSink.monsterSpawned.stream().anyMatch(m -> m.code().equals("sample_boss")));

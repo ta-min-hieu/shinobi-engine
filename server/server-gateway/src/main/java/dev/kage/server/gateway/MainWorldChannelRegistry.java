@@ -97,6 +97,17 @@ final class MainWorldChannelRegistry {
     }
 
     /**
+     * Nội dung tĩnh của world chính — dùng lại cho World của instance (ADR-048).
+     *
+     * <p>Hầm ngục cần catalog để tra mã boss, nhưng {@code buildInstanceRegistries} đã dùng hết 4
+     * tham số (trần Checkstyle {@code ParameterNumber}). Lớp này vốn đã giữ sẵn catalog, nên mở
+     * một getter rẻ hơn hẳn việc gói thêm một record chỉ để chuyền một giá trị đi qua.
+     */
+    WorldContentCatalog worldContent() {
+        return content;
+    }
+
+    /**
      * Định tuyến vào khu vực còn chỗ (mở thêm nếu cần) — trả lại {@link WorldFacade} của khu vực đó
      * để caller gọi tiếp (vd. {@code applyEquipmentBonus}).
      *

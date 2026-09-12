@@ -14,6 +14,8 @@ import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.server.world.CharacterBaseStats;
 import dev.kage.server.world.Element;
+import dev.kage.server.world.TickMetricsPort;
+import dev.kage.server.world.WorldContentCatalog;
 import dev.kage.server.world.WorldFacade;
 
 /**
@@ -24,9 +26,9 @@ import dev.kage.server.world.WorldFacade;
  * {@link CharacterFacade} sẵn, giống {@code SocialFacades}). Khi lát cắt sau cần dữ liệu thật, đó
  * là lúc tách ra module riêng.
  *
- * <p>Chỉ 1 dungeon hardcode ({@link #DUNGEON_CODE}) — cùng phong cách
- * {@code BossConstants.BOSS_CODE} — quái và NPC đã thoát khỏi hardcode (ADR-037/ADR-040), dungeon
- * thì chưa. Bất kỳ thành viên nào gửi
+ * <p>Chỉ 1 dungeon hardcode ({@link #DUNGEON_CODE}) — quái, NPC và nay cả BOSS đều đã thoát khỏi
+ * hardcode (ADR-037/ADR-040/ADR-048), dungeon thì chưa: nó vẫn là hằng số Java chứ chưa phải một
+ * hàng trong bảng. Bất kỳ thành viên nào gửi
  * {@code EnterDungeonCommand} sẽ kéo THEO CẢ party đang online vào CHUNG 1 instance (GAMEPLAY.md
  * §6 "Mỗi party 1 instance riêng") — không cần leader riêng cho hành động này ở lát cắt 1.
  *
@@ -37,6 +39,16 @@ import dev.kage.server.world.WorldFacade;
 final class DungeonInstanceRegistry {
 
     private static final String DUNGEON_CODE = "sample_dungeon";
+
+    /**
+     * Boss của hầm ngục mẫu — mã trong {@code monster_template} (ADR-048).
+     *
+     * <p>Trước ADR-048 không có hằng số này vì `spawnBoss()` không có tham số: cả dự án chỉ có một
+     * boss và nó hardcode trong `BossConstants`. Nay mã đi kèm lệnh, nên hầm ngục THỨ HAI chỉ cần
+     * đổi chuỗi này thay vì sửa `server-world`.
+     */
+    private static final String DUNGEON_BOSS_CODE = "sample_boss";
+
     private static final float DUNGEON_ENTRY_SPAWN_X = 0f;
     private static final float DUNGEON_ENTRY_SPAWN_Y = 0f;
 
@@ -45,20 +57,39 @@ final class DungeonInstanceRegistry {
     private final PartyFacade partyFacade;
     private final MainWorldChannelRegistry mainWorldChannels;
 
+    /**
+     * Nội dung tĩnh để dựng World của instance (ADR-048).
+     *
+     * <p>Trước ADR-048 hầm ngục dựng World bằng {@code new WorldFacade(sink, false)} — overload đó
+     * truyền {@code WorldContentCatalog.EMPTY}, và điều đó KHÔNG sao vì boss đọc chỉ số từ hằng số
+     * Java. Nay boss là một hàng trong {@code monster_template}, nên World không có catalog sẽ tra
+     * không ra mã boss và hầm ngục lặng lẽ rỗng. Đây là mắt xích ADR-048 không lường trước.
+     */
+    private final WorldContentCatalog worldContent;
+
     private final Map<Long, DungeonInstance> instancesByPartyId = new HashMap<>();
     private final Map<Long, DungeonInstance> instanceByCharacterId = new HashMap<>();
     private final Map<Long, PositionSnapshot> returnPositionByCharacterId = new HashMap<>();
 
+    /**
+     * @param facades hai facade đi CHUNG một tham số vì trần Checkstyle {@code ParameterNumber} là
+     *     4 và tham số thứ tư nay là {@code worldContent} (ADR-048) — cùng cách ADR-040 D6 gói quái
+     *     với NPC vào {@code WorldContentCatalog} khi constructor {@code WorldFacade} chạm trần.
+     */
     DungeonInstanceRegistry(
             ConnectedCharacterRegistry registry,
-            CharacterFacade characterFacade,
-            PartyFacade partyFacade,
-            MainWorldChannelRegistry mainWorldChannels) {
+            DungeonFacades facades,
+            MainWorldChannelRegistry mainWorldChannels,
+            WorldContentCatalog worldContent) {
         this.registry = registry;
-        this.characterFacade = characterFacade;
-        this.partyFacade = partyFacade;
+        this.characterFacade = facades.characterFacade();
+        this.partyFacade = facades.partyFacade();
         this.mainWorldChannels = mainWorldChannels;
+        this.worldContent = worldContent;
     }
+
+    /** Hai facade hầm ngục cần — xem javadoc constructor về vì sao chúng bị gói lại. */
+    record DungeonFacades(CharacterFacade characterFacade, PartyFacade partyFacade) {}
 
     /** {@code WorldFacade} nhân vật này đang ở TRONG (dungeon), rỗng nếu đang ở world chính. */
     Optional<WorldFacade> worldFacadeFor(long characterId) {
@@ -132,11 +163,15 @@ final class DungeonInstanceRegistry {
     }
 
     private DungeonInstance createInstance(long partyId) {
-        WorldFacade dungeonFacade = new WorldFacade(new DungeonOutboundSink(registry), false);
+        // ADR-048 — catalog PHẢI đi vào đây, nếu không `spawnBoss` tra không ra mã và hầm ngục
+        // rỗng không một lời báo. `spawnOverworldContent = false` vẫn giữ: World này không
+        // spawn nội dung overworld, nó chỉ cần TRA được loài boss.
+        WorldFacade dungeonFacade =
+                new WorldFacade(new DungeonOutboundSink(registry), false, TickMetricsPort.NO_OP, worldContent);
         dungeonFacade.start();
         // Phase 8 lát cắt 2 — NƠI DUY NHẤT "dungeon" và "boss" được nối với nhau; WorldFacade vẫn
         // không biết khái niệm "dungeon" (chỉ biết "có ai bảo spawn boss hay không").
-        dungeonFacade.spawnBoss();
+        dungeonFacade.spawnBoss(DUNGEON_BOSS_CODE);
         return new DungeonInstance(partyId, dungeonFacade);
     }
 

@@ -247,6 +247,9 @@ public final class ServerDatabaseBootstrap {
         ArrayList<String> refs = new ArrayList<String>();
         refs.addAll(new PostgresQuestTemplateAdapter(dataSource).listAllScriptRefs());
         refs.addAll(new PostgresNpcTemplateAdapter(dataSource).listAllDialogueScriptRefs());
+        // ADR-048 — script AI boss nay là dữ liệu (`monster_template.ai_script_ref`), nên nó phải
+        // được duyệt ở ĐÂY. `WorldFacade.listBossScriptResources()` cũ chỉ biết một hằng số.
+        refs.addAll(new PostgresMonsterCatalogAdapter(dataSource).listAllBossScriptRefs());
         return refs;
     }
 
