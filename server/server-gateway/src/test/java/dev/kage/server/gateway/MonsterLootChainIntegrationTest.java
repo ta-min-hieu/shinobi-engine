@@ -84,6 +84,7 @@ import dev.kage.server.database.quest.PostgresQuestAuditAdapter;
 import dev.kage.server.database.quest.PostgresQuestExpAdapter;
 import dev.kage.server.database.quest.PostgresQuestIdempotencyAdapter;
 import dev.kage.server.database.quest.PostgresQuestInventoryGrantAdapter;
+import dev.kage.server.database.quest.PostgresQuestItemTakeAdapter;
 import dev.kage.server.database.quest.PostgresQuestProgressAdapter;
 import dev.kage.server.database.quest.PostgresQuestTemplateAdapter;
 import dev.kage.server.world.CharacterBaseStats;
@@ -442,7 +443,11 @@ class MonsterLootChainIntegrationTest {
                 new PostgresQuestIdempotencyAdapter());
         return new QuestFacade(
                 new AcceptQuestUseCase(progressPort, templatePort, transactionRunner),
-                new ProcessQuestEventUseCase(progressPort, transactionRunner),
+                new ProcessQuestEventUseCase(
+                        progressPort,
+                        new PostgresQuestItemTakeAdapter(),
+                        new PostgresQuestAuditAdapter(),
+                        transactionRunner),
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, transactionRunner),
                 new ListQuestsUseCase(progressPort));
     }

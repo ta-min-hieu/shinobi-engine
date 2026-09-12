@@ -195,3 +195,44 @@ chỉ có nghĩa với đúng một loại sự kiện, nên thêm loại thứ 
 Từ khi có hai loại sự kiện, mỗi quest đang làm nhận MỌI sự kiện, nên nhánh "không liên quan" trở
 thành nhánh thường gặp nhất. `dispatch` bỏ hẳn lần `save` khi script trả lại đúng chuỗi cũ và chưa
 `complete()` — không thì số transaction rỗng tăng theo tích (số quest × số sự kiện).
+
+## Mục tiêu loại THỨ BA — "mang vật X tới NPC Y" (2026-09-11)
+
+Chỉ cơ chế, cho twist arc 2 (đệ tử ngoại môn mất tích). Không có migration nội dung — quest mẫu
+nằm ở test resources (`test_fixture_delivery.js` ở đây, `it_fixture_delivery.js` ở server-database).
+
+**Không lối vào mới, không loại sự kiện mới, không opcode.** Giao đồ đi trên `npc_talked`, cộng một
+hiệu ứng: `ctx.take_item(code, qty)`. Vì thế `dispatch` KHÔNG có lối vào thứ ba — không có gì để
+copy-paste.
+
+**Vì sao không làm "có được vật X":** có NĂM đường cấp vật phẩm (rơi đồ qua `GrantLootUseCase`;
+cửa hàng, thưởng quest, hòm thư, giao dịch đều `INSERT` thẳng ở adapter riêng). Mục tiêu dựa trên sự
+kiện "vật vào túi" phải móc cả năm, và vẫn sai khi vật có sẵn trước lúc nhận quest hoặc bị bán đi
+sau đó. Kiểm túi lúc giao chỉ nhìn trạng thái — năm đường không phải sửa gì.
+
+### Cách nó chạy
+
+- `QuestScriptRunner` chỉ đưa `take_item` vào `ctx` ở `on_event`. Ở `on_accept`/`on_claim` gọi nó là
+  lỗi script (ồn), không phải lời đòi đồ bị bỏ qua (im).
+- `ItemTake` chặn số lượng ≤ 0 ngay trong callback (số âm đi xuống `quantity - ?` là CỘNG đồ).
+- `HookEffects.scriptFailed`: script lỗi giữa chừng ⇒ `ProcessQuestEventUseCase` bỏ HẾT hiệu ứng dở
+  dang. ⚠️ `Accept`/`ClaimQuestRewardUseCase` chưa đọc cờ này và vẫn dùng hiệu ứng dở dang như cũ.
+- `ProcessQuestEventUseCase.write`: một transaction = compare-and-set tiến độ TRƯỚC → từng
+  `QuestItemTakePort.takeItemByCode` + audit `QUEST_ITEM_TAKEN`. Thiếu món ⇒ ném
+  `ItemsMissingException` (private, không bao giờ thoát khỏi lớp) để runner rollback.
+- `QuestProgressPort.saveIfUnchanged` (`UPDATE … WHERE status='IN_PROGRESS' AND progress_json=?`).
+  Xung đột ⇒ `find` đọc lại, chạy lại hook, tối đa 3 lần; quest đã rời IN_PROGRESS ⇒ dừng, không lấy đồ.
+  Default của nó NÉM — không có mặc định "vô hại" cho một lần ghi.
+- `PostgresQuestItemTakeAdapter`: `FOR UPDATE OF ii` các dòng cùng mã, **không đang mặc, chưa cường
+  hoá**, id nhỏ trước; đủ thì xoá/trừ, không đủ thì trả `false` mà chưa ghi gì.
+
+### Ba luật (mỗi luật có test gác)
+
+1. Lấy đồ là ĐIỀU KIỆN của cả hook — thiếu một món ⇒ rollback hết (`shouldLeaveNoTrace_whenOneOfTheItemsIsMissing`,
+   `shouldRollBackTheFirstItem_whenTheSecondIsMissing` trên Postgres thật).
+2. Tiến độ là CỜ + `!progress.delivered` — mở lời lần nữa không đòi đồ lần hai (`shouldNotTakeAgain_onceDelivered`).
+3. Không giao hai lần khi mở lời song song (`shouldNotHandOverTwice_whenAConcurrentTalkDeliveredFirst`,
+   `shouldHandOverOnlyOnce_whenTheSameTalkArrivesConcurrently` — 4 luồng, Postgres thật).
+
+Compare-and-set áp cho MỌI sự kiện ⇒ sửa luôn lỗi mất cập nhật có từ trước khi hai con quái chết
+cùng nhịp (`shouldRerunTheHookOnFreshProgress_whenAnotherEventWroteFirst`).

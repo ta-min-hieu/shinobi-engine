@@ -31,6 +31,18 @@ public final class PostgresQuestProgressAdapter implements QuestProgressPort {
                           updated_at = EXCLUDED.updated_at
             """;
 
+    /**
+     * Compare-and-set (xem {@code QuestProgressPort.saveIfUnchanged}). Ở mức READ COMMITTED mặc
+     * định, câu này chờ mọi lần ghi đang mở trên cùng dòng rồi ĐÁNH GIÁ LẠI {@code WHERE} trên bản
+     * đã commit — nên lần ghi thứ hai thấy {@code progress_json} đã khác và nhận 0 dòng, thay vì ghi đè.
+     */
+    private static final String UPDATE_IF_UNCHANGED = """
+            UPDATE character_quest_progress
+               SET status = ?, progress_json = ?, updated_at = ?
+             WHERE character_id = ? AND quest_template_id = ?
+               AND status = 'IN_PROGRESS' AND progress_json = ?
+            """;
+
     // JOIN quest_template để trả quest_code (khoá client dùng) thay vì quest_template_id —
     // ClaimQuestRewardCommand nhận code. KHÔNG select progress_json: chuỗi đục do script tự quản,
     // cố ý không đi qua dây (ADR-035 Decision-4).
@@ -107,5 +119,20 @@ public final class PostgresQuestProgressAdapter implements QuestProgressPort {
                 progress.status().name(),
                 progress.progressJson(),
                 Timestamp.from(Instant.now()));
+    }
+
+    @Override
+    public boolean saveIfUnchanged(Transaction tx, QuestProgress progress, String expectedProgressJson) {
+        Connection connection = ((JdbcTransaction) tx).connection();
+        int updated = JdbcOperations.update(
+                connection,
+                UPDATE_IF_UNCHANGED,
+                progress.status().name(),
+                progress.progressJson(),
+                Timestamp.from(Instant.now()),
+                progress.characterId(),
+                progress.questTemplateId(),
+                expectedProgressJson);
+        return updated == 1;
     }
 }

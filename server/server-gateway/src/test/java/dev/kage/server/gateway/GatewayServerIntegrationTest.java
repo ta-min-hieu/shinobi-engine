@@ -542,7 +542,8 @@ class GatewayServerIntegrationTest {
         dev.kage.quest.application.AcceptQuestUseCase acceptQuestUseCase =
                 new dev.kage.quest.application.AcceptQuestUseCase(progressPort, templatePort, tx);
         dev.kage.quest.application.ProcessQuestEventUseCase processQuestEventUseCase =
-                new dev.kage.quest.application.ProcessQuestEventUseCase(progressPort, tx);
+                new dev.kage.quest.application.ProcessQuestEventUseCase(
+                        progressPort, (t, characterId, itemTemplateCode, quantity) -> false, auditPort, tx);
         dev.kage.quest.domain.IdempotencyPort questIdempotencyPort = (t, idempotencyKey) -> {};
         dev.kage.quest.application.QuestRewardPorts rewardPorts = new dev.kage.quest.application.QuestRewardPorts(
                 expPort, inventoryGrantPort, auditPort, questIdempotencyPort);

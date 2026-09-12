@@ -112,6 +112,7 @@ import dev.kage.server.database.quest.PostgresQuestAuditAdapter;
 import dev.kage.server.database.quest.PostgresQuestExpAdapter;
 import dev.kage.server.database.quest.PostgresQuestIdempotencyAdapter;
 import dev.kage.server.database.quest.PostgresQuestInventoryGrantAdapter;
+import dev.kage.server.database.quest.PostgresQuestItemTakeAdapter;
 import dev.kage.server.database.quest.PostgresQuestProgressAdapter;
 import dev.kage.server.database.quest.PostgresQuestTemplateAdapter;
 import dev.kage.server.database.session.RedisClientFactory;
@@ -335,8 +336,8 @@ public final class ServerDatabaseBootstrap {
         PostgresQuestIdempotencyAdapter idempotencyPort = new PostgresQuestIdempotencyAdapter();
         JdbcQuestTransactionRunner transactionRunner = new JdbcQuestTransactionRunner(dataSource);
         AcceptQuestUseCase acceptQuestUseCase = new AcceptQuestUseCase(progressPort, templatePort, transactionRunner);
-        ProcessQuestEventUseCase processQuestEventUseCase =
-                new ProcessQuestEventUseCase(progressPort, transactionRunner);
+        ProcessQuestEventUseCase processQuestEventUseCase = new ProcessQuestEventUseCase(
+                progressPort, new PostgresQuestItemTakeAdapter(), auditPort, transactionRunner);
         QuestRewardPorts rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort, idempotencyPort);
         ClaimQuestRewardUseCase claimQuestRewardUseCase =
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, transactionRunner);
