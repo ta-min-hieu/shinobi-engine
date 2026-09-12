@@ -24,6 +24,7 @@ import io.opentelemetry.sdk.trace.data.SpanData;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -1367,6 +1368,193 @@ class GatewayServerIntegrationTest {
             assertThat(sawSpecialAction)
                     .as("boss phải dùng heavy_strike hoặc enrage trước khi chết")
                     .isTrue();
+        }
+    }
+
+    /**
+     * Người bị bạn cùng nhóm KÉO vào hầm ngục phải được báo — nợ ghi từ bàn giao 2026-08-30.
+     *
+     * <p>{@code DungeonInstanceRegistry.enterDungeon} dời MỌI thành viên đang online sang World hầm
+     * ngục, nhưng {@code handleEnterDungeonBlocking} chỉ trả {@code EnterDungeonResponse} cho NGƯỜI
+     * GỬI. Test này chứng minh phía server đã dời B thật (B nhận spawn của boss từ World hầm ngục)
+     * mà B không nhận một gói nào thuộc dải Dungeon (1500-1599) — nên client của B không biết mình
+     * đang ở đâu (không dải chữ HUD, không dọn thực thể của làng, vị trí sai tới lần đi đầu tiên).
+     *
+     * <p>Chạy thật 2026-09-11 khi chưa gắn {@code @Disabled}: ĐỎ đúng như dự đoán. Sửa bắt buộc đổi
+     * protocol (thêm event, hoặc đổi ngữ nghĩa {@code EnterDungeonResponse} thành gói đẩy) ⇒ chờ
+     * ADR-047. Điều kiện "dải 1500-1599" đúng cho cả phương án A (đẩy lại response với
+     * {@code sequenceId = 0}) lẫn B (event mới trong dải Dungeon) của ADR đó; chọn phương án khác
+     * thì sửa điều kiện ở đây, còn chọn "mỗi người tự vào" thì thay hẳn test này.
+     */
+    @Test
+    @Timeout(20)
+    @Disabled("Chờ ADR-047 (Proposed) — sửa bắt buộc đổi protocol; bỏ @Disabled khi thi hành phương án được chọn")
+    void pulledPartyMemberShouldBeToldTheyEnteredDungeon_overRealSockets() throws Exception {
+        try (Socket socketA = new Socket("127.0.0.1", server.port());
+                Socket socketB = new Socket("127.0.0.1", server.port())) {
+            socketA.setSoTimeout(5000);
+            socketB.setSoTimeout(5000);
+            DataInputStream inA = new DataInputStream(socketA.getInputStream());
+            DataInputStream inB = new DataInputStream(socketB.getInputStream());
+
+            String suffix = UUID.randomUUID().toString().substring(0, 8);
+            long characterA = connectCreateAndSelect(socketA, inA, "pa" + suffix);
+            long characterB = connectCreateAndSelect(socketB, inB, "pb" + suffix);
+            partyFacade.createParty(characterA);
+            partyFacade.invite(characterA, characterB);
+            long inviteId = partyFacade.listPendingInvites(characterB).get(0).inviteId();
+            partyFacade.acceptInvite(inviteId, characterB);
+
+            EnterDungeonCommand enterCommand = EnterDungeonCommand.newBuilder()
+                    .setDungeonCode("sample_dungeon")
+                    .build();
+            sendFrame(socketA, Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, 40, enterCommand.toByteArray());
+            EnterDungeonResponse enterResponseA =
+                    EnterDungeonResponse.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE)
+                            .payload());
+            assertThat(enterResponseA.getOutcome()).isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
+
+            // B không gửi gì. Đọc tới khi thấy boss — bằng chứng server ĐÃ dời B sang World hầm ngục
+            // (world chính không có boss) — và ghi lại mọi opcode B đã nhận trên đường đi.
+            // Không đặt trần số frame: @Timeout + socket timeout đã chặn trường hợp boss không bao giờ
+            // tới (và giữ lớp này dưới trần CyclomaticComplexity cấp lớp của PMD).
+            List<Integer> opcodesSeenByB = new ArrayList<>();
+            boolean bossSeenByB = false;
+            while (!bossSeenByB) {
+                PacketCodec.Frame frame = readFrame(inB);
+                opcodesSeenByB.add(frame.header().opcode());
+                bossSeenByB = frame.header().opcode() == Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE
+                        && "sample_boss"
+                                .equals(MonsterSpawnedEvent.parseFrom(frame.payload())
+                                        .getMonsterCode());
+            }
+            // Luồng auth (gửi báo) và luồng tick hầm ngục (gửi spawn) không hứa thứ tự với nhau —
+            // đọc thêm một quãng để lời báo tới SAU boss cũng được tính. Hết quãng, hoặc im lặng
+            // trọn quãng (socket timeout), đều là điều kiện dừng bình thường.
+            int graceMillis = 1500;
+            socketB.setSoTimeout(graceMillis);
+            long graceDeadline =
+                    System.nanoTime() + Duration.ofMillis(graceMillis).toNanos();
+            while (System.nanoTime() < graceDeadline) {
+                try {
+                    opcodesSeenByB.add(readFrame(inB).header().opcode());
+                } catch (java.net.SocketTimeoutException e) {
+                    break; // im lặng trọn quãng — không còn gì để ghi.
+                }
+            }
+
+            // Dải opcode chia theo trăm (NETWORK.md §4): Dungeon = 1500-1599.
+            int opcodeRangeWidth = 100;
+            int dungeonRange = Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE / opcodeRangeWidth;
+            assertThat(opcodesSeenByB)
+                    .as("B bị kéo vào hầm ngục phải nhận ít nhất một gói dải Dungeon, đã nhận: %s", opcodesSeenByB)
+                    .anyMatch(opcode -> opcode / opcodeRangeWidth == dungeonRange);
+        }
+    }
+
+    /**
+     * Đường rời hầm ngục thứ hai: một thành viên MẤT KẾT NỐI bên trong. Người ở lại không đổi World
+     * nên không cần gói báo nào — nhưng họ phải thấy người kia biến mất, và instance phải còn sống
+     * (World chỉ dừng khi RỖNG, {@code DungeonInstanceRegistry.leaveInstance}) để họ tự thoát được.
+     */
+    @Test
+    @Timeout(20)
+    void remainingMemberShouldSeeDespawnAndStillExit_whenPartyMemberDisconnectsInsideDungeon_overRealSockets()
+            throws Exception {
+        try (Socket socketA = new Socket("127.0.0.1", server.port())) {
+            socketA.setSoTimeout(5000);
+            DataInputStream inA = new DataInputStream(socketA.getInputStream());
+            String suffix = UUID.randomUUID().toString().substring(0, 8);
+            long characterA = connectCreateAndSelect(socketA, inA, "ra" + suffix);
+            long characterB;
+            try (Socket socketB = new Socket("127.0.0.1", server.port())) {
+                socketB.setSoTimeout(5000);
+                DataInputStream inB = new DataInputStream(socketB.getInputStream());
+                characterB = connectCreateAndSelect(socketB, inB, "rb" + suffix);
+                partyFacade.createParty(characterA);
+                partyFacade.invite(characterA, characterB);
+                long inviteId =
+                        partyFacade.listPendingInvites(characterB).get(0).inviteId();
+                partyFacade.acceptInvite(inviteId, characterB);
+
+                EnterDungeonCommand enterCommand = EnterDungeonCommand.newBuilder()
+                        .setDungeonCode("sample_dungeon")
+                        .build();
+                sendFrame(socketA, Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, 50, enterCommand.toByteArray());
+                assertThat(EnterDungeonResponse.parseFrom(
+                                        readUntilOpcode(inA, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE)
+                                                .payload())
+                                .getOutcome())
+                        .isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
+
+                // B đi sang phải TRONG hầm ngục, A phải thấy — bằng chứng A đang nhìn thấy B ở CHÍNH
+                // World hầm ngục (cùng cách partyShouldEnterAndExitDungeonAsSeparateWorld_...). Mỗi
+                // test dựng server riêng và chỉ B di chuyển, nên CharacterMovedEvent đầu tiên A nhận
+                // chính là của B — khẳng định id để sai thì đỏ to chứ không lặng lẽ đọc nhầm.
+                MoveCommand moveCommand =
+                        MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
+                sendFrame(socketB, Opcode.OPCODE_MOVE_COMMAND_VALUE, 51, moveCommand.toByteArray());
+                CharacterMovedEvent movedSeenByA =
+                        CharacterMovedEvent.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE)
+                                .payload());
+                assertThat(movedSeenByA.getCharacterId()).isEqualTo(characterB);
+                assertThat(movedSeenByA.getX()).isGreaterThan(0f);
+            } // B đóng socket ⇒ channelInactive ⇒ handleDisconnectIfInDungeon.
+
+            // A đã rời world chính trước B (cùng hộp thư, A xếp trước) nên world chính không báo A
+            // despawn của B; despawn duy nhất A nhận là từ World hầm ngục.
+            CharacterDespawnedEvent despawnSeenByA = CharacterDespawnedEvent.parseFrom(
+                    readUntilOpcode(inA, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE)
+                            .payload());
+            assertThat(despawnSeenByA.getCharacterId()).isEqualTo(characterB);
+
+            sendFrame(
+                    socketA,
+                    Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE,
+                    52,
+                    ExitDungeonCommand.newBuilder().build().toByteArray());
+            assertThat(ExitDungeonResponse.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE)
+                                    .payload())
+                            .getOutcome())
+                    .isEqualTo(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK);
+        }
+    }
+
+    /**
+     * Đường rời hầm ngục thứ ba: RỜI NHÓM khi đang ở trong. Rời nhóm không dời ai khỏi instance (không
+     * đổi World ⇒ không cần gói báo nào), nên điều duy nhất phải bảo đảm là người đó KHÔNG bị kẹt:
+     * {@code exitDungeon} tra theo nhân vật, không theo nhóm.
+     */
+    @Test
+    @Timeout(15)
+    void memberShouldStillExitDungeon_afterLeavingPartyInside_overRealSockets() throws Exception {
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(5000);
+            DataInputStream in = new DataInputStream(socket.getInputStream());
+            long characterId = connectCreateAndSelect(
+                    socket, in, "lp" + UUID.randomUUID().toString().substring(0, 6));
+            partyFacade.createParty(characterId); // nhóm 1 người — đủ điều kiện vào hầm ngục.
+
+            EnterDungeonCommand enterCommand = EnterDungeonCommand.newBuilder()
+                    .setDungeonCode("sample_dungeon")
+                    .build();
+            sendFrame(socket, Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, 60, enterCommand.toByteArray());
+            assertThat(EnterDungeonResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE)
+                                    .payload())
+                            .getOutcome())
+                    .isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
+
+            assertThat(partyFacade.leaveParty(characterId)).isEqualTo(dev.kage.party.api.PartyFacade.LeaveResult.OK);
+
+            sendFrame(
+                    socket,
+                    Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE,
+                    61,
+                    ExitDungeonCommand.newBuilder().build().toByteArray());
+            assertThat(ExitDungeonResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE)
+                                    .payload())
+                            .getOutcome())
+                    .isEqualTo(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK);
         }
     }
 

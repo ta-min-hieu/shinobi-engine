@@ -101,6 +101,10 @@ final class DungeonCoordinator implements WindowFlow {
     /**
      * Nói ra kết quả, ghi trạng thái theo lời server, rồi dọn màn hình nếu vừa đổi World.
      *
+     * <p>⚠️ Thứ tự dưới đây là GIẢ ĐỊNH, không phải bảo đảm: phía server còn đọc DB cho các thành
+     * viên khác SAU khi đã attach người gửi, nên vòng {@code sync} của world mới có thể lọt vào trước
+     * response — xem mục "Phát hiện phụ" của ADR-047.
+     *
      * <p>Thứ tự "response tới TRƯỚC entity của world mới" là thứ làm cho việc dọn ở đây an toàn:
      * {@code handleEnterDungeonBlocking} phía server trả lời NGAY trong lời gọi
      * {@code enterDungeon()}, còn attach/spawn chỉ là lệnh vừa được xếp vào hộp thư của World và

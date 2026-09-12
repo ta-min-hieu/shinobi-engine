@@ -36,7 +36,8 @@ import dev.kage.protocol.ExitDungeonOutcome;
  * </ul>
  *
  * <p>Đóng ba lỗ trên thật sự cần event đẩy phía server, tức cần sửa {@code .proto} — nằm ngoài
- * quyền của client (/CLAUDE.md §4).
+ * quyền của client (/CLAUDE.md §4). Lỗ thứ nhất đã tái hiện qua socket thật và có đề xuất ở
+ * ADR-047 (Proposed, 2026-09-11).
  */
 final class DungeonController {
 
