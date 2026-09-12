@@ -87,6 +87,14 @@ public final class QuestLogPanel implements HudWindow {
     /** Bề rộng cột chữ của một dòng nhiệm vụ — chừa đúng chỗ cho nút bên phải. */
     private static final float ROW_TEXT_WIDTH_PX = 340f;
 
+    /**
+     * Chiều cao TỐI ĐA của vùng cuộn nhật ký (≈ 7 dòng 52px); dài hơn thì cuộn. Số dòng được DỰNG
+     * là {@link ScrollingList#MAX_BUILT_ROWS} — trước 2026-09-11 là {@code QuestTracker.MAX_VISIBLE_ROWS
+     * = 8} với lý do "chưa có ScrollPane" đã chết. Chưa giấu gì thật (server mới seed 5 nhiệm vụ),
+     * nhưng nhiệm vụ thứ 9 sẽ biến mất khỏi nhật ký — cùng loại lỗi đã giấu mất đan dược ở túi đồ.
+     */
+    private static final float QUEST_LIST_MAX_HEIGHT_PX = 364f;
+
     /** Vàng đồng nhạt — tiêu đề mục, cùng tông viền HUD của {@link KageSkin}. */
     private static final Color SECTION_COLOR = Color.valueOf("E0B860");
 
@@ -137,7 +145,12 @@ public final class QuestLogPanel implements HudWindow {
         panel.pad(PANEL_PAD_PX);
         panel.add(titleLabel()).width(PANEL_WIDTH_PX).left().row();
         panel.add(statusLabel).width(PANEL_WIDTH_PX).left().padTop(6f).row();
-        panel.add(questList).width(PANEL_WIDTH_PX).growX().padTop(10f).row();
+        panel.add(ScrollingList.wrap(questList, skin))
+                .width(PANEL_WIDTH_PX)
+                .maxHeight(QUEST_LIST_MAX_HEIGHT_PX)
+                .growX()
+                .padTop(10f)
+                .row();
         panel.add(closeHint()).width(PANEL_WIDTH_PX).left().padTop(8f).row();
         panel.setVisible(false);
 
@@ -330,6 +343,14 @@ public final class QuestLogPanel implements HudWindow {
         } catch (java.util.MissingResourceException e) {
             return key;
         }
+    }
+
+    /**
+     * Chiều cao khung MUỐN có ở trạng thái hiện tại — chỉ dùng cho {@code HudLayoutBudgetTool}, cùng
+     * lý do {@link InventoryPanel#preferredHeight()}.
+     */
+    float preferredHeight() {
+        return panel.getPrefHeight();
     }
 
     @Override

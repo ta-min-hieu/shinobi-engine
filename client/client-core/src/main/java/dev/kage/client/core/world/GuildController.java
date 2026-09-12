@@ -62,14 +62,6 @@ final class GuildController {
      */
     static final int MAX_NAME_LENGTH = 32;
 
-    /**
-     * Số dòng tối đa hiển thị cho mỗi danh sách. Trần cứng cùng lý do {@link ChatController#MAX_LINES}:
-     * số thành viên do NGƯỜI KHÁC quyết (leader duyệt bao nhiêu đơn tuỳ họ), không phải do máy này
-     * quyết — và {@code KageSkin} chưa có style {@code ScrollPane} nào, nên danh sách dài sẽ đội
-     * khung cao vượt khỏi màn hình chứ không tự cuộn.
-     */
-    static final int MAX_VISIBLE_ROWS = 8;
-
     /** Một thành viên bang. {@code online} do gateway ghép từ registry, không phải từ feature-guild. */
     record Member(long characterId, String name, boolean leader, boolean online) {}
 

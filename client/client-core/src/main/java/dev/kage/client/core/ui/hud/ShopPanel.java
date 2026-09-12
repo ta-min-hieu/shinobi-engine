@@ -74,11 +74,19 @@ public final class ShopPanel implements HudWindow {
     private static final int DEFAULT_QUANTITY = 1;
 
     /**
-     * Số dòng hiển thị cùng lúc — trần cứng cùng lý do {@code MailController.MAX_VISIBLE_ROWS}:
-     * {@code KageSkin} chưa có style {@code ScrollPane} nào, nên danh mục dài sẽ đội khung cao vượt
-     * khỏi màn hình chứ không tự cuộn.
+     * Chiều cao TỐI ĐA của vùng cuộn danh mục (≈ 7 dòng 52px). Danh mục dài hơn thì cuộn — số dòng
+     * được DỰNG là {@link ScrollingList#MAX_BUILT_ROWS}, không phải con số này.
+     *
+     * <p>⚠️ Trước 2026-09-11 chỗ này là trần {@code MAX_VISIBLE_ROWS = 8} với lý do "{@code KageSkin}
+     * chưa có style {@code ScrollPane}" — lý do đã chết, và trần đó là một LỖI THẬT: server bán 19
+     * món ({@code shop_item}, sắp theo {@code item_template_id}) nên 11 món cuối không bao giờ được
+     * dựng, không mua được bằng cách nào — kể cả {@code minor_healing_pill} (V36), món dùng được duy
+     * nhất của game. Xem {@link ScrollingList}.
+     *
+     * <p>Đo bằng {@code HudLayoutBudgetTool} ở trạng thái tệ nhất (danh mục đầy, dòng trạng thái
+     * dài): con số ghi ở javadoc lớp công cụ đó sau mỗi lần chỉnh.
      */
-    public static final int MAX_VISIBLE_ROWS = 8;
+    private static final float LISTING_MAX_HEIGHT_PX = 364f;
 
     /** Vàng đồng nhạt — tiêu đề mục, cùng tông viền HUD của {@link KageSkin}. */
     private static final Color SECTION_COLOR = Color.valueOf("E0B860");
@@ -144,7 +152,11 @@ public final class ShopPanel implements HudWindow {
                 .left()
                 .padTop(10f)
                 .row();
-        panel.add(listingTable).width(PANEL_WIDTH_PX).growX().row();
+        panel.add(ScrollingList.wrap(listingTable, skin))
+                .width(PANEL_WIDTH_PX)
+                .maxHeight(LISTING_MAX_HEIGHT_PX)
+                .growX()
+                .row();
         panel.add(closeHint()).width(PANEL_WIDTH_PX).left().padTop(8f).row();
         panel.setVisible(false);
 
@@ -400,6 +412,14 @@ public final class ShopPanel implements HudWindow {
         } catch (java.util.MissingResourceException e) {
             return key;
         }
+    }
+
+    /**
+     * Chiều cao khung MUỐN có ở trạng thái hiện tại — chỉ dùng cho {@code HudLayoutBudgetTool}, cùng
+     * lý do {@link InventoryPanel#preferredHeight()}.
+     */
+    float preferredHeight() {
+        return panel.getPrefHeight();
     }
 
     @Override

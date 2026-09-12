@@ -82,6 +82,27 @@ public final class MailPanel implements HudWindow {
     /** Bề rộng cột chữ của một dòng thư — chừa đúng chỗ cho ba nút bên phải. */
     private static final float ROW_TEXT_WIDTH_PX = 330f;
 
+    /**
+     * Chiều cao TỐI ĐA của vùng cuộn danh sách thư (≈ 3 dòng 52px); dài hơn thì cuộn. Số dòng được
+     * DỰNG là {@link ScrollingList#MAX_BUILT_ROWS}.
+     *
+     * <p>⚠️ Trước 2026-09-11 danh sách không cuộn, trần {@code MailController.MAX_VISIBLE_ROWS = 6}
+     * với lý do "không có ScrollPane nên danh sách dài đội khung vượt màn hình". Trần đó vừa GIẤU
+     * thư thứ 7 trở đi (không đọc/nhận/xoá được — server không có trần hòm thư nào) vừa KHÔNG làm
+     * được việc nó hứa: ở trạng thái tệ nhất (6 thư + một lá dài đúng 1024 ký tự đang mở) khung cao
+     * <b>1224px</b> trong màn hình 720px, đo bằng {@code HudLayoutBudgetTool}.
+     *
+     * <p>Nhỏ hơn các cửa sổ khác vì khung này gánh BA mục (danh sách + đọc + soạn) cùng lúc.
+     */
+    private static final float MAIL_LIST_MAX_HEIGHT_PX = 156f;
+
+    /**
+     * Chiều cao TỐI ĐA của nội dung thư đang đọc (≈ 3 dòng chữ); dài hơn thì cuộn. Cột
+     * {@code mail.body} cho tới 1024 ký tự — tự nở theo chữ thì riêng nó đã ~400px, đẩy khung soạn
+     * thư và dòng "ESC để đóng" ra khỏi màn hình.
+     */
+    private static final float READ_BODY_MAX_HEIGHT_PX = 81f;
+
     /** Ô nhập số vàng hẹp hơn hẳn ba ô chữ — nó chứa số, không chứa câu. */
     private static final float GOLD_FIELD_WIDTH_PX = 110f;
 
@@ -186,7 +207,11 @@ public final class MailPanel implements HudWindow {
                 .left()
                 .padTop(10f)
                 .row();
-        panel.add(mailList).width(PANEL_WIDTH_PX).growX().row();
+        panel.add(ScrollingList.wrap(mailList, skin))
+                .width(PANEL_WIDTH_PX)
+                .maxHeight(MAIL_LIST_MAX_HEIGHT_PX)
+                .growX()
+                .row();
         panel.add(buildReadSection()).width(PANEL_WIDTH_PX).growX().padTop(10f).row();
         panel.add(buildComposeSection())
                 .width(PANEL_WIDTH_PX)
@@ -256,7 +281,14 @@ public final class MailPanel implements HudWindow {
                 .left()
                 .row();
         section.add(readHeaderLabel).width(PANEL_WIDTH_PX).left().padTop(4f).row();
-        section.add(readBodyLabel).width(PANEL_WIDTH_PX).left().padTop(4f).row();
+        Table body = new Table();
+        body.add(readBodyLabel).growX().left();
+        section.add(ScrollingList.wrap(body, skin))
+                .width(PANEL_WIDTH_PX)
+                .maxHeight(READ_BODY_MAX_HEIGHT_PX)
+                .growX()
+                .padTop(4f)
+                .row();
         return section;
     }
 
@@ -533,6 +565,14 @@ public final class MailPanel implements HudWindow {
         } catch (java.util.MissingResourceException e) {
             return key;
         }
+    }
+
+    /**
+     * Chiều cao khung MUỐN có ở trạng thái hiện tại — chỉ dùng cho {@code HudLayoutBudgetTool}, cùng
+     * lý do {@link InventoryPanel#preferredHeight()}.
+     */
+    float preferredHeight() {
+        return panel.getPrefHeight();
     }
 
     @Override

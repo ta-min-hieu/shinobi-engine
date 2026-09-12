@@ -10,6 +10,7 @@ import com.badlogic.gdx.utils.I18NBundle;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import dev.kage.client.core.ui.hud.InventoryPanel;
+import dev.kage.client.core.ui.hud.ScrollingList;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.EnhanceItemResponse;
 import dev.kage.protocol.EquipItemResponse;
@@ -397,7 +398,7 @@ final class InventoryCoordinator implements WindowFlow {
     /** Đẩy toàn bộ trạng thái hiện có xuống panel. Gọi sau MỖI response tra cứu, không phải mỗi khung. */
     private void refreshView() {
         List<InventoryController.Item> all = controller.items();
-        int shown = Math.min(all.size(), InventoryController.MAX_VISIBLE_SLOTS);
+        int shown = Math.min(all.size(), ScrollingList.MAX_BUILT_ROWS);
         itemRows.clear();
         for (int index = 0; index < shown; index++) {
             InventoryController.Item item = all.get(index);

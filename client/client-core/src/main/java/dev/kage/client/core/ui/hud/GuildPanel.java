@@ -62,6 +62,21 @@ public final class GuildPanel implements HudWindow {
     /** Bề rộng CỐ ĐỊNH cho nút hành động trên từng dòng — nhãn dài ngắn khác nhau không được làm cột nhảy. */
     private static final float ROW_BUTTON_WIDTH_PX = 92f;
 
+    /**
+     * Chiều cao TỐI ĐA của vùng cuộn thành viên (≈ 3 dòng 52px) và của vùng cuộn đơn xin gia nhập
+     * (≈ 2 dòng); dài hơn thì cuộn. Số dòng được DỰNG là {@link ScrollingList#MAX_BUILT_ROWS} — server
+     * không có trần thành viên hay trần đơn nào (V14 không có cột sức chứa, không {@code LIMIT}).
+     *
+     * <p>⚠️ Trước 2026-09-11 là trần {@code GuildController.MAX_VISIBLE_ROWS = 8} cho MỖI danh sách
+     * với lý do "chưa có ScrollPane nên danh sách dài đội khung vượt màn hình". Hai danh sách 8 dòng
+     * cùng lúc (trạng thái của bang chủ) cao <b>1261px</b> trong màn hình 720px — trần đó chưa bao giờ
+     * làm được việc nó hứa, chỉ giấu thành viên thứ 9 và đơn thứ 9 (không duyệt được).
+     */
+    private static final float MEMBER_LIST_MAX_HEIGHT_PX = 156f;
+
+    /** Xem {@link #MEMBER_LIST_MAX_HEIGHT_PX}. Thấp hơn vì chỉ bang chủ thấy, và chỉ lúc có đơn. */
+    private static final float PENDING_LIST_MAX_HEIGHT_PX = 104f;
+
     /** Vàng đồng nhạt — tiêu đề mục, cùng tông viền HUD của {@link KageSkin}. */
     private static final Color SECTION_COLOR = Color.valueOf("E0B860");
 
@@ -192,7 +207,11 @@ public final class GuildPanel implements HudWindow {
                 .width(PANEL_WIDTH_PX)
                 .left()
                 .row();
-        section.add(pendingList).width(PANEL_WIDTH_PX).growX().row();
+        section.add(ScrollingList.wrap(pendingList, skin))
+                .width(PANEL_WIDTH_PX)
+                .maxHeight(PENDING_LIST_MAX_HEIGHT_PX)
+                .growX()
+                .row();
         return section;
     }
 
@@ -202,7 +221,11 @@ public final class GuildPanel implements HudWindow {
                 .width(PANEL_WIDTH_PX)
                 .left()
                 .row();
-        section.add(memberList).width(PANEL_WIDTH_PX).growX().row();
+        section.add(ScrollingList.wrap(memberList, skin))
+                .width(PANEL_WIDTH_PX)
+                .maxHeight(MEMBER_LIST_MAX_HEIGHT_PX)
+                .growX()
+                .row();
         section.add(pendingSection).width(PANEL_WIDTH_PX).growX().padTop(10f).row();
 
         Table footer = new Table();
@@ -497,6 +520,14 @@ public final class GuildPanel implements HudWindow {
         } catch (java.util.MissingResourceException e) {
             return key;
         }
+    }
+
+    /**
+     * Chiều cao khung MUỐN có ở trạng thái hiện tại — chỉ dùng cho {@code HudLayoutBudgetTool}, cùng
+     * lý do {@link InventoryPanel#preferredHeight()}.
+     */
+    float preferredHeight() {
+        return panel.getPrefHeight();
     }
 
     @Override

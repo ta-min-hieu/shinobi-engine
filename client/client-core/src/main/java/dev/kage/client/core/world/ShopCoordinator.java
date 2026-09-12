@@ -7,6 +7,7 @@ import java.util.function.BooleanSupplier;
 import com.badlogic.gdx.utils.I18NBundle;
 import com.google.protobuf.InvalidProtocolBufferException;
 
+import dev.kage.client.core.ui.hud.ScrollingList;
 import dev.kage.client.core.ui.hud.ShopPanel;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.BuyItemResponse;
@@ -188,7 +189,7 @@ final class ShopCoordinator implements WindowFlow {
     /** Đẩy toàn bộ danh mục hiện có xuống panel. Gọi sau MỖI lần server trả lời hoặc catalog đổi tên. */
     private void refreshListings() {
         List<ShopController.Listing> all = controller.listings();
-        int shown = Math.min(all.size(), ShopPanel.MAX_VISIBLE_ROWS);
+        int shown = Math.min(all.size(), ScrollingList.MAX_BUILT_ROWS);
         rows.clear();
         for (int index = 0; index < shown; index++) {
             ShopController.Listing listing = all.get(index);

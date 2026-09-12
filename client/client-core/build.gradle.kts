@@ -76,6 +76,20 @@ tasks.register<JavaExec>("runHudPreview") {
     doFirst { workingDir.mkdirs() }
 }
 
+// ĐO (không chụp) chiều cao mọi cửa sổ HUD có danh sách ở trạng thái TỆ NHẤT, fail nếu cao hơn
+// 720p. KHÔNG throwaway: mỗi lần thêm dòng/nút vào một cửa sổ là một lần cần chạy lại — build gate
+// không bắt được vì cần GL context thật (CI không có display).
+tasks.register<JavaExec>("runHudLayoutCheck") {
+    group = "verification"
+    description = "Đo chiều cao các cửa sổ HUD khi danh sách đầy; fail nếu vượt màn hình 720p."
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("dev.kage.client.core.ui.hud.HudLayoutBudgetTool")
+    val assetRoot = rootProject.layout.projectDirectory.dir("assets/exported")
+    workingDir = assetRoot.asFile
+    providers.gradleProperty("kageLayoutRows").orNull?.let { systemProperty("kage.layout.rows", it) }
+    doFirst { workingDir.mkdirs() }
+}
+
 // Xem trước thế giới bằng ảnh, không cần server (~5s). KHÔNG throwaway: mỗi lần thêm/sửa một model
 // quái hay NPC là một lần cần nhìn lại hướng mặt, kích thước và dấu mục tiêu — thứ build gate không
 // bắt được.

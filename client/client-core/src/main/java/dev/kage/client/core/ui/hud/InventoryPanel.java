@@ -18,7 +18,6 @@ import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
-import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
@@ -222,7 +221,7 @@ public final class InventoryPanel implements HudWindow {
                 .padTop(10f)
                 .row();
         table.add(capacityLabel).width(PANEL_WIDTH_PX).left().row();
-        table.add(scrollable(itemList))
+        table.add(ScrollingList.wrap(itemList, skin))
                 .width(PANEL_WIDTH_PX)
                 .height(ITEM_LIST_HEIGHT_PX)
                 .growX()
@@ -235,7 +234,7 @@ public final class InventoryPanel implements HudWindow {
                 .left()
                 .padTop(10f)
                 .row();
-        table.add(scrollable(equipmentList))
+        table.add(ScrollingList.wrap(equipmentList, skin))
                 .width(PANEL_WIDTH_PX)
                 .height(EQUIPMENT_LIST_HEIGHT_PX)
                 .growX()
@@ -244,58 +243,6 @@ public final class InventoryPanel implements HudWindow {
         table.add(closeHint()).width(PANEL_WIDTH_PX).left().padTop(8f).row();
         table.setVisible(false);
         return table;
-    }
-
-    /**
-     * Bọc một danh sách vào vùng cuộn dọc, chiều cao do ô chứa quyết định (xem
-     * {@link #ITEM_LIST_HEIGHT_PX}).
-     *
-     * <p>{@code setScrollingDisabled(true, false)} khoá hẳn trục ngang: danh sách rộng đúng bằng
-     * khung nên cuộn ngang chỉ tạo ra một cú trượt nhầm. {@code setFadeScrollBars(false)} giữ thanh
-     * cuộn LUÔN hiện — thanh tự mờ đi làm người chơi không biết dưới còn đồ.
-     */
-    private ScrollPane scrollable(Table content) {
-        ScrollPane pane = new ScrollPane(content, skin.scrollPaneStyle);
-        pane.setScrollingDisabled(true, false);
-        pane.setFadeScrollBars(false);
-        pane.setOverscroll(false, false);
-        claimScrollFocusOnHover(pane);
-        return pane;
-    }
-
-    /**
-     * Cho lăn chuột ăn ngay khi RÊ vào vùng cuộn, không bắt phải bấm một phát trước.
-     *
-     * <p>Bẫy của libGDX: {@code Stage} gửi sự kiện lăn tới {@code scrollFocus}, mà {@link ScrollPane}
-     * chỉ tự giành {@code scrollFocus} trong {@code touchDown} của chính nó. Chưa bấm vào trong
-     * khung thì {@code scrollFocus} còn {@code null} và mọi cú lăn rơi vào {@code root} — người chơi
-     * thấy đúng cảnh "có thanh cuộn, có đồ ở dưới, lăn chuột không nhúc nhích". Bắt được lúc
-     * PLAYTEST SỐNG 2026-09-05 với túi 10 món trong khi khung chỉ hiện 3 — test không thấy được vì
-     * không test nào giả lập con trỏ chuột.
-     *
-     * <p>Trả {@code scrollFocus} về {@code null} lúc rời khung để lăn chuột ngoài cửa sổ không còn
-     * âm thầm cuộn danh sách này.
-     */
-    // PMD ExcessiveParameterList: chu ky enter/exit do Scene2D quyet dinh, khong sua duoc.
-    @SuppressWarnings("PMD.ExcessiveParameterList")
-    private static void claimScrollFocusOnHover(ScrollPane pane) {
-        pane.addListener(new InputListener() {
-            @Override
-            public void enter(InputEvent event, float x, float y, int pointer, Actor fromActor) {
-                if (pointer == -1 && pane.getStage() != null) { // -1 = con trỏ chuột, không phải ngón chạm
-                    pane.getStage().setScrollFocus(pane);
-                }
-            }
-
-            @Override
-            public void exit(InputEvent event, float x, float y, int pointer, Actor toActor) {
-                // Xoa vo dieu kien: Scene2D ban exit cua vung cu TRUOC enter cua vung moi, nen khong
-                // co nguy co xoa nham focus mot ScrollPane khac vua gianh duoc.
-                if (pointer == -1 && pane.getStage() != null) {
-                    pane.getStage().setScrollFocus(null);
-                }
-            }
-        });
     }
 
     /** Tự TẮT icon khi thiếu atlas (bản checkout chưa chạy pipeline art) — cùng {@code SkillVfxRenderer}. */
@@ -529,7 +476,8 @@ public final class InventoryPanel implements HudWindow {
      *
      * @param detailText chuỗi ĐÃ dịch (tên đầy đủ + số lượng + mức cường hoá), hoặc lời mời chọn một
      *     item khi chưa chọn gì.
-     * @param canEquip có bày nút Mặc hay không (item không mặc được theo catalog, hoặc chưa chọn gì).
+     * @param primary nút chính mang nghĩa gì — {@link PrimaryAction#NONE} thì giấu nút (chưa chọn gì,
+     *     hoặc món không mặc/dùng được theo catalog).
      * @param actions ba nút còn lại (Bán/Giao dịch/Cường hoá) — xem {@link Actions}.
      */
     public void showDetail(String detailText, PrimaryAction primary, Actions actions) {
@@ -659,9 +607,9 @@ public final class InventoryPanel implements HudWindow {
     }
 
     /**
-     * Chiều cao khung MUỐN có ở trạng thái hiện tại. Chỉ dùng cho {@code HudPreviewTool}: khung này
-     * chưa có {@code ScrollPane} (xem {@code InventoryController.MAX_VISIBLE_SLOTS}), nên "túi đầy
-     * có tràn khỏi màn hình không" là một con số phải ĐO, không phải một cảm giác nhìn ảnh.
+     * Chiều cao khung MUỐN có ở trạng thái hiện tại. Chỉ dùng cho {@code HudLayoutBudgetTool}: "túi
+     * đầy có tràn khỏi màn hình không" là một con số phải ĐO, không phải một cảm giác nhìn ảnh — khung
+     * này từng cao 1238px trong màn hình 720px mà build vẫn xanh (xem {@link #ITEM_LIST_HEIGHT_PX}).
      */
     float preferredHeight() {
         return panel.getPrefHeight();

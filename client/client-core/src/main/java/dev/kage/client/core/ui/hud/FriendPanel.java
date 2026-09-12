@@ -58,12 +58,20 @@ public final class FriendPanel implements HudWindow {
     private static final float ROW_GAP_PX = 6f;
 
     /**
-     * Số dòng tối đa mỗi mục. Danh sách bạn bè không có trần phía server, mà cửa sổ này neo giữa màn
-     * hình và nở ra cả hai phía — 40 người bạn là một cửa sổ cao hơn màn hình 720p, tức là những nút
-     * ở cuối (kể cả ô kết bạn) rơi ra ngoài vùng nhìn thấy và không bấm được nữa. Phần dư nói ra
-     * bằng một dòng "còn N người nữa" thay vì im lặng cắt mất.
+     * Chiều cao TỐI ĐA của vùng cuộn lời mời (≈ 3 dòng 52px); dài hơn thì cuộn. Số dòng được DỰNG
+     * là {@link ScrollingList#MAX_BUILT_ROWS}; phần vượt trần đó vẫn nói ra bằng dòng "còn N dòng nữa".
+     *
+     * <p>Khác sáu cửa sổ kia, MỐI LO cũ ở đây vẫn đúng: danh sách bạn bè không có trần phía server
+     * (V12 không có cột sức chứa, không {@code LIMIT}), và cửa sổ neo giữa màn hình nở cả hai phía —
+     * danh sách tự nở theo số bạn là đẩy ô kết bạn ra khỏi vùng nhìn thấy. Nhưng CÁCH CHỮA cũ — trần
+     * {@code MAX_VISIBLE_ROWS = 8} cho MỖI mục — không chữa được: hai mục 8 dòng cùng lúc cao
+     * <b>1044px</b> trong màn hình 720px ({@code HudLayoutBudgetTool}), còn người bạn thứ 9 thì không
+     * xoá được và lời mời thứ 9 không trả lời được. Chặn CHIỀU CAO bằng vùng cuộn mới chữa đúng chỗ.
      */
-    private static final int MAX_VISIBLE_ROWS = 8;
+    private static final float REQUEST_LIST_MAX_HEIGHT_PX = 156f;
+
+    /** Xem {@link #REQUEST_LIST_MAX_HEIGHT_PX} — ≈ 5 dòng, danh sách bạn dài hơn danh sách lời mời. */
+    private static final float FRIEND_LIST_MAX_HEIGHT_PX = 260f;
 
     private static final float NAME_COLUMN_WIDTH_PX = 250f;
 
@@ -162,12 +170,20 @@ public final class FriendPanel implements HudWindow {
                 .padTop(SECTION_PAD_PX)
                 .left()
                 .row();
-        built.add(requestList).width(PANEL_WIDTH_PX).growX().row();
+        built.add(ScrollingList.wrap(requestList, skin))
+                .width(PANEL_WIDTH_PX)
+                .maxHeight(REQUEST_LIST_MAX_HEIGHT_PX)
+                .growX()
+                .row();
         built.add(label("friend.section.friends", Color.WHITE))
                 .padTop(SECTION_PAD_PX)
                 .left()
                 .row();
-        built.add(friendList).width(PANEL_WIDTH_PX).growX().row();
+        built.add(ScrollingList.wrap(friendList, skin))
+                .width(PANEL_WIDTH_PX)
+                .maxHeight(FRIEND_LIST_MAX_HEIGHT_PX)
+                .growX()
+                .row();
         built.add(buildComposer())
                 .padTop(SECTION_PAD_PX)
                 .width(PANEL_WIDTH_PX)
@@ -326,7 +342,7 @@ public final class FriendPanel implements HudWindow {
             friendList.add(emptyLabel("friend.list.empty")).left().row();
             return;
         }
-        int shown = Math.min(rows.size(), MAX_VISIBLE_ROWS);
+        int shown = Math.min(rows.size(), ScrollingList.MAX_BUILT_ROWS);
         for (int index = 0; index < shown; index++) {
             friendList.add(friendRow(rows.get(index), index)).growX().row();
         }
@@ -340,7 +356,7 @@ public final class FriendPanel implements HudWindow {
             requestList.add(emptyLabel("friend.requests.empty")).left().row();
             return;
         }
-        int shown = Math.min(rows.size(), MAX_VISIBLE_ROWS);
+        int shown = Math.min(rows.size(), ScrollingList.MAX_BUILT_ROWS);
         for (int index = 0; index < shown; index++) {
             requestList.add(requestRow(rows.get(index), index)).growX().row();
         }
@@ -441,6 +457,14 @@ public final class FriendPanel implements HudWindow {
         } catch (java.util.MissingResourceException e) {
             return key;
         }
+    }
+
+    /**
+     * Chiều cao khung MUỐN có ở trạng thái hiện tại — chỉ dùng cho {@code HudLayoutBudgetTool}, cùng
+     * lý do {@link InventoryPanel#preferredHeight()}.
+     */
+    float preferredHeight() {
+        return panel.getPrefHeight();
     }
 
     @Override

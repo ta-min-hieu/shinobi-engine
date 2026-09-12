@@ -49,8 +49,20 @@ public final class TradePanel implements HudWindow {
      */
     private static final int OPEN_KEY = Input.Keys.N;
 
-    /** Trần số dòng vật phẩm hiện cho MỖI bên — cùng lý do trần của {@link MailPanel}. */
-    public static final int MAX_VISIBLE_ITEMS = 6;
+    /**
+     * Chiều cao TỐI ĐA của vùng cuộn vật phẩm của MỖI bên (≈ 3 dòng chữ); dài hơn thì cuộn. Số dòng
+     * được DỰNG là {@link ScrollingList#MAX_BUILT_ROWS} — trên sức chứa túi 20 ô, trần thật của một
+     * lời chào hợp lệ. Server KHÔNG đếm số món trong lời chào ({@code SetTradeOfferUseCase} lưu
+     * nguyên danh sách, chỉ xác thực lúc thi hành), nên phía client vẫn phải có một trần dựng dòng.
+     *
+     * <p>⚠️ Trước 2026-09-11 là trần {@code MAX_VISIBLE_ITEMS = 6} "cùng lý do trần của MailPanel" —
+     * tức lý do "chưa có ScrollPane" đã chết. Ở cửa sổ này nó tệ hơn mọi chỗ khác: đây là hệ thống
+     * nguy hiểm nhất (GAMEPLAY.md §8), người chơi phải thấy ĐỦ đối phương chào gì trước khi bấm xác
+     * nhận, mà món thứ 7 trở đi chỉ hiện thành "còn N món nữa". Trần đó cũng không giữ được khung
+     * trong màn hình: hai bên 6 món + lời mời đang chờ cao <b>886px</b> / 720px
+     * ({@code HudLayoutBudgetTool}).
+     */
+    private static final float ITEM_LIST_MAX_HEIGHT_PX = 84f;
 
     private static final float PANEL_WIDTH_PX = 520f;
 
@@ -169,14 +181,22 @@ public final class TradePanel implements HudWindow {
                 .padTop(8f)
                 .row();
         built.add(myOfferLabel).width(PANEL_WIDTH_PX).left().row();
-        built.add(myItemList).width(PANEL_WIDTH_PX).growX().row();
+        built.add(ScrollingList.wrap(myItemList, skin))
+                .width(PANEL_WIDTH_PX)
+                .maxHeight(ITEM_LIST_MAX_HEIGHT_PX)
+                .growX()
+                .row();
         built.add(sectionTitle("trade.section.their_offer"))
                 .width(PANEL_WIDTH_PX)
                 .left()
                 .padTop(8f)
                 .row();
         built.add(theirOfferLabel).width(PANEL_WIDTH_PX).left().row();
-        built.add(theirItemList).width(PANEL_WIDTH_PX).growX().row();
+        built.add(ScrollingList.wrap(theirItemList, skin))
+                .width(PANEL_WIDTH_PX)
+                .maxHeight(ITEM_LIST_MAX_HEIGHT_PX)
+                .growX()
+                .row();
         built.add(sessionActionRow).width(PANEL_WIDTH_PX).growX().padTop(10f).row();
         built.add(closeHint()).width(PANEL_WIDTH_PX).left().padTop(8f).row();
         built.setVisible(false);
@@ -383,27 +403,37 @@ public final class TradePanel implements HudWindow {
      * Danh sách vật phẩm của một bên.
      *
      * @param rows chuỗi ĐÃ dịch cho từng món
-     * @param overflowNotice chữ báo "còn N món nữa" khi vượt {@link #MAX_VISIBLE_ITEMS}, rỗng nếu
-     *     không có
+     * @param overflowNotice chữ báo "còn N món nữa" khi vượt {@link ScrollingList#MAX_BUILT_ROWS},
+     *     rỗng nếu không có
      * @param mine {@code true} thì vẽ vào cột của mình, {@code false} thì cột đối phương
      */
     public void setItems(List<String> rows, String overflowNotice, boolean mine) {
         Table target = mine ? myItemList : theirItemList;
         target.clear();
+        // growX() chứ không width(PANEL_WIDTH_PX): danh sách nằm trong vùng cuộn khoá trục ngang,
+        // thanh cuộn ăn mất mép phải — dòng rộng bằng khung sẽ bị cắt chữ ở đó (xem ScrollingList#wrap).
         for (String row : rows) {
             Label label = wrappingLabel(ROW_COLOR);
             label.setText(row);
-            target.add(label).width(PANEL_WIDTH_PX).left().row();
+            target.add(label).growX().left().row();
         }
         if (!overflowNotice.isEmpty()) {
             Label notice = wrappingLabel(SECTION_COLOR);
             notice.setText(overflowNotice);
-            target.add(notice).width(PANEL_WIDTH_PX).left().row();
+            target.add(notice).growX().left().row();
         }
     }
 
     private String text(String key) {
         return i18n.get(key);
+    }
+
+    /**
+     * Chiều cao khung MUỐN có ở trạng thái hiện tại — chỉ dùng cho {@code HudLayoutBudgetTool}, cùng
+     * lý do {@link InventoryPanel#preferredHeight()}.
+     */
+    float preferredHeight() {
+        return panel.getPrefHeight();
     }
 
     @Override

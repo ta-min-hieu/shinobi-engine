@@ -9,6 +9,7 @@ import com.badlogic.gdx.utils.I18NBundle;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import dev.kage.client.core.ui.hud.MailPanel;
+import dev.kage.client.core.ui.hud.ScrollingList;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.ClaimMailResponse;
 import dev.kage.protocol.DeleteMailResponse;
@@ -219,7 +220,7 @@ final class MailCoordinator implements WindowFlow {
     /** Đẩy toàn bộ trạng thái hiện có xuống panel. Gọi sau MỖI response tra cứu, không phải mỗi khung. */
     private void refreshView() {
         List<MailController.Mail> all = controller.mails();
-        int shown = Math.min(all.size(), MailController.MAX_VISIBLE_ROWS);
+        int shown = Math.min(all.size(), ScrollingList.MAX_BUILT_ROWS);
         mailRows.clear();
         for (int index = 0; index < shown; index++) {
             MailController.Mail mail = all.get(index);

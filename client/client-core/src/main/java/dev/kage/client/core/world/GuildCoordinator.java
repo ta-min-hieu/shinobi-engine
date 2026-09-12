@@ -10,6 +10,7 @@ import com.badlogic.gdx.utils.I18NBundle;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import dev.kage.client.core.ui.hud.GuildPanel;
+import dev.kage.client.core.ui.hud.ScrollingList;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.ApproveGuildJoinRequestResponse;
 import dev.kage.protocol.CreateGuildResponse;
@@ -222,7 +223,7 @@ final class GuildCoordinator implements WindowFlow {
      */
     private void refreshMembers(boolean leader) {
         List<GuildController.Member> all = controller.members();
-        int shown = Math.min(all.size(), GuildController.MAX_VISIBLE_ROWS);
+        int shown = Math.min(all.size(), ScrollingList.MAX_BUILT_ROWS);
         memberRows.clear();
         for (int index = 0; index < shown; index++) {
             GuildController.Member member = all.get(index);
@@ -233,7 +234,7 @@ final class GuildCoordinator implements WindowFlow {
 
     private void refreshPendingRequests() {
         List<GuildController.PendingRequest> all = controller.pendingRequests();
-        int shown = Math.min(all.size(), GuildController.MAX_VISIBLE_ROWS);
+        int shown = Math.min(all.size(), ScrollingList.MAX_BUILT_ROWS);
         requestRows.clear();
         for (int index = 0; index < shown; index++) {
             GuildController.PendingRequest request = all.get(index);

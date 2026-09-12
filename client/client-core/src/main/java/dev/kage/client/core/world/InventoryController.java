@@ -45,33 +45,6 @@ import dev.kage.protocol.ListInventoryResponse;
 final class InventoryController {
 
     /**
-     * Trần CỨNG cho số dòng túi được dựng — <b>không phải</b> số dòng nhìn thấy cùng lúc.
-     *
-     * <p>⚠️ <b>Lý do cũ của con số này đã CHẾT, và nó đã gây ra một lỗi thật (2026-09-09).</b> Nó
-     * từng là {@code 10} với lý do "{@code KageSkin} chưa có style {@code ScrollPane} nào, nên danh
-     * sách dài hơn sẽ đội khung cao vượt khỏi màn hình". Cả hai vế nay đều sai:
-     * {@code KageSkin.scrollPaneStyle} có thật, {@code InventoryPanel} bọc danh sách trong một
-     * {@link com.badlogic.gdx.scenes.scene2d.ui.ScrollPane} thật, và ô chứa nó có chiều cao CỐ ĐỊNH
-     * ({@code ITEM_LIST_HEIGHT_PX}) — khung không còn cao lên theo số vật phẩm nữa.
-     *
-     * <p><b>Cái giá đã phải trả:</b> một nhân vật có 14 vật phẩm thấy dòng "còn 4 vật phẩm nữa chưa
-     * hiện" và <b>không có cách nào chạm tới 4 món đó</b> — chúng không được dựng ra, nên cuộn cũng
-     * vô ích. Món thứ 14 của nhân vật thử nghiệm chính là {@code minor_healing_pill}, tức là <b>món
-     * DÙNG ĐƯỢC duy nhất của game (ADR-046) trở thành không dùng được</b> ngay khi túi quá 10 ô.
-     * Bắt được bằng CLIENT THẬT, không phải bằng test — xem {@code InventoryControllerTest}.
-     *
-     * <p>Giữ lại một trần vì một danh sách không giới hạn vẫn là một dòng dữ liệu từ server đi
-     * thẳng vào số widget phải dựng; nhưng nó phải nằm TRÊN sức chứa túi thật (server:
-     * {@code PostgresInventoryAdapter.DEFAULT_CAPACITY = 20}), không phải dưới. 60 = ba lần sức
-     * chứa hôm nay. Dòng "còn n chưa hiện" vì thế thành lưới đỡ cuối, không còn là đường thường gặp.
-     *
-     * <p>⚠️ {@code MailController.MAX_VISIBLE_ROWS} và {@code ShopPanel} còn chép LẠI đúng lý do đã
-     * chết ở trên. CHƯA sửa ở đợt này (mỗi cái là một khung khác, cần đo riêng) — nhưng ai đụng tới
-     * chúng thì đọc mục này trước.
-     */
-    static final int MAX_VISIBLE_SLOTS = 60;
-
-    /**
      * Ba {@code error_key} THẬT server phát cho Equip/Unequip hôm nay — xem javadoc lớp về việc
      * inventory.proto không có enum outcome cho hai lệnh này.
      */

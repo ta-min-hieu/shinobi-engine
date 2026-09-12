@@ -7,6 +7,7 @@ import java.util.function.BooleanSupplier;
 import com.badlogic.gdx.utils.I18NBundle;
 import com.google.protobuf.InvalidProtocolBufferException;
 
+import dev.kage.client.core.ui.hud.ScrollingList;
 import dev.kage.client.core.ui.hud.TradePanel;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.AcceptTradeRequestResponse;
@@ -262,7 +263,7 @@ final class TradeCoordinator implements WindowFlow {
 
     private void pushItems(List<TradeController.OfferItem> items, boolean mine) {
         itemRows.clear();
-        int shown = Math.min(items.size(), TradePanel.MAX_VISIBLE_ITEMS);
+        int shown = Math.min(items.size(), ScrollingList.MAX_BUILT_ROWS);
         for (int index = 0; index < shown; index++) {
             itemRows.add(itemText(items.get(index)));
         }

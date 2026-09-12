@@ -51,13 +51,6 @@ import dev.kage.protocol.QuestStatus;
  */
 final class QuestTracker {
 
-    /**
-     * Số dòng nhật ký hiển thị cùng lúc ở {@link QuestLogPanel} — cùng trần
-     * {@link GuildController#MAX_VISIBLE_ROWS}: {@code KageSkin} chưa có style {@code ScrollPane}
-     * nào, nên danh sách dài sẽ đội khung cao vượt màn hình chứ không tự cuộn.
-     */
-    static final int MAX_VISIBLE_ROWS = 8;
-
     /** Một dòng nhật ký — bản sao BẤT BIẾN trả ra ngoài, xem {@link #questLog()}. */
     record LoggedQuest(String questCode, QuestStatus status) {}
 

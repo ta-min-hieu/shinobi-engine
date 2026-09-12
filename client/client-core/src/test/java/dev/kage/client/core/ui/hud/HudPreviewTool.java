@@ -56,8 +56,9 @@ public final class HudPreviewTool extends ApplicationAdapter {
     private static final int FIFTH_SHOT_FRAME = 150;
 
     /**
-     * Khớp {@code InventoryController.MAX_VISIBLE_SLOTS} (package khác nên không tham chiếu thẳng
-     * được). Lệch nhau thì con số đo ở đây không nói về trạng thái thật — sửa bên kia thì sửa cả đây.
+     * Đủ để lấp đầy vùng cuộn túi đồ và NHÌN icon ở cỡ ô túi. KHÔNG phải trần thật
+     * ({@link ScrollingList#MAX_BUILT_ROWS}) — danh sách cuộn nên số dòng không đổi chiều cao khung;
+     * chiều cao ở trạng thái tệ nhất đo ở {@code HudLayoutBudgetTool}, không ở đây.
      */
     private static final int MAX_VISIBLE_SLOTS_PREVIEW = 10;
 
@@ -183,9 +184,8 @@ public final class HudPreviewTool extends ApplicationAdapter {
         inventoryPanel.resize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
         inventoryPanel.setGold("1.240 vàng");
         inventoryPanel.setStatus("Cường hoá thất bại — Bảo vệ đã chặn rớt cấp, tiêu 1 bùa.");
-        // TÚI ĐẦY: đúng MAX_VISIBLE_SLOTS dòng + dòng "còn n món chưa hiện" + cả 7 ô đều có đồ. Đây
-        // là trạng thái CAO NHẤT khung này có thể đạt — khung chưa có ScrollPane nên nó cũng là
-        // trạng thái duy nhất trả lời được câu "túi đầy thì có tràn khỏi màn hình không".
+        // TÚI ĐẦY: vùng cuộn đầy + dòng "còn n món chưa hiện" + cả 7 ô đều có đồ — trạng thái nhiều
+        // actor nhất để NHÌN. Chiều cao khung ở trạng thái tệ nhất thì ĐO bằng HudLayoutBudgetTool.
         // Mã icon lấy từ V21 chứ không phải 3 mã cũ: đây là chỗ DUY NHẤT chứng minh vùng
         // icon_<code> mới thật sự có trong atlas và client tra ra được (2026-08-30). Ô đầu nay là
         // `minor_healing_pill` (V36, ADR-046 D5) — icon MỚI NHẤT luôn nên đứng ở đây, vì nó là cái

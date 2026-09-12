@@ -9,6 +9,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 
 import dev.kage.client.core.ui.hud.CombatHud;
 import dev.kage.client.core.ui.hud.QuestLogPanel;
+import dev.kage.client.core.ui.hud.ScrollingList;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.AcceptQuestOutcome;
 import dev.kage.protocol.AcceptQuestResponse;
@@ -294,7 +295,7 @@ final class QuestCoordinator implements WindowFlow {
     /** Đẩy toàn bộ nhật ký hiện có xuống panel. Gọi sau MỖI response tra cứu, không phải mỗi khung. */
     private void refreshLogView() {
         List<QuestTracker.LoggedQuest> all = tracker.questLog();
-        int shown = Math.min(all.size(), QuestTracker.MAX_VISIBLE_ROWS);
+        int shown = Math.min(all.size(), ScrollingList.MAX_BUILT_ROWS);
         questRows.clear();
         for (int index = 0; index < shown; index++) {
             QuestTracker.LoggedQuest entry = all.get(index);

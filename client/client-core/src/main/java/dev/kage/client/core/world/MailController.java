@@ -70,14 +70,6 @@ final class MailController {
     static final int MAX_RECIPIENT_NAME_LENGTH = 16;
 
     /**
-     * Số lá thư hiển thị cùng lúc. Trần cứng cùng lý do {@link GuildController#MAX_VISIBLE_ROWS}: số
-     * thư do NGƯỜI KHÁC quyết (ai cũng gửi cho mình được, và thư hệ thống thì tự đến), không phải do
-     * máy này quyết — và {@code KageSkin} chưa có style {@code ScrollPane} nào, nên danh sách dài sẽ
-     * đội khung cao vượt khỏi màn hình chứ không tự cuộn.
-     */
-    static final int MAX_VISIBLE_ROWS = 6;
-
-    /**
      * Một món đính kèm — chỉ có số, xem "Khoảng trống 1" ở javadoc lớp.
      *
      * @param itemTemplateId khoá chính của {@code item_template}, không phải {@code code} đọc được.

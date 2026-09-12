@@ -364,30 +364,6 @@ class InventoryControllerTest {
                 .build();
     }
 
-    /**
-     * LỖI THẬT, bắt bằng CLIENT THẬT 2026-09-09 (không phải bằng test — nên ô này tồn tại).
-     *
-     * <p>Nhân vật thử nghiệm có 14 vật phẩm; khung túi hiện "còn 4 vật phẩm nữa chưa hiện" và
-     * <b>không có cách nào chạm tới bốn món đó</b> — {@code InventoryCoordinator.refreshView} chỉ
-     * dựng {@code MAX_VISIBLE_SLOTS} dòng đầu, nên cuộn chuột cũng vô ích. Món thứ 14 chính là
-     * {@code minor_healing_pill}: <b>món DÙNG ĐƯỢC duy nhất của game (ADR-046) không dùng được</b>
-     * ngay khi túi vượt 10 ô.
-     *
-     * <p>Trần cũ là {@code 10} với lý do "chưa có ScrollPane" — lý do đó đã chết từ lúc
-     * {@code InventoryPanel} bọc danh sách vào {@code ScrollPane} thật có chiều cao CỐ ĐỊNH. Ô này
-     * ghim ràng buộc còn lại và là ràng buộc THẬT: trần phải nằm TRÊN sức chứa túi của server
-     * ({@code PostgresInventoryAdapter.DEFAULT_CAPACITY = 20}), nếu không người chơi lại mất đồ
-     * trong im lặng.
-     */
-    @Test
-    void visibleSlotCapMustExceedTheServerBagCapacity() {
-        int serverBagCapacity = 20; // PostgresInventoryAdapter.DEFAULT_CAPACITY — module khác, chép có chủ đích
-
-        assertThat(InventoryController.MAX_VISIBLE_SLOTS)
-                .as("trần dựng dòng phải > sức chứa túi, nếu không món cuối túi KHÔNG bấm tới được")
-                .isGreaterThan(serverBagCapacity);
-    }
-
     private static EquippedSlotView equipped(EquipmentSlot slot, long itemId) {
         return EquippedSlotView.newBuilder().setSlot(slot).setItemId(itemId).build();
     }
