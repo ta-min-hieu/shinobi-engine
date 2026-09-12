@@ -53,7 +53,7 @@ class SeniorSisterDialogueTreeTest {
      * thức của người chơi — khác hẳn quest 5, thứ hoàn thành bằng chính việc mở lời với cô.
      */
     @Test
-    @DisplayName("Nhánh giao việc nhận được quest 6 và quest 7, đúng mã và đúng thứ tự kể")
+    @DisplayName("Nhánh giao việc nhận được quest 6, 7 và 8 — đúng mã, đúng thứ tự kể")
     void workBranchOffersTheTallyQuest() {
         DialogueNode work = node("about_work");
 
@@ -63,6 +63,7 @@ class SeniorSisterDialogueTreeTest {
                 .containsExactly(
                         "accept_quest:recover_outer_sect_tallies",
                         "accept_quest:missing_disciple_trail",
+                        "accept_quest:abandoned_cave",
                         "start",
                         "end");
     }
@@ -129,7 +130,7 @@ class SeniorSisterDialogueTreeTest {
 
         assertThat(questOptions)
                 .as("mọi lựa chọn nhận quest phải nằm gọn trong nhánh giao việc — chỗ khác là mốc quest trôi đi")
-                .isEqualTo(2L);
+                .isEqualTo(3L);
     }
 
     private DialogueNode node(String nodeId) {

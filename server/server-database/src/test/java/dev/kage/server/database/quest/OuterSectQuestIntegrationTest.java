@@ -68,6 +68,10 @@ class OuterSectQuestIntegrationTest {
     private static final String TOWN_ELDER = "town_elder";
     private static final String BANDIT = "wandering_bandit";
     private static final long TRAIL_QUEST_EXP = 1300L;
+    private static final String CAVE_QUEST_CODE = "abandoned_cave";
+    private static final String TALISMAN_ITEM_CODE = "blood_sand_talisman";
+    private static final String SCOUT = "blood_sand_scout";
+    private static final long CAVE_QUEST_EXP = 1600L;
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
@@ -276,6 +280,94 @@ class OuterSectQuestIntegrationTest {
         insertTallies(characterId, 2);
         newProcessUseCase().npcTalked(characterId, SENIOR_SISTER);
         newClaimUseCase().execute(characterId, TALLY_QUEST_CODE, newIdempotencyKey());
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Quest THỨ TÁM — `abandoned_cave` (V40): nhịp TWIST, hai bước (hạ kẻ canh → giao lệnh phù).
+    // ------------------------------------------------------------------------------------------
+
+    @Test
+    void shouldPlayAbandonedCaveLifecycle_withRealScript() {
+        long characterId = createFreshCharacter("Cave1");
+        claimTrailQuest(characterId);
+
+        assertThat(newAcceptUseCase().execute(characterId, CAVE_QUEST_CODE))
+                .isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
+
+        // Cầm lệnh phù nhặt được ở đâu đó tới gặp cô mà CHƯA hạ kẻ canh cửa: không tính.
+        insertItem(characterId, TALISMAN_ITEM_CODE, 1);
+        assertThat(newProcessUseCase().npcTalked(characterId, SENIOR_SISTER)).isEmpty();
+        assertThat(countItem(characterId, TALISMAN_ITEM_CODE)).isEqualTo(1);
+
+        newProcessUseCase().monsterKilled(characterId, SCOUT);
+        long expBefore = readExp(characterId);
+
+        List<ProcessQuestEventUseCase.QuestStatusChange> afterDelivery =
+                newProcessUseCase().npcTalked(characterId, SENIOR_SISTER);
+
+        assertThat(afterDelivery).hasSize(1);
+        assertThat(afterDelivery.get(0).questCode()).isEqualTo(CAVE_QUEST_CODE);
+        assertThat(afterDelivery.get(0).status()).isEqualTo(QuestStatus.COMPLETED);
+        assertThat(countItem(characterId, TALISMAN_ITEM_CODE)).isZero();
+
+        ClaimQuestRewardUseCase.ClaimResult claim =
+                newClaimUseCase().execute(characterId, CAVE_QUEST_CODE, newIdempotencyKey());
+
+        assertThat(claim.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
+        assertThat(claim.expGranted()).isEqualTo(CAVE_QUEST_EXP);
+        assertThat(readExp(characterId)).isEqualTo(expBefore + CAVE_QUEST_EXP);
+    }
+
+    /** Hạ kẻ canh rồi nhưng tay không tới gặp cô: không xong, và không mất gì. */
+    @Test
+    void shouldLeaveNoTrace_whenTalismanIsMissing() {
+        long characterId = createFreshCharacter("Cave2");
+        claimTrailQuest(characterId);
+        newAcceptUseCase().execute(characterId, CAVE_QUEST_CODE);
+        newProcessUseCase().monsterKilled(characterId, SCOUT);
+
+        assertThat(newProcessUseCase().npcTalked(characterId, SENIOR_SISTER)).isEmpty();
+        assertThat(readCaveProgress(characterId)).contains("\"delivered\":false");
+    }
+
+    @Test
+    void shouldSeedAbandonedCave_withPrerequisitePointingAtTheTrailQuest() {
+        assertThat(prerequisiteCodeOf(CAVE_QUEST_CODE)).isEqualTo(TRAIL_QUEST_CODE);
+    }
+
+    /** Quest 5 + 6 + 7 — điều kiện ADR-044 để mở quest 8. */
+    private static void claimTrailQuest(long characterId) {
+        claimTallyQuest(characterId);
+        newAcceptUseCase().execute(characterId, TRAIL_QUEST_CODE);
+        newProcessUseCase().npcTalked(characterId, TOWN_ELDER);
+        newProcessUseCase().monsterKilled(characterId, BANDIT);
+        newProcessUseCase().monsterKilled(characterId, BANDIT);
+        newProcessUseCase().npcTalked(characterId, SENIOR_SISTER);
+        newClaimUseCase().execute(characterId, TRAIL_QUEST_CODE, newIdempotencyKey());
+    }
+
+    private static void insertItem(long characterId, String itemCode, int quantity) {
+        queryLong("""
+                INSERT INTO inventory_item (character_id, item_template_id, quantity, enhance_level, slot_index)
+                SELECT ?, id, ?, 0, 0 FROM item_template WHERE code = ?
+                RETURNING id
+                """, characterId, quantity, itemCode);
+    }
+
+    private static int countItem(long characterId, String itemCode) {
+        return (int) queryLong("""
+                SELECT COALESCE(SUM(ii.quantity), 0) FROM inventory_item ii
+                  JOIN item_template it ON it.id = ii.item_template_id
+                 WHERE ii.character_id = ? AND it.code = ?
+                """, characterId, itemCode);
+    }
+
+    private static String readCaveProgress(long characterId) {
+        return queryString("""
+                SELECT p.progress_json FROM character_quest_progress p
+                  JOIN quest_template q ON q.id = p.quest_template_id
+                 WHERE p.character_id = ? AND q.code = ?
+                """, characterId, CAVE_QUEST_CODE);
     }
 
     // ------------------------------------------------------------------------------------------

@@ -94,22 +94,42 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
      */
     private static final long SISTER_ID = -9L;
 
+    /**
+     * Loài của V40 — Thám Tử Huyết Sa, quái đầu tiên của Huyết Sa. Đứng NGAY CẠNH tán tu có chủ
+     * đích, và đây là cặp khó nhất từ trước tới nay: ba cỗ máy đá còn có lore bắt chúng giống nhau,
+     * còn hai con này đều là NGƯỜI dựng từ cùng một mesh kit, cùng dáng chibi, cùng mười một xương.
+     * Thứ duy nhất tách chúng ra là bố cục sáng-tối bị ĐẢO (tán tu: da nâu vừa, mặt hở, điểm đỏ nhỏ
+     * · thám tử: áo gần đen, khăn che mặt, mảng đỏ sẫm lớn) cộng dáng vũ khí khác hẳn (một đao dài
+     * vs hai đao ngắn). Khung này là chỗ DUY NHẤT chứng minh được điều đó, vì nó chụp qua chính bộ
+     * dựng của client — thứ đã ba lần bác bỏ ảnh Blender.
+     */
+    private static final long SCOUT_ID = -10L;
+
     // Toàn bộ khung nằm TRƯỚC bệ demo đầu tiên (bắt đầu ở x=3, xem DemoPlatforms) — bệ vẽ đè lên
     // quái thì ảnh không còn chứng minh được gì về chính con quái, đúng bẫy đã gặp ở lượt chụp đầu.
     // Ba loài quái đứng CẠNH NHAU (dummy/bandit/ogre) chứ không rải ra: câu hỏi mà ảnh này phải trả
     // lời là "có phân biệt được không", và thứ tự đó là thứ tự sát thương 8/22/40.
     private static final float PLAYER_X = -4.4f;
     private static final float DUMMY_X = -2.0f;
-    private static final float BANDIT_X = -0.85f;
-    private static final float OGRE_X = 0.3f;
-    private static final float WARDEN_X = 1.45f;
-    private static final float TRIAL_X = 2.6f;
-    private static final float BOSS_X = 3.75f;
+    // ⚠️ Thêm một thực thể vào khung này phải NÉN khoảng cách, KHÔNG được đẩy đuôi sang phải: bệ
+    // demo đầu tiên bắt đầu ở x=3 (DemoPlatforms) và nó là khối 3D có depth test, nên bất cứ thứ gì
+    // trôi qua mốc đó bị bệ VẼ ĐÈ và ảnh thôi chứng minh được gì về chính nó. Lần thêm thám tử
+    // (2026-09-12) đã dính đúng bẫy đó ở bản đầu — ảnh ra thì cỗ khảo hạch và hai hộp thay thế nằm
+    // sau một mảng olive. Bước giữa các mốc vì thế là 0.7 chứ không phải 1.15.
+    private static final float BANDIT_X = -1.3f;
+
+    /** Sát tán tu: xem javadoc {@link #SCOUT_ID} về vì sao đúng chỗ này chứ không phải chỗ khác. */
+    private static final float SCOUT_X = -0.6f;
+
+    private static final float OGRE_X = 0.1f;
+    private static final float WARDEN_X = 0.8f;
+    private static final float TRIAL_X = 1.5f;
+    private static final float BOSS_X = 2.2f;
     // Hai NPC xếp sát nhau hơn hàng quái (0,8 thay vì 1,15): chúng mảnh hơn hẳn ba cỗ máy đá, và
     // câu hỏi "có lẫn vào nhau không" chỉ trả lời được khi chúng thật sự đứng cạnh nhau.
     private static final float ELDER_X = -3.55f;
     private static final float SISTER_X = -2.75f;
-    private static final float UNDRAWN_NPC_X = 4.9f;
+    private static final float UNDRAWN_NPC_X = 2.9f;
 
     /**
      * Phép so A/B của ÁO CHOÀNG (câu hỏi để ngỏ từ 2026-09-06): bốn trong năm bộ B3 mặc
@@ -182,6 +202,7 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         }
         putMonster(DUMMY_ID, "training_dummy", DUMMY_X);
         putMonster(BANDIT_ID, "wandering_bandit", BANDIT_X);
+        putMonster(SCOUT_ID, "blood_sand_scout", SCOUT_X);
         putMonster(OGRE_ID, "stone_ogre", OGRE_X);
         putMonster(WARDEN_ID, "archive_warden", WARDEN_X);
         putMonster(TRIAL_ID, "trial_construct", TRIAL_X);
@@ -194,6 +215,7 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
                         + "trial_construct={} sample_boss={} (sample_boss=false là ĐÚNG, chưa vẽ)",
                 models.hasModel(DUMMY_ID),
                 models.hasModel(BANDIT_ID),
+                models.hasModel(SCOUT_ID),
                 models.hasModel(OGRE_ID),
                 models.hasModel(WARDEN_ID),
                 models.hasModel(TRIAL_ID),

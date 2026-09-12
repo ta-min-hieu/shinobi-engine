@@ -192,7 +192,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         List<MonsterSpawnPoint> spawns =
                 new PostgresMonsterCatalogAdapter(dataSource).listSpawnPoints(MonsterSpawnPoint.MAIN_WORLD_CODE);
 
-        assertThat(spawns).hasSize(8);
+        assertThat(spawns).hasSize(9);
         // ADR-033 — quái lệch khỏi y=0 là quái người chơi không bao giờ chạm tới. DB có CHECK,
         // đây là hàng rào thứ hai và cũng là tài liệu sống cho ràng buộc đó.
         assertThat(spawns).allSatisfy(spawn -> assertThat(spawn.posY()).isZero());
@@ -207,9 +207,14 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         // cả hai luật hình học).
         // KHÔNG khớp theo thứ tự: adapter trả về theo id (thứ tự chèn của các migration), không
         // theo trục x — V32 dời hai thạch vệ sang âm nên hai thứ tự đó nay khác hẳn nhau.
+        // V40 thêm cửa hang bỏ hoang ở 66 và DỜI quỷ đá 47 → 80 (ra SAU hang). Dời vì playtest đo
+        // được: một mình quỷ đá lấy 31 máu mỗi lượt đi ngang, đủ để quest 8 thua chắc. Nó là loài
+        // duy nhất chưa quest nào dùng nên dời được mà không phá quest cũ nào. Đó là điểm spawn đầu tiên phải
+        // ĐỢI nền đất nới ra mới đặt được: đo bằng máy thì cả đoạn [-55, 60] cũ không còn khe nào
+        // hợp lệ cho một loài aggro 6, nên `DemoPlatforms.GROUND_MAX_X` đi 60 → 85 cùng đợt.
         assertThat(spawns)
                 .extracting(MonsterSpawnPoint::posX)
-                .containsExactlyInAnyOrder(-47f, -33f, -20f, 8f, 14f, 21f, 34f, 47f);
+                .containsExactlyInAnyOrder(-47f, -33f, -20f, 8f, 14f, 21f, 34f, 66f, 80f);
     }
 
     /**
@@ -284,8 +289,9 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
                 .filter(spawn -> aggroByCode.getOrDefault(spawn.monsterCode(), 0f) > 0f)
                 .toList();
 
-        // 2 tán tu + 1 quỷ đá + 2 thạch vệ (V30) + 1 cỗ khảo hạch (V33). Mộc nhân aggro 0, không tính.
-        assertThat(aggressive).hasSize(6);
+        // 2 tán tu + 1 quỷ đá + 2 thạch vệ (V30) + 1 cỗ khảo hạch (V33) + 1 thám tử Huyết Sa (V40).
+        // Mộc nhân aggro 0, không tính.
+        assertThat(aggressive).hasSize(7);
         for (int i = 0; i < aggressive.size(); i++) {
             for (int j = i + 1; j < aggressive.size(); j++) {
                 MonsterSpawnPoint first = aggressive.get(i);

@@ -2719,3 +2719,81 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
     - 🔴 **Tên riêng "Lý Tam" vẫn CHƯA có trong STORY §5** — nay nó là tên hiển thị của cả một quest.
       §8 quy tắc 3 đòi khai tên riêng mới vào §4/§5 cùng lượt, nhưng §1–§6 là SSOT tường thuật mà AI
       không được tự sửa (CLAUDE.md §14: mâu thuẫn thì báo cáo, không tự chọn bên). **Chờ chủ dự án.**
+
+73. **QUEST THỨ TÁM — nhịp TWIST arc 2; bản đồ HẾT CHỖ và phải nới nền đất (2026-09-12)**:
+    - 📏 **Đo trước khi chọn chỗ, và số nói KHÔNG**: với một loài `aggro = 6`, luật giãn V29
+      (`|A−B| > aggroA + aggroB`), vùng an toàn V35 và ba bệ nhảy, cả đoạn nền đất cũ `[-55, 60]`
+      chỉ còn ĐÚNG HAI khe hợp lệ — một khe rộng 1m ngay chỗ hình nộm đứng (x≈8) và đúng một điểm
+      x=59,5 sát mép. **Sáu quest vừa qua đã lấp kín trục chơi.**
+    - ❓ **Ba hướng đưa chủ dự án chọn** (không tự quyết, CLAUDE.md §4 — đụng bản đồ/kiến trúc):
+      nới nền đất về đông · dựng hầm ngục thứ hai (đúng lore §7 "Bí Cảnh" nhưng hiện chỉ có MỘT hầm
+      ngục hardcode trong Java, và chạm vùng ADR-047 đang chờ) · kể twist bằng hội thoại, không thêm
+      địa điểm. **Chủ dự án chọn NỚI NỀN ĐẤT.**
+    - 🗺️ `DemoPlatforms.GROUND_MAX_X` **60 → 85**, kèm ghi chú lý do ngay tại hằng số. Hang ở
+      **x = 66**: cách quỷ đá @47 **19m** (> aggro 12, > leash+tầm đánh 12), ngoài vùng an toàn,
+      ngoài mọi bệ nhảy — cả bốn ràng buộc kiểm bằng máy, không bằng mắt.
+    - 🧩 **V40**: loài `blood_sand_scout` (hp 150 · atk 26 · def 10 · res 8 · exp 70), vật chứng
+      `blood_sand_talisman` rơi **100%**, điểm spawn x=66, quest `abandoned_cave` khoá sau quest 7.
+      Quest hai bước: hạ kẻ canh cửa → giao lệnh phù tận tay Tô Vân Nhi (mục tiêu loại ba).
+    - 🐛 **PLAYTEST BÁC BẢN ĐẦU, và nó bác đúng chỗ tôi chưa tính.** Hai lượt đo trùng khít: đi từ
+      vùng an toàn ra x=66 mất **65 máu** (tán tu 17 + tán tu 17 + **quỷ đá 31**), tới nơi còn
+      **53/118**. Với máu đó kẻ canh cần **3 nhát** hạ người chơi trong khi người chơi cần **5 nhát**
+      hạ nó ⇒ **thua chắc**. Con quái tự nó cân đúng (5 đổi 6 khi máu ĐẦY) — thứ bị bỏ sót là QUÃNG
+      ĐƯỜNG, đúng cái bẫy V32 từng gặp và cũng đúng 65 máu. Tôi đã VIẾT trong V40 rằng "người chơi
+      sẽ tới nơi với máu đã vơi" mà không kiểm còn đủ để thắng không.
+      ⚠️ Lượt "chơi lại sau khi hồi máu" của tôi cũng vô nghĩa và nhật ký nói ra điều đó: mỗi lần
+      chạy `gameProbe` là một lần ĐĂNG NHẬP MỚI (máu đầy, đi lại từ đầu), nên không giữ được trạng
+      thái giữa hai lượt.
+    - ❓ **Ba hướng đưa chủ dự án chọn** (không tự chỉnh số cân bằng — bài học "hỏi CÔNG THỨC trước
+      khi đổi số"): dời quỷ đá khỏi đường đi · hạ chỉ số kẻ canh cho vừa 53 máu · bắt người chơi
+      chuẩn bị đan dược/đồ Ngoại Môn. **Chủ dự án chọn DỜI QUỶ ĐÁ** (+ hạ máu kẻ canh 150 → 120).
+    - 🪨 **Quỷ đá 47 → 80** (ra SAU hang). Dời được vì nó là loài **DUY NHẤT chưa quest nào dùng** —
+      chính câu V30 §2 đã ghi khi chọn thêm `archive_warden` thay vì dùng lại nó. x=80 kiểm lại đủ
+      bốn ràng buộc (cách hang 14 > 12 ở CẢ luật aggro lẫn luật leash; x=78 thì TRƯỢT vì đúng 12).
+      Ba chỗ khoá vị trí cũ phải sửa theo: danh sách toạ độ spawn, `NightWatchDuelBalanceTest`
+      (`47f - 34f` → `80f - 34f`), và chú thích đường đi trong script quest.
+    - 🐛 **LƯỢT ĐO THỨ HAI BÁC TIẾP — và lộ ra một yếu tố chưa chỗ nào trong dự án ghi lại: quái ra
+      đòn TRƯỚC người chơi hai nhát.** `aggro_radius_meters = 6` còn
+      `CombatConstants.ATTACK_RANGE_METERS = 2`, nên người chơi phải băng **4 mét dưới làn đạn** mới
+      đánh trả được. Đo thật: quái đánh ở t=12,2s và t=13,8s, nhát đầu của người chơi mãi t=14,5s.
+      Với quái đánh 20 thì đó là **40 máu mất trắng**, và nó áp cho **MỌI trận trong game** — chỉ là
+      ở đây nó đủ lớn để lật kết quả. Máu hiệu dụng lúc bắt đầu đánh trả: 84 − 40 = **44** ⇒ chỉ kịp
+      **3 nhát** (102 sát thương) ⇒ máu 120 vẫn thua (đo: quái còn 18).
+    - ⚖️ **Chốt: máu kẻ canh 100** — 3 × 34 = 102 ≥ 100, thắng đúng ở nhát cuối cùng có thể. Đường
+      đi sau khi dời quỷ đá còn 2 tán tu = **34 máu** ⇒ tới hang **84/118**. Hai con số sát thương
+      (34 và 20 sau giáp) đều ĐO trong playtest, không suy từ công thức. **1.600 EXP** tính theo
+      quãng đường ~61m MỘT CHIỀU. Đường tối thiểu: 7.225 + 70 + 1.600 = **8.895** ⇒ đóng quest ở
+      **Cấp 13**.
+      ⚠️ **Ba lượt playtest mới ra con số này** (150 → 120 → 100), và mỗi lượt bác một giả định
+      khác nhau của tôi: lượt 1 bác "quãng đường không đáng kể", lượt 2 bác "máu lúc tới nơi là máu
+      lúc đánh". Không lượt nào bác bằng suy luận — tất cả bằng nhật ký sát thương từng đòn.
+    - ✅ **LƯỢT ĐO THỨ TƯ — QUA, và qua đúng như tính**: tới hang **84/118**, quái vẫn ra đòn trước,
+      người chơi hạ nó bằng **ĐÚNG 3 nhát** (34 × 3 = 102 so với 100 máu) khi bản thân còn **24/118**.
+      Lệnh phù rơi ra, giao cho Tô Vân Nhi ⇒ opcode 607 COMPLETED, lĩnh thưởng ⇒ **+1.600 EXP,
+      Cấp 13 → 14**; DB đọc ra `{"slain":1,"delivered":true}`, trạng thái CLAIMED.
+      ⚠️ Nhân vật test lên Cấp 14 vì đã cày thêm từ các đợt trước — **đường tối thiểu vẫn là Cấp 13**.
+      📌 Nhật ký còn ghi một thứ đáng biết: đứng lại 10 giây sau trận thì con hồi sinh tại chỗ đánh
+      chết người chơi. Quest đã xong trước đó nên không ảnh hưởng, nhưng hang KHÔNG phải chỗ nán lại.
+    - 🖼️ **Công cụ preview suýt bị chính tôi làm hỏng**: thêm con thứ tám bằng cách ĐẨY các mốc sang
+      phải làm đuôi khung trôi qua x=3 — nơi bệ nhảy demo bắt đầu — và ảnh ra thì cỗ khảo hạch cùng
+      hai hộp thay thế nằm sau một mảng olive. Sửa bằng cách NÉN bước từ 1,15 xuống 0,7, và ghi luật
+      đó ngay tại chỗ khai toạ độ.
+    - 📖 **Cái tên Huyết Sa lần đầu xuất hiện**, và nó tới qua hai thứ người chơi TỰ THẤY: tên con
+      canh cửa trên khung mục tiêu, và vật nó bỏ lại trong túi. Chỉ đến thế — chân tướng Đại Kiếp,
+      hộ pháp cải trang, và thân phận thật của Tô Vân Nhi đều thuộc nhịp sau (§8 quy tắc 2).
+    - 🎨 **Art riêng, KHÔNG mượn model** — `mob_blood-sand-scout` dựng bằng mesh kit (0 lượt Rodin):
+      41 part · 11 xương · 7 action, LOD **6.154 / 6.154 / 4.982**. Đảo bố cục sáng-tối so với tán
+      tu (áo gần đen + khăn che mặt + mảng đỏ sẫm lớn, hai đao ngắn thay một đao dài).
+      ⚠️ Bản LOW chỉ **dư 18 tam giác** so với trần 5.000 — `char_senior-sister` cũng 4.976, tức
+      decimate của kit luôn ép sát trần ở tier thấp. Thêm phụ kiện nữa là vượt.
+    - ⚠️ **HAI lần tôi viện tiền lệ đã hết hiệu lực trong cùng một đợt**, cả hai đều do đọc trí nhớ
+      thay vì đọc luật hiện hành:
+      · Định mượn `model_key` của tán tu rồi "ghi nợ" theo V23 §3 / V30 §1 — nhưng
+        `shouldNotLetAnyTwoSpeciesShareAModelKey` nay CẤM hẳn, và javadoc của chính ô đó viết sẵn
+        cách xử lý đúng ("dựng art rồi đổi `model_key`, mất khoảng một giờ"). Test khoá nợ tôi vừa
+        viết bị xoá, loài có `.glb` riêng ngay từ đầu.
+      · Viết `curved_blade` trong spec art — mesh kit chỉ dựng
+        `kunai / gourd / twin_blades / long_blade / stone_mace`.
+    - ✅ **Ba ô test đếm/liệt kê đỏ đúng lúc** và đều là hàng rào thật: số điểm spawn (8→9), số loài
+      hung hãn (6→7), và một ô LIỆT KÊ từng toạ độ spawn — ô cuối là thứ bắt được rằng x=66 chỉ hợp
+      lệ SAU khi nền đất nới, nên nó được cập nhật kèm nguyên cớ chứ không chỉ thêm một con số.

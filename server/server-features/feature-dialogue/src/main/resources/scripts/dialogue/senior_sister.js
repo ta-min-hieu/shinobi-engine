@@ -84,6 +84,10 @@
             // TRÍ — thay đổi CÓ CHỦ ĐÍCH, ghim lại bằng SeniorSisterDialogueTreeTest).
             { label_key: "dialogue.option.accept_quest_missing_disciple",
               action: "accept_quest:missing_disciple_trail" },
+            // Quest 8 (V40) — nhịp TWIST. Cũng đặt nối đuôi, cùng lý do: hai việc trước đọc theo
+            // đúng thứ tự kể, và chỉ `start`/`end` lùi chỗ (option_index là VỊ TRÍ).
+            { label_key: "dialogue.option.accept_quest_abandoned_cave",
+              action: "accept_quest:abandoned_cave" },
             { label_key: "dialogue.option.back_senior_sister", action: "start" },
             { label_key: "dialogue.option.bye_senior_sister", action: "end" }
         ]

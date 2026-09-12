@@ -47,13 +47,21 @@ final class DemoPlatforms {
      * Playtest 2026-09-06 bắt được. Đầu tây nay là {@code -55}: phủ sân khảo hạch {@code -47} còn
      * dư 8m. Đầu đông {@code 60} vẫn phủ quỷ đá {@code 47}.
      *
-     * <p>⚠️ Thêm điểm spawn ngoài đoạn {@code [-55, 60]} thì phải nới dải này CÙNG migration —
+     * <p>⚠️ Thêm điểm spawn ngoài đoạn {@code [-55, 85]} thì phải nới dải này CÙNG migration —
      * `monster_spawn` sống trong DB còn hai số này là hằng số client, không có gì nối chúng lại
      * ngoài dòng ghi chú này. Khi có map thật (ADR-033 #7) thì cả lớp này biến mất.
+     *
+     * <p><b>Đầu đông nới 60 → 85 (2026-09-12, V40).</b> Không phải cho đẹp: trục chơi đã HẾT chỗ
+     * đặt điểm spawn mới. Đo bằng máy với một loài {@code aggro = 6} và luật giãn V29
+     * ({@code |A−B| > aggroA + aggroB}), cộng vùng an toàn V35 và ba bệ nhảy, cả đoạn
+     * {@code [-55, 60]} chỉ còn đúng hai khe hợp lệ: một khe rộng 1m ngay chỗ hình nộm đang đứng
+     * (x≈8) và đúng một điểm {@code x = 59.5} sát mép. Hang bỏ hoang của arc 2 vì thế cần đất mới,
+     * và chủ dự án chọn nới về đông thay vì dựng hầm ngục thứ hai (hiện chỉ có MỘT hầm ngục
+     * hardcode trong Java) — xem ROADMAP mục 73.
      */
     private static final float GROUND_MIN_X = -55f;
 
-    private static final float GROUND_MAX_X = 60f;
+    private static final float GROUND_MAX_X = 85f;
 
     private DemoPlatforms() {}
 

@@ -102,6 +102,8 @@ class NightWatchDuelBalanceTest {
         // Bố cục V29 (21 và 34): 13 > 12 ⇒ không vị trí nào kéo được cả hai.
         assertThat(34f - 21f).isGreaterThan(combinedReach);
         // Và quỷ đá cũng phải rời ra theo, nếu không lỗi chỉ dời sang cặp tán tu #2 + quỷ đá.
-        assertThat(47f - 34f).isGreaterThan(combinedReach);
+        // V40 dời nó 47 → 80 (ra SAU hang bỏ hoang) vì playtest đo được một mình nó lấy 31 máu mỗi
+        // lượt người chơi đi ngang, đủ để quest 8 thua chắc. Luật V29 vẫn phải đúng ở chỗ mới.
+        assertThat(80f - 34f).isGreaterThan(combinedReach);
     }
 }
