@@ -2551,3 +2551,56 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       `QuestStatusChangedEvent` ngay sau, ĐÚNG thứ tự đó), `ProductionDialogueTreesTest` (ba bất
       biến cấu trúc của cây hội thoại nay chạy cho MỌI NPC thay vì chỉ ông lão),
       `SpawnGeometryIntegrationTest`, và một ô gác trần túi đồ.
+
+70. **BA LUỒNG SONG SONG — trần danh sách client, mục tiêu quest loại THỨ BA, và nợ hầm ngục (2026-09-11/12)**:
+    - Ba luồng chạy đồng thời trong worktree riêng. **Cả ba đều bị dừng giữa chừng vì hết hạn mức
+      phiên**; phiên chính kiểm lại diff, chạy build, commit và gộp. Công việc không mất gì vì mỗi
+      luồng làm trong worktree của nó.
+    - 🐛 **CLIENT — trần danh sách giấu dữ liệu ở BẢY cửa sổ, không phải một.** Nối tiếp phát hiện
+      2026-09-09 (trần túi đồ giấu viên đan): sáu cửa sổ còn lại chép LẠI cùng một lý do đã chết
+      ("`KageSkin` chưa có style `ScrollPane`"). Nặng nhất là **cửa hàng: trần 8 trong khi
+      `shop_item` có 19 dòng** (`ORDER BY item_template_id`) ⇒ **11 món cuối — gồm chính viên đan
+      dược V36 — không MUA được bằng bất kỳ cách nào.**
+    - 📏 **Và cái trần đó chưa bao giờ làm được việc nó hứa.** Đo ở trạng thái TỆ NHẤT bằng công cụ
+      mới `runHudLayoutCheck` (`HudLayoutBudgetTool`, cần GL context nên không vào được CI): với
+      **trần CŨ**, bốn cửa sổ đã cao hơn màn hình 720p rồi — hòm thư **1224px**, bang hội **1261px**,
+      bạn bè **1044px**, giao dịch **886px**. Tức trần "cho vừa màn hình" chỉ giấu dữ liệu chứ không
+      giữ bố cục. Sau khi sửa: cả bảy cửa sổ ≤ **695px** ở 60 dòng.
+    - 🧹 Gom về **một** lớp `ScrollingList` (vùng cuộn + mẹo giành `scrollFocus` khi rê chuột + MỘT
+      trần `MAX_BUILT_ROWS = 60`), `ScrollingListTest` gác bằng ràng buộc THẬT **đọc thẳng từ
+      migration** (20 ô túi, 19 món cửa hàng, 5 quest) chứ không chép số, cộng một ô chặn mọi cửa sổ
+      tự đặt lại trần riêng.
+    - 🧩 **SERVER — mục tiêu quest loại THỨ BA: "mang vật X tới NPC Y"** (GAMEPLAY §9.5). Cơ chế đi
+      TRƯỚC nội dung lần thứ BA. **Không lối vào mới, không loại sự kiện mới, không opcode**: nó đi
+      trên chính `npc_talked` (§9.4) cộng một hiệu ứng script `ctx.take_item(code, qty)` chỉ tồn tại
+      ở `on_event`.
+    - **Vì sao KHÔNG làm "có được vật X"**: có NĂM đường đưa đồ vào túi (rơi đồ, cửa hàng, thưởng
+      quest, hòm thư, giao dịch) — mục tiêu theo sự kiện phải móc cả năm, và VẪN sai hai chỗ (vật có
+      sẵn trước khi nhận quest thì không bao giờ bắn sự kiện; nhặt xong bán đi thì quest vẫn xong).
+      Kiểm **trạng thái túi lúc giao** thì không đường cấp nào phải sửa.
+    - **Một transaction cho tất cả**: compare-and-set tiến độ TRƯỚC (`saveIfUnchanged`) rồi mới lấy
+      đồ + ghi `audit_log` (`QUEST_ITEM_TAKEN`); thiếu một món hoặc script ném lỗi giữa chừng ⇒
+      rollback sạch. Chỉ lấy món **không đang mặc, chưa cường hoá**, gom được từ nhiều dòng.
+    - ✅ **Lợi ích phụ ngoài dự tính**: compare-and-set áp cho MỌI sự kiện quest nên nó sửa luôn một
+      lỗi **mất cập nhật có sẵn từ trước** — hai con quái chết cùng nhịp là hai Virtual Thread, cả
+      hai đọc `counter = 0` và cả hai ghi `1`.
+    - 🔴 **Nội dung arc 2 CỐ Ý chưa viết** — còn chờ chủ dự án trả lời dòng **#19** (quãng Lv10–18).
+      Quest mẫu chỉ nằm ở test resources, **không migration nội dung nào**.
+    - 🐛 **SERVER — nợ 2026-08-30 "vào hầm ngục theo nhóm" đã TÁI HIỆN được qua socket thật**: A bấm
+      `EnterDungeonCommand`, server dời cả B, nhưng B **không nhận một gói nào trong dải 1500–1599**
+      — B thấy A biến mất rồi hiện lại và một con boss mọc giữa làng. Hậu quả: không biết mình đang ở
+      trong hầm ngục, cả cái làng còn đứng nguyên trên màn hình, vị trí sai tới lần đi đầu tiên.
+    - **Bốn đường rời hầm ngục thì SẠCH** (thoát bằng lệnh, mất kết nối, rời nhóm khi đang ở trong,
+      boss chết) — mỗi đường một test, hai test mới. Khoảng trống chỉ ở chiều VÀO, chỉ với người bị
+      kéo theo.
+    - ⛔ **Không tự sửa vì phải đổi protocol** ⇒ [ADR-047](../01-architecture/adr/ADR-047-Dungeon-Entered-Event.md)
+      **Proposed**, dòng **#21** của bảng chờ. Khuyến nghị **B** (event `DungeonEnteredEvent` 1504,
+      cùng khuôn `DuelStartedEvent`, `protocolVersion` KHÔNG tăng); **E** là phương án duy nhất không
+      đổi protocol nhưng đổi LUẬT CHƠI. Test tái hiện để `@Disabled` chờ quyết định. Kèm phát hiện
+      phụ: **người GỬI cũng có khe thứ tự** response-vs-spawn (sửa được không đổi protocol).
+    - ⚠️ **Bẫy quy trình, dính hai lần trong một buổi**: `./gradlew build | tail` **nuốt mã thoát của
+      Gradle** — lần chạy đầu báo `exit code 0` trong khi build THẤT BẠI. Ghi log ra file rồi
+      `echo $?` ngay sau lệnh, đừng đọc kết luận từ mấy dòng cuối đã qua đường ống.
+    - ⚠️ Và hai lỗi SpotBugs chỉ `./gradlew build` đầy đủ mới bắt (test module nào cũng xanh):
+      `Path.getFileName()` có thể null, và một `static long` dùng chung giữa các luồng test thiếu
+      `volatile`.
