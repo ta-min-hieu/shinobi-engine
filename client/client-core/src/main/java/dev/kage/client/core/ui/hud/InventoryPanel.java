@@ -72,6 +72,12 @@ public final class InventoryPanel implements HudWindow {
     private static final float ROW_BUTTON_WIDTH_PX = 84f;
 
     /**
+     * Bề rộng cột tên ô trang bị ("Pháp khí", "Ngọc bội 1"...). Cố định để cột mô tả bên phải không
+     * nhảy theo độ dài tên ô.
+     */
+    private static final float SLOT_LABEL_WIDTH_PX = 140f;
+
+    /**
      * Nút trong hàng hành động rộng hơn {@link #ROW_BUTTON_WIDTH_PX}: nhãn dài nhất ở đó là
      * "Giao dịch"/"Cường hoá", và ở 84px chúng bị CẮT MẤT CHỮ tràn ra ngoài viền khung — thấy bằng
      * ảnh chụp {@code HudPreviewTool}, không thấy bằng build xanh.
@@ -448,7 +454,7 @@ public final class InventoryPanel implements HudWindow {
         itemList.add(iconActor(row.iconCode())).size(ICON_SIZE_PX).padRight(6f).padBottom(ROW_PAD_PX);
         Label label = rowLabel(row.displayText());
         label.setEllipsis(true);
-        itemList.add(label).growX().left().padRight(6f).padBottom(ROW_PAD_PX);
+        itemList.add(label).growX().minWidth(0f).left().padRight(6f).padBottom(ROW_PAD_PX);
         itemList.add(actionButton("inventory.action.select", () -> emit(onSelect, row.itemId())))
                 .width(ROW_BUTTON_WIDTH_PX)
                 .padBottom(ROW_PAD_PX);
@@ -560,13 +566,18 @@ public final class InventoryPanel implements HudWindow {
         for (EquipmentRow row : rows) {
             equipmentList
                     .add(rowLabel(row.slotLabel()))
-                    .width(140f)
+                    .width(SLOT_LABEL_WIDTH_PX)
                     .left()
                     .padRight(6f)
                     .padBottom(ROW_PAD_PX);
             Label label = rowLabel(row.displayText());
             label.setEllipsis(true);
-            equipmentList.add(label).growX().left().padRight(6f).padBottom(ROW_PAD_PX);
+            // minWidth(0): không có nó, ô lấy bề rộng MONG MUỐN của nhãn (dòng dài nhất của mô tả
+            // hai dòng, ~370px) làm bề rộng TỐI THIỂU, nên cả hàng đòi 604px trong một vùng cuộn
+            // 550px. Trục ngang bị khoá nên không có thanh cuộn: bảng bị căn giữa và tràn ra CẢ HAI
+            // mép — người chơi thấy "áp khí"/"o bào" thay vì "Pháp khí"/"Đạo bào", và nút Gỡ cụt.
+            // Cho ô co được thì setEllipsis ở trên mới thật sự có việc để làm.
+            equipmentList.add(label).growX().minWidth(0f).left().padRight(6f).padBottom(ROW_PAD_PX);
             if (row.equipped()) {
                 equipmentList
                         .add(actionButton("inventory.action.unequip", () -> emitInt(onUnequip, row.slotNumber())))

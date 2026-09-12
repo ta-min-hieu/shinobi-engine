@@ -8,6 +8,10 @@ import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
+import com.badlogic.gdx.scenes.scene2d.Actor;
+import com.badlogic.gdx.scenes.scene2d.Group;
+import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
+import com.badlogic.gdx.scenes.scene2d.utils.Layout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +65,9 @@ public final class HudLayoutBudgetTool extends ApplicationAdapter {
 
     private static final String ROWS_PROPERTY = "kage.layout.rows";
 
+    /** Sai số làm tròn của một lượt layout; dưới ngưỡng này thì không phải tràn thật. */
+    private static final float OVERFLOW_TOLERANCE_PX = 1f;
+
     /** Kết quả vượt trần — đọc lại ở {@link #main} SAU khi vòng lặp GL đã đóng. */
     private static final List<String> FAILURES = new ArrayList<>();
 
@@ -102,6 +109,56 @@ public final class HudLayoutBudgetTool extends ApplicationAdapter {
         if (!fits) {
             FAILURES.add(name + " cao " + Math.round(height) + "px > " + SCREEN_HEIGHT_PX + "px");
         }
+        measureOverflowWidth(name, window);
+    }
+
+    /**
+     * Đo chiều NGANG: nội dung bên trong mỗi vùng cuộn có rộng hơn chính vùng cuộn không.
+     *
+     * <p>Vì sao cần, và vì sao phép đo chiều cao ở trên KHÔNG đủ: mọi vùng cuộn HUD khoá trục ngang
+     * ({@link ScrollingList#wrap}), nên bảng con rộng hơn viewport KHÔNG sinh thanh cuộn — nó bị căn
+     * giữa và **tràn ra cả hai mép**, ăn mất chữ đầu của cột trái lẫn nút ở cột phải. Đó đúng là lỗi
+     * khu "Trang bị" của túi đồ: nhãn hiện ra là "áp khí"/"o bào" thay vì "Pháp khí"/"Đạo bào", thấy
+     * lúc PLAYTEST SỐNG 2026-09-12, trong khi công cụ này vẫn báo xanh vì khung vẫn VỪA chiều cao.
+     */
+    private void measureOverflowWidth(String name, HudWindow window) {
+        for (ScrollPane pane : scrollPanes(window.stage().getRoot())) {
+            Actor content = pane.getActor();
+            if (!(content instanceof Layout laidOut)) {
+                continue;
+            }
+            // Đại lượng đúng là chiều rộng TỐI THIỂU, không phải getWidth() (trục ngang bị khoá nên
+            // ScrollPane đã ép nó bằng vùng nhìn — mọi cửa sổ ra cùng một con số vô nghĩa) và cũng
+            // không phải getPrefWidth() (một danh sách co giãn LUÔN muốn rộng hơn; đó là bình
+            // thường). Tràn xảy ra đúng khi nội dung TỪ CHỐI co xuống dưới vùng nhìn — tức
+            // getMinWidth() > vùng nhìn. Cả hai lần đo sai trước đó đều vì lẫn ba đại lượng này.
+            float available = pane.getScrollWidth();
+            float needed = laidOut.getMinWidth();
+            boolean fits = needed <= available + OVERFLOW_TOLERANCE_PX;
+            LOG.info(
+                    "  vùng cuộn {}px — nội dung tối thiểu {}px, mong muốn {}px ({})",
+                    Math.round(available),
+                    Math.round(needed),
+                    Math.round(laidOut.getPrefWidth()),
+                    fits ? "co vừa" : "TRÀN NGANG");
+            if (!fits) {
+                FAILURES.add(name + " tràn NGANG " + Math.round(needed - available) + "px (tối thiểu "
+                        + Math.round(needed) + "px / vùng cuộn " + Math.round(available) + "px)");
+            }
+        }
+    }
+
+    private static List<ScrollPane> scrollPanes(Group group) {
+        List<ScrollPane> found = new ArrayList<>();
+        for (Actor child : group.getChildren()) {
+            if (child instanceof ScrollPane pane) {
+                found.add(pane);
+            }
+            if (child instanceof Group nested) {
+                found.addAll(scrollPanes(nested));
+            }
+        }
+        return found;
     }
 
     /** Hòm thư đầy, MỌI dòng đều có nút Nhận, đang đọc một lá thư dài đúng 1024 ký tự (cột {@code mail.body}). */
@@ -225,7 +282,14 @@ public final class HudLayoutBudgetTool extends ApplicationAdapter {
         panel.setItems(items, rows + "/20 ô", "... còn 4 vật phẩm nữa chưa hiện.");
         List<InventoryPanel.EquipmentRow> equipment = new ArrayList<>();
         for (int slot = 1; slot <= EquipmentSlots.COUNT; slot++) {
-            equipment.add(new InventoryPanel.EquipmentRow(slot, "Trang sức 1", "Trường kiếm thẳng +15", true));
+            // Đúng cái game thật dựng: nhãn slot dài nhất của bundle + mô tả HAI dòng, dòng dưới là
+            // chuỗi chỉ số dài nhất có thể. Bản cũ dùng "Trang sức 1"/"Trường kiếm thẳng +15" — ngắn
+            // hơn thực tế, nên nó KHÔNG chạm tới lỗi tràn ngang có thật ở khung này.
+            equipment.add(new InventoryPanel.EquipmentRow(
+                    slot,
+                    "Ngọc bội 1",
+                    "Áo Vải Tạp Dịch +15" + System.lineSeparator() + "Chỉ số gốc: Giáp +3, Kháng +2, Máu +8",
+                    true));
         }
         panel.setEquipment(equipment);
         panel.showDetail(

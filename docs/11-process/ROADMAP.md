@@ -2614,6 +2614,29 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       bị căn giữa và **tràn ra CẢ HAI mép**. Hàng vật phẩm không dính vì chuỗi ngắn hơn. Cùng họ với
       bẫy nút bề rộng cố định (mục 53) — và `runHudLayoutCheck` **không bắt được** vì nó chỉ đo CHIỀU
       CAO, không đo tràn NGANG.
+    - ✅ **ĐÃ SỬA cùng ngày, và phép đo phải sửa TRƯỚC** (2026-09-12). Nguyên nhân là một ô bảng
+      Scene2D `growX()` **không có `minWidth(0)`**: bề rộng TỐI THIỂU của ô mặc định bằng bề rộng
+      MONG MUỐN của nhãn, nên cả hàng từ chối co xuống dưới 604px trong một vùng cuộn 550px —
+      `setEllipsis(true)` đứng đó mà không bao giờ có việc làm. Sửa: `minWidth(0f)` cho ô mô tả (khu
+      trang bị + hàng vật phẩm) và đặt tên hằng số `SLOT_LABEL_WIDTH_PX` cho số 140 vốn viết thẳng.
+    - 🔍 **Cùng phép đo mới lộ ra cửa sổ thứ HAI chưa ai biết là hỏng: Bang hội tràn 22px** — tên
+      thành viên dài + hàng đơn xin gia nhập có tới HAI nút. Sửa cùng cách.
+    - 📏 **`runHudLayoutCheck` nay đo cả chiều NGANG**, và tôi đã đo SAI HAI LẦN trước khi đúng —
+      bài học là ba đại lượng Scene2D khác nhau: `getWidth()` (vô dụng ở đây: trục ngang bị khoá nên
+      ScrollPane đã ÉP nó bằng vùng nhìn ⇒ mọi cửa sổ ra cùng một con số), `getPrefWidth()` (cũng sai:
+      danh sách co giãn LUÔN muốn rộng hơn, đó là bình thường), và **`getMinWidth()` — đại lượng
+      đúng**: tràn xảy ra đúng khi nội dung TỪ CHỐI co xuống dưới vùng nhìn.
+    - ✅ **Kiểm chứng NGƯỢC, không chỉ "xanh sau khi sửa"**: tạm gỡ `minWidth(0f)` rồi chạy lại ⇒ đỏ
+      đúng **604px tối thiểu / 550px vùng cuộn = tràn 54px**; đặt lại ⇒ xanh. Nếu bỏ qua bước này thì
+      một phép đo hỏng (ví dụ vòng lặp im lặng bỏ qua mọi vùng cuộn) cũng cho ra màu xanh y hệt.
+    - ✅ **PLAYTEST SỐNG lần hai, sau khi sửa (2026-09-12)**: khu "Trang bị" của túi đồ nay đọc ra
+      **"Pháp khí"** và **"Đạo bào"** đủ chữ, nút **Gỡ** nằm trọn trong khung, và dòng mô tả dài tự
+      rút gọn ("Chỉ số gốc: Giáp +3, Kháng +2…") thay vì đẩy cả hàng tràn ra ngoài. Khung **Bang hội**
+      cũng đi trọn đường thật: gõ tên dài → **Lập bang** → *"Đã lập bang!"*, dòng thành viên
+      "Kagemaru — Trưởng bang · Trực tuyến" hiện đủ, DB có `guild` + `guild_member` đúng vai LEADER;
+      giải tán xong trả DB về sạch. ⚠️ Nói cho đúng: bang thật chỉ có MỘT thành viên, nên **trạng
+      thái tệ nhất của khung đó là do `runHudLayoutCheck` gác** (60 dòng, tên dài, hai nút), không
+      phải do buổi chơi này chứng minh.
     - ⚠️ **Bẫy quy trình, dính hai lần trong một buổi**: `./gradlew build | tail` **nuốt mã thoát của
       Gradle** — lần chạy đầu báo `exit code 0` trong khi build THẤT BẠI. Ghi log ra file rồi
       `echo $?` ngay sau lệnh, đừng đọc kết luận từ mấy dòng cuối đã qua đường ống.

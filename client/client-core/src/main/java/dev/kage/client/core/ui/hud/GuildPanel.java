@@ -445,7 +445,13 @@ public final class GuildPanel implements HudWindow {
     public void setMembers(List<MemberRow> rows, String overflowNotice) {
         memberList.clear();
         for (MemberRow row : rows) {
-            memberList.add(rowLabel(row.displayText())).growX().left().padBottom(ROW_PAD_PX);
+            // minWidth(0) + ellipsis: tên bang/tên thành viên dài đòi bề rộng lớn hơn vùng cuộn,
+            // mà trục ngang bị khoá nên không có thanh cuộn — bảng bị căn giữa và tràn ra CẢ HAI
+            // mép, ăn mất chữ đầu của tên lẫn nút bên phải. Đo được bằng HudLayoutBudgetTool
+            // (2026-09-12: Bang hội tràn 22px), không thấy bằng build xanh.
+            Label memberLabel = rowLabel(row.displayText());
+            memberLabel.setEllipsis(true);
+            memberList.add(memberLabel).growX().minWidth(0f).left().padBottom(ROW_PAD_PX);
             if (row.kickable()) {
                 memberList
                         .add(actionButton("guild.action.kick", () -> kick(row.kickTargetName())))
@@ -468,7 +474,10 @@ public final class GuildPanel implements HudWindow {
     public void setPendingRequests(List<RequestRow> rows, String overflowNotice) {
         pendingList.clear();
         for (RequestRow row : rows) {
-            pendingList.add(rowLabel(row.displayText())).growX().left().padBottom(ROW_PAD_PX);
+            // Cùng lý do ô tên ở setMembers, và hàng này còn chật hơn: HAI nút bên phải.
+            Label requestLabel = rowLabel(row.displayText());
+            requestLabel.setEllipsis(true);
+            pendingList.add(requestLabel).growX().minWidth(0f).left().padBottom(ROW_PAD_PX);
             pendingList
                     .add(actionButton("guild.action.approve", () -> approve(row.requestId())))
                     .width(ROW_BUTTON_WIDTH_PX)
