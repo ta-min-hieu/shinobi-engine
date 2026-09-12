@@ -516,6 +516,31 @@ từ trước: hai con quái chết cùng nhịp là hai Virtual Thread, cả ha
 dành riêng cho quest; giao một món người chơi có thể còn muốn giữ (đan dược…) là quyết định thiết
 kế cần cân nhắc.
 
+
+### 9.6 Quest NHIỀU BƯỚC CÓ THỨ TỰ (✅ Đã code, 2026-09-12 — quest 7 `missing_disciple_trail`)
+
+Sáu quest đầu mỗi quest có ĐÚNG MỘT loại mục tiêu. Quest 7 có ba bước và chúng phải xảy ra đúng
+thứ tự: hỏi Chu Hoành (`npc_talked` town_elder) → dẹp 2 tán tu chặn đường (`monster_killed`) →
+quay về báo Tô Vân Nhi (`npc_talked` senior_sister).
+
+**Thứ tự sống trong SCRIPT, không sống trong Java.** `ProcessQuestEventUseCase` không biết khái
+niệm "bước": nó vẫn chạy hook rồi ghi lại chuỗi tiến độ script trả về. Java không thêm một dòng
+nào cho kiểu quest này — Điều 27 áp lần thứ sáu liên tiếp (V28 → V30 → V33 → V37 → V38 → V39).
+
+Cách thi hành thứ tự là **điều kiện cộng dồn**: bước 2 kiểm `progress.asked`, bước 3 kiểm
+`progress.asked && progress.cleared >= 2`. Ba nhánh độc lập KHÔNG có điều kiện cộng dồn thì người
+chơi giết tán tu trước khi hỏi ai vẫn xong quest — tức ba việc rời rạc, không phải một cuộc điều
+tra. Ô test `shouldNotCountBandits_killedBeforeAskingTheElder` gác đúng chỗ đó.
+
+⚠️ Bước cuối hỏi ĐÚNG người giao quest. Lần mở lời để NHẬN quest không tự đóng bước cuối: sự kiện
+`npc_talked` bắn lúc MỞ LỜI, tức trước khi quest tồn tại — và kể cả không thế thì điều kiện
+`cleared >= 2` vẫn chưa đúng.
+
+**Không dùng quỷ đá (`stone_ogre`), dù nó là loài duy nhất chưa quest nào dùng**: bảng so sánh ở
+V30 §2 đã tính sẵn — với trọn bộ "Tạp Dịch" người chơi cần **7 nhát** để hạ nó còn nó cần **4 nhát**
+để hạ người chơi, tức THUA. Hạ được nó đòi trọn bộ "Hạ Nhẫn" (10.900 vàng), xa hơn đầu arc 2 rất
+nhiều. Số cũ trả lời được thì đừng đo lại bằng cảm giác.
+
 ---
 
 ## 10. Chat

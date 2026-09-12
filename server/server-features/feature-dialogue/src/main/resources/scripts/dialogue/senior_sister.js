@@ -79,6 +79,11 @@
         options: [
             { label_key: "dialogue.option.accept_quest_outer_sect_tallies",
               action: "accept_quest:recover_outer_sect_tallies" },
+            // Quest 7 (V39) — nhịp ĐIỀU TRA. Đặt NGAY SAU quest 6 để hai việc của cô đọc theo đúng
+            // thứ tự kể; hai lựa chọn còn lại của node này vì thế lùi một chỗ (option_index là VỊ
+            // TRÍ — thay đổi CÓ CHỦ ĐÍCH, ghim lại bằng SeniorSisterDialogueTreeTest).
+            { label_key: "dialogue.option.accept_quest_missing_disciple",
+              action: "accept_quest:missing_disciple_trail" },
             { label_key: "dialogue.option.back_senior_sister", action: "start" },
             { label_key: "dialogue.option.bye_senior_sister", action: "end" }
         ]

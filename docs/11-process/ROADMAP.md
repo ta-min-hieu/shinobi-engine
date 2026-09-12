@@ -2681,3 +2681,41 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       hai quest của cô đều nằm ở lúc MỞ LỜI.
     - 🔴 **Dòng #19 KHÔNG đóng**: quest này thu hẹp khoảng lệch Lv10–18 đúng **một cấp**. Lấp trọn
       quãng đó (nhiệm vụ ngày? thêm quest? đổi đường cong EXP?) vẫn là quyết định của chủ dự án.
+
+72. **QUEST THỨ BẢY — quest NHIỀU BƯỚC CÓ THỨ TỰ đầu tiên; arc 2 đi tới Cấp 12 (2026-09-12)**:
+    - **V39** thêm ĐÚNG MỘT DÒNG (`missing_disciple_trail`, tiên quyết `recover_outer_sect_tallies`).
+      Không vật phẩm mới, không bảng rơi mới, không loài quái mới: cái MỚI nằm ở **cấu trúc mục tiêu**,
+      không ở dữ liệu. Lần thứ SÁU liên tiếp một quest mới không tốn dòng Java nội dung nào.
+    - 🧩 **Ba bước, đúng thứ tự**: hỏi Chu Hoành (`npc_talked`) → dẹp 2 tán tu chặn đường
+      (`monster_killed`) → quay về báo Tô Vân Nhi (`npc_talked`). **Thứ tự sống trong SCRIPT**, thi
+      hành bằng ĐIỀU KIỆN CỘNG DỒN (`asked` gác bước 2, `cleared >= 2` gác bước 3);
+      `ProcessQuestEventUseCase` không biết khái niệm "bước" và không cần biết (Điều 27). Ba nhánh
+      độc lập không có điều kiện cộng dồn thì giết tán tu TRƯỚC khi hỏi ai vẫn xong quest — tức ba
+      việc rời rạc, không phải một cuộc điều tra. Xem GAMEPLAY §9.6.
+    - 🚫 **Không dùng quỷ đá, và số cũ trả lời điều đó chứ không phải cảm giác**: bảng V30 §2 đã tính
+      sẵn — với trọn bộ "Tạp Dịch", người chơi cần **7 nhát** hạ `stone_ogre` còn nó cần **4 nhát**
+      ⇒ THUA. Hạ nó đòi trọn bộ "Hạ Nhẫn" (10.900 vàng), xa hơn đầu arc 2 nhiều. Quỷ đá để dành cho
+      nhịp cao trào. **Đọc lại kết luận đã đo thay vì đo lại bằng mắt** là cách rẻ nhất ở đây.
+    - 📖 **Nhịp ĐIỀU TRA (STORY §6 arc 2)**: Chu Hoành nói ra hai điều — Hình Đường đã KẾT LUẬN "bỏ
+      trốn", và đây là đứa thứ ba trong nửa năm, cả ba đều bỏ lại đồ đạc. Ông KHÔNG nhắc hang luyện
+      công, dấu vết hút tu vi, hay Huyết Sa: cả ba là nhịp TWIST, §8 quy tắc 2 cấm nói trước.
+    - ⚖️ **1.300 EXP** chọn từ quãng đường (x=2 → −5 → 21/34 → 2, ~70m, 2 trận), nằm trên quest 6
+      (1.000, đi 34m). Đường chơi TỐI THIỂU: 5.855 + 2 × 35 + 1.300 = **7.225** ⇒ đóng quest ở
+      **Cấp 12** (Cấp 13 cần 7.800). Mỗi quest arc 2 đẩy đúng một cấp.
+    - 🧪 **PLAYTEST trọn vòng bằng `gameProbe` trên server thật**: nhận quest tại node `about_work`
+      ⇒ IN_PROGRESS; **về báo NGAY khi chưa làm gì ⇒ KHÔNG có gói 607 nào** (thứ tự có hiệu lực
+      thật, không chỉ trong test); hỏi Chu Hoành; hạ 2 tán tu; báo lại ⇒ 607 COMPLETED; lĩnh thưởng
+      ⇒ **+1.300 EXP**. DB: `{"asked":true,"cleared":2,"reported":true}`, trạng thái CLAIMED.
+      ⚠️ Nhân vật test lên Cấp 13 chứ không phải 12 — vì nó đã cày thêm từ các đợt trước, KHÔNG phải
+      đường tối thiểu. Con số của đường tối thiểu vẫn là Cấp 12.
+    - ✅ **Hai test cây thoại lại đỏ đúng lúc** (cùng lý do mục 71: `option_index` là VỊ TRÍ). Nhánh
+      của Chu Hoành vì thế MỌC XUỐNG DƯỚI qua `about_town` — không chen vào `start`, đúng luật chính
+      file đó đã ghi từ arc 1; còn ở Tô Vân Nhi thì lựa chọn quest 7 đặt ngay sau quest 6 và hai
+      lựa chọn còn lại lùi một chỗ, ghim lại bằng test.
+    - 🧱 Lớp test `OuterSectTallyQuestIntegrationTest` đổi tên thành **`OuterSectQuestIntegrationTest`**
+      và nay phủ cả hai quest arc 2 — vùng nghiệp vụ là "quest ngoại môn", không phải "thẻ bài".
+    - 🔴 **Dòng #19 vẫn chưa đóng**: arc 2 nay đưa người chơi từ Cấp 10 lên **Cấp 12**, trong khi
+      STORY §6 khai arc 2 ở Lv19–36.
+    - 🔴 **Tên riêng "Lý Tam" vẫn CHƯA có trong STORY §5** — nay nó là tên hiển thị của cả một quest.
+      §8 quy tắc 3 đòi khai tên riêng mới vào §4/§5 cùng lượt, nhưng §1–§6 là SSOT tường thuật mà AI
+      không được tự sửa (CLAUDE.md §14: mâu thuẫn thì báo cáo, không tự chọn bên). **Chờ chủ dự án.**

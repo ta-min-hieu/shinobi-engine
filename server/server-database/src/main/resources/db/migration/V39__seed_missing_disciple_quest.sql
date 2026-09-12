@@ -1,0 +1,78 @@
+-- V39 — quest THỨ BẢY: "Dấu Vết Đệ Tử Mất Tích" (STORY.md §6 arc 2, nhịp ĐIỀU TRA).
+--
+-- CHỈ THÊM MỘT DÒNG. Không vật phẩm mới, không bảng rơi mới, không loài quái mới — quest này dùng
+-- lại nguyên bộ nội dung đã có, và cái MỚI của nó nằm ở CẤU TRÚC mục tiêu, không ở dữ liệu.
+--
+-- =============================================================================================
+-- QUEST NHIỀU BƯỚC CÓ THỨ TỰ — LẦN ĐẦU
+-- =============================================================================================
+-- Sáu quest trước đều có ĐÚNG MỘT loại mục tiêu: đếm quái (1-4), gặp NPC (5), giao đồ (6). Quest
+-- này có BA bước và chúng phải xảy ra ĐÚNG THỨ TỰ:
+--
+--   1. `npc_talked` town_elder      — hỏi Chu Hoành chuyện đệ tử mất tích
+--   2. `monster_killed` wandering_bandit × 2 — tán tu chặn đường ra bãi đá phía đông
+--   3. `npc_talked` senior_sister   — quay về báo Tô Vân Nhi
+--
+-- Thứ tự được thi hành TRONG SCRIPT (Điều 27: Java là cơ chế, script là nội dung) — `dispatch`
+-- của `ProcessQuestEventUseCase` không biết và không cần biết khái niệm "bước". Nhờ đó quest nhiều
+-- bước không tốn một dòng Java nào, y như năm quest trước: lần thứ SÁU liên tiếp
+-- (V28 → V30 → V33 → V37 → V38 → V39).
+--
+-- =============================================================================================
+-- VÌ SAO KHÔNG DÙNG QUỶ ĐÁ (`stone_ogre`), dù nó là loài DUY NHẤT chưa quest nào dùng
+-- =============================================================================================
+-- Vì số đã có sẵn và nó nói KHÔNG. Bảng so sánh ở V30 §2 (tính bằng công thức
+-- `hit = round(atk × 100 / (100 + def))`, cả hai bên chung nhịp `ATTACK_INTERVAL_SECONDS = 1`),
+-- với nhân vật nền + trọn bộ "Tạp Dịch" (ATK 37 · DEF 27 · HP 118):
+--
+--   | Đối thủ                   | người chơi cần | quái cần | kết quả |
+--   |---------------------------|----------------|----------|---------|
+--   | tán tu                    | 3 nhát         | 7 nhát   | thắng   |
+--   | quỷ đá (`stone_ogre`)     | 7 nhát         | 4 nhát   | THUA    |
+--
+-- Hạ quỷ đá cần trọn bộ "Hạ Nhẫn" (10.900 vàng) — xa hơn chỗ người chơi đang đứng ở đầu arc 2 rất
+-- nhiều. V30 đã ghi đúng câu đó khi chọn thêm `archive_warden` thay vì dùng lại quỷ đá; quest này
+-- chỉ đọc lại kết luận cũ thay vì tự đo lại bằng cảm giác. Quỷ đá để dành cho nhịp CAO TRÀO của
+-- arc 2, khi người chơi đã mua nổi đồ Ngoại Môn.
+--
+-- =============================================================================================
+-- NHỊP CỐT TRUYỆN (STORY §6 arc 2 + §8 quy tắc 2)
+-- =============================================================================================
+-- Quest 6 gieo mầm (một thẻ bài là của đứa mấy hôm không thấy về, lời giải thích chính thức: bỏ
+-- trốn). Quest này là nhịp ĐIỀU TRA: Tô Vân Nhi không tin, và người đầu tiên phải hỏi là Chu Hoành.
+--   ✅ Chu Hoành được nói: Hình Đường đã kết luận "bỏ trốn", ông chưa tin, và đây KHÔNG phải đứa
+--      đầu tiên. Đúng §5 ("biết nhiều hơn những gì ông nói").
+--   ❌ KHÔNG một chữ về hang luyện công, dấu vết hút tu vi, hay cái tên Huyết Sa — cả ba là nhịp
+--      TWIST của arc, và §8 quy tắc 2 cấm nói trước, kể cả úp mở.
+--
+-- =============================================================================================
+-- CÂN BẰNG: 1.300 EXP
+-- =============================================================================================
+-- Chọn từ tương quan với hai quest liền trước, và từ QUÃNG ĐƯỜNG thật (khuôn V30 §2):
+--
+--   quest 5  đi 2m trong vùng an toàn, 0 trận          =   200 EXP
+--   quest 6  đi tới x=34, 2 trận tán tu                = 1.000 EXP
+--   quest 7  x=2 → x=-5 → x=21/34 → x=2 (~70m), 2 trận = 1.300 EXP
+--
+-- Đường chơi tối thiểu: 5.855 (hết quest 6) + 2 × 35 (tán tu) + 1.300 = **7.225**.
+-- `ExperienceCurve` tuyến tính 100 × cấp ⇒ tổng của Cấp 12 là 6.600, của Cấp 13 là 7.800
+-- ⇒ người chơi đóng quest này ở **Cấp 12**. Đúng nhịp đã đặt ở V38: mỗi quest arc 2 đẩy MỘT cấp.
+--
+-- ⚠️ Dòng #19 của bảng chờ vẫn CHƯA đóng: tới đây arc 2 đưa người chơi từ Cấp 10 lên Cấp 12, còn
+--    STORY §6 khai arc 2 ở Lv19–36. Lấp phần còn lại là quyết định của chủ dự án, không phải của AI.
+-- ---------------------------------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------------------------------
+-- Quest 7. Nội dung (ba bước, thứ tự, phần thưởng) nằm HẾT trong script; bảng này chỉ giữ định
+-- danh + đường dẫn script + điều kiện MỞ.
+--
+-- `prerequisite_quest_id` trỏ về `recover_outer_sect_tallies` (ADR-044, mốc CLAIMED): người chơi
+-- phải đã cầm hai thẻ bài về cho Tô Vân Nhi thì mới có lý do đi hỏi chuyện Lý Tam. Tra theo `code`
+-- chứ KHÔNG hardcode id (tiền lệ V28/V30/V33/V37/V38).
+-- ---------------------------------------------------------------------------------------------
+INSERT INTO quest_template (code, type, script_ref, prerequisite_quest_id)
+SELECT 'missing_disciple_trail',
+       'MAIN',
+       '/scripts/quest/missing_disciple_trail.js',
+       (SELECT id FROM quest_template WHERE code = 'recover_outer_sect_tallies')
+ WHERE NOT EXISTS (SELECT 1 FROM quest_template WHERE code = 'missing_disciple_trail');

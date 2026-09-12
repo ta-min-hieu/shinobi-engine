@@ -65,6 +65,7 @@ class TownElderDialogueTreeTest {
                         "old_archive",
                         "awakening_trial",
                         "outer_sect",
+                        "missing_disciple",
                         "end");
         assertThat(node("about_realm").textKey()).isEqualTo("dialogue.town_elder.about_realm");
         assertThat(node("about_elder").textKey()).isEqualTo("dialogue.town_elder.about_elder");

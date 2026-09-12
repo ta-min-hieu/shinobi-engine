@@ -43,6 +43,7 @@
             { label_key: "dialogue.option.ask_old_archive", action: "old_archive" },
             { label_key: "dialogue.option.ask_awakening_trial", action: "awakening_trial" },
             { label_key: "dialogue.option.ask_outer_sect", action: "outer_sect" },
+            { label_key: "dialogue.option.ask_missing_disciple", action: "missing_disciple" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]
     },
@@ -131,6 +132,21 @@
     // đi NHANH tới đâu, không quyết định đi ĐƯỢC tới đâu.
     about_elder: {
         text_key: "dialogue.town_elder.about_elder",
+        options: [
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    // ĐIỀU TRA arc 2 (STORY.md §6): Tô Vân Nhi nhờ người chơi hỏi ông về chuyện đệ tử ngoại môn
+    // không thấy về. Mọc xuống dưới qua `about_town`, cùng lý do với `night_watch`/`old_archive`:
+    // bốn lựa chọn của `start` bị khoá bởi option_index.
+    //
+    // §5 Chu Hoành "biết nhiều hơn những gì ông nói": ông nói ra được hai điều — Hình Đường đã
+    // KẾT LUẬN là bỏ trốn, và đây không phải đứa đầu tiên. Ông KHÔNG được nhắc hang luyện công,
+    // dấu vết hút tu vi, hay Huyết Sa: cả ba là nhịp TWIST của arc 2 (§8 quy tắc 2), và ông cũng
+    // thật sự chưa biết.
+    missing_disciple: {
+        text_key: "dialogue.town_elder.missing_disciple",
         options: [
             { label_key: "dialogue.option.back", action: "about_town" },
             { label_key: "dialogue.option.bye", action: "end" }

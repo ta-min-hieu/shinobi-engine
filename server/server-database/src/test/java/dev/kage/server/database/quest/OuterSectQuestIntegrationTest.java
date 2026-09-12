@@ -40,9 +40,10 @@ import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
 
 /**
- * Test bằng PostgreSQL THẬT — quest THỨ SÁU {@code recover_outer_sect_tallies} (seed V38,
- * STORY.md §6 arc 2 nhịp VIỆC VẶT): quest SẢN PHẨM đầu tiên dùng mục tiêu loại thứ ba
- * ("mang vật X tới NPC Y", GAMEPLAY.md §9.5).
+ * Test bằng PostgreSQL THẬT — các quest NGOẠI MÔN của arc 2 (STORY.md §6): quest THỨ SÁU
+ * {@code recover_outer_sect_tallies} (V38, nhịp VIỆC VẶT — mục tiêu "mang vật X tới NPC Y",
+ * GAMEPLAY.md §9.5) và quest THỨ BẢY {@code missing_disciple_trail} (V39, nhịp ĐIỀU TRA — quest
+ * NHIỀU BƯỚC CÓ THỨ TỰ đầu tiên, GAMEPLAY.md §9.6).
  *
  * <p><b>Vì sao là lớp RIÊNG</b>, trong khi {@link QuestIntegrationTest} cố ý gom năm quest trước
  * vào một chỗ để khỏi dựng thêm một Postgres: thêm khối này vào lớp kia làm nó chạm TRẦN độ phức
@@ -54,7 +55,7 @@ import dev.kage.server.database.character.PostgresCharacterAdapter;
  * phẩm, đúng số lượng, đúng người nhận, đúng phần thưởng, và đúng thứ tự quest (ADR-044).
  */
 @Testcontainers
-class OuterSectTallyQuestIntegrationTest {
+class OuterSectQuestIntegrationTest {
 
     private static final int POSTGRES_PORT = 5432;
     private static final String TALLY_QUEST_CODE = "recover_outer_sect_tallies";
@@ -63,6 +64,10 @@ class OuterSectTallyQuestIntegrationTest {
     private static final String AWAKENING_TRIAL_CODE = "awakening_trial";
     private static final String SENIOR_SISTER = "senior_sister";
     private static final long TALLY_QUEST_EXP = 1000L;
+    private static final String TRAIL_QUEST_CODE = "missing_disciple_trail";
+    private static final String TOWN_ELDER = "town_elder";
+    private static final String BANDIT = "wandering_bandit";
+    private static final long TRAIL_QUEST_EXP = 1300L;
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
@@ -187,6 +192,90 @@ class OuterSectTallyQuestIntegrationTest {
                 """, TALLY_ITEM_CODE);
 
         assertThat(chance).isEqualTo(100L);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Quest THỨ BẢY — `missing_disciple_trail` (V39): ba bước, và THỨ TỰ là thứ phải gác.
+    // ------------------------------------------------------------------------------------------
+
+    @Test
+    void shouldPlayMissingDiscipleLifecycle_withRealScript() {
+        long characterId = createFreshCharacter("Trail1");
+        claimTallyQuest(characterId);
+
+        assertThat(newAcceptUseCase().execute(characterId, TRAIL_QUEST_CODE))
+                .isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
+
+        // Về báo trước khi đi hỏi: không xong — bước 3 đứng sau hai bước kia.
+        assertThat(newProcessUseCase().npcTalked(characterId, SENIOR_SISTER)).isEmpty();
+
+        newProcessUseCase().npcTalked(characterId, TOWN_ELDER);
+        newProcessUseCase().monsterKilled(characterId, BANDIT);
+        newProcessUseCase().monsterKilled(characterId, BANDIT);
+        long expBefore = readExp(characterId);
+
+        List<ProcessQuestEventUseCase.QuestStatusChange> afterReport =
+                newProcessUseCase().npcTalked(characterId, SENIOR_SISTER);
+
+        assertThat(afterReport).hasSize(1);
+        assertThat(afterReport.get(0).questCode()).isEqualTo(TRAIL_QUEST_CODE);
+        assertThat(afterReport.get(0).status()).isEqualTo(QuestStatus.COMPLETED);
+
+        ClaimQuestRewardUseCase.ClaimResult claim =
+                newClaimUseCase().execute(characterId, TRAIL_QUEST_CODE, newIdempotencyKey());
+
+        assertThat(claim.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
+        assertThat(claim.expGranted()).isEqualTo(TRAIL_QUEST_EXP);
+        assertThat(readExp(characterId)).isEqualTo(expBefore + TRAIL_QUEST_EXP);
+    }
+
+    /**
+     * Tán tu hạ TRƯỚC khi hỏi Chu Hoành KHÔNG được tính lùi. Thiếu điều kiện cộng dồn này thì ba
+     * bước thành ba việc rời rạc, và người chơi "điều tra" xong trước khi biết mình điều tra gì.
+     */
+    @Test
+    void shouldNotCountBandits_killedBeforeAskingTheElder() {
+        long characterId = createFreshCharacter("Trail2");
+        claimTallyQuest(characterId);
+        newAcceptUseCase().execute(characterId, TRAIL_QUEST_CODE);
+
+        newProcessUseCase().monsterKilled(characterId, BANDIT);
+        newProcessUseCase().monsterKilled(characterId, BANDIT);
+        newProcessUseCase().npcTalked(characterId, TOWN_ELDER);
+
+        // Hỏi xong mới giết: vẫn phải giết đủ hai con nữa.
+        assertThat(newProcessUseCase().npcTalked(characterId, SENIOR_SISTER)).isEmpty();
+        newProcessUseCase().monsterKilled(characterId, BANDIT);
+        assertThat(newProcessUseCase().npcTalked(characterId, SENIOR_SISTER)).isEmpty();
+        newProcessUseCase().monsterKilled(characterId, BANDIT);
+
+        assertThat(newProcessUseCase().npcTalked(characterId, SENIOR_SISTER))
+                .extracting(ProcessQuestEventUseCase.QuestStatusChange::questCode)
+                .containsExactly(TRAIL_QUEST_CODE);
+    }
+
+    /** V39 tra quest tiên quyết theo {@code code}, không hardcode id. */
+    @Test
+    void shouldSeedMissingDisciple_withPrerequisitePointingAtTheTallyQuest() {
+        assertThat(prerequisiteCodeOf(TRAIL_QUEST_CODE)).isEqualTo(TALLY_QUEST_CODE);
+    }
+
+    @Test
+    void shouldRejectMissingDisciple_whenTallyQuestNotClaimedYet() {
+        long characterId = createFreshCharacter("Trail3");
+        claimReportToOuterSect(characterId); // xong quest 5, nhưng chưa đòi thẻ bài về
+
+        assertThat(newAcceptUseCase().execute(characterId, TRAIL_QUEST_CODE))
+                .isEqualTo(AcceptQuestUseCase.AcceptResult.PREREQUISITE_NOT_MET);
+    }
+
+    /** Quest 5 + quest 6 — điều kiện ADR-044 để mở quest 7. */
+    private static void claimTallyQuest(long characterId) {
+        claimReportToOuterSect(characterId);
+        newAcceptUseCase().execute(characterId, TALLY_QUEST_CODE);
+        insertTallies(characterId, 2);
+        newProcessUseCase().npcTalked(characterId, SENIOR_SISTER);
+        newClaimUseCase().execute(characterId, TALLY_QUEST_CODE, newIdempotencyKey());
     }
 
     // ------------------------------------------------------------------------------------------
