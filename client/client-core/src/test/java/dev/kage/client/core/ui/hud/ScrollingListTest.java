@@ -112,7 +112,9 @@ class ScrollingListTest {
                 if (PER_WINDOW_CAP
                         .matcher(Files.readString(file, StandardCharsets.UTF_8))
                         .find()) {
-                    offenders.add(file.getFileName().toString());
+                    // Đường dẫn tương đối, không getFileName(): Path.getFileName() khai trả null
+                    // (thư mục gốc không có tên) và tên file trần thì không nói file nằm ở đâu.
+                    offenders.add(repoRoot().relativize(file).toString());
                 }
             }
         }

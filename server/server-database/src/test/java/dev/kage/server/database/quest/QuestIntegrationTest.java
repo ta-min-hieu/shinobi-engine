@@ -75,7 +75,9 @@ class QuestIntegrationTest {
             new PostgreSQLContainer<>(DockerImageName.parse("postgres:17")).withStartupTimeout(Duration.ofMinutes(2));
 
     static DataSource dataSource;
-    static long accountId;
+    // volatile: @BeforeAll ghi ở luồng JUnit, còn các test đồng thời đọc nó từ luồng khác —
+    // ghi một biến 64-bit không volatile không bảo đảm nguyên tử (SpotBugs AT).
+    static volatile long accountId;
 
     @BeforeAll
     static void migrate() {
@@ -803,10 +805,10 @@ class QuestIntegrationTest {
 
     /** Nhận quest giao đồ mẫu cho một nhân vật mới tinh (quest mẫu không có tiên quyết). */
     private static long acceptDeliveryQuest(String characterName) {
-        execute(
-                "INSERT INTO quest_template (code, type, script_ref) VALUES (?, 'MAIN', ?) ON CONFLICT (code) DO NOTHING",
-                DELIVERY_CODE,
-                DELIVERY_SCRIPT_REF);
+        execute("""
+                INSERT INTO quest_template (code, type, script_ref)
+                VALUES (?, 'MAIN', ?) ON CONFLICT (code) DO NOTHING
+                """, DELIVERY_CODE, DELIVERY_SCRIPT_REF);
         long characterId = createFreshCharacter(characterName);
         assertThat(newAcceptUseCase().execute(characterId, DELIVERY_CODE))
                 .isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
