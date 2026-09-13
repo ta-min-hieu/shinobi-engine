@@ -97,6 +97,13 @@ public final class GameProbe {
                 new GameConnection.GatewayEndpoint(config.host(), config.port(), HANDSHAKE_TIMEOUT_MILLIS);
         try (GameConnection connection = GameConnection.open(endpoint, session)) {
             enterWorld(connection, config, session, observation);
+            // Mặc đồ TRƯỚC khi đi bộ: `bonus_hp` nâng MÁU TỐI ĐA thật (ADR-036) và server trả máu
+            // mới ngay trong EquipItemResponse (ADR-043), nên mặc sau khi đi thì "máu lúc tới nơi"
+            // đo ra sai. Ngược hẳn với UseItemScenario bên dưới — món tiêu hao phải dùng SAU khi
+            // đã mất máu, trong cùng phiên.
+            if (!config.equipItemCodes().isEmpty()) {
+                new EquipScenario(connection, session).run(config.equipItemCodes());
+            }
             if (config.moveToX().isPresent()) {
                 walkTo(connection, observation, session, config.moveToX().getAsDouble());
             }

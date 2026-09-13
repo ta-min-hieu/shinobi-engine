@@ -23,6 +23,7 @@ import dev.kage.tools.loadtest.CommandLineArguments;
  * @param attackTarget {@code none} | {@code nearest} | id thực thể cụ thể (số, âm = quái)
  * @param attackIntervalMillis nhịp gửi {@code AttackCommand} (cooldown thật do server giữ)
  * @param observeSeconds thời gian đứng đọc sự kiện sau khi đã tới chỗ
+ * @param equipItemCodes danh sách mã trang bị cần MẶC trước khi đi bộ (ô trang bị suy từ catalog)
  * @param quest kịch bản nhiệm vụ (nói chuyện NPC / lĩnh thưởng / in nhật ký) — xem {@link QuestPlan}
  */
 public record ProbeConfig(
@@ -38,7 +39,18 @@ public record ProbeConfig(
         String useItemCode,
         OptionalDouble returnToX,
         int settleSeconds,
+        List<String> equipItemCodes,
         QuestPlan quest) {
+
+    /**
+     * Danh sách mã trang bị BẤT BIẾN — record không tự copy, mà lệnh gọi có thể truyền list sống
+     * (đúng lý do {@link QuestPlan} đã làm với {@code dialogueChoices}). Thiếu chỗ này thì SpotBugs
+     * bắt đúng hai lỗi: {@code EI_EXPOSE_REP2} (constructor giữ list của người ngoài) và
+     * {@code EI_EXPOSE_REP} (getter trả thẳng list nội bộ ra).
+     */
+    public ProbeConfig {
+        equipItemCodes = List.copyOf(equipItemCodes);
+    }
 
     /**
      * Phần kịch bản NHIỆM VỤ của một lần chạy probe — tách khỏi {@link ProbeConfig} để chữ ký
@@ -92,6 +104,7 @@ public record ProbeConfig(
                 raw.text("useItemCode", ""),
                 raw.optionalDouble("returnToX"),
                 raw.integer("settleSeconds", 0),
+                List.copyOf(raw.list("equipItemCodes")),
                 new QuestPlan(
                         raw.text("talkToNpc", ""),
                         raw.list("dialogueChoices"),
