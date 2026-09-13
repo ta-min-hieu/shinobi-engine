@@ -27,6 +27,14 @@ enum AcceptQuestOutcome {
   // KHÔNG gộp vào QUEST_NOT_FOUND: quest CÓ THẬT, chỉ là chưa tới lượt — nói "không có nhiệm
   // vụ này" là nói dối người chơi về một thứ họ sẽ nhận được sau vài phút nữa.
   ACCEPT_QUEST_OUTCOME_PREREQUISITE_NOT_MET = 4;
+  // Hook `on_accept` NÉM LỖI giữa chừng (QuestScriptRunner.HookEffects.scriptFailed). Chỉ THÊM giá
+  // trị enum, không đổi/xoá giá trị nào ⇒ `protocolVersion` KHÔNG tăng (NETWORK.md §6) — cùng cách
+  // PREREQUISITE_NOT_MET = 4 đã làm. Client cũ rơi vào nhánh "không rõ" sẵn có, không vỡ.
+  //
+  // KHÔNG gộp vào câu chung "không nhận được nhiệm vụ": đây là lỗi của MÁY CHỦ (script hỏng), không
+  // phải thứ người chơi làm sai. Nói chung chung thì họ thử lại mãi một việc không bao giờ chạy
+  // được, và không ai biết là phải đi sửa script.
+  ACCEPT_QUEST_OUTCOME_SCRIPT_ERROR = 5;
 }
 
 // Response: Server -> Client (OPCODE_ACCEPT_QUEST_RESPONSE).
@@ -67,6 +75,10 @@ enum ClaimQuestRewardOutcome {
   CLAIM_QUEST_REWARD_OUTCOME_NOT_ACCEPTED = 3;
   CLAIM_QUEST_REWARD_OUTCOME_NOT_COMPLETED_YET = 4;
   CLAIM_QUEST_REWARD_OUTCOME_DUPLICATE_REQUEST = 5; // ADR-025: idempotency_key đã dùng trước đó
+  // Hook `on_claim` NÉM LỖI giữa chừng. Server KHÔNG trao phần thưởng dở dang, KHÔNG đổi status
+  // sang CLAIMED, và KHÔNG ghi `idempotency_key` ⇒ quest vẫn COMPLETED và người chơi lĩnh lại được
+  // sau khi script được sửa. Chỉ THÊM ⇒ `protocolVersion` KHÔNG tăng.
+  CLAIM_QUEST_REWARD_OUTCOME_SCRIPT_ERROR = 6;
 }
 
 message ItemRewardView {

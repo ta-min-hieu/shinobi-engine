@@ -50,6 +50,14 @@ public final class ClaimQuestRewardUseCase {
         }
 
         QuestScriptRunner.HookEffects effects = scriptRunner.runClaim(template.scriptRef(), progress.progressJson());
+        if (effects.scriptFailed()) {
+            // Tới 2026-09-12 nhánh này là một lỗ MẤT PHẦN THƯỞNG VĨNH VIỄN: hiệu ứng dở dang được
+            // trao (những give_exp/give_item chạy được trước chỗ lỗi), status đổi sang CLAIMED, và
+            // idempotency_key bị ĐỐT — nên phần thưởng còn lại không bao giờ về, mà cũng không lĩnh
+            // lại được nữa. Nay dừng TRƯỚC transaction: chưa một dòng nào được ghi, quest vẫn
+            // COMPLETED, key vẫn còn nguyên để lần lĩnh sau dùng lại.
+            return ClaimResult.scriptError();
+        }
         try {
             tx.inTransaction((Transaction t) -> {
                 rewardPorts.idempotencyPort().recordOrThrow(t, idempotencyKey);
@@ -89,7 +97,9 @@ public final class ClaimQuestRewardUseCase {
             QUEST_NOT_FOUND,
             NOT_ACCEPTED,
             NOT_COMPLETED_YET,
-            DUPLICATE_REQUEST
+            DUPLICATE_REQUEST,
+            /** Hook {@code on_claim} ném lỗi — chưa ghi gì, quest vẫn COMPLETED và lĩnh lại được. */
+            SCRIPT_ERROR
         }
 
         public record ItemReward(String itemTemplateCode, int quantity) {}
@@ -112,6 +122,10 @@ public final class ClaimQuestRewardUseCase {
 
         static ClaimResult duplicateRequest() {
             return new ClaimResult(Outcome.DUPLICATE_REQUEST, 0, List.of());
+        }
+
+        static ClaimResult scriptError() {
+            return new ClaimResult(Outcome.SCRIPT_ERROR, 0, List.of());
         }
     }
 }

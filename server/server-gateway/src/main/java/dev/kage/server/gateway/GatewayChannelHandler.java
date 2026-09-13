@@ -1492,7 +1492,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             QuestFacade.AcceptResult.ALREADY_ACCEPTED,
             AcceptQuestOutcome.ACCEPT_QUEST_OUTCOME_ALREADY_ACCEPTED,
             QuestFacade.AcceptResult.PREREQUISITE_NOT_MET,
-            AcceptQuestOutcome.ACCEPT_QUEST_OUTCOME_PREREQUISITE_NOT_MET);
+            AcceptQuestOutcome.ACCEPT_QUEST_OUTCOME_PREREQUISITE_NOT_MET,
+            QuestFacade.AcceptResult.SCRIPT_ERROR,
+            AcceptQuestOutcome.ACCEPT_QUEST_OUTCOME_SCRIPT_ERROR);
 
     private static AcceptQuestOutcome toProtoOutcome(QuestFacade.AcceptResult result) {
         return ACCEPT_QUEST_OUTCOME_MAPPING.get(result);
@@ -1549,7 +1551,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     QuestFacade.ClaimOutcome.NOT_COMPLETED_YET,
                     ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_NOT_COMPLETED_YET,
                     QuestFacade.ClaimOutcome.DUPLICATE_REQUEST,
-                    ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_DUPLICATE_REQUEST);
+                    ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_DUPLICATE_REQUEST,
+                    QuestFacade.ClaimOutcome.SCRIPT_ERROR,
+                    ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_SCRIPT_ERROR);
 
     private static ClaimQuestRewardOutcome toProtoOutcome(QuestFacade.ClaimOutcome outcome) {
         return CLAIM_QUEST_REWARD_OUTCOME_MAPPING.get(outcome);

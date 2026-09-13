@@ -215,8 +215,8 @@ sau đó. Kiểm túi lúc giao chỉ nhìn trạng thái — năm đường kh�
 - `QuestScriptRunner` chỉ đưa `take_item` vào `ctx` ở `on_event`. Ở `on_accept`/`on_claim` gọi nó là
   lỗi script (ồn), không phải lời đòi đồ bị bỏ qua (im).
 - `ItemTake` chặn số lượng ≤ 0 ngay trong callback (số âm đi xuống `quantity - ?` là CỘNG đồ).
-- `HookEffects.scriptFailed`: script lỗi giữa chừng ⇒ `ProcessQuestEventUseCase` bỏ HẾT hiệu ứng dở
-  dang. ⚠️ `Accept`/`ClaimQuestRewardUseCase` chưa đọc cờ này và vẫn dùng hiệu ứng dở dang như cũ.
+- `HookEffects.scriptFailed`: script lỗi giữa chừng ⇒ bỏ HẾT hiệu ứng dở dang. Từ 2026-09-12 **CẢ
+  BA** đường vào đều đọc cờ này — xem mục "Script lỗi thì không đường nào dùng hiệu ứng dở dang" cuối file.
 - `ProcessQuestEventUseCase.write`: một transaction = compare-and-set tiến độ TRƯỚC → từng
   `QuestItemTakePort.takeItemByCode` + audit `QUEST_ITEM_TAKEN`. Thiếu món ⇒ ném
   `ItemsMissingException` (private, không bao giờ thoát khỏi lớp) để runner rollback.
@@ -236,3 +236,26 @@ sau đó. Kiểm túi lúc giao chỉ nhìn trạng thái — năm đường kh�
 
 Compare-and-set áp cho MỌI sự kiện ⇒ sửa luôn lỗi mất cập nhật có từ trước khi hai con quái chết
 cùng nhịp (`shouldRerunTheHookOnFreshProgress_whenAnotherEventWroteFirst`).
+
+
+## Script lỗi thì không đường nào dùng hiệu ứng dở dang (2026-09-12)
+
+`ProcessQuestEventUseCase` đọc `HookEffects.scriptFailed` từ 2026-09-11, nhưng hai đường vào còn lại
+thì không — và đó là hai lỗ thật, không phải nợ hình thức:
+
+| Đường | Hành vi CŨ khi script ném lỗi | Hậu quả |
+|---|---|---|
+| `AcceptQuestUseCase` | vẫn `save` status `IN_PROGRESS` với tiến độ dở dang | quest KHÔNG BAO GIỜ xong được: `on_event` của chính script hỏng đó cũng lỗi, mà `ALREADY_ACCEPTED` chặn nhận lại |
+| `ClaimQuestRewardUseCase` | trao phần thưởng dở dang + đổi `CLAIMED` + **ghi `idempotency_key`** | **mất phần thưởng VĨNH VIỄN** — phần còn lại không về, và cả hai cái chốt kia khoá luôn đường lĩnh lại |
+
+Nay cả hai dừng **TRƯỚC** transaction, nên chưa một dòng nào được ghi. Quest ở lại đúng trạng thái
+cũ (`chưa nhận` / `COMPLETED`) và lĩnh lại được sau khi script được sửa.
+
+**Chủ dự án chốt cách báo cho client (2026-09-12)**: outcome RIÊNG, không phải câu lỗi chung —
+`ACCEPT_QUEST_OUTCOME_SCRIPT_ERROR = 5` và `CLAIM_QUEST_REWARD_OUTCOME_SCRIPT_ERROR = 6`. CHỈ THÊM
+giá trị enum ⇒ `protocolVersion` KHÔNG tăng, đúng tiền lệ `PREREQUISITE_NOT_MET = 4`/
+`DUPLICATE_REQUEST = 5`. Lý do không gộp: đây là lỗi MÁY CHỦ, không phải thứ người chơi làm sai —
+câu chung chung khiến họ bấm lại mãi một việc không bao giờ chạy được.
+
+⚠️ **Fixture `test_fixture_broken.js` cố ý gọi vài callback THẬT rồi mới ném lỗi.** Một fixture ném
+lỗi ở dòng đầu sẽ xanh kể cả khi Java vẫn đọc hiệu ứng dở dang — nó không gác được gì cả.

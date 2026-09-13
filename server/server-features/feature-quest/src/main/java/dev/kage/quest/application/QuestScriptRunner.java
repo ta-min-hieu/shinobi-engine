@@ -47,9 +47,10 @@ final class QuestScriptRunner {
      * @param itemTakes vật phẩm script đòi lấy khỏi túi ({@code ctx.take_item}) — CHỈ có ở
      *     {@code on_event}, xem {@link #runEvent}
      * @param scriptFailed script ném lỗi giữa chừng. Khi {@code true}, các trường còn lại là hiệu
-     *     ứng DỞ DANG (những callback đã kịp gọi trước chỗ lỗi) — {@code ProcessQuestEventUseCase} bỏ
-     *     HẾT. ⚠️ {@code AcceptQuestUseCase}/{@code ClaimQuestRewardUseCase} chưa đọc cờ này và vẫn
-     *     giữ hành vi cũ (dùng hiệu ứng dở dang); sửa hai đường đó là việc riêng.
+     *     ứng DỞ DANG (những callback đã kịp gọi trước chỗ lỗi) — và từ 2026-09-12 CẢ BA đường vào
+     *     đều bỏ HẾT: {@code ProcessQuestEventUseCase}, {@code AcceptQuestUseCase} (không ghi tiến
+     *     độ) và {@code ClaimQuestRewardUseCase} (không trao thưởng, không đổi CLAIMED, không đốt
+     *     {@code idempotencyKey}). Không còn đường nào dùng hiệu ứng dở dang.
      */
     record HookEffects(
             String progressJson,

@@ -35,6 +35,14 @@ public final class AcceptQuestUseCase {
         }
 
         QuestScriptRunner.HookEffects effects = scriptRunner.runAccept(template.scriptRef());
+        if (effects.scriptFailed()) {
+            // Hiệu ứng DỞ DANG (script có thể đã kịp gọi save_progress trước chỗ lỗi) — bỏ hết,
+            // đúng cách ProcessQuestEventUseCase đã làm từ 2026-09-11. Ghi xuống thì tạo ra một
+            // quest IN_PROGRESS mang tiến độ rác mà KHÔNG hook nào đẩy đi được nữa: on_event của
+            // chính script hỏng đó cũng sẽ lỗi, nên người chơi mắc kẹt vĩnh viễn với một dòng
+            // character_quest_progress không thể hoàn thành và cũng không thể nhận lại.
+            return AcceptResult.SCRIPT_ERROR;
+        }
         tx.inTransaction((Transaction t) -> progressPort.save(
                 t, new QuestProgress(characterId, template.id(), QuestStatus.IN_PROGRESS, effects.progressJson())));
         return AcceptResult.OK;
@@ -65,6 +73,11 @@ public final class AcceptQuestUseCase {
         QUEST_NOT_FOUND,
         ALREADY_ACCEPTED,
         /** ADR-044 — quest tiên quyết chưa lĩnh thưởng xong. */
-        PREREQUISITE_NOT_MET
+        PREREQUISITE_NOT_MET,
+        /**
+         * Hook {@code on_accept} ném lỗi — KHÔNG ghi gì xuống DB, người chơi nhận lại được sau khi
+         * script được sửa (2026-09-12, chủ dự án chốt outcome riêng thay vì một câu báo lỗi chung).
+         */
+        SCRIPT_ERROR
     }
 }

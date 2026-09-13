@@ -25,13 +25,20 @@ class ClaimQuestRewardUseCaseTest {
     private static final long TEMPLATE_ID = 100L;
     private static final String QUEST_CODE = "known_quest";
     private static final String SCRIPT_REF = "/scripts/quest/test_fixture.js";
+    private static final String BROKEN_QUEST_CODE = "broken_quest";
+    private static final String BROKEN_SCRIPT_REF = "/scripts/quest/test_fixture_broken.js";
 
     static final class FakeQuestTemplatePort implements QuestTemplatePort {
         @Override
         public Optional<QuestTemplate> findByCode(String questCode) {
-            return QUEST_CODE.equals(questCode)
-                    ? Optional.of(QuestTemplate.withoutPrerequisite(TEMPLATE_ID, SCRIPT_REF))
-                    : Optional.empty();
+            if (QUEST_CODE.equals(questCode)) {
+                return Optional.of(QuestTemplate.withoutPrerequisite(TEMPLATE_ID, SCRIPT_REF));
+            }
+            if (BROKEN_QUEST_CODE.equals(questCode)) {
+                // Cùng TEMPLATE_ID: Fake progress port tra theo nhân vật nên hai mã dùng chung một dòng tiến độ.
+                return Optional.of(QuestTemplate.withoutPrerequisite(TEMPLATE_ID, BROKEN_SCRIPT_REF));
+            }
+            return Optional.empty();
         }
     }
 
@@ -180,5 +187,56 @@ class ClaimQuestRewardUseCaseTest {
         ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE, IDEMPOTENCY_KEY);
 
         assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.DUPLICATE_REQUEST);
+    }
+
+    /**
+     * Script {@code on_claim} ném lỗi ⇒ KHÔNG trao gì, KHÔNG đổi CLAIMED (2026-09-12).
+     *
+     * <p>Fixture gọi {@code give_exp(100)} và {@code give_item("test_item", 3)} TRƯỚC chỗ lỗi, nên
+     * mọi khẳng định dưới đây đều đỏ với bản cũ — đó chính là lỗ mất phần thưởng vĩnh viễn.
+     */
+    @Test
+    void shouldGrantNothingAndKeepQuestClaimable_whenClaimHookThrows() {
+        QuestProgress progress = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.COMPLETED, "{\"counter\":2}");
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(progress);
+        FakeExpPort expPort = new FakeExpPort();
+        FakeInventoryGrantPort inventoryGrantPort = new FakeInventoryGrantPort();
+        FakeAuditPort auditPort = new FakeAuditPort();
+        ClaimQuestRewardUseCase useCase = newUseCase(progressPort, expPort, inventoryGrantPort, auditPort);
+
+        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, BROKEN_QUEST_CODE, IDEMPOTENCY_KEY);
+
+        assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.SCRIPT_ERROR);
+        assertThat(result.expGranted()).isZero();
+        assertThat(result.itemsGranted()).isEmpty();
+        assertThat(expPort.grantedAmount).isEqualTo(-1); // -1 = chưa ai gọi grantExp
+        assertThat(inventoryGrantPort.grantedCode).isNull();
+        assertThat(auditPort.loggedAction).isNull();
+        // Vẫn COMPLETED: người chơi lĩnh lại được sau khi script được sửa.
+        assertThat(progressPort.saved).isNull();
+    }
+
+    /**
+     * Và khoá idempotency KHÔNG bị đốt — thứ quyết định "lĩnh lại được" có thật hay chỉ trên giấy.
+     *
+     * <p>Cùng một {@code idempotencyKey} dùng lại sau lần lỗi phải đi tới cùng: bản cũ ghi key trong
+     * transaction TRƯỚC khi trao thưởng, nên lần thử lại sẽ trả {@code DUPLICATE_REQUEST} và người
+     * chơi mất thưởng mãi mãi.
+     */
+    @Test
+    void shouldNotBurnTheIdempotencyKey_whenClaimHookThrows() {
+        QuestProgress progress = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.COMPLETED, "{\"counter\":2}");
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(progress);
+        FakeExpPort expPort = new FakeExpPort();
+        QuestRewardPorts rewardPorts = new QuestRewardPorts(
+                expPort, new FakeInventoryGrantPort(), new FakeAuditPort(), new FakeIdempotencyPort());
+        ClaimQuestRewardUseCase useCase = newUseCase(progressPort, rewardPorts);
+        useCase.execute(CHARACTER_ID, BROKEN_QUEST_CODE, IDEMPOTENCY_KEY);
+
+        // Script được sửa (mã lành, CÙNG khoá) — lần lĩnh này phải đi tới cùng.
+        ClaimQuestRewardUseCase.ClaimResult retry = useCase.execute(CHARACTER_ID, QUEST_CODE, IDEMPOTENCY_KEY);
+
+        assertThat(retry.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
+        assertThat(expPort.grantedAmount).isEqualTo(100L);
     }
 }

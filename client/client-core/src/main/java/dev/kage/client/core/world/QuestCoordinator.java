@@ -184,6 +184,9 @@ final class QuestCoordinator implements WindowFlow {
             // ADR-044 — nói ĐÚNG lý do. "Không nhận được nhiệm vụ" cho người chơi biết là hỏng
             // nhưng không biết phải làm gì; câu này chỉ thẳng sang việc còn dở.
             case ACCEPT_QUEST_OUTCOME_PREREQUISITE_NOT_MET -> "quest.notice.prerequisite_not_met";
+            // Lỗi của MÁY CHỦ, không phải thứ người chơi làm sai. Câu chung "không nhận được nhiệm
+            // vụ" sẽ khiến họ bấm lại mãi một việc không bao giờ chạy được.
+            case ACCEPT_QUEST_OUTCOME_SCRIPT_ERROR -> "quest.notice.script_error";
             default -> "quest.notice.accept_failed";
         };
     }

@@ -20,13 +20,20 @@ class AcceptQuestUseCaseTest {
     private static final long TEMPLATE_ID = 100L;
     private static final String QUEST_CODE = "known_quest";
     private static final String SCRIPT_REF = "/scripts/quest/test_fixture.js";
+    private static final String BROKEN_QUEST_CODE = "broken_quest";
+    private static final String BROKEN_SCRIPT_REF = "/scripts/quest/test_fixture_broken.js";
 
     static final class FakeQuestTemplatePort implements QuestTemplatePort {
         @Override
         public Optional<QuestTemplate> findByCode(String questCode) {
-            return QUEST_CODE.equals(questCode)
-                    ? Optional.of(QuestTemplate.withoutPrerequisite(TEMPLATE_ID, SCRIPT_REF))
-                    : Optional.empty();
+            if (QUEST_CODE.equals(questCode)) {
+                return Optional.of(QuestTemplate.withoutPrerequisite(TEMPLATE_ID, SCRIPT_REF));
+            }
+            if (BROKEN_QUEST_CODE.equals(questCode)) {
+                // Cùng TEMPLATE_ID: Fake progress port tra theo nhân vật nên hai mã dùng chung một dòng tiến độ.
+                return Optional.of(QuestTemplate.withoutPrerequisite(TEMPLATE_ID, BROKEN_SCRIPT_REF));
+            }
+            return Optional.empty();
         }
     }
 
@@ -84,5 +91,24 @@ class AcceptQuestUseCaseTest {
         assertThat(progressPort.saved).isNotNull();
         assertThat(progressPort.saved.status()).isEqualTo(QuestStatus.IN_PROGRESS);
         assertThat(progressPort.saved.progressJson()).isEqualTo("{\"counter\":0}");
+    }
+
+    /**
+     * Script {@code on_accept} ném lỗi ⇒ KHÔNG ghi gì (2026-09-12).
+     *
+     * <p>Trước bản sửa, nhánh này ghi một dòng {@code IN_PROGRESS} mang tiến độ dở dang mà không hook
+     * nào đẩy đi được nữa — {@code on_event} của chính script hỏng đó cũng lỗi, còn
+     * {@code ALREADY_ACCEPTED} thì chặn nhận lại ⇒ quest chết vĩnh viễn.
+     */
+    @Test
+    void shouldSaveNothingAndReportScriptError_whenAcceptHookThrows() {
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(null);
+        AcceptQuestUseCase useCase = new AcceptQuestUseCase(progressPort, new FakeQuestTemplatePort(), DIRECT_TX);
+
+        AcceptQuestUseCase.AcceptResult result = useCase.execute(CHARACTER_ID, BROKEN_QUEST_CODE);
+
+        assertThat(result).isEqualTo(AcceptQuestUseCase.AcceptResult.SCRIPT_ERROR);
+        // Fixture ĐÃ gọi save_progress trước chỗ lỗi — dòng này đỏ nghĩa là hiệu ứng dở dang lọt xuống DB.
+        assertThat(progressPort.saved).isNull();
     }
 }

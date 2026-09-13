@@ -40,6 +40,7 @@ public final class QuestFacade {
             case QUEST_NOT_FOUND -> AcceptResult.QUEST_NOT_FOUND;
             case ALREADY_ACCEPTED -> AcceptResult.ALREADY_ACCEPTED;
             case PREREQUISITE_NOT_MET -> AcceptResult.PREREQUISITE_NOT_MET;
+            case SCRIPT_ERROR -> AcceptResult.SCRIPT_ERROR;
         };
     }
 
@@ -93,6 +94,7 @@ public final class QuestFacade {
                     case NOT_ACCEPTED -> ClaimOutcome.NOT_ACCEPTED;
                     case NOT_COMPLETED_YET -> ClaimOutcome.NOT_COMPLETED_YET;
                     case DUPLICATE_REQUEST -> ClaimOutcome.DUPLICATE_REQUEST;
+                    case SCRIPT_ERROR -> ClaimOutcome.SCRIPT_ERROR;
                 };
         List<ItemReward> items = result.itemsGranted().stream()
                 .map(item -> new ItemReward(item.itemTemplateCode(), item.quantity()))
@@ -117,7 +119,9 @@ public final class QuestFacade {
         QUEST_NOT_FOUND,
         ALREADY_ACCEPTED,
         /** ADR-044 — quest tiên quyết chưa lĩnh thưởng xong. */
-        PREREQUISITE_NOT_MET
+        PREREQUISITE_NOT_MET,
+        /** Hook {@code on_accept} của script quest ném lỗi — không ghi gì xuống DB. */
+        SCRIPT_ERROR
     }
 
     public enum ClaimOutcome {
@@ -125,7 +129,9 @@ public final class QuestFacade {
         QUEST_NOT_FOUND,
         NOT_ACCEPTED,
         NOT_COMPLETED_YET,
-        DUPLICATE_REQUEST
+        DUPLICATE_REQUEST,
+        /** Hook {@code on_claim} ném lỗi — chưa trao gì, quest vẫn COMPLETED và lĩnh lại được. */
+        SCRIPT_ERROR
     }
 
     /** {@code status} chỉ bao giờ là COMPLETED ở lát cắt này (xem {@link #onMonsterKilled} javadoc). */
