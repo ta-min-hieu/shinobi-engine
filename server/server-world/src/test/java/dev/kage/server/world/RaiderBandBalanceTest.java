@@ -138,6 +138,34 @@ class RaiderBandBalanceTest {
         assertThat(playerHitsFor).isGreaterThanOrEqualTo(chieftainHitsFor);
     }
 
+    /**
+     * Đầu lĩnh cũng mắc ĐÚNG lỗi phủ đầu của đàn em, và V46 sửa cả hai cùng lúc.
+     *
+     * <p>Playtest 2026-09-13 bác thiết kế của `vein_raider` vì `aggro_radius_meters` 6 gấp ba tầm
+     * đánh 2: quái chạy tự do 4m và đánh trước 1-2 nhát. Đầu lĩnh khai y hệt, đánh đau hơn (20/nhát
+     * lên giáp 50), nên hai nhát phủ đầu là 40 máu — đủ lật trận. **V46 hạ cả hai xuống aggro 3.**
+     *
+     * <p>⚠️ Trận này CHƯA đo được bằng `gameProbe`: nó chỉ đúng khi mặc bộ "Ngoại Môn", mà probe có
+     * `useItemCode` chứ KHÔNG có đường mặc đồ. Con số dưới đây vẫn là giấy — khác với `vein_raider`
+     * đã có số đo thật.
+     */
+    @Test
+    @DisplayName("Phủ đầu 1 nhát (sau V46) vẫn THẮNG; phủ đầu 2 nhát thì không")
+    void openingHitsDecideTheChieftainDuelToo() {
+        int hitTaken = hit(CHIEFTAIN_ATK, playerDef());
+        int playerHitsNeeded = hitsToKill(CHIEFTAIN_HP, hit(playerAtk(), CHIEFTAIN_DEF));
+
+        int afterOneOpener = arrivalHp() - hitTaken;
+        int afterTwoOpeners = arrivalHp() - (2 * hitTaken);
+
+        assertThat(hitTaken).isEqualTo(20);
+        assertThat(playerHitsNeeded).isEqualTo(4);
+        // Phủ đầu 1: vẫn còn nhiều nhát hơn số người chơi cần ⇒ thắng.
+        assertThat(hitsToKill(afterOneOpener, hitTaken)).isGreaterThan(playerHitsNeeded);
+        // Phủ đầu 2: hết biên ⇒ đúng thứ V46 sinh ra để chặn.
+        assertThat(hitsToKill(afterTwoOpeners, hitTaken)).isLessThanOrEqualTo(playerHitsNeeded);
+    }
+
     /** Đầu lĩnh phải là bậc thang thật trên đàn em của chính hắn, không phải bản phóng to đổi tên. */
     @Test
     @DisplayName("Đầu lĩnh dày hơn, đau hơn và dai hơn đàn em đoạt mạch")

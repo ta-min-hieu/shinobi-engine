@@ -1,0 +1,90 @@
+-- V46 — hai loài của V45 thôi ĐÁNH PHỦ ĐẦU: `aggro_radius_meters` 6 → 3.
+--
+-- =============================================================================================
+-- PLAYTEST BÁC THIẾT KẾ CỦA V45, VÀ ĐÂY LÀ SỐ ĐO
+-- =============================================================================================
+-- Chạy thật bằng `gameProbe` 2026-09-13, nhân vật `Kagemaru` (Cấp 16, trọn bộ Tạp Dịch sáu món,
+-- máu 118). CÙNG một trận với `vein_raider`, chạy HAI lần, ra HAI kết quả ngược nhau:
+--
+--   | | phủ đầu | trao đổi | kết quả |
+--   |---|---|---|---|
+--   | lượt 1 | **1 nhát** (84 → 70) | 4 nhát người chơi / 4 nhát quái | **THẮNG**, còn 28 máu |
+--   | lượt 2 | **2 nhát** (84 → 70 → 56) | 3 nhát người chơi / 6 nhát quái | **CHẾT**, quái còn 31 |
+--
+-- Cả hai lượt đi cùng một đường, ăn cùng hai nhát tán tu dọc đường (17 + 17, đúng như V45 tính).
+-- Khác biệt DUY NHẤT là số nhát quái kịp ra TRƯỚC khi người chơi vung nhát đầu tiên.
+--
+-- ⚠️ Mốc đó về sau được sửa lại thành **lúc người chơi TỚI NƠI** (`đi bộ xong`): nhát đầu tiên
+-- của người chơi đến muộn đúng bằng `--attackIntervalMillis`, nên đếm theo nó sẽ tính nhầm một
+-- nhát trao đổi bình thường thành nhát phủ đầu. Bảng ĐO LẠI cuối file dùng mốc đã sửa.
+--
+-- ⇒ Biên thật KHÔNG phải 2 như V45 khai. Nó là **6 − số_nhát_phủ_đầu − 4**: phủ đầu 1 thì biên 1
+--   (thắng), phủ đầu 2 thì biên 0 (chết). Một trận quyết định bằng thứ người chơi không điều khiển
+--   được là một lần tung đồng xu — đúng thứ ROADMAP mục 64 bảo phải tránh.
+--
+-- =============================================================================================
+-- NGUYÊN NHÂN: TẦM AGGRO GẤP BA TẦM ĐÁNH — lỗi này dự án đã trả giá một lần rồi
+-- =============================================================================================
+-- `aggro_radius_meters = 6` còn `ATTACK_RANGE_METERS = 2`. Con quái phát hiện người chơi từ 6m, lao
+-- tới (3 m/s) và **đánh được trong lúc người chơi còn đang đi tới**. Bốn mét chạy tự do ≈ 1,3 giây
+-- ≈ 1-2 nhát miễn phí.
+--
+-- Đây ĐÚNG bài học đã ghi khi làm quest 8: *"máu lúc TỚI NƠI ≠ máu lúc BẮT ĐẦU ĐÁNH"*. V45 tính
+-- được máu lúc tới nơi (84) rồi lại giả định trận đấu bắt đầu sòng phẳng từ đó — tức là bỏ đúng cái
+-- số hạng mà bài học kia nói tới. Bài học có sẵn không cứu được ai nếu không đưa vào công thức.
+--
+-- =============================================================================================
+-- CHỌN CÁCH 3 (chủ dự án chốt 2026-09-13): CHỮA NGUYÊN NHÂN, KHÔNG BÙ TRỪ HẬU QUẢ
+-- =============================================================================================
+-- Ba hướng đã cân nhắc:
+--   (1) hạ `atk` 18 → 12  — hai nhát phủ đầu chỉ còn 24 thay vì 28. Bù trừ hậu quả, con quái yếu đi
+--       ở MỌI tình huống kể cả khi không phủ đầu.
+--   (2) hạ `max_hp` 130 → 100 — người chơi chỉ cần 3 nhát. Cũng là bù trừ, và làm loài này tụt
+--       xuống dưới `trial_construct` (130) của quest 4, tức đi lùi một bậc thang.
+--   (3) **hạ `aggro_radius_meters` 6 → 3** — thu hẹp quãng con quái được đánh MIỄN PHÍ trong lúc
+--       người chơi còn đang đi tới: nó chỉ phát hiện ở 3m, chạy 1m (≈0,33 giây) là đã vào tầm đánh
+--       2m. Chỉ số chiến đấu GIỮ NGUYÊN, nên bậc thang so với `trial_construct` giữ nguyên.
+--
+-- ⚠️ **KHÔNG làm chúng thành cọc gỗ.** Cả hai loài có `retaliates = true` (ADR-049, V45), nên đánh
+-- vào là chúng đánh trả ngay bất kể tầm aggro — chính cơ chế ADR-049 sinh ra cho `aggro = 0` của
+-- chấp sự Hình Vân Sơn. Khác biệt duy nhất là quãng ra đòn TRƯỚC bị thu hẹp, KHÔNG bị xoá hẳn.
+--
+-- ⚠️ Hệ quả phụ CÓ Ý THỨC: đi ngang qua chúng nay gần như miễn phí (phải lại gần 3m mới bị để ý).
+-- Điều đó làm đường đông tới sào huyệt @93 RẺ hơn bảng tính của V45, tức `arrivalHp` 111 của
+-- `RaiderBandBalanceTest` thành CẬN DƯỚI thận trọng chứ không phải số sai.
+--
+-- ⚠️ Vì sao 3 chứ không phải 2: 2 bằng đúng tầm đánh, nên con quái chỉ "tỉnh" đúng lúc đã bị đánh —
+-- nhìn như đồ vật. 3 cho nó một bước chân để quay sang, vẫn đủ gần để không tặng nhát nào.
+--
+-- Ràng buộc V25 vẫn thoả: `leash (10) >= aggro (3)` ✓ và `patrol (3) <= leash (10)` ✓.
+--
+-- ⚠️ V45 đã push nên KHÔNG sửa tại chỗ — ra version mới, đúng luật đã áp cho V44 với V41.
+-- ---------------------------------------------------------------------------------------------
+
+-- =============================================================================================
+-- ĐO LẠI SAU KHI V46 CHẠY THẬT (gameProbe, 2026-09-13, 12 lượt hợp lệ) — VÀ PHẦN CÒN LẠI
+-- =============================================================================================
+-- Số nhát quái kịp ra TRƯỚC khi người chơi tới nơi (mốc `đi bộ xong`), 12 lượt đi bộ 0 → 47:
+--
+--   | số nhát phủ đầu | 0 | 1 | 2 |
+--   |---|---|---|---|
+--   | V45 (aggro 6) | — | có | **có** |
+--   | V46 (aggro 3) | 3 lượt | 9 lượt | **0 lượt** |
+--
+-- ⇒ Mục tiêu của V46 ĐẠT: trường hợp 2 nhát phủ đầu — thứ biến trận đấu thành tung đồng xu — không
+--   còn xuất hiện lượt nào. Hằng số `OPENING_HITS_AFTER_V46 = 1` của `SpiritVeinDuelBalanceTest`
+--   là cận TRÊN thận trọng (đo được 0 hoặc 1), không phải con số cố định.
+--
+-- ⚠️ NHƯNG TRẬN ĐẤU VẪN CHƯA TẤT ĐỊNH, vì một nguyên nhân KHÁC — báo cáo, không tự sửa (CLAUDE.md §4):
+--   `vein_raider` có `dodge_percent = 0` và `crit_percent = 0`, nên mỗi nhát của nó luôn đúng 14.
+--   Người chơi thì `hitPercent = (90 + agi*0.1)/100 = 0,91` ⇒ **~9% trượt mỗi nhát** (đo: ~6 trượt
+--   / ~48 nhát). Với biên chỉ 1 nhát, **một nhát trượt là đủ lật thắng thành thua**: ở nhịp đánh
+--   đúng (1100ms) 4 lượt ra 3 thắng / 1 thua, và lượt thua là lượt trượt HAI nhát.
+--
+-- ⚠️ Bẫy ĐO, không phải bẫy cân bằng: `--attackIntervalMillis` PHẢI lớn hơn `ATTACK_INTERVAL_SECONDS`
+--   (1s). Gửi 850ms thì mỗi lệnh tới sớm bị server bỏ im lặng (`CombatSystem.tryAttackNow`), nhát
+--   thật rơi xuống mỗi ~1700ms và người chơi thua CẢ BA lượt — số đo nói về công cụ, không nói về game.
+
+UPDATE monster_template
+   SET aggro_radius_meters = 3
+ WHERE code IN ('vein_raider', 'raider_chieftain');

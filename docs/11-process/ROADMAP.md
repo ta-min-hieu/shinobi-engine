@@ -2963,3 +2963,48 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
     - ⏳ **Còn lại**: 6 icon vật phẩm cho bộ Ngoại Môn, và **playtest sống** — mọi con số ở trên là
       giấy cho tới lúc đó, và quest 8 đã bị chính playtest bác ba lần trong một ngày.
 
+#### V46 — nhát phủ đầu, và một trận vẫn là tung đồng xu sau khi đã chữa (2026-09-13, chiều)
+
+    - 🗃️ **V46 — hai loài của V45 thôi ĐÁNH PHỦ ĐẦU**: `aggro_radius_meters` **6 → 3** cho cả
+      `vein_raider` lẫn `raider_chieftain`. Chủ dự án chọn **cách 3** — chữa NGUYÊN NHÂN (aggro 6
+      gấp ba `ATTACK_RANGE_METERS` 2, nên quái chạy tự do 4m và đánh trong lúc người chơi còn đang
+      đi tới) thay vì bù trừ hậu quả bằng hạ `atk` hay `max_hp`. Chỉ số chiến đấu GIỮ NGUYÊN nên
+      bậc thang so với `trial_construct` không đổi. `retaliates = true` (ADR-049) vẫn giữ, nên
+      chúng KHÔNG thành cọc gỗ — chỉ mất quãng ra đòn trước.
+    - 📏 **PLAYTEST SỐNG ĐÃ LÀM, và nó BÁC một khẳng định của V45.** Mục V45 ở trên ghi "Biên **2**
+      cho cả hai … rộng hơn một lần tung đồng xu ở tỉ lệ trúng 91%". Số đo thật nói khác: V45 tính
+      được máu lúc TỚI NƠI (84) rồi giả định trận bắt đầu sòng phẳng từ đó, tức **bỏ sót đúng số
+      hạng nhát phủ đầu** — chính bài học quest 8 *"máu lúc TỚI NƠI ≠ máu lúc BẮT ĐẦU ĐÁNH"*. Cùng
+      một trận chạy hai lần cho hai kết cục ngược nhau, khác biệt duy nhất là 1 hay 2 nhát phủ đầu.
+    - ✅ **V46 đạt mục tiêu, đo bằng 12 lượt `gameProbe` hợp lệ**: số nhát quái kịp ra TRƯỚC khi
+      người chơi tới nơi = **0 ở 3 lượt, 1 ở 9 lượt, 2 ở 0 lượt** (V45 đo được 1 và 2). Trường hợp
+      2 nhát — thứ biến trận thành tung đồng xu — biến mất hẳn. Hằng số
+      `OPENING_HITS_AFTER_V46 = 1` là **cận TRÊN thận trọng**, không phải số cố định.
+    - ⚠️ **NỢ ĐÃ BIẾT — chủ dự án chọn GHI NHẬN, CHƯA SỬA (2026-09-13).** Trận vẫn chưa tất định,
+      nhưng vì nguyên nhân KHÁC: biên sau phủ đầu chỉ còn **1 nhát**, mà người chơi trượt ~9%
+      (`hitPercent = (90 + agi*0,1)/100 = 0,91`; quái thì `dodge_percent = 0`, `crit_percent = 0`
+      nên nhát nào cũng đúng 14) ⇒ **một nhát trượt là đủ lật thắng thành thua**. Đo ở nhịp đánh
+      đúng: **3 thắng / 1 thua**, lượt thua là lượt trượt HAI nhát. Đây là chuyện của `hitPercent`
+      áp cho MỌI trận chứ không riêng loài này, nên nếu sau này muốn chữa thì chữa ở tầng đó
+      (khả năng cần ADR), không phải chỉnh một hàng `monster_template`. Chờ playtest người thật.
+    - 🧪 **Bẫy đo mới, suýt kết luận V46 thất bại** ⇒ `--attackIntervalMillis` PHẢI **lớn hơn**
+      `ATTACK_INTERVAL_SECONDS` (1s). Gửi 850ms thì mọi lệnh tới sớm bị `CombatSystem.tryAttackNow`
+      bỏ IM LẶNG, nhát thật rơi xuống mỗi ~1700ms, người chơi chỉ ra 2-3 nhát thay vì 4 và **thua
+      cả ba lượt**. Ba "trận thua" đó là số đo về CÔNG CỤ, không phải về cân bằng. Dùng **1100ms**.
+    - 🧭 **Mốc đếm "phủ đầu" cũng phải đúng**: đếm tới lúc `đi bộ xong` (TỚI NƠI), KHÔNG tới nhát
+      đầu tiên của người chơi — nhát đó đến muộn đúng bằng `--attackIntervalMillis`, nên đếm kiểu
+      kia biến một nhát trao đổi bình thường thành "nhát phủ đầu".
+    - 🗃️ **Sửa comment của migration ĐÃ APPLY = đổi checksum.** Sửa phần ghi chú V46 sau khi nó đã
+      chạy trên DB dev làm Flyway validate đỏ ở lần khởi động sau — đúng họ với
+      "bẫy đặt chỗ số hiệu migration". Cách gỡ đã dùng: xoá hàng V46 trong `flyway_schema_history`
+      rồi khởi động lại cho nó apply lại (thân migration là `UPDATE` idempotent nên an toàn).
+    - 🔌 **Chạy server dev cần CẢ BA biến**: `DB_PASSWORD` (từ `deploy/docker/.env`),
+      `KAGE_TLS_ENABLED=true` và `KAGE_TLS_CERT_PATH`/`KAGE_TLS_KEY_PATH` trỏ
+      `server/server-gateway/src/test/resources/tls/dev-*.pem`. Thiếu TLS thì `main` chết **SAU** khi
+      đã bind cổng metrics 9404 ⇒ tiến trình nhìn như "còn sống" mà 7777 không hề mở; `gameProbe`
+      thì BẮT BUỘC TLS vì nó pin đúng cert đó.
+    - ✅ **Build xanh** `./gradlew build -x pmdMain -x pmdTest` SUCCESSFUL, 12/12 test cân bằng PASSED.
+      Hai mục `⏳ Còn lại` của V45 nay ĐÓNG: 6 icon đã dựng (commit `17f21dc`) và playtest sống đã chạy.
+    - 📌 **Chưa đo được**: trận đầu lĩnh vẫn là giấy — nó chỉ đúng khi mặc bộ "Ngoại Môn", mà
+      `gameProbe` có `useItemCode` nhưng KHÔNG có đường mặc trang bị.
+

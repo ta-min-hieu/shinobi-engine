@@ -93,6 +93,34 @@ class SpiritVeinDuelBalanceTest {
         return CombatConstants.CHARACTER_MAX_HP + NOVICE_SET_HP - (2 * hit(BANDIT_ATK, playerDef));
     }
 
+    /**
+     * Số nhát quái kịp ra TRƯỚC khi người chơi vung nhát đầu tiên.
+     *
+     * <p>⚠️ Đây là số hạng mà bản đầu của lớp này BỎ SÓT, và playtest 2026-09-13 bác thiết kế vì
+     * đúng chỗ đó. Cùng một trận chạy hai lượt bằng {@code gameProbe}: phủ đầu **1 nhát** ⇒ thắng
+     * còn 28 máu; phủ đầu **2 nhát** ⇒ CHẾT, quái còn 31. Đường đi, sát thương, mọi thứ khác giống
+     * hệt nhau.
+     *
+     * <p>Nguyên nhân là hình học chứ không phải chỉ số: {@code aggro_radius_meters} 6 gấp ba
+     * {@code ATTACK_RANGE_METERS} 2, nên quái chạy tự do 4m (≈1,3 giây) và đánh trong lúc người chơi
+     * còn đang đi tới. **V46 hạ aggro xuống 3**, nên quãng chạy tự do chỉ còn 1m.
+     *
+     * <p>⚠️ Hằng số này là **CẬN TRÊN thận trọng, không phải số cố định**. Đo lại bằng
+     * {@code gameProbe} sau khi V46 chạy thật (12 lượt hợp lệ, 2026-09-13): **0 nhát ở 3 lượt,
+     * 1 nhát ở 9 lượt, 2 nhát ở 0 lượt**. V46 xoá hẳn trường hợp 2 nhát — thứ biến trận đấu
+     * thành tung đồng xu — chứ không làm mọi lượt đều đúng 1 nhát.
+     *
+     * <p>Đây chính là bài học *"máu lúc TỚI NƠI ≠ máu lúc BẮT ĐẦU ĐÁNH"* của quest 8, lần này ở
+     * dạng một SỐ HẠNG trong công thức thay vì một câu trong tài liệu.
+     */
+    private static final int OPENING_HITS_AFTER_V46 = 1;
+
+    /** Máu lúc VUNG NHÁT ĐẦU TIÊN — khác máu lúc tới nơi đúng bằng số nhát phủ đầu. */
+    private static int hpAtFirstSwing(int openingHits) {
+        int playerDef = outerDisciple().def() + NOVICE_SET_DEF;
+        return arrivalHp() - (openingHits * hit(RAIDER_ATK, playerDef));
+    }
+
     @Test
     @DisplayName("Tới linh mạch với 84 máu vẫn THẮNG — 4 nhát so với 6, biên 2 nhát")
     void gearedDiscipleShouldWinTheSpiritVeinDuel() {
@@ -153,6 +181,48 @@ class SpiritVeinDuelBalanceTest {
         // Giáp dày hơn ⇒ cần nhiều nhát hơn cho cùng lượng máu.
         assertThat(hitsToKill(RAIDER_HP, hit(playerAtk, RAIDER_DEF)))
                 .isGreaterThanOrEqualTo(hitsToKill(CONSTRUCT_HP, hit(playerAtk, CONSTRUCT_DEF)));
+    }
+
+    /**
+     * Với phủ đầu 1 nhát (mức V46 cho phép) người chơi VẪN thắng — đây là ô gác cho cú hạ aggro.
+     *
+     * <p>Số đo thật của lượt thắng: quái ra 1 nhát phủ đầu rồi hai bên đổi 4-4, người chơi về đích
+     * còn 28/118.
+     */
+    @Test
+    @DisplayName("Phủ đầu 1 nhát (sau V46) vẫn THẮNG — biên còn lại ≥ 1")
+    void oneOpeningHitStillLeavesTheDuelWinnable() {
+        CombatConstants.CombatStats player = outerDisciple();
+        int playerAtk = player.atk() + NOVICE_SET_ATK;
+        int playerDef = player.def() + NOVICE_SET_DEF;
+
+        int playerHitsNeeded = hitsToKill(RAIDER_HP, hit(playerAtk, RAIDER_DEF));
+        int raiderHitsLeft = hitsToKill(hpAtFirstSwing(OPENING_HITS_AFTER_V46), hit(RAIDER_ATK, playerDef));
+
+        assertThat(hpAtFirstSwing(OPENING_HITS_AFTER_V46)).isEqualTo(70);
+        assertThat(playerHitsNeeded).isEqualTo(4);
+        assertThat(raiderHitsLeft).isGreaterThan(playerHitsNeeded);
+    }
+
+    /**
+     * Và với phủ đầu 2 nhát thì THUA — ô này giữ lại phép tính của cái đã xảy ra thật, để không ai
+     * nâng `aggro_radius_meters` lên lại mà không thấy giá của nó.
+     *
+     * <p>Số đo thật của lượt thua (gameProbe 2026-09-13): 84 → 70 → 56 trước nhát đầu tiên của
+     * người chơi; kết cục người chơi chết trong khi quái còn 31/130.
+     */
+    @Test
+    @DisplayName("Phủ đầu 2 nhát thì THUA — vì sao V46 phải hạ aggro 6 → 3")
+    void twoOpeningHitsLoseTheDuel() {
+        CombatConstants.CombatStats player = outerDisciple();
+        int playerAtk = player.atk() + NOVICE_SET_ATK;
+        int playerDef = player.def() + NOVICE_SET_DEF;
+
+        int playerHitsNeeded = hitsToKill(RAIDER_HP, hit(playerAtk, RAIDER_DEF));
+        int raiderHitsLeft = hitsToKill(hpAtFirstSwing(2), hit(RAIDER_ATK, playerDef));
+
+        assertThat(hpAtFirstSwing(2)).isEqualTo(56);
+        assertThat(raiderHitsLeft).isLessThanOrEqualTo(playerHitsNeeded);
     }
 
     /**
