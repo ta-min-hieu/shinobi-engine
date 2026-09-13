@@ -1,0 +1,192 @@
+package dev.kage.server.world;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Cân bằng của quest thứ MƯỜI HAI — đệ tử ngoại môn vs {@code raider_chieftain} (quest
+ * {@code break_the_raider_band}, seed V45, STORY.md §6 arc 1 nhịp ĐÓNG của quãng Lv10–18).
+ *
+ * <p><b>Khác mọi lớp cân bằng trước: người chơi đã ĐỔI BỘ ĐỒ.</b> Bốn lớp cũ đều tính trên bộ
+ * "Tạp Dịch" vì arc 1 không có bộ nào khác trong tầm với (bộ "Hạ Nhẫn" giá 10.900 vàng). Quest 11
+ * trao bộ <b>"Ngoại Môn"</b> ({@code required_level 15}, V45) như phần thưởng — đó chính là "công
+ * pháp đầu tiên (Lv15)" mà STORY.md §6 hứa, hiện thực bằng cơ chế ĐÃ CÓ (ADR-036 trang bị có chỉ
+ * số thật) thay vì một cơ chế mở khoá chiêu mới.
+ *
+ * <p>Vì vậy trận này phải được tính trên bộ MỚI. Tính nó trên bộ Tạp Dịch là mô tả một người chơi
+ * đã bỏ qua phần thưởng của chính chuỗi quest đang chơi.
+ */
+class RaiderBandBalanceTest {
+
+    /** Chỉ số nền của nhân vật mới: 10/10/10/10 (V-migration seed, giống mọi nhân vật vừa tạo). */
+    private static final int BASE_STAT = 10;
+
+    /** Cấp 15 — mốc {@code required_level} của bộ "Ngoại Môn", và cấp người chơi khi nhận quest 12. */
+    private static final int LEVEL_AT_QUEST_TWELVE = 15;
+
+    /**
+     * Bộ "Ngoại Môn" SÁU món (V45) — cùng quy ước lũt đồ sáu món của arc 1: ô {@code ACCESSORY_2}
+     * để trống (xem javadoc {@link SpiritVeinDuelBalanceTest}).
+     *
+     * <p>Đặt TRÊN bộ "Hạ Nhẫn" sáu món ({@code atk 26 · def 23 · hp 48}) vì nó mở ở Cấp 15 chứ
+     * không phải Cấp 5 — một bộ cấp cao hơn mà yếu hơn thì không ai mặc.
+     */
+    private static final int OUTER_SECT_SET_ATK = 34;
+
+    private static final int OUTER_SECT_SET_DEF = 30;
+    private static final int OUTER_SECT_SET_HP = 70;
+
+    /** Bộ "Tạp Dịch" sáu món — mốc so sánh, để thấy phần thưởng quest 11 đáng giá bao nhiêu. */
+    private static final int NOVICE_SET_ATK = 7;
+
+    private static final int NOVICE_SET_DEF = 7;
+    private static final int NOVICE_SET_HP = 18;
+
+    /** `monster_template` hàng `raider_chieftain` (seed V45) — nguồn duy nhất của ba số này. */
+    private static final int CHIEFTAIN_HP = 200;
+
+    private static final int CHIEFTAIN_ATK = 30;
+    private static final int CHIEFTAIN_DEF = 18;
+
+    /** `monster_template` hàng `vein_raider` (seed V45) — đàn em của hắn, bậc thang ngay dưới. */
+    private static final int RAIDER_HP = 130;
+
+    private static final int RAIDER_ATK = 18;
+    private static final int RAIDER_DEF = 12;
+
+    /** Ba loài đứng dọc đường đông SAU khi V45 dời quỷ đá 80 → 106. */
+    private static final int BANDIT_ATK = 22;
+
+    private static final int SCOUT_ATK = 26;
+
+    /** Giáp giảm sát thương kiểu LMHT/Liên Quân, đúng công thức {@code CombatConstants#resolveAttack}. */
+    private static int hit(int attack, int defence) {
+        return Math.round(attack * (100f / (100f + defence)));
+    }
+
+    private static int hitsToKill(int hitPoints, int damagePerHit) {
+        return (int) Math.ceil((double) hitPoints / damagePerHit);
+    }
+
+    private static CombatConstants.CombatStats disciple() {
+        return CombatConstants.deriveCombatStats(new CharacterBaseStats(
+                BASE_STAT, BASE_STAT, BASE_STAT, BASE_STAT, Element.NONE, LEVEL_AT_QUEST_TWELVE));
+    }
+
+    private static int playerAtk() {
+        return disciple().atk() + OUTER_SECT_SET_ATK;
+    }
+
+    private static int playerDef() {
+        return disciple().def() + OUTER_SECT_SET_DEF;
+    }
+
+    private static int playerHp() {
+        return CombatConstants.CHARACTER_MAX_HP + OUTER_SECT_SET_HP;
+    }
+
+    /**
+     * Máu lúc CHẠM MẶT đầu lĩnh ở x=93, tính đúng cách {@link AwakeningTrialBalanceTest} đã dạy.
+     *
+     * <p>Đường đông sau V45: tán tu @21, tán tu @34, đoạt mạch @47, thám tử @66 — mỗi con một nhát.
+     * <b>Quỷ đá KHÔNG còn trên đường</b>: V45 dời nó 80 → 106, cùng lý do V40 đã dời nó 47 → 80 một
+     * lần rồi (một mình nó lấy 31 máu mỗi lượt đi ngang, đủ để biến trận cuối thành thua chắc).
+     *
+     * <p>Sau khi dời, x≈80 thành một khe YÊN TĨNH: cách thám tử @66 14m và cách đầu lĩnh @93 13m,
+     * tức ngoài tầm aggro của cả hai. Đó là chỗ người chơi đứng lại hồi máu (ADR-046) trước trận —
+     * nhưng thiết kế dưới đây vẫn phải đứng vững kể cả khi họ KHÔNG dừng.
+     */
+    private static int arrivalHp() {
+        int def = playerDef();
+        return playerHp() - (2 * hit(BANDIT_ATK, def)) - hit(RAIDER_ATK, def) - hit(SCOUT_ATK, def);
+    }
+
+    @Test
+    @DisplayName("Mặc bộ Ngoại Môn, tới nơi với 111 máu vẫn THẮNG — 4 nhát so với 6, biên 2")
+    void gearedDiscipleShouldWinTheChieftainDuel() {
+        int playerHitsFor = hitsToKill(CHIEFTAIN_HP, hit(playerAtk(), CHIEFTAIN_DEF));
+        int chieftainHitsFor = hitsToKill(arrivalHp(), hit(CHIEFTAIN_ATK, playerDef()));
+
+        // 170 − 2×15 (tán tu) − 12 (đoạt mạch) − 17 (thám tử) = 111. Giáp 50 của bộ Ngoại Môn cắt
+        // sát thương đường đi xuống gần một nửa so với bộ Tạp Dịch — đó là nửa còn lại của phần
+        // thưởng quest 11, và là lý do quãng đường KHÔNG còn là thứ quyết định trận này.
+        assertThat(arrivalHp()).isEqualTo(111);
+        assertThat(playerHitsFor).isEqualTo(4);
+        assertThat(chieftainHitsFor).isEqualTo(6);
+        assertThat(chieftainHitsFor - playerHitsFor).isEqualTo(2);
+    }
+
+    /**
+     * Vì sao quest 11 phải trao bộ đồ TRƯỚC trận này — câu trả lời là số, không phải nhịp kể chuyện.
+     *
+     * <p>Mặc bộ "Tạp Dịch" đi đánh đầu lĩnh là thua, và thua không sát nút. Đây chính là thứ biến
+     * phần thưởng quest 11 từ "một dòng chữ" thành "điều kiện cần".
+     */
+    @Test
+    @DisplayName("Mặc bộ Tạp Dịch đi đánh đầu lĩnh thì THUA — nên phần thưởng quest 11 là điều kiện cần")
+    void theNoviceSetShouldNotBeEnoughForTheChieftain() {
+        int noviceAtk = disciple().atk() + NOVICE_SET_ATK;
+        int noviceDef = disciple().def() + NOVICE_SET_DEF;
+        int noviceHp = CombatConstants.CHARACTER_MAX_HP + NOVICE_SET_HP;
+
+        int playerHitsFor = hitsToKill(CHIEFTAIN_HP, hit(noviceAtk, CHIEFTAIN_DEF));
+        int chieftainHitsFor = hitsToKill(noviceHp, hit(CHIEFTAIN_ATK, noviceDef));
+
+        // Ngay cả trên MÁU ĐẦY (cận trên rộng rãi nhất) người chơi vẫn không thắng nổi.
+        assertThat(playerHitsFor).isGreaterThanOrEqualTo(chieftainHitsFor);
+    }
+
+    /** Đầu lĩnh phải là bậc thang thật trên đàn em của chính hắn, không phải bản phóng to đổi tên. */
+    @Test
+    @DisplayName("Đầu lĩnh dày hơn, đau hơn và dai hơn đàn em đoạt mạch")
+    void theChieftainShouldBeAStepAboveHisOwnRaiders() {
+        assertThat(CHIEFTAIN_HP).isGreaterThan(RAIDER_HP);
+        assertThat(CHIEFTAIN_ATK).isGreaterThan(RAIDER_ATK);
+        assertThat(CHIEFTAIN_DEF).isGreaterThan(RAIDER_DEF);
+    }
+
+    /**
+     * Bộ "Ngoại Môn" phải TRÊN bộ "Hạ Nhẫn" — nếu không thì một bộ mở ở Cấp 15 lại thua bộ mở ở
+     * Cấp 5, và người chơi có lý do hợp lệ để bỏ phần thưởng quest 11 trong túi.
+     */
+    @Test
+    @DisplayName("Bộ Ngoại Môn (Cấp 15) mạnh hơn bộ Hạ Nhẫn (Cấp 5) ở cả ba trục")
+    void theOuterSectSetShouldOutrankTheGeninSet() {
+        // Bộ "Hạ Nhẫn" SÁU món theo `item_template` (trừ dây chuyền, cùng quy ước lũt đồ arc 1).
+        int geninSetAtk = 26;
+        int geninSetDef = 23;
+        int geninSetHp = 48;
+
+        assertThat(OUTER_SECT_SET_ATK).isGreaterThan(geninSetAtk);
+        assertThat(OUTER_SECT_SET_DEF).isGreaterThan(geninSetDef);
+        assertThat(OUTER_SECT_SET_HP).isGreaterThan(geninSetHp);
+    }
+
+    /**
+     * Luật hình học cho điểm spawn MỚI của V45 — và cho cú DỜI quỷ đá.
+     *
+     * <p>Dữ liệu thật thì {@code PostgresMonsterCatalogAdapterIntegrationTest} gác; ô này giữ phép
+     * tính cạnh phép tính cân bằng, vì trận tay đôi chỉ đúng khi người chơi thật sự đánh MỘT con.
+     */
+    @Test
+    @DisplayName("Sào huyệt (93) yên tĩnh, và quỷ đá dời sang 106 vẫn thoả luật")
+    void theRaiderCampIsAQuietPlaceToFightIn() {
+        float aggroRadiusMeters = 6f;
+        float leashRadiusMeters = 10f;
+        float meleeAttackRangeMeters = 2f;
+        float combinedReach = aggroRadiusMeters + aggroRadiusMeters;
+        float leashReach = leashRadiusMeters + meleeAttackRangeMeters;
+
+        // Hàng xóm hai phía của sào huyệt: thám tử @66 và quỷ đá @106 (sau khi dời).
+        assertThat(Math.abs(93f - 66f)).isGreaterThan(combinedReach);
+        assertThat(Math.abs(106f - 93f)).isGreaterThan(combinedReach);
+        assertThat(Math.abs(93f - 66f)).isGreaterThan(leashReach);
+        assertThat(Math.abs(106f - 93f)).isGreaterThan(leashReach);
+
+        // Khe nghỉ ở x≈80: ngoài tầm aggro của CẢ thám tử lẫn đầu lĩnh, nên hồi máu được.
+        assertThat(Math.abs(80f - 66f)).isGreaterThan(aggroRadiusMeters);
+        assertThat(Math.abs(93f - 80f)).isGreaterThan(aggroRadiusMeters);
+    }
+}

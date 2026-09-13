@@ -455,12 +455,38 @@ class OuterSectQuestIntegrationTest {
     // Hạ tầng test
     // ------------------------------------------------------------------------------------------
 
-    /** Trọn arc 1 (quest 1→4) bằng chính script sản phẩm — ADR-044 khoá quest sau theo quest trước. */
+    /**
+     * Trọn arc 1 bằng chính script sản phẩm — ADR-044 khoá quest sau theo quest trước.
+     *
+     * <p>⚠️ Arc 1 nay là BẢY quest, không phải bốn. V45 thêm quãng Lv10–18 mà STORY.md §6 vốn khai
+     * nhưng chuỗi cũ chưa bao giờ chạm tới, và TRỎ LẠI tiên quyết của {@code report_to_outer_sect}
+     * từ {@code awakening_trial} sang {@code break_the_raider_band}. Nên hàm này phải đi hết cả bảy,
+     * nếu không mọi test arc 2 dừng ngay ở {@code PREREQUISITE_NOT_MET}.
+     *
+     * <p>Hai quest cuối KHÔNG dùng được {@link #playQuest}: chúng có bước thứ hai là MỞ LỜI với Chu
+     * Hoành ({@code npc_talked}), còn {@code playQuest} chỉ biết giết quái.
+     */
     private static void advanceThroughArcOne(long characterId) {
         playQuest(characterId, "kill_training_dummies", "training_dummy", 3);
         playQuest(characterId, "night_watch_bandit", "wandering_bandit", 3);
         playQuest(characterId, "clear_old_archive", "archive_warden", 2);
         playQuest(characterId, AWAKENING_TRIAL_CODE, "trial_construct", 1);
+
+        // Quest 10 — ba con đoạt mạch, một bước, nên playQuest đủ dùng.
+        playQuest(characterId, "spirit_vein_raiders", "vein_raider", 3);
+
+        // Quest 11 — hai con RỒI mở lời; thứ tự sống trong script (`recovered` gác bước 2).
+        newAcceptUseCase().execute(characterId, "first_cultivation_manual");
+        newProcessUseCase().monsterKilled(characterId, "vein_raider");
+        newProcessUseCase().monsterKilled(characterId, "vein_raider");
+        newProcessUseCase().npcTalked(characterId, "town_elder");
+        newClaimUseCase().execute(characterId, "first_cultivation_manual", newIdempotencyKey());
+
+        // Quest 12 — hạ đầu lĩnh RỒI về báo; nhịp đóng arc 1, lĩnh xong là Cấp 18.
+        newAcceptUseCase().execute(characterId, "break_the_raider_band");
+        newProcessUseCase().monsterKilled(characterId, "raider_chieftain");
+        newProcessUseCase().npcTalked(characterId, "town_elder");
+        newClaimUseCase().execute(characterId, "break_the_raider_band", newIdempotencyKey());
     }
 
     /** Arc 1 + quest 5 — điều kiện ADR-044 để mở quest 6. */

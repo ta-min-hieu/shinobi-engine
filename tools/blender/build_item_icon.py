@@ -1,6 +1,7 @@
 """Build the `icon_<item_code>` assets — one per real `item_template` row seeded
-in the DB: V4/V5/V9 (kunai, wooden_sword, enhance_protection_charm) plus the 15
-rows V21 adds (`V21__seed_starter_equipment.sql`). ART-PIPELINE.md §8.3:
+in the DB: V4/V5/V9 (kunai, wooden_sword, enhance_protection_charm), the 15 rows
+V21 adds (`V21__seed_starter_equipment.sql`), `ancient_jade_shard` (V30),
+`minor_healing_pill` (V36) and the six `outer_sect_*` pieces of V45. ART-PIPELINE.md §8.3:
 "item_template.code = 'kunai' <-> art_asset.asset_key = 'icon_kunai'"
 (soft-link convention).
 
@@ -685,6 +686,154 @@ def build_minor_healing_pill():
     return 1.22
 
 
+# --- V45: bậc "Ngoại Môn" (required_level 15) --------------------------------
+#
+# Bậc THỨ BA của bộ icon, và nó phải đọc ra khác cả hai bậc cũ ở CHẤT LIỆU chứ không chỉ ở màu:
+# "Tập Sự" là vải/rơm/gỗ tông ấm xỉn, "Hạ Nhẫn" là vải chàm + thép + vàng. Bậc này là NGỌC + VÀNG,
+# không thép — kim loại đổi hẳn, nên ở 64x64 nó không bao giờ bị đọc nhầm thành bậc Hạ Nhẫn đổi màu.
+# Ba màu ngọc JADE/JADE_PALE/JADE_DARK đã có sẵn (dùng cho `ancient_jade_shard`), không chế màu mới.
+
+
+def build_outer_sect_robe():
+    # Ngoại Môn Đạo Bào — cùng silhouette `_vest`, nhưng yếm ngọc thay yếm thép.
+    return _vest(JADE, JADE_DARK, JADE_PALE, JADE_PALE, cloth_shades=3)
+
+
+def build_outer_sect_cap():
+    # Ngoại Môn Quan — dùng lại đúng `_outer_sect_cap` đã dựng cho `genin_headband` (ADR-038 Đợt 3),
+    # đổi sang thân ngọc + trâm vàng. Hàm đó vốn sinh ra để thay băng trán ninja, nên tên nó khớp
+    # bậc này còn đúng hơn chỗ nó đang được dùng.
+    return _outer_sect_cap(JADE_DARK, JADE, GOLD)
+
+
+def build_outer_sect_gloves():
+    # Ngoại Môn Hộ Thủ — `_wraps` với khớp NGỌC (bậc Hạ Nhẫn là thép), đinh vàng do helper tự thêm.
+    return _wraps(JADE, JADE_DARK, JADE_PALE)
+
+
+def build_outer_sect_boots():
+    """Ngoại Môn Vân Ngoa — ủng mây nhìn nghiêng, dựng bằng MỘT khối liền.
+
+    ⚠️ Hai vòng B mới ra được hình này, và cả hai cái sai đều đã có sẵn lời cảnh báo trong file.
+
+    **Vòng B #1** vẽ ủng nhìn CHÍNH DIỆN để lấy "tư thế thứ ba" khác `novice_sandals` (đôi, nhìn từ
+    trên) và `genin_sandals` (một chiếc, nhìn nghiêng). Ra một cái THÁP đối xứng — đọc ra cái đèn.
+    Thứ làm một chiếc giày đọc được LÀ bất đối xứng mũi-gót; nhìn chính diện thì bỏ đi đúng cái đó.
+
+    **Vòng B #2** quay lại nhìn nghiêng nhưng ghép mũi hếch bằng HAI hộp nhỏ xoay. Ra một cái CO
+    ỐNG NƯỚC: mũi tách hẳn thành một mảnh vàng rời, và ống với bàn chân cùng một tông `JADE` gặp
+    nhau ở góc vuông nên đọc thành mối nối ống. `_outer_sect_cap` đã ghi sẵn luật này
+    ("Freestyle outlines every object separately, so a small detached shape never fuses into the
+    mass it is meant to hang off") — đọc rồi vẫn sập.
+
+    Bản này sửa đúng hai nguyên nhân đó:
+      * **MỘT khối liền** (`_prism_obj`) ôm trọn đường viền ủng — gót, ống, cổ, mu bàn chân và mũi
+        HẾCH nằm trong cùng một profile, nên mũi cong là một phần của hình chứ không dính vào hình.
+      * **Tách ống khỏi bàn chân bằng SẮC ĐỘ**, không bằng đường: ống sáng (`JADE_PALE`) trên bàn
+        chân sẫm hơn, nên chỗ gập đọc ra cổ chân chứ không ra khớp nối.
+    """
+    # Profile (x, z) theo chiều NGƯỢC kim đồng hồ như camera nhìn — xem _prism_obj.
+    # Đi: gót sau → lên lưng ống → cổ ống → xuống mặt trước ống → mu bàn chân → mũi hếch cong lên
+    #     → xuống đầu mũi → dọc đế về gót.
+    profile = [
+        (-0.150, -0.150),   # gót, sát đế
+        (-0.150,  0.150),   # lưng ống
+        (-0.128,  0.318),   # vai cổ ống
+        (-0.020,  0.318),   # mép cổ trước
+        (-0.004,  0.120),   # mặt trước ống thu vào
+        ( 0.060, -0.020),   # mu bàn chân
+        ( 0.196,  0.004),   # mũi bắt đầu hếch
+        ( 0.262,  0.092),   # đỉnh mũi cong (vân ngoa)
+        ( 0.300,  0.052),   # mép ngoài mũi
+        ( 0.236, -0.064),   # mũi đổ xuống
+        ( 0.214, -0.150),   # đầu đế trước
+    ]
+    body = _prism_obj("Boot", profile, 0.058, loc=(-0.030, 0.0, 0.0))
+    apply_toon(body, JADE, shades=3)
+
+    # Ống sáng hơn bàn chân — đây là thứ làm chỗ gập đọc ra cổ chân (vòng B #2 thiếu đúng cái này).
+    shaft = _box_obj("ShaftFace", 0.064, 0.030, 0.150, loc=(-0.106, -0.062, 0.170))
+    apply_toon(shaft, JADE_PALE, shades=3)
+
+    cuff = _box_obj("CuffBand", 0.084, 0.064, 0.030, loc=(-0.104, -0.006, 0.300))
+    apply_toon(cuff, GOLD, shades=2)
+
+    sole = _box_obj("Sole", 0.196, 0.062, 0.030, loc=(0.010, 0.0, -0.166))
+    apply_toon(sole, JADE_DARK, shades=2)
+    return 0.80
+
+
+def build_outer_sect_talisman():
+    """Ngoại Môn Hộ Thân Phù — thẻ ngọc TREO trên dây, buông thẳng xuống.
+
+    ⚠️ KHÔNG được là một vòng tròn. Cả hai món ACCESSORY_1 đang có (`novice_bracelet`,
+    `genin_bracelet`) đều là VÒNG KÍN nhìn chính diện, và chính `build_novice_bracelet` ghi rằng
+    vòng-kín-đối-lại-chữ-U-của-dây-chuyền là tín hiệu DUY NHẤT sống sót khi thu nhỏ. Một vòng ngọc
+    thứ ba sẽ đọc y hệt vòng thép thứ hai.
+
+    Nên hình ở đây là trục DỌC: nút dây trên cùng, dải tua ngắn, rồi một thẻ ngọc chữ nhật khắc. Nó
+    cũng không đụng chữ U của hai dây chuyền — chúng cong ngang, cái này buông thẳng.
+    """
+    knot = _box_obj("Knot", 0.062, 0.048, 0.052, loc=(0.0, 0.0, 0.330))
+    apply_toon(knot, GOLD, shades=2)
+    for index, side in enumerate((-1, 1)):
+        cord = _box_obj("Cord%d" % index, 0.022, 0.030, 0.120,
+                        loc=(side * 0.052, 0.0, 0.222), rot=_tilt(side * -12))
+        apply_toon(cord, TASSEL_RED, shades=2)
+    tablet = _box_obj("Tablet", 0.150, 0.048, 0.208, loc=(0.0, 0.0, -0.040))
+    apply_toon(tablet, JADE, shades=3)
+    bevel = _box_obj("Bevel", 0.116, 0.030, 0.170, loc=(0.0, -0.054, -0.040))
+    apply_toon(bevel, JADE_PALE, shades=3)
+    for index, height in enumerate((0.046, -0.040, -0.126)):
+        glyph = _box_obj("Glyph%d" % index, 0.070, 0.020, 0.018, loc=(0.0, -0.086, height))
+        apply_toon(glyph, JADE_DARK, shades=2)
+    fall = _box_obj("TasselFall", 0.030, 0.034, 0.078, loc=(0.0, -0.010, -0.290))
+    apply_toon(fall, TASSEL_RED, shades=3)
+    return 0.92
+
+
+def build_outer_sect_blade():
+    """Ngoại Môn Kiếm — vẫn là kiếm thẳng (jian), nhưng KHÔNG được đọc ra `steel_katana` đổi màu.
+
+    Cùng ô WEAPON nên cùng trục dọc; ba thứ tách nó ra: lưỡi HẸP hơn và dài hơn, hộ thủ là một đĩa
+    NGỌC tròn thay thanh ngang + hai quillon, và tua kiếm dài gấp đôi (hai đoạn thay một).
+    """
+    # ⚠️ VÒNG B #1 (2026-09-13). Bản đầu để lưỡi HẸP hơn `steel_katana` (0.054 so với 0.070) và
+    # ĐỒNG THỜI kéo ortho_scale ra xa hơn (1.24 so với 1.18). Hai thứ đó cộng lại làm viền Freestyle
+    # 2.0px ăn gần hết bề ngang lưỡi ⇒ render ra một cái ỐNG ĐEN, không ra kiếm ngọc. Đây đúng bài
+    # học `icon_genin_headband`: hình MẢNH không sống nổi qua viền ở cỡ icon.
+    #
+    # Bản này rộng hơn cả katana (0.078) và kéo gần lại (1.10). Và BỎ HẲN sống kiếm ở giữa: một
+    # khối mảnh lồng trong khối mảnh chỉ thêm một đường viền đen thứ hai dọc thân, đúng thứ đang
+    # làm lưỡi tối đi.
+    blade = _box_obj("Blade", 0.078, 0.026, 0.258, loc=(0.0, -0.050, 0.232))
+    apply_toon(blade, JADE_PALE, shades=3)
+    tip = _box_obj("Tip", 0.042, 0.024, 0.054, loc=(0.0, -0.050, 0.534))
+    apply_toon(tip, JADE_PALE, shades=3)
+
+    disc = _gem_obj("GuardDisc", 0.128, 0.044, 0.070, loc=(0.0, -0.050, -0.046))
+    apply_toon(disc, JADE, shades=3)
+    hub = _box_obj("GuardHub", 0.052, 0.048, 0.030, loc=(0.0, -0.050, -0.046))
+    apply_toon(hub, GOLD, shades=2)
+
+    handle = _box_obj("Handle", 0.042, 0.042, 0.126, loc=(0.0, -0.050, -0.208))
+    apply_toon(handle, JADE_DARK, shades=2)
+    for index, height in enumerate((-0.150, -0.266)):
+        ring = _box_obj("Ring%d" % index, 0.050, 0.046, 0.018, loc=(0.0, -0.050, height))
+        apply_toon(ring, GOLD, shades=2)
+    pommel = _gem_obj("Pommel", 0.058, 0.050, 0.040, loc=(0.0, -0.050, -0.352))
+    apply_toon(pommel, GOLD, shades=2)
+
+    knot = _box_obj("TasselKnot", 0.034, 0.036, 0.032, loc=(0.0, -0.058, -0.410))
+    apply_toon(knot, TASSEL_RED, shades=2)
+    upper = _box_obj("TasselUpper", 0.032, 0.034, 0.076, loc=(0.030, -0.060, -0.470),
+                     rot=_tilt(16))
+    apply_toon(upper, TASSEL_RED, shades=3)
+    lower = _box_obj("TasselLower", 0.028, 0.032, 0.070, loc=(0.074, -0.062, -0.536),
+                    rot=_tilt(30))
+    apply_toon(lower, TASSEL_RED, shades=3)
+    return 1.10
+
 ITEMS = {
     "kunai": build_kunai,
     "wooden_sword": build_wooden_sword,
@@ -711,6 +860,13 @@ ITEMS = {
     "ancient_jade_shard": build_ancient_jade_shard,
     # V36 — đan dược hồi máu (ADR-046 D5), món DÙNG ĐƯỢC đầu tiên của game
     "minor_healing_pill": build_minor_healing_pill,
+    # V45 — bậc "Ngoại Môn" (required_level 15), phần thưởng quest 11. Ngọc + vàng, không thép.
+    "outer_sect_blade": build_outer_sect_blade,
+    "outer_sect_robe": build_outer_sect_robe,
+    "outer_sect_cap": build_outer_sect_cap,
+    "outer_sect_gloves": build_outer_sect_gloves,
+    "outer_sect_boots": build_outer_sect_boots,
+    "outer_sect_talisman": build_outer_sect_talisman,
 }
 
 

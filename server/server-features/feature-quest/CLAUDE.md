@@ -259,3 +259,42 @@ câu chung chung khiến họ bấm lại mãi một việc không bao giờ ch�
 
 ⚠️ **Fixture `test_fixture_broken.js` cố ý gọi vài callback THẬT rồi mới ném lỗi.** Một fixture ném
 lỗi ở dòng đầu sẽ xanh kể cả khi Java vẫn đọc hiệu ứng dở dang — nó không gác được gì cả.
+
+
+## Arc 1 nay là BẢY quest, không phải bốn (V45, 2026-09-13)
+
+STORY.md §6 xếp arc 1 ở **Lv1–18**, nhưng chuỗi cũ dừng ở **ĐÚNG Cấp 10** (ràng buộc cố ý của V33 —
+Cấp 10 là mốc `SelectFactionUseCase.MIN_LEVEL`). V45 lấp nửa sau bằng ba quest và khép arc ở Cấp 18:
+
+```
+… → awakening_trial → spirit_vein_raiders → first_cultivation_manual → break_the_raider_band
+                                                                            ↓ (tiên quyết MỚI)
+                                                                     report_to_outer_sect (arc 2)
+```
+
+⚠️ **`report_to_outer_sect` bị TRỎ LẠI tiên quyết** (`awakening_trial` → `break_the_raider_band`)
+bằng một câu `UPDATE` ở V45 §7 — V37 không bị sửa, vì nó đã push. Hệ quả với test: mọi lối vào arc 2
+phải đi hết **bảy** quest, nếu không dừng ngay ở `PREREQUISITE_NOT_MET`. Hai chỗ phải sửa cùng lượt
+và không có chỗ thứ ba: `QuestIntegrationTest.claimAwakeningTrial` và
+`OuterSectQuestIntegrationTest.advanceThroughArcOne`.
+
+### Luật "người GIAO việc không thể là mốc của bước ĐẦU" — lần thứ BA
+
+Quest 11 và 12 đều nhận từ Chu Hoành và đều có bước cuối là mở lời với chính ông. Bước ĐẦU vì thế
+bắt buộc là việc đi làm (giết quái), không phải `npc_talked`: sự kiện đó bắn ra **TRƯỚC** khi quest
+tồn tại, nên một quest nhận-từ-X-và-báo-cho-X sẽ tự đóng ngay lúc nhận. Quest 7 trả giá đầu tiên
+(`missing_disciple_trail.js`), quest 9 viết nó thành luật, và hai quest này là lần thứ ba áp dụng.
+
+Thứ tự bước sống trong SCRIPT (`progress.recovered` / `progress.felled` gác bước 2), không sống
+trong Java — GAMEPLAY §9.6.
+
+### "Công pháp" là TRANG BỊ, không phải cơ chế mở khoá chiêu
+
+Mốc "công pháp đầu tiên (Lv15)" của §6 hiện thực bằng bộ **"Ngoại Môn"** `required_level 15` (6 món,
+quest 11 trao), dùng đúng ADR-036 đã chạy. Trong code KHÔNG có cơ chế mở khoá chiêu theo cấp nào;
+dựng một cái chạm `SkillRegistry` và có thể chạm protocol ⇒ **cần ADR riêng** (CLAUDE.md §4). Chủ dự
+án chốt hướng trang bị 2026-09-13.
+
+⚠️ Bộ TRAO đúng bằng bộ được TÍNH: **sáu** món, ô `ACCESSORY_2` để trống — đúng lũt đồ mà mọi lớp
+cân bằng của dự án giả định. Cộng cả bảy món trong `item_template` là cộng **catalog cửa hàng**, không
+phải một lũt đồ ai đang mặc; nhầm hai thứ đó suýt làm tôi sửa hỏng ba test đang đúng (ROADMAP mục 77).

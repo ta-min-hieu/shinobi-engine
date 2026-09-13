@@ -695,12 +695,43 @@ class QuestIntegrationTest {
     // không được lẫn vào nhau, và một sự kiện LẶP LẠI không được làm tiến độ trôi.
     // ---------------------------------------------------------------------------------------
 
-    /** Đưa nhân vật qua trọn arc 1 (quest 1→4) — điều kiện ADR-044 để mở quest 5. */
+    /**
+     * Đưa nhân vật qua TRỌN arc 1 — điều kiện ADR-044 để mở quest 5.
+     *
+     * <p>⚠️ Arc 1 nay là BẢY quest, không phải bốn, và tên hàm này giữ nguyên vì hai chỗ gọi nó vẫn
+     * hỏi đúng một câu: "đã xong arc 1 chưa". V45 thêm quãng Lv10–18 mà STORY.md §6 vốn khai cho
+     * arc 1 nhưng chuỗi cũ chưa bao giờ chạm tới (bốn quest đưa người chơi tới ĐÚNG Cấp 10 rồi
+     * dừng), và TRỎ LẠI tiên quyết của {@code report_to_outer_sect} sang {@code break_the_raider_band}.
+     * Thiếu ba quest cuối thì mọi test quest 5 dừng ngay ở {@code PREREQUISITE_NOT_MET}.
+     *
+     * <p>Hai quest cuối có bước thứ hai là MỞ LỜI với Chu Hoành ({@code npc_talked}), nên chúng
+     * không đi qua {@code playQuest} được — thứ tự sống trong script, không trong Java.
+     */
     private static void claimAwakeningTrial(long characterId) {
         claimOldArchive(characterId);
         newAcceptUseCase().execute(characterId, AWAKENING_TRIAL_CODE);
         newProcessUseCase().monsterKilled(characterId, "trial_construct");
         newClaimUseCase().execute(characterId, AWAKENING_TRIAL_CODE, newIdempotencyKey());
+
+        // Quest 10 — ba con đoạt mạch ở linh mạch x=47.
+        newAcceptUseCase().execute(characterId, "spirit_vein_raiders");
+        for (int kill = 0; kill < 3; kill++) {
+            newProcessUseCase().monsterKilled(characterId, "vein_raider");
+        }
+        newClaimUseCase().execute(characterId, "spirit_vein_raiders", newIdempotencyKey());
+
+        // Quest 11 — đòi hai quyển công pháp RỒI mang về; phần thưởng là bộ "Ngoại Môn" sáu món.
+        newAcceptUseCase().execute(characterId, "first_cultivation_manual");
+        newProcessUseCase().monsterKilled(characterId, "vein_raider");
+        newProcessUseCase().monsterKilled(characterId, "vein_raider");
+        newProcessUseCase().npcTalked(characterId, "town_elder");
+        newClaimUseCase().execute(characterId, "first_cultivation_manual", newIdempotencyKey());
+
+        // Quest 12 — hạ đầu lĩnh ở sào huyệt x=93 RỒI về báo. Lĩnh xong là Cấp 18, arc 1 đóng.
+        newAcceptUseCase().execute(characterId, "break_the_raider_band");
+        newProcessUseCase().monsterKilled(characterId, "raider_chieftain");
+        newProcessUseCase().npcTalked(characterId, "town_elder");
+        newClaimUseCase().execute(characterId, "break_the_raider_band", newIdempotencyKey());
     }
 
     @Test
@@ -759,10 +790,19 @@ class QuestIntegrationTest {
         assertThat(readProgressJson(characterId, REPORT_TO_OUTER_SECT_CODE)).isEqualTo(progressAfterFirst);
     }
 
-    /** V37 phải tra `awakening_trial` theo `code`, không hardcode id (khuôn V28/V30/V33). */
+    /**
+     * Tiên quyết của quest 5 nay là nhịp ĐÓNG THẬT của arc 1, không còn là khảo hạch.
+     *
+     * <p>V37 trỏ nó về {@code awakening_trial} vì lúc đó đó LÀ nhịp đóng. V45 thêm quãng Lv10–18
+     * (STORY.md §6 khai arc 1 ở Lv1–18, nhưng chuỗi cũ dừng ở ĐÚNG Cấp 10) nên mốc đóng dời sang
+     * {@code break_the_raider_band}. V37 không bị sửa — đã push thì ra version mới, và V45 §7 làm
+     * việc đó bằng một câu UPDATE.
+     *
+     * <p>Vẫn tra theo {@code code}, không hardcode id (khuôn V28/V30/V33).
+     */
     @Test
-    void shouldSeedReportToOuterSect_withPrerequisitePointingAtTheAwakeningTrial() {
-        assertThat(prerequisiteCodeOf(REPORT_TO_OUTER_SECT_CODE)).isEqualTo(AWAKENING_TRIAL_CODE);
+    void shouldSeedReportToOuterSect_withPrerequisitePointingAtTheEndOfArcOne() {
+        assertThat(prerequisiteCodeOf(REPORT_TO_OUTER_SECT_CODE)).isEqualTo("break_the_raider_band");
     }
 
     @Test

@@ -2921,3 +2921,45 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       lệ crit chỉ **1%/đòn** (agi 10 × 0,1 / 100) — hiếm, và "hiếm" là thứ làm CI đỏ ngẫu nhiên chứ
       không phải thứ làm ô test an toàn.
 
+77. **QUÃNG Lv10–18 CỦA ARC 1 — arc 1 lần đầu khép ở ĐÚNG Cấp 18 như STORY khai (2026-09-13)**:
+    - 🎯 **Dòng #19 của bảng chờ đóng lại.** STORY.md §6 xếp arc 1 ở **Lv1–18** từ khi được duyệt
+      (2026-09-05), nhưng trọn chuỗi cũ (4 quest) dừng ở **ĐÚNG Cấp 10** — ràng buộc CỐ Ý của V33.
+      Gần nửa sau của arc 1 chưa bao giờ tồn tại. Chủ dự án chọn hướng **thêm quest arc 1**, và
+      "công pháp đầu tiên (Lv15)" hiện thực bằng **một bộ trang bị `required_level 15`** thay vì
+      dựng cơ chế học chiêu mới (việc đó chạm SkillRegistry + có thể chạm protocol ⇒ cần ADR riêng).
+    - 🗃️ **V45, một migration, không một dòng Java NỘI DUNG nào** (lần thứ chín liên tiếp): 2 loài,
+      2 điểm spawn, 1 cú dời quỷ đá, 6 món trang bị, 3 quest, và một câu `UPDATE` trỏ lại tiên quyết
+      của `report_to_outer_sect` từ `awakening_trial` sang `break_the_raider_band`. Java đổi đúng
+      MỘT hằng số hiển thị (`DemoPlatforms.GROUND_MAX_X` 85 → 115) vì luật "nền đất phải phủ hết
+      spawn" bắt nó đi cùng lượt.
+    - ⚖️ **Chỉ số hai loài CHỌN TỪ test, không chọn bằng cảm giác** — hai lớp mới
+      (`SpiritVeinDuelBalanceTest`, `RaiderBandBalanceTest`), tổng **22 khẳng định** cùng ba lớp cũ:
+      `vein_raider` 130/18/12 (tới nơi 84 máu ⇒ 4 nhát so với 6) và `raider_chieftain` 200/30/18
+      (mặc bộ Ngoại Môn, tới nơi 111 ⇒ 4 so với 6). Biên **2** cho cả hai — chặt hơn nhịp đóng arc
+      (biên 3) nhưng rộng hơn một lần tung đồng xu ở tỉ lệ trúng 91%.
+    - 🧭 **Quãng đường lại là một phần của cân bằng, lần thứ ba.** Đường đông tới sào huyệt @93 đi
+      qua 4 điểm spawn; riêng quỷ đá @80 lấy 31 máu. V45 **dời nó 80 → 106** — đúng việc V40 đã làm
+      một lần (47 → 80) vì cùng lý do. Sau khi dời, **x≈80 thành khe yên tĩnh** (cách hai bên 14m và
+      13m, ngoài tầm aggro) để người chơi hồi máu trước trận cuối. Hồi máu ADR-046 **không** cứu
+      được quãng đi: `REGEN_DELAY_SECONDS` là 8 giây mà các điểm spawn chỉ cách nhau ~2,6 giây chạy.
+    - 🎨 **Hai loài có art riêng ngay từ đầu** (`mob_vein-raider`, `mob_raider-chieftain`) — 0 lượt
+      Rodin, dựng bằng `kage_mesh_kit` headless. Không loài nào mượn `model_key` của loài nào.
+    - ⛔ **MỘT "LỖI" KHÔNG CÓ THẬT, suýt sửa nhầm ba test đang đúng.** Cộng bảy món `novice_*` trong
+      `item_template` ra `atk 8 · def 7 · hp 22` → 122 máu, trong khi ba lớp cân bằng ghi `7/7/18` →
+      118. Tôi kết luận "test đã cũ" và **chủ dự án đã duyệt cho sửa**. Kiểm lại trước khi sửa thì
+      tiền đề SAI: nhân vật playtest mặc **SÁU** món (ô `ACCESSORY_2` trống), và vết đo playtest V44
+      ghi thẳng `máu 118 -> 94`. Cái tôi cộng là **tổng CATALOG cửa hàng**, không phải một lũt đồ ai
+      đang mặc. ⇒ Giữ nguyên 118, không sửa gì. Bài học: **kiểm tiền đề trước khi xin duyệt, không
+      phải sau.**
+    - 🐛 **Ba cái bẫy nhặt được, đã ghi vào ASSET-LOG**: `_acc_arm_wrap` và `_acc_thigh_guard` **bỏ
+      qua tham số `bone`** (tự dựng cả hai bên — truyền `bone` vào bị nuốt im lặng, bản đầu ra BỐN
+      tấm giáp đùi chồng nhau); sửa `.blend` **không** tự sinh lại `.glb`; và `--out` tương đối làm
+      Blender ghi ảnh ra **gốc ổ đĩa**, tái phạm đúng lỗi đã ghi từ 2026-08-01.
+    - 🧪 **`hasSize(7)` là một cái ĐẾM, và nó che mất luật.** Ô `shouldKeepAggroSpawnsApartEnough…`
+      đỏ ở dòng đếm số quái CÓ aggro (7 → 9) **trước khi** vòng lặp kiểm mọi cặp kịp chạy — tức luật
+      V29 chưa từng được soi với hai điểm spawn mới cho tới khi sửa con số đó.
+    - ✅ **Build xanh**: `./gradlew build -x pmdMain -x pmdTest` SUCCESSFUL, gồm cả test Postgres
+      (Flyway chạy V45 trên DB sạch), chuỗi arc 1 **bảy quest** chạy trọn, và cây thoại 12 lựa chọn.
+    - ⏳ **Còn lại**: 6 icon vật phẩm cho bộ Ngoại Môn, và **playtest sống** — mọi con số ở trên là
+      giấy cho tới lúc đó, và quest 8 đã bị chính playtest bác ba lần trong một ngày.
+

@@ -61,7 +61,14 @@ final class DemoPlatforms {
      */
     private static final float GROUND_MIN_X = -55f;
 
-    private static final float GROUND_MAX_X = 85f;
+    /**
+     * <b>Đầu đông nới 85 → 115 (2026-09-13, V45).</b> Lần thứ hai, và cùng lý do hệt lần đầu: trục
+     * chơi hết chỗ. V45 thêm sào huyệt đoạt mạch ở {@code x = 93} và DỜI quỷ đá {@code 80 → 106} để
+     * dọn đường đông (nó là con đánh đau nhất trục chơi, atk 40, và V40 đã phải dời nó một lần rồi
+     * vì đúng chuyện đó). Phủ hết {@code 106} còn dư 9m — không sát mép, đúng ràng buộc (a) mà V40
+     * tự đặt ra cho chính nó.
+     */
+    private static final float GROUND_MAX_X = 115f;
 
     private DemoPlatforms() {}
 

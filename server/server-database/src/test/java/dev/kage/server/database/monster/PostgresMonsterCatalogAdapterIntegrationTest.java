@@ -192,7 +192,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         List<MonsterSpawnPoint> spawns =
                 new PostgresMonsterCatalogAdapter(dataSource).listSpawnPoints(MonsterSpawnPoint.MAIN_WORLD_CODE);
 
-        assertThat(spawns).hasSize(10);
+        assertThat(spawns).hasSize(12);
         // ADR-033 — quái lệch khỏi y=0 là quái người chơi không bao giờ chạm tới. DB có CHECK,
         // đây là hàng rào thứ hai và cũng là tài liệu sống cho ràng buộc đó.
         assertThat(spawns).allSatisfy(spawn -> assertThat(spawn.posY()).isZero());
@@ -223,9 +223,14 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         // ⚠️ Và hai ô test hình học bên dưới KHÔNG gác điểm này (chúng chỉ soi loài có aggro > 0),
         // nên nếu ngày nào đó hắn được cho aggro thì chúng vẫn im. Chỗ duy nhất ghi lại ràng buộc
         // là đúng dòng toạ độ này.
+        // V45 thêm HAI điểm: đoạt mạch @47 (khe quỷ đá để lại khi V40 dời nó đi) và sào huyệt đầu
+        // lĩnh @93 (đất mới — `DemoPlatforms.GROUND_MAX_X` đi 85 → 115 cùng đợt). Và nó DỜI quỷ đá
+        // lần thứ hai, 80 → 106, cùng lý do V40 đã dời nó lần đầu: nó là con đánh đau nhất trục chơi
+        // (atk 40) và lần này nó nằm trên đường tới @93. Sau khi dời, x≈80 thành khe yên tĩnh để
+        // người chơi hồi máu trước trận cuối (ADR-046).
         assertThat(spawns)
                 .extracting(MonsterSpawnPoint::posX)
-                .containsExactlyInAnyOrder(-47f, -33f, -20f, -8f, 8f, 14f, 21f, 34f, 66f, 80f);
+                .containsExactlyInAnyOrder(-47f, -33f, -20f, -8f, 8f, 14f, 21f, 34f, 47f, 66f, 93f, 106f);
     }
 
     /**
@@ -300,9 +305,14 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
                 .filter(spawn -> aggroByCode.getOrDefault(spawn.monsterCode(), 0f) > 0f)
                 .toList();
 
-        // 2 tán tu + 1 quỷ đá + 2 thạch vệ (V30) + 1 cỗ khảo hạch (V33) + 1 thám tử Huyết Sa (V40).
-        // Mộc nhân aggro 0, không tính.
-        assertThat(aggressive).hasSize(7);
+        // 2 tán tu + 1 quỷ đá + 2 thạch vệ (V30) + 1 cỗ khảo hạch (V33) + 1 thám tử Huyết Sa (V40)
+        // + 1 đoạt mạch @47 và 1 đầu lĩnh @93 (V45) = 9.
+        //
+        // Mộc nhân aggro 0, không tính — và chấp sự Hình Vân Sơn @-8 cũng vậy (V41 cho hắn aggro 0
+        // CỐ Ý, xem shouldListMainWorldSpawnPointsOnThePlayLine). Con số này là một cái ĐẾM chứ
+        // không phải một luật, nên mỗi đợt thêm loài CÓ aggro đều phải sửa nó — đó là chủ đích:
+        // thêm một con biết tự đánh người mà không ai đọc lại luật giãn spawn thì ô này đỏ trước.
+        assertThat(aggressive).hasSize(9);
         for (int i = 0; i < aggressive.size(); i++) {
             for (int j = i + 1; j < aggressive.size(); j++) {
                 MonsterSpawnPoint first = aggressive.get(i);

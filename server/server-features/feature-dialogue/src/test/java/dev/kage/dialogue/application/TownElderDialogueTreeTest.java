@@ -64,6 +64,13 @@ class TownElderDialogueTreeTest {
                         "night_watch",
                         "old_archive",
                         "awakening_trial",
+                        // V45 — quãng Lv10-18 của arc 1, chèn TRƯỚC `outer_sect` vì arc 1 phải đọc
+                        // xong rồi mới tới nhịp bàn giao sang arc 2. Ba lựa chọn sau đó lùi ba chỗ;
+                        // `option_index` là VỊ TRÍ nên đây là thay đổi CÓ CHỦ ĐÍCH, và ô test này
+                        // chính là chỗ ghim nó lại.
+                        "spirit_vein",
+                        "first_manual",
+                        "raider_band",
                         "outer_sect",
                         "missing_disciple",
                         "confront_steward",
@@ -163,6 +170,57 @@ class TownElderDialogueTreeTest {
         assertThat(confront.options())
                 .extracting(DialogueOption::action)
                 .containsExactly("accept_quest:confront_the_steward", "about_town", "end");
+    }
+
+    /**
+     * Quãng Lv10–18 của arc 1 (V45) — ba nhánh lấp nửa sau của dải mà STORY.md §6 khai cho arc 1
+     * nhưng chuỗi cũ chưa bao giờ chạm tới (bốn quest đưa người chơi tới ĐÚNG Cấp 10 rồi dừng).
+     *
+     * <p>Cả ba mọc xuống dưới qua {@code about_town} như mọi nhánh quest trước, và chúng đứng
+     * TRƯỚC {@code outer_sect}: arc 1 phải đọc xong rồi mới tới nhịp bàn giao sang arc 2.
+     */
+    @Test
+    @DisplayName("Nhánh linh mạch nhận được quest thứ mười, và nhận đúng mã spirit_vein_raiders")
+    void spiritVeinBranchOffersTheTenthQuest() {
+        DialogueNode spiritVein = node("spirit_vein");
+
+        assertThat(spiritVein.textKey()).isEqualTo("dialogue.town_elder.spirit_vein");
+        assertThat(spiritVein.options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:spirit_vein_raiders", "about_town", "end");
+    }
+
+    /**
+     * Mốc "công pháp đầu tiên (Lv15)" của STORY.md §6 — mốc DUY NHẤT của arc 1 chưa từng được làm.
+     *
+     * <p>Nó là một BỘ TRANG BỊ {@code required_level 15} (V45), không phải cơ chế học chiêu mới:
+     * trong code không có cơ chế mở khoá chiêu theo cấp nào, và dựng một cái là việc cần ADR riêng
+     * (CLAUDE.md §4). Chủ dự án chốt hướng này 2026-09-13.
+     */
+    @Test
+    @DisplayName("Nhánh công pháp nhận được quest thứ mười một, và nhận đúng mã first_cultivation_manual")
+    void firstManualBranchOffersTheEleventhQuest() {
+        DialogueNode firstManual = node("first_manual");
+
+        assertThat(firstManual.textKey()).isEqualTo("dialogue.town_elder.first_manual");
+        assertThat(firstManual.options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:first_cultivation_manual", "about_town", "end");
+    }
+
+    /**
+     * Nhịp ĐÓNG của arc 1 — và là quest mà {@code report_to_outer_sect} (arc 2 nhịp MỞ) nay lấy làm
+     * tiên quyết, thay cho {@code awakening_trial} (V45 §7).
+     */
+    @Test
+    @DisplayName("Nhánh dẹp đám đoạt mạch nhận được quest thứ mười hai, và nhận đúng mã break_the_raider_band")
+    void raiderBandBranchOffersTheTwelfthQuest() {
+        DialogueNode raiderBand = node("raider_band");
+
+        assertThat(raiderBand.textKey()).isEqualTo("dialogue.town_elder.raider_band");
+        assertThat(raiderBand.options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:break_the_raider_band", "about_town", "end");
     }
 
     private DialogueNode node(String nodeId) {

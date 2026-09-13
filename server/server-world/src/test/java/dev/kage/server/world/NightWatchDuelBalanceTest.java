@@ -103,7 +103,9 @@ class NightWatchDuelBalanceTest {
         assertThat(34f - 21f).isGreaterThan(combinedReach);
         // Và quỷ đá cũng phải rời ra theo, nếu không lỗi chỉ dời sang cặp tán tu #2 + quỷ đá.
         // V40 dời nó 47 → 80 (ra SAU hang bỏ hoang) vì playtest đo được một mình nó lấy 31 máu mỗi
-        // lượt người chơi đi ngang, đủ để quest 8 thua chắc. Luật V29 vẫn phải đúng ở chỗ mới.
-        assertThat(80f - 34f).isGreaterThan(combinedReach);
+        // lượt người chơi đi ngang, đủ để quest 8 thua chắc. V45 dời nó LẦN NỮA, 80 → 106, vì cùng
+        // một lý do lặp lại ở quãng Lv10–18: nó nằm trên đường tới sào huyệt đoạt mạch @93. Luật
+        // V29 vẫn phải đúng ở mỗi chỗ mới — đó là điều ô này gác, không phải con số cụ thể.
+        assertThat(106f - 34f).isGreaterThan(combinedReach);
     }
 }

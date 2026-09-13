@@ -42,6 +42,13 @@
             { label_key: "dialogue.option.ask_night_watch", action: "night_watch" },
             { label_key: "dialogue.option.ask_old_archive", action: "old_archive" },
             { label_key: "dialogue.option.ask_awakening_trial", action: "awakening_trial" },
+            // Quãng Lv10-18 của arc 1 (V45) — BA nhánh, và chúng đứng TRƯỚC `outer_sect` vì arc 1
+            // phải đọc xong rồi mới tới nhịp bàn giao sang arc 2. Ba lựa chọn phía sau vì thế lùi
+            // ba chỗ; `option_index` là VỊ TRÍ (dialogue.proto) nên đây là thay đổi CÓ CHỦ ĐÍCH,
+            // ghim lại bằng TownElderDialogueTreeTest — cùng luật V39/V40 đã áp khi chèn nhánh mới.
+            { label_key: "dialogue.option.ask_spirit_vein", action: "spirit_vein" },
+            { label_key: "dialogue.option.ask_first_manual", action: "first_manual" },
+            { label_key: "dialogue.option.ask_raider_band", action: "raider_band" },
             { label_key: "dialogue.option.ask_outer_sect", action: "outer_sect" },
             { label_key: "dialogue.option.ask_missing_disciple", action: "missing_disciple" },
             { label_key: "dialogue.option.ask_confront_steward", action: "confront_steward" },
@@ -98,6 +105,48 @@
         text_key: "dialogue.town_elder.awakening_trial",
         options: [
             { label_key: "dialogue.option.accept_quest_awakening_trial", action: "accept_quest:awakening_trial" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    // QUÃNG Lv10-18 CỦA ARC 1 (STORY.md §6) — ba nhánh, thêm 2026-09-13 cùng V45. Trước chúng, cả
+    // nửa sau của dải Lv1-18 mà §6 khai cho arc 1 chưa từng tồn tại: bốn quest cũ đưa người chơi
+    // tới ĐÚNG Cấp 10 rồi dừng. Ba nhánh này khép nó ở Cấp 18.
+    //
+    // Nhịp hé lộ (§8 quy tắc 2): vẫn arc 1, nên đám đoạt mạch là cướp THƯỜNG. Chu Hoành KHÔNG được
+    // nhắc Huyết Sa (arc 2 mới lộ, quest 8), càng không nhắc Thiên Môn hay mảnh ngọc cổ. Ông nói
+    // đúng thứ một ông già coi việc ngoại môn biết: có người chiếm mạch, đệ tử phải đi vòng.
+    spirit_vein: {
+        text_key: "dialogue.town_elder.spirit_vein",
+        options: [
+            { label_key: "dialogue.option.accept_quest_spirit_vein", action: "accept_quest:spirit_vein_raiders" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    // "Công pháp đầu tiên (Lv15)" của §6 — mốc DUY NHẤT của arc 1 chưa từng được làm. Nó là một BỘ
+    // TRANG BỊ `required_level 15` (V45), không phải cơ chế học chiêu mới: trong code không có cơ
+    // chế mở khoá chiêu theo cấp nào, và dựng một cái là việc cần ADR riêng (CLAUDE.md §4).
+    //
+    // ⚠️ Lời thoại NÓI THẲNG rằng bộ pháp y là thứ cần cho việc TIẾP THEO, không phải thưởng cho
+    // việc đi đòi sách. Đó không phải câu văn cho đẹp: `RaiderBandBalanceTest` đo được mặc bộ Tạp
+    // Dịch đi đánh đầu lĩnh là THUA kể cả trên máu đầy. Bản đồ, lời thoại và phép tính nói cùng một
+    // câu — đúng bài học V33 đã trả giá khi V30 để người chơi tự phát hiện giữa đường.
+    first_manual: {
+        text_key: "dialogue.town_elder.first_manual",
+        options: [
+            { label_key: "dialogue.option.accept_quest_first_manual", action: "accept_quest:first_cultivation_manual" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    // NHỊP ĐÓNG của arc 1. Hạ đầu lĩnh xong là Cấp 18, và câu cuối của ông lão ("ta có chuyện khác
+    // muốn bàn") chính là chỗ nối sang nhánh `outer_sect` ngay dưới — arc 2 chỉ mở sau nhánh này,
+    // và V45 thi hành điều đó bằng `prerequisite_quest_id` chứ không bằng lời hứa.
+    raider_band: {
+        text_key: "dialogue.town_elder.raider_band",
+        options: [
+            { label_key: "dialogue.option.accept_quest_raider_band", action: "accept_quest:break_the_raider_band" },
             { label_key: "dialogue.option.back", action: "about_town" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]
