@@ -18,12 +18,10 @@ import dev.kage.protocol.ExitDungeonOutcome;
  * 1500-1503 chỉ có đúng 2 cặp Command/Response, không có một {@code *Event} nào):
  *
  * <ul>
- *   <li><b>Bị kéo vào theo nhóm thì không hay biết gì.</b> {@code DungeonInstanceRegistry
- *       .enterDungeon} kéo MỌI thành viên đang online vào chung một instance, nhưng chỉ người GỬI
- *       lệnh nhận được {@code EnterDungeonResponse}. Máy của những người còn lại bị đổi World mà
- *       không nhận một gói tin nào nói ra chuyện đó — họ sẽ không thấy dải chữ trên HUD, và không
- *       có nút Rời hầm ngục nào bày ra cho họ. Đó là lý do lớp này KHÔNG được coi
- *       {@link #inDungeon()} là sự thật tuyệt đối: nó chỉ đúng cho người vừa tự bấm nút.
+ *   <li>✅ <b>ĐÃ ĐÓNG 2026-09-13 (ADR-047, phương án B).</b> ~~Bị kéo vào theo nhóm thì không hay
+ *       biết gì.~~ Người bị kéo nay nhận {@code DungeonEnteredEvent} (opcode 1504) — event ĐẦU TIÊN
+ *       của dải Dungeon — và đi đúng đường {@code settleEnter} như người tự bấm nút. Vì vậy
+ *       {@link #inDungeon()} nay đúng cho CẢ HAI, không còn chỉ đúng cho người vừa tự bấm.
  *   <li><b>Không có gói "đổi World" nào.</b> Khi nhân vật rời world chính,
  *       {@code AreaOfInterestTracker.onDetach} chỉ báo despawn cho NHỮNG NGƯỜI KHÁC — bản thân
  *       người đi không nhận được despawn của bất cứ thứ gì họ đang thấy. World mới thì có phát
@@ -35,9 +33,9 @@ import dev.kage.protocol.ExitDungeonOutcome;
  *       gửi lúc attach.
  * </ul>
  *
- * <p>Đóng ba lỗ trên thật sự cần event đẩy phía server, tức cần sửa {@code .proto} — nằm ngoài
- * quyền của client (/CLAUDE.md §4). Lỗ thứ nhất đã tái hiện qua socket thật và có đề xuất ở
- * ADR-047 (Proposed, 2026-09-11).
+ * <p>Đóng các lỗ trên thật sự cần event đẩy phía server, tức cần sửa {@code .proto} — nằm ngoài
+ * quyền của client (/CLAUDE.md §4). Lỗ thứ nhất đã đóng (ADR-047 Accepted 2026-09-13); HAI lỗ còn
+ * lại vẫn nguyên, và cả hai vẫn được bù bằng cú dọn {@code onWorldChanged} phía client.
  */
 final class DungeonController {
 
@@ -64,8 +62,9 @@ final class DungeonController {
      * Kết quả một lệnh vào hầm ngục.
      *
      * <p>{@code ALREADY_IN_DUNGEON} cũng ghi {@link #inDungeon} thành {@code true}: đó là server nói
-     * thẳng ra "nhân vật này đang ở trong một instance", và nó là đường DUY NHẤT một máy bị kéo vào
-     * theo nhóm có thể biết sự thật — bấm Vào hầm ngục lần nữa rồi đọc câu từ chối.
+     * thẳng ra "nhân vật này đang ở trong một instance". Trước ADR-047 nó là đường DUY NHẤT một máy
+     * bị kéo vào theo nhóm có thể biết sự thật (bấm Vào hầm ngục lần nữa rồi đọc câu từ chối); nay
+     * chỉ còn là lưới đỡ, vì opcode 1504 báo thẳng.
      */
     void onEnterOutcome(EnterDungeonOutcome outcome) {
         if (outcome == EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK

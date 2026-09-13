@@ -12,6 +12,8 @@ import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.party.api.PartyFacade;
+import dev.kage.protocol.DungeonEnteredEvent;
+import dev.kage.protocol.Opcode;
 import dev.kage.server.world.CharacterBaseStats;
 import dev.kage.server.world.Element;
 import dev.kage.server.world.TickMetricsPort;
@@ -97,6 +99,22 @@ final class DungeonInstanceRegistry {
         return instance == null ? Optional.empty() : Optional.of(instance.facade());
     }
 
+    /**
+     * Vào hầm ngục — kéo THEO CẢ nhóm đang online vào chung một instance.
+     *
+     * <p><b>ADR-047 D3 — báo TRƯỚC, attach SAU.</b> Người bị KÉO theo nhận
+     * {@code DungeonEnteredEvent} ghi thẳng vào kênh của họ NGAY TRƯỚC {@code attachCharacter} của
+     * chính họ. Đảo thứ tự này là làm hỏng cả tính năng chứ không phải một tối ưu nhỏ: client dọn
+     * sạch thực thể khi nhận lời báo, nên lời báo tới SAU spawn sẽ xoá mất boss và đồng đội vừa
+     * nhận đúng, và server KHÔNG phát lại (tập "đang thấy" phía server đã có họ).
+     *
+     * <p>Người GỬI không nhận event — họ đã có {@code EnterDungeonResponse} (D1).
+     *
+     * <p>⚠️ <b>Toàn bộ việc dời người phải xong TRƯỚC khi gateway trả response</b>, xem
+     * {@code GatewayChannelHandler.handleEnterDungeonBlocking}. Mục "Phát hiện phụ" của ADR-047 đề
+     * xuất ngược lại (trả lời trước, dời người sau) và <b>đã bị chính test bác</b> — giữ nguyên thứ
+     * tự này.
+     */
     EnterOutcome enterDungeon(long requestingCharacterId, String dungeonCode) {
         if (!DUNGEON_CODE.equals(dungeonCode)) {
             return EnterOutcome.UNKNOWN_DUNGEON;
@@ -119,10 +137,23 @@ final class DungeonInstanceRegistry {
         DungeonInstance instance = instancesByPartyId.computeIfAbsent(partyId, id -> createInstance(id));
         for (PartyFacade.MemberView member : members) {
             if (!instanceByCharacterId.containsKey(member.characterId())) {
+                if (member.characterId() != requestingCharacterId) {
+                    notifyPulledIn(member.characterId(), dungeonCode, requestingCharacterId);
+                }
                 moveCharacterIntoDungeon(member.characterId(), instance);
             }
         }
         return EnterOutcome.OK;
+    }
+
+    /** ADR-047 phương án B — xem {@link #commitEnter} về vì sao lời báo phải đi TRƯỚC attach. */
+    private void notifyPulledIn(long characterId, String dungeonCode, long initiatorCharacterId) {
+        DungeonEnteredEvent event = DungeonEnteredEvent.newBuilder()
+                .setDungeonCode(dungeonCode)
+                .setInitiatorCharacterId(initiatorCharacterId)
+                .build();
+        registry.sendToCharacterIfOnline(
+                characterId, Opcode.OPCODE_DUNGEON_ENTERED_EVENT_VALUE, 0, event.toByteArray());
     }
 
     ExitOutcome exitDungeon(long characterId) {

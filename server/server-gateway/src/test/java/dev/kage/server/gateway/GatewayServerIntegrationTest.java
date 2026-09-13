@@ -24,7 +24,6 @@ import io.opentelemetry.sdk.trace.data.SpanData;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -1383,15 +1382,12 @@ class GatewayServerIntegrationTest {
      * mà B không nhận một gói nào thuộc dải Dungeon (1500-1599) — nên client của B không biết mình
      * đang ở đâu (không dải chữ HUD, không dọn thực thể của làng, vị trí sai tới lần đi đầu tiên).
      *
-     * <p>Chạy thật 2026-09-11 khi chưa gắn {@code @Disabled}: ĐỎ đúng như dự đoán. Sửa bắt buộc đổi
-     * protocol (thêm event, hoặc đổi ngữ nghĩa {@code EnterDungeonResponse} thành gói đẩy) ⇒ chờ
-     * ADR-047. Điều kiện "dải 1500-1599" đúng cho cả phương án A (đẩy lại response với
-     * {@code sequenceId = 0}) lẫn B (event mới trong dải Dungeon) của ADR đó; chọn phương án khác
-     * thì sửa điều kiện ở đây, còn chọn "mỗi người tự vào" thì thay hẳn test này.
+     * <p>Chạy thật 2026-09-11 khi chưa gắn {@code @Disabled}: ĐỎ đúng như dự đoán. Chủ dự án chọn
+     * <b>phương án B</b> và ADR-047 được Accept 2026-09-13 ⇒ {@code @Disabled} đã gỡ, và test có
+     * thêm khẳng định THỨ TỰ (D3) — thứ mà bản cũ cố ý KHÔNG hỏi tới.
      */
     @Test
     @Timeout(20)
-    @Disabled("Chờ ADR-047 (Proposed) — sửa bắt buộc đổi protocol; bỏ @Disabled khi thi hành phương án được chọn")
     void pulledPartyMemberShouldBeToldTheyEnteredDungeon_overRealSockets() throws Exception {
         try (Socket socketA = new Socket("127.0.0.1", server.port());
                 Socket socketB = new Socket("127.0.0.1", server.port())) {
@@ -1431,6 +1427,11 @@ class GatewayServerIntegrationTest {
                                 .equals(MonsterSpawnedEvent.parseFrom(frame.payload())
                                         .getMonsterCode());
             }
+            // Chốt lại những gì B nhận TRƯỚC (và tính cả) spawn của boss — đây là thứ khẳng định
+            // thứ tự ở cuối hỏi tới. Bản trước ADR-047 cố ý không hỏi, vì lúc đó chưa biết phương án
+            // nào được chọn.
+            List<Integer> beforeBoss = List.copyOf(opcodesSeenByB);
+
             // Luồng auth (gửi báo) và luồng tick hầm ngục (gửi spawn) không hứa thứ tự với nhau —
             // đọc thêm một quãng để lời báo tới SAU boss cũng được tính. Hết quãng, hoặc im lặng
             // trọn quãng (socket timeout), đều là điều kiện dừng bình thường.
@@ -1452,6 +1453,13 @@ class GatewayServerIntegrationTest {
             assertThat(opcodesSeenByB)
                     .as("B bị kéo vào hầm ngục phải nhận ít nhất một gói dải Dungeon, đã nhận: %s", opcodesSeenByB)
                     .anyMatch(opcode -> opcode / opcodeRangeWidth == dungeonRange);
+            // ADR-047 D3 — THỨ TỰ là một phần của quyết định, không phải chi tiết thi hành: client
+            // dọn sạch thực thể khi nhận lời báo, nên lời báo tới SAU spawn của boss sẽ xoá mất
+            // chính con boss đó, và server KHÔNG phát lại (tập "đang thấy" phía server đã có nó).
+            // Khẳng định này mới là thứ gác điều đó — cái ở trên chỉ hỏi "có tới không".
+            assertThat(beforeBoss)
+                    .as("DungeonEnteredEvent (1504) phải tới TRƯỚC spawn của boss; B đã nhận: %s", beforeBoss)
+                    .contains(Opcode.OPCODE_DUNGEON_ENTERED_EVENT_VALUE);
         }
     }
 

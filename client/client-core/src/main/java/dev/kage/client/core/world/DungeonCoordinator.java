@@ -8,6 +8,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import dev.kage.client.core.ui.hud.CombatHud;
 import dev.kage.client.core.ui.hud.PartyPanel;
 import dev.kage.client.core.ui.theme.KageI18n;
+import dev.kage.protocol.DungeonEnteredEvent;
 import dev.kage.protocol.EnterDungeonOutcome;
 import dev.kage.protocol.EnterDungeonResponse;
 import dev.kage.protocol.ExitDungeonOutcome;
@@ -95,6 +96,13 @@ final class DungeonCoordinator implements WindowFlow {
             settleExit(ExitDungeonResponse.parseFrom(payload).getOutcome());
             return true;
         }
+        if (opcode == Opcode.OPCODE_DUNGEON_ENTERED_EVENT_VALUE) {
+            // Không field nào cần đọc ở lát cắt này — parse để chắc payload hợp lệ, cùng cách
+            // GatewayChannelHandler làm với ExitDungeonCommand.
+            DungeonEnteredEvent.parseFrom(payload);
+            settlePulledIn();
+            return true;
+        }
         return false;
     }
 
@@ -116,6 +124,24 @@ final class DungeonCoordinator implements WindowFlow {
         if (DungeonController.changesWorld(outcome)) {
             onWorldChanged.run();
         }
+        refreshBanner();
+    }
+
+    /**
+     * ADR-047 — chính người chơi này vừa bị bạn cùng nhóm KÉO vào hầm ngục. Không có lệnh nào của
+     * họ đang treo, nên đây là gói ĐẨY chứ không phải response.
+     *
+     * <p>Đi ĐÚNG con đường {@link #settleEnter} đã đi, chỉ khác dòng chữ: ghi trạng thái, dọn sạch
+     * thực thể của world cũ, rồi để {@code onWorldChanged} xin lại vị trí. Server ghi gói này vào
+     * kênh TRƯỚC khi attach (ADR-047 D3), nên cú dọn ở đây không thể xoá mất boss hay đồng đội.
+     *
+     * <p>{@code initiator_character_id} chưa được hiện ra chữ — client chưa có đường tra tên từ id
+     * cho người không nằm trong tầm nhìn. Xem javadoc message trong {@code dungeon.proto}.
+     */
+    private void settlePulledIn() {
+        controller.onEnterOutcome(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
+        announce(Optional.of("dungeon.notice.pulled_in"));
+        onWorldChanged.run();
         refreshBanner();
     }
 

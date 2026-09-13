@@ -42,3 +42,24 @@ enum ExitDungeonOutcome {
 message ExitDungeonResponse {
   ExitDungeonOutcome outcome = 1;
 }
+
+// -----------------------------------------------------------------------------------------------
+// ADR-047 (Accepted 2026-09-13) — phương án B. Event ĐẦU TIÊN của dải Dungeon; trước nó dải này chỉ
+// có hai cặp Command/Response, nên người bị KÉO vào hầm ngục theo nhóm không nhận một gói nào nói
+// ra chuyện đó (đã tái hiện qua socket thật). CHỈ THÊM ⇒ `protocolVersion` KHÔNG tăng (NETWORK.md
+// §6), cùng khuôn `DuelStartedEvent` của Arena — nơi đã gặp đúng bài toán "người kia không gửi lệnh
+// gì mà vẫn phải được báo".
+//
+// ⚠️ Người GỬI `EnterDungeonCommand` KHÔNG nhận event này: họ đã có `EnterDungeonResponse` (D1).
+// Hai đường quyền lực cho cùng một sự kiện là thứ ADR-045 đã cố ý tránh.
+//
+// ⚠️ THỨ TỰ là một phần của quyết định (D3): server ghi gói này vào kênh của người bị kéo TRƯỚC khi
+// `attachCharacter` của họ được xếp vào hộp thư World hầm ngục. Client dọn sạch thực thể khi nhận
+// gói này, nên nếu nó tới SAU spawn thì cú dọn xoá mất boss và đồng đội — và server KHÔNG phát lại.
+// -----------------------------------------------------------------------------------------------
+message DungeonEnteredEvent {
+  string dungeon_code = 1;
+  // Ai bấm. Client hiện CHƯA hiện tên ra chữ (chưa có đường tra tên từ id cho người ngoài tầm
+  // nhìn); field nằm sẵn ở đây để lúc có đường đó thì không phải đổi protocol lần nữa.
+  int64 initiator_character_id = 2;
+}

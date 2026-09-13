@@ -2347,6 +2347,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 };
         EnterDungeonResponse response =
                 EnterDungeonResponse.newBuilder().setOutcome(protoOutcome).build();
+        // ⚠️ Response đi SAU khi mọi người đã được dời — và đó là BẮT BUỘC, không phải quán tính.
+        // Mục "Phát hiện phụ" của ADR-047 đề xuất đảo lại (trả lời trước, dời sau) để đóng khe
+        // response-vs-spawn của chính người gửi. Đã dựng thử 2026-09-13 và HAI test có sẵn bác ngay:
+        //   · partyShouldEnterAndExitDungeonAsSeparateWorld — lệnh vào THỨ HAI (của B, người vừa bị
+        //     kéo) nhận OK thay vì ALREADY_IN_DUNGEON;
+        //   · memberShouldStillExitDungeon_afterLeavingPartyInside — lệnh RA ngay sau đó nhận
+        //     NOT_IN_DUNGEON thay vì OK.
+        // Lý do chung: Response còn là MỐC happens-before cho lệnh TIẾP THEO của client. Trả lời
+        // trước khi trạng thái kịp đổi thì lệnh kế tiếp đọc phải trạng thái cũ. Khe của người gửi
+        // vẫn còn (nợ cũ, không chặn gì); đóng nó cần một cách khác — xem ADR-047.
         send(ctx, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 

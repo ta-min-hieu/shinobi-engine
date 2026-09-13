@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | 🟡 **Proposed** (2026-09-11) — chờ chủ dự án chọn phương án. AI **không** tự Accept, **chưa** thi hành phần protocol. |
+| Status | ✅ **Accepted** (2026-09-13) — chủ dự án chọn **phương án B**, thi hành ngay cùng ngày: opcode **1504** `DungeonEnteredEvent`, `protocolVersion` KHÔNG tăng. `@Disabled` đã gỡ và test có thêm khẳng định THỨ TỰ (D3). ⚠️ Mục **"Phát hiện phụ"** (khe thứ tự của người GỬI) đã dựng thử và **BỊ TEST BÁC** — xem cuối mục đó. |
 | Date | 2026-09-11 |
 | Deciders | Chủ dự án quyết; AI soạn |
 | Related | [ADR-026](ADR-026-Dungeon-Instance-Model.md) (instance hầm ngục = World riêng cùng process) · [ADR-045](ADR-045-Appearance-Changed-Event.md) (cùng họ: server đúng, client không được báo ⇒ thêm một event đẩy) · [ADR-042](ADR-042-Outbound-Packet-Batching.md) (đang muốn GIẢM số gói) · [NETWORK.md §3, §5](../../05-server/NETWORK.md) (Command/Response/Event, khớp `sequenceId`) · [GAMEPLAY.md §6](../../05-server/GAMEPLAY.md) ("mỗi party 1 instance riêng") |
@@ -91,9 +91,10 @@ client thật, chỉ bằng đường dây:
 
 ## Decision
 
-*(Đề xuất — chờ chủ dự án chọn. Mọi thứ dưới đây là khuyến nghị của AI, chưa phải quyết định.)*
+✅ **Chủ dự án chọn phương án B (2026-09-13).** Mọi mục D1–D4 dưới đây là quyết định đã chốt và
+đã thi hành.
 
-**Khuyến nghị: phương án B** — thêm **một** event đẩy trong dải Dungeon, cùng khuôn `DuelStartedEvent`:
+**Phương án B** — thêm **một** event đẩy trong dải Dungeon, cùng khuôn `DuelStartedEvent`:
 
 ```protobuf
 // opcode_registry.proto
@@ -164,8 +165,29 @@ và **sau khi đã attach người gửi** vẫn còn đọc DB (`loadStats`, `f
 những thành viên còn lại, rồi mới trả response. Nếu vòng `sync` 20Hz của World hầm ngục chạy lọt vào
 khoảng đó, boss/đồng đội tới trước response ⇒ cú dọn của client xoá họ ⇒ người gửi không thấy boss.
 Test socket không bắt được vì fake DB trả ngay lập tức; với Postgres thật, cửa sổ là vài ms mỗi thành
-viên so với chu kỳ 50ms của `sync`. Sửa được **không đổi protocol** (xác định outcome xong thì gửi
-response, rồi mới dời người) — nên gộp vào lượt thi hành ADR này vì đó cũng chính là ràng buộc D3.
+viên so với chu kỳ 50ms của `sync`.
+
+> ⛔ **BẢN SỬA ĐỀ XUẤT Ở TRÊN LÀ SAI — đã dựng thử 2026-09-13 và bị chính test bác.**
+>
+> Câu *"xác định outcome xong thì gửi response, rồi mới dời người"* nghe hợp lý nhưng hỏng: tách
+> `enterDungeon` thành `decideEnter` + `commitEnter` rồi gửi response ở giữa làm **HAI test có sẵn đỏ
+> ngay**:
+>
+> | Test | Mong đợi | Nhận được |
+> |---|---|---|
+> | `partyShouldEnterAndExitDungeonAsSeparateWorld_overRealSockets` | lệnh vào THỨ HAI (của B, người vừa bị kéo) trả `ALREADY_IN_DUNGEON` | `OK` |
+> | `memberShouldStillExitDungeon_afterLeavingPartyInside_overRealSockets` | lệnh RA ngay sau đó trả `OK` | `NOT_IN_DUNGEON` |
+>
+> **Nguyên nhân chung, và nó là một luật chứ không phải một lỗi vặt:** `Response` không chỉ là lời
+> đáp cho lệnh vừa rồi, nó còn là **mốc happens-before cho lệnh TIẾP THEO của client**. Client đọc
+> response xong là gửi lệnh kế tiếp ngay; lệnh đó chạy trên `authExecutor` và có thể vượt lên trước
+> phần `commit` còn đang chạy, nên nó đọc phải trạng thái CŨ. Trả lời sớm = nói dối về một trạng thái
+> chưa tồn tại.
+>
+> ⇒ **Giữ nguyên thứ tự "dời người xong mới trả lời".** Khe response-vs-spawn của người GỬI vẫn còn
+> (nợ cũ, chưa chặn gì, chưa ai thấy nó xảy ra thật). Đóng nó phải bằng cách KHÁC — ví dụ để client
+> tự xin lại trạng thái sau khi đổi World thay vì dọn mù, hoặc lối vào chung của phương án C. Cần
+> một lượt thiết kế riêng, không phải một cú đảo hai dòng.
 
 ---
 
@@ -196,9 +218,12 @@ Không (phương án C, nếu có ngày chọn, sẽ cần ADR riêng).
 
 ## Việc cần làm tiếp theo
 
-1. **Chủ dự án**: chọn phương án (khuyến nghị **B**; **E** nếu muốn tránh đổi protocol bằng cách đổi luật
-   chơi) rồi Accept/từ chối.
-2. Khi đã chọn: bỏ `@Disabled` ở `pulledPartyMemberShouldBeToldTheyEnteredDungeon_overRealSockets`, thêm
-   khẳng định thứ tự (D3), thi hành, sửa luôn khe thứ tự của người gửi (mục "Phát hiện phụ").
-3. Kiểm chứng sống bằng **hai client thật** (công thức ở bàn giao 2026-08-29): A bấm vào, màn hình B
-   phải đổi sang hầm ngục + hiện dải chữ.
+1. ✅ **XONG** — chủ dự án chọn **B** (2026-09-13).
+2. ✅ **XONG cùng ngày** — `@Disabled` đã gỡ; test có thêm khẳng định thứ tự (D3, `beforeBoss`);
+   `notifyPulledIn` chạy NGAY TRƯỚC `attachCharacter` của chính người bị kéo.
+   ⛔ Mục **"Phát hiện phụ"** thì KHÔNG xong: bản sửa đề xuất đã dựng thử và bị hai test bác (xem
+   khung cảnh báo ở cuối mục đó). Khe của người gửi vẫn mở, và nay đã biết vì sao cách đó không đi
+   được.
+3. ⏳ **CÒN LẠI**: kiểm chứng sống bằng **hai client thật** (công thức ở bàn giao 2026-08-29): A bấm
+   vào, màn hình B phải đổi sang hầm ngục + hiện dải chữ "Người trong nhóm vừa đưa cả nhóm vào bí
+   cảnh". Test socket đã gác đường dây; cái còn thiếu là con mắt người.
