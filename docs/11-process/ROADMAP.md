@@ -3067,4 +3067,20 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
     - ⚠️ **Hạn chế đã biết, ghi thẳng vào javadoc**: lô có NHIỀU món CÙNG loại xếp chồng được đếm hơi
       thận trọng (mỗi lần gộp làm đổi chỗ trống còn lại). Thận trọng là phía an toàn — từ chối oan thì
       dọn túi rồi lĩnh lại được, còn nói nhầm "đủ chỗ" thì mất món vĩnh viễn.
+    - 🏁 **ARC 1 KHÉP TRỌN BẰNG PLAYTEST — 12/12 quest CLAIMED** (Kagemaru Cấp 22). Chuỗi cuối chạy
+      thật bằng `gameProbe`: nhận quest 12 qua cây thoại (`about_town` → `raider_band` → accept), hạ
+      `raider_chieftain` @93, về báo Chu Hoành ở phiên TÁCH BIỆT (script tự cảnh báo *"npc_talked bắn
+      ra TRƯỚC khi quest tồn tại — bài học của quest 7"*), rồi lĩnh 3700 EXP.
+    - ✅ **Kiểm chứng SỐNG chiều ngược của bản vá**: lần claim này chạy với túi **20/20** mà vẫn trả
+      `OK` (`items=0`) — tức nhánh `itemGrants.isEmpty()` của guard mới KHÔNG từ chối oan quest không
+      trao vật phẩm. (⚠️ Chiều XUÔI — túi đầy + CÓ trao đồ — thì quest 12 không kiểm được vì nó chỉ
+      `give_exp`; bằng chứng cho chiều đó vẫn là 3 ô test, một ô chạy adapter thật + SQL thật.)
+    - ⚠️ **NỢ "biên 1 nhát" MỞ RỘNG sang cả `raider_chieftain` — tức cả NHỊP ĐÓNG arc 1.** Đo 3 lượt:
+      **2 thắng / 1 thua**. Lượt thua người chơi CHẾT trong khi đầu lĩnh còn 38/200. Ba số hạng ăn
+      sạch "biên 2 nhát" mà `RaiderBandBalanceTest` khai: (1) vẫn **1 nhát phủ đầu** dù V46 đã hạ
+      aggro xuống 3; (2) **~1,2 giây trễ trước nhát ĐẦU TIÊN** của người chơi — đủ cho đầu lĩnh thêm
+      2 nhát = 40 máu (lượt thắng chỉ trễ 0,9 giây); (3) **~9% trượt**, và lượt thua trượt đúng nhát
+      mở màn. ⇒ Cùng bản chất nợ đã ghi cho `vein_raider`, nhưng đắt hơn nhiều vì đây là trận ĐÓNG
+      ARC: thua là mất cả quãng đường 93m. Chủ dự án đã chốt hướng "ghi nhận, chưa sửa" cho họ lỗi
+      này; ghi lại đây để khi xem lại có đủ số.
 
