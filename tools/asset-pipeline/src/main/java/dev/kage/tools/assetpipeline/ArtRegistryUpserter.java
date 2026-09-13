@@ -132,6 +132,14 @@ final class ArtRegistryUpserter {
      *     {@code assets/exported/models/} (cha của 3 thư mục tier)
      * @param renderRoot thư mục master render, chỉ dùng để KIỂM TRA bằng chứng nghiệm thu có thật
      *     hay không — đường dẫn ghi vào DB luôn là hằng số tương đối {@link #RENDER_OUT_ROOT}
+     *
+     * <p><b>Một asset hỏng không chặn cả lô</b> (phát hiện thật 2026-09-13, chủ dự án chốt): bản cũ
+     * fail-fast ngay asset đầu tiên, mà {@code char_hoa-b1} đứng ĐẦU bảng chữ cái và có sidecar trỏ ra
+     * ngoài {@code assets/raw/} ⇒ **25 model hợp lệ còn lại không bao giờ được upsert**, đo được 23/26
+     * model mồ côi trên máy dev. Nay mỗi model hỏng chỉ tự nó bị bỏ qua (có in lý do), các model khác vẫn
+     * vào sổ, và lỗi được gộp ném ở CUỐI — vẫn fail build theo §8.5, vẫn giữ nguyên văn thông báo gốc
+     * (ô test {@code shouldFailBuildWithClearMessage_whenModelHasNoSidecar} đòi đúng chuỗi đó).
+     * {@link SQLException} thì VẪN thoát ngay: lỗi hạ tầng khác lỗi dữ liệu của một asset.
      */
     static void upsertModels(List<ScannedModel> models, Path modelsRoot, Path renderRoot, ArtRegistryConfig config) {
         if (models.isEmpty()) {
@@ -143,16 +151,30 @@ final class ArtRegistryUpserter {
                     .computeIfAbsent(model.assetKey(), key -> new ArrayList<>())
                     .add(model);
         }
+        List<String> failures = new ArrayList<>();
+        int upserted = 0;
         try (Connection connection = DriverManager.getConnection(config.jdbcUrl(), config.user(), config.password())) {
             for (List<ScannedModel> tiers : tiersByAssetKey.values()) {
-                upsertOneModel(connection, tiers, modelsRoot, renderRoot);
+                String assetKey = tiers.getFirst().assetKey();
+                try {
+                    upsertOneModel(connection, tiers, modelsRoot, renderRoot);
+                    upserted++;
+                } catch (AssetPipelineException e) {
+                    // MỘT asset hỏng KHÔNG được chặn những asset còn lại — xem javadoc method.
+                    System.out.println("[asset-pipeline] BỎ QUA model '" + assetKey + "': " + e.getMessage());
+                    failures.add(e.getMessage());
+                }
             }
         } catch (SQLException e) {
             throw new AssetPipelineException("Lỗi upsert art_asset nhánh 3D"
                     + " (đã chạy V20__extend_art_asset_for_3d.sql chưa?): " + e.getMessage());
         }
-        System.out.println("[asset-pipeline] upsert art_asset nhánh 3D: " + tiersByAssetKey.size() + " dòng model ("
-                + models.size() + " file .glb)");
+        System.out.println("[asset-pipeline] upsert art_asset nhánh 3D: " + upserted + " dòng model (" + models.size()
+                + " file .glb, " + failures.size() + " bỏ qua)");
+        if (!failures.isEmpty()) {
+            throw new AssetPipelineException("Không upsert được " + failures.size() + "/" + tiersByAssetKey.size()
+                    + " model (các model còn lại ĐÃ vào art_asset): " + String.join(" | ", failures));
+        }
     }
 
     // assetKey suy từ chính tiers thay vì nhận thêm 1 tham số: mọi phần tử trong danh sách này đã

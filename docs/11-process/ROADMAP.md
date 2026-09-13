@@ -3008,3 +3008,28 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
     - 📌 **Chưa đo được**: trận đầu lĩnh vẫn là giấy — nó chỉ đúng khi mặc bộ "Ngoại Môn", mà
       `gameProbe` có `useItemCode` nhưng KHÔNG có đường mặc trang bị.
 
+78. **SỔ SÁCH ART: 6 icon vào `art_asset`, và MỘT sidecar hỏng đang chặn 25 model (2026-09-13)**:
+    - 🎨 **Nhánh 2D xong**: chạy `tools:asset-pipeline` upsert đủ 6 icon bộ "Ngoại Môn"
+      (`EXPORTED`/`atlas_name=main`/`master_px=128`) và đóng gói lại atlas cả 3 tier (med phình thêm
+      `main4.png`). Hai loài của V45 (`mob_vein-raider`, `mob_raider-chieftain`) cũng vào sổ cùng lượt.
+    - ⚠️ **Phải truyền `--render-root`/`--exported-root` TUYỆT ĐỐI**: task `run` của application plugin
+      lấy cwd = thư mục subproject (bẫy cũ của `tools:asset-pipeline`), và `argOrDefault` nhận
+      **`--flag value` hai token**, không phải `--flag=value` — gõ sai thì tool im lặng dùng mặc định sai.
+    - 🐛 **MỘT asset hỏng chặn cả lô — đã sửa (chủ dự án chốt).** `art_asset` chỉ có **3** hàng MODEL
+      trong khi đĩa có **26** `.glb`/tier ⇒ **23 mồ côi**. Nguyên nhân: duy nhất
+      `char_hoa-b1.model-meta.json` khai `blend_file` trỏ vào **scratchpad của một phiên Claude cũ**
+      (ngoài `assets/raw/`) nên `ModelSidecar.toRepoRelative` ném — mà `char_hoa-b1` đứng **ĐẦU bảng
+      chữ cái** và `upsertModels` fail-fast, nên **25 model hợp lệ phía sau không bao giờ được ghi**.
+      Nay lỗi được gom theo TỪNG model: model hỏng tự nó bị bỏ qua (in lý do), phần còn lại vẫn vào
+      sổ, lỗi gộp ném ở CUỐI nên vẫn fail build §8.5 và vẫn giữ nguyên văn thông báo gốc. **Đo lại:
+      MODEL 3 → 25, mồ côi còn ĐÚNG 1.** `SQLException` vẫn thoát ngay — lỗi hạ tầng khác lỗi dữ liệu.
+    - 🧪 Ô test gác hành vi: `shouldStillUpsertHealthyModels_whenAnEarlierModelHasBrokenSidecar`
+      (đặt tên `aaa`/`zzz` để model hỏng bị duyệt TRƯỚC — nếu không, ô test xanh giả ngay cả với bản
+      fail-fast cũ). Ô cũ `shouldFailBuildWithClearMessage_whenModelHasNoSidecar` vẫn xanh.
+    - 🔎 **HỆ QUẢ MỚI LỘ RA — mô tả, KHÔNG tự sửa (§4).** Nhánh MODEL chạy được làm 15 asset đổi
+      `asset_kind` SPRITE → MODEL (SPRITE 63 → 48). Điều này **đúng thiết kế** (comment
+      `UPSERT_MODEL_SQL` đã ghi sẵn, và cả 15 đều là nhân vật/quái/NPC — vốn phải là MODEL theo
+      ADR-031), nhưng `OrphanAssetChecker` lại coi MỌI thư mục `render-out` là sprite ⇒ **khi #20 được
+      gỡ và `upsertModels` hết ném, checker sẽ fail build vì 15 "sprite mồ côi"**. Gốc rễ: contact
+      sheet nghiệm thu của model vẫn bị `packTier` nhét vào atlas 2D. Cần chủ dự án quyết hướng.
+

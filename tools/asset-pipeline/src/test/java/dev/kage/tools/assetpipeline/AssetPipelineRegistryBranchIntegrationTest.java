@@ -143,6 +143,32 @@ class AssetPipelineRegistryBranchIntegrationTest {
                 .hasMessageContaining("thiếu sidecar");
     }
 
+    /**
+     * MỘT model hỏng không được chặn những model còn lại — phát hiện thật 2026-09-13: trên máy dev,
+     * {@code char_hoa-b1} có sidecar trỏ ra ngoài {@code assets/raw/} VÀ đứng ĐẦU bảng chữ cái, nên bản
+     * fail-fast cũ bỏ luôn 25 model hợp lệ phía sau — đo được **23/26 model mồ côi** trong {@code art_asset}.
+     *
+     * <p>Ô này gác CẢ HAI nửa, vì chỉ một nửa thì vẫn hỏng theo hướng ngược lại: model lành VẪN vào
+     * {@code art_asset}, VÀ pipeline VẪN fail build (§8.5) với thông báo nêu đích danh model hỏng. Tên
+     * {@code aaa}/{@code zzz} là có chủ đích: model hỏng phải được duyệt TRƯỚC model lành, nếu không ô test
+     * sẽ xanh giả ngay cả với bản fail-fast cũ.
+     */
+    @Test
+    void shouldStillUpsertHealthyModels_whenAnEarlierModelHasBrokenSidecar(@TempDir Path tempRoot) throws IOException {
+        Path renderRoot = tempRoot.resolve("render-out");
+        writeStaticIcon(renderRoot, "icon_registry-item");
+        Path exportedRoot = tempRoot.resolve("exported");
+        writeModel(exportedRoot, GraphicsTier.MEDIUM, "char_aaa-broken", INDEX_COUNT_WELL_UNDER_BUDGET);
+        writeModel(exportedRoot, GraphicsTier.MEDIUM, "char_zzz-healthy", INDEX_COUNT_WELL_UNDER_BUDGET);
+        Files.delete(exportedRoot.resolve("models").resolve("char_aaa-broken.model-meta.json"));
+
+        assertThatThrownBy(() -> AssetPipelineRunner.run(renderRoot, exportedRoot, Optional.of(dbConfig)))
+                .isInstanceOf(AssetPipelineException.class)
+                .hasMessageContaining("char_aaa-broken");
+
+        assertThat(selectAssetKinds()).containsEntry("char_zzz-healthy", "MODEL");
+    }
+
     private static Map<String, String> selectAssetKinds() {
         Map<String, String> kinds = new LinkedHashMap<>();
         try (Connection connection =
