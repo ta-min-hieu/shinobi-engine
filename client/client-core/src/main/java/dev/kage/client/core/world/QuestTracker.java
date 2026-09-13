@@ -270,7 +270,8 @@ final class QuestTracker {
                     "quest.claim_outcome.not_completed_yet",
             ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_DUPLICATE_REQUEST,
                     "quest.claim_outcome.duplicate_request",
-            ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_SCRIPT_ERROR, "quest.claim_outcome.script_error");
+            ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_SCRIPT_ERROR, "quest.claim_outcome.script_error",
+            ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_INVENTORY_FULL, "quest.claim_outcome.inventory_full");
 
     /** Khoá i18n cho một trạng thái nhiệm vụ — dùng để hiện chữ trong {@link QuestLogPanel}. */
     static Optional<String> statusMessageKey(QuestStatus status) {

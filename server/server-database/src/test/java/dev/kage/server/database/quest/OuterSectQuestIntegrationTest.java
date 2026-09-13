@@ -60,6 +60,10 @@ class OuterSectQuestIntegrationTest {
     private static final int POSTGRES_PORT = 5432;
     private static final String TALLY_QUEST_CODE = "recover_outer_sect_tallies";
     private static final String TALLY_ITEM_CODE = "outer_sect_tally";
+    private static final String FIRST_MANUAL_CODE = "first_cultivation_manual";
+    /** Trùng PostgresQuestInventoryGrantAdapter.DEFAULT_CAPACITY — trần túi đồ hiện tại. */
+    private static final int INVENTORY_CAPACITY = 20;
+
     private static final String REPORT_TO_OUTER_SECT_CODE = "report_to_outer_sect";
     private static final String AWAKENING_TRIAL_CODE = "awakening_trial";
     private static final String SENIOR_SISTER = "senior_sister";
@@ -425,6 +429,95 @@ class OuterSectQuestIntegrationTest {
         newProcessUseCase().monsterKilled(characterId, BANDIT);
         newProcessUseCase().npcTalked(characterId, SENIOR_SISTER);
         newClaimUseCase().execute(characterId, TRAIL_QUEST_CODE, newIdempotencyKey());
+    }
+
+    /**
+     * Túi đầy ⇒ claim quest 11 bị TỪ CHỐI sạch, không trao dở dang, và key còn nguyên.
+     *
+     * <p><b>Bug đo thật 2026-09-13</b>: quest 11 trao SÁU món bộ Ngoại Môn; khi túi chỉ còn 5 ô,
+     * người chơi nhận 5 và {@code outer_sect_talisman} (lệnh {@code give_item} CUỐI) biến mất —
+     * không còn dòng {@code inventory_item} nào. Nhưng server vẫn trả OK kèm {@code items=6}, quest
+     * thành CLAIMED và {@code idempotency_key} bị ĐỐT ⇒ mất món vĩnh viễn, không lĩnh lại được.
+     * Nguyên nhân: {@code grantItemByCode} trả {@code false} khi đầy mà use case VỨT BỎ giá trị đó.
+     *
+     * <p>Ô này đi qua adapter THẬT nên nó gác luôn phép đếm ô của {@code hasRoomFor} — thứ mà test
+     * unit (port giả) không chạm tới được.
+     */
+    @Test
+    void shouldRefuseClaimAndKeepRewardsClaimable_whenBagIsFull() {
+        long characterId = createFreshCharacter("FullBag1");
+        advanceToEleventhQuestCompleted(characterId);
+        fillBagToCapacity(characterId);
+        long expBefore = readExp(characterId);
+        int rowsBefore = countInventoryRows(characterId);
+        String idempotencyKey = newIdempotencyKey();
+
+        ClaimQuestRewardUseCase.ClaimResult refused =
+                newClaimUseCase().execute(characterId, FIRST_MANUAL_CODE, idempotencyKey);
+
+        assertThat(refused.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.INVENTORY_FULL);
+        assertThat(countInventoryRows(characterId))
+                .as("không món nào được trao")
+                .isEqualTo(rowsBefore);
+        assertThat(countItem(characterId, "outer_sect_talisman")).isZero();
+        assertThat(readExp(characterId)).as("không được trao EXP").isEqualTo(expBefore);
+
+        freeBagSlots(characterId);
+        ClaimQuestRewardUseCase.ClaimResult afterCleanup =
+                newClaimUseCase().execute(characterId, FIRST_MANUAL_CODE, idempotencyKey);
+
+        assertThat(afterCleanup.outcome())
+                .as("key chưa bị đốt nên ĐÚNG key cũ vẫn lĩnh được")
+                .isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
+        assertThat(countItem(characterId, "outer_sect_talisman"))
+                .as("món CUỐI — thứ đã mất trong bug")
+                .isEqualTo(1);
+        assertThat(readExp(characterId)).isGreaterThan(expBefore);
+    }
+
+    /** Arc 1 tới hết quest 11 nhưng DỪNG TRƯỚC claim — `advanceThroughArcOne` claim luôn nên không dùng lại được. */
+    private static void advanceToEleventhQuestCompleted(long characterId) {
+        playQuest(characterId, "kill_training_dummies", "training_dummy", 3);
+        playQuest(characterId, "night_watch_bandit", BANDIT, 3);
+        playQuest(characterId, "clear_old_archive", "archive_warden", 2);
+        playQuest(characterId, AWAKENING_TRIAL_CODE, "trial_construct", 1);
+        playQuest(characterId, "spirit_vein_raiders", "vein_raider", 3);
+
+        newAcceptUseCase().execute(characterId, FIRST_MANUAL_CODE);
+        newProcessUseCase().monsterKilled(characterId, "vein_raider");
+        newProcessUseCase().monsterKilled(characterId, "vein_raider");
+        newProcessUseCase().npcTalked(characterId, TOWN_ELDER);
+    }
+
+    /** Bơm cho đủ 20 dòng — trang bị có `max_stack = 1` nên KHÔNG gộp được, buộc phải mở ô mới. */
+    private static void fillBagToCapacity(long characterId) {
+        int missing = INVENTORY_CAPACITY - countInventoryRows(characterId);
+        for (int i = 0; i < missing; i++) {
+            insertItem(characterId, "kunai", 1);
+        }
+        assertThat(countInventoryRows(characterId)).isEqualTo(INVENTORY_CAPACITY);
+    }
+
+    /**
+     * Dọn đủ chỗ cho SÁU món của bộ Ngoại Môn.
+     *
+     * <p>Xoá 6 dòng BẤT KỲ chứ không lọc theo mã: số dòng rác còn lại phụ thuộc túi đầy tới đâu sau
+     * arc 1, lọc theo mã thì có lượt xoá được 0 dòng và {@code queryLong} đỏ vì không có dòng nào
+     * trả về. Thời điểm này chưa có món Ngoại Môn nào trong túi nên không thể xoá nhầm phần thưởng.
+     */
+    private static void freeBagSlots(long characterId) {
+        queryLong("""
+                DELETE FROM inventory_item
+                 WHERE id IN (SELECT id FROM inventory_item
+                               WHERE character_id = ?
+                               ORDER BY id DESC
+                               LIMIT 6)
+                RETURNING id
+                """, characterId);
+    }
+
+    private static int countInventoryRows(long characterId) {
+        return (int) queryLong("SELECT COUNT(*) FROM inventory_item WHERE character_id = ?", characterId);
     }
 
     private static void insertItem(long characterId, String itemCode, int quantity) {

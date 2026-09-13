@@ -79,6 +79,14 @@ enum ClaimQuestRewardOutcome {
   // sang CLAIMED, và KHÔNG ghi `idempotency_key` ⇒ quest vẫn COMPLETED và người chơi lĩnh lại được
   // sau khi script được sửa. Chỉ THÊM ⇒ `protocolVersion` KHÔNG tăng.
   CLAIM_QUEST_REWARD_OUTCOME_SCRIPT_ERROR = 6;
+  // Túi đồ KHÔNG đủ ô trống cho phần thưởng. Server dừng TRƯỚC transaction: không trao gì, KHÔNG
+  // đổi status sang CLAIMED, KHÔNG ghi `idempotency_key` ⇒ người chơi dọn túi rồi lĩnh lại được.
+  //
+  // Vì sao cần (bug đo được 2026-09-13): trước đây `grantItemByCode` trả `false` khi túi đầy mà
+  // use case VỨT BỎ giá trị đó, nên quest 11 khai trao 6 món nhưng chỉ vào túi 5 — `items` trong
+  // response đếm Ý ĐỊNH của script chứ không đếm thứ thật sự trao. Quest vẫn CLAIMED và key vẫn bị
+  // đốt ⇒ MẤT MÓN VĨNH VIỄN. Chỉ THÊM ⇒ `protocolVersion` KHÔNG tăng (cùng tiền lệ giá trị 6).
+  CLAIM_QUEST_REWARD_OUTCOME_INVENTORY_FULL = 7;
 }
 
 message ItemRewardView {

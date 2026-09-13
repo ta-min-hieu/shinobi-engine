@@ -95,6 +95,7 @@ public final class QuestFacade {
                     case NOT_COMPLETED_YET -> ClaimOutcome.NOT_COMPLETED_YET;
                     case DUPLICATE_REQUEST -> ClaimOutcome.DUPLICATE_REQUEST;
                     case SCRIPT_ERROR -> ClaimOutcome.SCRIPT_ERROR;
+                    case INVENTORY_FULL -> ClaimOutcome.INVENTORY_FULL;
                 };
         List<ItemReward> items = result.itemsGranted().stream()
                 .map(item -> new ItemReward(item.itemTemplateCode(), item.quantity()))
@@ -131,7 +132,9 @@ public final class QuestFacade {
         NOT_COMPLETED_YET,
         DUPLICATE_REQUEST,
         /** Hook {@code on_claim} ném lỗi — chưa trao gì, quest vẫn COMPLETED và lĩnh lại được. */
-        SCRIPT_ERROR
+        SCRIPT_ERROR,
+        /** Túi không đủ ô — chưa trao gì, quest vẫn COMPLETED và lĩnh lại được sau khi dọn túi. */
+        INVENTORY_FULL
     }
 
     /** {@code status} chỉ bao giờ là COMPLETED ở lát cắt này (xem {@link #onMonsterKilled} javadoc). */

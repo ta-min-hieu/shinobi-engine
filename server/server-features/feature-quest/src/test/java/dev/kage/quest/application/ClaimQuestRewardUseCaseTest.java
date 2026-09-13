@@ -82,6 +82,22 @@ class ClaimQuestRewardUseCaseTest {
         }
     }
 
+    /** Túi đầy: {@code hasRoomFor} trả false, còn {@code grantItemByCode} sẽ KHÔNG được gọi tới. */
+    static final class FullBagInventoryGrantPort implements QuestInventoryGrantPort {
+        boolean grantAttempted;
+
+        @Override
+        public boolean grantItemByCode(Transaction tx, long characterId, String itemTemplateCode, int quantity) {
+            grantAttempted = true;
+            return false;
+        }
+
+        @Override
+        public boolean hasRoomFor(Transaction tx, long characterId, java.util.List<ItemGrantRequest> grants) {
+            return false;
+        }
+    }
+
     static final class FakeAuditPort implements AuditPort {
         String loggedAction;
 
@@ -187,6 +203,65 @@ class ClaimQuestRewardUseCaseTest {
         ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE, IDEMPOTENCY_KEY);
 
         assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.DUPLICATE_REQUEST);
+    }
+
+    /**
+     * Túi KHÔNG đủ ô ⇒ KHÔNG trao gì, KHÔNG đổi CLAIMED, KHÔNG đốt key (bug đo thật 2026-09-13).
+     *
+     * <p>Quest 11 trao 6 món khi túi còn 5 ô: người chơi nhận 5, {@code outer_sect_talisman} biến
+     * mất, mà server vẫn trả OK với {@code items=6} và {@code idempotency_key} vẫn bị đốt ⇒ MẤT MÓN
+     * VĨNH VIỄN. Túi đầy KHÔNG ném exception nên guard {@code scriptFailed} không che được ca này.
+     *
+     * <p>Fixture gọi {@code give_exp(100)} + {@code give_item} nên MỌI khẳng định dưới đây đều đỏ
+     * với bản cũ — kể cả {@code grantAttempted}, thứ chứng minh use case dừng TRƯỚC transaction.
+     */
+    @Test
+    void shouldGrantNothingAndKeepQuestClaimable_whenBagHasNoRoom() {
+        QuestProgress progress = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.COMPLETED, "{\"counter\":2}");
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(progress);
+        FakeExpPort expPort = new FakeExpPort();
+        FullBagInventoryGrantPort inventoryGrantPort = new FullBagInventoryGrantPort();
+        FakeAuditPort auditPort = new FakeAuditPort();
+        FakeIdempotencyPort idempotencyPort = new FakeIdempotencyPort();
+        ClaimQuestRewardUseCase useCase =
+                newUseCase(progressPort, new QuestRewardPorts(expPort, inventoryGrantPort, auditPort, idempotencyPort));
+
+        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE, IDEMPOTENCY_KEY);
+
+        assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.INVENTORY_FULL);
+        assertThat(result.itemsGranted()).isEmpty();
+        assertThat(result.expGranted()).isZero();
+        assertThat(expPort.grantedAmount).as("không được trao EXP").isEqualTo(-1L);
+        assertThat(inventoryGrantPort.grantAttempted)
+                .as("phải dừng TRƯỚC transaction, không thử trao món nào")
+                .isFalse();
+        assertThat(auditPort.loggedAction).as("không được ghi audit").isNull();
+        assertThat(progressPort.saved).as("quest phải vẫn COMPLETED").isNull();
+    }
+
+    /** Key CHƯA bị đốt ⇒ dọn túi xong lĩnh lại bằng ĐÚNG key cũ vẫn phải được — thứ bug cũ phá. */
+    @Test
+    void shouldStillBeClaimableWithSameKey_afterBagWasFreed() {
+        QuestProgress progress = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.COMPLETED, "{\"counter\":2}");
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(progress);
+        FakeIdempotencyPort idempotencyPort = new FakeIdempotencyPort();
+        ClaimQuestRewardUseCase blocked = newUseCase(
+                progressPort,
+                new QuestRewardPorts(
+                        new FakeExpPort(), new FullBagInventoryGrantPort(), new FakeAuditPort(), idempotencyPort));
+        blocked.execute(CHARACTER_ID, QUEST_CODE, IDEMPOTENCY_KEY);
+
+        FakeExpPort expPort = new FakeExpPort();
+        FakeInventoryGrantPort roomy = new FakeInventoryGrantPort();
+        ClaimQuestRewardUseCase afterCleanup =
+                newUseCase(progressPort, new QuestRewardPorts(expPort, roomy, new FakeAuditPort(), idempotencyPort));
+
+        ClaimQuestRewardUseCase.ClaimResult result = afterCleanup.execute(CHARACTER_ID, QUEST_CODE, IDEMPOTENCY_KEY);
+
+        assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
+        assertThat(expPort.grantedAmount).isEqualTo(100L);
+        assertThat(roomy.grantedCode).isEqualTo("test_item");
+        assertThat(progressPort.saved.status()).isEqualTo(QuestStatus.CLAIMED);
     }
 
     /**

@@ -3033,3 +3033,38 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       gỡ và `upsertModels` hết ném, checker sẽ fail build vì 15 "sprite mồ côi"**. Gốc rễ: contact
       sheet nghiệm thu của model vẫn bị `packTier` nhét vào atlas 2D. Cần chủ dự án quyết hướng.
 
+79. **TRẬN ĐẦU LĨNH HẾT LÀ GIẤY — và phép đo lôi ra một bug MẤT PHẦN THƯỞNG (2026-09-13)**:
+    - 🧰 **`gameProbe` lần đầu mặc được trang bị** (`EquipScenario`, cờ `--equipItemCodes=a,b,c`). Ô
+      trang bị SUY từ `equip_slot` trong catalog (509/510) chứ không bắt người dùng gõ tay — gõ tay
+      vừa dễ sai vừa để client tự quyết thứ server mới có quyền quyết. Bước này phải chạy **TRƯỚC**
+      lúc đi bộ: `bonus_hp` nâng máu tối đa (ADR-036) và server trả máu mới ngay trong
+      `EquipItemResponse` (ADR-043), mặc sau khi đi thì "máu lúc tới nơi" đo ra sai — ngược hẳn với
+      `UseItemScenario`, thứ cố tình chạy SAU vòng quan sát.
+    - 📏 **Số đo khớp phép tính đến từng điểm.** Mặc 6 món, máu tối đa leo đúng từng bước
+      **118 → 136 → 146 → 152 → 158 → 170**. Đi 0 → 93, tới sào huyệt còn **111 máu** — ĐÚNG y hệt
+      `arrivalHp 111` mà `RaiderBandBalanceTest` giả định từ V45. Đầu lĩnh đánh **20**/nhát, người
+      chơi **54**/nhát, hạ 200 máu trong **4 nhát**, **THẮNG còn 31/170**. ⇒ Mục "📌 Chưa đo được"
+      của mục 78 ĐÓNG; `RaiderBandBalanceTest` không còn ô nào là giấy.
+    - 🐛 **BUG THẬT lôi ra dọc đường: túi đầy ⇒ MẤT phần thưởng vĩnh viễn.** Claim quest 11 trao 6
+      món khi túi có 15/20 dòng: người chơi nhận **5**, `outer_sect_talisman` (lệnh `give_item` cuối)
+      biến mất — không có dòng `inventory_item` nào trên toàn DB. Nhưng server trả OK với **`items=6`**,
+      quest thành CLAIMED, `idempotency_key` bị ĐỐT ⇒ không lĩnh lại được.
+      Chuỗi nhân quả: `grantItemByCode` trả `false` khi đầy → `ClaimQuestRewardUseCase` **VỨT BỎ giá
+      trị trả về** → `ClaimResult` dựng danh sách từ `effects.itemGrants()` tức **Ý ĐỊNH của script**,
+      không phải thứ trao được → `detailJson` cũng ghi sai nên **`audit_log` nói dối luôn**.
+      ⚠️ Bản vá `26a24a4` (script lỗi) KHÔNG che được ca này: túi đầy **không ném exception**
+      (`Inventory.add` coi đó là trạng thái bình thường), nên `scriptFailed` không bao giờ thấy.
+    - 🩹 **Chủ dự án chốt hướng "chặn TRƯỚC transaction"** — thêm `CLAIM_QUEST_REWARD_OUTCOME_INVENTORY_FULL = 7`
+      (chỉ THÊM ⇒ `protocolVersion` KHÔNG tăng, cùng tiền lệ giá trị 6), guard đặt NGAY CẠNH guard
+      `scriptFailed`: thiếu ô thì từ chối claim, quest giữ COMPLETED và key còn nguyên để dọn túi rồi
+      lĩnh lại.
+    - 🧩 **Chi phí thật làm đổi thiết kế giữa chừng.** Bản đầu thêm 3 method abstract vào
+      `QuestInventoryGrantPort` — nhưng port đó đang được dùng như **functional interface** ở 4 lớp
+      test (`(tx, id, code, qty) -> true`), và hai method không nhận `Transaction` lại buộc adapter
+      phải có `DataSource` ⇒ đổi constructor ⇒ sửa thêm 5 call site. Đổi sang **MỘT `default` method
+      nhận `Transaction`**: interface giữ đúng một abstract nên mọi lambda vẫn biên dịch, adapter
+      dùng lại đúng đường lấy `Connection` sẵn có, không đụng call site nào.
+    - ⚠️ **Hạn chế đã biết, ghi thẳng vào javadoc**: lô có NHIỀU món CÙNG loại xếp chồng được đếm hơi
+      thận trọng (mỗi lần gộp làm đổi chỗ trống còn lại). Thận trọng là phía an toàn — từ chối oan thì
+      dọn túi rồi lĩnh lại được, còn nói nhầm "đủ chỗ" thì mất món vĩnh viễn.
+

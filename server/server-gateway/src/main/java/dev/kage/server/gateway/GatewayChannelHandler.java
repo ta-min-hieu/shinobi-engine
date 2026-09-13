@@ -1553,7 +1553,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     QuestFacade.ClaimOutcome.DUPLICATE_REQUEST,
                     ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_DUPLICATE_REQUEST,
                     QuestFacade.ClaimOutcome.SCRIPT_ERROR,
-                    ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_SCRIPT_ERROR);
+                    ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_SCRIPT_ERROR,
+                    QuestFacade.ClaimOutcome.INVENTORY_FULL,
+                    ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_INVENTORY_FULL);
 
     private static ClaimQuestRewardOutcome toProtoOutcome(QuestFacade.ClaimOutcome outcome) {
         return CLAIM_QUEST_REWARD_OUTCOME_MAPPING.get(outcome);

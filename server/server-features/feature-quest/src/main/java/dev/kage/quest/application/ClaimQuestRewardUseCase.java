@@ -3,6 +3,7 @@ package dev.kage.quest.application;
 import java.util.List;
 
 import dev.kage.quest.domain.IdempotencyKeyReusedException;
+import dev.kage.quest.domain.QuestInventoryGrantPort;
 import dev.kage.quest.domain.QuestProgress;
 import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestStatus;
@@ -58,6 +59,9 @@ public final class ClaimQuestRewardUseCase {
             // COMPLETED, key vẫn còn nguyên để lần lĩnh sau dùng lại.
             return ClaimResult.scriptError();
         }
+        if (!hasRoomForRewards(characterId, effects.itemGrants())) {
+            return ClaimResult.inventoryFull();
+        }
         try {
             tx.inTransaction((Transaction t) -> {
                 rewardPorts.idempotencyPort().recordOrThrow(t, idempotencyKey);
@@ -82,6 +86,31 @@ public final class ClaimQuestRewardUseCase {
         return ClaimResult.ok(effects.expGranted(), items);
     }
 
+    /**
+     * Túi còn đủ ô cho trọn lô phần thưởng không — hỏi TRƯỚC khi ghi bất cứ thứ gì.
+     *
+     * <p>Túi đầy KHÔNG ném exception ({@code Inventory.add} coi đó là trạng thái bình thường,
+     * adapter chỉ trả {@code false}), nên guard {@code scriptFailed} KHÔNG che được ca này. Bug đo
+     * thật 2026-09-13: quest 11 khai trao 6 món, túi chỉ nhận 5, mà response vẫn OK và
+     * {@code idempotency_key} vẫn bị đốt ⇒ mất món vĩnh viễn.
+     *
+     * <p>Mở một transaction CHỈ ĐỌC riêng, trước transaction ghi: câu hỏi này cần {@code Connection}
+     * mà cách lấy duy nhất của adapter là qua {@link Transaction}. Không ghi gì ở đây nên
+     * {@code idempotency_key} còn nguyên khi trả về {@code INVENTORY_FULL}.
+     */
+    private boolean hasRoomForRewards(long characterId, List<QuestScriptRunner.ItemGrant> itemGrants) {
+        if (itemGrants.isEmpty()) {
+            return true;
+        }
+        List<QuestInventoryGrantPort.ItemGrantRequest> requests = itemGrants.stream()
+                .map(g -> new QuestInventoryGrantPort.ItemGrantRequest(g.itemTemplateCode(), g.quantity()))
+                .toList();
+        boolean[] roomy = {true};
+        tx.inTransaction(
+                (Transaction t) -> roomy[0] = rewardPorts.inventoryGrantPort().hasRoomFor(t, characterId, requests));
+        return roomy[0];
+    }
+
     private static String detailJson(String questCode, QuestScriptRunner.HookEffects effects) {
         return "{\"questCode\":\"%s\",\"expGranted\":%d,\"itemCount\":%d}"
                 .formatted(questCode, effects.expGranted(), effects.itemGrants().size());
@@ -99,7 +128,9 @@ public final class ClaimQuestRewardUseCase {
             NOT_COMPLETED_YET,
             DUPLICATE_REQUEST,
             /** Hook {@code on_claim} ném lỗi — chưa ghi gì, quest vẫn COMPLETED và lĩnh lại được. */
-            SCRIPT_ERROR
+            SCRIPT_ERROR,
+            /** Túi không đủ ô — chưa ghi gì, quest vẫn COMPLETED và lĩnh lại được sau khi dọn túi. */
+            INVENTORY_FULL
         }
 
         public record ItemReward(String itemTemplateCode, int quantity) {}
@@ -126,6 +157,10 @@ public final class ClaimQuestRewardUseCase {
 
         static ClaimResult scriptError() {
             return new ClaimResult(Outcome.SCRIPT_ERROR, 0, List.of());
+        }
+
+        static ClaimResult inventoryFull() {
+            return new ClaimResult(Outcome.INVENTORY_FULL, 0, List.of());
         }
     }
 }
