@@ -234,7 +234,10 @@ class SpiritVeinDuelBalanceTest {
     @Test
     @DisplayName("Linh mạch (47) đủ xa tán tu (34) và thám tử (66) theo CẢ HAI luật hình học")
     void theSpiritVeinIsAQuietPlaceToFightIn() {
-        float aggroRadiusMeters = 6f;
+        // V46 hạ `vein_raider` xuống aggro 3, nhưng hai HÀNG XÓM (tán tu @34, thám tử @66) vẫn giữ
+        // aggro 6 mặc định V25 — và luật "đi ngang không kéo hai con" phụ thuộc con ĐAU NHẤT, nên
+        // 6 ở đây là cận trên có chủ đích chứ không phải số cũ sót lại.
+        float neighbourAggroRadiusMeters = 6f;
         float leashRadiusMeters = 10f;
         float meleeAttackRangeMeters = 2f;
 
@@ -242,8 +245,8 @@ class SpiritVeinDuelBalanceTest {
         float toScout = Math.abs(66f - 47f);
 
         // V29 — đi ngang không kéo được hai con cùng lúc.
-        assertThat(toBandit).isGreaterThan(aggroRadiusMeters + aggroRadiusMeters);
-        assertThat(toScout).isGreaterThan(aggroRadiusMeters + aggroRadiusMeters);
+        assertThat(toBandit).isGreaterThan(neighbourAggroRadiusMeters + neighbourAggroRadiusMeters);
+        assertThat(toScout).isGreaterThan(neighbourAggroRadiusMeters + neighbourAggroRadiusMeters);
         // V32 — đứng lại đánh thì con bên cạnh không với tới nơi.
         assertThat(toBandit).isGreaterThan(leashRadiusMeters + meleeAttackRangeMeters);
         assertThat(toScout).isGreaterThan(leashRadiusMeters + meleeAttackRangeMeters);

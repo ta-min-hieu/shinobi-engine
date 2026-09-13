@@ -2586,6 +2586,8 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       hai đọc `counter = 0` và cả hai ghi `1`.
     - 🔴 **Nội dung arc 2 CỐ Ý chưa viết** — còn chờ chủ dự án trả lời dòng **#19** (quãng Lv10–18).
       Quest mẫu chỉ nằm ở test resources, **không migration nội dung nào**.
+      · 📌 **ĐÍNH CHÍNH 2026-09-13**: dòng #19 ĐÃ ĐÓNG và arc 2 nay có **5 quest thật** trong
+        migration (id 6,7,8,11,12). Câu trên giữ nguyên làm dấu vết thời điểm, không còn đúng hiện tại.
     - 🐛 **SERVER — nợ 2026-08-30 "vào hầm ngục theo nhóm" đã TÁI HIỆN được qua socket thật**: A bấm
       `EnterDungeonCommand`, server dời cả B, nhưng B **không nhận một gói nào trong dải 1500–1599**
       — B thấy A biến mất rồi hiện lại và một con boss mọc giữa làng. Hậu quả: không biết mình đang ở
@@ -2716,6 +2718,9 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       và nay phủ cả hai quest arc 2 — vùng nghiệp vụ là "quest ngoại môn", không phải "thẻ bài".
     - 🔴 **Dòng #19 vẫn chưa đóng**: arc 2 nay đưa người chơi từ Cấp 10 lên **Cấp 12**, trong khi
       STORY §6 khai arc 2 ở Lv19–36.
+      · 📌 **ĐÍNH CHÍNH 2026-09-13**: #19 ĐÃ ĐÓNG. Sau V45/V46 và playtest trọn chuỗi, 12 quest đưa
+        người chơi tới **Cấp 22** — đúng đầu dải Lv19–36 của arc 2. Quãng **Lv22–36 vẫn TRỐNG**
+        (chưa quest nào dẫn tới ba mốc mở khoá STORY §6 khai: linh thú Lv20, bang hội Lv25, PvP Lv30).
     - 🔴 **Tên riêng "Lý Tam" vẫn CHƯA có trong STORY §5** — nay nó là tên hiển thị của cả một quest.
       §8 quy tắc 3 đòi khai tên riêng mới vào §4/§5 cùng lượt, nhưng §1–§6 là SSOT tường thuật mà AI
       không được tự sửa (CLAUDE.md §14: mâu thuẫn thì báo cáo, không tự chọn bên). **Chờ chủ dự án.**

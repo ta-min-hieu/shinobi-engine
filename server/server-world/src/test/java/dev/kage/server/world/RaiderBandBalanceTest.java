@@ -201,10 +201,13 @@ class RaiderBandBalanceTest {
     @Test
     @DisplayName("Sào huyệt (93) yên tĩnh, và quỷ đá dời sang 106 vẫn thoả luật")
     void theRaiderCampIsAQuietPlaceToFightIn() {
-        float aggroRadiusMeters = 6f;
+        // V46 hạ `raider_chieftain` xuống aggro 3, nhưng luật hình học phải soi theo hàng xóm ĐAU
+        // NHẤT: thám tử @66 và quỷ đá @106 vẫn giữ aggro 6 (mặc định V25). Giữ 6 ở đây là CẬN TRÊN
+        // có chủ đích — đổi thành 3 sẽ nới lỏng luật theo con số của loài đã được làm hiền đi.
+        float neighbourAggroRadiusMeters = 6f;
         float leashRadiusMeters = 10f;
         float meleeAttackRangeMeters = 2f;
-        float combinedReach = aggroRadiusMeters + aggroRadiusMeters;
+        float combinedReach = neighbourAggroRadiusMeters + neighbourAggroRadiusMeters;
         float leashReach = leashRadiusMeters + meleeAttackRangeMeters;
 
         // Hàng xóm hai phía của sào huyệt: thám tử @66 và quỷ đá @106 (sau khi dời).
@@ -214,7 +217,9 @@ class RaiderBandBalanceTest {
         assertThat(Math.abs(106f - 93f)).isGreaterThan(leashReach);
 
         // Khe nghỉ ở x≈80: ngoài tầm aggro của CẢ thám tử lẫn đầu lĩnh, nên hồi máu được.
-        assertThat(Math.abs(80f - 66f)).isGreaterThan(aggroRadiusMeters);
-        assertThat(Math.abs(93f - 80f)).isGreaterThan(aggroRadiusMeters);
+        // Vẫn soi theo 6 (thám tử) chứ không theo 3 của đầu lĩnh sau V46 — khe chỉ yên tĩnh khi
+        // con KHÓ TÍNH nhất cũng không với tới.
+        assertThat(Math.abs(80f - 66f)).isGreaterThan(neighbourAggroRadiusMeters);
+        assertThat(Math.abs(93f - 80f)).isGreaterThan(neighbourAggroRadiusMeters);
     }
 }

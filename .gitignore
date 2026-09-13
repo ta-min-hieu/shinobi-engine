@@ -1,6 +1,9 @@
 # Build (khớp cả build-logic/build/ và mọi module/build/)
 build/
 .gradle/
+# Thư mục phiên của Kotlin compiler daemon (build-logic/.kotlin/sessions/*.salive) — rác
+# build thuần tuý, nhưng KHÔNG nằm dưới build/ hay .gradle/ nên `git add -A` sẽ nuốt nó.
+.kotlin/
 **/bin/
 out/
 
