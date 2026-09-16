@@ -44,12 +44,28 @@ import dev.kage.client.core.ui.theme.KageSkin;
  * Bạn bè            1044px @ 8+8     — TRÀN         692px
  * Nhật ký nhiệm vụ   626px @ 8 dòng                 547px
  * Túi đồ             693px (đã có vùng cuộn từ trước) 693px
+ * Hội thoại          870px @ 15 lựa chọn — TRÀN      570px
  * </pre>
  *
  * Bốn cửa sổ TRÀN ngay cả với trần cũ — tức là trần "cho vừa màn hình" chưa bao giờ làm được việc
  * nó hứa ở trạng thái tệ nhất, nó chỉ giấu dữ liệu. Hòm thư tràn chủ yếu vì nội dung thư 1024 ký
  * tự (~400px) tự nở, không phải vì danh sách. Chỉnh bất kỳ chiều cao nào ở các panel thì chạy lại
  * và sửa bảng này.
+ *
+ * <h2>Cửa sổ thứ TÁM — hội thoại (thêm 2026-09-16)</h2>
+ *
+ * Lớp này đo BẢY cửa sổ suốt từ 2026-09-11, và {@code DialoguePanel} là cửa sổ có-danh-sách DUY
+ * NHẤT không có mặt. Nó lọt qua vì nó không giống sáu cửa sổ kia ở đúng chỗ khiến người ta nhớ:
+ * nó KHÔNG có trần {@code MAX_VISIBLE_*} nào để mà nghi ngờ, nên ô {@code ScrollingListTest}
+ * "không cửa sổ nào giữ trần riêng" vẫn xanh một cách vô hại. Không có trần thì không có gì để
+ * kiểm — và cũng không có gì chặn nó nở.
+ *
+ * Số lựa chọn ở đó KHÔNG do client quyết: nó bằng số nhánh trong {@code town_elder.js}, và nhánh
+ * chỉ thêm chứ chưa bao giờ bớt. V47 đẩy {@code about_town} lên 15 lựa chọn ⇒ đo được <b>870px</b>.
+ *
+ * ⚠️ Và hướng tràn ở đây NGƯỢC với sáu cửa sổ kia: khung hội thoại neo ở ĐÁY rồi nở LÊN TRÊN, nên
+ * thứ bị đẩy ra ngoài màn hình là ĐỈNH khung — <b>chính lời thoại của NPC</b> cùng những lựa chọn
+ * ĐẦU danh sách, chứ không phải mấy nhánh mới thêm ở cuối. Người chơi thấy một khung cụt đầu.
  */
 public final class HudLayoutBudgetTool extends ApplicationAdapter {
 
@@ -81,7 +97,7 @@ public final class HudLayoutBudgetTool extends ApplicationAdapter {
     @Override
     public void create() {
         skin = new KageSkin();
-        LOG.info("Đo {} cửa sổ ở {} dòng mỗi danh sách, màn hình {}x{}", 7, rows, SCREEN_WIDTH_PX, SCREEN_HEIGHT_PX);
+        LOG.info("Đo {} cửa sổ ở {} dòng mỗi danh sách, màn hình {}x{}", 8, rows, SCREEN_WIDTH_PX, SCREEN_HEIGHT_PX);
         measureMail();
         measureShop();
         measureGuild();
@@ -89,7 +105,42 @@ public final class HudLayoutBudgetTool extends ApplicationAdapter {
         measureFriend();
         measureQuestLog();
         measureInventory();
+        measureDialogue();
         Gdx.app.exit();
+    }
+
+    /**
+     * Khung hội thoại ở node ĐÔNG NHẤT của cây: {@code about_town} của Chu Hoành.
+     *
+     * <p>Số lựa chọn ở đây KHÔNG do client quyết — nó bằng số nhánh trong {@code town_elder.js}, và
+     * nhánh chỉ có thêm chứ chưa bao giờ bớt: mỗi quest mới là một dòng nữa. V47 đẩy nó lên **15**
+     * (14 nhánh + "tạm biệt"), và ba nhánh mới nhất nằm ở chỉ số 11/12/13 — tức gần cuối.
+     *
+     * <p>⚠️ Khác bảy cửa sổ trên: khung này KHÔNG có vùng cuộn và KHÔNG có trần, nên nó không "giấu
+     * bớt" dòng như các danh sách kia từng làm — nó nở thẳng ra ngoài màn hình. Danh sách khoá dưới
+     * đây là danh sách THẬT, chép từ nhật ký {@code gameProbe} chứ không bịa, để con số đo được là
+     * trạng thái người chơi thật gặp.
+     */
+    private void measureDialogue() {
+        DialoguePanel panel = new DialoguePanel(skin);
+        List<String> options = new ArrayList<>();
+        options.add("dialogue.option.ask_about_realm");
+        options.add("dialogue.option.ask_about_elder");
+        options.add("dialogue.option.ask_night_watch");
+        options.add("dialogue.option.ask_old_archive");
+        options.add("dialogue.option.ask_awakening_trial");
+        options.add("dialogue.option.ask_spirit_vein");
+        options.add("dialogue.option.ask_first_manual");
+        options.add("dialogue.option.ask_raider_band");
+        options.add("dialogue.option.ask_outer_sect");
+        options.add("dialogue.option.ask_missing_disciple");
+        options.add("dialogue.option.ask_confront_steward");
+        options.add("dialogue.option.ask_dead_vein");
+        options.add("dialogue.option.ask_blood_sand_trail");
+        options.add("dialogue.option.ask_scatter_band");
+        options.add("dialogue.option.bye");
+        panel.show("dialogue.town_elder.about_town", options);
+        measure("Hội thoại", panel, panel::preferredHeight);
     }
 
     private void measure(String name, HudWindow window, DoubleSupplier preferredHeight) {

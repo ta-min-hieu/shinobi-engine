@@ -42,6 +42,27 @@ public final class DialoguePanel implements HudWindow {
 
     private static final float BOTTOM_MARGIN_PX = 90f;
 
+    /**
+     * Trần chiều cao của DANH SÁCH LỰA CHỌN — phần vượt thì cuộn, không đẩy khung ra ngoài màn hình.
+     *
+     * <p><b>Đo được 2026-09-16, và nó là một lỗi THẬT chứ không phải phòng xa.</b> Node đông nhất của
+     * cây hội thoại ({@code about_town} của Chu Hoành) có <b>15</b> lựa chọn sau V47, và
+     * {@code HudLayoutBudgetTool} đo khung khi đó cao <b>870px</b> trên màn hình <b>720px</b>.
+     *
+     * <p>Vì khung neo ở ĐÁY ({@link #BOTTOM_MARGIN_PX}) và nở LÊN TRÊN, phần bị đẩy ra ngoài là
+     * ĐỈNH khung — tức <b>chính lời thoại</b> và những lựa chọn đầu danh sách, không phải những
+     * lựa chọn mới thêm ở cuối. Người chơi thấy một khung cụt đầu, không đọc được NPC đang nói gì.
+     *
+     * <p>Ngân sách: 720 (màn hình) − 90 ({@code BOTTOM_MARGIN_PX}) = 630px cho cả thân khung; phần
+     * không phải danh sách (lời thoại đã xuống dòng + đệm) chiếm ~150px ⇒ trần danh sách ≤ 480px.
+     * Lấy 420px để còn chỗ cho node có lời thoại dài hơn {@code about_town}.
+     *
+     * <p>⚠️ Số lựa chọn KHÔNG do client quyết — nó bằng số nhánh trong {@code town_elder.js}, và
+     * nhánh chỉ có thêm chứ chưa bao giờ bớt (mỗi quest mới là một dòng nữa). Nên đây không phải
+     * thứ "đủ dùng cho hôm nay": cuộn là cách duy nhất không phải sửa lại mỗi lần viết quest.
+     */
+    private static final float OPTION_LIST_MAX_HEIGHT_PX = 420f;
+
     private final Stage stage;
     private final KageSkin skin;
     private final I18NBundle i18n;
@@ -73,7 +94,12 @@ public final class DialoguePanel implements HudWindow {
         panel.setBackground(skin.panel);
         panel.pad(PANEL_PAD_PX);
         panel.add(textLabel).width(PANEL_WIDTH_PX).growX().row();
-        panel.add(optionList).padTop(12f).width(PANEL_WIDTH_PX).growX().row();
+        panel.add(ScrollingList.wrap(optionList, skin))
+                .padTop(12f)
+                .width(PANEL_WIDTH_PX)
+                .maxHeight(OPTION_LIST_MAX_HEIGHT_PX)
+                .growX()
+                .row();
 
         Table container = new Table();
         container.setFillParent(true);
@@ -150,6 +176,23 @@ public final class DialoguePanel implements HudWindow {
 
     public boolean isVisible() {
         return panel.isVisible();
+    }
+
+    /**
+     * Chiều cao khung sẽ chiếm khi dàn trang — cùng lý do {@code QuestLogPanel#preferredHeight()}.
+     *
+     * <p>⚠️ Khung này KHÔNG có vùng cuộn: {@link #show} thêm đúng MỘT nút cho mỗi lựa chọn, không
+     * trần, không {@link ScrollingList}. Nó là cửa sổ có-danh-sách DUY NHẤT vắng mặt khỏi
+     * {@code HudLayoutBudgetTool} kể từ khi công cụ đó ra đời (2026-09-11) — bảy cửa sổ kia đều
+     * được đo, còn số lựa chọn hội thoại thì lớn dần theo NỘI DUNG (mỗi quest mới là một nhánh) mà
+     * không ai đo lần nào.
+     *
+     * <p>Phương thức này tồn tại để công cụ đó đo được nó. Khung neo ở ĐÁY màn hình và nở LÊN TRÊN
+     * ({@code Align.bottom} + {@code padBottom}), nên khi nó cao hơn màn hình thì phần bị đẩy ra
+     * ngoài là các lựa chọn ĐẦU danh sách.
+     */
+    float preferredHeight() {
+        return panel.getPrefHeight();
     }
 
     private TextButton optionButton(String labelKey, int index) {
