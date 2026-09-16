@@ -74,6 +74,12 @@ class TownElderDialogueTreeTest {
                         "outer_sect",
                         "missing_disciple",
                         "confront_steward",
+                        // V47 — quãng Lv22–27 của arc 2, chèn SAU `confront_steward` vì cả ba nối
+                        // tiếp đúng cái kết dang dở của nó. Chỉ `end` lùi ba chỗ; `option_index` là
+                        // VỊ TRÍ nên đây là thay đổi CÓ CHỦ ĐÍCH, ghim lại ngay tại đây.
+                        "dead_vein",
+                        "blood_sand_trail",
+                        "scatter_band",
                         "end");
         assertThat(node("about_realm").textKey()).isEqualTo("dialogue.town_elder.about_realm");
         assertThat(node("about_elder").textKey()).isEqualTo("dialogue.town_elder.about_elder");
@@ -206,6 +212,34 @@ class TownElderDialogueTreeTest {
         assertThat(firstManual.options())
                 .extracting(DialogueOption::action)
                 .containsExactly("accept_quest:first_cultivation_manual", "about_town", "end");
+    }
+
+    /**
+     * Ba nhánh của quãng Lv22–27 (V47) — nối tiếp cái kết dang dở của {@code confront_steward}.
+     *
+     * <p>Chúng đứng SAU nó trong {@code about_town}, không chen vào giữa: hộ pháp phải chết rồi thì
+     * mới có chuyện "thứ hắn đào dở vẫn nằm đấy".
+     *
+     * <p>⚠️ Nhịp hé lộ (STORY §8 quy tắc 2): nhánh ĐẦU ông lão chưa biết chúng là Huyết Sa — chỉ
+     * biết "người lạ". Cái tên rơi xuống ở nhánh THỨ HAI, khi người chơi tự nhìn thấy dấu hút tu vi.
+     */
+    @Test
+    @DisplayName("Ba nhánh mạch chết nhận đúng ba mã quest của quãng Lv22–27")
+    void deadVeinBranchesOfferTheArcTwoUpperQuests() {
+        assertThat(node("dead_vein").textKey()).isEqualTo("dialogue.town_elder.dead_vein");
+        assertThat(node("dead_vein").options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:dead_vein_intruders", "about_town", "end");
+
+        assertThat(node("blood_sand_trail").textKey()).isEqualTo("dialogue.town_elder.blood_sand_trail");
+        assertThat(node("blood_sand_trail").options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:blood_sand_trail", "about_town", "end");
+
+        assertThat(node("scatter_band").textKey()).isEqualTo("dialogue.town_elder.scatter_band");
+        assertThat(node("scatter_band").options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:scatter_the_blood_sand_band", "about_town", "end");
     }
 
     /**

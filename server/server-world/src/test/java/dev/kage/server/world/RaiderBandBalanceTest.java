@@ -56,7 +56,7 @@ class RaiderBandBalanceTest {
     private static final int RAIDER_ATK = 18;
     private static final int RAIDER_DEF = 12;
 
-    /** Ba loài đứng dọc đường đông SAU khi V45 dời quỷ đá 80 → 106. */
+    /** Ba loài đứng dọc đường đông; V45 dời quỷ đá 80 → 106, rồi V47 dời tiếp 106 → 161. */
     private static final int BANDIT_ATK = 22;
 
     private static final int SCOUT_ATK = 26;
@@ -199,7 +199,7 @@ class RaiderBandBalanceTest {
      * tính cạnh phép tính cân bằng, vì trận tay đôi chỉ đúng khi người chơi thật sự đánh MỘT con.
      */
     @Test
-    @DisplayName("Sào huyệt (93) yên tĩnh, và quỷ đá dời sang 106 vẫn thoả luật")
+    @DisplayName("Sào huyệt (93) yên tĩnh, và hàng xóm đông nay là tế đồ @120 vẫn thoả luật")
     void theRaiderCampIsAQuietPlaceToFightIn() {
         // V46 hạ `raider_chieftain` xuống aggro 3, nhưng luật hình học phải soi theo hàng xóm ĐAU
         // NHẤT: thám tử @66 và quỷ đá @106 vẫn giữ aggro 6 (mặc định V25). Giữ 6 ở đây là CẬN TRÊN
@@ -210,11 +210,12 @@ class RaiderBandBalanceTest {
         float combinedReach = neighbourAggroRadiusMeters + neighbourAggroRadiusMeters;
         float leashReach = leashRadiusMeters + meleeAttackRangeMeters;
 
-        // Hàng xóm hai phía của sào huyệt: thám tử @66 và quỷ đá @106 (sau khi dời).
+        // Hàng xóm hai phía của sào huyệt: thám tử @66 và — sau khi V47 dời quỷ đá 106 → 161 —
+        // tế đồ Huyết Sa @120. Vẫn soi theo cận trên 6 chứ không theo aggro 3 thật của tế đồ.
         assertThat(Math.abs(93f - 66f)).isGreaterThan(combinedReach);
-        assertThat(Math.abs(106f - 93f)).isGreaterThan(combinedReach);
+        assertThat(Math.abs(120f - 93f)).isGreaterThan(combinedReach);
         assertThat(Math.abs(93f - 66f)).isGreaterThan(leashReach);
-        assertThat(Math.abs(106f - 93f)).isGreaterThan(leashReach);
+        assertThat(Math.abs(120f - 93f)).isGreaterThan(leashReach);
 
         // Khe nghỉ ở x≈80: ngoài tầm aggro của CẢ thám tử lẫn đầu lĩnh, nên hồi máu được.
         // Vẫn soi theo 6 (thám tử) chứ không theo 3 của đầu lĩnh sau V46 — khe chỉ yên tĩnh khi

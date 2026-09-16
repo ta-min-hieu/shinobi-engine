@@ -62,13 +62,23 @@ final class DemoPlatforms {
     private static final float GROUND_MIN_X = -55f;
 
     /**
-     * <b>Đầu đông nới 85 → 115 (2026-09-13, V45).</b> Lần thứ hai, và cùng lý do hệt lần đầu: trục
-     * chơi hết chỗ. V45 thêm sào huyệt đoạt mạch ở {@code x = 93} và DỜI quỷ đá {@code 80 → 106} để
-     * dọn đường đông (nó là con đánh đau nhất trục chơi, atk 40, và V40 đã phải dời nó một lần rồi
-     * vì đúng chuyện đó). Phủ hết {@code 106} còn dư 9m — không sát mép, đúng ràng buộc (a) mà V40
-     * tự đặt ra cho chính nó.
+     * <b>Đầu đông nới 115 → 170 (2026-09-14, V47).</b> Lần thứ BA, và vẫn cùng một lý do: trục chơi
+     * hết chỗ. V47 mở quãng Lv22–27 của arc 2 với ba điểm spawn ở {@code x = 120, 134, 148} (hai tế
+     * đồ Huyết Sa và một đàn chủ), trong khi sau quỷ đá {@code @106} chỉ còn đúng 9m trống — không
+     * đủ cho một điểm nào, vì luật giãn V29/V32 đòi khe {@code > 12m}.
+     *
+     * <p><b>Và cùng đợt, quỷ đá đi tiếp {@code 106 → 161}</b> — playtest bằng {@code gameProbe} đo
+     * được nó lấy 27 máu mỗi lượt người chơi đi từ khe nghỉ @80 ra mạch chết @120, kéo biên trận tế
+     * đồ từ +2 xuống +1. Nên điểm xa nhất nay là CHÍNH NÓ, không phải đàn chủ @148.
+     *
+     * <p>170 = 161 + 9m biên, giữ nguyên khoảng dư mà V45 để lại sau {@code @106}: phủ hết điểm xa
+     * nhất nhưng không để nó sát mép (ràng buộc (a) V40 tự đặt).
+     *
+     * <p><b>Đầu đông nới 85 → 115 (2026-09-13, V45).</b> Lần thứ hai: V45 thêm sào huyệt đoạt mạch
+     * ở {@code x = 93} và DỜI quỷ đá {@code 80 → 106} để dọn đường đông (nó là con đánh đau nhất
+     * trục chơi, atk 40, và V40 đã phải dời nó một lần rồi vì đúng chuyện đó).
      */
-    private static final float GROUND_MAX_X = 115f;
+    private static final float GROUND_MAX_X = 170f;
 
     private DemoPlatforms() {}
 

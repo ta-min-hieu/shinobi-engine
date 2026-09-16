@@ -52,6 +52,12 @@
             { label_key: "dialogue.option.ask_outer_sect", action: "outer_sect" },
             { label_key: "dialogue.option.ask_missing_disciple", action: "missing_disciple" },
             { label_key: "dialogue.option.ask_confront_steward", action: "confront_steward" },
+            // Quang Lv22-27 (V47) - ba nhanh DUNG SAU confront_steward vi chung noi tiep
+            // dung cai ket dang do cua no. option_index la VI TRI (dialogue.proto) nen
+            // chen o day day "bye" lui ba cho: co chu dich, ghim bang TownElderDialogueTreeTest.
+            { label_key: "dialogue.option.ask_dead_vein", action: "dead_vein" },
+            { label_key: "dialogue.option.ask_blood_sand_trail", action: "blood_sand_trail" },
+            { label_key: "dialogue.option.ask_scatter_band", action: "scatter_band" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]
     },
@@ -147,6 +153,35 @@
         text_key: "dialogue.town_elder.raider_band",
         options: [
             { label_key: "dialogue.option.accept_quest_raider_band", action: "accept_quest:break_the_raider_band" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    // Quang Lv22-27 cua arc 2 (V47). Ba nhanh nay noi tiep cai ket dang do cua `confront_steward`:
+    // ho phap chet, nhung thu han dao do o vung mach chet phia dong thi van nam day.
+    //
+    // NHIP HE LO (STORY §8 quy tac 2): o nhanh DAU ong lao CHUA biet chung la Huyet Sa - chi biet
+    // "nguoi la". Cai ten roi xuong o nhanh THU HAI, khi nguoi choi tu nhin thay dau hut tu vi.
+    dead_vein: {
+        text_key: "dialogue.town_elder.dead_vein",
+        options: [
+            { label_key: "dialogue.option.accept_quest_dead_vein", action: "accept_quest:dead_vein_intruders" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    blood_sand_trail: {
+        text_key: "dialogue.town_elder.blood_sand_trail",
+        options: [
+            { label_key: "dialogue.option.accept_quest_blood_sand_trail", action: "accept_quest:blood_sand_trail" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    scatter_band: {
+        text_key: "dialogue.town_elder.scatter_band",
+        options: [
+            { label_key: "dialogue.option.accept_quest_scatter_band", action: "accept_quest:scatter_the_blood_sand_band" },
             { label_key: "dialogue.option.back", action: "about_town" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]

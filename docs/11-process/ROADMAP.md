@@ -3089,3 +3089,92 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       ARC: thua là mất cả quãng đường 93m. Chủ dự án đã chốt hướng "ghi nhận, chưa sửa" cho họ lỗi
       này; ghi lại đây để khi xem lại có đủ số.
 
+80. **LÁT CẮT Lv22–27 CỦA ARC 2 — và số đo bác chính bản nháp đầu của nó (2026-09-14)**:
+    - 🎯 **Vì sao có đợt này.** Arc 1 khép ở Cấp 22 (playtest 2026-09-13), trong khi STORY §6 xếp arc 2
+      ở **Lv19–36**. Quãng Lv22–36 cần **39.900 EXP** ⇒ 11–14 quest theo nhịp hiện tại, tức ngang
+      bằng TOÀN BỘ 12 quest đang có. Chủ dự án chốt: làm **một lát cắt Lv22–27 trước**, đo thật rồi
+      mới viết tiếp — thay vì viết 14 quest trên giấy.
+    - 🗃️ **V47, một migration, không một dòng Java NỘI DUNG nào** (lần thứ mười): 2 loài, 3 điểm
+      spawn, 3 quest. Java đổi đúng MỘT hằng số hiển thị (`DemoPlatforms.GROUND_MAX_X` **115 → 170**,
+      lần thứ BA) vì luật "nền đất phải phủ hết spawn" bắt nó đi cùng lượt.
+    - ⛔ **SỐ ĐO BÁC BẢN NHÁP ĐẦU — và đây là bài học đắt nhất của đợt.** Bản đầu khai
+      `260/34/26` + `280/36/28` với lý do "biên 2", nhưng biên đó tính trên **máu ĐẦY 170**. Đi thẳng
+      từ tông ra x=120 thì tới nơi chỉ còn **96** (2 nhát tán tu + 1 thám tử + 1 quỷ đá), và ở mức đó
+      **KHÔNG tồn tại** bộ chỉ số nào vừa mạnh hơn đầu lĩnh arc 1 vừa giữ biên ≥2 — quét
+      `hp 210–400 × atk 32–44 × def 20–34` ra RỖNG. Tức lát cắt thua chắc.
+      📌 Đúng bài học *"máu lúc TỚI NƠI ≠ máu lúc BẮT ĐẦU ĐÁNH"* mà quest 8 đã trả giá — lặp lại lần
+      thứ ba, lần này trong chính migration đang viết nó.
+    - ⚖️ **Chủ dự án chốt ĐỔI LUẬT NỀN (2026-09-14): quãng ≥100m được tính CÓ hồi máu ở khe nghỉ.**
+      Khe yên tĩnh @80 do chính V45 tạo ra cho đúng việc này (ADR-046). ⚠️ `SpiritVeinDuelBalanceTest`
+      khai NGƯỢC LẠI (*"phải đứng vững cả khi họ KHÔNG dừng"*) và luật cũ vẫn đúng cho quãng 47m của
+      arc 1 — hai luật cùng tồn tại, ghi rõ ở cả V47 lẫn `BloodSandBandBalanceTest` để lần sau không
+      ai lặng lẽ trộn chúng.
+    - 🔬 **PLAYTEST BÁC TIẾP LẦN HAI — và lần này nó bác một câu tôi vừa tự viết ra.** Bản đầu tính
+      `arrivalHp = 170 − 27 = 143` với lý do "V46 hạ đoạt mạch xuống aggro 3 nên chúng không với tới
+      người đi ngang ở 5 m/s". `gameProbe` đo ngược: **aggro 3 VẪN đánh trúng đúng một nhát** — đoạt
+      mạch @47 đánh 12, đầu lĩnh @93 đánh 20, hai lần xác nhận độc lập, khớp `hit(atk, 50)` tới từng
+      điểm máu. V46 THU HẸP cửa sổ phủ đầu chứ không xoá nó — đúng như chính V46 đã ghi.
+      📌 `RaiderBandBalanceTest` vốn đã làm đúng từ đầu (nó trừ cả nhát của `vein_raider` dù con đó
+      cũng aggro 3), và số `arrivalHp = 111` của nó **đo trúng tới từng điểm máu**. Lớp mới là lớp
+      duy nhất lệch khỏi quy ước — lỗi nằm ở tôi, không ở mô hình sẵn có.
+    - ⚖️ **Chủ dự án chốt (lượt hai, 2026-09-14): DỜI QUỶ ĐÁ 106 → 161**, nền đất **157 → 170**.
+      Nghỉ đủ ở @80 rồi đi tiếp thì tới mạch chết còn **123** máu (đầu lĩnh 20 + quỷ đá 27), và ở đó
+      biên chỉ còn **+1**: đo được thắng còn **8 máu**, chỉ nhờ một chí mạng. Bỏ nhát quỷ đá ra thì
+      tới nơi **150** ⇒ tế đồ cần 7 nhát, người chơi cần 5 ⇒ **biên +2**. Ở 123 máu thì một tế đồ
+      "5 nhát" biên ≥2 là **bất khả** (quái cần 7 nhát ⇒ atk ≤ 26, mà atk phải >30 mới hơn đầu lĩnh).
+      📌 Lần thứ BA cùng một nước đi: V40 dời `47→80`, V45 dời `80→106`, nay V47 dời `106→161` — mỗi
+      lần vì nó là con đánh đau nhất trục chơi (atk 40) và nội dung mới cứ mọc ra phía sau nó.
+      ⚠️ Phương án `aggro 0 + retaliates` cũng cho biên +2 nhưng bị loại: nó đổi tính cách một loài
+      chạy từ V23. Phương án dời theo **y** bị loại ở tầng DỮ LIỆU — `CHECK (pos_y = 0)` trên
+      `monster_spawn` (thử ghi y=14 bị từ chối thật), và ADR-033 bỏ qua `dirY` nên quái lệch trục là
+      quái không ai chạm tới được.
+    - ⚖️ **Chỉ số cuối chọn TỪ test**: `blood_sand_acolyte` **220/34/26**, `blood_sand_ringleader`
+      **240/35/28**, cả hai biên 2. ⚠️ **Biên 3 là BẤT KHẢ** kể cả với arrivalHp 143 — nó đòi tế đồ
+      xuống hp 200, tức BẰNG đầu lĩnh arc 1 chứ không hơn. Và đàn chủ phải lấy `atk` **35** chứ không
+      phải 36: với 36 hắn cần hp ≤ 200 để giữ biên, mà hp phải > 220 để trên tế đồ — mâu thuẫn.
+      ⇒ Hệ quả đo được: **bộ "Ngoại Môn" mạnh hơn thang quái hiện có** (người chơi đánh đầu lĩnh arc 1
+      với biên 5), và ràng buộc này sẽ còn siết chặt hơn ở Lv28–36 — lúc đó là vấn đề THIẾT KẾ.
+    - 🎨 **Hai loài có art riêng ngay từ đầu** (`mob_blood-sand-acolyte`, `mob_blood-sand-ringleader`),
+      0 lượt Rodin, `kage_mesh_kit` headless. Huyết Sa nay có BỐN người nên chọn hình phải theo trục
+      SẮC ĐỘ: hai loài cũ đã chiếm hai đầu (scout tối + mảng đỏ lớn; enforcer áo sáng + đai hẹp), nên
+      tế đồ lấy điểm GIỮA (mid-tone + khăn sáng hẹp) và đàn chủ lấy điểm TỐI NHẤT + giáp vai sáng.
+      Vũ khí `kunai` (chưa loài nào dùng) và `long_blade`; tóc `spiky_short`/`bang` (hai kiểu cuối còn
+      trống). KHÔNG dùng `cloak` — lỗi "khối tối ăn mặt" đã ba lần.
+    - 📖 **STORY §7 bù luôn HAI dòng nợ cũ**: `blood_sand_scout` và `blood_sand_enforcer` (thêm từ
+      V41/V42) chưa bao giờ có dòng trong bảng lore↔hệ thống, dù §7 ghi "feature không có dòng ở đây
+      thì chưa được đặt tên/viết thoại". Nay đủ cả bốn loài Huyết Sa. (Còn `sample_boss` thiếu — loài
+      mẫu kỹ thuật từ V17, KHÔNG tự thêm, chờ chủ dự án.)
+    - ✅ **PLAYTEST SỐNG TRỌN LÁT CẮT (2026-09-16)** — ba quest đều `CLAIMED`, nhân vật đi từ Cấp 22
+      lên **Cấp 28** (38.850 EXP). Quest cho đúng 12.000 như thiết kế; phần dư tới từ quái dọc đường
+      và các lượt chơi lại, khớp câu "đóng quãng ở Cấp 27 **có dư**" mà chính V47 viết.
+      📌 Hai trận then chốt khớp mô hình tới từng điểm máu, và lần này **không cần chí mạng**:
+      tế đồ — tới nơi **150**, người chơi 5 nhát, biên **+2** (trước khi dời quỷ đá: tới nơi 123,
+      thắng còn 8 máu và chỉ nhờ một chí mạng); đàn chủ — tới nơi **147**, 5 nhát so với 7, biên **+2**.
+      📌 Việc dời quỷ đá được xác minh ở BA tầng, không phải một: dòng DB (`pos_x = 161`), hành vi
+      (1 nhát dọc đường → **0**), và thực thể sống (`MONSTER_SPAWNED_EVENT … stone_ogre x=161.53`).
+    - ⛔ **PHÁT HIỆN THIẾT KẾ: mô hình cân bằng chỉ phủ MỘT trận tay đôi.** Quest 14 đòi HAI mạng, và
+      chuyến thứ hai đi ngang con thứ nhất **vừa hồi sinh** (`respawn_seconds = 30`) — đo được tới
+      nơi còn **68** máu thay vì 170 ⇒ chết. Không lớp cân bằng nào của dự án tính số hạng này.
+      ⚠️ Và chỗ NGHỈ phải soi theo **leash**, không theo aggro: nghỉ ở `x=141` (cách tế đồ @134 7m >
+      aggro 3) vẫn chết đứng vì đi ngang đã ĐÁNH THỨC nó, mà leash 10 cho nó đuổi tới **144**. Ba chỗ
+      nghỉ trước đó (110, 127) thoát nạn vì lúc đó không con nào bị đánh thức, chứ không phải vì
+      chọn đúng. Hệ quả hình học: giữa @134 (với tới 146) và @148 (bắt từ 145) **không tồn tại chỗ
+      đứng hợp lệ nào** ⇒ đường duy nhất tới đàn chủ là dọn sạch tế đồ trước. Chưa test nào gác điều
+      kiện ba số hạng `khoảng cách > leash + tầm đánh + aggro(con sau)`.
+    - 🐛 **KHUNG HỘI THOẠI TRÀN MÀN HÌNH — tìm ra và đã vá.** `DialoguePanel` là cửa sổ có-danh-sách
+      DUY NHẤT chưa bao giờ nằm trong `HudLayoutBudgetTool` (bảy cửa sổ kia có từ 2026-09-11). Ba
+      nhánh quest mới đẩy `about_town` lên 15 lựa chọn ⇒ đo được **870px / 720px**.
+      ⚠️ Hướng tràn NGƯỢC với mọi cửa sổ khác: khung neo ĐÁY, nở LÊN TRÊN, nên thứ bị đẩy ra ngoài là
+      **lời thoại của NPC** và các lựa chọn ĐẦU — không phải ba nhánh mới ở cuối. Bọc `ScrollingList`
+      (trần 420px, đúng khuôn 7 panel anh em, không đổi public API) ⇒ **570px, dư 150px**. Công cụ
+      nay đo **tám** cửa sổ.
+      📌 Vì sao nó lọt lâu vậy: nó KHÔNG có trần `MAX_VISIBLE_*` nào, nên ô `ScrollingListTest`
+      "không cửa sổ nào giữ trần riêng" vẫn xanh vô hại. **Không có trần thì không có gì để kiểm —
+      và cũng không có gì chặn nó nở.**
+    - 🧪 **Ba ô test spawn phải sửa cùng lượt** (`hasSize(12)`→15, danh sách toạ độ +120/134/148,
+      `aggressive hasSize(9)`→11) — chính ô đó tự ghi chú "mỗi đợt thêm loài CÓ aggro đều phải sửa
+      nó, đó là chủ đích". Cây thoại `about_town` đi 12 → **15** lựa chọn, ghim lại ở
+      `TownElderDialogueTreeTest`.
+    - ⏳ **CHƯA PLAYTEST** — mọi con số ở trên là giấy cho tới lúc đó. Arc 1 đã bị playtest bác ba
+      lần trong một ngày, và chính đợt này vừa tự bác bản nháp đầu bằng phép tính.
+

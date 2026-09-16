@@ -106,6 +106,8 @@ class NightWatchDuelBalanceTest {
         // lượt người chơi đi ngang, đủ để quest 8 thua chắc. V45 dời nó LẦN NỮA, 80 → 106, vì cùng
         // một lý do lặp lại ở quãng Lv10–18: nó nằm trên đường tới sào huyệt đoạt mạch @93. Luật
         // V29 vẫn phải đúng ở mỗi chỗ mới — đó là điều ô này gác, không phải con số cụ thể.
-        assertThat(106f - 34f).isGreaterThan(combinedReach);
+        // V47 dời nó LẦN THỨ BA, 106 → 161, ra sau đàn chủ Huyết Sa @148 — cùng lý do lặp lại ở
+        // quãng Lv22–27: nó chắn đường tới vùng mạch chết và một mình nó lấy 27 máu mỗi lượt đi qua.
+        assertThat(161f - 34f).isGreaterThan(combinedReach);
     }
 }

@@ -192,7 +192,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         List<MonsterSpawnPoint> spawns =
                 new PostgresMonsterCatalogAdapter(dataSource).listSpawnPoints(MonsterSpawnPoint.MAIN_WORLD_CODE);
 
-        assertThat(spawns).hasSize(12);
+        assertThat(spawns).hasSize(15);
         // ADR-033 — quái lệch khỏi y=0 là quái người chơi không bao giờ chạm tới. DB có CHECK,
         // đây là hàng rào thứ hai và cũng là tài liệu sống cho ràng buộc đó.
         assertThat(spawns).allSatisfy(spawn -> assertThat(spawn.posY()).isZero());
@@ -230,7 +230,29 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         // người chơi hồi máu trước trận cuối (ADR-046).
         assertThat(spawns)
                 .extracting(MonsterSpawnPoint::posX)
-                .containsExactlyInAnyOrder(-47f, -33f, -20f, -8f, 8f, 14f, 21f, 34f, 47f, 66f, 93f, 106f);
+                .containsExactlyInAnyOrder(
+                        -47f,
+                        -33f,
+                        -20f,
+                        -8f,
+                        8f,
+                        14f,
+                        21f,
+                        34f,
+                        47f,
+                        66f,
+                        93f,
+                        // V47 — quãng Lv22–27 của arc 2: hai tế đồ Huyết Sa và một đàn chủ ở
+                        // vùng mạch chết phía đông. `DemoPlatforms.GROUND_MAX_X` đi 115 → 170
+                        // cùng đợt.
+                        120f,
+                        134f,
+                        148f,
+                        // Và V47 dời quỷ đá LẦN THỨ BA, 106 → 161: playtest đo được nó lấy 27 máu
+                        // mỗi lượt người chơi đi từ khe nghỉ @80 ra mạch chết @120, kéo biên trận
+                        // tế đồ từ +2 xuống +1. Nay nó đứng SAU đàn chủ, vẫn săn được, không chắn
+                        // đường ai. Cùng nước đi V40 (47→80) và V45 (80→106) đã làm.
+                        161f);
     }
 
     /**
@@ -306,13 +328,16 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
                 .toList();
 
         // 2 tán tu + 1 quỷ đá + 2 thạch vệ (V30) + 1 cỗ khảo hạch (V33) + 1 thám tử Huyết Sa (V40)
-        // + 1 đoạt mạch @47 và 1 đầu lĩnh @93 (V45) = 9.
+        // + 1 đoạt mạch @47 và 1 đầu lĩnh @93 (V45) + 2 tế đồ @120/@134 và 1 đàn chủ @148 (V47) = 12.
+        //
+        // ⚠️ V47 thêm HAI loài nhưng BA điểm spawn — tế đồ có hai chỗ đứng. Bản sửa đầu ghi 11 vì
+        // đếm theo số LOÀI; ô này đếm SPAWN, và nó đỏ ngay — đúng việc nó sinh ra để làm.
         //
         // Mộc nhân aggro 0, không tính — và chấp sự Hình Vân Sơn @-8 cũng vậy (V41 cho hắn aggro 0
         // CỐ Ý, xem shouldListMainWorldSpawnPointsOnThePlayLine). Con số này là một cái ĐẾM chứ
         // không phải một luật, nên mỗi đợt thêm loài CÓ aggro đều phải sửa nó — đó là chủ đích:
         // thêm một con biết tự đánh người mà không ai đọc lại luật giãn spawn thì ô này đỏ trước.
-        assertThat(aggressive).hasSize(9);
+        assertThat(aggressive).hasSize(12);
         for (int i = 0; i < aggressive.size(); i++) {
             for (int j = i + 1; j < aggressive.size(); j++) {
                 MonsterSpawnPoint first = aggressive.get(i);
