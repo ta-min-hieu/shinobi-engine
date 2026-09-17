@@ -61,7 +61,8 @@ import dev.kage.client.core.ui.theme.KageSkin;
  * kiểm — và cũng không có gì chặn nó nở.
  *
  * Số lựa chọn ở đó KHÔNG do client quyết: nó bằng số nhánh trong {@code town_elder.js}, và nhánh
- * chỉ thêm chứ chưa bao giờ bớt. V47 đẩy {@code about_town} lên 15 lựa chọn ⇒ đo được <b>870px</b>.
+ * chỉ thêm chứ chưa bao giờ bớt. V47 đẩy {@code about_town} lên 15 lựa chọn ⇒ đo được <b>870px</b>;
+ * V48 đẩy tiếp lên <b>20</b>, và đó chính là thứ vùng cuộn sinh ra để chịu.
  *
  * ⚠️ Và hướng tràn ở đây NGƯỢC với sáu cửa sổ kia: khung hội thoại neo ở ĐÁY rồi nở LÊN TRÊN, nên
  * thứ bị đẩy ra ngoài màn hình là ĐỈNH khung — <b>chính lời thoại của NPC</b> cùng những lựa chọn
@@ -138,6 +139,11 @@ public final class HudLayoutBudgetTool extends ApplicationAdapter {
         options.add("dialogue.option.ask_dead_vein");
         options.add("dialogue.option.ask_blood_sand_trail");
         options.add("dialogue.option.ask_scatter_band");
+        options.add("dialogue.option.ask_wasteland_edge");
+        options.add("dialogue.option.ask_rank_board");
+        options.add("dialogue.option.ask_pill_run");
+        options.add("dialogue.option.ask_proving");
+        options.add("dialogue.option.ask_breakthrough");
         options.add("dialogue.option.bye");
         panel.show("dialogue.town_elder.about_town", options);
         measure("Hội thoại", panel, panel::preferredHeight);

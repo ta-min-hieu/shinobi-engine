@@ -80,6 +80,14 @@ class TownElderDialogueTreeTest {
                         "dead_vein",
                         "blood_sand_trail",
                         "scatter_band",
+                        // V48 — quãng Lv28–36, chèn SAU `scatter_band` vì đây là đoạn khép arc 2 ở
+                        // Trúc Cơ tầng 9. Chỉ `end` lùi năm chỗ; `option_index` là VỊ TRÍ nên đây là
+                        // thay đổi CÓ CHỦ ĐÍCH, ghim lại ngay tại đây.
+                        "wasteland_edge",
+                        "rank_board",
+                        "pill_run",
+                        "proving",
+                        "breakthrough",
                         "end");
         assertThat(node("about_realm").textKey()).isEqualTo("dialogue.town_elder.about_realm");
         assertThat(node("about_elder").textKey()).isEqualTo("dialogue.town_elder.about_elder");
@@ -223,6 +231,35 @@ class TownElderDialogueTreeTest {
      * <p>⚠️ Nhịp hé lộ (STORY §8 quy tắc 2): nhánh ĐẦU ông lão chưa biết chúng là Huyết Sa — chỉ
      * biết "người lạ". Cái tên rơi xuống ở nhánh THỨ HAI, khi người chơi tự nhìn thấy dấu hút tu vi.
      */
+    /**
+     * ⚠️ Ô này tồn tại vì V48 đã lên master THIẾU đúng thứ nó gác: năm quest có hàng
+     * {@code quest_template} và có script, nhưng KHÔNG có nhánh thoại nào — tức nội dung nằm trong
+     * DB mà người chơi không có đường chạm tới. Thêm quest = ba thứ, không phải hai.
+     */
+    @Test
+    @DisplayName("Năm nhánh Lv28–36 nhận đúng năm mã quest, và nhánh cuối là nhịp đóng arc 2")
+    void foundationBranchesOfferTheArcTwoClosingQuests() {
+        assertThat(node("wasteland_edge").options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:wasteland_edge_patrol", "about_town", "end");
+
+        assertThat(node("rank_board").options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:rank_board_dispute", "about_town", "end");
+
+        assertThat(node("pill_run").options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:foundation_pill_run", "about_town", "end");
+
+        assertThat(node("proving").options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:outer_sect_proving", "about_town", "end");
+
+        assertThat(node("breakthrough").options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:foundation_breakthrough", "about_town", "end");
+    }
+
     @Test
     @DisplayName("Ba nhánh mạch chết nhận đúng ba mã quest của quãng Lv22–27")
     void deadVeinBranchesOfferTheArcTwoUpperQuests() {

@@ -58,6 +58,11 @@
             { label_key: "dialogue.option.ask_dead_vein", action: "dead_vein" },
             { label_key: "dialogue.option.ask_blood_sand_trail", action: "blood_sand_trail" },
             { label_key: "dialogue.option.ask_scatter_band", action: "scatter_band" },
+            { label_key: "dialogue.option.ask_wasteland_edge", action: "wasteland_edge" },
+            { label_key: "dialogue.option.ask_rank_board", action: "rank_board" },
+            { label_key: "dialogue.option.ask_pill_run", action: "pill_run" },
+            { label_key: "dialogue.option.ask_proving", action: "proving" },
+            { label_key: "dialogue.option.ask_breakthrough", action: "breakthrough" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]
     },
@@ -166,6 +171,56 @@
         text_key: "dialogue.town_elder.dead_vein",
         options: [
             { label_key: "dialogue.option.accept_quest_dead_vein", action: "accept_quest:dead_vein_intruders" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+
+    // --- V48, quãng Lv28–36: nhịp ĐÓNG arc 2 ---------------------------------------------------
+    // ⚠️ Năm nhánh này lẽ ra phải đi CÙNG V48. Migration và script quest đã lên master mà không có
+    // một lối vào nào — nội dung tồn tại trong DB nhưng người chơi không chạm tới được. Bài học:
+    // thêm quest = thêm hàng `quest_template` + script + NHÁNH THOẠI, thiếu cái thứ ba thì hai cái
+    // kia là đồ trang trí.
+    wasteland_edge: {
+        text_key: "dialogue.town_elder.wasteland_edge",
+        options: [
+            { label_key: "dialogue.option.accept_quest_wasteland_edge", action: "accept_quest:wasteland_edge_patrol" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+
+    rank_board: {
+        text_key: "dialogue.town_elder.rank_board",
+        options: [
+            { label_key: "dialogue.option.accept_quest_rank_board", action: "accept_quest:rank_board_dispute" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+
+    pill_run: {
+        text_key: "dialogue.town_elder.pill_run",
+        options: [
+            { label_key: "dialogue.option.accept_quest_pill_run", action: "accept_quest:foundation_pill_run" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+
+    proving: {
+        text_key: "dialogue.town_elder.proving",
+        options: [
+            { label_key: "dialogue.option.accept_quest_proving", action: "accept_quest:outer_sect_proving" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+
+    breakthrough: {
+        text_key: "dialogue.town_elder.breakthrough",
+        options: [
+            { label_key: "dialogue.option.accept_quest_breakthrough", action: "accept_quest:foundation_breakthrough" },
             { label_key: "dialogue.option.back", action: "about_town" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]
