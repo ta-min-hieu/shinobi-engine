@@ -27,15 +27,22 @@ import dev.kage.client.core.render.FontFactory;
  * {@link #buttonStyle}/{@link #textFieldStyle}/{@link #healthFill}/{@link #healthEmpty}, không biết
  * chúng sinh ra thế nào).
  *
- * <p>⚠️ Font nạp qua đường dẫn tương đối {@code ../raw/fonts/} thoát khỏi {@code workingDir}
- * ({@code assets/exported/}, xem {@code client-desktop/build.gradle.kts}) — {@code assets/raw/}
- * chưa được đưa vào asset-pipeline (RESOURCE.md §7: "chưa có UI nào tiêu thụ"). Đây là lối tắt có
- * chủ đích cho bản demo đầu tiên, không phải tích hợp pipeline thật — theo dõi ở RESOURCE.md.
+ * <p>Font nạp từ CLASSPATH ({@code fonts/…}), không phải từ thư mục làm việc. Bản trước dùng
+ * {@code ../raw/fonts/…} — một đường dẫn THOÁT RA NGOÀI {@code workingDir} ({@code assets/exported/}),
+ * chạy được ở dev chỉ vì mọi task Gradle đều tự đặt {@code workingDir} về gốc asset. Bản CÀI thì
+ * không: nó khởi động từ chỗ người dùng đứng, nên đường đó trỏ vào hư không và client **không hiện
+ * được một chữ nào**. Đo thật 2026-09-16: {@code installDist} ra {@code bin/} + {@code lib/} với 69
+ * jar và KHÔNG một file {@code .ttf} nào.
+ *
+ * <p>Nay {@code client-core/build.gradle.kts} copy đúng file đó từ {@code assets/raw/fonts/} vào
+ * classpath lúc {@code processResources} — một nguồn sự thật, không nhân bản file trong repo. Cùng
+ * cơ chế {@code i18n/strings} và {@code tls/dev-cert.pem} vẫn chạy, nên đường này đã được chứng
+ * minh chứ không phải mới.
  * {@code LoginScreen}/{@code CharacterSelectScreen} (client-core/screen/) dùng chung skin này.
  */
 public final class KageSkin implements Disposable {
 
-    private static final String FONT_PATH = "../raw/fonts/BeVietnamPro-Regular.ttf";
+    private static final String FONT_PATH = "fonts/BeVietnamPro-Regular.ttf";
     private static final int FONT_SIZE_PX = 20;
 
     private final BitmapFont font;

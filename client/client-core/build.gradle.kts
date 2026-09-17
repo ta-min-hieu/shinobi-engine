@@ -37,6 +37,21 @@ dependencies {
     testImplementation(libs.logback.classic)
 }
 
+// Font tiếng Việt lên CLASSPATH, lấy thẳng từ `assets/raw/fonts/` — MỘT nguồn sự thật, không nhân
+// bản file .ttf thứ hai trong repo (RESOURCE.md §7 giữ nguyên vị trí gốc, và
+// `FontFactoryVietnameseGlyphTest` vẫn đọc theo đường repo nên không bị ảnh hưởng).
+//
+// Vì sao classpath chứ không phải thư mục: `Gdx.files.internal` phân giải theo WORKING DIRECTORY
+// rồi mới rơi về classpath. Bản cài khởi động từ chỗ người dùng đứng, không ai đảm bảo cwd là gốc
+// asset — nhưng classpath thì luôn đúng. Đây chính là cách `i18n/strings` và `tls/dev-cert.pem`
+// đang chạy, nên không phải cơ chế mới.
+tasks.named<ProcessResources>("processResources") {
+    from(rootProject.layout.projectDirectory.dir("assets/raw/fonts")) {
+        include("BeVietnamPro-Regular.ttf")
+        into("fonts")
+    }
+}
+
 // Chạy CharacterModelFrameBenchmarkTool — KHÔNG qua `test` (JUnit): cần MỞ CỬA SỔ GL thật, việc
 // `test` không hỗ trợ và CI (ci.yml, ubuntu-latest, không Xvfb — xem FontFactoryVietnameseGlyphTest)
 // sẽ luôn fail nếu chạy ở đó. Asset root giống hệt client-desktop/build.gradle.kts: workingDir phải
