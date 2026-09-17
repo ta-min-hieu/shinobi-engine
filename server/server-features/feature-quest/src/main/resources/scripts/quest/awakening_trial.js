@@ -41,7 +41,8 @@
 //
 //    `ExperienceCurve` là tuyến tính 100 × cấp ⇒ tổng EXP của Cấp 10 là 4.500, của Cấp 11 là 5.500.
 //    Đường tối thiểu về đích ở 4.585: đúng Cấp 10, chưa chạm Cấp 11. Phép tính này được KHOÁ LẠI
-//    bằng `AwakeningTrialProgressionTest` (server-world) — nó đối chiếu với `ExperienceCurve` thật
+//    bằng `QuestIntegrationTest.shouldLandExactlyAtLevelTen_afterTheWholeArcOneChain` — nó đối
+//    chiếu với `ExperienceCurve` thật
 //    chứ không chép lại công thức, nên đổi đường cong EXP là test đỏ ngay.
 //
 //    ⚠️ Đổi hai số này là quyết định gameplay riêng, cần playtest riêng — và nếu đổi số 1800 thì

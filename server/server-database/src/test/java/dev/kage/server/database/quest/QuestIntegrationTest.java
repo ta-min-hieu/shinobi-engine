@@ -687,6 +687,132 @@ class QuestIntegrationTest {
         assertThat(readLevel(characterId)).isEqualTo(10); // cột level THẬT, thứ SelectFactionUseCase đọc
     }
 
+    /**
+     * Nhịp ĐÓNG arc 2 — ràng buộc cuối cùng của v1: lĩnh thưởng quest thứ HAI MƯƠI xong thì người
+     * chơi phải đứng ở ĐÚNG <b>Cấp 36</b>.
+     *
+     * <p><b>Vì sao đúng 36.</b> {@code CultivationRealm.of(level)} chia năm cảnh giới đầu theo 18
+     * cấp một cảnh giới: {@code realmIndex = (level − 1) / 18}. Ở Cấp 36 ⇒ {@code realmIndex = 1}
+     * (<b>Trúc Cơ</b>), {@code levelInRealm = 18} ⇒ <b>tầng 9</b>, tầng CUỐI. Cấp 37 đã sang Tử Phủ,
+     * tức arc 3. Mốc "Trúc Cơ thành công" của STORY §6 vì thế là có thật về CƠ CHẾ, và v1 kết thúc ở
+     * ranh giới cảnh giới chứ không phải ở chỗ hết việc.
+     *
+     * <p>Đi ĐÚNG đường ít EXP nhất qua cả hai arc: chỉ EXP thưởng quest + đúng số quái mà chính các
+     * quest bắt hạ, KHÔNG cày thêm con nào.
+     *
+     * <p>⚠️ <b>Biên tới Cấp 37 chỉ còn ~1.665 EXP</b> (mốc 36 là 63.000, mốc 37 là 66.600, đường tối
+     * thiểu về đích ở ~64.935). Người chơi cày thêm vài con là vượt sang Tử Phủ trước khi arc 3 tồn
+     * tại. Đó là thứ CẦN BIẾT khi viết arc 3, không phải lỗi của ô này — ô này khoá đường TỐI THIỂU,
+     * đúng như ô Cấp 10 ở trên.
+     */
+    @Test
+    void shouldLandExactlyAtLevelThirtySix_afterTheWholeArcTwoChain() {
+        long characterId = createFreshCharacter("ArcTwoMinimal");
+
+        playWholeArcOne(characterId);
+        playArcTwoLower(characterId);
+        playArcTwoUpper(characterId);
+
+        // 63.000 = 100 × (1+…+35) là mốc Cấp 36; 66.600 là mốc Cấp 37.
+        assertThat(ExperienceCurve.progressOf(readExp(characterId)).level()).isEqualTo(36);
+        assertThat(readLevel(characterId)).isEqualTo(36);
+    }
+
+    /**
+     * Quest hỗn hợp — {@link #playQuest} chỉ biết giết quái, nên bước {@code npc_talked} phải lái
+     * tay. Vẫn cộng EXP quái và vẫn hoà giải cột {@code level} y hệt {@code playQuest}, nếu không
+     * phép cộng của ô khoá sẽ đếm thiếu.
+     */
+    private static void playQuestWithTalk(
+            long characterId, String questCode, String monsterCode, int kills, String npcCode) {
+        GrantExperienceUseCase experience = new GrantExperienceUseCase(new PostgresCharacterAdapter(dataSource));
+        // ⚠️ ASSERT chứ không nuốt: bản đầu bỏ qua kết quả, nên bốn quest bị từ chối
+        // (PREREQUISITE_NOT_MET) trôi qua im lặng và lỗi chỉ nổ ở `playQuest` mãi sau — mất một
+        // vòng chẩn đoán chỉ vì một dòng không kiểm.
+        assertThat(newAcceptUseCase().execute(characterId, questCode)).isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
+        for (int kill = 0; kill < kills; kill++) {
+            newProcessUseCase().monsterKilled(characterId, monsterCode);
+            experience.execute(characterId, expRewardOf(monsterCode));
+        }
+        newProcessUseCase().npcTalked(characterId, npcCode);
+        assertThat(newClaimUseCase()
+                        .execute(characterId, questCode, newIdempotencyKey())
+                        .outcome())
+                .isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
+        experience.execute(characterId, 0L);
+    }
+
+    /**
+     * Arc 1 + nhịp mở arc 2 — MƯỜI HAI quest, theo ĐÚNG chuỗi tiên quyết trong DB.
+     *
+     * <p>⚠️ Thứ tự ở đây KHÔNG phải thứ tự người ta đoán từ tên quest. V45 trỏ lại tiên quyết của
+     * {@code report_to_outer_sect} từ {@code awakening_trial} sang {@code break_the_raider_band},
+     * nên arc 1 phải đi HẾT tới Cấp 18 rồi mới được sang arc 2. Bản đầu của hàm này xếp quest 5–9
+     * lên trước và ô khoá Cấp 36 đỏ với {@code PREREQUISITE_NOT_MET} — đọc chuỗi từ DB, đừng xếp
+     * theo trí nhớ.
+     */
+    private static void playWholeArcOne(long characterId) {
+        playQuest(characterId, QUEST_CODE, "training_dummy", 3);
+        playQuest(characterId, NIGHT_WATCH_CODE, "wandering_bandit", 3);
+        playQuest(characterId, OLD_ARCHIVE_CODE, "archive_warden", 2);
+        playQuest(characterId, AWAKENING_TRIAL_CODE, "trial_construct", 1);
+
+        // Lv10 -> Lv18: ba quest của V45, và `break_the_raider_band` mới là thứ MỞ arc 2.
+        playQuest(characterId, "spirit_vein_raiders", "vein_raider", 3);
+        playQuestWithTalk(characterId, "first_cultivation_manual", "vein_raider", 2, "town_elder");
+        playQuestWithTalk(characterId, "break_the_raider_band", "raider_chieftain", 1, "town_elder");
+
+        // Arc 2 nhịp mở — không đếm quái, chỉ mở lời với Tô Vân Nhi.
+        playQuestWithTalk(characterId, REPORT_TO_OUTER_SECT_CODE, "training_dummy", 0, "senior_sister");
+
+        // Giao đồ: thẻ bài phải có SẴN trong túi thì `take_item` mới lấy được.
+        insertInventoryRow(characterId, "outer_sect_tally", 3, 0);
+        playQuestWithTalk(characterId, "recover_outer_sect_tallies", "training_dummy", 0, "senior_sister");
+
+        // Hỏi Chu Hoành TRƯỚC rồi mới dọn hai tán tu — thứ tự sống trong script.
+        GrantExperienceUseCase experience = new GrantExperienceUseCase(new PostgresCharacterAdapter(dataSource));
+        assertThat(newAcceptUseCase().execute(characterId, "missing_disciple_trail"))
+                .isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
+        newProcessUseCase().npcTalked(characterId, "town_elder");
+        for (int kill = 0; kill < 2; kill++) {
+            newProcessUseCase().monsterKilled(characterId, "wandering_bandit");
+            experience.execute(characterId, expRewardOf("wandering_bandit"));
+        }
+        // ⚠️ Bước 3 đòi TÔ VÂN NHI, không phải Chu Hoành — quest nhận từ ông nhưng báo cho cô.
+        newProcessUseCase().npcTalked(characterId, "senior_sister");
+        assertThat(newClaimUseCase()
+                        .execute(characterId, "missing_disciple_trail", newIdempotencyKey())
+                        .outcome())
+                .isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
+        experience.execute(characterId, 0L);
+
+        // Hạ thám tử rồi đưa lệnh phù tận tay Tô Vân Nhi.
+        insertInventoryRow(characterId, "blood_sand_talisman", 1, 0);
+        playQuestWithTalk(characterId, "abandoned_cave", "blood_sand_scout", 1, "senior_sister");
+
+        playQuestWithTalk(characterId, "confront_the_steward", "blood_sand_enforcer", 1, "senior_sister");
+    }
+
+    /** Quãng Lv22–27 (V47) — ba quest của vùng mạch chết. */
+    private static void playArcTwoLower(long characterId) {
+        playQuest(characterId, "dead_vein_intruders", "blood_sand_acolyte", 3);
+        playQuestWithTalk(characterId, "blood_sand_trail", "blood_sand_acolyte", 2, "senior_sister");
+        playQuestWithTalk(characterId, "scatter_the_blood_sand_band", "blood_sand_ringleader", 1, "town_elder");
+    }
+
+    /** Quãng Lv28–36 (V48) — năm quest, nhịp đóng arc 2 và nội dung cuối của v1. */
+    private static void playArcTwoUpper(long characterId) {
+        playQuestWithTalk(characterId, "wasteland_edge_patrol", "blood_sand_ringleader", 1, "town_elder");
+        playQuestWithTalk(characterId, "rank_board_dispute", "wasteland_beast", 2, "senior_sister");
+
+        // Đan dược phải có sẵn trong túi — `foundation_pill_run` lấy 3 viên lúc giao.
+        insertInventoryRow(characterId, "minor_healing_pill", 3, 0);
+        playQuestWithTalk(characterId, "foundation_pill_run", "wasteland_beast", 2, "town_elder");
+
+        playQuestWithTalk(characterId, "outer_sect_proving", "wasteland_beast", 3, "town_elder");
+        playQuestWithTalk(characterId, "foundation_breakthrough", "foundation_warden", 1, "town_elder");
+    }
+
     // ---------------------------------------------------------------------------------------
     // Quest THỨ NĂM — `report_to_outer_sect` (seed V37, STORY.md §6 arc 2 nhịp MỞ).
     //

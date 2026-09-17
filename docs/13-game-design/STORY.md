@@ -272,6 +272,9 @@ mới = thêm dòng cùng PR (như luật GLOSSARY §4):
 | Tế Đồ Huyết Sa (`blood_sand_acolyte`) | Môn đồ thường của giáo, tu bằng cách hút tu vi kẻ khác (§4.3). Sau khi chấp sự tự tan tu vi, chúng quay lại vùng mạch chết phía đông tìm thứ hắn bỏ dở — và bắt người dọc đường làm "nhiên liệu" |
 | Đàn Chủ Huyết Sa (`blood_sand_ringleader`) | Kẻ cầm đầu toán tế đồ trên, một bậc trên chúng. Không phải hộ pháp — chỉ là đàn chủ một toán nhỏ, nên hạ được hắn thì toán tan chứ giáo không suy suyển gì |
 | Đầu Lĩnh Đoạt Mạch (`raider_chieftain`) | Kẻ cầm đầu đám trên, đóng ở chỗ mạch cạn phía đông. Một tán tu có bản lĩnh thật nhưng không tông không môn — hạ được hắn thì đám kia tự tan, và thân phận tạp dịch của người chơi chấm dứt (nhịp đóng arc 1) |
+| Yêu Nhân Hoang Vực (`wasteland_beast`) | Tu sĩ bị mạch chết làm biến dị ở rìa Hoang Vực — vùng linh mạch chết ngoài vòng luật lệ. Đệ tử ngoại môn bị cắt phần tài nguyên theo thứ hạng phải tự ra đây kiếm, và đó là lý do tường thuật của quãng Lv28–36 |
+| Trắc Trúc Cơ Thạch Nhân (`foundation_warden`) | Cùng dòng máy móc Linh Triều với `trial_construct` của khảo hạch Lv10, nhưng là cỗ tông môn dựng riêng cho kỳ khảo hạch Trúc Cơ — một bậc trên, và là đối thủ của nhịp ĐÓNG arc 2 |
+| Bộ "Trúc Cơ" (`foundation_*`, 6 món, Lv30) | Đồ tông môn cấp cho đệ tử sắp vào khảo hạch Trúc Cơ. Không bán ở Tàng Bảo Các: nó là ĐIỀU KIỆN CẦN của hai nhịp cuối, bán đi là cho phép mua đường tắt qua chính chuỗi quest dựng ra nó |
 | Chết → hồi sinh tại hub | Đệ tử mang **hộ mệnh ngọc** của tông: thân tan thì hồn về núi, tông môn tái tụ thân thể (tổn thất = rơi tu vi/đồ tuỳ cơ chế) |
 | Nhiệm vụ ngày | Công việc tông môn: gánh nước, tuần sơn, hái linh thảo, trông lò luyện đan |
 | Nhiệm vụ bang | Nhiệm vụ Đường/bang hội giao theo tuần |

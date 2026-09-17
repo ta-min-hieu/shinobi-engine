@@ -192,7 +192,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         List<MonsterSpawnPoint> spawns =
                 new PostgresMonsterCatalogAdapter(dataSource).listSpawnPoints(MonsterSpawnPoint.MAIN_WORLD_CODE);
 
-        assertThat(spawns).hasSize(15);
+        assertThat(spawns).hasSize(18);
         // ADR-033 — quái lệch khỏi y=0 là quái người chơi không bao giờ chạm tới. DB có CHECK,
         // đây là hàng rào thứ hai và cũng là tài liệu sống cho ràng buộc đó.
         assertThat(spawns).allSatisfy(spawn -> assertThat(spawn.posY()).isZero());
@@ -252,7 +252,13 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
                         // mỗi lượt người chơi đi từ khe nghỉ @80 ra mạch chết @120, kéo biên trận
                         // tế đồ từ +2 xuống +1. Nay nó đứng SAU đàn chủ, vẫn săn được, không chắn
                         // đường ai. Cùng nước đi V40 (47→80) và V45 (80→106) đã làm.
-                        161f);
+                        161f,
+                        // V48 — quãng Lv28–36, nhịp ĐÓNG arc 2 và là nội dung cuối của v1: hai yêu
+                        // thú rìa Hoang Vực @175/@188 và cỗ khảo hạch Trúc Cơ @201.
+                        // `DemoPlatforms.GROUND_MAX_X` đi 170 → 210 cùng đợt (lần thứ TƯ).
+                        175f,
+                        188f,
+                        201f);
     }
 
     /**
@@ -337,7 +343,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         // CỐ Ý, xem shouldListMainWorldSpawnPointsOnThePlayLine). Con số này là một cái ĐẾM chứ
         // không phải một luật, nên mỗi đợt thêm loài CÓ aggro đều phải sửa nó — đó là chủ đích:
         // thêm một con biết tự đánh người mà không ai đọc lại luật giãn spawn thì ô này đỏ trước.
-        assertThat(aggressive).hasSize(12);
+        assertThat(aggressive).hasSize(15);
         for (int i = 0; i < aggressive.size(); i++) {
             for (int j = i + 1; j < aggressive.size(); j++) {
                 MonsterSpawnPoint first = aggressive.get(i);

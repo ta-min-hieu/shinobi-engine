@@ -688,6 +688,69 @@ Closed Beta → Open Beta → Release Candidate → Production → Hotfix
 
 ---
 
+### v1 — định nghĩa "XONG" (chủ dự án chốt 2026-09-16)
+
+Phase 10 là phase **duy nhất** chưa bao giờ có Exit Criteria hình thức (mục 22 tự ghi điều đó), nên
+"xong" là một từ không đo được — và đó chính là thứ chặn mọi ước lượng tiến độ. Mục này chốt lại.
+
+**Hướng đi chủ dự án chọn**: *hoàn thiện một bản HOÀN CHỈNH sớm nhất có thể, rồi phát triển thêm dần*.
+Hai quyết định kèm theo:
+
+| Quyết định | Chọn | Vì sao |
+|---|---|---|
+| Điểm dừng cốt truyện của v1 | **đóng arc 2 ở Lv36** | twist (`abandoned_cave`) và cao trào (`confront_the_steward`) của arc 2 **đã xong**; chỉ còn mốc "Trúc Cơ thành công" của STORY §6. Người chơi kết thúc v1 bằng một thành tựu, không phải hết việc giữa chừng |
+| Xác thực | **giữ username-only** | đúng thiết kế đã ghi từ V1 và đúng cảnh báo trong `docker-compose.prod.yml`: chấp nhận được cho Closed Beta nội bộ qua mạng riêng |
+
+**Exit Criteria — v1 (Closed Beta nội bộ):**
+- [ ] **Arc 2 khép ở Lv36** — thêm ~5 quest tới mốc "Trúc Cơ thành công" (tỉ lệ đo được: 0,6 quest/cấp,
+      từ lát cắt Lv22–27 là 3 quest = 5 cấp)
+- [x] **Người chơi hết nội dung thì được BÁO** (2026-09-16) — `QuestTracker.everyQuestClaimed()` +
+      chuỗi `questlog.all_claimed`. Trước đó `listNotice` chỉ nói khi nhật ký RỖNG, nên người cày hết
+      mọi quest (tổng > 0) thấy **không gì cả**: một bức tường vô hình. Ba ô gác ở `QuestTrackerTest`
+      (toàn CLAIMED ⇒ đúng · còn một dòng chưa lĩnh ⇒ sai · nhật ký rỗng ⇒ sai, vì đó là *chưa nhận*
+      chứ không phải *đã hết* — chỗ dễ nói dối nhất của tính năng này).
+      ⚠️ `gameProbe` KHÔNG kiểm được ô này: probe chạy headless, không dựng HUD. Bằng chứng là test,
+      không phải playtest.
+- [x] **Bản cài client mang theo asset và KHỞI ĐỘNG được** (2026-09-16) — `installDist` nay ra
+      `lib/kage-assets.jar` (**20,9 MB, 48 mục**: `models/med/` 29 file + `atlases/` 16 file), và font
+      đã lên classpath trong `client-core.jar` (`fonts/`, cạnh `i18n/` và `tls/`).
+      📌 `KageSkin.FONT_PATH` thôi trỏ `../raw/fonts/…` — đường đó THOÁT khỏi `workingDir`, chạy
+      được ở dev chỉ vì mọi task Gradle tự đặt cwd về gốc asset; bản cài thì không.
+      📌 Và một lỗi có TRƯỚC mọi thay đổi đóng gói: dòng `set CLASSPATH=` của script khởi động dài
+      **8.294 ký tự** sau khi `%APP_HOME%` nở, vượt trần **8.191** của `cmd.exe` ⇒ *"The input line
+      is too long"*, `cmd` chết trước khi Java kịp chạy. Bỏ hẳn jar asset ra vẫn còn **8.192** —
+      vượt đúng một ký tự. Sửa bằng ký tự đại diện `%APP_HOME%/lib/*` ⇒ dòng còn **30 ký tự** và
+      miễn nhiễm với mọi jar thêm sau.
+      ⚠️ **Phạm vi đã chứng minh**: client KHỞI ĐỘNG và trụ được 22 giây khi chạy từ một thư mục
+      KHÔNG phải gốc asset — đúng tính chất từng hỏng. CHƯA chứng minh nó vẽ được model/atlas hay
+      chơi được: không ảnh chụp, không probe. Cũng chưa chạy trên máy thứ hai.
+      ⚠️ LWJGL cảnh báo `Unsupported JNI version detected, this may result in a crash` trên JDK 25 —
+      22 giây chưa sập, nhưng đây là rủi ro phải theo dõi khi có người chơi thật.
+- [ ] **Image server có thật trên GHCR** — `ci.yml` đã có job `docker-build-push` (master + tag `v*`),
+      còn phải xác nhận nó đã chạy xanh ít nhất một lần, vì `.env.prod` ghim `IMAGE_TAG`
+- [ ] **Cert TLS thật + `.env.prod`** đủ 6 giá trị (`DB_PASSWORD`, `CACHE_PASSWORD`,
+      `GRAFANA_ADMIN_PASSWORD`, `IMAGE_TAG`, `TLS_CERT_HOST_PATH`, `TLS_KEY_HOST_PATH`) — **việc của
+      chủ dự án**, hướng dẫn `openssl` nằm sẵn đầu `docker-compose.prod.yml`
+- [ ] **Một vòng Closed Beta thật** với người chơi thật, theo đúng bảng quy tắc phía trên
+- [x] Build + static analysis + test + gitleaks xanh trên CI (`build-and-verify`, `secret-scan`)
+- [x] Observability chạy được bằng `docker compose up` — Prometheus + Alertmanager + Grafana 5 dashboard
+      (Exit Criteria Phase 9, 2026-07-28)
+
+**NGOÀI phạm vi v1 — cố ý, phát triển thêm sau:**
+
+| Hoãn | Ghi chú |
+|---|---|
+| Arc 3–6 (Lv37–100) | ~43–50 quest nữa theo tỉ lệ đo được; cần cả hệ thống **zone** vì thế giới hiện là MỘT đường thẳng `[-55, 170]` |
+| `ensureAssetsAvailable(tier)` — đổi mức đồ hoạ lúc chạy | ADR-028 Accepted nhưng mới thi hành một nửa; `GraphicsTier` **tự khai** trong javadoc là chưa có đường đổi tier. v1 đóng gói đúng MEDIUM |
+| Linh thú (Lv20) · Thần Thông (Lv50) · Luận Kiếm Đài · Bí Cảnh · nhiệm vụ ngày · ranking | STORY §6 gọi tên cả sáu; grep toàn repo ra **0 kết quả** cho từng cái. Mỗi thứ là một ADR + module |
+| Mật khẩu | chỉ cần khi có người ngoài vòng thân quen chơi, hoặc server mở ra Internet |
+
+⚠️ **Ràng buộc đã chạm, phải giải trước khi mở Lv37+**: bộ "Ngoại Môn" (Lv15) **đã mạnh hơn thang quái
+hiện có** — đo được người chơi hạ đầu lĩnh arc 1 với biên 5 nhát. Lv28+ cần bậc trang bị mới hoặc thang
+quái mới; đó là quyết định THIẾT KẾ, không phải việc cân số.
+
+---
+
 ## 4. Bảng tóm tắt
 
 | Phase | Network? | Server? | Hệ phái | Điều kiện qua |

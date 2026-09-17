@@ -62,7 +62,17 @@ final class DemoPlatforms {
     private static final float GROUND_MIN_X = -55f;
 
     /**
-     * <b>Đầu đông nới 115 → 170 (2026-09-14, V47).</b> Lần thứ BA, và vẫn cùng một lý do: trục chơi
+     * <b>Đầu đông nới 170 → 210 (2026-09-16, V48).</b> Lần thứ TƯ, và là lần cuối của v1: V48 mở
+     * quãng Lv28–36 — nhịp ĐÓNG arc 2 — với ba điểm spawn ở {@code x = 175, 188, 201}. Sau quỷ đá
+     * {@code @161} chỉ còn 9m trống, không đủ cho một điểm nào vì luật giãn đòi khe {@code > 12m}.
+     * 210 = 201 + 9m biên, giữ đúng quy ước ba lần nới trước tự đặt.
+     *
+     * <p>⚠️ Bốn lần nới trong hai tháng là một tín hiệu, không phải một tiện tay: trục chơi MỘT
+     * chiều đang cạn, và arc 3–6 (Lv37–100) đòi "toàn bộ Hoang Vực"/"toàn bản đồ" theo STORY §6.
+     * Nới lần thứ năm không phải câu trả lời — cần hệ thống zone, và đó là quyết định kiến trúc
+     * nằm NGOÀI phạm vi v1.
+     *
+     * <p><b>Đầu đông nới 115 → 170 (2026-09-14, V47).</b> Lần thứ BA, và vẫn cùng một lý do: trục chơi
      * hết chỗ. V47 mở quãng Lv22–27 của arc 2 với ba điểm spawn ở {@code x = 120, 134, 148} (hai tế
      * đồ Huyết Sa và một đàn chủ), trong khi sau quỷ đá {@code @106} chỉ còn đúng 9m trống — không
      * đủ cho một điểm nào, vì luật giãn V29/V32 đòi khe {@code > 12m}.
@@ -78,7 +88,7 @@ final class DemoPlatforms {
      * ở {@code x = 93} và DỜI quỷ đá {@code 80 → 106} để dọn đường đông (nó là con đánh đau nhất
      * trục chơi, atk 40, và V40 đã phải dời nó một lần rồi vì đúng chuyện đó).
      */
-    private static final float GROUND_MAX_X = 170f;
+    private static final float GROUND_MAX_X = 210f;
 
     private DemoPlatforms() {}
 
