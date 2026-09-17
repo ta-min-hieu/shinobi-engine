@@ -332,6 +332,13 @@ final class QuestCoordinator implements WindowFlow {
         if (total == 0) {
             return text("questlog.empty");
         }
+        // Đã lĩnh thưởng HẾT: trước đây câu này im lặng, nên người chơi cày xong mọi nhiệm vụ chỉ
+        // thấy một danh sách toàn "đã nhận thưởng" và không có gì nói cho họ biết phải làm gì tiếp
+        // — một bức tường vô hình. Ưu tiên trước câu "còn N dòng chưa hiện" vì khi mọi thứ đã xong
+        // thì phần bị cắt bớt không còn là thông tin người chơi cần.
+        if (tracker.everyQuestClaimed()) {
+            return text("questlog.all_claimed");
+        }
         return hidden <= 0 ? "" : format("questlog.list.truncated", hidden);
     }
 

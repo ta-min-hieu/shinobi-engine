@@ -222,6 +222,63 @@ class QuestTrackerTest {
         assertThat(afterRelog.isTracking()).isFalse();
     }
 
+    /**
+     * Người chơi vắt hết nội dung đang cầm thì phải được BÁO, không đâm vào tường vô hình.
+     *
+     * <p>Trước bản vá này {@code QuestCoordinator.listNotice} chỉ nói khi nhật ký RỖNG, nên người
+     * cày xong mọi nhiệm vụ (tổng &gt; 0) thấy một danh sách toàn "đã nhận thưởng" và không một câu
+     * nào nói họ phải làm gì tiếp.
+     */
+    @Test
+    @DisplayName("Mọi dòng đều đã lĩnh thưởng ⇒ everyQuestClaimed() đúng")
+    void reportsEveryQuestClaimedWhenTheWholeLogIsClaimed() {
+        QuestTracker afterRelog = new QuestTracker();
+
+        afterRelog.onQuestsListed(ListQuestsResponse.newBuilder()
+                .addQuests(QuestLogEntry.newBuilder()
+                        .setQuestCode("kill_training_dummies")
+                        .setStatus(QuestStatus.QUEST_STATUS_CLAIMED)
+                        .build())
+                .addQuests(QuestLogEntry.newBuilder()
+                        .setQuestCode("night_watch_bandit")
+                        .setStatus(QuestStatus.QUEST_STATUS_CLAIMED)
+                        .build())
+                .build());
+
+        assertThat(afterRelog.everyQuestClaimed()).isTrue();
+    }
+
+    /** Còn MỘT dòng chưa lĩnh là chưa hết việc — câu "hết nội dung" nói ra lúc này là nói dối. */
+    @Test
+    @DisplayName("Còn một dòng chưa lĩnh thưởng ⇒ everyQuestClaimed() sai")
+    void doesNotReportEveryQuestClaimedWhileOneIsStillOpen() {
+        QuestTracker afterRelog = new QuestTracker();
+
+        afterRelog.onQuestsListed(ListQuestsResponse.newBuilder()
+                .addQuests(QuestLogEntry.newBuilder()
+                        .setQuestCode("kill_training_dummies")
+                        .setStatus(QuestStatus.QUEST_STATUS_CLAIMED)
+                        .build())
+                .addQuests(QuestLogEntry.newBuilder()
+                        .setQuestCode("night_watch_bandit")
+                        .setStatus(QuestStatus.QUEST_STATUS_IN_PROGRESS)
+                        .build())
+                .build());
+
+        assertThat(afterRelog.everyQuestClaimed()).isFalse();
+    }
+
+    /**
+     * Nhật ký RỖNG là "chưa nhận nhiệm vụ nào", KHÔNG phải "đã hết nội dung" — hai câu khác hẳn
+     * nhau, và người mới tạo nhân vật rơi vào câu thứ nhất. Đây là chỗ dễ nói dối nhất của tính
+     * năng này nên nó có ô riêng.
+     */
+    @Test
+    @DisplayName("Nhật ký rỗng ⇒ everyQuestClaimed() sai, vì đó là 'chưa nhận', không phải 'đã hết'")
+    void doesNotMistakeAnEmptyLogForFinishedContent() {
+        assertThat(new QuestTracker().everyQuestClaimed()).isFalse();
+    }
+
     @Test
     @DisplayName("Khoá nhận thưởng theo mã: giữ nguyên khi retry cùng một mã, sinh mới cho mã khác")
     void claimKeyByCodeFollowsTheSameAdr025Rule() {

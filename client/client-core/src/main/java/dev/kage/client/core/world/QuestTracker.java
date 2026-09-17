@@ -99,6 +99,31 @@ final class QuestTracker {
     }
 
     /**
+     * Mọi dòng trong nhật ký đều đã {@code CLAIMED} — tức người chơi đã vắt hết nội dung mà họ
+     * ĐANG CẦM.
+     *
+     * <p>⚠️ Đây KHÔNG phải "đã hết nội dung trong game". Client không biết server còn quest nào
+     * chưa được nhận hay không — nhật ký chỉ chứa thứ người chơi đã nhận ({@code ListQuestsResponse}
+     * là nguồn chân lý, và nó liệt kê nhiệm vụ CỦA nhân vật). Câu chữ dùng hàm này vì thế phải nói
+     * đúng phạm vi đó; hứa nhiều hơn là nói dối người mới chơi chưa đi gặp NPC nào.
+     *
+     * <p>Nhật ký RỖNG trả {@code false}: đó là trạng thái "chưa nhận nhiệm vụ nào", đã có câu riêng.
+     *
+     * @return {@code true} nếu nhật ký có ít nhất một dòng và mọi dòng đều đã nhận thưởng
+     */
+    boolean everyQuestClaimed() {
+        if (log.isEmpty()) {
+            return false;
+        }
+        for (QuestStatus loggedStatus : log.values()) {
+            if (loggedStatus != QuestStatus.QUEST_STATUS_CLAIMED) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Server vừa trả trọn nhật ký (opcode 611, ADR-035) — THAY THẲNG {@link #log}, không trộn với
      * bản cũ: đây là nguồn chân lý MỚI NHẤT, giữ lại dữ liệu cũ chỉ tạo ra nhiệm vụ ma nếu server đã
      * quên nó (không nên xảy ra, nhưng thay toàn bộ vẫn an toàn hơn hợp nhất âm thầm).
