@@ -10,7 +10,7 @@ import java.util.Set;
 
 import io.micrometer.core.instrument.MeterRegistry;
 
-import dev.kage.server.world.CharacterBaseStats;
+import dev.kage.server.world.CharacterEntry;
 import dev.kage.server.world.WorldContentCatalog;
 import dev.kage.server.world.WorldFacade;
 
@@ -118,11 +118,11 @@ final class MainWorldChannelRegistry {
      * {@link #channels}/{@link #channelByCharacterId} đọc-sửa nhiều bước (đếm sức chứa, chọn khu
      * vực, ghi 2 map) KHÔNG an toàn nếu chỉ đổi sang collection concurrent đơn lẻ — cần khoá cả khối.
      */
-    synchronized WorldFacade attachCharacter(
-            long characterId, float spawnX, float spawnY, CharacterBaseStats baseStats) {
+    synchronized WorldFacade attachCharacter(CharacterEntry entry) {
+        long characterId = entry.characterId();
         maybeAutoOpenChannel();
         Channel channel = firstChannelWithRoom();
-        channel.facade().attachCharacter(characterId, spawnX, spawnY, baseStats);
+        channel.facade().attachCharacter(entry);
         channel.characterIds().add(characterId);
         channelByCharacterId.put(characterId, channel);
         return channel.facade();

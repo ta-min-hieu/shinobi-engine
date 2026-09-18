@@ -15,6 +15,7 @@ import dev.kage.party.api.PartyFacade;
 import dev.kage.protocol.DungeonEnteredEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.server.world.CharacterBaseStats;
+import dev.kage.server.world.CharacterEntry;
 import dev.kage.server.world.Element;
 import dev.kage.server.world.TickMetricsPort;
 import dev.kage.server.world.WorldContentCatalog;
@@ -164,7 +165,15 @@ final class DungeonInstanceRegistry {
         instance.facade().detachCharacter(characterId);
         CharacterBaseStats baseStats = loadBaseStats(characterId);
         PositionSnapshot returnPosition = returnPositionByCharacterId.remove(characterId);
-        mainWorldChannels.attachCharacter(characterId, returnPosition.x(), returnPosition.y(), baseStats);
+        // Bonus trang bị đi CÙNG lệnh attach (2026-09-18): thiếu nó thì đấu xong / rời hầm ngục là
+        // nhân vật về map chính với chỉ số NỀN và không bao giờ được cộng lại — máu 206 → 100,
+        // def 65 → 20, tới tận khi mặc/gỡ đồ hoặc đăng nhập lại. `registry` đã cầm InventoryFacade.
+        mainWorldChannels.attachCharacter(new CharacterEntry(
+                characterId,
+                returnPosition.x(),
+                returnPosition.y(),
+                baseStats,
+                registry.equipmentBonusOf(characterId)));
         leaveInstance(characterId, instance);
         return ExitOutcome.OK;
     }

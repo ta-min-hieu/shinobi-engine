@@ -12,6 +12,7 @@ import dev.kage.character.application.GrantExperienceUseCase;
 import dev.kage.character.domain.ExperienceProgress;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.inventory.api.InventoryFacade;
+import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterAppearanceChangedEvent;
@@ -41,6 +42,7 @@ import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
 import dev.kage.quest.api.QuestFacade;
+import dev.kage.server.world.EquipmentBonusSnapshot;
 import dev.kage.server.world.WorldOutboundSink;
 
 /**
@@ -515,6 +517,23 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 .setReasonKey(reasonKey)
                 .build();
         send(ctx, Opcode.OPCODE_GOLD_CHANGED_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    /**
+     * Chỉ số trang bị hiện tại của một nhân vật (2026-09-18) — lớp này đã cầm sẵn
+     * {@code InventoryFacade}, nên hai registry đấu trường/hầm ngục mượn được mà không phải
+     * đổi constructor của chúng.
+     *
+     * <p>⚠️ Vì sao cần: trước đây hai đường đó attach nhân vật trở lại map chính bằng
+     * {@code baseStats} và KHÔNG bao giờ cộng lại bonus — đấu xong hoặc rời hầm ngục là máu tối đa
+     * 206 → 100, def 65 → 20, kéo dài tới khi người chơi mặc/gỡ một món đồ hoặc đăng nhập lại.
+     *
+     * <p>Chạm DB: chỉ gọi trên Virtual Thread (settlementExecutor / authExecutor), không bao giờ
+     * trên EventLoop.
+     */
+    EquipmentBonusSnapshot equipmentBonusOf(long characterId) {
+        EquipmentBonus bonus = inventoryFacade.computeEquipmentBonus(characterId);
+        return new EquipmentBonusSnapshot(bonus.bonusAtk(), bonus.bonusDef(), bonus.bonusRes(), bonus.bonusHp());
     }
 
     private void grantLootBlocking(long killerCharacterId, String monsterCode) {

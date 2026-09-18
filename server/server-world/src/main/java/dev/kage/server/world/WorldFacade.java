@@ -369,7 +369,25 @@ public final class WorldFacade {
     }
 
     public void attachCharacter(long characterId, float spawnX, float spawnY, CharacterBaseStats baseStats) {
-        inbox.add(new WorldCommand.AttachCharacterCommand(characterId, spawnX, spawnY, baseStats));
+        attachCharacter(CharacterEntry.withoutEquipment(characterId, spawnX, spawnY, baseStats));
+    }
+
+    /**
+     * Gắn nhân vật vào world KÈM chỉ số trang bị — một lệnh duy nhất (sửa 2026-09-18).
+     *
+     * <p>⚠️ Vì sao không gọi {@link #applyEquipmentBonus} ngay sau {@code attachCharacter}: hai
+     * lệnh rời nằm trong cùng hàng đợi, nên giữa chúng có ít nhất một tick mà entity đã ở trong
+     * world với chỉ số NỀN — quái nhắm được và {@code CombatSystem} giải quyết đòn được. Đo thật
+     * 2026-09-18: đăng nhập cạnh {@code wasteland_beast} ăn 37 sát thương (giáp chưa mặc) trên
+     * thanh máu 100, trong khi mặc đủ bộ là 27 trên thanh 206 — và nhát đó rơi trước cả
+     * {@code SelectCharacterResponse}.
+     *
+     * <p>⚠️ Các đường arena/dungeon vẫn dùng overload 4 tham số ở trên và vì thế CÒN cửa sổ đó:
+     * chúng không cầm sẵn {@code EquipmentBonusSnapshot}. Nối chúng là việc riêng, cần chủ dự án
+     * quyết vì nó kéo {@code currentEquipmentBonus} ra khỏi {@code GatewayChannelHandler}.
+     */
+    public void attachCharacter(CharacterEntry entry) {
+        inbox.add(new WorldCommand.AttachCharacterCommand(entry));
     }
 
     public void detachCharacter(long characterId) {
@@ -551,8 +569,7 @@ public final class WorldFacade {
         WorldCommand command;
         while ((command = inbox.poll()) != null) {
             switch (command) {
-                case WorldCommand.AttachCharacterCommand c ->
-                    handleAttach(c.characterId(), c.spawnX(), c.spawnY(), c.baseStats());
+                case WorldCommand.AttachCharacterCommand c -> handleAttach(c.entry());
                 case WorldCommand.DetachCharacterCommand c -> handleDetach(c.characterId());
                 case WorldCommand.MoveIntentCommand c -> handleMoveIntent(c);
                 case WorldCommand.JumpIntentCommand c -> handleJumpIntent(c);
@@ -570,14 +587,14 @@ public final class WorldFacade {
         }
     }
 
-    private void handleAttach(long characterId, float spawnX, float spawnY, CharacterBaseStats baseStats) {
-        if (entitiesByCharacterId.containsKey(characterId)) {
+    private void handleAttach(CharacterEntry entry) {
+        if (entitiesByCharacterId.containsKey(entry.characterId())) {
             return; // đã attach — bỏ qua an toàn thay vì tạo entity trùng.
         }
         KEntity entity = ecsWorld.createEntity();
 
         PositionComponent position = new PositionComponent();
-        position.x = spawnX;
+        position.x = entry.spawnX();
         // ADR-033 — KÉO VỀ ĐƯỜNG CHƠI: di chuyển giờ khoá vào đúng trục X, không lệnh nào đổi được
         // Y nữa. Nhân vật có `pos_y` đã lưu khác 0 (từ thời đi tự do 4 hướng, DB vẫn giữ nguyên) sẽ
         // kẹt VĨNH VIỄN ngoài đường chơi — không bao giờ chạm được bệ/địa hình nào vốn đều định
@@ -590,20 +607,20 @@ public final class WorldFacade {
         entity.add(new VelocityComponent());
 
         CharacterIdComponent characterIdComponent = new CharacterIdComponent();
-        characterIdComponent.characterId = characterId;
+        characterIdComponent.characterId = entry.characterId();
         entity.add(characterIdComponent);
 
         HealthComponent health = new HealthComponent();
         health.current = CombatConstants.CHARACTER_MAX_HP; // placeholder — GDD chưa chốt công thức HP tối đa
         health.max = CombatConstants.CHARACTER_MAX_HP;
         entity.add(health);
-        entity.add(toComponent(CombatConstants.deriveCombatStats(baseStats)));
+        entity.add(toComponent(CombatConstants.deriveCombatStats(entry.baseStats())));
         entity.add(new TargetComponent());
         entity.add(new AttackCooldownComponent());
         entity.add(new SkillCooldownComponent());
         entity.add(new StatusEffectComponent());
         CharacterLevelComponent levelComponent = new CharacterLevelComponent();
-        levelComponent.level = baseStats.level();
+        levelComponent.level = entry.baseStats().level();
         entity.add(levelComponent);
 
         ChiComponent chi = new ChiComponent();
@@ -613,9 +630,11 @@ public final class WorldFacade {
 
         addRecoveryComponents(entity);
 
-        entitiesByCharacterId.put(characterId, entity);
-        baseStatsByCharacterId.put(characterId, baseStats);
-        aoiTracker.onAttach(characterId);
+        entitiesByCharacterId.put(entry.characterId(), entity);
+        baseStatsByCharacterId.put(entry.characterId(), entry.baseStats());
+        // TRƯỚC onAttach: entity không được có một tick nào vừa nhìn thấy được vừa mang chỉ số nền.
+        applyBonusTo(entity, entry.baseStats(), entry.bonus());
+        aoiTracker.onAttach(entry.characterId());
     }
 
     private void handleDetach(long characterId) {
@@ -766,10 +785,16 @@ public final class WorldFacade {
         if (entity == null || baseStats == null) {
             return; // chưa attach xong hoặc đã detach giữa lúc lệnh còn trong hàng đợi — bỏ qua an toàn.
         }
+        applyBonusTo(entity, baseStats, command.bonus());
+    }
+
+    /**
+     * Dùng chung bởi {@link #handleAttach} (lúc vào world) và {@link #handleApplyEquipmentBonus}
+     * (lúc mặc/gỡ đồ) — LUÔN tính lại từ nền, không cộng dồn (xem javadoc applyEquipmentBonus).
+     */
+    private void applyBonusTo(KEntity entity, CharacterBaseStats baseStats, EquipmentBonusSnapshot bonus) {
         CombatStatsComponent combatStats = COMBAT_STATS.get(entity);
         CombatConstants.CombatStats derived = CombatConstants.deriveCombatStats(baseStats);
-        // LUÔN tính lại từ nền, không cộng dồn (xem javadoc applyEquipmentBonus).
-        EquipmentBonusSnapshot bonus = command.bonus();
         combatStats.atk = derived.atk() + bonus.atk();
         combatStats.def = derived.def() + bonus.def();
         combatStats.res = derived.res() + bonus.res();

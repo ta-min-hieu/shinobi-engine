@@ -250,6 +250,7 @@ import dev.kage.pvp.api.PvpFacade;
 import dev.kage.pvp.application.GetPvpRatingUseCase;
 import dev.kage.quest.api.QuestFacade;
 import dev.kage.server.world.CharacterBaseStats;
+import dev.kage.server.world.CharacterEntry;
 import dev.kage.server.world.EquipmentBonusSnapshot;
 import dev.kage.server.world.WorldFacade;
 import dev.kage.shop.api.ShopFacade;
@@ -633,13 +634,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // Phase 9 lát cắt 6: định tuyến vào khu vực (channel) còn chỗ thay vì thẳng 1 World
             // duy nhất — MainWorldChannelRegistry tự mở thêm khu vực nếu cần (giới hạn người/khu
             // vực chặn AoI phình theo TỔNG N toàn map, xem javadoc class đó).
-            WorldFacade channelFacade =
-                    worldGateway.mainWorldChannels().attachCharacter(characterId, spawn.x(), spawn.y(), baseStats);
-            // GAMEPLAY.md §2 "tính lại chỉ số dẫn xuất khi đổi trang bị" — áp dụng NGAY lúc attach,
-            // không chỉ lúc equip/unequip sau đó, nếu không nhân vật mặc đồ từ phiên trước sẽ mất
-            // bonus khi đăng nhập lại (server-world không tự biết feature-inventory).
+            // GAMEPLAY.md §2 "tính lại chỉ số dẫn xuất khi đổi trang bị" — đọc TRƯỚC khi attach và
+            // gửi CÙNG một lệnh world. Tách làm hai lệnh (attach rồi applyEquipmentBonus) để lại một
+            // tick mà entity đã ở trong world với chỉ số NỀN: đo thật 2026-09-18, đăng nhập cạnh quái
+            // ăn 37 sát thương trên thanh máu 100 thay vì 27 trên thanh 206.
             EquipmentBonusSnapshot bonus = currentEquipmentBonus(characterId);
-            channelFacade.applyEquipmentBonus(characterId, bonus);
+            worldGateway
+                    .mainWorldChannels()
+                    .attachCharacter(new CharacterEntry(characterId, spawn.x(), spawn.y(), baseStats, bonus));
             SelectCharacterResponse response = enterWorldResponse(bonus, spawn);
             send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
             sendInitialSelfState(characterId);

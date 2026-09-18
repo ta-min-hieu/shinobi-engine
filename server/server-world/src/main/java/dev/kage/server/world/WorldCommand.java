@@ -14,9 +14,17 @@ sealed interface WorldCommand {
      * SERVER.md §8) — KHÔNG luôn là (0,0), chỉ nhân vật chưa từng lưu vị trí mới ở đó.
      * {@code baseStats} là STR/AGI/INT/VIT thật từ {@code character_stat} DB (gateway đọc qua
      * {@code CharacterFacade.loadStats}) — world derive thành ATK/DEF/... (GDD §5).
+     *
+     * <p>⚠️ {@code bonus} đi CÙNG lệnh này, không phải một lệnh riêng gửi sau (sửa 2026-09-18).
+     * Đo được: attach và {@code ApplyEquipmentBonusCommand} là hai lệnh rời trong cùng hàng đợi,
+     * nên entity sống ít nhất một tick với chỉ số NỀN. Đăng nhập cạnh quái thì ăn một nhát tính
+     * theo giáp CHƯA mặc, trên thanh máu 100 thay vì 206 — đo thật: 37 sát thương thay vì 27,
+     * và nhát đó rơi TRƯỚC cả gói {@code SelectCharacterResponse}.
+     *
+     * <p>{@link EquipmentBonusSnapshot#NONE} cho chỗ gọi không có trang bị (test, và các đường
+     * arena/dungeon chưa nối — chúng còn nguyên cửa sổ này, xem ghi chú ở WorldFacade).
      */
-    record AttachCharacterCommand(long characterId, float spawnX, float spawnY, CharacterBaseStats baseStats)
-            implements WorldCommand {}
+    record AttachCharacterCommand(CharacterEntry entry) implements WorldCommand {}
 
     /** Xoá entity ECS của {@code characterId} — gọi khi mất kết nối. */
     record DetachCharacterCommand(long characterId) implements WorldCommand {}
