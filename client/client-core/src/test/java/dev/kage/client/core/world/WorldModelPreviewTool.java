@@ -105,11 +105,18 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
      */
     private static final long SCOUT_ID = -10L;
 
+    /** NPC thứ ba (V49, ADR-050 D6): một `npc_template` đứng ở cả SÁU trạm tiếp ứng dọc trục. */
+    private static final long WAYPOST_ID = -11L;
+
     // Toàn bộ khung nằm TRƯỚC bệ demo đầu tiên (bắt đầu ở x=3, xem DemoPlatforms) — bệ vẽ đè lên
     // quái thì ảnh không còn chứng minh được gì về chính con quái, đúng bẫy đã gặp ở lượt chụp đầu.
     // Ba loài quái đứng CẠNH NHAU (dummy/bandit/ogre) chứ không rải ra: câu hỏi mà ảnh này phải trả
     // lời là "có phân biệt được không", và thứ tự đó là thứ tự sát thương 8/22/40.
-    private static final float PLAYER_X = -4.4f;
+    // ⚠️ Nới sang TRÁI, không đẩy đuôi sang phải (2026-09-18, thêm NPC thứ ba). Camera bám
+    // {@code PLAYER_X + 4.65} nên hạ mốc này là khung trượt sang trái mà không con quái nào đổi
+    // chỗ và không gì vượt mốc x=3 của bệ demo — đúng luật NÉN đã ghi ngay trên. Bản đầu tôi đẩy
+    // hộp thay thế sang 3.6 cho rảnh chỗ, tức tự cấp ngoại lệ khỏi chính luật này.
+    private static final float PLAYER_X = -5.1f;
     private static final float DUMMY_X = -2.0f;
     // ⚠️ Thêm một thực thể vào khung này phải NÉN khoảng cách, KHÔNG được đẩy đuôi sang phải: bệ
     // demo đầu tiên bắt đầu ở x=3 (DemoPlatforms) và nó là khối 3D có depth test, nên bất cứ thứ gì
@@ -127,9 +134,17 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
     private static final float BOSS_X = 2.2f;
     // Hai NPC xếp sát nhau hơn hàng quái (0,8 thay vì 1,15): chúng mảnh hơn hẳn ba cỗ máy đá, và
     // câu hỏi "có lẫn vào nhau không" chỉ trả lời được khi chúng thật sự đứng cạnh nhau.
-    private static final float ELDER_X = -3.55f;
-    private static final float SISTER_X = -2.75f;
+    private static final float ELDER_X = -4.35f;
+    private static final float SISTER_X = -3.55f;
     private static final float UNDRAWN_NPC_X = 2.9f;
+
+    /**
+     * NPC thứ ba, nối tiếp cặp cũ ở cùng bước 0,8. ⚠️ KHÔNG đặt từ x=3.0 trở đi:
+     * {@code DemoPlatforms.PLATFORMS} chiếm x ∈ [3,7], [9,13], [15,19] và là khối 3D có depth
+     * test, nên mọi thứ ở đó bị bệ ô-liu vẽ đè từ ngang ngực xuống. Bản đầu đặt ở 3.6 và ảnh chỉ
+     * còn cái đầu với hai bàn chân — đúng bẫy mà chú thích phía trên đã ghi sẵn.
+     */
+    private static final float WAYPOST_X = -2.75f;
 
     /**
      * Phép so A/B của ÁO CHOÀNG (câu hỏi để ngỏ từ 2026-09-06): bốn trong năm bộ B3 mặc
@@ -210,6 +225,7 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         putNpc(ELDER_ID, "town_elder", ELDER_X);
         putNpc(SISTER_ID, "senior_sister", SISTER_X);
         putNpc(UNDRAWN_NPC_ID, "shop_keeper", UNDRAWN_NPC_X);
+        putNpc(WAYPOST_ID, "waypost_attendant", WAYPOST_X);
         LOG.info(
                 "model quái: training_dummy={} wandering_bandit={} stone_ogre={} archive_warden={} "
                         + "trial_construct={} sample_boss={} (sample_boss=false là ĐÚNG, chưa vẽ)",
@@ -222,10 +238,11 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
                 models.hasModel(BOSS_ID));
         LOG.info(
                 "model NPC: town_elder={} senior_sister={} shop_keeper={} "
-                        + "(shop_keeper=false là ĐÚNG, mã NPC chưa tồn tại)",
+                        + "waypost_attendant={} (shop_keeper=false là ĐÚNG, mã NPC chưa tồn tại)",
                 models.hasModel(ELDER_ID),
                 models.hasModel(SISTER_ID),
-                models.hasModel(UNDRAWN_NPC_ID));
+                models.hasModel(UNDRAWN_NPC_ID),
+                models.hasModel(WAYPOST_ID));
     }
 
     private void putNpc(long npcId, String npcCode, float x) {
