@@ -702,8 +702,19 @@ Hai quyết định kèm theo:
 | Xác thực | **giữ username-only** | đúng thiết kế đã ghi từ V1 và đúng cảnh báo trong `docker-compose.prod.yml`: chấp nhận được cho Closed Beta nội bộ qua mạng riêng |
 
 **Exit Criteria — v1 (Closed Beta nội bộ):**
-- [ ] **Arc 2 khép ở Lv36** — thêm ~5 quest tới mốc "Trúc Cơ thành công" (tỉ lệ đo được: 0,6 quest/cấp,
-      từ lát cắt Lv22–27 là 3 quest = 5 cấp)
+- [x] **Arc 2 khép ở Lv36** (2026-09-18) — 5 quest của V48 đã **CHƠI XONG THẬT**, cả năm `CLAIMED`:
+      `wasteland_edge_patrol` · `rank_board_dispute` · `foundation_pill_run` · `outer_sect_proving` ·
+      `foundation_breakthrough`. Đường đi tới đó do [ADR-050](../01-architecture/adr/ADR-050-Safe-Zones-Along-The-Trunk.md)
+      mở ra: trước nó lát cắt này **không tới nơi được** — playtest 2026-09-17 chết 2–3 lần mỗi lượt
+      trên chính con đường đó.
+      📌 Số đo sau ADR-050: hành quân `−5 → 195` **0 lần chết** (nghỉ ở trạm tiếp ứng về 206/206);
+      hạ `foundation_warden` Lv33 **ngay lần đầu**, còn 129/206; chặng về `195 → −5` cũng 0 lần chết.
+      ⚠️ **Nhân vật thật kết thúc ở Cấp 37 (69.170 EXP), không phải 36** (mốc Cấp 37 = 66.600).
+      Đây KHÔNG phải bằng chứng thiết kế sai: nhân vật test đã cày lệch khỏi đường tối thiểu (các
+      trận đo, các mạng cày lại sau mỗi lần chết). Lời hứa "đúng Cấp 36" do ô
+      `shouldLandExactlyAtLevelThirtySix_afterTheWholeArcTwoChain` gác, và nó chơi đường TỐI THIỂU
+      trên nhân vật mới tinh. Thứ con số này chứng minh là **biên tới Cấp 37 (~1.665 EXP) quá mỏng
+      để chịu nổi việc chơi thật** — phải tính lại khi mở arc 3.
 - [x] **Người chơi hết nội dung thì được BÁO** (2026-09-16) — `QuestTracker.everyQuestClaimed()` +
       chuỗi `questlog.all_claimed`. Trước đó `listNotice` chỉ nói khi nhật ký RỖNG, nên người cày hết
       mọi quest (tổng > 0) thấy **không gì cả**: một bức tường vô hình. Ba ô gác ở `QuestTrackerTest`
