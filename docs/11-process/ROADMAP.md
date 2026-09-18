@@ -740,7 +740,7 @@ Hai quyết định kèm theo:
 
 | Hoãn | Ghi chú |
 |---|---|
-| Arc 3–6 (Lv37–100) | ~43–50 quest nữa theo tỉ lệ đo được; cần cả hệ thống **zone** vì thế giới hiện là MỘT đường thẳng `[-55, 170]` |
+| Arc 3–6 (Lv37–100) | ~43–50 quest nữa theo tỉ lệ đo được; cần cả hệ thống **zone** vì thế giới hiện là MỘT đường thẳng `[-55, 210]` (đã nới BỐN lần trong hai tháng — lần thứ năm không phải câu trả lời) |
 | `ensureAssetsAvailable(tier)` — đổi mức đồ hoạ lúc chạy | ADR-028 Accepted nhưng mới thi hành một nửa; `GraphicsTier` **tự khai** trong javadoc là chưa có đường đổi tier. v1 đóng gói đúng MEDIUM |
 | Linh thú (Lv20) · Thần Thông (Lv50) · Luận Kiếm Đài · Bí Cảnh · nhiệm vụ ngày · ranking | STORY §6 gọi tên cả sáu; grep toàn repo ra **0 kết quả** cho từng cái. Mỗi thứ là một ADR + module |
 | Mật khẩu | chỉ cần khi có người ngoài vòng thân quen chơi, hoặc server mở ra Internet |

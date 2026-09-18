@@ -99,6 +99,21 @@
 bằng phép biến đổi thuần (`NpcModelKey`: `town_elder` → `char_town-elder`). Thêm cột chỉ có nghĩa khi
 đồng thời gửi nó qua dây, tức **đổi protocol** — chưa có nhu cầu nào đòi điều đó.
 
+### 2.10 World geometry
+
+| Bảng | Cột chính | Ghi chú |
+|---|---|---|
+| `safe_zone` | `id, code, world_code, min_x, min_y, max_x, max_y` | **Tĩnh** — vùng an toàn hình chữ nhật. Bước VÀO ⇒ đầy máu ngay ([ADR-046](../01-architecture/adr/ADR-046-Health-Recovery.md) D3). `code` UNIQUE; `CHECK safe_zone_bounds_not_inverted (min_x <= max_x AND min_y <= max_y)`; index trên `world_code`. World không khai vùng nào (dungeon/arena) ⇒ trả rỗng, KHÔNG phải lỗi. Chủ bảng là module **`feature-world`** — `server-world` không đọc DB (Điều 23), `server-gateway` dịch sang `SafeZoneCatalogSnapshot` rồi đổ vào `TriggerZoneSystem`. Migration V35 (2026-09-07) |
+
+⚠️ **Tên "safe_zone" chứ không phải "heal_zone" là có chủ đích**: cùng vùng đó sau này là chỗ cấm PvP
+([STORY §7](../13-game-design/STORY.md) — "trong tông không thể động thủ"). Tới 2026-09-17 bảng mới có
+ĐÚNG một luật (hồi máu) nên **chưa có cột "vùng này làm gì"** — [ADR-050](../01-architecture/adr/ADR-050-Safe-Zones-Along-The-Trunk.md)
+(Proposed) là chỗ đề xuất cột `heals` đầu tiên, đúng như Revisit Trigger của ADR-046 đã đặt tên trước.
+
+⚠️ **Bệ nhảy (`DEMO_PLATFORMS`) và dải nền đất vẫn HARDCODE** — bệ ở Java, nền đất ở CLIENT
+(`DemoPlatforms.GROUND_MAX_X`). Đó là nguồn của bug "quái đứng lơ lửng" 2026-09-06 và của luật
+"nền đất phải phủ hết mọi điểm spawn". `feature-world` là chỗ ở tương lai của cả hai (ADR-046 D3).
+
 ---
 
 ## 3. ERD
