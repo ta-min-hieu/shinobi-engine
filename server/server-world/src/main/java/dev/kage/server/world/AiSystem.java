@@ -12,11 +12,13 @@ import dev.kage.engine.ecs.Family;
 import dev.kage.engine.ecs.IteratingKSystem;
 import dev.kage.engine.ecs.KEntity;
 import dev.kage.engine.ecs.component.PositionComponent;
+import dev.kage.engine.ecs.component.TriggerZoneMembershipComponent;
 import dev.kage.engine.ecs.component.VelocityComponent;
 import dev.kage.server.world.component.AiParamsComponent;
 import dev.kage.server.world.component.AiState;
 import dev.kage.server.world.component.AiStateComponent;
 import dev.kage.server.world.component.CharacterIdComponent;
+import dev.kage.server.world.component.CombatRecencyComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterIdComponent;
 import dev.kage.server.world.component.StatusEffectComponent;
@@ -58,6 +60,14 @@ final class AiSystem extends IteratingKSystem {
 
     private static final ComponentMapper<MonsterIdComponent> MONSTER_ID =
             ComponentMapper.getFor(MonsterIdComponent.class);
+
+    // ADR-050 D1/D3 — hai thứ quyết định một nhân vật có đang được vùng an toàn che hay không.
+    // Cả hai component này mọi nhân vật đều mang sẵn từ ADR-046 (WorldFacade.addRecoveryComponents),
+    // nên luật mới KHÔNG cần plumbing: không đổi constructor, không đụng WorldContentCatalog.
+    private static final ComponentMapper<TriggerZoneMembershipComponent> ZONE_MEMBERSHIP =
+            ComponentMapper.getFor(TriggerZoneMembershipComponent.class);
+    private static final ComponentMapper<CombatRecencyComponent> COMBAT_RECENCY =
+            ComponentMapper.getFor(CombatRecencyComponent.class);
 
     private final Supplier<Collection<KEntity>> characterEntities;
     private final LongFunction<KEntity> entityLookup;
@@ -165,6 +175,11 @@ final class AiSystem extends IteratingKSystem {
             return;
         }
 
+        if (isShieldedBySafeZone(targetEntity)) {
+            startReturning(ai, target, VELOCITY.get(entity)); // ADR-050 D2
+            return;
+        }
+
         PositionComponent position = POSITION.get(entity);
         if (distance(position.x, position.y, ai.spawnX, ai.spawnY) > params.leashRadiusMeters()) {
             startReturning(ai, target, VELOCITY.get(entity));
@@ -189,6 +204,13 @@ final class AiSystem extends IteratingKSystem {
         TargetComponent target = TARGET.get(entity);
         KEntity targetEntity = entityLookup.apply(target.targetEntityId);
         if (targetEntity == null || HEALTH.get(targetEntity).isDead()) {
+            startReturning(ai, target, VELOCITY.get(entity));
+            return;
+        }
+
+        // ADR-050 D2 — phải gác ở CẢ trạng thái ĐÁNH, không chỉ ĐUỔI: tickAttack chỉ tụt về CHASE
+        // khi mục tiêu ra ngoài tầm, nên một con đang đứng sát biên vùng sẽ đánh mãi vào trong.
+        if (isShieldedBySafeZone(targetEntity)) {
             startReturning(ai, target, VELOCITY.get(entity));
             return;
         }
@@ -264,6 +286,35 @@ final class AiSystem extends IteratingKSystem {
      *     {@code range == 0} vòng lặp vẫn aggro một người chơi đứng ĐÚNG toạ độ con quái, và vẫn
      *     quét toàn bộ danh sách người chơi mỗi tick cho mỗi con quái thụ động.
      */
+    /**
+     * ADR-050 D1/D2/D3 — nhân vật này có đang được một vùng an toàn che hay không.
+     *
+     * <p>Hai điều kiện, và điều kiện thứ hai mới là thứ giữ cho trạm tiếp ứng không thành chòi bắn
+     * tỉa: <b>(1)</b> đang đứng trong ít nhất một vùng, <b>(2)</b> chưa TỰ RA ĐÒN trong
+     * {@code REGEN_DELAY_SECONDS} giây. Ai vừa đánh ra thì tự bỏ lá chắn của mình.
+     *
+     * <p>⚠️ Phải là {@code secondsSinceAttackDealt}, KHÔNG phải {@code secondsSinceCombat}. Đồng hồ
+     * kia reset cho cả bên đánh lẫn bên CHỊU (ADR-046 D2, cố ý), nên dùng nó thì người đang bị đuổi
+     * không bao giờ đạt ngưỡng — và D3 sẽ vô hiệu hoá chính D2 ở đúng tình huống D2 sinh ra để giải.
+     * Bản đầu của ADR-050 mắc đúng lỗi đó; ô test
+     * {@code shouldBreakOffTheChase_whenTheTargetStepsIntoASafeZone} là chỗ nó lộ ra.
+     *
+     * <p>⚠️ Trễ MỘT tick: {@code TriggerZoneSystem} chạy sau {@code AiSystem} trong cùng tick
+     * ({@code WorldFacade}), nên đây đọc membership của tick trước — 16,7ms, tức ≤ 0,08m ở tốc độ
+     * chạy 5 m/s.
+     *
+     * <p>Quái không mang hai component này (ADR-046 chỉ gắn cho nhân vật), nên hàm trả
+     * {@code false} cho chúng — đúng ý: vùng an toàn không che quái.
+     */
+    private static boolean isShieldedBySafeZone(KEntity character) {
+        TriggerZoneMembershipComponent membership = ZONE_MEMBERSHIP.get(character);
+        if (membership == null || membership.occupiedZoneIds.isEmpty()) {
+            return false;
+        }
+        CombatRecencyComponent recency = COMBAT_RECENCY.get(character);
+        return recency != null && recency.secondsSinceAttackDealt >= CombatConstants.REGEN_DELAY_SECONDS;
+    }
+
     private KEntity findNearestCharacterInRange(PositionComponent position, float range) {
         if (range <= 0f) {
             return null;
@@ -271,6 +322,9 @@ final class AiSystem extends IteratingKSystem {
         KEntity nearest = null;
         double nearestDistance = range;
         for (KEntity character : characterEntities.get()) {
+            if (isShieldedBySafeZone(character)) {
+                continue; // ADR-050 D1
+            }
             PositionComponent characterPosition = POSITION.get(character);
             double d = distance(position.x, position.y, characterPosition.x, characterPosition.y);
             if (d <= nearestDistance) {

@@ -51,10 +51,18 @@ stateDiagram-v2
     Chase --> Attack: vào tầm đánh
     Attack --> Chase: mục tiêu chạy xa
     Chase --> Return: mục tiêu ra ngoài aggro range
+    Chase --> Return: mục tiêu vào VÙNG AN TOÀN (ADR-050)
+    Attack --> Return: mục tiêu vào VÙNG AN TOÀN (ADR-050)
     Return --> Idle: về tới điểm spawn
     Attack --> Dead: HP <= 0
     Chase --> Dead: HP <= 0
 ```
+
+⚠️ **Hai nhánh Return mới (ADR-050)**: vùng an toàn nay CHẶN AGGRO, không chỉ hồi máu. Vòng quét
+aggro bỏ qua người đang đứng trong vùng (D1), và con đang đuổi/đang đánh mà mục tiêu bước vào thì
+bỏ cuộc (D2) — phải gác ở CẢ hai trạng thái, vì `tickAttack` chỉ tụt về `Chase` khi mục tiêu ra
+ngoài tầm, nên một con đứng sát biên vùng sẽ đánh mãi vào trong. Lá chắn mất hiệu lực nếu chính
+người chơi vừa đánh ra (D3, đo bằng `CombatRecencyComponent.secondsSinceCombat`).
 
 **Tại sao FSM đủ cho 95% quái**: yêu thú trong một game side-view không cần thông minh. Nó cần: đứng yên → thấy người → đuổi → đánh → mất mục tiêu thì về. Hết. Behavior Tree cho việc này là over-engineering (Điều 9).
 

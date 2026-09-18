@@ -105,7 +105,7 @@ class WorldContentLoaderTest {
                 monsterFacadeWith(List.of()),
                 npcFacadeWith(List.of()),
                 geometryFacadeWith(
-                        List.of(new SafeZone("sect_grounds", SafeZone.MAIN_WORLD_CODE, -15f, -10f, 5f, 10f))),
+                        List.of(new SafeZone("sect_grounds", SafeZone.MAIN_WORLD_CODE, -15f, -10f, 5f, 10f, true))),
                 MonsterSpawnPoint.MAIN_WORLD_CODE);
 
         assertThat(content.safeZones().zones())

@@ -257,6 +257,7 @@ mới = thêm dòng cùng PR (như luật GLOSSARY §4):
 | Hệ thống trong game | Lý do tường thuật |
 |---|---|
 | Hub an toàn (Thanh Hư Tông) | Trận pháp hộ sơn ngàn năm — trong tông không thể động thủ |
+| Trạm tiếp ứng dọc đường (`waypost_*`, 6 chỗ) | Tông môn chia trận pháp hộ sơn thành từng góc nhỏ, dựng dọc đường ra rìa Hoang Vực cho đệ tử ngoại môn đi lĩnh phần tài nguyên có chỗ nghỉ chân. Trong vòng trận không ai động thủ được — nhưng trận chỉ che người đang NGHỈ: hễ đệ tử rút kiếm đánh ra thì trận thôi nhận, đó là lý do nó không thành chỗ bắn lén. Trận nhỏ nên KHÔNG hồi được tu vi như trong tông; người ta phải tự ngồi lại sức |
 | 5 Linh Mạch (zone luyện cấp theo hệ) | 5 linh mạch ngũ hành giao dưới núi Thanh Hư; yêu thú tụ theo thuộc tính |
 | Hoang Vực (PvP mở) | Vùng linh mạch chết, ngoài vòng luật lệ mọi tông môn |
 | Bí Cảnh (dungeon instance) | Di tích Linh Triều bị phong ấn, "thức dậy" từ arc 3 do vết nứt Thiên Môn rỉ linh khí |

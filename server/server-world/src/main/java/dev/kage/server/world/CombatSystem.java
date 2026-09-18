@@ -159,6 +159,9 @@ final class CombatSystem extends IteratingKSystem {
         // quái đang vung trượt vẫn là đang đánh nhau, không phải đang nghỉ.
         markInCombat(attacker);
         markInCombat(target);
+        // ADR-050 D3 — CHỈ bên ra đòn: lá chắn vùng an toàn mất hiệu lực với người vừa đánh ra,
+        // nhưng vẫn che người đang bị đánh (nếu không, D2 không bao giờ chạy được).
+        markAttackDealt(attacker);
         // ADR-049 — loài khai `retaliates` bị đánh thì đuổi theo kẻ vừa đánh, kể cả khi aggro = 0.
         // Đây là đường THỨ HAI đặt TargetComponent; AiSystem không còn độc quyền chuyện đó.
         Retaliation.onAttacked(target, attacker);
@@ -182,6 +185,13 @@ final class CombatSystem extends IteratingKSystem {
     private static void markInCombat(KEntity entity) {
         if (RECENCY.has(entity)) {
             RECENCY.get(entity).secondsSinceCombat = 0f;
+        }
+    }
+
+    /** ADR-050 D3 — xem {@code CombatRecencyComponent.secondsSinceAttackDealt}. */
+    private static void markAttackDealt(KEntity entity) {
+        if (RECENCY.has(entity)) {
+            RECENCY.get(entity).secondsSinceAttackDealt = 0f;
         }
     }
 

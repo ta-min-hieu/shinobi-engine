@@ -238,6 +238,17 @@ public final class WorldFacade {
     private final NpcCatalogSnapshot npcCatalog;
 
     /**
+     * Mã những vùng an toàn khai {@code heals = true} (ADR-050 D4). Tông môn hồi ĐẦY máu lúc bước
+     * vào (ADR-046 D3, không đổi); trạm tiếp ứng dọc trục thì KHÔNG — chúng chỉ che chở, người chơi
+     * tự hồi bằng hồi máu ngoài chiến đấu.
+     *
+     * <p>Vì sao giữ TẬP MÃ chứ không nhét cờ vào {@code NamedZone}: engine chỉ cần biết biên và tên
+     * vùng để báo vào/ra, còn "vùng này làm gì" là luật của server-world. Nhét cờ xuống engine là
+     * đẩy luật gameplay vào tầng không được biết gameplay.
+     */
+    private final Set<String> healingZoneCodes;
+
+    /**
      * Toàn bộ resource script skill (hardcode, chưa DB-driven — xem {@link SkillConstants}) —
      * dùng cho validate script lúc khởi động (SCRIPTING.md §8). {@code static} vì đây là config
      * cố định, không phụ thuộc instance {@link WorldFacade} nào.
@@ -291,6 +302,7 @@ public final class WorldFacade {
         this.outboundSink = outboundSink;
         this.monsterCatalog = content.monsters();
         this.npcCatalog = content.npcs();
+        this.healingZoneCodes = healingZoneCodesOf(content.safeZones());
         this.monsterRespawnCountdownSeconds =
                 newAliveCountdowns(monsterCatalog.spawnPoints().size());
         this.spawnOverworldContent = spawnOverworldContent;
@@ -857,6 +869,23 @@ public final class WorldFacade {
         entity.add(new TriggerZoneMembershipComponent());
     }
 
+    /**
+     * ADR-050 D4 — mã những vùng khai {@code heals}. Tách khỏi constructor vì nó là phép LỌC, không
+     * phải phép nối dây; và constructor đã chạm trần 50 dòng của Checkstyle.
+     *
+     * <p>Vòng lặp thường thay vì stream: chạy đúng MỘT lần lúc dựng world, nên không có gì để tối ưu,
+     * mà đọc ra thì thẳng hơn.
+     */
+    private static Set<String> healingZoneCodesOf(SafeZoneCatalogSnapshot safeZones) {
+        List<String> codes = new ArrayList<String>();
+        for (SafeZoneCatalogSnapshot.SafeZoneDefinition zone : safeZones.zones()) {
+            if (zone.heals()) {
+                codes.add(zone.code());
+            }
+        }
+        return Set.copyOf(codes);
+    }
+
     /** ADR-046 D3 — dịch vùng an toàn của world sang kiểu của {@code engine-ecs} (một lần, lúc dựng). */
     private static List<NamedZone> toNamedZones(SafeZoneCatalogSnapshot safeZones) {
         return safeZones.zones().stream()
@@ -873,6 +902,9 @@ public final class WorldFacade {
      * mỗi lần bước vào lại đẻ một gói là đúng thứ ADR-042 đang muốn tránh.
      */
     private void onSafeZoneEntered(KEntity entity, String zoneId) {
+        if (!healingZoneCodes.contains(zoneId)) {
+            return; // ADR-050 D4 — trạm tiếp ứng CHE CHỞ chứ không hồi máu; nghỉ vẫn tốn thời gian.
+        }
         HealthComponent health = HEALTH.get(entity);
         if (health == null || health.isDead() || health.current >= health.max) {
             return;

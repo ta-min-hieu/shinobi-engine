@@ -476,8 +476,8 @@ class WorldFacadeTest {
         WorldContentCatalog withZone = new WorldContentCatalog(
                 TestMonsterCatalogs.trainingGround(),
                 NpcCatalogSnapshot.EMPTY,
-                new SafeZoneCatalogSnapshot(
-                        List.of(new SafeZoneCatalogSnapshot.SafeZoneDefinition("sect_grounds", 0f, -10f, 5f, 10f))));
+                new SafeZoneCatalogSnapshot(List.of(
+                        new SafeZoneCatalogSnapshot.SafeZoneDefinition("sect_grounds", 0f, -10f, 5f, 10f, true))));
         WorldFacade zoneWorld = new WorldFacade(zoneSink, true, TickMetricsPort.NO_OP, withZone);
         try {
             zoneWorld.start();

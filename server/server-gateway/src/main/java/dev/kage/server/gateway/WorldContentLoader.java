@@ -63,7 +63,7 @@ final class WorldContentLoader {
 
     private static SafeZoneCatalogSnapshot.SafeZoneDefinition toSafeZoneDefinition(SafeZone zone) {
         return new SafeZoneCatalogSnapshot.SafeZoneDefinition(
-                zone.code(), zone.minX(), zone.minY(), zone.maxX(), zone.maxY());
+                zone.code(), zone.minX(), zone.minY(), zone.maxX(), zone.maxY(), zone.heals());
     }
 
     private static MonsterCatalogSnapshot loadMonsters(MonsterFacade monsterFacade, String worldCode) {

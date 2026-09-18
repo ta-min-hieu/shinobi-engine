@@ -99,6 +99,34 @@ final class TestMonsterCatalogs {
         return MonsterCatalogSnapshot.of(List.of(boss), List.of());
     }
 
+    /** Loài của test ADR-050 — mã riêng để không lẫn với cọc tập lẫn con canh gác của ADR-049. */
+    static final String ROAMING_HUNTER_CODE = "roaming_hunter";
+
+    /**
+     * Một con CÓ gây sự thật (aggro 6m) nhưng KHÔNG lang thang (patrol 0) — fixture của ADR-050.
+     *
+     * <p>Vì sao cần loài thứ ba thay vì dùng lại {@link #standingSentry(boolean)}: con kia khai
+     * {@code aggro = 0} nên nó không bao giờ đi qua vòng quét aggro, mà vòng quét aggro CHÍNH LÀ thứ
+     * ADR-050 D1 sửa. Đo luật mới bằng một con không chạy qua chỗ sửa thì ô test luôn xanh, kể cả khi
+     * luật hỏng.
+     *
+     * <p>{@code patrol = 0} để nó đứng yên ở x=8: mọi ô test bên dưới tính khoảng cách theo con số
+     * đó, và một con lang thang sẽ làm phép đo trôi. {@code retaliates = true} vì D3 cần nó đánh trả.
+     */
+    static MonsterCatalogSnapshot roamingHunter() {
+        MonsterCatalogSnapshot.MonsterSpecies hunter = new MonsterCatalogSnapshot.MonsterSpecies(
+                ROAMING_HUNTER_CODE,
+                "mob_training-dummy",
+                200,
+                10L,
+                new MonsterCatalogSnapshot.MonsterCombatNumbers(12, 0, 0, 0, 100, 0, 0, "NONE"),
+                new MonsterCatalogSnapshot.MonsterAiNumbers(6f, 10f, 3f, 1.5f, 0f, 3f, true),
+                null);
+        return MonsterCatalogSnapshot.of(
+                List.of(hunter),
+                List.of(new MonsterCatalogSnapshot.MonsterSpawnDefinition(ROAMING_HUNTER_CODE, 8f, 0f, 10f)));
+    }
+
     /** Loài canh gác của test ADR-049 — mã riêng để không lẫn với cọc tập. */
     static final String STANDING_SENTRY_CODE = "standing_sentry";
 

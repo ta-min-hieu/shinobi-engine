@@ -23,6 +23,18 @@ public final class CombatRecencyComponent implements Component {
     /** Giây kể từ lần cuối entity này gây HOẶC chịu damage. Khởi tạo lớn = coi như đã ngoài chiến đấu từ lâu. */
     public float secondsSinceCombat = Float.MAX_VALUE;
 
+    /**
+     * Giây kể từ lần cuối entity này TỰ RA ĐÒN (ADR-050 D3) — khác {@link #secondsSinceCombat} ở
+     * chỗ nó KHÔNG reset khi bị đánh.
+     *
+     * <p>Vì sao phải là đồng hồ THỨ HAI: {@code secondsSinceCombat} reset cho cả bên đánh lẫn bên
+     * chịu (CombatSystem — cố ý, ADR-046 D2), nên người đang bị đuổi không bao giờ đạt ngưỡng. Bản
+     * đầu của ADR-050 dùng nó làm điều kiện lá chắn và vì thế D3 vô hiệu hoá chính D2: chạy vào
+     * trạm lúc đang bị đánh thì quái KHÔNG bỏ cuộc — đúng cái tình huống D2 sinh ra để giải.
+     * Đo được bằng ô test {@code shouldBreakOffTheChase_whenTheTargetStepsIntoASafeZone}.
+     */
+    public float secondsSinceAttackDealt = Float.MAX_VALUE;
+
     /** Phần máu lẻ chưa đủ 1 điểm để đổ vào {@link HealthComponent#current}. */
     public float healAccumulator;
 

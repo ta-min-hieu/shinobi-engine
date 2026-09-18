@@ -33,5 +33,5 @@ public record SafeZoneCatalogSnapshot(List<SafeZoneDefinition> zones) {
      * tông môn là đất an toàn). ADR-046 chỉ thi hành phần hồi máu; chưa có cột "vùng này làm gì"
      * vì mới có đúng MỘT luật, và đoán trước luật thứ hai là đoán sai (xem Revisit Trigger).
      */
-    public record SafeZoneDefinition(String code, float minX, float minY, float maxX, float maxY) {}
+    public record SafeZoneDefinition(String code, float minX, float minY, float maxX, float maxY, boolean heals) {}
 }

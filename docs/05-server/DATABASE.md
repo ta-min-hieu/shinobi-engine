@@ -103,7 +103,12 @@ bằng phép biến đổi thuần (`NpcModelKey`: `town_elder` → `char_town-e
 
 | Bảng | Cột chính | Ghi chú |
 |---|---|---|
-| `safe_zone` | `id, code, world_code, min_x, min_y, max_x, max_y` | **Tĩnh** — vùng an toàn hình chữ nhật. Bước VÀO ⇒ đầy máu ngay ([ADR-046](../01-architecture/adr/ADR-046-Health-Recovery.md) D3). `code` UNIQUE; `CHECK safe_zone_bounds_not_inverted (min_x <= max_x AND min_y <= max_y)`; index trên `world_code`. World không khai vùng nào (dungeon/arena) ⇒ trả rỗng, KHÔNG phải lỗi. Chủ bảng là module **`feature-world`** — `server-world` không đọc DB (Điều 23), `server-gateway` dịch sang `SafeZoneCatalogSnapshot` rồi đổ vào `TriggerZoneSystem`. Migration V35 (2026-09-07) |
+| `safe_zone` | `id, code, world_code, min_x, min_y, max_x, max_y, heals` | **Tĩnh** — vùng an toàn hình chữ nhật. Bước VÀO ⇒ đầy máu ngay ([ADR-046](../01-architecture/adr/ADR-046-Health-Recovery.md) D3). `code` UNIQUE; `CHECK safe_zone_bounds_not_inverted (min_x <= max_x AND min_y <= max_y)`; index trên `world_code`. World không khai vùng nào (dungeon/arena) ⇒ trả rỗng, KHÔNG phải lỗi. Chủ bảng là module **`feature-world`** — `server-world` không đọc DB (Điều 23), `server-gateway` dịch sang `SafeZoneCatalogSnapshot` rồi đổ vào `TriggerZoneSystem`. Migration V35 (2026-09-07) |
+
+⚠️ **`heals` (V49, ADR-050 D4)**: `TRUE` = bước vào hồi ĐẦY máu ngay (chỉ `sect_grounds`);
+`FALSE` = vùng chỉ CHE CHỞ, người chơi tự hồi bằng hồi máu ngoài chiến đấu (6 trạm tiếp ứng dọc
+trục). Còn **chặn aggro thì KHÔNG khai ở đây** — từ ADR-050 D1 nó là luật của MỌI vùng an toàn,
+và thêm cột để khai một giá trị duy nhất là đoán trước luật thứ hai.
 
 ⚠️ **Tên "safe_zone" chứ không phải "heal_zone" là có chủ đích**: cùng vùng đó sau này là chỗ cấm PvP
 ([STORY §7](../13-game-design/STORY.md) — "trong tông không thể động thủ"). Tới 2026-09-17 bảng mới có

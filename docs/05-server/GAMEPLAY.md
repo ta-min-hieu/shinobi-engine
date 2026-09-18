@@ -89,9 +89,28 @@ Trước 2026-09-07 **không có nguồn hồi máu nào ngoài chiến đấu**
 | Nguồn | Ai được | Cơ chế | Ở đâu |
 |---|---|---|---|
 | Ngoài chiến đấu | **Nhân vật** | 8 giây không gây/chịu damage ⇒ hồi 3% máu tối đa mỗi giây | `HealthRegenSystem` (`server-world`) |
-| Vùng an toàn | **Nhân vật** | Bước VÀO vùng ⇒ đầy máu ngay | bảng `safe_zone` (`feature-world`) + `TriggerZoneSystem` |
+| Vùng an toàn | **Nhân vật** | Bước VÀO vùng ⇒ đầy máu ngay — **chỉ vùng khai `heals = true`** (tông môn). Trạm tiếp ứng dọc trục khai `false`: chúng CHE CHỞ chứ không hồi máu ([ADR-050](../01-architecture/adr/ADR-050-Safe-Zones-Along-The-Trunk.md) D4) | bảng `safe_zone` (`feature-world`) + `TriggerZoneSystem` |
 | Đan dược | **Nhân vật** | Dùng 1 món có `item_template.use_effect = HEAL_HP` | `UseItemUseCase` (`feature-inventory`) → `WorldFacade.enqueueHealCharacter` |
 | Về tới điểm spawn | **Quái** | Chạm điểm spawn sau khi Return ⇒ đầy máu | `AiSystem.tickReturn` |
+
+### Vùng an toàn còn CHẶN AGGRO (ADR-050)
+
+Từ ADR-050, vùng an toàn không còn chỉ là chỗ hồi máu — nó là chỗ **không bị nhắm**:
+
+| Luật | Ở đâu |
+|---|---|
+| Vòng quét aggro BỎ QUA người đang đứng trong một vùng an toàn | `AiSystem.findNearestCharacterInRange` (D1) |
+| Quái đang ĐUỔI hoặc đang ĐÁNH mà mục tiêu bước vào vùng ⇒ về điểm spawn | `AiSystem.tickChase` + `tickAttack` (D2) |
+| Ai vừa đánh ra thì MẤT lá chắn cho tới khi ngoài chiến đấu đủ `REGEN_DELAY_SECONDS` | `AiSystem.isShieldedBySafeZone` (D3) |
+
+⚠️ D3 là thứ giữ cho trạm tiếp ứng không thành chòi bắn tỉa: đứng trong vùng bắn ra rồi để quái
+bỏ cuộc là thắng mọi trận mà không mất giọt máu nào. Nó dùng lại ĐÚNG đồng hồ
+`CombatRecencyComponent.secondsSinceCombat` mà hồi máu ngoài chiến đấu đang dùng — không có
+state mới, và luật phát biểu được bằng một câu: *trạm che cho người đang nghỉ, không che cho
+người đang đánh.*
+
+⚠️ Vùng an toàn KHÔNG che quái: chúng không mang `TriggerZoneMembershipComponent`. Và `AiSystem`
+đọc membership của tick TRƯỚC (TriggerZoneSystem chạy sau nó) — trễ 16,7ms, tức ≤ 0,08m.
 
 **Vì sao quái KHÔNG dùng chung cơ chế "ngoài chiến đấu"**: con quái đang ĐUỔI mà chưa đánh trúng ai
 vẫn là "ngoài chiến đấu" theo nghĩa đen, nên nó sẽ vừa chạy vừa hồi máu. Hai loại entity, hai cơ chế.

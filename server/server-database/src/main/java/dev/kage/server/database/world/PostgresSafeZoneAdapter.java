@@ -19,7 +19,7 @@ public final class PostgresSafeZoneAdapter implements SafeZonePort {
     // ORDER BY id giữ thứ tự ổn định giữa các lần khởi động — không ai dựa vào nó, nhưng thứ tự
     // ngẫu nhiên làm test khó tái hiện mà chẳng đổi lấy gì.
     private static final String LIST_SAFE_ZONES = """
-            SELECT code, world_code, min_x, min_y, max_x, max_y
+            SELECT code, world_code, min_x, min_y, max_x, max_y, heals
               FROM safe_zone
              WHERE world_code = ?
              ORDER BY id
@@ -43,6 +43,7 @@ public final class PostgresSafeZoneAdapter implements SafeZonePort {
                 rs.getFloat("min_x"),
                 rs.getFloat("min_y"),
                 rs.getFloat("max_x"),
-                rs.getFloat("max_y"));
+                rs.getFloat("max_y"),
+                rs.getBoolean("heals"));
     }
 }

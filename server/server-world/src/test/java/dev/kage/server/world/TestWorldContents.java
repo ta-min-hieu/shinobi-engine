@@ -41,6 +41,26 @@ final class TestWorldContents {
         return WorldContentCatalog.ofMonsters(TestMonsterCatalogs.dungeonBoss());
     }
 
+    /** Mã vùng an toàn dựng tay cho test ADR-050 — không trùng mã sản phẩm nào (`sect_grounds`, `waypost_*`). */
+    static final String TEST_ZONE_CODE = "it_test_zone";
+
+    /**
+     * World của test ADR-050: một con CÓ gây sự ở x=8, và một vùng an toàn phủ {@code [0, 7]}.
+     *
+     * <p>Biên chọn để hai phép đo khác nhau cùng dùng được một world: đứng ở x=3 thì trong vùng và
+     * cách con quái 5m (trong tầm aggro 6m — nên nếu luật D1 hỏng, nó SẼ đuổi); đứng ở x=6.5 thì vẫn
+     * trong vùng mà đã ở trong tầm đánh 2m, đủ để người chơi đánh ra và tự bỏ lá chắn (D3).
+     *
+     * @param heals vùng có hồi đầy máu lúc bước vào hay không (ADR-050 D4)
+     */
+    static WorldContentCatalog withHunterAndZone(boolean heals) {
+        return new WorldContentCatalog(
+                TestMonsterCatalogs.roamingHunter(),
+                NpcCatalogSnapshot.EMPTY,
+                new SafeZoneCatalogSnapshot(List.of(
+                        new SafeZoneCatalogSnapshot.SafeZoneDefinition(TEST_ZONE_CODE, 0f, -10f, 7f, 10f, heals))));
+    }
+
     /** World chỉ có MỘT con canh gác đứng yên — cặp đối chứng của ADR-049 (xem TestMonsterCatalogs). */
     static WorldContentCatalog withStandingSentry(boolean retaliates) {
         return WorldContentCatalog.ofMonsters(TestMonsterCatalogs.standingSentry(retaliates));

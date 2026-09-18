@@ -111,10 +111,23 @@ Nếu không, trạm tiếp ứng thành chòi bắn tỉa: đứng trong vùng 
 (ADR-049 `Retaliation.onAttacked` — **đường nhắm mục tiêu THỨ HAI**, không đi qua vòng quét aggro),
 D2 bắt nó quay về, mình đánh tiếp. Thắng mọi trận mà không mất một giọt máu.
 
-Luật: lá chắn của D1/D2 chỉ có hiệu lực khi `CombatRecencyComponent.secondsSinceCombat >=
-REGEN_DELAY_SECONDS` (8 giây — **cùng đúng cái đồng hồ** mà ADR-046 D2 đã dùng để quyết định "ngoài
-chiến đấu"). Không thêm state mới, và nó phát biểu một câu dễ hiểu cho người chơi: *trạm che cho
-người đang nghỉ, không che cho người đang đánh.*
+Luật: lá chắn của D1/D2 chỉ có hiệu lực khi `CombatRecencyComponent.secondsSinceAttackDealt >=
+REGEN_DELAY_SECONDS` (8 giây) — đồng hồ đếm từ lần cuối người chơi **TỰ RA ĐÒN**. Nó phát biểu một
+câu dễ hiểu cho người chơi: *trạm che cho người đang nghỉ, không che cho người đang đánh.*
+
+⚠️ **Bản đầu của D3 dùng `secondsSinceCombat` và đã SAI — sửa 2026-09-18 sau khi đo.** Đồng hồ đó
+reset cho **cả bên đánh lẫn bên chịu** (`CombatSystem` gọi `markInCombat(attacker)` *và*
+`markInCombat(target)`, cố ý từ ADR-046 D2: "đứng cạnh một con quái đang vung trượt vẫn là đang đánh
+nhau"). Hệ quả: người **đang bị đuổi** không bao giờ đạt ngưỡng, nên D3 vô hiệu hoá chính D2 ở đúng
+tình huống D2 sinh ra để giải — chạy vào trạm khi đang bị đánh. Ô test
+`shouldBreakOffTheChase_whenTheTargetStepsIntoASafeZone` bắt được điều này, và phép thử nới biên vùng
+rộng tới mức người chơi không thể ở ngoài vẫn đỏ ⇒ loại hẳn nguyên nhân vị trí.
+
+Cách sửa (chủ dự án chọn): **đồng hồ THỨ HAI** `secondsSinceAttackDealt`, chỉ reset ở nhánh người ra
+đòn — `CombatSystem` (đòn thường) và `SkillSystem` (chiêu gây damage; buff/hồi máu cố ý không tính).
+`BossAiSystem` không đụng vì nó chỉ đánh dấu bên chịu đòn. `HealthRegenSystem` cộng `deltaTime` cho
+đồng hồ mới **trước mọi nhánh thoát sớm**, nếu không người đầy máu sẽ không bao giờ lấy lại lá chắn.
+Giá phải trả: **một field mới** — đắt hơn bản đầu đúng một float, và đó là giá của việc D2 chạy thật.
 
 ### D4 — Trạm tiếp ứng KHÔNG hồi đầy máu: thêm cột `heals BOOLEAN NOT NULL DEFAULT TRUE`
 
@@ -146,7 +159,14 @@ khi bản đồ có tầng).
 cũng không còn cần: vùng an toàn nhờ LUẬT, không nhờ khoảng cách. Thay bằng bất biến mới, vẫn kiểm
 được bằng máy:
 
-> **Không vùng nào được chồng lên dải tuần tra của một điểm spawn** (`spawn ± patrol_radius`).
+> **Không vùng nào được chồng lên dải tuần tra của một điểm spawn CÓ THỂ GÂY SỰ**
+> (`spawn ± patrol_radius`, chỉ xét loài `aggro_radius_meters > 0`).
+>
+> ⚠️ Vế "có thể gây sự" thêm 2026-09-18 sau khi đo: bản đầu viết "bất kỳ điểm spawn nào" và
+> đỏ ngay ở hàng seed CŨ — `blood_sand_enforcer` đứng ở `x = -8` với tuần tra 0, tức dải
+> `[-8, -8]` nằm gọn trong sân tông môn `[-15, 5]`. Đó là nội dung cố ý (STORY §6: hộ pháp cải
+> trang làm chấp sự, đứng trên hành lang arc 1 — ADR-049 cho hắn `aggro = 0` đúng vì thế).
+> Mối nguy thật là con CÓ THỂ nhắm người, nên bất biến gác đúng chỗ đó.
 
 Lý do: quái *đứng trong* vùng an toàn là cảnh vô lý, và D1/D2 không đụng tới quái nên không có gì
 đẩy nó ra. Sáu biên trên đều nằm trong các cửa sổ trống-tuần-tra `(123,131) (137,145) (164,172)

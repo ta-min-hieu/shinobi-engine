@@ -37,6 +37,7 @@ class ProductionDialogueTreesTest {
     private static final String ALL_PRODUCTION_NPCS = """
             town_elder, /scripts/dialogue/town_elder.js
             senior_sister, /scripts/dialogue/senior_sister.js
+            waypost_attendant, /scripts/dialogue/waypost_attendant.js
             """;
 
     @ParameterizedTest(name = "[{0}] mọi action điều hướng trỏ tới một node CÓ THẬT")

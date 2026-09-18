@@ -10,13 +10,13 @@ class SafeZoneTest {
 
     @Test
     void shouldRejectBlankCode() {
-        assertThatThrownBy(() -> new SafeZone(" ", SafeZone.MAIN_WORLD_CODE, -15f, -10f, 5f, 10f))
+        assertThatThrownBy(() -> new SafeZone(" ", SafeZone.MAIN_WORLD_CODE, -15f, -10f, 5f, 10f, true))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void shouldRejectBlankWorldCode() {
-        assertThatThrownBy(() -> new SafeZone("sect_grounds", "", -15f, -10f, 5f, 10f))
+        assertThatThrownBy(() -> new SafeZone("sect_grounds", "", -15f, -10f, 5f, 10f, true))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -26,9 +26,9 @@ class SafeZoneTest {
      */
     @Test
     void shouldRejectInvertedBounds() {
-        assertThatThrownBy(() -> new SafeZone("sect_grounds", SafeZone.MAIN_WORLD_CODE, 5f, -10f, -15f, 10f))
+        assertThatThrownBy(() -> new SafeZone("sect_grounds", SafeZone.MAIN_WORLD_CODE, 5f, -10f, -15f, 10f, true))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new SafeZone("sect_grounds", SafeZone.MAIN_WORLD_CODE, -15f, 10f, 5f, -10f))
+        assertThatThrownBy(() -> new SafeZone("sect_grounds", SafeZone.MAIN_WORLD_CODE, -15f, 10f, 5f, -10f, true))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -36,7 +36,7 @@ class SafeZoneTest {
     void shouldAcceptDegenerateBounds_becauseAZeroWidthZoneIsMeaninglessButNotCorrupt() {
         // min == max là vùng một điểm: vô dụng nhưng không sai dữ liệu. Chặn nó là đoán ý người
         // viết migration; để nó qua thì playtest tự thấy "đứng đúng chỗ đó mới hồi máu".
-        SafeZone point = new SafeZone("pin", SafeZone.MAIN_WORLD_CODE, 3f, 0f, 3f, 0f);
+        SafeZone point = new SafeZone("pin", SafeZone.MAIN_WORLD_CODE, 3f, 0f, 3f, 0f, true);
 
         assertThat(point.minX()).isEqualTo(point.maxX());
     }

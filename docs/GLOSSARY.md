@@ -78,6 +78,7 @@
 | Tâm pháp (bị động) | Passive Skill | — |
 | Hồi chiêu | Cooldown | Server giữ, không tin client |
 | Tông môn (hub) | Sect (Hub) | Safe zone — Thanh Hư Tông (tên cũ: Học Viện Ninja / Ninja Academy) |
+| Trạm tiếp ứng | Way Post | Vùng an toàn NHỎ dọc trục (`waypost_*`, V49) — che chở nhưng KHÔNG hồi đầy máu, khác hub. Đệ tử trực trạm giữ một góc trận pháp hộ sơn thu nhỏ (ADR-050) |
 | Đệ tử tạp dịch / ngoại môn / nội môn | Outer/Inner Disciple | Bậc tường thuật, không phải cơ chế |
 | Linh Mạch | Faction Zone | Luyện cấp theo nguyên tố (tên cũ: Lãnh Địa Hệ Phái) |
 | Hoang Vực | Contested Zone | PvP mở (tên cũ: Vùng Tranh Chấp) |

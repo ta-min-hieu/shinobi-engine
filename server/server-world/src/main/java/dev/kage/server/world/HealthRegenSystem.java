@@ -53,6 +53,9 @@ final class HealthRegenSystem extends IteratingKSystem {
         // Float.MAX_VALUE + deltaTime vẫn là Float.MAX_VALUE (không tràn) — nhân vật vừa vào world
         // được coi là đã ngoài chiến đấu từ lâu, đúng ý.
         recency.secondsSinceCombat += deltaTime;
+        // ADR-050 D3 — đồng hồ "tôi vừa ra đòn" phải chạy ở ĐÂY, trước mọi nhánh thoát sớm; để
+        // dưới thì người đầy máu không bao giờ lấy lại được lá chắn vùng an toàn.
+        recency.secondsSinceAttackDealt += deltaTime;
 
         HealthComponent health = HEALTH.get(entity);
         if (health.isDead() || health.current >= health.max) {
