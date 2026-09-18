@@ -1,7 +1,8 @@
 """Build the `icon_<item_code>` assets — one per real `item_template` row seeded
 in the DB: V4/V5/V9 (kunai, wooden_sword, enhance_protection_charm), the 15 rows
 V21 adds (`V21__seed_starter_equipment.sql`), `ancient_jade_shard` (V30),
-`minor_healing_pill` (V36) and the six `outer_sect_*` pieces of V45. ART-PIPELINE.md §8.3:
+`minor_healing_pill` (V36), the six `outer_sect_*` pieces of V45 and the
+six `foundation_*` pieces of V48. ART-PIPELINE.md §8.3:
 "item_template.code = 'kunai' <-> art_asset.asset_key = 'icon_kunai'"
 (soft-link convention).
 
@@ -85,6 +86,13 @@ PILL_DARK = "#8E2E1F"
 JADE = "#5FA986"
 JADE_PALE = "#A8D9BE"
 JADE_DARK = "#3F7A5E"
+
+# V48 — bậc "Trúc Cơ". Bạch ngọc gần trắng + huyền thiết gần đen: hai đầu của trục SẮC ĐỘ, vì bậc
+# này phải đảo bố cục sáng-tối của bậc Ngoại Môn chứ không được nhích màu (xem khối ghi chú V48 bên
+# dưới). `ONYX` ngả tím ấm để không lẫn với `GENIN_DARK` (#1E242E) vốn ngả lam — hai màu gần-đen
+# nhưng nằm trên hai khối chính khác hẳn nhau (chàm sẫm vs trắng ngà) nên không bao giờ tráo chỗ.
+BONE = "#E8DFC9"
+ONYX = "#322C3C"
 
 
 def _clear_scene():
@@ -834,6 +842,245 @@ def build_outer_sect_blade():
     apply_toon(lower, TASSEL_RED, shades=3)
     return 1.10
 
+
+# --- V48: bậc "Trúc Cơ" (required_level 30) ----------------------------------
+#
+# Bậc THỨ TƯ, và là bậc nguy hiểm nhất từ trước tới nay: nó rơi vào ĐÚNG sáu ô của bậc Ngoại Môn
+# với ĐÚNG sáu danh từ tiếng Việt (Kiếm · Đạo Bào · Quan · Hộ Thủ · Vân Ngoa · Hộ Thân Phù). Cùng
+# một VẬT, cao hơn một bậc. Đường dễ nhất — tô lại bộ cũ bằng màu khác — là đúng cái sai mà
+# ASSET-LOG đã ghi hai lần: ở 50–64px mắt đọc BỐ CỤC SÁNG-TỐI trước, màu sau, nên hai asset cùng
+# dòng dõi phải ĐẢO bố cục, không nhích màu.
+#
+#     Ngoại Môn : khối chính TRUNG TÍNH (ngọc), chi tiết SÁNG hơn (JADE_PALE), viền tối
+#     Trúc Cơ   : khối chính SÁNG GẦN TRẮNG (bạch ngọc), chi tiết TỐI (huyền thiết) + đỏ + vàng
+#
+# Chất liệu đổi hẳn lần thứ tư, đúng khuôn ba lần trước: vải/rơm/gỗ → chàm + THÉP SÁNG + vàng →
+# ngọc + vàng, không thép → bạch ngọc + HUYỀN THIẾT TỐI. Kim loại quay lại nhưng ở đầu kia của trục
+# sắc độ so với bậc Hạ Nhẫn, nên "có kim loại" không làm hai bậc lẫn nhau.
+#
+# ⚠️ Một ngoại lệ ĐƯỢC GHI NHẬN, không phải bỏ sót: `foundation_blade` KHÔNG đảo sắc độ ở lưỡi
+# kiếm. Lưỡi tối là đúng cái đã làm `outer_sect_blade` vòng B #1 render ra "một cái ỐNG ĐEN". Luật
+# hình mảnh không sống nổi qua viền Freestyle thắng luật đảo bố cục ở chỗ này, nên khác biệt của
+# thanh kiếm bậc bốn nằm hết ở HỘ THỦ (lưỡi liềm thay đĩa) và ở chuôi/tua.
+
+
+def build_foundation_robe():
+    # Trúc Cơ Đạo Bào — cùng silhouette `_vest` như cả ba bậc trước, đảo sắc độ: thân trắng ngà,
+    # vai + cổ + đai huyền thiết, yếm đỏ. Bậc Ngoại Môn là thân ngọc trung tính với yếm SÁNG hơn;
+    # ở đây thân sáng nhất còn mọi chi tiết đều tối hơn nó. Yếm đỏ (không phải vàng) vì `_vest` tự
+    # gắn khoá đai VÀNG ngay dưới yếm — hai khối vàng chạm nhau sẽ dính thành một hình lỗ khoá.
+    return _vest(BONE, ONYX, ONYX, TASSEL_RED, cloth_shades=3)
+
+
+def build_foundation_gloves():
+    # Trúc Cơ Hộ Thủ — `_wraps` với bàn tay trắng ngà, dải quấn huyền thiết, tấm khớp ngón ĐỎ.
+    # Không dùng vàng cho tấm khớp vì `_wraps` tự gắn chốt vàng lên chính tấm đó (cùng màu ⇒ chốt
+    # biến mất), đúng lý do bậc Ngoại Môn để tấm `JADE_PALE` chứ không để vàng.
+    return _wraps(BONE, ONYX, TASSEL_RED)
+
+
+def build_foundation_cap():
+    """Trúc Cơ Quan — mũ HAI TẦNG: vành trắng rộng, thân huyền thiết, chóp trắng nhỏ.
+
+    KHÔNG tái dùng `_outer_sect_cap`. Lý do nằm nguyên văn trong docstring hàm đó, viết cho tình
+    huống y hệt: bỏ tấm kim loại khỏi `_headband` chỉ ra `novice_headband` đổi màu, "ở 64x64 là
+    không còn icon". Gọi `_outer_sect_cap` với ba màu mới thì ra `outer_sect_cap` đổi màu.
+
+    ⚠️ **VÒNG B #1 (2026-09-18) — ra một cái THÙNG.** Bản đầu đảo luôn silhouette: chóp cụt bậc ba
+    thu vào trên (hình A), nên bản này loe ra trên (hình V), thân tối, đai trắng nằm dưới. Ở 64px
+    nó đọc ra thùng rác có que xuyên qua. Nguyên nhân KHÔNG phải màu — nó phá đúng luật đã ghi sẵn
+    trong `_outer_sect_cap`: *"the top brim WIDER than the crown... a brim that flares outwards is
+    what makes the outline read 'hat' instead of 'box'"*. Mũ loe lên trên thì phần rộng nhất nằm ở
+    ĐỈNH, và một hình rộng ở đỉnh hẹp ở đáy là cái hộp, không phải cái mũ.
+
+    ⇒ Bài học: luật đảo bố cục sáng-tối KHÔNG được phép đổi lấy một luật hình. Bản này giữ nguyên
+    quan hệ vành-rộng-hơn-thân, và dồn toàn bộ khác biệt vào hai chỗ khác:
+
+      * **Sắc độ đảo** — bậc ba là đai TỐI đỡ thân SÁNG; ở đây vành SÁNG đỡ thân TỐI. Luật thật sự
+        cần giữ là hai khối xếp chồng phải chênh sắc độ (nếu không dính thành một cục); luật đó nói
+        về độ CHÊNH, không nói chiều.
+      * **Hai tầng thay một** — thêm tầng chóp trắng nhỏ trên đỉnh thân. Bậc ba chỉ có MỘT khối
+        chóp cụt, nên đường viền ba bậc (rộng → hẹp → nhỏ) phân biệt được kể cả khi bỏ hết màu.
+
+    Vẫn KHÔNG có đuôi khăn buông: Freestyle vẽ viền riêng từng object nên mảnh nhỏ không bao giờ
+    hoà vào khối nó định bám — một đuôi ra báng súng, hai đuôi ra hai cái chân.
+    """
+    # Vành là khối RỘNG NHẤT của cả hình. Đây là điều kiện để đọc ra mũ, không phải tuỳ chọn.
+    brim = _box_obj("Brim", 0.290, 0.066, 0.046, loc=(0.0, 0.0, -0.212))
+    apply_toon(brim, BONE, shades=3)
+
+    # Viên đá đỏ thay viên ngọc lam của bậc ba: `GEM_BLUE` đang là đá của cả `genin_bracelet` lẫn
+    # `genin_necklace`, nên dùng lại nó ở đây là kéo bậc bốn về phía bậc hai.
+    stone = _gem_obj("Stone", 0.072, 0.048, 0.086, loc=(0.0, -0.090, -0.212))
+    apply_toon(stone, TASSEL_RED, shades=3)
+
+    crown = _frustum_obj("Crown", 0.212, 0.150, 0.070, 0.140, loc=(0.0, 0.0, -0.030))
+    apply_toon(crown, ONYX, shades=3)
+
+    # Tầng chóp loe nhẹ so với đỉnh thân (0.166 > 0.150) — đủ để mắt bắt ra một BẬC, không đủ để
+    # phần rộng nhất chuyển lên đỉnh và làm hình lộn ngược trở lại thành cái hộp.
+    top = _frustum_obj("TopTier", 0.166, 0.132, 0.062, 0.088, loc=(0.0, 0.0, 0.196))
+    apply_toon(top, BONE, shades=3)
+
+    pin = _box_obj("Pin", 0.268, 0.022, 0.024, loc=(0.0, -0.086, 0.052), rot=_tilt(-8))
+    apply_toon(pin, GOLD, shades=3)
+    bead = _box_obj("PinBead", 0.044, 0.036, 0.046, loc=(-0.270, -0.088, 0.090))
+    apply_toon(bead, GOLD, shades=2)
+    return 0.92
+
+
+def build_foundation_boots():
+    """Trúc Cơ Vân Ngoa — vẫn MỘT khối liền nhìn nghiêng, ống cao hơn và vân mũi lớn hơn.
+
+    Ba tư thế đã bị loại bằng render thật, ghi ở `build_outer_sect_boots`: nhìn chính diện ra cái
+    ĐÈN, mũi hếch ghép rời ra cái CO ỐNG NƯỚC. Nên tư thế nghiêng-một-khối-liền là thứ DUY NHẤT đã
+    chứng minh được, và bậc này không đi tìm tư thế thứ tư — nó đổi TỶ LỆ (ống 0.392 so với 0.318)
+    và đảo sắc độ.
+
+    Đảo so với bậc ba: ở đó thân ngọc trung tính, ống SÁNG hơn thân. Ở đây thân trắng ngà và ống
+    TỐI hơn thân. Luật thật sự cần giữ là "tách ống khỏi bàn chân bằng SẮC ĐỘ, không bằng đường" —
+    luật đó nói về độ CHÊNH, không nói chiều, nên đảo chiều vẫn thoả.
+    """
+    profile = [
+        (-0.166, -0.160),   # gót, sát đế
+        (-0.166,  0.190),   # lưng ống
+        (-0.140,  0.392),   # vai cổ ống — cao hơn bậc ba 0.074
+        (-0.018,  0.392),   # mép cổ trước
+        (-0.002,  0.150),   # mặt trước ống thu vào
+        ( 0.066, -0.026),   # mu bàn chân
+        ( 0.198, -0.004),   # mũi bắt đầu hếch
+        ( 0.286,  0.116),   # đỉnh vân mũi
+        ( 0.336,  0.056),   # mép ngoài mũi
+        ( 0.252, -0.074),   # mũi đổ xuống
+        ( 0.228, -0.160),   # đầu đế trước
+    ]
+    body = _prism_obj("Boot", profile, 0.058, loc=(-0.030, 0.0, -0.030))
+    apply_toon(body, BONE, shades=3)
+
+    # ⚠️ VÒNG B #1 (2026-09-18): tấm ống cao tới 0.360 và nằm ở y=-0.092, tức TRƯỚC đai vàng
+    # (mặt trước đai ở y=-0.072) ⇒ đai bị che, đỉnh ủng render ra một mảng tối phẳng và mất hẳn
+    # điểm vàng. Hai số phải đi cùng nhau: tấm ống dừng DƯỚI đai, và đai đẩy ra TRƯỚC tấm ống.
+    shaft = _box_obj("ShaftFace", 0.066, 0.030, 0.150, loc=(-0.112, -0.062, 0.176))
+    apply_toon(shaft, ONYX, shades=3)
+
+    cuff = _box_obj("CuffBand", 0.078, 0.066, 0.034, loc=(-0.082, -0.044, 0.356))
+    apply_toon(cuff, GOLD, shades=2)
+
+    sole = _box_obj("Sole", 0.210, 0.064, 0.032, loc=(0.014, 0.0, -0.206))
+    apply_toon(sole, ONYX, shades=2)
+    return 0.98
+
+
+def build_foundation_talisman():
+    """Trúc Cơ Hộ Thân Phù — thẻ HÌNH THOI tối, đai vàng ngang, lõi sáng.
+
+    Ô ACCESSORY_1 có sẵn hai ràng buộc đã ghi và cả hai vẫn hiệu lực:
+      * KHÔNG được là vòng kín — `novice_bracelet` và `genin_bracelet` đã chiếm hình đó, và
+        `build_novice_bracelet` ghi rằng vòng-kín-đối-lại-chữ-U-của-dây-chuyền là tín hiệu DUY NHẤT
+        sống sót khi thu nhỏ.
+      * KHÔNG được là thẻ chữ nhật treo dây — `outer_sect_talisman` là hình đó.
+
+    Nên hình ở đây vẫn trục dọc (không đụng chữ U ngang của hai necklace) nhưng thân là khối bát
+    diện: viền THOI đối lại viền CHỮ NHẬT, phân biệt được ngay cả khi bỏ hết màu.
+
+    Và đây là món đảo bố cục rõ nhất cả bộ: bậc ba là một vật SÁNG (thẻ ngọc + vát `JADE_PALE`) với
+    vài nét tối; bậc bốn là một vật TỐI với vài nét sáng. KHÔNG dùng lại giấy bùa — `icon_
+    enhance_protection_charm` đã là bùa giấy kem có ấn đỏ, thêm một lá bùa giấy nữa là hai icon
+    tranh nhau cùng một hình.
+    """
+    cap = _box_obj("Cap", 0.058, 0.046, 0.048, loc=(0.0, 0.0, 0.348))
+    apply_toon(cap, GOLD, shades=2)
+    for index, side in enumerate((-1, 1)):
+        cord = _box_obj("Cord%d" % index, 0.022, 0.030, 0.108,
+                        loc=(side * 0.050, 0.0, 0.248), rot=_tilt(side * -12))
+        apply_toon(cord, TASSEL_RED, shades=2)
+
+    plaque = _gem_obj("Plaque", 0.196, 0.052, 0.252, loc=(0.0, 0.0, -0.036))
+    apply_toon(plaque, ONYX, shades=3)
+
+    # Đai vàng chạy ngang bụng thoi, lõi sáng đè lên giữa đai — hai cánh vàng còn thò ra hai bên là
+    # thứ giữ cho lõi đọc ra "khảm vào" chứ không ra "dán lên".
+    waist = _box_obj("Waist", 0.150, 0.030, 0.030, loc=(0.0, -0.060, -0.036))
+    apply_toon(waist, GOLD, shades=2)
+    # ⚠️ VÒNG B #1 (2026-09-18): lõi 0.064x0.084 biến mất hẳn ở 64px — bộ ba sắc độ (tối/vàng/
+    # sáng) tụt còn hai và thẻ đọc ra một cái diều đen trơn. Phóng lên 0.088x0.116, vẫn nhỏ hơn
+    # đai vàng 0.150 nên hai cánh vàng còn thò ra hai bên và lõi vẫn đọc ra "khảm vào".
+    core = _gem_obj("Core", 0.088, 0.030, 0.116, loc=(0.0, -0.076, -0.036))
+    apply_toon(core, BONE, shades=3)
+
+    fall = _box_obj("TasselFall", 0.032, 0.034, 0.082, loc=(0.0, -0.010, -0.336))
+    apply_toon(fall, TASSEL_RED, shades=3)
+    return 1.00
+
+
+def build_foundation_blade():
+    """Trúc Cơ Kiếm — lưỡi THON một khối liền + hộ thủ LƯỠI LIỀM.
+
+    Ba thanh kiếm đứng cùng ô WEAPON nên phải tách được bằng đúng hai thứ mắt bắt trước ở 64px:
+    đường viền và chỗ rộng nhất.
+
+        wooden_sword      : thanh gỗ, hộ thủ mảnh
+        steel_katana      : lưỡi thẳng bản đều, thanh hộ thủ ngang + 2 quillon
+        outer_sect_blade  : lưỡi bản đều, hộ thủ ĐĨA tròn ngọc
+        foundation_blade  : lưỡi THON (rộng ở gốc, hẹp dần lên mũi), hộ thủ LƯỠI LIỀM chúc xuống
+
+    ⚠️ Lưỡi vẫn SÁNG, cố ý không đảo. `outer_sect_blade` vòng B #1 đã trả giá đúng chỗ này: lưỡi
+    hẹp + camera xa làm viền Freestyle ăn gần hết bề ngang và render ra một cái ỐNG ĐEN. Lưỡi tối
+    là cùng một lỗi đi bằng cửa khác. Nên bản này còn rộng hơn bậc ba ở gốc (0.094 so với 0.078) và
+    kéo camera GẦN hơn (1.14 so với 1.10); chỗ đảo bố cục dồn hết vào chuôi huyền thiết.
+
+    Hộ thủ là MỘT khối `_prism_obj`, không phải hai cánh rời: hai mảnh rời sẽ tách khỏi lưỡi đúng
+    như mũi ủng bậc ba từng tách ra thành mảnh vàng lơ lửng.
+    """
+    blade_profile = [
+        (-0.094, -0.210),   # gốc lưỡi, bản rộng nhất
+        (-0.090,  0.140),
+        (-0.062,  0.286),   # vai lưỡi thu vào
+        (-0.028,  0.362),   # mũi CÙN chứ không nhọn: một đỉnh nhọn bị viền 2px nuốt sạch
+        ( 0.028,  0.362),
+        ( 0.062,  0.286),
+        ( 0.090,  0.140),
+        ( 0.094, -0.210),
+    ]
+    blade = _prism_obj("Blade", blade_profile, 0.026, loc=(0.0, -0.050, 0.130))
+    apply_toon(blade, BONE, shades=3)
+
+    guard_profile = [
+        (-0.232, -0.086),   # đầu cánh trái, chúc xuống
+        (-0.152,  0.034),
+        (-0.054,  0.062),
+        ( 0.054,  0.062),
+        ( 0.152,  0.034),
+        ( 0.232, -0.086),
+        ( 0.180, -0.120),   # cạnh dưới vòng ngược về
+        ( 0.062, -0.030),
+        (-0.062, -0.030),
+        (-0.180, -0.120),
+    ]
+    guard = _prism_obj("Guard", guard_profile, 0.044, loc=(0.0, -0.050, -0.118))
+    apply_toon(guard, GOLD, shades=3)
+
+    grip = _box_obj("Grip", 0.046, 0.044, 0.136, loc=(0.0, -0.050, -0.296))
+    apply_toon(grip, ONYX, shades=3)
+    for index, height in enumerate((-0.232, -0.362)):
+        ring = _box_obj("Ring%d" % index, 0.054, 0.048, 0.018, loc=(0.0, -0.050, height))
+        apply_toon(ring, GOLD, shades=2)
+    pommel = _gem_obj("Pommel", 0.062, 0.052, 0.044, loc=(0.0, -0.050, -0.448))
+    apply_toon(pommel, GOLD, shades=2)
+
+    # Tua kiếm GIỮ — ASSET-LOG 2026-09-03 ghi rằng bỏ bớt tín hiệu chỉ đưa về "kiếm chung chung",
+    # phải THÊM một tín hiệu dương mới đọc ra kiếm Trung Hoa. Bỏ nó ở bậc bốn là đi lùi.
+    knot = _box_obj("TasselKnot", 0.034, 0.036, 0.032, loc=(0.0, -0.058, -0.506))
+    apply_toon(knot, TASSEL_RED, shades=2)
+    upper = _box_obj("TasselUpper", 0.032, 0.034, 0.076, loc=(-0.030, -0.060, -0.566),
+                     rot=_tilt(-16))
+    apply_toon(upper, TASSEL_RED, shades=3)
+    lower = _box_obj("TasselLower", 0.028, 0.032, 0.070, loc=(-0.074, -0.062, -0.632),
+                     rot=_tilt(-30))
+    apply_toon(lower, TASSEL_RED, shades=3)
+    return 1.14
+
+
 ITEMS = {
     "kunai": build_kunai,
     "wooden_sword": build_wooden_sword,
@@ -867,6 +1114,13 @@ ITEMS = {
     "outer_sect_gloves": build_outer_sect_gloves,
     "outer_sect_boots": build_outer_sect_boots,
     "outer_sect_talisman": build_outer_sect_talisman,
+    # V48 — bậc "Trúc Cơ" (required_level 30), phần thưởng quest 19/20. Bạch ngọc + huyền thiết.
+    "foundation_blade": build_foundation_blade,
+    "foundation_robe": build_foundation_robe,
+    "foundation_cap": build_foundation_cap,
+    "foundation_gloves": build_foundation_gloves,
+    "foundation_boots": build_foundation_boots,
+    "foundation_talisman": build_foundation_talisman,
 }
 
 
