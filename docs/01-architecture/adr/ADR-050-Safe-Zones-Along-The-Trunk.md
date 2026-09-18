@@ -271,5 +271,14 @@ bảng mà tài liệu DB chưa bao giờ ghi; trả nợ luôn) · [STORY §7](
 
 1. ✅ Chủ dự án duyệt D1–D8 và chọn D6(a) — 2026-09-18.
 2. Thi hành: V49 (cột + 6 hàng) → 7 chặng plumbing → D1/D2/D3 trong `AiSystem` → test → 6 tài liệu.
-3. **Playtest lại đúng lát cắt đã đo hôm nay** (`0 → 177`, rồi trận Lv29) và so với hai bảng số ở
-   mục Context. Đó là thước đo duy nhất nói được ADR này có giải quyết vấn đề thật hay không.
+3. ✅ **Đã playtest lại 2026-09-18.** Đứng ở `x = 168` — trong trạm `waypost_wasteland_gate`, mà
+   vẫn trong tầm với của `stone_ogre` @161 (`161 + 3 + 6 = 170`), tức đúng chỗ playtest trước chết:
+   **0 nhát suốt ~21 giây, máu 189 → 196 → 203 → 206**. Nhát duy nhất ăn phải rơi lúc còn đang đi
+   tới — suy ra từ mốc hồi máu giây 10,7 so với `REGEN_DELAY_SECONDS = 8`. Đây là bằng chứng của
+   D1 + D2 + D4 cùng lúc.
+   ⚠️ Hai số kia KHÔNG chứng minh gì và không được trích như thế: đi bộ `0 → 150` ra **72/206** so
+   với nền **51/206** là dao động giữa các lượt (thuế đường đi còn nguyên, cố ý ngoài phạm vi);
+   trận Lv29 **thắng còn 44/206** là MỘT lượt duy nhất, lại bắt đầu từ 107/206 chứ không phải máu
+   đầy. Muốn nói về cân bằng thì cần ≥3 lượt, như bảng nền đã làm.
+4. Nợ art mới do ADR này sinh ra: `char_waypost-attendant` chưa có model — client vẽ hộp cho sáu
+   mốc trạm (xấu, không sập).
