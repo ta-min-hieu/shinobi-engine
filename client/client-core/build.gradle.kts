@@ -250,3 +250,59 @@ tasks.register<JavaExec>("runOrientationDebug") {
     workingDir = assetRoot.asFile
     doFirst { workingDir.mkdirs() }
 }
+
+// Hợp đồng THỨ BA cùng loại (tìm ra 2026-09-19 khi rà toàn repo tìm "PHẢI khớp" không có cổng nào
+// canh): server-world.WorldConstants và client-core.WorldConstants tự tay chép lại CÙNG 5 hằng số
+// dự đoán cục bộ (MOVE_SPEED_MPS/GRAVITY_MPS2/JUMP_VELOCITY_MPS/MAX_AIR_JUMPS/
+// AIR_JUMP_VELOCITY_MPS) — mỗi bên tự ghi javadoc "PHẢI khớp" bên kia, KHÔNG compiler nào ép được
+// (client-core không được phụ thuộc server-world, client/CLAUDE.md). Rủi ro lệch không phải giả
+// định: javadoc của chính GRAVITY_MPS2/JUMP_VELOCITY_MPS/AIR_JUMP_VELOCITY_MPS phía server tự nói
+// "CHƯA đo cảm giác rơi thật... chỉ tinh chỉnh 1 chỗ khi có số liệu thật" — tức đúng những hằng số
+// này còn sẽ bị sửa. Rà tay 2026-09-19: cả 5 số HIỆN ĐANG khớp; cổng dưới đây chỉ khoá lại trạng
+// thái đó (không phải sửa bug) để lần tinh chỉnh kế tiếp không âm thầm chỉ sửa một bên — lệch ở đây
+// không phải lỗ hổng (server luôn thắng qua MoveResponse) nhưng khiến dự đoán cục bộ giật/lag-y cho
+// tới khi server sửa lại, đúng cảm giác mà ADR-033 cố tránh.
+val verifyWorldConstantsMatchServer = tasks.register("verifyWorldConstantsMatchServer") {
+    group = "verification"
+    description = "5 hằng số dự đoán cục bộ (tốc độ/trọng lực/nhảy) của client phải khớp số thật server dùng."
+    val clientFile =
+        layout.projectDirectory.file("src/main/java/dev/kage/client/core/world/WorldConstants.java").asFile
+    val serverFile = rootProject.file("server/server-world/src/main/java/dev/kage/server/world/WorldConstants.java")
+    val stamp = layout.buildDirectory.file("verifyWorldConstantsMatchServer.txt")
+    inputs.file(clientFile).withPropertyName("clientWorldConstants")
+    inputs.file(serverFile).withPropertyName("serverWorldConstants")
+    outputs.file(stamp)
+    doLast {
+        val declaration = Regex("""static final (?:float|int) (\w+) = ([0-9.]+f?);""")
+        fun constantsOf(file: java.io.File): Map<String, String> = declaration
+            .findAll(file.readText())
+            .associate { it.groupValues[1] to it.groupValues[2].removeSuffix("f") }
+        val clientConstants = constantsOf(clientFile)
+        val serverConstants = constantsOf(serverFile)
+        // Tên CÙNG xuất hiện ở cả hai file — javadoc của chính hai bên đã tự liệt kê đúng tập này là
+        // "PHẢI khớp" (không phải MỌI hằng số chung tên đều cần bằng nhau ở module khác, nhưng đây
+        // đúng 5 cái duy nhất lặp tên giữa hai file WorldConstants này).
+        val sharedNames = listOf(
+            "MOVE_SPEED_MPS", "GRAVITY_MPS2", "JUMP_VELOCITY_MPS", "MAX_AIR_JUMPS", "AIR_JUMP_VELOCITY_MPS")
+        val mismatches = sharedNames.mapNotNull { name ->
+            val clientValue = clientConstants[name]
+            val serverValue = serverConstants[name]
+            when {
+                clientValue == null -> "$name: thiếu ở client-core.WorldConstants"
+                serverValue == null -> "$name: thiếu ở server-world.WorldConstants"
+                clientValue != serverValue -> "$name: client=$clientValue, server=$serverValue"
+                else -> null
+            }
+        }
+        if (mismatches.isNotEmpty()) {
+            throw GradleException(
+                "client-core.WorldConstants và server-world.WorldConstants lệch nhau — dự đoán cục " +
+                    "bộ (ADR-033) sẽ giật/lag-y tới khi MoveResponse sửa lại:\n  " +
+                    mismatches.joinToString("\n  ")
+            )
+        }
+        stamp.get().asFile.writeText("${sharedNames.size} hằng số dự đoán cục bộ khớp giữa client và server\n")
+    }
+}
+
+tasks.named("check") { dependsOn(verifyWorldConstantsMatchServer) }
