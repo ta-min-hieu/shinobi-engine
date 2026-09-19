@@ -1,6 +1,5 @@
 package dev.kage.client.core.world;
 
-import java.util.MissingResourceException;
 import java.util.StringJoiner;
 import java.util.function.LongFunction;
 
@@ -106,26 +105,14 @@ final class InventoryItemText {
     }
 
     private String text(String key) {
-        try {
-            return i18n.get(key);
-        } catch (MissingResourceException e) {
-            return key;
-        }
+        return KageI18n.textOrKey(i18n, key);
     }
 
     private String format(String key, Object argument) {
-        try {
-            return i18n.format(key, argument);
-        } catch (MissingResourceException e) {
-            return key;
-        }
+        return KageI18n.formatOrKey(i18n, key, argument);
     }
 
     private String format2(String key, Object first, Object second) {
-        try {
-            return i18n.format(key, first, second);
-        } catch (MissingResourceException e) {
-            return key;
-        }
+        return KageI18n.formatOrKey(i18n, key, first, second);
     }
 }

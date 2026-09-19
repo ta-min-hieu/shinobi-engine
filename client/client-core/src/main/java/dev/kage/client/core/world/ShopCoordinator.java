@@ -230,19 +230,11 @@ final class ShopCoordinator implements WindowFlow {
     }
 
     private String text(String key) {
-        try {
-            return i18n.get(key);
-        } catch (java.util.MissingResourceException e) {
-            return key;
-        }
+        return KageI18n.textOrKey(i18n, key);
     }
 
     private String format(String key, Object argument) {
-        try {
-            return i18n.format(key, argument);
-        } catch (java.util.MissingResourceException e) {
-            return key;
-        }
+        return KageI18n.formatOrKey(i18n, key, argument);
     }
 
     /** Rời màn hình/mất kết nối — cửa hàng của một phiên chơi không được sống sót sang phiên sau. */

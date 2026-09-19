@@ -43,8 +43,44 @@ public final class KageI18n {
         return bundle.get(errorKey);
     }
 
-    /** {@code I18NBundle} báo "không có khoá này" bằng cách trả về chính khoá kẹp giữa {@code ??}. */
+    /**
+     * Tra bản dịch, thiếu thì trả về CHÍNH khoá đó — hợp đồng mà javadoc của 24 lớp HUD
+     * và coordinator đã hứa từ lâu: nội dung nằm trong script/DB phía server còn bản dịch nằm ở
+     * client, hai nhịp cập nhật khác nhau, nên "thêm nội dung mà quên dịch" là chuyện SẼ xảy ra.
+     *
+     * <p>⚠️ Mỗi lớp đó tự viết một {@code try/catch MissingResourceException} để giữ lời hứa ấy, và
+     * <b>không cái nào từng chạy</b>: {@link #load()} gọi {@code setExceptionOnMissingKey(false)} — cờ
+     * <b>static trên cả lớp</b> {@code I18NBundle}, nên một lần gọi là mọi bundle trong tiến trình đều
+     * thôi ném. Cái người chơi thực sự đọc là {@code ??quest.name.foundation_breakthrough??}.
+     * Dồn về đây để phép kiểm chỉ còn một chỗ, và là phép kiểm THẬT.
+     */
+    public static String textOrKey(I18NBundle bundle, String key) {
+        String text = bundle.get(key);
+        return isMissingMarker(text, key) ? key : text;
+    }
+
+    /**
+     * Như {@link #textOrKey} nhưng có tham số để chèn.
+     *
+     * <p>Phải hỏi {@code get} TRƯỚC rồi mới {@code format}: với khoá thiếu, {@code format} đem chính chuỗi
+     * {@code ??key??} đi qua {@code MessageFormat} — không có ô {@code {0}} nào để điền nên tham số bị nuốt
+     * im lặng và kết quả vẫn là {@code ??key??}.
+     */
+    public static String formatOrKey(I18NBundle bundle, String key, Object... arguments) {
+        return isMissingMarker(bundle.get(key), key) ? key : bundle.format(key, arguments);
+    }
+
+    /**
+     * {@code I18NBundle} báo "không có khoá này" bằng cách trả về chính khoá kẹp giữa <b>BA</b> dấu
+     * hỏi: {@code ???key???}, không phải hai.
+     *
+     * <p>⚠️ Bản đầu của hàm này (2026-09-19) đếm HAI, và test đi kèm cũng đếm hai — tức cả hai đều
+     * chép lại cùng một phỏng đoán chứ không ai hỏi {@code I18NBundle} một câu. Hệ quả: bản vá
+     * {@link #errorText} tưởng đã sửa xong hôm ấy thực ra <b>không nhận ra một khoá thiếu nào</b>. Con
+     * số ba này nay được khoá bằng một bundle THẬT trong {@code KageI18nMissingKeyTest}, không bằng trí
+     * nhớ — libGDX đổi thì ca đó đỏ trước.
+     */
     static boolean isMissingMarker(String text, String key) {
-        return text == null || text.equals("??" + key + "??");
+        return text == null || text.equals("???" + key + "???");
     }
 }

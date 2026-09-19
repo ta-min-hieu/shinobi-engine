@@ -574,11 +574,7 @@ public final class CombatHud implements HudWindow {
     }
 
     private String translateOrKey(String key) {
-        try {
-            return i18n.get(key);
-        } catch (java.util.MissingResourceException e) {
-            return key;
-        }
+        return KageI18n.textOrKey(i18n, key);
     }
 
     @Override

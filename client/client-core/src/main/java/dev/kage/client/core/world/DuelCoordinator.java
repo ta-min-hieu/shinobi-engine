@@ -365,27 +365,15 @@ final class DuelCoordinator implements WindowFlow {
 
     /** Tra bản dịch, thiếu thì hiện thẳng khoá — cùng lý do {@code DialoguePanel#text}. */
     private String text(String key) {
-        try {
-            return i18n.get(key);
-        } catch (java.util.MissingResourceException e) {
-            return key;
-        }
+        return KageI18n.textOrKey(i18n, key);
     }
 
     private String format(String key, Object argument) {
-        try {
-            return i18n.format(key, argument);
-        } catch (java.util.MissingResourceException e) {
-            return key;
-        }
+        return KageI18n.formatOrKey(i18n, key, argument);
     }
 
     private String format3(String key, Object first, Object second, Object third) {
-        try {
-            return i18n.format(key, first, second, third);
-        } catch (java.util.MissingResourceException e) {
-            return key;
-        }
+        return KageI18n.formatOrKey(i18n, key, first, second, third);
     }
 
     /** Rời màn hình/mất kết nối — trạng thái đấu của một phiên chơi không sống sót sang phiên sau. */

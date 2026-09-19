@@ -213,16 +213,12 @@ public final class DialoguePanel implements HudWindow {
      *
      * <p>Nội dung hội thoại nằm trong script GraalJS phía server ({@code town_elder.js}) còn bản dịch
      * nằm trong bundle phía client — hai file khác nhau, hai nhịp cập nhật khác nhau, nên "thêm một
-     * nhánh hội thoại mới mà quên dịch" là chuyện SẼ xảy ra. Ném {@code MissingResourceException}
-     * giữa lúc đang nói chuyện sẽ giết cả màn hình; hiện khoá thô cho người làm nội dung thấy ngay
-     * mình thiếu gì thì vừa không sập vừa tự tố cáo.
+     * nhánh hội thoại mới mà quên dịch" là chuyện SẼ xảy ra. Hiện khoá thô cho người làm nội dung
+     * thấy ngay mình thiếu gì thì vừa không sập vừa tự tố cáo — phép kiểm thật nằm ở
+     * {@link KageI18n#textOrKey}, xem javadoc ở đó vì sao bản {@code try/catch} cũ không bao giờ chạy.
      */
     private String text(String key) {
-        try {
-            return i18n.get(key);
-        } catch (java.util.MissingResourceException e) {
-            return key;
-        }
+        return KageI18n.textOrKey(i18n, key);
     }
 
     @Override

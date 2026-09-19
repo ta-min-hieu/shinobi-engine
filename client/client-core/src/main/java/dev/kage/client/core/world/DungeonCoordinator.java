@@ -173,11 +173,7 @@ final class DungeonCoordinator implements WindowFlow {
 
     /** Tra bản dịch, thiếu thì hiện thẳng khoá — cùng lý do {@code DialoguePanel#text}. */
     private String text(String key) {
-        try {
-            return i18n.get(key);
-        } catch (java.util.MissingResourceException e) {
-            return key;
-        }
+        return KageI18n.textOrKey(i18n, key);
     }
 
     /** Rời màn hình/mất kết nối — trạng thái của một phiên chơi không sống sót sang phiên sau. */

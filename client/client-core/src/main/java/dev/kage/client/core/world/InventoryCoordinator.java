@@ -517,27 +517,15 @@ final class InventoryCoordinator implements WindowFlow {
 
     /** Tra bản dịch, thiếu thì hiện thẳng khoá — cùng lý do {@code DialoguePanel#text}. */
     private String text(String key) {
-        try {
-            return i18n.get(key);
-        } catch (java.util.MissingResourceException e) {
-            return key;
-        }
+        return KageI18n.textOrKey(i18n, key);
     }
 
     private String format(String key, Object argument) {
-        try {
-            return i18n.format(key, argument);
-        } catch (java.util.MissingResourceException e) {
-            return key;
-        }
+        return KageI18n.formatOrKey(i18n, key, argument);
     }
 
     private String format2(String key, Object first, Object second) {
-        try {
-            return i18n.format(key, first, second);
-        } catch (java.util.MissingResourceException e) {
-            return key;
-        }
+        return KageI18n.formatOrKey(i18n, key, first, second);
     }
 
     /** Rời màn hình/mất kết nối — túi của một phiên chơi không được sống sót sang phiên sau. */

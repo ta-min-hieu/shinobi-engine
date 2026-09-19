@@ -292,11 +292,8 @@ final class MailCoordinator implements WindowFlow {
     }
 
     private String formatAttachment(MailController.Attachment attachment) {
-        try {
-            return i18n.format("mail.attachment.raw_item", attachment.itemTemplateId(), attachment.quantity());
-        } catch (java.util.MissingResourceException e) {
-            return "mail.attachment.raw_item";
-        }
+        return KageI18n.formatOrKey(
+                i18n, "mail.attachment.raw_item", attachment.itemTemplateId(), attachment.quantity());
     }
 
     /**
@@ -313,19 +310,11 @@ final class MailCoordinator implements WindowFlow {
 
     /** Tra bản dịch, thiếu thì hiện thẳng khoá — cùng lý do {@code DialoguePanel#text}. */
     private String text(String key) {
-        try {
-            return i18n.get(key);
-        } catch (java.util.MissingResourceException e) {
-            return key;
-        }
+        return KageI18n.textOrKey(i18n, key);
     }
 
     private String format(String key, Object argument) {
-        try {
-            return i18n.format(key, argument);
-        } catch (java.util.MissingResourceException e) {
-            return key;
-        }
+        return KageI18n.formatOrKey(i18n, key, argument);
     }
 
     /** Rời màn hình/mất kết nối — hòm thư của một phiên chơi không được sống sót sang phiên sau. */
