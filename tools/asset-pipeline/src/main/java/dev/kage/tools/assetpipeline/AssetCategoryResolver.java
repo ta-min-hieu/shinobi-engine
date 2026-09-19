@@ -21,13 +21,22 @@ import java.util.Set;
  * một TẬP, và mọi NPC mới phải thêm một dòng vào đó — vẫn thủ công, nhưng nó thủ công một cách nhìn
  * thấy được. Danh mục là thứ thuộc về art (ART-PIPELINE.md §8.2), không đọc được từ DB gameplay:
  * công cụ này chạy trên đĩa, không nối tới Postgres.
+ *
+ * <p><b>2026-09-19 — tới hạn LẦN THỨ HAI, đúng kiểu đã cảnh báo.</b> NPC thứ ba
+ * ({@code waypost_attendant}, ADR-050 D6, seed V49) bị bỏ sót khỏi tập này suốt từ lúc thêm — dò
+ * DB thật cho thấy {@code char_waypost-attendant} nằm ở {@code category_id} của
+ * {@code character-player} thay vì {@code character-npc}, không có gì đỏ lên, y hệt lần trước. Bổ
+ * sung có test {@code AssetCategoryResolverTest} khoá lại — nhưng test chỉ khoá được sự CÓ MẶT của
+ * ba khoá đã biết, KHÔNG khoá được việc quên thêm khoá thứ tư: đây vẫn là một tập thủ công, phải tự
+ * nhớ mỗi khi thêm NPC (đối chiếu {@code npc_template} thật trong DB, không phải đoán).
  */
 final class AssetCategoryResolver {
 
     private static final String[] ELEMENT_CODES = {"hoa", "thuy", "phong", "loi", "tho"};
 
     /** Các {@code char_*} là NPC; phần còn lại là ngoại hình nhân vật người chơi (5 hệ × 3 bộ). */
-    private static final Set<String> NPC_ASSET_KEYS = Set.of("char_town-elder", "char_senior-sister");
+    private static final Set<String> NPC_ASSET_KEYS =
+            Set.of("char_town-elder", "char_senior-sister", "char_waypost-attendant");
 
     private AssetCategoryResolver() {}
 
