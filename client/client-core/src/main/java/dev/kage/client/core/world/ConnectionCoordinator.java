@@ -10,8 +10,8 @@ import dev.kage.protocol.PongResponse;
 import dev.kage.protocol.wire.PacketCodec;
 
 /**
- * Hai gói mức KẾT NỐI (system.proto) mà client vẫn nhận nhưng chưa từng làm gì với chúng:
- * {@code PONG} (2) và {@code SERVER_SHUTTING_DOWN_EVENT} (6).
+ * Mọi thứ ở mức ĐƯỜNG TRUYỀN: hai gói của {@code system.proto} — {@code PONG} (2) và
+ * {@code SERVER_SHUTTING_DOWN_EVENT} (6) — cộng với việc theo dõi đứt/nối lại ({@link #onTick}).
  *
  * <p><b>Vì sao gộp một lớp.</b> Cả hai đều không thuộc tính năng gameplay nào, đều không có cửa sổ
  * riêng, và đều nói về chính đường truyền chứ không về nhân vật — tách hai lớp một-hàm sẽ là hai
@@ -43,6 +43,12 @@ final class ConnectionCoordinator implements WindowFlow {
     private final CombatHud hud;
     private final ChatCoordinator notices;
     private final I18NBundle i18n = KageI18n.load();
+
+    /**
+     * Trạng thái đường truyền ở nhịp TRƯỚC. {@code null} = chưa đo lần nào, nên nhịp đầu tiên chỉ
+     * ghi nhận chứ không báo gì — không thì mỗi lần vào world lại hiện một dòng "đã kết nối lại".
+     */
+    private Boolean wasConnected;
 
     /**
      * @param notices kênh báo bảo trì — nhật ký chat, cùng chỗ {@link DungeonCoordinator} và
@@ -96,10 +102,48 @@ final class ConnectionCoordinator implements WindowFlow {
         return java.util.OptionalLong.of(roundTripMs);
     }
 
+    /**
+     * Nhịp mỗi tick: nói cho người chơi biết đường truyền vừa đứt hay vừa nối lại.
+     *
+     * <p><b>Vì sao cần.</b> {@code GameConnection} tự kết nối lại trong im lặng, nhưng phiên trên
+     * server thì KHÔNG sống lại: {@code boundCharacterId} là trạng thái của riêng một channel, và
+     * server đã detach nhân vật lúc kết nối đứt. Sau khi nối lại, client ngồi trên một socket sống
+     * với một phiên đã chết — mọi lệnh gameplay bị trả về {@code error.not_authenticated}, mà
+     * {@code ErrorResponse} trong màn world chỉ có {@code FactionCoordinator} đọc nên **người chơi
+     * không thấy gì cả**: thế giới đứng im, thanh máu đứng im, không một dòng thông báo. Cách thoát
+     * duy nhất là tự đoán ra mà khởi động lại.
+     *
+     * <p>Chỗ này CHỈ nói ra sự thật đó. Việc chọn hành vi đúng — tự đăng nhập lại và nối tiếp phiên
+     * cũ, hay đưa thẳng về màn đăng nhập — là quyết định thiết kế (/CLAUDE.md §4), chưa chốt.
+     *
+     * <p>Chỉ báo ở LẰN RANH đổi trạng thái, không báo mỗi tick: người chơi cần biết điều vừa xảy
+     * ra, không cần bị nhắc 60 lần một giây.
+     */
+    void onTick(boolean connected) {
+        noticeKeyFor(wasConnected, connected).ifPresent(key -> notices.showSystemNotice(text(key)));
+        wasConnected = connected;
+    }
+
+    /**
+     * Khoá i18n cần nói ra ở lằn ranh trạng thái, hoặc rỗng khi không có gì để nói.
+     *
+     * <p>Tách thành hàm tĩnh THUẦN vì cùng lý do {@link #plausibleRoundTrip}: {@link CombatHud} cần
+     * ngữ cảnh GL nên bản thân lớp này không dựng được trong JUnit.
+     *
+     * @param previous trạng thái nhịp trước, {@code null} = chưa đo lần nào
+     */
+    static java.util.Optional<String> noticeKeyFor(Boolean previous, boolean connected) {
+        if (previous == null || previous == connected) {
+            return java.util.Optional.empty();
+        }
+        return java.util.Optional.of(connected ? "system.notice.reconnected" : "system.notice.connection_lost");
+    }
+
     /** Rời màn hình/mất kết nối — độ trễ của phiên trước không được nằm lại trên HUD phiên sau. */
     @Override
     public void reset() {
         hud.clearLatency();
+        wasConnected = null;
     }
 
     /** Tra bản dịch, thiếu thì hiện thẳng khoá — cùng lý do {@code DialoguePanel#text}. */

@@ -36,4 +36,19 @@ class ConnectionCoordinatorTest {
         assertThat(ConnectionCoordinator.plausibleRoundTrip(0L, ceiling)).hasValue(ceiling);
         assertThat(ConnectionCoordinator.plausibleRoundTrip(0L, ceiling + 1L)).isEmpty();
     }
+
+    @Test
+    void shouldSaySomething_onlyAtTheEdgeOfAConnectionChange() {
+        // Nhịp ĐẦU TIÊN im lặng: `previous == null` là "chưa đo lần nào", không phải "vừa nối lại".
+        // Thiếu ô này thì mỗi lần vào world lại hiện một dòng "đã kết nối lại" vô nghĩa.
+        assertThat(ConnectionCoordinator.noticeKeyFor(null, true)).isEmpty();
+        assertThat(ConnectionCoordinator.noticeKeyFor(null, false)).isEmpty();
+
+        // Đứng yên thì im — hàm này chạy MỖI TICK (60 lần/giây).
+        assertThat(ConnectionCoordinator.noticeKeyFor(true, true)).isEmpty();
+        assertThat(ConnectionCoordinator.noticeKeyFor(false, false)).isEmpty();
+
+        assertThat(ConnectionCoordinator.noticeKeyFor(true, false)).hasValue("system.notice.connection_lost");
+        assertThat(ConnectionCoordinator.noticeKeyFor(false, true)).hasValue("system.notice.reconnected");
+    }
 }

@@ -607,6 +607,11 @@ final class WorldCommandSender {
         return connection.pollInbound();
     }
 
+    /** Uỷ nhiệm thẳng, cùng khuôn {@link #pollInbound()} — xem {@code ConnectionCoordinator#onTick}. */
+    boolean isConnected() {
+        return connection.isConnected();
+    }
+
     // -------------------------------------------------------------------------------------------
     // Catalog vật phẩm (inventory.proto, ADR-035 opcode 509/510) — xem ItemCatalogCoordinator.
     // -------------------------------------------------------------------------------------------

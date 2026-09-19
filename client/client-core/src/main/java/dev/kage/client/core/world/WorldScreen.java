@@ -509,6 +509,9 @@ public final class WorldScreen implements GameScreen {
 
     @Override
     public void fixedUpdate(float fixedDeltaTime) {
+        // TRƯỚC processInboundPackets: nếu đường truyền vừa đứt thì hàng đợi đang rỗng, và người
+        // chơi nên biết lý do trước khi ngồi nhìn một thế giới đứng im.
+        connection.onTick(sender.isConnected());
         processInboundPackets();
         intents.tick(fixedDeltaTime);
         combatHudController.tick(fixedDeltaTime);
