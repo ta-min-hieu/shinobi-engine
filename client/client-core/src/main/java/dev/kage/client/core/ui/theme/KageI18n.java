@@ -18,7 +18,8 @@ public final class KageI18n {
     private KageI18n() {}
 
     public static I18NBundle load() {
-        I18NBundle.setExceptionOnMissingKey(false); // key thiếu hiện "??key??" thay vì crash UI.
+        I18NBundle.setExceptionOnMissingKey(
+                false); // key thiếu hiện "???key???" thay vì crash UI (BA dấu hỏi — xem isMissingMarker).
         return I18NBundle.createBundle(Gdx.files.internal(BUNDLE_PATH), Locale.of("vi"), "UTF-8");
     }
 

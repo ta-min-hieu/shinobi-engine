@@ -155,15 +155,22 @@ tasks.named("check") { dependsOn(verifyServerErrorKeys) }
 // vụ và 14/14 khoá quái trích ra từ .sql khớp từng dòng với bảng.
 val verifyContentKeys = tasks.register("verifyContentKeys") {
     group = "verification"
-    description = "Mọi name_key trong migration + mọi quest.name.<code> phải có bản dịch ở CẢ HAI bundle."
+    description = "Mọi khoá nội dung của server (SQL + script + quest.name.<code>) phải dịch được ở CẢ HAI bundle."
     val migrations = rootProject.fileTree("server/server-database/src/main/resources/db/migration") {
         include("*.sql")
+    }
+    // Nguồn thứ BA: script GraalJS của hội thoại/nhiệm vụ gửi thẳng `text_key`/`label_key` cho
+    // client ({@code DialoguePanel#text}). Chỉ lấy `src/main/resources` — fixture trong
+    // `src/test/resources` cố tình dùng khoá không có bản dịch và không bao giờ tới mắt người chơi.
+    val scripts = rootProject.fileTree("server") {
+        include("**/src/main/resources/scripts/**/*.js")
     }
     val bundles = listOf("vi", "en").map {
         layout.projectDirectory.file("src/main/resources/i18n/strings_$it.properties").asFile
     }
     val stamp = layout.buildDirectory.file("verifyContentKeys.txt")
     inputs.files(migrations).withPropertyName("migrations")
+    inputs.files(scripts).withPropertyName("contentScripts")
     inputs.files(bundles).withPropertyName("i18nBundles")
     outputs.file(stamp)
     doLast {
@@ -178,6 +185,10 @@ val verifyContentKeys = tasks.register("verifyContentKeys") {
             val sql = file.readText()
             keyLiteral.findAll(sql).forEach { needed.add(it.groupValues[1]) }
             questCode.findAll(sql).forEach { needed.add("quest.name." + it.groupValues[1]) }
+        }
+        val scriptLiteral = Regex("""["]([a-z][a-z0-9_]*(?:\.[a-z0-9_]+){1,4})["]""")
+        scripts.forEach { file ->
+            scriptLiteral.findAll(file.readText()).forEach { needed.add(it.groupValues[1]) }
         }
         val missing = mutableListOf<String>()
         bundles.forEach { bundle ->
