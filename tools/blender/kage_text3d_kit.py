@@ -728,9 +728,17 @@ def _untextured_material(source_material, name):
     fragment shader fails to compile on `v_texCoord : undeclared identifier`,
     which takes down every character on screen, not just the weapon.
 
-    The weapons are flat single-colour props, so dropping the texture costs
-    nothing visually. Giving them UVs instead would mean unwrapping four extra
-    meshes per character for one colour each.
+    Giving those meshes UVs instead would mean unwrapping four extra meshes per
+    character for one colour each.
+
+    ⚠️ Narrowed on 2026-09-19. This used to be the material for EVERY non-UV
+    mesh, which meant every weapon and every B3 accent on all fifteen player
+    characters shipped in `WEAPON_BASE_COLOR` and the colour the caller passed to
+    `attach_weapon` was thrown away — measured by painting char_loi-b2's blade
+    #00FF00 and counting zero green pixels on screen. Those meshes now keep their
+    own colours through `_flat_material`; what is left here is `kage_ink`, the
+    outline shell's material, which carries no cel ramp and no colour worth
+    keeping and whose polygons are not exported anyway.
     """
     material = source_material.copy()
     material.name = name
@@ -774,14 +782,47 @@ def export_gltf(path, obj, armature, extras=(), texture_px=None):
 
     saved_materials = {}
     saved_outlines = {}
+    flat_materials = []
     for mesh_obj in exported:
         saved_materials[mesh_obj] = list(mesh_obj.data.materials)
-        mesh_obj.data.materials.clear()
-        # Chỉ mesh CÓ UV map mới nhận được material có texture — xem _untextured_material.
-        mesh_obj.data.materials.append(
-            material if mesh_obj.data.uv_layers else untextured)
-        for polygon in mesh_obj.data.polygons:
-            polygon.material_index = 0
+        if mesh_obj.data.uv_layers:
+            # The generated body: one baked albedo, so every slot collapses onto it.
+            mesh_obj.data.materials.clear()
+            mesh_obj.data.materials.append(material)
+            for polygon in mesh_obj.data.polygons:
+                polygon.material_index = 0
+        else:
+            # Weapons and B3 accents. These used to collapse onto ONE grey
+            # `untextured` material, which threw away the colour the caller
+            # passed to `attach_weapon`: every weapon on all fifteen player
+            # characters shipped as #383A42 and `--color` did nothing. Measured
+            # 2026-09-19 by painting char_loi-b2's blade #00FF00 and counting
+            # zero green pixels on screen.
+            #
+            # Each slot keeps its own colour instead, exactly as
+            # `export_gltf_flat` does for a procedural asset — and for the same
+            # reason it is safe: `_flat_material` builds a plain Principled node
+            # with no image node, so the `"texCoord": -1` crash that
+            # `_untextured_material` exists to dodge is still out of reach.
+            #
+            # `polygon.material_index` is NOT touched here. It is the slot
+            # contract, and these objects are shared across all three LOD passes
+            # (only the body is copied per tier), so zeroing it would silently
+            # flatten tiers two and three.
+            for index, slot in enumerate(mesh_obj.data.materials):
+                colourable = slot is not None and (
+                    slot.get("kage_base_hex") or _recovered_base_hex(slot))
+                if colourable:
+                    replacement = _flat_material(slot, "gltf_flat_" + slot.name)
+                    flat_materials.append(replacement)
+                    mesh_obj.data.materials[index] = replacement
+                else:
+                    # `kage_ink` — the outline shell's material. It is a plain
+                    # emission black with no cel ramp, so nothing to read back,
+                    # and the KageOutline modifier is removed just below, so no
+                    # polygon references this slot and it contributes no
+                    # primitive. It still has to be something safe to export.
+                    mesh_obj.data.materials[index] = untextured
         outline = mesh_obj.modifiers.get("KageOutline")
         if outline is not None:
             saved_outlines[mesh_obj] = {
@@ -823,10 +864,15 @@ def export_gltf(path, obj, armature, extras=(), texture_px=None):
                 restored.use_rim = False
                 restored.material_offset = saved["material_offset"]
                 restored.material_offset_rim = saved["material_offset"]
+        # Three LOD passes run against the same scene, so the per-slot copies
+        # have to go or the .blend grows a new set of them on every tier.
+        for flat in flat_materials:
+            bpy.data.materials.remove(flat)
 
     size = os.path.getsize(path)
-    print("[t3d] export {0}: {1:.2f} MB texture={2}".format(
-        os.path.basename(path), size / (1024.0 * 1024.0), tuple(image.size)))
+    print("[t3d] export {0}: {1:.2f} MB texture={2} flat_slots={3}".format(
+        os.path.basename(path), size / (1024.0 * 1024.0), tuple(image.size),
+        len(flat_materials)))
     return size
 
 
@@ -920,16 +966,49 @@ def export_gltf_flat(path, obj, armature, extras=()):
     return size
 
 
+def _recovered_base_hex(toon_material):
+    """Read a toon material's base colour back out of its ColorRamp.
+
+    For materials built BEFORE `make_toon_material` started recording
+    `kage_base_hex`. Every character .blend from 2026-08-06 is in that state, and
+    they cannot simply be rebuilt: their bodies came back from a Rodin job and
+    the key has been out of funds since 2026-09-03.
+
+    `make_toon_material` writes `min(1.0, base * SHADE_STEPS[shades][i])` into
+    element `i`, so the LAST element is the base colour exactly — but only while
+    `SHADE_STEPS[shades][-1]` is 1.0. That is checked here rather than assumed,
+    which is the objection the old `raise` was making; a checked read is not a
+    guess. The number of elements IS `shades`, since the builder creates one per
+    step.
+
+    Returns display-space hex, the space `_display_rgb` wants, so the linear
+    values Blender stores are converted back on the way out.
+    """
+    ramp = next((n for n in toon_material.node_tree.nodes if n.type == "VALTORGB"), None)
+    if ramp is None:
+        return None
+    elements = ramp.color_ramp.elements
+    steps = ksr.SHADE_STEPS.get(len(elements))
+    if not steps or steps[-1] != 1.0:
+        return None
+    linear = tuple(elements[len(elements) - 1].color)[:3]
+    channels = []
+    for value in linear:
+        srgb = value * 12.92 if value <= 0.0031308 else 1.055 * (value ** (1.0 / 2.4)) - 0.055
+        channels.append(max(0, min(255, int(round(srgb * 255.0)))))
+    return "#{0:02X}{1:02X}{2:02X}".format(*channels)
+
+
 def _flat_material(toon_material, name):
     """One Principled material carrying `toon_material`'s base colour, nothing else."""
     base_hex = toon_material.get("kage_base_hex")
     if base_hex is None:
-        # Guessing from the ColorRamp would work today only because
-        # SHADE_STEPS[n][-1] == 1.0; say so instead of silently shipping a
-        # wrong colour the day that stops being true.
+        base_hex = _recovered_base_hex(toon_material)
+    if base_hex is None:
         raise RuntimeError(
-            "material '" + toon_material.name + "' has no kage_base_hex — build it with "
-            "kage_sprite_render.make_toon_material, or pass a textured model to export_gltf")
+            "material '" + toon_material.name + "' has no kage_base_hex and its ramp "
+            "cannot be read back — build it with kage_sprite_render.make_toon_material, "
+            "or pass a textured model to export_gltf")
 
     material = bpy.data.materials.new(name)
     material.use_nodes = True
