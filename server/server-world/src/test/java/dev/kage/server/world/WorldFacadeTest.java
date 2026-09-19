@@ -1085,9 +1085,12 @@ class WorldFacadeTest {
     @Timeout(10)
     void shouldRaiseMaxHp_whenEquipmentGrantsBonusHp() {
         // ADR-036: bonus_hp cộng vào MÁU TỐI ĐA trên nền CHARACTER_MAX_HP (placeholder, chủ dự án
-        // chấp nhận maxHp = 100 + bonus_hp khi duyệt ADR). Đọc qua RespawnSnapshot vì đó là chỗ
-        // DUY NHẤT máu tối đa của nhân vật đi ra ngoài world — cũng chứng minh luôn hồi sinh dùng
-        // máu tối đa MỚI chứ không phải hằng số.
+        // chấp nhận maxHp = 100 + bonus_hp khi duyệt ADR). Đọc qua RespawnSnapshot để chứng minh
+        // hồi sinh dùng máu tối đa MỚI chứ không phải hằng số.
+        //
+        // ⚠️ Nó KHÔNG còn là chỗ duy nhất máu tối đa đi ra ngoài world (câu cũ ở đây nói vậy): từ
+        // 2026-09-19 `handleApplyEquipmentBonus` cũng phát `HealthChange` — xem
+        // shouldAnnounceShiftedHealth_whenEquipmentChangesMaxHp.
         world.start();
         world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
         world.attachCharacter(2L, 1f, 0f, DEFAULT_STATS);

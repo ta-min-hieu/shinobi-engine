@@ -170,8 +170,13 @@ final class CombatHudController {
      * vùng an toàn, quái về tới điểm spawn, đan dược).
      *
      * <p>Đi CHUNG {@link #applyHpUpdate} với đòn đánh, chỉ khác một chỗ: {@code died} luôn
-     * {@code false} — không nguồn hồi máu nào giết ai, và event này KHÔNG bao giờ mang HP = 0
-     * (server chỉ phát khi máu vừa TĂNG).
+     * {@code false} — không nguồn nào ở đây giết ai, và event này KHÔNG bao giờ mang HP = 0.
+     *
+     * <p>⚠️ Từ 2026-09-19 gói này KHÔNG còn chỉ mang máu TĂNG: đổi trang bị làm máu tối đa đổi thì
+     * server dịch máu hiện tại theo độ chênh, nên GỠ đồ +HP phát ra một lần TỤT (vẫn chặn dưới ở 1,
+     * nên vẫn không bao giờ là 0). Đó cũng là lý do nhánh này phải tự cập nhật {@code playerMaxHp}:
+     * {@code onOwnMaxHpChanged} chỉ đổi mẫu số rồi {@code min(hp, max)}, nên một mình nó vẽ THỪA
+     * máu sau khi gỡ đồ.
      *
      * <p>Máu tối đa cũng được cập nhật khi entity là chính mình: đây là gói ĐẦU TIÊN có thể tới sau
      * khi trang bị đổi {@code max}, và vạch máu lấy mẫu số từ đó (cùng họ bug ADR-043 đã sửa).

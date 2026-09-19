@@ -778,6 +778,23 @@ public final class WorldFacade {
         }
     }
 
+    /**
+     * ⚠️ Phát {@code HealthChange} khi máu THỰC SỰ đổi. Trước 2026-09-19 đường này im lặng và vạch
+     * máu của client NÓI SAI: gói {@code EquipItemResponse} chỉ chở {@code max_hp}, còn
+     * {@code CombatHudController.onOwnMaxHpChanged} chỉ đổi mẫu số rồi {@code min(hp, max)} — nó
+     * KHÔNG dịch máu hiện tại theo độ chênh như {@link #applyMaxHpBonus} vừa làm ở server. Hệ quả
+     * đo được: đang 50/100 mà mặc bộ +106 máu thì server thành 156/206 còn HUD vẽ 50/206; gỡ ra
+     * thì server về 50/100 còn HUD vẽ **100/100** — người chơi tưởng mình đầy máu ngay trước trận.
+     *
+     * <p>Sửa ở ĐÂY chứ không ở gateway vì gateway không đọc được máu hiện tại: {@code
+     * applyEquipmentBonus} chỉ xếp lệnh vào {@code inbox}, kết quả nằm sau một tick. Đường ống
+     * {@code HealthChangedEvent} (ADR-046 D1) đã là nơi DUY NHẤT máu đi ra ngoài world, và client
+     * đã đọc được nó từ trước — không opcode mới, không field mới.
+     *
+     * <p>KHÔNG phát ở {@link #handleAttach} dù nó gọi cùng {@code applyBonusTo}: lúc đó
+     * {@code SelectCharacterResponse} đã chở cả máu hiện tại lẫn máu tối đa, nên thêm một gói nữa
+     * là đúng thứ ADR-042 đang muốn bớt.
+     */
     private void handleApplyEquipmentBonus(WorldCommand.ApplyEquipmentBonusCommand command) {
         long characterId = command.characterId();
         KEntity entity = entitiesByCharacterId.get(characterId);
@@ -785,7 +802,13 @@ public final class WorldFacade {
         if (entity == null || baseStats == null) {
             return; // chưa attach xong hoặc đã detach giữa lúc lệnh còn trong hàng đợi — bỏ qua an toàn.
         }
+        HealthComponent health = HEALTH.get(entity);
+        int currentBefore = health.current;
+        int maxBefore = health.max;
         applyBonusTo(entity, baseStats, command.bonus());
+        if (health.current != currentBefore || health.max != maxBefore) {
+            pendingHealthChanges.add(new HealthChange(characterId, health.current, health.max));
+        }
     }
 
     /**
