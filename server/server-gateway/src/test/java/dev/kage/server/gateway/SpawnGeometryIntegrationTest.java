@@ -21,6 +21,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
+import dev.kage.engine.ecs.system.Aabb;
 import dev.kage.engine.ecs.system.Platform;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
@@ -60,6 +61,20 @@ class SpawnGeometryIntegrationTest {
 
     /** Chỉ world 'main' có bệ — dungeon/arena dựng với {@code spawnOverworldContent=false}. */
     private static final String MAIN_WORLD_CODE = "main";
+
+    /**
+     * Chép tay từ {@code DemoPlatforms.GROUND_MIN_X}/{@code GROUND_MAX_X}
+     * ({@code client/client-core/src/main/java/dev/kage/client/core/world/DemoPlatforms.java}) —
+     * cùng lý do {@code DEMO_PLATFORMS} ở dưới cũng chép tay thay vì import: {@code server-gateway}
+     * không được phụ thuộc {@code client-core}, và ranh giới module không có cách nào khác để một
+     * hằng số hình học nhìn thấy cả hai phía. Đổi một bên mà quên bên kia thì test này (phía server)
+     * vẫn xanh — nó chỉ gác server tự lệch với chính hai số ghim ở đây, không gác hai module lệch
+     * NHAU (xem {@code verifyDemoPlatformsMatch} trong {@code client-core/build.gradle.kts} cho vế
+     * đó, nếu đã thêm).
+     */
+    private static final float GROUND_MIN_X = -55f;
+
+    private static final float GROUND_MAX_X = 210f;
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
@@ -102,6 +117,55 @@ class SpawnGeometryIntegrationTest {
                         + " JOIN monster_template t ON t.id = s.monster_template_id"
                         + " WHERE s.world_code = ?"),
                 "quái");
+    }
+
+    /**
+     * Dải nền đất minh hoạ ở client-core phải phủ hết mọi điểm spawn — một bất biến bị vi phạm
+     * trong im lặng BỐN lần trước khi ai viết ra một test (xem javadoc {@code GROUND_MAX_X} ở
+     * {@code DemoPlatforms}). Không có gì trong DB hay compiler nối {@code [-55, 210]} với
+     * {@code monster_spawn}/{@code npc_spawn}; hàng rào duy nhất là ô này.
+     */
+    @Test
+    @DisplayName("Mọi điểm spawn (NPC lẫn quái) nằm trong dải nền đất minh hoạ [-55, 210]")
+    void everySpawnFallsWithinTheGroundStrip() {
+        List<Spawn> spawns = new ArrayList<Spawn>();
+        spawns.addAll(readSpawns("SELECT t.code, s.pos_x FROM npc_spawn s"
+                + " JOIN npc_template t ON t.id = s.npc_template_id"
+                + " WHERE s.world_code = ?"));
+        spawns.addAll(readSpawns("SELECT t.code, s.pos_x FROM monster_spawn s"
+                + " JOIN monster_template t ON t.id = s.monster_template_id"
+                + " WHERE s.world_code = ?"));
+        assertThat(spawns)
+                .as("không đọc được dòng spawn nào — truy vấn hỏng thì ô này vô dụng")
+                .isNotEmpty();
+        for (Spawn spawn : spawns) {
+            assertThat(spawn.posX())
+                    .as(
+                            "'%s' @ x=%s nằm NGOÀI dải nền đất minh hoạ [%s, %s] — người chơi sẽ thấy"
+                                    + " mình đứng lơ lửng giữa khoảng đen (playtest 2026-09-06 bắt lỗi"
+                                    + " này lần đầu)",
+                            spawn.code(), spawn.posX(), GROUND_MIN_X, GROUND_MAX_X)
+                    .isBetween(GROUND_MIN_X, GROUND_MAX_X);
+        }
+    }
+
+    /**
+     * Ghim ba bệ nhảy demo phía SERVER lại literal cụ thể. Đây KHÔNG phải test hai module khớp
+     * nhau (không cách nào làm việc đó bằng compiler qua ranh giới module) — nó chỉ bắt
+     * {@code WorldFacade.DEMO_PLATFORMS} tự lệch khỏi chính nó theo thời gian. Đổi literal ở đây
+     * thì PHẢI đổi tay {@code PLATFORMS} trong {@code client-core.DemoPlatforms} — không có gì
+     * khác nhắc việc đó ngoài dòng comment ở cả hai phía.
+     */
+    @Test
+    @DisplayName("WorldFacade.demoPlatforms() vẫn giữ đúng 3 bệ đã ghim, không âm thầm đổi")
+    void demoPlatformsMatchesThePinnedLiterals() {
+        // Platform/Aabb là record — so bằng equals() tự sinh, không cần helper riêng (PMD
+        // ExcessiveParameterList sẽ bắt một helper 6 tham số).
+        assertThat(WorldFacade.demoPlatforms())
+                .containsExactly(
+                        new Platform(new Aabb(3f, -0.75f, 7f, 0.75f), 0.8f),
+                        new Platform(new Aabb(9f, -0.75f, 13f, 0.75f), 1.5f),
+                        new Platform(new Aabb(15f, -0.75f, 19f, 0.75f), 2.2f));
     }
 
     private static void assertNoneInsideAPlatform(List<Spawn> spawns, String what) {

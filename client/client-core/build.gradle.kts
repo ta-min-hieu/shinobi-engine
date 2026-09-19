@@ -211,6 +211,61 @@ val verifyContentKeys = tasks.register("verifyContentKeys") {
 
 tasks.named("check") { dependsOn(verifyContentKeys) }
 
+// Hợp đồng THỨ BA cùng loại (2026-09-19): toạ độ ba bệ nhảy demo sống ĐỘC LẬP ở hai module không
+// được phụ thuộc nhau — server-world.WorldFacade.DEMO_PLATFORMS (nguồn vật lý thật, server tự ghim
+// lại bằng test riêng trong SpawnGeometryIntegrationTest) và client-core.DemoPlatforms.PLATFORMS
+// (chỉ để VẼ). Không compiler nào nối chúng; tới nay chỉ có một dòng comment ở mỗi bên nói "khớp
+// từng dòng với...". Rà bằng máy 2026-09-19: hiện TRÙNG KHỚP (không có bug thật) — nhưng đây đúng
+// hình dạng lỗi đã bắt AssetCategoryResolver.NPC_ASSET_KEYS lệch hai lần. Khoá bằng gate, đừng khoá
+// bằng trí nhớ.
+val verifyDemoPlatformsMatch = tasks.register("verifyDemoPlatformsMatch") {
+    group = "verification"
+    description =
+        "Toạ độ 3 bệ nhảy demo phải khớp TỪNG DÒNG giữa server-world.WorldFacade và client-core.DemoPlatforms."
+    val serverFile = rootProject.file("server/server-world/src/main/java/dev/kage/server/world/WorldFacade.java")
+    val clientFile =
+        layout.projectDirectory.file("src/main/java/dev/kage/client/core/world/DemoPlatforms.java").asFile
+    val stamp = layout.buildDirectory.file("verifyDemoPlatformsMatch.txt")
+    inputs.file(serverFile).withPropertyName("serverWorldFacade")
+    inputs.file(clientFile).withPropertyName("clientDemoPlatforms")
+    outputs.file(stamp)
+    doLast {
+        // Cả hai bên đều viết literal dạng `<số>f` — chỉ khác khuôn bao quanh (`new Platform(new
+        // Aabb(...), ...)` bên server, `{...}` bên client). Bắt 5 số {minX, minY, maxX, maxY, topZ}
+        // theo ĐÚNG thứ tự xuất hiện, không quan tâm khuôn bao ngoài.
+        val serverLiteral = Regex(
+            "new Platform\\(new Aabb\\(\\s*(-?[0-9.]+)f\\s*,\\s*(-?[0-9.]+)f\\s*,\\s*(-?[0-9.]+)f\\s*,\\s*" +
+                "(-?[0-9.]+)f\\s*\\)\\s*,\\s*(-?[0-9.]+)f\\s*\\)"
+        )
+        val clientLiteral = Regex(
+            "\\{\\s*(-?[0-9.]+)f\\s*,\\s*(-?[0-9.]+)f\\s*,\\s*(-?[0-9.]+)f\\s*,\\s*(-?[0-9.]+)f\\s*,\\s*" +
+                "(-?[0-9.]+)f\\s*}"
+        )
+        fun rows(regex: Regex, text: String): List<List<Float>> =
+            regex.findAll(text).map { m -> (1..5).map { m.groupValues[it].toFloat() } }.toList()
+        val serverRows = rows(serverLiteral, serverFile.readText())
+        val clientRows = rows(clientLiteral, clientFile.readText())
+        if (serverRows.isEmpty() || clientRows.isEmpty()) {
+            throw GradleException(
+                "Không trích được toạ độ bệ nhảy nào từ ít nhất một bên — regex lệch khỏi định dạng " +
+                    "thật, cổng này sẽ IM LẶNG vô dụng nếu không fail cứng ở đây " +
+                    "(server=${serverRows.size} dòng, client=${clientRows.size} dòng)"
+            )
+        }
+        if (serverRows != clientRows) {
+            throw GradleException(
+                "Bệ nhảy demo LỆCH giữa hai module — sửa một bên mà quên bên kia khiến client vẽ bệ " +
+                    "ở chỗ khác với nơi server thật sự cho đứng lên:\n" +
+                    "  server (WorldFacade.DEMO_PLATFORMS): $serverRows\n" +
+                    "  client (DemoPlatforms.PLATFORMS):    $clientRows"
+            )
+        }
+        stamp.get().asFile.writeText("${serverRows.size} bệ nhảy demo khớp giữa server-world và client-core\n")
+    }
+}
+
+tasks.named("check") { dependsOn(verifyDemoPlatformsMatch) }
+
 // ĐO (không chụp) chiều cao mọi cửa sổ HUD có danh sách ở trạng thái TỆ NHẤT, fail nếu cao hơn
 // 720p. KHÔNG throwaway: mỗi lần thêm dòng/nút vào một cửa sổ là một lần cần chạy lại — build gate
 // không bắt được vì cần GL context thật (CI không có display).
