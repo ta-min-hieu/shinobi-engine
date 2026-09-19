@@ -137,6 +137,69 @@ val verifyServerErrorKeys = tasks.register("verifyServerErrorKeys") {
 
 tasks.named("check") { dependsOn(verifyServerErrorKeys) }
 
+// Hợp đồng THỨ HAI cùng loại, tìm ra bằng chính mẹo đã tìm ra cái trên: nội dung sống trong
+// migration SQL của server, chữ hiện lên màn hình sống trong bundle của client, và KHÔNG có gì nối
+// hai bên. Rà bằng máy 2026-09-19: 20 nhiệm vụ trong `quest_template` mà bundle chỉ dịch 15, và
+// `sample_boss` — con boss DUY NHẤT của hầm ngục — không có tên. Người chơi thấy
+// `??quest.name.foundation_breakthrough??` ngay trên HUD.
+//
+// Hai nguồn khoá, vì client lấy chữ bằng HAI đường khác nhau:
+//   1. `name_key` server ghi thẳng vào bảng (`item.*`, `hud.monster.*`, `npc.*`) — client nhận qua
+//      dây hoặc tự ghép, nhưng chuỗi khoá có mặt NGUYÊN VĂN trong file .sql.
+//   2. `quest.name.<code>` — KHÔNG có trong .sql chút nào: client tự ghép từ `quest_code` trên dây
+//      (CombatHud.setQuest, QuestCoordinator.questLine). Đây đúng là loại hợp đồng chỉ tồn tại
+//      trong đầu người viết, nên nó là loại đứt đầu tiên.
+//
+// Đọc file .sql chứ KHÔNG nối tới Postgres: cổng build phải chạy được trên máy không có DB (cùng lý
+// do `verifyServerErrorKeys` chỉ đọc file .java). Đã đối chiếu một lần với DB thật: 20/20 mã nhiệm
+// vụ và 14/14 khoá quái trích ra từ .sql khớp từng dòng với bảng.
+val verifyContentKeys = tasks.register("verifyContentKeys") {
+    group = "verification"
+    description = "Mọi name_key trong migration + mọi quest.name.<code> phải có bản dịch ở CẢ HAI bundle."
+    val migrations = rootProject.fileTree("server/server-database/src/main/resources/db/migration") {
+        include("*.sql")
+    }
+    val bundles = listOf("vi", "en").map {
+        layout.projectDirectory.file("src/main/resources/i18n/strings_$it.properties").asFile
+    }
+    val stamp = layout.buildDirectory.file("verifyContentKeys.txt")
+    inputs.files(migrations).withPropertyName("migrations")
+    inputs.files(bundles).withPropertyName("i18nBundles")
+    outputs.file(stamp)
+    doLast {
+        // Khoá i18n trong .sql luôn là literal nháy đơn dạng `a.b.c` chữ thường. Cố tình BẮT RỘNG:
+        // một literal lọt vào đây mà không phải khoá i18n thì thà sửa regex này còn hơn để một tên
+        // hiển thị trôi ra bản build mà không ai thấy.
+        val keyLiteral = Regex("""'([a-z][a-z0-9_]*(?:\.[a-z0-9_]+){1,4})'""")
+        // Mỗi INSERT vào `quest_template` đều kết bằng mệnh đề chống trùng này (khuôn V26→V48).
+        val questCode = Regex("FROM quest_template WHERE code = '([a-z0-9_]+)'")
+        val needed = sortedSetOf<String>()
+        migrations.forEach { file ->
+            val sql = file.readText()
+            keyLiteral.findAll(sql).forEach { needed.add(it.groupValues[1]) }
+            questCode.findAll(sql).forEach { needed.add("quest.name." + it.groupValues[1]) }
+        }
+        val missing = mutableListOf<String>()
+        bundles.forEach { bundle ->
+            val translated = bundle.readLines()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() && !it.startsWith("#") && it.contains("=") }
+                .map { it.substringBefore("=").trim() }
+                .toSet()
+            needed.minus(translated).forEach { missing.add("${bundle.name}: thiếu $it") }
+        }
+        if (missing.isNotEmpty()) {
+            throw GradleException(
+                "Nội dung server có mà bundle không dịch được — người chơi sẽ thấy `??khoá??` " +
+                    "thay vì tên:\n  " + missing.joinToString("\n  ")
+            )
+        }
+        stamp.get().asFile.writeText("${needed.size} khoá nội dung của server, đủ bản dịch ở cả hai bundle\n")
+    }
+}
+
+tasks.named("check") { dependsOn(verifyContentKeys) }
+
 // ĐO (không chụp) chiều cao mọi cửa sổ HUD có danh sách ở trạng thái TỆ NHẤT, fail nếu cao hơn
 // 720p. KHÔNG throwaway: mỗi lần thêm dòng/nút vào một cửa sổ là một lần cần chạy lại — build gate
 // không bắt được vì cần GL context thật (CI không có display).
