@@ -211,6 +211,153 @@ val verifyContentKeys = tasks.register("verifyContentKeys") {
 
 tasks.named("check") { dependsOn(verifyContentKeys) }
 
+// Hợp đồng THỨ BA cùng loại: `CombatConstants` phía client tự ghi trong javadoc của chính nó
+// "PHẢI khớp server-world.CombatConstants/SkillConstants/SkillRegistry" rồi CHÉP TAY 4 hằng số +
+// 5 skill hệ phái (code/cooldown/chi slot 0) từ ba file phía server, chỉ nối bằng đúng một dòng
+// comment — không có gì bắt drift khi cân bằng đổi số (mọi giá trị ở cả 4 file đang ghi rõ
+// "PLACEHOLDER, chưa cân bằng qua playtest"). Đọc .java làm text, KHÔNG phụ thuộc compile-time vào
+// server-world (kiến trúc cấm client-core biết server, giống lý do verifyServerErrorKeys chỉ đọc
+// text). SkillRegistry.ALL dựng bằng `new SkillDefinition(...)` nhiều dòng — riêng slot 0 hệ Hỏa
+// TRUYỀN THẲNG hằng số SkillConstants.FIREBALL_* (không lặp literal) trong khi 4 hệ còn lại dùng
+// literal trực tiếp; regex bắt RAW TOKEN ở từng vị trí tham số rồi giải nghĩa (literal hoặc tra
+// bảng hằng số FIREBALL_* đã trích ở trên) để xử lý đều cả hai kiểu mà không cần rẽ nhánh Hỏa riêng.
+val verifyCombatConstantsMatchServer = tasks.register("verifyCombatConstantsMatchServer") {
+    group = "verification"
+    description = "CombatConstants phía client phải khớp CombatConstants/SkillConstants/SkillRegistry phía server."
+    val serverCombatConstants = rootProject.layout.projectDirectory.file(
+        "server/server-world/src/main/java/dev/kage/server/world/CombatConstants.java")
+    val serverSkillConstants = rootProject.layout.projectDirectory.file(
+        "server/server-world/src/main/java/dev/kage/server/world/SkillConstants.java")
+    val serverSkillRegistry = rootProject.layout.projectDirectory.file(
+        "server/server-world/src/main/java/dev/kage/server/world/SkillRegistry.java")
+    val clientCombatConstants =
+        layout.projectDirectory.file("src/main/java/dev/kage/client/core/world/CombatConstants.java")
+    val stamp = layout.buildDirectory.file("verifyCombatConstantsMatchServer.txt")
+    inputs.file(serverCombatConstants).withPropertyName("serverCombatConstants")
+    inputs.file(serverSkillConstants).withPropertyName("serverSkillConstants")
+    inputs.file(serverSkillRegistry).withPropertyName("serverSkillRegistry")
+    inputs.file(clientCombatConstants).withPropertyName("clientCombatConstants")
+    outputs.file(stamp)
+    doLast {
+        val serverCombatText = serverCombatConstants.asFile.readText()
+        val serverSkillText = serverSkillConstants.asFile.readText()
+        val serverRegistryText = serverSkillRegistry.asFile.readText()
+        val clientText = clientCombatConstants.asFile.readText()
+
+        fun find1(regex: Regex, text: String, label: String): String =
+            regex.find(text)?.groupValues?.get(1)
+                ?: throw GradleException("Không tìm thấy $label — regex có thể đã lỗi thời so với file thật.")
+
+        // Bốn hằng số đỉnh.
+        val serverAttackInterval =
+            find1(Regex("""ATTACK_INTERVAL_SECONDS\s*=\s*([\d.]+)f\s*;"""), serverCombatText, "ATTACK_INTERVAL_SECONDS (server)").toFloat()
+        val serverAttackRange =
+            find1(Regex("""ATTACK_RANGE_METERS\s*=\s*([\d.]+)f\s*;"""), serverCombatText, "ATTACK_RANGE_METERS (server)").toFloat()
+        val serverMaxHp =
+            find1(Regex("""CHARACTER_MAX_HP\s*=\s*(\d+)\s*;"""), serverCombatText, "CHARACTER_MAX_HP (server)").toInt()
+        val serverMaxChi =
+            find1(Regex("""CHARACTER_MAX_CHI\s*=\s*(\d+)\s*;"""), serverSkillText, "CHARACTER_MAX_CHI (server)").toInt()
+
+        val clientAttackInterval =
+            find1(Regex("""ATTACK_INTERVAL_SECONDS\s*=\s*([\d.]+)f\s*;"""), clientText, "ATTACK_INTERVAL_SECONDS (client)").toFloat()
+        val clientAttackRange =
+            find1(Regex("""ATTACK_RANGE_METERS\s*=\s*([\d.]+)f\s*;"""), clientText, "ATTACK_RANGE_METERS (client)").toFloat()
+        val clientMaxHp =
+            find1(Regex("""CHARACTER_MAX_HP\s*=\s*(\d+)\s*;"""), clientText, "CHARACTER_MAX_HP (client)").toInt()
+        val clientMaxChi =
+            find1(Regex("""CHARACTER_MAX_CHI\s*=\s*(\d+)\s*;"""), clientText, "CHARACTER_MAX_CHI (client)").toInt()
+
+        val mismatches = mutableListOf<String>()
+        fun compare(label: String, server: Any, client: Any) {
+            if (server != client) mismatches.add("$label: server=$server, client=$client")
+        }
+        compare("ATTACK_INTERVAL_SECONDS", serverAttackInterval, clientAttackInterval)
+        compare("ATTACK_RANGE_METERS", serverAttackRange, clientAttackRange)
+        compare("CHARACTER_MAX_HP", serverMaxHp, clientMaxHp)
+        compare("CHARACTER_MAX_CHI", serverMaxChi, clientMaxChi)
+
+        // Hằng số Hỏa Cầu (SkillConstants) — nguồn thật mà cả SkillRegistry (slot 0 hệ Hỏa) lẫn
+        // client FACTION_SKILLS đều chỉ THAM CHIẾU, không lặp literal.
+        val serverFireballCode =
+            find1(Regex("""FIREBALL_SKILL_CODE\s*=\s*"([a-z_]+)"\s*;"""), serverSkillText, "FIREBALL_SKILL_CODE (server)")
+        val serverFireballCooldown =
+            find1(Regex("""FIREBALL_COOLDOWN_SECONDS\s*=\s*([\d.]+)f\s*;"""), serverSkillText, "FIREBALL_COOLDOWN_SECONDS (server)").toFloat()
+        val serverFireballChi =
+            find1(Regex("""FIREBALL_CHI_COST\s*=\s*(\d+)\s*;"""), serverSkillText, "FIREBALL_CHI_COST (server)").toInt()
+
+        val clientFireballCode =
+            find1(Regex("""FIREBALL_SKILL_CODE\s*=\s*"([a-z_]+)"\s*;"""), clientText, "FIREBALL_SKILL_CODE (client)")
+        val clientFireballCooldown =
+            find1(Regex("""FIREBALL_COOLDOWN_SECONDS\s*=\s*([\d.]+)f\s*;"""), clientText, "FIREBALL_COOLDOWN_SECONDS (client)").toFloat()
+        val clientFireballChi =
+            find1(Regex("""FIREBALL_CHI_COST\s*=\s*(\d+)\s*;"""), clientText, "FIREBALL_CHI_COST (client)").toInt()
+
+        // Token thô ở 1 tham số constructor có thể là literal ("thuy_song_du", 4f, 12) HOẶC tham
+        // chiếu tới hằng số FIREBALL_* (chỉ hệ Hỏa) — giải nghĩa theo hình dạng token, không theo hệ.
+        fun resolveCode(raw: String, fireball: String): String {
+            val t = raw.trim()
+            return if (t.startsWith("\"")) t.removeSurrounding("\"") else fireball
+        }
+        fun resolveCooldown(raw: String, fireball: Float): Float {
+            val t = raw.trim()
+            return if (t.endsWith("f")) t.dropLast(1).toFloat() else fireball
+        }
+        fun resolveChi(raw: String, fireball: Int): Int {
+            val t = raw.trim()
+            return t.toIntOrNull() ?: fireball
+        }
+
+        // Slot 0 (active đầu tiên) của mỗi hệ phái trong SkillRegistry.ALL — `new SkillDefinition(`
+        // rồi code, Element.<X>, slotIndex 0 (literal — chỉ slot 0 mới bằng 0), targetKind,
+        // scriptResource, cooldownSeconds, chiCost, đúng thứ tự tham số của SkillDefinition record.
+        val skillEntry = Regex(
+            """new SkillDefinition\(\s*([^,]+),\s*Element\.(HOA|THUY|PHONG|THO|LOI),\s*0,\s*""" +
+                """SkillTargetKind\.\w+,\s*[^,]+,\s*([^,]+),\s*([^,]+),""")
+        val serverSkills = mutableMapOf<String, Triple<String, Float, Int>>()
+        skillEntry.findAll(serverRegistryText).forEach { m ->
+            val element = m.groupValues[2]
+            serverSkills[element] = Triple(
+                resolveCode(m.groupValues[1], serverFireballCode),
+                resolveCooldown(m.groupValues[3], serverFireballCooldown),
+                resolveChi(m.groupValues[4], serverFireballChi))
+        }
+
+        // Cùng vai trò ở phía client — 1 dòng/hệ trong `FACTION_SKILLS = Map.of(...)`.
+        val factionSkill = Regex(
+            """Faction\.FACTION_(HOA|THUY|PHONG|THO|LOI),\s*new FactionSkill\(\s*([^,]+),\s*([^,]+),\s*([^,]+),""")
+        val clientSkills = mutableMapOf<String, Triple<String, Float, Int>>()
+        factionSkill.findAll(clientText).forEach { m ->
+            val element = m.groupValues[1]
+            clientSkills[element] = Triple(
+                resolveCode(m.groupValues[2], clientFireballCode),
+                resolveCooldown(m.groupValues[3], clientFireballCooldown),
+                resolveChi(m.groupValues[4], clientFireballChi))
+        }
+
+        listOf("HOA", "THUY", "PHONG", "THO", "LOI").forEach { element ->
+            val server = serverSkills[element]
+                ?: throw GradleException("Server thiếu skill slot 0 hệ $element trong SkillRegistry.ALL.")
+            val client = clientSkills[element]
+                ?: throw GradleException("Client thiếu skill slot 0 hệ $element trong FACTION_SKILLS.")
+            compare("$element skillCode", server.first, client.first)
+            compare("$element cooldownSeconds", server.second, client.second)
+            compare("$element chiCost", server.third, client.third)
+        }
+
+        if (mismatches.isNotEmpty()) {
+            throw GradleException(
+                "CombatConstants phía client lệch với server — HUD sẽ hiện nút skill sẵn " +
+                    "sàng/hồi chiêu sai (không phải lỗ hổng, server vẫn tự kiểm, nhưng cần sửa " +
+                    "CombatConstants.java phía client để khớp lại):\n  " + mismatches.joinToString("\n  ")
+            )
+        }
+        stamp.get().asFile.writeText(
+            "4 hằng số đỉnh + 5 skill hệ phái (code/cooldown/chi slot 0) khớp giữa client và server\n")
+    }
+}
+
+tasks.named("check") { dependsOn(verifyCombatConstantsMatchServer) }
+
 // ĐO (không chụp) chiều cao mọi cửa sổ HUD có danh sách ở trạng thái TỆ NHẤT, fail nếu cao hơn
 // 720p. KHÔNG throwaway: mỗi lần thêm dòng/nút vào một cửa sổ là một lần cần chạy lại — build gate
 // không bắt được vì cần GL context thật (CI không có display).
