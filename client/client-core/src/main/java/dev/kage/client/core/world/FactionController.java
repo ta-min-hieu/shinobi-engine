@@ -129,9 +129,14 @@ final class FactionController {
      * Khoá i18n giải thích một lần đổi hệ thất bại.
      *
      * @param errorKey đúng chuỗi server gửi trong {@code ErrorResponse.error_key} (VD
-     *     {@code error.level_too_low}) — dùng thẳng làm khoá i18n, không dịch tên lại, vì mọi khoá
-     *     server sinh ra đều đã có mặt trong bundle. Chuỗi rỗng (server cũ, hoặc một nhánh lỗi chưa
-     *     đặt khoá) rơi về {@code faction.error.unknown}: nói ra là không hiểu, thay vì im lặng.
+     *     {@code error.level_too_low}) — dùng thẳng làm khoá i18n, không dịch tên lại. Chuỗi rỗng
+     *     (server cũ, hoặc một nhánh lỗi chưa đặt khoá) rơi về {@code faction.error.unknown}: nói
+     *     ra là không hiểu, thay vì im lặng.
+     *     <p>⚠️ Câu "vì mọi khoá server sinh ra đều đã có mặt trong bundle" từng đứng ở đây là
+     *     SAI: rà bằng máy 2026-09-19 thì server sinh 25 khoá {@code error.*} mà bundle chỉ có 10.
+     *     Nay đủ cả 25, nhưng bất biến đó không có gì canh — thêm một {@code sendError} với khoá
+     *     mới mà quên bundle thì không ai báo. Chỗ nào không chắc thì đi qua
+     *     {@code KageI18n#errorText}, nó có câu dự phòng.
      */
     static String errorMessageKey(String errorKey) {
         return errorKey == null || errorKey.isBlank() ? "faction.error.unknown" : errorKey;

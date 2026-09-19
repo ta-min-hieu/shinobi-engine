@@ -21,4 +21,30 @@ public final class KageI18n {
         I18NBundle.setExceptionOnMissingKey(false); // key thiếu hiện "??key??" thay vì crash UI.
         return I18NBundle.createBundle(Gdx.files.internal(BUNDLE_PATH), Locale.of("vi"), "UTF-8");
     }
+
+    /**
+     * Dịch {@code error_key} server gửi, rơi về {@code fallbackKey} khi bundle không có nó.
+     *
+     * <p>Server gửi {@code error_key} để client DÙNG THẲNG làm khoá i18n. Rà bằng máy 2026-09-19:
+     * server sinh 25 khoá {@code error.*} mà bundle chỉ có 10 — tức cái bất biến ghi trong javadoc
+     * {@code FactionController.errorMessageKey} ("mọi khoá server sinh ra đều đã có mặt trong
+     * bundle") **không đúng**. Thiếu khoá thì cần một câu chung, không phải một chuỗi khoá trần.
+     *
+     * <p>⚠️ Phải soi {@code ??key??} chứ KHÔNG bắt {@code MissingResourceException}:
+     * {@link #load()} gọi {@code setExceptionOnMissingKey(false)}, nên {@code bundle.get} với khoá
+     * thiếu **không ném gì cả** — nó trả về đúng chuỗi ấy. Một {@code try/catch} ở đây trông như
+     * đang phòng thủ mà thật ra không bao giờ chạy, và {@code ??error.abc??} sẽ hiện thẳng lên màn
+     * hình người chơi. (Bản đầu của chính lần sửa này viết sai đúng kiểu đó.)
+     */
+    public static String errorText(I18NBundle bundle, String errorKey, String fallbackKey) {
+        if (errorKey == null || errorKey.isBlank() || isMissingMarker(bundle.get(errorKey), errorKey)) {
+            return bundle.get(fallbackKey);
+        }
+        return bundle.get(errorKey);
+    }
+
+    /** {@code I18NBundle} báo "không có khoá này" bằng cách trả về chính khoá kẹp giữa {@code ??}. */
+    static boolean isMissingMarker(String text, String key) {
+        return text == null || text.equals("??" + key + "??");
+    }
 }

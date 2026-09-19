@@ -31,6 +31,7 @@ import dev.kage.engine.core.KageEngine;
 import dev.kage.protocol.CharacterSummary;
 import dev.kage.protocol.CreateCharacterRequest;
 import dev.kage.protocol.CreateCharacterResponse;
+import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.Faction;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SelectCharacterRequest;
@@ -277,8 +278,9 @@ public final class CharacterSelectScreen implements GameScreen {
                 return;
             }
             if (opcode == Opcode.OPCODE_ERROR_VALUE) {
-                LOG.warn("Server từ chối CreateCharacterRequest (ErrorResponse)");
-                failWithGenericError();
+                String errorKey = errorKeyOf(frame.payload());
+                LOG.warn("Server từ chối CreateCharacterRequest: error_key={}", errorKey);
+                failWith(errorKey);
                 return;
             }
         }
@@ -292,7 +294,7 @@ public final class CharacterSelectScreen implements GameScreen {
             CreateCharacterResponse response = CreateCharacterResponse.parseFrom(payload);
             if (!response.getSuccess()) {
                 LOG.warn("Tạo nhân vật thất bại: errorKey={}", response.getErrorKey());
-                failWithGenericError();
+                failWith(response.getErrorKey());
                 return;
             }
             newCharacterNameField.setText("");
@@ -312,8 +314,9 @@ public final class CharacterSelectScreen implements GameScreen {
                 return;
             }
             if (opcode == Opcode.OPCODE_ERROR_VALUE) {
-                LOG.warn("Server từ chối SelectCharacterRequest (ErrorResponse)");
-                failWithGenericError();
+                String errorKey = errorKeyOf(frame.payload());
+                LOG.warn("Server từ chối SelectCharacterRequest: error_key={}", errorKey);
+                failWith(errorKey);
                 return;
             }
         }
@@ -338,9 +341,34 @@ public final class CharacterSelectScreen implements GameScreen {
     }
 
     private void failWithGenericError() {
+        failWith(null);
+    }
+
+    /**
+     * Nói LÝ DO server đưa ra, không phải một câu chung cho mọi thứ.
+     *
+     * <p>Trước 2026-09-19 mọi nhánh hỏng ở màn này đều rơi về {@code charselect.error.generic} và
+     * {@code error_key} thật chỉ đi vào một dòng log. Người chơi tạo nhân vật trùng tên vì thế thấy
+     * đúng câu mà họ thấy khi máy chủ sập — và chuyện trùng tên thì chắc chắn xảy ra ngay ngày đầu
+     * Closed Beta.
+     *
+     * @param errorKey khoá server gửi, hoặc {@code null} khi hỏng vì lý do không có khoá (hết giờ
+     *     chờ, payload không parse được) — lúc đó câu chung mới đúng là câu đúng
+     */
+    private void failWith(String errorKey) {
         setFormEnabled(true);
-        statusLabel.setText(i18n.get("charselect.error.generic"));
+        statusLabel.setText(KageI18n.errorText(i18n, errorKey, "charselect.error.generic"));
         transitionTo(State.FAILED);
+    }
+
+    /** {@code error_key} trong một khung {@code ErrorResponse}, hoặc {@code null} nếu không đọc được. */
+    private String errorKeyOf(byte[] payload) {
+        try {
+            return ErrorResponse.parseFrom(payload).getErrorKey();
+        } catch (InvalidProtocolBufferException e) {
+            LOG.warn("ErrorResponse không hợp lệ", e);
+            return null;
+        }
     }
 
     private void setFormEnabled(boolean enabled) {

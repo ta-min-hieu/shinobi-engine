@@ -46,6 +46,7 @@ import dev.kage.protocol.CharacterRespawnedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.CharacterSummary;
 import dev.kage.protocol.CostumeTier;
+import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.ExperienceChangedEvent;
 import dev.kage.protocol.HealthChangedEvent;
 import dev.kage.protocol.MonsterDespawnedEvent;
@@ -141,6 +142,9 @@ public final class WorldScreen implements GameScreen {
 
     /** Luồng chat (nhật ký + kênh + mạng) — xem {@link ChatCoordinator}. */
     private final ChatCoordinator chat;
+
+    /** Chỉ để dịch {@code ErrorResponse} không ai nhận — xem {@link #onUnclaimedError}. */
+    private final com.badlogic.gdx.utils.I18NBundle i18n = dev.kage.client.core.ui.theme.KageI18n.load();
 
     /** Cửa sổ Nhóm — mượn skin của {@link #combatHud} như hai panel trên. */
     private final PartyPanel partyPanel = new PartyPanel(combatHud.skin());
@@ -533,6 +537,10 @@ public final class WorldScreen implements GameScreen {
             }
             int opcode = frame.header().opcode();
             byte[] payload = frame.payload();
+            if (opcode == Opcode.OPCODE_ERROR_VALUE) {
+                onUnclaimedError(ErrorResponse.parseFrom(payload));
+                return;
+            }
             if (!dispatchMovement(opcode, payload)) {
                 dispatchCombat(opcode, payload);
             }
@@ -543,6 +551,30 @@ public final class WorldScreen implements GameScreen {
                     frame.header().opcode(),
                     e);
         }
+    }
+
+    /**
+     * {@code ErrorResponse} (opcode 5) mà KHÔNG luồng nào nhận — nói ra thay vì bỏ im.
+     *
+     * <p>Opcode 5 dùng chung cho cả giao thức, và mỗi luồng chỉ nhận lỗi khớp {@code sequenceId}
+     * đang treo của chính nó (xem {@code FactionCoordinator#onError}) — đúng như vậy, vì nuốt hết
+     * là cướp gói của người khác. Nhưng phần còn lại thì trước 2026-09-19 rơi thẳng vào hư không:
+     * server từ chối một thao tác, người chơi không thấy gì cả. Ca dễ gặp nhất là sau khi
+     * {@code GameConnection} tự kết nối lại — phiên trên server đã chết nên MỌI lệnh trả về
+     * {@code error.not_authenticated}, một khoá mà bundle đã dịch sẵn từ lâu mà chẳng ai hiện ra.
+     *
+     * <p>Chạy ở nhánh CUỐI, sau khi {@code panels.dispatch} đã trả {@code false} — nên không bao
+     * giờ nói chồng lên luồng nào đã tự xử lý lỗi của mình.
+     *
+     * <p>Khoá lạ (server mới hơn client) rơi về {@code error.unhandled} qua
+     * {@code KageI18n#errorText}: nói rằng thao tác bị từ chối, không đoán bừa lý do và không hiện
+     * chuỗi khoá trần. Khoá thật thì vẫn ghi {@code warn} kèm mã — Closed Beta cần đọc được nó
+     * trong log.
+     */
+    private void onUnclaimedError(ErrorResponse error) {
+        String key = error.getErrorKey();
+        LOG.warn("Server từ chối một thao tác: code={} error_key={}", error.getErrorCode(), key);
+        chat.showSystemNotice(dev.kage.client.core.ui.theme.KageI18n.errorText(i18n, key, "error.unhandled"));
     }
 
     // Tách dispatch() thành 2 nhóm (di chuyển/spawn nhân vật vs quái/combat) THUẦN để hạ cyclomatic
