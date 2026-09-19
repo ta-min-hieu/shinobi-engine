@@ -529,23 +529,26 @@ def seat_weapon(parts, body, max_span=0.55, clearance=0.005):
         shift = (max(p.x for p in band) + clearance) - max(p.x for p in weapon_points)
     else:
         shift = (min(p.x for p in band) - clearance) - min(p.x for p in weapon_points)
-    # A BACK-mounted weapon still needs the sideways shove: pressed flat against
-    # the back, the body occludes the whole thing at the 3/4 preview angle and Q7
-    # fails. Thuy's gourd reads because it hangs clear of the silhouette, so push
-    # until it breaks the outline by `stick_out` of the body's own width.
-    # A front-mounted one has nothing in front of it, so it stays where the kit
-    # put it — being shoved sideways is what turned char_loi's blade into a thin
-    # stick floating beside the character.
-    shift_y = 0.0
-    if not front_mounted:
-        body_half_y = max(abs(p.y) for p in band)
-        weapon_edge_y = max(abs(p.y) for p in weapon_points)
-        side = 1.0 if sum(p.y for p in weapon_points) >= 0 else -1.0
-        # Capped, or a weapon that started centred gets thrown clear of the body
-        # and reads as floating rather than carried -- char_loi-b1's blade needed
-        # +0.365 to clear on its own and hung in mid-air at that distance.
-        shift_y = side * min(body_half_y * STICK_OUT_CAP,
-                             max(0.0, body_half_y * (1.0 + STICK_OUT) - weapon_edge_y))
+    # Sideways clearance, for EVERY weapon and not just back-worn ones. The kit
+    # mounts laterally in absolute units tuned to its own torso (|y| <= 0.113);
+    # a generated body is |y| <= 0.294, so the same offset that clears the kit
+    # sits well inside a Rodin one and the weapon is swallowed. Measured
+    # 2026-09-19: dropping this for front mounts cost char_tho-b1 32 pixels of
+    # silhouette, because its mace head is #A6763D — the EXACT hex of its torso,
+    # so it only ever read by hanging clear of the body.
+    #
+    # The formula is already "only as much as needed": it goes to zero when the
+    # weapon's own edge is past `STICK_OUT` of the body's half-width. What made
+    # this look wrong before was not the shove, it was being applied to a blade
+    # that was still centred, still edge-on and still dragged round to the back.
+    body_half_y = max(abs(p.y) for p in band)
+    weapon_edge_y = max(abs(p.y) for p in weapon_points)
+    side = 1.0 if sum(p.y for p in weapon_points) >= 0 else -1.0
+    # Capped, or a weapon that started centred gets thrown clear of the body
+    # and reads as floating rather than carried -- char_loi-b1's blade needed
+    # +0.365 to clear on its own and hung in mid-air at that distance.
+    shift_y = side * min(body_half_y * STICK_OUT_CAP,
+                         max(0.0, body_half_y * (1.0 + STICK_OUT) - weapon_edge_y))
     for part in parts:
         part.data.transform(Matrix.Translation((shift, shift_y, 0.0)))
         part.data.update()

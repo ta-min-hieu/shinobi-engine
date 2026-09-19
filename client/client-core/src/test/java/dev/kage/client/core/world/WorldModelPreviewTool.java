@@ -214,6 +214,39 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
     /** Từ khung này trở đi kịch bản chuyển sang phép so áo choàng — xem {@link #cloakScript()}. */
     private static final int CLOAK_TEST_FIRST_FRAME = 96;
 
+    /**
+     * Dải chấm Q7 (ART-QUALITY-STANDARD §2: <i>"vũ khí đọc được ĐÚNG loại ở @1x"</i>) — cả NĂM hệ
+     * đứng cạnh nhau trong MỘT ảnh, cầm năm hình vũ khí khác nhau của kit.
+     *
+     * <p>Khung này sinh ra vì Q7 của nhân vật người chơi chưa bao giờ chấm được bằng chính bộ dựng
+     * của client: công cụ này chỉ vẽ {@code char_hoa-b1} (người chơi) và hai bộ Lôi (phép so áo
+     * choàng). Sau 2026-09-19 thì nó thành bắt buộc — vị trí vũ khí (`seat_weapon`) và màu vũ khí
+     * (`export_gltf`) đều vừa đổi, và "đọc được không" là câu hỏi CHỈ trả lời được bằng ảnh.
+     *
+     * <p>Bậc B1 cho cả năm: vũ khí có đủ từ bậc đó, còn phụ kiện B2/B3 chỉ thêm thứ che nó đi.
+     * ⚠️ {@code char_hoa-b1} vào khung như một ĐỐI CHỨNG chứ không phải một ứng viên — file
+     * {@code hoa-b1.blend} trong repo là bản dựng bằng mesh kit chứ không phải nguồn của model đang
+     * ship, nên nó KHÔNG xuất lại được và vũ khí của nó vẫn giữ màu xám cũ.
+     */
+    private static final int WEAPON_STRIP_FIRST_FRAME = 124;
+
+    /**
+     * Tâm dải, đặt SAU bệ demo cuối cùng ({@code DemoPlatforms.PLATFORMS} chiếm tới x=19) và cách
+     * xa chỗ đứng của phép so áo choàng. Nền đất kéo tới {@code GROUND_MAX_X}=210 nên vẫn có đất.
+     */
+    private static final float WEAPON_STRIP_X = 26.0f;
+
+    /** Bước giữa năm nhân vật: đủ rời để không chồng silhouette, đủ gần để vào chung một khung. */
+    private static final float WEAPON_STRIP_STEP = 1.2f;
+
+    /** Thứ tự theo HÌNH vũ khí, không theo thứ tự hệ: kunai · bầu · song đao · trường kiếm · chuỳ. */
+    private static final String[] WEAPON_STRIP_MODELS = {
+        "char_hoa-b1", "char_thuy-b1", "char_phong-b1", "char_loi-b1", "char_tho-b1",
+    };
+
+    /** Id riêng cho dải chấm, không đụng id nào đang dùng. */
+    private static final long WEAPON_STRIP_FIRST_ID = 20L;
+
     private final Map<Long, CombatHudController.MonsterState> monsters = new LinkedHashMap<>();
 
     private WorldModelRenderer models;
@@ -224,6 +257,9 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
 
     /** Từ khung này trở đi, cảnh chỉ còn phép so áo choàng — xem {@link #CLOAK_TEST_ID}. */
     private boolean showingCloakTest;
+
+    /** Từ khung này trở đi, cảnh chỉ còn dải chấm Q7 — xem {@link #WEAPON_STRIP_FIRST_FRAME}. */
+    private boolean showingWeaponStrip;
 
     @Override
     public void create() {
@@ -309,6 +345,11 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         Gdx.gl.glClearColor(0.1f, 0.1f, 0.15f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
 
+        if (showingWeaponStrip) {
+            renderWeaponStrip();
+            script();
+            return;
+        }
         if (showingCloakTest) {
             renderCloakTest();
             script();
@@ -334,10 +375,23 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
      * đúng khung đầu (crossfade 0.15s = 9 khung) — chụp quá sớm thì mọi tư thế trông như nhau.
      */
     private void script() {
+        if (frame >= WEAPON_STRIP_FIRST_FRAME) {
+            weaponScript();
+            return;
+        }
         if (frame >= CLOAK_TEST_FIRST_FRAME) {
             cloakScript();
             return;
         }
+        openingScript();
+    }
+
+    /**
+     * Phần một: bốn tư thế của cảnh chính. Tách khỏi {@link #script()} khi phần ba ra đời — chỉ
+     * thêm MỘT nhánh rẽ nữa là {@code script()} chạm trần {@code CyclomaticComplexity} = 10 của PMD,
+     * đúng bức tường đã tách {@link #cloakScript()} ra trước đó.
+     */
+    private void openingScript() {
         switch (frame) {
             case 60 -> capture("1-idle-va-fallback");
             case 61 -> feedMovement();
@@ -369,11 +423,52 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
             // Không có ô này thì mọi con số "pixel khác nhau" ở trên đều lẫn độ trôi tư thế idle, và
             // đó chính là lỗi đã làm hỏng phép đo lần đầu.
             case 114 -> capture("5c-doi-chung-cung-model-2-khung-sau");
-            case 120 -> Gdx.app.exit();
             default -> {
                 /* các khung còn lại chỉ để animation chạy tiếp */
             }
         }
+    }
+
+    /**
+     * Phần ba: dải chấm Q7. Tách hẳn khỏi hai phần trên vì cùng một lý do PMD
+     * {@code CyclomaticComplexity} đã tách {@link #cloakScript()}.
+     */
+    private void weaponScript() {
+        switch (frame) {
+            case WEAPON_STRIP_FIRST_FRAME -> startWeaponStrip();
+            // Đủ khung để crossfade 0,15s (9 khung) về hẳn idle trên CẢ NĂM model.
+            case 140 -> capture("6-q7-vu-khi-nam-he");
+            case 146 -> Gdx.app.exit();
+            default -> {
+                /* các khung còn lại chỉ để animation chạy tiếp */
+            }
+        }
+    }
+
+    /** Dựng năm nhân vật thành một hàng và dời camera sang đó. */
+    private void startWeaponStrip() {
+        models.setPosition(CLOAK_TEST_ID, CLOAK_TEST_OFFSCREEN_X, 0f, 0f);
+        models.setPosition(CLOAK_TEST_ID_WITH, CLOAK_TEST_OFFSCREEN_X, 0f, 0f);
+        float left = WEAPON_STRIP_X - WEAPON_STRIP_STEP * (WEAPON_STRIP_MODELS.length - 1) / 2f;
+        StringBuilder drawn = new StringBuilder();
+        for (int index = 0; index < WEAPON_STRIP_MODELS.length; index++) {
+            long id = WEAPON_STRIP_FIRST_ID + index;
+            models.addCharacter(id, WEAPON_STRIP_MODELS[index]);
+            models.setPosition(id, left + WEAPON_STRIP_STEP * index, 0f, 0f);
+            drawn.append(WEAPON_STRIP_MODELS[index])
+                    .append('=')
+                    .append(models.hasModel(id))
+                    .append(' ');
+        }
+        showingWeaponStrip = true;
+        LOG.info("dải chấm Q7: {}", drawn.toString().trim());
+    }
+
+    private void renderWeaponStrip() {
+        presenter.sync(monsters, WEAPON_STRIP_X);
+        npcPresenter.sync(WEAPON_STRIP_X);
+        models.follow(WEAPON_STRIP_X, 0f);
+        models.render(1f / 60f);
     }
 
     /**

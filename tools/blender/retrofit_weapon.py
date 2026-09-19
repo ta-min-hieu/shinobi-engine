@@ -76,7 +76,7 @@ def _body(rig, weapon_names):
     return bodies[0]
 
 
-def retrofit(kind, color, accent, outline_px):
+def retrofit(kind, color, accent, outline_px, offset=(0.0, 0.0, 0.0)):
     old = _weapon_parts()
     if not old:
         raise SystemExit("no weapon parts found; nothing to retrofit")
@@ -94,7 +94,7 @@ def retrofit(kind, color, accent, outline_px):
         if mesh.users == 0:
             bpy.data.meshes.remove(mesh)
 
-    parts = t3d.attach_weapon(rig, prefix, kind, offset=(0.0, 0.0, 0.0),
+    parts = t3d.attach_weapon(rig, prefix, kind, offset=offset,
                               outline_px_at_1x=outline_px, color=color, accent=accent,
                               body=body)
     print("[retrofit] rebuilt: " + ", ".join(sorted(p.name for p in parts)))
@@ -111,10 +111,23 @@ def _cli(argv):
     parser.add_argument("--color", required=True, help="weapon hex")
     parser.add_argument("--accent", required=True, help="grip/accent hex")
     parser.add_argument("--outline-px", type=float, default=DEFAULT_OUTLINE_PX)
+    # ⚠️ This script RE-DERIVES placement through `seat_weapon`; it does not
+    # reproduce whatever hand-measured `--weapon-offset` the original build
+    # passed, because that number lives only in a shell command nobody kept.
+    # Measured 2026-09-19 on char_tho-b1: re-seating moved its mace from fully
+    # clear of the body to overlapping the hip, and since the mace head is
+    # #A6763D — the exact hex of tho's torso — it stopped reading. Tho was
+    # reverted rather than retrofitted. Pass the offset here when a character's
+    # original placement was better than what seating derives.
+    parser.add_argument("--weapon-offset", default=None,
+                        help="x,y,z added to the seated weapon; see the note above")
     return parser.parse_args(argv)
 
 
 if __name__ == "__main__":
     raw = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
     parsed = _cli(raw)
-    retrofit(parsed.weapon, parsed.color, parsed.accent, parsed.outline_px)
+    shift = (0.0, 0.0, 0.0)
+    if parsed.weapon_offset:
+        shift = tuple(float(part) for part in parsed.weapon_offset.split(","))
+    retrofit(parsed.weapon, parsed.color, parsed.accent, parsed.outline_px, shift)
