@@ -27,9 +27,27 @@ final class MicrometerTickMetricsPort implements TickMetricsPort {
      * {@code IteratingKSystem} mà {@code WorldFacade} constructor đăng ký (kể cả
      * {@code MovementSystem} của engine-ecs). Biết trước danh sách này cho phép pre-build Timer
      * cho từng tên NGAY lúc construct — không tạo Timer mới trên tick thread nếu tên hợp lệ.
+     *
+     * <p>⚠️ Đã lệch THẬT tới 2026-09-19: danh sách chỉ có 6 tên trong khi {@code WorldFacade} đã
+     * đăng ký 10 — {@code VerticalMovementSystem} (ADR-033), {@code TerrainCollisionSystem}
+     * (PHYSICS.md §4), {@code TriggerZoneSystem} (ADR-050) và {@code HealthRegenSystem} (ADR-046)
+     * thêm sau lần cuối ai đó cập nhật ô này, khiến {@code kage.ecs.system.duration} âm thầm thiếu
+     * 4/10 System (nhánh {@code timer == null} ở {@link #recordSystemDuration} nuốt êm, không log,
+     * không crash). Bốn tên đó đã được thêm lại ở đây; {@link MicrometerTickMetricsPortTest}
+     * (server-gateway) tick một {@code WorldFacade} thật để tự phát hiện lần lệch KẾ TIẾP thay vì
+     * dựa vào ai đó nhớ sửa comment này.
      */
     private static final String[] SYSTEM_NAMES = {
-        "AiSystem", "MovementSystem", "CombatSystem", "SkillSystem", "BossAiSystem", "StatusEffectSystem"
+        "AiSystem",
+        "MovementSystem",
+        "VerticalMovementSystem",
+        "TerrainCollisionSystem",
+        "TriggerZoneSystem",
+        "CombatSystem",
+        "SkillSystem",
+        "BossAiSystem",
+        "StatusEffectSystem",
+        "HealthRegenSystem"
     };
 
     private final Timer tickTimer;
