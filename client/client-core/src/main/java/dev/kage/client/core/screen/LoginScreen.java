@@ -26,6 +26,7 @@ import dev.kage.engine.core.GameScreen;
 import dev.kage.engine.core.KageEngine;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
+import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.ListCharactersRequest;
 import dev.kage.protocol.ListCharactersResponse;
 import dev.kage.protocol.Opcode;
@@ -190,8 +191,9 @@ public final class LoginScreen implements GameScreen {
                 return;
             }
             if (opcode == Opcode.OPCODE_ERROR_VALUE) {
-                LOG.warn("Server từ chối ConnectRequest (ErrorResponse)");
-                failWithGenericError();
+                String errorKey = errorKeyOf(frame.payload());
+                LOG.warn("Server từ chối ConnectRequest: error_key={}", errorKey);
+                failWith(errorKey);
                 return;
             }
         }
@@ -205,7 +207,7 @@ public final class LoginScreen implements GameScreen {
             ConnectResponse response = ConnectResponse.parseFrom(payload);
             if (!response.getSuccess()) {
                 LOG.warn("Đăng nhập bị server từ chối: errorKey={}", response.getErrorKey());
-                failWithGenericError();
+                failWith(response.getErrorKey());
                 return;
             }
             sendListCharactersRequest();
@@ -238,8 +240,9 @@ public final class LoginScreen implements GameScreen {
                 return;
             }
             if (opcode == Opcode.OPCODE_ERROR_VALUE) {
-                LOG.warn("Server từ chối ListCharactersRequest (ErrorResponse)");
-                failWithGenericError();
+                String errorKey = errorKeyOf(frame.payload());
+                LOG.warn("Server từ chối ListCharactersRequest: error_key={}", errorKey);
+                failWith(errorKey);
                 return;
             }
         }
@@ -259,12 +262,41 @@ public final class LoginScreen implements GameScreen {
     }
 
     private void failWithGenericError() {
+        failWith(null);
+    }
+
+    /**
+     * Nói LÝ DO server đưa ra, không phải một câu chung cho mọi thứ — cùng mẫu
+     * {@code CharacterSelectScreen#failWith}.
+     *
+     * <p>Trước 2026-09-19, mọi nhánh hỏng ở màn này (kể cả {@code error.invalid_username} — người
+     * chơi CÓ THỂ sửa — và {@code error.login_failed}/{@code error.list_characters_failed} — lỗi
+     * MÁY CHỦ, không phải người chơi làm sai) đều rơi về đúng MỘT câu {@code login.error.connect_failed}.
+     * Ba khoá đó (cộng {@code error.not_authenticated}) đã có bản dịch từ trước (cổng build
+     * {@code verifyServerErrorKeys} đòi mọi {@code error.*} literal ở server phải có mặt trong cả
+     * hai bundle) — chỉ là màn hình này chưa từng đọc {@code error_key} để dùng chúng.
+     *
+     * @param errorKey khoá server gửi, hoặc {@code null} khi hỏng vì lý do không có khoá (hết giờ
+     *     chờ, mất kết nối giữa chừng gửi gói, payload không parse được) — lúc đó câu chung mới
+     *     đúng là câu đúng
+     */
+    private void failWith(String errorKey) {
         if (connection != null) {
             connection.stop();
         }
         setFormEnabled(true);
-        statusLabel.setText(i18n.get("login.error.connect_failed"));
+        statusLabel.setText(KageI18n.errorText(i18n, errorKey, "login.error.connect_failed"));
         transitionTo(State.FAILED);
+    }
+
+    /** {@code error_key} trong một khung {@code ErrorResponse}, hoặc {@code null} nếu không đọc được. */
+    private String errorKeyOf(byte[] payload) {
+        try {
+            return ErrorResponse.parseFrom(payload).getErrorKey();
+        } catch (InvalidProtocolBufferException e) {
+            LOG.warn("ErrorResponse không hợp lệ", e);
+            return null;
+        }
     }
 
     private void setFormEnabled(boolean enabled) {
