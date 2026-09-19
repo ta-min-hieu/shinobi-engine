@@ -518,22 +518,34 @@ def seat_weapon(parts, body, max_span=0.55, clearance=0.005):
     band = [p for p in body_points if low_z <= p.z <= high_z]
     if not band:
         return scale, 0.0
-    # The weapon rides behind the character, which faces +X.
-    shift = (min(p.x for p in band) - clearance) - min(p.x for p in weapon_points)
-    # Seating alone hides it: pressed flat against the back, the body occludes
-    # the whole weapon at the 3/4 preview angle and Q7 fails on all three of
-    # phong/loi/tho. Thuy's gourd reads because it hangs clear of the silhouette,
-    # so push the weapon sideways until it breaks the outline by `stick_out` of
-    # the body's own width. A weapon that cannot be seen is not equipment.
-    body_half_y = max(abs(p.y) for p in band)
-    weapon_edge_y = max(abs(p.y) for p in weapon_points)
-    side = 1.0 if sum(p.y for p in weapon_points) >= 0 else -1.0
-    # Capped, or a weapon that started centred gets thrown clear of the body and
-    # reads as floating rather than carried -- char_loi-b1's blade needed +0.365
-    # to clear on its own and hung in mid-air at that distance. Sticking out is
-    # for breaking the silhouette, not for leaving the character.
-    shift_y = side * min(body_half_y * STICK_OUT_CAP,
-                         max(0.0, body_half_y * (1.0 + STICK_OUT) - weapon_edge_y))
+    # Seat against whichever face the KIT mounted this weapon on, instead of
+    # assuming the back. `stone_mace` sits at x=+0.075 and `twin_blades` at
+    # +0.030 — in FRONT of the torso — and since 2026-09-19 so does `long_blade`
+    # (x=+0.150, after it was measured rendering zero pixels in game). Dragging a
+    # front-mounted weapon round to the back put it straight back behind the body
+    # and undid the fix; this reads the kit's own intent off the geometry.
+    front_mounted = sum(p.x for p in weapon_points) >= 0
+    if front_mounted:
+        shift = (max(p.x for p in band) + clearance) - max(p.x for p in weapon_points)
+    else:
+        shift = (min(p.x for p in band) - clearance) - min(p.x for p in weapon_points)
+    # A BACK-mounted weapon still needs the sideways shove: pressed flat against
+    # the back, the body occludes the whole thing at the 3/4 preview angle and Q7
+    # fails. Thuy's gourd reads because it hangs clear of the silhouette, so push
+    # until it breaks the outline by `stick_out` of the body's own width.
+    # A front-mounted one has nothing in front of it, so it stays where the kit
+    # put it — being shoved sideways is what turned char_loi's blade into a thin
+    # stick floating beside the character.
+    shift_y = 0.0
+    if not front_mounted:
+        body_half_y = max(abs(p.y) for p in band)
+        weapon_edge_y = max(abs(p.y) for p in weapon_points)
+        side = 1.0 if sum(p.y for p in weapon_points) >= 0 else -1.0
+        # Capped, or a weapon that started centred gets thrown clear of the body
+        # and reads as floating rather than carried -- char_loi-b1's blade needed
+        # +0.365 to clear on its own and hung in mid-air at that distance.
+        shift_y = side * min(body_half_y * STICK_OUT_CAP,
+                             max(0.0, body_half_y * (1.0 + STICK_OUT) - weapon_edge_y))
     for part in parts:
         part.data.transform(Matrix.Translation((shift, shift_y, 0.0)))
         part.data.update()

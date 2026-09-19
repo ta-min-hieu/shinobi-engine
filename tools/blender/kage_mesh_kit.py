@@ -235,17 +235,41 @@ def _blade(length, width, thickness, curve_deg=0.0, taper=0.25, sections=8):
     return verts, faces
 
 
-def _transform(verts, translate=(0.0, 0.0, 0.0), rotate_y_deg=0.0, scale=(1.0, 1.0, 1.0)):
-    """Scale, then rotate in the screen plane (about Y), then translate."""
+def _transform(verts, translate=(0.0, 0.0, 0.0), rotate_y_deg=0.0, scale=(1.0, 1.0, 1.0),
+               rotate_x_deg=0.0):
+    """Scale, rotate about X then about Y, then translate.
+
+    ⚠️ The docstring used to call the Y rotation "the screen plane" and that is
+    wrong for the CLIENT: the kit's own sprite camera looks down −Y, but the game
+    renders from ±X with a 35° yaw (`WorldModelRenderer.MODEL_YAW_DEGREES`), so
+    on screen the horizontal axis is **Y** (the two arms sit at ±`ARM_Y` and are
+    drawn side by side) and **X is depth**. A shape rotated only about Y leans
+    into the screen, not across it. `rotate_x_deg` is the one that tilts a part
+    in the plane the player actually sees; it defaults to 0.0, so every existing
+    caller is unchanged. Measured, not assumed — see ASSET-LOG 2026-09-19 (2).
+    """
+    angle_x = math.radians(rotate_x_deg)
+    cos_x, sin_x = math.cos(angle_x), math.sin(angle_x)
     angle = math.radians(rotate_y_deg)
     cos_a, sin_a = math.cos(angle), math.sin(angle)
     out = []
     for x, y, z in verts:
         x, y, z = x * scale[0], y * scale[1], z * scale[2]
+        y, z = y * cos_x - z * sin_x, y * sin_x + z * cos_x
         rx = x * cos_a + z * sin_a
         rz = -x * sin_a + z * cos_a
         out.append((rx + translate[0], y + translate[1], rz + translate[2]))
     return out
+
+
+def _face_the_camera(verts):
+    """Swap a part's X and Y so its BROAD face meets the client camera.
+
+    `_blade` sweeps along +Z with its width on X and its thickness on Y — correct
+    for the kit's own −Y sprite camera, edge-on for the game's. Swapping the two
+    puts the width on Y (screen-horizontal) and the 11 mm thickness into depth.
+    """
+    return [(y, x, z) for x, y, z in verts]
 
 
 def head_surface_y(x, z, offset=0.006):
@@ -1119,18 +1143,25 @@ def _weapon_twin_blades(rig, name, steel, wood):
 
 def _weapon_long_blade(rig, name, steel, wood):
     """Long straight thin blade worn across the back — Lôi's armour-piercer."""
-    y = -ARM_Y * 0.2
-    blade_verts, blade_faces = _blade(0.520, 0.034, 0.011, curve_deg=0.0, taper=0.16, sections=3)
+    # Lateral: outside the arm wrap, whose outer edge is at |y| = 0.166.
+    y = -ARM_Y - 0.060
+    # Depth: in FRONT of the torso (|x| <= 0.130), so neither body nor arm can
+    # cover it at any yaw the locked camera produces.
+    origin = (0.150, y, 0.215)
+    # Leans across the SCREEN, tip toward the far shoulder.
+    tilt = -52.0
+    blade_verts, blade_faces = _blade(0.520, 0.048, 0.011, curve_deg=0.0, taper=0.16, sections=3)
     parts = [_new_part(rig, name + "_LongBlade",
-                       _transform(blade_verts, (-0.145, y, 0.235), rotate_y_deg=-24.0),
+                       _transform(_face_the_camera(blade_verts), origin, rotate_x_deg=tilt),
                        blade_faces, steel, "spine", shades=2, smooth=False)]
     grip = _revolve([(0.0, 0.016, 0.015), (0.105, 0.016, 0.015)], 10)
     parts.append(_new_part(rig, name + "_LongBladeGrip",
-                           _transform(grip[0], (-0.145, y, 0.235), rotate_y_deg=156.0),
+                           _transform(grip[0], origin, rotate_x_deg=tilt + 180.0),
                            grip[1], wood, "spine", shades=2, smooth=False))
-    guard, guard_faces = _box(0.006, 0.038, 0.0, 0.014)
+    # Crossguard long on Y: on X it was 12 mm wide and the camera never saw it.
+    guard, guard_faces = _box(0.011, 0.044, -0.007, 0.007)
     parts.append(_new_part(rig, name + "_LongBladeGuard",
-                           _transform(guard, (-0.145, y, 0.235), rotate_y_deg=-24.0),
+                           _transform(guard, origin, rotate_x_deg=tilt),
                            guard_faces, shade_hex(steel, 0.7), "spine", shades=2, smooth=False))
     return parts
 
