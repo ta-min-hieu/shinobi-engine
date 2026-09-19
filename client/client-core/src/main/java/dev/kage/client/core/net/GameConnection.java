@@ -58,6 +58,28 @@ public final class GameConnection {
     // (readLoop() dựa vào readInt() blocking — hành vi có từ trước TLS, ngoài phạm vi ADR-027).
     private static final int TLS_HANDSHAKE_TIMEOUT_MS = 10_000;
 
+    /**
+     * Trần khung ĐỌC VÀO — cố ý khớp {@code GatewayServer.MAX_FRAME_LENGTH} (1MB).
+     *
+     * <p>Phía server đã chặn khung khổng lồ từ lâu ({@code LengthFieldBasedFrameDecoder}, có hẳn ô
+     * test bảo mật cho nó), còn client thì {@code new byte[in.readInt()]} theo đúng con số trên dây
+     * — một bất đối xứng, và nó hỏng theo BA kiểu:
+     *
+     * <ul>
+     *   <li>số quá lớn ⇒ {@code OutOfMemoryError} ngay lập tức;
+     *   <li>số ÂM ⇒ {@code NegativeArraySizeException}, mà {@code connectionLoop} chỉ bắt
+     *       {@code IOException} ⇒ luồng kết nối CHẾT HẲN, không bao giờ thử lại nữa;
+     *   <li>số lớn vừa phải nhưng bịa ⇒ {@code readFully} chờ mãi (sau bắt tay TLS
+     *       {@code soTimeout} đã về 0) ⇒ client treo im, cũng không thử lại.
+     * </ul>
+     *
+     * <p>Không cần một server thù địch mới chạm tới: một khung dở dang là đủ.
+     */
+    private static final int MAX_FRAME_LENGTH = 1024 * 1024;
+
+    /** Header 7 byte (NETWORK.md §102) — khung ngắn hơn thế thì chắc chắn rác. */
+    private static final int MIN_FRAME_LENGTH = 7;
+
     // ADR-027 — cert self-signed DEV/TEST mặc định, dùng chung với server/server-gateway test
     // resource. ⚠️ KHÔNG an toàn cho Closed Beta/Production thật (private key tương ứng đã public
     // trên GitHub) — operator PHẢI tự tạo cặp cert/key riêng rồi thay file resource này + build lại
@@ -69,6 +91,17 @@ public final class GameConnection {
     private final int port;
     private final Queue<PacketCodec.Frame> inbound = new ConcurrentLinkedQueue<>();
     private final AtomicInteger nextSequenceId = new AtomicInteger(1);
+
+    /**
+     * Tăng một lần mỗi khi {@code doConnect} dựng xong socket. Luồng heartbeat giữ lại con số của
+     * lần kết nối sinh ra nó và tự thoát khi số đã đổi — xem {@link #startHeartbeat()}.
+     *
+     * <p>Đếm thế hệ chứ không so {@code socket == owner}: PMD {@code CompareObjectsWithEquals} chặn
+     * so sánh tham chiếu, mà ở đây ý cần diễn đạt vốn là "còn là LẦN KẾT NỐI ấy không", không phải
+     * "còn là đối tượng ấy không".
+     */
+    private final AtomicInteger connectionGeneration = new AtomicInteger();
+
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     private volatile Socket socket;
@@ -163,6 +196,7 @@ public final class GameConnection {
         newSocket.setSoTimeout(0);
         socket = newSocket;
         out = new DataOutputStream(newSocket.getOutputStream());
+        connectionGeneration.incrementAndGet();
         LOG.info("Đã kết nối tới {}:{}", host, port);
         startHeartbeat();
     }
@@ -197,16 +231,57 @@ public final class GameConnection {
         DataInputStream in = new DataInputStream(socket.getInputStream());
         while (running.get()) {
             int length = in.readInt(); // ném IOException khi mất kết nối — vòng lặp tự thoát
-            byte[] frameBytes = new byte[length];
+            byte[] frameBytes = new byte[checkedFrameLength(length)];
             in.readFully(frameBytes);
             inbound.add(PacketCodec.decodeFrame(frameBytes));
         }
     }
 
+    /**
+     * Cửa duy nhất giữa con số trên dây và {@code new byte[...]} — xem {@link #MAX_FRAME_LENGTH}.
+     *
+     * <p>Ném {@link IOException} chứ không phải lỗi runtime là CHỦ ĐÍCH: {@code connectionLoop} đã
+     * coi {@code IOException} là "mất kết nối bình thường", nên một khung rác chỉ làm client đóng
+     * rồi kết nối lại theo backoff — đúng thứ nó đã làm với mọi hỏng hóc dây khác.
+     */
+    static int checkedFrameLength(int declared) throws IOException {
+        if (declared < MIN_FRAME_LENGTH || declared > MAX_FRAME_LENGTH) {
+            throw new IOException("Khung có độ dài không hợp lệ: " + declared + " byte (cho phép " + MIN_FRAME_LENGTH
+                    + ".." + MAX_FRAME_LENGTH + ")");
+        }
+        return declared;
+    }
+
+    /**
+     * ⚠️ Một luồng heartbeat thuộc về ĐÚNG MỘT socket, và {@code doConnect} gọi hàm này sau MỌI lần
+     * kết nối lại.
+     *
+     * <p>Bản trước lặp theo {@code running && isConnected()} và ghi đè {@code heartbeatThread} mà
+     * không dừng luồng cũ. Luồng cũ đang nằm trong {@code sleep(15s)} thì không thấy quãng mất kết
+     * nối (backoff ngắn nhất là 1 giây): lúc nó tỉnh dậy, {@code isConnected()} đã TRUE trở lại vì
+     * socket MỚI — nên nó sống tiếp và ping trên socket của người khác. Mỗi lần mạng chập chờn cộng
+     * thêm một luồng vĩnh viễn, và mỗi luồng là một gói nữa mỗi 15 giây — đúng thứ ADR-042 đang
+     * muốn bớt. {@code stop()} cũng chỉ với tới được luồng MỚI NHẤT, những luồng kia không ai gọi
+     * tên nữa.
+     *
+     * <p>Sửa bằng cách buộc luồng vào LẦN KẾT NỐI sinh ra nó ({@link #connectionGeneration}): số
+     * đổi ⇒ vòng lặp thoát ở vòng kiểm kế tiếp, không cần ai dừng hộ. Luồng cũ vẫn được
+     * {@code interrupt()} để nó khỏi ngủ nốt 15 giây vô ích.
+     *
+     * <p>Không có ô test cho chỗ này: harness của {@code client-core} dùng {@code ServerSocket}
+     * thuần nên bắt tay TLS không bao giờ xong, mà {@code startHeartbeat} chỉ chạy SAU bắt tay
+     * (xem {@code GameConnectionReconnectTest}). Sửa theo hướng làm cho lỗi KHÔNG THỂ xảy ra về mặt
+     * cấu trúc thay vì canh nó bằng một cờ.
+     */
     private void startHeartbeat() {
+        Thread previous = heartbeatThread;
+        if (previous != null) {
+            previous.interrupt();
+        }
+        int generation = connectionGeneration.get();
         heartbeatThread = new Thread(
                 () -> {
-                    while (running.get() && isConnected()) {
+                    while (running.get() && connectionGeneration.get() == generation && isConnected()) {
                         try {
                             PingCommand ping = PingCommand.newBuilder()
                                     .setClientTimestampMs(System.currentTimeMillis())
