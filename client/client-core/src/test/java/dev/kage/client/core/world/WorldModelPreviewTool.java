@@ -108,6 +108,22 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
     /** NPC thứ ba (V49, ADR-050 D6): một `npc_template` đứng ở cả SÁU trạm tiếp ứng dọc trục. */
     private static final long WAYPOST_ID = -11L;
 
+    /**
+     * Loài của V48, Lv29. Cả hai loài V48 đã SHIP (`3a8d98a`, 2026-09-17) mà chưa lần nào đi qua bộ
+     * dựng của client — không có mục nào trong ASSET-LOG và không có khung này. Đặt nó NGAY SAU thám
+     * tử Huyết Sa có chủ đích: lập luận tách biệt duy nhất của nó là MÀU (ô-cạ + xanh bệnh, chứ
+     * không phải họ xám/nâu/đỏ sẫm của Huyết Sa), mà lập luận về màu thì chỉ chứng minh được khi hai
+     * bên đứng cạnh nhau trong CÙNG một ảnh, dưới CÙNG một đèn.
+     */
+    private static final long BEAST_ID = -12L;
+
+    /**
+     * Loài của V48, Lv33 — trận CUỐI của v1. Cùng dòng dõi máy Linh Triều với quỷ đá, thạch vệ và cỗ
+     * khảo hạch, nên nó phải đứng NGAY SAU cỗ khảo hạch: câu hỏi cần trả lời là "cái thứ tư này có
+     * đọc ra LỄ KHÍ của tông môn (ngọc nhạt + vàng) thay vì đá phong hoá như ba cái kia không".
+     */
+    private static final long FOUNDATION_ID = -13L;
+
     // Toàn bộ khung nằm TRƯỚC bệ demo đầu tiên (bắt đầu ở x=3, xem DemoPlatforms) — bệ vẽ đè lên
     // quái thì ảnh không còn chứng minh được gì về chính con quái, đúng bẫy đã gặp ở lượt chụp đầu.
     // Ba loài quái đứng CẠNH NHAU (dummy/bandit/ogre) chứ không rải ra: câu hỏi mà ảnh này phải trả
@@ -116,26 +132,36 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
     // {@code PLAYER_X + 4.65} nên hạ mốc này là khung trượt sang trái mà không con quái nào đổi
     // chỗ và không gì vượt mốc x=3 của bệ demo — đúng luật NÉN đã ghi ngay trên. Bản đầu tôi đẩy
     // hộp thay thế sang 3.6 cho rảnh chỗ, tức tự cấp ngoại lệ khỏi chính luật này.
-    private static final float PLAYER_X = -5.1f;
-    private static final float DUMMY_X = -2.0f;
+    // 2026-09-19, thêm HAI loài V48: cùng cách nới sang trái, lần này −1,4 = đúng hai bước 0,7.
+    // Cả hàng dịch trái nguyên khối, riêng {@code UNDRAWN_NPC_X} = 2,9 GIỮ NGUYÊN vì nó là mốc
+    // chạm trần x=3 — nó ở lại đúng chỗ thì trần vẫn chưa bị chạm sau khi thêm người.
+    private static final float PLAYER_X = -6.5f;
+    private static final float DUMMY_X = -3.4f;
     // ⚠️ Thêm một thực thể vào khung này phải NÉN khoảng cách, KHÔNG được đẩy đuôi sang phải: bệ
     // demo đầu tiên bắt đầu ở x=3 (DemoPlatforms) và nó là khối 3D có depth test, nên bất cứ thứ gì
     // trôi qua mốc đó bị bệ VẼ ĐÈ và ảnh thôi chứng minh được gì về chính nó. Lần thêm thám tử
     // (2026-09-12) đã dính đúng bẫy đó ở bản đầu — ảnh ra thì cỗ khảo hạch và hai hộp thay thế nằm
     // sau một mảng olive. Bước giữa các mốc vì thế là 0.7 chứ không phải 1.15.
-    private static final float BANDIT_X = -1.3f;
+    private static final float BANDIT_X = -2.7f;
 
     /** Sát tán tu: xem javadoc {@link #SCOUT_ID} về vì sao đúng chỗ này chứ không phải chỗ khác. */
-    private static final float SCOUT_X = -0.6f;
+    private static final float SCOUT_X = -2.0f;
 
-    private static final float OGRE_X = 0.1f;
-    private static final float WARDEN_X = 0.8f;
-    private static final float TRIAL_X = 1.5f;
+    /** Sát thám tử Huyết Sa — xem javadoc {@link #BEAST_ID}. */
+    private static final float BEAST_X = -1.3f;
+
+    private static final float OGRE_X = -0.6f;
+    private static final float WARDEN_X = 0.1f;
+    private static final float TRIAL_X = 0.8f;
+
+    /** Sát cỗ khảo hạch — xem javadoc {@link #FOUNDATION_ID}. */
+    private static final float FOUNDATION_X = 1.5f;
+
     private static final float BOSS_X = 2.2f;
     // Hai NPC xếp sát nhau hơn hàng quái (0,8 thay vì 1,15): chúng mảnh hơn hẳn ba cỗ máy đá, và
     // câu hỏi "có lẫn vào nhau không" chỉ trả lời được khi chúng thật sự đứng cạnh nhau.
-    private static final float ELDER_X = -4.35f;
-    private static final float SISTER_X = -3.55f;
+    private static final float ELDER_X = -5.75f;
+    private static final float SISTER_X = -4.95f;
     private static final float UNDRAWN_NPC_X = 2.9f;
 
     /**
@@ -144,7 +170,7 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
      * test, nên mọi thứ ở đó bị bệ ô-liu vẽ đè từ ngang ngực xuống. Bản đầu đặt ở 3.6 và ảnh chỉ
      * còn cái đầu với hai bàn chân — đúng bẫy mà chú thích phía trên đã ghi sẵn.
      */
-    private static final float WAYPOST_X = -2.75f;
+    private static final float WAYPOST_X = -4.15f;
 
     /**
      * Phép so A/B của ÁO CHOÀNG (câu hỏi để ngỏ từ 2026-09-06): bốn trong năm bộ B3 mặc
@@ -218,23 +244,28 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         putMonster(DUMMY_ID, "training_dummy", DUMMY_X);
         putMonster(BANDIT_ID, "wandering_bandit", BANDIT_X);
         putMonster(SCOUT_ID, "blood_sand_scout", SCOUT_X);
+        putMonster(BEAST_ID, "wasteland_beast", BEAST_X);
         putMonster(OGRE_ID, "stone_ogre", OGRE_X);
         putMonster(WARDEN_ID, "archive_warden", WARDEN_X);
         putMonster(TRIAL_ID, "trial_construct", TRIAL_X);
+        putMonster(FOUNDATION_ID, "foundation_warden", FOUNDATION_X);
         putMonster(BOSS_ID, "sample_boss", BOSS_X);
         putNpc(ELDER_ID, "town_elder", ELDER_X);
         putNpc(SISTER_ID, "senior_sister", SISTER_X);
         putNpc(UNDRAWN_NPC_ID, "shop_keeper", UNDRAWN_NPC_X);
         putNpc(WAYPOST_ID, "waypost_attendant", WAYPOST_X);
         LOG.info(
-                "model quái: training_dummy={} wandering_bandit={} stone_ogre={} archive_warden={} "
-                        + "trial_construct={} sample_boss={} (sample_boss=false là ĐÚNG, chưa vẽ)",
+                "model quái: training_dummy={} wandering_bandit={} blood_sand_scout={} "
+                        + "wasteland_beast={} stone_ogre={} archive_warden={} trial_construct={} "
+                        + "foundation_warden={} sample_boss={} (sample_boss=false là ĐÚNG, chưa vẽ)",
                 models.hasModel(DUMMY_ID),
                 models.hasModel(BANDIT_ID),
                 models.hasModel(SCOUT_ID),
+                models.hasModel(BEAST_ID),
                 models.hasModel(OGRE_ID),
                 models.hasModel(WARDEN_ID),
                 models.hasModel(TRIAL_ID),
+                models.hasModel(FOUNDATION_ID),
                 models.hasModel(BOSS_ID));
         LOG.info(
                 "model NPC: town_elder={} senior_sister={} shop_keeper={} "
@@ -288,7 +319,7 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         // Y HỆT WorldScreen.renderModels: sync trước, follow, rồi render.
         presenter.sync(monsters, PLAYER_X);
         npcPresenter.sync(PLAYER_X);
-        models.follow(PLAYER_X + 4.65f, 0f); // lùi camera ra giữa để cả 8 đối tượng vào khung
+        models.follow(PLAYER_X + 4.65f, 0f); // lùi camera ra giữa để cả 14 đối tượng vào khung
         models.render(1f / 60f);
         DemoPlatforms.render(shapeRenderer, models.combined());
         presenter.render(shapeRenderer, models.combined(), monsters, DUMMY_ID);

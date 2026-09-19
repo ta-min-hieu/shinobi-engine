@@ -20,6 +20,17 @@ is exactly what a player should read a half-second before the fight starts.
 ⚠️ Do NOT give it a red accent. Every red on this play line means Blood Sand, and
 this thing belongs to the sect.
 
+REVISED 2026-09-19, the first time this species was ever put through
+`runWorldPreview`. It shipped in `3a8d98a` graded on nothing but its own colour
+list, and at the size a player sees (~50px) it read as one pale lump: the
+`carved_crest` cap became a brim over the whole face, the anime eyes landed on
+the silhouette edges, and skin / torso / crest were all the same VALUE. Three
+things fixed it, all of them already written down in
+`build_monster_trial_construct` before this file was authored — `cap: False`,
+`face_style: "none"`, and a `stone_visor` with AMBER slots. The lesson is not
+about jade: a species is not graded until it has been through the client's own
+renderer next to its own lineage.
+
 Run headless (never in an MCP session — full file rebuild):
 
     blender -b assets/raw/blender/kage_character_base.blend \
@@ -43,27 +54,75 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from kage_mesh_kit import assemble_character  # noqa: E402
 from kage_sprite_render import setup_scene  # noqa: E402
 
+# The sect's ceremonial jade, pale at the chest and darkening down the body.
+JADE_PALE = "#A8D9BE"
+JADE_MID = "#5FA986"
+JADE_DEEP = "#3F7A5E"
+# The dark end of the same hue, and the load-bearing colour of this spec: every
+# piece that has to READ (crest, visor frame, blade, boots) is cut from it. The
+# first version had nothing this dark above the waist and the model came back
+# from `runWorldPreview` as one pale lump — see the 2026-09-19 entry in
+# ASSET-LOG.
+JADE_IRON = "#2E5847"
+# Gold, where every other species on the play line carries dried red or (V48)
+# sickly green. ⚠️ Do NOT swap this for red: red means Blood Sand here.
+GOLD = "#C9A227"
+# Copied verbatim from `build_monster_trial_construct`, which copied it from
+# `build_monster_archive_warden`, which copied it from the ogre. Lit slots in
+# this exact amber are the Linh Triều family tie — do not "improve" it.
+AMBER = "#E8A33C"
+
 WARDEN_SPEC = {
     "name": "foundation",
     # Carved stone, not flesh — paler and flatter than any living species so the
     # material reads before the shape does.
     "skin": "#C8CBC0",
-    # Spirit-lamp green-blue: it is lit, not alive. Distinct from the wasteland
-    # species' sickly green (#8FBF5A) by being much colder.
-    "eye_color": "#7FD6C6",
-    "hair": {"style": "carved_crest", "color": "#8FA89B"},
+    # ⚠️ `cap: False` is NOT a style choice, and this file paid for learning it
+    # twice. `add_hair` cuts the dome for a LEVEL camera while the client's looks
+    # down (ADR-031), so on a bare skull the cap renders as a brim over the whole
+    # face — exactly the note `build_monster_trial_construct` already carried
+    # ("learned on the elder, paid for again on the warden"). The first version
+    # of this spec ignored it and the render showed a pale lid with no face under
+    # it. Dark crest over pale skull is also the VALUE contrast the species was
+    # missing.
+    "hair": {"style": "carved_crest", "color": JADE_IRON, "cap": False},
+    # A machine has no anime face, and `add_face` cannot give it one that works:
+    # the kit authors eye/brow/mouth for a PROFILE view and the client draws
+    # closer to head-on, which slides both eyes onto the silhouette edges. The
+    # `stone_visor` below is the face. (This is the same defect recorded for
+    # every haired kit character; on a bare skull it is merely more obvious.)
+    "face_style": "none",
     # Pale jade body with darker jade at the legs — the sect's ceremonial colours,
     # unused by any monster on the play line.
-    "cloth": {"torso": "#A8D9BE", "pelvis": "#5FA986", "legs": "#3F7A5E"},
-    "shoe": "#2E5847",
+    "cloth": {"torso": JADE_PALE, "pelvis": JADE_MID, "legs": JADE_DEEP},
+    "shoe": JADE_IRON,
     "accessories": [
-        # Gold, where every other species carries dried red or (V48) sickly green.
-        {"kind": "sash", "color": "#C9A227"},
-        {"kind": "arm_wrap", "color": "#3F7A5E"},
+        # The face. Jade frame instead of the other three machines' iron, amber
+        # slots because that is the family tie. It is the only warm colour above
+        # the waist, so the head is the first thing the eye lands on — which is
+        # what was missing when this species had no readable face at all.
+        {"kind": "stone_visor", "color": JADE_IRON, "accent": AMBER},
+        {"kind": "sash", "color": GOLD},
+        # Dark on a pale arm. The first version used JADE_DEEP and it had no
+        # edge at 50px — the same "pale rope on a pale arm is nothing" finding
+        # that sent `trial_construct`'s arm bands to iron.
+        {"kind": "arm_wrap", "color": JADE_IRON},
     ],
+    # ⚠️ KEPT, and it renders NOTHING — knowingly. `_weapon_long_blade` places the
+    # blade at x = -0.145, i.e. across the BACK (its own docstring says so), and
+    # the client's camera is near head-on (ADR-031), so the body occludes it in
+    # every frame of `runWorldPreview`: idle, run, attack, die. This is NOT a
+    # colour problem — the first version of this spec painted the blade JADE_PALE
+    # and I assumed that was the cause; darkening it to JADE_IRON changed nothing,
+    # and `wandering_bandit` (shipped 2026-08) and `blood_sand_ringleader` carry
+    # the same invisible blade. It is the `_acc_cloak` finding again, on a weapon.
+    # Left in place because it is an identity choice (a ceremonial guard holds a
+    # sword) and because the LOW tier has ~530 triangles of headroom; whoever
+    # moves the blade to the front of the body in `kage_mesh_kit` gets three
+    # species back for free. See ASSET-LOG 2026-09-19.
     "weapon": "long_blade",
-    "weapon_color": "#A8D9BE",
-    "weapon_grip": "#C9A227",
+    "weapon_color": JADE_IRON,
+    "weapon_grip": GOLD,
 }
 
 
