@@ -58,10 +58,19 @@ final class RateLimiter {
 
     private void rotateWindowIfElapsed() {
         long now = nanoTimeSource.getAsLong();
-        if (now - windowStartNanos < windowNanos) {
+        long elapsed = now - windowStartNanos;
+        if (elapsed < windowNanos) {
             return;
         }
-        consecutiveViolatedWindows = violatedThisWindow ? consecutiveViolatedWindows + 1 : 0;
+        // >= 2 window trôi qua nghĩa là có ít nhất MỘT window hoàn toàn im lặng ở giữa (không
+        // tryAcquire() nào rơi vào đó, vì rotate chỉ chạy khi có lệnh gọi tới) — window im lặng đó
+        // chắc chắn KHÔNG vi phạm (không gọi thì không đếm), nên chuỗi liên tục phải đứt ở đây.
+        // Không kiểm điều này thì cờ violatedThisWindow của window active gần nhất — có thể đã cách
+        // đây rất lâu — bị tính nhầm thành "window liền kề vừa vi phạm", cộng dồn sai vào
+        // consecutiveViolatedWindows dù hai window đó không hề liên tục về thời gian thật.
+        boolean immediatelyAdjacentWindow = elapsed < 2 * windowNanos;
+        consecutiveViolatedWindows =
+                immediatelyAdjacentWindow && violatedThisWindow ? consecutiveViolatedWindows + 1 : 0;
         windowStartNanos = now;
         countInWindow = 0;
         violatedThisWindow = false;
