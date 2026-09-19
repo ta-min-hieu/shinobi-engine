@@ -91,6 +91,52 @@ tasks.register<JavaExec>("runHudPreview") {
     doFirst { workingDir.mkdirs() }
 }
 
+// Hợp đồng giữa hai module mà KHÔNG compiler nào canh: server gửi `ErrorResponse.error_key` để
+// client dùng THẲNG làm khoá i18n (xem javadoc FactionController.errorMessageKey). Rà bằng máy
+// 2026-09-19: server sinh 25 khoá `error.*` mà bundle chỉ có 10 — tức bất biến ấy đã SAI trong im
+// lặng một thời gian dài, và hậu quả là người chơi hoặc không thấy gì, hoặc thấy `??error.abc??`.
+//
+// Đặt ở client-core chứ không ở root: bundle là tài sản của module NÀY, nên nó là chỗ hợp lý để
+// chịu trách nhiệm phủ hết. Chỉ ĐỌC file nguồn của server lúc build — không thêm dependency module,
+// không đụng classpath. Cùng khuôn với các task ở dưới đã đọc `rootProject` cho `assets/exported`.
+val verifyServerErrorKeys = tasks.register("verifyServerErrorKeys") {
+    group = "verification"
+    description = "Mọi error_key server gửi phải có bản dịch trong CẢ HAI bundle i18n."
+    val serverSources = rootProject.fileTree("server") { include("**/src/main/java/**/*.java") }
+    val bundles = listOf("vi", "en").map {
+        layout.projectDirectory.file("src/main/resources/i18n/strings_$it.properties").asFile
+    }
+    val stamp = layout.buildDirectory.file("verifyServerErrorKeys.txt")
+    inputs.files(serverSources).withPropertyName("serverSources")
+    inputs.files(bundles).withPropertyName("i18nBundles")
+    outputs.file(stamp)
+    doLast {
+        val literal = Regex("\"(error\\.[a-z0-9_]+)\"")
+        val produced = sortedSetOf<String>()
+        serverSources.forEach { file ->
+            literal.findAll(file.readText()).forEach { produced.add(it.groupValues[1]) }
+        }
+        val missing = mutableListOf<String>()
+        bundles.forEach { bundle ->
+            val translated = bundle.readLines()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() && !it.startsWith("#") && it.contains("=") }
+                .map { it.substringBefore("=").trim() }
+                .toSet()
+            produced.minus(translated).forEach { missing.add("${bundle.name}: thiếu $it") }
+        }
+        if (missing.isNotEmpty()) {
+            throw GradleException(
+                "error_key server gửi mà bundle không dịch được — người chơi sẽ thấy câu chung " +
+                    "thay vì lý do thật:\n  " + missing.joinToString("\n  ")
+            )
+        }
+        stamp.get().asFile.writeText("${produced.size} khoá error.* của server, đủ bản dịch ở cả hai bundle\n")
+    }
+}
+
+tasks.named("check") { dependsOn(verifyServerErrorKeys) }
+
 // ĐO (không chụp) chiều cao mọi cửa sổ HUD có danh sách ở trạng thái TỆ NHẤT, fail nếu cao hơn
 // 720p. KHÔNG throwaway: mỗi lần thêm dòng/nút vào một cửa sổ là một lần cần chạy lại — build gate
 // không bắt được vì cần GL context thật (CI không có display).

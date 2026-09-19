@@ -134,9 +134,10 @@ final class FactionController {
      *     ra là không hiểu, thay vì im lặng.
      *     <p>⚠️ Câu "vì mọi khoá server sinh ra đều đã có mặt trong bundle" từng đứng ở đây là
      *     SAI: rà bằng máy 2026-09-19 thì server sinh 25 khoá {@code error.*} mà bundle chỉ có 10.
-     *     Nay đủ cả 25, nhưng bất biến đó không có gì canh — thêm một {@code sendError} với khoá
-     *     mới mà quên bundle thì không ai báo. Chỗ nào không chắc thì đi qua
-     *     {@code KageI18n#errorText}, nó có câu dự phòng.
+     *     Nay đủ cả 25, và bất biến ấy đã có cổng canh: task Gradle {@code verifyServerErrorKeys}
+     *     (nằm trong {@code check}) đối chiếu mọi literal {@code "error.*"} trong nguồn của
+     *     {@code server/} với CẢ HAI bundle và fail build nếu thiếu. Chỗ nào vẫn không chắc thì đi
+     *     qua {@code KageI18n#errorText}, nó có câu dự phòng.
      */
     static String errorMessageKey(String errorKey) {
         return errorKey == null || errorKey.isBlank() ? "faction.error.unknown" : errorKey;
