@@ -28,8 +28,14 @@ bản** (không phải Battlefield 5v5 hay Chiếm Lãnh Địa guild war — 2 
 - **Elo cổ điển, K=32 cố định, KHÔNG season/decay** — `EloRating` thuần Java, test được không cần
   Port/DB. Điểm khởi điểm 1000 cho nhân vật CHƯA từng đấu (không tạo dòng DB lúc tạo nhân vật, chỉ
   tạo lúc trận đầu tiên kết thúc — tránh ghi rác cho nhân vật không bao giờ đấu).
-- **`recordMatchResult` là UPSERT nguyên tử cho CẢ 2 người** (winner + loser), không phải 2 lời gọi
-  Port riêng — tránh 1 bên ghi thành công, bên kia lỗi giữa chừng làm rating lệch nhau.
+- **`recordDuelResult` khoá {@code FOR UPDATE} + đọc + tính + ghi CẢ 2 người trong 1 transaction**
+  (2026-09-20, thay `recordMatchResult` cũ) — không chỉ "ghi nguyên tử", mà ĐỌC-TÍNH-GHI nguyên tử.
+  Bản cũ để `RecordDuelResultUseCase` tự đọc 2 rating rời rồi mới gọi Port ghi, hở ra khoảng trống
+  giữa đọc/ghi: 1 nhân vật thắng 2 trận Arena chồng lấn thời gian (settle trên 2 Virtual Thread khác
+  nhau qua `ArenaInstanceRegistry.settlementExecutor`) có thể mất nguyên 1 trận Elo — `wins`/`losses`
+  vẫn đúng (cộng dồn) nhưng `rating` bị ghi đè bằng giá trị tính từ dữ liệu cũ. Khoá theo
+  `character_id` TĂNG DẦN (không theo thắng/thua) để tránh deadlock giữa 2 trận chồng lấn 1 người.
+  Xem `PostgresPvpRatingAdapterIntegrationTest` (server-database) cho phép đo race thật.
 - **Cách ly PvP KHÔNG sửa `CombatSystem`/`SkillSystem`** — trận đấu diễn ra trong 1 `WorldFacade`
   instance riêng (ADR-026, giống dungeon) chỉ chứa đúng 2 người, nên "chỉ đánh được đối thủ" là hệ
   quả TỰ NHIÊN của cách ly instance, không cần thêm cờ team/faction ở tầng combat.
