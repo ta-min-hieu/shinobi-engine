@@ -1,6 +1,9 @@
 package dev.kage.inventory.api;
 
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 
 import dev.kage.inventory.application.AddItemUseCase;
 import dev.kage.inventory.application.ComputeEquipmentBonusUseCase;
@@ -21,8 +24,54 @@ import dev.kage.inventory.domain.ItemStack;
  * API công khai của {@code feature-inventory} — module khác (server-gateway) CHỈ gọi qua đây,
  * không bao giờ đọc bảng {@code inventory_item}/{@code equipment_slot}/{@code drop_table*} trực
  * tiếp (Điều 24).
+ *
+ * <p>⚠️ <b>Race THẬT tìm được 2026-09-20, giống hệt hình dạng bug đã vá ở {@code PvpRatingPort}
+ * cùng ngày, nhưng NẶNG hơn.</b> Bốn use case — {@link AddItemUseCase}, {@link GrantLootUseCase},
+ * {@link EnhanceItemUseCase}, {@link UseItemUseCase} — đều đọc TOÀN BỘ {@code Inventory} của 1
+ * nhân vật, sửa trong bộ nhớ, rồi lưu lại CẢ CHỒNG qua {@code InventoryPort#save} —
+ * {@code PostgresInventoryAdapter#save} coi mọi dòng KHÔNG có mặt trong chồng vừa lưu là "đã bị
+ * gỡ" rồi <b>XOÁ THẬT</b> (không chỉ "mất cập nhật" như bug PvP — ở đây một món đồ hoàn toàn có
+ * thể biến mất khỏi DB).
+ *
+ * <p>{@code GrantLootUseCase} chạy trên {@code ConnectedCharacterRegistry.lootExecutor}
+ * (virtual-thread-per-task, MỘT tác vụ MỚI cho MỖI con quái chết — KHÔNG tuần tự hoá theo nhân
+ * vật), khác hẳn 3 use case kia vốn chạy qua lệnh client trên {@code authExecutor} (tự nhiên tuần
+ * tự vì một kết nối chỉ có một lệnh đang xử lý). Giết 2 quái gần nhau (rất bình thường), hoặc giết
+ * 1 quái RỒI LẬP TỨC dùng đan dược (cũng bình thường — combo "đánh rồi hồi máu"), đều có thể cho 2
+ * lệnh này chạy THẬT SỰ song song — lệnh nào lưu chồng SAU sẽ xoá mất phần mà lệnh kia vừa thêm.
+ *
+ * <p>{@link EquipItemUseCase}/{@link UnequipItemUseCase} KHÔNG dính lỗ này — chúng chỉ ĐỌC
+ * {@code Inventory} để xác thực rồi ghi qua {@code EquipmentPort} (bảng {@code equipment_slot}
+ * nhỏ, không phải chồng {@code inventory_item}). Vẫn khoá CHUNG cho nhất quán (đơn giản hơn phải
+ * nhớ "2 method này miễn khoá") — cái giá là không đáng kể, đây là hành động hiếm/theo nhịp người.
+ *
+ * <p>Khoá {@link #withCharacterLock} bọc NGOÀI mọi method có sửa túi đồ — không sửa gì bên trong
+ * các use case, không đổi hành vi khi chỉ có MỘT lệnh tại một thời điểm (trường hợp tuyệt đại đa
+ * số). 3 method chỉ ĐỌC ({@link #computeEquipmentBonus}, {@link #listInventory},
+ * {@link #itemCatalog}) KHÔNG cần khoá — Postgres tự bảo đảm một giao dịch {@code save()} không
+ * bao giờ để lộ trạng thái nửa vời (đọc thấy TRƯỚC hoặc SAU trọn vẹn, không bao giờ ở giữa).
  */
 public final class InventoryFacade {
+
+    /**
+     * Một khoá/nhân vật — {@link ReentrantLock}, KHÔNG {@code synchronized}: cả 2 nhóm gọi vào đây
+     * đều là Virtual Thread (authExecutor/lootExecutor, cùng lý do các nơi khác trong dự án dùng
+     * Virtual Thread cho blocking I/O), và {@code synchronized} có thể ghim Virtual Thread vào
+     * carrier thread trong lúc chờ khoá — {@code ReentrantLock} thì không. Không bao giờ dọn map
+     * này: số nhân vật hữu hạn theo tổng tài khoản đã tạo, một {@code ReentrantLock} rỗng nặng vài
+     * chục byte — không đáng đổi lấy rủi ro dọn nhầm lúc khoá đang được giữ.
+     */
+    private final ConcurrentHashMap<Long, ReentrantLock> locksByCharacterId = new ConcurrentHashMap<>();
+
+    private <T> T withCharacterLock(long characterId, Supplier<T> action) {
+        ReentrantLock lock = locksByCharacterId.computeIfAbsent(characterId, id -> new ReentrantLock());
+        lock.lock();
+        try {
+            return action.get();
+        } finally {
+            lock.unlock();
+        }
+    }
 
     private final AddItemUseCase addItemUseCase;
     private final GrantLootUseCase grantLootUseCase;
@@ -56,10 +105,10 @@ public final class InventoryFacade {
      * @return {@link Result#FULL} nếu túi đầy (không ném exception — túi đầy là bình thường)
      */
     public Result addItem(long characterId, ItemStack stack) {
-        return switch (addItemUseCase.execute(characterId, stack)) {
+        return withCharacterLock(characterId, () -> switch (addItemUseCase.execute(characterId, stack)) {
             case OK -> Result.OK;
             case FULL -> Result.FULL;
-        };
+        });
     }
 
     /**
@@ -70,7 +119,7 @@ public final class InventoryFacade {
      *     client biết nhặt được gì
      */
     public List<ItemStack> grantLoot(long characterId, String dropTableCode) {
-        return grantLootUseCase.execute(characterId, dropTableCode);
+        return withCharacterLock(characterId, () -> grantLootUseCase.execute(characterId, dropTableCode));
     }
 
     /**
@@ -83,20 +132,21 @@ public final class InventoryFacade {
      *     port riêng
      */
     public EquipResult equipItem(long characterId, long itemId, EquipmentSlotType targetSlot, int characterLevel) {
-        return switch (equipItemUseCase.execute(characterId, itemId, targetSlot, characterLevel)) {
-            case OK -> EquipResult.OK;
-            case ITEM_NOT_FOUND -> EquipResult.ITEM_NOT_FOUND;
-            case WRONG_SLOT -> EquipResult.WRONG_SLOT;
-            case LEVEL_TOO_LOW -> EquipResult.LEVEL_TOO_LOW;
-        };
+        return withCharacterLock(
+                characterId, () -> switch (equipItemUseCase.execute(characterId, itemId, targetSlot, characterLevel)) {
+                    case OK -> EquipResult.OK;
+                    case ITEM_NOT_FOUND -> EquipResult.ITEM_NOT_FOUND;
+                    case WRONG_SLOT -> EquipResult.WRONG_SLOT;
+                    case LEVEL_TOO_LOW -> EquipResult.LEVEL_TOO_LOW;
+                });
     }
 
     /** Gỡ trang bị khỏi {@code slot} — item vẫn còn trong túi đồ, không bị xoá. */
     public UnequipResult unequipItem(long characterId, EquipmentSlotType slot) {
-        return switch (unequipItemUseCase.execute(characterId, slot)) {
+        return withCharacterLock(characterId, () -> switch (unequipItemUseCase.execute(characterId, slot)) {
             case OK -> UnequipResult.OK;
             case NOT_EQUIPPED -> UnequipResult.NOT_EQUIPPED;
-        };
+        });
     }
 
     /**
@@ -115,7 +165,8 @@ public final class InventoryFacade {
      * {@code idempotencyKey} (ADR-025) — client sinh UUID, giữ nguyên khi tự retry.
      */
     public EnhanceResult enhanceItem(long characterId, long itemId, boolean useProtection, String idempotencyKey) {
-        return switch (enhanceItemUseCase.execute(characterId, itemId, useProtection, idempotencyKey)) {
+        return withCharacterLock(characterId, () -> switch (enhanceItemUseCase.execute(
+                characterId, itemId, useProtection, idempotencyKey)) {
             case SUCCESS -> EnhanceResult.SUCCESS;
             case FAILED_NO_DROP -> EnhanceResult.FAILED_NO_DROP;
             case FAILED_DROPPED -> EnhanceResult.FAILED_DROPPED;
@@ -124,7 +175,7 @@ public final class InventoryFacade {
             case MAX_LEVEL -> EnhanceResult.MAX_LEVEL;
             case INSUFFICIENT_GOLD -> EnhanceResult.INSUFFICIENT_GOLD;
             case DUPLICATE_REQUEST -> EnhanceResult.DUPLICATE_REQUEST;
-        };
+        });
     }
 
     /**
@@ -135,7 +186,7 @@ public final class InventoryFacade {
      * @return hiệu ứng cần áp + số cái còn lại; {@code outcome != OK} nghĩa là không trừ gì cả
      */
     public UseItemUseCase.UseItemResult useItem(long characterId, long inventoryItemId) {
-        return useItemUseCase.execute(characterId, inventoryItemId);
+        return withCharacterLock(characterId, () -> useItemUseCase.execute(characterId, inventoryItemId));
     }
 
     /**
