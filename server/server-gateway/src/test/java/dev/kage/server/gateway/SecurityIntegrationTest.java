@@ -1420,10 +1420,20 @@ class SecurityIntegrationTest {
             }
 
             @Override
-            public void recordMatchResult(
-                    long winnerCharacterId, int winnerNewRating, long loserCharacterId, int loserNewRating) {
-                upsert(winnerCharacterId, winnerNewRating, 1, 0);
-                upsert(loserCharacterId, loserNewRating, 0, 1);
+            public synchronized dev.kage.pvp.domain.EloRating.Result recordDuelResult(
+                    long winnerCharacterId, long loserCharacterId, EloComputer computer) {
+                int winnerRating = currentRating(winnerCharacterId);
+                int loserRating = currentRating(loserCharacterId);
+                dev.kage.pvp.domain.EloRating.Result result = computer.compute(winnerRating, loserRating);
+                upsert(winnerCharacterId, result.newWinnerRating(), 1, 0);
+                upsert(loserCharacterId, result.newLoserRating(), 0, 1);
+                return result;
+            }
+
+            private int currentRating(long characterId) {
+                return findByCharacterId(characterId)
+                        .map(dev.kage.pvp.domain.PvpRating::rating)
+                        .orElse(dev.kage.pvp.domain.EloRating.DEFAULT_RATING);
             }
 
             private void upsert(long characterId, int newRating, int winsDelta, int lossesDelta) {

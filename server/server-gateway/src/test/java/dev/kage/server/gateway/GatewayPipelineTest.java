@@ -1359,8 +1359,8 @@ class GatewayPipelineTest {
             }
 
             @Override
-            public void recordMatchResult(
-                    long winnerCharacterId, int winnerNewRating, long loserCharacterId, int loserNewRating) {
+            public dev.kage.pvp.domain.EloRating.Result recordDuelResult(
+                    long winnerCharacterId, long loserCharacterId, EloComputer computer) {
                 throw new UnsupportedOperationException("không dùng ở test này");
             }
         };
