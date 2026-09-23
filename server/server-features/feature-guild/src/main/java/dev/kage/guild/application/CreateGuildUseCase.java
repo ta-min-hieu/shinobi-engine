@@ -1,5 +1,6 @@
 package dev.kage.guild.application;
 
+import dev.kage.guild.domain.DuplicateGuildMembershipException;
 import dev.kage.guild.domain.DuplicateGuildNameException;
 import dev.kage.guild.domain.Guild;
 import dev.kage.guild.domain.GuildPort;
@@ -21,6 +22,12 @@ public final class CreateGuildUseCase {
             return new Result(Outcome.OK, port.createGuild(name, characterId));
         } catch (DuplicateGuildNameException e) {
             return new Result(Outcome.NAME_TAKEN, null);
+        } catch (DuplicateGuildMembershipException e) {
+            // findMembershipOf ở trên rồi createGuild không atomic — 2 lệnh "Tạo bang" (tên khác
+            // nhau) của CÙNG 1 nhân vật gần như đồng thời có thể cả hai đều vượt qua check đó.
+            // DB (UNIQUE guild_member.character_id) là tuyến chặn cuối, dịch lại thành outcome
+            // nghiệp vụ bình thường thay vì để exception xuyên thẳng lên gateway.
+            return new Result(Outcome.ALREADY_IN_GUILD, null);
         }
     }
 

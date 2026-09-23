@@ -2,7 +2,14 @@ package dev.kage.guild.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
+
+import dev.kage.guild.domain.DuplicateGuildMembershipException;
+import dev.kage.guild.domain.Guild;
+import dev.kage.guild.domain.GuildMember;
+import dev.kage.guild.domain.GuildPort;
 
 class CreateGuildUseCaseTest {
 
@@ -38,5 +45,40 @@ class CreateGuildUseCaseTest {
         CreateGuildUseCase.Result result = useCase.execute(7, "Konoha");
 
         assertThat(result.outcome()).isEqualTo(CreateGuildUseCase.Outcome.NAME_TAKEN);
+    }
+
+    /**
+     * {@code findMembershipOf} rồi mới {@code createGuild} không atomic — race THẬT (xác nhận bằng
+     * Testcontainers ở {@code GuildIntegrationTest
+     * #shouldTranslateRaceIntoDuplicateGuildMembershipException_whenSameCharacterRacesTwoCreateGuildCalls})
+     * là 2 lệnh tạo bang gần như đồng thời của CÙNG 1 nhân vật đều vượt qua check đó trước khi 1
+     * trong 2 transaction commit; DB (UNIQUE {@code guild_member.character_id}) chặn ở lời gọi
+     * {@code createGuild} thay vì check này. Test đơn vị này chỉ verify khúc DỊCH exception →
+     * outcome (nhanh, không cần Postgres thật) — bản thân race đã verify bằng Postgres thật ở test
+     * kia.
+     */
+    @Test
+    void shouldReturnAlreadyInGuild_whenPortDetectsRaceAtCreateGuild() {
+        GuildPort port = new ThrowingOnCreateGuildPort();
+        CreateGuildUseCase useCase = new CreateGuildUseCase(port);
+
+        CreateGuildUseCase.Result result = useCase.execute(5, "Konoha");
+
+        assertThat(result.outcome()).isEqualTo(CreateGuildUseCase.Outcome.ALREADY_IN_GUILD);
+        assertThat(result.guild()).isNull();
+    }
+
+    /** Chỉ mô phỏng đúng 2 method mà {@link CreateGuildUseCase} gọi — xem {@link UnsupportedGuildPort}. */
+    private static final class ThrowingOnCreateGuildPort extends UnsupportedGuildPort {
+
+        @Override
+        public Optional<GuildMember> findMembershipOf(long characterId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Guild createGuild(String name, long leaderCharacterId) {
+            throw new DuplicateGuildMembershipException(leaderCharacterId);
+        }
     }
 }

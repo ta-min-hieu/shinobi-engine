@@ -25,6 +25,9 @@ public interface GuildPort {
      * Tạo bang mới + thêm {@code leaderCharacterId} làm {@link GuildRole#LEADER}, nguyên tử.
      *
      * @throws DuplicateGuildNameException nếu vi phạm UNIQUE {@code name}
+     * @throws DuplicateGuildMembershipException nếu vi phạm UNIQUE {@code guild_member.character_id}
+     *     — {@code leaderCharacterId} vừa vào bang khác (race với 1 lệnh tạo/duyệt bang khác của
+     *     CHÍNH nhân vật này, chạy gần như đồng thời trên virtual thread khác)
      */
     Guild createGuild(String name, long leaderCharacterId);
 
