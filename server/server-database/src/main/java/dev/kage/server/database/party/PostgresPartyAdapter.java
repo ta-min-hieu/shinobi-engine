@@ -57,6 +57,12 @@ public final class PostgresPartyAdapter implements PartyPort {
             INSERT INTO party_invite (party_id, invitee_character_id, invited_at) VALUES (?, ?, ?) RETURNING id
             """;
 
+    // KHÔNG khoá — chỉ để biết cần khoá dòng party nào TRƯỚC khi khoá chính dòng invite này (xem
+    // SELECT_INVITE_FOR_ACCEPT javadoc trong acceptInviteInTransaction cho lý do thứ tự khoá).
+    private static final String FIND_INVITE_PARTY_ID = """
+            SELECT party_id FROM party_invite WHERE id = ? AND invitee_character_id = ?
+            """;
+
     private static final String SELECT_INVITE_FOR_ACCEPT = """
             SELECT id, party_id, invitee_character_id FROM party_invite WHERE id = ? AND invitee_character_id = ?
              FOR UPDATE
@@ -170,13 +176,39 @@ public final class PostgresPartyAdapter implements PartyPort {
                 dataSource, connection -> acceptInviteInTransaction(connection, inviteId, characterId));
     }
 
+    /**
+     * ⚠️ Race THẬT tìm được 2026-09-23 (xem {@code PartyIntegrationTest
+     * #shouldNotThrow_whenInviteeAcceptsWhileSoleLeaderConcurrentlyDissolvesTheParty}): bản cũ khoá
+     * dòng {@code party_invite} (qua {@code SELECT_INVITE_FOR_ACCEPT}) RỒI MỚI khoá dòng {@code
+     * party}. {@code leaveParty} (khi leader là người cuối, giải tán party) khoá dòng {@code party}
+     * TRƯỚC rồi mới CASCADE xoá {@code party_invite} — NGƯỢC thứ tự. Nếu 1 lời mời đang PENDING đúng
+     * lúc leader rời, 2 giao dịch khoá CHÉO nhau → Postgres phát hiện DEADLOCK THẬT và huỷ NGẪU
+     * NHIÊN 1 trong 2 phía bằng lỗi không được xử lý (client bấm "Chấp nhận" hoặc "Rời nhóm" có thể
+     * treo vô thời hạn — {@code GatewayChannelHandler} không có try/catch quanh use case này).
+     *
+     * <p>Vá bằng cách khoá {@code party} TRƯỚC {@code party_invite} ở CẢ HAI luồng — đọc {@code
+     * party_id} không khoá để biết cần khoá dòng {@code party} nào, khoá dòng đó (còn tồn tại thì
+     * mới an toàn tiếp tục; party đã bị giải tán thì trả thẳng {@code NOT_FOUND}, KHÔNG cần tự xoá
+     * lại dòng {@code party_invite} vì CASCADE của {@code leaveParty} đã lo), rồi mới khoá lại đúng
+     * dòng invite để đọc/xoá — cùng thứ tự {@code leaveParty} đã dùng, không còn đường nào 2 giao
+     * dịch khoá chéo nhau.
+     */
     private static AcceptResult acceptInviteInTransaction(Connection connection, long inviteId, long characterId) {
+        Optional<Long> unlockedPartyId = JdbcOperations.queryOne(
+                connection, FIND_INVITE_PARTY_ID, rs -> rs.getLong("party_id"), inviteId, characterId);
+        if (unlockedPartyId.isEmpty()) {
+            return AcceptResult.NOT_FOUND;
+        }
+        if (!lockPartyIfExists(connection, unlockedPartyId.get())) {
+            // Party đã bị giải tán (leader là người cuối, vừa rời) đúng lúc lời mời này còn PENDING —
+            // CASCADE của leaveParty đã hoặc sắp xoá dòng invite này, không cần tự xoá lại.
+            return AcceptResult.NOT_FOUND;
+        }
         Optional<Long> partyId = JdbcOperations.queryOne(
                 connection, SELECT_INVITE_FOR_ACCEPT, rs -> rs.getLong("party_id"), inviteId, characterId);
         if (partyId.isEmpty()) {
             return AcceptResult.NOT_FOUND;
         }
-        JdbcOperations.lock(connection, LOCK_PARTY, partyId.get());
         if (isAlreadyMember(connection, characterId)) {
             deleteInvite(connection, inviteId);
             return AcceptResult.ALREADY_IN_PARTY;
@@ -188,6 +220,12 @@ public final class PostgresPartyAdapter implements PartyPort {
         insertMember(connection, new NewMember(partyId.get(), characterId, PartyRole.MEMBER, Instant.now()));
         deleteInvite(connection, inviteId);
         return AcceptResult.OK;
+    }
+
+    /** {@code true} nếu dòng {@code party} còn tồn tại — đã khoá FOR UPDATE khi trả {@code true}. */
+    private static boolean lockPartyIfExists(Connection connection, long partyId) {
+        return JdbcOperations.queryOne(connection, LOCK_PARTY, rs -> Boolean.TRUE, partyId)
+                .isPresent();
     }
 
     private static boolean isAlreadyMember(Connection connection, long characterId) {
