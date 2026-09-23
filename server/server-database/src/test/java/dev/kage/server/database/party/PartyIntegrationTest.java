@@ -3,13 +3,23 @@ package dev.kage.server.database.party;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.sql.DataSource;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -210,5 +220,90 @@ class PartyIntegrationTest {
 
         assertThat(kicked).isTrue();
         assertThat(adapter.findMembershipOf(member)).isEmpty();
+    }
+
+    /**
+     * ⚠️ Race THẬT — {@code acceptInvite} khoá dòng {@code party} bằng {@code SELECT ... FOR UPDATE}
+     * (đúng như javadoc {@link dev.kage.party.domain.PartyPort#acceptInvite} mô tả), NHƯNG bỏ qua
+     * việc dòng đó có còn tồn tại hay không: {@code leaveParty} khoá CÙNG dòng {@code party} này khi
+     * leader (người cuối cùng) rời nhóm và GIẢI TÁN — {@code DELETE FROM party}. Nếu 1 lời mời đang
+     * PENDING đúng lúc leader rời, {@code acceptInvite} vẫn chạy tiếp sau khi khoá "trúng" 0 dòng,
+     * rồi INSERT {@code party_member} tham chiếu 1 {@code party_id} không còn tồn tại → vi phạm FOREIGN
+     * KEY, ném {@code DatabaseAccessException} THẲNG ra ngoài thay vì trả kết quả gọn (client bấm
+     * "Chấp nhận" sẽ treo vô thời hạn — {@code GatewayChannelHandler.handleAcceptPartyInviteBlocking}
+     * không có try/catch nên không response nào được gửi khi use case này ném lỗi).
+     *
+     * <p>Test tự tay giữ khoá {@code FOR UPDATE} trên dòng {@code party} bằng 1 kết nối JDBC riêng
+     * (cùng kỹ thuật {@code PostgresPvpRatingAdapterIntegrationTest}) để buộc lời gọi {@code
+     * acceptInvite} THẬT phải CHỜ đúng chỗ nó chờ trong sản xuất, rồi mới giải tán party thật (XOÁ
+     * dòng {@code party_member} của leader + dòng {@code party}) và nhả khoá — tái hiện ĐÚNG thứ tự
+     * "leader rời/giải tán xong TRƯỚC KHI acceptInvite tiếp tục", không phải suy đoán.
+     */
+    @Test
+    @Timeout(15)
+    void shouldNotThrow_whenInviteeAcceptsWhileSoleLeaderConcurrentlyDissolvesTheParty() throws Exception {
+        long leader = createFreshCharacter("PartyLeader10");
+        long invitee = createFreshCharacter("PartyInvitee5");
+        PostgresPartyAdapter adapter = newAdapter();
+        Party party = adapter.createParty(leader);
+        PartyInvite invite = adapter.invite(party.id(), invitee);
+
+        CountDownLatch lockAcquired = new CountDownLatch(1);
+        CountDownLatch proceedToDissolve = new CountDownLatch(1);
+        ExecutorService dissolver = Executors.newSingleThreadExecutor();
+        Future<?> dissolveTask = dissolver.submit(() -> {
+            try (Connection connection = dataSource.getConnection()) {
+                connection.setAutoCommit(false);
+                // Cùng SQL/thứ tự leaveParty dùng thật (LOCK_PARTY) — khoá dòng party mà acceptInvite
+                // cũng sẽ cố khoá.
+                try (PreparedStatement lock =
+                        connection.prepareStatement("SELECT id FROM party WHERE id = ? FOR UPDATE")) {
+                    lock.setLong(1, party.id());
+                    try (ResultSet ignored = lock.executeQuery()) {
+                        // không đọc gì — chỉ cần dòng đã bị khoá lúc executeQuery() trả về.
+                    }
+                }
+                lockAcquired.countDown();
+                if (!proceedToDissolve.await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("test không cho phép giải tán kịp — xem lỗi ở luồng chính");
+                }
+                try (PreparedStatement deleteMember = connection.prepareStatement(
+                        "DELETE FROM party_member WHERE party_id = ? AND character_id = ?")) {
+                    deleteMember.setLong(1, party.id());
+                    deleteMember.setLong(2, leader);
+                    deleteMember.executeUpdate();
+                }
+                try (PreparedStatement deleteParty = connection.prepareStatement("DELETE FROM party WHERE id = ?")) {
+                    deleteParty.setLong(1, party.id());
+                    deleteParty.executeUpdate();
+                }
+                connection.commit();
+            }
+            return null;
+        });
+        assertThat(lockAcquired.await(5, TimeUnit.SECONDS))
+                .as("luồng giải tán phải chiếm được FOR UPDATE trước khi test tiếp tục")
+                .isTrue();
+
+        ExecutorService caller = Executors.newSingleThreadExecutor();
+        Future<PartyPort.AcceptResult> acceptTask = caller.submit(() -> adapter.acceptInvite(invite.id(), invitee));
+
+        // acceptInvite PHẢI chờ đúng ở khoá dòng party (chưa đọc/ghi gì) trong khi khoá còn bị giữ.
+        assertThatThrownBy(() -> acceptTask.get(1, TimeUnit.SECONDS))
+                .as("acceptInvite phải CHỜ, không được đọc/ghi ngay trong khi khoá còn bị giữ")
+                .isInstanceOf(TimeoutException.class);
+
+        proceedToDissolve.countDown();
+        dissolveTask.get(5, TimeUnit.SECONDS);
+
+        // Đây chính là phép đo cho bug: bản CHƯA vá ném DatabaseAccessException (vi phạm FOREIGN KEY)
+        // thay vì trả kết quả gọn — client sẽ treo vô thời hạn chờ response không bao giờ tới.
+        PartyPort.AcceptResult result = acceptTask.get(5, TimeUnit.SECONDS);
+
+        assertThat(result).isEqualTo(PartyPort.AcceptResult.NOT_FOUND);
+        assertThat(adapter.findPendingInviteOfInvitee(invitee))
+                .as("lời mời phải được dọn, không được treo lại mãi trong danh sách của invitee")
+                .isEmpty();
+        assertThat(adapter.findMembershipOf(invitee)).isEmpty();
     }
 }
