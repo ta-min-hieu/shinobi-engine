@@ -13,6 +13,7 @@ import java.util.Optional;
 import javax.sql.DataSource;
 
 import dev.kage.guild.domain.DuplicateGuildJoinRequestException;
+import dev.kage.guild.domain.DuplicateGuildMembershipException;
 import dev.kage.guild.domain.DuplicateGuildNameException;
 import dev.kage.guild.domain.Guild;
 import dev.kage.guild.domain.GuildJoinRequest;
@@ -156,10 +157,18 @@ public final class PostgresGuildAdapter implements GuildPort {
     /** Gói tham số cho {@link #insertMember} — tránh vượt 4 tham số Checkstyle {@code ParameterNumber}. */
     private record NewMember(long guildId, long characterId, GuildRole role, Instant joinedAt) {}
 
+    // updateOrThrow (không phải update chung chung) — CreateGuildUseCase.findMembershipOf rồi mới
+    // createGuild là check-then-act không atomic: 2 request "Tạo bang" (tên khác nhau) của CÙNG 1
+    // nhân vật gần như đồng thời đều có thể vượt qua check đó trước khi 1 trong 2 transaction
+    // commit. Không dịch unique_violation ở đây thì bên thua ném DatabaseAccessException chung
+    // chung xuyên thẳng lên GatewayChannelHandler (không có try/catch) — client treo vô thời hạn
+    // thay vì nhận CREATE_GUILD_OUTCOME_ALREADY_IN_GUILD (phát hiện thật bằng Testcontainers +
+    // CyclicBarrier, xem GuildIntegrationTest#shouldTranslateRaceIntoDuplicateGuildMembershipException...).
     private static void insertMember(Connection connection, NewMember member) {
-        JdbcOperations.update(
+        JdbcOperations.updateOrThrow(
                 connection,
                 INSERT_MEMBER,
+                () -> new DuplicateGuildMembershipException(member.characterId()),
                 member.guildId(),
                 member.characterId(),
                 member.role().name(),

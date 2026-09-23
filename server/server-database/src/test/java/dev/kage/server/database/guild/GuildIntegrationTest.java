@@ -4,12 +4,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -19,7 +29,9 @@ import dev.kage.account.domain.Account;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
+import dev.kage.guild.application.LeaveGuildUseCase;
 import dev.kage.guild.domain.DuplicateGuildJoinRequestException;
+import dev.kage.guild.domain.DuplicateGuildMembershipException;
 import dev.kage.guild.domain.DuplicateGuildNameException;
 import dev.kage.guild.domain.Guild;
 import dev.kage.guild.domain.GuildJoinRequest;
@@ -200,5 +212,187 @@ class GuildIntegrationTest {
         GuildPort.ApproveResult result = adapter.approveJoinRequest(requestToB.id(), leaderB);
 
         assertThat(result).isEqualTo(GuildPort.ApproveResult.TARGET_ALREADY_IN_GUILD);
+    }
+
+    /**
+     * Race THẬT: 1 nhân vật gửi 2 lệnh "Tạo bang" (tên KHÁC nhau) gần như đồng thời — VD double
+     * click với client bị lag, hoặc client tự thử gửi lại tên khác sau timeout tưởng lần đầu thất
+     * bại. {@code CreateGuildUseCase} check-then-act ({@code findMembershipOf} rồi mới
+     * {@code createGuild}) không atomic — cả 2 request đều thấy "chưa ở bang nào" trước khi 1 trong
+     * 2 transaction commit. Trước bản vá, {@code insertMember} dùng {@code JdbcOperations.update}
+     * (không có nhánh dịch unique_violation), nên bên thua ném {@code DatabaseAccessException}
+     * CHUNG CHUNG thay vì {@link DuplicateGuildMembershipException} — {@code CreateGuildUseCase}
+     * chỉ bắt {@code DuplicateGuildNameException} nên exception này XUYÊN THẲNG lên
+     * {@code GatewayChannelHandler.handleCreateGuildBlocking} (không có try/catch), khiến virtual
+     * thread chết mà KHÔNG gửi packet phản hồi nào — client của người thua cuộc treo vô thời hạn
+     * thay vì nhận {@code CREATE_GUILD_OUTCOME_ALREADY_IN_GUILD}. Dùng {@link CyclicBarrier} để 2
+     * luồng thật sự gọi {@code createGuild} CÙNG LÚC (không phải may rủi theo thời gian).
+     */
+    @Test
+    @Timeout(15)
+    void shouldTranslateRaceIntoDuplicateGuildMembershipException_whenSameCharacterRacesTwoCreateGuildCalls()
+            throws Exception {
+        long leader = createFreshCharacter("GuildRaceLeader1");
+        PostgresGuildAdapter adapter = newAdapter();
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        Callable<Guild> createA = () -> {
+            barrier.await(5, TimeUnit.SECONDS);
+            return adapter.createGuild("ConcurrentA", leader);
+        };
+        Callable<Guild> createB = () -> {
+            barrier.await(5, TimeUnit.SECONDS);
+            return adapter.createGuild("ConcurrentB", leader);
+        };
+
+        Future<Guild> futureA = pool.submit(createA);
+        Future<Guild> futureB = pool.submit(createB);
+        Guild winner = null;
+        RuntimeException loserException = null;
+        try {
+            winner = futureA.get(10, TimeUnit.SECONDS);
+        } catch (ExecutionException e) {
+            loserException = (RuntimeException) e.getCause();
+        }
+        try {
+            Guild guildB = futureB.get(10, TimeUnit.SECONDS);
+            assertThat(winner).as("cả 2 lời gọi không được cùng thành công").isNull();
+            winner = guildB;
+        } catch (ExecutionException e) {
+            assertThat(loserException)
+                    .as("phải có đúng 1 lời gọi thua cuộc, không phải cả 2")
+                    .isNull();
+            loserException = (RuntimeException) e.getCause();
+        }
+        pool.shutdown();
+
+        assertThat(winner).as("đúng 1 trong 2 lời gọi phải tạo bang thành công").isNotNull();
+        assertThat(loserException)
+                .as("lời gọi thua cuộc phải ném DuplicateGuildMembershipException (dịch được ở"
+                        + " application/), KHÔNG phải DatabaseAccessException chung chung xuyên thẳng lên gateway")
+                .isInstanceOf(DuplicateGuildMembershipException.class);
+        // Rollback phải TOÀN BỘ — tên bang của lời thua cuộc không được để lại rác.
+        boolean createdA = adapter.findByName("ConcurrentA").isPresent();
+        boolean createdB = adapter.findByName("ConcurrentB").isPresent();
+        assertThat(createdA ^ createdB)
+                .as("chỉ đúng 1 trong 2 tên bang được tạo thật")
+                .isTrue();
+        assertThat(adapter.findMembershipOf(leader).orElseThrow().guildId()).isEqualTo(winner.id());
+    }
+
+    /**
+     * Race THẬT: leader KICK 1 thành viên đúng lúc thành viên đó tự bấm RỜI bang — cả hai chạy
+     * trên virtual thread khác nhau, không tuần tự hoá theo guild ({@code authExecutor} =
+     * {@code Executors.newVirtualThreadPerTaskExecutor()}, xem {@code GatewayServer}).
+     * {@code LeaveGuildUseCase} cũ: {@code findMembershipOf} (thấy CÒN trong bang) rồi
+     * {@code port.leaveGuild(characterId)} — bản CŨ vứt bỏ giá trị {@code boolean} trả về và LUÔN
+     * trả {@code Result.OK}, dù DELETE thật sự ảnh hưởng 0 dòng vì kick đã xoá dòng đó trước. Người
+     * chơi bị kick nhận thông báo "Đã rời bang" như thể tự nguyện, thay vì phải biết mình BỊ ĐUỔI.
+     * DB vẫn đúng (chỉ 1 DELETE thắng) — cái sai là {@code Result} trả về client, nên test đo đúng
+     * GIÁ TRỊ CUỐI đó, không phải "có bị chặn hay không". Dùng {@link GuildPort} bọc quanh adapter
+     * THẬT để ép đúng lệnh kick THẬT (adapter thật, DB thật) chạy CHÍNH XÁC giữa 2 lời gọi port của
+     * use case — tất định, không phải may rủi theo thời gian luồng.
+     */
+    @Test
+    @Timeout(15)
+    void shouldReportNotInGuild_whenLeaderKicksTheSameMemberBetweenItsTwoReadsAndWrite() {
+        long leader = createFreshCharacter("KickRaceLeader1");
+        long member = createFreshCharacter("KickRaceMember1");
+        PostgresGuildAdapter adapter = newAdapter();
+        Guild guild = adapter.createGuild("KickRaceGuild1", leader);
+        adapter.approveJoinRequest(adapter.sendJoinRequest(guild.id(), member).id(), leader);
+
+        GuildPort racingPort = new KickInjectingGuildPort(adapter, leader, member);
+        LeaveGuildUseCase useCase = new LeaveGuildUseCase(racingPort);
+
+        LeaveGuildUseCase.Result result = useCase.execute(member);
+
+        assertThat(result)
+                .as("thành viên vừa bị KICK ngay giữa 2 lời gọi của use case — không được báo"
+                        + " Result.OK như thể tự rời")
+                .isEqualTo(LeaveGuildUseCase.Result.NOT_IN_GUILD);
+        assertThat(adapter.findMembershipOf(member)).isEmpty();
+    }
+
+    /**
+     * Bọc {@link PostgresGuildAdapter} THẬT — chỉ chèn 1 lệnh {@code kickMember} THẬT (DB thật)
+     * ngay sau {@link #findMembershipOf}, trước khi {@link LeaveGuildUseCase} kịp gọi
+     * {@link #leaveGuild}, mô phỏng đúng cửa sổ race giữa 2 lời gọi port không atomic đó. Mọi
+     * method khác uỷ quyền thẳng cho adapter thật — {@link LeaveGuildUseCase} chỉ gọi 2 trong số
+     * này nên phần còn lại không cần đúng ngữ nghĩa, chỉ cần không bị gọi.
+     */
+    private record KickInjectingGuildPort(PostgresGuildAdapter delegate, long leaderCharacterId, long targetCharacterId)
+            implements GuildPort {
+
+        @Override
+        public Optional<GuildMember> findMembershipOf(long characterId) {
+            Optional<GuildMember> result = delegate.findMembershipOf(characterId);
+            if (characterId == targetCharacterId) {
+                assertThat(delegate.kickMember(leaderCharacterId, targetCharacterId))
+                        .as("lệnh kick THẬT chèn giữa race phải thành công")
+                        .isTrue();
+            }
+            return result;
+        }
+
+        @Override
+        public boolean leaveGuild(long characterId) {
+            return delegate.leaveGuild(characterId);
+        }
+
+        @Override
+        public Optional<Guild> findByName(String name) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<Guild> findById(long guildId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<GuildMember> listMembers(long guildId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Guild createGuild(String name, long leaderCharacterId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean disbandGuild(long leaderCharacterId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<GuildJoinRequest> findPendingRequestOfCharacter(long characterId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<GuildJoinRequest> listPendingRequests(long guildId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public GuildJoinRequest sendJoinRequest(long guildId, long characterId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ApproveResult approveJoinRequest(long requestId, long leaderCharacterId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean rejectJoinRequest(long requestId, long leaderCharacterId) {
+            throw new UnsupportedOperationException();
+        }
     }
 }
