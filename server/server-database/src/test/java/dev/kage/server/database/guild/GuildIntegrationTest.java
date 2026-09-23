@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
@@ -27,6 +29,7 @@ import dev.kage.account.domain.Account;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
+import dev.kage.guild.application.LeaveGuildUseCase;
 import dev.kage.guild.domain.DuplicateGuildJoinRequestException;
 import dev.kage.guild.domain.DuplicateGuildMembershipException;
 import dev.kage.guild.domain.DuplicateGuildNameException;
@@ -275,5 +278,121 @@ class GuildIntegrationTest {
                 .as("chỉ đúng 1 trong 2 tên bang được tạo thật")
                 .isTrue();
         assertThat(adapter.findMembershipOf(leader).orElseThrow().guildId()).isEqualTo(winner.id());
+    }
+
+    /**
+     * Race THẬT: leader KICK 1 thành viên đúng lúc thành viên đó tự bấm RỜI bang — cả hai chạy
+     * trên virtual thread khác nhau, không tuần tự hoá theo guild ({@code authExecutor} =
+     * {@code Executors.newVirtualThreadPerTaskExecutor()}, xem {@code GatewayServer}).
+     * {@code LeaveGuildUseCase} cũ: {@code findMembershipOf} (thấy CÒN trong bang) rồi
+     * {@code port.leaveGuild(characterId)} — bản CŨ vứt bỏ giá trị {@code boolean} trả về và LUÔN
+     * trả {@code Result.OK}, dù DELETE thật sự ảnh hưởng 0 dòng vì kick đã xoá dòng đó trước. Người
+     * chơi bị kick nhận thông báo "Đã rời bang" như thể tự nguyện, thay vì phải biết mình BỊ ĐUỔI.
+     * DB vẫn đúng (chỉ 1 DELETE thắng) — cái sai là {@code Result} trả về client, nên test đo đúng
+     * GIÁ TRỊ CUỐI đó, không phải "có bị chặn hay không". Dùng {@link GuildPort} bọc quanh adapter
+     * THẬT để ép đúng lệnh kick THẬT (adapter thật, DB thật) chạy CHÍNH XÁC giữa 2 lời gọi port của
+     * use case — tất định, không phải may rủi theo thời gian luồng.
+     */
+    @Test
+    @Timeout(15)
+    void shouldReportNotInGuild_whenLeaderKicksTheSameMemberBetweenItsTwoReadsAndWrite() {
+        long leader = createFreshCharacter("KickRaceLeader1");
+        long member = createFreshCharacter("KickRaceMember1");
+        PostgresGuildAdapter adapter = newAdapter();
+        Guild guild = adapter.createGuild("KickRaceGuild1", leader);
+        adapter.approveJoinRequest(adapter.sendJoinRequest(guild.id(), member).id(), leader);
+
+        GuildPort racingPort = new KickInjectingGuildPort(adapter, leader, member);
+        LeaveGuildUseCase useCase = new LeaveGuildUseCase(racingPort);
+
+        LeaveGuildUseCase.Result result = useCase.execute(member);
+
+        assertThat(result)
+                .as("thành viên vừa bị KICK ngay giữa 2 lời gọi của use case — không được báo"
+                        + " Result.OK như thể tự rời")
+                .isEqualTo(LeaveGuildUseCase.Result.NOT_IN_GUILD);
+        assertThat(adapter.findMembershipOf(member)).isEmpty();
+    }
+
+    /**
+     * Bọc {@link PostgresGuildAdapter} THẬT — chỉ chèn 1 lệnh {@code kickMember} THẬT (DB thật)
+     * ngay sau {@link #findMembershipOf}, trước khi {@link LeaveGuildUseCase} kịp gọi
+     * {@link #leaveGuild}, mô phỏng đúng cửa sổ race giữa 2 lời gọi port không atomic đó. Mọi
+     * method khác uỷ quyền thẳng cho adapter thật — {@link LeaveGuildUseCase} chỉ gọi 2 trong số
+     * này nên phần còn lại không cần đúng ngữ nghĩa, chỉ cần không bị gọi.
+     */
+    private record KickInjectingGuildPort(PostgresGuildAdapter delegate, long leaderCharacterId, long targetCharacterId)
+            implements GuildPort {
+
+        @Override
+        public Optional<GuildMember> findMembershipOf(long characterId) {
+            Optional<GuildMember> result = delegate.findMembershipOf(characterId);
+            if (characterId == targetCharacterId) {
+                assertThat(delegate.kickMember(leaderCharacterId, targetCharacterId))
+                        .as("lệnh kick THẬT chèn giữa race phải thành công")
+                        .isTrue();
+            }
+            return result;
+        }
+
+        @Override
+        public boolean leaveGuild(long characterId) {
+            return delegate.leaveGuild(characterId);
+        }
+
+        @Override
+        public Optional<Guild> findByName(String name) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<Guild> findById(long guildId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<GuildMember> listMembers(long guildId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Guild createGuild(String name, long leaderCharacterId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean disbandGuild(long leaderCharacterId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<GuildJoinRequest> findPendingRequestOfCharacter(long characterId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<GuildJoinRequest> listPendingRequests(long guildId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public GuildJoinRequest sendJoinRequest(long guildId, long characterId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ApproveResult approveJoinRequest(long requestId, long leaderCharacterId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean rejectJoinRequest(long requestId, long leaderCharacterId) {
+            throw new UnsupportedOperationException();
+        }
     }
 }

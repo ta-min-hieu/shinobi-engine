@@ -23,8 +23,10 @@ public final class LeaveGuildUseCase {
         if (membership.get().role() == GuildRole.LEADER) {
             return Result.LEADER_CANNOT_LEAVE;
         }
-        port.leaveGuild(characterId);
-        return Result.OK;
+        // findMembershipOf rồi mới leaveGuild không atomic — nếu leader KICK đúng nhân vật này
+        // ngay giữa 2 lời gọi (virtual thread khác, không tuần tự hoá theo guild), leaveGuild xoá 0
+        // dòng (đã bị kick xoá trước). Phải đọc lại kết quả DELETE thật, không được mặc định OK.
+        return port.leaveGuild(characterId) ? Result.OK : Result.NOT_IN_GUILD;
     }
 
     public enum Result {
