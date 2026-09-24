@@ -47,11 +47,6 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
                AND ii.quantity + ? <= it.max_stack
             """;
 
-    private static final String INSERT_ITEM = """
-            INSERT INTO inventory_item (character_id, item_template_id, quantity, enhance_level, slot_index)
-            VALUES (?, ?, ?, 0, ?)
-            """;
-
     @Override
     public boolean hasRoomFor(Transaction tx, long characterId, java.util.List<ItemGrantRequest> grants) {
         Connection connection = ((JdbcTransaction) tx).connection();
@@ -73,7 +68,9 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
                             grant.quantity())
                     .orElse(0);
             if (mergeable == 0) {
-                newSlotsNeeded++;
+                // Khớp đúng số dòng grantItemByCode sẽ mở (tách theo max_stack) — lệch là guard nói
+                // "đủ chỗ" rồi lúc trao lại thiếu ô.
+                newSlotsNeeded += InventoryStackMerge.slotsNeeded(connection, itemTemplateId.get(), grant.quantity());
             }
         }
         return newSlotsNeeded <= DEFAULT_CAPACITY - used;
@@ -91,12 +88,7 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
         if (InventoryStackMerge.mergeIntoExistingStack(connection, characterId, itemTemplateId.get(), quantity)) {
             return true;
         }
-        int existingCount = JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId)
-                .orElse(0);
-        if (existingCount >= DEFAULT_CAPACITY) {
-            return false;
-        }
-        JdbcOperations.update(connection, INSERT_ITEM, characterId, itemTemplateId.get(), quantity, existingCount);
-        return true;
+        // Không gộp được ⇒ mở ô mới, tách theo max_stack (xem InventoryStackMerge#insertRespectingMaxStack).
+        return InventoryStackMerge.insertRespectingMaxStack(connection, characterId, itemTemplateId.get(), quantity);
     }
 }

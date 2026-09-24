@@ -56,6 +56,23 @@ public final class InventoryStackMerge {
                           LIMIT 1)
             """;
 
+    // PLACEHOLDER trùng DEFAULT_CAPACITY của PostgresInventoryAdapter / shop / thư / quest (GDD chưa
+    // chốt sức chứa túi đồ thật) — đổi thì phải đổi ở mọi chỗ cho tới khi có nguồn chung.
+    private static final int BAG_CAPACITY = 20;
+
+    private static final String FIND_MAX_STACK = """
+            SELECT max_stack FROM item_template WHERE id = ?
+            """;
+
+    private static final String COUNT_ITEMS = """
+            SELECT COUNT(*) FROM inventory_item WHERE character_id = ?
+            """;
+
+    private static final String INSERT_ITEM = """
+            INSERT INTO inventory_item (character_id, item_template_id, quantity, enhance_level, slot_index)
+            VALUES (?, ?, ?, 0, ?)
+            """;
+
     private InventoryStackMerge() {}
 
     /**
@@ -70,5 +87,55 @@ public final class InventoryStackMerge {
         return JdbcOperations.update(
                         connection, MERGE_INTO_EXISTING_STACK, quantity, characterId, itemTemplateId, quantity)
                 > 0;
+    }
+
+    /**
+     * Số ô mới cần để chứa {@code quantity} món của loại này khi KHÔNG gộp được: chia theo
+     * {@code max_stack} (làm tròn lên). Loại không tồn tại ⇒ 1, để người gọi không đoán sai là "vừa".
+     */
+    public static int slotsNeeded(Connection connection, long itemTemplateId, int quantity) {
+        int maxStack = maxStackOf(connection, itemTemplateId);
+        return (quantity + maxStack - 1) / maxStack;
+    }
+
+    /**
+     * Mở ô mới cho {@code quantity} món, mỗi dòng KHÔNG vượt {@code max_stack}; không đủ ô thì không
+     * ghi gì cả.
+     *
+     * <p><b>Vì sao tồn tại (2026-09-24).</b> Trước đó shop/thư/quest {@code INSERT} MỘT dòng mang
+     * nguyên số lượng yêu cầu khi không gộp được. Cửa hàng có ô nhập số lượng ngay trên client hợp
+     * lệ: gõ "50" khi mua kiếm gỗ ({@code max_stack = 1}) là được một dòng ×50, và cường hoá giữ
+     * nguyên {@code quantity} của dòng — cường hoá 50 thanh với giá một lần. Phi đao thì một ô chứa
+     * cả nghìn cái, vượt trần 99. {@link #mergeIntoExistingStack} đã tôn trọng {@code max_stack} từ
+     * đầu; nửa còn lại (mở ô mới) thì chưa.
+     *
+     * @return {@code false} nếu túi không đủ ô cho số dòng cần mở — không có dòng nào được ghi,
+     *     người gọi báo túi đầy như cũ.
+     */
+    public static boolean insertRespectingMaxStack(
+            Connection connection, long characterId, long itemTemplateId, int quantity) {
+        int maxStack = maxStackOf(connection, itemTemplateId);
+        int rowsNeeded = (quantity + maxStack - 1) / maxStack;
+        int used = JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId)
+                .orElse(0);
+        if (used + rowsNeeded > BAG_CAPACITY) {
+            return false;
+        }
+        int remaining = quantity;
+        for (int row = 0; row < rowsNeeded; row++) {
+            int rowQuantity = Math.min(maxStack, remaining);
+            // slot_index — nối vào cuối danh sách hiện có (cột chỉ để sắp xếp, V27).
+            JdbcOperations.update(connection, INSERT_ITEM, characterId, itemTemplateId, rowQuantity, used + row);
+            remaining -= rowQuantity;
+        }
+        return true;
+    }
+
+    // max_stack < 1 không hợp lệ theo dữ liệu hiện có, nhưng chia cho 0 ở đây là sập cả giao dịch —
+    // coi như 1 (mỗi món một ô) là phía an toàn.
+    private static int maxStackOf(Connection connection, long itemTemplateId) {
+        int maxStack = JdbcOperations.queryOne(connection, FIND_MAX_STACK, rs -> rs.getInt(1), itemTemplateId)
+                .orElse(1);
+        return Math.max(1, maxStack);
     }
 }

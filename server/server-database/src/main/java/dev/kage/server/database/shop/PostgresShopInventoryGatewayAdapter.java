@@ -20,21 +20,8 @@ import dev.kage.shop.domain.Transaction;
  */
 public final class PostgresShopInventoryGatewayAdapter implements InventoryGatewayPort {
 
-    // PLACEHOLDER trùng với PostgresInventoryAdapter.DEFAULT_CAPACITY (GDD chưa chốt sức chứa
-    // thật) — đổi thì phải đổi cả 2 chỗ cho tới khi có nguồn chung (VD cột character.inventory_capacity).
-    private static final int DEFAULT_CAPACITY = 20;
-
     private static final String FIND_ITEM = """
             SELECT id, item_template_id, quantity FROM inventory_item WHERE id = ? AND character_id = ?
-            """;
-
-    private static final String COUNT_ITEMS = """
-            SELECT COUNT(*) FROM inventory_item WHERE character_id = ?
-            """;
-
-    private static final String INSERT_ITEM = """
-            INSERT INTO inventory_item (character_id, item_template_id, quantity, enhance_level, slot_index)
-            VALUES (?, ?, ?, 0, ?)
             """;
 
     // equipped: equipment_slot.inventory_item_id là cách DUY NHẤT biết một dòng đang mặc (V5). Đọc
@@ -80,14 +67,8 @@ public final class PostgresShopInventoryGatewayAdapter implements InventoryGatew
         if (InventoryStackMerge.mergeIntoExistingStack(connection, characterId, itemTemplateId, quantity)) {
             return true;
         }
-        int existingCount = JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId)
-                .orElse(0);
-        if (existingCount >= DEFAULT_CAPACITY) {
-            return false;
-        }
-        // slot_index — nối vào cuối danh sách hiện có.
-        JdbcOperations.update(connection, INSERT_ITEM, characterId, itemTemplateId, quantity, existingCount);
-        return true;
+        // Không gộp được ⇒ mở ô mới, tách theo max_stack (xem InventoryStackMerge#insertRespectingMaxStack).
+        return InventoryStackMerge.insertRespectingMaxStack(connection, characterId, itemTemplateId, quantity);
     }
 
     @Override

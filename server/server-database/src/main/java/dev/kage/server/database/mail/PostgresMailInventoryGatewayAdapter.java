@@ -19,18 +19,6 @@ import dev.kage.server.database.inventory.InventoryStackMerge;
  */
 public final class PostgresMailInventoryGatewayAdapter implements InventoryGatewayPort {
 
-    // PLACEHOLDER trùng PostgresInventoryAdapter.DEFAULT_CAPACITY (GDD chưa chốt sức chứa thật).
-    private static final int DEFAULT_CAPACITY = 20;
-
-    private static final String COUNT_ITEMS = """
-            SELECT COUNT(*) FROM inventory_item WHERE character_id = ?
-            """;
-
-    private static final String INSERT_ITEM = """
-            INSERT INTO inventory_item (character_id, item_template_id, quantity, enhance_level, slot_index)
-            VALUES (?, ?, ?, 0, ?)
-            """;
-
     // ORDER BY id: hai transaction gửi thư song song khoá các dòng theo CÙNG thứ tự nên không
     // deadlock nhau. enhance_level = 0: xem javadoc #consumeItem. Cột equipped để LOẠI dòng đang
     // mặc khỏi phần được trừ (vẫn khoá nó như cũ — KHÔNG đổi thứ tự khoá).
@@ -65,14 +53,9 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
         if (InventoryStackMerge.mergeIntoExistingStack(connection, characterId, itemTemplateId, quantity)) {
             return true;
         }
-        int existingCount = JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId)
-                .orElse(0);
-        if (existingCount >= DEFAULT_CAPACITY) {
-            return false;
-        }
-        // slot_index — nối vào cuối danh sách hiện có.
-        JdbcOperations.update(connection, INSERT_ITEM, characterId, itemTemplateId, quantity, existingCount);
-        return true;
+        // Không gộp được ⇒ mở ô mới, tách theo max_stack: thư gom số lượng từ NHIỀU dòng của người
+        // gửi (3 thanh kiếm = 3 dòng), nên số tới đây có thể vượt max_stack của loại.
+        return InventoryStackMerge.insertRespectingMaxStack(connection, characterId, itemTemplateId, quantity);
     }
 
     /**
