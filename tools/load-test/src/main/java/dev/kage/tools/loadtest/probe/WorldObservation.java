@@ -23,6 +23,7 @@ import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SelectCharacterResponse;
 import dev.kage.protocol.SkillResultEvent;
+import dev.kage.protocol.WorldChangedEvent;
 import dev.kage.protocol.wire.PacketCodec;
 
 /**
@@ -148,6 +149,16 @@ final class WorldObservation {
                 playerMaxHp = event.getMaxHp();
             }
             case Opcode.OPCODE_HEALTH_CHANGED_EVENT_VALUE -> onHealthChanged(HealthChangedEvent.parseFrom(payload));
+            case Opcode.OPCODE_WORLD_CHANGED_EVENT_VALUE -> {
+                // ADR-051 — vị trí + máu ở World MỚI. Thiếu nhánh này thì sau khi gục trong hầm ngục
+                // probe vẫn tin mình đứng ở toạ độ hầm ngục với 0 máu, và walkTo đi lạc hướng.
+                WorldChangedEvent event = WorldChangedEvent.parseFrom(payload);
+                playerX = event.getX();
+                playerY = event.getY();
+                playerCurrentHp = event.getCurrentHp();
+                playerMaxHp = event.getMaxHp();
+                leaveAreaOfInterestOfEveryMonster();
+            }
             case Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE -> {
                 ExperienceChangedEvent event = ExperienceChangedEvent.parseFrom(payload);
                 latestExperience = new ExperienceSnapshot(
@@ -278,6 +289,16 @@ final class WorldObservation {
                     event.getEntityId(),
                     withPresence(target, event.getCurrentHp(), target.lastUpdateMillis(), target.inAreaOfInterest()));
         }
+    }
+
+    /**
+     * Đổi World ⇒ mọi quái đang thấy thuộc World CŨ, server không gửi despawn cho từng con (ADR-051:
+     * client tự dọn theo 308). Giữ lại trong báo cáo ("tổng đã từng thấy") nhưng không còn trong tầm
+     * nhìn — nếu không, báo cáo hầm ngục liệt kê cả quái làng như đang đứng cạnh boss.
+     */
+    private void leaveAreaOfInterestOfEveryMonster() {
+        monsters.replaceAll(
+                (id, sighting) -> withPresence(sighting, sighting.currentHp(), sighting.lastUpdateMillis(), false));
     }
 
     private static MonsterSighting withPresence(

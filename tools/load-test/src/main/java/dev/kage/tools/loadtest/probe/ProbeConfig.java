@@ -25,6 +25,8 @@ import dev.kage.tools.loadtest.CommandLineArguments;
  * @param observeSeconds thời gian đứng đọc sự kiện sau khi đã tới chỗ
  * @param equipItemCodes danh sách mã trang bị cần MẶC trước khi đi bộ (ô trang bị suy từ catalog)
  * @param quest kịch bản nhiệm vụ (nói chuyện NPC / lĩnh thưởng / in nhật ký) — xem {@link QuestPlan}
+ * @param enterDungeon mã hầm ngục để tự lập nhóm 1 người rồi vào, sau khi đi bộ; rỗng = không vào —
+ *     xem {@link DungeonScenario}
  */
 public record ProbeConfig(
         String host,
@@ -40,7 +42,8 @@ public record ProbeConfig(
         OptionalDouble returnToX,
         int settleSeconds,
         List<String> equipItemCodes,
-        QuestPlan quest) {
+        QuestPlan quest,
+        String enterDungeon) {
 
     /**
      * Danh sách mã trang bị BẤT BIẾN — record không tự copy, mà lệnh gọi có thể truyền list sống
@@ -109,7 +112,8 @@ public record ProbeConfig(
                         raw.text("talkToNpc", ""),
                         raw.list("dialogueChoices"),
                         raw.text("claimQuest", ""),
-                        raw.flag("questReport", false)));
+                        raw.flag("questReport", false)),
+                raw.text("enterDungeon", ""));
     }
 
     /** {@code true} khi người dùng muốn probe tự chọn con gần nhất trong AoI. */

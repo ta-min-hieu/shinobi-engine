@@ -67,8 +67,8 @@ class DungeonInstanceRegistryConcurrencyTest {
 
     private static final int ROUNDS = 20;
     private static final long PARTY_ID = 1L;
-    private static final long LEADER_ID = 101L;
-    private static final long MEMBER_ID = 102L;
+    static final long LEADER_ID = 101L;
+    static final long MEMBER_ID = 102L;
 
     private ConnectedCharacterRegistry characterRegistry;
     private MainWorldChannelRegistry mainWorldChannels;
@@ -113,7 +113,8 @@ class DungeonInstanceRegistryConcurrencyTest {
         for (int round = 0; round < ROUNDS; round++) {
             DungeonInstanceRegistry dungeons = new DungeonInstanceRegistry(
                     characterRegistry,
-                    new DungeonInstanceRegistry.DungeonFacades(fakeCharacterFacade(), fakePartyFacade()),
+                    new DungeonInstanceRegistry.DungeonFacades(
+                            fakeCharacterFacade(), fakePartyFacade(this::awaitBarrier)),
                     mainWorldChannels,
                     TestWorldContents.withBoss());
             try {
@@ -213,7 +214,13 @@ class DungeonInstanceRegistryConcurrencyTest {
         return new CharacterFacade(useCases, port);
     }
 
-    private PartyFacade fakePartyFacade() {
+    /**
+     * Nhóm hai người {@link #LEADER_ID} + {@link #MEMBER_ID}.
+     *
+     * @param beforeListMembers chạy ngay trước khi trả danh sách thành viên — chỗ đặt rào cho test
+     *     race; test khác truyền việc rỗng
+     */
+    static PartyFacade fakePartyFacade(Runnable beforeListMembers) {
         PartyPort port = new PartyPort() {
             @Override
             public Optional<PartyMember> findMembershipOf(long characterId) {
@@ -223,7 +230,7 @@ class DungeonInstanceRegistryConcurrencyTest {
 
             @Override
             public List<PartyMember> listMembers(long partyId) {
-                awaitBarrier();
+                beforeListMembers.run();
                 return List.of(
                         new PartyMember(PARTY_ID, LEADER_ID, PartyRole.LEADER, Instant.EPOCH),
                         new PartyMember(PARTY_ID, MEMBER_ID, PartyRole.MEMBER, Instant.EPOCH));

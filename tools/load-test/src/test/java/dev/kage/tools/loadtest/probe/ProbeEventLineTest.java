@@ -19,6 +19,9 @@ import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.QuestStatus;
 import dev.kage.protocol.QuestStatusChangedEvent;
+import dev.kage.protocol.WorldChangeReason;
+import dev.kage.protocol.WorldChangedEvent;
+import dev.kage.protocol.WorldKind;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
@@ -91,6 +94,26 @@ final class ProbeEventLineTest {
                 ProbeEventLine.format(7L, frameOf(Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE, new byte[] {1, 2, 3}));
 
         assertThat(line).isEqualTo("7\t1001\tLIST_SHOP_ITEMS_RESPONSE\tpayloadBytes=3");
+    }
+
+    /** ADR-051 — gục trong hầm ngục: probe phải đọc được World nào, vì sao, đứng đâu, máu bao nhiêu. */
+    @Test
+    void shouldDecodeWorldChanged_withKindReasonPositionAndHp() throws InvalidProtocolBufferException {
+        WorldChangedEvent event = WorldChangedEvent.newBuilder()
+                .setWorldKind(WorldKind.WORLD_KIND_MAIN)
+                .setReason(WorldChangeReason.WORLD_CHANGE_REASON_DEFEATED)
+                .setX(3.5f)
+                .setY(0f)
+                .setCurrentHp(118)
+                .setMaxHp(118)
+                .build();
+
+        String line = ProbeEventLine.format(9L, frameOf(Opcode.OPCODE_WORLD_CHANGED_EVENT_VALUE, event.toByteArray()));
+
+        assertThat(line)
+                .isEqualTo("9\t308\tWORLD_CHANGED_EVENT\tworld=WORLD_KIND_MAIN"
+                        + " reason=WORLD_CHANGE_REASON_DEFEATED"
+                        + " x=3.50 y=0.00 hp=118/118");
     }
 
     @Test

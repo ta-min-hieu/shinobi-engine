@@ -12,8 +12,11 @@ import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterRespawnedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.ClaimQuestRewardResponse;
+import dev.kage.protocol.CreatePartyResponse;
 import dev.kage.protocol.DialogueNodeResponse;
+import dev.kage.protocol.EnterDungeonResponse;
 import dev.kage.protocol.ErrorResponse;
+import dev.kage.protocol.ExitDungeonResponse;
 import dev.kage.protocol.ExperienceChangedEvent;
 import dev.kage.protocol.GoldChangedEvent;
 import dev.kage.protocol.HealthChangedEvent;
@@ -29,6 +32,7 @@ import dev.kage.protocol.NpcSpawnedEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.QuestStatusChangedEvent;
 import dev.kage.protocol.SkillResultEvent;
+import dev.kage.protocol.WorldChangedEvent;
 import dev.kage.protocol.wire.PacketCodec;
 
 /**
@@ -88,6 +92,10 @@ final class ProbeEventLine {
         if (selfState.isPresent()) {
             return selfState.get();
         }
+        Optional<String> worldChange = describeWorldChange(opcode, payload);
+        if (worldChange.isPresent()) {
+            return worldChange.get();
+        }
         // Opcode chưa giải mã vẫn được ghi ra (tên + số byte) thay vì bỏ im lặng — probe phải cho
         // thấy CÓ GÌ ĐÓ đã tới, kể cả khi nó chưa biết đọc.
         return describeQuest(opcode, payload).orElseGet(() -> "payloadBytes=" + payload.length);
@@ -116,6 +124,35 @@ final class ProbeEventLine {
                 Optional.of(inventory(ListInventoryResponse.parseFrom(payload)));
             default -> Optional.empty();
         };
+    }
+
+    /**
+     * Đổi World (ADR-051) — tạo nhóm 1301, vào/ra hầm ngục 1501/1503, và {@code WorldChangedEvent}
+     * 308: gói DUY NHẤT nói người chơi đang ở World nào, đứng đâu, còn bao nhiêu máu sau khi đổi.
+     */
+    private static Optional<String> describeWorldChange(int opcode, byte[] payload)
+            throws InvalidProtocolBufferException {
+        return switch (opcode) {
+            case Opcode.OPCODE_WORLD_CHANGED_EVENT_VALUE ->
+                Optional.of(worldChanged(WorldChangedEvent.parseFrom(payload)));
+            case Opcode.OPCODE_CREATE_PARTY_RESPONSE_VALUE ->
+                Optional.of("outcome="
+                        + CreatePartyResponse.parseFrom(payload).getOutcome().name());
+            case Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE ->
+                Optional.of("outcome="
+                        + EnterDungeonResponse.parseFrom(payload).getOutcome().name());
+            case Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE ->
+                Optional.of("outcome="
+                        + ExitDungeonResponse.parseFrom(payload).getOutcome().name());
+            default -> Optional.empty();
+        };
+    }
+
+    private static String worldChanged(WorldChangedEvent event) {
+        return "world=" + event.getWorldKind().name() + " reason="
+                + event.getReason().name() + " x="
+                + meters(event.getX()) + " y=" + meters(event.getY()) + " hp=" + event.getCurrentHp() + "/"
+                + event.getMaxHp();
     }
 
     private static String dialogueNode(DialogueNodeResponse response) {

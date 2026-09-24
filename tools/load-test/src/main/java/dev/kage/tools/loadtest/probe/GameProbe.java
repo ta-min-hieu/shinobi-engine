@@ -44,6 +44,13 @@ import dev.kage.tools.loadtest.GameConnection;
  *     --observeSeconds=1"
  * }</pre>
  *
+ * <p><b>Kịch bản HẦM NGỤC</b> (ADR-051) — lập nhóm 1 người, vào hầm ngục, rồi đứng quan sát; gục
+ * trong đó thì dòng {@code WORLD_CHANGED_EVENT reason=WORLD_CHANGE_REASON_DEFEATED} là bằng chứng.
+ *
+ * <pre>{@code
+ * ./gradlew :tools:load-test:gameProbe --args="--username=aloha --enterDungeon=sample_dungeon --observeSeconds=30"
+ * }</pre>
+ *
  * <p>Kết quả ra stdout: mỗi frame nhận được là 1 dòng TSV ({@link ProbeEventLine}), cuối cùng là
  * báo cáo tổng kết ({@link WorldObservation#renderReport()}). Chuyển hướng ra file bằng {@code >}
  * nếu cần đọc lại — probe cố ý KHÔNG tự ghi file, để không phải nhận đường dẫn từ tham số (cwd của
@@ -106,6 +113,9 @@ public final class GameProbe {
             }
             if (config.moveToX().isPresent()) {
                 walkTo(connection, observation, session, config.moveToX().getAsDouble());
+            }
+            if (!config.enterDungeon().isEmpty()) {
+                new DungeonScenario(connection, session).run(config.enterDungeon());
             }
             if (config.quest().isRequested()) {
                 new QuestScenario(connection, session, observation).run(config.quest());

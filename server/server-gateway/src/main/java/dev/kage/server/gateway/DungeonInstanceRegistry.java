@@ -295,11 +295,16 @@ final class DungeonInstanceRegistry {
         // ADR-048 — catalog PHẢI đi vào đây, nếu không `spawnBoss` tra không ra mã và hầm ngục
         // rỗng không một lời báo. `spawnOverworldContent = false` vẫn giữ: World này không
         // spawn nội dung overworld, nó chỉ cần TRA được loài boss.
+        //
+        // CHỈ danh mục quái, KHÔNG vùng an toàn/NPC (sửa 2026-09-24): WorldFacade cài vùng an toàn
+        // từ catalog bất kể là World nào, nên truyền nguyên catalog world chính thì `sect_grounds`
+        // [-15, 5] phủ đúng điểm xuất hiện x=0 trong hầm ngục ⇒ boss không bao giờ đánh người đứng
+        // yên. ADR-050 D8 để "vùng cho dungeon/arena" NGOÀI phạm vi. Xem DungeonWorldContentTest.
         WorldFacade dungeonFacade = new WorldFacade(
                 new DungeonOutboundSink(registry, this::handleCharacterDefeated),
                 false,
                 TickMetricsPort.NO_OP,
-                worldContent);
+                WorldContentCatalog.ofMonsters(worldContent.monsters()));
         dungeonFacade.start();
         // Phase 8 lát cắt 2 — NƠI DUY NHẤT "dungeon" và "boss" được nối với nhau; WorldFacade vẫn
         // không biết khái niệm "dungeon" (chỉ biết "có ai bảo spawn boss hay không").

@@ -15,6 +15,9 @@ import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SelectCharacterResponse;
+import dev.kage.protocol.WorldChangeReason;
+import dev.kage.protocol.WorldChangedEvent;
+import dev.kage.protocol.WorldKind;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
@@ -130,6 +133,28 @@ final class WorldObservationTest {
 
         assertThat(observation.monstersInAreaOfInterest()).isEmpty();
         assertThat(observation.renderReport()).contains("tổng đã từng thấy: 1");
+    }
+
+    /** ADR-051 — gục trong hầm ngục: vị trí/máu lấy từ 308, quái của World cũ rời tầm nhìn. */
+    @Test
+    void shouldMoveThePlayerAndForgetOldWorldMonsters_onWorldChanged() throws InvalidProtocolBufferException {
+        enterWorldAt(8f);
+        apply(100L, Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE, bandit(BANDIT_A, 11f));
+        apply(
+                500L,
+                Opcode.OPCODE_WORLD_CHANGED_EVENT_VALUE,
+                WorldChangedEvent.newBuilder()
+                        .setWorldKind(WorldKind.WORLD_KIND_MAIN)
+                        .setReason(WorldChangeReason.WORLD_CHANGE_REASON_DEFEATED)
+                        .setX(0f)
+                        .setY(0f)
+                        .setCurrentHp(100)
+                        .setMaxHp(100)
+                        .build());
+
+        assertThat(observation.playerX()).isZero();
+        assertThat(observation.monstersInAreaOfInterest()).isEmpty();
+        assertThat(observation.renderReport()).contains("tổng đã từng thấy: 1").contains("máu=100/100");
     }
 
     @Test
