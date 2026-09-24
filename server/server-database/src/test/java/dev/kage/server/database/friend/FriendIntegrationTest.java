@@ -6,6 +6,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
@@ -39,6 +44,7 @@ import dev.kage.server.database.character.PostgresCharacterAdapter;
 class FriendIntegrationTest {
 
     private static final int POSTGRES_PORT = 5432;
+    private static final int CONCURRENT_ROUNDS = 20;
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
@@ -103,6 +109,56 @@ class FriendIntegrationTest {
     }
 
     @Test
+    void shouldRejectRequest_whenReverseDirectionAlreadyPending() {
+        long a = createFreshCharacter("FriendA9");
+        long b = createFreshCharacter("FriendB9");
+        PostgresFriendAdapter adapter = newAdapter();
+        adapter.sendRequest(a, b);
+
+        assertThatThrownBy(() -> adapter.sendRequest(b, a)).isInstanceOf(DuplicateFriendRequestException.class);
+        assertThat(adapter.listPendingIncoming(a)).isEmpty();
+    }
+
+    // A mời B đúng lúc B mời A: trước bản vá cả hai INSERT đều lọt (UNIQUE chỉ chặn cùng chiều),
+    // sau khi cả hai chấp nhận thì mỗi người thấy người kia HAI LẦN trong danh sách bạn. Đo GIÁ TRỊ
+    // CUỐI (số dòng của cặp), không đo "có chặn không" — nhiều cặp để cửa sổ race có cơ hội mở.
+    @Test
+    void shouldKeepExactlyOneRow_whenBothSidesSendAtTheSameInstant() throws Exception {
+        PostgresFriendAdapter adapter = newAdapter();
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            for (int round = 0; round < CONCURRENT_ROUNDS; round++) {
+                long a = createFreshCharacter("FrRaceA" + round);
+                long b = createFreshCharacter("FrRaceB" + round);
+                CyclicBarrier barrier = new CyclicBarrier(2);
+                Future<Boolean> first = executor.submit(() -> sendAfterBarrier(adapter, barrier, a, b));
+                Future<Boolean> second = executor.submit(() -> sendAfterBarrier(adapter, barrier, b, a));
+
+                int succeeded = (first.get(1, TimeUnit.MINUTES) ? 1 : 0) + (second.get(1, TimeUnit.MINUTES) ? 1 : 0);
+
+                assertThat(succeeded).as("round %d", round).isEqualTo(1);
+                assertThat(adapter.listPendingIncoming(a).size()
+                                + adapter.listPendingIncoming(b).size())
+                        .as("round %d", round)
+                        .isEqualTo(1);
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private static boolean sendAfterBarrier(
+            PostgresFriendAdapter adapter, CyclicBarrier barrier, long requesterId, long addresseeId) throws Exception {
+        barrier.await(1, TimeUnit.MINUTES);
+        try {
+            adapter.sendRequest(requesterId, addresseeId);
+            return true;
+        } catch (DuplicateFriendRequestException e) {
+            return false;
+        }
+    }
+
+    @Test
     void shouldAcceptRequest_andAppearInListAccepted() {
         long a = createFreshCharacter("FriendA3");
         long b = createFreshCharacter("FriendB3");
@@ -161,10 +217,11 @@ class FriendIntegrationTest {
         long a = createFreshCharacter("FriendA7");
         long b = createFreshCharacter("FriendB7");
         long c = createFreshCharacter("FriendC7");
+        long d = createFreshCharacter("FriendD7");
         PostgresFriendAdapter adapter = newAdapter();
         adapter.sendRequest(a, b); // b nhận
         adapter.sendRequest(c, b); // b nhận thêm 1 cái nữa
-        adapter.sendRequest(b, c); // c nhận (không liên quan tới b's incoming)
+        adapter.sendRequest(b, d); // d nhận (không liên quan tới b's incoming)
 
         List<Friendship> pending = adapter.listPendingIncoming(b);
 
