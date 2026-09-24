@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import dev.kage.trade.domain.OwnedItemSnapshot;
@@ -26,6 +27,21 @@ final class FakeTradeInventoryPort implements TradeInventoryPort {
 
     void markInventoryFull(long characterId) {
         fullInventoryCharacterIds.add(characterId);
+    }
+
+    private final AtomicInteger capacity = new AtomicInteger(Integer.MAX_VALUE);
+
+    /** Sức chứa theo SỐ DÒNG, kiểm bởi {@link #exceedsCapacity} — mặc định không giới hạn. */
+    void setCapacity(int rows) {
+        capacity.set(rows);
+    }
+
+    @Override
+    public boolean exceedsCapacity(Transaction tx, long characterId) {
+        long rows = items.values().stream()
+                .filter(i -> i.characterId() == characterId)
+                .count();
+        return rows > capacity.get();
     }
 
     @Override

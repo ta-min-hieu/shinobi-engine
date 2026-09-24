@@ -68,6 +68,28 @@ class ConfirmTradeUseCaseTest {
     }
 
     @Test
+    void shouldReturnOfferInvalid_whenRecipientBagWouldEndUpOverCapacity() {
+        FakeTradeSessionPort sessionPort = new FakeTradeSessionPort();
+        FakeTradeInventoryPort inventoryPort = new FakeTradeInventoryPort();
+        FakeTradeAuditPort auditPort = new FakeTradeAuditPort();
+        inventoryPort.setCapacity(1);
+        TradeSession session = sessionPort.createRequest(1, 5);
+        sessionPort.acceptRequest(session.id(), 5);
+        long itemId = inventoryPort.addItem(1, 200, 1, 0);
+        inventoryPort.addItem(5, 300, 1, 0); // túi bên 5 đã đủ 1/1
+        sessionPort.replaceOffer(session.id(), 1, 0, List.of(new OfferedItemInput(itemId, 1)));
+        sessionPort.replaceOffer(session.id(), 5, 0, List.of());
+        ConfirmTradeUseCase useCase = newUseCase(new TradePorts(
+                sessionPort, inventoryPort, new FakeTradeGoldPort(), auditPort, new FakeIdempotencyPort()));
+
+        useCase.execute(session.id(), 1, "key-a");
+        ConfirmTradeUseCase.Result result = useCase.execute(session.id(), 5, "key-b");
+
+        assertThat(result).isEqualTo(ConfirmTradeUseCase.Result.OFFER_INVALID);
+        assertThat(auditPort.loggedActions).isEmpty();
+    }
+
+    @Test
     void shouldSplitStack_whenOfferedQuantityLessThanRowQuantity() {
         FakeTradeSessionPort sessionPort = new FakeTradeSessionPort();
         FakeTradeInventoryPort inventoryPort = new FakeTradeInventoryPort();

@@ -21,6 +21,21 @@ public interface TradeInventoryPort {
      */
     TransferOutcome transferItem(Transaction tx, TransferRequest request);
 
+    /**
+     * Sau MỌI lượt chuyển của một giao dịch (cùng transaction), {@code characterId} có đang giữ
+     * nhiều dòng hơn sức chứa túi không.
+     *
+     * <p>Kiểm ở CUỐI chứ không ở từng lượt (thêm 2026-09-24): đổi 1-lấy-1 giữa hai túi đều đầy là
+     * hợp lệ, nhưng giữa chừng một bên tạm có thêm một dòng. Trước đây lượt chuyển NGUYÊN DÒNG bỏ
+     * qua hẳn kiểm sức chứa, nên túi đủ 20 dòng vẫn nhận thêm thành 21.
+     *
+     * <p>Mặc định {@code false} CHỈ để các fake port ở test không dính tới giao dịch khỏi phải hiện
+     * thực — adapter thật PHẢI ghi đè.
+     */
+    default boolean exceedsCapacity(Transaction tx, long characterId) {
+        return false;
+    }
+
     /** Gói tham số cho {@link #transferItem} — tránh vượt 4 tham số Checkstyle {@code ParameterNumber}. */
     record TransferRequest(long fromCharacterId, long toCharacterId, long itemId, int quantity) {}
 
