@@ -157,6 +157,51 @@ class TradeIntegrationTest {
         }
     }
 
+    // Lấp túi bằng wooden_sword (max_stack = 1 — không bao giờ gộp) tới đúng {@code rows} dòng.
+    private static void fillBagWithSwords(long characterId, int rows) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement("""
+                        INSERT INTO inventory_item (character_id, item_template_id, quantity, enhance_level, slot_index)
+                        SELECT ?, id, 1, 0, ? FROM item_template WHERE code = 'wooden_sword'
+                        """)) {
+            for (int slot = 0; slot < rows; slot++) {
+                statement.setLong(1, characterId);
+                statement.setInt(2, slot);
+                statement.executeUpdate();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Lỗi test-only lấp túi: characterId=" + characterId, e);
+        }
+    }
+
+    private static int bagRowCount(long characterId) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
+                        connection.prepareStatement("SELECT COUNT(*) FROM inventory_item WHERE character_id = ?")) {
+            statement.setLong(1, characterId);
+            try (ResultSet rs = statement.executeQuery()) {
+                rs.next();
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Lỗi test-only đếm túi: characterId=" + characterId, e);
+        }
+    }
+
+    private static long firstItemOf(long characterId) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(
+                        "SELECT id FROM inventory_item WHERE character_id = ? ORDER BY id LIMIT 1")) {
+            statement.setLong(1, characterId);
+            try (ResultSet rs = statement.executeQuery()) {
+                rs.next();
+                return rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Lỗi test-only tìm item: characterId=" + characterId, e);
+        }
+    }
+
     private static long itemOwner(long itemId) {
         try (Connection connection = dataSource.getConnection();
                 PreparedStatement statement =
@@ -214,6 +259,62 @@ class TradeIntegrationTest {
         assertThat(itemOwner(itemA)).isEqualTo(b);
         assertThat(itemOwner(itemB)).isEqualTo(a);
         assertThat(sessionPort.findActiveSessionOfCharacter(a)).isEmpty();
+    }
+
+    /**
+     * Chuyển NGUYÊN DÒNG (đổi {@code character_id}) từng bỏ qua hẳn kiểm sức chứa — chỉ nhánh tách
+     * stack mới kiểm. Túi người nhận đủ 20 dòng vẫn nhận thêm, thành 21 (sửa 2026-09-24).
+     */
+    @Test
+    void shouldRejectTrade_whenAWholeRowWouldOverfillTheRecipientsBag() {
+        long a = createFreshCharacter("TradeA7");
+        long b = createFreshCharacter("TradeB7");
+        long itemA = persistOneItem(a, kunaiTemplateId, 4);
+        fillBagWithSwords(b, 20);
+        PostgresTradeSessionAdapter sessionPort = newSessionPort();
+        TradeSession session =
+                new RequestTradeUseCase(sessionPort).execute(a, b).session();
+        new AcceptTradeRequestUseCase(sessionPort).execute(session.id(), b);
+        new SetTradeOfferUseCase(sessionPort).execute(session.id(), a, 0, List.of(new OfferedItemInput(itemA, 4)));
+        new SetTradeOfferUseCase(sessionPort).execute(session.id(), b, 0, List.of());
+        ConfirmTradeUseCase confirmUseCase = newConfirmUseCase(sessionPort);
+
+        confirmUseCase.execute(session.id(), a, newIdempotencyKey());
+        ConfirmTradeUseCase.Result result = confirmUseCase.execute(session.id(), b, newIdempotencyKey());
+
+        assertThat(bagRowCount(b)).isEqualTo(20);
+        assertThat(itemOwner(itemA)).isEqualTo(a);
+        assertThat(result).isEqualTo(ConfirmTradeUseCase.Result.OFFER_INVALID);
+    }
+
+    /**
+     * Đổi 1-lấy-1 giữa hai túi ĐỀU đầy là hợp lệ: giữa chừng một bên tạm có 21 dòng nhưng lúc
+     * xong mỗi bên vẫn 20. Vì vậy sức chứa phải kiểm SAU mọi lượt chuyển, không phải từng lượt.
+     */
+    @Test
+    void shouldExecuteOneForOneSwap_whenBothBagsAreFull() {
+        long a = createFreshCharacter("TradeA8");
+        long b = createFreshCharacter("TradeB8");
+        fillBagWithSwords(a, 20);
+        fillBagWithSwords(b, 20);
+        long itemA = firstItemOf(a);
+        long itemB = firstItemOf(b);
+        PostgresTradeSessionAdapter sessionPort = newSessionPort();
+        TradeSession session =
+                new RequestTradeUseCase(sessionPort).execute(a, b).session();
+        new AcceptTradeRequestUseCase(sessionPort).execute(session.id(), b);
+        new SetTradeOfferUseCase(sessionPort).execute(session.id(), a, 0, List.of(new OfferedItemInput(itemA, 1)));
+        new SetTradeOfferUseCase(sessionPort).execute(session.id(), b, 0, List.of(new OfferedItemInput(itemB, 1)));
+        ConfirmTradeUseCase confirmUseCase = newConfirmUseCase(sessionPort);
+
+        confirmUseCase.execute(session.id(), a, newIdempotencyKey());
+        ConfirmTradeUseCase.Result result = confirmUseCase.execute(session.id(), b, newIdempotencyKey());
+
+        assertThat(result).isEqualTo(ConfirmTradeUseCase.Result.EXECUTED);
+        assertThat(itemOwner(itemA)).isEqualTo(b);
+        assertThat(itemOwner(itemB)).isEqualTo(a);
+        assertThat(bagRowCount(a)).isEqualTo(20);
+        assertThat(bagRowCount(b)).isEqualTo(20);
     }
 
     @Test

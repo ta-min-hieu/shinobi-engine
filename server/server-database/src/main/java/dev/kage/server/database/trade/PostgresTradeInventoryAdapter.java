@@ -82,6 +82,11 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
         return TransferOutcome.OK;
     }
 
+    @Override
+    public boolean exceedsCapacity(Transaction tx, long characterId) {
+        return countItems(((JdbcTransaction) tx).connection(), characterId) > DEFAULT_CAPACITY;
+    }
+
     private static Optional<OwnedItemSnapshot> selectForUpdate(Connection connection, long itemId) {
         return JdbcOperations.queryOne(
                 connection,

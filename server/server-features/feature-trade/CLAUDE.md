@@ -45,6 +45,11 @@ yêu cầu, KHÔNG có thiết kế nào — mọi cơ chế bên dưới là qu
    nguyên `character_id` của dòng; nếu nhỏ hơn, giảm `quantity` dòng gốc + tạo dòng MỚI cho người
    nhận (KHÔNG gộp vào stack có sẵn của người nhận — hệ thống hiện tại không tự gộp stack ở bất kỳ
    đường cấp item nào khác, giữ nhất quán).
+   ⚠️ 2026-09-24: tiền đề "không đường nào khác tự gộp" nay SAI — rơi đồ, shop, quest, thư đều gộp
+   (`InventoryStackMerge`). Quyết định vẫn giữ nguyên tới khi chủ dự án chốt lại.
+   **Sức chứa túi** kiểm SAU mọi lượt chuyển (`TradeInventoryPort#exceedsCapacity`, sửa
+   2026-09-24): trước đó chuyển NGUYÊN DÒNG bỏ qua hẳn kiểm, túi 20 dòng nhận thành 21. Kiểm ở
+   cuối chứ không từng lượt để đổi 1-lấy-1 giữa hai túi đều đầy vẫn hợp lệ.
 3. **`idempotencyKey` (ADR-025) chỉ ở `ConfirmTradeCommand`** — Command duy nhất có thể kích hoạt
    hiệu ứng thật (chuyển gold/item). `RequestTrade`/`AcceptTradeRequest`/`Cancel`/`SetTradeOffer`
    không cần — tự nhiên idempotent (gọi lại vô hại) hoặc không có hậu quả kinh tế.

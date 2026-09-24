@@ -74,6 +74,11 @@ public final class ConfirmTradeUseCase {
             transferOrAbort(
                     t, new TradeInventoryPort.TransferRequest(targetId, requesterId, item.itemId(), item.quantity()));
         }
+        // Sức chứa kiểm SAU mọi lượt chuyển — xem TradeInventoryPort#exceedsCapacity.
+        if (ports.inventoryPort().exceedsCapacity(t, requesterId)
+                || ports.inventoryPort().exceedsCapacity(t, targetId)) {
+            throw new TradeExecutionAbortedException();
+        }
     }
 
     /** Tách khỏi {@link #executeTransferOrAbort} chỉ để giữ độ phức tạp method dưới ngưỡng

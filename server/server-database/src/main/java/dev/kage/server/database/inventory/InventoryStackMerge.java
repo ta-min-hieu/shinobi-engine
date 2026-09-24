@@ -17,8 +17,12 @@ import dev.kage.server.database.JdbcOperations;
  *       BỎ SÓT lúc bản vá đầu (chỉ đếm ba đường), thêm 2026-09-24.
  * </ol>
  *
- * <p>⚠️ {@code PostgresTradeInventoryAdapter} cũng {@code INSERT} thẳng vào {@code inventory_item} và
- * CHƯA dùng lớp này — chưa rà xem có cố ý không.
+ * <p>⚠️ {@code PostgresTradeInventoryAdapter} (giao dịch) cũng đưa đồ vào túi nhưng CỐ Ý không dùng
+ * lớp này: quyết định MVP 2 trong feature-trade/CLAUDE.md, chốt cùng chủ dự án 2026-07-24, ghi
+ * "KHÔNG gộp vào stack có sẵn của người nhận". Đo thật 2026-09-24: nhận 3 phi đao khi đã có chồng
+ * 5 ⇒ 2 dòng; túi đủ 20 dòng mà chồng còn chỗ ⇒ bị từ chối. Lý do gốc của quyết định ("không
+ * đường cấp đồ nào khác tự gộp, giữ nhất quán") nay đã SAI — bốn đường trên đều gộp — nên đây là
+ * việc chờ chủ dự án quyết lại, KHÔNG tự đổi.
  *
  * <p>Hai đường sau bỏ qua hẳn domain (feature-shop/feature-quest không được import feature-inventory
  * — mỗi feature chỉ đọc bảng của mình qua adapter riêng, xem server/CLAUDE.md). Sửa xếp chồng ở
