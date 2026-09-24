@@ -42,6 +42,15 @@ public final class PostgresInventoryAdapter implements InventoryPort {
               FROM inventory_item WHERE character_id = ? ORDER BY id
             """;
 
+    // FOR UPDATE: xem InventoryPort#findOwnedItemForUpdate. Postgres đánh giá lại WHERE sau khi chờ
+    // khoá, nên dòng vừa bị giao dịch đổi chủ sẽ KHÔNG khớp character_id nữa (rỗng, không phải dữ
+    // liệu cũ).
+    private static final String FIND_OWNED_ITEM_FOR_UPDATE = """
+            SELECT id, item_template_id, quantity, enhance_level
+              FROM inventory_item WHERE id = ? AND character_id = ?
+               FOR UPDATE
+            """;
+
     private static final String SELECT_EXISTING_IDS = """
             SELECT id FROM inventory_item WHERE character_id = ?
             """;
@@ -71,6 +80,13 @@ public final class PostgresInventoryAdapter implements InventoryPort {
         List<ItemStack> items = JdbcOperations.query(
                 dataSource, FIND_BY_CHARACTER, PostgresInventoryAdapter::mapItemStack, characterId);
         return Optional.of(new Inventory(characterId, DEFAULT_CAPACITY, items));
+    }
+
+    @Override
+    public Optional<ItemStack> findOwnedItemForUpdate(Transaction tx, long characterId, long itemId) {
+        Connection connection = ((JdbcTransaction) tx).connection();
+        return JdbcOperations.queryOne(
+                connection, FIND_OWNED_ITEM_FOR_UPDATE, PostgresInventoryAdapter::mapItemStack, itemId, characterId);
     }
 
     @Override

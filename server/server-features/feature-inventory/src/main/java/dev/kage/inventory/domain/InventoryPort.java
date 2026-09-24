@@ -26,4 +26,20 @@ public interface InventoryPort {
      *     giá trị trả về này, không phải tham số {@code inventory} đầu vào.
      */
     Inventory save(Transaction tx, Inventory inventory);
+
+    /**
+     * Món {@code itemId} CÒN thuộc {@code characterId}, đọc trong giao dịch {@code tx} và KHOÁ dòng
+     * đó tới hết giao dịch — rỗng nếu không tồn tại hoặc thuộc người khác (fail secure, SECURITY.md §4).
+     *
+     * <p><b>Vì sao cần</b> (2026-09-24): mặc đồ từng xác thực bằng {@link #findByCharacter} — đọc
+     * NGOÀI giao dịch, không khoá — trong khi giao dịch/cửa hàng/thư khoá dòng {@code FOR UPDATE} rồi
+     * mới kiểm "đang mặc không". Mặc đúng lúc món đó đổi chủ qua giao dịch thì ô trang bị của người
+     * cũ trỏ vào đồ của người mới (một thanh kiếm, hai người cùng hưởng chỉ số). Khoá cùng dòng làm
+     * hai bên xếp hàng: bên nào tới sau thấy trạng thái SAU khi bên kia commit.
+     *
+     * <p>Mặc định (fake trong test, không có khái niệm khoá): tra qua {@link #findByCharacter}.
+     */
+    default Optional<ItemStack> findOwnedItemForUpdate(Transaction tx, long characterId, long itemId) {
+        return findByCharacter(characterId).flatMap(inventory -> inventory.findItem(itemId));
+    }
 }

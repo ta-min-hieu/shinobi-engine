@@ -44,6 +44,9 @@ import dev.kage.inventory.domain.ItemStack;
  * {@code Inventory} để xác thực rồi ghi qua {@code EquipmentPort} (bảng {@code equipment_slot}
  * nhỏ, không phải chồng {@code inventory_item}). Vẫn khoá CHUNG cho nhất quán (đơn giản hơn phải
  * nhớ "2 method này miễn khoá") — cái giá là không đáng kể, đây là hành động hiếm/theo nhịp người.
+ * ⚠️ Khoá này chỉ tuần tự hoá các lệnh ĐI QUA facade này; giao dịch/cửa hàng/thư xoá hoặc đổi chủ
+ * dòng vật phẩm bằng adapter riêng của feature đó, KHÔNG qua đây — nên mặc đồ còn phải khoá chính
+ * dòng đó trong DB (2026-09-24, {@code InventoryPort#findOwnedItemForUpdate}).
  *
  * <p>Khoá {@link #withCharacterLock} bọc NGOÀI mọi method có sửa túi đồ — không sửa gì bên trong
  * các use case, không đổi hành vi khi chỉ có MỘT lệnh tại một thời điểm (trường hợp tuyệt đại đa
