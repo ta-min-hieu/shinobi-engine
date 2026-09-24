@@ -294,6 +294,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // NETWORK.md §13 (đề xuất, chưa verify): MoveCommand ≤ tick rate (30/giây).
     private static final int MAX_MOVE_COMMANDS_PER_SECOND = 30;
 
+    // Chủ dự án duyệt 2026-09-24: trần CHUNG cho mọi lệnh chạm DB (mọi lệnh đi qua executeBlocking).
+    // Cỡ theo client THẬT, đếm từ client-core: đăng nhập ≤4 (Connect, ListCharacters, CreateCharacter,
+    // SelectCharacter), vào world 2 (GetItemCatalog, ListQuests — WorldScreen.show), rồi mở MỌI cửa sổ
+    // trong cùng một giây: bang 3, nhóm 3, bạn bè 2, túi đồ/thư/cửa hàng/xếp hạng mỗi cái 1 = 18.
+    // Trần 40 = GẤP ĐÔI mức cao nhất của client thật (chủ dự án chọn 2026-09-24, thay cho 20 ban
+    // đầu): 18/20 là biên quá mỏng, vì vài lệnh client tự gửi khi nhận event do NGƯỜI KHÁC gây ra
+    // (mỗi TradeUpdatedEvent ⇒ GetTradeStatus; NewMailEvent/ItemGrantedEvent khi đang mở cửa sổ ⇒
+    // listMail/listInventory) — một đối tác giao dịch spam có thể đẩy nạn nhân sát trần rồi ngắt oan.
+    // Một client spam hàng nghìn lệnh/giây vẫn chạm ngay.
+    private static final int MAX_DB_COMMANDS_PER_SECOND = 40;
+
     // Khoá i18n cho GoldChangedEvent lúc vừa vào world (ADR-035 Decision-3) — KHÔNG phải câu tiếng
     // Việt cứng. Các lý do còn lại (mua/bán/cường hoá/thư/giao dịch) do adapter server-database đặt,
     // xem GoldLedger javadoc vì sao chúng nằm ở đó chứ không ở đây.
@@ -320,6 +331,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // hoá, chỉ được đọc/ghi trên Netty EventLoop của CHÍNH connection này.
     private final RateLimiter moveCommandRateLimiter =
             new RateLimiter(MAX_MOVE_COMMANDS_PER_SECOND, Duration.ofSeconds(1));
+    // Chỉ chạm trong executeBlocking, mà executeBlocking chỉ được gọi từ các handle*Command/Request
+    // do channelRead0 phát — tức trên EventLoop của CHÍNH kết nối này, cùng quy ước moveCommandRateLimiter.
+    private final RateLimiter dbCommandRateLimiter = new RateLimiter(MAX_DB_COMMANDS_PER_SECOND, Duration.ofSeconds(1));
     // NETWORK.md §13 (đề xuất, chưa verify) — World nghiêm ngặt nhất (toàn server thấy), Khu vực
     // lỏng nhất (chỉ người gần thấy), Riêng tư ở giữa, khớp bảng GAMEPLAY.md §10.
     private final RateLimiter chatWorldRateLimiter = new RateLimiter(5, Duration.ofSeconds(10));
@@ -3445,11 +3459,27 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      *
      * <p>Client đã sẵn đường cho lỗi này: panel đang chờ đúng {@code sequenceId} tự nhận, không ai
      * nhận thì {@code WorldScreen#onUnclaimedError} hiện ra cho người chơi.
+     *
+     * <p><b>Rate limit</b> (2026-09-24, NETWORK.md §13): chạy TRÊN EventLoop, TRƯỚC khi đẩy sang
+     * {@code authExecutor} — lệnh bị từ chối không tốn một Virtual Thread hay một câu query nào. Vượt
+     * ngưỡng một cửa sổ ⇒ trả {@code error.rate_limited} về đúng {@code sequenceId} (KHÁC MoveCommand
+     * vốn bỏ im lặng: ở đây có panel đang chờ câu trả lời, im lặng là để nó treo); vượt LIÊN TIẾP ⇒
+     * ngắt kết nối, cùng cơ chế {@link #moveCommandRateLimiter}.
      */
     // PMD AvoidCatchingGenericException: đúng ý — ranh giới I/O bất đồng bộ, PHẢI trả lời client dù
     // lỗi gì xảy ra (cùng lý do handleConnectBlocking).
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void executeBlocking(ChannelHandlerContext ctx, int sequenceId, Runnable handler) {
+        if (!dbCommandRateLimiter.tryAcquire()) {
+            networkMetrics.recordRateLimitRejected("db");
+            if (dbCommandRateLimiter.shouldDisconnect()) {
+                LOG.warn("Lệnh chạm DB vượt rate limit liên tục — ngắt kết nối: characterId={}", boundCharacterId);
+                ctx.close();
+                return;
+            }
+            sendError(ctx, sequenceId, 429, "error.rate_limited");
+            return;
+        }
         authExecutor.execute(() -> {
             try {
                 handler.run();
