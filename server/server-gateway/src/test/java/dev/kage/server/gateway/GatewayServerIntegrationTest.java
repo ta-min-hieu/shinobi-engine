@@ -2139,11 +2139,22 @@ class GatewayServerIntegrationTest {
     @Test
     @Timeout(15)
     void clientShouldReceiveSendMailResponse_overRealSockets() throws Exception {
-        // Cùng lý do clientShouldReceiveSendFriendRequestResponse_overRealSockets: tên người nhận
-        // bất kỳ chắc chắn không tồn tại, verify đúng nhánh RECIPIENT_NOT_FOUND — nhánh này KHÔNG
-        // chạm tới fakeMailFacade()'s MailRepositoryPort (ném exception nếu bị gọi thật).
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        // Nhánh 1 — cùng lý do clientShouldReceiveSendFriendRequestResponse_overRealSockets: tên
+        // người nhận bất kỳ chắc chắn không tồn tại ⇒ RECIPIENT_NOT_FOUND, KHÔNG chạm
+        // fakeMailFacade()'s MailRepositoryPort.
+        // Nhánh 2 — người nhận CÓ thật nên đi tới MailRepositoryPort.send, mà fake luôn ném: đúng
+        // hình dạng một lỗi DB thật. handleSendMailBlocking không tự bắt gì; trước lưới
+        // executeBlocking (2026-09-24) client không nhận gì và treo tới hết @Timeout. Gộp chung một
+        // hàm: lớp này đã chạm trần CyclomaticComplexity cả lớp của PMD.
+        try (Socket recipient = new Socket("127.0.0.1", server.port());
+                Socket socket = new Socket("127.0.0.1", server.port())) {
+            recipient.setSoTimeout(5000);
             socket.setSoTimeout(5000);
+            String recipientName = connectCreateAndSelectNamed(
+                            recipient,
+                            new DataInputStream(recipient.getInputStream()),
+                            "mlrcv" + UUID.randomUUID().toString().substring(0, 6))
+                    .name();
             DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(
                     socket, in, "mail" + UUID.randomUUID().toString().substring(0, 6));
@@ -2158,6 +2169,18 @@ class GatewayServerIntegrationTest {
             SendMailResponse response = SendMailResponse.parseFrom(
                     readUntilOpcode(in, Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE).payload());
             assertThat(response.getOutcome()).isEqualTo(SendMailOutcome.SEND_MAIL_OUTCOME_RECIPIENT_NOT_FOUND);
+
+            SendMailCommand failingCommand = SendMailCommand.newBuilder()
+                    .setRecipientName(recipientName)
+                    .setSubject("s")
+                    .setBody("b")
+                    .build();
+            sendFrame(socket, Opcode.OPCODE_SEND_MAIL_COMMAND_VALUE, 11, failingCommand.toByteArray());
+
+            ErrorResponse error = ErrorResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_ERROR_VALUE).payload());
+            assertThat(error.getErrorKey()).isEqualTo("error.server_internal");
+            assertThat(error.getRelatedSequenceId()).isEqualTo(11);
         }
     }
 

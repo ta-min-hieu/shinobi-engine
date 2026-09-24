@@ -498,7 +498,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // Đăng nhập chạm Redis/PostgreSQL (qua AccountFacade) — I/O chặn, KHÔNG được chạy trên
         // Netty EventLoop (SERVER.md §2 — "Cấm: Query DB, logic nặng, chờ lock"). Đẩy sang Virtual
         // Thread; ctx.writeAndFlush an toàn gọi từ thread khác EventLoop (Netty tự chuyển task).
-        authExecutor.execute(() -> handleConnectBlocking(ctx, sequenceId, username));
+        executeBlocking(ctx, sequenceId, () -> handleConnectBlocking(ctx, sequenceId, username));
     }
 
     // PMD AvoidCatchingGenericException: đúng ý — đây là ranh giới I/O bất đồng bộ, PHẢI trả lời
@@ -536,7 +536,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleListCharactersBlocking(ctx, sequenceId, accountId));
+        executeBlocking(ctx, sequenceId, () -> handleListCharactersBlocking(ctx, sequenceId, accountId));
     }
 
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
@@ -564,7 +564,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleCreateCharacterBlocking(ctx, sequenceId, accountId, request));
+        executeBlocking(ctx, sequenceId, () -> handleCreateCharacterBlocking(ctx, sequenceId, accountId, request));
     }
 
     // PMD AvoidCatchingGenericException: ranh giới I/O bất đồng bộ, phải trả lời dù lỗi gì.
@@ -607,7 +607,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             return;
         }
         long characterId = request.getCharacterId();
-        authExecutor.execute(() -> handleSelectCharacterBlocking(ctx, sequenceId, accountId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleSelectCharacterBlocking(ctx, sequenceId, accountId, characterId));
     }
 
     // PMD AvoidCatchingGenericException: ranh giới I/O bất đồng bộ, phải trả lời dù lỗi gì.
@@ -763,7 +763,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 400, "error.invalid_faction");
             return;
         }
-        authExecutor.execute(() -> handleSelectFactionBlocking(ctx, sequenceId, characterId, request));
+        executeBlocking(ctx, sequenceId, () -> handleSelectFactionBlocking(ctx, sequenceId, characterId, request));
     }
 
     // PMD AvoidCatchingGenericException: ranh giới I/O bất đồng bộ, phải trả lời dù lỗi gì.
@@ -932,7 +932,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleEquipItemBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleEquipItemBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleEquipItemBlocking(
@@ -972,7 +972,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleUnequipItemBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleUnequipItemBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleUnequipItemBlocking(
@@ -1010,7 +1010,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // Gộp characterId/command/tracingContext vào 1 record — tránh vượt Checkstyle ParameterNumber
         // (max 4) mà không cần đổi field instance (per-connection nhưng có thể pipeline nhiều lệnh).
         EnhanceItemRequest request = new EnhanceItemRequest(sequenceId, characterId, command, Context.current());
-        authExecutor.execute(() -> handleEnhanceItemBlocking(ctx, request));
+        executeBlocking(ctx, sequenceId, () -> handleEnhanceItemBlocking(ctx, request));
     }
 
     private record EnhanceItemRequest(
@@ -1062,7 +1062,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             return;
         }
         long inventoryItemId = command.getInventoryItemId();
-        authExecutor.execute(() -> handleUseItemBlocking(ctx, sequenceId, characterId, inventoryItemId));
+        executeBlocking(ctx, sequenceId, () -> handleUseItemBlocking(ctx, sequenceId, characterId, inventoryItemId));
     }
 
     /**
@@ -1137,7 +1137,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleListInventoryBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleListInventoryBlocking(ctx, sequenceId, characterId));
     }
 
     private void handleListInventoryBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
@@ -1179,7 +1179,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleGetItemCatalogBlocking(ctx, sequenceId, request.getKnownVersion()));
+        executeBlocking(
+                ctx, sequenceId, () -> handleGetItemCatalogBlocking(ctx, sequenceId, request.getKnownVersion()));
     }
 
     /**
@@ -1228,7 +1229,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleListQuestsBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleListQuestsBlocking(ctx, sequenceId, characterId));
     }
 
     private void handleListQuestsBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
@@ -1266,7 +1267,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleListShopItemsBlocking(ctx, sequenceId));
+        executeBlocking(ctx, sequenceId, () -> handleListShopItemsBlocking(ctx, sequenceId));
     }
 
     private void handleListShopItemsBlocking(ChannelHandlerContext ctx, int sequenceId) {
@@ -1301,7 +1302,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // Context.current() PHẢI chụp NGAY ở đây (còn trên EventLoop, bên trong span "gateway.command"
         // của channelRead0) — cùng lý do EnhanceItemRequest ở handleEnhanceItemCommand.
         BuyItemRequest request = new BuyItemRequest(sequenceId, characterId, command, Context.current());
-        authExecutor.execute(() -> handleBuyItemBlocking(ctx, request));
+        executeBlocking(ctx, sequenceId, () -> handleBuyItemBlocking(ctx, request));
     }
 
     private record BuyItemRequest(int sequenceId, long characterId, BuyItemCommand command, Context tracingContext) {}
@@ -1351,7 +1352,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         // Context.current() PHẢI chụp NGAY ở đây — cùng lý do handleBuyItemCommand.
         SellItemRequest request = new SellItemRequest(sequenceId, characterId, command, Context.current());
-        authExecutor.execute(() -> handleSellItemBlocking(ctx, request));
+        executeBlocking(ctx, sequenceId, () -> handleSellItemBlocking(ctx, request));
     }
 
     private record SellItemRequest(int sequenceId, long characterId, SellItemCommand command, Context tracingContext) {}
@@ -1399,7 +1400,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleTalkToNpcBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleTalkToNpcBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleTalkToNpcBlocking(
@@ -1448,7 +1449,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleSelectDialogueOptionBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(
+                ctx, sequenceId, () -> handleSelectDialogueOptionBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleSelectDialogueOptionBlocking(
@@ -1511,7 +1513,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleClaimQuestRewardBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleClaimQuestRewardBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleClaimQuestRewardBlocking(
@@ -1572,7 +1574,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleSendFriendRequestBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleSendFriendRequestBlocking(ctx, sequenceId, characterId, command));
     }
 
     // PMD AvoidCatchingGenericException: đúng ý — đây là ranh giới I/O bất đồng bộ (authExecutor,
@@ -1627,7 +1629,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleAcceptFriendRequestBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(
+                ctx, sequenceId, () -> handleAcceptFriendRequestBlocking(ctx, sequenceId, characterId, command));
     }
 
     // PMD AvoidCatchingGenericException: cùng lý do handleSendFriendRequestBlocking.
@@ -1657,7 +1660,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleRejectFriendRequestBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(
+                ctx, sequenceId, () -> handleRejectFriendRequestBlocking(ctx, sequenceId, characterId, command));
     }
 
     // PMD AvoidCatchingGenericException: cùng lý do handleSendFriendRequestBlocking.
@@ -1687,7 +1691,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleRemoveFriendBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleRemoveFriendBlocking(ctx, sequenceId, characterId, command));
     }
 
     // PMD AvoidCatchingGenericException: cùng lý do handleSendFriendRequestBlocking.
@@ -1726,7 +1730,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleListFriendsBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleListFriendsBlocking(ctx, sequenceId, characterId));
     }
 
     // PMD AvoidCatchingGenericException: cùng lý do handleSendFriendRequestBlocking.
@@ -1765,7 +1769,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleListPendingFriendRequestsBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleListPendingFriendRequestsBlocking(ctx, sequenceId, characterId));
     }
 
     // PMD AvoidCatchingGenericException: cùng lý do handleSendFriendRequestBlocking.
@@ -1804,7 +1808,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleCreateGuildBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleCreateGuildBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleCreateGuildBlocking(
@@ -1840,7 +1844,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleSendGuildJoinRequestBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(
+                ctx, sequenceId, () -> handleSendGuildJoinRequestBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleSendGuildJoinRequestBlocking(
@@ -1876,7 +1881,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleApproveGuildJoinRequestBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(
+                ctx, sequenceId, () -> handleApproveGuildJoinRequestBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleApproveGuildJoinRequestBlocking(
@@ -1910,7 +1916,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleRejectGuildJoinRequestBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(
+                ctx, sequenceId, () -> handleRejectGuildJoinRequestBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleRejectGuildJoinRequestBlocking(
@@ -1933,7 +1940,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleLeaveGuildBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleLeaveGuildBlocking(ctx, sequenceId, characterId));
     }
 
     private void handleLeaveGuildBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
@@ -1957,7 +1964,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleDisbandGuildBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleDisbandGuildBlocking(ctx, sequenceId, characterId));
     }
 
     private void handleDisbandGuildBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
@@ -1978,7 +1985,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleKickGuildMemberBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleKickGuildMemberBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleKickGuildMemberBlocking(
@@ -2013,7 +2020,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleListGuildMembersBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleListGuildMembersBlocking(ctx, sequenceId, characterId));
     }
 
     private void handleListGuildMembersBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
@@ -2048,7 +2055,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleListPendingGuildJoinRequestsBlocking(ctx, sequenceId, characterId));
+        executeBlocking(
+                ctx, sequenceId, () -> handleListPendingGuildJoinRequestsBlocking(ctx, sequenceId, characterId));
     }
 
     private void handleListPendingGuildJoinRequestsBlocking(
@@ -2082,7 +2090,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleGetMyGuildBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleGetMyGuildBlocking(ctx, sequenceId, characterId));
     }
 
     private void handleGetMyGuildBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
@@ -2109,7 +2117,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleCreatePartyBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleCreatePartyBlocking(ctx, sequenceId, characterId));
     }
 
     private void handleCreatePartyBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
@@ -2138,7 +2146,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleInvitePartyMemberBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleInvitePartyMemberBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleInvitePartyMemberBlocking(
@@ -2187,7 +2195,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleAcceptPartyInviteBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleAcceptPartyInviteBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleAcceptPartyInviteBlocking(
@@ -2214,7 +2222,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleRejectPartyInviteBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleRejectPartyInviteBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleRejectPartyInviteBlocking(
@@ -2237,7 +2245,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleLeavePartyBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleLeavePartyBlocking(ctx, sequenceId, characterId));
     }
 
     private void handleLeavePartyBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
@@ -2258,7 +2266,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleKickPartyMemberBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleKickPartyMemberBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleKickPartyMemberBlocking(
@@ -2293,7 +2301,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleListPartyMembersBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleListPartyMembersBlocking(ctx, sequenceId, characterId));
     }
 
     private void handleListPartyMembersBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
@@ -2326,7 +2334,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleListPendingPartyInvitesBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleListPendingPartyInvitesBlocking(ctx, sequenceId, characterId));
     }
 
     private void handleListPendingPartyInvitesBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
@@ -2353,7 +2361,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleGetMyPartyBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleGetMyPartyBlocking(ctx, sequenceId, characterId));
     }
 
     private void handleGetMyPartyBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
@@ -2379,7 +2387,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleEnterDungeonBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleEnterDungeonBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleEnterDungeonBlocking(
@@ -2419,7 +2427,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleExitDungeonBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleExitDungeonBlocking(ctx, sequenceId, characterId));
     }
 
     private void handleExitDungeonBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
@@ -2444,7 +2452,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleChallengeDuelBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleChallengeDuelBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleChallengeDuelBlocking(
@@ -2514,7 +2522,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleAcceptDuelBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleAcceptDuelBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleAcceptDuelBlocking(
@@ -2564,7 +2572,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleDeclineDuelBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleDeclineDuelBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleDeclineDuelBlocking(
@@ -2603,7 +2611,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleExitDuelBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleExitDuelBlocking(ctx, sequenceId, characterId));
     }
 
     private void handleExitDuelBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
@@ -2626,7 +2634,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleGetPvpRatingBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleGetPvpRatingBlocking(ctx, sequenceId, characterId));
     }
 
     private void handleGetPvpRatingBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
@@ -2648,7 +2656,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleRequestTradeBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleRequestTradeBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleRequestTradeBlocking(
@@ -2711,7 +2719,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleAcceptTradeRequestBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleAcceptTradeRequestBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleAcceptTradeRequestBlocking(
@@ -2737,7 +2745,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleCancelTradeBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleCancelTradeBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleCancelTradeBlocking(
@@ -2774,7 +2782,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleSetTradeOfferBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleSetTradeOfferBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleSetTradeOfferBlocking(
@@ -2806,7 +2814,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         // Context.current() PHẢI chụp NGAY ở đây — cùng lý do handleBuyItemCommand.
         ConfirmTradeRequest request = new ConfirmTradeRequest(sequenceId, characterId, command, Context.current());
-        authExecutor.execute(() -> handleConfirmTradeBlocking(ctx, request));
+        executeBlocking(ctx, sequenceId, () -> handleConfirmTradeBlocking(ctx, request));
     }
 
     private record ConfirmTradeRequest(
@@ -2895,7 +2903,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleGetTradeStatusBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleGetTradeStatusBlocking(ctx, sequenceId, characterId));
     }
 
     private void handleGetTradeStatusBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
@@ -2952,7 +2960,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleSendMailBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleSendMailBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleSendMailBlocking(
@@ -3019,7 +3027,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleListMailBlocking(ctx, sequenceId, characterId));
+        executeBlocking(ctx, sequenceId, () -> handleListMailBlocking(ctx, sequenceId, characterId));
     }
 
     private void handleListMailBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
@@ -3057,7 +3065,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleClaimMailBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleClaimMailBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleClaimMailBlocking(
@@ -3090,7 +3098,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        authExecutor.execute(() -> handleDeleteMailBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleDeleteMailBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleDeleteMailBlocking(
@@ -3134,7 +3142,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             }
             return;
         }
-        authExecutor.execute(() -> handleSendChatMessageBlocking(ctx, sequenceId, characterId, command));
+        executeBlocking(ctx, sequenceId, () -> handleSendChatMessageBlocking(ctx, sequenceId, characterId, command));
     }
 
     private RateLimiter chatRateLimiterFor(ChatChannel channel) {
@@ -3385,6 +3393,34 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case FACTION_LOI -> dev.kage.character.domain.Faction.LOI;
             case FACTION_THO -> dev.kage.character.domain.Faction.THO;
         };
+    }
+
+    /**
+     * Đẩy một handler chạm DB sang {@code authExecutor}, kèm lưới an toàn cuối cùng: exception nào
+     * lọt ra khỏi handler cũng thành {@code error.server_internal} gửi về đúng {@code sequenceId}.
+     *
+     * <p><b>Vì sao cần</b> (2026-09-24): handler chạy trên Virtual Thread của {@code authExecutor},
+     * nên exception ở đó KHÔNG tới {@code exceptionCaught} của pipeline — nó chết lặng lẽ trong
+     * executor và client chờ một response không bao giờ tới. Rà ngày 2026-09-24 thấy 56/61 handler
+     * không tự bắt gì cả: một lần DB chập chờn là túi đồ, cửa hàng, bang, nhóm, giao dịch, thư...
+     * đều treo. Handler nào cần thông báo RIÊNG (tên trùng, vượt giới hạn...) vẫn tự bắt trước —
+     * lưới này chỉ đỡ phần còn lại.
+     *
+     * <p>Client đã sẵn đường cho lỗi này: panel đang chờ đúng {@code sequenceId} tự nhận, không ai
+     * nhận thì {@code WorldScreen#onUnclaimedError} hiện ra cho người chơi.
+     */
+    // PMD AvoidCatchingGenericException: đúng ý — ranh giới I/O bất đồng bộ, PHẢI trả lời client dù
+    // lỗi gì xảy ra (cùng lý do handleConnectBlocking).
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private void executeBlocking(ChannelHandlerContext ctx, int sequenceId, Runnable handler) {
+        authExecutor.execute(() -> {
+            try {
+                handler.run();
+            } catch (RuntimeException e) {
+                LOG.error("Handler lỗi ngoài dự kiến: sequenceId={}", sequenceId, e);
+                sendError(ctx, sequenceId, 500, "error.server_internal");
+            }
+        });
     }
 
     private void sendError(ChannelHandlerContext ctx, int relatedSequenceId, int errorCode, String errorKey) {
