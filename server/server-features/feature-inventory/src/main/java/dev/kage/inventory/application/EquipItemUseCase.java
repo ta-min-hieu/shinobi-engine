@@ -1,9 +1,11 @@
 package dev.kage.inventory.application;
 
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+
 import dev.kage.inventory.domain.Equipment;
 import dev.kage.inventory.domain.EquipmentPort;
 import dev.kage.inventory.domain.EquipmentSlotType;
-import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.ItemTemplate;
@@ -21,6 +23,11 @@ import dev.kage.inventory.domain.TransactionRunner;
  * cấp nhân vật thuộc {@code feature-character}, và {@code GatewayChannelHandler} vốn đã là nơi nối
  * hai module (cùng khuôn với {@code computeEquipmentBonus} → {@code WorldFacade}). Con số đó luôn
  * đọc từ DB phía server, KHÔNG bao giờ nhận từ client (Điều 15/24).
+ *
+ * <p><b>Cả lượt chạy trong MỘT giao dịch, dòng vật phẩm bị khoá trước khi xác thực</b> (sửa
+ * 2026-09-24) — xem {@link InventoryPort#findOwnedItemForUpdate}. Thứ tự khoá: dòng
+ * {@code inventory_item} rồi mới tới {@code equipment_slot}, cùng chiều với giao dịch/cửa hàng/thư
+ * (khoá dòng vật phẩm, chỉ ĐỌC {@code equipment_slot}) — không tạo vòng khoá mới.
  *
  * <p>Constructor Injection tường minh — không DI container, không field injection (ADR-009).
  */
@@ -49,14 +56,22 @@ public final class EquipItemUseCase {
      *     {@code item_template.required_level} (ADR-036 D4)
      */
     public EquipItemResult execute(long characterId, long itemId, EquipmentSlotType targetSlot, int characterLevel) {
-        Inventory inventory = inventoryPort
-                .findByCharacter(characterId)
-                .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
-        ItemStack item = inventory.findItem(itemId).orElse(null);
-        if (item == null) {
+        AtomicReference<EquipItemResult> result = new AtomicReference<>();
+        tx.inTransaction((Transaction t) ->
+                result.set(equipInTransaction(t, new EquipRequest(characterId, itemId, targetSlot, characterLevel))));
+        return result.get();
+    }
+
+    private EquipItemResult equipInTransaction(Transaction t, EquipRequest request) {
+        long characterId = request.characterId();
+        long itemId = request.itemId();
+        EquipmentSlotType targetSlot = request.targetSlot();
+        Optional<ItemStack> owned = inventoryPort.findOwnedItemForUpdate(t, characterId, itemId);
+        if (owned.isEmpty()) {
             // item không tồn tại HOẶC không thuộc characterId này — cùng lỗi (fail secure, SECURITY.md §4)
             return EquipItemResult.ITEM_NOT_FOUND;
         }
+        ItemStack item = owned.get();
 
         ItemTemplate template = itemTemplatePort
                 .findById(item.itemTemplateId())
@@ -67,7 +82,7 @@ public final class EquipItemUseCase {
         }
         // ADR-036 D4 — GAMEPLAY.md §7 mô tả phép kiểm này từ lâu nhưng nó KHÔNG tồn tại được cho
         // tới khi có cột required_level: trước đó nhân vật Cấp 1 đủ vàng là mặc trọn bộ "Hạ Nhẫn".
-        if (characterLevel < template.requiredLevel()) {
+        if (request.characterLevel() < template.requiredLevel()) {
             return EquipItemResult.LEVEL_TOO_LOW;
         }
 
@@ -75,9 +90,12 @@ public final class EquipItemUseCase {
                 .findByCharacter(characterId)
                 .orElseThrow(() -> new IllegalStateException("EquipmentPort phải luôn trả Optional có giá trị"));
         equipment.equip(targetSlot, itemId);
-        tx.inTransaction((Transaction t) -> equipmentPort.save(t, equipment));
+        equipmentPort.save(t, equipment);
         return EquipItemResult.OK;
     }
+
+    // Gói tham số — trần Checkstyle ParameterNumber là 4, cộng thêm Transaction là 5.
+    private record EquipRequest(long characterId, long itemId, EquipmentSlotType targetSlot, int characterLevel) {}
 
     public enum EquipItemResult {
         OK,
