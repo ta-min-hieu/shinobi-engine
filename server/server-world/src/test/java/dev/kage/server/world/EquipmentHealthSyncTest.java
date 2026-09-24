@@ -124,6 +124,9 @@ class EquipmentHealthSyncTest {
         WorldFacade world =
                 new WorldFacade(sink, true, TickMetricsPort.NO_OP, TestWorldContents.trainingGroundWithElder());
         try {
+            // Người chơi đánh người chơi chỉ là CÔNG CỤ dựng kịch bản ở đây — World thường cấm PvP
+            // (2026-09-24, xem PlayerVersusPlayerRuleTest), nên bật như World Arena.
+            world.allowPlayerVersusPlayer();
             world.start();
             world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
             world.attachCharacter(2L, 1f, 0f, DEFAULT_STATS);

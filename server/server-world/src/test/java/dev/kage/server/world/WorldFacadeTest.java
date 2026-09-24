@@ -817,6 +817,9 @@ class WorldFacadeTest {
         // Con số khớp chính xác: crit ×1.5 ⇒ 25,3 × 1,5 = 38, còn 25,3 × 1,15 = 29,1. Tỉ lệ crit
         // chỉ 1%/đòn (agi 10 × 0,1 / 100) nên nó hiếm, và "hiếm" là thứ làm ô này đỏ ngẫu nhiên
         // trong CI chứ không phải thứ làm nó an toàn.
+        // Người chơi đánh người chơi chỉ là CÔNG CỤ dựng kịch bản ở đây — World thường cấm PvP
+        // (2026-09-24, xem PlayerVersusPlayerRuleTest), nên bật như World Arena.
+        world.allowPlayerVersusPlayer();
         world.start();
         world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS); // Hỏa
         world.attachCharacter(2L, 1f, 0f, PHONG_STATS); // bị Hỏa khắc
@@ -849,6 +852,9 @@ class WorldFacadeTest {
         // cho duel (ArenaOutboundSink chốt kết quả trận đấu); world CHÍNH không có UI nào phơi bày
         // đường này (xem feature-pvp/CLAUDE.md), test trực tiếp bằng setTarget như test khắc chế
         // nguyên tố ở trên.
+        // Người chơi đánh người chơi chỉ là CÔNG CỤ dựng kịch bản ở đây — World thường cấm PvP
+        // (2026-09-24, xem PlayerVersusPlayerRuleTest), nên bật như World Arena.
+        world.allowPlayerVersusPlayer();
         world.start();
         world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
         world.attachCharacter(2L, 1f, 0f, DEFAULT_STATS);
@@ -883,6 +889,9 @@ class WorldFacadeTest {
         // World CHÍNH (spawnOverworldContent=true, field `world` mặc định) — hồi sinh tại chỗ ngay
         // sau onCharacterDefeated (WorldFacade#respawnCharacter). Cùng cách hạ gục tức thời như
         // shouldFireCharacterDefeated_whenCharacterKillsAnotherCharacter ở trên.
+        // Người chơi đánh người chơi chỉ là CÔNG CỤ dựng kịch bản ở đây — World thường cấm PvP
+        // (2026-09-24, xem PlayerVersusPlayerRuleTest), nên bật như World Arena.
+        world.allowPlayerVersusPlayer();
         world.start();
         world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
         world.attachCharacter(2L, 1f, 0f, DEFAULT_STATS);
@@ -915,6 +924,9 @@ class WorldFacadeTest {
         RecordingSink dungeonSink = new RecordingSink();
         WorldFacade dungeonWorld = new WorldFacade(dungeonSink, false);
         try {
+            // Người chơi đánh người chơi chỉ là CÔNG CỤ dựng kịch bản ở đây — World thường cấm PvP
+            // (2026-09-24, xem PlayerVersusPlayerRuleTest), nên bật như World Arena.
+            dungeonWorld.allowPlayerVersusPlayer();
             dungeonWorld.start();
             dungeonWorld.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
             dungeonWorld.attachCharacter(2L, 1f, 0f, DEFAULT_STATS);
@@ -1010,6 +1022,9 @@ class WorldFacadeTest {
         // đơn giản hoá PvP-style thay vì cần quái di chuyển bằng MoveCommand). Không bị slow: 5
         // m/s (MOVE_SPEED_MPS) × 1s = 5m. Bị slow 40%: 3 m/s × 1s = 3m — ngưỡng 4m đủ phân biệt kể
         // cả dưới jitter tick loop thật.
+        // Người chơi đánh người chơi chỉ là CÔNG CỤ dựng kịch bản ở đây — World thường cấm PvP
+        // (2026-09-24, xem PlayerVersusPlayerRuleTest), nên bật như World Arena.
+        world.allowPlayerVersusPlayer();
         world.start();
         world.attachCharacter(1L, 0f, 0f, THUY_STATS);
         world.attachCharacter(2L, 3f, 0f, LOI_STATS); // trong tầm skill Thủy (5m)
@@ -1091,6 +1106,9 @@ class WorldFacadeTest {
         // ⚠️ Nó KHÔNG còn là chỗ duy nhất máu tối đa đi ra ngoài world (câu cũ ở đây nói vậy): từ
         // 2026-09-19 `handleApplyEquipmentBonus` cũng phát `HealthChange` — xem
         // shouldAnnounceShiftedHealth_whenEquipmentChangesMaxHp.
+        // Người chơi đánh người chơi chỉ là CÔNG CỤ dựng kịch bản ở đây — World thường cấm PvP
+        // (2026-09-24, xem PlayerVersusPlayerRuleTest), nên bật như World Arena.
+        world.allowPlayerVersusPlayer();
         world.start();
         world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
         world.attachCharacter(2L, 1f, 0f, DEFAULT_STATS);
@@ -1117,6 +1135,9 @@ class WorldFacadeTest {
         //
         // MỘT người đánh (1L), HAI mục tiêu giống hệt nhau (2L có giáp, 3L không) — chênh lệch chỉ
         // có thể do DEF. Không so với một con số cứng vì damage còn nhánh crit/miss ngẫu nhiên.
+        // Người chơi đánh người chơi chỉ là CÔNG CỤ dựng kịch bản ở đây — World thường cấm PvP
+        // (2026-09-24, xem PlayerVersusPlayerRuleTest), nên bật như World Arena.
+        world.allowPlayerVersusPlayer();
         world.start();
         world.attachCharacter(1L, 0f, 0f, DEFAULT_STATS);
         world.attachCharacter(2L, 1f, 0f, DEFAULT_STATS);

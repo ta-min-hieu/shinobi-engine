@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 import java.util.function.LongFunction;
 import java.util.stream.Collectors;
 
@@ -83,14 +84,19 @@ final class SkillSystem extends IteratingKSystem {
             ComponentMapper.getFor(CombatRecencyComponent.class);
 
     private final LongFunction<KEntity> entityLookup;
+    private final BooleanSupplier pvpAllowed;
     private final ScriptSandbox scriptSandbox = new ScriptSandbox(SkillConstants.SCRIPT_MAX_STATEMENTS);
     private final Map<String, String> scriptsByCode;
     private final List<SkillOutcome> pendingResults = new ArrayList<>();
 
-    /** @param entityLookup tra KEntity theo entity ID (nhân vật DƯƠNG hoặc quái ÂM — combat.proto). */
-    SkillSystem(LongFunction<KEntity> entityLookup) {
+    /**
+     * @param entityLookup tra KEntity theo entity ID (nhân vật DƯƠNG hoặc quái ÂM — combat.proto).
+     * @param pvpAllowed skill ENEMY có được nhắm người chơi khác không — xem {@code WorldFacade#pvpAllowed}.
+     */
+    SkillSystem(LongFunction<KEntity> entityLookup, BooleanSupplier pvpAllowed) {
         super(Family.all(SkillCooldownComponent.class).get());
         this.entityLookup = entityLookup;
+        this.pvpAllowed = pvpAllowed;
         this.scriptsByCode = SkillRegistry.BY_CODE.values().stream()
                 .collect(Collectors.toMap(SkillDefinition::code, def -> loadScript(def.scriptResource())));
         // SCRIPTING.md §8: validate MỌI script lúc khởi động, fail fast (ném thẳng nếu lỗi — server
@@ -198,7 +204,12 @@ final class SkillSystem extends IteratingKSystem {
         if (definition.targetKind() == SkillTargetKind.ALLY && resolvedTargetId <= 0) {
             return false;
         }
-        return definition.targetKind() != SkillTargetKind.ENEMY || resolvedTargetId != casterId;
+        if (definition.targetKind() != SkillTargetKind.ENEMY) {
+            return true;
+        }
+        // ENEMY lên người chơi khác (ID dương) ngoài Arena — cả damage lẫn debuff/stun đều là gây
+        // hại (2026-09-24, tạm thời — xem WorldFacade#pvpAllowed). ALLY (hồi máu/khiên) vẫn được.
+        return resolvedTargetId != casterId && (resolvedTargetId <= 0 || pvpAllowed.getAsBoolean());
     }
 
     /** @return {@code null} nếu mục tiêu không hợp lệ theo {@code definition.targetKind()} (bỏ qua âm thầm). */

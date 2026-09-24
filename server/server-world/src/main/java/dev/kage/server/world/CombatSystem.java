@@ -2,6 +2,7 @@ package dev.kage.server.world;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 import java.util.function.LongFunction;
 
 import dev.kage.engine.ecs.ComponentMapper;
@@ -68,13 +69,18 @@ final class CombatSystem extends IteratingKSystem {
             boolean targetDied) {}
 
     private final LongFunction<KEntity> entityLookup;
+    private final BooleanSupplier pvpAllowed;
     private final List<AttackOutcome> pendingResults = new ArrayList<>();
 
-    /** @param entityLookup tra KEntity theo entity ID (nhân vật DƯƠNG hoặc quái ÂM — combat.proto). */
-    CombatSystem(LongFunction<KEntity> entityLookup) {
+    /**
+     * @param entityLookup tra KEntity theo entity ID (nhân vật DƯƠNG hoặc quái ÂM — combat.proto).
+     * @param pvpAllowed người chơi có được đánh người chơi khác không — xem {@code WorldFacade#pvpAllowed}.
+     */
+    CombatSystem(LongFunction<KEntity> entityLookup, BooleanSupplier pvpAllowed) {
         super(Family.all(PositionComponent.class, TargetComponent.class, AttackCooldownComponent.class)
                 .get());
         this.entityLookup = entityLookup;
+        this.pvpAllowed = pvpAllowed;
     }
 
     List<AttackOutcome> drainResults() {
@@ -146,12 +152,24 @@ final class CombatSystem extends IteratingKSystem {
             return;
         }
 
+        if (isForbiddenPlayerVersusPlayer(entity, targetEntity)) {
+            return; // ngoài Arena — bỏ qua âm thầm, giữ mục tiêu (vẫn được nhắm để xem thông tin)
+        }
+
         if (distance(POSITION.get(entity), POSITION.get(targetEntity)) > CombatConstants.ATTACK_RANGE_METERS) {
             return; // ngoài tầm — chờ, KHÔNG reset cooldown (không "tích luỹ" đòn khi đứng ngoài tầm)
         }
 
         cooldown.remainingSeconds = CombatConstants.ATTACK_INTERVAL_SECONDS;
         resolveAndRecordAttack(entity, targetEntity, target.targetEntityId, targetHealth);
+    }
+
+    /**
+     * Người chơi đánh người chơi khi World này không cho PvP (2026-09-24, tạm thời — xem
+     * {@code WorldFacade#pvpAllowed}). Quái đánh người chơi, người chơi đánh quái: không ảnh hưởng.
+     */
+    private boolean isForbiddenPlayerVersusPlayer(KEntity attacker, KEntity target) {
+        return CHARACTER_ID.has(attacker) && CHARACTER_ID.has(target) && !pvpAllowed.getAsBoolean();
     }
 
     private void resolveAndRecordAttack(
