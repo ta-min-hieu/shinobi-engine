@@ -79,12 +79,33 @@ class GrantExperienceUseCaseTest {
         assertThat(port.savedLevel).isEqualTo(5);
     }
 
+    /**
+     * Giết 2 quái cùng một tick = 2 lượt cộng EXP trên 2 Virtual Thread. Lượt A cộng 1 (99→100, cấp
+     * 2) nhưng TRƯỚC khi A kịp ghi cấp, lượt B cộng 200 (100→300, cấp 3) và ghi xong. Bản cũ để A
+     * ghi đè 2 lên 3 — cột {@code level} LÙI, lệch với {@code exp} cho tới lần nhận EXP kế tiếp.
+     */
+    @Test
+    void shouldNotMoveLevelBackwards_whenAnOlderConcurrentGrantWritesLast() {
+        FakeCharacterPort port = new FakeCharacterPort(1, 99L);
+        GrantExperienceUseCase useCase = new GrantExperienceUseCase(port);
+        port.beforeFirstSave = () -> useCase.execute(CHARACTER_ID, 200L);
+
+        useCase.execute(CHARACTER_ID, 1L);
+
+        assertThat(port.exp).isEqualTo(300L);
+        assertThat(port.savedLevel).isEqualTo(3);
+    }
+
     /** Chỉ hiện thực những phương thức use case này thật sự gọi. */
     private static final class FakeCharacterPort implements CharacterPort {
 
         private final int storedLevel;
         private long exp;
         private Integer savedLevel;
+        // Chạy ĐÚNG MỘT LẦN ngay trước lần saveLevel đầu tiên — chen một lượt cộng EXP khác vào
+        // giữa "cộng" và "ghi cấp" của lượt đang chạy, tái hiện tất định hai Virtual Thread về đích
+        // ngược thứ tự.
+        private Runnable beforeFirstSave = () -> {};
 
         private FakeCharacterPort(int storedLevel, long exp) {
             this.storedLevel = storedLevel;
@@ -93,8 +114,9 @@ class GrantExperienceUseCaseTest {
 
         @Override
         public Optional<Character> findById(long characterId) {
+            int level = savedLevel == null ? storedLevel : savedLevel;
             return Optional.of(
-                    new Character(characterId, 1L, 1, "Kagemaru", Faction.HOA, storedLevel, exp, 0, Instant.EPOCH));
+                    new Character(characterId, 1L, 1, "Kagemaru", Faction.HOA, level, exp, 0, Instant.EPOCH));
         }
 
         @Override
@@ -104,8 +126,15 @@ class GrantExperienceUseCaseTest {
         }
 
         @Override
-        public void saveLevel(long characterId, int level) {
+        public boolean saveLevel(long characterId, int level, long derivedFromExp) {
+            Runnable hook = beforeFirstSave;
+            beforeFirstSave = () -> {};
+            hook.run();
+            if (exp != derivedFromExp) {
+                return false;
+            }
             savedLevel = level;
+            return true;
         }
 
         @Override

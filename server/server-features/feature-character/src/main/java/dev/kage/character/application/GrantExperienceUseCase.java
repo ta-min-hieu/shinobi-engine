@@ -34,13 +34,14 @@ public final class GrantExperienceUseCase {
                 characterPort.findById(characterId).orElseThrow(() -> new CharacterNotFoundException(characterId));
         ExperienceProgress before = ExperienceCurve.progressOf(character.exp());
         if (amount <= 0L) {
-            reconcileStoredLevel(characterId, character.level(), before.level());
+            reconcileStoredLevel(characterId, character.level(), before.level(), character.exp());
             return new Result(before, false);
         }
 
-        ExperienceProgress after = ExperienceCurve.progressOf(characterPort.addExperience(characterId, amount));
+        long expAfter = characterPort.addExperience(characterId, amount);
+        ExperienceProgress after = ExperienceCurve.progressOf(expAfter);
         boolean leveledUp = after.level() > before.level();
-        reconcileStoredLevel(characterId, character.level(), after.level());
+        reconcileStoredLevel(characterId, character.level(), after.level(), expAfter);
         return new Result(after, leveledUp);
     }
 
@@ -60,10 +61,14 @@ public final class GrantExperienceUseCase {
      *
      * <p>Vẫn giữ nguyên tinh thần tối ưu cũ — không UPDATE khi giá trị không đổi — chỉ đổi phép so
      * cho ĐÚNG: so với thứ đang nằm trong DB, không phải với một mốc phái sinh.
+     *
+     * <p><b>Ghi kèm điều kiện {@code exp} chưa đổi</b> (sửa 2026-09-24): xem
+     * {@link CharacterPort#saveLevel} — không có điều kiện đó, hai lần cộng song song về đích ngược
+     * thứ tự có thể ghi cột {@code level} LÙI về cấp cũ.
      */
-    private void reconcileStoredLevel(long characterId, int storedLevel, int derivedLevel) {
+    private void reconcileStoredLevel(long characterId, int storedLevel, int derivedLevel, long derivedFromExp) {
         if (storedLevel != derivedLevel) {
-            characterPort.saveLevel(characterId, derivedLevel);
+            characterPort.saveLevel(characterId, derivedLevel, derivedFromExp);
         }
     }
 

@@ -112,8 +112,9 @@ public final class PostgresCharacterAdapter implements CharacterPort {
             UPDATE character SET exp = exp + ? WHERE id = ? RETURNING exp
             """;
 
+    // AND exp = ?: compare-and-set, xem CharacterPort#saveLevel.
     private static final String UPDATE_LEVEL = """
-            UPDATE character SET level = ? WHERE id = ?
+            UPDATE character SET level = ? WHERE id = ? AND exp = ?
             """;
 
     @Override
@@ -209,8 +210,8 @@ public final class PostgresCharacterAdapter implements CharacterPort {
     }
 
     @Override
-    public void saveLevel(long characterId, int level) {
-        JdbcOperations.update(dataSource, UPDATE_LEVEL, level, characterId);
+    public boolean saveLevel(long characterId, int level, long derivedFromExp) {
+        return JdbcOperations.update(dataSource, UPDATE_LEVEL, level, characterId, derivedFromExp) > 0;
     }
 
     @Override

@@ -64,8 +64,18 @@ public interface CharacterPort {
      */
     long addExperience(long characterId, long amount);
 
-    /** Ghi lại cấp đã tính từ tổng EXP — gọi CHỈ KHI cấp thật sự đổi (xem {@code GrantExperienceUseCase}). */
-    void saveLevel(long characterId, int level);
+    /**
+     * Ghi lại cấp đã tính từ tổng EXP — gọi CHỈ KHI cấp thật sự đổi (xem {@code GrantExperienceUseCase}).
+     *
+     * <p>Chỉ ghi nếu {@code exp} trong DB VẪN LÀ {@code derivedFromExp} (compare-and-set). Hai lần
+     * cộng EXP chạy song song (giết 2 quái cùng một tick, mỗi lượt một Virtual Thread) có thể về đích
+     * NGƯỢC thứ tự: lần cộng trước suy ra cấp thấp hơn nhưng ghi SAU, kéo cột {@code level} lùi lại.
+     * Với điều kiện này, lần ghi dựa trên EXP đã cũ bị bỏ qua, còn lần cộng mới nhất luôn khớp và
+     * luôn ghi được.
+     *
+     * @return {@code true} nếu đã ghi
+     */
+    boolean saveLevel(long characterId, int level, long derivedFromExp);
 
     /**
      * Ghi đè hệ phái (GDD §4 "chọn hệ ở Lv10", Phase 8) — 1 câu UPDATE đơn, không cần
