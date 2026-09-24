@@ -176,6 +176,9 @@ public final class WorldScreen implements GameScreen {
     /** Luồng hầm ngục (opcode 1500-1503) — nút nằm trong {@link #partyPanel}, xem {@link DungeonCoordinator}. */
     private final DungeonCoordinator dungeon;
 
+    /** ADR-051 — mọi cú đổi World (hầm ngục, đấu trường) đi qua đúng một lối, xem {@link WorldChangeCoordinator}. */
+    private final WorldChangeCoordinator worldChange = new WorldChangeCoordinator();
+
     /** Hai gói mức kết nối (PONG, server tắt) — không có cửa sổ, xem {@link ConnectionCoordinator}. */
     private final ConnectionCoordinator connection;
     /** Hòm thư (phím M) — mượn skin của {@link #combatHud} như {@link #chatPanel}. */
@@ -414,6 +417,7 @@ public final class WorldScreen implements GameScreen {
         panels.register(shopPanel, shop);
         panels.register(tradePanel, trade);
         panels.register(chatPanel, chat);
+        panels.register(worldChange);
         panels.register(dungeon);
         panels.register(connection);
         panels.register(combatHud);
@@ -454,16 +458,17 @@ public final class WorldScreen implements GameScreen {
         // FactionCoordinator#setOpenGate (chỉ bày lối vào cho nhân vật còn được mời chọn).
         faction.setOpenGate(panels::noneOpen);
         faction.onCharacterState(character.getLevel(), character.getFaction());
-        // Vứt sạch view của world cũ rồi xin lại vị trí của chính mình — LÝ DO đầy đủ (giao thức
-        // không có gói "đổi World" nào) nằm ở DungeonCoordinator#setOnWorldChanged. Gửi lại ĐÚNG
-        // hướng đang đi chứ không phải 0: MoveResponse chỉ được phát như ack cho MoveCommand, nên
-        // đây là cách duy nhất hỏi "tôi đang ở đâu" bằng gói đã có, mà không đổi ý định nào cả.
-        dungeon.setOnWorldChanged(() -> {
+        // ADR-051 — vứt sạch view của World cũ rồi đặt vị trí/máu của chính mình theo gói đổi
+        // World. Gói tới TRƯỚC spawn của World mới (D2) nên cú dọn không xoá mất thứ gì của nó; và
+        // gói mang sẵn x/y nên không còn phải gửi lại hướng đi để xin MoveResponse như trước.
+        worldChange.setOnWorldChanged(event -> {
             remoteCharacters.clear();
             npcPresenter.clear();
             monsterPresenter.clear(combatHudController.monsters().keySet());
             combatHudController.clearMonsters();
-            intents.resendDirection();
+            snapLocalPlayer(event.getX(), event.getY());
+            combatHudController.onEnterWorld(event.getCurrentHp(), event.getMaxHp());
+            dungeon.onWorldChanged(event);
         });
         // Bậc trang phục của chính mình chưa suy được từ đâu (xem CharacterAppearance phía server) —
         // dùng đúng giá trị mặc định server đang phát cho người khác, để mình và người khác nhìn
@@ -680,19 +685,29 @@ public final class WorldScreen implements GameScreen {
      * nội suy — hồi sinh vốn là dịch chuyển tức thời, khác di chuyển thường.
      */
     private void onCharacterRespawned(CharacterRespawnedEvent event) {
+        snapLocalPlayer(event.getX(), event.getY());
+        combatHudController.onRespawn(event.getCurrentHp(), event.getMaxHp(), event.getCurrentChi());
+    }
+
+    /**
+     * Đặt CHÍNH mình tới {@code (x, y)} trên mặt đất NGAY, không nội suy — hồi sinh và đổi World
+     * (ADR-051) đều là dịch chuyển tức thời, khác di chuyển thường.
+     *
+     * <p>ADR-033 — reset cả trục dọc: có thể chết/đổi World giữa lúc đang lơ lửng (z&gt;0,
+     * grounded=false), không reset sẽ xuất hiện "bay". Model cũng về tư thế đứng: gục trong hầm ngục
+     * rồi được đưa về (ADR-051 D5) không được nằm nguyên tư thế ngã.
+     */
+    private void snapLocalPlayer(float x, float y) {
         PositionComponent pos = POSITION.get(localPlayer);
-        pos.x = event.getX();
-        pos.y = event.getY();
+        pos.x = x;
+        pos.y = y;
         pos.prevX = pos.x;
         pos.prevY = pos.y;
-        // ADR-033 — hồi sinh LUÔN ở mặt đất (WorldFacade.respawnCharacter), reset cả trục dọc: có
-        // thể chết giữa lúc đang lơ lửng (z>0, grounded=false), không reset sẽ hồi sinh "bay".
         pos.z = 0f;
         pos.prevZ = 0f;
         pos.vz = 0f;
         pos.grounded = true;
         pos.airJumpsUsed = 0;
-        combatHudController.onRespawn(event.getCurrentHp(), event.getMaxHp(), event.getCurrentChi());
         models.resetAfterRespawn(WorldConstants.LOCAL_CHARACTER_ID);
     }
 

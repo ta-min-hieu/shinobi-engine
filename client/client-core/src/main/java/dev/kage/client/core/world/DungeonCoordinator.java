@@ -14,6 +14,8 @@ import dev.kage.protocol.EnterDungeonResponse;
 import dev.kage.protocol.ExitDungeonOutcome;
 import dev.kage.protocol.ExitDungeonResponse;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.WorldChangeReason;
+import dev.kage.protocol.WorldChangedEvent;
 import dev.kage.protocol.wire.PacketCodec;
 
 /**
@@ -36,9 +38,6 @@ final class DungeonCoordinator implements WindowFlow {
     private final ChatCoordinator notices;
     private final I18NBundle i18n = KageI18n.load();
 
-    /** Xem {@link #setOnWorldChanged}. Mặc định không làm gì — lớp này tự chạy được trong test. */
-    private Runnable onWorldChanged = () -> {};
-
     /**
      * @param notices kênh báo kết quả — nhật ký chat, cùng chỗ {@link PartyCoordinator} đã dùng để
      *     giải thích vì sao một lệnh nhóm hỏng. Hai luồng nói về cùng một nhóm người thì nên nói ở
@@ -53,23 +52,16 @@ final class DungeonCoordinator implements WindowFlow {
     }
 
     /**
-     * Việc phải làm khi server vừa xác nhận nhân vật ĐỔI World — dọn sạch mọi thực thể đang hiển
-     * thị rồi xin lại vị trí của chính mình.
-     *
-     * <p>Bắt buộc phải có vì giao thức không có gói "đổi World" nào: người rời world chính KHÔNG
-     * nhận được despawn của những thứ họ đang thấy (xem khoảng trống thứ hai ở
-     * {@link DungeonController}). Không dọn thì bên trong hầm ngục vẫn còn nguyên hình nộm, ông già
-     * làng và những người chơi khác của làng đứng lơ lửng — thứ mà chính server cũng không biết là
-     * đang hiện trên màn hình này.
-     *
-     * <p>Đây KHÔNG phải client tự quyết trạng thái: nó chỉ VỨT đi dữ liệu đã hết hạn, không bịa ra
-     * dữ liệu mới. World mới tự phát lại spawn cho mọi thứ thật sự nhìn thấy được ở đó
-     * ({@code AreaOfInterestTracker.onAttach} khởi tạo tập "đang thấy" rỗng, nên lượt {@code sync}
-     * kế tiếp phát lại đủ) — cái bị xoá mà vẫn còn thật sẽ quay lại ngay, cái không quay lại là cái
-     * đáng ra không được ở đó.
+     * ADR-051 — server vừa đưa nhân vật sang World khác ({@link WorldChangeCoordinator} gọi). Việc DỌN
+     * màn hình không nằm ở đây; lớp này chỉ ghi cờ "đang ở hầm ngục", cập nhật dải chữ, và nói ra
+     * lý do khi lý do đó không có Response nào khác nói thay — gục trong hầm ngục (D5).
      */
-    void setOnWorldChanged(Runnable listener) {
-        this.onWorldChanged = listener;
+    void onWorldChanged(WorldChangedEvent event) {
+        controller.onWorldChanged(event.getWorldKind());
+        if (event.getReason() == WorldChangeReason.WORLD_CHANGE_REASON_DEFEATED) {
+            announce(Optional.of("dungeon.notice.defeated"));
+        }
+        refreshBanner();
     }
 
     /** Theo lời server — xem {@link DungeonController#inDungeon()} về giới hạn của câu trả lời này. */
@@ -107,23 +99,13 @@ final class DungeonCoordinator implements WindowFlow {
     }
 
     /**
-     * Nói ra kết quả, ghi trạng thái theo lời server, rồi dọn màn hình nếu vừa đổi World.
-     *
-     * <p>⚠️ Thứ tự dưới đây là GIẢ ĐỊNH, không phải bảo đảm: phía server còn đọc DB cho các thành
-     * viên khác SAU khi đã attach người gửi, nên vòng {@code sync} của world mới có thể lọt vào trước
-     * response — xem mục "Phát hiện phụ" của ADR-047.
-     *
-     * <p>Thứ tự "response tới TRƯỚC entity của world mới" là thứ làm cho việc dọn ở đây an toàn:
-     * {@code handleEnterDungeonBlocking} phía server trả lời NGAY trong lời gọi
-     * {@code enterDungeon()}, còn attach/spawn chỉ là lệnh vừa được xếp vào hộp thư của World và
-     * phải chờ tick sau — nên không có gói spawn nào của hầm ngục bị cú dọn này xoá mất.
+     * Nói ra kết quả và ghi trạng thái theo lời server. KHÔNG dọn màn hình nữa (ADR-051 D1): việc đó
+     * theo {@code WorldChangedEvent}, gói luôn tới TRƯỚC spawn của World mới — Response thì không
+     * được bảo đảm như vậy (ADR-047 "Phát hiện phụ"), nên dọn theo nó từng có thể xoá mất boss.
      */
     private void settleEnter(EnterDungeonOutcome outcome) {
         controller.onEnterOutcome(outcome);
         announce(DungeonController.enterMessageKey(outcome));
-        if (DungeonController.changesWorld(outcome)) {
-            onWorldChanged.run();
-        }
         refreshBanner();
     }
 
@@ -131,9 +113,8 @@ final class DungeonCoordinator implements WindowFlow {
      * ADR-047 — chính người chơi này vừa bị bạn cùng nhóm KÉO vào hầm ngục. Không có lệnh nào của
      * họ đang treo, nên đây là gói ĐẨY chứ không phải response.
      *
-     * <p>Đi ĐÚNG con đường {@link #settleEnter} đã đi, chỉ khác dòng chữ: ghi trạng thái, dọn sạch
-     * thực thể của world cũ, rồi để {@code onWorldChanged} xin lại vị trí. Server ghi gói này vào
-     * kênh TRƯỚC khi attach (ADR-047 D3), nên cú dọn ở đây không thể xoá mất boss hay đồng đội.
+     * <p>Từ ADR-051 chỉ còn là dòng báo + cờ trạng thái: dọn màn hình theo {@code WorldChangedEvent}
+     * (D4 — 1504 vẫn được phát cho client cũ).
      *
      * <p>{@code initiator_character_id} chưa được hiện ra chữ — client chưa có đường tra tên từ id
      * cho người không nằm trong tầm nhìn. Xem javadoc message trong {@code dungeon.proto}.
@@ -141,16 +122,12 @@ final class DungeonCoordinator implements WindowFlow {
     private void settlePulledIn() {
         controller.onEnterOutcome(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
         announce(Optional.of("dungeon.notice.pulled_in"));
-        onWorldChanged.run();
         refreshBanner();
     }
 
     private void settleExit(ExitDungeonOutcome outcome) {
         controller.onExitOutcome(outcome);
         announce(DungeonController.exitMessageKey(outcome));
-        if (DungeonController.changesWorld(outcome)) {
-            onWorldChanged.run();
-        }
         refreshBanner();
     }
 
