@@ -2087,11 +2087,22 @@ class GatewayServerIntegrationTest {
     @Test
     @Timeout(15)
     void clientShouldReceiveSendFriendRequestResponse_overRealSockets() throws Exception {
-        // FakeCharacterPort chỉ chứa nhân vật vừa tạo ở kết nối NÀY — tên bất kỳ khác chắc chắn
-        // không tồn tại, verify đúng nhánh TARGET_NOT_FOUND (dây thật: opcode dispatch → decode →
+        // Nhánh 1: tên không tồn tại ⇒ TARGET_NOT_FOUND (dây thật: opcode dispatch → decode →
         // Virtual Thread → CharacterFacade.findByName → encode response).
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        // Nhánh 2: tên CÓ tồn tại nhưng fakeFriendFacade()'s FriendPort.sendRequest luôn ném — đúng
+        // hình dạng một lỗi DB thật. Handler chạy trên Virtual Thread của authExecutor nên exception
+        // KHÔNG tới exceptionCaught của pipeline: trước bản vá 2026-09-24 client không nhận gì và
+        // treo vô thời hạn (ở đây: hết @Timeout). Gộp chung một hàm thay vì tách: lớp này đã chạm
+        // trần CyclomaticComplexity cả lớp của PMD (mỗi hàm mới cộng ít nhất 1).
+        try (Socket target = new Socket("127.0.0.1", server.port());
+                Socket socket = new Socket("127.0.0.1", server.port())) {
+            target.setSoTimeout(5000);
             socket.setSoTimeout(5000);
+            String targetName = connectCreateAndSelectNamed(
+                            target,
+                            new DataInputStream(target.getInputStream()),
+                            "frtgt" + UUID.randomUUID().toString().substring(0, 6))
+                    .name();
             DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(
                     socket, in, "friend" + UUID.randomUUID().toString().substring(0, 6));
@@ -2106,6 +2117,15 @@ class GatewayServerIntegrationTest {
                             .payload());
             assertThat(response.getOutcome())
                     .isEqualTo(SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_TARGET_NOT_FOUND);
+
+            SendFriendRequestCommand failingCommand = SendFriendRequestCommand.newBuilder()
+                    .setTargetName(targetName)
+                    .build();
+            sendFrame(socket, Opcode.OPCODE_SEND_FRIEND_REQUEST_COMMAND_VALUE, 11, failingCommand.toByteArray());
+
+            ErrorResponse error = ErrorResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_ERROR_VALUE).payload());
+            assertThat(error.getErrorKey()).isEqualTo("error.send_friend_request_failed");
         }
     }
 
