@@ -752,7 +752,7 @@ class GatewayPipelineTest {
                 .isTrue();
     }
 
-    private static void connect(EmbeddedChannel channel, String username) {
+    static void connect(EmbeddedChannel channel, String username) {
         ConnectRequest request =
                 ConnectRequest.newBuilder().setUsername(username).build();
         PacketHeader header = new PacketHeader(Opcode.OPCODE_CONNECT_REQUEST_VALUE, ProtocolVersion.CURRENT, 1);
@@ -774,7 +774,7 @@ class GatewayPipelineTest {
         return response.getCharacter().getId();
     }
 
-    private static EmbeddedChannel newPipeline() {
+    static EmbeddedChannel newPipeline() {
         return newPipeline(new FakeCharacterPort());
     }
 
@@ -1700,7 +1700,7 @@ class GatewayPipelineTest {
         }
     }
 
-    private static void writeInboundFrame(EmbeddedChannel channel, PacketHeader header, byte[] payload) {
+    static void writeInboundFrame(EmbeddedChannel channel, PacketHeader header, byte[] payload) {
         byte[] frameBytes = PacketCodec.encodeFrame(header, payload);
         ByteBuf buf = Unpooled.buffer(4 + frameBytes.length);
         buf.writeInt(frameBytes.length);
@@ -1713,7 +1713,7 @@ class GatewayPipelineTest {
      * sau (đủ cho test request/response), nhưng ADR-035 cần thấy EVENT bắn KÈM sau response (VD
      * GoldChangedEvent ngay sau SelectCharacterResponse).
      */
-    private static List<PacketCodec.Frame> readOutboundFrames(EmbeddedChannel channel) {
+    static List<PacketCodec.Frame> readOutboundFrames(EmbeddedChannel channel) {
         ByteBuf combined = Unpooled.buffer();
         ByteBuf part;
         while ((part = channel.readOutbound()) != null) {
