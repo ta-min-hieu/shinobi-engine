@@ -51,6 +51,7 @@ public final class ShopFacade {
             case ITEM_NOT_SELLABLE -> SellResult.ITEM_NOT_SELLABLE;
             case INSUFFICIENT_QUANTITY -> SellResult.INSUFFICIENT_QUANTITY;
             case DUPLICATE_REQUEST -> SellResult.DUPLICATE_REQUEST;
+            case ITEM_EQUIPPED -> SellResult.ITEM_EQUIPPED;
         };
     }
 
@@ -67,6 +68,7 @@ public final class ShopFacade {
         ITEM_NOT_FOUND,
         ITEM_NOT_SELLABLE,
         INSUFFICIENT_QUANTITY,
-        DUPLICATE_REQUEST
+        DUPLICATE_REQUEST,
+        ITEM_EQUIPPED
     }
 }

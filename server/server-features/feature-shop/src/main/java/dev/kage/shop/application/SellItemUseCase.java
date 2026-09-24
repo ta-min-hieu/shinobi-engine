@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import dev.kage.shop.domain.IdempotencyKeyReusedException;
 import dev.kage.shop.domain.OwnedItem;
+import dev.kage.shop.domain.RemoveItemOutcome;
 import dev.kage.shop.domain.ShopListing;
 import dev.kage.shop.domain.Transaction;
 import dev.kage.shop.domain.TransactionRunner;
@@ -43,8 +44,13 @@ public final class SellItemUseCase {
         try {
             tx.inTransaction((Transaction t) -> {
                 ports.idempotencyPort().recordOrThrow(t, idempotencyKey);
-                if (!ports.inventoryGatewayPort().removeQuantity(t, characterId, itemId, quantity)) {
-                    resultHolder.set(SellResult.INSUFFICIENT_QUANTITY);
+                RemoveItemOutcome removed =
+                        ports.inventoryGatewayPort().removeUnequippedQuantity(t, characterId, itemId, quantity);
+                if (removed != RemoveItemOutcome.OK) {
+                    resultHolder.set(
+                            removed == RemoveItemOutcome.ITEM_EQUIPPED
+                                    ? SellResult.ITEM_EQUIPPED
+                                    : SellResult.INSUFFICIENT_QUANTITY);
                     return;
                 }
                 ports.goldPort().creditGold(t, characterId, totalCredit);
@@ -64,6 +70,8 @@ public final class SellItemUseCase {
         ITEM_NOT_FOUND,
         ITEM_NOT_SELLABLE,
         INSUFFICIENT_QUANTITY,
-        DUPLICATE_REQUEST
+        DUPLICATE_REQUEST,
+        /** Đang mặc — phải gỡ ra trước (quyết định chủ dự án 2026-09-24). */
+        ITEM_EQUIPPED
     }
 }

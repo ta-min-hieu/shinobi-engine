@@ -1385,7 +1385,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             ShopFacade.SellResult.ITEM_NOT_FOUND, SellOutcome.SELL_OUTCOME_ITEM_NOT_FOUND,
             ShopFacade.SellResult.ITEM_NOT_SELLABLE, SellOutcome.SELL_OUTCOME_ITEM_NOT_SELLABLE,
             ShopFacade.SellResult.INSUFFICIENT_QUANTITY, SellOutcome.SELL_OUTCOME_INSUFFICIENT_QUANTITY,
-            ShopFacade.SellResult.DUPLICATE_REQUEST, SellOutcome.SELL_OUTCOME_DUPLICATE_REQUEST);
+            ShopFacade.SellResult.DUPLICATE_REQUEST, SellOutcome.SELL_OUTCOME_DUPLICATE_REQUEST,
+            // Không thêm giá trị mới vào shop.proto: ITEM_NOT_SELLABLE là đúng ở trạng thái hiện
+            // tại, và câu chữ phía client (shop.error.item_not_sellable) đã nhắc "đang mặc thì gỡ ra".
+            ShopFacade.SellResult.ITEM_EQUIPPED, SellOutcome.SELL_OUTCOME_ITEM_NOT_SELLABLE);
 
     private static SellOutcome toProtoOutcome(ShopFacade.SellResult result) {
         return SELL_OUTCOME_MAPPING.get(result);

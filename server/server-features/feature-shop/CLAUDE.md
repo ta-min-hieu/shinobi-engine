@@ -63,6 +63,11 @@ túi đồ thật), đổi thì phải đổi cả 2 chỗ cho tới khi có ngu
   race 2 request bán cùng lúc) → cộng gold. `creditGold` không có nhánh thất bại (luôn là 1 UPDATE
   vô điều kiện) nên KHÔNG cần rollback thủ công — thứ tự này tránh hẳn nhu cầu dùng exception-để-
   rollback ở đường bán, đơn giản hơn đường mua.
+- **Không bán món ĐANG MẶC** (quyết định chủ dự án 2026-09-24, cùng luật với giao dịch/thư):
+  `removeUnequippedQuantity` kiểm `equipment_slot` SAU khi khoá dòng, trả `ITEM_EQUIPPED`. Trên dây
+  vẫn là `SELL_OUTCOME_ITEM_NOT_SELLABLE` (không đổi shop.proto) — câu chữ client đã nhắc "đang mặc
+  thì tháo ra trước". Trước đó dòng bị xoá, ô trang bị về NULL mà World vẫn giữ chỉ số tới lúc
+  đăng nhập lại.
 
 ## Cứng
 

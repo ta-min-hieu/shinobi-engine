@@ -9,6 +9,7 @@ import dev.kage.server.database.JdbcOperations;
 import dev.kage.server.database.inventory.InventoryStackMerge;
 import dev.kage.shop.domain.InventoryGatewayPort;
 import dev.kage.shop.domain.OwnedItem;
+import dev.kage.shop.domain.RemoveItemOutcome;
 import dev.kage.shop.domain.Transaction;
 
 /**
@@ -36,8 +37,14 @@ public final class PostgresShopInventoryGatewayAdapter implements InventoryGatew
             VALUES (?, ?, ?, 0, ?)
             """;
 
-    private static final String SELECT_QUANTITY_FOR_UPDATE = """
-            SELECT quantity FROM inventory_item WHERE id = ? AND character_id = ? FOR UPDATE
+    // equipped: equipment_slot.inventory_item_id là cách DUY NHẤT biết một dòng đang mặc (V5). Đọc
+    // cùng câu với FOR UPDATE nên phép kiểm nằm SAU khoá dòng, trong cùng transaction.
+    private static final String SELECT_FOR_UPDATE = """
+            SELECT quantity,
+                   EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = inventory_item.id) AS equipped
+              FROM inventory_item
+             WHERE id = ? AND character_id = ?
+               FOR UPDATE
             """;
 
     private static final String DELETE_ITEM = """
@@ -85,22 +92,32 @@ public final class PostgresShopInventoryGatewayAdapter implements InventoryGatew
 
     @Override
     public boolean removeQuantity(Transaction tx, long characterId, long itemId, int quantity) {
+        return removeUnequippedQuantity(tx, characterId, itemId, quantity) == RemoveItemOutcome.OK;
+    }
+
+    @Override
+    public RemoveItemOutcome removeUnequippedQuantity(Transaction tx, long characterId, long itemId, int quantity) {
         Connection connection = ((JdbcTransaction) tx).connection();
-        int currentQuantity = selectQuantityForUpdate(connection, characterId, itemId);
-        if (currentQuantity < quantity) {
-            return false;
+        Optional<LockedRow> row = JdbcOperations.queryOne(
+                connection,
+                SELECT_FOR_UPDATE,
+                rs -> new LockedRow(rs.getInt("quantity"), rs.getBoolean("equipped")),
+                itemId,
+                characterId);
+        if (row.isEmpty() || row.get().quantity() < quantity) {
+            return RemoveItemOutcome.INSUFFICIENT_QUANTITY;
         }
-        if (currentQuantity == quantity) {
+        if (row.get().equipped()) {
+            return RemoveItemOutcome.ITEM_EQUIPPED;
+        }
+        if (row.get().quantity() == quantity) {
             JdbcOperations.update(connection, DELETE_ITEM, itemId);
         } else {
             JdbcOperations.update(connection, DECREMENT_QUANTITY, quantity, itemId);
         }
-        return true;
+        return RemoveItemOutcome.OK;
     }
 
-    /** {@code -1} nếu không tồn tại/không thuộc {@code characterId} — coi như "không đủ số lượng". */
-    private static int selectQuantityForUpdate(Connection connection, long characterId, long itemId) {
-        return JdbcOperations.queryOne(connection, SELECT_QUANTITY_FOR_UPDATE, rs -> rs.getInt(1), itemId, characterId)
-                .orElse(-1);
-    }
+    /** Dòng {@code inventory_item} đã khoá — các cột cần để quyết có bớt được không. */
+    private record LockedRow(int quantity, boolean equipped) {}
 }
