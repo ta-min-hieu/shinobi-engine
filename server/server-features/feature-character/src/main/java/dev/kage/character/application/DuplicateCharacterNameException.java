@@ -8,4 +8,9 @@ public final class DuplicateCharacterNameException extends RuntimeException {
     public DuplicateCharacterNameException(String name) {
         super("tên nhân vật đã tồn tại: " + name);
     }
+
+    /** Tên bị lấy mất giữa phép kiểm sớm và lúc INSERT — {@code cause} là tín hiệu từ tầng DB. */
+    public DuplicateCharacterNameException(String name, Throwable cause) {
+        super("tên nhân vật đã tồn tại: " + name, cause);
+    }
 }
