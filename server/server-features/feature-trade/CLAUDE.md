@@ -43,10 +43,12 @@ yêu cầu, KHÔNG có thiết kế nào — mọi cơ chế bên dưới là qu
 2. **Cho phép tách stack** — 1 item chào có thể là 1 PHẦN của 1 dòng `inventory_item` (VD 3/10
    kunai). `TradeInventoryPort.transferItem` tự tách: nếu `quantity` bằng đúng số lượng dòng, đổi
    nguyên `character_id` của dòng; nếu nhỏ hơn, giảm `quantity` dòng gốc + tạo dòng MỚI cho người
-   nhận (KHÔNG gộp vào stack có sẵn của người nhận — hệ thống hiện tại không tự gộp stack ở bất kỳ
-   đường cấp item nào khác, giữ nhất quán).
-   ⚠️ 2026-09-24: tiền đề "không đường nào khác tự gộp" nay SAI — rơi đồ, shop, quest, thư đều gộp
-   (`InventoryStackMerge`). Quyết định vẫn giữ nguyên tới khi chủ dự án chốt lại.
+   nhận. **Gộp chồng** (chủ dự án ĐẢO quyết định ban đầu ngày 2026-09-24): bản 2026-07-24 ghi
+   "KHÔNG gộp vào stack có sẵn của người nhận" vì lúc đó không đường cấp đồ nào khác tự gộp; nay
+   rơi đồ, shop, quest, thư đều gộp (`InventoryStackMerge`) nên giao dịch gộp theo. Đồ CHƯA cường
+   hoá gộp vào chồng sẵn có còn chỗ (`max_stack`) của người nhận TRƯỚC — nguyên dòng thì xoá dòng
+   nguồn, tách thì giảm dòng nguồn; không chồng nào nhận được mới đổi chủ/tạo dòng như cũ. Đồ đã
+   cường hoá không bao giờ gộp.
    **Sức chứa túi** kiểm SAU mọi lượt chuyển (`TradeInventoryPort#exceedsCapacity`, sửa
    2026-09-24): trước đó chuyển NGUYÊN DÒNG bỏ qua hẳn kiểm, túi 20 dòng nhận thành 21. Kiểm ở
    cuối chứ không từng lượt để đổi 1-lấy-1 giữa hai túi đều đầy vẫn hợp lệ.

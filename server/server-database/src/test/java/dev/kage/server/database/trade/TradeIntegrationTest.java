@@ -216,6 +216,37 @@ class TradeIntegrationTest {
         }
     }
 
+    // Tổng số lượng + số dòng của MỘT loại vật phẩm trong túi — đo bảo toàn số lượng qua giao dịch.
+    private static int[] quantityAndRows(long characterId, long itemTemplateId) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
+                        connection.prepareStatement("SELECT COALESCE(SUM(quantity), 0), COUNT(*) FROM inventory_item"
+                                + " WHERE character_id = ? AND item_template_id = ?")) {
+            statement.setLong(1, characterId);
+            statement.setLong(2, itemTemplateId);
+            try (ResultSet rs = statement.executeQuery()) {
+                rs.next();
+                return new int[] {rs.getInt(1), rs.getInt(2)};
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Lỗi test-only đếm vật phẩm: characterId=" + characterId, e);
+        }
+    }
+
+    private static ConfirmTradeUseCase.Result executeOneSidedTrade(
+            long giver, long receiver, long itemId, int quantity) {
+        PostgresTradeSessionAdapter sessionPort = newSessionPort();
+        TradeSession session =
+                new RequestTradeUseCase(sessionPort).execute(giver, receiver).session();
+        new AcceptTradeRequestUseCase(sessionPort).execute(session.id(), receiver);
+        new SetTradeOfferUseCase(sessionPort)
+                .execute(session.id(), giver, 0, List.of(new OfferedItemInput(itemId, quantity)));
+        new SetTradeOfferUseCase(sessionPort).execute(session.id(), receiver, 0, List.of());
+        ConfirmTradeUseCase confirmUseCase = newConfirmUseCase(sessionPort);
+        confirmUseCase.execute(session.id(), giver, newIdempotencyKey());
+        return confirmUseCase.execute(session.id(), receiver, newIdempotencyKey());
+    }
+
     private static PostgresTradeSessionAdapter newSessionPort() {
         return new PostgresTradeSessionAdapter(dataSource);
     }
@@ -256,8 +287,10 @@ class TradeIntegrationTest {
         assertThat(result).isEqualTo(ConfirmTradeUseCase.Result.EXECUTED);
         assertThat(readGold(a)).isEqualTo(90); // 100 - 20 + 10
         assertThat(readGold(b)).isEqualTo(60); // 50 - 10 + 20
-        assertThat(itemOwner(itemA)).isEqualTo(b);
-        assertThat(itemOwner(itemB)).isEqualTo(a);
+        // Hai bên đều đưa phi đao ⇒ gộp chồng (2026-09-24): so theo TỔNG số lượng từng người chứ
+        // không theo id dòng — dòng nguồn gộp xong thì bị xoá. A: 3 → 1, B: 1 → 3.
+        assertThat(quantityAndRows(a, kunaiTemplateId)[0]).isEqualTo(1);
+        assertThat(quantityAndRows(b, kunaiTemplateId)[0]).isEqualTo(3);
         assertThat(sessionPort.findActiveSessionOfCharacter(a)).isEmpty();
     }
 
@@ -315,6 +348,54 @@ class TradeIntegrationTest {
         assertThat(itemOwner(itemB)).isEqualTo(a);
         assertThat(bagRowCount(a)).isEqualTo(20);
         assertThat(bagRowCount(b)).isEqualTo(20);
+    }
+
+    /**
+     * Chủ dự án đảo quyết định MVP 2 ngày 2026-09-24: giao dịch gộp chồng như rơi đồ/shop/quest/thư.
+     * Trước đó nhận 3 phi đao khi đã có chồng 5 ra HAI dòng.
+     */
+    @Test
+    void shouldMergeWholeRowIntoRecipientsStack_andConserveQuantity() {
+        long a = createFreshCharacter("TradeA9");
+        long b = createFreshCharacter("TradeB9");
+        long itemA = persistOneItem(a, kunaiTemplateId, 3);
+        persistOneItem(b, kunaiTemplateId, 5);
+
+        ConfirmTradeUseCase.Result result = executeOneSidedTrade(a, b, itemA, 3);
+
+        assertThat(result).isEqualTo(ConfirmTradeUseCase.Result.EXECUTED);
+        assertThat(quantityAndRows(b, kunaiTemplateId)).containsExactly(8, 1);
+        assertThat(quantityAndRows(a, kunaiTemplateId)).containsExactly(0, 0);
+    }
+
+    @Test
+    void shouldMergeSplitPartIntoRecipientsStack_andConserveQuantity() {
+        long a = createFreshCharacter("TradeA10");
+        long b = createFreshCharacter("TradeB10");
+        long itemA = persistOneItem(a, kunaiTemplateId, 10);
+        persistOneItem(b, kunaiTemplateId, 5);
+
+        ConfirmTradeUseCase.Result result = executeOneSidedTrade(a, b, itemA, 3);
+
+        assertThat(result).isEqualTo(ConfirmTradeUseCase.Result.EXECUTED);
+        assertThat(quantityAndRows(b, kunaiTemplateId)).containsExactly(8, 1);
+        assertThat(quantityAndRows(a, kunaiTemplateId)).containsExactly(7, 1);
+    }
+
+    /** Túi đủ 20 dòng nhưng chồng phi đao còn chỗ: gộp không tốn ô, nên giao dịch phải thành. */
+    @Test
+    void shouldAcceptTrade_whenBagIsFullButAStackHasRoom() {
+        long a = createFreshCharacter("TradeA11");
+        long b = createFreshCharacter("TradeB11");
+        long itemA = persistOneItem(a, kunaiTemplateId, 3);
+        persistOneItem(b, kunaiTemplateId, 5);
+        fillBagWithSwords(b, 19);
+
+        ConfirmTradeUseCase.Result result = executeOneSidedTrade(a, b, itemA, 3);
+
+        assertThat(result).isEqualTo(ConfirmTradeUseCase.Result.EXECUTED);
+        assertThat(bagRowCount(b)).isEqualTo(20);
+        assertThat(quantityAndRows(b, kunaiTemplateId)).containsExactly(8, 1);
     }
 
     @Test

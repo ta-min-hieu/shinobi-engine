@@ -8,6 +8,7 @@ import java.util.Optional;
 import javax.sql.DataSource;
 
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.inventory.InventoryStackMerge;
 import dev.kage.trade.domain.OwnedItemSnapshot;
 import dev.kage.trade.domain.TradeInventoryPort;
 import dev.kage.trade.domain.Transaction;
@@ -16,7 +17,7 @@ import dev.kage.trade.domain.Transaction;
  * Hiện thực {@link TradeInventoryPort} trên PostgreSQL — SQL riêng cho {@code inventory_item},
  * bản sao ý tưởng {@code PostgresShopInventoryGatewayAdapter}. {@link #transferItem} là bước XÁC
  * THỰC THẬT DUY NHẤT của toàn bộ feature-trade (xem feature-trade/CLAUDE.md) — khoá dòng FOR
- * UPDATE, kiểm còn đúng chủ + đủ số lượng, tách stack nếu cần.
+ * UPDATE, kiểm còn đúng chủ + đủ số lượng, gộp vào chồng sẵn có của người nhận hoặc tách stack.
  */
 public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
 
@@ -41,6 +42,10 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
 
     private static final String DECREMENT_QUANTITY = """
             UPDATE inventory_item SET quantity = quantity - ? WHERE id = ?
+            """;
+
+    private static final String DELETE_ROW = """
+            DELETE FROM inventory_item WHERE id = ?
             """;
 
     private static final String INSERT_ROW = """
@@ -70,6 +75,14 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
             return TransferOutcome.INSUFFICIENT_QUANTITY;
         }
         boolean isWholeRow = current.get().quantity() == request.quantity();
+        if (mergeIntoRecipientStack(connection, request, current.get())) {
+            if (isWholeRow) {
+                JdbcOperations.update(connection, DELETE_ROW, request.itemId());
+            } else {
+                JdbcOperations.update(connection, DECREMENT_QUANTITY, request.quantity(), request.itemId());
+            }
+            return TransferOutcome.OK;
+        }
         if (!isWholeRow && countItems(connection, request.toCharacterId()) >= DEFAULT_CAPACITY) {
             return TransferOutcome.RECIPIENT_INVENTORY_FULL;
         }
@@ -80,6 +93,23 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
             insertRow(connection, request, current.get());
         }
         return TransferOutcome.OK;
+    }
+
+    /**
+     * Gộp vào chồng sẵn có của người nhận (chủ dự án đảo quyết định MVP 2 ngày 2026-09-24 — giao
+     * dịch nay gộp chồng như rơi đồ/cửa hàng/quest/thư). Chỉ đồ CHƯA cường hoá: đồ đã cường hoá là
+     * một cá thể riêng, không được hoà vào chồng thường ({@link InventoryStackMerge} cũng chỉ nhận
+     * chồng {@code enhance_level = 0} ở phía đích).
+     *
+     * <p>Thứ tự khoá không đổi so với trước: dòng nguồn đã khoá {@code FOR UPDATE} ở trên, dòng
+     * chồng đích bị {@code UPDATE} khoá SAU — cùng chiều "vàng → túi đồ" với cửa hàng/thư, không
+     * tạo vòng khoá mới.
+     */
+    private static boolean mergeIntoRecipientStack(
+            Connection connection, TransferRequest request, OwnedItemSnapshot source) {
+        return source.enhanceLevel() == 0
+                && InventoryStackMerge.mergeIntoExistingStack(
+                        connection, request.toCharacterId(), source.itemTemplateId(), request.quantity());
     }
 
     @Override
