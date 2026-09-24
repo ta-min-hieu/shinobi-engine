@@ -6,6 +6,7 @@ import java.util.List;
 import dev.kage.mail.domain.InventoryGatewayPort;
 import dev.kage.mail.domain.Transaction;
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.inventory.InventoryStackMerge;
 
 /**
  * Hiện thực {@link InventoryGatewayPort} trên PostgreSQL — SQL riêng cho {@code inventory_item},
@@ -47,9 +48,20 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
             UPDATE inventory_item SET quantity = quantity - ? WHERE id = ?
             """;
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Gộp chồng TRƯỚC (sửa 2026-09-24): nhận thư là đường cấp vật phẩm THỨ TƯ, cạnh rơi đồ, mua
+     * hàng và thưởng quest — bản vá xếp chồng {@code 540adf2} chỉ đếm ba đường nên bỏ sót nó. Hậu
+     * quả: mỗi lần nhận thư ăn thêm một ô dù đã có chồng cùng loại còn chỗ, và túi đủ 20 ô thì thư
+     * có phi đao bị từ chối {@code INVENTORY_FULL} trong khi mua đúng món đó ở cửa hàng vẫn được.
+     */
     @Override
     public boolean grantItem(Transaction tx, long characterId, long itemTemplateId, int quantity) {
         Connection connection = ((JdbcTransaction) tx).connection();
+        if (InventoryStackMerge.mergeIntoExistingStack(connection, characterId, itemTemplateId, quantity)) {
+            return true;
+        }
         int existingCount = JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId)
                 .orElse(0);
         if (existingCount >= DEFAULT_CAPACITY) {
