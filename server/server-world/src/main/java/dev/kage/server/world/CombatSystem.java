@@ -110,12 +110,28 @@ final class CombatSystem extends IteratingKSystem {
         tryAttackNow(entity, COOLDOWN.get(entity));
     }
 
-    private void tryAttackNow(KEntity entity, AttackCooldownComponent cooldown) {
+    /**
+     * Điều kiện của CHÍNH người ra đòn: hết cooldown, còn sống, không bị stun. Tách khỏi
+     * {@link #tryAttackNow} chỉ để giữ độ phức tạp method dưới ngưỡng CyclomaticComplexity.
+     *
+     * <p>"Còn sống" thêm 2026-09-24: World chính hồi sinh ngay nên không thấy, nhưng World hầm ngục
+     * để nhân vật nằm 0 máu — trước đó họ vẫn bấm đánh trúng boss/đồng đội.
+     */
+    private static boolean isAttackerReady(KEntity entity, AttackCooldownComponent cooldown) {
         if (cooldown.remainingSeconds > 0f) {
-            return;
+            return false;
         }
-        if (StatusEffects.isStunned(STATUS_EFFECT.get(entity))) {
-            return; // bị stun (Phase 8, hệ Thủy) — không đánh thường tick này, cooldown giữ nguyên <=0.
+        HealthComponent ownHealth = HEALTH.get(entity);
+        if (ownHealth != null && ownHealth.isDead()) {
+            return false;
+        }
+        // Bị stun (Phase 8, hệ Thủy) — không đánh thường tick này, cooldown giữ nguyên <=0.
+        return !StatusEffects.isStunned(STATUS_EFFECT.get(entity));
+    }
+
+    private void tryAttackNow(KEntity entity, AttackCooldownComponent cooldown) {
+        if (!isAttackerReady(entity, cooldown)) {
+            return;
         }
 
         TargetComponent target = TARGET.get(entity);

@@ -656,7 +656,10 @@ public final class WorldFacade {
         }
 
         VelocityComponent velocity = VELOCITY.get(entity);
-        if (StatusEffects.isStunned(STATUS_EFFECT.get(entity))) {
+        // Người đã chết (World hầm ngục không tự hồi sinh — xem handleCombatResults) đứng yên như bị
+        // stun: vẫn ack để client reconcile sequenceId.
+        HealthComponent health = HEALTH.get(entity);
+        if (StatusEffects.isStunned(STATUS_EFFECT.get(entity)) || (health != null && health.isDead())) {
             // Bị stun (Phase 8, hệ Thủy) — không di chuyển, nhưng VẪN ack lệnh (client cần reconcile
             // sequenceId dù bị từ chối, khác các lệnh "âm thầm bỏ qua" không cần phản hồi).
             velocity.x = 0f;
@@ -1410,12 +1413,22 @@ public final class WorldFacade {
         return entityId > 0 ? entitiesByCharacterId.get(entityId) : entitiesByMonsterId.get(entityId);
     }
 
-    /** Server SỞ HỮU tốc độ — client chỉ gửi hướng, clamp về unit vector chặn speed-hack. */
+    /**
+     * Server SỞ HỮU tốc độ — client chỉ gửi hướng, clamp về unit vector chặn speed-hack.
+     *
+     * <p>Hướng không hữu hạn ({@code NaN}/{@code Infinity}) ⇒ đứng yên (sửa 2026-09-24): bản cũ so
+     * {@code lengthSquared > 1f}, mà {@code NaN > 1f} là {@code false}, nên {@code NaN} đi thẳng vào
+     * vận tốc rồi vào vị trí — một gói là nhân vật mang toạ độ {@code NaN} vĩnh viễn. Độ dài tính
+     * bằng {@link Math#hypot} (double) thay vì bình phương float: {@code 1e30f} bình phương tràn thành
+     * {@code Infinity} và bản cũ biến một hướng "sang phải" hợp lệ thành đứng yên.
+     */
     private static float[] clampDirection(float dirX, float dirY) {
-        float lengthSquared = (dirX * dirX) + (dirY * dirY);
-        if (lengthSquared > 1f) {
-            float length = (float) Math.sqrt(lengthSquared);
-            return new float[] {dirX / length, dirY / length};
+        if (!Float.isFinite(dirX) || !Float.isFinite(dirY)) {
+            return new float[] {0f, 0f};
+        }
+        double length = Math.hypot(dirX, dirY);
+        if (length > 1.0) {
+            return new float[] {(float) (dirX / length), (float) (dirY / length)};
         }
         return new float[] {dirX, dirY};
     }

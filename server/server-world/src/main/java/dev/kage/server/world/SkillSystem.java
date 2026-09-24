@@ -171,6 +171,11 @@ final class SkillSystem extends IteratingKSystem {
     }
 
     private boolean isCasterEligible(KEntity caster, SkillDefinition definition) {
+        // Người đã chết không tung skill — cùng lý do CombatSystem#tryAttackNow (2026-09-24).
+        HealthComponent casterHealth = HEALTH.get(caster);
+        if (casterHealth != null && casterHealth.isDead()) {
+            return false;
+        }
         CombatStatsComponent casterStatsComponent = COMBAT_STATS.get(caster);
         if (casterStatsComponent.element != definition.faction()) {
             return false; // sai hệ phái — chống dùng skill hệ khác (client gửi skillCode tuỳ ý).
