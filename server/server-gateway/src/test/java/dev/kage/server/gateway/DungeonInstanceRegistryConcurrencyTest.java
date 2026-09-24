@@ -136,7 +136,7 @@ class DungeonInstanceRegistryConcurrencyTest {
         }
     }
 
-    private CharacterFacade fakeCharacterFacade() {
+    static CharacterFacade fakeCharacterFacade() {
         CharacterPort port = new CharacterPort() {
             @Override
             public Optional<Character> findById(long characterId) {

@@ -1,5 +1,7 @@
 package dev.kage.server.gateway;
 
+import java.util.function.LongConsumer;
+
 import dev.kage.server.world.WorldOutboundSink;
 
 /**
@@ -14,8 +16,12 @@ final class DungeonOutboundSink implements WorldOutboundSink {
 
     private final ConnectedCharacterRegistry registry;
 
-    DungeonOutboundSink(ConnectedCharacterRegistry registry) {
+    /** ADR-051 D5 — {@code DungeonInstanceRegistry#handleCharacterDefeated}, xem đó về luồng. */
+    private final LongConsumer onDefeated;
+
+    DungeonOutboundSink(ConnectedCharacterRegistry registry, LongConsumer onDefeated) {
         this.registry = registry;
+        this.onDefeated = onDefeated;
     }
 
     @Override
@@ -96,6 +102,9 @@ final class DungeonOutboundSink implements WorldOutboundSink {
     @Override
     public void onCharacterDefeated(long defeatedCharacterId, long killerEntityId) {
         registry.onCharacterDefeated(defeatedCharacterId, killerEntityId);
+        // World hầm ngục KHÔNG tự hồi sinh (spawnOverworldContent = false) — trước ADR-051 nhân vật
+        // nằm 0 máu tới khi tự bấm rời. Nay đưa về world chính (D5).
+        onDefeated.accept(defeatedCharacterId);
     }
 
     @Override

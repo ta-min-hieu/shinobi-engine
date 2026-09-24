@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.domain.Character;
@@ -15,6 +17,8 @@ import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.protocol.DungeonEnteredEvent;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.WorldChangeReason;
+import dev.kage.protocol.WorldKind;
 import dev.kage.server.world.CharacterBaseStats;
 import dev.kage.server.world.CharacterEntry;
 import dev.kage.server.world.Element;
@@ -62,6 +66,8 @@ final class DungeonInstanceRegistry {
 
     private static final float DUNGEON_ENTRY_SPAWN_X = 0f;
     private static final float DUNGEON_ENTRY_SPAWN_Y = 0f;
+    private static final PositionSnapshot DUNGEON_ENTRY_POSITION =
+            new PositionSnapshot(DUNGEON_ENTRY_SPAWN_X, DUNGEON_ENTRY_SPAWN_Y);
 
     private final ConnectedCharacterRegistry registry;
     private final CharacterFacade characterFacade;
@@ -82,6 +88,16 @@ final class DungeonInstanceRegistry {
     private final Map<Long, DungeonInstance> instanceByCharacterId = new HashMap<>();
     private final Map<Long, PositionSnapshot> returnPositionByCharacterId = new HashMap<>();
 
+    private final WorldTransfer transfer;
+
+    /**
+     * ADR-051 D5 — gục trong hầm ngục thì đưa về world chính. Lời báo gục tới trên tick thread của
+     * World hầm ngục, còn đường về đọc DB (chỉ số, trang bị) và {@code stop()} World khi người cuối
+     * rời (join chính tick thread đó) ⇒ PHẢI chạy ở đây, không bao giờ ngay trên tick thread. Cùng
+     * khuôn {@code ArenaInstanceRegistry.settlementExecutor}.
+     */
+    private final ExecutorService defeatExecutor = Executors.newVirtualThreadPerTaskExecutor();
+
     /**
      * @param facades hai facade đi CHUNG một tham số vì trần Checkstyle {@code ParameterNumber} là
      *     4 và tham số thứ tư nay là {@code worldContent} (ADR-048) — cùng cách ADR-040 D6 gói quái
@@ -97,6 +113,7 @@ final class DungeonInstanceRegistry {
         this.partyFacade = facades.partyFacade();
         this.mainWorldChannels = mainWorldChannels;
         this.worldContent = worldContent;
+        this.transfer = new WorldTransfer(registry);
     }
 
     /** Hai facade hầm ngục cần — xem javadoc constructor về vì sao chúng bị gói lại. */
@@ -164,10 +181,13 @@ final class DungeonInstanceRegistry {
         DungeonInstance instance = instancesByPartyId.computeIfAbsent(partyId, this::createInstance);
         for (PendingEntry entry : entries) {
             if (!instanceByCharacterId.containsKey(entry.characterId())) {
+                WorldChangeReason reason = WorldChangeReason.WORLD_CHANGE_REASON_REQUESTED;
                 if (entry.characterId() != requestingCharacterId) {
+                    // ADR-051 D4 — 1504 vẫn phát cho client cũ; client mới chỉ dùng nó để báo chữ.
                     notifyPulledIn(entry.characterId(), dungeonCode, requestingCharacterId);
+                    reason = WorldChangeReason.WORLD_CHANGE_REASON_PULLED_BY_PARTY;
                 }
-                moveCharacterIntoDungeon(entry, instance);
+                moveCharacterIntoDungeon(entry, instance, reason);
             }
         }
     }
@@ -192,6 +212,22 @@ final class DungeonInstanceRegistry {
     }
 
     ExitOutcome exitDungeon(long characterId) {
+        return exitDungeon(characterId, WorldChangeReason.WORLD_CHANGE_REASON_REQUESTED);
+    }
+
+    /**
+     * ADR-051 D5 — gọi TRÊN tick thread của World hầm ngục (qua {@link DungeonOutboundSink}) khi
+     * nhân vật gục. Chỉ đẩy việc đi, không làm gì ở đây: xem javadoc {@link #defeatExecutor}.
+     *
+     * <p>Về world chính SỐNG và đầy máu (attach mới luôn cho máu đầy), đúng luật world chính "gục là
+     * hồi sinh ngay". Nếu người này vừa tự bấm rời hoặc vừa mất kết nối, {@link #commitExit} thấy họ
+     * không còn trong hầm ngục và bỏ qua an toàn.
+     */
+    void handleCharacterDefeated(long defeatedCharacterId) {
+        defeatExecutor.execute(() -> exitDungeon(defeatedCharacterId, WorldChangeReason.WORLD_CHANGE_REASON_DEFEATED));
+    }
+
+    private ExitOutcome exitDungeon(long characterId, WorldChangeReason reason) {
         if (!isInDungeon(characterId)) {
             return ExitOutcome.NOT_IN_DUNGEON;
         }
@@ -201,21 +237,31 @@ final class DungeonInstanceRegistry {
         // nhân vật về map chính với chỉ số NỀN và không bao giờ được cộng lại — máu 206 → 100,
         // def 65 → 20, tới tận khi mặc/gỡ đồ hoặc đăng nhập lại. `registry` đã cầm InventoryFacade.
         EquipmentBonusSnapshot equipmentBonus = registry.equipmentBonusOf(characterId);
-        return commitExit(characterId, baseStats, equipmentBonus);
+        return commitExit(characterId, new ExitEntry(baseStats, equipmentBonus, reason));
     }
+
+    /** Dữ liệu DB của một lượt rời hầm ngục, đọc sẵn ngoài khoá, kèm lý do rời (ADR-051). */
+    private record ExitEntry(
+            CharacterBaseStats baseStats, EquipmentBonusSnapshot equipmentBonus, WorldChangeReason reason) {}
 
     // Kiểm lại trong khoá: người này có thể đã mất kết nối (handleDisconnectIfInDungeon trên
     // EventLoop) trong lúc đọc DB ở trên.
-    private synchronized ExitOutcome commitExit(
-            long characterId, CharacterBaseStats baseStats, EquipmentBonusSnapshot equipmentBonus) {
+    private synchronized ExitOutcome commitExit(long characterId, ExitEntry exit) {
         DungeonInstance instance = instanceByCharacterId.get(characterId);
         if (instance == null) {
             return ExitOutcome.NOT_IN_DUNGEON;
         }
-        instance.facade().detachCharacter(characterId);
         PositionSnapshot returnPosition = returnPositionByCharacterId.remove(characterId);
-        mainWorldChannels.attachCharacter(
-                new CharacterEntry(characterId, returnPosition.x(), returnPosition.y(), baseStats, equipmentBonus));
+        transfer.move(
+                characterId,
+                () -> instance.facade().detachCharacter(characterId),
+                WorldTransfer.event(
+                        WorldKind.WORLD_KIND_MAIN,
+                        exit.reason(),
+                        returnPosition,
+                        WorldFacade.characterMaxHp(exit.equipmentBonus())),
+                () -> mainWorldChannels.attachCharacter(new CharacterEntry(
+                        characterId, returnPosition.x(), returnPosition.y(), exit.baseStats(), exit.equipmentBonus())));
         leaveInstance(characterId, instance);
         return ExitOutcome.OK;
     }
@@ -242,14 +288,18 @@ final class DungeonInstanceRegistry {
         instancesByPartyId.clear();
         instanceByCharacterId.clear();
         returnPositionByCharacterId.clear();
+        defeatExecutor.shutdown();
     }
 
     private DungeonInstance createInstance(long partyId) {
         // ADR-048 — catalog PHẢI đi vào đây, nếu không `spawnBoss` tra không ra mã và hầm ngục
         // rỗng không một lời báo. `spawnOverworldContent = false` vẫn giữ: World này không
         // spawn nội dung overworld, nó chỉ cần TRA được loài boss.
-        WorldFacade dungeonFacade =
-                new WorldFacade(new DungeonOutboundSink(registry), false, TickMetricsPort.NO_OP, worldContent);
+        WorldFacade dungeonFacade = new WorldFacade(
+                new DungeonOutboundSink(registry, this::handleCharacterDefeated),
+                false,
+                TickMetricsPort.NO_OP,
+                worldContent);
         dungeonFacade.start();
         // Phase 8 lát cắt 2 — NƠI DUY NHẤT "dungeon" và "boss" được nối với nhau; WorldFacade vẫn
         // không biết khái niệm "dungeon" (chỉ biết "có ai bảo spawn boss hay không").
@@ -257,12 +307,22 @@ final class DungeonInstanceRegistry {
         return new DungeonInstance(partyId, dungeonFacade);
     }
 
-    private void moveCharacterIntoDungeon(PendingEntry entry, DungeonInstance instance) {
+    private void moveCharacterIntoDungeon(PendingEntry entry, DungeonInstance instance, WorldChangeReason reason) {
         long characterId = entry.characterId();
         returnPositionByCharacterId.put(characterId, entry.returnPosition());
 
-        mainWorldChannels.detachCharacter(characterId);
-        instance.facade().attachCharacter(characterId, DUNGEON_ENTRY_SPAWN_X, DUNGEON_ENTRY_SPAWN_Y, entry.baseStats());
+        // Attach vào hầm ngục KHÔNG kèm bonus trang bị (giới hạn có sẵn — javadoc
+        // WorldFacade#attachCharacter(CharacterEntry)) ⇒ máu đặt lúc attach là máu nền.
+        transfer.move(
+                characterId,
+                () -> mainWorldChannels.detachCharacter(characterId),
+                WorldTransfer.event(
+                        WorldKind.WORLD_KIND_DUNGEON,
+                        reason,
+                        DUNGEON_ENTRY_POSITION,
+                        WorldFacade.characterMaxHp(EquipmentBonusSnapshot.NONE)),
+                () -> instance.facade()
+                        .attachCharacter(characterId, DUNGEON_ENTRY_SPAWN_X, DUNGEON_ENTRY_SPAWN_Y, entry.baseStats()));
         instance.characterIds().add(characterId);
         instanceByCharacterId.put(characterId, instance);
     }

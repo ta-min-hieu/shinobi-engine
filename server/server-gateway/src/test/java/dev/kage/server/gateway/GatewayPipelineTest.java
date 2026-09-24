@@ -780,7 +780,7 @@ class GatewayPipelineTest {
 
     // WorldFacade không start() ở test này (xem newPipeline) nên onMonsterKilled không bao giờ
     // thật sự bị gọi — Fake rỗng chỉ để thoả constructor, không kiểm tra hành vi ở đây.
-    private static InventoryFacade fakeInventoryFacade() {
+    static InventoryFacade fakeInventoryFacade() {
         return fakeInventoryFacade(List.of(), Map.of(), List.of());
     }
 

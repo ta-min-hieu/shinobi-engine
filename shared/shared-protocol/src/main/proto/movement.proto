@@ -111,3 +111,40 @@ message CharacterAppearanceChangedEvent {
   Faction faction = 2;
   CostumeTier costume_tier = 3;
 }
+
+// ADR-051 — loại World mà người chơi vừa được đưa vào.
+enum WorldKind {
+  WORLD_KIND_UNSPECIFIED = 0;
+  WORLD_KIND_MAIN = 1;
+  WORLD_KIND_DUNGEON = 2;
+  WORLD_KIND_ARENA = 3;
+}
+
+// ADR-051 — vì sao người chơi đổi World. Client dùng để chọn dòng báo; KHÔNG đổi cách dọn màn hình.
+enum WorldChangeReason {
+  WORLD_CHANGE_REASON_UNSPECIFIED = 0;
+  WORLD_CHANGE_REASON_REQUESTED = 1;       // chính người này bấm (vào/ra hầm ngục, vào trận đấu)
+  WORLD_CHANGE_REASON_PULLED_BY_PARTY = 2; // bị bạn cùng nhóm kéo vào hầm ngục
+  WORLD_CHANGE_REASON_DEFEATED = 3;        // gục trong hầm ngục ⇒ đưa về world chính
+  WORLD_CHANGE_REASON_DUEL_ENDED = 4;      // trận đấu chốt xong ⇒ về world chính
+}
+
+// Event: Server -> Client (OPCODE_WORLD_CHANGED_EVENT, ADR-051). CHÍNH nhân vật nhận gói vừa được
+// đưa sang một World khác — không có character_id, cùng quy ước MoveResponse/CharacterRespawnedEvent.
+//
+// Luôn được ghi vào kênh SAU khi detach khỏi World cũ và TRƯỚC khi attach vào World mới được xếp
+// hàng (ADR-051 D2, thừa kế ADR-047 D3) ⇒ tới trước MỌI gói spawn của World mới. Client dọn sạch
+// thực thể đang hiển thị và đặt vị trí/máu của chính mình theo gói này — Response của lệnh
+// vào/ra (nếu có) chỉ còn báo kết quả, không dọn màn hình nữa (ADR-051 D1).
+//
+// current_hp/max_hp là máu mà lệnh attach vào World mới đặt (attach luôn cho máu đầy — xem
+// WorldFacade#characterMaxHp). World hầm ngục/đấu trường attach KHÔNG kèm bonus trang bị (giới hạn
+// có sẵn, xem javadoc WorldFacade#attachCharacter(CharacterEntry)) nên max_hp ở đó là máu nền.
+message WorldChangedEvent {
+  WorldKind world_kind = 1;
+  WorldChangeReason reason = 2;
+  float x = 3;
+  float y = 4;
+  int32 current_hp = 5;
+  int32 max_hp = 6;
+}

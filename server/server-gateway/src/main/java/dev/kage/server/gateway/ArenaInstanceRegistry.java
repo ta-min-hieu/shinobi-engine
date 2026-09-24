@@ -16,6 +16,8 @@ import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.protocol.DuelResultEvent;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.WorldChangeReason;
+import dev.kage.protocol.WorldKind;
 import dev.kage.pvp.api.PvpFacade;
 import dev.kage.pvp.application.RecordDuelResultUseCase;
 import dev.kage.server.world.CharacterBaseStats;
@@ -84,6 +86,8 @@ final class ArenaInstanceRegistry {
     // ConnectedCharacterRegistry.lootExecutor.
     private final ExecutorService settlementExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
+    private final WorldTransfer transfer;
+
     ArenaInstanceRegistry(
             ConnectedCharacterRegistry registry,
             CharacterFacade characterFacade,
@@ -93,6 +97,7 @@ final class ArenaInstanceRegistry {
         this.characterFacade = characterFacade;
         this.pvpFacade = pvpFacade;
         this.mainWorldChannels = mainWorldChannels;
+        this.transfer = new WorldTransfer(registry);
     }
 
     /** {@code WorldFacade} nhân vật này đang ở TRONG (duel), rỗng nếu đang ở world chính. */
@@ -305,12 +310,25 @@ final class ArenaInstanceRegistry {
         return true;
     }
 
+    /**
+     * ADR-051 — cả hai người nhận {@code WorldChangedEvent} lý do {@code REQUESTED}: người chấp nhận
+     * vừa bấm, còn người thách chính là người đã xin trận này. Máu đặt lúc attach là máu NỀN — World
+     * đấu trường attach không kèm bonus trang bị (giới hạn có sẵn, javadoc
+     * {@code WorldFacade#attachCharacter(CharacterEntry)}).
+     */
     private void moveCharacterIntoDuel(DuelEntrant entrant, DuelInstance instance, float spawnX) {
         long characterId = entrant.characterId();
         returnPositionByCharacterId.put(characterId, entrant.returnPosition());
 
-        mainWorldChannels.detachCharacter(characterId);
-        instance.facade().attachCharacter(characterId, spawnX, DUEL_SPAWN_Y, entrant.baseStats());
+        transfer.move(
+                characterId,
+                () -> mainWorldChannels.detachCharacter(characterId),
+                WorldTransfer.event(
+                        WorldKind.WORLD_KIND_ARENA,
+                        WorldChangeReason.WORLD_CHANGE_REASON_REQUESTED,
+                        new PositionSnapshot(spawnX, DUEL_SPAWN_Y),
+                        WorldFacade.characterMaxHp(EquipmentBonusSnapshot.NONE)),
+                () -> instance.facade().attachCharacter(characterId, spawnX, DUEL_SPAWN_Y, entrant.baseStats()));
         instanceByCharacterId.put(characterId, instance);
     }
 
@@ -355,8 +373,18 @@ final class ArenaInstanceRegistry {
         // nhân vật về map chính với chỉ số NỀN và không bao giờ được cộng lại — máu 206 → 100,
         // def 65 → 20, tới tận khi mặc/gỡ đồ hoặc đăng nhập lại. `registry` đã cầm InventoryFacade.
         EquipmentBonusSnapshot equipmentBonus = registry.equipmentBonusOf(characterId);
-        mainWorldChannels.attachCharacter(
-                new CharacterEntry(characterId, returnPosition.x(), returnPosition.y(), baseStats, equipmentBonus));
+        // Mọi đường gọi tới đây đã detach cả hai người khỏi World đấu trường từ trước ⇒ bước detach
+        // của WorldTransfer không còn gì để làm.
+        transfer.move(
+                characterId,
+                () -> {},
+                WorldTransfer.event(
+                        WorldKind.WORLD_KIND_MAIN,
+                        WorldChangeReason.WORLD_CHANGE_REASON_DUEL_ENDED,
+                        returnPosition,
+                        WorldFacade.characterMaxHp(equipmentBonus)),
+                () -> mainWorldChannels.attachCharacter(new CharacterEntry(
+                        characterId, returnPosition.x(), returnPosition.y(), baseStats, equipmentBonus)));
     }
 
     private static long opponentOf(long characterId, DuelInstance instance) {
