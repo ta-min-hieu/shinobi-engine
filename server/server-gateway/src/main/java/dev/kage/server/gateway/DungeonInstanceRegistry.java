@@ -1,5 +1,6 @@
 package dev.kage.server.gateway;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -17,6 +18,7 @@ import dev.kage.protocol.Opcode;
 import dev.kage.server.world.CharacterBaseStats;
 import dev.kage.server.world.CharacterEntry;
 import dev.kage.server.world.Element;
+import dev.kage.server.world.EquipmentBonusSnapshot;
 import dev.kage.server.world.TickMetricsPort;
 import dev.kage.server.world.WorldContentCatalog;
 import dev.kage.server.world.WorldFacade;
@@ -35,9 +37,15 @@ import dev.kage.server.world.WorldFacade;
  * {@code EnterDungeonCommand} sẽ kéo THEO CẢ party đang online vào CHUNG 1 instance (GAMEPLAY.md
  * §6 "Mỗi party 1 instance riêng") — không cần leader riêng cho hành động này ở lát cắt 1.
  *
- * <p>Mọi phương thức được gọi từ {@code authExecutor} (Virtual Thread) của
- * {@code GatewayChannelHandler} — chạm {@link PartyFacade}/{@link CharacterFacade} (DB, blocking),
- * KHÔNG được gọi từ Netty EventLoop hay world tick thread (server/CLAUDE.md).
+ * <p><b>Thread-safety (sửa 2026-09-24).</b> Bản cũ ghi "mọi phương thức được gọi từ
+ * {@code authExecutor}" và dùng {@link HashMap} trần — sai ở hai chỗ: {@code authExecutor} là
+ * một-Virtual-Thread-mỗi-task (hai thành viên bấm "vào hầm ngục" cùng lúc chạy SONG SONG), và
+ * {@link #handleDisconnectIfInDungeon}/{@link #worldFacadeFor} chạy trên Netty EventLoop. Hai
+ * lượt vào đồng thời từng có thể dựng HAI instance cho một nhóm (mỗi cái một boss, cái bị ghi đè
+ * chạy tick mãi không ai dừng) và tách nhóm ra hai World. Nay mọi đọc/ghi bảng định tuyến nằm
+ * trong {@code synchronized} ngắn — cùng cách {@link MainWorldChannelRegistry} — còn mọi lời gọi
+ * DB ({@link PartyFacade}/{@link CharacterFacade}/trang bị) chạy TRƯỚC, ngoài khoá, để EventLoop
+ * không bao giờ phải chờ một câu query (server/CLAUDE.md: EventLoop cấm chờ lock lâu).
  */
 final class DungeonInstanceRegistry {
 
@@ -95,7 +103,7 @@ final class DungeonInstanceRegistry {
     record DungeonFacades(CharacterFacade characterFacade, PartyFacade partyFacade) {}
 
     /** {@code WorldFacade} nhân vật này đang ở TRONG (dungeon), rỗng nếu đang ở world chính. */
-    Optional<WorldFacade> worldFacadeFor(long characterId) {
+    synchronized Optional<WorldFacade> worldFacadeFor(long characterId) {
         DungeonInstance instance = instanceByCharacterId.get(characterId);
         return instance == null ? Optional.empty() : Optional.of(instance.facade());
     }
@@ -120,7 +128,7 @@ final class DungeonInstanceRegistry {
         if (!DUNGEON_CODE.equals(dungeonCode)) {
             return EnterOutcome.UNKNOWN_DUNGEON;
         }
-        if (instanceByCharacterId.containsKey(requestingCharacterId)) {
+        if (isInDungeon(requestingCharacterId)) {
             return EnterOutcome.ALREADY_IN_DUNGEON;
         }
         Optional<PartyFacade.MyPartyView> myParty = partyFacade.findMyParty(requestingCharacterId);
@@ -134,20 +142,46 @@ final class DungeonInstanceRegistry {
             }
         }
 
-        long partyId = myParty.get().partyId();
-        DungeonInstance instance = instancesByPartyId.computeIfAbsent(partyId, id -> createInstance(id));
+        // Đọc DB cho từng người TRƯỚC khi vào khoá — xem javadoc lớp.
+        List<PendingEntry> entries = new ArrayList<>(members.size());
         for (PartyFacade.MemberView member : members) {
-            if (!instanceByCharacterId.containsKey(member.characterId())) {
-                if (member.characterId() != requestingCharacterId) {
-                    notifyPulledIn(member.characterId(), dungeonCode, requestingCharacterId);
-                }
-                moveCharacterIntoDungeon(member.characterId(), instance);
+            long memberId = member.characterId();
+            if (!isInDungeon(memberId)) {
+                entries.add(new PendingEntry(memberId, loadBaseStats(memberId), returnPositionOf(memberId)));
             }
         }
+        commitEnter(myParty.get().partyId(), dungeonCode, requestingCharacterId, entries);
         return EnterOutcome.OK;
     }
 
-    /** ADR-047 phương án B — xem {@link #commitEnter} về vì sao lời báo phải đi TRƯỚC attach. */
+    /**
+     * Phần ghi của {@link #enterDungeon}, nguyên tử: tra/dựng instance của nhóm rồi dời người. Kiểm
+     * lại "đã ở hầm ngục chưa" TRONG khoá — lượt vào song song của đồng đội có thể vừa kéo người
+     * này vào sau khi ảnh chụp ngoài khoá được đọc.
+     */
+    private synchronized void commitEnter(
+            long partyId, String dungeonCode, long requestingCharacterId, List<PendingEntry> entries) {
+        DungeonInstance instance = instancesByPartyId.computeIfAbsent(partyId, this::createInstance);
+        for (PendingEntry entry : entries) {
+            if (!instanceByCharacterId.containsKey(entry.characterId())) {
+                if (entry.characterId() != requestingCharacterId) {
+                    notifyPulledIn(entry.characterId(), dungeonCode, requestingCharacterId);
+                }
+                moveCharacterIntoDungeon(entry, instance);
+            }
+        }
+    }
+
+    private synchronized boolean isInDungeon(long characterId) {
+        return instanceByCharacterId.containsKey(characterId);
+    }
+
+    private PositionSnapshot returnPositionOf(long characterId) {
+        PositionSnapshot lastKnown = registry.lastKnownPosition(characterId);
+        return lastKnown == null ? characterFacade.loadPosition(characterId) : lastKnown;
+    }
+
+    /** ADR-047 phương án B — xem {@link #enterDungeon} về vì sao lời báo phải đi TRƯỚC attach. */
     private void notifyPulledIn(long characterId, String dungeonCode, long initiatorCharacterId) {
         DungeonEnteredEvent event = DungeonEnteredEvent.newBuilder()
                 .setDungeonCode(dungeonCode)
@@ -158,22 +192,30 @@ final class DungeonInstanceRegistry {
     }
 
     ExitOutcome exitDungeon(long characterId) {
+        if (!isInDungeon(characterId)) {
+            return ExitOutcome.NOT_IN_DUNGEON;
+        }
+        // Đọc DB TRƯỚC khi vào khoá — xem javadoc lớp.
+        CharacterBaseStats baseStats = loadBaseStats(characterId);
+        // Bonus trang bị đi CÙNG lệnh attach (2026-09-18): thiếu nó thì đấu xong / rời hầm ngục là
+        // nhân vật về map chính với chỉ số NỀN và không bao giờ được cộng lại — máu 206 → 100,
+        // def 65 → 20, tới tận khi mặc/gỡ đồ hoặc đăng nhập lại. `registry` đã cầm InventoryFacade.
+        EquipmentBonusSnapshot equipmentBonus = registry.equipmentBonusOf(characterId);
+        return commitExit(characterId, baseStats, equipmentBonus);
+    }
+
+    // Kiểm lại trong khoá: người này có thể đã mất kết nối (handleDisconnectIfInDungeon trên
+    // EventLoop) trong lúc đọc DB ở trên.
+    private synchronized ExitOutcome commitExit(
+            long characterId, CharacterBaseStats baseStats, EquipmentBonusSnapshot equipmentBonus) {
         DungeonInstance instance = instanceByCharacterId.get(characterId);
         if (instance == null) {
             return ExitOutcome.NOT_IN_DUNGEON;
         }
         instance.facade().detachCharacter(characterId);
-        CharacterBaseStats baseStats = loadBaseStats(characterId);
         PositionSnapshot returnPosition = returnPositionByCharacterId.remove(characterId);
-        // Bonus trang bị đi CÙNG lệnh attach (2026-09-18): thiếu nó thì đấu xong / rời hầm ngục là
-        // nhân vật về map chính với chỉ số NỀN và không bao giờ được cộng lại — máu 206 → 100,
-        // def 65 → 20, tới tận khi mặc/gỡ đồ hoặc đăng nhập lại. `registry` đã cầm InventoryFacade.
-        mainWorldChannels.attachCharacter(new CharacterEntry(
-                characterId,
-                returnPosition.x(),
-                returnPosition.y(),
-                baseStats,
-                registry.equipmentBonusOf(characterId)));
+        mainWorldChannels.attachCharacter(
+                new CharacterEntry(characterId, returnPosition.x(), returnPosition.y(), baseStats, equipmentBonus));
         leaveInstance(characterId, instance);
         return ExitOutcome.OK;
     }
@@ -183,7 +225,7 @@ final class DungeonInstanceRegistry {
      * re-attach vào world chính (đã ngắt kết nối, không còn ai để gửi packet). {@code false} nếu
      * nhân vật không ở dungeon nào — caller tự xử lý detach world chính như bình thường.
      */
-    boolean handleDisconnectIfInDungeon(long characterId) {
+    synchronized boolean handleDisconnectIfInDungeon(long characterId) {
         DungeonInstance instance = instanceByCharacterId.get(characterId);
         if (instance == null) {
             return false;
@@ -195,7 +237,7 @@ final class DungeonInstanceRegistry {
     }
 
     /** Graceful shutdown (SERVER.md §10) — dừng MỌI dungeon World đang chạy trước khi thoát process. */
-    void stopAll() {
+    synchronized void stopAll() {
         instancesByPartyId.values().forEach(instance -> instance.facade().stop());
         instancesByPartyId.clear();
         instanceByCharacterId.clear();
@@ -215,19 +257,18 @@ final class DungeonInstanceRegistry {
         return new DungeonInstance(partyId, dungeonFacade);
     }
 
-    private void moveCharacterIntoDungeon(long characterId, DungeonInstance instance) {
-        CharacterBaseStats baseStats = loadBaseStats(characterId);
-        PositionSnapshot returnPosition = registry.lastKnownPosition(characterId);
-        if (returnPosition == null) {
-            returnPosition = characterFacade.loadPosition(characterId);
-        }
-        returnPositionByCharacterId.put(characterId, returnPosition);
+    private void moveCharacterIntoDungeon(PendingEntry entry, DungeonInstance instance) {
+        long characterId = entry.characterId();
+        returnPositionByCharacterId.put(characterId, entry.returnPosition());
 
         mainWorldChannels.detachCharacter(characterId);
-        instance.facade().attachCharacter(characterId, DUNGEON_ENTRY_SPAWN_X, DUNGEON_ENTRY_SPAWN_Y, baseStats);
+        instance.facade().attachCharacter(characterId, DUNGEON_ENTRY_SPAWN_X, DUNGEON_ENTRY_SPAWN_Y, entry.baseStats());
         instance.characterIds().add(characterId);
         instanceByCharacterId.put(characterId, instance);
     }
+
+    /** Dữ liệu DB của một người sắp vào hầm ngục, đọc sẵn ngoài khoá. */
+    private record PendingEntry(long characterId, CharacterBaseStats baseStats, PositionSnapshot returnPosition) {}
 
     /** Gỡ bookkeeping của {@code characterId} khỏi {@code instance} — dừng luôn World nếu rỗng. */
     private void leaveInstance(long characterId, DungeonInstance instance) {
