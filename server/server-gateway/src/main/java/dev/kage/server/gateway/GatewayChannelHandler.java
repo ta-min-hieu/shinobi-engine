@@ -298,8 +298,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // Cỡ theo client THẬT, đếm từ client-core: đăng nhập ≤4 (Connect, ListCharacters, CreateCharacter,
     // SelectCharacter), vào world 2 (GetItemCatalog, ListQuests — WorldScreen.show), rồi mở MỌI cửa sổ
     // trong cùng một giây: bang 3, nhóm 3, bạn bè 2, túi đồ/thư/cửa hàng/xếp hạng mỗi cái 1 = 18.
-    // Người chơi thật không chạm 20; một client spam hàng nghìn lệnh/giây thì chạm ngay.
-    private static final int MAX_DB_COMMANDS_PER_SECOND = 20;
+    // Trần 40 = GẤP ĐÔI mức cao nhất của client thật (chủ dự án chọn 2026-09-24, thay cho 20 ban
+    // đầu): 18/20 là biên quá mỏng, vì vài lệnh client tự gửi khi nhận event do NGƯỜI KHÁC gây ra
+    // (mỗi TradeUpdatedEvent ⇒ GetTradeStatus; NewMailEvent/ItemGrantedEvent khi đang mở cửa sổ ⇒
+    // listMail/listInventory) — một đối tác giao dịch spam có thể đẩy nạn nhân sát trần rồi ngắt oan.
+    // Một client spam hàng nghìn lệnh/giây vẫn chạm ngay.
+    private static final int MAX_DB_COMMANDS_PER_SECOND = 40;
 
     // Khoá i18n cho GoldChangedEvent lúc vừa vào world (ADR-035 Decision-3) — KHÔNG phải câu tiếng
     // Việt cứng. Các lý do còn lại (mua/bán/cường hoá/thư/giao dịch) do adapter server-database đặt,

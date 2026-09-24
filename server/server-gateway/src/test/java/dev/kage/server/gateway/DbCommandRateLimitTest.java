@@ -31,7 +31,7 @@ import dev.kage.protocol.wire.ProtocolVersion;
 class DbCommandRateLimitTest {
 
     // Phải khớp GatewayChannelHandler.MAX_DB_COMMANDS_PER_SECOND.
-    private static final int LIMIT_PER_SECOND = 20;
+    private static final int LIMIT_PER_SECOND = 40;
 
     @Test
     void shouldRejectSpam_beforeItReachesTheDatabase() {
