@@ -1,7 +1,10 @@
 package dev.kage.server.gateway;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -18,6 +21,7 @@ import dev.kage.pvp.application.RecordDuelResultUseCase;
 import dev.kage.server.world.CharacterBaseStats;
 import dev.kage.server.world.CharacterEntry;
 import dev.kage.server.world.Element;
+import dev.kage.server.world.EquipmentBonusSnapshot;
 import dev.kage.server.world.WorldFacade;
 
 /**
@@ -27,10 +31,23 @@ import dev.kage.server.world.WorldFacade;
  * nghiệp vụ nào cần persist — xem feature-pvp/CLAUDE.md). Chỉ rating/wins/losses (feature-pvp) mới
  * cần DB.
  *
- * <p>⚠️ Khác {@code DungeonInstanceRegistry} (chỉ gọi từ {@code authExecutor}): registry NÀY còn bị
- * gọi từ {@code handleCharacterDefeated} TRÊN world tick thread của CHÍNH duel instance (qua
- * {@link ArenaOutboundSink}) — các map dưới đây dùng {@link ConcurrentHashMap} vì lý do đó, khác
- * {@code HashMap} thường của dungeon.
+ * <p><b>Thread-safety (sửa 2026-09-24).</b> Registry bị gọi từ bốn loại luồng: {@code authExecutor}
+ * (một-Virtual-Thread-mỗi-task — hai lệnh chạy SONG SONG), Netty EventLoop ({@link #worldFacadeFor},
+ * {@link #handleDisconnectIfInDuel}), tick thread của chính trận ({@link #handleCharacterDefeated})
+ * và {@link #settlementExecutor}. Bản cũ dùng {@link ConcurrentHashMap} cho TỪNG map, nhưng mọi
+ * bước chuyển trạng thái đều là kiểm-rồi-làm XUYÊN nhiều map, nên an toàn từng map không cứu được:
+ * hai người cùng chấp nhận lời thách của một người thì người đó bị gắn vào HAI trận. Nay mọi bước
+ * chuyển nằm trong {@code synchronized} ngắn — cùng cách {@code DungeonInstanceRegistry}/
+ * {@link MainWorldChannelRegistry} — còn mọi lời gọi DB (chỉ số, vị trí, trang bị, rating) chạy
+ * ngoài khoá, để EventLoop không bao giờ phải chờ một câu query:
+ *
+ * <ul>
+ *   <li>Chấp nhận = giữ chỗ cả hai người TRONG khoá ({@link #startingDuelCharacterIds}), đọc DB
+ *       ngoài khoá, rồi mới dựng trận trong khoá.
+ *   <li>Chốt trận = một "vé" duy nhất: ai gỡ được trận khỏi {@link #instancesByChallengeId} thì
+ *       người đó chốt. Bản cũ lấy vé bằng cách gỡ NGƯỜI THUA khỏi bảng — hai đường chốt với hai người
+ *       thua khác nhau (bỏ cuộc vs bị hạ gục, rớt mạng vs bị hạ gục) có thể cùng lấy được vé.
+ * </ul>
  *
  * <p>⚠️ Giới hạn CHỦ Ý (ngoài phạm vi lát cắt này, xem feature-pvp/CLAUDE.md): KHÔNG cross-check
  * với {@code DungeonInstanceRegistry} — 1 nhân vật đang ở dungeon về lý thuyết vẫn có thể bị thách
@@ -52,9 +69,14 @@ final class ArenaInstanceRegistry {
 
     // Khoá theo characterId ĐANG BỊ thách đấu — chỉ 1 thách đấu ĐẾN đang chờ tại 1 thời điểm/người
     // (thách đấu mới ghi đè thách đấu cũ, ephemeral hoàn toàn trong bộ nhớ, giống trade session).
-    private final Map<Long, PendingChallenge> pendingChallengeByTargetId = new ConcurrentHashMap<>();
-    private final Map<Long, DuelInstance> instancesByChallengeId = new ConcurrentHashMap<>();
-    private final Map<Long, DuelInstance> instanceByCharacterId = new ConcurrentHashMap<>();
+    // Bốn trường dưới đây chỉ được chạm khi đang giữ monitor của `this` — xem javadoc lớp.
+    private final Map<Long, PendingChallenge> pendingChallengeByTargetId = new HashMap<>();
+    private final Map<Long, DuelInstance> instancesByChallengeId = new HashMap<>();
+    private final Map<Long, DuelInstance> instanceByCharacterId = new HashMap<>();
+    // Đã chấp nhận, đang đọc DB để dựng trận — coi như ĐANG BẬN, chưa có World.
+    private final Set<Long> startingDuelCharacterIds = new HashSet<>();
+    // Không cần khoá: mỗi người chỉ được một đường ghi (dựng trận) và một đường gỡ (chốt trận, sau
+    // khi đã lấy vé), và gỡ chạy ngoài khoá cùng lời gọi DB.
     private final Map<Long, PositionSnapshot> returnPositionByCharacterId = new ConcurrentHashMap<>();
     private final AtomicLong nextChallengeId = new AtomicLong(1);
     // settleDuel chạm DB (PvpFacade.recordDuelResult, blocking) — CẤM chạy trên world tick thread
@@ -74,19 +96,19 @@ final class ArenaInstanceRegistry {
     }
 
     /** {@code WorldFacade} nhân vật này đang ở TRONG (duel), rỗng nếu đang ở world chính. */
-    Optional<WorldFacade> worldFacadeFor(long characterId) {
+    synchronized Optional<WorldFacade> worldFacadeFor(long characterId) {
         DuelInstance instance = instanceByCharacterId.get(characterId);
         return instance == null ? Optional.empty() : Optional.of(instance.facade());
     }
 
-    ChallengeResult challengeDuel(long challengerCharacterId, long targetCharacterId) {
+    synchronized ChallengeResult challengeDuel(long challengerCharacterId, long targetCharacterId) {
         if (challengerCharacterId == targetCharacterId) {
             return new ChallengeResult(ChallengeOutcome.CANNOT_CHALLENGE_SELF, 0);
         }
-        if (instanceByCharacterId.containsKey(challengerCharacterId)) {
+        if (isBusy(challengerCharacterId)) {
             return new ChallengeResult(ChallengeOutcome.ALREADY_IN_DUEL, 0);
         }
-        if (instanceByCharacterId.containsKey(targetCharacterId)) {
+        if (isBusy(targetCharacterId)) {
             return new ChallengeResult(ChallengeOutcome.TARGET_ALREADY_IN_DUEL, 0);
         }
         if (!registry.isOnline(targetCharacterId)) {
@@ -99,21 +121,58 @@ final class ArenaInstanceRegistry {
     }
 
     AcceptResult acceptDuel(long characterId, long challengeId) {
-        PendingChallenge challenge = pendingChallengeByTargetId.get(characterId);
-        if (challenge == null || challenge.challengeId() != challengeId) {
+        Optional<Long> reservedChallenger = reserveForDuel(characterId, challengeId);
+        if (reservedChallenger.isEmpty()) {
             return new AcceptResult(AcceptOutcome.NOT_FOUND, 0);
         }
-        pendingChallengeByTargetId.remove(characterId);
-        long challengerCharacterId = challenge.challengerCharacterId();
-        // Challenger có thể đã offline/bận trận khác giữa lúc thách đấu và lúc được chấp nhận.
-        if (!registry.isOnline(challengerCharacterId) || instanceByCharacterId.containsKey(challengerCharacterId)) {
-            return new AcceptResult(AcceptOutcome.NOT_FOUND, 0);
+        long challengerCharacterId = reservedChallenger.get();
+        boolean started = false;
+        try {
+            // Đọc DB NGOÀI khoá — xem javadoc lớp.
+            DuelEntrant challenger = loadEntrant(challengerCharacterId);
+            DuelEntrant target = loadEntrant(characterId);
+            started = commitStartDuel(challengeId, challenger, target);
+        } finally {
+            if (!started) {
+                releaseReservation(challengerCharacterId, characterId);
+            }
         }
-        startDuel(challengeId, challengerCharacterId, characterId);
-        return new AcceptResult(AcceptOutcome.OK, challengerCharacterId);
+        return started
+                ? new AcceptResult(AcceptOutcome.OK, challengerCharacterId)
+                : new AcceptResult(AcceptOutcome.NOT_FOUND, 0);
     }
 
-    DeclineResult declineDuel(long characterId, long challengeId) {
+    /**
+     * Tiêu lời thách và giữ chỗ cả hai người, nguyên tử. Rỗng nếu lời thách không còn, hoặc một
+     * trong hai người đang bận — kể cả NGƯỜI CHẤP NHẬN: bản cũ chỉ kiểm người thách, nên người đang
+     * đánh trận khác vẫn chấp nhận được một lời thách cũ và bị gắn vào trận thứ hai.
+     */
+    private synchronized Optional<Long> reserveForDuel(long targetCharacterId, long challengeId) {
+        PendingChallenge challenge = pendingChallengeByTargetId.get(targetCharacterId);
+        if (challenge == null || challenge.challengeId() != challengeId) {
+            return Optional.empty();
+        }
+        pendingChallengeByTargetId.remove(targetCharacterId);
+        long challengerCharacterId = challenge.challengerCharacterId();
+        // Challenger có thể đã offline/bận trận khác giữa lúc thách đấu và lúc được chấp nhận.
+        if (!registry.isOnline(challengerCharacterId) || isBusy(challengerCharacterId) || isBusy(targetCharacterId)) {
+            return Optional.empty();
+        }
+        startingDuelCharacterIds.add(challengerCharacterId);
+        startingDuelCharacterIds.add(targetCharacterId);
+        return Optional.of(challengerCharacterId);
+    }
+
+    private synchronized void releaseReservation(long challengerCharacterId, long targetCharacterId) {
+        startingDuelCharacterIds.remove(challengerCharacterId);
+        startingDuelCharacterIds.remove(targetCharacterId);
+    }
+
+    private boolean isBusy(long characterId) {
+        return instanceByCharacterId.containsKey(characterId) || startingDuelCharacterIds.contains(characterId);
+    }
+
+    synchronized DeclineResult declineDuel(long characterId, long challengeId) {
         PendingChallenge challenge = pendingChallengeByTargetId.get(characterId);
         if (challenge == null || challenge.challengeId() != challengeId) {
             return new DeclineResult(DeclineOutcome.NOT_FOUND, 0);
@@ -124,15 +183,22 @@ final class ArenaInstanceRegistry {
 
     /** Bỏ cuộc giữa chừng — tính THUA thật (khác {@code DungeonInstanceRegistry.exitDungeon}). */
     ExitResult forfeitDuel(long characterId) {
-        DuelInstance instance = instanceByCharacterId.get(characterId);
-        if (instance == null) {
+        Optional<DuelInstance> instance = currentInstance(characterId);
+        if (instance.isEmpty()) {
             return new ExitResult(ExitOutcome.NOT_IN_DUEL, 0);
         }
-        long winnerCharacterId = opponentOf(characterId, instance);
+        long winnerCharacterId = opponentOf(characterId, instance.get());
         // Gọi trên authExecutor (Virtual Thread, KHÔNG phải tick thread hay EventLoop) — settleDuel
         // block an toàn ở đây (xem javadoc field settlementExecutor + handleCharacterDefeated).
-        settleDuel(instance, winnerCharacterId, characterId);
-        return new ExitResult(ExitOutcome.OK, winnerCharacterId);
+        // false = đường khác (bị hạ gục, rớt mạng) vừa chốt trận trước — trận đã xong, không phải
+        // lượt bỏ cuộc này.
+        return settleDuel(instance.get(), winnerCharacterId, characterId)
+                ? new ExitResult(ExitOutcome.OK, winnerCharacterId)
+                : new ExitResult(ExitOutcome.NOT_IN_DUEL, 0);
+    }
+
+    private synchronized Optional<DuelInstance> currentInstance(long characterId) {
+        return Optional.ofNullable(instanceByCharacterId.get(characterId));
     }
 
     /**
@@ -143,79 +209,117 @@ final class ArenaInstanceRegistry {
      * {@link #settlementExecutor}.
      */
     void handleCharacterDefeated(long defeatedCharacterId, long killerEntityId) {
-        DuelInstance instance = instanceByCharacterId.get(defeatedCharacterId);
-        if (instance == null) {
+        Optional<DuelInstance> instance = currentInstance(defeatedCharacterId);
+        if (instance.isEmpty()) {
             return; // đã settle bởi lời gọi khác (forfeit gần như đồng thời) — bỏ qua an toàn.
         }
-        long winnerCharacterId = killerEntityId > 0 ? killerEntityId : opponentOf(defeatedCharacterId, instance);
-        settlementExecutor.execute(() -> settleDuel(instance, winnerCharacterId, defeatedCharacterId));
+        long winnerCharacterId = killerEntityId > 0 ? killerEntityId : opponentOf(defeatedCharacterId, instance.get());
+        settlementExecutor.execute(() -> settleDuel(instance.get(), winnerCharacterId, defeatedCharacterId));
     }
 
     /**
      * Gọi từ {@code channelInactive} (Netty EventLoop, mất kết nối) — người mất kết nối tính THUA
      * (không được "trốn thua" bằng cách rút dây mạng). Dừng {@code WorldFacade} instance đồng bộ ở
      * đây (join tick thread NGẮN, cùng pattern {@code DungeonInstanceRegistry.handleDisconnectIfInDungeon}
-     * đã chấp nhận) NHƯNG đẩy phần chạm DB (ghi rating) sang {@link #settlementExecutor} — EventLoop
-     * cấm blocking I/O (server/CLAUDE.md). {@code false} nếu nhân vật không ở duel nào.
+     * đã chấp nhận) NHƯNG đẩy MỌI phần chạm DB sang {@link #settlementExecutor} — EventLoop cấm
+     * blocking I/O (server/CLAUDE.md). Bản cũ đưa đối phương về world chính NGAY trên EventLoop,
+     * mà việc đó đọc chỉ số + trang bị từ DB. {@code false} nếu nhân vật không ở duel nào.
      */
     boolean handleDisconnectIfInDuel(long characterId) {
-        DuelInstance instance = instanceByCharacterId.get(characterId);
-        if (instance == null) {
+        Optional<DuelInstance> current = currentInstance(characterId);
+        if (current.isEmpty()) {
             return false;
         }
-        long winnerCharacterId = opponentOf(characterId, instance);
-        if (instanceByCharacterId.remove(characterId) == null) {
+        DuelInstance instance = current.get();
+        if (!claimSettlement(instance)) {
             return true; // đã settle bởi lời gọi khác gần như đồng thời — coi như đã xử lý xong.
         }
-        instanceByCharacterId.remove(winnerCharacterId);
-        instancesByChallengeId.remove(instance.challengeId());
+        long winnerCharacterId = opponentOf(characterId, instance);
         instance.facade().detachCharacter(winnerCharacterId);
         instance.facade().detachCharacter(characterId);
-        reattachToMainWorld(winnerCharacterId); // đối phương còn kết nối — đưa về world chính thật.
         returnPositionByCharacterId.remove(characterId); // người mất kết nối: không re-attach, dọn rác.
         instance.facade().stop();
-        settlementExecutor.execute(() -> recordResultAndNotify(winnerCharacterId, characterId));
+        settlementExecutor.execute(() -> {
+            reattachToMainWorld(winnerCharacterId); // đối phương còn kết nối — đưa về world chính thật.
+            recordResultAndNotify(winnerCharacterId, characterId);
+        });
+        return true;
+    }
+
+    /**
+     * Vé chốt trận: đúng MỘT đường (bỏ cuộc, bị hạ gục, rớt mạng) lấy được, mọi đường khác nhận
+     * {@code false} — xem javadoc lớp về vì sao gỡ người thua khỏi bảng không làm được vé.
+     */
+    private synchronized boolean claimSettlement(DuelInstance instance) {
+        // equals của record = so từng trường; challengeId là duy nhất (AtomicLong) nên tương đương so
+        // danh tính.
+        if (!instance.equals(instancesByChallengeId.get(instance.challengeId()))) {
+            return false;
+        }
+        instancesByChallengeId.remove(instance.challengeId());
+        instanceByCharacterId.remove(instance.challengerCharacterId());
+        instanceByCharacterId.remove(instance.targetCharacterId());
         return true;
     }
 
     /** Graceful shutdown (SERVER.md §10) — dừng MỌI duel World đang chạy trước khi thoát process. */
-    void stopAll() {
+    synchronized void stopAll() {
         instancesByChallengeId.values().forEach(instance -> instance.facade().stop());
         instancesByChallengeId.clear();
         instanceByCharacterId.clear();
+        startingDuelCharacterIds.clear();
         returnPositionByCharacterId.clear();
         settlementExecutor.shutdown();
     }
 
-    private void startDuel(long challengeId, long challengerCharacterId, long targetCharacterId) {
-        WorldFacade duelFacade = new WorldFacade(new ArenaOutboundSink(registry, this), false);
-        duelFacade.start();
-        DuelInstance instance = new DuelInstance(challengeId, duelFacade, challengerCharacterId, targetCharacterId);
-        instancesByChallengeId.put(challengeId, instance);
-        moveCharacterIntoDuel(challengerCharacterId, instance, DUEL_SPAWN_X_CHALLENGER);
-        moveCharacterIntoDuel(targetCharacterId, instance, DUEL_SPAWN_X_TARGET);
-    }
-
-    private void moveCharacterIntoDuel(long characterId, DuelInstance instance, float spawnX) {
-        CharacterBaseStats baseStats = loadBaseStats(characterId);
+    private DuelEntrant loadEntrant(long characterId) {
         PositionSnapshot returnPosition = registry.lastKnownPosition(characterId);
         if (returnPosition == null) {
             returnPosition = characterFacade.loadPosition(characterId);
         }
-        returnPositionByCharacterId.put(characterId, returnPosition);
+        return new DuelEntrant(characterId, loadBaseStats(characterId), returnPosition);
+    }
+
+    /**
+     * Phần ghi của {@link #acceptDuel}: dựng World rồi dời cả hai người vào, nguyên tử. {@code false}
+     * nếu một trong hai vừa rớt mạng trong lúc đọc DB ngoài khoá — {@code channelInactive} gỡ đăng ký
+     * TRƯỚC khi gọi {@link #handleDisconnectIfInDuel}, mà lúc đó chưa có trận nào để nó dọn, nên kiểm
+     * ở đây là chốt chặn cuối cho việc gắn một người đã ngắt kết nối vào trận.
+     */
+    private synchronized boolean commitStartDuel(long challengeId, DuelEntrant challenger, DuelEntrant target) {
+        startingDuelCharacterIds.remove(challenger.characterId());
+        startingDuelCharacterIds.remove(target.characterId());
+        if (!registry.isOnline(challenger.characterId()) || !registry.isOnline(target.characterId())) {
+            return false;
+        }
+        WorldFacade duelFacade = new WorldFacade(new ArenaOutboundSink(registry, this), false);
+        duelFacade.start();
+        DuelInstance instance =
+                new DuelInstance(challengeId, duelFacade, challenger.characterId(), target.characterId());
+        instancesByChallengeId.put(challengeId, instance);
+        moveCharacterIntoDuel(challenger, instance, DUEL_SPAWN_X_CHALLENGER);
+        moveCharacterIntoDuel(target, instance, DUEL_SPAWN_X_TARGET);
+        return true;
+    }
+
+    private void moveCharacterIntoDuel(DuelEntrant entrant, DuelInstance instance, float spawnX) {
+        long characterId = entrant.characterId();
+        returnPositionByCharacterId.put(characterId, entrant.returnPosition());
 
         mainWorldChannels.detachCharacter(characterId);
-        instance.facade().attachCharacter(characterId, spawnX, DUEL_SPAWN_Y, baseStats);
+        instance.facade().attachCharacter(characterId, spawnX, DUEL_SPAWN_Y, entrant.baseStats());
         instanceByCharacterId.put(characterId, instance);
     }
 
-    /** Chốt kết quả trận — dọn bookkeeping, đưa cả 2 về world chính, ghi rating + báo kết quả. */
-    private void settleDuel(DuelInstance instance, long winnerCharacterId, long loserCharacterId) {
-        if (instanceByCharacterId.remove(loserCharacterId) == null) {
-            return; // đã settle bởi lời gọi khác (2 đòn hạ gục/forfeit gần như đồng thời) — bỏ qua an toàn.
+    /**
+     * Chốt kết quả trận — dọn bookkeeping, đưa cả 2 về world chính, ghi rating + báo kết quả.
+     *
+     * @return {@code false} nếu đường chốt khác đã lấy vé trước (xem {@link #claimSettlement})
+     */
+    private boolean settleDuel(DuelInstance instance, long winnerCharacterId, long loserCharacterId) {
+        if (!claimSettlement(instance)) {
+            return false; // đã settle bởi lời gọi khác (2 đòn hạ gục/forfeit gần như đồng thời) — bỏ qua an toàn.
         }
-        instanceByCharacterId.remove(winnerCharacterId);
-        instancesByChallengeId.remove(instance.challengeId());
 
         instance.facade().detachCharacter(winnerCharacterId);
         instance.facade().detachCharacter(loserCharacterId);
@@ -224,6 +328,7 @@ final class ArenaInstanceRegistry {
         instance.facade().stop();
 
         recordResultAndNotify(winnerCharacterId, loserCharacterId);
+        return true;
     }
 
     private void recordResultAndNotify(long winnerCharacterId, long loserCharacterId) {
@@ -246,12 +351,9 @@ final class ArenaInstanceRegistry {
         // Bonus trang bị đi CÙNG lệnh attach (2026-09-18): thiếu nó thì đấu xong / rời hầm ngục là
         // nhân vật về map chính với chỉ số NỀN và không bao giờ được cộng lại — máu 206 → 100,
         // def 65 → 20, tới tận khi mặc/gỡ đồ hoặc đăng nhập lại. `registry` đã cầm InventoryFacade.
-        mainWorldChannels.attachCharacter(new CharacterEntry(
-                characterId,
-                returnPosition.x(),
-                returnPosition.y(),
-                baseStats,
-                registry.equipmentBonusOf(characterId)));
+        EquipmentBonusSnapshot equipmentBonus = registry.equipmentBonusOf(characterId);
+        mainWorldChannels.attachCharacter(
+                new CharacterEntry(characterId, returnPosition.x(), returnPosition.y(), baseStats, equipmentBonus));
     }
 
     private static long opponentOf(long characterId, DuelInstance instance) {
@@ -270,6 +372,9 @@ final class ArenaInstanceRegistry {
     }
 
     private record PendingChallenge(long challengeId, long challengerCharacterId, long targetCharacterId) {}
+
+    /** Dữ liệu DB của một người sắp vào trận, đọc sẵn ngoài khoá. */
+    private record DuelEntrant(long characterId, CharacterBaseStats baseStats, PositionSnapshot returnPosition) {}
 
     /** 1 trận Arena đang chạy — {@code challengerCharacterId}/{@code targetCharacterId} cố định cả trận. */
     private record DuelInstance(
