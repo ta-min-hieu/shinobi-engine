@@ -13,6 +13,7 @@ import java.util.UUID;
 import javax.sql.DataSource;
 
 import dev.kage.character.domain.Character;
+import dev.kage.character.domain.CharacterNameTakenException;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.Faction;
@@ -148,9 +149,14 @@ public final class PostgresCharacterAdapter implements CharacterPort {
     public Character create(Transaction tx, NewCharacter newCharacter) {
         Connection connection = ((JdbcTransaction) tx).connection();
         insertIdempotencyKey(connection, newCharacter.idempotencyKey());
-        long characterId = JdbcOperations.insertReturningId(
+        // ...OrThrow: UNIQUE duy nhất mà câu INSERT này có thể vi phạm là character.name (V2; id là
+        // IDENTITY, khoá idempotency nằm ở câu riêng phía trên). Hai người tạo cùng một tên ĐÚNG
+        // cùng lúc đều qua existsByName của use case — người thua phải nhận "tên trùng", không phải
+        // lỗi DB chung.
+        long characterId = JdbcOperations.insertReturningIdOrThrow(
                 connection,
                 INSERT_CHARACTER,
+                () -> new CharacterNameTakenException(newCharacter.name()),
                 newCharacter.accountId(),
                 newCharacter.name(),
                 newCharacter.faction().name(),

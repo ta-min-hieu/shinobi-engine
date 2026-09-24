@@ -3,6 +3,7 @@ package dev.kage.character.application;
 import java.util.concurrent.atomic.AtomicReference;
 
 import dev.kage.character.domain.Character;
+import dev.kage.character.domain.CharacterNameTakenException;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
@@ -34,7 +35,13 @@ public final class CreateCharacterUseCase {
 
         NewCharacter newCharacter = new NewCharacter(accountId, name, Faction.HOA, idempotencyKey);
         AtomicReference<Character> holder = new AtomicReference<Character>();
-        transactionRunner.inTransaction(tx -> holder.set(characterPort.create(tx, newCharacter)));
+        try {
+            transactionRunner.inTransaction(tx -> holder.set(characterPort.create(tx, newCharacter)));
+        } catch (CharacterNameTakenException e) {
+            // existsByName ở trên chỉ là kiểm sớm, không nguyên tử với INSERT: người khác có thể lấy
+            // đúng tên này ngay giữa hai bước. Báo cùng một lỗi như đường thường.
+            throw new DuplicateCharacterNameException(name, e);
+        }
         return holder.get();
     }
 }

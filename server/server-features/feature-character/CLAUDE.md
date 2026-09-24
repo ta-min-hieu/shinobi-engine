@@ -8,8 +8,13 @@
 api/            CharacterFacade         ← module khác (server-gateway) CHỈ gọi qua đây
 application/    CreateCharacterUseCase · ListCharactersUseCase
 domain/         Character (aggregate) · Faction · CharacterPort · Transaction · TransactionRunner
-                IdempotencyKeyReusedException
+                IdempotencyKeyReusedException · CharacterNameTakenException
 ```
+
+`CharacterNameTakenException` (2026-09-24): `existsByName` trong `CreateCharacterUseCase` chỉ là
+kiểm sớm, KHÔNG nguyên tử với INSERT. Hai người tạo cùng một tên đúng cùng lúc đều qua được nó; UNIQUE
+`character.name` chặn người thứ hai, adapter dịch thành exception này, use case đổi thành
+`DuplicateCharacterNameException` — người chơi nhận "tên trùng" như đường thường.
 
 Chiều: `api → application → domain`. **`domain/` không import gì bên ngoài** — không có
 `infrastructure/` trong module này (xem feature-account/CLAUDE.md mục "Khác template chuẩn" —

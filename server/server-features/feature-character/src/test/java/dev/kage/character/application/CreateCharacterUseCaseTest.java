@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 import dev.kage.character.domain.Character;
+import dev.kage.character.domain.CharacterNameTakenException;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.Faction;
@@ -25,7 +26,7 @@ import dev.kage.character.domain.TransactionRunner;
 class CreateCharacterUseCaseTest {
 
     /** Fake = implementation in-memory THẬT, phát hiện lỗi tương tác thật hơn Mockito (TESTING §4). */
-    static final class FakeCharacterPort implements CharacterPort {
+    static class FakeCharacterPort implements CharacterPort {
         final List<Character> characters = new ArrayList<>();
         final AtomicLong nextId = new AtomicLong(1);
         final Map<Long, PositionSnapshot> positions = new HashMap<>();
@@ -147,6 +148,25 @@ class CreateCharacterUseCaseTest {
         assertThatThrownBy(() -> useCase.execute(2L, "KageHero", "idem-2"))
                 .isInstanceOf(DuplicateCharacterNameException.class);
         assertThat(port.characters).hasSize(1);
+    }
+
+    /**
+     * Người khác lấy đúng tên này GIỮA phép kiểm {@code existsByName} và lúc INSERT — chỉ tầng DB
+     * thấy (adapter ném {@link CharacterNameTakenException}). Người chơi vẫn phải nhận "tên trùng".
+     */
+    @Test
+    void shouldReportDuplicateName_whenNameIsTakenBetweenCheckAndInsert() {
+        FakeCharacterPort port = new FakeCharacterPort() {
+            @Override
+            public Character create(Transaction tx, NewCharacter newCharacter) {
+                throw new CharacterNameTakenException(newCharacter.name());
+            }
+        };
+        CreateCharacterUseCase useCase = new CreateCharacterUseCase(port, DIRECT_TX);
+
+        assertThatThrownBy(() -> useCase.execute(1L, "KageHero", "idem-1"))
+                .isInstanceOf(DuplicateCharacterNameException.class)
+                .hasCauseInstanceOf(CharacterNameTakenException.class);
     }
 
     @Test

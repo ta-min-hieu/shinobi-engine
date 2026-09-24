@@ -4,7 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
@@ -17,6 +23,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import dev.kage.account.domain.Account;
 import dev.kage.character.domain.Character;
+import dev.kage.character.domain.CharacterNameTakenException;
 import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.IdempotencyKeyReusedException;
@@ -182,5 +189,58 @@ class PostgresCharacterAdapterIntegrationTest {
         assertThat(staleWritten).isFalse();
         assertThat(freshWritten).isTrue();
         assertThat(adapter.findById(id).orElseThrow().level()).isEqualTo(3);
+    }
+
+    /**
+     * Hai người tạo CÙNG một tên đúng cùng lúc: cả hai đều qua phép kiểm {@code existsByName} của
+     * use case, chỉ UNIQUE {@code character.name} chặn được người thứ hai. Trước bản vá 2026-09-24
+     * adapter để lọt nguyên {@code DatabaseAccessException} — người thua nhận
+     * {@code error.create_character_failed} ("máy chủ lỗi") thay vì "tên đã có người dùng".
+     * Đo GIÁ TRỊ CUỐI: đúng một nhân vật mang tên đó, bên thua thấy tín hiệu domain.
+     */
+    @Test
+    void shouldReportNameTaken_whenTwoCreatesRaceForTheSameName() throws Exception {
+        PostgresCharacterAdapter adapter = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
+        String name = "RaceName";
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Optional<Throwable>> first =
+                    executor.submit(() -> createAfterBarrier(adapter, transactionRunner, barrier, name));
+            Future<Optional<Throwable>> second =
+                    executor.submit(() -> createAfterBarrier(adapter, transactionRunner, barrier, name));
+            Optional<Throwable> firstFailure = first.get(1, TimeUnit.MINUTES);
+            Optional<Throwable> secondFailure = second.get(1, TimeUnit.MINUTES);
+
+            assertThat(adapter.existsByName(name)).isTrue();
+            assertThat(adapter.listByAccount(accountId).stream()
+                            .filter(c -> c.name().equals(name))
+                            .count())
+                    .isEqualTo(1L);
+            assertThat(firstFailure.isPresent() ^ secondFailure.isPresent()).isTrue();
+            assertThat(firstFailure.or(() -> secondFailure)).containsInstanceOf(CharacterNameTakenException.class);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    // Trả về exception của lượt tạo (rỗng = tạo thành công) để luồng test so sánh hai kết quả.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private static Optional<Throwable> createAfterBarrier(
+            PostgresCharacterAdapter adapter,
+            JdbcCharacterTransactionRunner transactionRunner,
+            CyclicBarrier barrier,
+            String name)
+            throws Exception {
+        NewCharacter newCharacter =
+                new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
+        barrier.await(1, TimeUnit.MINUTES);
+        try {
+            transactionRunner.inTransaction(tx -> adapter.create(tx, newCharacter));
+            return Optional.empty();
+        } catch (RuntimeException e) {
+            return Optional.of(e);
+        }
     }
 }
