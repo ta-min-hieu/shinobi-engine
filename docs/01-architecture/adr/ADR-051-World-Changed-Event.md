@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ✅ **Accepted** (2026-09-24) — chủ dự án chọn **phương án A** (event chung 308) cùng ngày. Chưa thi hành lúc Accept. |
+| Status | ✅ **Accepted** (2026-09-24) — chủ dự án chọn **phương án A** (event chung 308) cùng ngày. **Đã thi hành cùng ngày** — xem "Việc cần làm tiếp theo" mục 2. |
 | Date | 2026-09-24 |
 | Deciders | Chủ dự án quyết; AI soạn |
 | Related | [ADR-047](ADR-047-Dungeon-Entered-Event.md) (phương án C + Revisit Trigger mà ADR này thi hành) · [ADR-026](ADR-026-Dungeon-Instance-Model.md) (hầm ngục = World riêng) · [ADR-045](ADR-045-Appearance-Changed-Event.md) (khuôn "thêm event đẩy, `protocolVersion` không tăng") · [ADR-042](ADR-042-Outbound-Packet-Batching.md) (đang muốn GIẢM số gói) · [NETWORK.md §3, §5, §6](../../05-server/NETWORK.md) |
@@ -190,6 +190,22 @@ Không (ngừng phát 1504 — D4 — sẽ cần ADR riêng khi tới lúc).
 ## Việc cần làm tiếp theo
 
 1. ✅ **XONG** — chủ dự án chọn **A** (2026-09-24).
-2. Nếu A: thi hành theo D1–D5, kèm test socket khẳng định thứ tự (event trước spawn) cho: người gửi vào
-   hầm ngục, người bị kéo, người chết trong hầm ngục, hai người chơi vào/ra đấu trường.
+2. ✅ **ĐÃ THI HÀNH 2026-09-24** theo D1–D5, không lệch Decision:
+   - `shared-protocol`: opcode **308** + `WorldChangedEvent` + `WorldKind` + `WorldChangeReason` trong
+     `movement.proto` (cạnh 300–307), `protocolVersion` KHÔNG tăng.
+   - `server-gateway`: `WorldTransfer` là chỗ DUY NHẤT giữ thứ tự D2 (detach → event → attach), dùng
+     chung cho `DungeonInstanceRegistry` (vào: `REQUESTED` cho người bấm, `PULLED_BY_PARTY` cho người bị
+     kéo — 1504 vẫn phát, D4; ra: `REQUESTED`; gục: `DEFEATED`) và `ArenaInstanceRegistry` (vào trận:
+     `REQUESTED` cho CẢ HAI người — người thách chính là người đã xin trận; chốt trận mọi đường — bỏ
+     cuộc, bị hạ gục, đối thủ rớt mạng: `DUEL_ENDED`). D5: `DungeonOutboundSink.onCharacterDefeated`
+     (tick thread) ⇒ `DungeonInstanceRegistry.handleCharacterDefeated` ⇒ executor Virtual Thread ⇒ đường
+     `exitDungeon`/`commitExit` có sẵn. `current_hp = max_hp` = máu mà lệnh attach đặt; hầm ngục/đấu
+     trường attach KHÔNG kèm bonus trang bị (giới hạn có sẵn) nên `max_hp` ở đó là máu nền.
+   - `client-core`: `WorldChangeCoordinator` là lối vào duy nhất; `WorldScreen` dọn thực thể + đặt vị
+     trí/máu theo event; Response vào/ra hầm ngục và 1504 KHÔNG còn dọn màn hình; mẹo
+     `resendDirection` đã xoá; dòng báo mới `dungeon.notice.defeated`.
+   - Test: `WorldChangedEventOrderTest` khẳng định event tới TRƯỚC spawn đầu tiên cho người bấm vào,
+     người bị kéo, cả hai người vào trận; và TRƯỚC spawn của world chính khi gục trong hầm ngục/chốt trận.
+     Với hành vi cũ (lời báo gục rơi vào hàm rỗng), test gục-trong-hầm-ngục đỏ: nhân vật vẫn ở trong sau
+     10 giây chờ.
 3. Kiểm chứng sống bằng client thật: gục trong bí cảnh ⇒ màn hình về làng, không còn boss đọng, vạch máu đầy.

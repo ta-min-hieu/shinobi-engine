@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import dev.kage.protocol.EnterDungeonOutcome;
 import dev.kage.protocol.ExitDungeonOutcome;
+import dev.kage.protocol.WorldKind;
 
 /**
  * {@link DungeonController} thuần Java, không libGDX — chạy được thẳng trong JUnit như
@@ -72,18 +73,20 @@ class DungeonControllerTest {
     }
 
     @Test
-    @DisplayName("Chỉ OK mới là một cú ĐỔI World — ALREADY_IN_DUNGEON thì không dọn màn hình")
-    void onlyOkChangesWorld() {
-        assertThat(DungeonController.changesWorld(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK))
-                .isTrue();
-        assertThat(DungeonController.changesWorld(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_ALREADY_IN_DUNGEON))
+    @DisplayName("ADR-051 — bị đưa ra khỏi hầm ngục không qua Response nào vẫn tắt cờ 'đang ở hầm ngục'")
+    void worldChangedEventDecidesWhetherWeAreInsideTheDungeon() {
+        controller.onEnterOutcome(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
+
+        controller.onWorldChanged(WorldKind.WORLD_KIND_MAIN);
+        assertThat(controller.inDungeon())
+                .as("gục trong hầm ngục ⇒ về world chính")
                 .isFalse();
-        assertThat(DungeonController.changesWorld(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_NOT_IN_PARTY))
-                .isFalse();
-        assertThat(DungeonController.changesWorld(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK))
-                .isTrue();
-        assertThat(DungeonController.changesWorld(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_NOT_IN_DUNGEON))
-                .isFalse();
+
+        controller.onWorldChanged(WorldKind.WORLD_KIND_DUNGEON);
+        assertThat(controller.inDungeon()).isTrue();
+
+        controller.onWorldChanged(WorldKind.WORLD_KIND_ARENA);
+        assertThat(controller.inDungeon()).isFalse();
     }
 
     @Test

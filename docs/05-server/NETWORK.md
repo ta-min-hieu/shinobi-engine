@@ -96,9 +96,15 @@ Dải số cố định theo domain — tránh đụng độ khi nhiều ngườ
 
 **Nguồn chân lý thật**: `shared-protocol/src/main/proto/opcode_registry.proto`. Tài liệu này là bản tóm tắt — **lệch nhau thì file `.proto` thắng**.
 
-Tổng opcode đã cấp phát (không tính `OPCODE_UNSPECIFIED`): **161** (2026-09-07).
+Tổng opcode đã cấp phát (không tính `OPCODE_UNSPECIFIED`): **163** (2026-09-24 — đếm lại từ file
+`.proto`; con số 161 cũ chưa cộng `OPCODE_DUNGEON_ENTERED_EVENT` 1504 của ADR-047).
 
-Lượt cấp gần nhất — [ADR-046](../01-architecture/adr/ADR-046-Health-Recovery.md) (Accepted 2026-09-07), 158 → 161:
+Lượt cấp gần nhất — [ADR-051](../01-architecture/adr/ADR-051-World-Changed-Event.md) (Accepted
+2026-09-24): `OPCODE_WORLD_CHANGED_EVENT` = 308 (dải Movement/World), 162 → 163. Trước đó
+[ADR-047](../01-architecture/adr/ADR-047-Dungeon-Entered-Event.md) cấp
+`OPCODE_DUNGEON_ENTERED_EVENT` = 1504 (161 → 162).
+
+Lượt trước nữa — [ADR-046](../01-architecture/adr/ADR-046-Health-Recovery.md) (Accepted 2026-09-07), 158 → 161:
 
 | Opcode | Số | Dải |
 |---|---|---|

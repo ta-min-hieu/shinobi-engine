@@ -66,6 +66,9 @@ enum Opcode {
   // Movement/World chứ không phải Character (200-299) vì nó nói về một nhân vật KHÁC trong world,
   // cùng nhóm với spawn/despawn/respawn ở trên.
   OPCODE_CHARACTER_APPEARANCE_CHANGED_EVENT = 307;
+  // ADR-051 — CHÍNH mình vừa được đưa sang World khác (hầm ngục, đấu trường, về world chính).
+  // Một event cho MỌI cú đổi World, luôn tới TRƯỚC spawn đầu tiên của World mới.
+  OPCODE_WORLD_CHANGED_EVENT = 308;
 
   // --- Combat / Skill (400-499) ---
   OPCODE_SET_TARGET_COMMAND = 400;

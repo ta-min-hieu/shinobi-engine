@@ -63,14 +63,6 @@ final class LocalIntentSender {
     }
 
     /**
-     * Gửi LẠI đúng hướng đang đi, không phải 0 — cách duy nhất hỏi "tôi đang ở đâu" bằng gói đã có
-     * sau khi đổi World, xem {@code DungeonCoordinator#setOnWorldChanged}.
-     */
-    void resendDirection() {
-        context.sender().moveDirection(lastSentDirX);
-    }
-
-    /**
      * ADR-033 — chỉ còn trái/phải (bỏ {@code MOVE_UP}/{@code MOVE_DOWN}, xem {@link GameAction}).
      * {@code dirY} LUÔN gửi {@code 0f}: field còn tồn tại trên dây (movement.proto không xoá field
      * đang dùng, shared/CLAUDE.md) nhưng server-world giờ bỏ qua nó

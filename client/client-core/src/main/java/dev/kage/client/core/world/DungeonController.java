@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import dev.kage.protocol.EnterDungeonOutcome;
 import dev.kage.protocol.ExitDungeonOutcome;
+import dev.kage.protocol.WorldKind;
 
 /**
  * Trạng thái "đang ở trong hầm ngục hay không" của chính người chơi (2026-08-27) — thuần Java,
@@ -14,28 +15,18 @@ import dev.kage.protocol.ExitDungeonOutcome;
  * <p>Lát cắt hầm ngục hiện tại (Phase 8 lát cắt 1, ADR-026): cả nhóm cùng bị chuyển sang một
  * {@code WorldFacade} riêng, tick độc lập world chính. Map trống + 1 boss, chưa có phần thưởng gì.
  *
- * <p><b>⚠️ Ba khoảng trống CÓ THẬT của dungeon.proto</b> (kiểm lại opcode_registry.proto: dải
- * 1500-1503 chỉ có đúng 2 cặp Command/Response, không có một {@code *Event} nào):
+ * <p><b>Ba khoảng trống lịch sử của dungeon.proto — nay đều đã đóng:</b>
  *
  * <ul>
- *   <li>✅ <b>ĐÃ ĐÓNG 2026-09-13 (ADR-047, phương án B).</b> ~~Bị kéo vào theo nhóm thì không hay
- *       biết gì.~~ Người bị kéo nay nhận {@code DungeonEnteredEvent} (opcode 1504) — event ĐẦU TIÊN
- *       của dải Dungeon — và đi đúng đường {@code settleEnter} như người tự bấm nút. Vì vậy
- *       {@link #inDungeon()} nay đúng cho CẢ HAI, không còn chỉ đúng cho người vừa tự bấm.
- *   <li><b>Không có gói "đổi World" nào.</b> Khi nhân vật rời world chính,
- *       {@code AreaOfInterestTracker.onDetach} chỉ báo despawn cho NHỮNG NGƯỜI KHÁC — bản thân
- *       người đi không nhận được despawn của bất cứ thứ gì họ đang thấy. World mới thì có phát
- *       spawn đầy đủ (tập "đang thấy" của họ bắt đầu rỗng ở world mới), nên hệ quả là ĐỌNG chứ
- *       không phải THIẾU: quái/NPC/người chơi của làng vẫn nằm nguyên trên màn hình bên trong hầm
- *       ngục. Xem {@code WorldScreen#onWorldInstanceChanged} về cách bù.
- *   <li><b>Không có gói nào báo vị trí mới.</b> Server đặt nhân vật ở {@code (0,0)} của instance,
- *       nhưng {@code MoveResponse} chỉ được phát như một ack cho {@code MoveCommand} — không tự
- *       gửi lúc attach.
+ *   <li>✅ <b>ADR-047 (2026-09-13).</b> Bị kéo vào theo nhóm thì không hay biết gì — nay có
+ *       {@code DungeonEnteredEvent} (1504), còn phát cho client cũ nhưng client này chỉ dùng nó để
+ *       báo chữ.
+ *   <li>✅ <b>ADR-051 (2026-09-24).</b> Không có gói "đổi World" nào ⇒ thực thể của World cũ đứng
+ *       ĐỌNG trên màn hình. Nay có {@code WorldChangedEvent} (308), tới TRƯỚC spawn của World mới;
+ *       {@link WorldChangeCoordinator} dọn màn hình theo đúng gói đó.
+ *   <li>✅ <b>ADR-051.</b> Không có gói nào báo vị trí mới ⇒ nay chính {@code WorldChangedEvent}
+ *       mang {@code x/y}, bỏ được mẹo gửi lại hướng đi để xin {@code MoveResponse}.
  * </ul>
- *
- * <p>Đóng các lỗ trên thật sự cần event đẩy phía server, tức cần sửa {@code .proto} — nằm ngoài
- * quyền của client (/CLAUDE.md §4). Lỗ thứ nhất đã đóng (ADR-047 Accepted 2026-09-13); HAI lỗ còn
- * lại vẫn nguyên, và cả hai vẫn được bù bằng cú dọn {@code onWorldChanged} phía client.
  */
 final class DungeonController {
 
@@ -90,19 +81,12 @@ final class DungeonController {
     }
 
     /**
-     * Lệnh vừa rồi có làm nhân vật ĐỔI World hay không — chỗ gọi phải dọn mọi thực thể đang hiển thị
-     * khi câu này đúng (xem khoảng trống thứ hai ở javadoc lớp).
-     *
-     * <p>Chỉ {@code OK} mới đổi World: {@code ALREADY_IN_DUNGEON} nghĩa là đã ở sẵn trong đó, không
-     * có cú chuyển nào xảy ra, và dọn màn hình lúc đó chỉ xoá đi những thứ vừa nhận đúng.
+     * ADR-051 — server vừa đưa nhân vật sang World khác. Đây là nguồn DUY NHẤT biết được việc bị
+     * đưa RA khỏi hầm ngục mà không bấm gì (gục trong hầm ngục, D5): không có Response nào cho việc
+     * đó, nên {@link #onExitOutcome} không bao giờ chạy.
      */
-    static boolean changesWorld(EnterDungeonOutcome outcome) {
-        return outcome == EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK;
-    }
-
-    /** Cùng lập luận {@link #changesWorld(EnterDungeonOutcome)} cho chiều đi ra. */
-    static boolean changesWorld(ExitDungeonOutcome outcome) {
-        return outcome == ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK;
+    void onWorldChanged(WorldKind kind) {
+        inDungeon = kind == WorldKind.WORLD_KIND_DUNGEON;
     }
 
     /** Rời màn hình/mất kết nối — trạng thái của một phiên chơi không sống sót sang phiên sau. */
