@@ -163,4 +163,24 @@ class PostgresCharacterAdapterIntegrationTest {
         assertThat(stats.intelligence()).isEqualTo(10);
         assertThat(stats.vit()).isEqualTo(10);
     }
+
+    @Test
+    void shouldSaveLevel_onlyWhenExpIsStillTheValueItWasDerivedFrom() {
+        PostgresCharacterAdapter adapter = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
+        NewCharacter newCharacter = new NewCharacter(
+                accountId, "LevelCas", Faction.HOA, UUID.randomUUID().toString());
+        Character[] holder = new Character[1];
+        transactionRunner.inTransaction(tx -> holder[0] = adapter.create(tx, newCharacter));
+        long id = holder[0].id();
+        long expAfterFirstGrant = adapter.addExperience(id, 100L);
+        long expAfterSecondGrant = adapter.addExperience(id, 200L);
+
+        boolean staleWritten = adapter.saveLevel(id, 2, expAfterFirstGrant);
+        boolean freshWritten = adapter.saveLevel(id, 3, expAfterSecondGrant);
+
+        assertThat(staleWritten).isFalse();
+        assertThat(freshWritten).isTrue();
+        assertThat(adapter.findById(id).orElseThrow().level()).isEqualTo(3);
+    }
 }

@@ -86,7 +86,7 @@ class ListCharactersUseCaseTest {
         }
 
         @Override
-        public void saveLevel(long characterId, int level) {
+        public boolean saveLevel(long characterId, int level, long derivedFromExp) {
             throw new UnsupportedOperationException("không dùng trong test này");
         }
     }

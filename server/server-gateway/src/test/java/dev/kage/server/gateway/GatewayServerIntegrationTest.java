@@ -340,7 +340,10 @@ class GatewayServerIntegrationTest {
             // trong file này không có đường lên cấp nào khác — giết quái tới cấp 10 qua socket
             // thật sẽ mất hàng chục giây cho một thứ không phải chủ đề của test.
             @Override
-            public void saveLevel(long characterId, int level) {
+            public boolean saveLevel(long characterId, int level, long derivedFromExp) {
+                if (findById(characterId).map(Character::exp).orElse(-1L) != derivedFromExp) {
+                    return false;
+                }
                 replaceCharacter(
                         characterId,
                         c -> new Character(
@@ -353,6 +356,7 @@ class GatewayServerIntegrationTest {
                                 c.exp(),
                                 c.rebirthCount(),
                                 c.createdAt()));
+                return true;
             }
 
             @Override
@@ -1112,7 +1116,10 @@ class GatewayServerIntegrationTest {
 
             // Đổi hệ phái đòi Lv10 (SelectFactionUseCase) và file này không có đường lên cấp nào —
             // seed thẳng vào Port, đúng cách GatewayPipelineTest đã làm cho hai test hệ phái ở đó.
-            characterPort.saveLevel(characterB, 10);
+            characterPort.saveLevel(
+                    characterB,
+                    10,
+                    characterPort.findById(characterB).orElseThrow().exp());
             dev.kage.protocol.SelectFactionRequest factionRequest = dev.kage.protocol.SelectFactionRequest.newBuilder()
                     .setFaction(dev.kage.protocol.Faction.FACTION_THUY)
                     .build();
