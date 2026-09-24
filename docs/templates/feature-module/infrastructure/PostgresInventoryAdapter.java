@@ -15,11 +15,15 @@ import java.util.Optional;
 public final class PostgresInventoryAdapter implements InventoryPort {
 
     // TEMPLATE: SQL dùng text block, tham số hoá bằng '?'
+    // ⚠️ ORDER BY i.id, KHÔNG phải slot_index (2026-09-24): code thật không đọc slot_index —
+    // cột không UNIQUE, có thể trùng/có lỗ sau trade/thư/shop/quest (V27 chấp nhận), gateway tự
+    // đánh số lại 0..n-1 khi gửi túi đồ. Sắp theo slot_index ở đây là biến cột đó thành có nghĩa
+    // và lỗi trùng số thành lỗi hiển thị.
     private static final String FIND_BY_CHARACTER = """
-            SELECT i.id, i.item_template_id, i.quantity, i.enhance_level, i.slot_index
+            SELECT i.id, i.item_template_id, i.quantity, i.enhance_level
               FROM inventory_item i
              WHERE i.character_id = ?
-             ORDER BY i.slot_index
+             ORDER BY i.id
             """;
 
     // TEMPLATE: inject DataSource/connection provider qua constructor.
