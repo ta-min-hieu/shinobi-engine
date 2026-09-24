@@ -1575,22 +1575,32 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         authExecutor.execute(() -> handleSendFriendRequestBlocking(ctx, sequenceId, characterId, command));
     }
 
+    // PMD AvoidCatchingGenericException: đúng ý — đây là ranh giới I/O bất đồng bộ (authExecutor,
+    // Virtual Thread), PHẢI trả lời client dù lỗi gì xảy ra, cùng lý do handleConnectBlocking. Một
+    // exception ở đây KHÔNG rơi vào exceptionCaught của pipeline (đang chạy trên Executor riêng,
+    // không phải EventLoop) — nếu không bắt, client treo chờ response không bao giờ tới.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void handleSendFriendRequestBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, SendFriendRequestCommand command) {
-        Optional<Character> target = characterFacade.findByName(command.getTargetName());
-        if (target.isEmpty()) {
+        try {
+            Optional<Character> target = characterFacade.findByName(command.getTargetName());
+            if (target.isEmpty()) {
+                SendFriendRequestResponse response = SendFriendRequestResponse.newBuilder()
+                        .setOutcome(SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_TARGET_NOT_FOUND)
+                        .build();
+                send(ctx, Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
+                return;
+            }
+            FriendFacade.SendRequestResult result =
+                    friendFacade.sendRequest(characterId, target.get().id());
             SendFriendRequestResponse response = SendFriendRequestResponse.newBuilder()
-                    .setOutcome(SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_TARGET_NOT_FOUND)
+                    .setOutcome(toProtoOutcome(result))
                     .build();
             send(ctx, Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
-            return;
+        } catch (RuntimeException e) {
+            LOG.error("Gửi lời mời kết bạn thất bại", e);
+            sendError(ctx, sequenceId, 500, "error.send_friend_request_failed");
         }
-        FriendFacade.SendRequestResult result =
-                friendFacade.sendRequest(characterId, target.get().id());
-        SendFriendRequestResponse response = SendFriendRequestResponse.newBuilder()
-                .setOutcome(toProtoOutcome(result))
-                .build();
-        send(ctx, Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
     private static final Map<FriendFacade.SendRequestResult, SendFriendRequestOutcome>
@@ -1620,15 +1630,22 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         authExecutor.execute(() -> handleAcceptFriendRequestBlocking(ctx, sequenceId, characterId, command));
     }
 
+    // PMD AvoidCatchingGenericException: cùng lý do handleSendFriendRequestBlocking.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void handleAcceptFriendRequestBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, AcceptFriendRequestCommand command) {
-        FriendFacade.AcceptResult result = friendFacade.accept(command.getFriendshipId(), characterId);
-        AcceptFriendRequestOutcome outcome = result == FriendFacade.AcceptResult.OK
-                ? AcceptFriendRequestOutcome.ACCEPT_FRIEND_REQUEST_OUTCOME_OK
-                : AcceptFriendRequestOutcome.ACCEPT_FRIEND_REQUEST_OUTCOME_NOT_FOUND;
-        AcceptFriendRequestResponse response =
-                AcceptFriendRequestResponse.newBuilder().setOutcome(outcome).build();
-        send(ctx, Opcode.OPCODE_ACCEPT_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        try {
+            FriendFacade.AcceptResult result = friendFacade.accept(command.getFriendshipId(), characterId);
+            AcceptFriendRequestOutcome outcome = result == FriendFacade.AcceptResult.OK
+                    ? AcceptFriendRequestOutcome.ACCEPT_FRIEND_REQUEST_OUTCOME_OK
+                    : AcceptFriendRequestOutcome.ACCEPT_FRIEND_REQUEST_OUTCOME_NOT_FOUND;
+            AcceptFriendRequestResponse response =
+                    AcceptFriendRequestResponse.newBuilder().setOutcome(outcome).build();
+            send(ctx, Opcode.OPCODE_ACCEPT_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        } catch (RuntimeException e) {
+            LOG.error("Chấp nhận lời mời kết bạn thất bại", e);
+            sendError(ctx, sequenceId, 500, "error.accept_friend_request_failed");
+        }
     }
 
     private void handleRejectFriendRequestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -1643,15 +1660,22 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         authExecutor.execute(() -> handleRejectFriendRequestBlocking(ctx, sequenceId, characterId, command));
     }
 
+    // PMD AvoidCatchingGenericException: cùng lý do handleSendFriendRequestBlocking.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void handleRejectFriendRequestBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, RejectFriendRequestCommand command) {
-        FriendFacade.RejectResult result = friendFacade.reject(command.getFriendshipId(), characterId);
-        RejectFriendRequestOutcome outcome = result == FriendFacade.RejectResult.OK
-                ? RejectFriendRequestOutcome.REJECT_FRIEND_REQUEST_OUTCOME_OK
-                : RejectFriendRequestOutcome.REJECT_FRIEND_REQUEST_OUTCOME_NOT_FOUND;
-        RejectFriendRequestResponse response =
-                RejectFriendRequestResponse.newBuilder().setOutcome(outcome).build();
-        send(ctx, Opcode.OPCODE_REJECT_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        try {
+            FriendFacade.RejectResult result = friendFacade.reject(command.getFriendshipId(), characterId);
+            RejectFriendRequestOutcome outcome = result == FriendFacade.RejectResult.OK
+                    ? RejectFriendRequestOutcome.REJECT_FRIEND_REQUEST_OUTCOME_OK
+                    : RejectFriendRequestOutcome.REJECT_FRIEND_REQUEST_OUTCOME_NOT_FOUND;
+            RejectFriendRequestResponse response =
+                    RejectFriendRequestResponse.newBuilder().setOutcome(outcome).build();
+            send(ctx, Opcode.OPCODE_REJECT_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        } catch (RuntimeException e) {
+            LOG.error("Từ chối lời mời kết bạn thất bại", e);
+            sendError(ctx, sequenceId, 500, "error.reject_friend_request_failed");
+        }
     }
 
     private void handleRemoveFriendCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -1666,24 +1690,31 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         authExecutor.execute(() -> handleRemoveFriendBlocking(ctx, sequenceId, characterId, command));
     }
 
+    // PMD AvoidCatchingGenericException: cùng lý do handleSendFriendRequestBlocking.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void handleRemoveFriendBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, RemoveFriendCommand command) {
-        Optional<Character> target = characterFacade.findByName(command.getTargetName());
-        if (target.isEmpty()) {
-            RemoveFriendResponse response = RemoveFriendResponse.newBuilder()
-                    .setOutcome(RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_TARGET_NOT_FOUND)
-                    .build();
+        try {
+            Optional<Character> target = characterFacade.findByName(command.getTargetName());
+            if (target.isEmpty()) {
+                RemoveFriendResponse response = RemoveFriendResponse.newBuilder()
+                        .setOutcome(RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_TARGET_NOT_FOUND)
+                        .build();
+                send(ctx, Opcode.OPCODE_REMOVE_FRIEND_RESPONSE_VALUE, sequenceId, response.toByteArray());
+                return;
+            }
+            FriendFacade.RemoveResult result =
+                    friendFacade.remove(characterId, target.get().id());
+            RemoveFriendOutcome outcome = result == FriendFacade.RemoveResult.OK
+                    ? RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_OK
+                    : RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_NOT_FRIENDS;
+            RemoveFriendResponse response =
+                    RemoveFriendResponse.newBuilder().setOutcome(outcome).build();
             send(ctx, Opcode.OPCODE_REMOVE_FRIEND_RESPONSE_VALUE, sequenceId, response.toByteArray());
-            return;
+        } catch (RuntimeException e) {
+            LOG.error("Huỷ kết bạn thất bại", e);
+            sendError(ctx, sequenceId, 500, "error.remove_friend_failed");
         }
-        FriendFacade.RemoveResult result =
-                friendFacade.remove(characterId, target.get().id());
-        RemoveFriendOutcome outcome = result == FriendFacade.RemoveResult.OK
-                ? RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_OK
-                : RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_NOT_FRIENDS;
-        RemoveFriendResponse response =
-                RemoveFriendResponse.newBuilder().setOutcome(outcome).build();
-        send(ctx, Opcode.OPCODE_REMOVE_FRIEND_RESPONSE_VALUE, sequenceId, response.toByteArray());
     }
 
     private void handleListFriendsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -1698,24 +1729,31 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         authExecutor.execute(() -> handleListFriendsBlocking(ctx, sequenceId, characterId));
     }
 
+    // PMD AvoidCatchingGenericException: cùng lý do handleSendFriendRequestBlocking.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void handleListFriendsBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        ListFriendsResponse.Builder responseBuilder = ListFriendsResponse.newBuilder();
-        for (long friendId : friendFacade.listFriends(characterId)) {
-            // findByName/findById chạm DB mỗi bạn — chấp nhận N+1 ở quy mô danh sách bạn bè MVP
-            // (vài chục), không phải đường nóng mỗi tick (khác AoI/combat).
-            String name =
-                    characterFacade.findById(friendId).map(Character::name).orElse("");
-            responseBuilder.addFriends(FriendView.newBuilder()
-                    .setCharacterId(friendId)
-                    .setName(name)
-                    .setOnline(worldGateway.registry().isOnline(friendId))
-                    .build());
+        try {
+            ListFriendsResponse.Builder responseBuilder = ListFriendsResponse.newBuilder();
+            for (long friendId : friendFacade.listFriends(characterId)) {
+                // findByName/findById chạm DB mỗi bạn — chấp nhận N+1 ở quy mô danh sách bạn bè MVP
+                // (vài chục), không phải đường nóng mỗi tick (khác AoI/combat).
+                String name =
+                        characterFacade.findById(friendId).map(Character::name).orElse("");
+                responseBuilder.addFriends(FriendView.newBuilder()
+                        .setCharacterId(friendId)
+                        .setName(name)
+                        .setOnline(worldGateway.registry().isOnline(friendId))
+                        .build());
+            }
+            send(
+                    ctx,
+                    Opcode.OPCODE_LIST_FRIENDS_RESPONSE_VALUE,
+                    sequenceId,
+                    responseBuilder.build().toByteArray());
+        } catch (RuntimeException e) {
+            LOG.error("Liệt kê danh sách bạn bè thất bại", e);
+            sendError(ctx, sequenceId, 500, "error.list_friends_failed");
         }
-        send(
-                ctx,
-                Opcode.OPCODE_LIST_FRIENDS_RESPONSE_VALUE,
-                sequenceId,
-                responseBuilder.build().toByteArray());
     }
 
     private void handleListPendingFriendRequestsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -1730,24 +1768,31 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         authExecutor.execute(() -> handleListPendingFriendRequestsBlocking(ctx, sequenceId, characterId));
     }
 
+    // PMD AvoidCatchingGenericException: cùng lý do handleSendFriendRequestBlocking.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void handleListPendingFriendRequestsBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        ListPendingFriendRequestsResponse.Builder responseBuilder = ListPendingFriendRequestsResponse.newBuilder();
-        for (FriendFacade.PendingRequestView pending : friendFacade.listPendingRequests(characterId)) {
-            String requesterName = characterFacade
-                    .findById(pending.requesterId())
-                    .map(Character::name)
-                    .orElse("");
-            responseBuilder.addRequests(PendingFriendRequestView.newBuilder()
-                    .setFriendshipId(pending.friendshipId())
-                    .setRequesterId(pending.requesterId())
-                    .setRequesterName(requesterName)
-                    .build());
+        try {
+            ListPendingFriendRequestsResponse.Builder responseBuilder = ListPendingFriendRequestsResponse.newBuilder();
+            for (FriendFacade.PendingRequestView pending : friendFacade.listPendingRequests(characterId)) {
+                String requesterName = characterFacade
+                        .findById(pending.requesterId())
+                        .map(Character::name)
+                        .orElse("");
+                responseBuilder.addRequests(PendingFriendRequestView.newBuilder()
+                        .setFriendshipId(pending.friendshipId())
+                        .setRequesterId(pending.requesterId())
+                        .setRequesterName(requesterName)
+                        .build());
+            }
+            send(
+                    ctx,
+                    Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_RESPONSE_VALUE,
+                    sequenceId,
+                    responseBuilder.build().toByteArray());
+        } catch (RuntimeException e) {
+            LOG.error("Liệt kê lời mời kết bạn đang chờ thất bại", e);
+            sendError(ctx, sequenceId, 500, "error.list_pending_friend_requests_failed");
         }
-        send(
-                ctx,
-                Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_RESPONSE_VALUE,
-                sequenceId,
-                responseBuilder.build().toByteArray());
     }
 
     private void handleCreateGuildCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)

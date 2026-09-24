@@ -32,10 +32,12 @@ Chiều: `api → application → domain`. **`domain/` không import gì bên ng
   over-engineering (Điều 9). Khi có multi-instance thật (ngoài scope hiện tại), đổi điểm này.
 - **Từ chối = xoá dòng**, không có trạng thái `REJECTED` — người bị từ chối có thể gửi lại lời mời
   mới bất cứ lúc nào, không cần lịch sử từ chối.
-- **Race 2 lời mời ngược hướng** (A mời B đúng lúc B mời A) KHÔNG bị chặn ở tầng DB (UNIQUE chỉ
-  khoá đúng 1 hướng `(requester_id, addressee_id)`) — chấp nhận có thể tạo 2 dòng PENDING ngược
-  nhau, vô hại, không thêm lock/transaction chỉ để chặn edge case hiếm này (xem
-  `DuplicateFriendRequestException` javadoc).
+- **Race 2 lời mời ngược hướng** (A mời B đúng lúc B mời A): UNIQUE `(requester_id, addressee_id)`
+  của V12 chỉ khoá đúng 1 hướng, nên chặn ở `PostgresFriendAdapter.sendRequest` — khoá tư vấn
+  (`pg_advisory_xact_lock`) theo CẶP rồi kiểm cả 2 chiều trong CÙNG giao dịch với INSERT. Bản MVP
+  cũ ghi race này "vô hại" — sai: nếu cả hai cùng chấp nhận, mỗi người thấy người kia HAI LẦN trong
+  danh sách bạn (2 dòng ACCEPTED). Không đổi schema (một UNIQUE theo `LEAST/GREATEST` là cách triệt
+  để hơn nhưng là migration, phải dọn trước các cặp trùng đã có trong DB thật).
 
 ## Cứng
 

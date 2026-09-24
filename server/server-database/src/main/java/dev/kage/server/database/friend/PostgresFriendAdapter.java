@@ -1,6 +1,5 @@
 package dev.kage.server.database.friend;
 
-import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -14,8 +13,8 @@ import dev.kage.friend.domain.DuplicateFriendRequestException;
 import dev.kage.friend.domain.FriendPort;
 import dev.kage.friend.domain.Friendship;
 import dev.kage.friend.domain.FriendshipStatus;
-import dev.kage.server.database.DatabaseAccessException;
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.JdbcTransactionRunner;
 
 /**
  * Hiện thực {@link FriendPort} trên PostgreSQL — bảng {@code friendship} (V12). Không có
@@ -28,6 +27,16 @@ public final class PostgresFriendAdapter implements FriendPort {
             SELECT id, requester_id, addressee_id, status, created_at, responded_at FROM friendship
              WHERE (requester_id = ? AND addressee_id = ?) OR (requester_id = ? AND addressee_id = ?)
             """;
+
+    // Khoá tư vấn (advisory) theo CẶP nhân vật, tự nhả khi giao dịch kết thúc. Dạng 2 tham số int:
+    // tham số 1 là "không gian tên" riêng của bảng friendship để không đụng khoá tư vấn nào khác
+    // trong DB; tham số 2 là băm của cặp (min, max) — trùng băm giữa 2 cặp khác nhau chỉ làm chúng
+    // xếp hàng chờ nhau một chút, không bao giờ sai kết quả.
+    private static final String LOCK_PAIR = "SELECT pg_advisory_xact_lock(?, ?)";
+
+    // Hằng số tuỳ ý nhưng CỐ ĐỊNH — đổi giá trị trong lúc server cũ còn chạy song song (rolling
+    // deploy) sẽ làm 2 bản khoá 2 chìa khác nhau cho cùng một cặp.
+    private static final int FRIENDSHIP_LOCK_NAMESPACE = 0x4652_4E44;
 
     private static final String INSERT_REQUEST = """
             INSERT INTO friendship (requester_id, addressee_id, status, created_at)
@@ -78,10 +87,36 @@ public final class PostgresFriendAdapter implements FriendPort {
                 characterIdA);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>UNIQUE (requester_id, addressee_id) của V12 chỉ chặn trùng CÙNG CHIỀU. A mời B đúng lúc B
+     * mời A thì cả hai {@code findBetween} ở use case đều thấy rỗng và cả hai INSERT đều lọt, sinh 2
+     * dòng cho 1 cặp ⇒ sau khi cả hai chấp nhận, mỗi người thấy người kia HAI LẦN trong danh sách
+     * bạn. Vì vậy phép kiểm "đã có quan hệ theo chiều nào chưa" phải nằm CÙNG giao dịch với INSERT,
+     * sau một khoá theo cặp — khoá dòng không dùng được vì lúc đó chưa có dòng nào để khoá.
+     */
     @Override
     public Friendship sendRequest(long requesterId, long addresseeId) {
         Instant now = Instant.now();
-        try (Connection connection = dataSource.getConnection()) {
+        return JdbcTransactionRunner.call(dataSource, connection -> {
+            JdbcOperations.query(
+                    connection,
+                    LOCK_PAIR,
+                    rs -> Boolean.TRUE,
+                    FRIENDSHIP_LOCK_NAMESPACE,
+                    pairLockKey(requesterId, addresseeId));
+            if (JdbcOperations.queryOne(
+                            connection,
+                            FIND_BETWEEN,
+                            PostgresFriendAdapter::mapRow,
+                            requesterId,
+                            addresseeId,
+                            addresseeId,
+                            requesterId)
+                    .isPresent()) {
+                throw new DuplicateFriendRequestException(requesterId, addresseeId);
+            }
             long id = JdbcOperations.insertReturningIdOrThrow(
                     connection,
                     INSERT_REQUEST,
@@ -90,9 +125,14 @@ public final class PostgresFriendAdapter implements FriendPort {
                     addresseeId,
                     Timestamp.from(now));
             return new Friendship(id, requesterId, addresseeId, FriendshipStatus.PENDING, now, null);
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi gửi lời mời kết bạn: " + requesterId + " -> " + addresseeId, e);
-        }
+        });
+    }
+
+    // Không phụ thuộc chiều: (a, b) và (b, a) ra cùng một chìa.
+    private static int pairLockKey(long characterIdA, long characterIdB) {
+        long low = Math.min(characterIdA, characterIdB);
+        long high = Math.max(characterIdA, characterIdB);
+        return Long.hashCode(low * 31 + high);
     }
 
     @Override
