@@ -7,13 +7,18 @@ import dev.kage.server.database.JdbcOperations;
 /**
  * Gộp vật phẩm vào một chồng sẵn có, cho những đường cấp đồ đi THẲNG bằng SQL.
  *
- * <p><b>Vì sao tồn tại (2026-09-05).</b> Dự án có BA đường cấp vật phẩm vào túi, không phải một:
+ * <p><b>Vì sao tồn tại (2026-09-05).</b> Dự án có NHIỀU đường cấp vật phẩm vào túi, không phải một:
  *
  * <ol>
  *   <li>{@code Inventory.add()} — rơi đồ, {@code AddItemUseCase}. Luật xếp chồng nằm ở domain.
  *   <li>{@code PostgresShopInventoryGatewayAdapter.grantItem} — MUA hàng, {@code INSERT} thẳng.
  *   <li>{@code PostgresQuestInventoryGrantAdapter.grantItemByCode} — thưởng nhiệm vụ, {@code INSERT} thẳng.
+ *   <li>{@code PostgresMailInventoryGatewayAdapter.grantItem} — nhận thư, {@code INSERT} thẳng. Bị
+ *       BỎ SÓT lúc bản vá đầu (chỉ đếm ba đường), thêm 2026-09-24.
  * </ol>
+ *
+ * <p>⚠️ {@code PostgresTradeInventoryAdapter} cũng {@code INSERT} thẳng vào {@code inventory_item} và
+ * CHƯA dùng lớp này — chưa rà xem có cố ý không.
  *
  * <p>Hai đường sau bỏ qua hẳn domain (feature-shop/feature-quest không được import feature-inventory
  * — mỗi feature chỉ đọc bảng của mình qua adapter riêng, xem server/CLAUDE.md). Sửa xếp chồng ở

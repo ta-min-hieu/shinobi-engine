@@ -60,6 +60,7 @@ class MailIntegrationTest {
     static DataSource dataSource;
     static long accountId;
     static long kunaiTemplateId;
+    static long woodenSwordTemplateId;
 
     @BeforeAll
     static void migrate() {
@@ -78,6 +79,7 @@ class MailIntegrationTest {
         accountTx.inTransaction(tx -> accountHolder[0] = accountAdapter.findOrCreate(tx, "mailtester"));
         accountId = accountHolder[0].id();
         kunaiTemplateId = findItemTemplateIdByCode("kunai");
+        woodenSwordTemplateId = findItemTemplateIdByCode("wooden_sword");
     }
 
     private static long createFreshCharacter(String name) {
@@ -274,7 +276,10 @@ class MailIntegrationTest {
     void shouldRollbackGold_whenClaimAndInventoryFull() {
         long recipientId = createFreshCharacter("MailRecv4");
         fillInventoryToCapacity(recipientId);
-        Mail mail = sendSystemMail(recipientId, 999, List.of(new MailAttachmentDraft(kunaiTemplateId, 1)));
+        // Trang bị (max_stack = 1), KHÔNG phải phi đao: túi lấp bằng phi đao nên một phi đao gửi kèm
+        // sẽ gộp vào chồng sẵn có và nhận được bình thường — xem
+        // shouldClaimStackableItem_whenBagIsFullButAStackHasRoom.
+        Mail mail = sendSystemMail(recipientId, 999, List.of(new MailAttachmentDraft(woodenSwordTemplateId, 1)));
 
         ClaimMailUseCase.ClaimOutcome result = newClaimUseCase().execute(mail.id(), recipientId, newIdempotencyKey());
 
@@ -482,6 +487,36 @@ class MailIntegrationTest {
     }
 
     /** Gom đủ số lượng từ NHIỀU stack cùng loại — đính kèm chỉ có template + số lượng, không có itemId. */
+    // Nhận thư là đường cấp vật phẩm THỨ TƯ (cạnh rơi đồ, mua hàng, thưởng quest) — bản vá xếp chồng
+    // 540adf2 bỏ sót nó: mỗi lần nhận thư đẻ thêm một dòng dù đã có chồng cùng loại còn chỗ.
+    @Test
+    void shouldMergeIntoExistingStack_whenClaimingStackableItem() {
+        long recipientId = createFreshCharacter("MailMerge1");
+        persistOneItem(recipientId, kunaiTemplateId, 5);
+        Mail mail = sendSystemMail(recipientId, 0, List.of(new MailAttachmentDraft(kunaiTemplateId, 2)));
+
+        ClaimMailUseCase.ClaimOutcome result = newClaimUseCase().execute(mail.id(), recipientId, newIdempotencyKey());
+
+        assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.OK);
+        assertThat(countInventoryRows(recipientId)).isEqualTo(1);
+        assertThat(readItemQuantity(recipientId, kunaiTemplateId)).isEqualTo(7);
+    }
+
+    // Hậu quả thật của lỗi trên: túi đủ 20 ô nhưng chồng phi đao còn chỗ — mua ở cửa hàng hay nhận
+    // thưởng quest cùng món đó thì được, nhận qua thư thì bị từ chối INVENTORY_FULL.
+    @Test
+    void shouldClaimStackableItem_whenBagIsFullButAStackHasRoom() {
+        long recipientId = createFreshCharacter("MailMerge2");
+        fillInventoryToCapacity(recipientId);
+        Mail mail = sendSystemMail(recipientId, 0, List.of(new MailAttachmentDraft(kunaiTemplateId, 1)));
+
+        ClaimMailUseCase.ClaimOutcome result = newClaimUseCase().execute(mail.id(), recipientId, newIdempotencyKey());
+
+        assertThat(result).isEqualTo(ClaimMailUseCase.ClaimOutcome.OK);
+        assertThat(countInventoryRows(recipientId)).isEqualTo(20);
+        assertThat(readItemQuantity(recipientId, kunaiTemplateId)).isEqualTo(21);
+    }
+
     @Test
     void shouldConsumeAcrossMultipleStacks_whenOneStackIsNotEnough() {
         long senderId = createFreshCharacter("MailStacks");
