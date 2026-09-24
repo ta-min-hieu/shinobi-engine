@@ -1,6 +1,7 @@
 package dev.kage.server.database.mail;
 
 import java.sql.Connection;
+import java.util.Comparator;
 import java.util.List;
 
 import dev.kage.mail.domain.InventoryGatewayPort;
@@ -32,9 +33,12 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
             """;
 
     // ORDER BY id: hai transaction gửi thư song song khoá các dòng theo CÙNG thứ tự nên không
-    // deadlock nhau. enhance_level = 0: xem javadoc #consumeItem.
+    // deadlock nhau. enhance_level = 0: xem javadoc #consumeItem. Cột equipped chỉ để chọn THỨ TỰ
+    // TRỪ (dòng không mặc trước), KHÔNG đổi thứ tự khoá.
     private static final String SELECT_STACKS_FOR_UPDATE = """
-            SELECT id, quantity FROM inventory_item
+            SELECT id, quantity,
+                   EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = inventory_item.id) AS equipped
+              FROM inventory_item
              WHERE character_id = ? AND item_template_id = ? AND enhance_level = 0
              ORDER BY id
                FOR UPDATE
@@ -83,6 +87,11 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
      * {@code mail_item} + {@code MailAttachmentView} — đổi schema và đổi protocol, cả hai đều cần
      * chủ dự án quyết (/CLAUDE.md §4).
      *
+     * <p><b>Trừ dòng KHÔNG mặc trước</b> (sửa 2026-09-24): thư trừ theo LOẠI chứ không theo dòng.
+     * Trước đó nó trừ theo id tăng dần, nên có một thanh kiếm đang mặc (thường có trước, id nhỏ
+     * hơn) cộng một thanh dự phòng giống hệt thì thanh ĐANG MẶC bị xoá, ô vũ khí rơi về NULL, còn
+     * thanh dự phòng nằm lại trong túi.
+     *
      * <p>Đếm ĐỦ trước rồi mới trừ: transaction ngoài cùng vẫn rollback nếu trả {@code false},
      * nhưng "không đủ" là kết quả bình thường của nghiệp vụ, không nên để nó phụ thuộc vào việc ai
      * đó nhớ rollback đúng.
@@ -93,15 +102,17 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
         List<Stack> stacks = JdbcOperations.query(
                 connection,
                 SELECT_STACKS_FOR_UPDATE,
-                rs -> new Stack(rs.getLong("id"), rs.getInt("quantity")),
+                rs -> new Stack(rs.getLong("id"), rs.getInt("quantity"), rs.getBoolean("equipped")),
                 characterId,
                 itemTemplateId);
+        List<Stack> consumeOrder =
+                stacks.stream().sorted(Comparator.comparing(Stack::equipped)).toList();
         long available = stacks.stream().mapToLong(Stack::quantity).sum();
         if (available < quantity) {
             return false;
         }
         int remaining = quantity;
-        for (Stack stack : stacks) {
+        for (Stack stack : consumeOrder) {
             if (remaining == 0) {
                 break;
             }
@@ -116,6 +127,6 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
         return true;
     }
 
-    /** Một dòng {@code inventory_item} đã khoá — chỉ hai cột cần cho việc trừ. */
-    private record Stack(long id, int quantity) {}
+    /** Một dòng {@code inventory_item} đã khoá — các cột cần cho việc trừ. */
+    private record Stack(long id, int quantity, boolean equipped) {}
 }

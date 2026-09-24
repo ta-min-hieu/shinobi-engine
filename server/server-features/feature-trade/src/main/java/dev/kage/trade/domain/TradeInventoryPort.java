@@ -46,6 +46,12 @@ public interface TradeInventoryPort {
         /** Còn sở hữu nhưng số lượng hiện tại ít hơn lúc chào. */
         INSUFFICIENT_QUANTITY,
         /** Người nhận đã đầy túi đồ (chỉ xảy ra khi tách stack tạo dòng mới). */
-        RECIPIENT_INVENTORY_FULL
+        RECIPIENT_INVENTORY_FULL,
+        /**
+         * Người đưa đang MẶC món này (sửa 2026-09-24) — feature-trade/CLAUDE.md quyết định 1 vốn
+         * ghi "trang bị mất item đã chào giữa chừng ⇒ giao dịch thất bại sạch" nhưng trước đó
+         * không nơi nào kiểm.
+         */
+        ITEM_EQUIPPED
     }
 }

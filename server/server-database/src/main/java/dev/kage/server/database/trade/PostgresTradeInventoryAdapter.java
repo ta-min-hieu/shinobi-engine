@@ -32,6 +32,11 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
             SELECT character_id, item_template_id, quantity, enhance_level FROM inventory_item WHERE id = ? FOR UPDATE
             """;
 
+    // Đọc SAU khi dòng nguồn đã khoá FOR UPDATE ở cùng transaction — xem #transferItem.
+    private static final String IS_EQUIPPED_BY = """
+            SELECT COUNT(*) FROM equipment_slot WHERE character_id = ? AND inventory_item_id = ?
+            """;
+
     private static final String COUNT_ITEMS = """
             SELECT COUNT(*) FROM inventory_item WHERE character_id = ?
             """;
@@ -68,11 +73,9 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
     public TransferOutcome transferItem(Transaction tx, TransferRequest request) {
         Connection connection = ((JdbcTransaction) tx).connection();
         Optional<OwnedItemSnapshot> current = selectForUpdate(connection, request.itemId());
-        if (current.isEmpty() || current.get().characterId() != request.fromCharacterId()) {
-            return TransferOutcome.ITEM_NOT_OWNED;
-        }
-        if (current.get().quantity() < request.quantity()) {
-            return TransferOutcome.INSUFFICIENT_QUANTITY;
+        Optional<TransferOutcome> rejection = rejectionOf(connection, request, current);
+        if (rejection.isPresent()) {
+            return rejection.get();
         }
         boolean isWholeRow = current.get().quantity() == request.quantity();
         if (mergeIntoRecipientStack(connection, request, current.get())) {
@@ -93,6 +96,28 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
             insertRow(connection, request, current.get());
         }
         return TransferOutcome.OK;
+    }
+
+    /**
+     * Lý do KHÔNG được chuyển dòng đã khoá {@code current}, rỗng nếu chuyển được. Tách khỏi
+     * {@link #transferItem} để giữ độ phức tạp dưới trần PMD.
+     *
+     * <p>Món đang mặc KHÔNG được rời túi qua giao dịch (sửa 2026-09-24): trước đó nó đổi chủ nguyên
+     * dòng trong khi ô trang bị người đưa vẫn trỏ vào nó — người đưa giữ chỉ số trong World (chỉ
+     * tính lại khi mặc/gỡ/cường hoá), người nhận mặc được ngay: một món, hai người hưởng.
+     */
+    private static Optional<TransferOutcome> rejectionOf(
+            Connection connection, TransferRequest request, Optional<OwnedItemSnapshot> current) {
+        if (current.isEmpty() || current.get().characterId() != request.fromCharacterId()) {
+            return Optional.of(TransferOutcome.ITEM_NOT_OWNED);
+        }
+        if (current.get().quantity() < request.quantity()) {
+            return Optional.of(TransferOutcome.INSUFFICIENT_QUANTITY);
+        }
+        if (isEquippedBy(connection, request.fromCharacterId(), request.itemId())) {
+            return Optional.of(TransferOutcome.ITEM_EQUIPPED);
+        }
+        return Optional.empty();
     }
 
     /**
@@ -128,6 +153,12 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
                         rs.getInt("quantity"),
                         rs.getInt("enhance_level")),
                 itemId);
+    }
+
+    private static boolean isEquippedBy(Connection connection, long characterId, long itemId) {
+        return JdbcOperations.queryOne(connection, IS_EQUIPPED_BY, rs -> rs.getInt(1), characterId, itemId)
+                        .orElse(0)
+                > 0;
     }
 
     private static int countItems(Connection connection, long characterId) {
