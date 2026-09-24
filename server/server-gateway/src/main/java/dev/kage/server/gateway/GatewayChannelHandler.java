@@ -336,6 +336,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private volatile Long boundAccountId;
     private volatile Long boundCharacterId;
 
+    // Một lần dọn mỗi kết nối — xem releaseCharacter (channelInactive và bindOrReleaseIfClosed có
+    // thể cùng thấy kết nối chết).
+    private final java.util.concurrent.atomic.AtomicBoolean characterReleased =
+            new java.util.concurrent.atomic.AtomicBoolean();
+
     // Bind sau khi field khác đã gán xong (field initializer chạy tuần tự trong <init>) — method
     // reference chỉ CHỤP this, không gọi ngay, nên thứ tự khai báo so với constructor không quan trọng.
     // Map.ofEntries thay Map.of (11 cặp vượt quá 10 overload cố định của Map.of) — cùng ngữ nghĩa.
@@ -616,12 +621,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             ChannelHandlerContext ctx, int sequenceId, long accountId, long characterId) {
         try {
             Character character = characterFacade.selectCharacter(accountId, characterId);
-            boundCharacterId = characterId;
-            // Đăng ký connection NÀY để world outbound (spawn/move/despawn — SERVER.md §6) tìm
-            // đúng channel; attachCharacter chỉ enqueue, entity ECS thật tạo ở tick kế tiếp.
-            worldGateway
-                    .registry()
-                    .register(characterId, ctx, CharacterAppearance.of(toProtoFaction(character.faction())));
+            // THỨ TỰ (2026-09-24): đọc DB → gửi response → RỒI MỚI đăng ký + attach — client BỎ mọi
+            // gói tới trước response (chat, bạn bè online, spawn quái không phát lại). Xem
+            // bindOrReleaseIfClosed.
             PositionSnapshot spawn = characterFacade.loadPosition(characterId);
             CharacterStats stats = characterFacade.loadStats(characterId);
             CharacterBaseStats baseStats = new CharacterBaseStats(
@@ -639,11 +641,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // tick mà entity đã ở trong world với chỉ số NỀN: đo thật 2026-09-18, đăng nhập cạnh quái
             // ăn 37 sát thương trên thanh máu 100 thay vì 27 trên thanh 206.
             EquipmentBonusSnapshot bonus = currentEquipmentBonus(characterId);
+            SelectCharacterResponse response = enterWorldResponse(bonus, spawn);
+            send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            // Đăng ký connection NÀY để world outbound (spawn/move/despawn — SERVER.md §6) tìm
+            // đúng channel; attachCharacter chỉ enqueue, entity ECS thật tạo ở tick kế tiếp.
+            worldGateway
+                    .registry()
+                    .register(characterId, ctx, CharacterAppearance.of(toProtoFaction(character.faction())));
             worldGateway
                     .mainWorldChannels()
                     .attachCharacter(new CharacterEntry(characterId, spawn.x(), spawn.y(), baseStats, bonus));
-            SelectCharacterResponse response = enterWorldResponse(bonus, spawn);
-            send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            if (!bindOrReleaseIfClosed(ctx, characterId)) {
+                return;
+            }
             sendInitialSelfState(characterId);
             // Đang trên authExecutor (Virtual Thread) rồi — friendFacade.listFriends chạm DB, an
             // toàn gọi thẳng, không cần đẩy thêm 1 lớp executor nữa (khác channelInactive bên dưới).
@@ -656,6 +666,30 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             LOG.error("Chọn nhân vật thất bại: lỗi không mong đợi", e);
             sendError(ctx, sequenceId, 500, "error.select_character_failed");
         }
+    }
+
+    /**
+     * Gán {@code boundCharacterId} SAU khi đăng ký + attach, rồi dọn ngay nếu kết nối đã chết.
+     *
+     * <p><b>Vì sao gán muộn</b>: lệnh tới trong khoảng giữa response và attach (di chuyển, tấn
+     * công...) chạy trên EventLoop và gọi {@code currentWorldFacade}, vốn NÉM nếu nhân vật chưa thuộc
+     * World nào — tức {@code exceptionCaught} đóng luôn kết nối. Gán muộn thì lệnh đó chỉ nhận
+     * {@code error.not_authenticated}, không ai bị đá.
+     *
+     * <p><b>Vì sao phải tự dọn</b>: kết nối chết TRƯỚC khi gán thì {@code channelInactive} thấy
+     * {@code boundCharacterId == null} và không dọn gì — bản cũ còn tệ hơn: nó dọn TRƯỚC khi attach
+     * rồi handler attach tiếp, để lại một thực thể "bóng ma" đứng mãi trong world. Nay kiểm lại sau
+     * khi gán; {@link #releaseCharacter} chỉ chạy đúng một lần dù hai phía cùng thấy.
+     *
+     * @return {@code false} nếu kết nối đã chết và nhân vật vừa được dọn
+     */
+    private boolean bindOrReleaseIfClosed(ChannelHandlerContext ctx, long characterId) {
+        boundCharacterId = characterId;
+        if (ctx.channel().isActive()) {
+            return true;
+        }
+        releaseCharacter(characterId);
+        return false;
     }
 
     /**
@@ -3449,32 +3483,44 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // để bia đỡ đạn đứng lại trong world).
         Long characterId = boundCharacterId;
         if (characterId != null) {
-            // Đọc vị trí cuối TRƯỚC unregister() (unregister xoá luôn khỏi lastKnownPosition —
-            // đọc ở đây trên EventLoop, rẻ, không phải I/O, không tra lại sau trên authExecutor
-            // vì lúc đó có thể đã bị unregister() xoá mất — xem javadoc CharacterPositionPersister#save).
-            PositionSnapshot lastPosition = worldGateway.registry().lastKnownPosition(characterId);
-            worldGateway.registry().unregister(characterId);
-            // Phase 8 lát cắt 1 (ADR-026): nếu đang ở dungeon, detach khỏi ĐÚNG dungeon World +
-            // dọn bookkeeping instance (dừng luôn World nếu rỗng) — KHÔNG re-attach world chính
-            // (đã ngắt kết nối). Lát cắt 4: tương tự cho duel Arena — người mất kết nối tính THUA
-            // (forfeit ngầm, ArenaInstanceRegistry tự chốt rating). false ở CẢ 2 = không ở dungeon
-            // lẫn duel nào, detach world chính như trước giờ.
-            boolean handledElsewhere = worldGateway.dungeonInstanceRegistry().handleDisconnectIfInDungeon(characterId)
-                    || worldGateway.arenaInstanceRegistry().handleDisconnectIfInDuel(characterId);
-            if (!handledElsewhere) {
-                worldGateway.mainWorldChannels().detachCharacter(characterId);
-            }
-            // SERVER.md §8: logout là 1 trong 3 mốc bắt buộc ghi vị trí. savePosition chạm DB
-            // (blocking) — không được chạy trên EventLoop, đẩy sang authExecutor.
-            if (lastPosition != null) {
-                authExecutor.execute(
-                        () -> worldGateway.positionPersister().save(characterId, lastPosition.x(), lastPosition.y()));
-            }
-            // channelInactive chạy trên EventLoop — friendFacade.listFriends chạm DB (blocking),
-            // PHẢI đẩy sang authExecutor, không được gọi thẳng ở đây (server/CLAUDE.md: EventLoop
-            // cấm query DB), cùng lý do savePosition ở trên.
-            authExecutor.execute(() -> notifyFriendsPresenceChanged(characterId, false));
+            releaseCharacter(characterId);
         }
+    }
+
+    /**
+     * Dọn nhân vật khỏi world khi kết nối chết — gọi từ {@code channelInactive} (EventLoop) HOẶC từ
+     * {@link #bindOrReleaseIfClosed} (Virtual Thread) nếu kết nối chết giữa lúc chọn nhân vật. Chạy
+     * ĐÚNG MỘT LẦN mỗi kết nối: hai phía có thể cùng thấy kết nối chết.
+     */
+    private void releaseCharacter(long characterId) {
+        if (!characterReleased.compareAndSet(false, true)) {
+            return;
+        }
+        // Đọc vị trí cuối TRƯỚC unregister() (unregister xoá luôn khỏi lastKnownPosition —
+        // đọc ở đây trên EventLoop, rẻ, không phải I/O, không tra lại sau trên authExecutor
+        // vì lúc đó có thể đã bị unregister() xoá mất — xem javadoc CharacterPositionPersister#save).
+        PositionSnapshot lastPosition = worldGateway.registry().lastKnownPosition(characterId);
+        worldGateway.registry().unregister(characterId);
+        // Phase 8 lát cắt 1 (ADR-026): nếu đang ở dungeon, detach khỏi ĐÚNG dungeon World +
+        // dọn bookkeeping instance (dừng luôn World nếu rỗng) — KHÔNG re-attach world chính
+        // (đã ngắt kết nối). Lát cắt 4: tương tự cho duel Arena — người mất kết nối tính THUA
+        // (forfeit ngầm, ArenaInstanceRegistry tự chốt rating). false ở CẢ 2 = không ở dungeon
+        // lẫn duel nào, detach world chính như trước giờ.
+        boolean handledElsewhere = worldGateway.dungeonInstanceRegistry().handleDisconnectIfInDungeon(characterId)
+                || worldGateway.arenaInstanceRegistry().handleDisconnectIfInDuel(characterId);
+        if (!handledElsewhere) {
+            worldGateway.mainWorldChannels().detachCharacter(characterId);
+        }
+        // SERVER.md §8: logout là 1 trong 3 mốc bắt buộc ghi vị trí. savePosition chạm DB
+        // (blocking) — không được chạy trên EventLoop, đẩy sang authExecutor.
+        if (lastPosition != null) {
+            authExecutor.execute(
+                    () -> worldGateway.positionPersister().save(characterId, lastPosition.x(), lastPosition.y()));
+        }
+        // channelInactive chạy trên EventLoop — friendFacade.listFriends chạm DB (blocking),
+        // PHẢI đẩy sang authExecutor, không được gọi thẳng ở đây (server/CLAUDE.md: EventLoop
+        // cấm query DB), cùng lý do savePosition ở trên.
+        authExecutor.execute(() -> notifyFriendsPresenceChanged(characterId, false));
     }
 
     /** Báo cho bạn bè ĐANG online của {@code characterId} rằng người này vừa vào/thoát world. */

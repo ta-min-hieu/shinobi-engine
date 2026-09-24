@@ -630,6 +630,80 @@ class GatewayPipelineTest {
         assertThat(frames.get(0).header().opcode()).isEqualTo(Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE);
     }
 
+    /**
+     * Không gói nào dành cho nhân vật được đi TRƯỚC {@code SelectCharacterResponse} (2026-09-24).
+     *
+     * <p>Client ({@code CharacterSelectScreen.pollSelectResponse}) rút và BỎ mọi gói không phải
+     * phản hồi chọn nhân vật. Bản cũ đăng ký nhân vật "online" TRƯỚC khi đọc DB và gửi phản hồi, nên
+     * mọi thứ nhắm vào nó trong cửa sổ đó — chat thế giới, bạn bè online, và hiếm hơn là gói spawn
+     * quái từ tick (server không phát lại ⇒ quái vô hình tới khi ra/vào lại tầm nhìn) — bị mất. Ở
+     * đây cửa sổ được mở bằng hook trong lần đọc DB, và một sự kiện bạn bè online được bắn vào đó.
+     */
+    @Test
+    void shouldSendNothingBeforeSelectCharacterResponse_evenIfAnEventTargetsTheCharacterMidSelect()
+            throws InvalidProtocolBufferException {
+        FakeCharacterPort characterPort = new FakeCharacterPort();
+        EmbeddedChannel channel = newPipeline(characterPort);
+        connect(channel, "ordertest1");
+        long characterId = createCharacter(channel, "OrderHero", 2);
+        characterPort.beforeLoadPosition = id -> characterPort
+                .worldGateway
+                .registry()
+                .sendToCharacterIfOnline(
+                        id,
+                        Opcode.OPCODE_FRIEND_ONLINE_EVENT_VALUE,
+                        0,
+                        dev.kage.protocol.FriendOnlineEvent.newBuilder()
+                                .setCharacterId(999L)
+                                .build()
+                                .toByteArray());
+
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, ProtocolVersion.CURRENT, 3),
+                SelectCharacterRequest.newBuilder()
+                        .setCharacterId(characterId)
+                        .build()
+                        .toByteArray());
+
+        assertThat(readOutboundFrames(channel).get(0).header().opcode())
+                .isEqualTo(Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE);
+    }
+
+    /**
+     * Mất kết nối GIỮA lúc chọn nhân vật không được để lại "bóng ma" trong world (2026-09-24).
+     *
+     * <p>Bản cũ gán {@code boundCharacterId} rồi đăng ký, rồi đọc DB, rồi mới attach. Kết nối chết
+     * trong lúc đọc DB thì {@code channelInactive} dọn (lúc đó chưa attach gì), rồi handler chạy
+     * tiếp và attach nhân vật vào world — không còn ai dọn nữa: một thực thể đứng yên mãi, quái vẫn
+     * đánh nó, người khác vẫn thấy nó.
+     */
+    @Test
+    void shouldLeaveNoCharacterInTheWorld_whenConnectionDiesMidSelect() throws InvalidProtocolBufferException {
+        FakeCharacterPort characterPort = new FakeCharacterPort();
+        EmbeddedChannel channel = newPipeline(characterPort);
+        connect(channel, "ordertest2");
+        long characterId = createCharacter(channel, "GhostHero", 2);
+        // EmbeddedChannel HOÃN channelInactive vào hàng task — runPendingTasks ép nó chạy ngay trong
+        // cửa sổ, đúng như EventLoop thật chạy song song với Virtual Thread đang chọn nhân vật.
+        characterPort.beforeLoadPosition = id -> {
+            channel.close();
+            channel.runPendingTasks();
+        };
+
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, ProtocolVersion.CURRENT, 3),
+                SelectCharacterRequest.newBuilder()
+                        .setCharacterId(characterId)
+                        .build()
+                        .toByteArray());
+
+        assertThat(characterPort.worldGateway.registry().isOnline(characterId)).isFalse();
+        assertThat(characterPort.worldGateway.mainWorldChannels().worldFacadeFor(characterId))
+                .isEmpty();
+    }
+
     private static dev.kage.protocol.ItemCatalogResponse requestCatalog(
             EmbeddedChannel channel, String knownVersion, int sequenceId) throws InvalidProtocolBufferException {
         writeInboundFrame(
@@ -1454,6 +1528,7 @@ class GatewayPipelineTest {
                 positionPersister,
                 dungeonInstanceRegistry,
                 arenaInstanceRegistry);
+        characterPort.worldGateway = worldGateway;
 
         return new EmbeddedChannel(
                 new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
@@ -1518,9 +1593,15 @@ class GatewayPipelineTest {
         private final List<Character> characters = new ArrayList<>();
         private final AtomicLong nextId = new AtomicLong(1);
         private final Map<Long, PositionSnapshot> positions = new HashMap<>();
+        // Cài vào đúng CỬA SỔ đọc DB của handleSelectCharacterBlocking (loadPosition là một lần đọc
+        // trong đó) — để test chen một sự kiện vào giữa lúc chọn nhân vật, xem
+        // shouldSendNothingBeforeSelectCharacterResponse_*. newPipeline gán worldGateway.
+        java.util.function.LongConsumer beforeLoadPosition = characterId -> {};
+        WorldGateway worldGateway;
 
         @Override
         public PositionSnapshot loadPosition(long characterId) {
+            beforeLoadPosition.accept(characterId);
             return positions.getOrDefault(characterId, new PositionSnapshot(0f, 0f));
         }
 
