@@ -293,6 +293,9 @@ final class ArenaInstanceRegistry {
             return false;
         }
         WorldFacade duelFacade = new WorldFacade(new ArenaOutboundSink(registry, this), false);
+        // World DUY NHẤT được phép PvP (2026-09-24, tạm thời tới khi có vùng Hoang Vực — xem
+        // WorldFacade#allowPlayerVersusPlayer). Thiếu dòng này thì đấu Arena không ai gây nổi sát thương.
+        duelFacade.allowPlayerVersusPlayer();
         duelFacade.start();
         DuelInstance instance =
                 new DuelInstance(challengeId, duelFacade, challenger.characterId(), target.characterId());

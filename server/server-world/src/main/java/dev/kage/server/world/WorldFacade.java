@@ -162,6 +162,19 @@ public final class WorldFacade {
     private final AreaOfInterestTracker aoiTracker;
     private final CombatSystem combatSystem;
     private final SkillSystem skillSystem;
+
+    /**
+     * Người chơi có được gây hại cho người chơi KHÁC trong World này không (2026-09-24).
+     *
+     * <p><b>TẠM THỜI</b> — mặc định {@code false} ở MỌI World, chỉ Arena bật qua
+     * {@link #allowPlayerVersusPlayer()}. Thiết kế đã duyệt (STORY.md §7, GDD) là PvP THEO VÙNG: cấm
+     * trong tông môn, MỞ ở Hoang Vực. Code chưa có vùng Hoang Vực nào, nên chủ dự án chọn cấm hết
+     * cho tới khi dựng nó — lúc đó mở bằng một loại zone mới, không phải bật cờ này cho World chính.
+     *
+     * <p>{@code volatile}: ghi trên luồng dựng World (gateway), đọc trên tick thread.
+     */
+    private volatile boolean pvpAllowed;
+
     private final BossAiSystem bossAiSystem;
     private final HealthRegenSystem healthRegenSystem;
 
@@ -309,10 +322,10 @@ public final class WorldFacade {
         this.tickMetricsPort = tickMetricsPort;
         this.systemTimingListener = tickMetricsPort::recordSystemDuration;
         this.aoiTracker = new AreaOfInterestTracker(outboundSink);
-        this.combatSystem = new CombatSystem(this::lookupEntity);
+        this.combatSystem = new CombatSystem(this::lookupEntity, this::isPvpAllowed);
         this.healthRegenSystem = new HealthRegenSystem();
         this.aiSystem = new AiSystem(entitiesByCharacterId::values, this::lookupEntity);
-        this.skillSystem = new SkillSystem(this::lookupEntity);
+        this.skillSystem = new SkillSystem(this::lookupEntity, this::isPvpAllowed);
         this.bossAiSystem = new BossAiSystem(this::lookupEntity);
         // Thứ tự ĐÚNG ECS.md §6 (InputCommandSystem -> AISystem -> MovementSystem -> ... ->
         // CombatSystem): AI set vận tốc/mục tiêu trước, Movement tích luỹ vị trí, Combat mới xét
@@ -403,7 +416,24 @@ public final class WorldFacade {
         inbox.add(new WorldCommand.JumpIntentCommand(characterId, sequenceId));
     }
 
-    /** Chỉ NHẮM mục tiêu — không tự đánh nữa từ 2026-08-09, xem {@link #attack} ({@code CombatSystem}). */
+    /**
+     * Cho phép người chơi gây hại cho nhau trong World này — CHỈ World đấu Arena gọi (xem
+     * {@link #pvpAllowed}). Gọi TRƯỚC {@link #start()}.
+     */
+    public void allowPlayerVersusPlayer() {
+        pvpAllowed = true;
+    }
+
+    private boolean isPvpAllowed() {
+        return pvpAllowed;
+    }
+
+    /**
+     * Chỉ NHẮM mục tiêu — không tự đánh nữa từ 2026-08-09, xem {@link #attack} ({@code CombatSystem}).
+     *
+     * <p>Nhắm một người chơi khác vẫn được kể cả khi {@link #pvpAllowed} tắt (xem thông tin / máu của
+     * họ) — cổng thật nằm ở {@code CombatSystem}/{@code SkillSystem}: đòn không bao giờ ra.
+     */
     public void setTarget(long characterId, long targetEntityId) {
         inbox.add(new WorldCommand.SetTargetCommand(characterId, targetEntityId));
     }

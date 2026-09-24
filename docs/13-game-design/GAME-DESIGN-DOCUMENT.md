@@ -60,7 +60,7 @@ thế, vào **Thanh Hư Tông** (tên đề xuất) làm **đệ tử tạp dị
 |---|---|
 | **Thanh Hư Tông** | Hub trung tâm, safe zone tuyệt đối (NPC trưởng lão, cửa hàng, nhiệm vụ) |
 | **5 Linh Mạch** (theo nguyên tố) | Luyện cấp theo hệ linh căn, yêu thú khó dần theo cảnh giới |
-| **Hoang Vực** | PvP mở, tài nguyên hiếm (linh thảo, khoáng thạch) |
+| **Hoang Vực** | PvP mở, tài nguyên hiếm (linh thảo, khoáng thạch). _Trạng thái code 2026-09-24: vùng chưa được dựng ⇒ PvP tạm cấm mọi nơi trừ Arena (chủ dự án quyết; xem STORY.md §7)._ |
 | **Bí Cảnh** | Instance theo party + Hard Mode + Yêu Vương (World Boss) |
 
 ---

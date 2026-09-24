@@ -77,6 +77,8 @@ class ServerAuthorityWorldTest {
     @Test
     void shouldNotLetADeadCharacterAttackOrCast() {
         world = new WorldFacade(sink, false);
+        // Kịch bản người chơi hạ người chơi — chỉ dựng được trong World cho PvP (như Arena).
+        world.allowPlayerVersusPlayer();
         world.start();
         world.attachCharacter(1L, 0f, 0f, ONE_SHOT_STATS);
         world.attachCharacter(2L, 0f, 0f, DEFAULT_STATS);
