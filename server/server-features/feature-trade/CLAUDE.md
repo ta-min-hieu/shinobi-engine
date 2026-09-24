@@ -36,7 +36,10 @@ yêu cầu, KHÔNG có thiết kế nào — mọi cơ chế bên dưới là qu
    lượng/gold, trong CÙNG 1 transaction với chuyển gold/item. Nếu ai đã bán/gửi/trang bị mất item
    đã chào giữa chừng, giao dịch thất bại SẠCH (`OFFER_INVALID`, không mất gì, không có bên nào
    nhận được gì) — KHÔNG có đường nào tạo ra duplicate item dù không khoá trước, vì mọi transfer
-   đều khoá dòng thật lúc thi hành. Đánh đổi: trải nghiệm kém hơn 1 chút (biết lời chào hỏng ở bước
+   đều khoá dòng thật lúc thi hành. ⚠️ Nhánh "trang bị mất" chỉ được THI HÀNH từ 2026-09-24
+   (`TransferOutcome.ITEM_EQUIPPED`): trước đó `transferItem` chỉ kiểm chủ + số lượng, nên món đang
+   mặc bị đổi chủ trong khi ô trang bị người đưa vẫn trỏ vào nó — người đưa giữ chỉ số trong World,
+   người nhận mặc được ngay. Đánh đổi: trải nghiệm kém hơn 1 chút (biết lời chào hỏng ở bước
    cuối thay vì ngay lúc chào), đổi lấy KHÔNG đụng 2 module đã xong (feature-inventory/feature-shop)
    — chọn vì rủi ro/chi phí thấp hơn nhiều, đúng thứ tự ưu tiên CLAUDE.md §8 (Correctness trước,
    không đổi Correctness lấy Elegance/UX polish).
