@@ -30,4 +30,20 @@ public interface InventoryGatewayPort {
      * @return {@code false} nếu item không tồn tại/không đủ số lượng (không đổi gì)
      */
     boolean removeQuantity(Transaction tx, long characterId, long itemId, int quantity);
+
+    /**
+     * Như {@link #removeQuantity} nhưng TỪ CHỐI dòng đang mặc — đường bán hàng gọi hàm này.
+     *
+     * <p>Quyết định chủ dự án 2026-09-24: món đang mặc phải gỡ ra trước mới bán được, cùng luật
+     * với giao dịch. Trước đó dòng bị xoá, ô trang bị rơi về NULL ({@code ON DELETE SET NULL}) nhưng
+     * World vẫn giữ chỉ số của nó tới lần đăng nhập sau — bán vũ khí lấy vàng mà vẫn giữ ATK.
+     *
+     * <p>⚠️ Bản mặc định KHÔNG biết gì về trang bị (chỉ để các fake ở test không phải sửa). Adapter
+     * thật PHẢI ghi đè và kiểm "đang mặc" SAU khi đã khoá dòng, trong cùng transaction.
+     */
+    default RemoveItemOutcome removeUnequippedQuantity(Transaction tx, long characterId, long itemId, int quantity) {
+        return removeQuantity(tx, characterId, itemId, quantity)
+                ? RemoveItemOutcome.OK
+                : RemoveItemOutcome.INSUFFICIENT_QUANTITY;
+    }
 }

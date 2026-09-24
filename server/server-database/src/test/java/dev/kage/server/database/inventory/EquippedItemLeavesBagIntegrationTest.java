@@ -33,12 +33,20 @@ import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
 import dev.kage.server.database.mail.JdbcMailTransactionRunner;
 import dev.kage.server.database.mail.PostgresMailInventoryGatewayAdapter;
+import dev.kage.server.database.shop.JdbcShopTransactionRunner;
+import dev.kage.server.database.shop.PostgresShopAuditAdapter;
+import dev.kage.server.database.shop.PostgresShopCatalogAdapter;
+import dev.kage.server.database.shop.PostgresShopGoldAdapter;
+import dev.kage.server.database.shop.PostgresShopIdempotencyAdapter;
+import dev.kage.server.database.shop.PostgresShopInventoryGatewayAdapter;
 import dev.kage.server.database.trade.JdbcTradeTransactionRunner;
 import dev.kage.server.database.trade.PostgresTradeAuditAdapter;
 import dev.kage.server.database.trade.PostgresTradeGoldAdapter;
 import dev.kage.server.database.trade.PostgresTradeIdempotencyAdapter;
 import dev.kage.server.database.trade.PostgresTradeInventoryAdapter;
 import dev.kage.server.database.trade.PostgresTradeSessionAdapter;
+import dev.kage.shop.application.SellItemUseCase;
+import dev.kage.shop.application.ShopPorts;
 import dev.kage.trade.application.AcceptTradeRequestUseCase;
 import dev.kage.trade.application.ConfirmTradeUseCase;
 import dev.kage.trade.application.RequestTradeUseCase;
@@ -64,6 +72,7 @@ class EquippedItemLeavesBagIntegrationTest {
     static DataSource dataSource;
     static long accountId;
     static long swordTemplateId;
+    static long katanaTemplateId;
 
     @BeforeAll
     static void migrate() {
@@ -82,6 +91,7 @@ class EquippedItemLeavesBagIntegrationTest {
         accountTx.inTransaction(tx -> accountHolder[0] = accountAdapter.findOrCreate(tx, "equipcrosstester"));
         accountId = accountHolder[0].id();
         swordTemplateId = queryLong("SELECT id FROM item_template WHERE code = ?", "wooden_sword");
+        katanaTemplateId = queryLong("SELECT id FROM item_template WHERE code = ?", "steel_katana");
     }
 
     /**
@@ -143,6 +153,84 @@ class EquippedItemLeavesBagIntegrationTest {
         assertThat(equippedWeaponOf(sender)).contains(equipped);
         assertThat(rowExists(equipped)).isTrue();
         assertThat(rowExists(spare)).isFalse();
+    }
+
+    /**
+     * Bán cho cửa hàng ĐÚNG thanh kiếm đang mặc (quyết định chủ dự án 2026-09-24: từ chối, phải gỡ
+     * ra trước — cùng luật với giao dịch). Trước đó dòng bị xoá, ô vũ khí rơi về NULL ({@code ON
+     * DELETE SET NULL}) nhưng World vẫn giữ chỉ số tới lần đăng nhập sau: bán vũ khí lấy vàng mà
+     * vẫn giữ ATK. So {@code name()} thay vì hằng enum để chính ô này chạy được trên code cũ.
+     */
+    @Test
+    void shouldRejectSellingTheEquippedItem() {
+        long seller = createFreshCharacter("EqShA");
+        long katana = insertItem(seller, katanaTemplateId);
+        equipWeapon(seller, katana);
+        long goldBefore = goldOf(seller);
+
+        SellItemUseCase.SellResult result = sellOne(seller, katana);
+
+        assertThat(result.name()).isEqualTo("ITEM_EQUIPPED");
+        assertThat(rowExists(katana)).isTrue();
+        assertThat(equippedWeaponOf(seller)).contains(katana);
+        assertThat(goldOf(seller)).isEqualTo(goldBefore);
+    }
+
+    /** Đối chứng: cùng món đó, KHÔNG mặc, thì vẫn bán được bình thường. */
+    @Test
+    void shouldSellTheSameItem_whenNotEquipped() {
+        long seller = createFreshCharacter("EqShB");
+        long katana = insertItem(seller, katanaTemplateId);
+        long goldBefore = goldOf(seller);
+
+        SellItemUseCase.SellResult result = sellOne(seller, katana);
+
+        assertThat(result).isEqualTo(SellItemUseCase.SellResult.OK);
+        assertThat(rowExists(katana)).isFalse();
+        assertThat(goldOf(seller)).isGreaterThan(goldBefore);
+    }
+
+    /**
+     * Gửi thư đính kèm "1 kiếm gỗ" khi thanh DUY NHẤT đang mặc: phải từ chối (người gửi nhận
+     * {@code ATTACHMENT_NOT_OWNED}), không được lấy thanh đang mặc. Có thanh dự phòng thì thư lấy
+     * thanh dự phòng — ô {@link #shouldConsumeTheSpareCopyForMail_notTheEquippedOne}.
+     */
+    @Test
+    void shouldRejectMailingTheOnlyCopy_whenItIsEquipped() {
+        long sender = createFreshCharacter("EqMlB");
+        long equipped = insertSword(sender);
+        equipWeapon(sender, equipped);
+        PostgresMailInventoryGatewayAdapter adapter = new PostgresMailInventoryGatewayAdapter();
+        boolean[] consumed = new boolean[1];
+
+        new JdbcMailTransactionRunner(dataSource)
+                .inTransaction(tx -> consumed[0] = adapter.consumeItem(tx, sender, swordTemplateId, 1));
+
+        assertThat(consumed[0]).isFalse();
+        assertThat(rowExists(equipped)).isTrue();
+        assertThat(equippedWeaponOf(sender)).contains(equipped);
+    }
+
+    private static SellItemUseCase.SellResult sellOne(long characterId, long itemId) {
+        ShopPorts ports = new ShopPorts(
+                new PostgresShopCatalogAdapter(dataSource),
+                new PostgresShopGoldAdapter(),
+                new PostgresShopInventoryGatewayAdapter(dataSource),
+                new PostgresShopAuditAdapter(),
+                new PostgresShopIdempotencyAdapter());
+        return new SellItemUseCase(ports, new JdbcShopTransactionRunner(dataSource))
+                .execute(characterId, itemId, 1, UUID.randomUUID().toString());
+    }
+
+    private static long goldOf(long characterId) {
+        return queryLong("SELECT gold FROM character_stat WHERE character_id = ?", characterId);
+    }
+
+    private static long insertItem(long characterId, long templateId) {
+        return queryLong("""
+                INSERT INTO inventory_item (character_id, item_template_id, quantity, enhance_level, slot_index)
+                VALUES (?, ?, 1, 0, 0) RETURNING id
+                """, characterId, templateId);
     }
 
     private static ConfirmTradeUseCase.Result executeOneSidedTrade(long giver, long receiver, long itemId) {

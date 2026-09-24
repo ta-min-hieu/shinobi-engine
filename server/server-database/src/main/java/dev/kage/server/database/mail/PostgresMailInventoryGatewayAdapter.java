@@ -1,7 +1,6 @@
 package dev.kage.server.database.mail;
 
 import java.sql.Connection;
-import java.util.Comparator;
 import java.util.List;
 
 import dev.kage.mail.domain.InventoryGatewayPort;
@@ -33,8 +32,8 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
             """;
 
     // ORDER BY id: hai transaction gửi thư song song khoá các dòng theo CÙNG thứ tự nên không
-    // deadlock nhau. enhance_level = 0: xem javadoc #consumeItem. Cột equipped chỉ để chọn THỨ TỰ
-    // TRỪ (dòng không mặc trước), KHÔNG đổi thứ tự khoá.
+    // deadlock nhau. enhance_level = 0: xem javadoc #consumeItem. Cột equipped để LOẠI dòng đang
+    // mặc khỏi phần được trừ (vẫn khoá nó như cũ — KHÔNG đổi thứ tự khoá).
     private static final String SELECT_STACKS_FOR_UPDATE = """
             SELECT id, quantity,
                    EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = inventory_item.id) AS equipped
@@ -87,10 +86,12 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
      * {@code mail_item} + {@code MailAttachmentView} — đổi schema và đổi protocol, cả hai đều cần
      * chủ dự án quyết (/CLAUDE.md §4).
      *
-     * <p><b>Trừ dòng KHÔNG mặc trước</b> (sửa 2026-09-24): thư trừ theo LOẠI chứ không theo dòng.
-     * Trước đó nó trừ theo id tăng dần, nên có một thanh kiếm đang mặc (thường có trước, id nhỏ
-     * hơn) cộng một thanh dự phòng giống hệt thì thanh ĐANG MẶC bị xoá, ô vũ khí rơi về NULL, còn
-     * thanh dự phòng nằm lại trong túi.
+     * <p><b>Không bao giờ trừ dòng ĐANG MẶC</b> (sửa 2026-09-24, hai bước): thư trừ theo LOẠI chứ
+     * không theo dòng. Bản cũ trừ theo id tăng dần, nên thanh kiếm đang mặc (thường có trước, id
+     * nhỏ hơn) bị xoá thay cho thanh dự phòng giống hệt. Bước sau (quyết định chủ dự án cùng
+     * ngày): dòng đang mặc KHÔNG tính vào số có thể gửi — chỉ còn thanh đang mặc thì từ chối
+     * ({@code ATTACHMENT_NOT_OWNED}), cùng luật với bán hàng và giao dịch. Lấy nó đi thì ô trang bị
+     * rơi về NULL mà World vẫn giữ chỉ số tới lần đăng nhập sau.
      *
      * <p>Đếm ĐỦ trước rồi mới trừ: transaction ngoài cùng vẫn rollback nếu trả {@code false},
      * nhưng "không đủ" là kết quả bình thường của nghiệp vụ, không nên để nó phụ thuộc vào việc ai
@@ -106,8 +107,8 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
                 characterId,
                 itemTemplateId);
         List<Stack> consumeOrder =
-                stacks.stream().sorted(Comparator.comparing(Stack::equipped)).toList();
-        long available = stacks.stream().mapToLong(Stack::quantity).sum();
+                stacks.stream().filter(stack -> !stack.equipped()).toList();
+        long available = consumeOrder.stream().mapToLong(Stack::quantity).sum();
         if (available < quantity) {
             return false;
         }
