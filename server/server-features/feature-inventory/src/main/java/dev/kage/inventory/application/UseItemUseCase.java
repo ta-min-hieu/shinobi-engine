@@ -1,6 +1,7 @@
 package dev.kage.inventory.application;
 
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import dev.kage.inventory.domain.AuditPort;
 import dev.kage.inventory.domain.Inventory;
@@ -61,8 +62,17 @@ public final class UseItemUseCase {
     }
 
     public UseItemResult execute(long characterId, long inventoryItemId) {
+        AtomicReference<UseItemResult> result = new AtomicReference<UseItemResult>();
+        // Đọc + trừ + lưu trong CÙNG một transaction, đọc sau khoá túi đồ (sửa 2026-09-25): đọc ngoài
+        // transaction thì một lần mua hàng/nhận thư commit chen giữa bị save() coi là "đã gỡ" và xoá
+        // thật. Các nhánh từ chối không ghi gì — transaction commit rỗng.
+        tx.inTransaction((Transaction t) -> result.set(useInTransaction(t, characterId, inventoryItemId)));
+        return result.get();
+    }
+
+    private UseItemResult useInTransaction(Transaction t, long characterId, long inventoryItemId) {
         Inventory inventory = inventoryPort
-                .findByCharacter(characterId)
+                .findByCharacterForUpdate(t, characterId)
                 .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
         ItemStack item = inventory.findItem(inventoryItemId).orElse(null);
         if (item == null) {
@@ -78,12 +88,10 @@ public final class UseItemUseCase {
                 .findItem(inventoryItemId)
                 .map(ItemStack::quantity)
                 .orElse(0); // ô túi biến mất khi dùng cái cuối cùng
-        tx.inTransaction((Transaction t) -> {
-            inventoryPort.save(t, inventory);
-            // Audit dù không đụng gold: đây là đường DUY NHẤT làm vật phẩm biến mất mà không có
-            // giao dịch nào đối chiếu được, nên "vì sao mất viên đan" phải trả lời được.
-            auditPort.log(t, characterId, "USE_ITEM", detailJson(inventoryItemId, item.itemTemplateId()));
-        });
+        inventoryPort.save(t, inventory);
+        // Audit dù không đụng gold: đây là đường DUY NHẤT làm vật phẩm biến mất mà không có
+        // giao dịch nào đối chiếu được, nên "vì sao mất viên đan" phải trả lời được.
+        auditPort.log(t, characterId, "USE_ITEM", detailJson(inventoryItemId, item.itemTemplateId()));
         return new UseItemResult(
                 Outcome.OK,
                 remaining,

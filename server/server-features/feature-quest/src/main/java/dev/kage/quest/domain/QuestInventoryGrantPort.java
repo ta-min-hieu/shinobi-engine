@@ -10,6 +10,18 @@ import java.util.List;
  */
 public interface QuestInventoryGrantPort {
 
+    /**
+     * Xếp hàng sau MỌI transaction khác đang ghi túi đồ của {@code characterId}, giữ tới hết
+     * {@code tx}. PHẢI là lời gọi ĐẦU TIÊN trong transaction lĩnh thưởng, trước EXP (cùng dòng
+     * {@code character_stat} với vàng) — thứ tự khoá chung, xem DATABASE.md §5.1 "Thứ tự
+     * khoá túi đồ". Sau khoá này {@link #hasRoomFor} mới trả lời đúng cho tới lúc commit.
+     *
+     * <p>Mặc định không làm gì CHỈ để các fake ở test khỏi phải sửa — adapter thật PHẢI ghi đè.
+     */
+    default void lockInventory(Transaction tx, long characterId) {
+        // Fake trong test: không có transaction thật, không có gì để khoá.
+    }
+
     /** {@code false} nếu {@code itemTemplateCode} không tồn tại HOẶC túi đầy (không đổi gì). */
     boolean grantItemByCode(Transaction tx, long characterId, String itemTemplateCode, int quantity);
 
@@ -28,7 +40,9 @@ public interface QuestInventoryGrantPort {
      *
      * <p><b>Nhận {@link Transaction}</b> để adapter dùng lại đúng đường lấy {@code Connection} sẵn
      * có, khỏi phải thêm {@code DataSource} vào constructor (5 nơi đang dựng nó không tham số).
-     * Người gọi mở một transaction CHỈ ĐỌC riêng cho câu hỏi này, trước transaction ghi.
+     * Người gọi hỏi NGAY TRONG transaction ghi, sau {@link #lockInventory} (sửa 2026-09-25 — trước
+     * đó hỏi ở một transaction chỉ đọc riêng, nên một lần mua hàng chen giữa hai transaction làm
+     * câu trả lời "đủ chỗ" thành sai lúc trao).
      *
      * @param grants danh sách {@code give_item} theo đúng thứ tự script gọi
      * @return {@code true} nếu đủ chỗ (mặc định) — chỉ {@code false} khi chắc chắn thiếu ô

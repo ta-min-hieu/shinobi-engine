@@ -184,6 +184,11 @@ public final class ProcessQuestEventUseCase {
         AtomicBoolean written = new AtomicBoolean(false);
         try {
             tx.inTransaction((Transaction t) -> {
+                if (!effects.itemTakes().isEmpty()) {
+                    // Có lấy đồ ⇒ khoá túi đồ ĐẦU TIÊN, trước dòng tiến độ — thứ tự khoá chung
+                    // (DATABASE.md §5.1). Không lấy đồ thì không đụng túi, khỏi xếp hàng.
+                    itemTakePort.lockInventory(t, characterId);
+                }
                 if (!progressPort.saveIfUnchanged(t, next, expectedProgressJson)) {
                     return;
                 }

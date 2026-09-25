@@ -1,6 +1,7 @@
 package dev.kage.quest.application;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import dev.kage.quest.domain.IdempotencyKeyReusedException;
 import dev.kage.quest.domain.QuestInventoryGrantPort;
@@ -59,18 +60,17 @@ public final class ClaimQuestRewardUseCase {
             // COMPLETED, key vẫn còn nguyên để lần lĩnh sau dùng lại.
             return ClaimResult.scriptError();
         }
-        if (!hasRoomForRewards(characterId, effects.itemGrants())) {
-            return ClaimResult.inventoryFull();
-        }
+        AtomicBoolean bagHasRoom = new AtomicBoolean(true);
         try {
             tx.inTransaction((Transaction t) -> {
-                rewardPorts.idempotencyPort().recordOrThrow(t, idempotencyKey);
-                rewardPorts.expPort().grantExp(t, characterId, effects.expGranted());
-                for (QuestScriptRunner.ItemGrant itemGrant : effects.itemGrants()) {
-                    rewardPorts
-                            .inventoryGrantPort()
-                            .grantItemByCode(t, characterId, itemGrant.itemTemplateCode(), itemGrant.quantity());
+                // Khoá túi đồ ĐẦU TIÊN, rồi hỏi "đủ chỗ" trong CHÍNH transaction này (DATABASE.md §5.1).
+                rewardPorts.inventoryGrantPort().lockInventory(t, characterId);
+                if (!hasRoomForRewards(t, characterId, effects.itemGrants())) {
+                    bagHasRoom.set(false);
+                    return; // chưa ghi gì: quest vẫn COMPLETED, idempotency_key vẫn còn nguyên
                 }
+                rewardPorts.idempotencyPort().recordOrThrow(t, idempotencyKey);
+                grantRewards(t, characterId, effects);
                 rewardPorts.auditPort().log(t, characterId, "QUEST_CLAIM", detailJson(questCode, effects));
                 QuestProgress claimed =
                         new QuestProgress(characterId, template.id(), QuestStatus.CLAIMED, progress.progressJson());
@@ -79,11 +79,24 @@ public final class ClaimQuestRewardUseCase {
         } catch (IdempotencyKeyReusedException e) {
             return ClaimResult.duplicateRequest();
         }
+        if (!bagHasRoom.get()) {
+            return ClaimResult.inventoryFull();
+        }
 
         List<ClaimResult.ItemReward> items = effects.itemGrants().stream()
                 .map(g -> new ClaimResult.ItemReward(g.itemTemplateCode(), g.quantity()))
                 .toList();
         return ClaimResult.ok(effects.expGranted(), items);
+    }
+
+    /** Trao EXP + từng món thưởng trong transaction đang mở (đã khoá túi đồ, đã kiểm đủ chỗ). */
+    private void grantRewards(Transaction t, long characterId, QuestScriptRunner.HookEffects effects) {
+        rewardPorts.expPort().grantExp(t, characterId, effects.expGranted());
+        for (QuestScriptRunner.ItemGrant itemGrant : effects.itemGrants()) {
+            rewardPorts
+                    .inventoryGrantPort()
+                    .grantItemByCode(t, characterId, itemGrant.itemTemplateCode(), itemGrant.quantity());
+        }
     }
 
     /**
@@ -94,21 +107,20 @@ public final class ClaimQuestRewardUseCase {
      * thật 2026-09-13: quest 11 khai trao 6 món, túi chỉ nhận 5, mà response vẫn OK và
      * {@code idempotency_key} vẫn bị đốt ⇒ mất món vĩnh viễn.
      *
-     * <p>Mở một transaction CHỈ ĐỌC riêng, trước transaction ghi: câu hỏi này cần {@code Connection}
-     * mà cách lấy duy nhất của adapter là qua {@link Transaction}. Không ghi gì ở đây nên
-     * {@code idempotency_key} còn nguyên khi trả về {@code INVENTORY_FULL}.
+     * <p>Hỏi TRONG transaction ghi, sau khi đã khoá túi đồ (sửa 2026-09-25). Trước đó câu hỏi chạy
+     * ở một transaction CHỈ ĐỌC riêng: một lần mua hàng commit chen giữa hai transaction làm câu trả
+     * lời "đủ chỗ" thành sai lúc trao — túi 21 ô, hoặc món thưởng bị bỏ rơi trong im lặng vì kết
+     * quả của {@code grantItemByCode} không được kiểm. Gọi trước {@code recordOrThrow} nên
+     * {@code idempotency_key} vẫn còn nguyên khi trả về {@code INVENTORY_FULL}.
      */
-    private boolean hasRoomForRewards(long characterId, List<QuestScriptRunner.ItemGrant> itemGrants) {
+    private boolean hasRoomForRewards(Transaction t, long characterId, List<QuestScriptRunner.ItemGrant> itemGrants) {
         if (itemGrants.isEmpty()) {
             return true;
         }
         List<QuestInventoryGrantPort.ItemGrantRequest> requests = itemGrants.stream()
                 .map(g -> new QuestInventoryGrantPort.ItemGrantRequest(g.itemTemplateCode(), g.quantity()))
                 .toList();
-        boolean[] roomy = {true};
-        tx.inTransaction(
-                (Transaction t) -> roomy[0] = rewardPorts.inventoryGrantPort().hasRoomFor(t, characterId, requests));
-        return roomy[0];
+        return rewardPorts.inventoryGrantPort().hasRoomFor(t, characterId, requests);
     }
 
     private static String detailJson(String questCode, QuestScriptRunner.HookEffects effects) {

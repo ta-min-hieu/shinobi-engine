@@ -6,6 +6,7 @@ import java.util.List;
 import dev.kage.mail.domain.InventoryGatewayPort;
 import dev.kage.mail.domain.Transaction;
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.inventory.CharacterInventoryLock;
 import dev.kage.server.database.inventory.InventoryStackMerge;
 
 /**
@@ -38,6 +39,11 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
     private static final String DECREMENT_QUANTITY = """
             UPDATE inventory_item SET quantity = quantity - ? WHERE id = ?
             """;
+
+    @Override
+    public void lockInventory(Transaction tx, long characterId) {
+        CharacterInventoryLock.acquire(((JdbcTransaction) tx).connection(), characterId);
+    }
 
     /**
      * {@inheritDoc}

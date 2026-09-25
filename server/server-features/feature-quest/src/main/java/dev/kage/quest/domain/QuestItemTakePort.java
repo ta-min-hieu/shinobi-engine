@@ -25,4 +25,16 @@ public interface QuestItemTakePort {
      *     hook có thể đã thành công.
      */
     boolean takeItemByCode(Transaction tx, long characterId, String itemTemplateCode, int quantity);
+
+    /**
+     * Xếp hàng sau MỌI transaction khác đang ghi túi đồ của {@code characterId}, giữ tới hết
+     * {@code tx}. PHẢI gọi ĐẦU TIÊN trong transaction có lấy đồ — thứ tự khoá chung, xem
+     * DATABASE.md §5.1.
+     *
+     * <p>Mặc định không làm gì CHỈ để các fake ở test (nhiều cái là lambda) khỏi phải sửa — adapter
+     * thật PHẢI ghi đè.
+     */
+    default void lockInventory(Transaction tx, long characterId) {
+        // Fake trong test: không có transaction thật, không có gì để khoá.
+    }
 }

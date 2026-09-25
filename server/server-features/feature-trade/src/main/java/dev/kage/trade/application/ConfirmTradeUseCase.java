@@ -65,6 +65,9 @@ public final class ConfirmTradeUseCase {
     private void executeTransferOrAbort(Transaction t, TradeSessionSnapshot snapshot) {
         long requesterId = snapshot.requesterCharacterId();
         long targetId = snapshot.targetCharacterId();
+        // Khoá túi đồ CẢ HAI người trước vàng/vật phẩm — thứ tự khoá chung (DATABASE.md §5.1);
+        // khoá phiên ở trên là ngoại lệ duy nhất được đứng trước, vì chỉ đọc phiên mới biết hai người.
+        ports.inventoryPort().lockInventories(t, requesterId, targetId);
         transferGoldOrAbort(t, snapshot, requesterId, targetId);
         for (TradeOfferItem item : snapshot.itemsOffered(requesterId)) {
             transferOrAbort(

@@ -30,6 +30,10 @@ public final class ClaimMailUseCase {
         AtomicReference<ClaimOutcome> resultHolder = new AtomicReference<ClaimOutcome>();
         try {
             tx.inTransaction((Transaction t) -> {
+                // Khoá túi đồ ĐẦU TIÊN, trước dòng thư và vàng — thứ tự khoá chung
+                // (DATABASE.md §5.1). Không có nó, một lần mua hàng song song cùng đếm
+                // thấy ô trống cuối cùng với lần nhận thư này ⇒ túi 21 ô.
+                ports.inventoryGatewayPort().lockInventory(t, recipientId);
                 ports.idempotencyPort().recordOrThrow(t, idempotencyKey);
                 Optional<Mail> mailOpt = ports.repositoryPort().findByIdForUpdate(t, mailId);
                 if (mailOpt.isEmpty() || mailOpt.get().recipientId() != recipientId) {

@@ -264,3 +264,21 @@ những gì ảnh hưởng tới cách viết code trong module này:
   có chúng, client phải bày nút "Dùng" với MỌI món rồi chờ server từ chối, và ô chi tiết không nói
   được "hồi 50 máu". ⚠️ Cột mới phải nối vào **CẢ HAI** đường đọc của `PostgresItemTemplateAdapter`
   (`findById` cho gameplay, `listCatalog` cho client) — có test Postgres khoá cả hai.
+
+
+### Khoá túi đồ trong DB — đọc-sửa-lưu nay nằm TRỌN trong một transaction (2026-09-25)
+
+- **Lỗi thật**: `AddItemUseCase`/`GrantLootUseCase`/`UseItemUseCase`/`EnhanceItemUseCase` đọc túi
+  bằng `findByCharacter` NGOÀI transaction rồi `save()` — mà `save()` xoá mọi dòng không có trong
+  bản đã đọc. Một lần mua hàng/nhận thư/giao dịch commit chen giữa hai bước bị XOÁ THẬT (tiền đã
+  trừ). `ReentrantLock` của `InventoryFacade` không che được: cửa hàng/thư/quest/giao dịch không đi
+  qua facade. Song song với nó, mọi đường "đếm ô rồi INSERT" đẩy được túi lên 21 ô.
+- **Cách vá**: `InventoryPort.findByCharacterForUpdate(tx, characterId)` — adapter Postgres lấy
+  `CharacterInventoryLock` (khoá tư vấn theo nhân vật) rồi mới đọc. Bốn use case trên đọc bằng hàm
+  này, là lời gọi ĐẦU TIÊN trong transaction, trước cả `idempotency_key` và vàng. Cường hoá nay
+  roll SAU khi trừ vàng, trong transaction (phân phối không đổi).
+- **Luật thứ tự khoá chung của cả server** (cửa hàng, thư, quest, giao dịch cũng theo):
+  [DATABASE.md §5.1](../../../docs/05-server/DATABASE.md). Thêm use case ghi túi đồ ⇒ đọc bằng
+  `findByCharacterForUpdate`, KHÔNG bằng `findByCharacter`.
+- `findByCharacter` vẫn dùng cho đường CHỈ ĐỌC (liệt kê túi, tính chỉ số trang bị) và cho bản mặc
+  định của fake ở test.

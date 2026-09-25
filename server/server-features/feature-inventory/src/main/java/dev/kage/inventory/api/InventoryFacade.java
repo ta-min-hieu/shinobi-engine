@@ -47,6 +47,10 @@ import dev.kage.inventory.domain.ItemStack;
  * ⚠️ Khoá này chỉ tuần tự hoá các lệnh ĐI QUA facade này; giao dịch/cửa hàng/thư xoá hoặc đổi chủ
  * dòng vật phẩm bằng adapter riêng của feature đó, KHÔNG qua đây — nên mặc đồ còn phải khoá chính
  * dòng đó trong DB (2026-09-24, {@code InventoryPort#findOwnedItemForUpdate}).
+ * Cùng lý do, bốn use case đọc-sửa-lưu nay đọc túi TRONG transaction qua
+ * {@code InventoryPort#findByCharacterForUpdate} — khoá túi đồ trong DB mà cửa hàng/thư/quest/giao
+ * dịch cũng phải lấy (2026-09-25, DATABASE.md §5.1). Khoá JVM ở đây giờ chỉ còn giảm tranh chấp
+ * trong một tiến trình; điểm tuần tự hoá THẬT là khoá DB.
  *
  * <p>Khoá {@link #withCharacterLock} bọc NGOÀI mọi method có sửa túi đồ — không sửa gì bên trong
  * các use case, không đổi hành vi khi chỉ có MỘT lệnh tại một thời điểm (trường hợp tuyệt đại đa

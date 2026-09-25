@@ -6,6 +6,7 @@ import java.util.Optional;
 import dev.kage.quest.domain.QuestInventoryGrantPort;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.inventory.CharacterInventoryLock;
 import dev.kage.server.database.inventory.InventoryStackMerge;
 
 /**
@@ -46,6 +47,11 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
                AND it.max_stack > 1
                AND ii.quantity + ? <= it.max_stack
             """;
+
+    @Override
+    public void lockInventory(Transaction tx, long characterId) {
+        CharacterInventoryLock.acquire(((JdbcTransaction) tx).connection(), characterId);
+    }
 
     @Override
     public boolean hasRoomFor(Transaction tx, long characterId, java.util.List<ItemGrantRequest> grants) {

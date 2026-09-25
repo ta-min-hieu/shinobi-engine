@@ -17,6 +17,24 @@ public interface InventoryPort {
     Optional<Inventory> findByCharacter(long characterId);
 
     /**
+     * Như {@link #findByCharacter} nhưng đọc TRONG {@code tx}, SAU KHI đã xếp hàng sau mọi transaction
+     * khác đang ghi túi đồ của {@code characterId} (cửa hàng, thư, quest, giao dịch — những đường
+     * KHÔNG đi qua {@code InventoryFacade}); khoá giữ tới hết {@code tx}. Mọi use case đọc-sửa-lưu
+     * túi đồ PHẢI đọc bằng hàm này, là lời gọi đầu tiên trong transaction (thứ tự khoá chung, xem
+     * DATABASE.md §5.1).
+     *
+     * <p><b>Vì sao</b> (2026-09-25): đọc bằng {@link #findByCharacter} NGOÀI transaction rồi
+     * {@link #save} thì một lần mua hàng commit chen giữa hai bước bị {@code save} coi là "đã gỡ" và
+     * XOÁ THẬT — món đã trả tiền biến mất. Khoá JVM của {@code InventoryFacade} không che được, vì
+     * cửa hàng không đi qua facade.
+     *
+     * <p>Mặc định (fake trong test, không có khái niệm khoá): tra qua {@link #findByCharacter}.
+     */
+    default Optional<Inventory> findByCharacterForUpdate(Transaction tx, long characterId) {
+        return findByCharacter(characterId);
+    }
+
+    /**
      * Lưu inventory trong transaction đang mở.
      *
      * @param tx transaction bắt buộc — thao tác có giá trị phải nguyên tử (DATABASE.md §5)

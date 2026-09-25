@@ -13,6 +13,22 @@ import java.util.Optional;
  */
 public interface InventoryGatewayPort {
 
+    /**
+     * Xếp hàng sau MỌI transaction khác đang ghi túi đồ của {@code characterId} (cửa hàng, thư,
+     * quest, giao dịch, rơi đồ...), giữ tới hết {@code tx}. PHẢI là lời gọi ĐẦU TIÊN trong
+     * transaction, trước khi đụng vàng — thứ tự khoá chung của cả server, xem
+     * DATABASE.md §5.1.
+     *
+     * <p><b>Vì sao</b> (2026-09-25): mỗi đường cấp vật phẩm tự "đếm ô rồi INSERT"; hai đường chạy
+     * song song cùng đếm thấy 19 ô ⇒ túi 21 ô.
+     *
+     * <p>Mặc định không làm gì CHỈ để các fake ở test (không có khái niệm đồng thời) khỏi phải sửa —
+     * adapter thật PHẢI ghi đè.
+     */
+    default void lockInventory(Transaction tx, long characterId) {
+        // Fake trong test: không có transaction thật, không có gì để khoá.
+    }
+
     /** {@code Optional.empty()} nếu {@code itemId} không tồn tại hoặc không thuộc {@code characterId}. */
     Optional<OwnedItem> findItem(long characterId, long itemId);
 

@@ -36,6 +36,22 @@ public interface TradeInventoryPort {
         return false;
     }
 
+    /**
+     * Xếp hàng sau MỌI transaction khác đang ghi túi đồ của CẢ HAI người (cửa hàng, thư, quest,
+     * rơi đồ, giao dịch khác...), giữ tới hết {@code tx}. Gọi ngay sau khi khoá phiên giao dịch và
+     * TRƯỚC khi đụng vàng/vật phẩm — khoá phiên là ngoại lệ duy nhất được đứng trước, vì chỉ đọc
+     * phiên mới biết hai người là ai. Thứ tự giữa hai người do adapter quyết (tất định, không theo
+     * vai), xem DATABASE.md §5.1.
+     *
+     * <p><b>Vì sao</b> (2026-09-25): {@link #exceedsCapacity} đếm dòng ở READ COMMITTED — món một
+     * lần mua hàng vừa chèn mà chưa commit thì vô hình, hai bên cùng commit ⇒ túi 21 ô.
+     *
+     * <p>Mặc định không làm gì CHỈ để fake ở test khỏi phải sửa — adapter thật PHẢI ghi đè.
+     */
+    default void lockInventories(Transaction tx, long characterIdA, long characterIdB) {
+        // Fake trong test: không có transaction thật, không có gì để khoá.
+    }
+
     /** Gói tham số cho {@link #transferItem} — tránh vượt 4 tham số Checkstyle {@code ParameterNumber}. */
     record TransferRequest(long fromCharacterId, long toCharacterId, long itemId, int quantity) {}
 

@@ -34,44 +34,51 @@ public final class EnhanceItemUseCase {
     }
 
     public EnhanceResult execute(long characterId, long itemId, boolean useProtection, String idempotencyKey) {
-        Inventory inventory = ports.inventoryPort()
-                .findByCharacter(characterId)
-                .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
-        ItemStack item = inventory.findItem(itemId).orElse(null);
-        if (item == null) {
-            return EnhanceResult.ITEM_NOT_FOUND;
-        }
-        int currentLevel = item.enhanceLevel();
-        if (currentLevel >= ItemStack.MAX_ENHANCE) {
-            return EnhanceResult.MAX_LEVEL;
-        }
-
-        long cost = EnhancementTable.goldCost(currentLevel);
-        int successRate = EnhancementTable.successRatePercent(currentLevel);
-        boolean rolledSuccess = ThreadLocalRandom.current().nextInt(100) < successRate;
-
         AtomicReference<EnhanceResult> resultHolder = new AtomicReference<EnhanceResult>();
         try {
+            // Đọc túi TRONG transaction, sau khoá túi đồ, TRƯỚC khi đụng vàng (sửa 2026-09-25): thứ
+            // tự khoá chung của cả server (DATABASE.md §5.1). Đọc ngoài transaction thì một
+            // lần mua hàng commit chen giữa bị save() coi là "đã gỡ" và xoá thật.
             tx.inTransaction((Transaction t) -> {
-                ports.idempotencyPort().recordOrThrow(t, idempotencyKey);
-                if (!ports.goldPort().deductGold(t, characterId, cost)) {
-                    resultHolder.set(EnhanceResult.INSUFFICIENT_GOLD);
+                Inventory inventory = ports.inventoryPort()
+                        .findByCharacterForUpdate(t, characterId)
+                        .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
+                Optional<ItemStack> item = inventory.findItem(itemId);
+                if (item.isEmpty()) {
+                    resultHolder.set(EnhanceResult.ITEM_NOT_FOUND);
                     return;
                 }
-                Optional<ItemStack> protectionCharge =
-                        findProtectionCharge(inventory, currentLevel, rolledSuccess, useProtection);
-                EnhanceOutcome outcome = resolveOutcome(currentLevel, rolledSuccess, protectionCharge.isPresent());
-                inventory.replaceItem(
-                        new ItemStack(item.id(), item.itemTemplateId(), item.quantity(), outcome.toLevel()));
-                protectionCharge.ifPresent(charge -> inventory.consumeOne(charge.id()));
-                ports.inventoryPort().save(t, inventory);
-                ports.auditPort().log(t, characterId, "ENHANCE_ITEM", detailJson(itemId, cost, outcome));
-                resultHolder.set(outcome.result());
+                if (item.get().enhanceLevel() >= ItemStack.MAX_ENHANCE) {
+                    resultHolder.set(EnhanceResult.MAX_LEVEL);
+                    return;
+                }
+                ports.idempotencyPort().recordOrThrow(t, idempotencyKey);
+                resultHolder.set(enhance(t, inventory, item.get(), useProtection));
             });
         } catch (IdempotencyKeyReusedException e) {
             return EnhanceResult.DUPLICATE_REQUEST;
         }
         return resultHolder.get();
+    }
+
+    /** Trừ vàng, roll, đổi cấp (+ tiêu Bảo Vệ nếu có), lưu, ghi audit — trong transaction đang mở. */
+    private EnhanceResult enhance(Transaction t, Inventory inventory, ItemStack item, boolean useProtection) {
+        long characterId = inventory.characterId();
+        int currentLevel = item.enhanceLevel();
+        long cost = EnhancementTable.goldCost(currentLevel);
+        if (!ports.goldPort().deductGold(t, characterId, cost)) {
+            return EnhanceResult.INSUFFICIENT_GOLD;
+        }
+        int successRate = EnhancementTable.successRatePercent(currentLevel);
+        boolean rolledSuccess = ThreadLocalRandom.current().nextInt(100) < successRate;
+        Optional<ItemStack> protectionCharge =
+                findProtectionCharge(inventory, currentLevel, rolledSuccess, useProtection);
+        EnhanceOutcome outcome = resolveOutcome(currentLevel, rolledSuccess, protectionCharge.isPresent());
+        inventory.replaceItem(new ItemStack(item.id(), item.itemTemplateId(), item.quantity(), outcome.toLevel()));
+        protectionCharge.ifPresent(charge -> inventory.consumeOne(charge.id()));
+        ports.inventoryPort().save(t, inventory);
+        ports.auditPort().log(t, characterId, "ENHANCE_ITEM", detailJson(item.id(), cost, outcome));
+        return outcome.result();
     }
 
     /** {@code Optional.empty()} nếu không cần/không dùng/không có Bảo Vệ — không tiêu gì cả. */

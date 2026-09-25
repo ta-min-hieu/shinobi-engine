@@ -6,6 +6,7 @@ import java.util.Optional;
 import javax.sql.DataSource;
 
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.inventory.CharacterInventoryLock;
 import dev.kage.server.database.inventory.InventoryStackMerge;
 import dev.kage.shop.domain.InventoryGatewayPort;
 import dev.kage.shop.domain.OwnedItem;
@@ -56,6 +57,11 @@ public final class PostgresShopInventoryGatewayAdapter implements InventoryGatew
                 rs -> new OwnedItem(rs.getLong("id"), rs.getLong("item_template_id"), rs.getInt("quantity")),
                 itemId,
                 characterId);
+    }
+
+    @Override
+    public void lockInventory(Transaction tx, long characterId) {
+        CharacterInventoryLock.acquire(((JdbcTransaction) tx).connection(), characterId);
     }
 
     @Override

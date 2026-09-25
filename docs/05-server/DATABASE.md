@@ -189,6 +189,38 @@ transactionManager.inTransaction(tx -> {
 
 ⚠️ **Không giữ transaction mở trong khi chờ I/O khác** — giữ transaction ngắn nhất có thể, tránh lock contention.
 
+### 5.1 Thứ tự khoá túi đồ (2026-09-25)
+
+**Vấn đề đã gặp.** Có sáu đường ghi `inventory_item`: rơi đồ / cường hoá / dùng đồ (qua
+`InventoryFacade`), cửa hàng, thư, quest (lĩnh thưởng + giao đồ), giao dịch. Mỗi đường tự "đếm ô
+rồi INSERT" trong transaction riêng; ở READ COMMITTED hai đường khác nhau cùng đếm thấy 19 ô, cùng
+chèn, cùng commit ⇒ **túi 21 ô**. Đường facade còn tệ hơn: nó đọc túi NGOÀI transaction rồi
+`save()` xoá mọi dòng không có trong bản đã đọc ⇒ **món cửa hàng vừa bán (đã trừ tiền) bị xoá
+thật**. `ReentrantLock` của `InventoryFacade` không che được vì cửa hàng/thư/quest/giao dịch không
+đi qua facade (và khoá JVM không sống qua nhiều tiến trình). Tái hiện tất định ở
+`InventoryGrantRaceIntegrationTest` (server-database).
+
+**Luật.** Mọi transaction ghi túi đồ của nhân vật X lấy **khoá túi đồ của X trước mọi khoá khác**
+— `CharacterInventoryLock` (khoá tư vấn `pg_advisory_xact_lock(namespace, key)` theo `character.id`,
+tự nhả khi commit/rollback; không đổi schema, không đụng dòng `character` mà nhiều đường khác ghi).
+
+| Bước | Khoá | Ghi chú |
+|---|---|---|
+| 0 | *(chỉ giao dịch)* dòng `trade_session` `FOR UPDATE` | Ngoại lệ duy nhất đứng trước: phải đọc phiên mới biết hai người là ai. Không đường nào giữ khoá túi đồ rồi mới xin dòng phiên ⇒ không tạo vòng |
+| 1 | **Khoá túi đồ** — `lockInventory` / `findByCharacterForUpdate` / `lockInventories` | Hai người (giao dịch): xếp theo KHOÁ tăng dần, không theo vai người mời/người nhận |
+| 2 | Mọi thứ còn lại theo thứ tự sẵn có của use case: `idempotency_key`, dòng thư, `character_stat` (vàng qua `GoldLedger`, EXP), dòng `inventory_item`, `audit_log`... | Thứ tự giữa chúng không còn tạo vòng với nhau vì hai transaction cùng đụng túi X đã xếp hàng ở bước 1 |
+
+Hệ quả phải giữ:
+
+- Đọc túi để quyết định (còn chỗ không, có món đó không) phải nằm **trong** transaction, **sau**
+  khoá. `ClaimQuestRewardUseCase` từng hỏi "đủ chỗ không" ở một transaction chỉ đọc riêng — nay hỏi
+  ngay trong transaction ghi.
+- Transaction chỉ đụng vàng mà không đụng túi đồ (vd lập bang) KHÔNG cần khoá này — chúng không bao
+  giờ chờ khoá túi đồ nên không khép được vòng.
+- Thêm đường ghi túi đồ thứ bảy ⇒ gọi khoá ở dòng đầu tiên của transaction. Port có bản mặc định
+  không làm gì (để fake ở test khỏi sửa) — adapter Postgres thật PHẢI ghi đè;
+  `InventoryGrantRaceIntegrationTest` bắn mọi đường song song theo cả hai chiều để bắt deadlock.
+
 ---
 
 ## 6. Redis
@@ -338,6 +370,7 @@ private static final String FIND_INVENTORY = """
 | 10 | **MVP không partition** | Điều 9, 30 | Accepted |
 | 11 | SQL **chỉ** trong `infrastructure/`; luôn `PreparedStatement` | Kiến trúc + bảo mật | Accepted |
 | 12 | **`realm_id` = có, mặc định 1** (single-realm MVP) | Sẵn sàng multi-realm không migration | ✅ [ADR-010](../01-architecture/adr/ADR-010-Realm-Model.md) |
+| 14 | **Khoá túi đồ theo nhân vật là khoá ĐẦU TIÊN** của mọi transaction ghi `inventory_item` (khoá tư vấn, không đổi schema) — §5.1 | Hai đường cấp đồ song song từng đẩy túi quá 20 ô và xoá món đã mua; xếp khoá cố định để không deadlock | Accepted (2026-09-25) |
 | 13 | Index §8 **đã verify thật** qua Testcontainers + `EXPLAIN ANALYZE` (2026-08-02) | Mọi index cần thiết đều đã tồn tại sẵn (V2/V4/V7/V11/V13/V14); phần đề xuất còn lại bị bác bỏ có bằng chứng — không cần migration mới | ✅ Đã đóng |
 
 ## ADR cần tạo
