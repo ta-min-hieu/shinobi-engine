@@ -212,6 +212,11 @@ public final class GameConnection {
 
 **Reconnect**: mất kết nối → thử kết nối lại với session cũ. Session còn hạn → vào lại đúng chỗ. Hết hạn → về Login.
 
+**Bị đá vì đăng nhập nơi khác** (2026-09-25, [SERVER.md §5.1](../05-server/SERVER.md)): `ErrorResponse` mang
+`error.logged_in_elsewhere` ⇒ `ConnectionCoordinator` báo `WorldScreen` kết thúc phiên ⇒ dừng HẲN
+`GameConnection` (kể cả vòng tự nối lại), về `LoginScreen` và hiện câu i18n đó. `WorldScreen.dispose`
+dọn `EcsWorld` của engine (`EcsWorld.clear()`) để lần vào world sau không đăng ký System di chuyển lần hai.
+
 ---
 
 ## 9. Audio

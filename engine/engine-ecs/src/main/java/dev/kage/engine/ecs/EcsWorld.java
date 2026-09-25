@@ -48,6 +48,20 @@ public final class EcsWorld {
         systems.add(system);
     }
 
+    /**
+     * Quên MỌI entity và MỌI System — đưa world về trạng thái vừa tạo.
+     *
+     * <p>Dành cho lúc rời hẳn một phiên chơi mà {@link EcsWorld} vẫn sống tiếp (client: engine giữ
+     * một world duy nhất suốt đời ứng dụng, còn màn world thì đăng ký System của nó mỗi lần dựng —
+     * bị đá về màn đăng nhập rồi vào lại mà không dọn thì System di chuyển chạy HAI lần mỗi tick).
+     * Không gọi giữa lúc {@link #update} đang lặp.
+     */
+    public void clear() {
+        ashleyEngine.removeAllEntities();
+        handles.clear();
+        systems.clear();
+    }
+
     /** Tổng số entity đang sống — OBSERVABILITY.md §3.1 {@code kage.entities.count}. */
     public int entityCount() {
         return ashleyEngine.getEntities().size();

@@ -861,7 +861,7 @@ class GatewayPipelineTest {
     }
 
     // Shop không dùng trong test này — fake tối thiểu để compile (cùng convention fakeInventoryFacade).
-    private static dev.kage.shop.api.ShopFacade fakeShopFacade() {
+    static dev.kage.shop.api.ShopFacade fakeShopFacade() {
         dev.kage.shop.domain.ShopCatalogPort catalogPort = new dev.kage.shop.domain.ShopCatalogPort() {
             @Override
             public Optional<dev.kage.shop.domain.ShopListing> findListing(long itemTemplateId) {
@@ -915,7 +915,7 @@ class GatewayPipelineTest {
     }
 
     // Dialogue không dùng trong test này — fake tối thiểu để compile (cùng convention fakeShopFacade).
-    private static dev.kage.dialogue.api.DialogueFacade fakeDialogueFacade() {
+    static dev.kage.dialogue.api.DialogueFacade fakeDialogueFacade() {
         dev.kage.dialogue.domain.NpcTemplatePort npcTemplatePort = npcCode -> Optional.empty();
         dev.kage.dialogue.application.GetDialogueNodeUseCase useCase =
                 new dev.kage.dialogue.application.GetDialogueNodeUseCase(npcTemplatePort);
@@ -1040,7 +1040,7 @@ class GatewayPipelineTest {
                 new dev.kage.quest.application.ListQuestsUseCase(progressPort));
     }
 
-    private static dev.kage.quest.api.QuestFacade fakeQuestFacade() {
+    static dev.kage.quest.api.QuestFacade fakeQuestFacade() {
         return fakeQuestFacade(List.of());
     }
 
@@ -1085,7 +1085,7 @@ class GatewayPipelineTest {
     }
 
     // Friend không dùng trong test này — fake tối thiểu để compile (cùng convention fakeQuestFacade).
-    private static dev.kage.friend.api.FriendFacade fakeFriendFacade() {
+    static dev.kage.friend.api.FriendFacade fakeFriendFacade() {
         dev.kage.friend.domain.FriendPort friendPort = new dev.kage.friend.domain.FriendPort() {
             @Override
             public Optional<dev.kage.friend.domain.Friendship> findBetween(long characterIdA, long characterIdB) {
@@ -1133,7 +1133,7 @@ class GatewayPipelineTest {
     }
 
     // Mail không dùng trong test này — fake tối thiểu để compile (cùng convention fakeFriendFacade).
-    private static dev.kage.mail.api.MailFacade fakeMailFacade() {
+    static dev.kage.mail.api.MailFacade fakeMailFacade() {
         dev.kage.mail.domain.MailRepositoryPort mailRepositoryPort = new dev.kage.mail.domain.MailRepositoryPort() {
             @Override
             public dev.kage.mail.domain.Mail send(
@@ -1188,13 +1188,13 @@ class GatewayPipelineTest {
     }
 
     // Chat không dùng trong test này — fake tối thiểu để compile (cùng convention fakeMailFacade).
-    private static dev.kage.chat.api.ChatFacade fakeChatFacade() {
+    static dev.kage.chat.api.ChatFacade fakeChatFacade() {
         dev.kage.chat.domain.ChatAuditPort chatAuditPort = (characterId, action, detailJson) -> {};
         return new dev.kage.chat.api.ChatFacade(new dev.kage.chat.application.SendChatMessageUseCase(chatAuditPort));
     }
 
     // Guild không dùng trong test này — fake tối thiểu để compile (cùng convention fakeFriendFacade).
-    private static dev.kage.guild.api.GuildFacade fakeGuildFacade() {
+    static dev.kage.guild.api.GuildFacade fakeGuildFacade() {
         dev.kage.guild.domain.GuildPort guildPort = new dev.kage.guild.domain.GuildPort() {
             @Override
             public Optional<dev.kage.guild.domain.Guild> findByName(String name) {
@@ -1276,7 +1276,7 @@ class GatewayPipelineTest {
     }
 
     // Party không dùng trong test này — fake tối thiểu để compile (cùng convention fakeGuildFacade).
-    private static dev.kage.party.api.PartyFacade fakePartyFacade() {
+    static dev.kage.party.api.PartyFacade fakePartyFacade() {
         dev.kage.party.domain.PartyPort partyPort = new dev.kage.party.domain.PartyPort() {
             @Override
             public Optional<dev.kage.party.domain.PartyMember> findMembershipOf(long characterId) {
@@ -1342,7 +1342,7 @@ class GatewayPipelineTest {
     }
 
     // Trade không dùng trong test này — fake tối thiểu để compile (cùng convention fakePartyFacade).
-    private static dev.kage.trade.api.TradeFacade fakeTradeFacade() {
+    static dev.kage.trade.api.TradeFacade fakeTradeFacade() {
         dev.kage.trade.domain.TradeSessionPort sessionPort = new dev.kage.trade.domain.TradeSessionPort() {
             @Override
             public Optional<dev.kage.trade.domain.TradeSession> findActiveSessionOfCharacter(long characterId) {
@@ -1431,7 +1431,7 @@ class GatewayPipelineTest {
     }
 
     // Pvp không dùng trong test này — fake tối thiểu để compile (cùng convention fakeTradeFacade).
-    private static dev.kage.pvp.api.PvpFacade fakePvpFacade() {
+    static dev.kage.pvp.api.PvpFacade fakePvpFacade() {
         dev.kage.pvp.domain.PvpRatingPort ratingPort = new dev.kage.pvp.domain.PvpRatingPort() {
             @Override
             public Optional<dev.kage.pvp.domain.PvpRating> findByCharacterId(long characterId) {

@@ -222,6 +222,10 @@ Kết nối lại với session token cũ
 
 ⚠️ **Backoff bắt buộc** — không có backoff, 1000 client mất kết nối cùng lúc sẽ retry đồng loạt và giết server đang phục hồi (thundering herd).
 
+**Đăng nhập cùng nhân vật từ nơi khác** (quyết định chủ dự án 2026-09-25, [SERVER.md §5.1](SERVER.md)):
+phiên mới thắng, server gửi phiên cũ `ErrorResponse{error_key="error.logged_in_elsewhere"}` rồi đóng
+kết nối. Client nhận khoá này thì **không** tự kết nối lại — phiên đó đã chết hẳn — mà về màn Login.
+
 **Server giữ session bao lâu sau khi mất kết nối?** Chưa chốt — quá ngắn thì mất kết nối 2s là mất nhân vật; quá dài thì nhân vật đứng như bia đỡ đạn trong PvP. **Đề xuất: 30–60s**, cần cân nhắc cùng game design.
 
 ---

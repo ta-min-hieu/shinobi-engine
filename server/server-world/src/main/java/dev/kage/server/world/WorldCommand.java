@@ -101,4 +101,11 @@ sealed interface WorldCommand {
      * (server/CLAUDE.md, ba ranh giới thread), còn lệnh này đến từ Virtual Thread xử lý gói.
      */
     record HealCharacterCommand(long characterId, int amount) implements WorldCommand {}
+
+    /**
+     * Mốc chặn hàng đợi — không đổi gì trong ECS, chỉ gọi {@code onReached} khi tick thread đã xử lý
+     * xong mọi lệnh xếp TRƯỚC nó. Xem {@link WorldFacade#inboxBarrier()}. Mang callback chứ không
+     * mang thẳng future: record không giữ đối tượng mutable của người gọi (SpotBugs EI).
+     */
+    record InboxBarrierCommand(Runnable onReached) implements WorldCommand {}
 }

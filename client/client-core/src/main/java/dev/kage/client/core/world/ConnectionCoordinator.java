@@ -5,6 +5,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 
 import dev.kage.client.core.ui.hud.CombatHud;
 import dev.kage.client.core.ui.theme.KageI18n;
+import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PongResponse;
 import dev.kage.protocol.wire.PacketCodec;
@@ -30,6 +31,14 @@ import dev.kage.protocol.wire.PacketCodec;
  * Gói rỗng, server gửi NGAY TRƯỚC khi đóng kết nối lúc bảo trì có chủ đích (SERVER.md §10). Việc
  * duy nhất client làm được lúc này là nói cho người chơi biết đây là bảo trì chứ không phải mạng
  * hỏng — kết nối sẽ đứt ngay sau đó dù client có làm gì đi nữa.
+ *
+ * <h2>Bị đá vì đăng nhập nơi khác ({@code error.logged_in_elsewhere})</h2>
+ *
+ * Quyết định chủ dự án 2026-09-25: một nhân vật chỉ một phiên sống — chọn nhân vật đang online từ
+ * kết nối khác thì server ĐÁ phiên cũ: gửi {@code ErrorResponse} mang khoá này rồi đóng kết nối.
+ * Phiên đó đã chết hẳn trên server, nên tự kết nối lại (việc {@code GameConnection} vẫn làm khi
+ * đứt) chỉ đưa người chơi vào một socket sống với một phiên chết — đúng cái bẫy {@link #onTick}
+ * mô tả. Lớp này báo cho màn world kết thúc phiên; màn world dừng kết nối và về màn đăng nhập.
  */
 final class ConnectionCoordinator implements WindowFlow {
 
@@ -40,8 +49,12 @@ final class ConnectionCoordinator implements WindowFlow {
      */
     static final long MAX_PLAUSIBLE_ROUND_TRIP_MS = 15_000L;
 
+    /** Khoá server gửi cho phiên bị đá — cùng chuỗi với {@code GatewayChannelHandler}. */
+    static final String LOGGED_IN_ELSEWHERE_KEY = "error.logged_in_elsewhere";
+
     private final CombatHud hud;
     private final ChatCoordinator notices;
+    private final java.util.function.Consumer<String> onSessionEnded;
     private final I18NBundle i18n = KageI18n.load();
 
     /**
@@ -53,10 +66,13 @@ final class ConnectionCoordinator implements WindowFlow {
     /**
      * @param notices kênh báo bảo trì — nhật ký chat, cùng chỗ {@link DungeonCoordinator} và
      *     {@link PartyCoordinator} đã dùng: một câu người chơi cần ĐỌC chứ không cần bấm.
+     * @param onSessionEnded gọi với {@code error_key} khi server kết thúc phiên này (bị đá vì đăng
+     *     nhập nơi khác) — xem {@link #endsSession}
      */
-    ConnectionCoordinator(CombatHud hud, ChatCoordinator notices) {
+    ConnectionCoordinator(CombatHud hud, ChatCoordinator notices, java.util.function.Consumer<String> onSessionEnded) {
         this.hud = hud;
         this.notices = notices;
+        this.onSessionEnded = onSessionEnded;
     }
 
     @Override
@@ -71,7 +87,28 @@ final class ConnectionCoordinator implements WindowFlow {
             notices.showSystemNotice(text("system.notice.server_shutdown"));
             return true;
         }
+        if (opcode == Opcode.OPCODE_ERROR_VALUE) {
+            // Chỉ nhận ĐÚNG khoá kết thúc phiên; mọi lỗi khác là của luồng khác (nuốt hết là cướp gói).
+            String errorKey = ErrorResponse.parseFrom(frame.payload()).getErrorKey();
+            if (endsSession(errorKey)) {
+                onSessionEnded.accept(errorKey);
+                return true;
+            }
+        }
         return false;
+    }
+
+    /**
+     * {@code error_key} này có nghĩa phiên trên server đã bị kết thúc hẳn (không phải một thao tác
+     * bị từ chối) không.
+     *
+     * <p>Tách thành hàm tĩnh THUẦN vì cùng lý do {@link #plausibleRoundTrip}: {@link CombatHud} cần
+     * ngữ cảnh GL nên bản thân lớp này không dựng được trong JUnit.
+     *
+     * @param errorKey khoá trong {@code ErrorResponse}, có thể {@code null}/rỗng
+     */
+    static boolean endsSession(String errorKey) {
+        return LOGGED_IN_ELSEWHERE_KEY.equals(errorKey);
     }
 
     /** Một nhịp heartbeat vừa về — bỏ qua gói không tin được, xem {@link #plausibleRoundTrip}. */

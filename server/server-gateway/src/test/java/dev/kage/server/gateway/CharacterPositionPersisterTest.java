@@ -71,14 +71,18 @@ class CharacterPositionPersisterTest {
         moveTo(LOGOUT_POSITION);
         PositionSnapshot lastPosition = registry.lastKnownPosition(CHARACTER_ID);
         registry.unregister(CHARACTER_ID);
-        Thread logout =
-                Thread.ofVirtual().start(() -> persister.save(CHARACTER_ID, lastPosition.x(), lastPosition.y()));
+        java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CompletableFuture<Void>> logoutWrite =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        Thread logout = Thread.ofVirtual()
+                .start(() -> logoutWrite.set(persister.save(CHARACTER_ID, lastPosition.x(), lastPosition.y())));
         logout.join(TimeUnit.SECONDS.toMillis(WAIT_SECONDS));
 
         releasePeriodicWrite.countDown();
         awaitWriteCount(writes, 2);
 
         assertThat(writes).last().isEqualTo(LOGOUT_POSITION);
+        // Mốc "đã ghi xong" mà phiên mới chờ trước khi đọc vị trí (quyết định một-phiên 2026-09-25).
+        assertThat(logoutWrite.get()).succeedsWithin(Duration.ofSeconds(WAIT_SECONDS));
     }
 
     private void moveTo(PositionSnapshot position) {

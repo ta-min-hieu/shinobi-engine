@@ -70,6 +70,29 @@ class ConnectedCharacterRegistryPositionTest {
         assertThat(registry.snapshotPositions()).containsEntry(CHARACTER_ID, new PositionSnapshot(30f, 40f));
     }
 
+    /**
+     * Lần dọn của kết nối CŨ không được xoá nhân vật mà kết nối MỚI đã đăng ký (quyết định một-phiên
+     * 2026-09-25) — kể cả vị trí mới nhất của phiên mới.
+     */
+    @Test
+    void shouldKeepNewSession_whenOldConnectionUnregistersAfterIt() {
+        EmbeddedChannel oldSession = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        EmbeddedChannel newSession = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(CHARACTER_ID, oldSession.pipeline().firstContext());
+        registry.register(CHARACTER_ID, newSession.pipeline().firstContext());
+        registry.onMoveAccepted(moveAccepted(1, 30f, 40f));
+
+        boolean removed =
+                registry.unregister(CHARACTER_ID, oldSession.pipeline().firstContext());
+
+        assertThat(removed).isFalse();
+        assertThat(registry.isOnline(CHARACTER_ID)).isTrue();
+        assertThat(registry.lastKnownPosition(CHARACTER_ID)).isEqualTo(new PositionSnapshot(30f, 40f));
+        assertThat(registry.unregister(CHARACTER_ID, newSession.pipeline().firstContext()))
+                .isTrue();
+        assertThat(registry.isOnline(CHARACTER_ID)).isFalse();
+    }
+
     private static WorldOutboundSink.MoveAcceptedSnapshot moveAccepted(int sequenceId, float x, float y) {
         return new WorldOutboundSink.MoveAcceptedSnapshot(CHARACTER_ID, sequenceId, x, y, 0f, true);
     }
