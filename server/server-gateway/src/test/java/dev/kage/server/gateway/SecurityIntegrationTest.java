@@ -732,6 +732,11 @@ class SecurityIntegrationTest {
             }
 
             @Override
+            public int lockAccountAndCountCharacters(dev.kage.character.domain.Transaction tx, long accountId) {
+                return countByAccount(accountId);
+            }
+
+            @Override
             public boolean existsByName(String name) {
                 return characters.stream().anyMatch(c -> c.name().equals(name));
             }

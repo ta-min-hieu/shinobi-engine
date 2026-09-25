@@ -163,6 +163,11 @@ class GrantExperienceUseCaseTest {
         }
 
         @Override
+        public int lockAccountAndCountCharacters(Transaction tx, long accountId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
         public PositionSnapshot loadPosition(long characterId) {
             throw new UnsupportedOperationException("không dùng trong test này");
         }

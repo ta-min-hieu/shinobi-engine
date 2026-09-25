@@ -16,6 +16,11 @@ kiểm sớm, KHÔNG nguyên tử với INSERT. Hai người tạo cùng một t
 `character.name` chặn người thứ hai, adapter dịch thành exception này, use case đổi thành
 `DuplicateCharacterNameException` — người chơi nhận "tên trùng" như đường thường.
 
+Giới hạn 4 nhân vật/account (vá 2026-09-25): `countByAccount` ngoài transaction cũng chỉ là kiểm
+sớm. Phép kiểm QUYẾT ĐỊNH là `CharacterPort#lockAccountAndCountCharacters` — khoá dòng `account`
+(`FOR NO KEY UPDATE`) rồi đếm lại, trong CÙNG transaction với INSERT. Trước bản vá, 8 lượt tạo song
+song trên account có 3 nhân vật cho ra 11 nhân vật (`CharacterLimitRaceIntegrationTest`).
+
 Chiều: `api → application → domain`. **`domain/` không import gì bên ngoài** — không có
 `infrastructure/` trong module này (xem feature-account/CLAUDE.md mục "Khác template chuẩn" —
 adapter thật nằm ở `server-database`, ArchUnit chặn JDBC/Redis theo package

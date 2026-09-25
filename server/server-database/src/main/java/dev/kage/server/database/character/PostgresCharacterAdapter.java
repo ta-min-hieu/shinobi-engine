@@ -71,6 +71,14 @@ public final class PostgresCharacterAdapter implements CharacterPort {
             SELECT COUNT(*) FROM character WHERE account_id = ?
             """;
 
+    // FOR NO KEY UPDATE (không phải FOR UPDATE): tự xung đột với chính nó nên vẫn xếp hàng các lượt
+    // tạo nhân vật trên cùng account, nhưng KHÔNG xung đột với khoá FOR KEY SHARE mà Postgres tự lấy
+    // khi kiểm FK character.account_id — không chặn thừa các INSERT tham chiếu account khác.
+    // Không transaction nào khác khoá dòng account (2026-09-25), nên không có thứ tự khoá ngược.
+    private static final String LOCK_ACCOUNT = """
+            SELECT id FROM account WHERE id = ? FOR NO KEY UPDATE
+            """;
+
     private static final String EXISTS_BY_NAME = """
             SELECT 1 FROM character WHERE name = ?
             """;
@@ -126,6 +134,16 @@ public final class PostgresCharacterAdapter implements CharacterPort {
     @Override
     public int countByAccount(long accountId) {
         return JdbcOperations.queryOne(dataSource, COUNT_BY_ACCOUNT, rs -> rs.getInt(1), accountId)
+                .orElse(0);
+    }
+
+    @Override
+    public int lockAccountAndCountCharacters(Transaction tx, long accountId) {
+        Connection connection = ((JdbcTransaction) tx).connection();
+        JdbcOperations.lock(connection, LOCK_ACCOUNT, accountId);
+        // READ COMMITTED: câu đếm là câu MỚI sau khi có khoá ⇒ snapshot mới, thấy nhân vật mà lượt
+        // giữ khoá trước đó vừa commit.
+        return JdbcOperations.queryOne(connection, COUNT_BY_ACCOUNT, rs -> rs.getInt(1), accountId)
                 .orElse(0);
     }
 
