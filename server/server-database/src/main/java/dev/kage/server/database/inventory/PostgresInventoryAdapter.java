@@ -98,9 +98,22 @@ public final class PostgresInventoryAdapter implements InventoryPort {
         return Optional.of(new Inventory(characterId, DEFAULT_CAPACITY, items));
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p><b>Khoá {@link CharacterInventoryLock} TRƯỚC khoá dòng</b> (sửa 2026-09-25). Chỉ khoá dòng
+     * thì mặc đồ chặn được chiều "đồ rời túi trước, mặc sau", nhưng KHÔNG chặn chiều ngược: mặc tới
+     * trước (đã ghi ô, chưa commit), bán/gửi thư tới sau chờ ở {@code FOR UPDATE} rồi đọc câu
+     * {@code EXISTS (equipment_slot)} theo ảnh chụp CŨ của chính câu lệnh đó — Postgres chỉ đánh giá
+     * lại dòng bị khoá, không đánh giá lại bảng khác — nên thấy "chưa mặc" và bán luôn món vừa mặc.
+     * Xếp hàng ở khoá túi đồ (đường bán/thư/giao dịch đều lấy nó đầu tiên) thì câu kiểm của bên tới
+     * sau là một câu lệnh MỚI, chạy sau khi lệnh mặc commit. Tái hiện ở
+     * {@code EquipWhileItemLeavesIntegrationTest}.
+     */
     @Override
     public Optional<ItemStack> findOwnedItemForUpdate(Transaction tx, long characterId, long itemId) {
         Connection connection = ((JdbcTransaction) tx).connection();
+        CharacterInventoryLock.acquire(connection, characterId);
         return JdbcOperations.queryOne(
                 connection, FIND_OWNED_ITEM_FOR_UPDATE, PostgresInventoryAdapter::mapItemStack, itemId, characterId);
     }

@@ -25,9 +25,10 @@ import dev.kage.inventory.domain.TransactionRunner;
  * đọc từ DB phía server, KHÔNG bao giờ nhận từ client (Điều 15/24).
  *
  * <p><b>Cả lượt chạy trong MỘT giao dịch, dòng vật phẩm bị khoá trước khi xác thực</b> (sửa
- * 2026-09-24) — xem {@link InventoryPort#findOwnedItemForUpdate}. Thứ tự khoá: dòng
- * {@code inventory_item} rồi mới tới {@code equipment_slot}, cùng chiều với giao dịch/cửa hàng/thư
- * (khoá dòng vật phẩm, chỉ ĐỌC {@code equipment_slot}) — không tạo vòng khoá mới.
+ * 2026-09-24) — xem {@link InventoryPort#findOwnedItemForUpdate}. Thứ tự khoá: khoá túi đồ của
+ * nhân vật (từ 2026-09-25 — DATABASE.md §5.1), dòng {@code inventory_item}, rồi mới tới
+ * {@code equipment_slot}, cùng chiều với giao dịch/cửa hàng/thư (khoá túi đồ, khoá dòng vật phẩm,
+ * chỉ ĐỌC {@code equipment_slot}) — không tạo vòng khoá mới.
  *
  * <p>Constructor Injection tường minh — không DI container, không field injection (ADR-009).
  */
