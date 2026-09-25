@@ -13,6 +13,40 @@ public interface QuestProgressPort {
     void save(Transaction tx, QuestProgress progress);
 
     /**
+     * Ghi dòng tiến độ ĐẦU TIÊN — chỉ khi nhân vật CHƯA có dòng nào cho quest này. Dùng cho
+     * {@code AcceptQuestUseCase}.
+     *
+     * <p><b>Vì sao có (2026-09-25).</b> Nhận quest từng là "{@link #find} thấy rỗng ⇒ {@link #save}"
+     * — hai bước rời, và {@link #save} là upsert mù. Hai lệnh nhận của cùng một người chơi (bấm đúp)
+     * chạy song song ở gateway; lần chậm đọc "chưa có" rồi ghi SAU khi người chơi đã làm xong và
+     * lĩnh thưởng, kéo quest CLAIMED về IN_PROGRESS tiến độ 0 ⇒ làm lại và lĩnh lại được. Phép ghi
+     * này để khoá chính {@code (character_id, quest_template_id)} phán quyết thay cho lần đọc.
+     *
+     * @return {@code false} nếu đã có dòng (bất kể status) — khi đó KHÔNG ghi gì
+     */
+    default boolean insertIfAbsent(Transaction tx, QuestProgress progress) {
+        // Cùng lý do saveIfUnchanged: một lần GHI không có mặc định "vô hại".
+        throw new UnsupportedOperationException("insertIfAbsent chưa được hiện thực ở " + getClass());
+    }
+
+    /**
+     * Đổi {@code COMPLETED → CLAIMED} CHỈ KHI dòng vẫn đang {@code COMPLETED} — compare-and-set,
+     * dùng làm BƯỚC ĐẦU TIÊN trong transaction lĩnh thưởng của {@code ClaimQuestRewardUseCase}.
+     *
+     * <p><b>Vì sao có (2026-09-25).</b> {@code idempotency_key} chỉ chặn lần gửi LẠI của cùng một
+     * lệnh. Hai lệnh lĩnh khác nhau (mỗi lần bấm một key mới) cùng đọc thấy COMPLETED ngoài
+     * transaction rồi cùng trao thưởng — đo thật: 8 lệnh lĩnh đồng thời trao 8 lần EXP. Lần ghi có
+     * điều kiện này khoá dòng tiến độ và chỉ để MỘT giao dịch thắng; các giao dịch khác chờ khoá,
+     * đánh giá lại {@code WHERE} trên bản đã commit và nhận 0 dòng.
+     *
+     * @return {@code false} nếu dòng không còn {@code COMPLETED} (đã có người lĩnh, hoặc chưa xong)
+     *     — khi đó KHÔNG ghi gì, người gọi không được trao thưởng
+     */
+    default boolean markClaimedIfCompleted(Transaction tx, long characterId, long questTemplateId) {
+        throw new UnsupportedOperationException("markClaimedIfCompleted chưa được hiện thực ở " + getClass());
+    }
+
+    /**
      * Ghi tiến độ mới CHỈ KHI dòng vẫn còn {@code IN_PROGRESS} với ĐÚNG {@code expectedProgressJson}
      * — compare-and-set, dùng cho {@code ProcessQuestEventUseCase}.
      *

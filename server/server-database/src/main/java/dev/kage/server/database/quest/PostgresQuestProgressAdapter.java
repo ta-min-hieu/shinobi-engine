@@ -31,6 +31,22 @@ public final class PostgresQuestProgressAdapter implements QuestProgressPort {
                           updated_at = EXCLUDED.updated_at
             """;
 
+    // Nhận quest: khoá chính (character_id, quest_template_id) phán quyết "đã có dòng chưa" thay
+    // cho lần đọc rời ở use case — xem QuestProgressPort.insertIfAbsent. Đang có một lần chèn khác
+    // chưa commit thì câu này CHỜ nó rồi mới quyết (không bao giờ ghi đè).
+    private static final String INSERT_IF_ABSENT = """
+            INSERT INTO character_quest_progress (character_id, quest_template_id, status, progress_json, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (character_id, quest_template_id) DO NOTHING
+            """;
+
+    // Lĩnh thưởng: COMPLETED -> CLAIMED có điều kiện, là câu ĐẦU TIÊN của transaction lĩnh thưởng
+    // (khoá dòng tiến độ trước mọi dòng khác) — xem QuestProgressPort.markClaimedIfCompleted.
+    private static final String MARK_CLAIMED_IF_COMPLETED = """
+            UPDATE character_quest_progress SET status = 'CLAIMED', updated_at = ?
+             WHERE character_id = ? AND quest_template_id = ? AND status = 'COMPLETED'
+            """;
+
     /**
      * Compare-and-set (xem {@code QuestProgressPort.saveIfUnchanged}). Ở mức READ COMMITTED mặc
      * định, câu này chờ mọi lần ghi đang mở trên cùng dòng rồi ĐÁNH GIÁ LẠI {@code WHERE} trên bản
@@ -119,6 +135,28 @@ public final class PostgresQuestProgressAdapter implements QuestProgressPort {
                 progress.status().name(),
                 progress.progressJson(),
                 Timestamp.from(Instant.now()));
+    }
+
+    @Override
+    public boolean insertIfAbsent(Transaction tx, QuestProgress progress) {
+        Connection connection = ((JdbcTransaction) tx).connection();
+        int inserted = JdbcOperations.update(
+                connection,
+                INSERT_IF_ABSENT,
+                progress.characterId(),
+                progress.questTemplateId(),
+                progress.status().name(),
+                progress.progressJson(),
+                Timestamp.from(Instant.now()));
+        return inserted == 1;
+    }
+
+    @Override
+    public boolean markClaimedIfCompleted(Transaction tx, long characterId, long questTemplateId) {
+        Connection connection = ((JdbcTransaction) tx).connection();
+        int updated = JdbcOperations.update(
+                connection, MARK_CLAIMED_IF_COMPLETED, Timestamp.from(Instant.now()), characterId, questTemplateId);
+        return updated == 1;
     }
 
     @Override

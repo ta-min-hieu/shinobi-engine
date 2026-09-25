@@ -62,8 +62,18 @@ public final class ClaimQuestRewardUseCase {
         if (!hasRoomForRewards(characterId, effects.itemGrants())) {
             return ClaimResult.inventoryFull();
         }
+        // Câu kiểm COMPLETED ở trên đọc NGOÀI transaction — chỉ để trả lời nhanh, không bảo vệ gì.
+        // idempotency_key chỉ chặn lần gửi LẠI của cùng một lệnh; hai lần bấm là hai key, và bản cũ
+        // trao thưởng cho MỌI lệnh lĩnh chồng nhau (đo thật: 8 lệnh đồng thời = 8 lần EXP). Đổi
+        // COMPLETED -> CLAIMED có điều kiện là câu ĐẦU TIÊN của transaction: nó khoá dòng tiến độ,
+        // chỉ một giao dịch thắng, các giao dịch khác nhận 0 dòng và không ghi gì cả.
+        boolean[] lostTheClaim = {false};
         try {
             tx.inTransaction((Transaction t) -> {
+                if (!progressPort.markClaimedIfCompleted(t, characterId, template.id())) {
+                    lostTheClaim[0] = true;
+                    return;
+                }
                 rewardPorts.idempotencyPort().recordOrThrow(t, idempotencyKey);
                 rewardPorts.expPort().grantExp(t, characterId, effects.expGranted());
                 for (QuestScriptRunner.ItemGrant itemGrant : effects.itemGrants()) {
@@ -72,12 +82,13 @@ public final class ClaimQuestRewardUseCase {
                             .grantItemByCode(t, characterId, itemGrant.itemTemplateCode(), itemGrant.quantity());
                 }
                 rewardPorts.auditPort().log(t, characterId, "QUEST_CLAIM", detailJson(questCode, effects));
-                QuestProgress claimed =
-                        new QuestProgress(characterId, template.id(), QuestStatus.CLAIMED, progress.progressJson());
-                progressPort.save(t, claimed);
             });
         } catch (IdempotencyKeyReusedException e) {
             return ClaimResult.duplicateRequest();
+        }
+        if (lostTheClaim[0]) {
+            // Đúng câu trả lời lệnh này sẽ nhận nếu tới chậm hơn một nhịp, sau khi lệnh thắng commit.
+            return ClaimResult.notCompletedYet();
         }
 
         List<ClaimResult.ItemReward> items = effects.itemGrants().stream()

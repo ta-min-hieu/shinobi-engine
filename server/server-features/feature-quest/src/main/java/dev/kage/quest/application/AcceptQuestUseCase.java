@@ -43,9 +43,13 @@ public final class AcceptQuestUseCase {
             // character_quest_progress không thể hoàn thành và cũng không thể nhận lại.
             return AcceptResult.SCRIPT_ERROR;
         }
-        tx.inTransaction((Transaction t) -> progressPort.save(
+        // Lần find ở trên chỉ để trả lời nhanh — nó KHÔNG bảo vệ được gì: hai lệnh nhận của cùng
+        // một người chơi chạy song song, và lần chậm từng ghi đè (upsert mù) một quest đã CLAIMED về
+        // IN_PROGRESS tiến độ 0. Khoá chính của dòng tiến độ mới là trọng tài thật.
+        boolean[] inserted = {false};
+        tx.inTransaction((Transaction t) -> inserted[0] = progressPort.insertIfAbsent(
                 t, new QuestProgress(characterId, template.id(), QuestStatus.IN_PROGRESS, effects.progressJson())));
-        return AcceptResult.OK;
+        return inserted[0] ? AcceptResult.OK : AcceptResult.ALREADY_ACCEPTED;
     }
 
     /**

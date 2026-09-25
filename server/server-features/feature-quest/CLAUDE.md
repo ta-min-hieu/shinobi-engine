@@ -112,6 +112,19 @@ dùng cho `ClaimMailUseCase` (Command "nhận 1 lần" gần nhất về ngữ n
 trả `ClaimResult.Outcome.DUPLICATE_REQUEST` (`ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_DUPLICATE_REQUEST
 = 5` ở protocol, additive, cùng số 5 các Command khác đã dùng cho DUPLICATE_REQUEST).
 
+⚠️ **Bản vá trên CHƯA chặn được race thật (phát hiện 2026-09-25).** `idempotency_key` chỉ chặn lần
+gửi LẠI của CÙNG một lệnh; bấm lĩnh hai lần là hai key. Lệnh chạm DB của cùng một kết nối chạy song
+song (mỗi lệnh một Virtual Thread trên `authExecutor`), nên hai lệnh cùng đọc thấy COMPLETED rồi
+cùng trao thưởng — đo thật trên Postgres: **8 lệnh lĩnh đồng thời trao 4000 EXP thay vì 500**. Nay
+câu ĐẦU TIÊN của transaction lĩnh thưởng là `QuestProgressPort.markClaimedIfCompleted`
+(`UPDATE … SET status='CLAIMED' WHERE … AND status='COMPLETED'`): khoá dòng tiến độ, chỉ một giao
+dịch thắng, lệnh thua nhận `NOT_COMPLETED_YET` (đúng câu nó nhận nếu tới chậm một nhịp) và không
+ghi gì — kể cả key. Cùng lượt: nhận quest từng upsert mù sau một lần `find` rời, nên lệnh nhận
+chậm kéo quest đã CLAIMED về IN_PROGRESS tiến độ 0 (làm lại + lĩnh lại được); nay là
+`insertIfAbsent` (`ON CONFLICT DO NOTHING`), khoá chính phán quyết. Gác bởi
+`server-database/.../quest/QuestConcurrencyIntegrationTest`. `save` (upsert mù) nay không còn đường
+sản phẩm nào gọi — đừng dùng lại nó cho một lần ghi có điều kiện.
+
 ## Cứng
 
 ✅ Nội dung quest (điều kiện hoàn thành, công thức thưởng) là SCRIPT (Điều 27) — Java chỉ là cơ chế
