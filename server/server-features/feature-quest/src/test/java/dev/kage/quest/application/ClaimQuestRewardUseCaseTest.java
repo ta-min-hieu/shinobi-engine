@@ -240,7 +240,9 @@ class ClaimQuestRewardUseCaseTest {
 
         assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.NOT_COMPLETED_YET);
         assertThat(expPort.grantedAmount).as("không được trao EXP").isEqualTo(-1L);
-        assertThat(inventoryGrantPort.grantedCode).as("không được trao vật phẩm").isNull();
+        assertThat(inventoryGrantPort.grantedCode)
+                .as("không được trao vật phẩm")
+                .isNull();
         assertThat(auditPort.loggedAction).isNull();
         assertThat(progressPort.saved).isNull();
         progressPort.claimedByAnotherRequest = false;

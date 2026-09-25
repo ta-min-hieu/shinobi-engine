@@ -105,8 +105,7 @@ class GuildConcurrencyIntegrationTest {
         }
     }
 
-    private static void runDisbandVersusApprovals(ExecutorService executor, int round)
-            throws InterruptedException {
+    private static void runDisbandVersusApprovals(ExecutorService executor, int round) throws InterruptedException {
         PostgresGuildAdapter adapter = new PostgresGuildAdapter(dataSource);
         long leader = createFreshCharacter("GDis" + round + "L");
         Guild guild = adapter.createGuild("DisbandRace" + round, leader);
@@ -143,8 +142,12 @@ class GuildConcurrencyIntegrationTest {
             }
         }
 
-        assertThat(failures).as("vòng %d: không lời gọi nào được ném lỗi", round).isEmpty();
-        assertThat(adapter.findById(guild.id())).as("vòng %d: bang phải đã giải tán", round).isEmpty();
+        assertThat(failures)
+                .as("vòng %d: không lời gọi nào được ném lỗi", round)
+                .isEmpty();
+        assertThat(adapter.findById(guild.id()))
+                .as("vòng %d: bang phải đã giải tán", round)
+                .isEmpty();
         assertThat(countRows("SELECT COUNT(*) FROM guild_member WHERE guild_id = ?", guild.id()))
                 .as("vòng %d: không còn thành viên nào của bang đã giải tán", round)
                 .isZero();
@@ -157,7 +160,10 @@ class GuildConcurrencyIntegrationTest {
     private static String describeChain(Throwable failure) {
         StringBuilder text = new StringBuilder();
         for (Throwable current = failure; current != null; current = current.getCause()) {
-            text.append(current.getClass().getSimpleName()).append(": ").append(current.getMessage()).append(" <- ");
+            text.append(current.getClass().getSimpleName())
+                    .append(": ")
+                    .append(current.getMessage())
+                    .append(" <- ");
         }
         return text.toString();
     }
@@ -165,7 +171,8 @@ class GuildConcurrencyIntegrationTest {
     private static long createFreshCharacter(String name) {
         PostgresCharacterAdapter characterAdapter = new PostgresCharacterAdapter(dataSource);
         JdbcCharacterTransactionRunner characterTx = new JdbcCharacterTransactionRunner(dataSource);
-        NewCharacter newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
+        NewCharacter newCharacter =
+                new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
         Character[] holder = new Character[1];
         characterTx.inTransaction(tx -> holder[0] = characterAdapter.create(tx, newCharacter));
         return holder[0].id();

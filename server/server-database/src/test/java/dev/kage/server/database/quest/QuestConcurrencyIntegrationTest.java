@@ -114,8 +114,7 @@ class QuestConcurrencyIntegrationTest {
                 long expBefore = readExp(characterId);
                 int itemsBefore = countItemQuantity(characterId, QUEST_ITEM_REWARD);
 
-                List<ClaimQuestRewardUseCase.ClaimResult.Outcome> outcomes =
-                        claimConcurrently(executor, characterId);
+                List<ClaimQuestRewardUseCase.ClaimResult.Outcome> outcomes = claimConcurrently(executor, characterId);
 
                 assertThat(readExp(characterId) - expBefore)
                         .as("EXP trao ở vòng %d", round)
@@ -258,7 +257,8 @@ class QuestConcurrencyIntegrationTest {
     private static long createFreshCharacter(String name) {
         PostgresCharacterAdapter characterAdapter = new PostgresCharacterAdapter(dataSource);
         JdbcCharacterTransactionRunner characterTx = new JdbcCharacterTransactionRunner(dataSource);
-        NewCharacter newCharacter = new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
+        NewCharacter newCharacter =
+                new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString());
         Character[] holder = new Character[1];
         characterTx.inTransaction(tx -> holder[0] = characterAdapter.create(tx, newCharacter));
         return holder[0].id();
