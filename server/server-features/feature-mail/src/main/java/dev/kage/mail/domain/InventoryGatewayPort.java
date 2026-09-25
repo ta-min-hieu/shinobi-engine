@@ -11,6 +11,18 @@ package dev.kage.mail.domain;
 public interface InventoryGatewayPort {
 
     /**
+     * Xếp hàng sau MỌI transaction khác đang ghi túi đồ của {@code characterId} (cửa hàng, thư,
+     * quest, giao dịch, rơi đồ...), giữ tới hết {@code tx}. PHẢI là lời gọi ĐẦU TIÊN trong
+     * transaction, trước khi khoá dòng thư hay đụng vàng — thứ tự khoá chung của cả server, xem
+     * DATABASE.md §5.1.
+     *
+     * <p>Mặc định không làm gì CHỈ để các fake ở test khỏi phải sửa — adapter thật PHẢI ghi đè.
+     */
+    default void lockInventory(Transaction tx, long characterId) {
+        // Fake trong test: không có transaction thật, không có gì để khoá.
+    }
+
+    /**
      * Thêm {@code quantity} món {@code itemTemplateId} vào túi {@code characterId}.
      *
      * @return {@code true} nếu cấp thành công, {@code false} nếu túi đầy (không đổi gì)

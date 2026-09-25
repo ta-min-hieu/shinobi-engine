@@ -6,6 +6,7 @@ import java.util.List;
 import dev.kage.quest.domain.QuestItemTakePort;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.inventory.CharacterInventoryLock;
 
 /**
  * Hiện thực {@link QuestItemTakePort} trên PostgreSQL — chiều ngược của
@@ -48,6 +49,11 @@ public final class PostgresQuestItemTakeAdapter implements QuestItemTakePort {
             """;
 
     private record TakeableStack(long id, int quantity) {}
+
+    @Override
+    public void lockInventory(Transaction tx, long characterId) {
+        CharacterInventoryLock.acquire(((JdbcTransaction) tx).connection(), characterId);
+    }
 
     @Override
     public boolean takeItemByCode(Transaction tx, long characterId, String itemTemplateCode, int quantity) {

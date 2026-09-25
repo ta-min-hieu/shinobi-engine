@@ -36,6 +36,8 @@ public final class BuyItemUseCase {
         AtomicReference<BuyResult> resultHolder = new AtomicReference<BuyResult>();
         try {
             tx.inTransaction((Transaction t) -> {
+                // Khoá túi đồ ĐẦU TIÊN, trước vàng — thứ tự khoá chung (DATABASE.md §5.1).
+                ports.inventoryGatewayPort().lockInventory(t, characterId);
                 ports.idempotencyPort().recordOrThrow(t, idempotencyKey);
                 if (!ports.goldPort().deductGold(t, characterId, totalCost)) {
                     resultHolder.set(BuyResult.INSUFFICIENT_GOLD);

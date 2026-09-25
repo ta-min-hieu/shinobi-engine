@@ -58,25 +58,30 @@ public final class GrantLootUseCase {
             return List.of();
         }
 
-        Inventory inventory = inventoryPort
-                .findByCharacter(characterId)
-                .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
-
-        // Vị trí do chính Inventory.Added báo về — KHÔNG đoán bằng items().size() - 1 nữa: từ khi
-        // có gộp chồng, item vừa cộng có thể nằm ở một ô CŨ chứ không phải ô cuối. save() giữ
-        // nguyên thứ tự nên chỉ số này tra lại đúng item trong Inventory đã lưu.
+        // Đọc + cộng + lưu trong CÙNG một transaction, đọc sau khoá túi đồ (sửa 2026-09-25): đọc ngoài
+        // transaction thì một lần mua hàng/nhận thư commit chen giữa bị save() coi là "đã gỡ" và xoá
+        // thật. Khoá JVM của InventoryFacade không che được — cửa hàng/thư không đi qua facade.
         ArrayList<int[]> placements = new ArrayList<int[]>(); // {index, soLuongVuaNhan}
-        for (ItemStack stack : drops) {
-            if (inventory.add(stack, maxStackOf(stack)) instanceof Inventory.Added added) {
-                placements.add(new int[] {added.index(), stack.quantity()});
+        AtomicReference<Inventory> savedHolder = new AtomicReference<Inventory>();
+        tx.inTransaction((Transaction t) -> {
+            Inventory inventory = inventoryPort
+                    .findByCharacterForUpdate(t, characterId)
+                    .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
+            // Vị trí do chính Inventory.Added báo về — KHÔNG đoán bằng items().size() - 1 nữa: từ khi
+            // có gộp chồng, item vừa cộng có thể nằm ở một ô CŨ chứ không phải ô cuối. save() giữ
+            // nguyên thứ tự nên chỉ số này tra lại đúng item trong Inventory đã lưu.
+            for (ItemStack stack : drops) {
+                if (inventory.add(stack, maxStackOf(stack)) instanceof Inventory.Added added) {
+                    placements.add(new int[] {added.index(), stack.quantity()});
+                }
             }
-        }
+            if (!placements.isEmpty()) {
+                savedHolder.set(inventoryPort.save(t, inventory));
+            }
+        });
         if (placements.isEmpty()) {
             return List.of();
         }
-
-        AtomicReference<Inventory> savedHolder = new AtomicReference<Inventory>();
-        tx.inTransaction((Transaction t) -> savedHolder.set(inventoryPort.save(t, inventory)));
         List<ItemStack> savedItems = savedHolder.get().items();
 
         ArrayList<ItemStack> granted = new ArrayList<ItemStack>(placements.size());

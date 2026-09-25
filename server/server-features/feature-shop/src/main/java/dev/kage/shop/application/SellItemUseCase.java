@@ -43,6 +43,8 @@ public final class SellItemUseCase {
         AtomicReference<SellResult> resultHolder = new AtomicReference<SellResult>();
         try {
             tx.inTransaction((Transaction t) -> {
+                // Khoá túi đồ ĐẦU TIÊN, trước vàng — thứ tự khoá chung (DATABASE.md §5.1).
+                ports.inventoryGatewayPort().lockInventory(t, characterId);
                 ports.idempotencyPort().recordOrThrow(t, idempotencyKey);
                 RemoveItemOutcome removed =
                         ports.inventoryGatewayPort().removeUnequippedQuantity(t, characterId, itemId, quantity);

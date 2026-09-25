@@ -82,6 +82,22 @@ public final class PostgresInventoryAdapter implements InventoryPort {
         return Optional.of(new Inventory(characterId, DEFAULT_CAPACITY, items));
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Khoá {@link CharacterInventoryLock} TRƯỚC rồi mới đọc: ở READ COMMITTED mỗi câu lệnh thấy
+     * dữ liệu đã commit tại lúc nó chạy, nên câu đọc sau khoá thấy trọn kết quả của người giữ khoá
+     * trước. Không cần {@code FOR UPDATE} từng dòng — mọi đường ghi túi đồ đều xếp hàng ở khoá này.
+     */
+    @Override
+    public Optional<Inventory> findByCharacterForUpdate(Transaction tx, long characterId) {
+        Connection connection = ((JdbcTransaction) tx).connection();
+        CharacterInventoryLock.acquire(connection, characterId);
+        List<ItemStack> items = JdbcOperations.query(
+                connection, FIND_BY_CHARACTER, PostgresInventoryAdapter::mapItemStack, characterId);
+        return Optional.of(new Inventory(characterId, DEFAULT_CAPACITY, items));
+    }
+
     @Override
     public Optional<ItemStack> findOwnedItemForUpdate(Transaction tx, long characterId, long itemId) {
         Connection connection = ((JdbcTransaction) tx).connection();

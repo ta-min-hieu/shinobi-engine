@@ -8,6 +8,7 @@ import java.util.Optional;
 import javax.sql.DataSource;
 
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.inventory.CharacterInventoryLock;
 import dev.kage.server.database.inventory.InventoryStackMerge;
 import dev.kage.trade.domain.OwnedItemSnapshot;
 import dev.kage.trade.domain.TradeInventoryPort;
@@ -67,6 +68,11 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
     @Override
     public Optional<OwnedItemSnapshot> findItemById(long itemId) {
         return JdbcOperations.queryOne(dataSource, FIND_BY_ID, PostgresTradeInventoryAdapter::mapRow, itemId);
+    }
+
+    @Override
+    public void lockInventories(Transaction tx, long characterIdA, long characterIdB) {
+        CharacterInventoryLock.acquireBoth(((JdbcTransaction) tx).connection(), characterIdA, characterIdB);
     }
 
     @Override

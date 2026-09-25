@@ -81,6 +81,9 @@ public final class SendMailUseCase {
         if (senderId == null) {
             return;
         }
+        // Khoá túi đồ người gửi ĐẦU TIÊN, trước vàng — thứ tự khoá chung (DATABASE.md §5.1).
+        // Đây là lời gọi DB đầu tiên của transaction gửi thư.
+        ports.inventoryGatewayPort().lockInventory(t, senderId);
         if (draft.goldAmount() > 0 && !ports.goldPort().deductGold(t, senderId, draft.goldAmount())) {
             throw new SendMailAbortedException(SendOutcome.INSUFFICIENT_GOLD);
         }
