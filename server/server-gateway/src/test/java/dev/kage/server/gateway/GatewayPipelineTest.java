@@ -1011,6 +1011,12 @@ class GatewayPipelineTest {
             public void save(dev.kage.quest.domain.Transaction tx, dev.kage.quest.domain.QuestProgress progress) {}
 
             @Override
+            public boolean markClaimedIfCompleted(
+                    dev.kage.quest.domain.Transaction tx, long characterId, long questTemplateId) {
+                return true;
+            }
+
+            @Override
             public List<dev.kage.quest.domain.QuestLogEntry> listLog(long characterId) {
                 return List.of();
             }

@@ -40,6 +40,7 @@ class AcceptQuestUseCaseTest {
     static final class FakeQuestProgressPort implements QuestProgressPort {
         private QuestProgress existing;
         QuestProgress saved;
+        boolean rowAppearedMeanwhile;
 
         FakeQuestProgressPort(QuestProgress existing) {
             this.existing = existing;
@@ -53,6 +54,16 @@ class AcceptQuestUseCaseTest {
         @Override
         public void save(Transaction tx, QuestProgress progress) {
             this.saved = progress;
+        }
+
+        /** {@code rowAppearedMeanwhile}: một lệnh nhận khác đã chèn dòng sau lần {@code find}. */
+        @Override
+        public boolean insertIfAbsent(Transaction tx, QuestProgress progress) {
+            if (existing != null || rowAppearedMeanwhile) {
+                return false;
+            }
+            this.saved = progress;
+            return true;
         }
     }
 
@@ -91,6 +102,22 @@ class AcceptQuestUseCaseTest {
         assertThat(progressPort.saved).isNotNull();
         assertThat(progressPort.saved.status()).isEqualTo(QuestStatus.IN_PROGRESS);
         assertThat(progressPort.saved.progressJson()).isEqualTo("{\"counter\":0}");
+    }
+
+    /**
+     * Một lệnh nhận khác chèn dòng SAU lần {@code find} của lệnh này (bấm đúp — hai lệnh chạy song
+     * song ở gateway). Bản cũ upsert mù và ghi đè cả quest đã CLAIMED; nay khoá chính phán quyết.
+     */
+    @Test
+    void shouldReturnAlreadyAccepted_whenAConcurrentAcceptInsertedFirst() {
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(null);
+        progressPort.rowAppearedMeanwhile = true;
+        AcceptQuestUseCase useCase = new AcceptQuestUseCase(progressPort, new FakeQuestTemplatePort(), DIRECT_TX);
+
+        AcceptQuestUseCase.AcceptResult result = useCase.execute(CHARACTER_ID, QUEST_CODE);
+
+        assertThat(result).isEqualTo(AcceptQuestUseCase.AcceptResult.ALREADY_ACCEPTED);
+        assertThat(progressPort.saved).isNull();
     }
 
     /**

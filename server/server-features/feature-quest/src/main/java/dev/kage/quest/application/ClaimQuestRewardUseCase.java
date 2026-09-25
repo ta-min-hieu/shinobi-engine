@@ -60,27 +60,38 @@ public final class ClaimQuestRewardUseCase {
             // COMPLETED, key vẫn còn nguyên để lần lĩnh sau dùng lại.
             return ClaimResult.scriptError();
         }
+        // Câu kiểm COMPLETED ở trên đọc NGOÀI transaction — chỉ để trả lời nhanh, không bảo vệ gì.
+        // idempotency_key chỉ chặn lần gửi LẠI của cùng một lệnh; hai lần bấm là hai key, và bản cũ
+        // trao thưởng cho MỌI lệnh lĩnh chồng nhau (đo thật: 8 lệnh đồng thời = 8 lần EXP). Thứ tự
+        // trong transaction (DATABASE.md §5.1): khoá túi đồ ĐẦU TIÊN, hỏi "đủ chỗ" (chưa ghi gì),
+        // rồi đổi COMPLETED -> CLAIMED có điều kiện — chỉ một giao dịch thắng, các giao dịch khác
+        // nhận 0 dòng và không ghi gì cả.
         AtomicBoolean bagHasRoom = new AtomicBoolean(true);
+        AtomicBoolean lostTheClaim = new AtomicBoolean(false);
         try {
             tx.inTransaction((Transaction t) -> {
-                // Khoá túi đồ ĐẦU TIÊN, rồi hỏi "đủ chỗ" trong CHÍNH transaction này (DATABASE.md §5.1).
                 rewardPorts.inventoryGrantPort().lockInventory(t, characterId);
                 if (!hasRoomForRewards(t, characterId, effects.itemGrants())) {
                     bagHasRoom.set(false);
                     return; // chưa ghi gì: quest vẫn COMPLETED, idempotency_key vẫn còn nguyên
                 }
+                if (!progressPort.markClaimedIfCompleted(t, characterId, template.id())) {
+                    lostTheClaim.set(true);
+                    return;
+                }
                 rewardPorts.idempotencyPort().recordOrThrow(t, idempotencyKey);
                 grantRewards(t, characterId, effects);
                 rewardPorts.auditPort().log(t, characterId, "QUEST_CLAIM", detailJson(questCode, effects));
-                QuestProgress claimed =
-                        new QuestProgress(characterId, template.id(), QuestStatus.CLAIMED, progress.progressJson());
-                progressPort.save(t, claimed);
             });
         } catch (IdempotencyKeyReusedException e) {
             return ClaimResult.duplicateRequest();
         }
         if (!bagHasRoom.get()) {
             return ClaimResult.inventoryFull();
+        }
+        if (lostTheClaim.get()) {
+            // Đúng câu trả lời lệnh này sẽ nhận nếu tới chậm hơn một nhịp, sau khi lệnh thắng commit.
+            return ClaimResult.notCompletedYet();
         }
 
         List<ClaimResult.ItemReward> items = effects.itemGrants().stream()

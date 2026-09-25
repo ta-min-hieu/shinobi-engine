@@ -45,6 +45,8 @@ class ClaimQuestRewardUseCaseTest {
     static final class FakeQuestProgressPort implements QuestProgressPort {
         private QuestProgress existing;
         QuestProgress saved;
+        // Một lệnh lĩnh KHÁC đã đổi dòng sang CLAIMED giữa lần find và transaction của lệnh này.
+        boolean claimedByAnotherRequest;
 
         FakeQuestProgressPort(QuestProgress existing) {
             this.existing = existing;
@@ -58,6 +60,19 @@ class ClaimQuestRewardUseCaseTest {
         @Override
         public void save(Transaction tx, QuestProgress progress) {
             this.saved = progress;
+        }
+
+        /**
+         * Không sửa {@code existing}: lần {@code find} kế tiếp vẫn thấy COMPLETED, đúng như một
+         * lệnh lĩnh chồng lên đọc được trước khi lệnh kia commit.
+         */
+        @Override
+        public boolean markClaimedIfCompleted(Transaction tx, long characterId, long questTemplateId) {
+            if (claimedByAnotherRequest || existing == null || existing.status() != QuestStatus.COMPLETED) {
+                return false;
+            }
+            this.saved = new QuestProgress(characterId, questTemplateId, QuestStatus.CLAIMED, existing.progressJson());
+            return true;
         }
     }
 
@@ -203,6 +218,37 @@ class ClaimQuestRewardUseCaseTest {
         ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE, IDEMPOTENCY_KEY);
 
         assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.DUPLICATE_REQUEST);
+    }
+
+    /**
+     * Hai lệnh lĩnh với HAI key khác nhau cùng đọc thấy COMPLETED: lệnh thua không được trao gì, và
+     * key của nó KHÔNG bị đốt (nó không ghi gì cả). Bản cũ trao thưởng cho cả hai.
+     */
+    @Test
+    void shouldGrantNothing_whenAnotherClaimWonTheRace() {
+        QuestProgress progress = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.COMPLETED, "{\"counter\":2}");
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(progress);
+        progressPort.claimedByAnotherRequest = true;
+        FakeExpPort expPort = new FakeExpPort();
+        FakeInventoryGrantPort inventoryGrantPort = new FakeInventoryGrantPort();
+        FakeAuditPort auditPort = new FakeAuditPort();
+        FakeIdempotencyPort idempotencyPort = new FakeIdempotencyPort();
+        ClaimQuestRewardUseCase useCase =
+                newUseCase(progressPort, new QuestRewardPorts(expPort, inventoryGrantPort, auditPort, idempotencyPort));
+
+        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE, IDEMPOTENCY_KEY);
+
+        assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.NOT_COMPLETED_YET);
+        assertThat(expPort.grantedAmount).as("không được trao EXP").isEqualTo(-1L);
+        assertThat(inventoryGrantPort.grantedCode)
+                .as("không được trao vật phẩm")
+                .isNull();
+        assertThat(auditPort.loggedAction).isNull();
+        assertThat(progressPort.saved).isNull();
+        progressPort.claimedByAnotherRequest = false;
+        assertThat(useCase.execute(CHARACTER_ID, QUEST_CODE, IDEMPOTENCY_KEY).outcome())
+                .as("key không bị đốt")
+                .isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
     }
 
     /**
