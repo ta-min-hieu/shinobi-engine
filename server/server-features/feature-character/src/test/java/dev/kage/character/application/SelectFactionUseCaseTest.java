@@ -39,6 +39,11 @@ class SelectFactionUseCaseTest {
         }
 
         @Override
+        public int lockAccountAndCountCharacters(Transaction tx, long accountId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
         public boolean existsByName(String name) {
             throw new UnsupportedOperationException("không dùng trong test này");
         }

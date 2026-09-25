@@ -185,6 +185,11 @@ class ArenaInstanceRegistryConcurrencyTest {
             }
 
             @Override
+            public int lockAccountAndCountCharacters(dev.kage.character.domain.Transaction tx, long accountId) {
+                throw new UnsupportedOperationException("không dùng trong test này");
+            }
+
+            @Override
             public boolean existsByName(String name) {
                 throw new UnsupportedOperationException("không dùng trong test này");
             }

@@ -26,6 +26,8 @@ public final class CreateCharacterUseCase {
     public Character execute(long accountId, String name, String idempotencyKey) {
         Character.validateName(name);
 
+        // Kiểm sớm, KHÔNG khoá — chỉ để account đã đầy khỏi mở transaction. Phép kiểm quyết định là
+        // phép đếm có khoá bên trong transaction phía dưới.
         if (characterPort.countByAccount(accountId) >= MAX_CHARACTERS_PER_ACCOUNT) {
             throw new CharacterLimitExceededException(accountId, MAX_CHARACTERS_PER_ACCOUNT);
         }
@@ -36,7 +38,15 @@ public final class CreateCharacterUseCase {
         NewCharacter newCharacter = new NewCharacter(accountId, name, Faction.HOA, idempotencyKey);
         AtomicReference<Character> holder = new AtomicReference<Character>();
         try {
-            transactionRunner.inTransaction(tx -> holder.set(characterPort.create(tx, newCharacter)));
+            transactionRunner.inTransaction(tx -> {
+                // Đếm lại SAU khi khoá account, trong CÙNG transaction với INSERT: các lượt tạo đồng
+                // thời trên cùng account xếp hàng ở đây (race vượt giới hạn, vá 2026-09-25). Ném ra
+                // ⇒ transaction rollback, chưa ghi gì (khoá là thao tác đầu tiên).
+                if (characterPort.lockAccountAndCountCharacters(tx, accountId) >= MAX_CHARACTERS_PER_ACCOUNT) {
+                    throw new CharacterLimitExceededException(accountId, MAX_CHARACTERS_PER_ACCOUNT);
+                }
+                holder.set(characterPort.create(tx, newCharacter));
+            });
         } catch (CharacterNameTakenException e) {
             // existsByName ở trên chỉ là kiểm sớm, không nguyên tử với INSERT: người khác có thể lấy
             // đúng tên này ngay giữa hai bước. Báo cùng một lỗi như đường thường.

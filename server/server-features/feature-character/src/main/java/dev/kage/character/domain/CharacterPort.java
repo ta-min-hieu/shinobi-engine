@@ -11,7 +11,24 @@ public interface CharacterPort {
 
     List<Character> listByAccount(long accountId);
 
+    /** Đếm KHÔNG khoá — chỉ để hiển thị/kiểm sớm. Để THI HÀNH giới hạn, dùng {@link #lockAccountAndCountCharacters}. */
     int countByAccount(long accountId);
+
+    /**
+     * Khoá account trong transaction đang mở rồi mới đếm số nhân vật của nó — phép đếm dùng để thi
+     * hành giới hạn nhân vật/account.
+     *
+     * <p>Khoá giữ đến hết transaction, nên mọi lượt tạo nhân vật khác trên CÙNG account phải chờ
+     * lượt này commit/rollback rồi mới đếm được: "đếm rồi INSERT" trở thành nguyên tử theo account.
+     * Không có khoá này, nhiều lượt tạo đồng thời cùng đọc "3 &lt; 4" và cùng INSERT (đo thật
+     * 2026-09-25: 8 lượt song song trên account có 3 nhân vật ⇒ 11 nhân vật).
+     *
+     * <p>Phải là thao tác ĐẦU TIÊN có khoá trong transaction tạo nhân vật (thứ tự khoá: account
+     * trước, rồi mới tới các dòng INSERT) — xem {@code PostgresCharacterAdapter}.
+     *
+     * @return số nhân vật hiện có của account, đọc SAU khi đã giữ khoá
+     */
+    int lockAccountAndCountCharacters(Transaction tx, long accountId);
 
     /** Tên đã trùng (bất kỳ account nào — UNIQUE toàn server, DATABASE.md §2.1) → Optional rỗng. */
     boolean existsByName(String name);

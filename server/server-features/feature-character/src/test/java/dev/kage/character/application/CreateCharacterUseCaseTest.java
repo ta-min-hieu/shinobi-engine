@@ -62,6 +62,11 @@ class CreateCharacterUseCaseTest {
         }
 
         @Override
+        public int lockAccountAndCountCharacters(Transaction tx, long accountId) {
+            return countByAccount(accountId);
+        }
+
+        @Override
         public boolean existsByName(String name) {
             return characters.stream().anyMatch(c -> c.name().equals(name));
         }
@@ -180,6 +185,25 @@ class CreateCharacterUseCaseTest {
         assertThatThrownBy(() -> useCase.execute(1L, "OneMore", "idem-extra"))
                 .isInstanceOf(CharacterLimitExceededException.class);
         assertThat(port.characters).hasSize(CreateCharacterUseCase.MAX_CHARACTERS_PER_ACCOUNT);
+    }
+
+    /**
+     * Lượt tạo khác trên cùng account commit GIỮA phép kiểm sớm (không khoá) và lúc transaction
+     * giữ khoá account — chỉ phép đếm có khoá thấy account đã đầy. Không được INSERT.
+     */
+    @Test
+    void shouldRejectWhenLimitIsReachedBetweenEarlyCheckAndLockedCount() {
+        FakeCharacterPort port = new FakeCharacterPort() {
+            @Override
+            public int lockAccountAndCountCharacters(Transaction tx, long accountId) {
+                return CreateCharacterUseCase.MAX_CHARACTERS_PER_ACCOUNT;
+            }
+        };
+        CreateCharacterUseCase useCase = new CreateCharacterUseCase(port, DIRECT_TX);
+
+        assertThatThrownBy(() -> useCase.execute(1L, "KageHero", "idem-1"))
+                .isInstanceOf(CharacterLimitExceededException.class);
+        assertThat(port.characters).isEmpty();
     }
 
     @Test
