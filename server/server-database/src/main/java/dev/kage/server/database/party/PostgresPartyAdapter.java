@@ -11,6 +11,7 @@ import java.util.Optional;
 import javax.sql.DataSource;
 
 import dev.kage.party.domain.DuplicatePartyInviteException;
+import dev.kage.party.domain.DuplicatePartyMembershipException;
 import dev.kage.party.domain.Party;
 import dev.kage.party.domain.PartyInvite;
 import dev.kage.party.domain.PartyMember;
@@ -41,8 +42,11 @@ public final class PostgresPartyAdapter implements PartyPort {
             INSERT INTO party (leader_character_id, created_at) VALUES (?, ?) RETURNING id
             """;
 
+    // ON CONFLICT (character_id) DO NOTHING — xem insertMember: nhân vật vào 2 party cùng lúc thì
+    // bên sau CHỜ bên trước commit rồi nhận 0 dòng, thay vì unique_violation làm hỏng transaction.
     private static final String INSERT_MEMBER = """
             INSERT INTO party_member (party_id, character_id, role, joined_at) VALUES (?, ?, ?, ?)
+             ON CONFLICT (character_id) DO NOTHING
             """;
 
     private static final String FIND_PENDING_INVITE_OF_INVITEE = """
@@ -135,7 +139,10 @@ public final class PostgresPartyAdapter implements PartyPort {
             Instant now = Instant.now();
             long partyId =
                     JdbcOperations.insertReturningId(connection, INSERT_PARTY, leaderCharacterId, Timestamp.from(now));
-            insertMember(connection, new NewMember(partyId, leaderCharacterId, PartyRole.LEADER, now));
+            if (!insertMember(connection, new NewMember(partyId, leaderCharacterId, PartyRole.LEADER, now))) {
+                // Ném để JdbcTransactionRunner rollback CẢ dòng party vừa insert — không để party mồ côi.
+                throw new DuplicatePartyMembershipException(leaderCharacterId);
+            }
             return new Party(partyId, leaderCharacterId, now);
         });
     }
@@ -217,9 +224,13 @@ public final class PostgresPartyAdapter implements PartyPort {
             deleteInvite(connection, inviteId);
             return AcceptResult.PARTY_FULL;
         }
-        insertMember(connection, new NewMember(partyId.get(), characterId, PartyRole.MEMBER, Instant.now()));
+        boolean joined =
+                insertMember(connection, new NewMember(partyId.get(), characterId, PartyRole.MEMBER, Instant.now()));
         deleteInvite(connection, inviteId);
-        return AcceptResult.OK;
+        // isAlreadyMember ở trên không thấy transaction CHƯA commit của party khác — invitee vừa vào
+        // party đó đồng thời (chấp nhận lời mời khác, hoặc tự tạo party). Lời mời này hết hạn như
+        // nhánh ALREADY_IN_PARTY thường: đã xoá ở trên, không treo lại.
+        return joined ? AcceptResult.OK : AcceptResult.ALREADY_IN_PARTY;
     }
 
     /** {@code true} nếu dòng {@code party} còn tồn tại — đã khoá FOR UPDATE khi trả {@code true}. */
@@ -241,14 +252,29 @@ public final class PostgresPartyAdapter implements PartyPort {
     /** Gói tham số cho {@link #insertMember} — tránh vượt 4 tham số Checkstyle {@code ParameterNumber}. */
     private record NewMember(long partyId, long characterId, PartyRole role, Instant joinedAt) {}
 
-    private static void insertMember(Connection connection, NewMember member) {
-        JdbcOperations.update(
-                connection,
-                INSERT_MEMBER,
-                member.partyId(),
-                member.characterId(),
-                member.role().name(),
-                Timestamp.from(member.joinedAt()));
+    /**
+     * {@code false} nếu nhân vật đã ở party khác (UNIQUE {@code party_member.character_id}).
+     *
+     * <p>⚠️ Race THẬT (xem {@code PartyMembershipRaceIntegrationTest}): 1 nhân vật vào 2 party cùng
+     * lúc — chấp nhận 2 lời mời, tạo party trong lúc chấp nhận lời mời, hoặc tạo party 2 lần. Kiểm
+     * "đã ở party chưa" trước đó (application/ hoặc {@link #isAlreadyMember}) không thấy transaction
+     * chưa commit của bên kia. Bản cũ để INSERT ném unique_violation → {@code
+     * DatabaseAccessException} chung chung → client nhận {@code error.server_internal} thay vì
+     * "đã ở trong nhóm". {@code ON CONFLICT DO NOTHING} (không phải bắt unique_violation như {@code
+     * DuplicateGuildMembershipException} của guild) vì nhánh chấp nhận cần TIẾP TỤC transaction để
+     * xoá lời mời — unique_violation đánh dấu cả transaction là aborted, phải thêm SAVEPOINT.
+     * Postgres vẫn CHỜ bên kia commit/rollback trước khi quyết định có xung đột hay không, nên kết
+     * quả luôn đúng.
+     */
+    private static boolean insertMember(Connection connection, NewMember member) {
+        return JdbcOperations.update(
+                        connection,
+                        INSERT_MEMBER,
+                        member.partyId(),
+                        member.characterId(),
+                        member.role().name(),
+                        Timestamp.from(member.joinedAt()))
+                > 0;
     }
 
     private static void deleteInvite(Connection connection, long inviteId) {
