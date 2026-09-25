@@ -17,7 +17,12 @@ public interface PartyPort {
 
     List<PartyMember> listMembers(long partyId);
 
-    /** Tạo party mới + thêm {@code leaderCharacterId} làm {@link PartyRole#LEADER}, nguyên tử. */
+    /**
+     * Tạo party mới + thêm {@code leaderCharacterId} làm {@link PartyRole#LEADER}, nguyên tử.
+     *
+     * @throws DuplicatePartyMembershipException nếu {@code leaderCharacterId} vừa vào party khác
+     *     (race với 1 lệnh tạo/chấp nhận khác của CHÍNH nhân vật này) — không có gì được ghi
+     */
     Party createParty(long leaderCharacterId);
 
     /**
@@ -59,7 +64,10 @@ public interface PartyPort {
         OK,
         /** Không tìm thấy lời mời, HOẶC {@code characterId} không phải invitee của lời mời đó. */
         NOT_FOUND,
-        /** Invitee đã vào party KHÁC giữa lúc được mời và lúc chấp nhận — lời mời hết hạn, bị xoá. */
+        /**
+         * Invitee đã vào party KHÁC giữa lúc được mời và lúc chấp nhận (kể cả party kia commit
+         * ĐỒNG THỜI với lần chấp nhận này) — lời mời hết hạn, bị xoá.
+         */
         ALREADY_IN_PARTY,
         /** Party đã đủ {@link Party#MAX_MEMBERS} do lời mời khác được chấp nhận trước — lời mời bị xoá. */
         PARTY_FULL

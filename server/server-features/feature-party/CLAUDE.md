@@ -15,6 +15,7 @@ application/    CreatePartyUseCase · InvitePartyMemberUseCase · AcceptPartyInv
                 ParameterNumber, cùng tinh thần GuildUseCases/FriendUseCases)
 domain/         Party (aggregate, có hằng số MAX_MEMBERS=5) · PartyMember (VO) · PartyInvite (VO)
                 PartyRole (enum) · PartyPort · DuplicatePartyInviteException
+                DuplicatePartyMembershipException
 ```
 
 Chiều: `api → application → domain`. **`domain/` không import gì bên ngoài** — adapter thật
@@ -39,7 +40,11 @@ thành viên vào sớm nhất (`joined_at` nhỏ nhất còn lại) làm leader
   được chấp nhận đồng thời vượt quá 5 (không có UNIQUE/CHECK constraint nào ở DB bắt được việc này,
   phải khoá dòng thủ công, cùng lý do `approveJoinRequest` của feature-guild cần SAVEPOINT).
 - **1 nhân vật tối đa 1 party tại 1 thời điểm** — ràng buộc ở tầng DB (`party_member.character_id
-  UNIQUE`), không chỉ ở application/.
+  UNIQUE`), không chỉ ở application/. Bên THUA race (1 nhân vật vào 2 party cùng lúc) phải ra
+  outcome "đã ở trong nhóm", không phải lỗi chung: `insertMember` dùng `ON CONFLICT (character_id)
+  DO NOTHING` → `acceptInvite` trả `ALREADY_IN_PARTY` (xoá lời mời), `createParty` ném
+  `DuplicatePartyMembershipException` (rollback cả dòng `party`) → `CreatePartyUseCase` dịch thành
+  `ALREADY_IN_PARTY`. Bằng chứng: `PartyMembershipRaceIntegrationTest` (2026-09-25).
 - **`leaveParty` xử lý CẢ 2 vai trò** (khác feature-guild tách `LeaveGuildUseCase`/
   `DisbandGuildUseCase` riêng) — MEMBER rời chỉ xoá dòng; LEADER rời tự động thăng người vào sớm
   nhất còn lại (UPDATE role + `party.leader_character_id`) hoặc xoá luôn party nếu là người cuối.
