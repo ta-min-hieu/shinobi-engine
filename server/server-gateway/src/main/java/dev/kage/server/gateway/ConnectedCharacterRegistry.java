@@ -122,6 +122,8 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     }
 
     void unregister(long characterId) {
+        // Thứ tự bắt buộc: xoá khỏi contextsByCharacterId TRƯỚC lastKnownPosition — xem
+        // trackPositionIfConnected, đó là thứ khiến một onMoveAccepted muộn không đẻ lại dòng vị trí.
         contextsByCharacterId.remove(characterId);
         lastKnownPosition.remove(characterId);
         appearanceByCharacterId.remove(characterId);
@@ -180,8 +182,30 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         // z KHÔNG vào PositionSnapshot/DB (ADR-033) — nhân vật luôn hồi sinh/đăng nhập lại ở mặt
         // đất z=0 (WorldFacade.respawnCharacter), nên trục dọc là trạng thái CHỈ SỐNG TRONG TICK,
         // không cần bền vững. Chỉ x/y (mặt đất) mới cần cho CharacterPositionPersister.
-        lastKnownPosition.put(accepted.characterId(), new PositionSnapshot(accepted.x(), accepted.y()));
+        trackPositionIfConnected(accepted.characterId(), accepted.x(), accepted.y());
         sendMoveResponseWithoutTrackingPosition(accepted);
+    }
+
+    /**
+     * Ghi vị trí mới nhất CHỈ KHI nhân vật còn đăng ký — nguyên tử với {@link #unregister}.
+     *
+     * <p><b>Vì sao không {@code put} thẳng.</b> {@code onMoveAccepted}/{@code onCharacterRespawned}
+     * chạy trên world tick thread, còn {@link #unregister} chạy trên EventLoop và CHỈ SAU ĐÓ mới
+     * xếp {@code detachCharacter} vào inbox của world. Mọi lệnh di chuyển đã nằm trong inbox trước
+     * lệnh detach vẫn được world xử lý và gọi {@code onMoveAccepted} SAU {@code unregister} —
+     * {@code put} thẳng sẽ đẻ lại một dòng trong {@code lastKnownPosition} cho nhân vật đã thoát:
+     * rò rỉ vĩnh viễn, và {@code CharacterPositionPersister} ghi nó xuống DB ở MỌI lượt định kỳ.
+     * Kiểm {@code containsKey} rồi mới {@code put} cũng không đủ (unregister có thể chen giữa hai
+     * bước). {@code computeIfPresent} giữ khoá bin của khoá này trong {@code contextsByCharacterId}
+     * suốt lúc ghi, còn {@link #unregister} xoá khỏi {@code contextsByCharacterId} TRƯỚC rồi mới
+     * xoá {@code lastKnownPosition} — nên hoặc lần ghi chạy trọn trước và bị unregister dọn, hoặc
+     * nó thấy nhân vật đã vắng mặt và không ghi gì.
+     */
+    private void trackPositionIfConnected(long characterId, float x, float y) {
+        contextsByCharacterId.computeIfPresent(characterId, (id, ctx) -> {
+            lastKnownPosition.put(id, new PositionSnapshot(x, y));
+            return ctx;
+        });
     }
 
     /**
@@ -438,7 +462,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         if (ctx == null) {
             return;
         }
-        lastKnownPosition.put(respawn.characterId(), new PositionSnapshot(respawn.x(), respawn.y()));
+        trackPositionIfConnected(respawn.characterId(), respawn.x(), respawn.y());
         CharacterRespawnedEvent event = CharacterRespawnedEvent.newBuilder()
                 .setX(respawn.x())
                 .setY(respawn.y())
