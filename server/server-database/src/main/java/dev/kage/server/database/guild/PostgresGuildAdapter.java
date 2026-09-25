@@ -92,6 +92,19 @@ public final class PostgresGuildAdapter implements GuildPort {
             INSERT INTO guild_join_request (guild_id, character_id, requested_at) VALUES (?, ?, ?) RETURNING id
             """;
 
+    // KHÔNG khoá — chỉ để biết cần khoá dòng guild nào TRƯỚC khi khoá dòng đơn (xem
+    // approveJoinRequest javadoc cho lý do thứ tự khoá).
+    private static final String FIND_REQUEST_GUILD_ID = """
+            SELECT guild_id FROM guild_join_request WHERE id = ?
+            """;
+
+    // FOR NO KEY UPDATE, không FOR UPDATE: xung đột với DELETE của disbandGuild (đúng thứ cần xếp
+    // hàng) nhưng KHÔNG chặn FOR KEY SHARE mà lần kiểm FK của sendJoinRequest/INSERT guild_member
+    // của giao dịch khác cần trên cùng dòng này.
+    private static final String LOCK_GUILD = """
+            SELECT id FROM guild WHERE id = ? FOR NO KEY UPDATE
+            """;
+
     private static final String SELECT_JOIN_REQUEST_FOR_APPROVAL = """
             SELECT gjr.character_id, gjr.guild_id, g.leader_character_id
               FROM guild_join_request gjr JOIN guild g ON g.id = gjr.guild_id
@@ -219,11 +232,29 @@ public final class PostgresGuildAdapter implements GuildPort {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>⚠️ Deadlock THẬT tìm được 2026-09-25 (xem {@code GuildConcurrencyIntegrationTest}): bản cũ
+     * khoá dòng {@code guild_join_request} (FOR UPDATE) RỒI MỚI chạm dòng {@code guild} — qua lần
+     * kiểm FK của INSERT {@code guild_member}. {@link #disbandGuild} làm NGƯỢC lại: DELETE dòng
+     * {@code guild} trước, rồi CASCADE sang dòng đơn đang bị khoá. Leader bấm "Giải tán" đúng lúc
+     * một lần "Duyệt" đang chạy ⇒ Postgres huỷ ngẫu nhiên một bên bằng "deadlock detected" — cùng họ
+     * lỗi thứ tự khoá của {@code PostgresPartyAdapter#acceptInvite} (2026-09-23).
+     *
+     * <p>Vá bằng cách khoá dòng {@code guild} TRƯỚC (đọc {@code guild_id} không khoá để biết khoá dòng
+     * nào), cùng thứ tự {@link #disbandGuild}. Bang đã bị giải tán thì trả {@code NOT_FOUND} — CASCADE
+     * đã xoá đơn.
+     */
     @Override
     public ApproveResult approveJoinRequest(long requestId, long leaderCharacterId) {
         try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
+                if (!lockGuildOfRequest(connection, requestId)) {
+                    connection.rollback();
+                    return ApproveResult.NOT_FOUND;
+                }
                 Optional<PendingApproval> approval = selectForApproval(connection, requestId);
                 if (approval.isEmpty() || approval.get().guildLeaderCharacterId() != leaderCharacterId) {
                     connection.rollback();
@@ -240,6 +271,26 @@ public final class PostgresGuildAdapter implements GuildPort {
             }
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi duyệt đơn xin gia nhập: requestId=" + requestId, e);
+        }
+    }
+
+    /** {@code true} nếu đơn và bang của nó còn tồn tại — dòng {@code guild} đã bị khoá khi trả {@code true}. */
+    private static boolean lockGuildOfRequest(Connection connection, long requestId) throws SQLException {
+        long guildId;
+        try (PreparedStatement find = connection.prepareStatement(FIND_REQUEST_GUILD_ID)) {
+            find.setLong(1, requestId);
+            try (ResultSet rs = find.executeQuery()) {
+                if (!rs.next()) {
+                    return false;
+                }
+                guildId = rs.getLong("guild_id");
+            }
+        }
+        try (PreparedStatement lock = connection.prepareStatement(LOCK_GUILD)) {
+            lock.setLong(1, guildId);
+            try (ResultSet rs = lock.executeQuery()) {
+                return rs.next();
+            }
         }
     }
 

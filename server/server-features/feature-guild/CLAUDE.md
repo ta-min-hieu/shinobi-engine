@@ -48,6 +48,11 @@ Dialogue ở Phase 6).
 - **`createGuild`/`approveJoinRequest` nguyên tử bằng transaction thủ công trong adapter** (không
   `TransactionRunner` riêng) — cả 2 bảng liên quan đều thuộc feature-guild, không xuyên feature
   khác như shop/quest cần gọi ngược `server-world`.
+- **Thứ tự khoá: dòng `guild` TRƯỚC dòng `guild_join_request`** (2026-09-25). `approveJoinRequest`
+  bản cũ khoá đơn trước rồi mới chạm `guild` (qua kiểm FK của INSERT `guild_member`), còn
+  `disbandGuild` DELETE `guild` rồi CASCADE sang đơn — ngược thứ tự ⇒ deadlock THẬT khi leader giải
+  tán đúng lúc đang duyệt (`GuildConcurrencyIntegrationTest`, đỏ ngay vòng 1). Nay duyệt khoá
+  `guild` `FOR NO KEY UPDATE` trước. Mọi giao dịch mới chạm cả hai bảng phải giữ đúng thứ tự này.
 - **Test application/ dùng 1 `FakeGuildPort` DÙNG CHUNG** (test-fixture package riêng), KHÔNG lặp
   lại nested Fake ở mỗi file test như feature-friend — `GuildPort` có 13 method, lặp lại 9+ lần sẽ
   là trùng lặp thật (không phải "3 dòng giống nhau", CLAUDE.md §"cấm kỵ" ưu tiên maintainability),
