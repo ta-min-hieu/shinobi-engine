@@ -60,6 +60,14 @@ public final class ClaimQuestRewardUseCase {
             // COMPLETED, key vẫn còn nguyên để lần lĩnh sau dùng lại.
             return ClaimResult.scriptError();
         }
+        return claimInTransaction(new ClaimRequest(characterId, template.id(), questCode, idempotencyKey), effects);
+    }
+
+    /**
+     * Phần ghi của lượt lĩnh — một transaction duy nhất; mọi nhánh từ chối trả về khi CHƯA ghi gì.
+     */
+    private ClaimResult claimInTransaction(ClaimRequest request, QuestScriptRunner.HookEffects effects) {
+        long characterId = request.characterId();
         // Câu kiểm COMPLETED ở trên đọc NGOÀI transaction — chỉ để trả lời nhanh, không bảo vệ gì.
         // idempotency_key chỉ chặn lần gửi LẠI của cùng một lệnh; hai lần bấm là hai key, và bản cũ
         // trao thưởng cho MỌI lệnh lĩnh chồng nhau (đo thật: 8 lệnh đồng thời = 8 lần EXP). Thứ tự
@@ -75,13 +83,13 @@ public final class ClaimQuestRewardUseCase {
                     bagHasRoom.set(false);
                     return; // chưa ghi gì: quest vẫn COMPLETED, idempotency_key vẫn còn nguyên
                 }
-                if (!progressPort.markClaimedIfCompleted(t, characterId, template.id())) {
+                if (!progressPort.markClaimedIfCompleted(t, characterId, request.questId())) {
                     lostTheClaim.set(true);
                     return;
                 }
-                rewardPorts.idempotencyPort().recordOrThrow(t, idempotencyKey);
+                rewardPorts.idempotencyPort().recordOrThrow(t, request.idempotencyKey());
                 grantRewards(t, characterId, effects);
-                rewardPorts.auditPort().log(t, characterId, "QUEST_CLAIM", detailJson(questCode, effects));
+                rewardPorts.auditPort().log(t, characterId, "QUEST_CLAIM", detailJson(request.questCode(), effects));
             });
         } catch (IdempotencyKeyReusedException e) {
             return ClaimResult.duplicateRequest();
@@ -99,6 +107,9 @@ public final class ClaimQuestRewardUseCase {
                 .toList();
         return ClaimResult.ok(effects.expGranted(), items);
     }
+
+    /** Định danh một lệnh lĩnh — gom lại để phần ghi không vượt trần tham số. */
+    private record ClaimRequest(long characterId, long questId, String questCode, String idempotencyKey) {}
 
     /** Trao EXP + từng món thưởng trong transaction đang mở (đã khoá túi đồ, đã kiểm đủ chỗ). */
     private void grantRewards(Transaction t, long characterId, QuestScriptRunner.HookEffects effects) {
