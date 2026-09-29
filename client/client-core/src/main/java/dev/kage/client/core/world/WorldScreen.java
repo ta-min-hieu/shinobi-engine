@@ -191,6 +191,15 @@ public final class WorldScreen implements GameScreen {
 
     /** Đưa người chơi về màn đăng nhập — màn chọn nhân vật cài vào, xem {@link #setOnSessionEnded}. */
     private java.util.function.Consumer<String> onSessionEnded = errorKey -> {};
+
+    /** Tự đăng nhập lại khi đứt mạng (quyết định chủ dự án 2026-09-29) — xem {@link #enableAutoRelog}. */
+    private final AutoRelog relog;
+
+    /**
+     * {@link EcsWorld} đã được trả lại cho màn world KẾ TIẾP ({@link #releaseWorld}) — {@link #dispose}
+     * không được xoá nó lần nữa, vì lúc đó nó đang chứa nhân vật và System của màn mới.
+     */
+    private boolean worldReleased;
     /** Hòm thư (phím M) — mượn skin của {@link #combatHud} như {@link #chatPanel}. */
     private final MailPanel mailPanel = new MailPanel(combatHud.skin());
 
@@ -262,6 +271,7 @@ public final class WorldScreen implements GameScreen {
         this.world = context.world();
         this.inputMapper = context.inputMapper();
         this.sender = new WorldCommandSender(connection);
+        this.relog = new AutoRelog(sender, character.getId());
         this.localCharacterId = character.getId();
         this.characterLevel = character.getLevel();
         this.combatHudController = new CombatHudController(character.getId(), character.getFaction());
@@ -512,6 +522,35 @@ public final class WorldScreen implements GameScreen {
         this.onSessionEnded = onSessionEnded;
     }
 
+    /**
+     * Bật tự đăng nhập lại khi đường truyền đứt thật (quyết định chủ dự án 2026-09-29): nối lại,
+     * đăng nhập bằng {@code username}, chọn lại ĐÚNG nhân vật này rồi giao gói vào world cho
+     * {@code onResumed} dựng một màn world mới. Hỏng hẳn (hết lượt, hoặc server từ chối) thì đi
+     * đường {@link #setOnSessionEnded} kèm lý do. Bị đá vì đăng nhập nơi khác thì KHÔNG BAO GIỜ tự
+     * vào lại — xem {@link SessionRecovery}.
+     *
+     * <p>Lúc {@code onResumed} chạy, màn này đã trả {@link EcsWorld} lại (đã dọn sạch) cho màn mới —
+     * màn mới phải được dựng NGAY trong lời gọi đó và thay màn này.
+     *
+     * @param username tên đăng nhập của phiên hiện tại — giao thức chỉ đăng nhập bằng tên (ADR-017),
+     *     không có mật khẩu hay token trình lại được
+     * @param onResumed nhận {@code CharacterSummary} MỚI NHẤT (cấp/hệ phái có thể đã đổi) và gói vào
+     *     world
+     */
+    public void enableAutoRelog(
+            String username, java.util.function.BiConsumer<CharacterSummary, SelectCharacterResponse> onResumed) {
+        relog.enable(
+                username,
+                (character, enterWorld) -> {
+                    releaseWorld();
+                    onResumed.accept(character, enterWorld);
+                },
+                errorKey -> {
+                    sessionEndedKey = errorKey;
+                    endSession();
+                });
+    }
+
     @Override
     public void show() {
         // Input di chuyển/nhảy/skill vẫn poll qua InputMapper (không đổi) — chỉ CLICK chọn mục tiêu
@@ -545,9 +584,21 @@ public final class WorldScreen implements GameScreen {
         // TRƯỚC processInboundPackets: nếu đường truyền vừa đứt thì hàng đợi đang rỗng, và người
         // chơi nên biết lý do trước khi ngồi nhìn một thế giới đứng im.
         connection.onTick(sender.isConnected());
+        if (relog.isRecovering()) {
+            // Thế giới đứng im: không gửi ý định, không đọc gói gameplay — gói lúc này là của cỗ máy
+            // đăng nhập lại; gói sau SelectCharacterResponse được để lại cho màn world mới.
+            relog.tick(fixedDeltaTime);
+            return;
+        }
+        // Gói TRƯỚC, quyết định SAU: server gửi lời đá rồi mới đóng socket, nên lúc thấy socket đứt
+        // thì lời đá (nếu có) đã nằm trong hàng đợi — xử lý nó trước là điều kiện để một cú bị đá
+        // không bao giờ bị hiểu nhầm thành mạng đứt rồi tự vào lại.
         processInboundPackets();
         if (sessionEndedKey != null) {
             endSession();
+            return;
+        }
+        if (relog.startIfSessionLost()) {
             return;
         }
         intents.tick(fixedDeltaTime);
@@ -572,9 +623,21 @@ public final class WorldScreen implements GameScreen {
      */
     private void endSession() {
         String errorKey = sessionEndedKey;
-        LOG.warn("Server kết thúc phiên: error_key={}", errorKey);
+        LOG.warn("Phiên kết thúc: error_key={}", errorKey);
         sender.stop();
         onSessionEnded.accept(errorKey);
+    }
+
+    /**
+     * Trả {@link EcsWorld} (đã dọn sạch) cho màn world mới của phiên vừa phục hồi. Phải chạy TRƯỚC
+     * khi màn mới được dựng: {@code KageEngine#setScreen} chỉ dispose màn này SAU khi màn mới đã
+     * dựng xong (đối số được tính trước), nên nếu để {@link #dispose} dọn như thường lệ thì nó xoá
+     * mất nhân vật và System của chính màn mới.
+     */
+    private void releaseWorld() {
+        LOG.info("Đã vào lại world với nhân vật {}", localCharacterId);
+        world.clear();
+        worldReleased = true;
     }
 
     private void dispatch(PacketCodec.Frame frame) {
@@ -932,7 +995,9 @@ public final class WorldScreen implements GameScreen {
         // EcsWorld là của engine và sống suốt đời ứng dụng, còn System/entity ở trong là của RIÊNG
         // phiên này (installMovementSystems, nhân vật, quái...). Rời màn hình mà không dọn thì lần
         // vào world sau đăng ký System di chuyển LẦN HAI — dự đoán cục bộ chạy nhanh gấp đôi.
-        world.clear();
+        if (!worldReleased) {
+            world.clear();
+        }
         shapeRenderer.dispose();
         models.dispose();
         // TRƯỚC combatHud: combatFeedback mượn font của HUD, dispose HUD trước là kéo font ra khỏi

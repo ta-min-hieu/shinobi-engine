@@ -264,7 +264,8 @@ public final class LoginScreen implements GameScreen {
     private void handleCharacterList(byte[] payload) {
         try {
             ListCharactersResponse response = ListCharactersResponse.parseFrom(payload);
-            engine.setScreen(new CharacterSelectScreen(engine, context, connection, response.getCharactersList()));
+            engine.setScreen(new CharacterSelectScreen(
+                    engine, context, new AccountSession(connection, username), response.getCharactersList()));
         } catch (InvalidProtocolBufferException e) {
             LOG.warn("ListCharactersResponse không hợp lệ", e);
             failWithGenericError();

@@ -86,7 +86,7 @@ import dev.kage.protocol.wire.PacketCodec;
  * lại. Vì vậy mọi hàm ở đây nuốt {@link IOException} xuống mức {@code debug} — đây là ngoại lệ CÓ
  * CHỦ ĐÍCH của "cấm nuốt exception" (/CLAUDE.md §11), không phải quên xử lý.
  */
-final class WorldCommandSender {
+final class WorldCommandSender implements SessionRecovery.Link {
 
     private static final Logger LOG = LoggerFactory.getLogger(WorldCommandSender.class);
 
@@ -603,13 +603,32 @@ final class WorldCommandSender {
     }
 
     /** Gói tin đến từ server — {@code null} khi hàng đợi rỗng (xem {@link GameConnection}). */
-    PacketCodec.Frame pollInbound() {
+    @Override
+    public PacketCodec.Frame pollInbound() {
         return connection.pollInbound();
     }
 
     /** Uỷ nhiệm thẳng, cùng khuôn {@link #pollInbound()} — xem {@code ConnectionCoordinator#onTick}. */
-    boolean isConnected() {
+    @Override
+    public boolean isConnected() {
         return connection.isConnected();
+    }
+
+    /** Uỷ nhiệm thẳng — xem {@link GameConnection#connectionGeneration()} và {@link SessionRecovery}. */
+    @Override
+    public int connectionGeneration() {
+        return connection.connectionGeneration();
+    }
+
+    /**
+     * Gửi một yêu cầu đăng nhập lại và NÉM lỗi thay vì nuốt như các lệnh gameplay: {@link
+     * SessionRecovery} cần biết lượt này hỏng để thử lượt khác.
+     */
+    @Override
+    public int sendRequest(int opcode, byte[] payload) throws IOException {
+        int sequenceId = connection.nextSequenceId();
+        connection.send(opcode, sequenceId, payload);
+        return sequenceId;
     }
 
     /**
