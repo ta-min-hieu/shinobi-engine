@@ -139,6 +139,18 @@ public final class GameConnection {
         return current != null && current.isConnected() && !current.isClosed();
     }
 
+    /**
+     * Số lần đã dựng xong một socket (bắt tay TLS xong) kể từ {@link #start()}.
+     *
+     * <p>Phiên trên server gắn với MỘT kết nối ({@code boundCharacterId} là trạng thái của channel),
+     * nên con số này đổi nghĩa là phiên cũ đã chết dù {@link #isConnected()} đang true trở lại. Đọc
+     * nó thay vì bắt lằn ranh true→false của {@link #isConnected()}: một lần đứt ngắn hơn một nhịp
+     * lấy mẫu vẫn làm số này đổi.
+     */
+    public int connectionGeneration() {
+        return connectionGeneration.get();
+    }
+
     /** Client sinh sequenceId tăng dần THEO KẾT NỐI (NETWORK.md §105). */
     public int nextSequenceId() {
         return nextSequenceId.getAndIncrement();

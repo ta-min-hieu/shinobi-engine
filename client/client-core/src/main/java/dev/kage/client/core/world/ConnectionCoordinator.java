@@ -150,8 +150,9 @@ final class ConnectionCoordinator implements WindowFlow {
      * không thấy gì cả**: thế giới đứng im, thanh máu đứng im, không một dòng thông báo. Cách thoát
      * duy nhất là tự đoán ra mà khởi động lại.
      *
-     * <p>Chỗ này CHỈ nói ra sự thật đó. Việc chọn hành vi đúng — tự đăng nhập lại và nối tiếp phiên
-     * cũ, hay đưa thẳng về màn đăng nhập — là quyết định thiết kế (/CLAUDE.md §4), chưa chốt.
+     * <p>Chỗ này CHỈ nói ra sự thật đó. Hành vi đúng đã được chủ dự án chốt 2026-09-29: tự đăng
+     * nhập lại và chọn lại đúng nhân vật cũ — việc đó nằm ở {@link SessionRecovery} (do
+     * {@code WorldScreen} điều khiển), hai dòng báo ở đây chỉ nói cho người chơi biết nó đang chạy.
      *
      * <p>Chỉ báo ở LẰN RANH đổi trạng thái, không báo mỗi tick: người chơi cần biết điều vừa xảy
      * ra, không cần bị nhắc 60 lần một giây.

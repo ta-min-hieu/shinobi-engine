@@ -73,9 +73,8 @@ public final class CharacterSelectScreen implements GameScreen {
     /** Khung chứa rộng hơn dòng đúng 20px — giữ nguyên tỉ lệ lề của bố cục cũ (360 so với 340). */
     private static final float CHARACTER_LIST_WIDTH_PX = 460f;
 
-    private final KageEngine engine;
-    private final PlayContext context;
     private final GameConnection connection;
+    private final WorldEntry worldEntry;
     private final Stage stage;
     private final KageSkin skin;
     private final I18NBundle i18n;
@@ -89,11 +88,15 @@ public final class CharacterSelectScreen implements GameScreen {
     private float stateElapsed;
     private CharacterSummary pendingSelection;
 
+    /**
+     * @param session kết nối đã đăng nhập + tên đăng nhập của nó — tên được giữ trong bộ nhớ để màn
+     *     world tự vào lại khi đứt mạng (xem {@link WorldEntry})
+     * @param characters danh sách nhân vật của tài khoản, từ {@code ListCharactersResponse}
+     */
     public CharacterSelectScreen(
-            KageEngine engine, PlayContext context, GameConnection connection, List<CharacterSummary> characters) {
-        this.engine = engine;
-        this.context = context;
-        this.connection = connection;
+            KageEngine engine, PlayContext context, AccountSession session, List<CharacterSummary> characters) {
+        this.connection = session.connection();
+        this.worldEntry = new WorldEntry(engine, context, session.connection(), session.username());
         this.stage = new Stage(new ScreenViewport(), new SpriteBatch());
         this.skin = new KageSkin();
         this.i18n = KageI18n.load();
@@ -333,15 +336,7 @@ public final class CharacterSelectScreen implements GameScreen {
                 failWithGenericError();
                 return;
             }
-            WorldScreen worldScreen = new WorldScreen(context, connection, pendingSelection, response);
-            // Bị đá vì đăng nhập nơi khác (2026-09-25) ⇒ về màn đăng nhập kèm lý do, không tự nối lại
-            // vào một phiên đã chết. Màn world đã tự dừng kết nối trước khi gọi tới đây.
-            worldScreen.setOnSessionEnded(errorKey -> {
-                LoginScreen login = new LoginScreen(engine, context, null);
-                login.showSessionEndedReason(errorKey);
-                engine.setScreen(login);
-            });
-            engine.setScreen(worldScreen);
+            worldEntry.open(pendingSelection, response);
         } catch (InvalidProtocolBufferException e) {
             LOG.warn("SelectCharacterResponse không hợp lệ", e);
             failWithGenericError();

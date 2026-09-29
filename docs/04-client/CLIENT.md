@@ -210,7 +210,29 @@ public final class GameConnection {
 - Timeout mặc định 5s → coi là lỗi mạng.
 - **Không tự retry Command có side-effect** (mua đồ, trade) khi chưa có idempotency ở server.
 
-**Reconnect**: mất kết nối → thử kết nối lại với session cũ. Session còn hạn → vào lại đúng chỗ. Hết hạn → về Login.
+**Reconnect — tự đăng nhập lại** (quyết định chủ dự án **2026-09-29**): mạng đứt thật (KHÔNG phải bị đá) ⇒
+`GameConnection` tự dựng lại socket như cũ, rồi `WorldScreen` giao cho `SessionRecovery` (lớp thuần, có test)
+chạy lại đúng chuỗi đăng nhập trên socket mới: `ConnectRequest` → `ListCharactersRequest` → `SelectCharacterRequest`
+cho **đúng nhân vật cũ** (không bao giờ chọn nhân vật khác), rồi `WorldEntry` dựng một `WorldScreen` MỚI, sạch
+thực thể — server phát lại spawn/máu như lần vào world bình thường. Không đổi protocol.
+
+- **Đăng nhập lại bằng gì**: giao thức chỉ đăng nhập bằng `username` (ADR-017 — không mật khẩu);
+  `ConnectRequest.token` còn dự phòng và server chưa đọc, `session_id` không có đường trình lại. Nên client giữ
+  `username` **trong bộ nhớ** của tiến trình (`AccountSession`), không ghi ra đĩa. Khi có token resume thật thì đổi ở
+  `SessionRecovery` là đủ.
+- **Phát hiện đứt**: so `GameConnection.connectionGeneration()` với số lúc phiên vào world (phiên trên server gắn
+  với đúng một channel) — không phụ thuộc việc lấy mẫu kịp lằn ranh `isConnected()`.
+- **Giới hạn**: tối đa 4 lượt bắt tay, nghỉ 1/2/4 giây giữa các lượt; mỗi lượt chờ socket ≤ 45 giây và mỗi
+  Response ≤ 5 giây. Response/lỗi khớp theo `sequenceId` — lỗi `not_authenticated` của lệnh gameplay lỡ gửi lên
+  socket mới không bị hiểu nhầm là "đăng nhập bị từ chối". Server từ chối (có `error_key`) ⇒ dừng ngay, không thử
+  lại. Hỏng hẳn ⇒ về `LoginScreen`, hiện lý do (`login.error.relog_failed` hoặc khoá của server), ô tên điền sẵn.
+- **Bị đá KHÔNG BAO GIỜ tự vào lại**: server gửi `error.logged_in_elsewhere` rồi mới đóng socket, nên `WorldScreen`
+  xử lý hết gói TRƯỚC rồi mới xét socket đứt — lời đá luôn thắng. Lời đá tới giữa lúc đang vào lại cũng dừng hẳn.
+  Không vậy thì hai client đá nhau mãi.
+- **Luồng**: mọi thứ chạy trên render thread trong `fixedUpdate`; gói vẫn đi qua hàng đợi của `GameConnection`.
+  Gói tới sau `SelectCharacterResponse` được để lại hàng đợi cho màn world mới. `WorldScreen` dọn `EcsWorld` TRƯỚC
+  khi màn mới được dựng (`KageEngine.setScreen` dispose màn cũ SAU khi màn mới đã dựng) và `dispose` không dọn lần
+  hai.
 
 **Bị đá vì đăng nhập nơi khác** (2026-09-25, [SERVER.md §5.1](../05-server/SERVER.md)): `ErrorResponse` mang
 `error.logged_in_elsewhere` ⇒ `ConnectionCoordinator` báo `WorldScreen` kết thúc phiên ⇒ dừng HẲN
