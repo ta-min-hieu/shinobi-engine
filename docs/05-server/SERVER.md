@@ -124,6 +124,36 @@ while (running) {
 
 **Gateway không chứa gameplay logic.** Nó là bưu điện, không phải người đọc thư.
 
+### 5.1 Một nhân vật — một phiên sống (quyết định chủ dự án 2026-09-25)
+
+**Luật**: tại mọi thời điểm một nhân vật chỉ gắn với ĐÚNG MỘT kết nối. Chọn nhân vật đang online từ
+kết nối khác thì **phiên MỚI thắng, phiên CŨ bị đá**. Chọn lại đúng nhân vật đang chơi trên CÙNG kết
+nối (bấm hai lần) không tự đá mình.
+
+Trước quyết định này gateway không kiểm gì cả, và có ba bug thật: kết nối nào đóng trước thì
+`unregister` luôn nhân vật của kết nối kia; khu vực map chính đầu tiên đầy thì cùng một nhân vật có
+HAI thực thể ở hai khu vực (cày gấp đôi); gói xác nhận di chuyển muộn của phiên cũ rơi vào kết nối mới.
+
+Trình tự khi kết nối B chọn nhân vật C đang gắn với kết nối A (`GatewayChannelHandler.enterWorldAsOnlySession`):
+
+1. B giữ khoá của C (`CharacterSessionRegistry.lockFor`, chỉ trên Virtual Thread) suốt các bước dưới
+   — hai lượt chọn cùng một nhân vật không bao giờ đan xen.
+2. B ghi mình làm chủ phiên của C; chủ cũ là A ⇒ B xếp lượt đá lên **EventLoop của A** (để không
+   lệnh nào của A còn lọt vào world sau đó) rồi CHỜ A dọn xong (trần 5 giây).
+3. Lượt đá trên A: gỡ `boundCharacterId`, dọn y hệt ngắt kết nối thường (§9: unregister có điều kiện
+   theo kết nối, rời hầm ngục/đấu trường/world, ghi vị trí lúc thoát §8, báo bạn bè offline), gửi
+   `ErrorResponse{error_key="error.logged_in_elsewhere", error_code=409}` rồi đóng kết nối SAU khi gói
+   đã ghi ra dây.
+4. "Dọn xong" nghĩa là: dòng vị trí đã GHI xuống DB và world đã xử lý hết mọi lệnh xếp trước lệnh
+   detach (`WorldFacade.inboxBarrier()`). Chỉ sau mốc này B mới đọc vị trí, gửi
+   `SelectCharacterResponse`, đăng ký kết nối và gắn vào world.
+
+Phòng thủ thêm: `ConnectedCharacterRegistry.unregister(characterId, ctx)` chỉ xoá khi nhân vật còn gắn
+với đúng kết nối đó; `MainWorldChannelRegistry.attachCharacter` gắn lại nhân vật đã ở một khu vực là
+không làm gì. Không đổi protocol (dùng lại `ErrorResponse`), không đổi schema. Client nhận khoá này thì
+dừng hẳn kết nối (không tự nối lại vào phiên đã chết) và về màn đăng nhập kèm lý do (CLIENT.md §8).
+Test: `CharacterSessionTakeoverTest`, `MainWorldChannelRegistryTest`, `WorldInboxBarrierTest`.
+
 ---
 
 ## 6. State Sync — gửi gì cho client
@@ -240,6 +270,7 @@ Không có bước này → mất toàn bộ dữ liệu chưa ghi ở §8.
 | 9 | Tick rate **60Hz** | Ưu tiên độ mượt; ngân sách 16.6ms khắt khe | ✅ [ADR-018](../01-architecture/adr/ADR-018-Tick-Rate.md) |
 | 10 | Kích thước AoI chưa chốt | Ảnh hưởng gameplay + băng thông | ⏳ Đo ở Phase 3 |
 | 11 | Ngân sách §11 **chưa đo** | Mục tiêu, không phải sự thật | ⏳ Đo Phase 9 |
+| 12 | **Một nhân vật — một phiên sống; phiên mới đá phiên cũ** (§5.1) | Hai phiên = hai thực thể, dọn nhầm phiên của nhau | ✅ Chủ dự án quyết 2026-09-25 |
 
 ## ADR cần tạo
 

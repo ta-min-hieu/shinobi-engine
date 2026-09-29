@@ -56,4 +56,27 @@ class EcsWorldTest {
         // MarkerSystem (đăng ký SAU) cũng phải chạy — cả 2 System cùng hoạt động, không cái nào bị loại.
         assertThat(marker.processedCount).isEqualTo(1);
     }
+
+    /**
+     * Rời hẳn một phiên chơi (bị đá vì đăng nhập nơi khác — quyết định chủ dự án 2026-09-25 — rồi về
+     * màn đăng nhập): màn world kế tiếp dùng lại CÙNG {@link EcsWorld} của engine. Không dọn thì nó
+     * đăng ký System di chuyển LẦN HAI (dự đoán cục bộ chạy nhanh gấp đôi) và nhân vật cũ còn nằm lại.
+     */
+    @Test
+    void shouldForgetEveryEntityAndSystem_whenCleared() {
+        EcsWorld world = new EcsWorld();
+        MarkerSystem previousSession = new MarkerSystem();
+        world.addSystem(previousSession);
+        world.createEntity().add(new PositionComponent());
+
+        world.clear();
+        MarkerSystem nextSession = new MarkerSystem();
+        world.addSystem(nextSession);
+        world.createEntity().add(new PositionComponent());
+        world.update(1f);
+
+        assertThat(world.entityCount()).isEqualTo(1);
+        assertThat(previousSession.processedCount).isZero();
+        assertThat(nextSession.processedCount).isEqualTo(1);
+    }
 }

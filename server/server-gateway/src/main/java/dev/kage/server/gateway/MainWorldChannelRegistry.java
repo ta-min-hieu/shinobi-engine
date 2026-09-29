@@ -120,6 +120,13 @@ final class MainWorldChannelRegistry {
      */
     synchronized WorldFacade attachCharacter(CharacterEntry entry) {
         long characterId = entry.characterId();
+        Channel current = channelByCharacterId.get(characterId);
+        if (current != null) {
+            // Một nhân vật chỉ ở MỘT khu vực (quyết định chủ dự án 2026-09-25: một phiên sống). Trước
+            // đây khu vực đầu đầy thì lần gắn thứ hai rơi sang khu vực khác — hai thực thể, cày gấp
+            // đôi, và detach sau chỉ gỡ được một. Gắn lại khi đã ở trong là không làm gì cả.
+            return current.facade();
+        }
         maybeAutoOpenChannel();
         Channel channel = firstChannelWithRoom();
         channel.facade().attachCharacter(entry);
@@ -145,6 +152,11 @@ final class MainWorldChannelRegistry {
     synchronized Optional<WorldFacade> worldFacadeFor(long characterId) {
         Channel channel = channelByCharacterId.get(characterId);
         return channel == null ? Optional.empty() : Optional.of(channel.facade());
+    }
+
+    /** Tổng số nhân vật đang ở MỌI khu vực map chính — mỗi nhân vật đếm đúng một lần. */
+    synchronized int playerCount() {
+        return totalPlayers();
     }
 
     /** Graceful shutdown (SERVER.md §10) — dừng MỌI khu vực đang chạy, kể cả #1. */

@@ -51,4 +51,20 @@ class ConnectionCoordinatorTest {
         assertThat(ConnectionCoordinator.noticeKeyFor(true, false)).hasValue("system.notice.connection_lost");
         assertThat(ConnectionCoordinator.noticeKeyFor(false, true)).hasValue("system.notice.reconnected");
     }
+
+    /**
+     * Một nhân vật chỉ một phiên sống (quyết định chủ dự án 2026-09-25): server đá phiên cũ bằng
+     * {@code error.logged_in_elsewhere} rồi đóng kết nối. Chỉ đúng khoá đó mới kết thúc phiên — mọi
+     * lỗi khác vẫn là "một thao tác bị từ chối", kể cả {@code error.not_authenticated}.
+     */
+    @Test
+    void shouldEndTheSession_onlyWhenAnotherConnectionTookTheCharacterOver() {
+        assertThat(ConnectionCoordinator.endsSession("error.logged_in_elsewhere"))
+                .isTrue();
+
+        assertThat(ConnectionCoordinator.endsSession("error.not_authenticated")).isFalse();
+        assertThat(ConnectionCoordinator.endsSession("error.rate_limited")).isFalse();
+        assertThat(ConnectionCoordinator.endsSession("")).isFalse();
+        assertThat(ConnectionCoordinator.endsSession(null)).isFalse();
+    }
 }

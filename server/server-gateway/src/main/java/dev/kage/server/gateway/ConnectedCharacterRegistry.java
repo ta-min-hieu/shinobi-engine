@@ -75,6 +75,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     // DB (blocking), CẤM chạy trực tiếp ở đó (server/CLAUDE.md: Game Tick cấm blocking I/O). Đẩy
     // sang Virtual Thread riêng, cùng pattern authExecutor của GatewayChannelHandler.
     private final ExecutorService lootExecutor = Executors.newVirtualThreadPerTaskExecutor();
+    // Ai có quyền giữ/dọn phiên của mỗi nhân vật (quyết định chủ dự án 2026-09-25) — ở đây vì
+    // registry này vốn là thứ DUY NHẤT mọi kết nối cùng thấy, không phải thêm tham số cho handler.
+    private final CharacterSessionRegistry sessions = new CharacterSessionRegistry();
 
     ConnectedCharacterRegistry(
             InventoryFacade inventoryFacade,
@@ -127,6 +130,27 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         contextsByCharacterId.remove(characterId);
         lastKnownPosition.remove(characterId);
         appearanceByCharacterId.remove(characterId);
+    }
+
+    /**
+     * Như {@link #unregister(long)} nhưng CHỈ khi nhân vật vẫn gắn với đúng {@code ctx} — lần dọn của
+     * một kết nối cũ không bao giờ được xoá nhân vật mà kết nối MỚI đã đăng ký (bug trước quyết định
+     * một-phiên 2026-09-25: kết nối nào đóng trước thì dọn luôn nhân vật của kết nối kia).
+     *
+     * @return {@code true} nếu đã dọn; {@code false} nếu nhân vật đã thuộc kết nối khác (hoặc đã dọn)
+     */
+    boolean unregister(long characterId, ChannelHandlerContext ctx) {
+        if (!contextsByCharacterId.remove(characterId, ctx)) {
+            return false;
+        }
+        lastKnownPosition.remove(characterId);
+        appearanceByCharacterId.remove(characterId);
+        return true;
+    }
+
+    /** Sổ chủ phiên của mọi nhân vật — xem {@link CharacterSessionRegistry}. */
+    CharacterSessionRegistry sessions() {
+        return sessions;
     }
 
     /**

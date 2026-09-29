@@ -181,6 +181,16 @@ public final class WorldScreen implements GameScreen {
 
     /** Hai gói mức kết nối (PONG, server tắt) — không có cửa sổ, xem {@link ConnectionCoordinator}. */
     private final ConnectionCoordinator connection;
+
+    /**
+     * Khoá lỗi server dùng để kết thúc phiên này (bị đá vì đăng nhập nơi khác — quyết định chủ dự
+     * án 2026-09-25), {@code null} khi phiên còn sống. Chỉ GHI NHẬN trong lúc xử lý gói; việc rời màn
+     * hình chạy ở cuối {@link #fixedUpdate}, không bao giờ giữa vòng xử lý gói — xem {@link #endSession}.
+     */
+    private String sessionEndedKey;
+
+    /** Đưa người chơi về màn đăng nhập — màn chọn nhân vật cài vào, xem {@link #setOnSessionEnded}. */
+    private java.util.function.Consumer<String> onSessionEnded = errorKey -> {};
     /** Hòm thư (phím M) — mượn skin của {@link #combatHud} như {@link #chatPanel}. */
     private final MailPanel mailPanel = new MailPanel(combatHud.skin());
 
@@ -279,7 +289,7 @@ public final class WorldScreen implements GameScreen {
         this.guild = new GuildCoordinator(guildPanel, sender, panels::noneOpen);
         this.duel = new DuelCoordinator(duelPanel, combatHud, sender, combatFeedback);
         this.dungeon = new DungeonCoordinator(partyPanel, combatHud, sender, chat);
-        this.connection = new ConnectionCoordinator(combatHud, chat);
+        this.connection = new ConnectionCoordinator(combatHud, chat, errorKey -> sessionEndedKey = errorKey);
         this.faction = new FactionCoordinator(
                 factionPanel,
                 sender,
@@ -488,6 +498,20 @@ public final class WorldScreen implements GameScreen {
         return multiplexer;
     }
 
+    /**
+     * Việc cần làm khi server kết thúc phiên này (bị đá vì đăng nhập nơi khác — quyết định chủ dự án
+     * 2026-09-25): nhận {@code error_key} để màn kế tiếp nói ra lý do.
+     *
+     * <p>Setter chứ không phải tham số constructor: constructor đã chạm trần Checkstyle
+     * {@code ParameterNumber}, và màn này không biết (không cần biết) {@code KageEngine} — người dựng
+     * nó (màn chọn nhân vật) mới biết màn nào đến tiếp theo.
+     *
+     * @param onSessionEnded được gọi đúng MỘT lần, SAU khi kết nối đã dừng hẳn
+     */
+    public void setOnSessionEnded(java.util.function.Consumer<String> onSessionEnded) {
+        this.onSessionEnded = onSessionEnded;
+    }
+
     @Override
     public void show() {
         // Input di chuyển/nhảy/skill vẫn poll qua InputMapper (không đổi) — chỉ CLICK chọn mục tiêu
@@ -522,6 +546,10 @@ public final class WorldScreen implements GameScreen {
         // chơi nên biết lý do trước khi ngồi nhìn một thế giới đứng im.
         connection.onTick(sender.isConnected());
         processInboundPackets();
+        if (sessionEndedKey != null) {
+            endSession();
+            return;
+        }
         intents.tick(fixedDeltaTime);
         combatHudController.tick(fixedDeltaTime);
         remoteCharacters.tick(fixedDeltaTime);
@@ -530,9 +558,23 @@ public final class WorldScreen implements GameScreen {
 
     private void processInboundPackets() {
         PacketCodec.Frame frame;
-        while ((frame = sender.pollInbound()) != null) {
+        // Dừng ngay khi phiên vừa bị kết thúc: gói sau đó (nếu có) thuộc một phiên đã chết.
+        while (sessionEndedKey == null && (frame = sender.pollInbound()) != null) {
             dispatch(frame);
         }
+    }
+
+    /**
+     * Phiên bị server kết thúc: dừng HẲN kết nối (kể cả tự nối lại) rồi giao cho màn kế tiếp.
+     *
+     * <p>Chạy ở cuối {@link #fixedUpdate} và {@code return} ngay sau đó, vì màn kế tiếp dispose màn
+     * này — không được chạm gì của nó nữa sau lời gọi {@link #onSessionEnded}.
+     */
+    private void endSession() {
+        String errorKey = sessionEndedKey;
+        LOG.warn("Server kết thúc phiên: error_key={}", errorKey);
+        sender.stop();
+        onSessionEnded.accept(errorKey);
     }
 
     private void dispatch(PacketCodec.Frame frame) {
@@ -887,6 +929,10 @@ public final class WorldScreen implements GameScreen {
 
     @Override
     public void dispose() {
+        // EcsWorld là của engine và sống suốt đời ứng dụng, còn System/entity ở trong là của RIÊNG
+        // phiên này (installMovementSystems, nhân vật, quái...). Rời màn hình mà không dọn thì lần
+        // vào world sau đăng ký System di chuyển LẦN HAI — dự đoán cục bộ chạy nhanh gấp đôi.
+        world.clear();
         shapeRenderer.dispose();
         models.dispose();
         // TRƯỚC combatHud: combatFeedback mượn font của HUD, dispose HUD trước là kéo font ra khỏi

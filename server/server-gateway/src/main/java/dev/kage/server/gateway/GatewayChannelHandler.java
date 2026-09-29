@@ -4,9 +4,16 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.ReentrantLock;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.opentelemetry.api.trace.Span;
@@ -310,6 +317,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // xem GoldLedger javadoc vì sao chúng nằm ở đó chứ không ở đây.
     private static final String REASON_ENTER_WORLD = "gold.reason.enter_world";
 
+    // Quyết định chủ dự án 2026-09-25: một nhân vật chỉ một phiên sống, phiên mới ĐÁ phiên cũ. Khoá
+    // i18n gửi cho phiên bị đá (client về màn đăng nhập và hiện câu này), mã 409 = xung đột phiên.
+    private static final String ERROR_LOGGED_IN_ELSEWHERE = "error.logged_in_elsewhere";
+    private static final int ERROR_CODE_SESSION_CONFLICT = 409;
+
+    // Trần chờ phiên cũ dọn xong. Bình thường chỉ vài chục mili giây (một lượt ghi vị trí + một tick
+    // world); vượt trần nghĩa là có thứ kẹt (DB treo) — vẫn cho phiên mới vào thay vì khoá người chơi
+    // ngoài cửa, vì mọi lần dọn/đăng ký đều đã có điều kiện theo kết nối nên không đè được phiên mới.
+    private static final Duration EVICTION_TIMEOUT = Duration.ofSeconds(5);
+
     private final AccountFacade accountFacade;
     private final CharacterFacade characterFacade;
     private final InventoryFacade inventoryFacade;
@@ -354,6 +371,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // thể cùng thấy kết nối chết).
     private final java.util.concurrent.atomic.AtomicBoolean characterReleased =
             new java.util.concurrent.atomic.AtomicBoolean();
+
+    // Xong khi lần dọn đã chạy TRỌN (vị trí đã ghi, world đã xử lý hết lệnh cũ, bạn bè đã được báo)
+    // — phiên mới của cùng nhân vật chờ mốc này, xem CharacterSessionRegistry.Session#evict.
+    private final CompletableFuture<Void> characterReleaseCompleted = new CompletableFuture<>();
+
+    // Danh tính của kết nối này trong CharacterSessionRegistry — MỘT đối tượng cố định, vì sổ so
+    // chủ phiên bằng danh tính (method reference tạo mới mỗi lần sẽ không bao giờ bằng nhau).
+    private final CharacterSessionRegistry.Session session = this::evictCharacter;
+
+    // Gán cùng boundCharacterId — cần để đá kết nối này từ luồng của kết nối KHÁC.
+    private volatile ChannelHandlerContext boundContext;
 
     // Bind sau khi field khác đã gán xong (field initializer chạy tuần tự trong <init>) — method
     // reference chỉ CHỤP this, không gọi ngay, nên thứ tự khai báo so với constructor không quan trọng.
@@ -635,37 +663,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             ChannelHandlerContext ctx, int sequenceId, long accountId, long characterId) {
         try {
             Character character = characterFacade.selectCharacter(accountId, characterId);
-            // THỨ TỰ (2026-09-24): đọc DB → gửi response → RỒI MỚI đăng ký + attach — client BỎ mọi
-            // gói tới trước response (chat, bạn bè online, spawn quái không phát lại). Xem
-            // bindOrReleaseIfClosed.
-            PositionSnapshot spawn = characterFacade.loadPosition(characterId);
-            CharacterStats stats = characterFacade.loadStats(characterId);
-            CharacterBaseStats baseStats = new CharacterBaseStats(
-                    stats.str(),
-                    stats.agi(),
-                    stats.intelligence(),
-                    stats.vit(),
-                    FactionMapping.toElement(character.faction()),
-                    character.level());
-            // Phase 9 lát cắt 6: định tuyến vào khu vực (channel) còn chỗ thay vì thẳng 1 World
-            // duy nhất — MainWorldChannelRegistry tự mở thêm khu vực nếu cần (giới hạn người/khu
-            // vực chặn AoI phình theo TỔNG N toàn map, xem javadoc class đó).
-            // GAMEPLAY.md §2 "tính lại chỉ số dẫn xuất khi đổi trang bị" — đọc TRƯỚC khi attach và
-            // gửi CÙNG một lệnh world. Tách làm hai lệnh (attach rồi applyEquipmentBonus) để lại một
-            // tick mà entity đã ở trong world với chỉ số NỀN: đo thật 2026-09-18, đăng nhập cạnh quái
-            // ăn 37 sát thương trên thanh máu 100 thay vì 27 trên thanh 206.
-            EquipmentBonusSnapshot bonus = currentEquipmentBonus(characterId);
-            SelectCharacterResponse response = enterWorldResponse(bonus, spawn);
-            send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
-            // Đăng ký connection NÀY để world outbound (spawn/move/despawn — SERVER.md §6) tìm
-            // đúng channel; attachCharacter chỉ enqueue, entity ECS thật tạo ở tick kế tiếp.
-            worldGateway
-                    .registry()
-                    .register(characterId, ctx, CharacterAppearance.of(toProtoFaction(character.faction())));
-            worldGateway
-                    .mainWorldChannels()
-                    .attachCharacter(new CharacterEntry(characterId, spawn.x(), spawn.y(), baseStats, bonus));
-            if (!bindOrReleaseIfClosed(ctx, characterId)) {
+            if (!enterWorldAsOnlySession(ctx, sequenceId, character)) {
                 return;
             }
             sendInitialSelfState(characterId);
@@ -680,6 +678,105 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             LOG.error("Chọn nhân vật thất bại: lỗi không mong đợi", e);
             sendError(ctx, sequenceId, 500, "error.select_character_failed");
         }
+    }
+
+    /**
+     * Vào world với tư cách phiên DUY NHẤT của nhân vật (quyết định chủ dự án 2026-09-25, SERVER.md
+     * §8): nhân vật đang online ở kết nối khác thì kết nối đó bị ĐÁ — báo lý do, dọn y như ngắt kết
+     * nối thường, đóng — rồi mới tới lượt kết nối này.
+     *
+     * <p><b>Thứ tự là cả điểm mấu chốt.</b> Cả đoạn chạy dưới khoá của nhân vật, nên hai lượt chọn
+     * không đan xen. Và kết nối này chỉ ĐỌC vị trí (trong {@link #enterWorld}) SAU khi phiên cũ đã dọn
+     * xong trọn vẹn: vị trí lúc thoát đã ghi xuống DB (không thì đăng nhập lại bị lùi về chỗ lưu lần
+     * trước), world đã xử lý hết lệnh cũ (không thì gói xác nhận di chuyển muộn của phiên cũ rơi vào
+     * kết nối mới, và hai khu vực khác nhau có thể cùng giữ thực thể trong một tick).
+     *
+     * <p>Chọn lại đúng nhân vật đang chơi trên CÙNG kết nối (bấm hai lần) không tự đá mình — sổ trả
+     * rỗng, còn {@code register}/{@code attachCharacter} vốn đã chịu được gọi lặp.
+     *
+     * @return {@code false} nếu kết nối này chết giữa chừng và nhân vật đã được dọn
+     */
+    private boolean enterWorldAsOnlySession(ChannelHandlerContext ctx, int sequenceId, Character character) {
+        long characterId = character.id();
+        CharacterSessionRegistry sessions = worldGateway.registry().sessions();
+        ReentrantLock lock = sessions.lockFor(characterId);
+        lock.lock();
+        try {
+            return claimAndEnterWorld(ctx, sequenceId, character, sessions);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /** Thân của {@link #enterWorldAsOnlySession} — chỉ gọi khi ĐANG giữ khoá của nhân vật. */
+    private boolean claimAndEnterWorld(
+            ChannelHandlerContext ctx, int sequenceId, Character character, CharacterSessionRegistry sessions) {
+        long characterId = character.id();
+        boolean entered = false;
+        try {
+            sessions.claim(characterId, session).ifPresent(previous -> awaitEviction(previous, characterId));
+            entered = enterWorld(ctx, sequenceId, character);
+            return entered;
+        } finally {
+            Long bound = boundCharacterId;
+            if (!entered && (bound == null || bound != characterId)) {
+                // Hỏng trước khi vào được world: trả quyền giữ phiên, không thì lượt sau sẽ đi "đá" một
+                // kết nối chưa từng giữ nhân vật này.
+                sessions.release(characterId, session);
+            }
+        }
+    }
+
+    /** Chờ phiên cũ dọn xong — có trần, xem {@link #EVICTION_TIMEOUT}. */
+    private static void awaitEviction(CharacterSessionRegistry.Session previous, long characterId) {
+        try {
+            previous.evict(characterId).get(EVICTION_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            LOG.warn(
+                    "Phiên cũ chưa dọn xong sau {} — vẫn cho phiên mới vào: characterId={}",
+                    EVICTION_TIMEOUT,
+                    characterId,
+                    e);
+        } catch (ExecutionException e) {
+            LOG.warn("Dọn phiên cũ lỗi — vẫn cho phiên mới vào: characterId={}", characterId, e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Bị ngắt khi chờ dọn phiên cũ: characterId=" + characterId, e);
+        }
+    }
+
+    /** Phần "vào world" của chọn nhân vật — gọi dưới khoá của nhân vật, xem {@link #enterWorldAsOnlySession}. */
+    private boolean enterWorld(ChannelHandlerContext ctx, int sequenceId, Character character) {
+        long characterId = character.id();
+        // THỨ TỰ (2026-09-24): đọc DB → gửi response → RỒI MỚI đăng ký + attach — client BỎ mọi
+        // gói tới trước response (chat, bạn bè online, spawn quái không phát lại). Xem
+        // bindOrReleaseIfClosed.
+        PositionSnapshot spawn = characterFacade.loadPosition(characterId);
+        CharacterStats stats = characterFacade.loadStats(characterId);
+        CharacterBaseStats baseStats = new CharacterBaseStats(
+                stats.str(),
+                stats.agi(),
+                stats.intelligence(),
+                stats.vit(),
+                FactionMapping.toElement(character.faction()),
+                character.level());
+        // Phase 9 lát cắt 6: định tuyến vào khu vực (channel) còn chỗ thay vì thẳng 1 World
+        // duy nhất — MainWorldChannelRegistry tự mở thêm khu vực nếu cần (giới hạn người/khu
+        // vực chặn AoI phình theo TỔNG N toàn map, xem javadoc class đó).
+        // GAMEPLAY.md §2 "tính lại chỉ số dẫn xuất khi đổi trang bị" — đọc TRƯỚC khi attach và
+        // gửi CÙNG một lệnh world. Tách làm hai lệnh (attach rồi applyEquipmentBonus) để lại một
+        // tick mà entity đã ở trong world với chỉ số NỀN: đo thật 2026-09-18, đăng nhập cạnh quái
+        // ăn 37 sát thương trên thanh máu 100 thay vì 27 trên thanh 206.
+        EquipmentBonusSnapshot bonus = currentEquipmentBonus(characterId);
+        SelectCharacterResponse response = enterWorldResponse(bonus, spawn);
+        send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        // Đăng ký connection NÀY để world outbound (spawn/move/despawn — SERVER.md §6) tìm
+        // đúng channel; attachCharacter chỉ enqueue, entity ECS thật tạo ở tick kế tiếp.
+        worldGateway.registry().register(characterId, ctx, CharacterAppearance.of(toProtoFaction(character.faction())));
+        worldGateway
+                .mainWorldChannels()
+                .attachCharacter(new CharacterEntry(characterId, spawn.x(), spawn.y(), baseStats, bonus));
+        return bindOrReleaseIfClosed(ctx, characterId);
     }
 
     /**
@@ -698,11 +795,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * @return {@code false} nếu kết nối đã chết và nhân vật vừa được dọn
      */
     private boolean bindOrReleaseIfClosed(ChannelHandlerContext ctx, long characterId) {
+        boundContext = ctx;
         boundCharacterId = characterId;
         if (ctx.channel().isActive()) {
             return true;
         }
-        releaseCharacter(characterId);
+        releaseCharacter(ctx, characterId);
         return false;
     }
 
@@ -3513,24 +3611,79 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // để bia đỡ đạn đứng lại trong world).
         Long characterId = boundCharacterId;
         if (characterId != null) {
-            releaseCharacter(characterId);
+            releaseCharacter(ctx, characterId);
         }
     }
 
     /**
-     * Dọn nhân vật khỏi world khi kết nối chết — gọi từ {@code channelInactive} (EventLoop) HOẶC từ
+     * {@link CharacterSessionRegistry.Session#evict} của kết nối này — gọi từ Virtual Thread của
+     * kết nối MỚI vừa chọn cùng nhân vật (quyết định chủ dự án 2026-09-25: phiên mới đá phiên cũ).
+     *
+     * <p>Việc đá chạy trên EventLoop của CHÍNH kết nối này, không chạy tại chỗ: mọi lệnh gameplay
+     * của kết nối này cũng chạy ở đó, nên sau khi lượt đá chạy xong không lệnh nào của nó còn lọt
+     * được vào world (lệnh tới sau thấy {@code boundCharacterId == null}). Chạy tại chỗ thì một lệnh
+     * di chuyển đang dở trên EventLoop vẫn có thể xếp vào world SAU lệnh detach — tức điều khiển
+     * được thực thể của phiên mới.
+     */
+    private CompletableFuture<Void> evictCharacter(long characterId) {
+        ChannelHandlerContext ctx = boundContext;
+        if (ctx == null) {
+            // Chủ phiên luôn đã vào world (claim + vào world nằm trọn dưới một khoá) — nhánh này chỉ
+            // để không treo người chờ nếu bất biến đó có ngày bị phá.
+            return CompletableFuture.completedFuture(null);
+        }
+        try {
+            ctx.executor().execute(() -> kick(ctx, characterId));
+        } catch (RejectedExecutionException e) {
+            // EventLoop đã tắt (server đang dừng) — dọn tại chỗ, vẫn đúng một lần nhờ characterReleased.
+            LOG.warn("EventLoop đã dừng — dọn phiên cũ tại chỗ: characterId={}", characterId, e);
+            releaseCharacter(ctx, characterId);
+        }
+        return characterReleaseCompleted;
+    }
+
+    /** Lượt đá, trên EventLoop của kết nối bị đá — xem {@link #evictCharacter}. */
+    private void kick(ChannelHandlerContext ctx, long characterId) {
+        LOG.info("Nhân vật đăng nhập từ kết nối khác — đá phiên cũ: characterId={}", characterId);
+        boundCharacterId = null;
+        releaseCharacter(ctx, characterId);
+        ErrorResponse error = ErrorResponse.newBuilder()
+                .setErrorCode(ERROR_CODE_SESSION_CONFLICT)
+                .setErrorKey(ERROR_LOGGED_IN_ELSEWHERE)
+                .build();
+        byte[] payload = error.toByteArray();
+        networkMetrics.recordPacketSent(Opcode.OPCODE_ERROR_VALUE, payload.length);
+        PacketHeader header = new PacketHeader(Opcode.OPCODE_ERROR_VALUE, ProtocolVersion.CURRENT, 0);
+        // Đóng SAU khi gói lý do đã ghi ra dây — đóng ngay thì client chỉ thấy "mất kết nối".
+        ctx.writeAndFlush(new PacketCodec.Frame(header, payload)).addListener(ChannelFutureListener.CLOSE);
+    }
+
+    // Error Prone FutureReturnValueIgnored: đúng ý — kết quả của chuỗi allOf(...).whenComplete KHÔNG
+    // cần ai đọc; mọi lỗi của các bước đã được finishRelease log và mốc hoàn tất thật là
+    // characterReleaseCompleted.
+    /**
+     * Dọn nhân vật khỏi world khi kết nối chết — gọi từ {@code channelInactive} (EventLoop), từ
+     * {@link #kick} (EventLoop, phiên bị kết nối khác đá — 2026-09-25) HOẶC từ
      * {@link #bindOrReleaseIfClosed} (Virtual Thread) nếu kết nối chết giữa lúc chọn nhân vật. Chạy
      * ĐÚNG MỘT LẦN mỗi kết nối: hai phía có thể cùng thấy kết nối chết.
+     *
+     * <p>Các bước chạm DB/world chạy bất đồng bộ; khi TẤT CẢ xong, {@link #finishRelease} trả quyền
+     * giữ phiên và hoàn tất {@link #characterReleaseCompleted} — mốc mà phiên mới đang chờ.
      */
-    private void releaseCharacter(long characterId) {
+    @SuppressWarnings("FutureReturnValueIgnored")
+    private void releaseCharacter(ChannelHandlerContext ctx, long characterId) {
         if (!characterReleased.compareAndSet(false, true)) {
             return;
         }
+        // World nhân vật đang ở — hỏi TRƯỚC khi detach (sau đó nó không thuộc World nào nữa). Mốc chặn
+        // hàng đợi của đúng World này là "mọi lệnh cũ đã xử lý", xem WorldFacade#inboxBarrier.
+        Optional<WorldFacade> world = currentWorldFacadeIfPresent(characterId);
         // Đọc vị trí cuối TRƯỚC unregister() (unregister xoá luôn khỏi lastKnownPosition —
         // đọc ở đây trên EventLoop, rẻ, không phải I/O, không tra lại sau trên authExecutor
         // vì lúc đó có thể đã bị unregister() xoá mất — xem javadoc CharacterPositionPersister#save).
         PositionSnapshot lastPosition = worldGateway.registry().lastKnownPosition(characterId);
-        worldGateway.registry().unregister(characterId);
+        // CÓ ĐIỀU KIỆN theo kết nối: nếu nhân vật đã thuộc kết nối khác thì không đụng tới.
+        worldGateway.registry().unregister(characterId, ctx);
         // Phase 8 lát cắt 1 (ADR-026): nếu đang ở dungeon, detach khỏi ĐÚNG dungeon World +
         // dọn bookkeeping instance (dừng luôn World nếu rỗng) — KHÔNG re-attach world chính
         // (đã ngắt kết nối). Lát cắt 4: tương tự cho duel Arena — người mất kết nối tính THUA
@@ -3543,14 +3696,38 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         // SERVER.md §8: logout là 1 trong 3 mốc bắt buộc ghi vị trí. savePosition chạm DB
         // (blocking) — không được chạy trên EventLoop, đẩy sang authExecutor.
-        if (lastPosition != null) {
-            authExecutor.execute(
-                    () -> worldGateway.positionPersister().save(characterId, lastPosition.x(), lastPosition.y()));
-        }
+        // join() trên Virtual Thread của authExecutor: save() chỉ XẾP lượt ghi vào luồng của
+        // persister (xem javadoc của nó về thứ tự với lượt định kỳ) — chờ tới lúc ghi xong thật.
+        CompletableFuture<Void> positionSaved = lastPosition == null
+                ? CompletableFuture.completedFuture(null)
+                : CompletableFuture.runAsync(
+                        () -> worldGateway
+                                .positionPersister()
+                                .save(characterId, lastPosition.x(), lastPosition.y())
+                                .join(),
+                        authExecutor);
+        CompletableFuture<Void> worldDrained =
+                world.map(WorldFacade::inboxBarrier).orElseGet(() -> CompletableFuture.completedFuture(null));
         // channelInactive chạy trên EventLoop — friendFacade.listFriends chạm DB (blocking),
         // PHẢI đẩy sang authExecutor, không được gọi thẳng ở đây (server/CLAUDE.md: EventLoop
         // cấm query DB), cùng lý do savePosition ở trên.
-        authExecutor.execute(() -> notifyFriendsPresenceChanged(characterId, false));
+        CompletableFuture<Void> friendsNotified =
+                CompletableFuture.runAsync(() -> notifyFriendsPresenceChanged(characterId, false), authExecutor);
+        CompletableFuture.allOf(positionSaved, worldDrained, friendsNotified)
+                .whenComplete((ignored, error) -> finishRelease(characterId, error));
+    }
+
+    /**
+     * Bước cuối của lần dọn: thôi giữ phiên và báo cho phiên mới (nếu có ai đang chờ) rằng đã xong.
+     * Luôn chạy, kể cả khi một bước trước lỗi — một lần ghi vị trí hỏng không được khoá người chơi
+     * ngoài cửa.
+     */
+    private void finishRelease(long characterId, Throwable error) {
+        if (error != null) {
+            LOG.warn("Dọn nhân vật có bước lỗi: characterId={}", characterId, error);
+        }
+        worldGateway.registry().sessions().release(characterId, session);
+        characterReleaseCompleted.complete(null);
     }
 
     /** Báo cho bạn bè ĐANG online của {@code characterId} rằng người này vừa vào/thoát world. */
