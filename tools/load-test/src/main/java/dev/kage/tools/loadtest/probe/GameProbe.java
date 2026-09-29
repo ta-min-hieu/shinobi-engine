@@ -104,23 +104,9 @@ public final class GameProbe {
                 new GameConnection.GatewayEndpoint(config.host(), config.port(), HANDSHAKE_TIMEOUT_MILLIS);
         try (GameConnection connection = GameConnection.open(endpoint, session)) {
             enterWorld(connection, config, session, observation);
-            // Mặc đồ TRƯỚC khi đi bộ: `bonus_hp` nâng MÁU TỐI ĐA thật (ADR-036) và server trả máu
-            // mới ngay trong EquipItemResponse (ADR-043), nên mặc sau khi đi thì "máu lúc tới nơi"
-            // đo ra sai. Ngược hẳn với UseItemScenario bên dưới — món tiêu hao phải dùng SAU khi
-            // đã mất máu, trong cùng phiên.
-            if (!config.equipItemCodes().isEmpty()) {
-                new EquipScenario(connection, session).run(config.equipItemCodes());
-            }
-            if (config.moveToX().isPresent()) {
-                walkTo(connection, observation, session, config.moveToX().getAsDouble());
-            }
-            if (!config.enterDungeon().isEmpty()) {
-                new DungeonScenario(connection, session).run(config.enterDungeon());
-            }
-            if (config.quest().isRequested()) {
-                new QuestScenario(connection, session, observation).run(config.quest());
-            }
+            ArenaScenario arena = prepareBeforeObserving(connection, config, session, observation);
             observe(connection, config, session, observation);
+            arena.forfeitIfRequested(config.duel());
             // Uống thuốc SAU vòng quan sát: máu không được lưu vào DB (thoát ra vào lại là đầy),
             // nên muốn thấy đan dược làm gì thì phải đánh mất máu TRƯỚC, trong cùng phiên này.
             if (!config.useItemCode().isEmpty()) {
@@ -141,6 +127,34 @@ public final class GameProbe {
             }
         }
         session.print(observation.renderReport());
+    }
+
+    /**
+     * Mọi bước TRƯỚC vòng quan sát: mặc đồ, đi bộ, vào hầm ngục/đấu trường, nhiệm vụ. Trả về kịch bản
+     * Arena để bước bỏ cuộc (sau vòng quan sát) dùng lại.
+     */
+    private static ArenaScenario prepareBeforeObserving(
+            GameConnection connection, ProbeConfig config, ProbeSession session, WorldObservation observation)
+            throws IOException, InterruptedException {
+        // Mặc đồ TRƯỚC khi đi bộ: `bonus_hp` nâng MÁU TỐI ĐA thật (ADR-036) và server trả máu
+        // mới ngay trong EquipItemResponse (ADR-043), nên mặc sau khi đi thì "máu lúc tới nơi"
+        // đo ra sai. Ngược hẳn với UseItemScenario bên dưới — món tiêu hao phải dùng SAU khi
+        // đã mất máu, trong cùng phiên.
+        if (!config.equipItemCodes().isEmpty()) {
+            new EquipScenario(connection, session).run(config.equipItemCodes());
+        }
+        if (config.moveToX().isPresent()) {
+            walkTo(connection, observation, session, config.moveToX().getAsDouble());
+        }
+        if (!config.enterDungeon().isEmpty()) {
+            new DungeonScenario(connection, session).run(config.enterDungeon());
+        }
+        ArenaScenario arena = new ArenaScenario(connection, session, HANDSHAKE_TIMEOUT_MILLIS);
+        arena.enter(config.duel());
+        if (config.quest().isRequested()) {
+            new QuestScenario(connection, session, observation).run(config.quest());
+        }
+        return arena;
     }
 
     private static void enterWorld(

@@ -5,8 +5,10 @@ import java.util.Optional;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 
+import dev.kage.protocol.AcceptDuelResponse;
 import dev.kage.protocol.AcceptQuestResponse;
 import dev.kage.protocol.AttackResultEvent;
+import dev.kage.protocol.ChallengeDuelResponse;
 import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterRespawnedEvent;
@@ -14,8 +16,12 @@ import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.ClaimQuestRewardResponse;
 import dev.kage.protocol.CreatePartyResponse;
 import dev.kage.protocol.DialogueNodeResponse;
+import dev.kage.protocol.DuelChallengeReceivedEvent;
+import dev.kage.protocol.DuelResultEvent;
+import dev.kage.protocol.DuelStartedEvent;
 import dev.kage.protocol.EnterDungeonResponse;
 import dev.kage.protocol.ErrorResponse;
+import dev.kage.protocol.ExitDuelResponse;
 import dev.kage.protocol.ExitDungeonResponse;
 import dev.kage.protocol.ExperienceChangedEvent;
 import dev.kage.protocol.GoldChangedEvent;
@@ -96,6 +102,10 @@ final class ProbeEventLine {
         if (worldChange.isPresent()) {
             return worldChange.get();
         }
+        Optional<String> duel = describeDuel(opcode, payload);
+        if (duel.isPresent()) {
+            return duel.get();
+        }
         // Opcode chưa giải mã vẫn được ghi ra (tên + số byte) thay vì bỏ im lặng — probe phải cho
         // thấy CÓ GÌ ĐÓ đã tới, kể cả khi nó chưa biết đọc.
         return describeQuest(opcode, payload).orElseGet(() -> "payloadBytes=" + payload.length);
@@ -144,6 +154,39 @@ final class ProbeEventLine {
             case Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE ->
                 Optional.of("outcome="
                         + ExitDungeonResponse.parseFrom(payload).getOutcome().name());
+            default -> Optional.empty();
+        };
+    }
+
+    /** Arena 1v1 (1601/1603/1607/1608/1610/1611) — vào trận và chốt trận, cặp với 308 (ADR-051). */
+    private static Optional<String> describeDuel(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+        return switch (opcode) {
+            case Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE -> {
+                ChallengeDuelResponse response = ChallengeDuelResponse.parseFrom(payload);
+                yield Optional.of(
+                        "outcome=" + response.getOutcome().name() + " challengeId=" + response.getChallengeId());
+            }
+            case Opcode.OPCODE_ACCEPT_DUEL_RESPONSE_VALUE ->
+                Optional.of("outcome="
+                        + AcceptDuelResponse.parseFrom(payload).getOutcome().name());
+            case Opcode.OPCODE_EXIT_DUEL_RESPONSE_VALUE ->
+                Optional.of("outcome="
+                        + ExitDuelResponse.parseFrom(payload).getOutcome().name());
+            case Opcode.OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT_VALUE -> {
+                DuelChallengeReceivedEvent event = DuelChallengeReceivedEvent.parseFrom(payload);
+                yield Optional.of("challengeId=" + event.getChallengeId() + " from=" + event.getChallengerCharacterId()
+                        + " name=" + event.getChallengerName());
+            }
+            case Opcode.OPCODE_DUEL_STARTED_EVENT_VALUE -> {
+                DuelStartedEvent event = DuelStartedEvent.parseFrom(payload);
+                yield Optional.of("opponent=" + event.getOpponentCharacterId() + " name=" + event.getOpponentName());
+            }
+            case Opcode.OPCODE_DUEL_RESULT_EVENT_VALUE -> {
+                DuelResultEvent event = DuelResultEvent.parseFrom(payload);
+                yield Optional.of("winner=" + event.getWinnerCharacterId() + " loser=" + event.getLoserCharacterId()
+                        + " winnerRating=" + event.getWinnerNewRating() + " loserRating="
+                        + event.getLoserNewRating());
+            }
             default -> Optional.empty();
         };
     }
