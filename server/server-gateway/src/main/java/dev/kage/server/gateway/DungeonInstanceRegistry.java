@@ -11,18 +11,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import dev.kage.character.api.CharacterFacade;
-import dev.kage.character.domain.Character;
-import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.protocol.DungeonEnteredEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.WorldChangeReason;
 import dev.kage.protocol.WorldKind;
-import dev.kage.server.world.CharacterBaseStats;
-import dev.kage.server.world.CharacterEntry;
-import dev.kage.server.world.Element;
-import dev.kage.server.world.EquipmentBonusSnapshot;
 import dev.kage.server.world.TickMetricsPort;
 import dev.kage.server.world.WorldContentCatalog;
 import dev.kage.server.world.WorldFacade;
@@ -164,7 +158,7 @@ final class DungeonInstanceRegistry {
         for (PartyFacade.MemberView member : members) {
             long memberId = member.characterId();
             if (!isInDungeon(memberId)) {
-                entries.add(new PendingEntry(memberId, loadBaseStats(memberId), returnPositionOf(memberId)));
+                entries.add(new PendingEntry(memberId, loadoutOf(memberId), returnPositionOf(memberId)));
             }
         }
         commitEnter(myParty.get().partyId(), dungeonCode, requestingCharacterId, entries);
@@ -231,18 +225,13 @@ final class DungeonInstanceRegistry {
         if (!isInDungeon(characterId)) {
             return ExitOutcome.NOT_IN_DUNGEON;
         }
-        // Đọc DB TRƯỚC khi vào khoá — xem javadoc lớp.
-        CharacterBaseStats baseStats = loadBaseStats(characterId);
-        // Bonus trang bị đi CÙNG lệnh attach (2026-09-18): thiếu nó thì đấu xong / rời hầm ngục là
-        // nhân vật về map chính với chỉ số NỀN và không bao giờ được cộng lại — máu 206 → 100,
-        // def 65 → 20, tới tận khi mặc/gỡ đồ hoặc đăng nhập lại. `registry` đã cầm InventoryFacade.
-        EquipmentBonusSnapshot equipmentBonus = registry.equipmentBonusOf(characterId);
-        return commitExit(characterId, new ExitEntry(baseStats, equipmentBonus, reason));
+        // Đọc DB TRƯỚC khi vào khoá — xem javadoc lớp. Bonus trang bị đi CÙNG lệnh attach
+        // (2026-09-18): thiếu nó thì rời hầm ngục là về map chính với chỉ số NỀN — máu 206 → 100.
+        return commitExit(characterId, new ExitEntry(loadoutOf(characterId), reason));
     }
 
     /** Dữ liệu DB của một lượt rời hầm ngục, đọc sẵn ngoài khoá, kèm lý do rời (ADR-051). */
-    private record ExitEntry(
-            CharacterBaseStats baseStats, EquipmentBonusSnapshot equipmentBonus, WorldChangeReason reason) {}
+    private record ExitEntry(CharacterLoadout loadout, WorldChangeReason reason) {}
 
     // Kiểm lại trong khoá: người này có thể đã mất kết nối (handleDisconnectIfInDungeon trên
     // EventLoop) trong lúc đọc DB ở trên.
@@ -259,9 +248,8 @@ final class DungeonInstanceRegistry {
                         WorldKind.WORLD_KIND_MAIN,
                         exit.reason(),
                         returnPosition,
-                        WorldFacade.characterMaxHp(exit.equipmentBonus())),
-                () -> mainWorldChannels.attachCharacter(new CharacterEntry(
-                        characterId, returnPosition.x(), returnPosition.y(), exit.baseStats(), exit.equipmentBonus())));
+                        exit.loadout().maxHp()),
+                () -> mainWorldChannels.attachCharacter(exit.loadout().entryAt(characterId, returnPosition)));
         leaveInstance(characterId, instance);
         return ExitOutcome.OK;
     }
@@ -316,8 +304,8 @@ final class DungeonInstanceRegistry {
         long characterId = entry.characterId();
         returnPositionByCharacterId.put(characterId, entry.returnPosition());
 
-        // Attach vào hầm ngục KHÔNG kèm bonus trang bị (giới hạn có sẵn — javadoc
-        // WorldFacade#attachCharacter(CharacterEntry)) ⇒ máu đặt lúc attach là máu nền.
+        // Attach KÈM bonus trang bị (sửa 2026-09-29) — trước đây đường vào dùng chỉ số NỀN nên
+        // người mặc giáp +máu vào hầm ngục với 100 máu, và WorldChangedEvent cũng báo 100.
         transfer.move(
                 characterId,
                 () -> mainWorldChannels.detachCharacter(characterId),
@@ -325,15 +313,14 @@ final class DungeonInstanceRegistry {
                         WorldKind.WORLD_KIND_DUNGEON,
                         reason,
                         DUNGEON_ENTRY_POSITION,
-                        WorldFacade.characterMaxHp(EquipmentBonusSnapshot.NONE)),
-                () -> instance.facade()
-                        .attachCharacter(characterId, DUNGEON_ENTRY_SPAWN_X, DUNGEON_ENTRY_SPAWN_Y, entry.baseStats()));
+                        entry.loadout().maxHp()),
+                () -> instance.facade().attachCharacter(entry.loadout().entryAt(characterId, DUNGEON_ENTRY_POSITION)));
         instance.characterIds().add(characterId);
         instanceByCharacterId.put(characterId, instance);
     }
 
     /** Dữ liệu DB của một người sắp vào hầm ngục, đọc sẵn ngoài khoá. */
-    private record PendingEntry(long characterId, CharacterBaseStats baseStats, PositionSnapshot returnPosition) {}
+    private record PendingEntry(long characterId, CharacterLoadout loadout, PositionSnapshot returnPosition) {}
 
     /** Gỡ bookkeeping của {@code characterId} khỏi {@code instance} — dừng luôn World nếu rỗng. */
     private void leaveInstance(long characterId, DungeonInstance instance) {
@@ -345,13 +332,8 @@ final class DungeonInstanceRegistry {
         }
     }
 
-    private CharacterBaseStats loadBaseStats(long characterId) {
-        CharacterStats stats = characterFacade.loadStats(characterId);
-        Optional<Character> character = characterFacade.findById(characterId);
-        Element element =
-                character.map(c -> FactionMapping.toElement(c.faction())).orElse(Element.NONE);
-        int level = character.map(Character::level).orElse(1);
-        return new CharacterBaseStats(stats.str(), stats.agi(), stats.intelligence(), stats.vit(), element, level);
+    private CharacterLoadout loadoutOf(long characterId) {
+        return CharacterLoadout.load(characterFacade, registry, characterId);
     }
 
     /** 1 dungeon World đang chạy cho 1 party — {@code characterIds} mutable (thành viên vào/ra lẻ tẻ). */
