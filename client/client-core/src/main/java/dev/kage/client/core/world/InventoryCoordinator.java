@@ -15,6 +15,7 @@ import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.EnhanceItemResponse;
 import dev.kage.protocol.EquipItemResponse;
 import dev.kage.protocol.EquipmentSlot;
+import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.ItemCatalogEntry;
 import dev.kage.protocol.ItemGrantedEvent;
 import dev.kage.protocol.ItemUseEffect;
@@ -198,6 +199,9 @@ final class InventoryCoordinator implements WindowFlow {
             onItemGranted(ItemGrantedEvent.parseFrom(payload));
             return true;
         }
+        if (opcode == Opcode.OPCODE_ERROR_VALUE) {
+            return onEnhanceRejected(ErrorResponse.parseFrom(payload));
+        }
         return false;
     }
 
@@ -276,10 +280,28 @@ final class InventoryCoordinator implements WindowFlow {
      * phải có ĐÚNG một chủ.
      */
     private void onEnhanceSelected() {
-        controller
-                .selected()
-                .ifPresent(item -> sender.enhanceItem(
-                        item.itemId(), controller.useProtection(), controller.beginEnhance(item.itemId())));
+        controller.selected().ifPresent(item -> {
+            String idempotencyKey = controller.beginEnhance(item.itemId());
+            controller.onEnhanceSent(sender.enhanceItem(item.itemId(), controller.useProtection(), idempotencyKey));
+        });
+    }
+
+    /**
+     * Server từ chối lệnh Cường hoá đang treo bằng {@code ErrorResponse} thay vì
+     * {@code EnhanceItemResponse} — hiện chỉ có một ca: món đang được chào trong giao dịch (quyết
+     * định chủ dự án 2026-09-29, {@code error.item_in_trade}); thêm giá trị vào {@code EnhanceOutcome}
+     * là đổi protocol nên server đi đường lỗi chung.
+     *
+     * @return {@code false} nếu gói không thuộc lệnh Cường hoá đang treo — để luồng khác (hoặc
+     *     {@code WorldScreen#onUnclaimedError}) nhận
+     */
+    private boolean onEnhanceRejected(ErrorResponse error) {
+        if (!controller.isPendingEnhance(error.getRelatedSequenceId())) {
+            return false;
+        }
+        controller.onEnhanceSettled();
+        settle(InventoryController.errorMessageKey(error.getErrorKey()).orElse("inventory.error.unknown"));
+        return true;
     }
 
     /** Bấm "Dùng" trên item đang chọn (ADR-046 D5) — đan dược. */

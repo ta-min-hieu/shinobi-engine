@@ -1,6 +1,7 @@
 package dev.kage.inventory.api;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
@@ -172,17 +173,9 @@ public final class InventoryFacade {
      * {@code idempotencyKey} (ADR-025) — client sinh UUID, giữ nguyên khi tự retry.
      */
     public EnhanceResult enhanceItem(long characterId, long itemId, boolean useProtection, String idempotencyKey) {
-        return withCharacterLock(characterId, () -> switch (enhanceItemUseCase.execute(
-                characterId, itemId, useProtection, idempotencyKey)) {
-            case SUCCESS -> EnhanceResult.SUCCESS;
-            case FAILED_NO_DROP -> EnhanceResult.FAILED_NO_DROP;
-            case FAILED_DROPPED -> EnhanceResult.FAILED_DROPPED;
-            case FAILED_PROTECTED -> EnhanceResult.FAILED_PROTECTED;
-            case ITEM_NOT_FOUND -> EnhanceResult.ITEM_NOT_FOUND;
-            case MAX_LEVEL -> EnhanceResult.MAX_LEVEL;
-            case INSUFFICIENT_GOLD -> EnhanceResult.INSUFFICIENT_GOLD;
-            case DUPLICATE_REQUEST -> EnhanceResult.DUPLICATE_REQUEST;
-        });
+        return withCharacterLock(
+                characterId,
+                () -> toFacadeResult(enhanceItemUseCase.execute(characterId, itemId, useProtection, idempotencyKey)));
     }
 
     /**
@@ -241,6 +234,26 @@ public final class InventoryFacade {
         ITEM_NOT_FOUND,
         MAX_LEVEL,
         INSUFFICIENT_GOLD,
-        DUPLICATE_REQUEST
+        DUPLICATE_REQUEST,
+        /** Món đang nằm trong lời chào của một phiên giao dịch còn mở (2026-09-29) — không đổi gì. */
+        ITEM_IN_TRADE
+    }
+
+    // Bảng tra thay biểu thức switch: thêm nhánh thứ 9 (ITEM_IN_TRADE, 2026-09-29) đẩy switch chạm
+    // trần CyclomaticComplexity của PMD — cùng cách gateway làm với ENHANCE_OUTCOME_MAPPING.
+    private static final Map<EnhanceItemUseCase.EnhanceResult, EnhanceResult> ENHANCE_RESULT_MAPPING = Map.of(
+            EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceResult.SUCCESS,
+            EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP, EnhanceResult.FAILED_NO_DROP,
+            EnhanceItemUseCase.EnhanceResult.FAILED_DROPPED, EnhanceResult.FAILED_DROPPED,
+            EnhanceItemUseCase.EnhanceResult.FAILED_PROTECTED, EnhanceResult.FAILED_PROTECTED,
+            EnhanceItemUseCase.EnhanceResult.ITEM_NOT_FOUND, EnhanceResult.ITEM_NOT_FOUND,
+            EnhanceItemUseCase.EnhanceResult.MAX_LEVEL, EnhanceResult.MAX_LEVEL,
+            EnhanceItemUseCase.EnhanceResult.INSUFFICIENT_GOLD, EnhanceResult.INSUFFICIENT_GOLD,
+            EnhanceItemUseCase.EnhanceResult.DUPLICATE_REQUEST, EnhanceResult.DUPLICATE_REQUEST,
+            EnhanceItemUseCase.EnhanceResult.ITEM_IN_TRADE, EnhanceResult.ITEM_IN_TRADE);
+
+    /** Package-private để test khoá bảng tra phủ HẾT enum của use case (switch thì compiler khoá hộ). */
+    static EnhanceResult toFacadeResult(EnhanceItemUseCase.EnhanceResult result) {
+        return ENHANCE_RESULT_MAPPING.get(result);
     }
 }

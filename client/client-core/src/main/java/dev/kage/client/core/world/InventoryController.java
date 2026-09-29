@@ -52,7 +52,10 @@ final class InventoryController {
             "error.item_not_found",
             "error.wrong_equipment_slot",
             "error.slot_not_equipped",
-            "error.equip_level_too_low");
+            "error.equip_level_too_low",
+            // Cường hoá món đang chào trong giao dịch (quyết định chủ dự án 2026-09-29) — tới bằng
+            // ErrorResponse, không phải EnhanceOutcome, xem InventoryCoordinator#onEnhanceRejected.
+            "error.item_in_trade");
 
     /**
      * Một dòng túi đồ.
@@ -74,6 +77,9 @@ final class InventoryController {
     private long pendingEnhanceItemId;
 
     private String pendingEnhanceKey = "";
+
+    /** {@code sequenceId} của gói Cường hoá gửi gần nhất — chỉ có nghĩa khi đang có lệnh treo. */
+    private int pendingEnhanceSequenceId;
 
     /** Xem {@link #useProtection()} — mặc định TẮT. */
     private boolean useProtection;
@@ -199,6 +205,20 @@ final class InventoryController {
     void onEnhanceSettled() {
         pendingEnhanceItemId = 0L;
         pendingEnhanceKey = "";
+    }
+
+    /** Gói Cường hoá vừa gửi đi mang {@code sequenceId} này — xem {@link #isPendingEnhance(int)}. */
+    void onEnhanceSent(int sequenceId) {
+        pendingEnhanceSequenceId = sequenceId;
+    }
+
+    /**
+     * {@code ErrorResponse} có {@code related_sequence_id} này là lời từ chối của lệnh Cường hoá đang
+     * treo không. Opcode lỗi dùng chung cả giao thức, nên chỉ nhận đúng gói của mình — nuốt hết là
+     * cướp lỗi của luồng khác (cùng luật {@code FactionCoordinator#onError}).
+     */
+    boolean isPendingEnhance(int relatedSequenceId) {
+        return !pendingEnhanceKey.isEmpty() && relatedSequenceId == pendingEnhanceSequenceId;
     }
 
     /** Vật phẩm của lệnh Cường hoá đang treo — 0 khi không có lệnh nào treo. Chỉ dùng để test. */

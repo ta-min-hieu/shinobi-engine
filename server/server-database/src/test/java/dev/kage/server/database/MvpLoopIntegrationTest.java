@@ -216,7 +216,8 @@ class MvpLoopIntegrationTest {
                 new PostgresGoldAdapter(),
                 new PostgresAuditAdapter(),
                 new PostgresItemTemplateAdapter(dataSource),
-                new PostgresInventoryIdempotencyAdapter());
+                new PostgresInventoryIdempotencyAdapter(),
+                new dev.kage.server.database.inventory.PostgresInventoryTradeOfferAdapter());
         return new EnhanceItemUseCase(ports, new JdbcInventoryTransactionRunner(dataSource));
     }
 

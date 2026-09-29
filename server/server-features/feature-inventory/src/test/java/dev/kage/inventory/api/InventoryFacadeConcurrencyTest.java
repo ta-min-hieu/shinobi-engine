@@ -234,7 +234,8 @@ class InventoryFacadeConcurrencyTest {
                                 (tx, characterId, amount) -> true,
                                 (tx, characterId, action, detailJson) -> {},
                                 templatePort,
-                                (tx, idempotencyKey) -> {}),
+                                (tx, idempotencyKey) -> {},
+                                (tx, characterId, itemId) -> false),
                         DIRECT_TX),
                 new UseItemUseCase(port, templatePort, (tx, characterId, action, detailJson) -> {}, DIRECT_TX));
         InventoryQueryUseCases queryUseCases = new InventoryQueryUseCases(

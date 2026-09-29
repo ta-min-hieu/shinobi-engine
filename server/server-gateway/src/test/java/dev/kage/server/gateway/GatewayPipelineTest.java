@@ -845,8 +845,8 @@ class GatewayPipelineTest {
         GoldPort goldPort = (tx, characterId, amount) -> true;
         AuditPort auditPort = (tx, characterId, action, detailJson) -> {};
         dev.kage.inventory.domain.IdempotencyPort idempotencyPort = (tx, idempotencyKey) -> {};
-        EnhancePorts enhancePorts =
-                new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort, idempotencyPort);
+        EnhancePorts enhancePorts = new EnhancePorts(
+                inventoryPort, goldPort, auditPort, itemTemplatePort, idempotencyPort, (tx, c, i) -> false);
         EnhanceItemUseCase enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
         return new InventoryFacade(
                 new dev.kage.inventory.api.ItemAcquisitionUseCases(addItemUseCase, grantLootUseCase),

@@ -106,6 +106,7 @@ class EnhanceItemUseCaseTest {
     }
 
     private static final dev.kage.inventory.domain.TransactionRunner DIRECT_TX = action -> action.accept(null);
+    private static final dev.kage.inventory.domain.TradeOfferPort NOT_IN_TRADE = (tx, characterId, itemId) -> false;
     private static final String IDEMPOTENCY_KEY = "key-1";
 
     private static EnhanceItemUseCase newUseCase(
@@ -113,8 +114,8 @@ class EnhanceItemUseCaseTest {
             FakeGoldPort goldPort,
             FakeAuditPort auditPort,
             FakeItemTemplatePort itemTemplatePort) {
-        return newUseCase(
-                new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort, new FakeIdempotencyPort()));
+        return newUseCase(new EnhancePorts(
+                inventoryPort, goldPort, auditPort, itemTemplatePort, new FakeIdempotencyPort(), NOT_IN_TRADE));
     }
 
     private static EnhanceItemUseCase newUseCase(EnhancePorts ports) {
@@ -133,6 +134,38 @@ class EnhanceItemUseCaseTest {
         assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.ITEM_NOT_FOUND);
         assertThat(goldPort.deductCalled).isFalse();
         assertThat(auditPort.loggedAction).isNull();
+    }
+
+    /**
+     * Quyết định chủ dự án 2026-09-29: món đang chào trong giao dịch còn mở không được cường hoá —
+     * không trừ vàng, không đổi cấp, không ghi audit, và không TIÊU khoá idempotency (huỷ giao dịch
+     * xong thử lại bằng chính khoá đó vẫn phải chạy).
+     */
+    @Test
+    void shouldRejectWithoutSpendingAnything_whenItemIsOfferedInAnActiveTrade() {
+        ItemStack item = new ItemStack(ITEM_ID, TEMPLATE_ID, 1, 0);
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(item)));
+        FakeGoldPort goldPort = new FakeGoldPort(true);
+        FakeAuditPort auditPort = new FakeAuditPort();
+        FakeIdempotencyPort idempotencyPort = new FakeIdempotencyPort();
+        boolean[] inTrade = {true};
+        EnhanceItemUseCase useCase = newUseCase(new EnhancePorts(
+                inventoryPort,
+                goldPort,
+                auditPort,
+                new FakeItemTemplatePort(false),
+                idempotencyPort,
+                (tx, characterId, itemId) -> inTrade[0] && characterId == CHARACTER_ID && itemId == ITEM_ID));
+
+        EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false, IDEMPOTENCY_KEY);
+
+        assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.ITEM_IN_TRADE);
+        assertThat(goldPort.deductCalled).isFalse();
+        assertThat(inventoryPort.saved).isNull();
+        assertThat(auditPort.loggedAction).isNull();
+        inTrade[0] = false;
+        assertThat(useCase.execute(CHARACTER_ID, ITEM_ID, false, IDEMPOTENCY_KEY))
+                .isIn(EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP);
     }
 
     @Test
@@ -192,8 +225,8 @@ class EnhanceItemUseCaseTest {
         FakeGoldPort goldPort = new FakeGoldPort(true);
         FakeAuditPort auditPort = new FakeAuditPort();
         FakeIdempotencyPort idempotencyPort = new FakeIdempotencyPort();
-        EnhanceItemUseCase useCase = newUseCase(
-                new EnhancePorts(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false), idempotencyPort));
+        EnhanceItemUseCase useCase = newUseCase(new EnhancePorts(
+                inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(false), idempotencyPort, NOT_IN_TRADE));
         useCase.execute(CHARACTER_ID, ITEM_ID, false, IDEMPOTENCY_KEY);
 
         EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false, IDEMPOTENCY_KEY);

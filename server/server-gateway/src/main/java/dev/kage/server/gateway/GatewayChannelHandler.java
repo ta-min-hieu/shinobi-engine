@@ -1178,6 +1178,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     request.command().getIdempotencyKey());
             networkMetrics.recordEnhanceResult(result.name());
             span.setAttribute("result", result.name());
+            if (result == InventoryFacade.EnhanceResult.ITEM_IN_TRADE) {
+                // Quyết định chủ dự án 2026-09-29: món đang chào trong giao dịch không được cường
+                // hoá. KHÔNG thêm giá trị EnhanceOutcome (đổi protocol) — đi đường ErrorResponse +
+                // error_key như mọi từ chối nghiệp vụ khác; client khớp theo sequenceId.
+                sendError(ctx, request.sequenceId(), 409, "error.item_in_trade");
+                return;
+            }
             // ADR-043 — tôi luyện ĐỔI `enhance_level`, mà ADR-036 D2/D3 nhân hệ số cường hoá thẳng
             // vào `bonus_hp`/`bonus_atk`. Trước 2026-09-05 nhánh này KHÔNG HỀ gọi
             // `applyEquipmentBonus`, nên tôi luyện một món ĐANG MẶC không đổi chỉ số thật cho tới

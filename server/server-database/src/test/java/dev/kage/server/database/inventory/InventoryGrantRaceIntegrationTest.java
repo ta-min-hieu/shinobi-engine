@@ -350,7 +350,8 @@ class InventoryGrantRaceIntegrationTest {
                 new PostgresGoldAdapter(),
                 new PostgresAuditAdapter(),
                 new PostgresItemTemplateAdapter(dataSource),
-                new PostgresInventoryIdempotencyAdapter());
+                new PostgresInventoryIdempotencyAdapter(),
+                new PostgresInventoryTradeOfferAdapter());
         return new EnhanceItemUseCase(ports, new JdbcInventoryTransactionRunner(dataSource))
                 .execute(characterId, swordIds.get(0), false, newKey());
     }

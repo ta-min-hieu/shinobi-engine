@@ -158,7 +158,13 @@ class EnhanceItemUseCaseIntegrationTest {
         PostgresItemTemplateAdapter itemTemplatePort = new PostgresItemTemplateAdapter(dataSource);
         PostgresInventoryIdempotencyAdapter idempotencyPort = new PostgresInventoryIdempotencyAdapter();
         JdbcInventoryTransactionRunner tx = new JdbcInventoryTransactionRunner(dataSource);
-        EnhancePorts ports = new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort, idempotencyPort);
+        EnhancePorts ports = new EnhancePorts(
+                inventoryPort,
+                goldPort,
+                auditPort,
+                itemTemplatePort,
+                idempotencyPort,
+                new PostgresInventoryTradeOfferAdapter());
         return new EnhanceItemUseCase(ports, tx);
     }
 

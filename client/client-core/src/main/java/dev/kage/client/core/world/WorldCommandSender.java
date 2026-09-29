@@ -685,14 +685,18 @@ final class WorldCommandSender {
      *     tiêu khi roll THẤT BẠI ở mức đủ cao VÀ trong túi còn bùa, không tiêu nếu thành công.
      * @param idempotencyKey xem {@link #buyItem} — cùng luật ADR-025, và cùng lý do: cường hoá TRỪ
      *     VÀNG THẬT nên một lần bấm không được biến thành hai lần trừ.
+     * @return {@code sequenceId} của gói — server từ chối món đang chào trong giao dịch bằng
+     *     {@code ErrorResponse} mang đúng số này (2026-09-29), không bằng {@code EnhanceItemResponse}
      */
-    void enhanceItem(long itemId, boolean useProtection, String idempotencyKey) {
+    int enhanceItem(long itemId, boolean useProtection, String idempotencyKey) {
         EnhanceItemCommand command = EnhanceItemCommand.newBuilder()
                 .setItemId(itemId)
                 .setUseProtection(useProtection)
                 .setIdempotencyKey(idempotencyKey)
                 .build();
-        send(Opcode.OPCODE_ENHANCE_ITEM_COMMAND_VALUE, command.toByteArray(), "EnhanceItemCommand");
+        int sequenceId = connection.nextSequenceId();
+        send(Opcode.OPCODE_ENHANCE_ITEM_COMMAND_VALUE, sequenceId, command.toByteArray(), "EnhanceItemCommand");
+        return sequenceId;
     }
 
     /**
