@@ -109,6 +109,16 @@ public final class LoginScreen implements GameScreen {
         stage.addActor(root);
     }
 
+    /**
+     * Hiện lý do người chơi vừa bị đưa về đây từ màn world — ví dụ {@code error.logged_in_elsewhere}
+     * (bị đá vì nhân vật vừa vào thế giới từ kết nối khác, quyết định chủ dự án 2026-09-25).
+     *
+     * @param errorKey khoá i18n server gửi; khoá lạ rơi về câu lỗi kết nối chung
+     */
+    public void showSessionEndedReason(String errorKey) {
+        statusLabel.setText(KageI18n.errorText(i18n, errorKey, "login.error.connect_failed"));
+    }
+
     @Override
     public void show() {
         Gdx.input.setInputProcessor(stage);

@@ -27,6 +27,7 @@ import dev.kage.tools.loadtest.CommandLineArguments;
  * @param quest kịch bản nhiệm vụ (nói chuyện NPC / lĩnh thưởng / in nhật ký) — xem {@link QuestPlan}
  * @param enterDungeon mã hầm ngục để tự lập nhóm 1 người rồi vào, sau khi đi bộ; rỗng = không vào —
  *     xem {@link DungeonScenario}
+ * @param duel kịch bản Arena 1v1 (thách / chấp nhận / bỏ cuộc) — xem {@link DuelPlan}
  */
 public record ProbeConfig(
         String host,
@@ -43,7 +44,8 @@ public record ProbeConfig(
         int settleSeconds,
         List<String> equipItemCodes,
         QuestPlan quest,
-        String enterDungeon) {
+        String enterDungeon,
+        DuelPlan duel) {
 
     /**
      * Danh sách mã trang bị BẤT BIẾN — record không tự copy, mà lệnh gọi có thể truyền list sống
@@ -79,6 +81,23 @@ public record ProbeConfig(
         }
     }
 
+    /**
+     * Kịch bản Arena 1v1 ({@link ArenaScenario}) — hai probe, một bên thách, một bên chấp nhận.
+     *
+     * @param challengeTargetName tên nhân vật để thách đấu; rỗng = không thách
+     * @param acceptIncoming {@code true} = đợi lời thách đến rồi chấp nhận
+     * @param waitSeconds hạn chót chờ lời thách / trận bắt đầu
+     * @param forfeitAfterObserve {@code true} = gửi {@code ExitDuelCommand} (bỏ cuộc) sau vòng quan sát
+     */
+    public record DuelPlan(
+            String challengeTargetName, boolean acceptIncoming, int waitSeconds, boolean forfeitAfterObserve) {
+
+        /** {@code true} khi probe phải vào trận trước vòng quan sát. */
+        public boolean isRequested() {
+            return acceptIncoming || !challengeTargetName.isEmpty();
+        }
+    }
+
     /** Giá trị {@code attackTarget} nghĩa là "không đánh, chỉ quan sát". */
     public static final String ATTACK_TARGET_NONE = "none";
 
@@ -90,6 +109,7 @@ public record ProbeConfig(
     private static final String DEFAULT_USERNAME = "kagetest";
     private static final int DEFAULT_ATTACK_INTERVAL_MILLIS = 1000; // CombatConstants.ATTACK_INTERVAL_SECONDS = 1s
     private static final int DEFAULT_OBSERVE_SECONDS = 10;
+    private static final int DEFAULT_DUEL_WAIT_SECONDS = 60;
 
     /** @param args mảng tham số thô của {@code main} */
     public static ProbeConfig parse(String[] args) {
@@ -113,7 +133,12 @@ public record ProbeConfig(
                         raw.list("dialogueChoices"),
                         raw.text("claimQuest", ""),
                         raw.flag("questReport", false)),
-                raw.text("enterDungeon", ""));
+                raw.text("enterDungeon", ""),
+                new DuelPlan(
+                        raw.text("challengeDuel", ""),
+                        raw.flag("acceptDuel", false),
+                        raw.integer("duelWaitSeconds", DEFAULT_DUEL_WAIT_SECONDS),
+                        raw.flag("forfeitDuel", false)));
     }
 
     /** {@code true} khi người dùng muốn probe tự chọn con gần nhất trong AoI. */

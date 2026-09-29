@@ -9,6 +9,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.embedded.EmbeddedChannel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -28,7 +31,8 @@ class CharacterPositionPersisterTest {
     private static final PositionSnapshot LOGOUT_POSITION = new PositionSnapshot(2f, 2f);
     private static final long WAIT_SECONDS = 5L;
 
-    private final ConnectedCharacterRegistry registry = new ConnectedCharacterRegistry(null, null, null, null);
+    private final ConnectedCharacterRegistry registry =
+            new ConnectedCharacterRegistry(null, null, null, new GatewayNetworkMetrics(new SimpleMeterRegistry()));
     private CharacterPositionPersister persister;
 
     @AfterEach
@@ -54,6 +58,10 @@ class CharacterPositionPersisterTest {
             writes.add(new PositionSnapshot(x, y));
         };
         persister = new CharacterPositionPersister(writer, registry, Duration.ofMillis(10));
+        // Phải register như GatewayChannelHandler thật — registry chỉ theo dõi vị trí của nhân vật
+        // đang đăng ký (ConnectedCharacterRegistryPositionTest).
+        EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(CHARACTER_ID, channel.pipeline().firstContext());
         moveTo(SNAPSHOT_POSITION);
         persister.start();
         assertThat(periodicWriteEntered.await(WAIT_SECONDS, TimeUnit.SECONDS)).isTrue();
@@ -63,14 +71,18 @@ class CharacterPositionPersisterTest {
         moveTo(LOGOUT_POSITION);
         PositionSnapshot lastPosition = registry.lastKnownPosition(CHARACTER_ID);
         registry.unregister(CHARACTER_ID);
-        Thread logout =
-                Thread.ofVirtual().start(() -> persister.save(CHARACTER_ID, lastPosition.x(), lastPosition.y()));
+        java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CompletableFuture<Void>> logoutWrite =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        Thread logout = Thread.ofVirtual()
+                .start(() -> logoutWrite.set(persister.save(CHARACTER_ID, lastPosition.x(), lastPosition.y())));
         logout.join(TimeUnit.SECONDS.toMillis(WAIT_SECONDS));
 
         releasePeriodicWrite.countDown();
         awaitWriteCount(writes, 2);
 
         assertThat(writes).last().isEqualTo(LOGOUT_POSITION);
+        // Mốc "đã ghi xong" mà phiên mới chờ trước khi đọc vị trí (quyết định một-phiên 2026-09-25).
+        assertThat(logoutWrite.get()).succeedsWithin(Duration.ofSeconds(WAIT_SECONDS));
     }
 
     private void moveTo(PositionSnapshot position) {

@@ -55,6 +55,10 @@ public interface InventoryPort {
      * cũ trỏ vào đồ của người mới (một thanh kiếm, hai người cùng hưởng chỉ số). Khoá cùng dòng làm
      * hai bên xếp hàng: bên nào tới sau thấy trạng thái SAU khi bên kia commit.
      *
+     * <p>Adapter thật PHẢI lấy khoá túi đồ của {@code characterId} TRƯỚC khoá dòng (2026-09-25,
+     * DATABASE.md §5.1): khoá dòng một mình không chặn được chiều "mặc trước, bán sau" — câu kiểm
+     * "đang mặc không" của bên bán đọc bảng {@code equipment_slot} theo ảnh chụp cũ sau khi chờ.
+     *
      * <p>Mặc định (fake trong test, không có khái niệm khoá): tra qua {@link #findByCharacter}.
      */
     default Optional<ItemStack> findOwnedItemForUpdate(Transaction tx, long characterId, long itemId) {

@@ -612,6 +612,14 @@ final class WorldCommandSender {
         return connection.isConnected();
     }
 
+    /**
+     * Dừng HẲN kết nối, kể cả vòng tự kết nối lại — phiên đã bị server kết thúc (bị đá vì đăng nhập
+     * nơi khác), nối lại chỉ đưa người chơi vào một phiên chết. Xem {@code WorldScreen#endSession}.
+     */
+    void stop() {
+        connection.stop();
+    }
+
     // -------------------------------------------------------------------------------------------
     // Catalog vật phẩm (inventory.proto, ADR-035 opcode 509/510) — xem ItemCatalogCoordinator.
     // -------------------------------------------------------------------------------------------

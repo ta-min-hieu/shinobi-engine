@@ -333,7 +333,15 @@ public final class CharacterSelectScreen implements GameScreen {
                 failWithGenericError();
                 return;
             }
-            engine.setScreen(new WorldScreen(context, connection, pendingSelection, response));
+            WorldScreen worldScreen = new WorldScreen(context, connection, pendingSelection, response);
+            // Bị đá vì đăng nhập nơi khác (2026-09-25) ⇒ về màn đăng nhập kèm lý do, không tự nối lại
+            // vào một phiên đã chết. Màn world đã tự dừng kết nối trước khi gọi tới đây.
+            worldScreen.setOnSessionEnded(errorKey -> {
+                LoginScreen login = new LoginScreen(engine, context, null);
+                login.showSessionEndedReason(errorKey);
+                engine.setScreen(login);
+            });
+            engine.setScreen(worldScreen);
         } catch (InvalidProtocolBufferException e) {
             LOG.warn("SelectCharacterResponse không hợp lệ", e);
             failWithGenericError();

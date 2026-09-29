@@ -215,6 +215,12 @@ Hệ quả phải giữ:
 - Đọc túi để quyết định (còn chỗ không, có món đó không) phải nằm **trong** transaction, **sau**
   khoá. `ClaimQuestRewardUseCase` từng hỏi "đủ chỗ không" ở một transaction chỉ đọc riêng — nay hỏi
   ngay trong transaction ghi.
+- **Mặc đồ cũng lấy khoá này** (2026-09-25) dù nó chỉ ghi `equipment_slot`: bán/thư/giao dịch
+  kiểm "đang mặc không" bằng `EXISTS (equipment_slot)` trong câu `FOR UPDATE`, và sau khi chờ khoá
+  dòng Postgres chỉ đánh giá lại DÒNG bị khoá, còn bảng khác vẫn đọc theo ảnh chụp cũ ⇒ mặc tới
+  trước (chưa commit), bán tới sau = bán luôn món vừa mặc (World giữ chỉ số tới lần đăng nhập
+  sau). Tái hiện ở `EquipWhileItemLeavesIntegrationTest`. Bài học chung: **khoá dòng không thay
+  được khoá túi đồ** khi phép kiểm đọc bảng khác.
 - Transaction chỉ đụng vàng mà không đụng túi đồ (vd lập bang) KHÔNG cần khoá này — chúng không bao
   giờ chờ khoá túi đồ nên không khép được vòng.
 - Thêm đường ghi túi đồ thứ bảy ⇒ gọi khoá ở dòng đầu tiên của transaction. Port có bản mặc định

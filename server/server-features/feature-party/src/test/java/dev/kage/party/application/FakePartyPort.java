@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 import dev.kage.party.domain.DuplicatePartyInviteException;
+import dev.kage.party.domain.DuplicatePartyMembershipException;
 import dev.kage.party.domain.Party;
 import dev.kage.party.domain.PartyInvite;
 import dev.kage.party.domain.PartyMember;
@@ -23,7 +24,7 @@ import dev.kage.party.domain.PartyRole;
  * thật: UNIQUE (party_id, invitee_character_id) lời mời, UNIQUE character_id thành viên, khoá
  * sức chứa {@link Party#MAX_MEMBERS} lúc chấp nhận, thăng leader tự động lúc leader rời.
  */
-final class FakePartyPort implements PartyPort {
+class FakePartyPort implements PartyPort {
 
     private final Map<Long, Party> partiesById = new LinkedHashMap<>();
     private final List<PartyMember> members = new ArrayList<>();
@@ -43,6 +44,11 @@ final class FakePartyPort implements PartyPort {
 
     @Override
     public Party createParty(long leaderCharacterId) {
+        // Mô phỏng UNIQUE party_member.character_id — KHÔNG gọi findMembershipOf (lớp con trong
+        // CreatePartyUseCaseTest ghi đè nó để giả lập check-then-act thua race).
+        if (members.stream().anyMatch(m -> m.characterId() == leaderCharacterId)) {
+            throw new DuplicatePartyMembershipException(leaderCharacterId);
+        }
         Party party = new Party(nextPartyId.getAndIncrement(), leaderCharacterId, Instant.now());
         partiesById.put(party.id(), party);
         members.add(new PartyMember(party.id(), leaderCharacterId, PartyRole.LEADER, Instant.now()));

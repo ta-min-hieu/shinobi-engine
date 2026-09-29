@@ -379,6 +379,46 @@ public final class WorldFacade {
             tickLock.lock();
             tickLock.unlock();
         }
+        completePendingBarriers();
+    }
+
+    /**
+     * Mốc chặn hàng đợi: xong khi tick thread đã xử lý hết MỌI lệnh xếp trước lời gọi này.
+     *
+     * <p><b>Vì sao cần (quyết định chủ dự án 2026-09-25 — một nhân vật chỉ một phiên sống).</b> Khi
+     * phiên mới đá phiên cũ, lệnh di chuyển của phiên cũ có thể còn nằm trong hàng đợi TRƯỚC lệnh
+     * detach. World xử lý chúng sau, và {@code onMoveAccepted} tra kết nối theo {@code characterId} —
+     * nếu phiên mới đã đăng ký thì gói xác nhận muộn của phiên cũ rơi vào kết nối MỚI. Gateway chờ
+     * mốc này trước khi đăng ký phiên mới, nên thứ tự đó không thể xảy ra.
+     *
+     * <p>World không tick (chưa {@link #start()}, hoặc đã {@link #stop()}) thì không lệnh nào còn
+     * có thể phát gói ra ngoài — mốc xong NGAY. Lệnh xếp vào đúng lúc {@link #stop()} chạy cũng không
+     * treo: {@link #stop()} tự hoàn tất mọi mốc còn nằm lại trong hàng đợi.
+     *
+     * <p>Không chạy trong vòng tick; không cấp phát gì trên tick thread ngoài việc hoàn tất future.
+     */
+    public java.util.concurrent.CompletableFuture<Void> inboxBarrier() {
+        java.util.concurrent.CompletableFuture<Void> reached = new java.util.concurrent.CompletableFuture<>();
+        if (!running) {
+            reached.complete(null);
+            return reached;
+        }
+        inbox.add(new WorldCommand.InboxBarrierCommand(() -> reached.complete(null)));
+        if (!running) {
+            // stop() chen vào giữa lần kiểm ở trên và lúc xếp hàng — có thể nó đã quét hàng đợi
+            // xong trước khi mốc này vào. Không tick nữa thì mốc đã "tới" theo đúng nghĩa.
+            reached.complete(null);
+        }
+        return reached;
+    }
+
+    /** Hoàn tất mọi mốc chặn còn nằm lại sau khi world ngừng tick — xem {@link #inboxBarrier()}. */
+    private void completePendingBarriers() {
+        for (WorldCommand command : inbox) {
+            if (command instanceof WorldCommand.InboxBarrierCommand barrier) {
+                barrier.onReached().run();
+            }
+        }
     }
 
     public void attachCharacter(long characterId, float spawnX, float spawnY, CharacterBaseStats baseStats) {
@@ -612,6 +652,7 @@ public final class WorldFacade {
                 case WorldCommand.AppearanceChangedCommand c -> handleAppearanceChanged(c.characterId());
                 case WorldCommand.HealCharacterCommand c -> handleHealCharacter(c.characterId(), c.amount());
                 case WorldCommand.SpawnBossCommand c -> spawnBossEntity(c.bossCode());
+                case WorldCommand.InboxBarrierCommand c -> c.onReached().run();
             }
         }
     }

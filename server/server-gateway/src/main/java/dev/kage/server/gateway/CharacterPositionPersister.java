@@ -1,6 +1,7 @@
 package dev.kage.server.gateway;
 
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -90,18 +91,22 @@ final class CharacterPositionPersister {
      * caller đọc) xong trước; lượt nào bắt đầu SAU lời gọi này thì nhân vật đã bị
      * {@code unregister()}, không còn trong ảnh chụp. Chưa {@link #start()} (test) hoặc đã
      * {@link #stop()} (tắt server — đã chờ lượt đang dở xong) thì ghi ngay trên thread gọi.
+     *
+     * @return xong khi dòng vị trí đã được ghi (hoặc lần ghi đã thất bại và được log) — phiên mới
+     *     của CÙNG nhân vật chờ mốc này trước khi đọc vị trí vào world (quyết định một-phiên
+     *     2026-09-25), nếu không nó đọc phải vị trí lưu lần trước
      */
-    void save(long characterId, float x, float y) {
+    CompletableFuture<Void> save(long characterId, float x, float y) {
         ScheduledExecutorService current = scheduler;
         if (current != null) {
             try {
-                current.execute(() -> savePositionSafely(characterId, x, y));
-                return;
+                return CompletableFuture.runAsync(() -> savePositionSafely(characterId, x, y), current);
             } catch (RejectedExecutionException e) {
                 LOG.debug("Persister đã dừng — ghi vị trí trực tiếp: characterId={}", characterId, e);
             }
         }
         savePositionSafely(characterId, x, y);
+        return CompletableFuture.completedFuture(null);
     }
 
     // PMD AvoidCatchingGenericException: task nền định kỳ — 1 nhân vật lỗi (DB tạm gián đoạn)
