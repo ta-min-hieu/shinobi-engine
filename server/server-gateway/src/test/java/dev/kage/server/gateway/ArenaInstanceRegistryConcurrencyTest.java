@@ -64,7 +64,10 @@ class ArenaInstanceRegistryConcurrencyTest {
         // Inventory/quest/pvp KHÔNG nằm trên đường thách đấu/chấp nhận (chỉ chốt trận mới chạm tới) —
         // null thay vì dựng ba facade cồng kềnh chỉ để không bao giờ gọi tới.
         characterRegistry = new ConnectedCharacterRegistry(
-                null, null, ExperienceGrantPort.disabled(), new GatewayNetworkMetrics(new SimpleMeterRegistry()));
+                GatewayPipelineTest.fakeInventoryFacade(),
+                null,
+                ExperienceGrantPort.disabled(),
+                new GatewayNetworkMetrics(new SimpleMeterRegistry()));
         for (long id : new long[] {CHALLENGER_ID, TARGET_ONE_ID, TARGET_TWO_ID}) {
             characterRegistry.register(
                     id,

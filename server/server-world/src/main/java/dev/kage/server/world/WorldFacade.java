@@ -435,9 +435,8 @@ public final class WorldFacade {
      * thanh máu 100, trong khi mặc đủ bộ là 27 trên thanh 206 — và nhát đó rơi trước cả
      * {@code SelectCharacterResponse}.
      *
-     * <p>⚠️ Các đường arena/dungeon vẫn dùng overload 4 tham số ở trên và vì thế CÒN cửa sổ đó:
-     * chúng không cầm sẵn {@code EquipmentBonusSnapshot}. Nối chúng là việc riêng, cần chủ dự án
-     * quyết vì nó kéo {@code currentEquipmentBonus} ra khỏi {@code GatewayChannelHandler}.
+     * <p>Mọi đường attach của gateway (world chính, hầm ngục, đấu trường, đường về) đều đi qua
+     * overload này từ 2026-09-29 — overload 4 tham số ở trên chỉ còn cho test/nhân vật không trang bị.
      */
     public void attachCharacter(CharacterEntry entry) {
         inbox.add(new WorldCommand.AttachCharacterCommand(entry));

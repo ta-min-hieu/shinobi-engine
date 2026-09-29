@@ -12,13 +12,13 @@ package dev.kage.server.world;
  * 27 trên thanh 206. Gói chúng vào một record là cách làm cho "quên gửi bonus" trở thành chuyện
  * KHÔNG diễn đạt được, thay vì một lỗi phải nhớ mà tránh.
  *
- * @param bonus {@link EquipmentBonusSnapshot#NONE} nếu chỗ gọi không có trang bị (test, và các đường
- *     arena/dungeon chưa nối — xem ghi chú tại chỗ gọi ở hai registry đó)
+ * @param bonus {@link EquipmentBonusSnapshot#NONE} nếu chỗ gọi không có trang bị (test); mọi đường
+ *     attach của gateway đều truyền bonus thật từ 2026-09-29
  */
 public record CharacterEntry(
         long characterId, float spawnX, float spawnY, CharacterBaseStats baseStats, EquipmentBonusSnapshot bonus) {
 
-    /** Vào world KHÔNG kèm chỉ số trang bị — test, và các đường chưa nối được nguồn bonus. */
+    /** Vào world KHÔNG kèm chỉ số trang bị — chỉ cho test. */
     public static CharacterEntry withoutEquipment(
             long characterId, float spawnX, float spawnY, CharacterBaseStats baseStats) {
         return new CharacterEntry(characterId, spawnX, spawnY, baseStats, EquipmentBonusSnapshot.NONE);

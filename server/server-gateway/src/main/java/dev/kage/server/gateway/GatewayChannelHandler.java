@@ -42,7 +42,6 @@ import dev.kage.friend.api.FriendFacade;
 import dev.kage.guild.api.GuildFacade;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.application.UseItemUseCase;
-import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.InventorySnapshot;
 import dev.kage.inventory.domain.ItemCatalog;
@@ -256,8 +255,6 @@ import dev.kage.protocol.wire.ProtocolVersion;
 import dev.kage.pvp.api.PvpFacade;
 import dev.kage.pvp.application.GetPvpRatingUseCase;
 import dev.kage.quest.api.QuestFacade;
-import dev.kage.server.world.CharacterBaseStats;
-import dev.kage.server.world.CharacterEntry;
 import dev.kage.server.world.EquipmentBonusSnapshot;
 import dev.kage.server.world.WorldFacade;
 import dev.kage.shop.api.ShopFacade;
@@ -753,13 +750,6 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // bindOrReleaseIfClosed.
         PositionSnapshot spawn = characterFacade.loadPosition(characterId);
         CharacterStats stats = characterFacade.loadStats(characterId);
-        CharacterBaseStats baseStats = new CharacterBaseStats(
-                stats.str(),
-                stats.agi(),
-                stats.intelligence(),
-                stats.vit(),
-                FactionMapping.toElement(character.faction()),
-                character.level());
         // Phase 9 lát cắt 6: định tuyến vào khu vực (channel) còn chỗ thay vì thẳng 1 World
         // duy nhất — MainWorldChannelRegistry tự mở thêm khu vực nếu cần (giới hạn người/khu
         // vực chặn AoI phình theo TỔNG N toàn map, xem javadoc class đó).
@@ -767,15 +757,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // gửi CÙNG một lệnh world. Tách làm hai lệnh (attach rồi applyEquipmentBonus) để lại một
         // tick mà entity đã ở trong world với chỉ số NỀN: đo thật 2026-09-18, đăng nhập cạnh quái
         // ăn 37 sát thương trên thanh máu 100 thay vì 27 trên thanh 206.
-        EquipmentBonusSnapshot bonus = currentEquipmentBonus(characterId);
-        SelectCharacterResponse response = enterWorldResponse(bonus, spawn);
+        CharacterLoadout loadout = new CharacterLoadout(
+                CharacterLoadout.baseStatsOf(character, stats), currentEquipmentBonus(characterId));
+        SelectCharacterResponse response = enterWorldResponse(loadout, spawn);
         send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
         // Đăng ký connection NÀY để world outbound (spawn/move/despawn — SERVER.md §6) tìm
         // đúng channel; attachCharacter chỉ enqueue, entity ECS thật tạo ở tick kế tiếp.
         worldGateway.registry().register(characterId, ctx, CharacterAppearance.of(toProtoFaction(character.faction())));
-        worldGateway
-                .mainWorldChannels()
-                .attachCharacter(new CharacterEntry(characterId, spawn.x(), spawn.y(), baseStats, bonus));
+        worldGateway.mainWorldChannels().attachCharacter(loadout.entryAt(characterId, spawn));
         return bindOrReleaseIfClosed(ctx, characterId);
     }
 
@@ -817,8 +806,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * máu hiện tại chưa được lưu qua phiên ({@code character_stat.current_hp} có cột nhưng world
      * không đọc). Khi nào HP được lưu thật thì đổi ĐÚNG chỗ này.
      */
-    private static SelectCharacterResponse enterWorldResponse(EquipmentBonusSnapshot bonus, PositionSnapshot spawn) {
-        int maxHp = WorldFacade.characterMaxHp(bonus);
+    private static SelectCharacterResponse enterWorldResponse(CharacterLoadout loadout, PositionSnapshot spawn) {
+        int maxHp = loadout.maxHp();
         return SelectCharacterResponse.newBuilder()
                 .setSuccess(true)
                 .setCurrentHp(maxHp)
@@ -871,8 +860,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * {@code authExecutor} (Virtual Thread), không bao giờ trên EventLoop.
      */
     private EquipmentBonusSnapshot currentEquipmentBonus(long characterId) {
-        EquipmentBonus bonus = inventoryFacade.computeEquipmentBonus(characterId);
-        return new EquipmentBonusSnapshot(bonus.bonusAtk(), bonus.bonusDef(), bonus.bonusRes(), bonus.bonusHp());
+        return CharacterLoadout.snapshotOf(inventoryFacade.computeEquipmentBonus(characterId));
     }
 
     /**

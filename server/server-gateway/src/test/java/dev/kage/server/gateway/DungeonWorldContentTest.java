@@ -53,7 +53,10 @@ class DungeonWorldContentTest {
     @BeforeEach
     void setUp() {
         characterRegistry = new ConnectedCharacterRegistry(
-                null, null, ExperienceGrantPort.disabled(), new GatewayNetworkMetrics(new SimpleMeterRegistry()));
+                GatewayPipelineTest.fakeInventoryFacade(),
+                null,
+                ExperienceGrantPort.disabled(),
+                new GatewayNetworkMetrics(new SimpleMeterRegistry()));
         characterRegistry.register(
                 DungeonInstanceRegistryConcurrencyTest.LEADER_ID,
                 leaderChannel.pipeline().firstContext());

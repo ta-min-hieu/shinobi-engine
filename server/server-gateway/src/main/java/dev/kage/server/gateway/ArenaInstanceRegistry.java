@@ -11,8 +11,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 import dev.kage.character.api.CharacterFacade;
-import dev.kage.character.domain.Character;
-import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.protocol.DuelResultEvent;
 import dev.kage.protocol.Opcode;
@@ -20,10 +18,6 @@ import dev.kage.protocol.WorldChangeReason;
 import dev.kage.protocol.WorldKind;
 import dev.kage.pvp.api.PvpFacade;
 import dev.kage.pvp.application.RecordDuelResultUseCase;
-import dev.kage.server.world.CharacterBaseStats;
-import dev.kage.server.world.CharacterEntry;
-import dev.kage.server.world.Element;
-import dev.kage.server.world.EquipmentBonusSnapshot;
 import dev.kage.server.world.WorldFacade;
 
 /**
@@ -282,7 +276,7 @@ final class ArenaInstanceRegistry {
         if (returnPosition == null) {
             returnPosition = characterFacade.loadPosition(characterId);
         }
-        return new DuelEntrant(characterId, loadBaseStats(characterId), returnPosition);
+        return new DuelEntrant(characterId, loadoutOf(characterId), returnPosition);
     }
 
     /**
@@ -312,23 +306,24 @@ final class ArenaInstanceRegistry {
 
     /**
      * ADR-051 — cả hai người nhận {@code WorldChangedEvent} lý do {@code REQUESTED}: người chấp nhận
-     * vừa bấm, còn người thách chính là người đã xin trận này. Máu đặt lúc attach là máu NỀN — World
-     * đấu trường attach không kèm bonus trang bị (giới hạn có sẵn, javadoc
-     * {@code WorldFacade#attachCharacter(CharacterEntry)}).
+     * vừa bấm, còn người thách chính là người đã xin trận này. Attach KÈM bonus trang bị (sửa
+     * 2026-09-29 — trước đây vào trận bằng chỉ số NỀN, máu 206 → 100) ⇒ máu trong event là máu đầy
+     * của máu tối đa hiệu lực.
      */
     private void moveCharacterIntoDuel(DuelEntrant entrant, DuelInstance instance, float spawnX) {
         long characterId = entrant.characterId();
         returnPositionByCharacterId.put(characterId, entrant.returnPosition());
 
+        PositionSnapshot spawn = new PositionSnapshot(spawnX, DUEL_SPAWN_Y);
         transfer.move(
                 characterId,
                 () -> mainWorldChannels.detachCharacter(characterId),
                 WorldTransfer.event(
                         WorldKind.WORLD_KIND_ARENA,
                         WorldChangeReason.WORLD_CHANGE_REASON_REQUESTED,
-                        new PositionSnapshot(spawnX, DUEL_SPAWN_Y),
-                        WorldFacade.characterMaxHp(EquipmentBonusSnapshot.NONE)),
-                () -> instance.facade().attachCharacter(characterId, spawnX, DUEL_SPAWN_Y, entrant.baseStats()));
+                        spawn,
+                        entrant.loadout().maxHp()),
+                () -> instance.facade().attachCharacter(entrant.loadout().entryAt(characterId, spawn)));
         instanceByCharacterId.put(characterId, instance);
     }
 
@@ -367,12 +362,10 @@ final class ArenaInstanceRegistry {
     }
 
     private void reattachToMainWorld(long characterId) {
-        CharacterBaseStats baseStats = loadBaseStats(characterId);
+        // Bonus trang bị đi CÙNG lệnh attach (2026-09-18): thiếu nó thì đấu xong là về map chính
+        // với chỉ số NỀN và không bao giờ được cộng lại — máu 206 → 100, def 65 → 20.
+        CharacterLoadout loadout = loadoutOf(characterId);
         PositionSnapshot returnPosition = returnPositionByCharacterId.remove(characterId);
-        // Bonus trang bị đi CÙNG lệnh attach (2026-09-18): thiếu nó thì đấu xong / rời hầm ngục là
-        // nhân vật về map chính với chỉ số NỀN và không bao giờ được cộng lại — máu 206 → 100,
-        // def 65 → 20, tới tận khi mặc/gỡ đồ hoặc đăng nhập lại. `registry` đã cầm InventoryFacade.
-        EquipmentBonusSnapshot equipmentBonus = registry.equipmentBonusOf(characterId);
         // Mọi đường gọi tới đây đã detach cả hai người khỏi World đấu trường từ trước ⇒ bước detach
         // của WorldTransfer không còn gì để làm.
         transfer.move(
@@ -382,9 +375,8 @@ final class ArenaInstanceRegistry {
                         WorldKind.WORLD_KIND_MAIN,
                         WorldChangeReason.WORLD_CHANGE_REASON_DUEL_ENDED,
                         returnPosition,
-                        WorldFacade.characterMaxHp(equipmentBonus)),
-                () -> mainWorldChannels.attachCharacter(new CharacterEntry(
-                        characterId, returnPosition.x(), returnPosition.y(), baseStats, equipmentBonus)));
+                        loadout.maxHp()),
+                () -> mainWorldChannels.attachCharacter(loadout.entryAt(characterId, returnPosition)));
     }
 
     private static long opponentOf(long characterId, DuelInstance instance) {
@@ -393,19 +385,14 @@ final class ArenaInstanceRegistry {
                 : instance.challengerCharacterId();
     }
 
-    private CharacterBaseStats loadBaseStats(long characterId) {
-        CharacterStats stats = characterFacade.loadStats(characterId);
-        Optional<Character> character = characterFacade.findById(characterId);
-        Element element =
-                character.map(c -> FactionMapping.toElement(c.faction())).orElse(Element.NONE);
-        int level = character.map(Character::level).orElse(1);
-        return new CharacterBaseStats(stats.str(), stats.agi(), stats.intelligence(), stats.vit(), element, level);
+    private CharacterLoadout loadoutOf(long characterId) {
+        return CharacterLoadout.load(characterFacade, registry, characterId);
     }
 
     private record PendingChallenge(long challengeId, long challengerCharacterId, long targetCharacterId) {}
 
     /** Dữ liệu DB của một người sắp vào trận, đọc sẵn ngoài khoá. */
-    private record DuelEntrant(long characterId, CharacterBaseStats baseStats, PositionSnapshot returnPosition) {}
+    private record DuelEntrant(long characterId, CharacterLoadout loadout, PositionSnapshot returnPosition) {}
 
     /** 1 trận Arena đang chạy — {@code challengerCharacterId}/{@code targetCharacterId} cố định cả trận. */
     private record DuelInstance(

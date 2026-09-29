@@ -792,6 +792,22 @@ class GatewayPipelineTest {
             List<dev.kage.inventory.domain.ItemStack> seededItems,
             Map<dev.kage.inventory.domain.EquipmentSlotType, Long> seededEquipment,
             List<dev.kage.inventory.domain.ItemCatalogEntry> seededCatalog) {
+        return fakeInventoryFacade(new SeededInventory(seededItems, seededEquipment, Map.of()), seededCatalog);
+    }
+
+    /**
+     * Túi đồ + trang bị + mẫu vật phẩm seed sẵn — MỌI nhân vật dùng chung một bộ. Có {@code templates}
+     * thì {@code computeEquipmentBonus} ra số thật (test chỉ số trang bị khi đổi World).
+     */
+    record SeededInventory(
+            List<dev.kage.inventory.domain.ItemStack> items,
+            Map<dev.kage.inventory.domain.EquipmentSlotType, Long> equipment,
+            Map<Long, ItemTemplate> templates) {}
+
+    static InventoryFacade fakeInventoryFacade(
+            SeededInventory seeded, List<dev.kage.inventory.domain.ItemCatalogEntry> seededCatalog) {
+        List<dev.kage.inventory.domain.ItemStack> seededItems = seeded.items();
+        Map<dev.kage.inventory.domain.EquipmentSlotType, Long> seededEquipment = seeded.equipment();
         InventoryPort inventoryPort = new InventoryPort() {
             @Override
             public Optional<Inventory> findByCharacter(long characterId) {
@@ -807,7 +823,7 @@ class GatewayPipelineTest {
         ItemTemplatePort itemTemplatePort = new ItemTemplatePort() {
             @Override
             public Optional<ItemTemplate> findById(long itemTemplateId) {
-                return Optional.empty();
+                return Optional.ofNullable(seeded.templates().get(itemTemplateId));
             }
 
             @Override

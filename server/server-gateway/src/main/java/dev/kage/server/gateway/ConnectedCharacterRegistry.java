@@ -12,7 +12,6 @@ import dev.kage.character.application.GrantExperienceUseCase;
 import dev.kage.character.domain.ExperienceProgress;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.inventory.api.InventoryFacade;
-import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterAppearanceChangedEvent;
@@ -580,8 +579,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
      * trên EventLoop.
      */
     EquipmentBonusSnapshot equipmentBonusOf(long characterId) {
-        EquipmentBonus bonus = inventoryFacade.computeEquipmentBonus(characterId);
-        return new EquipmentBonusSnapshot(bonus.bonusAtk(), bonus.bonusDef(), bonus.bonusRes(), bonus.bonusHp());
+        return CharacterLoadout.snapshotOf(inventoryFacade.computeEquipmentBonus(characterId));
     }
 
     private void grantLootBlocking(long killerCharacterId, String monsterCode) {

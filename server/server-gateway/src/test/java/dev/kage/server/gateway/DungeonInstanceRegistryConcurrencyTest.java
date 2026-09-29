@@ -80,7 +80,10 @@ class DungeonInstanceRegistryConcurrencyTest {
         // Inventory/quest KHÔNG nằm trên đường vào hầm ngục (chỉ rời hầm ngục mới hỏi trang bị) —
         // null thay vì dựng hai facade cồng kềnh chỉ để không bao giờ gọi tới.
         characterRegistry = new ConnectedCharacterRegistry(
-                null, null, ExperienceGrantPort.disabled(), new GatewayNetworkMetrics(new SimpleMeterRegistry()));
+                GatewayPipelineTest.fakeInventoryFacade(),
+                null,
+                ExperienceGrantPort.disabled(),
+                new GatewayNetworkMetrics(new SimpleMeterRegistry()));
         characterRegistry.register(
                 LEADER_ID,
                 new EmbeddedChannel(new ChannelInboundHandlerAdapter())
