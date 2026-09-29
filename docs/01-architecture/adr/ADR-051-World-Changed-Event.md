@@ -201,6 +201,10 @@ Không (ngừng phát 1504 — D4 — sẽ cần ADR riêng khi tới lúc).
      (tick thread) ⇒ `DungeonInstanceRegistry.handleCharacterDefeated` ⇒ executor Virtual Thread ⇒ đường
      `exitDungeon`/`commitExit` có sẵn. `current_hp = max_hp` = máu mà lệnh attach đặt; hầm ngục/đấu
      trường attach KHÔNG kèm bonus trang bị (giới hạn có sẵn) nên `max_hp` ở đó là máu nền.
+     **Đã sửa 2026-09-29**: mọi đường attach của gateway (chọn nhân vật, vào/ra hầm ngục, vào/chốt
+     trận) nay đi qua `CharacterLoadout` (chỉ số nền + bonus trang bị) ⇒ `max_hp` trong event là máu
+     tối đa HIỆU LỰC, và thực thể trong hầm ngục/đấu trường mang đủ bonus. Test:
+     `EquipmentAcrossWorldTransferTest`.
    - `client-core`: `WorldChangeCoordinator` là lối vào duy nhất; `WorldScreen` dọn thực thể + đặt vị
      trí/máu theo event; Response vào/ra hầm ngục và 1504 KHÔNG còn dọn màn hình; mẹo
      `resendDirection` đã xoá; dòng báo mới `dungeon.notice.defeated`.
