@@ -152,7 +152,13 @@ Phòng thủ thêm: `ConnectedCharacterRegistry.unregister(characterId, ctx)` ch
 với đúng kết nối đó; `MainWorldChannelRegistry.attachCharacter` gắn lại nhân vật đã ở một khu vực là
 không làm gì. Không đổi protocol (dùng lại `ErrorResponse`), không đổi schema. Client nhận khoá này thì
 dừng hẳn kết nối (không tự nối lại vào phiên đã chết) và về màn đăng nhập kèm lý do (CLIENT.md §8).
-Test: `CharacterSessionTakeoverTest`, `MainWorldChannelRegistryTest`, `WorldInboxBarrierTest`.
+**Cùng kết nối đổi nhân vật (C → D, cùng account — client hiện tại không làm, server không tin client)**:
+C được dọn TRỌN y như ngắt kết nối thường (dưới khoá của C, trên EventLoop của kết nối, chờ mốc "dọn
+xong") rồi D mới vào world qua đúng trình tự trên; các lượt chọn của một kết nối chạy tuần tự
+(`selectLock`), mỗi lần gắn có cờ dọn riêng (`CharacterBinding`) nên ngắt kết nối vẫn dọn D, và lần
+đăng nhập C sau đó không đá kết nối đang chơi D (2026-09-29).
+Test: `CharacterSessionTakeoverTest`, `CharacterSwitchOnSameConnectionTest`, `MainWorldChannelRegistryTest`,
+`WorldInboxBarrierTest`.
 
 ---
 

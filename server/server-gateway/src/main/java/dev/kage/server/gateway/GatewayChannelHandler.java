@@ -10,6 +10,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -364,14 +365,15 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private volatile Long boundAccountId;
     private volatile Long boundCharacterId;
 
-    // Một lần dọn mỗi kết nối — xem releaseCharacter (channelInactive và bindOrReleaseIfClosed có
-    // thể cùng thấy kết nối chết).
-    private final java.util.concurrent.atomic.AtomicBoolean characterReleased =
-            new java.util.concurrent.atomic.AtomicBoolean();
+    // Lần gắn nhân vật HIỆN TẠI của kết nối (null = chưa/không gắn). Mỗi lần gắn có cờ dọn + mốc hoàn
+    // tất riêng — một kết nối có thể rời C rồi gắn D (SERVER.md §5.1), nên cờ dọn không được là "một
+    // lần mỗi kết nối" như bản cũ (bản đó để C ở lại world mãi mãi). Xem CharacterBinding.
+    private volatile CharacterBinding binding;
 
-    // Xong khi lần dọn đã chạy TRỌN (vị trí đã ghi, world đã xử lý hết lệnh cũ, bạn bè đã được báo)
-    // — phiên mới của cùng nhân vật chờ mốc này, xem CharacterSessionRegistry.Session#evict.
-    private final CompletableFuture<Void> characterReleaseCompleted = new CompletableFuture<>();
+    // Tuần tự hoá mọi lượt chọn nhân vật của CHÍNH kết nối này (chỉ giữ trên Virtual Thread) — hai
+    // lượt chọn C và D gửi cùng lúc không được cùng vào world rồi ghi đè nhau. Thứ tự khoá luôn là
+    // khoá này TRƯỚC, khoá nhân vật SAU, và không bao giờ giữ hai khoá nhân vật cùng lúc.
+    private final ReentrantLock selectLock = new ReentrantLock();
 
     // Danh tính của kết nối này trong CharacterSessionRegistry — MỘT đối tượng cố định, vì sổ so
     // chủ phiên bằng danh tính (method reference tạo mới mỗi lần sẽ không bao giờ bằng nhau).
@@ -651,7 +653,18 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             return;
         }
         long characterId = request.getCharacterId();
-        executeBlocking(ctx, sequenceId, () -> handleSelectCharacterBlocking(ctx, sequenceId, accountId, characterId));
+        executeBlocking(ctx, sequenceId, () -> selectCharacterSerialized(ctx, sequenceId, accountId, characterId));
+    }
+
+    /** Một lượt chọn nhân vật mỗi lúc trên kết nối này — xem {@link #selectLock}. */
+    private void selectCharacterSerialized(
+            ChannelHandlerContext ctx, int sequenceId, long accountId, long characterId) {
+        selectLock.lock();
+        try {
+            handleSelectCharacterBlocking(ctx, sequenceId, accountId, characterId);
+        } finally {
+            selectLock.unlock();
+        }
     }
 
     // PMD AvoidCatchingGenericException: ranh giới I/O bất đồng bộ, phải trả lời dù lỗi gì.
@@ -660,6 +673,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             ChannelHandlerContext ctx, int sequenceId, long accountId, long characterId) {
         try {
             Character character = characterFacade.selectCharacter(accountId, characterId);
+            // Kiểm quyền sở hữu XONG mới rời nhân vật cũ — chọn nhầm id thì vẫn giữ nhân vật đang chơi.
+            releasePreviousCharacterIfSwitching(ctx, characterId);
             if (!enterWorldAsOnlySession(ctx, sequenceId, character)) {
                 return;
             }
@@ -726,8 +741,54 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     /** Chờ phiên cũ dọn xong — có trần, xem {@link #EVICTION_TIMEOUT}. */
     private static void awaitEviction(CharacterSessionRegistry.Session previous, long characterId) {
+        awaitRelease(previous.evict(characterId), characterId);
+    }
+
+    /**
+     * Kết nối này đang gắn nhân vật KHÁC {@code nextCharacterId} (cùng account) thì rời nhân vật đó
+     * TRƯỚC — dọn y như ngắt kết nối thường: ghi vị trí, rời world sau mốc chặn hàng đợi, báo bạn bè
+     * offline, thôi đăng ký + thôi giữ phiên (có điều kiện). Client hiện tại không bao giờ làm vậy,
+     * nhưng server không tin client: bản cũ ghi đè {@code boundCharacterId} và để nhân vật cũ đứng
+     * mãi trong world (SERVER.md §5.1).
+     *
+     * <p>Chạy dưới khoá của nhân vật CŨ (nhả trước khi lấy khoá nhân vật mới) nên một kết nối khác
+     * đang giành đúng nhân vật đó hoặc chạy trước — đá luôn kết nối này, cũng dọn đủ — hoặc chạy sau
+     * và thấy nhân vật đã không còn ai giữ. Chọn lại ĐÚNG nhân vật đang chơi thì không làm gì (vẫn
+     * idempotent như trước).
+     */
+    private void releasePreviousCharacterIfSwitching(ChannelHandlerContext ctx, long nextCharacterId) {
+        CharacterBinding previous = binding;
+        if (previous == null || previous.characterId() == nextCharacterId) {
+            return;
+        }
+        long previousId = previous.characterId();
+        ReentrantLock lock = worldGateway.registry().sessions().lockFor(previousId);
+        lock.lock();
         try {
-            previous.evict(characterId).get(EVICTION_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+            LOG.info("Kết nối đổi nhân vật — rời nhân vật cũ trước: {} -> {}", previousId, nextCharacterId);
+            // Trên EventLoop của kết nối này, cùng lý do evictCharacter: không lệnh gameplay nào của
+            // nhân vật cũ còn lọt vào world sau lệnh detach.
+            runOnEventLoop(ctx, () -> unbindAndRelease(ctx, previous));
+            awaitRelease(previous.completed(), previousId);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /** Chạy {@code task} trên EventLoop của kết nối; EventLoop đã tắt (server đang dừng) thì chạy tại chỗ. */
+    private static void runOnEventLoop(ChannelHandlerContext ctx, Runnable task) {
+        try {
+            ctx.executor().execute(task);
+        } catch (RejectedExecutionException e) {
+            LOG.warn("EventLoop đã dừng — dọn nhân vật tại chỗ", e);
+            task.run();
+        }
+    }
+
+    /** Chờ một lần dọn chạy trọn — có trần, xem {@link #EVICTION_TIMEOUT}. */
+    private static void awaitRelease(CompletableFuture<Void> released, long characterId) {
+        try {
+            released.get(EVICTION_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
             LOG.warn(
                     "Phiên cũ chưa dọn xong sau {} — vẫn cho phiên mới vào: characterId={}",
@@ -784,12 +845,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * @return {@code false} nếu kết nối đã chết và nhân vật vừa được dọn
      */
     private boolean bindOrReleaseIfClosed(ChannelHandlerContext ctx, long characterId) {
+        // Mỗi lần gắn một CharacterBinding MỚI (cờ dọn riêng). Chọn lại đúng nhân vật đang gắn thì bản
+        // cũ bị thay khi chưa dọn — đúng, vì cùng một nhân vật chỉ cần dọn một lần, qua bản mới.
+        CharacterBinding bound = new CharacterBinding(characterId);
         boundContext = ctx;
+        binding = bound;
         boundCharacterId = characterId;
         if (ctx.channel().isActive()) {
             return true;
         }
-        releaseCharacter(ctx, characterId);
+        releaseCharacter(ctx, bound);
         return false;
     }
 
@@ -3597,9 +3662,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // Mất kết nối (đóng chủ động, timeout, hay lỗi — exceptionCaught cũng dẫn tới sự kiện
         // này) — dọn entity ECS + AoI của nhân vật này (SERVER.md §9: 1 kết nối chết không được
         // để bia đỡ đạn đứng lại trong world).
-        Long characterId = boundCharacterId;
-        if (characterId != null) {
-            releaseCharacter(ctx, characterId);
+        CharacterBinding bound = binding;
+        if (bound != null) {
+            releaseCharacter(ctx, bound);
         }
     }
 
@@ -3615,26 +3680,47 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      */
     private CompletableFuture<Void> evictCharacter(long characterId) {
         ChannelHandlerContext ctx = boundContext;
-        if (ctx == null) {
-            // Chủ phiên luôn đã vào world (claim + vào world nằm trọn dưới một khoá) — nhánh này chỉ
-            // để không treo người chờ nếu bất biến đó có ngày bị phá.
+        CharacterBinding bound = binding;
+        if (ctx == null || bound == null || bound.characterId() != characterId) {
+            // Kết nối này không còn gắn nhân vật đó: đã rời sang nhân vật khác (lần dọn chạy dưới khoá
+            // của nhân vật, xem releasePreviousCharacterIfSwitching) hoặc chưa từng vào world — không
+            // có gì để đá, và TUYỆT ĐỐI không đóng một kết nối đang chơi nhân vật khác.
             return CompletableFuture.completedFuture(null);
         }
-        try {
-            ctx.executor().execute(() -> kick(ctx, characterId));
-        } catch (RejectedExecutionException e) {
-            // EventLoop đã tắt (server đang dừng) — dọn tại chỗ, vẫn đúng một lần nhờ characterReleased.
-            LOG.warn("EventLoop đã dừng — dọn phiên cũ tại chỗ: characterId={}", characterId, e);
-            releaseCharacter(ctx, characterId);
+        if (bound.released().get()) {
+            // Đã/đang dọn (kết nối vừa chết) — chỉ cần chờ lần dọn đó, không cần đá.
+            return bound.completed();
         }
-        return characterReleaseCompleted;
+        runOnEventLoop(ctx, () -> kick(ctx, bound));
+        return bound.completed();
+    }
+
+    /**
+     * Thôi gắn {@code bound} (nếu nó vẫn là lần gắn hiện tại) rồi dọn nó — gọi trên EventLoop.
+     *
+     * @return {@code true} nếu {@code bound} vẫn là lần gắn hiện tại của kết nối
+     */
+    // Error Prone ReferenceEquality + PMD CompareObjectsWithEquals: đúng ý — "cùng lần gắn" là cùng
+    // đối tượng; hai lần gắn cùng một nhân vật là HAI lần khác nhau.
+    @SuppressWarnings({"ReferenceEquality", "PMD.CompareObjectsWithEquals"})
+    private boolean unbindAndRelease(ChannelHandlerContext ctx, CharacterBinding bound) {
+        boolean current = binding == bound;
+        if (current) {
+            binding = null;
+            boundCharacterId = null;
+        }
+        releaseCharacter(ctx, bound);
+        return current;
     }
 
     /** Lượt đá, trên EventLoop của kết nối bị đá — xem {@link #evictCharacter}. */
-    private void kick(ChannelHandlerContext ctx, long characterId) {
+    private void kick(ChannelHandlerContext ctx, CharacterBinding bound) {
+        long characterId = bound.characterId();
         LOG.info("Nhân vật đăng nhập từ kết nối khác — đá phiên cũ: characterId={}", characterId);
-        boundCharacterId = null;
-        releaseCharacter(ctx, characterId);
+        if (!unbindAndRelease(ctx, bound)) {
+            // Kết nối đã rời nhân vật này sang nhân vật khác — dọn là đủ, không đóng kết nối.
+            return;
+        }
         ErrorResponse error = ErrorResponse.newBuilder()
                 .setErrorCode(ERROR_CODE_SESSION_CONFLICT)
                 .setErrorKey(ERROR_LOGGED_IN_ELSEWHERE)
@@ -3648,21 +3734,23 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     // Error Prone FutureReturnValueIgnored: đúng ý — kết quả của chuỗi allOf(...).whenComplete KHÔNG
     // cần ai đọc; mọi lỗi của các bước đã được finishRelease log và mốc hoàn tất thật là
-    // characterReleaseCompleted.
+    // CharacterBinding#completed.
     /**
      * Dọn nhân vật khỏi world khi kết nối chết — gọi từ {@code channelInactive} (EventLoop), từ
-     * {@link #kick} (EventLoop, phiên bị kết nối khác đá — 2026-09-25) HOẶC từ
+     * {@link #kick} (EventLoop, phiên bị kết nối khác đá — 2026-09-25), từ
+     * {@link #releasePreviousCharacterIfSwitching} (EventLoop, kết nối đổi sang nhân vật khác) HOẶC từ
      * {@link #bindOrReleaseIfClosed} (Virtual Thread) nếu kết nối chết giữa lúc chọn nhân vật. Chạy
-     * ĐÚNG MỘT LẦN mỗi kết nối: hai phía có thể cùng thấy kết nối chết.
+     * ĐÚNG MỘT LẦN mỗi lần gắn: nhiều phía có thể cùng thấy kết nối chết.
      *
      * <p>Các bước chạm DB/world chạy bất đồng bộ; khi TẤT CẢ xong, {@link #finishRelease} trả quyền
-     * giữ phiên và hoàn tất {@link #characterReleaseCompleted} — mốc mà phiên mới đang chờ.
+     * giữ phiên và hoàn tất {@link CharacterBinding#completed} — mốc mà phiên mới đang chờ.
      */
     @SuppressWarnings("FutureReturnValueIgnored")
-    private void releaseCharacter(ChannelHandlerContext ctx, long characterId) {
-        if (!characterReleased.compareAndSet(false, true)) {
+    private void releaseCharacter(ChannelHandlerContext ctx, CharacterBinding bound) {
+        if (!bound.released().compareAndSet(false, true)) {
             return;
         }
+        long characterId = bound.characterId();
         // World nhân vật đang ở — hỏi TRƯỚC khi detach (sau đó nó không thuộc World nào nữa). Mốc chặn
         // hàng đợi của đúng World này là "mọi lệnh cũ đã xử lý", xem WorldFacade#inboxBarrier.
         Optional<WorldFacade> world = currentWorldFacadeIfPresent(characterId);
@@ -3702,7 +3790,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         CompletableFuture<Void> friendsNotified =
                 CompletableFuture.runAsync(() -> notifyFriendsPresenceChanged(characterId, false), authExecutor);
         CompletableFuture.allOf(positionSaved, worldDrained, friendsNotified)
-                .whenComplete((ignored, error) -> finishRelease(characterId, error));
+                .whenComplete((ignored, error) -> finishRelease(bound, error));
     }
 
     /**
@@ -3710,12 +3798,25 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * Luôn chạy, kể cả khi một bước trước lỗi — một lần ghi vị trí hỏng không được khoá người chơi
      * ngoài cửa.
      */
-    private void finishRelease(long characterId, Throwable error) {
+    private void finishRelease(CharacterBinding bound, Throwable error) {
+        long characterId = bound.characterId();
         if (error != null) {
             LOG.warn("Dọn nhân vật có bước lỗi: characterId={}", characterId, error);
         }
         worldGateway.registry().sessions().release(characterId, session);
-        characterReleaseCompleted.complete(null);
+        bound.completed().complete(null);
+    }
+
+    /**
+     * Một lần gắn nhân vật vào kết nối: cờ "đã dọn" (dọn đúng một lần dù nhiều phía cùng thấy kết nối
+     * chết) và mốc "dọn xong trọn" (phiên mới của cùng nhân vật chờ mốc này, xem
+     * {@link CharacterSessionRegistry.Session#evict}).
+     */
+    private record CharacterBinding(long characterId, AtomicBoolean released, CompletableFuture<Void> completed) {
+
+        CharacterBinding(long characterId) {
+            this(characterId, new AtomicBoolean(), new CompletableFuture<>());
+        }
     }
 
     /** Báo cho bạn bè ĐANG online của {@code characterId} rằng người này vừa vào/thoát world. */

@@ -75,4 +75,9 @@ final class CharacterSessionRegistry {
     void release(long characterId, Session session) {
         ownerByCharacterId.remove(characterId, session);
     }
+
+    /** Có phiên nào đang giữ {@code characterId} không — chỉ để quan sát (test, chẩn đoán). */
+    boolean isClaimed(long characterId) {
+        return ownerByCharacterId.containsKey(characterId);
+    }
 }
