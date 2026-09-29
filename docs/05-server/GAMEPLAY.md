@@ -614,7 +614,7 @@ hội (`SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_PARTY` + `PartyFacade.listMembers`).
 
 | Hệ thống | MVP | Ghi chú |
 |---|---|---|
-| Guild | ✅ Đã code (2026-07-24, Phase 7 lát cắt 1) | `feature-guild` — tạo/xin gia nhập/leader duyệt-từ chối/rời/kick/giải tán + kênh chat Bang hội (xem §10). Kho bang + nhiệm vụ bang dời lát cắt sau (xem feature-guild/CLAUDE.md) |
+| Guild | ✅ Đã code (2026-07-24, Phase 7 lát cắt 1) | `feature-guild` — tạo/xin gia nhập/leader duyệt-từ chối/rời/kick/giải tán + kênh chat Bang hội (xem §10). Kho bang + nhiệm vụ bang dời lát cắt sau (xem feature-guild/CLAUDE.md). **Tên bang mới** kiểm ở server theo đúng luật tên nhân vật (2-16 ký tự, chữ/số/`_`) — quyết định chủ dự án 2026-09-29, sai luật ⇒ `ErrorResponse` `error.guild_name_invalid` |
 | Party | ✅ Đã code (2026-07-24, Phase 7 lát cắt 2) | `feature-party` — tạo/mời/chấp nhận-từ chối/rời (leader tự động chuyển cho thành viên vào sớm nhất)/kick + kênh chat Party (xem §10). Sức chứa tối đa 5 (GDD). Chia EXP KHÔNG có ở lát cắt này — chưa có cơ chế cấp EXP từ giết quái solo (xem feature-party/CLAUDE.md) |
 | Friend | ✅ Đã code (2026-07-23) | `feature-friend`, trạng thái online qua `ConnectedCharacterRegistry` in-memory (KHÔNG qua Redis — xem feature-friend/CLAUDE.md, quyết định tránh trùng lặp hạ tầng ở single-instance) |
 | Mail | ✅ Đã code (2026-07-23) | `feature-mail` — gửi/xem/nhận/xoá; nhận gold+item đính kèm chạy trong 1 transaction (khoá dòng + kiểm `claimed_at` + cấp thưởng + đánh dấu + audit), verify rollback thật bằng Postgres (Testcontainers) |

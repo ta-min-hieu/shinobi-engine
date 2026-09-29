@@ -737,7 +737,7 @@ class GatewayPipelineTest {
                         character.createdAt()));
     }
 
-    private static void selectCharacter(EmbeddedChannel channel, long characterId, int sequenceId)
+    static void selectCharacter(EmbeddedChannel channel, long characterId, int sequenceId)
             throws InvalidProtocolBufferException {
         SelectCharacterRequest request =
                 SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
@@ -760,7 +760,7 @@ class GatewayPipelineTest {
         readOutboundFrame(channel); // tiêu thụ ConnectResponse — caller không kiểm tra lại nội dung
     }
 
-    private static long createCharacter(EmbeddedChannel channel, String name, int sequenceId)
+    static long createCharacter(EmbeddedChannel channel, String name, int sequenceId)
             throws InvalidProtocolBufferException {
         CreateCharacterRequest request = CreateCharacterRequest.newBuilder()
                 .setName(name)

@@ -15,6 +15,7 @@ import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.ApproveGuildJoinRequestResponse;
 import dev.kage.protocol.CreateGuildResponse;
 import dev.kage.protocol.DisbandGuildResponse;
+import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.GetMyGuildResponse;
 import dev.kage.protocol.KickGuildMemberResponse;
 import dev.kage.protocol.LeaveGuildResponse;
@@ -46,10 +47,16 @@ import dev.kage.protocol.wire.PacketCodec;
  */
 final class GuildCoordinator implements WindowFlow {
 
+    /** Không có lệnh Tạo bang nào đang chờ — sequenceId thật luôn dương. */
+    private static final int NO_PENDING_CREATE = -1;
+
     private final GuildController controller = new GuildController();
     private final GuildPanel panel;
     private final WorldCommandSender sender;
     private final I18NBundle i18n = KageI18n.load();
+
+    /** {@code sequenceId} của lệnh Tạo bang đang chờ, xem {@link #onCreateRejected}. */
+    private int pendingCreateSequenceId = NO_PENDING_CREATE;
 
     /** Đệm dựng sẵn cho {@link GuildPanel#setMembers} — chỉ đổi khi server vừa trả lời, không mỗi khung. */
     private final List<GuildPanel.MemberRow> memberRows = new ArrayList<>();
@@ -67,7 +74,7 @@ final class GuildCoordinator implements WindowFlow {
         this.sender = sender;
         panel.setCanOpen(canOpen);
         panel.setOnRefresh(this::refresh);
-        panel.setOnCreate(typed -> submitName(typed, sender::createGuild));
+        panel.setOnCreate(typed -> submitName(typed, name -> pendingCreateSequenceId = sender.createGuild(name)));
         panel.setOnJoin(typed -> submitName(typed, sender::sendGuildJoinRequest));
         panel.setOnKick(sender::kickGuildMember);
         panel.setOnApprove(sender::approveGuildJoinRequest);
@@ -108,7 +115,25 @@ final class GuildCoordinator implements WindowFlow {
     }
 
     private boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+        if (opcode == Opcode.OPCODE_ERROR_VALUE) {
+            return onCreateRejected(ErrorResponse.parseFrom(payload));
+        }
         return dispatchQueryResponse(opcode, payload) || dispatchCommandResponse(opcode, payload);
+    }
+
+    /**
+     * Server từ chối lệnh Tạo bang đang chờ bằng {@code ErrorResponse} — tên sai luật (quyết định
+     * chủ dự án 2026-09-29, {@code error.guild_name_invalid}). Chỉ nhận đúng gói khớp
+     * {@code sequenceId} của lệnh đó: opcode lỗi dùng chung cả giao thức, nuốt hết là cướp lỗi của
+     * luồng khác (cùng luật {@code FactionCoordinator#onError}).
+     */
+    private boolean onCreateRejected(ErrorResponse error) {
+        if (pendingCreateSequenceId == NO_PENDING_CREATE || error.getRelatedSequenceId() != pendingCreateSequenceId) {
+            return false;
+        }
+        pendingCreateSequenceId = NO_PENDING_CREATE;
+        settle(GuildController.createErrorMessageKey(error.getErrorKey()));
+        return true;
     }
 
     /** Ba response TRA CỨU — nguồn DUY NHẤT làm đổi trạng thái hiển thị, xem javadoc lớp. */
@@ -137,6 +162,7 @@ final class GuildCoordinator implements WindowFlow {
      */
     private boolean dispatchCommandResponse(int opcode, byte[] payload) throws InvalidProtocolBufferException {
         if (opcode == Opcode.OPCODE_CREATE_GUILD_RESPONSE_VALUE) {
+            pendingCreateSequenceId = NO_PENDING_CREATE;
             settle(GuildController.createMessageKey(
                     CreateGuildResponse.parseFrom(payload).getOutcome()));
         } else if (opcode == Opcode.OPCODE_SEND_GUILD_JOIN_REQUEST_RESPONSE_VALUE) {

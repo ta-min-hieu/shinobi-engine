@@ -33,6 +33,7 @@ public final class GuildFacade {
                     case OK -> CreateOutcome.OK;
                     case ALREADY_IN_GUILD -> CreateOutcome.ALREADY_IN_GUILD;
                     case NAME_TAKEN -> CreateOutcome.NAME_TAKEN;
+                    case INVALID_NAME -> CreateOutcome.INVALID_NAME;
                 };
         Long guildId = result.guild() == null ? null : result.guild().id();
         return new CreateResult(outcome, guildId);
@@ -107,7 +108,12 @@ public final class GuildFacade {
     public enum CreateOutcome {
         OK,
         ALREADY_IN_GUILD,
-        NAME_TAKEN
+        NAME_TAKEN,
+        /**
+         * Tên sai luật tên bang (= luật tên nhân vật, 2026-09-29). Gateway trả {@code ErrorResponse}
+         * {@code error.guild_name_invalid} — KHÔNG có giá trị tương ứng trong guild.proto.
+         */
+        INVALID_NAME
     }
 
     public enum SendJoinRequestResult {

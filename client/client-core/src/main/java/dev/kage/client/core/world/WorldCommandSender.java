@@ -341,11 +341,16 @@ final class WorldCommandSender {
      * KHOẢNG TRỐNG chứ không phải quyết định: gửi trùng lệnh này sẽ tạo bang thứ hai nếu lần đầu đã
      * kịp thực thi mà response mất trên đường về. Giao thức không cho client làm gì hơn — không tự
      * vá được ở phía này (xem {@link GuildController} về các khoảng trống của guild.proto).
+     *
+     * @return {@code sequenceId} của gói — tên sai luật bị server từ chối bằng {@code ErrorResponse}
+     *     mang đúng số này (2026-09-29), không bằng {@code CreateGuildResponse}
      */
-    void createGuild(String name) {
+    int createGuild(String name) {
         CreateGuildCommand command =
                 CreateGuildCommand.newBuilder().setName(name).build();
-        send(Opcode.OPCODE_CREATE_GUILD_COMMAND_VALUE, command.toByteArray(), "CreateGuildCommand");
+        int sequenceId = connection.nextSequenceId();
+        send(Opcode.OPCODE_CREATE_GUILD_COMMAND_VALUE, sequenceId, command.toByteArray(), "CreateGuildCommand");
+        return sequenceId;
     }
 
     /**

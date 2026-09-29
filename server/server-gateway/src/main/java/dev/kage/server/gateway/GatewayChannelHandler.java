@@ -1970,6 +1970,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleCreateGuildBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, CreateGuildCommand command) {
         GuildFacade.CreateResult result = guildFacade.createGuild(characterId, command.getName());
+        if (result.outcome() == GuildFacade.CreateOutcome.INVALID_NAME) {
+            // Quyết định chủ dự án 2026-09-29: đi đường ErrorResponse + error_key, KHÔNG thêm giá trị
+            // vào CreateGuildOutcome (đổi protocol).
+            sendError(ctx, sequenceId, 400, "error.guild_name_invalid");
+            return;
+        }
         CreateGuildResponse.Builder responseBuilder =
                 CreateGuildResponse.newBuilder().setOutcome(toProtoOutcome(result.outcome()));
         if (result.guildId() != null) {

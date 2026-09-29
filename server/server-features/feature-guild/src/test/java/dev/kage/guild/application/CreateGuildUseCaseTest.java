@@ -25,6 +25,34 @@ class CreateGuildUseCaseTest {
         assertThat(port.findMembershipOf(5).orElseThrow().role().name()).isEqualTo("LEADER");
     }
 
+    /**
+     * Quyết định chủ dự án 2026-09-29: tên bang theo đúng luật tên nhân vật. Tên sai bị từ chối
+     * TRƯỚC khi chạm Port — không bang nào được tạo, người gửi không thành trưởng bang nào.
+     */
+    @Test
+    void shouldRejectWithoutCreatingAnything_whenNameIsInvalid() {
+        FakeGuildPort port = new FakeGuildPort();
+        CreateGuildUseCase useCase = new CreateGuildUseCase(port);
+
+        for (String name : java.util.List.of("", "A", "Thanh Vân Môn", "Kiếm-Tông", "ABCDEFGHIJKLMNOPQ")) {
+            CreateGuildUseCase.Result result = useCase.execute(5, name);
+
+            assertThat(result.outcome()).as("'%s'", name).isEqualTo(CreateGuildUseCase.Outcome.INVALID_NAME);
+            assertThat(result.guild()).isNull();
+            assertThat(port.findByName(name)).isEmpty();
+        }
+        assertThat(port.findMembershipOf(5)).isEmpty();
+    }
+
+    @Test
+    void shouldAcceptVietnameseDiacritics() {
+        FakeGuildPort port = new FakeGuildPort();
+
+        CreateGuildUseCase.Result result = new CreateGuildUseCase(port).execute(5, "ThanhVânMôn");
+
+        assertThat(result.outcome()).isEqualTo(CreateGuildUseCase.Outcome.OK);
+    }
+
     @Test
     void shouldReject_whenCharacterAlreadyInGuild() {
         FakeGuildPort port = new FakeGuildPort();
