@@ -15,7 +15,8 @@ application/    CreateGuildUseCase · SendGuildJoinRequestUseCase · ApproveGuil
                 GuildUseCases (gộp 10 UseCase, tránh GuildFacade vượt 4 tham số — Checkstyle
                 ParameterNumber, cùng tinh thần FriendUseCases/ShopPorts)
 domain/         Guild (aggregate) · GuildMember (VO) · GuildJoinRequest (VO) · GuildRole (enum)
-                GuildPort · DuplicateGuildNameException · DuplicateGuildJoinRequestException
+                GuildName (luật tên bang MỚI) · GuildPort · DuplicateGuildNameException
+                DuplicateGuildJoinRequestException
 ```
 
 Chiều: `api → application → domain`. **`domain/` không import gì bên ngoài** — adapter thật
@@ -61,6 +62,21 @@ Dialogue ở Phase 6).
   `GuildFacade.listMembers(senderCharacterId)` SAU KHI `ChatFacade.sendMessage` OK để lấy danh
   sách nhận, broadcast qua `ConnectedCharacterRegistry` (không cần AoI/tick thread, giống World/
   Riêng tư — guild membership không phải dữ liệu world-tick).
+
+## Tên bang được kiểm ở server (quyết định chủ dự án 2026-09-29)
+
+- **Luật = ĐÚNG luật tên nhân vật** (`Character.validateName`): 2-16 ký tự, chỉ chữ cái (mọi ngôn
+  ngữ, tiếng Việt dựng sẵn), chữ số, `_`; không cắt khoảng trắng; chưa có từ cấm (tên nhân vật cũng
+  chưa — SECURITY.md §12). Trước đó server không kiểm gì: tên 33 ký tự nổ `SQLException` ở INSERT.
+- **Luật bị CHÉP sang `GuildName`** (không gọi thẳng): module này cấm phụ thuộc feature-character,
+  `shared-common` cấm business logic. `GuildNameParityTest` (server-gateway — module duy nhất thấy cả
+  hai) so hai luật trên cùng một bộ mẫu ⇒ sửa một bên quên bên kia là build đỏ.
+- **Chỉ kiểm lúc TẠO** (`CreateGuildUseCase`, trước mọi lời gọi Port ⇒ `Outcome.INVALID_NAME`), KHÔNG
+  ở compact constructor của `Guild`: bang tạo trước ngày này có thể dài tới 32 ký tự/có dấu cách, dựng
+  lại từ DB không được nổ. Xin gia nhập theo tên KHÔNG kiểm luật (tên sai thì chỉ là không tìm thấy).
+- **Protocol KHÔNG đổi**: gateway trả `ErrorResponse` `error.guild_name_invalid` (400), không thêm giá
+  trị `CreateGuildOutcome`; client (`GuildCoordinator#onCreateRejected`) khớp theo `sequenceId` của
+  lệnh Tạo bang và hiện ở dòng trạng thái khung bang hội.
 
 ## Cứng
 

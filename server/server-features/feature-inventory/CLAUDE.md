@@ -282,3 +282,20 @@ những gì ảnh hưởng tới cách viết code trong module này:
   `findByCharacterForUpdate`, KHÔNG bằng `findByCharacter`.
 - `findByCharacter` vẫn dùng cho đường CHỈ ĐỌC (liệt kê túi, tính chỉ số trang bị) và cho bản mặc
   định của fake ở test.
+
+### Món đang chào trong giao dịch không được cường hoá (quyết định chủ dự án 2026-09-29)
+
+- **Lỗi thật**: `trade_offer_item` không lưu `enhance_level` — người đưa cường hoá món SAU KHI người
+  kia đã xác nhận, giao dịch thi hành với món khác giá trị với thứ đã được đồng ý.
+- **`TradeOfferPort`** (domain, mới) — `EnhancePorts` giờ 6 Port. `EnhanceItemUseCase` hỏi nó NGAY SAU
+  khi tìm thấy món (sau khoá túi đồ, TRƯỚC `idempotency_key` và vàng) ⇒ `EnhanceResult.ITEM_IN_TRADE`:
+  không trừ vàng, không đổi cấp, không audit, khoá idempotency CHƯA tiêu (huỷ giao dịch xong thử lại
+  bằng chính khoá đó vẫn chạy). Adapter `PostgresInventoryTradeOfferAdapter` (server-database) đọc
+  `trade_offer_item` — cùng cách feature-trade đọc `inventory_item` qua port riêng, không phụ thuộc
+  Gradle vào feature-trade.
+- **Protocol KHÔNG đổi**: gateway gửi `ErrorResponse` `error.item_in_trade` (409) thay cho
+  `EnhanceItemResponse`; client khớp theo `sequenceId` của lệnh đang treo
+  (`InventoryCoordinator#onEnhanceRejected`).
+- **`InventoryFacade.enhanceItem`** đổi switch sang bảng tra (nhánh thứ 9 chạm trần
+  `CyclomaticComplexity`); `InventoryFacadeEnhanceResultTest` khoá bảng phủ hết enum thay cho compiler.
+- Tuần tự hoá với đặt lời chào: xem feature-trade/CLAUDE.md và DATABASE.md §5.1.

@@ -221,6 +221,12 @@ Hệ quả phải giữ:
   trước (chưa commit), bán tới sau = bán luôn món vừa mặc (World giữ chỉ số tới lần đăng nhập
   sau). Tái hiện ở `EquipWhileItemLeavesIntegrationTest`. Bài học chung: **khoá dòng không thay
   được khoá túi đồ** khi phép kiểm đọc bảng khác.
+- **Đặt lời chào giao dịch cũng lấy khoá này** (2026-09-29) dù nó chỉ ghi `trade_offer_item`: cường
+  hoá từ chối món đang chào (quyết định chủ dự án 2026-09-29, GAMEPLAY.md §8) bằng một câu đọc
+  `trade_offer_item` SAU khoá túi đồ — không có khoá ở phía chào thì cường hoá hỏi xong, lời chào
+  commit chen vào, cường hoá commit sau ⇒ người kia xác nhận trên cấp cũ. Thứ tự: dòng
+  `trade_session` `FOR UPDATE` rồi khoá túi đồ người chào (đúng ngoại lệ bước 0). Tái hiện ở
+  `EnhanceWhileInTradeIntegrationTest` (bỏ khoá ⇒ đỏ ngay vòng đầu).
 - Transaction chỉ đụng vàng mà không đụng túi đồ (vd lập bang) KHÔNG cần khoá này — chúng không bao
   giờ chờ khoá túi đồ nên không khép được vòng.
 - Thêm đường ghi túi đồ thứ bảy ⇒ gọi khoá ở dòng đầu tiên của transaction. Port có bản mặc định

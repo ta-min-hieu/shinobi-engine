@@ -97,6 +97,7 @@ import dev.kage.server.database.inventory.PostgresEquipmentAdapter;
 import dev.kage.server.database.inventory.PostgresGoldAdapter;
 import dev.kage.server.database.inventory.PostgresInventoryAdapter;
 import dev.kage.server.database.inventory.PostgresInventoryIdempotencyAdapter;
+import dev.kage.server.database.inventory.PostgresInventoryTradeOfferAdapter;
 import dev.kage.server.database.inventory.PostgresItemTemplateAdapter;
 import dev.kage.server.database.mail.JdbcMailTransactionRunner;
 import dev.kage.server.database.mail.PostgresMailAuditAdapter;
@@ -223,8 +224,13 @@ public final class ServerDatabaseBootstrap {
                 new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
         EquipmentUseCases equipmentUseCases =
                 new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
-        EnhancePorts enhancePorts =
-                new EnhancePorts(inventoryPort, goldPort, auditPort, itemTemplatePort, idempotencyPort);
+        EnhancePorts enhancePorts = new EnhancePorts(
+                inventoryPort,
+                goldPort,
+                auditPort,
+                itemTemplatePort,
+                idempotencyPort,
+                new PostgresInventoryTradeOfferAdapter());
         EnhanceItemUseCase enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, transactionRunner);
         UseItemUseCase useItemUseCase =
                 new UseItemUseCase(inventoryPort, itemTemplatePort, auditPort, transactionRunner);

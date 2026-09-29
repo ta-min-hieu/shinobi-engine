@@ -55,6 +55,16 @@ yêu cầu, KHÔNG có thiết kế nào — mọi cơ chế bên dưới là qu
    **Sức chứa túi** kiểm SAU mọi lượt chuyển (`TradeInventoryPort#exceedsCapacity`, sửa
    2026-09-24): trước đó chuyển NGUYÊN DÒNG bỏ qua hẳn kiểm, túi 20 dòng nhận thành 21. Kiểm ở
    cuối chứ không từng lượt để đổi 1-lấy-1 giữa hai túi đều đầy vẫn hợp lệ.
+   **Ngoại lệ HẸP (chủ dự án quyết 2026-09-29): món đang chào KHÔNG được cường hoá.** Lỗi thật:
+   `trade_offer_item` không lưu `enhance_level`, xác thực lúc thi hành chỉ kiểm chủ/số lượng/đang
+   mặc ⇒ người đưa cường hoá SAU KHI người kia đã xác nhận, giao dịch thi hành với món khác giá trị.
+   `EnhanceItemUseCase` (feature-inventory) nay hỏi `TradeOfferPort` sau khoá túi đồ và trả
+   `ITEM_IN_TRADE` (gateway → `ErrorResponse` `error.item_in_trade`, không đổi protocol/schema).
+   Không cần phụ thuộc Gradle giữa hai module: port khai ở feature-inventory, adapter
+   (`PostgresInventoryTradeOfferAdapter`) đọc `trade_offer_item` ở server-database. Để hai bên xếp
+   hàng, `PostgresTradeSessionAdapter.replaceOffer` lấy `CharacterInventoryLock` của người chào sau
+   khi khoá dòng phiên (DATABASE.md §5.1). Bán/gửi thư/mặc KHÔNG bị chặn — chúng không đổi giá trị
+   món, chỉ làm giao dịch hỏng sạch lúc thi hành như cũ. Test: `EnhanceWhileInTradeIntegrationTest`.
 3. **`idempotencyKey` (ADR-025) chỉ ở `ConfirmTradeCommand`** — Command duy nhất có thể kích hoạt
    hiệu ứng thật (chuyển gold/item). `RequestTrade`/`AcceptTradeRequest`/`Cancel`/`SetTradeOffer`
    không cần — tự nhiên idempotent (gọi lại vô hại) hoặc không có hậu quả kinh tế.
@@ -95,6 +105,7 @@ yêu cầu, KHÔNG có thiết kế nào — mọi cơ chế bên dưới là qu
 ❌ SQL/JDBC/Redis client trong module này (Điều 23 — enforce bằng ArchUnit)
 ❌ `domain/` biết PostgreSQL
 ❌ Thêm cột `locked`/escrow vào `inventory_item`/`character_stat` — vi phạm quyết định 1 ở trên
+❌ Bỏ `CharacterInventoryLock` trong `replaceOffer` — mở lại lỗi "cường hoá sau khi đã chào" (2026-09-29)
 ❌ `feature-trade` phụ thuộc Gradle vào `feature-inventory`/`feature-shop`/`feature-character`
 
 ## Test

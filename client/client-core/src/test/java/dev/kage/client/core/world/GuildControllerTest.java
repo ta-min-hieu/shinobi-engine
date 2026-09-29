@@ -175,6 +175,15 @@ class GuildControllerTest {
     }
 
     @Test
+    @DisplayName("Tên bang sai luật tới bằng ErrorResponse (2026-09-29) — khoá thật có câu, khoá lạ thì rỗng")
+    void mapsGuildNameInvalidErrorKey() {
+        assertThat(GuildController.createErrorMessageKey("error.guild_name_invalid"))
+                .contains("error.guild_name_invalid");
+        assertThat(GuildController.createErrorMessageKey("error.some_future_key"))
+                .isEmpty();
+    }
+
+    @Test
     @DisplayName("Outcome thật có khoá; UNSPECIFIED/UNRECOGNIZED thì rỗng để chỗ gọi tự nói 'không hiểu'")
     void mapsRealOutcomesAndLeavesUnknownEmpty() {
         assertThat(GuildController.createMessageKey(CreateGuildOutcome.CREATE_GUILD_OUTCOME_NAME_TAKEN))

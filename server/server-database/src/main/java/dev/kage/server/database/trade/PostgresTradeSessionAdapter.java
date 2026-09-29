@@ -13,6 +13,7 @@ import javax.sql.DataSource;
 
 import dev.kage.server.database.DatabaseAccessException;
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.inventory.CharacterInventoryLock;
 import dev.kage.trade.domain.OfferedItemInput;
 import dev.kage.trade.domain.TradeOfferItem;
 import dev.kage.trade.domain.TradeSession;
@@ -185,6 +186,12 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
         if (characterId != requesterId && characterId != targetId) {
             return false;
         }
+        // Quyết định chủ dự án 2026-09-29: món đang chào không được cường hoá. Cường hoá hỏi "đang
+        // chào không" SAU khoá túi đồ; lấy CÙNG khoá đó ở đây để hai bên xếp hàng — không có nó,
+        // cường hoá hỏi xong (chưa có lời chào), lời chào commit, cường hoá commit sau ⇒ người kia
+        // xác nhận trên cấp cũ. Thứ tự khoá: dòng phiên (FOR UPDATE ở trên) rồi túi đồ — đúng ngoại
+        // lệ bước 0 của DATABASE.md §5.1, cùng thứ tự ConfirmTradeUseCase.
+        CharacterInventoryLock.acquire(connection, characterId);
         JdbcOperations.update(connection, DELETE_OFFER_ITEMS_OF_CHARACTER, request.sessionId(), characterId);
         List<Object[]> batchParams = request.items().stream()
                 .map(item -> new Object[] {request.sessionId(), characterId, item.itemId(), item.quantity()})

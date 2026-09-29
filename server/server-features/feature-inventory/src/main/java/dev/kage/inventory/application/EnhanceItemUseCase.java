@@ -48,6 +48,15 @@ public final class EnhanceItemUseCase {
                     resultHolder.set(EnhanceResult.ITEM_NOT_FOUND);
                     return;
                 }
+                // Quyết định chủ dự án 2026-09-29: món đang chào trong giao dịch còn mở KHÔNG được
+                // cường hoá — trade_offer_item không lưu cấp, người kia đã xác nhận trên cấp cũ. Hỏi
+                // SAU khoá túi đồ: đặt lời chào cũng lấy khoá này nên hai bên xếp hàng (DATABASE.md
+                // §5.1). Từ chối TRƯỚC idempotency_key: khoá chưa ghi, huỷ giao dịch xong thử lại
+                // bằng chính khoá đó vẫn là cùng một lần cường hoá.
+                if (ports.tradeOfferPort().isOfferedInActiveTrade(t, characterId, itemId)) {
+                    resultHolder.set(EnhanceResult.ITEM_IN_TRADE);
+                    return;
+                }
                 if (item.get().enhanceLevel() >= ItemStack.MAX_ENHANCE) {
                     resultHolder.set(EnhanceResult.MAX_LEVEL);
                     return;
@@ -120,6 +129,8 @@ public final class EnhanceItemUseCase {
         ITEM_NOT_FOUND,
         MAX_LEVEL,
         INSUFFICIENT_GOLD,
-        DUPLICATE_REQUEST
+        DUPLICATE_REQUEST,
+        /** Món đang nằm trong lời chào của một phiên giao dịch còn mở (2026-09-29) — không đổi gì. */
+        ITEM_IN_TRADE
     }
 }

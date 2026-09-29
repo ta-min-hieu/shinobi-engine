@@ -408,7 +408,8 @@ class MonsterLootChainIntegrationTest {
                 new PostgresGoldAdapter(),
                 new PostgresAuditAdapter(),
                 itemTemplatePort,
-                new PostgresInventoryIdempotencyAdapter());
+                new PostgresInventoryIdempotencyAdapter(),
+                new dev.kage.server.database.inventory.PostgresInventoryTradeOfferAdapter());
         return new InventoryFacade(
                 new ItemAcquisitionUseCases(
                         new AddItemUseCase(inventoryPort, itemTemplatePort, transactionRunner),

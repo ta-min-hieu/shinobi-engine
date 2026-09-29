@@ -54,13 +54,15 @@ final class GuildController {
      * hằng số là CÓ CHỦ ĐÍCH, cùng lý do {@link ChatController#MAX_BODY_LENGTH}: client-core không
      * được phụ thuộc module server, và luật thật vẫn nằm ở DB.
      *
-     * <p>⚠️ Khác chat, ở đây client là hàng rào DUY NHẤT: {@code CreateGuildUseCase} phía server
-     * KHÔNG kiểm độ dài hay chuỗi rỗng, nó đưa thẳng tên xuống {@code INSERT INTO guild}. Tên 33 ký
-     * tự sẽ nổ {@code SQLException} trong {@code authExecutor} chứ không trả về một outcome nào —
-     * xem báo cáo khoảng trống ở javadoc lớp. Chặn ở đây không thay thế được validate phía server
-     * (Điều 24), nó chỉ khiến người chơi không vấp vào cái hố đó trong lúc chờ server vá.
+     * <p>Từ 2026-09-29 server kiểm tên bang MỚI theo luật tên nhân vật (2-16 ký tự, chữ/số/{@code _},
+     * quyết định chủ dự án) và trả {@code ErrorResponse} {@code error.guild_name_invalid} — xem
+     * {@link #createErrorMessageKey}. Trần 32 ở đây CỐ Ý không hạ xuống 16: ô nhập này dùng chung cho
+     * xin gia nhập, và bang tạo trước ngày đó có thể mang tên dài tới 32 ký tự.
      */
     static final int MAX_NAME_LENGTH = 32;
+
+    /** Khoá lỗi server trả khi tên bang sai luật (= luật tên nhân vật, 2026-09-29). */
+    private static final String GUILD_NAME_INVALID = "error.guild_name_invalid";
 
     /** Một thành viên bang. {@code online} do gateway ghép từ registry, không phải từ feature-guild. */
     record Member(long characterId, String name, boolean leader, boolean online) {}
@@ -274,6 +276,16 @@ final class GuildController {
      */
     private static <T> Optional<String> messageKey(Map<T, String> table, T outcome) {
         return Optional.ofNullable(table.get(outcome));
+    }
+
+    /**
+     * {@code error_key} server gửi qua {@code ErrorResponse} cho lệnh Tạo bang — hiện chỉ có tên sai
+     * luật (quyết định chủ dự án 2026-09-29; guild.proto KHÔNG có outcome cho ca này).
+     *
+     * @return rỗng khi khoá lạ (server MỚI HƠN client) — chỗ gọi nói "không hiểu", không đoán bừa
+     */
+    static Optional<String> createErrorMessageKey(String serverErrorKey) {
+        return GUILD_NAME_INVALID.equals(serverErrorKey) ? Optional.of(serverErrorKey) : Optional.empty();
     }
 
     static Optional<String> createMessageKey(CreateGuildOutcome outcome) {

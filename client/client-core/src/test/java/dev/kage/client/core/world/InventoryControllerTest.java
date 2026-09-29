@@ -136,8 +136,11 @@ class InventoryControllerTest {
     @Test
     @DisplayName("Ba error_key THẬT server phát cho Equip/Unequip đều có khoá i18n")
     void mapsEveryKnownErrorKey() {
-        for (String errorKey :
-                List.of("error.item_not_found", "error.wrong_equipment_slot", "error.slot_not_equipped")) {
+        for (String errorKey : List.of(
+                "error.item_not_found",
+                "error.wrong_equipment_slot",
+                "error.slot_not_equipped",
+                "error.item_in_trade")) {
             assertThat(InventoryController.errorMessageKey(errorKey))
                     .as("error_key '%s' chưa có khoá i18n", errorKey)
                     .contains(errorKey);
@@ -212,6 +215,20 @@ class InventoryControllerTest {
         String first = controller.beginEnhance(5L);
 
         assertThat(controller.beginEnhance(6L)).isNotEqualTo(first);
+    }
+
+    @Test
+    @DisplayName("ErrorResponse chỉ thuộc lệnh Cường hoá khi khớp sequenceId của gói ĐANG TREO")
+    void claimsOnlyTheErrorOfThePendingEnhance() {
+        controller.beginEnhance(5L);
+        controller.onEnhanceSent(41);
+
+        assertThat(controller.isPendingEnhance(41)).isTrue();
+        assertThat(controller.isPendingEnhance(40)).as("lỗi của luồng khác").isFalse();
+        controller.onEnhanceSettled();
+        assertThat(controller.isPendingEnhance(41))
+                .as("đã có kết luận thì không nhận nữa")
+                .isFalse();
     }
 
     @Test
