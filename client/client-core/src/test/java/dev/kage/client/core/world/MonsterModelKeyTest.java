@@ -31,8 +31,9 @@ class MonsterModelKeyTest {
 
     @Test
     void mapsMonsterCodeThatHasNoArtYet() {
-        // sample_boss chưa được vẽ tính tới 2026-08-09 — khoá vẫn phải hợp lệ và đoán được, việc
-        // "chưa có file" là chuyện của WorldModelRenderer.addMonsterOrNpc, không phải của lớp này.
+        // sample_boss sống KHÔNG có art từ 2026-08-09 tới 2026-09-30 — suốt quãng đó khoá vẫn phải hợp
+        // lệ và đoán được, việc "chưa có file" là chuyện của WorldModelRenderer.addMonsterOrNpc, không
+        // phải của lớp này. Giữ mã này làm ca thử: lớp này không biết (và không được biết) con nào có art.
         assertThat(MonsterModelKey.of("sample_boss")).isEqualTo("mob_sample-boss");
     }
 

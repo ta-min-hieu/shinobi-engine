@@ -34,9 +34,9 @@ import dev.kage.protocol.NpcSpawnedEvent;
  * <p>Khung hình cố ý đặt cạnh nhau những thứ phải phân biệt được: nhân vật (đã có model từ
  * ADR-031), bốn loài quái ĐÃ có model ({@code training_dummy}, {@code wandering_bandit},
  * {@code stone_ogre}, {@code archive_warden} — trước 2026-08-30 ba loài đầu dùng chung một model và
- * trông y hệt nhau, rồi V30 lặp lại đúng chuyện đó với loài thứ tư cho tới V31), và quái
- * CHƯA có model ({@code sample_boss}, vẫn là hộp đỏ) — nếu nhánh fallback từng bị hỏng, ảnh này là
- * chỗ thấy ngay.
+ * trông y hệt nhau, rồi V30 lặp lại đúng chuyện đó với loài thứ tư cho tới V31), và một mã quái
+ * cố ý KHÔNG có model ({@code preview_undrawn_monster}, hộp đỏ lơ lửng — vai {@code sample_boss}
+ * đóng tới 2026-09-30) — nếu nhánh fallback từng bị hỏng, ảnh này là chỗ thấy ngay.
  */
 public final class WorldModelPreviewTool extends ApplicationAdapter {
 
@@ -124,6 +124,9 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
      */
     private static final long FOUNDATION_ID = -13L;
 
+    /** Xem {@link #UNDRAWN_MONSTER_X}. */
+    private static final long UNDRAWN_MONSTER_ID = -14L;
+
     // Toàn bộ khung nằm TRƯỚC bệ demo đầu tiên (bắt đầu ở x=3, xem DemoPlatforms) — bệ vẽ đè lên
     // quái thì ảnh không còn chứng minh được gì về chính con quái, đúng bẫy đã gặp ở lượt chụp đầu.
     // Ba loài quái đứng CẠNH NHAU (dummy/bandit/ogre) chứ không rải ra: câu hỏi mà ảnh này phải trả
@@ -163,6 +166,24 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
     private static final float ELDER_X = -5.75f;
     private static final float SISTER_X = -4.95f;
     private static final float UNDRAWN_NPC_X = 2.9f;
+
+    /**
+     * Quái KHÔNG có art — đối chứng cho nhánh hộp thay thế của {@link MonsterPresenter}. Tới
+     * 2026-09-30 vai này do {@code sample_boss} đóng (hộp đỏ cuối cùng của game); boss có model thì
+     * đối chứng phải là một mã cố ý không tồn tại, cùng cách {@link #UNDRAWN_NPC_ID} làm cho NPC.
+     *
+     * <p>⚠️ Đứng CÙNG x với hộp NPC nhưng lơ lửng phía trên ({@link #UNDRAWN_MONSTER_Y} là trục
+     * cao, không phải trục sâu). Hàng ngang không còn chỗ: khung chỉ rộng ~10 đơn vị quanh
+     * {@code PLAYER_X + 4.65}, và bản đầu dịch cả hàng sang trái 0,7 để mua một ô thì chính hộp NPC
+     * trôi ra khỏi mép phải — tức đổi một đối chứng lấy một đối chứng.
+     */
+    private static final float UNDRAWN_MONSTER_X = UNDRAWN_NPC_X;
+
+    /**
+     * Đo trên ảnh: 1,4 vẫn chồng lên hộp NPC (trục cao co hơn trục ngang dưới camera nghiêng), 3,2
+     * thì tách hẳn — hai hộp phải đọc được là HAI.
+     */
+    private static final float UNDRAWN_MONSTER_Y = 3.2f;
 
     /**
      * NPC thứ ba, nối tiếp cặp cũ ở cùng bước 0,8. ⚠️ KHÔNG đặt từ x=3.0 trở đi:
@@ -286,6 +307,7 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         putMonster(TRIAL_ID, "trial_construct", TRIAL_X);
         putMonster(FOUNDATION_ID, "foundation_warden", FOUNDATION_X);
         putMonster(BOSS_ID, "sample_boss", BOSS_X);
+        putMonster(UNDRAWN_MONSTER_ID, "preview_undrawn_monster", UNDRAWN_MONSTER_X, UNDRAWN_MONSTER_Y);
         putNpc(ELDER_ID, "town_elder", ELDER_X);
         putNpc(SISTER_ID, "senior_sister", SISTER_X);
         putNpc(UNDRAWN_NPC_ID, "shop_keeper", UNDRAWN_NPC_X);
@@ -293,7 +315,8 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         LOG.info(
                 "model quái: training_dummy={} wandering_bandit={} blood_sand_scout={} "
                         + "wasteland_beast={} stone_ogre={} archive_warden={} trial_construct={} "
-                        + "foundation_warden={} sample_boss={} (sample_boss=false là ĐÚNG, chưa vẽ)",
+                        + "foundation_warden={} sample_boss={} preview_undrawn_monster={} "
+                        + "(preview_undrawn_monster=false là ĐÚNG, mã quái cố ý không tồn tại)",
                 models.hasModel(DUMMY_ID),
                 models.hasModel(BANDIT_ID),
                 models.hasModel(SCOUT_ID),
@@ -302,7 +325,8 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
                 models.hasModel(WARDEN_ID),
                 models.hasModel(TRIAL_ID),
                 models.hasModel(FOUNDATION_ID),
-                models.hasModel(BOSS_ID));
+                models.hasModel(BOSS_ID),
+                models.hasModel(UNDRAWN_MONSTER_ID));
         LOG.info(
                 "model NPC: town_elder={} senior_sister={} shop_keeper={} "
                         + "waypost_attendant={} (shop_keeper=false là ĐÚNG, mã NPC chưa tồn tại)",
@@ -323,12 +347,16 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
 
     /** Đi qua đúng {@link MonsterPresenter#onSpawned} thay vì tự gọi {@code addMonsterOrNpc}. */
     private void putMonster(long monsterId, String monsterCode, float x) {
-        monsters.put(monsterId, new CombatHudController.MonsterState(monsterCode, x, 0f, 100, 100));
+        putMonster(monsterId, monsterCode, x, 0f);
+    }
+
+    private void putMonster(long monsterId, String monsterCode, float x, float y) {
+        monsters.put(monsterId, new CombatHudController.MonsterState(monsterCode, x, y, 100, 100));
         presenter.onSpawned(dev.kage.protocol.MonsterSpawnedEvent.newBuilder()
                 .setMonsterId(monsterId)
                 .setMonsterCode(monsterCode)
                 .setX(x)
-                .setY(0f)
+                .setY(y)
                 .setCurrentHp(100)
                 .setMaxHp(100)
                 .build());

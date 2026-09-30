@@ -17,7 +17,8 @@ import java.util.Locale;
  * client không nên là bên thứ ba phải đồng ý.
  *
  * <p>Hệ quả cố ý: mã quái CHƯA có art vẫn ra một khoá hợp lệ trỏ tới file không tồn tại
- * ({@code sample_boss} → {@code mob_sample-boss}, chưa vẽ tính đến 2026-08-09). Đó là trường hợp
+ * (ví dụ lịch sử: {@code sample_boss} → {@code mob_sample-boss} đã sống như thế từ 2026-08-09 tới
+ * khi có art 2026-09-30). Đó là trường hợp
  * {@link WorldModelRenderer#addMonsterOrNpc} xử lý được — vẽ hộp cho riêng con đó — nên ở đây không cần
  * (và không thể) biết con nào đã có model.
  */
