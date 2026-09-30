@@ -233,6 +233,16 @@ thực thể — server phát lại spawn/máu như lần vào world bình thư�
   Gói tới sau `SelectCharacterResponse` được để lại hàng đợi cho màn world mới. `WorldScreen` dọn `EcsWorld` TRƯỚC
   khi màn mới được dựng (`KageEngine.setScreen` dispose màn cũ SAU khi màn mới đã dựng) và `dispose` không dọn lần
   hai.
+- **Đã kiểm sống 2026-09-29** (client desktop thật + server `installDist`, giết/dựng lại tiến trình server để tạo
+  đứt mạng thật; chọn nhân vật THỨ HAI trong danh sách để bắt lỗi "chọn nhầm người đầu"):
+  - *Vào lại*: server chết 17 giây ⇒ socket nối lại ở lần thử 6, vào lại world **đúng nhân vật 8005 sau 136 ms**,
+    thế giới chạy tiếp (quái đánh, máu cập nhật, ping hồi). Ô chat trống sau đó ~12 giây là hành vi tự ẩn
+    `IDLE_HIDE_SECONDS`, không phải lỗi.
+  - *Bị đá* (gameProbe vào cùng nhân vật): về `LoginScreen` với câu `error.logged_in_elsewhere`, **không** có dòng
+    `AutoRelog` nào, và `GameConnection` không thử nối lại thêm lần nào.
+  - *Hỏng hẳn* (server chết không dựng lại): 4 lượt đều "socket không dựng lại kịp", về `LoginScreen` với
+    `login.error.relog_failed` sau **3 phút 07 giây** — vì 4 lượt × 45 giây chờ socket cộng dồn, trong khi lượt 2–4
+    không làm gì mới (`GameConnection` vốn vẫn tự thử lại). Con số giới hạn do agent chọn, chờ chủ dự án chốt.
 
 **Bị đá vì đăng nhập nơi khác** (2026-09-25, [SERVER.md §5.1](../05-server/SERVER.md)): `ErrorResponse` mang
 `error.logged_in_elsewhere` ⇒ `ConnectionCoordinator` báo `WorldScreen` kết thúc phiên ⇒ dừng HẲN

@@ -735,6 +735,12 @@ Hai quyết định kèm theo:
       ⚠️ **Phạm vi đã chứng minh**: client KHỞI ĐỘNG và trụ được 22 giây khi chạy từ một thư mục
       KHÔNG phải gốc asset — đúng tính chất từng hỏng. CHƯA chứng minh nó vẽ được model/atlas hay
       chơi được: không ảnh chụp, không probe. Cũng chưa chạy trên máy thứ hai.
+      ✅ **Vẽ được + chơi được — đã chứng minh 2026-09-30**: `installDist -PkageBundleAssets` (jar asset
+      22,1 MB, có cả `mob_sample-boss` mới), CHÉP cả thư mục cài ra một thư mục tạm không có cây
+      `assets/`, chạy đúng file **`client-desktop.bat`** qua `cmd.exe` từ đó. Đăng nhập → chọn nhân
+      vật → vào world: font tiếng Việt đúng, model nhân vật + NPC vẽ đủ (không một dòng "Chưa có
+      model"), đi lại được, túi đồ mở ra với **icon từ atlas trong jar** và dữ liệu thật từ server.
+      Vẫn còn nguyên: chưa chạy trên máy thứ hai, và cảnh báo JNI của LWJGL bên dưới.
       ⚠️ LWJGL cảnh báo `Unsupported JNI version detected, this may result in a crash` trên JDK 25 —
       22 giây chưa sập, nhưng đây là rủi ro phải theo dõi khi có người chơi thật.
 - [ ] **Image server có thật trên GHCR** — `ci.yml` đã có job `docker-build-push` (master + tag `v*`),
@@ -3249,6 +3255,10 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       `aggressive hasSize(9)`→11) — chính ô đó tự ghi chú "mỗi đợt thêm loài CÓ aggro đều phải sửa
       nó, đó là chủ đích". Cây thoại `about_town` đi 12 → **15** lựa chọn, ghim lại ở
       `TownElderDialogueTreeTest`.
-    - ⏳ **CHƯA PLAYTEST** — mọi con số ở trên là giấy cho tới lúc đó. Arc 1 đã bị playtest bác ba
-      lần trong một ngày, và chính đợt này vừa tự bác bản nháp đầu bằng phép tính.
+    - ~~⏳ **CHƯA PLAYTEST** — mọi con số ở trên là giấy cho tới lúc đó.~~ ✅ **ĐÃ CHƠI THẬT** (dòng
+      này sống sót lỗi thời tới 2026-09-30 mới được sửa): `Kagemaru` (id 3) có cả ba quest V47
+      `CLAIMED` trong DB dev — `dead_vein_intruders` 2026-09-14, `blood_sand_trail` và
+      `scatter_the_blood_sand_band` 2026-09-16 — và hai trận được đo bằng `gameProbe` hôm 09-16: tế đồ
+      tới nơi **150** máu, đàn chủ tới nơi **147**, cả hai biên **+2**. Phần hành quân của lát này sau
+      đó được ADR-050 viết lại, và đã chạy lại trọn trong ô "Arc 2 khép ở Lv36" (Exit Criteria v1).
 

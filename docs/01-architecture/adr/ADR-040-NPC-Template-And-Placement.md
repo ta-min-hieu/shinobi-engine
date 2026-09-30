@@ -437,8 +437,13 @@ Không đẻ nợ mới **đã đặt tên** nào, chỉ ba Revisit Trigger có 
    `server-world` → `WorldFacade.spawnNpc()` đọc catalog → `MonsterCatalogLoader` →
    `WorldContentLoader` → sửa test → **bổ sung DATABASE.md §2.9** + sửa ADR-037 D7/`feature-monster`
    CLAUDE.md (nợ `npc_template` đã trả).
-3. **Chưa playtest.** Kiểm chứng tối thiểu khi Docker bật lại: chạy server thật, đi tới `x = -5`,
-   thấy Chu Hoành, nói chuyện, nhận nhiệm vụ, mở cửa hàng — tất cả **y hệt** trước migration (D4).
+3. ~~**Chưa playtest.**~~ ✅ **Đã kiểm sống** (ghi nhận muộn 2026-09-30, chỉ tính bằng chứng SAU
+   ngày V26 vào repo 2026-09-04 — playtest D11 của ADR-038 là 09-01, tức TRƯỚC, nên không đếm): server
+   thật phát `NPC_SPAWNED_EVENT npcId=-19 code=town_elder x=-5.00` (`gameProbe`, 2026-09-29) và client
+   vẽ ông đúng chỗ đó; mọi quest arc 1–2 chơi thật từ 2026-09-06 trở đi (ROADMAP mục 71–75, 77, 80)
+   đều được NHẬN qua hội thoại của NPC đặt bằng `npc_spawn` (lĩnh thưởng thì qua khung nhiệm vụ). Mở cửa hàng qua hội thoại: kiểm riêng 2026-09-30 bằng `gameProbe --talkToNpc=town_elder --dialogueChoices=open_shop` — node `start` có 4 lựa chọn, chọn `[2] open_shop` ⇒ server trả `LIST_SHOP_ITEMS_RESPONSE` (1001, 171 byte) và hội thoại đóng, đúng hợp đồng `dialogue.proto`. Nguyên văn yêu cầu cũ:
+   chạy server thật, đi tới `x = -5`, thấy Chu Hoành, nói chuyện, nhận nhiệm vụ, mở cửa hàng — tất
+   cả **y hệt** trước migration (D4).
 4. Nếu muốn `shop_keeper` (D7 để riêng), checklist **đầy đủ**, không thiếu bước nào:
    1. Chọn **tên tu tiên + arc** theo STORY.md §8 (đừng để tên là "shop keeper").
    2. `feature-dialogue/src/main/resources/scripts/dialogue/shop_keeper.js` — tối thiểu node `start`

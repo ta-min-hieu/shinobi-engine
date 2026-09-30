@@ -224,6 +224,11 @@ Không (phương án C, nếu có ngày chọn, sẽ cần ADR riêng).
    ⛔ Mục **"Phát hiện phụ"** thì KHÔNG xong: bản sửa đề xuất đã dựng thử và bị hai test bác (xem
    khung cảnh báo ở cuối mục đó). Khe của người gửi vẫn mở, và nay đã biết vì sao cách đó không đi
    được.
-3. ⏳ **CÒN LẠI**: kiểm chứng sống bằng **hai client thật** (công thức ở bàn giao 2026-08-29): A bấm
-   vào, màn hình B phải đổi sang hầm ngục + hiện dải chữ "Người trong nhóm vừa đưa cả nhóm vào bí
-   cảnh". Test socket đã gác đường dây; cái còn thiếu là con mắt người.
+3. ✅ **KIỂM SỐNG XONG 2026-09-29** — hai client thật: B = client desktop (`aloha`/Benkei), A =
+   `gameProbe --enterDungeon=sample_dungeon` (`kagetest`/Kagemaru), cùng nhóm. Màn hình B đổi sang
+   bí cảnh ngay: dải "ĐANG Ở TRONG BÍ CẢNH", dòng chat "Người trong nhóm vừa đưa cả nhóm vào bí cảnh
+   — bạn được kéo theo.", NPC làng biến mất, khung mục tiêu là boss. Đo đường dây ở phía B bằng một
+   probe quan sát: `1504` tới ở 11595 ms, cùng mốc với `308 PULLED_BY_PARTY`, **trước** spawn boss
+   (11627 ms) — đúng D3. Ghi chú bên lề: boss vẫn vẽ bằng hộp vì `mob_sample-boss` chưa có art (nợ
+   cũ, không thuộc ADR này); và B nhận `304` despawn nhân vật của A từ world cũ SAU `308` — cùng họ
+   câu hỏi "gói world cũ tới sau 308" của Arena đang chờ chủ dự án, ở đây vô hại vì spawn mới tới sau.
