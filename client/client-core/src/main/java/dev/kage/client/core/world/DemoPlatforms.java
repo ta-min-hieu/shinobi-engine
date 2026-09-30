@@ -11,6 +11,7 @@ import com.badlogic.gdx.math.Matrix4;
 
 import dev.kage.engine.ecs.system.Aabb;
 import dev.kage.engine.ecs.system.Platform;
+import dev.kage.protocol.WorldKind;
 
 /**
  * Hình minh hoạ cho bệ nhảy demo ([ADR-033](docs/01-architecture/adr/ADR-033-Ninja-School-Style-Movement.md)
@@ -31,6 +32,9 @@ final class DemoPlatforms {
         {9f, -0.75f, 13f, 0.75f, 1.5f},
         {15f, -0.75f, 19f, 0.75f, 2.2f},
     };
+
+    /** Vẽ ở World không có bệ — hằng số để vòng vẽ mỗi frame không cấp phát (CLAUDE.md §6). */
+    private static final float[][] NO_PLATFORMS = new float[0][];
 
     /** Dày bao nhiêu tính XUỐNG từ mặt bệ — thuần thẩm mỹ, vật lý chỉ biết {@code topZ}. */
     private static final float THICKNESS = 0.3f;
@@ -102,6 +106,23 @@ final class DemoPlatforms {
      * mãi. Đây là bug thật chủ dự án phát hiện khi test tay (2026-08-09).
      */
     static List<Platform> physics() {
+        return physics(WorldKind.WORLD_KIND_MAIN);
+    }
+
+    /**
+     * Bộ bệ của ĐÚNG World server nói nhân vật đang đứng — rỗng ở mọi World không phải world chính.
+     *
+     * <p>Server chỉ nạp {@code DEMO_PLATFORMS} khi dựng world chính ({@code spawnOverworldContent});
+     * hầm ngục và đấu trường KHÔNG có bệ nào. Trước 2026-09-30 client vẫn nạp đủ ba bệ ở mọi nơi —
+     * đúng bug của javadoc {@link #physics()} nhưng theo chiều NGƯỢC: trong bí cảnh client dự đoán
+     * đứng trên bệ cao 0,8m còn server nói {@code z=0}, lệch dưới ngưỡng snap nên không bao giờ được
+     * sửa ⇒ nhân vật đi trên một cái bệ không tồn tại. Boss bí cảnh đứng ở {@code x=2,95}, ngay mép
+     * bệ đầu tiên, nên đó là chỗ người chơi đánh nhau.
+     */
+    static List<Platform> physics(WorldKind kind) {
+        if (!hasPlatforms(kind)) {
+            return List.of();
+        }
         List<Platform> result = new ArrayList<>(PLATFORMS.length);
         for (float[] platform : PLATFORMS) {
             result.add(new Platform(new Aabb(platform[0], platform[1], platform[2], platform[3]), platform[4]));
@@ -118,6 +139,15 @@ final class DemoPlatforms {
      * của khối nằm đúng mặt bệ mà nhân vật đứng lên.
      */
     static void render(ShapeRenderer shapeRenderer, Matrix4 projection) {
+        render(shapeRenderer, projection, WorldKind.WORLD_KIND_MAIN);
+    }
+
+    /**
+     * Như {@link #render(ShapeRenderer, Matrix4)} nhưng chỉ vẽ bệ ở World CÓ bệ — cùng luật với
+     * {@link #physics(WorldKind)}, để thứ người chơi THẤY khớp thứ vật lý tính. Nền đất thì vẽ ở mọi
+     * World: mặt đất {@code z=0} là vô hạn ở cả server lẫn client, bí cảnh cũng vậy.
+     */
+    static void render(ShapeRenderer shapeRenderer, Matrix4 projection, WorldKind kind) {
         // Depth test BẮT BUỘC — đây là hình khối 3D thật phải che/bị che đúng với nhân vật (ADR-031
         // §9 "thứ tự che nhau: depth buffer"). Thiếu dòng này, ShapeRenderer vẽ SAU nên tô đè phẳng
         // lên nhân vật, nhân vật đứng trên bệ biến mất hoàn toàn — đã thấy thật qua ảnh chụp.
@@ -137,7 +167,7 @@ final class DemoPlatforms {
                 THICKNESS);
 
         shapeRenderer.setColor(Color.OLIVE);
-        for (float[] platform : PLATFORMS) {
+        for (float[] platform : hasPlatforms(kind) ? PLATFORMS : NO_PLATFORMS) {
             shapeRenderer.box(
                     platform[0],
                     platform[1],
@@ -150,5 +180,10 @@ final class DemoPlatforms {
         // Trả lại trạng thái cho HUD Scene2D vẽ sau (UI phẳng, không cần depth) — không để rò rỉ
         // trạng thái GL sang lớp khác.
         Gdx.gl.glDisable(GL20.GL_DEPTH_TEST);
+    }
+
+    /** Khớp {@code WorldFacade}: chỉ world chính được nạp {@code DEMO_PLATFORMS}. */
+    private static boolean hasPlatforms(WorldKind kind) {
+        return kind == WorldKind.WORLD_KIND_MAIN;
     }
 }

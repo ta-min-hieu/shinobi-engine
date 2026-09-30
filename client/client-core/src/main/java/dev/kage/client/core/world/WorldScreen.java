@@ -179,6 +179,13 @@ public final class WorldScreen implements GameScreen {
     /** ADR-051 — mọi cú đổi World (hầm ngục, đấu trường) đi qua đúng một lối, xem {@link WorldChangeCoordinator}. */
     private final WorldChangeCoordinator worldChange = new WorldChangeCoordinator();
 
+    /**
+     * Trục dọc dự đoán cục bộ — giữ tham chiếu để đổi bộ bệ khi server báo đổi World (hầm ngục và
+     * đấu trường không có bệ nào, xem {@link DemoPlatforms#physics(dev.kage.protocol.WorldKind)}).
+     */
+    private final VerticalMovementSystem verticalMovementSystem =
+            new VerticalMovementSystem(WorldConstants.GRAVITY_MPS2);
+
     /** Hai gói mức kết nối (PONG, server tắt) — không có cửa sổ, xem {@link ConnectionCoordinator}. */
     private final ConnectionCoordinator connection;
 
@@ -324,7 +331,6 @@ public final class WorldScreen implements GameScreen {
      */
     private void installMovementSystems() {
         world.addSystem(new MovementSystem());
-        VerticalMovementSystem verticalMovementSystem = new VerticalMovementSystem(WorldConstants.GRAVITY_MPS2);
         verticalMovementSystem.setPlatforms(DemoPlatforms.physics());
         world.addSystem(verticalMovementSystem);
     }
@@ -486,6 +492,7 @@ public final class WorldScreen implements GameScreen {
             npcPresenter.clear();
             monsterPresenter.clear(combatHudController.monsters().keySet());
             combatHudController.clearMonsters();
+            verticalMovementSystem.setPlatforms(DemoPlatforms.physics(event.getWorldKind()));
             snapLocalPlayer(event.getX(), event.getY());
             combatHudController.onEnterWorld(event.getCurrentHp(), event.getMaxHp());
             dungeon.onWorldChanged(event);
@@ -882,14 +889,14 @@ public final class WorldScreen implements GameScreen {
         if (models.isEnabled()) {
             renderModels(alpha);
             renderMonsters(models.combined());
-            DemoPlatforms.render(shapeRenderer, models.combined());
+            DemoPlatforms.render(shapeRenderer, models.combined(), worldChange.currentKind());
             // VFX/số damage vẽ SAU cùng trong nhánh 3D — luôn hiện đè lên nhân vật/địa hình, đúng
             // thứ tự "nhân vật vẽ trước, VFX vẽ đè sau" của RENDERING.md §2.
             combatFeedback.render(Gdx.graphics.getDeltaTime(), models.combined(), modelProjector);
         } else {
             renderPlaceholderBoxes(alpha);
             renderMonsters(camera.combined);
-            DemoPlatforms.render(shapeRenderer, camera.combined);
+            DemoPlatforms.render(shapeRenderer, camera.combined, worldChange.currentKind());
             combatFeedback.render(Gdx.graphics.getDeltaTime(), camera.combined, fallbackProjector);
         }
 
