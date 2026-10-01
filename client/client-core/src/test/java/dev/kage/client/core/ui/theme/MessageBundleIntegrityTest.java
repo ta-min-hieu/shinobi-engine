@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Properties;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,6 +52,18 @@ class MessageBundleIntegrityTest {
 
     /** Từ ba từ trở lên mới tính là một câu (tên riêng như "Tiếng Việt" chỉ có hai). */
     private static final int MIN_WORDS_OF_A_SENTENCE = 3;
+
+    /** Tên ngôn ngữ viết bằng chính nó ở MỌI bundle (xem {@code KageI18nLanguageTest}). */
+    private static final String LANGUAGE_NAME_KEY = "language.name.vi";
+
+    /** Ký tự ASCII lớn nhất; chữ cái nào vượt qua nó trong bundle tiếng Anh là chữ có dấu. */
+    private static final int ASCII_MAX = 0x7F;
+
+    /** Một ô tham số MessageFormat: {@code {0}}, {@code {1,number,#}}... — nhóm 1 là chỉ số. */
+    private static final Pattern PLACEHOLDER = Pattern.compile("\\{(\\d+)[,}]");
+
+    /** Ngoặc nhọn mở không theo sau bởi chữ số, và không phải cặp ngoặc kép đã thoát. */
+    private static final Pattern STRAY_BRACE = Pattern.compile("(?<!\\{)\\{(?![\\d{])");
 
     @Test
     @DisplayName("Không bundle nào chứa dấu xung đột git còn sót lại")
@@ -90,6 +104,69 @@ class MessageBundleIntegrityTest {
         assertThat(untranslated)
                 .as("Các khoá này hiện câu TIẾNG ANH cho người chơi đã chọn tiếng Việt")
                 .isEmpty();
+    }
+
+    /**
+     * Chiều ngược lại của kiểm tra trên, cho người chơi đã chọn tiếng Anh. Bundle tiếng Anh không cần
+     * một chữ cái ngoài ASCII nào — tên riêng đã viết bằng pinyin không dấu ("Zhou Heng", "Su Yun'er").
+     * Ngoại lệ duy nhất là tên ngôn ngữ, cố tình viết bằng chính ngôn ngữ đó ("Tiếng Việt").
+     */
+    @Test
+    @DisplayName("Bundle tiếng Anh không còn chữ tiếng Việt (trừ tên ngôn ngữ tự gọi mình)")
+    void englishBundleHasNoVietnameseLetter() {
+        Properties english = load("strings_en.properties");
+        List<String> leaking = english.stringPropertyNames().stream()
+                .filter(key -> !LANGUAGE_NAME_KEY.equals(key))
+                .filter(key -> english.getProperty(key).chars().anyMatch(MessageBundleIntegrityTest::isNonAsciiLetter))
+                .sorted()
+                .toList();
+        assertThat(leaking)
+                .as("Các khoá này hiện chữ có dấu tiếng Việt cho người chơi đã chọn tiếng Anh")
+                .isEmpty();
+    }
+
+    /**
+     * Rà 2026-10-01: ô {@code {0}} lệch giữa hai bundle thì MessageFormat KHÔNG báo lỗi — tham số
+     * thừa bị nuốt im lặng, ô thiếu hiện nguyên văn {@code {1}} trên màn hình. Chỉ so CHỈ SỐ tham số
+     * ({@code {1,number,#}} và {@code {1}} là cùng một ô), không so thứ tự: tiếng Anh được quyền đảo câu.
+     */
+    @Test
+    @DisplayName("Hai bundle dùng đúng cùng tập ô tham số {n} cho mỗi khoá")
+    void placeholdersMatchBetweenBundles() {
+        Properties vietnamese = load("strings_vi.properties");
+        Properties english = load("strings_en.properties");
+        List<String> mismatched = vietnamese.stringPropertyNames().stream()
+                .filter(english::containsKey)
+                .filter(key -> !placeholderIndices(vietnamese.getProperty(key))
+                        .equals(placeholderIndices(english.getProperty(key))))
+                .sorted()
+                .toList();
+        assertThat(mismatched)
+                .as("Các khoá này có ô tham số {n} khác nhau giữa tiếng Việt và tiếng Anh")
+                .isEmpty();
+    }
+
+    /**
+     * Luật thoát chữ của {@code I18NBundle} KHÁC {@link java.text.MessageFormat} — đọc nhầm là viết hỏng.
+     * {@code TextFormatter} (libGDX 1.14.2) tự nhân đôi mọi dấu nháy đơn trước khi đưa cho MessageFormat,
+     * nên {@code "Su Yun'er"} hiện đúng nguyên văn, còn thói quen MessageFormat viết {@code ''} lại hiện
+     * ra HAI dấu nháy. Ký tự cần thoát duy nhất là ngoặc nhọn mở (viết hai lần); một ngoặc lẻ không mở
+     * ô tham số nào sẽ làm {@code format} ném lỗi giữa giao diện. Tiếng Anh dùng nháy đơn nhiều hơn hẳn
+     * tiếng Việt, nên mở song ngữ là lúc người viết bản dịch dễ "sửa giúp" thành {@code ''} nhất.
+     */
+    @Test
+    @DisplayName("Không giá trị nào viết '' kiểu MessageFormat hoặc có { lẻ không phải ô tham số")
+    void usesTextFormatterEscapingRules() {
+        for (String bundle : BUNDLES) {
+            Properties properties = load(bundle);
+            List<String> broken = properties.stringPropertyNames().stream()
+                    .filter(key -> breaksTextFormatter(properties.getProperty(key)))
+                    .sorted()
+                    .toList();
+            assertThat(broken)
+                    .as("%s: các khoá này sẽ hiện '' hoặc làm hỏng format — xem javadoc test", bundle)
+                    .isEmpty();
+        }
     }
 
     @Test
@@ -162,6 +239,24 @@ class MessageBundleIntegrityTest {
                 .filter(line -> line.indexOf('=') > 0)
                 .map(line -> line.substring(0, line.indexOf('=')).strip())
                 .toList();
+    }
+
+    private static boolean breaksTextFormatter(String value) {
+        return value.contains("''") || STRAY_BRACE.matcher(value).find();
+    }
+
+    private static boolean isNonAsciiLetter(int character) {
+        return character > ASCII_MAX && Character.isLetter(character);
+    }
+
+    /** Chỉ số các ô tham số: {@code "{0} +{2,number,#} x{1}"} cho {@code [0, 1, 2]}. */
+    private static SortedSet<Integer> placeholderIndices(String value) {
+        SortedSet<Integer> indices = new TreeSet<>();
+        Matcher matcher = PLACEHOLDER.matcher(value);
+        while (matcher.find()) {
+            indices.add(Integer.parseInt(matcher.group(1)));
+        }
+        return indices;
     }
 
     /** Số từ chữ cái (bỏ qua ô {@code {0}}, số, ký hiệu). */
