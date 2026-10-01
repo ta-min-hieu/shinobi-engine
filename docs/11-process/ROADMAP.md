@@ -743,6 +743,16 @@ Hai quyết định kèm theo:
       Vẫn còn nguyên: chưa chạy trên máy thứ hai, và cảnh báo JNI của LWJGL bên dưới.
       ⚠️ LWJGL cảnh báo `Unsupported JNI version detected, this may result in a crash` trên JDK 25 —
       22 giây chưa sập, nhưng đây là rủi ro phải theo dõi khi có người chơi thật.
+      ✅ **Đã kiểm nguồn 2026-10-01: báo động GIẢ trên JDK 25.** Cảnh báo in ở `ThreadLocalUtil`
+      (khối `static`, `lwjgl-3.3.3-sources.jar`): LWJGL chép bảng `JNINativeInterface_` và đoán kích
+      thước theo `GetVersion()`; bản 3.3.3 chưa biết `JNI_VERSION_24` (giá trị JDK 25 trả) nên rơi vào
+      `default` = 232 hàm — trùng ĐÚNG số hàm thật trong `jni.h` của JBR 25.0.3 ⇒ không có đường crash.
+      Rủi ro thật còn lại: (1) JDK 28 thêm hàm thứ 233 (`HasIdentity`) — mọi bản LWJGL kể cả 3.4.3 sẽ
+      chép thiếu; chặn được bằng `-Dorg.lwjgl.system.JNINativeInterfaceSize=233`; (2) bản cài KHÔNG
+      kèm JRE nên không kiểm soát được JDK của người chơi. Thử ép LWJGL 3.4.3 (cặp libGDX master dùng)
+      thì cảnh báo biến mất và client khởi động được — nhưng đó là đổi phiên bản thư viện, chờ chủ dự án.
+      Đã làm: launcher client chạy với `--enable-native-access=ALL-UNNAMED` (`applicationDefaultJvmArgs`,
+      có trong cả `.bat` lẫn script unix) — chặn trước việc JDK sau CẤM `System::load` của gdx-jnigen.
 - [ ] **Image server có thật trên GHCR** — `ci.yml` đã có job `docker-build-push` (master + tag `v*`),
       còn phải xác nhận nó đã chạy xanh ít nhất một lần, vì `.env.prod` ghim `IMAGE_TAG`
 - [ ] **Cert TLS thật + `.env.prod`** đủ 6 giá trị (`DB_PASSWORD`, `CACHE_PASSWORD`,

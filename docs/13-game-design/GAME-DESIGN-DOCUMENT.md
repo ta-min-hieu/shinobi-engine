@@ -311,6 +311,37 @@ nhát**, khớp `biên thật = +2` của `DuelMargin`. Ta trúng 50/56 nhát (~
    chưa đo nhịp này.
 3. **Quái cũng hụt** (5/70 đòn, ~7%) — mô hình không tính, có lợi cho người chơi, bù một phần cho (1)–(2).
 
+📌 **Nhân quả của (1)–(2) đã xác minh 2026-10-01 — phần lớn là lỗi CÔNG CỤ đo.** Server bỏ IM LẶNG lệnh
+đánh khi mục tiêu còn ngoài tầm 2 m (`CombatSystem.tryAttackNow`) và CỐ Ý không giữ lại lệnh đó; lúc
+probe "đi bộ xong" con quái thường còn đang lao tới (> 2 m), nên lệnh đầu bị bỏ, rồi probe chờ trọn một
+nhịp 1100 ms (+ tới 200 ms chặn đọc) mới gửi lại ⇒ đúng dải 1,15–1,3 s. Probe đã sửa (`AttackCadence`:
+thử lại mỗi 100 ms tới khi server xác nhận nhát đầu, sau đó giữ nhịp tính từ nhát đầu). Ô
+`CombatSystemTest.shouldDropAttackRequestSilently_whenTargetStillOutOfRange_andNotReplayItWhenTargetCloses`
+khoá hành vi server. **Không nâng giả định phủ đầu lên 3** — đo lại bên dưới xác nhận. Phát hiện phụ: cooldown thực là **61 tick** (~1,017 s), không phải 60 — trừ `1f/60f`
+dạng float 60 lần còn dư ~2,8e-7 — áp cho cả hai bên nên tỉ lệ 1v1 không đổi. Client thật dính cùng cơ
+chế bỏ lệnh ngoài tầm (giữ phím lặp 1 s) — hướng xử lý chờ chủ dự án.
+
+#### Đo lại V50 bằng probe đã sửa (2026-10-01, DB dev đã ở V50)
+
+Cùng nhân vật/đồ/xuất phát/cờ như trên (`--attackIntervalMillis=1100 --observeSeconds=20`), probe có
+`AttackCadence`. Sát thương khớp từng điểm (62/61 ra, 22 vào, máu 206/206). **10/10 thắng.**
+
+| Đối thủ | Phủ đầu (5 lượt) | Ta hụt | Quái hụt | Máu thấp nhất |
+|---|---|---|---|---|
+| `wasteland_beast` | 2 · 1 · 1 · 1 · 1 | 3 · 1 · 1 · 0 · 0 | 3 · 1 · 1 · 1 · 0 | 74 · 96 · 96 · 118 · 96 |
+| `foundation_warden` | 1 · 1 · 1 · 1 · 1 | 0 · 0 · 0 · 0 · 1 | 0 · 0 · 0 · 0 · 0 | 96 · 96 · 96 · 96 · 74 |
+
+- Trễ nhát đầu sau "đi bộ xong": 15–315 ms (cũ: 5/10 lượt 1150–1282 ms). Ở các lượt trễ 100–300 ms
+  nhát của ta tới ~30 ms sau nhát đầu của quái ⇒ đó là nhát phủ đầu KHÔNG tránh được (quái vào tầm trước).
+- Nhịp của ta 1098–1118 ms (cũ 1100–1301); quái ~1018 ms (61 tick) ⇒ ta chậm hơn ~8%, không còn 10–20%.
+- Lượt duy nhất phủ đầu 2: một nhát rơi lúc ta còn ĐANG ĐI và nhát đó hụt. Đã dựng lại từng tick bằng
+  System thật (`MonsterOpeningHitRangeReplayTest`): phía server quái ra đòn ở **1,994 m ≤ 2** — đúng tầm.
+  Probe thấy 2,32 m vì `MoveResponse` gửi lúc drain lệnh (trước Movement, trễ tới 4 tick), vị trí quái
+  chỉ phát mỗi 3 tick (AoI 20 Hz), và quái lệch trục y ~0,9 m. **Không có bug server**; đây là thuế tiếp
+  cận thật. Đừng chấm "đánh ngoài tầm" từ log probe — sai số ~0,35 m.
+- **Kết luận: giả định "phủ đầu ≤ 2" của `DuelMargin` ĐỨNG; bảng 10 lượt ở trên là bi quan giả do lỗi
+  nhịp của probe.** Lượt tệ nhất mới 74/206 (cũ 30/206).
+
 Phạm vi: chỉ đo trận 1v1 từ máu ĐẦY, đi tới từ trạm nghỉ sát bên. Thuế đường đi trên trục chính
 (nhiều quái liên tiếp) không nằm trong phép đo này. Số cân bằng KHÔNG đổi. ✅ **Chủ dự án DUYỆT V50 2026-10-01** (cả hai điểm: máu yêu thú 280 → 289 và nới ô test thành "không dương").
 

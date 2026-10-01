@@ -149,8 +149,9 @@ Virtual Thread  GmCommandRouter
   SQL đó đi **cùng transaction** với một dòng `gm_audit_log` `command='role_grant'/'role_revoke'`
   (xem Q3 về việc ép bằng trigger).
 
-**Phác thảo migration — `V50__create_gm_role_and_audit.sql`** (số kế tiếp: hiện cao nhất là
-`V49__seed_waypost_safe_zones.sql`; **chưa tạo file** — ADR còn Proposed; đặt số lúc thi hành, xem
+**Phác thảo migration — `V51__create_gm_role_and_audit.sql`** (số kế tiếp: hiện cao nhất là
+`V50__real_margin_rule_wasteland_retune.sql` — ⚠️ bản đầu của ADR này ghi V50, nhưng V50 đã thuộc về
+migration cân bằng và đã chạy lên DB dev 2026-10-01; **chưa tạo file** — ADR còn Proposed; đặt số lúc thi hành, xem
 bẫy "đặt chỗ số hiệu migration"):
 
 ```sql
@@ -329,7 +330,7 @@ Không có gì khác: chiều đi/về của lệnh và `announce` dùng nguyên
   `ProfanityFilter`), `ChatFacade.mute/unmute`. `feature-chat` không biết GM là gì — nó chỉ biết "account
   này đang bị khoá chat tới lúc nào".
 - **`server-database`**: `PostgresGmRoleAdapter`, `PostgresGmAuditAdapter`, `PostgresChatMuteAdapter`,
-  migration V50.
+  migration V51.
 - **Không đụng**: `feature-account`, `server-world` (dùng API có sẵn), `shared-protocol` ngoài 2 giá trị
   enum.
 
@@ -378,7 +379,7 @@ mà quên audit là lỗi biên dịch, không phải lỗi review.
 - `server-gateway` — `GmCommandRouter` mới, một nhánh rẽ trong `handleSendChatMessageCommand`, một biến
   thể `evict` mang `error_key`, đọc `KAGE_GM_ENABLED`/`KAGE_GM_ALLOWED_CIDRS`.
 - `feature-chat` — mute.
-- `server-database` — 3 adapter + V50.
+- `server-database` — 3 adapter + V51.
 - `shared-protocol` — 2 giá trị enum.
 - `client-core` — `ConnectionCoordinator.endsSession`, `ChatController.OUTCOME_MESSAGE_KEYS`, 2 chuỗi i18n × 2 ngôn ngữ.
 - **Không đụng** `server-world`, `feature-account`, `feature-inventory`, `feature-mail` (dùng API có sẵn).
@@ -394,7 +395,7 @@ test tích hợp hai socket. Không đổi luồng nóng nào (đường chat th
 |---|---|
 | Đơn vị, `feature-gm` | Parser: từng lệnh, thiếu/thừa tham số, số ngoài biên, hoa thường, khoảng trắng, `/gm` trơn. Ma trận quyền: 10 lệnh × {không role, GM, ADMIN}. Luật "không tác động người cấp ≥ mình". Write-ahead: `GmAuditPort` giả ném lỗi ở `INSERT` ⇒ không hàm thi hành nào được gọi. |
 | Đơn vị, `feature-chat` | `MUTED` khi còn hạn; hết hạn thì gửi được; kiểm mute đứng TRƯỚC lọc từ cấm. |
-| Postgres thật (Testcontainers, cùng bộ 197 test hiện có) | V50 áp lên DB đã có dữ liệu; CHECK của `role`/`outcome`; FK; chuyển `PENDING → OK` chỉ được một lần. |
+| Postgres thật (Testcontainers, cùng bộ 197 test hiện có) | V51 áp lên DB đã có dữ liệu; CHECK của `role`/`outcome`; FK; chuyển `PENDING → OK` chỉ được một lần. |
 | Tích hợp socket, `server-gateway` (khuôn `SecurityIntegrationTest`/`WorldChangedEventOrderTest`) | (1) Người không role gõ `/gm announce x` ⇒ socket thứ hai KHÔNG nhận gì, không dòng `gm_audit_log`. (2) GM `kick` ⇒ mục tiêu nhận `ErrorResponse error.kicked_by_gm` rồi socket đóng. (3) GM gõ `give` ⇒ `DENIED` + dòng audit, không thư. (4) ADMIN `give` ⇒ thư hệ thống + `NEW_MAIL_EVENT`; lĩnh ⇒ `MAIL_CLAIM`; túi đầy ⇒ đồ còn trong thư. (5) `mute` ⇒ `OUTCOME_MUTED`; `unmute` ⇒ gửi lại được. (6) `summon` ⇒ `WorldChangedEvent{GM_MOVED}` tới TRƯỚC spawn đầu tiên ở chỗ mới; thoát ngay sau đó ⇒ vị trí lưu là chỗ MỚI. (7) `heal` ⇒ `HealthChangedEvent` với `current = max`. (8) `KAGE_GM_ENABLED=false` hoặc địa chỉ ngoài CIDR ⇒ mọi lệnh bị từ chối dù có role. (9) Tin `/gm` không bao giờ sinh dòng `CHAT_MESSAGE`. |
 | Kiến trúc | ArchUnit (`quality/architecture-tests`): `feature-gm` không import Netty/JDBC (luật sẵn có phủ nếu mẫu package khớp — kiểm lại khi thêm module). Test quét chuỗi SQL trong `server-database`: không `INSERT|UPDATE|DELETE` nào vào `gm_role`; chỉ `PostgresGmAuditAdapter` được `UPDATE gm_audit_log` và câu đó phải có `outcome = 'PENDING'` trong `WHERE`. |
 | Client | `ConnectionCoordinator.endsSession("error.kicked_by_gm")` = true; `outcomeMessageKey(MUTED)`; cổng `verifyServerErrorKeys` + `verifyContentKeys` xanh. |
@@ -458,6 +459,6 @@ test tích hợp hai socket. Không đổi luồng nóng nào (đường chat th
      hay tiếng Việt?
    - **Q5** — Biên số: `give` ≤ 99 món/lệnh, `gold` ≤ 1.000.000/lệnh, `mute` ≤ 7 ngày — giữ hay đổi?
    - **Q6** — `mute` thật với `OUTCOME_MUTED` (khuyến nghị) hay shadow-mute (phương án F, 0 enum)?
-2. Sau khi Accepted: thi hành theo thứ tự migration V50 → `feature-gm` → `feature-chat` mute → `GmCommandRouter`
+2. Sau khi Accepted: thi hành theo thứ tự migration V51 → `feature-gm` → `feature-chat` mute → `GmCommandRouter`
    → client (D7) → test (mục Testing) → viết ADMIN.md → cập nhật REPOSITORY-STRUCTURE §1, docs/README.md dòng #6.
 3. Kiểm sống bằng hai client thật (mục Testing, dòng cuối).
