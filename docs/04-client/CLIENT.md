@@ -244,7 +244,13 @@ thực thể — server phát lại spawn/máu như lần vào world bình thư�
   - *Hỏng hẳn* (server chết không dựng lại): 4 lượt đều "socket không dựng lại kịp", về `LoginScreen` với
     `login.error.relog_failed` sau **3 phút 07 giây** — vì 4 lượt × 45 giây chờ socket cộng dồn, trong khi lượt 2–4
     không làm gì mới (`GameConnection` vốn vẫn tự thử lại). ⇒ 2026-10-01 chủ dự án chốt một hạn tổng (45–60 giây,
-    chọn 60 để vẫn phủ năm lần thử nối lại đầu của `GameConnection`). Hành vi mới CHƯA kiểm sống lại.
+    chọn 60 để vẫn phủ năm lần thử nối lại đầu của `GameConnection`).
+- **Kiểm sống lại hạn tổng 2026-10-01** (commit `d1ac2ef`, cùng cách: client desktop thật, giết tiến trình server):
+  - *Hỏng hẳn*: phát hiện đứt 10:52:55.587 ⇒ `Hết hạn tổng 60.0s` + `login.error.relog_failed` lúc 10:53:55.600 —
+    **đúng 60,0 giây** (trước: 3 phút 07 giây). Sau đó `GameConnection` không thử nối lại thêm lần nào (lần 7 lẽ ra
+    rơi ~10:53:56).
+  - *Vào lại*: server chết ~15 giây ⇒ socket nối lại ở lần thử 5, `Đã vào lại world với nhân vật 3` sau 110 ms —
+    hạn tổng không chặn đường vào lại.
 
 **Bị đá vì đăng nhập nơi khác** (2026-09-25, [SERVER.md §5.1](../05-server/SERVER.md)): `ErrorResponse` mang
 `error.logged_in_elsewhere` ⇒ `ConnectionCoordinator` báo `WorldScreen` kết thúc phiên ⇒ dừng HẲN
