@@ -698,9 +698,10 @@ def _add_frontal_face(rig, spec):
 
     The eye top stays under the hair cap's cut (z 0.839) so the fringe does not
     close over it from the downward camera; the NPC builders' chin-up idle
-    (head -26..-30) still helps and is kept. A builder whose idle keeps the
-    kit's default head angle (e.g. `blood_sand_enforcer`) gets eyes that the
-    brim half-covers — better than none, worse than the NPCs.
+    (head -26..-30) still helps and is kept. A builder that keeps the kit's
+    stock idle gets eyes the brim half-covers unless its spec sets
+    `idle_chin_lift` (28 for every kit monster that wears this face; 16 was
+    measured and still cut the eye tops).
 
     Parts: _EyeWhite/_EyeWhiteFar (rim), _Eye/_EyeFar (iris),
     _EyeShine/_EyeShineFar, _Brow/_BrowFar, _Mouth. All but the brow are kept out
@@ -1419,8 +1420,19 @@ def _orbit_prop(rig, name, color, radius, center, speed, size, phase, faceted=Fa
 # head are counter-posed so the character never looks like a rotating plank.
 
 
-def author_actions(rig):
-    """Author the seven standard actions with real weight and follow-through."""
+def author_actions(rig, idle_chin_lift=0.0):
+    """Author the seven standard actions with real weight and follow-through.
+
+    `idle_chin_lift` (degrees, positive = chin up) is added to the head in
+    `idle` only. The client camera looks DOWN 30 deg (ADR-031), so at the kit's
+    near-level idle head the hair cap's front edge covers the top of a
+    `frontal` face's eyes; the three NPCs re-key their own idle with the head
+    at -26..-30 for exactly that reason. A kit monster that keeps the stock
+    idle gets the same fix through its spec (`idle_chin_lift`) instead of a
+    hand-copied idle. Idle only: it is the pose a hostile holds while the
+    player walks up to it, and every other clip already moves the head for its
+    own reasons.
+    """
     if rig.animation_data is None:
         rig.animation_data_create()
 
@@ -1436,19 +1448,20 @@ def author_actions(rig):
     # not stack into one shape.
     start("idle")
     idle_stance = {"leg_r": 7, "leg_l": -7, "shin_r": -5, "shin_l": 4}
+    lift = idle_chin_lift
     pose_frame(rig, 1, dict(idle_stance, arm_l=16, arm_r=20, forearm_l=-14,
-                            forearm_r=-18, spine=2, head=-1), root_z=0.0)
+                            forearm_r=-18, spine=2, head=-1 - lift), root_z=0.0)
     pose_frame(rig, 5, dict(idle_stance, arm_l=13, arm_r=17, forearm_l=-17,
-                            forearm_r=-21, spine=3, head=-2),
+                            forearm_r=-21, spine=3, head=-2 - lift),
                root_z=0.012, root_scale_z=1.006)
     pose_frame(rig, 9, dict(idle_stance, arm_l=10, arm_r=14, forearm_l=-19,
-                            forearm_r=-23, spine=4, head=-3),
+                            forearm_r=-23, spine=4, head=-3 - lift),
                root_z=0.018, root_scale_z=1.010)
     pose_frame(rig, 13, dict(idle_stance, arm_l=13, arm_r=17, forearm_l=-16,
-                             forearm_r=-20, spine=3, head=-2),
+                             forearm_r=-20, spine=3, head=-2 - lift),
                root_z=0.008, root_scale_z=1.004)
     pose_frame(rig, 17, dict(idle_stance, arm_l=16, arm_r=20, forearm_l=-14,
-                             forearm_r=-18, spine=2, head=-1), root_z=0.0)
+                             forearm_r=-18, spine=2, head=-1 - lift), root_z=0.0)
 
     # Run: a two-step cycle. Frames 3 and 9 are the airborne passes (both feet
     # off the ground), which is the read that separates running from walking.
@@ -1593,7 +1606,7 @@ def assemble_character(spec):
     if spec.get("motion_detail"):
         add_motion_detail(rig, spec, spec["motion_detail"]["kind"],
                           spec["motion_detail"]["color"])
-    author_actions(rig)
+    author_actions(rig, idle_chin_lift=spec.get("idle_chin_lift", 0.0))
     apply_outline_exclusions()
     return rig
 
@@ -1613,4 +1626,5 @@ accessories     [{"kind": one of _ACCESSORY_BUILDERS, "color": hex, "bone": opti
 weapon          one of _WEAPON_BUILDERS, or None
 weapon_color    hex, optional   weapon_grip hex, optional
 motion_detail   {"kind": embers|water_ring|ribbons|spark|stone_shards, "color": hex}
+idle_chin_lift  degrees, optional (default 0) - chin up in `idle` only; see author_actions
 """

@@ -115,6 +115,10 @@ RAIDER_SPEC = {
     # `blood_sand_scout`'s mask. A tán tu is not hiding, he has simply taken
     # something and expects to keep it.
     "eye_color": "#231B14",
+    # Two-eyed game-camera face + chin up in idle — see `build_monster_bandit`
+    # (ASSET-LOG 2026-10-01, second pass).
+    "face_style": "frontal",
+    "idle_chin_lift": 28,
     # `topknot_bun` — the third distinct head shape among the people in the
     # roster, and a tighter mass than a loose topknot, which is what a fighter
     # reads as. Tighter also means less dark area crowding the face, which is

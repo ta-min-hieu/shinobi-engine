@@ -95,6 +95,12 @@ ENFORCER_SPEC = {
     # for a pure profile and wrong for the game's 3/4 camera - lesson 5 of the
     # elder rebuild, re-confirmed on the senior sister.
     "face_style": "frontal",
+    # Chin up in idle (ASSET-LOG 2026-10-01, second pass). At the kit's level
+    # idle head the topknot_bun brim covered the top half of both eyes from the
+    # client's downward camera; 16 still cut the eye tops, 28 is what
+    # runWorldPreview accepted. The three NPCs carry the same lift (-26..-30)
+    # in their own hand-keyed idles.
+    "idle_chin_lift": 28,
     # Dark hair, like the sister's and unlike the elder's pale one.
     # `topknot_bun` is the elder's OUTLINE and that is the point: a functionary
     # of the same sect wears the same knot. The two stay apart on VALUE (his

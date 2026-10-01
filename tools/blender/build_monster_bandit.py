@@ -43,6 +43,13 @@ BANDIT_SPEC = {
     "name": "bandit",
     "skin": "#E0B183",
     "eye_color": "#241C16",
+    # Two-eyed game-camera face + chin up in idle (ASSET-LOG 2026-10-01, second
+    # pass). A monster turns to face the player, so half the time the client
+    # draws it almost head-on — where the profile-authored `default` face is
+    # skin plus a grey speck at the temple. The lift keeps the hair brim off the
+    # eyes from the downward camera (16 was not enough, 28 is).
+    "face_style": "frontal",
+    "idle_chin_lift": 28,
     "hair": {"style": "topknot", "color": "#2B211A"},
     "cloth": {"torso": "#6B4A2E", "pelvis": "#3E342A", "legs": "#4C4238"},
     "shoe": "#2E2822",

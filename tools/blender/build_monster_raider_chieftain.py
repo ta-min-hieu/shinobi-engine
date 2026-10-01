@@ -95,6 +95,10 @@ CHIEFTAIN_SPEC = {
     # wind, next to one who does the work.
     "skin": "#D8A579",
     "eye_color": "#1E1820",
+    # Two-eyed game-camera face + chin up in idle — see `build_monster_bandit`
+    # (ASSET-LOG 2026-10-01, second pass).
+    "face_style": "frontal",
+    "idle_chin_lift": 28,
     # The single biggest silhouette separator in the file: every other person in
     # the roster ties their hair. See module docstring.
     "hair": {"style": "spiky_long", "color": "#1F1A22"},

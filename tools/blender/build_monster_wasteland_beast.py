@@ -56,6 +56,11 @@ WASTELAND_SPEC = {
     # The one loud note on the model, and the reason the species reads as WRONG
     # rather than merely poor: spirit-line sickness shows in the eyes first.
     "eye_color": "#8FBF5A",
+    # Two-eyed game-camera face + chin up in idle — see `build_monster_bandit`
+    # (ASSET-LOG 2026-10-01, second pass). Head-on, the sick green above was not
+    # on screen at all before this.
+    "face_style": "frontal",
+    "idle_chin_lift": 28,
     "hair": {"style": "spiky_long", "color": "#4A4230"},
     # OCHRE, not grey and not the Blood Sand browns — this is the whole
     # separation argument, see the module docstring.

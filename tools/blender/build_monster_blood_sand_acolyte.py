@@ -68,6 +68,10 @@ ACOLYTE_SPEC = {
     # spirit line where nothing grows.
     "skin": "#BFA68F",
     "eye_color": "#C0554A",
+    # Two-eyed game-camera face + chin up in idle — see `build_monster_bandit`
+    # (ASSET-LOG 2026-10-01, second pass).
+    "face_style": "frontal",
+    "idle_chin_lift": 28,
     "hair": {"style": "spiky_short", "color": "#171312"},
     # MID-tone throughout: the point of this model. Not the scout's near-black,
     # not the enforcer's pale ash.

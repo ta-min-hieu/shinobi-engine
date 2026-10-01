@@ -72,6 +72,11 @@ RINGLEADER_SPEC = {
     # Red eyes over a near-black head: the acolyte's are the same family but
     # duller, so leader and follower still read as one faction up close.
     "eye_color": "#D4564A",
+    # Two-eyed game-camera face + chin up in idle — see `build_monster_bandit`
+    # (ASSET-LOG 2026-10-01, second pass). The `bang` fringe is the reason the
+    # lift is 28, not 16: at 16 it still cut across both eye tops.
+    "face_style": "frontal",
+    "idle_chin_lift": 28,
     "hair": {"style": "bang", "color": "#141011"},
     # Darkest of the four. The acolyte is mid-tone; putting the leader BELOW him
     # on the value axis is what makes the pair read as two things, not two sizes

@@ -72,6 +72,11 @@ SCOUT_SPEC = {
     # The one bright thing on the model. A masked face with dark eyes is a
     # featureless blob at 64px; amber eyes over a dark mask is a face.
     "eye_color": "#D8A23A",
+    # Two-eyed game-camera face + chin up in idle — see `build_monster_bandit`
+    # (ASSET-LOG 2026-10-01, second pass). Head-on, the amber above was not on
+    # screen at all before this.
+    "face_style": "frontal",
+    "idle_chin_lift": 28,
     "hair": {"style": "topknot", "color": "#14100E"},
     # Near-black robe with the dried-blood field on the torso. This is the
     # inversion: the bandit is mid-tone cloth with a dark accent, this is a dark

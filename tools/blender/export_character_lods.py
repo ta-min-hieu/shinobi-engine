@@ -55,6 +55,9 @@ BODY_SHARE_FLOOR = 0.25
 # that to the sash tail, the scarf tail and the blade guard.
 MIN_PART_TRIANGLES = 64
 
+# Retries for a shared-ratio shrink that lands over its tier budget — see export_lods.
+MAX_SHRINK_ATTEMPTS = 4
+
 
 def _triangles(obj):
     obj.data.calc_loop_triangles()
@@ -124,7 +127,21 @@ def export_lods(source, armature, extras, asset_key, out_dir, flat_materials=Fal
             _, after = t3d.decimate(working, budget - extra_triangles)
             tier_extras = extras
         else:
-            after, tier_extras = _shrink_together(working, extras, tier, budget, extra_triangles)
+            # Decimate does not land exactly on its target: summed over ~40 kit parts the low
+            # tier can come out a few triangles OVER the ceiling (blood_sand_scout 5006 on the
+            # 2026-10-01 face rebuild), which TriangleBudgetValidator fails on. Re-run from a
+            # fresh copy with the overshoot taken off the target until it fits.
+            target = budget
+            for _attempt in range(MAX_SHRINK_ATTEMPTS):
+                after, tier_extras = _shrink_together(working, extras, tier, target, extra_triangles)
+                total = after + sum(_triangles(extra) for extra in tier_extras)
+                if total <= budget:
+                    break
+                for copy in tier_extras:
+                    bpy.data.objects.remove(copy, do_unlink=True)
+                bpy.data.objects.remove(working, do_unlink=True)
+                working = _copy_of(source, "{0}_{1}".format(source.name, tier))
+                target -= total - budget
         path = os.path.join(out_dir, tier, asset_key + ".glb")
         if flat_materials:
             byte_counts[tier] = t3d.export_gltf_flat(path, working, armature, extras=tier_extras)
