@@ -15,6 +15,8 @@ import com.badlogic.gdx.scenes.scene2d.utils.Layout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import dev.kage.client.core.ui.theme.ClientLanguage;
+import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.client.core.ui.theme.KageSkin;
 
 /**
@@ -97,6 +99,9 @@ public final class HudLayoutBudgetTool extends ApplicationAdapter {
 
     @Override
     public void create() {
+        // -PkageLanguage=en: đo/chụp bằng bundle tiếng Anh (song ngữ, 2026-10-01). Phải trước mọi load().
+        KageI18n.useLanguage(
+                ClientLanguage.fromCode(System.getProperty("kage.language")).orElse(ClientLanguage.DEFAULT));
         skin = new KageSkin();
         LOG.info("Đo {} cửa sổ ở {} dòng mỗi danh sách, màn hình {}x{}", 8, rows, SCREEN_WIDTH_PX, SCREEN_HEIGHT_PX);
         measureMail();

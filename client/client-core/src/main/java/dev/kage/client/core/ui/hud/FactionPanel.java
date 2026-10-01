@@ -48,7 +48,7 @@ public final class FactionPanel implements HudWindow {
 
     private static final float PANEL_PAD_PX = 16f;
 
-    private static final float CHOICE_BUTTON_WIDTH_PX = 112f;
+    static final float CHOICE_BUTTON_WIDTH_PX = 112f;
 
     /** Vàng đồng nhạt — tiêu đề, cùng tông viền HUD của {@link KageSkin}. */
     private static final Color TITLE_COLOR = Color.valueOf("E0B860");

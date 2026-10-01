@@ -82,7 +82,7 @@ public final class FriendPanel implements HudWindow {
      */
     private static final float FRIEND_NAME_COLUMN_WIDTH_PX = 210f;
 
-    private static final float ACTION_BUTTON_WIDTH_PX = 92f;
+    static final float ACTION_BUTTON_WIDTH_PX = 92f;
 
     /** Trần ký tự ô nhập tên — khớp {@code FriendController.MAX_NAME_LENGTH} (world/ không với tới). */
     private static final int NAME_INPUT_MAX_LENGTH = 16;

@@ -41,7 +41,15 @@ public final class CombatHud implements HudWindow {
 
     private static final float EXP_LABEL_SCALE = 0.7f;
     private static final float BADGE_SIZE = 52f;
-    private static final float SLOT_SIZE = 46f;
+    /**
+     * Ô gợi ý phím. 46 → 52 (2026-10-01, song ngữ): "Chọn/Chuột" đã sát viền ở 46, "Target/Mouse"
+     * thì tràn — đo bằng {@code HudButtonLabelFitTest}.
+     */
+    static final float SLOT_SIZE = 52f;
+
+    /** Cỡ chữ (tỉ lệ) trong ô gợi ý phím — ô vuông {@link #SLOT_SIZE}, chữ phải vừa ở cả hai ngôn ngữ. */
+    static final float HINT_LABEL_SCALE = 0.65f;
+
     private static final float ACTION_BUTTON_SIZE = 96f;
 
     /** Nút chiêu nhỏ hơn nút Đánh — thứ bậc thị giác: đánh thường là hành động chính (2026-08-09). */
@@ -391,7 +399,7 @@ public final class CombatHud implements HudWindow {
     private Table hintSlot(String text) {
         Label label = new Label(text, skin.statLabelStyle);
         label.setAlignment(Align.center);
-        label.setFontScale(0.65f);
+        label.setFontScale(HINT_LABEL_SCALE);
         Table slot = new Table();
         slot.setBackground(skin.slot);
         slot.add(label).expand().center();

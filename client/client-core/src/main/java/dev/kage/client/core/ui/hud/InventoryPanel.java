@@ -69,7 +69,11 @@ public final class InventoryPanel implements HudWindow {
 
     private static final float ROW_PAD_PX = 4f;
 
-    private static final float ROW_BUTTON_WIDTH_PX = 84f;
+    /**
+     * Nút trên từng dòng. 84 → 88 (2026-10-01): "Unequip" cần ~87px kể cả lề ({@code
+     * HudButtonLabelFitTest}). Hàng hành động: 2 × 88 + 2 × 104 + 150 + 4 khe 6 = 558 ≤ 560.
+     */
+    static final float ROW_BUTTON_WIDTH_PX = 88f;
 
     /**
      * Bề rộng cột tên ô trang bị ("Pháp khí", "Ngọc bội 1"...). Cố định để cột mô tả bên phải không
@@ -82,10 +86,10 @@ public final class InventoryPanel implements HudWindow {
      * "Giao dịch"/"Cường hoá", và ở 84px chúng bị CẮT MẤT CHỮ tràn ra ngoài viền khung — thấy bằng
      * ảnh chụp {@code HudPreviewTool}, không thấy bằng build xanh.
      */
-    private static final float ACTION_BUTTON_WIDTH_PX = 104f;
+    static final float ACTION_BUTTON_WIDTH_PX = 104f;
 
     /** Công tắc Bảo Vệ mang cả nhãn lẫn trạng thái ("Bảo vệ: Tắt") nên rộng hơn nút thường. */
-    private static final float PROTECTION_BUTTON_WIDTH_PX = 150f;
+    static final float PROTECTION_BUTTON_WIDTH_PX = 150f;
 
     /**
      * Chiều cao CỐ ĐỊNH của vùng cuộn danh sách túi, và của vùng cuộn khu trang bị.

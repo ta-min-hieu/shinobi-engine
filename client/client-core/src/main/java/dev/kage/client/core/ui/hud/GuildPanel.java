@@ -59,8 +59,11 @@ public final class GuildPanel implements HudWindow {
 
     private static final float ROW_PAD_PX = 4f;
 
-    /** Bề rộng CỐ ĐỊNH cho nút hành động trên từng dòng — nhãn dài ngắn khác nhau không được làm cột nhảy. */
-    private static final float ROW_BUTTON_WIDTH_PX = 92f;
+    /**
+     * Bề rộng CỐ ĐỊNH cho nút hành động trên từng dòng — nhãn dài ngắn khác nhau không được làm cột
+     * nhảy. 92 → 100 (2026-10-01): "Lập bang" chạm sát viền — đo bằng {@code HudButtonLabelFitTest}.
+     */
+    static final float ROW_BUTTON_WIDTH_PX = 100f;
 
     /**
      * Chiều cao TỐI ĐA của vùng cuộn thành viên (≈ 3 dòng 52px) và của vùng cuộn đơn xin gia nhập

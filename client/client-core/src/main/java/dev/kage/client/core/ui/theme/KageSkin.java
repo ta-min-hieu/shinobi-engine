@@ -43,7 +43,8 @@ import dev.kage.client.core.render.FontFactory;
 public final class KageSkin implements Disposable {
 
     private static final String FONT_PATH = "fonts/BeVietnamPro-Regular.ttf";
-    private static final int FONT_SIZE_PX = 20;
+    /** Cỡ chữ UI duy nhất — package-private để {@code TextWidthMeter} (test) đo đúng cỡ đang vẽ. */
+    static final int FONT_SIZE_PX = 20;
 
     private final BitmapFont font;
     private final List<Texture> ownedTextures = new ArrayList<>();

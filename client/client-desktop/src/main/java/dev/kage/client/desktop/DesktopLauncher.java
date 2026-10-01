@@ -1,5 +1,6 @@
 package dev.kage.client.desktop;
 
+import com.badlogic.gdx.Files;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
 
@@ -19,6 +20,9 @@ import dev.kage.engine.ecs.EcsWorld;
  */
 public final class DesktopLauncher {
 
+    /** Tương đối so với thư mục người dùng ({@code FileType.External} trên desktop). */
+    private static final String PREFERENCES_DIRECTORY = ".kage/";
+
     private DesktopLauncher() {}
 
     public static void main(String[] args) throws Exception {
@@ -30,6 +34,9 @@ public final class DesktopLauncher {
         config.useVsync(true);
         // Foreground FPS không giới hạn tick logic — logic luôn cố định 60Hz (ENGINE.md §4).
         config.setForegroundFPS(144);
+        // Cài đặt người chơi (hiện chỉ có ngôn ngữ — GdxPreferencesLanguageStore) nằm cạnh
+        // PlatformAdapter#savePath (~/.kage), thay vì ~/.prefs/ mặc định của libGDX.
+        config.setPreferencesConfig(PREFERENCES_DIRECTORY, Files.FileType.External);
 
         DesktopPlatformAdapter platform = new DesktopPlatformAdapter();
         DesktopInputMapper inputMapper = new DesktopInputMapper();

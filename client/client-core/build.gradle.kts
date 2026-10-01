@@ -86,6 +86,8 @@ tasks.register<JavaExec>("runHudPreview") {
     description = "Chụp ảnh bố cục CombatHud với dữ liệu giả (THROWAWAY)."
     classpath = sourceSets["test"].runtimeClasspath
     mainClass.set("dev.kage.client.core.ui.hud.HudPreviewTool")
+    // -PkageLanguage=en chụp bằng bundle tiếng Anh (song ngữ, 2026-10-01).
+    providers.gradleProperty("kageLanguage").orNull?.let { systemProperty("kage.language", it) }
     val assetRoot = rootProject.layout.projectDirectory.dir("assets/exported")
     workingDir = assetRoot.asFile
     doFirst { workingDir.mkdirs() }
@@ -424,6 +426,7 @@ tasks.register<JavaExec>("runHudLayoutCheck") {
     val assetRoot = rootProject.layout.projectDirectory.dir("assets/exported")
     workingDir = assetRoot.asFile
     providers.gradleProperty("kageLayoutRows").orNull?.let { systemProperty("kage.layout.rows", it) }
+    providers.gradleProperty("kageLanguage").orNull?.let { systemProperty("kage.language", it) }
     doFirst { workingDir.mkdirs() }
 }
 

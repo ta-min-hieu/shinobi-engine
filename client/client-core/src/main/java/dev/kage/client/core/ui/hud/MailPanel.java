@@ -77,7 +77,13 @@ public final class MailPanel implements HudWindow {
     private static final float ROW_PAD_PX = 4f;
 
     /** Bề rộng CỐ ĐỊNH cho nút hành động trên từng dòng — nhãn dài ngắn khác nhau không làm cột nhảy. */
-    private static final float ROW_BUTTON_WIDTH_PX = 84f;
+    static final float ROW_BUTTON_WIDTH_PX = 84f;
+
+    /**
+     * Nút Làm mới nằm ở hàng gợi ý, KHÔNG ở dòng thư — được rộng hơn mà không phá phép cộng 330 + 3 × 84
+     * của dòng thư. "Làm mới" cần ~92px kể cả lề ({@code HudButtonLabelFitTest}).
+     */
+    static final float REFRESH_BUTTON_WIDTH_PX = 104f;
 
     /** Bề rộng cột chữ của một dòng thư — chừa đúng chỗ cho ba nút bên phải. */
     private static final float ROW_TEXT_WIDTH_PX = 330f;
@@ -325,7 +331,7 @@ public final class MailPanel implements HudWindow {
         Label hint = new Label(text("mail.hint.close"), skin.labelStyle);
         hint.setColor(SECTION_COLOR);
         row.add(hint).left().expandX().padRight(6f);
-        row.add(actionButton("mail.action.refresh", () -> fire(onOpened))).width(ROW_BUTTON_WIDTH_PX);
+        row.add(actionButton("mail.action.refresh", () -> fire(onOpened))).width(REFRESH_BUTTON_WIDTH_PX);
         return row;
     }
 

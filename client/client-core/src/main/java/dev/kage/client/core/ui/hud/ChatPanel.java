@@ -84,7 +84,7 @@ public final class ChatPanel implements HudWindow {
      * ("Thế giới") bị cắt cụt thành "Thế giớ" trên ảnh chụp preview đầu tiên, và bề rộng nhảy theo
      * kênh đang chọn làm ô nhập giật sang trái/phải mỗi lần bấm.
      */
-    private static final float CHANNEL_BUTTON_WIDTH_PX = 104f;
+    static final float CHANNEL_BUTTON_WIDTH_PX = 104f;
 
     /** Trắng ngà — kênh Thế giới, và mặc định cho kênh không nhận ra. */
     private static final Color WORLD_COLOR = Color.valueOf("F2F2F2");

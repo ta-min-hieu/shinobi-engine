@@ -57,7 +57,8 @@ public final class DuelPanel implements HudWindow {
 
     private static final float SECTION_PAD_PX = 8f;
 
-    private static final float ACTION_BUTTON_WIDTH_PX = 104f;
+    /** Nút hành động. 104 → 116 (2026-10-01): "Thách đấu" chạm sát viền — {@code HudButtonLabelFitTest}. */
+    static final float ACTION_BUTTON_WIDTH_PX = 116f;
 
     /** Trần ký tự ô nhập tên — khớp {@code DuelController.MAX_NAME_LENGTH} (world/ không với tới). */
     private static final int NAME_INPUT_MAX_LENGTH = 16;

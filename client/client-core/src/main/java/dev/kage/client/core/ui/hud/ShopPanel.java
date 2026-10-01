@@ -59,7 +59,7 @@ public final class ShopPanel implements HudWindow {
     private static final float ROW_PAD_PX = 4f;
 
     /** Bề rộng CỐ ĐỊNH cho nút Mua trên từng dòng — nhãn dài ngắn khác nhau không làm cột nhảy. */
-    private static final float ROW_BUTTON_WIDTH_PX = 84f;
+    static final float ROW_BUTTON_WIDTH_PX = 84f;
 
     /** Bề rộng cột chữ của một dòng danh mục — chừa đúng chỗ cho nút Mua bên phải. */
     private static final float ROW_TEXT_WIDTH_PX = 400f;

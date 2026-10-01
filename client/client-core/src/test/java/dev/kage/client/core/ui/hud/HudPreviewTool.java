@@ -13,6 +13,9 @@ import com.badlogic.gdx.utils.ScreenUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import dev.kage.client.core.ui.theme.ClientLanguage;
+import dev.kage.client.core.ui.theme.KageI18n;
+
 /**
  * THROWAWAY — xem trước bố cục {@link CombatHud} bằng ảnh chụp, KHÔNG cần chạy server/đăng nhập.
  * Dựng lên khi chỉnh HUD theo ảnh Ninja School Online chủ dự án gửi (2026-08-09): vòng lặp
@@ -73,6 +76,9 @@ public final class HudPreviewTool extends ApplicationAdapter {
 
     @Override
     public void create() {
+        // -PkageLanguage=en: đo/chụp bằng bundle tiếng Anh (song ngữ, 2026-10-01). Phải trước mọi load().
+        KageI18n.useLanguage(
+                ClientLanguage.fromCode(System.getProperty("kage.language")).orElse(ClientLanguage.DEFAULT));
         hud = new CombatHud();
         hud.resize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
         // Dữ liệu giả nhưng ĐÚNG dải giá trị thật (HP/Khí tối đa 100 — CombatConstants) để bố cục

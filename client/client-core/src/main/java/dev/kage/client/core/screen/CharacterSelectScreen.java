@@ -67,11 +67,21 @@ public final class CharacterSelectScreen implements GameScreen {
      *
      * <p>⚠️ Bề rộng cũ vốn ĐÃ sát trần trước đợt này: "(Cấp 100)" cho ra ~330px trên cùng cái tên
      * 16 ký tự đó. Nới thêm là trả lại khoảng thở cho cả hai, không riêng cảnh giới.
+     *
+     * <p>⚠️ 440 → 640 (2026-10-01, song ngữ). Hai điều sai cùng lúc, bắt bằng
+     * {@code ScreenButtonLabelFitTest} (metric FreeType thật, không phải ảnh chụp): (1) cỡ chữ thật là
+     * ~11,5px/ký tự chứ không phải 9,7, và trường hợp dài nhất là "chưa thức tỉnh" chứ không phải
+     * "Phong" — tên 16 ký tự + "Chưa thức tỉnh (Luyện Khí 9)" cần ~500px, tức tiếng Việt vốn ĐÃ tràn
+     * 440; (2) tiếng Anh dài hơn hẳn: "… — Thunder (Spirit Transformation Perfected)" ~626px. Màn
+     * này chỉ có danh sách nhân vật giữa cửa sổ 1280px, còn thừa chỗ.
      */
-    private static final float CHARACTER_ROW_WIDTH_PX = 440f;
+    static final float CHARACTER_ROW_WIDTH_PX = 640f;
 
     /** Khung chứa rộng hơn dòng đúng 20px — giữ nguyên tỉ lệ lề của bố cục cũ (360 so với 340). */
-    private static final float CHARACTER_LIST_WIDTH_PX = 460f;
+    private static final float CHARACTER_LIST_WIDTH_PX = 660f;
+
+    /** Nút "Tạo nhân vật mới" — rộng cố định, nhãn đo ở cả hai ngôn ngữ bằng {@code ScreenButtonLabelFitTest}. */
+    static final float CREATE_BUTTON_WIDTH_PX = 200f;
 
     private final GameConnection connection;
     private final WorldEntry worldEntry;
@@ -128,7 +138,7 @@ public final class CharacterSelectScreen implements GameScreen {
                 .padBottom(24f)
                 .row();
         root.add(newCharacterNameField).width(280f).height(48f).padBottom(12f).row();
-        root.add(createButton).size(200f, 48f).padBottom(12f).row();
+        root.add(createButton).size(CREATE_BUTTON_WIDTH_PX, 48f).padBottom(12f).row();
         root.add(statusLabel);
 
         stage.addActor(root);

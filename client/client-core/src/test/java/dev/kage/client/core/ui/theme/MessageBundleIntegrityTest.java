@@ -8,6 +8,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.SortedSet;
@@ -47,6 +48,9 @@ class MessageBundleIntegrityTest {
     /** Dấu xung đột git, đúng như git ghi ra: ba ký tự lặp bảy lần ở đầu dòng. */
     private static final List<String> CONFLICT_MARKERS = List.of("<<<<<<<", "=======", ">>>>>>>");
 
+    /** Từ ba từ trở lên mới tính là một câu (tên riêng như "Tiếng Việt" chỉ có hai). */
+    private static final int MIN_WORDS_OF_A_SENTENCE = 3;
+
     @Test
     @DisplayName("Không bundle nào chứa dấu xung đột git còn sót lại")
     void hasNoLeftoverConflictMarker() {
@@ -64,6 +68,28 @@ class MessageBundleIntegrityTest {
     @DisplayName("Bundle tiếng Việt và tiếng Anh có ĐÚNG cùng tập khoá")
     void bundlesHaveIdenticalKeys() {
         assertThat(keys("strings_vi.properties")).isEqualTo(keys("strings_en.properties"));
+    }
+
+    /**
+     * Rà 2026-10-01 (lúc mở song ngữ): TÁM khoá {@code error.*} của server mang nguyên câu tiếng Anh
+     * trong bundle tiếng Việt — bản sao chép để qua cổng {@code verifyServerErrorKeys} rồi không ai dịch.
+     * Cả năm kiểm tra khác đều xanh với lỗi đó (khoá có, giá trị không rỗng, ký tự có glyph). Một
+     * CÂU (từ ba từ trở lên) giống hệt nhau ở hai bundle gần như chắc chắn là chưa dịch; tên riêng,
+     * số, ký hiệu ngắn ("{0} ms", "x{0}", "English") thì được phép trùng.
+     */
+    @Test
+    @DisplayName("Không câu nào ở bundle tiếng Việt là bản sao nguyên văn của câu tiếng Anh")
+    void vietnameseBundleHasNoUntranslatedEnglishSentence() {
+        Properties vietnamese = load("strings_vi.properties");
+        Properties english = load("strings_en.properties");
+        List<String> untranslated = vietnamese.stringPropertyNames().stream()
+                .filter(key -> vietnamese.getProperty(key).equals(english.getProperty(key)))
+                .filter(key -> wordCount(vietnamese.getProperty(key)) >= MIN_WORDS_OF_A_SENTENCE)
+                .sorted()
+                .toList();
+        assertThat(untranslated)
+                .as("Các khoá này hiện câu TIẾNG ANH cho người chơi đã chọn tiếng Việt")
+                .isEmpty();
     }
 
     @Test
@@ -136,6 +162,13 @@ class MessageBundleIntegrityTest {
                 .filter(line -> line.indexOf('=') > 0)
                 .map(line -> line.substring(0, line.indexOf('=')).strip())
                 .toList();
+    }
+
+    /** Số từ chữ cái (bỏ qua ô {@code {0}}, số, ký hiệu). */
+    private static long wordCount(String value) {
+        return Arrays.stream(value.split("[^\\p{L}]+"))
+                .filter(word -> word.length() > 1)
+                .count();
     }
 
     private static SortedSet<String> keys(String bundle) {

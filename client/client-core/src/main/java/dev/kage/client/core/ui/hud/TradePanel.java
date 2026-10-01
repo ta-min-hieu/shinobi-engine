@@ -68,7 +68,17 @@ public final class TradePanel implements HudWindow {
 
     private static final float PANEL_PAD_PX = 16f;
 
-    private static final float ACTION_BUTTON_WIDTH_PX = 104f;
+    /**
+     * Nút hành động. 104 → 116 (2026-10-01): "Chấp nhận" cần ~113px kể cả lề — đo bằng
+     * {@code HudButtonLabelFitTest}, không bằng mắt.
+     */
+    static final float ACTION_BUTTON_WIDTH_PX = 116f;
+
+    /**
+     * Nút đặt linh thạch RIÊNG một bề rộng: "Đặt linh thạch" (~147px) và "Set spirit stones" (~162px)
+     * đều tràn hẳn khỏi nút 104px cũ. Hàng phiên: ô 96 + 166 + 116 + 116 + 3 khe 6 = 512 ≤ 520.
+     */
+    static final float GOLD_BUTTON_WIDTH_PX = 166f;
 
     private static final float GOLD_FIELD_WIDTH_PX = 96f;
 
@@ -226,7 +236,7 @@ public final class TradePanel implements HudWindow {
         Table row = new Table();
         row.add(goldInput).width(GOLD_FIELD_WIDTH_PX).padRight(6f);
         row.add(actionButton("trade.action.set_gold", this::submitTypedGold))
-                .width(ACTION_BUTTON_WIDTH_PX)
+                .width(GOLD_BUTTON_WIDTH_PX)
                 .padRight(6f);
         row.add(actionButton("trade.action.confirm", () -> fire(onConfirm)))
                 .width(ACTION_BUTTON_WIDTH_PX)

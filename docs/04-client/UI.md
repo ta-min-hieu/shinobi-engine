@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version | 1.0.0 |
+| Version | 1.1.0 — song ngữ Việt–Anh (§7.1, §7.2), 2026-10-01 |
 | Status | Draft |
 | Liên quan | [CLIENT.md](CLIENT.md), [RENDERING.md](../03-engine/RENDERING.md) |
 
@@ -48,7 +48,9 @@ client-core/
 ├── ui/
 │   ├── theme/
 │   │   ├── KageSkin.java        ← Skin thủ tục (mảng màu phẳng, chưa có atlas UI thật)
-│   │   └── KageI18n.java        ← nạp I18NBundle dùng chung (Login/CharacterSelect/CombatHud)
+│   │   ├── KageI18n.java        ← nạp I18NBundle theo ngôn ngữ đang chọn (§7.1)
+│   │   ├── ClientLanguage.java  ← VI/EN; LanguageSettings + LanguageStore (port) +
+│   │   │                            GdxPreferencesLanguageStore lưu lựa chọn cục bộ
 │   ├── widget/
 │   │   └── HealthBar.java       ← ItemSlot/CooldownIcon CHƯA làm, chưa có consumer thật
 │   └── hud/
@@ -143,7 +145,43 @@ label.setText(i18n.get("skill.error.not_enough_chi"));
 |---|---|
 | Công cụ | libGDX `I18NBundle` (có sẵn) |
 | File | `strings_vi.properties`, `strings_en.properties` |
-| MVP có tiếng Anh không? | ⏳ **Chưa chốt** — nhưng **hạ tầng i18n phải có từ đầu** |
+| MVP có tiếng Anh không? | ✅ **CÓ — song ngữ Việt–Anh từ MVP** (quyết định chủ dự án 2026-10-01). Mặc định tiếng Việt |
+
+### 7.1 Đổi ngôn ngữ (2026-10-01)
+
+| Hạng mục | Thực tế đã code |
+|---|---|
+| Chỗ đổi | **Chỉ ở `LoginScreen`** — hàng nút "Tiếng Việt" / "English" dưới nút Kết nối, kèm dòng chữ "Ngôn ngữ: …" (không dùng màu xám của nút đang chọn làm thông tin duy nhất, §8). Khoá khi đang kết nối |
+| Ngôn ngữ có | `ClientLanguage` (`VI`, `EN`); `DEFAULT = VI` |
+| Lưu ở đâu | Máy người chơi, libGDX `Preferences` bộ `kage-client`, khoá `language` (`GdxPreferencesLanguageStore`). Desktop: `~/.kage/kage-client` (launcher đặt `setPreferencesConfig`). Giá trị lạ/hỏng ⇒ tiếng Việt (`LanguageSettings`) |
+| Server biết không? | **Không.** Thuần client: không opcode, không cột DB. Server chỉ gửi khoá (`error_key`, `name_key`, `text_key`) nên câu lỗi server **tự đổi theo** ngôn ngữ đã chọn (`KageI18n.errorText` dịch bằng bundle của màn hình) |
+| Cơ chế | `KageI18n.useLanguage(...)` đổi ngôn ngữ của TIẾN TRÌNH; `KageI18n.load()` nạp theo nó. Mọi màn hình/HUD/coordinator nạp bundle **một lần lúc dựng** — vì thế đổi được an toàn chỉ ở màn đăng nhập: `LoginScreen` tự nạp lại bundle + viết lại mọi chữ của nó (dòng trạng thái nhớ dưới dạng KHOÁ, nên câu lỗi cũng đổi theo); màn chọn nhân vật, màn world và mọi HUD đều được dựng MỚI sau đó |
+| ⚠️ Muốn đổi trong game | Phải dựng lại cả cây UI đang sống (WorldScreen + ~14 panel + coordinator đều giữ bundle cũ trong field `final`). Chưa làm — chưa có nhu cầu |
+| Tên ngôn ngữ | `language.name.vi` = "Tiếng Việt", `language.name.en` = "English" **giống hệt ở cả hai bundle**: lỡ chọn nhầm sang thứ tiếng không đọc được vẫn thấy đường quay về |
+
+### 7.2 Cổng chặn chữ tràn nút (2026-10-01)
+
+Mỗi chuỗi giờ có HAI độ dài. Bẫy "nút bề rộng cố định" (nhãn vẽ tràn ra ngoài nền nút — nhật ký
+nhiệm vụ 2026-09-05) trước đây chỉ rà được bằng ảnh chụp game thật. Nay là test JUnit chạy trong
+`check`, không cần GL:
+
+- `TextWidthMeter` (test, `ui/theme`) — đo bề rộng chữ bằng metric FreeType THẬT, đúng font/cỡ/tập
+  ký tự của `KageSkin`; mẹo không cần GL: tự đưa `PixmapPacker` cho `generateData` nên không dựng
+  `Texture`. Lề tối thiểu 4px mỗi bên.
+- `HudButtonLabelFitTest` / `ScreenButtonLabelFitTest` — bảng VIẾT TAY các nút rộng cố định (hằng bề
+  rộng lấy thẳng từ panel, package-private) × khoá nhãn, đo ở MỌI ngôn ngữ. **Thêm nút rộng cố định
+  mới ⇒ thêm một dòng vào bảng.** Nút dùng `minWidth` (VD `QuestLogPanel`) tự nở, không cần có mặt.
+- Có ca đối chứng: thước phải báo tràn "Nhận thưởng" trong nút 96px cũ của `QuestLogPanel`.
+
+Lần chạy đầu bắt được (đã sửa): `TradePanel` "Đặt linh thạch"/"Set spirit stones" tràn ~40–60px
+khỏi nút 104px — **tràn cả ở tiếng Việt**; dòng nhân vật ở `CharacterSelectScreen` tràn ở CẢ HAI
+ngôn ngữ với tên 16 ký tự (cỡ chữ thật ~11,5px/ký tự, không phải 9,7 như ước cũ) ⇒ 440 → 640px;
+"Add friend", "Create New Character", "Spirit Ward: On/Off", ô gợi ý phím "Target/Mouse",
+"Attack/Z"; vài nút tiếng Việt chạm sát viền ("Lập bang", "Thách đấu", "Chấp nhận", "Làm mới").
+
+`MessageBundleIntegrityTest` thêm ca: không câu (≥ 3 từ) nào ở bundle tiếng Việt được trùng
+nguyên văn câu tiếng Anh — bắt được 8 khoá `error.*` của server mang câu tiếng Anh trong
+`strings_vi.properties`.
 
 ⚠️ **Tiếng Việt có dấu cần font hỗ trợ** — dùng `gdx-freetype` ([TECHNOLOGY-STACK.md §4](../01-architecture/TECHNOLOGY-STACK.md)). **Test glyph tiếng Việt ở Phase 1**, không để tới cuối mới phát hiện font thiếu chữ.
 
@@ -226,6 +264,7 @@ thấy. Cùng loại với bẫy "vạch máu 139/100" và "khung túi đồ tr�
 | 2 | **Widget không biết ECS** — nhận dữ liệu qua setter | Test được, tái sử dụng được | Accepted |
 | 3 | **1 skin duy nhất**, không làm theme system | Điều 9, 10 | Accepted |
 | 4 | **i18n bắt buộc từ đầu** kể cả khi chỉ có tiếng Việt | Retrofit i18n rất đắt; làm đúng từ đầu tốn ~0 | Accepted |
+| 4b | **Song ngữ Việt–Anh từ MVP**, chọn ở màn đăng nhập, lưu cục bộ, thuần client (§7.1) | Quyết định chủ dự án 2026-10-01; server chỉ gửi khoá nên không cần protocol/DB | Accepted |
 | 5 | Server trả `errorKey`, client dịch | Khớp NETWORK.md | Accepted |
 | 6 | **Nút tối thiểu 48dp trên mobile** | Không bấm trúng = không chơi được | Accepted |
 | 7 | **Không dùng màu làm thông tin duy nhất** | Mù màu ~8% nam giới; chi phí gần 0 | Accepted |
@@ -255,6 +294,12 @@ thấy. Cùng loại với bẫy "vạch máu 139/100" và "khung túi đồ tr�
 2. Chốt mobile-first hay desktop-first → mở khoá §6 và ADR-023. Vẫn CHƯA chốt — 2 màn hình +
    HUD hiện tại (§3) mới build cho desktop, chưa test `uiScale()`/vùng chạm 48dp trên mobile thật.
 3. ✅ **Hạ tầng i18n** (§7) — `KageI18n`/`I18NBundle` + `strings_vi.properties`/`strings_en.properties`,
-   dùng thật trong cả 3 màn hình từ 2026-08-08. `strings_en.properties` có sẵn key nhưng CHƯA có
-   cách đổi ngôn ngữ lúc chạy (bundle Locale hard-code `vi`) — mục "MVP có tiếng Anh?" ở §7 vẫn
-   ⏳ chưa chốt.
+   dùng thật trong cả 3 màn hình từ 2026-08-08. ✅ **Song ngữ Việt–Anh** (chủ dự án chốt
+   2026-10-01): chọn ngôn ngữ ở màn đăng nhập, lưu cục bộ, mặc định tiếng Việt — §7.1; cổng chặn
+   chữ tràn nút ở cả hai ngôn ngữ — §7.2.
+4. ⏳ **Chưa kiểm bằng mắt trên client thật**: hàng nút ngôn ngữ ở màn đăng nhập, và các nút vừa
+   nới bề rộng (`TradePanel`, `DuelPanel`, `GuildPanel`, `InventoryPanel`, `MailPanel`, ô gợi ý phím
+   `CombatHud`, dòng nhân vật 640px). Cổng §7.2 đo CHỮ trong NÚT; nó không đo được một hàng nút rộng
+   hơn khung chứa — chạy `runHudLayoutCheck` + `runHudPreview` (cần GL) ở cả hai ngôn ngữ
+   (`-PkageLanguage=en` cho tiếng Anh).
+5. ⏳ Đổi ngôn ngữ TRONG GAME (không chỉ ở màn đăng nhập) — cần dựng lại cả cây UI, xem §7.1.
