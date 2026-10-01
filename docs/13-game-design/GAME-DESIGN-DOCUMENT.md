@@ -318,7 +318,9 @@ nhịp 1100 ms (+ tới 200 ms chặn đọc) mới gửi lại ⇒ đúng dải
 thử lại mỗi 100 ms tới khi server xác nhận nhát đầu, sau đó giữ nhịp tính từ nhát đầu). Ô
 `CombatSystemTest.shouldDropAttackRequestSilently_whenTargetStillOutOfRange_andNotReplayItWhenTargetCloses`
 khoá hành vi server. **Không nâng giả định phủ đầu lên 3** — đo lại bên dưới xác nhận. Phát hiện phụ: cooldown thực là **61 tick** (~1,017 s), không phải 60 — trừ `1f/60f`
-dạng float 60 lần còn dư ~2,8e-7 — áp cho cả hai bên nên tỉ lệ 1v1 không đổi. Client thật dính cùng cơ
+dạng float 60 lần còn dư ~2,8e-7 — áp cho cả hai bên nên tỉ lệ 1v1 không đổi. ✅ **Đã sửa 2026-10-01** (chủ dự án duyệt):
+`COOLDOWN_READY_EPSILON_SECONDS` = nửa tick cho cả đòn thường lẫn kỹ năng ⇒ đúng 60 tick (ô
+`CombatSystemTest.shouldAttackEverySixtyTicks_despiteFloatCooldownResidue`); số đo bảng trên là trước bản sửa. Client thật dính cùng cơ
 chế bỏ lệnh ngoài tầm (giữ phím lặp 1 s) — hướng xử lý chờ chủ dự án.
 
 #### Đo lại V50 bằng probe đã sửa (2026-10-01, DB dev đã ở V50)
