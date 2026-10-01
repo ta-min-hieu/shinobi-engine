@@ -232,3 +232,7 @@ Không (phương án C, nếu có ngày chọn, sẽ cần ADR riêng).
    (11627 ms) — đúng D3. Ghi chú bên lề: boss vẫn vẽ bằng hộp vì `mob_sample-boss` chưa có art (nợ
    cũ, không thuộc ADR này); và B nhận `304` despawn nhân vật của A từ world cũ SAU `308` — cùng họ
    câu hỏi "gói world cũ tới sau 308" của Arena đang chờ chủ dự án, ở đây vô hại vì spawn mới tới sau.
+   **2026-10-01:** chủ dự án duyệt P1 cho Arena — `ArenaInstanceRegistry` chờ
+   `MainWorldChannelRegistry#detachCharacterAndDrain` rồi mới 308 + attach; test
+   `WorldChangedEventOrderTest#mainWorldShouldFallSilentBeforeTheArenaIsAnnounced`. Hầm ngục vẫn giữ
+   thứ tự cũ (vô hại như trên); muốn bịt nốt thì dùng đúng cơ chế đó trong `DungeonInstanceRegistry`.

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 import io.micrometer.core.instrument.MeterRegistry;
 
@@ -143,6 +144,23 @@ final class MainWorldChannelRegistry {
         channel.facade().detachCharacter(characterId);
         channel.characterIds().remove(characterId);
         closeIfEmptyOverflowChannel(channel);
+    }
+
+    /**
+     * {@link #detachCharacter} rồi trả mốc "khu vực cũ đã xử lý xong lệnh detach" ({@link
+     * WorldFacade#inboxBarrier()}). Sau mốc này khu vực cũ không còn phát gói nào cho nhân vật — người
+     * dời World chờ nó trước khi gửi {@code WorldChangedEvent} (quyết định chủ dự án 2026-10-01, xem
+     * {@code ArenaInstanceRegistry#moveCharacterIntoDuel}). Không ở khu vực nào ⇒ xong ngay.
+     */
+    synchronized CompletableFuture<Void> detachCharacterAndDrain(long characterId) {
+        Channel channel = channelByCharacterId.get(characterId);
+        if (channel == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        detachCharacter(characterId);
+        // Xếp SAU lệnh detach trên cùng hàng đợi. Khu vực phụ vừa bị đóng vì rỗng thì stop() đã join
+        // tick thread — mốc xong ngay, đúng nghĩa.
+        return channel.facade().inboxBarrier();
     }
 
     /**

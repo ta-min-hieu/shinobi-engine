@@ -10,6 +10,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.protocol.DuelResultEvent;
@@ -51,6 +54,8 @@ import dev.kage.server.world.WorldFacade;
  * mới, không đáng cho 1 edge-case hiếm ở dự án cá nhân).
  */
 final class ArenaInstanceRegistry {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ArenaInstanceRegistry.class);
 
     // Cách nhau 1m — TRONG tầm CombatConstants.ATTACK_RANGE_METERS (2m), đánh được NGAY không cần
     // di chuyển (khác dungeon: boss spawn cách entry point trong tầm AGGRO_RADIUS, cùng lý do).
@@ -309,22 +314,52 @@ final class ArenaInstanceRegistry {
      * vừa bấm, còn người thách chính là người đã xin trận này. Attach KÈM bonus trang bị (sửa
      * 2026-09-29 — trước đây vào trận bằng chỉ số NỀN, máu 206 → 100) ⇒ máu trong event là máu đầy
      * của máu tối đa hiệu lực.
+     *
+     * <p><b>Chờ world chính xử lý xong lệnh detach rồi mới báo 308 (quyết định chủ dự án 2026-10-01).</b>
+     * Kiểm sống 2026-09-25 đo được gói despawn {@code 304} của world chính tới SAU {@code 308 ARENA} ở
+     * 2/3 lượt: lệnh detach chỉ được xếp hàng, tick đang chạy dở vẫn phát nốt. Entity id = characterId ở
+     * mọi World ⇒ client có thể xoá đối thủ khỏi màn đấu trường. Nay 308 + attach chạy sau mốc chặn hàng
+     * đợi của world chính, trên {@link #settlementExecutor} (không chiếm tick thread của world chính,
+     * không giữ khoá trong lúc chờ — EventLoop cũng xin khoá này).
      */
+    @SuppressWarnings("FutureReturnValueIgnored") // lỗi đã được whenComplete ghi log
     private void moveCharacterIntoDuel(DuelEntrant entrant, DuelInstance instance, float spawnX) {
         long characterId = entrant.characterId();
         returnPositionByCharacterId.put(characterId, entrant.returnPosition());
+        instanceByCharacterId.put(characterId, instance);
 
         PositionSnapshot spawn = new PositionSnapshot(spawnX, DUEL_SPAWN_Y);
+        mainWorldChannels
+                .detachCharacterAndDrain(characterId)
+                .thenRunAsync(() -> finishMoveIntoDuel(entrant, instance, spawn), settlementExecutor)
+                .whenComplete((ignored, error) -> {
+                    if (error != null) {
+                        LOG.warn("Đưa nhân vật vào trận đấu lỗi: characterId={}", characterId, error);
+                    }
+                });
+    }
+
+    /**
+     * Nửa sau của {@link #moveCharacterIntoDuel}, khi world chính đã im. Trong khoá, và chỉ khi trận
+     * còn là trận của người này: một đường chốt (rớt mạng ngay đầu trận) có thể đã lấy vé trong lúc
+     * chờ — khi đó nó tự đưa người còn lại về world chính, gửi 308 ARENA ở đây sẽ tới SAU 308 MAIN của
+     * nó. Chốt trận lấy vé cũng trong khoá này ⇒ hoặc bước này xong trọn trước, hoặc bỏ qua.
+     */
+    private synchronized void finishMoveIntoDuel(DuelEntrant entrant, DuelInstance instance, PositionSnapshot spawn) {
+        long characterId = entrant.characterId();
+        if (!instance.equals(instanceByCharacterId.get(characterId))) {
+            return;
+        }
+        // Lệnh detach đã chạy (và đã chờ) ở moveCharacterIntoDuel.
         transfer.move(
                 characterId,
-                () -> mainWorldChannels.detachCharacter(characterId),
+                () -> {},
                 WorldTransfer.event(
                         WorldKind.WORLD_KIND_ARENA,
                         WorldChangeReason.WORLD_CHANGE_REASON_REQUESTED,
                         spawn,
                         entrant.loadout().maxHp()),
                 () -> instance.facade().attachCharacter(entrant.loadout().entryAt(characterId, spawn)));
-        instanceByCharacterId.put(characterId, instance);
     }
 
     /**
@@ -339,9 +374,12 @@ final class ArenaInstanceRegistry {
 
         instance.facade().detachCharacter(winnerCharacterId);
         instance.facade().detachCharacter(loserCharacterId);
+        // Dừng TRƯỚC khi báo 308 MAIN (2026-10-01): stop() join tick thread ⇒ mọi gói của World đấu
+        // trường đã ghi ra kênh trước 308, cùng lý do moveCharacterIntoDuel. Đường rớt mạng
+        // (handleDisconnectIfInDuel) vốn đã theo thứ tự này.
+        instance.facade().stop();
         reattachToMainWorld(winnerCharacterId);
         reattachToMainWorld(loserCharacterId);
-        instance.facade().stop();
 
         recordResultAndNotify(winnerCharacterId, loserCharacterId);
         return true;

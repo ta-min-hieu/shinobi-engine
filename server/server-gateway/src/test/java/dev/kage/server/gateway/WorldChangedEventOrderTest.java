@@ -207,6 +207,40 @@ class WorldChangedEventOrderTest {
         }
     }
 
+    /**
+     * Quyết định chủ dự án 2026-10-01 — kiểm sống 2026-09-25 đo được {@code 304} (đối thủ rời world
+     * chính) tới SAU {@code 308 ARENA} ở 2/3 lượt; entity id = characterId ở mọi World nên client xoá
+     * mất đối thủ khỏi màn đấu trường. Đua theo tick ⇒ lặp nhiều trận để bản cũ lộ ra.
+     */
+    @Test
+    void mainWorldShouldFallSilentBeforeTheArenaIsAnnounced() throws Exception {
+        for (int round = 0; round < 20; round++) {
+            clearRecorded();
+            long challengeId = arena.challengeDuel(LEADER_ID, MEMBER_ID).challengeId();
+            assertThat(arena.acceptDuel(MEMBER_ID, challengeId).outcome())
+                    .isEqualTo(ArenaInstanceRegistry.AcceptOutcome.OK);
+            for (long id : new long[] {LEADER_ID, MEMBER_ID}) {
+                // Spawn của World đấu trường = spawn SAU 308 (spawn trước đó có thể là gói muộn của lượt
+                // trước, khi cả hai vừa về world chính).
+                awaitTrue(() -> {
+                    List<Integer> now = opcodes(id);
+                    int announced = now.indexOf(Opcode.OPCODE_WORLD_CHANGED_EVENT_VALUE);
+                    return announced >= 0
+                            && now.subList(announced, now.size()).contains(Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE);
+                });
+                // Đợi thêm vài tick: gói muộn của world chính (nếu còn) có thời gian rơi vào.
+                Thread.sleep(50);
+                List<Integer> received = opcodes(id);
+                assertThat(received.lastIndexOf(Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE))
+                        .as("lượt %d, characterId=%d nhận %s", round, id, received)
+                        .isLessThan(received.indexOf(Opcode.OPCODE_WORLD_CHANGED_EVENT_VALUE));
+            }
+            assertThat(arena.forfeitDuel(LEADER_ID).outcome()).isEqualTo(ArenaInstanceRegistry.ExitOutcome.OK);
+            awaitTrue(() -> mainWorldChannels.worldFacadeFor(LEADER_ID).isPresent()
+                    && mainWorldChannels.worldFacadeFor(MEMBER_ID).isPresent());
+        }
+    }
+
     private void assertWorldChangedBeforeFirstSpawn(long characterId, WorldKind kind, WorldChangeReason reason)
             throws InvalidProtocolBufferException {
         WorldChangedEvent event = onlyWorldChanged(characterId);
