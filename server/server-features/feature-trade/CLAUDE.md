@@ -18,6 +18,7 @@ domain/         TradeSession (danh tính) · TradeSessionSnapshot (toàn bộ tr
                 LẪN FOR UPDATE) · TradeOfferItem · OfferedItemInput · OwnedItemSnapshot
                 TradeStatus (enum) · TradeSessionPort · TradeInventoryPort · TradeGoldPort
                 TradeAuditPort · IdempotencyPort · IdempotencyKeyReusedException
+                TradeParticipantBusyException
                 Transaction · TransactionRunner (bản khai riêng, không dùng chung feature khác)
 ```
 
@@ -81,11 +82,16 @@ yêu cầu, KHÔNG có thiết kế nào — mọi cơ chế bên dưới là qu
 - **`CancelTradeUseCase` dùng chung cho từ chối (PENDING_ACCEPT) lẫn huỷ giữa chừng (OPEN)** —
   không tách 2 Command riêng (khác feature-guild tách Leave/Disband) vì cả 2 trường hợp đều là
   "1 trong 2 bên rút lui, không escrow gì để hoàn trả" — cùng 1 hành động, không cần phân biệt.
-- **"1 nhân vật tối đa 1 phiên trade active"** kiểm ở tầng application (`findActiveSessionOfCharacter`
-  trước khi tạo mới), KHÔNG có UNIQUE constraint DB cứng (khác `guild_member.character_id`/
-  `party_member.character_id`) — race hiếm tạo 2 phiên cùng lúc chỉ là bug UX (1 trong 2 phiên sẽ
-  thi hành trước, phiên kia thất bại sạch lúc thi hành do item/gold đã dùng ở phiên trước), KHÔNG
-  phải lỗ hổng duplicate — chấp nhận được, tránh thêm ràng buộc phức tạp cho 1 race vô hại.
+- **"1 nhân vật tối đa 1 phiên trade active"** — KHÔNG có UNIQUE constraint DB cứng (khác
+  `guild_member.character_id`/`party_member.character_id`; một người có thể ở cột requester HOẶC
+  target nên UNIQUE không diễn đạt được). Bản 2026-07-24 chỉ kiểm ở tầng application
+  (`findActiveSessionOfCharacter` trước khi tạo mới) và coi race 2 phiên là "hiếm, vô hại". ⚠️
+  **Đo lại 2026-10-02 (`EconomyConcurrencyIntegrationTest`): A mời T đúng lúc B mời T thì T kẹt
+  trong HAI phiên 10/10 lần**, và `GetTradeStatusUseCase` chỉ thấy một — vẫn không mất tài sản
+  (thi hành xác thực lại), nhưng không hiếm. Nay `PostgresTradeSessionAdapter#createRequest` kiểm lại
+  trong CÙNG giao dịch với INSERT, sau khoá tư vấn theo TỪNG nhân vật (không gian tên riêng,
+  không chạm khoá túi đồ), ném `TradeParticipantBusyException` nếu một bên đã bận. Không đổi
+  schema/protocol. ⏳ **Chờ chủ dự án duyệt** việc đảo quyết định cũ này.
 - **`trade_offer_item.item_id` KHÔNG có FK** tới `inventory_item` — tham chiếu MỀM có chủ đích
   (xem comment migration V16): có FK sẽ CHẶN việc bán/gửi thư 1 item đang được chào trong 1 trade
   không liên quan (vi phạm FK), sai hoàn toàn với triết lý "không khoá trước".

@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import dev.kage.trade.domain.OfferedItemInput;
 import dev.kage.trade.domain.TradeOfferItem;
+import dev.kage.trade.domain.TradeParticipantBusyException;
 import dev.kage.trade.domain.TradeSession;
 import dev.kage.trade.domain.TradeSessionPort;
 import dev.kage.trade.domain.TradeSessionSnapshot;
@@ -26,6 +27,8 @@ final class FakeTradeSessionPort implements TradeSessionPort {
     private final Map<Long, MutableState> sessions = new LinkedHashMap<>();
     private final AtomicLong nextSessionId = new AtomicLong(1);
     private final AtomicLong nextOfferItemId = new AtomicLong(1);
+    // {requester, target} của lời mời chen vào lần createRequest kế tiếp — rỗng nếu không có.
+    private long[] racingRequest = new long[0];
 
     private static final class MutableState {
         long id;
@@ -48,8 +51,26 @@ final class FakeTradeSessionPort implements TradeSessionPort {
                 .map(FakeTradeSessionPort::toSession);
     }
 
+    /**
+     * Giả lập một lời mời KHÁC lọt vào giữa phép kiểm sớm của use case và lệnh tạo: lần
+     * {@link #createRequest} kế tiếp sẽ thấy phiên này đã tồn tại trước nó.
+     */
+    void raceNextCreateWith(long requesterCharacterId, long targetCharacterId) {
+        this.racingRequest = new long[] {requesterCharacterId, targetCharacterId};
+    }
+
     @Override
     public TradeSession createRequest(long requesterCharacterId, long targetCharacterId) {
+        if (racingRequest.length == 2) {
+            long[] racing = racingRequest;
+            racingRequest = new long[0];
+            createRequest(racing[0], racing[1]);
+        }
+        // Cùng hợp đồng với adapter thật: kiểm "ai cũng rảnh" ngay tại lệnh tạo.
+        if (findActiveSessionOfCharacter(requesterCharacterId).isPresent()
+                || findActiveSessionOfCharacter(targetCharacterId).isPresent()) {
+            throw new TradeParticipantBusyException(requesterCharacterId, targetCharacterId);
+        }
         MutableState state = new MutableState();
         state.id = nextSessionId.getAndIncrement();
         state.requesterCharacterId = requesterCharacterId;

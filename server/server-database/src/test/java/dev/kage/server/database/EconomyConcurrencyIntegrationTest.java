@@ -316,6 +316,38 @@ class EconomyConcurrencyIntegrationTest {
                 .isEqualTo(START_GOLD - charged);
     }
 
+    /**
+     * Lỗi thật (đo 2026-10-02: 10/10 vòng hỏng): A mời T đúng lúc B mời T — cả hai phép kiểm "T có
+     * đang trade không" của use case cùng thấy rỗng, cả hai phiên được tạo, T kẹt trong HAI phiên mà
+     * màn trạng thái chỉ thấy một. Đúng một lời mời phải thắng.
+     */
+    @Test
+    void shouldPutTheTargetInOneSessionOnly_whenTwoRequestsForThemRace() throws Exception {
+        PostgresTradeSessionAdapter sessionPort = new PostgresTradeSessionAdapter(dataSource);
+        for (int round = 0; round < TRADE_ROUNDS; round++) {
+            long first = newCharacter();
+            long second = newCharacter();
+            long target = newCharacter();
+
+            List<Object> results = runPair(
+                    () -> new RequestTradeUseCase(sessionPort).execute(first, target),
+                    () -> new RequestTradeUseCase(sessionPort).execute(second, target));
+
+            long okCount = results.stream()
+                    .map(RequestTradeUseCase.Result.class::cast)
+                    .filter(r -> r.outcome() == RequestTradeUseCase.Outcome.OK)
+                    .count();
+            assertThat(okCount).as("vòng %d: số lời mời thắng", round).isEqualTo(1);
+            assertThat(queryLong(
+                            "SELECT COUNT(*) FROM trade_session"
+                                    + " WHERE requester_character_id = ? OR target_character_id = ?",
+                            target,
+                            target))
+                    .as("vòng %d: số phiên của người được mời", round)
+                    .isEqualTo(1);
+        }
+    }
+
     // ---------------------------------------------------------------- chạy song song
 
     /** {@link #THREADS} bản sao của {@code task}, thả cùng lúc qua một cổng xuất phát. */

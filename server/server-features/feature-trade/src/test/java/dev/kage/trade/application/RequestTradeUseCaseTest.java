@@ -48,4 +48,20 @@ class RequestTradeUseCaseTest {
 
         assertThat(result.outcome()).isEqualTo(RequestTradeUseCase.Outcome.TARGET_ALREADY_IN_TRADE);
     }
+
+    /** B mời T lọt vào SAU phép kiểm sớm của lệnh A mời T: lệnh của A bị từ chối, T vẫn chỉ một phiên. */
+    @Test
+    void shouldReject_whenAnotherRequestForTheTargetLandsAfterTheEarlyCheck() {
+        FakeTradeSessionPort port = new FakeTradeSessionPort();
+        port.raceNextCreateWith(7, 5);
+        RequestTradeUseCase useCase = new RequestTradeUseCase(port);
+
+        RequestTradeUseCase.Result result = useCase.execute(1, 5);
+
+        assertThat(result.outcome()).isEqualTo(RequestTradeUseCase.Outcome.TARGET_ALREADY_IN_TRADE);
+        assertThat(result.session()).isNull();
+        assertThat(port.findActiveSessionOfCharacter(1)).isEmpty();
+        assertThat(port.findActiveSessionOfCharacter(5).orElseThrow().requesterCharacterId())
+                .isEqualTo(7);
+    }
 }
