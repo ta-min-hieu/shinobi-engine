@@ -728,8 +728,7 @@ public final class WorldFacade {
         VelocityComponent velocity = VELOCITY.get(entity);
         // Người đã chết (World hầm ngục không tự hồi sinh — xem handleCombatResults) đứng yên như bị
         // stun: vẫn ack để client reconcile sequenceId.
-        HealthComponent health = HEALTH.get(entity);
-        if (StatusEffects.isStunned(STATUS_EFFECT.get(entity)) || (health != null && health.isDead())) {
+        if (isIncapacitated(entity)) {
             // Bị stun (Phase 8, hệ Thủy) — không di chuyển, nhưng VẪN ack lệnh (client cần reconcile
             // sequenceId dù bị từ chối, khác các lệnh "âm thầm bỏ qua" không cần phản hồi).
             velocity.x = 0f;
@@ -773,7 +772,9 @@ public final class WorldFacade {
             return; // Race hiếm — cùng lý do handleMoveIntent.
         }
         PositionComponent position = POSITION.get(entity);
-        if (!StatusEffects.isStunned(STATUS_EFFECT.get(entity))) {
+        // Người đã chết cũng không nhảy (2026-10-02) — trước đó chỉ chặn stun, nên trong World hầm
+        // ngục (không tự hồi sinh) một client sửa đổi vẫn nhảy được bằng cái xác 0 máu.
+        if (!isIncapacitated(entity)) {
             if (position.grounded) {
                 position.grounded = false;
                 position.vz = WorldConstants.JUMP_VELOCITY_MPS;
@@ -787,6 +788,12 @@ public final class WorldFacade {
         }
         outboundSink.onMoveAccepted(new WorldOutboundSink.MoveAcceptedSnapshot(
                 intent.characterId(), intent.sequenceId(), position.x, position.y, position.z, position.grounded));
+    }
+
+    /** Bị stun hoặc đã chết — không tự di chuyển/nhảy được (cổng chung của move và jump). */
+    private static boolean isIncapacitated(KEntity entity) {
+        HealthComponent health = HEALTH.get(entity);
+        return StatusEffects.isStunned(STATUS_EFFECT.get(entity)) || (health != null && health.isDead());
     }
 
     private void handleSetTarget(long characterId, long targetEntityId) {
@@ -960,9 +967,7 @@ public final class WorldFacade {
                 // khi hết cooldown — PHÁT HIỆN THẬT lúc thêm hồi sinh (unit test đột nhiên thấy
                 // onCharacterDefeated bắn 2 lần thay vì 1 trong lúc sleepQuietly chờ xác nhận).
                 clearAttackerTarget(outcome.attackerEntityId());
-                if (spawnOverworldContent) {
-                    respawnCharacter(outcome.targetEntityId());
-                }
+                respawnOrHaltCorpse(outcome.targetEntityId());
             }
         }
     }
@@ -1110,9 +1115,7 @@ public final class WorldFacade {
                 // Xem giải thích đầy đủ ở handleCombatResults — cùng lý do, khác nguồn đòn (skill).
                 outboundSink.onCharacterDefeated(outcome.targetEntityId(), outcome.attackerEntityId());
                 clearAttackerTarget(outcome.attackerEntityId());
-                if (spawnOverworldContent) {
-                    respawnCharacter(outcome.targetEntityId());
-                }
+                respawnOrHaltCorpse(outcome.targetEntityId());
             }
         }
     }
@@ -1125,6 +1128,26 @@ public final class WorldFacade {
         KEntity attacker = lookupEntity(attackerEntityId);
         if (attacker != null) {
             TARGET.get(attacker).targetEntityId = 0L;
+        }
+    }
+
+    /**
+     * World chính hồi sinh ngay; World không tự hồi sinh (hầm ngục/Arena) thì cái xác phải ĐỨNG YÊN.
+     *
+     * <p>Sửa 2026-10-02: vận tốc ngang chỉ được xoá khi có {@code MoveCommand} kế tiếp (nhánh "đã
+     * chết" của {@link #handleMoveIntent}), nên một client sửa đổi chết giữa lúc đang chạy rồi KHÔNG
+     * gửi lệnh nào nữa thì cái xác 0 máu cứ trôi đi mãi theo hướng cũ — server tự chạy vị trí đó.
+     */
+    private void respawnOrHaltCorpse(long characterId) {
+        if (spawnOverworldContent) {
+            respawnCharacter(characterId);
+            return;
+        }
+        KEntity entity = entitiesByCharacterId.get(characterId);
+        if (entity != null) {
+            VelocityComponent velocity = VELOCITY.get(entity);
+            velocity.x = 0f;
+            velocity.y = 0f;
         }
     }
 
