@@ -34,7 +34,7 @@ class ServerAuthorityWorldTest {
     private static final CharacterBaseStats ONE_SHOT_STATS = new CharacterBaseStats(5000, 10, 10, 10, Element.HOA, 1);
     private static final float START_X = 5f;
 
-    private record Accepted(long characterId, int sequenceId, float x) {}
+    private record Accepted(long characterId, int sequenceId, float x, float z) {}
 
     private record Hit(long attacker, long target) {}
 
@@ -76,6 +76,61 @@ class ServerAuthorityWorldTest {
 
     @Test
     void shouldNotLetADeadCharacterAttackOrCast() {
+        killCharacterTwo(false);
+
+        world.setTarget(2L, 1L);
+        world.attack(2L);
+        world.useSkill(2L, SkillConstants.FIREBALL_SKILL_CODE, 1L);
+        sleepQuietly(500);
+
+        assertThat(sink.hits).noneMatch(hit -> hit.attacker() == 2L);
+    }
+
+    /**
+     * Cùng lỗ với đánh/skill: World hầm ngục để người chết nằm 0 máu, và {@code handleJumpIntent}
+     * chỉ chặn stun — client sửa đổi vẫn nhảy (kể cả nhảy đôi) bằng cái xác.
+     */
+    @Test
+    void shouldNotLetADeadCharacterJump() {
+        killCharacterTwo(false);
+
+        world.enqueueJumpCommand(2L, 10);
+        sleepQuietly(100);
+        world.enqueueJumpCommand(2L, 11);
+        sleepQuietly(100);
+        world.enqueueJumpCommand(2L, 12);
+
+        awaitTrue(() -> ack(12) != null);
+        // z của ack là độ cao TRƯỚC khi lệnh đó áp — nhảy thật thì ack 11/12 đã ở trên không.
+        assertThat(ack(11).z()).isZero();
+        assertThat(ack(12).z()).isZero();
+    }
+
+    /**
+     * Vận tốc ngang chỉ bị xoá khi có MoveCommand KẾ TIẾP — chết giữa lúc chạy rồi im lặng thì cái
+     * xác cứ trôi theo hướng cũ, do chính server mô phỏng.
+     */
+    @Test
+    void shouldStopTheCorpse_whenACharacterDiesWhileRunning() {
+        killCharacterTwo(true);
+
+        // JumpCommand bị từ chối vẫn được ack kèm toạ độ — đọc vị trí mà KHÔNG gửi MoveCommand
+        // (MoveCommand tự xoá vận tốc, sẽ che mất lỗi).
+        world.enqueueJumpCommand(2L, 10);
+        awaitTrue(() -> ack(10) != null);
+        sleepQuietly(300);
+        world.enqueueJumpCommand(2L, 11);
+
+        awaitTrue(() -> ack(11) != null);
+        assertThat(ack(11).x()).isEqualTo(ack(10).x());
+    }
+
+    /**
+     * Nhân vật 1 hạ nhân vật 2 bằng MỘT đòn trong World không tự hồi sinh (như hầm ngục/Arena).
+     *
+     * @param victimRunning nhân vật 2 đang chạy sang phải lúc bị hạ
+     */
+    private void killCharacterTwo(boolean victimRunning) {
         world = new WorldFacade(sink, false);
         // Kịch bản người chơi hạ người chơi — chỉ dựng được trong World cho PvP (như Arena).
         world.allowPlayerVersusPlayer();
@@ -84,15 +139,11 @@ class ServerAuthorityWorldTest {
         world.attachCharacter(2L, 0f, 0f, DEFAULT_STATS);
         sleepQuietly(100);
         world.setTarget(1L, 2L);
+        if (victimRunning) {
+            world.enqueueMoveCommand(2L, 1, 1f, 0f);
+        }
         world.attack(1L);
         awaitTrue(() -> sink.defeated.contains(2L));
-
-        world.setTarget(2L, 1L);
-        world.attack(2L);
-        world.useSkill(2L, SkillConstants.FIREBALL_SKILL_CODE, 1L);
-        sleepQuietly(500);
-
-        assertThat(sink.hits).noneMatch(hit -> hit.attacker() == 2L);
     }
 
     private void assertDirectionKeepsPositionFinite(float dirX, float dirY) {
@@ -142,7 +193,7 @@ class ServerAuthorityWorldTest {
 
         @Override
         public void onMoveAccepted(WorldOutboundSink.MoveAcceptedSnapshot snapshot) {
-            accepted.add(new Accepted(snapshot.characterId(), snapshot.sequenceId(), snapshot.x()));
+            accepted.add(new Accepted(snapshot.characterId(), snapshot.sequenceId(), snapshot.x(), snapshot.z()));
         }
 
         @Override
