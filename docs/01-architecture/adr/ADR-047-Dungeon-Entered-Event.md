@@ -251,3 +251,8 @@ Không (phương án C, nếu có ngày chọn, sẽ cần ADR riêng).
    chiều ra chỉ cỡ µs nên một lượt chạy sống không phân biệt được bản cũ với bản mới — bằng chứng cho
    chiều đó là `WorldChangedEventOrderTest#dungeonShouldFallSilentBeforeTheMainWorldIsAnnounced` (giữ
    tick có chủ đích); lượt sống chỉ xác nhận đường ra vẫn chạy đúng.
+   **Kiểm sống Arena P1 2026-10-01 (commit `274f4a6`)**, 3 lượt thách → chấp nhận → bỏ cuộc, hai
+   gameProbe đứng cạnh nhau ở world chính. Bên được thách nhận `304` (người thách rời world chính)
+   **trước** `308 ARENA` ~2 ms ở cả 3/3 lượt — kiểm sống 2026-09-25 đo nó tới SAU `308` ở 2/3 lượt.
+   Bên thách không nhận `304` nào (nó rời world chính trước nên không còn quan sát). Chốt trận: sau
+   `308 MAIN DUEL_ENDED` chỉ có spawn của world chính ở cả hai phía. Log server sạch.
