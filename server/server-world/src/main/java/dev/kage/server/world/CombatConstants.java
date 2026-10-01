@@ -62,6 +62,13 @@ final class CombatConstants {
 
     static final float ATTACK_INTERVAL_SECONDS = 1f; // ATK_SPEED placeholder — 1 đòn/giây
     static final float ATTACK_RANGE_METERS = 2f;
+    /**
+     * Cooldown coi như HẾT khi phần còn lại không quá nửa tick. Trừ {@code 1f/60f} kiểu float 60 lần
+     * từ {@code 1f} còn dư ~2,8e-7 &gt; 0 ⇒ so với 0 thì đòn 1 giây thực ra 61 tick (~1,017 s), và client
+     * giữ phím lặp đúng 1 s đôi khi tới sớm một tick rồi bị bỏ (đo 2026-10-01). Nửa tick đủ nuốt sai số
+     * float mà không bao giờ làm cooldown ngắn đi trọn một tick (chủ dự án duyệt 2026-10-01).
+     */
+    static final float COOLDOWN_READY_EPSILON_SECONDS = WorldConstants.FIXED_DT / 2f;
     // MONSTER_MAX_HP và MONSTER_RESPAWN_SECONDS đã chuyển thành cột `monster_template.max_hp` và
     // `monster_spawn.respawn_seconds` (ADR-037) — mỗi điểm spawn có nhịp hồi sinh riêng.
 

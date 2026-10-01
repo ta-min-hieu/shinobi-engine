@@ -2,6 +2,7 @@ package dev.kage.server.world;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -144,6 +145,32 @@ class CombatSystemTest {
         world.update(0.016f);
 
         assertThat(combatSystem.drainResults()).hasSize(1);
+    }
+
+    /**
+     * Đòn 1 giây phải cách nhau ĐÚNG 60 tick. Trước {@code COOLDOWN_READY_EPSILON_SECONDS} là 61:
+     * trừ {@code 1f/60f} kiểu float 60 lần còn dư ~2,8e-7 &gt; 0 (đo 2026-10-01).
+     */
+    @Test
+    void shouldAttackEverySixtyTicks_despiteFloatCooldownResidue() {
+        EcsWorld world = new EcsWorld();
+        KEntity attacker = buildMonsterAttacker(world);
+        KEntity defender = buildDefender(world, true);
+        HEALTH.get(defender).max = 1_000_000;
+        HEALTH.get(defender).current = 1_000_000;
+        Map<Long, KEntity> byId = Map.of(MONSTER_ATTACKER_ID, attacker, DEFENDER_ID, defender);
+        CombatSystem combatSystem = new CombatSystem(byId::get, PVP_ALLOWED);
+        world.addSystem(combatSystem);
+
+        List<Integer> attackTicks = new ArrayList<>();
+        for (int tick = 0; tick < 300; tick++) {
+            world.update(WorldConstants.FIXED_DT);
+            if (!combatSystem.drainResults().isEmpty()) {
+                attackTicks.add(tick);
+            }
+        }
+
+        assertThat(attackTicks).containsExactly(0, 60, 120, 180, 240);
     }
 
     @Test

@@ -124,7 +124,7 @@ final class CombatSystem extends IteratingKSystem {
      * để nhân vật nằm 0 máu — trước đó họ vẫn bấm đánh trúng boss/đồng đội.
      */
     private static boolean isAttackerReady(KEntity entity, AttackCooldownComponent cooldown) {
-        if (cooldown.remainingSeconds > 0f) {
+        if (cooldown.remainingSeconds > CombatConstants.COOLDOWN_READY_EPSILON_SECONDS) {
             return false;
         }
         HealthComponent ownHealth = HEALTH.get(entity);

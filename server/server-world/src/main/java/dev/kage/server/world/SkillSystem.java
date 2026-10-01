@@ -168,7 +168,9 @@ final class SkillSystem extends IteratingKSystem {
         ChiComponent chi = CHI.get(caster);
         int chiCost = definition.isUltimate() ? chi.current : definition.chiCost();
         // Tuyệt Kỹ cần > 0 Khí hiện có (GDD §4 "tốn TOÀN BỘ Khí"); skill thường cần đủ chiCost cố định.
-        if (cooldown.remainingSeconds[definition.slotIndex()] > 0f || chiCost <= 0 || chi.current < chiCost) {
+        if (cooldown.remainingSeconds[definition.slotIndex()] > CombatConstants.COOLDOWN_READY_EPSILON_SECONDS
+                || chiCost <= 0
+                || chi.current < chiCost) {
             return false;
         }
         cooldown.remainingSeconds[definition.slotIndex()] = definition.cooldownSeconds();
