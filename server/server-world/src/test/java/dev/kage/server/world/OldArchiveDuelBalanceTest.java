@@ -175,4 +175,35 @@ class OldArchiveDuelBalanceTest {
         assertThat(Math.abs(-33f - (-47f))).isGreaterThan(combinedReach);
         assertThat(Math.abs(-20f - 21f)).isGreaterThan(combinedReach);
     }
+
+    /**
+     * 🔴 <b>VI PHẠM luật biên thật (chủ dự án chốt 2026-10-01, {@link DuelMargin}) — CHƯA chỉnh số,
+     * chờ chủ dự án.</b>
+     *
+     * <p>Bộ Tạp Dịch vs thạch vệ 120/26/14: ta 4 nhát, nó 6 nhát ⇒ biên giấy 2, biên thật −1.
+     * Quét toàn bộ không gian chỉ số: mọi bộ cho biên thật ≥2 đều làm
+     * {@link #barehandedNoviceShouldNotSurviveTheArchive()} hỏng (tay không cũng thắng) VÀ phá bậc
+     * thang tán tu (90) &lt; thạch vệ &lt; cỗ khảo hạch (130 máu, atk 15). Bộ Tạp Dịch chỉ hơn tay
+     * không +7/+7/+18 — khoảng đó quá hẹp để vừa "phải sắm đồ" vừa "thắng chắc". Đây là câu hỏi
+     * THIẾT KẾ (đổi bộ đồ hoặc bỏ một luật), không phải một con số.
+     *
+     * <p>Ô này KHOÁ đúng con số vi phạm hiện tại, để bất kỳ ai đổi chỉ số loài này đều phải dừng lại
+     * đối chiếu với luật biên thật thay vì lặng lẽ giữ trận ở dưới ngưỡng.
+     */
+    @Test
+    @DisplayName("🔴 Luật biên thật: thạch vệ ĐANG vi phạm — biên thật −1, cần +2 (chờ chủ dự án)")
+    void theArchiveDuelViolatesTheRealMarginRule() {
+        CombatConstants.CombatStats player = novice();
+        DuelMargin duel = new DuelMargin(
+                player.atk() + NOVICE_SET_ATK,
+                player.def() + NOVICE_SET_DEF,
+                CombatConstants.CHARACTER_MAX_HP + NOVICE_SET_HP,
+                WARDEN_HP,
+                WARDEN_ATK,
+                WARDEN_DEF);
+
+        assertThat(duel.paperMargin()).isEqualTo(2);
+        assertThat(duel.realMargin()).isEqualTo(-1);
+        assertThat(duel.meetsRealMarginRule()).isFalse();
+    }
 }

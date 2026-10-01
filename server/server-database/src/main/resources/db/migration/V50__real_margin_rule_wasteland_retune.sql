@@ -1,0 +1,47 @@
+-- V50 — LUẬT BIÊN THẬT: chỉnh lại chỉ số `wasteland_beast` và `foundation_warden` (V48).
+-- Chỉ UPDATE số trong `monster_template`. Không đổi schema, không đổi spawn, aggro, EXP, rơi đồ.
+--
+-- =================================================================================================
+-- VÌ SAO — số đo, không phải cảm giác
+-- =================================================================================================
+-- Playtest 2026-09-17 (gameProbe, Kagemaru Cấp 30, bộ Trúc Cơ: công 82 · thủ 65 · máu 206 — xem
+-- V49): ba trận 1v1 với `wasteland_beast` TỪ MÁU ĐẦY ra **1 thắng, 2 chết**, trong khi số học
+-- đúng thiết kế: ta 62 sát thương/nhát cần 5 nhát, nó 27/nhát cần 8 ⇒ biên giấy +3.
+-- Hai số hạng giấy bỏ sót: quái ra 1–2 nhát PHỦ ĐẦU trong lúc người chơi đi tới / đứng vào thế
+-- đánh (kể cả aggro 3 — V46/V47 đo hai lần), và mỗi lần người chơi HỤT (~9%) là trả trọn một nhát.
+--
+-- Chủ dự án chốt 2026-10-01 — ĐỔI LUẬT BIÊN:
+--     biên thật = nhát quái cần − nhát người chơi cần − 2 (phủ đầu) − 1 (dự trữ một lần né)
+--     trận tay đôi bắt buộc của chuỗi quest phải có  biên thật ≥ +2  (tức biên giấy ≥ +5)
+-- Phép tính sống ở `DuelMargin` + `FoundationTrialBalanceTest` (server-world, test).
+--
+-- =================================================================================================
+-- SỐ MỚI — ưu tiên hạ công trước, đụng máu sau
+-- =================================================================================================
+--   | loài               | V48          | V50          | ta cần | nó cần | biên giấy | biên thật |
+--   |--------------------|--------------|--------------|--------|--------|-----------|-----------|
+--   | wasteland_beast    | 280 / 44 / 32| 289 / 36 / 32|   5    | 8 → 10 |  3 → 5    |  0 → +2   |
+--   | foundation_warden  | 300 / 46 / 35| 300 / 37 / 35|   5    | 8 → 10 |  3 → 5    |  0 → +2   |
+--   (máu / công / thủ; "nó cần" tính trên máu ĐẦY 206 — phủ đầu đã nằm trong số hạng −2)
+--
+-- Vì sao đúng những con số này (quét toàn bộ không gian, không chọn tay):
+--   · công 36 là SÀN: phải > 35 của `blood_sand_ringleader` (luật bậc thang V48).
+--     36 và 37 cùng cho 22 sát thương lên thủ 65 ⇒ quái cần 10 nhát.
+--   · cỗ khảo hạch phải > yêu thú ở CẢ BA trục, nên công 37. Công 38 ⇒ 23/nhát ⇒ quái cần 9 ⇒
+--     người chơi phải hạ nó trong 4 nhát ⇒ máu ≤ 244 < yêu thú — phá bậc thang. Không có lời giải.
+--     Vậy yêu thú KHÔNG được lấy công 37, phải 36.
+--   · máu yêu thú 280 → 289 là phần THÊM duy nhất, và chỉ để giữ một luật khoá khác: với công 36,
+--     bộ Ngoại Môn (công 64) cần 6 nhát cho 280 máu và lại THẮNG — tức quest mở của lát cắt thôi
+--     cần trao bộ Trúc Cơ. 289 đẩy lên 7 nhát ⇒ hoà 7–7 = chết (quy ước "hoà nghĩa là chết" của
+--     các lớp cân bằng arc 1). Không có cặp chỉ số nào vừa đạt luật biên thật vừa giữ bộ Ngoại Môn
+--     THUA HẲN; hoà là mức tốt nhất. Ta vẫn chỉ cần 5 nhát (289 / 62 = 4,66).
+--   · thủ GIỮ NGUYÊN cả hai loài.
+--
+-- ⚠️ Bảy trận tay đôi khác của chuỗi quest (tán tu, thạch vệ, cỗ khảo hạch, đoạt mạch, đầu lĩnh,
+--    tế đồ, đàn chủ Huyết Sa) CŨNG vi phạm luật mới (biên thật −1..+1) nhưng KHÔNG chỉnh ở đây:
+--    mọi bộ số đạt luật đều phá một luật khoá khác (tay không phải thua / bậc thang / trận thua đo
+--    thật của V46). Các ô `*ViolatesTheRealMarginRule` khoá con số vi phạm — chờ chủ dự án.
+-- -------------------------------------------------------------------------------------------------
+UPDATE monster_template SET max_hp = 289, atk = 36 WHERE code = 'wasteland_beast';
+
+UPDATE monster_template SET atk = 37 WHERE code = 'foundation_warden';

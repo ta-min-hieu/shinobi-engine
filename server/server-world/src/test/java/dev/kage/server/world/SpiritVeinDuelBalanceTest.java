@@ -251,4 +251,33 @@ class SpiritVeinDuelBalanceTest {
         assertThat(toBandit).isGreaterThan(leashRadiusMeters + meleeAttackRangeMeters);
         assertThat(toScout).isGreaterThan(leashRadiusMeters + meleeAttackRangeMeters);
     }
+
+    /**
+     * 🔴 <b>VI PHẠM luật biên thật (chủ dự án chốt 2026-10-01, {@link DuelMargin}) — CHƯA chỉnh số,
+     * chờ chủ dự án.</b>
+     *
+     * <p>Tới linh mạch 84 máu, bộ Tạp Dịch vs đoạt mạch 130/18/12: ta 4 nhát, nó 6 nhát ⇒ biên giấy
+     * 2, biên thật −1. KHÔNG có bộ chỉ số nào đạt luật mà vẫn giữ
+     * {@link #theRaiderShouldBeAStepAboveTheTrialConstruct()} (máu = 130, atk &gt; 15, def &gt; 10):
+     * đạt biên thật +2 đòi sát thương mỗi nhát ≤10 ⇒ {@code atk ≤ 13}. Dừng, báo cáo.
+     *
+     * <p>Ô này KHOÁ đúng con số vi phạm hiện tại, để bất kỳ ai đổi chỉ số loài này đều phải dừng lại
+     * đối chiếu với luật biên thật thay vì lặng lẽ giữ trận ở dưới ngưỡng.
+     */
+    @Test
+    @DisplayName("🔴 Luật biên thật: đoạt mạch ĐANG vi phạm — biên thật −1, cần +2 (chờ chủ dự án)")
+    void theSpiritVeinDuelViolatesTheRealMarginRule() {
+        CombatConstants.CombatStats player = outerDisciple();
+        DuelMargin duel = new DuelMargin(
+                player.atk() + NOVICE_SET_ATK,
+                player.def() + NOVICE_SET_DEF,
+                arrivalHp(),
+                RAIDER_HP,
+                RAIDER_ATK,
+                RAIDER_DEF);
+
+        assertThat(duel.paperMargin()).isEqualTo(2);
+        assertThat(duel.realMargin()).isEqualTo(-1);
+        assertThat(duel.meetsRealMarginRule()).isFalse();
+    }
 }

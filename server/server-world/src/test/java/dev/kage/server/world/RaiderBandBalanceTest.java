@@ -223,4 +223,27 @@ class RaiderBandBalanceTest {
         assertThat(Math.abs(80f - 66f)).isGreaterThan(neighbourAggroRadiusMeters);
         assertThat(Math.abs(93f - 80f)).isGreaterThan(neighbourAggroRadiusMeters);
     }
+
+    /**
+     * 🔴 <b>VI PHẠM luật biên thật (chủ dự án chốt 2026-10-01, {@link DuelMargin}) — CHƯA chỉnh số,
+     * chờ chủ dự án.</b>
+     *
+     * <p>Tới sào huyệt 111 máu, bộ Ngoại Môn vs đầu lĩnh 200/30/18: ta 4 nhát, nó 6 nhát ⇒ biên giấy
+     * 2, biên thật −1. Có bộ chỉ số đạt luật trên bậc thang (vd. hạ {@code atk 30 → 20}), nhưng MỌI
+     * bộ như vậy làm {@link #theNoviceSetShouldNotBeEnoughForTheChieftain()} hỏng: bộ Tạp Dịch cũng
+     * thắng, tức phần thưởng quest 11 thôi là điều kiện cần. Dừng, báo cáo.
+     *
+     * <p>Ô này KHOÁ đúng con số vi phạm hiện tại, để bất kỳ ai đổi chỉ số loài này đều phải dừng lại
+     * đối chiếu với luật biên thật thay vì lặng lẽ giữ trận ở dưới ngưỡng.
+     */
+    @Test
+    @DisplayName("🔴 Luật biên thật: đầu lĩnh đoạt mạch ĐANG vi phạm — biên thật −1, cần +2 (chờ chủ dự án)")
+    void theChieftainDuelViolatesTheRealMarginRule() {
+        DuelMargin duel =
+                new DuelMargin(playerAtk(), playerDef(), arrivalHp(), CHIEFTAIN_HP, CHIEFTAIN_ATK, CHIEFTAIN_DEF);
+
+        assertThat(duel.paperMargin()).isEqualTo(2);
+        assertThat(duel.realMargin()).isEqualTo(-1);
+        assertThat(duel.meetsRealMarginRule()).isFalse();
+    }
 }

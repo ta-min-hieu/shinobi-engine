@@ -213,6 +213,62 @@ finalDamage = rawDamage × mitigation × elementMultiplier
 ⚠️ Toàn bộ hệ số trên là **placeholder — chưa cân bằng qua playtest**. Không phải quyết định cuối
 cùng, nhưng đủ cụ thể để code `CombatSystem` ([GAMEPLAY.md §3](../05-server/GAMEPLAY.md)).
 
+### Luật biên thật — trận tay đôi bắt buộc của chuỗi quest (chốt 2026-10-01)
+
+**Số đo dẫn tới luật.** Playtest 2026-09-17 (`gameProbe`, nhân vật Cấp 30, bộ Trúc Cơ: công 82 ·
+thủ 65 · máu 206): `wasteland_beast` (Lv29, 280/44/32) trên giấy là trận thắng — người chơi cần
+**5** nhát, quái cần **8** ⇒ biên giấy **+3**. Ba trận 1v1 thật từ máu đầy: **1 thắng, 2 chết**.
+Biên giấy bỏ sót hai số hạng:
+
+- **Nhát phủ đầu** — quái ra 1–2 nhát trong lúc người chơi đi tới/đứng vào thế đánh, kể cả với
+  `aggro_radius_meters = 3` (V46/V47 đo hai lần độc lập). Luật lấy cận trên: **2**.
+- **Một lần né** — người chơi trúng ~91% (bước 1 ở trên); mỗi lần hụt là trả trọn một nhát của quái.
+  Luật dự trữ: **1**.
+
+**Luật** (chủ dự án chốt 2026-10-01, thay luật "biên ≥ 2" cũ):
+
+```
+biên giấy = (số nhát quái cần để hạ người chơi) − (số nhát người chơi cần để hạ quái)
+biên thật = biên giấy − 2 (phủ đầu) − 1 (dự trữ một lần né)
+Trận tay đôi BẮT BUỘC của chuỗi quest phải có  biên thật ≥ +2   (tức biên giấy ≥ +5)
+```
+
+- Sát thương mỗi nhát tính bằng ATK trung bình, không bạo kích, theo công thức giảm giáp ở trên;
+  hai bên chung nhịp 1 đòn/giây; **hoà nghĩa là chết**.
+- Người chơi đo theo **trang bị mốc** mà lớp cân bằng của chính trận đó dùng (bộ Tạp Dịch / Ngoại
+  Môn / Trúc Cơ).
+- Máu đầu vào là máu lúc **tới nơi** sau thuế đường đi của các loài KHÁC (nếu trận đó có mô hình
+  đường đi), **không** trừ nhát phủ đầu của chính đối thủ — số hạng −2 đã gánh phần đó.
+- Mã: `DuelMargin` (`server-world`, test) + các lớp `*BalanceTest`.
+
+**Áp luật lên mọi trận đang có lớp cân bằng** (2026-10-01):
+
+| Trận (loài) | Cấp | Trang bị mốc | Biên giấy trước | Biên thật trước | Sau V50 |
+|---|---|---|---|---|---|
+| `wandering_bandit` (quest 2) | 4 | Tạp Dịch | 4 | +1 | 🔴 chưa chỉnh |
+| `archive_warden` (quest 3) | 5 | Tạp Dịch | 2 | −1 | 🔴 chưa chỉnh |
+| `trial_construct` (quest 4, đóng arc 1 nửa đầu) | 8 | Tạp Dịch | 3 | 0 | 🔴 chưa chỉnh |
+| `vein_raider` (quest 10) | 10 | Tạp Dịch | 2 | −1 | 🔴 chưa chỉnh |
+| `raider_chieftain` (quest 12) | 15 | Ngoại Môn | 2 | −1 | 🔴 chưa chỉnh |
+| `blood_sand_acolyte` (quest 13–15) | 22 | Ngoại Môn | 2 | −1 | 🔴 chưa chỉnh |
+| `blood_sand_ringleader` (quest 13–15) | 22 | Ngoại Môn | 2 | −1 | 🔴 chưa chỉnh |
+| `wasteland_beast` (quãng quest 16–20) | 29 | Trúc Cơ | 3 | 0 | ✅ 280/44/32 → **289/36/32**: biên giấy 5, biên thật **+2** |
+| `foundation_warden` (quest 20, **đóng arc 2**) | 33 | Trúc Cơ | 3 | 0 | ✅ 300/46/35 → **300/37/35**: biên giấy 5, biên thật **+2** |
+
+**Vì sao bảy trận đầu chưa chỉnh.** Quét toàn bộ không gian chỉ số cho từng loài: mọi bộ số đạt
+luật đều phá một luật đang khoá — tay không phải thua thạch vệ/cỗ khảo hạch (bộ Tạp Dịch chỉ hơn
+tay không +7/+7/+18, quá hẹp để vừa "phải sắm đồ" vừa "thắng chắc"); bộ Tạp Dịch phải thua đầu
+lĩnh đoạt mạch; bậc thang loài (tán tu < thạch vệ < cỗ khảo hạch; `vein_raider` cùng máu với cỗ
+khảo hạch; đầu lĩnh < tế đồ < đàn chủ < yêu thú); và trận THUA đo thật của V46 (đổi công tán tu làm
+nó lật thành thắng). Đây là câu hỏi **thiết kế** (trang bị mốc / bậc thang), không phải một con
+số — chờ chủ dự án. Các ô `*ViolatesTheRealMarginRule` khoá đúng con số vi phạm hiện tại.
+
+**Hai điểm của V50 cần biết.** (1) Máu yêu thú TĂNG 280 → 289 — phần thêm duy nhất, để bộ Ngoại
+Môn vẫn không thắng (dưới 289 thì nó cần 6 nhát và thắng, tức quest mở lát cắt thôi cần trao bộ
+Trúc Cơ). (2) Không cặp chỉ số nào vừa đạt luật vừa giữ bộ Ngoại Môn **thua hẳn**; mức tốt nhất
+là **hoà 7–7 = chết**, biên thật −2. Phép so trong `FoundationTrialBalanceTest` vì vậy đổi từ
+"âm" sang "không dương". ⚠️ V50 chưa kiểm sống bằng `gameProbe` — số đo 1 thắng/2 chết là của V48.
+
 ---
 
 ## 7. Xã hội
@@ -322,6 +378,7 @@ Mỗi câu trả lời → cập nhật tài liệu này hoặc tạo ADR.
 | 10 | **Re-theme tu tiên: chỉ đổi tường thuật/tên hiển thị, KHÔNG đổi cơ chế/protocol/DB** | ✅ [ADR-038](../01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md) Accepted 2026-09-01 |
 | 11 | Cảnh giới = cách trình bày Lv1–100 (6 cảnh giới × 9 tầng, có Tử Phủ), không phải hệ thống mới | ✅ ADR-038 D2 |
 | 12 | Open questions còn lại §12 | ⏳ |
+| 13 | **Luật biên thật** cho trận tay đôi bắt buộc: biên giấy − 2 phủ đầu − 1 né ≥ +2 (§6) | ✅ Chủ dự án chốt 2026-10-01; 7/9 trận còn vi phạm, chờ quyết định thiết kế |
 
 ## ADR cần tạo
 

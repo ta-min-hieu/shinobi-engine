@@ -26,6 +26,11 @@ import org.junit.jupiter.api.Test;
  * {@code hit(atk, 50)} tới từng điểm máu). Cửa sổ phủ đầu chỉ biến mất khi
  * {@code aggro <= ATTACK_RANGE_METERS}. Đừng trừ 0 cho loài có {@code aggro > 2}.
  *
+ * <p><b>Luật biên thật (2026-10-01, {@link DuelMargin}).</b> Hai ô "biên ≥2 sau một nhát phủ đầu"
+ * bên dưới là luật CŨ và vẫn được giữ, nhưng chúng đã xanh trong khi trận thật thua (V48: 1 thắng
+ * 2 chết). Luật quyết định nay là hai ô {@code *MeetsTheRealMarginRule} — biên giấy trên máu ĐẦY
+ * trừ 2 nhát phủ đầu và 1 lần né, phải ≥2. V50 chỉnh chỉ số hai loài cho đạt luật đó.
+ *
  * <p>Nó KHÔNG mô phỏng AI, khoảng cách hay né/bạo kích ngẫu nhiên — chỉ trả lời đúng một câu: với
  * sát thương TRUNG BÌNH mỗi bên, ai hết máu trước?
  */
@@ -53,15 +58,17 @@ class FoundationTrialBalanceTest {
 
     private static final int OUTER_SECT_SET_RES = 24;
 
-    private static final int BEAST_HP = 280;
+    /** `monster_template` hàng `wasteland_beast` — V48 seed 280/44/32, V50 chỉnh lại theo luật biên thật. */
+    private static final int BEAST_HP = 289;
 
-    private static final int BEAST_ATK = 44;
+    private static final int BEAST_ATK = 36;
 
     private static final int BEAST_DEF = 32;
 
+    /** `monster_template` hàng `foundation_warden` — V48 seed 300/46/35, V50 hạ atk theo luật biên thật. */
     private static final int WARDEN_HP = 300;
 
-    private static final int WARDEN_ATK = 46;
+    private static final int WARDEN_ATK = 37;
 
     private static final int WARDEN_DEF = 35;
 
@@ -140,39 +147,104 @@ class FoundationTrialBalanceTest {
      * <p>Không có bộ chỉ số nào cho biên ≥2 với bộ Ngoại Môn mà không trùng đúng chỉ số
      * {@code blood_sand_acolyte} (220/34/26) hoặc {@code blood_sand_ringleader} (240/35/28) — tức
      * KHÔNG CÒN bậc thang nào ở trên bộ cũ. Đó là trần đã báo cáo 2026-09-16.
+     *
+     * <p><b>V50 (luật biên thật, 2026-10-01) nới phép so ở đây từ "thua hẳn" thành "hoà là chết".</b>
+     * Quét toàn bộ không gian (yêu thú × cỗ khảo hạch, giữ luật bậc thang của
+     * {@link #bothSpeciesClimbTheExistingLadder()}) cho thấy KHÔNG có cặp chỉ số nào vừa cho bộ
+     * Trúc Cơ biên thật ≥2 ở CẢ HAI trận vừa giữ biên giấy của bộ Ngoại Môn ÂM hẳn — tốt nhất là hoà
+     * 7–7. Hoà chung nhịp đánh nghĩa là chết, đúng quy ước {@link OldArchiveDuelBalanceTest} và
+     * {@link AwakeningTrialBalanceTest} đã dùng từ đầu. Và dưới chính luật biên thật, bộ Ngoại Môn
+     * đứng ở −2: không phải tung đồng xu, mà là thua.
      */
     @Test
-    @DisplayName("Mặc bộ NGOẠI MÔN đi đánh yêu thú Lv29 thì THUA — 6 nhát so với 5")
+    @DisplayName("Mặc bộ NGOẠI MÔN đi đánh yêu thú Lv29 thì THUA — hoà 7–7 trên giấy, biên thật −2")
     void outerSectGearLosesToTheWastelandBeast() {
         int playerHitsFor = hitsToKill(BEAST_HP, hit(outerSectAtk(), BEAST_DEF));
         int beastHitsFor =
                 hitsToKill(arrivalHp(outerSectMaxHp(), BEAST_ATK, outerSectDef()), hit(BEAST_ATK, outerSectDef()));
 
-        assertThat(playerHitsFor).isEqualTo(6);
-        assertThat(beastHitsFor).isEqualTo(5);
-        assertThat(beastHitsFor - playerHitsFor).isNegative();
+        assertThat(playerHitsFor).isEqualTo(7);
+        assertThat(beastHitsFor).isEqualTo(7);
+        // Hoà nghĩa là chết — cùng nhịp đánh mà không chết sau thì không thắng.
+        assertThat(beastHitsFor - playerHitsFor).isNotPositive();
+
+        DuelMargin outerSect =
+                new DuelMargin(outerSectAtk(), outerSectDef(), outerSectMaxHp(), BEAST_HP, BEAST_ATK, BEAST_DEF);
+        assertThat(outerSect.realMargin()).isEqualTo(-2);
+        assertThat(outerSect.meetsRealMarginRule()).isFalse();
     }
 
     @Test
-    @DisplayName("Mặc bộ Trúc Cơ, thắng yêu thú rìa Hoang Vực — 5 nhát so với 7, biên 2")
+    @DisplayName("Mặc bộ Trúc Cơ, thắng yêu thú rìa Hoang Vực — 5 nhát so với 9 sau một nhát phủ đầu")
     void gearedDiscipleShouldWinAgainstTheWastelandBeast() {
         int playerHitsFor = hitsToKill(BEAST_HP, hit(foundationAtk(), BEAST_DEF));
         int beastHitsFor =
                 hitsToKill(arrivalHp(foundationMaxHp(), BEAST_ATK, foundationDef()), hit(BEAST_ATK, foundationDef()));
 
         assertThat(playerHitsFor).isEqualTo(5);
+        assertThat(beastHitsFor).isEqualTo(9);
         assertThat(beastHitsFor - playerHitsFor).isGreaterThanOrEqualTo(2);
     }
 
     @Test
-    @DisplayName("Cỗ khảo hạch Trúc Cơ: biên 2 — nhịp ĐÓNG arc, và là trận cuối của v1")
+    @DisplayName("Cỗ khảo hạch Trúc Cơ: 5 nhát so với 9 sau một nhát phủ đầu — nhịp ĐÓNG arc, trận cuối v1")
     void gearedDiscipleShouldWinTheFoundationTrial() {
         int playerHitsFor = hitsToKill(WARDEN_HP, hit(foundationAtk(), WARDEN_DEF));
         int wardenHitsFor =
                 hitsToKill(arrivalHp(foundationMaxHp(), WARDEN_ATK, foundationDef()), hit(WARDEN_ATK, foundationDef()));
 
         assertThat(playerHitsFor).isEqualTo(5);
+        assertThat(wardenHitsFor).isEqualTo(9);
         assertThat(wardenHitsFor - playerHitsFor).isGreaterThanOrEqualTo(2);
+    }
+
+    /**
+     * Luật biên thật (chủ dự án chốt 2026-10-01, {@link DuelMargin}) cho yêu thú — số đo đã bác
+     * bản V48.
+     *
+     * <p>V48 (280/44/32): ta 5 nhát, nó 8 nhát từ máu đầy ⇒ biên giấy +3, biên thật 0. Ba trận 1v1
+     * thật từ máu đầy (gameProbe 2026-09-17, V49): <b>1 thắng, 2 chết</b>. V50 hạ {@code atk 44 → 36}
+     * (sát thương mỗi nhát 27 → 22, quái cần 10 nhát) và nâng {@code max_hp 280 → 289} — phần máu
+     * thêm chỉ để giữ {@link #outerSectGearLosesToTheWastelandBeast()}: dưới 289 thì bộ Ngoại Môn
+     * cần 6 nhát và lại THẮNG.
+     */
+    @Test
+    @DisplayName("Luật biên thật: yêu thú Hoang Vực — biên giấy 5, biên thật +2 (V48 là 0)")
+    void theWastelandBeastMeetsTheRealMarginRule() {
+        DuelMargin beast =
+                new DuelMargin(foundationAtk(), foundationDef(), foundationMaxHp(), BEAST_HP, BEAST_ATK, BEAST_DEF);
+        DuelMargin beforeV50 = new DuelMargin(foundationAtk(), foundationDef(), foundationMaxHp(), 280, 44, BEAST_DEF);
+
+        assertThat(beforeV50.paperMargin()).isEqualTo(3);
+        assertThat(beforeV50.realMargin()).isZero();
+        assertThat(beforeV50.meetsRealMarginRule()).isFalse();
+
+        assertThat(beast.playerHitsToKill()).isEqualTo(5);
+        assertThat(beast.monsterHitsToKill()).isEqualTo(10);
+        assertThat(beast.realMargin()).isGreaterThanOrEqualTo(DuelMargin.REQUIRED_REAL_MARGIN);
+    }
+
+    /**
+     * Luật biên thật cho cỗ khảo hạch Trúc Cơ — trận ĐÓNG arc 2, nội dung cuối của v1.
+     *
+     * <p>V48 (300/46/35): 5 nhát so với 8 ⇒ biên thật 0, mắc đúng bệnh của yêu thú. V50 hạ
+     * {@code atk 46 → 37}. 37 là trần, không phải con số tiện tay: 38 cho 23 sát thương/nhát ⇒ quái
+     * chỉ cần 9 nhát ⇒ người chơi phải hạ nó trong 4 nhát ⇒ {@code max_hp ≤ 244}, tức THẤP hơn yêu
+     * thú — phá luật bậc thang. Còn atk phải &gt; 36 của yêu thú cũng vì luật đó.
+     */
+    @Test
+    @DisplayName("Luật biên thật: cỗ khảo hạch Trúc Cơ — biên giấy 5, biên thật +2 (V48 là 0)")
+    void theFoundationWardenMeetsTheRealMarginRule() {
+        DuelMargin warden =
+                new DuelMargin(foundationAtk(), foundationDef(), foundationMaxHp(), WARDEN_HP, WARDEN_ATK, WARDEN_DEF);
+        DuelMargin beforeV50 =
+                new DuelMargin(foundationAtk(), foundationDef(), foundationMaxHp(), WARDEN_HP, 46, WARDEN_DEF);
+
+        assertThat(beforeV50.realMargin()).isZero();
+
+        assertThat(warden.playerHitsToKill()).isEqualTo(5);
+        assertThat(warden.monsterHitsToKill()).isEqualTo(10);
+        assertThat(warden.realMargin()).isGreaterThanOrEqualTo(DuelMargin.REQUIRED_REAL_MARGIN);
     }
 
     @Test

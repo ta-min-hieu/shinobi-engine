@@ -187,4 +187,35 @@ class AwakeningTrialBalanceTest {
         // V32 — đứng lại đánh thì con bên cạnh không với tới nơi.
         assertThat(distanceToNearestWarden).isGreaterThan(leashRadiusMeters + meleeAttackRangeMeters);
     }
+
+    /**
+     * 🔴 <b>VI PHẠM luật biên thật (chủ dự án chốt 2026-10-01, {@link DuelMargin}) — CHƯA chỉnh số,
+     * chờ chủ dự án.</b>
+     *
+     * <p>Tới nơi 78 máu (đo thật), bộ Tạp Dịch vs cỗ khảo hạch 130/15/10: ta 4 nhát, nó 7 nhát ⇒
+     * biên giấy 3, biên thật 0. Mọi bộ chỉ số đạt luật mà vẫn giữ
+     * {@link #barehandedNoviceShouldStillFailTheTrial()} đều phải đổi {@code max_hp}, mà
+     * {@code SpiritVeinDuelBalanceTest#theRaiderShouldBeAStepAboveTheTrialConstruct} khoá
+     * {@code vein_raider} CÙNG máu 130 và đánh/giáp HƠN nó — kéo theo cả {@code vein_raider} (bản
+     * thân cũng vi phạm và không có lời giải trên bậc thang). Dừng, báo cáo.
+     *
+     * <p>Ô này KHOÁ đúng con số vi phạm hiện tại, để bất kỳ ai đổi chỉ số loài này đều phải dừng lại
+     * đối chiếu với luật biên thật thay vì lặng lẽ giữ trận ở dưới ngưỡng.
+     */
+    @Test
+    @DisplayName("🔴 Luật biên thật: cỗ khảo hạch ĐANG vi phạm — biên thật 0, cần +2 (chờ chủ dự án)")
+    void theTrialViolatesTheRealMarginRule() {
+        CombatConstants.CombatStats player = novice();
+        DuelMargin duel = new DuelMargin(
+                player.atk() + NOVICE_SET_ATK,
+                player.def() + NOVICE_SET_DEF,
+                ARRIVAL_HP,
+                CONSTRUCT_HP,
+                CONSTRUCT_ATK,
+                CONSTRUCT_DEF);
+
+        assertThat(duel.paperMargin()).isEqualTo(3);
+        assertThat(duel.realMargin()).isZero();
+        assertThat(duel.meetsRealMarginRule()).isFalse();
+    }
 }

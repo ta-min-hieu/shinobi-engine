@@ -110,4 +110,36 @@ class NightWatchDuelBalanceTest {
         // quãng Lv22–27: nó chắn đường tới vùng mạch chết và một mình nó lấy 27 máu mỗi lượt đi qua.
         assertThat(161f - 34f).isGreaterThan(combinedReach);
     }
+
+    /**
+     * 🔴 <b>VI PHẠM luật biên thật (chủ dự án chốt 2026-10-01, {@link DuelMargin}) — CHƯA chỉnh số,
+     * chờ chủ dự án.</b>
+     *
+     * <p>Bộ Tạp Dịch (37/27/118) vs tán tu 90/22/10: ta 3 nhát, nó 7 nhát ⇒ biên giấy 4, biên thật
+     * +1 (cần +2). Hạ {@code atk 22 → 20} là đủ cho riêng trận này và vẫn giữ
+     * {@link #barehandedNoviceShouldBeAtTheEdge()} — NHƯNG tán tu cũng là thuế đường đi của quest 10:
+     * máu tới linh mạch đổi 84 → 86 và {@code SpiritVeinDuelBalanceTest#twoOpeningHitsLoseTheDuel}
+     * (phép tính của trận THUA đo thật 2026-09-13) lật thành thắng. Theo lệnh "phá luật khoá khác thì
+     * dừng", V50 không đụng loài này.
+     *
+     * <p>Ô này KHOÁ đúng con số vi phạm hiện tại, để bất kỳ ai đổi chỉ số loài này đều phải dừng lại
+     * đối chiếu với luật biên thật thay vì lặng lẽ giữ trận ở dưới ngưỡng.
+     */
+    @Test
+    @DisplayName("🔴 Luật biên thật: tán tu ĐANG vi phạm — biên thật +1, cần +2 (chờ chủ dự án)")
+    void theBanditDuelViolatesTheRealMarginRule() {
+        CombatConstants.CombatStats player = CombatConstants.deriveCombatStats(
+                new CharacterBaseStats(BASE_STAT, BASE_STAT, BASE_STAT, BASE_STAT, Element.HOA, 4));
+        DuelMargin duel = new DuelMargin(
+                player.atk() + NOVICE_SET_ATK,
+                player.def() + NOVICE_SET_DEF,
+                CombatConstants.CHARACTER_MAX_HP + NOVICE_SET_HP,
+                BANDIT_HP,
+                BANDIT_ATK,
+                BANDIT_DEF);
+
+        assertThat(duel.paperMargin()).isEqualTo(4);
+        assertThat(duel.realMargin()).isEqualTo(1);
+        assertThat(duel.meetsRealMarginRule()).isFalse();
+    }
 }

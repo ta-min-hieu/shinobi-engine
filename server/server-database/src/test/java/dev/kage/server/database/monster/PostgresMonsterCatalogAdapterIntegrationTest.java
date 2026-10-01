@@ -117,6 +117,28 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         assertThat(construct.expReward()).isEqualTo(80L);
     }
 
+    @Test
+    void shouldRetuneTheArcTwoCloserSpeciesToTheRealMarginRule() {
+        // V50 — luật biên thật (chủ dự án chốt 2026-10-01): hai loài của V48 được chỉnh từ phép
+        // tính ở `FoundationTrialBalanceTest` + `DuelMargin` (server-world). Cùng lý do với thạch
+        // vệ ở trên: lớp kia đọc hằng số của chính nó, chỉ có ô này giữ hai bên khớp nhau. Thủ, EXP
+        // và tầm aggro KHÔNG đổi — V50 chỉ đụng máu/công.
+        MonsterTemplate beast = findByCode("wasteland_beast");
+        MonsterTemplate warden = findByCode("foundation_warden");
+
+        assertThat(beast.stats().maxHp()).isEqualTo(289);
+        assertThat(beast.stats().atk()).isEqualTo(36);
+        assertThat(beast.stats().def()).isEqualTo(32);
+        assertThat(beast.expReward()).isEqualTo(520L);
+        assertThat(beast.aiParams().aggroRadiusMeters()).isEqualTo(3f);
+
+        assertThat(warden.stats().maxHp()).isEqualTo(300);
+        assertThat(warden.stats().atk()).isEqualTo(37);
+        assertThat(warden.stats().def()).isEqualTo(35);
+        assertThat(warden.expReward()).isEqualTo(700L);
+        assertThat(warden.aiParams().aggroRadiusMeters()).isEqualTo(3f);
+    }
+
     /**
      * Loài ĐẦU TIÊN cố ý không rơi gì (V33 §1): cỗ máy khảo hạch là tài sản tông môn.
      *

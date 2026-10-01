@@ -217,4 +217,33 @@ class BloodSandBandBalanceTest {
         assertThat(groundMaxX).isGreaterThan(furthestSpawnX);
         assertThat(groundMaxX - furthestSpawnX).isEqualTo(9f);
     }
+
+    /**
+     * 🔴 <b>VI PHẠM luật biên thật (chủ dự án chốt 2026-10-01, {@link DuelMargin}) — CHƯA chỉnh số,
+     * chờ chủ dự án.</b>
+     *
+     * <p>Tới mạch chết 150 máu, bộ Ngoại Môn: tế đồ 220/34/26 và đàn chủ 240/35/28 đều 5 nhát so với
+     * 7 ⇒ biên giấy 2, biên thật −1. Đây đúng là trần trang bị {@link
+     * #theRingleaderDuelShouldKeepATwoSwingMargin()} đã báo: biên giấy 3 đã bất khả trên bậc thang
+     * đầu lĩnh arc 1 &lt; tế đồ &lt; đàn chủ &lt; yêu thú, nói gì biên giấy 5. Quét toàn bộ không
+     * gian: 0 lời giải. Cần quyết định THIẾT KẾ (trang bị/bậc thang), không phải con số.
+     *
+     * <p>Ô này KHOÁ đúng con số vi phạm hiện tại, để bất kỳ ai đổi chỉ số loài này đều phải dừng lại
+     * đối chiếu với luật biên thật thay vì lặng lẽ giữ trận ở dưới ngưỡng.
+     */
+    @Test
+    @DisplayName("🔴 Luật biên thật: tế đồ và đàn chủ Huyết Sa ĐANG vi phạm — biên thật −1, cần +2 (chờ chủ dự án)")
+    void theBloodSandDuelsViolateTheRealMarginRule() {
+        DuelMargin acolyte =
+                new DuelMargin(playerAtk(), playerDef(), arrivalHp(), ACOLYTE_HP, ACOLYTE_ATK, ACOLYTE_DEF);
+        DuelMargin ringleader =
+                new DuelMargin(playerAtk(), playerDef(), arrivalHp(), RINGLEADER_HP, RINGLEADER_ATK, RINGLEADER_DEF);
+
+        assertThat(acolyte.paperMargin()).isEqualTo(2);
+        assertThat(acolyte.realMargin()).isEqualTo(-1);
+        assertThat(acolyte.meetsRealMarginRule()).isFalse();
+        assertThat(ringleader.paperMargin()).isEqualTo(2);
+        assertThat(ringleader.realMargin()).isEqualTo(-1);
+        assertThat(ringleader.meetsRealMarginRule()).isFalse();
+    }
 }

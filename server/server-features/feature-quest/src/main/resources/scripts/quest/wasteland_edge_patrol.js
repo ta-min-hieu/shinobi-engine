@@ -10,6 +10,10 @@
 //
 //     yêu thú: người chơi ceil(280/48) = 6 nhát · quái ceil(141/29) = 5 nhát  ⇒ biên −1, THUA
 //
+// ⚠️ V50 (luật biên thật, chủ dự án chốt 2026-10-01) đổi hai loài thành 289/36/32 và 300/37/35.
+//    Bộ Ngoại Môn nay HOÀ 7–7 trên giấy (hoà = chết) và biên thật −2; bộ Trúc Cơ biên thật +2.
+//    Ràng buộc "đồ phải tới trước" vẫn đứng — xem `FoundationTrialBalanceTest`.
+//
 // Và không có bộ số nào cho biên +2 với bộ cũ mà không trùng đúng chỉ số `blood_sand_acolyte`
 // (220/34/26) hoặc `blood_sand_ringleader` (240/35/28) — tức KHÔNG CÒN bậc thang nào ở trên bộ
 // Ngoại Môn. Đó là trần đã báo cáo 2026-09-16, và nó quyết định thứ tự chuỗi này: đồ phải tới
