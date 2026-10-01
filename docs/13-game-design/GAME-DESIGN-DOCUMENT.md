@@ -267,7 +267,52 @@ số — chờ chủ dự án. Các ô `*ViolatesTheRealMarginRule` khoá đúng
 Môn vẫn không thắng (dưới 289 thì nó cần 6 nhát và thắng, tức quest mở lát cắt thôi cần trao bộ
 Trúc Cơ). (2) Không cặp chỉ số nào vừa đạt luật vừa giữ bộ Ngoại Môn **thua hẳn**; mức tốt nhất
 là **hoà 7–7 = chết**, biên thật −2. Phép so trong `FoundationTrialBalanceTest` vì vậy đổi từ
-"âm" sang "không dương". ⚠️ V50 chưa kiểm sống bằng `gameProbe` — số đo 1 thắng/2 chết là của V48.
+"âm" sang "không dương" (✅ chủ dự án duyệt cả hai điểm 2026-10-01). Số đo 1 thắng/2 chết ở trên là của V48; V50 đã kiểm sống — xem mục ngay dưới.
+
+#### Kiểm sống V50 trên DB vứt đi (2026-10-01)
+
+**Cách đo.** DB dev `kage` KHÔNG chạy V50 (vẫn ở V49 — chủ dự án chưa duyệt V50, Flyway không lùi
+được). Thay vào đó: mạng docker riêng `kage-v50check` gồm Postgres 17 + Redis trắng, server-gateway
+build từ cây có V50 chạy trong container `eclipse-temurin:25-jre`, cổng host 7790 (cổng 7777 viết
+cứng trong `GatewayBootstrap`, nên tách bằng ánh xạ cổng của docker chứ không bằng biến môi trường).
+Flyway chạy V1→V50 trên DB trắng; xác nhận `wasteland_beast 289/36/32`, `foundation_warden 300/37/35`.
+Nhân vật Cấp 30 hệ HOẢ, chỉ số nền 10/10/10/10, mặc trọn 6 món `foundation_*` bằng SQL — vào world
+**máu 206/206**, đánh **62** lên yêu thú / **61** lên cỗ khảo hạch, ăn **22**/nhát từ cả hai, đúng
+từng điểm với `FoundationTrialBalanceTest`. `gameProbe --attackTarget=nearest
+--attackIntervalMillis=1100 --observeSeconds=20` (ngắn hơn `respawn_seconds` 30), xuất phát TRONG
+trạm nghỉ ngay trước quái (x=169 → đi tới 176; x=195 → đi tới 201), quãng đi ≤7 m, mỗi lượt từ máu đầy.
+
+| Lượt | Đối thủ | Nhát quái ra trước nhát đầu của ta | Ta hụt | Quái hụt | Máu thấp nhất | Kết quả |
+|---|---|---|---|---|---|---|
+| 1 | `wasteland_beast` @175 | 2 | 0 | 2 | 96/206 | thắng |
+| 2 | `wasteland_beast` | 1 | 1 | 1 | 74/206 | thắng |
+| 3 | `wasteland_beast` | 1 | 1 | 1 | 74/206 | thắng |
+| 4 | `wasteland_beast` | **3** | 0 | 0 | 52/206 | thắng |
+| 5 | `wasteland_beast` | 1 | **2** | 0 | **30/206** | thắng |
+| 1 | `foundation_warden` @201 | 2 | 0 | 0 | 52/206 | thắng |
+| 2 | `foundation_warden` | 1 | 0 | 1 | 96/206 | thắng |
+| 3 | `foundation_warden` | 2 | 0 | 0 | 52/206 | thắng |
+| 4 | `foundation_warden` | 2 | 1 | 0 | **30/206** | thắng |
+| 5 | `foundation_warden` | 1 | 1 | 0 | 74/206 | thắng |
+
+**Kết luận: PASS — 10/10 thắng** (V48: yêu thú 1 thắng 2 chết; cỗ khảo hạch 2 thắng sít + 1 chết).
+Trường hợp xấu nhất (lượt 5 yêu thú, lượt 4 cỗ khảo hạch) là đúng tổ hợp luật dự trữ — tổng
+"phủ đầu + hụt" = 3 — và còn **30 máu = đúng 1 nhát + 8**, tức quái đánh trúng 8 trong 10 nhát nó cần: còn thiếu đúng **2
+nhát**, khớp `biên thật = +2` của `DuelMargin`. Ta trúng 50/56 nhát (~89%, khớp ~91%); bạo kích 2 lần.
+
+**Ba chỗ mô hình và thực đo lệch nhau (không lật kết luận):**
+1. **Phủ đầu có lúc là 3** (lượt 4 yêu thú), vượt cận trên 2 của luật. Nguyên nhân thấy được trong
+   log: ở 5/10 lượt, nhát đầu của ta đến **~1,15–1,3 s sau** lúc "đi bộ xong" thay vì ngay lập tức
+   (nghi lệnh đánh đầu tiên bị bỏ vì chưa vào tầm/đang cooldown — chưa xác minh nhân quả, có thể là
+   đặc tính của `gameProbe`, xem bẫy nhịp đánh). Lượt đó vẫn thắng vì không hụt nhát nào; nếu 3 phủ
+   đầu trùng 2 lần hụt thì chỉ còn dư 0 nhát (8 máu) — vẫn sống, nhưng sát nút.
+2. **Nhịp không chung**: quái đánh đều 1,0 s; ta (probe gửi 1100 ms) ra nhát mỗi ~1,1–1,25 s. Mô hình
+   giả định chung nhịp 1 đòn/giây ⇒ lạc quan cho người chơi ~10–20% số nhát trao đổi. Client thật
+   chưa đo nhịp này.
+3. **Quái cũng hụt** (5/70 đòn, ~7%) — mô hình không tính, có lợi cho người chơi, bù một phần cho (1)–(2).
+
+Phạm vi: chỉ đo trận 1v1 từ máu ĐẦY, đi tới từ trạm nghỉ sát bên. Thuế đường đi trên trục chính
+(nhiều quái liên tiếp) không nằm trong phép đo này. Số cân bằng KHÔNG đổi. ✅ **Chủ dự án DUYỆT V50 2026-10-01** (cả hai điểm: máu yêu thú 280 → 289 và nới ô test thành "không dương").
 
 ---
 
