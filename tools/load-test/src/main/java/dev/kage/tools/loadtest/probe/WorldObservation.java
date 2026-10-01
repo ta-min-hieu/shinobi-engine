@@ -341,6 +341,21 @@ final class WorldObservation {
         return List.copyOf(damageEvents);
     }
 
+    /**
+     * Số đòn ĐÁNH THƯỜNG do chính nhân vật ra mà server đã xác nhận (trúng hay hụt đều tính — cả
+     * hai đều tiêu cooldown). {@link AttackCadence} dùng để biết nhát mở màn đã ra hay chưa.
+     */
+    int ownBasicAttacksResolved() {
+        int count = 0;
+        for (DamageEvent event : damageEvents) {
+            if (event.attackerEntityId() == playerCharacterId
+                    && event.skillCode().isEmpty()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     /** Con quái gần nhất ĐANG trong tầm nhìn — rỗng nếu chưa thấy con nào. */
     OptionalLong nearestMonsterId() {
         Optional<MonsterSighting> nearest = monstersInAreaOfInterest().stream().findFirst();

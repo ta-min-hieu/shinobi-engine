@@ -192,6 +192,34 @@ final class WorldObservationTest {
         assertThat(observation.renderReport()).contains("máu=91/100");
     }
 
+    /** AttackCadence chỉ được tính đòn CỦA MÌNH — đòn quái đánh mình không phải "nhát mở màn đã ra". */
+    @Test
+    void shouldCountOnlyOwnBasicAttacks_includingMisses() throws InvalidProtocolBufferException {
+        enterWorldAt(21f);
+        apply(100L, Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE, bandit(BANDIT_A, 21f));
+        apply(
+                200L,
+                Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE,
+                AttackResultEvent.newBuilder()
+                        .setAttackerEntityId(BANDIT_A)
+                        .setTargetEntityId(PLAYER_ID)
+                        .setDamage(9)
+                        .setTargetCurrentHp(91)
+                        .build());
+        assertThat(observation.ownBasicAttacksResolved()).isZero();
+
+        apply(
+                300L,
+                Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE,
+                AttackResultEvent.newBuilder()
+                        .setAttackerEntityId(PLAYER_ID)
+                        .setTargetEntityId(BANDIT_A)
+                        .setIsMiss(true)
+                        .setTargetCurrentHp(120)
+                        .build());
+        assertThat(observation.ownBasicAttacksResolved()).isEqualTo(1);
+    }
+
     @Test
     void shouldFollowPlayerPositionFromMoveResponse() throws InvalidProtocolBufferException {
         enterWorldAt(8f);

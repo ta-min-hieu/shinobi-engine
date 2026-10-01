@@ -21,6 +21,10 @@ dependencies {
 }
 application {
     mainClass.set("dev.kage.client.desktop.DesktopLauncher")
+    // JDK 24+ cảnh báo "restricted method System::load" (gdx-jnigen-loader nạp native LWJGL/
+    // FreeType) và báo trước sẽ CHẶN hẳn ở JDK sau. Cho phép tường minh để bản cài không gãy khi
+    // người chơi chạy JDK mới hơn (ROADMAP v1 — mục rủi ro LWJGL, kiểm nguồn 2026-10-01).
+    applicationDefaultJvmArgs = listOf("--enable-native-access=ALL-UNNAMED")
 }
 
 // ---------------------------------------------------------------------------------------------

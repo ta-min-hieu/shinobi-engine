@@ -247,16 +247,28 @@ public final class GameProbe {
 
         connection.setReadTimeoutMillis(OBSERVE_READ_TIMEOUT_MILLIS);
         long endAt = System.currentTimeMillis() + (long) config.observeSeconds() * MILLIS_PER_SECOND;
-        long nextAttackAt = System.currentTimeMillis();
+        // Nhịp gửi: thử lại dày trước nhát đầu, rồi đúng attackIntervalMillis — xem AttackCadence
+        // (kiểm sống V50: lệnh mở màn ngoài tầm bị bỏ im lặng, sinh nhát "phủ đầu" thứ ba giả).
+        AttackCadence cadence = new AttackCadence(config.attackIntervalMillis(), System.currentTimeMillis());
         while (System.currentTimeMillis() < endAt) {
-            if (target.isPresent() && System.currentTimeMillis() >= nextAttackAt) {
+            if (target.isEmpty()) {
+                readOneFrameOrWait(connection);
+                continue;
+            }
+            long now = System.currentTimeMillis();
+            if (cadence.isDue(now, observation.ownBasicAttacksResolved())) {
                 connection.send(
                         Opcode.OPCODE_ATTACK_COMMAND_VALUE,
                         AttackCommand.getDefaultInstance().toByteArray());
-                nextAttackAt = System.currentTimeMillis() + config.attackIntervalMillis();
+                cadence.onSent(now);
             }
+            connection.setReadTimeoutMillis(
+                    cadence.readTimeoutMillis(System.currentTimeMillis(), OBSERVE_READ_TIMEOUT_MILLIS));
             readOneFrameOrWait(connection);
         }
+        // Trả lại cửa sổ đọc như trước vòng lặp: các bước SAU (uống thuốc, bỏ cuộc Arena) chờ phản
+        // hồi bằng cửa sổ này, và 20ms của AttackCadence là quá hẹp cho họ.
+        connection.setReadTimeoutMillis(OBSERVE_READ_TIMEOUT_MILLIS);
     }
 
     /**

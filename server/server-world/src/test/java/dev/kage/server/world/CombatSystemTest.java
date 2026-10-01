@@ -31,6 +31,8 @@ class CombatSystemTest {
 
     private static final ComponentMapper<PositionComponent> POSITION = ComponentMapper.getFor(PositionComponent.class);
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
+    private static final ComponentMapper<AttackCooldownComponent> COOLDOWN =
+            ComponentMapper.getFor(AttackCooldownComponent.class);
     private static final ComponentMapper<CombatRecencyComponent> RECENCY =
             ComponentMapper.getFor(CombatRecencyComponent.class);
 
@@ -182,6 +184,49 @@ class CombatSystemTest {
         // hitPercent=1, dodgePercent=0 ở buildDefender/buildAttacker — đòn LUÔN trúng khi grounded.
         assertThat(results.get(0).miss()).isFalse();
         assertThat(results.get(0).damage()).isGreaterThan(0);
+    }
+
+    /**
+     * Kiểm sống V50 (2026-10-01): ở 5/10 lượt {@code gameProbe}, nhát đầu của người chơi tới trễ
+     * ~1,15–1,3 s sau lúc "đi bộ xong". Đây là cơ chế: {@code AttackCommand} là lệnh MỘT LẦN — gửi
+     * lúc mục tiêu còn ngoài tầm 2m (con quái vẫn đang đuổi tới) thì bị bỏ IM LẶNG, và KHÔNG được
+     * giữ lại để tự bắn khi mục tiêu vào tầm. Người gửi phải gửi lại; probe gửi lại sau đúng
+     * {@code attackIntervalMillis}, client thật (giữ phím) sau ~1 giây.
+     *
+     * <p>Ô này khoá hành vi ĐÃ CHỦ ĐÍCH ({@code CombatSystem.tryAttackNow}: "ngoài tầm — chờ, KHÔNG
+     * reset cooldown, không tích luỹ đòn") để ai muốn đổi sang "nhớ ý định đánh" phải đổi nó một cách
+     * có ý thức — đó là quyết định thiết kế, không phải sửa lỗi.
+     */
+    @Test
+    void shouldDropAttackRequestSilently_whenTargetStillOutOfRange_andNotReplayItWhenTargetCloses() {
+        EcsWorld world = new EcsWorld();
+        KEntity attacker = buildAttacker(world);
+        KEntity defender = buildDefender(world, true);
+        POSITION.get(defender).x = CombatConstants.ATTACK_RANGE_METERS + 0.3f; // con quái còn đang đuổi tới
+        Map<Long, KEntity> byId = Map.of(ATTACKER_ID, attacker, DEFENDER_ID, defender);
+        CombatSystem combatSystem = new CombatSystem(byId::get, PVP_ALLOWED);
+        world.addSystem(combatSystem);
+        world.update(1f / 60f);
+
+        combatSystem.requestAttack(attacker); // lệnh tới khi còn ngoài tầm
+        assertThat(combatSystem.drainResults())
+                .as("ngoài tầm: bỏ im lặng, không có kết quả nào")
+                .isEmpty();
+        assertThat(COOLDOWN.get(attacker).remainingSeconds)
+                .as("lệnh bị bỏ không tiêu cooldown")
+                .isLessThanOrEqualTo(0f);
+
+        POSITION.get(defender).x = CombatConstants.ATTACK_RANGE_METERS - 0.1f; // một tick sau nó đã vào tầm
+        for (int tick = 0; tick < 60; tick++) { // 1 giây — đủ để thấy lệnh cũ KHÔNG tự bắn lại
+            world.update(1f / 60f);
+        }
+        assertThat(combatSystem.drainResults())
+                .as("ý định đánh không được nhớ lại")
+                .isEmpty();
+        assertThat(HEALTH.get(defender).current).isEqualTo(100);
+
+        combatSystem.requestAttack(attacker); // chỉ lệnh MỚI mới ra đòn
+        assertThat(combatSystem.drainResults()).hasSize(1);
     }
 
     /**
