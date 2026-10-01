@@ -20,7 +20,8 @@ import dev.kage.protocol.WorldKind;
  * đang chạy dở sau event. Đó là giới hạn có sẵn (đã có từ trước ADR-051), không phải thứ lớp này
  * gây ra. Đấu trường đã bịt nó (quyết định chủ dự án 2026-10-01): vào trận thì chờ mốc chặn hàng
  * đợi của world chính rồi mới gọi lớp này, về world chính thì dừng World đấu trường trước — xem
- * {@code ArenaInstanceRegistry#moveCharacterIntoDuel}. Hầm ngục CHƯA làm tương tự.
+ * {@code ArenaInstanceRegistry#moveCharacterIntoDuel}. Hầm ngục cũng vậy (cùng ngày) nhưng chờ mốc ở
+ * CẢ hai chiều, vì World hầm ngục còn chạy cho đồng đội — xem javadoc lớp {@code DungeonInstanceRegistry}.
  */
 final class WorldTransfer {
 

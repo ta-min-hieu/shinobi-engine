@@ -7,8 +7,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.domain.PositionSnapshot;
@@ -44,8 +51,25 @@ import dev.kage.server.world.WorldFacade;
  * trong {@code synchronized} ngắn — cùng cách {@link MainWorldChannelRegistry} — còn mọi lời gọi
  * DB ({@link PartyFacade}/{@link CharacterFacade}/trang bị) chạy TRƯỚC, ngoài khoá, để EventLoop
  * không bao giờ phải chờ một câu query (server/CLAUDE.md: EventLoop cấm chờ lock lâu).
+ *
+ * <p><b>World cũ im hẳn rồi mới báo 308 (2026-10-01, cùng quyết định P1 của đấu trường).</b> Lệnh
+ * detach chỉ được xếp hàng, nên World cũ có thể phát nốt gói của tick đang chạy dở SAU
+ * {@code WorldChangedEvent} — entity id = characterId ở mọi World, client có thể xoá nhầm đồng đội.
+ * Nay mỗi lượt dời chia hai nửa: nửa đầu (trong khoá) detach + giữ định tuyến về hầm ngục; chờ
+ * {@link WorldFacade#inboxBarrier()} của World cũ NGOÀI khoá; nửa sau (trong khoá) báo 308 + attach,
+ * bỏ qua nếu trong lúc chờ người đó đã rớt mạng/rời đi. Định tuyến KHÔNG được để trống trong lúc chờ:
+ * {@code GatewayChannelHandler.currentWorldFacade} ném (đóng kết nối) với người không thuộc World nào,
+ * mà gói di chuyển tới mỗi frame.
  */
 final class DungeonInstanceRegistry {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DungeonInstanceRegistry.class);
+
+    /**
+     * Trần chờ World cũ xử lý xong lệnh detach. Mốc thường tới trong một tick (~17ms); hết trần thì
+     * vẫn dời — chỉ lùi về thứ tự cũ (có thể lọt gói muộn), không bao giờ treo người chơi ở giữa.
+     */
+    private static final long OLD_WORLD_DRAIN_TIMEOUT_MILLIS = 1000;
 
     private static final String DUNGEON_CODE = "sample_dungeon";
 
@@ -81,6 +105,9 @@ final class DungeonInstanceRegistry {
     private final Map<Long, DungeonInstance> instancesByPartyId = new HashMap<>();
     private final Map<Long, DungeonInstance> instanceByCharacterId = new HashMap<>();
     private final Map<Long, PositionSnapshot> returnPositionByCharacterId = new HashMap<>();
+
+    /** Người đã qua nửa đầu lượt rời, đang chờ World hầm ngục im — xem {@link #beginExit}. */
+    private final Set<Long> exitingCharacterIds = new HashSet<>();
 
     private final WorldTransfer transfer;
 
@@ -161,28 +188,79 @@ final class DungeonInstanceRegistry {
                 entries.add(new PendingEntry(memberId, loadoutOf(memberId), returnPositionOf(memberId)));
             }
         }
-        commitEnter(myParty.get().partyId(), dungeonCode, requestingCharacterId, entries);
+        AdmittedEntries admitted = admitIntoInstance(myParty.get().partyId(), entries);
+        // Ngoài khoá — xem javadoc lớp. Người gửi vẫn nhận response SAU nửa sau (ADR-047), vì
+        // cả lượt này chạy trên luồng của chính lệnh vào.
+        awaitOldWorldSilent(
+                CompletableFuture.allOf(admitted.mainWorldDrained().toArray(CompletableFuture[]::new)),
+                requestingCharacterId);
+        finishEnter(admitted, dungeonCode, requestingCharacterId);
         return EnterOutcome.OK;
     }
 
     /**
-     * Phần ghi của {@link #enterDungeon}, nguyên tử: tra/dựng instance của nhóm rồi dời người. Kiểm
-     * lại "đã ở hầm ngục chưa" TRONG khoá — lượt vào song song của đồng đội có thể vừa kéo người
-     * này vào sau khi ảnh chụp ngoài khoá được đọc.
+     * Nửa đầu của {@link #enterDungeon}, nguyên tử: tra/dựng instance của nhóm, ghi định tuyến và
+     * detach khỏi world chính. Kiểm lại "đã ở hầm ngục chưa" TRONG khoá — lượt vào song song của đồng
+     * đội có thể vừa kéo người này vào sau khi ảnh chụp ngoài khoá được đọc.
      */
-    private synchronized void commitEnter(
-            long partyId, String dungeonCode, long requestingCharacterId, List<PendingEntry> entries) {
+    private synchronized AdmittedEntries admitIntoInstance(long partyId, List<PendingEntry> entries) {
         DungeonInstance instance = instancesByPartyId.computeIfAbsent(partyId, this::createInstance);
+        List<PendingEntry> admitted = new ArrayList<>(entries.size());
+        List<CompletableFuture<Void>> drained = new ArrayList<>(entries.size());
         for (PendingEntry entry : entries) {
-            if (!instanceByCharacterId.containsKey(entry.characterId())) {
-                WorldChangeReason reason = WorldChangeReason.WORLD_CHANGE_REASON_REQUESTED;
-                if (entry.characterId() != requestingCharacterId) {
-                    // ADR-051 D4 — 1504 vẫn phát cho client cũ; client mới chỉ dùng nó để báo chữ.
-                    notifyPulledIn(entry.characterId(), dungeonCode, requestingCharacterId);
-                    reason = WorldChangeReason.WORLD_CHANGE_REASON_PULLED_BY_PARTY;
-                }
-                moveCharacterIntoDungeon(entry, instance, reason);
+            long characterId = entry.characterId();
+            if (!instanceByCharacterId.containsKey(characterId)) {
+                returnPositionByCharacterId.put(characterId, entry.returnPosition());
+                instance.characterIds().add(characterId);
+                instanceByCharacterId.put(characterId, instance);
+                drained.add(mainWorldChannels.detachCharacterAndDrain(characterId));
+                admitted.add(entry);
             }
+        }
+        return new AdmittedEntries(instance, admitted, drained);
+    }
+
+    /**
+     * Nửa sau của {@link #enterDungeon}, khi world chính đã im với mọi người được nhận. Trong lúc
+     * chờ, một người có thể đã rớt mạng ({@link #handleDisconnectIfInDungeon} gỡ họ, có khi dừng luôn
+     * instance) ⇒ chỉ dời ai còn trỏ đúng instance này.
+     */
+    private synchronized void finishEnter(AdmittedEntries admitted, String dungeonCode, long requestingCharacterId) {
+        for (PendingEntry entry : admitted.entries()) {
+            long characterId = entry.characterId();
+            if (!admitted.instance().equals(instanceByCharacterId.get(characterId))) {
+                continue;
+            }
+            WorldChangeReason reason = WorldChangeReason.WORLD_CHANGE_REASON_REQUESTED;
+            if (characterId != requestingCharacterId) {
+                // ADR-051 D4 — 1504 vẫn phát cho client cũ; client mới chỉ dùng nó để báo chữ.
+                // Cũng đi SAU mốc: client cũ dọn thực thể khi nhận nó.
+                notifyPulledIn(characterId, dungeonCode, requestingCharacterId);
+                reason = WorldChangeReason.WORLD_CHANGE_REASON_PULLED_BY_PARTY;
+            }
+            moveCharacterIntoDungeon(entry, admitted.instance(), reason);
+        }
+    }
+
+    /** Kết quả nửa đầu của lượt vào: ai được nhận, và mốc "world chính đã im" của từng người. */
+    private record AdmittedEntries(
+            DungeonInstance instance, List<PendingEntry> entries, List<CompletableFuture<Void>> mainWorldDrained) {}
+
+    /** Chờ World cũ im, có trần — xem {@link #OLD_WORLD_DRAIN_TIMEOUT_MILLIS}. Chỉ gọi NGOÀI khoá. */
+    private static void awaitOldWorldSilent(CompletableFuture<?> drained, long characterId) {
+        try {
+            drained.get(OLD_WORLD_DRAIN_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            LOG.warn(
+                    "World cũ chưa im sau {}ms, vẫn dời: characterId={}",
+                    OLD_WORLD_DRAIN_TIMEOUT_MILLIS,
+                    characterId,
+                    e);
+        } catch (ExecutionException e) {
+            LOG.warn("Chờ World cũ im lỗi, vẫn dời: characterId={}", characterId, e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOG.warn("Bị ngắt khi chờ World cũ im, vẫn dời: characterId={}", characterId, e);
         }
     }
 
@@ -214,7 +292,7 @@ final class DungeonInstanceRegistry {
      * nhân vật gục. Chỉ đẩy việc đi, không làm gì ở đây: xem javadoc {@link #defeatExecutor}.
      *
      * <p>Về world chính SỐNG và đầy máu (attach mới luôn cho máu đầy), đúng luật world chính "gục là
-     * hồi sinh ngay". Nếu người này vừa tự bấm rời hoặc vừa mất kết nối, {@link #commitExit} thấy họ
+     * hồi sinh ngay". Nếu người này vừa tự bấm rời hoặc vừa mất kết nối, {@link #beginExit} thấy họ
      * không còn trong hầm ngục và bỏ qua an toàn.
      */
     void handleCharacterDefeated(long defeatedCharacterId) {
@@ -227,23 +305,49 @@ final class DungeonInstanceRegistry {
         }
         // Đọc DB TRƯỚC khi vào khoá — xem javadoc lớp. Bonus trang bị đi CÙNG lệnh attach
         // (2026-09-18): thiếu nó thì rời hầm ngục là về map chính với chỉ số NỀN — máu 206 → 100.
-        return commitExit(characterId, new ExitEntry(loadoutOf(characterId), reason));
+        ExitEntry exit = new ExitEntry(loadoutOf(characterId), reason);
+        Optional<DungeonInstance> leaving = beginExit(characterId);
+        if (leaving.isEmpty()) {
+            return ExitOutcome.NOT_IN_DUNGEON;
+        }
+        // Ngoài khoá — xem javadoc lớp. World hầm ngục còn chạy cho đồng đội nên phải chờ mốc, không
+        // dừng nó trước được như đấu trường.
+        awaitOldWorldSilent(leaving.get().facade().inboxBarrier(), characterId);
+        return finishExit(characterId, leaving.get(), exit);
     }
 
     /** Dữ liệu DB của một lượt rời hầm ngục, đọc sẵn ngoài khoá, kèm lý do rời (ADR-051). */
     private record ExitEntry(CharacterLoadout loadout, WorldChangeReason reason) {}
 
-    // Kiểm lại trong khoá: người này có thể đã mất kết nối (handleDisconnectIfInDungeon trên
-    // EventLoop) trong lúc đọc DB ở trên.
-    private synchronized ExitOutcome commitExit(long characterId, ExitEntry exit) {
+    /**
+     * Nửa đầu của lượt rời: detach khỏi World hầm ngục nhưng GIỮ định tuyến — xem javadoc lớp. Rỗng
+     * nếu người này không ở hầm ngục, hoặc đã có một lượt rời khác đang chờ (vd. gục ngay lúc bấm
+     * rời): lượt đó sẽ đưa họ về, lượt này nhận {@code NOT_IN_DUNGEON} như thể tới sau.
+     */
+    private synchronized Optional<DungeonInstance> beginExit(long characterId) {
+        // Kiểm lại trong khoá: người này có thể đã mất kết nối (handleDisconnectIfInDungeon trên
+        // EventLoop) trong lúc đọc DB ở trên.
         DungeonInstance instance = instanceByCharacterId.get(characterId);
-        if (instance == null) {
+        if (instance == null || !exitingCharacterIds.add(characterId)) {
+            return Optional.empty();
+        }
+        instance.facade().detachCharacter(characterId);
+        return Optional.of(instance);
+    }
+
+    /**
+     * Nửa sau của lượt rời, khi World hầm ngục đã im với người này. Bỏ qua nếu trong lúc chờ họ đã
+     * rớt mạng — {@link #handleDisconnectIfInDungeon} đã dọn, không còn ai để đưa về.
+     */
+    private synchronized ExitOutcome finishExit(long characterId, DungeonInstance instance, ExitEntry exit) {
+        exitingCharacterIds.remove(characterId);
+        if (!instance.equals(instanceByCharacterId.get(characterId))) {
             return ExitOutcome.NOT_IN_DUNGEON;
         }
         PositionSnapshot returnPosition = returnPositionByCharacterId.remove(characterId);
         transfer.move(
                 characterId,
-                () -> instance.facade().detachCharacter(characterId),
+                () -> {},
                 WorldTransfer.event(
                         WorldKind.WORLD_KIND_MAIN,
                         exit.reason(),
@@ -266,6 +370,7 @@ final class DungeonInstanceRegistry {
         }
         instance.facade().detachCharacter(characterId);
         returnPositionByCharacterId.remove(characterId);
+        exitingCharacterIds.remove(characterId);
         leaveInstance(characterId, instance);
         return true;
     }
@@ -276,6 +381,7 @@ final class DungeonInstanceRegistry {
         instancesByPartyId.clear();
         instanceByCharacterId.clear();
         returnPositionByCharacterId.clear();
+        exitingCharacterIds.clear();
         defeatExecutor.shutdown();
     }
 
@@ -302,21 +408,18 @@ final class DungeonInstanceRegistry {
 
     private void moveCharacterIntoDungeon(PendingEntry entry, DungeonInstance instance, WorldChangeReason reason) {
         long characterId = entry.characterId();
-        returnPositionByCharacterId.put(characterId, entry.returnPosition());
-
         // Attach KÈM bonus trang bị (sửa 2026-09-29) — trước đây đường vào dùng chỉ số NỀN nên
         // người mặc giáp +máu vào hầm ngục với 100 máu, và WorldChangedEvent cũng báo 100.
+        // Detach world chính (và chờ nó im) đã làm ở admitIntoInstance/enterDungeon.
         transfer.move(
                 characterId,
-                () -> mainWorldChannels.detachCharacter(characterId),
+                () -> {},
                 WorldTransfer.event(
                         WorldKind.WORLD_KIND_DUNGEON,
                         reason,
                         DUNGEON_ENTRY_POSITION,
                         entry.loadout().maxHp()),
                 () -> instance.facade().attachCharacter(entry.loadout().entryAt(characterId, DUNGEON_ENTRY_POSITION)));
-        instance.characterIds().add(characterId);
-        instanceByCharacterId.put(characterId, instance);
     }
 
     /** Dữ liệu DB của một người sắp vào hầm ngục, đọc sẵn ngoài khoá. */

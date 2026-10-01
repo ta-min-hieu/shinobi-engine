@@ -236,3 +236,10 @@ Không (phương án C, nếu có ngày chọn, sẽ cần ADR riêng).
    `MainWorldChannelRegistry#detachCharacterAndDrain` rồi mới 308 + attach; test
    `WorldChangedEventOrderTest#mainWorldShouldFallSilentBeforeTheArenaIsAnnounced`. Hầm ngục vẫn giữ
    thứ tự cũ (vô hại như trên); muốn bịt nốt thì dùng đúng cơ chế đó trong `DungeonInstanceRegistry`.
+   **2026-10-01 (sau):** hầm ngục đã bịt nốt, ở CẢ HAI chiều. Vào: `DungeonInstanceRegistry` ghi định
+   tuyến + `detachCharacterAndDrain` trong khoá, chờ mốc NGOÀI khoá, rồi mới `1504`/`308` + attach (bỏ
+   qua ai đã rớt mạng lúc chờ). Ra: detach khỏi World hầm ngục, chờ `inboxBarrier` của nó (World còn
+   chạy cho đồng đội nên không dừng trước được như đấu trường), rồi mới `308 MAIN`. Định tuyến giữ
+   nguyên về hầm ngục trong lúc chờ — để trống thì `currentWorldFacade` ném và đóng kết nối. Trần chờ
+   1 giây, quá trần vẫn dời (lùi về thứ tự cũ). Response vẫn đi SAU khi dời xong — D1 và kết luận
+   "Phát hiện phụ" giữ nguyên.
