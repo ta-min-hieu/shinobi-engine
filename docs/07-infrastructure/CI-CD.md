@@ -269,7 +269,7 @@ Chi tiết: [GIT-WORKFLOW.md](../11-process/GIT-WORKFLOW.md).
 - [TESTING.md](../10-quality/TESTING.md) — chi tiết bước 3, 4
 - [GIT-WORKFLOW.md](../11-process/GIT-WORKFLOW.md) — §11
 - [BENCHMARK.md](../09-performance/BENCHMARK.md) — vì sao không chạy ở PR
-- [KUBERNETES.md](KUBERNETES.md) — ⏳ §8
+- [KUBERNETES.md](KUBERNETES.md) — ~~⏳ §8~~ ⛔ Deprecated — [ADR-014](../01-architecture/adr/ADR-014-Kubernetes-vs-Docker-Compose.md) không dùng K8s (✅ 2026-10-02)
 
 ## Việc cần làm tiếp theo
 

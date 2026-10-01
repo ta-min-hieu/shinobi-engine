@@ -114,7 +114,7 @@ Không. Các mục ⏳ ở trên là tham số nội dung, không phải quyết
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ **Chủ dự án cập nhật GDD §6** — bỏ "Auto-target đánh thường", ghi lại luật mới.
+1. ~~⏳~~ **Chủ dự án cập nhật GDD §6** — bỏ "Auto-target đánh thường", ghi lại luật mới. ✅ 2026-10-02: GDD §6 nay ghi "BẤM đánh thường … không auto-target" kèm link ADR này (`0faefa3`, 2026-09-01).
 2. ⏳ **Chốt số cân bằng EXP** (Technical Decisions #4/#5) sau khi chơi thử đủ lâu.
 3. ⏳ **Đo lại PvP** sau khi đổi sang bấm tay (Technical Decision #6).
 4. 🟡 **Một phần — chữ bay xong 2026-08-09, chưa có âm thanh.** Lên cấp hiện chữ "LÊN CẤP!" xanh lá

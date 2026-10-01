@@ -229,7 +229,7 @@ D6 là **đề xuất khởi điểm chưa playtest**, đúng thân phận mà b
   `sample_boss.js` và `BossAiSystem` riêng, kéo nó vào bảng là một quyết định khác.
 - **`npc_template`** — cùng loại nợ (`SAMPLE_NPC_CODE` hardcode) nhưng NPC không có chỉ số chiến đấu;
   không gộp bừa vào để ADR khỏi phình.
-  ➜ **Đã có ADR riêng: [ADR-040](ADR-040-NPC-Template-And-Placement.md)** (🟡 Proposed 2026-09-03) —
+  ➜ **Đã có ADR riêng: [ADR-040](ADR-040-NPC-Template-And-Placement.md)** (~~🟡 Proposed 2026-09-03~~ ✅ 2026-10-02: Accepted 2026-09-05, `3d53796`) —
   giữ `npc_template` của V10, thêm `npc_spawn`; **không** cột `role`, **không** `model_key`, **không**
   đổi protocol.
 
@@ -306,8 +306,8 @@ D6 là **đề xuất khởi điểm chưa playtest**, đúng thân phận mà b
 Không. ADR này tự đứng được. Nhưng nó **để lại hai nợ đã đặt tên**, mỗi cái là một ADR sau nếu làm:
 tham số AI theo loài, và `npc_template`.
 
-- `npc_template` ➜ **[ADR-040](ADR-040-NPC-Template-And-Placement.md)** (🟡 Proposed 2026-09-03).
-- Tham số AI theo loài ➜ vẫn mở (xem "Việc cần làm tiếp theo" mục 5).
+- `npc_template` ➜ **[ADR-040](ADR-040-NPC-Template-And-Placement.md)** (~~🟡 Proposed 2026-09-03~~ ✅ 2026-10-02: Accepted 2026-09-05, `3d53796`).
+- Tham số AI theo loài ➜ ~~vẫn mở (xem "Việc cần làm tiếp theo" mục 5)~~ ✅ 2026-10-02: [ADR-039](ADR-039-Per-Species-AI-Parameters.md) (Accepted 2026-09-05, `V25__monster_ai_params.sql`).
 
 ## Tài liệu liên quan
 
@@ -339,4 +339,5 @@ tham số AI theo loài, và `npc_template`.
    loài giờ phân biệt được bằng mắt, ảnh chụp qua `./gradlew :client:client-core:runWorldPreview`.
    Chi tiết + bẫy: [ASSET-LOG.md](../../../assets/raw/ASSET-LOG.md) mục 2026-08-30; quy trình:
    [ART-PIPELINE §6.6](../../14-art/ART-PIPELINE.md).
-5. Còn lại: **tham số AI theo loài (D7)** — aggro/leash/tốc độ đuổi vẫn dùng chung `AiConstants`.
+5. ~~Còn lại: **tham số AI theo loài (D7)** — aggro/leash/tốc độ đuổi vẫn dùng chung `AiConstants`.~~
+   ✅ 2026-10-02: xong bởi [ADR-039](ADR-039-Per-Species-AI-Parameters.md) (Accepted 2026-09-05, `3d53796`, V25).

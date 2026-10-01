@@ -681,8 +681,10 @@ phải chứa quá đông người để cách tính đó có ý nghĩa.
 
 **Việc chưa làm / follow-up còn lại**:
 1. ✅ HikariCP `maximumPoolSize` 10→20 (2026-07-28, cùng ngày) — dựa trên backlog thật đo được ở
-   trên; vẫn là khởi điểm hợp lý, chưa phải số đã tune kỹ (chưa có DB pool pending metric qua
-   Micrometer để đo lại có còn backlog ở N lớn hơn không — mục "DB pool pending" §5 vẫn ⏳).
+   trên; vẫn là khởi điểm hợp lý, chưa phải số đã tune kỹ (~~chưa có DB pool pending metric qua
+   Micrometer để đo lại có còn backlog ở N lớn hơn không — mục "DB pool pending" §5 vẫn ⏳~~).
+   ✅ 2026-10-02: metric `kage.db.pool.active`/`pending` có trong `GatewayBootstrap`, và §5 dòng "DB pool pending"
+   đã ✅ — đo thật lần đầu 2026-08-02 (ramp 10→100 client).
 2. Chưa xác nhận lại với chủ dự án cách diễn giải "25 khu mặc định" (lazy vs pre-warm) nêu trên.
 3. `SPECIAL_CAPACITY=50` chưa có nơi nào trong game gán/dùng (chưa có khái niệm "map đặc biệt") —
    hook đã sẵn, chờ nội dung game thật cần tới.

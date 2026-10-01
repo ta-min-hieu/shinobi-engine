@@ -54,7 +54,7 @@ graph LR
 | ✅ **ADR-012** — package root `dev.kage` | Đã chốt (2026-07-18) |
 | ✅ **ADR-010** — single-realm + `realm_id` dự phòng | Đã chốt (2026-07-18) |
 | ✅ **ADR-018** — tick rate 60Hz (cần cho Phase 1) | Đã chốt (2026-07-18) |
-| ⏳ **ADR-011** — enforce dependency rule (ArchUnit) | Là **việc kỹ thuật trong Phase 0** (viết ArchUnit test), không phải quyết định chặn khởi động |
+| ~~⏳~~ ✅ **ADR-011** — enforce dependency rule (ArchUnit) | Là **việc kỹ thuật trong Phase 0** (viết ArchUnit test), không phải quyết định chặn khởi động. ✅ 2026-10-02: Accepted 2026-08-01 (`e0b34d8`), test `quality/architecture-tests/.../DependencyRuleTest.java` |
 
 → **Dự án đủ điều kiện mở Phase 0.** ADR-011 được hoàn thành như một hạng mục của chính Phase 0.
 
@@ -121,7 +121,7 @@ graph LR
 | `tools/asset-pipeline` + validate | [RESOURCE.md §11](../04-client/RESOURCE.md) |
 | JMH harness | [BENCHMARK.md](../09-performance/BENCHMARK.md) |
 
-**ADR cần trước Phase 1**: ✅ ADR-018 (tick rate 60Hz — đã chốt) · ⏳ ADR-020 (viewport)
+**ADR cần trước Phase 1**: ✅ ADR-018 (tick rate 60Hz — đã chốt) · ~~⏳~~ ADR-020 (viewport) — ✅ 2026-10-02: Accepted 2026-08-01 (`e0b34d8`), khớp `FitViewport` trong `WorldScreen`
 
 **Exit Criteria:**
 - [x] Chạy `client-desktop` → nhân vật hiển thị, di chuyển bằng bàn phím — **nhìn thấy chạy thật
@@ -1759,7 +1759,8 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
     - ✅ **Đã NHÌN THẤY chạy thật**: `./gradlew :client:client-core:runWorldPreview` (công cụ nay
       dựng cả 3 loài cạnh nhau theo thứ tự sát thương 8/22/40 + hộp đỏ `sample_boss` chứng minh
       nhánh fallback còn sống). Ba loài phân biệt được ngay từ silhouette.
-    - ⚠️ Còn lại của ADR-037: **tham số AI theo loài (D7)**.
+    - ~~⚠️ Còn lại của ADR-037: **tham số AI theo loài (D7)**.~~ ✅ 2026-10-02: đã trả bởi [ADR-039](../01-architecture/adr/ADR-039-Per-Species-AI-Parameters.md)
+      (Accepted 2026-09-05, `3d53796`, migration `V25__monster_ai_params.sql`).
 
 46. **RÀ EXIT CRITERIA PHASE 0-3 — 12/13 ô tick, CÓ BẰNG CHỨNG TỪNG Ô (2026-08-30)**:
     - Nợ sổ sách cũ: bốn phase đầu tuyên bố đóng bằng prose nhưng gần như không ô nào được tick.
@@ -3055,8 +3056,11 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       V29 chưa từng được soi với hai điểm spawn mới cho tới khi sửa con số đó.
     - ✅ **Build xanh**: `./gradlew build -x pmdMain -x pmdTest` SUCCESSFUL, gồm cả test Postgres
       (Flyway chạy V45 trên DB sạch), chuỗi arc 1 **bảy quest** chạy trọn, và cây thoại 12 lựa chọn.
-    - ⏳ **Còn lại**: 6 icon vật phẩm cho bộ Ngoại Môn, và **playtest sống** — mọi con số ở trên là
-      giấy cho tới lúc đó, và quest 8 đã bị chính playtest bác ba lần trong một ngày.
+    - ~~⏳ **Còn lại**: 6 icon vật phẩm cho bộ Ngoại Môn, và **playtest sống** — mọi con số ở trên là
+      giấy cho tới lúc đó, và quest 8 đã bị chính playtest bác ba lần trong một ngày.~~
+      ✅ 2026-10-02: cả hai đã đóng — xem mục V46 ngay dưới (`07a69d3`). 6 icon: nguồn `.blend` vào ở `17f21dc`,
+      region `icon_outer_sect_{blade,boots,cap,gloves,robe,talisman}` có trong atlas cả 3 tier (mục 78),
+      khớp mã `item_template` của V45 qua `InventoryPanel` (`findRegion("icon_" + code)`).
 
 #### V46 — nhát phủ đầu, và một trận vẫn là tung đồng xu sau khi đã chữa (2026-09-13, chiều)
 

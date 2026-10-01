@@ -63,7 +63,11 @@ Thứ để **sau**: dashboard đẹp, analytics, quản lý hàng loạt.
 5. Phân quyền GM (role-based)
 6. Bảo mật GM tool
 
-## Câu hỏi trước khi viết — 🔴 **đây mới là thứ đang chặn**
+## Câu hỏi trước khi viết — ~~🔴 **đây mới là thứ đang chặn**~~
+
+> ✅ 2026-10-02: cả ba câu đã có HƯỚNG — chủ dự án chọn 2026-10-01 (`30db3f8`, [docs/README.md](../README.md) dòng 6):
+> **lệnh in-game** `/gm`, **hai cấp quyền** GM/ADMIN, **nhúng trong server**. Chi tiết nằm ở
+> [ADR-052](../01-architecture/adr/ADR-052-In-Game-GM-Commands.md) — vẫn **Proposed**, nên tài liệu này vẫn chờ ADR đó Accepted.
 
 - [ ] **GM tool là in-game command, web app, hay cả hai?** Ảnh hưởng lớn nhất: web app kéo theo một
       tầng HTTP + xác thực riêng ([ADR-009](../01-architecture/adr/ADR-009-Why-No-Spring-Boot.md) cấm

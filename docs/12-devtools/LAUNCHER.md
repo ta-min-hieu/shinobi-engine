@@ -54,8 +54,8 @@ Phụ thuộc [ADR-024](../01-architecture/adr/README.md) (asset distribution) v
 
 ## Câu hỏi trước khi viết
 
-- [ ] ADR-024: chiến lược asset distribution?
-- [ ] Desktop-first hay mobile-first? (mobile → có thể bỏ launcher)
+- [x] ADR-024: chiến lược asset distribution? — ✅ 2026-10-02: [ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md) Accepted 2026-08-01 (`e0b34d8`), amend bởi [ADR-028](../01-architecture/adr/ADR-028-Graphics-Tier-Asset-Delivery.md)
+- [x] Desktop-first hay mobile-first? (mobile → có thể bỏ launcher) — ✅ 2026-10-02: desktop-first, [ADR-023](../01-architecture/adr/ADR-023-Desktop-First-Input.md) Accepted 2026-09-05 (`297d6cb`)
 - [ ] Có ngân sách CDN không?
 - [ ] Phát hành qua store (Steam/itch.io) hay tự phân phối? (Steam lo update)
 

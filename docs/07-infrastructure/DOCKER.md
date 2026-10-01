@@ -276,7 +276,7 @@ Không còn — ADR-019 (GC flags cho container, §7) đã Accepted 2026-07-28.
 ## Tài liệu liên quan
 
 - [CI-CD.md](CI-CD.md) — build image trong pipeline
-- [KUBERNETES.md](KUBERNETES.md) — ⏳ stub
+- [KUBERNETES.md](KUBERNETES.md) — ~~⏳ stub~~ ⛔ Deprecated — [ADR-014](../01-architecture/adr/ADR-014-Kubernetes-vs-Docker-Compose.md) không dùng K8s (✅ 2026-10-02)
 - [OBSERVABILITY.md](OBSERVABILITY.md) — log/metrics từ container
 - [JVM.md](../09-performance/JVM.md) — GC flags
 - [SECURITY.md](../08-security/SECURITY.md) — không root, không secret

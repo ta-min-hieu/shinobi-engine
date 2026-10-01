@@ -432,13 +432,13 @@ Xem lại nếu:
 
 1. ✅ **Chủ dự án đã quyết 2026-08-27**: duyệt nguyên đề xuất, catalog theo **A′**. Không còn quyết
    định nào treo trong ADR này (ngoài #8 vốn cố ý để ngoài phạm vi).
-2. ⏳ Sau khi Accepted: ghi 7 opcode vào `opcode_registry.proto`, thêm message vào `inventory.proto`
+2. ~~⏳~~ ✅ 2026-10-02: xong `783131f` (2026-08-28) — opcode 209/507–510/610/611 trong `opcode_registry.proto`, round-trip ở `InventoryPacketsTest`/`QuestPacketsTest`/`CharacterPacketsTest`. Sau khi Accepted: ghi 7 opcode vào `opcode_registry.proto`, thêm message vào `inventory.proto`
    / `character.proto` / `quest.proto`, kèm round-trip test mỗi message.
-3. ⏳ Cập nhật bảng [NETWORK.md §4](../../05-server/NETWORK.md) — hiện ghi dải 600-699 là "Quest",
+3. ~~⏳~~ ✅ 2026-10-02: xong `783131f` — NETWORK.md §4 nay ghi "Quest / NPC / Dialogue". Cập nhật bảng [NETWORK.md §4](../../05-server/NETWORK.md) — hiện ghi dải 600-699 là "Quest",
    trong khi `.proto` ghi "Quest / NPC / Dialogue". Lệch nhỏ, sửa luôn cùng lượt.
-4. ⏳ Tìm **một** điểm phát duy nhất cho `GoldChangedEvent` trước khi viết handler — rắc lời gọi ở
+4. ~~⏳~~ ✅ 2026-10-02: xong — `GoldLedger` là điểm duy nhất đổi vàng + phát event (`server-database/.../GoldLedger.java`). Tìm **một** điểm phát duy nhất cho `GoldChangedEvent` trước khi viết handler — rắc lời gọi ở
    từng use-case là cách chắc chắn sẽ sót đường.
-5. ⏳ Nợ nội dung chặn giao diện, làm song song được: thêm khoá `item.*` vào
+5. ~~⏳~~ ✅ 2026-10-02: xong `74c9d56` (2026-08-29) — khoá `item.*` có trong `strings_vi/en.properties`. Nợ nội dung chặn giao diện, làm song song được: thêm khoá `item.*` vào
    `strings_vi/en.properties` (hiện 0 khoá). ~~Render icon~~ — kiểm lại 2026-08-27 thì icon **đã có**
    trong atlas cả 3 tier, không phải việc phải làm.
 6. ⏳ Sau khi có 4 màn hình này, đo lại độ phủ opcode client — con số 40/150 hôm nay là mốc so sánh.

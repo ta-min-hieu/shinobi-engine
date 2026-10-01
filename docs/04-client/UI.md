@@ -270,7 +270,7 @@ thấy. Cùng loại với bẫy "vạch máu 139/100" và "khung túi đồ tr�
 | 7 | **Không dùng màu làm thông tin duy nhất** | Mù màu ~8% nam giới; chi phí gần 0 | Accepted |
 | 8 | Không screen reader / accessibility đầy đủ | Không khả thi với game realtime 2D | Accepted — trung thực về giới hạn |
 | 9 | UI atlas tách riêng gameplay atlas | Vòng đời khác nhau | Accepted |
-| 10 | HUD layout riêng cho mobile; menu dùng chung co giãn | Cân bằng công sức vs trải nghiệm | ⏳ Đề xuất — chờ chốt mobile-first |
+| 10 | HUD layout riêng cho mobile; menu dùng chung co giãn | Cân bằng công sức vs trải nghiệm | ~~⏳ Đề xuất — chờ chốt mobile-first~~ ✅ 2026-10-02: đã chốt **desktop-first** ([ADR-023](../01-architecture/adr/ADR-023-Desktop-First-Input.md), Accepted 2026-09-05) — HUD mobile là Post-MVP, cần ADR riêng |
 
 ## ADR cần tạo
 
