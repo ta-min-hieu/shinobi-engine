@@ -222,8 +222,9 @@ thực thể — server phát lại spawn/máu như lần vào world bình thư�
   `SessionRecovery` là đủ.
 - **Phát hiện đứt**: so `GameConnection.connectionGeneration()` với số lúc phiên vào world (phiên trên server gắn
   với đúng một channel) — không phụ thuộc việc lấy mẫu kịp lằn ranh `isConnected()`.
-- **Giới hạn**: tối đa 4 lượt bắt tay, nghỉ 1/2/4 giây giữa các lượt; mỗi lượt chờ socket ≤ 45 giây và mỗi
-  Response ≤ 5 giây. Response/lỗi khớp theo `sequenceId` — lỗi `not_authenticated` của lệnh gameplay lỡ gửi lên
+- **Giới hạn**: **một hạn TỔNG 60 giây** cho cả lần tự vào lại (`SessionRecovery.TOTAL_DEADLINE_SECONDS`, quyết
+  định chủ dự án 2026-10-01 — thay cho 45 giây chờ socket MỖI lượt, xem đoạn kiểm sống bên dưới); trong hạn đó tối
+  đa 4 lượt bắt tay, nghỉ 1/2/4 giây giữa các lượt, mỗi Response ≤ 5 giây. Response/lỗi khớp theo `sequenceId` — lỗi `not_authenticated` của lệnh gameplay lỡ gửi lên
   socket mới không bị hiểu nhầm là "đăng nhập bị từ chối". Server từ chối (có `error_key`) ⇒ dừng ngay, không thử
   lại. Hỏng hẳn ⇒ về `LoginScreen`, hiện lý do (`login.error.relog_failed` hoặc khoá của server), ô tên điền sẵn.
 - **Bị đá KHÔNG BAO GIỜ tự vào lại**: server gửi `error.logged_in_elsewhere` rồi mới đóng socket, nên `WorldScreen`
@@ -242,7 +243,8 @@ thực thể — server phát lại spawn/máu như lần vào world bình thư�
     `AutoRelog` nào, và `GameConnection` không thử nối lại thêm lần nào.
   - *Hỏng hẳn* (server chết không dựng lại): 4 lượt đều "socket không dựng lại kịp", về `LoginScreen` với
     `login.error.relog_failed` sau **3 phút 07 giây** — vì 4 lượt × 45 giây chờ socket cộng dồn, trong khi lượt 2–4
-    không làm gì mới (`GameConnection` vốn vẫn tự thử lại). Con số giới hạn do agent chọn, chờ chủ dự án chốt.
+    không làm gì mới (`GameConnection` vốn vẫn tự thử lại). ⇒ 2026-10-01 chủ dự án chốt một hạn tổng (45–60 giây,
+    chọn 60 để vẫn phủ năm lần thử nối lại đầu của `GameConnection`). Hành vi mới CHƯA kiểm sống lại.
 
 **Bị đá vì đăng nhập nơi khác** (2026-09-25, [SERVER.md §5.1](../05-server/SERVER.md)): `ErrorResponse` mang
 `error.logged_in_elsewhere` ⇒ `ConnectionCoordinator` báo `WorldScreen` kết thúc phiên ⇒ dừng HẲN

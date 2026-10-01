@@ -59,11 +59,12 @@ final class SessionRecovery {
     private static final float[] RETRY_DELAY_SECONDS = {1f, 2f, 4f};
 
     /**
-     * Chờ socket mới tối đa bao lâu cho MỘT lượt. {@code GameConnection} thử lại theo 1, 2, 4, 8,
-     * 16, 30 giây — 45 giây phủ được năm lần thử đầu, đủ cho một lần mạng chập chờn thật mà không
-     * bắt người chơi nhìn một thế giới đứng im vô hạn.
+     * Hạn TỔNG cho cả lần tự vào lại, mọi lượt cộng lại (quyết định chủ dự án 2026-10-01). Bản cũ cho
+     * mỗi lượt chờ socket 45 giây riêng — 4 lượt cộng dồn, kiểm sống 2026-09-30 đo được 3 phút 07 giây
+     * đứng nhìn một thế giới im trước khi về màn đăng nhập. {@code GameConnection} thử lại theo 1, 2,
+     * 4, 8, 16, 30 giây: 60 giây vẫn phủ năm lần thử đầu, đủ cho một lần mạng chập chờn thật.
      */
-    static final float SOCKET_WAIT_SECONDS = 45f;
+    static final float TOTAL_DEADLINE_SECONDS = 60f;
 
     /** Hạn chờ mỗi Response — cùng con số {@code STEP_TIMEOUT_SECONDS} của hai màn đăng nhập. */
     static final float STEP_TIMEOUT_SECONDS = 5f;
@@ -116,6 +117,7 @@ final class SessionRecovery {
 
     private Phase phase = Phase.WAITING_FOR_SOCKET;
     private float phaseElapsed;
+    private float totalElapsed;
     private int attempt;
     private int attemptGeneration;
     private int pendingSequenceId;
@@ -179,6 +181,12 @@ final class SessionRecovery {
      */
     Phase tick(float deltaSeconds) {
         phaseElapsed += deltaSeconds;
+        totalElapsed += deltaSeconds;
+        if (phase != Phase.RESUMED && phase != Phase.FAILED && totalElapsed > TOTAL_DEADLINE_SECONDS) {
+            LOG.info("Hết hạn tổng {}s tự đăng nhập lại ở lượt {}", TOTAL_DEADLINE_SECONDS, attemptNumber());
+            fail(RELOG_FAILED_KEY);
+            return phase;
+        }
         switch (phase) {
             case WAITING_FOR_SOCKET -> tickWaitingForSocket();
             case BACKING_OFF -> tickBackingOff();
@@ -197,11 +205,8 @@ final class SessionRecovery {
                     Opcode.OPCODE_CONNECT_REQUEST_VALUE,
                     ConnectRequest.newBuilder().setUsername(username).build().toByteArray(),
                     Phase.AWAITING_CONNECT);
-            return;
         }
-        if (phaseElapsed > SOCKET_WAIT_SECONDS) {
-            attemptFailed("socket không dựng lại kịp");
-        }
+        // Socket chưa về thì cứ chờ — hạn tổng ở tick() là thứ chặn chờ vô hạn.
     }
 
     private void tickBackingOff() {

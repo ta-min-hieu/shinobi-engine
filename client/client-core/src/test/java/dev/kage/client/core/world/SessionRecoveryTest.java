@@ -220,6 +220,34 @@ class SessionRecoveryTest {
         }
         assertThat(phase).isEqualTo(SessionRecovery.Phase.FAILED);
         assertThat(link.sent).isEmpty();
+        assertThat(ticks * TICK).isLessThanOrEqualTo(SessionRecovery.TOTAL_DEADLINE_SECONDS + 2 * TICK);
+    }
+
+    /**
+     * Quyết định chủ dự án 2026-10-01: một hạn TỔNG. Bản cũ cho mỗi lượt 45 giây chờ socket riêng —
+     * socket chập chờn (về rồi đứt giữa bắt tay, lặp lại) kéo dài 4 × 45 giây = 3 phút đứng im.
+     */
+    @Test
+    @DisplayName("Socket chập chờn qua nhiều lượt ⇒ vẫn bỏ cuộc trong hạn tổng, không cộng dồn hạn mỗi lượt")
+    void flappingSocketStillFailsWithinTheTotalDeadline() {
+        FakeLink link = new FakeLink();
+        SessionRecovery recovery = new SessionRecovery(link, USERNAME, CHARACTER_ID);
+
+        SessionRecovery.Phase phase = recovery.phase();
+        int ticks = 0;
+        while (phase != SessionRecovery.Phase.FAILED && ticks < 60 * 600) {
+            // Socket về sau 40 giây chờ mỗi lượt, rồi đứt ngay giữa bắt tay.
+            if (phase == SessionRecovery.Phase.WAITING_FOR_SOCKET && ticks % (60 * 40) == 60 * 40 - 1) {
+                link.reconnect();
+            } else if (phase == SessionRecovery.Phase.AWAITING_CONNECT) {
+                link.connected = false;
+            }
+            phase = recovery.tick(TICK);
+            ticks++;
+        }
+        assertThat(phase).isEqualTo(SessionRecovery.Phase.FAILED);
+        assertThat(recovery.failureKey()).isEqualTo(SessionRecovery.RELOG_FAILED_KEY);
+        assertThat(ticks * TICK).isLessThanOrEqualTo(SessionRecovery.TOTAL_DEADLINE_SECONDS + 2 * TICK);
     }
 
     @Test
