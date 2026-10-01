@@ -142,8 +142,16 @@ class ServerAuthorityWorldTest {
         if (victimRunning) {
             world.enqueueMoveCommand(2L, 1, 1f, 0f);
         }
-        world.attack(1L);
-        awaitTrue(() -> sink.defeated.contains(2L));
+        // Đánh LẶP tới khi hạ: một đòn có thể TRƯỢT (tỉ lệ trúng < 100%), và một lệnh đánh duy nhất
+        // trượt thì không bao giờ hạ được — từng làm test chập chờn (2026-10-02). Nhịp > cooldown 1s.
+        long deadline = System.nanoTime() + 10_000_000_000L;
+        while (!sink.defeated.contains(2L)) {
+            if (System.nanoTime() > deadline) {
+                throw new AssertionError("Nhân vật 2 không bị hạ sau 10 giây");
+            }
+            world.attack(1L);
+            sleepQuietly(1100);
+        }
     }
 
     private void assertDirectionKeepsPositionFinite(float dirX, float dirY) {
