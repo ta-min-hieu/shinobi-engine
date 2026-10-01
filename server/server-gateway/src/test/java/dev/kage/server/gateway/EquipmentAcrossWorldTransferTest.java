@@ -166,12 +166,26 @@ class EquipmentAcrossWorldTransferTest {
                 .isEqualTo(EFFECTIVE_MAX_HP);
     }
 
-    private WorldChangedEvent onlyWorldChanged(long characterId) throws InvalidProtocolBufferException {
-        List<PacketCodec.Frame> events = sent.get(characterId).stream()
-                .filter(f -> f.header().opcode() == Opcode.OPCODE_WORLD_CHANGED_EVENT_VALUE)
-                .toList();
+    /**
+     * Chờ rồi mới đếm: từ 2026-10-01 (quyết định P1) đấu trường gửi 308 trên luồng riêng SAU mốc
+     * "world chính đã im" — {@code acceptDuel} trả về trước khi event kịp ghi.
+     */
+    private WorldChangedEvent onlyWorldChanged(long characterId)
+            throws InvalidProtocolBufferException, InterruptedException {
+        Instant deadline = Instant.now().plus(WAIT);
+        List<PacketCodec.Frame> events = worldChangedFrames(characterId);
+        while (events.isEmpty() && Instant.now().isBefore(deadline)) {
+            Thread.sleep(POLL_MILLIS);
+            events = worldChangedFrames(characterId);
+        }
         assertThat(events).hasSize(1);
         return WorldChangedEvent.parseFrom(events.get(0).payload());
+    }
+
+    private List<PacketCodec.Frame> worldChangedFrames(long characterId) {
+        return sent.get(characterId).stream()
+                .filter(f -> f.header().opcode() == Opcode.OPCODE_WORLD_CHANGED_EVENT_VALUE)
+                .toList();
     }
 
     /** Đòn đầu tiên trúng một trong {@code targetIds}; {@code attack} được gọi lại mỗi nhịp tới khi có đòn. */
