@@ -586,6 +586,29 @@ class WorldFacadeTest {
     }
 
     @Test
+    @Timeout(10)
+    void shouldFireCharacterDefeated_whenABossSkillKillsTheCharacter() {
+        // PHÁT HIỆN 2026-10-02: handleBossResults chỉ phát onSkillResult, KHÔNG có nhánh "nhân vật
+        // chết" như handleCombatResults/handleSkillResults. Nhân vật bị chiêu boss hạ gục trong hầm
+        // ngục vì thế không bao giờ được đưa về world chính (ADR-051 D5) — nằm 0 máu tới khi tự rời.
+        RecordingSink dungeonSink = new RecordingSink();
+        WorldFacade dungeonWorld = new WorldFacade(dungeonSink, false, TickMetricsPort.NO_OP,
+                WorldContentCatalog.ofMonsters(TestMonsterCatalogs.executionerBoss()));
+        try {
+            dungeonWorld.start();
+            dungeonWorld.spawnBoss(TestMonsterCatalogs.EXECUTIONER_BOSS_CODE);
+            dungeonWorld.attachCharacter(1L, 3f, 1f, DEFAULT_STATS);
+            awaitTrue(() -> dungeonSink.skillResults.stream()
+                    .anyMatch(r -> "heavy_strike".equals(r.skillCode()) && r.died()));
+
+            awaitTrue(() -> dungeonSink.characterDefeated.stream()
+                    .anyMatch(d -> d.defeatedCharacterId() == 1L));
+        } finally {
+            dungeonWorld.stop();
+        }
+    }
+
+    @Test
     @Timeout(15) // > CombatConstants.MONSTER_RESPAWN_SECONDS (10s) — chờ xác nhận KHÔNG respawn.
     void shouldNotRespawnBoss_afterDeathInDungeon() {
         // PHÁT HIỆN THẬT (Phase 8 lát cắt 2): trước khi thêm guard `spawnOverworldContent` ở

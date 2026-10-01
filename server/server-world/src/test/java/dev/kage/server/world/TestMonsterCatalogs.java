@@ -99,6 +99,24 @@ final class TestMonsterCatalogs {
         return MonsterCatalogSnapshot.of(List.of(boss), List.of());
     }
 
+    static final String EXECUTIONER_BOSS_CODE = "it_executioner";
+
+    /**
+     * Boss chỉ có trong test: script {@code executioner.js} luôn tung {@code heavy_strike} hạ gục ngay
+     * đòn đầu. Đánh thường của nó gần như vô hại (atk 1), nên nhân vật chỉ có thể chết bởi CHIÊU boss.
+     */
+    static MonsterCatalogSnapshot executionerBoss() {
+        MonsterCatalogSnapshot.MonsterSpecies boss = new MonsterCatalogSnapshot.MonsterSpecies(
+                EXECUTIONER_BOSS_CODE,
+                "mob_sample-boss",
+                320,
+                200L,
+                new MonsterCatalogSnapshot.MonsterCombatNumbers(1, 0, 10, 8, 95, 0, 5, "NONE"),
+                AGGRESSIVE_AI,
+                new MonsterCatalogSnapshot.MonsterBossNumbers("/test-scripts/boss/executioner.js", 0.5f, 3.0f));
+        return MonsterCatalogSnapshot.of(List.of(boss), List.of());
+    }
+
     /** Loài của test ADR-050 — mã riêng để không lẫn với cọc tập lẫn con canh gác của ADR-049. */
     static final String ROAMING_HUNTER_CODE = "roaming_hunter";
 

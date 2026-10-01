@@ -1214,9 +1214,15 @@ public final class WorldFacade {
             for (long observerId : observers) {
                 outboundSink.onSkillResult(observerId, sinkOutcome);
             }
-            // targetEntityId của chiêu boss luôn DƯƠNG (nhân vật) — không nhánh handleMonsterDeath
-            // như handleCombatResults/handleSkillResults (chưa có cơ chế tử vong nhân vật, cùng
-            // hiện trạng đánh thường của quái qua AiSystem/CombatSystem, ngoài phạm vi lát cắt này).
+            // targetEntityId của chiêu boss luôn DƯƠNG (nhân vật) — không nhánh handleMonsterDeath.
+            // Sửa 2026-10-02: trước đây nhánh "nhân vật chết" cũng vắng mặt, nên nhân vật bị CHIÊU
+            // boss hạ gục không bao giờ bắn onCharacterDefeated ⇒ hầm ngục không đưa họ về world
+            // chính (ADR-051 D5), họ nằm 0 máu tới khi tự rời. Cùng xử lý như handleSkillResults.
+            if (outcome.targetDied() && outcome.targetEntityId() > 0) {
+                outboundSink.onCharacterDefeated(outcome.targetEntityId(), outcome.attackerEntityId());
+                clearAttackerTarget(outcome.attackerEntityId());
+                respawnOrHaltCorpse(outcome.targetEntityId());
+            }
         }
     }
 
