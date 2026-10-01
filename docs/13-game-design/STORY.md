@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version | **1.0.0** — §1–§8, nội dung duyệt nguyên trạng 2026-09-05 |
+| Version | **1.0.1** — §1–§8, nội dung duyệt nguyên trạng 2026-09-05; 2026-10-01 thêm nhân vật **Lý Tam** vào §5 (chủ dự án duyệt) |
 | Status | ✅ **Approved** (2026-09-05) — chủ dự án đọc và **duyệt nguyên trạng**: chân tướng Đại Kiếp §3.2, twist Tô Vân Nhi §5, lời giải rebirth §6 arc 6, và cả ba điểm được nêu ra để soi kỹ (xuất thân cố định của người chơi ở §5; twist Tô Vân Nhi không rẽ nhánh cơ chế ở MVP; mới arc 1 tồn tại trong code). Bố cục đã duyệt trước đó cùng [ADR-038](../01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md) 2026-09-01. |
 | Liên quan | [GDD](GAME-DESIGN-DOCUMENT.md) — cơ chế · [ADR-038](../01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md) — quyết định re-theme tu tiên · [GLOSSARY.md](../GLOSSARY.md) — thuật ngữ |
 
@@ -146,6 +146,7 @@ thống game nào** — NPC không gắn hệ thống thì chưa cần tồn t�
 | **Bạch Kính Chi** | Thiên tài đối thủ | Linh căn dày hạng nhất một thế hệ, kiêu nhưng **không hèn** — gương chiếu của fantasy phàm nhân: khinh người chơi ở arc 1-2, bị vượt ở arc 3, thành chiến hữu miễn cưỡng từ arc 4 | Đối thủ khảo hạch/luận kiếm (PvE scripted), mồi giới thiệu PvP |
 | **Tông chủ Huyền Cơ chân nhân** | Tông chủ Thanh Hư | Bế quan trị thương gần như toàn truyện (*thật ra đang đè nén vết thương cũ liên quan vết nứt Thiên Môn — hé lộ arc 6*) | Xuất hiện ở cắt cảnh mốc lớn |
 | **Sa Y Nhân** | Giáo chủ Huyết Sa — phản diện cuối | *Chính là một Trùng Tu Giả đã chuyển thế nhiều lần, tuyệt vọng vì cửa hỏng, chọn con đường máu* — đối lập trực tiếp với người chơi (cũng sẽ thành Trùng Tu Giả nhưng không bán rẻ đạo tâm) | Boss arc 6 |
+| **Lý Tam** | Đệ tử ngoại môn mất tích | Đứa thứ ba mất tích trong nửa năm; Hình Đường ghi sổ đúng một chữ "trốn" rồi đóng hồ sơ, dù cả ba đều bỏ lại đồ đạc. Thật ra là nạn nhân của chuỗi mất tích arc 2 (§6 — Huyết Sa hút tu vi). Là mồi đầu tiên dẫn người chơi vào twist arc 2. *(Thêm 2026-10-01, chủ dự án duyệt)* | Quest 6 `recover_outer_sect_tallies` (một trong hai thẻ bài là của Lý Tam) · quest 7 `missing_disciple_trail` (tên hiển thị "Dấu Vết Lý Tam") |
 | Hộ pháp/đàn chủ Huyết Sa (nhiều) | Boss giữa các arc | Tay chân Sa Y Nhân | Boss quest chính arc 2-5 |
 
 ---
