@@ -135,6 +135,18 @@ if (input.isPressed(GameAction.JUMP)) jump();
 
 ⚠️ Bảng cũ ở đây từng ghi `Space`/`J`/`SKILL_1..6` — **sai so với code** kể từ ADR-033/034. Sửa 2026-09-05.
 
+**Gửi lại khi chưa được xác nhận (`AttackInputController`, 2026-10-01).** Server bỏ **im lặng** lệnh
+đánh thường khi mục tiêu ngoài tầm 2 m hoặc còn cooldown, và không nhớ lại ý định
+(`CombatSystem.tryAttackNow`). Trước đây bấm Z lúc quái còn ở 2,1 m (đang lao tới) là mất trọn ~1 s
+không có gì xảy ra; cooldown thật 61 tick (~1,017 s) cũng làm nhịp giữ phím 1 s đôi khi tới sớm một
+tick và bị bỏ. Nay mỗi lần gửi do người chơi (nhấn, click nút, nhịp lặp khi giữ) mở một **cửa sổ chờ
+xác nhận**: tới khi thấy `AttackResultEvent` do **chính mình** ra (trúng hay hụt), client gửi lại im
+lặng (không chữ nổi, không lặp animation) mỗi `ATTACK_CONFIRM_RETRY_SECONDS` = 100 ms, tối đa
+`ATTACK_CONFIRM_WINDOW_SECONDS` = 1 s. Cửa sổ đóng khi nhả phím (cửa sổ mở bằng click thì sống hết
+1 s), đổi/mất mục tiêu, chết, hoặc mở hội thoại. Sau xác nhận, nhịp lặp kế tiếp đo từ lúc thấy xác
+nhận. Trần ~10 gói/giây và chỉ khi đang chờ — chi phí server tính theo gói ([BENCHMARK §5.1](../09-performance/BENCHMARK.md)).
+Chỉ client: không đổi server/protocol. Cùng cơ chế với `AttackCadence` của gameProbe.
+
 ✅ **Nền tảng đã chốt: desktop-first** ([ADR-023](../01-architecture/adr/ADR-023-Desktop-First-Input.md), Accepted 2026-09-05). Sơ đồ cảm ứng KHÔNG thiết kế trước (Điều 9) — khi nào làm mobile thật thì cần một ADR riêng, phạm vi tối thiểu: sơ đồ nhập liệu cảm ứng, bố cục lại HUD theo vùng chạm tối thiểu, và xem lại [ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md)/[ADR-028](../01-architecture/adr/ADR-028-Asset-Delivery-Tiers.md).
 
 ---

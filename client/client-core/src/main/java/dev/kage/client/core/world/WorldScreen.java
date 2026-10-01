@@ -376,7 +376,8 @@ public final class WorldScreen implements GameScreen {
                 combatHudController,
                 combatFeedback,
                 panels::noneOpen,
-                dialogue::isOpen));
+                dialogue::isOpen,
+                localCharacterId));
     }
 
     /**
@@ -754,6 +755,7 @@ public final class WorldScreen implements GameScreen {
         combatHudController.onAttackResult(event);
         combatAnimationTrigger.onAttackResult(event);
         combatFeedback.onAttackResult(event);
+        intents.onAttackResult(event);
     }
 
     /** Kết quả 1 lần dùng skill THẬT — cùng hình dạng {@link AttackResultEvent}. */

@@ -28,6 +28,22 @@ final class CombatConstants {
     static final float ATTACK_INTERVAL_SECONDS = 1f;
 
     /**
+     * Khoảng gửi lại {@code AttackCommand} khi chưa thấy server xác nhận đòn của chính mình, giây
+     * ({@link AttackInputController}). 100ms ≈ 6 tick server: đủ dày để nhát mở màn ra gần như ngay
+     * khi con quái lọt vào tầm 2m, mà vẫn giữ trần ~10 gói/giây — chi phí server là THEO GÓI
+     * (BENCHMARK §5.1). Lớn hơn RTT thường gặp nên trong tầm thì xác nhận về trước, không phát sinh
+     * lần gửi lại nào.
+     */
+    static final float ATTACK_CONFIRM_RETRY_SECONDS = 0.1f;
+
+    /**
+     * Cửa sổ tối đa cho các lần gửi lại ở trên, giây — bằng đúng một nhịp
+     * {@link #ATTACK_INTERVAL_SECONDS}: giữ phím thì nhịp lặp kế tiếp mở cửa sổ mới, nên không có
+     * quãng chết nào; click một lần thì thôi sau 1s thay vì spam vô hạn khi quái không bao giờ tới.
+     */
+    static final float ATTACK_CONFIRM_WINDOW_SECONDS = ATTACK_INTERVAL_SECONDS;
+
+    /**
      * Tầm đánh thường, mét — bản sao của {@code server-world.CombatConstants.ATTACK_RANGE_METERS}.
      * CHỈ dùng để nói cho người chơi biết "đang đứng xa quá" khi bấm đánh mà không thấy gì xảy ra;
      * lệnh vẫn được GỬI dù client nghĩ là ngoài tầm — server mới là bên quyết định trúng/trượt, và

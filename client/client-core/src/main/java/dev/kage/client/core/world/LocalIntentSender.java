@@ -8,6 +8,7 @@ import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.KEntity;
 import dev.kage.engine.ecs.component.PositionComponent;
 import dev.kage.engine.ecs.component.VelocityComponent;
+import dev.kage.protocol.AttackResultEvent;
 
 /**
  * Biến phím người chơi đang bấm thành <b>Ý ĐỊNH</b> gửi lên server — đi lại, nhảy, đánh thường,
@@ -40,13 +41,22 @@ final class LocalIntentSender {
     private final JumpInputController jumpInput = new JumpInputController();
 
     /** Phím Z + nút Đánh trên HUD gộp về một nguồn — xem {@link AttackInputController}. */
-    private final AttackInputController attackInput = new AttackInputController();
+    private final AttackInputController attackInput;
 
     /** Edge-detection cho phím dùng skill — giữ phím không spam (nhảy có bộ đếm riêng ở {@link #jumpInput}). */
     private boolean skillKeyWasPressed;
 
     LocalIntentSender(LocalIntentContext context) {
         this.context = context;
+        this.attackInput = new AttackInputController(context.localCharacterId());
+    }
+
+    /**
+     * Mọi {@code AttackResultEvent} đi qua đây — đòn của CHÍNH mình là xác nhận, chấm dứt cửa sổ gửi
+     * lại của {@link AttackInputController}. Đòn của người khác/quái bị lớp kia bỏ qua.
+     */
+    void onAttackResult(AttackResultEvent event) {
+        attackInput.onAttackResult(event.getAttackerEntityId());
     }
 
     /** Nút Đánh trên HUD — cùng nguồn với phím Z, xem {@link AttackInputController}. */
@@ -105,8 +115,24 @@ final class LocalIntentSender {
     private void updateAttack(float fixedDeltaTime) {
         // Đang nói chuyện thì phím Z/Enter thuộc về khung thoại, không phải về combat: người chơi
         // đang đọc chữ, không nhắm ai. Vẫn cho đi lại/nhảy — đứng hình khi mở thoại còn khó chịu hơn.
-        if (context.dialogueOpen().getAsBoolean()
-                || !attackInput.update(isPressed(GameAction.ATTACK), fixedDeltaTime)) {
+        if (context.dialogueOpen().getAsBoolean()) {
+            attackInput.cancelRetry();
+            return;
+        }
+        // Đang chết thì thôi gửi lại: cửa sổ chờ xác nhận là cho ý định đánh, chết là hết ý định đó.
+        // Lần gửi do người chơi vẫn đi như cũ — server mới quyết người chết đánh được hay không.
+        if (context.combat().playerHp() <= 0) {
+            attackInput.cancelRetry();
+        }
+        AttackInputController.Send send = attackInput.update(
+                isPressed(GameAction.ATTACK), fixedDeltaTime, context.combat().currentTargetId());
+        if (send == AttackInputController.Send.NONE) {
+            return;
+        }
+        if (send == AttackInputController.Send.RETRY) {
+            // Gửi lại IM LẶNG: chữ nổi/animation đã có ở lần gửi do người chơi, lặp lại mỗi 100ms
+            // chỉ làm rối mắt (xem AttackInputController).
+            context.sender().attack();
             return;
         }
         CombatHudController.MonsterState target = context.combat().targetState();
@@ -168,6 +194,8 @@ final class LocalIntentSender {
      *     {@link PanelHub#noneOpen()}, nguồn chân lý duy nhất
      * @param dialogueOpen tách riêng khỏi {@code keyboardFree} có chủ đích: đang đọc lời thoại thì
      *     đánh/skill bị chặn nhưng đi lại/nhảy thì KHÔNG (đứng hình khi mở thoại còn khó chịu hơn)
+     * @param localCharacterId id THẬT của chính người chơi — nhận ra {@code AttackResultEvent} nào là
+     *     xác nhận đòn của MÌNH ({@link AttackInputController#onAttackResult})
      */
     record LocalIntentContext(
             InputMapper inputMapper,
@@ -177,5 +205,6 @@ final class LocalIntentSender {
             CombatHudController combat,
             CombatFeedbackPresenter feedback,
             BooleanSupplier keyboardFree,
-            BooleanSupplier dialogueOpen) {}
+            BooleanSupplier dialogueOpen,
+            long localCharacterId) {}
 }
