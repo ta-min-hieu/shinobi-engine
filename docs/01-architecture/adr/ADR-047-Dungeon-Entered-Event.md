@@ -243,3 +243,11 @@ Không (phương án C, nếu có ngày chọn, sẽ cần ADR riêng).
    nguyên về hầm ngục trong lúc chờ — để trống thì `currentWorldFacade` ném và đóng kết nối. Trần chờ
    1 giây, quá trần vẫn dời (lùi về thứ tự cũ). Response vẫn đi SAU khi dời xong — D1 và kết luận
    "Phát hiện phụ" giữ nguyên.
+   **Kiểm sống 2026-10-01 (sau commit `1338548`)**, hai gameProbe cùng nhóm, A=Kagemaru vào và kéo
+   B=Benkei. Chiều vào: B nhận `304` (A rời world chính) ở 8332 ms, **trước** `1504`/`308` ở 8352 ms —
+   cách đúng một tick chờ mốc; bản cũ (kiểm sống 2026-09-30 ở trên) nhận nó SAU `308`. Chiều ra: B gục
+   ở 48364 ms, `308 MAIN DEFEATED` ở 48382 ms trong khi A ở lại; sau đó chỉ có spawn của world chính,
+   không gói nào về A hay boss. Log server không có cảnh báo hết trần chờ. Lưu ý trung thực: khe đua
+   chiều ra chỉ cỡ µs nên một lượt chạy sống không phân biệt được bản cũ với bản mới — bằng chứng cho
+   chiều đó là `WorldChangedEventOrderTest#dungeonShouldFallSilentBeforeTheMainWorldIsAnnounced` (giữ
+   tick có chủ đích); lượt sống chỉ xác nhận đường ra vẫn chạy đúng.
