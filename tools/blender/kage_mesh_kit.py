@@ -542,11 +542,14 @@ def add_face(rig, spec, style="default"):
     """Eye, brow and mouth stuck on the head. Parented to the head bone and kept
     out of Freestyle so the ink line does not swallow the pupil.
 
-    `style="frontal"` mirrors the eye and brow onto the far cheek as well. The
-    single-sided default is correct for the profile view these assets were first
-    judged in, and WRONG in the game: the client camera is a 3/4 view (ADR-031),
-    both cheeks are on screen, and a one-eyed face reads as a face with
-    something missing. Verified by rendering through the client itself
+    `style="frontal"` is the face for the GAME camera and is built by
+    `_add_frontal_face` — read that docstring before touching it. It is what
+    every NPC uses (the player walks up and talks to them).
+
+    The single-sided default is correct for the profile view these assets were
+    first judged in, and WRONG in the game: the client camera is a 3/4 view
+    (ADR-031), both cheeks are on screen, and a one-eyed face reads as a face
+    with something missing. Verified by rendering through the client itself
     (`runWorldPreview`, 2026-09-03), not in Blender — the Blender preview looks
     fine at yaw 0 and hides the problem completely.
 
@@ -564,8 +567,9 @@ def add_face(rig, spec, style="default"):
         # white sclera specks on the far edges of the skull — the shape they take
         # when a profile-authored face is seen head-on.
         return []
+    if style == "frontal":
+        return _add_frontal_face(rig, spec)
     wide = 1.15 if style == "wide" else 1.0
-    frontal = style == "frontal"
     parts = []
 
     # Sit the features below the hairline add_hair() cuts at z=0.856, or the
@@ -599,28 +603,151 @@ def add_face(rig, spec, style="default"):
         _transform(mouth_verts, (mouth_x, head_surface_y(mouth_x, mouth_z, 0.003), mouth_z)),
         mouth_faces, shade_hex(spec["skin"], 0.45), "head", shades=2))
 
-    if frontal:
-        far = len(parts)
-        far_sclera = _transform(sclera_verts,
-                                (eye_x, -head_surface_y(eye_x, eye_z, 0.004), eye_z))
-        parts.append(_new_part(rig, name + "_EyeWhiteFar", far_sclera, sclera_faces,
-                               "#FFFFFF", "head", shades=2))
-        far_pupil = _transform(pupil_verts,
-                               (pupil_x, -head_surface_y(pupil_x, pupil_z, 0.014), pupil_z))
-        parts.append(_new_part(rig, name + "_PupilFar", far_pupil, pupil_faces,
-                               eye_color, "head", shades=2))
-        far_brow = _transform(brow_verts,
-                              (brow_x, -head_surface_y(brow_x, brow_z, 0.004), brow_z),
-                              rotate_y_deg=-12.0)
-        parts.append(_new_part(rig, name + "_BrowFar", far_brow, brow_faces,
-                               hair_color, "head", shades=2))
-        _exclude_from_outline(parts[far + 1])
-
     # The sclera and the brow keep their ink line — an outlined eye and a solid
     # brow are the anime read. Only the pupil and mouth, both already dark and
     # only a few pixels across, would be swallowed by their own outline.
     _exclude_from_outline(parts[1])
     _exclude_from_outline(parts[3])
+    return parts
+
+
+# The client draws a character from one of TWO directions, picked by which way
+# it faces (`WorldModelRenderer.ORIENTATION_FACING_LEFT/RIGHT`). Measured in the
+# kit's own frame — azimuth 0 = straight ahead (+X), positive = round towards
+# the -Y cheek — the camera then sits at about +10 deg (facing left: almost
+# head-on) or about +80 deg (facing right: almost profile), always 30 deg above
+# (`VIEW_PITCH_DEGREES`). A face has to read from both.
+#
+# The old `frontal` face sat its eyes at about +-61 deg and built them as discs
+# whose broad side faced -Y, i.e. for the +90 deg sprite camera. Seen from +10
+# deg such a disc is edge-on AND on the silhouette edge, so all that survived at
+# the client's ~50 px was two grey specks at the temples (ASSET-LOG 2026-10-01).
+#
+# So the face is centred on the HEAD-ON camera (+10), not on +X, and the eyes
+# sit 40 deg either side of it: +50 (near) and -30 (far). Head-on they land
+# symmetric on screen; in profile the near eye is 30 deg off the camera and
+# reads, and the far one (110 deg off) hides behind the skull as it should.
+# Measured, not chosen (runWorldPreview, ASSET-LOG 2026-10-01): a symmetric
+# +-30 read head-on but put the near eye on the silhouette edge in profile,
+# where it was WORSE than the old face; spread 35 with a thinner white rim was
+# still weaker in profile than this. Eye z 0.766 let the elder's white hair brim cut across the top of
+# both eyes head-on; 0.760 clears it.
+FACE_CENTER_AZIMUTH_DEG = 10.0
+FACE_EYE_SPREAD_DEG = 40.0
+FACE_EYE_Z = 0.760
+FACE_BROW_Z = 0.816
+FACE_MOUTH_Z = 0.699
+
+
+def _head_surface_frame(azimuth_deg, z, offset):
+    """Point on the head ellipsoid at (azimuth, z), pushed `offset` along the
+    surface normal, plus that normal's yaw and pitch in degrees."""
+    nz = (z - HEAD_CENTER[2]) / HEAD_RZ
+    ring = math.sqrt(max(0.0, 1.0 - nz * nz))
+    angle = math.radians(azimuth_deg)
+    px = HEAD_CENTER[0] + HEAD_RX * ring * math.cos(angle)
+    py = HEAD_CENTER[1] - HEAD_RY * ring * math.sin(angle)
+    normal = ((px - HEAD_CENTER[0]) / (HEAD_RX * HEAD_RX),
+              (py - HEAD_CENTER[1]) / (HEAD_RY * HEAD_RY),
+              (z - HEAD_CENTER[2]) / (HEAD_RZ * HEAD_RZ))
+    length = math.sqrt(sum(c * c for c in normal))
+    normal = tuple(c / length for c in normal)
+    point = (px + normal[0] * offset, py + normal[1] * offset, z + normal[2] * offset)
+    yaw = math.degrees(math.atan2(normal[1], normal[0]))
+    pitch = math.degrees(math.asin(normal[2]))
+    return point, yaw, pitch
+
+
+def _on_head(verts, azimuth_deg, z, offset, roll_deg=0.0):
+    """Lay a part built with its THIN axis on X flat onto the head surface.
+
+    The part's broad side ends up facing along the surface normal at
+    (azimuth, z) — so it is seen face-on by whichever camera looks at that spot,
+    instead of being a sticker that only one camera can see. `roll_deg` turns
+    it in its own plane (a brow's slant).
+    """
+    point, yaw, pitch = _head_surface_frame(azimuth_deg, z, offset)
+    # Roll about the part's own X (its normal), then pitch (rotate_y < 0 tips
+    # the normal up), then yaw about Z, then move onto the surface.
+    rolled = _transform(verts, rotate_x_deg=roll_deg, rotate_y_deg=-pitch)
+    cos_z, sin_z = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+    return [(x * cos_z - y * sin_z + point[0],
+             x * sin_z + y * cos_z + point[1],
+             zz + point[2]) for x, y, zz in rolled]
+
+
+def _add_frontal_face(rig, spec):
+    """The face for the game camera: two dark eyes that read at ~50 px.
+
+    Three things the old `frontal` face got wrong, each measured through
+    `runWorldPreview` (ASSET-LOG 2026-10-01):
+
+    * Placement. See FACE_CENTER_AZIMUTH_DEG — the eyes were on the temples.
+    * Orientation. Every feature is now laid on the skull along the surface
+      normal (`_on_head`), so it has width from both camera directions.
+    * Value. The eye is now mostly a DARK iris (about 3/4 of the eye) on a thin
+      white rim, plus a white catch-light. The old eye was mostly white sclera
+      with a small pupil: at ~50 px white next to light skin is almost the same
+      value and dissolves, while a dark mark on light skin is the strongest
+      light/dark step the face has (ART-QUALITY-STANDARD, "bố cục sáng-tối thắng
+      màu ở 50px"). The rim still earns its 6x14 ring: in PROFILE the near eye
+      sits next to the hair, where a dark iris alone merges into the dark hair
+      and only the white edge separates them. The catch-light sits at the same
+      azimuth offset on both eyes — one light source, so the pair looks the
+      same way.
+
+    The eye top stays under the hair cap's cut (z 0.839) so the fringe does not
+    close over it from the downward camera; the NPC builders' chin-up idle
+    (head -26..-30) still helps and is kept. A builder whose idle keeps the
+    kit's default head angle (e.g. `blood_sand_enforcer`) gets eyes that the
+    brim half-covers — better than none, worse than the NPCs.
+
+    Parts: _EyeWhite/_EyeWhiteFar (rim), _Eye/_EyeFar (iris),
+    _EyeShine/_EyeShineFar, _Brow/_BrowFar, _Mouth. All but the brow are kept out
+    of Freestyle — an ink line as wide as the feature turns it into a smudge.
+    About 0.55k triangles fewer than the old frontal face.
+    """
+    name = spec["name"]
+    hair_color = spec["hair"]["color"]
+    eye_color = spec.get("eye_color", "#2B2B33")
+    parts = []
+
+    sclera = _ellipsoid(0.010, 0.043, 0.056, rings=6, segments=14)
+    iris = _ellipsoid(0.012, 0.029, 0.044, rings=8, segments=14)
+    shine = _ellipsoid(0.006, 0.011, 0.013, rings=4, segments=8)
+    brow = _ellipsoid(0.008, 0.036, 0.009, rings=4, segments=10)
+
+    for suffix, side in (("", 1.0), ("Far", -1.0)):
+        azimuth = FACE_CENTER_AZIMUTH_DEG + side * FACE_EYE_SPREAD_DEG
+        parts.append(_new_part(
+            rig, "{0}_EyeWhite{1}".format(name, suffix),
+            _on_head(sclera[0], azimuth, FACE_EYE_Z, 0.0), sclera[1],
+            "#FFFFFF", "head", shades=2))
+        _exclude_from_outline(parts[-1])
+        parts.append(_new_part(
+            rig, "{0}_Eye{1}".format(name, suffix),
+            _on_head(iris[0], azimuth, FACE_EYE_Z - 0.002, 0.004), iris[1],
+            eye_color, "head", shades=2))
+        _exclude_from_outline(parts[-1])
+        # Same world-side offset on both eyes: one light, not two mirrored ones.
+        parts.append(_new_part(
+            rig, "{0}_EyeShine{1}".format(name, suffix),
+            _on_head(shine[0], azimuth + 6.0, FACE_EYE_Z + 0.016, 0.012), shine[1],
+            "#FFFFFF", "head", shades=2))
+        _exclude_from_outline(parts[-1])
+        # Brow slants down towards the nose on both sides (a calm face).
+        parts.append(_new_part(
+            rig, "{0}_Brow{1}".format(name, suffix),
+            _on_head(brow[0], azimuth + side * 2.0, FACE_BROW_Z, 0.003,
+                     roll_deg=side * 8.0), brow[1],
+            hair_color, "head", shades=2))
+
+    mouth = _ellipsoid(0.007, 0.022, 0.008, rings=4, segments=10)
+    parts.append(_new_part(
+        rig, name + "_Mouth",
+        _on_head(mouth[0], FACE_CENTER_AZIMUTH_DEG, FACE_MOUTH_Z, 0.002), mouth[1],
+        shade_hex(spec["skin"], 0.45), "head", shades=2))
+    _exclude_from_outline(parts[-1])
     return parts
 
 
@@ -1477,7 +1604,7 @@ skin            hex
 eye_color       hex, optional (default near-black)
 hair            {"style": one of HAIR_STYLES, "color": hex,
                  "cap": False to drop the hair masses — see add_hair}
-face_style      'default' | 'wide' | 'frontal' (mirrors eye+brow) | 'none', optional
+face_style      'default' | 'wide' | 'frontal' (two-eyed game-camera face) | 'none', optional
                 'none' builds no face at all — for a construct wearing a stone_visor
 cloth           {"torso": hex, "pelvis": hex, "legs": hex}
 shoe            hex, optional (defaults to a darkened trouser colour)
