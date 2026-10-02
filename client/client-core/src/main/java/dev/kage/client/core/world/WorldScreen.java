@@ -752,17 +752,20 @@ public final class WorldScreen implements GameScreen {
      * {@link CombatAnimationTrigger}.
      */
     private void onAttackResult(AttackResultEvent event) {
+        // combatFeedback TRƯỚC combatHudController: số bay neo theo vị trí quái lấy từ
+        // combatHudController.monsters(), mà đòn kết liễu (target_died) GỠ quái khỏi đó. Đặt sau là
+        // đòn cuối cùng — đúng đòn người chơi muốn thấy nhất — không bao giờ hiện số.
+        combatFeedback.onAttackResult(event);
         combatHudController.onAttackResult(event);
         combatAnimationTrigger.onAttackResult(event);
-        combatFeedback.onAttackResult(event);
         intents.onAttackResult(event);
     }
 
-    /** Kết quả 1 lần dùng skill THẬT — cùng hình dạng {@link AttackResultEvent}. */
+    /** Kết quả 1 lần dùng skill THẬT — cùng hình dạng {@link AttackResultEvent}, cùng thứ tự. */
     private void onSkillResult(SkillResultEvent event) {
+        combatFeedback.onSkillResult(event);
         combatHudController.onSkillResult(event);
         combatAnimationTrigger.onSkillResult(event);
-        combatFeedback.onSkillResult(event);
     }
 
     private void onMoveResponse(MoveResponse response) {

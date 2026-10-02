@@ -84,11 +84,19 @@ final class ItemCatalog {
         return byId(itemTemplateId).map(ItemCatalogEntry::getNameKey);
     }
 
-    /** Ô trang bị của một vật phẩm; {@code UNSPECIFIED} nghĩa là KHÔNG mặc được (equip_slot NULL). */
+    /**
+     * Ô trang bị của một vật phẩm; {@code UNSPECIFIED} nghĩa là KHÔNG mặc được (equip_slot NULL).
+     *
+     * <p>Ô mà bản {@code .proto} của client này chưa biết ({@code UNRECOGNIZED} — server mới hơn
+     * thêm ô) cũng trả {@code UNSPECIFIED}: client không có tên để hiện, không có hàng để đặt, và
+     * quan trọng hơn {@code EquipItemCommand.Builder.setSlot(UNRECOGNIZED)} NÉM
+     * {@code IllegalArgumentException} — trên luồng render là sập ứng dụng.
+     */
     EquipmentSlot equipSlot(long itemTemplateId) {
-        return byId(itemTemplateId)
+        EquipmentSlot slot = byId(itemTemplateId)
                 .map(ItemCatalogEntry::getEquipSlot)
                 .orElse(EquipmentSlot.EQUIPMENT_SLOT_UNSPECIFIED);
+        return slot == EquipmentSlot.UNRECOGNIZED ? EquipmentSlot.EQUIPMENT_SLOT_UNSPECIFIED : slot;
     }
 
     /**
