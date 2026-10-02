@@ -682,6 +682,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // Đang trên authExecutor (Virtual Thread) rồi — friendFacade.listFriends chạm DB, an
             // toàn gọi thẳng, không cần đẩy thêm 1 lớp executor nữa (khác channelInactive bên dưới).
             notifyFriendsPresenceChanged(characterId, true);
+            correctStaleOnlineAnnouncement(characterId);
         } catch (CharacterNotFoundException e) {
             // Cùng lỗi dù nhân vật không tồn tại hay thuộc account khác (fail secure — SECURITY.md §4).
             LOG.warn("Chọn nhân vật thất bại: không tìm thấy", e);
@@ -3829,6 +3830,32 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
         CharacterBinding(long characterId) {
             this(characterId, new AtomicBoolean(), new CompletableFuture<>());
+        }
+    }
+
+    /**
+     * Lời báo "online" vừa gửi có thể đã LỖI THỜI (2026-10-02, {@code FriendPresenceOrderTest}): giữa
+     * lúc vào world và lúc gửi nó có vài lần đọc DB, và kết nối rớt đúng khe đó thì lần dọn của
+     * {@code channelInactive} báo "offline" trên luồng khác — có thể tới bạn bè TRƯỚC lời "online".
+     * Bạn bè thấy người đã thoát vẫn online cho tới lần họ đăng nhập lại.
+     *
+     * <p>Kiểm lại SAU khi đã gửi: nhân vật không còn đăng ký ⇒ lần dọn đã chạy (gỡ đăng ký đứng trước
+     * lời báo offline của nó), báo offline lần nữa để lời cuối cùng đúng. Còn đăng ký ⇒ lần dọn (nếu
+     * có) chưa gỡ, nên lời offline của nó chắc chắn đi SAU lời online đã gửi. Kiểm theo "còn đăng ký"
+     * chứ không theo kết nối này: bị phiên mới ĐÁ thì phiên mới đã đăng ký và tự báo online — không
+     * được chen lời offline vào sau nó. Kiểm + báo dưới khoá của nhân vật vì lý do đó: phiên mới đăng
+     * ký dưới đúng khoá này ({@link #enterWorldAsOnlySession}) và chỉ báo online SAU khi nhả nó, nên
+     * hoặc ta chạy trước (lời online của nó tới sau lời offline này), hoặc ta thấy nó đã đăng ký.
+     */
+    private void correctStaleOnlineAnnouncement(long characterId) {
+        ReentrantLock lock = worldGateway.registry().sessions().lockFor(characterId);
+        lock.lock();
+        try {
+            if (!worldGateway.registry().isOnline(characterId)) {
+                notifyFriendsPresenceChanged(characterId, false);
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
