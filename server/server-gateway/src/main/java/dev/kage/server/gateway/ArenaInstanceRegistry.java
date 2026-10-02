@@ -227,11 +227,14 @@ final class ArenaInstanceRegistry {
 
     /**
      * Gọi từ {@code channelInactive} (Netty EventLoop, mất kết nối) — người mất kết nối tính THUA
-     * (không được "trốn thua" bằng cách rút dây mạng). Dừng {@code WorldFacade} instance đồng bộ ở
-     * đây (join tick thread NGẮN, cùng pattern {@code DungeonInstanceRegistry.handleDisconnectIfInDungeon}
-     * đã chấp nhận) NHƯNG đẩy MỌI phần chạm DB sang {@link #settlementExecutor} — EventLoop cấm
-     * blocking I/O (server/CLAUDE.md). Bản cũ đưa đối phương về world chính NGAY trên EventLoop,
-     * mà việc đó đọc chỉ số + trang bị từ DB. {@code false} nếu nhân vật không ở duel nào.
+     * (không được "trốn thua" bằng cách rút dây mạng). Đẩy MỌI phần chạm DB VÀ cả {@code stop()}
+     * (chờ lần tick đang chạy dở — vài ms khi script skill chạy) sang {@link #settlementExecutor}:
+     * EventLoop cấm blocking (server/CLAUDE.md). Bản cũ đưa đối phương về world chính NGAY trên
+     * EventLoop, mà việc đó đọc chỉ số + trang bị từ DB.
+     *
+     * <p>{@code true} cả khi trận đang được một đường khác chốt dở — người này vẫn còn định tuyến về
+     * trận (xem {@link #claimSettlement}) và đường chốt đó tự gỡ họ khỏi world chính nếu thấy họ đã
+     * offline ({@link #reattachToMainWorld}). {@code false} nếu nhân vật không ở duel nào.
      */
     boolean handleDisconnectIfInDuel(long characterId) {
         Optional<DuelInstance> current = currentInstance(characterId);
@@ -246,9 +249,12 @@ final class ArenaInstanceRegistry {
         instance.facade().detachCharacter(winnerCharacterId);
         instance.facade().detachCharacter(characterId);
         returnPositionByCharacterId.remove(characterId); // người mất kết nối: không re-attach, dọn rác.
-        instance.facade().stop();
+        releaseRoute(characterId, instance); // không còn kết nối nào gửi gói cho người này.
         settlementExecutor.execute(() -> {
-            reattachToMainWorld(winnerCharacterId); // đối phương còn kết nối — đưa về world chính thật.
+            // stop() chờ tick đang chạy dở — không làm trên EventLoop (2026-10-02). Cùng task, TRƯỚC
+            // 308 MAIN của reattachToMainWorld ⇒ "World cũ im rồi mới báo 308" vẫn giữ nguyên.
+            instance.facade().stop();
+            reattachToMainWorld(winnerCharacterId, instance); // đối phương còn kết nối — đưa về world chính.
             recordResultAndNotify(winnerCharacterId, characterId);
         });
         return true;
@@ -257,17 +263,35 @@ final class ArenaInstanceRegistry {
     /**
      * Vé chốt trận: đúng MỘT đường (bỏ cuộc, bị hạ gục, rớt mạng) lấy được, mọi đường khác nhận
      * {@code false} — xem javadoc lớp về vì sao gỡ người thua khỏi bảng không làm được vé.
+     *
+     * <p><b>KHÔNG gỡ định tuyến ở đây (sửa 2026-10-02).</b> Bản cũ gỡ cả hai người khỏi
+     * {@link #instanceByCharacterId} ngay lúc lấy vé, TRƯỚC khi đưa họ về world chính (đọc DB). Trong
+     * khe đó họ không thuộc World nào, và gói di chuyển/tấn công tới đúng lúc làm
+     * {@code GatewayChannelHandler.currentWorldFacade} ném ⇒ {@code exceptionCaught} đóng kết nối người
+     * vừa thắng — gốc của {@code EOFException} chập chờn trong test đấu trường qua socket thật. Nay
+     * định tuyến giữ tới khi chính người đó đã được gắn vào world chính ({@link #releaseRoute}), cùng
+     * cách {@code DungeonInstanceRegistry} giữ định tuyến trong lúc rời. Lệnh gửi tới World đấu trường
+     * đã dừng chỉ nằm im trong hàng đợi của nó — không ném, không phát gì, mất cùng World. Trong lúc
+     * đó người này vẫn "bận" ({@link #isBusy}) — đúng: chưa về tới world chính thì chưa thách đấu được.
      */
     private synchronized boolean claimSettlement(DuelInstance instance) {
-        // equals của record = so từng trường; challengeId là duy nhất (AtomicLong) nên tương đương so
-        // danh tính.
-        if (!instance.equals(instancesByChallengeId.get(instance.challengeId()))) {
+        if (!isUnsettled(instance)) {
             return false;
         }
         instancesByChallengeId.remove(instance.challengeId());
-        instanceByCharacterId.remove(instance.challengerCharacterId());
-        instanceByCharacterId.remove(instance.targetCharacterId());
         return true;
+    }
+
+    /** Chưa đường chốt nào lấy vé của trận này. Chỉ gọi khi đang giữ monitor. */
+    private boolean isUnsettled(DuelInstance instance) {
+        // equals của record = so từng trường; challengeId là duy nhất (AtomicLong) nên tương đương so
+        // danh tính.
+        return instance.equals(instancesByChallengeId.get(instance.challengeId()));
+    }
+
+    /** Gỡ định tuyến về trận đã chốt — chỉ khi người này vẫn trỏ đúng trận đó. */
+    private synchronized void releaseRoute(long characterId, DuelInstance instance) {
+        instanceByCharacterId.remove(characterId, instance);
     }
 
     /** Graceful shutdown (SERVER.md §10) — dừng MỌI duel World đang chạy trước khi thoát process. */
@@ -351,7 +375,9 @@ final class ArenaInstanceRegistry {
      */
     private synchronized void finishMoveIntoDuel(DuelEntrant entrant, DuelInstance instance, PositionSnapshot spawn) {
         long characterId = entrant.characterId();
-        if (!instance.equals(instanceByCharacterId.get(characterId))) {
+        // Phải kiểm CẢ vé: định tuyến nay còn giữ trong lúc chốt (xem claimSettlement), nên chỉ nhìn
+        // định tuyến thì không biết trận đã chốt chưa — 308 ARENA có thể tới SAU 308 MAIN.
+        if (!isUnsettled(instance) || !instance.equals(instanceByCharacterId.get(characterId))) {
             return;
         }
         // Lệnh detach đã chạy (và đã chờ) ở moveCharacterIntoDuel.
@@ -382,8 +408,8 @@ final class ArenaInstanceRegistry {
         // trường đã ghi ra kênh trước 308, cùng lý do moveCharacterIntoDuel. Đường rớt mạng
         // (handleDisconnectIfInDuel) vốn đã theo thứ tự này.
         instance.facade().stop();
-        reattachToMainWorld(winnerCharacterId);
-        reattachToMainWorld(loserCharacterId);
+        reattachToMainWorld(winnerCharacterId, instance);
+        reattachToMainWorld(loserCharacterId, instance);
 
         recordResultAndNotify(winnerCharacterId, loserCharacterId);
         return true;
@@ -403,27 +429,40 @@ final class ArenaInstanceRegistry {
         registry.sendToCharacterIfOnline(loserCharacterId, Opcode.OPCODE_DUEL_RESULT_EVENT_VALUE, 0, payload);
     }
 
-    private void reattachToMainWorld(long characterId) {
-        // Bonus trang bị đi CÙNG lệnh attach (2026-09-18): thiếu nó thì đấu xong là về map chính
-        // với chỉ số NỀN và không bao giờ được cộng lại — máu 206 → 100, def 65 → 20.
-        CharacterLoadout loadout = loadoutOf(characterId);
-        PositionSnapshot returnPosition = returnPositionByCharacterId.remove(characterId);
-        // Mọi đường gọi tới đây đã detach cả hai người khỏi World đấu trường từ trước ⇒ bước detach
-        // của WorldTransfer không còn gì để làm.
-        transfer.move(
-                characterId,
-                () -> {},
-                WorldTransfer.event(
-                        WorldKind.WORLD_KIND_MAIN,
-                        WorldChangeReason.WORLD_CHANGE_REASON_DUEL_ENDED,
-                        returnPosition,
-                        loadout.maxHp()),
-                () -> mainWorldChannels.attachCharacter(loadout.entryAt(characterId, returnPosition)));
+    /**
+     * Đưa một người của trận đã chốt về world chính, RỒI mới gỡ định tuyến đấu trường của họ — xem
+     * {@link #claimSettlement}. Gỡ trong {@code finally}: lỗi giữa chừng (DB) thì người đó không kẹt
+     * mãi với World đấu trường đã dừng — lùi về hành vi cũ (gói kế tiếp đóng kết nối, đăng nhập lại
+     * là về world chính).
+     */
+    private void reattachToMainWorld(long characterId, DuelInstance instance) {
+        try {
+            // Bonus trang bị đi CÙNG lệnh attach (2026-09-18): thiếu nó thì đấu xong là về map chính
+            // với chỉ số NỀN và không bao giờ được cộng lại — máu 206 → 100, def 65 → 20.
+            CharacterLoadout loadout = loadoutOf(characterId);
+            PositionSnapshot returnPosition = returnPositionByCharacterId.remove(characterId);
+            // Mọi đường gọi tới đây đã detach cả hai người khỏi World đấu trường VÀ dừng nó ⇒ bước
+            // detach của WorldTransfer không còn gì để làm, và World đó không phát gì sau 308.
+            transfer.move(
+                    characterId,
+                    () -> {},
+                    WorldTransfer.event(
+                            WorldKind.WORLD_KIND_MAIN,
+                            WorldChangeReason.WORLD_CHANGE_REASON_DUEL_ENDED,
+                            returnPosition,
+                            loadout.maxHp()),
+                    () -> mainWorldChannels.attachCharacter(loadout.entryAt(characterId, returnPosition)));
+        } finally {
+            // Gắn vào world chính XONG rồi mới gỡ: giữa hai bước, gói của họ đi vào World đấu trường
+            // đã dừng (vô hại, gateway thử đấu trường trước world chính); sau bước này là world chính.
+            releaseRoute(characterId, instance);
+        }
         // Người này có thể đã rớt mạng trong lúc chốt (cả hai cùng rớt; hoặc người thắng rớt ngay sau
-        // đòn kết liễu). channelInactive của họ đã/sẽ gỡ họ khỏi world chính — nhưng nếu nó chạy
-        // TRƯỚC lệnh attach ở trên thì gỡ trượt, để lại thực thể bóng ma không ai dọn (sửa 2026-10-02).
-        // Kiểm SAU attach đóng cả hai thứ tự: gỡ đăng ký chạy trước bước gỡ khỏi world chính của họ,
-        // nên hoặc ta thấy họ offline và tự gỡ, hoặc bước gỡ của họ chạy sau attach này.
+        // đòn kết liễu). channelInactive của họ gỡ đăng ký TRƯỚC rồi mới hỏi handleDisconnectIfInDuel:
+        // còn định tuyến ⇒ true, KHÔNG gỡ khỏi world chính; hết định tuyến ⇒ false, tự gỡ. Kiểm online
+        // SAU releaseRoute đóng cả hai thứ tự (sửa a16f46b, giữ nguyên 2026-10-02): gỡ đăng ký trước
+        // lần kiểm này ⇒ ta thấy offline và tự gỡ; sau ⇒ handleDisconnectIfInDuel của họ chạy sau
+        // releaseRoute, trả false, và channelInactive gỡ họ khỏi world chính (attach đã xếp trước).
         if (!registry.isOnline(characterId)) {
             mainWorldChannels.detachCharacter(characterId);
         }
