@@ -22,7 +22,11 @@ public interface QuestInventoryGrantPort {
         // Fake trong test: không có transaction thật, không có gì để khoá.
     }
 
-    /** {@code false} nếu {@code itemTemplateCode} không tồn tại HOẶC túi đầy (không đổi gì). */
+    /**
+     * {@code false} nếu {@code itemTemplateCode} không tồn tại HOẶC túi đầy (không đổi gì). Từ
+     * 2026-10-02 {@code ClaimQuestRewardUseCase} coi {@code false} là lỗi cứng: rollback cả lượt
+     * lĩnh và trả {@code INVENTORY_FULL}.
+     */
     boolean grantItemByCode(Transaction tx, long characterId, String itemTemplateCode, int quantity);
 
     /**

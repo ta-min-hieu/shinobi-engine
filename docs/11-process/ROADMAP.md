@@ -3166,6 +3166,12 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
     - ⚠️ **Hạn chế đã biết, ghi thẳng vào javadoc**: lô có NHIỀU món CÙNG loại xếp chồng được đếm hơi
       thận trọng (mỗi lần gộp làm đổi chỗ trống còn lại). Thận trọng là phía an toàn — từ chối oan thì
       dọn túi rồi lĩnh lại được, còn nói nhầm "đủ chỗ" thì mất món vĩnh viễn.
+      **⚠️ Đính chính 2026-10-02: nhận định "thận trọng" SAI chiều.** Hai lần `give_item` cùng mã vào
+      một chồng chỉ còn chỗ cho MỘT lần đều thấy "gộp được" ⇒ đếm ra 0 ô mới, trong khi lần sau phải
+      mở ô — đếm LẠC QUAN, túi đầy là mất món (tái hiện đỏ trên Postgres thật:
+      `QuestClaimStackRoomIntegrationTest`). Đã sửa: `hasRoomFor` diễn lại đúng thuật toán trao theo
+      thứ tự, gom theo mã; và `ClaimQuestRewardUseCase` coi `grantItemByCode == false` là lỗi cứng —
+      rollback cả lượt lĩnh, trả `INVENTORY_FULL` (không enum/protocol mới).
     - 🏁 **ARC 1 KHÉP TRỌN BẰNG PLAYTEST — 12/12 quest CLAIMED** (Kagemaru Cấp 22). Chuỗi cuối chạy
       thật bằng `gameProbe`: nhận quest 12 qua cây thoại (`about_town` → `raider_band` → accept), hạ
       `raider_chieftain` @93, về báo Chu Hoành ở phiên TÁCH BIỆT (script tự cảnh báo *"npc_talked bắn

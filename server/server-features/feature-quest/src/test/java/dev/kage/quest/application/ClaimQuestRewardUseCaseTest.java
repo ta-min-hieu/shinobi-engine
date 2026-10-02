@@ -311,6 +311,28 @@ class ClaimQuestRewardUseCaseTest {
     }
 
     /**
+     * Guard {@code hasRoomFor} nói "đủ chỗ" nhưng lúc trao món vẫn hụt (2026-10-02) — bản cũ vứt kết
+     * quả {@code grantItemByCode} và trả OK. Nay đó là lỗi cứng: transaction bị ném để rollback, kết
+     * quả là {@code INVENTORY_FULL}. (DIRECT_TX không rollback thật — phần rollback trên DB thật nằm
+     * ở {@code QuestClaimStackRoomIntegrationTest}.)
+     */
+    @Test
+    void shouldReportInventoryFull_whenAGrantFailsDespiteTheRoomCheck() {
+        QuestProgress progress = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.COMPLETED, "{\"counter\":2}");
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(progress);
+        QuestInventoryGrantPort optimisticGuard = (tx, characterId, code, quantity) -> false;
+        ClaimQuestRewardUseCase useCase = newUseCase(
+                progressPort,
+                new QuestRewardPorts(
+                        new FakeExpPort(), optimisticGuard, new FakeAuditPort(), new FakeIdempotencyPort()));
+
+        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE, IDEMPOTENCY_KEY);
+
+        assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.INVENTORY_FULL);
+        assertThat(result.itemsGranted()).isEmpty();
+    }
+
+    /**
      * Script {@code on_claim} ném lỗi ⇒ KHÔNG trao gì, KHÔNG đổi CLAIMED (2026-09-12).
      *
      * <p>Fixture gọi {@code give_exp(100)} và {@code give_item("test_item", 3)} TRƯỚC chỗ lỗi, nên

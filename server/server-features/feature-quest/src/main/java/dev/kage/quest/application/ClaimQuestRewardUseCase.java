@@ -3,6 +3,9 @@ package dev.kage.quest.application;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import dev.kage.quest.domain.IdempotencyKeyReusedException;
 import dev.kage.quest.domain.QuestInventoryGrantPort;
 import dev.kage.quest.domain.QuestProgress;
@@ -20,6 +23,8 @@ import dev.kage.quest.domain.TransactionRunner;
  * thưởng thành công nhưng không đánh dấu CLAIMED = nhận thưởng lặp lại được).
  */
 public final class ClaimQuestRewardUseCase {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ClaimQuestRewardUseCase.class);
 
     private final QuestProgressPort progressPort;
     private final QuestTemplatePort templatePort;
@@ -93,6 +98,14 @@ public final class ClaimQuestRewardUseCase {
             });
         } catch (IdempotencyKeyReusedException e) {
             return ClaimResult.duplicateRequest();
+        } catch (RewardGrantFailedException e) {
+            // Transaction đã rollback trọn: chưa trao gì, quest vẫn COMPLETED, key vẫn còn nguyên.
+            LOG.warn(
+                    "Trao thưởng quest thất bại sau khi đã báo đủ chỗ — rollback: characterId={}, quest={}, item={}",
+                    characterId,
+                    request.questCode(),
+                    e.getMessage());
+            return ClaimResult.inventoryFull();
         }
         if (!bagHasRoom.get()) {
             return ClaimResult.inventoryFull();
@@ -111,13 +124,34 @@ public final class ClaimQuestRewardUseCase {
     /** Định danh một lệnh lĩnh — gom lại để phần ghi không vượt trần tham số. */
     private record ClaimRequest(long characterId, long questId, String questCode, String idempotencyKey) {}
 
-    /** Trao EXP + từng món thưởng trong transaction đang mở (đã khoá túi đồ, đã kiểm đủ chỗ). */
+    /**
+     * Trao EXP + từng món thưởng trong transaction đang mở (đã khoá túi đồ, đã kiểm đủ chỗ).
+     *
+     * <p>Một món trao hụt (túi đầy, mã sai) là lỗi CỨNG: ném để rollback cả lượt lĩnh (2026-10-02).
+     * Trước đó kết quả {@code grantItemByCode} bị vứt đi, nên mỗi khi {@code hasRoomFor} nói nhầm
+     * "đủ chỗ" — ví dụ script trao cùng một mã hai lần mà chồng sẵn có chỉ nhận được một — quest
+     * vẫn thành CLAIMED và món hụt mất vĩnh viễn. Guard ở trên là để trả lời SỚM; dòng này là để
+     * không bao giờ commit một lượt lĩnh thiếu món, dù guard có sai.
+     */
     private void grantRewards(Transaction t, long characterId, QuestScriptRunner.HookEffects effects) {
         rewardPorts.expPort().grantExp(t, characterId, effects.expGranted());
         for (QuestScriptRunner.ItemGrant itemGrant : effects.itemGrants()) {
-            rewardPorts
+            boolean granted = rewardPorts
                     .inventoryGrantPort()
                     .grantItemByCode(t, characterId, itemGrant.itemTemplateCode(), itemGrant.quantity());
+            if (!granted) {
+                throw new RewardGrantFailedException(itemGrant.itemTemplateCode() + " x" + itemGrant.quantity());
+            }
+        }
+    }
+
+    /** Ném từ trong transaction để rollback — chỉ sống trong lớp này, bắt lại thành {@code INVENTORY_FULL}. */
+    private static final class RewardGrantFailedException extends RuntimeException {
+
+        private static final long serialVersionUID = 1L;
+
+        RewardGrantFailedException(String grant) {
+            super(grant);
         }
     }
 
