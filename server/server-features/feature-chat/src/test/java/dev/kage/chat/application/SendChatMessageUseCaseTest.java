@@ -3,6 +3,8 @@ package dev.kage.chat.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import dev.kage.chat.domain.ChatAuditPort;
 import dev.kage.chat.domain.ChatChannel;
@@ -28,6 +30,34 @@ class SendChatMessageUseCaseTest {
         SendChatMessageUseCase.Result result = useCase.execute(5, ChatChannel.WORLD, "   ");
 
         assertThat(result).isEqualTo(SendChatMessageUseCase.Result.MESSAGE_BLANK);
+    }
+
+    /**
+     * Lỗi thật (2026-10-02): {@link String#isBlank()} chỉ nhận khoảng trắng của
+     * {@link Character#isWhitespace}, nên tin TOÀN ký tự vô hình (khoảng trắng không ngắt, ký tự
+     * độ rộng 0, ký tự điều khiển) lọt qua thành một dòng chat trống phát đi cả server.
+     */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {"\u00A0\u00A0", "\u200B\u200B\u200B", "\u2007\u202F", "\uFEFF", " \u200D\u00A0 ", "\u0000\u0007"
+            })
+    void shouldReturnMessageBlank_whenBodyHasOnlyInvisibleCharacters(String body) {
+        FakeChatAuditPort auditPort = new FakeChatAuditPort();
+        SendChatMessageUseCase useCase = new SendChatMessageUseCase(auditPort);
+
+        SendChatMessageUseCase.Result result = useCase.execute(5, ChatChannel.WORLD, body);
+
+        assertThat(result).isEqualTo(SendChatMessageUseCase.Result.MESSAGE_BLANK);
+        assertThat(auditPort.loggedAction).isNull();
+    }
+
+    @Test
+    void shouldReturnOk_whenVisibleTextSurroundedByInvisibleCharacters() {
+        SendChatMessageUseCase useCase = new SendChatMessageUseCase(new FakeChatAuditPort());
+
+        SendChatMessageUseCase.Result result = useCase.execute(5, ChatChannel.WORLD, "\u00A0chào\u200B");
+
+        assertThat(result).isEqualTo(SendChatMessageUseCase.Result.OK);
     }
 
     @Test
