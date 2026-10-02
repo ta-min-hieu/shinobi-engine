@@ -40,4 +40,11 @@ public final class CombatRecencyComponent implements Component {
 
     /** Giây kể từ lần cuối phát {@code HealthChangedEvent} vì hồi máu. */
     public float secondsSinceEmit;
+
+    /**
+     * Đã hồi máu từ lần báo cuối mà CHƯA báo (đang chờ nhịp {@code REGEN_EMIT_INTERVAL_SECONDS}).
+     * Chiến đấu cắt ngang thì {@code HealthRegenSystem} báo nốt ngay, không để vạch máu kẹt số cũ
+     * suốt cửa sổ chờ {@code REGEN_DELAY_SECONDS}.
+     */
+    public boolean regenUnannounced;
 }
