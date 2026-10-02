@@ -188,7 +188,14 @@ final class DungeonInstanceRegistry {
                 entries.add(new PendingEntry(memberId, loadoutOf(memberId), returnPositionOf(memberId)));
             }
         }
-        AdmittedEntries admitted = admitIntoInstance(myParty.get().partyId(), entries);
+        Optional<AdmittedEntries> maybeAdmitted =
+                admitIntoInstance(myParty.get().partyId(), entries);
+        if (maybeAdmitted.isEmpty()) {
+            // Không còn ai để dời: đồng đội vừa kéo cả nhóm vào trước (người gửi đã ở trong — cùng
+            // kết quả với lượt thắng), hoặc ai cũng vừa rớt mạng (không còn ai đọc response).
+            return EnterOutcome.OK;
+        }
+        AdmittedEntries admitted = maybeAdmitted.get();
         // Ngoài khoá — xem javadoc lớp. Người gửi vẫn nhận response SAU nửa sau (ADR-047), vì
         // cả lượt này chạy trên luồng của chính lệnh vào.
         awaitOldWorldSilent(
@@ -200,24 +207,42 @@ final class DungeonInstanceRegistry {
 
     /**
      * Nửa đầu của {@link #enterDungeon}, nguyên tử: tra/dựng instance của nhóm, ghi định tuyến và
-     * detach khỏi world chính. Kiểm lại "đã ở hầm ngục chưa" TRONG khoá — lượt vào song song của đồng
-     * đội có thể vừa kéo người này vào sau khi ảnh chụp ngoài khoá được đọc.
+     * detach khỏi world chính. Kiểm lại TRONG khoá hai điều mà ảnh chụp ngoài khoá có thể đã sai:
+     *
+     * <ul>
+     *   <li>"đã ở hầm ngục chưa" — lượt vào song song của đồng đội có thể vừa kéo người này vào;
+     *   <li>"còn online không" (sửa 2026-10-02) — người rớt mạng trong lúc đọc DB đã được
+     *       {@code channelInactive} dọn TRỌN (gỡ đăng ký → {@link #handleDisconnectIfInDungeon} thấy
+     *       họ chưa ở đây → gỡ khỏi world chính). Nhận họ lúc này là gắn một thực thể bóng ma vào hầm
+     *       ngục mà không kết nối nào còn dọn nữa: World hầm ngục tick mãi dù cả nhóm đã ra, và lần
+     *       đăng nhập sau bị định tuyến nhầm vào đây. Gỡ đăng ký chạy TRƯỚC lời gọi vào khoá này, nên
+     *       hoặc ta thấy họ offline, hoặc {@link #handleDisconnectIfInDungeon} tới sau và dọn họ.
+     * </ul>
+     *
+     * <p>Rỗng nếu không nhận được ai — và khi đó KHÔNG dựng instance (bản cũ dựng trước rồi mới lọc,
+     * để lại một World rỗng kèm boss không ai dừng).
      */
-    private synchronized AdmittedEntries admitIntoInstance(long partyId, List<PendingEntry> entries) {
-        DungeonInstance instance = instancesByPartyId.computeIfAbsent(partyId, this::createInstance);
+    private synchronized Optional<AdmittedEntries> admitIntoInstance(long partyId, List<PendingEntry> entries) {
         List<PendingEntry> admitted = new ArrayList<>(entries.size());
-        List<CompletableFuture<Void>> drained = new ArrayList<>(entries.size());
         for (PendingEntry entry : entries) {
             long characterId = entry.characterId();
-            if (!instanceByCharacterId.containsKey(characterId)) {
-                returnPositionByCharacterId.put(characterId, entry.returnPosition());
-                instance.characterIds().add(characterId);
-                instanceByCharacterId.put(characterId, instance);
-                drained.add(mainWorldChannels.detachCharacterAndDrain(characterId));
+            if (!instanceByCharacterId.containsKey(characterId) && registry.isOnline(characterId)) {
                 admitted.add(entry);
             }
         }
-        return new AdmittedEntries(instance, admitted, drained);
+        if (admitted.isEmpty()) {
+            return Optional.empty();
+        }
+        DungeonInstance instance = instancesByPartyId.computeIfAbsent(partyId, this::createInstance);
+        List<CompletableFuture<Void>> drained = new ArrayList<>(admitted.size());
+        for (PendingEntry entry : admitted) {
+            long characterId = entry.characterId();
+            returnPositionByCharacterId.put(characterId, entry.returnPosition());
+            instance.characterIds().add(characterId);
+            instanceByCharacterId.put(characterId, instance);
+            drained.add(mainWorldChannels.detachCharacterAndDrain(characterId));
+        }
+        return Optional.of(new AdmittedEntries(instance, admitted, drained));
     }
 
     /**
@@ -373,6 +398,11 @@ final class DungeonInstanceRegistry {
         exitingCharacterIds.remove(characterId);
         leaveInstance(characterId, instance);
         return true;
+    }
+
+    /** Số instance (World hầm ngục) đang chạy — mỗi cái giữ một lịch tick, nên rò một cái là rò thật. */
+    synchronized int instanceCount() {
+        return instancesByPartyId.size();
     }
 
     /** Graceful shutdown (SERVER.md §10) — dừng MỌI dungeon World đang chạy trước khi thoát process. */

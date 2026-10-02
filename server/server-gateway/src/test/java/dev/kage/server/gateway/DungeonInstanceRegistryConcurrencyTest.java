@@ -140,7 +140,90 @@ class DungeonInstanceRegistryConcurrencyTest {
         }
     }
 
+    /**
+     * Đồng đội rớt mạng ĐÚNG lúc lượt vào đang đọc DB — sau lượt kiểm "cả nhóm online", trước phần
+     * ghi. {@code channelInactive} chạy trọn trước (gỡ đăng ký, hầm ngục chưa biết họ, gỡ khỏi world
+     * chính), rồi lượt vào mới ghi. Bản cũ không kiểm lại "còn online không" trong khoá: kéo luôn
+     * người đã thoát vào hầm ngục — thực thể bóng ma không ai dọn (không còn kết nối nào sẽ chết lần
+     * nữa), giữ World hầm ngục tick mãi kể cả khi cả nhóm đã ra, và lần đăng nhập sau của người đó bị
+     * định tuyến nhầm vào hầm ngục.
+     */
+    @Test
+    void shouldNotPullAMemberIntoTheDungeon_whenTheyDisconnectWhileTheEntryReadsTheDatabase() {
+        DungeonInstanceRegistry[] holder = new DungeonInstanceRegistry[1];
+        DungeonInstanceRegistry dungeons = new DungeonInstanceRegistry(
+                characterRegistry,
+                new DungeonInstanceRegistry.DungeonFacades(
+                        fakeCharacterFacade(characterId -> {
+                            if (characterId == MEMBER_ID) {
+                                simulateDisconnect(holder[0], MEMBER_ID);
+                            }
+                        }),
+                        fakePartyFacade(() -> {})),
+                mainWorldChannels,
+                TestWorldContents.withBoss());
+        holder[0] = dungeons;
+        try {
+            assertThat(dungeons.enterDungeon(LEADER_ID, "sample_dungeon"))
+                    .isEqualTo(DungeonInstanceRegistry.EnterOutcome.OK);
+
+            assertThat(dungeons.worldFacadeFor(LEADER_ID)).isPresent();
+            assertThat(dungeons.worldFacadeFor(MEMBER_ID)).isEmpty();
+
+            // Người còn lại ra ⇒ không còn ai, World hầm ngục phải dừng — bóng ma không được giữ nó.
+            assertThat(dungeons.exitDungeon(LEADER_ID)).isEqualTo(DungeonInstanceRegistry.ExitOutcome.OK);
+            assertThat(dungeons.instanceCount()).isZero();
+        } finally {
+            dungeons.stopAll();
+        }
+    }
+
+    /**
+     * Cả nhóm rớt mạng trong lúc lượt vào đọc DB ⇒ không ai được nhận. Bản cũ dựng instance TRƯỚC khi
+     * biết có nhận được ai, nên một instance rỗng (kèm boss) nằm lại trong bảng, tick mãi.
+     */
+    @Test
+    void shouldNotLeaveAnEmptyInstanceRunning_whenTheWholePartyDisconnectsDuringEntry() {
+        DungeonInstanceRegistry[] holder = new DungeonInstanceRegistry[1];
+        DungeonInstanceRegistry dungeons = new DungeonInstanceRegistry(
+                characterRegistry,
+                new DungeonInstanceRegistry.DungeonFacades(
+                        fakeCharacterFacade(characterId -> simulateDisconnect(holder[0], characterId)),
+                        fakePartyFacade(() -> {})),
+                mainWorldChannels,
+                TestWorldContents.withBoss());
+        holder[0] = dungeons;
+        try {
+            dungeons.enterDungeon(LEADER_ID, "sample_dungeon");
+
+            assertThat(dungeons.worldFacadeFor(LEADER_ID)).isEmpty();
+            assertThat(dungeons.worldFacadeFor(MEMBER_ID)).isEmpty();
+            assertThat(dungeons.instanceCount()).isZero();
+        } finally {
+            dungeons.stopAll();
+        }
+    }
+
+    /** Đúng thứ tự của {@code GatewayChannelHandler.releaseCharacter}: gỡ đăng ký → hầm ngục → world chính. */
+    private void simulateDisconnect(DungeonInstanceRegistry dungeons, long characterId) {
+        if (!characterRegistry.isOnline(characterId)) {
+            return;
+        }
+        characterRegistry.unregister(characterId);
+        if (!dungeons.handleDisconnectIfInDungeon(characterId)) {
+            mainWorldChannels.detachCharacter(characterId);
+        }
+    }
+
     static CharacterFacade fakeCharacterFacade() {
+        return fakeCharacterFacade(characterId -> {});
+    }
+
+    /**
+     * @param onLoadStats chạy mỗi lần đọc chỉ số — lời gọi DB đầu tiên của {@code CharacterLoadout},
+     *     tức ĐÚNG khoảng hở giữa lượt kiểm "cả nhóm online" và phần ghi của lượt vào hầm ngục
+     */
+    static CharacterFacade fakeCharacterFacade(java.util.function.LongConsumer onLoadStats) {
         CharacterPort port = new CharacterPort() {
             @Override
             public Optional<Character> findById(long characterId) {
@@ -150,6 +233,7 @@ class DungeonInstanceRegistryConcurrencyTest {
 
             @Override
             public CharacterStats loadStats(long characterId) {
+                onLoadStats.accept(characterId);
                 return new CharacterStats(10, 10, 10, 10);
             }
 
