@@ -98,10 +98,10 @@ class FriendPresenceOrderTest {
     private GatewayObservability observability;
     private LocalAddress address;
     private Channel serverChannel;
-    private long accountId;
-    private long walkerId;
-    private long friendId;
-    private TestClient walker;
+    private volatile long accountId;
+    private volatile long walkerId;
+    private volatile long friendId;
+    private volatile TestClient walker;
 
     @BeforeEach
     void startGateway() throws InterruptedException {
@@ -285,7 +285,10 @@ class FriendPresenceOrderTest {
 
     private long createCharacter(String name) {
         return characterPort
-                .create(null, new NewCharacter(accountId, name, Faction.HOA, UUID.randomUUID().toString()))
+                .create(
+                        null,
+                        new NewCharacter(
+                                accountId, name, Faction.HOA, UUID.randomUUID().toString()))
                 .id();
     }
 
@@ -303,24 +306,28 @@ class FriendPresenceOrderTest {
                 .connect(address)
                 .sync()
                 .channel();
-        send(client, Opcode.OPCODE_CONNECT_REQUEST_VALUE, ConnectRequest.newBuilder()
-                .setUsername(USERNAME)
-                .build()
-                .toByteArray());
+        send(
+                client,
+                Opcode.OPCODE_CONNECT_REQUEST_VALUE,
+                ConnectRequest.newBuilder().setUsername(USERNAME).build().toByteArray());
         assertThat(client.awaitOpcode(Opcode.OPCODE_CONNECT_RESPONSE_VALUE)).isTrue();
         return client;
     }
 
     private static void select(TestClient client, long characterId) throws InterruptedException {
         sendSelect(client, characterId);
-        assertThat(client.awaitOpcode(Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE)).isTrue();
+        assertThat(client.awaitOpcode(Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE))
+                .isTrue();
     }
 
     private static void sendSelect(TestClient client, long characterId) {
-        send(client, Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, SelectCharacterRequest.newBuilder()
-                .setCharacterId(characterId)
-                .build()
-                .toByteArray());
+        send(
+                client,
+                Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE,
+                SelectCharacterRequest.newBuilder()
+                        .setCharacterId(characterId)
+                        .build()
+                        .toByteArray());
     }
 
     private static void send(TestClient client, int opcode, byte[] payload) {

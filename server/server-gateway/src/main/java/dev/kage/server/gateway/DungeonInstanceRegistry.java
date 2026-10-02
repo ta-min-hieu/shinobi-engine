@@ -181,7 +181,7 @@ final class DungeonInstanceRegistry {
         }
         // Người bấm đang ở đấu trường cũng "đã ở trong một instance" — protocol không có outcome riêng
         // cho trường hợp này (2026-10-02, xem admitIntoInstance), và cho qua là gắn họ vào HAI World.
-        if (isInDungeon(requestingCharacterId) || inDuel.test(requestingCharacterId)) {
+        if (isInAnyInstance(requestingCharacterId)) {
             return EnterOutcome.ALREADY_IN_DUNGEON;
         }
         Optional<PartyFacade.MyPartyView> myParty = partyFacade.findMyParty(requestingCharacterId);
@@ -343,6 +343,11 @@ final class DungeonInstanceRegistry {
             Thread.currentThread().interrupt();
             LOG.warn("Bị ngắt khi chờ World cũ im, vẫn dời: characterId={}", characterId, e);
         }
+    }
+
+    /** Đang ở hầm ngục HOẶC đấu trường — tách riêng để {@link #enterDungeon} dưới trần CyclomaticComplexity. */
+    private boolean isInAnyInstance(long characterId) {
+        return isInDungeon(characterId) || inDuel.test(characterId);
     }
 
     private synchronized boolean isInDungeon(long characterId) {

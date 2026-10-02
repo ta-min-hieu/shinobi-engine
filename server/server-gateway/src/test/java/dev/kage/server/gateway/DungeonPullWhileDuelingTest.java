@@ -110,7 +110,9 @@ class DungeonPullWhileDuelingTest {
                 .isEqualTo(DungeonInstanceRegistry.EnterOutcome.ALREADY_IN_DUNGEON);
 
         assertThat(dungeons.worldFacadeFor(LEADER_ID)).isEmpty();
-        assertThat(dungeons.worldFacadeFor(MEMBER_ID)).as("không ai bị kéo khi lượt vào bị từ chối").isEmpty();
+        assertThat(dungeons.worldFacadeFor(MEMBER_ID))
+                .as("không ai bị kéo khi lượt vào bị từ chối")
+                .isEmpty();
         assertThat(dungeons.instanceCount()).isZero();
     }
 
@@ -130,8 +132,7 @@ class DungeonPullWhileDuelingTest {
 
     private void startDuel(long challengerId, long targetId) {
         long challengeId = arena.challengeDuel(challengerId, targetId).challengeId();
-        assertThat(arena.acceptDuel(targetId, challengeId).outcome())
-                .isEqualTo(ArenaInstanceRegistry.AcceptOutcome.OK);
+        assertThat(arena.acceptDuel(targetId, challengeId).outcome()).isEqualTo(ArenaInstanceRegistry.AcceptOutcome.OK);
         assertThat(arena.worldFacadeFor(targetId)).isPresent();
     }
 
