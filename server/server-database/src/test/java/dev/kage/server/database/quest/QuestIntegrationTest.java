@@ -280,6 +280,31 @@ class QuestIntegrationTest {
         assertThat(secondClaim.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.NOT_COMPLETED_YET);
     }
 
+    /**
+     * Quest đã COMPLETED (chưa lĩnh) thì giết thêm KHÔNG được đẩy bộ đếm vượt mốc, KHÔNG báo
+     * "hoàn thành" lần hai — chỉ đường quét {@code listInProgress} (lọc {@code status='IN_PROGRESS'}
+     * bằng SQL) giữ điều này, fake port của unit test không chứng minh được.
+     */
+    @Test
+    void shouldNeitherCountNorReportAgain_whenKillingAfterCompletion() {
+        long characterId = createFreshCharacter("QuestPlayerOver");
+        newAcceptUseCase().execute(characterId, QUEST_CODE);
+        for (int i = 0; i < 3; i++) {
+            newProcessUseCase().monsterKilled(characterId, "training_dummy");
+        }
+        String progressAtCompletion = readProgressJson(characterId, QUEST_CODE);
+
+        List<ProcessQuestEventUseCase.QuestStatusChange> fourthKill =
+                newProcessUseCase().monsterKilled(characterId, "training_dummy");
+
+        assertThat(fourthKill).isEmpty();
+        assertThat(readProgressJson(characterId, QUEST_CODE)).isEqualTo(progressAtCompletion);
+        assertThat(newClaimUseCase()
+                        .execute(characterId, QUEST_CODE, newIdempotencyKey())
+                        .outcome())
+                .isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
+    }
+
     @Test
     void shouldListScriptRef_forStartupValidation() {
         // SCRIPTING.md §8 — validate lúc khởi động cần liệt kê ĐÚNG script_ref đang tham chiếu
