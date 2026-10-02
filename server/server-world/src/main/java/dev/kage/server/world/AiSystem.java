@@ -17,6 +17,7 @@ import dev.kage.engine.ecs.component.VelocityComponent;
 import dev.kage.server.world.component.AiParamsComponent;
 import dev.kage.server.world.component.AiState;
 import dev.kage.server.world.component.AiStateComponent;
+import dev.kage.server.world.component.BossAiComponent;
 import dev.kage.server.world.component.CharacterIdComponent;
 import dev.kage.server.world.component.CombatRecencyComponent;
 import dev.kage.server.world.component.HealthComponent;
@@ -60,6 +61,7 @@ final class AiSystem extends IteratingKSystem {
 
     private static final ComponentMapper<MonsterIdComponent> MONSTER_ID =
             ComponentMapper.getFor(MonsterIdComponent.class);
+    private static final ComponentMapper<BossAiComponent> BOSS_AI = ComponentMapper.getFor(BossAiComponent.class);
 
     // ADR-050 D1/D3 — hai thứ quyết định một nhân vật có đang được vùng an toàn che hay không.
     // Cả hai component này mọi nhân vật đều mang sẵn từ ADR-046 (WorldFacade.addRecoveryComponents),
@@ -234,6 +236,7 @@ final class AiSystem extends IteratingKSystem {
             ai.state = AiState.IDLE;
             ai.stateTimer = 0f;
             healToFullOnArrival(entity);
+            resetBossPhaseOnArrival(entity);
             return;
         }
         moveToward(entity, ai.spawnX, ai.spawnY, params.chaseSpeedMps());
@@ -254,6 +257,18 @@ final class AiSystem extends IteratingKSystem {
         }
         health.current = health.max;
         pendingHealthChanges.add(new HealthChange(MONSTER_ID.get(entity).monsterId, health.current, health.max));
+    }
+
+    /**
+     * Về nhà là "trận đấu reset" (ADR-046 D4) — với boss, reset cả PHA: script khai
+     * {@code already_enraged} là "chỉ kích hoạt 1 lần/TRẬN". Không có bước này thì boss lành đầy
+     * máu mà vẫn mang cờ enrage của trận trước: bỏ hẳn đòn enrage, và đánh hệ số pha cuối từ 70%.
+     */
+    private static void resetBossPhaseOnArrival(KEntity entity) {
+        BossAiComponent bossAi = BOSS_AI.get(entity);
+        if (bossAi != null) {
+            bossAi.enraged = false;
+        }
     }
 
     private void startChasing(AiStateComponent ai, TargetComponent target, KEntity characterEntity) {
@@ -322,8 +337,10 @@ final class AiSystem extends IteratingKSystem {
         KEntity nearest = null;
         double nearestDistance = range;
         for (KEntity character : characterEntities.get()) {
-            if (isShieldedBySafeZone(character)) {
-                continue; // ADR-050 D1
+            if (isShieldedBySafeZone(character) || isDead(character)) {
+                // ADR-050 D1; và cái xác của World không tự hồi sinh (hầm ngục/Arena) — chọn nó thì
+                // nó che người còn sống ở xa hơn, còn quái lật CHASE→RETURN→IDLE mãi mãi.
+                continue;
             }
             PositionComponent characterPosition = POSITION.get(character);
             double d = distance(position.x, position.y, characterPosition.x, characterPosition.y);
@@ -333,6 +350,11 @@ final class AiSystem extends IteratingKSystem {
             }
         }
         return nearest;
+    }
+
+    private static boolean isDead(KEntity character) {
+        HealthComponent health = HEALTH.get(character);
+        return health != null && health.isDead();
     }
 
     private static void moveToward(KEntity entity, float toX, float toY, float speed) {
