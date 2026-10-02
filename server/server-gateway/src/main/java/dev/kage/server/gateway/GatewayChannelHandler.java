@@ -588,7 +588,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleListCharacters(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        ListCharactersRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        ListCharactersRequest.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long accountId = boundAccountId;
         if (accountId == null) {
@@ -1057,6 +1057,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // MoveCommand KHÔNG chạm DB/Redis — chỉ enqueue vào server-world (rẻ, thread-safe), nên xử
     // lý thẳng trên EventLoop, không cần authExecutor (SERVER.md §2: "EventLoop được: decode,
     // validate rẻ, enqueue").
+    // FutureReturnValueIgnored: ChannelFuture của close()/writeAndFlush() — lỗi đi qua pipeline Netty.
+    @SuppressWarnings("FutureReturnValueIgnored")
     private void handleMoveCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         MoveCommand command = MoveCommand.parseFrom(payload);
@@ -1085,9 +1087,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // handleMoveCommand. Dùng CHUNG moveCommandRateLimiter (không tạo limiter riêng): nhảy là hành
     // động di chuyển liên quan, và world tự chặn double-jump qua điều kiện grounded (WorldFacade.
     // handleJumpIntent) nên rate limit riêng không thêm phòng thủ thật nào.
+    // FutureReturnValueIgnored: ChannelFuture của close()/writeAndFlush() — lỗi đi qua pipeline Netty.
+    @SuppressWarnings("FutureReturnValueIgnored")
     private void handleJumpCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        JumpCommand.parseFrom(payload); // message rỗng — parse chỉ để validate wire format.
+        JumpCommand.parser().parseFrom(payload); // message rỗng — parse chỉ để validate wire format.
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -1131,6 +1135,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      *
      * @return {@code false} nếu caller phải bỏ lệnh
      */
+    // FutureReturnValueIgnored: ChannelFuture của close()/writeAndFlush() — lỗi đi qua pipeline Netty.
+    @SuppressWarnings("FutureReturnValueIgnored")
     private boolean tryAcquireCombatCommand(ChannelHandlerContext ctx, long characterId) {
         if (combatCommandRateLimiter.tryAcquire()) {
             return true;
@@ -1148,7 +1154,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // nhưng không chặn chi phí mỗi gói trên tick thread — nên vẫn qua tryAcquireCombatCommand.
     private void handleAttackCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        AttackCommand.parseFrom(payload); // message rỗng — parse chỉ để validate wire format.
+        AttackCommand.parser().parseFrom(payload); // message rỗng — parse chỉ để validate wire format.
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -1394,7 +1400,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleListInventoryRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        ListInventoryRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        ListInventoryRequest.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -1486,7 +1492,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleListQuestsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        ListQuestsRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        ListQuestsRequest.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -1524,7 +1530,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleListShopItemsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        ListShopItemsRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        ListShopItemsRequest.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -1990,7 +1996,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleListFriendsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        ListFriendsRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        ListFriendsRequest.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -2029,7 +2035,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleListPendingFriendRequestsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        ListPendingFriendRequestsRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        ListPendingFriendRequestsRequest.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -2206,7 +2212,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleLeaveGuildCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        LeaveGuildCommand.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        LeaveGuildCommand.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -2230,7 +2236,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleDisbandGuildCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        DisbandGuildCommand.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        DisbandGuildCommand.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -2286,7 +2292,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleListGuildMembersRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        ListGuildMembersRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        ListGuildMembersRequest.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -2321,7 +2327,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleListPendingGuildJoinRequestsRequest(
             ChannelHandlerContext ctx, PacketHeader header, byte[] payload) throws InvalidProtocolBufferException {
-        ListPendingGuildJoinRequestsRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        ListPendingGuildJoinRequestsRequest.parser()
+                .parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -2356,7 +2363,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleGetMyGuildRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        GetMyGuildRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        GetMyGuildRequest.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -2383,7 +2390,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleCreatePartyCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        CreatePartyCommand.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        CreatePartyCommand.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -2511,7 +2518,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleLeavePartyCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        LeavePartyCommand.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        LeavePartyCommand.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -2567,7 +2574,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleListPartyMembersRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        ListPartyMembersRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        ListPartyMembersRequest.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -2600,7 +2607,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleListPendingPartyInvitesRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        ListPendingPartyInvitesRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        ListPendingPartyInvitesRequest.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -2627,7 +2634,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleGetMyPartyRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        GetMyPartyRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        GetMyPartyRequest.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -2693,7 +2700,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // ExitDungeonCommand chạm CharacterFacade (DB) qua DungeonInstanceRegistry — Virtual Thread.
     private void handleExitDungeonCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        ExitDungeonCommand.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        ExitDungeonCommand.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -2877,7 +2884,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // ArenaInstanceRegistry tự gửi (settleDuel), handler này chỉ trả ExitDuelResponse.
     private void handleExitDuelCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        ExitDuelCommand.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        ExitDuelCommand.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -2900,7 +2907,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleGetPvpRatingRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        GetPvpRatingRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        GetPvpRatingRequest.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -3169,7 +3176,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleGetTradeStatusRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        GetTradeStatusRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        GetTradeStatusRequest.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -3293,7 +3300,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleListMailRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        ListMailRequest.parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
+        ListMailRequest.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
         int sequenceId = header.sequenceId();
         Long characterId = boundCharacterId;
         if (characterId == null) {
@@ -3392,6 +3399,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         return DELETE_MAIL_OUTCOME_MAPPING.get(result);
     }
 
+    // FutureReturnValueIgnored: ChannelFuture của close()/writeAndFlush() — lỗi đi qua pipeline Netty.
+    @SuppressWarnings("FutureReturnValueIgnored")
     private void handleSendChatMessageCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         SendChatMessageCommand command = SendChatMessageCommand.parseFrom(payload);
@@ -3690,7 +3699,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      */
     // PMD AvoidCatchingGenericException: đúng ý — ranh giới I/O bất đồng bộ, PHẢI trả lời client dù
     // lỗi gì xảy ra (cùng lý do handleConnectBlocking).
-    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    // FutureReturnValueIgnored: ChannelFuture của close()/writeAndFlush() — lỗi đi qua pipeline Netty.
+    @SuppressWarnings({"PMD.AvoidCatchingGenericException", "FutureReturnValueIgnored"})
     private void executeBlocking(ChannelHandlerContext ctx, int sequenceId, Runnable handler) {
         if (!dbCommandRateLimiter.tryAcquire()) {
             networkMetrics.recordRateLimitRejected("db");
@@ -3721,6 +3731,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         send(ctx, Opcode.OPCODE_ERROR_VALUE, relatedSequenceId, error.toByteArray());
     }
 
+    // FutureReturnValueIgnored: ChannelFuture của close()/writeAndFlush() — lỗi đi qua pipeline Netty.
+    @SuppressWarnings("FutureReturnValueIgnored")
     private void send(ChannelHandlerContext ctx, int opcode, int sequenceId, byte[] payload) {
         networkMetrics.recordPacketSent(opcode, payload.length);
         PacketHeader header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
@@ -3942,6 +3954,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * {@link #channelInactive} dọn nhân vật như mọi lần ngắt khác.
      */
     @Override
+    // FutureReturnValueIgnored: ChannelFuture của close()/writeAndFlush() — lỗi đi qua pipeline Netty.
+    @SuppressWarnings("FutureReturnValueIgnored")
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
         if (evt instanceof IdleStateEvent idle && idle.state() == IdleState.READER_IDLE) {
             LOG.info(
@@ -3968,6 +3982,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     @Override
+    // FutureReturnValueIgnored: ChannelFuture của close()/writeAndFlush() — lỗi đi qua pipeline Netty.
+    @SuppressWarnings("FutureReturnValueIgnored")
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         LOG.error("Lỗi không mong đợi trên kết nối {}", ctx.channel().remoteAddress(), cause);
         ctx.close();
