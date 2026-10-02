@@ -1,6 +1,7 @@
 package dev.kage.server.gateway;
 
 import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -20,6 +21,7 @@ import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.timeout.IdleStateHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +31,8 @@ import org.slf4j.LoggerFactory;
  * mỏng gọi lớp này.
  *
  * <p>Pipeline: [TLS nếu {@link TlsConfig#enabled()}, ADR-027] → framing length-prefixed
- * (NETWORK.md §101) → {@code PacketCodec} → {@link GatewayChannelHandler}. MODULE DUY NHẤT được
+ * (NETWORK.md §101) → {@code PacketCodec} → hạn im lặng (NETWORK.md §10) →
+ * {@link GatewayChannelHandler}, xem {@link #addProtocolHandlers}. MODULE DUY NHẤT được
  * import Netty (Điều 23).
  */
 public final class GatewayServer {
@@ -39,6 +42,12 @@ public final class GatewayServer {
     // Chống packet khổng lồ chiếm bộ nhớ (một dạng rate-limit thô — NETWORK.md §109).
     private static final int MAX_FRAME_LENGTH = 1024 * 1024;
     private static final int LENGTH_FIELD_LENGTH = 4;
+
+    // NETWORK.md §10: client ping mỗi ~15s; server không nhận gì trong ~45s ⇒ kết nối chết, dọn dẹp
+    // ("bắt buộc — TCP có thể treo mà không báo lỗi"). Trước 2026-10-02 server KHÔNG có hạn này: một
+    // kết nối nửa mở (rút dây mạng, NAT quên luồng) giữ nhân vật đứng trong world mãi mãi, và một
+    // kết nối không bao giờ đăng nhập giữ socket + handler mãi mãi. Mọi frame đều tính, không riêng Ping.
+    static final Duration READER_IDLE_TIMEOUT = Duration.ofSeconds(45);
 
     // Số kết nối TCP chờ accept() tối đa (hàng đợi SYN đã hoàn tất handshake, chưa được boss thread
     // nhận). PHÁT HIỆN THẬT (BENCHMARK.md §5.4, 2026-07-29): giá trị cũ 128 chính là nguyên nhân
@@ -115,18 +124,35 @@ public final class GatewayServer {
                         if (sslContext != null) {
                             pipeline.addLast(sslContext.newHandler(ch.alloc()));
                         }
-                        pipeline.addLast(new LengthFieldBasedFrameDecoder(
-                                        MAX_FRAME_LENGTH, 0, LENGTH_FIELD_LENGTH, 0, LENGTH_FIELD_LENGTH))
-                                .addLast(new LengthFieldPrepender(LENGTH_FIELD_LENGTH))
-                                .addLast(new PacketFrameDecoder())
-                                .addLast(new PacketFrameEncoder())
-                                .addLast(new GatewayChannelHandler(
+                        addProtocolHandlers(
+                                pipeline,
+                                new GatewayChannelHandler(
                                         facades, context.worldGateway(), authExecutor, context.observability()));
                     }
                 });
 
         serverChannel = bootstrap.bind(requestedPort).sync().channel();
         LOG.info("server-gateway lắng nghe cổng {} (TLS {})", port(), tlsConfig.enabled() ? "bật" : "TẮT");
+    }
+
+    /**
+     * Mọi handler SAU lớp TLS — tách ra để test {@code EmbeddedChannel} dựng ĐÚNG pipeline này thay
+     * vì chép tay một bản (bản chép tay không có {@link IdleStateHandler}, nên không test nào thấy
+     * server thiếu nó).
+     *
+     * <p>{@link IdleStateHandler} đứng SAU {@link PacketFrameDecoder}: chỉ một frame HOÀN CHỈNH mới
+     * tính là "còn sống" — client nhỏ giọt từng byte của một frame không bao giờ xong không giữ được
+     * kết nối. Hết hạn thì {@code GatewayChannelHandler#userEventTriggered} đóng kết nối, và
+     * {@code channelInactive} dọn nhân vật như mọi lần ngắt khác.
+     */
+    static void addProtocolHandlers(ChannelPipeline pipeline, GatewayChannelHandler handler) {
+        pipeline.addLast(new LengthFieldBasedFrameDecoder(
+                        MAX_FRAME_LENGTH, 0, LENGTH_FIELD_LENGTH, 0, LENGTH_FIELD_LENGTH))
+                .addLast(new LengthFieldPrepender(LENGTH_FIELD_LENGTH))
+                .addLast(new PacketFrameDecoder())
+                .addLast(new PacketFrameEncoder())
+                .addLast(new IdleStateHandler(READER_IDLE_TIMEOUT.toMillis(), 0, 0, TimeUnit.MILLISECONDS))
+                .addLast(handler);
     }
 
     /** {@code null} nếu {@link TlsConfig#enabled()} là false (ADR-027 — test/dev tường minh). */

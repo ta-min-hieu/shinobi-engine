@@ -15,9 +15,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelInitializer;
 import io.netty.channel.embedded.EmbeddedChannel;
-import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
-import io.netty.handler.codec.LengthFieldPrepender;
 import org.junit.jupiter.api.Test;
 
 import dev.kage.account.api.AccountFacade;
@@ -1552,31 +1552,35 @@ class GatewayPipelineTest {
                 arenaInstanceRegistry);
         characterPort.worldGateway = worldGateway;
 
-        return new EmbeddedChannel(
-                new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
-                new LengthFieldPrepender(4),
-                new PacketFrameDecoder(),
-                new PacketFrameEncoder(),
-                new GatewayChannelHandler(
-                        new GatewayFacades(
-                                accountFacade,
-                                characterFacade,
-                                inventoryFacade,
-                                new ContentFacades(
-                                        shopFacade,
-                                        dialogueFacade,
-                                        questFacade,
-                                        new SocialFacades(
-                                                friendFacade,
-                                                mailFacade,
-                                                chatFacade,
-                                                guildFacade,
-                                                partyFacade,
-                                                tradeFacade,
-                                                pvpFacade))),
-                        worldGateway,
-                        Runnable::run,
-                        observability));
+        // Pipeline dựng bằng CHÍNH hàm của server (GatewayServer.addProtocolHandlers) thay vì chép
+        // tay — bản chép tay từng thiếu IdleStateHandler mà không test nào thấy (2026-10-02).
+        GatewayChannelHandler handler = new GatewayChannelHandler(
+                new GatewayFacades(
+                        accountFacade,
+                        characterFacade,
+                        inventoryFacade,
+                        new ContentFacades(
+                                shopFacade,
+                                dialogueFacade,
+                                questFacade,
+                                new SocialFacades(
+                                        friendFacade,
+                                        mailFacade,
+                                        chatFacade,
+                                        guildFacade,
+                                        partyFacade,
+                                        tradeFacade,
+                                        pvpFacade))),
+                worldGateway,
+                Runnable::run,
+                observability);
+        // ChannelInitializer chạy lúc register, TRƯỚC channelActive — cùng thứ tự với server thật.
+        return new EmbeddedChannel(new ChannelInitializer<Channel>() {
+            @Override
+            protected void initChannel(Channel ch) {
+                GatewayServer.addProtocolHandlers(ch.pipeline(), handler);
+            }
+        });
     }
 
     /** Fake = implementation in-memory THẬT (TESTING.md §4), không Mockito. */

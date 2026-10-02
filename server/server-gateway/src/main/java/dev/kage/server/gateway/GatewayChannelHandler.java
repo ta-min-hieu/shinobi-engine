@@ -17,6 +17,8 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.timeout.IdleState;
+import io.netty.handler.timeout.IdleStateEvent;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.context.Context;
@@ -299,6 +301,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // NETWORK.md §13 (đề xuất, chưa verify): MoveCommand ≤ tick rate (30/giây).
     private static final int MAX_MOVE_COMMANDS_PER_SECOND = 30;
 
+    // Cùng trần với MoveCommand — lý do ở combatCommandRateLimiter bên dưới.
+    private static final int MAX_COMBAT_COMMANDS_PER_SECOND = 30;
+
     // Chủ dự án duyệt 2026-09-24: trần CHUNG cho mọi lệnh chạm DB (mọi lệnh đi qua executeBlocking).
     // Cỡ theo client THẬT, đếm từ client-core: đăng nhập ≤4 (Connect, ListCharacters, CreateCharacter,
     // SelectCharacter), vào world 2 (GetItemCatalog, ListQuests — WorldScreen.show), rồi mở MỌI cửa sổ
@@ -349,6 +354,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // Chỉ chạm trong executeBlocking, mà executeBlocking chỉ được gọi từ các handle*Command/Request
     // do channelRead0 phát — tức trên EventLoop của CHÍNH kết nối này, cùng quy ước moveCommandRateLimiter.
     private final RateLimiter dbCommandRateLimiter = new RateLimiter(MAX_DB_COMMANDS_PER_SECOND, Duration.ofSeconds(1));
+    // SetTarget/Attack/UseSkill (2026-10-02). Bản cũ không giới hạn vì "cooldown tự chặn tần suất
+    // thật" — đúng về GAMEPLAY nhưng sai về TÀI NGUYÊN: mỗi gói vẫn là một WorldCommand trong inbox
+    // KHÔNG giới hạn của WorldFacade, và tick thread (một luồng, chung cả khu vực) phải rút HẾT mỗi
+    // tick. Một client spam gói 7 byte ở tốc độ đường truyền làm cả khu vực giật. Dùng chung trần với
+    // MoveCommand: client thật gửi vài lệnh chiến đấu mỗi giây (đánh 1 đòn/giây kèm vài lần gửi lại,
+    // đổi mục tiêu khi click, skill theo hồi chiêu) — cách trần cả chục lần, không đổi cảm giác chơi.
+    private final RateLimiter combatCommandRateLimiter =
+            new RateLimiter(MAX_COMBAT_COMMANDS_PER_SECOND, Duration.ofSeconds(1));
     // NETWORK.md §13 (đề xuất, chưa verify) — World nghiêm ngặt nhất (toàn server thấy), Khu vực
     // lỏng nhất (chỉ người gần thấy), Riêng tư ở giữa, khớp bảng GAMEPLAY.md §10.
     private final RateLimiter chatWorldRateLimiter = new RateLimiter(5, Duration.ofSeconds(10));
@@ -1077,8 +1090,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     // SetTargetCommand KHÔNG chạm DB — chỉ enqueue vào server-world (rẻ, thread-safe), xử lý
     // thẳng trên EventLoop giống handleMoveCommand. GDD §6 "Auto-target": đây KHÔNG phải lệnh
-    // "đánh 1 nhát" nên không cần rate limit riêng như MoveCommand (tần suất thấp — người chơi
-    // chọn mục tiêu, không lặp lại mỗi tick).
+    // "đánh 1 nhát". Tần suất thật thấp, nhưng vẫn qua trần chiến đấu chung (tryAcquireCombatCommand).
     private void handleSetTargetCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         SetTargetCommand command = SetTargetCommand.parseFrom(payload);
@@ -1088,13 +1100,34 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
+        if (!tryAcquireCombatCommand(ctx, characterId)) {
+            return;
+        }
         currentWorldFacade(characterId).setTarget(characterId, command.getTargetEntityId());
     }
 
+    /**
+     * Trần chung cho SetTarget/Attack/UseSkill — xem {@link #combatCommandRateLimiter}. Vượt một cửa
+     * sổ ⇒ bỏ IM LẶNG như MoveCommand (ba lệnh này không có response nào để báo); vượt liên tiếp ⇒
+     * ngắt kết nối.
+     *
+     * @return {@code false} nếu caller phải bỏ lệnh
+     */
+    private boolean tryAcquireCombatCommand(ChannelHandlerContext ctx, long characterId) {
+        if (combatCommandRateLimiter.tryAcquire()) {
+            return true;
+        }
+        networkMetrics.recordRateLimitRejected("combat");
+        if (combatCommandRateLimiter.shouldDisconnect()) {
+            LOG.warn("Lệnh chiến đấu vượt rate limit liên tục — ngắt kết nối: characterId={}", characterId);
+            ctx.close();
+        }
+        return false;
+    }
+
     // AttackCommand KHÔNG chạm DB — chỉ enqueue vào server-world, xử lý thẳng trên EventLoop giống
-    // handleSetTargetCommand. Không rate limit riêng: cooldown đánh thường (CombatSystem, 1 đòn/
-    // giây) tự chặn tần suất THẬT — spam gói quá cooldown chỉ là no-op, cùng lý do UseSkillCommand
-    // bên dưới không có rate limit.
+    // handleSetTargetCommand. Cooldown đánh thường (CombatSystem, 1 đòn/giây) chặn tần suất GAMEPLAY,
+    // nhưng không chặn chi phí mỗi gói trên tick thread — nên vẫn qua tryAcquireCombatCommand.
     private void handleAttackCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         AttackCommand.parseFrom(payload); // message rỗng — parse chỉ để validate wire format.
@@ -1104,12 +1137,15 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
+        if (!tryAcquireCombatCommand(ctx, characterId)) {
+            return;
+        }
         currentWorldFacade(characterId).attack(characterId);
     }
 
     // UseSkillCommand KHÔNG chạm DB — chỉ enqueue vào server-world, xử lý thẳng trên EventLoop
-    // giống handleSetTargetCommand. Cooldown skill tự giới hạn tần suất thật (SkillSystem) nên
-    // không cần rate limit riêng — spam quá cooldown chỉ là no-op, không ảnh hưởng gameplay.
+    // giống handleSetTargetCommand. Cooldown skill (SkillSystem) giới hạn tần suất GAMEPLAY; trần
+    // chi phí gói là tryAcquireCombatCommand, cùng lý do AttackCommand.
     private void handleUseSkillCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         UseSkillCommand command = UseSkillCommand.parseFrom(payload);
@@ -1117,6 +1153,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        if (!tryAcquireCombatCommand(ctx, characterId)) {
             return;
         }
         currentWorldFacade(characterId).useSkill(characterId, command.getSkillCode(), command.getTargetEntityId());
@@ -3878,6 +3917,36 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         for (long friendId : friendIds) {
             worldGateway.registry().sendToCharacterIfOnline(friendId, opcode, 0, payload);
         }
+    }
+
+    /**
+     * Hết hạn im lặng (NETWORK.md §10, {@code GatewayServer#READER_IDLE_TIMEOUT}) ⇒ đóng kết nối;
+     * {@link #channelInactive} dọn nhân vật như mọi lần ngắt khác.
+     */
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
+        if (evt instanceof IdleStateEvent idle && idle.state() == IdleState.READER_IDLE) {
+            LOG.info(
+                    "Kết nối im lặng quá lâu — đóng: remote={}, characterId={}",
+                    ctx.channel().remoteAddress(),
+                    boundCharacterId);
+            ctx.close();
+            return;
+        }
+        ctx.fireUserEventTriggered(evt);
+    }
+
+    /**
+     * Client không đọc phản hồi (hàng đợi ghi vượt high water mark) ⇒ NGỪNG đọc lệnh mới của nó cho
+     * tới khi nó đọc kịp. Trước 2026-10-02 không có chặn này: mỗi Ping/lệnh sai đều đẻ một phản hồi,
+     * và một client gửi liên tục mà không bao giờ đọc làm hàng đợi ghi của server phình không giới
+     * hạn trong heap. Ngừng đọc thì lệnh dồn lại ở bộ đệm TCP của CHÍNH client đó; nếu nó không đọc
+     * lại trong {@code READER_IDLE_TIMEOUT}, {@link #userEventTriggered} đóng kết nối.
+     */
+    @Override
+    public void channelWritabilityChanged(ChannelHandlerContext ctx) {
+        ctx.channel().config().setAutoRead(ctx.channel().isWritable());
+        ctx.fireChannelWritabilityChanged();
     }
 
     @Override
