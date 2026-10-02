@@ -55,6 +55,14 @@ public final class CombatHud implements HudWindow {
     /** Nút chiêu nhỏ hơn nút Đánh — thứ bậc thị giác: đánh thường là hành động chính (2026-08-09). */
     private static final float SKILL_BUTTON_SIZE = 76f;
 
+    private static final float NAME_PLATE_PAD_Y = 4f;
+
+    /**
+     * Khung biển tên là texture 64px kéo giãn ({@code KageSkin.framed}), nên viền 2px phồng lên ~4px ở bề
+     * rộng ~130px. Lề ngang 4px làm nhãn dài như "Flamesphere" đè lên viền (kiểm sống 2026-10-02).
+     */
+    private static final float NAME_PLATE_PAD_X = 10f;
+
     private final Stage stage;
     private final KageSkin skin;
     private final I18NBundle i18n;
@@ -382,7 +390,7 @@ public final class CombatHud implements HudWindow {
         label.setAlignment(Align.center);
         Table plate = new Table();
         plate.setBackground(skin.panel);
-        plate.add(label).pad(4f);
+        plate.add(label).pad(NAME_PLATE_PAD_Y, NAME_PLATE_PAD_X, NAME_PLATE_PAD_Y, NAME_PLATE_PAD_X);
         return plate;
     }
 

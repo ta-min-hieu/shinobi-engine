@@ -91,7 +91,7 @@ final class DungeonCoordinator implements WindowFlow {
         if (opcode == Opcode.OPCODE_DUNGEON_ENTERED_EVENT_VALUE) {
             // Không field nào cần đọc ở lát cắt này — parse để chắc payload hợp lệ, cùng cách
             // GatewayChannelHandler làm với ExitDungeonCommand.
-            DungeonEnteredEvent.parseFrom(payload);
+            DungeonEnteredEvent.parser().parseFrom(payload);
             settlePulledIn();
             return true;
         }
