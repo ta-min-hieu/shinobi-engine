@@ -185,8 +185,11 @@ public final class GatewayServer {
      */
     public void stop() {
         LOG.info("Đang tắt server-gateway...");
-        if (serverChannel != null) {
-            serverChannel.close();
+        // isOpen: stop() gọi lần hai (event loop đã tắt) thì close() trả future THẤT BẠI — chờ nó là ném.
+        if (serverChannel != null && serverChannel.isOpen()) {
+            // Chờ đóng XONG: bước (1) phải hoàn tất trước khi báo người chơi ở bước (2), không thì
+            // một kết nối mới vẫn có thể lọt vào giữa lúc broadcast và không nhận được thông báo.
+            serverChannel.close().syncUninterruptibly();
         }
         context.worldGateway().registry().broadcastShuttingDown();
         awaitGracefully(workerGroup);
