@@ -623,6 +623,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
+        if (rejectMalformedIdempotencyKey(ctx, sequenceId, request.getIdempotencyKey())) {
+            return;
+        }
         executeBlocking(ctx, sequenceId, () -> handleCreateCharacterBlocking(ctx, sequenceId, accountId, request));
     }
 
@@ -1273,6 +1276,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // Gộp characterId/command/tracingContext vào 1 record — tránh vượt Checkstyle ParameterNumber
         // (max 4) mà không cần đổi field instance (per-connection nhưng có thể pipeline nhiều lệnh).
         EnhanceItemRequest request = new EnhanceItemRequest(sequenceId, characterId, command, Context.current());
+        if (rejectMalformedIdempotencyKey(ctx, sequenceId, command.getIdempotencyKey())) {
+            return;
+        }
         executeBlocking(ctx, sequenceId, () -> handleEnhanceItemBlocking(ctx, request));
     }
 
@@ -1572,6 +1578,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // Context.current() PHẢI chụp NGAY ở đây (còn trên EventLoop, bên trong span "gateway.command"
         // của channelRead0) — cùng lý do EnhanceItemRequest ở handleEnhanceItemCommand.
         BuyItemRequest request = new BuyItemRequest(sequenceId, characterId, command, Context.current());
+        if (rejectMalformedIdempotencyKey(ctx, sequenceId, command.getIdempotencyKey())) {
+            return;
+        }
         executeBlocking(ctx, sequenceId, () -> handleBuyItemBlocking(ctx, request));
     }
 
@@ -1622,6 +1631,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         // Context.current() PHẢI chụp NGAY ở đây — cùng lý do handleBuyItemCommand.
         SellItemRequest request = new SellItemRequest(sequenceId, characterId, command, Context.current());
+        if (rejectMalformedIdempotencyKey(ctx, sequenceId, command.getIdempotencyKey())) {
+            return;
+        }
         executeBlocking(ctx, sequenceId, () -> handleSellItemBlocking(ctx, request));
     }
 
@@ -1784,6 +1796,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        if (rejectMalformedIdempotencyKey(ctx, sequenceId, command.getIdempotencyKey())) {
             return;
         }
         executeBlocking(ctx, sequenceId, () -> handleClaimQuestRewardBlocking(ctx, sequenceId, characterId, command));
@@ -3094,6 +3109,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         // Context.current() PHẢI chụp NGAY ở đây — cùng lý do handleBuyItemCommand.
         ConfirmTradeRequest request = new ConfirmTradeRequest(sequenceId, characterId, command, Context.current());
+        if (rejectMalformedIdempotencyKey(ctx, sequenceId, command.getIdempotencyKey())) {
+            return;
+        }
         executeBlocking(ctx, sequenceId, () -> handleConfirmTradeBlocking(ctx, request));
     }
 
@@ -3267,6 +3285,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // này, và ký quỹ vàng/vật phẩm trong SendMailUseCase luôn chạy. Đường "thư hệ thống miễn
         // ký quỹ" chỉ với tới được từ code server.
         MailFacade.SendOutcome outcome = mailFacade.sendMail(request);
+        if (outcome.result() == MailFacade.SendResult.INVALID_TEXT) {
+            // Không có SendMailOutcome nào khớp (thêm là đổi protocol) — đi đường ErrorResponse như
+            // mọi dữ liệu dây hỏng khác; client khớp theo sequenceId. Chưa có thư nào được tạo.
+            sendError(ctx, sequenceId, 400, "error.invalid_payload");
+            return;
+        }
         SendMailResponse response = SendMailResponse.newBuilder()
                 .setOutcome(toProtoOutcome(outcome.result()))
                 .setMailId(outcome.mailId())
@@ -3343,6 +3367,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         Long characterId = boundCharacterId;
         if (characterId == null) {
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        if (rejectMalformedIdempotencyKey(ctx, sequenceId, command.getIdempotencyKey())) {
             return;
         }
         executeBlocking(ctx, sequenceId, () -> handleClaimMailBlocking(ctx, sequenceId, characterId, command));
@@ -3720,6 +3747,27 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 sendError(ctx, sequenceId, 500, "error.server_internal");
             }
         });
+    }
+
+    /**
+     * {@code idempotencyKey} không phải UUID ⇒ trả 400 {@code error.invalid_payload} ngay trên
+     * EventLoop, KHÔNG đẩy sang {@code authExecutor} (sửa 2026-10-02).
+     *
+     * <p>Trước đó chuỗi bẩn đi thẳng tới {@code UUID.fromString} trong adapter idempotency của
+     * {@code server-database}, NỔ {@link IllegalArgumentException} giữa transaction — và mỗi handler
+     * hiểu exception đó một kiểu: tạo nhân vật báo {@code error.invalid_character_name} (nhánh bắt
+     * IAE vốn dành cho tên), còn cường hoá/mua/bán/nhận thưởng/giao dịch/nhận thư rơi vào lưới cuối
+     * {@code error.server_internal} 500. Định dạng khoá là hợp đồng dây (ADR-025: client sinh UUID),
+     * nên kiểm ở biên dây — một chỗ cho cả bảy lệnh.
+     *
+     * @return {@code true} nếu đã từ chối (caller dừng lại)
+     */
+    private boolean rejectMalformedIdempotencyKey(ChannelHandlerContext ctx, int sequenceId, String idempotencyKey) {
+        if (IdempotencyKeyFormat.isWellFormed(idempotencyKey)) {
+            return false;
+        }
+        sendError(ctx, sequenceId, 400, "error.invalid_payload");
+        return true;
     }
 
     private void sendError(ChannelHandlerContext ctx, int relatedSequenceId, int errorCode, String errorKey) {

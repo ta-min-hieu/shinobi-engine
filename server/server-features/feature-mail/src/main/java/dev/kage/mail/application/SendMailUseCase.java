@@ -119,6 +119,7 @@ public final class SendMailUseCase {
             case ATTACHMENT_INVALID -> SendOutcome.INVALID_ATTACHMENT;
             case SUBJECT_TOO_LONG -> SendOutcome.SUBJECT_TOO_LONG;
             case BODY_TOO_LONG -> SendOutcome.BODY_TOO_LONG;
+            case TEXT_CONTAINS_NUL -> SendOutcome.INVALID_TEXT;
         };
     }
 
@@ -139,6 +140,8 @@ public final class SendMailUseCase {
         INVALID_GOLD_AMOUNT,
         INVALID_ATTACHMENT,
         SUBJECT_TOO_LONG,
-        BODY_TOO_LONG
+        BODY_TOO_LONG,
+        /** Tiêu đề/nội dung chứa ký tự không lưu được ({@code U+0000}). */
+        INVALID_TEXT
     }
 }

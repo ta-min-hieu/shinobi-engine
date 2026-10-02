@@ -25,6 +25,10 @@ class GetDialogueNodeUseCaseTest {
 
         @Override
         public Optional<String> findDialogueScriptRefByCode(String npcCode) {
+            // Giống adapter thật: Postgres từ chối U+0000 trong tham số chuỗi, kể cả ở câu SELECT.
+            if (npcCode.indexOf('\0') >= 0) {
+                throw new IllegalStateException("Postgres từ chối U+0000 trong tham số chuỗi");
+            }
             return "known_npc".equals(npcCode) ? Optional.of(scriptRef) : Optional.empty();
         }
     }
@@ -34,6 +38,16 @@ class GetDialogueNodeUseCaseTest {
         GetDialogueNodeUseCase useCase = new GetDialogueNodeUseCase(new FakeNpcTemplatePort(TEST_SCRIPT_REF));
 
         Optional<DialogueNode> result = useCase.execute("unknown_npc", DialogueNode.START_NODE_ID);
+
+        assertThat(result).isEmpty();
+    }
+
+    /** Bug 2026-10-02: mã NPC chứa U+0000 từng tới câu SELECT — Postgres từ chối, client nhận 500. */
+    @Test
+    void shouldReturnEmpty_whenNpcCodeContainsNul() {
+        GetDialogueNodeUseCase useCase = new GetDialogueNodeUseCase(new FakeNpcTemplatePort(TEST_SCRIPT_REF));
+
+        Optional<DialogueNode> result = useCase.execute("known\0npc", DialogueNode.START_NODE_ID);
 
         assertThat(result).isEmpty();
     }

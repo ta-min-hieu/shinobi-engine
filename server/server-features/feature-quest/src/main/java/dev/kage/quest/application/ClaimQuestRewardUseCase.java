@@ -44,6 +44,11 @@ public final class ClaimQuestRewardUseCase {
     }
 
     public ClaimResult execute(long characterId, String questCode, String idempotencyKey) {
+        // questCode đến thẳng từ packet. U+0000 không thể có trong quest_template.code — và Postgres
+        // từ chối nó ngay cả ở câu SELECT, nên trước 2026-10-02 client nhận 500 thay vì "không có".
+        if (questCode.indexOf('\0') >= 0) {
+            return ClaimResult.notFound();
+        }
         QuestTemplate template = templatePort.findByCode(questCode).orElse(null);
         if (template == null) {
             return ClaimResult.notFound();

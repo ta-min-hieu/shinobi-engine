@@ -45,6 +45,11 @@ public final class GetDialogueNodeUseCase {
     }
 
     public Optional<DialogueNode> execute(String npcCode, String nodeId) {
+        // npcCode đến thẳng từ packet. U+0000 không thể có trong npc_template.code — và Postgres từ
+        // chối nó ngay cả ở câu SELECT, nên trước 2026-10-02 client nhận 500 thay vì 404.
+        if (npcCode.indexOf('\0') >= 0) {
+            return Optional.empty();
+        }
         Optional<String> scriptRef = npcTemplatePort.findDialogueScriptRefByCode(npcCode);
         if (scriptRef.isEmpty()) {
             return Optional.empty();

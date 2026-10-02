@@ -63,6 +63,7 @@ public final class MailFacade {
             case INVALID_ATTACHMENT -> SendResult.INVALID_ATTACHMENT;
             case SUBJECT_TOO_LONG -> SendResult.SUBJECT_TOO_LONG;
             case BODY_TOO_LONG -> SendResult.BODY_TOO_LONG;
+            case INVALID_TEXT -> SendResult.INVALID_TEXT;
         };
     }
 
@@ -110,7 +111,12 @@ public final class MailFacade {
         INVALID_GOLD_AMOUNT,
         INVALID_ATTACHMENT,
         SUBJECT_TOO_LONG,
-        BODY_TOO_LONG
+        BODY_TOO_LONG,
+        /**
+         * Tiêu đề/nội dung chứa {@code U+0000}. KHÔNG có giá trị {@code SendMailOutcome} tương ứng
+         * (thêm là đổi protocol) — gateway trả {@code ErrorResponse} {@code error.invalid_payload}.
+         */
+        INVALID_TEXT
     }
 
     public enum ClaimResult {

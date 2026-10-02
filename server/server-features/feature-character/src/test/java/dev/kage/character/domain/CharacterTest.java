@@ -50,4 +50,16 @@ class CharacterTest {
     void validateNameShouldMatchCompactConstructorRules() {
         assertThatThrownBy(() -> Character.validateName("A")).isInstanceOf(IllegalArgumentException.class);
     }
+
+    /** Bản không ném phải nói đúng điều {@code validateName} nói — kể cả với U+0000 và null. */
+    @Test
+    void isValidNameShouldAgreeWithValidateName() {
+        assertThat(Character.isValidName("KageHero")).isTrue();
+        assertThat(Character.isValidName("Nguyên_Anh")).isTrue();
+        assertThat(Character.isValidName("A")).isFalse();
+        assertThat(Character.isValidName("A".repeat(17))).isFalse();
+        assertThat(Character.isValidName("Kage\0Hero")).isFalse();
+        assertThat(Character.isValidName("Kage Hero")).isFalse();
+        assertThat(Character.isValidName(null)).isFalse();
+    }
 }

@@ -26,6 +26,8 @@ public final class LoginOrCreateAccountUseCase {
     }
 
     public LoginResult execute(String username) {
+        // Kiểm TRƯỚC khi chạm DB — xem javadoc Account#validateUsername.
+        Account.validateUsername(username);
         AtomicReference<Account> accountHolder = new AtomicReference<Account>();
         transactionManager.inTransaction(tx -> accountHolder.set(accountPort.findOrCreate(tx, username)));
 

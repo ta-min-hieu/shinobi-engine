@@ -66,29 +66,36 @@ public final class JdbcTransactionRunner {
     // PMD AvoidCatchingGenericException: đúng ý — transaction PHẢI rollback khi action ném BẤT KỲ
     // RuntimeException nào (không thể liệt kê hết loại exception nghiệp vụ của caller). Đây là
     // ranh giới transaction, không phải nơi xử lý lỗi nghiệp vụ cụ thể — rethrow ngay sau rollback.
+    //
+    // SQLException cũng phải đi qua nhánh dọn dẹp (sửa 2026-10-02): COMMIT tự nó có thể thất bại (mất
+    // kết nối, ràng buộc DEFERRABLE, lỗi tuần tự hoá) và ném SQLException CHECKED. Bản cũ chỉ bắt
+    // RuntimeException nên commit hỏng bỏ qua cả việc đếm kage.db.transaction.failed lẫn việc vứt
+    // vàng ghi tạm trong GoldLedger — thay đổi đó nằm lại theo Connection mãi mãi, và nếu đối tượng
+    // Connection được dùng lại thì bị BÁO ở lần commit sau (JdbcTransactionRunnerCommitFailureTest).
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private static void runAction(Connection connection, Consumer<Connection> action) throws SQLException {
         try {
             action.accept(connection);
             connection.commit();
-            GoldLedger.publishCommitted(connection);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | SQLException e) {
             rollbackQuietly(connection);
             throw e;
         }
+        GoldLedger.publishCommitted(connection);
     }
 
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private static <T> T callAction(Connection connection, Function<Connection, T> action) throws SQLException {
+        T result;
         try {
-            T result = action.apply(connection);
+            result = action.apply(connection);
             connection.commit();
-            GoldLedger.publishCommitted(connection);
-            return result;
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | SQLException e) {
             rollbackQuietly(connection);
             throw e;
         }
+        GoldLedger.publishCommitted(connection);
+        return result;
     }
 
     private static void rollbackQuietly(Connection connection) {

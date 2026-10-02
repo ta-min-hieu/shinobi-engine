@@ -184,6 +184,17 @@ class SendMailUseCaseTest {
         assertThat(fixture.repositoryPort.stored).isEmpty();
     }
 
+    @Test
+    void shouldRejectNulCharacter_beforeEscrowingAnything() {
+        Fixture fixture = fixture();
+
+        SendMailUseCase.SendResult result =
+                fixture.useCase().execute(new MailDraft(SENDER_ID, RECIPIENT_ID, "s", "hi\0there", 0, List.of()));
+
+        assertThat(result.outcome()).isEqualTo(SendMailUseCase.SendOutcome.INVALID_TEXT);
+        assertThat(fixture.repositoryPort.stored).isEmpty();
+    }
+
     /** Thư hệ thống không có ai để trừ — nhánh này chỉ với tới được từ code server, không từ client. */
     @Test
     void shouldSkipEscrow_forSystemMailWithNullSender() {

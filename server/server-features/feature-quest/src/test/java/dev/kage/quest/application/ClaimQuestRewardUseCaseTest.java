@@ -31,6 +31,10 @@ class ClaimQuestRewardUseCaseTest {
     static final class FakeQuestTemplatePort implements QuestTemplatePort {
         @Override
         public Optional<QuestTemplate> findByCode(String questCode) {
+            // Giống adapter thật: Postgres từ chối U+0000 trong tham số chuỗi, kể cả ở câu SELECT.
+            if (questCode.indexOf('\0') >= 0) {
+                throw new IllegalStateException("Postgres từ chối U+0000 trong tham số chuỗi");
+            }
             if (QUEST_CODE.equals(questCode)) {
                 return Optional.of(QuestTemplate.withoutPrerequisite(TEMPLATE_ID, SCRIPT_REF));
             }
@@ -155,6 +159,17 @@ class ClaimQuestRewardUseCaseTest {
                 new FakeQuestProgressPort(null), new FakeExpPort(), new FakeInventoryGrantPort(), new FakeAuditPort());
 
         ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, "unknown_code", IDEMPOTENCY_KEY);
+
+        assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.QUEST_NOT_FOUND);
+    }
+
+    /** Bug 2026-10-02: mã quest chứa U+0000 từng tới câu SELECT — Postgres từ chối, client nhận 500. */
+    @Test
+    void shouldReturnQuestNotFound_whenCodeContainsNul() {
+        ClaimQuestRewardUseCase useCase = newUseCase(
+                new FakeQuestProgressPort(null), new FakeExpPort(), new FakeInventoryGrantPort(), new FakeAuditPort());
+
+        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, "known\0quest", IDEMPOTENCY_KEY);
 
         assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.QUEST_NOT_FOUND);
     }

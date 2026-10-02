@@ -88,8 +88,19 @@ public final class CharacterFacade {
         return characterPort.loadGold(characterId);
     }
 
-    /** Tra nhân vật theo tên — dùng cho kết bạn/gửi thư theo tên (feature-friend, feature-mail). */
+    /**
+     * Tra nhân vật theo tên — dùng cho kết bạn/gửi thư theo tên (feature-friend, feature-mail).
+     *
+     * <p>Tên không hợp lệ ({@link Character#isValidName}) trả rỗng NGAY, không chạm DB (sửa
+     * 2026-10-02): tên đến thẳng từ packet của client ở chín đường (thư, chat riêng, kết bạn, mời
+     * nhóm/bang, giao dịch, đấu trường...), và một tên chứa {@code U+0000} từng làm Postgres từ chối
+     * câu SELECT — người chơi nhận 500 {@code error.server_internal} thay vì "không tìm thấy". Không
+     * mất kết quả nào: mọi nhân vật đã lưu đều qua đúng luật này.
+     */
     public Optional<Character> findByName(String name) {
+        if (!Character.isValidName(name)) {
+            return Optional.empty();
+        }
         return characterPort.findByName(name);
     }
 

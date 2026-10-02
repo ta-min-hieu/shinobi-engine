@@ -33,6 +33,10 @@ final class FakeGuildPort implements GuildPort {
 
     @Override
     public Optional<Guild> findByName(String name) {
+        // Giống adapter thật: Postgres từ chối U+0000 trong tham số chuỗi, kể cả ở câu SELECT.
+        if (name.indexOf('\0') >= 0) {
+            throw new IllegalStateException("Postgres từ chối U+0000 trong tham số chuỗi");
+        }
         return guildsById.values().stream().filter(g -> g.name().equals(name)).findFirst();
     }
 

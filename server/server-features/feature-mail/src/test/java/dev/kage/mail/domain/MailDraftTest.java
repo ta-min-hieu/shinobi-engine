@@ -52,6 +52,13 @@ class MailDraftTest {
         assertThat(draft("s", tooLong, 0, List.of()).validate()).contains(MailContentViolation.BODY_TOO_LONG);
     }
 
+    /** Postgres không lưu được U+0000 trong cột text — trước 2026-10-02 nó rơi xuống thành 500. */
+    @Test
+    void shouldRejectNulCharacter_inSubjectOrBody() {
+        assertThat(draft("a\0b", "b", 0, List.of()).validate()).contains(MailContentViolation.TEXT_CONTAINS_NUL);
+        assertThat(draft("s", "\0", 0, List.of()).validate()).contains(MailContentViolation.TEXT_CONTAINS_NUL);
+    }
+
     @Test
     void shouldAcceptBodyExactlyAtColumnWidth() {
         String exact = "b".repeat(MailDraft.MAX_BODY_LENGTH);

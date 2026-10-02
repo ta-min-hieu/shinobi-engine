@@ -8,6 +8,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.Optional;
 
 import javax.sql.DataSource;
 
@@ -18,7 +19,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import dev.kage.account.application.LoginOrCreateAccountUseCase;
 import dev.kage.account.domain.Account;
+import dev.kage.account.domain.SessionPort;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.PostgresDataSourceFactory;
@@ -100,6 +103,37 @@ class PostgresAccountAdapterIntegrationTest {
                         .as("rollback phải xoá row chưa commit")
                         .isZero();
             }
+        }
+    }
+
+    /**
+     * Bug 2026-10-02 trên DB THẬT: username 21 ký tự từng chạm câu INSERT, cột {@code VARCHAR(20)}
+     * từ chối bằng {@code DatabaseAccessException} và gateway trả 500 {@code error.login_failed}.
+     * Giờ phải là {@link IllegalArgumentException} (gateway dịch thành {@code error.invalid_username}).
+     */
+    @Test
+    void shouldRejectOverlongUsername_asInvalidInput_notAsDatabaseFailure() {
+        LoginOrCreateAccountUseCase useCase = new LoginOrCreateAccountUseCase(
+                new PostgresAccountAdapter(), new UnusedSessionPort(), new JdbcAccountTransactionRunner(dataSource));
+
+        assertThatThrownBy(() -> useCase.execute("a".repeat(21))).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    /** Không bao giờ được gọi — username không hợp lệ phải dừng trước khi tới session. */
+    private static final class UnusedSessionPort implements SessionPort {
+        @Override
+        public String issue(long accountId) {
+            throw new AssertionError("không được phát session cho username không hợp lệ");
+        }
+
+        @Override
+        public Optional<Long> validateAndRenew(String token) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void revoke(String token) {
+            // không dùng
         }
     }
 }

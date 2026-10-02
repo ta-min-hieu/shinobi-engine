@@ -23,6 +23,12 @@ public final class SendGuildJoinRequestUseCase {
         if (port.findMembershipOf(characterId).isPresent()) {
             return Result.ALREADY_IN_GUILD;
         }
+        // KHÔNG lọc bằng GuildName.isValid: bang tạo trước 2026-09-29 có thể mang tên ngoài luật mới
+        // (xem javadoc GuildName) mà vẫn phải xin vào được. Chỉ chặn đúng thứ chắc chắn không thể có
+        // trong DB — U+0000, ký tự Postgres từ chối ngay cả ở câu SELECT (từng ra 500, 2026-10-02).
+        if (guildName.indexOf('\0') >= 0) {
+            return Result.GUILD_NOT_FOUND;
+        }
         Optional<Guild> guild = port.findByName(guildName);
         if (guild.isEmpty()) {
             return Result.GUILD_NOT_FOUND;

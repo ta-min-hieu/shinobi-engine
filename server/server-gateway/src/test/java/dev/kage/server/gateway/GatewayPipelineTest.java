@@ -1674,6 +1674,11 @@ class GatewayPipelineTest {
 
         @Override
         public Optional<Character> findByName(String name) {
+            // Giống PostgresCharacterAdapter thật: Postgres từ chối U+0000 trong tham số chuỗi, kể cả
+            // ở câu SELECT (PostgresCharacterAdapterIntegrationTest#shouldFailLoudly_on...).
+            if (name.indexOf('\0') >= 0) {
+                throw new IllegalStateException("Postgres từ chối U+0000 trong tham số chuỗi");
+            }
             return characters.stream().filter(c -> c.name().equals(name)).findFirst();
         }
 

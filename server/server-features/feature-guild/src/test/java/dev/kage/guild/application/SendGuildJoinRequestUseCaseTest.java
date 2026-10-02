@@ -27,6 +27,18 @@ class SendGuildJoinRequestUseCaseTest {
         assertThat(result).isEqualTo(SendGuildJoinRequestUseCase.Result.GUILD_NOT_FOUND);
     }
 
+    /** Bug 2026-10-02: tên chứa U+0000 từng tới câu SELECT, Postgres từ chối, client nhận 500. */
+    @Test
+    void shouldReportGuildNotFound_whenNameContainsNul() {
+        FakeGuildPort port = new FakeGuildPort();
+        port.createGuild("Konoha", 1);
+        SendGuildJoinRequestUseCase useCase = new SendGuildJoinRequestUseCase(port);
+
+        SendGuildJoinRequestUseCase.Result result = useCase.execute(5, "Kono\0ha");
+
+        assertThat(result).isEqualTo(SendGuildJoinRequestUseCase.Result.GUILD_NOT_FOUND);
+    }
+
     @Test
     void shouldReject_whenCharacterAlreadyInAGuild() {
         FakeGuildPort port = new FakeGuildPort();

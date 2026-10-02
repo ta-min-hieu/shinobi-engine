@@ -23,5 +23,12 @@ public enum MailContentViolation {
     SUBJECT_TOO_LONG,
 
     /** Vượt {@link MailDraft#MAX_BODY_LENGTH}. */
-    BODY_TOO_LONG
+    BODY_TOO_LONG,
+
+    /**
+     * Tiêu đề hoặc nội dung chứa {@code U+0000}. PostgreSQL không lưu được ký tự này trong cột
+     * {@code text}/{@code varchar} — trước 2026-10-02 nó đi tới câu INSERT, nổ ở đó và người chơi
+     * nhận 500 {@code error.server_internal}. Client thật không gõ ra được ký tự này.
+     */
+    TEXT_CONTAINS_NUL
 }

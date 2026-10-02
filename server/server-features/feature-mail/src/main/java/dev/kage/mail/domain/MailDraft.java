@@ -32,6 +32,9 @@ public record MailDraft(
     /** Bằng {@code mail.body VARCHAR(1024)} (V13). */
     public static final int MAX_BODY_LENGTH = 1024;
 
+    /** Ký tự PostgreSQL không lưu được trong cột chuỗi — xem {@link MailContentViolation#TEXT_CONTAINS_NUL}. */
+    private static final char NUL = '\0';
+
     public MailDraft {
         Objects.requireNonNull(subject, "subject");
         Objects.requireNonNull(body, "body");
@@ -54,6 +57,9 @@ public record MailDraft(
         }
         if (body.length() > MAX_BODY_LENGTH) {
             return Optional.of(MailContentViolation.BODY_TOO_LONG);
+        }
+        if (subject.indexOf(NUL) >= 0 || body.indexOf(NUL) >= 0) {
+            return Optional.of(MailContentViolation.TEXT_CONTAINS_NUL);
         }
         for (MailAttachmentDraft attachment : attachments) {
             if (!attachment.isValid()) {
