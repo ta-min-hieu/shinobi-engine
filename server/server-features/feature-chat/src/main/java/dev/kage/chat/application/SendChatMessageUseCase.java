@@ -19,7 +19,7 @@ public final class SendChatMessageUseCase {
     }
 
     public Result execute(long senderId, ChatChannel channel, String body) {
-        if (body == null || body.isBlank()) {
+        if (body == null || ChatMessage.isVisuallyBlank(body)) {
             return Result.MESSAGE_BLANK;
         }
         if (body.length() > ChatMessage.MAX_BODY_LENGTH) {
