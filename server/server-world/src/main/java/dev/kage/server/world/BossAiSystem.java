@@ -127,8 +127,10 @@ final class BossAiSystem extends IteratingKSystem {
         }
         bossAi.decisionCooldownSeconds = bossAi.decisionIntervalSeconds;
 
-        if (AI_STATE.get(entity).state != AiState.ATTACK) {
-            return; // chưa vào tầm/chưa có mục tiêu hợp lệ — AiSystem lo phần này.
+        if (AI_STATE.get(entity).state != AiState.ATTACK || HEALTH.get(entity).isDead()) {
+            // Chưa vào tầm/chưa có mục tiêu hợp lệ — AiSystem lo phần này. Hoặc boss vừa bị hạ gục
+            // từ hàng đợi lệnh tick này: entity chỉ bị xoá SAU update(), cái xác không được ra chiêu.
+            return;
         }
         TargetComponent target = TARGET.get(entity);
         KEntity targetEntity = entityLookup.apply(target.targetEntityId);

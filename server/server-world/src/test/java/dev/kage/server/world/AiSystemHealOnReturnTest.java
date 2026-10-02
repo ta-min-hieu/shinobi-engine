@@ -14,6 +14,7 @@ import dev.kage.engine.ecs.component.VelocityComponent;
 import dev.kage.server.world.component.AiParamsComponent;
 import dev.kage.server.world.component.AiState;
 import dev.kage.server.world.component.AiStateComponent;
+import dev.kage.server.world.component.BossAiComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterIdComponent;
 import dev.kage.server.world.component.TargetComponent;
@@ -32,6 +33,7 @@ import dev.kage.server.world.component.TargetComponent;
 class AiSystemHealOnReturnTest {
 
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
+    private static final ComponentMapper<BossAiComponent> BOSS_AI = ComponentMapper.getFor(BossAiComponent.class);
 
     private static final long MONSTER_ID = -1L;
     private static final int MAX_HP = 50;
@@ -106,5 +108,28 @@ class AiSystemHealOnReturnTest {
 
         assertThat(HEALTH.get(monster).current).isEqualTo(MAX_HP);
         assertThat(emitted).isEmpty();
+    }
+
+    /**
+     * Về nhà là "trận đấu reset" (ADR-046 D4) — với boss, phải reset cả PHA chứ không chỉ máu.
+     *
+     * <p>Script boss khai {@code already_enraged} là "chỉ kích hoạt 1 lần/TRẬN". Trước bản sửa, boss
+     * lành đầy máu nhưng {@code enraged} vẫn {@code true}: trận sau nó bỏ hẳn đòn enrage và tung
+     * {@code heavy_strike} với hệ số của pha cuối ngay từ 70% máu — một con 100% máu đánh như con 30%.
+     */
+    @Test
+    void shouldResetTheBossPhase_whenAnEnragedBossGetsBackToItsSpawnPoint() {
+        EcsWorld world = new EcsWorld();
+        KEntity boss = buildReturningMonster(world, 7, 0.1f);
+        BossAiComponent bossAi = new BossAiComponent();
+        bossAi.enraged = true;
+        boss.add(bossAi);
+        AiSystem system = new AiSystem(List::of, id -> null);
+        world.addSystem(system);
+
+        runUntilHome(world, system, 10);
+
+        assertThat(HEALTH.get(boss).current).isEqualTo(MAX_HP);
+        assertThat(BOSS_AI.get(boss).enraged).isFalse();
     }
 }
