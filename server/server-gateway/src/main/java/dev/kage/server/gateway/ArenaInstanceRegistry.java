@@ -135,7 +135,11 @@ final class ArenaInstanceRegistry {
             // Đọc DB NGOÀI khoá — xem javadoc lớp.
             DuelEntrant challenger = loadEntrant(challengerCharacterId);
             DuelEntrant target = loadEntrant(characterId);
-            started = commitStartDuel(challengeId, challenger, target);
+            // Dựng World cũng NGOÀI khoá (2026-10-02): ~55–110ms chạy thử script skill trong GraalJS,
+            // mà EventLoop xin khoá này cho mọi gói di chuyển (worldFacadeFor). Không vào được trận
+            // thì World chưa start này bị bỏ, không có gì phải dừng.
+            WorldFacade duelFacade = new WorldFacade(new ArenaOutboundSink(registry, this), false);
+            started = commitStartDuel(challengeId, challenger, target, duelFacade);
         } finally {
             if (!started) {
                 releaseReservation(challengerCharacterId, characterId);
@@ -290,13 +294,13 @@ final class ArenaInstanceRegistry {
      * TRƯỚC khi gọi {@link #handleDisconnectIfInDuel}, mà lúc đó chưa có trận nào để nó dọn, nên kiểm
      * ở đây là chốt chặn cuối cho việc gắn một người đã ngắt kết nối vào trận.
      */
-    private synchronized boolean commitStartDuel(long challengeId, DuelEntrant challenger, DuelEntrant target) {
+    private synchronized boolean commitStartDuel(
+            long challengeId, DuelEntrant challenger, DuelEntrant target, WorldFacade duelFacade) {
         startingDuelCharacterIds.remove(challenger.characterId());
         startingDuelCharacterIds.remove(target.characterId());
         if (!registry.isOnline(challenger.characterId()) || !registry.isOnline(target.characterId())) {
             return false;
         }
-        WorldFacade duelFacade = new WorldFacade(new ArenaOutboundSink(registry, this), false);
         // World DUY NHẤT được phép PvP (2026-09-24, tạm thời tới khi có vùng Hoang Vực — xem
         // WorldFacade#allowPlayerVersusPlayer). Thiếu dòng này thì đấu Arena không ai gây nổi sát thương.
         duelFacade.allowPlayerVersusPlayer();
