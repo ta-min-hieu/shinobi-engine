@@ -13,6 +13,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.LongPredicate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,6 +91,7 @@ final class DungeonInstanceRegistry {
     private final ConnectedCharacterRegistry registry;
     private final CharacterFacade characterFacade;
     private final PartyFacade partyFacade;
+    private final LongPredicate inDuel;
     private final MainWorldChannelRegistry mainWorldChannels;
 
     /**
@@ -132,13 +134,24 @@ final class DungeonInstanceRegistry {
         this.registry = registry;
         this.characterFacade = facades.characterFacade();
         this.partyFacade = facades.partyFacade();
+        this.inDuel = facades.inDuel();
         this.mainWorldChannels = mainWorldChannels;
         this.worldContent = worldContent;
         this.transfer = new WorldTransfer(registry);
     }
 
-    /** Hai facade hầm ngục cần — xem javadoc constructor về vì sao chúng bị gói lại. */
-    record DungeonFacades(CharacterFacade characterFacade, PartyFacade partyFacade) {}
+    /**
+     * Hai facade hầm ngục cần — xem javadoc constructor về vì sao chúng bị gói lại — kèm câu hỏi "người
+     * này có đang ở đấu trường không" ({@code ArenaInstanceRegistry#isInDuel}, 2026-10-02): lượt kéo
+     * cả nhóm KHÔNG được gắn một người đang đấu vào thêm World hầm ngục.
+     */
+    record DungeonFacades(CharacterFacade characterFacade, PartyFacade partyFacade, LongPredicate inDuel) {
+
+        /** Không có đấu trường — chỉ cho test và dựng thử, nơi không ai đấu được. */
+        DungeonFacades(CharacterFacade characterFacade, PartyFacade partyFacade) {
+            this(characterFacade, partyFacade, characterId -> false);
+        }
+    }
 
     /** {@code WorldFacade} nhân vật này đang ở TRONG (dungeon), rỗng nếu đang ở world chính. */
     synchronized Optional<WorldFacade> worldFacadeFor(long characterId) {
@@ -166,7 +179,9 @@ final class DungeonInstanceRegistry {
         if (!DUNGEON_CODE.equals(dungeonCode)) {
             return EnterOutcome.UNKNOWN_DUNGEON;
         }
-        if (isInDungeon(requestingCharacterId)) {
+        // Người bấm đang ở đấu trường cũng "đã ở trong một instance" — protocol không có outcome riêng
+        // cho trường hợp này (2026-10-02, xem admitIntoInstance), và cho qua là gắn họ vào HAI World.
+        if (isInDungeon(requestingCharacterId) || inDuel.test(requestingCharacterId)) {
             return EnterOutcome.ALREADY_IN_DUNGEON;
         }
         Optional<PartyFacade.MyPartyView> myParty = partyFacade.findMyParty(requestingCharacterId);
@@ -226,6 +241,12 @@ final class DungeonInstanceRegistry {
      *       ngục mà không kết nối nào còn dọn nữa: World hầm ngục tick mãi dù cả nhóm đã ra, và lần
      *       đăng nhập sau bị định tuyến nhầm vào đây. Gỡ đăng ký chạy TRƯỚC lời gọi vào khoá này, nên
      *       hoặc ta thấy họ offline, hoặc {@link #handleDisconnectIfInDungeon} tới sau và dọn họ.
+     *   <li>"có đang ở đấu trường không" (sửa 2026-10-02) — thực thể của người đang đấu nằm trong World
+     *       đấu trường; kéo họ là gắn THÊM một thực thể vào hầm ngục (định tuyến ưu tiên hầm ngục nên
+     *       thực thể trong trận đứng im chịu đòn, và hết trận đấu trường gắn họ về world chính: hai
+     *       thực thể sống). Họ bị BỎ QUA chứ không chặn cả nhóm — hết trận tự bấm vào là gia nhập đúng
+     *       instance của nhóm. Hỏi trong khoá này ⇒ thứ tự khoá hầm ngục → đấu trường, xem
+     *       {@code ArenaInstanceRegistry#isInDuel}.
      * </ul>
      *
      * <p>Không nhận được ai ⇒ {@code admitted} rỗng và KHÔNG dựng instance (bản cũ dựng trước rồi mới
@@ -243,7 +264,9 @@ final class DungeonInstanceRegistry {
         List<PendingEntry> admitted = new ArrayList<>(entries.size());
         for (PendingEntry entry : entries) {
             long characterId = entry.characterId();
-            if (!instanceByCharacterId.containsKey(characterId) && registry.isOnline(characterId)) {
+            if (!instanceByCharacterId.containsKey(characterId)
+                    && registry.isOnline(characterId)
+                    && !inDuel.test(characterId)) {
                 admitted.add(entry);
             }
         }
