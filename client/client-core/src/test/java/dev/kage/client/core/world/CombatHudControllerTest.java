@@ -473,4 +473,54 @@ class CombatHudControllerTest {
         assertThat(controller.playerHp()).isEqualTo(60);
         assertThat(controller.playerMaxHp()).isEqualTo(118);
     }
+
+    /**
+     * ADR-051 — đổi World (vào/ra hầm ngục, đấu trường) là một lần ATTACH MỚI phía server
+     * ({@code WorldFacade#handleAttach}): Khí về đầy, {@code SkillCooldownComponent} mới tinh. Gói
+     * {@code WorldChangedEvent} chỉ chở máu, nên trước bản vá client giữ nguyên Khí đã tiêu và hồi
+     * chiêu đang đếm của world cũ — tiêu hết Khí ở world chính rồi được kéo vào hầm ngục thì nút
+     * chiêu xám mãi (Khí chỉ nạp lại khi hồi sinh), dù server sẵn sàng nhận lệnh ngay.
+     */
+    @Test
+    void shouldRefillChiAndClearSkillCooldown_whenWorldChanges() {
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+        controller.onMonsterSpawned(dummySpawned());
+        int maxUses = CombatConstants.CHARACTER_MAX_CHI / CombatConstants.FIREBALL_CHI_COST;
+        for (int i = 0; i < maxUses - 1; i++) {
+            controller.useSkill();
+            controller.tick(CombatConstants.FIREBALL_COOLDOWN_SECONDS);
+        }
+        controller.useSkill(); // nhát cuối: hết Khí VÀ hồi chiêu còn đang đếm lúc đổi World
+        assertThat(controller.playerChi()).isLessThan(CombatConstants.FIREBALL_CHI_COST);
+        assertThat(controller.skillCooldownRemaining()).isPositive();
+
+        controller.onWorldChanged(118, 118);
+
+        assertThat(controller.playerChi()).isEqualTo(CombatConstants.CHARACTER_MAX_CHI);
+        assertThat(controller.skillCooldownRemaining()).isZero();
+        assertThat(controller.playerHp()).isEqualTo(118);
+        assertThat(controller.playerMaxHp()).isEqualTo(118);
+        assertThat(controller.monsters()).isEmpty();
+        assertThat(controller.currentTargetId()).isZero();
+
+        controller.onMonsterSpawned(dummySpawned());
+        assertThat(controller.useSkill()).isTrue();
+    }
+
+    @Test
+    void shouldStillRefillChi_whenWorldChangedCarriesZeroMaxHp() {
+        // Cùng luật onEnterWorld: max_hp = 0 là "server cũ chưa gửi" — giữ máu đang biết, nhưng cú
+        // attach mới vẫn xảy ra thật nên Khí/hồi chiêu vẫn phải về trạng thái của entity mới.
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+        controller.onEnterWorld(80, 118);
+        controller.onMonsterSpawned(dummySpawned());
+        controller.useSkill();
+
+        controller.onWorldChanged(0, 0);
+
+        assertThat(controller.playerHp()).isEqualTo(80);
+        assertThat(controller.playerMaxHp()).isEqualTo(118);
+        assertThat(controller.playerChi()).isEqualTo(CombatConstants.CHARACTER_MAX_CHI);
+        assertThat(controller.skillCooldownRemaining()).isZero();
+    }
 }
