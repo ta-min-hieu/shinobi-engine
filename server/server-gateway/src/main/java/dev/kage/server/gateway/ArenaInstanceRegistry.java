@@ -415,6 +415,14 @@ final class ArenaInstanceRegistry {
                         returnPosition,
                         loadout.maxHp()),
                 () -> mainWorldChannels.attachCharacter(loadout.entryAt(characterId, returnPosition)));
+        // Người này có thể đã rớt mạng trong lúc chốt (cả hai cùng rớt; hoặc người thắng rớt ngay sau
+        // đòn kết liễu). channelInactive của họ đã/sẽ gỡ họ khỏi world chính — nhưng nếu nó chạy
+        // TRƯỚC lệnh attach ở trên thì gỡ trượt, để lại thực thể bóng ma không ai dọn (sửa 2026-10-02).
+        // Kiểm SAU attach đóng cả hai thứ tự: gỡ đăng ký chạy trước bước gỡ khỏi world chính của họ,
+        // nên hoặc ta thấy họ offline và tự gỡ, hoặc bước gỡ của họ chạy sau attach này.
+        if (!registry.isOnline(characterId)) {
+            mainWorldChannels.detachCharacter(characterId);
+        }
     }
 
     private static long opponentOf(long characterId, DuelInstance instance) {
