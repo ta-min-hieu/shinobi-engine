@@ -80,6 +80,11 @@ services:
     # IMAGE_TAG bắt buộc chỉ định tường minh (vd "0.1.0" hoặc "master-<sha>" cụ thể), KHÔNG có default
     # "latest" — cùng nguyên tắc "pin version, không latest" đã áp cho base image (DOCKER.md #3).
     image: ghcr.io/ta-min-hieu/shinobi-engine/server-gateway:${IMAGE_TAG:?set IMAGE_TAG trong .env.prod, pin version cu the, khong dung latest}
+    # Graceful shutdown (SERVER.md §10) cần nhiều hơn 10s mặc định của Docker trong ca xấu: event
+    # loop ≤5s + auth/lưu vị trí logout ≤10s + persister ≤5s + thưởng hạ quái ≤10s + Hikari đóng pool
+    # (≤10s, nó ABORT connection còn mượn chứ không chờ). Hết hạn là SIGKILL — chính các lượt ghi
+    # đang chờ đó bị cắt.
+    stop_grace_period: 60s
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }

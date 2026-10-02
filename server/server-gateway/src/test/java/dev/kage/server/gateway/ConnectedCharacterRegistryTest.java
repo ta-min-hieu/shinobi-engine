@@ -175,6 +175,35 @@ class ConnectedCharacterRegistryTest {
         assertThat(event.getLeveledUp()).isTrue();
     }
 
+    /**
+     * Graceful shutdown (SERVER.md §10): {@code GatewayBootstrap} đóng pool DB NGAY sau
+     * {@code stop()}. Một lượt cộng EXP/rơi đồ/tiến độ quest đang chạy dở trên {@code lootExecutor}
+     * lúc đó là phần thưởng của một con quái ĐÃ chết — DB đóng giữa chừng thì nó mất vĩnh viễn (quái
+     * không được lưu, không có gì để chạy lại). {@code stop()} phải chờ nó xong.
+     */
+    @Test
+    void stopWaitsForInFlightRewardWrites_beforeDatabaseCanBeClosed() throws InterruptedException {
+        java.util.concurrent.CountDownLatch grantEntered = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicBoolean grantFinished = new java.util.concurrent.atomic.AtomicBoolean();
+        registry = new ConnectedCharacterRegistry(
+                fakeInventoryFacade(0),
+                fakeQuestFacade(),
+                (characterId, amount) -> {
+                    grantEntered.countDown();
+                    sleepQuietly(300); // "DB chậm" — lượt ghi còn dở khi shutdown bắt đầu
+                    grantFinished.set(true);
+                    return new GrantExperienceUseCase.Result(new ExperienceProgress(1, amount, amount, 100L), false);
+                },
+                new GatewayNetworkMetrics(new SimpleMeterRegistry()));
+
+        registry.onMonsterKilled(1L, "training_dummy", 20L);
+        assertThat(grantEntered.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+
+        registry.stop();
+
+        assertThat(grantFinished).as("stop() trả về khi lượt cộng EXP còn dở").isTrue();
+    }
+
     /** Quái chưa khai báo EXP không được phát gói EXP nào — bỏ qua sớm, không đụng cổng EXP. */
     @Test
     void shouldSendNoExperienceEvent_whenMonsterHasNoReward() {

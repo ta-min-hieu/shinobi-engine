@@ -5,8 +5,11 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import io.netty.channel.ChannelHandlerContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import dev.kage.character.application.GrantExperienceUseCase;
 import dev.kage.character.domain.ExperienceProgress;
@@ -55,6 +58,13 @@ import dev.kage.server.world.WorldOutboundSink;
  * task nội bộ), nên KHÔNG có blocking nào ở đây.
  */
 final class ConnectedCharacterRegistry implements WorldOutboundSink {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ConnectedCharacterRegistry.class);
+
+    // Trần chờ lượt trao thưởng đang dở lúc tắt server — mỗi lượt là MỘT transaction ngắn, 10s
+    // là dư cho DB khoẻ; DB treo thì thà mất vài phần thưởng còn hơn treo cả quá trình tắt (Docker
+    // SIGKILL sau stop_grace_period). Cùng mức với AUTH_SHUTDOWN_TIMEOUT_SECONDS của GatewayServer.
+    private static final long REWARD_SHUTDOWN_TIMEOUT_SECONDS = 10L;
 
     private final InventoryFacade inventoryFacade;
     private final QuestFacade questFacade;
@@ -628,9 +638,26 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         return QUEST_STATUS_MAPPING.get(status);
     }
 
-    /** Dừng {@link #lootExecutor} (SERVER.md §10 graceful shutdown) — gọi sau khi world tick dừng. */
+    /**
+     * Dừng {@link #lootExecutor} (SERVER.md §10 graceful shutdown) — gọi sau khi world tick dừng,
+     * TRƯỚC khi đóng DB.
+     *
+     * <p><b>Chờ lượt đang dở xong (sửa 2026-10-02).</b> Bản cũ chỉ {@code shutdown()} rồi trả về
+     * ngay, và {@code GatewayBootstrap} đóng pool DB ngay sau đó: rơi đồ/EXP/tiến độ quest của một
+     * con quái vừa chết trước khi tắt bị cắt giữa chừng và mất vĩnh viễn — quái không được lưu, nên
+     * không có gì để chạy lại lúc khởi động.
+     */
     void stop() {
         lootExecutor.shutdown();
+        try {
+            if (!lootExecutor.awaitTermination(REWARD_SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                LOG.warn(
+                        "Trao thưởng hạ quái chưa xong sau {}s — có thể mất phần thưởng của vài lượt hạ quái cuối",
+                        REWARD_SHUTDOWN_TIMEOUT_SECONDS);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void send(ChannelHandlerContext ctx, int opcode, int sequenceId, byte[] payload) {
