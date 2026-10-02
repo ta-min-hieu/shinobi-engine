@@ -119,6 +119,10 @@ final class RemoteCharacterPresenter {
             motionTracker.remove(entry.getKey());
         }
         entities.clear();
+        // Cùng tập với entities — bỏ sót ở đây thì người chơi của World CŨ vẫn click trúng được
+        // (entity đã gỡ khỏi EcsWorld nhưng Ashley giữ nguyên PositionComponent của nó), và cú click
+        // vào chỗ họ từng đứng chọn họ làm đối thủ thách đấu dù họ không còn ở đây.
+        pickables.clear();
     }
 
     /** True nếu {@code characterId} là một người chơi KHÁC đang hiển thị. */
