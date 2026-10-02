@@ -496,12 +496,20 @@ final class DungeonInstanceRegistry {
     /** Dữ liệu DB của một người sắp vào hầm ngục, đọc sẵn ngoài khoá. */
     private record PendingEntry(long characterId, CharacterLoadout loadout, PositionSnapshot returnPosition) {}
 
-    /** Gỡ bookkeeping của {@code characterId} khỏi {@code instance} — dừng luôn World nếu rỗng. */
+    /**
+     * Gỡ bookkeeping của {@code characterId} khỏi {@code instance} — dừng luôn World nếu rỗng.
+     *
+     * <p>Dừng trên {@link #defeatExecutor}, không ngay đây (2026-10-02): hàm này chạy TRONG khoá, có
+     * lúc trên EventLoop ({@link #handleDisconnectIfInDungeon}), còn {@code stop()} chờ lần tick dở
+     * dang. Không thứ tự nào cần World này dừng xong trước khi trả về: nó đã rỗng và đã rời bảng (lượt
+     * vào sau dựng instance mới); người vừa rời đã chờ mốc chặn của nó trước khi nhận 308; ai lấy mốc
+     * chặn sau đó (kết nối vừa rớt) thì mốc chờ cả {@code stop()} đang dở.
+     */
     private void leaveInstance(long characterId, DungeonInstance instance) {
         instance.characterIds().remove(characterId);
         instanceByCharacterId.remove(characterId);
         if (instance.characterIds().isEmpty()) {
-            instance.facade().stop();
+            WorldStopper.stopInBackground(defeatExecutor, instance.facade());
             instancesByPartyId.remove(instance.partyId());
         }
     }

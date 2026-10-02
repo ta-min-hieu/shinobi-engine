@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import io.micrometer.core.instrument.MeterRegistry;
 
@@ -80,6 +82,12 @@ final class MainWorldChannelRegistry {
     private final WorldContentCatalog content;
     private final List<Channel> channels = new ArrayList<>();
     private final Map<Long, Channel> channelByCharacterId = new HashMap<>();
+
+    /**
+     * Dừng khu vực phụ vừa rỗng NGOÀI khoá và ngoài EventLoop — xem {@link #closeIfEmptyOverflowChannel}.
+     * Cùng khuôn {@code ArenaInstanceRegistry.settlementExecutor}/{@code DungeonInstanceRegistry.defeatExecutor}.
+     */
+    private final ExecutorService channelStopExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     /**
      * {@code firstChannelFacade} PHẢI đã {@code start()} — {@code GatewayBootstrap} dựng nó cùng
@@ -197,8 +205,9 @@ final class MainWorldChannelRegistry {
             return CompletableFuture.completedFuture(null);
         }
         detachCharacter(characterId);
-        // Xếp SAU lệnh detach trên cùng hàng đợi. Khu vực phụ vừa bị đóng vì rỗng thì stop() đã join
-        // tick thread — mốc xong ngay, đúng nghĩa.
+        // Xếp SAU lệnh detach trên cùng hàng đợi. Khu vực phụ vừa bị đóng vì rỗng thì stop() đang
+        // chạy (hoặc sắp chạy) trên luồng khác — mốc xong khi tick xử lý tới nó, hoặc khi stop() xong
+        // hẳn (WorldFacade#inboxBarrier chờ cả một stop() đang dở), không bao giờ sớm hơn.
         return channel.facade().inboxBarrier();
     }
 
@@ -221,6 +230,7 @@ final class MainWorldChannelRegistry {
         channels.forEach(channel -> channel.facade().stop());
         channels.clear();
         channelByCharacterId.clear();
+        channelStopExecutor.shutdown();
     }
 
     /**
@@ -282,12 +292,20 @@ final class MainWorldChannelRegistry {
         channels.add(new Channel(facade, capacity));
     }
 
-    /** Đóng khu vực rỗng — KHÔNG BAO GIỜ đóng khu vực #1 (map chính luôn phải sẵn ít nhất 1 khu vực). */
+    /**
+     * Đóng khu vực rỗng — KHÔNG BAO GIỜ đóng khu vực #1 (map chính luôn phải sẵn ít nhất 1 khu vực).
+     *
+     * <p>Gỡ khỏi bảng NGAY (trong khoá — không ai được gắn vào nó nữa) nhưng {@code stop()} chạy trên
+     * {@link #channelStopExecutor} (2026-10-02): hàm này chạy trong khoá mà EventLoop xin cho MỌI gói
+     * di chuyển, thường còn trên chính EventLoop (rớt mạng), mà {@code stop()} chờ lần tick dở dang.
+     * Người cần "khu vực cũ đã im" ({@link #detachCharacterAndDrain}) chờ mốc chặn, mốc đó chờ cả
+     * {@code stop()} đang dở — nên thứ tự "World cũ im rồi mới báo 308" không đổi.
+     */
     private void closeIfEmptyOverflowChannel(Channel channel) {
         if (channels.indexOf(channel) == 0 || !channel.characterIds().isEmpty()) {
             return;
         }
-        channel.facade().stop();
+        WorldStopper.stopInBackground(channelStopExecutor, channel.facade());
         channels.remove(channel);
     }
 

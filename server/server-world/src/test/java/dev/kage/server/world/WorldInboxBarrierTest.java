@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
@@ -67,17 +68,74 @@ class WorldInboxBarrierTest {
         assertThat(world.inboxBarrier()).isDone();
     }
 
+    /**
+     * {@code stop()} chạy trên luồng khác (gateway, 2026-10-02) và đang chờ một lần tick dở dang — lần
+     * tick đó VẪN có thể phát gói. Mốc lấy đúng lúc này không được xong trước khi {@code stop()} xong.
+     * Bản cũ thấy {@code running == false} và xong mốc ngay.
+     */
+    @Test
+    void shouldNotComplete_whileStopIsStillWaitingForTheTickInProgress() throws Exception {
+        CountDownLatch tickBlocked = new CountDownLatch(1);
+        CountDownLatch releaseTick = new CountDownLatch(1);
+        WorldFacade world = new WorldFacade(new MoveRecordingSink(new CopyOnWriteArrayList<>(), () -> {
+            tickBlocked.countDown();
+            awaitQuietly(releaseTick);
+        }));
+        world.start();
+        world.attachCharacter(CHARACTER_ID, 0f, 0f, DEFAULT_STATS);
+        world.enqueueMoveCommand(CHARACTER_ID, 1, 1f, 0f);
+        assertThat(tickBlocked.await(5, TimeUnit.SECONDS)).isTrue();
+
+        Thread stopper = Thread.ofPlatform().start(world::stop);
+        try {
+            waitUntilParked(stopper);
+            CompletableFuture<Void> barrier = world.inboxBarrier();
+            assertThat(barrier).as("lần tick dở dang còn đang phát gói").isNotDone();
+
+            releaseTick.countDown();
+            stopper.join(TimeUnit.SECONDS.toMillis(5));
+            barrier.get(5, TimeUnit.SECONDS);
+        } finally {
+            releaseTick.countDown();
+            stopper.join(TimeUnit.SECONDS.toMillis(5));
+        }
+    }
+
+    private static void waitUntilParked(Thread thread) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (thread.getState() != Thread.State.WAITING) {
+            assertThat(System.nanoTime()).as("stop() phải đang chờ tickLock").isLessThan(deadline);
+            Thread.sleep(1);
+        }
+    }
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("bị ngắt khi giữ tick", e);
+        }
+    }
+
     /** Chỉ ghi lại {@code sequence_id} của các gói xác nhận di chuyển; mọi tín hiệu khác bỏ qua. */
     private static final class MoveRecordingSink implements WorldOutboundSink {
         private final List<Integer> acknowledged;
+        private final Runnable onAccepted;
 
         MoveRecordingSink(List<Integer> acknowledged) {
+            this(acknowledged, () -> {});
+        }
+
+        MoveRecordingSink(List<Integer> acknowledged, Runnable onAccepted) {
             this.acknowledged = acknowledged;
+            this.onAccepted = onAccepted;
         }
 
         @Override
         public void onMoveAccepted(WorldOutboundSink.MoveAcceptedSnapshot accepted) {
             acknowledged.add(accepted.sequenceId());
+            onAccepted.run();
         }
 
         @Override

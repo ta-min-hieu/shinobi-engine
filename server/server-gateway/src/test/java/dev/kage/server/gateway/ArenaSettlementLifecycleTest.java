@@ -150,6 +150,64 @@ class ArenaSettlementLifecycleTest {
         assertThat(mainWorldChannels.worldFacadeFor(FIRST_ID)).isEmpty();
     }
 
+    /**
+     * Chốt trận do bị hạ gục: trong lúc lượt chốt đang đọc DB để đưa người thắng về, CẢ HAI người vẫn
+     * phải thuộc một World nào đó. Bản cũ gỡ định tuyến đấu trường ngay lúc lấy vé, nên trong khe đó
+     * {@code GatewayChannelHandler.currentWorldFacade} ném với gói di chuyển/tấn công tới đúng lúc ⇒
+     * {@code exceptionCaught} đóng kết nối — gốc của {@code EOFException} chập chờn trong
+     * {@code shouldFightDuelToDeathAndUpdateRating_overRealSockets}.
+     */
+    @Test
+    void shouldKeepBothDuelistsRouted_whileTheSettlementReturnsThemToTheMainWorld() throws Exception {
+        startDuel();
+        holdSecondReturn = true;
+
+        arena.handleCharacterDefeated(FIRST_ID, SECOND_ID);
+        assertThat(secondReturnStarted.await(WAIT_MILLIS, TimeUnit.MILLISECONDS))
+                .as("lượt chốt phải đang đưa người thắng về")
+                .isTrue();
+
+        assertThat(currentWorld(SECOND_ID)).as("người thắng, đang được đưa về").isPresent();
+        assertThat(currentWorld(FIRST_ID)).as("người thua, chưa tới lượt về").isPresent();
+        // Lệnh tới World đấu trường đã dừng chỉ nằm im trong hàng đợi — không ném, không ai bị đá.
+        currentWorld(FIRST_ID).orElseThrow().enqueueMoveCommand(FIRST_ID, 1, 1f, 0f);
+        currentWorld(FIRST_ID).orElseThrow().attack(FIRST_ID);
+        releaseSecondReturn.countDown();
+
+        assertThat(ratingWritten.await(WAIT_MILLIS, TimeUnit.MILLISECONDS)).isTrue();
+        assertThat(arena.worldFacadeFor(FIRST_ID)).isEmpty();
+        assertThat(arena.worldFacadeFor(SECOND_ID)).isEmpty();
+        assertThat(mainWorldChannels.worldFacadeFor(FIRST_ID)).isPresent();
+        assertThat(mainWorldChannels.worldFacadeFor(SECOND_ID)).isPresent();
+    }
+
+    /** Như trên, nhưng chốt do đối thủ rớt mạng — người ở lại vẫn phải có World trong lúc được đưa về. */
+    @Test
+    void shouldKeepTheStayingDuelistRouted_whileTheDisconnectSettlementReturnsThem() throws Exception {
+        startDuel();
+        holdSecondReturn = true;
+
+        simulateDisconnect(FIRST_ID);
+        assertThat(secondReturnStarted.await(WAIT_MILLIS, TimeUnit.MILLISECONDS))
+                .isTrue();
+
+        assertThat(currentWorld(SECOND_ID)).isPresent();
+        assertThat(arena.worldFacadeFor(FIRST_ID))
+                .as("người rớt mạng không còn gì để định tuyến")
+                .isEmpty();
+        releaseSecondReturn.countDown();
+
+        assertThat(ratingWritten.await(WAIT_MILLIS, TimeUnit.MILLISECONDS)).isTrue();
+        assertThat(arena.worldFacadeFor(SECOND_ID)).isEmpty();
+        assertThat(mainWorldChannels.worldFacadeFor(SECOND_ID)).isPresent();
+        assertThat(mainWorldChannels.worldFacadeFor(FIRST_ID)).isEmpty();
+    }
+
+    /** Cùng thứ tự tra của {@code GatewayChannelHandler.currentWorldFacadeIfPresent} (bỏ hầm ngục). */
+    private Optional<WorldFacade> currentWorld(long characterId) {
+        return arena.worldFacadeFor(characterId).or(() -> mainWorldChannels.worldFacadeFor(characterId));
+    }
+
     private void startDuel() {
         long challengeId = arena.challengeDuel(FIRST_ID, SECOND_ID).challengeId();
         assertThat(arena.acceptDuel(SECOND_ID, challengeId).outcome())
