@@ -1,6 +1,8 @@
 // shared-protocol — Packet/DTO. KHÔNG phụ thuộc module nào khác (REPOSITORY-STRUCTURE §2).
 // KHÔNG phụ thuộc Netty (Điều 23) — PacketCodec dùng java.nio.ByteBuffer thuần, để cả
 // server-gateway (Netty) lẫn client-core (Socket thuần) đều dùng chung không phá ArchUnit.
+import net.ltgt.gradle.errorprone.errorprone
+
 plugins {
     id("kage.quality-conventions")
     id("com.google.protobuf") version "0.10.0"
@@ -31,4 +33,11 @@ tasks.named<Checkstyle>("checkstyleMain") {
 }
 tasks.named<Pmd>("pmdMain") {
     source = fileTree("src/main/java")
+}
+
+// Error Prone cũng phải bỏ qua code SINH RA — cùng lý do với Checkstyle/PMD ở trên: protoc sinh
+// hàng trăm warning ReferenceEquality/PatternMatchingInstanceof mỗi lần biên dịch lại, chôn mất
+// warning thật của code ta viết. Dấu "." thay cho dấu phân cách để khớp cả "\" (Windows) lẫn "/".
+tasks.withType<JavaCompile>().configureEach {
+    options.errorprone.excludedPaths.set(".*.build.generated.*")
 }

@@ -52,5 +52,8 @@ public final class PacketCodec {
      * sánh {@code header} và nội dung {@code payload} (VD {@code Arrays.equals}) RIÊNG, không
      * dùng {@code equals()} mặc định của record này.
      */
+    // ArrayRecordComponent: cố ý — payload đi thẳng vào parseFrom()/ra socket, bọc lại chỉ để có
+    // equals() theo nội dung là thêm một bản sao mỗi gói trên đường nóng. Cạm bẫy đã ghi ở trên.
+    @SuppressWarnings("ArrayRecordComponent")
     public record Frame(PacketHeader header, byte[] payload) {}
 }
