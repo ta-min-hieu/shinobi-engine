@@ -77,6 +77,7 @@ class CharacterSwitchOnSameConnectionTest {
     private static final Duration WAIT = Duration.ofSeconds(10);
     private static final int RACE_ROUNDS = 15;
     private static final float WALKED_TO_X = 13.5f;
+    private static final Duration GHOST_GRACE = Duration.ofSeconds(1);
 
     private final List<Channel> serverSideChannels = new CopyOnWriteArrayList<>();
     private EventLoopGroup eventLoops;
@@ -228,6 +229,45 @@ class CharacterSwitchOnSameConnectionTest {
             awaitTrue(() -> isGone(first) && isGone(second) && isUnclaimed(first) && isUnclaimed(second));
             assertThat(worldGateway.mainWorldChannels().playerCount()).isZero();
         }
+    }
+
+    /**
+     * Chọn LẠI đúng nhân vật đang chơi trong lúc nó đang ở trận Arena (cùng kết nối). Bug trước bản
+     * vá: world chính không còn giữ nhân vật (nó đã được dời sang trận) nên lần gắn "vô hại" của lượt
+     * chọn lại tạo một thực thể THỨ HAI ở world chính — và lần dọn lúc ngắt kết nối chỉ dọn trận, để
+     * thực thể đó đứng mãi trong world chính.
+     */
+    @Test
+    void shouldNotCreateASecondEntity_whenReselectingTheCharacterWhileItIsInADuel() throws InterruptedException {
+        long duelist = createCharacter("Duelist");
+        long opponent = createCharacter("Opponent");
+        TestClient client = login();
+        TestClient other = login();
+        assertThat(select(client, duelist).getSuccess()).isTrue();
+        assertThat(select(other, opponent).getSuccess()).isTrue();
+        awaitTrue(() -> isInWorld(duelist) && isInWorld(opponent));
+
+        ArenaInstanceRegistry arena = worldGateway.arenaInstanceRegistry();
+        long challengeId = arena.challengeDuel(duelist, opponent).challengeId();
+        assertThat(arena.acceptDuel(opponent, challengeId).outcome()).isEqualTo(ArenaInstanceRegistry.AcceptOutcome.OK);
+        awaitTrue(() -> worldGateway.mainWorldChannels().worldFacadeFor(duelist).isEmpty());
+
+        sendSelect(client, duelist, 3);
+        awaitSelectResponse(client);
+        // Response đi TRƯỚC lần gắn (xem enterWorld) — cho lần gắn sai (nếu có) đủ thời gian xảy ra.
+        long deadline = System.nanoTime() + GHOST_GRACE.toNanos();
+        while (worldGateway.mainWorldChannels().worldFacadeFor(duelist).isEmpty() && System.nanoTime() < deadline) {
+            Thread.sleep(10L);
+        }
+
+        assertThat(worldGateway.mainWorldChannels().worldFacadeFor(duelist))
+                .as("nhân vật đang đấu không được có thực thể thứ hai ở world chính")
+                .isEmpty();
+        assertThat(arena.worldFacadeFor(duelist)).isPresent();
+
+        client.channel.close().syncUninterruptibly();
+        awaitServerSideClosed(client);
+        awaitTrue(() -> isGone(duelist) && arena.worldFacadeFor(duelist).isEmpty() && isUnclaimed(duelist));
     }
 
     // ------------------------------------------------------------------------------ kiểm trạng thái

@@ -836,11 +836,29 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 CharacterLoadout.baseStatsOf(character, stats), currentEquipmentBonus(characterId));
         SelectCharacterResponse response = enterWorldResponse(loadout, spawn);
         send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
-        // Đăng ký connection NÀY để world outbound (spawn/move/despawn — SERVER.md §6) tìm
-        // đúng channel; attachCharacter chỉ enqueue, entity ECS thật tạo ở tick kế tiếp.
-        worldGateway.registry().register(characterId, ctx, CharacterAppearance.of(toProtoFaction(character.faction())));
-        worldGateway.mainWorldChannels().attachCharacter(loadout.entryAt(characterId, spawn));
+        if (!isLiveOnThisConnection(characterId)) {
+            // Đăng ký connection NÀY để world outbound (spawn/move/despawn — SERVER.md §6) tìm
+            // đúng channel; attachCharacter chỉ enqueue, entity ECS thật tạo ở tick kế tiếp.
+            worldGateway
+                    .registry()
+                    .register(characterId, ctx, CharacterAppearance.of(toProtoFaction(character.faction())));
+            worldGateway.mainWorldChannels().attachCharacter(loadout.entryAt(characterId, spawn));
+        }
         return bindOrReleaseIfClosed(ctx, characterId);
+    }
+
+    /**
+     * Kết nối này đang chơi ĐÚNG {@code characterId} và chưa dọn nó — tức lượt chọn này là chọn LẠI
+     * nhân vật đang ở trong world (bấm hai lần). Khi đó nhân vật đã thuộc đúng một World, không được
+     * gắn thêm: nếu nó đang ở hầm ngục/Arena thì world chính KHÔNG biết nó, nên gắn vào world chính sẽ
+     * đẻ thực thể thứ hai — và lần dọn lúc ngắt kết nối chỉ dọn hầm ngục/trận, để thực thể đó đứng mãi
+     * ({@code CharacterSwitchOnSameConnectionTest}, 2026-10-02).
+     */
+    private boolean isLiveOnThisConnection(long characterId) {
+        CharacterBinding current = binding;
+        return current != null
+                && current.characterId() == characterId
+                && !current.released().get();
     }
 
     /**
