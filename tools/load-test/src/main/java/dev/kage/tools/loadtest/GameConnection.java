@@ -87,6 +87,8 @@ public final class GameConnection implements AutoCloseable {
         FrameObserver NONE = new FrameObserver() {};
 
         /**
+         * Gọi sau mỗi frame đã gửi.
+         *
          * @param frameBytes tổng byte thật đã ghi ra socket, GỒM 4-byte length prefix
          * @throws IOException nếu bản thân việc quan sát hỏng (vd. ghi ra file log)
          */
@@ -95,6 +97,8 @@ public final class GameConnection implements AutoCloseable {
         }
 
         /**
+         * Gọi sau mỗi frame đã nhận.
+         *
          * @param frameBytes tổng byte thật đã đọc từ socket, GỒM 4-byte length prefix
          * @throws IOException nếu payload không parse được, hoặc việc quan sát hỏng
          */
@@ -247,7 +251,11 @@ public final class GameConnection implements AutoCloseable {
                 + " frame — server có quá tải không?");
     }
 
-    /** @throws IOException nếu server từ chối hoặc không trả lời (xem {@link #expectFrame}) */
+    /**
+     * Đăng nhập bằng tên tài khoản.
+     *
+     * @throws IOException nếu server từ chối hoặc không trả lời (xem {@link #expectFrame})
+     */
     public ConnectResponse connect(String username) throws IOException {
         ConnectRequest request =
                 ConnectRequest.newBuilder().setUsername(username).build();
@@ -256,7 +264,11 @@ public final class GameConnection implements AutoCloseable {
                 .payload());
     }
 
-    /** @throws IOException nếu server từ chối hoặc không trả lời (xem {@link #expectFrame}) */
+    /**
+     * Liệt kê nhân vật của tài khoản đang đăng nhập.
+     *
+     * @throws IOException nếu server từ chối hoặc không trả lời (xem {@link #expectFrame})
+     */
     public ListCharactersResponse listCharacters() throws IOException {
         send(
                 Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE,
@@ -282,7 +294,11 @@ public final class GameConnection implements AutoCloseable {
                         .payload());
     }
 
-    /** @throws IOException nếu server từ chối hoặc không trả lời (xem {@link #expectFrame}) */
+    /**
+     * Chọn nhân vật để vào world.
+     *
+     * @throws IOException nếu server từ chối hoặc không trả lời (xem {@link #expectFrame})
+     */
     public SelectCharacterResponse selectCharacter(long characterId) throws IOException {
         SelectCharacterRequest request =
                 SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();

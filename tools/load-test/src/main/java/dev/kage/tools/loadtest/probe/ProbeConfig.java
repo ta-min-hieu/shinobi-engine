@@ -111,7 +111,11 @@ public record ProbeConfig(
     private static final int DEFAULT_OBSERVE_SECONDS = 10;
     private static final int DEFAULT_DUEL_WAIT_SECONDS = 60;
 
-    /** @param args mảng tham số thô của {@code main} */
+    /**
+     * Dựng cấu hình probe từ tham số dòng lệnh.
+     *
+     * @param args mảng tham số thô của {@code main}
+     */
     public static ProbeConfig parse(String[] args) {
         CommandLineArguments raw = CommandLineArguments.parse(args);
         return new ProbeConfig(

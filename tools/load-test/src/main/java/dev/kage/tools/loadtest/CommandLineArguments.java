@@ -27,7 +27,11 @@ public final class CommandLineArguments {
         this.values = Map.copyOf(values);
     }
 
-    /** @param args mảng tham số thô của {@code main} */
+    /**
+     * Tách {@code --key=value} thành bảng tra.
+     *
+     * @param args mảng tham số thô của {@code main}
+     */
     public static CommandLineArguments parse(String[] args) {
         Map<String, String> raw = new HashMap<>();
         for (String arg : args) {
@@ -74,13 +78,21 @@ public final class CommandLineArguments {
         return "true".equals(normalized) || "1".equals(normalized) || "yes".equals(normalized);
     }
 
-    /** @throws NumberFormatException nếu người dùng gõ sai kiểu — dừng ngay còn hơn chạy với số bịa */
+    /**
+     * Đọc một tham số kiểu {@code int}, hoặc trả {@code defaultValue} nếu không có.
+     *
+     * @throws NumberFormatException nếu người dùng gõ sai kiểu — dừng ngay còn hơn chạy với số bịa
+     */
     public int integer(String key, int defaultValue) {
         String value = values.get(key);
         return value == null ? defaultValue : Integer.parseInt(value);
     }
 
-    /** @throws NumberFormatException nếu người dùng gõ sai kiểu — dừng ngay còn hơn chạy với số bịa */
+    /**
+     * Đọc một tham số kiểu {@code long}, hoặc trả {@code defaultValue} nếu không có.
+     *
+     * @throws NumberFormatException nếu người dùng gõ sai kiểu — dừng ngay còn hơn chạy với số bịa
+     */
     public long number(String key, long defaultValue) {
         String value = values.get(key);
         return value == null ? defaultValue : Long.parseLong(value);

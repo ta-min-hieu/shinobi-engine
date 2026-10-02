@@ -88,6 +88,8 @@ public final class GameProbe {
     private GameProbe() {}
 
     /**
+     * Chạy một lượt probe: nối server, vào world, quan sát rồi in số liệu.
+     *
      * @param args tham số {@code --key=value}, xem {@link ProbeConfig}
      * @throws IOException nếu không nối được server hoặc server từ chối — probe không đoán, nó dừng
      * @throws InterruptedException nếu bị ngắt trong lúc chờ

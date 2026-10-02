@@ -56,7 +56,9 @@ public final class LoadTestRunner {
             SimulatedPlayer player = new SimulatedPlayer(
                     config.host(), config.port(), "loadtest" + nextClientIndex.getAndIncrement(), reporting.metrics());
             players.add(player);
-            clientExecutor.submit(player);
+            // execute, không submit: submit gói exception vào Future không ai đọc — một client chết
+            // vì lỗi lập trình sẽ biến mất không dấu vết. execute để nó tới uncaught handler.
+            clientExecutor.execute(player);
         };
         for (int i = 0; i < config.initialClients(); i++) {
             spawnOneClient.run();
@@ -80,6 +82,9 @@ public final class LoadTestRunner {
     private record ReportingContext(
             SimulatedPlayer.Metrics metrics, MetricsScraper metricsScraper, AtomicInteger peakPlayersOnline) {}
 
+    // FutureReturnValueIgnored: scrape() tự bắt lỗi I/O và trả UNAVAILABLE; lịch report chỉ dừng
+    // khi có lỗi lập trình, và chẳng có ai chờ Future này để báo lỗi đó sớm hơn log.
+    @SuppressWarnings("FutureReturnValueIgnored")
     private static void scheduleReporting(
             ScheduledExecutorService scheduler,
             LoadTestConfig config,
