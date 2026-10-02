@@ -55,6 +55,9 @@ final class ShopCoordinator implements WindowFlow {
     /** Đệm dựng sẵn cho {@link ShopPanel#setListings} — chỉ đổi khi server/catalog vừa cập nhật. */
     private final List<ShopPanel.ShopRow> rows = new ArrayList<>();
 
+    /** Số lượng của một lần bấm Bán trong túi đồ — xem {@link #sellOne(long)}. */
+    private static final int SINGLE_ITEM = 1;
+
     /**
      * Hai luồng NỀN dùng chung (ADR-035: catalog vật phẩm + số vàng) — gộp lại để hạ tham số
      * constructor của {@link ShopCoordinator} xuống dưới ngưỡng {@code ParameterNumber} của
@@ -64,9 +67,6 @@ final class ShopCoordinator implements WindowFlow {
      * {@code EI_EXPOSE_REP}/{@code EI_EXPOSE_REP2} dành cho {@code PlayContext}, cùng lý do áp dụng
      * ở đây).
      */
-    /** Số lượng của một lần bấm Bán trong túi đồ — xem {@link #sellOne(long)}. */
-    private static final int SINGLE_ITEM = 1;
-
     record SharedFeeds(ItemCatalogCoordinator itemCatalog, GoldCoordinator gold) {}
 
     /**
@@ -120,7 +120,6 @@ final class ShopCoordinator implements WindowFlow {
         return false;
     }
 
-    /** Danh mục vừa về — xem javadoc lớp về hai lối vào chụm lại đây. */
     /**
      * Danh mục vừa về. Hiện cửa sổ bằng {@link ShopPanel#showListings()} chứ KHÔNG phải
      * {@link ShopPanel#open()}: {@code open()} hỏi lại danh mục, mà chính gói trả lời của lần hỏi đó

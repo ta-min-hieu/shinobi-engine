@@ -13,7 +13,10 @@ public final class Family {
         this.ashleyFamily = ashleyFamily;
     }
 
+    // "varargs": chuyển tiếp mảng varargs sang Family.all của Ashley (không @SafeVarargs) — chỉ đọc,
+    // không ghi gì vào mảng, nên không có heap pollution.
     @SafeVarargs
+    @SuppressWarnings("varargs")
     public static Builder all(Class<? extends Component>... types) {
         return new Builder(com.badlogic.ashley.core.Family.all(types));
     }

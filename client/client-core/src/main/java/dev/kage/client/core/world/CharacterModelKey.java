@@ -19,6 +19,8 @@ final class CharacterModelKey {
     private CharacterModelKey() {}
 
     /**
+     * Khoá model của nhân vật theo hệ phái và bậc trang phục.
+     *
      * @return khoá asset kiểu {@code char_hoa-b1}, luôn trỏ tới một model có thật.
      */
     static String of(Faction faction, CostumeTier costumeTier) {

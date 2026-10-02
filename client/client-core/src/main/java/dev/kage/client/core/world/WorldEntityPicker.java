@@ -46,6 +46,8 @@ final class WorldEntityPicker {
     private final Vector3 top = new Vector3();
 
     /**
+     * Tìm con quái dưới con trỏ chuột.
+     *
      * @param screenX toạ độ chuột theo trục ngang, pixel.
      * @param screenY toạ độ chuột theo quy ước GL (gốc DƯỚI-trái) — người gọi phải lật {@code y}
      *     của {@code InputProcessor} trước khi truyền vào, xem {@link WorldToScreen}.

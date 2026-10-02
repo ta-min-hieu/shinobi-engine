@@ -3,7 +3,6 @@ package dev.kage.engine.ecs;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.badlogic.ashley.core.PooledEngine;
@@ -26,7 +25,7 @@ import com.badlogic.ashley.utils.ImmutableArray;
 public final class EcsWorld {
 
     private final PooledEngine ashleyEngine = new PooledEngine();
-    private final Map<com.badlogic.ashley.core.Entity, KEntity> handles = new IdentityHashMap<>();
+    private final IdentityHashMap<com.badlogic.ashley.core.Entity, KEntity> handles = new IdentityHashMap<>();
     private final AtomicLong nextId = new AtomicLong(1);
     private final List<IteratingKSystem> systems = new ArrayList<>();
 

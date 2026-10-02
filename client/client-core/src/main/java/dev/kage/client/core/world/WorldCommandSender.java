@@ -97,7 +97,7 @@ final class WorldCommandSender implements SessionRecovery.Link {
     }
 
     /**
-     * @param dirX hướng đi ngang đã chuẩn hoá (-1/0/1). {@code dirY} luôn 0 kể từ ADR-033 — field
+     * @param dirX hướng đi ngang đã chuẩn hoá (-1/0/1). Trục dọc của lệnh luôn gửi 0 kể từ ADR-033 — field
      *     còn trên dây nhưng server-world bỏ qua, xem {@code WorldScreen}.
      */
     void moveDirection(float dirX) {
