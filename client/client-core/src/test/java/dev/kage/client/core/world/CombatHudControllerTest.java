@@ -1,7 +1,6 @@
 package dev.kage.client.core.world;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
 
@@ -297,10 +296,31 @@ class CombatHudControllerTest {
         assertThat(controller.useSkill()).isTrue();
     }
 
+    /**
+     * Hệ phái đến từ MẠNG ({@code CharacterSummary.faction}), nên một server mới hơn thêm hệ thứ sáu
+     * sẽ tới đây dưới dạng {@code UNRECOGNIZED}. Bản trước ném {@code IllegalArgumentException}
+     * ngay trong constructor của {@code WorldScreen} — libGDX không bắt gì trong vòng render, nên
+     * người chơi bấm "Vào game" là ứng dụng sập. Rơi về Hoả, đúng như server
+     * ({@code GatewayChannelHandler} map UNSPECIFIED/UNRECOGNIZED → HOA) và {@link CharacterModelKey}.
+     */
     @Test
-    void constructor_rejectsFactionWithoutASlot0SkillMapping() {
-        assertThatThrownBy(() -> new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_UNSPECIFIED))
-                .isInstanceOf(IllegalArgumentException.class);
+    void shouldFallBackToHoaSkill_whenFactionIsUnknownToThisClient() {
+        CombatHudController unspecified = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_UNSPECIFIED);
+        CombatHudController unrecognized = new CombatHudController(LOCAL_CHARACTER_ID, Faction.UNRECOGNIZED);
+
+        String hoaSkill = CombatConstants.FACTION_SKILLS.get(Faction.FACTION_HOA).skillCode();
+        assertThat(unspecified.skillCode()).isEqualTo(hoaSkill);
+        assertThat(unrecognized.skillCode()).isEqualTo(hoaSkill);
+    }
+
+    @Test
+    void shouldKeepWorking_whenFactionChangesToAValueUnknownToThisClient() {
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_THUY);
+
+        controller.onFactionChanged(Faction.UNRECOGNIZED);
+
+        assertThat(controller.skillCode())
+                .isEqualTo(CombatConstants.FACTION_SKILLS.get(Faction.FACTION_HOA).skillCode());
     }
 
     @Test

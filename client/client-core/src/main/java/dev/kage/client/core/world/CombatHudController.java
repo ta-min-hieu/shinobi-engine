@@ -86,12 +86,17 @@ final class CombatHudController {
         this.skill = skillFor(faction);
     }
 
+    /**
+     * Hệ phái lạ ({@code UNSPECIFIED}, hoặc {@code UNRECOGNIZED} từ một server mới hơn) rơi về Hoả —
+     * đúng cách server tự map ({@code GatewayChannelHandler}: UNSPECIFIED/UNRECOGNIZED → HOA) và
+     * cách {@link CharacterModelKey} chọn model. Không ném: giá trị này đến từ MẠNG
+     * ({@code CharacterSummary.faction}), và một ngoại lệ ở đây nằm trong constructor của
+     * {@code WorldScreen} — libGDX không bắt gì trong vòng render, nên ném là sập cả ứng dụng lúc
+     * vào game. Nút chiêu sai hệ thì server vẫn tự từ chối ({@code SkillSystem.isCasterEligible}).
+     */
     private static CombatConstants.FactionSkill skillFor(Faction faction) {
         CombatConstants.FactionSkill found = CombatConstants.FACTION_SKILLS.get(faction);
-        if (found == null) {
-            throw new IllegalArgumentException("Không có skill slot 0 cho hệ phái: " + faction);
-        }
-        return found;
+        return found != null ? found : CombatConstants.FACTION_SKILLS.get(Faction.FACTION_HOA);
     }
 
     /**
