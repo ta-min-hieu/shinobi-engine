@@ -118,22 +118,61 @@ final class MainWorldChannelRegistry {
      * {@code ConcurrentHashMap} cho bookkeeping riêng của nó. {@link Channel#characterIds()} +
      * {@link #channels}/{@link #channelByCharacterId} đọc-sửa nhiều bước (đếm sức chứa, chọn khu
      * vực, ghi 2 map) KHÔNG an toàn nếu chỉ đổi sang collection concurrent đơn lẻ — cần khoá cả khối.
+     *
+     * <p><b>Dựng World mới NGOÀI khoá (2026-10-02).</b> {@link #worldFacadeFor} cũng cần khoá này, và
+     * EventLoop gọi nó cho MỌI gói di chuyển/tấn công của MỌI người chơi. Dựng một {@link WorldFacade}
+     * tốn ~55–110ms (constructor chạy thử từng script skill trong một GraalJS Context mới) — bản cũ
+     * dựng nó ngay trong khoá, nên mỗi lần mở khu vực mới mọi EventLoop đứng chờ chừng ấy (SERVER.md §2:
+     * EventLoop cấm chờ khoá). Nay khi cần khu vực mới thì nhả khoá, dựng World, rồi mới vào lại khoá
+     * và gắn; World dựng thừa (luồng khác vừa mở trước) chưa từng {@code start()} nên bỏ đi là xong.
      */
-    synchronized WorldFacade attachCharacter(CharacterEntry entry) {
+    WorldFacade attachCharacter(CharacterEntry entry) {
+        return tryAttach(entry, Optional.empty()).orElseGet(() -> tryAttach(entry, Optional.of(newChannelFacade()))
+                .orElseThrow());
+    }
+
+    /**
+     * Mở sẵn khu vực mới (dựng World NGOÀI mọi khoá) nếu lượt {@link #attachCharacter} kế tiếp sẽ cần
+     * nó. Dành cho caller đang chuẩn bị gắn nhân vật trong lúc giữ khoá của CHÍNH nó (vd. {@code
+     * DungeonInstanceRegistry} đưa người về world chính) — không gọi trước thì chi phí dựng World rơi
+     * vào trong khoá của caller, mà khoá đó EventLoop cũng xin cho mỗi gói di chuyển.
+     */
+    void ensureRoomForOneMore() {
+        if (needsNewChannel()) {
+            adoptChannelIfStillNeeded(newChannelFacade());
+        }
+    }
+
+    /**
+     * Phần trong khoá của {@link #attachCharacter}. Rỗng ⇔ cần mở khu vực mới mà {@code spare} rỗng —
+     * caller dựng World ngoài khoá rồi gọi lại. {@code spare} không dùng tới thì bị bỏ (chưa start).
+     */
+    private synchronized Optional<WorldFacade> tryAttach(CharacterEntry entry, Optional<WorldFacade> spare) {
         long characterId = entry.characterId();
         Channel current = channelByCharacterId.get(characterId);
         if (current != null) {
             // Một nhân vật chỉ ở MỘT khu vực (quyết định chủ dự án 2026-09-25: một phiên sống). Trước
             // đây khu vực đầu đầy thì lần gắn thứ hai rơi sang khu vực khác — hai thực thể, cày gấp
             // đôi, và detach sau chỉ gỡ được một. Gắn lại khi đã ở trong là không làm gì cả.
-            return current.facade();
+            return Optional.of(current.facade());
         }
-        maybeAutoOpenChannel();
+        if (needsNewChannel()) {
+            if (spare.isEmpty()) {
+                return Optional.empty();
+            }
+            openChannel(spare.get(), DEFAULT_CAPACITY);
+        }
         Channel channel = firstChannelWithRoom();
         channel.facade().attachCharacter(entry);
         channel.characterIds().add(characterId);
         channelByCharacterId.put(characterId, channel);
-        return channel.facade();
+        return Optional.of(channel.facade());
+    }
+
+    private synchronized void adoptChannelIfStillNeeded(WorldFacade spare) {
+        if (needsNewChannel()) {
+            openChannel(spare, DEFAULT_CAPACITY);
+        }
     }
 
     synchronized void detachCharacter(long characterId) {
@@ -184,12 +223,23 @@ final class MainWorldChannelRegistry {
         channelByCharacterId.clear();
     }
 
-    private void maybeAutoOpenChannel() {
+    /**
+     * Lượt gắn kế tiếp có phải mở khu vực mới không: tổng số người đã ĐẠT ngưỡng tự mở, hoặc mọi khu
+     * vực đều đầy (hiếm — capacity đặc biệt nhỏ) — mở thêm thay vì nhồi vượt cam kết.
+     */
+    private synchronized boolean needsNewChannel() {
         int totalCapacity = totalCapacity();
         int totalPlayers = totalPlayers();
-        if ((double) totalPlayers / totalCapacity >= AUTO_OPEN_UTILIZATION_THRESHOLD) {
-            openChannel(DEFAULT_CAPACITY);
+        return (double) totalPlayers / totalCapacity >= AUTO_OPEN_UTILIZATION_THRESHOLD || !hasChannelWithRoom();
+    }
+
+    private boolean hasChannelWithRoom() {
+        for (Channel channel : channels) {
+            if (channel.characterIds().size() < channel.capacity()) {
+                return true;
+            }
         }
+        return false;
     }
 
     private int totalCapacity() {
@@ -208,26 +258,28 @@ final class MainWorldChannelRegistry {
         return sum;
     }
 
+    /** Chỉ gọi sau {@link #needsNewChannel} = {@code false} (hoặc vừa mở khu mới) — luôn có chỗ. */
     private Channel firstChannelWithRoom() {
         for (Channel channel : channels) {
             if (channel.characterIds().size() < channel.capacity()) {
                 return channel;
             }
         }
-        // Mọi khu vực đều đầy dù vừa auto-open (hiếm — race giữa nhiều lượt attach cùng lúc trên
-        // authExecutor, hoặc capacity đặc biệt nhỏ) — mở thêm 1 khu dự phòng thay vì nhồi vượt cam kết.
-        return openChannel(DEFAULT_CAPACITY);
+        throw new IllegalStateException("Không khu vực nào còn chỗ dù vừa kiểm — lỗi lập trình");
     }
 
-    private Channel openChannel(int capacity) {
-        // Khu vực mở thêm là CÙNG map chính nên phải có CÙNG quái VÀ cùng NPC — dùng lại catalog
-        // đã nạp một lần ở GatewayBootstrap, không đọc lại DB (ADR-037, ADR-040).
-        WorldFacade facade =
-                new WorldFacade(registry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG), content);
+    /**
+     * Dựng World cho một khu vực mới, CHƯA start — gọi NGOÀI khoá (xem {@link #attachCharacter}).
+     * Khu vực mở thêm là CÙNG map chính nên phải có CÙNG quái VÀ cùng NPC — dùng lại catalog đã nạp
+     * một lần ở GatewayBootstrap, không đọc lại DB (ADR-037, ADR-040).
+     */
+    private WorldFacade newChannelFacade() {
+        return new WorldFacade(registry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG), content);
+    }
+
+    private void openChannel(WorldFacade facade, int capacity) {
         facade.start();
-        Channel channel = new Channel(facade, capacity);
-        channels.add(channel);
-        return channel;
+        channels.add(new Channel(facade, capacity));
     }
 
     /** Đóng khu vực rỗng — KHÔNG BAO GIỜ đóng khu vực #1 (map chính luôn phải sẵn ít nhất 1 khu vực). */

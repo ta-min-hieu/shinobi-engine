@@ -2,6 +2,12 @@ package dev.kage.server.gateway;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
+import io.micrometer.core.instrument.Meter;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.distribution.DistributionStatisticConfig;
+import io.micrometer.core.instrument.distribution.pause.PauseDetector;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,10 +36,11 @@ class MainWorldChannelRegistryTest {
     private static final long CHARACTER_ID = 1_000L;
 
     private MainWorldChannelRegistry channels;
+    private ConnectedCharacterRegistry registry;
 
     @BeforeEach
     void setUp() {
-        ConnectedCharacterRegistry registry = new ConnectedCharacterRegistry(
+        registry = new ConnectedCharacterRegistry(
                 GatewayPipelineTest.fakeInventoryFacade(),
                 GatewayPipelineTest.fakeQuestFacade(),
                 ExperienceGrantPort.disabled(),
@@ -71,6 +78,89 @@ class MainWorldChannelRegistryTest {
 
         assertThat(channels.playerCount()).isEqualTo(1);
         assertThat(channels.worldFacadeFor(CHARACTER_ID)).isPresent();
+    }
+
+    /**
+     * EventLoop xin khoá của registry cho MỌI gói di chuyển ({@code worldFacadeFor}), còn dựng một
+     * {@link WorldFacade} tốn ~55–110ms (chạy thử script skill trong GraalJS) — bản cũ dựng khu vực
+     * mới NGAY TRONG khoá, mọi EventLoop đứng chờ chừng ấy mỗi lần mở khu vực (SERVER.md §2).
+     *
+     * <p>Móc vào lúc dựng: {@link MicrometerTickMetricsPort} đăng ký Timer ngay trong lúc dựng World
+     * của khu vực mới, nên {@code newTimer} chạy trên đúng luồng đang dựng — hỏi luồng đó có đang giữ
+     * khoá của registry không.
+     */
+    @Test
+    void shouldBuildNewChannelWorldOutsideRegistryLock_whenAttachCrossesAutoOpenThreshold() {
+        LockProbingMeterRegistry meters = new LockProbingMeterRegistry();
+        MainWorldChannelRegistry probed =
+                new MainWorldChannelRegistry(registry, new WorldFacade(registry), meters, WorldContentCatalog.EMPTY);
+        meters.watch(probed);
+        try {
+            for (long id = 1; id <= MainWorldChannelRegistry.DEFAULT_CAPACITY; id++) {
+                probed.attachCharacter(entry(id));
+            }
+
+            assertThat(meters.timersCreated.get())
+                    .as("khu vực mới đã được dựng")
+                    .isPositive();
+            assertThat(meters.timersCreatedUnderLock.get()).isZero();
+            assertThat(probed.playerCount()).isEqualTo(MainWorldChannelRegistry.DEFAULT_CAPACITY);
+        } finally {
+            probed.stopAll();
+        }
+    }
+
+    /** Đường mở sẵn cho caller đang giữ khoá riêng của nó (DungeonInstanceRegistry) — cùng luật. */
+    @Test
+    void shouldBuildNewChannelWorldOutsideRegistryLock_whenRoomIsEnsuredAhead() {
+        LockProbingMeterRegistry meters = new LockProbingMeterRegistry();
+        MainWorldChannelRegistry probed =
+                new MainWorldChannelRegistry(registry, new WorldFacade(registry), meters, WorldContentCatalog.EMPTY);
+        meters.watch(probed);
+        try {
+            long belowThreshold = MainWorldChannelRegistry.DEFAULT_CAPACITY * 4L / 5L;
+            for (long id = 1; id <= belowThreshold; id++) {
+                probed.attachCharacter(entry(id));
+            }
+            assertThat(meters.timersCreated.get())
+                    .as("chưa tới lượt gắn kế tiếp")
+                    .isZero();
+
+            probed.ensureRoomForOneMore();
+            int afterEnsure = meters.timersCreated.get();
+            probed.attachCharacter(entry(belowThreshold + 1));
+
+            assertThat(afterEnsure)
+                    .as("khu vực mới dựng ở ensureRoomForOneMore")
+                    .isPositive();
+            assertThat(meters.timersCreated.get())
+                    .as("lượt gắn không dựng thêm")
+                    .isEqualTo(afterEnsure);
+            assertThat(meters.timersCreatedUnderLock.get()).isZero();
+        } finally {
+            probed.stopAll();
+        }
+    }
+
+    /** Đếm Timer mới, và bao nhiêu cái được tạo trong lúc luồng tạo đang giữ khoá của registry. */
+    private static final class LockProbingMeterRegistry extends SimpleMeterRegistry {
+        private final AtomicInteger timersCreated = new AtomicInteger();
+        private final AtomicInteger timersCreatedUnderLock = new AtomicInteger();
+        private volatile Object watchedLock = new Object();
+
+        void watch(Object lock) {
+            watchedLock = lock;
+        }
+
+        @Override
+        protected Timer newTimer(
+                Meter.Id id, DistributionStatisticConfig distributionStatisticConfig, PauseDetector pauseDetector) {
+            timersCreated.incrementAndGet();
+            if (Thread.holdsLock(watchedLock)) {
+                timersCreatedUnderLock.incrementAndGet();
+            }
+            return super.newTimer(id, distributionStatisticConfig, pauseDetector);
+        }
     }
 
     private static CharacterEntry entry(long characterId) {

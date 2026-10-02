@@ -189,7 +189,7 @@ final class DungeonInstanceRegistry {
             }
         }
         Optional<AdmittedEntries> maybeAdmitted =
-                admitIntoInstance(myParty.get().partyId(), entries);
+                admitBuildingWorldIfNeeded(myParty.get().partyId(), entries);
         if (maybeAdmitted.isEmpty()) {
             // Không còn ai để dời: đồng đội vừa kéo cả nhóm vào trước (người gửi đã ở trong — cùng
             // kết quả với lượt thắng), hoặc ai cũng vừa rớt mạng (không còn ai đọc response).
@@ -203,6 +203,15 @@ final class DungeonInstanceRegistry {
                 requestingCharacterId);
         finishEnter(admitted, dungeonCode, requestingCharacterId);
         return EnterOutcome.OK;
+    }
+
+    /** Thử nhận vào instance; nhóm chưa có instance thì dựng World NGOÀI khoá rồi thử lại (2026-10-02). */
+    private Optional<AdmittedEntries> admitBuildingWorldIfNeeded(long partyId, List<PendingEntry> entries) {
+        AdmitAttempt attempt = admitIntoInstance(partyId, entries, Optional.empty());
+        if (attempt.needsWorld()) {
+            attempt = admitIntoInstance(partyId, entries, Optional.of(newDungeonWorld()));
+        }
+        return attempt.admitted();
     }
 
     /**
@@ -219,10 +228,18 @@ final class DungeonInstanceRegistry {
      *       hoặc ta thấy họ offline, hoặc {@link #handleDisconnectIfInDungeon} tới sau và dọn họ.
      * </ul>
      *
-     * <p>Rỗng nếu không nhận được ai — và khi đó KHÔNG dựng instance (bản cũ dựng trước rồi mới lọc,
-     * để lại một World rỗng kèm boss không ai dừng).
+     * <p>Không nhận được ai ⇒ {@code admitted} rỗng và KHÔNG dựng instance (bản cũ dựng trước rồi mới
+     * lọc, để lại một World rỗng kèm boss không ai dừng).
+     *
+     * <p><b>Không dựng World trong khoá (2026-10-02).</b> EventLoop xin khoá này cho MỌI gói di
+     * chuyển/tấn công của MỌI người chơi ({@link #worldFacadeFor}, qua {@code currentWorldFacade}),
+     * còn dựng một {@link WorldFacade} tốn ~55–110ms (chạy thử từng script skill trong GraalJS). Nhóm
+     * chưa có instance mà {@code spare} rỗng ⇒ {@code needsWorld}, caller dựng World ngoài khoá rồi gọi
+     * lại. {@code spare} không dùng tới (đồng đội vừa dựng trước, hoặc không nhận được ai) chưa từng
+     * {@code start()} — bỏ đi là xong.
      */
-    private synchronized Optional<AdmittedEntries> admitIntoInstance(long partyId, List<PendingEntry> entries) {
+    private synchronized AdmitAttempt admitIntoInstance(
+            long partyId, List<PendingEntry> entries, Optional<WorldFacade> spare) {
         List<PendingEntry> admitted = new ArrayList<>(entries.size());
         for (PendingEntry entry : entries) {
             long characterId = entry.characterId();
@@ -231,9 +248,16 @@ final class DungeonInstanceRegistry {
             }
         }
         if (admitted.isEmpty()) {
-            return Optional.empty();
+            return AdmitAttempt.NOBODY;
         }
-        DungeonInstance instance = instancesByPartyId.computeIfAbsent(partyId, this::createInstance);
+        DungeonInstance instance = instancesByPartyId.get(partyId);
+        if (instance == null) {
+            if (spare.isEmpty()) {
+                return AdmitAttempt.NEEDS_WORLD;
+            }
+            instance = startInstance(partyId, spare.get());
+            instancesByPartyId.put(partyId, instance);
+        }
         List<CompletableFuture<Void>> drained = new ArrayList<>(admitted.size());
         for (PendingEntry entry : admitted) {
             long characterId = entry.characterId();
@@ -242,7 +266,7 @@ final class DungeonInstanceRegistry {
             instanceByCharacterId.put(characterId, instance);
             drained.add(mainWorldChannels.detachCharacterAndDrain(characterId));
         }
-        return Optional.of(new AdmittedEntries(instance, admitted, drained));
+        return new AdmitAttempt(false, Optional.of(new AdmittedEntries(instance, admitted, drained)));
     }
 
     /**
@@ -265,6 +289,15 @@ final class DungeonInstanceRegistry {
             }
             moveCharacterIntoDungeon(entry, admitted.instance(), reason);
         }
+    }
+
+    /**
+     * Kết quả một lần thử {@link #admitIntoInstance}: cần dựng World ngoài khoá rồi thử lại, hoặc ai
+     * được nhận (rỗng = không còn ai để dời).
+     */
+    private record AdmitAttempt(boolean needsWorld, Optional<AdmittedEntries> admitted) {
+        static final AdmitAttempt NOBODY = new AdmitAttempt(false, Optional.empty());
+        static final AdmitAttempt NEEDS_WORLD = new AdmitAttempt(true, Optional.empty());
     }
 
     /** Kết quả nửa đầu của lượt vào: ai được nhận, và mốc "world chính đã im" của từng người. */
@@ -338,6 +371,9 @@ final class DungeonInstanceRegistry {
         // Ngoài khoá — xem javadoc lớp. World hầm ngục còn chạy cho đồng đội nên phải chờ mốc, không
         // dừng nó trước được như đấu trường.
         awaitOldWorldSilent(leaving.get().facade().inboxBarrier(), characterId);
+        // finishExit gắn lại vào world chính TRONG khoá này — nếu world chính phải mở khu vực mới thì
+        // dựng World đó ngay bây giờ, ngoài khoá (2026-10-02, xem admitIntoInstance).
+        mainWorldChannels.ensureRoomForOneMore();
         return finishExit(characterId, leaving.get(), exit);
     }
 
@@ -415,7 +451,8 @@ final class DungeonInstanceRegistry {
         defeatExecutor.shutdown();
     }
 
-    private DungeonInstance createInstance(long partyId) {
+    /** Dựng World hầm ngục, CHƯA start — gọi NGOÀI khoá, xem {@link #admitIntoInstance}. */
+    private WorldFacade newDungeonWorld() {
         // ADR-048 — catalog PHẢI đi vào đây, nếu không `spawnBoss` tra không ra mã và hầm ngục
         // rỗng không một lời báo. `spawnOverworldContent = false` vẫn giữ: World này không
         // spawn nội dung overworld, nó chỉ cần TRA được loài boss.
@@ -424,11 +461,15 @@ final class DungeonInstanceRegistry {
         // từ catalog bất kể là World nào, nên truyền nguyên catalog world chính thì `sect_grounds`
         // [-15, 5] phủ đúng điểm xuất hiện x=0 trong hầm ngục ⇒ boss không bao giờ đánh người đứng
         // yên. ADR-050 D8 để "vùng cho dungeon/arena" NGOÀI phạm vi. Xem DungeonWorldContentTest.
-        WorldFacade dungeonFacade = new WorldFacade(
+        return new WorldFacade(
                 new DungeonOutboundSink(registry, this::handleCharacterDefeated),
                 false,
                 TickMetricsPort.NO_OP,
                 WorldContentCatalog.ofMonsters(worldContent.monsters()));
+    }
+
+    /** Start World đã dựng sẵn + gọi boss — rẻ (chỉ xếp lịch tick + xếp lệnh), chạy được trong khoá. */
+    private static DungeonInstance startInstance(long partyId, WorldFacade dungeonFacade) {
         dungeonFacade.start();
         // Phase 8 lát cắt 2 — NƠI DUY NHẤT "dungeon" và "boss" được nối với nhau; WorldFacade vẫn
         // không biết khái niệm "dungeon" (chỉ biết "có ai bảo spawn boss hay không").

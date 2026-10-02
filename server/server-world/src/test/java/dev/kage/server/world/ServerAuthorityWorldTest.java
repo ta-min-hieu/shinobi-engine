@@ -31,7 +31,10 @@ class ServerAuthorityWorldTest {
 
     private static final CharacterBaseStats DEFAULT_STATS = new CharacterBaseStats(10, 10, 10, 10, Element.HOA, 1);
     // Một đòn là chết — đủ để dựng "người đã chết" mà không phải đánh qua lại hàng chục giây.
-    private static final CharacterBaseStats ONE_SHOT_STATS = new CharacterBaseStats(5000, 10, 10, 10, Element.HOA, 1);
+    // AGI 100 ⇒ tỉ lệ trúng chạm trần 1,0; nạn nhân AGI 0 (Hỏa không cộng né) ⇒ né 0 — đòn hạ gục LUÔN
+    // trúng. Thiếu điều này, một đòn trượt để nạn nhân đang chạy ra khỏi tầm (test chập chờn 2026-10-02).
+    private static final CharacterBaseStats ONE_SHOT_STATS = new CharacterBaseStats(5000, 100, 10, 10, Element.HOA, 1);
+    private static final CharacterBaseStats NEVER_DODGES_STATS = new CharacterBaseStats(10, 0, 10, 10, Element.HOA, 1);
     private static final float START_X = 5f;
 
     private record Accepted(long characterId, int sequenceId, float x, float z) {}
@@ -136,7 +139,7 @@ class ServerAuthorityWorldTest {
         world.allowPlayerVersusPlayer();
         world.start();
         world.attachCharacter(1L, 0f, 0f, ONE_SHOT_STATS);
-        world.attachCharacter(2L, 0f, 0f, DEFAULT_STATS);
+        world.attachCharacter(2L, 0f, 0f, NEVER_DODGES_STATS);
         sleepQuietly(100);
         world.setTarget(1L, 2L);
         if (victimRunning) {
