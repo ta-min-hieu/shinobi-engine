@@ -196,18 +196,20 @@ public final class GatewayBootstrap {
             GatewayFacades facades,
             MainWorldChannelRegistry mainWorldChannels,
             CharacterPositionPersister positionPersister) {
-        DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
-                characterRegistry,
-                new DungeonInstanceRegistry.DungeonFacades(
-                        facades.characterFacade(),
-                        facades.contentFacades().socialFacades().partyFacade()),
-                mainWorldChannels,
-                mainWorldChannels.worldContent());
+        // Đấu trường dựng TRƯỚC: hầm ngục hỏi nó "ai đang đấu" trước khi kéo cả nhóm vào (2026-10-02).
         ArenaInstanceRegistry arenaInstanceRegistry = new ArenaInstanceRegistry(
                 characterRegistry,
                 facades.characterFacade(),
                 facades.contentFacades().socialFacades().pvpFacade(),
                 mainWorldChannels);
+        DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
+                characterRegistry,
+                new DungeonInstanceRegistry.DungeonFacades(
+                        facades.characterFacade(),
+                        facades.contentFacades().socialFacades().partyFacade(),
+                        arenaInstanceRegistry::isInDuel),
+                mainWorldChannels,
+                mainWorldChannels.worldContent());
         WorldGateway worldGateway = new WorldGateway(
                 mainWorldChannels,
                 characterRegistry,

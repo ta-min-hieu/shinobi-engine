@@ -51,7 +51,9 @@ import dev.kage.server.world.WorldFacade;
  * <p>⚠️ Giới hạn CHỦ Ý (ngoài phạm vi lát cắt này, xem feature-pvp/CLAUDE.md): KHÔNG cross-check
  * với {@code DungeonInstanceRegistry} — 1 nhân vật đang ở dungeon về lý thuyết vẫn có thể bị thách
  * đấu/thách đấu người khác (constructor đã đủ 4 tham số, thêm phụ thuộc chéo cần tách record gộp
- * mới, không đáng cho 1 edge-case hiếm ở dự án cá nhân).
+ * mới, không đáng cho 1 edge-case hiếm ở dự án cá nhân). Chiều NGƯỢC lại — lượt "vào hầm ngục" kéo
+ * cả nhóm, trong đó có người đang đấu — thì KHÔNG hiếm (một đồng đội bấm là đủ) và đã chặn từ
+ * 2026-10-02: hầm ngục hỏi {@link #isInDuel} và bỏ qua người đang đấu.
  */
 final class ArenaInstanceRegistry {
 
@@ -174,6 +176,19 @@ final class ArenaInstanceRegistry {
     private synchronized void releaseReservation(long challengerCharacterId, long targetCharacterId) {
         startingDuelCharacterIds.remove(challengerCharacterId);
         startingDuelCharacterIds.remove(targetCharacterId);
+    }
+
+    /**
+     * Đang đấu, đang chờ chốt trận, hoặc đã chấp nhận và đang dựng trận — tức thực thể của người này
+     * (sắp) nằm trong một World đấu trường. {@link DungeonInstanceRegistry} hỏi câu này trước khi kéo
+     * ai vào hầm ngục (2026-10-02).
+     *
+     * <p>⚠️ <b>Thứ tự khoá: hầm ngục → đấu trường.</b> Hầm ngục gọi hàm này khi ĐANG giữ monitor của
+     * nó; vì vậy không phương thức nào của lớp này được chờ monitor của {@code DungeonInstanceRegistry}
+     * khi đang giữ monitor của chính mình — làm thế là deadlock.
+     */
+    synchronized boolean isInDuel(long characterId) {
+        return isBusy(characterId);
     }
 
     private boolean isBusy(long characterId) {
