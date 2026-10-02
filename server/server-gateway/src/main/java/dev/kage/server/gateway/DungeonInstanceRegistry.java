@@ -442,7 +442,12 @@ final class DungeonInstanceRegistry {
     }
 
     /** Graceful shutdown (SERVER.md §10) — dừng MỌI dungeon World đang chạy trước khi thoát process. */
-    synchronized void stopAll() {
+    void stopAll() {
+        stopAllInstances();
+        ShutdownDrain.await(defeatExecutor, "Đưa người gục khỏi hầm ngục");
+    }
+
+    private synchronized void stopAllInstances() {
         instancesByPartyId.values().forEach(instance -> instance.facade().stop());
         instancesByPartyId.clear();
         instanceByCharacterId.clear();

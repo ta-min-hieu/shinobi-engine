@@ -226,7 +226,12 @@ final class MainWorldChannelRegistry {
     }
 
     /** Graceful shutdown (SERVER.md §10) — dừng MỌI khu vực đang chạy, kể cả #1. */
-    synchronized void stopAll() {
+    void stopAll() {
+        stopAllInstances();
+        ShutdownDrain.await(channelStopExecutor, "Dừng khu vực rỗng");
+    }
+
+    private synchronized void stopAllInstances() {
         channels.forEach(channel -> channel.facade().stop());
         channels.clear();
         channelByCharacterId.clear();

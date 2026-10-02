@@ -295,7 +295,12 @@ final class ArenaInstanceRegistry {
     }
 
     /** Graceful shutdown (SERVER.md §10) — dừng MỌI duel World đang chạy trước khi thoát process. */
-    synchronized void stopAll() {
+    void stopAll() {
+        stopAllInstances();
+        ShutdownDrain.await(settlementExecutor, "Chốt trận Arena");
+    }
+
+    private synchronized void stopAllInstances() {
         instancesByChallengeId.values().forEach(instance -> instance.facade().stop());
         instancesByChallengeId.clear();
         instanceByCharacterId.clear();
