@@ -164,9 +164,16 @@ val verifyContentKeys = tasks.register("verifyContentKeys") {
     // Nguồn thứ BA: script GraalJS của hội thoại/nhiệm vụ gửi thẳng `text_key`/`label_key` cho
     // client ({@code DialoguePanel#text}). Chỉ lấy `src/main/resources` — fixture trong
     // `src/test/resources` cố tình dùng khoá không có bản dịch và không bao giờ tới mắt người chơi.
-    val scripts = rootProject.fileTree("server") {
-        include("**/src/main/resources/scripts/**/*.js")
-    }
+    // Gốc của từng cây là ĐÚNG thư mục scripts, không phải cả `server/`: một cây gốc `server/` chứa
+    // luôn các `build/` của server, nên Gradle coi task này đọc output của `compileJava` bên đó mà
+    // không khai phụ thuộc — chạy chung một lệnh với `:server:server-world:compileJava` là hỏng.
+    val scripts = rootProject.files(
+        rootProject.file("server").walkTopDown()
+            .onEnter { it.name != "build" && it.name != ".gradle" }
+            .filter { it.isDirectory && it.path.replace('\\', '/').endsWith("/src/main/resources/scripts") }
+            .map { dir -> rootProject.fileTree(dir) { include("**/*.js") } }
+            .toList(),
+    )
     val bundles = listOf("vi", "en").map {
         layout.projectDirectory.file("src/main/resources/i18n/strings_$it.properties").asFile
     }
