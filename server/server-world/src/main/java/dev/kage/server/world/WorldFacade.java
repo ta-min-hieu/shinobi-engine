@@ -574,6 +574,14 @@ public final class WorldFacade {
         }
         tickLock.lock();
         try {
+            if (!running) {
+                // Kiểm LẠI sau khi có khoá (sửa 2026-10-02): lần kiểm ở trên và lock() không nguyên tử.
+                // Lần tick đã qua kiểm nhưng chưa kịp lấy khoá khi stop() chạy thì stop() lấy-nhả khoá
+                // không vướng gì và TRẢ VỀ — rồi lần tick này mới lấy khoá và chạy trọn một tick SAU
+                // stop(): xử lý hàng đợi, phát gói ra kênh. Đúng thứ ArenaInstanceRegistry/
+                // DungeonInstanceRegistry dựa vào stop() để chặn (gói World cũ tới sau 308).
+                return;
+            }
             if (!contentSpawned) {
                 contentSpawned = true;
                 if (spawnOverworldContent) {
