@@ -10,6 +10,7 @@ import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
@@ -27,6 +28,7 @@ import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.ListCharactersRequest;
 import dev.kage.protocol.ListCharactersResponse;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.SelectCharacterResponse;
 import dev.kage.protocol.wire.PacketCodec;
@@ -59,6 +61,9 @@ public final class GameConnection implements AutoCloseable {
      * thật sự quên trả lời.
      */
     private static final int MAX_FRAMES_SKIPPED_WHILE_WAITING = 200;
+
+    // Cùng nhịp heartbeat của client thật (GameConnection client-core, NETWORK.md §10: ~15s).
+    private static final long KEEPALIVE_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(15);
 
     // ADR-027 — CÙNG cert dev/test dùng ở server-gateway/client-core (xem comment tương ứng ở đó,
     // KHÔNG an toàn cho môi trường thật). Nạp từ CLASSPATH chứ không từ đường dẫn tham số: cwd của
@@ -103,6 +108,7 @@ public final class GameConnection implements AutoCloseable {
     private final DataOutputStream output;
     private final FrameObserver observer;
     private int nextSequenceId = 1;
+    private long lastSentNanos = System.nanoTime();
 
     private GameConnection(SSLSocket socket, FrameObserver observer) throws IOException {
         this.socket = socket;
@@ -144,7 +150,27 @@ public final class GameConnection implements AutoCloseable {
         output.writeInt(frame.length);
         output.write(frame);
         output.flush();
+        lastSentNanos = System.nanoTime();
         observer.onFrameSent(LENGTH_PREFIX_BYTES + frame.length);
+    }
+
+    /**
+     * Server đóng kết nối im lặng quá {@code READER_IDLE_TIMEOUT} 45s (NETWORK.md §10, từ
+     * 2026-10-02). Client thật có luồng heartbeat riêng; công cụ này một luồng, nên gửi Ping ngay
+     * trước lượt đọc nếu đã lâu không gửi gì — probe chỉ ĐỌC suốt {@code --observeSeconds} dài (không
+     * có mục tiêu) hay lúc chờ lời thách Arena sẽ không bị đá giữa chừng. {@code PongResponse} tới
+     * sau được mọi chỗ đọc bỏ qua như mọi event xen giữa khác.
+     */
+    private void sendKeepaliveIfQuiet() throws IOException {
+        if (System.nanoTime() - lastSentNanos < KEEPALIVE_INTERVAL_NANOS) {
+            return;
+        }
+        send(
+                Opcode.OPCODE_PING_VALUE,
+                PingCommand.newBuilder()
+                        .setClientTimestampMs(System.currentTimeMillis())
+                        .build()
+                        .toByteArray());
     }
 
     /**
@@ -154,6 +180,7 @@ public final class GameConnection implements AutoCloseable {
      * @throws IOException nếu socket chết hoặc frame hỏng
      */
     public PacketCodec.Frame readFrame() throws IOException {
+        sendKeepaliveIfQuiet();
         int length = input.readInt();
         byte[] bytes = new byte[length];
         input.readFully(bytes);
