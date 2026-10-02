@@ -14,7 +14,11 @@ import dev.kage.character.domain.ExperienceProgress;
 @FunctionalInterface
 interface ExperienceGrantPort {
 
-    /** @param amount {@code <= 0} = chỉ đọc trạng thái hiện tại (xem {@code GrantExperienceUseCase}). */
+    /**
+     * Cộng EXP cho nhân vật và trả trạng thái cấp sau khi cộng.
+     *
+     * @param amount {@code <= 0} = chỉ đọc trạng thái hiện tại (xem {@code GrantExperienceUseCase}).
+     */
     GrantExperienceUseCase.Result grantExperience(long characterId, long amount);
 
     /**

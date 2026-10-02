@@ -50,6 +50,9 @@ final class CharacterPositionPersister {
         void savePosition(long characterId, float x, float y);
     }
 
+    // FutureReturnValueIgnored: lỗi từng nhân vật đã bị chặn ở savePositionSafely nên lịch định kỳ
+    // không chết vì một lần ghi hỏng; Future này chỉ còn dùng để huỷ, và stop() tắt cả scheduler.
+    @SuppressWarnings("FutureReturnValueIgnored")
     void start() {
         scheduler = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "character-position-persister"));
         long intervalMillis = interval.toMillis();

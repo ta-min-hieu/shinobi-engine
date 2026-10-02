@@ -660,6 +660,8 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         }
     }
 
+    // FutureReturnValueIgnored: ChannelFuture của writeAndFlush() — lỗi đi qua pipeline Netty.
+    @SuppressWarnings("FutureReturnValueIgnored")
     private void send(ChannelHandlerContext ctx, int opcode, int sequenceId, byte[] payload) {
         networkMetrics.recordPacketSent(opcode, payload.length);
         PacketHeader header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
