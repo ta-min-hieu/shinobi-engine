@@ -1,6 +1,7 @@
 package dev.kage.server.world;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,7 @@ import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterComponent;
 import dev.kage.server.world.component.MonsterIdComponent;
+import dev.kage.server.world.component.MoveIntentComponent;
 import dev.kage.server.world.component.NpcComponent;
 import dev.kage.server.world.component.SkillCooldownComponent;
 import dev.kage.server.world.component.StatusEffectComponent;
@@ -74,6 +76,8 @@ public final class WorldFacade {
             ComponentMapper.getFor(StatusEffectComponent.class);
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
     private static final ComponentMapper<ChiComponent> CHI = ComponentMapper.getFor(ChiComponent.class);
+    private static final ComponentMapper<MoveIntentComponent> MOVE_INTENT =
+            ComponentMapper.getFor(MoveIntentComponent.class);
     private static final ComponentMapper<CharacterIdComponent> CHARACTER_ID =
             ComponentMapper.getFor(CharacterIdComponent.class);
 
@@ -339,6 +343,8 @@ public final class WorldFacade {
         // đếm ngược cooldown mỗi tick (hành động thật là lệnh rời rạc/điều kiện nội bộ, không phải
         // hành vi lặp mỗi tick như đánh thường) — thứ tự với CombatSystem không quan trọng.
         ecsWorld.addSystem(aiSystem);
+        // Vận tốc nhân vật theo stun/slow/buff HIỆN HÀNH — phải trước MovementSystem (2026-10-02).
+        ecsWorld.addSystem(new CharacterLocomotionSystem());
         ecsWorld.addSystem(new MovementSystem());
         // Trục dọc (ADR-033) — chạy ngay sau MovementSystem (ngang), TRƯỚC TerrainCollisionSystem,
         // cùng nhóm "áp chuyển động" của tick trước khi xử va chạm. World chính (spawnOverworldContent)
@@ -710,6 +716,7 @@ public final class WorldFacade {
         position.prevY = position.y;
         entity.add(position);
         entity.add(new VelocityComponent());
+        entity.add(new MoveIntentComponent());
 
         CharacterIdComponent characterIdComponent = new CharacterIdComponent();
         characterIdComponent.characterId = entry.characterId();
@@ -761,6 +768,9 @@ public final class WorldFacade {
         }
 
         VelocityComponent velocity = VELOCITY.get(entity);
+        // Nhớ hướng đang giữ CẢ khi đang bị stun/đã chết: CharacterLocomotionSystem dùng nó để chạy
+        // tiếp khi hết choáng mà phím vẫn giữ (client không gửi lại lệnh cùng hướng).
+        MOVE_INTENT.get(entity).dirX = clampDirection(intent.dirX(), 0f)[0];
         // Người đã chết (World hầm ngục không tự hồi sinh — xem handleCombatResults) đứng yên như bị
         // stun: vẫn ack để client reconcile sequenceId.
         if (isIncapacitated(entity)) {
@@ -1215,6 +1225,10 @@ public final class WorldFacade {
 
         ChiComponent chi = CHI.get(entity);
         chi.current = chi.max;
+
+        // Hồi sinh sạch hiệu ứng (sửa 2026-10-02) — trước đó stun/slow/khiên/buff cũ đi theo sang
+        // mạng mới, hồi sinh xong vẫn bị choáng hoặc chạy chậm.
+        Arrays.fill(STATUS_EFFECT.get(entity).slots, null);
 
         TARGET.get(entity).targetEntityId = 0L;
 

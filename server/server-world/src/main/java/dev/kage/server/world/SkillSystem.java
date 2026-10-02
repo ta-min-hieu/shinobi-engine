@@ -7,7 +7,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.stream.Collectors;
 
@@ -94,11 +96,22 @@ final class SkillSystem extends IteratingKSystem {
      * @param pvpAllowed skill ENEMY có được nhắm người chơi khác không — xem {@code WorldFacade#pvpAllowed}.
      */
     SkillSystem(LongFunction<KEntity> entityLookup, BooleanSupplier pvpAllowed) {
+        this(entityLookup, pvpAllowed, def -> loadScript(def.scriptResource()));
+    }
+
+    /**
+     * Như constructor 2 tham số nhưng nguồn script do caller cấp — đường duy nhất để test dựng một
+     * script lỗi lúc chạy (script thật nằm trong classpath, không thay được từ test).
+     */
+    SkillSystem(
+            LongFunction<KEntity> entityLookup,
+            BooleanSupplier pvpAllowed,
+            Function<SkillDefinition, String> scriptSource) {
         super(Family.all(SkillCooldownComponent.class).get());
         this.entityLookup = entityLookup;
         this.pvpAllowed = pvpAllowed;
-        this.scriptsByCode = SkillRegistry.BY_CODE.values().stream()
-                .collect(Collectors.toMap(SkillDefinition::code, def -> loadScript(def.scriptResource())));
+        this.scriptsByCode =
+                SkillRegistry.BY_CODE.values().stream().collect(Collectors.toMap(SkillDefinition::code, scriptSource));
         // SCRIPTING.md §8: validate MỌI script lúc khởi động, fail fast (ném thẳng nếu lỗi — server
         // không nên khởi động với 1 skill hỏng script/sai hợp đồng trả về).
         Map<String, Object> dummyCtx = Map.of("skill_dmg", 0.0, "target_hp_percent", 1.0);
@@ -145,7 +158,7 @@ final class SkillSystem extends IteratingKSystem {
             return;
         }
 
-        if (!consumeCooldownAndChi(caster, definition)) {
+        if (!canAfford(caster, definition)) {
             return;
         }
 
@@ -153,29 +166,39 @@ final class SkillSystem extends IteratingKSystem {
                 CombatConstants.toStats(COMBAT_STATS.get(caster)), STATUS_EFFECT.get(caster));
         HealthComponent targetHealth = HEALTH.get(ctx.target());
         double targetHpPercent = targetHealth.max <= 0 ? 0.0 : (double) targetHealth.current / targetHealth.max;
-        ScriptEffect scriptEffect = evalSkillScript(definition, casterStats.skillDmg(), targetHpPercent);
-        applyScriptEffect(ctx, casterStats, scriptEffect);
+        // Chạy script TRƯỚC khi trừ Khí/cooldown (sửa 2026-10-02): script lỗi lúc chạy là huỷ cast
+        // (SCRIPTING.md §7 "huỷ + log"), không phải "đã trả giá nhưng chẳng có gì xảy ra".
+        Optional<ScriptEffect> scriptEffect = evalSkillScript(definition, casterStats.skillDmg(), targetHpPercent);
+        if (scriptEffect.isEmpty()) {
+            return;
+        }
+        consumeCooldownAndChi(caster, definition);
+        applyScriptEffect(ctx, casterStats, scriptEffect.get());
     }
 
     /**
-     * Kiểm cooldown + Khí VÀ trừ luôn nếu đủ điều kiện (gộp 1 chỗ — tách khỏi {@link #tryCast} chỉ
-     * để giữ độ phức tạp method dưới ngưỡng CyclomaticComplexity, không đổi thứ tự/điều kiện gốc).
-     *
-     * @return {@code false} nếu còn cooldown hoặc không đủ Khí (KHÔNG trừ gì) — caller bỏ qua âm thầm.
+     * Còn cooldown hoặc không đủ Khí ⇒ {@code false}, caller bỏ qua âm thầm. CHỈ kiểm, không trừ —
+     * {@link #consumeCooldownAndChi} trừ sau khi script đã chạy thành công.
      */
-    private boolean consumeCooldownAndChi(KEntity caster, SkillDefinition definition) {
-        SkillCooldownComponent cooldown = COOLDOWN.get(caster);
+    private static boolean canAfford(KEntity caster, SkillDefinition definition) {
         ChiComponent chi = CHI.get(caster);
-        int chiCost = definition.isUltimate() ? chi.current : definition.chiCost();
+        int chiCost = chiCostOf(chi, definition);
         // Tuyệt Kỹ cần > 0 Khí hiện có (GDD §4 "tốn TOÀN BỘ Khí"); skill thường cần đủ chiCost cố định.
-        if (cooldown.remainingSeconds[definition.slotIndex()] > CombatConstants.COOLDOWN_READY_EPSILON_SECONDS
-                || chiCost <= 0
-                || chi.current < chiCost) {
-            return false;
-        }
-        cooldown.remainingSeconds[definition.slotIndex()] = definition.cooldownSeconds();
-        chi.current -= chiCost;
-        return true;
+        return COOLDOWN.get(caster).remainingSeconds[definition.slotIndex()]
+                        <= CombatConstants.COOLDOWN_READY_EPSILON_SECONDS
+                && chiCost > 0
+                && chi.current >= chiCost;
+    }
+
+    /** Gọi SAU {@link #canAfford} trong CÙNG lần cast — không tự kiểm lại. */
+    private static void consumeCooldownAndChi(KEntity caster, SkillDefinition definition) {
+        ChiComponent chi = CHI.get(caster);
+        COOLDOWN.get(caster).remainingSeconds[definition.slotIndex()] = definition.cooldownSeconds();
+        chi.current -= chiCostOf(chi, definition);
+    }
+
+    private static int chiCostOf(ChiComponent chi, SkillDefinition definition) {
+        return definition.isUltimate() ? chi.current : definition.chiCost();
     }
 
     private boolean isCasterEligible(KEntity caster, SkillDefinition definition) {
@@ -297,7 +320,9 @@ final class SkillSystem extends IteratingKSystem {
         HealthComponent targetHealth = HEALTH.get(ctx.target());
         int healAmount = Math.max(0, Math.round((float) scriptEffect.value()));
         int before = targetHealth.current;
-        targetHealth.current = Math.min(targetHealth.max, targetHealth.current + healAmount);
+        // Cộng trên long: lượng hồi cực lớn (Math.round bão hoà ở Integer.MAX_VALUE) cộng int sẽ tràn
+        // thành số ÂM ⇒ "hồi máu" giết luôn đồng đội.
+        targetHealth.current = (int) Math.min(targetHealth.max, (long) targetHealth.current + healAmount);
 
         pendingResults.add(new SkillOutcome(
                 ctx.definition().code(),
@@ -358,26 +383,31 @@ final class SkillSystem extends IteratingKSystem {
         };
     }
 
-    private ScriptEffect evalSkillScript(SkillDefinition definition, double skillDmg, double targetHpPercent) {
+    /**
+     * @return rỗng nếu script lỗi lúc chạy hoặc trả sai hình dạng — caller HUỶ cast (không trừ Khí,
+     *     không đặt cooldown). Trước 2026-10-02 nhánh này trả "damage, value=0" sau khi đã trừ Khí,
+     *     và damage tối thiểu 1 rơi cả vào đồng đội của skill hồi máu.
+     */
+    private Optional<ScriptEffect> evalSkillScript(
+            SkillDefinition definition, double skillDmg, double targetHpPercent) {
         Map<String, Object> ctx = Map.<String, Object>of("skill_dmg", skillDmg, "target_hp_percent", targetHpPercent);
         try {
             String script = scriptsByCode.get(definition.code());
-            return scriptSandbox.eval(script, Map.of("ctx", ctx), SkillSystem::parseScriptEffect);
+            return Optional.of(scriptSandbox.eval(script, Map.of("ctx", ctx), SkillSystem::parseScriptEffect));
         } catch (ScriptExecutionException e) {
-            LOG.error("Script skill '{}' lỗi lúc chạy — coi như effect=damage, value=0", definition.code(), e);
-            return new ScriptEffect("damage", 0.0, "", 0.0, 0.0);
+            LOG.error("Script skill '{}' lỗi lúc chạy — huỷ lần cast này", definition.code(), e);
+            return Optional.empty();
         }
     }
 
+    /** Sai hình dạng ⇒ {@code ScriptExecutionException} (xem {@link ScriptResults}), không NPE/CCE. */
     private static ScriptEffect parseScriptEffect(org.graalvm.polyglot.Value value) {
         return new ScriptEffect(
-                value.getMember("effect").asString(),
-                value.getMember("value").asDouble(),
-                value.hasMember("stat") ? value.getMember("stat").asString() : "",
-                value.hasMember("duration") ? value.getMember("duration").asDouble() : 0.0,
-                value.hasMember("armor_pierce")
-                        ? value.getMember("armor_pierce").asDouble()
-                        : 0.0);
+                ScriptResults.requireString(value, "effect"),
+                ScriptResults.requireFiniteNumber(value, "value"),
+                ScriptResults.optionalString(value, "stat", ""),
+                ScriptResults.optionalFiniteNumber(value, "duration", 0.0),
+                ScriptResults.optionalFiniteNumber(value, "armor_pierce", 0.0));
     }
 
     private static double distance(PositionComponent a, PositionComponent b) {

@@ -79,7 +79,7 @@ class MicrometerTickMetricsPortTest {
         WorldFacade world = new WorldFacade(new NoOpOutboundSink(), true, spy);
         try {
             world.start();
-            awaitTrue(() -> realSystemNames.size() >= 10);
+            awaitTrue(() -> realSystemNames.size() >= 11);
         } finally {
             world.stop();
         }

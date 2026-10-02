@@ -27,6 +27,7 @@ import dev.kage.server.world.component.CombatRecencyComponent;
 import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterIdComponent;
+import dev.kage.server.world.component.StatusEffectComponent;
 import dev.kage.server.world.component.TargetComponent;
 
 /**
@@ -60,6 +61,8 @@ final class BossAiSystem extends IteratingKSystem {
     private static final ComponentMapper<BossAiComponent> BOSS_AI = ComponentMapper.getFor(BossAiComponent.class);
     private static final ComponentMapper<MonsterIdComponent> MONSTER_ID =
             ComponentMapper.getFor(MonsterIdComponent.class);
+    private static final ComponentMapper<StatusEffectComponent> STATUS_EFFECT =
+            ComponentMapper.getFor(StatusEffectComponent.class);
 
     /** Kết quả 1 chiêu đặc biệt đã xảy ra thật trong tick này — {@code WorldFacade} drain để phát AoI. */
     record BossActionOutcome(
@@ -127,9 +130,11 @@ final class BossAiSystem extends IteratingKSystem {
         }
         bossAi.decisionCooldownSeconds = bossAi.decisionIntervalSeconds;
 
-        if (AI_STATE.get(entity).state != AiState.ATTACK || HEALTH.get(entity).isDead()) {
+        if (AI_STATE.get(entity).state != AiState.ATTACK || HEALTH.get(entity).isDead() || isStunned(entity)) {
             // Chưa vào tầm/chưa có mục tiêu hợp lệ — AiSystem lo phần này. Hoặc boss vừa bị hạ gục
             // từ hàng đợi lệnh tick này: entity chỉ bị xoá SAU update(), cái xác không được ra chiêu.
+            // Hoặc đang bị stun (sửa 2026-10-02): AiSystem giữ nguyên state ATTACK suốt cơn choáng,
+            // nên thiếu kiểm này boss đứng im, không đánh thường được, mà vẫn tung chiêu nặng.
             return;
         }
         TargetComponent target = TARGET.get(entity);
@@ -164,12 +169,17 @@ final class BossAiSystem extends IteratingKSystem {
         }
         bossAi.heavyStrikeCooldownSeconds = bossAi.skillCooldownSeconds;
 
-        CombatConstants.CombatStats attackerStats = CombatConstants.toStats(COMBAT_STATS.get(entity));
-        CombatConstants.CombatStats defenderStats = CombatConstants.toStats(COMBAT_STATS.get(targetEntity));
+        // Buff/debuff + khiên của CẢ HAI bên, cùng luật với CombatSystem/SkillSystem (sửa 2026-10-02 —
+        // trước đó chiêu boss đọc chỉ số gốc và trừ thẳng vào máu, khiên hệ Thổ vô dụng trước boss).
+        CombatConstants.CombatStats attackerStats = withModifiers(entity);
+        CombatConstants.CombatStats defenderStats = withModifiers(targetEntity);
         CombatConstants.AttackResult result =
                 CombatConstants.resolveSkillAttack(attackerStats, defenderStats, decision.rawDamage());
+        int damage = STATUS_EFFECT.has(targetEntity)
+                ? StatusEffects.absorbWithShield(STATUS_EFFECT.get(targetEntity), result.damage())
+                : result.damage();
         HealthComponent targetHealth = HEALTH.get(targetEntity);
-        targetHealth.current = Math.max(0, targetHealth.current - result.damage());
+        targetHealth.current = Math.max(0, targetHealth.current - damage);
         // ADR-046 D2 — chiêu boss cũng chặn hồi máu ngoài chiến đấu, y hệt đòn thường. Boss là quái
         // (không mang component này), nên chỉ đánh dấu bên chịu đòn.
         if (RECENCY.has(targetEntity)) {
@@ -180,7 +190,7 @@ final class BossAiSystem extends IteratingKSystem {
                 decision.action(),
                 MONSTER_ID.get(entity).monsterId,
                 targetEntityId,
-                result.damage(),
+                damage, // damage THẬT trừ vào máu (sau khiên) — cùng quy ước với AttackOutcome.
                 result.crit(),
                 result.miss(),
                 targetHealth.current,
@@ -205,13 +215,23 @@ final class BossAiSystem extends IteratingKSystem {
             return scriptSandbox.eval(
                     scriptByRef.computeIfAbsent(bossAi.scriptRef, BossAiSystem::loadScript),
                     Map.of("ctx", ctx),
+                    // Sai hình dạng ⇒ ScriptExecutionException (ScriptResults), không NPE/CCE lọt khỏi tick.
                     value -> new ScriptDecision(
-                            value.getMember("action").asString(),
-                            value.getMember("raw_damage").asDouble()));
+                            ScriptResults.requireString(value, "action"),
+                            ScriptResults.requireFiniteNumber(value, "raw_damage")));
         } catch (ScriptExecutionException e) {
             LOG.error("Script boss '{}' lỗi lúc chạy — coi như basic_attack", bossAi.scriptRef, e);
             return new ScriptDecision("basic_attack", 0.0);
         }
+    }
+
+    private static boolean isStunned(KEntity entity) {
+        return STATUS_EFFECT.has(entity) && StatusEffects.isStunned(STATUS_EFFECT.get(entity));
+    }
+
+    private static CombatConstants.CombatStats withModifiers(KEntity entity) {
+        CombatConstants.CombatStats base = CombatConstants.toStats(COMBAT_STATS.get(entity));
+        return STATUS_EFFECT.has(entity) ? StatusEffects.applyModifiers(base, STATUS_EFFECT.get(entity)) : base;
     }
 
     private static double healthPercent(HealthComponent health) {
