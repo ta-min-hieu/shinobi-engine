@@ -93,6 +93,21 @@ tasks.register<JavaExec>("runHudPreview") {
     doFirst { workingDir.mkdirs() }
 }
 
+/**
+ * Mọi thư mục `<module>/<relativeDir>` dưới `server/`, mỗi thư mục là một cây riêng (lọc `pattern`).
+ *
+ * KHÔNG dùng một cây gốc `server/` rồi lọc bằng include: gốc đó chứa luôn các `build/` của server, nên
+ * Gradle coi task đọc output của `compileJava` bên đó mà không khai phụ thuộc — chạy chung một lệnh với
+ * một task build server là hỏng ("implicit dependency", 2026-10-02).
+ */
+fun serverSourceTrees(relativeDir: String, pattern: String): FileCollection = rootProject.files(
+    rootProject.file("server").walkTopDown()
+        .onEnter { it.name != "build" && it.name != ".gradle" }
+        .filter { it.isDirectory && it.invariantSeparatorsPath.endsWith("/$relativeDir") }
+        .map { dir -> rootProject.fileTree(dir) { include(pattern) } }
+        .toList(),
+)
+
 // Hợp đồng giữa hai module mà KHÔNG compiler nào canh: server gửi `ErrorResponse.error_key` để
 // client dùng THẲNG làm khoá i18n (xem javadoc FactionController.errorMessageKey). Rà bằng máy
 // 2026-09-19: server sinh 25 khoá `error.*` mà bundle chỉ có 10 — tức bất biến ấy đã SAI trong im
@@ -104,7 +119,7 @@ tasks.register<JavaExec>("runHudPreview") {
 val verifyServerErrorKeys = tasks.register("verifyServerErrorKeys") {
     group = "verification"
     description = "Mọi error_key server gửi phải có bản dịch trong CẢ HAI bundle i18n."
-    val serverSources = rootProject.fileTree("server") { include("**/src/main/java/**/*.java") }
+    val serverSources = serverSourceTrees("src/main/java", "**/*.java")
     val bundles = listOf("vi", "en").map {
         layout.projectDirectory.file("src/main/resources/i18n/strings_$it.properties").asFile
     }
@@ -164,16 +179,7 @@ val verifyContentKeys = tasks.register("verifyContentKeys") {
     // Nguồn thứ BA: script GraalJS của hội thoại/nhiệm vụ gửi thẳng `text_key`/`label_key` cho
     // client ({@code DialoguePanel#text}). Chỉ lấy `src/main/resources` — fixture trong
     // `src/test/resources` cố tình dùng khoá không có bản dịch và không bao giờ tới mắt người chơi.
-    // Gốc của từng cây là ĐÚNG thư mục scripts, không phải cả `server/`: một cây gốc `server/` chứa
-    // luôn các `build/` của server, nên Gradle coi task này đọc output của `compileJava` bên đó mà
-    // không khai phụ thuộc — chạy chung một lệnh với `:server:server-world:compileJava` là hỏng.
-    val scripts = rootProject.files(
-        rootProject.file("server").walkTopDown()
-            .onEnter { it.name != "build" && it.name != ".gradle" }
-            .filter { it.isDirectory && it.path.replace('\\', '/').endsWith("/src/main/resources/scripts") }
-            .map { dir -> rootProject.fileTree(dir) { include("**/*.js") } }
-            .toList(),
-    )
+    val scripts = serverSourceTrees("src/main/resources/scripts", "**/*.js")
     val bundles = listOf("vi", "en").map {
         layout.projectDirectory.file("src/main/resources/i18n/strings_$it.properties").asFile
     }
