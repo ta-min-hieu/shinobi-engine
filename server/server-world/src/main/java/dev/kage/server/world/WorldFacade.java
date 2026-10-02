@@ -227,6 +227,12 @@ public final class WorldFacade {
     private long tickCounter;
 
     private volatile boolean running;
+    // Ghi TRƯỚC running = false trong stop() — ai đọc running == false rồi đọc cờ này thấy đúng là
+    // "đã/đang dừng" chứ không phải "chưa từng start". Xem inboxBarrier().
+    private volatile boolean stopRequested;
+    // Xong khi stop() đã chờ lần tick dở dang chạy hết — mốc chặn lấy giữa lúc stop() đang chờ phải
+    // đợi cái này, không được xong ngay (xem inboxBarrier()).
+    private final java.util.concurrent.CompletableFuture<Void> stopped = new java.util.concurrent.CompletableFuture<>();
     // Thay "1 OS thread riêng/World" (Phase 9, xem WorldTickScheduler javadoc) — pool CỐ ĐỊNH dùng
     // chung, số thread không tăng theo số kênh/dungeon/duel đang chạy.
     private ScheduledFuture<?> tickFuture;
@@ -369,6 +375,7 @@ public final class WorldFacade {
 
     /** Dừng tick (SERVER.md §10 — graceful shutdown, không {@code kill -9}). */
     public void stop() {
+        stopRequested = true;
         running = false;
         if (tickFuture != null) {
             tickFuture.cancel(false);
@@ -380,6 +387,7 @@ public final class WorldFacade {
             tickLock.unlock();
         }
         completePendingBarriers();
+        stopped.complete(null);
     }
 
     /**
@@ -395,21 +403,34 @@ public final class WorldFacade {
      * có thể phát gói ra ngoài — mốc xong NGAY. Lệnh xếp vào đúng lúc {@link #stop()} chạy cũng không
      * treo: {@link #stop()} tự hoàn tất mọi mốc còn nằm lại trong hàng đợi.
      *
+     * <p><b>Gọi đúng lúc {@link #stop()} đang chờ lần tick dở dang (sửa 2026-10-02).</b> {@code running}
+     * đã là {@code false} nhưng lần tick đó vẫn có thể đang phát gói ra kênh. Bản cũ coi
+     * {@code !running} là "đã im" và xong mốc NGAY — sai đúng thứ mốc này hứa. Nay mốc chờ tới khi
+     * {@link #stop()} trả về. Trước đây khe này gần như không chạm được vì gateway luôn gọi
+     * {@link #stop()} đồng bộ trước khi lấy mốc; nay gateway dừng World trên luồng khác (không chiếm
+     * EventLoop), nên khe đó có thật.
+     *
      * <p>Không chạy trong vòng tick; không cấp phát gì trên tick thread ngoài việc hoàn tất future.
      */
     public java.util.concurrent.CompletableFuture<Void> inboxBarrier() {
-        java.util.concurrent.CompletableFuture<Void> reached = new java.util.concurrent.CompletableFuture<>();
         if (!running) {
-            reached.complete(null);
-            return reached;
+            return afterStopOrNow();
         }
+        java.util.concurrent.CompletableFuture<Void> reached = new java.util.concurrent.CompletableFuture<>();
         inbox.add(new WorldCommand.InboxBarrierCommand(() -> reached.complete(null)));
         if (!running) {
             // stop() chen vào giữa lần kiểm ở trên và lúc xếp hàng — có thể nó đã quét hàng đợi
-            // xong trước khi mốc này vào. Không tick nữa thì mốc đã "tới" theo đúng nghĩa.
-            reached.complete(null);
+            // xong trước khi mốc này vào. Không tick nữa thì mốc "tới" khi stop() xong.
+            stopped.whenComplete((ignored, error) -> reached.complete(null));
         }
         return reached;
+    }
+
+    /** Mốc cho World không tick: chưa từng start ⇒ xong ngay; đã/đang dừng ⇒ xong khi stop() xong. */
+    private java.util.concurrent.CompletableFuture<Void> afterStopOrNow() {
+        // running đọc trước, stopRequested đọc sau; stop() ghi theo thứ tự ngược lại ⇒ đã thấy
+        // running == false do stop() thì chắc chắn thấy stopRequested.
+        return stopRequested ? stopped.copy() : java.util.concurrent.CompletableFuture.completedFuture(null);
     }
 
     /** Hoàn tất mọi mốc chặn còn nằm lại sau khi world ngừng tick — xem {@link #inboxBarrier()}. */
