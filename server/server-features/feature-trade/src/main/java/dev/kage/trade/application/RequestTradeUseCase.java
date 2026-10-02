@@ -1,5 +1,6 @@
 package dev.kage.trade.application;
 
+import dev.kage.trade.domain.TradeParticipantBusyException;
 import dev.kage.trade.domain.TradeSession;
 import dev.kage.trade.domain.TradeSessionPort;
 
@@ -22,7 +23,17 @@ public final class RequestTradeUseCase {
         if (port.findActiveSessionOfCharacter(targetCharacterId).isPresent()) {
             return new Result(Outcome.TARGET_ALREADY_IN_TRADE, null);
         }
-        return new Result(Outcome.OK, port.createRequest(requesterCharacterId, targetCharacterId));
+        // Hai lần hỏi ở trên chỉ để trả lời nhanh — một lời mời khác có thể lọt vào giữa. Trọng tài
+        // thật là createRequest (kiểm lại trong cùng giao dịch, sau khoá từng nhân vật).
+        try {
+            return new Result(Outcome.OK, port.createRequest(requesterCharacterId, targetCharacterId));
+        } catch (TradeParticipantBusyException e) {
+            Outcome outcome =
+                    port.findActiveSessionOfCharacter(requesterCharacterId).isPresent()
+                            ? Outcome.ALREADY_IN_TRADE
+                            : Outcome.TARGET_ALREADY_IN_TRADE;
+            return new Result(outcome, null);
+        }
     }
 
     public enum Outcome {

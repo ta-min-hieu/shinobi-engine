@@ -12,7 +12,16 @@ public interface TradeSessionPort {
     /** Phiên đang PENDING_ACCEPT hoặc OPEN mà {@code characterId} tham gia (bất kỳ vai trò) — rỗng nếu không có. */
     Optional<TradeSession> findActiveSessionOfCharacter(long characterId);
 
-    /** Tạo yêu cầu trade mới, trạng thái PENDING_ACCEPT. */
+    /**
+     * Tạo yêu cầu trade mới, trạng thái PENDING_ACCEPT — CHỈ KHI cả hai bên chưa có phiên nào đang
+     * hoạt động, kiểm trong CÙNG giao dịch với lệnh tạo.
+     *
+     * <p>Vì sao không đủ để người gọi tự hỏi {@link #findActiveSessionOfCharacter} trước (đo thật
+     * 2026-10-02): A mời T đúng lúc B mời T thì cả hai lần hỏi đều thấy T rảnh và cả hai phiên đều
+     * được tạo — T kẹt trong HAI phiên, mà {@code GetTradeStatusUseCase} chỉ thấy được một.
+     *
+     * @throws TradeParticipantBusyException nếu một trong hai bên đã có phiên — không tạo gì cả
+     */
     TradeSession createRequest(long requesterCharacterId, long targetCharacterId);
 
     /** Chấp nhận — điều kiện: {@code characterId} là target VÀ đang PENDING_ACCEPT. */

@@ -13,9 +13,11 @@ import javax.sql.DataSource;
 
 import dev.kage.server.database.DatabaseAccessException;
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.JdbcTransactionRunner;
 import dev.kage.server.database.inventory.CharacterInventoryLock;
 import dev.kage.trade.domain.OfferedItemInput;
 import dev.kage.trade.domain.TradeOfferItem;
+import dev.kage.trade.domain.TradeParticipantBusyException;
 import dev.kage.trade.domain.TradeSession;
 import dev.kage.trade.domain.TradeSessionPort;
 import dev.kage.trade.domain.TradeSessionSnapshot;
@@ -38,6 +40,13 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
             SELECT id, requester_character_id, target_character_id, status, created_at FROM trade_session
              WHERE requester_character_id = ? OR target_character_id = ?
             """;
+
+    private static final String LOCK_PARTICIPANT = "SELECT pg_advisory_xact_lock(?, ?)";
+
+    // "Không gian tên" riêng ("TRAD") cho khoá tư vấn của #createRequest — không đụng túi đồ
+    // (0x494E5654) hay friendship (0x46524E44). Hằng số CỐ ĐỊNH, cùng lý do rolling deploy ở
+    // CharacterInventoryLock.
+    private static final int TRADE_PARTICIPANT_LOCK_NAMESPACE = 0x5452_4144;
 
     private static final String INSERT_SESSION = """
             INSERT INTO trade_session (requester_character_id, target_character_id, status, created_at)
@@ -114,12 +123,48 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
                 characterId);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Khoá tư vấn theo TỪNG nhân vật (không theo cặp như {@code PostgresFriendAdapter}): luật bị
+     * phá là "T chỉ ở một phiên", và hai lời mời A→T, B→T là hai CẶP khác nhau — khoá cặp sẽ không
+     * bắt chúng xếp hàng. Lúc này chưa có dòng nào để {@code FOR UPDATE}, nên phải là khoá tư vấn.
+     * Hai khoá xin theo thứ tự khoá tăng dần (như {@code CharacterInventoryLock#acquireBoth}) nên
+     * hai lời mời chéo nhau không chờ vòng. Giao dịch này không giữ khoá nào khác — không chạm thứ
+     * tự khoá chung của DATABASE.md §5.1.
+     */
     @Override
     public TradeSession createRequest(long requesterCharacterId, long targetCharacterId) {
         Instant now = Instant.now();
-        long sessionId = JdbcOperations.insertReturningId(
-                dataSource, INSERT_SESSION, requesterCharacterId, targetCharacterId, Timestamp.from(now));
-        return new TradeSession(sessionId, requesterCharacterId, targetCharacterId, TradeStatus.PENDING_ACCEPT, now);
+        return JdbcTransactionRunner.call(dataSource, connection -> {
+            lockParticipants(connection, requesterCharacterId, targetCharacterId);
+            if (hasActiveSession(connection, requesterCharacterId) || hasActiveSession(connection, targetCharacterId)) {
+                throw new TradeParticipantBusyException(requesterCharacterId, targetCharacterId);
+            }
+            long sessionId = JdbcOperations.insertReturningId(
+                    connection, INSERT_SESSION, requesterCharacterId, targetCharacterId, Timestamp.from(now));
+            return new TradeSession(
+                    sessionId, requesterCharacterId, targetCharacterId, TradeStatus.PENDING_ACCEPT, now);
+        });
+    }
+
+    private static void lockParticipants(Connection connection, long characterIdA, long characterIdB) {
+        int keyA = Long.hashCode(characterIdA);
+        int keyB = Long.hashCode(characterIdB);
+        JdbcOperations.lock(connection, LOCK_PARTICIPANT, TRADE_PARTICIPANT_LOCK_NAMESPACE, Math.min(keyA, keyB));
+        if (keyA != keyB) {
+            JdbcOperations.lock(connection, LOCK_PARTICIPANT, TRADE_PARTICIPANT_LOCK_NAMESPACE, Math.max(keyA, keyB));
+        }
+    }
+
+    private static boolean hasActiveSession(Connection connection, long characterId) {
+        return JdbcOperations.queryOne(
+                        connection,
+                        FIND_ACTIVE_OF_CHARACTER,
+                        PostgresTradeSessionAdapter::mapSession,
+                        characterId,
+                        characterId)
+                .isPresent();
     }
 
     @Override
