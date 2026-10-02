@@ -52,10 +52,25 @@ public final class GameConnection {
     private static final Logger LOG = LoggerFactory.getLogger(GameConnection.class);
 
     private static final int[] RECONNECT_BACKOFF_SECONDS = {1, 2, 4, 8, 16, 30};
-    private static final long HEARTBEAT_INTERVAL_MS = 15_000;
+    static final long HEARTBEAT_INTERVAL_MS = 15_000;
+
+    /**
+     * Hạn ĐỌC sau bắt tay: im lặng lâu hơn thế thì coi đường truyền đã chết, đóng và thử lại
+     * (NETWORK.md §10: "phát hiện kết nối chết là bắt buộc — TCP có thể treo mà không báo lỗi").
+     *
+     * <p>Bằng đúng {@code GatewayServer.READER_IDLE_TIMEOUT} (45 giây = ba nhịp heartbeat). Server
+     * trả {@code PongResponse} cho MỌI {@code PingCommand}, kể cả trước khi đăng nhập, nên một kết
+     * nối lành luôn có ít nhất một khung về mỗi {@link #HEARTBEAT_INTERVAL_MS} — 45 giây không có gì
+     * nghĩa là ba Pong liên tiếp không về.
+     *
+     * <p>Trước 2026-10-02 hạn này là 0 (chờ vô hạn): một đường truyền "đen" (đổi mạng Wi-Fi, NAT quên
+     * ánh xạ, server treo mà không đóng socket) giữ {@link #isConnected()} TRUE mãi mãi, nên cả
+     * {@code GameConnection} lẫn tự đăng nhập lại ({@code AutoRelog}) không bao giờ chạy — thế giới
+     * đứng im không một dòng báo. Xem {@code GameConnectionDeadLinkTest}.
+     */
+    static final int READ_TIMEOUT_MS = 45_000;
     // Chỉ áp dụng lúc bắt tay TLS — tránh treo vô thời hạn nếu mạng "đen" (black-hole) hoặc phía
-    // kia không phản hồi ClientHello. Đọc dữ liệu game SAU handshake vẫn chờ vô thời hạn như cũ
-    // (readLoop() dựa vào readInt() blocking — hành vi có từ trước TLS, ngoài phạm vi ADR-027).
+    // kia không phản hồi ClientHello. Đọc dữ liệu game SAU handshake dùng READ_TIMEOUT_MS.
     private static final int TLS_HANDSHAKE_TIMEOUT_MS = 10_000;
 
     /**
@@ -69,8 +84,8 @@ public final class GameConnection {
      *   <li>số quá lớn ⇒ {@code OutOfMemoryError} ngay lập tức;
      *   <li>số ÂM ⇒ {@code NegativeArraySizeException}, mà {@code connectionLoop} chỉ bắt
      *       {@code IOException} ⇒ luồng kết nối CHẾT HẲN, không bao giờ thử lại nữa;
-     *   <li>số lớn vừa phải nhưng bịa ⇒ {@code readFully} chờ mãi (sau bắt tay TLS
-     *       {@code soTimeout} đã về 0) ⇒ client treo im, cũng không thử lại.
+     *   <li>số lớn vừa phải nhưng bịa ⇒ {@code readFully} chờ mãi (hồi đó {@code soTimeout}
+     *       sau bắt tay TLS còn là 0, xem {@link #READ_TIMEOUT_MS}) ⇒ client treo im, không thử lại.
      * </ul>
      *
      * <p>Không cần một server thù địch mới chạm tới: một khung dở dang là đủ.
@@ -89,6 +104,8 @@ public final class GameConnection {
 
     private final String host;
     private final int port;
+    private final long heartbeatIntervalMs;
+    private final int readTimeoutMs;
     private final Queue<PacketCodec.Frame> inbound = new ConcurrentLinkedQueue<>();
     private final AtomicInteger nextSequenceId = new AtomicInteger(1);
 
@@ -110,8 +127,15 @@ public final class GameConnection {
     private Thread heartbeatThread;
 
     public GameConnection(String host, int port) {
+        this(host, port, HEARTBEAT_INTERVAL_MS, READ_TIMEOUT_MS);
+    }
+
+    /** Cho test — rút ngắn nhịp heartbeat và hạn đọc để đo được trong vài giây. */
+    GameConnection(String host, int port, long heartbeatIntervalMs, int readTimeoutMs) {
         this.host = host;
         this.port = port;
+        this.heartbeatIntervalMs = heartbeatIntervalMs;
+        this.readTimeoutMs = readTimeoutMs;
     }
 
     public void start() {
@@ -205,7 +229,9 @@ public final class GameConnection {
         // pin hoặc server không bật TLS, thay vì đợi tới lần I/O đầu tiên mới phát hiện.
         newSocket.setSoTimeout(TLS_HANDSHAKE_TIMEOUT_MS);
         newSocket.startHandshake();
-        newSocket.setSoTimeout(0);
+        // Sau bắt tay: hạn đọc READ_TIMEOUT_MS chứ không phải 0 — readInt() quá hạn ném
+        // SocketTimeoutException (một IOException), connectionLoop coi như mất kết nối và thử lại.
+        newSocket.setSoTimeout(readTimeoutMs);
         socket = newSocket;
         out = new DataOutputStream(newSocket.getOutputStream());
         connectionGeneration.incrementAndGet();
@@ -291,6 +317,7 @@ public final class GameConnection {
             previous.interrupt();
         }
         int generation = connectionGeneration.get();
+        Socket owned = socket;
         heartbeatThread = new Thread(
                 () -> {
                     while (running.get() && connectionGeneration.get() == generation && isConnected()) {
@@ -299,9 +326,14 @@ public final class GameConnection {
                                     .setClientTimestampMs(System.currentTimeMillis())
                                     .build();
                             send(Opcode.OPCODE_PING_VALUE, nextSequenceId(), ping.toByteArray());
-                            Thread.sleep(HEARTBEAT_INTERVAL_MS);
+                            Thread.sleep(heartbeatIntervalMs);
                         } catch (IOException e) {
-                            LOG.debug("Gửi heartbeat thất bại, kết nối có thể đã chết", e);
+                            // Gửi không đi nghĩa là socket này đã hỏng — đóng NGAY để readLoop thức
+                            // dậy và connectionLoop thử lại, thay vì để client đứng trên một socket
+                            // không còn heartbeat cho tới khi server hết hạn 45 giây. Đóng đúng
+                            // socket của LẦN KẾT NỐI này, không bao giờ đụng tới socket mới hơn.
+                            LOG.debug("Gửi heartbeat thất bại — đóng kết nối để thử lại", e);
+                            closeQuietly(owned);
                             return;
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
@@ -315,16 +347,19 @@ public final class GameConnection {
     }
 
     private void closeQuietly() {
+        closeQuietly(socket);
+        socket = null;
+        out = null;
+    }
+
+    private static void closeQuietly(Socket target) {
         try {
-            Socket current = socket;
-            if (current != null) {
-                current.close();
+            if (target != null) {
+                target.close();
             }
         } catch (IOException ignored) {
             // Đóng kết nối đã chết — không có gì để xử lý thêm, tên biến "ignored" là chủ đích.
         }
-        socket = null;
-        out = null;
     }
 
     private void sleepQuietly(long millis) {
