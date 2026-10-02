@@ -39,6 +39,7 @@ final class MicrometerTickMetricsPort implements TickMetricsPort {
      */
     private static final String[] SYSTEM_NAMES = {
         "AiSystem",
+        "CharacterLocomotionSystem",
         "MovementSystem",
         "VerticalMovementSystem",
         "TerrainCollisionSystem",
