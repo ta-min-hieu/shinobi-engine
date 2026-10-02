@@ -1,5 +1,6 @@
 package dev.kage.chat.domain;
 
+import java.text.Normalizer;
 import java.util.Locale;
 import java.util.Set;
 
@@ -10,6 +11,13 @@ import java.util.Set;
  * chốt danh sách thật). Thay bằng nguồn cấu hình/DB khi có danh sách chính thức. KHÔNG xử lý XSS
  * (cảnh báo RIÊNG ở GAMEPLAY.md §10) — client tự hiển thị chat dạng text thuần, không render HTML,
  * nên không cần escape ở đây.
+ *
+ * <p><b>So khớp NGUYÊN TỪ, không phải chuỗi con (sửa 2026-10-02).</b> Bản cũ dùng
+ * {@code contains}, nên từ cấm "ngu" chặn mọi chữ bắt đầu bằng nó: cảnh giới "Nguyên Anh"
+ * (ADR-038), họ "Nguyễn", "nguy hiểm", "nguyên liệu" — người chơi không gõ nổi tên cảnh giới của
+ * chính mình. Giờ một lần khớp chỉ tính khi hai bên nó KHÔNG dính chữ/số/dấu tổ hợp. Văn bản được
+ * chuẩn hoá NFC trước: bộ gõ dạng tổ hợp (NFD) gửi "ngủ" thành "ngu" + dấu hỏi rời — không chuẩn
+ * hoá thì nó trông như từ cấm, còn "chó chết" gõ dạng NFD lại lọt qua.
  */
 public final class ProfanityFilter {
 
@@ -19,7 +27,33 @@ public final class ProfanityFilter {
     private ProfanityFilter() {}
 
     public static boolean containsBannedWord(String text) {
-        String lower = text.toLowerCase(Locale.ROOT);
-        return BANNED_WORDS.stream().anyMatch(lower::contains);
+        String normalized = Normalizer.normalize(text, Normalizer.Form.NFC).toLowerCase(Locale.ROOT);
+        for (String bannedWord : BANNED_WORDS) {
+            if (containsAsWholeWord(normalized, Normalizer.normalize(bannedWord, Normalizer.Form.NFC))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsAsWholeWord(String text, String word) {
+        int from = text.indexOf(word);
+        while (from >= 0) {
+            int end = from + word.length();
+            boolean startsAtBoundary = from == 0 || !isWordPart(text.codePointBefore(from));
+            boolean endsAtBoundary = end == text.length() || !isWordPart(text.codePointAt(end));
+            if (startsAtBoundary && endsAtBoundary) {
+                return true;
+            }
+            from = text.indexOf(word, from + 1);
+        }
+        return false;
+    }
+
+    /** Chữ, số, hoặc dấu tổ hợp còn sót sau NFC (vẫn là một phần của chữ đứng trước nó). */
+    private static boolean isWordPart(int codePoint) {
+        return Character.isLetterOrDigit(codePoint)
+                || Character.getType(codePoint) == Character.NON_SPACING_MARK
+                || Character.getType(codePoint) == Character.COMBINING_SPACING_MARK;
     }
 }
