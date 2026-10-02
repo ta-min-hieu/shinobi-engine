@@ -90,4 +90,23 @@ class LoginOrCreateAccountUseCaseTest {
 
         assertThatThrownBy(() -> useCase.execute("a")).isInstanceOf(IllegalArgumentException.class);
     }
+
+    /**
+     * Bug 2026-10-02: tên dài hơn 20 ký tự tới được câu INSERT, cột {@code account.username
+     * VARCHAR(20)} từ chối nó TRƯỚC khi {@code Account} kịp kiểm, và người chơi nhận 500
+     * {@code error.login_failed} thay vì {@code error.invalid_username}. Transaction runner ở đây ném
+     * nếu bị gọi — nó đứng thay cho cái DB sẽ từ chối dữ liệu bẩn.
+     */
+    @Test
+    void shouldRejectInvalidUsername_beforeTouchingTheDatabase() {
+        TransactionRunner failIfOpened = action -> {
+            throw new AssertionError("không được mở transaction cho username không hợp lệ");
+        };
+        LoginOrCreateAccountUseCase useCase =
+                new LoginOrCreateAccountUseCase(new FakeAccountPort(), new FakeSessionPort(), failIfOpened);
+
+        assertThatThrownBy(() -> useCase.execute("a".repeat(21))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> useCase.execute("ab")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> useCase.execute("kage\u0000hero")).isInstanceOf(IllegalArgumentException.class);
+    }
 }
