@@ -63,10 +63,18 @@ final class HealthRegenSystem extends IteratingKSystem {
             // nhiều nhất, và nó phát 0 gói. Dọn luôn phần lẻ để lần bị thương sau bắt đầu từ 0.
             recency.healAccumulator = 0f;
             recency.secondsSinceEmit = 0f;
+            recency.regenUnannounced = false;
             return;
         }
         if (recency.secondsSinceCombat < CombatConstants.REGEN_DELAY_SECONDS) {
-            return; // vừa đánh nhau xong — chưa hồi, nhưng đồng hồ phát gói cũng đứng yên
+            // Vừa đánh nhau — chưa hồi, đồng hồ phát gói đứng yên. Nhưng phần máu đã hồi mà chưa
+            // kịp báo thì báo NGAY: đòn của chính mình không mang máu của mình ra dây
+            // (AttackResultEvent chỉ chở máu bên chịu đòn), nên không báo ở đây thì vạch máu kẹt số
+            // cũ suốt REGEN_DELAY_SECONDS giây (test shouldAnnounceUnreportedRegen_...).
+            if (recency.regenUnannounced) {
+                announce(entity, recency, health);
+            }
+            return;
         }
 
         recency.healAccumulator += CombatConstants.REGEN_FRACTION_PER_SECOND * health.max * deltaTime;
@@ -80,9 +88,17 @@ final class HealthRegenSystem extends IteratingKSystem {
         boolean full = health.current >= health.max;
         // Phát khi đủ nhịp HOẶC khi vừa đầy máu — nhịp cuối cùng luôn tới nơi, không để client kẹt
         // ở "còn thiếu 2 máu" cho tới đòn đánh kế tiếp.
-        if (restored > 0 && (full || recency.secondsSinceEmit >= CombatConstants.REGEN_EMIT_INTERVAL_SECONDS)) {
-            recency.secondsSinceEmit = 0f;
-            pendingResults.add(new HealthChange(CHARACTER_ID.get(entity).characterId, health.current, health.max));
+        if (restored > 0) {
+            recency.regenUnannounced = true;
+            if (full || recency.secondsSinceEmit >= CombatConstants.REGEN_EMIT_INTERVAL_SECONDS) {
+                announce(entity, recency, health);
+            }
         }
+    }
+
+    private void announce(KEntity entity, CombatRecencyComponent recency, HealthComponent health) {
+        recency.secondsSinceEmit = 0f;
+        recency.regenUnannounced = false;
+        pendingResults.add(new HealthChange(CHARACTER_ID.get(entity).characterId, health.current, health.max));
     }
 }

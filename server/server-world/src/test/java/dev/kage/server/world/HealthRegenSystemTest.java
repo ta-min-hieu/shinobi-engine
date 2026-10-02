@@ -27,6 +27,8 @@ import dev.kage.server.world.component.HealthComponent;
 class HealthRegenSystemTest {
 
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
+    private static final ComponentMapper<CombatRecencyComponent> RECENCY =
+            ComponentMapper.getFor(CombatRecencyComponent.class);
 
     private static final long CHARACTER_ID = 1L;
     private static final int MAX_HP = 118;
@@ -158,6 +160,38 @@ class HealthRegenSystemTest {
 
         // 3% × 118 = 3,54 máu/giây ⇒ sau đúng 1 giây phải là 41 (38 + 3), không phải 38.
         assertThat(health(character).current).isEqualTo(HP_AFTER_FIRST_FIGHT + 3);
+    }
+
+    /**
+     * Máu đã hồi nhưng chưa tới nhịp báo (trần 1 gói/giây) thì phải được báo NGAY khi đồng hồ chiến
+     * đấu reset — nếu không, vạch máu của client (và của mọi người đang nhìn) kẹt ở số cũ suốt
+     * {@code REGEN_DELAY_SECONDS} giây tới.
+     *
+     * <p>Kịch bản thật: đang hồi máu thì lao vào đánh con quái kế tiếp. Đòn của MÌNH đặt
+     * {@code secondsSinceCombat = 0} cho mình, nhưng {@code AttackResultEvent} chỉ mang máu của BÊN
+     * CHỊU đòn. Gặp quái không đánh trả (cọc luyện công, ADR-039 D4) là lệch tới hết trận + 8 giây.
+     */
+    @Test
+    void shouldAnnounceUnreportedRegen_whenCombatInterruptsItBeforeTheNextEmit() {
+        EcsWorld world = new EcsWorld();
+        KEntity character = buildCharacter(world, HP_AFTER_FIRST_FIGHT, CombatConstants.REGEN_DELAY_SECONDS);
+        HealthRegenSystem system = new HealthRegenSystem();
+        world.addSystem(system);
+        List<HealthChange> beforeTheFight = run(world, system, 0.5f);
+        assertThat(beforeTheFight).as("nửa giây — chưa tới nhịp báo").isEmpty();
+        int regenerated = health(character).current;
+        assertThat(regenerated).isGreaterThan(HP_AFTER_FIRST_FIGHT);
+
+        // Nhân vật tự ra đòn (CombatSystem.markInCombat) — máu KHÔNG đổi.
+        RECENCY.get(character).secondsSinceCombat = 0f;
+        List<HealthChange> afterTheFirstSwing = run(world, system, TICK_SECONDS);
+
+        assertThat(afterTheFirstSwing)
+                .as("số máu đã hồi phải tới client trước khi hồi máu dừng 8 giây")
+                .containsExactly(new HealthChange(CHARACTER_ID, regenerated, MAX_HP));
+        assertThat(run(world, system, 5f))
+                .as("chỉ báo MỘT lần, không lặp mỗi tick trong trận")
+                .isEmpty();
     }
 
     private static HealthComponent health(KEntity entity) {
