@@ -1950,8 +1950,10 @@ class GatewayServerIntegrationTest {
             connectCreateAndSelect(
                     socket, in, "enhance" + UUID.randomUUID().toString().substring(0, 6));
 
-            EnhanceItemCommand enhanceCommand =
-                    EnhanceItemCommand.newBuilder().setItemId(1L).build();
+            EnhanceItemCommand enhanceCommand = EnhanceItemCommand.newBuilder()
+                    .setIdempotencyKey(UUID.randomUUID().toString())
+                    .setItemId(1L)
+                    .build();
             sendFrame(socket, Opcode.OPCODE_ENHANCE_ITEM_COMMAND_VALUE, 10, enhanceCommand.toByteArray());
 
             EnhanceItemResponse response =
@@ -2020,6 +2022,7 @@ class GatewayServerIntegrationTest {
                     socket, in, "buy" + UUID.randomUUID().toString().substring(0, 6));
 
             BuyItemCommand command = BuyItemCommand.newBuilder()
+                    .setIdempotencyKey(UUID.randomUUID().toString())
                     .setItemTemplateId(1L)
                     .setQuantity(1)
                     .build();
@@ -2041,8 +2044,11 @@ class GatewayServerIntegrationTest {
             connectCreateAndSelect(
                     socket, in, "sell" + UUID.randomUUID().toString().substring(0, 6));
 
-            SellItemCommand command =
-                    SellItemCommand.newBuilder().setItemId(1L).setQuantity(1).build();
+            SellItemCommand command = SellItemCommand.newBuilder()
+                    .setIdempotencyKey(UUID.randomUUID().toString())
+                    .setItemId(1L)
+                    .setQuantity(1)
+                    .build();
             sendFrame(socket, Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, 10, command.toByteArray());
 
             SellItemResponse response = SellItemResponse.parseFrom(
@@ -2084,6 +2090,7 @@ class GatewayServerIntegrationTest {
                     socket, in, "quest" + UUID.randomUUID().toString().substring(0, 6));
 
             ClaimQuestRewardCommand command = ClaimQuestRewardCommand.newBuilder()
+                    .setIdempotencyKey(UUID.randomUUID().toString())
                     .setQuestCode("kill_training_dummies")
                     .build();
             sendFrame(socket, Opcode.OPCODE_CLAIM_QUEST_REWARD_COMMAND_VALUE, 10, command.toByteArray());
@@ -2712,6 +2719,7 @@ class GatewayServerIntegrationTest {
                         socket, in, "tracing" + UUID.randomUUID().toString().substring(0, 6));
 
                 BuyItemCommand buyCommand = BuyItemCommand.newBuilder()
+                        .setIdempotencyKey(UUID.randomUUID().toString())
                         .setItemTemplateId(1L)
                         .setQuantity(1)
                         .build();
@@ -2719,14 +2727,17 @@ class GatewayServerIntegrationTest {
                 readUntilOpcode(in, Opcode.OPCODE_BUY_ITEM_RESPONSE_VALUE);
 
                 SellItemCommand sellCommand = SellItemCommand.newBuilder()
+                        .setIdempotencyKey(UUID.randomUUID().toString())
                         .setItemId(1L)
                         .setQuantity(1)
                         .build();
                 sendFrame(socket, Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, 21, sellCommand.toByteArray());
                 readUntilOpcode(in, Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE);
 
-                ConfirmTradeCommand confirmCommand =
-                        ConfirmTradeCommand.newBuilder().setSessionId(1L).build();
+                ConfirmTradeCommand confirmCommand = ConfirmTradeCommand.newBuilder()
+                        .setIdempotencyKey(UUID.randomUUID().toString())
+                        .setSessionId(1L)
+                        .build();
                 sendFrame(socket, Opcode.OPCODE_CONFIRM_TRADE_COMMAND_VALUE, 22, confirmCommand.toByteArray());
                 ConfirmTradeResponse confirmResponse =
                         ConfirmTradeResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_CONFIRM_TRADE_RESPONSE_VALUE)

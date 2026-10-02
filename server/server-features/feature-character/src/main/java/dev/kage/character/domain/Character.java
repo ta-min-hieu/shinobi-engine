@@ -51,12 +51,27 @@ public record Character(
      */
     public static void validateName(String name) {
         Objects.requireNonNull(name, "name");
-        if (name.length() < NAME_MIN_LENGTH || name.length() > NAME_MAX_LENGTH) {
+        if (!hasValidLength(name)) {
             throw new IllegalArgumentException(
                     "tên nhân vật phải dài %d-%d ký tự: '%s'".formatted(NAME_MIN_LENGTH, NAME_MAX_LENGTH, name));
         }
         if (!NAME_PATTERN.matcher(name).matches()) {
             throw new IllegalArgumentException("tên nhân vật chứa ký tự không hợp lệ: '" + name + "'");
         }
+    }
+
+    /**
+     * Bản không ném của {@link #validateName} — {@code true} nếu {@code name} là tên một nhân vật CÓ
+     * THỂ tồn tại. Vì compact constructor áp đúng luật này cho mọi {@code Character} (kể cả dựng lại
+     * từ DB), tên trả {@code false} chắc chắn không khớp nhân vật nào.
+     */
+    public static boolean isValidName(String name) {
+        return name != null
+                && hasValidLength(name)
+                && NAME_PATTERN.matcher(name).matches();
+    }
+
+    private static boolean hasValidLength(String name) {
+        return name.length() >= NAME_MIN_LENGTH && name.length() <= NAME_MAX_LENGTH;
     }
 }

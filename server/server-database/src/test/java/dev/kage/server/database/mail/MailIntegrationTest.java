@@ -331,6 +331,25 @@ class MailIntegrationTest {
     }
 
     /**
+     * Bug 2026-10-02 trên Postgres THẬT: {@code U+0000} trong nội dung thư từng tới câu INSERT, bị
+     * Postgres từ chối bằng {@code DatabaseAccessException} — client nhận 500. Giờ là một outcome,
+     * và vàng ký quỹ không bị đụng tới.
+     */
+    @Test
+    void shouldRejectNulCharacter_asOutcome_withoutTouchingSenderGold() {
+        long senderId = createFreshCharacter("MailNulSend");
+        long recipientId = createFreshCharacter("MailNulRecv");
+        grantGold(senderId, 1_000);
+
+        SendMailUseCase.SendResult result =
+                newSendUseCase().execute(new MailDraft(senderId, recipientId, "Quà", "a\u0000b", 300, List.of()));
+
+        assertThat(result.outcome()).isEqualTo(SendMailUseCase.SendOutcome.INVALID_TEXT);
+        assertThat(readGold(senderId)).isEqualTo(1_000);
+        assertThat(countMailRows(recipientId)).isZero();
+    }
+
+    /**
      * Test hồi quy CHÍNH của lỗ hổng: tự gửi thư cho chính mình rồi nhận, tổng vàng và tổng vật
      * phẩm không đổi. Trước bản vá, 500 vàng này sinh ra từ không khí mỗi lần lặp.
      */

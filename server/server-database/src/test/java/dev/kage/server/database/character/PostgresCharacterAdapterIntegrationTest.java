@@ -29,6 +29,7 @@ import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.IdempotencyKeyReusedException;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.character.domain.PositionSnapshot;
+import dev.kage.server.database.DatabaseAccessException;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.PostgresDataSourceFactory;
@@ -100,6 +101,26 @@ class PostgresCharacterAdapterIntegrationTest {
 
         // Nhân vật thứ 2 KHÔNG được tạo — đúng thiết kế ADR-025 (chống trùng, không phải replay).
         assertThat(adapter.existsByName("IdemSecond")).isFalse();
+    }
+
+    /**
+     * Sự thật về tầng DB mà hai lớp chặn phía trên dựa vào (2026-10-02): Postgres từ chối
+     * {@code U+0000} trong tham số chuỗi — kể cả ở một câu SELECT chỉ để TRA — nên
+     * {@code CharacterFacade#findByName} phải lọc tên không hợp lệ trước khi tới đây; và adapter nổ
+     * {@link IllegalArgumentException} với {@code idempotencyKey} không phải UUID, nên gateway phải
+     * kiểm định dạng khoá trước khi gọi feature.
+     */
+    @Test
+    void shouldFailLoudly_onInputsTheUpperLayersMustFilterOut() {
+        PostgresCharacterAdapter adapter = new PostgresCharacterAdapter(dataSource);
+        JdbcCharacterTransactionRunner transactionRunner = new JdbcCharacterTransactionRunner(dataSource);
+
+        assertThatThrownBy(() -> adapter.findByName("Kage\u0000Hero")).isInstanceOf(DatabaseAccessException.class);
+
+        NewCharacter badKey = new NewCharacter(accountId, "BadKeyHero", Faction.HOA, "not-a-uuid");
+        assertThatThrownBy(() -> transactionRunner.inTransaction(tx -> adapter.create(tx, badKey)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(adapter.existsByName("BadKeyHero")).isFalse();
     }
 
     @Test
