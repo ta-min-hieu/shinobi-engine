@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import dev.kage.dialogue.domain.DialogueNode;
 import dev.kage.dialogue.domain.NpcTemplatePort;
@@ -68,6 +70,23 @@ class GetDialogueNodeUseCaseTest {
         GetDialogueNodeUseCase useCase = new GetDialogueNodeUseCase(new FakeNpcTemplatePort(TEST_SCRIPT_REF));
 
         Optional<DialogueNode> result = useCase.execute("known_npc", "no_such_node");
+
+        assertThat(result).isEmpty();
+    }
+
+    /**
+     * {@code nodeId} đi thẳng từ packet ({@code SelectDialogueOptionCommand.current_node_id}) — client
+     * gửi gì cũng được. Cây hội thoại là một object JS, nên tên của thuộc tính KẾ THỪA từ
+     * {@code Object.prototype} ({@code constructor}, {@code toString}...) cũng "có mặt" trên nó:
+     * trước bản vá, chúng lọt qua phép tra node rồi làm extractor ném lỗi, gateway trả 500 kèm một
+     * stack trace ở mức ERROR thay vì 404 "không có lựa chọn này".
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"constructor", "toString", "valueOf", "hasOwnProperty", "__proto__", "__defineGetter__"})
+    void shouldReturnEmpty_whenNodeIdNamesAnInheritedObjectProperty(String nodeId) {
+        GetDialogueNodeUseCase useCase = new GetDialogueNodeUseCase(new FakeNpcTemplatePort(TEST_SCRIPT_REF));
+
+        Optional<DialogueNode> result = useCase.execute("known_npc", nodeId);
 
         assertThat(result).isEmpty();
     }

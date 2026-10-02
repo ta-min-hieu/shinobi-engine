@@ -58,12 +58,20 @@ public final class GetDialogueNodeUseCase {
         }
     }
 
-    /** {@code null} nếu {@code nodeId} không tồn tại trong cây — Optional bọc lại ở {@link #execute}. */
+    /**
+     * {@code null} nếu {@code nodeId} không tồn tại trong cây — Optional bọc lại ở {@link #execute}.
+     *
+     * <p>⚠️ Chỉ tính key RIÊNG của cây, không dùng {@code getMember} trần: {@code nodeId} đến thẳng
+     * từ packet, và {@code getMember} đi theo chuỗi prototype — client gửi {@code "constructor"}/
+     * {@code "toString"} thì nhận về một hàm JS, extractor ném NPE và gateway trả 500 thay vì 404
+     * (test {@code shouldReturnEmpty_whenNodeIdNamesAnInheritedObjectProperty}). Phải DUYỆT tập key:
+     * {@code getMemberKeys().contains(...)} của GraalJS cũng hỏi qua chuỗi prototype (đo thật).
+     */
     private static DialogueNode extractNode(Value root, String nodeId) {
-        Value node = root.getMember(nodeId);
-        if (node == null) {
+        if (!isOwnKey(root, nodeId)) {
             return null;
         }
+        Value node = root.getMember(nodeId);
         String textKey = node.getMember("text_key").asString();
         Value optionsValue = node.getMember("options");
         ArrayList<DialogueOption> options = new ArrayList<DialogueOption>();
@@ -75,6 +83,15 @@ public final class GetDialogueNodeUseCase {
                     option.getMember("action").asString()));
         }
         return new DialogueNode(nodeId, textKey, options);
+    }
+
+    private static boolean isOwnKey(Value root, String nodeId) {
+        for (String key : root.getMemberKeys()) {
+            if (key.equals(nodeId)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String loadScript(String resourcePath) {
