@@ -296,12 +296,6 @@ final class AiSystem extends IteratingKSystem {
     }
 
     /**
-     * @param range 0 (hoặc âm) = loài THỤ ĐỘNG, không bao giờ gây hấn (ADR-039 D4). Nhánh này phải
-     *     tường minh chứ không được để nó "tự đúng" nhờ phép so sánh bên dưới: với
-     *     {@code range == 0} vòng lặp vẫn aggro một người chơi đứng ĐÚNG toạ độ con quái, và vẫn
-     *     quét toàn bộ danh sách người chơi mỗi tick cho mỗi con quái thụ động.
-     */
-    /**
      * ADR-050 D1/D2/D3 — nhân vật này có đang được một vùng an toàn che hay không.
      *
      * <p>Hai điều kiện, và điều kiện thứ hai mới là thứ giữ cho trạm tiếp ứng không thành chòi bắn
@@ -330,6 +324,12 @@ final class AiSystem extends IteratingKSystem {
         return recency != null && recency.secondsSinceAttackDealt >= CombatConstants.REGEN_DELAY_SECONDS;
     }
 
+    /**
+     * @param range 0 (hoặc âm) = loài THỤ ĐỘNG, không bao giờ gây hấn (ADR-039 D4). Nhánh này phải
+     *     tường minh chứ không được để nó "tự đúng" nhờ phép so sánh bên dưới: với
+     *     {@code range == 0} vòng lặp vẫn aggro một người chơi đứng ĐÚNG toạ độ con quái, và vẫn
+     *     quét toàn bộ danh sách người chơi mỗi tick cho mỗi con quái thụ động.
+     */
     private KEntity findNearestCharacterInRange(PositionComponent position, float range) {
         if (range <= 0f) {
             return null;

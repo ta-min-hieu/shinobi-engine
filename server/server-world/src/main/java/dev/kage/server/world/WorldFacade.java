@@ -52,7 +52,7 @@ import dev.kage.server.world.component.TargetComponent;
  * <p>{@link #attachCharacter}, {@link #detachCharacter}, {@link #enqueueMoveCommand},
  * {@link #setTarget} được gọi từ Netty EventLoop hoặc Virtual Thread của gateway — CHỈ enqueue
  * (rẻ, thread-safe), không bao giờ chạm {@link EcsWorld} trực tiếp (SERVER.md §2: "Virtual
- * Thread cấm sửa ECS state trực tiếp"). Việc thật xảy ra ở đầu tick kế tiếp trên {@link #tickLoop},
+ * Thread cấm sửa ECS state trực tiếp"). Việc thật xảy ra ở đầu tick kế tiếp trên {@link #tickTask},
  * đúng pseudocode SERVER.md §3.
  */
 // PMD CyclomaticComplexity (class-level, ngưỡng mặc định 80): PMD 7.10.0 chưa từng chạy được thật
@@ -374,6 +374,9 @@ public final class WorldFacade {
     }
 
     /** Dừng tick (SERVER.md §10 — graceful shutdown, không {@code kill -9}). */
+    // LockNotBeforeTry: lock() rồi unlock() NGAY là cố ý — không có đoạn găng nào để bọc try/finally,
+    // chỉ dùng khoá làm điểm CHỜ lần tick dở dang (xem comment trong thân hàm).
+    @SuppressWarnings("LockNotBeforeTry")
     public void stop() {
         stopRequested = true;
         running = false;
@@ -412,6 +415,9 @@ public final class WorldFacade {
      *
      * <p>Không chạy trong vòng tick; không cấp phát gì trên tick thread ngoài việc hoàn tất future.
      */
+    // FutureReturnValueIgnored: whenComplete chỉ dùng làm callback hoàn tất mốc; lỗi (nếu có) của
+    // stopped không đổi gì — mốc vẫn phải xong để không ai treo.
+    @SuppressWarnings("FutureReturnValueIgnored")
     public java.util.concurrent.CompletableFuture<Void> inboxBarrier() {
         if (!running) {
             return afterStopOrNow();
@@ -633,7 +639,7 @@ public final class WorldFacade {
     }
 
     /**
-     * Cách ly lỗi (ADR-026): 1 exception trong tick KHÔNG được âm thầm giết {@link #tickThread} —
+     * Cách ly lỗi (ADR-026): 1 exception trong tick KHÔNG được âm thầm giết tick thread —
      * trước đây không bắt, tick lỗi 1 lần là World đóng băng vĩnh viễn không ai biết. Log rồi tick
      * tiếp, cùng tinh thần {@code CharacterPositionPersister.savePositionSafely} (1 lỗi không dừng
      * cả vòng lặp).
@@ -1390,7 +1396,6 @@ public final class WorldFacade {
                 ai.retaliates());
     }
 
-    /** Danh tính loài trên entity: mã trên dây, khoá art, và EXP mà world chỉ chở ra ngoài. */
     /** Chép hành vi boss từ catalog vào component — {@code BossAiSystem} chỉ đọc từ đây (ADR-048 D3). */
     private static BossAiComponent newBossAi(MonsterCatalogSnapshot.MonsterBossNumbers boss) {
         BossAiComponent component = new BossAiComponent();
@@ -1400,6 +1405,7 @@ public final class WorldFacade {
         return component;
     }
 
+    /** Danh tính loài trên entity: mã trên dây, khoá art, và EXP mà world chỉ chở ra ngoài. */
     private static MonsterComponent toMonsterComponent(MonsterCatalogSnapshot.MonsterSpecies loai) {
         MonsterComponent monster = new MonsterComponent();
         monster.monsterCode = loai.code();
@@ -1441,7 +1447,7 @@ public final class WorldFacade {
      * Spawn boss theo MÃ LOÀI, tại chỗ cố định của instance (ADR-048 D6).
      *
      * <p>Dùng cho hầm ngục — nơi KHÔNG có {@code monster_spawn} nào. Boss của world chính thì đi
-     * đường bình thường qua {@link #spawnMonsterEntity}, và {@link BossAiComponent} được gắn ở đó
+     * đường bình thường qua {@link #spawnMonster}, và {@link BossAiComponent} được gắn ở đó
      * theo {@code species.isBoss()}; đây không phải hai cơ chế, chỉ là hai nguồn toạ độ.
      *
      * <p>⚠️ Mọi chỉ số nay đọc từ catalog. World nhận catalog RỖNG (hầm ngục trước ADR-048) sẽ
