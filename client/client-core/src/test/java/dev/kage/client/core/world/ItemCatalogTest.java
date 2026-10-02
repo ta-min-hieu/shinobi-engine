@@ -57,7 +57,11 @@ class ItemCatalogTest {
 
         for (long itemId : new long[] {SWORD_ID, NEW_SLOT_ITEM_ID}) {
             EquipmentSlot slot = catalog.equipSlot(itemId);
-            assertThat(EquipItemCommand.newBuilder().setItemId(itemId).setSlot(slot).build().getSlot())
+            assertThat(EquipItemCommand.newBuilder()
+                            .setItemId(itemId)
+                            .setSlot(slot)
+                            .build()
+                            .getSlot())
                     .isEqualTo(slot);
         }
     }

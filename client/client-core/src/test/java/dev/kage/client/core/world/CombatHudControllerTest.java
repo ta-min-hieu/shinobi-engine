@@ -308,7 +308,8 @@ class CombatHudControllerTest {
         CombatHudController unspecified = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_UNSPECIFIED);
         CombatHudController unrecognized = new CombatHudController(LOCAL_CHARACTER_ID, Faction.UNRECOGNIZED);
 
-        String hoaSkill = CombatConstants.FACTION_SKILLS.get(Faction.FACTION_HOA).skillCode();
+        String hoaSkill =
+                CombatConstants.FACTION_SKILLS.get(Faction.FACTION_HOA).skillCode();
         assertThat(unspecified.skillCode()).isEqualTo(hoaSkill);
         assertThat(unrecognized.skillCode()).isEqualTo(hoaSkill);
     }
@@ -320,7 +321,8 @@ class CombatHudControllerTest {
         controller.onFactionChanged(Faction.UNRECOGNIZED);
 
         assertThat(controller.skillCode())
-                .isEqualTo(CombatConstants.FACTION_SKILLS.get(Faction.FACTION_HOA).skillCode());
+                .isEqualTo(
+                        CombatConstants.FACTION_SKILLS.get(Faction.FACTION_HOA).skillCode());
     }
 
     @Test
