@@ -218,12 +218,6 @@ final class CombatHudController {
     }
 
     /**
-     * HP/Khí vừa được server đặt lại (luôn về đầy) sau khi hồi sinh — xem
-     * {@code CharacterRespawnedEvent}. Xoá luôn mục tiêu đang nhắm: server cũng tự xoá
-     * {@code TargetComponent} của kẻ vừa hồi sinh (WorldFacade#respawnCharacter), nên client giữ
-     * mục tiêu cũ chỉ gây lệch hiển thị vô ích.
-     */
-    /**
      * Máu của chính mình NGAY khi vào world ({@code SelectCharacterResponse}, ADR-036 hậu kiểm) —
      * gọi một lần trước sự kiện đầu tiên. Trước khi có gói này, mẫu số vạch máu kẹt ở
      * {@code CHARACTER_MAX_HP} trong khi tử số là số thật của server, nên người chơi mặc đồ +HP
@@ -241,6 +235,25 @@ final class CombatHudController {
     }
 
     /**
+     * ADR-051 — nhân vật vừa đổi World (vào/ra hầm ngục, vào/ra đấu trường). Phía server đó là một
+     * lần ATTACH MỚI ({@code WorldTransfer} → {@code WorldFacade#handleAttach}): entity mới với Khí
+     * đầy, {@code SkillCooldownComponent} mới tinh và không mục tiêu. {@code WorldChangedEvent} chỉ
+     * chở máu, nên phần còn lại client phải tự đặt về ĐÚNG trạng thái của entity mới — cùng giả định
+     * client đã dùng lúc vào world lần đầu (Khí khởi tạo bằng {@link CombatConstants#CHARACTER_MAX_CHI}).
+     *
+     * <p>Thiếu bước này thì Khí đã tiêu và hồi chiêu đang đếm của world cũ đi theo sang world mới; mà
+     * Khí phía client chỉ được nạp lại khi hồi sinh ({@link #onRespawn}), nên người chơi tiêu hết
+     * Khí rồi được kéo vào hầm ngục sẽ thấy nút chiêu xám mãi — {@link #useSkill} chặn tại chỗ một
+     * lệnh mà server sẵn sàng nhận.
+     */
+    void onWorldChanged(int currentHp, int maxHp) {
+        clearMonsters();
+        onEnterWorld(currentHp, maxHp);
+        playerChi = CombatConstants.CHARACTER_MAX_CHI;
+        skillCooldownRemaining = 0f;
+    }
+
+    /**
      * ADR-043 — máu tối đa mới sau khi mặc/gỡ/tôi luyện trang bị. Máu HIỆN TẠI không đi kèm: server
      * dịch nó theo độ chênh nhưng gateway không đọc được (xem javadoc
      * {@code GatewayChannelHandler#applyEquipmentBonusAndComputeMaxHp}), nên ở đây chỉ CẮT tử số cho
@@ -254,6 +267,12 @@ final class CombatHudController {
         playerHp = Math.min(playerHp, maxHp);
     }
 
+    /**
+     * HP/Khí vừa được server đặt lại (luôn về đầy) sau khi hồi sinh — xem
+     * {@code CharacterRespawnedEvent}. Xoá luôn mục tiêu đang nhắm: server cũng tự xoá
+     * {@code TargetComponent} của kẻ vừa hồi sinh (WorldFacade#respawnCharacter), nên client giữ
+     * mục tiêu cũ chỉ gây lệch hiển thị vô ích.
+     */
     void onRespawn(int currentHp, int maxHp, int currentChi) {
         playerHp = currentHp;
         // ADR-036: máu tối đa phụ thuộc trang bị, nên LẤY của server thay vì đọc hằng số client.

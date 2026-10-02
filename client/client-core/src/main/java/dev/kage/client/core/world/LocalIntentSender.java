@@ -64,6 +64,17 @@ final class LocalIntentSender {
         attackInput.onButtonClicked();
     }
 
+    /**
+     * ADR-051 — vừa đổi World. Phía server đó là một entity MỚI với vận tốc 0
+     * ({@code WorldFacade#handleAttach}), nên hướng đi đã gửi cho entity cũ không còn hiệu lực. Quên
+     * nó đi để nhịp kế tiếp gửi lại nếu người chơi vẫn đang giữ phím — không thì client tự đi một
+     * mình (dự đoán cục bộ vẫn chạy) trong khi nhân vật thật đứng yên ở điểm vào, và bị giật ngược
+     * về đó lúc nhả phím.
+     */
+    void onWorldChanged() {
+        lastSentDirX = 0f;
+    }
+
     /** Gọi mỗi tick cố định từ {@code WorldScreen#fixedUpdate}. */
     void tick(float fixedDeltaTime) {
         updateMovement();

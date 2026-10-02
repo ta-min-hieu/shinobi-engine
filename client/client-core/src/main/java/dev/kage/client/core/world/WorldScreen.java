@@ -492,10 +492,13 @@ public final class WorldScreen implements GameScreen {
             remoteCharacters.clear();
             npcPresenter.clear();
             monsterPresenter.clear(combatHudController.monsters().keySet());
-            combatHudController.clearMonsters();
             verticalMovementSystem.setPlatforms(DemoPlatforms.physics(event.getWorldKind()));
             snapLocalPlayer(event.getX(), event.getY());
-            combatHudController.onEnterWorld(event.getCurrentHp(), event.getMaxHp());
+            // Quái + mục tiêu + máu + Khí + hồi chiêu: World mới là một entity MỚI phía server.
+            combatHudController.onWorldChanged(event.getCurrentHp(), event.getMaxHp());
+            intents.onWorldChanged();
+            // NPC của World cũ vừa bị xoá khỏi màn hình — cuộc nói chuyện với họ không đi theo sang.
+            dialogue.reset();
             dungeon.onWorldChanged(event);
         });
         // Bậc trang phục của chính mình chưa suy được từ đâu (xem CharacterAppearance phía server) —
