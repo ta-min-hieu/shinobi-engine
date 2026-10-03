@@ -57,8 +57,8 @@
 | Bảng | Cột chính | Ghi chú |
 |---|---|---|
 | `monster_template` | `id, code, name_key, model_key, level, max_hp, atk, skill_dmg, def, res, hit_percent, dodge_percent, crit_percent, element, exp_reward, drop_table_id` **+ 6 cột AI**: `aggro_radius_meters, leash_radius_meters, chase_speed_mps, patrol_speed_mps, patrol_radius_meters, idle_duration_seconds` | **Tĩnh**, nạp lúc khởi động. ⚠️ **CỘT QUAN HỆ, KHÔNG JSON** — đặc tả gốc ghi `base_stats_json`/`ai_params_json` nhưng dự án không có thư viện JSON nào; [ADR-037](../01-architecture/adr/ADR-037-Monster-Template-And-Spawn-Tables.md) D1 quyết ngược lại, cùng lập luận đã dùng cho `drop_table_entry` và ADR-036. Sáu cột AI vào từ migration **V25** ([ADR-039](../01-architecture/adr/ADR-039-Per-Species-AI-Parameters.md)) — `aggro_radius_meters = 0` nghĩa là **loài thụ động, không bao giờ gây hấn**. `CHECK` gác `leash >= aggro` (nhỏ hơn ⇒ quái dao động Chase/Return vô hạn) và `patrol_radius <= leash`. ⚠️ **Chỉ 6/8 hằng của `AiConstants` vào bảng**: epsilon "đã tới nơi" và van chống kẹt tuần tra là **cơ chế**, cố ý ở lại code — [AI.md §10.1](../03-engine/AI.md) |
-| `monster_spawn` | `id, monster_template_id (FK), world_code, pos_x, pos_y, respawn_seconds` | **Tĩnh** — loài nào đứng ở đâu. `CHECK pos_y = 0` (ADR-033 khoá di chuyển vào trục X). Migration V23 |
-| `drop_table` | `id, entries_json` | Tỉ lệ rơi đồ — **config, không code** |
+| `monster_spawn` | `id, monster_template_id (FK), world_code, pos_x, pos_y, respawn_seconds` | **Tĩnh** — loài nào đứng ở đâu. `CHECK pos_y = 0` (ADR-033 khoá di chuyển vào trục X). Migration V23. ⚠️ `CHECK (respawn_seconds > 0)` **để lọt `'NaN'`/`'Infinity'`** (Postgres xếp NaN lớn hơn mọi số) — chặn ở tầng code: `MonsterSpawnPoint` từ chối mọi số không hữu hạn lúc nạp (2026-10-03, feature-monster/CLAUDE.md) |
+| `drop_table` | `id, entries_json` | Tỉ lệ rơi đồ — **config, không code**. ⚠️ Lúc chạy bảng rơi được tra theo **MÃ quái** (`drop_table.code`), KHÔNG qua `monster_template.drop_table_id`; loài cố ý không rơi gì vẫn cần một bảng RỖNG mang đúng mã (quy ước V33, V51 áp cho `blood_sand_enforcer`) — xem §10 "Cổng tham chiếu nội dung" |
 
 ### 2.5 Quest
 
@@ -233,6 +233,16 @@ Hệ quả phải giữ:
   không làm gì (để fake ở test khỏi sửa) — adapter Postgres thật PHẢI ghi đè;
   `InventoryGrantRaceIntegrationTest` bắn mọi đường song song theo cả hai chiều để bắt deadlock.
 
+### 5.2 Thứ tự khoá ngoài túi đồ (2026-10-03)
+
+Hai luật nhỏ hơn, cùng tinh thần §5.1 — đều bắt được bằng đo đua thật trên Postgres:
+
+| Vùng | Luật | Vì sao |
+|---|---|---|
+| Party | Dòng `party` `FOR UPDATE` **trước** mọi dòng `party_member`/`party_invite` — ở cả `acceptInvite` lẫn `leaveParty` | `leaveParty` từng khoá dòng thành viên của người rời trước dòng party, trong khi leader rời lại khoá dòng thành viên của leader kế nhiệm SAU dòng party ⇒ leader và thành viên vào sớm nhất cùng rời = deadlock thật, một bên nhận `error.server_internal`. `PartyDissolveRaceIntegrationTest` |
+| Party/bang vừa giải tán | Vi phạm FK tới dòng cha (mời vào party vừa mất leader cuối, xin vào bang vừa giải tán) được adapter dịch thành `PartyDissolvedException`/`GuildDisbandedException` ⇒ outcome thường | Trước đó là 500. `GuildDisbandRaceIntegrationTest` |
+| `pvp_rating` | Chèn dòng mặc định `ON CONFLICT DO NOTHING` **rồi mới** `FOR UPDATE`, theo `character_id` tăng dần | `FOR UPDATE` không khoá được dòng chưa tồn tại (READ COMMITTED cũng không chờ INSERT chưa commit) ⇒ hai trận đầu đời settle cùng lúc từng mất trọn Elo của một trận. `PostgresPvpRatingAdapterIntegrationTest` |
+
 ---
 
 ## 6. Redis
@@ -326,6 +336,14 @@ index có sẵn phủ (composite `inventory_item`, `mail.is_read`/`expires_at`, 
 | Migration **phải có rollback plan** | Hoặc rollback script, hoặc kế hoạch tường minh |
 | Migration **không phá client cũ** | Thêm cột nullable trước, backfill, rồi mới bắt buộc |
 | Test migration trên bản sao dữ liệu thật | Không test trên DB rỗng |
+
+**Cổng tham chiếu nội dung** (2026-10-03, `ContentReferenceIntegrationTest`, server-database): chạy
+MỌI migration rồi kiểm các tham chiếu chéo mà không FK hay cổng nào khác che — bảng rơi theo mã cho
+mọi loài quái, giới hạn dòng rơi so với `max_stack`, chênh giá mua/bán cửa hàng (chống lãi vô hạn),
+vật phẩm mà `take_item` đòi phải kiếm được, diện tích/chồng lấn vùng an toàn, duyệt cây hội thoại của
+mọi `npc_template`, file `.blend` nguồn cho mọi `model_key` quái/NPC, và icon vật phẩm. Hai vật phẩm
+quest đang thiếu icon (nợ art đã biết) bị ghim CẢ HAI chiều — vẽ xong icon mà quên gỡ ghim thì test
+cũng đỏ. Thêm migration nội dung mới ⇒ cổng này phải xanh.
 
 **Quy trình thêm cột NOT NULL an toàn:**
 ```
