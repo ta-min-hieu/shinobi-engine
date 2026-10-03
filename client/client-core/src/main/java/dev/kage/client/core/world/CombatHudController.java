@@ -20,7 +20,9 @@ import dev.kage.protocol.SkillResultEvent;
  *
  * <p>Khí và hồi chiêu KHÔNG có gói đồng bộ nào (GAMEPLAY.md §3): chúng bắt đầu ở mức đầy và hồi
  * chiêu là đếm ngược cục bộ hoàn toàn dự đoán, có thể lệch với server (chấp nhận được — server luôn
- * tự kiểm tra lại, lệch chỉ khiến nút bật/tắt sai thời điểm, xem {@link CombatConstants}).
+ * tự kiểm tra lại, lệch chỉ khiến nút bật/tắt sai thời điểm, xem {@link CombatConstants}). Riêng
+ * lệch do server BỎ lệnh skill (im lặng) thì được sửa: lần bấm không thấy {@code SkillResultEvent}
+ * của chính mình trong cửa sổ chờ được trả lại Khí + hồi chiêu, xem {@link #tick}.
  *
  * <p><b>HP thì CÓ</b>, kể từ ADR-046: ngoài {@link AttackResultEvent}/{@link SkillResultEvent} nhắm
  * vào mình, còn {@link HealthChangedEvent} cho mọi lần máu đổi mà không do đòn đánh (hồi máu ngoài
@@ -44,6 +46,9 @@ final class CombatHudController {
 
     private final Map<Long, MonsterState> monsters = new HashMap<>();
 
+    /** View chỉ-đọc của {@link #monsters}, dựng MỘT lần — xem {@link #monsters()}. */
+    private final Map<Long, MonsterState> monstersView = Collections.unmodifiableMap(monsters);
+
     private int playerHp = CombatConstants.CHARACTER_MAX_HP;
     /**
      * MÁU TỐI ĐA của chính người chơi. Kể từ ADR-036 con số này KHÔNG còn là hằng số: trang bị có
@@ -59,6 +64,19 @@ final class CombatHudController {
 
     private int playerChi = CombatConstants.CHARACTER_MAX_CHI;
     private float skillCooldownRemaining;
+
+    /**
+     * Lần bấm skill gần nhất đã trừ Khí + bắt đầu hồi chiêu DỰ ĐOÁN nhưng chưa thấy
+     * {@code SkillResultEvent} của chính mình — xem {@link #tick} về việc trả lại khi quá hạn.
+     */
+    private boolean castAwaitingConfirmation;
+
+    /** Giây đã trôi kể từ lần bấm đang chờ xác nhận, so với {@link CombatConstants#SKILL_CONFIRM_WINDOW_SECONDS}. */
+    private float castConfirmElapsedSeconds;
+
+    /** Khí đã trừ cho lần bấm đang chờ — nhớ riêng vì hệ phái (tức giá Khí) đổi được giữa chừng. */
+    private int pendingCastChiCost;
+
     private long currentTargetId;
 
     /**
@@ -167,7 +185,30 @@ final class CombatHudController {
     }
 
     void onSkillResult(SkillResultEvent event) {
+        if (event.getAttackerEntityId() == localCharacterId
+                && event.getSkillCode().equals(skill.skillCode())) {
+            confirmOwnCast();
+        }
         applyHpUpdate(event.getTargetEntityId(), event.getTargetCurrentHp(), event.getTargetDied());
+    }
+
+    /**
+     * Server vừa xác nhận một lần cast của CHÍNH mình ({@code SkillSystem} phát đúng MỘT
+     * {@code SkillResultEvent} cho mỗi lần cast thật, và luôn gửi cho người cast — kể cả khi trượt).
+     *
+     * <p>Đang chờ ⇒ Khí/hồi chiêu đã trừ dự đoán là ĐÚNG, chỉ thôi chờ. Không chờ gì ⇒ lời xác nhận
+     * tới SAU khi {@link #tick} đã trả lại (mạng chậm hơn cửa sổ chờ): server ĐÃ trừ thật nên trừ
+     * lại, hồi chiêu đặt theo cận dưới của thời gian đã trôi (ít nhất đúng cửa sổ chờ) — thà nút
+     * xám lâu hơn thật một chút còn hơn sáng lên đúng lúc server chắc chắn từ chối.
+     */
+    private void confirmOwnCast() {
+        if (castAwaitingConfirmation) {
+            castAwaitingConfirmation = false;
+            return;
+        }
+        playerChi = Math.max(0, playerChi - skill.chiCost());
+        skillCooldownRemaining = Math.max(
+                skillCooldownRemaining, skill.cooldownSeconds() - CombatConstants.SKILL_CONFIRM_WINDOW_SECONDS);
     }
 
     /**
@@ -251,6 +292,7 @@ final class CombatHudController {
         onEnterWorld(currentHp, maxHp);
         playerChi = CombatConstants.CHARACTER_MAX_CHI;
         skillCooldownRemaining = 0f;
+        castAwaitingConfirmation = false;
     }
 
     /**
@@ -281,12 +323,32 @@ final class CombatHudController {
             playerMaxHp = maxHp;
         }
         playerChi = currentChi;
+        // Khí vừa lấy THẲNG của server — lần bấm đang chờ (nếu có) không còn gì để trả lại.
+        castAwaitingConfirmation = false;
         currentTargetId = 0L;
     }
 
+    /**
+     * Đếm ngược hồi chiêu, và trả lại Khí + hồi chiêu của lần bấm skill mà server không xác nhận
+     * trong {@link CombatConstants#SKILL_CONFIRM_WINDOW_SECONDS}.
+     *
+     * <p>Server bỏ IM LẶNG mọi lệnh skill sai ({@code SkillSystem.tryCast}: ngoài tầm, bị choáng,
+     * mục tiêu vừa chết, hồi chiêu phía server chưa xong...) và chỉ trừ Khí khi cast THẬT, còn Khí
+     * phía client không có gói đồng bộ nào ngoài hồi sinh/đổi World. Không trả lại ở đây thì mỗi lần
+     * bấm hụt là một lần Khí client tụt xa hơn Khí thật, tới khi nút chiêu xám hẳn dù server vẫn
+     * đầy Khí (CLIENT.md §6: dự đoán sai thì sửa theo server — im lặng chính là câu trả lời).
+     */
     void tick(float deltaTime) {
         if (skillCooldownRemaining > 0f) {
             skillCooldownRemaining = Math.max(0f, skillCooldownRemaining - deltaTime);
+        }
+        if (castAwaitingConfirmation) {
+            castConfirmElapsedSeconds += deltaTime;
+            if (castConfirmElapsedSeconds >= CombatConstants.SKILL_CONFIRM_WINDOW_SECONDS) {
+                castAwaitingConfirmation = false;
+                playerChi = Math.min(CombatConstants.CHARACTER_MAX_CHI, playerChi + pendingCastChiCost);
+                skillCooldownRemaining = 0f;
+            }
         }
     }
 
@@ -307,6 +369,10 @@ final class CombatHudController {
         }
         skillCooldownRemaining = skill.cooldownSeconds();
         playerChi -= skill.chiCost();
+        // Trừ NGAY để nút phản hồi tức thì, nhưng chỉ là dự đoán — xem tick() về lúc trả lại.
+        castAwaitingConfirmation = true;
+        castConfirmElapsedSeconds = 0f;
+        pendingCastChiCost = skill.chiCost();
         return true;
     }
 
@@ -345,8 +411,12 @@ final class CombatHudController {
         return monsters.get(currentTargetId);
     }
 
+    /**
+     * Kho quái dạng CHỈ ĐỌC — luôn cùng một view dựng sẵn, vì người gọi đọc nó nhiều lần mỗi khung
+     * render (bọc mới mỗi lần là cấp phát trong game loop, /CLAUDE.md §6).
+     */
     Map<Long, MonsterState> monsters() {
-        return Collections.unmodifiableMap(monsters);
+        return monstersView;
     }
 
     float skillCooldownRemaining() {

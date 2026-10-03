@@ -1,7 +1,5 @@
 package dev.kage.client.core.ui.hud;
 
-import java.util.Locale;
-
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
@@ -117,6 +115,7 @@ public final class CombatHud implements HudWindow {
     private int lastTargetHp = -1;
     private int lastTargetMaxHp = -1;
     private String lastSkillText;
+    private final CooldownText cooldownText = new CooldownText();
     private String lastDuelText;
     private int lastLevel = -1;
     private int lastPlayerChi = -1;
@@ -457,7 +456,7 @@ public final class CombatHud implements HudWindow {
         skillNameLabel.setText(i18n.get(i18nKey));
         // Nút TRÒN nhỏ không đủ chỗ cho tên + số: tên nằm nhãn phía trên, trong nút chỉ còn đếm
         // ngược (rỗng khi sẵn sàng — nút sáng lên là đủ tín hiệu "dùng được").
-        String text = cooldownRemainingSeconds > 0f ? String.format(Locale.ROOT, "%.1f", cooldownRemainingSeconds) : "";
+        String text = cooldownText.textFor(cooldownRemainingSeconds);
         if (text.equals(lastSkillText)) {
             return; // UI.md §9 — chỉ setText khi giá trị thực sự đổi.
         }

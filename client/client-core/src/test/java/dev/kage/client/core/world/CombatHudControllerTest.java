@@ -119,7 +119,7 @@ class CombatHudControllerTest {
         int maxUses = CombatConstants.CHARACTER_MAX_CHI / CombatConstants.FIREBALL_CHI_COST;
 
         for (int i = 0; i < maxUses; i++) {
-            assertThat(controller.useSkill()).isTrue();
+            castConfirmed(controller);
             controller.tick(CombatConstants.FIREBALL_COOLDOWN_SECONDS);
         }
 
@@ -252,7 +252,7 @@ class CombatHudControllerTest {
         int maxUses = CombatConstants.CHARACTER_MAX_CHI / thuySkill.chiCost();
 
         for (int i = 0; i < maxUses; i++) {
-            assertThat(controller.useSkill()).isTrue();
+            castConfirmed(controller);
             controller.tick(thuySkill.cooldownSeconds());
         }
 
@@ -487,7 +487,7 @@ class CombatHudControllerTest {
         controller.onMonsterSpawned(dummySpawned());
         int maxUses = CombatConstants.CHARACTER_MAX_CHI / CombatConstants.FIREBALL_CHI_COST;
         for (int i = 0; i < maxUses - 1; i++) {
-            controller.useSkill();
+            castConfirmed(controller);
             controller.tick(CombatConstants.FIREBALL_COOLDOWN_SECONDS);
         }
         controller.useSkill(); // nhát cuối: hết Khí VÀ hồi chiêu còn đang đếm lúc đổi World
@@ -522,5 +522,118 @@ class CombatHudControllerTest {
         assertThat(controller.playerMaxHp()).isEqualTo(118);
         assertThat(controller.playerChi()).isEqualTo(CombatConstants.CHARACTER_MAX_CHI);
         assertThat(controller.skillCooldownRemaining()).isZero();
+    }
+
+    /**
+     * {@code monsters()} được đọc 2–3 lần MỖI KHUNG render (vẽ hộp/dấu mục tiêu, đồng bộ model, chọn
+     * mục tiêu). Trước bản vá mỗi lần gọi bọc một {@code Collections.unmodifiableMap} MỚI — cấp phát
+     * trong game loop, thứ /CLAUDE.md §6 cấm. Cùng một view chỉ-đọc dựng một lần là đủ: nó phản ánh
+     * thay đổi của kho bên dưới.
+     */
+    @Test
+    void shouldHandOutTheSameReadOnlyView_insteadOfWrappingEveryFrame() {
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+
+        java.util.Map<Long, CombatHudController.MonsterState> first = controller.monsters();
+        controller.onMonsterSpawned(dummySpawned());
+
+        assertThat(controller.monsters()).isSameAs(first);
+        assertThat(first).containsKey(MONSTER_ID);
+    }
+
+    /** Server xác nhận lần cast của CHÍNH mình — đúng hình dạng gói {@code SkillSystem} phát ra. */
+    private static SkillResultEvent ownCastConfirmed(CombatHudController controller) {
+        return SkillResultEvent.newBuilder()
+                .setSkillCode(controller.skillCode())
+                .setAttackerEntityId(LOCAL_CHARACTER_ID)
+                .setTargetEntityId(MONSTER_ID)
+                .setDamage(5)
+                .setTargetCurrentHp(45)
+                .build();
+    }
+
+    /**
+     * Bấm skill rồi server XÁC NHẬN — lối đi bình thường của một lần cast hợp lệ, dùng trong các
+     * test tiêu Khí liên tiếp (không xác nhận thì Khí được trả lại, xem test hoàn Khí bên dưới).
+     */
+    private static void castConfirmed(CombatHudController controller) {
+        assertThat(controller.useSkill()).isTrue();
+        controller.onSkillResult(ownCastConfirmed(controller));
+    }
+
+    /**
+     * {@code SkillSystem.tryCast} bỏ IM LẶNG mọi lệnh sai (ngoài tầm, bị choáng, mục tiêu vừa chết,
+     * hồi chiêu phía server chưa xong) và chỉ trừ Khí khi cast THẬT. Trước bản vá client trừ Khí
+     * ngay lúc bấm và không bao giờ trả lại; Khí phía client lại không có gói đồng bộ nào ngoài hồi
+     * sinh/đổi World — nên mười lần bấm fireball ngoài tầm 5m là nút chiêu xám tới lần chết kế tiếp,
+     * trong khi server vẫn đang giữ đầy 100 Khí.
+     */
+    @Test
+    void shouldRefundChiAndCooldown_whenServerSilentlyDropsTheCast() {
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+        controller.onMonsterSpawned(dummySpawned());
+        int maxUses = CombatConstants.CHARACTER_MAX_CHI / CombatConstants.FIREBALL_CHI_COST;
+
+        for (int i = 0; i < maxUses; i++) {
+            assertThat(controller.useSkill()).isTrue();
+            controller.tick(CombatConstants.SKILL_CONFIRM_WINDOW_SECONDS);
+        }
+
+        assertThat(controller.playerChi()).isEqualTo(CombatConstants.CHARACTER_MAX_CHI);
+        assertThat(controller.skillCooldownRemaining()).isZero();
+        assertThat(controller.canUseSkill()).isTrue();
+    }
+
+    @Test
+    void shouldKeepChiSpentAndCooldownRunning_whenServerConfirmsTheCast() {
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+        controller.onMonsterSpawned(dummySpawned());
+
+        castConfirmed(controller);
+        controller.tick(CombatConstants.SKILL_CONFIRM_WINDOW_SECONDS);
+
+        assertThat(controller.playerChi())
+                .isEqualTo(CombatConstants.CHARACTER_MAX_CHI - CombatConstants.FIREBALL_CHI_COST);
+        assertThat(controller.skillCooldownRemaining())
+                .isEqualTo(CombatConstants.FIREBALL_COOLDOWN_SECONDS - CombatConstants.SKILL_CONFIRM_WINDOW_SECONDS);
+    }
+
+    /** Chiêu của boss/người khác đi chung opcode 402 — không phải lời xác nhận cho lần bấm của MÌNH. */
+    @Test
+    void shouldNotTreatSomeoneElsesSkillResultAsConfirmation() {
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+        controller.onMonsterSpawned(dummySpawned());
+        controller.useSkill();
+
+        controller.onSkillResult(SkillResultEvent.newBuilder()
+                .setSkillCode("heavy_strike")
+                .setAttackerEntityId(MONSTER_ID)
+                .setTargetEntityId(LOCAL_CHARACTER_ID)
+                .setDamage(5)
+                .setTargetCurrentHp(95)
+                .build());
+        controller.tick(CombatConstants.SKILL_CONFIRM_WINDOW_SECONDS);
+
+        assertThat(controller.playerChi()).isEqualTo(CombatConstants.CHARACTER_MAX_CHI);
+    }
+
+    /**
+     * Mạng chậm hơn cửa sổ chờ: Khí đã được trả rồi lời xác nhận mới tới. Server ĐÃ trừ thật, nên
+     * client trừ lại — thiếu nhánh này thì Khí phía client lệch theo chiều ngược lại (cao hơn thật),
+     * nút sáng trong lúc server chắc chắn từ chối.
+     */
+    @Test
+    void shouldChargeAgain_whenConfirmationArrivesAfterTheRefund() {
+        CombatHudController controller = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
+        controller.onMonsterSpawned(dummySpawned());
+        controller.useSkill();
+        controller.tick(CombatConstants.SKILL_CONFIRM_WINDOW_SECONDS);
+        assertThat(controller.playerChi()).isEqualTo(CombatConstants.CHARACTER_MAX_CHI);
+
+        controller.onSkillResult(ownCastConfirmed(controller));
+
+        assertThat(controller.playerChi())
+                .isEqualTo(CombatConstants.CHARACTER_MAX_CHI - CombatConstants.FIREBALL_CHI_COST);
+        assertThat(controller.skillCooldownRemaining()).isPositive();
     }
 }
