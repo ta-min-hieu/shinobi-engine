@@ -350,7 +350,11 @@ final class DungeonInstanceRegistry {
         return isInDungeon(characterId) || inDuel.test(characterId);
     }
 
-    private synchronized boolean isInDungeon(long characterId) {
+    /**
+     * Đang ở (hoặc đang rời) một instance hầm ngục. Đấu trường hỏi câu này NGOÀI khoá của nó trước khi
+     * dời ai vào trận — xem {@code ArenaInstanceRegistry#refuseCharactersIn}.
+     */
+    synchronized boolean isInDungeon(long characterId) {
         return instanceByCharacterId.containsKey(characterId);
     }
 

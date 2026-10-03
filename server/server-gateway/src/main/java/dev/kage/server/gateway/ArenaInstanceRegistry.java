@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongPredicate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,12 +49,11 @@ import dev.kage.server.world.WorldFacade;
  *       thua khác nhau (bỏ cuộc vs bị hạ gục, rớt mạng vs bị hạ gục) có thể cùng lấy được vé.
  * </ul>
  *
- * <p>⚠️ Giới hạn CHỦ Ý (ngoài phạm vi lát cắt này, xem feature-pvp/CLAUDE.md): KHÔNG cross-check
- * với {@code DungeonInstanceRegistry} — 1 nhân vật đang ở dungeon về lý thuyết vẫn có thể bị thách
- * đấu/thách đấu người khác (constructor đã đủ 4 tham số, thêm phụ thuộc chéo cần tách record gộp
- * mới, không đáng cho 1 edge-case hiếm ở dự án cá nhân). Chiều NGƯỢC lại — lượt "vào hầm ngục" kéo
- * cả nhóm, trong đó có người đang đấu — thì KHÔNG hiếm (một đồng đội bấm là đủ) và đã chặn từ
- * 2026-10-02: hầm ngục hỏi {@link #isInDuel} và bỏ qua người đang đấu.
+ * <p><b>Đối chiếu với hầm ngục — cả hai chiều.</b> Lượt "vào hầm ngục" kéo cả nhóm hỏi
+ * {@link #isInDuel} và bỏ qua người đang đấu (2026-10-02). Chiều này — người đang ở hầm ngục thách
+ * đấu, bị thách, hay chấp nhận — từng được ghi là "giới hạn chủ ý, edge-case hiếm", nhưng nó không
+ * hiếm (bị đồng đội kéo vào hầm ngục sau khi đã nhận lời thách là đủ) và hậu quả là hai thực thể sống;
+ * chặn từ 2026-10-03 qua {@link #refuseCharactersIn}.
  */
 final class ArenaInstanceRegistry {
 
@@ -89,6 +89,15 @@ final class ArenaInstanceRegistry {
 
     private final WorldTransfer transfer;
 
+    /**
+     * Người đang ở hầm ngục không được thách đấu, bị thách, hay vào trận (sửa 2026-10-03). Trước đó
+     * đấu trường chỉ hỏi "đang đấu chưa": người ở hầm ngục chấp nhận một lời thách là bị dời thêm vào
+     * World đấu trường trong khi thực thể hầm ngục vẫn sống — định tuyến ưu tiên hầm ngục nên thực thể
+     * trong trận đứng im chịu đòn, và hết trận họ được gắn về world chính: hai thực thể sống. Mặc định
+     * "không ai ở hầm ngục" cho test chỉ dựng đấu trường.
+     */
+    private volatile LongPredicate inDungeon = characterId -> false;
+
     ArenaInstanceRegistry(
             ConnectedCharacterRegistry registry,
             CharacterFacade characterFacade,
@@ -101,16 +110,45 @@ final class ArenaInstanceRegistry {
         this.transfer = new WorldTransfer(registry);
     }
 
+    /**
+     * Nối câu hỏi "người này có đang ở hầm ngục không" ({@code DungeonInstanceRegistry#isInDungeon}).
+     * Setter chứ không phải tham số constructor: hầm ngục được dựng SAU và cần chính {@link #isInDuel}
+     * của lớp này (GatewayBootstrap), còn constructor đã chạm trần 4 tham số.
+     *
+     * <p>⚠️ Chỉ được gọi {@code inDungeon} khi KHÔNG giữ monitor của lớp này — thứ tự khoá là hầm ngục
+     * → đấu trường (xem {@link #isInDuel}).
+     */
+    void refuseCharactersIn(LongPredicate inDungeon) {
+        this.inDungeon = inDungeon;
+    }
+
     /** {@code WorldFacade} nhân vật này đang ở TRONG (duel), rỗng nếu đang ở world chính. */
     synchronized Optional<WorldFacade> worldFacadeFor(long characterId) {
         DuelInstance instance = instanceByCharacterId.get(characterId);
         return instance == null ? Optional.empty() : Optional.of(instance.facade());
     }
 
-    synchronized ChallengeResult challengeDuel(long challengerCharacterId, long targetCharacterId) {
+    /**
+     * Hỏi hầm ngục NGOÀI khoá (thứ tự khoá hầm ngục → đấu trường). Chỉ là câu trả lời sớm cho người
+     * chơi: người thách vào hầm ngục SAU câu này thì {@link #acceptDuel} kiểm lại, nên không có khe hở.
+     * Protocol không có outcome "đang ở hầm ngục" — {@code ALREADY_IN_DUEL}/{@code TARGET_ALREADY_IN_DUEL}
+     * ("đang bận một instance") là gần nhất, cùng cách hầm ngục trả {@code ALREADY_IN_DUNGEON} cho người
+     * đang đấu.
+     */
+    ChallengeResult challengeDuel(long challengerCharacterId, long targetCharacterId) {
         if (challengerCharacterId == targetCharacterId) {
             return new ChallengeResult(ChallengeOutcome.CANNOT_CHALLENGE_SELF, 0);
         }
+        if (inDungeon.test(challengerCharacterId)) {
+            return new ChallengeResult(ChallengeOutcome.ALREADY_IN_DUEL, 0);
+        }
+        if (inDungeon.test(targetCharacterId)) {
+            return new ChallengeResult(ChallengeOutcome.TARGET_ALREADY_IN_DUEL, 0);
+        }
+        return registerChallenge(challengerCharacterId, targetCharacterId);
+    }
+
+    private synchronized ChallengeResult registerChallenge(long challengerCharacterId, long targetCharacterId) {
         if (isBusy(challengerCharacterId)) {
             return new ChallengeResult(ChallengeOutcome.ALREADY_IN_DUEL, 0);
         }
@@ -134,6 +172,12 @@ final class ArenaInstanceRegistry {
         long challengerCharacterId = reservedChallenger.get();
         boolean started = false;
         try {
+            // SAU khi giữ chỗ, ngoài khoá: từ lúc giữ chỗ, hầm ngục thấy cả hai "đang đấu" và không kéo
+            // ai vào nữa; ai đã vào TRƯỚC đó thì câu hỏi này thấy. Hỏi trước khi giữ chỗ thì một lượt kéo
+            // cả nhóm lọt được vào giữa hai bước.
+            if (inDungeon.test(challengerCharacterId) || inDungeon.test(characterId)) {
+                return new AcceptResult(AcceptOutcome.NOT_FOUND, 0);
+            }
             // Đọc DB NGOÀI khoá — xem javadoc lớp.
             DuelEntrant challenger = loadEntrant(challengerCharacterId);
             DuelEntrant target = loadEntrant(characterId);
