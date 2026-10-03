@@ -1578,7 +1578,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // Context.current() PHẢI chụp NGAY ở đây (còn trên EventLoop, bên trong span "gateway.command"
         // của channelRead0) — cùng lý do EnhanceItemRequest ở handleEnhanceItemCommand.
         BuyItemRequest request = new BuyItemRequest(sequenceId, characterId, command, Context.current());
-        if (rejectMalformedIdempotencyKey(ctx, sequenceId, command.getIdempotencyKey())) {
+        if (rejectMalformedIdempotencyKey(ctx, sequenceId, command.getIdempotencyKey())
+                || rejectMalformedShape(ctx, sequenceId, EconomyCommandShape.isValidQuantity(command.getQuantity()))) {
             return;
         }
         executeBlocking(ctx, sequenceId, () -> handleBuyItemBlocking(ctx, request));
@@ -1631,7 +1632,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         // Context.current() PHẢI chụp NGAY ở đây — cùng lý do handleBuyItemCommand.
         SellItemRequest request = new SellItemRequest(sequenceId, characterId, command, Context.current());
-        if (rejectMalformedIdempotencyKey(ctx, sequenceId, command.getIdempotencyKey())) {
+        if (rejectMalformedIdempotencyKey(ctx, sequenceId, command.getIdempotencyKey())
+                || rejectMalformedShape(ctx, sequenceId, EconomyCommandShape.isValidQuantity(command.getQuantity()))) {
             return;
         }
         executeBlocking(ctx, sequenceId, () -> handleSellItemBlocking(ctx, request));
@@ -3077,6 +3079,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
+        if (rejectMalformedShape(ctx, sequenceId, EconomyCommandShape.isWellFormed(command))) {
+            return;
+        }
         executeBlocking(ctx, sequenceId, () -> handleSetTradeOfferBlocking(ctx, sequenceId, characterId, command));
     }
 
@@ -3764,6 +3769,22 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      */
     private boolean rejectMalformedIdempotencyKey(ChannelHandlerContext ctx, int sequenceId, String idempotencyKey) {
         if (IdempotencyKeyFormat.isWellFormed(idempotencyKey)) {
+            return false;
+        }
+        sendError(ctx, sequenceId, 400, "error.invalid_payload");
+        return true;
+    }
+
+    /**
+     * Lệnh kinh tế sai HÌNH DẠNG (số lượng/vàng/id không dương) ⇒ 400 {@code error.invalid_payload}
+     * trên EventLoop, không chạm DB (sửa 2026-10-03) — trước đó use case ném
+     * {@link IllegalArgumentException} và lưới cuối của {@link #executeBlocking} báo 500. Xem
+     * {@link EconomyCommandShape}.
+     *
+     * @return {@code true} nếu đã từ chối (caller dừng lại)
+     */
+    private boolean rejectMalformedShape(ChannelHandlerContext ctx, int sequenceId, boolean wellFormed) {
+        if (wellFormed) {
             return false;
         }
         sendError(ctx, sequenceId, 400, "error.invalid_payload");
