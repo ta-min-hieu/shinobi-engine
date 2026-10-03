@@ -35,15 +35,29 @@ public final class PostgresPvpRatingAdapter implements PvpRatingPort {
             SELECT character_id, rating, wins, losses, updated_at FROM pvp_rating WHERE character_id = ?
             """;
 
+    /**
+     * Bảo đảm dòng TỒN TẠI trước khi khoá nó (sửa 2026-10-03). {@code FOR UPDATE} không khoá được
+     * một dòng chưa có, và ở READ COMMITTED cũng không chờ một INSERT chưa commit của giao dịch khác
+     * — trận đầu đời của một nhân vật vì thế từng đọc {@link EloRating#DEFAULT_RATING} trong khi trận
+     * kia đang ghi dở, rồi UPSERT ghi đè kết quả của trận kia. {@code DO NOTHING} trên khoá chính thì
+     * CHỜ giao dịch đang chèn cùng {@code character_id} commit — sau câu này dòng chắc chắn đã có và
+     * {@code FOR UPDATE} đọc được bản đã commit.
+     */
+    private static final String INSERT_DEFAULT_IF_ABSENT = """
+            INSERT INTO pvp_rating (character_id, rating, wins, losses, updated_at)
+            VALUES (?, ?, 0, 0, ?)
+            ON CONFLICT (character_id) DO NOTHING
+            """;
+
     private static final String LOCK_RATING_FOR_UPDATE = """
             SELECT rating FROM pvp_rating WHERE character_id = ? FOR UPDATE
             """;
 
     // ON CONFLICT: rating GHI ĐÈ (giá trị mới đã tính đủ, không cộng dồn); wins/losses CỘNG DỒN
-    // (delta 0/1 theo winner/loser — xem lời gọi ở recordDuelResult). Dòng CHƯA TỒN TẠI thì
-    // LOCK_RATING_FOR_UPDATE ở trên trả 0 dòng (không khoá được cái chưa có) — INSERT ở đây tự nó
-    // là điểm nguyên tử THẬT SỰ cho trận ĐẦU TIÊN của 1 nhân vật (2 giao dịch cùng INSERT 1
-    // character_id thì Postgres tự khoá theo unique index, một bên chờ bên kia commit).
+    // (delta 0/1 theo winner/loser — xem lời gọi ở recordDuelResult). Tới đây dòng LUÔN đã tồn tại
+    // và đã bị khoá (INSERT_DEFAULT_IF_ABSENT + LOCK_RATING_FOR_UPDATE) — ON CONFLICT chỉ còn là
+    // lưới an toàn. Bản cũ trông vào chính câu này làm "điểm nguyên tử" cho trận ĐẦU TIÊN, nhưng
+    // rating nó ghi đã được tính TRƯỚC khi chờ, từ 1000 — xem INSERT_DEFAULT_IF_ABSENT.
     private static final String UPSERT_RATING = """
             INSERT INTO pvp_rating (character_id, rating, wins, losses, updated_at)
             VALUES (?, ?, ?, ?, ?)
@@ -85,10 +99,16 @@ public final class PostgresPvpRatingAdapter implements PvpRatingPort {
         });
     }
 
-    /** Khoá 1 dòng (nếu có) rồi trả rating của nó, hoặc {@link EloRating#DEFAULT_RATING} nếu chưa
-     * từng đấu — PHẢI gọi bên trong transaction đã mở của {@link #recordDuelResult}, tự nó không
+    /** Chèn dòng {@link EloRating#DEFAULT_RATING} nếu nhân vật chưa từng đấu, khoá dòng đó rồi trả
+     * rating đã commit của nó — PHẢI gọi bên trong transaction đã mở của {@link #recordDuelResult}, tự nó không
      * khoá được gì nếu chạy đơn lẻ ngoài transaction (autocommit nhả khoá ngay khi câu lệnh xong). */
     private static int lockAndReadRating(Connection connection, long characterId) {
+        JdbcOperations.update(
+                connection,
+                INSERT_DEFAULT_IF_ABSENT,
+                characterId,
+                EloRating.DEFAULT_RATING,
+                Timestamp.from(Instant.now()));
         try (PreparedStatement statement = connection.prepareStatement(LOCK_RATING_FOR_UPDATE)) {
             statement.setLong(1, characterId);
             try (ResultSet rs = statement.executeQuery()) {
