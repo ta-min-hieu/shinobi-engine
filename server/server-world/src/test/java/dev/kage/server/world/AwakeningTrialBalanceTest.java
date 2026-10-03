@@ -179,7 +179,7 @@ class AwakeningTrialBalanceTest {
         float aggroRadiusMeters = 6f; // mặc định V25, cả hai loài giữ nguyên
         float leashRadiusMeters = 10f;
         float meleeAttackRangeMeters = 2f;
-        float distanceToNearestWarden = Math.abs(-47f - (-33f));
+        float distanceToNearestWarden = Math.abs(-47f - -33f);
 
         assertThat(distanceToNearestWarden).isEqualTo(14f);
         // V29 — đi ngang không kéo được hai con cùng lúc.

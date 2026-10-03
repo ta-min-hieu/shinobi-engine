@@ -14,9 +14,9 @@ import javax.sql.DataSource;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import dev.kage.account.domain.Account;
@@ -68,8 +68,8 @@ class QuestIntegrationTest {
     private static final String REPORT_TO_OUTER_SECT_CODE = "report_to_outer_sect";
 
     @Container
-    static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(DockerImageName.parse("postgres:17")).withStartupTimeout(Duration.ofMinutes(2));
+    static final PostgreSQLContainer POSTGRES =
+            new PostgreSQLContainer(DockerImageName.parse("postgres:17")).withStartupTimeout(Duration.ofMinutes(2));
 
     static DataSource dataSource;
     // volatile: @BeforeAll ghi ở luồng JUnit, còn các test đồng thời đọc nó từ luồng khác —
@@ -438,8 +438,8 @@ class QuestIntegrationTest {
      * V28 phải trỏ {@code prerequisite_quest_id} về {@code kill_training_dummies} bằng cách TRA
      * THEO {@code code}, không hardcode số 1 (id do {@code GENERATED ALWAYS AS IDENTITY} cấp).
      *
-     * <p>⚠️ Test này chỉ verify DỮ LIỆU. Cột này CHƯA được đọc ở bất kỳ đâu trong code — xem
-     * {@link #shouldStillAcceptNightWatch_becausePrerequisiteIsNotEnforcedYet}.
+     * <p>Test này chỉ verify DỮ LIỆU. Việc THI HÀNH cột này (ADR-044) có ô riêng — xem
+     * {@link #shouldRejectNightWatch_whenTrainingDummiesNotClaimedYet}.
      */
     @Test
     void shouldSeedNightWatch_withPrerequisiteResolvedByCode() {

@@ -20,9 +20,9 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import dev.kage.account.domain.Account;
@@ -65,8 +65,8 @@ class PostgresPvpRatingAdapterIntegrationTest {
     private static final int POSTGRES_PORT = 5432;
 
     @Container
-    static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(DockerImageName.parse("postgres:17")).withStartupTimeout(Duration.ofMinutes(2));
+    static final PostgreSQLContainer POSTGRES =
+            new PostgreSQLContainer(DockerImageName.parse("postgres:17")).withStartupTimeout(Duration.ofMinutes(2));
 
     static DataSource dataSource;
     static long accountId;
@@ -153,11 +153,14 @@ class PostgresPvpRatingAdapterIntegrationTest {
                 try (PreparedStatement lock = connection.prepareStatement(
                         "SELECT rating FROM pvp_rating WHERE character_id = ? FOR UPDATE")) {
                     lock.setLong(1, a);
-                    // ResultSet chỉ cần THỰC THI để khoá dòng — nội dung không dùng tới, nhưng vẫn
+                    // ResultSet chỉ cần THỰC THI để khoá dòng — giá trị không dùng tới, nhưng vẫn
                     // phải đóng qua try-with-resources (SpotBugs RV: bỏ qua giá trị trả về của
-                    // executeQuery() coi như rò tài nguyên).
-                    try (ResultSet ignored = lock.executeQuery()) {
-                        // không đọc gì — chỉ cần dòng đã bị khoá lúc executeQuery() trả về.
+                    // executeQuery() coi như rò tài nguyên). Dòng phải TỒN TẠI: không có dòng thì
+                    // FOR UPDATE chẳng khoá gì và cả phép đo race thành vô nghĩa.
+                    try (ResultSet locked = lock.executeQuery()) {
+                        if (!locked.next()) {
+                            throw new IllegalStateException("không có dòng pvp_rating nào để khoá");
+                        }
                     }
                 }
                 lockAcquired.countDown();

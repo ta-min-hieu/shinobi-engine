@@ -16,7 +16,8 @@ import dev.kage.server.world.MonsterCatalogSnapshot;
  *
  * <p>⚠️ <b>{@link #AGGRESSIVE_AI} là fixture CƠ CHẾ, không còn khớp nội dung DB.</b> Từ
  * ADR-039 D4, {@code training_dummy} thật trong {@code monster_template} là loài THỤ ĐỘNG
- * (aggro = 0, xem {@link #passiveTrainingGround()}). Fixture ở đây giữ bộ tham số hung dữ mặc định
+ * (aggro = 0, xem {@code passiveTrainingGround()} của bản bên {@code server-world} — bản sao này
+ * không cần nó). Fixture ở đây giữ bộ tham số hung dữ mặc định
  * vì các test dùng nó kiểm <b>FSM Idle→Chase→Attack</b> — thứ độc lập với loài nào đang chạy nó.
  */
 final class TestMonsterCatalogs {

@@ -191,7 +191,7 @@ chục nghìn dòng qua nhiều feature. Kết quả KHÔNG phải "5000 warning
 format lại (auto-fix, không tốn công người), và chỉ ~30 SpotBugs finding thật cần xử lý (2 bug thật
 sửa, còn lại suppress có lý do rõ — xem `config/spotbugs/exclude.xml`). Dự đoán "trễ = thảm hoạ" ở
 trên đúng tinh thần nhưng phóng đại quy mô — có thể vì đa số finding rơi vào vài pattern lặp lại
-nhiều lần (Port/DataSource/JedisPool held-by-reference, TLS chưa làm) chứ không phải rải rác ngẫu
+nhiều lần (Port/DataSource/RedisClient held-by-reference, TLS chưa làm) chứ không phải rải rác ngẫu
 nhiên khắp nơi.
 
 ---

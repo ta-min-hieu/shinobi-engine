@@ -11,8 +11,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.RedisClient;
 import redis.clients.jedis.exceptions.JedisAccessControlException;
 
 /** Test bằng Redis THẬT qua Testcontainers — verify sliding TTL + thu hồi tức thì (ADR-017). */
@@ -27,14 +26,14 @@ class RedisSessionAdapterIntegrationTest {
             .withCommand("redis-server", "--requirepass", TEST_PASSWORD)
             .withStartupTimeout(Duration.ofMinutes(2));
 
-    private static JedisPool jedisPool() {
-        return new JedisPool(REDIS.getHost(), REDIS.getMappedPort(6379), null, TEST_PASSWORD);
+    private static RedisClient redisClient() {
+        return RedisClientFactory.create(new RedisConfig(REDIS.getHost(), REDIS.getMappedPort(6379), TEST_PASSWORD));
     }
 
     @Test
     void shouldValidateIssuedToken_andReturnAccountId() {
-        try (JedisPool jedisPool = jedisPool()) {
-            RedisSessionAdapter adapter = new RedisSessionAdapter(jedisPool);
+        try (RedisClient redisClient = redisClient()) {
+            RedisSessionAdapter adapter = new RedisSessionAdapter(redisClient);
 
             String token = adapter.issue(42L);
             Optional<Long> result = adapter.validateAndRenew(token);
@@ -45,8 +44,8 @@ class RedisSessionAdapterIntegrationTest {
 
     @Test
     void shouldReturnEmpty_whenTokenNeverIssued() {
-        try (JedisPool jedisPool = jedisPool()) {
-            RedisSessionAdapter adapter = new RedisSessionAdapter(jedisPool);
+        try (RedisClient redisClient = redisClient()) {
+            RedisSessionAdapter adapter = new RedisSessionAdapter(redisClient);
 
             Optional<Long> result = adapter.validateAndRenew("token-khong-ton-tai");
 
@@ -56,8 +55,8 @@ class RedisSessionAdapterIntegrationTest {
 
     @Test
     void shouldInvalidateImmediately_afterRevoke() {
-        try (JedisPool jedisPool = jedisPool()) {
-            RedisSessionAdapter adapter = new RedisSessionAdapter(jedisPool);
+        try (RedisClient redisClient = redisClient()) {
+            RedisSessionAdapter adapter = new RedisSessionAdapter(redisClient);
             String token = adapter.issue(7L);
 
             adapter.revoke(token);
@@ -70,8 +69,8 @@ class RedisSessionAdapterIntegrationTest {
 
     @Test
     void shouldIssueDifferentTokens_forDifferentSessions() {
-        try (JedisPool jedisPool = jedisPool()) {
-            RedisSessionAdapter adapter = new RedisSessionAdapter(jedisPool);
+        try (RedisClient redisClient = redisClient()) {
+            RedisSessionAdapter adapter = new RedisSessionAdapter(redisClient);
 
             String tokenA = adapter.issue(1L);
             String tokenB = adapter.issue(2L);
@@ -86,12 +85,8 @@ class RedisSessionAdapterIntegrationTest {
     void shouldRejectConnection_whenNoPasswordProvided() {
         // SECURITY.md §14 — verify runtime thật rằng `--requirepass` từ chối kết nối không auth,
         // không chỉ đọc cấu hình compose bằng mắt.
-        try (JedisPool noAuthPool = new JedisPool(REDIS.getHost(), REDIS.getMappedPort(6379))) {
-            assertThatThrownBy(() -> {
-                        try (Jedis jedis = noAuthPool.getResource()) {
-                            jedis.ping();
-                        }
-                    })
+        try (RedisClient noAuthClient = RedisClient.create(REDIS.getHost(), REDIS.getMappedPort(6379))) {
+            assertThatThrownBy(noAuthClient::ping)
                     .isInstanceOf(JedisAccessControlException.class)
                     .hasMessageContaining("NOAUTH");
         }

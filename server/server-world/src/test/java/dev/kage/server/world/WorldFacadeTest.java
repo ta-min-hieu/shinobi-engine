@@ -1313,14 +1313,6 @@ class WorldFacadeTest {
     }
 
     /**
-     * Nhắm {@code targetEntityId} rồi BẤM ĐÁNH liên tục tới khi {@code condition} đúng.
-     *
-     * <p>Thay cho {@code setTarget} + {@link #awaitTrue} thuần kể từ 2026-08-09: nhân vật KHÔNG tự
-     * đánh nữa (chủ dự án quyết sau playtest, xem {@code CombatSystem}), {@code setTarget} giờ chỉ
-     * còn nghĩa "nhắm ai". Luôn dùng nhân vật {@code 1L} — mọi test combat ở file này đều để
-     * {@code 1L} làm bên tấn công.
-     */
-    /**
      * ADR-049 — loài khai {@code retaliates} BỊ ĐÁNH là đánh trả, dù {@code aggro = 0}.
      *
      * <p>PHÁT HIỆN THẬT (playtest quest 9, 2026-09-12): trước ADR này, boss cao trào arc 2 đứng im
@@ -1391,6 +1383,14 @@ class WorldFacadeTest {
         }
     }
 
+    /**
+     * Nhắm {@code targetEntityId} rồi BẤM ĐÁNH liên tục tới khi {@code condition} đúng.
+     *
+     * <p>Thay cho {@code setTarget} + {@link #awaitTrue} thuần kể từ 2026-08-09: nhân vật KHÔNG tự
+     * đánh nữa (chủ dự án quyết sau playtest, xem {@code CombatSystem}), {@code setTarget} giờ chỉ
+     * còn nghĩa "nhắm ai". Luôn dùng nhân vật {@code 1L} — mọi test combat ở file này đều để
+     * {@code 1L} làm bên tấn công.
+     */
     private static void targetAndAttackUntil(WorldFacade world, long targetEntityId, Supplier<Boolean> condition) {
         targetAndAttackUntil(world, targetEntityId, condition, Duration.ofSeconds(5));
     }

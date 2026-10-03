@@ -16,6 +16,8 @@ package dev.kage.inventory.domain;
 public interface TradeOfferPort {
 
     /**
+     * Kiểm món {@code itemId} của {@code characterId} có đang được chào trong giao dịch không.
+     *
      * @return {@code true} nếu {@code characterId} đang chào {@code itemId} trong một phiên giao
      *     dịch chưa kết thúc (phiên đã thi hành/huỷ bị xoá hẳn nên không còn lời chào nào)
      */

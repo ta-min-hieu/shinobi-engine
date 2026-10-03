@@ -5,8 +5,8 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.Optional;
 
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.RedisClient;
+import redis.clients.jedis.params.SetParams;
 
 import dev.kage.account.domain.SessionPort;
 
@@ -14,7 +14,7 @@ import dev.kage.account.domain.SessionPort;
  * Session token (ADR-017): opaque random 256-bit, key {@code session:{token}} → accountId,
  * sliding TTL 24h — mỗi {@link #validateAndRenew} gia hạn lại (DATABASE.md §6 key pattern).
  *
- * <p>Chỉ dùng lệnh Redis chuẩn (SETEX/GET/EXPIRE/DEL) — không module độc quyền Redis Stack
+ * <p>Chỉ dùng lệnh Redis chuẩn (SET … EX/GET/EXPIRE/DEL) — không module độc quyền Redis Stack
  * (ADR-005 ràng buộc bắt buộc, giữ chi phí đổi sang Valkey ≈ 0 nếu cần).
  */
 public final class RedisSessionAdapter implements SessionPort {
@@ -23,11 +23,12 @@ public final class RedisSessionAdapter implements SessionPort {
     private static final Duration SESSION_TTL = Duration.ofHours(24);
     private static final String KEY_PREFIX = "session:";
 
-    private final JedisPool jedisPool;
+    private final RedisClient redisClient;
     private final SecureRandom secureRandom = new SecureRandom();
 
-    public RedisSessionAdapter(JedisPool jedisPool) {
-        this.jedisPool = jedisPool;
+    /** {@code redisClient} tự quản pool kết nối; mỗi lệnh mượn rồi trả kết nối bên trong nó. */
+    public RedisSessionAdapter(RedisClient redisClient) {
+        this.redisClient = redisClient;
     }
 
     @Override
@@ -35,29 +36,28 @@ public final class RedisSessionAdapter implements SessionPort {
         byte[] tokenBytes = new byte[TOKEN_ENTROPY_BYTES];
         secureRandom.nextBytes(tokenBytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
-        try (Jedis jedis = jedisPool.getResource()) {
-            jedis.setex(KEY_PREFIX + token, SESSION_TTL.toSeconds(), Long.toString(accountId));
-        }
+        // SET ... EX là dạng thay thế chính thức của SETEX (Jedis 7.3 deprecate setex) — cùng ngữ
+        // nghĩa nguyên tử: ghi giá trị và TTL trong MỘT lệnh.
+        redisClient.set(
+                KEY_PREFIX + token,
+                Long.toString(accountId),
+                SetParams.setParams().ex(SESSION_TTL.toSeconds()));
         return token;
     }
 
     @Override
     public Optional<Long> validateAndRenew(String token) {
         String key = KEY_PREFIX + token;
-        try (Jedis jedis = jedisPool.getResource()) {
-            String value = jedis.get(key);
-            if (value == null) {
-                return Optional.empty();
-            }
-            jedis.expire(key, SESSION_TTL.toSeconds());
-            return Optional.of(Long.parseLong(value));
+        String value = redisClient.get(key);
+        if (value == null) {
+            return Optional.empty();
         }
+        redisClient.expire(key, SESSION_TTL.toSeconds());
+        return Optional.of(Long.parseLong(value));
     }
 
     @Override
     public void revoke(String token) {
-        try (Jedis jedis = jedisPool.getResource()) {
-            jedis.del(KEY_PREFIX + token);
-        }
+        redisClient.del(KEY_PREFIX + token);
     }
 }

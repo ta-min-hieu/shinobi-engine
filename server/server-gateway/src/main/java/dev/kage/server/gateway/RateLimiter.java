@@ -40,7 +40,11 @@ final class RateLimiter {
         this.windowStartNanos = nanoTimeSource.getAsLong();
     }
 
-    /** @return {@code true} nếu request được phép; {@code false} nếu vượt ngưỡng — caller PHẢI drop. */
+    /**
+     * Đếm một request vào cửa sổ hiện tại.
+     *
+     * @return {@code true} nếu request được phép; {@code false} nếu vượt ngưỡng — caller PHẢI drop.
+     */
     boolean tryAcquire() {
         rotateWindowIfElapsed();
         countInWindow++;

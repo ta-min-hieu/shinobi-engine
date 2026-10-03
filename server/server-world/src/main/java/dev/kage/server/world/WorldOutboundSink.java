@@ -28,7 +28,7 @@ public interface WorldOutboundSink {
     /** Nhân vật {@code movedCharacterId} (đã ở trong AoI từ trước) vừa đổi vị trí. */
     void onCharacterMoved(long targetCharacterId, long movedCharacterId, float x, float y);
 
-    /** Quái {@code monsterId} VỪA vào AoI của {@code targetCharacterId} (spawn lần đầu hoặc hồi sinh). */
+    /** Quái {@code monster.monsterId()} VỪA vào AoI của {@code targetCharacterId} (spawn lần đầu hoặc hồi sinh). */
     void onMonsterSpawned(long targetCharacterId, MonsterSnapshot monster);
 
     /** Quái {@code monsterId} VỪA rời AoI của {@code targetCharacterId} (chết hoặc ra xa). */
@@ -38,12 +38,12 @@ public interface WorldOutboundSink {
     void onMonsterMoved(long targetCharacterId, long monsterId, float x, float y);
 
     /**
-     * @param expReward EXP thưởng ({@code monster_template.exp_reward}, ADR-037 D4) — server-world
-     *     chỉ CHỞ con số này ra, không dùng tới nó, đúng như nó chở {@code monsterCode}
-     *
      * Quái {@code monsterCode} VỪA bị {@code killerCharacterId} hạ gục — server-world không biết
      * DB/inventory (server/CLAUDE.md), nên chỉ báo SỰ KIỆN; việc roll rơi đồ + cộng vào túi thật
      * xảy ra ở gateway (nơi có {@code InventoryFacade}, GAMEPLAY.md §5).
+     *
+     * @param expReward EXP thưởng ({@code monster_template.exp_reward}, ADR-037 D4) — server-world
+     *     chỉ CHỞ con số này ra, không dùng tới nó, đúng như nó chở {@code monsterCode}
      */
     void onMonsterKilled(long killerCharacterId, String monsterCode, long expReward);
 

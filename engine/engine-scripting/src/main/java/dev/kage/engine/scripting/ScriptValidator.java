@@ -21,7 +21,10 @@ public final class ScriptValidator {
     }
 
     /**
-     * @throws IllegalStateException nếu {@code scriptRef} không tồn tại trên classpath
+     * Kiểm tra cú pháp từng script trong {@code scriptRefs}, dừng ở script lỗi đầu tiên.
+     *
+     * @throws IllegalStateException nếu một phần tử của {@code scriptRefs} không tồn tại trên
+     *     classpath
      * @throws ScriptExecutionException nếu bất kỳ script nào lỗi cú pháp
      */
     public void validateAll(List<String> scriptRefs) {

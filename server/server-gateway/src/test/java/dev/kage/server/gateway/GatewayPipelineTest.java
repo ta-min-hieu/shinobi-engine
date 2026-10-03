@@ -16,6 +16,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.embedded.EmbeddedChannel;
 import org.junit.jupiter.api.Test;
@@ -433,14 +434,6 @@ class GatewayPipelineTest {
     }
 
     /**
-     * EXP thưởng quest đi thẳng vào {@code character.exp} qua {@code PostgresQuestExpAdapter},
-     * KHÔNG qua {@code GrantExperienceUseCase} — nên nếu gateway không tự đẩy lại trạng thái EXP
-     * sau khi nhận thưởng thì vạch trên HUD đứng im tới lần đăng nhập sau.
-     *
-     * <p>Playtest 2026-09-05 gặp đúng thế: nhận 500 EXP mà HUD vẫn 20/200. Test này khoá lại bản
-     * sửa — xoá lời gọi đẩy EXP trong {@code handleClaimQuestRewardBlocking} là test đỏ.
-     */
-    /**
      * ADR-041 — {@code SelectCharacterResponse} phải mang vị trí THẬT, không để client đoán (0,0).
      *
      * <p>Playtest 2026-09-05: đăng nhập ở x=8, x=-3, x=-5 cho ra khung hình giống nhau từng pixel,
@@ -533,6 +526,14 @@ class GatewayPipelineTest {
                 .containsExactly(Opcode.OPCODE_ERROR_VALUE);
     }
 
+    /**
+     * EXP thưởng quest đi thẳng vào {@code character.exp} qua {@code PostgresQuestExpAdapter},
+     * KHÔNG qua {@code GrantExperienceUseCase} — nên nếu gateway không tự đẩy lại trạng thái EXP
+     * sau khi nhận thưởng thì vạch trên HUD đứng im tới lần đăng nhập sau.
+     *
+     * <p>Playtest 2026-09-05 gặp đúng thế: nhận 500 EXP mà HUD vẫn 20/200. Test này khoá lại bản
+     * sửa — xoá lời gọi đẩy EXP trong {@code handleClaimQuestRewardBlocking} là test đỏ.
+     */
     @Test
     void shouldPushExperienceState_afterClaimingQuestReward() throws InvalidProtocolBufferException {
         EmbeddedChannel channel = newPipeline(new FakeCharacterPort(), fakeInventoryFacade(), claimableQuestFacade());
@@ -687,8 +688,11 @@ class GatewayPipelineTest {
         // EmbeddedChannel HOÃN channelInactive vào hàng task — runPendingTasks ép nó chạy ngay trong
         // cửa sổ, đúng như EventLoop thật chạy song song với Virtual Thread đang chọn nhân vật.
         characterPort.beforeLoadPosition = id -> {
-            channel.close();
+            ChannelFuture closed = channel.close();
             channel.runPendingTasks();
+            if (!closed.isSuccess()) {
+                throw new IllegalStateException("EmbeddedChannel không đóng được", closed.cause());
+            }
         };
 
         writeInboundFrame(

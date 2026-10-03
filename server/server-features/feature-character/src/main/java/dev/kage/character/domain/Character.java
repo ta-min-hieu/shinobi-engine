@@ -12,6 +12,10 @@ import java.util.regex.Pattern;
  * <p>⚠️ Validate tên hiện tại CHỈ độ dài + charset — CHƯA lọc từ cấm/homoglyph (SECURITY.md §12
  * yêu cầu đủ, nhưng dự án cá nhân rủi ro thấp, để trống có chủ đích ở lát cắt này).
  */
+// AvoidCommonTypeNames: tên trùng java.lang.Character là tên aggregate đang dùng (~50 file ở
+// 3 module import nó). Đổi tên là đổi public API của feature-character — việc của chủ dự án,
+// không phải của một đợt dọn warning. Trong package này không ai dùng java.lang.Character.
+@SuppressWarnings("AvoidCommonTypeNames")
 public record Character(
         long id,
         long accountId,

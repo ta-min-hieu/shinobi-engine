@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.time.Duration;
 import java.time.Instant;
@@ -1017,7 +1018,7 @@ class GatewayServerIntegrationTest {
         // PHÁT HIỆN THẬT (xem javadoc GatewayServer#stop): bản trước tắt authExecutor TRƯỚC khi
         // đóng channel — channelInactive lúc shutdown bị RejectedExecutionException âm thầm, mất
         // vị trí cuối. Test này verify trực tiếp qua Fake Port, không chỉ đọc code.
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             long characterId = connectCreateAndSelect(socket, in, "shutdowntest");
@@ -1048,7 +1049,7 @@ class GatewayServerIntegrationTest {
     @Test
     @Timeout(10)
     void clientShouldReceivePong_overRealSocket() throws Exception {
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
             DataInputStream in = new DataInputStream(socket.getInputStream());
 
@@ -1073,8 +1074,8 @@ class GatewayServerIntegrationTest {
     @Test
     @Timeout(10)
     void serverShouldAcceptMultipleConnectionsConcurrently() throws Exception {
-        try (Socket socketA = new Socket("127.0.0.1", server.port());
-                Socket socketB = new Socket("127.0.0.1", server.port())) {
+        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
+                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             sendPing(socketA, 1, 111L);
             sendPing(socketB, 1, 222L);
 
@@ -1096,8 +1097,8 @@ class GatewayServerIntegrationTest {
         // Nửa trước (2026-08-29) chỉ vá cache ngoại hình nên chỉ người tới SAU mới thấy đúng; đây
         // là đường đi thật của nửa sau, qua chính giao thức dây: A đứng nhìn, B đổi hệ phái, A phải
         // nhận opcode 307 mang hệ phái MỚI mà không cần B rời rồi vào lại tầm nhìn.
-        try (Socket socketA = new Socket("127.0.0.1", server.port());
-                Socket socketB = new Socket("127.0.0.1", server.port())) {
+        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
+                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socketA.setSoTimeout(5000);
             socketB.setSoTimeout(5000);
             DataInputStream inA = new DataInputStream(socketA.getInputStream());
@@ -1149,8 +1150,8 @@ class GatewayServerIntegrationTest {
     void twoClientsShouldSeeEachOtherMove_overRealSockets() throws Exception {
         // Verify đúng Phase 3 Exit Criteria (ROADMAP.md): "2 client kết nối cùng server, thấy
         // nhau di chuyển" — qua chính giao thức dây (socket thật), không chỉ nội bộ WorldFacade.
-        try (Socket socketA = new Socket("127.0.0.1", server.port());
-                Socket socketB = new Socket("127.0.0.1", server.port())) {
+        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
+                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socketA.setSoTimeout(5000);
             socketB.setSoTimeout(5000);
             DataInputStream inA = new DataInputStream(socketA.getInputStream());
@@ -1196,7 +1197,7 @@ class GatewayServerIntegrationTest {
     void clientShouldBecomeAirborne_whenSendingJumpCommand_overRealSockets() throws Exception {
         // ADR-033 — verify đúng giao thức dây (JumpCommand rỗng -> MoveResponse.grounded=false),
         // không chỉ nội bộ WorldFacade (đã có WorldFacadeTest.shouldApplyJumpVelocity_...).
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             String suffix = UUID.randomUUID().toString().substring(0, 8);
@@ -1220,9 +1221,9 @@ class GatewayServerIntegrationTest {
     void partyShouldEnterAndExitDungeonAsSeparateWorld_overRealSockets() throws Exception {
         // Phase 8 lát cắt 1 (ADR-026): "cả party cùng vào 1 World riêng, tick độc lập world
         // chính" — verify qua chính giao thức dây, không chỉ nội bộ DungeonInstanceRegistry.
-        try (Socket socketA = new Socket("127.0.0.1", server.port());
-                Socket socketB = new Socket("127.0.0.1", server.port());
-                Socket socketC = new Socket("127.0.0.1", server.port())) {
+        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
+                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port());
+                Socket socketC = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socketA.setSoTimeout(5000);
             socketB.setSoTimeout(5000);
             socketC.setSoTimeout(5000);
@@ -1338,7 +1339,7 @@ class GatewayServerIntegrationTest {
         // (DungeonInstanceRegistry.createInstance gọi spawnBoss() sau start()). Verify qua chính
         // giao thức dây: boss xuất hiện, đánh xuyên nhiều pha (heavy_strike/enrage — SkillResultEvent
         // TÁI DÙNG, không opcode riêng), chết → MonsterDespawnedEvent.
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(10000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
 
@@ -1411,8 +1412,8 @@ class GatewayServerIntegrationTest {
     @Test
     @Timeout(20)
     void pulledPartyMemberShouldBeToldTheyEnteredDungeon_overRealSockets() throws Exception {
-        try (Socket socketA = new Socket("127.0.0.1", server.port());
-                Socket socketB = new Socket("127.0.0.1", server.port())) {
+        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
+                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socketA.setSoTimeout(5000);
             socketB.setSoTimeout(5000);
             DataInputStream inA = new DataInputStream(socketA.getInputStream());
@@ -1494,13 +1495,13 @@ class GatewayServerIntegrationTest {
     @Timeout(20)
     void remainingMemberShouldSeeDespawnAndStillExit_whenPartyMemberDisconnectsInsideDungeon_overRealSockets()
             throws Exception {
-        try (Socket socketA = new Socket("127.0.0.1", server.port())) {
+        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socketA.setSoTimeout(5000);
             DataInputStream inA = new DataInputStream(socketA.getInputStream());
             String suffix = UUID.randomUUID().toString().substring(0, 8);
             long characterA = connectCreateAndSelect(socketA, inA, "ra" + suffix);
             long characterB;
-            try (Socket socketB = new Socket("127.0.0.1", server.port())) {
+            try (Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
                 socketB.setSoTimeout(5000);
                 DataInputStream inB = new DataInputStream(socketB.getInputStream());
                 characterB = connectCreateAndSelect(socketB, inB, "rb" + suffix);
@@ -1561,7 +1562,7 @@ class GatewayServerIntegrationTest {
     @Test
     @Timeout(15)
     void memberShouldStillExitDungeon_afterLeavingPartyInside_overRealSockets() throws Exception {
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             long characterId = connectCreateAndSelect(
@@ -1596,8 +1597,8 @@ class GatewayServerIntegrationTest {
     void shouldDeclineDuelChallenge_overRealSockets() throws Exception {
         // Phase 8 lát cắt 4 — challenger phải nhận DuelChallengeDeclinedEvent khi bị từ chối,
         // KHÔNG có DuelStartedEvent nào phát ra (không World riêng nào được tạo).
-        try (Socket socketA = new Socket("127.0.0.1", server.port());
-                Socket socketB = new Socket("127.0.0.1", server.port())) {
+        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
+                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socketA.setSoTimeout(5000);
             socketB.setSoTimeout(5000);
             DataInputStream inA = new DataInputStream(socketA.getInputStream());
@@ -1652,9 +1653,9 @@ class GatewayServerIntegrationTest {
         // Phase 8 lát cắt 4 — chấp nhận thách đấu đưa CẢ 2 vào 1 World riêng (ADR-026, giống
         // dungeon), đánh tới khi 1 người chết → DuelResultEvent cho CẢ 2 + rating cập nhật qua
         // GetPvpRatingRequest (Elo, K=32: thắng +16, thua -16 khi cùng rating khởi điểm 1000).
-        try (Socket socketA = new Socket("127.0.0.1", server.port());
-                Socket socketB = new Socket("127.0.0.1", server.port());
-                Socket socketC = new Socket("127.0.0.1", server.port())) {
+        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
+                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port());
+                Socket socketC = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socketA.setSoTimeout(10000);
             socketB.setSoTimeout(10000);
             socketC.setSoTimeout(10000);
@@ -1780,8 +1781,8 @@ class GatewayServerIntegrationTest {
     void shouldForfeitDuel_overRealSockets() throws Exception {
         // Phase 8 lát cắt 4 — bỏ cuộc giữa chừng tính THUA thật (khác ExitDungeonCommand), đối
         // phương thắng NGAY không cần hạ gục.
-        try (Socket socketA = new Socket("127.0.0.1", server.port());
-                Socket socketB = new Socket("127.0.0.1", server.port())) {
+        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
+                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socketA.setSoTimeout(5000);
             socketB.setSoTimeout(5000);
             DataInputStream inA = new DataInputStream(socketA.getInputStream());
@@ -1841,7 +1842,7 @@ class GatewayServerIntegrationTest {
     void clientShouldDamageMonster_overRealSockets() throws Exception {
         // Verify Phase 4 lát cắt 1 qua chính giao thức dây: di chuyển tới gần quái bù nhìn (spawn
         // cố định (5,5), WorldFacade) → SetTargetCommand → nhận AttackResultEvent thật.
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             long characterId = connectCreateAndSelect(
@@ -1891,7 +1892,7 @@ class GatewayServerIntegrationTest {
         // (opcode dispatch, decode protobuf, chạy trên authExecutor, encode response) hoạt động
         // đúng dây thật, không phải nhánh "mặc thành công" (cái đó PostgresInventoryAdapter/
         // PostgresEquipmentAdapterIntegrationTest + EquipItemUseCaseTest đã phủ ở tầng dưới).
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(
@@ -1916,7 +1917,7 @@ class GatewayServerIntegrationTest {
     @Test
     @Timeout(15)
     void clientShouldReceiveUnequipItemResponse_overRealSockets() throws Exception {
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(
@@ -1944,7 +1945,7 @@ class GatewayServerIntegrationTest {
         // đúng nhánh ITEM_NOT_FOUND, verify dây thật (opcode dispatch → decode → Virtual Thread →
         // encode response), không phải nhánh cường hoá thành công (đã phủ ở EnhanceItemUseCaseTest/
         // EnhanceItemUseCaseIntegrationTest ở tầng dưới).
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(
@@ -1970,7 +1971,7 @@ class GatewayServerIntegrationTest {
         // fakeInventoryFacade() luôn trả túi đồ RỖNG nên id=1 chắc chắn không tồn tại — test đúng
         // nhánh ITEM_NOT_FOUND, verify dây thật (opcode 511 dispatch → decode → Virtual Thread →
         // encode 512). Nhánh uống thành công đã phủ ở UseItemUseCaseTest + HealingPillIntegrationTest.
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(
@@ -1994,7 +1995,7 @@ class GatewayServerIntegrationTest {
         // fakeShopFacade() luôn trả catalog RỖNG (Fake, không DB thật) — verify dây thật (opcode
         // dispatch → decode → Virtual Thread → encode response), không phải nội dung catalog thật
         // (đã phủ ở ShopIntegrationTest tầng dưới).
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(
@@ -2015,7 +2016,7 @@ class GatewayServerIntegrationTest {
     void clientShouldReceiveBuyItemResponse_overRealSockets() throws Exception {
         // Cùng lý do clientShouldReceiveEnhanceItemResponse_overRealSockets: catalog rỗng nên
         // itemTemplateId=1 chắc chắn không có trong shop — verify đúng nhánh ITEM_NOT_IN_SHOP.
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(
@@ -2038,7 +2039,7 @@ class GatewayServerIntegrationTest {
     @Timeout(15)
     void clientShouldReceiveSellItemResponse_overRealSockets() throws Exception {
         // fakeShopFacade().findItem() luôn trả rỗng — verify đúng nhánh ITEM_NOT_FOUND.
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(
@@ -2062,7 +2063,7 @@ class GatewayServerIntegrationTest {
     void clientShouldReceiveErrorResponse_whenTalkingToUnknownNpc_overRealSockets() throws Exception {
         // fakeDialogueFacade()'s NpcTemplatePort luôn trả rỗng — verify đúng lỗi 404 (không có
         // opcode DialogueNodeResponse riêng cho nhánh này, sendError dùng chung OPCODE_ERROR).
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(
@@ -2083,7 +2084,7 @@ class GatewayServerIntegrationTest {
     void clientShouldReceiveClaimQuestRewardResponse_overRealSockets() throws Exception {
         // fakeQuestFacade()'s QuestTemplatePort luôn trả rỗng — verify đúng nhánh QUEST_NOT_FOUND
         // (kiểm tra template TRƯỚC progress, xem ClaimQuestRewardUseCase.execute).
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(
@@ -2113,8 +2114,8 @@ class GatewayServerIntegrationTest {
         // KHÔNG tới exceptionCaught của pipeline: trước bản vá 2026-09-24 client không nhận gì và
         // treo vô thời hạn (ở đây: hết @Timeout). Gộp chung một hàm thay vì tách: lớp này đã chạm
         // trần CyclomaticComplexity cả lớp của PMD (mỗi hàm mới cộng ít nhất 1).
-        try (Socket target = new Socket("127.0.0.1", server.port());
-                Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket target = new Socket(InetAddress.getLoopbackAddress(), server.port());
+                Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             target.setSoTimeout(5000);
             socket.setSoTimeout(5000);
             String targetName = connectCreateAndSelectNamed(
@@ -2158,8 +2159,8 @@ class GatewayServerIntegrationTest {
         // hình dạng một lỗi DB thật. handleSendMailBlocking không tự bắt gì; trước lưới
         // executeBlocking (2026-09-24) client không nhận gì và treo tới hết @Timeout. Gộp chung một
         // hàm: lớp này đã chạm trần CyclomaticComplexity cả lớp của PMD.
-        try (Socket recipient = new Socket("127.0.0.1", server.port());
-                Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket recipient = new Socket(InetAddress.getLoopbackAddress(), server.port());
+                Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             recipient.setSoTimeout(5000);
             socket.setSoTimeout(5000);
             String recipientName = connectCreateAndSelectNamed(
@@ -2202,8 +2203,8 @@ class GatewayServerIntegrationTest {
         // World chat = broadcast toàn server, KHÔNG cần AoI/cùng vị trí — verify dây thật (opcode
         // dispatch → decode → Virtual Thread → ChatFacade.sendMessage → ConnectedCharacterRegistry
         // .broadcastToAll → encode) cho CẢ người gửi (tự thấy tin của mình) lẫn người khác.
-        try (Socket socketA = new Socket("127.0.0.1", server.port());
-                Socket socketB = new Socket("127.0.0.1", server.port())) {
+        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
+                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socketA.setSoTimeout(5000);
             socketB.setSoTimeout(5000);
             DataInputStream inA = new DataInputStream(socketA.getInputStream());
@@ -2245,7 +2246,8 @@ class GatewayServerIntegrationTest {
         ConnectRequest connectRequest =
                 ConnectRequest.newBuilder().setUsername(username).build();
         sendFrame(socket, Opcode.OPCODE_CONNECT_REQUEST_VALUE, 1, connectRequest.toByteArray());
-        ConnectResponse.parseFrom(readFrame(in).payload());
+        assertThat(ConnectResponse.parseFrom(readFrame(in).payload()).getSuccess())
+                .isTrue();
 
         CreateCharacterRequest createRequest = CreateCharacterRequest.newBuilder()
                 .setName("Hero" + UUID.randomUUID().toString().replace("-", "").substring(0, 8))
@@ -2269,7 +2271,8 @@ class GatewayServerIntegrationTest {
         ConnectRequest connectRequest =
                 ConnectRequest.newBuilder().setUsername(username).build();
         sendFrame(socket, Opcode.OPCODE_CONNECT_REQUEST_VALUE, 1, connectRequest.toByteArray());
-        ConnectResponse.parseFrom(readFrame(in).payload());
+        assertThat(ConnectResponse.parseFrom(readFrame(in).payload()).getSuccess())
+                .isTrue();
 
         // Character.validateName: chỉ chữ/số, KHÔNG dấu gạch ngang (feature-character/CLAUDE.md).
         CreateCharacterRequest createRequest = CreateCharacterRequest.newBuilder()
@@ -2488,7 +2491,8 @@ class GatewayServerIntegrationTest {
         try (TlsTestServer tlsServer = startServerWithTls(new TlsConfig(true, certFile, keyFile))) {
             // Client plaintext gửi ĐÚNG format framing cũ — server giờ mong đợi TLS record ở byte
             // đầu tiên, không phải plaintext frame. Server KHÔNG được trả pong hợp lệ.
-            try (Socket socket = new Socket("127.0.0.1", tlsServer.server().port())) {
+            try (Socket socket = new Socket(
+                    InetAddress.getLoopbackAddress(), tlsServer.server().port())) {
                 socket.setSoTimeout(3000);
                 sendPing(socket, 1, 999L);
 
@@ -2712,7 +2716,8 @@ class GatewayServerIntegrationTest {
     void clientCommands_shouldEmitDeepChildSpans_forGoldAffectingCommands() throws Exception {
         RecordingSpanExporter exporter = new RecordingSpanExporter();
         try (TracingTestServer tracingServer = startServerWithTracing(GatewayTracing.forTesting(exporter))) {
-            try (Socket socket = new Socket("127.0.0.1", tracingServer.server().port())) {
+            try (Socket socket = new Socket(
+                    InetAddress.getLoopbackAddress(), tracingServer.server().port())) {
                 socket.setSoTimeout(5000);
                 DataInputStream in = new DataInputStream(socket.getInputStream());
                 connectCreateAndSelect(

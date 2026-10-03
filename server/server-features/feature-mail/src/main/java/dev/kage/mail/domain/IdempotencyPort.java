@@ -10,6 +10,8 @@ package dev.kage.mail.domain;
 public interface IdempotencyPort {
 
     /**
+     * Ghi nhận {@code idempotencyKey} trong transaction {@code tx}; key trùng thì ném lỗi.
+     *
      * @throws IdempotencyKeyReusedException nếu {@code idempotencyKey} đã dùng trước đó
      */
     void recordOrThrow(Transaction tx, String idempotencyKey);

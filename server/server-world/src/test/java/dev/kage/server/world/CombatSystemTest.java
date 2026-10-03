@@ -40,11 +40,14 @@ class CombatSystemTest {
     private static final long ATTACKER_ID = 1L;
     private static final long DEFENDER_ID = 2L;
 
-    // Người thủ ở đây mang CharacterIdComponent — lớp này kiểm CƠ CHẾ đòn đánh (cooldown/tầm/né),
-    // không kiểm luật PvP, nên bật PvP. Luật PvP: PlayerVersusPlayerRuleTest.
-    private static final java.util.function.BooleanSupplier PVP_ALLOWED = () -> true;
     /** ÂM — quái/NPC dùng không gian id âm (combat.proto), khác nhân vật luôn dương. */
     private static final long MONSTER_ATTACKER_ID = -1L;
+
+    // Người thủ ở đây mang CharacterIdComponent — lớp này kiểm CƠ CHẾ đòn đánh (cooldown/tầm/né),
+    // không kiểm luật PvP, nên bật PvP. Luật PvP: PlayerVersusPlayerRuleTest.
+    private static boolean pvpAllowed() {
+        return true;
+    }
 
     private KEntity buildAttacker(EcsWorld world) {
         KEntity entity = buildAttackerWithoutIdentity(world);
@@ -118,7 +121,7 @@ class CombatSystemTest {
         KEntity attacker = buildAttacker(world);
         KEntity defender = buildDefender(world, true);
         Map<Long, KEntity> byId = Map.of(ATTACKER_ID, attacker, DEFENDER_ID, defender);
-        CombatSystem combatSystem = new CombatSystem(byId::get, PVP_ALLOWED);
+        CombatSystem combatSystem = new CombatSystem(byId::get, CombatSystemTest::pvpAllowed);
         world.addSystem(combatSystem);
 
         for (int tick = 0; tick < 300; tick++) { // 5 giây ở 60Hz — thừa sức qua nhiều lần cooldown
@@ -139,7 +142,7 @@ class CombatSystemTest {
         KEntity attacker = buildMonsterAttacker(world);
         KEntity defender = buildDefender(world, true);
         Map<Long, KEntity> byId = Map.of(MONSTER_ATTACKER_ID, attacker, DEFENDER_ID, defender);
-        CombatSystem combatSystem = new CombatSystem(byId::get, PVP_ALLOWED);
+        CombatSystem combatSystem = new CombatSystem(byId::get, CombatSystemTest::pvpAllowed);
         world.addSystem(combatSystem);
 
         world.update(0.016f);
@@ -159,7 +162,7 @@ class CombatSystemTest {
         HEALTH.get(defender).max = 1_000_000;
         HEALTH.get(defender).current = 1_000_000;
         Map<Long, KEntity> byId = Map.of(MONSTER_ATTACKER_ID, attacker, DEFENDER_ID, defender);
-        CombatSystem combatSystem = new CombatSystem(byId::get, PVP_ALLOWED);
+        CombatSystem combatSystem = new CombatSystem(byId::get, CombatSystemTest::pvpAllowed);
         world.addSystem(combatSystem);
 
         List<Integer> attackTicks = new ArrayList<>();
@@ -179,7 +182,7 @@ class CombatSystemTest {
         KEntity attacker = buildAttacker(world);
         KEntity defender = buildDefender(world, false); // grounded=false — đang lơ lửng (ADR-033)
         Map<Long, KEntity> byId = Map.of(ATTACKER_ID, attacker, DEFENDER_ID, defender);
-        CombatSystem combatSystem = new CombatSystem(byId::get, PVP_ALLOWED);
+        CombatSystem combatSystem = new CombatSystem(byId::get, CombatSystemTest::pvpAllowed);
         world.addSystem(combatSystem);
 
         // Người tấn công là NHÂN VẬT nên không tự đánh nữa (2026-08-09) — phải yêu cầu tường minh,
@@ -200,7 +203,7 @@ class CombatSystemTest {
         KEntity attacker = buildAttacker(world);
         KEntity defender = buildDefender(world, true); // grounded=true — hành vi cũ, không đổi
         Map<Long, KEntity> byId = Map.of(ATTACKER_ID, attacker, DEFENDER_ID, defender);
-        CombatSystem combatSystem = new CombatSystem(byId::get, PVP_ALLOWED);
+        CombatSystem combatSystem = new CombatSystem(byId::get, CombatSystemTest::pvpAllowed);
         world.addSystem(combatSystem);
 
         world.update(0.016f);
@@ -231,7 +234,7 @@ class CombatSystemTest {
         KEntity defender = buildDefender(world, true);
         POSITION.get(defender).x = CombatConstants.ATTACK_RANGE_METERS + 0.3f; // con quái còn đang đuổi tới
         Map<Long, KEntity> byId = Map.of(ATTACKER_ID, attacker, DEFENDER_ID, defender);
-        CombatSystem combatSystem = new CombatSystem(byId::get, PVP_ALLOWED);
+        CombatSystem combatSystem = new CombatSystem(byId::get, CombatSystemTest::pvpAllowed);
         world.addSystem(combatSystem);
         world.update(1f / 60f);
 
@@ -271,7 +274,7 @@ class CombatSystemTest {
         RECENCY.get(attacker).secondsSinceCombat = 999f;
         RECENCY.get(defender).secondsSinceCombat = 999f;
         Map<Long, KEntity> byId = Map.of(ATTACKER_ID, attacker, DEFENDER_ID, defender);
-        CombatSystem combatSystem = new CombatSystem(byId::get, PVP_ALLOWED);
+        CombatSystem combatSystem = new CombatSystem(byId::get, CombatSystemTest::pvpAllowed);
         world.addSystem(combatSystem);
 
         world.update(0.016f);

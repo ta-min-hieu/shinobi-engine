@@ -129,7 +129,7 @@ class JdbcTransactionRunnerCommitFailureTest {
 
     private static Object defaultValue(Class<?> type) {
         if (type == boolean.class) {
-            return Boolean.FALSE;
+            return false;
         }
         if (type == int.class) {
             return 0;
@@ -154,8 +154,9 @@ class JdbcTransactionRunnerCommitFailureTest {
                 handler);
     }
 
-    // Định danh, không phải equals(): gọi equals() trên proxy sẽ quay lại chính handler này.
-    @SuppressWarnings("PMD.CompareObjectsWithEquals")
+    // Định danh, không phải equals(): gọi equals() trên proxy sẽ quay lại chính handler này (đệ quy
+    // vô hạn) — nên so sánh tham chiếu là đúng ý, cả PMD lẫn Error Prone (ReferenceEquality).
+    @SuppressWarnings({"PMD.CompareObjectsWithEquals", "ReferenceEquality"})
     private static boolean isSameProxy(Object proxy, Object other) {
         return proxy == other;
     }

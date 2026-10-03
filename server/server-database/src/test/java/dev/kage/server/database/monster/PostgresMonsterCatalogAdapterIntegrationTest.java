@@ -15,9 +15,9 @@ import javax.sql.DataSource;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import dev.kage.monster.domain.MonsterAiParams;
@@ -45,8 +45,8 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
     private static final float MELEE_ATTACK_RANGE_METERS = 2f;
 
     @Container
-    static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(DockerImageName.parse("postgres:17")).withStartupTimeout(Duration.ofMinutes(2));
+    static final PostgreSQLContainer POSTGRES =
+            new PostgreSQLContainer(DockerImageName.parse("postgres:17")).withStartupTimeout(Duration.ofMinutes(2));
 
     static DataSource dataSource;
 
@@ -284,18 +284,6 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
     }
 
     /**
-     * V29 (ROADMAP mục 57) — hàng rào HÌNH HỌC, không phải hàng rào chỉ số.
-     *
-     * <p>Một điểm {@code p} kéo được CẢ HAI con {@code A} và {@code B} khi {@code |p-A| <= aggroA}
-     * và {@code |p-B| <= aggroB}, tức khi {@code |A-B| <= aggroA + aggroB}. Trước V29,
-     * {@code wandering_bandit} nằm ở 21 và 27 (cách 6, tổng aggro 12) nên MỌI vị trí ở giữa kéo cả
-     * hai và sát thương nhận vào gấp đôi — quest {@code night_watch_bandit} lại dẫn người chơi vào
-     * đúng đoạn đó. {@code stone_ogre} ở 34 cũng chồng lên con thứ hai y như vậy.
-     *
-     * <p>Ô test này gác luật chung thay vì gác ba con số, nên thêm loài mới hay dời điểm spawn đều
-     * bị soi lại. Quái {@code isPassive} (mộc nhân, aggro 0) không tham gia: chúng không tự đánh ai.
-     */
-    /**
      * ROADMAP mục 62 — hàng rào thứ HAI về hình học, sinh ra từ một buổi playtest đo được.
      *
      * <p>{@link #shouldKeepAggroSpawnsApartEnoughToPullOneAtATime} chỉ bảo đảm người chơi ĐI NGANG
@@ -343,6 +331,18 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         }
     }
 
+    /**
+     * V29 (ROADMAP mục 57) — hàng rào HÌNH HỌC, không phải hàng rào chỉ số.
+     *
+     * <p>Một điểm {@code p} kéo được CẢ HAI con {@code A} và {@code B} khi {@code |p-A| <= aggroA}
+     * và {@code |p-B| <= aggroB}, tức khi {@code |A-B| <= aggroA + aggroB}. Trước V29,
+     * {@code wandering_bandit} nằm ở 21 và 27 (cách 6, tổng aggro 12) nên MỌI vị trí ở giữa kéo cả
+     * hai và sát thương nhận vào gấp đôi — quest {@code night_watch_bandit} lại dẫn người chơi vào
+     * đúng đoạn đó. {@code stone_ogre} ở 34 cũng chồng lên con thứ hai y như vậy.
+     *
+     * <p>Ô test này gác luật chung thay vì gác ba con số, nên thêm loài mới hay dời điểm spawn đều
+     * bị soi lại. Quái {@code isPassive} (mộc nhân, aggro 0) không tham gia: chúng không tự đánh ai.
+     */
     @Test
     void shouldKeepAggroSpawnsApartEnoughToPullOneAtATime() {
         PostgresMonsterCatalogAdapter adapter = new PostgresMonsterCatalogAdapter(dataSource);

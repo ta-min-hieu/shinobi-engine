@@ -13,8 +13,8 @@ import dev.kage.server.world.component.CombatStatsComponent;
  *
  * <p>{@link #deriveCombatStats} tính ATK/SKILL_DMG/DEF/RES/HIT%/DODGE%/CRIT% THẬT từ
  * {@code character_stat} DB (qua {@link CharacterBaseStats}, gateway truyền vào lúc attach) theo
- * công thức GDD §5. Quái vẫn dùng {@link #MONSTER_STATS} cố định — chưa có {@code monster_template}
- * DB-driven (lát cắt sau).
+ * công thức GDD §5. Chỉ số quái (kể cả boss) KHÔNG ở đây: đọc từ {@code monster_template} rồi tới
+ * server-world qua {@link MonsterCatalogSnapshot} (ADR-037, ADR-048).
  *
  * <p>{@link #resolveAttack} là đòn đánh thường (vật lý, ATK vs DEF). {@link #resolveSkillAttack}
  * là skill (phép, SKILL_DMG vs RES — GDD §6 "damage phép tính y hệt, thay DEF bằng RES") — Java lo

@@ -223,15 +223,6 @@ class TownElderDialogueTreeTest {
     }
 
     /**
-     * Ba nhánh của quãng Lv22–27 (V47) — nối tiếp cái kết dang dở của {@code confront_steward}.
-     *
-     * <p>Chúng đứng SAU nó trong {@code about_town}, không chen vào giữa: hộ pháp phải chết rồi thì
-     * mới có chuyện "thứ hắn đào dở vẫn nằm đấy".
-     *
-     * <p>⚠️ Nhịp hé lộ (STORY §8 quy tắc 2): nhánh ĐẦU ông lão chưa biết chúng là Huyết Sa — chỉ
-     * biết "người lạ". Cái tên rơi xuống ở nhánh THỨ HAI, khi người chơi tự nhìn thấy dấu hút tu vi.
-     */
-    /**
      * ⚠️ Ô này tồn tại vì V48 đã lên master THIẾU đúng thứ nó gác: năm quest có hàng
      * {@code quest_template} và có script, nhưng KHÔNG có nhánh thoại nào — tức nội dung nằm trong
      * DB mà người chơi không có đường chạm tới. Thêm quest = ba thứ, không phải hai.
@@ -260,6 +251,15 @@ class TownElderDialogueTreeTest {
                 .containsExactly("accept_quest:foundation_breakthrough", "about_town", "end");
     }
 
+    /**
+     * Ba nhánh của quãng Lv22–27 (V47) — nối tiếp cái kết dang dở của {@code confront_steward}.
+     *
+     * <p>Chúng đứng SAU nó trong {@code about_town}, không chen vào giữa: hộ pháp phải chết rồi thì
+     * mới có chuyện "thứ hắn đào dở vẫn nằm đấy".
+     *
+     * <p>⚠️ Nhịp hé lộ (STORY §8 quy tắc 2): nhánh ĐẦU ông lão chưa biết chúng là Huyết Sa — chỉ
+     * biết "người lạ". Cái tên rơi xuống ở nhánh THỨ HAI, khi người chơi tự nhìn thấy dấu hút tu vi.
+     */
     @Test
     @DisplayName("Ba nhánh mạch chết nhận đúng ba mã quest của quãng Lv22–27")
     void deadVeinBranchesOfferTheArcTwoUpperQuests() {

@@ -13,7 +13,7 @@ public final class RecordDuelResultUseCase {
     }
 
     /**
-     * @return rating MỚI của cả 2 sau trận — gateway dùng để đóng gói {@code DuelResultEvent}.
+     * Chốt trận: tính và ghi rating mới của người thắng và người thua.
      *
      * <p>Đọc-tính-ghi rating giao HẲN cho {@link PvpRatingPort#recordDuelResult} làm NGUYÊN TỬ
      * (khoá row trước khi đọc) — trước đây use case này tự đọc rời 2 rating rồi mới gọi Port ghi,
@@ -21,6 +21,8 @@ public final class RecordDuelResultUseCase {
      * qua được (xem javadoc {@link PvpRatingPort#recordDuelResult}). {@code EloRating::computeNewRatings}
      * vẫn là hàm THUẦN duy nhất chứa công thức Elo — chỉ đổi chỗ nó được gọi (trong transaction của
      * Port) chứ không đổi công thức.
+     *
+     * @return rating MỚI của cả 2 sau trận — gateway dùng để đóng gói {@code DuelResultEvent}.
      */
     public DuelSettlement execute(long winnerCharacterId, long loserCharacterId) {
         EloRating.Result result =
