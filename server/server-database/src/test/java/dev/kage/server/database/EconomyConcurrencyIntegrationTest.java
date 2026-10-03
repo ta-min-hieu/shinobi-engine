@@ -77,6 +77,7 @@ import dev.kage.trade.application.ConfirmTradeUseCase;
 import dev.kage.trade.application.RequestTradeUseCase;
 import dev.kage.trade.application.SetTradeOfferUseCase;
 import dev.kage.trade.application.TradePorts;
+import dev.kage.trade.domain.OfferedItemInput;
 
 /**
  * Kiểm toán đồng thời các đường ghi KINH TẾ chưa có phép đo song song riêng (2026-10-02): mua/bán,
@@ -250,6 +251,81 @@ class EconomyConcurrencyIntegrationTest {
 
         assertThat(readGold(requesterId)).as("người đưa").isEqualTo(START_GOLD - requesterPaid);
         assertThat(readGold(targetId)).as("người nhận").isEqualTo(START_GOLD + requesterPaid);
+    }
+
+    /**
+     * Người đưa BÁN đúng chồng phi đao đang chào, cùng lúc với lần bấm xác nhận cuối cùng (rà
+     * 2026-10-03): mỗi vòng đúng MỘT trong hai thắng. Đo giá trị cuối — phi đao chỉ có thể nằm ở
+     * người nhận (giao dịch thắng) hoặc đã đổi thành vàng của người đưa (bán thắng), không bao giờ cả hai.
+     */
+    @Test
+    void shouldLetEitherTheTradeOrTheSaleHaveTheStack_whenBothRaceForIt() throws Exception {
+        long requesterId = newCharacter();
+        long targetId = newCharacter();
+        PostgresTradeSessionAdapter sessionPort = new PostgresTradeSessionAdapter(dataSource);
+        ConfirmTradeUseCase confirm = newConfirmTradeUseCase(sessionPort);
+        long sellPrice = listingOf(kunaiTemplateId).sellPrice();
+        int executed = 0;
+        int sold = 0;
+
+        for (int round = 0; round < TRADE_ROUNDS; round++) {
+            long stackId = insertItem(requesterId, kunaiTemplateId, KUNAI_STACK);
+            long sessionId = openTradeWithRequesterGold(sessionPort, requesterId, targetId, 0L);
+            new SetTradeOfferUseCase(sessionPort)
+                    .execute(sessionId, requesterId, 0L, List.of(new OfferedItemInput(stackId, KUNAI_STACK)));
+            assertThat(confirm.execute(sessionId, targetId, newKey())).isEqualTo(ConfirmTradeUseCase.Result.OK);
+
+            List<Object> results =
+                    runPair(() -> confirm.execute(sessionId, requesterId, newKey()), () -> newSellUseCase()
+                            .execute(requesterId, stackId, KUNAI_STACK, newKey()));
+            boolean tradeWon = results.get(0) == ConfirmTradeUseCase.Result.EXECUTED;
+            boolean saleWon = results.get(1) == SellItemUseCase.SellResult.OK;
+            assertThat(tradeWon ^ saleWon).as("vòng %d: %s", round, results).isTrue();
+            executed += tradeWon ? 1 : 0;
+            sold += saleWon ? 1 : 0;
+            new dev.kage.trade.application.CancelTradeUseCase(sessionPort).execute(sessionId, requesterId);
+        }
+
+        assertThat(countOf(requesterId, kunaiTemplateId))
+                .as("phi đao người đưa")
+                .isZero();
+        assertThat(countOf(targetId, kunaiTemplateId))
+                .as("phi đao người nhận")
+                .isEqualTo((long) executed * KUNAI_STACK);
+        assertThat(readGold(requesterId)).as("vàng người đưa").isEqualTo(START_GOLD + sold * KUNAI_STACK * sellPrice);
+        assertThat(readGold(targetId)).as("vàng người nhận").isEqualTo(START_GOLD);
+    }
+
+    /**
+     * Người nhận bấm HUỶ đúng lúc người đưa bấm xác nhận cuối cùng: mỗi vòng đúng một trong hai
+     * thắng — huỷ thắng thì vàng không nhúc nhích, xác nhận thắng thì chuyển trọn. Không có "huỷ
+     * rồi mà tiền vẫn đi" hay "thi hành một nửa".
+     */
+    @Test
+    void shouldEitherCancelOrExecuteWholly_whenCancelRacesTheLastConfirm() throws Exception {
+        long requesterId = newCharacter();
+        long targetId = newCharacter();
+        PostgresTradeSessionAdapter sessionPort = new PostgresTradeSessionAdapter(dataSource);
+        ConfirmTradeUseCase confirm = newConfirmTradeUseCase(sessionPort);
+        dev.kage.trade.application.CancelTradeUseCase cancel =
+                new dev.kage.trade.application.CancelTradeUseCase(sessionPort);
+        int executed = 0;
+
+        for (int round = 0; round < TRADE_ROUNDS; round++) {
+            long sessionId = openTradeWithRequesterGold(sessionPort, requesterId, targetId, TRADE_GOLD);
+            assertThat(confirm.execute(sessionId, targetId, newKey())).isEqualTo(ConfirmTradeUseCase.Result.OK);
+
+            List<Object> results = runPair(
+                    () -> confirm.execute(sessionId, requesterId, newKey()), () -> cancel.execute(sessionId, targetId));
+            boolean tradeWon = results.get(0) == ConfirmTradeUseCase.Result.EXECUTED;
+            boolean cancelWon = results.get(1) == dev.kage.trade.application.CancelTradeUseCase.Result.OK;
+            assertThat(tradeWon ^ cancelWon).as("vòng %d: %s", round, results).isTrue();
+            executed += tradeWon ? 1 : 0;
+            assertThat(sessionPort.findActiveSessionOfCharacter(requesterId)).isEmpty();
+        }
+
+        assertThat(readGold(requesterId)).as("người đưa").isEqualTo(START_GOLD - TRADE_GOLD * executed);
+        assertThat(readGold(targetId)).as("người nhận").isEqualTo(START_GOLD + TRADE_GOLD * executed);
     }
 
     /** Ba viên đan, 8 lệnh uống cùng lúc: đúng 3 lần hồi máu, ô túi biến mất, không viên nào "uống ké". */

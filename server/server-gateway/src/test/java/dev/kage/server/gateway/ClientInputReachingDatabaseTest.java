@@ -10,6 +10,7 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ClaimMailCommand;
 import dev.kage.protocol.CreateCharacterRequest;
@@ -17,12 +18,15 @@ import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.ListCharactersRequest;
 import dev.kage.protocol.ListCharactersResponse;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.SellItemCommand;
 import dev.kage.protocol.SendChatMessageCommand;
 import dev.kage.protocol.SendChatMessageOutcome;
 import dev.kage.protocol.SendChatMessageResponse;
 import dev.kage.protocol.SendMailCommand;
 import dev.kage.protocol.SendMailOutcome;
 import dev.kage.protocol.SendMailResponse;
+import dev.kage.protocol.SetTradeOfferCommand;
+import dev.kage.protocol.TradeOfferItemInput;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
@@ -133,6 +137,74 @@ class ClientInputReachingDatabaseTest {
         assertThat(SendChatMessageResponse.parseFrom(frames.getFirst().payload())
                         .getOutcome())
                 .isEqualTo(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_TARGET_NOT_FOUND);
+    }
+
+    /**
+     * Số lượng mua/bán âm hoặc 0 (rà kinh tế 2026-10-03): use case ném
+     * {@link IllegalArgumentException} để chặn, nhưng lỗi đó rơi vào lưới cuối của gateway thành 500
+     * {@code error.server_internal} kèm stack trace trong log ERROR — client độc hại spam được log
+     * lỗi máy chủ, client lành nhận câu báo sai. Số lượng là hình dạng gói, kiểm ở biên dây.
+     */
+    @Test
+    void shouldAnswerInvalidPayload_whenBuyQuantityIsNotPositive() throws InvalidProtocolBufferException {
+        EmbeddedChannel channel = inWorld("zerobuyuser", "ZeroBuyer");
+
+        BuyItemCommand command = BuyItemCommand.newBuilder()
+                .setItemTemplateId(1)
+                .setQuantity(0)
+                .setIdempotencyKey(UUID.randomUUID().toString())
+                .build();
+        write(channel, Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, 10, command.toByteArray());
+
+        assertErrorKey(GatewayPipelineTest.readOutboundFrames(channel), 10, "error.invalid_payload");
+    }
+
+    @Test
+    void shouldAnswerInvalidPayload_whenSellQuantityIsNegative() throws InvalidProtocolBufferException {
+        EmbeddedChannel channel = inWorld("negselluser", "NegSeller");
+
+        SellItemCommand command = SellItemCommand.newBuilder()
+                .setItemId(1)
+                .setQuantity(-5)
+                .setIdempotencyKey(UUID.randomUUID().toString())
+                .build();
+        write(channel, Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, 10, command.toByteArray());
+
+        assertErrorKey(GatewayPipelineTest.readOutboundFrames(channel), 10, "error.invalid_payload");
+    }
+
+    /** Vàng chào âm — {@code SetTradeOfferUseCase} ném, từng thành 500. */
+    @Test
+    void shouldAnswerInvalidPayload_whenTradeOfferGoldIsNegative() throws InvalidProtocolBufferException {
+        EmbeddedChannel channel = inWorld("neggolduser", "NegGoldOffer");
+
+        SetTradeOfferCommand command = SetTradeOfferCommand.newBuilder()
+                .setSessionId(1)
+                .setGoldAmount(-1)
+                .build();
+        write(channel, Opcode.OPCODE_SET_TRADE_OFFER_COMMAND_VALUE, 10, command.toByteArray());
+
+        assertErrorKey(GatewayPipelineTest.readOutboundFrames(channel), 10, "error.invalid_payload");
+    }
+
+    /** Dòng chào số lượng 0 / id 0 — {@code OfferedItemInput} ném, từng thành 500. */
+    @Test
+    void shouldAnswerInvalidPayload_whenTradeOfferLineIsMalformed() throws InvalidProtocolBufferException {
+        EmbeddedChannel channel = inWorld("badlineuser", "BadLineOffer");
+
+        SetTradeOfferCommand zeroQuantity = SetTradeOfferCommand.newBuilder()
+                .setSessionId(1)
+                .addItems(TradeOfferItemInput.newBuilder().setItemId(7).setQuantity(0))
+                .build();
+        write(channel, Opcode.OPCODE_SET_TRADE_OFFER_COMMAND_VALUE, 10, zeroQuantity.toByteArray());
+        assertErrorKey(GatewayPipelineTest.readOutboundFrames(channel), 10, "error.invalid_payload");
+
+        SetTradeOfferCommand zeroItemId = SetTradeOfferCommand.newBuilder()
+                .setSessionId(1)
+                .addItems(TradeOfferItemInput.newBuilder().setItemId(0).setQuantity(1))
+                .build();
+        write(channel, Opcode.OPCODE_SET_TRADE_OFFER_COMMAND_VALUE, 11, zeroItemId.toByteArray());
+        assertErrorKey(GatewayPipelineTest.readOutboundFrames(channel), 11, "error.invalid_payload");
     }
 
     @Test

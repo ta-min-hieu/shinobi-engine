@@ -1,6 +1,8 @@
 package dev.kage.trade.application;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.StringJoiner;
 import java.util.concurrent.atomic.AtomicReference;
 
 import dev.kage.trade.domain.IdempotencyKeyReusedException;
@@ -108,20 +110,61 @@ public final class ConfirmTradeUseCase {
         }
     }
 
+    /**
+     * Ghi cho MỖI bên: đã đưa gì, đã nhận gì (sửa 2026-10-03). Phiên + lời chào bị xoá ngay sau đây
+     * ({@code deleteSession}, CASCADE), nên dòng audit này là dấu vết DUY NHẤT còn lại — bản cũ chỉ
+     * có {@code sessionId}/{@code counterpartId}, không trả lời được "giao dịch đó chuyển gì".
+     * {@code itemId} là dòng NGUỒN lúc thi hành (gộp chồng/tách chồng có thể cấp id khác cho bên nhận).
+     */
     private void logAudit(Transaction t, TradeSessionSnapshot snapshot) {
-        String detail = "{\"sessionId\":%d,\"counterpartId\":%d}";
+        long requesterId = snapshot.requesterCharacterId();
+        long targetId = snapshot.targetCharacterId();
+        String requesterItems = itemsJson(snapshot.itemsOffered(requesterId));
+        String targetItems = itemsJson(snapshot.itemsOffered(targetId));
         ports.auditPort()
                 .log(
                         t,
-                        snapshot.requesterCharacterId(),
+                        requesterId,
                         "TRADE_EXECUTED",
-                        detail.formatted(snapshot.id(), snapshot.targetCharacterId()));
+                        auditDetail(
+                                snapshot.id(),
+                                targetId,
+                                new AuditSide(snapshot.requesterGold(), requesterItems),
+                                new AuditSide(snapshot.targetGold(), targetItems)));
         ports.auditPort()
                 .log(
                         t,
-                        snapshot.targetCharacterId(),
+                        targetId,
                         "TRADE_EXECUTED",
-                        detail.formatted(snapshot.id(), snapshot.requesterCharacterId()));
+                        auditDetail(
+                                snapshot.id(),
+                                requesterId,
+                                new AuditSide(snapshot.targetGold(), targetItems),
+                                new AuditSide(snapshot.requesterGold(), requesterItems)));
+    }
+
+    /** Một chiều của giao dịch — vàng + mảng JSON các dòng vật phẩm. */
+    private record AuditSide(long gold, String itemsJson) {}
+
+    private static String auditDetail(long sessionId, long counterpartId, AuditSide given, AuditSide received) {
+        return ("{\"sessionId\":%d,\"counterpartId\":%d,\"goldGiven\":%d,\"goldReceived\":%d,"
+                        + "\"itemsGiven\":%s,\"itemsReceived\":%s}")
+                .formatted(
+                        sessionId,
+                        counterpartId,
+                        given.gold(),
+                        received.gold(),
+                        given.itemsJson(),
+                        received.itemsJson());
+    }
+
+    // Chỉ số nguyên do server tự đọc từ DB — không có chuỗi người dùng, không cần thoát ký tự.
+    private static String itemsJson(List<TradeOfferItem> items) {
+        StringJoiner joiner = new StringJoiner(",", "[", "]");
+        for (TradeOfferItem item : items) {
+            joiner.add("{\"itemId\":%d,\"quantity\":%d}".formatted(item.itemId(), item.quantity()));
+        }
+        return joiner.toString();
     }
 
     public enum Result {

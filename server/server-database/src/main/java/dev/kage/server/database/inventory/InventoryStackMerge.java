@@ -41,6 +41,10 @@ public final class InventoryStackMerge {
      * <p>{@code max_stack > 1} lọc thẳng trong SQL: item không xếp chồng thì không bao giờ khớp.
      *
      * <p>Postgres không cho {@code LIMIT} trực tiếp trong {@code UPDATE} — phải qua truy vấn con.
+     *
+     * <p>{@code ii.quantity <= max_stack - ?} chứ không {@code ii.quantity + ? <= max_stack} (sửa
+     * 2026-10-03): số lượng tới từ client ({@code int32}), cộng gần {@code Integer.MAX_VALUE} thì
+     * Postgres nổ "integer out of range" ⇒ 500. Phép trừ không tràn vì {@code max_stack} dương.
      */
     private static final String MERGE_INTO_EXISTING_STACK = """
             UPDATE inventory_item SET quantity = quantity + ?
@@ -51,7 +55,7 @@ public final class InventoryStackMerge {
                             AND ii.item_template_id = ?
                             AND ii.enhance_level = 0
                             AND it.max_stack > 1
-                            AND ii.quantity + ? <= it.max_stack
+                            AND ii.quantity <= it.max_stack - ?
                           ORDER BY ii.id
                           LIMIT 1)
             """;
@@ -94,8 +98,8 @@ public final class InventoryStackMerge {
      * {@code max_stack} (làm tròn lên). Loại không tồn tại ⇒ 1, để người gọi không đoán sai là "vừa".
      */
     public static int slotsNeeded(Connection connection, long itemTemplateId, int quantity) {
-        int maxStack = maxStackOf(connection, itemTemplateId);
-        return (quantity + maxStack - 1) / maxStack;
+        long rows = rowsNeeded(quantity, maxStackOf(connection, itemTemplateId));
+        return (int) Math.min(Integer.MAX_VALUE, rows);
     }
 
     /**
@@ -115,7 +119,7 @@ public final class InventoryStackMerge {
     public static boolean insertRespectingMaxStack(
             Connection connection, long characterId, long itemTemplateId, int quantity) {
         int maxStack = maxStackOf(connection, itemTemplateId);
-        int rowsNeeded = (quantity + maxStack - 1) / maxStack;
+        long rowsNeeded = rowsNeeded(quantity, maxStack);
         int used = JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId)
                 .orElse(0);
         if (used + rowsNeeded > BAG_CAPACITY) {
@@ -129,6 +133,13 @@ public final class InventoryStackMerge {
             remaining -= rowQuantity;
         }
         return true;
+    }
+
+    // Tính bằng long (sửa 2026-10-03): quantity tới từ client, `quantity + maxStack - 1` sát
+    // Integer.MAX_VALUE tràn thành số ÂM ⇒ "cần −21 ô, vừa" ⇒ không chèn gì mà vẫn báo thành công
+    // (cửa hàng đã trừ tiền). Kết quả có thể vượt int — người gọi chỉ so với sức chứa túi.
+    private static long rowsNeeded(int quantity, int maxStack) {
+        return ((long) quantity + maxStack - 1) / maxStack;
     }
 
     // max_stack < 1 không hợp lệ theo dữ liệu hiện có, nhưng chia cho 0 ở đây là sập cả giao dịch —

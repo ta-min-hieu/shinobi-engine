@@ -67,6 +67,39 @@ class ConfirmTradeUseCaseTest {
         assertThat(auditPort.loggedActions).containsExactly("TRADE_EXECUTED", "TRADE_EXECUTED");
     }
 
+    /**
+     * Phiên và lời chào bị XOÁ ngay khi thi hành xong (V16, CASCADE) — nên dòng {@code audit_log} là
+     * dấu vết DUY NHẤT còn lại của giao dịch. Trước bản vá (2026-10-03) nó chỉ có {@code sessionId}
+     * + {@code counterpartId}: không ai trả lời được "giao dịch đó chuyển gì", đúng câu hỏi điều tra
+     * gian lận mà DATABASE.md §2.7 bắt buộc audit để trả lời.
+     */
+    @Test
+    void shouldAuditWhatEachSideGaveAndReceived_whenExecuted() {
+        FakeTradeSessionPort sessionPort = new FakeTradeSessionPort();
+        FakeTradeInventoryPort inventoryPort = new FakeTradeInventoryPort();
+        FakeTradeGoldPort goldPort = new FakeTradeGoldPort();
+        FakeTradeAuditPort auditPort = new FakeTradeAuditPort();
+        TradeSession session = sessionPort.createRequest(1, 5);
+        sessionPort.acceptRequest(session.id(), 5);
+        goldPort.setGold(1, 100);
+        long requesterItemId = inventoryPort.addItem(1, 200, 3, 0);
+        sessionPort.replaceOffer(session.id(), 1, 20, List.of(new OfferedItemInput(requesterItemId, 2)));
+        sessionPort.replaceOffer(session.id(), 5, 0, List.of());
+        ConfirmTradeUseCase useCase =
+                newUseCase(new TradePorts(sessionPort, inventoryPort, goldPort, auditPort, new FakeIdempotencyPort()));
+
+        useCase.execute(session.id(), 1, "key-a");
+        useCase.execute(session.id(), 5, "key-b");
+
+        String item = "{\"itemId\":" + requesterItemId + ",\"quantity\":2}";
+        assertThat(auditPort.loggedDetails)
+                .containsExactly(
+                        "{\"sessionId\":" + session.id() + ",\"counterpartId\":5,\"goldGiven\":20,"
+                                + "\"goldReceived\":0,\"itemsGiven\":[" + item + "],\"itemsReceived\":[]}",
+                        "{\"sessionId\":" + session.id() + ",\"counterpartId\":1,\"goldGiven\":0,"
+                                + "\"goldReceived\":20,\"itemsGiven\":[],\"itemsReceived\":[" + item + "]}");
+    }
+
     @Test
     void shouldReturnOfferInvalid_whenRecipientBagWouldEndUpOverCapacity() {
         FakeTradeSessionPort sessionPort = new FakeTradeSessionPort();

@@ -38,6 +38,10 @@ public final class GetTradeStatusUseCase {
         List<ResolvedOfferItem> resolvedItems = snapshot.items().stream()
                 .map(item -> inventoryPort
                         .findItemById(item.itemId())
+                        // Chỉ tra món CÒN thuộc người chào (sửa 2026-10-03): lời chào không xác thực
+                        // sở hữu, nên không lọc ở đây là để người chào dò loại + cấp cường hoá của
+                        // món bất kỳ theo id, và để đối phương thấy một món không bao giờ chuyển được.
+                        .filter(owned -> owned.characterId() == item.offeringCharacterId())
                         .map(owned -> new ResolvedOfferItem(
                                 item.offeringCharacterId(),
                                 item.itemId(),
@@ -59,7 +63,10 @@ public final class GetTradeStatusUseCase {
                 resolvedItems));
     }
 
-    /** {@code itemTemplateId=0}/{@code enhanceLevel=0} nếu item đã bị bán/gửi/xoá giữa chừng (tham chiếu mềm). */
+    /**
+     * {@code itemTemplateId=0}/{@code enhanceLevel=0} nếu item đã bị bán/gửi/xoá giữa chừng (tham chiếu
+     * mềm) HOẶC không thuộc người chào.
+     */
     public record ResolvedOfferItem(
             long offeringCharacterId, long itemId, long itemTemplateId, int quantity, int enhanceLevel) {}
 

@@ -1,10 +1,8 @@
 package dev.kage.trade.application;
 
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -17,16 +15,11 @@ final class FakeTradeInventoryPort implements TradeInventoryPort {
 
     private final Map<Long, OwnedItemSnapshot> items = new LinkedHashMap<>();
     private final AtomicLong nextItemId = new AtomicLong(1);
-    private final Set<Long> fullInventoryCharacterIds = new HashSet<>();
 
     long addItem(long characterId, long itemTemplateId, int quantity, int enhanceLevel) {
         long id = nextItemId.getAndIncrement();
         items.put(id, new OwnedItemSnapshot(id, characterId, itemTemplateId, quantity, enhanceLevel));
         return id;
-    }
-
-    void markInventoryFull(long characterId) {
-        fullInventoryCharacterIds.add(characterId);
     }
 
     private final AtomicInteger capacity = new AtomicInteger(Integer.MAX_VALUE);
@@ -57,9 +50,6 @@ final class FakeTradeInventoryPort implements TradeInventoryPort {
         }
         if (current.quantity() < request.quantity()) {
             return TransferOutcome.INSUFFICIENT_QUANTITY;
-        }
-        if (fullInventoryCharacterIds.contains(request.toCharacterId())) {
-            return TransferOutcome.RECIPIENT_INVENTORY_FULL;
         }
         if (current.quantity() == request.quantity()) {
             items.put(

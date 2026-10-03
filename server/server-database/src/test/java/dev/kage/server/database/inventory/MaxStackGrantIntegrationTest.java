@@ -122,6 +122,44 @@ class MaxStackGrantIntegrationTest {
         assertThat(readGold(characterId)).isEqualTo(10_000L);
     }
 
+    /**
+     * Số lượng sát {@code Integer.MAX_VALUE} (rà kinh tế 2026-10-03; client gửi {@code int32} tuỳ ý,
+     * chỉ cần đủ vàng). Phép chia ô {@code (quantity + maxStack - 1) / maxStack} tràn int thành số
+     * ÂM ⇒ "cần −21 ô, vừa" ⇒ không chèn dòng nào mà vẫn báo thành công: TRỪ ~10,7 tỉ vàng, KHÔNG
+     * cấp gì.
+     */
+    @Test
+    void shouldRefuseAndChargeNothing_whenQuantityOverflowsTheSlotArithmetic() {
+        long characterId = createFreshCharacter("MsBuyOverflow");
+        setGold(characterId, Long.MAX_VALUE / 2);
+
+        BuyItemUseCase.BuyResult result =
+                newBuyUseCase().execute(characterId, kunaiTemplateId, Integer.MAX_VALUE, newKey());
+
+        assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.INVENTORY_FULL);
+        assertThat(rowQuantities(characterId, kunaiTemplateId)).isEmpty();
+        assertThat(readGold(characterId)).isEqualTo(Long.MAX_VALUE / 2);
+    }
+
+    /**
+     * Cùng số lượng, nhưng đã có sẵn một chồng phi đao: câu gộp chồng tính {@code quantity + ?}
+     * bằng {@code integer} của Postgres và nổ "integer out of range" ⇒ 500 thay vì túi đầy.
+     */
+    @Test
+    void shouldRefuseAndChargeNothing_whenQuantityWouldOverflowAnExistingStack() {
+        long characterId = createFreshCharacter("MsOvfStack");
+        setGold(characterId, Long.MAX_VALUE / 2);
+        newBuyUseCase().execute(characterId, kunaiTemplateId, 1, newKey());
+        long goldAfterFirstBuy = readGold(characterId);
+
+        BuyItemUseCase.BuyResult result =
+                newBuyUseCase().execute(characterId, kunaiTemplateId, Integer.MAX_VALUE, newKey());
+
+        assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.INVENTORY_FULL);
+        assertThat(rowQuantities(characterId, kunaiTemplateId)).containsExactly(1);
+        assertThat(readGold(characterId)).isEqualTo(goldAfterFirstBuy);
+    }
+
     @Test
     void shouldGiveOneRowPerSword_whenMailDeliversSeveralNonStackableItems() {
         long characterId = createFreshCharacter("MsMailSwords");
