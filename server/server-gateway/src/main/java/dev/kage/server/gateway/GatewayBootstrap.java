@@ -96,13 +96,34 @@ public final class GatewayBootstrap {
                 facades,
                 new GatewayServer.GatewayContext(instanceRegistries.worldGateway(), observability),
                 TlsConfig.fromEnvironment());
-        server.start();
-        registerShutdownHook(
+        Runnable shutdown = shutdownSequence(
                 new ShutdownContext(server, worldContext, instanceRegistries, characterRegistry),
                 positionPersister,
                 observability,
                 databaseBootstrap);
+        startOrShutDown(server, shutdown);
+        Runtime.getRuntime().addShutdownHook(new Thread(shutdown, "gateway-shutdown"));
         server.awaitTermination();
+    }
+
+    /**
+     * Mở cổng; thất bại thì chạy {@code shutdown} rồi mới ném tiếp (sửa 2026-10-03).
+     *
+     * <p>Lúc mở cổng, luồng lưu vị trí và máy chủ metrics — đều KHÔNG daemon — đã chạy. Bản cũ để
+     * exception thoát khỏi {@code main()} mà không tắt chúng (shutdown hook còn chưa đăng ký): JVM
+     * không bao giờ thoát, tiến trình treo mà không mở cổng game nào. Hook chỉ đăng ký SAU khi mở
+     * cổng thành công, nên trình tự tắt không chạy hai lần.
+     */
+    static void startOrShutDown(GatewayServer server, Runnable shutdown) throws InterruptedException, SSLException {
+        boolean started = false;
+        try {
+            server.start();
+            started = true;
+        } finally {
+            if (!started) {
+                shutdown.run();
+            }
+        }
     }
 
     /**
@@ -135,36 +156,34 @@ public final class GatewayBootstrap {
     }
 
     /**
-     * Tách khỏi {@code main()} để giữ dưới giới hạn Checkstyle MethodLength.
+     * Trình tự tắt server — chạy bởi shutdown hook, hoặc bởi {@link #startOrShutDown} nếu mở cổng
+     * thất bại. Tách khỏi {@code main()} để giữ dưới giới hạn Checkstyle MethodLength.
      */
-    private static void registerShutdownHook(
+    private static Runnable shutdownSequence(
             ShutdownContext ctx,
             CharacterPositionPersister positionPersister,
             GatewayObservability observability,
             ServerDatabaseBootstrap databaseBootstrap) {
-        Runtime.getRuntime()
-                .addShutdownHook(new Thread(
-                        () -> {
-                            // Thứ tự SERVER.md §10: ngừng nhận kết nối mới trước (server.stop() đóng channel),
-                            // rồi mới dừng world tick + đóng DB. positionPersister dừng SAU worldFacade — vòng
-                            // quét định kỳ cuối cùng vẫn nên chạy trước khi tắt hẳn (không mất vị trí ai đó vừa
-                            // logout đúng lúc server tắt). dungeonInstanceRegistry/arenaInstanceRegistry dừng CÙNG
-                            // lúc worldFacade (mọi World, chính lẫn dungeon/duel, dừng trước khi đóng DB).
-                            ctx.server().stop();
-                            ctx.worldContext().mainWorldChannels().stopAll();
-                            ctx.instanceRegistries().dungeon().stopAll();
-                            ctx.instanceRegistries().arena().stopAll();
-                            ctx.characterRegistry().stop();
-                            positionPersister.stop();
-                            ctx.worldContext().metricsHttpServer().stop();
-                            observability.tracing().shutdown();
-                            databaseBootstrap.shutdown();
-                        },
-                        "gateway-shutdown"));
+        return () -> {
+            // Thứ tự SERVER.md §10: ngừng nhận kết nối mới trước (server.stop() đóng channel),
+            // rồi mới dừng world tick + đóng DB. positionPersister dừng SAU worldFacade — vòng
+            // quét định kỳ cuối cùng vẫn nên chạy trước khi tắt hẳn (không mất vị trí ai đó vừa
+            // logout đúng lúc server tắt). dungeonInstanceRegistry/arenaInstanceRegistry dừng CÙNG
+            // lúc worldFacade (mọi World, chính lẫn dungeon/duel, dừng trước khi đóng DB).
+            ctx.server().stop();
+            ctx.worldContext().mainWorldChannels().stopAll();
+            ctx.instanceRegistries().dungeon().stopAll();
+            ctx.instanceRegistries().arena().stopAll();
+            ctx.characterRegistry().stop();
+            positionPersister.stop();
+            ctx.worldContext().metricsHttpServer().stop();
+            observability.tracing().shutdown();
+            databaseBootstrap.shutdown();
+        };
     }
 
     /**
-     * Gộp thứ cần cho {@link #registerShutdownHook} — giữ tham số method đó ≤ 4 (Checkstyle
+     * Gộp thứ cần cho {@link #shutdownSequence} — giữ tham số method đó ≤ 4 (Checkstyle
      * ParameterNumber).
      */
     private record ShutdownContext(

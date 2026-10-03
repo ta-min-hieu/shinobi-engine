@@ -98,7 +98,23 @@ public final class GatewayServer {
         this.tlsConfig = tlsConfig;
     }
 
+    /**
+     * Mở cổng. Ném ra (cổng đang bị chiếm, chứng chỉ TLS hỏng...) thì mọi thứ đã dựng trong lúc mở
+     * được tắt lại trước khi ném — xem {@link #releaseAfterFailedStart}.
+     */
     public void start() throws InterruptedException, SSLException {
+        boolean started = false;
+        try {
+            bindAndListen();
+            started = true;
+        } finally {
+            if (!started) {
+                releaseAfterFailedStart();
+            }
+        }
+    }
+
+    private void bindAndListen() throws InterruptedException, SSLException {
         bossGroup = new NioEventLoopGroup(1);
         workerGroup = new NioEventLoopGroup();
         // Auth chạm Redis/PostgreSQL (blocking I/O) — Virtual Thread, KHÔNG chạy trên EventLoop
@@ -197,6 +213,20 @@ public final class GatewayServer {
         if (authExecutor != null) {
             authExecutor.shutdown();
             awaitAuthExecutorTermination();
+        }
+    }
+
+    /**
+     * Mở cổng thất bại (sửa 2026-10-03): {@code bind} đã kịp chạy luồng boss của Netty — luồng
+     * KHÔNG daemon — nên bản cũ ném ra rồi để nó sống mãi: {@code main()} chết nhưng JVM không thoát,
+     * tiến trình treo mà không phục vụ ai (restart policy của Docker không bao giờ kích hoạt). Không
+     * báo người chơi gì: chưa ai kết nối được. Xem {@code GatewayServerStartFailureTest}.
+     */
+    private void releaseAfterFailedStart() {
+        awaitGracefully(workerGroup);
+        awaitGracefully(bossGroup);
+        if (authExecutor != null) {
+            authExecutor.shutdownNow();
         }
     }
 
