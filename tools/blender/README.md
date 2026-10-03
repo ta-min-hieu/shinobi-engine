@@ -7,6 +7,11 @@ Tài liệu gốc: [docs/14-art/ART-PIPELINE.md](../../docs/14-art/ART-PIPELINE.
 > ảnh render chỉ là bằng chứng nghiệm thu. **VFX · icon · UI** vẫn là nhánh 2D pre-render ra sprite.
 > Đọc đúng nhánh của thứ mình đang làm — phần lớn script dưới đây thuộc nhánh 2D.
 
+> ⚠️ **Chạy headless LUÔN kèm `--python-exit-code 1`** (đặt TRƯỚC `-P`). Thiếu cờ này, script
+> `-P` ném exception thì Blender vẫn in traceback rồi **thoát mã 0** — đo thật 2026-10-03 trên
+> Blender 5.2 với script chỉ có `raise RuntimeError`: không cờ → exit 0, có cờ → exit 1. Một lần
+> xuất LOD/render hỏng giữa chừng trông y hệt một lần thành công với mọi thứ đọc mã thoát.
+
 ## Script nào cho việc gì
 
 | Script | Dùng khi | Cần mở Blender? |
@@ -52,7 +57,7 @@ Vòng nghiệm thu và ngân sách vòng: [ART-QUALITY-STANDARD §7](../../docs/
 ## `export_character_lods.py` — bước E
 
 ```bash
-blender -b <char>.blend -P tools/blender/export_character_lods.py -- \
+blender -b --python-exit-code 1 <char>.blend -P tools/blender/export_character_lods.py -- \
   --object Hoa_D --rig hoa_d_Rig --extras hoa_KunaiBlade,hoa_KunaiGrip,hoa_KunaiRing \
   --asset-key char_hoa-b1 --out <abs>/assets/exported/models
 ```
@@ -82,7 +87,7 @@ nguồn duy nhất là [ART-QUALITY-STANDARD §4](../../docs/14-art/ART-QUALITY-
 ## `make_contact_sheet.py`
 
 ```bash
-blender -b -P tools/blender/make_contact_sheet.py -- \
+blender -b --python-exit-code 1 -P tools/blender/make_contact_sheet.py -- \
   --dir assets/raw/render-out/char_hoa-b1 \
   --frames idle_00 run_01 attack_00 attack_02 die_05 \
   --out assets/raw/render-out/_review/hoa-b1.png --scale 2
@@ -106,7 +111,7 @@ setup_scene(px=256)
 Headless (render dài, chạy background bằng Bash tool):
 
 ```
-blender -b assets/raw/blender/characters/ninja-fire.blend -P tools/blender/kage_sprite_render.py -- --all-actions --out assets/raw/render-out/char_ninja-fire
+blender -b --python-exit-code 1 assets/raw/blender/characters/ninja-fire.blend -P tools/blender/kage_sprite_render.py -- --all-actions --out assets/raw/render-out/char_ninja-fire
 ```
 
 ---

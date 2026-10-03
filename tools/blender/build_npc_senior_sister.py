@@ -14,7 +14,7 @@ generated path — so `build_text3d_monster.py --code senior_sister` over a real
 
 Run headless (never in an MCP session — full file rebuild):
 
-    blender -b assets/raw/blender/kage_character_base.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/kage_character_base.blend \
       -P tools/blender/build_npc_senior_sister.py \
       -- --out assets/raw/blender/characters/senior-sister.blend
 """

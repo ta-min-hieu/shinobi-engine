@@ -45,7 +45,7 @@ which §7/§8 say to add per-PR — so this ships without adding to the queue.
 
 Run headless (never in an MCP session — full file rebuild):
 
-    blender -b assets/raw/blender/kage_character_base.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/kage_character_base.blend \
       -P tools/blender/build_monster_vein_raider.py \
       -- --out assets/raw/blender/monsters/vein-raider.blend
 
@@ -53,7 +53,7 @@ Then the three LODs (ART-PIPELINE §6.5 — `--flat-materials` is mandatory for 
 kit-built mesh, `--extras all` because naming the parts by hand is how
 `bandit_SashTail` went missing):
 
-    blender -b assets/raw/blender/monsters/vein-raider.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/monsters/vein-raider.blend \
       -P tools/blender/export_character_lods.py -- \
       --object raider_Torso --rig raider_Rig --extras all --flat-materials \
       --asset-key mob_vein-raider --out <ABSOLUTE>/assets/exported/models

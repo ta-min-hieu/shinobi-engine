@@ -5,7 +5,7 @@ several frames (idle for the build quality, run and attack for the motion
 criteria). Opening them one by one is slow and makes it hard to see whether the
 frames belong to the same character; a strip shows drift at a glance.
 
-    blender -b -P tools/blender/make_contact_sheet.py -- \
+    blender -b --python-exit-code 1 -P tools/blender/make_contact_sheet.py -- \
       --dir assets/raw/render-out/char_hoa-b1 \
       --frames idle_00 run_01 run_02 attack_00 attack_02 die_05 \
       --out assets/raw/render-out/_review/hoa-b1.png [--scale 2]

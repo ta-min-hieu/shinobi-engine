@@ -40,7 +40,7 @@ the art without touching anything else.
 
 Run headless (never in an MCP session — full file rebuild):
 
-    blender -b assets/raw/blender/kage_character_base.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/kage_character_base.blend \
       -P tools/blender/build_monster_archive_warden.py \
       -- --out assets/raw/blender/monsters/archive-warden.blend
 
@@ -48,7 +48,7 @@ Then the three LODs (ART-PIPELINE §6.5 — `--flat-materials` is mandatory for 
 hand-built mesh, and `--extras all` because naming forty parts by hand is how
 `bandit_SashTail` went missing):
 
-    blender -b assets/raw/blender/monsters/archive-warden.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/monsters/archive-warden.blend \
       -P tools/blender/export_character_lods.py -- \
       --object warden_Torso --rig warden_Rig --extras all --flat-materials \
       --asset-key mob_archive-warden --out <ABSOLUTE>/assets/exported/models

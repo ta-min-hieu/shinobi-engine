@@ -157,7 +157,7 @@ Spec dict: xem `CHARACTER_SPEC_KEYS` cuối file kit. Spec thật của **cả 5
 Dựng 1 nhân vật = **1 dòng lệnh**, không cần mở Blender:
 
 ```bash
-blender -b assets/raw/blender/kage_character_base.blend \
+blender -b --python-exit-code 1 assets/raw/blender/kage_character_base.blend \
   -P tools/blender/build_kage_character.py \
   -- --element hoa --tier b1 --out assets/raw/blender/characters/hoa-b1.blend
 ```
@@ -229,7 +229,7 @@ là **góc nghiệm thu**, không khoá gì trong game.
 **Bước 2 · Chấm vòng A (chất lượng mesh) trên preview `idle`** — trước khi tinh chỉnh bất cứ thứ gì:
 
 ```bash
-blender -b assets/raw/blender/characters/<hệ>-<bậc>.blend -P tools/blender/kage_sprite_render.py \
+blender -b --python-exit-code 1 assets/raw/blender/characters/<hệ>-<bậc>.blend -P tools/blender/kage_sprite_render.py \
   -- --preview idle --out assets/raw/render-out/_review
 ```
 
@@ -242,9 +242,9 @@ Không sinh mesh mới.
 **Bước 4 · PASS Q1–Q10 → render cả bộ, ghép contact sheet, chấm Q11–Q12 trong _một_ lần xem:**
 
 ```bash
-blender -b assets/raw/blender/characters/<hệ>-<bậc>.blend -P tools/blender/kage_sprite_render.py \
+blender -b --python-exit-code 1 assets/raw/blender/characters/<hệ>-<bậc>.blend -P tools/blender/kage_sprite_render.py \
   -- --all-actions --out assets/raw/render-out/char_<hệ>-<bậc>
-blender -b -P tools/blender/make_contact_sheet.py -- \
+blender -b --python-exit-code 1 -P tools/blender/make_contact_sheet.py -- \
   --dir assets/raw/render-out/char_<hệ>-<bậc> \
   --frames idle_00 run_01 attack_00 attack_02 die_05 \
   --out assets/raw/render-out/_review/<hệ>-<bậc>.png --scale 2

@@ -96,6 +96,63 @@ final class AssetPipelineIntegrationTest {
     }
 
     /**
+     * Trang atlas thừa của lần chạy TRƯỚC không được sống sót ở tier HIGH. TexturePacker tự xoá
+     * {@code main*.png} cũ ở thư mục đích của LOW/MED, nhưng HIGH là bản SAO CHÉP từ MED — bản cũ
+     * chỉ ghi đè file trùng tên, nên khi số trang giảm (VD 4 → 1) thì {@code high/main4.png} cũ vẫn
+     * nằm đó và manifest liệt kê nó kèm hash: patcher tải về một trang mà không {@code .atlas} nào
+     * tham chiếu.
+     */
+    @Test
+    void shouldDropStaleHighTierPages_whenPreviousRunLeftMorePages(@TempDir Path tempRoot) throws IOException {
+        Path renderRoot = tempRoot.resolve("render-out");
+        writeStaticIcon(renderRoot, "icon_test-item");
+        Path exportedRoot = tempRoot.resolve("exported");
+        Path highDir = exportedRoot.resolve("atlases").resolve("high");
+        Files.createDirectories(highDir);
+        Path staleHighPage = highDir.resolve("main4.png");
+        writePng(staleHighPage, 8, 8);
+
+        AssetPipelineRunner.run(renderRoot, exportedRoot, Optional.empty());
+
+        assertThat(staleHighPage).doesNotExist();
+        assertThat(Files.readString(exportedRoot.resolve("asset-manifest.json")))
+                .doesNotContain("main4.png");
+    }
+
+    /**
+     * TexturePacker coi {@code _<số>} ở cuối tên file là chỉ số frame ({@code useIndexes}). Icon
+     * tĩnh tên {@code icon_x_2} vì thế ra region {@code icon_x} index 2 — client tìm
+     * {@code findRegion("icon_x_2")} không thấy, build vẫn xanh. Phải fail build ngay ở bước tên.
+     */
+    @Test
+    void shouldFailBuild_whenStaticIconKeyEndsWithFrameIndexSuffix(@TempDir Path tempRoot) throws IOException {
+        Path renderRoot = tempRoot.resolve("render-out");
+        writeStaticIcon(renderRoot, "icon_test-item_2");
+        Path exportedRoot = tempRoot.resolve("exported");
+
+        assertThatThrownBy(() -> AssetPipelineRunner.run(renderRoot, exportedRoot, Optional.empty()))
+                .isInstanceOf(AssetPipelineException.class)
+                .hasMessageContaining("icon_test-item_2");
+    }
+
+    /**
+     * Hai asset khác nhau có thể dẹt ra CÙNG tên file staging: {@code vfx_a} action {@code b_c}
+     * và {@code vfx_a_b} action {@code c} đều thành {@code vfx_a_b_c_00.png}. Bản cũ ghi đè im lặng
+     * — một asset biến mất khỏi atlas, build xanh.
+     */
+    @Test
+    void shouldFailBuild_whenTwoAssetsFlattenToSameStagedFrame(@TempDir Path tempRoot) throws IOException {
+        Path renderRoot = tempRoot.resolve("render-out");
+        writeAnimatedAsset(renderRoot, "vfx_a", "b_c");
+        writeAnimatedAsset(renderRoot, "vfx_a_b", "c");
+        Path exportedRoot = tempRoot.resolve("exported");
+
+        assertThatThrownBy(() -> AssetPipelineRunner.run(renderRoot, exportedRoot, Optional.empty()))
+                .isInstanceOf(AssetPipelineException.class)
+                .hasMessageContaining("vfx_a_b_c_00.png");
+    }
+
+    /**
      * File {@code .glb} tối thiểu: header + chunk JSON thật, không có chunk BIN (xem counter test),
      * KÈM sidecar {@code <asset_key>.model-meta.json} bắt buộc của ART-PIPELINE.md §8.6.
      *
@@ -129,13 +186,16 @@ final class AssetPipelineIntegrationTest {
     }
 
     private static void writeAnimatedAsset(Path renderRoot, String assetKey) throws IOException {
+        writeAnimatedAsset(renderRoot, assetKey, "idle");
+    }
+
+    private static void writeAnimatedAsset(Path renderRoot, String assetKey, String action) throws IOException {
         Path folder = renderRoot.resolve(assetKey);
         Files.createDirectories(folder);
-        Files.writeString(folder.resolve("render-meta.json"), """
-                { "actions": { "idle": 2 }, "master_px": 8 }
-                """);
-        writePng(folder.resolve("idle_00.png"), 8, 8);
-        writePng(folder.resolve("idle_01.png"), 8, 8);
+        Files.writeString(
+                folder.resolve("render-meta.json"), "{ \"actions\": { \"" + action + "\": 2 }, \"master_px\": 8 }");
+        writePng(folder.resolve(action + "_00.png"), 8, 8);
+        writePng(folder.resolve(action + "_01.png"), 8, 8);
     }
 
     private static void writeStaticIcon(Path renderRoot, String assetKey) throws IOException {

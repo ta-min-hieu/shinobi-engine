@@ -3,7 +3,7 @@
 Run headless — never from an MCP session, because resetting the file there
 kills the blender-mcp addon along with the connection:
 
-    blender -b --factory-startup -P tools/blender/build_character_base.py
+    blender -b --python-exit-code 1 --factory-startup -P tools/blender/build_character_base.py
 
 Every character .blend starts as a copy of this file, so camera, lights,
 Freestyle, render settings and the chibi scale guide are identical everywhere

@@ -12,14 +12,14 @@ category built so far.
 
 Run headless, one process builds+renders every item:
 
-    blender -b -P tools/blender/build_item_icon.py -- --all \
+    blender -b --python-exit-code 1 -P tools/blender/build_item_icon.py -- --all \
       --out-blend assets/raw/blender/props --out-render assets/raw/render-out
 
 `--item` also takes a comma-separated list, which is how the V21 batch was
 built without re-saving (and so churning through Git LFS) the three .blend
 files that already shipped:
 
-    blender -b -P tools/blender/build_item_icon.py -- \
+    blender -b --python-exit-code 1 -P tools/blender/build_item_icon.py -- \
       --item novice_vest,genin_vest --out-blend ... --out-render ...
 
 Two rules the V21 batch had to learn — keep them when adding more items:

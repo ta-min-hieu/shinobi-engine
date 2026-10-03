@@ -4,13 +4,13 @@ This replaces build_box_character.py for every player/NPC-shaped asset. The box
 builder stays in the tree only so the first-generation .blend files can still be
 regenerated; nothing new should use it (ART-QUALITY-STANDARD.md §0).
 
-    blender -b assets/raw/blender/kage_character_base.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/kage_character_base.blend \
       -P tools/blender/build_kage_character.py \
       -- --element hoa --tier b1 --out assets/raw/blender/characters/hoa-b1.blend
 
 Then render the sheet with the normal pipeline:
 
-    blender -b <that file> -P tools/blender/kage_sprite_render.py \
+    blender -b --python-exit-code 1 <that file> -P tools/blender/kage_sprite_render.py \
       -- --all-actions --out assets/raw/render-out/char_hoa-b1
 
 Costume descriptions come from ART-PIPELINE.md §2.3 (the "Trang phục" line of

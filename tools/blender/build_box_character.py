@@ -8,7 +8,7 @@ matches what was verified to render cleanly for char_hoa-pilot
 
 Run headless (never in an MCP session — this does a full file rebuild):
 
-    blender -b assets/raw/blender/kage_character_base.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/kage_character_base.blend \
       -P tools/blender/build_box_character.py \
       -- --element thuy --base-hex "#2D7FE8" --accent-hex "#7FD4FF" \
          --out assets/raw/blender/characters/thuy-pilot.blend

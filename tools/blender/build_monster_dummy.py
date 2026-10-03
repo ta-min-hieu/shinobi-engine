@@ -16,7 +16,7 @@ monster jump or cast, and the client tolerates a missing clip by falling back to
 
 Run headless (never in an MCP session — full file rebuild):
 
-    blender -b assets/raw/blender/kage_character_base.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/kage_character_base.blend \
       -P tools/blender/build_monster_dummy.py \
       -- --out assets/raw/blender/monsters/training-dummy.blend
 

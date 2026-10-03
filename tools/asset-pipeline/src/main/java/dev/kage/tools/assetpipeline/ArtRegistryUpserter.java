@@ -43,6 +43,7 @@ final class ArtRegistryUpserter {
      * Thư mục bằng chứng nghiệm thu, tương đối gốc repo (ART-PIPELINE.md §7). Ghi hằng số này thay
      * vì {@code renderRoot} người dùng truyền vào: §8.4 bắt mọi cột đường dẫn của {@code art_asset}
      * giữ đường dẫn tương đối, mà {@code --render-root} thường được gọi bằng đường dẫn tuyệt đối.
+     * Áp cho CẢ HAI nhánh (SPRITE lẫn MODEL).
      */
     private static final String RENDER_OUT_ROOT = "assets/raw/render-out/";
 
@@ -270,7 +271,10 @@ final class ArtRegistryUpserter {
                 statement.setNull(3, Types.VARCHAR);
             }
             statement.setString(4, BlendPathResolver.resolve(asset.assetKey()));
-            statement.setString(5, asset.folder().toString().replace('\\', '/'));
+            // Hằng số tương đối, KHÔNG phải asset.folder(): folder mang nguyên --render-root (tuyệt
+            // đối khi chạy thật) nên bản cũ ghi "E:/study/.../render-out/<key>" vào DB — vi phạm
+            // §8.4 y như lý do RENDER_OUT_ROOT tồn tại cho nhánh MODEL.
+            statement.setString(5, RENDER_OUT_ROOT + asset.assetKey());
             if (asset.isStaticIcon()) {
                 statement.setNull(6, Types.OTHER);
                 statement.setInt(7, readIconMasterPx(asset));

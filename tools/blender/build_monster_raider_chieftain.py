@@ -50,7 +50,7 @@ row; two proper names are already queued for the owner and this adds no third.
 Run headless (never in an MCP session — full file rebuild; the addon refuses in
 background mode anyway):
 
-    blender -b assets/raw/blender/kage_character_base.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/kage_character_base.blend \
       -P tools/blender/build_monster_raider_chieftain.py \
       -- --out assets/raw/blender/monsters/raider-chieftain.blend
 
@@ -58,7 +58,7 @@ Then the three LODs (ART-PIPELINE §6.5 — `--flat-materials` is mandatory for 
 kit-built mesh, `--extras all` because naming the parts by hand is how
 `bandit_SashTail` went missing):
 
-    blender -b assets/raw/blender/monsters/raider-chieftain.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/monsters/raider-chieftain.blend \
       -P tools/blender/export_character_lods.py -- \
       --object chief_Torso --rig chief_Rig --extras all --flat-materials \
       --asset-key mob_raider-chieftain --out <ABSOLUTE>/assets/exported/models

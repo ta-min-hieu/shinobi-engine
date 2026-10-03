@@ -24,7 +24,8 @@ import com.badlogic.gdx.utils.JsonValue;
  * <p>Số tam giác của một primitive suy ra từ <b>số đỉnh</b> (accessor {@code indices} nếu có, không
  * thì accessor {@code POSITION}) và {@code mode}: {@code TRIANGLES} chia 3, còn
  * {@code TRIANGLE_STRIP}/{@code TRIANGLE_FAN} là {@code n - 2} vì mọi đỉnh sau đỉnh thứ ba đều tái
- * dùng hai đỉnh trước. Mode điểm/đường không sinh tam giác nào.
+ * dùng hai đỉnh trước. Mode điểm/đường không sinh tam giác nào. Tổng của một mesh rồi nhân với số
+ * node trỏ tới nó — xem {@link #drawsPerMesh}.
  */
 final class GlbTriangleCounter {
 
@@ -52,6 +53,8 @@ final class GlbTriangleCounter {
 
     /** {@code accessor.count} theo spec luôn {@code >= 1}; -1 = field bắt buộc bị thiếu. */
     private static final int MISSING_COUNT = -1;
+
+    private static final String EXT_GPU_INSTANCING = "EXT_mesh_gpu_instancing";
 
     private GlbTriangleCounter() {}
 
@@ -102,17 +105,62 @@ final class GlbTriangleCounter {
             return 0;
         }
         JsonValue accessors = root.get("accessors");
+        int[] drawsPerMesh = drawsPerMesh(root.get("nodes"), meshes.size, glbFile);
         long total = 0;
-        for (JsonValue mesh = meshes.child; mesh != null; mesh = mesh.next) {
+        int meshIndex = 0;
+        for (JsonValue mesh = meshes.child; mesh != null; mesh = mesh.next, meshIndex++) {
             JsonValue primitives = mesh.get("primitives");
             if (primitives == null) {
                 continue;
             }
+            long meshTriangles = 0;
             for (JsonValue primitive = primitives.child; primitive != null; primitive = primitive.next) {
-                total += trianglesOf(primitive, accessors, glbFile);
+                meshTriangles += trianglesOf(primitive, accessors, glbFile);
             }
+            total += meshTriangles * drawsPerMesh[meshIndex];
         }
         return Math.toIntExact(total);
+    }
+
+    /**
+     * Số lần GPU vẽ mỗi mesh = số node trỏ tới nó (glTF 2.0 §3.5: mesh là hình học, node là chỗ
+     * đặt). Blender xuất bản sao liên kết (Alt+D) thành MỘT mesh và NHIỀU node — chỉ cộng theo
+     * {@code meshes} thì đếm hụt. Mesh không node nào trỏ tới vẫn tính MỘT lần: thà đếm dư phần
+     * không được vẽ còn hơn đếm hụt phần được vẽ, vì đây là cổng trần ngân sách.
+     */
+    private static int[] drawsPerMesh(JsonValue nodes, int meshCount, Path glbFile) {
+        int[] nodeRefs = new int[meshCount];
+        if (nodes != null) {
+            for (JsonValue node = nodes.child; node != null; node = node.next) {
+                int mesh = meshOf(node, meshCount, glbFile);
+                if (mesh != NO_ACCESSOR) {
+                    nodeRefs[mesh]++;
+                }
+            }
+        }
+        for (int i = 0; i < meshCount; i++) {
+            nodeRefs[i] = Math.max(1, nodeRefs[i]);
+        }
+        return nodeRefs;
+    }
+
+    /** Mesh mà node trỏ tới, hoặc {@link #NO_ACCESSOR} nếu node không mang mesh (khớp xương, rỗng). */
+    private static int meshOf(JsonValue node, int meshCount, Path glbFile) {
+        int mesh = node.getInt("mesh", NO_ACCESSOR);
+        if (mesh == NO_ACCESSOR) {
+            return NO_ACCESSOR;
+        }
+        if (mesh < 0 || mesh >= meshCount) {
+            throw new AssetPipelineException("File '" + glbFile + "' có node trỏ tới mesh #" + mesh + " không tồn tại");
+        }
+        JsonValue extensions = node.get("extensions");
+        if (extensions != null && extensions.has(EXT_GPU_INSTANCING)) {
+            // Số bản sao nằm trong buffer nhị phân, counter chỉ đọc chunk JSON — đếm 1 lần là đếm
+            // hụt im lặng, nên từ chối thẳng.
+            throw new AssetPipelineException("File '" + glbFile + "' dùng " + EXT_GPU_INSTANCING
+                    + " — cổng ngân sách tam giác chưa đếm được instancing GPU");
+        }
+        return mesh;
     }
 
     private static int trianglesOf(JsonValue primitive, JsonValue accessors, Path glbFile) {

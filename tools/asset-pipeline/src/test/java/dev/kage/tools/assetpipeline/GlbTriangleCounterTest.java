@@ -95,6 +95,42 @@ final class GlbTriangleCounterTest {
         assertThat(GlbTriangleCounter.countTriangles(glb)).isEqualTo(10 + 10 + 2);
     }
 
+    /**
+     * glTF tách "hình học" ({@code meshes}) khỏi "chỗ đặt" ({@code nodes}): Blender xuất bản sao
+     * liên kết (Alt+D — VD hai chiếc giày, hai tay của mesh kit) thành MỘT mesh và NHIỀU node trỏ vào
+     * nó, và GPU vẽ mesh đó một lần cho mỗi node. Bản cũ chỉ cộng theo {@code meshes} nên đếm hụt —
+     * model vượt trần vẫn qua cổng §4.4.
+     */
+    @Test
+    void shouldCountMeshOncePerNode_whenSeveralNodesInstanceSameMesh(@TempDir Path folder) throws IOException {
+        Path glb = writeGlb(folder, """
+                { "accessors": [ { "count": 36 }, { "count": 30 } ],
+                  "meshes": [ { "primitives": [ { "attributes": { "POSITION": 0 }, "indices": 0 } ] },
+                              { "primitives": [ { "attributes": { "POSITION": 1 }, "indices": 1 } ] } ],
+                  "nodes": [ { "mesh": 0 }, { "mesh": 0 }, { "mesh": 0 }, { "mesh": 1 }, { "name": "rig" } ] }
+                """);
+
+        assertThat(GlbTriangleCounter.countTriangles(glb)).isEqualTo(3 * 12 + 10);
+    }
+
+    /**
+     * {@code EXT_mesh_gpu_instancing} nhân bản một node theo số dòng trong buffer nhị phân — counter
+     * chỉ đọc chunk JSON nên không đếm được. Im lặng đếm 1 lần là đếm hụt, nên phải từ chối rõ ràng.
+     */
+    @Test
+    void shouldReject_whenModelUsesGpuInstancingExtension(@TempDir Path folder) throws IOException {
+        Path glb = writeGlb(folder, """
+                { "accessors": [ { "count": 36 }, { "count": 100 } ],
+                  "meshes": [ { "primitives": [ { "attributes": { "POSITION": 0 }, "indices": 0 } ] } ],
+                  "nodes": [ { "mesh": 0, "extensions": { "EXT_mesh_gpu_instancing":
+                      { "attributes": { "TRANSLATION": 1 } } } } ] }
+                """);
+
+        assertThatThrownBy(() -> GlbTriangleCounter.countTriangles(glb))
+                .isInstanceOf(AssetPipelineException.class)
+                .hasMessageContaining("EXT_mesh_gpu_instancing");
+    }
+
     @Test
     void shouldReject_whenFileIsNotBinaryGltf(@TempDir Path folder) throws IOException {
         Path notGlb = folder.resolve("broken.glb");

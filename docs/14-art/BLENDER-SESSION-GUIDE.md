@@ -51,7 +51,7 @@ Bước bật addon trong Preferences chỉ làm **một lần**; các phiên sa
 AI viết script `.py`, chạy bằng dòng lệnh, rồi **đọc thẳng file PNG** vừa render để tự đánh giá:
 
 ```
-blender -b <file>.blend -P <script>.py -- ...
+blender -b --python-exit-code 1 <file>.blend -P <script>.py -- ...
 ```
 
 ✅ Không phải mở/giữ Blender · ✅ Mọi thứ thành script **commit được, chạy lại được** · ✅ Không bao giờ mất kết nối
@@ -89,7 +89,7 @@ In ra: `[kage] scene ready: engine=BLENDER_EEVEE px=256 outline=5.0px` (số in 
 ⚠️ **5.0px chỉ đúng nếu asset choán ít khung.** Với nhân vật chibi cao ~166px trong khung 256px, 2.5px@1x phủ đen gần kín hình — số đo đúng là **1.1px@1x** ([ART-QUALITY-STANDARD §4](ART-QUALITY-STANDARD.md)). Luôn chọn độ dày theo kích thước thật của asset trong khung, đừng mặc định.
 
 ⚠️ **Tuyệt đối không** `bpy.ops.wm.read_factory_settings()` để "làm sạch scene" — lệnh đó tắt addon MCP và giết kết nối (§4). Cần dựng lại file base thì chạy headless:
-`blender -b --factory-startup -P tools/blender/build_character_base.py`
+`blender -b --python-exit-code 1 --factory-startup -P tools/blender/build_character_base.py`
 
 **Scale guide**: 3 khối wireframe (`guide_head`/`guide_torso`/`guide_legs`) — nhân vật cao đúng **1.0 unit**, chân tại `z=0`, đầu 0.4 unit (chibi 2.5 đầu). Model bám theo guide này thì mọi sprite tự động cùng tỷ lệ. Guide đã set `hide_render` nên không bao giờ lọt vào sprite.
 
@@ -247,7 +247,7 @@ Save `.blend` có `bpy.ops.file.pack_all()` — texture đến từ job cloud n�
 Chạy headless, sinh cả 3 tier cùng lúc theo ngân sách đã đo ở [ART-PIPELINE §4.4](ART-PIPELINE.md):
 
 ```bash
-blender -b assets/raw/blender/characters/<hệ>-<bậc>.blend \
+blender -b --python-exit-code 1 assets/raw/blender/characters/<hệ>-<bậc>.blend \
   -P tools/blender/export_character_lods.py -- \
   --object <MeshThân> --rig <tên_Rig> --extras <các,phần,vũ,khí> \
   --asset-key char_<hệ>-<bậc> --out <abs>/assets/exported/models

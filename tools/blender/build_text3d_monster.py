@@ -13,7 +13,7 @@ session for the fifteen characters, which meant a GUI Blender had to be running.
 A monster arrives from the same Rodin job as a plain `.glb` on disk, so `--glb`
 imports it here and the whole pipeline runs headless from one command.
 
-    blender -b assets/raw/blender/kage_character_base.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/kage_character_base.blend \
       -P tools/blender/build_text3d_monster.py -- \
       --glb <abs path to the Rodin .glb> --code stone_ogre \
       --out assets/raw/blender/monsters/stone-ogre.blend
