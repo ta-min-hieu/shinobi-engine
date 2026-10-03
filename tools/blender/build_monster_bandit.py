@@ -17,7 +17,7 @@ real Rodin `.glb` later replaces the art without touching anything else.
 
 Run headless (never in an MCP session — full file rebuild):
 
-    blender -b assets/raw/blender/kage_character_base.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/kage_character_base.blend \
       -P tools/blender/build_monster_bandit.py \
       -- --out assets/raw/blender/monsters/wandering-bandit.blend
 

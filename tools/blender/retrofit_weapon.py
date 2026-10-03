@@ -18,7 +18,7 @@ ASSET-LOG 2026-09-19 (2).
 
 Run headless, one character at a time (it rewrites the file it opens):
 
-    blender -b assets/raw/blender/characters/loi-b1.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/characters/loi-b1.blend \
       -P tools/blender/retrofit_weapon.py -- \
       --weapon long_blade --color "#8C4DE8" --accent "#FFE84D"
 

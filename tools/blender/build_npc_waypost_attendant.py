@@ -13,14 +13,14 @@ the Wasteland. Not a fighter, not an elder: someone doing a duty shift.
 
 Run headless (never in an MCP session — full file rebuild):
 
-    blender -b assets/raw/blender/kage_character_base.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/kage_character_base.blend \
       -P tools/blender/build_npc_waypost_attendant.py \
       -- --out assets/raw/blender/characters/waypost-attendant.blend
 
 Then the three LODs (`--flat-materials` is mandatory for a kit-built mesh,
 `--extras all` because naming forty parts by hand loses pieces):
 
-    blender -b assets/raw/blender/characters/waypost-attendant.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/characters/waypost-attendant.blend \
       -P tools/blender/export_character_lods.py -- \
       --object waypost_Torso --rig waypost_Rig --extras all --flat-materials \
       --asset-key char_waypost-attendant --out <ABSOLUTE>/assets/exported/models

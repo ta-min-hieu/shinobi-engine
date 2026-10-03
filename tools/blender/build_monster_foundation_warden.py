@@ -33,13 +33,13 @@ renderer next to its own lineage.
 
 Run headless (never in an MCP session — full file rebuild):
 
-    blender -b assets/raw/blender/kage_character_base.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/kage_character_base.blend \
       -P tools/blender/build_monster_foundation_warden.py \
       -- --out assets/raw/blender/monsters/foundation-warden.blend
 
 Then the three LODs (ART-PIPELINE §6.5):
 
-    blender -b assets/raw/blender/monsters/foundation-warden.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/monsters/foundation-warden.blend \
       -P tools/blender/export_character_lods.py -- \
       --object foundation_Torso --rig foundation_Rig --extras all --flat-materials \
       --asset-key mob_foundation-warden --out <ABSOLUTE>/assets/exported/models

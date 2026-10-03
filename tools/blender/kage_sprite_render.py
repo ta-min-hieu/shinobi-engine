@@ -11,7 +11,7 @@ Two entry points, same file:
         render_preview(r'<repo>/assets/raw/render-out/preview.png', action='idle')
 
   * Headless batch render:
-        blender -b char.blend -P kage_sprite_render.py -- --all-actions --out <dir>
+        blender -b --python-exit-code 1 char.blend -P kage_sprite_render.py -- --all-actions --out <dir>
 
 Hard constraints this script enforces (do not "fix" them without reading the doc):
   * Renders the MASTER at @2x only. Downscaling to @1x / @0.5x belongs to

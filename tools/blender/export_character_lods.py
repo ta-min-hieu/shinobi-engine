@@ -8,7 +8,7 @@ migration V20). `blend_file` in the sidecar is load-bearing: it is the only
 record of which .blend a model really came from, and the upsert refuses to run
 without it rather than guess the name from the asset key.
 
-    blender -b <char>.blend -P tools/blender/export_character_lods.py -- \
+    blender -b --python-exit-code 1 <char>.blend -P tools/blender/export_character_lods.py -- \
         --object Hoa_D --rig hoa_d_Rig \
         --extras hoa_KunaiBlade,hoa_KunaiGrip,hoa_KunaiRing \
         --asset-key char_hoa-b1 --out <repo>/assets/exported/models

@@ -24,6 +24,9 @@ final class NamingValidator {
 
     private static final Pattern SAFE_NAME = Pattern.compile("^[a-z0-9_.-]+$");
 
+    /** Cùng dạng hậu tố mà TexturePacker coi là chỉ số frame (xem {@link #validateStaticIcon}). */
+    private static final Pattern FRAME_INDEX_SUFFIX = Pattern.compile(".+_\\d+$");
+
     private NamingValidator() {}
 
     static void validate(AssetFolder asset) {
@@ -52,6 +55,14 @@ final class NamingValidator {
     }
 
     private static void validateStaticIcon(AssetFolder asset) {
+        // Icon tĩnh được stage thành "<asset_key>.png" KHÔNG hậu tố frame — TexturePacker
+        // (useIndexes, regex "(.+)_(\d+)$" trong ImageProcessor) sẽ hiểu "_<số>" cuối tên là chỉ số
+        // frame: "icon_x_2" ra region "icon_x" index 2, client findRegion("icon_x_2") không thấy gì.
+        if (FRAME_INDEX_SUFFIX.matcher(asset.assetKey()).find()) {
+            throw new AssetPipelineException("Icon '" + asset.assetKey() + "' kết thúc bằng '_<số>' — TexturePacker"
+                    + " sẽ đọc phần đó thành chỉ số frame và đặt sai tên region trong atlas; đổi tên"
+                    + " (VD '-2' thay vì '_2')");
+        }
         Path expected = asset.folder().resolve("icon.png");
         if (!Files.isRegularFile(expected)) {
             throw new AssetPipelineException(

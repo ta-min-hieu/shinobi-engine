@@ -13,7 +13,7 @@ number that cannot be acted on:
   * texture  — one triangle target at each tier's texture size
 
 Run:
-    blender -b <char>.blend -P tools/blender/measure_triangle_budget.py -- \
+    blender -b --python-exit-code 1 <char>.blend -P tools/blender/measure_triangle_budget.py -- \
         --object Hoa_D --rig hoa_d_Rig --out <abs dir>
 
 What this does NOT measure is client frame time, which needs gdx-gltf on the

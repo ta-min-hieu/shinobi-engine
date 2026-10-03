@@ -26,14 +26,14 @@ the player can make out a single shape.
 
 Run headless (never in an MCP session — full file rebuild):
 
-    blender -b assets/raw/blender/kage_character_base.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/kage_character_base.blend \
       -P tools/blender/build_monster_wasteland_beast.py \
       -- --out assets/raw/blender/monsters/wasteland-beast.blend
 
 Then the three LODs (ART-PIPELINE §6.5 — `--flat-materials` is mandatory for a
 kit-built mesh, `--extras all` because naming parts by hand loses pieces):
 
-    blender -b assets/raw/blender/monsters/wasteland-beast.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/monsters/wasteland-beast.blend \
       -P tools/blender/export_character_lods.py -- \
       --object wasteland_Torso --rig wasteland_Rig --extras all --flat-materials \
       --asset-key mob_wasteland-beast --out <ABSOLUTE>/assets/exported/models

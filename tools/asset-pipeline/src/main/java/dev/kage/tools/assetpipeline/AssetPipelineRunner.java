@@ -132,6 +132,12 @@ public final class AssetPipelineRunner {
     private static void reuseMediumForHigh(Path atlasesRoot) {
         Path mediumDir = atlasesRoot.resolve(GraphicsTier.MEDIUM.folderName);
         Path highDir = atlasesRoot.resolve(GraphicsTier.HIGH.folderName);
+        // Dọn sạch HIGH trước khi chép: TexturePacker tự xoá trang cũ ở LOW/MED (thư mục đích của
+        // nó), còn HIGH không đi qua TexturePacker. Chỉ ghi đè thì khi số trang giảm, high/mainN.png
+        // của lần chạy trước sống sót và ManifestWriter (quét cả cây atlases/) liệt kê nó.
+        if (Files.exists(highDir)) {
+            deleteRecursively(highDir);
+        }
         try (Stream<Path> files = Files.walk(mediumDir)) {
             Files.createDirectories(highDir);
             for (Path source : files.filter(Files::isRegularFile).toList()) {
@@ -150,7 +156,7 @@ public final class AssetPipelineRunner {
         try (Stream<Path> files = Files.walk(root)) {
             files.sorted(Comparator.reverseOrder()).forEach(AssetPipelineRunner::deleteQuietly);
         } catch (IOException e) {
-            throw new UncheckedIOException("Không dọn được thư mục staging: " + root, e);
+            throw new UncheckedIOException("Không dọn được thư mục: " + root, e);
         }
     }
 

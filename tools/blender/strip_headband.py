@@ -1,6 +1,6 @@
 """Xoa TAM KIM LOAI tren bang tran khoi anh dong goi trong .blend (ADR-038 Dot 3 muc #2).
 
-    blender -b <char>.blend -P strip_headband.py -- --seed u,v [--save-as out.blend] [--dry]
+    blender -b --python-exit-code 1 <char>.blend -P strip_headband.py -- --seed u,v [--save-as out.blend] [--dry]
 
 DA DUNG THAT 2026-09-01 tren char_hoa-b1 (hoa-text3d-pilot.blend), seed 0.8281,0.1929:
 tam kim loai + dinh tan + hoa tiet khac bien mat, thay bang vai do tron lay tu chinh chiec

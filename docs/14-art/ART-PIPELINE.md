@@ -430,7 +430,7 @@ Nguyên tắc thiết kế tier:
 4. **Screenshot đúng 3 checkpoint**: (a) sau khi dựng/import model xong, (b) sau render preview 1 frame, (c) nghiệm thu cuối. Không screenshot sau mỗi lệnh.
 5. **Preview trước, render sheet sau**: render 1 frame duy nhất để duyệt phong cách; chỉ khi đạt mới render cả bộ animation.
 6. **Ghi sổ thay vì mở lại file**: xong asset nào ghi 1 dòng vào `assets/raw/ASSET-LOG.md` (tên, .blend nguồn, action đã render, ngày). Phiên sau đọc log, không mở .blend để "xem lại".
-7. Job render dài (cả bộ animation) → chạy **headless qua CLI** (`blender -b file.blend -P script.py`) bằng Bash tool ở background, không chiếm phiên MCP.
+7. Job render dài (cả bộ animation) → chạy **headless qua CLI** (`blender -b --python-exit-code 1 file.blend -P script.py`) bằng Bash tool ở background, không chiếm phiên MCP.
 
 ### 6.2 Workflow chuẩn: 1 nhân vật mới
 
@@ -482,7 +482,7 @@ Bảng trên mô tả đường Text→3D cho **nhân vật**. Quái/NPC hình k
 (`build_monster_dummy.py`, `build_npc_elder.py`) — nhưng vẫn dùng chung bước 9:
 
 ```bash
-blender -b assets/raw/blender/monsters/training-dummy.blend -P tools/blender/export_character_lods.py -- \
+blender -b --python-exit-code 1 assets/raw/blender/monsters/training-dummy.blend -P tools/blender/export_character_lods.py -- \
   --object Dummy_Body --rig Dummy_Rig --asset-key mob_training-dummy --flat-materials \
   --out <ĐƯỜNG DẪN TUYỆT ĐỐI>/assets/exported/models
 ```
@@ -511,9 +511,9 @@ import file đó rồi chạy trọn bước 2–8 trong một lệnh.
 ```bash
 # 1. Sinh mesh: POST https://hyperhuman.deemos.com/api/v2/rodin (§6.3), tải .glb về
 # 2-8. Dựng .blend hoàn chỉnh, headless
-blender -b assets/raw/blender/kage_character_base.blend -P tools/blender/build_text3d_monster.py --   --glb <ĐƯỜNG DẪN TUYỆT ĐỐI>/stone_ogre.glb --code stone_ogre   --out <TUYỆT ĐỐI>/assets/raw/blender/monsters/stone-ogre.blend
+blender -b --python-exit-code 1 assets/raw/blender/kage_character_base.blend -P tools/blender/build_text3d_monster.py --   --glb <ĐƯỜNG DẪN TUYỆT ĐỐI>/stone_ogre.glb --code stone_ogre   --out <TUYỆT ĐỐI>/assets/raw/blender/monsters/stone-ogre.blend
 # 9. Ba LOD — tên object/rig lấy theo mã quái: stone_ogre -> StoneOgre / stoneogre_Rig
-blender -b assets/raw/blender/monsters/stone-ogre.blend -P tools/blender/export_character_lods.py --   --object StoneOgre --rig stoneogre_Rig --asset-key mob_stone-ogre   --out <TUYỆT ĐỐI>/assets/exported/models
+blender -b --python-exit-code 1 assets/raw/blender/monsters/stone-ogre.blend -P tools/blender/export_character_lods.py --   --object StoneOgre --rig stoneogre_Rig --asset-key mob_stone-ogre   --out <TUYỆT ĐỐI>/assets/exported/models
 ```
 
 `--code` là `monster_code` y như server biết (`monster_template`, ADR-037), vì client suy khoá asset

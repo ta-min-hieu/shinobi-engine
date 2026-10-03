@@ -17,7 +17,7 @@ art without touching anything else.
 
 Run headless (never in an MCP session — full file rebuild):
 
-    blender -b assets/raw/blender/kage_character_base.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/kage_character_base.blend \
       -P tools/blender/build_npc_elder.py \
       -- --out assets/raw/blender/characters/town-elder.blend
 

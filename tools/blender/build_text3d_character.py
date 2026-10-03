@@ -12,7 +12,7 @@ profile mechanically so thirteen more characters do not each need a pair of eyes
 and prints every number it derived so a wrong one is visible rather than silent.
 Override any of them with --joint name=value when the print looks wrong.
 
-    blender -b assets/raw/blender/kage_character_base.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/kage_character_base.blend \
       -P tools/blender/build_text3d_character.py -- \
       --source Rodin_Phong --element phong --tier b1 \
       --weapon twin_blades --color '#3DBF7A' --accent '#CFF5E0' \

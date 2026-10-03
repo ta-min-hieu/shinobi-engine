@@ -33,6 +33,7 @@ final class AtlasStager {
     private static void stageIcon(AssetFolder asset, GraphicsTier tier, Path stagingDir) throws IOException {
         Path source = asset.folder().resolve("icon.png");
         Path destination = stagingDir.resolve(asset.assetKey() + ".png");
+        requireUnclaimed(destination, asset);
         ImageDownscaler.downscaleTo(source, destination, tier.scaleOfMaster);
     }
 
@@ -43,8 +44,20 @@ final class AtlasStager {
                 String destName = "%s_%s_%02d.png".formatted(asset.assetKey(), action.getKey(), index);
                 Path source = asset.folder().resolve(sourceName);
                 Path destination = stagingDir.resolve(destName);
+                requireUnclaimed(destination, asset);
                 ImageDownscaler.downscaleTo(source, destination, tier.scaleOfMaster);
             }
+        }
+    }
+
+    // Thư mục staging luôn mới tinh (createTempDirectory) — file đã có ở đó nghĩa là một asset KHÁC
+    // vừa dẹt ra đúng tên này. VD "vfx_a" action "b_c" và "vfx_a_b" action "c" cùng thành
+    // "vfx_a_b_c_00.png". Ghi đè thì một asset biến mất khỏi atlas mà build vẫn xanh.
+    private static void requireUnclaimed(Path destination, AssetFolder asset) {
+        if (Files.exists(destination)) {
+            throw new AssetPipelineException("Asset '" + asset.assetKey() + "' dẹt ra tên staging "
+                    + destination.getFileName() + " TRÙNG với một asset khác — một trong hai sẽ mất khỏi"
+                    + " atlas; đổi asset_key hoặc tên action để tách hai tên region");
         }
     }
 }

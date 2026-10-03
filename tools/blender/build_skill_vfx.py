@@ -23,7 +23,7 @@ pre-rendered): ember/particle trails, afterimage-via-alpha, camera shake.
 
 Run headless, one process builds+renders all 17:
 
-    blender -b -P tools/blender/build_skill_vfx.py -- --all \
+    blender -b --python-exit-code 1 -P tools/blender/build_skill_vfx.py -- --all \
       --out-blend assets/raw/blender/effects --out-render assets/raw/render-out
 """
 

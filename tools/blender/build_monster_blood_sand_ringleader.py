@@ -43,14 +43,14 @@ Deliberately NO proper name — §8 rule 3, same reasoning as the acolyte.
 
 Run headless (never in an MCP session — full file rebuild):
 
-    blender -b assets/raw/blender/kage_character_base.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/kage_character_base.blend \
       -P tools/blender/build_monster_blood_sand_ringleader.py \
       -- --out assets/raw/blender/monsters/blood-sand-ringleader.blend
 
 Then the three LODs (ART-PIPELINE §6.5 — `--flat-materials` mandatory for a
 kit-built mesh, `--extras all` so no part goes missing):
 
-    blender -b assets/raw/blender/monsters/blood-sand-ringleader.blend \
+    blender -b --python-exit-code 1 assets/raw/blender/monsters/blood-sand-ringleader.blend \
       -P tools/blender/export_character_lods.py -- \
       --object ringleader_Torso --rig ringleader_Rig --extras all --flat-materials \
       --asset-key mob_blood-sand-ringleader --out <ABSOLUTE>/assets/exported/models

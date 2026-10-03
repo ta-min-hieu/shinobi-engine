@@ -107,6 +107,41 @@ class AssetPipelineRegistryBranchIntegrationTest {
     }
 
     /**
+     * {@code render_dir} của SPRITE phải tương đối gốc repo (ART-PIPELINE.md §8.4) bất kể
+     * {@code --render-root} được truyền thế nào. Bản cũ ghi thẳng {@code asset.folder()} — chạy thật
+     * bắt buộc dùng đường dẫn TUYỆT ĐỐI (cwd của Gradle {@code run} là thư mục subproject), nên DB
+     * nhận {@code E:/study/.../render-out/<key>}: ổ đĩa + thư mục của một máy cụ thể, đúng thứ §8.4
+     * cấm, trong khi nhánh MODEL cùng lớp đã ghi hằng số tương đối.
+     */
+    @Test
+    void shouldStoreRepoRelativeSpriteRenderDir_whenRenderRootIsAbsolute(@TempDir Path tempRoot) throws IOException {
+        Path renderRoot = tempRoot.resolve("render-out").toAbsolutePath();
+        writeStaticIcon(renderRoot, "icon_registry-item");
+        Path exportedRoot = tempRoot.resolve("exported");
+
+        AssetPipelineRunner.run(renderRoot, exportedRoot, Optional.of(dbConfig));
+
+        assertThat(selectRenderDir("icon_registry-item")).isEqualTo("assets/raw/render-out/icon_registry-item");
+    }
+
+    private static String selectRenderDir(String assetKey) {
+        try (Connection connection =
+                        DriverManager.getConnection(dbConfig.jdbcUrl(), dbConfig.user(), dbConfig.password());
+                PreparedStatement statement =
+                        connection.prepareStatement("SELECT render_dir FROM art_asset WHERE asset_key = ?")) {
+            statement.setString(1, assetKey);
+            try (ResultSet rows = statement.executeQuery()) {
+                assertThat(rows.next())
+                        .as("phải có đúng 1 dòng art_asset cho " + assetKey)
+                        .isTrue();
+                return rows.getString(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Không đọc lại được render_dir của " + assetKey, e);
+        }
+    }
+
+    /**
      * Chạy hai lần trên CÙNG dữ liệu phải cho cùng kết quả — {@code ON CONFLICT (asset_key) DO
      * UPDATE} là điều kiện để dây chuyền art chạy được nhiều lần trong ngày (ART-PIPELINE.md §8.3).
      */
