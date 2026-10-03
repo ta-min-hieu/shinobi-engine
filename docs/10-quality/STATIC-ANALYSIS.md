@@ -137,13 +137,13 @@ Bắt: complexity, duplicate, unused, deep nesting.
 | Độ sâu kế thừa | ≤ 3 | ❌ PMD 7 không có rule DIT — chỉ review |
 | Duplicate | ≥ 3 lần ([CODE-REVIEW.md §4](../02-coding-standards/CODE-REVIEW.md) — rule of three) | ❌ CPD không có task Gradle sẵn, cần plugin/task mới (Điều luật "không thêm plugin" → chờ chủ dự án) — chỉ review |
 
-## 8.1. Compiler — `-Xlint:all -Werror`
+## 8.1. Compiler — `-Xlint:all` (đề xuất `-Werror` — 🔴 chờ chủ dự án)
 
-Từ 2026-10-03 mọi `JavaCompile` (main/test/jmh, mọi module) chạy `-Xlint:all -Werror`: warning của javac
-và của Error Prone (check mức WARNING) đều làm đỏ build. Trước đó cố ý không `-Werror` vì lo "warning của
-thư viện thứ ba" — đo lại: 0 warning trên 28 module, tức luật "warning = 0" lúc đó chỉ được giữ bằng trí
-nhớ (gài thử một raw type → build vẫn xanh). Warning thật sự không tránh được → `@SuppressWarnings("<key>")`
-hẹp nhất + comment lý do (§10).
+Mọi `JavaCompile` chạy `-Xlint:all`, **cố ý KHÔNG `-Werror`** (lý do gốc: lo warning của thư viện thứ ba
+chặn cả build — comment trong `kage.java-conventions`). Rà 2026-10-03 đo lại: **0 warning trên 28 module**
+(main/test/jmh, `--rerun-tasks`), và gài thử một raw type thì build vẫn xanh — tức luật "warning = 0"
+(Definition of Done) hiện chỉ được giữ bằng người đọc log. Đề xuất bật `-Werror` (1 dòng); vì đảo một
+quyết định đã ghi là CHỦ ĐÍCH nên chưa bật, chờ chủ dự án (bảng chờ trong [README](../README.md)).
 
 ---
 

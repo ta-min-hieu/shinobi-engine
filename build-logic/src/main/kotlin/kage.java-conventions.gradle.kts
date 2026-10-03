@@ -13,16 +13,14 @@ java {
 
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
-    // -Xlint:all + -Werror: warning của javac VÀ của Error Prone (check mức WARNING) đều làm đỏ build.
-    //
-    // Rà 2026-10-03: trước đây CHỦ ĐÍCH không -Werror, với lý do "thư viện thứ ba (Ashley/libGDX/
-    // Netty) sinh warning không sửa được". Đo thật (`compileJava compileTestJava compileJmhJava
-    // --rerun-tasks`, 28 module): 0 warning — warning -Xlint chỉ báo trên mã nguồn CỦA TA (vd lời gọi
-    // varargs generic thì @SafeVarargs/@SuppressWarnings ngay tại chỗ gọi), không có warning nào
-    // "của người khác". Không -Werror thì luật "warning = 0" (Definition of Done, CLAUDE.md §10) chỉ
-    // nằm trong trí nhớ: gài thử một raw type vào engine-core → build vẫn XANH, warning trôi qua log.
-    // Warning thật sự không tránh được → @SuppressWarnings("<lint-key>") hẹp nhất + comment lý do.
-    options.compilerArgs.addAll(listOf("-Xlint:all", "-Werror"))
+    // ⚠️ CHỦ ĐÍCH KHÔNG -Werror: dự án bọc thư viện thứ ba (Ashley/libGDX/Netty) — chúng phát
+    // sinh warning (VD varargs generic heap-pollution) không phải lỗi của code ta và không sửa
+    // được. -Werror chặn TOÀN BỘ build vì warning của người khác = "quá nghiêm → bị tắt hẳn"
+    // (STATIC-ANALYSIS.md §11). Vẫn giữ -Xlint:all để warning HIỂN THỊ, không ẩn đi.
+    // Enforcement thật nằm ở Checkstyle + PMD + ArchUnit (nhắm đúng code CỦA TA).
+    // Rà 2026-10-03 đề xuất bật -Werror (đo 0 warning trên 28 module) — CHỜ CHỦ DỰ ÁN, xem
+    // STATIC-ANALYSIS.md §8.1; quyết định này không tự đảo.
+    options.compilerArgs.add("-Xlint:all")
 }
 
 tasks.withType<Test>().configureEach {
