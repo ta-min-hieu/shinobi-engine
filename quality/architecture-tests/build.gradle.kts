@@ -4,21 +4,31 @@ plugins {
     id("kage.java-conventions")
 }
 
+// Mọi module PRODUCTION (lá) dưới shared/engine/client/server — tự dò, KHÔNG liệt kê tay.
+//
+// Rà 2026-10-03: danh sách liệt kê tay cũ dừng ở feature-account/feature-character (Phase 3). 13
+// feature module sau đó vẫn được quét chỉ nhờ MAY: chúng tới classpath gián tiếp qua server-gateway.
+// client-desktop thì không — chưa từng bị ArchUnit nhìn thấy, mọi rule "xanh" với nó chỉ vì class của
+// nó không có trên classpath test. Module mới thêm vào settings.gradle.kts giờ tự vào tầm quét.
+// tools/ và quality/ không phải production nên đứng ngoài.
+val productionRoots = listOf(":shared:", ":engine:", ":client:", ":server:")
+val productionModules = rootProject.subprojects
+    .filter { candidate -> productionRoots.any { candidate.path.startsWith(it) } }
+    .filter { candidate -> candidate.file("build.gradle.kts").exists() && candidate.childProjects.isEmpty() }
+    .map { it.path }
+    .sorted()
+
 dependencies {
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.2")   // ✅ ADR-011
 
     // Phụ thuộc mọi production module để ArchUnit import được class của chúng.
-    // (Module rỗng ở Phase 0 → chưa có class → rule pass trivially, nhưng đã sẵn để "bite".)
-    testImplementation(project(":shared:shared-common"))
-    testImplementation(project(":shared:shared-protocol"))
-    testImplementation(project(":engine:engine-core"))
-    testImplementation(project(":engine:engine-ecs"))
-    testImplementation(project(":engine:engine-physics"))
-    testImplementation(project(":engine:engine-scripting"))
-    testImplementation(project(":client:client-core"))
-    testImplementation(project(":server:server-gateway"))
-    testImplementation(project(":server:server-world"))
-    testImplementation(project(":server:server-database"))
-    testImplementation(project(":server:server-features:feature-account"))
-    testImplementation(project(":server:server-features:feature-character"))
+    productionModules.forEach { testImplementation(project(it)) }
+}
+
+tasks.withType<Test>().configureEach {
+    // ScannedModulesTest đối chiếu: mỗi module có mã nguồn main phải góp ít nhất một class vào tập quét.
+    val sourceRoots = productionModules
+        .map { rootProject.project(it).file("src/main/java") }
+        .filter { it.isDirectory }
+    systemProperty("kage.architecture.sourceRoots", sourceRoots.joinToString(File.pathSeparator) { it.absolutePath })
 }

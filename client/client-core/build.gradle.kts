@@ -133,6 +133,15 @@ val verifyServerErrorKeys = tasks.register("verifyServerErrorKeys") {
         serverSources.forEach { file ->
             literal.findAll(file.readText()).forEach { produced.add(it.groupValues[1]) }
         }
+        // Chốt ngược (rà 2026-10-03): đường dẫn nguồn đổi hoặc regex lệch cách server viết khoá thì
+        // `produced` rỗng và cổng XANH mà không kiểm gì. Server hiện sinh vài chục khoá error.* —
+        // không tìm thấy cái nào chắc chắn là cổng hỏng, không phải server hết lỗi.
+        if (serverSources.isEmpty || produced.isEmpty()) {
+            throw GradleException(
+                "verifyServerErrorKeys không trích được khoá error.* nào (${serverSources.files.size} file " +
+                    "nguồn server) — đường dẫn hoặc regex đã lệch, cổng này sẽ IM LẶNG vô dụng"
+            )
+        }
         val missing = mutableListOf<String>()
         bundles.forEach { bundle ->
             val translated = bundle.readLines()
@@ -196,14 +205,40 @@ val verifyContentKeys = tasks.register("verifyContentKeys") {
         // Mỗi INSERT vào `quest_template` đều kết bằng mệnh đề chống trùng này (khuôn V26→V48).
         val questCode = Regex("FROM quest_template WHERE code = '([a-z0-9_]+)'")
         val needed = sortedSetOf<String>()
+        var sqlKeys = 0
+        var questKeys = 0
+        var scriptKeys = 0
         migrations.forEach { file ->
             val sql = file.readText()
-            keyLiteral.findAll(sql).forEach { needed.add(it.groupValues[1]) }
-            questCode.findAll(sql).forEach { needed.add("quest.name." + it.groupValues[1]) }
+            keyLiteral.findAll(sql).forEach {
+                needed.add(it.groupValues[1])
+                sqlKeys++
+            }
+            questCode.findAll(sql).forEach {
+                needed.add("quest.name." + it.groupValues[1])
+                questKeys++
+            }
         }
         val scriptLiteral = Regex("""["]([a-z][a-z0-9_]*(?:\.[a-z0-9_]+){1,4})["]""")
         scripts.forEach { file ->
-            scriptLiteral.findAll(file.readText()).forEach { needed.add(it.groupValues[1]) }
+            scriptLiteral.findAll(file.readText()).forEach {
+                needed.add(it.groupValues[1])
+                scriptKeys++
+            }
+        }
+        // Chốt ngược (rà 2026-10-03): ba nguồn khoá là ba đường dẫn/regex độc lập — một nguồn trích
+        // rỗng (thư mục migration dời chỗ, khuôn INSERT quest_template đổi, script dời thư mục) làm
+        // cổng XANH cho đúng phần nó phải canh. Nguồn nào cũng phải góp ít nhất một khoá.
+        val emptySources = listOfNotNull(
+            "khoá literal trong migration SQL".takeIf { sqlKeys == 0 },
+            "quest.name.<code> từ quest_template".takeIf { questKeys == 0 },
+            "script hội thoại/nhiệm vụ".takeIf { scriptKeys == 0 },
+        )
+        if (emptySources.isNotEmpty()) {
+            throw GradleException(
+                "verifyContentKeys không trích được khoá nào từ: ${emptySources.joinToString()} — " +
+                    "đường dẫn hoặc regex đã lệch, cổng này sẽ IM LẶNG vô dụng cho phần đó"
+            )
         }
         val missing = mutableListOf<String>()
         bundles.forEach { bundle ->
