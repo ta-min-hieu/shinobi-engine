@@ -48,6 +48,12 @@ COPY server/server-features/feature-guild/build.gradle.kts server/server-feature
 COPY server/server-features/feature-party/build.gradle.kts server/server-features/feature-party/
 COPY server/server-features/feature-trade/build.gradle.kts server/server-features/feature-trade/
 COPY server/server-features/feature-pvp/build.gradle.kts server/server-features/feature-pvp/
+# ⚠️ 2 dòng dưới THIẾU từ 2026-08-30 (feature-monster, ADR-037) / 2026-09-07 (feature-world,
+# ADR-046) tới 2026-10-03 — Gradle 9 từ chối configure project không có thư mục ⇒ bước
+# `dependencies` ngay dưới fail cứng, image không build được (job CI docker-build-push đỏ). Thêm
+# module vào settings.gradle.kts thì PHẢI thêm 1 dòng COPY ở đây.
+COPY server/server-features/feature-monster/build.gradle.kts server/server-features/feature-monster/
+COPY server/server-features/feature-world/build.gradle.kts server/server-features/feature-world/
 COPY quality/architecture-tests/build.gradle.kts quality/architecture-tests/
 COPY tools/asset-pipeline/build.gradle.kts tools/asset-pipeline/
 COPY tools/load-test/build.gradle.kts tools/load-test/
