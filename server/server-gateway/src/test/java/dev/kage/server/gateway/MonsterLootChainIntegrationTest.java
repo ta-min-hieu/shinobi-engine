@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
@@ -197,7 +198,7 @@ class MonsterLootChainIntegrationTest {
             world = null;
         }
         registry.stop();
-        eventLoopGroup.shutdownGracefully();
+        eventLoopGroup.shutdownGracefully(0, 1, TimeUnit.SECONDS).syncUninterruptibly();
     }
 
     /**

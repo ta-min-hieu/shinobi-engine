@@ -20,6 +20,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.DefaultEventLoopGroup;
@@ -260,8 +261,11 @@ class CharacterSessionTakeoverTest {
             TestClient fresh = login();
 
             sendSelect(fresh, characterId, 2);
-            old.channel.close();
+            // KHÔNG chờ ở đây: đóng phải chạy đua với lệnh chọn đang bay. Chỉ chờ sau, để một lần
+            // đóng thất bại không bị nuốt im.
+            ChannelFuture oldClosed = old.channel.close();
             assertThat(awaitSelectResponse(fresh).getSuccess()).isTrue();
+            oldClosed.syncUninterruptibly();
             awaitServerSideClosed(old);
 
             assertThat(fresh.channel.isActive()).isTrue();

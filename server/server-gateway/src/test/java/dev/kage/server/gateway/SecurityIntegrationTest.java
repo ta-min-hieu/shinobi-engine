@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.time.Duration;
 import java.time.Instant;
@@ -183,7 +184,7 @@ class SecurityIntegrationTest {
     @Test
     @Timeout(10)
     void shouldRejectAuthenticatedCommand_beforeAnyLogin() throws Exception {
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
 
@@ -201,14 +202,15 @@ class SecurityIntegrationTest {
     @Test
     @Timeout(10)
     void shouldRejectAuthenticatedCommand_afterLoginButBeforeCharacterSelected() throws Exception {
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             ConnectRequest connectRequest = ConnectRequest.newBuilder()
                     .setUsername("nopick" + UUID.randomUUID().toString().substring(0, 6))
                     .build();
             sendFrame(socket, Opcode.OPCODE_CONNECT_REQUEST_VALUE, 1, connectRequest.toByteArray());
-            ConnectResponse.parseFrom(readFrame(in).payload());
+            assertThat(ConnectResponse.parseFrom(readFrame(in).payload()).getSuccess())
+                    .isTrue();
 
             // Đăng nhập THÀNH CÔNG nhưng chưa SelectCharacterRequest — boundCharacterId vẫn null.
             MoveCommand moveCommand =
@@ -223,8 +225,8 @@ class SecurityIntegrationTest {
     @Test
     @Timeout(15)
     void shouldRejectSelectCharacter_whenCharacterBelongsToAnotherAccount() throws Exception {
-        try (Socket socketA = new Socket("127.0.0.1", server.port());
-                Socket socketB = new Socket("127.0.0.1", server.port())) {
+        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
+                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socketA.setSoTimeout(5000);
             socketB.setSoTimeout(5000);
             DataInputStream inA = new DataInputStream(socketA.getInputStream());
@@ -263,7 +265,7 @@ class SecurityIntegrationTest {
     void shouldAcceptSelectCharacter_whenCharacterBelongsToOwnAccount() throws Exception {
         // Đối chứng dương cho shouldRejectSelectCharacter_whenCharacterBelongsToAnotherAccount —
         // cùng packet, cùng field characterId do client khai, nhưng khai ĐÚNG nhân vật CỦA MÌNH.
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(
@@ -285,7 +287,7 @@ class SecurityIntegrationTest {
     @Test
     @Timeout(15)
     void shouldRejectDuplicateBuyItemCommand_whenIdempotencyKeyReused() throws Exception {
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             long characterId = connectCreateAndSelect(
@@ -324,7 +326,7 @@ class SecurityIntegrationTest {
     void shouldAllowBuyItemCommand_whenIdempotencyKeyDiffers() throws Exception {
         // Đối chứng cho test trên — chứng minh việc chặn KHÔNG PHẢI vì "mua item giống hệt lần 2"
         // (VD 1 dạng dedupe theo nội dung), mà cụ thể là VÌ idempotencyKey trùng.
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             long characterId = connectCreateAndSelect(
@@ -361,14 +363,15 @@ class SecurityIntegrationTest {
     @Test
     @Timeout(15)
     void shouldPreventDuplicateCharacterCreation_whenRetryingIdenticalRequest() throws Exception {
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             ConnectRequest connectRequest = ConnectRequest.newBuilder()
                     .setUsername("createreplay" + UUID.randomUUID().toString().substring(0, 6))
                     .build();
             sendFrame(socket, Opcode.OPCODE_CONNECT_REQUEST_VALUE, 1, connectRequest.toByteArray());
-            ConnectResponse.parseFrom(readFrame(in).payload());
+            assertThat(ConnectResponse.parseFrom(readFrame(in).payload()).getSuccess())
+                    .isTrue();
 
             String name = "Hero" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
             String idempotencyKey = UUID.randomUUID().toString();
@@ -404,14 +407,15 @@ class SecurityIntegrationTest {
     @Test
     @Timeout(15)
     void shouldRejectCreateCharacterCommand_whenIdempotencyKeyReused_withDifferentName() throws Exception {
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             ConnectRequest connectRequest = ConnectRequest.newBuilder()
                     .setUsername("createreplay2" + UUID.randomUUID().toString().substring(0, 6))
                     .build();
             sendFrame(socket, Opcode.OPCODE_CONNECT_REQUEST_VALUE, 1, connectRequest.toByteArray());
-            ConnectResponse.parseFrom(readFrame(in).payload());
+            assertThat(ConnectResponse.parseFrom(readFrame(in).payload()).getSuccess())
+                    .isTrue();
 
             String idempotencyKey = UUID.randomUUID().toString();
             String firstName =
@@ -459,7 +463,7 @@ class SecurityIntegrationTest {
         // không hề bị từ chối như tài liệu mô tả. Command CÓ side-effect thật (Buy/Sell/CreateChar/
         // ClaimMail/ConfirmTrade) được bảo vệ bởi idempotencyKey RIÊNG (test ở trên), không phải
         // cơ chế sequenceId này.
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(
@@ -490,7 +494,7 @@ class SecurityIntegrationTest {
     @Test
     @Timeout(10)
     void shouldRejectMoveCommands_pastRateLimitThreshold_andIncrementMetric() throws Exception {
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(
@@ -523,7 +527,7 @@ class SecurityIntegrationTest {
     @Test
     @Timeout(20)
     void shouldDisconnectConnection_whenMoveRateLimitViolatedForSustainedPeriod() throws Exception {
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(
@@ -571,7 +575,7 @@ class SecurityIntegrationTest {
     @Test
     @Timeout(15)
     void shouldRejectChatCommands_pastRateLimitThreshold_andRespondRateLimited() throws Exception {
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             connectCreateAndSelect(
@@ -628,7 +632,7 @@ class SecurityIntegrationTest {
         Random random = new Random(20260802L); // seed cố định — tái lập được khi cần điều tra lại.
         for (int i = 0; i < FUZZ_ITERATIONS; i++) {
             int variant = i % 6;
-            try (Socket socket = new Socket("127.0.0.1", server.port())) {
+            try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
                 socket.setSoTimeout(1000);
                 DataOutputStream out = new DataOutputStream(socket.getOutputStream());
                 switch (variant) {
@@ -663,7 +667,7 @@ class SecurityIntegrationTest {
         }
 
         // Sanity CUỐI — server vẫn sống, xử lý ĐÚNG cho 1 kết nối MỚI, hoàn toàn sạch.
-        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
             sendPing(socket, 1, 42L);
@@ -1462,7 +1466,8 @@ class SecurityIntegrationTest {
         ConnectRequest connectRequest =
                 ConnectRequest.newBuilder().setUsername(username).build();
         sendFrame(socket, Opcode.OPCODE_CONNECT_REQUEST_VALUE, 1, connectRequest.toByteArray());
-        ConnectResponse.parseFrom(readFrame(in).payload());
+        assertThat(ConnectResponse.parseFrom(readFrame(in).payload()).getSuccess())
+                .isTrue();
 
         CreateCharacterRequest createRequest = CreateCharacterRequest.newBuilder()
                 .setName("Hero" + UUID.randomUUID().toString().replace("-", "").substring(0, 8))
