@@ -1,7 +1,6 @@
 package dev.kage.client.core.world;
 
-import java.util.HashMap;
-import java.util.Map;
+import com.badlogic.gdx.utils.LongMap;
 
 /**
  * Suy ra "đang di chuyển" cho nhân vật KHÁC từ độ lệch vị trí giữa 2 {@code CharacterMovedEvent}
@@ -34,11 +33,20 @@ final class RemoteMotionTracker {
         private boolean hasPosition;
     }
 
-    private final Map<Long, MotionTimer> timersByCharacter = new HashMap<>();
+    /**
+     * {@link LongMap}: {@link #isMoving} chạy cho mọi thực thể MỖI KHUNG — tra {@code HashMap} khoá
+     * {@code Long} là boxing mỗi lần (đo ở FrameAllocationTest). Lặp {@link LongMap#values()} trả lại
+     * cùng một iterator dựng sẵn, không cấp phát.
+     */
+    private final LongMap<MotionTimer> timersByCharacter = new LongMap<>();
 
     /** Gọi mỗi khi nhận {@code CharacterMovedEvent} cho nhân vật khác. */
     void onPositionUpdate(long characterId, float newX, float newY) {
-        MotionTimer timer = timersByCharacter.computeIfAbsent(characterId, id -> new MotionTimer());
+        MotionTimer timer = timersByCharacter.get(characterId);
+        if (timer == null) {
+            timer = new MotionTimer();
+            timersByCharacter.put(characterId, timer);
+        }
         if (timer.hasPosition) {
             float dx = newX - timer.lastX;
             float dy = newY - timer.lastY;

@@ -12,6 +12,7 @@ import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Disposable;
+import com.badlogic.gdx.utils.LongMap;
 import net.mgsx.gltf.loaders.glb.GLBLoader;
 import net.mgsx.gltf.scene3d.scene.Scene;
 import net.mgsx.gltf.scene3d.scene.SceneAsset;
@@ -178,8 +179,15 @@ public final class WorldModelRenderer implements Disposable {
     private final String modelDirectory;
 
     private final Map<String, SceneAsset> assetsByKey = new HashMap<>();
-    private final Map<Long, Scene> scenesById = new HashMap<>();
-    private final Map<Long, AnimationState> animationStateById = new HashMap<>();
+    /**
+     * {@link LongMap} chứ không {@code Map<Long, ...>}: {@link #setPosition}/{@link #setMoving}/
+     * {@link #hasModel} được gọi cho MỌI thực thể MỖI KHUNG, và mỗi lần tra một {@code HashMap}
+     * khoá {@code Long} là một lần boxing — đo được (FrameAllocationTest, 2026-10-03) chứ không chỉ
+     * suy ra: escape analysis của C2 KHÔNG khử được chúng.
+     */
+    private final LongMap<Scene> scenesById = new LongMap<>();
+
+    private final LongMap<AnimationState> animationStateById = new LongMap<>();
     /**
      * Danh sách vẽ song song với {@link #scenesById}, đồng bộ ở {@link #addCharacter}/
      * {@link #remove}. Riêng vì {@code render()} lặp nó MỖI KHUNG (2 lượt vẽ + 1 lượt
@@ -328,6 +336,18 @@ public final class WorldModelRenderer implements Disposable {
         scene.animationController.setAnimation(CharacterAnimationClips.IDLE, -1);
         animationStateById.put(id, new AnimationState(id));
         return true;
+    }
+
+    /**
+     * Đặt sẵn một {@link SceneAsset} vào kho đệm dưới khoá {@code assetKey} — {@link #attach} sau đó
+     * dùng lại nó thay vì đọc {@code .glb} từ đĩa.
+     *
+     * <p>Chỉ để test: đo cấp phát mỗi khung ({@code FrameAllocationTest}) cần thực thể CÓ model thật
+     * mà không có GL context để nạp glTF. Đi qua đúng đường {@link #addCharacter}/
+     * {@link #addMonsterOrNpc} thật — chỉ bỏ qua bước đọc file.
+     */
+    void preloadAsset(String assetKey, SceneAsset asset) {
+        assetsByKey.put(assetKey, asset);
     }
 
     /**
