@@ -100,6 +100,14 @@ class ArchitectureTest {
 
 ## 5. GitHub Actions
 
+⚠️ Khối dưới là **bản phác thiết kế**; file thật là `.github/workflows/ci.yml` và khác ở chỗ quan
+trọng (đối chiếu 2026-10-03): **không có task `integrationTest` và không có job integration riêng** —
+test Testcontainers chạy chung trong `./gradlew test` của job `build-and-verify` (runner
+`ubuntu-latest` có Docker). Job `docker-build-push` chỉ chạy khi push `master`/tag `v*`, sau khi
+`build-and-verify` xanh. `actions/checkout` KHÔNG bật LFS ⇒ font `assets/raw/fonts/*.ttf` chỉ là con
+trỏ LFS trên CI ⇒ `FontFactoryVietnameseGlyphTest` (client-core) đỏ; cách lấy LFS trên CI (chỉ
+font hay toàn bộ, quota băng thông LFS) đang chờ chủ dự án quyết.
+
 ```yaml
 name: CI
 on: [push, pull_request]
