@@ -3,6 +3,8 @@ package dev.kage.client.core.screen;
 import java.io.IOException;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Supplier;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
@@ -107,6 +109,15 @@ public final class LoginScreen implements GameScreen {
     private float stateElapsed;
     private String username = "";
     private GameConnection connection;
+
+    /**
+     * {@code sequence_id} của yêu cầu đang chờ — chỉ câu trả lời mang đúng số này mới được nhận, câu
+     * trả lời muộn của lần bấm trước bị bỏ ({@link PendingReply}).
+     */
+    private int pendingSequenceId;
+
+    /** Giữ một lần thay vì tạo method reference mới mỗi tick. */
+    private final Supplier<PacketCodec.Frame> inbound = this::pollConnection;
 
     /** @param initialUsername điền sẵn ô username, tuỳ chọn — {@code null}/rỗng để trống. */
     public LoginScreen(KageEngine engine, PlayContext context, String initialUsername) {
@@ -297,7 +308,8 @@ public final class LoginScreen implements GameScreen {
         try {
             ConnectRequest request =
                     ConnectRequest.newBuilder().setUsername(username).build();
-            connection.send(Opcode.OPCODE_CONNECT_REQUEST_VALUE, connection.nextSequenceId(), request.toByteArray());
+            pendingSequenceId = connection.nextSequenceId();
+            connection.send(Opcode.OPCODE_CONNECT_REQUEST_VALUE, pendingSequenceId, request.toByteArray());
             showStatus(StatusLine.of("login.status.handshaking"));
             transitionTo(State.AWAITING_CONNECT_RESPONSE);
         } catch (IOException e) {
@@ -307,19 +319,18 @@ public final class LoginScreen implements GameScreen {
     }
 
     private void pollConnectResponse() {
-        PacketCodec.Frame frame;
-        while ((frame = connection.pollInbound()) != null) {
-            int opcode = frame.header().opcode();
-            if (opcode == Opcode.OPCODE_CONNECT_RESPONSE_VALUE) {
-                handleConnectResponse(frame.payload());
-                return;
-            }
-            if (opcode == Opcode.OPCODE_ERROR_VALUE) {
+        Optional<PacketCodec.Frame> reply =
+                PendingReply.poll(inbound, pendingSequenceId, Opcode.OPCODE_CONNECT_RESPONSE_VALUE);
+        if (reply.isPresent()) {
+            PacketCodec.Frame frame = reply.get();
+            if (frame.header().opcode() == Opcode.OPCODE_ERROR_VALUE) {
                 String errorKey = errorKeyOf(frame.payload());
                 LOG.warn("Server từ chối ConnectRequest: error_key={}", errorKey);
                 failWith(errorKey);
-                return;
+            } else {
+                handleConnectResponse(frame.payload());
             }
+            return;
         }
         if (stateElapsed > STEP_TIMEOUT_SECONDS) {
             failWithGenericError();
@@ -343,9 +354,10 @@ public final class LoginScreen implements GameScreen {
 
     private void sendListCharactersRequest() {
         try {
+            pendingSequenceId = connection.nextSequenceId();
             connection.send(
                     Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE,
-                    connection.nextSequenceId(),
+                    pendingSequenceId,
                     ListCharactersRequest.newBuilder().build().toByteArray());
             showStatus(StatusLine.of("login.status.loading_characters"));
             transitionTo(State.AWAITING_CHARACTER_LIST);
@@ -356,19 +368,18 @@ public final class LoginScreen implements GameScreen {
     }
 
     private void pollCharacterList() {
-        PacketCodec.Frame frame;
-        while ((frame = connection.pollInbound()) != null) {
-            int opcode = frame.header().opcode();
-            if (opcode == Opcode.OPCODE_LIST_CHARACTERS_RESPONSE_VALUE) {
-                handleCharacterList(frame.payload());
-                return;
-            }
-            if (opcode == Opcode.OPCODE_ERROR_VALUE) {
+        Optional<PacketCodec.Frame> reply =
+                PendingReply.poll(inbound, pendingSequenceId, Opcode.OPCODE_LIST_CHARACTERS_RESPONSE_VALUE);
+        if (reply.isPresent()) {
+            PacketCodec.Frame frame = reply.get();
+            if (frame.header().opcode() == Opcode.OPCODE_ERROR_VALUE) {
                 String errorKey = errorKeyOf(frame.payload());
                 LOG.warn("Server từ chối ListCharactersRequest: error_key={}", errorKey);
                 failWith(errorKey);
-                return;
+            } else {
+                handleCharacterList(frame.payload());
             }
+            return;
         }
         if (stateElapsed > STEP_TIMEOUT_SECONDS) {
             failWithGenericError();
@@ -384,6 +395,11 @@ public final class LoginScreen implements GameScreen {
             LOG.warn("ListCharactersResponse không hợp lệ", e);
             failWithGenericError();
         }
+    }
+
+    /** {@code null} khi chưa có kết nối — {@link PendingReply#poll} coi như hàng đợi rỗng. */
+    private PacketCodec.Frame pollConnection() {
+        return connection == null ? null : connection.pollInbound();
     }
 
     private void failWithGenericError() {
