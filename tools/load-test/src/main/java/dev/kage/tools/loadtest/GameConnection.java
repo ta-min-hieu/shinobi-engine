@@ -48,12 +48,17 @@ import dev.kage.protocol.wire.ProtocolVersion;
  * <p>Không thread-safe: 1 kết nối = 1 luồng điều khiển. {@link #close()} gọi được từ luồng khác
  * (dừng test) — đóng socket làm luồng đang đọc bật ra {@link IOException}, đúng ý.
  */
-public final class GameConnection implements AutoCloseable {
+public final class GameConnection implements AutoCloseable, FrameChannel {
 
     private static final Logger LOG = LoggerFactory.getLogger(GameConnection.class);
 
     /** 4 byte length prefix bọc ngoài mỗi frame — tính vào băng thông thật của cổng 7777. */
     private static final int LENGTH_PREFIX_BYTES = 4;
+
+    /** opcode(2) + protocolVersion(1) + sequenceId(4) — khung ngắn hơn không có nổi header. */
+    private static final int MIN_FRAME_BYTES = 7;
+    // Cùng trần với GatewayServer.MAX_FRAME_LENGTH và client-core GameConnection (1MB).
+    private static final int MAX_FRAME_BYTES = 1024 * 1024;
 
     /**
      * Trần số frame "không phải cái đang chờ" được bỏ qua trong lúc bắt tay. Đủ rộng cho lưu lượng
@@ -146,16 +151,21 @@ public final class GameConnection implements AutoCloseable {
     /**
      * Gửi 1 frame, tự cấp {@code sequenceId} tăng dần cho kết nối này.
      *
+     * @return {@code sequenceId} đã gắn — server lặp lại đúng số này ở phản hồi, dùng để ghép
+     *     phản hồi với lệnh ({@link RoundTrip})
      * @throws IOException nếu socket đã chết
      */
-    public void send(int opcode, byte[] payload) throws IOException {
-        PacketHeader header = new PacketHeader(opcode, ProtocolVersion.CURRENT, nextSequenceId++);
+    @Override
+    public int send(int opcode, byte[] payload) throws IOException {
+        int sequenceId = nextSequenceId++;
+        PacketHeader header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
         byte[] frame = PacketCodec.encodeFrame(header, payload);
         output.writeInt(frame.length);
         output.write(frame);
         output.flush();
         lastSentNanos = System.nanoTime();
         observer.onFrameSent(LENGTH_PREFIX_BYTES + frame.length);
+        return sequenceId;
     }
 
     /**
@@ -183,14 +193,31 @@ public final class GameConnection implements AutoCloseable {
      * @throws java.net.SocketTimeoutException nếu hết thời gian chờ mà không frame nào tới
      * @throws IOException nếu socket chết hoặc frame hỏng
      */
+    @Override
     public PacketCodec.Frame readFrame() throws IOException {
         sendKeepaliveIfQuiet();
-        int length = input.readInt();
+        int length = checkedFrameLength(input.readInt());
         byte[] bytes = new byte[length];
         input.readFully(bytes);
         PacketCodec.Frame frame = PacketCodec.decodeFrame(bytes);
         observer.onFrameReceived(frame, LENGTH_PREFIX_BYTES + length);
         return frame;
+    }
+
+    /**
+     * Độ dài khung đọc từ dây phải nằm trong [header, trần] — cùng trần 1MB với server
+     * ({@code GatewayServer.MAX_FRAME_LENGTH}) và client thật. Bản cũ tin thẳng: một length âm nổ
+     * {@code NegativeArraySizeException}, một length quá ngắn nổ {@code IllegalArgumentException} ở
+     * {@code decodeFrame} — đều là unchecked, giết luồng client IM LẶNG (không đếm lỗi nào) trong khi
+     * client đó vẫn được tính "đang chạy". Nay thành {@link IOException} ⇒ đi đúng đường đếm lỗi.
+     *
+     * @throws IOException nếu độ dài nằm ngoài khoảng hợp lệ
+     */
+    static int checkedFrameLength(int length) throws IOException {
+        if (length < MIN_FRAME_BYTES || length > MAX_FRAME_BYTES) {
+            throw new IOException("Độ dài khung không hợp lệ trên dây: " + length);
+        }
+        return length;
     }
 
     /**

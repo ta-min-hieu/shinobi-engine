@@ -45,9 +45,10 @@ public final class LoadTestRunner {
 
         ReportingContext reporting = new ReportingContext(
                 new SimulatedPlayer.Metrics(
-                        new LatencyRecorder(), new AtomicLong(), new AtomicLong(), new AtomicLong()),
+                        new LatencyRecorder(), new FailureCounters(), new AtomicLong(), new AtomicLong()),
                 new MetricsScraper(config.host(), config.metricsPort()),
-                new AtomicInteger());
+                new AtomicInteger(),
+                new AtomicLong(System.nanoTime()));
         List<SimulatedPlayer> players = new CopyOnWriteArrayList<>();
         AtomicInteger nextClientIndex = new AtomicInteger();
         ExecutorService clientExecutor = Executors.newVirtualThreadPerTaskExecutor();
@@ -74,13 +75,16 @@ public final class LoadTestRunner {
 
         Thread.sleep(Duration.ofSeconds(config.durationSeconds()));
         stopAll(stopped, runningTest);
-        reportFinal(reporting, config);
+        reportFinal(reporting, players);
         LOG.info("Load test kết thúc.");
     }
 
     /** Gộp state cần cho lịch report định kỳ — Checkstyle ParameterNumber tối đa 4 tham số. */
     private record ReportingContext(
-            SimulatedPlayer.Metrics metrics, MetricsScraper metricsScraper, AtomicInteger peakPlayersOnline) {}
+            SimulatedPlayer.Metrics metrics,
+            MetricsScraper metricsScraper,
+            AtomicInteger peakPlayersOnline,
+            AtomicLong lastReportNanos) {}
 
     // FutureReturnValueIgnored: scrape() tự bắt lỗi I/O và trả UNAVAILABLE; lịch report chỉ dừng
     // khi có lỗi lập trình, và chẳng có ai chờ Future này để báo lỗi đó sớm hơn log.
@@ -92,10 +96,9 @@ public final class LoadTestRunner {
             ReportingContext reporting) {
         scheduler.scheduleAtFixedRate(
                 () -> report(
-                        players.size(),
-                        reporting.metrics(),
-                        scrapeAndTrackPeak(reporting.metricsScraper(), reporting.peakPlayersOnline()),
-                        config.reportIntervalSeconds()),
+                        ClientCounts.of(players),
+                        reporting,
+                        scrapeAndTrackPeak(reporting.metricsScraper(), reporting.peakPlayersOnline())),
                 config.reportIntervalSeconds(),
                 config.reportIntervalSeconds(),
                 TimeUnit.SECONDS);
@@ -107,10 +110,10 @@ public final class LoadTestRunner {
      * post-hoc bằng {@code jcmd VM.native_memory} sau khi test kết thúc, dễ lệch pha nếu test dừng
      * sớm hơn dự kiến và client đã ngắt hết trước lúc chụp).
      */
-    private static void reportFinal(ReportingContext reporting, LoadTestConfig config) {
+    private static void reportFinal(ReportingContext reporting, List<SimulatedPlayer> players) {
         MetricsScraper.MetricsSnapshot snapshot =
                 scrapeAndTrackPeak(reporting.metricsScraper(), reporting.peakPlayersOnline());
-        report(0, reporting.metrics(), snapshot, config.reportIntervalSeconds());
+        report(ClientCounts.of(players), reporting, snapshot);
         LOG.info(
                 "Đỉnh tải thật đo được: kage_players_online cao nhất = {}",
                 reporting.peakPlayersOnline().get());
@@ -154,7 +157,7 @@ public final class LoadTestRunner {
                     for (int i = 0; i < config.rampStepClients() && players.size() < config.maxClients(); i++) {
                         spawnOneClient.run();
                     }
-                    LOG.info("Ramp: {} client đang hoạt động", players.size());
+                    LOG.info("Ramp: đã dựng {} client", players.size());
                 },
                 config.rampStepIntervalSeconds(),
                 config.rampStepIntervalSeconds(),
@@ -180,29 +183,67 @@ public final class LoadTestRunner {
         }
     }
 
-    private static void report(
-            int activeClients,
-            SimulatedPlayer.Metrics metrics,
-            MetricsScraper.MetricsSnapshot tick,
-            long intervalSeconds) {
+    /**
+     * Số client theo trạng thái THẬT ({@link SimulatedPlayer.Phase}). Bản cũ in {@code players.size()}
+     * — mọi client từng được dựng, kể cả đã bắt tay hỏng, đã bỏ cuộc, hay đã chết — dưới nhãn
+     * "client=", nên "N client" trong report không phải N kết nối đang tạo tải.
+     */
+    record ClientCounts(int started, int inWorld, int ended) {
+
+        static ClientCounts of(List<SimulatedPlayer> players) {
+            int inWorld = 0;
+            int ended = 0;
+            for (SimulatedPlayer player : players) {
+                SimulatedPlayer.Phase phase = player.phase();
+                if (phase == SimulatedPlayer.Phase.IN_WORLD) {
+                    inWorld++;
+                } else if (phase == SimulatedPlayer.Phase.ENDED) {
+                    ended++;
+                }
+            }
+            return new ClientCounts(players.size(), inWorld, ended);
+        }
+    }
+
+    /**
+     * KB/s trên ĐÚNG khoảng thời gian đã trôi qua. Bản cũ chia cho {@code reportIntervalSeconds} cố
+     * định — report cuối (khoảng lẻ, thường ngắn hơn nhiều) bị chia cho cả một khoảng đầy ⇒ băng
+     * thông của report cuối bị báo THẤP theo đúng tỉ lệ khoảng lẻ/khoảng đầy.
+     */
+    static double kibPerSecond(long bytes, long elapsedNanos) {
+        if (elapsedNanos <= 0) {
+            return 0;
+        }
+        return bytes / 1024.0 / (elapsedNanos / 1_000_000_000.0);
+    }
+
+    private static void report(ClientCounts clients, ReportingContext reporting, MetricsScraper.MetricsSnapshot tick) {
+        SimulatedPlayer.Metrics metrics = reporting.metrics();
+        long now = System.nanoTime();
+        long elapsedNanos = now - reporting.lastReportNanos().getAndSet(now);
         LatencyRecorder.Snapshot latency = metrics.latencyRecorder().snapshot();
         // getAndSet(0) — băng thông là RATE của khoảng vừa qua, không phải số cộng dồn từ đầu test.
-        double sentKBs = metrics.bytesSent().getAndSet(0) / 1024.0 / intervalSeconds;
-        double receivedKBs = metrics.bytesReceived().getAndSet(0) / 1024.0 / intervalSeconds;
+        double sentKBs = kibPerSecond(metrics.bytesSent().getAndSet(0), elapsedNanos);
+        double receivedKBs = kibPerSecond(metrics.bytesReceived().getAndSet(0), elapsedNanos);
         LOG.info(
-                "[report] client={} packetLatencyMs(p50/p95/p99)={}/{}/{} (n={}) "
-                        + "serverTickMs(p50/p95/p99)={}/{}/{} băngThôngKBs(gửi/nhận)={}/{} lỗi={} kageGold={}",
-                activeClients,
+                "[report] client(trongWorld/đãDựng/đãKếtThúc)={}/{}/{} "
+                        + "packetLatencyMs(p50/p95/p99)={}/{}/{} (n={}, cậnDướiDoHếtGiờ={}) "
+                        + "serverTickMs(p50/p95/p99)={}/{}/{} băngThôngKBs(gửi/nhận)={}/{} "
+                        + "lỗiCộngDồn[{}] kageGold={}",
+                clients.inWorld(),
+                clients.started(),
+                clients.ended(),
                 round(latency.p50Millis()),
                 round(latency.p95Millis()),
                 round(latency.p99Millis()),
                 latency.count(),
+                latency.censoredCount(),
                 round(tick.p50Millis()),
                 round(tick.p95Millis()),
                 round(tick.p99Millis()),
                 round(sentKBs),
                 round(receivedKBs),
-                metrics.errorCount().get(),
+                metrics.failures(),
                 tick.goldTotal());
     }
 
