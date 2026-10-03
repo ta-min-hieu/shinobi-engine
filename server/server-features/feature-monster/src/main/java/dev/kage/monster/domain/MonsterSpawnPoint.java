@@ -23,8 +23,18 @@ public record MonsterSpawnPoint(String monsterCode, String worldCode, float posX
         if (worldCode == null || worldCode.isBlank()) {
             throw new IllegalArgumentException("worldCode không được rỗng");
         }
-        if (respawnSeconds <= 0f) {
-            throw new IllegalArgumentException("respawnSeconds phải > 0: " + respawnSeconds);
+        // isFinite: CHECK (respawn_seconds > 0) của DB để lọt 'NaN' và 'Infinity' (Postgres coi NaN
+        // lớn hơn mọi số). Đồng hồ hồi sinh NaN không bao giờ chạm 0 — quái chết là mất vĩnh viễn.
+        if (!Float.isFinite(respawnSeconds) || respawnSeconds <= 0f) {
+            throw new IllegalArgumentException("respawnSeconds phải là số hữu hạn > 0: " + respawnSeconds);
+        }
+        requireFinite("posX", posX);
+        requireFinite("posY", posY);
+    }
+
+    private static void requireFinite(String field, float value) {
+        if (!Float.isFinite(value)) {
+            throw new IllegalArgumentException(field + " phải là số hữu hạn: " + value);
         }
     }
 }
