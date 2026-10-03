@@ -23,6 +23,8 @@ public final class GrantExperienceUseCase {
     }
 
     /**
+     * Cộng {@code amount} EXP cho nhân vật rồi trả trạng thái EXP/cấp sau khi cộng.
+     *
      * @param amount lượng EXP cộng thêm; {@code <= 0} thì KHÔNG cộng gì — đó là cách gateway lấy số
      *     để gửi vạch EXP lúc vào world và sau khi nhận thưởng quest. ⚠️ Không cộng KHÔNG có nghĩa
      *     là không ghi: nhánh này vẫn hoà giải cột {@code level} nếu nó lệch (xem
@@ -72,6 +74,10 @@ public final class GrantExperienceUseCase {
         }
     }
 
-    /** @param leveledUp true nếu CHÍNH lần cộng này làm đổi cấp (có thể nhảy nhiều cấp một lúc). */
+    /**
+     * Kết quả một lần {@link #execute}.
+     *
+     * @param leveledUp true nếu CHÍNH lần cộng này làm đổi cấp (có thể nhảy nhiều cấp một lúc).
+     */
     public record Result(ExperienceProgress progress, boolean leveledUp) {}
 }

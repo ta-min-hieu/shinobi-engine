@@ -32,7 +32,7 @@ public interface TickMetricsPort {
     /**
      * Gọi khi 1 tick vượt ngân sách {@link WorldConstants#FIXED_DT} (OBSERVABILITY.md §3.1
      * {@code kage.tick.overrun.count}) — cùng điều kiện với log WARN "World tick quá hạn" ở
-     * {@link WorldFacade#tickLoop}, nhưng là Counter đếm được/dashboard được thay vì chỉ đọc log.
+     * {@code WorldFacade.tickTask}, nhưng là Counter đếm được/dashboard được thay vì chỉ đọc log.
      */
     void recordTickOverrun();
 

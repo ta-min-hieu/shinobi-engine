@@ -15,7 +15,7 @@ public interface PvpRatingPort {
      * rating hiện tại là {@link EloRating#DEFAULT_RATING}.
      *
      * <p>⚠️ Race đã có THẬT trước khi thêm method này (2026-09-19): {@code RecordDuelResultUseCase}
-     * từng gọi {@code findByCharacterId} 2 lần (đọc rời, không khoá) rồi mới ghi — nhân vật A thắng
+     * từng gọi {@link #findByCharacterId} 2 lần (đọc rời, không khoá) rồi mới ghi — nhân vật A thắng
      * trận 1, được thả về world chính TRƯỚC KHI rating trận 1 ghi xong, lập tức thắng tiếp trận 2
      * (settle trên Virtual Thread khác) → cả 2 lần đọc cùng thấy rating CŨ của A, tính 2 kết quả
      * khác nhau, ai ghi SAU thắng — mất nguyên 1 trận Elo dù {@code wins}/{@code losses} vẫn đúng

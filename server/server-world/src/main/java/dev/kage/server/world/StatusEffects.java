@@ -27,7 +27,11 @@ final class StatusEffects {
         return false;
     }
 
-    /** @return hệ số nhân tốc độ di chuyển, luôn &gt;= 0 (nhiều {@code MOVE_SPEED_MOD} cộng dồn). */
+    /**
+     * Hệ số nhân tốc độ di chuyển từ các hiệu ứng đang có.
+     *
+     * @return hệ số nhân tốc độ di chuyển, luôn &gt;= 0 (nhiều {@code MOVE_SPEED_MOD} cộng dồn).
+     */
     static float moveSpeedMultiplier(StatusEffectComponent status) {
         float multiplier = 1f;
         for (StatusEffect effect : status.slots) {
