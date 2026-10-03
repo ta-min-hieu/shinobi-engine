@@ -210,6 +210,8 @@ public final class GatewayBootstrap {
                         arenaInstanceRegistry::isInDuel),
                 mainWorldChannels,
                 mainWorldChannels.worldContent());
+        // Và chiều ngược: người ở hầm ngục không được vào trận đấu (2026-10-03).
+        arenaInstanceRegistry.refuseCharactersIn(dungeonInstanceRegistry::isInDungeon);
         WorldGateway worldGateway = new WorldGateway(
                 mainWorldChannels,
                 characterRegistry,

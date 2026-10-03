@@ -199,4 +199,66 @@ class PostgresPvpRatingAdapterIntegrationTest {
         assertThat(result.newWinnerRating()).isEqualTo(expected.newWinnerRating());
         assertThat(adapter.findByCharacterId(a).orElseThrow().rating()).isEqualTo(expected.newWinnerRating());
     }
+
+    /**
+     * Cùng race, nhưng ở trận ĐẦU TIÊN của A — chưa có dòng {@code pvp_rating} nào (bug tìm được
+     * 2026-10-03). {@code SELECT ... FOR UPDATE} không khoá được một dòng CHƯA TỒN TẠI, và ở READ
+     * COMMITTED nó cũng không thấy (nên không chờ) một INSERT chưa commit của giao dịch khác. Trận 2
+     * vì thế đọc {@link EloRating#DEFAULT_RATING}, rồi câu UPSERT của nó chờ INSERT kia commit và
+     * GHI ĐÈ rating vừa commit bằng kết quả tính từ 1000 — mất trọn trận đầu (wins vẫn đúng 2 vì
+     * cộng dồn, chỉ rating sai). Hai trận đầu đời chốt cùng lúc là thật: A thắng B, được thả về world
+     * chính, thắng C ngay trong khi Virtual Thread chốt trận 1 còn đang ghi.
+     *
+     * <p>Mô phỏng "trận 1 đang ghi dở": một kết nối riêng INSERT dòng của A (rating mới) và GIỮ chưa
+     * commit. Đo GIÁ TRỊ CUỐI — rating của A sau khi cả hai commit.
+     */
+    @Test
+    @Timeout(15)
+    void shouldReadThePostCommitRating_whenASecondDuelRacesTheFirstDuelEverOfThatCharacter() throws Exception {
+        long a = createFreshCharacter("PvpFirstA");
+        long c = createFreshCharacter("PvpFirstC");
+        PostgresPvpRatingAdapter adapter = new PostgresPvpRatingAdapter(dataSource);
+        int firstDuelRating = EloRating.DEFAULT_RATING + 777;
+
+        CountDownLatch rowInserted = new CountDownLatch(1);
+        CountDownLatch proceedToCommit = new CountDownLatch(1);
+        ExecutorService firstDuel = Executors.newSingleThreadExecutor();
+        Future<?> firstDuelTask = firstDuel.submit(() -> {
+            try (Connection connection = dataSource.getConnection()) {
+                connection.setAutoCommit(false);
+                try (PreparedStatement insert = connection.prepareStatement(
+                        "INSERT INTO pvp_rating (character_id, rating, wins, losses, updated_at)"
+                                + " VALUES (?, ?, 1, 0, now())")) {
+                    insert.setLong(1, a);
+                    insert.setInt(2, firstDuelRating);
+                    insert.executeUpdate();
+                }
+                rowInserted.countDown();
+                if (!proceedToCommit.await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("test không cho phép commit kịp — xem lỗi ở luồng chính");
+                }
+                connection.commit();
+            }
+            return null;
+        });
+        assertThat(rowInserted.await(5, TimeUnit.SECONDS)).isTrue();
+
+        ExecutorService caller = Executors.newSingleThreadExecutor();
+        Future<EloRating.Result> secondDuel =
+                caller.submit(() -> adapter.recordDuelResult(a, c, EloRating::computeNewRatings));
+        // Cho trận 2 thời gian chạy tới chỗ nó bị chặn (bản lỗi: đã đọc 1000 và đang chờ ở UPSERT).
+        assertThatThrownBy(() -> secondDuel.get(1, TimeUnit.SECONDS)).isInstanceOf(TimeoutException.class);
+
+        proceedToCommit.countDown();
+        firstDuelTask.get(5, TimeUnit.SECONDS);
+        secondDuel.get(5, TimeUnit.SECONDS);
+
+        EloRating.Result expected = EloRating.computeNewRatings(firstDuelRating, EloRating.DEFAULT_RATING);
+        assertThat(adapter.findByCharacterId(a).orElseThrow().rating())
+                .as("trận 2 phải tính từ rating trận 1 vừa commit, không phải từ 1000")
+                .isEqualTo(expected.newWinnerRating());
+        assertThat(adapter.findByCharacterId(a).orElseThrow().wins()).isEqualTo(2);
+        firstDuel.shutdown();
+        caller.shutdown();
+    }
 }

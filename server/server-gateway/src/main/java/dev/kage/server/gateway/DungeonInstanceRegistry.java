@@ -295,12 +295,18 @@ final class DungeonInstanceRegistry {
     /**
      * Nửa sau của {@link #enterDungeon}, khi world chính đã im với mọi người được nhận. Trong lúc
      * chờ, một người có thể đã rớt mạng ({@link #handleDisconnectIfInDungeon} gỡ họ, có khi dừng luôn
-     * instance) ⇒ chỉ dời ai còn trỏ đúng instance này.
+     * instance) ⇒ chỉ dời ai còn trỏ đúng instance này — và chưa bắt đầu rời ({@link #beginExit}).
      */
     private synchronized void finishEnter(AdmittedEntries admitted, String dungeonCode, long requestingCharacterId) {
         for (PendingEntry entry : admitted.entries()) {
             long characterId = entry.characterId();
             if (!admitted.instance().equals(instanceByCharacterId.get(characterId))) {
+                continue;
+            }
+            if (exitingCharacterIds.contains(characterId)) {
+                // Lệnh RỜI tới trong lúc chờ (2026-10-03, DungeonEnterExitRaceTest): nó đã xếp lệnh gỡ
+                // khỏi World hầm ngục — lúc người này CHƯA được gắn — và sắp đưa họ về world chính. Gắn
+                // bây giờ là gắn SAU lệnh gỡ đó: thực thể bóng ma ở lại hầm ngục mãi. Để lượt rời làm nốt.
                 continue;
             }
             WorldChangeReason reason = WorldChangeReason.WORLD_CHANGE_REASON_REQUESTED;
@@ -350,7 +356,11 @@ final class DungeonInstanceRegistry {
         return isInDungeon(characterId) || inDuel.test(characterId);
     }
 
-    private synchronized boolean isInDungeon(long characterId) {
+    /**
+     * Đang ở (hoặc đang rời) một instance hầm ngục. Đấu trường hỏi câu này NGOÀI khoá của nó trước khi
+     * dời ai vào trận — xem {@code ArenaInstanceRegistry#refuseCharactersIn}.
+     */
+    synchronized boolean isInDungeon(long characterId) {
         return instanceByCharacterId.containsKey(characterId);
     }
 

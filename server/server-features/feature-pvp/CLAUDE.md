@@ -53,6 +53,9 @@ bản** (không phải Battlefield 5v5 hay Chiếm Lãnh Địa guild war — 2 
   khi gọi `ArenaInstanceRegistry`, cùng pattern `RequestTradeCommand`). Chỉ 1 thách đấu ĐẾN đang
   chờ tại 1 thời điểm cho mỗi người (thách đấu mới khi đang có thách đấu chờ → outcome riêng),
   hoàn toàn trong bộ nhớ (không bảng DB nào cho challenge, ephemeral như Trade session).
+  Người đang ở HẦM NGỤC thì không thách, không bị thách, không vào trận được (2026-10-03,
+  `DuelWhileInDungeonTest`) — chiều ngược của "hầm ngục bỏ qua người đang đấu"; cho qua là một nhân
+  vật có hai thực thể sống.
 - **Không giới hạn rating khi ghép trận** (không phải matchmaking tự động — người chơi tự chọn đối
   thủ qua tên) — MMR ở lát cắt này CHỈ là con số hiển thị/xếp hạng, chưa dùng để ghép trận tự động.
 
