@@ -315,9 +315,10 @@ public final class CharacterSelectScreen implements GameScreen {
     private void handleCreateResponse(byte[] payload) {
         try {
             CreateCharacterResponse response = CreateCharacterResponse.parseFrom(payload);
-            if (!response.getSuccess()) {
-                LOG.warn("Tạo nhân vật thất bại: errorKey={}", response.getErrorKey());
-                failWith(response.getErrorKey());
+            Optional<ReplyVerdict.Rejection> rejection = ReplyVerdict.of(response);
+            if (rejection.isPresent()) {
+                LOG.warn("Tạo nhân vật thất bại: errorKey={}", rejection.get().errorKey());
+                failWith(rejection.get().errorKey());
                 return;
             }
             newCharacterNameField.setText("");
@@ -350,9 +351,10 @@ public final class CharacterSelectScreen implements GameScreen {
     private void handleSelectResponse(byte[] payload) {
         try {
             SelectCharacterResponse response = SelectCharacterResponse.parseFrom(payload);
-            if (!response.getSuccess()) {
-                LOG.warn("Chọn nhân vật thất bại: errorKey={}", response.getErrorKey());
-                failWithGenericError();
+            Optional<ReplyVerdict.Rejection> rejection = ReplyVerdict.of(response);
+            if (rejection.isPresent()) {
+                LOG.warn("Chọn nhân vật thất bại: errorKey={}", rejection.get().errorKey());
+                failWith(rejection.get().errorKey());
                 return;
             }
             worldEntry.open(pendingSelection, response);

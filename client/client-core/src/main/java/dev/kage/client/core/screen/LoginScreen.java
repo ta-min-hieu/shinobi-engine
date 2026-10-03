@@ -340,9 +340,12 @@ public final class LoginScreen implements GameScreen {
     private void handleConnectResponse(byte[] payload) {
         try {
             ConnectResponse response = ConnectResponse.parseFrom(payload);
-            if (!response.getSuccess()) {
-                LOG.warn("Đăng nhập bị server từ chối: errorKey={}", response.getErrorKey());
-                failWith(response.getErrorKey());
+            Optional<ReplyVerdict.Rejection> rejection = ReplyVerdict.of(response);
+            if (rejection.isPresent()) {
+                LOG.warn(
+                        "Đăng nhập bị server từ chối: errorKey={}",
+                        rejection.get().errorKey());
+                failWith(rejection.get().errorKey());
                 return;
             }
             sendListCharactersRequest();
