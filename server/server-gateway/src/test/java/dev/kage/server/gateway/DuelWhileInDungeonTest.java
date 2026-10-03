@@ -116,10 +116,18 @@ class DuelWhileInDungeonTest {
         assertThat(arena.acceptDuel(OUTSIDER_ID, challengeId).outcome())
                 .isEqualTo(ArenaInstanceRegistry.AcceptOutcome.NOT_FOUND);
 
-        assertThat(arena.worldFacadeFor(LEADER_ID)).as("người ở hầm ngục KHÔNG được gắn thêm vào đấu trường").isEmpty();
-        assertThat(arena.worldFacadeFor(OUTSIDER_ID)).as("không có trận nào được dựng").isEmpty();
-        assertThat(dungeons.worldFacadeFor(LEADER_ID)).as("vẫn ở nguyên hầm ngục").isPresent();
-        assertThat(arena.isInDuel(OUTSIDER_ID)).as("chỗ giữ của người chấp nhận được nhả").isFalse();
+        assertThat(arena.worldFacadeFor(LEADER_ID))
+                .as("người ở hầm ngục KHÔNG được gắn thêm vào đấu trường")
+                .isEmpty();
+        assertThat(arena.worldFacadeFor(OUTSIDER_ID))
+                .as("không có trận nào được dựng")
+                .isEmpty();
+        assertThat(dungeons.worldFacadeFor(LEADER_ID))
+                .as("vẫn ở nguyên hầm ngục")
+                .isPresent();
+        assertThat(arena.isInDuel(OUTSIDER_ID))
+                .as("chỗ giữ của người chấp nhận được nhả")
+                .isFalse();
     }
 
     /** Người CHẤP NHẬN đang ở hầm ngục (bị đồng đội kéo vào sau khi nhận lời thách). */
@@ -134,7 +142,9 @@ class DuelWhileInDungeonTest {
         assertThat(arena.worldFacadeFor(MEMBER_ID)).isEmpty();
         assertThat(arena.worldFacadeFor(OUTSIDER_ID)).isEmpty();
         assertThat(dungeons.worldFacadeFor(MEMBER_ID)).isPresent();
-        assertThat(arena.isInDuel(OUTSIDER_ID)).as("người thách được nhả, thách đấu lại được").isFalse();
+        assertThat(arena.isInDuel(OUTSIDER_ID))
+                .as("người thách được nhả, thách đấu lại được")
+                .isFalse();
     }
 
     private void enterDungeon() {

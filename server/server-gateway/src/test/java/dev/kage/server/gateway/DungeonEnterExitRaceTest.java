@@ -151,8 +151,12 @@ class DungeonEnterExitRaceTest {
         memberGate.release();
         assertThat(exit.get(10, TimeUnit.SECONDS)).isEqualTo(DungeonInstanceRegistry.ExitOutcome.OK);
 
-        assertThat(dungeons.worldFacadeFor(LEADER_ID)).as("định tuyến: LEADER đã rời").isEmpty();
-        assertThat(mainWorldChannels.worldFacadeFor(LEADER_ID)).as("LEADER ở world chính").isPresent();
+        assertThat(dungeons.worldFacadeFor(LEADER_ID))
+                .as("định tuyến: LEADER đã rời")
+                .isEmpty();
+        assertThat(mainWorldChannels.worldFacadeFor(LEADER_ID))
+                .as("LEADER ở world chính")
+                .isPresent();
         // Mốc chặn hàng đợi hầm ngục ⇒ mọi lệnh gắn/gỡ đã xếp đều đã chạy. Gói xuất hiện/biến mất thì
         // chỉ phát ở nhịp đồng bộ AoI (20Hz, mỗi 3 tick) — chờ thêm vài nhịp cho chắc đã ra kênh.
         dungeonWorld.inboxBarrier().get(5, TimeUnit.SECONDS);
@@ -203,7 +207,9 @@ class DungeonEnterExitRaceTest {
         }
 
         void awaitStalled() throws InterruptedException {
-            assertThat(stalled.await(5, TimeUnit.SECONDS)).as("tick phải bị giữ ở cổng").isTrue();
+            assertThat(stalled.await(5, TimeUnit.SECONDS))
+                    .as("tick phải bị giữ ở cổng")
+                    .isTrue();
         }
 
         void release() {
