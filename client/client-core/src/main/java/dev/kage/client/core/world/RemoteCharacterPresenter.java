@@ -3,6 +3,8 @@ package dev.kage.client.core.world;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.badlogic.gdx.utils.LongMap;
+
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.EcsWorld;
 import dev.kage.engine.ecs.KEntity;
@@ -30,7 +32,12 @@ final class RemoteCharacterPresenter {
 
     private final EcsWorld world;
     private final WorldModelRenderer models;
-    private final Map<Long, KEntity> entities = new HashMap<>();
+    /**
+     * {@link LongMap}: {@link #sync} lặp nó MỖI KHUNG — lặp/tra {@code HashMap} khoá {@code Long} cấp
+     * phát (iterator + boxing), đo được ở FrameAllocationTest. {@link LongMap#entries()} trả lại cùng
+     * một iterator dựng sẵn.
+     */
+    private final LongMap<KEntity> entities = new LongMap<>();
 
     /** Cùng tập người chơi với {@link #entities}, dạng click chuột vào được — xem {@link #characters()}. */
     private final Map<Long, CharacterPoint> pickables = new HashMap<>();
@@ -113,10 +120,10 @@ final class RemoteCharacterPresenter {
      * {@code DungeonController}). Không gỡ thì dân làng đứng nguyên trong hầm ngục.
      */
     void clear() {
-        for (Map.Entry<Long, KEntity> entry : entities.entrySet()) {
-            world.removeEntity(entry.getValue());
-            models.remove(entry.getKey());
-            motionTracker.remove(entry.getKey());
+        for (LongMap.Entry<KEntity> entry : entities.entries()) {
+            world.removeEntity(entry.value);
+            models.remove(entry.key);
+            motionTracker.remove(entry.key);
         }
         entities.clear();
         // Cùng tập với entities — bỏ sót ở đây thì người chơi của World CŨ vẫn click trúng được
@@ -154,9 +161,9 @@ final class RemoteCharacterPresenter {
      * {@code setAirborne}: người khác nhảy thì mình không thấy, dù server đã mô phỏng đúng cho họ.
      */
     void sync(float alpha) {
-        for (Map.Entry<Long, KEntity> entry : entities.entrySet()) {
-            long characterId = entry.getKey();
-            PositionComponent position = POSITION.get(entry.getValue());
+        for (LongMap.Entry<KEntity> entry : entities.entries()) {
+            long characterId = entry.key;
+            PositionComponent position = POSITION.get(entry.value);
             models.setPosition(
                     characterId,
                     position.prevX + ((position.x - position.prevX) * alpha),
