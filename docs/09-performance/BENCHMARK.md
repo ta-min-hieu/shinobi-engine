@@ -1039,6 +1039,46 @@ lớn hơn hoặc soak dài hơn.
 client và tick p99 xa dưới ngân sách đã đủ để trả lời "> 4ms/tick?" là KHÔNG, còn cách xa — nhưng nếu
 sau này cần con số ở N/soak lớn hơn, đây là điểm bắt đầu tiếp theo, không phải kết luận cuối cùng.
 
+### 5.11 Cấp phát mỗi khung của client — `FrameAllocationTest` (commit `152a7cf`, 2026-10-03)
+
+✅ **Đo thật lần đầu** luật "không `new` mỗi frame" ([CLAUDE.md §6](../../CLAUDE.md)) phía client —
+trước đó chỉ có suy đoán từ đọc code. Không phải JMH, không phải load test: một unit test headless
+trong `client-core` (`FrameAllocationTest`) đếm byte bằng
+`com.sun.management.ThreadMXBean#getCurrentThreadAllocatedBytes()` — bộ đếm cấp phát của CHÍNH luồng
+test, chính xác tới byte, không phụ thuộc GC.
+
+**Cảnh**: 20 người chơi khác, 15 quái, 3 NPC, mọi thực thể đều có model (asset giả thuần dữ liệu qua
+`WorldModelRenderer.preloadAsset` — không có GL context). Cứ 3 khung (20Hz AoI ở 60fps) một nửa người
+chơi + quái nhận gói di chuyển; phần nạp gói KHÔNG nằm trong cửa sổ đo. **Cách đo**: warm-up
+**30.000 khung** (đủ cho C2), rồi **5 vòng × 5.000 khung**, lấy **vòng thấp nhất** chia số khung.
+
+| Đường mỗi khung | Trước `152a7cf` | Sau | Cổng trong test |
+|---|---|---|---|
+| `RemoteCharacterPresenter.sync` | 2.400 B/khung | **0** | đúng 0 |
+| `MonsterPresenter.sync` | 2.520 B/khung | **0** | ≤ 64 B |
+| `NpcPresenter.sync` | 320 B/khung | **32** | ≤ 64 B |
+| `RemoteCharacterPresenter.tick`, `MonsterPresenter.tick`, model người chơi local (`setPosition`/`follow`) | — | **0** | đúng 0 |
+| `CombatHudController` (tick + các lần đọc HUD) | — | **24** | ≤ 64 B |
+
+**Thủ phạm: boxing khoá `Long`** khi tra `HashMap<Long, …>` — `scenesById`/`animationStateById` của
+`WorldModelRenderer` và bộ đếm giờ của `RemoteMotionTracker` (~120–170 B mỗi thực thể mỗi khung).
+**KHÔNG phải iterator**: escape analysis của C2 đã khử được iterator `HashMap`, nhưng không khử được
+boxing. Sửa bằng `com.badlogic.gdx.utils.LongMap` (có sẵn trong libGDX — không thêm thư viện).
+
+⚠️ **Số 0 của các đường còn dùng `HashMap` phụ thuộc C2.** Đo tay lúc làm commit với
+`-XX:TieredStopAtLevel=1` (chỉ C1): `MonsterPresenter.sync` = **296 B/khung** (số này không nằm trong
+test). Vì vậy test chia hai cổng: đường đã sang `LongMap` không cấp phát theo CẤU TRÚC ⇒ phải **đúng
+0**; đường còn phụ thuộc JIT (Monster/Npc sync, HUD) ⇒ **≤ 64 B** (`JIT_DEPENDENT_LIMIT_BYTES`) — vẫn
+đủ chặt để bắt lại một lần boxing cho mỗi thực thể.
+
+**Còn lại, CHƯA sửa**: `NpcPresenter.sync` 32 B (iterator `HashMap`) và HUD 24 B (một `Long` của
+`targetState()`). Gỡ nốt cần đổi kiểu kho quái/`npcs()` — chạm ~4 lớp — nên đưa lên bảng chờ chủ dự
+án ([README dòng 57](../README.md)), không tự làm.
+
+**Không đo được ở đây** (cần GPU thật): `WorldModelRenderer.render`, các `render` vẽ hộp của
+`MonsterPresenter`/`NpcPresenter`, `CombatHud` (Stage + font FreeType). Đây cũng chưa phải số
+frame time — chỉ là áp lực cấp phát.
+
 ---
 
 ## 6. Khi nào chạy
@@ -1168,3 +1208,5 @@ Không có — đây là quy trình, không phải quyết định kiến trúc.
    `kage.ecs.system.duration` thành 1 con số thật rồi so Trigger": xem §5.10. Xác nhận lại bằng
    production metric thật (N=500, có đủ AI/Combat/Skill/Boss/StatusEffect System) đúng kết luận JMH
    — Trigger CHƯA kích hoạt (0.83% ngân sách 4ms).
+5. ✅ **(2026-10-03)** — đo cấp phát mỗi khung phía client lần đầu (`FrameAllocationTest`), xem
+   §5.11: ba đường sync từ 2.400/2.520/320 B/khung xuống 0/0/32. Còn NPC 32 B + HUD 24 B chờ chủ dự án.

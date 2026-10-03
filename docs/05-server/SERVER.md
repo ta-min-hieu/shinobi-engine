@@ -286,6 +286,33 @@ Chi tiết: [ARCHITECTURE.md §15](../01-architecture/ARCHITECTURE.md).
 
 Không có bước này → mất toàn bộ dữ liệu chưa ghi ở §8.
 
+**Hiện thực** (`GatewayBootstrap.shutdownSequence`, chạy bởi shutdown hook `gateway-shutdown`):
+`GatewayServer.stop()` (đóng cổng → `broadcastShuttingDown` → tắt Netty event loop, tức đóng mọi kết
+nối → tắt `authExecutor`) → `stopAll()` khu vực world chính → hầm ngục → Arena → registry nhân vật →
+luồng lưu vị trí (`CharacterPositionPersister`) → máy chủ metrics → tracing → đóng DB.
+
+**Khởi động hỏng nay tắt sạch và THOÁT** (sửa 2026-10-03, `52bb46f`). Trước đó, mở cổng thất bại (cổng
+bị chiếm, chứng chỉ TLS hỏng) làm `main()` chết nhưng **JVM không bao giờ thoát**: luồng boss của Netty,
+luồng lưu vị trí và máy chủ metrics đều KHÔNG daemon và không ai tắt (hook còn chưa đăng ký) — tiến
+trình treo mà không phục vụ ai, và restart policy của Docker không bao giờ kích hoạt. Nay:
+- `GatewayServer.start()` thất bại thì tự tắt event loop group + `authExecutor` rồi mới ném tiếp
+  (`releaseAfterFailedStart`).
+- `GatewayBootstrap.startOrShutDown` chạy nguyên trình tự tắt ở trên khi `start()` ném; shutdown hook
+  chỉ đăng ký **sau** khi mở cổng thành công, nên trình tự tắt không chạy hai lần.
+- Test: `GatewayServerStartFailureTest`.
+
+**Không mở khu vực world chính mới sau khi đã tắt** (sửa 2026-10-03, `52bb46f`). Lúc tắt server, một
+lượt chốt trận Arena hay đưa người gục khỏi hầm ngục còn chạy dở có thể gắn người về world chính SAU
+`MainWorldChannelRegistry.stopAll()`: bảng khu vực đã rỗng nên bản cũ coi là "cần khu vực mới", dựng
+và `start()` một World không ai dừng — nó tick tiếp trong lúc pool DB đóng. Nay registry có cờ
+`stopped`: lượt gắn muộn rơi vào khu vực #1 **đã dừng** (lệnh nằm im trong hàng đợi) và
+`needsNewChannel()` luôn `false`. Test: `MainWorldChannelRegistryTest`.
+
+⚠️ **Còn để ngỏ, đã đưa lên bảng chờ chủ dự án** ([README](../README.md)): tắt server giữa trận Arena
+vẫn xử thua theo thứ tự Netty đóng kết nối và **ghi Elo thật** (dòng 36); lưu vị trí lúc ngắt kết nối
+thất bại thì không thử lại (dòng 55 — §8 chấp nhận mất ≤ 5 phút); `WorldFacade.stop()` chờ `tickLock`
+không có trần thời gian (dòng 56 — `stop_grace_period: 60s` của Docker là lưới cuối).
+
 ---
 
 ## 11. Ngân sách tick (**60Hz = 16.6ms** — [ADR-018](../01-architecture/adr/ADR-018-Tick-Rate.md))

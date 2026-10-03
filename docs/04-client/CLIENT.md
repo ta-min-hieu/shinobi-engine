@@ -360,6 +360,17 @@ public interface PlatformAdapter {
 
 ⚠️ **Dòng "draw call" chỉ còn đo được nửa vấn đề.** Sau [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md), nhân vật · quái · NPC không đi qua `SpriteBatch` nữa nên chi phí của chúng là **số tam giác**, không phải số draw call — ngân sách 5k/10k/20k tam giác mỗi nhân vật theo tier ở [RENDERING.md §7](../03-engine/RENDERING.md). Frame time GPU với 20 nhân vật trên màn **chưa ai đo**.
 
+**Cấp phát mỗi khung — ĐÃ ĐO (2026-10-03, `FrameAllocationTest`, [BENCHMARK §5.11](../09-performance/BENCHMARK.md)).**
+Cảnh 20 người chơi khác + 15 quái + 3 NPC, sau warm-up C2: `RemoteCharacterPresenter.sync`
+2.400 → **0** B/khung, `MonsterPresenter.sync` 2.520 → **0**, `NpcPresenter.sync` 320 → **32**; các
+`tick` + model người chơi local **0**; `CombatHudController` **24**. Gốc là boxing khoá `Long` khi tra
+`HashMap<Long, …>` (không phải iterator) — đã sang `LongMap` ở `WorldModelRenderer` và
+`RemoteMotionTracker`. Hệ quả thực tế cho code mới trong vòng render: kho tra theo id thực thể nên dùng
+`LongMap`, không `HashMap<Long, …>` (C2 không khử được boxing). Test là cổng — đường `LongMap` phải **đúng 0**, Monster/Npc/HUD
+≤ 64 B. Số 0 của đường còn `HashMap` phụ thuộc C2 (chỉ C1: `MonsterPresenter.sync` = 296 B). Npc 32 B
++ HUD 24 B còn lại chờ chủ dự án ([README dòng 57](../README.md)). Chưa đo được phần cần GPU
+(`WorldModelRenderer.render`, `CombatHud`).
+
 ---
 
 ## Technical Decisions
