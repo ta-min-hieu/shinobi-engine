@@ -3,6 +3,7 @@ package dev.kage.server.world;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -138,6 +139,9 @@ final class AreaOfInterestTracker {
             long characterId = entry.getKey();
             PositionComponent charPos = POSITION.get(entry.getValue());
 
+            dropVisibleOutsideNeighborCells(
+                    characterId, charPos, entitiesByCharacterId, entitiesByMonsterId, entitiesByNpcId);
+
             collectNeighbors(characterGrid, charPos.x, charPos.y);
             for (long otherCharacterId : neighborBuffer) {
                 // b > a khử trùng lặp — cặp (a,b) đối xứng nên cả 2 phía đều tìm thấy nhau qua
@@ -160,6 +164,75 @@ final class AreaOfInterestTracker {
         // PHẢI chạy SAU vòng trên (mọi so sánh "đã đổi vị trí" ở lượt sync() này đọc giá trị CŨ
         // trước khi bị ghi đè ở đây) — xem javadoc lastSyncedPosition.
         refreshLastSyncedPositions(entitiesByCharacterId, entitiesByMonsterId);
+    }
+
+    /**
+     * Báo "ra khỏi tầm" cho mọi thứ {@code characterId} đang thấy mà nay nằm NGOÀI 3×3 ô quanh nó.
+     *
+     * <p>Chứng minh ở javadoc lớp chỉ đi một chiều: trong tầm ⇒ là ô lân cận, nên vòng quét ô lân
+     * cận không bỏ sót lần "vào tầm" nào. Chiều ngược lại KHÔNG đúng — một cặp đang thấy nhau có thể
+     * ra ngoài 3×3 ô ngay ở lần sync kế tiếp, và vòng quét ô lân cận không bao giờ thăm lại nó: hai
+     * người cách nhau 15m ở hai mép ô {@code 0} và {@code 1}, một người bước thêm một mét sang ô
+     * {@code 2}; hoặc hồi sinh dịch chuyển nhân vật về {@code (0,0)}. Trước bản vá này cặp đó không
+     * bao giờ nhận despawn — client giữ một bóng ma đứng yên, và vì server vẫn ghi "đang thấy" nên
+     * lúc quay lại cũng không gửi lại spawn. Đo: {@code AreaOfInterestBoundaryTest}.
+     *
+     * <p>Chỉ duyệt tập ĐANG THẤY (không phải mọi entity) và chỉ xử lý id NGOÀI 3×3 ô — id trong 3×3
+     * ô vẫn để vòng quét ô lân cận xử lý như cũ, nên không sự kiện nào bị phát hai lần. Ngoài 3×3 ô
+     * thì chắc chắn ngoài tầm (cùng chứng minh ở javadoc lớp), không cần đo khoảng cách. Một
+     * {@code Iterator} mỗi nhân vật mỗi lần sync (20Hz, không phải 60Hz) — cùng mức cấp phát mà các
+     * vòng {@code entrySet()} của {@link #sync} vốn đã có.
+     */
+    private void dropVisibleOutsideNeighborCells(
+            long characterId,
+            PositionComponent charPos,
+            Map<Long, KEntity> entitiesByCharacterId,
+            Map<Long, KEntity> entitiesByMonsterId,
+            Map<Long, KEntity> entitiesByNpcId) {
+        Set<Long> visible = visibleTo.get(characterId);
+        if (visible.isEmpty()) {
+            return;
+        }
+        int cx = cellCoord(charPos.x);
+        int cy = cellCoord(charPos.y);
+        Iterator<Long> iterator = visible.iterator();
+        while (iterator.hasNext()) {
+            Long otherId = iterator.next();
+            KEntity other = lookupVisible(otherId, entitiesByCharacterId, entitiesByMonsterId, entitiesByNpcId);
+            if (other == null) {
+                continue; // onDetach/onMonsterDetach là chỗ dọn — không đoán loại entity ở đây.
+            }
+            PositionComponent otherPos = POSITION.get(other);
+            if (Math.abs(cellCoord(otherPos.x) - cx) <= 1 && Math.abs(cellCoord(otherPos.y) - cy) <= 1) {
+                continue; // vòng quét ô lân cận sẽ tự thăm cặp này.
+            }
+            iterator.remove();
+            if (otherId > 0) {
+                Set<Long> otherVisible = visibleTo.get(otherId);
+                if (otherVisible != null) {
+                    otherVisible.remove(characterId);
+                }
+                sink.onCharacterDespawned(characterId, otherId);
+                sink.onCharacterDespawned(otherId, characterId);
+            } else if (entitiesByMonsterId.containsKey(otherId)) {
+                sink.onMonsterDespawned(characterId, otherId);
+            } else {
+                sink.onNpcDespawned(characterId, otherId);
+            }
+        }
+    }
+
+    /** ID dương = nhân vật; âm = quái HOẶC NPC (chung một bộ đếm ở {@code WorldFacade}, không trùng nhau). */
+    private static KEntity lookupVisible(
+            Long entityId,
+            Map<Long, KEntity> entitiesByCharacterId,
+            Map<Long, KEntity> entitiesByMonsterId,
+            Map<Long, KEntity> entitiesByNpcId) {
+        if (entityId > 0) {
+            return entitiesByCharacterId.get(entityId);
+        }
+        KEntity monster = entitiesByMonsterId.get(entityId);
+        return monster != null ? monster : entitiesByNpcId.get(entityId);
     }
 
     private static void buildGrid(Map<Long, KEntity> entitiesById, Map<Long, List<Long>> grid) {
