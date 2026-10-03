@@ -139,8 +139,7 @@ final class AreaOfInterestTracker {
             long characterId = entry.getKey();
             PositionComponent charPos = POSITION.get(entry.getValue());
 
-            dropVisibleOutsideNeighborCells(
-                    characterId, charPos, entitiesByCharacterId, entitiesByMonsterId, entitiesByNpcId);
+            dropVisibleOutsideNeighborCells(characterId, entitiesByCharacterId, entitiesByMonsterId, entitiesByNpcId);
 
             collectNeighbors(characterGrid, charPos.x, charPos.y);
             for (long otherCharacterId : neighborBuffer) {
@@ -185,7 +184,6 @@ final class AreaOfInterestTracker {
      */
     private void dropVisibleOutsideNeighborCells(
             long characterId,
-            PositionComponent charPos,
             Map<Long, KEntity> entitiesByCharacterId,
             Map<Long, KEntity> entitiesByMonsterId,
             Map<Long, KEntity> entitiesByNpcId) {
@@ -193,6 +191,7 @@ final class AreaOfInterestTracker {
         if (visible.isEmpty()) {
             return;
         }
+        PositionComponent charPos = POSITION.get(entitiesByCharacterId.get(characterId));
         int cx = cellCoord(charPos.x);
         int cy = cellCoord(charPos.y);
         Iterator<Long> iterator = visible.iterator();
