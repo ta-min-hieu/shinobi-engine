@@ -438,8 +438,8 @@ class QuestIntegrationTest {
      * V28 phải trỏ {@code prerequisite_quest_id} về {@code kill_training_dummies} bằng cách TRA
      * THEO {@code code}, không hardcode số 1 (id do {@code GENERATED ALWAYS AS IDENTITY} cấp).
      *
-     * <p>⚠️ Test này chỉ verify DỮ LIỆU. Cột này CHƯA được đọc ở bất kỳ đâu trong code — xem
-     * {@link #shouldStillAcceptNightWatch_becausePrerequisiteIsNotEnforcedYet}.
+     * <p>Test này chỉ verify DỮ LIỆU. Việc THI HÀNH cột này (ADR-044) có ô riêng — xem
+     * {@link #shouldRejectNightWatch_whenTrainingDummiesNotClaimedYet}.
      */
     @Test
     void shouldSeedNightWatch_withPrerequisiteResolvedByCode() {

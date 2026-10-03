@@ -259,8 +259,11 @@ class PartyIntegrationTest {
                 try (PreparedStatement lock =
                         connection.prepareStatement("SELECT id FROM party WHERE id = ? FOR UPDATE")) {
                     lock.setLong(1, party.id());
-                    try (ResultSet ignored = lock.executeQuery()) {
-                        // không đọc gì — chỉ cần dòng đã bị khoá lúc executeQuery() trả về.
+                    // Dòng phải TỒN TẠI: không có dòng thì FOR UPDATE chẳng khoá gì và phép đo vô nghĩa.
+                    try (ResultSet locked = lock.executeQuery()) {
+                        if (!locked.next()) {
+                            throw new IllegalStateException("không có dòng party nào để khoá");
+                        }
                     }
                 }
                 lockAcquired.countDown();

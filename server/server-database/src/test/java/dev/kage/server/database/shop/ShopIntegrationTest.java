@@ -140,9 +140,9 @@ class ShopIntegrationTest {
         }
     }
 
-    /** Điền túi đồ tới đầy (DEFAULT_CAPACITY=20) — dùng để test nhánh {@code INVENTORY_FULL}. */
     /**
-     * Làm ĐẦY túi bằng món KHÔNG xếp chồng.
+     * Làm ĐẦY túi (DEFAULT_CAPACITY=20) bằng món KHÔNG xếp chồng — dùng để test nhánh
+     * {@code INVENTORY_FULL}.
      *
      * <p>Trước 2026-09-05 hàm này đổ 20 dòng {@code kunai x1} — chỉ "đầy" vì hồi đó không có gộp
      * chồng. Nay mua thêm phi đao sẽ cộng vào một trong 20 dòng đó (1 + 1 ≤ 99) và mua THÀNH CÔNG,
