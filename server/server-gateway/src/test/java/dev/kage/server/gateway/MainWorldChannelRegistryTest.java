@@ -34,6 +34,7 @@ class MainWorldChannelRegistryTest {
 
     private static final CharacterBaseStats STATS = new CharacterBaseStats(10, 10, 10, 10, Element.HOA, 1);
     private static final long CHARACTER_ID = 1_000L;
+    private static final long TICK_OBSERVATION_MILLIS = 300L;
 
     private MainWorldChannelRegistry channels;
     private ConnectedCharacterRegistry registry;
@@ -140,6 +141,37 @@ class MainWorldChannelRegistryTest {
         } finally {
             probed.stopAll();
         }
+    }
+
+    /**
+     * Gắn nhân vật SAU {@code stopAll} không được mở (và start) một khu vực mới (2026-10-03).
+     *
+     * <p>Lúc tắt server, {@code GatewayBootstrap} dừng world chính TRƯỚC đấu trường/hầm ngục. Lượt chốt
+     * trận do {@code channelInactive} xếp lên {@code settlementExecutor} còn chạy sau đó và đưa người
+     * thắng về world chính: danh sách khu vực đã rỗng ⇒ "cần khu vực mới" ⇒ dựng + start một World mà
+     * không ai còn dừng nữa — nó tick tiếp trong lúc pool DB đóng. Đo bằng chính nhịp tick: Timer
+     * {@code kage.tick.duration} của khu vực mở thêm không được tăng sau khi đã tắt.
+     */
+    @Test
+    void shouldNotStartAnyWorld_whenCharacterIsAttachedAfterStopAll() throws InterruptedException {
+        SimpleMeterRegistry meters = new SimpleMeterRegistry();
+        MainWorldChannelRegistry stopped =
+                new MainWorldChannelRegistry(registry, new WorldFacade(registry), meters, WorldContentCatalog.EMPTY);
+        stopped.stopAll();
+
+        stopped.ensureRoomForOneMore();
+        stopped.attachCharacter(entry(CHARACTER_ID));
+        long ticksAfterAttach = tickCount(meters);
+        Thread.sleep(TICK_OBSERVATION_MILLIS);
+
+        assertThat(tickCount(meters)).isEqualTo(ticksAfterAttach).isZero();
+        assertThat(stopped.playerCount()).isZero();
+    }
+
+    private static long tickCount(SimpleMeterRegistry meters) {
+        return meters.find("kage.tick.duration").timers().stream()
+                .mapToLong(Timer::count)
+                .sum();
     }
 
     /** Đếm Timer mới, và bao nhiêu cái được tạo trong lúc luồng tạo đang giữ khoá của registry. */

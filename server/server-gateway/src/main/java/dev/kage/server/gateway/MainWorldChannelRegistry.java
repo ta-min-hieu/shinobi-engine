@@ -90,6 +90,20 @@ final class MainWorldChannelRegistry {
     private final ExecutorService channelStopExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     /**
+     * Khu vực #1 — sau {@link #stopAll} là đích (đã dừng) của mọi lượt gắn muộn, xem {@link #stopped}.
+     */
+    private final WorldFacade firstChannelFacade;
+
+    /**
+     * Đã {@link #stopAll} (sửa 2026-10-03). Lúc tắt server, lượt chốt trận Arena / đưa người gục khỏi
+     * hầm ngục còn chạy dở có thể gắn người về world chính SAU khi world chính đã dừng: bảng khu vực
+     * rỗng nên bản cũ coi là "cần khu vực mới", dựng và {@code start()} một World không ai dừng nữa —
+     * nó tick tiếp trong lúc pool DB đóng. Nay lượt gắn muộn rơi vào khu vực #1 đã dừng: lệnh nằm im
+     * trong hàng đợi, không World nào được mở. Chỉ đọc/ghi trong khoá.
+     */
+    private boolean stopped;
+
+    /**
      * {@code firstChannelFacade} PHẢI đã {@code start()} — {@code GatewayBootstrap} dựng nó cùng
      * {@code TickMetricsPort} thật. {@code meterRegistry} dùng để gắn {@code TickMetricsPort} thật
      * cho MỌI khu vực mở thêm sau ({@link #openChannel}) — xem javadoc lớp "Metrics".
@@ -102,6 +116,7 @@ final class MainWorldChannelRegistry {
         this.registry = registry;
         this.meterRegistry = meterRegistry;
         this.content = content;
+        this.firstChannelFacade = firstChannelFacade;
         channels.add(new Channel(firstChannelFacade, DEFAULT_CAPACITY));
     }
 
@@ -156,6 +171,9 @@ final class MainWorldChannelRegistry {
      * caller dựng World ngoài khoá rồi gọi lại. {@code spare} không dùng tới thì bị bỏ (chưa start).
      */
     private synchronized Optional<WorldFacade> tryAttach(CharacterEntry entry, Optional<WorldFacade> spare) {
+        if (stopped) {
+            return Optional.of(firstChannelFacade);
+        }
         long characterId = entry.characterId();
         Channel current = channelByCharacterId.get(characterId);
         if (current != null) {
@@ -232,6 +250,7 @@ final class MainWorldChannelRegistry {
     }
 
     private synchronized void stopAllInstances() {
+        stopped = true;
         channels.forEach(channel -> channel.facade().stop());
         channels.clear();
         channelByCharacterId.clear();
@@ -243,6 +262,9 @@ final class MainWorldChannelRegistry {
      * vực đều đầy (hiếm — capacity đặc biệt nhỏ) — mở thêm thay vì nhồi vượt cam kết.
      */
     private synchronized boolean needsNewChannel() {
+        if (stopped) {
+            return false;
+        }
         int totalCapacity = totalCapacity();
         int totalPlayers = totalPlayers();
         return (double) totalPlayers / totalCapacity >= AUTO_OPEN_UTILIZATION_THRESHOLD || !hasChannelWithRoom();
