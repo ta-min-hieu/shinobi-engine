@@ -4,6 +4,7 @@ import java.util.Optional;
 
 import dev.kage.guild.domain.DuplicateGuildJoinRequestException;
 import dev.kage.guild.domain.Guild;
+import dev.kage.guild.domain.GuildDisbandedException;
 import dev.kage.guild.domain.GuildPort;
 
 /**
@@ -40,6 +41,10 @@ public final class SendGuildJoinRequestUseCase {
             port.sendJoinRequest(guild.get().id(), characterId);
         } catch (DuplicateGuildJoinRequestException e) {
             return Result.REQUEST_ALREADY_PENDING;
+        } catch (GuildDisbandedException e) {
+            // findByName ở trên rồi mới ghi đơn — leader giải tán đúng giữa hai bước (2026-10-03,
+            // trước đó thành 500). Bang không còn thì đúng là "không tìm thấy".
+            return Result.GUILD_NOT_FOUND;
         }
         return Result.OK;
     }

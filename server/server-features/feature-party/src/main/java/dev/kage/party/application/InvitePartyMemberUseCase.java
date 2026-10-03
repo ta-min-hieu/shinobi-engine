@@ -4,6 +4,7 @@ import java.util.Optional;
 
 import dev.kage.party.domain.DuplicatePartyInviteException;
 import dev.kage.party.domain.Party;
+import dev.kage.party.domain.PartyDissolvedException;
 import dev.kage.party.domain.PartyMember;
 import dev.kage.party.domain.PartyPort;
 import dev.kage.party.domain.PartyRole;
@@ -42,6 +43,10 @@ public final class InvitePartyMemberUseCase {
             port.invite(partyId, targetCharacterId);
         } catch (DuplicatePartyInviteException e) {
             return Result.INVITE_ALREADY_PENDING;
+        } catch (PartyDissolvedException e) {
+            // Leader (người cuối) rời nhóm ở kết nối khác ngay sau phép kiểm "là leader" ở trên
+            // (2026-10-03, trước đó thành 500). Party không còn ⇒ người gọi không còn là leader.
+            return Result.NOT_LEADER;
         }
         return Result.OK;
     }

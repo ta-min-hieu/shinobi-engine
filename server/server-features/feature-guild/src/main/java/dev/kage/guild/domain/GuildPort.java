@@ -45,7 +45,10 @@ public interface GuildPort {
     List<GuildJoinRequest> listPendingRequests(long guildId);
 
     /**
+     * Ghi đơn xin gia nhập PENDING.
+     *
      * @throws DuplicateGuildJoinRequestException nếu vi phạm UNIQUE {@code (guild_id, character_id)}
+     * @throws GuildDisbandedException nếu bang đã bị giải tán (vừa xảy ra, sau lần tra bang của caller)
      */
     GuildJoinRequest sendJoinRequest(long guildId, long characterId);
 

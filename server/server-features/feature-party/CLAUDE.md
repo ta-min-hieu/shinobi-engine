@@ -39,6 +39,11 @@ thành viên vào sớm nhất (`joined_at` nhỏ nhất còn lại) làm leader
   UPDATE + đếm lại thành viên NGAY TRONG transaction trước khi insert — chống race nhiều lời mời
   được chấp nhận đồng thời vượt quá 5 (không có UNIQUE/CHECK constraint nào ở DB bắt được việc này,
   phải khoá dòng thủ công, cùng lý do `approveJoinRequest` của feature-guild cần SAVEPOINT).
+- **Thứ tự khoá: dòng `party` TRƯỚC mọi dòng `party_member`/`party_invite`** — ở CẢ `acceptInvite`
+  (2026-09-23) lẫn `leaveParty` (2026-10-03: leader và thành viên vào sớm nhất cùng rời từng
+  deadlock thật, `PartyDissolveRaceIntegrationTest`). Giao dịch mới chạm các bảng này phải giữ đúng
+  thứ tự. Mời vào party vừa bị giải tán ⇒ adapter ném `PartyDissolvedException` (vi phạm FK), use
+  case trả `NOT_LEADER`.
 - **1 nhân vật tối đa 1 party tại 1 thời điểm** — ràng buộc ở tầng DB (`party_member.character_id
   UNIQUE`), không chỉ ở application/. Bên THUA race (1 nhân vật vào 2 party cùng lúc) phải ra
   outcome "đã ở trong nhóm", không phải lỗi chung: `insertMember` dùng `ON CONFLICT (character_id)

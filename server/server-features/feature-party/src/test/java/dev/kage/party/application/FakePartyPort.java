@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import dev.kage.party.domain.DuplicatePartyInviteException;
 import dev.kage.party.domain.DuplicatePartyMembershipException;
 import dev.kage.party.domain.Party;
+import dev.kage.party.domain.PartyDissolvedException;
 import dev.kage.party.domain.PartyInvite;
 import dev.kage.party.domain.PartyMember;
 import dev.kage.party.domain.PartyPort;
@@ -71,6 +72,10 @@ class FakePartyPort implements PartyPort {
 
     @Override
     public PartyInvite invite(long partyId, long inviteeCharacterId) {
+        // Mô phỏng FOREIGN KEY party_id — party đã bị giải tán.
+        if (!partiesById.containsKey(partyId)) {
+            throw new PartyDissolvedException(partyId);
+        }
         if (invites.stream().anyMatch(i -> i.partyId() == partyId && i.inviteeCharacterId() == inviteeCharacterId)) {
             throw new DuplicatePartyInviteException(partyId, inviteeCharacterId);
         }

@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import dev.kage.guild.domain.DuplicateGuildJoinRequestException;
 import dev.kage.guild.domain.DuplicateGuildNameException;
 import dev.kage.guild.domain.Guild;
+import dev.kage.guild.domain.GuildDisbandedException;
 import dev.kage.guild.domain.GuildJoinRequest;
 import dev.kage.guild.domain.GuildMember;
 import dev.kage.guild.domain.GuildPort;
@@ -23,7 +24,7 @@ import dev.kage.guild.domain.GuildRole;
  * nhiều lần mới là trùng lặp thật). Logic mô phỏng đúng ràng buộc adapter Postgres thật: UNIQUE
  * tên bang, UNIQUE (guild_id, character_id) đơn xin gia nhập, UNIQUE character_id thành viên.
  */
-final class FakeGuildPort implements GuildPort {
+class FakeGuildPort implements GuildPort {
 
     private final Map<Long, Guild> guildsById = new LinkedHashMap<>();
     private final List<GuildMember> members = new ArrayList<>();
@@ -111,6 +112,10 @@ final class FakeGuildPort implements GuildPort {
 
     @Override
     public GuildJoinRequest sendJoinRequest(long guildId, long characterId) {
+        // Mô phỏng FOREIGN KEY guild_id — bang đã bị giải tán.
+        if (!guildsById.containsKey(guildId)) {
+            throw new GuildDisbandedException(guildId);
+        }
         if (joinRequests.stream().anyMatch(r -> r.guildId() == guildId && r.characterId() == characterId)) {
             throw new DuplicateGuildJoinRequestException(guildId, characterId);
         }
