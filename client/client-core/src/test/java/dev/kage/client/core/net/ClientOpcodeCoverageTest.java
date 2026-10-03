@@ -32,8 +32,12 @@ class ClientOpcodeCoverageTest {
 
     private static final Path MAIN_SOURCES = Path.of("src", "main", "java");
 
-    /** Một NHÁNH NHẬN: so sánh opcode của khung vừa tới với một hằng. */
-    private static final Pattern RECEIVE_BRANCH = Pattern.compile("[!=]=\\s*Opcode\\.OPCODE_([A-Z0-9_]+)_VALUE");
+    /**
+     * Một NHÁNH NHẬN: so sánh opcode của khung vừa tới với một hằng, hoặc chờ câu trả lời qua
+     * {@code PendingReply.poll} (màn đăng nhập/chọn nhân vật khớp opcode bên trong lời gọi đó).
+     */
+    private static final Pattern RECEIVE_BRANCH =
+            Pattern.compile("(?:[!=]=\\s*|PendingReply\\.poll\\([^;]*?)Opcode\\.OPCODE_([A-Z0-9_]+)_VALUE");
 
     /** Bất kỳ lần nhắc tới nào — đủ cho chiều GỬI (opcode là đối số của lời gọi gửi). */
     private static final Pattern ANY_REFERENCE = Pattern.compile("Opcode\\.OPCODE_([A-Z0-9_]+)_VALUE");

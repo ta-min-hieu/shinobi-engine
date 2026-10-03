@@ -19,6 +19,8 @@ final class KeyPressEdge {
     private boolean heldBefore;
 
     /**
+     * Ghi trạng thái phím của nhịp này và cho biết đây có phải một cú nhấn mới thuộc về gameplay.
+     *
      * @param held phím đang được giữ hay không (trạng thái thô từ {@code InputMapper})
      * @param keyboardFree {@code false} khi một ô nhập đang chiếm bàn phím
      * @return {@code true} đúng một lần cho mỗi cú nhấn thuộc về gameplay
