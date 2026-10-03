@@ -36,6 +36,13 @@ bản** (không phải Battlefield 5v5 hay Chiếm Lãnh Địa guild war — 2 
   vẫn đúng (cộng dồn) nhưng `rating` bị ghi đè bằng giá trị tính từ dữ liệu cũ. Khoá theo
   `character_id` TĂNG DẦN (không theo thắng/thua) để tránh deadlock giữa 2 trận chồng lấn 1 người.
   Xem `PostgresPvpRatingAdapterIntegrationTest` (server-database) cho phép đo race thật.
+  ⚠️ **Trận ĐẦU ĐỜI từng lọt khoá** (sửa 2026-10-03, `98d1547`): `FOR UPDATE` không khoá được dòng
+  chưa tồn tại, và dưới READ COMMITTED cũng không chờ INSERT chưa commit của giao dịch khác. Hai
+  trận đầu của cùng một nhân vật settle cùng lúc ⇒ trận sau đọc 1000 mặc định, UPSERT chờ INSERT
+  của trận trước rồi ghi đè ⇒ mất trọn Elo trận đầu (wins vẫn đúng). Nay `recordDuelResult` chèn dòng
+  mặc định (`ON CONFLICT DO NOTHING` — câu này CÓ chờ INSERT đồng thời cùng khoá) trước khi khoá, vẫn
+  theo thứ tự id tăng dần. "Không tạo dòng tới trận đầu" ở gạch đầu dòng trên vẫn đúng — dòng chỉ
+  sinh ra trong giao dịch settle.
 - **Cách ly PvP KHÔNG sửa `CombatSystem`/`SkillSystem`** — trận đấu diễn ra trong 1 `WorldFacade`
   instance riêng (ADR-026, giống dungeon) chỉ chứa đúng 2 người, nên "chỉ đánh được đối thủ" là hệ
   quả TỰ NHIÊN của cách ly instance, không cần thêm cờ team/faction ở tầng combat.
@@ -46,6 +53,10 @@ bản** (không phải Battlefield 5v5 hay Chiếm Lãnh Địa guild war — 2 
   hành vi này để test khắc chế nguyên tố bằng 3 nhân vật thay vì quái). Không có UI nào ở client
   hiện tại phơi bày đường này ở world chính; nếu sau này client cho phép chọn nhân vật khác làm
   target ngoài Arena, cần ADR riêng cho cơ chế "an toàn/safe-zone" thật.
+  ⚠️ *(Rà 2026-10-03)* Mặt trái của câu trên: client hiện chỉ đặt mục tiêu là QUÁI, nên **trong Arena
+  client thật cũng không nhắm được đối thủ** — trận đấu không đánh được bằng client thật. Kiểm sống
+  ADR-051 PASS là nhờ `gameProbe` gửi thẳng id. Sửa phía client (không đổi protocol) đang chờ chủ dự
+  án chọn hướng (["🔴 ĐANG CHỜ CHỦ DỰ ÁN"](../../../docs/README.md)).
 - **Forfeit (`ExitDuelCommand`) tính THUA thật** (mất điểm) — khác `ExitDungeonCommand` (không mất
   gì). Disconnect giữa trận cũng tính THUA cho người mất kết nối (không được "trốn thua").
 - **Thách đấu là request-based (giống Trade), KHÔNG cần gần nhau/cùng map** — challenge theo TÊN
@@ -55,7 +66,10 @@ bản** (không phải Battlefield 5v5 hay Chiếm Lãnh Địa guild war — 2 
   hoàn toàn trong bộ nhớ (không bảng DB nào cho challenge, ephemeral như Trade session).
   Người đang ở HẦM NGỤC thì không thách, không bị thách, không vào trận được (2026-10-03,
   `DuelWhileInDungeonTest`) — chiều ngược của "hầm ngục bỏ qua người đang đấu"; cho qua là một nhân
-  vật có hai thực thể sống.
+  vật có hai thực thể sống. Trên dây dùng lại outcome sẵn có (`ALREADY_IN_DUEL` /
+  `TARGET_ALREADY_IN_DUEL` khi thách, `NOT_FOUND` khi chấp nhận), không đổi protocol — câu chữ người
+  chơi thấy vì vậy nói "đang đấu" chứ không nói "đang ở hầm ngục"; giữ hay đổi đang chờ chủ dự án
+  (["🔴 ĐANG CHỜ CHỦ DỰ ÁN"](../../../docs/README.md)).
 - **Không giới hạn rating khi ghép trận** (không phải matchmaking tự động — người chơi tự chọn đối
   thủ qua tên) — MMR ở lát cắt này CHỈ là con số hiển thị/xếp hạng, chưa dùng để ghép trận tự động.
 

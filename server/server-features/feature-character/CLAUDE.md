@@ -21,6 +21,14 @@ sớm. Phép kiểm QUYẾT ĐỊNH là `CharacterPort#lockAccountAndCountCharac
 (`FOR NO KEY UPDATE`) rồi đếm lại, trong CÙNG transaction với INSERT. Trước bản vá, 8 lượt tạo song
 song trên account có 3 nhân vật cho ra 11 nhân vật (`CharacterLimitRaceIntegrationTest`).
 
+Vị trí đã lưu KHÔNG hữu hạn (vá 2026-10-03, `5aab474`): trước bản vá hướng-NaN (2026-09-24) một
+`MoveCommand` có thể cho nhân vật `x = NaN`, và giá trị đó được ghi xuống cột REAL `pos_x` lúc đăng
+xuất ⇒ mỗi lần vào lại thế giới đều mang NaN, vật lý/AoI/kiểm tầm đầu độc vĩnh viễn, NaN còn đi ra
+client trong `SelectCharacterResponse`. Nay `PositionSnapshot` chuẩn hoá toạ độ không hữu hạn về `0`
+(điểm xuất phát của nhân vật chưa từng lưu vị trí) — phủ cả response lẫn mọi đường attach đọc vị trí
+đã lưu; `WorldFacade.handleAttach` (server-world) là lớp phòng thủ thứ hai, rơi về điểm hồi sinh.
+Test: `PositionSnapshotTest`, `ServerAuthorityWorldTest`.
+
 Chiều: `api → application → domain`. **`domain/` không import gì bên ngoài** — không có
 `infrastructure/` trong module này (xem feature-account/CLAUDE.md mục "Khác template chuẩn" —
 adapter thật nằm ở `server-database`, ArchUnit chặn JDBC/Redis theo package

@@ -169,6 +169,18 @@ Engine scripting đã chốt: [ADR-016](../01-architecture/adr/ADR-016-Scripting
 
 ✅ **Lát cắt 2 (Boss AI) đã code xong** (2026-07-25, chi tiết ở [ROADMAP.md Phase 8](../11-process/ROADMAP.md)): boss (`sample_boss`) tự spawn khi dungeon instance được tạo (`DungeonInstanceRegistry.createInstance` gọi `WorldFacade.spawnBoss()`), quyết định pha/chiêu qua script GraalJS (`sample_boss.js`, tái dùng `ScriptSandbox` từ Phase 4). Loot tái dùng nguyên `drop_table`/`GrantLootUseCase` có sẵn (chỉ thêm migration seed). Verify thật qua socket (`GatewayServerIntegrationTest.partyShouldFightBossInDungeon_overRealSockets`). Phát hiện + vá 1 lỗ hổng AoI có sẵn từ Phase 4 (không riêng Boss AI): nhân vật chơi SOLO không nhận được `AttackResultEvent`/`SkillResultEvent` khi quái/boss đánh trả — xem ROADMAP.md Phase 8 "Quyết định lát cắt 2" để biết chi tiết.
 
+✅ **Vá 2026-10-03 — hai đường đổi World đua nhau** (đều ở `server-gateway`, không đổi protocol):
+- **Thoát chen vào giữa lúc đang vào ⇒ thực thể ma** (`437e670`): vào/ra hầm ngục mỗi bên chạy hai
+  nửa quanh lượt chờ World cũ yên lặng, và hai lệnh từ cùng một kết nối chạy song song. `ExitDungeon`
+  tới khi lệnh vào của chính người đó còn chờ world chính ⇒ lệnh ra xếp hàng detach khỏi World hầm
+  ngục TRƯỚC khi người đó được attach vào; lệnh vào rồi vẫn attach, lệnh ra đưa người về world chính
+  ⇒ thực thể trong hầm ngục không bao giờ bị gỡ: đồng đội nhìn thấy, boss đánh được, trong khi người
+  chơi đã ở world chính. Nay `finishEnter` bỏ qua người đã bắt đầu ra và để lệnh ra hoàn tất. Test:
+  `DungeonEnterExitRaceTest` (ép đúng thứ tự bằng cách chặn tick thread trên một lần ghi kênh).
+- **Người đang ở hầm ngục không vào được đấu trường** (`843a582`): trước đó họ thách/được thách/chấp
+  nhận được ⇒ một nhân vật có thực thể sống ở CẢ hầm ngục lẫn world chính sau khi trận kết thúc. Chi
+  tiết + câu chữ báo lỗi đang chờ chủ dự án: [feature-pvp/CLAUDE.md](../../server/server-features/feature-pvp/CLAUDE.md).
+
 ---
 
 ## 7. Inventory & Equipment
@@ -299,6 +311,14 @@ cộng gold — cộng gold không có nhánh thất bại nên không cần rol
 ✅ **Protocol/gateway đã nối cùng lát cắt** — `ListShopItemsRequest/Response`,
 `BuyItemCommand/Response`, `SellItemCommand/Response` (opcode 1000-1005, `shop.proto`).
 
+✅ **Vá 2026-10-03**: (1) mua số lượng sát `Integer.MAX_VALUE` từng tràn phép đếm ô ⇒ trừ vàng mà
+không nhận gì (hoặc 500 khi có chồng sẵn) — nay đếm bằng `long`; (2) `quantity ≤ 0` bị trả **400
+`error.invalid_payload`** ngay ở biên dây (`EconomyCommandShape`) thay vì 500. Chi tiết:
+[feature-shop/CLAUDE.md](../../server/server-features/feature-shop/CLAUDE.md).
+⚠️ *(Rà 2026-10-03)* Câu "Phase 6 mới có NPC/Dialogue, lúc đó mới ràng buộc đứng gần NPC" ở đầu mục
+đã LỖI THỜI: NPC có từ Phase 6 nhưng mua/bán, nói chuyện NPC, nhận/trả quest vẫn không kiểm khoảng
+cách. Đang chờ chủ dự án ([docs/README.md](../README.md) "🔴 ĐANG CHỜ CHỦ DỰ ÁN").
+
 ---
 
 ## 8. Trade
@@ -308,7 +328,7 @@ cộng gold — cộng gold không có nhánh thất bại nên không cần rol
 | Yêu cầu | Vì sao | Cách đạt được (✅ Đã code 2026-07-24, Phase 7 lát cắt 3) |
 |---|---|---|
 | **Transaction** cho toàn bộ giao dịch | Mất một nửa = mất item | `ConfirmTradeUseCase` — 1 transaction duy nhất chuyển CẢ gold lẫn item 2 chiều |
-| **Audit log** mọi giao dịch | Điều tra gian lận | `TRADE_EXECUTED` ghi cho CẢ 2 bên trong CÙNG transaction |
+| **Audit log** mọi giao dịch | Điều tra gian lận | `TRADE_EXECUTED` ghi cho CẢ 2 bên trong CÙNG transaction — từ 2026-10-03 ghi cả vàng + dòng vật phẩm (id nguồn, số lượng) mỗi bên đưa/nhận; trước đó chỉ có id phiên + id đối phương, không trả lời được "giao dịch đó chuyển gì" |
 | **Cả hai bên xác nhận** (2-phase confirm) | Chống lừa đảo | Sửa lời chào (`SetTradeOfferCommand`) SAU KHI 1 bên đã confirm sẽ reset CẢ 2 cờ confirmed |
 | **Khoá item khi đang trade** | Chống trade cùng item cho 2 người | KHÔNG khoá lúc chào — xác thực lại TOÀN BỘ (khoá dòng FOR UPDATE + kiểm sở hữu/số lượng) NGAY LÚC THI HÀNH, cùng đạt mục đích "không bao giờ duplicate" với ít blast radius hơn (không đụng feature-inventory/feature-shop đã xong) |
 | **Idempotency** | Chống retry duplicate ([NETWORK.md §5](NETWORK.md)) | `ConfirmTradeCommand.idempotency_key` (ADR-025), bảng `idempotency_key` dùng chung |
@@ -327,6 +347,17 @@ chào) hợp lệ — lời chào hiện cấp hiện tại. Tuần tự hoá: �
 HẸP của quyết định "không khoá item lúc chào": bán/gửi thư/mặc vẫn không bị chặn (xác thực lúc thi
 hành vẫn bắt được), vì chúng không đổi GIÁ TRỊ món mà người kia đã thấy — chúng làm món biến mất và
 giao dịch hỏng sạch. Test: `EnhanceWhileInTradeIntegrationTest` (server-database).
+
+✅ **Vá 2026-10-03** (chi tiết ở `feature-trade/CLAUDE.md`):
+- **Xem trạng thái giao dịch không còn lộ đồ người lạ** — lời chào là tham chiếu mềm, không kiểm sở
+  hữu lúc chào, nên trước đó chào một `inventory_item` id bất kỳ là đọc được loại + cấp cường hoá của
+  nó. Món không thuộc người chào nay hiện như món đã biến mất.
+- **Kiểm sức chứa túi chỉ ở CUỐI giao dịch, cả với tách chồng** — tách chồng từng còn kiểm giữa
+  chừng, làm một vụ đổi hợp lệ hỏng hay không tuỳ ai là requester.
+- **Lời chào sai hình (vàng âm, id/số lượng ≤ 0) ⇒ 400 `error.invalid_payload`** ở biên dây, không
+  còn 500.
+- Đua thi hành với bán món đang chào / với huỷ: đã đo giá trị cuối 10 vòng mỗi kiểu, bảo toàn — không
+  có bug (`EconomyConcurrencyIntegrationTest`).
 
 ⚠️ **Phát hiện lúc code (2026-07-24)**: ADR-025 nêu tên `BuyItemCommand`/`SellItemCommand`/
 `ClaimMailCommand` cần `idempotencyKey` nhưng chỉ `CreateCharacterCommand` thật sự có — đã vá cả
@@ -615,7 +646,7 @@ hội (`SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_PARTY` + `PartyFacade.listMembers`).
 | Hệ thống | MVP | Ghi chú |
 |---|---|---|
 | Guild | ✅ Đã code (2026-07-24, Phase 7 lát cắt 1) | `feature-guild` — tạo/xin gia nhập/leader duyệt-từ chối/rời/kick/giải tán + kênh chat Bang hội (xem §10). Kho bang + nhiệm vụ bang dời lát cắt sau (xem feature-guild/CLAUDE.md). **Tên bang mới** kiểm ở server theo đúng luật tên nhân vật (2-16 ký tự, chữ/số/`_`) — quyết định chủ dự án 2026-09-29, sai luật ⇒ `ErrorResponse` `error.guild_name_invalid` |
-| Party | ✅ Đã code (2026-07-24, Phase 7 lát cắt 2) | `feature-party` — tạo/mời/chấp nhận-từ chối/rời (leader tự động chuyển cho thành viên vào sớm nhất)/kick + kênh chat Party (xem §10). Sức chứa tối đa 5 (GDD). Chia EXP KHÔNG có ở lát cắt này — chưa có cơ chế cấp EXP từ giết quái solo (xem feature-party/CLAUDE.md) |
+| Party | ✅ Đã code (2026-07-24, Phase 7 lát cắt 2) | `feature-party` — tạo/mời/chấp nhận-từ chối/rời (leader tự động chuyển cho thành viên vào sớm nhất)/kick + kênh chat Party (xem §10). Sức chứa tối đa 5 (GDD). Chia EXP KHÔNG có ở lát cắt này — chưa có cơ chế cấp EXP từ giết quái solo (xem feature-party/CLAUDE.md). **Vá 2026-10-03**: leader và thành viên vào sớm nhất cùng rời từng deadlock Postgres thật (thứ tự khoá ngược) — nay khoá dòng `party` trước; mời vào party vừa giải tán / xin vào bang vừa giải tán trả outcome thường (`NOT_LEADER` / `GUILD_NOT_FOUND`) thay vì 500 |
 | Friend | ✅ Đã code (2026-07-23) | `feature-friend`, trạng thái online qua `ConnectedCharacterRegistry` in-memory (KHÔNG qua Redis — xem feature-friend/CLAUDE.md, quyết định tránh trùng lặp hạ tầng ở single-instance) |
 | Mail | ✅ Đã code (2026-07-23) | `feature-mail` — gửi/xem/nhận/xoá; nhận gold+item đính kèm chạy trong 1 transaction (khoá dòng + kiểm `claimed_at` + cấp thưởng + đánh dấu + audit), verify rollback thật bằng Postgres (Testcontainers) |
 
@@ -631,7 +662,7 @@ Chi tiết: [SECURITY.md](../08-security/SECURITY.md). Ở tầng gameplay:
 |---|---|
 | Speed hack | `MoveCommand` chỉ mang **hướng** (`dirX/dirY`), server tự sở hữu hằng số tốc độ và tự tính vị trí — client không có kênh nào để gửi vị trí/tốc độ, nên không có gì để "kiểm tra rồi từ chối" (loại bỏ hẳn kênh tấn công, không phải validate-sau) |
 | Teleport | Như trên — cùng lý do, không phải "phát hiện di chuyển quá xa" |
-| Đi xuyên tường | `TerrainCollisionSystem` ([PHYSICS.md §3](../03-engine/PHYSICS.md)) — ⚠️ cơ chế đã có, obstacle rỗng, chưa có map thật để chặn ([ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md)) |
+| Đi xuyên tường | `TerrainCollisionSystem` ([PHYSICS.md §3](../03-engine/PHYSICS.md)) — ⚠️ cơ chế đã có, obstacle rỗng, chưa có map thật để chặn ([ADR-021](../01-architecture/adr/ADR-021-Box2D-vs-AABB.md)). Từ 2026-10-03 kiểm cả ĐOẠN di chuyển của tick, không chỉ điểm cuối — chướng ngại mỏng hơn bước mỗi tick không còn bị xuyên ([PHYSICS.md §8](../03-engine/PHYSICS.md)) |
 | Cooldown hack | Server giữ cooldown, không tin client |
 | Damage hack | Server tính damage |
 | Item duplicate | Transaction + audit (§7, §8, §11) |

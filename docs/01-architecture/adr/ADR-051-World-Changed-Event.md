@@ -213,3 +213,12 @@ Không (ngừng phát 1504 — D4 — sẽ cần ADR riêng khi tới lúc).
      Với hành vi cũ (lời báo gục rơi vào hàm rỗng), test gục-trong-hầm-ngục đỏ: nhân vật vẫn ở trong sau
      10 giây chờ.
 3. Kiểm chứng sống bằng client thật: gục trong bí cảnh ⇒ màn hình về làng, không còn boss đọng, vạch máu đầy.
+   - ⚠️ *(Ghi chú 2026-10-03)* Lượt kiểm sống nhánh **đấu trường** (2026-09-25, hai `gameProbe`, ba cách
+     chốt trận — hạ gục / bỏ cuộc / rớt mạng — đều PASS) **chưa phủ đường client THẬT**: probe đánh
+     đối thủ bằng cách gửi thẳng id nhân vật (`--attackTarget=<characterId>`), còn client desktop chỉ
+     đặt mục tiêu là QUÁI (`CombatHudController.selectTarget` chỉ nhận id trong bảng quái; click vào
+     người chơi đi sang `DuelCoordinator.onCharacterPicked` — chọn để thách đấu, không gửi
+     `SetTargetCommand`). Tức là với client thật, **vào được trận nhưng không đánh được đối thủ**; kết
+     luận PASS đúng cho thứ tự 308/spawn và đường chốt trận phía server, không cho trải nghiệm trận
+     đấu. Hướng sửa (phía client, không đổi protocol) đang chờ chủ dự án — dòng Arena ở
+     ["🔴 ĐANG CHỜ CHỦ DỰ ÁN"](../../README.md).

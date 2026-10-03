@@ -175,6 +175,17 @@ Bài toán: 100 người chơi trong 1 map, mỗi tick gửi toàn bộ state ch
 
 ⚠️ **AoI là bắt buộc, không phải tối ưu.** Không có AoI, map đông người sẽ sập băng thông ngay ở Phase 3.
 
+**Hiện thực** (`AreaOfInterestTracker`, server-world): lưới spatial hashing, sync 20Hz, mỗi nhân vật
+quét 3×3 ô quanh mình ([BENCHMARK §5.2](../09-performance/BENCHMARK.md)). ⚠️ Vòng quét ô lân cận chỉ
+chứng minh được một chiều — "trong tầm ⇒ là ô lân cận", nên không sót lần **vào** tầm — nhưng không
+thăm lại cặp đã **rời** 3×3 ô (hai người ở hai mép ô 0/1 rồi một người bước sang ô 2; hay hồi sinh
+dịch chuyển về `(0,0)`). Trước 2026-10-03 các cặp đó không bao giờ nhận despawn: client giữ bóng ma
+đứng yên, và vì server vẫn ghi "đang thấy" nên lúc quay lại cũng không gửi lại spawn. **Sửa
+2026-10-03** (`e53722d`): mỗi lần sync duyệt tập ĐANG THẤY của từng nhân vật trước, despawn mọi id
+ngoài 3×3 ô (chắc chắn ngoài tầm); id trong 3×3 ô để vòng quét cũ xử lý nên không event nào phát
+hai lần. Test: `AreaOfInterestBoundaryTest`. Chi phí thêm chưa đo lại bằng load test (thêm một lượt
+duyệt tập đang thấy + một `Iterator` mỗi nhân vật mỗi lần sync ở 20Hz).
+
 **Chưa chốt**: kích thước AoI (bao nhiêu world unit?) — ảnh hưởng cả gameplay (thấy được ai) lẫn băng thông. Cần đo ở Phase 3.
 
 ### Kiểm sống 2026-10-03 — AoI "bóng ma" (`e53722d`) và vị trí NaN (`5aab474`)
