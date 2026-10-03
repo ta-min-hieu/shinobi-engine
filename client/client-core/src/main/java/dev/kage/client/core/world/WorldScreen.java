@@ -351,12 +351,10 @@ public final class WorldScreen implements GameScreen {
     private KEntity spawnLocalPlayer(SelectCharacterResponse enterWorld) {
         KEntity entity = world.createEntity();
         PositionComponent position = new PositionComponent();
-        position.x = enterWorld.getSpawnX();
-        position.y = enterWorld.getSpawnY();
-        // prev = hiện tại: không có gì để nội suy ở frame đầu, để lệch sẽ thấy nhân vật trượt một
-        // đoạn từ (0,0) tới chỗ thật ngay khi vừa vào world.
-        position.prevX = position.x;
-        position.prevY = position.y;
+        // snapTo đặt prev = hiện tại (không có gì để nội suy ở frame đầu — để lệch sẽ thấy nhân vật
+        // trượt một đoạn từ (0,0) tới chỗ thật), và bỏ qua toạ độ không hữu hạn: khi đó đứng ở
+        // (0,0) chờ MoveResponse đầu tiên kéo về, thay vì chép NaN vào camera.
+        LocalPositionReconciler.snapTo(position, enterWorld.getSpawnX(), enterWorld.getSpawnY());
         entity.add(position);
         entity.add(new VelocityComponent());
         return entity;
@@ -772,31 +770,7 @@ public final class WorldScreen implements GameScreen {
     }
 
     private void onMoveResponse(MoveResponse response) {
-        PositionComponent pos = POSITION.get(localPlayer);
-        float dx = response.getX() - pos.x;
-        float dy = response.getY() - pos.y;
-        float dz = response.getZ() - pos.z;
-        if (Math.sqrt((dx * dx) + (dy * dy) + (dz * dz)) > WorldConstants.RECONCILE_SNAP_THRESHOLD) {
-            // Lệch lớn (mất gói MoveCommand/JumpCommand trước đó, hoặc server điều chỉnh) — sửa
-            // NGAY theo server, không tranh cãi (Điều 15, CLIENT.md §6).
-            pos.x = response.getX();
-            pos.y = response.getY();
-            pos.prevX = pos.x;
-            pos.prevY = pos.y;
-            pos.z = response.getZ();
-            pos.prevZ = pos.z;
-            pos.grounded = response.getGrounded();
-            if (pos.grounded) {
-                // Server nói đang đứng đất ⇒ hạn mức nhảy đôi bên server CHẮC CHẮN đã reset
-                // (VerticalMovementSystem xoá lúc đáp đất) — theo server luôn, tránh trường hợp
-                // client tưởng còn nợ 1 lần nhảy giữa không trung dù đã đứng trên đất.
-                pos.airJumpsUsed = 0;
-            }
-            // vz KHÔNG snap theo server — MoveResponse không mang vz (chỉ x/y/z/grounded, xem
-            // movement.proto). Dự đoán cục bộ tiếp tục dùng vz hiện có, tự hội tụ đúng quỹ đạo ở
-            // các tick sau vì VerticalMovementSystem chạy CÙNG công thức cả 2 phía (ADR-033) —
-            // follow-up nếu số liệu thật cho thấy cần đồng bộ cả vz.
-        }
+        LocalPositionReconciler.reconcile(POSITION.get(localPlayer), response);
     }
 
     /**
@@ -818,16 +792,7 @@ public final class WorldScreen implements GameScreen {
      * rồi được đưa về (ADR-051 D5) không được nằm nguyên tư thế ngã.
      */
     private void snapLocalPlayer(float x, float y) {
-        PositionComponent pos = POSITION.get(localPlayer);
-        pos.x = x;
-        pos.y = y;
-        pos.prevX = pos.x;
-        pos.prevY = pos.y;
-        pos.z = 0f;
-        pos.prevZ = 0f;
-        pos.vz = 0f;
-        pos.grounded = true;
-        pos.airJumpsUsed = 0;
+        LocalPositionReconciler.snapTo(POSITION.get(localPlayer), x, y);
         models.resetAfterRespawn(WorldConstants.LOCAL_CHARACTER_ID);
     }
 
