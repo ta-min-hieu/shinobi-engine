@@ -177,6 +177,39 @@ Bài toán: 100 người chơi trong 1 map, mỗi tick gửi toàn bộ state ch
 
 **Chưa chốt**: kích thước AoI (bao nhiêu world unit?) — ảnh hưởng cả gameplay (thấy được ai) lẫn băng thông. Cần đo ở Phase 3.
 
+### Kiểm sống 2026-10-03 — AoI "bóng ma" (`e53722d`) và vị trí NaN (`5aab474`)
+
+Server `installDist` thật + Postgres dev + `gameProbe` (TLS thật). Bán kính/cạnh ô AoI = 15 m.
+
+**1. Cặp nhân vật rời 3×3 ô — PASS, và chạy đúng NHÁNH MỚI của bản vá.** B (`Benkei`, id 4) đặt
+`pos_x = 0` bằng SQL rồi đứng yên trong `sect_grounds`; A (`Kagemaru`, id 3) đi bộ 0 → −35, đứng 5 s,
+quay về 0. Vì B đứng **đúng** ở x = 0 (ô 0) nên lúc khoảng cách vừa vượt 15 m thì A đã ở x < −15, tức
+ô −2 — cặp này **chỉ** `dropVisibleOutsideNeighborCells` mới bắt được; trước bản vá nó không bao giờ
+được báo despawn. Đo:
+- Phía A: `3237 MOVE_RESPONSE x=-15.00` → `3288 CHARACTER_DESPAWNED characterId=4` → `3304 x=-15.33`.
+  Lúc quay về: `16352 x=-15.00` → `16403 CHARACTER_SPAWNED characterId=4 x=0.00`.
+- Phía B: `11148 CHARACTER_MOVED characterId=3 x=-15.00` → `11200 CHARACTER_DESPAWNED characterId=3`;
+  spawn lại `24298 CHARACTER_SPAWNED characterId=3 x=-14.83`. Cả hai chiều đều có, không lặp sự kiện.
+
+**2. Quái — PASS cả hai đường.**
+- Đi bộ (nhánh cũ, ô lân cận): hình nộm `-2`@14 despawn khi A qua x = −1,00→−1,33, spawn lại ở
+  −1,08→−0,75; hình nộm `-1`@8 despawn ở −7,00, spawn lại ở −7,00→−6,67; `blood_sand_enforcer`
+  `-10`@−8 despawn ở −23,00, spawn lại ở −22,67. Ngưỡng khớp 15 m tới từng bước 0,33 m.
+- **Dịch chuyển do hồi sinh (nhánh MỚI, đúng ca commit nêu):** B (Lv1) đi tới x = −30, bị hai
+  `archive_warden` đánh chết (`8554 … targetHp=0 targetDied=true`), hồi sinh về (0,0)
+  (`8557 CHARACTER_RESPAWNED x=0.00`), và **5 ms sau** nhận `8562 MONSTER_DESPAWNED -6` + `-7` — hai con
+  đó đang ở x ≈ −28,0 / −31,6 (ô −2/−3, ngoài 3×3 ô quanh ô 0). Trước bản vá chúng sẽ là bóng ma.
+  Cùng mốc 8562 server gửi lại spawn `-10`/`-1`/`-2` và NPC quanh làng.
+
+**3. Vị trí NaN — PASS.** Nhân vật `al` (id 2, offline) đặt `pos_x = 'NaN'` bằng SQL. Vào world:
+`spawn=(0.00, 0.00)` trong `SelectCharacterResponse` (không còn NaN trên dây), `MOVE_RESPONSE`
+đi đều 0,00 → 3,00 trong 0,6 s, AoI thấy đủ 3 quái + 2 NPC. Đăng xuất xong DB ghi lại
+`pos_x = 2.9999993` (hữu hạn). Log server: không exception nào ngoài OTLP collector vắng (cổng 4318)
+và các dò BouncyCastle của Netty (đều là nhiễu môi trường dev).
+
+Dọn dẹp: `pos_x` của id 2/3/4 trả về giá trị trước khi đo; server và container dev đã tắt. Lưu ý
+server tự chạy migration V51 (đã có trên `master`) vào DB dev lúc khởi động.
+
 ---
 
 ## 7. Scheduler

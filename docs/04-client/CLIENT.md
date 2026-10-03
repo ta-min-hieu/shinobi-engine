@@ -147,6 +147,12 @@ lặng (không chữ nổi, không lặp animation) mỗi `ATTACK_CONFIRM_RETRY_
 nhận. Trần ~10 gói/giây và chỉ khi đang chờ — chi phí server tính theo gói ([BENCHMARK §5.1](../09-performance/BENCHMARK.md)).
 Chỉ client: không đổi server/protocol. Cùng cơ chế với `AttackCadence` của gameProbe.
 
+**Hoàn Khí/hồi chiêu khi server bỏ im lặng lệnh skill (`0553aeb`, 2026-10-03) — CHƯA kiểm sống.**
+Bản vá nằm trong `CombatHudController` (client desktop), còn `gameProbe` không chạy code HUD và cũng
+không có đường gửi lệnh skill (chỉ giải mã `SkillResultEvent`), nên không có cách đo bằng probe.
+Chỉ có `CombatHudControllerTest`; kiểm sống thật cần client desktop (bấm Enter ngoài tầm/khi bị
+choáng rồi đọc thanh Khí). Đợt kiểm sống cùng ngày cho AoI/NaN: [SERVER.md §6](../05-server/SERVER.md#6-state-sync--gửi-gì-cho-client).
+
 ✅ **Nền tảng đã chốt: desktop-first** ([ADR-023](../01-architecture/adr/ADR-023-Desktop-First-Input.md), Accepted 2026-09-05). Sơ đồ cảm ứng KHÔNG thiết kế trước (Điều 9) — khi nào làm mobile thật thì cần một ADR riêng, phạm vi tối thiểu: sơ đồ nhập liệu cảm ứng, bố cục lại HUD theo vùng chạm tối thiểu, và xem lại [ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md)/[ADR-028](../01-architecture/adr/ADR-028-Asset-Delivery-Tiers.md).
 
 ---
