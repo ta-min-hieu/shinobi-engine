@@ -705,7 +705,7 @@ public final class WorldFacade {
         KEntity entity = ecsWorld.createEntity();
 
         PositionComponent position = new PositionComponent();
-        position.x = entry.spawnX();
+        position.x = finiteSpawnX(entry.spawnX());
         // ADR-033 — KÉO VỀ ĐƯỜNG CHƠI: di chuyển giờ khoá vào đúng trục X, không lệnh nào đổi được
         // Y nữa. Nhân vật có `pos_y` đã lưu khác 0 (từ thời đi tự do 4 hướng, DB vẫn giữ nguyên) sẽ
         // kẹt VĨNH VIỄN ngoài đường chơi — không bao giờ chạm được bệ/địa hình nào vốn đều định
@@ -747,6 +747,16 @@ public final class WorldFacade {
         // TRƯỚC onAttach: entity không được có một tick nào vừa nhìn thấy được vừa mang chỉ số nền.
         applyBonusTo(entity, entry.baseStats(), entry.bonus());
         aoiTracker.onAttach(entry.characterId());
+    }
+
+    /**
+     * Vị trí đã lưu KHÔNG hữu hạn ⇒ về điểm hồi sinh (sửa 2026-10-03). Trước bản vá hướng NaN
+     * (2026-09-24, {@link #clampDirection}) một gói MoveCommand đủ để nhân vật mang {@code x = NaN},
+     * và vị trí đó được ghi xuống DB lúc thoát (cột REAL nhận NaN). Không chặn ở đây thì nhân vật ấy
+     * kẹt NaN VĨNH VIỄN mỗi lần vào lại: NaN cộng gì cũng ra NaN, so khoảng cách nào cũng false.
+     */
+    private static float finiteSpawnX(float savedX) {
+        return Float.isFinite(savedX) ? savedX : CHARACTER_RESPAWN_X;
     }
 
     private void handleDetach(long characterId) {

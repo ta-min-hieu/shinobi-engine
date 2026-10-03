@@ -77,6 +77,29 @@ class ServerAuthorityWorldTest {
         assertThat(ack(2).x() - START_X).isLessThanOrEqualTo(WorldConstants.MOVE_SPEED_MPS * 0.6f);
     }
 
+    /**
+     * Vị trí đã lưu là {@code NaN}/{@code Infinity} (di chứng của lỗ hướng NaN trước 2026-09-24: vị
+     * trí hỏng được ghi xuống DB lúc thoát) ⇒ vào world ở điểm hồi sinh, không mang NaN vào tick.
+     */
+    @Test
+    void shouldSpawnAtRespawnPoint_whenSavedPositionIsNotFinite() {
+        world = new WorldFacade(sink, false);
+        world.start();
+        world.attachCharacter(1L, Float.NaN, 0f, DEFAULT_STATS);
+        world.attachCharacter(2L, Float.NEGATIVE_INFINITY, 0f, DEFAULT_STATS);
+
+        world.enqueueMoveCommand(1L, 1, 1f, 0f);
+        world.enqueueMoveCommand(2L, 2, 1f, 0f);
+        sleepQuietly(300);
+        world.enqueueMoveCommand(1L, 3, 0f, 0f);
+        world.enqueueMoveCommand(2L, 4, 0f, 0f);
+
+        awaitTrue(() -> ack(3) != null && ack(4) != null);
+        // Đi được (hữu hạn và đã rời điểm xuất phát 0) — tức vật lý chạy trên toạ độ thật.
+        assertThat(ack(3).x()).isFinite().isPositive();
+        assertThat(ack(4).x()).isFinite().isPositive();
+    }
+
     @Test
     void shouldNotLetADeadCharacterAttackOrCast() {
         killCharacterTwo(false);
