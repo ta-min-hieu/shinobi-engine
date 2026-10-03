@@ -1,11 +1,11 @@
 package dev.kage.tools.loadtest;
 
 import java.io.IOException;
-import java.net.SocketTimeoutException;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -39,6 +39,14 @@ import dev.kage.protocol.wire.PacketCodec;
  * <p>Chỉ dummy tập luyện cố định (5,5) tồn tại trong World chính lúc viết lát cắt này — mọi người
  * chơi giả lập hội tụ về cùng 1 điểm, MÔ PHỎNG ĐÚNG kịch bản áp lực AoI/combat cao nhất hiện có
  * (không phải hạn chế của tool, phản ánh đúng nội dung game hiện tại).
+ *
+ * <p>⚠️ <b>KHÔNG có combat thật kể từ 2026-08-09</b> (rà 2026-10-03): {@code SetTargetCommand} từ
+ * đó chỉ NHẮM, không tự ra đòn ({@code WorldCommand.SetTargetCommand}, ADR-034) — muốn đánh phải
+ * gửi {@code AttackCommand}, mà công cụ này chưa bao giờ gửi. Hệ quả: không {@code AttackResultEvent},
+ * không vật phẩm rơi, nhánh bán đồ bên dưới không bao giờ chạy, {@code kage_gold} đứng yên. Mọi
+ * phép đo capacity sau ngày đó là tải "đi + chat + ping", KHÔNG phải "move + combat + chat" như
+ * BENCHMARK.md §5 mô tả. Chưa thêm {@code AttackCommand}: đổi tải đầu vào làm số mới không so được
+ * với số cũ, và cần vị trí trong tầm đánh — là quyết định của chủ dự án.
  */
 final class SimulatedPlayer implements Runnable, GameConnection.FrameObserver {
 
@@ -58,15 +66,43 @@ final class SimulatedPlayer implements Runnable, GameConnection.FrameObserver {
     // Không giới hạn rate riêng ở server cho bán đồ (khác world chat) — xác suất chỉ để tránh MỌI
     // client cùng bán đúng 1 nhịp, không phải né rate limiter.
     private static final int SELL_PROBABILITY_PERCENT = 50;
+    // Nhịp ngủ giữa hai vòng: 300 + [0, 500) ms (sleepJitter).
+    private static final int CYCLE_SLEEP_MIN_MS = 300;
+    private static final int CYCLE_SLEEP_JITTER_MS = 500;
+    /**
+     * Nhịp DỰ KIẾN giữa hai lệnh Move mở vòng (trung bình của {@link #sleepJitter}) — dùng bù
+     * coordinated omission cho mẫu Move ({@link LatencyRecorder#record(long, long)}). Chỉ Move được
+     * bù vì chỉ Move đi ĐỀU mỗi vòng; Ping/Chat/Sell là xác suất, không có nhịp cố định để bù.
+     */
+    private static final long EXPECTED_CYCLE_INTERVAL_NANOS =
+            TimeUnit.MILLISECONDS.toNanos(CYCLE_SLEEP_MIN_MS + CYCLE_SLEEP_JITTER_MS / 2);
+
+    private static final long NO_COORDINATED_OMISSION_CORRECTION = Long.MAX_VALUE;
 
     /**
      * Gộp mọi bộ đếm chia sẻ giữa các client — Checkstyle ParameterNumber tối đa 4 tham số.
      * {@code bytesSent}/{@code bytesReceived} đo THẬT qua chính socket (gồm 4-byte length prefix +
      * header + payload protobuf) — xấp xỉ đúng traffic cổng 7777, tách biệt hoàn toàn traffic
-     * Postgres/Redis (giao thức game và giao thức DB không đi qua cùng 1 socket).
+     * Postgres/Redis (giao thức game và giao thức DB không đi qua cùng 1 socket). Lỗi đếm TÁCH
+     * THEO LOẠI ({@link FailureCounters}) — bản cũ một {@code errorCount} chung trộn bắt tay hỏng với
+     * quá tải.
      */
     record Metrics(
-            LatencyRecorder latencyRecorder, AtomicLong errorCount, AtomicLong bytesSent, AtomicLong bytesReceived) {}
+            LatencyRecorder latencyRecorder,
+            FailureCounters failures,
+            AtomicLong bytesSent,
+            AtomicLong bytesReceived) {}
+
+    /**
+     * Vòng đời một client — report đếm client CÒN Ở TRONG WORLD theo trạng thái này. Bản cũ đếm
+     * {@code players.size()}: một client bắt tay hỏng, bỏ cuộc sau {@link #MAX_CONSECUTIVE_FAILURES}
+     * lỗi liên tiếp, hay chết vì exception unchecked vẫn được in là "đang chạy" tới hết test.
+     */
+    enum Phase {
+        CONNECTING,
+        IN_WORLD,
+        ENDED
+    }
 
     /** 1 dòng {@code ItemGrantedEvent} chưa bán — {@code itemId} là {@code inventory_item.id} thật. */
     private record OwnedItem(long itemId, int quantity) {}
@@ -79,13 +115,19 @@ final class SimulatedPlayer implements Runnable, GameConnection.FrameObserver {
     // 1 thread/player (Runnable chạy trên Virtual Thread riêng, LoadTestRunner), không cần đồng bộ.
     private final Deque<OwnedItem> ownedItems = new ArrayDeque<>();
 
-    private GameConnection connection;
+    private volatile Phase phase = Phase.CONNECTING;
+    // volatile: stop() đọc từ luồng dừng test, run() ghi từ luồng của client.
+    private volatile GameConnection connection;
 
     SimulatedPlayer(String host, int port, String username, Metrics metrics) {
         this.host = host;
         this.port = port;
         this.username = username;
         this.metrics = metrics;
+    }
+
+    Phase phase() {
+        return phase;
     }
 
     void stop() {
@@ -100,11 +142,14 @@ final class SimulatedPlayer implements Runnable, GameConnection.FrameObserver {
             this.connection = openConnection;
 
             connectCreateSelect(openConnection);
+            phase = Phase.IN_WORLD;
             long monsterId = findTrainingDummy(openConnection);
 
+            TimedExchange exchange =
+                    new TimedExchange(openConnection, metrics.latencyRecorder(), metrics.failures(), System::nanoTime);
             int consecutiveFailures = 0;
             while (running.get() && consecutiveFailures < MAX_CONSECUTIVE_FAILURES) {
-                consecutiveFailures = playOneCycle(openConnection, monsterId) ? 0 : consecutiveFailures + 1;
+                consecutiveFailures = playOneCycle(openConnection, exchange, monsterId) ? 0 : consecutiveFailures + 1;
             }
             if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
                 LOG.debug(
@@ -113,10 +158,14 @@ final class SimulatedPlayer implements Runnable, GameConnection.FrameObserver {
                         consecutiveFailures);
             }
         } catch (IOException e) {
+            // Mọi lỗi trong vòng chơi đã được playOneCycle bắt và đếm — tới được đây chỉ có thể là
+            // lúc mở socket/bắt tay (findTrainingDummy tự nuốt lỗi của nó).
             if (running.get()) { // đóng chủ động lúc test kết thúc không tính là lỗi thật.
-                metrics.errorCount().incrementAndGet();
-                LOG.debug("Client {} lỗi kết nối", username, e);
+                metrics.failures().increment(FailureCounters.Kind.HANDSHAKE);
+                LOG.debug("Client {} bắt tay hỏng", username, e);
             }
+        } finally {
+            phase = Phase.ENDED; // kể cả khi luồng chết vì exception unchecked.
         }
     }
 
@@ -126,7 +175,7 @@ final class SimulatedPlayer implements Runnable, GameConnection.FrameObserver {
     }
 
     /**
-     * Đếm MỌI frame nhận được (kể cả AoI event bị {@code readUntilOpcode} bỏ qua) — băng thông
+     * Đếm MỌI frame nhận được (kể cả AoI event bị {@link RoundTrip} bỏ qua) — băng thông
      * nhận thật. Ghi nhận {@code ItemGrantedEvent} THỤ ĐỘNG ở đây (không phải nơi gọi cụ thể nào)
      * vì nó có thể xen giữa BẤT KỲ lượt đọc nào sau lúc hạ dummy — cùng lý do
      * {@link #findTrainingDummy} phải quét thay vì đợi ở 1 điểm cố định.
@@ -186,7 +235,7 @@ final class SimulatedPlayer implements Runnable, GameConnection.FrameObserver {
 
     /**
      * PHÁT HIỆN THẬT (soak test đầu tiên, 2026-07-26): {@code Thread.sleep} jitter trước đây nằm
-     * CUỐI khối {@code try} — 1 lần {@link IOException}/{@link SocketTimeoutException} (bình
+     * CUỐI khối {@code try} — 1 lần {@link IOException}/{@link java.net.SocketTimeoutException} (bình
      * thường khi AoI event dồn dập lúc nhiều client tụ 1 điểm) khiến vòng lặp
      * {@link #run} gọi lại {@link #playOneCycle} NGAY LẬP TỨC, không throttle, tạo busy-loop thật —
      * 60 client sinh ra >20 TRIỆU lỗi trong < 5 phút (verify bằng server.log: server hoàn toàn khoẻ
@@ -197,18 +246,15 @@ final class SimulatedPlayer implements Runnable, GameConnection.FrameObserver {
      *     TIẾP, bỏ cuộc sau {@link #MAX_CONSECUTIVE_FAILURES} lần (kết nối đã chết hẳn, vd. bị
      *     {@code RateLimiter.shouldDisconnect} ngắt — không có lý do thử lại vô thời hạn).
      */
-    private boolean playOneCycle(GameConnection openConnection, long monsterId) {
+    private boolean playOneCycle(GameConnection openConnection, TimedExchange exchange, long monsterId) {
         ThreadLocalRandom random = ThreadLocalRandom.current();
         try {
-            runCycleBody(openConnection, monsterId, random);
+            runCycleBody(openConnection, exchange, monsterId, random);
             return true;
-        } catch (SocketTimeoutException e) {
-            // server chậm/quá tải, hoặc AoI event dồn dập che mất response cần tìm — 1 tín hiệu, không phải crash.
-            metrics.errorCount().incrementAndGet();
-            return false;
         } catch (IOException e) {
+            // Hết giờ / thiếu phản hồi / mất kết nối — đếm TÁCH loại (FailureCounters.classifyInWorld).
             if (running.get()) {
-                metrics.errorCount().incrementAndGet();
+                metrics.failures().increment(FailureCounters.classifyInWorld(e));
             }
             return false;
         } finally {
@@ -217,17 +263,18 @@ final class SimulatedPlayer implements Runnable, GameConnection.FrameObserver {
     }
 
     /** Tách khỏi {@link #playOneCycle} để giữ dưới giới hạn Checkstyle MethodLength. */
-    private void runCycleBody(GameConnection openConnection, long monsterId, ThreadLocalRandom random)
+    private void runCycleBody(
+            GameConnection openConnection, TimedExchange exchange, long monsterId, ThreadLocalRandom random)
             throws IOException {
-        timedRoundTrip(
-                openConnection,
+        exchange.run(
                 Opcode.OPCODE_MOVE_COMMAND_VALUE,
                 Opcode.OPCODE_MOVE_RESPONSE_VALUE,
                 MoveCommand.newBuilder()
                         .setDirX(DUMMY_DIR_X)
                         .setDirY(DUMMY_DIR_Y)
                         .build()
-                        .toByteArray());
+                        .toByteArray(),
+                EXPECTED_CYCLE_INTERVAL_NANOS);
 
         if (monsterId != 0 && random.nextInt(100) < 70) { // GDD §6 auto-target — fire-and-forget.
             SetTargetCommand setTarget =
@@ -235,24 +282,28 @@ final class SimulatedPlayer implements Runnable, GameConnection.FrameObserver {
             openConnection.send(Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, setTarget.toByteArray());
         }
         if (random.nextInt(100) < CHAT_PROBABILITY_PERCENT) {
-            timedRoundTrip(
-                    openConnection,
+            exchange.run(
                     Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE,
                     Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE,
                     SendChatMessageCommand.newBuilder()
                             .setChannel(ChatChannel.CHAT_CHANNEL_WORLD)
                             .setBody("load-test " + username)
                             .build()
-                            .toByteArray());
+                            .toByteArray(),
+                    NO_COORDINATED_OMISSION_CORRECTION);
         }
         if (random.nextInt(100) < 30) {
             PingCommand ping = PingCommand.newBuilder()
                     .setClientTimestampMs(System.currentTimeMillis())
                     .build();
-            timedRoundTrip(openConnection, Opcode.OPCODE_PING_VALUE, Opcode.OPCODE_PONG_VALUE, ping.toByteArray());
+            exchange.run(
+                    Opcode.OPCODE_PING_VALUE,
+                    Opcode.OPCODE_PONG_VALUE,
+                    ping.toByteArray(),
+                    NO_COORDINATED_OMISSION_CORRECTION);
         }
         if (!ownedItems.isEmpty() && random.nextInt(100) < SELL_PROBABILITY_PERCENT) {
-            sellOneOwnedItem(openConnection);
+            sellOneOwnedItem(exchange);
         }
 
         MoveCommand stop = MoveCommand.newBuilder().setDirX(0f).setDirY(0f).build();
@@ -265,10 +316,9 @@ final class SimulatedPlayer implements Runnable, GameConnection.FrameObserver {
      * nếu server đã dọn item đó vì lý do khác — tool chỉ cần round-trip THẬT để tạo tải kage.gold
      * thật, không assert nghiệp vụ ở đây, business logic đã có test riêng ở feature-shop).
      */
-    private void sellOneOwnedItem(GameConnection openConnection) throws IOException {
+    private void sellOneOwnedItem(TimedExchange exchange) throws IOException {
         OwnedItem item = ownedItems.poll();
-        timedRoundTrip(
-                openConnection,
+        exchange.run(
                 Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE,
                 Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE,
                 SellItemCommand.newBuilder()
@@ -276,29 +326,18 @@ final class SimulatedPlayer implements Runnable, GameConnection.FrameObserver {
                         .setQuantity(item.quantity())
                         .setIdempotencyKey(UUID.randomUUID().toString())
                         .build()
-                        .toByteArray());
+                        .toByteArray(),
+                NO_COORDINATED_OMISSION_CORRECTION);
     }
 
     private void sleepJitter(ThreadLocalRandom random) {
         try {
-            Thread.sleep(300 + random.nextInt(500)); // jitter — tránh mọi client đồng bộ tuyệt đối.
+            // jitter — tránh mọi client đồng bộ tuyệt đối.
+            Thread.sleep(CYCLE_SLEEP_MIN_MS + random.nextInt(CYCLE_SLEEP_JITTER_MS));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             running.set(false);
         }
-    }
-
-    // 2000 (không phải 200) — nhiều client tụ 1 điểm (findTrainingDummy javadoc) sinh AoI event
-    // fan-out O(n) thật, ngân sách quá nhỏ biến "chậm nhưng vẫn tới" thành "lỗi" giả — soak test
-    // đầu tiên (2026-07-26) cho thấy server hoàn toàn khoẻ mạnh trong lúc client báo lỗi hàng loạt.
-    private static final int MAX_FRAMES_TO_SKIP = 2000;
-
-    private void timedRoundTrip(GameConnection openConnection, int commandOpcode, int responseOpcode, byte[] payload)
-            throws IOException {
-        long startNanos = System.nanoTime();
-        openConnection.send(commandOpcode, payload);
-        openConnection.readUntilOpcode(responseOpcode, MAX_FRAMES_TO_SKIP);
-        metrics.latencyRecorder().record(System.nanoTime() - startNanos);
     }
 
     private void closeQuietly() {

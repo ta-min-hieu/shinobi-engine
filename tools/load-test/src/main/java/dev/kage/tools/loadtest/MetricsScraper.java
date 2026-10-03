@@ -28,6 +28,12 @@ final class MetricsScraper {
     private static final Pattern QUANTILE_LINE =
             Pattern.compile("kage_tick_duration_seconds\\{[^}]*quantile=\"(0\\.\\d+)\"[^}]*}\\s+([0-9.eE+-]+)");
 
+    // Timer mang tag world=main/dungeon/arena (MicrometerTickMetricsPort) — CHỈ đọc "main", nơi load
+    // test tạo tải. Bản cũ lấy dòng quantile đọc SAU CÙNG: có hầm ngục/đấu trường từng mở (meter
+    // không bị gỡ khi đóng) là report hiện tick của khu đó — percentile của timer không còn ghi gì
+    // rơi về 0, ra "tick p99 = 0" giả (2026-10-03).
+    private static final String MAIN_WORLD_LABEL = "world=\"main\"";
+
     // kage.players.online (GatewayBootstrap) là Gauge KHÔNG có tag → Prometheus in ra không kèm
     // {...} (vd "kage_players_online 199.0"). 2 nhánh tách rời (có nhãn / không nhãn) thay vì bọc
     // "{...}" trong 1 group rồi quantify thêm (?) — hình dạng đó bị SpotBugs/find-sec-bugs (SECRD)
@@ -78,21 +84,7 @@ final class MetricsScraper {
     }
 
     static MetricsSnapshot parse(String body) {
-        double p50 = -1;
-        double p95 = -1;
-        double p99 = -1;
-        Matcher matcher = QUANTILE_LINE.matcher(body);
-        while (matcher.find()) {
-            double quantile = Double.parseDouble(matcher.group(1));
-            double valueMillis = Double.parseDouble(matcher.group(2)) * 1000.0;
-            if (quantile == 0.5) {
-                p50 = valueMillis;
-            } else if (quantile == 0.95) {
-                p95 = valueMillis;
-            } else if (quantile == 0.99) {
-                p99 = valueMillis;
-            }
-        }
+        double[] tickMillis = parseMainWorldTickQuantiles(body);
         double playersOnline = -1;
         Matcher playersMatcher = PLAYERS_ONLINE_LINE.matcher(body);
         if (playersMatcher.find()) {
@@ -105,6 +97,27 @@ final class MetricsScraper {
             String value = goldMatcher.group(1) != null ? goldMatcher.group(1) : goldMatcher.group(2);
             goldTotal = Double.parseDouble(value);
         }
-        return new MetricsSnapshot(p50, p95, p99, playersOnline, goldTotal);
+        return new MetricsSnapshot(tickMillis[0], tickMillis[1], tickMillis[2], playersOnline, goldTotal);
+    }
+
+    /** @return {p50, p95, p99} của tick world {@code main} (ms), {@code -1} cho quantile vắng mặt */
+    private static double[] parseMainWorldTickQuantiles(String body) {
+        double[] millis = {-1, -1, -1};
+        Matcher matcher = QUANTILE_LINE.matcher(body);
+        while (matcher.find()) {
+            if (!matcher.group().contains(MAIN_WORLD_LABEL)) {
+                continue;
+            }
+            double quantile = Double.parseDouble(matcher.group(1));
+            double valueMillis = Double.parseDouble(matcher.group(2)) * 1000.0;
+            if (quantile == 0.5) {
+                millis[0] = valueMillis;
+            } else if (quantile == 0.95) {
+                millis[1] = valueMillis;
+            } else if (quantile == 0.99) {
+                millis[2] = valueMillis;
+            }
+        }
+        return millis;
     }
 }

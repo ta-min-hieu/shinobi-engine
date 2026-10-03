@@ -124,6 +124,10 @@ với `kage.tick.duration` phía server thật (scrape `/metrics`, Phase 9 lát 
 `./gradlew :tools:load-test:run --args="--maxClients=200 --durationSeconds=7200"` nhắm vào server
 đang chạy sẵn (không tự khởi động `GatewayBootstrap` — đo server production-like).
 
+⚠️ **Rà công cụ đo 2026-10-03 — đọc mục "⛔ Rà công cụ đo 2026-10-03" cuối §5.1 trước khi dùng BẤT KỲ số "trễ gói"/"packetLatency" nào trong tài liệu này.** Tóm tắt: mọi số trễ gói
+từ 2026-07-26 đều lệch THẤP (công cụ đo trúng phản hồi cũ); và từ 2026-08-09 công cụ KHÔNG còn tạo
+combat (câu "move+combat(auto-target)" ở trên không còn đúng).
+
 **Đo gì:**
 
 | Metric | Ngưỡng | Đo bằng |
@@ -545,6 +549,36 @@ vừa hỏng 1000/1000: **1000/1000 online, 0 lỗi, DB không tăng thêm một
 ⚠️ **Hệ quả: mọi con số "lỗi" trong §5.1 — kể cả "66 lỗi" ở N=2000 của bảng cũ và 1677/9560 của lần
 đo hôm nay — đều TRỘN LẪN lỗi bắt tay với lỗi quá tải, và không nên dùng làm bằng chứng về sức
 chứa.** Các con số CPU/băng thông/độ trễ thì không bị ảnh hưởng (đo trên những client ĐÃ vào được).
+
+### ⛔ Rà công cụ đo 2026-10-03 — mọi số "trễ gói" đã ghi đều lệch THẤP
+
+Rà tính đúng đắn của `tools:load-test`. **Không sửa con số nào ở trên** — muốn có số đúng phải đo lại
+thật; mục này chỉ nói số nào bị ảnh hưởng và lệch theo CHIỀU nào. Công cụ đã vá (kèm test đơn vị
+chứng minh đỏ trước khi sửa: `TimedExchangeTest`, `LatencyRecorderTest`, `MetricsScraperTest`,
+`FailureCountersTest`, `SimulatedPlayerTest`).
+
+| # | Lỗi của công cụ | Số bị ảnh hưởng | Chiều lệch |
+|---|---|---|---|
+| 1 | **Ghép phản hồi theo opcode, không theo `sequenceId`.** Mỗi vòng kết thúc bằng một `MoveCommand` dừng bắn-rồi-quên, server ack CẢ lệnh đó; ack nằm sẵn trong socket suốt 300-800ms ngủ ⇒ lượt Move kế tiếp nhặt ack CŨ, đo ra thời gian giải mã vài frame đã đệm (≈0). Move là ~⅔ số mẫu. Có từ bản đầu (2026-07-26). | **Mọi** "trễ gói p50/p95/p99" / "packetLatency" trong tài liệu (vd. 0,8ms / 3,9-14,7ms ở N=950; 21ms / 3,8s ở N=1997; 1-8s / 10-18s cấu hình DEV; 8460/7298ms ở §5.7) | **THẤP hơn thật.** p50 gần như vô nghĩa (rơi vào mẫu ≈0); p95 thực chất ≈ phân vị ~84 của mẫu thật, p99 ≈ phân vị ~97 |
+| 2 | **Lượt hết giờ bị bỏ khỏi histogram** (chỉ đếm lỗi). | p99 lúc quá tải (N≈2000, DEV) | **THẤP** — càng quá tải càng đẹp giả (thiên lệch kẻ sống sót) |
+| 3 | **Coordinated omission**: client vòng kín, server khựng L giây chỉ sinh 1 mẫu xấu thay vì ~L/0,55s mẫu. | p95/p99 lúc có khựng (GC pause giây ở §5.7, N=2000) | **THẤP** |
+| 4 | **"client=" trong report là số client từng dựng**, kể cả đã bắt tay hỏng/bỏ cuộc/chết. | Chỉ dòng log `[report] client=`; các bảng dùng `kage_players_online` phía server nên **không** bị ảnh hưởng | Cao hơn thật |
+| 5 | **Một `errorCount` chung** trộn bắt tay hỏng / hết giờ / mất kết nối / server từ chối. | Mọi cột "Lỗi client" (đã cảnh báo ở mục trên, nay có nguyên nhân thứ ba) | Không xác định — không tách được |
+| 6 | **Tick quantile lấy dòng `world=` đọc sau cùng**, không lọc `main`. | "serverTickMs"/"Tick p99" do load-test in ra — **chỉ khi** server từng mở hầm ngục/đấu trường (meter không bị gỡ, percentile của timer nhàn rỗi rơi về 0) | Có thể **THẤP** (về 0); số đọc thẳng từ Prometheus/JFR không bị ảnh hưởng |
+| 7 | Report cuối chia byte của khoảng LẺ cho cả `reportIntervalSeconds`. | Băng thông ở dòng report CUỐI (các bảng dùng report định kỳ ⇒ không ảnh hưởng) | THẤP |
+
+⚠️ **Lệch MÔ HÌNH TẢI — không phải lỗi tính toán, chưa sửa, cần chủ dự án quyết:** từ 2026-08-09
+(ADR-034) `SetTargetCommand` chỉ NHẮM, không tự đánh; công cụ chưa bao giờ gửi `AttackCommand` ⇒
+**mọi phép đo sau ngày đó KHÔNG có combat** (không `AttackResultEvent`, không rơi đồ, nhánh bán đồ
+không chạy, `kage_gold` đứng yên) — gồm cả lần đo lại N=2000 ngày 2026-09-05 (20,9 lõi). Phần
+combat ⇒ CPU/băng thông mỗi người chơi bị đo **THẤP** so với "move + combat + chat" mà §5 tuyên bố.
+Ngược lại công cụ gửi ~3,6 `MoveCommand`/giây/client đều đặn, trong khi client thật chỉ gửi khi
+ĐỔI hướng phím ⇒ phần di chuyển có thể bị đo **CAO**. Tổng hợp hai chiều thì chưa biết; 59.760
+gói/giây ở N=1000 chủ yếu là sự kiện AoI di chuyển. Cả hai đều dưới trần 30 lệnh/giây của server.
+
+Hệ quả cho các kết luận đang dùng: **kết luận CPU (20,9 lõi, siêu tuyến tính) và "giảm số gói" không
+bị lỗi tính toán nào ở trên chạm tới** (đo phía server), nhưng chịu lệch mô hình tải. Kết luận nào
+dựa vào **trễ gói phía client** (vd. "PROD p95 21ms" là chấp nhận được) **phải đo lại** trước khi dùng.
 
 ### Việc CHƯA làm / giới hạn phương pháp (Điều 30)
 

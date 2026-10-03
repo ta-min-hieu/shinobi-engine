@@ -17,9 +17,9 @@ final class MetricsScraperTest {
     private static final String SAMPLE_BODY = """
             # HELP kage_tick_duration_seconds Tick duration
             # TYPE kage_tick_duration_seconds summary
-            kage_tick_duration_seconds{world="0",quantile="0.5"} 0.002
-            kage_tick_duration_seconds{world="0",quantile="0.95"} 0.006
-            kage_tick_duration_seconds{world="0",quantile="0.99"} 0.009
+            kage_tick_duration_seconds{world="main",quantile="0.5"} 0.002
+            kage_tick_duration_seconds{world="main",quantile="0.95"} 0.006
+            kage_tick_duration_seconds{world="main",quantile="0.99"} 0.009
             # HELP kage_players_online Số người chơi đang online
             # TYPE kage_players_online gauge
             kage_players_online 199.0
@@ -47,12 +47,36 @@ final class MetricsScraperTest {
     @Test
     void shouldReportUnavailable_whenPlayersOnlineLineMissing() {
         String bodyWithoutGauge = """
-                kage_tick_duration_seconds{world="0",quantile="0.5"} 0.002
+                kage_tick_duration_seconds{world="main",quantile="0.5"} 0.002
                 """;
 
         MetricsScraper.MetricsSnapshot snapshot = MetricsScraper.parse(bodyWithoutGauge);
 
         assertThat(snapshot.playersOnline()).isEqualTo(-1);
+    }
+
+    /**
+     * {@code kage.tick.duration} mang tag {@code world} = main/dungeon/arena
+     * ({@code MicrometerTickMetricsPort}). Bản cũ lấy dòng quantile NÀO đọc sau cùng — một khi đã
+     * có hầm ngục/đấu trường từng mở (meter không bị gỡ khi đóng), report hiện tick của khu đó, mà
+     * percentile của một timer không còn ghi gì thì tự rơi về 0 ⇒ "tick p99 = 0" giả.
+     */
+    @Test
+    void shouldReadMainWorldTick_whenOtherWorldSeriesFollow() {
+        String body = """
+                kage_tick_duration_seconds{quantile="0.5",world="main",} 0.002
+                kage_tick_duration_seconds{quantile="0.95",world="main",} 0.006
+                kage_tick_duration_seconds{quantile="0.99",world="main",} 0.009
+                kage_tick_duration_seconds{quantile="0.5",world="dungeon",} 0.0
+                kage_tick_duration_seconds{quantile="0.95",world="dungeon",} 0.0
+                kage_tick_duration_seconds{quantile="0.99",world="dungeon",} 0.0
+                """;
+
+        MetricsScraper.MetricsSnapshot snapshot = MetricsScraper.parse(body);
+
+        assertThat(snapshot.p50Millis()).isEqualTo(2.0);
+        assertThat(snapshot.p95Millis()).isEqualTo(6.0);
+        assertThat(snapshot.p99Millis()).isEqualTo(9.0);
     }
 
     @Test
@@ -79,7 +103,7 @@ final class MetricsScraperTest {
     @Test
     void shouldReportUnavailable_whenGoldTotalLineMissing() {
         String bodyWithoutGauge = """
-                kage_tick_duration_seconds{world="0",quantile="0.5"} 0.002
+                kage_tick_duration_seconds{world="main",quantile="0.5"} 0.002
                 """;
 
         MetricsScraper.MetricsSnapshot snapshot = MetricsScraper.parse(bodyWithoutGauge);
