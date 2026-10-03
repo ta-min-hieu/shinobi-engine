@@ -3,9 +3,16 @@
     "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
     "https://checkstyle.org/dtds/configuration_1_3.dtd">
 <!--
-  Checkstyle cho TEST SOURCE — giống checkstyle.xml, CHỈ khác MethodName: cho phép
-  dấu gạch dưới để mô tả hành vi (TESTING.md §10: "shouldRejectAttack_whenTargetOutOfRange" —
-  chính tài liệu của dự án khuyến nghị quy ước này cho test, khác production code).
+  Checkstyle cho TEST SOURCE — giống checkstyle.xml, CHỈ khác HAI chỗ:
+  1. MethodName: cho phép dấu gạch dưới để mô tả hành vi (TESTING.md §10:
+     "shouldRejectAttack_whenTargetOutOfRange" — chính tài liệu của dự án khuyến nghị quy ước này cho
+     test, khác production code).
+  2. KHÔNG có MethodLength. Rà 2026-10-03: file này từ ngày đầu (Phase 2) đã thiếu LẶNG LẼ ba rule
+     (hậu tố Manager/Helper/Util/Info/Data, MethodLength, ParameterNumber) trong khi dòng đầu vẫn ghi
+     "chỉ khác MethodName". Hai rule kia bật lại không lộ vi phạm nào. MethodLength thì lộ 50 hàm test
+     dài hơn 50 dòng (server-gateway 42, server-database 4, client-core 3, server-world 1) — phần lớn là
+     fake*Facade dựng test double và kịch bản end-to-end qua socket thật. Tách nhỏ chúng là việc thật,
+     không cơ học, nên đang CHỜ CHỦ DỰ ÁN: giữ ngoại lệ này hay trả nợ rồi bật lại.
 -->
 <module name="Checker">
     <property name="charset" value="UTF-8"/>
@@ -15,6 +22,11 @@
     <module name="RegexpSingleline">
         <property name="format" value="^import .*\.\*;$"/>
         <property name="message" value="Cấm wildcard import — liệt kê rõ từng import (CODING-STANDARDS §23)."/>
+    </module>
+
+    <module name="RegexpSingleline">
+        <property name="format" value="\b(class|interface|record|enum)\s+\w*(Manager|Helper|Util|Utils|Info|Data)\b"/>
+        <property name="message" value="Hậu tố Manager/Helper/Util/Info/Data thường vô nghĩa — đặt tên theo trách nhiệm thật (CODING-STANDARDS §2). Nếu thật sự phản ánh trách nhiệm, suppress có lý do."/>
     </module>
 
     <!-- Cấm `var` cho local variable (CODING-STANDARDS §5) — luôn ghi kiểu tường minh, kể cả trong test.
@@ -43,6 +55,12 @@
         <module name="ConstantName"/>
         <module name="PackageName">
             <property name="format" value="^dev\.kage(\.[a-z][a-z0-9]*)+$"/>
+        </module>
+
+        <!-- MethodLength (≤50 dòng) KHÔNG áp cho test — xem ghi chú đầu file. -->
+        <module name="ParameterNumber">
+            <property name="max" value="4"/>
+            <property name="ignoreOverriddenMethods" value="true"/>
         </module>
 
         <module name="EmptyCatchBlock">

@@ -9,9 +9,13 @@
          phải viết tay, không thể/không nên "sửa" vì protoc ghi đè lại y hệt lần build sau). Toàn
          bộ generated code nằm TRỰC TIẾP dưới dev.kage.protocol; code viết tay (PacketCodec,
          PacketHeader, ProtocolVersion) nằm ở dev.kage.protocol.wire — regex loại trừ chính xác
-         subpackage .wire, không đụng tới code viết tay. -->
+         subpackage .wire, không đụng tới code viết tay.
+         ⚠️ Rà 2026-10-03: regex cũ "dev.kage.protocol.(?!wire.).*" nuốt luôn TEST viết tay nằm thẳng
+         dưới dev.kage.protocol (OpcodeRegistryTest — gài thử `new Random().nextInt()` vào đó,
+         spotbugsTest vẫn xanh). Loại trừ nay chừa ra mọi lớp *Test (và lớp lồng *Test$...): protoc
+         không bao giờ sinh tên đó vì không .proto nào có message/file tên *Test. -->
     <Match>
-        <Class name="~dev\.kage\.protocol\.(?!wire\.).*"/>
+        <Class name="~dev\.kage\.protocol\.(?!wire\.)(?![A-Za-z0-9_]*Test(\$.*)?$).*"/>
     </Match>
 
     <!-- Test giả lập server bằng ServerSocket thường để verify hành vi reconnect/backoff của
