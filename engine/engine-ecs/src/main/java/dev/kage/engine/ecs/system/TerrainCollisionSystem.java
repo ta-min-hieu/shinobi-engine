@@ -50,11 +50,26 @@ public final class TerrainCollisionSystem extends IteratingKSystem {
         PositionComponent position = POSITION.get(entity);
         // Index loop (không for-each) — tránh Iterator allocation trong game loop (Điều 31).
         for (int i = 0; i < obstacles.size(); i++) {
-            if (obstacles.get(i).contains(position.x, position.y)) {
+            if (blocks(obstacles.get(i), position)) {
                 position.x = position.prevX;
                 position.y = position.prevY;
                 return;
             }
         }
+    }
+
+    /**
+     * Chặn khi điểm cuối nằm trong vật chặn (hành vi cũ) HOẶC đoạn đi trong tick QUÉT QUA nó từ bên
+     * ngoài. Chỉ kiểm điểm cuối thì một tick dời entity qua hẳn bức tường mỏng hơn quãng đi được
+     * (5 m/s ở 60Hz = 8,3cm/tick; nhanh hơn — lướt, đẩy lùi — còn dài hơn) mà cả hai đầu đều ở
+     * ngoài: xuyên tường. Điểm đầu đã ở TRONG thì không xét đoạn quét, để entity lỡ nằm trong vật
+     * chặn còn đi ra được thay vì kẹt vĩnh viễn.
+     */
+    private static boolean blocks(Aabb obstacle, PositionComponent position) {
+        if (obstacle.contains(position.x, position.y)) {
+            return true;
+        }
+        return !obstacle.contains(position.prevX, position.prevY)
+                && obstacle.intersectsSegment(position.prevX, position.prevY, position.x, position.y);
     }
 }
