@@ -2,6 +2,7 @@ package dev.kage.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -13,8 +14,9 @@ import com.tngtech.archunit.lang.ArchRule;
  * <p>Rule dùng wildcard {@code ..} nên bền vững với package prefix: chỉ cần các segment
  * ngữ nghĩa (engine.ecs, server.gateway, server.database, domain, infrastructure) xuất hiện.
  *
- * <p>Phase 0: module rỗng → chưa có class → rule pass trivially. Rule đã sẵn để chặn ngay khi
- * code đầu tiên vi phạm. KHÔNG xoá rule nào mà không có ADR ({@code Supersedes ADR-011}).
+ * <p>Mọi module production đều trên classpath (build.gradle.kts tự dò, {@link ScannedModulesTest}
+ * chốt ngược) và {@code failOnEmptyShould=true}: rule có mệnh đề {@code that()} rỗng là ĐỎ, không
+ * phải "pass trivially". KHÔNG xoá rule nào mà không có ADR ({@code Supersedes ADR-011}).
  */
 @AnalyzeClasses(packages = "dev.kage", importOptions = ImportOption.DoNotIncludeTests.class)
 class DependencyRuleTest {
@@ -68,11 +70,19 @@ class DependencyRuleTest {
                     .should().dependOnClassesThat().resideInAnyPackage("org.springframework..")
                     .because("Không dùng Spring cho Game Server (ADR-009)");
 
+    /**
+     * Module {@code shared-*} KHÔNG nằm dưới gói {@code ..shared..}: shared-protocol sinh code vào
+     * {@code dev.kage.protocol} (java_package của mọi .proto). Bản cũ chọn {@code ..shared..} — tập rỗng,
+     * rule xanh giả từ Phase 0 tới khi rà 2026-10-03 bật lại {@code failOnEmptyShould}. Cấm theo chiều
+     * ngược lại cho chắc: protocol không được biết bất kỳ gói {@code dev.kage} nào khác (engine, client,
+     * server và cả 14 feature module {@code dev.kage.<feature>}).
+     */
     @ArchTest
     static final ArchRule shared_khong_phu_thuoc_gameplay =
             noClasses()
-                    .that().resideInAPackage("..shared..")
-                    .should().dependOnClassesThat().resideInAnyPackage("..engine..", "..client..", "..server..")
+                    .that().resideInAPackage("dev.kage.protocol..")
+                    .should().dependOnClassesThat(JavaClass.Predicates.resideInAPackage("dev.kage..")
+                            .and(JavaClass.Predicates.resideOutsideOfPackage("dev.kage.protocol..")))
                     .because("shared chỉ chứa DTO/Protocol/Constant, không business logic (Điều 22)");
 
     @ArchTest
