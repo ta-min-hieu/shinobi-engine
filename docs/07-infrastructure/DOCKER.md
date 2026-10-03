@@ -26,15 +26,28 @@
 deploy/docker/
 ├── server.Dockerfile          # gateway + world (MVP: cùng 1 image)
 ├── docker-compose.yml         # môi trường dev đầy đủ
-├── docker-compose.ci.yml      # tối giản cho CI
-└── .dockerignore
+├── docker-compose.prod.yml    # Production — VM đơn (ADR-014), pull image GHCR
+├── .env.example               # mẫu secret dev  → copy thành .env (gitignore)
+├── .env.prod.example          # mẫu secret prod → copy thành .env.prod (gitignore)
+├── prometheus/ alertmanager/ grafana/   # observability (OBSERVABILITY.md §6-10)
+.dockerignore                  # ở REPO ROOT (build context = repo root), không ở deploy/docker/
 ```
+
+⚠️ Đối chiếu file thật 2026-10-03: **không có `docker-compose.ci.yml`** — CI không dùng Compose;
+integration test Testcontainers tự dựng Postgres/Redis trong `./gradlew test` (`.github/workflows/ci.yml`).
 
 ⚠️ **Client không container hoá** — client là ứng dụng desktop/mobile, không phải service.
 
 ---
 
 ## 3. Multi-stage Build
+
+⚠️ Khối dưới là **bản phác thiết kế gốc**, KHÔNG phải file thật. File thật
+(`deploy/docker/server.Dockerfile`) đã khác ở 3 chỗ: COPY `build.gradle.kts` của TỪNG module trước
+bước tải dependency (không `|| true`), thêm stage `jlink` (§8), runtime là `ubuntu:26.04` + JRE
+jlink thay vì `eclipse-temurin:25-jre`. ⚠️ **Thêm module vào `settings.gradle.kts` PHẢI thêm dòng
+COPY tương ứng** — đã quên 2 lần (2026-08-01: `tools/asset-pipeline`; 2026-08-30→10-03:
+`feature-monster` + `feature-world`), mỗi lần làm image không build được.
 
 ```dockerfile
 # ---- Stage 1: build ----
@@ -154,8 +167,8 @@ generic (`PostgreSQLContainer`, không phải `PostgreSQLContainer<?>`).
 | Môi trường | Compose file | Đặc điểm |
 |---|---|---|
 | **Development** | `docker-compose.yml` | Volume persist; log DEBUG; TLS tắt (tường minh) |
-| **Test/CI** | `docker-compose.ci.yml` | Không volume (sạch mỗi lần); nhanh nhất có thể |
-| **Production** | `docker-compose.prod.yml` (mới, khi viết) | [ADR-014](../01-architecture/adr/ADR-014-Kubernetes-vs-Docker-Compose.md) ✅ — không K8s, chạy trên VM đơn cùng cơ chế Compose |
+| **Test/CI** | — (không có file Compose; Testcontainers trong `./gradlew test`) | Container sạch mỗi lần chạy test |
+| **Production** | `docker-compose.prod.yml` (2026-07-31, chưa chạy thật trên VM — §"Việc cần làm" mục 7) | [ADR-014](../01-architecture/adr/ADR-014-Kubernetes-vs-Docker-Compose.md) ✅ — không K8s, chạy trên VM đơn cùng cơ chế Compose |
 
 ---
 

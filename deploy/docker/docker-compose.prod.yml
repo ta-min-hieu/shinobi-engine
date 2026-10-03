@@ -178,8 +178,11 @@ services:
       COLLECTOR_OTLP_ENABLED: "true"
     ports:
       - "127.0.0.1:16686:16686" # UI — SSH tunnel để xem
-      - "4318:4318" # OTLP/HTTP nhận trace — chỉ container khác trong network này gọi thật (server), nhưng
-        # publish ra host để tiện gỡ lỗi thủ công tạm thời; KHÔNG có traffic ngoài nào cần gọi cổng này.
+      # OTLP/HTTP nhận trace — chỉ container "server" gọi thật, qua network Compose (`jaeger:4318`),
+      # KHÔNG cần publish. Bản cũ publish "4318:4318" = 0.0.0.0, trái điểm 3 đầu file ("chỉ 7777
+      # public"): ai trên Internet cũng bơm span giả được vào Jaeger không xác thực. Giữ loopback
+      # để gỡ lỗi thủ công qua SSH tunnel như các cổng admin khác (sửa 2026-10-03).
+      - "127.0.0.1:4318:4318"
     logging:
       driver: json-file
       options: { max-size: "50m", max-file: "5" }
