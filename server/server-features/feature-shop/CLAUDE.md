@@ -28,6 +28,9 @@ protocol chưa có thiết kế nào trong docs gốc):
    cố định của `buy_price`) — tự cân bằng từng item, không áp 1 công thức chung.
 3. **Shop TOÀN CỤC, không gắn NPC/vị trí** — Phase 6 mới có NPC/Dialogue; lúc đó mới thêm ràng
    buộc "đứng gần NPC mới mua được" (không phải thiếu sót, chờ đúng lúc có khái niệm NPC).
+   ⚠️ *(Rà 2026-10-03)* Lý do hoãn này đã LỖI THỜI — NPC/hội thoại có từ Phase 6, mà mua/bán (và
+   nói chuyện NPC, nhận/trả quest) vẫn không kiểm khoảng cách. Chưa sửa: đã đưa thành câu hỏi ở
+   ["🔴 ĐANG CHỜ CHỦ DỰ ÁN"](../../../docs/README.md).
 
 ## Vì sao là module RIÊNG (không gộp vào feature-inventory như cường hoá)
 
@@ -68,6 +71,14 @@ túi đồ thật), đổi thì phải đổi cả 2 chỗ cho tới khi có ngu
   vẫn là `SELL_OUTCOME_ITEM_NOT_SELLABLE` (không đổi shop.proto) — câu chữ client đã nhắc "đang mặc
   thì tháo ra trước". Trước đó dòng bị xoá, ô trang bị về NULL mà World vẫn giữ chỉ số tới lúc
   đăng nhập lại.
+- **Số lượng mua cực lớn không còn tràn số** (sửa 2026-10-03, `0d66b5f`): `quantity` tới từ client
+  là `int32`. Mua gần `Integer.MAX_VALUE` (đủ vàng) từng làm `(quantity + maxStack - 1)` tràn thành
+  số ô ÂM ⇒ lọt kiểm sức chứa, không chèn gì mà vẫn báo `OK` sau khi đã TRỪ VÀNG; có chồng sẵn thì
+  SQL gộp tràn `integer` của Postgres ⇒ 500. `InventoryStackMerge` (server-database) nay đếm ô bằng
+  `long` và điều kiện gộp viết `quantity <= max_stack - ?`. Test: `MaxStackGrantIntegrationTest`.
+- **`quantity ≤ 0` bị chặn ở biên dây** (2026-10-03, `EconomyCommandShape` ở `server-gateway`) ⇒ 400
+  `error.invalid_payload`, không còn rơi vào lưới cuối thành 500. Kiểm trong use case (mục "Cứng")
+  vẫn giữ — biên dây chỉ kiểm hình dạng.
 
 ## Cứng
 

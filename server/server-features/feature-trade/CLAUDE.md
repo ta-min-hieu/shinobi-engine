@@ -55,7 +55,12 @@ yêu cầu, KHÔNG có thiết kế nào — mọi cơ chế bên dưới là qu
    cường hoá không bao giờ gộp.
    **Sức chứa túi** kiểm SAU mọi lượt chuyển (`TradeInventoryPort#exceedsCapacity`, sửa
    2026-09-24): trước đó chuyển NGUYÊN DÒNG bỏ qua hẳn kiểm, túi 20 dòng nhận thành 21. Kiểm ở
-   cuối chứ không từng lượt để đổi 1-lấy-1 giữa hai túi đều đầy vẫn hợp lệ.
+   cuối chứ không từng lượt để đổi 1-lấy-1 giữa hai túi đều đầy vẫn hợp lệ. ⚠️ Bản 2026-09-24 mới
+   bỏ kiểm giữa chừng cho chuyển NGUYÊN DÒNG; chuyển TÁCH CHỒNG vẫn đếm dòng người nhận ngay giữa
+   giao dịch, và vì lời chào của requester chạy trước nên một vụ đổi hợp lệ (requester tách chồng vào
+   túi đầy, target trả lại nguyên dòng) bị `OFFER_INVALID` trong khi đảo vai thì thành công. **Sửa
+   2026-10-03** (`7ca8e2f`): kiểm giữa chừng bị gỡ hẳn, outcome `RECIPIENT_INVENTORY_FULL` của
+   `TradeInventoryPort` cũng gỡ; chỉ còn `exceedsCapacity` ở cuối. Test: `TradeIntegrationTest`.
    **Ngoại lệ HẸP (chủ dự án quyết 2026-09-29): món đang chào KHÔNG được cường hoá.** Lỗi thật:
    `trade_offer_item` không lưu `enhance_level`, xác thực lúc thi hành chỉ kiểm chủ/số lượng/đang
    mặc ⇒ người đưa cường hoá SAU KHI người kia đã xác nhận, giao dịch thi hành với món khác giá trị.
@@ -95,6 +100,16 @@ yêu cầu, KHÔNG có thiết kế nào — mọi cơ chế bên dưới là qu
 - **`trade_offer_item.item_id` KHÔNG có FK** tới `inventory_item` — tham chiếu MỀM có chủ đích
   (xem comment migration V16): có FK sẽ CHẶN việc bán/gửi thư 1 item đang được chào trong 1 trade
   không liên quan (vi phạm FK), sai hoàn toàn với triết lý "không khoá trước".
+  ⚠️ Hệ quả của tham chiếu mềm: lời chào **không xác thực sở hữu** lúc đặt, nên trước 2026-10-03
+  `GetTradeStatusUseCase` tra loại + cấp cường hoá của BẤT KỲ `inventory_item` id nào được chào —
+  lộ đồ người lạ theo id, và cho đối phương thấy một món +15 không bao giờ chuyển được. **Sửa
+  2026-10-03** (`11ed42a`): món không còn thuộc người chào hiển thị như món đã biến mất
+  (`itemTemplateId=0`). Xác thực thật vẫn chỉ ở lúc thi hành.
+- **Hình dạng lời chào kiểm ở biên dây** (2026-10-03, `EconomyCommandShape` ở `server-gateway`):
+  vàng âm hoặc dòng có `itemId`/`quantity` ≤ 0 bị từ chối bằng **400 `error.invalid_payload`** trên
+  event loop. Trước đó chúng tới `OfferedItemInput`, ném `IllegalArgumentException` và rơi vào lưới
+  cuối của gateway thành 500 kèm stack trace mức ERROR mỗi gói. Nghiệp vụ (đủ vàng, còn sở hữu) vẫn
+  là việc của use case.
 - **Không có `DisbandTrade`/kick riêng** — trade luôn đúng 2 người, `CancelTradeUseCase` đã đủ.
 
 ## Cứng
@@ -106,7 +121,11 @@ yêu cầu, KHÔNG có thiết kế nào — mọi cơ chế bên dưới là qu
 ✅ Port là interface trong `domain/`; Adapter implement ở `server-database`
 ✅ Value Object = `record`, validate trong compact constructor
 ✅ Module khác gọi qua `TradeFacade`, không đọc bảng `trade_session`/`trade_offer_item` trực tiếp
-✅ Ghi audit (`TRADE_EXECUTED`) cho CẢ 2 bên khi thi hành thành công
+✅ Ghi audit (`TRADE_EXECUTED`) cho CẢ 2 bên khi thi hành thành công — từ 2026-10-03 (`85ac060`)
+   mỗi dòng ghi `goldGiven`/`goldReceived` + `itemsGiven`/`itemsReceived` (`itemId` dòng NGUỒN +
+   `quantity`). Phiên và lời chào bị xoá ngay sau thi hành nên dòng audit là dấu vết DUY NHẤT; bản cũ
+   chỉ có `sessionId`/`counterpartId`. Chưa ghi template/cấp cường hoá — câu hỏi mở, xem
+   ["🔴 ĐANG CHỜ CHỦ DỰ ÁN"](../../../docs/README.md)
 
 ❌ SQL/JDBC/Redis client trong module này (Điều 23 — enforce bằng ArchUnit)
 ❌ `domain/` biết PostgreSQL
@@ -121,4 +140,6 @@ validate compact constructor). `application/` test với **Fake Port dùng chung
 feature-guild/feature-party — nhiều Port, tránh lặp nested Fake mỗi file). Postgres thật
 (`server-database/.../trade/TradeIntegrationTest`) verify: xác thực lại phát hiện item đã bán mất
 giữa chừng → `OFFER_INVALID`, tách stack đúng, rollback TOÀN BỘ (gold lẫn item) khi 1 chân thất
-bại, `idempotencyKey` chặn thi hành 2 lần.
+bại, `idempotencyKey` chặn thi hành 2 lần. `EconomyConcurrencyIntegrationTest` (2026-10-03) đua
+thi hành với bán món đang chào và với bên kia huỷ, mỗi kiểu 10 vòng, đo GIÁ TRỊ CUỐI: đúng một bên
+thắng mỗi vòng, vàng/vật phẩm bảo toàn — không có bug, test giữ lại làm hàng rào.
