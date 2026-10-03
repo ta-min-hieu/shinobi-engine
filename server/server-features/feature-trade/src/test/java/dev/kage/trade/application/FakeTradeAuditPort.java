@@ -10,9 +10,11 @@ import dev.kage.trade.domain.Transaction;
 final class FakeTradeAuditPort implements TradeAuditPort {
 
     final List<String> loggedActions = new ArrayList<>();
+    final List<String> loggedDetails = new ArrayList<>();
 
     @Override
     public void log(Transaction tx, long characterId, String action, String detailJson) {
         loggedActions.add(action);
+        loggedDetails.add(detailJson);
     }
 }
