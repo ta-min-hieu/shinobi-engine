@@ -68,17 +68,24 @@ spotless {
 
 Thực thi [CODING-STANDARDS.md](../02-coding-standards/CODING-STANDARDS.md):
 
-| Rule | Nguồn |
-|---|---|
-| Line length 120 | §23 |
-| Không wildcard import | §23 |
-| Method ≤ 50 dòng | §4 |
-| Tham số ≤ 4 | §4 |
-| Field ≤ 10/class | [CODE-REVIEW.md §5](../02-coding-standards/CODE-REVIEW.md) |
-| **Cấm tên `*Manager`, `*Helper`, `*Util`** | §2 — custom regex rule |
-| JavaDoc bắt buộc cho `api/` | §16 |
+| Rule | Nguồn | Máy ép thật? (rà 2026-10-03) |
+|---|---|---|
+| Line length 120 | §23 | ✅ main + test + jmh |
+| Không wildcard import | §23 | ✅ main + test + jmh |
+| **Cấm `var` cho local** (`NoVarLocal`) | §5 | ✅ main + test + jmh |
+| Method ≤ 50 dòng | §4 | ⚠️ main + jmh; **test thì KHÔNG** (50 hàm test vượt — chờ chủ dự án, xem `config/checkstyle/checkstyle-test.xml`) |
+| Tham số ≤ 4 | §4 | ✅ main + test + jmh |
+| Field ≤ 10/class | [CODE-REVIEW.md §5](../02-coding-standards/CODE-REVIEW.md) | ❌ **chưa có rule** — Checkstyle không có rule đếm field; PMD `TooManyFields(maxfields=10)` đo thử: 3 lớp vượt (`CombatHud`, `InventoryPanel`, `TradeController`) |
+| **Cấm tên `*Manager`, `*Helper`, `*Util`** | §2 — custom regex rule | ✅ main + test + jmh |
+| JavaDoc bắt buộc cho `api/` | §16 | ❌ **chưa có rule** — `MissingJavadocType/Method` giới hạn ở `api/` đo thử: 114 chỗ thiếu trên 15 feature module |
 
 ⚠️ Rule "cấm `*Manager/*Helper/*Util`" cần custom `TypeName` regex — đây là rule **đặc thù dự án**, giá trị cao vì nó bắt đúng thứ [CODING-STANDARDS.md §2](../02-coding-standards/CODING-STANDARDS.md) cấm.
+
+⚠️ **Rà độ phủ 2026-10-03**: `checkstyle-test.xml` từ Phase 2 đã thiếu lặng lẽ rule hậu tố, MethodLength,
+ParameterNumber (dòng đầu file vẫn ghi "chỉ khác MethodName"); `quality:architecture-tests` không áp
+`kage.quality-conventions` nên không cổng tĩnh nào quét nó; Spotless chỉ nhắm `src/main` + `src/test`
+nên bỏ sót `src/jmh`. Đã sửa cả ba (trừ MethodLength cho test — xem bảng). Bài học: một rule "có trong
+config" chưa phải bằng chứng nó chạy — gài thử một vi phạm và nhìn cổng đỏ.
 
 ---
 
@@ -124,11 +131,19 @@ dependencies {
 
 Bắt: complexity, duplicate, unused, deep nesting.
 
-| Ngưỡng | Giá trị |
-|---|---|
-| Cyclomatic complexity | ≤ 10 |
-| Độ sâu kế thừa | ≤ 3 |
-| Duplicate | ≥ 3 lần ([CODE-REVIEW.md §4](../02-coding-standards/CODE-REVIEW.md) — rule of three) |
+| Ngưỡng | Giá trị | Máy ép thật? (rà 2026-10-03) |
+|---|---|---|
+| Cyclomatic complexity | ≤ 10 mỗi method; ≤ 80 cả lớp (mặc định PMD) | ✅ `CyclomaticComplexity` |
+| Độ sâu kế thừa | ≤ 3 | ❌ PMD 7 không có rule DIT — chỉ review |
+| Duplicate | ≥ 3 lần ([CODE-REVIEW.md §4](../02-coding-standards/CODE-REVIEW.md) — rule of three) | ❌ CPD không có task Gradle sẵn, cần plugin/task mới (Điều luật "không thêm plugin" → chờ chủ dự án) — chỉ review |
+
+## 8.1. Compiler — `-Xlint:all -Werror`
+
+Từ 2026-10-03 mọi `JavaCompile` (main/test/jmh, mọi module) chạy `-Xlint:all -Werror`: warning của javac
+và của Error Prone (check mức WARNING) đều làm đỏ build. Trước đó cố ý không `-Werror` vì lo "warning của
+thư viện thứ ba" — đo lại: 0 warning trên 28 module, tức luật "warning = 0" lúc đó chỉ được giữ bằng trí
+nhớ (gài thử một raw type → build vẫn xanh). Warning thật sự không tránh được → `@SuppressWarnings("<key>")`
+hẹp nhất + comment lý do (§10).
 
 ---
 

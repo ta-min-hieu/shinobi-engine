@@ -47,7 +47,8 @@ Lớp 4 — HIẾN PHÁP (chỉ khi tranh chấp nguyên tắc)
 | Format, import order | Spotless auto-fix | ❌ |
 | Tên `*Manager/*Helper` | Checkstyle | ❌ |
 | SQL injection | find-sec-bugs | ❌ |
-| Method quá dài, complexity | PMD | ❌ |
+| Method quá dài (Checkstyle, KHÔNG áp cho test), complexity (PMD) | Checkstyle / PMD | ❌ |
+| `var` cho local, warning compiler | Checkstyle `NoVarLocal` / `-Werror` | ❌ |
 
 → **Gen code theo hiểu biết tốt nhất, để build bắt lỗi còn lại.** Đừng nạp doc chỉ để "chắc chắn không phạm luật X" — enforcement lo (xem [STATIC-ANALYSIS.md](10-quality/STATIC-ANALYSIS.md), [CI-CD.md §4](07-infrastructure/CI-CD.md)).
 

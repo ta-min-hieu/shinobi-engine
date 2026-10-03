@@ -154,8 +154,8 @@ Nếu ý kiến của bạn là về **style** và [CODING-STANDARDS.md](CODING-
 |---|---|---|
 | Cyclomatic complexity | ≤ 10 mỗi method | PMD |
 | Cognitive complexity | ≤ 15 mỗi method | SonarQube (nếu có) |
-| Số field mỗi class | ≤ 10 | Checkstyle |
-| Độ sâu kế thừa | ≤ 3 | PMD |
+| Số field mỗi class | ≤ 10 | Review — chưa có rule máy ([STATIC-ANALYSIS.md §5](../10-quality/STATIC-ANALYSIS.md)) |
+| Độ sâu kế thừa | ≤ 3 | Review — PMD 7 không có rule ([STATIC-ANALYSIS.md §8](../10-quality/STATIC-ANALYSIS.md)) |
 
 Vượt ngưỡng **không tự động sai** — nhưng phải giải thích được.
 

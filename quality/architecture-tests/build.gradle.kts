@@ -1,7 +1,11 @@
 // quality:architecture-tests — ADR-011. Enforce dependency rule bằng ArchUnit (CI-CD §4).
 // Quét class của mọi production module; vi phạm ranh giới = test fail = build fail.
 plugins {
-    id("kage.java-conventions")
+    // quality-conventions (không chỉ java-conventions): rà 2026-10-03 — module này là nơi DUY NHẤT
+    // không cổng tĩnh nào quét (Checkstyle/PMD/SpotBugs/Spotless/Error Prone đều vắng), gài thử `var`
+    // vào test của nó → xanh. Bật lên lộ 9 ConstantName (tên rule @ArchTest — suppress có lý do tại
+    // lớp), 1 SpotBugs NP thật (getFileName() có thể null) và lệch format — đã sửa.
+    id("kage.quality-conventions")
 }
 
 // Mọi module PRODUCTION (lá) dưới shared/engine/client/server — tự dò, KHÔNG liệt kê tay.

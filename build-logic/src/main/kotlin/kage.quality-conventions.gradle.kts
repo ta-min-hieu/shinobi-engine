@@ -48,7 +48,10 @@ pmd {
 // targetExclude loại thư mục generated khỏi phạm vi Spotless.
 spotless {
     java {
-        target("src/main/java/**/*.java", "src/test/java/**/*.java")
+        // MỌI sourceSet (main/test/jmh/...) — rà 2026-10-03: bản cũ chỉ liệt kê main+test nên
+        // engine-ecs/src/jmh chưa từng được kiểm format (gài thử một file lệch format → vẫn xanh).
+        // Checkstyle/PMD/SpotBugs tự phủ mọi sourceSet; Spotless thì phải khai đích danh.
+        target("src/*/java/**/*.java")
         palantirJavaFormat()
         importOrder("java", "javax", "", "dev.kage")
         removeUnusedImports()

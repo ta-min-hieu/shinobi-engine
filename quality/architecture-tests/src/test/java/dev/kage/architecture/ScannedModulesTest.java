@@ -11,11 +11,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import org.junit.jupiter.api.Test;
-
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import org.junit.jupiter.api.Test;
 
 /**
  * Chốt ngược cho {@link DependencyRuleTest}: mọi rule của nó dạng {@code noClasses()...should()}, nên
@@ -58,7 +57,9 @@ class ScannedModulesTest {
                 missing.add(root + " (vd " + sample.get() + ")");
             }
         }
-        assertThat(sampled).as("không tìm thấy file .java nào dưới %s", sourceRoots).isPositive();
+        assertThat(sampled)
+                .as("không tìm thấy file .java nào dưới %s", sourceRoots)
+                .isPositive();
         assertThat(missing)
                 .as("module production có mã nguồn mà ArchUnit không nhìn thấy — mọi rule xanh giả với nó")
                 .isEmpty();
@@ -67,8 +68,8 @@ class ScannedModulesTest {
     private static Optional<String> anyClassName(Path root) throws IOException {
         try (Stream<Path> files = Files.walk(root)) {
             return files.filter(path -> path.toString().endsWith(".java"))
-                    .filter(path -> !path.getFileName().toString().equals("package-info.java"))
-                    .filter(path -> !path.getFileName().toString().equals("module-info.java"))
+                    .filter(path -> !path.endsWith("package-info.java"))
+                    .filter(path -> !path.endsWith("module-info.java"))
                     .findFirst()
                     .map(path -> {
                         String relative = root.relativize(path).toString().replace(File.separatorChar, '.');
