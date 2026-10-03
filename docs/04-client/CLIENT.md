@@ -147,6 +147,16 @@ lặng (không chữ nổi, không lặp animation) mỗi `ATTACK_CONFIRM_RETRY_
 nhận. Trần ~10 gói/giây và chỉ khi đang chờ — chi phí server tính theo gói ([BENCHMARK §5.1](../09-performance/BENCHMARK.md)).
 Chỉ client: không đổi server/protocol. Cùng cơ chế với `AttackCadence` của gameProbe.
 
+**Hoàn Khí/hồi chiêu khi server bỏ im lặng một lần thi triển (`CombatHudController`, 2026-10-03).**
+`SkillSystem` bỏ không trả lời những lần thi triển không hợp lệ (ngoài tầm, đang choáng, mục tiêu đã
+chết, hồi chiêu phía server chưa xong) và chỉ trừ Khí cho lần thi triển THẬT; client thì trừ Khí +
+bắt đầu hồi chiêu ở MỌI lần bấm và không bao giờ trả lại. Vì ngoài hồi sinh/đổi World không có gói
+nào đồng bộ Khí, bấm ngoài tầm vài lần là nút skill xám hẳn trong khi server vẫn giữ đầy Khí. Nay vẫn
+trừ lạc quan, nhưng chờ `SkillResultEvent` do **chính mình** ra trong `SKILL_CONFIRM_WINDOW_SECONDS`
+(= `ATTACK_CONFIRM_WINDOW_SECONDS`, 1 s); không tới thì hoàn Khí + hồi chiêu, tới muộn thì trừ lại.
+Chỉ client, không đổi protocol. Kèm: gỡ hai lượt cấp phát mỗi khung ở HUD (`monsters()` trả một view
+chỉ-đọc dùng lại; nhãn hồi chiêu chỉ định dạng lại khi phần mười giây hiển thị đổi — `CooldownText`).
+
 ✅ **Nền tảng đã chốt: desktop-first** ([ADR-023](../01-architecture/adr/ADR-023-Desktop-First-Input.md), Accepted 2026-09-05). Sơ đồ cảm ứng KHÔNG thiết kế trước (Điều 9) — khi nào làm mobile thật thì cần một ADR riêng, phạm vi tối thiểu: sơ đồ nhập liệu cảm ứng, bố cục lại HUD theo vùng chạm tối thiểu, và xem lại [ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md)/[ADR-028](../01-architecture/adr/ADR-028-Asset-Delivery-Tiers.md).
 
 ---
@@ -186,6 +196,13 @@ sequenceDiagram
 ⚠️ **Quy tắc vàng**: dự đoán **chỉ** cho thứ mà sai cũng không ai bị thiệt. Dự đoán damage rồi server nói trượt = người chơi thấy số damage rồi mất → tệ hơn là chờ.
 
 **Reconciliation**: server nói sai → **client sửa theo server ngay**, không tranh cãi (Điều 15). Nếu lệch nhỏ → lerp mượt. Lệch lớn (teleport, bị hack) → snap thẳng.
+
+⚠️ **Số không hữu hạn** (sửa 2026-10-03, `LocalPositionReconciler`): bản cũ so `sqrt(drift) > ngưỡng`
+— luôn `false` khi vị trí dự đoán là NaN, nên không `MoveResponse` nào kéo được người chơi về và
+camera bám theo NaN tới lần hồi sinh sau. Nay snap bất cứ khi nào **không chứng minh được** độ lệch
+nằm trong ngưỡng (`!(drift <= RECONCILE_SNAP_THRESHOLD)`), và các lần snap lúc spawn/hồi sinh/đổi
+World bỏ qua toạ độ không hữu hạn từ server. Phía server cũng đã chặn nguồn NaN đã lưu DB — xem
+[feature-character/CLAUDE.md](../../server/server-features/feature-character/CLAUDE.md).
 
 ---
 

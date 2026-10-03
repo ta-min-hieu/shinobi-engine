@@ -141,7 +141,14 @@ bị `TerrainCollisionSystem` sửa lại (revert) NGAY TRONG CÙNG TICK trướ
 đọc — không có nguồn chân lý thứ hai, không có vấn đề "ghi hai chiều" mà bản Box2D cũ phải cảnh báo.
 
 **Vòng đời**: không có native memory nào để quản (không Box2D `Body`) — `Aabb` là record thuần Java,
-GC lo hết. Cạm bẫy Box2D cũ (destroy body, sửa world giữa step, tunneling...) không còn áp dụng.
+GC lo hết. Cạm bẫy Box2D cũ (destroy body, sửa world giữa step...) không còn áp dụng.
+⚠️ *(Sửa câu cũ 2026-10-03)* Bản trước ghi cả **tunneling** vào danh sách "không còn áp dụng" — SAI:
+`TerrainCollisionSystem` từng chỉ kiểm vị trí CUỐI tick, nên một tick mang entity vượt qua chướng ngại
+mỏng hơn bước mỗi tick (8,3cm ở 5 m/s, 60Hz; người đi nhanh hơn thì dày hơn) để cả hai đầu mút ở
+ngoài và entity đi xuyên tường, kể cả xuyên góc chướng ngại khi đi chéo. **Sửa 2026-10-03**
+(`aa3340a`): ngoài vị trí cuối, hệ còn revert khi đoạn `prev → current` của tick cắt một chướng ngại
+từ bên ngoài (`Aabb.intersectsSegment`, slab test, không cấp phát). Entity đã ĐỨNG SẴN trong chướng
+ngại vẫn được đi ra (không kẹt vĩnh viễn). Test: `TerrainCollisionSystemTest`.
 
 ---
 

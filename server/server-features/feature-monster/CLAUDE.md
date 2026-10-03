@@ -36,14 +36,30 @@ khác" là thêm một lớp không làm gì.
   **cơ chế** ⇒ ở lại `server-world`. Đừng "hoàn thiện" bằng cách thêm nốt hai cột đó.
 - **`aggroRadiusMeters == 0` là giá trị HỢP LỆ**, nghĩa là loài thụ động, không bao giờ gây hấn
   (`training_dummy`). Đừng thêm `CHECK > 0` hay cờ `is_passive`.
+- **`MonsterSpawnPoint` từ chối số KHÔNG hữu hạn** (2026-10-03, `f57bcf3`): `CHECK (respawn_seconds
+  > 0)` của DB để lọt `'NaN'`/`'Infinity'` (Postgres xếp NaN lớn hơn mọi số). Đồng hồ hồi sinh NaN
+  không bao giờ `< 0` (sống) cũng không `<= 0` (tới hạn) ⇒ quái ở điểm đó chết lần đầu là biến mất
+  vĩnh viễn, không lỗi nào. Tọa độ NaN/vô cực thì đặt quái ở chỗ không ai tới được. Compact
+  constructor nay ném ngay lúc nạp catalog (nạp một lần lúc khởi động ⇒ server không khởi động với
+  dữ liệu hỏng thay vì chạy âm thầm sai). `MonsterAiParams` vốn đã chặn NaN. Test:
+  `MonsterSpawnPointTest`.
+- **Bảng rơi tra theo MÃ quái**, không theo `monster_template.drop_table_id`
+  (`grantLoot` → `drop_table.code`). Loài cố ý không rơi gì vẫn cần một `drop_table` RỖNG mang đúng
+  mã của nó (quy ước V33; V51 áp cho `blood_sand_enforcer`), nếu không mỗi lần chạy server sẽ WARN
+  "không có bảng rơi" ở lượt giết đầu. `ContentReferenceIntegrationTest` (server-database) gác các
+  tham chiếu chéo mà FK không bắt được — xem [DATABASE.md](../../../docs/05-server/DATABASE.md).
 
 ## Cố ý CHƯA làm
 
 - **Tầm đánh theo loài** (`CombatConstants.ATTACK_RANGE_METERS`, cho quái bắn xa) — đụng cả tầm
   đánh của nhân vật nên là một ADR riêng (ADR-039 D7).
-- **Boss** (`sample_boss`) giữ hardcode: nó có script GraalJS + `BossAiSystem` riêng.
+- ~~**Boss** (`sample_boss`) giữ hardcode: nó có script GraalJS + `BossAiSystem` riêng.~~ *(Lỗi
+  thời — rà 2026-10-03)* [ADR-048](../../../docs/01-architecture/adr/ADR-048-Boss-Into-Data-Tables.md)
+  ✅ Accepted 2026-09-12 đã kéo boss vào `monster_template` (V41: `is_boss` + `ai_script_ref` + nhịp
+  AI, `MonsterBossBehaviour`). `BossConstants` chỉ còn hằng cơ chế (VD trần lệnh của sandbox script).
 - ~~**`npc_template`**~~ — nợ này KHÔNG còn thuộc về đây. Nó đã có ADR riêng
-  ([ADR-040](../../../docs/01-architecture/adr/ADR-040-NPC-Template-And-Placement.md), 🟡 Proposed)
+  ([ADR-040](../../../docs/01-architecture/adr/ADR-040-NPC-Template-And-Placement.md), ✅ Accepted
+  2026-09-05 — chữ "🟡 Proposed" cũ ở đây đã lỗi thời)
   và được thi hành trong **`feature-dialogue`** (module đã sở hữu `npc_template` từ V10), không phải
   module này. NPC không có chỉ số chiến đấu, không bảng rơi, không hồi sinh — gộp vào đây sẽ là
   bảng chung mà hơn nửa cột là `NULL` cho mọi hàng NPC (ADR-040 Alternatives E).
