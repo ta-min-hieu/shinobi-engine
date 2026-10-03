@@ -14,6 +14,10 @@ public interface LanguageStore {
     /** Mã đã lưu, hoặc rỗng nếu chưa lưu bao giờ. Có thể là rác — bên gọi tự kiểm. */
     Optional<String> readLanguageCode();
 
-    /** Ghi đè mã đã lưu và đẩy xuống nơi lưu ngay (người chơi có thể tắt game ngay sau khi chọn). */
+    /**
+     * Ghi đè mã đã lưu và đẩy xuống nơi lưu ngay (người chơi có thể tắt game ngay sau khi chọn).
+     * KHÔNG ném khi nơi lưu hỏng — giá trị vẫn có hiệu lực trong phiên này, chỉ không sống qua lần mở
+     * game sau.
+     */
     void writeLanguageCode(String code);
 }

@@ -43,8 +43,11 @@ final class LocalIntentSender {
     /** Phím Z + nút Đánh trên HUD gộp về một nguồn — xem {@link AttackInputController}. */
     private final AttackInputController attackInput;
 
-    /** Edge-detection cho phím dùng skill — giữ phím không spam (nhảy có bộ đếm riêng ở {@link #jumpInput}). */
-    private boolean skillKeyWasPressed;
+    /**
+     * Mép nhấn của phím dùng skill — giữ phím không spam (nhảy có bộ đếm riêng ở {@link #jumpInput}),
+     * và Enter vừa GỬI một ô nhập không bị đọc lại thành lệnh dùng skill (xem {@link KeyPressEdge}).
+     */
+    private final KeyPressEdge skillKey = new KeyPressEdge();
 
     LocalIntentSender(LocalIntentContext context) {
         this.context = context;
@@ -159,11 +162,12 @@ final class LocalIntentSender {
     }
 
     private void updateSkill() {
-        boolean skillPressed = isPressed(GameAction.USE_SKILL);
-        if (skillPressed && !skillKeyWasPressed && !context.dialogueOpen().getAsBoolean()) {
+        boolean freshPress = skillKey.update(
+                context.inputMapper().isPressed(GameAction.USE_SKILL),
+                context.keyboardFree().getAsBoolean());
+        if (freshPress && !context.dialogueOpen().getAsBoolean()) {
             onSkillButtonClicked();
         }
-        skillKeyWasPressed = skillPressed;
     }
 
     /** Nút Skill trên HUD — cùng đường với phím, nên cả hai đi qua đúng một hàm này. */

@@ -2,7 +2,9 @@ package dev.kage.client.core.screen;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
@@ -97,6 +99,15 @@ public final class CharacterSelectScreen implements GameScreen {
     private State state = State.LISTING;
     private float stateElapsed;
     private CharacterSummary pendingSelection;
+
+    /**
+     * {@code sequence_id} của yêu cầu đang chờ — chỉ câu trả lời mang đúng số này mới được nhận, câu
+     * trả lời muộn của lần bấm trước bị bỏ ({@link PendingReply}).
+     */
+    private int pendingSequenceId;
+
+    /** Giữ một lần thay vì tạo method reference mới mỗi tick. */
+    private final Supplier<PacketCodec.Frame> inbound = this::pollConnection;
 
     /**
      * @param session kết nối đã đăng nhập + tên đăng nhập của nó — tên được giữ trong bộ nhớ để màn
@@ -237,8 +248,8 @@ public final class CharacterSelectScreen implements GameScreen {
                     .setName(name)
                     .setIdempotencyKey(UUID.randomUUID().toString())
                     .build();
-            connection.send(
-                    Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, connection.nextSequenceId(), request.toByteArray());
+            pendingSequenceId = connection.nextSequenceId();
+            connection.send(Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, pendingSequenceId, request.toByteArray());
             setFormEnabled(false);
             statusLabel.setText(i18n.get("charselect.status.creating"));
             transitionTo(State.AWAITING_CREATE_RESPONSE);
@@ -254,8 +265,8 @@ public final class CharacterSelectScreen implements GameScreen {
             SelectCharacterRequest request = SelectCharacterRequest.newBuilder()
                     .setCharacterId(character.getId())
                     .build();
-            connection.send(
-                    Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, connection.nextSequenceId(), request.toByteArray());
+            pendingSequenceId = connection.nextSequenceId();
+            connection.send(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, pendingSequenceId, request.toByteArray());
             setFormEnabled(false);
             statusLabel.setText(i18n.get("charselect.status.selecting"));
             transitionTo(State.AWAITING_SELECT_RESPONSE);
@@ -283,19 +294,18 @@ public final class CharacterSelectScreen implements GameScreen {
     }
 
     private void pollCreateResponse() {
-        PacketCodec.Frame frame;
-        while ((frame = connection.pollInbound()) != null) {
-            int opcode = frame.header().opcode();
-            if (opcode == Opcode.OPCODE_CREATE_CHARACTER_RESPONSE_VALUE) {
-                handleCreateResponse(frame.payload());
-                return;
-            }
-            if (opcode == Opcode.OPCODE_ERROR_VALUE) {
+        Optional<PacketCodec.Frame> reply =
+                PendingReply.poll(inbound, pendingSequenceId, Opcode.OPCODE_CREATE_CHARACTER_RESPONSE_VALUE);
+        if (reply.isPresent()) {
+            PacketCodec.Frame frame = reply.get();
+            if (frame.header().opcode() == Opcode.OPCODE_ERROR_VALUE) {
                 String errorKey = errorKeyOf(frame.payload());
                 LOG.warn("Server từ chối CreateCharacterRequest: error_key={}", errorKey);
                 failWith(errorKey);
-                return;
+            } else {
+                handleCreateResponse(frame.payload());
             }
+            return;
         }
         if (stateElapsed > STEP_TIMEOUT_SECONDS) {
             failWithGenericError();
@@ -319,19 +329,18 @@ public final class CharacterSelectScreen implements GameScreen {
     }
 
     private void pollSelectResponse() {
-        PacketCodec.Frame frame;
-        while ((frame = connection.pollInbound()) != null) {
-            int opcode = frame.header().opcode();
-            if (opcode == Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE) {
-                handleSelectResponse(frame.payload());
-                return;
-            }
-            if (opcode == Opcode.OPCODE_ERROR_VALUE) {
+        Optional<PacketCodec.Frame> reply =
+                PendingReply.poll(inbound, pendingSequenceId, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE);
+        if (reply.isPresent()) {
+            PacketCodec.Frame frame = reply.get();
+            if (frame.header().opcode() == Opcode.OPCODE_ERROR_VALUE) {
                 String errorKey = errorKeyOf(frame.payload());
                 LOG.warn("Server từ chối SelectCharacterRequest: error_key={}", errorKey);
                 failWith(errorKey);
-                return;
+            } else {
+                handleSelectResponse(frame.payload());
             }
+            return;
         }
         if (stateElapsed > STEP_TIMEOUT_SECONDS) {
             failWithGenericError();
@@ -351,6 +360,11 @@ public final class CharacterSelectScreen implements GameScreen {
             LOG.warn("SelectCharacterResponse không hợp lệ", e);
             failWithGenericError();
         }
+    }
+
+    /** {@code null} khi chưa có kết nối — {@link PendingReply#poll} coi như hàng đợi rỗng. */
+    private PacketCodec.Frame pollConnection() {
+        return connection == null ? null : connection.pollInbound();
     }
 
     private void failWithGenericError() {
