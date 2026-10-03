@@ -9,7 +9,6 @@ import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.PixmapIO;
-import com.badlogic.gdx.utils.ScreenUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -270,7 +269,7 @@ public final class HudPreviewTool extends ApplicationAdapter {
     }
 
     private static void capture(String path) {
-        Pixmap pixmap = ScreenUtils.getFrameBufferPixmap(
+        Pixmap pixmap = Pixmap.createFromFrameBuffer(
                 0, 0, Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight());
         Gdx.files.absolute(path).parent().mkdirs();
         // flipY=true BẮT BUỘC — xem WorldModelRenderer.Y_UP_TO_Z_UP về lần dính bẫy này.

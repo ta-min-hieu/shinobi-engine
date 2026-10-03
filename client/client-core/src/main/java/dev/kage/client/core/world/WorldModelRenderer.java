@@ -120,7 +120,7 @@ public final class WorldModelRenderer implements Disposable {
      *
      * <p><b>Lịch sử — đừng lặp lại</b>: bản 2026-08-08 từng đổi hằng số này thành {@code -90f} và
      * ghi rằng "ảnh chụp thật bác bỏ quy tắc bàn tay phải". Kết luận đó SAI, và sai vì <b>công cụ
-     * chụp</b> chứ không phải vì engine: {@code ScreenUtils.getFrameBufferPixmap} trả dữ liệu THÔ
+     * chụp</b> chứ không phải vì engine: {@code Pixmap.createFromFrameBuffer} trả dữ liệu THÔ
      * của GL (dòng 0 = đáy màn hình) còn PNG quy ước dòng 0 = đỉnh, nên ảnh lưu ra bị LẬT DỌC —
      * nhân vật đang lộn ngược trên màn hình lại hiện "đứng thẳng" trong ảnh. Chủ dự án phát hiện
      * bằng mắt trên game thật (2026-08-09); chụp lại với {@code flipY=true} xác nhận {@code -90f}

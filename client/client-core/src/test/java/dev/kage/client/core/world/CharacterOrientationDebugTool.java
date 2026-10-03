@@ -10,7 +10,6 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.PixmapIO;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
-import com.badlogic.gdx.utils.ScreenUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,7 +101,7 @@ public final class CharacterOrientationDebugTool extends ApplicationAdapter {
     }
 
     private void capture(String name) {
-        Pixmap pixmap = ScreenUtils.getFrameBufferPixmap(
+        Pixmap pixmap = Pixmap.createFromFrameBuffer(
                 0, 0, Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight());
         Gdx.files.absolute(OUTPUT_DIR).mkdirs();
         // ⚠️ flipY=TRUE BẮT BUỘC — getFrameBufferPixmap trả dữ liệu THÔ của GL (dòng 0 = ĐÁY màn
