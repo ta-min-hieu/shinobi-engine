@@ -37,13 +37,19 @@ groups:
           summary: "Tick p99 vượt ngân sách 16.6ms (60Hz, ADR-018)"
           description: "World '{{ $labels.world }}' tick p99 = {{ $value }}s, liên tục 5 phút."
 
+      # ⚠️ Sửa 2026-10-03: job này có 2 target (prometheus.yml) mà theo thiết kế CHỈ 1 cái chạy tại 1
+      # thời điểm (container "server" HOẶC native qua host.docker.internal) — `up == 0` từng so TỪNG
+      # series, nên target còn lại làm alert này cháy THƯỜNG TRỰC ở mọi môi trường (ở prod không có
+      # extra_hosts nên host.docker.internal không bao giờ up) ⇒ server sập thật trông y hệt lúc bình
+      # thường. Nay: cháy khi KHÔNG target nào up. Nếu cả 2 series biến mất (đổi tên job) thì biểu
+      # thức rỗng — đổi job_name nhớ sửa cả đây.
       - alert: ServerDown
-        expr: up{job="kage-server-gateway"} == 0
+        expr: max by (job) (up{job="kage-server-gateway"}) == 0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "Không scrape được server-gateway (down hoặc mất kết nối tới host.docker.internal:9404)"
+          summary: "Không scrape được server-gateway ở BẤT KỲ target nào (server:9404 lẫn host.docker.internal:9404)"
 
       - alert: DbPoolExhausted
         expr: kage_db_pool_pending > 0
