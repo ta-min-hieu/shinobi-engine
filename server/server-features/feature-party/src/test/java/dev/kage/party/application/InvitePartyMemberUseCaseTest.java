@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 
 import dev.kage.party.domain.Party;
+import dev.kage.party.domain.PartyInvite;
 
 class InvitePartyMemberUseCaseTest {
 
@@ -59,6 +60,29 @@ class InvitePartyMemberUseCaseTest {
         InvitePartyMemberUseCase useCase = new InvitePartyMemberUseCase(port);
 
         assertThat(useCase.execute(1, 999)).isEqualTo(InvitePartyMemberUseCase.Result.PARTY_FULL);
+    }
+
+    /**
+     * Bug 2026-10-03: leader (người cuối) rời nhóm ở kết nối khác đúng giữa lúc use case xác nhận
+     * "là leader" và lúc ghi lời mời — vi phạm FOREIGN KEY từng thành 500. Không còn party ⇒ không
+     * còn là leader.
+     */
+    @Test
+    void shouldReportNotLeader_whenPartyIsDissolvedBetweenLeaderCheckAndWrite() {
+        FakePartyPort port = new FakePartyPort() {
+            @Override
+            public PartyInvite invite(long partyId, long inviteeCharacterId) {
+                leaveParty(1);
+                return super.invite(partyId, inviteeCharacterId);
+            }
+        };
+        port.createParty(1);
+        InvitePartyMemberUseCase useCase = new InvitePartyMemberUseCase(port);
+
+        InvitePartyMemberUseCase.Result result = useCase.execute(1, 5);
+
+        assertThat(result).isEqualTo(InvitePartyMemberUseCase.Result.NOT_LEADER);
+        assertThat(port.findPendingInviteOfInvitee(5)).isEmpty();
     }
 
     @Test

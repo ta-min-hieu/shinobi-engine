@@ -13,6 +13,7 @@ import javax.sql.DataSource;
 import dev.kage.party.domain.DuplicatePartyInviteException;
 import dev.kage.party.domain.DuplicatePartyMembershipException;
 import dev.kage.party.domain.Party;
+import dev.kage.party.domain.PartyDissolvedException;
 import dev.kage.party.domain.PartyInvite;
 import dev.kage.party.domain.PartyMember;
 import dev.kage.party.domain.PartyPort;
@@ -159,6 +160,14 @@ public final class PostgresPartyAdapter implements PartyPort {
                 dataSource, LIST_PENDING_INVITES_OF_INVITEE, PostgresPartyAdapter::mapInvite, characterId);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Vi phạm FOREIGN KEY ở đây chỉ có thể là {@code party_id}: invitee đã được gateway tra theo
+     * tên và nhân vật không bao giờ bị xoá. Party biến mất khi leader cuối rời nhóm đúng lúc use case
+     * vừa xác nhận người gọi là leader (sửa 2026-10-03 — trước đó thành 500
+     * {@code error.server_internal}).
+     */
     @Override
     public PartyInvite invite(long partyId, long inviteeCharacterId) {
         Instant now = Instant.now();
@@ -171,6 +180,11 @@ public final class PostgresPartyAdapter implements PartyPort {
                     inviteeCharacterId,
                     Timestamp.from(now));
             return new PartyInvite(id, partyId, inviteeCharacterId, now);
+        } catch (DatabaseAccessException e) {
+            if (JdbcOperations.isForeignKeyViolation(e)) {
+                throw new PartyDissolvedException(partyId);
+            }
+            throw e;
         } catch (SQLException e) {
             throw new DatabaseAccessException(
                     "Lỗi mời party: partyId=" + partyId + ", inviteeCharacterId=" + inviteeCharacterId, e);
@@ -291,17 +305,37 @@ public final class PostgresPartyAdapter implements PartyPort {
         return JdbcTransactionRunner.call(dataSource, connection -> leavePartyInTransaction(connection, characterId));
     }
 
+    /**
+     * ⚠️ Deadlock THẬT tìm được 2026-10-03 (xem {@code PartyDissolveRaceIntegrationTest}): bản cũ khoá
+     * dòng {@code party_member} của người rời TRƯỚC rồi mới khoá dòng {@code party}, còn leader rời
+     * thì khoá thêm dòng {@code party_member} của người được thăng chức SAU khi đã giữ dòng
+     * {@code party}. Leader và thành viên vào sớm nhất cùng bấm "Rời nhóm" ⇒ hai giao dịch khoá chéo,
+     * Postgres huỷ một bên ⇒ 500.
+     *
+     * <p>Nay khoá dòng {@code party} TRƯỚC mọi dòng {@code party_member} — cùng thứ tự
+     * {@link #acceptInviteInTransaction}. {@code party_id} đọc không khoá chỉ để biết khoá dòng nào;
+     * sau khi giữ khoá thì đọc LẠI vai trò (có thể vừa được thăng leader trong lúc chờ) và party
+     * (có thể đã rời party đó, vào party khác).
+     */
     private static LeaveResult leavePartyInTransaction(Connection connection, long characterId) {
+        Optional<Long> unlockedPartyId =
+                JdbcOperations.queryOne(connection, FIND_MEMBERSHIP, rs -> rs.getLong("party_id"), characterId);
+        if (unlockedPartyId.isEmpty()) {
+            return LeaveResult.NOT_IN_PARTY;
+        }
+        JdbcOperations.lock(connection, LOCK_PARTY, unlockedPartyId.get());
         Optional<MembershipRow> membership = JdbcOperations.queryOne(
                 connection,
                 SELECT_MEMBERSHIP_FOR_UPDATE,
                 rs -> new MembershipRow(rs.getLong("party_id"), PartyRole.valueOf(rs.getString("role"))),
                 characterId);
-        if (membership.isEmpty()) {
+        if (membership.isEmpty() || membership.get().partyId() != unlockedPartyId.get()) {
+            // Đã rời (bị kick / tự rời ở kết nối khác) trong lúc chờ khoá. Trường hợp đã sang party
+            // KHÁC ngay trong khoảng đó: coi như lệnh rời nhắm vào party cũ — không đụng party mới
+            // mà mình chưa khoá (khoá thêm sẽ phá thứ tự khoá vừa dựng).
             return LeaveResult.NOT_IN_PARTY;
         }
         long partyId = membership.get().partyId();
-        JdbcOperations.lock(connection, LOCK_PARTY, partyId);
         JdbcOperations.update(connection, DELETE_MEMBER, partyId, characterId);
         if (membership.get().role() != PartyRole.LEADER) {
             return LeaveResult.OK;

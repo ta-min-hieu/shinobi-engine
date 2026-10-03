@@ -30,6 +30,9 @@ public final class JdbcOperations {
     // Mã lỗi Postgres cho unique_violation (SQLState) — dùng bởi updateOrThrow/insertReturningIdOrThrow.
     private static final String UNIQUE_VIOLATION_SQLSTATE = "23505";
 
+    // Mã lỗi Postgres cho foreign_key_violation — dùng bởi isForeignKeyViolation.
+    private static final String FOREIGN_KEY_VIOLATION_SQLSTATE = "23503";
+
     // OBSERVABILITY.md §3.3 kage.db.query.duration — xem javadoc DbMetricsPort: cấu hình 1 LẦN lúc
     // khởi động (ServerDatabaseBootstrap), mặc định NO_OP nên mọi test/call site hiện có không đổi
     // hành vi khi chưa gọi configureMetrics.
@@ -140,6 +143,15 @@ public final class JdbcOperations {
         } catch (SQLException e) {
             throw translateUniqueViolation(sql, onUniqueViolation, e, "Lỗi insert: ");
         }
+    }
+
+    /**
+     * {@code true} nếu {@code e} bọc một {@code foreign_key_violation} — INSERT tham chiếu tới một
+     * dòng cha mà giao dịch khác vừa xoá (bang/party bị giải tán) giữa lúc use case kiểm tra và lúc
+     * ghi. Adapter dịch nó thành exception nghiệp vụ thay vì để thành 500.
+     */
+    public static boolean isForeignKeyViolation(DatabaseAccessException e) {
+        return e.getCause() instanceof SQLException cause && FOREIGN_KEY_VIOLATION_SQLSTATE.equals(cause.getSQLState());
     }
 
     /** {@code INSERT ... RETURNING id} ngoài transaction — tự mở/đóng connection. */

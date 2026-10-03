@@ -16,6 +16,7 @@ import dev.kage.guild.domain.DuplicateGuildJoinRequestException;
 import dev.kage.guild.domain.DuplicateGuildMembershipException;
 import dev.kage.guild.domain.DuplicateGuildNameException;
 import dev.kage.guild.domain.Guild;
+import dev.kage.guild.domain.GuildDisbandedException;
 import dev.kage.guild.domain.GuildJoinRequest;
 import dev.kage.guild.domain.GuildMember;
 import dev.kage.guild.domain.GuildPort;
@@ -214,6 +215,13 @@ public final class PostgresGuildAdapter implements GuildPort {
         return JdbcOperations.query(dataSource, LIST_PENDING_REQUESTS, PostgresGuildAdapter::mapJoinRequest, guildId);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Vi phạm FOREIGN KEY ở đây chỉ có thể là {@code guild_id} (người xin là nhân vật đang đăng
+     * nhập, nhân vật không bao giờ bị xoá): leader giải tán bang đúng giữa lúc use case tra bang theo
+     * tên và lúc ghi đơn (sửa 2026-10-03 — trước đó thành 500 {@code error.server_internal}).
+     */
     @Override
     public GuildJoinRequest sendJoinRequest(long guildId, long characterId) {
         Instant now = Instant.now();
@@ -226,6 +234,11 @@ public final class PostgresGuildAdapter implements GuildPort {
                     characterId,
                     Timestamp.from(now));
             return new GuildJoinRequest(id, guildId, characterId, now);
+        } catch (DatabaseAccessException e) {
+            if (JdbcOperations.isForeignKeyViolation(e)) {
+                throw new GuildDisbandedException(guildId);
+            }
+            throw e;
         } catch (SQLException e) {
             throw new DatabaseAccessException(
                     "Lỗi gửi đơn xin gia nhập: guildId=" + guildId + ", characterId=" + characterId, e);

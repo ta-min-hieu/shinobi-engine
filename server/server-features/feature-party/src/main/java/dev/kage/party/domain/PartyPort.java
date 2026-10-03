@@ -34,7 +34,10 @@ public interface PartyPort {
     List<PartyInvite> listPendingInvitesOfInvitee(long characterId);
 
     /**
+     * Ghi lời mời PENDING.
+     *
      * @throws DuplicatePartyInviteException nếu vi phạm UNIQUE {@code (party_id, invitee_character_id)}
+     * @throws PartyDissolvedException nếu party đã bị giải tán (vừa xảy ra, sau lần kiểm leader của caller)
      */
     PartyInvite invite(long partyId, long inviteeCharacterId);
 

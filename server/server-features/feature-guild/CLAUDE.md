@@ -16,7 +16,8 @@ application/    CreateGuildUseCase · SendGuildJoinRequestUseCase · ApproveGuil
                 ParameterNumber, cùng tinh thần FriendUseCases/ShopPorts)
 domain/         Guild (aggregate) · GuildMember (VO) · GuildJoinRequest (VO) · GuildRole (enum)
                 GuildName (luật tên bang MỚI) · GuildPort · DuplicateGuildNameException
-                DuplicateGuildJoinRequestException
+                DuplicateGuildJoinRequestException · GuildDisbandedException (xin vào bang vừa bị
+                giải tán — vi phạm FK, use case trả GUILD_NOT_FOUND, 2026-10-03)
 ```
 
 Chiều: `api → application → domain`. **`domain/` không import gì bên ngoài** — adapter thật
