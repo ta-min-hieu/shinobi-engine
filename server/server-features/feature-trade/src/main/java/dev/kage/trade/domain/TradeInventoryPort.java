@@ -61,8 +61,9 @@ public interface TradeInventoryPort {
         ITEM_NOT_OWNED,
         /** Còn sở hữu nhưng số lượng hiện tại ít hơn lúc chào. */
         INSUFFICIENT_QUANTITY,
-        /** Người nhận đã đầy túi đồ (chỉ xảy ra khi tách stack tạo dòng mới). */
-        RECIPIENT_INVENTORY_FULL,
+        // Không có giá trị "túi người nhận đầy" (bỏ 2026-10-03): sức chứa CHỈ kiểm ở cuối, qua
+        // #exceedsCapacity. Một lượt chuyển tự kiểm giữa chừng làm kết quả phụ thuộc thứ tự lời
+        // chào (người mời chạy trước) — xem TradeIntegrationTest#shouldExecuteSplitForWholeRowSwap...
         /**
          * Người đưa đang MẶC món này (sửa 2026-09-24) — feature-trade/CLAUDE.md quyết định 1 vốn
          * ghi "trang bị mất item đã chào giữa chừng ⇒ giao dịch thất bại sạch" nhưng trước đó

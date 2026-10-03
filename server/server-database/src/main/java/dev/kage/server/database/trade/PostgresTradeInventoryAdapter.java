@@ -92,9 +92,9 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
             }
             return TransferOutcome.OK;
         }
-        if (!isWholeRow && countItems(connection, request.toCharacterId()) >= DEFAULT_CAPACITY) {
-            return TransferOutcome.RECIPIENT_INVENTORY_FULL;
-        }
+        // Không kiểm sức chứa ở đây, kể cả khi tách dòng (sửa 2026-10-03): ConfirmTradeUseCase kiểm
+        // #exceedsCapacity SAU mọi lượt. Kiểm giữa chừng làm giao dịch hợp lệ (người mời tách chồng
+        // sang túi 20 dòng, người nhận đưa lại một dòng) thất bại hay thành công tuỳ ai là người mời.
         if (isWholeRow) {
             JdbcOperations.update(connection, UPDATE_OWNER, request.toCharacterId(), request.itemId());
         } else {

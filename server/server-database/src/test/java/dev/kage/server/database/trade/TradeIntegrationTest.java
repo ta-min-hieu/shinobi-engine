@@ -351,6 +351,40 @@ class TradeIntegrationTest {
     }
 
     /**
+     * Cùng luật "kiểm sức chứa SAU mọi lượt chuyển", nhưng phía người MỜI tách chồng (sửa
+     * 2026-10-03). Lời chào của người mời chạy trước, nên phần tách tới túi đầy của người nhận
+     * TRƯỚC khi người nhận kịp đưa thanh kiếm đi — lượt tách từng tự kiểm sức chứa giữa chừng và
+     * huỷ cả giao dịch, dù lúc xong mỗi bên đều đúng 20 dòng. Đổi vai (người nhận tách) thì cùng
+     * giao dịch đó lại thành công: kết quả phụ thuộc ai bấm mời.
+     */
+    @Test
+    void shouldExecuteSplitForWholeRowSwap_whenRequesterSplitsIntoAFullBag() {
+        long a = createFreshCharacter("TradeA13");
+        long b = createFreshCharacter("TradeB13");
+        long kunaiA = persistOneItem(a, kunaiTemplateId, 10);
+        fillBagWithSwords(a, 18);
+        fillBagWithSwords(b, 20);
+        long swordB = firstItemOf(b);
+        PostgresTradeSessionAdapter sessionPort = newSessionPort();
+        TradeSession session =
+                new RequestTradeUseCase(sessionPort).execute(a, b).session();
+        new AcceptTradeRequestUseCase(sessionPort).execute(session.id(), b);
+        new SetTradeOfferUseCase(sessionPort).execute(session.id(), a, 0, List.of(new OfferedItemInput(kunaiA, 3)));
+        new SetTradeOfferUseCase(sessionPort).execute(session.id(), b, 0, List.of(new OfferedItemInput(swordB, 1)));
+        ConfirmTradeUseCase confirmUseCase = newConfirmUseCase(sessionPort);
+
+        confirmUseCase.execute(session.id(), a, newIdempotencyKey());
+        ConfirmTradeUseCase.Result result = confirmUseCase.execute(session.id(), b, newIdempotencyKey());
+
+        assertThat(result).isEqualTo(ConfirmTradeUseCase.Result.EXECUTED);
+        assertThat(itemQuantity(kunaiA)).isEqualTo(7);
+        assertThat(quantityAndRows(b, kunaiTemplateId)).containsExactly(3, 1);
+        assertThat(itemOwner(swordB)).isEqualTo(a);
+        assertThat(bagRowCount(a)).isEqualTo(20);
+        assertThat(bagRowCount(b)).isEqualTo(20);
+    }
+
+    /**
      * Chủ dự án đảo quyết định MVP 2 ngày 2026-09-24: giao dịch gộp chồng như rơi đồ/shop/quest/thư.
      * Trước đó nhận 3 phi đao khi đã có chồng 5 ra HAI dòng.
      */
