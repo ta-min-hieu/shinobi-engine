@@ -5,7 +5,7 @@ import java.util.List;
 
 import javax.sql.DataSource;
 
-import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.RedisClient;
 
 import dev.kage.account.api.AccountFacade;
 import dev.kage.account.application.LoginOrCreateAccountUseCase;
@@ -151,14 +151,14 @@ import dev.kage.world.api.WorldGeometryFacade;
 /**
  * Composition root — nơi DUY NHẤT lắp ráp Facade thật (Adapter + UseCase + TransactionRunner)
  * từ cấu hình môi trường. {@code server-gateway} chỉ gọi {@link #wireAccountFacade()}/{@link
- * #wireCharacterFacade()}, không bao giờ thấy {@link DataSource}/{@link JedisPool} trực tiếp
+ * #wireCharacterFacade()}, không bao giờ thấy {@link DataSource}/{@link RedisClient} trực tiếp
  * (Điều 23 — server-gateway không biết DB; gọi qua đây không vi phạm vì server-gateway không tự
  * import java.sql/Jedis).
  */
 public final class ServerDatabaseBootstrap {
 
     private final DataSource dataSource;
-    private final JedisPool jedisPool;
+    private final RedisClient redisClient;
 
     public ServerDatabaseBootstrap() {
         this(DbMetricsPort.NO_OP);
@@ -175,14 +175,14 @@ public final class ServerDatabaseBootstrap {
     public ServerDatabaseBootstrap(DbMetricsPort metricsPort) {
         this.dataSource = PostgresDataSourceFactory.create(DatabaseConfig.fromEnvironment());
         FlywayMigrator.migrate(dataSource);
-        this.jedisPool = RedisClientFactory.create(RedisConfig.fromEnvironment());
+        this.redisClient = RedisClientFactory.create(RedisConfig.fromEnvironment());
         JdbcOperations.configureMetrics(metricsPort);
         JdbcTransactionRunner.configureMetrics(metricsPort);
     }
 
     public AccountFacade wireAccountFacade() {
         PostgresAccountAdapter accountPort = new PostgresAccountAdapter();
-        RedisSessionAdapter sessionPort = new RedisSessionAdapter(jedisPool);
+        RedisSessionAdapter sessionPort = new RedisSessionAdapter(redisClient);
         JdbcAccountTransactionRunner transactionManager = new JdbcAccountTransactionRunner(dataSource);
         LoginOrCreateAccountUseCase useCase =
                 new LoginOrCreateAccountUseCase(accountPort, sessionPort, transactionManager);
@@ -454,7 +454,7 @@ public final class ServerDatabaseBootstrap {
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */
     public void shutdown() {
-        jedisPool.close();
+        redisClient.close();
         PostgresDataSourceFactory.close(dataSource);
     }
 }

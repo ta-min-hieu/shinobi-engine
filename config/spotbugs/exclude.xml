@@ -118,7 +118,7 @@
         <Bug pattern="NM_SAME_SIMPLE_NAME_AS_INTERFACE"/>
     </Match>
 
-    <!-- DataSource (HikariCP) / JedisPool (Redis) là tài nguyên hạ tầng dùng chung (connection
+    <!-- DataSource (HikariCP) / RedisClient (Redis, pool bên trong) là tài nguyên hạ tầng dùng chung (connection
          pool), KHÔNG phải value object — giữ tham chiếu trực tiếp là đúng thiết kế (server-database
          là module DUY NHẤT được chạm JDBC/Redis, Điều 23), copy "phòng thủ" vô nghĩa (không thể
          "copy" 1 connection pool). Khớp theo KIỂU field (không phải từng class) vì rất nhiều
@@ -128,7 +128,7 @@
     <Match>
         <Or>
             <Field type="javax.sql.DataSource"/>
-            <Field type="redis.clients.jedis.JedisPool"/>
+            <Field type="redis.clients.jedis.RedisClient"/>
         </Or>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>

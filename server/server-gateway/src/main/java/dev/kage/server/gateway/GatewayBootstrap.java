@@ -37,7 +37,7 @@ import dev.kage.trade.api.TradeFacade;
  * bằng socket thật được, xem {@code GatewayServerIntegrationTest}).
  *
  * <p>Composition root — nơi DUY NHẤT server-gateway chạm tới {@link ServerDatabaseBootstrap}, và
- * chỉ để lấy {@code AccountFacade} đã lắp ráp sẵn (không bao giờ thấy DataSource/JedisPool trực
+ * chỉ để lấy {@code AccountFacade} đã lắp ráp sẵn (không bao giờ thấy DataSource/RedisClient trực
  * tiếp — xem javadoc {@link ServerDatabaseBootstrap}, Điều 23).
  */
 public final class GatewayBootstrap {
