@@ -44,6 +44,16 @@ final class CombatConstants {
     static final float ATTACK_CONFIRM_WINDOW_SECONDS = ATTACK_INTERVAL_SECONDS;
 
     /**
+     * Thời gian chờ {@code SkillResultEvent} của CHÍNH mình sau khi bấm skill, giây — quá hạn mà
+     * chưa thấy thì coi như server đã âm thầm bỏ lệnh ({@code SkillSystem.tryCast}: ngoài tầm, bị
+     * choáng, mục tiêu vừa chết, hồi chiêu phía server chưa xong...) và trả lại Khí + hồi chiêu đã
+     * trừ dự đoán ({@link CombatHudController#tick}). Cùng độ dài với cửa sổ xác nhận đòn đánh
+     * thường ({@link #ATTACK_CONFIRM_WINDOW_SECONDS}) — rộng gấp nhiều lần RTT thường gặp, mà vẫn
+     * ngắn hơn mọi hồi chiêu slot 0 (3–5s) nên nút sáng lại trước khi người chơi kịp thắc mắc.
+     */
+    static final float SKILL_CONFIRM_WINDOW_SECONDS = ATTACK_CONFIRM_WINDOW_SECONDS;
+
+    /**
      * Tầm đánh thường, mét — bản sao của {@code server-world.CombatConstants.ATTACK_RANGE_METERS}.
      * CHỈ dùng để nói cho người chơi biết "đang đứng xa quá" khi bấm đánh mà không thấy gì xảy ra;
      * lệnh vẫn được GỬI dù client nghĩ là ngoài tầm — server mới là bên quyết định trúng/trượt, và
