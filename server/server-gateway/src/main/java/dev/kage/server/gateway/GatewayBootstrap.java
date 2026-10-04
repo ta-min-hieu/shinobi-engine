@@ -149,7 +149,7 @@ public final class GatewayBootstrap {
      * cường hoá, nhận thư, giao dịch) là cách chắc chắn sẽ sót một đường, và sót thì client hiện số
      * cũ mà không có lỗi nào để lần ra.
      */
-    private static void wireGoldChangeNotifications(
+    static void wireGoldChangeNotifications(
             ServerDatabaseBootstrap databaseBootstrap, ConnectedCharacterRegistry characterRegistry) {
         databaseBootstrap.configureGoldChangeListener(change -> characterRegistry.sendGoldChanged(
                 change.characterId(), change.gold(), change.delta(), change.reasonKey()));
@@ -202,7 +202,7 @@ public final class GatewayBootstrap {
      * Gộp Dungeon/Arena instance registry + {@link WorldGateway} — dựng cùng lúc,
      * xem {@link #buildInstanceRegistries}.
      */
-    private record InstanceRegistries(
+    record InstanceRegistries(
             DungeonInstanceRegistry dungeon, ArenaInstanceRegistry arena, WorldGateway worldGateway) {}
 
     /**
@@ -210,7 +210,7 @@ public final class GatewayBootstrap {
      * registry đều cần {@code mainWorldChannels} (đích re-attach sau khi thoát instance, Phase 8
      * lát cắt 1/4) nên dựng cùng chỗ với {@link WorldGateway} luôn cho gọn.
      */
-    private static InstanceRegistries buildInstanceRegistries(
+    static InstanceRegistries buildInstanceRegistries(
             ConnectedCharacterRegistry characterRegistry,
             GatewayFacades facades,
             MainWorldChannelRegistry mainWorldChannels,
@@ -312,8 +312,12 @@ public final class GatewayBootstrap {
         return new WorldContext(mainWorldChannels, metricsHttpServer);
     }
 
-    /** Tách khỏi {@code main()} để giữ dưới giới hạn Checkstyle MethodLength — càng thêm facade, dòng càng dài. */
-    private static GatewayFacades wireFacades(ServerDatabaseBootstrap databaseBootstrap) {
+    /**
+     * Tách khỏi {@code main()} để giữ dưới giới hạn Checkstyle MethodLength — càng thêm facade, dòng càng dài.
+     * Package-private (cùng {@link #buildInstanceRegistries}/{@link #wireGoldChangeNotifications}) để
+     * {@code GatewayOpcodeFuzzDatabaseTest} lắp ĐÚNG composition root này thay vì chép tay.
+     */
+    static GatewayFacades wireFacades(ServerDatabaseBootstrap databaseBootstrap) {
         AccountFacade accountFacade = databaseBootstrap.wireAccountFacade();
         CharacterFacade characterFacade = databaseBootstrap.wireCharacterFacade();
         InventoryFacade inventoryFacade = databaseBootstrap.wireInventoryFacade();

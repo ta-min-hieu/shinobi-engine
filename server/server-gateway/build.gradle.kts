@@ -63,4 +63,17 @@ tasks.test {
     // Test cũng chạy qua pipeline Netty thật (EmbeddedChannel + socket thật) — bật paranoid ở
     // đây để CI tự bắt leak ByteBuf (quên release()) thay vì đợi phát hiện lúc chạy server thật.
     systemProperty("io.netty.leakDetection.level", "paranoid")
+    // Bộ fuzz opcode (GatewayOpcodeFuzzTest/GatewayOpcodeFuzzDatabaseTest) — chuyển tiếp cờ chạy tay
+    // từ dòng lệnh Gradle vào JVM test: `-Dkage.fuzz.iterations=500`, `-Dkage.fuzz.seed=0x...`,
+    // `-Dkage.fuzz.opcode=OPCODE_...`. Không đặt thì test dùng ngân sách mặc định của cổng `check`.
+    // Vòng lớn vượt @Timeout của test — tắt bằng `-Djunit.jupiter.execution.timeout.mode=disabled`.
+    for (key in listOf(
+        "kage.fuzz.seed",
+        "kage.fuzz.iterations",
+        "kage.fuzz.dbIterations",
+        "kage.fuzz.opcode",
+        "junit.jupiter.execution.timeout.mode",
+    )) {
+        providers.systemProperty(key).orNull?.let { systemProperty(key, it) }
+    }
 }
