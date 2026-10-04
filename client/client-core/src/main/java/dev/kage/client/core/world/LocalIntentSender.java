@@ -1,5 +1,6 @@
 package dev.kage.client.core.world;
 
+import java.util.Optional;
 import java.util.function.BooleanSupplier;
 
 import dev.kage.client.core.input.GameAction;
@@ -149,12 +150,14 @@ final class LocalIntentSender {
             context.sender().attack();
             return;
         }
-        CombatHudController.MonsterState target = context.combat().targetState();
-        if (target == null) {
+        // Quái HOẶC nhân vật (đối thủ đấu trường, 2026-10-04 — xem DuelTargeting): trước đây chỉ tra
+        // quái, nên trong đấu trường mọi cú bấm đều thành "chưa chọn mục tiêu".
+        Optional<PickablePoint> target = context.combat().targetPoint();
+        if (target.isEmpty()) {
             context.feedback().showSelfNotice("hud.combat.no_target", FloatingCombatText.MISS);
             return;
         }
-        if (!withinAttackRange(target)) {
+        if (!withinAttackRange(target.get())) {
             context.feedback().showSelfNotice("hud.combat.out_of_range", FloatingCombatText.MISS);
         }
         context.models().playAttack(WorldConstants.LOCAL_CHARACTER_ID);
@@ -182,7 +185,7 @@ final class LocalIntentSender {
         context.sender().useSkill(context.combat().skillCode(), context.combat().currentTargetId());
     }
 
-    private boolean withinAttackRange(CombatHudController.MonsterState target) {
+    private boolean withinAttackRange(PickablePoint target) {
         PositionComponent pos = POSITION.get(context.localPlayer());
         float dx = target.x() - pos.x;
         float dy = target.y() - pos.y;

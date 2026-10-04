@@ -167,6 +167,9 @@ public final class WorldScreen implements GameScreen {
 
     /** Luồng đấu tay đôi + xếp hạng PvP (arena.proto) — xem {@link DuelCoordinator}. */
     private final DuelCoordinator duel;
+
+    /** Tự nhắm đối thủ đấu trường — dòng 32 bảng chờ, phương án (a), xem {@link DuelTargeting}. */
+    private final DuelTargeting duelTargeting;
     /** Khung chọn hệ phái ở Lv10 (phím H) — mượn skin của {@link #combatHud} như {@link #chatPanel}. */
     private final FactionPanel factionPanel = new FactionPanel(combatHud.skin());
 
@@ -304,7 +307,8 @@ public final class WorldScreen implements GameScreen {
         this.party = new PartyCoordinator(partyPanel, sender, chat);
         this.friends = new FriendCoordinator(friendPanel, sender, combatFeedback, panels::noneOpen);
         this.guild = new GuildCoordinator(guildPanel, sender, panels::noneOpen);
-        this.duel = new DuelCoordinator(duelPanel, combatHud, sender, combatFeedback);
+        this.duelTargeting = buildDuelTargeting();
+        this.duel = buildDuel();
         this.dungeon = new DungeonCoordinator(partyPanel, combatHud, sender, chat);
         this.connection = new ConnectionCoordinator(combatHud, chat, errorKey -> sessionEndedKey = errorKey);
         this.faction = new FactionCoordinator(
@@ -376,6 +380,24 @@ public final class WorldScreen implements GameScreen {
                 panels::noneOpen,
                 dialogue::isOpen,
                 localCharacterId));
+    }
+
+    /**
+     * Tự nhắm đối thủ đấu trường (dòng 32 bảng chờ, phương án a). Tách khỏi constructor vì
+     * {@code MethodLength}. Nối luôn kho vị trí nhân vật khác vào HUD: mục tiêu nay có thể là một
+     * nhân vật, và kiểm tầm/neo số sát thương cần biết họ đứng đâu. PHẢI gọi SAU khi
+     * {@link #remoteCharacters} và {@link #sender} đã gán.
+     */
+    private DuelTargeting buildDuelTargeting() {
+        combatHudController.bindCharacterPositions(remoteCharacters.characters());
+        return new DuelTargeting(combatHudController, remoteCharacters::isPresent, sender::setTarget);
+    }
+
+    /** Tách khỏi constructor vì {@code MethodLength}; PHẢI gọi SAU {@link #buildDuelTargeting}. */
+    private DuelCoordinator buildDuel() {
+        DuelCoordinator coordinator = new DuelCoordinator(duelPanel, combatHud, sender, combatFeedback);
+        coordinator.setDuelListener(duelTargeting);
+        return coordinator;
     }
 
     /**
@@ -498,6 +520,8 @@ public final class WorldScreen implements GameScreen {
             // NPC của World cũ vừa bị xoá khỏi màn hình — cuộc nói chuyện với họ không đi theo sang.
             dialogue.reset();
             dungeon.onWorldChanged(event);
+            // SAU khi đã dọn: đối thủ đấu trường chỉ được nhắm khi spawn của World mới tới.
+            duelTargeting.onWorldChanged(event.getWorldKind());
         });
         // Bậc trang phục của chính mình chưa suy được từ đâu (xem CharacterAppearance phía server) —
         // dùng đúng giá trị mặc định server đang phát cho người khác, để mình và người khác nhìn
@@ -704,13 +728,13 @@ public final class WorldScreen implements GameScreen {
         if (opcode == Opcode.OPCODE_MOVE_RESPONSE_VALUE) {
             onMoveResponse(MoveResponse.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE) {
-            remoteCharacters.onSpawned(CharacterSpawnedEvent.parseFrom(payload));
+            onCharacterSpawned(CharacterSpawnedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE) {
             remoteCharacters.onMoved(CharacterMovedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_CHARACTER_APPEARANCE_CHANGED_EVENT_VALUE) {
             remoteCharacters.onAppearanceChanged(CharacterAppearanceChangedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE) {
-            remoteCharacters.onDespawned(CharacterDespawnedEvent.parseFrom(payload));
+            onCharacterDespawned(CharacterDespawnedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_CHARACTER_RESPAWNED_EVENT_VALUE) {
             onCharacterRespawned(CharacterRespawnedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE) {
@@ -767,6 +791,18 @@ public final class WorldScreen implements GameScreen {
         combatFeedback.onSkillResult(event);
         combatHudController.onSkillResult(event);
         combatAnimationTrigger.onSkillResult(event);
+    }
+
+    /** Nhân vật khác vào tầm nhìn — có thể chính là đối thủ đấu trường đang chờ được nhắm. */
+    private void onCharacterSpawned(CharacterSpawnedEvent event) {
+        remoteCharacters.onSpawned(event);
+        duelTargeting.onCharacterSpawned(event.getCharacterId());
+    }
+
+    /** Nhân vật khác rời tầm nhìn — đang nhắm người đó thì thôi nhắm. */
+    private void onCharacterDespawned(CharacterDespawnedEvent event) {
+        remoteCharacters.onDespawned(event);
+        combatHudController.onCharacterDespawned(event.getCharacterId());
     }
 
     private void onMoveResponse(MoveResponse response) {
@@ -892,12 +928,7 @@ public final class WorldScreen implements GameScreen {
         combatHud.setPlayerHp(combatHudController.playerHp(), combatHudController.playerMaxHp());
         combatHud.setPlayerChi(combatHudController.playerChi(), combatHudController.playerMaxChi());
         combatHud.setLevel(characterLevel);
-        CombatHudController.MonsterState target = combatHudController.targetState();
-        if (target != null) {
-            combatHud.setTarget(target.code(), target.hp(), target.maxHp());
-        } else {
-            combatHud.clearTarget();
-        }
+        TargetHudSync.sync(combatHudController, combatHud);
         combatHud.setSkillState(combatHudController.skillNameKey(), combatHudController.skillCooldownRemaining());
         combatHud.setSkillReady(combatHudController.canUseSkill());
     }

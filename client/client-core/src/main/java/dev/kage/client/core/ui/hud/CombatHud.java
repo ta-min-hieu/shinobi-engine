@@ -112,6 +112,9 @@ public final class CombatHud implements HudWindow {
     private int lastPlayerHp = -1;
     private int lastPlayerMaxHp = -1;
     private String lastTargetCode;
+    /** Tên nhân vật đang là mục tiêu (đối thủ đấu trường) — loại trừ với {@link #lastTargetCode}. */
+    private String lastCharacterTargetName;
+
     private int lastTargetHp = -1;
     private int lastTargetMaxHp = -1;
     private String lastSkillText;
@@ -499,7 +502,12 @@ public final class CombatHud implements HudWindow {
         targetGroup.setVisible(true);
         if (!monsterCode.equals(lastTargetCode)) {
             lastTargetCode = monsterCode;
+            lastCharacterTargetName = null;
             targetNameLabel.setText(i18n.get("hud.monster." + monsterCode));
+            // Mục tiêu trước có thể là nhân vật chưa biết máu tối đa (vạch máu đang ẩn) — vẽ lại hết.
+            lastTargetHp = -1;
+            lastTargetMaxHp = -1;
+            targetHealthBar.setVisible(true);
         }
         if (current == lastTargetHp && max == lastTargetMaxHp) {
             return;
@@ -510,11 +518,50 @@ public final class CombatHud implements HudWindow {
         targetHpLabel.setText(current + " / " + max);
     }
 
+    /**
+     * Mục tiêu là một NHÂN VẬT (đối thủ đấu trường, 2026-10-04).
+     *
+     * <p>Khác quái ở hai chỗ: tên là tên người chơi do server gửi (không có khoá i18n nào cho nó), và
+     * máu có thể CHƯA BIẾT — giao thức chỉ mang máu tối đa của người khác trong
+     * {@code HealthChangedEvent}. Chưa biết máu tối đa thì ẨN vạch máu và chỉ hiện con số đã biết:
+     * vẽ một tỉ lệ đoán mò là client tự bịa số (Điều 15).
+     *
+     * @param displayName tên đã sanitize
+     * @param current máu hiện tại, âm = chưa biết
+     * @param max máu tối đa, không dương = chưa biết
+     */
+    public void setCharacterTarget(String displayName, int current, int max) {
+        targetGroup.setVisible(true);
+        if (!displayName.equals(lastCharacterTargetName)) {
+            lastCharacterTargetName = displayName;
+            lastTargetCode = null;
+            targetNameLabel.setText(displayName);
+            lastTargetHp = Integer.MIN_VALUE;
+            lastTargetMaxHp = Integer.MIN_VALUE;
+        }
+        if (current == lastTargetHp && max == lastTargetMaxHp) {
+            return; // UI.md §9 — chỉ setText khi giá trị thực sự đổi.
+        }
+        lastTargetHp = current;
+        lastTargetMaxHp = max;
+        boolean maxKnown = max > 0 && current >= 0;
+        targetHealthBar.setVisible(maxKnown);
+        if (maxKnown) {
+            targetHealthBar.setValues(current, max);
+            targetHpLabel.setText(current + " / " + max);
+        } else if (current >= 0) {
+            targetHpLabel.setText(KageI18n.formatOrKey(i18n, "hud.target.hp_partial", String.valueOf(current)));
+        } else {
+            targetHpLabel.setText(KageI18n.textOrKey(i18n, "hud.target.hp_unknown"));
+        }
+    }
+
     public void clearTarget() {
-        if (lastTargetCode == null) {
+        if (lastTargetCode == null && lastCharacterTargetName == null) {
             return;
         }
         lastTargetCode = null;
+        lastCharacterTargetName = null;
         lastTargetHp = -1;
         lastTargetMaxHp = -1;
         targetGroup.setVisible(false);

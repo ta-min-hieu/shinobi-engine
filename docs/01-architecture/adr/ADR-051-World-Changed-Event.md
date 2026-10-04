@@ -222,3 +222,10 @@ Không (ngừng phát 1504 — D4 — sẽ cần ADR riêng khi tới lúc).
      luận PASS đúng cho thứ tự 308/spawn và đường chốt trận phía server, không cho trải nghiệm trận
      đấu. Hướng sửa (phía client, không đổi protocol) đang chờ chủ dự án — dòng Arena ở
      ["🔴 ĐANG CHỜ CHỦ DỰ ÁN"](../../README.md).
+   - *(2026-10-04)* **Đã thi hành phương án (a)** phía client: `DuelTargeting` tự gửi
+     `SetTargetCommand(opponent_character_id)` khi đủ ba điều kiện — có `DuelStartedEvent`, đang ở World
+     ARENA (308), đối thủ đã spawn trong World đó (ba gói tới không theo thứ tự cố định). HUD mục tiêu
+     hiện tên + máu đối thủ, số sát thương neo lên đối thủ. Không đổi protocol/server. Chi tiết + khoảng
+     trống còn lại (máu tối đa của đối thủ không có trên dây): [CLIENT.md](../../04-client/CLIENT.md).
+     Test headless `DuelTargetingTest`. ⚠️ **CHƯA kiểm sống bằng client desktop thật** (`gameProbe` không
+     chạy HUD) — mục này vẫn mở tới khi có lượt đó; phương án (b) (click người chơi để nhắm) vẫn mở.

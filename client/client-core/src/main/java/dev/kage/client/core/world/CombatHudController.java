@@ -3,6 +3,7 @@ package dev.kage.client.core.world;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.Faction;
@@ -33,6 +34,12 @@ final class CombatHudController {
 
     /** Trạng thái 1 quái đã biết, tối thiểu để vẽ hộp + thanh máu (không phải ECS Component). */
     record MonsterState(String code, float x, float y, int hp, int maxHp) implements PickablePoint {}
+
+    /**
+     * Máu đối thủ CHƯA biết — {@code CharacterSpawnedEvent} không mang máu, nên trước gói máu đầu
+     * tiên client không có con số thật nào để hiện (Điều 15: không đoán).
+     */
+    static final int UNKNOWN_HP = -1;
 
     private final long localCharacterId;
 
@@ -77,7 +84,18 @@ final class CombatHudController {
     /** Khí đã trừ cho lần bấm đang chờ — nhớ riêng vì hệ phái (tức giá Khí) đổi được giữa chừng. */
     private int pendingCastChiCost;
 
+    /**
+     * Id mục tiêu đang nhắm: ÂM = quái, DƯƠNG = nhân vật khác (đối thủ đấu trường, 2026-10-04),
+     * {@code 0} = không nhắm ai — cùng quy ước dấu với {@code target_entity_id} của combat.proto.
+     */
     private long currentTargetId;
+
+    /** Nhân vật khác đang thấy — xem {@link #bindCharacterPositions}. Rỗng tới khi được nối. */
+    private Map<Long, ? extends PickablePoint> characterPositions = Map.of();
+
+    private String characterTargetName = "";
+    private int characterTargetHp = UNKNOWN_HP;
+    private int characterTargetMaxHp = UNKNOWN_HP;
 
     /**
      * @param localCharacterId id nhân vật của chính người chơi — dùng để nhận ra
@@ -231,6 +249,10 @@ final class CombatHudController {
         if (event.getEntityId() == localCharacterId && event.getMaxHp() > 0) {
             playerMaxHp = event.getMaxHp();
         }
+        // Gói DUY NHẤT mang máu tối đa của người khác — xem characterTargetMaxHp().
+        if (event.getEntityId() == currentTargetId && hasCharacterTarget() && event.getMaxHp() > 0) {
+            characterTargetMaxHp = event.getMaxHp();
+        }
         applyHpUpdate(event.getEntityId(), event.getCurrentHp(), false);
     }
 
@@ -240,6 +262,14 @@ final class CombatHudController {
     private void applyHpUpdate(long targetEntityId, int currentHp, boolean died) {
         if (targetEntityId == localCharacterId) {
             playerHp = currentHp;
+            return;
+        }
+        if (targetEntityId > 0L) {
+            // Nhân vật khác: chỉ nhớ máu của người đang nhắm (HUD mục tiêu). Gục thì GIỮ mục tiêu —
+            // trận đấu do server chốt (DuelResultEvent/308), không phải gói đòn đánh này.
+            if (targetEntityId == currentTargetId) {
+                characterTargetHp = currentHp;
+            }
             return;
         }
         MonsterState existing = monsters.get(targetEntityId);
@@ -421,5 +451,90 @@ final class CombatHudController {
 
     float skillCooldownRemaining() {
         return skillCooldownRemaining;
+    }
+
+    /**
+     * Nối kho vị trí nhân vật khác đang thấy ({@code RemoteCharacterPresenter#characters()}) — để
+     * {@link #selectCharacterTarget} chỉ nhắm người đang thật sự có trên màn hình, và để
+     * {@link #targetPoint()} biết mục tiêu đang đứng đâu (kiểm tầm cục bộ, neo số sát thương).
+     * Giữ THAM CHIẾU, không sao chép: kho đó tự cập nhật theo spawn/move/despawn.
+     */
+    void bindCharacterPositions(Map<Long, ? extends PickablePoint> positions) {
+        this.characterPositions = positions;
+    }
+
+    /**
+     * Nhắm một NHÂN VẬT khác (đối thủ đấu trường — dòng 32 bảng chờ, phương án a, 2026-10-04).
+     *
+     * <p>Chỉ là Ý ĐỊNH: server tự kiểm lại ({@code WorldFacade#handleSetTarget} bỏ qua mục tiêu không
+     * tồn tại trong World đó; {@code CombatSystem} quyết PvP có được phép không).
+     *
+     * @param displayName tên đã sanitize, chỉ để hiện trên HUD mục tiêu
+     * @return {@code true} nếu mục tiêu vừa ĐỔI — caller phải gửi {@code SetTargetCommand}.
+     *     {@code false} khi đó là chính mình, người đó không có trên màn hình, hoặc đã đang nhắm
+     *     đúng người đó (không gửi gói thừa, cùng lý do {@link #selectTarget}).
+     */
+    boolean selectCharacterTarget(long characterId, String displayName) {
+        if (characterId <= 0L
+                || characterId == localCharacterId
+                || characterId == currentTargetId
+                || !characterPositions.containsKey(characterId)) {
+            return false;
+        }
+        currentTargetId = characterId;
+        characterTargetName = displayName;
+        characterTargetHp = UNKNOWN_HP;
+        characterTargetMaxHp = UNKNOWN_HP;
+        return true;
+    }
+
+    /** Một nhân vật khác vừa rời tầm nhìn — đang nhắm người đó thì thôi nhắm. */
+    void onCharacterDespawned(long characterId) {
+        clearCharacterTarget(characterId);
+    }
+
+    /** Bỏ mục tiêu nếu (và chỉ nếu) đang nhắm đúng nhân vật này — hết trận, đối thủ biến mất. */
+    void clearCharacterTarget(long characterId) {
+        if (characterId > 0L && currentTargetId == characterId) {
+            currentTargetId = 0L;
+        }
+    }
+
+    /** Mục tiêu hiện tại là một NHÂN VẬT (id dương) chứ không phải quái (id âm). */
+    boolean hasCharacterTarget() {
+        return currentTargetId > 0L;
+    }
+
+    /** Tên hiển thị của nhân vật đang nhắm — chỉ có nghĩa khi {@link #hasCharacterTarget()}. */
+    String characterTargetName() {
+        return characterTargetName;
+    }
+
+    /** Máu hiện tại của nhân vật đang nhắm theo gói server gần nhất, hoặc {@link #UNKNOWN_HP}. */
+    int characterTargetHp() {
+        return characterTargetHp;
+    }
+
+    /**
+     * Máu tối đa của nhân vật đang nhắm, hoặc {@link #UNKNOWN_HP}. Chỉ {@code HealthChangedEvent}
+     * mang con số này cho người KHÁC — {@code AttackResultEvent}/{@code SkillResultEvent} chỉ mang
+     * máu còn lại, {@code CharacterSpawnedEvent} không mang máu (khoảng trống giao thức, xem CLIENT.md).
+     */
+    int characterTargetMaxHp() {
+        return characterTargetMaxHp;
+    }
+
+    /**
+     * Vị trí mục tiêu hiện tại, dù là quái hay nhân vật — rỗng khi không nhắm ai hoặc mục tiêu không
+     * còn trên màn hình. Gọi theo nhịp sự kiện/bấm nút, KHÔNG mỗi khung (tra {@code Map<Long, …>} là
+     * boxing).
+     */
+    Optional<PickablePoint> targetPoint() {
+        if (currentTargetId == 0L) {
+            return Optional.empty();
+        }
+        PickablePoint point =
+                currentTargetId < 0L ? monsters.get(currentTargetId) : characterPositions.get(currentTargetId);
+        return Optional.ofNullable(point);
     }
 }

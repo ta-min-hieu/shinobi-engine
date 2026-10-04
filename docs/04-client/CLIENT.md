@@ -130,7 +130,7 @@ if (input.isPressed(GameAction.JUMP)) jump();
 | `JUMP` | **W** (hoặc ↑, Space) | ADR-033 — nhảy có tác dụng gameplay thật |
 | `ATTACK` | **Z** (hoặc nút Đánh trên HUD) | Giữ được, tự lặp — [ADR-034](../01-architecture/adr/ADR-034-Manual-Attack-And-Click-Target.md) |
 | `USE_SKILL` | **Enter** (hoặc numpad Enter) | Một nút skill, không phải dãy 1–6 |
-| Chọn mục tiêu | **Chuột trái** vào quái/NPC | ADR-034 — KHÔNG có tương đương cảm ứng một-đổi-một |
+| Chọn mục tiêu | **Chuột trái** vào quái/NPC | ADR-034 — KHÔNG có tương đương cảm ứng một-đổi-một. Trong đấu trường: **tự nhắm đối thủ** (xem dưới); click người chơi vẫn chỉ là chọn để thách đấu |
 | Mở 11 cửa sổ HUD | **T** chat · **I** túi đồ · **B** mua bán · **N** giao dịch · **J** nhiệm vụ · **M** thư · **P** nhóm · **F** bạn · **G** bang · **K** luận kiếm · **H** hệ phái | Phím chữ, không đi qua `GameAction`: đây không phải ý định gameplay |
 
 ⚠️ Bảng cũ ở đây từng ghi `Space`/`J`/`SKILL_1..6` — **sai so với code** kể từ ADR-033/034. Sửa 2026-09-05.
@@ -161,6 +161,27 @@ Bản vá nằm trong `CombatHudController` (client desktop), còn `gameProbe` k
 không có đường gửi lệnh skill (chỉ giải mã `SkillResultEvent`), nên không có cách đo bằng probe.
 Chỉ có `CombatHudControllerTest`; kiểm sống thật cần client desktop (bấm Enter ngoài tầm/khi bị
 choáng rồi đọc thanh Khí). Đợt kiểm sống cùng ngày cho AoI/NaN: [SERVER.md §6](../05-server/SERVER.md#6-state-sync--gửi-gì-cho-client).
+
+**Tự nhắm đối thủ đấu trường (`DuelTargeting`, 2026-10-04 — dòng 32 bảng chờ, phương án a).**
+Trước đây mục tiêu chỉ có thể là QUÁI (tự chọn lúc quái spawn, hoặc click quái); click người chơi khác
+đi sang `DuelCoordinator.onCharacterPicked` (chọn để thách đấu). Đấu trường không có quái ⇒ không bao
+giờ có mục tiêu ⇒ bấm Đánh báo "chưa chọn mục tiêu", nút skill xám. Nay client tự gửi
+`SetTargetCommand(opponent_character_id)` — id lấy từ `DuelStartedEvent`, client không tự chọn ai —
+khi đủ **cả ba**: đang có trận, đang ở World ARENA (gói 308), và đối thủ đã spawn trong World đó. Ba
+gói này tới theo thứ tự KHÔNG cố định (`DuelStartedEvent` gửi ngay sau `acceptDuel`; 308 + attach chạy
+trên executor riêng sau khi world chính xả hàng đợi), nên chờ đủ cả ba; spawn trong đấu trường cũng
+là bằng chứng entity đối thủ đã attach phía server, tức `WorldFacade#handleSetTarget` sẽ không bỏ qua
+lệnh. Bỏ mục tiêu khi: `DuelResultEvent`, đổi World (308 nào cũng dọn), đối thủ despawn (spawn lại thì
+nhắm lại), hoặc người chơi click một con quái. `CombatHudController` giữ mục tiêu nhân vật (id dương)
+cạnh mục tiêu quái (id âm): máu lấy từ `AttackResultEvent`/`SkillResultEvent`, máu TỐI ĐA chỉ từ
+`HealthChangedEvent`. ⚠️ **Khoảng trống giao thức**: `CharacterSpawnedEvent`/`AttackResultEvent`
+không mang máu tối đa của người khác ⇒ trong một trận ngắn HUD mục tiêu thường chỉ hiện `88 / ?`
+(vạch máu ẩn — vẽ tỉ lệ đoán mò là client bịa số). Lấp thật cần thêm field vào protocol — quyết định
+của chủ dự án. Số sát thương nay neo lên nhân vật đang là mục tiêu (`CombatFeedbackPresenter`); số của
+người khác vẫn không hiện. Chưa có dấu mục tiêu vẽ dưới chân nhân vật (chỉ quái có). Phương án (b) —
+click người chơi để nhắm khi đang trong trận — CHƯA làm. Test: `DuelTargetingTest` (đỏ trước, xanh
+sau), `FrameAllocationTest#characterTargetHudPath_isAllocationFree`. **CHƯA kiểm sống bằng client
+desktop thật** — `gameProbe` không chạy code HUD/`DuelTargeting` nên không đo được đường này.
 
 ✅ **Nền tảng đã chốt: desktop-first** ([ADR-023](../01-architecture/adr/ADR-023-Desktop-First-Input.md), Accepted 2026-09-05). Sơ đồ cảm ứng KHÔNG thiết kế trước (Điều 9) — khi nào làm mobile thật thì cần một ADR riêng, phạm vi tối thiểu: sơ đồ nhập liệu cảm ứng, bố cục lại HUD theo vùng chạm tối thiểu, và xem lại [ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md)/[ADR-028](../01-architecture/adr/ADR-028-Asset-Delivery-Tiers.md).
 
