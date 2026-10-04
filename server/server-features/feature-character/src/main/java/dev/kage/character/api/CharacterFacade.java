@@ -67,6 +67,14 @@ public final class CharacterFacade {
         return grantExperienceUseCase.execute(characterId, amount);
     }
 
+    /**
+     * Vạch EXP sau khi thưởng quest đã cộng EXP bằng đường tắt — {@code leveledUp} báo đúng khi lần
+     * lĩnh thưởng đó vượt mốc cấp. Xem {@link GrantExperienceUseCase#syncAfterExternalGrant}.
+     */
+    public GrantExperienceUseCase.Result syncExperienceAfterQuestReward(long characterId) {
+        return grantExperienceUseCase.syncAfterExternalGrant(characterId);
+    }
+
     public PositionSnapshot loadPosition(long characterId) {
         return characterPort.loadPosition(characterId);
     }

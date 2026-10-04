@@ -358,8 +358,24 @@ final class WorldObservation {
 
     /** Con quái gần nhất ĐANG trong tầm nhìn — rỗng nếu chưa thấy con nào. */
     OptionalLong nearestMonsterId() {
-        Optional<MonsterSighting> nearest = monstersInAreaOfInterest().stream().findFirst();
+        return nearestMonsterId("");
+    }
+
+    /**
+     * Con quái gần nhất ĐANG trong tầm nhìn thuộc loài {@code monsterCode} — rỗng nếu chưa thấy con
+     * nào. {@code monsterCode} rỗng = mọi loài.
+     */
+    OptionalLong nearestMonsterId(String monsterCode) {
+        Optional<MonsterSighting> nearest = monstersInAreaOfInterest().stream()
+                .filter(sighting -> monsterCode.isEmpty() || monsterCode.equals(sighting.monsterCode()))
+                .findFirst();
         return nearest.map(sighting -> OptionalLong.of(sighting.monsterId())).orElseGet(OptionalLong::empty);
+    }
+
+    /** {@code true} khi con quái này còn trong tầm nhìn (chưa chết, chưa despawn, chưa đổi World). */
+    boolean isInAreaOfInterest(long monsterId) {
+        MonsterSighting sighting = monsters.get(monsterId);
+        return sighting != null && sighting.inAreaOfInterest();
     }
 
     double distanceToPlayer(MonsterSighting sighting) {

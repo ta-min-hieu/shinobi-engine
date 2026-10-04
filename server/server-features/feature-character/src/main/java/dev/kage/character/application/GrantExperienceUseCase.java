@@ -48,6 +48,24 @@ public final class GrantExperienceUseCase {
     }
 
     /**
+     * Đồng bộ vạch EXP SAU khi EXP đã được cộng bằng đường khác use case này — thưởng quest đi thẳng
+     * vào {@code character.exp} qua {@code PostgresQuestExpAdapter}. Hoà giải cột {@code level} như
+     * {@code execute(id, 0)}, nhưng {@code leveledUp} so cấp suy từ {@code exp} với cột {@code level}
+     * ĐANG LƯU — cột đó là cấp người chơi đang thấy trước lần lĩnh thưởng này.
+     *
+     * <p>Vì sao không dùng {@code execute(id, 0)}: nhánh đó trả {@code leveledUp=false} có chủ đích
+     * (lúc vào world không có gì để mừng), nên những cú lên cấp lớn nhất arc 1 — đều đến từ thưởng
+     * quest — không bao giờ hiện thông báo lên cấp (kiểm sống chuỗi quest, 2026-10-03).
+     */
+    public Result syncAfterExternalGrant(long characterId) {
+        Character character =
+                characterPort.findById(characterId).orElseThrow(() -> new CharacterNotFoundException(characterId));
+        ExperienceProgress now = ExperienceCurve.progressOf(character.exp());
+        reconcileStoredLevel(characterId, character.level(), now.level(), character.exp());
+        return new Result(now, now.level() > character.level());
+    }
+
+    /**
      * Ghi cột {@code character.level} khi và CHỈ khi nó lệch với cấp suy ra từ {@code exp}.
      *
      * <p><b>Vì sao so với cột ĐANG LƯU chứ không so trước/sau lần cộng này</b> (sửa 2026-09-05):
