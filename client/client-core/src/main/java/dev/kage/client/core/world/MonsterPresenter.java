@@ -61,6 +61,11 @@ final class MonsterPresenter {
      * của boss (vẫn hardcode, ADR-037 D7).
      */
     void onSpawned(MonsterSpawnedEvent event) {
+        // Cùng phán quyết với CombatHudController#onMonsterSpawned (nơi đã ghi log): gắn model cho
+        // một con quái mà kho quái không nhận là để nó đứng ở gốc toạ độ mãi mãi.
+        if (!MalformedPacket.isDisplayable(event)) {
+            return;
+        }
         String modelKey =
                 event.getModelKey().isEmpty() ? MonsterModelKey.of(event.getMonsterCode()) : event.getModelKey();
         models.addMonsterOrNpc(event.getMonsterId(), modelKey);
@@ -68,6 +73,9 @@ final class MonsterPresenter {
     }
 
     void onMoved(MonsterMovedEvent event) {
+        if (!MalformedPacket.isFinite(event.getX(), event.getY())) {
+            return; // CombatHudController#onMonsterMoved đã ghi log gói này.
+        }
         motionTracker.onPositionUpdate(event.getMonsterId(), event.getX(), event.getY());
     }
 

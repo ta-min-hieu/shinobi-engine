@@ -155,10 +155,17 @@ final class CombatHudController {
      *     đủ — chưa cần chọn "quái gần nhất" trong nhiều lựa chọn.
      */
     long onMonsterSpawned(MonsterSpawnedEvent event) {
+        if (!MalformedPacket.accepts(event)) {
+            return 0L; // id không phải quái (dương = nhân vật, kể cả chính mình) hoặc toạ độ hỏng.
+        }
         monsters.put(
                 event.getMonsterId(),
                 new MonsterState(
-                        event.getMonsterCode(), event.getX(), event.getY(), event.getCurrentHp(), event.getMaxHp()));
+                        event.getMonsterCode(),
+                        event.getX(),
+                        event.getY(),
+                        MalformedPacket.clampPoints(event.getCurrentHp(), event.getMaxHp()),
+                        event.getMaxHp()));
         if (currentTargetId == 0L) {
             currentTargetId = event.getMonsterId();
             return currentTargetId;
@@ -191,7 +198,7 @@ final class CombatHudController {
 
     void onMonsterMoved(MonsterMovedEvent event) {
         MonsterState existing = monsters.get(event.getMonsterId());
-        if (existing != null) {
+        if (existing != null && MalformedPacket.accepts(event)) {
             monsters.put(
                     event.getMonsterId(),
                     new MonsterState(existing.code(), event.getX(), event.getY(), existing.hp(), existing.maxHp()));
@@ -260,15 +267,18 @@ final class CombatHudController {
     // HP còn lại, có chết không (SkillResultEvent chỉ thêm skill_code/effect_kind, chưa cần cho
     // HUD tối thiểu này). Gọi 2 lần (Despawned tới sau) vẫn an toàn — remove/clear đã idempotent.
     private void applyHpUpdate(long targetEntityId, int currentHp, boolean died) {
+        // Mọi con số máu đi qua đây đều bị KẸP về [0, max] (InboundPacketFuzzTest): server không bao
+        // giờ gửi máu âm hay vượt trần, nên gói như thế là gói hỏng — vạch máu "-5 / 100" hay
+        // "250 / 100" chỉ làm người chơi tin sai, không giúp ai cả.
         if (targetEntityId == localCharacterId) {
-            playerHp = currentHp;
+            playerHp = MalformedPacket.clampPoints(currentHp, playerMaxHp);
             return;
         }
         if (targetEntityId > 0L) {
             // Nhân vật khác: chỉ nhớ máu của người đang nhắm (HUD mục tiêu). Gục thì GIỮ mục tiêu —
             // trận đấu do server chốt (DuelResultEvent/308), không phải gói đòn đánh này.
             if (targetEntityId == currentTargetId) {
-                characterTargetHp = currentHp;
+                characterTargetHp = MalformedPacket.clampPoints(currentHp, characterTargetMaxHp);
             }
             return;
         }
@@ -285,7 +295,12 @@ final class CombatHudController {
         }
         monsters.put(
                 targetEntityId,
-                new MonsterState(existing.code(), existing.x(), existing.y(), currentHp, existing.maxHp()));
+                new MonsterState(
+                        existing.code(),
+                        existing.x(),
+                        existing.y(),
+                        MalformedPacket.clampPoints(currentHp, existing.maxHp()),
+                        existing.maxHp()));
     }
 
     /**
@@ -346,13 +361,14 @@ final class CombatHudController {
      * mục tiêu cũ chỉ gây lệch hiển thị vô ích.
      */
     void onRespawn(int currentHp, int maxHp, int currentChi) {
-        playerHp = currentHp;
         // ADR-036: máu tối đa phụ thuộc trang bị, nên LẤY của server thay vì đọc hằng số client.
         // maxHp <= 0 nghĩa là server cũ chưa gửi field (mặc định proto3) — giữ giá trị đang có.
         if (maxHp > 0) {
             playerMaxHp = maxHp;
         }
-        playerChi = currentChi;
+        // Kẹp SAU khi đã có mẫu số mới — xem applyHpUpdate.
+        playerHp = MalformedPacket.clampPoints(currentHp, playerMaxHp);
+        playerChi = MalformedPacket.clampPoints(currentChi, CombatConstants.CHARACTER_MAX_CHI);
         // Khí vừa lấy THẲNG của server — lần bấm đang chờ (nếu có) không còn gì để trả lại.
         castAwaitingConfirmation = false;
         currentTargetId = 0L;

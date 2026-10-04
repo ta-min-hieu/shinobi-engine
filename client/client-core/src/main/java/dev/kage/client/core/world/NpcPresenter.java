@@ -48,6 +48,9 @@ final class NpcPresenter {
     }
 
     void onSpawned(NpcSpawnedEvent event) {
+        if (!MalformedPacket.accepts(event)) {
+            return; // id sai không gian hoặc toạ độ NaN/vô cực — xem MalformedPacket.
+        }
         npcs.put(event.getNpcId(), new NpcState(event.getNpcCode(), event.getX(), event.getY()));
         models.addMonsterOrNpc(event.getNpcId(), NpcModelKey.of(event.getNpcCode()));
     }

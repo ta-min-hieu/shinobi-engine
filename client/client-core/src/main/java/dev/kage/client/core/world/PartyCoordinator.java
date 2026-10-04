@@ -8,6 +8,7 @@ import com.badlogic.gdx.utils.I18NBundle;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import dev.kage.client.core.ui.hud.PartyPanel;
+import dev.kage.client.core.ui.hud.ScrollingList;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.AcceptPartyInviteResponse;
 import dev.kage.protocol.CreatePartyResponse;
@@ -151,12 +152,22 @@ final class PartyCoordinator implements WindowFlow {
     }
 
     private void redraw() {
+        // Trần số dòng DỰNG, cùng trần mọi cửa sổ có danh sách (ScrollingList.MAX_BUILT_ROWS): một gói
+        // liệt kê 100k phần tử từng dựng 100k hàng actor và làm client hết bộ nhớ
+        // (InboundPacketFuzzTest#hugeRepeatedFieldsDoNotHang). Nhóm thật có trần sĩ số phía server
+        // nên trần này chỉ chạm tới khi dữ liệu đã hỏng.
         memberRows.clear();
-        for (PartyController.Member member : controller.members()) {
+        List<PartyController.Member> members = controller.members();
+        int shownMembers = Math.min(members.size(), ScrollingList.MAX_BUILT_ROWS);
+        for (int index = 0; index < shownMembers; index++) {
+            PartyController.Member member = members.get(index);
             memberRows.add(new PartyPanel.MemberRow(displayName(member), member.name(), member.online()));
         }
         inviteRows.clear();
-        for (PartyController.Invite invite : controller.invites()) {
+        List<PartyController.Invite> invites = controller.invites();
+        int shownInvites = Math.min(invites.size(), ScrollingList.MAX_BUILT_ROWS);
+        for (int index = 0; index < shownInvites; index++) {
+            PartyController.Invite invite = invites.get(index);
             inviteRows.add(
                     new PartyPanel.InviteRow(invite.inviteId(), i18n.format("party.invite.row", invite.partyId())));
         }

@@ -61,6 +61,24 @@
         <Bug pattern="PREDICTABLE_RANDOM"/>
     </Match>
 
+    <!-- Fuzz đường NHẬN gói của client (InboundPacketFuzzTest/FuzzSequence) — java.util.Random với
+         seed CỐ ĐỊNH CHỦ ĐÍCH (in ra khi đỏ) để mỗi ca đỏ dựng lại được. Chỉ sinh gói/thao tác cho
+         test, không phải giá trị bảo mật — cùng lý do SecurityIntegrationTest ngay trên. -->
+    <Match>
+        <Or>
+            <Class name="dev.kage.client.core.world.InboundPacketFuzzTest"/>
+            <Class name="dev.kage.client.core.world.FuzzSequence"/>
+        </Or>
+        <Bug pattern="PREDICTABLE_RANDOM"/>
+    </Match>
+
+    <!-- Kiểm rò bộ nhớ: màn world đã dispose phải được GC thu hồi (WeakReference) — gọi System.gc()
+         là CÁCH DUY NHẤT để hỏi câu đó, không phải tối ưu hiệu năng. -->
+    <Match>
+        <Class name="dev.kage.client.core.world.InboundPacketScenarioTest"/>
+        <Bug pattern="DM_GC"/>
+    </Match>
+
     <!-- Random chọn hướng tuần tra quái vật (gameplay, KHÔNG bảo mật) — sinh ở server đúng quy tắc
          (CLAUDE.md "Random ảnh hưởng gameplay: chỉ sinh ở server"), predictable PRNG là lựa chọn
          ĐÚNG cho gameplay (SecureRandom lãng phí, không cần thiết cho hướng đi AI). -->

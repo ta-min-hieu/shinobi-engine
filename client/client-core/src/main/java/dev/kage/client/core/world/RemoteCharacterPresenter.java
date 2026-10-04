@@ -44,12 +44,22 @@ final class RemoteCharacterPresenter {
 
     private final RemoteMotionTracker motionTracker = new RemoteMotionTracker();
 
-    RemoteCharacterPresenter(EcsWorld world, WorldModelRenderer models) {
+    private final long localCharacterId;
+
+    /**
+     * @param localCharacterId id của CHÍNH người chơi — server không bao giờ gửi spawn của mình cho
+     *     mình, nên một gói như thế là gói hỏng và không được dựng thành "người khác".
+     */
+    RemoteCharacterPresenter(EcsWorld world, WorldModelRenderer models, long localCharacterId) {
         this.world = world;
         this.models = models;
+        this.localCharacterId = localCharacterId;
     }
 
     void onSpawned(CharacterSpawnedEvent event) {
+        if (!MalformedPacket.accepts(event, localCharacterId)) {
+            return; // id sai không gian hoặc toạ độ NaN/vô cực — xem MalformedPacket.
+        }
         if (entities.containsKey(event.getCharacterId())) {
             return; // đã có — bỏ qua an toàn thay vì tạo entity trùng.
         }
@@ -85,7 +95,7 @@ final class RemoteCharacterPresenter {
 
     void onMoved(CharacterMovedEvent event) {
         KEntity entity = entities.get(event.getCharacterId());
-        if (entity == null) {
+        if (entity == null || !MalformedPacket.accepts(event)) {
             return; // Moved tới trước Spawned (hiếm qua TCP, nhưng an toàn bỏ qua thay vì crash).
         }
         PositionComponent position = POSITION.get(entity);
