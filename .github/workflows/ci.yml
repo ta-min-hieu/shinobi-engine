@@ -21,6 +21,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # README bảng chờ dòng 60, phương án B (2026-10-04): checkout KHÔNG bật `lfs: true` (sẽ kéo cả
+      # `.blend` nặng, ăn quota băng thông LFS) — chỉ kéo font, thứ duy nhất build/test cần
+      # (`FontFactoryVietnameseGlyphTest` ở client-core đọc `assets/raw/fonts/*.ttf` thật, không phải
+      # con trỏ LFS). Runner ubuntu-latest có sẵn git-lfs; `install --local` gắn filter cho repo này
+      # để `git status` không thấy font là "đã sửa" sau khi pull.
+      - name: Kéo font LFS (chỉ assets/raw/fonts)
+        run: |
+          git lfs install --local
+          git lfs pull --include="assets/raw/fonts/**"
+
       - name: Set up JDK 25 (Temurin)
         uses: actions/setup-java@v5
         with:

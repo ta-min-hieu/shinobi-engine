@@ -104,9 +104,11 @@ class ArchitectureTest {
 trọng (đối chiếu 2026-10-03): **không có task `integrationTest` và không có job integration riêng** —
 test Testcontainers chạy chung trong `./gradlew test` của job `build-and-verify` (runner
 `ubuntu-latest` có Docker). Job `docker-build-push` chỉ chạy khi push `master`/tag `v*`, sau khi
-`build-and-verify` xanh. `actions/checkout` KHÔNG bật LFS ⇒ font `assets/raw/fonts/*.ttf` chỉ là con
-trỏ LFS trên CI ⇒ `FontFactoryVietnameseGlyphTest` (client-core) đỏ; cách lấy LFS trên CI (chỉ
-font hay toàn bộ, quota băng thông LFS) đang chờ chủ dự án quyết.
+`build-and-verify` xanh. `actions/checkout` KHÔNG bật LFS (cố ý — tránh kéo `.blend` nặng, ăn quota
+băng thông LFS); thay vào đó job `build-and-verify` có bước riêng ngay sau checkout:
+`git lfs install --local` + `git lfs pull --include="assets/raw/fonts/**"` — chỉ kéo font, để
+`FontFactoryVietnameseGlyphTest` (client-core) đọc được `.ttf` thật thay vì con trỏ LFS (bảng chờ
+[README](../README.md) dòng 60, phương án B, thi hành 2026-10-04; ⚠️ chưa xác minh trên GitHub).
 
 ```yaml
 name: CI
