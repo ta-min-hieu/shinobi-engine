@@ -133,6 +133,23 @@ class MetricsHttpServerTest {
         assertThat(response.statusCode()).isEqualTo(503);
     }
 
+    /**
+     * Vòng đời: {@code HttpServer.stop} không đóng executor do người gọi cấp qua
+     * {@code setExecutor} — trước bản vá, executor virtual-thread sống tiếp sau {@code stop()}.
+     */
+    @Test
+    void shouldShutDownExecutor_whenStopped() throws IOException {
+        int freePort = findFreePort();
+        MetricsHttpServer stopped =
+                new MetricsHttpServer(freePort, new PrometheusMeterRegistry(PrometheusConfig.DEFAULT), () -> true);
+        stopped.start();
+        assertThat(stopped.isExecutorShutdown()).isFalse();
+
+        stopped.stop();
+
+        assertThat(stopped.isExecutorShutdown()).isTrue();
+    }
+
     private static int findFreePort() throws IOException {
         try (ServerSocket socket = new ServerSocket(0)) {
             return socket.getLocalPort();
