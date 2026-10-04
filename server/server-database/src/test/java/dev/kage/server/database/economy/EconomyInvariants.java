@@ -148,7 +148,7 @@ final class EconomyInvariants {
 
     private List<String> systemGoldIsConserved() {
         long[] row = query(SYSTEM_GOLD, world.accountId(), world.accountId()).get(0);
-        long expected = world.initialGoldEach() * world.characters().length + row[1];
+        long expected = world.initialGoldEach() * world.characters().size() + row[1];
         return row[0] == expected
                 ? List.of()
                 : List.of("tổng vàng (túi + thư chưa nhận) = %d, kỳ vọng ban đầu + bán − mua − cường hoá = %d"

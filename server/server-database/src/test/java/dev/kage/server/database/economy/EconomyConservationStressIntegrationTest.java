@@ -8,6 +8,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -250,7 +251,7 @@ class EconomyConservationStressIntegrationTest {
                 EconomyStressFacades.wire(dataSource),
                 catalog,
                 new EconomyStressTally(),
-                characterIds,
+                Arrays.stream(characterIds).boxed().toList(),
                 START_GOLD,
                 initialQuantities);
     }

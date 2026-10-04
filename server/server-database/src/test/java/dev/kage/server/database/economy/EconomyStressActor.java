@@ -53,7 +53,7 @@ final class EconomyStressActor implements Runnable {
         this.facades = world.facades();
         this.catalog = world.catalog();
         this.tally = world.tally();
-        this.characters = world.characters();
+        this.characters = world.characters().stream().mapToLong(Long::longValue).toArray();
         this.random = random;
         this.deadlineNanos = deadlineNanos;
         register(14, this::buy);

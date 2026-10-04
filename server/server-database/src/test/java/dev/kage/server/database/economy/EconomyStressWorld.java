@@ -1,5 +1,6 @@
 package dev.kage.server.database.economy;
 
+import java.util.List;
 import java.util.Map;
 
 import javax.sql.DataSource;
@@ -15,17 +16,12 @@ record EconomyStressWorld(
         EconomyStressFacades facades,
         EconomyStressCatalog catalog,
         EconomyStressTally tally,
-        long[] characters,
+        List<Long> characters,
         long initialGoldEach,
         Map<Long, Long> initialQuantityByTemplate) {
 
     EconomyStressWorld {
-        characters = characters.clone();
+        characters = List.copyOf(characters);
         initialQuantityByTemplate = Map.copyOf(initialQuantityByTemplate);
-    }
-
-    @Override
-    public long[] characters() {
-        return characters.clone();
     }
 }
