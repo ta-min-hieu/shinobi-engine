@@ -67,6 +67,36 @@ class GrantExperienceUseCaseTest {
         assertThat(port.savedLevel).isEqualTo(4);
     }
 
+    /**
+     * Kiểm sống chuỗi quest arc 1 (2026-10-03): lĩnh thưởng quest là những cú lên cấp LỚN NHẤT của cả
+     * arc (1→3, 3→5, 8→10 — mở chọn hệ phái, 13→15 — mở mặc bộ Ngoại Môn), nhưng mọi
+     * {@code ExperienceChangedEvent} sau lĩnh thưởng đều mang {@code leveledUp=false} — đo trên dây
+     * 6/6 lần — nên client không bao giờ hiện "lên cấp" cho chúng. EXP thưởng đã vào {@code exp} qua
+     * đường tắt; cột {@code level} còn ghi cấp CŨ, tức đúng cấp mà client đang hiển thị.
+     */
+    @Test
+    void shouldReportLevelUp_whenSyncingAfterQuestRewardCrossedThresholds() {
+        FakeCharacterPort port = new FakeCharacterPort(2, 620L);
+        GrantExperienceUseCase useCase = new GrantExperienceUseCase(port);
+
+        GrantExperienceUseCase.Result result = useCase.syncAfterExternalGrant(CHARACTER_ID);
+
+        assertThat(result.progress().level()).isEqualTo(4);
+        assertThat(result.leveledUp()).isTrue();
+        assertThat(port.savedLevel).isEqualTo(4);
+    }
+
+    @Test
+    void shouldNotReportLevelUp_whenSyncingAfterQuestRewardStayedInSameLevel() {
+        FakeCharacterPort port = new FakeCharacterPort(4, 650L);
+        GrantExperienceUseCase useCase = new GrantExperienceUseCase(port);
+
+        GrantExperienceUseCase.Result result = useCase.syncAfterExternalGrant(CHARACTER_ID);
+
+        assertThat(result.progress().level()).isEqualTo(4);
+        assertThat(result.leveledUp()).isFalse();
+    }
+
     @Test
     void shouldNotSkipLevels_whenStoredLevelIsBehindAndAGrantCrossesAThreshold() {
         // exp=620 (cấp 4) nhưng cột kẹt ở 2; cộng thêm 380 lên 1000 = cấp 5 (100+200+300+400).

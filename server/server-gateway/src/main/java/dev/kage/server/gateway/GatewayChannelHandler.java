@@ -1829,8 +1829,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // GrantExperienceUseCase, nên client không hề biết vạch EXP đã đổi: playtest 2026-09-05
             // thấy nhận 500 EXP mà HUD vẫn đứng ở 20/200 cho tới khi đăng nhập lại (lúc đó
             // sendInitialSelfState mới đồng bộ). amount=0 = CHỈ ĐỌC trạng thái hiện tại rồi gửi,
-            // đúng cách sendInitialSelfState làm lúc vào world — không cộng thêm lần nữa.
-            worldGateway.registry().sendExperience(characterId, characterFacade.grantExperience(characterId, 0L));
+            // đúng cách sendInitialSelfState làm lúc vào world — không cộng thêm lần nữa. Khác lúc vào
+            // world ở đúng một điểm: lần lĩnh thưởng này CÓ THỂ vừa lên cấp, và client chỉ hiện "lên
+            // cấp" khi leveledUp=true (kiểm sống chuỗi quest 2026-10-03: 6/6 lần lên cấp nhờ thưởng
+            // quest đều mang false).
+            worldGateway
+                    .registry()
+                    .sendExperience(characterId, characterFacade.syncExperienceAfterQuestReward(characterId));
         }
     }
 

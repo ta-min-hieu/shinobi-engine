@@ -373,6 +373,74 @@ Phạm vi: chỉ đo trận 1v1 từ máu ĐẦY, đi tới từ trạm nghỉ s
 - **Nhiệm vụ bang** — hợp tác
 - **Sự kiện mùa** — Feature Flag bật/tắt không deploy lại
 
+### Kiểm sống TOÀN CHUỖI quest arc 1–2 từ nhân vật Cấp 1 mới tinh (2026-10-03)
+
+**Cách đo.** Server `installDist` thật trên DB dev (V51), nhân vật `QuestRun` TẠO MỚI qua đúng
+`CreateCharacterRequest` (probe thêm `--createCharacter=true`): Cấp 1, 100 máu, 0 vàng, túi rỗng, không
+trang bị. Đi hết 20 quest bằng `gameProbe` (hội thoại/nhận/lĩnh thưởng/đánh/đi bộ/mua bán đều qua dây
+thật — probe thêm `--sellItems/--buyItems` và `--attackCode/--retargetOnKill`). **Không nhảy bước nào
+bằng SQL** — cấp, vàng, đồ đều kiếm thật. Quy ước duy nhất: "nghỉ ở trạm" = thoát ra vào lại tại đúng
+trạm đó (máu không lưu ⇒ đầy; cùng kết quả với đứng yên ~30 s, chỉ nhanh hơn). Mọi trận dưới đây đều
+từ máu đầy, đi tới từ trạm/chỗ an toàn gần nhất, trừ khi ghi "nối máu". Nhịp đánh 1100 ms.
+
+| # | Quest | Cấp lúc làm | Nhận / Xong / Lĩnh | Trận bắt buộc — đo thật |
+|---|---|---|---|---|
+| 1 | `kill_training_dummies` | 1 | ✅/✅/✅ +500, kunai×5 → Cấp 3 | 3/3 (mộc nhân không đánh trả) |
+| 2 | `night_watch_bandit` | 3, tay không | ✅/✅/✅ +800, bùa hộ cường hoá → Cấp 5 | 1/1 thắng, còn 28/100 |
+| 3 | `clear_old_archive` | 5 | ✅/✅/✅ +1200, Mảnh Ngọc Cổ → Cấp 7 | tay không 1 thắng (nhờ thạch vệ hụt 2) 1 **chết**; 6/7 món Tạp Dịch **2/2 thắng**, còn 38/118 |
+| 4 | `awakening_trial` | 7, đủ Tạp Dịch | ✅/✅/✅ +1800 → Cấp 10 | đứng ở −43: **0/2 — chết cả hai** (thạch vệ @−33 đánh kèm); đứng ở −46: 1/1 thắng, còn 66/122 |
+| 5 | `spirit_vein_raiders` | 10 | ✅/✅/✅ +2800 → Cấp 13 | đứng ở 45: **chết** (tán tu @34 đánh kèm); ở 50: thắng còn **4**/122; vòng lặp tại 49 nối máu: 3/3 thắng (66 · 54 · 42) |
+| 6 | `first_cultivation_manual` | 13 | ✅/✅/✅ +3300, bộ Ngoại Môn → Cấp 15 | 2/2 thắng |
+| 7 | `break_the_raider_band` | 15, Ngoại Môn | ✅/✅/✅ +3700 → Cấp 18 | đầu lĩnh 1/1 thắng, còn 54/174 (ta hụt 2) |
+| 8 | `report_to_outer_sect` | 18 | ✅/✅/✅ +200, đan×2 | — |
+| 9 | `recover_outer_sect_tallies` | 18 | ✅/✅/✅ +1000 | nộp khi có 1 thẻ: không lấy, không xong (đúng luật); 2 thẻ: lấy đúng 2 |
+| 10 | `missing_disciple_trail` | 18 | ✅/✅/✅ +1300 → Cấp 19 | tán tu hạ TRƯỚC khi hỏi Chu Hoành KHÔNG tính (đúng script); sau khi hỏi 2/2 |
+| 11 | `abandoned_cave` | 19 | ✅/✅/✅ +1600 → Cấp 20 | thám tử 1/1, huyết phù rơi 100%, nộp đúng 1 |
+| 12 | `confront_the_steward` | 20 | ✅/✅/✅ +2000 → Cấp 21 | quản sự (Cấp 12) chết sau 2 nhát |
+| 13 | `dead_vein_intruders` | 21 | ✅/✅/✅ +3600 → Cấp 23 | tế đồ 3/3 thắng (59 · 59 · 59 /174) |
+| 14 | `blood_sand_trail` | 23 | ✅/✅/✅ +4000 → Cấp 25 | 2/2 thắng, nối máu (59 · 59) |
+| 15 | `scatter_the_blood_sand_band` | 25 | ✅/✅/✅ +4400 → Cấp 27 | đàn chủ 1/1, còn 36/174 |
+| 16 | `wasteland_edge_patrol` | 27 | ✅/✅/⚠️ lần 1 **INVENTORY_FULL**; bán đồ cũ rồi ✅ +4400, bộ Trúc Cơ → **Cấp 29** | đàn chủ 1/1, còn 36/174 |
+| 17 | `rank_board_dispute` | 29→30 | ✅/✅/✅ +4600 → Cấp 32 | Ngoại Môn ở Cấp 29: 1 **chết** (yêu thú còn 19), 1 bỏ dở 30 vs 44; cày 6 đàn chủ (6/6 thắng) lên Cấp 30; Trúc Cơ: 4/4 |
+| 18 | `foundation_pill_run` | 32 | ✅/✅/✅ +4800 → Cấp 33 | 2/2; nộp lấy đúng 3 đan (túi có 24) |
+| 19 | `outer_sect_proving` | 33 | ✅/✅/✅ +5000 → Cấp 35 | 3/3 |
+| 20 | `foundation_breakthrough` | 36 | ✅/✅/✅ +5400 → **Cấp 38** | cỗ khảo hạch 4/4 thắng (56 · 78 · 100 · 122 /210) |
+
+**Kết luận: chuỗi 20 quest chạy THÔNG từ Cấp 1 tới CLAIMED quest cuối**, không quest nào kẹt cứng,
+không tiên quyết vòng, không vật phẩm quest nào không rơi/không nộp được, mọi phần thưởng khớp script
+từng con số. Yêu thú với bộ Trúc Cơ **9/9 thắng** (máu thấp nhất 56/210), cỗ khảo hạch 4/4 — khớp
+lần đo V50. Thuế đường đi đo lại: tông môn → trạm 107 mất 79 máu (5 nhát), → trạm 141 mất 125 máu (7 nhát).
+
+**Bug code đã sửa:** `ExperienceChangedEvent.leveled_up` sau lĩnh thưởng quest LUÔN `false` (6/6 lần lên
+cấp nhờ thưởng quest trong lượt đo — 1→3, 3→5, 8→10 mở chọn hệ phái, 13→15, …) ⇒ client không bao giờ
+hiện "lên cấp" cho đúng những cú lên cấp lớn nhất. Sửa: `GrantExperienceUseCase.syncAfterExternalGrant`
+so cấp suy từ `exp` với cột `level` đang lưu; kiểm sống lại: lĩnh quest 1 ra `level=3 leveledUp=true`.
+
+**Chỗ vướng thật (thiết kế/nội dung — KHÔNG tự sửa, chờ chủ dự án):**
+1. **Vàng cho bộ Tạp Dịch.** Nhân vật mới 0 vàng, quest không thưởng vàng, quái không rơi vàng. Lớp
+   cân bằng quest 3–5 giả định bộ Tạp Dịch (700 vàng), mà đường duy nhất tới đó ở Cấp 5 là **bán bùa
+   hộ cường hoá thưởng quest 2 (500)** + đồ rơi (tổng 644 — thiếu 56 cho món thứ 7). Không bán bùa thì
+   phải cày mộc nhân (~9 vàng/con theo bảng rơi). Tay không vs thạch vệ: 1 thắng 1 chết.
+2. **Hai trận bắt buộc kéo thêm con thứ hai qua leash.** Người chơi đi từ phía tông môn gặp
+   `trial_construct` (@−47) ở khoảng −41…−43 — vẫn trong leash 10 m của `archive_warden` @−33 vừa bị
+   đánh động lúc đi ngang ⇒ 2/2 chết; lùi sâu tới −46 thì thắng thoải mái. `vein_raider` @47 y hệt với
+   `wandering_bandit` @34 (đứng 45 chết, 50 thắng). Luật giãn spawn V29 (`|A−B| > aggroA+aggroB`)
+   không tính vế **leash** của con bị đánh động khi đi ngang.
+3. **Cấp 29 cầm bộ Cấp 30.** Quest 16 trao bộ Trúc Cơ (`required_level` 30) nhưng để người chơi ở
+   Cấp 29 (40 990 EXP; Cấp 30 = 43 500), mà quest 17–20 cân bằng theo đúng bộ đó. Bộ Ngoại Môn đo
+   được 1 chết + 1 sát nút ⇒ phải cày ~2 500 EXP ở chỗ khác (6 đàn chủ, ~5 phút) — không có quest/NPC
+   nào nói điều này.
+4. **Túi 20 ô tính cả 7 món đang mặc** ⇒ người giữ lại bộ cũ bị từ chối lĩnh thưởng 6 món
+   (`INVENTORY_FULL`; quest giữ `COMPLETED`, không mất gì). Kèm: `outer_sect_tally` vẫn rơi 100% từ tán tu
+   sau khi quest 9 xong và **không bán được** (cuối lượt còn 3 thẻ rác).
+5. **Im lặng khi chưa đủ điều kiện**: nộp thiếu thẻ bài, hạ tán tu trước khi hỏi Chu Hoành — đúng
+   luật script nhưng người chơi không nhận một dòng phản hồi nào.
+6. **Lên cấp không cộng chỉ số**: máu 100 từ Cấp 1 tới Cấp 5 tay không, sát thương chỉ đổi theo đồ ⇒
+   cấp chỉ là cổng mặc đồ. Ghi lại để xác nhận đây là chủ đích.
+
+Nhân vật thử đã xoá khỏi DB dev sau khi đo (account `questrun1003`, nhân vật 8007/8008, cùng quest/túi/
+audit của chúng); bảng `idempotency_key` không gắn nhân vật nên còn lại vài khoá UUID của lượt đo.
+
 ---
 
 ## 9. Core Loop

@@ -13,6 +13,7 @@ import java.util.OptionalLong;
 
 import dev.kage.protocol.AttackCommand;
 import dev.kage.protocol.CharacterSummary;
+import dev.kage.protocol.CreateCharacterResponse;
 import dev.kage.protocol.ListCharactersResponse;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.Opcode;
@@ -142,6 +143,9 @@ public final class GameProbe {
         // mới ngay trong EquipItemResponse (ADR-043), nên mặc sau khi đi thì "máu lúc tới nơi"
         // đo ra sai. Ngược hẳn với UseItemScenario bên dưới — món tiêu hao phải dùng SAU khi
         // đã mất máu, trong cùng phiên.
+        if (!config.sellItems().isEmpty() || !config.buyItems().isEmpty()) {
+            new ShopScenario(connection, session).run(config.sellItems(), config.buyItems());
+        }
         if (!config.equipItemCodes().isEmpty()) {
             new EquipScenario(connection, session).run(config.equipItemCodes());
         }
@@ -163,7 +167,18 @@ public final class GameProbe {
             GameConnection connection, ProbeConfig config, ProbeSession session, WorldObservation observation)
             throws IOException {
         connection.connect(config.username());
-        CharacterSummary chosen = chooseCharacter(connection.listCharacters(), config);
+        ListCharactersResponse characters = connection.listCharacters();
+        if (needsCreation(characters.getCharactersList(), config)) {
+            CreateCharacterResponse created = connection.createCharacter(config.characterName());
+            if (!created.getSuccess()) {
+                throw new IOException(
+                        "Server từ chối CreateCharacter '" + config.characterName() + "': " + created.getErrorKey());
+            }
+            session.note("tạo nhân vật MỚI characterId="
+                    + created.getCharacter().getId() + " tên=" + config.characterName());
+            characters = connection.listCharacters();
+        }
+        CharacterSummary chosen = chooseCharacter(characters, config);
         SelectCharacterResponse selected = connection.selectCharacter(chosen.getId());
         if (!selected.getSuccess()) {
             throw new IOException("Server từ chối SelectCharacter: " + selected.getErrorKey());
@@ -181,8 +196,26 @@ public final class GameProbe {
     }
 
     /**
+     * {@code true} khi người dùng xin {@code --createCharacter=true} VÀ account chưa có nhân vật mang
+     * đúng {@code characterName}. Gọi lại lần hai với cùng tên thì KHÔNG tạo thêm — lượt chạy sau của
+     * cùng kịch bản dùng lại đúng nhân vật đó (kiểm sống chuỗi quest chạy hàng chục lượt probe).
+     *
+     * @throws IOException nếu xin tạo mà không cho tên — tạo nhân vật vô danh là đoán thay người dùng
+     */
+    static boolean needsCreation(List<CharacterSummary> existing, ProbeConfig config) throws IOException {
+        if (!config.createCharacter()) {
+            return false;
+        }
+        if (config.characterName().isEmpty()) {
+            throw new IOException("--createCharacter=true cần --characterName=<tên nhân vật mới>");
+        }
+        return existing.stream().noneMatch(summary -> config.characterName().equals(summary.getName()));
+    }
+
+    /**
      * Chọn nhân vật theo id, rồi theo tên, cuối cùng là nhân vật đầu tiên. KHÔNG tự tạo nhân vật
-     * mới: probe dùng để soi thế giới hiện có, tạo thêm nhân vật rác chỉ làm bẩn DB dev.
+     * mới trừ khi được xin rõ ({@link #needsCreation}): probe dùng để soi thế giới hiện có, tạo thêm
+     * nhân vật rác chỉ làm bẩn DB dev.
      */
     private static CharacterSummary chooseCharacter(ListCharactersResponse characters, ProbeConfig config)
             throws IOException {
@@ -236,15 +269,11 @@ public final class GameProbe {
     private static void observe(
             GameConnection connection, ProbeConfig config, ProbeSession session, WorldObservation observation)
             throws IOException, InterruptedException {
-        OptionalLong target = resolveAttackTarget(config, observation);
-        if (target.isPresent()) {
-            connection.send(
-                    Opcode.OPCODE_SET_TARGET_COMMAND_VALUE,
-                    SetTargetCommand.newBuilder()
-                            .setTargetEntityId(target.getAsLong())
-                            .build()
-                            .toByteArray());
-            session.note("nhắm mục tiêu entityId=" + target.getAsLong());
+        // Mục tiêu chọn lại mỗi vòng khi cần — xem TargetSelector (bẫy "chưa thấy quái lúc bắt đầu"
+        // và "mục tiêu chết là ngừng đánh").
+        TargetSelector selector = new TargetSelector(config, observation);
+        if (selector.current().isPresent()) {
+            aimAt(connection, session, selector.current().getAsLong());
         }
 
         connection.setReadTimeoutMillis(OBSERVE_READ_TIMEOUT_MILLIS);
@@ -252,13 +281,21 @@ public final class GameProbe {
         // Nhịp gửi: thử lại dày trước nhát đầu, rồi đúng attackIntervalMillis — xem AttackCadence
         // (kiểm sống V50: lệnh mở màn ngoài tầm bị bỏ im lặng, sinh nhát "phủ đầu" thứ ba giả).
         AttackCadence cadence = new AttackCadence(config.attackIntervalMillis(), System.currentTimeMillis());
+        // Đòn đã ra TRƯỚC mục tiêu hiện tại — AttackCadence đếm "nhát mở màn" theo TỪNG mục tiêu.
+        int attacksBeforeCurrentTarget = observation.ownBasicAttacksResolved();
         while (System.currentTimeMillis() < endAt) {
-            if (target.isEmpty()) {
+            OptionalLong changed = selector.refresh(observation);
+            if (changed.isPresent()) {
+                aimAt(connection, session, changed.getAsLong());
+                cadence = new AttackCadence(config.attackIntervalMillis(), System.currentTimeMillis());
+                attacksBeforeCurrentTarget = observation.ownBasicAttacksResolved();
+            }
+            if (selector.current().isEmpty()) {
                 readOneFrameOrWait(connection);
                 continue;
             }
             long now = System.currentTimeMillis();
-            if (cadence.isDue(now, observation.ownBasicAttacksResolved())) {
+            if (cadence.isDue(now, observation.ownBasicAttacksResolved() - attacksBeforeCurrentTarget)) {
                 connection.send(
                         Opcode.OPCODE_ATTACK_COMMAND_VALUE,
                         AttackCommand.getDefaultInstance().toByteArray());
@@ -299,10 +336,13 @@ public final class GameProbe {
         }
     }
 
-    private static OptionalLong resolveAttackTarget(ProbeConfig config, WorldObservation observation) {
-        if (config.attacksNearest()) {
-            return observation.nearestMonsterId();
-        }
-        return config.explicitAttackTargetId();
+    private static void aimAt(GameConnection connection, ProbeSession session, long targetEntityId) throws IOException {
+        connection.send(
+                Opcode.OPCODE_SET_TARGET_COMMAND_VALUE,
+                SetTargetCommand.newBuilder()
+                        .setTargetEntityId(targetEntityId)
+                        .build()
+                        .toByteArray());
+        session.note("nhắm mục tiêu entityId=" + targetEntityId);
     }
 }

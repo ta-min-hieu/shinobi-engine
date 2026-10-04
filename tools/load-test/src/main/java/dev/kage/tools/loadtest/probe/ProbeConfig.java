@@ -19,10 +19,17 @@ import dev.kage.tools.loadtest.CommandLineArguments;
  * @param username tên account gửi trong {@code ConnectRequest}
  * @param characterId 0 = không chỉ định, chọn theo {@code characterName} hoặc nhân vật đầu tiên
  * @param characterName rỗng = không chỉ định
+ * @param createCharacter {@code true} = account chưa có nhân vật tên {@code characterName} thì TẠO MỚI
+ *     qua đúng {@code CreateCharacterRequest} thật trước khi vào world (kiểm sống chuỗi quest từ Cấp 1);
+ *     mặc định {@code false} — probe không tự đẻ nhân vật rác
  * @param moveToX rỗng = đứng yên tại chỗ server cho spawn; có giá trị = đi bộ THẬT tới toạ độ đó
  * @param attackTarget {@code none} | {@code nearest} | id thực thể cụ thể (số, âm = quái)
+ * @param attackCode rỗng = mọi loài; có giá trị = {@code nearest} chỉ chọn trong loài này
+ * @param retargetOnKill {@code true} = mục tiêu chết thì {@code nearest} chọn con kế tiếp — xem {@link TargetSelector}
  * @param attackIntervalMillis nhịp gửi {@code AttackCommand} (cooldown thật do server giữ)
  * @param observeSeconds thời gian đứng đọc sự kiện sau khi đã tới chỗ
+ * @param sellItems các dòng {@code code[:soLuong]} cần BÁN ở cửa hàng trước khi mặc đồ — xem {@link ShopScenario}
+ * @param buyItems các dòng {@code code[:soLuong]} cần MUA (sau khi bán) — xem {@link ShopScenario}
  * @param equipItemCodes danh sách mã trang bị cần MẶC trước khi đi bộ (ô trang bị suy từ catalog)
  * @param quest kịch bản nhiệm vụ (nói chuyện NPC / lĩnh thưởng / in nhật ký) — xem {@link QuestPlan}
  * @param enterDungeon mã hầm ngục để tự lập nhóm 1 người rồi vào, sau khi đi bộ; rỗng = không vào —
@@ -35,13 +42,18 @@ public record ProbeConfig(
         String username,
         long characterId,
         String characterName,
+        boolean createCharacter,
         OptionalDouble moveToX,
         String attackTarget,
+        String attackCode,
+        boolean retargetOnKill,
         int attackIntervalMillis,
         int observeSeconds,
         String useItemCode,
         OptionalDouble returnToX,
         int settleSeconds,
+        List<String> sellItems,
+        List<String> buyItems,
         List<String> equipItemCodes,
         QuestPlan quest,
         String enterDungeon,
@@ -54,6 +66,8 @@ public record ProbeConfig(
      * {@code EI_EXPOSE_REP} (getter trả thẳng list nội bộ ra).
      */
     public ProbeConfig {
+        sellItems = List.copyOf(sellItems);
+        buyItems = List.copyOf(buyItems);
         equipItemCodes = List.copyOf(equipItemCodes);
     }
 
@@ -124,13 +138,18 @@ public record ProbeConfig(
                 raw.text("username", DEFAULT_USERNAME),
                 raw.number("characterId", 0L),
                 raw.text("characterName", ""),
+                raw.flag("createCharacter", false),
                 raw.optionalDouble("moveToX"),
                 raw.text("attackTarget", ATTACK_TARGET_NONE).toLowerCase(Locale.ROOT),
+                raw.text("attackCode", ""),
+                raw.flag("retargetOnKill", false),
                 raw.integer("attackIntervalMillis", DEFAULT_ATTACK_INTERVAL_MILLIS),
                 raw.integer("observeSeconds", DEFAULT_OBSERVE_SECONDS),
                 raw.text("useItemCode", ""),
                 raw.optionalDouble("returnToX"),
                 raw.integer("settleSeconds", 0),
+                List.copyOf(raw.list("sellItems")),
+                List.copyOf(raw.list("buyItems")),
                 List.copyOf(raw.list("equipItemCodes")),
                 new QuestPlan(
                         raw.text("talkToNpc", ""),
