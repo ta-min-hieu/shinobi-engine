@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BooleanSupplier;
 
@@ -33,6 +34,11 @@ final class MetricsHttpServer {
     private static final String HEALTH_READY_PATH = "/health/ready";
 
     private final HttpServer httpServer;
+    /**
+     * Executor của chính {@link #httpServer} — {@code HttpServer.stop} KHÔNG tự đóng executor do
+     * người gọi cấp ({@code setExecutor}), nên lớp này sở hữu và phải tự đóng nó ở {@link #stop()}.
+     */
+    private final ExecutorService executor;
 
     /**
      * {@code readinessCheck} — OBSERVABILITY.md §7: "sẵn sàng nhận người chơi? (DB kết nối được?
@@ -62,7 +68,8 @@ final class MetricsHttpServer {
             boolean ready = readinessCheck.getAsBoolean();
             writePlainText(exchange, ready ? 200 : 503, ready ? "READY" : "NOT_READY");
         });
-        httpServer.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
+        executor = Executors.newVirtualThreadPerTaskExecutor();
+        httpServer.setExecutor(executor);
     }
 
     private static void writePlainText(com.sun.net.httpserver.HttpExchange exchange, int statusCode, String body)
@@ -83,8 +90,18 @@ final class MetricsHttpServer {
                 METRICS_PATH);
     }
 
-    /** Graceful shutdown (SERVER.md §10) — {@code delaySeconds=0} vì scrape không có state cần lưu. */
+    /**
+     * Graceful shutdown (SERVER.md §10) — {@code delaySeconds=0} vì scrape không có state cần lưu.
+     * Đóng thêm {@link #executor} (không chờ: {@code shutdown}, không phải {@code close}) — handler
+     * {@code /health/ready} chạm DB có thể đang treo, không được để nó chặn đường tắt server.
+     */
     void stop() {
         httpServer.stop(0);
+        executor.shutdown();
+    }
+
+    /** Chỉ cho test vòng đời: executor đã bị đóng sau {@link #stop()} chưa. */
+    boolean isExecutorShutdown() {
+        return executor.isShutdown();
     }
 }

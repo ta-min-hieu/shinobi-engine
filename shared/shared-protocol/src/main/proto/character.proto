@@ -135,7 +135,8 @@ message ExperienceChangedEvent {
 // Không có character_id: luôn là chính mình, cùng quy ước ExperienceChangedEvent (ADR-034).
 //
 // Gửi NGAY sau khi vào world (để cửa hàng có số ngay, không phải chờ giao dịch đầu tiên) và mỗi lần
-// vàng đổi: mua/bán, cường hoá, nhận thư, giao dịch, thưởng nhiệm vụ.
+// vàng đổi: mua/bán, cường hoá, gửi/nhận thư, giao dịch. Thưởng nhiệm vụ KHÔNG trao vàng (chỉ EXP +
+// vật phẩm — `QuestRewardPorts` không có cổng vàng), nên không phải một nguồn của event này.
 //
 // `gold` là số dư TUYỆT ĐỐI sau thay đổi, không phải delta — mất một gói giữa chừng thì gói kế tự
 // sửa lại, không tích luỹ sai lệch.

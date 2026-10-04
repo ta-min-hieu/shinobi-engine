@@ -306,6 +306,37 @@ class MailIntegrationTest {
         assertThat(afterClaim).isEqualTo(DeleteMailUseCase.Result.OK);
     }
 
+    /**
+     * Phòng thủ chiều sâu ở ADAPTER (không chỉ ở use case): gọi thẳng {@code delete} với người nhận
+     * SAI không được đụng tới thư lẫn vật phẩm đính kèm. Bản cũ chạy {@code DELETE FROM mail_item
+     * WHERE mail_id=?} không kiểm người nhận (autocommit) ⇒ thư còn đó nhưng món đính kèm mất thật.
+     */
+    @Test
+    void shouldNotDeleteMailOrAttachments_whenAdapterCalledWithWrongRecipient() {
+        long recipientId = createFreshCharacter("MailRecvDelA");
+        long strangerId = createFreshCharacter("MailRecvDelB");
+        Mail mail = sendSystemMail(recipientId, 0, List.of(new MailAttachmentDraft(kunaiTemplateId, 3)));
+        PostgresMailRepositoryAdapter adapter = new PostgresMailRepositoryAdapter(dataSource);
+
+        boolean deleted = adapter.delete(mail.id(), strangerId);
+
+        assertThat(deleted).isFalse();
+        Mail stillThere = adapter.findById(mail.id()).orElseThrow();
+        assertThat(stillThere.attachments()).containsExactlyElementsOf(mail.attachments());
+    }
+
+    @Test
+    void shouldDeleteMailAndAttachments_whenAdapterCalledWithOwnRecipient() {
+        long recipientId = createFreshCharacter("MailRecvDelC");
+        Mail mail = sendSystemMail(recipientId, 0, List.of(new MailAttachmentDraft(kunaiTemplateId, 3)));
+        PostgresMailRepositoryAdapter adapter = new PostgresMailRepositoryAdapter(dataSource);
+
+        boolean deleted = adapter.delete(mail.id(), recipientId);
+
+        assertThat(deleted).isTrue();
+        assertThat(adapter.findById(mail.id())).isEmpty();
+    }
+
     // ===== KÝ QUỸ lúc GỬI (2026-08-28) — vá lỗ đúc vàng/vật phẩm qua hòm thư =====
     // Trước đây gold_amount/attachments đi thẳng từ packet client vào bảng mail mà không trừ của
     // ai, còn ClaimMailUseCase thì cộng thật. Các test dưới đây chạy trên Postgres THẬT vì thứ

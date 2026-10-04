@@ -20,6 +20,7 @@ import dev.kage.mail.domain.NewMail;
 import dev.kage.mail.domain.Transaction;
 import dev.kage.server.database.DatabaseAccessException;
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.JdbcTransactionRunner;
 
 /**
  * Hiện thực {@link MailRepositoryPort} trên PostgreSQL — bảng {@code mail}/{@code mail_item} (V13).
@@ -64,8 +65,11 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
             UPDATE mail SET claimed_at = ? WHERE id = ? AND recipient_id = ? AND claimed_at IS NULL
             """;
 
+    // Ràng buộc người nhận NGAY TẠI ĐÂY, không chỉ dựa vào use case (đọc ngoài transaction): người
+    // nhận sai ⇒ 0 dòng, vật phẩm đính kèm của thư người khác không bị đụng.
     private static final String DELETE_MAIL_ITEMS = """
-            DELETE FROM mail_item WHERE mail_id = ?
+            DELETE FROM mail_item
+             WHERE mail_id = (SELECT id FROM mail WHERE id = ? AND recipient_id = ? FOR UPDATE)
             """;
 
     private static final String DELETE_MAIL = """
@@ -171,12 +175,12 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
 
     @Override
     public boolean delete(long mailId, long recipientId) {
-        try (Connection connection = dataSource.getConnection()) {
-            JdbcOperations.update(connection, DELETE_MAIL_ITEMS, mailId);
+        // Một transaction: xoá mail_item và mail cùng thành hoặc cùng bại (bản cũ autocommit từng câu
+        // ⇒ hỏng giữa chừng để lại thư mất đính kèm). Cả hai câu đều ràng buộc recipient_id.
+        return JdbcTransactionRunner.call(dataSource, connection -> {
+            JdbcOperations.update(connection, DELETE_MAIL_ITEMS, mailId, recipientId);
             return JdbcOperations.update(connection, DELETE_MAIL, mailId, recipientId) > 0;
-        } catch (SQLException e) {
-            throw new DatabaseAccessException("Lỗi xoá thư: mailId=" + mailId, e);
-        }
+        });
     }
 
     private static Mail mapRow(Connection connection, ResultSet rs) throws SQLException {

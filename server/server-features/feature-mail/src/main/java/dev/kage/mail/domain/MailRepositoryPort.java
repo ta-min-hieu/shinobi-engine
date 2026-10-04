@@ -30,6 +30,12 @@ public interface MailRepositoryPort {
      */
     boolean markClaimed(Transaction tx, long mailId, long recipientId);
 
-    /** Xoá thư — application đã tự kiểm "đã nhận hoặc không có gì để nhận" trước khi gọi. */
+    /**
+     * Xoá thư — application đã tự kiểm "đã nhận hoặc không có gì để nhận" trước khi gọi. Hiện thực
+     * vẫn PHẢI tự ràng buộc {@code recipientId} (phòng thủ chiều sâu): người nhận sai thì không xoá
+     * gì cả, kể cả vật phẩm đính kèm.
+     *
+     * @return {@code true} nếu có thư bị xoá
+     */
     boolean delete(long mailId, long recipientId);
 }
