@@ -173,9 +173,18 @@ public final class ServerDatabaseBootstrap {
      * metric này.
      */
     public ServerDatabaseBootstrap(DbMetricsPort metricsPort) {
-        this.dataSource = PostgresDataSourceFactory.create(DatabaseConfig.fromEnvironment());
+        this(DatabaseConfig.fromEnvironment(), RedisConfig.fromEnvironment(), metricsPort);
+    }
+
+    /**
+     * Cấu hình TRUYỀN VÀO thay vì đọc biến môi trường — cho test end-to-end lắp ĐÚNG composition root
+     * này trên Postgres/Redis của Testcontainers (bộ fuzz opcode gateway+DB, 2026-10-04). Không có nó,
+     * test phải chép tay từng {@code wire*Facade} và bản chép lệch dần khỏi bản thật.
+     */
+    public ServerDatabaseBootstrap(DatabaseConfig databaseConfig, RedisConfig redisConfig, DbMetricsPort metricsPort) {
+        this.dataSource = PostgresDataSourceFactory.create(databaseConfig);
         FlywayMigrator.migrate(dataSource);
-        this.redisClient = RedisClientFactory.create(RedisConfig.fromEnvironment());
+        this.redisClient = RedisClientFactory.create(redisConfig);
         JdbcOperations.configureMetrics(metricsPort);
         JdbcTransactionRunner.configureMetrics(metricsPort);
     }
