@@ -95,7 +95,10 @@ final class CombatSystem extends IteratingKSystem {
     @Override
     protected void processEntity(KEntity entity, float deltaTime) {
         AttackCooldownComponent cooldown = COOLDOWN.get(entity);
-        cooldown.remainingSeconds -= deltaTime;
+        // Kẹp dưới ở 0 (sửa 2026-10-04, WorldSimulationPropertyTest): trước đó trừ mãi không chặn —
+        // đứng yên một phút là -60s. Luật không đổi ("sẵn sàng" là ≤ ε) nhưng component nói sai nghĩa
+        // "còn bao nhiêu giây", và float trôi tới mức phép trừ không còn đổi giá trị.
+        cooldown.remainingSeconds = Math.max(0f, cooldown.remainingSeconds - deltaTime);
         // Người chơi KHÔNG còn tự đánh (chủ dự án 2026-08-09) — chỉ đếm lùi cooldown ở đây, đòn
         // thật ra khi có AttackCommand ({@link #requestAttack}). Quái/boss thì giữ nguyên tự đánh:
         // chúng không có ai bấm nút hộ, bỏ auto ở đây là không con nào đánh người chơi nữa.

@@ -134,7 +134,8 @@ final class SkillSystem extends IteratingKSystem {
         SkillCooldownComponent cooldown = COOLDOWN.get(entity);
         for (int i = 0; i < cooldown.remainingSeconds.length; i++) {
             if (cooldown.remainingSeconds[i] > 0f) {
-                cooldown.remainingSeconds[i] -= deltaTime;
+                // Kẹp ở 0 — cùng lý do CombatSystem.processEntity (2026-10-04).
+                cooldown.remainingSeconds[i] = Math.max(0f, cooldown.remainingSeconds[i] - deltaTime);
             }
         }
     }

@@ -98,6 +98,11 @@ final class AreaOfInterestTracker {
             return;
         }
         for (long otherId : wasVisibleTo) {
+            if (otherId < 0) {
+                // Quái/NPC trong tập "đang thấy" của người rời — chúng không phải người quan sát, không
+                // có client để báo (sửa 2026-10-04: trước đó phát onCharacterDespawned(quái, người rời)).
+                continue;
+            }
             Set<Long> otherVisible = visibleTo.get(otherId);
             if (otherVisible != null) {
                 otherVisible.remove(characterId);
