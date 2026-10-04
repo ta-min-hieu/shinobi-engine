@@ -2,6 +2,7 @@ package dev.kage.server.world;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -615,19 +616,7 @@ public final class WorldFacade {
                 // DungeonInstanceRegistry dựa vào stop() để chặn (gói World cũ tới sau 308).
                 return;
             }
-            if (!contentSpawned) {
-                contentSpawned = true;
-                if (spawnOverworldContent) {
-                    for (int i = 0; i < monsterCatalog.spawnPoints().size(); i++) {
-                        spawnMonster(i);
-                    }
-                    // NPC tĩnh, không chết/hồi sinh — spawn 1 lần duy nhất, khác quái (không có
-                    // spawnIndex nào phải nhớ lại, xem NpcCatalogSnapshot).
-                    for (int i = 0; i < npcCatalog.placements().size(); i++) {
-                        spawnNpc(npcCatalog.placements().get(i));
-                    }
-                }
-            }
+            spawnContentOnce();
 
             long start = System.nanoTime();
             tickOnce();
@@ -653,26 +642,99 @@ public final class WorldFacade {
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void tickOnce() {
         try {
-            drainInbox();
-            ecsWorld.update(WorldConstants.FIXED_DT, systemTimingListener);
-            tickMetricsPort.recordEntityCount(ecsWorld.entityCount());
-            handleCombatResults(combatSystem.drainResults());
-            handleSkillResults(skillSystem.drainResults());
-            handleBossResults(bossAiSystem.drainResults());
-            handleHealthChanges(healthRegenSystem.drainResults()); // ADR-046 D2
-            handleHealthChanges(aiSystem.drainHealthChanges()); // ADR-046 D4
-            handleHealthChanges(drainHealthChangeQueue()); // ADR-046 D3 + D5
-            tickMonsterRespawn(WorldConstants.FIXED_DT);
-            // O(n²) — chạy chậm hơn tick loop (WorldConstants.AOI_SYNC_INTERVAL_TICKS), xem
-            // javadoc AreaOfInterestTracker + WorldConstants.AOI_SYNC_RATE_HZ. Combat/skill/boss
-            // result ở trên KHÔNG bị ảnh hưởng — vẫn phát ngay mỗi tick qua observersOf().
-            tickCounter++;
-            if (tickCounter % WorldConstants.AOI_SYNC_INTERVAL_TICKS == 0) {
-                aoiTracker.sync(entitiesByCharacterId, entitiesByMonsterId, entitiesByNpcId);
-            }
+            simulateTick();
         } catch (RuntimeException e) {
             LOG.error("Lỗi trong World tick — bỏ qua tick này, KHÔNG dừng tick loop", e);
         }
+    }
+
+    /** Dựng quái/NPC tĩnh đúng MỘT lần, ngay trước tick đầu tiên (chạy trên tick thread). */
+    private void spawnContentOnce() {
+        if (contentSpawned) {
+            return;
+        }
+        contentSpawned = true;
+        if (spawnOverworldContent) {
+            for (int i = 0; i < monsterCatalog.spawnPoints().size(); i++) {
+                spawnMonster(i);
+            }
+            // NPC tĩnh, không chết/hồi sinh — spawn 1 lần duy nhất, khác quái (không có
+            // spawnIndex nào phải nhớ lại, xem NpcCatalogSnapshot).
+            for (int i = 0; i < npcCatalog.placements().size(); i++) {
+                spawnNpc(npcCatalog.placements().get(i));
+            }
+        }
+    }
+
+    /**
+     * Một tick mô phỏng trọn vẹn — thân của {@link #tickOnce()} khi KHÔNG bọc cách ly lỗi.
+     *
+     * <p>Tách ra (2026-10-04) để bộ kiểm thuộc tính {@code WorldSimulationPropertyTest} chạy được
+     * từng tick một cách XÁC ĐỊNH trên luồng gọi và thấy exception thay vì chỉ một dòng log — xem
+     * {@link #runOneTickOnCallerThread()}. Hành vi của tick thật không đổi.
+     */
+    private void simulateTick() {
+        drainInbox();
+        ecsWorld.update(WorldConstants.FIXED_DT, systemTimingListener);
+        tickMetricsPort.recordEntityCount(ecsWorld.entityCount());
+        handleCombatResults(combatSystem.drainResults());
+        handleSkillResults(skillSystem.drainResults());
+        handleBossResults(bossAiSystem.drainResults());
+        handleHealthChanges(healthRegenSystem.drainResults()); // ADR-046 D2
+        handleHealthChanges(aiSystem.drainHealthChanges()); // ADR-046 D4
+        handleHealthChanges(drainHealthChangeQueue()); // ADR-046 D3 + D5
+        tickMonsterRespawn(WorldConstants.FIXED_DT);
+        // O(n²) — chạy chậm hơn tick loop (WorldConstants.AOI_SYNC_INTERVAL_TICKS), xem
+        // javadoc AreaOfInterestTracker + WorldConstants.AOI_SYNC_RATE_HZ. Combat/skill/boss
+        // result ở trên KHÔNG bị ảnh hưởng — vẫn phát ngay mỗi tick qua observersOf().
+        tickCounter++;
+        if (tickCounter % WorldConstants.AOI_SYNC_INTERVAL_TICKS == 0) {
+            aoiTracker.sync(entitiesByCharacterId, entitiesByMonsterId, entitiesByNpcId);
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Khe kiểm thử (package-private — chỉ test cùng package thấy; gateway KHÔNG gọi được).
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Chạy đúng MỘT tick trên luồng GỌI, không qua {@link WorldTickScheduler}, không nuốt exception.
+     *
+     * <p>Chỉ dùng cho World CHƯA {@link #start()}: hai luồng cùng chạm ECS state là vi phạm đúng
+     * ranh giới SERVER.md §2 mà tick thread tồn tại để giữ.
+     */
+    void runOneTickOnCallerThread() {
+        if (running) {
+            throw new IllegalStateException("World đang tự tick — không được tick tay song song");
+        }
+        // Cùng khoá với tickTask — giữ đúng bất biến "một luồng chạm ECS state tại một thời điểm".
+        tickLock.lock();
+        try {
+            spawnContentOnce();
+            simulateTick();
+        } finally {
+            tickLock.unlock();
+        }
+    }
+
+    /** Chỉ đọc — entity nhân vật đang gắn, theo {@code characterId}. Chỉ hợp lệ giữa hai tick tay. */
+    Map<Long, KEntity> characterEntitiesView() {
+        return Collections.unmodifiableMap(entitiesByCharacterId);
+    }
+
+    /** Chỉ đọc — entity quái/boss còn sống, theo {@code monsterId} (âm). */
+    Map<Long, KEntity> monsterEntitiesView() {
+        return Collections.unmodifiableMap(entitiesByMonsterId);
+    }
+
+    /** Chỉ đọc — entity NPC tĩnh, theo {@code npcId} (âm). */
+    Map<Long, KEntity> npcEntitiesView() {
+        return Collections.unmodifiableMap(entitiesByNpcId);
+    }
+
+    /** Tổng entity trong {@link EcsWorld} — để đối chiếu với ba map trên (không entity mồ côi). */
+    int ecsEntityCount() {
+        return ecsWorld.entityCount();
     }
 
     private void drainInbox() {
@@ -760,6 +822,11 @@ public final class WorldFacade {
     }
 
     private void handleDetach(long characterId) {
+        // Máu đổi bởi lệnh xếp TRƯỚC lệnh rời này (đan dược, đổi trang bị) bình thường chỉ phát sau
+        // ecsWorld.update(). Phát NGAY, theo đúng thứ tự lệnh (sửa 2026-10-04, WorldSimulationPropertyTest):
+        // không thì người rời — mà gateway có thể đã đăng ký phiên mới ngay khi inboxBarrier xong — vẫn
+        // được gửi gói của phiên cũ. Đòn đánh/skill thì đã phát ngay lúc giải (emitCommandResults).
+        handleHealthChanges(drainHealthChangeQueue());
         KEntity entity = entitiesByCharacterId.remove(characterId);
         baseStatsByCharacterId.remove(characterId);
         if (entity == null) {
@@ -873,6 +940,24 @@ public final class WorldFacade {
             return; // Race hiếm — cùng lý do handleMoveIntent.
         }
         combatSystem.requestAttack(entity);
+        emitCommandResults();
+    }
+
+    /**
+     * Phát NGAY kết quả của đòn/skill vừa giải từ một lệnh trong hàng đợi (sửa 2026-10-04,
+     * {@code WorldSimulationPropertyTest}).
+     *
+     * <p>{@code requestAttack}/{@code tryCast} giải đòn lúc rút lệnh, nhưng trước đây kết quả nằm chờ
+     * tới sau {@code ecsWorld.update()} rồi phát theo LOẠI — mọi đòn thường trước, mọi skill sau — chứ
+     * không theo thứ tự lệnh. Hai hệ quả đo được: (1) skill của A trúng con quái rồi đòn thường của B
+     * hạ nó trong cùng tick ⇒ người xem nhận despawn con quái rồi mới nhận "skill trúng nó"; (2) đòn
+     * xếp trước lệnh RỜI world của nạn nhân/người đánh ⇒ người xem nhận despawn rồi mới nhận đòn trúng
+     * người đã rời, và người đã rời — gateway có thể đã đăng ký phiên mới ngay khi {@link #inboxBarrier}
+     * xong — vẫn được gửi gói của phiên cũ. Phát ngay thì thứ tự sự kiện là thứ tự lệnh.
+     */
+    private void emitCommandResults() {
+        handleCombatResults(combatSystem.drainResults());
+        handleSkillResults(skillSystem.drainResults());
     }
 
     private void handleUseSkill(long characterId, String skillCode, long targetEntityId) {
@@ -883,6 +968,7 @@ public final class WorldFacade {
         // khiên/heal) hợp lệ khi tự nhắm chính mình; SkillSystem.tryCast tự validate đầy đủ theo
         // SkillTargetKind của TỪNG skill (kể cả chặn ENEMY tự nhắm chính mình).
         skillSystem.tryCast(characterId, skillCode, targetEntityId);
+        emitCommandResults();
     }
 
     private void handleAreaChatMessage(long characterId, String senderName, String body) {
@@ -991,7 +1077,7 @@ public final class WorldFacade {
                     outcome.targetDied());
 
             Set<Long> observers = aoiTracker.observersOf(outcome.targetEntityId());
-            observers.add(outcome.attackerEntityId()); // người đánh luôn thấy kết quả đòn của chính mình.
+            addIfCharacter(observers, outcome.attackerEntityId()); // người đánh luôn thấy đòn của chính mình.
             // PHÁT HIỆN THẬT (Phase 8 lát cắt 2, viết test E2E thật mới lộ ra): khi mục tiêu là
             // NHÂN VẬT (dương), mục tiêu cũng phải LUÔN thấy đòn nhắm vào mình, không chỉ dựa vào
             // observersOf() — observersOf chỉ tìm được nhân vật nào đó KHÁC đang "thấy" mục tiêu
@@ -1108,7 +1194,9 @@ public final class WorldFacade {
         if (health.isDead() || health.current >= health.max) {
             return;
         }
-        health.current = Math.min(health.max, health.current + amount);
+        // Cộng kiểu long (sửa 2026-10-04, WorldSimulationPropertyTest): `current + amount` kiểu int tràn
+        // thành ÂM với lượng hồi lớn, và min(max, âm) giữ nguyên số âm — cùng cách SkillSystem.applyHeal.
+        health.current = (int) Math.min(health.max, (long) health.current + amount);
         pendingHealthChanges.add(new HealthChange(characterId, health.current, health.max));
     }
 
@@ -1172,6 +1260,22 @@ public final class WorldFacade {
                 clearAttackerTarget(outcome.attackerEntityId());
                 respawnOrHaltCorpse(outcome.targetEntityId());
             }
+        }
+    }
+
+    /**
+     * Thêm {@code entityId} vào tập người nhận CHỈ khi nó là nhân vật (dương) — người nhận của
+     * {@link WorldOutboundSink} là client, mà quái thì không có client.
+     *
+     * <p>Sửa 2026-10-04 ({@code WorldSimulationPropertyTest}): trước đó người ĐÁNH được thêm vô điều
+     * kiện, nên mỗi đòn của quái/boss phát thêm một sự kiện cho "người nhận" {@code -1}, {@code -2}...
+     * Gateway tự bỏ qua id lạ nên không client nào thấy sai, nhưng mỗi đòn quái tốn thêm một lần tra
+     * kênh vô ích, và hợp đồng sink ({@code targetCharacterId}) bị vi phạm đúng kiểu mà nhánh
+     * {@code targetEntityId > 0} ngay dưới đã cố tránh.
+     */
+    private static void addIfCharacter(Set<Long> observers, long entityId) {
+        if (entityId > 0) {
+            observers.add(entityId);
         }
     }
 
@@ -1265,7 +1369,7 @@ public final class WorldFacade {
                     SkillEffectKind.DAMAGE); // boss chỉ có chiêu damage ở lát cắt này (chưa heal/khiên/buff).
 
             Set<Long> observers = aoiTracker.observersOf(outcome.targetEntityId());
-            observers.add(outcome.attackerEntityId()); // boss "thấy" đòn của chính nó, giống người dùng skill.
+            // Người đánh ở đây luôn là BOSS (id âm) — không phải client nào, không thêm (xem addIfCharacter).
             // Chỉ target dương (nhân vật) — xem giải thích đầy đủ ở handleCombatResults.
             if (outcome.targetEntityId() > 0) {
                 observers.add(outcome.targetEntityId());
