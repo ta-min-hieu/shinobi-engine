@@ -227,5 +227,10 @@ Không (ngừng phát 1504 — D4 — sẽ cần ADR riêng khi tới lúc).
      ARENA (308), đối thủ đã spawn trong World đó (ba gói tới không theo thứ tự cố định). HUD mục tiêu
      hiện tên + máu đối thủ, số sát thương neo lên đối thủ. Không đổi protocol/server. Chi tiết + khoảng
      trống còn lại (máu tối đa của đối thủ không có trên dây): [CLIENT.md](../../04-client/CLIENT.md).
-     Test headless `DuelTargetingTest`. ⚠️ **CHƯA kiểm sống bằng client desktop thật** (`gameProbe` không
-     chạy HUD) — mục này vẫn mở tới khi có lượt đó; phương án (b) (click người chơi để nhắm) vẫn mở.
+     Test headless `DuelTargetingTest`.
+   - ✅ *(2026-10-04)* **Đã kiểm sống bằng HAI client desktop thật**: thách đấu (K) → nhận → vào đấu
+     trường ⇒ server nhận `SET_TARGET_COMMAND +2` (cả hai client tự nhắm, không click), HUD mục tiêu hiện
+     tên đối thủ, nút skill sáng; Z/Enter gây `-25`/`-45` nổi trên đối thủ (`ATTACK_RESULT_EVENT`,
+     `SKILL_RESULT_EVENT` khớp số lần bấm), hạ gục ⇒ `pvp_rating` 1016/984, về World chính thì mục tiêu
+     đối thủ bị bỏ. Số đo chi tiết: [CLIENT.md](../../04-client/CLIENT.md). Mục #3 về đường client thật
+     nay đóng; còn mở: phương án (b) (click người chơi để nhắm) và máu tối đa của đối thủ trên dây.

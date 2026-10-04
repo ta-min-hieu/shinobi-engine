@@ -156,11 +156,22 @@ trừ lạc quan, nhưng chờ `SkillResultEvent` do **chính mình** ra trong `
 (= `ATTACK_CONFIRM_WINDOW_SECONDS`, 1 s); không tới thì hoàn Khí + hồi chiêu, tới muộn thì trừ lại.
 Chỉ client, không đổi protocol. Kèm: gỡ hai lượt cấp phát mỗi khung ở HUD (`monsters()` trả một view
 chỉ-đọc dùng lại; nhãn hồi chiêu chỉ định dạng lại khi phần mười giây hiển thị đổi — `CooldownText`).
-Bản vá trên (`0553aeb`) **CHƯA kiểm sống.**
-Bản vá nằm trong `CombatHudController` (client desktop), còn `gameProbe` không chạy code HUD và cũng
-không có đường gửi lệnh skill (chỉ giải mã `SkillResultEvent`), nên không có cách đo bằng probe.
-Chỉ có `CombatHudControllerTest`; kiểm sống thật cần client desktop (bấm Enter ngoài tầm/khi bị
-choáng rồi đọc thanh Khí). Đợt kiểm sống cùng ngày cho AoI/NaN: [SERVER.md §6](../05-server/SERVER.md#6-state-sync--gửi-gì-cho-client).
+✅ **Đã kiểm sống 2026-10-04** bằng client desktop thật (`installDist`, nhân vật Cấp 1 mới, Hỏa Cầu
+Thuật tầm 5 m, mục tiêu là mộc nhân cách ~9 m): bấm Enter 3 lần, mỗi lần chụp ở +0,5 s và +1,7 s —
+thanh Khí **90 → 80 (nút xám, hồi chiêu 2.8) → 90 (nút sáng lại)**, cả ba lần. Số phía server
+(bộ đếm `kage_packet_received_total`/`kage_packet_sent_total` theo opcode ở cổng 9404, chụp trước/sau):
+`USE_SKILL_COMMAND +3`, `SKILL_RESULT_EVENT +0` — server đúng là bỏ im lặng cả ba, và client hoàn lại
+đúng. Nhánh "đang bị choáng" chưa kiểm sống (không có nguồn choáng dễ dựng cho Cấp 1).
+Đợt kiểm sống cho AoI/NaN: [SERVER.md §6](../05-server/SERVER.md#6-state-sync--gửi-gì-cho-client).
+
+**Enter gửi chat không còn tung skill (`KeyPressEdge`, 2026-10-03).** Enter vừa là phím GỬI của mọi ô
+nhập vừa là phím dùng skill; ô chat đóng ngay trong khung nhận Enter, nên nhịp logic kế tiếp thấy
+"bàn phím rảnh + Enter đang giữ" và tung skill vào mục tiêu đang chọn mỗi lần gửi một câu chat.
+`KeyPressEdge` coi mọi phím đang giữ lúc ô nhập chiếm bàn phím là "đã giữ từ trước" — phải nhả ra rồi
+nhấn lại mới thành cú nhấn gameplay. ✅ **Đã kiểm sống 2026-10-04** (client desktop thật, mục tiêu đã
+chọn, skill sẵn sàng, Enter giữ THẬT 250–300 ms bằng `keybd_event`): 4 lần T → gõ → Enter cho
+`SEND_CHAT_MESSAGE_COMMAND +4`, `USE_SKILL_COMMAND +0`, Khí đứng yên; đối chứng cùng chỗ, cùng mục
+tiêu, Enter khi chat ĐÓNG cho `USE_SKILL_COMMAND +1` (đường đọc phím vẫn sống).
 
 **Tự nhắm đối thủ đấu trường (`DuelTargeting`, 2026-10-04 — dòng 32 bảng chờ, phương án a).**
 Trước đây mục tiêu chỉ có thể là QUÁI (tự chọn lúc quái spawn, hoặc click quái); click người chơi khác
@@ -180,8 +191,19 @@ không mang máu tối đa của người khác ⇒ trong một trận ngắn HU
 của chủ dự án. Số sát thương nay neo lên nhân vật đang là mục tiêu (`CombatFeedbackPresenter`); số của
 người khác vẫn không hiện. Chưa có dấu mục tiêu vẽ dưới chân nhân vật (chỉ quái có). Phương án (b) —
 click người chơi để nhắm khi đang trong trận — CHƯA làm. Test: `DuelTargetingTest` (đỏ trước, xanh
-sau), `FrameAllocationTest#characterTargetHudPath_isAllocationFree`. **CHƯA kiểm sống bằng client
-desktop thật** — `gameProbe` không chạy code HUD/`DuelTargeting` nên không đo được đường này.
+sau), `FrameAllocationTest#characterTargetHudPath_isAllocationFree`.
+
+✅ **Đã kiểm sống 2026-10-04 bằng HAI client desktop thật** (hai account mới, nhân vật Cấp 1 không
+đồ). A mở **K** → gõ tên → **Thách đấu**; B bấm **Nhận**. Ngay khi vào trận (bộ đếm opcode của server,
+cổng 9404): `ACCEPT_DUEL_COMMAND +1`, `DUEL_STARTED_EVENT +2`, `WORLD_CHANGED_EVENT +2`,
+`CHARACTER_SPAWNED_EVENT +2` và **`SET_TARGET_COMMAND +2`** — cả hai client tự nhắm, người chơi không
+click gì. HUD mục tiêu hiện tên đối thủ (`ThuKiemB  ? / ?`), nút Hỏa Cầu Thuật KHÔNG xám. Đánh: Z một
+lần ⇒ `ATTACK_COMMAND +1`, `ATTACK_RESULT_EVENT +2`, chữ `-25` nổi trên người đối thủ, HUD `75 / ?`;
+Enter ⇒ `USE_SKILL_COMMAND +1`, `SKILL_RESULT_EVENT +2`, `-45`, HUD `55 / 100` (máu tối đa tới cùng
+`HealthChangedEvent` của hồi máu ngoài chiến đấu), Khí 100 → 90. Z bốn lần nữa ⇒ trận chốt:
+`DUEL_RESULT_EVENT +2`, `pvp_rating` A **1016 (1-0)**, B **984 (0-1)**. Về World chính: biển "LUẬN
+KIẾM" tắt, mục tiêu đối thủ bị bỏ (HUD chuyển sang con quái tự chọn của world chính). Ghi nhận thêm:
+`? / ?` trước đòn đầu là đúng khoảng trống giao thức đã nêu ở trên, không phải lỗi mới.
 
 ✅ **Nền tảng đã chốt: desktop-first** ([ADR-023](../01-architecture/adr/ADR-023-Desktop-First-Input.md), Accepted 2026-09-05). Sơ đồ cảm ứng KHÔNG thiết kế trước (Điều 9) — khi nào làm mobile thật thì cần một ADR riêng, phạm vi tối thiểu: sơ đồ nhập liệu cảm ứng, bố cục lại HUD theo vùng chạm tối thiểu, và xem lại [ADR-024](../01-architecture/adr/ADR-024-Asset-Distribution-Strategy.md)/[ADR-028](../01-architecture/adr/ADR-028-Asset-Delivery-Tiers.md).
 
