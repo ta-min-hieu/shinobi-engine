@@ -69,6 +69,14 @@
         <Bug pattern="PREDICTABLE_RANDOM"/>
     </Match>
 
+    <!-- Bài kiểm bảo toàn kinh tế dưới tải ngẫu nhiên dùng java.util.Random với seed CỐ ĐỊNH CHỦ
+         ĐÍCH (in ra khi đỏ, đặt lại bằng -Dkage.econ.seed) để chuỗi thao tác mỗi luồng tái lập được.
+         Chỉ chọn thao tác/tham số cho test, không phải giá trị bảo mật. -->
+    <Match>
+        <Class name="dev.kage.server.database.economy.EconomyConservationStressIntegrationTest"/>
+        <Bug pattern="PREDICTABLE_RANDOM"/>
+    </Match>
+
     <!-- Roll trúng đòn/chí mạng trong combat (gameplay, KHÔNG bảo mật) — sinh ở server đúng quy
          tắc, predictable PRNG đúng cho gameplay damage roll, không cần SecureRandom. -->
     <Match>

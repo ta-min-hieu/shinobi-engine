@@ -40,3 +40,10 @@ dependencies {
     // ở test để debug được, không chỉ ở runtime thật (server-gateway đã làm y hệt).
     testRuntimeOnly(libs.logback.classic)
 }
+
+// Bài kiểm bảo toàn kinh tế (EconomyConservationStressIntegrationTest) đọc seed/thời lượng/số luồng
+// từ system property `kage.econ.*`. Test chạy ở JVM con nên -D trên dòng lệnh Gradle không tự tới
+// được — chuyển tiếp đúng nhóm khoá này. Không đặt gì thì test dùng mặc định vừa ngân sách `check`.
+tasks.withType<Test>().configureEach {
+    systemProperties(providers.systemPropertiesPrefixedBy("kage.econ.").get())
+}
