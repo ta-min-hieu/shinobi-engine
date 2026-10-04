@@ -14,6 +14,7 @@ import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.ClaimMailResponse;
 import dev.kage.protocol.DeleteMailResponse;
 import dev.kage.protocol.ListMailResponse;
+import dev.kage.protocol.NewMailEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SendMailOutcome;
 import dev.kage.protocol.SendMailResponse;
@@ -110,6 +111,9 @@ final class MailCoordinator implements WindowFlow {
             return true;
         }
         if (opcode == Opcode.OPCODE_NEW_MAIL_EVENT_VALUE) {
+            // Đọc trước khi hỏi lại — payload rác phải dừng ở parse, không kéo theo lệnh gửi lên
+            // (InboundPacketFuzzTest), cùng luật với TradeUpdatedEvent.
+            NewMailEvent.parser().parseFrom(payload);
             onNewMail();
             return true;
         }

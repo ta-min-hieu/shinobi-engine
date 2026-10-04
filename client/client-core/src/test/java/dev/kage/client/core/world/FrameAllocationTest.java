@@ -132,7 +132,7 @@ class FrameAllocationTest {
                 WorldConstants.LOCAL_CHARACTER_ID,
                 CharacterModelKey.of(Faction.FACTION_HOA, CostumeTier.COSTUME_TIER_B1));
 
-        remoteCharacters = new RemoteCharacterPresenter(new EcsWorld(), models);
+        remoteCharacters = new RemoteCharacterPresenter(new EcsWorld(), models, 1L);
         monsterPresenter = new MonsterPresenter(models);
         npcPresenter = new NpcPresenter(models);
         combatHud = new CombatHudController(1L, Faction.FACTION_HOA);

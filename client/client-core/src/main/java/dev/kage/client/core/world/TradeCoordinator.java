@@ -21,6 +21,7 @@ import dev.kage.protocol.TradeCloseReason;
 import dev.kage.protocol.TradeClosedEvent;
 import dev.kage.protocol.TradePhase;
 import dev.kage.protocol.TradeRequestedEvent;
+import dev.kage.protocol.TradeUpdatedEvent;
 import dev.kage.protocol.wire.PacketCodec;
 
 /**
@@ -103,7 +104,10 @@ final class TradeCoordinator implements WindowFlow {
             return true;
         }
         if (opcode == Opcode.OPCODE_TRADE_UPDATED_EVENT_VALUE) {
-            // Event KHÔNG mang trạng thái (trade.proto) — nó chỉ nói "có gì đó đổi rồi".
+            // Event KHÔNG mang trạng thái (trade.proto) — nó chỉ nói "có gì đó đổi rồi". Vẫn ĐỌC nó
+            // trước khi hỏi lại: payload rác phải dừng ở parse như mọi gói khác, không được kéo theo
+            // một lệnh gửi lên (InboundPacketFuzzTest).
+            TradeUpdatedEvent.parser().parseFrom(payload);
             sender.getTradeStatus();
             return true;
         }

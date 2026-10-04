@@ -90,9 +90,14 @@ final class WorldCommandSender implements SessionRecovery.Link {
 
     private static final Logger LOG = LoggerFactory.getLogger(WorldCommandSender.class);
 
-    private final GameConnection connection;
+    private final CommandLink connection;
 
     WorldCommandSender(GameConnection connection) {
+        this(CommandLink.of(connection));
+    }
+
+    /** Cho test — đường truyền giả, xem {@link CommandLink}. */
+    WorldCommandSender(CommandLink connection) {
         this.connection = connection;
     }
 

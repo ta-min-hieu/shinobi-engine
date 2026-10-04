@@ -464,6 +464,9 @@ public final class TradePanel implements HudWindow {
 
     @Override
     public void dispose() {
+        // Stage KHÔNG tự dispose batch truyền vào constructor (ownsBatch=false) — thiếu dòng này là rò
+        // một SpriteBatch (mesh + shader) mỗi lần dựng lại màn world (InboundPacketFuzzTest).
+        stage.getBatch().dispose();
         stage.dispose();
     }
 }

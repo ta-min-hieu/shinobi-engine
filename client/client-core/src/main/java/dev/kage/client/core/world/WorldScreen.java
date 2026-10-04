@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Matrix4;
+import com.badlogic.gdx.utils.Timer;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -278,9 +279,21 @@ public final class WorldScreen implements GameScreen {
             GameConnection connection,
             CharacterSummary character,
             SelectCharacterResponse enterWorld) {
+        this(context, new WorldCommandSender(connection), character, enterWorld);
+    }
+
+    /**
+     * Cho test — dựng màn THẬT trên một đường truyền giả ({@link CommandLink}), để gói đến đi qua
+     * đúng bộ định tuyến {@link #dispatch} của bản chạy thật. Xem {@code InboundPacketFuzzTest}.
+     */
+    WorldScreen(
+            PlayContext context,
+            WorldCommandSender sender,
+            CharacterSummary character,
+            SelectCharacterResponse enterWorld) {
         this.world = context.world();
         this.inputMapper = context.inputMapper();
-        this.sender = new WorldCommandSender(connection);
+        this.sender = sender;
         this.relog = new AutoRelog(sender, character.getId());
         this.localCharacterId = character.getId();
         this.characterLevel = character.getLevel();
@@ -290,7 +303,7 @@ public final class WorldScreen implements GameScreen {
         this.combatHudController.onEnterWorld(enterWorld.getCurrentHp(), enterWorld.getMaxHp());
         this.combatAnimationTrigger =
                 new CombatAnimationTrigger(models, localCharacterId, WorldConstants.LOCAL_CHARACTER_ID);
-        this.remoteCharacters = new RemoteCharacterPresenter(context.world(), models);
+        this.remoteCharacters = new RemoteCharacterPresenter(context.world(), models, localCharacterId);
         installMovementSystems();
         this.localPlayer = spawnLocalPlayer(enterWorld);
 
@@ -1017,6 +1030,13 @@ public final class WorldScreen implements GameScreen {
         // Panel mượn skin của CombatHud nên phải trả tài nguyên trước chủ skin — PanelHub dọn
         // theo đúng thứ tự đăng ký, và HUD đăng ký cuối cùng chính vì vậy.
         panels.dispose();
+        // Ô nhập đang giữ bàn phím (chat, thư, bang...) lúc màn này bị bỏ — bị đá, tự đăng nhập lại —
+        // còn một tác vụ nháy con trỏ trong Timer TOÀN CỤC của libGDX: TextField chỉ huỷ nó trong
+        // draw() khi thấy mất focus, mà màn đã dispose thì không bao giờ draw nữa. Tác vụ đó giữ
+        // TextField → Stage → listener → coordinator → CẢ màn world cũ, mãi mãi (đo trong
+        // InboundPacketFuzzTest: ~6MB mỗi màn, hết heap sau vài chục lần dựng lại). Xoá sạch là an
+        // toàn: TextField còn sống ở màn khác tự lên lịch lại ngay lần draw kế tiếp.
+        Timer.instance().clear();
     }
 
     /**

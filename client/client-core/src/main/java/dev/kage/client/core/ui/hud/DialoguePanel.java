@@ -160,7 +160,10 @@ public final class DialoguePanel implements HudWindow {
     public void show(String textKey, List<String> optionLabelKeys) {
         textLabel.setText(text(textKey));
         optionList.clear();
-        for (int index = 0; index < optionLabelKeys.size(); index++) {
+        // Trần số nút DỰNG (InboundPacketFuzzTest#hugeRepeatedFieldsDoNotHang): một node 100k lựa chọn
+        // từng dựng 100k nút và giữ ~300MB. Chỉ số lựa chọn KHÔNG đổi — nút thứ i vẫn gửi đúng i.
+        int shown = Math.min(optionLabelKeys.size(), ScrollingList.MAX_BUILT_ROWS);
+        for (int index = 0; index < shown; index++) {
             optionList
                     .add(optionButton(optionLabelKeys.get(index), index))
                     .growX()
