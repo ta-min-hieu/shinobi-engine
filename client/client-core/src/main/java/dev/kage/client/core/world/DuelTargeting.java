@@ -1,0 +1,108 @@
+package dev.kage.client.core.world;
+
+import java.util.function.LongConsumer;
+import java.util.function.LongPredicate;
+
+import dev.kage.protocol.WorldKind;
+
+/**
+ * Tự nhắm ĐỐI THỦ đấu trường làm mục tiêu — dòng 32 bảng chờ, phương án (a), thi hành 2026-10-04.
+ *
+ * <p><b>Vì sao cần.</b> Client chỉ từng đặt mục tiêu là QUÁI (tự chọn lúc quái spawn, hoặc click
+ * quái); click vào người chơi khác là CHỌN để thách đấu ({@link DuelCoordinator#onCharacterPicked}).
+ * Đấu trường không có quái ⇒ không bao giờ có mục tiêu ⇒ bấm Đánh báo "chưa chọn mục tiêu", nút
+ * skill xám — vào được trận mà không đánh được ai. Phương án (b) — click người chơi để nhắm khi đang
+ * trong trận — CHƯA làm, UX chưa chốt.
+ *
+ * <p><b>Không đổi protocol, không quyết gameplay.</b> Lớp này chỉ gửi {@code SetTargetCommand} với
+ * đúng id mà server đã báo ở {@code DuelStartedEvent.opponent_character_id}; server tự kiểm lại
+ * ({@code WorldFacade#handleSetTarget} bỏ qua id không tồn tại trong World của người gửi;
+ * {@code CombatSystem} chỉ cho PvP ở World đấu trường).
+ *
+ * <p><b>Ba điều kiện, thứ tự tới KHÔNG cố định.</b> Chỉ nhắm khi đủ cả ba: đang có trận
+ * ({@code DuelStartedEvent}), đang ở World đấu trường ({@code WorldChangedEvent} ARENA) và đối thủ
+ * đang có trên màn hình (spawn của World đấu trường). Phía server {@code DuelStartedEvent} gửi ngay
+ * sau {@code acceptDuel}, còn 308 + attach chạy trên executor riêng SAU khi world chính xả hàng đợi
+ * ({@code ArenaInstanceRegistry#moveCharacterIntoDuel}) — gói nào tới trước tuỳ nhịp. Nhắm sớm hơn
+ * (thấy đối thủ ở world CHÍNH lúc vừa nhận trận) là gửi một {@code SetTargetCommand} mà server bỏ
+ * qua im lặng (entity ở đấu trường chưa tồn tại), rồi 308 xoá luôn mục tiêu phía client — nên chờ.
+ * Spawn của đối thủ trong World đấu trường cũng là bằng chứng entity của họ ĐÃ attach phía server,
+ * tức lệnh nhắm sẽ không rơi vào hư không.
+ *
+ * <p>Thuần, không GL, không mạng — gửi qua {@link LongConsumer} để test không cần kết nối thật.
+ */
+final class DuelTargeting implements DuelCoordinator.DuelListener {
+
+    private static final long NO_OPPONENT = 0L;
+
+    private final CombatHudController combat;
+    private final LongPredicate characterVisible;
+    private final LongConsumer setTargetSender;
+
+    /** Đối thủ server đã báo ở {@code DuelStartedEvent}; {@link #NO_OPPONENT} khi không có trận. */
+    private long opponentId = NO_OPPONENT;
+
+    private String opponentDisplayName = "";
+
+    /** Đang ở World đấu trường theo gói 308 gần nhất. Vào world lần đầu luôn là world chính. */
+    private boolean inArena;
+
+    /**
+     * @param combat nơi giữ mục tiêu hiện tại của HUD
+     * @param characterVisible nhân vật đó có đang trên màn hình không ({@code RemoteCharacterPresenter#isPresent})
+     * @param setTargetSender gửi {@code SetTargetCommand} ({@code WorldCommandSender#setTarget})
+     */
+    DuelTargeting(CombatHudController combat, LongPredicate characterVisible, LongConsumer setTargetSender) {
+        this.combat = combat;
+        this.characterVisible = characterVisible;
+        this.setTargetSender = setTargetSender;
+    }
+
+    /** {@code DuelStartedEvent} — server vừa nói đối thủ là ai. */
+    @Override
+    public void onDuelStarted(long opponentCharacterId, String opponentDisplayName) {
+        this.opponentId = opponentCharacterId;
+        this.opponentDisplayName = opponentDisplayName;
+        targetOpponentIfReady();
+    }
+
+    /**
+     * {@code WorldChangedEvent} — gọi SAU khi {@code WorldScreen} đã dọn thực thể của World cũ (mục
+     * tiêu cũ đã mất cùng {@link CombatHudController#onWorldChanged}).
+     */
+    void onWorldChanged(WorldKind kind) {
+        inArena = kind == WorldKind.WORLD_KIND_ARENA;
+        targetOpponentIfReady();
+    }
+
+    /** {@code CharacterSpawnedEvent} — nhân vật khác vừa vào tầm nhìn. */
+    void onCharacterSpawned(long characterId) {
+        if (characterId == opponentId) {
+            targetOpponentIfReady();
+        }
+    }
+
+    /** {@code DuelResultEvent} — trận đã chốt, thôi nhắm đối thủ cũ. */
+    @Override
+    public void onDuelEnded() {
+        combat.clearCharacterTarget(opponentId);
+        opponentId = NO_OPPONENT;
+        opponentDisplayName = "";
+    }
+
+    /** Rời màn hình/mất kết nối — trạng thái trận không sống sang phiên sau. */
+    @Override
+    public void onReset() {
+        onDuelEnded();
+        inArena = false;
+    }
+
+    private void targetOpponentIfReady() {
+        if (opponentId == NO_OPPONENT || !inArena || !characterVisible.test(opponentId)) {
+            return;
+        }
+        if (combat.selectCharacterTarget(opponentId, opponentDisplayName)) {
+            setTargetSender.accept(opponentId);
+        }
+    }
+}

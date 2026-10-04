@@ -177,6 +177,29 @@ class FrameAllocationTest {
                 .isLessThanOrEqualTo(JIT_DEPENDENT_LIMIT_BYTES);
     }
 
+    /**
+     * Mục tiêu là NHÂN VẬT (đối thủ đấu trường, 2026-10-04): đường HUD mỗi khung chỉ đọc số nguyên và
+     * một chuỗi có sẵn — không tra {@code Map<Long, …>} nào, nên ngưỡng là đúng 0.
+     */
+    @Test
+    void characterTargetHudPath_isAllocationFree() {
+        CombatHudController duelHud = new CombatHudController(1L, Faction.FACTION_HOA);
+        duelHud.bindCharacterPositions(remoteCharacters.characters());
+        assertThat(duelHud.selectCharacterTarget(FIRST_CHARACTER_ID, "opponent"))
+                .isTrue();
+
+        assertThat(measure("CombatHudController character target reads", () -> {
+                    duelHud.tick(FIXED_DT);
+                    if (duelHud.hasCharacterTarget()) {
+                        consume(duelHud.characterTargetName().length()
+                                + duelHud.characterTargetHp()
+                                + duelHud.characterTargetMaxHp());
+                    }
+                    consume(duelHud.canUseSkill() ? 1 : 0);
+                }))
+                .isZero();
+    }
+
     private void combatHudFrame() {
         combatHud.tick(FIXED_DT);
         consume(combatHud.playerHp() + combatHud.playerMaxHp() + combatHud.playerChi() + combatHud.playerMaxChi());

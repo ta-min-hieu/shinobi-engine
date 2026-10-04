@@ -1,5 +1,7 @@
 package dev.kage.client.core.world;
 
+import java.util.Optional;
+
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.math.Matrix4;
@@ -21,8 +23,9 @@ import dev.kage.protocol.SkillResultEvent;
  *
  * <p>Gộp hai thứ này lại vì chúng dùng CHUNG một phép tra khó: "entity id này đang ở đâu trong thế
  * giới" — mình (id dương khớp {@code localCharacterId}), quái (id âm, tra
- * {@link CombatHudController}), hay một nhân vật khác ngoài tầm theo dõi (không biết vị trí → bỏ
- * qua, không đoán). Trước khi tách ra, phép tra đó nằm lặp hai bản trong {@code WorldScreen}.
+ * {@link CombatHudController}), nhân vật đang là MỤC TIÊU (đối thủ đấu trường — vị trí lấy từ
+ * {@link CombatHudController#targetPoint()}), hay một nhân vật khác (bỏ qua, không đoán). Trước khi
+ * tách ra, phép tra đó nằm lặp hai bản trong {@code WorldScreen}.
  *
  * <p>KHÔNG sở hữu {@link BitmapFont} — font thuộc về {@code CombatHud}, ở đây chỉ mượn để vẽ.
  */
@@ -85,10 +88,20 @@ final class CombatFeedbackPresenter implements Disposable {
             return true;
         }
         CombatHudController.MonsterState monster = combat.monsters().get(targetEntityId);
-        if (monster == null) {
+        if (monster != null) {
+            anchor.set(monster.x(), monster.y(), 0f);
+            return true;
+        }
+        // Nhân vật khác: chỉ khi đó là MỤC TIÊU đang nhắm (đối thủ đấu trường, 2026-10-04) — số của
+        // những người khác vẫn không phải thứ người chơi cần thấy.
+        if (targetEntityId <= 0L || targetEntityId != combat.currentTargetId()) {
             return false;
         }
-        anchor.set(monster.x(), monster.y(), 0f);
+        Optional<PickablePoint> character = combat.targetPoint();
+        if (character.isEmpty()) {
+            return false;
+        }
+        anchor.set(character.get().x(), character.get().y(), 0f);
         return true;
     }
 

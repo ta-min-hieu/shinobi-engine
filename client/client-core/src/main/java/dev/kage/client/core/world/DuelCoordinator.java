@@ -64,6 +64,45 @@ final class DuelCoordinator implements WindowFlow {
 
     private final I18NBundle i18n = KageI18n.load();
 
+    /**
+     * Người nghe trận bắt đầu/kết thúc — {@link DuelTargeting} (tự nhắm đối thủ, dòng 32 bảng chờ,
+     * phương án a). Cài bằng {@link #setDuelListener} chứ không qua constructor: tham số thứ năm vượt
+     * {@code ParameterNumber}/{@code ExcessiveParameterList}, cùng khuôn
+     * {@code InventoryCoordinator#setOnMaxHpChanged}.
+     */
+    private DuelListener duelListener = DuelListener.NONE;
+
+    /** Ba nhịp của một trận mà nơi khác cần biết — tất cả đều do SERVER khởi phát. */
+    interface DuelListener {
+
+        /** Không ai nghe. */
+        DuelListener NONE = new DuelListener() {
+            @Override
+            public void onDuelStarted(long opponentCharacterId, String opponentDisplayName) {
+                // không ai nghe
+            }
+
+            @Override
+            public void onDuelEnded() {
+                // không ai nghe
+            }
+
+            @Override
+            public void onReset() {
+                // không ai nghe
+            }
+        };
+
+        /** {@code DuelStartedEvent} — id đối thủ do server báo. */
+        void onDuelStarted(long opponentCharacterId, String opponentDisplayName);
+
+        /** {@code DuelResultEvent} — trận đã chốt. */
+        void onDuelEnded();
+
+        /** Rời màn hình/mất kết nối. */
+        void onReset();
+    }
+
     DuelCoordinator(DuelPanel panel, CombatHud hud, WorldCommandSender sender, CombatFeedbackPresenter feedback) {
         this.panel = panel;
         this.hud = hud;
@@ -92,6 +131,11 @@ final class DuelCoordinator implements WindowFlow {
     @Override
     public void close() {
         panel.close();
+    }
+
+    /** Cài người nghe trận bắt đầu/kết thúc — xem {@link #duelListener}. */
+    void setDuelListener(DuelListener listener) {
+        this.duelListener = listener;
     }
 
     /**
@@ -259,6 +303,8 @@ final class DuelCoordinator implements WindowFlow {
     private void onDuelStarted(DuelStartedEvent event) {
         DuelController.Player opponent = controller.onDuelStarted(event);
         feedback.showSelfText(format("duel.notice.started", opponent.displayName()), FloatingCombatText.LEVEL_UP);
+        // Id đối thủ do SERVER báo — client chỉ biến nó thành ý định "nhắm người này".
+        duelListener.onDuelStarted(opponent.characterId(), opponent.displayName());
         refreshView();
     }
 
@@ -268,6 +314,7 @@ final class DuelCoordinator implements WindowFlow {
      */
     private void onDuelResult(DuelResultEvent event) {
         Optional<DuelController.Result> result = controller.onDuelResult(event);
+        duelListener.onDuelEnded();
         result.ifPresentOrElse(this::announceResult, () -> notice("duel.notice.finished"));
         refreshView();
         refreshRating();
@@ -380,6 +427,7 @@ final class DuelCoordinator implements WindowFlow {
     @Override
     public void reset() {
         controller.clear();
+        duelListener.onReset();
         panel.close();
         panel.setStatus(text("duel.hint.open"));
         hud.clearDuelStatus();
