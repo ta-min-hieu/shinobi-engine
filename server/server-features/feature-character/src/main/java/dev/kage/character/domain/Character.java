@@ -30,6 +30,8 @@ public record Character(
     private static final int NAME_MIN_LENGTH = 2;
     private static final int NAME_MAX_LENGTH = 16;
     private static final Pattern NAME_PATTERN = Pattern.compile("^[\\p{L}\\p{N}_]+$");
+    // Đúng MỘT ký tự theo luật của NAME_PATTERN — chỉ dùng để chỉ ra ký tự sai đầu tiên trong thông điệp lỗi.
+    private static final Pattern NAME_CHARACTER = Pattern.compile("[\\p{L}\\p{N}_]");
     private static final int MIN_LEVEL = 1;
 
     public Character {
@@ -55,13 +57,30 @@ public record Character(
      */
     public static void validateName(String name) {
         Objects.requireNonNull(name, "name");
+        // Thông điệp KHÔNG chép nguyên văn tên (sửa 2026-10-06): gateway ghi nó ra log ở mỗi lượt tạo
+        // sai, và tên đến thẳng từ client — khung 1 MiB thành dòng log 1 MiB, ký tự xuống dòng bịa được
+        // dòng log giả. Chỉ ghi độ dài và mã của ký tự sai đầu tiên.
         if (!hasValidLength(name)) {
-            throw new IllegalArgumentException(
-                    "tên nhân vật phải dài %d-%d ký tự: '%s'".formatted(NAME_MIN_LENGTH, NAME_MAX_LENGTH, name));
+            throw new IllegalArgumentException("tên nhân vật phải dài %d-%d ký tự, nhận %d"
+                    .formatted(NAME_MIN_LENGTH, NAME_MAX_LENGTH, name.length()));
         }
         if (!NAME_PATTERN.matcher(name).matches()) {
-            throw new IllegalArgumentException("tên nhân vật chứa ký tự không hợp lệ: '" + name + "'");
+            throw new IllegalArgumentException("tên nhân vật chứa ký tự không hợp lệ: " + firstInvalidCharacter(name));
         }
+    }
+
+    /** {@code U+XXXX tại vị trí i} của ký tự đầu tiên ngoài luật tên — chỉ gọi khi tên đã sai. */
+    private static String firstInvalidCharacter(String name) {
+        int index = 0;
+        while (index < name.length()) {
+            int codePoint = name.codePointAt(index);
+            String text = new String(java.lang.Character.toChars(codePoint));
+            if (!NAME_CHARACTER.matcher(text).matches()) {
+                return "U+%04X tại vị trí %d".formatted(codePoint, index);
+            }
+            index += java.lang.Character.charCount(codePoint);
+        }
+        return "không xác định";
     }
 
     /**
