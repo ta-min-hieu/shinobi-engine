@@ -43,6 +43,17 @@ adapter thật nằm ở `server-database`, ArchUnit chặn JDBC/Redis theo pack
   (`CreateCharacterUseCase.MAX_CHARACTERS_PER_ACCOUNT`) — tham số triển khai, chỉnh được không cần ADR.
 - **Validate tên nhân vật**: chỉ độ dài (2-16) + charset Unicode chữ/số — CHƯA có banned-word/
   homoglyph dù SECURITY.md §12 yêu cầu đủ cả hai. Dự án cá nhân, rủi ro thấp, để trống có chủ đích.
+  Hệ quả (chạy thử regex 2026-10-06): tên toàn ký tự VÔ HÌNH (Hangul filler U+3164/U+115F/U+FFA0 là
+  `\p{L}`), tên khổ toàn phần/chữ toán học/Cyrillic giả Latin đều được nhận; UNIQUE của cột `name`
+  phân biệt hoa thường nên `Kage`/`kage` là hai nhân vật khác nhau. Đổi luật là việc của chủ dự án (đã đưa vào bảng câu hỏi).
+- **Thông điệp lỗi của `validateName` KHÔNG chép nguyên văn tên** (2026-10-06): gateway log nó ở mỗi
+  lượt tạo sai; chỉ ghi độ dài + `U+XXXX` của ký tự sai đầu tiên (`CharacterTest`). Cùng luật cho
+  `Account.validateUsername`.
+
+Bất biến tạo/chọn nhân vật dưới đua trên Postgres thật (đúng một người thắng một tên, không
+`character_stat` mồ côi, khoá idempotency của người thua không bị đốt, giới hạn + tên trùng đan xen):
+`CharacterCreationInvariantsIntegrationTest` (server-database), `AccountCharacterWireDatabaseTest`
+(server-gateway — kiểm cả `error_key` qua dây).
 
 ## Idempotency (ADR-025 ✅ Accepted)
 
