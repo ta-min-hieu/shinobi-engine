@@ -95,6 +95,13 @@
         <Bug pattern="PREDICTABLE_RANDOM"/>
     </Match>
 
+    <!-- Fuzz máy trạng thái quest (QuestStateMachinePropertyIntegrationTest) — cùng lý do ngay trên:
+         seed CỐ ĐỊNH CHỦ ĐÍCH (in ra khi đỏ, đặt lại bằng -Dkage.questFuzz.seed), chỉ chọn lệnh test. -->
+    <Match>
+        <Class name="dev.kage.server.database.quest.fuzz.QuestFuzzRun"/>
+        <Bug pattern="PREDICTABLE_RANDOM"/>
+    </Match>
+
     <!-- Roll trúng đòn/chí mạng trong combat (gameplay, KHÔNG bảo mật) — sinh ở server đúng quy
          tắc, predictable PRNG đúng cho gameplay damage roll, không cần SecureRandom. -->
     <Match>
