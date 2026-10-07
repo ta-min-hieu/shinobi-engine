@@ -236,6 +236,13 @@ sau đó. Kiểm túi lúc giao chỉ nhìn trạng thái — năm đường kh�
 - `QuestProgressPort.saveIfUnchanged` (`UPDATE … WHERE status='IN_PROGRESS' AND progress_json=?`).
   Xung đột ⇒ `find` đọc lại, chạy lại hook, tối đa 3 lần; quest đã rời IN_PROGRESS ⇒ dừng, không lấy đồ.
   Default của nó NÉM — không có mặc định "vô hại" cho một lần ghi.
+- ⚠️ **3 lần chỉ đủ khi sự kiện của MỘT nhân vật không chen nhau** (2026-10-06). Gateway đẩy mỗi con
+  quái chết sang một Virtual Thread riêng; 8 cú hạ cùng lúc từng chỉ được đếm **3** (kẻ về chót thua
+  N−1 lần). Nay `QuestFacade.withEventLock` xếp hàng `onMonsterKilled`/`onNpcTalked` theo nhân vật
+  (mẫu khoá của `InventoryFacade`); compare-and-set giữ nguyên làm lớp gác liên tiến trình. Gác bởi
+  `server-database/.../quest/QuestEventConcurrencyIntegrationTest` và bộ fuzz
+  `.../quest/fuzz/QuestStateMachinePropertyIntegrationTest`. Đừng gọi thẳng `ProcessQuestEventUseCase`
+  từ nhiều luồng.
 - `PostgresQuestItemTakeAdapter`: `FOR UPDATE OF ii` các dòng cùng mã, **không đang mặc, chưa cường
   hoá**, id nhỏ trước; đủ thì xoá/trừ, không đủ thì trả `false` mà chưa ghi gì.
 
