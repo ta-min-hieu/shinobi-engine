@@ -1,6 +1,7 @@
 package dev.kage.server.world;
 
 import java.util.List;
+import java.util.random.RandomGenerator;
 
 /**
  * Ba "loại World" mà bộ kiểm thuộc tính ({@link WorldSimulationPropertyTest}) lần lượt chạy — đúng ba
@@ -25,18 +26,21 @@ enum WorldFuzzScenario {
     private static final String HUNTER_CODE = "fuzz_hunter";
     private static final String SENTRY_CODE = "fuzz_sentry";
 
-    /** Dựng World CHƯA start — bộ kiểm tự tick tay ({@link WorldFacade#runOneTickOnCallerThread()}). */
-    WorldFacade newWorld(WorldOutboundSink sink) {
+    /**
+     * Dựng World CHƯA start — bộ kiểm tự tick tay ({@link WorldFacade#runOneTickOnCallerThread()}).
+     * {@code random} là nguồn random gameplay của World (trúng/né/bạo kích, hướng tuần tra): seed cố
+     * định ⇒ cùng chuỗi lệnh cho cùng kết quả trận đấu.
+     */
+    WorldFacade newWorld(WorldOutboundSink sink, RandomGenerator random) {
         return switch (this) {
-            case OVERWORLD -> new WorldFacade(sink, true, TickMetricsPort.NO_OP, overworldContent());
+            case OVERWORLD -> new WorldFacade(sink, true, overworldContent(), random);
             case DUNGEON -> {
-                WorldFacade world =
-                        new WorldFacade(sink, false, TickMetricsPort.NO_OP, TestWorldContents.dungeonWithBoss());
+                WorldFacade world = new WorldFacade(sink, false, TestWorldContents.dungeonWithBoss(), random);
                 world.spawnBoss(TestMonsterCatalogs.SAMPLE_BOSS_CODE);
                 yield world;
             }
             case ARENA -> {
-                WorldFacade world = new WorldFacade(sink, false, TickMetricsPort.NO_OP, WorldContentCatalog.EMPTY);
+                WorldFacade world = new WorldFacade(sink, false, WorldContentCatalog.EMPTY, random);
                 world.allowPlayerVersusPlayer();
                 yield world;
             }

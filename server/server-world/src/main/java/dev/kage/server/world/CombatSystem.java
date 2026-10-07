@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongFunction;
+import java.util.random.RandomGenerator;
 
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.Family;
@@ -70,6 +71,7 @@ final class CombatSystem extends IteratingKSystem {
 
     private final LongFunction<KEntity> entityLookup;
     private final BooleanSupplier pvpAllowed;
+    private final RandomGenerator random;
     private final List<AttackOutcome> pendingResults = new ArrayList<>();
 
     /**
@@ -77,10 +79,19 @@ final class CombatSystem extends IteratingKSystem {
      * @param pvpAllowed người chơi có được đánh người chơi khác không — xem {@code WorldFacade#pvpAllowed}.
      */
     CombatSystem(LongFunction<KEntity> entityLookup, BooleanSupplier pvpAllowed) {
+        this(entityLookup, pvpAllowed, ThreadLocalRandomSource.INSTANCE);
+    }
+
+    /**
+     * Như constructor 2 tham số nhưng nguồn random trúng/né/bạo kích do caller cấp — {@link WorldFacade}
+     * truyền nguồn của World (seed cố định ở test thuộc tính, xem {@link ThreadLocalRandomSource}).
+     */
+    CombatSystem(LongFunction<KEntity> entityLookup, BooleanSupplier pvpAllowed, RandomGenerator random) {
         super(Family.all(PositionComponent.class, TargetComponent.class, AttackCooldownComponent.class)
                 .get());
         this.entityLookup = entityLookup;
         this.pvpAllowed = pvpAllowed;
+        this.random = random;
     }
 
     List<AttackOutcome> drainResults() {
@@ -181,7 +192,7 @@ final class CombatSystem extends IteratingKSystem {
                 CombatConstants.toStats(COMBAT_STATS.get(attacker)), STATUS_EFFECT.get(attacker));
         CombatConstants.CombatStats defenderStats = StatusEffects.applyModifiers(
                 CombatConstants.toStats(COMBAT_STATS.get(target)), STATUS_EFFECT.get(target));
-        CombatConstants.AttackResult result = CombatConstants.resolveAttack(attackerStats, defenderStats);
+        CombatConstants.AttackResult result = CombatConstants.resolveAttack(attackerStats, defenderStats, random);
         // ADR-033 Decision #4/#5: đánh thường (KHÔNG phải skill, xem SkillSystem) LUÔN bị coi là
         // "đòn tầm thấp" ở lát cắt MVP này — nhân vật đang lơ lửng (grounded=false, đang nhảy) né
         // TUYỆT ĐỐI, ghi đè RNG hit/dodge (xem CombatConstants.resolveAttack) thay vì cộng dồn xác
