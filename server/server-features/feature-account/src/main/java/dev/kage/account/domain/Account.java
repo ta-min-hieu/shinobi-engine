@@ -31,12 +31,36 @@ public record Account(long id, String username, Instant createdAt) {
      */
     public static void validateUsername(String username) {
         Objects.requireNonNull(username, "username");
+        // Thông điệp KHÔNG chép nguyên văn username (sửa 2026-10-06): gateway ghi nó ra log ở mỗi lượt
+        // đăng nhập sai, và username đến thẳng từ client — khung 1 MiB thành dòng log 1 MiB, ký tự xuống
+        // dòng bịa được dòng log giả. Chỉ ghi độ dài và mã của ký tự sai đầu tiên.
         if (username.length() < USERNAME_MIN_LENGTH || username.length() > USERNAME_MAX_LENGTH) {
-            throw new IllegalArgumentException("username phải dài %d-%d ký tự: '%s'"
-                    .formatted(USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH, username));
+            throw new IllegalArgumentException("username phải dài %d-%d ký tự, nhận %d"
+                    .formatted(USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH, username.length()));
         }
         if (!USERNAME_PATTERN.matcher(username).matches()) {
-            throw new IllegalArgumentException("username chỉ được chứa chữ/số/gạch dưới: '" + username + "'");
+            throw new IllegalArgumentException(
+                    "username chỉ được chứa chữ/số/gạch dưới, sai ở " + firstInvalidCharacter(username));
         }
+    }
+
+    /** {@code U+XXXX tại vị trí i} của ký tự đầu tiên ngoài {@code [a-zA-Z0-9_]} — chỉ gọi khi đã sai. */
+    private static String firstInvalidCharacter(String username) {
+        int index = 0;
+        while (index < username.length()) {
+            int codePoint = username.codePointAt(index);
+            if (!isUsernameCharacter(codePoint)) {
+                return "U+%04X tại vị trí %d".formatted(codePoint, index);
+            }
+            index += Character.charCount(codePoint);
+        }
+        return "không xác định";
+    }
+
+    private static boolean isUsernameCharacter(int codePoint) {
+        return (codePoint >= 'a' && codePoint <= 'z')
+                || (codePoint >= 'A' && codePoint <= 'Z')
+                || (codePoint >= '0' && codePoint <= '9')
+                || codePoint == '_';
     }
 }

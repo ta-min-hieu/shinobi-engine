@@ -1,6 +1,9 @@
 package dev.kage.quest.api;
 
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
@@ -22,6 +25,7 @@ public final class QuestFacade {
     private final ProcessQuestEventUseCase processQuestEventUseCase;
     private final ClaimQuestRewardUseCase claimQuestRewardUseCase;
     private final ListQuestsUseCase listQuestsUseCase;
+    private final ConcurrentHashMap<Long, ReentrantLock> eventLocksByCharacterId = new ConcurrentHashMap<>();
 
     public QuestFacade(
             AcceptQuestUseCase acceptQuestUseCase,
@@ -53,7 +57,39 @@ public final class QuestFacade {
      * của nhiều quest cùng lúc kể từ khi có quest thứ hai theo dõi giết quái.
      */
     public List<QuestStatusChange> onMonsterKilled(long characterId, String monsterCode) {
-        return toStatusChanges(processQuestEventUseCase.monsterKilled(characterId, monsterCode));
+        return withEventLock(
+                characterId, () -> toStatusChanges(processQuestEventUseCase.monsterKilled(characterId, monsterCode)));
+    }
+
+    /**
+     * Xếp hàng mọi SỰ KIỆN quest của cùng một nhân vật (sửa 2026-10-06).
+     *
+     * <p><b>Vì sao.</b> Gateway đẩy mỗi con quái chết sang một Virtual Thread riêng, nên một chiêu diện
+     * rộng hạ nhiều con cùng nhịp là nhiều lời gọi chồng nhau. {@code ProcessQuestEventUseCase} ghi
+     * bằng compare-and-set và chỉ thử lại {@code MAX_WRITE_ATTEMPTS} = 3 lần, với giả định "ba lần
+     * xung đột liền là có gì sai, không phải tải cao". Giả định đó SAI: N lời gọi cùng xuất phát thì
+     * kẻ về chót thua tới N−1 lần dù mọi thứ đều đúng. Đo thật trên Postgres
+     * ({@code QuestEventConcurrencyIntegrationTest}): 8 cú hạ cùng lúc chỉ được đếm <b>3</b> — năm cú
+     * biến mất khỏi tiến độ quest, không báo lỗi gì ngoài một dòng WARN.
+     *
+     * <p><b>Cách sửa.</b> Cùng mẫu khoá/nhân vật của {@code InventoryFacade}: trong một tiến trình
+     * gateway, sự kiện của một nhân vật chạy lần lượt, nên compare-and-set không còn thua vì chính
+     * người chơi đó. Compare-and-set vẫn ở nguyên chỗ cũ — nó là lớp gác khi có hơn một tiến trình,
+     * và là thứ giữ "giao đồ đúng một lần". {@link ReentrantLock} chứ không {@code synchronized}: gọi
+     * từ Virtual Thread, chờ khoá không được ghim carrier thread. Map không bao giờ dọn — cùng lý lẽ
+     * ở {@code InventoryFacade}: số nhân vật hữu hạn, một khoá rỗng nặng vài chục byte.
+     *
+     * <p>Nhận/lĩnh quest KHÔNG đi qua khoá này: chúng không đọc-rồi-ghi tiến độ bằng script, và đã có
+     * trọng tài riêng trong DB ({@code insertIfAbsent}, {@code markClaimedIfCompleted}).
+     */
+    private List<QuestStatusChange> withEventLock(long characterId, Supplier<List<QuestStatusChange>> event) {
+        ReentrantLock lock = eventLocksByCharacterId.computeIfAbsent(characterId, id -> new ReentrantLock());
+        lock.lock();
+        try {
+            return event.get();
+        } finally {
+            lock.unlock();
+        }
     }
 
     /**
@@ -74,7 +110,8 @@ public final class QuestFacade {
      * <p>Trả cùng dạng {@link #onMonsterKilled}: chỉ những quest VỪA chuyển sang COMPLETED.
      */
     public List<QuestStatusChange> onNpcTalked(long characterId, String npcCode) {
-        return toStatusChanges(processQuestEventUseCase.npcTalked(characterId, npcCode));
+        return withEventLock(
+                characterId, () -> toStatusChanges(processQuestEventUseCase.npcTalked(characterId, npcCode)));
     }
 
     private static List<QuestStatusChange> toStatusChanges(List<ProcessQuestEventUseCase.QuestStatusChange> changes) {

@@ -62,4 +62,22 @@ class CharacterTest {
         assertThat(Character.isValidName("Kage Hero")).isFalse();
         assertThat(Character.isValidName(null)).isFalse();
     }
+
+    /**
+     * Thông điệp từ chối tên được gateway ghi ra log ở mỗi lượt tạo nhân vật sai — không được chép
+     * nguyên văn đầu vào của client (xem {@code AccountTest} cùng tên: khuếch đại log, dòng log giả).
+     */
+    @Test
+    void shouldKeepRejectionMessageBounded_andFreeOfClientControlCharacters() {
+        assertThatThrownBy(() -> Character.validateName("A".repeat(1_000_000)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .satisfies(e -> assertThat(e.getMessage()).hasSizeLessThan(200));
+        assertThatThrownBy(() -> Character.validateName("Ab\nINFO forged"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .satisfies(e -> assertThat(e.getMessage()).doesNotContain("\n").doesNotContain("forged"));
+        assertThatThrownBy(() -> Character.validateName("Kage\u202EHero"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .satisfies(
+                        e -> assertThat(e.getMessage()).doesNotContain("\u202E").contains("U+202E"));
+    }
 }

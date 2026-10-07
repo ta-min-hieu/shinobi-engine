@@ -46,4 +46,6 @@ dependencies {
 // được — chuyển tiếp đúng nhóm khoá này. Không đặt gì thì test dùng mặc định vừa ngân sách `check`.
 tasks.withType<Test>().configureEach {
     systemProperties(providers.systemPropertiesPrefixedBy("kage.econ.").get())
+    // Cùng lý do cho bộ fuzz máy trạng thái quest (QuestStateMachinePropertyIntegrationTest).
+    systemProperties(providers.systemPropertiesPrefixedBy("kage.questFuzz.").get())
 }

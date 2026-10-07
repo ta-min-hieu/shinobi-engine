@@ -1,7 +1,7 @@
 package dev.kage.server.world;
 
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.random.RandomGenerator;
 
 import dev.kage.server.world.component.CombatStatsComponent;
 
@@ -37,6 +37,16 @@ final class CombatConstants {
 
     /** Kết quả 1 đòn đánh/skill đã tính xong — {@code damage == 0} khi {@code miss}. */
     record AttackResult(boolean miss, boolean crit, int damage) {}
+
+    /**
+     * Damage thô của một skill do script tính sẵn, kèm xuyên giáp.
+     *
+     * @param scriptRawDamage damage thô bước 2 (SKILL_DMG × hệ số + bonus riêng skill).
+     * @param armorPiercePercent 0-1, % RES hiệu dụng của defender bị bỏ qua TRƯỚC mitigation (hệ
+     *     Lôi "xuyên giáp", GDD §4) — script trả về qua field {@code armor_pierce}, 0 nếu skill
+     *     không có cơ chế này (mọi hệ khác).
+     */
+    record SkillDamage(double scriptRawDamage, float armorPiercePercent) {}
 
     static final int CHARACTER_MAX_HP = 100; // placeholder — GDD chưa chốt công thức HP tối đa
 
@@ -155,16 +165,17 @@ final class CombatConstants {
     /**
      * Pipeline damage ĐÃ CHỐT (GAME-DESIGN-DOCUMENT.md §6): né → damage thô → bạo kích → giảm
      * giáp kiểu LMHT/Liên Quân (diminishing returns) → hệ số khắc chế nguyên tố (Phase 8, 4 hệ
-     * phái, {@link ElementCounterTable}). Random chỉ sinh ở server (ENGINE.md §10) —
-     * {@link ThreadLocalRandom}, KHÔNG bao giờ nhận giá trị né/bạo kích từ client.
+     * phái, {@link ElementCounterTable}). Random chỉ sinh ở server (ENGINE.md §10) — {@code random}
+     * do World tiêm vào ({@link ThreadLocalRandomSource} ở production, seed cố định ở test), KHÔNG
+     * bao giờ nhận giá trị né/bạo kích từ client.
      */
-    static AttackResult resolveAttack(CombatStats attacker, CombatStats defender) {
+    static AttackResult resolveAttack(CombatStats attacker, CombatStats defender, RandomGenerator random) {
         float hitChance = clamp(attacker.hitPercent() - defender.dodgePercent(), MIN_HIT_PERCENT, MAX_HIT_PERCENT);
-        if (ThreadLocalRandom.current().nextFloat() >= hitChance) {
+        if (random.nextFloat() >= hitChance) {
             return new AttackResult(true, false, 0);
         }
 
-        boolean crit = ThreadLocalRandom.current().nextFloat() < attacker.critPercent();
+        boolean crit = random.nextFloat() < attacker.critPercent();
         float rawDamage = attacker.atk() * (crit ? attacker.critDamageMultiplier() : 1f);
         rawDamage *= ElementCounterTable.multiplier(attacker.element(), defender.element());
 
@@ -180,26 +191,24 @@ final class CombatConstants {
      * là damage thô bước 2 (SKILL_DMG × hệ số + bonus riêng skill) đã tính SẴN bởi script
      * ({@link SkillSystem}, Điều 27); hàm này chỉ làm phần MIỆN (miss/crit/mitigation RES/khắc chế
      * nguyên tố), y hệt cơ chế {@link #resolveAttack} — Java lo cơ chế dùng chung cho mọi skill,
-     * không lặp lại ở từng script. Không xuyên giáp (hệ Lôi) — xem overload 4 tham số.
-     */
-    static AttackResult resolveSkillAttack(CombatStats attacker, CombatStats defender, double scriptRawDamage) {
-        return resolveSkillAttack(attacker, defender, scriptRawDamage, 0f);
-    }
-
-    /**
-     * @param armorPiercePercent 0-1, % RES hiệu dụng của defender bị bỏ qua TRƯỚC mitigation (hệ
-     *     Lôi "xuyên giáp", GDD §4) — script trả về qua field {@code armor_pierce}, 0 nếu skill
-     *     không có cơ chế này (mọi hệ khác).
+     * không lặp lại ở từng script. Không xuyên giáp (hệ Lôi) — xem overload nhận {@link SkillDamage}.
      */
     static AttackResult resolveSkillAttack(
-            CombatStats attacker, CombatStats defender, double scriptRawDamage, float armorPiercePercent) {
+            CombatStats attacker, CombatStats defender, double scriptRawDamage, RandomGenerator random) {
+        return resolveSkillAttack(attacker, defender, new SkillDamage(scriptRawDamage, 0f), random);
+    }
+
+    /** Như overload {@code double} nhưng có xuyên giáp — xem {@link SkillDamage#armorPiercePercent()}. */
+    static AttackResult resolveSkillAttack(
+            CombatStats attacker, CombatStats defender, SkillDamage skillDamage, RandomGenerator random) {
         float hitChance = clamp(attacker.hitPercent() - defender.dodgePercent(), MIN_HIT_PERCENT, MAX_HIT_PERCENT);
-        if (ThreadLocalRandom.current().nextFloat() >= hitChance) {
+        if (random.nextFloat() >= hitChance) {
             return new AttackResult(true, false, 0);
         }
 
-        boolean crit = ThreadLocalRandom.current().nextFloat() < attacker.critPercent();
-        float rawDamage = (float) scriptRawDamage * (crit ? attacker.critDamageMultiplier() : 1f);
+        boolean crit = random.nextFloat() < attacker.critPercent();
+        float armorPiercePercent = skillDamage.armorPiercePercent();
+        float rawDamage = (float) skillDamage.scriptRawDamage() * (crit ? attacker.critDamageMultiplier() : 1f);
         rawDamage *= ElementCounterTable.multiplier(attacker.element(), defender.element());
 
         float effectiveRes = Math.max(0f, defender.res() * (1f - clamp(armorPiercePercent, 0f, 1f)));

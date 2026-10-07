@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongFunction;
+import java.util.random.RandomGenerator;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,10 +91,20 @@ final class BossAiSystem extends IteratingKSystem {
      */
     private final Map<String, String> scriptByRef = new ConcurrentHashMap<>();
 
+    private final RandomGenerator random;
+
     private final List<BossActionOutcome> pendingResults = new ArrayList<>();
 
     /** @param entityLookup tra KEntity theo entity ID (nhân vật DƯƠNG hoặc quái ÂM — combat.proto). */
     BossAiSystem(LongFunction<KEntity> entityLookup) {
+        this(entityLookup, ThreadLocalRandomSource.INSTANCE);
+    }
+
+    /**
+     * Như constructor 1 tham số nhưng nguồn random trúng/né/bạo kích của chiêu boss do caller cấp —
+     * {@link WorldFacade} truyền nguồn của World (xem {@link ThreadLocalRandomSource}).
+     */
+    BossAiSystem(LongFunction<KEntity> entityLookup, RandomGenerator random) {
         super(Family.all(
                         BossAiComponent.class,
                         AiStateComponent.class,
@@ -103,6 +114,7 @@ final class BossAiSystem extends IteratingKSystem {
                         PositionComponent.class)
                 .get());
         this.entityLookup = entityLookup;
+        this.random = random;
         // ⚠️ KHÔNG còn validate script ở đây, và đó là hệ quả có ý thức của ADR-048: lúc dựng system
         // chưa biết boss nào sẽ spawn nên chưa có ref nào để nạp. Fail fast chuyển sang
         // `ScriptValidator` lúc khởi động server — cùng chỗ đã duyệt script quest và hội thoại
@@ -174,7 +186,7 @@ final class BossAiSystem extends IteratingKSystem {
         CombatConstants.CombatStats attackerStats = withModifiers(entity);
         CombatConstants.CombatStats defenderStats = withModifiers(targetEntity);
         CombatConstants.AttackResult result =
-                CombatConstants.resolveSkillAttack(attackerStats, defenderStats, decision.rawDamage());
+                CombatConstants.resolveSkillAttack(attackerStats, defenderStats, decision.rawDamage(), random);
         int damage = STATUS_EFFECT.has(targetEntity)
                 ? StatusEffects.absorbWithShield(STATUS_EFFECT.get(targetEntity), result.damage())
                 : result.damage();

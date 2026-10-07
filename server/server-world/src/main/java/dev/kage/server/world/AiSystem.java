@@ -3,9 +3,9 @@ package dev.kage.server.world;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.LongFunction;
 import java.util.function.Supplier;
+import java.util.random.RandomGenerator;
 
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.Family;
@@ -73,6 +73,7 @@ final class AiSystem extends IteratingKSystem {
 
     private final Supplier<Collection<KEntity>> characterEntities;
     private final LongFunction<KEntity> entityLookup;
+    private final RandomGenerator random;
 
     /** Quái vừa về tới điểm spawn và lành lại (ADR-046 D4) — {@code WorldFacade} drain mỗi tick. */
     private final List<HealthChange> pendingHealthChanges = new ArrayList<>();
@@ -84,6 +85,17 @@ final class AiSystem extends IteratingKSystem {
      *     trí/HP của mục tiêu đã chọn.
      */
     AiSystem(Supplier<Collection<KEntity>> characterEntities, LongFunction<KEntity> entityLookup) {
+        this(characterEntities, entityLookup, ThreadLocalRandomSource.INSTANCE);
+    }
+
+    /**
+     * Như constructor 2 tham số nhưng nguồn random chọn hướng tuần tra do caller cấp — {@link WorldFacade}
+     * truyền nguồn của World (xem {@link ThreadLocalRandomSource}).
+     */
+    AiSystem(
+            Supplier<Collection<KEntity>> characterEntities,
+            LongFunction<KEntity> entityLookup,
+            RandomGenerator random) {
         super(Family.all(
                         PositionComponent.class,
                         VelocityComponent.class,
@@ -93,6 +105,7 @@ final class AiSystem extends IteratingKSystem {
                 .get());
         this.characterEntities = characterEntities;
         this.entityLookup = entityLookup;
+        this.random = random;
     }
 
     /** Cùng khuôn {@code CombatSystem.drainResults} — kết quả tick lấy ra SAU {@code ecsWorld.update()}. */
@@ -288,7 +301,7 @@ final class AiSystem extends IteratingKSystem {
         // patrolRadiusMeters = 0 ⇒ điểm tuần tra TRÙNG điểm spawn ⇒ tickPatrol thấy "đã tới nơi"
         // ngay tick sau và về IDLE với vận tốc 0: con quái đứng nguyên tại chỗ, không cần trạng
         // thái mới hay nhánh riêng (ADR-039 D4 — cây cọc luyện công).
-        double angle = ThreadLocalRandom.current().nextDouble(0, Math.PI * 2);
+        double angle = random.nextDouble(0, Math.PI * 2);
         ai.patrolTargetX = ai.spawnX + (float) (Math.cos(angle) * params.patrolRadiusMeters());
         ai.patrolTargetY = ai.spawnY + (float) (Math.sin(angle) * params.patrolRadiusMeters());
         ai.state = AiState.PATROL;

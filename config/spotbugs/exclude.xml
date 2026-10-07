@@ -54,7 +54,7 @@
          với seed CỐ ĐỊNH CHỦ ĐÍCH — tái lập được khi cần điều tra lại 1 lần fail (xem comment tại
          chỗ khởi tạo). Đây là test tự tấn công server bằng byte rác, KHÔNG phải giá trị bảo mật
          thật (không phải token/khoá) — SecureRandom ở đây chỉ làm test không tái lập được, không
-         thêm gì. Cùng tinh thần các exclude PREDICTABLE_RANDOM khác trong file này (AiSystem,
+         thêm gì. Cùng tinh thần các exclude PREDICTABLE_RANDOM khác trong file này (ThreadLocalRandomSource,
          LootRoller, SimulatedPlayer — random KHÔNG bảo mật thì predictable là lựa chọn ĐÚNG). -->
     <Match>
         <Class name="dev.kage.server.gateway.SecurityIntegrationTest"/>
@@ -79,14 +79,6 @@
         <Bug pattern="DM_GC"/>
     </Match>
 
-    <!-- Random chọn hướng tuần tra quái vật (gameplay, KHÔNG bảo mật) — sinh ở server đúng quy tắc
-         (CLAUDE.md "Random ảnh hưởng gameplay: chỉ sinh ở server"), predictable PRNG là lựa chọn
-         ĐÚNG cho gameplay (SecureRandom lãng phí, không cần thiết cho hướng đi AI). -->
-    <Match>
-        <Class name="dev.kage.server.world.AiSystem"/>
-        <Bug pattern="PREDICTABLE_RANDOM"/>
-    </Match>
-
     <!-- Bài kiểm bảo toàn kinh tế dưới tải ngẫu nhiên dùng java.util.Random với seed CỐ ĐỊNH CHỦ
          ĐÍCH (in ra khi đỏ, đặt lại bằng -Dkage.econ.seed) để chuỗi thao tác mỗi luồng tái lập được.
          Chỉ chọn thao tác/tham số cho test, không phải giá trị bảo mật. -->
@@ -95,10 +87,19 @@
         <Bug pattern="PREDICTABLE_RANDOM"/>
     </Match>
 
-    <!-- Roll trúng đòn/chí mạng trong combat (gameplay, KHÔNG bảo mật) — sinh ở server đúng quy
-         tắc, predictable PRNG đúng cho gameplay damage roll, không cần SecureRandom. -->
+    <!-- Fuzz máy trạng thái quest (QuestStateMachinePropertyIntegrationTest) — cùng lý do ngay trên:
+         seed CỐ ĐỊNH CHỦ ĐÍCH (in ra khi đỏ, đặt lại bằng -Dkage.questFuzz.seed), chỉ chọn lệnh test. -->
     <Match>
-        <Class name="dev.kage.server.world.CombatConstants"/>
+        <Class name="dev.kage.server.database.quest.fuzz.QuestFuzzRun"/>
+        <Bug pattern="PREDICTABLE_RANDOM"/>
+    </Match>
+
+    <!-- Nguồn random gameplay của World (2026-10-06 gom về một chỗ): roll trúng đòn/chí mạng của
+         đòn thường/skill/chiêu boss và hướng tuần tra quái (trước nằm rải ở CombatConstants và
+         AiSystem) — gameplay, KHÔNG bảo mật, sinh ở server đúng quy tắc ("Random ảnh hưởng gameplay:
+         chỉ sinh ở server"); predictable PRNG là lựa chọn ĐÚNG, SecureRandom lãng phí. -->
+    <Match>
+        <Class name="dev.kage.server.world.ThreadLocalRandomSource"/>
         <Bug pattern="PREDICTABLE_RANDOM"/>
     </Match>
 
