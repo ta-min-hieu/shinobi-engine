@@ -56,6 +56,15 @@ Xác nhận qua build thật (`./gradlew :engine:engine-scripting:test`), không
 
 **Quyết định tạm thời**: không ép dùng artifact đang lỗi, cũng không âm thầm hạ toàn bộ ADR. `ScriptSandbox` hiện tự khai báo tay các giới hạn tương đương `SandboxPolicy.CONSTRAINED` (chặn host access, I/O, thread/process mới, biến môi trường, polyglot access — cộng `statementLimit` chặn vòng lặp vô hạn), đủ để chặn toàn bộ danh sách "Script KHÔNG được" của SCRIPTING.md §4. Thiếu so với `ISOLATED`/`UNTRUSTED` thật: **không có heap JVM riêng** (script và host dùng chung heap — script cấp phát bộ nhớ lớn vẫn ảnh hưởng host tới khi `statementLimit` chặn) và không có JIT/Spectre mitigation riêng theo isolate.
 
+## Kiểm chứng bằng script thù địch (2026-10-06)
+
+Bộ `ScriptSandboxAdversarialTest` (engine-scripting) đánh vào từng bảo đảm ở trên. Kết quả, không suy đoán:
+
+1. **"Tương đương CONSTRAINED" là SAI** ở hai điểm — chính GraalVM nói vậy: dựng context cũ với `.sandbox(SandboxPolicy.CONSTRAINED)` bị từ chối vì (a) `HostAccess.NONE` vẫn bật *mutable target mapping*, (b) `print`/`console.log` của script ghi thẳng ra `System.out` của server (một kênh I/O mà `IOAccess.NONE` không phủ). **Đã sửa**: `ScriptSandbox` nay khai `.sandbox(SandboxPolicy.CONSTRAINED)` THẬT (artifact hiện có, không cần isolate) — GraalVM tự validate cấu hình mỗi lần dựng context.
+2. **`statementLimit` KHÔNG chặn được treo luồng.** Regex backtracking `/^(a+)+\1b$/` chỉ tốn vài câu lệnh nhưng treo luồng gọi > 15 giây; đệ quy `try/catch` bắt `RangeError` rồi gọi lại treo > 10 phút (statementLimit lẫn `close(true)` đều không dừng được). SCRIPTING.md §7 #7 "Timeout mỗi lần gọi" là Accepted nhưng chưa từng được làm. **Đã sửa**: timeout theo đồng hồ thật mỗi lần `eval` (`close(true)` từ luồng canh, mặc định 500ms — chốt chặn, chưa phải ngân sách) + `sandbox.MaxStackFrames=128` (vượt là cạn tài nguyên, script không `catch` được).
+3. **Câu "ảnh hưởng host tới khi `statementLimit` chặn" ở đoạn trên là sai**: MỘT câu lệnh (`new Array(5e7).fill(1.5)`) đủ đòi hàng trăm MB heap chung. `sandbox.MaxHeapMemory` báo "not supported on the current Truffle runtime" khi không có isolate — lỗ này chỉ ISOLATED đóng được.
+4. Builtin không có safepoint (VD `2n ** 20000000n`, ~5 giây) không bị `close(true)` ngắt giữa chừng — cũng chỉ ISOLATED (CPU limit theo isolate) mới xử lý triệt để.
+
 ## Consequences
 
 **Tích cực:**
