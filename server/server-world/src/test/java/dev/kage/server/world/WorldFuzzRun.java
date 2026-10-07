@@ -24,10 +24,11 @@ import dev.kage.server.world.component.HealthComponent;
  * đúng API công khai mà {@code server-gateway} gọi ({@link WorldFacade}), World được tick TAY từng
  * tick ({@link WorldFacade#runOneTickOnCallerThread()}), mọi bất biến kiểm sau MỖI tick.
  *
- * <p>Lệnh do {@link SplittableRandom} seed cố định sinh ra nên chuỗi lệnh tái lập được. Kết quả
- * trận đấu thì KHÔNG hoàn toàn: trúng/né/bạo kích và hướng tuần tra của quái dùng
- * {@code ThreadLocalRandom} của chính server (Điều "random chỉ sinh ở server") — chạy lại cùng seed
- * cho cùng lệnh, có thể khác máu. Vết lệnh ({@link #trace()}) đủ để rút gọn tay thành ca xác định.
+ * <p>Lệnh do {@link SplittableRandom} seed cố định sinh ra, và World nhận một nhánh tách từ CÙNG seed
+ * làm nguồn random gameplay (trúng/né/bạo kích, hướng tuần tra — production dùng
+ * {@code ThreadLocalRandom} qua {@link ThreadLocalRandomSource}) ⇒ cùng seed cho cùng toàn bộ lượt
+ * chạy, đến từng sự kiện ({@link InvariantCheckingSink#eventDigest()}). Trước 2026-10-06 World dùng
+ * {@code ThreadLocalRandom} ngay trong test: seed 24304 đỏ ~7% số lần chạy vì không ai chết.
  *
  * <p>Đầu vào cố ý gồm cả rác mà gateway KHÔNG lọc trước: hướng {@code NaN}/vô cực/khổng lồ, mục tiêu
  * không tồn tại/chính mình/{@code Long.MIN_VALUE}, mã skill sai hệ/không tồn tại, lượng hồi máu âm và
@@ -79,7 +80,9 @@ final class WorldFuzzRun {
         this.seed = seed;
         this.scenario = scenario;
         this.random = new SplittableRandom(seed);
-        this.world = scenario.newWorld(sink);
+        // Nhánh random RIÊNG cho World (tách từ seed): kết quả trận đấu theo seed, nhưng không ăn
+        // vào chuỗi lệnh — thêm một lần gọi random trong server không làm lệch lệnh của bộ kiểm.
+        this.world = scenario.newWorld(sink, random.split());
         sink.bind(world);
         this.stateInvariants = new WorldStateInvariants(world, scenario, sink);
     }

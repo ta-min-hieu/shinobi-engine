@@ -36,14 +36,15 @@ class WorldSimulationPropertyTest {
     private static final int SEEDS = Integer.getInteger("kage.worldFuzz.seeds", 24);
     /** 7200 tick = 2 phút mô phỏng mỗi seed (24 seed ≈ 15s trên máy dev). */
     private static final int TICKS = Integer.getInteger("kage.worldFuzz.ticks", 7200);
+    /** Seed hầm ngục từng đỏ ngẫu nhiên (thiếu {@code characterDefeated}) khi World chưa nhận random seed. */
+    private static final long DETERMINISM_FLAKE_SEED = 24_304L;
 
     @Test
     @Timeout(120)
     void shouldHoldEveryWorldInvariant_underRandomisedPlayerCommands() {
-        WorldFuzzScenario[] scenarios = WorldFuzzScenario.values();
         for (int i = 0; i < SEEDS; i++) {
             long seed = BASE_SEED + i;
-            WorldFuzzScenario scenario = scenarios[(int) Math.floorMod(seed, (long) scenarios.length)];
+            WorldFuzzScenario scenario = scenarioOf(seed);
             WorldFuzzRun run = new WorldFuzzRun(seed, scenario);
             List<String> violations = run.run(TICKS);
             assertThat(violations).as(() -> run.failureReport(violations)).isEmpty();
@@ -60,5 +61,41 @@ class WorldSimulationPropertyTest {
                         .isPositive();
             }
         }
+    }
+
+    /**
+     * Cùng seed ⇒ cùng lượt chạy đến từng sự kiện. Trước 2026-10-06 World dùng {@code ThreadLocalRandom}
+     * ngay trong bộ kiểm: seed 24304 (hầm ngục) đỏ ~7% số lần chạy vì lượt đó không ai chết, chạy lại
+     * thì xanh — một seed "cố định" không tái hiện được thì thông báo "chạy lại đúng seed này" là vô
+     * dụng. Ca này giữ cho mọi nguồn bất định (đồng hồ, luồng, thứ tự băm theo identity, random không
+     * seed) không lọt lại vào mô phỏng hay bộ kiểm.
+     */
+    @Test
+    @Timeout(120)
+    void shouldReplayIdentically_whenTheSameSeedRunsTwice() {
+        long[] seeds = {DETERMINISM_FLAKE_SEED, BASE_SEED + 1, BASE_SEED + 2}; // hầm ngục, đấu trường, world chính
+        for (long seed : seeds) {
+            WorldFuzzScenario scenario = scenarioOf(seed);
+            WorldFuzzRun first = new WorldFuzzRun(seed, scenario);
+            WorldFuzzRun second = new WorldFuzzRun(seed, scenario);
+            List<String> firstViolations = first.run(TICKS);
+            List<String> secondViolations = second.run(TICKS);
+
+            assertThat(second.sink().eventTotal())
+                    .as("số sự kiện, seed " + seed + " " + scenario)
+                    .isEqualTo(first.sink().eventTotal())
+                    .isPositive();
+            assertThat(second.sink().eventDigest())
+                    .as("dấu vân tay luồng sự kiện, seed " + seed + " " + scenario)
+                    .isEqualTo(first.sink().eventDigest());
+            assertThat(second.coverage()).isEqualTo(first.coverage());
+            assertThat(second.trace()).isEqualTo(first.trace());
+            assertThat(secondViolations).isEqualTo(firstViolations);
+        }
+    }
+
+    private static WorldFuzzScenario scenarioOf(long seed) {
+        WorldFuzzScenario[] scenarios = WorldFuzzScenario.values();
+        return scenarios[(int) Math.floorMod(seed, (long) scenarios.length)];
     }
 }

@@ -30,6 +30,7 @@ import java.util.Set;
 final class InvariantCheckingSink implements WorldOutboundSink {
 
     private static final int MAX_EXAMPLES = 5;
+    private static final long DIGEST_MULTIPLIER = 1_000_003L;
 
     private final Map<Long, Set<Long>> seen = new HashMap<>();
     private final Map<Long, Set<Long>> despawned = new HashMap<>();
@@ -41,6 +42,8 @@ final class InvariantCheckingSink implements WorldOutboundSink {
     private WorldFacade world;
     private long tick;
     private long unseenReferences;
+    private long eventDigest = 1L;
+    private long eventTotal;
 
     void bind(WorldFacade boundWorld) {
         this.world = boundWorld;
@@ -88,6 +91,19 @@ final class InvariantCheckingSink implements WorldOutboundSink {
         return eventCounts;
     }
 
+    /**
+     * Dấu vân tay THEO THỨ TỰ của toàn bộ luồng sự kiện (tick, loại, người nhận, nội dung) — hai lượt
+     * chạy cùng seed phải ra cùng số này; khác ⇒ có nguồn bất định lọt vào mô phỏng hoặc bộ kiểm.
+     */
+    long eventDigest() {
+        return eventDigest;
+    }
+
+    /** Tổng số sự kiện đã nhận — đi kèm {@link #eventDigest()} cho thông báo đỏ dễ đọc. */
+    long eventTotal() {
+        return eventTotal;
+    }
+
     /** Sổ "đang thấy" dựng từ sự kiện của {@code observerId} — rỗng nếu chưa từng có phiên. */
     Set<Long> seenBy(long observerId) {
         return seen.getOrDefault(observerId, Set.of());
@@ -97,7 +113,7 @@ final class InvariantCheckingSink implements WorldOutboundSink {
 
     @Override
     public void onMoveAccepted(MoveAcceptedSnapshot accepted) {
-        count("moveAccepted");
+        count("moveAccepted", accepted);
         recipient(accepted.characterId(), "MoveAccepted");
         if (!Float.isFinite(accepted.x()) || !Float.isFinite(accepted.z())) {
             violation("MoveAccepted mang toạ độ không hữu hạn: " + accepted);
@@ -106,26 +122,26 @@ final class InvariantCheckingSink implements WorldOutboundSink {
 
     @Override
     public void onCharacterSpawned(long targetCharacterId, long spawnedCharacterId, float x, float y) {
-        count("characterSpawned");
+        count("characterSpawned", targetCharacterId + ">" + spawnedCharacterId + "@" + x + "," + y);
         spawn(targetCharacterId, spawnedCharacterId, "CharacterSpawned");
     }
 
     @Override
     public void onCharacterDespawned(long targetCharacterId, long despawnedCharacterId) {
-        count("characterDespawned");
+        count("characterDespawned", targetCharacterId + ">" + despawnedCharacterId);
         despawn(targetCharacterId, despawnedCharacterId, "CharacterDespawned");
     }
 
     @Override
     public void onCharacterMoved(long targetCharacterId, long movedCharacterId, float x, float y) {
-        count("characterMoved");
+        count("characterMoved", targetCharacterId + ">" + movedCharacterId + "@" + x + "," + y);
         recipient(targetCharacterId, "CharacterMoved");
         mustBeSeen(targetCharacterId, movedCharacterId, "CharacterMoved");
     }
 
     @Override
     public void onMonsterSpawned(long targetCharacterId, MonsterSnapshot monster) {
-        count("monsterSpawned");
+        count("monsterSpawned", targetCharacterId + ">" + monster);
         spawn(targetCharacterId, monster.monsterId(), "MonsterSpawned");
         if (monster.currentHp() <= 0 || monster.currentHp() > monster.maxHp()) {
             violation("MonsterSpawned với máu ngoài (0, max]: " + monster);
@@ -134,38 +150,38 @@ final class InvariantCheckingSink implements WorldOutboundSink {
 
     @Override
     public void onMonsterDespawned(long targetCharacterId, long monsterId) {
-        count("monsterDespawned");
+        count("monsterDespawned", targetCharacterId + ">" + monsterId);
         despawn(targetCharacterId, monsterId, "MonsterDespawned");
     }
 
     @Override
     public void onMonsterMoved(long targetCharacterId, long monsterId, float x, float y) {
-        count("monsterMoved");
+        count("monsterMoved", targetCharacterId + ">" + monsterId + "@" + x + "," + y);
         recipient(targetCharacterId, "MonsterMoved");
         mustBeSeen(targetCharacterId, monsterId, "MonsterMoved");
     }
 
     @Override
     public void onMonsterKilled(long killerCharacterId, String monsterCode, long expReward) {
-        count("monsterKilled");
+        count("monsterKilled", killerCharacterId + ">" + monsterCode + "+" + expReward);
         recipient(killerCharacterId, "MonsterKilled");
     }
 
     @Override
     public void onNpcSpawned(long targetCharacterId, NpcSnapshot npc) {
-        count("npcSpawned");
+        count("npcSpawned", targetCharacterId + ">" + npc);
         spawn(targetCharacterId, npc.npcId(), "NpcSpawned");
     }
 
     @Override
     public void onNpcDespawned(long targetCharacterId, long npcId) {
-        count("npcDespawned");
+        count("npcDespawned", targetCharacterId + ">" + npcId);
         despawn(targetCharacterId, npcId, "NpcDespawned");
     }
 
     @Override
     public void onAttackResult(long targetCharacterId, AttackOutcome outcome) {
-        count("attackResult");
+        count("attackResult", targetCharacterId + ">" + outcome);
         recipient(targetCharacterId, "AttackResult");
         softReference(targetCharacterId, outcome.attackerEntityId(), "AttackResult.attacker");
         reference(targetCharacterId, outcome.targetEntityId(), "AttackResult.target");
@@ -175,7 +191,7 @@ final class InvariantCheckingSink implements WorldOutboundSink {
 
     @Override
     public void onSkillResult(long targetCharacterId, SkillOutcome outcome) {
-        count("skillResult." + outcome.effectKind());
+        count("skillResult." + outcome.effectKind(), targetCharacterId + ">" + outcome);
         recipient(targetCharacterId, "SkillResult");
         softReference(targetCharacterId, outcome.attackerEntityId(), "SkillResult.attacker");
         reference(targetCharacterId, outcome.targetEntityId(), "SkillResult.target");
@@ -190,21 +206,21 @@ final class InvariantCheckingSink implements WorldOutboundSink {
 
     @Override
     public void onAreaChatMessage(long targetCharacterId, long senderCharacterId, String senderName, String body) {
-        count("areaChat");
+        count("areaChat", targetCharacterId + ">" + senderCharacterId + ":" + body);
         recipient(targetCharacterId, "AreaChat");
         reference(targetCharacterId, senderCharacterId, "AreaChat.sender");
     }
 
     @Override
     public void onCharacterAppearanceChanged(long targetCharacterId, long changedCharacterId) {
-        count("appearanceChanged");
+        count("appearanceChanged", targetCharacterId + ">" + changedCharacterId);
         recipient(targetCharacterId, "AppearanceChanged");
         reference(targetCharacterId, changedCharacterId, "AppearanceChanged");
     }
 
     @Override
     public void onHealthChanged(long targetCharacterId, HealthSnapshot health) {
-        count("healthChanged");
+        count("healthChanged", targetCharacterId + ">" + health);
         recipient(targetCharacterId, "HealthChanged");
         reference(targetCharacterId, health.entityId(), "HealthChanged");
         if (health.maxHp() < 1 || health.currentHp() < 0 || health.currentHp() > health.maxHp()) {
@@ -214,13 +230,13 @@ final class InvariantCheckingSink implements WorldOutboundSink {
 
     @Override
     public void onCharacterDefeated(long defeatedCharacterId, long killerEntityId) {
-        count("characterDefeated");
+        count("characterDefeated", defeatedCharacterId + "<" + killerEntityId);
         recipient(defeatedCharacterId, "CharacterDefeated");
     }
 
     @Override
     public void onCharacterRespawned(RespawnSnapshot respawn) {
-        count("characterRespawned");
+        count("characterRespawned", respawn);
         recipient(respawn.characterId(), "CharacterRespawned");
         respawnedThisTick.add(respawn.characterId());
         boolean full = respawn.currentHp() == respawn.maxHp() && respawn.currentChi() == respawn.maxChi();
@@ -231,8 +247,12 @@ final class InvariantCheckingSink implements WorldOutboundSink {
 
     // ---------------------------------------------------------------------------------------------
 
-    private void count(String eventName) {
+    /** Đếm sự kiện và gộp nó (kèm tick + nội dung) vào {@link #eventDigest()}. */
+    private void count(String eventName, Object detail) {
         eventCounts.merge(eventName, 1, Integer::sum);
+        String line = tick + " " + eventName + " " + detail;
+        eventDigest = eventDigest * DIGEST_MULTIPLIER + line.hashCode();
+        eventTotal++;
     }
 
     private void violation(String message) {

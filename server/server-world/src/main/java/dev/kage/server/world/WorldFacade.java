@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.random.RandomGenerator;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -323,21 +324,51 @@ public final class WorldFacade {
             boolean spawnOverworldContent,
             TickMetricsPort tickMetricsPort,
             WorldContentCatalog content) {
-        this.outboundSink = outboundSink;
-        this.monsterCatalog = content.monsters();
-        this.npcCatalog = content.npcs();
-        this.healingZoneCodes = healingZoneCodesOf(content.safeZones());
+        this(
+                new Wiring(outboundSink, spawnOverworldContent, tickMetricsPort, content),
+                ThreadLocalRandomSource.INSTANCE);
+    }
+
+    /**
+     * Như constructor public 4 tham số (không đo tick) nhưng nguồn random gameplay — trúng/né/bạo
+     * kích của đòn thường, skill, chiêu boss và hướng tuần tra quái — do caller cấp. CHỈ cho test
+     * cần cùng seed ⇒ cùng kết quả ({@code WorldSimulationPropertyTest}); production luôn đi qua
+     * constructor public, tức {@link ThreadLocalRandomSource} của luồng tick, đúng như trước 2026-10-06.
+     *
+     * <p>{@code random} chỉ được dùng trên luồng tick — một {@link java.util.SplittableRandom} không
+     * an toàn đa luồng, nên World đã {@link #start()} không được dùng chung nguồn với World khác.
+     */
+    WorldFacade(
+            WorldOutboundSink outboundSink,
+            boolean spawnOverworldContent,
+            WorldContentCatalog content,
+            RandomGenerator random) {
+        this(new Wiring(outboundSink, spawnOverworldContent, TickMetricsPort.NO_OP, content), random);
+    }
+
+    /** Gom 4 tham số constructor public — constructor chung nhận thêm nguồn random mà không vượt trần 4 tham số. */
+    private record Wiring(
+            WorldOutboundSink outboundSink,
+            boolean spawnOverworldContent,
+            TickMetricsPort tickMetricsPort,
+            WorldContentCatalog content) {}
+
+    private WorldFacade(Wiring wiring, RandomGenerator random) {
+        this.outboundSink = wiring.outboundSink();
+        this.monsterCatalog = wiring.content().monsters();
+        this.npcCatalog = wiring.content().npcs();
+        this.healingZoneCodes = healingZoneCodesOf(wiring.content().safeZones());
         this.monsterRespawnCountdownSeconds =
                 newAliveCountdowns(monsterCatalog.spawnPoints().size());
-        this.spawnOverworldContent = spawnOverworldContent;
-        this.tickMetricsPort = tickMetricsPort;
+        this.spawnOverworldContent = wiring.spawnOverworldContent();
+        this.tickMetricsPort = wiring.tickMetricsPort();
         this.systemTimingListener = tickMetricsPort::recordSystemDuration;
         this.aoiTracker = new AreaOfInterestTracker(outboundSink);
-        this.combatSystem = new CombatSystem(this::lookupEntity, this::isPvpAllowed);
+        this.combatSystem = new CombatSystem(this::lookupEntity, this::isPvpAllowed, random);
         this.healthRegenSystem = new HealthRegenSystem();
-        this.aiSystem = new AiSystem(entitiesByCharacterId::values, this::lookupEntity);
-        this.skillSystem = new SkillSystem(this::lookupEntity, this::isPvpAllowed);
-        this.bossAiSystem = new BossAiSystem(this::lookupEntity);
+        this.aiSystem = new AiSystem(entitiesByCharacterId::values, this::lookupEntity, random);
+        this.skillSystem = new SkillSystem(this::lookupEntity, this::isPvpAllowed, random);
+        this.bossAiSystem = new BossAiSystem(this::lookupEntity, random);
         // Thứ tự ĐÚNG ECS.md §6 (InputCommandSystem -> AISystem -> MovementSystem -> ... ->
         // CombatSystem): AI set vận tốc/mục tiêu trước, Movement tích luỹ vị trí, Combat mới xét
         // tầm đánh — đổi thứ tự = đổi behavior (engine/CLAUDE.md). SkillSystem/BossAiSystem chỉ
@@ -359,7 +390,7 @@ public final class WorldFacade {
         // Obstacle mặc định RỖNG — chưa có map/asset thật (ADR-021). No-op an toàn cho tới khi có
         // nguồn map thật gọi setObstacles(...); giữ đúng thứ tự PHYSICS.md §4 (sau MovementSystem).
         ecsWorld.addSystem(new TerrainCollisionSystem());
-        ecsWorld.addSystem(newSafeZoneSystem(content.safeZones()));
+        ecsWorld.addSystem(newSafeZoneSystem(wiring.content().safeZones()));
         ecsWorld.addSystem(combatSystem);
         ecsWorld.addSystem(skillSystem);
         ecsWorld.addSystem(bossAiSystem);

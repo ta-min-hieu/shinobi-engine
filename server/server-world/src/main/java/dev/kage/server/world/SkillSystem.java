@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.LongFunction;
+import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -87,6 +88,7 @@ final class SkillSystem extends IteratingKSystem {
 
     private final LongFunction<KEntity> entityLookup;
     private final BooleanSupplier pvpAllowed;
+    private final RandomGenerator random;
     private final ScriptSandbox scriptSandbox = new ScriptSandbox(SkillConstants.SCRIPT_MAX_STATEMENTS);
     private final Map<String, String> scriptsByCode;
     private final List<SkillOutcome> pendingResults = new ArrayList<>();
@@ -96,7 +98,15 @@ final class SkillSystem extends IteratingKSystem {
      * @param pvpAllowed skill ENEMY có được nhắm người chơi khác không — xem {@code WorldFacade#pvpAllowed}.
      */
     SkillSystem(LongFunction<KEntity> entityLookup, BooleanSupplier pvpAllowed) {
-        this(entityLookup, pvpAllowed, def -> loadScript(def.scriptResource()));
+        this(entityLookup, pvpAllowed, ThreadLocalRandomSource.INSTANCE);
+    }
+
+    /**
+     * Như constructor 2 tham số nhưng nguồn random trúng/né/bạo kích do caller cấp — {@link WorldFacade}
+     * truyền nguồn của World (seed cố định ở test thuộc tính, xem {@link ThreadLocalRandomSource}).
+     */
+    SkillSystem(LongFunction<KEntity> entityLookup, BooleanSupplier pvpAllowed, RandomGenerator random) {
+        this(entityLookup, pvpAllowed, def -> loadScript(def.scriptResource()), random);
     }
 
     /**
@@ -107,9 +117,18 @@ final class SkillSystem extends IteratingKSystem {
             LongFunction<KEntity> entityLookup,
             BooleanSupplier pvpAllowed,
             Function<SkillDefinition, String> scriptSource) {
+        this(entityLookup, pvpAllowed, scriptSource, ThreadLocalRandomSource.INSTANCE);
+    }
+
+    private SkillSystem(
+            LongFunction<KEntity> entityLookup,
+            BooleanSupplier pvpAllowed,
+            Function<SkillDefinition, String> scriptSource,
+            RandomGenerator random) {
         super(Family.all(SkillCooldownComponent.class).get());
         this.entityLookup = entityLookup;
         this.pvpAllowed = pvpAllowed;
+        this.random = random;
         this.scriptsByCode =
                 SkillRegistry.BY_CODE.values().stream().collect(Collectors.toMap(SkillDefinition::code, scriptSource));
         // SCRIPTING.md §8: validate MỌI script lúc khởi động, fail fast (ném thẳng nếu lỗi — server
@@ -275,7 +294,10 @@ final class SkillSystem extends IteratingKSystem {
         CombatConstants.CombatStats targetStats =
                 StatusEffects.applyModifiers(CombatConstants.toStats(COMBAT_STATS.get(ctx.target())), targetStatus);
         CombatConstants.AttackResult result = CombatConstants.resolveSkillAttack(
-                casterStats, targetStats, scriptEffect.value(), (float) scriptEffect.armorPierce());
+                casterStats,
+                targetStats,
+                new CombatConstants.SkillDamage(scriptEffect.value(), (float) scriptEffect.armorPierce()),
+                random);
         HealthComponent targetHealth = HEALTH.get(ctx.target());
         int damageAfterShield = StatusEffects.absorbWithShield(targetStatus, result.damage());
         targetHealth.current = Math.max(0, targetHealth.current - damageAfterShield);
