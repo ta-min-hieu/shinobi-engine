@@ -61,6 +61,12 @@ public final class ProcessQuestEventUseCase {
      * ghi ({@link QuestProgressPort#saveIfUnchanged} trả {@code false}). Xung đột cần hai sự kiện của
      * CÙNG một người rơi vào CÙNG một quest trong vài mili-giây; ba lần liền là dấu hiệu có gì đó
      * sai chứ không phải tải cao — khi đó bỏ sự kiện (không ghi, không lấy đồ) và ghi log.
+     *
+     * <p>⚠️ Câu "ba lần liền là có gì sai" CHỈ đúng khi sự kiện của một nhân vật không chen nhau
+     * trong cùng tiến trình: N lời gọi cùng xuất phát thì kẻ về chót thua tới N−1 lần dù mọi thứ
+     * đều đúng (đo 2026-10-06: 8 cú hạ cùng lúc chỉ đếm được 3). Điều kiện đó do
+     * {@code QuestFacade.withEventLock} bảo đảm — gọi thẳng lớp này từ nhiều luồng cho cùng một
+     * nhân vật là mất sự kiện.
      */
     private static final int MAX_WRITE_ATTEMPTS = 3;
 
