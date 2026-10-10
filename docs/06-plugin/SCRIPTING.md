@@ -100,6 +100,8 @@ Script là nơi **nguy hiểm nhất** của hệ thống: nếu script thoát s
    → chống vòng lặp vô hạn
 3. Giới hạn bộ nhớ qua ResourceLimits
 4. Timeout mỗi lần gọi script (Context.close(true) khi vượt)
+   → ✅ làm 2026-10-06 (`ScriptSandbox.DEFAULT_TIMEOUT` 500ms, kèm `sandbox.MaxStackFrames`);
+     mục 3 (bộ nhớ) CHƯA có ở mức CONSTRAINED — xem ADR-016 "Kiểm chứng bằng script thù địch"
 5. API host: WHITELIST tường minh qua Value/ProxyObject, không expose object Java thô
 ```
 
