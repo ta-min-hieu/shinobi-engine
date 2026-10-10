@@ -55,7 +55,61 @@ class ExperienceCurveTest {
         assertThat(progress.expForNextLevel()).isZero();
     }
 
-    /** EXP âm không tồn tại (cột DB có ràng buộc), nhưng vào tay dữ liệu hỏng thì phải là cấp 1. */
+    /** Biên ±1 quanh mốc đầu tiên: 99 chưa lên, 100 vừa lên, 101 lên và dư 1. */
+    @Test
+    void shouldCrossThresholdExactlyAtTheBoundary() {
+        assertThat(ExperienceCurve.progressOf(99L).level()).isEqualTo(1);
+        assertThat(ExperienceCurve.progressOf(100L).level()).isEqualTo(2);
+        assertThat(ExperienceCurve.progressOf(101L).level()).isEqualTo(2);
+        assertThat(ExperienceCurve.progressOf(101L).expIntoLevel()).isEqualTo(1L);
+    }
+
+    /** Biên ±1 quanh TRẦN: tổng EXP của cấp 100 là 100 × (1 + 2 + … + 99) = 495.000. */
+    @Test
+    void shouldReachMaxLevelExactlyAtItsThreshold_andNeverPassIt() {
+        long expForMaxLevel = totalExpToReach(ExperienceCurve.MAX_LEVEL);
+
+        assertThat(expForMaxLevel).isEqualTo(495_000L);
+        assertThat(ExperienceCurve.progressOf(expForMaxLevel - 1L).level()).isEqualTo(ExperienceCurve.MAX_LEVEL - 1);
+        assertThat(ExperienceCurve.progressOf(expForMaxLevel).level()).isEqualTo(ExperienceCurve.MAX_LEVEL);
+        assertThat(ExperienceCurve.progressOf(expForMaxLevel + 1L).level()).isEqualTo(ExperienceCurve.MAX_LEVEL);
+    }
+
+    /** Tổng EXP lớn nhất mà cột BIGINT chứa được: không tràn, không âm, không vượt trần. */
+    @Test
+    void shouldNotOverflow_atTheLargestStorableTotal() {
+        ExperienceProgress progress = ExperienceCurve.progressOf(Long.MAX_VALUE);
+
+        assertThat(progress.level()).isEqualTo(ExperienceCurve.MAX_LEVEL);
+        assertThat(progress.totalExp()).isEqualTo(Long.MAX_VALUE);
+        assertThat(progress.expIntoLevel()).isEqualTo(Long.MAX_VALUE - totalExpToReach(ExperienceCurve.MAX_LEVEL));
+        assertThat(progress.expForNextLevel()).isZero();
+    }
+
+    /** Mỗi mốc cấp 2..100: đúng tổng thì vừa lên, thiếu 1 thì chưa — không lệch một ở bất kỳ cấp nào. */
+    @Test
+    void shouldAgreeWithTheCumulativeTable_atEveryLevelBoundary() {
+        for (int level = 2; level <= ExperienceCurve.MAX_LEVEL; level++) {
+            long threshold = totalExpToReach(level);
+
+            assertThat(ExperienceCurve.progressOf(threshold).level()).isEqualTo(level);
+            assertThat(ExperienceCurve.progressOf(threshold).expIntoLevel()).isZero();
+            assertThat(ExperienceCurve.progressOf(threshold - 1L).level()).isEqualTo(level - 1);
+        }
+    }
+
+    private static long totalExpToReach(int level) {
+        long total = 0L;
+        for (int current = 1; current < level; current++) {
+            total += ExperienceCurve.expForNextLevel(current);
+        }
+        return total;
+    }
+
+    /**
+     * EXP âm không được phép tồn tại, nhưng vào tay dữ liệu hỏng thì phải là cấp 1. (Cột
+     * {@code character.exp} KHÔNG có CHECK — thứ chặn là {@code Character} và {@code give_exp}.)
+     */
     @Test
     void shouldTreatNegativeExperienceAsZero() {
         assertThat(ExperienceCurve.progressOf(-5L).level()).isEqualTo(1);

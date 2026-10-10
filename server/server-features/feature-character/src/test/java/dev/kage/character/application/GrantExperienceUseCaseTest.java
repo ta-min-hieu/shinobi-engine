@@ -126,12 +126,56 @@ class GrantExperienceUseCaseTest {
         assertThat(port.savedLevel).isEqualTo(3);
     }
 
+    /**
+     * Hai quái chết sát nhau: mỗi lượt cộng EXP chạy trên một Virtual Thread và CẢ HAI đọc nhân vật
+     * trước khi lượt nào kịp cộng. Lượt B đưa 90 → 110 (vượt mốc lên cấp 2); lượt A sau đó đưa
+     * 110 → 130, không vượt mốc nào. Lên cấp phải được báo ĐÚNG MỘT LẦN — bản cũ so với lần đọc đã cũ
+     * (90) nên A báo lại chính lần lên cấp đó lần thứ hai.
+     */
+    @Test
+    void shouldAnnounceLevelUpOnce_whenTwoConcurrentGrantsBothReadBeforeEitherAdds() {
+        FakeCharacterPort port = new FakeCharacterPort(1, 90L);
+        GrantExperienceUseCase useCase = new GrantExperienceUseCase(port);
+        GrantExperienceUseCase.Result[] interleaved = new GrantExperienceUseCase.Result[1];
+        port.afterFirstFind = () -> interleaved[0] = useCase.execute(CHARACTER_ID, 20L);
+
+        GrantExperienceUseCase.Result outer = useCase.execute(CHARACTER_ID, 20L);
+
+        assertThat(port.exp).isEqualTo(130L);
+        assertThat(port.savedLevel).isEqualTo(2);
+        assertThat(interleaved[0].leveledUp()).isTrue();
+        assertThat(outer.leveledUp()).as("110 -> 130 không vượt mốc nào").isFalse();
+    }
+
+    /**
+     * Thưởng quest (+500, 110 → 610, cấp 2 → 4) đã commit qua đường tắt của quest, và một lượt cộng
+     * EXP hạ quái chen vào TRƯỚC lượt đồng bộ mà gateway gọi ngay sau đó. Lượt hạ quái hoà giải cột
+     * {@code level}, nên lượt đồng bộ không còn thấy gì để báo. Phải có MỘT bên báo cho client: bản
+     * cũ để cả hai trả {@code leveledUp=false}, cú lên cấp 2 → 4 không bao giờ hiện.
+     */
+    @Test
+    void shouldAnnounceLevelUp_whenAKillGrantHealsTheLevelBeforeTheQuestSyncRuns() {
+        FakeCharacterPort port = new FakeCharacterPort(2, 610L);
+        GrantExperienceUseCase useCase = new GrantExperienceUseCase(port);
+
+        GrantExperienceUseCase.Result kill = useCase.execute(CHARACTER_ID, 20L);
+        GrantExperienceUseCase.Result questSync = useCase.syncAfterExternalGrant(CHARACTER_ID);
+
+        assertThat(port.savedLevel).isEqualTo(4);
+        assertThat(kill.leveledUp() ^ questSync.leveledUp())
+                .as("cấp 2 -> 4 phải được báo đúng một lần (kill=%s, sync=%s)", kill.leveledUp(), questSync.leveledUp())
+                .isTrue();
+    }
+
     /** Chỉ hiện thực những phương thức use case này thật sự gọi. */
     private static final class FakeCharacterPort implements CharacterPort {
 
         private final int storedLevel;
         private long exp;
         private Integer savedLevel;
+        // Chạy ĐÚNG MỘT LẦN ngay sau lần findById đầu tiên — chen một lượt cộng EXP khác vào giữa
+        // "đọc" và "cộng" của lượt đang chạy.
+        private Runnable afterFirstFind = () -> {};
         // Chạy ĐÚNG MỘT LẦN ngay trước lần saveLevel đầu tiên — chen một lượt cộng EXP khác vào
         // giữa "cộng" và "ghi cấp" của lượt đang chạy, tái hiện tất định hai Virtual Thread về đích
         // ngược thứ tự.
@@ -144,9 +188,17 @@ class GrantExperienceUseCaseTest {
 
         @Override
         public Optional<Character> findById(long characterId) {
-            int level = savedLevel == null ? storedLevel : savedLevel;
-            return Optional.of(
-                    new Character(characterId, 1L, 1, "Kagemaru", Faction.HOA, level, exp, 0, Instant.EPOCH));
+            // Bản chụp (record bất biến) lấy TRƯỚC khi hook chạy — như một lần đọc dòng thật.
+            Optional<Character> snapshot = Optional.of(
+                    new Character(characterId, 1L, 1, "Kagemaru", Faction.HOA, currentLevel(), exp, 0, Instant.EPOCH));
+            Runnable hook = afterFirstFind;
+            afterFirstFind = () -> {};
+            hook.run();
+            return snapshot;
+        }
+
+        private int currentLevel() {
+            return savedLevel == null ? storedLevel : savedLevel;
         }
 
         @Override
@@ -160,7 +212,8 @@ class GrantExperienceUseCaseTest {
             Runnable hook = beforeFirstSave;
             beforeFirstSave = () -> {};
             hook.run();
-            if (exp != derivedFromExp) {
+            // Cùng hợp đồng với PostgresCharacterAdapter: exp chưa đổi VÀ cấp thật sự khác.
+            if (exp != derivedFromExp || currentLevel() == level) {
                 return false;
             }
             savedLevel = level;
