@@ -271,6 +271,8 @@ Vượt ngưỡng → drop packet + log. Vượt liên tục → ngắt kết n�
 
 Đếm bằng Redis (`ratelimit:{characterId}:{opcode}`) hoặc in-memory nếu single instance.
 
+**Thực tế đang chạy (2026-10-10)**: in-memory, single instance. Trần di chuyển/chiến đấu/lệnh chạm DB đếm theo **kết nối** (bảo vệ tài nguyên server trước một kết nối). Trần chat đếm theo **tài khoản** và sống qua các lần ngắt/nối lại (`ChatRateLimits`) — nó bảo vệ người chơi khác trước một người, đếm theo kết nối thì nối lại là có sổ trắng.
+
 ---
 
 ## 14. Authentication Handshake

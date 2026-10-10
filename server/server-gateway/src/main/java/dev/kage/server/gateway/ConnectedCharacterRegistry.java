@@ -87,6 +87,8 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     // Ai có quyền giữ/dọn phiên của mỗi nhân vật (quyết định chủ dự án 2026-09-25) — ở đây vì
     // registry này vốn là thứ DUY NHẤT mọi kết nối cùng thấy, không phải thêm tham số cho handler.
     private final CharacterSessionRegistry sessions = new CharacterSessionRegistry();
+    // Trần chat theo tài khoản — ở đây cùng lý do với sessions: phải sống LÂU HƠN một kết nối.
+    private final ChatRateLimits chatRateLimits = new ChatRateLimits();
 
     ConnectedCharacterRegistry(
             InventoryFacade inventoryFacade,
@@ -160,6 +162,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** Sổ chủ phiên của mọi nhân vật — xem {@link CharacterSessionRegistry}. */
     CharacterSessionRegistry sessions() {
         return sessions;
+    }
+
+    /** Trần tần suất chat của mọi tài khoản — xem {@link ChatRateLimits}. */
+    ChatRateLimits chatRateLimits() {
+        return chatRateLimits;
     }
 
     /**
