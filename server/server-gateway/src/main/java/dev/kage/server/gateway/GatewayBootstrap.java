@@ -264,6 +264,9 @@ public final class GatewayBootstrap {
                 positionPersister,
                 dungeonInstanceRegistry,
                 arenaInstanceRegistry);
+        // Lên cấp giữa phiên phải tới luật trong world (cổng Tuyệt Kỹ) — nối ở đây vì đây là chỗ đầu
+        // tiên mọi bảng định tuyến World cùng tồn tại.
+        characterRegistry.syncLevelUpsThrough(CharacterLevelSync.of(worldGateway));
         return new InstanceRegistries(dungeonInstanceRegistry, arenaInstanceRegistry, worldGateway);
     }
 

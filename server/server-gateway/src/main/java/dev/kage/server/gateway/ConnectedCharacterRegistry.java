@@ -81,6 +81,8 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     private final CharacterSessionRegistry sessions = new CharacterSessionRegistry();
     // Trần chat theo tài khoản — ở đây cùng lý do với sessions: phải sống LÂU HƠN một kết nối.
     private final ChatRateLimits chatRateLimits = new ChatRateLimits();
+    // Cú lên cấp phải tới cả World nhân vật đang đứng — nối sau, khi các World đã dựng (GatewayBootstrap).
+    private volatile CharacterLevelSync levelSync = CharacterLevelSync.unbound();
 
     ConnectedCharacterRegistry(
             InventoryFacade inventoryFacade,
@@ -152,6 +154,14 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         appearanceByCharacterId.remove(characterId);
         lastSentExperience.remove(characterId);
         return true;
+    }
+
+    /**
+     * Nối đường báo cấp mới vào World — setter vì các World được dựng SAU registry này (nó là
+     * {@code WorldOutboundSink} của chúng) và constructor đã chạm trần 4 tham số.
+     */
+    void syncLevelUpsThrough(CharacterLevelSync sync) {
+        this.levelSync = sync;
     }
 
     /** Sổ chủ phiên của mọi nhân vật — xem {@link CharacterSessionRegistry}. */
@@ -573,8 +583,12 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
      * nó mang {@code leveledUp}, khi đó vẫn báo lên cấp nhưng kèm con số MỚI NHẤT. So-rồi-gửi nằm
      * trong {@code compute} để hai luồng không chen được vào giữa; {@code writeAndFlush} từ ngoài
      * EventLoop chỉ xếp hàng, không chặn.
+     *
+     * <p>Cú lên cấp còn được báo cho World nhân vật đang đứng ({@link CharacterLevelSync}) — TRƯỚC khi
+     * xét kết nối: luật trong world không phụ thuộc việc gói hiển thị có gửi được hay không.
      */
     void sendExperience(long characterId, GrantExperienceUseCase.Result result) {
+        levelSync.onExperienceGranted(characterId, result);
         ChannelHandlerContext ctx = contextsByCharacterId.get(characterId);
         if (ctx == null) {
             return;

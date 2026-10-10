@@ -57,6 +57,13 @@
         <Bug pattern="UNENCRYPTED_SOCKET"/>
     </Match>
 
+    <!-- Cùng lý do: client test của LevelUpMidSessionDatabaseTest nối tới GatewayServer dựng với
+         TlsConfig.disabled() trên loopback. -->
+    <Match>
+        <Class name="dev.kage.server.gateway.LevelUpMidSessionDatabaseTest$Player"/>
+        <Bug pattern="UNENCRYPTED_SOCKET"/>
+    </Match>
+
     <!-- Fuzz test (shouldNotCrashOrHang_whenReceivingMalformedOrRandomFrames) dùng java.util.Random
          với seed CỐ ĐỊNH CHỦ ĐÍCH — tái lập được khi cần điều tra lại 1 lần fail (xem comment tại
          chỗ khởi tạo). Đây là test tự tấn công server bằng byte rác, KHÔNG phải giá trị bảo mật
