@@ -318,3 +318,27 @@ dựng một cái chạm `SkillRegistry` và có thể chạm protocol ⇒ **c�
 ⚠️ Bộ TRAO đúng bằng bộ được TÍNH: **sáu** món, ô `ACCESSORY_2` để trống — đúng lũt đồ mà mọi lớp
 cân bằng của dự án giả định. Cộng cả bảy món trong `item_template` là cộng **catalog cửa hàng**, không
 phải một lũt đồ ai đang mặc; nhầm hai thứ đó suýt làm tôi sửa hỏng ba test đang đúng (ROADMAP mục 77).
+
+
+## Biên đầu vào của `ctx.*` — tham số ngoài miền là LỖI SCRIPT (2026-10-10)
+
+Callback đọc tham số JS bằng `asString()`/`asInt()`/`asLong()`. Sai KIỂU (chuỗi thay số, `1.5`, `NaN`,
+vượt `int`/`long`, thiếu tham số) thì GraalVM tự ném và thành `scriptFailed` — phần đó vốn đã an
+toàn. Thứ từng lọt là giá trị ĐÚNG KIỂU nhưng ngoài miền, và `asString()` trả `null` cho
+`null`/`undefined` thay vì ném:
+
+| Lời gọi | Hậu quả TRƯỚC bản vá (đo trên Postgres thật) | Chặn ở |
+|---|---|---|
+| `give_item(code, âm)`, túi có sẵn chồng đó | dòng `inventory_item` `quantity = -2` ⇒ túi đồ không đọc lên được nữa; lượt lĩnh vẫn OK + CLAIMED | `ItemGrant` + adapter |
+| `give_item(code, âm hoặc 0)`, không có chồng | không ghi dòng nào, quest vẫn CLAIMED ⇒ mất thưởng im lặng | `ItemGrant` |
+| `give_item`/`take_item` với mã `null`/rỗng/chứa U+0000 | "túi đầy" / "chưa mang đủ đồ" MÃI MÃI, đổ lỗi cho người chơi | `requireItemCode` |
+| `save_progress(null/undefined)` | bị bỏ qua im lặng | `requireProgressJson` |
+
+`give_item` KHÔNG có trần trên ở tầng script, có chủ đích: trần thật là sức chứa túi.
+`Integer.MAX_VALUE` đi qua, `PostgresQuestInventoryGrantAdapter.hasRoomFor` (nay tính bằng `long`;
+trước đó tràn `int` thành "đủ chỗ") từ chối, lượt lĩnh rollback thành `INVENTORY_FULL`.
+
+Gác bởi `QuestScriptRunnerBoundaryTest` (fixture `test_fixture_boundary.js`, chọn nhánh qua
+`progress_json`) và `server-database/.../quest/QuestRewardItemBoundsIntegrationTest`.
+
+⚠️ Thêm hàm `ctx.*` mới thì thêm nhánh biên vào fixture đó TRƯỚC khi nối nó xuống một adapter.

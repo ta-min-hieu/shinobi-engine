@@ -77,17 +77,22 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
         for (ItemGrantRequest grant : grants) {
             quantitiesByCode
                     .computeIfAbsent(grant.itemTemplateCode(), code -> new ArrayList<>())
-                    .add(grant.quantity());
+                    .add(requirePositiveQuantity(grant.quantity()));
         }
-        int newSlotsNeeded = 0;
+        int freeSlots = DEFAULT_CAPACITY - used;
+        // long: tổng số ô của nhiều lần trao lớn không được quay vòng về số âm rồi thành "đủ chỗ".
+        long newSlotsNeeded = 0L;
         for (Map.Entry<String, List<Integer>> entry : quantitiesByCode.entrySet()) {
             Optional<Long> itemTemplateId = JdbcOperations.queryOne(
                     connection, FIND_ITEM_TEMPLATE_ID_BY_CODE, rs -> rs.getLong("id"), entry.getKey());
             if (itemTemplateId.isPresent()) {
                 newSlotsNeeded += newSlotsForSequence(connection, characterId, itemTemplateId.get(), entry.getValue());
             }
+            if (newSlotsNeeded > freeSlots) {
+                return false;
+            }
         }
-        return newSlotsNeeded <= DEFAULT_CAPACITY - used;
+        return true;
     }
 
     /**
@@ -95,8 +100,17 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
      * {@link InventoryStackMerge#mergeIntoExistingStack} (chồng id nhỏ nhất nhận TRỌN lần trao) rồi
      * {@link InventoryStackMerge#insertRespectingMaxStack} (tách theo {@code max_stack}; dòng mới
      * cũng thành chồng nhận được lần sau).
+     *
+     * <p>Tính bằng {@code long} và DỪNG ngay khi đã vượt sức chứa túi (sửa 2026-10-10). Bản trước
+     * tính {@code (quantity + maxStack - 1) / maxStack} bằng {@code int}: {@code Integer.MAX_VALUE}
+     * phi đao tràn thành số ô ÂM và guard trả lời "đủ chỗ" (đo trên Postgres thật); với vật không xếp
+     * chồng thì vòng lặp dưới chạy đủ hai tỉ lượt trong lúc đang giữ khoá túi đồ. Cùng lỗi tràn mà
+     * {@code InventoryStackMerge.rowsNeeded} đã sửa 2026-10-03 — phép diễn lại ở đây bị bỏ sót.
+     *
+     * @return số ô mới; khi lớn hơn {@code DEFAULT_CAPACITY} thì chỉ là "chắc chắn không vừa", không
+     *     phải con số chính xác
      */
-    private static int newSlotsForSequence(
+    private static long newSlotsForSequence(
             Connection connection, long characterId, long itemTemplateId, List<Integer> quantities) {
         int maxStack = Math.max(
                 1,
@@ -104,28 +118,33 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
                         .orElse(1));
         List<Integer> stacks = new ArrayList<>(JdbcOperations.query(
                 connection, LIST_MERGEABLE_STACK_QUANTITIES, rs -> rs.getInt(1), characterId, itemTemplateId));
-        int newSlots = 0;
+        long newSlots = 0L;
         for (int quantity : quantities) {
             if (maxStack > 1 && mergeIntoFirstFittingStack(stacks, quantity, maxStack)) {
                 continue;
             }
+            long rows = ((long) quantity + maxStack - 1) / maxStack;
+            newSlots += rows;
+            if (newSlots > DEFAULT_CAPACITY) {
+                return newSlots; // không túi nào chứa nổi — khỏi diễn lại từng dòng
+            }
             int remaining = quantity;
-            int rows = (quantity + maxStack - 1) / maxStack;
-            for (int row = 0; row < rows; row++) {
+            for (long row = 0; row < rows; row++) {
                 int rowQuantity = Math.min(maxStack, remaining);
                 if (maxStack > 1) {
                     stacks.add(rowQuantity);
                 }
                 remaining -= rowQuantity;
             }
-            newSlots += rows;
         }
         return newSlots;
     }
 
+    // `stack <= maxStack - quantity` chứ không `stack + quantity <= maxStack`: vế cộng tràn int với
+    // quantity sát Integer.MAX_VALUE và thành "gộp được". Cùng dạng với câu SQL của InventoryStackMerge.
     private static boolean mergeIntoFirstFittingStack(List<Integer> stacks, int quantity, int maxStack) {
         for (int i = 0; i < stacks.size(); i++) {
-            if (stacks.get(i) + quantity <= maxStack) {
+            if (stacks.get(i) <= maxStack - quantity) {
                 stacks.set(i, stacks.get(i) + quantity);
                 return true;
             }
@@ -133,8 +152,22 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
         return false;
     }
 
+    /**
+     * Lớp gác thứ hai sau {@code QuestScriptRunner.ItemGrant} (2026-10-10): số lượng ≤ 0 tới câu gộp
+     * chồng {@code quantity = quantity + ?} là TRỪ đồ của người chơi, và có thể để lại một dòng
+     * {@code quantity <= 0} làm túi đồ không đọc lên được nữa (cột không có CHECK). Ném chứ không trả
+     * {@code false}: {@code false} nghĩa là "túi đầy", còn đây là lỗi của người gọi.
+     */
+    private static int requirePositiveQuantity(int quantity) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("Số lượng trao phải dương: " + quantity);
+        }
+        return quantity;
+    }
+
     @Override
     public boolean grantItemByCode(Transaction tx, long characterId, String itemTemplateCode, int quantity) {
+        requirePositiveQuantity(quantity);
         Connection connection = ((JdbcTransaction) tx).connection();
         Optional<Long> itemTemplateId = JdbcOperations.queryOne(
                 connection, FIND_ITEM_TEMPLATE_ID_BY_CODE, rs -> rs.getLong("id"), itemTemplateCode);
