@@ -328,6 +328,18 @@ lúc tắt đều chạy trọn (vàng trừ = giá × số món, mỗi món m�
 giao dịch thứ hai bay đúng lúc tắt thì hoặc giao dịch xảy ra trọn hoặc phiên còn nguyên, và sau khởi
 động lại phiên còn sót huỷ được, mời lại được.
 
+**Thưởng hạ quái (rơi đồ / tiến độ quest / EXP) lúc tắt và lúc lỗi** (rà 2026-10-10,
+`KillRewardDispatcher`). Ba việc chạy trên ba Virtual Thread riêng, vốn đã độc lập — một việc ném không
+kéo mất hai việc kia. Hai thứ đã sửa: (1) việc ném thì exception chết trong Virtual Thread, chỉ in
+`Exception in thread ""` ra stderr — nay ra một dòng ERROR có `step=`/`characterId=`/`monsterCode=`;
+(2) lời báo quái chết tới sau khi registry đã `stop()` ném `RejectedExecutionException` trên tick thread
+— nay bị bỏ kèm một dòng WARN (không chạy tại chỗ: tick thread cấm blocking I/O, pool DB sắp đóng).
+Đã kiểm trên Postgres thật: quái chết ngay trước khi tắt mà lượt cộng EXP còn chờ DB 3 s thì trình tự
+tắt chờ nó (trần 10 s) và cả ba phần thưởng đều vào DB; người chơi ngắt kết nối trước khi phần thưởng
+ghi xong thì phần thưởng vẫn vào DB, chỉ mất gói thông báo. Test: `KillRewardIsolationTest`,
+`ServerShutdownMidPlayDatabaseTest`. ⚠️ **Không thử lại**: việc hỏng là phần thưởng MẤT hẳn (quái không
+được lưu) — có thử lại / có hàng đợi bền hay không là quyết định chưa chốt.
+
 ⚠️ **Còn để ngỏ, đã đưa lên bảng chờ chủ dự án** ([README](../README.md)): tắt server giữa trận Arena
 vẫn xử thua theo thứ tự Netty đóng kết nối và **ghi Elo thật** (dòng 36); lưu vị trí lúc ngắt kết nối
 thất bại thì không thử lại (dòng 55 — §8 chấp nhận mất ≤ 5 phút); `WorldFacade.stop()` chờ `tickLock`

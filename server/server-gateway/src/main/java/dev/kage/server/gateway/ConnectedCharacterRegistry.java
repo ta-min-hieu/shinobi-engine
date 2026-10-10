@@ -3,13 +3,8 @@ package dev.kage.server.gateway;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 import io.netty.channel.ChannelHandlerContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import dev.kage.character.application.GrantExperienceUseCase;
 import dev.kage.character.domain.ExperienceProgress;
@@ -59,13 +54,6 @@ import dev.kage.server.world.WorldOutboundSink;
  */
 final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ConnectedCharacterRegistry.class);
-
-    // Trần chờ lượt trao thưởng đang dở lúc tắt server — mỗi lượt là MỘT transaction ngắn, 10s
-    // là dư cho DB khoẻ; DB treo thì thà mất vài phần thưởng còn hơn treo cả quá trình tắt (Docker
-    // SIGKILL sau stop_grace_period). Cùng mức với AUTH_SHUTDOWN_TIMEOUT_SECONDS của GatewayServer.
-    private static final long REWARD_SHUTDOWN_TIMEOUT_SECONDS = 10L;
-
     private final InventoryFacade inventoryFacade;
     private final QuestFacade questFacade;
     private final ExperienceGrantPort experienceGrant;
@@ -85,8 +73,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     private final Map<Long, ExperienceProgress> lastSentExperience = new ConcurrentHashMap<>();
     // onMonsterKilled bị gọi TRÊN world tick thread (WorldOutboundSink javadoc) — grantLoot chạm
     // DB (blocking), CẤM chạy trực tiếp ở đó (server/CLAUDE.md: Game Tick cấm blocking I/O). Đẩy
-    // sang Virtual Thread riêng, cùng pattern authExecutor của GatewayChannelHandler.
-    private final ExecutorService lootExecutor = Executors.newVirtualThreadPerTaskExecutor();
+    // sang Virtual Thread riêng, mỗi việc tự cô lập lỗi của nó — xem KillRewardDispatcher. Giữ tên
+    // cũ `lootExecutor` (nhiều module nhắc tới nó trong comment) dù nay chạy cả quest lẫn EXP.
+    private final KillRewardDispatcher lootExecutor = new KillRewardDispatcher();
     // Ai có quyền giữ/dọn phiên của mỗi nhân vật (quyết định chủ dự án 2026-09-25) — ở đây vì
     // registry này vốn là thứ DUY NHẤT mọi kết nối cùng thấy, không phải thêm tham số cho handler.
     private final CharacterSessionRegistry sessions = new CharacterSessionRegistry();
@@ -536,14 +525,26 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     @Override
     public void onMonsterKilled(long killerCharacterId, String monsterCode, long expReward) {
-        lootExecutor.execute(() -> grantLootBlocking(killerCharacterId, monsterCode));
+        lootExecutor.dispatch(
+                KillRewardDispatcher.Step.LOOT,
+                killerCharacterId,
+                monsterCode,
+                () -> grantLootBlocking(killerCharacterId, monsterCode));
         // Cạnh grantLoot, KHÔNG qua EventBus (engine-ecs) — 1 nguồn duy nhất chưa tới ngưỡng đáng
         // kích hoạt pub-sub thật (feature-quest/CLAUDE.md). Virtual Thread RIÊNG cho quest, không
-        // chặn nhau với lootExecutor nếu 1 trong 2 chạm DB chậm.
-        lootExecutor.execute(() -> processQuestBlocking(killerCharacterId, monsterCode));
+        // chặn nhau với lượt rơi đồ nếu 1 trong 2 chạm DB chậm.
+        lootExecutor.dispatch(
+                KillRewardDispatcher.Step.QUEST_PROGRESS,
+                killerCharacterId,
+                monsterCode,
+                () -> processQuestBlocking(killerCharacterId, monsterCode));
         // Cạnh loot/quest, cùng lý do tách Virtual Thread riêng: cộng EXP chạm DB. Thêm 2026-08-09
         // khi chủ dự án hỏi vạch kinh nghiệm — trước đó giết quái KHÔNG cho EXP gì cả.
-        lootExecutor.execute(() -> grantExperienceBlocking(killerCharacterId, expReward));
+        lootExecutor.dispatch(
+                KillRewardDispatcher.Step.EXPERIENCE,
+                killerCharacterId,
+                monsterCode,
+                () -> grantExperienceBlocking(killerCharacterId, expReward));
     }
 
     /**
@@ -682,25 +683,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     }
 
     /**
-     * Dừng {@link #lootExecutor} (SERVER.md §10 graceful shutdown) — gọi sau khi world tick dừng,
-     * TRƯỚC khi đóng DB.
-     *
-     * <p><b>Chờ lượt đang dở xong (sửa 2026-10-02).</b> Bản cũ chỉ {@code shutdown()} rồi trả về
-     * ngay, và {@code GatewayBootstrap} đóng pool DB ngay sau đó: rơi đồ/EXP/tiến độ quest của một
-     * con quái vừa chết trước khi tắt bị cắt giữa chừng và mất vĩnh viễn — quái không được lưu, nên
-     * không có gì để chạy lại lúc khởi động.
+     * Dừng trao thưởng hạ quái (SERVER.md §10 graceful shutdown) — gọi sau khi world tick dừng, TRƯỚC
+     * khi đóng DB; chờ lượt đang dở xong, xem {@link KillRewardDispatcher#stop()}.
      */
     void stop() {
-        lootExecutor.shutdown();
-        try {
-            if (!lootExecutor.awaitTermination(REWARD_SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                LOG.warn(
-                        "Trao thưởng hạ quái chưa xong sau {}s — có thể mất phần thưởng của vài lượt hạ quái cuối",
-                        REWARD_SHUTDOWN_TIMEOUT_SECONDS);
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        lootExecutor.stop();
     }
 
     // FutureReturnValueIgnored: ChannelFuture của writeAndFlush() — lỗi đi qua pipeline Netty.
