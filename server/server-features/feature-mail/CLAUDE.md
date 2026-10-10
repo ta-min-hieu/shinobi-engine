@@ -85,6 +85,21 @@ lấy từ SESSION.
 hoá đó vĩnh viễn. Hiện chặn lại (`ATTACHMENT_NOT_OWNED`); mở ra thì phải đổi schema + protocol —
 cả hai đều là /CLAUDE.md §4.
 
+## ✅ Thư không túi nào nhận nổi — ĐÃ VÁ 2026-10-10
+
+**Lỗi cũ.** `ClaimMailUseCase` cấp TỪNG dòng đính kèm, mà luật gộp chồng chỉ nhận khi CẢ dòng vừa
+một chồng ("không xé lẻ"). Cùng một loại chia thành nhiều dòng nhỏ thì mỗi dòng mở một ô: 21 dòng
+× 50 phi đao (1050 cái — người gửi giữ được trong 11 ô) cần 21 ô > sức chứa 20. Túi RỖNG vẫn bị
+`INVENTORY_FULL`, và thư còn đồ thì không xoá được (`MUST_CLAIM_FIRST`) ⇒ vật phẩm + vàng đi kèm
+kẹt vĩnh viễn, lá thư nằm mãi trong hộp thư người nhận. Client hợp lệ không dựng được thư như vậy,
+nhưng số dòng đính kèm là dữ liệu của client.
+
+**Cách vá.** `InventoryGatewayPort.grantItems` cấp CẢ LÔ: dòng nào gộp trọn được vào chồng sẵn có
+thì gộp (đúng thứ tự cũ), phần còn lại dồn THEO LOẠI rồi mới mở ô. Hai tính chất được test giữ
+(`EconomyArithmeticBoundaryIntegrationTest`): lô nào người gửi từng giữ trong túi cũng vừa một túi
+rỗng; và không lần nhận nào tốn nhiều ô hơn cách cấp từng dòng trước đây. Không đổi protocol, không
+đổi schema, dòng `mail_item` vẫn lưu đúng như người gửi đã gửi.
+
 ## Cứng
 
 ✅ Quy tắc validate (goldAmount âm, quantity ≤ 0) ở `domain/` — HAI lớp: `MailDraft.validate()`

@@ -38,6 +38,7 @@ final class EconomyStressActor implements Runnable {
     private static final long MAIL_GOLD_MAX = 300L;
     private static final long TRADE_GOLD_MAX = 200L;
     private static final long ABSURD_GOLD = 1_000_000_000L;
+    private static final int SPLIT_ATTACHMENT_PERCENT = 33;
     private static final long BOGUS_ID = Long.MAX_VALUE / 2;
 
     private final EconomyStressFacades facades;
@@ -219,11 +220,25 @@ final class EconomyStressActor implements Runnable {
             int quantity = random.nextInt(PERCENT) < 15
                     ? row.get().quantity() + 1
                     : 1 + random.nextInt(row.get().quantity());
-            attachments.add(new MailFacade.AttachmentRequest(row.get().itemTemplateId(), quantity));
+            addAttachmentLines(attachments, row.get().itemTemplateId(), quantity);
         }
         MailFacade.SendOutcome outcome = facades.mail()
                 .sendMail(new MailFacade.SendMailRequest(actor, recipient, "stress", "body", gold, attachments));
         tally.outcome("mailSend", outcome.result());
+    }
+
+    /**
+     * Một phần ba số lần chia CÙNG số lượng thành hai dòng đính kèm cùng loại — dạng mà client hợp
+     * lệ không gửi nhưng dây cho phép; bản cấp-từng-dòng cũ từng làm thư không nhận nổi (2026-10-10).
+     */
+    private void addAttachmentLines(List<MailFacade.AttachmentRequest> attachments, long templateId, int quantity) {
+        if (quantity < 2 || random.nextInt(PERCENT) >= SPLIT_ATTACHMENT_PERCENT) {
+            attachments.add(new MailFacade.AttachmentRequest(templateId, quantity));
+            return;
+        }
+        int firstLine = 1 + random.nextInt(quantity - 1);
+        attachments.add(new MailFacade.AttachmentRequest(templateId, firstLine));
+        attachments.add(new MailFacade.AttachmentRequest(templateId, quantity - firstLine));
     }
 
     private void claimMail(long actor) {

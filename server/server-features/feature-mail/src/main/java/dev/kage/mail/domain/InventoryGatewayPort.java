@@ -1,5 +1,7 @@
 package dev.kage.mail.domain;
 
+import java.util.List;
+
 /**
  * Cổng đổi túi đồ — bản sao ý tưởng {@code dev.kage.shop.domain.InventoryGatewayPort}, đủ hai
  * chiều: {@link #consumeItem} ký quỹ món đính kèm khỏi túi người GỬI lúc gửi, {@link #grantItem}
@@ -28,6 +30,30 @@ public interface InventoryGatewayPort {
      * @return {@code true} nếu cấp thành công, {@code false} nếu túi đầy (không đổi gì)
      */
     boolean grantItem(Transaction tx, long characterId, long itemTemplateId, int quantity);
+
+    /**
+     * Cấp TRỌN lô đính kèm của một lá thư, dùng ÍT Ô NHẤT có thể: dòng nào gộp trọn được vào một
+     * chồng sẵn có thì gộp, phần còn lại của CÙNG một loại được dồn lại rồi mới mở ô (tách theo
+     * {@code max_stack}).
+     *
+     * <p><b>Vì sao không gọi {@link #grantItem} từng dòng</b> (lỗi thật 2026-10-10). Luật gộp chỉ
+     * nhận khi CẢ dòng vừa một chồng, nên 21 dòng "50 phi đao" mở 21 ô (50 + 50 > 99) dù cả lô chỉ
+     * là 1050 cái = 11 ô. Thư đó KHÔNG túi nào nhận nổi, kể cả túi rỗng, mà thư còn đồ thì không
+     * xoá được — vật phẩm và vàng đi kèm kẹt vĩnh viễn. Dồn theo loại thì lô nào người gửi từng giữ
+     * được trong túi cũng vừa một túi rỗng.
+     *
+     * <p>Mặc định cấp từng dòng CHỈ để các fake ở test khỏi phải sửa — adapter thật PHẢI ghi đè.
+     *
+     * @return {@code false} nếu túi không đủ ô — CÓ THỂ đã ghi dở, người gọi phải rollback
+     */
+    default boolean grantItems(Transaction tx, long characterId, List<MailAttachment> attachments) {
+        for (MailAttachment attachment : attachments) {
+            if (!grantItem(tx, characterId, attachment.itemTemplateId(), attachment.quantity())) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     /**
      * Trừ {@code quantity} món {@code itemTemplateId} khỏi túi {@code characterId} — KHOÁ dòng

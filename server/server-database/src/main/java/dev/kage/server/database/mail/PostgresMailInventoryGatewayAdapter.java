@@ -1,9 +1,12 @@
 package dev.kage.server.database.mail;
 
 import java.sql.Connection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import dev.kage.mail.domain.InventoryGatewayPort;
+import dev.kage.mail.domain.MailAttachment;
 import dev.kage.mail.domain.Transaction;
 import dev.kage.server.database.JdbcOperations;
 import dev.kage.server.database.inventory.CharacterInventoryLock;
@@ -62,6 +65,39 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
         // Không gộp được ⇒ mở ô mới, tách theo max_stack: thư gom số lượng từ NHIỀU dòng của người
         // gửi (3 thanh kiếm = 3 dòng), nên số tới đây có thể vượt max_stack của loại.
         return InventoryStackMerge.insertRespectingMaxStack(connection, characterId, itemTemplateId, quantity);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Hai lượt. Lượt một thử gộp TỪNG dòng vào chồng sẵn có, đúng thứ tự — y hệt cách cấp từng
+     * dòng trước đây chọn chồng (chồng sẵn có luôn có id nhỏ hơn mọi ô mới mở), nên không lần nhận
+     * thư nào tốn nhiều ô hơn trước. Lượt hai dồn các dòng KHÔNG gộp được theo loại rồi mới mở ô:
+     * {@code ceil(tổng / max_stack)} là số ô ít nhất chứa nổi phần đó.
+     *
+     * <p>Tổng dồn bằng {@code long}: thư hệ thống do server dựng không bị ràng bởi túi người gửi, nên
+     * không giả định tổng vừa {@code int}; vượt thì chắc chắn không túi nào chứa nổi.
+     */
+    @Override
+    public boolean grantItems(Transaction tx, long characterId, List<MailAttachment> attachments) {
+        Connection connection = ((JdbcTransaction) tx).connection();
+        Map<Long, Long> unmergedByTemplate = new LinkedHashMap<>();
+        for (MailAttachment attachment : attachments) {
+            boolean merged = InventoryStackMerge.mergeIntoExistingStack(
+                    connection, characterId, attachment.itemTemplateId(), attachment.quantity());
+            if (!merged) {
+                unmergedByTemplate.merge(attachment.itemTemplateId(), (long) attachment.quantity(), Long::sum);
+            }
+        }
+        for (Map.Entry<Long, Long> unmerged : unmergedByTemplate.entrySet()) {
+            long quantity = unmerged.getValue();
+            if (quantity > Integer.MAX_VALUE
+                    || !InventoryStackMerge.insertRespectingMaxStack(
+                            connection, characterId, unmerged.getKey(), Math.toIntExact(quantity))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
