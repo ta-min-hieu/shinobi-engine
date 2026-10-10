@@ -362,16 +362,6 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // đổi mục tiêu khi click, skill theo hồi chiêu) — cách trần cả chục lần, không đổi cảm giác chơi.
     private final RateLimiter combatCommandRateLimiter =
             new RateLimiter(MAX_COMBAT_COMMANDS_PER_SECOND, Duration.ofSeconds(1));
-    // NETWORK.md §13 (đề xuất, chưa verify) — World nghiêm ngặt nhất (toàn server thấy), Khu vực
-    // lỏng nhất (chỉ người gần thấy), Riêng tư ở giữa, khớp bảng GAMEPLAY.md §10.
-    private final RateLimiter chatWorldRateLimiter = new RateLimiter(5, Duration.ofSeconds(10));
-    private final RateLimiter chatPrivateRateLimiter = new RateLimiter(10, Duration.ofSeconds(10));
-    private final RateLimiter chatAreaRateLimiter = new RateLimiter(15, Duration.ofSeconds(10));
-    // GAMEPLAY.md §10: Bang hội = "Vừa", giữa World (nghiêm ngặt nhất) và Area (lỏng nhất).
-    private final RateLimiter chatGuildRateLimiter = new RateLimiter(10, Duration.ofSeconds(10));
-    // GAMEPLAY.md §10: Party = "Lỏng", cùng mức Area (party nhỏ, ít rủi ro spam hơn World/Guild).
-    private final RateLimiter chatPartyRateLimiter = new RateLimiter(15, Duration.ofSeconds(10));
-
     // handleConnect/handleSelectCharacter set giá trị này từ Virtual Thread; channelRead0 của
     // packet TIẾP THEO có thể chạy trên EventLoop trước khi Virtual Thread đó xong (Netty không
     // chờ) — cần volatile để đảm bảo visibility giữa 2 thread.
@@ -695,10 +685,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 return;
             }
             sendInitialSelfState(characterId);
-            // Đang trên authExecutor (Virtual Thread) rồi — friendFacade.listFriends chạm DB, an
-            // toàn gọi thẳng, không cần đẩy thêm 1 lớp executor nữa (khác channelInactive bên dưới).
-            notifyFriendsPresenceChanged(characterId, true);
-            correctStaleOnlineAnnouncement(characterId);
+            announceOnlineToFriends(characterId);
         } catch (CharacterNotFoundException e) {
             // Cùng lỗi dù nhân vật không tồn tại hay thuộc account khác (fail secure — SECURITY.md §4).
             LOG.warn("Chọn nhân vật thất bại: không tìm thấy", e);
@@ -706,6 +693,28 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         } catch (RuntimeException e) {
             LOG.error("Chọn nhân vật thất bại: lỗi không mong đợi", e);
             sendError(ctx, sequenceId, 500, "error.select_character_failed");
+        }
+    }
+
+    /**
+     * Báo cho bạn bè đang online rằng nhân vật vừa vào world. Việc PHỤ của lần vào world: lúc này
+     * {@code SelectCharacterResponse(success)} ĐÃ gửi, nên lỗi ở đây (đọc bảng {@code friendship}
+     * hỏng) không được nổi lên thành {@code error.select_character_failed} — người chơi đang đứng
+     * trong world mà nhận câu "chọn nhân vật thất bại" cho cùng {@code sequenceId} (sửa 2026-10-10,
+     * {@code FriendPresenceFailureTest}). Hậu quả của việc nuốt: bạn bè thấy người này offline cho
+     * tới lần họ mở lại danh sách bạn — {@code ListFriendsResponse} luôn tra trạng thái thật.
+     *
+     * <p>Đang trên authExecutor (Virtual Thread) rồi — friendFacade.listFriends chạm DB, an toàn gọi
+     * thẳng, không cần đẩy thêm 1 lớp executor nữa (khác channelInactive bên dưới).
+     */
+    // PMD AvoidCatchingGenericException: đúng ý — mọi lỗi của việc phụ này đều dừng ở đây.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private void announceOnlineToFriends(long characterId) {
+        try {
+            notifyFriendsPresenceChanged(characterId, true);
+            correctStaleOnlineAnnouncement(characterId);
+        } catch (RuntimeException e) {
+            LOG.error("Không báo được trạng thái online cho bạn bè: characterId={}", characterId, e);
         }
     }
 
@@ -3447,31 +3456,29 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        RateLimiter rateLimiter = chatRateLimiterFor(command.getChannel());
-        if (!rateLimiter.tryAcquire()) {
+        // Trần chat theo TÀI KHOẢN, không theo kết nối — xem ChatRateLimits. Đã có nhân vật thì chắc
+        // chắn đã đăng nhập; nhánh null chỉ để không bao giờ unbox null trên EventLoop.
+        Long accountId = boundAccountId;
+        if (accountId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        ChatRateLimits.Verdict verdict =
+                worldGateway.registry().chatRateLimits().acquire(accountId, command.getChannel());
+        if (verdict != ChatRateLimits.Verdict.ALLOWED) {
             networkMetrics.recordRateLimitRejected(
                     "chat_" + command.getChannel().name());
             SendChatMessageResponse response = SendChatMessageResponse.newBuilder()
                     .setOutcome(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_RATE_LIMITED)
                     .build();
             send(ctx, Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE, sequenceId, response.toByteArray());
-            if (rateLimiter.shouldDisconnect()) {
+            if (verdict == ChatRateLimits.Verdict.REJECTED_AND_DISCONNECT) {
                 LOG.warn("Chat vượt rate limit liên tục — ngắt kết nối: characterId={}", characterId);
                 ctx.close();
             }
             return;
         }
         executeBlocking(ctx, sequenceId, () -> handleSendChatMessageBlocking(ctx, sequenceId, characterId, command));
-    }
-
-    private RateLimiter chatRateLimiterFor(ChatChannel channel) {
-        return switch (channel) {
-            case CHAT_CHANNEL_PRIVATE -> chatPrivateRateLimiter;
-            case CHAT_CHANNEL_AREA -> chatAreaRateLimiter;
-            case CHAT_CHANNEL_GUILD -> chatGuildRateLimiter;
-            case CHAT_CHANNEL_PARTY -> chatPartyRateLimiter;
-            default -> chatWorldRateLimiter; // WORLD/UNSPECIFIED/UNRECOGNIZED — nghiêm ngặt nhất.
-        };
     }
 
     private void handleSendChatMessageBlocking(
