@@ -131,6 +131,37 @@ class EcsWorldLifecycleTest {
         assertThat(world.entityCount()).isZero();
     }
 
+    /**
+     * Trước 2026-10-10 vòng for-each qua danh sách System ném {@code ConcurrentModificationException}
+     * giữa tick. System đăng ký giữa tick chạy ngay trong tick đó, SAU mọi System đã có — cùng lệ với
+     * entity gia nhập Family giữa lượt lặp.
+     */
+    @Test
+    void shouldRunNewSystemAfterExistingOnes_whenRegisteredMidTick() {
+        EcsWorld world = new EcsWorld();
+        RecordingSystem late = new RecordingSystem(world);
+        RecordingSystem first = new RecordingSystem(world) {
+            private boolean registered;
+
+            @Override
+            protected void processEntity(KEntity entity, float deltaTime) {
+                super.processEntity(entity, deltaTime);
+                if (!registered) {
+                    registered = true;
+                    world.addSystem(late);
+                }
+            }
+        };
+        world.addSystem(first);
+        KEntity entity = spawn(world);
+
+        world.update(1f);
+        world.update(1f);
+
+        assertThat(first.processedIds).containsExactly(entity.id(), entity.id());
+        assertThat(late.processedIds).containsExactly(entity.id(), entity.id());
+    }
+
     @Test
     void shouldNotRemoveRecycledEntity_whenStaleHandleIsRemovedAgain() {
         EcsWorld world = new EcsWorld();

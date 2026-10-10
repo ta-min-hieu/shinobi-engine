@@ -11,7 +11,10 @@ import java.util.function.Consumer;
  * Event, ai quan tâm thì tự subscribe (ECS.md §7).
  *
  * <p>{@code subscribe()} chỉ gọi lúc khởi tạo System (composition root), không trong tick.
- * {@code publish()} không allocation — chỉ duyệt list listener đã có sẵn.
+ * {@code publish()} không allocation — chỉ duyệt list listener đã có sẵn, theo chỉ số (đo
+ * 2026-10-10, {@code EcsTickAllocationTest}: vòng for-each cũ cấp một {@code Iterator} 32 byte mỗi
+ * lần phát mà C2 không khử được). Listener đăng ký GIỮA lúc một sự kiện đang phát không nhận sự kiện
+ * đó — nó đã xảy ra trước khi listener tồn tại — và nhận từ sự kiện kế tiếp.
  */
 public final class EventBus {
 
@@ -27,8 +30,11 @@ public final class EventBus {
         if (list == null) {
             return;
         }
-        for (Consumer<?> listener : list) {
-            ((Consumer<T>) listener).accept(event);
+        // Chốt số listener TRƯỚC khi phát: listener nào subscribe thêm trong lúc xử lý thì nối vào
+        // cuối list, ngoài khoảng đang duyệt (không có unsubscribe nên list chỉ dài ra).
+        int count = list.size();
+        for (int i = 0; i < count; i++) {
+            ((Consumer<T>) list.get(i)).accept(event);
         }
     }
 }
