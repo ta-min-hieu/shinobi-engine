@@ -80,6 +80,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     // CharacterPositionPersister lưu định kỳ + lúc logout (SERVER.md §8), cập nhật mỗi lần
     // onMoveAccepted (server-world xác nhận lệnh di chuyển của connection này).
     private final Map<Long, PositionSnapshot> lastKnownPosition = new ConcurrentHashMap<>();
+    // Vạch EXP MỚI NHẤT đã gửi cho nhân vật đang kết nối — xem sendExperience. Xoá lúc register (mỗi
+    // lần vào world là một phiên hiển thị mới) và lúc unregister.
+    private final Map<Long, ExperienceProgress> lastSentExperience = new ConcurrentHashMap<>();
     // onMonsterKilled bị gọi TRÊN world tick thread (WorldOutboundSink javadoc) — grantLoot chạm
     // DB (blocking), CẤM chạy trực tiếp ở đó (server/CLAUDE.md: Game Tick cấm blocking I/O). Đẩy
     // sang Virtual Thread riêng, cùng pattern authExecutor của GatewayChannelHandler.
@@ -113,6 +116,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     void register(long characterId, ChannelHandlerContext ctx, CharacterAppearance appearance) {
         contextsByCharacterId.put(characterId, ctx);
         appearanceByCharacterId.put(characterId, appearance);
+        lastSentExperience.remove(characterId);
     }
 
     /**
@@ -141,6 +145,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         contextsByCharacterId.remove(characterId);
         lastKnownPosition.remove(characterId);
         appearanceByCharacterId.remove(characterId);
+        lastSentExperience.remove(characterId);
     }
 
     /**
@@ -156,6 +161,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         }
         lastKnownPosition.remove(characterId);
         appearanceByCharacterId.remove(characterId);
+        lastSentExperience.remove(characterId);
         return true;
     }
 
@@ -543,21 +549,37 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /**
      * Phát {@code ExperienceChangedEvent} cho chính người chơi đó. Mất kết nối giữa chừng thì EXP
      * ĐÃ vào DB thật rồi, chỉ mất thông báo — cùng cách xử lý của {@link #grantLootBlocking}.
+     *
+     * <p><b>Vạch EXP không bao giờ lùi</b> (sửa 2026-10-10). Mỗi lượt cộng EXP chạy trên một Virtual
+     * Thread riêng ({@code lootExecutor}, và {@code authExecutor} cho thưởng quest): DB cộng đúng thứ
+     * tự nhưng các luồng GỬI theo thứ tự bất kỳ. Gói về sau cùng mà mang tổng EXP CŨ hơn thì HUD
+     * đứng sai ở số cũ tới lần nhận EXP kế tiếp. Tổng EXP chỉ tăng (EXP quái {@code >= 0}, thưởng
+     * quest dương), nên gói có tổng nhỏ hơn gói đã gửi chắc chắn là gói đến muộn: bỏ nó — trừ khi
+     * nó mang {@code leveledUp}, khi đó vẫn báo lên cấp nhưng kèm con số MỚI NHẤT. So-rồi-gửi nằm
+     * trong {@code compute} để hai luồng không chen được vào giữa; {@code writeAndFlush} từ ngoài
+     * EventLoop chỉ xếp hàng, không chặn.
      */
     void sendExperience(long characterId, GrantExperienceUseCase.Result result) {
         ChannelHandlerContext ctx = contextsByCharacterId.get(characterId);
         if (ctx == null) {
             return;
         }
-        ExperienceProgress progress = result.progress();
-        ExperienceChangedEvent event = ExperienceChangedEvent.newBuilder()
-                .setLevel(progress.level())
-                .setTotalExp(progress.totalExp())
-                .setExpIntoLevel(progress.expIntoLevel())
-                .setExpForNextLevel(progress.expForNextLevel())
-                .setLeveledUp(result.leveledUp())
-                .build();
-        send(ctx, Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE, 0, event.toByteArray());
+        lastSentExperience.compute(characterId, (id, lastSent) -> {
+            boolean overtaken = lastSent != null && result.progress().totalExp() < lastSent.totalExp();
+            if (overtaken && !result.leveledUp()) {
+                return lastSent;
+            }
+            ExperienceProgress progress = overtaken ? lastSent : result.progress();
+            ExperienceChangedEvent event = ExperienceChangedEvent.newBuilder()
+                    .setLevel(progress.level())
+                    .setTotalExp(progress.totalExp())
+                    .setExpIntoLevel(progress.expIntoLevel())
+                    .setExpForNextLevel(progress.expForNextLevel())
+                    .setLeveledUp(result.leveledUp())
+                    .build();
+            send(ctx, Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE, 0, event.toByteArray());
+            return progress;
+        });
     }
 
     /**

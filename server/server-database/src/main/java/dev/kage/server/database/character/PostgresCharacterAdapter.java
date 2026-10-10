@@ -122,8 +122,10 @@ public final class PostgresCharacterAdapter implements CharacterPort {
             """;
 
     // AND exp = ?: compare-and-set, xem CharacterPort#saveLevel.
+    // AND level <> ?: "đã ghi" phải nghĩa là cột THẬT SỰ đổi — use case dùng kết quả này để quyết
+    // định ai báo "lên cấp", nên hai lượt cùng suy ra một cấp chỉ được có MỘT lượt thắng.
     private static final String UPDATE_LEVEL = """
-            UPDATE character SET level = ? WHERE id = ? AND exp = ?
+            UPDATE character SET level = ? WHERE id = ? AND exp = ? AND level <> ?
             """;
 
     @Override
@@ -235,7 +237,7 @@ public final class PostgresCharacterAdapter implements CharacterPort {
 
     @Override
     public boolean saveLevel(long characterId, int level, long derivedFromExp) {
-        return JdbcOperations.update(dataSource, UPDATE_LEVEL, level, characterId, derivedFromExp) > 0;
+        return JdbcOperations.update(dataSource, UPDATE_LEVEL, level, characterId, derivedFromExp, level) > 0;
     }
 
     @Override

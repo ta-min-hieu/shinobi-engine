@@ -90,7 +90,11 @@ public interface CharacterPort {
      * Với điều kiện này, lần ghi dựa trên EXP đã cũ bị bỏ qua, còn lần cộng mới nhất luôn khớp và
      * luôn ghi được.
      *
-     * @return {@code true} nếu đã ghi
+     * <p>Và chỉ ghi nếu cột {@code level} đang KHÁC {@code level} (sửa 2026-10-10): giá trị trả về
+     * là thứ {@code GrantExperienceUseCase} dùng để quyết định ai báo "lên cấp" cho client. Hai lượt
+     * song song cùng suy ra một cấp thì đúng MỘT lượt đổi được cột, và chỉ lượt đó nhận {@code true}.
+     *
+     * @return {@code true} nếu cột {@code level} THẬT SỰ đổi bởi lần gọi này
      */
     boolean saveLevel(long characterId, int level, long derivedFromExp);
 

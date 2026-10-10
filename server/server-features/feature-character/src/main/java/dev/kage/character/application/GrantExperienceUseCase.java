@@ -29,7 +29,8 @@ public final class GrantExperienceUseCase {
      *     để gửi vạch EXP lúc vào world và sau khi nhận thưởng quest. ⚠️ Không cộng KHÔNG có nghĩa
      *     là không ghi: nhánh này vẫn hoà giải cột {@code level} nếu nó lệch (xem
      *     {@link #reconcileStoredLevel}).
-     * @return trạng thái SAU khi cộng, kèm {@code leveledUp} để client biết có ăn mừng hay không.
+     * @return trạng thái SAU khi cộng, kèm {@code leveledUp} để client biết có ăn mừng hay không —
+     *     xem {@link #raiseStoredLevel} về việc AI được báo khi nhiều lượt chạy song song.
      */
     public Result execute(long characterId, long amount) {
         Character character =
@@ -42,16 +43,14 @@ public final class GrantExperienceUseCase {
 
         long expAfter = characterPort.addExperience(characterId, amount);
         ExperienceProgress after = ExperienceCurve.progressOf(expAfter);
-        boolean leveledUp = after.level() > before.level();
-        reconcileStoredLevel(characterId, character.level(), after.level(), expAfter);
-        return new Result(after, leveledUp);
+        return new Result(after, raiseStoredLevel(characterId, character.level(), after.level(), expAfter));
     }
 
     /**
      * Đồng bộ vạch EXP SAU khi EXP đã được cộng bằng đường khác use case này — thưởng quest đi thẳng
      * vào {@code character.exp} qua {@code PostgresQuestExpAdapter}. Hoà giải cột {@code level} như
-     * {@code execute(id, 0)}, nhưng {@code leveledUp} so cấp suy từ {@code exp} với cột {@code level}
-     * ĐANG LƯU — cột đó là cấp người chơi đang thấy trước lần lĩnh thưởng này.
+     * {@code execute(id, 0)}, nhưng CÓ báo {@code leveledUp} khi chính lần gọi này nâng được cột
+     * {@code level} — cột đó là cấp người chơi đang thấy trước lần lĩnh thưởng này.
      *
      * <p>Vì sao không dùng {@code execute(id, 0)}: nhánh đó trả {@code leveledUp=false} có chủ đích
      * (lúc vào world không có gì để mừng), nên những cú lên cấp lớn nhất arc 1 — đều đến từ thưởng
@@ -61,8 +60,31 @@ public final class GrantExperienceUseCase {
         Character character =
                 characterPort.findById(characterId).orElseThrow(() -> new CharacterNotFoundException(characterId));
         ExperienceProgress now = ExperienceCurve.progressOf(character.exp());
-        reconcileStoredLevel(characterId, character.level(), now.level(), character.exp());
-        return new Result(now, now.level() > character.level());
+        return new Result(now, raiseStoredLevel(characterId, character.level(), now.level(), character.exp()));
+    }
+
+    /**
+     * Hoà giải cột {@code level} và trả lời "lần gọi này có phải là lần LÊN CẤP không".
+     *
+     * <p><b>Cột {@code level} là trọng tài duy nhất của việc báo lên cấp</b> (sửa 2026-10-10): lên
+     * cấp được báo bởi đúng lượt ĐỔI ĐƯỢC cột đó lên cấp cao hơn ({@link CharacterPort#saveLevel}
+     * chỉ trả {@code true} cho một lượt). Hai phép so cũ đều sai khi có hai nguồn EXP chạy song song:
+     *
+     * <ul>
+     *   <li>{@code execute} so cấp trước/sau với {@code exp} ĐỌC TỪ TRƯỚC khi cộng. Mọi lượt đọc
+     *       trước khi một lượt khác vượt mốc đều tự cho là mình vượt mốc — đo trên Postgres thật, 16
+     *       lượt song song quanh MỘT mốc cấp báo lên cấp 9–10 lần
+     *       ({@code ExperienceGrantRaceIntegrationTest}).
+     *   <li>{@code syncAfterExternalGrant} so với cột {@code level} mà không biết mình có phải là
+     *       bên ghi hay không. Một lượt hạ quái chen giữa "thưởng quest commit" và "đồng bộ" hoà giải
+     *       cột trước, và khi đó KHÔNG bên nào báo — cú lên cấp biến mất.
+     * </ul>
+     *
+     * @return {@code true} nếu chính lần gọi này nâng cột {@code level} (có thể nhiều cấp một lúc)
+     */
+    private boolean raiseStoredLevel(long characterId, int storedLevel, int derivedLevel, long derivedFromExp) {
+        boolean written = reconcileStoredLevel(characterId, storedLevel, derivedLevel, derivedFromExp);
+        return written && derivedLevel > storedLevel;
     }
 
     /**
@@ -86,16 +108,15 @@ public final class GrantExperienceUseCase {
      * {@link CharacterPort#saveLevel} — không có điều kiện đó, hai lần cộng song song về đích ngược
      * thứ tự có thể ghi cột {@code level} LÙI về cấp cũ.
      */
-    private void reconcileStoredLevel(long characterId, int storedLevel, int derivedLevel, long derivedFromExp) {
-        if (storedLevel != derivedLevel) {
-            characterPort.saveLevel(characterId, derivedLevel, derivedFromExp);
-        }
+    private boolean reconcileStoredLevel(long characterId, int storedLevel, int derivedLevel, long derivedFromExp) {
+        return storedLevel != derivedLevel && characterPort.saveLevel(characterId, derivedLevel, derivedFromExp);
     }
 
     /**
      * Kết quả một lần {@link #execute}.
      *
-     * @param leveledUp true nếu CHÍNH lần cộng này làm đổi cấp (có thể nhảy nhiều cấp một lúc).
+     * @param leveledUp true nếu CHÍNH lần gọi này nâng cột {@code level} (có thể nhảy nhiều cấp một
+     *     lúc) — mỗi lần lên cấp được báo đúng một lần dù bao nhiêu lượt cộng EXP chạy song song.
      */
     public record Result(ExperienceProgress progress, boolean leveledUp) {}
 }

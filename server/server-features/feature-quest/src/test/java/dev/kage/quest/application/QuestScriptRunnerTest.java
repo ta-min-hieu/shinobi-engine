@@ -13,7 +13,22 @@ class QuestScriptRunnerTest {
 
     private static final String DELIVERY_SCRIPT_REF = "/scripts/quest/test_fixture_delivery.js";
 
+    private static final String NEGATIVE_EXP_SCRIPT_REF = "/scripts/quest/test_fixture_negative_exp.js";
+
     private final QuestScriptRunner runner = new QuestScriptRunner();
+
+    /**
+     * {@code give_exp} âm đi thẳng xuống {@code exp = exp + ?}. Cột {@code character.exp} không có
+     * CHECK, còn {@code Character} từ chối exp âm trong constructor — một lần trừ quá tay làm nhân
+     * vật (và cả danh sách nhân vật của tài khoản) không đọc lên được nữa. Phải chết trong callback
+     * và thành lỗi script, y như {@code take_item} âm: use case khi đó không ghi gì cả.
+     */
+    @Test
+    void shouldTurnANegativeExpGrantIntoAScriptFailure() {
+        QuestScriptRunner.HookEffects effects = runner.runClaim(NEGATIVE_EXP_SCRIPT_REF, "{}");
+
+        assertThat(effects.scriptFailed()).isTrue();
+    }
 
     /**
      * Số âm đi xuống {@code quantity - ?} của adapter là CỘNG đồ. Nó phải chết ngay trong callback
