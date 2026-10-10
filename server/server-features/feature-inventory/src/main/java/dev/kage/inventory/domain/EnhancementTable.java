@@ -33,6 +33,11 @@ public final class EnhancementTable {
      */
     public static final double ENHANCE_STEP = 0.10;
 
+    private static final long PERCENT = 100L;
+
+    /** {@link #ENHANCE_STEP} quy ra phần trăm nguyên — {@link #enhancedBonus} tính bằng số nguyên. */
+    private static final long STEP_PERCENT = Math.round(ENHANCE_STEP * PERCENT);
+
     private static final int[] SUCCESS_RATE_PERCENT = {95, 90, 85, 80, 70, 60, 50, 40, 30, 20, 15, 12, 10, 8, 5};
     private static final long[] GOLD_COST = {
         100, 200, 350, 550, 800, 1200, 1700, 2300, 3000, 4000, 5500, 7500, 10000, 14000, 20000
@@ -60,7 +65,11 @@ public final class EnhancementTable {
         if (baseBonus == 0 || enhanceLevel == 0) {
             return baseBonus;
         }
-        return Math.toIntExact(Math.round(baseBonus * (1.0 + (ENHANCE_STEP * enhanceLevel))));
+        // Số NGUYÊN, không double (sửa 2026-10-10): `1.0 + 0.10 × 13` ra 2.2999999999999998, nên
+        // gốc 25 ở +13 (đúng 57,5) bị làm tròn XUỐNG 57 thay vì 58 — hụt một điểm ở mọi gốc tận
+        // cùng bằng 5 rơi vào cấp đó. floorDiv(x + nửa) = làm tròn nửa-lên, y như Math.round.
+        long scaledHundredths = (long) baseBonus * (PERCENT + STEP_PERCENT * enhanceLevel);
+        return Math.toIntExact(Math.floorDiv(scaledHundredths + PERCENT / 2, PERCENT));
     }
 
     public static int successRatePercent(int currentLevel) {

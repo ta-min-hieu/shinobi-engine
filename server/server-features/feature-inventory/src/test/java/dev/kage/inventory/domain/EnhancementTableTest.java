@@ -61,6 +61,25 @@ class EnhancementTableTest {
         }
     }
 
+    /**
+     * Công thức tính bằng {@code double} ({@code 0.1 × cấp} không biểu diễn chính xác được), nên một
+     * kết quả đúng nửa đơn vị có thể rơi về phía dưới và làm món đồ hụt một điểm chỉ số so với bảng
+     * thiết kế. So với phép tính NGUYÊN chính xác — {@code gốc × (10 + cấp) / 10}, nửa thì làm tròn
+     * lên — trên cả miền chỉ số dùng được (rà biên số học 2026-10-10).
+     */
+    @Test
+    void shouldAgreeWithExactHalfUpIntegerArithmetic_forEveryBaseAndLevel() {
+        int largestBaseChecked = 100_000;
+        for (int base = 1; base <= largestBaseChecked; base++) {
+            for (int level = 0; level <= ItemStack.MAX_ENHANCE; level++) {
+                long exact = ((long) base * (10 + level) + 5) / 10;
+                assertThat(EnhancementTable.enhancedBonus(base, level))
+                        .as("gốc %d ở +%d", base, level)
+                        .isEqualTo((int) exact);
+            }
+        }
+    }
+
     @Test
     void shouldRejectEnhanceLevelOutsideRange() {
         assertThatThrownBy(() -> EnhancementTable.enhancedBonus(10, -1)).isInstanceOf(IllegalArgumentException.class);
