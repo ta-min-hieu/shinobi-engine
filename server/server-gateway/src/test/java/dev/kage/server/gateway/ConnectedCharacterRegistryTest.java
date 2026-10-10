@@ -176,6 +176,91 @@ class ConnectedCharacterRegistryTest {
     }
 
     /**
+     * Hai quái chết sát nhau = hai lượt cộng EXP trên hai Virtual Thread; DB cộng đúng thứ tự
+     * (110 rồi 130) nhưng hai luồng có thể GỬI ngược thứ tự. Gói về sau cùng mang số CŨ hơn thì
+     * vạch EXP của client lùi về 110 và đứng sai ở đó tới lần nhận EXP kế tiếp, dù DB đã là 130.
+     * Gọi thẳng {@code sendExperience} theo thứ tự ngược để tái hiện tất định.
+     */
+    @Test
+    void shouldNeverMoveTheExperienceBarBackwards_whenAnOlderGrantIsSentLast() throws InvalidProtocolBufferException {
+        registry = new ConnectedCharacterRegistry(
+                fakeInventoryFacade(0),
+                fakeQuestFacade(),
+                ExperienceGrantPort.disabled(),
+                new GatewayNetworkMetrics(new SimpleMeterRegistry()));
+        EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(1L, channel.pipeline().firstContext());
+
+        registry.sendExperience(
+                1L, new GrantExperienceUseCase.Result(new ExperienceProgress(2, 130L, 30L, 200L), false));
+        registry.sendExperience(
+                1L, new GrantExperienceUseCase.Result(new ExperienceProgress(2, 110L, 10L, 200L), false));
+
+        assertThat(lastExperienceEvent(channel).getTotalExp()).isEqualTo(130L);
+    }
+
+    /**
+     * Như trên, nhưng gói CŨ hơn lại là gói mang {@code leveledUp=true} (chính lượt đó vượt mốc).
+     * Bỏ hẳn nó thì mất thông báo lên cấp; gửi nguyên thì vạch lùi. Phải báo lên cấp KÈM số mới nhất.
+     */
+    @Test
+    void shouldStillAnnounceLevelUp_withTheNewestTotals_whenTheLevelUpGrantIsSentLast()
+            throws InvalidProtocolBufferException {
+        registry = new ConnectedCharacterRegistry(
+                fakeInventoryFacade(0),
+                fakeQuestFacade(),
+                ExperienceGrantPort.disabled(),
+                new GatewayNetworkMetrics(new SimpleMeterRegistry()));
+        EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(1L, channel.pipeline().firstContext());
+
+        registry.sendExperience(
+                1L, new GrantExperienceUseCase.Result(new ExperienceProgress(2, 130L, 30L, 200L), false));
+        registry.sendExperience(
+                1L, new GrantExperienceUseCase.Result(new ExperienceProgress(2, 110L, 10L, 200L), true));
+
+        ExperienceChangedEvent last = lastExperienceEvent(channel);
+        assertThat(last.getLeveledUp()).isTrue();
+        assertThat(last.getTotalExp()).isEqualTo(130L);
+        assertThat(last.getExpIntoLevel()).isEqualTo(30L);
+    }
+
+    /** Vào lại world là một phiên hiển thị MỚI: số đã gửi cho phiên trước không được chặn gói đầu tiên. */
+    @Test
+    void shouldSendExperienceAgain_afterTheCharacterReRegisters() throws InvalidProtocolBufferException {
+        registry = new ConnectedCharacterRegistry(
+                fakeInventoryFacade(0),
+                fakeQuestFacade(),
+                ExperienceGrantPort.disabled(),
+                new GatewayNetworkMetrics(new SimpleMeterRegistry()));
+        EmbeddedChannel first = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(1L, first.pipeline().firstContext());
+        registry.sendExperience(
+                1L, new GrantExperienceUseCase.Result(new ExperienceProgress(2, 130L, 30L, 200L), false));
+        registry.unregister(1L);
+
+        EmbeddedChannel second = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(1L, second.pipeline().firstContext());
+        registry.sendExperience(
+                1L, new GrantExperienceUseCase.Result(new ExperienceProgress(2, 130L, 30L, 200L), false));
+
+        assertThat(lastExperienceEvent(second).getTotalExp()).isEqualTo(130L);
+    }
+
+    /** Gói EXP CUỐI CÙNG đã ghi ra kênh — thứ quyết định vạch EXP client đang vẽ. */
+    private static ExperienceChangedEvent lastExperienceEvent(EmbeddedChannel channel)
+            throws InvalidProtocolBufferException {
+        Optional<ExperienceChangedEvent> last = Optional.empty();
+        for (Object message : channel.outboundMessages()) {
+            if (message instanceof PacketCodec.Frame frame
+                    && frame.header().opcode() == Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE) {
+                last = Optional.of(ExperienceChangedEvent.parseFrom(frame.payload()));
+            }
+        }
+        return last.orElseThrow(() -> new AssertionError("Không có ExperienceChangedEvent nào được gửi"));
+    }
+
+    /**
      * Graceful shutdown (SERVER.md §10): {@code GatewayBootstrap} đóng pool DB NGAY sau
      * {@code stop()}. Một lượt cộng EXP/rơi đồ/tiến độ quest đang chạy dở trên {@code lootExecutor}
      * lúc đó là phần thưởng của một con quái ĐÃ chết — DB đóng giữa chừng thì nó mất vĩnh viễn (quái
