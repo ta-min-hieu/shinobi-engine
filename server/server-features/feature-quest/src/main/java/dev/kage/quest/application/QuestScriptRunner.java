@@ -132,7 +132,8 @@ final class QuestScriptRunner {
             return null;
         });
         ctx.put("give_exp", (ProxyExecutable) args -> {
-            effects.expGranted += args[0].asLong();
+            // addExact: tràn long cũng là lỗi script, không phải một con số âm lặng lẽ.
+            effects.expGranted = Math.addExact(effects.expGranted, requireNonNegativeExp(args[0].asLong()));
             return null;
         });
         ctx.put("give_item", (ProxyExecutable) args -> {
@@ -163,6 +164,21 @@ final class QuestScriptRunner {
         List<ItemTake> itemTakes = List.copyOf(effects.itemTakes);
         return new HookEffects(
                 resultProgressJson, effects.completed, effects.expGranted, itemGrants, itemTakes, scriptFailed);
+    }
+
+    /**
+     * {@code ctx.give_exp(n)} chỉ nhận {@code n >= 0} (sửa 2026-10-10). Số âm đi thẳng xuống
+     * {@code exp = exp + ?}; cột {@code character.exp} không có CHECK, còn {@code Character} từ chối
+     * exp âm ngay trong constructor — đo trên Postgres thật: sau một lần trừ quá tay,
+     * {@code findById} VÀ {@code listByAccount} đều ném lỗi, tức nhân vật không vào được world và cả
+     * tài khoản không liệt kê nổi nhân vật. Ném từ trong callback nên nó thành lỗi script
+     * ({@link HookEffects#scriptFailed}) — cùng cách {@link ItemTake} chặn số lượng âm.
+     */
+    private static long requireNonNegativeExp(long amount) {
+        if (amount < 0L) {
+            throw new IllegalArgumentException("give_exp cần số không âm: " + amount);
+        }
+        return amount;
     }
 
     private static String loadScript(String resourcePath) {
