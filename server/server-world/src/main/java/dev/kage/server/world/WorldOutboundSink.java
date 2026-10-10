@@ -107,6 +107,20 @@ public interface WorldOutboundSink {
     void onCharacterRespawned(RespawnSnapshot respawn);
 
     /**
+     * Vị trí THẬT hiện tại của {@code characterId}, báo định kỳ (mỗi
+     * {@code WorldConstants.POSITION_SAMPLE_INTERVAL_TICKS} tick) cho MỌI nhân vật đang ở World này.
+     *
+     * <p><b>Vì sao cần (sửa 2026-10-10).</b> {@link #onMoveAccepted} chỉ chạy khi client gửi lệnh, mà
+     * client chỉ gửi {@code MoveCommand} lúc ĐỔI hướng: giữ phím đi 100 m thì vị trí cuối gateway
+     * biết vẫn là chỗ bấm phím. Mọi lần lưu vị trí (định kỳ, ngắt kết nối, tắt server) ghi đúng chỗ
+     * cũ đó — đăng nhập lại bị lùi về.
+     *
+     * <p>Mặc định KHÔNG làm gì: chỉ sink của world CHÍNH theo dõi vị trí để lưu — toạ độ trong hầm
+     * ngục/đấu trường là không gian riêng của instance, không bao giờ được ghi thành vị trí thật.
+     */
+    default void onCharacterPositionSampled(long characterId, float x, float y) {}
+
+    /**
      * Ảnh chụp vị trí sau khi xử lý {@code MoveCommand}/{@code JumpCommand} (ADR-033) — gộp tham số
      * (STATIC-ANALYSIS.md, checkstyle {@code ParameterNumberCheck} max=4). {@code z}/{@code
      * grounded} thêm ở ADR-033.

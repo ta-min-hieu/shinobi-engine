@@ -68,12 +68,40 @@ public final class GatewayBootstrap {
         MetricsContext metricsContext = buildMetrics();
         ServerDatabaseBootstrap databaseBootstrap =
                 new ServerDatabaseBootstrap(new MicrometerDbMetricsPort(metricsContext.meterRegistry()));
+        Assembly gateway = assemble(
+                databaseBootstrap,
+                metricsContext,
+                new GatewayTracing(),
+                new Endpoints(PORT, METRICS_PORT, TlsConfig.fromEnvironment()));
+        startOrShutDown(gateway.server(), gateway.shutdown());
+        Runtime.getRuntime().addShutdownHook(new Thread(gateway.shutdown(), "gateway-shutdown"));
+        gateway.server().awaitTermination();
+    }
+
+    /** Cổng game, cổng metrics và cấu hình TLS — thứ duy nhất test đổi so với production. */
+    record Endpoints(int gamePort, int metricsPort, TlsConfig tlsConfig) {}
+
+    /** Server đã lắp xong (CHƯA mở cổng) kèm trình tự tắt của chính nó — xem {@link #assemble}. */
+    record Assembly(GatewayServer server, Runnable shutdown) {}
+
+    /**
+     * Lắp toàn bộ server từ DB đã kết nối — world chính đã tick, luồng lưu vị trí và máy chủ metrics đã
+     * chạy, cổng game CHƯA mở ({@link #startOrShutDown} mở).
+     *
+     * <p>Tách khỏi {@code main()} (2026-10-10) để test tắt/khởi động lại
+     * ({@code ServerShutdownMidPlayDatabaseTest}) chạy ĐÚNG phép lắp và ĐÚNG trình tự tắt của
+     * production trên Postgres thật, thay vì một bản chép tay có thể lệch thứ tự.
+     */
+    static Assembly assemble(
+            ServerDatabaseBootstrap databaseBootstrap,
+            MetricsContext metricsContext,
+            GatewayTracing tracing,
+            Endpoints endpoints) {
         GatewayFacades facades = wireFacades(databaseBootstrap);
 
         validateContentScripts(databaseBootstrap);
 
-        GatewayObservability observability =
-                new GatewayObservability(metricsContext.networkMetrics(), new GatewayTracing());
+        GatewayObservability observability = new GatewayObservability(metricsContext.networkMetrics(), tracing);
 
         // characterRegistry là WorldOutboundSink thật — PHẢI tồn tại trước WorldFacade vì
         // WorldFacade cần sink lúc construct (SERVER.md §2: kết quả tick đi qua outbound queue).
@@ -83,7 +111,8 @@ public final class GatewayBootstrap {
                 facades.characterFacade()::grantExperience,
                 metricsContext.networkMetrics());
         wireGoldChangeNotifications(databaseBootstrap, characterRegistry);
-        WorldContext worldContext = startWorld(characterRegistry, databaseBootstrap, metricsContext.meterRegistry());
+        WorldContext worldContext = startWorld(
+                characterRegistry, databaseBootstrap, metricsContext.meterRegistry(), endpoints.metricsPort());
         MainWorldChannelRegistry mainWorldChannels = worldContext.mainWorldChannels();
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(facades.characterFacade(), characterRegistry, POSITION_SAVE_INTERVAL);
@@ -92,18 +121,16 @@ public final class GatewayBootstrap {
                 buildInstanceRegistries(characterRegistry, facades, mainWorldChannels, positionPersister);
 
         GatewayServer server = new GatewayServer(
-                PORT,
+                endpoints.gamePort(),
                 facades,
                 new GatewayServer.GatewayContext(instanceRegistries.worldGateway(), observability),
-                TlsConfig.fromEnvironment());
+                endpoints.tlsConfig());
         Runnable shutdown = shutdownSequence(
                 new ShutdownContext(server, worldContext, instanceRegistries, characterRegistry),
                 positionPersister,
                 observability,
                 databaseBootstrap);
-        startOrShutDown(server, shutdown);
-        Runtime.getRuntime().addShutdownHook(new Thread(shutdown, "gateway-shutdown"));
-        server.awaitTermination();
+        return new Assembly(server, shutdown);
     }
 
     /**
@@ -244,7 +271,7 @@ public final class GatewayBootstrap {
      * Gộp {@link PrometheusMeterRegistry} + {@link GatewayNetworkMetrics} — dựng cùng lúc,
      * xem {@link #buildMetrics}.
      */
-    private record MetricsContext(PrometheusMeterRegistry meterRegistry, GatewayNetworkMetrics networkMetrics) {}
+    record MetricsContext(PrometheusMeterRegistry meterRegistry, GatewayNetworkMetrics networkMetrics) {}
 
     /**
      * Tách khỏi {@code main()} để giữ dưới giới hạn Checkstyle MethodLength — {@code meterRegistry}
@@ -253,7 +280,7 @@ public final class GatewayBootstrap {
      * mọi đường gửi, kể cả broadcast của {@code ConnectedCharacterRegistry}, không chỉ response
      * trực tiếp của {@link GatewayChannelHandler}).
      */
-    private static MetricsContext buildMetrics() {
+    static MetricsContext buildMetrics() {
         PrometheusMeterRegistry meterRegistry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
         // OBSERVABILITY.md §3.4 "jvm.gc.pause (quan trọng) · jvm.memory.used · jvm.threads.live" —
         // binder có sẵn trong micrometer-core (KHÔNG cần dependency mới), chỉ chưa ai gọi bindTo()
@@ -276,9 +303,10 @@ public final class GatewayBootstrap {
     private static WorldContext startWorld(
             ConnectedCharacterRegistry characterRegistry,
             ServerDatabaseBootstrap databaseBootstrap,
-            PrometheusMeterRegistry meterRegistry) {
+            PrometheusMeterRegistry meterRegistry,
+            int metricsPort) {
         MetricsHttpServer metricsHttpServer =
-                new MetricsHttpServer(METRICS_PORT, meterRegistry, databaseBootstrap::isReady);
+                new MetricsHttpServer(metricsPort, meterRegistry, databaseBootstrap::isReady);
         metricsHttpServer.start();
         // OBSERVABILITY.md §3.1 kage.players.online + §3.5 kage.gold.total — Gauge đọc thẳng
         // state hiện có lúc scrape (weak reference qua Gauge.builder, không polling thủ công,

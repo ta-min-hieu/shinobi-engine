@@ -2,6 +2,7 @@ package dev.kage.server.gateway;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -367,17 +368,24 @@ final class ArenaInstanceRegistry {
 
     /** Graceful shutdown (SERVER.md §10) — dừng MỌI duel World đang chạy trước khi thoát process. */
     void stopAll() {
-        stopAllInstances();
+        // stop() NGOÀI khoá (sửa 2026-10-10, ArenaShutdownDeadlockTest): nó chờ lần tick đang chạy dở,
+        // mà lần tick đó — nếu vừa có người gục — đang xin chính monitor này ở handleCharacterDefeated.
+        // Dừng trong khoá là hai luồng chờ nhau mãi và trình tự tắt server đứng tại đây. Sổ sách đã
+        // xoá trước nên lời báo gục muộn thấy "không còn trận" và bỏ qua; executor tắt SAU khi mọi
+        // World đã im, nên không lời báo nào bị từ chối trên tick thread.
+        forgetAllInstances().forEach(instance -> instance.facade().stop());
+        settlementExecutor.shutdown();
         ShutdownDrain.await(settlementExecutor, "Chốt trận Arena");
     }
 
-    private synchronized void stopAllInstances() {
-        instancesByChallengeId.values().forEach(instance -> instance.facade().stop());
+    /** Xoá mọi sổ sách về trận, trả các trận CHƯA chốt (trận đã chốt do chính lượt chốt của nó dừng). */
+    private synchronized List<DuelInstance> forgetAllInstances() {
+        List<DuelInstance> unsettled = List.copyOf(instancesByChallengeId.values());
         instancesByChallengeId.clear();
         instanceByCharacterId.clear();
         startingDuelCharacterIds.clear();
         returnPositionByCharacterId.clear();
-        settlementExecutor.shutdown();
+        return unsettled;
     }
 
     private DuelEntrant loadEntrant(long characterId) {

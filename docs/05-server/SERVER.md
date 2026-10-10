@@ -308,6 +308,26 @@ và `start()` một World không ai dừng — nó tick tiếp trong lúc pool D
 `stopped`: lượt gắn muộn rơi vào khu vực #1 **đã dừng** (lệnh nằm im trong hàng đợi) và
 `needsNewChannel()` luôn `false`. Test: `MainWorldChannelRegistryTest`.
 
+**Vị trí lưu lúc tắt là chỗ nhân vật ĐANG ĐỨNG, không phải chỗ bấm phím lần cuối** (sửa 2026-10-10).
+Client chỉ gửi `MoveCommand` khi ĐỔI hướng, còn gateway chỉ học vị trí từ lời đáp của lệnh đó — nên mọi
+lần ghi vị trí (định kỳ, ngắt kết nối, tắt server) ghi chỗ người chơi bấm phím lần cuối: giữ phím đi
+12 m rồi server tắt là đăng nhập lại lùi đúng 12 m. Nay world chính báo vị trí thật của mọi nhân vật
+mỗi giây (`WorldOutboundSink.onCharacterPositionSampled`, `WorldConstants.POSITION_SAMPLE_RATE_HZ`);
+hầm ngục/đấu trường không báo (toạ độ instance không bao giờ thành vị trí thật). Còn mất nhiều nhất
+quãng đi của một giây. Test: `ServerShutdownMidPlayDatabaseTest`, `ConnectedCharacterRegistryPositionTest`.
+
+**`ArenaInstanceRegistry.stopAll()` dừng World NGOÀI khoá** (sửa 2026-10-10). Bản cũ gọi `stop()` —
+chờ lần tick dở — khi đang giữ monitor của registry, còn lần tick đó nếu vừa có người gục thì xin đúng
+monitor ấy (`handleCharacterDefeated`): khoá chết, trình tự tắt đứng lại tới khi Docker giết tiến
+trình. Trong trình tự tắt hiện tại mọi trận đã bị chốt lúc đóng kết nối nên chưa chạm được; sẽ chạm
+ngay nếu dòng 36 của bảng chờ (huỷ trận khi tắt) được thi hành. Test: `ArenaShutdownDeadlockTest`.
+
+**Kiểm tắt → khởi động lại trên Postgres thật** (`ServerShutdownMidPlayDatabaseTest`, 2026-10-10, chạy
+đúng phép lắp + trình tự tắt của production qua `GatewayBootstrap.assemble`): 30 lệnh mua còn đang bay
+lúc tắt đều chạy trọn (vàng trừ = giá × số món, mỗi món một dòng audit, không log ERROR); lệnh xác nhận
+giao dịch thứ hai bay đúng lúc tắt thì hoặc giao dịch xảy ra trọn hoặc phiên còn nguyên, và sau khởi
+động lại phiên còn sót huỷ được, mời lại được.
+
 ⚠️ **Còn để ngỏ, đã đưa lên bảng chờ chủ dự án** ([README](../README.md)): tắt server giữa trận Arena
 vẫn xử thua theo thứ tự Netty đóng kết nối và **ghi Elo thật** (dòng 36); lưu vị trí lúc ngắt kết nối
 thất bại thì không thử lại (dòng 55 — §8 chấp nhận mất ≤ 5 phút); `WorldFacade.stop()` chờ `tickLock`
