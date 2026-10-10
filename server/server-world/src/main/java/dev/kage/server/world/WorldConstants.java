@@ -70,5 +70,15 @@ final class WorldConstants {
     static final float AOI_SYNC_RATE_HZ = 20f;
     static final int AOI_SYNC_INTERVAL_TICKS = Math.round(TICK_RATE / AOI_SYNC_RATE_HZ);
 
+    /**
+     * Nhịp báo vị trí THẬT của nhân vật ra {@link WorldOutboundSink#onCharacterPositionSampled} —
+     * nguồn cho việc lưu vị trí (SERVER.md §8). Client chỉ gửi lệnh khi ĐỔI hướng, nên không có nhịp
+     * này thì vị trí gateway nhớ là chỗ bấm phím lần cuối. 1 Hz: lúc ngắt kết nối/tắt server mất
+     * nhiều nhất quãng đi của một giây ({@link #MOVE_SPEED_MPS} mét); chưa đo, tinh chỉnh một chỗ.
+     */
+    static final float POSITION_SAMPLE_RATE_HZ = 1f;
+
+    static final int POSITION_SAMPLE_INTERVAL_TICKS = Math.round(TICK_RATE / POSITION_SAMPLE_RATE_HZ);
+
     private WorldConstants() {}
 }

@@ -722,6 +722,17 @@ public final class WorldFacade {
         if (tickCounter % WorldConstants.AOI_SYNC_INTERVAL_TICKS == 0) {
             aoiTracker.sync(entitiesByCharacterId, entitiesByMonsterId, entitiesByNpcId);
         }
+        if (tickCounter % WorldConstants.POSITION_SAMPLE_INTERVAL_TICKS == 0) {
+            samplePositions();
+        }
+    }
+
+    /** Báo vị trí thật của mọi nhân vật — xem {@link WorldOutboundSink#onCharacterPositionSampled}. */
+    private void samplePositions() {
+        for (Map.Entry<Long, KEntity> entry : entitiesByCharacterId.entrySet()) {
+            PositionComponent position = POSITION.get(entry.getValue());
+            outboundSink.onCharacterPositionSampled(entry.getKey(), position.x, position.y);
+        }
     }
 
     // ---------------------------------------------------------------------------------------------

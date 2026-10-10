@@ -1046,6 +1046,40 @@ class GatewayServerIntegrationTest {
         }
     }
 
+    /**
+     * Tắt server lúc nhân vật ĐANG ĐI (phím vẫn giữ): client chỉ gửi {@code MoveCommand} khi ĐỔI
+     * hướng, nên trước 2026-10-10 vị trí server nhớ — và ghi xuống DB — là chỗ người chơi bấm phím
+     * lần cuối, không phải chỗ nhân vật đang đứng: đi 12 m rồi server tắt là đăng nhập lại lùi 12 m.
+     */
+    @Test
+    @Timeout(20)
+    void shouldSaveWhereTheCharacterActuallyIs_whenServerShutsDownWhileItIsStillWalking() throws Exception {
+        long walkMillis = 2500L;
+        // 5 m/s × 2,5 s ≈ 12,5 m thật; vị trí được lấy mẫu mỗi giây ⇒ chỗ đã lưu phải cách điểm xuất
+        // phát ít nhất quãng đi của một giây. Bản cũ lưu đúng điểm xuất phát (0 m).
+        float minimumSavedDistance = 5f;
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
+            socket.setSoTimeout(5000);
+            DataInputStream in = new DataInputStream(socket.getInputStream());
+            long characterId = connectCreateAndSelect(socket, in, "walkingshutdown");
+
+            MoveCommand moveCommand =
+                    MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
+            sendFrame(socket, Opcode.OPCODE_MOVE_COMMAND_VALUE, 10, moveCommand.toByteArray());
+            MoveResponse startResponse = MoveResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_MOVE_RESPONSE_VALUE).payload());
+
+            Thread.sleep(walkMillis); // phím vẫn giữ — KHÔNG có MoveCommand nào nữa
+
+            server.stop();
+
+            PositionSnapshot savedPosition = characterPort.loadPosition(characterId);
+            assertThat(savedPosition.x() - startResponse.getX())
+                    .as("quãng đường đã đi mà vị trí lưu lúc tắt server còn giữ được")
+                    .isGreaterThan(minimumSavedDistance);
+        }
+    }
+
     @Test
     @Timeout(10)
     void clientShouldReceivePong_overRealSocket() throws Exception {

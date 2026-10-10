@@ -93,6 +93,33 @@ class ConnectedCharacterRegistryPositionTest {
         assertThat(registry.isOnline(CHARACTER_ID)).isFalse();
     }
 
+    /**
+     * Client chỉ gửi lệnh khi đổi hướng — giữa hai lệnh, nhịp báo vị trí của world chính là thứ duy
+     * nhất giữ {@code lastKnownPosition} đúng với chỗ nhân vật đang đứng (sửa 2026-10-10).
+     */
+    @Test
+    void shouldFollowSampledPosition_whenNoMoveCommandArrivesWhileWalking() {
+        EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(CHARACTER_ID, channel.pipeline().firstContext());
+        registry.onMoveAccepted(moveAccepted(1, 10f, 20f));
+
+        registry.onCharacterPositionSampled(CHARACTER_ID, 15f, 20f);
+
+        assertThat(registry.lastKnownPosition(CHARACTER_ID)).isEqualTo(new PositionSnapshot(15f, 20f));
+    }
+
+    /** Cùng lý do với {@code onMoveAccepted} muộn: nhịp báo tới sau khi đã thoát không được đẻ lại dòng. */
+    @Test
+    void shouldNotResurrectPosition_whenSampleArrivesAfterUnregister() {
+        EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(CHARACTER_ID, channel.pipeline().firstContext());
+        registry.unregister(CHARACTER_ID);
+
+        registry.onCharacterPositionSampled(CHARACTER_ID, 15f, 20f);
+
+        assertThat(registry.snapshotPositions()).doesNotContainKey(CHARACTER_ID);
+    }
+
     private static WorldOutboundSink.MoveAcceptedSnapshot moveAccepted(int sequenceId, float x, float y) {
         return new WorldOutboundSink.MoveAcceptedSnapshot(CHARACTER_ID, sequenceId, x, y, 0f, true);
     }

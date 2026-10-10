@@ -198,7 +198,10 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         return Map.copyOf(lastKnownPosition);
     }
 
-    /** Vị trí đã biết của MỘT nhân vật, hoặc {@code null} nếu chưa từng di chuyển kể từ khi vào world. */
+    /**
+     * Vị trí đã biết của MỘT nhân vật, hoặc {@code null} nếu world chính chưa báo lần nào kể từ khi
+     * vào world (chưa gửi lệnh di chuyển và chưa tới nhịp {@link #onCharacterPositionSampled} đầu tiên).
+     */
     PositionSnapshot lastKnownPosition(long characterId) {
         return lastKnownPosition.get(characterId);
     }
@@ -224,6 +227,20 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         // không cần bền vững. Chỉ x/y (mặt đất) mới cần cho CharacterPositionPersister.
         trackPositionIfConnected(accepted.characterId(), accepted.x(), accepted.y());
         sendMoveResponseWithoutTrackingPosition(accepted);
+    }
+
+    /**
+     * Vị trí thật theo nhịp của world chính (sửa 2026-10-10) — thiếu nó thì {@code lastKnownPosition}
+     * chỉ đổi khi client gửi lệnh, tức là chỗ người chơi ĐỔI HƯỚNG lần cuối chứ không phải chỗ nhân
+     * vật đang đứng. Đứng yên thì không ghi gì (không cấp phát trên tick thread).
+     */
+    @Override
+    public void onCharacterPositionSampled(long characterId, float x, float y) {
+        PositionSnapshot known = lastKnownPosition.get(characterId);
+        if (known != null && Float.compare(known.x(), x) == 0 && Float.compare(known.y(), y) == 0) {
+            return;
+        }
+        trackPositionIfConnected(characterId, x, y);
     }
 
     /**
