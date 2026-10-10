@@ -353,6 +353,18 @@ final class ArenaInstanceRegistry {
         instanceByCharacterId.remove(characterId, instance);
     }
 
+    /**
+     * Số dòng sổ sách còn giữ về các trận (đang chạy, đang dựng, đang chốt) — chỉ để quan sát (test,
+     * chẩn đoán). Không ai đang đấu thì phải về 0: mỗi dòng sót là một nhân vật bị coi là "đang bận"
+     * mãi mãi. KHÔNG tính lời thách đang chờ: chúng cố ý sống qua lần ngắt kết nối.
+     */
+    synchronized int trackedEntryCount() {
+        return instancesByChallengeId.size()
+                + instanceByCharacterId.size()
+                + startingDuelCharacterIds.size()
+                + returnPositionByCharacterId.size();
+    }
+
     /** Graceful shutdown (SERVER.md §10) — dừng MỌI duel World đang chạy trước khi thoát process. */
     void stopAll() {
         stopAllInstances();

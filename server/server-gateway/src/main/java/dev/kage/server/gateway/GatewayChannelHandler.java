@@ -344,6 +344,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final TradeFacade tradeFacade;
     private final PvpFacade pvpFacade;
     private final WorldGateway worldGateway;
+    private final WorldRouteLookup worldRoutes;
     private final Executor authExecutor;
     private final GatewayNetworkMetrics networkMetrics;
     private final GatewayTracing tracing;
@@ -482,6 +483,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.tradeFacade = facades.contentFacades().socialFacades().tradeFacade();
         this.pvpFacade = facades.contentFacades().socialFacades().pvpFacade();
         this.worldGateway = worldGateway;
+        this.worldRoutes = WorldRouteLookup.of(worldGateway);
         this.authExecutor = authExecutor;
         this.networkMetrics = observability.networkMetrics();
         this.tracing = observability.tracing();
@@ -952,10 +954,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * hiện tại theo độ chênh của máu tối đa, nên trong chốc lát client hiển thị TỬ SỐ cũ (vd
      * {@code 100 / 118}) cho tới gói mang HP tiếp theo. MẪU SỐ — thứ sai trước ADR-043 — nay đúng
      * ngay. Muốn đúng cả tử số thì phải làm phương án (b) của D5 (đợi tick).
+     *
+     * <p><b>Nhân vật không còn ở World nào thì bỏ qua bước World (sửa 2026-10-10).</b> Lệnh này chạy
+     * trên Virtual Thread, SAU lời gọi DB: kết nối rớt trong lúc đó thì lần dọn đã gỡ nhân vật khỏi
+     * world trước khi ta tới đây. Bản cũ dùng {@code currentWorldFacade} (ném) — mặc đồ đã ghi DB xong
+     * mà vẫn thành một dòng ERROR "Handler lỗi ngoài dự kiến" kèm stack trace cho mỗi lần rớt mạng
+     * trúng lúc. Không có entity thì không có chỉ số nào để tính lại; lần vào world sau đọc trang bị
+     * từ DB. Cùng cách {@code handleUseItemBlocking} đã làm cho đan dược.
      */
     private int applyEquipmentBonusAndComputeMaxHp(long characterId) {
         EquipmentBonusSnapshot bonus = currentEquipmentBonus(characterId);
-        currentWorldFacade(characterId).applyEquipmentBonus(characterId, bonus);
+        currentWorldFacadeIfPresent(characterId).ifPresent(facade -> facade.applyEquipmentBonus(characterId, bonus));
         return WorldFacade.characterMaxHp(bonus);
     }
 
@@ -1059,11 +1068,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * nhân vật chưa vào World nào — ví dụ đổi hệ phái ngay sau khi chọn nhân vật (ADR-045).
      */
     private Optional<WorldFacade> currentWorldFacadeIfPresent(long characterId) {
-        return worldGateway
-                .dungeonInstanceRegistry()
-                .worldFacadeFor(characterId)
-                .or(() -> worldGateway.arenaInstanceRegistry().worldFacadeFor(characterId))
-                .or(() -> worldGateway.mainWorldChannels().worldFacadeFor(characterId));
+        return worldRoutes.find(characterId);
     }
 
     // MoveCommand KHÔNG chạm DB/Redis — chỉ enqueue vào server-world (rẻ, thread-safe), nên xử
@@ -3563,9 +3568,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         .sendToCharacterIfOnline(
                                 ctx.target().id(), Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
             }
+            // RỖNG nếu người gửi vừa rớt mạng trong lúc tin còn đang qua kiểm duyệt (2026-10-10) — không
+            // còn đứng ở đâu để ai "gần đó" nghe thấy; bỏ tin, không ném (xem applyEquipmentBonusAndComputeMaxHp).
             case AREA ->
-                currentWorldFacade(ctx.characterId())
-                        .enqueueAreaChatMessage(ctx.characterId(), ctx.senderName(), ctx.body());
+                currentWorldFacadeIfPresent(ctx.characterId())
+                        .ifPresent(facade ->
+                                facade.enqueueAreaChatMessage(ctx.characterId(), ctx.senderName(), ctx.body()));
             // GUILD/PARTY: broadcast cho MỌI thành viên đang online (gồm cả người gửi, cùng cách
             // AREA tự thấy tin của mình) — không cần AoI/tick thread, guild/party membership
             // không phải dữ liệu world-tick (feature-guild, feature-party/CLAUDE.md).
