@@ -59,7 +59,7 @@ final class SimulatedPlayer implements Runnable, GameConnection.FrameObserver {
     // không có ngưỡng này, 1 client bị server ngắt vì spam chat sẽ tiếp tục thử+lỗi suốt phần đời
     // còn lại của soak test, làm lỗi cộng dồn tăng dần đều theo thời gian dù server hoàn toàn khoẻ.
     private static final int MAX_CONSECUTIVE_FAILURES = 5;
-    // World chat giới hạn 5 lần/10s (GatewayChannelHandler.chatWorldRateLimiter) — xác suất này
+    // World chat giới hạn 5 lần/10s (ChatRateLimits, theo tài khoản) — xác suất này
     // phải đủ thấp để KHÔNG chạm ngưỡng đó dù cộng dồn nhiều cycle liên tiếp (trước là 20, gây
     // client bị ngắt kết nối hàng loạt trong soak test đầu).
     private static final int CHAT_PROBABILITY_PERCENT = 3;
