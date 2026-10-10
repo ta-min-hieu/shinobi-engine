@@ -581,7 +581,7 @@ class SecurityIntegrationTest {
             connectCreateAndSelect(
                     socket, in, "chatflood" + UUID.randomUUID().toString().substring(0, 6));
 
-            // Ngưỡng THẬT: 5 tin/10s cho kênh WORLD (chatWorldRateLimiter, nghiêm ngặt nhất trong
+            // Ngưỡng THẬT: 5 tin/10s cho kênh WORLD (ChatRateLimits, nghiêm ngặt nhất trong
             // các kênh chat — GAMEPLAY.md §10).
             for (int i = 1; i <= 6; i++) {
                 SendChatMessageCommand command = SendChatMessageCommand.newBuilder()
