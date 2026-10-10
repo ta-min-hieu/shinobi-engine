@@ -33,6 +33,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import dev.kage.protocol.AcceptTradeRequestCommand;
+import dev.kage.protocol.AttackCommand;
+import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.CancelTradeCommand;
 import dev.kage.protocol.CancelTradeOutcome;
@@ -44,6 +46,7 @@ import dev.kage.protocol.CreateCharacterRequest;
 import dev.kage.protocol.CreateCharacterResponse;
 import dev.kage.protocol.GetTradeStatusRequest;
 import dev.kage.protocol.GetTradeStatusResponse;
+import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.Opcode;
@@ -52,6 +55,7 @@ import dev.kage.protocol.RequestTradeOutcome;
 import dev.kage.protocol.RequestTradeResponse;
 import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.SelectCharacterResponse;
+import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.SetTradeOfferCommand;
 import dev.kage.protocol.TradeOfferItemInput;
 import dev.kage.protocol.TradeRequestedEvent;
@@ -60,6 +64,7 @@ import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.DbMetricsPort;
+import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.PostgresDataSourceFactory;
 import dev.kage.server.database.ServerDatabaseBootstrap;
 import dev.kage.server.database.session.RedisConfig;
@@ -96,6 +101,24 @@ class ServerShutdownMidPlayDatabaseTest {
     private static final long TRADE_GOLD = 100L;
     private static final int TRADE_ITEM_QUANTITY = 2;
     private static final int START_ITEM_QUANTITY = 5;
+
+    private static final String DUMMY_CODE = "training_dummy";
+
+    /** Đứng cách mộc nhân chừng này — trong tầm đánh 2 m. */
+    private static final float DISTANCE_TO_THE_DUMMY = 1f;
+
+    /** Dày hơn cooldown đánh thường (1 đòn/giây) — lệnh thừa là no-op ở server. */
+    private static final long ATTACK_INTERVAL_MILLIS = 250L;
+
+    /**
+     * Thời gian "DB chậm" giả lập: lượt cộng EXP đứng chờ khoá dòng lâu chừng này SAU khi trình tự tắt
+     * (hoặc lần ngắt kết nối) đã bắt đầu. Dài hơn hẳn thời gian trình tự tắt tự nó cần để đi tới bước
+     * đóng pool DB, và nằm gọn trong trần chờ 10 s.
+     */
+    private static final long SLOW_REWARD_MILLIS = 3_000L;
+
+    private static final long REWARD_POLL_MILLIS = 50L;
+    private static final long REWARD_DEADLINE_MILLIS = 10_000L;
 
     @Container
     static final PostgreSQLContainer POSTGRES =
@@ -361,7 +384,171 @@ class ServerShutdownMidPlayDatabaseTest {
         shutDown(second);
     }
 
+    /**
+     * Quái chết ngay trước khi server tắt, và lượt cộng EXP của nó còn đang chờ DB lúc trình tự tắt
+     * chạy: trình tự tắt phải chờ nó (trần 10 s) rồi mới đóng pool DB. Rơi đồ, tiến độ quest và EXP của
+     * con quái đó đều phải nằm trong DB sau khi tắt — quái không được lưu, mất là mất hẳn.
+     */
+    @Test
+    void killRewardStillWaitingOnTheDatabaseAtShutdownShouldLandBeforeThePoolCloses() throws Exception {
+        prepareOneHitDummyWithGuaranteedDrop();
+        GatewayBootstrap.Assembly server = startServer();
+        long expReward = queryLong("SELECT exp_reward FROM monster_template WHERE code = ?", DUMMY_CODE);
+        long characterId;
+        long itemsBefore;
+        try (ErrorLogCapture errorLog = ErrorLogCapture.attach();
+                Player player = Player.connect(server)) {
+            player.logIn("kill" + suffix());
+            characterId = player.createCharacter();
+            float dummyX = standBesideTheDummyOnItsQuest(characterId);
+            itemsBefore = totalItems(characterId);
+            player.select(characterId);
+            long dummyId = player.awaitMonsterAt(DUMMY_CODE, dummyX);
+
+            try (Connection slowDatabase = holdExperienceRow(characterId)) {
+                player.kill(dummyId, characterId);
+                Thread release = releaseLater(slowDatabase);
+
+                shutDown(server); // lượt cộng EXP còn đang chờ khoá dòng
+
+                release.join();
+            }
+            assertThat(errorLog.errorsSince(0))
+                    .as("không lượt trao thưởng nào bị cắt giữa chừng lúc tắt")
+                    .isEmpty();
+        }
+
+        assertThat(queryLong("SELECT exp FROM character WHERE id = ?", characterId))
+                .as("EXP của con quái chết ngay trước khi tắt")
+                .isEqualTo(expReward);
+        assertThat(totalItems(characterId) - itemsBefore)
+                .as("đồ rơi (bảng rơi đã ghim 100%)")
+                .isPositive();
+        assertThat(questProgress(characterId)).as("tiến độ quest đếm mộc nhân").contains("\"killed\":1");
+    }
+
+    /**
+     * Người chơi ngắt kết nối trong lúc lượt cộng EXP của con quái vừa hạ còn chờ DB: phần thưởng vẫn
+     * phải vào DB (chỉ mất gói thông báo), và không để lại log ERROR nào.
+     */
+    @Test
+    void killRewardShouldStillLand_whenTheKillerDisconnectsBeforeItIsWritten() throws Exception {
+        prepareOneHitDummyWithGuaranteedDrop();
+        GatewayBootstrap.Assembly server = startServer();
+        long expReward = queryLong("SELECT exp_reward FROM monster_template WHERE code = ?", DUMMY_CODE);
+        long characterId;
+        long itemsBefore;
+        try (ErrorLogCapture errorLog = ErrorLogCapture.attach()) {
+            try (Player player = Player.connect(server)) {
+                player.logIn("quit" + suffix());
+                characterId = player.createCharacter();
+                float dummyX = standBesideTheDummyOnItsQuest(characterId);
+                itemsBefore = totalItems(characterId);
+                player.select(characterId);
+                long dummyId = player.awaitMonsterAt(DUMMY_CODE, dummyX);
+
+                try (Connection slowDatabase = holdExperienceRow(characterId)) {
+                    player.kill(dummyId, characterId);
+                    player.disconnect(); // ngắt kết nối khi EXP chưa ghi
+                    Thread.sleep(SLOW_REWARD_MILLIS);
+                    assertThat(queryLong("SELECT exp FROM character WHERE id = ?", characterId))
+                            .as("khoá test còn giữ ⇒ EXP chưa thể ghi lúc người chơi đã rời")
+                            .isZero();
+                    slowDatabase.rollback();
+                }
+            }
+            awaitExperience(characterId, expReward);
+            assertThat(errorLog.errorsSince(0)).isEmpty();
+        }
+
+        assertThat(totalItems(characterId) - itemsBefore).as("đồ rơi").isPositive();
+        assertThat(questProgress(characterId)).as("tiến độ quest").contains("\"killed\":1");
+        shutDown(server);
+    }
+
     // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Mộc nhân chết sau MỘT đòn và luôn rơi đồ — chỉ là dữ liệu của container test (không đổi
+     * migration), để "có rơi hay không" và "mấy đòn thì chết" không còn là may rủi. Phải chạy TRƯỚC khi
+     * dựng server: chỉ số quái được nạp một lần lúc lắp.
+     */
+    private static void prepareOneHitDummyWithGuaranteedDrop() {
+        FlywayMigrator.migrate(probe);
+        update("UPDATE monster_template SET max_hp = 1, dodge_percent = 0 WHERE code = ?", DUMMY_CODE);
+        update(
+                "UPDATE drop_table_entry SET drop_chance_percent = 100"
+                        + " WHERE drop_table_id = (SELECT id FROM drop_table WHERE code = ?)",
+                DUMMY_CODE);
+    }
+
+    /**
+     * Đặt nhân vật (chưa vào world) cạnh một mộc nhân, đang làm quest đếm mộc nhân với tiến độ 0.
+     *
+     * @return toạ độ x của con mộc nhân đó — đọc từ {@code monster_spawn}, không chép số từ migration
+     */
+    private static float standBesideTheDummyOnItsQuest(long characterId) {
+        float dummyX = queryFloat(
+                "SELECT min(s.pos_x) FROM monster_spawn s JOIN monster_template t ON t.id = s.monster_template_id"
+                        + " WHERE t.code = ? AND s.world_code = 'main'",
+                DUMMY_CODE);
+        update("UPDATE character SET pos_x = ?, pos_y = 0 WHERE id = ?", dummyX - DISTANCE_TO_THE_DUMMY, characterId);
+        update(
+                "INSERT INTO character_quest_progress"
+                        + " (character_id, quest_template_id, status, progress_json, updated_at)"
+                        + " SELECT ?, id, 'IN_PROGRESS', '{\"killed\":0}', now()"
+                        + " FROM quest_template WHERE code = 'kill_training_dummies'",
+                characterId);
+        return dummyX;
+    }
+
+    /**
+     * Giữ khoá dòng nhân vật bằng một giao dịch mở: {@code UPDATE character SET exp = ...} của
+     * lượt cộng EXP đứng chờ tới khi giao dịch này kết thúc. {@code FOR NO KEY UPDATE} để KHÔNG chặn
+     * khoá ngoại của lượt rơi đồ/tiến độ quest (chúng chỉ xin {@code KEY SHARE}).
+     */
+    private static Connection holdExperienceRow(long characterId) throws SQLException {
+        Connection connection = probe.getConnection();
+        connection.setAutoCommit(false);
+        try (PreparedStatement statement =
+                connection.prepareStatement("SELECT id FROM character WHERE id = ? FOR NO KEY UPDATE")) {
+            statement.setLong(1, characterId);
+            statement.executeQuery().close();
+        }
+        return connection;
+    }
+
+    private static Thread releaseLater(Connection heldLock) {
+        return Thread.ofPlatform().name("slow-database-release").start(() -> {
+            try {
+                Thread.sleep(SLOW_REWARD_MILLIS);
+                heldLock.rollback();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (SQLException e) {
+                throw new IllegalStateException("nhả khoá test-only lỗi", e);
+            }
+        });
+    }
+
+    private static void awaitExperience(long characterId, long expected) throws InterruptedException {
+        long deadline =
+                System.nanoTime() + Duration.ofMillis(REWARD_DEADLINE_MILLIS).toNanos();
+        long exp = queryLong("SELECT exp FROM character WHERE id = ?", characterId);
+        while (exp != expected && System.nanoTime() < deadline) {
+            Thread.sleep(REWARD_POLL_MILLIS);
+            exp = queryLong("SELECT exp FROM character WHERE id = ?", characterId);
+        }
+        assertThat(exp).as("EXP của con quái hạ ngay trước khi ngắt kết nối").isEqualTo(expected);
+    }
+
+    private static long totalItems(long characterId) {
+        return queryLong("SELECT coalesce(sum(quantity), 0) FROM inventory_item WHERE character_id = ?", characterId);
+    }
+
+    private static String questProgress(long characterId) {
+        return queryString("SELECT progress_json FROM character_quest_progress WHERE character_id = ?", characterId);
+    }
 
     private GatewayBootstrap.Assembly startServer() throws Exception {
         ServerDatabaseBootstrap databaseBootstrap = new ServerDatabaseBootstrap(
@@ -532,6 +719,69 @@ class ServerShutdownMidPlayDatabaseTest {
                 }
             }
             throw new AssertionError("không thấy opcode " + opcode + " sau " + FRAMES_BEFORE_GIVING_UP + " gói");
+        }
+
+        /** Id của con quái mang {@code monsterCode} đứng tại {@code x} — đọc từ gói spawn của AoI. */
+        long awaitMonsterAt(String monsterCode, float x) throws IOException {
+            for (int i = 0; i < FRAMES_BEFORE_GIVING_UP; i++) {
+                MonsterSpawnedEvent spawned = MonsterSpawnedEvent.parseFrom(
+                        await(Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE).payload());
+                if (spawned.getMonsterCode().equals(monsterCode) && Math.abs(spawned.getX() - x) < POSITION_TOLERANCE) {
+                    return spawned.getMonsterId();
+                }
+            }
+            throw new AssertionError("không thấy " + monsterCode + " tại x=" + x);
+        }
+
+        /** Ngắt kết nối giữa chừng — như người chơi tắt client. */
+        void disconnect() throws IOException {
+            socket.close();
+        }
+
+        /**
+         * Nhắm rồi bấm đánh thường (luồng nền, vì luồng này bận đọc) tới khi chính nhân vật này hạ được
+         * con quái đó. Trả về ngay khi gói báo "mục tiêu chết" tới — lúc đó server đã xếp ba việc trao
+         * thưởng.
+         */
+        void kill(long monsterId, long characterId) throws IOException, InterruptedException {
+            send(
+                    Opcode.OPCODE_SET_TARGET_COMMAND_VALUE,
+                    SetTargetCommand.newBuilder()
+                            .setTargetEntityId(monsterId)
+                            .build()
+                            .toByteArray());
+            Thread attacker =
+                    Thread.ofPlatform().daemon().name("attack-spammer").start(this::attackUntilInterrupted);
+            try {
+                for (int i = 0; i < FRAMES_BEFORE_GIVING_UP; i++) {
+                    PacketCodec.Frame frame = readFrame();
+                    if (frame.header().opcode() != Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE) {
+                        continue;
+                    }
+                    AttackResultEvent result = AttackResultEvent.parseFrom(frame.payload());
+                    if (result.getAttackerEntityId() == characterId && result.getTargetDied()) {
+                        return;
+                    }
+                }
+            } finally {
+                attacker.interrupt();
+                attacker.join();
+            }
+            throw new AssertionError("không hạ được quái nào sau " + FRAMES_BEFORE_GIVING_UP + " gói");
+        }
+
+        private void attackUntilInterrupted() {
+            byte[] attack = AttackCommand.getDefaultInstance().toByteArray();
+            try {
+                while (!Thread.currentThread().isInterrupted()) {
+                    send(Opcode.OPCODE_ATTACK_COMMAND_VALUE, attack);
+                    Thread.sleep(ATTACK_INTERVAL_MILLIS);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (IOException e) {
+                LOG.debug("Socket đóng trong lúc bấm đánh — dừng bấm", e);
+            }
         }
 
         /** Mọi opcode còn tới cho đến khi server đóng kết nối. */

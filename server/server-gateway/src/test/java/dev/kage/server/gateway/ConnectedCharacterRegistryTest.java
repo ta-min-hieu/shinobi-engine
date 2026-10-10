@@ -67,6 +67,14 @@ class ConnectedCharacterRegistryTest {
 
     // Quest không dùng trong test này (chỉ verify grantLoot) — fake tối thiểu để compile.
     private static QuestFacade fakeQuestFacade() {
+        return fakeQuestFacade(() -> {});
+    }
+
+    /**
+     * Như {@link #fakeQuestFacade()}, kèm một móc chạy ở lần ĐỌC đầu tiên của mỗi sự kiện "quái chết"
+     * ({@code listInProgress}) — để test đếm lượt xử lý quest, hoặc cho nó ném như DB lỗi.
+     */
+    static QuestFacade fakeQuestFacade(Runnable onMonsterKilledEvent) {
         QuestProgressPort progressPort = new QuestProgressPort() {
             @Override
             public Optional<QuestProgress> find(long characterId, long questTemplateId) {
@@ -75,6 +83,12 @@ class ConnectedCharacterRegistryTest {
 
             @Override
             public void save(dev.kage.quest.domain.Transaction tx, QuestProgress progress) {}
+
+            @Override
+            public List<ActiveQuest> listInProgress(long characterId) {
+                onMonsterKilledEvent.run();
+                return List.of();
+            }
         };
         QuestTemplatePort templatePort = questCode -> Optional.empty();
         ExpPort expPort = (tx, characterId, amount) -> {};
@@ -459,6 +473,11 @@ class ConnectedCharacterRegistryTest {
     }
 
     private static InventoryFacade fakeInventoryFacade(int dropChancePercent) {
+        return fakeInventoryFacade(dropTableCode -> List.of(new DropTableEntry(100L, dropChancePercent, 2, 2)));
+    }
+
+    /** Như bản nhận tỉ lệ rơi, nhưng test tự đưa bảng rơi — để đếm lượt roll hoặc cho nó ném như DB lỗi. */
+    static InventoryFacade fakeInventoryFacade(DropTablePort dropTablePort) {
         InventoryPort inventoryPort = new InventoryPort() {
             @Override
             public Optional<Inventory> findByCharacter(long characterId) {
@@ -472,7 +491,6 @@ class ConnectedCharacterRegistryTest {
                 return inventory;
             }
         };
-        DropTablePort dropTablePort = dropTableCode -> List.of(new DropTableEntry(100L, dropChancePercent, 2, 2));
         ItemTemplatePort itemTemplatePort = new ItemTemplatePort() {
             @Override
             public Optional<ItemTemplate> findById(long itemTemplateId) {
