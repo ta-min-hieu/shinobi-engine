@@ -60,7 +60,26 @@ final class QuestScriptRunner {
             List<ItemTake> itemTakes,
             boolean scriptFailed) {}
 
-    record ItemGrant(String itemTemplateCode, int quantity) {}
+    /**
+     * Một lần {@code ctx.give_item(code, qty)}. {@code quantity} phải dương (sửa 2026-10-10) — chiều
+     * ngược của {@link ItemTake}: số âm đi xuống câu gộp chồng {@code quantity = quantity + ?} của
+     * adapter là TRỪ đồ. Đo trên Postgres thật, túi có sẵn 3 phi đao, {@code give_item("kunai", -5)}:
+     * dòng {@code inventory_item} thành {@code quantity = -2} (cột không có CHECK), và vì
+     * {@code ItemStack} từ chối số lượng ≤ 0 trong constructor nên từ đó túi đồ của nhân vật không
+     * đọc lên được nữa — trong khi lượt lĩnh vẫn trả OK và quest thành CLAIMED. Số {@code 0} (và số
+     * âm khi túi không có chồng nào) thì không ghi dòng nào mà quest vẫn CLAIMED: mất thưởng im lặng.
+     *
+     * <p>KHÔNG có trần trên ở đây có chủ đích: trần thật là sức chứa túi, chỉ tầng túi đồ biết —
+     * {@code Integer.MAX_VALUE} đi qua và bị từ chối ở đó ({@code INVENTORY_FULL}, rollback trọn).
+     */
+    record ItemGrant(String itemTemplateCode, int quantity) {
+        ItemGrant {
+            requireItemCode("give_item", itemTemplateCode);
+            if (quantity <= 0) {
+                throw new IllegalArgumentException("give_item cần số lượng dương: " + quantity);
+            }
+        }
+    }
 
     /**
      * Một lần {@code ctx.take_item(code, qty)}. {@code quantity} phải dương: số âm đi xuống câu
@@ -69,6 +88,7 @@ final class QuestScriptRunner {
      */
     record ItemTake(String itemTemplateCode, int quantity) {
         ItemTake {
+            requireItemCode("take_item", itemTemplateCode);
             if (quantity <= 0) {
                 throw new IllegalArgumentException("take_item cần số lượng dương: " + quantity);
             }
@@ -124,7 +144,7 @@ final class QuestScriptRunner {
         HashMap<String, Object> ctx = new HashMap<String, Object>();
         ctx.put("progress_json", currentProgressJson);
         ctx.put("save_progress", (ProxyExecutable) args -> {
-            effects.progressJson = args[0].asString();
+            effects.progressJson = requireProgressJson(args[0].asString());
             return null;
         });
         ctx.put("complete", (ProxyExecutable) args -> {
@@ -179,6 +199,37 @@ final class QuestScriptRunner {
             throw new IllegalArgumentException("give_exp cần số không âm: " + amount);
         }
         return amount;
+    }
+
+    /**
+     * Mã vật phẩm của {@code give_item}/{@code take_item} phải là một chuỗi có nội dung (sửa
+     * 2026-10-10). {@code Value.asString()} trả {@code null} cho {@code null}/{@code undefined} của
+     * JS thay vì ném, nên trước đó một biến gõ sai tên đi lọt xuống tận câu {@code WHERE code = ?}:
+     * {@code give_item} thành "túi đầy" mãi mãi, {@code take_item} thành "chưa mang đủ đồ" mãi mãi —
+     * cả hai đều im lặng và đổ lỗi cho người chơi. U+0000 thì Postgres từ chối ngay ở câu SELECT.
+     *
+     * <p>Mã KHÔNG TỒN TẠI thì tầng này không biết được — đó là việc của
+     * {@code QuestRewardItemCodesIntegrationTest}.
+     */
+    private static void requireItemCode(String function, String itemTemplateCode) {
+        if (itemTemplateCode == null || itemTemplateCode.isBlank() || itemTemplateCode.indexOf('\0') >= 0) {
+            throw new IllegalArgumentException(function + " cần mã vật phẩm là chuỗi không rỗng");
+        }
+    }
+
+    /**
+     * {@code ctx.save_progress(x)} chỉ nhận một chuỗi thật (sửa 2026-10-10). {@code null}/
+     * {@code undefined} — kể cả {@code JSON.stringify(undefined)} — trước đó bị bỏ qua trong im lặng:
+     * hook chạy "thành công" mà tiến độ không đổi. U+0000 không lưu được vào cột TEXT của Postgres,
+     * nên để lọt là một exception SQL giữa transaction thay vì một lỗi script.
+     *
+     * <p>Nội dung chuỗi vẫn ĐỤC với Java: không kiểm nó có phải JSON hay không.
+     */
+    private static String requireProgressJson(String progressJson) {
+        if (progressJson == null || progressJson.indexOf('\0') >= 0) {
+            throw new IllegalArgumentException("save_progress cần một chuỗi không null, không chứa U+0000");
+        }
+        return progressJson;
     }
 
     private static String loadScript(String resourcePath) {
