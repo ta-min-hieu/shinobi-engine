@@ -80,8 +80,7 @@ public final class KageEngine extends ApplicationAdapter {
 
     @Override
     public void render() {
-        float frameTime = Gdx.graphics.getDeltaTime();
-        accumulator += Math.min(frameTime, MAX_FRAME_TIME);
+        accumulator += usableFrameTime(Gdx.graphics.getDeltaTime());
 
         while (accumulator >= FIXED_DT) {
             if (currentScreen != null) {
@@ -95,6 +94,21 @@ public final class KageEngine extends ApplicationAdapter {
         if (currentScreen != null) {
             currentScreen.render(alpha);
         }
+    }
+
+    /**
+     * Phần thời gian khung được đưa vào accumulator: kẹp trần {@code MAX_FRAME_TIME}, và coi thời
+     * gian khung hỏng ({@code NaN}, âm) là 0. Không lọc thì MỘT giá trị {@code NaN} đầu độc
+     * accumulator vĩnh viễn — {@code NaN >= FIXED_DT} luôn sai nên logic đứng hình mãi mãi mà không
+     * báo gì — còn một giá trị âm bắt game "trả nợ" đủ ngần ấy giây rồi mới tick lại, và đưa
+     * {@code alpha} âm xuống lớp nội suy hình. Backend LWJGL3 tính delta từ {@code System.nanoTime()}
+     * nên hiện không sinh ra giá trị như vậy; hàm này để vòng lặp không phụ thuộc vào điều đó.
+     */
+    private static float usableFrameTime(float frameTime) {
+        if (Float.isNaN(frameTime) || frameTime <= 0f) {
+            return 0f;
+        }
+        return Math.min(frameTime, MAX_FRAME_TIME);
     }
 
     @Override

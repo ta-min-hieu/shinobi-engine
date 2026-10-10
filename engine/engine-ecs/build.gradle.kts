@@ -15,6 +15,21 @@ jmh {
     resultsFile.set(rootProject.file("benchmarks/results/engine-ecs-jmh-result.json"))
     resultFormat.set("JSON")
 }
+tasks.test {
+    // Các bộ kiểm thuộc tính của engine-ecs (EcsWorldModelPropertyTest và các bộ ở system/) — chuyển
+    // tiếp cờ chạy tay từ dòng lệnh Gradle vào JVM test: `-Dkage.ecsFuzz.seeds=3000
+    // -Dkage.ecsFuzz.steps=6000`, `-Dkage.ecsFuzz.seed=<seed in ra lúc đỏ>`. Không đặt thì test dùng
+    // ngân sách mặc định của cổng `check`. Vòng lớn vượt @Timeout — tắt bằng
+    // `-Djunit.jupiter.execution.timeout.mode=disabled`.
+    for (key in listOf(
+        "kage.ecsFuzz.seed",
+        "kage.ecsFuzz.seeds",
+        "kage.ecsFuzz.steps",
+        "junit.jupiter.execution.timeout.mode",
+    )) {
+        providers.systemProperty(key).orNull?.let { systemProperty(key, it) }
+    }
+}
 dependencies {
     api(project(":shared:shared-common"))
     // ⚠️ "api" là BẮT BUỘC, không thể "implementation": dev.kage.engine.ecs.Component EXTENDS

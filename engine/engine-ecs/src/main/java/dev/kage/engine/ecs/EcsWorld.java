@@ -60,11 +60,11 @@ public final class EcsWorld {
      *
      * <p>Handle cũ (đã gỡ, hoặc có từ trước {@link #clear}) là no-op: {@code PooledEngine} cấp lại
      * đúng entity gốc đó cho lần {@link #createEntity} kế tiếp, nên gỡ theo handle cũ từng gỡ mất
-     * một entity MỚI hoàn toàn khác.
+     * một entity MỚI hoàn toàn khác. Handle của một {@code EcsWorld} KHÁC cũng là no-op.
      */
     public void removeEntity(KEntity entity) {
         if (!entity.equals(handles.get(entity.raw()))) {
-            return; // handle đã hết hạn — entity gốc có thể đang thuộc về entity khác.
+            return; // handle chết (xem KEntity) hoặc không thuộc world này.
         }
         if (iteratingSystem != null) {
             if (!pendingRemovals.contains(entity)) {
@@ -79,6 +79,7 @@ public final class EcsWorld {
         com.badlogic.ashley.core.Entity raw = entity.raw();
         ashleyEngine.removeEntity(raw);
         handles.remove(raw);
+        entity.detach();
     }
 
     private void flushPendingRemovals() {
@@ -103,6 +104,9 @@ public final class EcsWorld {
      */
     public void clear() {
         ashleyEngine.removeAllEntities();
+        for (KEntity handle : handles.values()) {
+            handle.detach();
+        }
         handles.clear();
         pendingRemovals.clear();
         systems.clear();
@@ -133,7 +137,11 @@ public final class EcsWorld {
 
     /** Như {@link #update(float)} nhưng báo thời gian từng System qua {@code listener} mỗi lần gọi. */
     public void update(float fixedDeltaTime, SystemTimingListener listener) {
-        for (IteratingKSystem system : systems) {
+        // Index loop, đọc lại size() mỗi vòng: không phụ thuộc C2 khử Iterator (Điều 31), và một
+        // System gọi addSystem giữa tick không còn làm vòng for-each ném
+        // ConcurrentModificationException — System mới chạy ngay trong tick đó, sau các System đã có.
+        for (int index = 0; index < systems.size(); index++) {
+            IteratingKSystem system = systems.get(index);
             long start = System.nanoTime();
             ImmutableArray<com.badlogic.ashley.core.Entity> entities =
                     ashleyEngine.getEntitiesFor(system.family().raw());

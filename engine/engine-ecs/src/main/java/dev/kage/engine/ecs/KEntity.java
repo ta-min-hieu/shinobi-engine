@@ -10,10 +10,20 @@ package dev.kage.engine.ecs;
  *
  * <p>Không giữ tham chiếu {@code KEntity} lâu dài xuyên nhiều tick nếu entity có thể bị huỷ giữa
  * chừng — luôn tra cứu lại theo ID khi cần (ECS.md §2, tránh tham chiếu treo).
+ *
+ * <p>Handle của entity đã gỡ (hoặc có từ trước {@link EcsWorld#clear}) là handle CHẾT: nó trông như
+ * một entity rỗng mãi mãi — {@link #has} trả {@code false}, {@code ComponentMapper.get} không thấy
+ * gì, {@link #add} là no-op. Phải thế vì {@code PooledEngine} của Ashley cấp lại đúng entity gốc đó
+ * cho lần {@code createEntity()} kế tiếp: handle cũ còn trỏ vào entity gốc thì đọc ra component của
+ * một entity MỚI hoàn toàn khác, và ghi qua nó là ghi vào entity đó (hoặc, lúc entity gốc còn nằm
+ * trong pool, cài sẵn component cho entity chưa ra đời).
  */
 public final class KEntity {
 
-    private final com.badlogic.ashley.core.Entity ashleyEntity;
+    /** Entity gốc dùng chung của MỌI handle chết: không bao giờ vào engine, không bao giờ có component. */
+    private static final com.badlogic.ashley.core.Entity DETACHED = new com.badlogic.ashley.core.Entity();
+
+    private com.badlogic.ashley.core.Entity ashleyEntity;
     private final long id;
 
     KEntity(com.badlogic.ashley.core.Entity ashleyEntity, long id) {
@@ -26,12 +36,20 @@ public final class KEntity {
         return ashleyEntity;
     }
 
+    /** Chỉ {@link EcsWorld} gọi, đúng lúc entity gốc rời engine — từ đây handle này là handle chết. */
+    void detach() {
+        ashleyEntity = DETACHED;
+    }
+
     public long id() {
         return id;
     }
 
+    /** Gắn (hoặc ghi đè) component. No-op trên handle chết, cùng lệ với {@link EcsWorld#removeEntity}. */
     public <T extends Component> KEntity add(T component) {
-        ashleyEntity.add(component);
+        if (!ashleyEntity.equals(DETACHED)) {
+            ashleyEntity.add(component);
+        }
         return this;
     }
 
