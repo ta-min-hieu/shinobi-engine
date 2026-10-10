@@ -80,6 +80,8 @@ public final class WorldFacade {
     private static final ComponentMapper<ChiComponent> CHI = ComponentMapper.getFor(ChiComponent.class);
     private static final ComponentMapper<MoveIntentComponent> MOVE_INTENT =
             ComponentMapper.getFor(MoveIntentComponent.class);
+    private static final ComponentMapper<CharacterLevelComponent> LEVEL =
+            ComponentMapper.getFor(CharacterLevelComponent.class);
     private static final ComponentMapper<CharacterIdComponent> CHARACTER_ID =
             ComponentMapper.getFor(CharacterIdComponent.class);
 
@@ -606,6 +608,26 @@ public final class WorldFacade {
     }
 
     /**
+     * Nhân vật vừa lên cấp giữa phiên — nâng cấp mà mọi luật trong World này đọc (hiện là cổng Tuyệt
+     * Kỹ, {@code SkillSystem}) lên {@code level}, không chờ lần attach sau. Gọi từ
+     * {@code server-gateway} sau khi {@code GrantExperienceUseCase} báo {@code leveledUp}.
+     *
+     * <p>Chỉ NÂNG: {@code level} không cao hơn cấp đang có thì bị bỏ qua (lệnh đến muộn, xem
+     * {@link WorldCommand.RaiseCharacterLevelCommand}). Nhân vật không ở World này — chưa attach
+     * xong, hoặc đã rời — cũng bị bỏ qua êm: lần attach kế đọc cấp từ DB. Nhảy nhiều cấp một lần
+     * là một lệnh mang cấp cuối.
+     *
+     * <p>Chỉ số chiến đấu KHÔNG đổi theo cấp ở đây: {@code CombatConstants.deriveCombatStats} không
+     * đọc cấp, và lên cấp hiện không cộng STR/AGI/INT/VIT.
+     *
+     * @param characterId nhân vật vừa lên cấp
+     * @param level cấp MỚI (tuyệt đối, không phải số cấp tăng thêm)
+     */
+    public void enqueueCharacterLevel(long characterId, int level) {
+        inbox.add(new WorldCommand.RaiseCharacterLevelCommand(characterId, level));
+    }
+
+    /**
      * Spawn boss theo MÃ LOÀI (ADR-048 D6) — gọi bởi {@code DungeonInstanceRegistry} ngay sau khi
      * tạo dungeon World mới. World chính KHÔNG tự gọi hàm này (giữ đúng ranh giới: server-world
      * không biết khái niệm "dungeon", chỉ biết "có ai bảo spawn con nào").
@@ -796,6 +818,7 @@ public final class WorldFacade {
                     handleAreaChatMessage(c.characterId(), c.senderName(), c.body());
                 case WorldCommand.AppearanceChangedCommand c -> handleAppearanceChanged(c.characterId());
                 case WorldCommand.HealCharacterCommand c -> handleHealCharacter(c.characterId(), c.amount());
+                case WorldCommand.RaiseCharacterLevelCommand c -> handleRaiseCharacterLevel(c.characterId(), c.level());
                 case WorldCommand.SpawnBossCommand c -> spawnBossEntity(c.bossCode());
                 case WorldCommand.InboxBarrierCommand c -> c.onReached().run();
             }
@@ -1072,6 +1095,33 @@ public final class WorldFacade {
         if (health.current != currentBefore || health.max != maxBefore) {
             pendingHealthChanges.add(new HealthChange(characterId, health.current, health.max));
         }
+    }
+
+    /**
+     * Xem {@link #enqueueCharacterLevel}. Chép cấp vào cả {@link #baseStatsByCharacterId} để World
+     * không giữ hai bản cấp lệch nhau của cùng một nhân vật — một record mới mỗi lần LÊN CẤP, không
+     * phải mỗi tick.
+     */
+    private void handleRaiseCharacterLevel(long characterId, int level) {
+        KEntity entity = entitiesByCharacterId.get(characterId);
+        CharacterBaseStats baseStats = baseStatsByCharacterId.get(characterId);
+        if (entity == null || baseStats == null) {
+            return; // không ở World này (chưa attach xong / đã rời) — lần attach kế đọc cấp từ DB.
+        }
+        CharacterLevelComponent levelComponent = LEVEL.get(entity);
+        if (level <= levelComponent.level) {
+            return; // lệnh đến muộn — cấp không bao giờ lùi.
+        }
+        levelComponent.level = level;
+        baseStatsByCharacterId.put(
+                characterId,
+                new CharacterBaseStats(
+                        baseStats.str(),
+                        baseStats.agi(),
+                        baseStats.intelligence(),
+                        baseStats.vit(),
+                        baseStats.element(),
+                        level));
     }
 
     /**

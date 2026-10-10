@@ -103,6 +103,15 @@ sealed interface WorldCommand {
     record HealCharacterCommand(long characterId, int amount) implements WorldCommand {}
 
     /**
+     * Cấp của {@code characterId} vừa lên GIỮA PHIÊN (EXP hạ quái hoặc thưởng quest) — world chỉ
+     * NÂNG {@code CharacterLevelComponent}, không bao giờ hạ: các lượt cộng EXP chạy trên những
+     * Virtual Thread riêng nên hai lệnh có thể về ngược thứ tự, và lệnh mang cấp thấp hơn cấp đang
+     * có chắc chắn là lệnh đến muộn. World KHÔNG biết EXP hay đường cong cấp — nhận SỐ đã tính
+     * sẵn, đúng hình dạng {@link HealCharacterCommand}.
+     */
+    record RaiseCharacterLevelCommand(long characterId, int level) implements WorldCommand {}
+
+    /**
      * Mốc chặn hàng đợi — không đổi gì trong ECS, chỉ gọi {@code onReached} khi tick thread đã xử lý
      * xong mọi lệnh xếp TRƯỚC nó. Xem {@link WorldFacade#inboxBarrier()}. Mang callback chứ không
      * mang thẳng future: record không giữ đối tượng mutable của người gọi (SpotBugs EI).
