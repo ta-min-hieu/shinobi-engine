@@ -479,6 +479,14 @@ final class DungeonInstanceRegistry {
         return instancesByPartyId.size();
     }
 
+    /**
+     * Số dòng sổ sách còn giữ về người trong hầm ngục (định tuyến, vị trí trả về, lượt rời đang dở) —
+     * chỉ để quan sát (test, chẩn đoán). Không ai ở hầm ngục thì phải về 0.
+     */
+    synchronized int trackedEntryCount() {
+        return instanceByCharacterId.size() + returnPositionByCharacterId.size() + exitingCharacterIds.size();
+    }
+
     /** Graceful shutdown (SERVER.md §10) — dừng MỌI dungeon World đang chạy trước khi thoát process. */
     void stopAll() {
         stopAllInstances();

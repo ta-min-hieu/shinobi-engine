@@ -72,6 +72,10 @@ tasks.test {
         "kage.fuzz.iterations",
         "kage.fuzz.dbIterations",
         "kage.fuzz.opcode",
+        // DisconnectAnywhereFuzzDatabaseTest — seed của một vòng đỏ, số vòng, số bước mỗi vòng.
+        "kage.fuzz.disconnectSeed",
+        "kage.fuzz.disconnectRounds",
+        "kage.fuzz.disconnectSteps",
         "junit.jupiter.execution.timeout.mode",
     )) {
         providers.systemProperty(key).orNull?.let { systemProperty(key, it) }
