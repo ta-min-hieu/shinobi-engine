@@ -5,7 +5,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import dev.kage.mail.domain.IdempotencyKeyReusedException;
 import dev.kage.mail.domain.Mail;
-import dev.kage.mail.domain.MailAttachment;
 import dev.kage.mail.domain.Transaction;
 import dev.kage.mail.domain.TransactionRunner;
 
@@ -48,14 +47,13 @@ public final class ClaimMailUseCase {
                 if (mail.goldAmount() > 0) {
                     ports.goldPort().creditGold(t, recipientId, mail.goldAmount());
                 }
-                for (MailAttachment attachment : mail.attachments()) {
-                    boolean granted = ports.inventoryGatewayPort()
-                            .grantItem(t, recipientId, attachment.itemTemplateId(), attachment.quantity());
-                    if (!granted) {
-                        // Túi đầy giữa chừng — rollback CẢ gold đã cộng ở trên, KHÔNG "return" sớm
-                        // (return thường sẽ COMMIT phần đã làm, xem javadoc lớp).
-                        throw new MailTransactionAbortedException();
-                    }
+                // Cấp CẢ LÔ một lần (2026-10-10), không từng dòng: cùng một loại chia thành nhiều
+                // dòng nhỏ thì mỗi dòng mở một ô riêng, và thư thành ra không túi nào nhận nổi —
+                // xem InventoryGatewayPort#grantItems.
+                if (!ports.inventoryGatewayPort().grantItems(t, recipientId, mail.attachments())) {
+                    // Túi đầy giữa chừng — rollback CẢ gold đã cộng ở trên, KHÔNG "return" sớm
+                    // (return thường sẽ COMMIT phần đã làm, xem javadoc lớp).
+                    throw new MailTransactionAbortedException();
                 }
                 if (!ports.repositoryPort().markClaimed(t, mailId, recipientId)) {
                     // Race: request khác đã claim xong giữa lúc findByIdForUpdate và đây là không
