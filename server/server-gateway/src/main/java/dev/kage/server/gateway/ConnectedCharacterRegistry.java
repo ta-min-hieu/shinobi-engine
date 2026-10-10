@@ -232,14 +232,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /**
      * Vị trí thật theo nhịp của world chính (sửa 2026-10-10) — thiếu nó thì {@code lastKnownPosition}
      * chỉ đổi khi client gửi lệnh, tức là chỗ người chơi ĐỔI HƯỚNG lần cuối chứ không phải chỗ nhân
-     * vật đang đứng. Đứng yên thì không ghi gì (không cấp phát trên tick thread).
+     * vật đang đứng. Một {@link PositionSnapshot} mỗi nhân vật mỗi GIÂY (nhịp của world), không phải
+     * mỗi tick.
      */
     @Override
     public void onCharacterPositionSampled(long characterId, float x, float y) {
-        PositionSnapshot known = lastKnownPosition.get(characterId);
-        if (known != null && Float.compare(known.x(), x) == 0 && Float.compare(known.y(), y) == 0) {
-            return;
-        }
         trackPositionIfConnected(characterId, x, y);
     }
 
