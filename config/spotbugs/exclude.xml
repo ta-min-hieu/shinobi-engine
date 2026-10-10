@@ -87,6 +87,13 @@
         <Bug pattern="PREDICTABLE_RANDOM"/>
     </Match>
 
+    <!-- Fuzz ngắt kết nối (DisconnectAnywhereFuzzDatabaseTest) — cùng lý do ngay trên: seed CỐ ĐỊNH
+         CHỦ ĐÍCH (in ra khi đỏ, đặt lại bằng -Dkage.fuzz.disconnectSeed), chỉ chọn bước của test. -->
+    <Match>
+        <Class name="dev.kage.server.gateway.DisconnectFuzzScript"/>
+        <Bug pattern="PREDICTABLE_RANDOM"/>
+    </Match>
+
     <!-- Fuzz máy trạng thái quest (QuestStateMachinePropertyIntegrationTest) — cùng lý do ngay trên:
          seed CỐ ĐỊNH CHỦ ĐÍCH (in ra khi đỏ, đặt lại bằng -Dkage.questFuzz.seed), chỉ chọn lệnh test. -->
     <Match>
