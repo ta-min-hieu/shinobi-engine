@@ -14,9 +14,10 @@ import org.junit.jupiter.api.Timeout;
 /**
  * Đổi trang bị làm đổi MÁU TỐI ĐA thì client phải biết cả máu HIỆN TẠI mới.
  *
- * <p><b>Bug thật, nhìn thấy được, sửa 2026-09-19.</b> {@code WorldFacade.applyMaxHpBonus} dịch máu
- * hiện tại theo đúng độ chênh của máu tối đa (ADR-036/ADR-043: mặc đồ +HP không phải nút hồi máu,
- * gỡ đồ không được giết người chơi) — nhưng world KHÔNG nói con số mới ra ngoài, và
+ * <p><b>Bug thật, nhìn thấy được, sửa 2026-09-19.</b> {@code WorldFacade.applyMaxHpBonus} đổi máu
+ * hiện tại khi máu tối đa đổi (lúc đó: cộng thẳng độ chênh; từ 2026-10-11: giữ tỉ lệ — mặc đồ +HP
+ * không phải nút hồi máu, gỡ đồ không được giết người chơi) — nhưng world KHÔNG nói con số mới ra
+ * ngoài, và
  * {@code EquipItemResponse} chỉ chở {@code max_hp}. Client
  * ({@code CombatHudController.onOwnMaxHpChanged}) đổi mỗi MẪU SỐ rồi {@code min(hp, max)}:
  *
@@ -138,12 +139,19 @@ class EquipmentHealthSyncTest {
 
             world.applyEquipmentBonus(2L, new EquipmentBonusSnapshot(0, 0, 0, BONUS_HP));
             awaitTrue(() -> maxHpOfLastChange(sink, 2L) == CombatConstants.CHARACTER_MAX_HP + BONUS_HP);
-            assertThat(lastHealthChangeOf(sink, 2L).currentHp()).isEqualTo(wounded + BONUS_HP);
+            // Giữ TỈ LỆ, làm tròn xuống (quyết định chủ dự án 2026-10-11) — không còn cộng thẳng độ chênh.
+            int boostedMax = CombatConstants.CHARACTER_MAX_HP + BONUS_HP;
+            int scaledUp = wounded * boostedMax / CombatConstants.CHARACTER_MAX_HP;
+            assertThat(lastHealthChangeOf(sink, 2L).currentHp()).isEqualTo(scaledUp);
 
-            // Gỡ ra = bonus về 0. Máu hiện tại phải TỤT lại đúng ngần ấy, và client phải được báo.
+            // Gỡ ra = bonus về 0. Máu hiện tại co lại theo cùng tỉ lệ, và client phải được báo.
             world.applyEquipmentBonus(2L, new EquipmentBonusSnapshot(0, 0, 0, 0));
             awaitTrue(() -> maxHpOfLastChange(sink, 2L) == CombatConstants.CHARACTER_MAX_HP);
-            assertThat(lastHealthChangeOf(sink, 2L).currentHp()).isEqualTo(wounded);
+            int scaledBack = scaledUp * CombatConstants.CHARACTER_MAX_HP / boostedMax;
+            assertThat(lastHealthChangeOf(sink, 2L).currentHp()).isEqualTo(scaledBack);
+            assertThat(scaledBack)
+                    .as("một vòng mặc rồi gỡ không bao giờ làm máu TĂNG — đó là nút hồi máu miễn phí")
+                    .isLessThanOrEqualTo(wounded);
         } finally {
             world.stop();
         }

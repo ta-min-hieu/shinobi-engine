@@ -236,7 +236,9 @@ public final class InventoryFacade {
         INSUFFICIENT_GOLD,
         DUPLICATE_REQUEST,
         /** Món đang nằm trong lời chào của một phiên giao dịch còn mở (2026-09-29) — không đổi gì. */
-        ITEM_IN_TRADE
+        ITEM_IN_TRADE,
+        /** Món không phải trang bị (2026-10-11) — không đổi gì. */
+        NOT_EQUIPMENT
     }
 
     // Bảng tra thay biểu thức switch: thêm nhánh thứ 9 (ITEM_IN_TRADE, 2026-09-29) đẩy switch chạm
@@ -250,7 +252,8 @@ public final class InventoryFacade {
             EnhanceItemUseCase.EnhanceResult.MAX_LEVEL, EnhanceResult.MAX_LEVEL,
             EnhanceItemUseCase.EnhanceResult.INSUFFICIENT_GOLD, EnhanceResult.INSUFFICIENT_GOLD,
             EnhanceItemUseCase.EnhanceResult.DUPLICATE_REQUEST, EnhanceResult.DUPLICATE_REQUEST,
-            EnhanceItemUseCase.EnhanceResult.ITEM_IN_TRADE, EnhanceResult.ITEM_IN_TRADE);
+            EnhanceItemUseCase.EnhanceResult.ITEM_IN_TRADE, EnhanceResult.ITEM_IN_TRADE,
+            EnhanceItemUseCase.EnhanceResult.NOT_EQUIPMENT, EnhanceResult.NOT_EQUIPMENT);
 
     /** Package-private để test khoá bảng tra phủ HẾT enum của use case (switch thì compiler khoá hộ). */
     static EnhanceResult toFacadeResult(EnhanceItemUseCase.EnhanceResult result) {

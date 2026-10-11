@@ -108,6 +108,14 @@ vượt **bốn**, xem lại phương án B.
 
 ---
 
+## Cập nhật 2026-10-11 — máu hiện tại giữ TỈ LỆ, không còn dịch theo độ chênh
+
+Chủ dự án chọn hướng (A) của [docs/README.md](../../README.md) dòng 29. Cách "dịch theo độ chênh" ghi ở
+Decision hoá ra CHÍNH LÀ một nút hồi máu miễn phí: 5/118 gỡ áo +18 bị chặn dưới thành 1/100, mặc lại là
+19/118. Nay `WorldFacade.applyMaxHpBonus` tính `current × newMax / oldMax`, làm tròn XUỐNG ở cả hai chiều
+(bật/tắt đồ không bao giờ lời máu), người còn sống không bị làm tròn về 0, đang đầy thì vẫn đầy. Phần còn
+lại của ADR này — đẩy `max_hp` qua response, máu mới đi bằng `HealthChangedEvent` — không đổi.
+
 ## Revisit Trigger
 
 Khi GDD chốt công thức HP thật (thay `CHARACTER_MAX_HP = 100` placeholder), hoặc khi có nguồn thứ tư

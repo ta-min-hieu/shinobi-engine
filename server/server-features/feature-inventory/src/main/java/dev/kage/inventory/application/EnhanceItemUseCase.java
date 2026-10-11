@@ -48,6 +48,13 @@ public final class EnhanceItemUseCase {
                     resultHolder.set(EnhanceResult.ITEM_NOT_FOUND);
                     return;
                 }
+                // Quyết định chủ dự án 2026-10-11: chỉ TRANG BỊ mới cường hoá được. Trước đó cường hoá
+                // một dòng vật phẩm xếp chồng (đan dược, nguyên liệu) là cả chồng lên cấp, và đồ đã
+                // cường hoá không bao giờ gộp chồng lại được nữa. Từ chối TRƯỚC idempotency_key và vàng.
+                if (!isEquipment(item.get())) {
+                    resultHolder.set(EnhanceResult.NOT_EQUIPMENT);
+                    return;
+                }
                 // Quyết định chủ dự án 2026-09-29: món đang chào trong giao dịch còn mở KHÔNG được
                 // cường hoá — trade_offer_item không lưu cấp, người kia đã xác nhận trên cấp cũ. Hỏi
                 // SAU khoá túi đồ: đặt lời chào cũng lấy khoá này nên hai bên xếp hàng (DATABASE.md
@@ -68,6 +75,14 @@ public final class EnhanceItemUseCase {
             return EnhanceResult.DUPLICATE_REQUEST;
         }
         return resultHolder.get();
+    }
+
+    /** Món không còn template (dữ liệu hỏng) cũng coi là không phải trang bị — không có gì để cường hoá. */
+    private boolean isEquipment(ItemStack item) {
+        return ports.itemTemplatePort()
+                .findById(item.itemTemplateId())
+                .map(template -> template.equipSlot() != null)
+                .orElse(false);
     }
 
     /** Trừ vàng, roll, đổi cấp (+ tiêu Bảo Vệ nếu có), lưu, ghi audit — trong transaction đang mở. */
@@ -131,6 +146,8 @@ public final class EnhanceItemUseCase {
         INSUFFICIENT_GOLD,
         DUPLICATE_REQUEST,
         /** Món đang nằm trong lời chào của một phiên giao dịch còn mở (2026-09-29) — không đổi gì. */
-        ITEM_IN_TRADE
+        ITEM_IN_TRADE,
+        /** Món không phải trang bị — vật phẩm tiêu hao/nguyên liệu không cường hoá được (2026-10-11). */
+        NOT_EQUIPMENT
     }
 }

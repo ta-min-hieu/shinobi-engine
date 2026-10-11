@@ -628,6 +628,19 @@ public final class WorldFacade {
     }
 
     /**
+     * Nhân vật vừa đổi hệ phái giữa phiên (quyết định chủ dự án 2026-10-11) — nguyên tố và passive
+     * của hệ có hiệu lực NGAY trong World này. Trước đó chỉ ngoại hình đổi (ADR-045): người chơi thấy
+     * hệ mới mà đánh, chịu đòn và bị xét chiêu như hệ cũ tới khi đăng nhập lại. Gọi từ
+     * {@code server-gateway} sau khi {@code SelectFactionUseCase} ghi DB thành công.
+     *
+     * <p>Chỉ số từ trang bị được giữ nguyên; máu, Khí, cooldown và hiệu ứng đang mang không đổi. Nhân
+     * vật không ở World này thì lệnh bị bỏ qua êm — lần attach kế đọc hệ từ DB.
+     */
+    public void enqueueCharacterElement(long characterId, Element element) {
+        inbox.add(new WorldCommand.ChangeCharacterElementCommand(characterId, element));
+    }
+
+    /**
      * Spawn boss theo MÃ LOÀI (ADR-048 D6) — gọi bởi {@code DungeonInstanceRegistry} ngay sau khi
      * tạo dungeon World mới. World chính KHÔNG tự gọi hàm này (giữ đúng ranh giới: server-world
      * không biết khái niệm "dungeon", chỉ biết "có ai bảo spawn con nào").
@@ -819,6 +832,8 @@ public final class WorldFacade {
                 case WorldCommand.AppearanceChangedCommand c -> handleAppearanceChanged(c.characterId());
                 case WorldCommand.HealCharacterCommand c -> handleHealCharacter(c.characterId(), c.amount());
                 case WorldCommand.RaiseCharacterLevelCommand c -> handleRaiseCharacterLevel(c.characterId(), c.level());
+                case WorldCommand.ChangeCharacterElementCommand c ->
+                    handleChangeCharacterElement(c.characterId(), c.element());
                 case WorldCommand.SpawnBossCommand c -> spawnBossEntity(c.bossCode());
                 case WorldCommand.InboxBarrierCommand c -> c.onReached().run();
             }
@@ -1125,6 +1140,39 @@ public final class WorldFacade {
     }
 
     /**
+     * Xem {@link #enqueueCharacterElement}. Phần trang bị cộng thêm không được lưu riêng, nên đọc lại
+     * nó từ chính component: thứ nằm TRÊN chỉ số derive của hệ cũ là bonus trang bị
+     * ({@link #applyBonusTo} luôn ghi {@code derive + bonus}), rồi đặt lên chỉ số derive của hệ mới.
+     */
+    private void handleChangeCharacterElement(long characterId, Element element) {
+        KEntity entity = entitiesByCharacterId.get(characterId);
+        CharacterBaseStats baseStats = baseStatsByCharacterId.get(characterId);
+        if (entity == null || baseStats == null || baseStats.element() == element) {
+            return; // không ở World này, hoặc lệnh lặp — không có gì để đổi.
+        }
+        CharacterBaseStats changed = new CharacterBaseStats(
+                baseStats.str(),
+                baseStats.agi(),
+                baseStats.intelligence(),
+                baseStats.vit(),
+                element,
+                baseStats.level());
+        CombatConstants.CombatStats before = CombatConstants.deriveCombatStats(baseStats);
+        CombatConstants.CombatStats after = CombatConstants.deriveCombatStats(changed);
+        CombatStatsComponent combatStats = COMBAT_STATS.get(entity);
+        combatStats.atk = after.atk() + (combatStats.atk - before.atk());
+        combatStats.def = after.def() + (combatStats.def - before.def());
+        combatStats.res = after.res() + (combatStats.res - before.res());
+        combatStats.skillDmg = after.skillDmg();
+        combatStats.hitPercent = after.hitPercent();
+        combatStats.dodgePercent = after.dodgePercent();
+        combatStats.critPercent = after.critPercent();
+        combatStats.critDamageMultiplier = after.critDamageMultiplier();
+        combatStats.element = after.element();
+        baseStatsByCharacterId.put(characterId, changed);
+    }
+
+    /**
      * Dùng chung bởi {@link #handleAttach} (lúc vào world) và {@link #handleApplyEquipmentBonus}
      * (lúc mặc/gỡ đồ) — LUÔN tính lại từ nền, không cộng dồn (xem javadoc applyEquipmentBonus).
      */
@@ -1142,18 +1190,25 @@ public final class WorldFacade {
      * {@link CombatConstants#CHARACTER_MAX_HP} (vẫn là placeholder — GDD chưa chốt công thức HP;
      * chủ dự án chấp nhận {@code maxHp = 100 + bonusHp} như placeholder mới khi duyệt ADR).
      *
-     * <p>Máu HIỆN TẠI dịch theo đúng ĐỘ CHÊNH của máu tối đa, không đặt lại về đầy: mặc đồ +HP
-     * không được là một nút hồi máu miễn phí giữa trận, và gỡ đồ +HP không được giết người chơi
-     * (chặn dưới ở 1). Nhân vật đang chết ({@code current <= 0}) thì KHÔNG đụng vào máu hiện tại —
-     * {@code respawnCharacter} mới là chỗ hồi sinh, và nó tự đọc {@code health.max} mới.
+     * <p>Máu HIỆN TẠI giữ nguyên TỈ LỆ so với máu tối đa (quyết định chủ dự án 2026-10-11, thay cách
+     * "dịch theo độ chênh" của ADR-043). Cách cũ biến việc gỡ rồi mặc lại đồ +HP thành nút hồi máu
+     * miễn phí: 5/118 gỡ áo +18 bị chặn dưới thành 1/100, mặc lại là 19/118. Nay 5/118 thành 4/100 rồi
+     * về lại 4/118.
+     *
+     * <p>Làm tròn XUỐNG ở cả hai chiều, có chủ đích: bật/tắt đồ bao nhiêu lần máu cũng không bao giờ
+     * tăng (làm tròn lên hay làm tròn gần nhất thì mỗi lượt có thể lời một điểm). Người còn sống không
+     * bị làm tròn về 0 — gỡ đồ không được giết người chơi. Đang đầy máu thì vẫn đầy. Nhân vật đang chết
+     * ({@code current <= 0}) thì KHÔNG đụng vào máu hiện tại — {@code respawnCharacter} mới là chỗ hồi
+     * sinh, và nó tự đọc {@code health.max} mới.
      */
     private void applyMaxHpBonus(KEntity entity, int bonusHp) {
         HealthComponent health = HEALTH.get(entity);
+        int oldMax = health.max;
         int newMax = characterMaxHp(bonusHp);
-        int delta = newMax - health.max;
         health.max = newMax;
-        if (delta != 0 && health.current > 0) {
-            health.current = Math.clamp((long) health.current + delta, 1, newMax);
+        if (newMax != oldMax && health.current > 0) {
+            long scaled = oldMax > 0 ? (long) health.current * newMax / oldMax : newMax;
+            health.current = (int) Math.clamp(scaled, 1, newMax);
         }
     }
 

@@ -83,7 +83,12 @@ class EnhanceItemUseCaseTest {
 
         @Override
         public Optional<dev.kage.inventory.domain.ItemTemplate> findById(long itemTemplateId) {
-            throw new UnsupportedOperationException("Test này không cần findById");
+            // Món của test là TRANG BỊ; Bảo Vệ là vật phẩm xếp chồng, không mặc được.
+            dev.kage.inventory.domain.EquipmentSlotType slot = itemTemplateId == PROTECTION_TEMPLATE_ID
+                    ? null
+                    : dev.kage.inventory.domain.EquipmentSlotType.WEAPON;
+            return Optional.of(
+                    new dev.kage.inventory.domain.ItemTemplate(itemTemplateId, slot, 1, 0, 0, 0, 0, 1, null, 0));
         }
 
         @Override
@@ -166,6 +171,27 @@ class EnhanceItemUseCaseTest {
         inTrade[0] = false;
         assertThat(useCase.execute(CHARACTER_ID, ITEM_ID, false, IDEMPOTENCY_KEY))
                 .isIn(EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP);
+    }
+
+    /**
+     * Chỉ trang bị mới cường hoá được (quyết định chủ dự án 2026-10-11). Trước đó cường hoá một dòng
+     * vật phẩm xếp chồng là cả chồng lên cấp, và đồ đã cường hoá không gộp chồng lại được nữa. Phải
+     * từ chối trước khi đụng tới vàng, túi đồ hay khoá idempotency.
+     */
+    @Test
+    void shouldRefuseWithoutSpendingAnything_whenTheItemIsNotEquipment() {
+        ItemStack charms = new ItemStack(ITEM_ID, PROTECTION_TEMPLATE_ID, 5, 0);
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(new Inventory(CHARACTER_ID, 20, List.of(charms)));
+        FakeGoldPort goldPort = new FakeGoldPort(true);
+        FakeAuditPort auditPort = new FakeAuditPort();
+        EnhanceItemUseCase useCase = newUseCase(inventoryPort, goldPort, auditPort, new FakeItemTemplatePort(true));
+
+        EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false, IDEMPOTENCY_KEY);
+
+        assertThat(result).isEqualTo(EnhanceItemUseCase.EnhanceResult.NOT_EQUIPMENT);
+        assertThat(goldPort.deductCalled).isFalse();
+        assertThat(inventoryPort.saved).isNull();
+        assertThat(auditPort.loggedAction).isNull();
     }
 
     @Test

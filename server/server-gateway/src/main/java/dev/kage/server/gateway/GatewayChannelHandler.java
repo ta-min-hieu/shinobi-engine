@@ -1032,7 +1032,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // đi qua hàng đợi world vì AoI chỉ đọc được trên tick thread. Chưa vào World nào thì
             // không có ai đang nhìn — bỏ qua, lần vào world sau CharacterSpawnedEvent đã mang hệ
             // phái mới nhờ updateAppearance ở dòng trên.
-            currentWorldFacadeIfPresent(characterId).ifPresent(facade -> facade.enqueueAppearanceChanged(characterId));
+            // Quyết định chủ dự án 2026-10-11: phần CHIẾN ĐẤU của hệ mới (nguyên tố, passive, chiêu được
+            // phép) cũng có hiệu lực ngay, không chờ đăng nhập lại — trước lệnh ngoại hình, để không tick
+            // nào người khác thấy hệ mới mà world còn tính hệ cũ.
+            dev.kage.server.world.Element element = FactionMapping.toElement(toDomainFaction(request.getFaction()));
+            currentWorldFacadeIfPresent(characterId).ifPresent(facade -> {
+                facade.enqueueCharacterElement(characterId, element);
+                facade.enqueueAppearanceChanged(characterId);
+            });
             SelectFactionResponse response =
                     SelectFactionResponse.newBuilder().setSuccess(true).build();
             send(ctx, Opcode.OPCODE_SELECT_FACTION_RESPONSE_VALUE, sequenceId, response.toByteArray());
@@ -1320,6 +1327,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 // hoá. KHÔNG thêm giá trị EnhanceOutcome (đổi protocol) — đi đường ErrorResponse +
                 // error_key như mọi từ chối nghiệp vụ khác; client khớp theo sequenceId.
                 sendError(ctx, request.sequenceId(), 409, "error.item_in_trade");
+                return;
+            }
+            if (result == InventoryFacade.EnhanceResult.NOT_EQUIPMENT) {
+                // Quyết định chủ dự án 2026-10-11: chỉ trang bị mới cường hoá được — cùng đường
+                // ErrorResponse với nhánh trên, không thêm giá trị EnhanceOutcome.
+                sendError(ctx, request.sequenceId(), 409, "error.item_not_enhanceable");
                 return;
             }
             // ADR-043 — tôi luyện ĐỔI `enhance_level`, mà ADR-036 D2/D3 nhân hệ số cường hoá thẳng

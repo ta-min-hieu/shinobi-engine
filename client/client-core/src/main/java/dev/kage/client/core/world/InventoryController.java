@@ -55,7 +55,9 @@ final class InventoryController {
             "error.equip_level_too_low",
             // Cường hoá món đang chào trong giao dịch (quyết định chủ dự án 2026-09-29) — tới bằng
             // ErrorResponse, không phải EnhanceOutcome, xem InventoryCoordinator#onEnhanceRejected.
-            "error.item_in_trade");
+            "error.item_in_trade",
+            // Cường hoá món không phải trang bị (quyết định chủ dự án 2026-10-11) — cùng đường trên.
+            "error.item_not_enhanceable");
 
     /**
      * Một dòng túi đồ.

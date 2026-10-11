@@ -112,6 +112,14 @@ sealed interface WorldCommand {
     record RaiseCharacterLevelCommand(long characterId, int level) implements WorldCommand {}
 
     /**
+     * {@code characterId} vừa đổi hệ phái GIỮA PHIÊN — world tính lại mọi chỉ số chiến đấu phụ thuộc
+     * hệ (nguyên tố, passive của hệ) tại chỗ, không chờ lần attach sau. World KHÔNG biết "hệ phái"
+     * hay cấp tối thiểu để đổi — nhận {@link Element} đã dịch sẵn, đúng hình dạng
+     * {@link RaiseCharacterLevelCommand}.
+     */
+    record ChangeCharacterElementCommand(long characterId, Element element) implements WorldCommand {}
+
+    /**
      * Mốc chặn hàng đợi — không đổi gì trong ECS, chỉ gọi {@code onReached} khi tick thread đã xử lý
      * xong mọi lệnh xếp TRƯỚC nó. Xem {@link WorldFacade#inboxBarrier()}. Mang callback chứ không
      * mang thẳng future: record không giữ đối tượng mutable của người gọi (SpotBugs EI).
