@@ -38,6 +38,14 @@ final class TestWorldContents {
                 List.of(new NpcCatalogSnapshot.NpcPlacementDefinition(TOWN_ELDER_CODE, TOWN_ELDER_X, TOWN_ELDER_Y)));
     }
 
+    /** World chính chỉ có MỘT NPC mang {@code npcCode} đứng ở {@code (x, 0)} — cho test kiểm tầm nói chuyện. */
+    static WorldContentCatalog onlyNpc(String npcCode, float x) {
+        return new WorldContentCatalog(
+                dev.kage.server.world.MonsterCatalogSnapshot.EMPTY,
+                new NpcCatalogSnapshot(List.of(new NpcCatalogSnapshot.NpcPlacementDefinition(npcCode, x, 0f))),
+                SafeZoneCatalogSnapshot.EMPTY);
+    }
+
     /**
      * Nội dung world chính cho test có HẦM NGỤC — thêm boss vào danh mục quái (ADR-048).
      *

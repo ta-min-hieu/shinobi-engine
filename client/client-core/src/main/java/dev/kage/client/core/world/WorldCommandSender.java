@@ -136,24 +136,39 @@ final class WorldCommandSender implements SessionRecovery.Link {
         send(Opcode.OPCODE_USE_SKILL_COMMAND_VALUE, command.toByteArray(), "UseSkillCommand");
     }
 
-    /** Bắt chuyện với NPC — server luôn trả node {@code "start"} (dialogue.proto). */
-    void talkToNpc(String npcCode) {
+    /**
+     * Bắt chuyện với NPC — server luôn trả node {@code "start"} (dialogue.proto).
+     *
+     * @return {@code sequenceId} của gói — server từ chối (NPC không còn, đứng xa quá) bằng
+     *     {@code ErrorResponse} mang đúng số này
+     */
+    int talkToNpc(String npcCode) {
         TalkToNpcCommand command =
                 TalkToNpcCommand.newBuilder().setNpcCode(npcCode).build();
-        send(Opcode.OPCODE_TALK_TO_NPC_COMMAND_VALUE, command.toByteArray(), "TalkToNpcCommand");
+        int sequenceId = connection.nextSequenceId();
+        send(Opcode.OPCODE_TALK_TO_NPC_COMMAND_VALUE, sequenceId, command.toByteArray(), "TalkToNpcCommand");
+        return sequenceId;
     }
 
     /**
      * Chọn một lựa chọn trong node đang mở. Gửi CHỈ SỐ chứ không gửi {@code action} — server tự tra
      * lại action thật từ script theo chỉ số (Điều 24, xem {@link DialogueController}).
+     *
+     * @return {@code sequenceId} của gói, như {@link #talkToNpc}
      */
-    void selectDialogueOption(String npcCode, String currentNodeId, int optionIndex) {
+    int selectDialogueOption(String npcCode, String currentNodeId, int optionIndex) {
         SelectDialogueOptionCommand command = SelectDialogueOptionCommand.newBuilder()
                 .setNpcCode(npcCode)
                 .setCurrentNodeId(currentNodeId)
                 .setOptionIndex(optionIndex)
                 .build();
-        send(Opcode.OPCODE_SELECT_DIALOGUE_OPTION_COMMAND_VALUE, command.toByteArray(), "SelectDialogueOptionCommand");
+        int sequenceId = connection.nextSequenceId();
+        send(
+                Opcode.OPCODE_SELECT_DIALOGUE_OPTION_COMMAND_VALUE,
+                sequenceId,
+                command.toByteArray(),
+                "SelectDialogueOptionCommand");
+        return sequenceId;
     }
 
     /**

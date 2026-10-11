@@ -358,6 +358,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final PvpFacade pvpFacade;
     private final WorldGateway worldGateway;
     private final WorldRouteLookup worldRoutes;
+    private final NpcProximity npcProximity;
     private final Executor authExecutor;
     private final GatewayNetworkMetrics networkMetrics;
     private final GatewayTracing tracing;
@@ -497,6 +498,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.pvpFacade = facades.contentFacades().socialFacades().pvpFacade();
         this.worldGateway = worldGateway;
         this.worldRoutes = WorldRouteLookup.of(worldGateway);
+        this.npcProximity =
+                new NpcProximity(worldGateway.mainWorldChannels().worldContent().npcs(), this::mainWorldPositionOf);
         this.authExecutor = authExecutor;
         this.networkMetrics = observability.networkMetrics();
         this.tracing = observability.tracing();
@@ -1766,6 +1769,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 404, "error.npc_not_found");
             return;
         }
+        // SAU phép kiểm "NPC có tồn tại không": mã bịa vẫn nhận 404 như cũ, chỉ NPC có thật mà đứng xa
+        // mới nhận câu "lại gần hơn". TRƯỚC khi gửi cây thoại và trước sự kiện quest "đi gặp X".
+        if (rejectIfFarFromNpc(ctx, sequenceId, characterId, command.getNpcCode())) {
+            return;
+        }
         send(
                 ctx,
                 Opcode.OPCODE_DIALOGUE_NODE_RESPONSE_VALUE,
@@ -1796,6 +1804,35 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
     }
 
+    /**
+     * Từ chối bằng {@code error.npc_too_far} nếu nhân vật không đứng trong tầm của NPC — xem
+     * {@link NpcProximity}. Chạy trên luồng blocking: vị trí có thể phải đọc từ DB.
+     *
+     * @return {@code true} nếu đã từ chối (đã gửi lỗi) — người gọi dừng
+     */
+    private boolean rejectIfFarFromNpc(ChannelHandlerContext ctx, int sequenceId, long characterId, String npcCode) {
+        if (npcProximity.isWithinReach(characterId, npcCode)) {
+            return false;
+        }
+        sendError(ctx, sequenceId, 409, "error.npc_too_far");
+        return true;
+    }
+
+    /**
+     * Vị trí ở world chính của nhân vật, cho {@link NpcProximity}. Đang trong hầm ngục/đấu trường thì
+     * rỗng: vị trí gateway còn giữ lúc đó là chỗ họ đứng TRƯỚC khi vào, và NPC không có ở trong đó.
+     * Chưa có vị trí nào được báo (vừa vào world, chưa nhúc nhích) thì đọc chỗ đã lưu — cùng cách
+     * {@code ArenaInstanceRegistry} lấy vị trí quay về.
+     */
+    private Optional<PositionSnapshot> mainWorldPositionOf(long characterId) {
+        if (worldGateway.dungeonInstanceRegistry().isInDungeon(characterId)
+                || worldGateway.arenaInstanceRegistry().isInDuel(characterId)) {
+            return Optional.empty();
+        }
+        PositionSnapshot known = worldGateway.registry().lastKnownPosition(characterId);
+        return Optional.of(known != null ? known : characterFacade.loadPosition(characterId));
+    }
+
     private void handleSelectDialogueOptionCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         SelectDialogueOptionCommand command = SelectDialogueOptionCommand.parseFrom(payload);
@@ -1811,6 +1848,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSelectDialogueOptionBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, SelectDialogueOptionCommand command) {
+        // Mọi lựa chọn thoại — kể cả nhận quest và mở cửa hàng — đều là nói chuyện với NPC đó: đi khỏi
+        // tầm rồi thì cuộc thoại không tiếp tục được (quyết định chủ dự án 2026-10-11).
+        if (rejectIfFarFromNpc(ctx, sequenceId, characterId, command.getNpcCode())) {
+            return;
+        }
         DialogueFacade.SelectOptionResult result =
                 dialogueFacade.selectOption(command.getNpcCode(), command.getCurrentNodeId(), command.getOptionIndex());
         switch (result) {

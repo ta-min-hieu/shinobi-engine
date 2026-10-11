@@ -104,4 +104,35 @@ class DialogueControllerTest {
 
         assertThat(controller.beginTalk("town_elder")).isTrue();
     }
+
+    /**
+     * Server từ chối lệnh hội thoại bằng ErrorResponse mang sequenceId của lệnh (đứng xa NPC quá, từ
+     * 2026-10-11). Controller phải nhận ra đó là lệnh CỦA MÌNH để coordinator đóng cuộc thoại — không
+     * thì lần bấm NPC sau bị chính cuộc dở dang này chặn.
+     */
+    @Test
+    void recognisesTheRejectionOfItsOwnPendingCommand() {
+        controller.beginTalk("town_elder");
+        controller.onCommandSent(41);
+
+        assertThat(controller.isPendingCommand(41)).isTrue();
+        assertThat(controller.isPendingCommand(40))
+                .as("lỗi của luồng khác không phải của cuộc thoại này")
+                .isFalse();
+    }
+
+    @Test
+    void forgetsThePendingCommandOnceItIsAnsweredOrTheTalkCloses() {
+        controller.beginTalk("town_elder");
+        controller.onCommandSent(41);
+        controller.onNode(node("start", "dialogue.town_elder.greeting", "opt.a"));
+        assertThat(controller.isPendingCommand(41)).isFalse();
+
+        controller.onCommandSent(42);
+        controller.close();
+        assertThat(controller.isPendingCommand(42)).isFalse();
+        assertThat(controller.beginTalk("senior_sister"))
+                .as("đóng xong thì bắt chuyện lại được")
+                .isTrue();
+    }
 }

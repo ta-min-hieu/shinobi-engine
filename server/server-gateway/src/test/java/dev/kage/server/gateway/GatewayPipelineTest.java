@@ -75,7 +75,6 @@ import dev.kage.protocol.SelectFactionResponse;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
-import dev.kage.server.world.WorldContentCatalog;
 import dev.kage.server.world.WorldFacade;
 
 /**
@@ -524,6 +523,38 @@ class GatewayPipelineTest {
         assertThat(readOutboundFrames(channel))
                 .extracting(frame -> frame.header().opcode())
                 .containsExactly(Opcode.OPCODE_ERROR_VALUE);
+    }
+
+    /**
+     * Đứng XA NPC thì không nói chuyện được, và mục tiêu quest "đi gặp X" không được nhích (quyết định
+     * chủ dự án 2026-10-11). Trước đó client gửi mã NPC từ bất kỳ đâu là quest "đi gặp" hoàn thành.
+     */
+    @Test
+    void shouldRefuseTalkAndLeaveTheQuestAlone_whenStandingFarFromTheNpc() throws InvalidProtocolBufferException {
+        FakeCharacterPort characterPort = new FakeCharacterPort();
+        EmbeddedChannel channel =
+                newPipeline(characterPort, fakeInventoryFacade(), npcTalkQuestFacade(), talkableDialogueFacade());
+        connect(channel, "npctalk3");
+        long characterId = createCharacter(channel, "FarHero", 2);
+        characterPort.positions.put(characterId, new PositionSnapshot(60f, 0f));
+        selectCharacter(channel, characterId, 3);
+
+        writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_TALK_TO_NPC_COMMAND_VALUE, ProtocolVersion.CURRENT, 4),
+                dev.kage.protocol.TalkToNpcCommand.newBuilder()
+                        .setNpcCode(TALKABLE_NPC_CODE)
+                        .build()
+                        .toByteArray());
+
+        List<PacketCodec.Frame> frames = readOutboundFrames(channel);
+        assertThat(frames)
+                .as("chỉ một câu từ chối — không cây thoại, không sự kiện quest")
+                .extracting(frame -> frame.header().opcode())
+                .containsExactly(Opcode.OPCODE_ERROR_VALUE);
+        assertThat(dev.kage.protocol.ErrorResponse.parseFrom(frames.get(0).payload())
+                        .getErrorKey())
+                .isEqualTo("error.npc_too_far");
     }
 
     /**
@@ -1542,8 +1573,11 @@ class GatewayPipelineTest {
         ConnectedCharacterRegistry characterRegistry = new ConnectedCharacterRegistry(
                 inventoryFacade, questFacade, characterFacade::grantExperience, networkMetrics);
         WorldFacade firstChannelFacade = new WorldFacade(characterRegistry);
+        // NPC của test hội thoại được ĐẶT trong world chính, cạnh điểm xuất phát (0, 0): từ 2026-10-11
+        // server chỉ cho nói chuyện với NPC đứng trong tầm (NpcProximity). World này không start() nên
+        // việc đặt NPC không sinh gói spawn nào.
         MainWorldChannelRegistry mainWorldChannels = new MainWorldChannelRegistry(
-                characterRegistry, firstChannelFacade, meterRegistry, WorldContentCatalog.EMPTY);
+                characterRegistry, firstChannelFacade, meterRegistry, TestWorldContents.onlyNpc(TALKABLE_NPC_CODE, 3f));
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
         DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(

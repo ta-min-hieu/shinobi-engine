@@ -28,8 +28,15 @@ final class DialogueController {
     /** Không có cuộc hội thoại nào đang mở — giá trị của {@link #npcCode} lúc đóng. */
     private static final String CLOSED = "";
 
+    /** Server đánh {@code sequenceId} từ 1, nên 0 không bao giờ trùng một lệnh thật. */
+    private static final int NO_PENDING_COMMAND = 0;
+
     private String npcCode = CLOSED;
     private String currentNodeId = "";
+
+    /** {@code sequenceId} của lệnh hội thoại vừa gửi mà chưa có câu trả lời. */
+    private int pendingSequenceId = NO_PENDING_COMMAND;
+
     private String textKey = "";
     private final List<String> optionLabelKeys = new ArrayList<>();
 
@@ -67,6 +74,7 @@ final class DialogueController {
 
     /** Server trả về một node — thay toàn bộ nội dung đang hiển thị. */
     void onNode(DialogueNodeResponse response) {
+        pendingSequenceId = NO_PENDING_COMMAND;
         currentNodeId = response.getNodeId();
         textKey = response.getTextKey();
         optionLabelKeys.clear();
@@ -83,7 +91,25 @@ final class DialogueController {
      * kết thúc cuộc hội thoại, vì server không giữ state nào để nói tiếp
      * ({@code GetDialogueNodeUseCase} không có phiên).
      */
+    /**
+     * Ghi lại lệnh hội thoại vừa gửi (bắt chuyện hoặc chọn một lựa chọn). Server từ chối bằng
+     * {@code ErrorResponse} mang đúng {@code sequenceId} này — NPC không còn, hoặc đứng xa quá (từ
+     * 2026-10-11 server kiểm khoảng cách tới NPC).
+     */
+    void onCommandSent(int sequenceId) {
+        pendingSequenceId = sequenceId;
+    }
+
+    /**
+     * {@code true} nếu {@code relatedSequenceId} là của lệnh hội thoại đang chờ trả lời. Cuộc thoại
+     * đã đóng thì không lệnh nào còn chờ.
+     */
+    boolean isPendingCommand(int relatedSequenceId) {
+        return isOpen() && pendingSequenceId != NO_PENDING_COMMAND && pendingSequenceId == relatedSequenceId;
+    }
+
     void close() {
+        pendingSequenceId = NO_PENDING_COMMAND;
         npcCode = CLOSED;
         currentNodeId = "";
         textKey = "";

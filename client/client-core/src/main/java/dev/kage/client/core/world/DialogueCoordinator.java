@@ -4,6 +4,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 
 import dev.kage.client.core.ui.hud.DialoguePanel;
 import dev.kage.protocol.DialogueNodeResponse;
+import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.wire.PacketCodec;
 
@@ -56,7 +57,7 @@ final class DialogueCoordinator implements WindowFlow {
     /** Người chơi click trúng một NPC — mở hội thoại nếu chưa có cuộc nào đang mở. */
     void talkTo(String npcCode) {
         if (controller.beginTalk(npcCode)) {
-            sender.talkToNpc(npcCode);
+            controller.onCommandSent(sender.talkToNpc(npcCode));
         }
     }
 
@@ -76,6 +77,12 @@ final class DialogueCoordinator implements WindowFlow {
     }
 
     private boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+        if (opcode == Opcode.OPCODE_ERROR_VALUE) {
+            onError(ErrorResponse.parseFrom(payload));
+            // LUÔN trả false: câu lỗi do WorldScreen#onUnclaimedError nói ra khung chat — lớp này chỉ
+            // dọn trạng thái của chính nó.
+            return false;
+        }
         if (opcode == Opcode.OPCODE_DIALOGUE_NODE_RESPONSE_VALUE) {
             onNode(DialogueNodeResponse.parseFrom(payload));
             return true;
@@ -108,6 +115,18 @@ final class DialogueCoordinator implements WindowFlow {
         return false;
     }
 
+    /**
+     * Server từ chối lệnh hội thoại đang chờ ({@code error.npc_too_far} từ 2026-10-11,
+     * {@code error.npc_not_found}, {@code error.dialogue_option_not_found}). Phải đóng cuộc thoại: nếu
+     * không, {@code beginTalk} lần sau bị chính cuộc dở dang này chặn và mọi NPC hoá "câm" tới khi
+     * người chơi tình cờ bấm ESC.
+     */
+    private void onError(ErrorResponse error) {
+        if (controller.isPendingCommand(error.getRelatedSequenceId())) {
+            closePanel();
+        }
+    }
+
     private void onNode(DialogueNodeResponse response) {
         controller.onNode(response);
         panel.show(controller.textKey(), controller.optionLabelKeys());
@@ -120,7 +139,8 @@ final class DialogueCoordinator implements WindowFlow {
         // Mã nhiệm vụ chỉ có trong `action` của chính lựa chọn này — đọc TRƯỚC khi gửi, vì gói trả
         // lời (AcceptQuestResponse) không mang mã, xem QuestCoordinator.
         quests.onDialogueOptionSelected(controller.optionAction(optionIndex));
-        sender.selectDialogueOption(controller.npcCode(), controller.currentNodeId(), optionIndex);
+        controller.onCommandSent(
+                sender.selectDialogueOption(controller.npcCode(), controller.currentNodeId(), optionIndex));
     }
 
     private void closePanel() {
