@@ -111,6 +111,14 @@ final class DungeonInstanceRegistry {
     /** Người đã qua nửa đầu lượt rời, đang chờ World hầm ngục im — xem {@link #beginExit}. */
     private final Set<Long> exitingCharacterIds = new HashSet<>();
 
+    /**
+     * Đã {@link #stopAll} (sửa 2026-10-11) — cùng lý do với {@code MainWorldChannelRegistry#stopped}.
+     * Lệnh vào hầm ngục còn chạy dở lúc tắt server (đang đọc DB ngoài khoá) trước đây vẫn dựng và
+     * {@code start()} một World hầm ngục SAU khi mọi World đã dừng: không ai dừng nó nữa, nó tick tiếp
+     * trong lúc pool DB đóng. Nay lượt vào muộn không nhận ai. Chỉ đọc/ghi trong khoá.
+     */
+    private boolean stopped;
+
     private final WorldTransfer transfer;
 
     /**
@@ -263,10 +271,7 @@ final class DungeonInstanceRegistry {
             long partyId, List<PendingEntry> entries, Optional<WorldFacade> spare) {
         List<PendingEntry> admitted = new ArrayList<>(entries.size());
         for (PendingEntry entry : entries) {
-            long characterId = entry.characterId();
-            if (!instanceByCharacterId.containsKey(characterId)
-                    && registry.isOnline(characterId)
-                    && !inDuel.test(characterId)) {
+            if (isAdmissible(entry.characterId())) {
                 admitted.add(entry);
             }
         }
@@ -290,6 +295,18 @@ final class DungeonInstanceRegistry {
             drained.add(mainWorldChannels.detachCharacterAndDrain(characterId));
         }
         return new AdmitAttempt(false, Optional.of(new AdmittedEntries(instance, admitted, drained)));
+    }
+
+    /**
+     * Ba lượt kiểm lại trong khoá của {@link #admitIntoInstance}, cộng "server chưa tắt" (xem
+     * {@link #stopped}): sau {@link #stopAll} không ai được nhận ⇒ không instance nào được dựng, và
+     * {@code spare} chưa start bị bỏ. Chỉ gọi khi đang giữ khoá.
+     */
+    private boolean isAdmissible(long characterId) {
+        return !stopped
+                && !instanceByCharacterId.containsKey(characterId)
+                && registry.isOnline(characterId)
+                && !inDuel.test(characterId);
     }
 
     /**
@@ -494,6 +511,7 @@ final class DungeonInstanceRegistry {
     }
 
     private synchronized void stopAllInstances() {
+        stopped = true;
         instancesByPartyId.values().forEach(instance -> instance.facade().stop());
         instancesByPartyId.clear();
         instanceByCharacterId.clear();

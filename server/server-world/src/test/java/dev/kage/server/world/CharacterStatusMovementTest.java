@@ -196,7 +196,9 @@ class CharacterStatusMovementTest {
         world.useSkill(1L, "thuy_phong_toa", 2L); // -40% trong 4 giây
         awaitTrue(() -> hasSkillResult("thuy_phong_toa", 2L, SkillEffectKind.DEBUFF));
         world.setTarget(1L, 2L);
-        Instant deadline = Instant.now().plus(Duration.ofSeconds(3));
+        // 20 giây chứ không phải 3 (sửa 2026-10-11): mỗi nhát thường trượt ~10% (hit 0,91 - dodge 0,015)
+        // và cooldown là 1 giây, nên 3 giây chỉ đủ 2-3 nhát — máy tải mất một nhát là test đỏ oan.
+        Instant deadline = Instant.now().plus(Duration.ofSeconds(20));
         while (!sink.respawned.contains(2L) && Instant.now().isBefore(deadline)) {
             world.attack(1L);
             sleepQuietly(50);

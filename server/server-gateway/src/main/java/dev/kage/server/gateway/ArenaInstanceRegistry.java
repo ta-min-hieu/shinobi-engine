@@ -79,6 +79,11 @@ final class ArenaInstanceRegistry {
     private final Map<Long, DuelInstance> instanceByCharacterId = new HashMap<>();
     // Đã chấp nhận, đang đọc DB để dựng trận — coi như ĐANG BẬN, chưa có World.
     private final Set<Long> startingDuelCharacterIds = new HashSet<>();
+    // Đã stopAll (sửa 2026-10-11) — cùng lý do với MainWorldChannelRegistry#stopped. Lời chấp nhận thách
+    // đấu còn chạy dở lúc tắt server (đang đọc DB ngoài khoá), hoặc tới sau, trước đây vẫn dựng và start()
+    // một World đấu trường SAU khi mọi World đã dừng: không ai dừng nó nữa, và lượt dời người vào trận rơi
+    // vào settlementExecutor đã tắt. Nay không trận nào được dựng nữa.
+    private boolean stopped;
     // Không cần khoá: mỗi người chỉ được một đường ghi (dựng trận) và một đường gỡ (chốt trận, sau
     // khi đã lấy vé), và gỡ chạy ngoài khoá cùng lời gọi DB.
     private final Map<Long, PositionSnapshot> returnPositionByCharacterId = new ConcurrentHashMap<>();
@@ -204,7 +209,7 @@ final class ArenaInstanceRegistry {
      */
     private synchronized Optional<Long> reserveForDuel(long targetCharacterId, long challengeId) {
         PendingChallenge challenge = pendingChallengeByTargetId.get(targetCharacterId);
-        if (challenge == null || challenge.challengeId() != challengeId) {
+        if (stopped || challenge == null || challenge.challengeId() != challengeId) {
             return Optional.empty();
         }
         pendingChallengeByTargetId.remove(targetCharacterId);
@@ -381,6 +386,8 @@ final class ArenaInstanceRegistry {
     /** Xoá mọi sổ sách về trận, trả các trận CHƯA chốt (trận đã chốt do chính lượt chốt của nó dừng). */
     private synchronized List<DuelInstance> forgetAllInstances() {
         List<DuelInstance> unsettled = List.copyOf(instancesByChallengeId.values());
+        stopped = true;
+        pendingChallengeByTargetId.clear();
         instancesByChallengeId.clear();
         instanceByCharacterId.clear();
         startingDuelCharacterIds.clear();
@@ -406,6 +413,9 @@ final class ArenaInstanceRegistry {
             long challengeId, DuelEntrant challenger, DuelEntrant target, WorldFacade duelFacade) {
         startingDuelCharacterIds.remove(challenger.characterId());
         startingDuelCharacterIds.remove(target.characterId());
+        if (stopped) {
+            return false; // server tắt trong lúc đọc DB ngoài khoá — World chưa start này bị bỏ.
+        }
         if (!registry.isOnline(challenger.characterId()) || !registry.isOnline(target.characterId())) {
             return false;
         }
