@@ -39,8 +39,12 @@ public final class GatewayServer {
 
     private static final Logger LOG = LoggerFactory.getLogger(GatewayServer.class);
 
-    // Chống packet khổng lồ chiếm bộ nhớ (một dạng rate-limit thô — NETWORK.md §109).
-    private static final int MAX_FRAME_LENGTH = 1024 * 1024;
+    // Chống packet khổng lồ chiếm bộ nhớ (một dạng rate-limit thô — NETWORK.md §109). 64 KiB từ
+    // 2026-10-11 (quyết định chủ dự án; trước đó 1 MiB): đây là trần khung client GỬI LÊN, và lệnh hợp lệ
+    // lớn nhất (thư 1024 ký tự kèm đính kèm, lời chào giao dịch 20 dòng) chỉ vài KiB — phần còn lại của
+    // 1 MiB chỉ có lợi cho kẻ bơm khung lớn. Chiều server → client KHÔNG qua trần này (catalog vật phẩm
+    // lớn hơn nhiều); client tự giữ trần đọc vào riêng của nó.
+    private static final int MAX_FRAME_LENGTH = 64 * 1024;
     private static final int LENGTH_FIELD_LENGTH = 4;
 
     // NETWORK.md §10: client ping mỗi ~15s; server không nhận gì trong ~45s ⇒ kết nối chết, dọn dẹp

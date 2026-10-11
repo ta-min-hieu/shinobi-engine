@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
@@ -48,9 +49,22 @@ public final class GoldLedger {
             UPDATE character_stat SET gold = gold - ? WHERE character_id = ? AND gold >= ? RETURNING gold
             """;
 
-    private static final String CREDIT = """
-            UPDATE character_stat SET gold = gold + ? WHERE character_id = ? RETURNING gold
+    // AND gold <= ?: tham số là MAX_GOLD - amount, tính ở Java — "gold + amount <= MAX_GOLD" viết thẳng
+    // trong SQL sẽ tràn BIGINT ngay ở phép cộng với số dư sát mép.
+    private static final String CREDIT_WITHIN_CAP = """
+            UPDATE character_stat SET gold = gold + ? WHERE character_id = ? AND gold <= ? RETURNING gold
             """;
+
+    private static final String HAS_GOLD_ROW = """
+            SELECT 1 FROM character_stat WHERE character_id = ?
+            """;
+
+    /**
+     * Trần số dư vàng của một nhân vật (quyết định chủ dự án 2026-10-11). Trước đó trần duy nhất là
+     * {@code Long.MAX_VALUE} của cột, và chạm nó là lỗi 500. Chỉ {@link #credit} thi hành trần; số dư
+     * đã vượt trần từ trước (không có trên DB nào hiện nay) vẫn TIÊU được bình thường.
+     */
+    public static final long MAX_GOLD = 9_999_999_999L;
 
     private static volatile GoldChangeListener listener = GoldChangeListener.NO_OP;
 
@@ -88,10 +102,32 @@ public final class GoldLedger {
                 .orElse(Boolean.FALSE);
     }
 
-    /** Cộng {@code amount} gold — luôn thành công (không có trần số dư ở lát cắt này). */
+    /**
+     * Cộng {@code amount} gold, không vượt {@link #MAX_GOLD}.
+     *
+     * @throws GoldCapExceededException nếu số dư sau khi cộng sẽ vượt trần — KHÔNG đổi gì; người gọi
+     *     đang ở giữa một transaction và exception này làm nó rollback trọn
+     */
     public static void credit(Connection connection, long characterId, long amount, String reasonKey) {
-        JdbcOperations.queryOne(connection, CREDIT, rs -> rs.getLong("gold"), amount, characterId)
-                .ifPresent(newBalance -> stage(connection, new GoldChange(characterId, newBalance, amount, reasonKey)));
+        // amount > MAX_GOLD ⇒ ngưỡng âm ⇒ không dòng nào khớp ⇒ đi xuống nhánh vượt trần, đúng ý.
+        long highestBalanceThatStillFits = MAX_GOLD - amount;
+        Optional<Long> newBalance = JdbcOperations.queryOne(
+                connection,
+                CREDIT_WITHIN_CAP,
+                rs -> rs.getLong("gold"),
+                amount,
+                characterId,
+                highestBalanceThatStillFits);
+        if (newBalance.isPresent()) {
+            stage(connection, new GoldChange(characterId, newBalance.get(), amount, reasonKey));
+            return;
+        }
+        // Không dòng nào đổi: hoặc vượt trần, hoặc nhân vật không có dòng character_stat (giữ hành vi cũ
+        // của trường hợp sau: không làm gì).
+        if (JdbcOperations.queryOne(connection, HAS_GOLD_ROW, rs -> rs.getInt(1), characterId)
+                .isPresent()) {
+            throw new GoldCapExceededException(characterId);
+        }
     }
 
     /**

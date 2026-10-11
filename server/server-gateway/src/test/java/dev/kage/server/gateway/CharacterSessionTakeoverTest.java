@@ -182,6 +182,56 @@ class CharacterSessionTakeoverTest {
         assertThat(errorKeys(fresh)).doesNotContain(LOGGED_IN_ELSEWHERE);
     }
 
+    /**
+     * Một tài khoản chỉ MỘT nhân vật online (quyết định chủ dự án 2026-10-11). Trước đó hai kết nối của
+     * cùng tài khoản chọn hai nhân vật khác nhau là chơi song song được cả hai.
+     */
+    @Test
+    void shouldKickTheOtherCharacterOfTheSameAccount_whenASecondConnectionEntersWithAnotherOne()
+            throws InterruptedException {
+        long first = createCharacter("AltOne");
+        long second = createCharacter("AltTwo");
+        TestClient old = login();
+        assertThat(select(old, first).getSuccess()).isTrue();
+
+        TestClient fresh = login();
+        assertThat(select(fresh, second).getSuccess()).isTrue();
+
+        assertThat(awaitError(old))
+                .as("kết nối đang chơi nhân vật kia phải được báo lý do")
+                .hasValue(LOGGED_IN_ELSEWHERE);
+        assertThat(old.channel.closeFuture().await(WAIT.toMillis())).isTrue();
+        awaitServerSideClosed(old);
+        assertThat(worldGateway.registry().isOnline(first))
+                .as("nhân vật cũ đã rời world")
+                .isFalse();
+        assertThat(worldGateway.registry().isOnline(second)).isTrue();
+        assertThat(worldGateway.mainWorldChannels().playerCount()).isEqualTo(1);
+        assertThat(fresh.channel.isActive()).isTrue();
+        assertThat(errorKeys(fresh)).doesNotContain(LOGGED_IN_ELSEWHERE);
+    }
+
+    /** Sau khi bị đá, tài khoản vẫn vào lại được bằng nhân vật cũ — sổ "đang chơi ai" không kẹt. */
+    @Test
+    void shouldLetTheAccountComeBackWithTheFirstCharacter_afterBeingKickedByItsOwnOtherCharacter()
+            throws InterruptedException {
+        long first = createCharacter("AltBackA");
+        long second = createCharacter("AltBackB");
+        TestClient a = login();
+        assertThat(select(a, first).getSuccess()).isTrue();
+        TestClient b = login();
+        assertThat(select(b, second).getSuccess()).isTrue();
+        awaitServerSideClosed(a);
+
+        TestClient c = login();
+        assertThat(select(c, first).getSuccess()).isTrue();
+
+        awaitServerSideClosed(b);
+        assertThat(worldGateway.registry().isOnline(first)).isTrue();
+        assertThat(worldGateway.registry().isOnline(second)).isFalse();
+        assertThat(worldGateway.mainWorldChannels().playerCount()).isEqualTo(1);
+    }
+
     @Test
     void shouldNotKickItself_whenSameConnectionSelectsTheSameCharacterTwice() throws InterruptedException {
         long characterId = createCharacter("DoubleClick");

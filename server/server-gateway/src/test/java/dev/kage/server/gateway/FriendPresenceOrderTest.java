@@ -84,6 +84,7 @@ import dev.kage.server.world.WorldFacade;
 class FriendPresenceOrderTest {
 
     private static final String USERNAME = "presence";
+    private static final String FRIEND_USERNAME = "presencefriend";
     private static final Duration WAIT = Duration.ofSeconds(10);
 
     private final List<Channel> serverSideChannels = new CopyOnWriteArrayList<>();
@@ -122,7 +123,9 @@ class FriendPresenceOrderTest {
                 action -> action.accept(null)));
         accountId = accountFacade.login(USERNAME).accountId();
         walkerId = createCharacter("Walker");
-        friendId = createCharacter("Friend");
+        // Người bạn thuộc TÀI KHOẢN KHÁC: hai nhân vật của cùng tài khoản không online cùng lúc được
+        // (quyết định chủ dự án 2026-10-11).
+        friendId = createCharacter(accountFacade.login(FRIEND_USERNAME).accountId(), "Friend");
 
         SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
         GatewayNetworkMetrics networkMetrics = new GatewayNetworkMetrics(meterRegistry);
@@ -174,7 +177,7 @@ class FriendPresenceOrderTest {
 
     @Test
     void friendShouldEndUpSeeingOffline_whenTheCharacterDisconnectsWhileAnnouncingOnline() throws Exception {
-        TestClient friend = login();
+        TestClient friend = login(FRIEND_USERNAME);
         select(friend, friendId);
 
         walker = login();
@@ -284,15 +287,27 @@ class FriendPresenceOrderTest {
     }
 
     private long createCharacter(String name) {
+        return createCharacter(accountId, name);
+    }
+
+    /** Nhân vật của MỘT TÀI KHOẢN KHÁC — hai người chơi cùng online phải là hai tài khoản (2026-10-11). */
+    private long createCharacter(long ownerAccountId, String name) {
         return characterPort
                 .create(
                         null,
                         new NewCharacter(
-                                accountId, name, Faction.HOA, UUID.randomUUID().toString()))
+                                ownerAccountId,
+                                name,
+                                Faction.HOA,
+                                UUID.randomUUID().toString()))
                 .id();
     }
 
     private TestClient login() throws InterruptedException {
+        return login(USERNAME);
+    }
+
+    private TestClient login(String username) throws InterruptedException {
         TestClient client = new TestClient();
         client.channel = new Bootstrap()
                 .group(eventLoops)
@@ -309,7 +324,7 @@ class FriendPresenceOrderTest {
         send(
                 client,
                 Opcode.OPCODE_CONNECT_REQUEST_VALUE,
-                ConnectRequest.newBuilder().setUsername(USERNAME).build().toByteArray());
+                ConnectRequest.newBuilder().setUsername(username).build().toByteArray());
         assertThat(client.awaitOpcode(Opcode.OPCODE_CONNECT_RESPONSE_VALUE)).isTrue();
         return client;
     }

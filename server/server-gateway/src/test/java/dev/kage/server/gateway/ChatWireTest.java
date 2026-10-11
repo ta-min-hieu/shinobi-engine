@@ -124,10 +124,10 @@ class ChatWireTest {
      * Mỗi nội dung thù địch nhận ĐÚNG MỘT câu trả lời có nghĩa và không sinh log ERROR. Mỗi nội dung
      * một tài khoản riêng — trần kênh Thế giới là 5 tin/10 giây mỗi tài khoản.
      *
-     * <p>Các nội dung "lạ nhưng nhìn thấy được" (xuống dòng giữa câu, ký hiệu format/SQL/HTML) hiện
-     * được phát NGUYÊN VĂN: client vẽ chat dạng chữ thuần và tự đổi ký tự không vẽ được thành
-     * {@code ?} ({@code ChatController#sanitize}). Test chỉ chốt là chúng không làm server lỗi —
-     * có lọc ký tự điều khiển phía server hay không là câu hỏi cho chủ dự án.
+     * <p>Các nội dung "lạ nhưng nhìn thấy được" (ký hiệu format/SQL/HTML) được phát NGUYÊN VĂN: client
+     * vẽ chat dạng chữ thuần. Riêng xuống dòng và ký tự điều khiển thì từ 2026-10-11 server đổi thành
+     * dấu cách trước khi phát ({@code ChatMessage#singleLine}, xem
+     * {@link #shouldDeliverASingleLine_whenTheBodyContainsLineBreaks}).
      */
     @Test
     void shouldClassifyHostileBodies_withoutServerErrors() throws InvalidProtocolBufferException {
@@ -140,7 +140,9 @@ class ChatWireTest {
                 Map.entry("\u00A0\u2007\u202F\u3000", BLANK),
                 Map.entry("\u202E\u202D\u2066", BLANK),
                 Map.entry("a".repeat(MAX_BODY_LENGTH + 1), TOO_LONG),
-                Map.entry("a".repeat(100_000), TOO_LONG),
+                // 30.000 ký tự: xa trên trần tin nhắn nhưng vẫn lọt khung 64 KiB (trần khung từ 2026-10-11;
+                // khung lớn hơn bị cắt ngay ở tầng khung, không tới được phép kiểm này).
+                Map.entry("a".repeat(30_000), TOO_LONG),
                 // 101 emoji = 202 đơn vị UTF-16: trần đếm theo đơn vị UTF-16.
                 Map.entry("\uD83D\uDE00".repeat(MAX_BODY_LENGTH / 2 + 1), TOO_LONG),
                 Map.entry("a".repeat(MAX_BODY_LENGTH), OK),
@@ -169,6 +171,26 @@ class ChatWireTest {
             }
             assertThat(errors.errorsSince(0)).isEmpty();
         }
+    }
+
+    /**
+     * Tin có xuống dòng từng giả được tin hệ thống trên máy người nhận (quyết định chủ dự án 2026-10-11).
+     * Đo thứ NGƯỜI NHẬN thấy: một dòng duy nhất.
+     */
+    @Test
+    void shouldDeliverASingleLine_whenTheBodyContainsLineBreaks() throws InvalidProtocolBufferException {
+        EmbeddedChannel listener = enterWorld("linelistener", "LineListener");
+        EmbeddedChannel sender = enterWorld("linesender", "LineSender");
+        GatewayPipelineTest.readOutboundFrames(listener);
+        String lineFeed = Character.toString(0x0A);
+
+        send(sender, ChatChannel.CHAT_CHANNEL_WORLD, "", "chào" + lineFeed + "[Hệ thống] giả mạo");
+
+        List<PacketCodec.Frame> received = GatewayPipelineTest.readOutboundFrames(listener);
+        assertThat(received).hasSize(1);
+        assertThat(dev.kage.protocol.ChatMessageEvent.parseFrom(received.get(0).payload())
+                        .getBody())
+                .isEqualTo("chào [Hệ thống] giả mạo");
     }
 
     // Chuỗi trên dây không phải UTF-8 hợp lệ (nửa cặp surrogate mã hoá thẳng): protobuf từ chối ngay

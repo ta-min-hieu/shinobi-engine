@@ -248,7 +248,8 @@ class ServerShutdownMidPlayDatabaseTest {
 
     /**
      * Server tắt đúng lúc lệnh xác nhận THỨ HAI của một phiên giao dịch đang bay. Giao dịch hoặc xảy ra
-     * trọn (vàng + món đổi chủ, phiên biến mất) hoặc không xảy ra gì (phiên còn nguyên) — và sau khi
+     * trọn (vàng + món đổi chủ, phiên biến mất) hoặc không xảy ra gì (phiên còn nguyên, hoặc đã bị huỷ vì
+     * tắt server ngắt kết nối của hai bên — 2026-10-11) — và sau khi
      * khởi động lại, phiên còn sót không được khoá hai người chơi mãi mãi: huỷ được, mời lại được.
      */
     @Test
@@ -335,9 +336,15 @@ class ServerShutdownMidPlayDatabaseTest {
             assertThat(new long[] {buyerGold, sellerGold, buyerItems, sellerItems})
                     .as("phiên còn ⇒ chưa có gì đổi chủ")
                     .containsExactly(START_GOLD, 0L, 0L, START_ITEM_QUANTITY);
+        } else if (buyerGold == START_GOLD) {
+            // Từ 2026-10-11 ngắt kết nối là HUỶ phiên đang mở, và tắt server ngắt mọi kết nối — nên phiên
+            // có thể đã bị huỷ trước khi lệnh xác nhận thứ hai kịp thi hành. Vẫn là "không xảy ra gì".
+            assertThat(new long[] {buyerGold, sellerGold, buyerItems, sellerItems})
+                    .as("phiên đã xoá vì bị huỷ ⇒ chưa có gì đổi chủ")
+                    .containsExactly(START_GOLD, 0L, 0L, START_ITEM_QUANTITY);
         } else {
             assertThat(new long[] {buyerGold, sellerGold, buyerItems, sellerItems})
-                    .as("phiên đã xoá ⇒ giao dịch xảy ra trọn")
+                    .as("phiên đã xoá vì đã thi hành ⇒ giao dịch xảy ra trọn")
                     .containsExactly(
                             START_GOLD - TRADE_GOLD,
                             TRADE_GOLD,

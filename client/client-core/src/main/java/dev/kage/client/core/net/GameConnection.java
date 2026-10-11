@@ -74,7 +74,9 @@ public final class GameConnection {
     private static final int TLS_HANDSHAKE_TIMEOUT_MS = 10_000;
 
     /**
-     * Trần khung ĐỌC VÀO — cố ý khớp {@code GatewayServer.MAX_FRAME_LENGTH} (1MB).
+     * Trần khung ĐỌC VÀO (chiều server → client), 1 MiB. Trần của server cho chiều ngược lại
+     * ({@code GatewayServer.MAX_FRAME_LENGTH}) là 64 KiB từ 2026-10-11 — hai con số cố ý KHÁC nhau: gói
+     * server gửi xuống (catalog vật phẩm, danh sách) lớn hơn nhiều mọi lệnh client gửi lên.
      *
      * <p>Phía server đã chặn khung khổng lồ từ lâu ({@code LengthFieldBasedFrameDecoder}, có hẳn ô
      * test bảo mật cho nó), còn client thì {@code new byte[in.readInt()]} theo đúng con số trên dây

@@ -154,6 +154,7 @@ public final class InventoryFacade {
         return withCharacterLock(characterId, () -> switch (unequipItemUseCase.execute(characterId, slot)) {
             case OK -> UnequipResult.OK;
             case NOT_EQUIPPED -> UnequipResult.NOT_EQUIPPED;
+            case INVENTORY_FULL -> UnequipResult.INVENTORY_FULL;
         });
     }
 
@@ -223,7 +224,9 @@ public final class InventoryFacade {
 
     public enum UnequipResult {
         OK,
-        NOT_EQUIPPED
+        NOT_EQUIPPED,
+        /** Túi đầy — món đang mặc không có chỗ để về (2026-10-11). */
+        INVENTORY_FULL
     }
 
     public enum EnhanceResult {

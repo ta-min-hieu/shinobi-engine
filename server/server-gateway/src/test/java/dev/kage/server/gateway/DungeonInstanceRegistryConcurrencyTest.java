@@ -224,11 +224,25 @@ class DungeonInstanceRegistryConcurrencyTest {
      *     tức ĐÚNG khoảng hở giữa lượt kiểm "cả nhóm online" và phần ghi của lượt vào hầm ngục
      */
     static CharacterFacade fakeCharacterFacade(java.util.function.LongConsumer onLoadStats) {
+        return fakeCharacterFacade(onLoadStats, () -> 1);
+    }
+
+    /** @param storedLevel cấp "trong DB" lúc được đọc — cho test dựng một cú lên cấp giữa hai lần đọc */
+    static CharacterFacade fakeCharacterFacade(
+            java.util.function.LongConsumer onLoadStats, java.util.function.IntSupplier storedLevel) {
         CharacterPort port = new CharacterPort() {
             @Override
             public Optional<Character> findById(long characterId) {
-                return Optional.of(
-                        new Character(characterId, 1L, 1, "Hero" + characterId, Faction.HOA, 1, 0L, 0, Instant.EPOCH));
+                return Optional.of(new Character(
+                        characterId,
+                        1L,
+                        1,
+                        "Hero" + characterId,
+                        Faction.HOA,
+                        storedLevel.getAsInt(),
+                        0L,
+                        0,
+                        Instant.EPOCH));
             }
 
             @Override

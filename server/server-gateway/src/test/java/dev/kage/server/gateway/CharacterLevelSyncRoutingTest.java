@@ -111,6 +111,37 @@ class CharacterLevelSyncRoutingTest {
                 .doesNotThrowAnyException();
     }
 
+    /**
+     * Khe "lên cấp đúng lúc đang dời World" (bịt 2026-10-11): World mới được gắn với cấp đọc TRƯỚC khi
+     * dời; {@link CharacterLevelResync} đọc lại cấp trong DB sau khi dời và nâng World đó lên.
+     */
+    @Test
+    void resyncShouldRaiseTheNewWorldToTheStoredLevel_afterAMove() {
+        LiveWorld movedInto = startWorldWithCharacter(); // gắn với cấp 49 — cấp đọc trước khi dời
+        assertThat(movedInto.castsUltimate()).isFalse();
+
+        CharacterLevelResync.afterMoveInto(
+                movedInto.facade,
+                DungeonInstanceRegistryConcurrencyTest.fakeCharacterFacade(id -> {}, () -> GATE_LEVEL),
+                CHARACTER_ID);
+
+        assertThat(movedInto.castsUltimate()).isTrue();
+    }
+
+    /** DB còn cấp thấp hơn cấp World đang giữ (đọc trễ): World không bao giờ bị hạ cấp. */
+    @Test
+    void resyncShouldNeverLowerTheWorldsLevel() {
+        LiveWorld world = startWorldWithCharacter();
+        world.facade.enqueueCharacterLevel(CHARACTER_ID, GATE_LEVEL);
+
+        CharacterLevelResync.afterMoveInto(
+                world.facade,
+                DungeonInstanceRegistryConcurrencyTest.fakeCharacterFacade(id -> {}, () -> 1),
+                CHARACTER_ID);
+
+        assertThat(world.castsUltimate()).isTrue();
+    }
+
     private static CharacterLevelSync syncOver(
             Optional<LiveWorld> duel, Optional<LiveWorld> dungeon, Optional<LiveWorld> main) {
         return new CharacterLevelSync(

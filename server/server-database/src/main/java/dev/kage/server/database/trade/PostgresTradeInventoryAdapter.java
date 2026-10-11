@@ -38,8 +38,12 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
             SELECT COUNT(*) FROM equipment_slot WHERE character_id = ? AND inventory_item_id = ?
             """;
 
+    // Chỉ đếm món NẰM TRONG TÚI: đồ đang mặc không chiếm ô (quyết định chủ dự án 2026-10-11). Trước đó
+    // túi 20 ô tính cả 7 món trên người, nên người mặc đủ bộ chỉ còn 13 ô thật.
     private static final String COUNT_ITEMS = """
-            SELECT COUNT(*) FROM inventory_item WHERE character_id = ?
+            SELECT COUNT(*) FROM inventory_item ii
+             WHERE ii.character_id = ?
+               AND NOT EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = ii.id)
             """;
 
     private static final String UPDATE_OWNER = """

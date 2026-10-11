@@ -35,8 +35,8 @@ import dev.kage.protocol.Opcode;
  */
 final class FuzzPayloads {
 
-    /** Trần cỡ payload — dưới {@code GatewayServer.MAX_FRAME_LENGTH} (1 MiB) cho chắc chắn. */
-    private static final int MAX_PAYLOAD_BYTES = 256 * 1024;
+    /** Trần cỡ payload — dưới {@code GatewayServer.MAX_FRAME_LENGTH} (64 KiB từ 2026-10-11) cho chắc chắn. */
+    private static final int MAX_PAYLOAD_BYTES = 48 * 1024;
 
     private static final int MAX_RANDOM_BYTES = 96;
     private static final int MAX_DEPTH = 3;

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+import dev.kage.inventory.domain.AuditPort;
 import dev.kage.inventory.domain.DropTableEntry;
 import dev.kage.inventory.domain.DropTablePort;
 import dev.kage.inventory.domain.Inventory;
@@ -27,7 +28,9 @@ public final class GrantLootUseCase {
     private final InventoryPort inventoryPort;
     private final ItemTemplatePort itemTemplatePort;
     private final TransactionRunner tx;
+    private final AuditPort auditPort;
 
+    /** Bản KHÔNG ghi audit — cho test chỉ quan tâm tới túi đồ. Production dùng {@link #auditedBy}. */
     public GrantLootUseCase(
             DropTablePort dropTablePort,
             InventoryPort inventoryPort,
@@ -37,7 +40,33 @@ public final class GrantLootUseCase {
         this.inventoryPort = inventoryPort;
         this.itemTemplatePort = itemTemplatePort;
         this.tx = tx;
+        this.auditPort = NO_AUDIT;
     }
+
+    private GrantLootUseCase(GrantLootUseCase source, AuditPort auditPort) {
+        this.dropTablePort = source.dropTablePort;
+        this.inventoryPort = source.inventoryPort;
+        this.itemTemplatePort = source.itemTemplatePort;
+        this.tx = source.tx;
+        this.auditPort = auditPort;
+    }
+
+    /**
+     * Bản ghi một dòng {@code audit_log} {@value #AUDIT_ACTION} cho MỖI chồng đồ rơi thật sự vào túi
+     * (quyết định chủ dự án 2026-10-11). Rơi đồ là nguồn sinh vật phẩm lớn nhất của game và trước đó
+     * không để lại dấu nào: sổ vàng dựng lại trọn được từ audit, sổ vật phẩm thì không.
+     *
+     * <p>Ghi trong CÙNG transaction với lần lưu túi (luật của {@link AuditPort}). Một method thay vì
+     * tham số constructor thứ năm: constructor đã chạm trần 4 tham số của Checkstyle.
+     */
+    public GrantLootUseCase auditedBy(AuditPort port) {
+        return new GrantLootUseCase(this, port);
+    }
+
+    /** {@code audit_log.action} của một chồng đồ rơi. */
+    public static final String AUDIT_ACTION = "LOOT_GRANT";
+
+    private static final AuditPort NO_AUDIT = (transaction, characterId, action, detailJson) -> {};
 
     /**
      * Roll bảng rơi rồi cộng vào túi người hạ gục.
@@ -73,6 +102,8 @@ public final class GrantLootUseCase {
             for (ItemStack stack : drops) {
                 if (inventory.add(stack, maxStackOf(stack)) instanceof Inventory.Added added) {
                     placements.add(new int[] {added.index(), stack.quantity()});
+                    // Chỉ chồng THẬT SỰ vào túi mới được ghi — túi đầy thì chồng đó bị bỏ, không có gì để ghi.
+                    auditPort.log(t, characterId, AUDIT_ACTION, detailJson(dropTableCode, stack));
                 }
             }
             if (!placements.isEmpty()) {
@@ -94,6 +125,13 @@ public final class GrantLootUseCase {
     }
 
     /** Thiếu template (dữ liệu hỏng) ⇒ coi như KHÔNG xếp chồng — an toàn hơn là gộp nhầm. */
+    /** {@code source} là mã bảng rơi (= mã loài quái) — dữ liệu server, nhưng vẫn lọc về chữ/số/gạch dưới. */
+    private static String detailJson(String dropTableCode, ItemStack stack) {
+        String source = dropTableCode.replaceAll("[^A-Za-z0-9_]", "_");
+        return "{\"source\":\"%s\",\"itemTemplateId\":%d,\"quantity\":%d}"
+                .formatted(source, stack.itemTemplateId(), stack.quantity());
+    }
+
     private int maxStackOf(ItemStack stack) {
         return itemTemplatePort
                 .findById(stack.itemTemplateId())

@@ -19,9 +19,10 @@ import org.testcontainers.utility.DockerImageName;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.EnhancementTable;
 import dev.kage.mail.api.MailFacade;
-import dev.kage.server.database.DatabaseAccessException;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
+import dev.kage.server.database.GoldCapExceededException;
+import dev.kage.server.database.GoldLedger;
 import dev.kage.server.database.PostgresDataSourceFactory;
 import dev.kage.shop.api.ShopFacade;
 import dev.kage.trade.api.TradeFacade;
@@ -167,26 +168,26 @@ class EconomyArithmeticBoundaryIntegrationTest {
     }
 
     /**
-     * Không có trần vàng: cột là {@code BIGINT}, nên mép trên là {@code Long.MAX_VALUE}. Chạm đúng
-     * mép thì được; vượt một đồng thì Postgres từ chối ({@code bigint out of range}) và cả giao dịch
-     * rollback — món hàng KHÔNG mất, vàng KHÔNG quay vòng thành số âm. Gateway đổi exception này
-     * thành {@code error.server_internal}.
+     * Trần vàng {@link GoldLedger#MAX_GOLD} (quyết định chủ dự án 2026-10-11; trước đó mép trên là
+     * {@code Long.MAX_VALUE} của cột và vượt nó là lỗi 500). Chạm đúng trần thì được; vượt một đồng thì
+     * {@link GoldCapExceededException} và cả giao dịch rollback — món hàng KHÔNG mất, vàng KHÔNG đổi.
+     * Gateway đổi exception này thành {@code error.gold_cap_reached}.
      */
     @Test
     void shouldKeepTheItemAndTheGold_whenASaleWouldPushGoldPastTheColumnLimit() {
         long credit = fixture.sellPrice(kunai);
 
-        long atTheEdge = fixture.newCharacter(Long.MAX_VALUE - credit);
+        long atTheEdge = fixture.newCharacter(GoldLedger.MAX_GOLD - credit);
         long edgeItem = fixture.addRow(atTheEdge, kunai, 1);
         assertThat(facades.shop().sellItem(atTheEdge, edgeItem, 1, EconomyBoundaryFixture.newKey()))
                 .isEqualTo(ShopFacade.SellResult.OK);
-        assertThat(fixture.gold(atTheEdge)).isEqualTo(Long.MAX_VALUE);
+        assertThat(fixture.gold(atTheEdge)).isEqualTo(GoldLedger.MAX_GOLD);
 
-        long pastTheEdge = fixture.newCharacter(Long.MAX_VALUE - credit + 1);
+        long pastTheEdge = fixture.newCharacter(GoldLedger.MAX_GOLD - credit + 1);
         long item = fixture.addRow(pastTheEdge, kunai, 1);
         String before = fixture.snapshot(pastTheEdge);
         assertThatThrownBy(() -> facades.shop().sellItem(pastTheEdge, item, 1, EconomyBoundaryFixture.newKey()))
-                .isInstanceOf(DatabaseAccessException.class);
+                .isInstanceOf(GoldCapExceededException.class);
         assertThat(fixture.snapshot(pastTheEdge)).isEqualTo(before);
     }
 
@@ -436,20 +437,20 @@ class EconomyArithmeticBoundaryIntegrationTest {
         }
     }
 
-    /** Bên nhận đã ở mép {@code Long.MAX_VALUE}: giao dịch hỏng TRỌN, không ai mất đồng nào. */
+    /** Bên nhận đã ở đúng trần vàng: giao dịch hỏng TRỌN, không ai mất đồng nào. */
     @Test
     void shouldLeaveBothSidesUntouched_whenTradedGoldWouldOverflowTheReceiver() {
         long giver = fixture.newCharacter(10L);
-        long taker = fixture.newCharacter(Long.MAX_VALUE);
+        long taker = fixture.newCharacter(GoldLedger.MAX_GOLD);
         long sessionId = EconomyBoundaryFixture.openTrade(facades.trade(), giver, taker);
         facades.trade().setOffer(sessionId, giver, 1L, List.of());
         facades.trade().confirm(sessionId, giver, EconomyBoundaryFixture.newKey());
 
         assertThatThrownBy(() -> facades.trade().confirm(sessionId, taker, EconomyBoundaryFixture.newKey()))
-                .isInstanceOf(DatabaseAccessException.class);
+                .isInstanceOf(GoldCapExceededException.class);
 
         assertThat(fixture.gold(giver)).isEqualTo(10L);
-        assertThat(fixture.gold(taker)).isEqualTo(Long.MAX_VALUE);
+        assertThat(fixture.gold(taker)).isEqualTo(GoldLedger.MAX_GOLD);
         facades.trade().cancel(sessionId, giver);
     }
 

@@ -74,6 +74,7 @@ class CharacterSwitchOnSameConnectionTest {
 
     private static final String LOGGED_IN_ELSEWHERE = "error.logged_in_elsewhere";
     private static final String USERNAME = "altoholic";
+    private static final String OTHER_USERNAME = "altoholicrival";
     private static final Duration WAIT = Duration.ofSeconds(10);
     private static final int RACE_ROUNDS = 15;
     private static final float WALKED_TO_X = 13.5f;
@@ -186,9 +187,14 @@ class CharacterSwitchOnSameConnectionTest {
         assertThat(worldGateway.mainWorldChannels().playerCount()).isZero();
     }
 
-    /** Sau khi rời C, kết nối khác đăng nhập C thì KHÔNG được đá kết nối đang chơi D. */
+    /**
+     * Sau khi rời C sang D, một kết nối KHÁC của cùng tài khoản đăng nhập C thì kết nối đang chơi D bị
+     * đá — một tài khoản chỉ một nhân vật online (quyết định chủ dự án 2026-10-11; trước đó test này
+     * khẳng định điều ngược lại: hai kết nối, hai nhân vật của cùng tài khoản, cùng online).
+     */
     @Test
-    void shouldNotKickTheConnection_whenAnotherConnectionLaterSelectsTheCharacterItLeft() throws InterruptedException {
+    void shouldKickTheConnectionPlayingAnotherCharacter_whenTheSameAccountLaterSelectsTheOneItLeft()
+            throws InterruptedException {
         long first = createCharacter("Left");
         long second = createCharacter("Kept");
         TestClient client = login();
@@ -199,11 +205,11 @@ class CharacterSwitchOnSameConnectionTest {
         TestClient other = login();
         assertThat(select(other, first).getSuccess()).isTrue();
 
-        awaitTrue(() -> isInWorld(first));
-        assertThat(client.channel.isActive()).isTrue();
-        assertThat(errorKeys(client)).doesNotContain(LOGGED_IN_ELSEWHERE);
-        assertThat(worldGateway.registry().isOnline(second)).isTrue();
-        assertThat(worldGateway.mainWorldChannels().playerCount()).isEqualTo(2);
+        awaitTrue(() -> isInWorld(first) && isGone(second));
+        assertThat(client.channel.closeFuture().await(WAIT.toMillis())).isTrue();
+        assertThat(errorKeys(client)).contains(LOGGED_IN_ELSEWHERE);
+        assertThat(worldGateway.registry().isOnline(second)).isFalse();
+        assertThat(worldGateway.mainWorldChannels().playerCount()).isEqualTo(1);
     }
 
     /** Hai lượt chọn KHÁC nhân vật trên cùng kết nối chạy song song — cuối cùng chỉ một nhân vật gắn. */
@@ -240,9 +246,10 @@ class CharacterSwitchOnSameConnectionTest {
     @Test
     void shouldNotCreateASecondEntity_whenReselectingTheCharacterWhileItIsInADuel() throws InterruptedException {
         long duelist = createCharacter("Duelist");
-        long opponent = createCharacter("Opponent");
+        // Đối thủ thuộc TÀI KHOẢN KHÁC: hai nhân vật của cùng tài khoản không online cùng lúc được.
+        long opponent = createCharacter(accountFacade.login(OTHER_USERNAME).accountId(), "Opponent");
         TestClient client = login();
-        TestClient other = login();
+        TestClient other = login(OTHER_USERNAME);
         assertThat(select(client, duelist).getSuccess()).isTrue();
         assertThat(select(other, opponent).getSuccess()).isTrue();
         awaitTrue(() -> isInWorld(duelist) && isInWorld(opponent));
@@ -312,15 +319,27 @@ class CharacterSwitchOnSameConnectionTest {
     }
 
     private long createCharacter(String name) {
+        return createCharacter(accountId, name);
+    }
+
+    /** Nhân vật của MỘT TÀI KHOẢN KHÁC — hai người chơi cùng online phải là hai tài khoản (2026-10-11). */
+    private long createCharacter(long ownerAccountId, String name) {
         return characterPort
                 .create(
                         null,
                         new NewCharacter(
-                                accountId, name, Faction.HOA, UUID.randomUUID().toString()))
+                                ownerAccountId,
+                                name,
+                                Faction.HOA,
+                                UUID.randomUUID().toString()))
                 .id();
     }
 
     private TestClient login() throws InterruptedException {
+        return login(USERNAME);
+    }
+
+    private TestClient login(String username) throws InterruptedException {
         TestClient client = new TestClient();
         client.channel = new Bootstrap()
                 .group(eventLoops)
@@ -338,7 +357,7 @@ class CharacterSwitchOnSameConnectionTest {
                 client,
                 Opcode.OPCODE_CONNECT_REQUEST_VALUE,
                 1,
-                ConnectRequest.newBuilder().setUsername(USERNAME).build().toByteArray());
+                ConnectRequest.newBuilder().setUsername(username).build().toByteArray());
         assertThat(awaitFrame(client, Opcode.OPCODE_CONNECT_RESPONSE_VALUE)).isPresent();
         return client;
     }

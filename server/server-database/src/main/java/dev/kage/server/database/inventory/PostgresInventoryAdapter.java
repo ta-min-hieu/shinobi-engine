@@ -37,6 +37,13 @@ public final class PostgresInventoryAdapter implements InventoryPort {
     // PostgresCharacterAdapter). Chưa đọc từ character (level/VIP...) — lát cắt sau nếu cần.
     private static final int DEFAULT_CAPACITY = 20;
 
+    // Đồ đang mặc không chiếm ô túi (quyết định chủ dự án 2026-10-11). `Inventory` chứa MỌI dòng
+    // `inventory_item` của nhân vật, kể cả món đang mặc, và không biết món nào đang mặc — nên sức chứa
+    // nó nhận là "20 ô túi + số món đang mặc": số món nằm trong túi vì thế vẫn bị chặn ở đúng 20.
+    private static final String COUNT_EQUIPPED = """
+            SELECT COUNT(*) FROM equipment_slot WHERE character_id = ? AND inventory_item_id IS NOT NULL
+            """;
+
     private static final String FIND_BY_CHARACTER = """
             SELECT id, item_template_id, quantity, enhance_level
               FROM inventory_item WHERE character_id = ? ORDER BY id
@@ -79,7 +86,9 @@ public final class PostgresInventoryAdapter implements InventoryPort {
     public Optional<Inventory> findByCharacter(long characterId) {
         List<ItemStack> items = JdbcOperations.query(
                 dataSource, FIND_BY_CHARACTER, PostgresInventoryAdapter::mapItemStack, characterId);
-        return Optional.of(new Inventory(characterId, DEFAULT_CAPACITY, items));
+        int equipped = JdbcOperations.queryOne(dataSource, COUNT_EQUIPPED, rs -> rs.getInt(1), characterId)
+                .orElse(0);
+        return Optional.of(new Inventory(characterId, DEFAULT_CAPACITY + equipped, items));
     }
 
     /**
@@ -95,7 +104,9 @@ public final class PostgresInventoryAdapter implements InventoryPort {
         CharacterInventoryLock.acquire(connection, characterId);
         List<ItemStack> items = JdbcOperations.query(
                 connection, FIND_BY_CHARACTER, PostgresInventoryAdapter::mapItemStack, characterId);
-        return Optional.of(new Inventory(characterId, DEFAULT_CAPACITY, items));
+        int equipped = JdbcOperations.queryOne(connection, COUNT_EQUIPPED, rs -> rs.getInt(1), characterId)
+                .orElse(0);
+        return Optional.of(new Inventory(characterId, DEFAULT_CAPACITY + equipped, items));
     }
 
     /**

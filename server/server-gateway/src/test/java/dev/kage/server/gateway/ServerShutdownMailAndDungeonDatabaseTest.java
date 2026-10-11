@@ -33,6 +33,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import dev.kage.protocol.AcceptPartyInviteCommand;
+import dev.kage.protocol.AcceptTradeRequestCommand;
 import dev.kage.protocol.AttackCommand;
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.ConnectRequest;
@@ -45,15 +47,20 @@ import dev.kage.protocol.CreatePartyResponse;
 import dev.kage.protocol.EnterDungeonCommand;
 import dev.kage.protocol.EnterDungeonOutcome;
 import dev.kage.protocol.EnterDungeonResponse;
+import dev.kage.protocol.InvitePartyMemberCommand;
 import dev.kage.protocol.MailAttachmentView;
 import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.RequestTradeCommand;
 import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.SelectCharacterResponse;
 import dev.kage.protocol.SendMailCommand;
 import dev.kage.protocol.SetTargetCommand;
+import dev.kage.protocol.TradeCloseReason;
+import dev.kage.protocol.TradeClosedEvent;
+import dev.kage.protocol.TradeRequestedEvent;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
@@ -67,7 +74,8 @@ import dev.kage.server.database.session.RedisConfig;
 /**
  * Hai ca tắt server giữa lúc đang chơi mà {@link ServerShutdownMidPlayDatabaseTest} chưa phủ
  * (docs/README.md dòng 76(f), thêm 2026-10-11): một loạt thư còn đang bay, và người chơi đang đứng
- * TRONG hầm ngục. Cùng phép lắp production ({@link GatewayBootstrap#assemble}), Postgres + Redis thật,
+ * TRONG hầm ngục — cộng hai ca NGẮT KẾT NỐI có hệ quả với người khác (2026-10-11): đang giao dịch, và
+ * đang là trưởng nhóm. Cùng phép lắp production ({@link GatewayBootstrap#assemble}), Postgres + Redis thật,
  * socket TCP thật; mọi khẳng định đo GIÁ TRỊ CUỐI trong DB sau khi trình tự tắt trả về.
  *
  * <p>Lớp riêng chứ không nối vào lớp kia: lớp kia đã hơn 800 dòng, và client socket của các test này
@@ -277,6 +285,118 @@ class ServerShutdownMailAndDungeonDatabaseTest {
             assertThat(moved.getX()).isCloseTo(savedX, Offset.offset(POSITION_TOLERANCE));
         }
         shutDown(second);
+    }
+
+    /**
+     * Một bên mất kết nối giữa phiên giao dịch: phiên bị HUỶ và bên kia được báo (quyết định chủ dự án
+     * 2026-10-11). Trước đó phiên treo lại trong DB và bên kia ngồi trước một khung giao dịch chết.
+     */
+    @Test
+    void openTradeShouldBeCancelledAndTheOtherSideTold_whenOnePartyDisconnects() throws Exception {
+        GatewayBootstrap.Assembly server = startServer();
+        try (Player stayer = Player.connect(server)) {
+            stayer.logIn("tk" + suffix());
+            long stayerId = stayer.createCharacter();
+            long sessionId;
+            try (Player leaver = Player.connect(server)) {
+                leaver.logIn("tl" + suffix());
+                long leaverId = leaver.createCharacter();
+                String leaverName = queryString("SELECT name FROM character WHERE id = ?", leaverId);
+                stayer.select(stayerId);
+                leaver.select(leaverId);
+                stayer.send(
+                        Opcode.OPCODE_REQUEST_TRADE_COMMAND_VALUE,
+                        RequestTradeCommand.newBuilder()
+                                .setTargetName(leaverName)
+                                .build()
+                                .toByteArray());
+                stayer.await(Opcode.OPCODE_REQUEST_TRADE_RESPONSE_VALUE);
+                sessionId = TradeRequestedEvent.parseFrom(leaver.await(Opcode.OPCODE_TRADE_REQUESTED_EVENT_VALUE)
+                                .payload())
+                        .getSessionId();
+                leaver.send(
+                        Opcode.OPCODE_ACCEPT_TRADE_REQUEST_COMMAND_VALUE,
+                        AcceptTradeRequestCommand.newBuilder()
+                                .setSessionId(sessionId)
+                                .build()
+                                .toByteArray());
+                leaver.await(Opcode.OPCODE_ACCEPT_TRADE_REQUEST_RESPONSE_VALUE);
+            } // leaver đóng socket — như rớt mạng
+
+            TradeClosedEvent closed = TradeClosedEvent.parseFrom(
+                    stayer.await(Opcode.OPCODE_TRADE_CLOSED_EVENT_VALUE).payload());
+            assertThat(closed.getSessionId()).isEqualTo(sessionId);
+            assertThat(closed.getReason()).isEqualTo(TradeCloseReason.TRADE_CLOSE_REASON_CANCELLED);
+            assertThat(queryLong("SELECT count(*) FROM trade_session WHERE id = ?", sessionId))
+                    .as("phiên giao dịch không còn trong DB")
+                    .isZero();
+        }
+        shutDown(server);
+    }
+
+    /**
+     * Trưởng nhóm mất kết nối: thành viên đang online lên thay, người cũ ở lại nhóm (quyết định chủ dự
+     * án 2026-10-11). Đo bằng dòng {@code party} và {@code party_member} thật, qua đúng đường ngắt kết
+     * nối của production.
+     */
+    @Test
+    void partyLeadershipShouldPassToAnOnlineMember_whenTheLeaderDisconnects() throws Exception {
+        GatewayBootstrap.Assembly server = startServer();
+        try (Player member = Player.connect(server)) {
+            member.logIn("pm" + suffix());
+            long memberId = member.createCharacter();
+            String memberName = queryString("SELECT name FROM character WHERE id = ?", memberId);
+            long leaderId;
+            try (Player leader = Player.connect(server)) {
+                leader.logIn("pl" + suffix());
+                leaderId = leader.createCharacter();
+                leader.select(leaderId);
+                member.select(memberId);
+                leader.send(
+                        Opcode.OPCODE_CREATE_PARTY_COMMAND_VALUE,
+                        CreatePartyCommand.getDefaultInstance().toByteArray());
+                leader.await(Opcode.OPCODE_CREATE_PARTY_RESPONSE_VALUE);
+                leader.send(
+                        Opcode.OPCODE_INVITE_PARTY_MEMBER_COMMAND_VALUE,
+                        InvitePartyMemberCommand.newBuilder()
+                                .setTargetName(memberName)
+                                .build()
+                                .toByteArray());
+                leader.await(Opcode.OPCODE_INVITE_PARTY_MEMBER_RESPONSE_VALUE);
+                long inviteId = queryLong("SELECT id FROM party_invite WHERE invitee_character_id = ?", memberId);
+                member.send(
+                        Opcode.OPCODE_ACCEPT_PARTY_INVITE_COMMAND_VALUE,
+                        AcceptPartyInviteCommand.newBuilder()
+                                .setInviteId(inviteId)
+                                .build()
+                                .toByteArray());
+                member.await(Opcode.OPCODE_ACCEPT_PARTY_INVITE_RESPONSE_VALUE);
+                assertThat(queryString("SELECT role FROM party_member WHERE character_id = ?", leaderId))
+                        .isEqualTo("LEADER");
+            } // trưởng nhóm đóng socket — như rớt mạng
+
+            awaitRole(memberId, "LEADER");
+            assertThat(queryString("SELECT role FROM party_member WHERE character_id = ?", leaderId))
+                    .as("người cũ ở lại nhóm với vai thành viên")
+                    .isEqualTo("MEMBER");
+            assertThat(queryLong(
+                            "SELECT leader_character_id FROM party WHERE id ="
+                                    + " (SELECT party_id FROM party_member WHERE character_id = ?)",
+                            memberId))
+                    .isEqualTo(memberId);
+        }
+        shutDown(server);
+    }
+
+    /** Việc chuyển quyền chạy nền sau khi kết nối đóng — chờ có trần tới khi DB phản ánh. */
+    private static void awaitRole(long characterId, String expectedRole) throws InterruptedException {
+        long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+        String role = queryString("SELECT role FROM party_member WHERE character_id = ?", characterId);
+        while (!expectedRole.equals(role) && System.nanoTime() < deadline) {
+            Thread.sleep(50);
+            role = queryString("SELECT role FROM party_member WHERE character_id = ?", characterId);
+        }
+        assertThat(role).as("vai trò của nhân vật %s trong nhóm", characterId).isEqualTo(expectedRole);
     }
 
     /**

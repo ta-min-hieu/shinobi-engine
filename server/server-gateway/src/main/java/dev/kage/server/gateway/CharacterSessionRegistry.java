@@ -46,10 +46,56 @@ final class CharacterSessionRegistry {
     private final Map<Long, Session> ownerByCharacterId = new ConcurrentHashMap<>();
     private final ReentrantLock[] locks = new ReentrantLock[LOCK_STRIPES];
 
+    /**
+     * Mỗi tài khoản đang chơi nhân vật nào (quyết định chủ dự án 2026-10-11: một tài khoản chỉ MỘT nhân
+     * vật online). Trước đó sổ chỉ biết theo nhân vật, nên một tài khoản mở hai kết nối và chọn hai nhân
+     * vật khác nhau là chơi song song được cả hai — tự giao dịch, tự kéo nhau vào hầm ngục.
+     */
+    private final Map<Long, Long> playingCharacterByAccountId = new ConcurrentHashMap<>();
+
+    /** Chiều ngược của {@link #playingCharacterByAccountId} — để {@link #release} tự dọn. */
+    private final Map<Long, Long> accountByCharacterId = new ConcurrentHashMap<>();
+
+    private final ReentrantLock[] accountLocks = new ReentrantLock[LOCK_STRIPES];
+
     CharacterSessionRegistry() {
         for (int i = 0; i < LOCK_STRIPES; i++) {
             locks[i] = new ReentrantLock();
+            accountLocks[i] = new ReentrantLock();
         }
+    }
+
+    /**
+     * Khoá tuần tự hoá mọi lượt vào world của MỘT tài khoản. Lấy TRƯỚC {@link #lockFor} của nhân vật
+     * (thứ tự cố định: tài khoản → nhân vật), chỉ giữ trên Virtual Thread. Thiếu nó thì hai kết nối
+     * của cùng tài khoản chọn hai nhân vật khác nhau đúng cùng lúc đều thấy "chưa ai chơi" và cùng vào.
+     */
+    ReentrantLock lockForAccount(long accountId) {
+        return accountLocks[Math.floorMod(Long.hashCode(accountId), LOCK_STRIPES)];
+    }
+
+    /** Nhân vật KHÁC của cùng tài khoản đang online, và phiên đang giữ nó. */
+    record OtherCharacterOnline(long characterId, Session session) {}
+
+    /**
+     * Ghi {@code characterId} là nhân vật tài khoản {@code accountId} đang chơi. Gọi SAU {@link #claim}
+     * của chính nhân vật đó, khi đang giữ {@link #lockForAccount}.
+     *
+     * @return nhân vật KHÁC của tài khoản đang được một phiên KHÁC giữ — caller phải đá nó; rỗng nếu
+     *     tài khoản chưa chơi ai, đang chơi chính nhân vật này, hoặc nhân vật kia do chính
+     *     {@code session} giữ (đổi nhân vật trên cùng kết nối tự dọn lấy)
+     */
+    @SuppressWarnings({"ReferenceEquality", "PMD.CompareObjectsWithEquals"})
+    Optional<OtherCharacterOnline> claimAccount(long accountId, long characterId, Session session) {
+        accountByCharacterId.put(characterId, accountId);
+        Long previous = playingCharacterByAccountId.put(accountId, characterId);
+        if (previous == null || previous == characterId) {
+            return Optional.empty();
+        }
+        Session owner = ownerByCharacterId.get(previous);
+        return owner == null || owner == session
+                ? Optional.empty()
+                : Optional.of(new OtherCharacterOnline(previous, owner));
     }
 
     /** Khoá tuần tự hoá mọi lượt chọn {@code characterId} — chỉ giữ trên Virtual Thread. */
@@ -73,7 +119,13 @@ final class CharacterSessionRegistry {
 
     /** Thôi giữ — CHỈ khi {@code session} vẫn là chủ; chủ mới đã {@link #claim} thì không đụng tới. */
     void release(long characterId, Session session) {
-        ownerByCharacterId.remove(characterId, session);
+        if (ownerByCharacterId.remove(characterId, session)) {
+            Long accountId = accountByCharacterId.remove(characterId);
+            if (accountId != null) {
+                // Có điều kiện: tài khoản đã chuyển sang nhân vật khác thì dòng đó không phải của ta.
+                playingCharacterByAccountId.remove(accountId, characterId);
+            }
+        }
     }
 
     /** Có phiên nào đang giữ {@code characterId} không — chỉ để quan sát (test, chẩn đoán). */

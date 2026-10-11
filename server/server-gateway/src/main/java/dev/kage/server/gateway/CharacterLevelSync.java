@@ -24,10 +24,10 @@ import dev.kage.server.world.WorldFacade;
  * người — đường về world chính sau trận đọc lại cấp từ DB ({@link CharacterLoadout#load}) nên cấp mới
  * có hiệu lực ngay khi trận xong, không cần đăng nhập lại.
  *
- * <p><b>Giới hạn đã biết.</b> Nhân vật lên cấp ĐÚNG lúc đang được dời World (vào/ra hầm ngục): lệnh
- * tới World cũ và bị bỏ qua khi họ đã rời, còn lệnh attach vào World mới có thể mang cấp đọc từ DB
- * TRƯỚC khi cú lên cấp commit. Khi đó World mới giữ cấp cũ tới lần lên cấp/dời World/đăng nhập kế.
- * Khe này rộng cỡ một lượt đọc DB cộng một tick; cấp không bao giờ lùi vì world chỉ nâng.
+ * <p><b>Lên cấp ĐÚNG lúc đang được dời World</b> (vào/ra hầm ngục, về từ đấu trường): lệnh của lớp
+ * này có thể tới World cũ hoặc tới World mới khi thực thể chưa được gắn, và bị bỏ qua. Từ 2026-10-11
+ * khe đó do {@link CharacterLevelResync} bịt: mỗi lượt dời World đọc lại cấp từ DB sau khi dời và báo
+ * cho World mới. Cấp không bao giờ lùi vì world chỉ nâng.
  *
  * <p>Thread-safe: bảng định tuyến là các registry tự khoá, {@link WorldFacade#enqueueCharacterLevel}
  * chỉ xếp lệnh vào hàng đợi của tick thread. Gọi từ Virtual Thread, không bao giờ từ tick thread.

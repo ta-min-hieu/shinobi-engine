@@ -142,7 +142,8 @@ class InventoryControllerTest {
                 "error.slot_not_equipped",
                 "error.item_in_trade",
                 "error.item_not_enhanceable",
-                "error.item_on_cooldown")) {
+                "error.item_on_cooldown",
+                "error.inventory_full")) {
             assertThat(InventoryController.errorMessageKey(errorKey))
                     .as("error_key '%s' chưa có khoá i18n", errorKey)
                     .contains(errorKey);

@@ -98,6 +98,30 @@ class GrantLootUseCaseTest {
         assertThat(inventoryPort.saved.items()).containsExactly(ItemStack.newItem(100L, 2, 0));
     }
 
+    /**
+     * Mỗi chồng đồ rơi vào túi để lại một dòng audit (quyết định chủ dự án 2026-10-11) — rơi đồ là nguồn
+     * sinh vật phẩm lớn nhất và trước đó không có dấu vết nào. Chồng KHÔNG vào được túi thì không ghi.
+     */
+    @Test
+    void shouldAuditEachStackThatReallyEnteredTheBag() {
+        List<DropTableEntry> entries =
+                List.of(new DropTableEntry(100L, 100, 2, 2), new DropTableEntry(200L, 100, 1, 1));
+        Inventory oneFreeSlot = new Inventory(1L, 1, List.of());
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(oneFreeSlot);
+        List<String> audited = new java.util.ArrayList<>();
+        GrantLootUseCase useCase = new GrantLootUseCase(
+                        new FakeDropTablePort(entries), inventoryPort, templatePortWithMaxStack(1), DIRECT_TX)
+                .auditedBy((tx, characterId, action, detailJson) ->
+                        audited.add(characterId + " " + action + " " + detailJson));
+
+        List<ItemStack> granted = useCase.execute(1L, "stone_ogre");
+
+        assertThat(granted).hasSize(1);
+        assertThat(audited)
+                .as("túi chỉ còn một ô: chồng thứ hai bị bỏ và không được ghi audit")
+                .containsExactly("1 LOOT_GRANT {\"source\":\"stone_ogre\",\"itemTemplateId\":100,\"quantity\":2}");
+    }
+
     @Test
     void shouldGrantNothing_whenEntryNeverDrops() {
         List<DropTableEntry> entries = List.of(new DropTableEntry(100L, 0, 1, 1));

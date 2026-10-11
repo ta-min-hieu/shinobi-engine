@@ -559,7 +559,13 @@ final class ArenaInstanceRegistry {
         // releaseRoute, trả false, và channelInactive gỡ họ khỏi world chính (attach đã xếp trước).
         if (!registry.isOnline(characterId)) {
             mainWorldChannels.detachCharacter(characterId);
+            return;
         }
+        // Cấp trong trận đứng yên (CharacterLevelSync), nên cú lên cấp giữa trận phải tới world chính lúc
+        // về — và cú rơi đúng lúc đang dời không được mất. Xem CharacterLevelResync.
+        mainWorldChannels
+                .worldFacadeFor(characterId)
+                .ifPresent(world -> CharacterLevelResync.afterMoveInto(world, characterFacade, characterId));
     }
 
     private static long opponentOf(long characterId, DuelInstance instance) {

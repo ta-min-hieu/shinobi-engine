@@ -225,7 +225,15 @@ final class DungeonInstanceRegistry {
                 CompletableFuture.allOf(admitted.mainWorldDrained().toArray(CompletableFuture[]::new)),
                 requestingCharacterId);
         finishEnter(admitted, dungeonCode, requestingCharacterId);
+        resyncLevels(admitted);
         return EnterOutcome.OK;
+    }
+
+    /** Ngoài khoá (đọc DB): cú lên cấp rơi đúng lúc đang dời không được mất — xem {@link CharacterLevelResync}. */
+    private void resyncLevels(AdmittedEntries admitted) {
+        for (PendingEntry entry : admitted.entries()) {
+            CharacterLevelResync.afterMoveInto(admitted.instance().facade(), characterFacade, entry.characterId());
+        }
     }
 
     /** Thử nhận vào instance; nhóm chưa có instance thì dựng World NGOÀI khoá rồi thử lại (2026-10-02). */
@@ -429,7 +437,14 @@ final class DungeonInstanceRegistry {
         // finishExit gắn lại vào world chính TRONG khoá này — nếu world chính phải mở khu vực mới thì
         // dựng World đó ngay bây giờ, ngoài khoá (2026-10-02, xem admitIntoInstance).
         mainWorldChannels.ensureRoomForOneMore();
-        return finishExit(characterId, leaving.get(), exit);
+        ExitOutcome outcome = finishExit(characterId, leaving.get(), exit);
+        if (outcome == ExitOutcome.OK) {
+            // Ngoài khoá (đọc DB) — xem CharacterLevelResync.
+            mainWorldChannels
+                    .worldFacadeFor(characterId)
+                    .ifPresent(world -> CharacterLevelResync.afterMoveInto(world, characterFacade, characterId));
+        }
+        return outcome;
     }
 
     /** Dữ liệu DB của một lượt rời hầm ngục, đọc sẵn ngoài khoá, kèm lý do rời (ADR-051). */

@@ -813,12 +813,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private boolean enterWorldAsOnlySession(ChannelHandlerContext ctx, int sequenceId, Character character) {
         long characterId = character.id();
         CharacterSessionRegistry sessions = worldGateway.registry().sessions();
-        ReentrantLock lock = sessions.lockFor(characterId);
-        lock.lock();
+        // Thứ tự khoá cố định: tài khoản → nhân vật (xem CharacterSessionRegistry#lockForAccount).
+        ReentrantLock accountLock = sessions.lockForAccount(character.accountId());
+        accountLock.lock();
         try {
-            return claimAndEnterWorld(ctx, sequenceId, character, sessions);
+            ReentrantLock lock = sessions.lockFor(characterId);
+            lock.lock();
+            try {
+                return claimAndEnterWorld(ctx, sequenceId, character, sessions);
+            } finally {
+                lock.unlock();
+            }
         } finally {
-            lock.unlock();
+            accountLock.unlock();
         }
     }
 
@@ -829,6 +836,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         boolean entered = false;
         try {
             sessions.claim(characterId, session).ifPresent(previous -> awaitEviction(previous, characterId));
+            // Một tài khoản chỉ MỘT nhân vật online (quyết định chủ dự án 2026-10-11): nhân vật KHÁC của
+            // tài khoản này đang chơi ở kết nối khác thì kết nối đó bị đá, cùng cách và cùng câu báo với
+            // việc chọn lại chính nhân vật đó.
+            sessions.claimAccount(character.accountId(), characterId, session)
+                    .ifPresent(other -> awaitEviction(other.session(), other.characterId()));
             entered = enterWorld(ctx, sequenceId, character);
             return entered;
         } finally {
@@ -1350,10 +1362,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         UnequipItemResponse response = UnequipItemResponse.newBuilder()
                 .setSuccess(result == InventoryFacade.UnequipResult.OK)
-                .setErrorKey(result == InventoryFacade.UnequipResult.OK ? "" : "error.slot_not_equipped")
+                .setErrorKey(unequipErrorKey(result))
                 .setMaxHp(maxHp)
                 .build();
         send(ctx, Opcode.OPCODE_UNEQUIP_ITEM_RESPONSE_VALUE, sequenceId, response.toByteArray());
+    }
+
+    private static String unequipErrorKey(InventoryFacade.UnequipResult result) {
+        return switch (result) {
+            case OK -> "";
+            case NOT_EQUIPPED -> "error.slot_not_equipped";
+            // Đồ đang mặc không chiếm ô túi (2026-10-11), nên gỡ ra cần một ô trống.
+            case INVENTORY_FULL -> "error.inventory_full";
+        };
     }
 
     // EnhanceItemCommand chạm DB (feature-inventory) — Virtual Thread, giống handleEquipItemCommand.
@@ -3677,14 +3698,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         if (!isChannelMembershipValid(characterId, domainChannel, ctx, sequenceId)) {
             return;
         }
-        ChatFacade.SendResult result = chatFacade.sendMessage(characterId, domainChannel, command.getBody());
+        // Một dòng duy nhất (quyết định chủ dự án 2026-10-11) — và từ đây chỉ dùng `body` này: thứ được
+        // kiểm phải đúng là thứ được phát đi.
+        String body = dev.kage.chat.domain.ChatMessage.singleLine(command.getBody());
+        ChatFacade.SendResult result = chatFacade.sendMessage(characterId, domainChannel, body);
         sendChatOutcome(ctx, sequenceId, toProtoOutcome(result));
         if (result != ChatFacade.SendResult.OK) {
             return;
         }
         String senderName =
                 characterFacade.findById(characterId).map(Character::name).orElse("");
-        routeChatMessage(domainChannel, new ChatRouteContext(characterId, senderName, target, command.getBody()));
+        routeChatMessage(domainChannel, new ChatRouteContext(characterId, senderName, target, body));
     }
 
     /** GUILD/PARTY chỉ gửi được nếu đang ở trong guild/party đó — tách khỏi
@@ -3934,6 +3958,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         authExecutor.execute(() -> {
             try {
                 handler.run();
+            } catch (dev.kage.server.database.GoldCapExceededException e) {
+                // Trần vàng (quyết định chủ dự án 2026-10-11): bán / lĩnh thư / giao dịch sẽ đẩy số dư
+                // của một bên vượt trần ⇒ transaction đã rollback trọn, và đây là một từ chối nghiệp vụ
+                // có câu riêng, không phải sự cố server.
+                LOG.info("Từ chối lệnh vì vượt trần vàng: sequenceId={}, {}", sequenceId, e.getMessage());
+                sendError(ctx, sequenceId, 409, "error.gold_cap_reached");
             } catch (RuntimeException e) {
                 LOG.error("Handler lỗi ngoài dự kiến: sequenceId={}", sequenceId, e);
                 sendError(ctx, sequenceId, 500, "error.server_internal");
@@ -4164,36 +4194,68 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     /**
-     * Trưởng nhóm mất kết nối thì thành viên vào sớm nhất đang online lên thay (quyết định chủ dự án
-     * 2026-10-11) — xem {@code HandOverPartyLeadershipUseCase}. Chạm DB nên chạy trên {@code authExecutor}.
+     * Hai việc dọn "quan hệ với người khác" sau khi một nhân vật mất kết nối (quyết định chủ dự án
+     * 2026-10-11), đều chạm DB nên chạy trên {@code authExecutor}:
+     *
+     * <ul>
+     *   <li>trưởng nhóm thì thành viên vào sớm nhất đang online lên thay — xem
+     *       {@code HandOverPartyLeadershipUseCase};
+     *   <li>phiên giao dịch đang mở thì HUỶ, và bên kia được báo. Trước đó phiên treo lại: bên kia ngồi
+     *       trước một khung giao dịch không ai trả lời, và phiên sống tới khi một trong hai tự huỷ.
+     * </ul>
      *
      * <p>KHÔNG nằm trong mốc hoàn tất của lần dọn: phiên mới của cùng nhân vật không phải chờ việc này.
      * Vì thế hỏi lại "còn online không" ngay trước khi làm — bị phiên mới của CHÍNH nhân vật này đá thì
-     * họ vẫn đang chơi, không phải rớt mạng, và không được mất quyền trưởng nhóm.
+     * họ vẫn đang chơi, không phải rớt mạng: không mất quyền trưởng nhóm, không mất phiên giao dịch.
      */
-    // PMD AvoidCatchingGenericException: ranh giới task nền sau khi kết nối đã đóng — không còn ai để
-    // báo lỗi; chuyển quyền hỏng thì nhóm chỉ ở lại đúng trạng thái trước bản sửa này.
-    @SuppressWarnings({"PMD.AvoidCatchingGenericException", "FutureReturnValueIgnored"})
+    @SuppressWarnings("FutureReturnValueIgnored") // lỗi của từng việc đã được bắt và log ở bên trong
     private void handOverPartyLeadershipAfterDisconnect(long characterId) {
         try {
-            CompletableFuture.runAsync(
-                    () -> {
-                        try {
-                            ConnectedCharacterRegistry registry = worldGateway.registry();
-                            if (!registry.isOnline(characterId)) {
-                                partyFacade.handOverLeadership(characterId, registry::isOnline);
-                            }
-                        } catch (RuntimeException e) {
-                            LOG.warn(
-                                    "Chuyển quyền trưởng nhóm lúc ngắt kết nối thất bại: characterId={}",
-                                    characterId,
-                                    e);
-                        }
-                    },
-                    authExecutor);
+            CompletableFuture.runAsync(() -> settleSocialStateAfterDisconnect(characterId), authExecutor);
         } catch (java.util.concurrent.RejectedExecutionException e) {
-            LOG.debug("Bỏ chuyển quyền trưởng nhóm: server đang tắt", e);
+            LOG.debug("Bỏ dọn nhóm/giao dịch sau ngắt kết nối: server đang tắt", e);
         }
+    }
+
+    // PMD AvoidCatchingGenericException: ranh giới task nền sau khi kết nối đã đóng — không còn ai để
+    // báo lỗi, và việc này hỏng thì mọi thứ chỉ ở lại đúng trạng thái trước 2026-10-11. Hai việc bắt
+    // lỗi RIÊNG: việc này hỏng không được kéo theo việc kia.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private void settleSocialStateAfterDisconnect(long characterId) {
+        ConnectedCharacterRegistry registry = worldGateway.registry();
+        if (registry.isOnline(characterId)) {
+            return;
+        }
+        try {
+            partyFacade.handOverLeadership(characterId, registry::isOnline);
+        } catch (RuntimeException e) {
+            LOG.warn("Chuyển quyền trưởng nhóm lúc ngắt kết nối thất bại: characterId={}", characterId, e);
+        }
+        try {
+            cancelOpenTradeOf(characterId);
+        } catch (RuntimeException e) {
+            LOG.warn("Huỷ giao dịch lúc ngắt kết nối thất bại: characterId={}", characterId, e);
+        }
+    }
+
+    /** Huỷ phiên giao dịch đang mở của {@code characterId} (nếu có) và báo bên kia — cùng gói với lệnh Huỷ. */
+    private void cancelOpenTradeOf(long characterId) {
+        Optional<TradeFacade.TradeStatusView> status = tradeFacade.getStatus(characterId);
+        if (status.isEmpty()
+                || tradeFacade.cancel(status.get().sessionId(), characterId) != TradeFacade.CancelResult.OK) {
+            return;
+        }
+        TradeClosedEvent event = TradeClosedEvent.newBuilder()
+                .setSessionId(status.get().sessionId())
+                .setReason(TradeCloseReason.TRADE_CLOSE_REASON_CANCELLED)
+                .build();
+        worldGateway
+                .registry()
+                .sendToCharacterIfOnline(
+                        status.get().counterpartCharacterId(),
+                        Opcode.OPCODE_TRADE_CLOSED_EVENT_VALUE,
+                        0,
+                        event.toByteArray());
     }
 
     /**
