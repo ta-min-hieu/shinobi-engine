@@ -1,5 +1,6 @@
 package dev.kage.character.domain;
 
+import java.text.Normalizer;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -67,6 +68,36 @@ public record Character(
         if (!NAME_PATTERN.matcher(name).matches()) {
             throw new IllegalArgumentException("tên nhân vật chứa ký tự không hợp lệ: " + firstInvalidCharacter(name));
         }
+    }
+
+    /**
+     * Luật cho tên MỚI (quyết định chủ dự án 2026-10-11): {@link #validateName} cộng thêm "không ký tự
+     * vô hình, không dạng tương thích". {@code \p{L}} nhận cả ký tự lấp chỗ Hangul (hiện ra là
+     * KHOẢNG TRỐNG — tên vô hình) lẫn chữ khổ toàn phần / chữ toán học (trông y hệt chữ thường — giả
+     * mạo tên người khác).
+     *
+     * <p>CHỈ dùng lúc TẠO nhân vật — không đặt vào compact constructor: nhân vật tạo trước ngày này có
+     * thể đang mang đúng loại tên đó, và dựng lại chúng từ DB không được nổ (cùng lý do
+     * {@code GuildName} chỉ kiểm lúc tạo bang). {@link #isValidName} vì thế cũng giữ luật rộng.
+     *
+     * <p>Chưa chặn: chữ khác hệ trông giống nhau (Cyrillic {@code а} với Latin {@code a}) và tên chỉ
+     * khác hoa-thường — so trùng kiểu đó cần index mới ở DB.
+     */
+    public static void validateNewName(String name) {
+        validateName(name);
+        if (!Normalizer.isNormalized(name, Normalizer.Form.NFKC)
+                || name.codePoints().anyMatch(Character::isInvisibleLetter)) {
+            throw new IllegalArgumentException("tên nhân vật chứa ký tự vô hình hoặc dạng tương thích");
+        }
+    }
+
+    /**
+     * Bốn ký tự lấp chỗ Hangul: thuộc nhóm chữ cái nên qua được {@code \p{L}}, nhưng trình bày là
+     * khoảng trống. U+3164 và U+FFA0 đã bị kiểm NFKC bắt (chúng chuẩn hoá về U+1160); U+115F và
+     * U+1160 thì NFKC để nguyên nên phải gọi tên.
+     */
+    private static boolean isInvisibleLetter(int codePoint) {
+        return codePoint == 0x115F || codePoint == 0x1160 || codePoint == 0x3164 || codePoint == 0xFFA0;
     }
 
     /** {@code U+XXXX tại vị trí i} của ký tự đầu tiên ngoài luật tên — chỉ gọi khi tên đã sai. */

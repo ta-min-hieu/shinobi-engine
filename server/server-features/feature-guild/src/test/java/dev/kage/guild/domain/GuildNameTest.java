@@ -44,6 +44,26 @@ class GuildNameTest {
         assertThat(GuildName.isValid(name)).isFalse();
     }
 
+    /**
+     * Quyết định chủ dự án 2026-10-11: ký tự lấp chỗ Hangul (chữ cái theo Unicode, khoảng trống trên
+     * màn hình) và dạng tương thích (khổ toàn phần, chữ toán học) không dùng được cho tên bang MỚI.
+     * Dựng bằng mã điểm để mẫu thử nhìn thấy được trong mã.
+     */
+    @org.junit.jupiter.api.Test
+    void shouldReject_invisibleAndCompatibilityCharacters() {
+        for (int filler : new int[] {0x115F, 0x1160, 0x3164, 0xFFA0}) {
+            assertThat(GuildName.isValid("A" + Character.toString(filler) + "B"))
+                    .as("U+%04X", filler)
+                    .isFalse();
+        }
+        assertThat(GuildName.isValid(Character.toString(0xFF2B) + Character.toString(0xFF21)))
+                .as("chữ khổ toàn phần")
+                .isFalse();
+        assertThat(GuildName.isValid(Character.toString(0x1D40A) + Character.toString(0x1D41A)))
+                .as("chữ toán học đậm")
+                .isFalse();
+    }
+
     @org.junit.jupiter.api.Test
     void shouldReject_null() {
         assertThat(GuildName.isValid(null)).isFalse();

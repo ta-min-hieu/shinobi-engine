@@ -1,10 +1,11 @@
 package dev.kage.guild.domain;
 
+import java.text.Normalizer;
 import java.util.regex.Pattern;
 
 /**
  * Luật tên bang (quyết định chủ dự án 2026-09-29): ĐÚNG luật tên nhân vật
- * ({@code dev.kage.character.domain.Character#validateName}) — 2-16 ký tự, chỉ chữ cái (mọi ngôn ngữ,
+ * ({@code dev.kage.character.domain.Character#validateNewName}) — 2-16 ký tự, chỉ chữ cái (mọi ngôn ngữ,
  * kể cả tiếng Việt có dấu dựng sẵn), chữ số và {@code _}; không cắt khoảng trắng, không có danh sách
  * từ cấm (tên nhân vật cũng chưa có — SECURITY.md §12).
  *
@@ -30,6 +31,17 @@ public final class GuildName {
         return name != null
                 && name.length() >= MIN_LENGTH
                 && name.length() <= MAX_LENGTH
-                && ALLOWED.matcher(name).matches();
+                && ALLOWED.matcher(name).matches()
+                && Normalizer.isNormalized(name, Normalizer.Form.NFKC)
+                && name.codePoints().noneMatch(GuildName::isInvisibleLetter);
+    }
+
+    /**
+     * Bốn ký tự lấp chỗ Hangul — chữ cái trên giấy, khoảng trống trên màn hình (2026-10-11). Cùng với
+     * kiểm NFKC ở trên (chặn chữ khổ toàn phần, chữ toán học) là bản chép của
+     * {@code Character#validateNewName}; {@code GuildNameParityTest} giữ hai bản khớp nhau.
+     */
+    private static boolean isInvisibleLetter(int codePoint) {
+        return codePoint == 0x115F || codePoint == 0x1160 || codePoint == 0x3164 || codePoint == 0xFFA0;
     }
 }

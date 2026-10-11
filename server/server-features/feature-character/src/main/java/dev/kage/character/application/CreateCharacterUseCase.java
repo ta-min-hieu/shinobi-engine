@@ -24,7 +24,7 @@ public final class CreateCharacterUseCase {
     }
 
     public Character execute(long accountId, String name, String idempotencyKey) {
-        Character.validateName(name);
+        Character.validateNewName(name);
 
         // Kiểm sớm, KHÔNG khoá — chỉ để account đã đầy khỏi mở transaction. Phép kiểm quyết định là
         // phép đếm có khoá bên trong transaction phía dưới.

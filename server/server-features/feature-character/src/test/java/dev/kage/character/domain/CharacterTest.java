@@ -64,6 +64,46 @@ class CharacterTest {
     }
 
     /**
+     * Luật tên MỚI (quyết định chủ dự án 2026-10-11): ký tự lấp chỗ Hangul là chữ cái theo Unicode
+     * nhưng hiện ra là khoảng trống — tên vô hình; chữ khổ toàn phần và chữ toán học trông y hệt chữ
+     * thường — giả mạo được tên người khác. Dựng bằng mã điểm để mẫu thử nhìn thấy được trong mã.
+     */
+    @Test
+    void validateNewNameShouldRejectInvisibleAndCompatibilityCharacters() {
+        for (int filler : new int[] {0x115F, 0x1160, 0x3164, 0xFFA0}) {
+            String invisible = "A" + java.lang.Character.toString(filler) + "B";
+            assertThatThrownBy(() -> Character.validateNewName(invisible))
+                    .as("U+%04X", filler)
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+        String fullWidth = java.lang.Character.toString(0xFF2B) + java.lang.Character.toString(0xFF21);
+        String mathBold = java.lang.Character.toString(0x1D40A) + java.lang.Character.toString(0x1D41A);
+        assertThatThrownBy(() -> Character.validateNewName(fullWidth)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Character.validateNewName(mathBold)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Character.validateNewName("A")).isInstanceOf(IllegalArgumentException.class);
+
+        Character.validateNewName("KageHero");
+        Character.validateNewName("Nguyên_Anh");
+        Character.validateNewName("天剑宗");
+    }
+
+    /**
+     * Nhân vật tạo TRƯỚC luật mới có thể đang mang tên nay bị cấm; đọc chúng lên từ DB không được nổ —
+     * nếu không, cả tài khoản không liệt kê nổi nhân vật. Luật mới chỉ áp lúc tạo.
+     */
+    @Test
+    void shouldStillBuildAnExistingCharacter_whoseNameTheNewRuleWouldRefuse() {
+        String legacyName = java.lang.Character.toString(0xFF2B) + java.lang.Character.toString(0xFF21);
+
+        Character legacy = new Character(1L, 1L, 1, legacyName, Faction.HOA, 1, 0, 0, Instant.now());
+
+        assertThat(legacy.name()).isEqualTo(legacyName);
+        assertThat(Character.isValidName(legacyName))
+                .as("tra theo tên vẫn phải tìm được nhân vật cũ")
+                .isTrue();
+    }
+
+    /**
      * Thông điệp từ chối tên được gateway ghi ra log ở mỗi lượt tạo nhân vật sai — không được chép
      * nguyên văn đầu vào của client (xem {@code AccountTest} cùng tên: khuếch đại log, dòng log giả).
      */

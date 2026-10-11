@@ -38,7 +38,17 @@ class GuildNameParityTest {
             "Konoha\n",
             "Kíem",
             "Tông​môn",
-            "Rồng🐉");
+            "Rồng🐉",
+            // 2026-10-11 — tên vô hình và dạng tương thích: bốn ký tự lấp chỗ Hangul, chữ khổ toàn
+            // phần (KAGE), chữ toán học đậm, chữ số mũ. Bốn mẫu đầu chứa ký tự KHÔNG nhìn thấy được giữa A và B.
+            "AᅟB",
+            "AᅠB",
+            "AㅤB",
+            "AﾠB",
+            "ㅤㅤ",
+            "ＫＡＧＥ",
+            "𝐊𝐚",
+            "Kage²");
 
     @Test
     void guildNameRuleShouldMatchCharacterNameRule() {
@@ -49,7 +59,7 @@ class GuildNameParityTest {
 
     private static boolean characterNameAccepts(String name) {
         try {
-            Character.validateName(name);
+            Character.validateNewName(name);
             return true;
         } catch (IllegalArgumentException e) {
             return false;
