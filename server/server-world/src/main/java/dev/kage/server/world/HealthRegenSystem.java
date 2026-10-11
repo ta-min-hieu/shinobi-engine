@@ -2,6 +2,7 @@ package dev.kage.server.world;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.Family;
@@ -33,9 +34,17 @@ final class HealthRegenSystem extends IteratingKSystem {
 
     private final List<HealthChange> pendingResults = new ArrayList<>();
 
-    HealthRegenSystem() {
+    private final BooleanSupplier regenSuppressed;
+
+    /**
+     * @param regenSuppressed {@code true} = World này KHÔNG hồi máu ngoài chiến đấu. Chủ dự án chốt
+     *     2026-10-11 (README dòng 36iv): World đấu trường tắt hồi máu, để chạy vòng 8 giây không thành
+     *     cách kéo dài trận. Hai đồng hồ chiến đấu vẫn chạy như thường.
+     */
+    HealthRegenSystem(BooleanSupplier regenSuppressed) {
         super(Family.all(HealthComponent.class, CombatRecencyComponent.class, CharacterIdComponent.class)
                 .get());
+        this.regenSuppressed = regenSuppressed;
     }
 
     List<HealthChange> drainResults() {
@@ -66,6 +75,9 @@ final class HealthRegenSystem extends IteratingKSystem {
             recency.regenUnannounced = false;
             return;
         }
+        if (regenSuppressed.getAsBoolean()) {
+            return;
+        }
         if (recency.secondsSinceCombat < CombatConstants.REGEN_DELAY_SECONDS) {
             // Vừa đánh nhau — chưa hồi, đồng hồ phát gói đứng yên. Nhưng phần máu đã hồi mà chưa
             // kịp báo thì báo NGAY: đòn của chính mình không mang máu của mình ra dây
@@ -77,6 +89,10 @@ final class HealthRegenSystem extends IteratingKSystem {
             return;
         }
 
+        regenerate(entity, recency, health, deltaTime);
+    }
+
+    private void regenerate(KEntity entity, CombatRecencyComponent recency, HealthComponent health, float deltaTime) {
         recency.healAccumulator += CombatConstants.REGEN_FRACTION_PER_SECOND * health.max * deltaTime;
         int restored = (int) recency.healAccumulator;
         if (restored > 0) {

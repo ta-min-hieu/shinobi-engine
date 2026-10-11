@@ -14,6 +14,7 @@ import java.util.concurrent.Executors;
 import io.micrometer.core.instrument.MeterRegistry;
 
 import dev.kage.server.world.CharacterEntry;
+import dev.kage.server.world.SkillCooldownLedger;
 import dev.kage.server.world.WorldContentCatalog;
 import dev.kage.server.world.WorldFacade;
 
@@ -80,6 +81,7 @@ final class MainWorldChannelRegistry {
     private final ConnectedCharacterRegistry registry;
     private final MeterRegistry meterRegistry;
     private final WorldContentCatalog content;
+    private final SkillCooldownLedger skillCooldowns = new SkillCooldownLedger();
     private final List<Channel> channels = new ArrayList<>();
     private final Map<Long, Channel> channelByCharacterId = new HashMap<>();
 
@@ -117,7 +119,17 @@ final class MainWorldChannelRegistry {
         this.meterRegistry = meterRegistry;
         this.content = content;
         this.firstChannelFacade = firstChannelFacade;
+        firstChannelFacade.rememberSkillCooldownsIn(skillCooldowns);
         channels.add(new Channel(firstChannelFacade, DEFAULT_CAPACITY));
+    }
+
+    /**
+     * Sổ hồi chiêu dùng chung cho MỌI World của tiến trình (README dòng 37iii) — khu vực world chính,
+     * hầm ngục, đấu trường. Nằm ở đây cùng lý do {@link #worldContent()}: hai registry kia vốn đã
+     * cầm lớp này, không còn chỗ cho tham số constructor thứ năm.
+     */
+    SkillCooldownLedger skillCooldowns() {
+        return skillCooldowns;
     }
 
     /**
@@ -311,7 +323,10 @@ final class MainWorldChannelRegistry {
      * một lần ở GatewayBootstrap, không đọc lại DB (ADR-037, ADR-040).
      */
     private WorldFacade newChannelFacade() {
-        return new WorldFacade(registry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG), content);
+        WorldFacade facade =
+                new WorldFacade(registry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG), content);
+        facade.rememberSkillCooldownsIn(skillCooldowns);
+        return facade;
     }
 
     private void openChannel(WorldFacade facade, int capacity) {

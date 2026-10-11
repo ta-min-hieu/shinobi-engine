@@ -73,6 +73,14 @@ bản** (không phải Battlefield 5v5 hay Chiếm Lãnh Địa guild war — 2 
 - **Không giới hạn rating khi ghép trận** (không phải matchmaking tự động — người chơi tự chọn đối
   thủ qua tên) — MMR ở lát cắt này CHỈ là con số hiển thị/xếp hạng, chưa dùng để ghép trận tự động.
 
+## Luật chốt 2026-10-11 (chủ dự án)
+
+- **Hai người gục cùng tick = HOÀ, không đổi Elo.** Hiện KHÔNG có đường code: trường hợp đó không thể xảy
+  ra (sát thương trừ ngay, người gục không ra đòn) — bất biến được ghim ở `ArenaAndRelogRuleTest`
+  (server-world). Thêm nguồn sát thương trễ ⇒ ô đó đỏ ⇒ cài luật hoà ở `ArenaInstanceRegistry`.
+- **Rớt mạng giữa trận = thua ngay**, không ân hạn.
+- **World đấu trường không hồi máu ngoài chiến đấu.**
+
 ## Cứng
 
 ✅ Validate nghiệp vụ ở `application/`, trước khi chạm Port

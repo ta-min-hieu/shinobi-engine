@@ -17,4 +17,13 @@ public final class AiStateComponent implements Component {
     public float spawnY;
     public float patrolTargetX;
     public float patrolTargetY;
+
+    /**
+     * Người chơi gần đây nhất ra đòn vào thực thể này mà KHÔNG phải mục tiêu hiện tại của nó; 0 = chưa
+     * có ai. Chỉ boss dùng (xem {@code BossRetargeting} ở server-world).
+     */
+    public long otherAttackerId;
+
+    /** Số giây từ đòn của {@link #otherAttackerId}; {@code Float.MAX_VALUE} = chưa từng. */
+    public float secondsSinceOtherAttack = Float.MAX_VALUE;
 }

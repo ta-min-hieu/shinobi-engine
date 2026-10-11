@@ -545,11 +545,13 @@ final class DungeonInstanceRegistry {
         // từ catalog bất kể là World nào, nên truyền nguyên catalog world chính thì `sect_grounds`
         // [-15, 5] phủ đúng điểm xuất hiện x=0 trong hầm ngục ⇒ boss không bao giờ đánh người đứng
         // yên. ADR-050 D8 để "vùng cho dungeon/arena" NGOÀI phạm vi. Xem DungeonWorldContentTest.
-        return new WorldFacade(
+        WorldFacade facade = new WorldFacade(
                 new DungeonOutboundSink(registry, this::handleCharacterDefeated),
                 false,
                 TickMetricsPort.NO_OP,
                 WorldContentCatalog.ofMonsters(worldContent.monsters()));
+        facade.rememberSkillCooldownsIn(mainWorldChannels.skillCooldowns());
+        return facade;
     }
 
     /** Start World đã dựng sẵn + gọi boss — rẻ (chỉ xếp lịch tick + xếp lệnh), chạy được trong khoá. */

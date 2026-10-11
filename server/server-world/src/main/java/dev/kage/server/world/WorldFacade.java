@@ -72,6 +72,8 @@ public final class WorldFacade {
     private static final ComponentMapper<VelocityComponent> VELOCITY = ComponentMapper.getFor(VelocityComponent.class);
     private static final ComponentMapper<TargetComponent> TARGET = ComponentMapper.getFor(TargetComponent.class);
     private static final ComponentMapper<MonsterComponent> MONSTER = ComponentMapper.getFor(MonsterComponent.class);
+    private static final ComponentMapper<SkillCooldownComponent> SKILL_COOLDOWN =
+            ComponentMapper.getFor(SkillCooldownComponent.class);
     private static final ComponentMapper<CombatStatsComponent> COMBAT_STATS =
             ComponentMapper.getFor(CombatStatsComponent.class);
     private static final ComponentMapper<StatusEffectComponent> STATUS_EFFECT =
@@ -182,6 +184,12 @@ public final class WorldFacade {
      * <p>{@code volatile}: ghi trên luồng dựng World (gateway), đọc trên tick thread.
      */
     private volatile boolean pvpAllowed;
+
+    /**
+     * Sổ hồi chiêu sống lâu hơn thực thể (README dòng 37iii) — mặc định là sổ không nhớ gì, xem
+     * {@link #rememberSkillCooldownsIn}. {@code volatile}: cùng lý do {@link #pvpAllowed}.
+     */
+    private volatile SkillCooldownLedger skillCooldownLedger = SkillCooldownLedger.forgetful();
 
     private final BossAiSystem bossAiSystem;
     private final HealthRegenSystem healthRegenSystem;
@@ -367,7 +375,7 @@ public final class WorldFacade {
         this.systemTimingListener = tickMetricsPort::recordSystemDuration;
         this.aoiTracker = new AreaOfInterestTracker(outboundSink);
         this.combatSystem = new CombatSystem(this::lookupEntity, this::isPvpAllowed, random);
-        this.healthRegenSystem = new HealthRegenSystem();
+        this.healthRegenSystem = new HealthRegenSystem(this::isPvpAllowed);
         this.aiSystem = new AiSystem(entitiesByCharacterId::values, this::lookupEntity, random);
         this.skillSystem = new SkillSystem(this::lookupEntity, this::isPvpAllowed, random);
         this.bossAiSystem = new BossAiSystem(this::lookupEntity, random);
@@ -524,10 +532,20 @@ public final class WorldFacade {
 
     /**
      * Cho phép người chơi gây hại cho nhau trong World này — CHỈ World đấu Arena gọi (xem
-     * {@link #pvpAllowed}). Gọi TRƯỚC {@link #start()}.
+     * {@link #pvpAllowed}). Gọi TRƯỚC {@link #start()}. Kéo theo: World này không hồi máu ngoài chiến
+     * đấu (xem {@link HealthRegenSystem}).
      */
     public void allowPlayerVersusPlayer() {
         pvpAllowed = true;
+    }
+
+    /**
+     * Trao sổ hồi chiêu dùng chung của tiến trình: nhân vật rời World này thì hồi chiêu được ghi vào
+     * sổ, vào World này thì đọc lại — thoát ra vào lại không còn xoá hồi chiêu. Gọi trước khi nhân
+     * vật đầu tiên vào World.
+     */
+    public void rememberSkillCooldownsIn(SkillCooldownLedger ledger) {
+        skillCooldownLedger = ledger;
     }
 
     private boolean isPvpAllowed() {
@@ -871,7 +889,7 @@ public final class WorldFacade {
         entity.add(toComponent(CombatConstants.deriveCombatStats(entry.baseStats())));
         entity.add(new TargetComponent());
         entity.add(new AttackCooldownComponent());
-        entity.add(new SkillCooldownComponent());
+        entity.add(newSkillCooldown(entry.characterId()));
         entity.add(new StatusEffectComponent());
         CharacterLevelComponent levelComponent = new CharacterLevelComponent();
         levelComponent.level = entry.baseStats().level();
@@ -901,6 +919,13 @@ public final class WorldFacade {
         return Float.isFinite(savedX) ? savedX : CHARACTER_RESPAWN_X;
     }
 
+    /** Hồi chiêu của nhân vật vừa vào: đọc lại từ sổ nếu họ rời World khi chiêu còn đang hồi (README dòng 37iii). */
+    private SkillCooldownComponent newSkillCooldown(long characterId) {
+        SkillCooldownComponent skillCooldown = new SkillCooldownComponent();
+        skillCooldownLedger.restoreInto(characterId, skillCooldown.remainingSeconds);
+        return skillCooldown;
+    }
+
     private void handleDetach(long characterId) {
         // Máu đổi bởi lệnh xếp TRƯỚC lệnh rời này (đan dược, đổi trang bị) bình thường chỉ phát sau
         // ecsWorld.update(). Phát NGAY, theo đúng thứ tự lệnh (sửa 2026-10-04, WorldSimulationPropertyTest):
@@ -913,6 +938,9 @@ public final class WorldFacade {
             return;
         }
         aoiTracker.onDetach(characterId);
+        if (SKILL_COOLDOWN.has(entity)) {
+            skillCooldownLedger.remember(characterId, SKILL_COOLDOWN.get(entity).remainingSeconds);
+        }
         ecsWorld.removeEntity(entity);
     }
 
@@ -1208,7 +1236,7 @@ public final class WorldFacade {
         health.max = newMax;
         if (newMax != oldMax && health.current > 0) {
             long scaled = oldMax > 0 ? (long) health.current * newMax / oldMax : newMax;
-            health.current = (int) Math.clamp(scaled, 1, newMax);
+            health.current = Math.clamp(scaled, 1, newMax);
         }
     }
 

@@ -63,7 +63,14 @@ final class CombatConstants {
     private static final float MIN_HIT_PERCENT = 0.5f;
     private static final float MAX_HIT_PERCENT = 1.0f;
     private static final float MAX_DODGE_PERCENT = 0.3f;
-    private static final float MAX_CRIT_PERCENT = 0.5f;
+
+    /**
+     * Trần chí mạng cho TỔNG (chỉ số gốc + trang bị + buff). Chủ dự án chốt 2026-10-11 (README dòng
+     * 37iv): buff không được đẩy vượt trần của chỉ số gốc — {@link StatusEffects#applyModifiers} kẹp
+     * theo đúng hằng số này.
+     */
+    static final float MAX_CRIT_PERCENT = 0.5f;
+
     private static final int MIN_DAMAGE_FLOOR = 1; // tránh damage=0 vô nghĩa khi giáp/kháng rất cao
 
     // Chỉ số quái thường KHÔNG còn ở đây từ ADR-037, và chỉ số BOSS cũng thôi từ ADR-048: cả hai

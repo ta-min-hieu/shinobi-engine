@@ -67,10 +67,25 @@ class HealthRegenSystemTest {
         // nếu không có cửa sổ chờ này thì máu tự đầy GIỮA trận và mọi trận đấu mất hết ý nghĩa.
         EcsWorld world = new EcsWorld();
         KEntity character = buildCharacter(world, HP_AFTER_FIRST_FIGHT, 0f);
-        HealthRegenSystem system = new HealthRegenSystem();
+        HealthRegenSystem system = new HealthRegenSystem(() -> false);
         world.addSystem(system);
 
         List<HealthChange> emitted = run(world, system, CombatConstants.REGEN_DELAY_SECONDS - 1f);
+
+        assertThat(emitted).isEmpty();
+        assertThat(health(character).current).isEqualTo(HP_AFTER_FIRST_FIGHT);
+    }
+
+    /** README dòng 36(iv), chủ dự án chốt 2026-10-11: World đấu trường không hồi máu ngoài chiến đấu. */
+    @Test
+    void shouldNeverRegen_whenTheWorldSuppressesIt() {
+        EcsWorld world = new EcsWorld();
+        KEntity character = buildCharacter(world, HP_AFTER_FIRST_FIGHT, 0f);
+        HealthRegenSystem system = new HealthRegenSystem(() -> true);
+        world.addSystem(system);
+
+        // Cùng 35 giây đủ để hồi ĐẦY ở World thường (ô ngay dưới) — đây là đối chứng của nhau.
+        List<HealthChange> emitted = run(world, system, 35f);
 
         assertThat(emitted).isEmpty();
         assertThat(health(character).current).isEqualTo(HP_AFTER_FIRST_FIGHT);
@@ -80,7 +95,7 @@ class HealthRegenSystemTest {
     void shouldRegenBackToFull_afterTheDelay() {
         EcsWorld world = new EcsWorld();
         KEntity character = buildCharacter(world, HP_AFTER_FIRST_FIGHT, 0f);
-        HealthRegenSystem system = new HealthRegenSystem();
+        HealthRegenSystem system = new HealthRegenSystem(() -> false);
         world.addSystem(system);
 
         // 8s chờ + 80 máu ÷ (3% × 118 = 3,54 máu/giây) ≈ 22,6s hồi. Cho 35s để không phụ thuộc
@@ -103,7 +118,7 @@ class HealthRegenSystemTest {
     void shouldEmitAtMostOnePacketPerSecond_whileRegenerating() {
         EcsWorld world = new EcsWorld();
         buildCharacter(world, HP_AFTER_FIRST_FIGHT, 0f);
-        HealthRegenSystem system = new HealthRegenSystem();
+        HealthRegenSystem system = new HealthRegenSystem(() -> false);
         world.addSystem(system);
 
         List<HealthChange> emitted = run(world, system, 35f);
@@ -119,7 +134,7 @@ class HealthRegenSystemTest {
         // người online đẻ một gói mỗi giây suốt phiên chơi.
         EcsWorld world = new EcsWorld();
         KEntity character = buildCharacter(world, MAX_HP, 0f);
-        HealthRegenSystem system = new HealthRegenSystem();
+        HealthRegenSystem system = new HealthRegenSystem(() -> false);
         world.addSystem(system);
 
         List<HealthChange> emitted = run(world, system, 35f);
@@ -135,7 +150,7 @@ class HealthRegenSystemTest {
         // cho client — hai đường quyền lực cho cùng một việc.
         EcsWorld world = new EcsWorld();
         KEntity character = buildCharacter(world, 0, 0f);
-        HealthRegenSystem system = new HealthRegenSystem();
+        HealthRegenSystem system = new HealthRegenSystem(() -> false);
         world.addSystem(system);
 
         List<HealthChange> emitted = run(world, system, 35f);
@@ -153,7 +168,7 @@ class HealthRegenSystemTest {
     void shouldAccumulateFractionalHealing_insteadOfTruncatingEveryTick() {
         EcsWorld world = new EcsWorld();
         KEntity character = buildCharacter(world, HP_AFTER_FIRST_FIGHT, CombatConstants.REGEN_DELAY_SECONDS);
-        HealthRegenSystem system = new HealthRegenSystem();
+        HealthRegenSystem system = new HealthRegenSystem(() -> false);
         world.addSystem(system);
 
         run(world, system, 1f);
@@ -175,7 +190,7 @@ class HealthRegenSystemTest {
     void shouldAnnounceUnreportedRegen_whenCombatInterruptsItBeforeTheNextEmit() {
         EcsWorld world = new EcsWorld();
         KEntity character = buildCharacter(world, HP_AFTER_FIRST_FIGHT, CombatConstants.REGEN_DELAY_SECONDS);
-        HealthRegenSystem system = new HealthRegenSystem();
+        HealthRegenSystem system = new HealthRegenSystem(() -> false);
         world.addSystem(system);
         List<HealthChange> beforeTheFight = run(world, system, 0.5f);
         assertThat(beforeTheFight).as("nửa giây — chưa tới nhịp báo").isEmpty();

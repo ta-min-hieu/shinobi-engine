@@ -14,7 +14,6 @@ import dev.kage.server.world.component.StatusEffectType;
 final class StatusEffects {
 
     private static final float MIN_CRIT_PERCENT = 0f;
-    private static final float MAX_CRIT_PERCENT = 1f;
 
     private StatusEffects() {}
 
@@ -63,7 +62,8 @@ final class StatusEffects {
         if (defMod == 0f && resMod == 0f && critMod == 0f) {
             return base;
         }
-        float clampedCrit = Math.max(MIN_CRIT_PERCENT, Math.min(MAX_CRIT_PERCENT, base.critPercent() + critMod));
+        float clampedCrit =
+                Math.max(MIN_CRIT_PERCENT, Math.min(CombatConstants.MAX_CRIT_PERCENT, base.critPercent() + critMod));
         return new CombatConstants.CombatStats(
                 base.atk(),
                 base.skillDmg(),

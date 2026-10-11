@@ -61,6 +61,18 @@ class StatusEffectsTest {
         assertThat(result.atk()).isEqualTo(BASE_STATS.atk()); // không liên quan — giữ nguyên
     }
 
+    /** README dòng 37(iv), chủ dự án chốt 2026-10-11: gốc + buff kẹp chung ở trần 50% của chỉ số gốc. */
+    @Test
+    void shouldClampBuffedCrit_atTheBaseStatCap() {
+        StatusEffectComponent status = new StatusEffectComponent();
+        status.slots[0] = new StatusEffect(StatusEffectType.CRIT_MOD, 0.3f, 6f);
+        status.slots[1] = new StatusEffect(StatusEffectType.CRIT_MOD, 0.3f, 6f);
+
+        CombatConstants.CombatStats result = StatusEffects.applyModifiers(BASE_STATS, status);
+
+        assertThat(result.critPercent()).isEqualTo(CombatConstants.MAX_CRIT_PERCENT);
+    }
+
     @Test
     void shouldAbsorbDamageFromShieldPool_beforeAnyHpLoss() {
         StatusEffectComponent status = new StatusEffectComponent();

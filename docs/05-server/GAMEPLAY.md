@@ -139,6 +139,16 @@ một viên đan của chính người chơi, không khai thác được gì.
 
 Engine scripting đã chốt: [ADR-016](../01-architecture/adr/ADR-016-Scripting-Engine.md) — GraalJS.
 
+**Luật chốt 2026-10-11** (chủ dự án chọn, README dòng 36–37):
+
+- **Trần chí mạng 50% cho TỔNG** gốc + trang bị + buff — buff không đẩy vượt trần của chỉ số gốc
+  (`CombatConstants.MAX_CRIT_PERCENT`, `StatusEffects.applyModifiers` kẹp theo đúng hằng số đó).
+- **Hồi chiêu sống qua relog**: rời World thì hồi chiêu ghi vào `SkillCooldownLedger` (bộ nhớ, dùng chung
+  mọi World, lưu MỐC hết hạn nên thời gian offline vẫn trôi); vào lại đọc ra. Máu và Khí vẫn đầy khi vào
+  lại. Server khởi động lại là sổ sạch — cố ý, không đáng một bảng DB.
+- **Boss chịu khống chế nửa thời lượng** (`CrowdControl`): choáng và làm chậm; giảm DEF/RES không tính.
+- **World đấu trường không hồi máu ngoài chiến đấu** (§3.1 chỉ áp cho World không bật PvP).
+
 ---
 
 ## 5. Monster & Spawn
@@ -180,6 +190,11 @@ Engine scripting đã chốt: [ADR-016](../01-architecture/adr/ADR-016-Scripting
 - **Người đang ở hầm ngục không vào được đấu trường** (`843a582`): trước đó họ thách/được thách/chấp
   nhận được ⇒ một nhân vật có thực thể sống ở CẢ hầm ngục lẫn world chính sau khi trận kết thúc. Chi
   tiết + câu chữ báo lỗi đang chờ chủ dự án: [feature-pvp/CLAUDE.md](../../server/server-features/feature-pvp/CLAUDE.md).
+- **Boss mất mục tiêu thì nhắm người khác đang đánh nó** (chủ dự án chốt 2026-10-11, README dòng 37i,
+  `BossRetargeting`): mục tiêu gục / rời World / lùi vào vùng an toàn mà còn một người khác vừa ra đòn vào
+  boss trong 10 giây gần nhất thì boss đuổi người đó, KHÔNG về nhà hồi đầy. Không còn ai thì về nhà như cũ
+  (hồi đầy + reset pha `enraged`). Vượt leash vẫn về nhà. Boss chỉ nhớ MỘT người — bảng thù hận theo sát
+  thương là việc của một ADR riêng. Quái thường không dùng luật này.
 
 ---
 

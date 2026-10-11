@@ -24,6 +24,7 @@ import dev.kage.engine.ecs.KEntity;
 import dev.kage.engine.ecs.component.PositionComponent;
 import dev.kage.engine.scripting.ScriptExecutionException;
 import dev.kage.engine.scripting.ScriptSandbox;
+import dev.kage.server.world.component.BossAiComponent;
 import dev.kage.server.world.component.CharacterLevelComponent;
 import dev.kage.server.world.component.ChiComponent;
 import dev.kage.server.world.component.CombatRecencyComponent;
@@ -54,6 +55,7 @@ final class SkillSystem extends IteratingKSystem {
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
     private static final ComponentMapper<CombatStatsComponent> COMBAT_STATS =
             ComponentMapper.getFor(CombatStatsComponent.class);
+    private static final ComponentMapper<BossAiComponent> BOSS_AI = ComponentMapper.getFor(BossAiComponent.class);
     private static final ComponentMapper<StatusEffectComponent> STATUS_EFFECT =
             ComponentMapper.getFor(StatusEffectComponent.class);
     private static final ComponentMapper<CharacterLevelComponent> LEVEL =
@@ -382,8 +384,11 @@ final class SkillSystem extends IteratingKSystem {
     private void applyStatusOutcome(CastContext ctx, ScriptEffect scriptEffect, SkillEffectKind kind) {
         StatusEffectType type = parseStatusEffectType(scriptEffect.stat());
         if (type != null) {
-            StatusEffects.applyEffect(STATUS_EFFECT.get(ctx.target()), type, (float) scriptEffect.value(), (float)
-                    scriptEffect.duration());
+            float magnitude = (float) scriptEffect.value();
+            // README dòng 37(vi) — boss chịu khống chế với nửa thời lượng, xem CrowdControl.
+            float duration = CrowdControl.durationOn(
+                    BOSS_AI.has(ctx.target()), type, magnitude, (float) scriptEffect.duration());
+            StatusEffects.applyEffect(STATUS_EFFECT.get(ctx.target()), type, magnitude, duration);
         }
         if (kind == SkillEffectKind.DEBUFF) {
             // ADR-050 D3, mở rộng theo quyết định chủ dự án 2026-10-11: debuff lên kẻ địch cũng là RA

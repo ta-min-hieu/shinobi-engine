@@ -129,6 +129,8 @@ final class AiSystem extends IteratingKSystem {
             return;
         }
         AiStateComponent ai = AI_STATE.get(entity);
+        // Float.MAX_VALUE + deltaTime vẫn là Float.MAX_VALUE — "chưa từng" không tràn thành "vừa xong".
+        ai.secondsSinceOtherAttack += deltaTime;
         // Tra tham số theo loài: ComponentMapper, O(1), KHÔNG cấp phát (/CLAUDE.md §6) — khác hẳn
         // với việc tra catalog theo chuỗi mỗi tick, xem javadoc AiParamsComponent.
         AiParamsComponent params = AI_PARAMS.get(entity);
@@ -186,12 +188,12 @@ final class AiSystem extends IteratingKSystem {
         TargetComponent target = TARGET.get(entity);
         KEntity targetEntity = entityLookup.apply(target.targetEntityId);
         if (targetEntity == null || HEALTH.get(targetEntity).isDead()) {
-            startReturning(ai, target, VELOCITY.get(entity));
+            retargetOrReturn(entity, ai, target);
             return;
         }
 
         if (isShieldedBySafeZone(targetEntity)) {
-            startReturning(ai, target, VELOCITY.get(entity)); // ADR-050 D2
+            retargetOrReturn(entity, ai, target); // ADR-050 D2
             return;
         }
 
@@ -219,14 +221,14 @@ final class AiSystem extends IteratingKSystem {
         TargetComponent target = TARGET.get(entity);
         KEntity targetEntity = entityLookup.apply(target.targetEntityId);
         if (targetEntity == null || HEALTH.get(targetEntity).isDead()) {
-            startReturning(ai, target, VELOCITY.get(entity));
+            retargetOrReturn(entity, ai, target);
             return;
         }
 
         // ADR-050 D2 — phải gác ở CẢ trạng thái ĐÁNH, không chỉ ĐUỔI: tickAttack chỉ tụt về CHASE
         // khi mục tiêu ra ngoài tầm, nên một con đang đứng sát biên vùng sẽ đánh mãi vào trong.
         if (isShieldedBySafeZone(targetEntity)) {
-            startReturning(ai, target, VELOCITY.get(entity));
+            retargetOrReturn(entity, ai, target);
             return;
         }
 
@@ -290,7 +292,18 @@ final class AiSystem extends IteratingKSystem {
         ai.stateTimer = 0f;
     }
 
+    /**
+     * Mục tiêu vừa mất mà KHÔNG phải vì vượt leash: boss thử nhắm người khác đang đánh nó (README dòng
+     * 37i, xem {@link BossRetargeting}); không còn ai — hoặc không phải boss — thì về nhà như cũ.
+     */
+    private void retargetOrReturn(KEntity entity, AiStateComponent ai, TargetComponent target) {
+        if (!BossRetargeting.switchToOtherAttacker(entity, entityLookup)) {
+            startReturning(ai, target, VELOCITY.get(entity));
+        }
+    }
+
     private void startReturning(AiStateComponent ai, TargetComponent target, VelocityComponent velocity) {
+        BossRetargeting.forget(ai);
         target.targetEntityId = 0L;
         ai.state = AiState.RETURN;
         velocity.x = 0f; // tickReturn tự set lại đúng hướng ở tick sau
@@ -328,7 +341,7 @@ final class AiSystem extends IteratingKSystem {
      * <p>Quái không mang hai component này (ADR-046 chỉ gắn cho nhân vật), nên hàm trả
      * {@code false} cho chúng — đúng ý: vùng an toàn không che quái.
      */
-    private static boolean isShieldedBySafeZone(KEntity character) {
+    static boolean isShieldedBySafeZone(KEntity character) {
         TriggerZoneMembershipComponent membership = ZONE_MEMBERSHIP.get(character);
         if (membership == null || membership.occupiedZoneIds.isEmpty()) {
             return false;

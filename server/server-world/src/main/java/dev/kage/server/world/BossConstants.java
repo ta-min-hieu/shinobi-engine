@@ -19,5 +19,19 @@ final class BossConstants {
      */
     static final long SCRIPT_MAX_STATEMENTS = 10_000L;
 
+    /**
+     * Boss nhớ "người khác vừa đánh mình" trong bao lâu (README dòng 37i, xem {@link BossRetargeting}).
+     * 10 giây: dài hơn mọi hồi chiêu đang có (dài nhất 8 giây) nên một người đang đánh đều tay không
+     * bao giờ rơi khỏi trí nhớ, mà người đã bỏ đi thì không kéo boss theo mãi. Con số do người triển
+     * khai chọn — chủ dự án chỉ chốt hành vi.
+     */
+    static final float OTHER_ATTACKER_MEMORY_SECONDS = 10f;
+
+    /**
+     * Boss chịu khống chế (làm chậm, choáng) với NỬA thời lượng — chủ dự án chốt 2026-10-11 (README
+     * dòng 37vi): hệ Thuỷ/Lôi vẫn có ích khi đánh boss, nhưng không khoá chết được nó.
+     */
+    static final float CROWD_CONTROL_DURATION_MULTIPLIER = 0.5f;
+
     private BossConstants() {}
 }

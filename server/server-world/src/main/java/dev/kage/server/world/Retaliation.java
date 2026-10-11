@@ -63,6 +63,9 @@ final class Retaliation {
         if (target == null || attacker == null || !AI_PARAMS.has(target)) {
             return;
         }
+        // TRƯỚC mọi cửa thoát bên dưới: boss cần biết "còn ai khác đang đánh mình" kể cả khi nó đã có
+        // mục tiêu (README dòng 37i).
+        BossRetargeting.rememberOtherAttacker(target, attacker);
         if (!AI_PARAMS.get(target).retaliates()) {
             return;
         }

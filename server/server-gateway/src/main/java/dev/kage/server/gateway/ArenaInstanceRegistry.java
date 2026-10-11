@@ -193,6 +193,7 @@ final class ArenaInstanceRegistry {
             // mà EventLoop xin khoá này cho mọi gói di chuyển (worldFacadeFor). Không vào được trận
             // thì World chưa start này bị bỏ, không có gì phải dừng.
             WorldFacade duelFacade = new WorldFacade(new ArenaOutboundSink(registry, this), false);
+            duelFacade.rememberSkillCooldownsIn(mainWorldChannels.skillCooldowns());
             started = commitStartDuel(challengeId, challenger, target, duelFacade);
         } finally {
             if (!started) {
