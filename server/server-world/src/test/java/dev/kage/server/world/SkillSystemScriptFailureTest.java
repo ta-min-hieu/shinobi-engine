@@ -1,6 +1,7 @@
 package dev.kage.server.world;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Map;
 import java.util.function.Function;
@@ -11,6 +12,7 @@ import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.EcsWorld;
 import dev.kage.engine.ecs.KEntity;
 import dev.kage.engine.ecs.component.PositionComponent;
+import dev.kage.engine.scripting.ScriptExecutionException;
 import dev.kage.server.world.component.CharacterIdComponent;
 import dev.kage.server.world.component.CharacterLevelComponent;
 import dev.kage.server.world.component.ChiComponent;
@@ -154,6 +156,23 @@ class SkillSystemScriptFailureTest {
         system.tryCast(CASTER_ID, "thuy_hoi_phuc", CASTER_ID);
 
         assertThat(HEALTH.get(caster).current).isEqualTo(100);
+    }
+
+    /**
+     * Lượt chạy thử lúc dựng World có trần thời gian RIÊNG, rộng hơn 500ms của cast trên tick (chủ dự
+     * án chốt 5 giây, 2026-10-11): 500ms từng cắt nhầm script hợp lệ khi máy tải nặng, và dựng World
+     * hỏng là người chơi bị từ chối vào phó bản. Nó vẫn phải là một chốt chống treo — script treo
+     * thật (regex backtracking, một câu lệnh duy nhất nên trần câu lệnh không thấy) bị cắt, và thông
+     * báo mang đúng trần đó.
+     */
+    @Test
+    void shouldCutAHangingScriptAtTheValidationBudget_whenBuildingTheSystem() {
+        String hangingScript = "/^(a+)+\\1b$/.test('a'.repeat(40) + 'c'); ({ effect: 'damage', value: 1 })";
+        Map<Long, KEntity> nobody = Map.of();
+
+        assertThatThrownBy(() -> new SkillSystem(nobody::get, () -> false, scriptsWith(hangingScript)))
+                .isInstanceOf(ScriptExecutionException.class)
+                .hasMessageContaining(SkillConstants.SCRIPT_VALIDATION_TIMEOUT.toMillis() + "ms");
     }
 
     private static void assertCastRejectedCleanly(String brokenScript) {

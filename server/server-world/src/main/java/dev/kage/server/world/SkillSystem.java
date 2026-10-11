@@ -133,9 +133,12 @@ final class SkillSystem extends IteratingKSystem {
                 SkillRegistry.BY_CODE.values().stream().collect(Collectors.toMap(SkillDefinition::code, scriptSource));
         // SCRIPTING.md §8: validate MỌI script lúc khởi động, fail fast (ném thẳng nếu lỗi — server
         // không nên khởi động với 1 skill hỏng script/sai hợp đồng trả về).
+        // Sandbox RIÊNG với trần thời gian rộng hơn — xem SkillConstants.SCRIPT_VALIDATION_TIMEOUT.
+        ScriptSandbox validationSandbox =
+                new ScriptSandbox(SkillConstants.SCRIPT_MAX_STATEMENTS, SkillConstants.SCRIPT_VALIDATION_TIMEOUT);
         Map<String, Object> dummyCtx = Map.of("skill_dmg", 0.0, "target_hp_percent", 1.0);
         for (String script : scriptsByCode.values()) {
-            scriptSandbox.eval(script, Map.of("ctx", dummyCtx), SkillSystem::parseScriptEffect);
+            validationSandbox.eval(script, Map.of("ctx", dummyCtx), SkillSystem::parseScriptEffect);
         }
     }
 
