@@ -39,6 +39,12 @@ application {
 //   ... --args="--username=aloha --characterId=4 --partyAccept=true --partyReport=true --observeSeconds=20"
 //   ... --args="--username=kagetest --characterId=3 --partyInvite=Benkei --observeSeconds=5"
 // --useItemCode nhận NHIỀU mã cách nhau dấu phẩy (uống liên tiếp — đo hồi chiêu vật phẩm).
+//
+// Kịch bản hai người khác (probe.TradeScenario / ArenaScenario) và lệnh lẻ (probe.SessionEdgeScenario):
+//   --tradeAccept=true (chạy TRƯỚC) / --tradeRequest=<tên> / --tradeReport=true
+//   --acceptDuel=true --acceptDuelDelaySeconds=7   (ngồi yên rồi mới nhận lời thách)
+//   --unequipSlots=weapon,armor    --reloginInWorld=true [--reloginUsername=<tài khoản>]
+//   --chatChannel=world --chatBody=dong1\ndong2    (chuỗi \n thành xuống dòng thật)
 tasks.register<JavaExec>("gameProbe") {
     group = "verification"
     description = "Client headless quan sát: giải mã sự kiện world thành SỐ (vị trí quái, sát thương, vòng đời quest)"

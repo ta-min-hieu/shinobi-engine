@@ -36,6 +36,8 @@ import dev.kage.tools.loadtest.CommandLineArguments;
  *     xem {@link DungeonScenario}
  * @param duel kịch bản Arena 1v1 (thách / chấp nhận / bỏ cuộc) — xem {@link DuelPlan}
  * @param party kịch bản lập nhóm hai người (mời / chấp nhận / in thành viên) — xem {@link PartyPlan}
+ * @param trade kịch bản mở phiên giao dịch (mời / chấp nhận / in trạng thái) — xem {@link TradePlan}
+ * @param edge các lệnh lẻ gửi từ trong world (gỡ đồ / chat / đăng nhập lại) — xem {@link EdgePlan}
  */
 public record ProbeConfig(
         String host,
@@ -59,7 +61,9 @@ public record ProbeConfig(
         QuestPlan quest,
         String enterDungeon,
         DuelPlan duel,
-        PartyPlan party) {
+        PartyPlan party,
+        TradePlan trade,
+        EdgePlan edge) {
 
     /**
      * Danh sách mã trang bị BẤT BIẾN — record không tự copy, mà lệnh gọi có thể truyền list sống
@@ -104,10 +108,16 @@ public record ProbeConfig(
      * @param challengeTargetName tên nhân vật để thách đấu; rỗng = không thách
      * @param acceptIncoming {@code true} = đợi lời thách đến rồi chấp nhận
      * @param waitSeconds hạn chót chờ lời thách / trận bắt đầu
+     * @param acceptDelaySeconds số giây NGỒI YÊN sau khi nhận lời thách rồi mới chấp nhận — để bên thách
+     *     kịp rớt mạng trước (README dòng 73a); 0 = chấp nhận ngay
      * @param forfeitAfterObserve {@code true} = gửi {@code ExitDuelCommand} (bỏ cuộc) sau vòng quan sát
      */
     public record DuelPlan(
-            String challengeTargetName, boolean acceptIncoming, int waitSeconds, boolean forfeitAfterObserve) {
+            String challengeTargetName,
+            boolean acceptIncoming,
+            int waitSeconds,
+            int acceptDelaySeconds,
+            boolean forfeitAfterObserve) {
 
         /** {@code true} khi probe phải vào trận trước vòng quan sát. */
         public boolean isRequested() {
@@ -126,6 +136,38 @@ public record ProbeConfig(
      */
     public record PartyPlan(String inviteTargetName, boolean acceptIncoming, int waitSeconds, boolean report) {}
 
+    /**
+     * Kịch bản mở phiên giao dịch ({@link TradeScenario}) — hai probe trên hai tài khoản.
+     *
+     * @param requestTargetName tên nhân vật để gửi lời mời giao dịch; rỗng = không mời
+     * @param acceptIncoming {@code true} = đợi lời mời đến rồi chấp nhận
+     * @param waitSeconds hạn chót chờ lời mời
+     * @param report {@code true} = in trạng thái phiên giao dịch sau vòng quan sát
+     */
+    public record TradePlan(String requestTargetName, boolean acceptIncoming, int waitSeconds, boolean report) {}
+
+    /**
+     * Các lệnh lẻ gửi từ trong world ({@link SessionEdgeScenario}).
+     *
+     * @param unequipSlots tên ô trang bị cần GỠ (vd {@code weapon}, {@code armor}) trước khi đi bộ
+     * @param reloginInWorld {@code true} = gửi {@code ConnectRequest} lần hai trên kết nối đang chơi
+     * @param reloginUsername tên tài khoản của lần đăng nhập thứ hai (mặc định = {@code username})
+     * @param chatChannel kênh chat ({@code world} / {@code area} / {@code party} / {@code guild})
+     * @param chatBody nội dung chat gửi sau khi đi bộ; chuỗi {@code \n} thành xuống dòng thật; rỗng = không gửi
+     */
+    public record EdgePlan(
+            List<String> unequipSlots,
+            boolean reloginInWorld,
+            String reloginUsername,
+            String chatChannel,
+            String chatBody) {
+
+        /** Danh sách ô bất biến — record không tự copy, mà lệnh gọi có thể truyền list sống. */
+        public EdgePlan {
+            unequipSlots = List.copyOf(unequipSlots);
+        }
+    }
+
     /** Giá trị {@code attackTarget} nghĩa là "không đánh, chỉ quan sát". */
     public static final String ATTACK_TARGET_NONE = "none";
 
@@ -139,6 +181,7 @@ public record ProbeConfig(
     private static final int DEFAULT_OBSERVE_SECONDS = 10;
     private static final int DEFAULT_DUEL_WAIT_SECONDS = 60;
     private static final int DEFAULT_PARTY_WAIT_SECONDS = 30;
+    private static final String DEFAULT_CHAT_CHANNEL = "world";
 
     /**
      * Dựng cấu hình probe từ tham số dòng lệnh.
@@ -176,12 +219,24 @@ public record ProbeConfig(
                         raw.text("challengeDuel", ""),
                         raw.flag("acceptDuel", false),
                         raw.integer("duelWaitSeconds", DEFAULT_DUEL_WAIT_SECONDS),
+                        raw.integer("acceptDuelDelaySeconds", 0),
                         raw.flag("forfeitDuel", false)),
                 new PartyPlan(
                         raw.text("partyInvite", ""),
                         raw.flag("partyAccept", false),
                         raw.integer("partyWaitSeconds", DEFAULT_PARTY_WAIT_SECONDS),
-                        raw.flag("partyReport", false)));
+                        raw.flag("partyReport", false)),
+                new TradePlan(
+                        raw.text("tradeRequest", ""),
+                        raw.flag("tradeAccept", false),
+                        raw.integer("tradeWaitSeconds", DEFAULT_PARTY_WAIT_SECONDS),
+                        raw.flag("tradeReport", false)),
+                new EdgePlan(
+                        raw.list("unequipSlots"),
+                        raw.flag("reloginInWorld", false),
+                        raw.text("reloginUsername", raw.text("username", DEFAULT_USERNAME)),
+                        raw.text("chatChannel", DEFAULT_CHAT_CHANNEL),
+                        raw.text("chatBody", "")));
     }
 
     /** {@code true} khi người dùng muốn probe tự chọn con gần nhất trong AoI. */

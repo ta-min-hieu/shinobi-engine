@@ -48,7 +48,7 @@ final class ArenaScenario {
     /** Vào trận theo {@code plan}: chấp nhận, thách, hoặc không làm gì nếu không được yêu cầu. */
     void enter(ProbeConfig.DuelPlan plan) throws IOException {
         if (plan.acceptIncoming()) {
-            acceptIncoming(plan.waitSeconds());
+            acceptIncoming(plan.waitSeconds(), plan.acceptDelaySeconds());
         } else if (plan.isRequested()) {
             challenge(plan.challengeTargetName(), plan.waitSeconds());
         }
@@ -74,8 +74,11 @@ final class ArenaScenario {
         awaitDuelStarted(waitSeconds);
     }
 
-    /** Đợi lời thách đến (tối đa {@code waitSeconds}), chấp nhận, rồi đợi trận bắt đầu. */
-    void acceptIncoming(int waitSeconds) throws IOException {
+    /**
+     * Đợi lời thách đến (tối đa {@code waitSeconds}), ngồi yên {@code acceptDelaySeconds} giây, chấp
+     * nhận, rồi đợi trận bắt đầu.
+     */
+    void acceptIncoming(int waitSeconds, int acceptDelaySeconds) throws IOException {
         Optional<PacketCodec.Frame> incoming = await(Opcode.OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT_VALUE, waitSeconds);
         if (incoming.isEmpty()) {
             session.note("KHÔNG có lời thách nào trong " + waitSeconds + "s — bỏ qua Arena");
@@ -83,6 +86,8 @@ final class ArenaScenario {
         }
         long challengeId =
                 DuelChallengeReceivedEvent.parseFrom(incoming.get().payload()).getChallengeId();
+        // Opcode 0 không tồn tại — đọc cho hết quãng chờ, mọi frame vẫn thành dòng TSV qua ProbeSession.
+        await(0, acceptDelaySeconds);
         connection.send(
                 Opcode.OPCODE_ACCEPT_DUEL_COMMAND_VALUE,
                 AcceptDuelCommand.newBuilder()

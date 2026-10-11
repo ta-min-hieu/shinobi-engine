@@ -111,6 +111,7 @@ public final class GameProbe {
             observe(connection, config, session, observation);
             arena.forfeitIfRequested(config.duel());
             new PartyScenario(connection, session).reportIfRequested(config.party());
+            new TradeScenario(connection, session, HANDSHAKE_TIMEOUT_MILLIS).reportIfRequested(config.trade());
             // Uống thuốc SAU vòng quan sát: máu không được lưu vào DB (thoát ra vào lại là đầy),
             // nên muốn thấy đan dược làm gì thì phải đánh mất máu TRƯỚC, trong cùng phiên này.
             // Nhiều mã cách nhau dấu phẩy = uống LIÊN TIẾP — thứ duy nhất làm hồi chiêu vật phẩm (theo
@@ -149,15 +150,19 @@ public final class GameProbe {
         // đo ra sai. Ngược hẳn với UseItemScenario bên dưới — món tiêu hao phải dùng SAU khi
         // đã mất máu, trong cùng phiên.
         new PartyScenario(connection, session).join(config.party());
+        new TradeScenario(connection, session, HANDSHAKE_TIMEOUT_MILLIS).open(config.trade());
         if (!config.sellItems().isEmpty() || !config.buyItems().isEmpty()) {
             new ShopScenario(connection, session).run(config.sellItems(), config.buyItems());
         }
         if (!config.equipItemCodes().isEmpty()) {
             new EquipScenario(connection, session).run(config.equipItemCodes());
         }
+        SessionEdgeScenario edge = new SessionEdgeScenario(connection, session);
+        edge.runBeforeWalking(config.edge());
         if (config.moveToX().isPresent()) {
             walkTo(connection, observation, session, config.moveToX().getAsDouble());
         }
+        edge.sendChat(config.edge());
         if (!config.enterDungeon().isEmpty()) {
             new DungeonScenario(connection, session).run(config.enterDungeon());
         }

@@ -106,6 +106,10 @@ final class ProbeEventLine {
         if (duel.isPresent()) {
             return duel.get();
         }
+        Optional<String> social = SocialEventLine.describe(opcode, payload);
+        if (social.isPresent()) {
+            return social.get();
+        }
         // Opcode chưa giải mã vẫn được ghi ra (tên + số byte) thay vì bỏ im lặng — probe phải cho
         // thấy CÓ GÌ ĐÓ đã tới, kể cả khi nó chưa biết đọc.
         return describeQuest(opcode, payload).orElseGet(() -> "payloadBytes=" + payload.length);
