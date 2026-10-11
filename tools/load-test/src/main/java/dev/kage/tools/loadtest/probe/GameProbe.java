@@ -110,10 +110,15 @@ public final class GameProbe {
             ArenaScenario arena = prepareBeforeObserving(connection, config, session, observation);
             observe(connection, config, session, observation);
             arena.forfeitIfRequested(config.duel());
+            new PartyScenario(connection, session).reportIfRequested(config.party());
             // Uống thuốc SAU vòng quan sát: máu không được lưu vào DB (thoát ra vào lại là đầy),
             // nên muốn thấy đan dược làm gì thì phải đánh mất máu TRƯỚC, trong cùng phiên này.
-            if (!config.useItemCode().isEmpty()) {
-                new UseItemScenario(connection, session).run(config.useItemCode());
+            // Nhiều mã cách nhau dấu phẩy = uống LIÊN TIẾP — thứ duy nhất làm hồi chiêu vật phẩm (theo
+            // kết nối) quan sát được.
+            if (!config.useItemCodes().isEmpty()) {
+                for (String itemCode : config.useItemCodes()) {
+                    new UseItemScenario(connection, session).run(itemCode);
+                }
                 drainForMillis(connection, HEAL_SETTLE_MILLIS); // đợi HealthChangedEvent (408) tới
             }
             // Đi bộ LẦN HAI, sau khi đã mất máu — thứ duy nhất làm vùng an toàn (ADR-046 D3) quan
@@ -143,6 +148,7 @@ public final class GameProbe {
         // mới ngay trong EquipItemResponse (ADR-043), nên mặc sau khi đi thì "máu lúc tới nơi"
         // đo ra sai. Ngược hẳn với UseItemScenario bên dưới — món tiêu hao phải dùng SAU khi
         // đã mất máu, trong cùng phiên.
+        new PartyScenario(connection, session).join(config.party());
         if (!config.sellItems().isEmpty() || !config.buyItems().isEmpty()) {
             new ShopScenario(connection, session).run(config.sellItems(), config.buyItems());
         }

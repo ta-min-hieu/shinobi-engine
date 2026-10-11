@@ -35,6 +35,7 @@ import dev.kage.tools.loadtest.CommandLineArguments;
  * @param enterDungeon mã hầm ngục để tự lập nhóm 1 người rồi vào, sau khi đi bộ; rỗng = không vào —
  *     xem {@link DungeonScenario}
  * @param duel kịch bản Arena 1v1 (thách / chấp nhận / bỏ cuộc) — xem {@link DuelPlan}
+ * @param party kịch bản lập nhóm hai người (mời / chấp nhận / in thành viên) — xem {@link PartyPlan}
  */
 public record ProbeConfig(
         String host,
@@ -49,7 +50,7 @@ public record ProbeConfig(
         boolean retargetOnKill,
         int attackIntervalMillis,
         int observeSeconds,
-        String useItemCode,
+        List<String> useItemCodes,
         OptionalDouble returnToX,
         int settleSeconds,
         List<String> sellItems,
@@ -57,7 +58,8 @@ public record ProbeConfig(
         List<String> equipItemCodes,
         QuestPlan quest,
         String enterDungeon,
-        DuelPlan duel) {
+        DuelPlan duel,
+        PartyPlan party) {
 
     /**
      * Danh sách mã trang bị BẤT BIẾN — record không tự copy, mà lệnh gọi có thể truyền list sống
@@ -66,6 +68,7 @@ public record ProbeConfig(
      * {@code EI_EXPOSE_REP} (getter trả thẳng list nội bộ ra).
      */
     public ProbeConfig {
+        useItemCodes = List.copyOf(useItemCodes);
         sellItems = List.copyOf(sellItems);
         buyItems = List.copyOf(buyItems);
         equipItemCodes = List.copyOf(equipItemCodes);
@@ -112,6 +115,17 @@ public record ProbeConfig(
         }
     }
 
+    /**
+     * Kịch bản lập nhóm hai người ({@link PartyScenario}) — hai probe trên hai tài khoản, một bên mời,
+     * một bên chấp nhận.
+     *
+     * @param inviteTargetName tên nhân vật để lập nhóm rồi mời; rỗng = không mời
+     * @param acceptIncoming {@code true} = thăm dò lời mời đến rồi chấp nhận
+     * @param waitSeconds hạn chót chờ lời mời
+     * @param report {@code true} = in danh sách thành viên sau vòng quan sát
+     */
+    public record PartyPlan(String inviteTargetName, boolean acceptIncoming, int waitSeconds, boolean report) {}
+
     /** Giá trị {@code attackTarget} nghĩa là "không đánh, chỉ quan sát". */
     public static final String ATTACK_TARGET_NONE = "none";
 
@@ -124,6 +138,7 @@ public record ProbeConfig(
     private static final int DEFAULT_ATTACK_INTERVAL_MILLIS = 1000; // CombatConstants.ATTACK_INTERVAL_SECONDS = 1s
     private static final int DEFAULT_OBSERVE_SECONDS = 10;
     private static final int DEFAULT_DUEL_WAIT_SECONDS = 60;
+    private static final int DEFAULT_PARTY_WAIT_SECONDS = 30;
 
     /**
      * Dựng cấu hình probe từ tham số dòng lệnh.
@@ -145,7 +160,7 @@ public record ProbeConfig(
                 raw.flag("retargetOnKill", false),
                 raw.integer("attackIntervalMillis", DEFAULT_ATTACK_INTERVAL_MILLIS),
                 raw.integer("observeSeconds", DEFAULT_OBSERVE_SECONDS),
-                raw.text("useItemCode", ""),
+                List.copyOf(raw.list("useItemCode")),
                 raw.optionalDouble("returnToX"),
                 raw.integer("settleSeconds", 0),
                 List.copyOf(raw.list("sellItems")),
@@ -161,7 +176,12 @@ public record ProbeConfig(
                         raw.text("challengeDuel", ""),
                         raw.flag("acceptDuel", false),
                         raw.integer("duelWaitSeconds", DEFAULT_DUEL_WAIT_SECONDS),
-                        raw.flag("forfeitDuel", false)));
+                        raw.flag("forfeitDuel", false)),
+                new PartyPlan(
+                        raw.text("partyInvite", ""),
+                        raw.flag("partyAccept", false),
+                        raw.integer("partyWaitSeconds", DEFAULT_PARTY_WAIT_SECONDS),
+                        raw.flag("partyReport", false)));
     }
 
     /** {@code true} khi người dùng muốn probe tự chọn con gần nhất trong AoI. */

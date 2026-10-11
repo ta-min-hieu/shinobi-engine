@@ -32,6 +32,13 @@ application {
 //   ./gradlew :tools:load-test:gameProbe --args="--username=kagetest --characterId=3 \
 //       --claimQuest=kill_training_dummies --observeSeconds=1"
 //   ./gradlew :tools:load-test:gameProbe --args="--username=kagetest --questReport=true --observeSeconds=1"
+//
+// Kịch bản NHÓM hai người (2026-10-11, probe.PartyScenario) — HAI probe trên HAI TÀI KHOẢN (một tài
+// khoản chỉ một nhân vật online). Bên nhận chạy TRƯỚC; --partyReport in ai là trưởng nhóm sau vòng
+// quan sát. Nhóm sống theo DB: lượt sau cả hai vẫn ở trong nhóm, không cần mời lại.
+//   ... --args="--username=aloha --characterId=4 --partyAccept=true --partyReport=true --observeSeconds=20"
+//   ... --args="--username=kagetest --characterId=3 --partyInvite=Benkei --observeSeconds=5"
+// --useItemCode nhận NHIỀU mã cách nhau dấu phẩy (uống liên tiếp — đo hồi chiêu vật phẩm).
 tasks.register<JavaExec>("gameProbe") {
     group = "verification"
     description = "Client headless quan sát: giải mã sự kiện world thành SỐ (vị trí quái, sát thương, vòng đời quest)"
