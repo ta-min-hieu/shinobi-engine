@@ -57,6 +57,13 @@
         <Bug pattern="UNENCRYPTED_SOCKET"/>
     </Match>
 
+    <!-- Cùng lý do: client test của ServerShutdownMailAndDungeonDatabaseTest nối tới GatewayServer dựng với
+         TlsConfig.disabled() trên loopback. -->
+    <Match>
+        <Class name="dev.kage.server.gateway.ServerShutdownMailAndDungeonDatabaseTest$Player"/>
+        <Bug pattern="UNENCRYPTED_SOCKET"/>
+    </Match>
+
     <!-- Cùng lý do: client test của LevelUpMidSessionDatabaseTest nối tới GatewayServer dựng với
          TlsConfig.disabled() trên loopback. -->
     <Match>
