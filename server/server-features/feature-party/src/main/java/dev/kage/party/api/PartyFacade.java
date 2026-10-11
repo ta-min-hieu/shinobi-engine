@@ -87,6 +87,16 @@ public final class PartyFacade {
                 .toList();
     }
 
+    /**
+     * Trưởng nhóm vừa mất kết nối: trao quyền cho thành viên vào sớm nhất đang online — xem
+     * {@code HandOverPartyLeadershipUseCase}. Chạm DB (blocking).
+     *
+     * @return trưởng nhóm mới, hoặc rỗng nếu không có gì đổi
+     */
+    public Optional<Long> handOverLeadership(long leaderCharacterId, java.util.function.LongPredicate isOnline) {
+        return useCases.handOverPartyLeadershipUseCase().execute(leaderCharacterId, isOnline);
+    }
+
     public Optional<MyPartyView> findMyParty(long characterId) {
         return useCases.findMyPartyUseCase()
                 .execute(characterId)

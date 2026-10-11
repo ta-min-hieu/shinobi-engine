@@ -118,6 +118,10 @@ public final class PostgresPartyAdapter implements PartyPort {
             UPDATE party SET leader_character_id = ? WHERE id = ?
             """;
 
+    private static final String DEMOTE_TO_MEMBER = """
+            UPDATE party_member SET role = 'MEMBER' WHERE party_id = ? AND character_id = ?
+            """;
+
     private static final String DELETE_PARTY = """
             DELETE FROM party WHERE id = ?
             """;
@@ -312,6 +316,58 @@ public final class PostgresPartyAdapter implements PartyPort {
     @Override
     public boolean rejectInvite(long inviteId, long characterId) {
         return JdbcOperations.update(dataSource, REJECT_INVITE, inviteId, characterId) > 0;
+    }
+
+    @Override
+    public boolean transferLeadership(long leaderCharacterId, long newLeaderCharacterId) {
+        return JdbcTransactionRunner.call(
+                dataSource,
+                connection -> transferLeadershipInTransaction(connection, leaderCharacterId, newLeaderCharacterId));
+    }
+
+    /**
+     * Cùng thứ tự khoá với {@link #leavePartyInTransaction}: dòng {@code party} TRƯỚC, rồi mới các dòng
+     * {@code party_member} — và hai dòng thành viên khoá theo thứ tự id tăng dần, để hai lượt chuyển
+     * quyền ngược chiều nhau (không xảy ra hôm nay, vì cả hai đều phải giữ dòng {@code party}) cũng
+     * không khoá chéo. Đọc lại vai trò SAU khi giữ khoá: người gọi có thể vừa hết là trưởng nhóm, người
+     * nhận có thể vừa rời.
+     */
+    private static boolean transferLeadershipInTransaction(
+            Connection connection, long leaderCharacterId, long newLeaderCharacterId) {
+        Optional<Long> unlockedPartyId =
+                JdbcOperations.queryOne(connection, FIND_MEMBERSHIP, rs -> rs.getLong("party_id"), leaderCharacterId);
+        if (unlockedPartyId.isEmpty()) {
+            return false;
+        }
+        long partyId = unlockedPartyId.get();
+        JdbcOperations.lock(connection, LOCK_PARTY, partyId);
+        long firstId = Math.min(leaderCharacterId, newLeaderCharacterId);
+        long secondId = Math.max(leaderCharacterId, newLeaderCharacterId);
+        Optional<MembershipRow> first = lockMembership(connection, firstId);
+        Optional<MembershipRow> second = lockMembership(connection, secondId);
+        Optional<MembershipRow> leader = leaderCharacterId == firstId ? first : second;
+        Optional<MembershipRow> heir = leaderCharacterId == firstId ? second : first;
+        if (!isRoleInParty(leader, partyId, PartyRole.LEADER) || !isRoleInParty(heir, partyId, PartyRole.MEMBER)) {
+            return false;
+        }
+        JdbcOperations.update(connection, DEMOTE_TO_MEMBER, partyId, leaderCharacterId);
+        JdbcOperations.update(connection, PROMOTE_TO_LEADER, partyId, newLeaderCharacterId);
+        JdbcOperations.update(connection, UPDATE_PARTY_LEADER, newLeaderCharacterId, partyId);
+        return true;
+    }
+
+    private static Optional<MembershipRow> lockMembership(Connection connection, long characterId) {
+        return JdbcOperations.queryOne(
+                connection,
+                SELECT_MEMBERSHIP_FOR_UPDATE,
+                rs -> new MembershipRow(rs.getLong("party_id"), PartyRole.valueOf(rs.getString("role"))),
+                characterId);
+    }
+
+    private static boolean isRoleInParty(Optional<MembershipRow> membership, long partyId, PartyRole role) {
+        return membership.isPresent()
+                && membership.get().partyId() == partyId
+                && membership.get().role() == role;
     }
 
     @Override

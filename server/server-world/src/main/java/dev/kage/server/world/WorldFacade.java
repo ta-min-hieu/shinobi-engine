@@ -1493,6 +1493,13 @@ public final class WorldFacade {
 
         TARGET.get(entity).targetEntityId = 0L;
 
+        // Người ĐANG NHÌN nhân vật này cũng phải biết họ đã sống lại (quyết định chủ dự án 2026-10-11).
+        // onCharacterRespawned bên dưới chỉ tới chính người hồi sinh; người quan sát trước đó chỉ suy ra
+        // được từ gói di chuyển đầu tiên, nên người gục NGAY TẠI điểm hồi sinh (không gói di chuyển nào)
+        // nằm tư thế chết mãi trên máy họ. Máu đầy đi qua đường ống HealthChangedEvent sẵn có (ADR-046
+        // D1 — phát cho mọi người đang thấy entity): không opcode mới, không field mới.
+        pendingHealthChanges.add(new HealthChange(characterId, health.current, health.max));
+
         outboundSink.onCharacterRespawned(new WorldOutboundSink.RespawnSnapshot(
                 characterId, position.x, position.y, health.current, health.max, chi.current, chi.max));
     }

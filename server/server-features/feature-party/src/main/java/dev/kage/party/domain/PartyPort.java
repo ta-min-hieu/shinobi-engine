@@ -75,6 +75,15 @@ public interface PartyPort {
     /** Leader kick 1 thành viên MEMBER khác cùng party (không tự kick chính mình). */
     boolean kickMember(long leaderCharacterId, long targetCharacterId);
 
+    /**
+     * Chuyển quyền trưởng nhóm từ {@code leaderCharacterId} sang {@code newLeaderCharacterId}, nguyên tử:
+     * người cũ thành {@link PartyRole#MEMBER} (vẫn ở trong nhóm), người mới thành {@link PartyRole#LEADER}.
+     *
+     * @return {@code false} và không đổi gì nếu lúc ghi người gọi không còn là trưởng nhóm, hoặc người
+     *     nhận không còn là thành viên thường của CÙNG nhóm (vừa rời/bị kick)
+     */
+    boolean transferLeadership(long leaderCharacterId, long newLeaderCharacterId);
+
     enum AcceptResult {
         OK,
         /** Không tìm thấy lời mời, HOẶC {@code characterId} không phải invitee của lời mời đó. */

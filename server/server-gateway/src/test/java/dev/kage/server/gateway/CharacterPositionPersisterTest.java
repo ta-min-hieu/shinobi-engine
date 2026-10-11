@@ -85,6 +85,45 @@ class CharacterPositionPersisterTest {
         assertThat(logoutWrite.get()).succeedsWithin(Duration.ofSeconds(WAIT_SECONDS));
     }
 
+    /**
+     * Lần ghi lúc logout hỏng vì DB chập chờn thì thử lại (quyết định chủ dự án 2026-10-11): sau logout
+     * không vòng định kỳ nào ghi cho nhân vật này nữa, bỏ ngay là đăng nhập lại ở chỗ cũ.
+     */
+    @Test
+    void logoutSaveRetries_whenTheFirstAttemptsFail() {
+        java.util.concurrent.atomic.AtomicInteger attempts = new java.util.concurrent.atomic.AtomicInteger();
+        List<PositionSnapshot> writes = new CopyOnWriteArrayList<PositionSnapshot>();
+        CharacterPositionPersister.PositionWriter writer = (characterId, x, y) -> {
+            if (attempts.incrementAndGet() < CharacterPositionPersister.LOGOUT_SAVE_ATTEMPTS) {
+                throw new IllegalStateException("DB chập chờn (giả lập)");
+            }
+            writes.add(new PositionSnapshot(x, y));
+        };
+        persister = new CharacterPositionPersister(writer, registry, Duration.ofMinutes(5));
+
+        assertThat(persister.save(CHARACTER_ID, LOGOUT_POSITION.x(), LOGOUT_POSITION.y()))
+                .succeedsWithin(Duration.ofSeconds(WAIT_SECONDS));
+
+        assertThat(attempts).hasValue(CharacterPositionPersister.LOGOUT_SAVE_ATTEMPTS);
+        assertThat(writes).containsExactly(LOGOUT_POSITION);
+    }
+
+    /** DB hỏng hẳn: thử đủ số lần rồi BỎ, và mốc hoàn tất vẫn tới — không được khoá người chơi ngoài cửa. */
+    @Test
+    void logoutSaveGivesUpAfterTheLastAttempt_andStillCompletes() {
+        java.util.concurrent.atomic.AtomicInteger attempts = new java.util.concurrent.atomic.AtomicInteger();
+        CharacterPositionPersister.PositionWriter writer = (characterId, x, y) -> {
+            attempts.incrementAndGet();
+            throw new IllegalStateException("DB hỏng (giả lập)");
+        };
+        persister = new CharacterPositionPersister(writer, registry, Duration.ofMinutes(5));
+
+        assertThat(persister.save(CHARACTER_ID, LOGOUT_POSITION.x(), LOGOUT_POSITION.y()))
+                .succeedsWithin(Duration.ofSeconds(WAIT_SECONDS));
+
+        assertThat(attempts).hasValue(CharacterPositionPersister.LOGOUT_SAVE_ATTEMPTS);
+    }
+
     private void moveTo(PositionSnapshot position) {
         registry.onMoveAccepted(
                 new WorldOutboundSink.MoveAcceptedSnapshot(CHARACTER_ID, 0, position.x(), position.y(), 0f, true));

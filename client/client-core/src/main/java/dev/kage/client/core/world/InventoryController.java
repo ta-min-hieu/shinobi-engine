@@ -57,7 +57,10 @@ final class InventoryController {
             // ErrorResponse, không phải EnhanceOutcome, xem InventoryCoordinator#onEnhanceRejected.
             "error.item_in_trade",
             // Cường hoá món không phải trang bị (quyết định chủ dự án 2026-10-11) — cùng đường trên.
-            "error.item_not_enhanceable");
+            "error.item_not_enhanceable",
+            // Dùng vật phẩm khi còn hồi chiêu (quyết định chủ dự án 2026-10-11) — tới trong
+            // UseItemResponse.error_key.
+            "error.item_on_cooldown");
 
     /**
      * Một dòng túi đồ.

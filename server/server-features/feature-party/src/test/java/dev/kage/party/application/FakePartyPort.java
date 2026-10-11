@@ -71,6 +71,32 @@ class FakePartyPort implements PartyPort {
     }
 
     @Override
+    public boolean transferLeadership(long leaderCharacterId, long newLeaderCharacterId) {
+        Optional<PartyMember> leader = findMembershipOf(leaderCharacterId);
+        Optional<PartyMember> heir = findMembershipOf(newLeaderCharacterId);
+        boolean valid = leader.isPresent()
+                && heir.isPresent()
+                && leader.get().role() == PartyRole.LEADER
+                && heir.get().role() == PartyRole.MEMBER
+                && leader.get().partyId() == heir.get().partyId();
+        if (!valid) {
+            return false;
+        }
+        members.replaceAll(member -> {
+            if (member.characterId() == leaderCharacterId) {
+                return new PartyMember(member.partyId(), member.characterId(), PartyRole.MEMBER, member.joinedAt());
+            }
+            if (member.characterId() == newLeaderCharacterId) {
+                return new PartyMember(member.partyId(), member.characterId(), PartyRole.LEADER, member.joinedAt());
+            }
+            return member;
+        });
+        Party party = partiesById.get(leader.get().partyId());
+        partiesById.put(party.id(), new Party(party.id(), newLeaderCharacterId, party.createdAt()));
+        return true;
+    }
+
+    @Override
     public int deleteInvitesInvitedBefore(Instant cutoff) {
         int before = invites.size();
         invites.removeIf(invite -> invite.invitedAt().isBefore(cutoff));

@@ -8,8 +8,8 @@
 // test_fixture_broken.js: một nhánh chỉ có đúng lời gọi sai sẽ xanh kể cả khi Java kiểm TỔNG thay vì
 // kiểm TỪNG lần gọi.
 //
-// Ba hook dùng chung một bảng nhánh vì `take_item` chỉ tồn tại ở on_event, còn các hàm khác có ở cả
-// ba — test tự chọn hook đúng.
+// Hai hook dùng chung một bảng nhánh; từ 2026-10-11 mỗi hàm `ctx.*` chỉ có ở hook của nó (give_exp/
+// give_item ở on_claim; save_progress/complete/take_item ở on_event) — test tự chọn hook đúng cho từng nhánh.
 ({
     on_accept(ctx) {
         ctx.save_progress(JSON.stringify({}));
@@ -63,12 +63,12 @@
             give_exp_zero() { ctx.give_exp(10); ctx.give_exp(0); },
 
             // ----- save_progress -----
-            save_progress_null() { ctx.give_exp(10); ctx.save_progress(null); },
-            save_progress_undefined() { ctx.give_exp(10); ctx.save_progress(JSON.stringify(undefined)); },
-            save_progress_number() { ctx.give_exp(10); ctx.save_progress(42); },
-            save_progress_object() { ctx.give_exp(10); ctx.save_progress({ counter: 1 }); },
-            save_progress_no_arguments() { ctx.give_exp(10); ctx.save_progress(); },
-            save_progress_nul() { ctx.give_exp(10); ctx.save_progress("{\"a\":\"\u0000\"}"); },
+            save_progress_null() { ctx.save_progress("{}"); ctx.save_progress(null); },
+            save_progress_undefined() { ctx.save_progress("{}"); ctx.save_progress(JSON.stringify(undefined)); },
+            save_progress_number() { ctx.save_progress("{}"); ctx.save_progress(42); },
+            save_progress_object() { ctx.save_progress("{}"); ctx.save_progress({ counter: 1 }); },
+            save_progress_no_arguments() { ctx.save_progress("{}"); ctx.save_progress(); },
+            save_progress_nul() { ctx.save_progress("{}"); ctx.save_progress("{\"a\":\"\u0000\"}"); },
 
             // ----- take_item (chỉ on_event) -----
             take_item_zero() { ctx.take_item("kunai", 1); ctx.take_item("kunai", 0); },
@@ -82,6 +82,10 @@
             take_item_max_int() { ctx.take_item("kunai", 2147483647); }
         };
         cases[name]();
-        ctx.save_progress(JSON.stringify({ "case": name, done: true }));
+        // save_progress chỉ có ở on_event — ở on_claim gọi nó là lỗi script (đúng luật, nhưng không phải
+        // thứ các nhánh trên muốn đo).
+        if (ctx.save_progress) {
+            ctx.save_progress(JSON.stringify({ "case": name, done: true }));
+        }
     }
 })

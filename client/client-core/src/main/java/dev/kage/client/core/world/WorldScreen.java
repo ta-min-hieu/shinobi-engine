@@ -774,8 +774,11 @@ public final class WorldScreen implements GameScreen {
         } else if (opcode == Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE) {
             onSkillResult(SkillResultEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_HEALTH_CHANGED_EVENT_VALUE) {
-            // ADR-046 D1 — chỉ HUD, KHÔNG có animation/số bay: không ai vừa bị đánh cả.
-            combatHudController.onHealthChanged(HealthChangedEvent.parseFrom(payload));
+            // ADR-046 D1 — HUD, KHÔNG có số bay: không ai vừa bị đánh cả. Riêng người khác đang nằm tư
+            // thế chết mà máu về số dương thì đứng dậy (hồi sinh, 2026-10-11).
+            HealthChangedEvent healthChanged = HealthChangedEvent.parseFrom(payload);
+            combatHudController.onHealthChanged(healthChanged);
+            remoteCharacters.onHealthChanged(healthChanged.getEntityId(), healthChanged.getCurrentHp());
         } else if (opcode == Opcode.OPCODE_NPC_SPAWNED_EVENT_VALUE) {
             npcPresenter.onSpawned(NpcSpawnedEvent.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_NPC_DESPAWNED_EVENT_VALUE) {

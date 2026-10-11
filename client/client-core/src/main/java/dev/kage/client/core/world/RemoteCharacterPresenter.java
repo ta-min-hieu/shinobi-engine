@@ -112,6 +112,18 @@ final class RemoteCharacterPresenter {
         }
     }
 
+    /**
+     * Máu của một nhân vật KHÁC vừa đổi. Người đang nằm tư thế chết mà máu về lại số dương thì họ vừa
+     * hồi sinh — server phát gói này cho người quan sát mỗi lần hồi sinh (2026-10-11). Tín hiệu "gói
+     * di chuyển đầu tiên sau khi chết" ở {@link #onMoved} vẫn giữ, nhưng nó không tới khi người đó gục
+     * ngay tại điểm hồi sinh và đứng yên: không có gói di chuyển nào để suy ra.
+     */
+    void onHealthChanged(long characterId, int currentHp) {
+        if (currentHp > 0 && entities.containsKey(characterId) && models.isDead(characterId)) {
+            models.resetAfterRespawn(characterId);
+        }
+    }
+
     void onDespawned(CharacterDespawnedEvent event) {
         KEntity entity = entities.remove(event.getCharacterId());
         pickables.remove(event.getCharacterId());

@@ -339,4 +339,46 @@ class PartyIntegrationTest {
         // Lời mời cũ đã đi ⇒ UNIQUE (party_id, invitee) không còn chặn lời mời mới.
         assertThat(adapter.invite(party.id(), staleInvitee).id()).isNotEqualTo(stale.id());
     }
+
+    /**
+     * Chuyển quyền trưởng nhóm (quyết định chủ dự án 2026-10-11) trên Postgres thật: hai dòng
+     * {@code party_member} và dòng {@code party} đổi cùng nhau, người cũ ở lại nhóm, và trưởng nhóm
+     * mới kick được người cũ — tức quyền thật sự đã sang tay.
+     */
+    @Test
+    void shouldTransferLeadershipAtomically_andLetTheNewLeaderKickTheOldOne() {
+        long leader = createFreshCharacter("PartyHandLead");
+        long heir = createFreshCharacter("PartyHandHeir");
+        PostgresPartyAdapter adapter = newAdapter();
+        Party party = adapter.createParty(leader);
+        adapter.acceptInvite(adapter.invite(party.id(), heir).id(), heir);
+
+        assertThat(adapter.transferLeadership(leader, heir)).isTrue();
+
+        assertThat(adapter.findMembershipOf(heir).orElseThrow().role()).isEqualTo(PartyRole.LEADER);
+        assertThat(adapter.findMembershipOf(leader).orElseThrow().role()).isEqualTo(PartyRole.MEMBER);
+        assertThat(adapter.listMembers(party.id())).hasSize(2);
+        assertThat(adapter.kickMember(leader, heir))
+                .as("người cũ không còn quyền kick")
+                .isFalse();
+        assertThat(adapter.kickMember(heir, leader)).isTrue();
+    }
+
+    /** Người nhận không phải thành viên của nhóm đó, hoặc người gọi không phải trưởng nhóm: không đổi gì. */
+    @Test
+    void shouldRefuseTransfer_whenEitherSideIsNotWhatTheCallerAssumed() {
+        long leader = createFreshCharacter("PartyHandLead2");
+        long member = createFreshCharacter("PartyHandMem2");
+        long outsider = createFreshCharacter("PartyHandOut2");
+        PostgresPartyAdapter adapter = newAdapter();
+        Party party = adapter.createParty(leader);
+        adapter.acceptInvite(adapter.invite(party.id(), member).id(), member);
+
+        assertThat(adapter.transferLeadership(leader, outsider)).isFalse();
+        assertThat(adapter.transferLeadership(member, leader)).isFalse();
+        assertThat(adapter.transferLeadership(outsider, member)).isFalse();
+
+        assertThat(adapter.findMembershipOf(leader).orElseThrow().role()).isEqualTo(PartyRole.LEADER);
+        assertThat(adapter.findMembershipOf(member).orElseThrow().role()).isEqualTo(PartyRole.MEMBER);
+    }
 }

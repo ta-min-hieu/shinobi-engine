@@ -359,6 +359,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final WorldGateway worldGateway;
     private final WorldRouteLookup worldRoutes;
     private final NpcProximity npcProximity;
+    private final ItemUseCooldown itemUseCooldown = new ItemUseCooldown();
     private final Executor authExecutor;
     private final GatewayNetworkMetrics networkMetrics;
     private final GatewayTracing tracing;
@@ -381,6 +382,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // packet TIẾP THEO có thể chạy trên EventLoop trước khi Virtual Thread đó xong (Netty không
     // chờ) — cần volatile để đảm bảo visibility giữa 2 thread.
     private volatile Long boundAccountId;
+
+    /** Session token của lượt đăng nhập gần nhất trên kết nối này; {@code null} nếu chưa đăng nhập. */
+    private volatile String sessionToken;
+
     private volatile Long boundCharacterId;
 
     // Lần gắn nhân vật HIỆN TẠI của kết nối (null = chưa/không gắn). Mỗi lần gắn có cờ dọn + mốc hoàn
@@ -590,6 +595,24 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         ConnectRequest request = ConnectRequest.parseFrom(payload);
         String username = request.getUsername();
         int sequenceId = header.sequenceId();
+        // Quyết định chủ dự án 2026-10-11: client và server phải cùng phiên bản giao thức. Trước đó
+        // byte phiên bản trong header không ai đọc — client lệch phiên bản vẫn vào được rồi chạy sai âm
+        // thầm ở gói đầu tiên hai bên hiểu khác nhau. Kiểm ở ConnectRequest: gói đầu tiên của mọi phiên.
+        if (header.protocolVersion() != ProtocolVersion.CURRENT) {
+            LOG.warn(
+                    "Từ chối đăng nhập: phiên bản giao thức client={} khác server={}",
+                    header.protocolVersion(),
+                    ProtocolVersion.CURRENT);
+            sendError(ctx, sequenceId, 426, "error.client_outdated");
+            return;
+        }
+        // Quyết định chủ dự án 2026-10-11: kết nối ĐANG Ở WORLD không được đăng nhập lần nữa. Trước đó
+        // lệnh này ghi đè boundAccountId sang tài khoản mới trong khi kết nối vẫn điều khiển nhân vật
+        // của tài khoản cũ — hai nửa của một phiên thuộc hai tài khoản khác nhau.
+        if (boundCharacterId != null) {
+            sendError(ctx, sequenceId, 409, "error.already_in_world");
+            return;
+        }
 
         // Đăng nhập chạm Redis/PostgreSQL (qua AccountFacade) — I/O chặn, KHÔNG được chạy trên
         // Netty EventLoop (SERVER.md §2 — "Cấm: Query DB, logic nặng, chờ lock"). Đẩy sang Virtual
@@ -605,6 +628,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         try {
             LoginResult result = accountFacade.login(username);
             boundAccountId = result.accountId();
+            // Đăng nhập lại trên cùng kết nối (chưa vào world): phiên trước không còn ai dùng — thu hồi.
+            String previousToken = sessionToken;
+            sessionToken = result.sessionToken();
+            if (!result.sessionToken().equals(previousToken)) {
+                accountFacade.logout(previousToken);
+            }
             ConnectResponse response = ConnectResponse.newBuilder()
                     .setSuccess(true)
                     .setSessionId(result.sessionToken())
@@ -1410,8 +1439,26 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             return;
         }
         long inventoryItemId = command.getInventoryItemId();
-        executeBlocking(ctx, sequenceId, () -> handleUseItemBlocking(ctx, sequenceId, characterId, inventoryItemId));
+        // Hồi chiêu dùng vật phẩm (quyết định chủ dự án 2026-10-11) — chiếm NGAY ở đây, trên EventLoop,
+        // trước khi lệnh sang luồng chạm DB: xem ItemUseCooldown.
+        long cooldownTicket = itemUseCooldown.tryBegin();
+        if (cooldownTicket == ItemUseCooldown.ON_COOLDOWN) {
+            UseItemResponse onCooldown = UseItemResponse.newBuilder()
+                    .setSuccess(false)
+                    .setErrorKey("error.item_on_cooldown")
+                    .build();
+            send(ctx, Opcode.OPCODE_USE_ITEM_RESPONSE_VALUE, sequenceId, onCooldown.toByteArray());
+            return;
+        }
+        executeBlocking(
+                ctx,
+                sequenceId,
+                () -> handleUseItemBlocking(
+                        ctx, sequenceId, new UseItemRequest(characterId, inventoryItemId, cooldownTicket)));
     }
+
+    /** Một lệnh dùng vật phẩm đã qua hồi chiêu — {@code cooldownTicket} để hoàn lại nếu lệnh thất bại. */
+    private record UseItemRequest(long characterId, long inventoryItemId, long cooldownTicket) {}
 
     /**
      * Hai nửa của một lần uống đan: {@code feature-inventory} trừ món (transaction + audit) rồi trả
@@ -1421,9 +1468,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * <p>Máu mới KHÔNG đi kèm response: hàng đợi world là bất đồng bộ nên lúc này lệnh còn chưa
      * chạy (bẫy đã trả giá ở ADR-043). Client nhận số mới qua {@code HealthChangedEvent} (408).
      */
-    private void handleUseItemBlocking(
-            ChannelHandlerContext ctx, int sequenceId, long characterId, long inventoryItemId) {
-        UseItemUseCase.UseItemResult result = inventoryFacade.useItem(characterId, inventoryItemId);
+    private void handleUseItemBlocking(ChannelHandlerContext ctx, int sequenceId, UseItemRequest request) {
+        long characterId = request.characterId();
+        UseItemUseCase.UseItemResult result = inventoryFacade.useItem(characterId, request.inventoryItemId());
+        if (result.outcome() != UseItemUseCase.Outcome.OK) {
+            // Không có món / món không dùng được: chưa uống gì, không phạt hồi chiêu.
+            itemUseCooldown.cancel(request.cooldownTicket());
+        }
         if (result.outcome() == UseItemUseCase.Outcome.OK && result.effect() == ItemUseEffect.HEAL_HP) {
             // RỖNG nếu nhân vật vừa rớt mạng giữa chừng — món đã trừ rồi, nhưng không có entity
             // nào để cộng máu và cũng không còn ai để gửi gói. Không phải lỗi, đừng ném.
@@ -3954,6 +4005,36 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         if (bound != null) {
             releaseCharacter(ctx, bound);
         }
+        revokeSessionOnClose();
+    }
+
+    /**
+     * Thu hồi session token khi kết nối đóng (quyết định chủ dự án 2026-10-11) — xem
+     * {@code LoginOrCreateAccountUseCase#endSession}. Chạm Redis nên đẩy sang {@code authExecutor}.
+     *
+     * <p>Thu hồi hỏng không phải sự cố: token vẫn tự hết theo TTL, nên chỉ ghi WARN. Server đang tắt
+     * thì executor đã đóng — bỏ qua, cùng lý do.
+     */
+    // PMD AvoidCatchingGenericException: ranh giới của một task nền chạy sau khi kết nối đã đóng —
+    // không còn ai để báo lỗi, và mọi lỗi Redis đều có cùng một cách xử lý (để TTL lo).
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private void revokeSessionOnClose() {
+        String token = sessionToken;
+        if (token == null) {
+            return;
+        }
+        sessionToken = null;
+        try {
+            authExecutor.execute(() -> {
+                try {
+                    accountFacade.logout(token);
+                } catch (RuntimeException e) {
+                    LOG.warn("Thu hồi session token lúc ngắt kết nối thất bại — token sẽ tự hết theo TTL", e);
+                }
+            });
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            LOG.debug("Bỏ thu hồi session token: server đang tắt", e);
+        }
     }
 
     /**
@@ -4077,8 +4158,42 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // cấm query DB), cùng lý do savePosition ở trên.
         CompletableFuture<Void> friendsNotified =
                 CompletableFuture.runAsync(() -> notifyFriendsPresenceChanged(characterId, false), authExecutor);
+        handOverPartyLeadershipAfterDisconnect(characterId);
         CompletableFuture.allOf(positionSaved, worldDrained, friendsNotified)
                 .whenComplete((ignored, error) -> finishRelease(bound, error));
+    }
+
+    /**
+     * Trưởng nhóm mất kết nối thì thành viên vào sớm nhất đang online lên thay (quyết định chủ dự án
+     * 2026-10-11) — xem {@code HandOverPartyLeadershipUseCase}. Chạm DB nên chạy trên {@code authExecutor}.
+     *
+     * <p>KHÔNG nằm trong mốc hoàn tất của lần dọn: phiên mới của cùng nhân vật không phải chờ việc này.
+     * Vì thế hỏi lại "còn online không" ngay trước khi làm — bị phiên mới của CHÍNH nhân vật này đá thì
+     * họ vẫn đang chơi, không phải rớt mạng, và không được mất quyền trưởng nhóm.
+     */
+    // PMD AvoidCatchingGenericException: ranh giới task nền sau khi kết nối đã đóng — không còn ai để
+    // báo lỗi; chuyển quyền hỏng thì nhóm chỉ ở lại đúng trạng thái trước bản sửa này.
+    @SuppressWarnings({"PMD.AvoidCatchingGenericException", "FutureReturnValueIgnored"})
+    private void handOverPartyLeadershipAfterDisconnect(long characterId) {
+        try {
+            CompletableFuture.runAsync(
+                    () -> {
+                        try {
+                            ConnectedCharacterRegistry registry = worldGateway.registry();
+                            if (!registry.isOnline(characterId)) {
+                                partyFacade.handOverLeadership(characterId, registry::isOnline);
+                            }
+                        } catch (RuntimeException e) {
+                            LOG.warn(
+                                    "Chuyển quyền trưởng nhóm lúc ngắt kết nối thất bại: characterId={}",
+                                    characterId,
+                                    e);
+                        }
+                    },
+                    authExecutor);
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            LOG.debug("Bỏ chuyển quyền trưởng nhóm: server đang tắt", e);
+        }
     }
 
     /**

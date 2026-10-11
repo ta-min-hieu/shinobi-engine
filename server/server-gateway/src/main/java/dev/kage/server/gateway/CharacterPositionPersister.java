@@ -26,6 +26,11 @@ final class CharacterPositionPersister {
     private static final Logger LOG = LoggerFactory.getLogger(CharacterPositionPersister.class);
     private static final Duration STOP_TIMEOUT = Duration.ofSeconds(5);
 
+    /** Số lần thử ghi vị trí lúc logout, tính cả lần đầu — xem {@link #saveOnLogout}. */
+    static final int LOGOUT_SAVE_ATTEMPTS = 3;
+
+    private static final Duration LOGOUT_RETRY_PAUSE = Duration.ofMillis(200);
+
     private final PositionWriter writer;
     private final ConnectedCharacterRegistry registry;
     private final Duration interval;
@@ -103,13 +108,58 @@ final class CharacterPositionPersister {
         ScheduledExecutorService current = scheduler;
         if (current != null) {
             try {
-                return CompletableFuture.runAsync(() -> savePositionSafely(characterId, x, y), current);
+                return CompletableFuture.runAsync(() -> saveOnLogout(characterId, x, y), current);
             } catch (RejectedExecutionException e) {
                 LOG.debug("Persister đã dừng — ghi vị trí trực tiếp: characterId={}", characterId, e);
             }
         }
-        savePositionSafely(characterId, x, y);
+        saveOnLogout(characterId, x, y);
         return CompletableFuture.completedFuture(null);
+    }
+
+    /**
+     * Lần ghi lúc LOGOUT: thử lại vài lần trước khi bỏ (quyết định chủ dự án 2026-10-11). Lượt định kỳ
+     * không cần thử lại — vòng quét sau ghi đè; nhưng sau logout nhân vật đã rời registry, không vòng
+     * nào ghi cho họ nữa, nên một lần ghi hỏng vì DB chập chờn là đăng nhập lại ở chỗ cũ.
+     *
+     * <p>Thử lại ở đây an toàn vì ghi vị trí là GHI ĐÈ một giá trị tuyệt đối: chạy hai lần cho ra cùng
+     * kết quả với chạy một lần (khác hẳn cộng EXP hay trao đồ). Chờ giữa các lần ngay trên thread này:
+     * tổng cộng dưới nửa giây cho một nhân vật, và chỉ khi DB đang hỏng.
+     */
+    // PMD AvoidCatchingGenericException: cùng lý do savePositionSafely — mọi lỗi của PositionWriter
+    // đều được xử lý một cách (thử lại rồi bỏ), và task này không có ai để ném lên.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private void saveOnLogout(long characterId, float x, float y) {
+        for (int attempt = 1; attempt <= LOGOUT_SAVE_ATTEMPTS; attempt++) {
+            try {
+                writer.savePosition(characterId, x, y);
+                return;
+            } catch (RuntimeException e) {
+                if (attempt == LOGOUT_SAVE_ATTEMPTS) {
+                    LOG.warn(
+                            "Lưu vị trí lúc logout thất bại sau {} lần — bỏ: characterId={}",
+                            LOGOUT_SAVE_ATTEMPTS,
+                            characterId,
+                            e);
+                    return;
+                }
+                LOG.debug("Lưu vị trí lúc logout hỏng lần {} — thử lại: characterId={}", attempt, characterId, e);
+            }
+            if (!pauseBeforeRetry()) {
+                return;
+            }
+        }
+    }
+
+    /** @return {@code false} nếu thread bị ngắt trong lúc chờ — dừng thử lại, giữ cờ ngắt */
+    private static boolean pauseBeforeRetry() {
+        try {
+            Thread.sleep(LOGOUT_RETRY_PAUSE.toMillis());
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 
     // PMD AvoidCatchingGenericException: task nền định kỳ — 1 nhân vật lỗi (DB tạm gián đoạn)

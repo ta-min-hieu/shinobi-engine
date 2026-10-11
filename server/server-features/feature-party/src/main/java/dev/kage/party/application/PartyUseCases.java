@@ -13,4 +13,5 @@ public record PartyUseCases(
         KickPartyMemberUseCase kickPartyMemberUseCase,
         ListPartyMembersUseCase listPartyMembersUseCase,
         ListPendingPartyInvitesUseCase listPendingPartyInvitesUseCase,
-        FindMyPartyUseCase findMyPartyUseCase) {}
+        FindMyPartyUseCase findMyPartyUseCase,
+        HandOverPartyLeadershipUseCase handOverPartyLeadershipUseCase) {}

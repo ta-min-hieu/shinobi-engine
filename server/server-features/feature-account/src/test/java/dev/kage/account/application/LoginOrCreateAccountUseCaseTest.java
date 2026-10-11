@@ -109,4 +109,34 @@ class LoginOrCreateAccountUseCaseTest {
         assertThatThrownBy(() -> useCase.execute("ab")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> useCase.execute("kage\u0000hero")).isInstanceOf(IllegalArgumentException.class);
     }
+
+    /**
+     * Phiên phải thu hồi được ngay khi kết nối đóng (quyết định chủ dự án 2026-10-11) — trước đó token
+     * chỉ hết theo TTL 24 giờ, nên mỗi lượt đăng nhập để lại một khoá Redis suốt một ngày.
+     */
+    @Test
+    void endSessionShouldRevokeTheIssuedToken() {
+        FakeSessionPort sessionPort = new FakeSessionPort();
+        LoginOrCreateAccountUseCase useCase =
+                new LoginOrCreateAccountUseCase(new FakeAccountPort(), sessionPort, action -> action.accept(null));
+        LoginResult result = useCase.execute("kagehero");
+        assertThat(sessionPort.validateAndRenew(result.sessionToken())).isPresent();
+
+        useCase.endSession(result.sessionToken());
+
+        assertThat(sessionPort.validateAndRenew(result.sessionToken())).isEmpty();
+    }
+
+    /** Kết nối chưa từng đăng nhập không có token — không được chạm tới cổng phiên. */
+    @Test
+    void endSessionShouldIgnoreAMissingToken() {
+        FakeSessionPort sessionPort = new FakeSessionPort();
+        LoginOrCreateAccountUseCase useCase =
+                new LoginOrCreateAccountUseCase(new FakeAccountPort(), sessionPort, action -> action.accept(null));
+
+        useCase.endSession(null);
+        useCase.endSession("");
+
+        assertThat(sessionPort.validateAndRenew("")).isEmpty();
+    }
 }

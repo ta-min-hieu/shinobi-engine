@@ -420,7 +420,8 @@ public final class ServerDatabaseBootstrap {
                 new KickPartyMemberUseCase(partyPort),
                 new ListPartyMembersUseCase(partyPort),
                 new ListPendingPartyInvitesUseCase(partyPort),
-                new FindMyPartyUseCase(partyPort));
+                new FindMyPartyUseCase(partyPort),
+                new dev.kage.party.application.HandOverPartyLeadershipUseCase(partyPort));
         return new PartyFacade(useCases);
     }
 

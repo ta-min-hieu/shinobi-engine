@@ -597,6 +597,11 @@ class WorldChangedEventOrderTest {
             }
 
             @Override
+            public boolean transferLeadership(long leaderCharacterId, long newLeaderCharacterId) {
+                throw new UnsupportedOperationException("không dùng trong test này");
+            }
+
+            @Override
             public int deleteInvitesInvitedBefore(java.time.Instant cutoff) {
                 throw new UnsupportedOperationException("không dùng trong test này");
             }
@@ -635,6 +640,7 @@ class WorldChangedEventOrderTest {
                 new KickPartyMemberUseCase(port),
                 new ListPartyMembersUseCase(port),
                 new ListPendingPartyInvitesUseCase(port),
-                new FindMyPartyUseCase(port)));
+                new FindMyPartyUseCase(port),
+                new dev.kage.party.application.HandOverPartyLeadershipUseCase(port)));
     }
 }

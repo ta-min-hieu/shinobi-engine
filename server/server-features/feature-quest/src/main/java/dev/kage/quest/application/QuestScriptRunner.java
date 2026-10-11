@@ -40,6 +40,8 @@ final class QuestScriptRunner {
     private final Map<String, String> scriptSourceCache = new ConcurrentHashMap<>();
 
     private static final String ON_EVENT_HOOK = "on_event";
+    private static final String ON_ACCEPT_HOOK = "on_accept";
+    private static final String ON_CLAIM_HOOK = "on_claim";
 
     /**
      * Hiệu ứng một lần chạy hook.
@@ -103,8 +105,43 @@ final class QuestScriptRunner {
         final List<ItemTake> itemTakes = new ArrayList<>();
     }
 
+    /**
+     * Chạy {@code on_accept}. Hook này PHẢI lưu tiến độ ban đầu, và thứ nó lưu phải là JSON (quyết định
+     * chủ dự án 2026-10-11) — không thì kết quả mang {@link HookEffects#scriptFailed}.
+     *
+     * <p>Trước đó một {@code on_accept} quên {@code save_progress} (hoặc lưu một chuỗi không phải JSON)
+     * vẫn tạo quest {@code IN_PROGRESS}; {@code JSON.parse} trong {@code on_event} rồi lỗi ở MỌI sự kiện
+     * về sau, và {@code ALREADY_ACCEPTED} chặn nhận lại — quest kẹt vĩnh viễn. Nay việc nhận bị từ chối
+     * ngay (use case không ghi gì khi script lỗi), nhận lại được sau khi script được sửa.
+     */
     HookEffects runAccept(String scriptRef) {
-        return run(scriptRef, "on_accept", "", null);
+        HookEffects effects = run(scriptRef, ON_ACCEPT_HOOK, "", null);
+        if (effects.scriptFailed() || isJson(effects.progressJson())) {
+            return effects;
+        }
+        LOG.error("Script quest on_accept không lưu tiến độ JSON hợp lệ: scriptRef={}", scriptRef);
+        return new HookEffects(
+                effects.progressJson(),
+                effects.completed(),
+                effects.expGranted(),
+                effects.itemGrants(),
+                effects.itemTakes(),
+                true);
+    }
+
+    /**
+     * {@code progressJson} có phải thứ {@code JSON.parse} của script đọc được không. Hỏi chính GraalJS
+     * thay vì tự phân tích: Java không có thư viện JSON (feature-quest/CLAUDE.md), và câu trả lời duy
+     * nhất có nghĩa là "{@code on_event} có parse nổi nó không". Chuỗi rỗng — tức chưa lưu gì — không
+     * phải JSON.
+     */
+    private boolean isJson(String progressJson) {
+        try {
+            scriptSandbox.eval("JSON.parse(text); true;", Map.of("text", (Object) progressJson));
+            return true;
+        } catch (ScriptExecutionException e) {
+            return false;
+        }
     }
 
     /**
@@ -134,38 +171,14 @@ final class QuestScriptRunner {
     }
 
     HookEffects runClaim(String scriptRef, String currentProgressJson) {
-        return run(scriptRef, "on_claim", currentProgressJson, null);
+        return run(scriptRef, ON_CLAIM_HOOK, currentProgressJson, null);
     }
 
     private HookEffects run(String scriptRef, String hookName, String currentProgressJson, Map<String, Object> event) {
         String source = scriptSourceCache.computeIfAbsent(scriptRef, QuestScriptRunner::loadScript);
         MutableEffects effects = new MutableEffects();
 
-        HashMap<String, Object> ctx = new HashMap<String, Object>();
-        ctx.put("progress_json", currentProgressJson);
-        ctx.put("save_progress", (ProxyExecutable) args -> {
-            effects.progressJson = requireProgressJson(args[0].asString());
-            return null;
-        });
-        ctx.put("complete", (ProxyExecutable) args -> {
-            effects.completed = true;
-            return null;
-        });
-        ctx.put("give_exp", (ProxyExecutable) args -> {
-            // addExact: tràn long cũng là lỗi script, không phải một con số âm lặng lẽ.
-            effects.expGranted = Math.addExact(effects.expGranted, requireNonNegativeExp(args[0].asLong()));
-            return null;
-        });
-        ctx.put("give_item", (ProxyExecutable) args -> {
-            effects.itemGrants.add(new ItemGrant(args[0].asString(), args[1].asInt()));
-            return null;
-        });
-        if (ON_EVENT_HOOK.equals(hookName)) {
-            ctx.put("take_item", (ProxyExecutable) args -> {
-                effects.itemTakes.add(new ItemTake(args[0].asString(), args[1].asInt()));
-                return null;
-            });
-        }
+        HashMap<String, Object> ctx = buildContext(hookName, currentProgressJson, effects);
 
         Map<String, Object> hostApi = Map.of("ctx", (Object) ctx, "event", (Object) (event == null ? Map.of() : event));
         String wrapped = "var quest = " + source + "; quest." + hookName + "(ctx, event);";
@@ -184,6 +197,47 @@ final class QuestScriptRunner {
         List<ItemTake> itemTakes = List.copyOf(effects.itemTakes);
         return new HookEffects(
                 resultProgressJson, effects.completed, effects.expGranted, itemGrants, itemTakes, scriptFailed);
+    }
+
+    /**
+     * Dựng {@code ctx} của MỘT lần chạy hook — callback ghi thẳng vào {@code effects}.
+     */
+    private static HashMap<String, Object> buildContext(
+            String hookName, String currentProgressJson, MutableEffects effects) {
+        // Mỗi hàm chỉ có mặt ở hook mà hiệu ứng của nó được DÙNG (quyết định chủ dự án 2026-10-11). Trước
+        // đó cả bốn hàm có ở mọi hook, và gọi sai chỗ bị bỏ qua im lặng: give_exp/give_item ở
+        // on_accept/on_event không trao gì (thưởng chỉ được đọc ở on_claim), complete()/save_progress ở
+        // on_claim không đổi gì. Nay gọi sai chỗ là gọi một hàm không tồn tại — lỗi script ồn ào, cùng
+        // cách take_item đã làm từ 2026-09-11.
+        HashMap<String, Object> ctx = new HashMap<String, Object>();
+        ctx.put("progress_json", currentProgressJson);
+        if (ON_CLAIM_HOOK.equals(hookName)) {
+            ctx.put("give_exp", (ProxyExecutable) args -> {
+                // addExact: tràn long cũng là lỗi script, không phải một con số âm lặng lẽ.
+                effects.expGranted = Math.addExact(effects.expGranted, requireNonNegativeExp(args[0].asLong()));
+                return null;
+            });
+            ctx.put("give_item", (ProxyExecutable) args -> {
+                effects.itemGrants.add(new ItemGrant(args[0].asString(), args[1].asInt()));
+                return null;
+            });
+        } else {
+            ctx.put("save_progress", (ProxyExecutable) args -> {
+                effects.progressJson = requireProgressJson(args[0].asString());
+                return null;
+            });
+            ctx.put("complete", (ProxyExecutable) args -> {
+                effects.completed = true;
+                return null;
+            });
+        }
+        if (ON_EVENT_HOOK.equals(hookName)) {
+            ctx.put("take_item", (ProxyExecutable) args -> {
+                effects.itemTakes.add(new ItemTake(args[0].asString(), args[1].asInt()));
+                return null;
+            });
+        }
+        return ctx;
     }
 
     /**

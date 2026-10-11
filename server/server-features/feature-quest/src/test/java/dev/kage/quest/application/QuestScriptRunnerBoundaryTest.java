@@ -56,13 +56,7 @@ class QuestScriptRunnerBoundaryTest {
                 "give_exp_null",
                 "give_exp_no_arguments",
                 "give_exp_beyond_long",
-                "give_exp_sum_overflows",
-                "save_progress_null",
-                "save_progress_undefined",
-                "save_progress_number",
-                "save_progress_object",
-                "save_progress_no_arguments",
-                "save_progress_nul"
+                "give_exp_sum_overflows"
             })
     void shouldFailTheScript_whenAClaimCallbackGetsAnOutOfDomainArgument(String caseName) {
         QuestScriptRunner.HookEffects effects = runner.runClaim(BOUNDARY_SCRIPT_REF, progressFor(caseName));
@@ -81,8 +75,12 @@ class QuestScriptRunnerBoundaryTest {
                 "take_item_null_code",
                 "take_item_empty_code",
                 "take_item_nul_code",
-                "give_item_negative",
-                "save_progress_null"
+                "save_progress_null",
+                "save_progress_undefined",
+                "save_progress_number",
+                "save_progress_object",
+                "save_progress_no_arguments",
+                "save_progress_nul"
             })
     void shouldFailTheScript_whenAnEventCallbackGetsAnOutOfDomainArgument(String caseName) {
         QuestScriptRunner.HookEffects effects = runner.runEvent(BOUNDARY_SCRIPT_REF, progressFor(caseName), ANY_EVENT);

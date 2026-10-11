@@ -35,4 +35,19 @@ public final class LoginOrCreateAccountUseCase {
         String sessionToken = sessionPort.issue(account.id());
         return new LoginResult(account.id(), account.username(), sessionToken);
     }
+
+    /**
+     * Kết thúc phiên do {@link #execute} phát ra — thu hồi token ngay (quyết định chủ dự án 2026-10-11).
+     *
+     * <p>Trước đó token chỉ hết theo TTL 24 giờ: mỗi lượt đăng nhập để lại một khoá trong Redis suốt một
+     * ngày dù kết nối đã đóng từ lâu, nên spam đăng nhập làm Redis phình không giới hạn. Nằm ở lớp này
+     * vì nó là nơi DUY NHẤT phát token; ai phát thì người đó thu.
+     *
+     * <p>Token rỗng (kết nối chưa từng đăng nhập) được bỏ qua.
+     */
+    public void endSession(String sessionToken) {
+        if (sessionToken != null && !sessionToken.isEmpty()) {
+            sessionPort.revoke(sessionToken);
+        }
+    }
 }

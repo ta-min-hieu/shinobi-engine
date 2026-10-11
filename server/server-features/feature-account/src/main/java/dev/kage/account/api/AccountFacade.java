@@ -22,4 +22,12 @@ public final class AccountFacade {
     public LoginResult login(String username) {
         return loginOrCreateAccountUseCase.execute(username);
     }
+
+    /**
+     * Thu hồi session token của một lượt {@link #login} — gọi khi kết nối mang nó đóng, hoặc khi nó
+     * đăng nhập lại. Chạm Redis (blocking): KHÔNG gọi trên Netty EventLoop.
+     */
+    public void logout(String sessionToken) {
+        loginOrCreateAccountUseCase.endSession(sessionToken);
+    }
 }

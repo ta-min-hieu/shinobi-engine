@@ -1355,6 +1355,11 @@ class GatewayPipelineTest {
             }
 
             @Override
+            public boolean transferLeadership(long leaderCharacterId, long newLeaderCharacterId) {
+                return false; // fake không có nhóm nào để chuyển quyền
+            }
+
+            @Override
             public int deleteInvitesInvitedBefore(java.time.Instant cutoff) {
                 return 0; // fake không giữ lời mời nào để hết hạn
             }
@@ -1393,7 +1398,8 @@ class GatewayPipelineTest {
                 new dev.kage.party.application.KickPartyMemberUseCase(partyPort),
                 new dev.kage.party.application.ListPartyMembersUseCase(partyPort),
                 new dev.kage.party.application.ListPendingPartyInvitesUseCase(partyPort),
-                new dev.kage.party.application.FindMyPartyUseCase(partyPort));
+                new dev.kage.party.application.FindMyPartyUseCase(partyPort),
+                new dev.kage.party.application.HandOverPartyLeadershipUseCase(partyPort));
         return new dev.kage.party.api.PartyFacade(useCases);
     }
 
