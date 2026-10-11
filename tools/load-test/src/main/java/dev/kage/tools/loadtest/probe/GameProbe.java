@@ -19,6 +19,7 @@ import dev.kage.protocol.MoveCommand;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SelectCharacterResponse;
 import dev.kage.protocol.SetTargetCommand;
+import dev.kage.protocol.UseSkillCommand;
 import dev.kage.tools.loadtest.GameConnection;
 
 /**
@@ -306,10 +307,13 @@ public final class GameProbe {
                 continue;
             }
             long now = System.currentTimeMillis();
-            if (cadence.isDue(now, observation.ownBasicAttacksResolved() - attacksBeforeCurrentTarget)) {
-                connection.send(
-                        Opcode.OPCODE_ATTACK_COMMAND_VALUE,
-                        AttackCommand.getDefaultInstance().toByteArray());
+            // Chiêu không sinh AttackResultEvent nên không có "nhát đầu đã ra" để chờ — coi như đã xác
+            // nhận ngay, AttackCadence giữ đúng nhịp attackIntervalMillis từ đầu.
+            int strikesResolved = config.attackSkillCode().isEmpty()
+                    ? observation.ownBasicAttacksResolved() - attacksBeforeCurrentTarget
+                    : 1;
+            if (cadence.isDue(now, strikesResolved)) {
+                sendStrike(connection, config, selector.current().getAsLong());
                 cadence.onSent(now);
             }
             connection.setReadTimeoutMillis(
@@ -319,6 +323,24 @@ public final class GameProbe {
         // Trả lại cửa sổ đọc như trước vòng lặp: các bước SAU (uống thuốc, bỏ cuộc Arena) chờ phản
         // hồi bằng cửa sổ này, và 20ms của AttackCadence là quá hẹp cho họ.
         connection.setReadTimeoutMillis(OBSERVE_READ_TIMEOUT_MILLIS);
+    }
+
+    /** Một nhịp ra đòn: đánh thường, hoặc {@code UseSkillCommand} nếu có {@code --attackSkillCode}. */
+    private static void sendStrike(GameConnection connection, ProbeConfig config, long targetEntityId)
+            throws IOException {
+        if (config.attackSkillCode().isEmpty()) {
+            connection.send(
+                    Opcode.OPCODE_ATTACK_COMMAND_VALUE,
+                    AttackCommand.getDefaultInstance().toByteArray());
+            return;
+        }
+        connection.send(
+                Opcode.OPCODE_USE_SKILL_COMMAND_VALUE,
+                UseSkillCommand.newBuilder()
+                        .setSkillCode(config.attackSkillCode())
+                        .setTargetEntityId(targetEntityId)
+                        .build()
+                        .toByteArray());
     }
 
     /**

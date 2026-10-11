@@ -25,6 +25,8 @@ import dev.kage.tools.loadtest.CommandLineArguments;
  * @param moveToX rỗng = đứng yên tại chỗ server cho spawn; có giá trị = đi bộ THẬT tới toạ độ đó
  * @param attackTarget {@code none} | {@code nearest} | id thực thể cụ thể (số, âm = quái)
  * @param attackCode rỗng = mọi loài; có giá trị = {@code nearest} chỉ chọn trong loài này
+ * @param attackSkillCode rỗng = đánh thường; có giá trị = mỗi nhịp gửi {@code UseSkillCommand} mã này lên mục
+ *     tiêu thay cho đòn thường (nhịp đầu tới SAU một {@code attackIntervalMillis} — quãng đó là đối chứng)
  * @param retargetOnKill {@code true} = mục tiêu chết thì {@code nearest} chọn con kế tiếp — xem {@link TargetSelector}
  * @param attackIntervalMillis nhịp gửi {@code AttackCommand} (cooldown thật do server giữ)
  * @param observeSeconds thời gian đứng đọc sự kiện sau khi đã tới chỗ
@@ -49,6 +51,7 @@ public record ProbeConfig(
         OptionalDouble moveToX,
         String attackTarget,
         String attackCode,
+        String attackSkillCode,
         boolean retargetOnKill,
         int attackIntervalMillis,
         int observeSeconds,
@@ -200,6 +203,7 @@ public record ProbeConfig(
                 raw.optionalDouble("moveToX"),
                 raw.text("attackTarget", ATTACK_TARGET_NONE).toLowerCase(Locale.ROOT),
                 raw.text("attackCode", ""),
+                raw.text("attackSkillCode", ""),
                 raw.flag("retargetOnKill", false),
                 raw.integer("attackIntervalMillis", DEFAULT_ATTACK_INTERVAL_MILLIS),
                 raw.integer("observeSeconds", DEFAULT_OBSERVE_SECONDS),
@@ -231,12 +235,16 @@ public record ProbeConfig(
                         raw.flag("tradeAccept", false),
                         raw.integer("tradeWaitSeconds", DEFAULT_PARTY_WAIT_SECONDS),
                         raw.flag("tradeReport", false)),
-                new EdgePlan(
-                        raw.list("unequipSlots"),
-                        raw.flag("reloginInWorld", false),
-                        raw.text("reloginUsername", raw.text("username", DEFAULT_USERNAME)),
-                        raw.text("chatChannel", DEFAULT_CHAT_CHANNEL),
-                        raw.text("chatBody", "")));
+                edgePlan(raw));
+    }
+
+    private static EdgePlan edgePlan(CommandLineArguments raw) {
+        return new EdgePlan(
+                raw.list("unequipSlots"),
+                raw.flag("reloginInWorld", false),
+                raw.text("reloginUsername", raw.text("username", DEFAULT_USERNAME)),
+                raw.text("chatChannel", DEFAULT_CHAT_CHANNEL),
+                raw.text("chatBody", ""));
     }
 
     /** {@code true} khi người dùng muốn probe tự chọn con gần nhất trong AoI. */
