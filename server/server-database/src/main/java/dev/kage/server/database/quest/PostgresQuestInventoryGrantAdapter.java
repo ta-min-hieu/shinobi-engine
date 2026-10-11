@@ -155,7 +155,7 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
     /**
      * Lớp gác thứ hai sau {@code QuestScriptRunner.ItemGrant} (2026-10-10): số lượng ≤ 0 tới câu gộp
      * chồng {@code quantity = quantity + ?} là TRỪ đồ của người chơi, và có thể để lại một dòng
-     * {@code quantity <= 0} làm túi đồ không đọc lên được nữa (cột không có CHECK). Ném chứ không trả
+     * {@code quantity <= 0} làm túi đồ không đọc lên được nữa (CHECK của V52 nay cũng chặn). Ném chứ không trả
      * {@code false}: {@code false} nghĩa là "túi đầy", còn đây là lỗi của người gọi.
      */
     private static int requirePositiveQuantity(int quantity) {

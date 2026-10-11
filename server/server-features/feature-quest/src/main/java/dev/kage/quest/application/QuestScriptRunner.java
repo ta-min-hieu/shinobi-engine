@@ -64,7 +64,7 @@ final class QuestScriptRunner {
      * Một lần {@code ctx.give_item(code, qty)}. {@code quantity} phải dương (sửa 2026-10-10) — chiều
      * ngược của {@link ItemTake}: số âm đi xuống câu gộp chồng {@code quantity = quantity + ?} của
      * adapter là TRỪ đồ. Đo trên Postgres thật, túi có sẵn 3 phi đao, {@code give_item("kunai", -5)}:
-     * dòng {@code inventory_item} thành {@code quantity = -2} (cột không có CHECK), và vì
+     * dòng {@code inventory_item} thành {@code quantity = -2} (cột chưa có CHECK tới V52), và vì
      * {@code ItemStack} từ chối số lượng ≤ 0 trong constructor nên từ đó túi đồ của nhân vật không
      * đọc lên được nữa — trong khi lượt lĩnh vẫn trả OK và quest thành CLAIMED. Số {@code 0} (và số
      * âm khi túi không có chồng nào) thì không ghi dòng nào mà quest vẫn CLAIMED: mất thưởng im lặng.
@@ -188,7 +188,7 @@ final class QuestScriptRunner {
 
     /**
      * {@code ctx.give_exp(n)} chỉ nhận {@code n >= 0} (sửa 2026-10-10). Số âm đi thẳng xuống
-     * {@code exp = exp + ?}; cột {@code character.exp} không có CHECK, còn {@code Character} từ chối
+     * {@code exp = exp + ?}; cột {@code character.exp} chưa có CHECK tới V52, còn {@code Character} từ chối
      * exp âm ngay trong constructor — đo trên Postgres thật: sau một lần trừ quá tay,
      * {@code findById} VÀ {@code listByAccount} đều ném lỗi, tức nhân vật không vào được world và cả
      * tài khoản không liệt kê nổi nhân vật. Ném từ trong callback nên nó thành lỗi script

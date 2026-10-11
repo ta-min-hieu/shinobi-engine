@@ -32,8 +32,8 @@
 | Bảng | Cột chính | Ghi chú |
 |---|---|---|
 | `account` | `id, username, password_hash, email, created_at, status` | `status`: ACTIVE/BANNED/SUSPENDED. **Bcrypt/Argon2**, không bao giờ plaintext |
-| `character` | `id, account_id, realm_id, name, faction, level, exp, rebirth_count, created_at` | `realm_id` mặc định 1 (§ dưới). `faction` = 1 trong 5 hệ ([GDD](../13-game-design/GAME-DESIGN-DOCUMENT.md)). MVP chỉ dùng 1 giá trị faction nhưng **cột phải có sẵn** |
-| `character_stat` | `character_id (PK/FK), str, agi, int_, vit, current_hp, current_chi, gold` | **Tách khỏi `character`** vì ghi/đọc tần suất cao hơn nhiều. `gold` thêm ở migration V7 (2026-07-23, nền tảng cường hoá — GAMEPLAY.md §7) |
+| `character` | `id, account_id, realm_id, name, faction, level, exp, rebirth_count, created_at` | `CHECK exp >= 0` (V52). `realm_id` mặc định 1 (§ dưới). `faction` = 1 trong 5 hệ ([GDD](../13-game-design/GAME-DESIGN-DOCUMENT.md)). MVP chỉ dùng 1 giá trị faction nhưng **cột phải có sẵn** |
+| `character_stat` | `character_id (PK/FK), str, agi, int_, vit, current_hp, current_chi, gold` | **Tách khỏi `character`** vì ghi/đọc tần suất cao hơn nhiều. `gold` thêm ở migration V7 (2026-07-23, nền tảng cường hoá — GAMEPLAY.md §7), `CHECK gold >= 0` (V52) |
 
 ✅ **`realm_id` — CÓ** ([ADR-010](../01-architecture/adr/ADR-010-Realm-Model.md)): bảng `character` (và các bảng dữ liệu nhân vật cấp cao) có cột `realm_id` (mặc định = 1). MVP chạy single-realm nhưng schema sẵn sàng multi-realm, không cần migration sau. ⚠️ **Không hardcode "realm = 1"** — đọc từ dữ liệu/config.
 
@@ -42,7 +42,7 @@
 | Bảng | Cột chính | Ghi chú |
 |---|---|---|
 | `item_template` | `id, code, name_key, max_stack, equip_slot, bonus_atk, bonus_def, bonus_res, bonus_hp, required_level` | **Tĩnh** — sửa qua migration, không qua gameplay. `name_key` cho i18n. ⚠️ **Cột thật khác thiết kế gốc**: không có `category` (chưa ai cần) và **không có `base_stats_json`** — 4 chỉ số là 4 CỘT (ADR-036 D1 loại phương án JSON vì dự án chưa có thư viện JSON nào trong TECHNOLOGY-STACK; cùng lập luận đã dùng cho `drop_table_entry`). Migration: V4 → V5 (`equip_slot`) → V6 (`bonus_atk`) → **V22** (3 chỉ số còn lại + `required_level`) |
-| `inventory_item` | `id, character_id, item_template_id, quantity, enhance_level, slot_index` | **Động** — 1 dòng = 1 stack |
+| `inventory_item` | `id, character_id, item_template_id, quantity, enhance_level, slot_index` | **Động** — 1 dòng = 1 stack. `CHECK quantity > 0` (V52): hết hẳn thì XOÁ dòng, không ghi 0 |
 | `equipment_slot` | `character_id, slot_type, inventory_item_id (nullable)` | `slot_type`: WEAPON/ARMOR/HELMET/GLOVE/BOOT/ACCESSORY_1/ACCESSORY_2 |
 
 ### 2.3 Skill
@@ -344,6 +344,13 @@ vật phẩm mà `take_item` đòi phải kiếm được, diện tích/chồng 
 mọi `npc_template`, file `.blend` nguồn cho mọi `model_key` quái/NPC, và icon vật phẩm. Hai vật phẩm
 quest đang thiếu icon (nợ art đã biết) bị ghim CẢ HAI chiều — vẽ xong icon mà quên gỡ ghim thì test
 cũng đỏ. Thêm migration nội dung mới ⇒ cổng này phải xanh.
+
+**Hàng rào số không âm** (V52, 2026-10-11, `NonNegativeColumnChecksIntegrationTest`): `character.exp >= 0`,
+`character_stat.gold >= 0`, `inventory_item.quantity > 0`, `trade_session.requester_gold/target_gold >= 0`.
+Trước đó bốn con số này chỉ được code giữ, và mỗi lần lọt là một nhân vật hoặc túi đồ không đọc lên
+được nữa (`Character`/`ItemStack` từ chối giá trị đó ngay trong constructor). Nay lượt ghi xấu nhận
+lỗi SQL `23514` và transaction của nó rollback trọn. Cột số lượng/vàng của thư, giao dịch, cửa hàng đã
+có CHECK từ lúc tạo bảng. ⚠️ DB có sẵn dòng vi phạm thì V52 không chạy — cố ý, phải sửa tay trước.
 
 **Quy trình thêm cột NOT NULL an toàn:**
 ```

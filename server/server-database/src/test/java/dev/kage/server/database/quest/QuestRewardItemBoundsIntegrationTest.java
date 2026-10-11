@@ -51,7 +51,7 @@ import dev.kage.server.database.inventory.PostgresInventoryAdapter;
  * <ul>
  *   <li>{@code give_item("kunai", -5)} khi túi có sẵn 3 phi đao: câu gộp chồng
  *       {@code quantity = quantity + ?} chạy với {@code -5} ⇒ dòng {@code inventory_item} mang
- *       {@code quantity = -2} (cột KHÔNG có CHECK). {@code ItemStack} từ chối số lượng ≤ 0 ngay trong
+ *       {@code quantity = -2} (cột chưa có CHECK tới V52). {@code ItemStack} từ chối số lượng ≤ 0 ngay trong
  *       constructor, nên từ đó {@code PostgresInventoryAdapter.findByCharacter} NÉM cho nhân vật đó
  *       — túi đồ không liệt kê được nữa. Lượt lĩnh vẫn trả {@code OK} và quest thành {@code CLAIMED}.
  *   <li>Cùng lời gọi khi túi KHÔNG có phi đao, hoặc với số lượng {@code 0}: không dòng nào được ghi,

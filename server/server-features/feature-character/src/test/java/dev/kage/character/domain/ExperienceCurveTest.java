@@ -108,7 +108,7 @@ class ExperienceCurveTest {
 
     /**
      * EXP âm không được phép tồn tại, nhưng vào tay dữ liệu hỏng thì phải là cấp 1. (Cột
-     * {@code character.exp} KHÔNG có CHECK — thứ chặn là {@code Character} và {@code give_exp}.)
+     * {@code character.exp} có CHECK từ V52; trước đó thứ chặn chỉ là {@code Character} và {@code give_exp}.)
      */
     @Test
     void shouldTreatNegativeExperienceAsZero() {
