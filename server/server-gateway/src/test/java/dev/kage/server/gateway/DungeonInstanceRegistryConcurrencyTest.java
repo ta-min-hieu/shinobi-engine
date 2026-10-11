@@ -344,6 +344,11 @@ class DungeonInstanceRegistryConcurrencyTest {
             }
 
             @Override
+            public int deleteInvitesInvitedBefore(java.time.Instant cutoff) {
+                throw new UnsupportedOperationException("không dùng trong test này");
+            }
+
+            @Override
             public PartyInvite invite(long partyId, long inviteeCharacterId) {
                 throw new UnsupportedOperationException("không dùng trong test này");
             }

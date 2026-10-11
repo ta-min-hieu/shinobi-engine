@@ -1,5 +1,6 @@
 package dev.kage.party.domain;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,6 +41,17 @@ public interface PartyPort {
      * @throws PartyDissolvedException nếu party đã bị giải tán (vừa xảy ra, sau lần kiểm leader của caller)
      */
     PartyInvite invite(long partyId, long inviteeCharacterId);
+
+    /**
+     * Xoá mọi lời mời gửi trước {@code cutoff} (xem {@link PartyInvite#LIFETIME}). Ba use case đọc/ghi
+     * lời mời gọi hàm này TRƯỚC khi làm việc của mình, nên với chúng lời mời hết hạn không tồn tại.
+     *
+     * <p>Không được chờ khoá: lời mời đang bị một giao dịch khác giữ (đang được chấp nhận, hoặc đang bị
+     * xoá theo nhóm vừa giải tán) thì bỏ qua — lượt gọi sau dọn nốt.
+     *
+     * @return số lời mời đã xoá
+     */
+    int deleteInvitesInvitedBefore(Instant cutoff);
 
     /**
      * Chấp nhận — nguyên tử: khoá dòng {@code party}, kiểm sức chứa + đã-ở-party-khác, rồi thêm

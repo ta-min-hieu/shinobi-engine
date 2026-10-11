@@ -27,6 +27,7 @@ public final class FriendFacade {
             case CANNOT_FRIEND_SELF -> SendRequestResult.CANNOT_FRIEND_SELF;
             case ALREADY_FRIENDS -> SendRequestResult.ALREADY_FRIENDS;
             case REQUEST_ALREADY_PENDING -> SendRequestResult.REQUEST_ALREADY_PENDING;
+            case FRIEND_LIST_FULL -> SendRequestResult.FRIEND_LIST_FULL;
         };
     }
 
@@ -34,6 +35,9 @@ public final class FriendFacade {
         return switch (useCases.acceptFriendRequestUseCase().execute(friendshipId, addresseeId)) {
             case AcceptFriendRequestUseCase.Result.OK -> AcceptResult.OK;
             case AcceptFriendRequestUseCase.Result.NOT_FOUND -> AcceptResult.NOT_FOUND;
+            case AcceptFriendRequestUseCase.Result.FRIEND_LIST_FULL -> AcceptResult.FRIEND_LIST_FULL;
+            case AcceptFriendRequestUseCase.Result.REQUESTER_FRIEND_LIST_FULL ->
+                AcceptResult.REQUESTER_FRIEND_LIST_FULL;
         };
     }
 
@@ -67,12 +71,15 @@ public final class FriendFacade {
         OK,
         CANNOT_FRIEND_SELF,
         ALREADY_FRIENDS,
-        REQUEST_ALREADY_PENDING
+        REQUEST_ALREADY_PENDING,
+        FRIEND_LIST_FULL
     }
 
     public enum AcceptResult {
         OK,
-        NOT_FOUND
+        NOT_FOUND,
+        FRIEND_LIST_FULL,
+        REQUESTER_FRIEND_LIST_FULL
     }
 
     public enum RejectResult {

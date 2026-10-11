@@ -1269,6 +1269,11 @@ class SecurityIntegrationTest {
             }
 
             @Override
+            public int deleteInvitesInvitedBefore(java.time.Instant cutoff) {
+                return 0; // fake không giữ lời mời nào để hết hạn
+            }
+
+            @Override
             public dev.kage.party.domain.PartyInvite invite(long partyId, long inviteeCharacterId) {
                 long inviteId = nextInviteId.getAndIncrement();
                 dev.kage.party.domain.PartyInvite invite =

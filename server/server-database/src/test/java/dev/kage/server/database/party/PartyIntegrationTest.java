@@ -309,4 +309,34 @@ class PartyIntegrationTest {
                 .isEmpty();
         assertThat(adapter.findMembershipOf(invitee)).isEmpty();
     }
+
+    /**
+     * Câu dọn lời mời hết hạn (quyết định chủ dự án 2026-10-11) trên Postgres thật: xoá đúng lời mời
+     * cũ hơn mốc, để nguyên lời mời còn hạn, và sau đó nhóm khác mời lại được người đó.
+     */
+    @Test
+    void shouldDeleteOnlyInvitesOlderThanTheCutoff() throws Exception {
+        long leader = createFreshCharacter("PartyExpLead1");
+        long staleInvitee = createFreshCharacter("PartyExpOld1");
+        long freshInvitee = createFreshCharacter("PartyExpNew1");
+        PostgresPartyAdapter adapter = newAdapter();
+        Party party = adapter.createParty(leader);
+        PartyInvite stale = adapter.invite(party.id(), staleInvitee);
+        adapter.invite(party.id(), freshInvitee);
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(
+                        "UPDATE party_invite SET invited_at = invited_at - INTERVAL '10 minutes' WHERE id = ?")) {
+            statement.setLong(1, stale.id());
+            statement.executeUpdate();
+        }
+
+        int deleted = adapter.deleteInvitesInvitedBefore(PartyInvite.expiryCutoff(java.time.Instant.now()));
+
+        assertThat(deleted).isGreaterThanOrEqualTo(1);
+        assertThat(adapter.findPendingInviteOfInvitee(staleInvitee)).isEmpty();
+        assertThat(adapter.findPendingInviteOfInvitee(freshInvitee)).isPresent();
+        assertThat(adapter.acceptInvite(stale.id(), staleInvitee)).isEqualTo(PartyPort.AcceptResult.NOT_FOUND);
+        // Lời mời cũ đã đi ⇒ UNIQUE (party_id, invitee) không còn chặn lời mời mới.
+        assertThat(adapter.invite(party.id(), staleInvitee).id()).isNotEqualTo(stale.id());
+    }
 }

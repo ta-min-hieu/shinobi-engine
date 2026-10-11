@@ -3,6 +3,7 @@ package dev.kage.friend.application;
 import java.util.Optional;
 
 import dev.kage.friend.domain.DuplicateFriendRequestException;
+import dev.kage.friend.domain.FriendListLimit;
 import dev.kage.friend.domain.FriendPort;
 import dev.kage.friend.domain.Friendship;
 import dev.kage.friend.domain.FriendshipStatus;
@@ -26,6 +27,10 @@ public final class SendFriendRequestUseCase {
                     ? Result.ALREADY_FRIENDS
                     : Result.REQUEST_ALREADY_PENDING;
         }
+        // Danh sách của NGƯỜI GỬI đã đầy thì không mời thêm; danh sách người nhận được kiểm lúc họ chấp nhận.
+        if (FriendListLimit.isFull(port.listAccepted(requesterId).size())) {
+            return Result.FRIEND_LIST_FULL;
+        }
         try {
             port.sendRequest(requesterId, addresseeId);
         } catch (DuplicateFriendRequestException e) {
@@ -38,6 +43,8 @@ public final class SendFriendRequestUseCase {
         OK,
         CANNOT_FRIEND_SELF,
         ALREADY_FRIENDS,
-        REQUEST_ALREADY_PENDING
+        REQUEST_ALREADY_PENDING,
+        /** Danh sách bạn bè của người gửi đã chạm {@link FriendListLimit#MAX_FRIENDS} (2026-10-11). */
+        FRIEND_LIST_FULL
     }
 }

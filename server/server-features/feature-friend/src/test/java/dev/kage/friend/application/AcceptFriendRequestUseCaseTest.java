@@ -9,6 +9,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
+import dev.kage.friend.domain.FriendListLimit;
 import dev.kage.friend.domain.FriendPort;
 import dev.kage.friend.domain.Friendship;
 import dev.kage.friend.domain.FriendshipStatus;
@@ -45,6 +46,35 @@ class AcceptFriendRequestUseCaseTest {
         AcceptFriendRequestUseCase.Result result = useCase.execute(999, 7);
 
         assertThat(result).isEqualTo(AcceptFriendRequestUseCase.Result.NOT_FOUND);
+    }
+
+    /** Trần bạn bè (quyết định chủ dự án 2026-10-11) kiểm ở cả hai phía của một lần chấp nhận. */
+    @Test
+    void shouldRefuse_whenTheAcceptersOwnListIsFull() {
+        FakeFriendPort port = new FakeFriendPort();
+        port.friendships.add(new Friendship(1, 5, 7, FriendshipStatus.PENDING, Instant.now(), null));
+        port.giveFriends(7, FriendListLimit.MAX_FRIENDS);
+        AcceptFriendRequestUseCase useCase = new AcceptFriendRequestUseCase(port);
+
+        AcceptFriendRequestUseCase.Result result = useCase.execute(1, 7);
+
+        assertThat(result).isEqualTo(AcceptFriendRequestUseCase.Result.FRIEND_LIST_FULL);
+        assertThat(port.friendships.get(0).status())
+                .as("lời mời còn nguyên, chấp nhận lại được khi có chỗ")
+                .isEqualTo(FriendshipStatus.PENDING);
+    }
+
+    @Test
+    void shouldRefuse_whenTheRequestersListIsFull() {
+        FakeFriendPort port = new FakeFriendPort();
+        port.friendships.add(new Friendship(1, 5, 7, FriendshipStatus.PENDING, Instant.now(), null));
+        port.giveFriends(5, FriendListLimit.MAX_FRIENDS);
+        AcceptFriendRequestUseCase useCase = new AcceptFriendRequestUseCase(port);
+
+        AcceptFriendRequestUseCase.Result result = useCase.execute(1, 7);
+
+        assertThat(result).isEqualTo(AcceptFriendRequestUseCase.Result.REQUESTER_FRIEND_LIST_FULL);
+        assertThat(port.friendships.get(0).status()).isEqualTo(FriendshipStatus.PENDING);
     }
 
     static final class FakeFriendPort implements FriendPort {
@@ -95,12 +125,29 @@ class AcceptFriendRequestUseCaseTest {
 
         @Override
         public List<Friendship> listAccepted(long characterId) {
-            throw new UnsupportedOperationException("không dùng ở test này");
+            return friendships.stream()
+                    .filter(f -> f.involves(characterId) && f.status() == FriendshipStatus.ACCEPTED)
+                    .toList();
         }
 
         @Override
         public List<Friendship> listPendingIncoming(long characterId) {
-            throw new UnsupportedOperationException("không dùng ở test này");
+            return friendships.stream()
+                    .filter(f -> f.addresseeId() == characterId && f.status() == FriendshipStatus.PENDING)
+                    .toList();
+        }
+
+        /** Cho {@code characterId} đủ {@code count} bạn đã chấp nhận, id bạn bắt đầu từ 1000. */
+        void giveFriends(long characterId, int count) {
+            for (int i = 0; i < count; i++) {
+                friendships.add(new Friendship(
+                        10_000L + friendships.size(),
+                        characterId,
+                        1000L + i,
+                        FriendshipStatus.ACCEPTED,
+                        Instant.now(),
+                        Instant.now()));
+            }
         }
     }
 }

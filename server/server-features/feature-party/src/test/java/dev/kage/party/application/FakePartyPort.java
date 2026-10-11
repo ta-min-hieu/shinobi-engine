@@ -71,6 +71,22 @@ class FakePartyPort implements PartyPort {
     }
 
     @Override
+    public int deleteInvitesInvitedBefore(Instant cutoff) {
+        int before = invites.size();
+        invites.removeIf(invite -> invite.invitedAt().isBefore(cutoff));
+        return before - invites.size();
+    }
+
+    /** Lùi giờ gửi của MỌI lời mời đang chờ đi {@code age} — để test dựng một lời mời "cũ". */
+    void ageInvitesBy(java.time.Duration age) {
+        invites.replaceAll(invite -> new PartyInvite(
+                invite.id(),
+                invite.partyId(),
+                invite.inviteeCharacterId(),
+                invite.invitedAt().minus(age)));
+    }
+
+    @Override
     public PartyInvite invite(long partyId, long inviteeCharacterId) {
         // Mô phỏng FOREIGN KEY party_id — party đã bị giải tán.
         if (!partiesById.containsKey(partyId)) {

@@ -26,4 +26,15 @@ class ListPendingPartyInvitesUseCaseTest {
 
         assertThat(useCase.execute(5)).isEmpty();
     }
+
+    /** Lời mời hết hạn không được hiện ra cho người được mời (quyết định chủ dự án 2026-10-11). */
+    @Test
+    void shouldNotListAnExpiredInvite() {
+        FakePartyPort port = new FakePartyPort();
+        dev.kage.party.domain.Party party = port.createParty(1);
+        port.invite(party.id(), 5);
+        port.ageInvitesBy(dev.kage.party.domain.PartyInvite.LIFETIME.plusSeconds(1));
+
+        assertThat(new ListPendingPartyInvitesUseCase(port).execute(5)).isEmpty();
+    }
 }

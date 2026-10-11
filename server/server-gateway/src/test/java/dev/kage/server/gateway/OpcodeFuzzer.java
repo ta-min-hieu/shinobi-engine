@@ -147,6 +147,13 @@ final class OpcodeFuzzer {
     private static final int PAYLOAD_PREVIEW_BYTES = 48;
     private static final int PAYLOAD_PREVIEW_CHARS = 240;
 
+    /**
+     * Không phải triệu chứng: server đóng kết nối vì nó đã gửi quá
+     * {@code GatewayChannelHandler.MAX_PROTOCOL_VIOLATIONS} gói vi phạm giao thức — đúng thiết kế từ
+     * 2026-10-11. Mọi lần đóng kết nối KHÁC vẫn là vi phạm "kết nối bị đóng".
+     */
+    private static final String CLOSED_AT_VIOLATION_LIMIT = "(đóng đúng thiết kế: quá giới hạn vi phạm giao thức)";
+
     private final Settings settings;
     private final ChannelFactory channels;
     private final ErrorLogCapture errorLog;
@@ -273,7 +280,12 @@ final class OpcodeFuzzer {
                 byte[] payload = new FuzzPayloads(FuzzPayloads.random(caseSeed), memory).next(opcode);
                 sentOnChannel++;
                 String symptom = sendAndCheck(channel, opcode, payload, memory);
-                if (!symptom.isEmpty()) {
+                if (CLOSED_AT_VIOLATION_LIMIT.equals(symptom)) {
+                    // Đúng thiết kế (2026-10-11): server đóng kết nối gửi quá nhiều gói vi phạm giao
+                    // thức. Không phải vi phạm — mở kết nối mới rồi fuzz tiếp.
+                    close(channel);
+                    channel = null;
+                } else if (!symptom.isEmpty()) {
                     record(new Violation(opcode, stage, symptom, caseSeed, describe(opcode, payload), 1));
                     // Kết nối đã ở trạng thái hỏng (hoặc đã đóng) — ca sau bắt đầu lại sạch.
                     close(channel);
@@ -307,6 +319,10 @@ final class OpcodeFuzzer {
                 Opcode opcode = payloads.pick(commands);
                 byte[] payload = payloads.next(opcode);
                 String symptom = sendAndCheck(actors.get(actor), opcode, payload, memory);
+                if (CLOSED_AT_VIOLATION_LIMIT.equals(symptom)) {
+                    // Bên này vừa bị đóng đúng thiết kế — chuỗi dừng ở đây, không ghi vi phạm.
+                    return;
+                }
                 if (!symptom.isEmpty()) {
                     int from = Math.max(0, history.size() - MIXED_HISTORY_SHOWN);
                     String context = "bước " + step + " (bên " + (char) ('A' + actor) + ") sau "
@@ -347,6 +363,8 @@ final class OpcodeFuzzer {
     private String sendAndCheck(EmbeddedChannel channel, Opcode opcode, byte[] payload, FuzzMemory memory)
             throws InvalidProtocolBufferException {
         int errorMark = errorLog.errorCount();
+        // Lấy handler TRƯỚC khi gửi: kênh đóng rồi thì pipeline đã gỡ hết handler, hỏi sau là null.
+        GatewayChannelHandler handler = channel.pipeline().get(GatewayChannelHandler.class);
         GatewayPipelineTest.writeInboundFrame(
                 channel, new PacketHeader(opcode.getNumber(), ProtocolVersion.CURRENT, FUZZ_SEQUENCE_ID), payload);
         List<PacketCodec.Frame> replies = GatewayPipelineTest.readOutboundFrames(channel);
@@ -364,7 +382,7 @@ final class OpcodeFuzzer {
             return unspecified + errorLogSuffix(errorMark);
         }
         if (!channel.isOpen()) {
-            return "kết nối bị đóng" + errorLogSuffix(errorMark);
+            return closedSymptom(handler, errorMark);
         }
         GatewayPipelineTest.writeInboundFrame(
                 channel,
@@ -380,6 +398,14 @@ final class OpcodeFuzzer {
         }
         List<String> errors = errorLog.errorsSince(errorMark);
         return errors.isEmpty() ? "" : "log ERROR: " + errors.getFirst();
+    }
+
+    /** Kênh đã đóng: đúng thiết kế nếu nó vừa vượt giới hạn vi phạm giao thức, ngược lại là một vi phạm. */
+    private String closedSymptom(GatewayChannelHandler handler, int errorMark) {
+        if (handler != null && handler.exceededProtocolViolationLimit()) {
+            return CLOSED_AT_VIOLATION_LIMIT;
+        }
+        return "kết nối bị đóng" + errorLogSuffix(errorMark);
     }
 
     /**

@@ -1,5 +1,6 @@
 package dev.kage.party.application;
 
+import java.time.Instant;
 import java.util.List;
 
 import dev.kage.party.domain.PartyInvite;
@@ -15,6 +16,8 @@ public final class ListPendingPartyInvitesUseCase {
     }
 
     public List<PartyInvite> execute(long characterId) {
+        // Lời mời hết hạn không còn là lời mời (2026-10-11) — dọn trước, rồi mới đọc.
+        port.deleteInvitesInvitedBefore(PartyInvite.expiryCutoff(Instant.now()));
         return port.listPendingInvitesOfInvitee(characterId);
     }
 }

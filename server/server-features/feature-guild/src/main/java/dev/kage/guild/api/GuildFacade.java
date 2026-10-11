@@ -53,6 +53,7 @@ public final class GuildFacade {
             case ApproveGuildJoinRequestUseCase.Result.OK -> ApproveResult.OK;
             case ApproveGuildJoinRequestUseCase.Result.NOT_FOUND -> ApproveResult.NOT_FOUND;
             case ApproveGuildJoinRequestUseCase.Result.TARGET_ALREADY_IN_GUILD -> ApproveResult.TARGET_ALREADY_IN_GUILD;
+            case ApproveGuildJoinRequestUseCase.Result.GUILD_FULL -> ApproveResult.GUILD_FULL;
         };
     }
 
@@ -126,7 +127,8 @@ public final class GuildFacade {
     public enum ApproveResult {
         OK,
         NOT_FOUND,
-        TARGET_ALREADY_IN_GUILD
+        TARGET_ALREADY_IN_GUILD,
+        GUILD_FULL
     }
 
     public enum RejectResult {

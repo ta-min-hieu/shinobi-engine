@@ -89,6 +89,15 @@ public final class PostgresPartyAdapter implements PartyPort {
             DELETE FROM party_invite WHERE id = ? AND invitee_character_id = ?
             """;
 
+    // SKIP LOCKED có chủ đích: câu dọn này KHÔNG khoá dòng `party` trước (xem luật thứ tự khoá ở
+    // acceptInvite), nên nếu nó chờ một dòng lời mời đang bị leaveParty xoá theo CASCADE trong khi
+    // chính nó đang giữ dòng khác của cùng nhóm, hai bên chờ nhau. Bỏ qua dòng đang bị giữ thì không
+    // bao giờ chờ ai; dòng sót được lượt gọi sau dọn. ORDER BY id cho thứ tự khoá ổn định.
+    private static final String DELETE_INVITES_INVITED_BEFORE = """
+            DELETE FROM party_invite
+             WHERE id IN (SELECT id FROM party_invite WHERE invited_at < ? ORDER BY id FOR UPDATE SKIP LOCKED)
+            """;
+
     private static final String SELECT_MEMBERSHIP_FOR_UPDATE = """
             SELECT party_id, role FROM party_member WHERE character_id = ? FOR UPDATE
             """;
@@ -158,6 +167,11 @@ public final class PostgresPartyAdapter implements PartyPort {
     public List<PartyInvite> listPendingInvitesOfInvitee(long characterId) {
         return JdbcOperations.query(
                 dataSource, LIST_PENDING_INVITES_OF_INVITEE, PostgresPartyAdapter::mapInvite, characterId);
+    }
+
+    @Override
+    public int deleteInvitesInvitedBefore(Instant cutoff) {
+        return JdbcOperations.update(dataSource, DELETE_INVITES_INVITED_BEFORE, Timestamp.from(cutoff));
     }
 
     /**

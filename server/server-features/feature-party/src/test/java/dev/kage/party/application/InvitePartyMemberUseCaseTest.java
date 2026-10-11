@@ -94,4 +94,23 @@ class InvitePartyMemberUseCaseTest {
 
         assertThat(useCase.execute(1, 5)).isEqualTo(InvitePartyMemberUseCase.Result.INVITE_ALREADY_PENDING);
     }
+
+    /**
+     * Mỗi người chỉ có MỘT lời mời chờ. Trước 2026-10-11 lời mời không hết hạn, nên một lời mời bị bỏ
+     * quên chặn mọi nhóm khác mời người đó mãi mãi.
+     */
+    @Test
+    void shouldInviteAgain_onceAnotherPartysInviteHasExpired() {
+        FakePartyPort port = new FakePartyPort();
+        Party otherParty = port.createParty(2);
+        port.invite(otherParty.id(), 5);
+        port.createParty(1);
+        InvitePartyMemberUseCase useCase = new InvitePartyMemberUseCase(port);
+        assertThat(useCase.execute(1, 5)).isEqualTo(InvitePartyMemberUseCase.Result.INVITE_ALREADY_PENDING);
+
+        port.ageInvitesBy(PartyInvite.LIFETIME.plusSeconds(1));
+
+        assertThat(useCase.execute(1, 5)).isEqualTo(InvitePartyMemberUseCase.Result.OK);
+        assertThat(port.listPendingInvitesOfInvitee(5)).hasSize(1);
+    }
 }

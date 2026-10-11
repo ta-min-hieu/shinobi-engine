@@ -1,10 +1,12 @@
 package dev.kage.party.application;
 
+import java.time.Instant;
 import java.util.Optional;
 
 import dev.kage.party.domain.DuplicatePartyInviteException;
 import dev.kage.party.domain.Party;
 import dev.kage.party.domain.PartyDissolvedException;
+import dev.kage.party.domain.PartyInvite;
 import dev.kage.party.domain.PartyMember;
 import dev.kage.party.domain.PartyPort;
 import dev.kage.party.domain.PartyRole;
@@ -36,6 +38,8 @@ public final class InvitePartyMemberUseCase {
         if (port.listMembers(partyId).size() >= Party.MAX_MEMBERS) {
             return Result.PARTY_FULL;
         }
+        // Lời mời hết hạn của nhóm khác không được chặn lời mời này (2026-10-11) — dọn trước khi hỏi.
+        port.deleteInvitesInvitedBefore(PartyInvite.expiryCutoff(Instant.now()));
         if (port.findPendingInviteOfInvitee(targetCharacterId).isPresent()) {
             return Result.INVITE_ALREADY_PENDING;
         }

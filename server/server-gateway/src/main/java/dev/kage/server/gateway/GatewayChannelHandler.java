@@ -315,6 +315,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // Một client spam hàng nghìn lệnh/giây vẫn chạm ngay.
     private static final int MAX_DB_COMMANDS_PER_SECOND = 40;
 
+    /**
+     * Số gói vi phạm giao thức (opcode lạ, payload hỏng) một kết nối được gửi trong CẢ đời nó trước
+     * khi bị đóng (quyết định chủ dự án 2026-10-11). Client thật không bao giờ gửi gói như thế, nên
+     * con số chỉ cần đủ rộng cho một bản client lệch phiên bản lỡ gửi vài opcode server chưa biết.
+     * Trước đó không có trần: một kết nối bơm gói hỏng vô hạn, mỗi gói một câu trả lời và một dòng log.
+     */
+    static final int MAX_PROTOCOL_VIOLATIONS = 10;
+
+    // Ghi trên EventLoop của kết nối này (channelRead0); AtomicInteger vì test đọc từ luồng khác và nó
+    // chỉ được chạm khi có gói hỏng — không nằm trên đường nóng.
+    private final java.util.concurrent.atomic.AtomicInteger protocolViolations =
+            new java.util.concurrent.atomic.AtomicInteger();
+
     // Khoá i18n cho GoldChangedEvent lúc vừa vào world (ADR-035 Decision-3) — KHÔNG phải câu tiếng
     // Việt cứng. Các lý do còn lại (mua/bán/cường hoá/thư/giao dịch) do adapter server-database đặt,
     // xem GoldLedger javadoc vì sao chúng nằm ở đó chứ không ở đây.
@@ -509,19 +522,48 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         try (Scope scope = span.makeCurrent()) {
             if (handler == null) {
                 sendError(ctx, header.sequenceId(), 404, "error.unknown_opcode");
+                closeIfTooManyProtocolViolations(ctx);
                 return;
             }
             handler.handle(ctx, header, frame.payload());
         } catch (InvalidProtocolBufferException e) {
-            // Fail fast ở MỨC PACKET (Điều 16) — không làm sập kết nối vì 1 payload hỏng.
+            // Fail fast ở MỨC PACKET (Điều 16) — không làm sập kết nối vì 1 payload hỏng. KHÔNG kèm
+            // stack trace (2026-10-11): payload do client gửi, mỗi gói hỏng là ~40 dòng log, và chỗ
+            // ném luôn là parser protobuf — không có gì để lần.
             LOG.warn(
-                    "Payload protobuf không hợp lệ: opcode={}, sequenceId={}", header.opcode(), header.sequenceId(), e);
+                    "Payload protobuf không hợp lệ: opcode={}, sequenceId={}, lỗi={}",
+                    header.opcode(),
+                    header.sequenceId(),
+                    e.getClass().getSimpleName());
             span.recordException(e);
             span.setStatus(StatusCode.ERROR);
             sendError(ctx, header.sequenceId(), 400, "error.invalid_payload");
+            closeIfTooManyProtocolViolations(ctx);
         } finally {
             span.end();
         }
+    }
+
+    /**
+     * Đếm một gói vi phạm giao thức (opcode lạ, payload không parse được) và đóng kết nối khi vượt
+     * {@link #MAX_PROTOCOL_VIOLATIONS}. Gọi SAU khi đã gửi {@code ErrorResponse} của gói đó.
+     */
+    // FutureReturnValueIgnored: ChannelFuture của close() — lỗi đi qua pipeline Netty.
+    @SuppressWarnings("FutureReturnValueIgnored")
+    private void closeIfTooManyProtocolViolations(ChannelHandlerContext ctx) {
+        int violations = protocolViolations.incrementAndGet();
+        if (violations > MAX_PROTOCOL_VIOLATIONS) {
+            LOG.warn(
+                    "Đóng kết nối {} sau {} gói vi phạm giao thức",
+                    ctx.channel().remoteAddress(),
+                    violations);
+            ctx.close();
+        }
+    }
+
+    /** {@code true} nếu kết nối này đã vượt {@link #MAX_PROTOCOL_VIOLATIONS} — tức đã (hoặc đang) bị đóng vì thế. */
+    boolean exceededProtocolViolationLimit() {
+        return protocolViolations.get() > MAX_PROTOCOL_VIOLATIONS;
     }
 
     /** {@code opcode} lạ (packet giả mạo) gộp vào 1 tag "unknown" — cùng lý do {@code GatewayNetworkMetrics}. */
@@ -1917,6 +1959,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             }
             FriendFacade.SendRequestResult result =
                     friendFacade.sendRequest(characterId, target.get().id());
+            if (result == FriendFacade.SendRequestResult.FRIEND_LIST_FULL) {
+                // Trần bạn bè (quyết định chủ dự án 2026-10-11) — đi đường ErrorResponse như mọi từ chối
+                // nghiệp vụ thêm sau khi protocol đã chốt, không thêm giá trị outcome.
+                sendError(ctx, sequenceId, 409, "error.friend_list_full");
+                return;
+            }
             SendFriendRequestResponse response = SendFriendRequestResponse.newBuilder()
                     .setOutcome(toProtoOutcome(result))
                     .build();
@@ -1961,6 +2009,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             ChannelHandlerContext ctx, int sequenceId, long characterId, AcceptFriendRequestCommand command) {
         try {
             FriendFacade.AcceptResult result = friendFacade.accept(command.getFriendshipId(), characterId);
+            if (result == FriendFacade.AcceptResult.FRIEND_LIST_FULL) {
+                sendError(ctx, sequenceId, 409, "error.friend_list_full");
+                return;
+            }
+            if (result == FriendFacade.AcceptResult.REQUESTER_FRIEND_LIST_FULL) {
+                sendError(ctx, sequenceId, 409, "error.friend_list_full_other");
+                return;
+            }
             AcceptFriendRequestOutcome outcome = result == FriendFacade.AcceptResult.OK
                     ? AcceptFriendRequestOutcome.ACCEPT_FRIEND_REQUEST_OUTCOME_OK
                     : AcceptFriendRequestOutcome.ACCEPT_FRIEND_REQUEST_OUTCOME_NOT_FOUND;
@@ -2216,6 +2272,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleApproveGuildJoinRequestBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, ApproveGuildJoinRequestCommand command) {
         GuildFacade.ApproveResult result = guildFacade.approveJoinRequest(command.getRequestId(), characterId);
+        if (result == GuildFacade.ApproveResult.GUILD_FULL) {
+            // Trần thành viên bang (quyết định chủ dự án 2026-10-11) — cùng đường ErrorResponse.
+            sendError(ctx, sequenceId, 409, "error.guild_full");
+            return;
+        }
         ApproveGuildJoinRequestResponse response = ApproveGuildJoinRequestResponse.newBuilder()
                 .setOutcome(toProtoOutcome(result))
                 .build();
