@@ -385,6 +385,13 @@ final class SkillSystem extends IteratingKSystem {
             StatusEffects.applyEffect(STATUS_EFFECT.get(ctx.target()), type, (float) scriptEffect.value(), (float)
                     scriptEffect.duration());
         }
+        if (kind == SkillEffectKind.DEBUFF) {
+            // ADR-050 D3, mở rộng theo quyết định chủ dự án 2026-10-11: debuff lên kẻ địch cũng là RA
+            // ĐÒN. Trước đó chỉ chiêu gây damage hạ lá chắn vùng an toàn, nên đứng trong vùng mà làm
+            // chậm/choáng quái (hay người, ở nơi cho PvP) là khống chế miễn phí, không ai đánh trả được.
+            // CHỈ đồng hồ ra đòn: debuff không đụng tới máu nên không hoãn hồi máu (ADR-046 D2).
+            markAttackDealt(ctx.caster());
+        }
         HealthComponent targetHealth = HEALTH.get(ctx.target());
         pendingResults.add(new SkillOutcome(
                 ctx.definition().code(),

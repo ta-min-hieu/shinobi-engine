@@ -6,9 +6,11 @@ import java.util.Base64;
 import java.util.Optional;
 
 import redis.clients.jedis.RedisClient;
+import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.params.SetParams;
 
 import dev.kage.account.domain.SessionPort;
+import dev.kage.account.domain.SessionUnavailableException;
 
 /**
  * Session token (ADR-017): opaque random 256-bit, key {@code session:{token}} → accountId,
@@ -38,10 +40,16 @@ public final class RedisSessionAdapter implements SessionPort {
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
         // SET ... EX là dạng thay thế chính thức của SETEX (Jedis 7.3 deprecate setex) — cùng ngữ
         // nghĩa nguyên tử: ghi giá trị và TTL trong MỘT lệnh.
-        redisClient.set(
-                KEY_PREFIX + token,
-                Long.toString(accountId),
-                SetParams.setParams().ex(SESSION_TTL.toSeconds()));
+        try {
+            redisClient.set(
+                    KEY_PREFIX + token,
+                    Long.toString(accountId),
+                    SetParams.setParams().ex(SESSION_TTL.toSeconds()));
+        } catch (JedisException e) {
+            // Dịch sang exception của domain: tầng application quyết định Redis hỏng thì làm gì
+            // (2026-10-11: vẫn cho đăng nhập), và nó không được biết Jedis là gì.
+            throw new SessionUnavailableException("Không ghi được session token vào Redis", e);
+        }
         return token;
     }
 
@@ -58,6 +66,10 @@ public final class RedisSessionAdapter implements SessionPort {
 
     @Override
     public void revoke(String token) {
-        redisClient.del(KEY_PREFIX + token);
+        try {
+            redisClient.del(KEY_PREFIX + token);
+        } catch (JedisException e) {
+            throw new SessionUnavailableException("Không thu hồi được session token ở Redis", e);
+        }
     }
 }

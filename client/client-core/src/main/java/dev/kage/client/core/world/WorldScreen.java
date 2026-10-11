@@ -144,6 +144,9 @@ public final class WorldScreen implements GameScreen {
     /** Luồng chat (nhật ký + kênh + mạng) — xem {@link ChatCoordinator}. */
     private final ChatCoordinator chat;
 
+    /** Lưới an toàn theo từng gói đến — xem {@link InboundPacketGuard}. */
+    private final InboundPacketGuard packetGuard = new InboundPacketGuard();
+
     /** Chỉ để dịch {@code ErrorResponse} không ai nhận — xem {@link #onUnclaimedError}. */
     private final com.badlogic.gdx.utils.I18NBundle i18n = dev.kage.client.core.ui.theme.KageI18n.load();
 
@@ -657,7 +660,8 @@ public final class WorldScreen implements GameScreen {
         PacketCodec.Frame frame;
         // Dừng ngay khi phiên vừa bị kết thúc: gói sau đó (nếu có) thuộc một phiên đã chết.
         while (sessionEndedKey == null && (frame = sender.pollInbound()) != null) {
-            dispatch(frame);
+            // Một gói làm ném ngoại lệ thì bị bỏ, không làm sập client — xem InboundPacketGuard.
+            packetGuard.handle(frame, this::dispatch);
         }
     }
 

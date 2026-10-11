@@ -6,3 +6,8 @@
 plugins {
     id("kage.quality-conventions")
 }
+
+dependencies {
+    // Log cảnh báo khi kho session hỏng (2026-10-11) — slf4j-api, cùng thư viện các feature khác đã dùng.
+    implementation(libs.slf4j.api)
+}

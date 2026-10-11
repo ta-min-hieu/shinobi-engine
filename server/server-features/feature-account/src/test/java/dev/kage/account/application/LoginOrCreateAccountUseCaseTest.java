@@ -139,4 +139,39 @@ class LoginOrCreateAccountUseCaseTest {
 
         assertThat(sessionPort.validateAndRenew("")).isEmpty();
     }
+
+    /**
+     * Kho session (Redis) sập thì VẪN đăng nhập được, với token rỗng (quyết định chủ dự án 2026-10-11).
+     * Trước đó exception của Redis nổi thẳng lên và cả server không ai vào được, vì một token chưa lệnh
+     * nào đọc.
+     */
+    @Test
+    void shouldStillLogIn_withAnEmptyToken_whenTheSessionStoreIsDown() {
+        FakeAccountPort accountPort = new FakeAccountPort();
+        SessionPort brokenStore = new SessionPort() {
+            @Override
+            public String issue(long accountId) {
+                throw new dev.kage.account.domain.SessionUnavailableException("Redis sập (giả lập)", null);
+            }
+
+            @Override
+            public Optional<Long> validateAndRenew(String token) {
+                return Optional.empty();
+            }
+
+            @Override
+            public void revoke(String token) {
+                throw new dev.kage.account.domain.SessionUnavailableException("Redis sập (giả lập)", null);
+            }
+        };
+        LoginOrCreateAccountUseCase useCase = new LoginOrCreateAccountUseCase(accountPort, brokenStore, DIRECT_TX);
+
+        LoginResult result = useCase.execute("kagehero");
+
+        assertThat(result.accountId()).isPositive();
+        assertThat(result.sessionToken()).isEmpty();
+        assertThat(accountPort.byUsername).containsKey("kagehero");
+        // Token rỗng không được chạm tới kho phiên lúc kết thúc phiên (kho đang hỏng sẽ ném).
+        useCase.endSession(result.sessionToken());
+    }
 }

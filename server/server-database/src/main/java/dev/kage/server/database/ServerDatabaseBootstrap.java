@@ -159,6 +159,7 @@ public final class ServerDatabaseBootstrap {
 
     private final DataSource dataSource;
     private final RedisClient redisClient;
+    private final IdempotencyKeyJanitor idempotencyKeyJanitor;
 
     public ServerDatabaseBootstrap() {
         this(DbMetricsPort.NO_OP);
@@ -187,6 +188,8 @@ public final class ServerDatabaseBootstrap {
         this.redisClient = RedisClientFactory.create(redisConfig);
         JdbcOperations.configureMetrics(metricsPort);
         JdbcTransactionRunner.configureMetrics(metricsPort);
+        this.idempotencyKeyJanitor = new IdempotencyKeyJanitor(dataSource);
+        idempotencyKeyJanitor.start();
     }
 
     public AccountFacade wireAccountFacade() {
@@ -466,6 +469,7 @@ public final class ServerDatabaseBootstrap {
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */
     public void shutdown() {
+        idempotencyKeyJanitor.stop();
         redisClient.close();
         PostgresDataSourceFactory.close(dataSource);
     }

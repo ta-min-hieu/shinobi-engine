@@ -83,6 +83,8 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     private final ChatRateLimits chatRateLimits = new ChatRateLimits();
     // Cú lên cấp phải tới cả World nhân vật đang đứng — nối sau, khi các World đã dựng (GatewayBootstrap).
     private volatile CharacterLevelSync levelSync = CharacterLevelSync.unbound();
+    // Đồng đội nào được chia một cú hạ quái — nối sau, cùng lý do với levelSync.
+    private volatile KillRewardSharing rewardSharing = KillRewardSharing.none();
 
     ConnectedCharacterRegistry(
             InventoryFacade inventoryFacade,
@@ -162,6 +164,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
      */
     void syncLevelUpsThrough(CharacterLevelSync sync) {
         this.levelSync = sync;
+    }
+
+    /** Nối luật chia phần thưởng hạ quái cho nhóm — setter cùng lý do với {@link #syncLevelUpsThrough}. */
+    void shareKillRewardsThrough(KillRewardSharing sharing) {
+        this.rewardSharing = sharing;
     }
 
     /** Sổ chủ phiên của mọi nhân vật — xem {@link CharacterSessionRegistry}. */
@@ -555,6 +562,17 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 killerCharacterId,
                 monsterCode,
                 () -> grantExperienceBlocking(killerCharacterId, expReward));
+        // Phần của ĐỒNG ĐỘI (2026-10-11) — một việc RIÊNG, sau ba việc của người hạ: tra nhóm chạm DB,
+        // và nó hỏng thì phần của người ra đòn cuối ở trên không được suy suyển.
+        lootExecutor.dispatch(
+                KillRewardDispatcher.Step.PARTY_SHARE,
+                killerCharacterId,
+                monsterCode,
+                () -> rewardSharing.shareWithTeammates(
+                        killerCharacterId,
+                        monsterCode,
+                        teammateId -> processQuestBlocking(teammateId, monsterCode),
+                        teammateId -> grantExperienceBlocking(teammateId, expReward)));
     }
 
     /**

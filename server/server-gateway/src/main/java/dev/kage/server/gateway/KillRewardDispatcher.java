@@ -36,7 +36,9 @@ final class KillRewardDispatcher {
     enum Step {
         LOOT,
         QUEST_PROGRESS,
-        EXPERIENCE
+        EXPERIENCE,
+        /** Tra xem đồng đội nào được chia phần — hỏng thì KHÔNG đồng đội nào được gì, người hạ vẫn đủ. */
+        PARTY_SHARE
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(KillRewardDispatcher.class);
@@ -68,7 +70,7 @@ final class KillRewardDispatcher {
     // xoá giữa chừng), IllegalStateException từ pool đã đóng. Bắt hẹp hơn là để lọt đúng loại lỗi chưa
     // ai nghĩ tới chết im trong Virtual Thread như cũ.
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
-    private static void runIsolated(Step step, long killerCharacterId, String monsterCode, Runnable work) {
+    static void runIsolated(Step step, long killerCharacterId, String monsterCode, Runnable work) {
         try {
             work.run();
         } catch (RuntimeException e) {

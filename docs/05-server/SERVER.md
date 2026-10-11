@@ -287,8 +287,9 @@ Chi tiết: [ARCHITECTURE.md §15](../01-architecture/ARCHITECTURE.md).
 Không có bước này → mất toàn bộ dữ liệu chưa ghi ở §8.
 
 **Hiện thực** (`GatewayBootstrap.shutdownSequence`, chạy bởi shutdown hook `gateway-shutdown`):
-`GatewayServer.stop()` (đóng cổng → `broadcastShuttingDown` → tắt Netty event loop, tức đóng mọi kết
-nối → tắt `authExecutor`) → `stopAll()` khu vực world chính → hầm ngục → Arena → registry nhân vật →
+`ArenaInstanceRegistry.beginShutdown()` (từ đây rớt kết nối giữa trận là HUỶ trận, không ghi Elo —
+quyết định chủ dự án 2026-10-11) → `GatewayServer.stop()` (đóng cổng → `broadcastShuttingDown` → tắt
+Netty event loop, tức đóng mọi kết nối → tắt `authExecutor`) → `stopAll()` khu vực world chính → hầm ngục → Arena → registry nhân vật →
 luồng lưu vị trí (`CharacterPositionPersister`) → máy chủ metrics → tracing → đóng DB.
 
 **Khởi động hỏng nay tắt sạch và THOÁT** (sửa 2026-10-03, `52bb46f`). Trước đó, mở cổng thất bại (cổng
@@ -319,8 +320,8 @@ quãng đi của một giây. Test: `ServerShutdownMidPlayDatabaseTest`, `Connec
 **`ArenaInstanceRegistry.stopAll()` dừng World NGOÀI khoá** (sửa 2026-10-10). Bản cũ gọi `stop()` —
 chờ lần tick dở — khi đang giữ monitor của registry, còn lần tick đó nếu vừa có người gục thì xin đúng
 monitor ấy (`handleCharacterDefeated`): khoá chết, trình tự tắt đứng lại tới khi Docker giết tiến
-trình. Trong trình tự tắt hiện tại mọi trận đã bị chốt lúc đóng kết nối nên chưa chạm được; sẽ chạm
-ngay nếu dòng 36 của bảng chờ (huỷ trận khi tắt) được thi hành. Test: `ArenaShutdownDeadlockTest`.
+trình. Từ 2026-10-11 (dòng 36(ii) đã thi hành: tắt server là huỷ trận) đường này CHẠY THẬT ở mỗi lần
+tắt có trận đang dở — trước đó mọi trận đã bị chốt lúc đóng kết nối. Test: `ArenaShutdownDeadlockTest`.
 
 **Kiểm tắt → khởi động lại trên Postgres thật** (`ServerShutdownMidPlayDatabaseTest`, 2026-10-10, chạy
 đúng phép lắp + trình tự tắt của production qua `GatewayBootstrap.assemble`): 30 lệnh mua còn đang bay
@@ -340,10 +341,11 @@ ghi xong thì phần thưởng vẫn vào DB, chỉ mất gói thông báo. Test
 `ServerShutdownMidPlayDatabaseTest`. ⚠️ **Không thử lại**: việc hỏng là phần thưởng MẤT hẳn (quái không
 được lưu) — có thử lại / có hàng đợi bền hay không là quyết định chưa chốt.
 
-⚠️ **Còn để ngỏ, đã đưa lên bảng chờ chủ dự án** ([README](../README.md)): tắt server giữa trận Arena
-vẫn xử thua theo thứ tự Netty đóng kết nối và **ghi Elo thật** (dòng 36); lưu vị trí lúc ngắt kết nối
-thất bại thì không thử lại (dòng 55 — §8 chấp nhận mất ≤ 5 phút); `WorldFacade.stop()` chờ `tickLock`
-không có trần thời gian (dòng 56 — `stop_grace_period: 60s` của Docker là lưới cuối).
+Đã đóng 2026-10-11: tắt server giữa trận Arena nay huỷ trận, không ghi Elo (dòng 36(ii), test
+`ArenaSettlementLifecycleTest`); lưu vị trí lúc ngắt kết nối nay thử tối đa 3 lần (dòng 55).
+
+⚠️ **Còn để ngỏ, đã đưa lên bảng chờ chủ dự án** ([README](../README.md)): `WorldFacade.stop()` chờ
+`tickLock` không có trần thời gian (dòng 56 — `stop_grace_period: 60s` của Docker là lưới cuối).
 
 ---
 

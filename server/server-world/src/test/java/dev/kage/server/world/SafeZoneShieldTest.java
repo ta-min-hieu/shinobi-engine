@@ -33,6 +33,11 @@ class SafeZoneShieldTest {
 
     private static final CharacterBaseStats DEFAULT_STATS = new CharacterBaseStats(10, 10, 10, 10, Element.HOA, 1);
 
+    /** Hệ Thuỷ — để dùng được chiêu debuff thuần (làm chậm, không damage). */
+    private static final CharacterBaseStats WATER_STATS = new CharacterBaseStats(10, 10, 10, 10, Element.THUY, 1);
+
+    private static final String DEBUFF_SKILL = "thuy_phong_toa";
+
     private record MonsterSpawned(long monsterId, String code) {}
 
     private record AttackResult(long attacker, long defender, boolean miss) {}
@@ -212,6 +217,41 @@ class SafeZoneShieldTest {
 
             assertThat(sink.attackResults.stream().anyMatch(a -> a.attacker() == hunterId && a.defender() == 1L))
                     .as("ai vừa đánh ra thì vùng an toàn thôi che cho người đó (D3)")
+                    .isTrue();
+        } finally {
+            world.stop();
+        }
+    }
+
+    /**
+     * D3 mở rộng (quyết định chủ dự án 2026-10-11) — chiêu DEBUFF cũng là ra đòn. Cùng kịch bản với ô
+     * ngay trên, nhưng người chơi KHÔNG bao giờ đánh thường hay gây damage: chỉ ném Phong Toả (làm
+     * chậm). Trước đó con quái không bao giờ được phép đánh lại.
+     */
+    @Test
+    void shouldLoseTheSafeZoneShield_whenDebuffingFromInsideIt() {
+        RecordingSink sink = new RecordingSink();
+        WorldFacade world =
+                new WorldFacade(sink, true, TickMetricsPort.NO_OP, TestWorldContents.withHunterAndZone(false));
+        try {
+            world.start();
+            world.attachCharacter(1L, 6.5f, 0f, WATER_STATS);
+            awaitTrue(() -> sink.monsterSpawned.stream()
+                    .anyMatch(m -> m.code().equals(TestMonsterCatalogs.ROAMING_HUNTER_CODE)));
+            long hunterId = sink.monsterSpawned.get(0).monsterId();
+
+            Instant deadline = Instant.now().plus(Duration.ofSeconds(25));
+            while (sink.attackResults.stream().noneMatch(a -> a.attacker() == hunterId)
+                    && Instant.now().isBefore(deadline)) {
+                world.useSkill(1L, DEBUFF_SKILL, hunterId);
+                sleepQuietly(10);
+            }
+
+            assertThat(sink.attackResults.stream().anyMatch(a -> a.attacker() == hunterId && a.defender() == 1L))
+                    .as("ném debuff từ trong vùng an toàn thì vùng thôi che cho người đó")
+                    .isTrue();
+            assertThat(sink.attackResults.stream().noneMatch(a -> a.attacker() == 1L))
+                    .as("đối chứng: người chơi chưa từng gây một đòn damage nào")
                     .isTrue();
         } finally {
             world.stop();

@@ -4164,6 +4164,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // (đã ngắt kết nối). Lát cắt 4: tương tự cho duel Arena — người mất kết nối tính THUA
         // (forfeit ngầm, ArenaInstanceRegistry tự chốt rating). false ở CẢ 2 = không ở dungeon
         // lẫn duel nào, detach world chính như trước giờ.
+        // Lời thách đấu đang chờ của/tới người này không còn nghĩa khi họ đã mất kết nối (2026-10-11).
+        worldGateway.arenaInstanceRegistry().forgetChallengesOf(characterId);
         boolean handledElsewhere = worldGateway.dungeonInstanceRegistry().handleDisconnectIfInDungeon(characterId)
                 || worldGateway.arenaInstanceRegistry().handleDisconnectIfInDuel(characterId);
         if (!handledElsewhere) {

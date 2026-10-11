@@ -197,6 +197,8 @@ public final class GatewayBootstrap {
             // quét định kỳ cuối cùng vẫn nên chạy trước khi tắt hẳn (không mất vị trí ai đó vừa
             // logout đúng lúc server tắt). dungeonInstanceRegistry/arenaInstanceRegistry dừng CÙNG
             // lúc worldFacade (mọi World, chính lẫn dungeon/duel, dừng trước khi đóng DB).
+            // TRƯỚC khi đóng kết nối: từ đây rớt mạng giữa trận Arena là huỷ trận, không phải thua.
+            ctx.instanceRegistries().arena().beginShutdown();
             ctx.server().stop();
             ctx.worldContext().mainWorldChannels().stopAll();
             ctx.instanceRegistries().dungeon().stopAll();
@@ -267,6 +269,9 @@ public final class GatewayBootstrap {
         // Lên cấp giữa phiên phải tới luật trong world (cổng Tuyệt Kỹ) — nối ở đây vì đây là chỗ đầu
         // tiên mọi bảng định tuyến World cùng tồn tại.
         characterRegistry.syncLevelUpsThrough(CharacterLevelSync.of(worldGateway));
+        // Cùng lý do: "đồng đội cùng World" chỉ tra được khi mọi bảng định tuyến đã có.
+        characterRegistry.shareKillRewardsThrough(
+                KillRewardSharing.of(facades.contentFacades().socialFacades().partyFacade(), worldGateway));
         return new InstanceRegistries(dungeonInstanceRegistry, arenaInstanceRegistry, worldGateway);
     }
 

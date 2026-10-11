@@ -84,6 +84,8 @@ final class ArenaInstanceRegistry {
     // một World đấu trường SAU khi mọi World đã dừng: không ai dừng nó nữa, và lượt dời người vào trận rơi
     // vào settlementExecutor đã tắt. Nay không trận nào được dựng nữa.
     private boolean stopped;
+    // Trình tự tắt server đã bắt đầu (beginShutdown) nhưng World chưa dừng — khác `stopped`, bật ở stopAll.
+    private volatile boolean shuttingDown;
     // Không cần khoá: mỗi người chỉ được một đường ghi (dựng trận) và một đường gỡ (chốt trận, sau
     // khi đã lấy vé), và gỡ chạy ngoài khoá cùng lời gọi DB.
     private final Map<Long, PositionSnapshot> returnPositionByCharacterId = new ConcurrentHashMap<>();
@@ -306,6 +308,13 @@ final class ArenaInstanceRegistry {
         if (current.isEmpty()) {
             return false;
         }
+        if (shuttingDown) {
+            // Server đang tắt (quyết định chủ dự án 2026-10-11): trận bị HUỶ, không ai thua. Trước đó
+            // trình tự tắt đóng mọi kết nối, và người bị Netty đóng TRƯỚC bị xử thua kèm Elo thật —
+            // thắng thua do thứ tự đóng socket quyết định. Sổ sách để nguyên cho stopAll() dọn và dừng
+            // World; true vì người này không ở world chính, không có gì để gỡ ở đó.
+            return true;
+        }
         DuelInstance instance = current.get();
         if (!claimSettlement(instance)) {
             return true; // đã settle bởi lời gọi khác gần như đồng thời — coi như đã xử lý xong.
@@ -369,6 +378,25 @@ final class ArenaInstanceRegistry {
                 + instanceByCharacterId.size()
                 + startingDuelCharacterIds.size()
                 + returnPositionByCharacterId.size();
+    }
+
+    /**
+     * Bước ĐẦU của trình tự tắt server, trước khi kết nối nào bị đóng: từ đây mất kết nối không còn là
+     * "bỏ cuộc" — xem {@link #handleDisconnectIfInDuel}. Trận kết thúc bằng một cú hạ gục thật trong
+     * khoảnh khắc đó vẫn được chốt như thường.
+     */
+    void beginShutdown() {
+        shuttingDown = true;
+    }
+
+    /**
+     * Xoá mọi lời thách đấu đang chờ mà {@code characterId} gửi đi hoặc nhận được (quyết định chủ dự án
+     * 2026-10-11) — gọi khi nhân vật đó mất kết nối. Trước đó lời thách sống tiếp: A thách B, A rớt
+     * mạng rồi vào lại, B bấm nhận ⇒ trận mở với một người không còn chờ nó.
+     */
+    synchronized void forgetChallengesOf(long characterId) {
+        pendingChallengeByTargetId.remove(characterId);
+        pendingChallengeByTargetId.values().removeIf(challenge -> challenge.challengerCharacterId() == characterId);
     }
 
     /** Graceful shutdown (SERVER.md §10) — dừng MỌI duel World đang chạy trước khi thoát process. */

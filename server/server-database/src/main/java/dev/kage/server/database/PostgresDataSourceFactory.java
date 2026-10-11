@@ -1,5 +1,6 @@
 package dev.kage.server.database;
 
+import java.time.Duration;
 import java.util.Optional;
 import java.util.TimeZone;
 
@@ -21,6 +22,16 @@ public final class PostgresDataSourceFactory {
     // Chỉnh tiếp nếu N lớn hơn vẫn thấy backlog (HikariCP `leakDetectionThreshold`/pool metrics —
     // chưa expose qua Micrometer, xem BENCHMARK.md §5.2 "Việc chưa làm").
     private static final int DEFAULT_MAX_POOL_SIZE = 20;
+
+    /** Chờ một khoá (dòng, hay khoá tư vấn của túi đồ) tối đa ngần này rồi báo lỗi. */
+    static final Duration LOCK_TIMEOUT = Duration.ofSeconds(5);
+
+    /**
+     * Một câu lệnh chạy tối đa ngần này. Rộng hơn nhiều mọi câu của gameplay (mili giây); ⚠️ một
+     * migration Flyway dài hơn thế sẽ bị cắt — khi cần thì migration đó tự {@code SET LOCAL
+     * statement_timeout} cho mình.
+     */
+    static final Duration STATEMENT_TIMEOUT = Duration.ofSeconds(15);
 
     static {
         // ⚠️ PHÁT HIỆN THẬT: pgjdbc lấy TimeZone.getDefault() của JVM gửi cho PostgreSQL lúc
@@ -44,6 +55,13 @@ public final class PostgresDataSourceFactory {
         hikariConfig.setUsername(config.user());
         hikariConfig.setPassword(config.password());
         hikariConfig.setMaximumPoolSize(DEFAULT_MAX_POOL_SIZE);
+        // Trần chờ khoá và trần chạy của MỖI câu lệnh, đặt lúc mở kết nối (quyết định chủ dự án
+        // 2026-10-11). Trước đó cả hai là vô hạn: một giao dịch giữ khoá mà kẹt (bug, hay một phiên psql
+        // quên COMMIT) làm mọi lệnh chạm cùng dòng xếp hàng mãi, ăn hết 20 kết nối của pool, và từ đó
+        // MỌI lệnh của MỌI người chơi treo theo. Nay lệnh chờ quá trần nhận lỗi và nhả kết nối.
+        hikariConfig.addDataSourceProperty(
+                "options",
+                "-c lock_timeout=" + LOCK_TIMEOUT.toMillis() + " -c statement_timeout=" + STATEMENT_TIMEOUT.toMillis());
         return new HikariDataSource(hikariConfig);
     }
 

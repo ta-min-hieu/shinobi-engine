@@ -135,6 +135,44 @@ class ArenaSettlementLifecycleTest {
     }
 
     /**
+     * Server đang tắt: mất kết nối giữa trận là HUỶ trận, không ai bị ghi thua (quyết định chủ dự án
+     * 2026-10-11). Trước đó trình tự tắt đóng mọi kết nối và ai bị đóng trước thì thua kèm Elo thật.
+     */
+    @Test
+    void shouldRecordNoResult_whenADuelistDisconnectsWhileTheServerIsShuttingDown() throws Exception {
+        startDuel();
+        arena.beginShutdown();
+
+        simulateDisconnect(FIRST_ID);
+        simulateDisconnect(SECOND_ID);
+        arena.stopAll();
+
+        Thread.sleep(SECOND_SETTLEMENT_GRACE_MILLIS);
+        assertThat(ratingWrites).as("không trận nào được ghi kết quả").hasValue(0);
+        assertThat(arena.trackedEntryCount()).as("stopAll dọn hết sổ sách").isZero();
+    }
+
+    /**
+     * Lời thách đấu đang chờ bị xoá khi một trong hai bên mất kết nối (quyết định chủ dự án 2026-10-11)
+     * — dù người mất kết nối là người THÁCH hay người BỊ thách.
+     */
+    @Test
+    void shouldDropPendingChallenges_whenEitherSideDisconnects() {
+        long fromFirst = arena.challengeDuel(FIRST_ID, SECOND_ID).challengeId();
+        arena.forgetChallengesOf(FIRST_ID);
+        assertThat(arena.acceptDuel(SECOND_ID, fromFirst).outcome())
+                .as("người thách đã rớt mạng")
+                .isEqualTo(ArenaInstanceRegistry.AcceptOutcome.NOT_FOUND);
+
+        long toSecond = arena.challengeDuel(FIRST_ID, SECOND_ID).challengeId();
+        arena.forgetChallengesOf(SECOND_ID);
+        assertThat(arena.acceptDuel(SECOND_ID, toSecond).outcome())
+                .as("người bị thách đã rớt mạng")
+                .isEqualTo(ArenaInstanceRegistry.AcceptOutcome.NOT_FOUND);
+        assertThat(arena.worldFacadeFor(FIRST_ID)).isEmpty();
+    }
+
+    /**
      * Đối thủ rớt mạng giữa trận: người rớt THUA (feature-pvp/CLAUDE.md — không được "trốn thua"), người
      * còn lại về world chính, rating ghi đúng một lần.
      */
