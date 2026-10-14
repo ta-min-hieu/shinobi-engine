@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import com.badlogic.gdx.Gdx;
@@ -23,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import dev.kage.client.core.net.GameConnection;
+import dev.kage.client.core.net.HeldFrames;
 import dev.kage.client.core.ui.theme.CultivationRealm;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.client.core.ui.theme.KageSkin;
@@ -108,6 +110,14 @@ public final class CharacterSelectScreen implements GameScreen {
 
     /** Giữ một lần thay vì tạo method reference mới mỗi tick. */
     private final Supplier<PacketCodec.Frame> inbound = this::pollConnection;
+
+    /**
+     * Gói tới trong lúc chờ {@code SelectCharacterResponse} — trả lại cho màn world khi vào được, vứt khi
+     * lần chọn hỏng (2026-10-14, docs/README.md dòng 73(c); xem {@link HeldFrames}).
+     */
+    private final HeldFrames heldWhileSelecting = new HeldFrames();
+
+    private final Consumer<PacketCodec.Frame> holdWhileSelecting = heldWhileSelecting::hold;
 
     /**
      * @param session kết nối đã đăng nhập + tên đăng nhập của nó — tên được giữ trong bộ nhớ để màn
@@ -266,6 +276,7 @@ public final class CharacterSelectScreen implements GameScreen {
                     .setCharacterId(character.getId())
                     .build();
             pendingSequenceId = connection.nextSequenceId();
+            heldWhileSelecting.clear();
             connection.send(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, pendingSequenceId, request.toByteArray());
             setFormEnabled(false);
             statusLabel.setText(i18n.get("charselect.status.selecting"));
@@ -330,8 +341,8 @@ public final class CharacterSelectScreen implements GameScreen {
     }
 
     private void pollSelectResponse() {
-        Optional<PacketCodec.Frame> reply =
-                PendingReply.poll(inbound, pendingSequenceId, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE);
+        Optional<PacketCodec.Frame> reply = PendingReply.poll(
+                inbound, pendingSequenceId, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, holdWhileSelecting);
         if (reply.isPresent()) {
             PacketCodec.Frame frame = reply.get();
             if (frame.header().opcode() == Opcode.OPCODE_ERROR_VALUE) {
@@ -354,8 +365,13 @@ public final class CharacterSelectScreen implements GameScreen {
             Optional<ReplyVerdict.Rejection> rejection = ReplyVerdict.of(response);
             if (rejection.isPresent()) {
                 LOG.warn("Chọn nhân vật thất bại: errorKey={}", rejection.get().errorKey());
+                heldWhileSelecting.clear();
                 failWith(rejection.get().errorKey());
                 return;
+            }
+            int dropped = heldWhileSelecting.replayInto(connection);
+            if (dropped > 0) {
+                LOG.warn("Bỏ {} gói world tới trước SelectCharacterResponse (vượt trần giữ lại)", dropped);
             }
             worldEntry.open(pendingSelection, response);
         } catch (InvalidProtocolBufferException e) {

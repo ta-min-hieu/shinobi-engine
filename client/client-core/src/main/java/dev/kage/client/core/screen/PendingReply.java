@@ -1,6 +1,7 @@
 package dev.kage.client.core.screen;
 
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import dev.kage.protocol.Opcode;
@@ -30,15 +31,24 @@ final class PendingReply {
      * @return gói trả lời — opcode là {@code replyOpcode} hoặc {@code OPCODE_ERROR}; rỗng khi chưa tới
      */
     static Optional<PacketCodec.Frame> poll(Supplier<PacketCodec.Frame> inbound, int sequenceId, int replyOpcode) {
+        return poll(inbound, sequenceId, replyOpcode, frame -> {});
+    }
+
+    /**
+     * Như {@link #poll(Supplier, int, int)} nhưng gói không khớp được trao cho {@code skipped} thay vì
+     * vứt — dùng lúc chờ {@code SelectCharacterResponse}: server gắn nhân vật vào world TRƯỚC khi trả
+     * lời (2026-10-14, docs/README.md dòng 73(c)), nên gói world có thể tới trước câu trả lời.
+     */
+    static Optional<PacketCodec.Frame> poll(
+            Supplier<PacketCodec.Frame> inbound, int sequenceId, int replyOpcode, Consumer<PacketCodec.Frame> skipped) {
         PacketCodec.Frame frame;
         while ((frame = inbound.get()) != null) {
-            if (frame.header().sequenceId() != sequenceId) {
-                continue;
-            }
             int opcode = frame.header().opcode();
-            if (opcode == replyOpcode || opcode == Opcode.OPCODE_ERROR_VALUE) {
+            if (frame.header().sequenceId() == sequenceId
+                    && (opcode == replyOpcode || opcode == Opcode.OPCODE_ERROR_VALUE)) {
                 return Optional.of(frame);
             }
+            skipped.accept(frame);
         }
         return Optional.empty();
     }

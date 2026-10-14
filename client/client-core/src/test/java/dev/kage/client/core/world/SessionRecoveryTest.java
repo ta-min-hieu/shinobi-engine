@@ -105,6 +105,36 @@ class SessionRecoveryTest {
         });
     }
 
+    /**
+     * README dòng 73(c), 2026-10-14: server gắn nhân vật vào world TRƯỚC khi trả lời, nên gói world
+     * (spawn quái, chat) có thể tới trước {@code SelectCharacterResponse}. Chúng phải được trả lại cho màn
+     * world đúng thứ tự — trước đó bị vứt, và spawn thì server không phát lại.
+     */
+    @Test
+    @DisplayName("Gói world tới TRƯỚC SelectCharacterResponse được giữ lại và trả cho màn world, đúng thứ tự")
+    void holdsWorldFramesThatArriveBeforeTheSelectResponse() {
+        FakeLink link = new FakeLink();
+        SessionRecovery recovery = new SessionRecovery(link, USERNAME, CHARACTER_ID);
+        link.reconnect();
+        recovery.tick(TICK);
+        link.reply(Opcode.OPCODE_CONNECT_RESPONSE_VALUE, connectOk());
+        recovery.tick(TICK);
+        link.reply(
+                Opcode.OPCODE_LIST_CHARACTERS_RESPONSE_VALUE,
+                ListCharactersResponse.newBuilder()
+                        .addCharacters(summary(CHARACTER_ID, 11, Faction.FACTION_HOA))
+                        .build()
+                        .toByteArray());
+        assertThat(recovery.tick(TICK)).isEqualTo(SessionRecovery.Phase.AWAITING_SELECT);
+
+        link.push(Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE, 0, new byte[] {1});
+        link.push(Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE, 0, new byte[] {2});
+        link.reply(Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, selectOk());
+
+        assertThat(recovery.tick(TICK)).isEqualTo(SessionRecovery.Phase.RESUMED);
+        assertThat(link.replayed).extracting(frame -> frame.payload()[0]).containsExactly((byte) 1, (byte) 2);
+    }
+
     @Test
     @DisplayName("Gói tới SAU SelectCharacterResponse (spawn của World) được để lại cho màn world mới")
     void leavesWorldPacketsForTheNewScreen() {
@@ -328,6 +358,7 @@ class SessionRecoveryTest {
     private static final class FakeLink implements SessionRecovery.Link {
         private final Queue<PacketCodec.Frame> inbound = new ArrayDeque<>();
         private final List<PacketCodec.Frame> sent = new ArrayList<>();
+        private final List<PacketCodec.Frame> replayed = new ArrayList<>();
         private boolean connected;
         private int generation = 1;
         private int nextSequenceId = 100;
@@ -378,6 +409,11 @@ class SessionRecoveryTest {
         @Override
         public PacketCodec.Frame pollInbound() {
             return inbound.poll();
+        }
+
+        @Override
+        public void replayBeforeQueued(List<PacketCodec.Frame> frames) {
+            replayed.addAll(frames);
         }
     }
 }

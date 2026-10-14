@@ -157,6 +157,13 @@ final class FuzzRig {
         }
 
         @Override
+        public void replayBeforeQueued(List<PacketCodec.Frame> frames) {
+            for (int i = frames.size() - 1; i >= 0; i--) {
+                inbound.addFirst(frames.get(i));
+            }
+        }
+
+        @Override
         public boolean isConnected() {
             return !stopped;
         }

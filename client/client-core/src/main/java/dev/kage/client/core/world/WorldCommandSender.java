@@ -633,6 +633,12 @@ final class WorldCommandSender implements SessionRecovery.Link {
         return connection.pollInbound();
     }
 
+    /** Uỷ nhiệm thẳng — xem {@code GameConnection#replayBeforeQueued} (2026-10-14, README dòng 73(c)). */
+    @Override
+    public void replayBeforeQueued(List<PacketCodec.Frame> frames) {
+        connection.replayBeforeQueued(frames);
+    }
+
     /** Uỷ nhiệm thẳng, cùng khuôn {@link #pollInbound()} — xem {@code ConnectionCoordinator#onTick}. */
     @Override
     public boolean isConnected() {

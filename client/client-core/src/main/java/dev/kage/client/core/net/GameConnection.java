@@ -9,7 +9,10 @@ import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
+import java.util.Deque;
+import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -109,6 +112,13 @@ public final class GameConnection {
     private final long heartbeatIntervalMs;
     private final int readTimeoutMs;
     private final Queue<PacketCodec.Frame> inbound = new ConcurrentLinkedQueue<>();
+
+    /**
+     * Gói đã đọc ra rồi nhưng phải xử lý LẠI, trước mọi gói còn trong {@link #inbound} — xem
+     * {@link #replayBeforeQueued}. Concurrent chỉ để phòng thủ: mọi lời gọi hiện nay ở render thread.
+     */
+    private final Deque<PacketCodec.Frame> replay = new ConcurrentLinkedDeque<>();
+
     private final AtomicInteger nextSequenceId = new AtomicInteger(1);
 
     /**
@@ -196,9 +206,25 @@ public final class GameConnection {
         }
     }
 
-    /** Gọi ở ĐẦU TICK — không xử lý packet giữa render (CLIENT.md §8). */
+    /** Gọi ở ĐẦU TICK — không xử lý packet giữa render (CLIENT.md §8). Gói chờ phát lại đi trước. */
     public PacketCodec.Frame pollInbound() {
-        return inbound.poll();
+        PacketCodec.Frame held = replay.pollFirst();
+        return held != null ? held : inbound.poll();
+    }
+
+    /**
+     * Đưa {@code frames} (đã lấy ra bằng {@link #pollInbound}, theo đúng thứ tự tới) quay lại ĐẦU hàng
+     * đợi — lần {@link #pollInbound} kế tiếp trả chúng trước mọi gói khác.
+     *
+     * <p><b>Vì sao</b> (chủ dự án chốt 2026-10-14, docs/README.md dòng 73(c)): server nay gắn nhân vật
+     * vào world TRƯỚC khi trả {@code SelectCharacterResponse}, nên gói world (spawn quái, chat...) có thể
+     * tới trước response. Màn chọn nhân vật / đăng nhập lại giữ chúng trong lúc chờ rồi trả lại đây cho
+     * màn world — trước đó chúng bị vứt, và spawn thì server không phát lại.
+     */
+    public void replayBeforeQueued(List<PacketCodec.Frame> frames) {
+        for (int i = frames.size() - 1; i >= 0; i--) {
+            replay.addFirst(frames.get(i));
+        }
     }
 
     private void connectionLoop() {

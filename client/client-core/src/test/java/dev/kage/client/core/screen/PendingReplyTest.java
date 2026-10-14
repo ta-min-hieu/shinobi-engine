@@ -3,7 +3,9 @@ package dev.kage.client.core.screen;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -39,6 +41,26 @@ class PendingReplyTest {
         Optional<PacketCodec.Frame> reply = PendingReply.poll(inbound::poll, 7, SELECT);
 
         assertThat(reply).containsSame(replyForB);
+    }
+
+    /**
+     * README dòng 73(c), 2026-10-14: lúc chờ {@code SelectCharacterResponse}, gói không khớp được trao cho
+     * người gọi (để giữ lại cho màn world) chứ không vứt — theo đúng thứ tự tới.
+     */
+    @Test
+    void shouldHandSkippedFramesToTheCaller_inArrivalOrder() {
+        PacketCodec.Frame spawn = frame(Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE, 0);
+        PacketCodec.Frame lateReplyForA = frame(SELECT, 3);
+        PacketCodec.Frame replyForB = frame(SELECT, 7);
+        inbound.add(spawn);
+        inbound.add(lateReplyForA);
+        inbound.add(replyForB);
+        List<PacketCodec.Frame> skipped = new ArrayList<>();
+
+        Optional<PacketCodec.Frame> reply = PendingReply.poll(inbound::poll, 7, SELECT, skipped::add);
+
+        assertThat(reply).containsSame(replyForB);
+        assertThat(skipped).containsExactly(spawn, lateReplyForA);
     }
 
     @Test

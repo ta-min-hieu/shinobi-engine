@@ -1,12 +1,13 @@
 package dev.kage.client.core.world;
 
 import java.io.IOException;
+import java.util.List;
 
 import dev.kage.client.core.net.GameConnection;
 import dev.kage.protocol.wire.PacketCodec;
 
 /**
- * Phần của {@link GameConnection} mà {@link WorldCommandSender} thật sự dùng — sáu thao tác, không
+ * Phần của {@link GameConnection} mà {@link WorldCommandSender} thật sự dùng — bảy thao tác, không
  * hơn.
  *
  * <p>Tồn tại vì một lý do duy nhất: cho phép dựng {@link WorldScreen} THẬT trong test với một đường
@@ -20,6 +21,9 @@ interface CommandLink {
 
     /** Xem {@link GameConnection#pollInbound()} — {@code null} khi hàng đợi rỗng. */
     PacketCodec.Frame pollInbound();
+
+    /** Xem {@link GameConnection#replayBeforeQueued(List)}. */
+    void replayBeforeQueued(List<PacketCodec.Frame> frames);
 
     /** Xem {@link GameConnection#isConnected()}. */
     boolean isConnected();
@@ -44,6 +48,11 @@ interface CommandLink {
             @Override
             public PacketCodec.Frame pollInbound() {
                 return connection.pollInbound();
+            }
+
+            @Override
+            public void replayBeforeQueued(List<PacketCodec.Frame> frames) {
+                connection.replayBeforeQueued(frames);
             }
 
             @Override

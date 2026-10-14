@@ -924,9 +924,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     /** Phần "vào world" của chọn nhân vật — gọi dưới khoá của nhân vật, xem {@link #enterWorldAsOnlySession}. */
     private boolean enterWorld(ChannelHandlerContext ctx, int sequenceId, Character character) {
         long characterId = character.id();
-        // THỨ TỰ (2026-09-24): đọc DB → gửi response → RỒI MỚI đăng ký + attach — client BỎ mọi
-        // gói tới trước response (chat, bạn bè online, spawn quái không phát lại). Xem
-        // bindOrReleaseIfClosed.
+        // THỨ TỰ (chủ dự án chốt 2026-10-14, docs/README.md dòng 73(c)): đọc DB → đăng ký + attach + gắn
+        // → RỒI MỚI gửi response. Response vì thế là mốc "sẵn sàng" thật: lệnh đầu tiên client gửi ngay
+        // sau nó đã có World để đi tới (trước đó nhận error.not_authenticated, đo được thật). Gói world
+        // (spawn, chat) có thể tới TRƯỚC response — client GIỮ LẠI chúng cho màn world (HeldFrames ở
+        // client-core); bản 2026-09-24 đặt response lên trước chính vì client hồi đó vứt các gói này.
         PositionSnapshot spawn = characterFacade.loadPosition(characterId);
         CharacterStats stats = characterFacade.loadStats(characterId);
         // Phase 9 lát cắt 6: định tuyến vào khu vực (channel) còn chỗ thay vì thẳng 1 World
@@ -939,7 +941,6 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         CharacterLoadout loadout = new CharacterLoadout(
                 CharacterLoadout.baseStatsOf(character, stats), currentEquipmentBonus(characterId));
         SelectCharacterResponse response = enterWorldResponse(loadout, spawn);
-        send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
         if (!isLiveOnThisConnection(characterId)) {
             // Đăng ký connection NÀY để world outbound (spawn/move/despawn — SERVER.md §6) tìm
             // đúng channel; attachCharacter chỉ enqueue, entity ECS thật tạo ở tick kế tiếp.
@@ -948,7 +949,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .register(characterId, ctx, CharacterAppearance.of(toProtoFaction(character.faction())));
             worldGateway.mainWorldChannels().attachCharacter(loadout.entryAt(characterId, spawn));
         }
-        return bindOrReleaseIfClosed(ctx, characterId);
+        boolean bound = bindOrReleaseIfClosed(ctx, characterId);
+        if (bound) {
+            send(ctx, Opcode.OPCODE_SELECT_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        }
+        return bound;
     }
 
     /**
@@ -968,10 +973,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     /**
      * Gán {@code boundCharacterId} SAU khi đăng ký + attach, rồi dọn ngay nếu kết nối đã chết.
      *
-     * <p><b>Vì sao gán muộn</b>: lệnh tới trong khoảng giữa response và attach (di chuyển, tấn
-     * công...) chạy trên EventLoop và gọi {@code currentWorldFacade}, vốn NÉM nếu nhân vật chưa thuộc
-     * World nào — tức {@code exceptionCaught} đóng luôn kết nối. Gán muộn thì lệnh đó chỉ nhận
-     * {@code error.not_authenticated}, không ai bị đá.
+     * <p><b>Vì sao gán SAU attach</b>: lệnh gameplay chạy trên EventLoop và gọi {@code currentWorldFacade},
+     * vốn NÉM nếu nhân vật chưa thuộc World nào — tức {@code exceptionCaught} đóng luôn kết nối. Gán sau
+     * khi attach đã định tuyến xong thì lệnh nào thấy nhân vật cũng thấy World của nó. Từ 2026-10-14
+     * response đi SAU bước này (README dòng 73(c)), nên client không còn khe gửi lệnh mà nhận
+     * {@code error.not_authenticated}.
      *
      * <p><b>Vì sao phải tự dọn</b>: kết nối chết TRƯỚC khi gán thì {@code channelInactive} thấy
      * {@code boundCharacterId == null} và không dọn gì — bản cũ còn tệ hơn: nó dọn TRƯỚC khi attach

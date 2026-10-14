@@ -1,12 +1,14 @@
 package dev.kage.client.core.world;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import dev.kage.client.core.net.HeldFrames;
 import dev.kage.protocol.CharacterSummary;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
@@ -106,6 +108,9 @@ final class SessionRecovery {
 
         /** Gói kế tiếp trong hàng đợi, {@code null} khi rỗng (cùng hợp đồng {@code GameConnection}). */
         PacketCodec.Frame pollInbound();
+
+        /** Đưa gói đã đọc quay lại đầu hàng đợi — cùng hợp đồng {@code GameConnection#replayBeforeQueued}. */
+        void replayBeforeQueued(List<PacketCodec.Frame> frames);
     }
 
     /** Nhân vật (bản mới nhất từ server) và gói vào world — đủ để dựng lại màn world. */
@@ -123,6 +128,14 @@ final class SessionRecovery {
     private int pendingSequenceId;
     private CharacterSummary character;
     private Resumed resumed;
+
+    /**
+     * Gói tới trong lúc chờ {@code SelectCharacterResponse} — server gắn nhân vật vào world TRƯỚC khi trả
+     * lời (2026-10-14, docs/README.md dòng 73(c)), nên gói world có thể tới trước. Trả lại cho màn world
+     * khi vào được, vứt khi lượt này hỏng.
+     */
+    private final HeldFrames heldWhileSelecting = new HeldFrames();
+
     private String failureKey = RELOG_FAILED_KEY;
 
     /**
@@ -243,8 +256,10 @@ final class SessionRecovery {
                 onError(ErrorResponse.parseFrom(frame.payload()), frame.header().sequenceId());
             } else if (frame.header().sequenceId() == pendingSequenceId) {
                 onResponse(opcode, frame.payload());
+            } else if (phase == Phase.AWAITING_SELECT) {
+                heldWhileSelecting.hold(frame);
             }
-            // Gói khác (PONG, gói lạc của lệnh cũ) — không phải thứ đang chờ, bỏ qua.
+            // Gói khác ở các bước trước (PONG, gói lạc của lệnh cũ) — không phải thứ đang chờ, bỏ qua.
         } catch (InvalidProtocolBufferException e) {
             LOG.warn(
                     "Gói trả lời không hợp lệ lúc đăng nhập lại: opcode={}",
@@ -314,10 +329,12 @@ final class SessionRecovery {
             return;
         }
         resumed = new Resumed(character, response);
+        link.replayBeforeQueued(heldWhileSelecting.drain());
         enter(Phase.RESUMED);
     }
 
     private void send(int opcode, byte[] payload, Phase next) {
+        heldWhileSelecting.clear();
         try {
             pendingSequenceId = link.sendRequest(opcode, payload);
             enter(next);
