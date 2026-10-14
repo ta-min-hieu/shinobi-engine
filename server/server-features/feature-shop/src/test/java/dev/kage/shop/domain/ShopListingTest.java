@@ -1,5 +1,6 @@
 package dev.kage.shop.domain;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -21,5 +22,22 @@ class ShopListingTest {
     @Test
     void shouldAllowZeroPrice() {
         assertThatCode(() -> new ShopListing(1, 0, 0)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void shouldMultiplyPriceByQuantity() {
+        ShopListing listing = new ShopListing(1, 80, 20);
+
+        assertThat(listing.totalBuyCost(3)).isEqualTo(240L);
+        assertThat(listing.totalSellCredit(3)).isEqualTo(60L);
+    }
+
+    /** Phép nhân thường tràn thành số ÂM — trừ số âm là cộng vàng (README dòng 25(iv)). */
+    @Test
+    void shouldSaturateInsteadOfWrappingNegative_whenTotalOverflowsLong() {
+        ShopListing listing = new ShopListing(1, Long.MAX_VALUE / 2, Long.MAX_VALUE / 2);
+
+        assertThat(listing.totalBuyCost(Integer.MAX_VALUE)).isEqualTo(Long.MAX_VALUE);
+        assertThat(listing.totalSellCredit(3)).isEqualTo(Long.MAX_VALUE);
     }
 }

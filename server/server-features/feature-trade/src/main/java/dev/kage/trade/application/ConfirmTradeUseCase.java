@@ -10,6 +10,7 @@ import dev.kage.trade.domain.TradeInventoryPort;
 import dev.kage.trade.domain.TradeInventoryPort.TransferOutcome;
 import dev.kage.trade.domain.TradeOfferItem;
 import dev.kage.trade.domain.TradeSessionSnapshot;
+import dev.kage.trade.domain.TradeStatus;
 import dev.kage.trade.domain.Transaction;
 import dev.kage.trade.domain.TransactionRunner;
 
@@ -38,7 +39,12 @@ public final class ConfirmTradeUseCase {
             tx.inTransaction((Transaction t) -> {
                 ports.idempotencyPort().recordOrThrow(t, idempotencyKey);
                 Optional<TradeSessionSnapshot> snapshotOpt = ports.sessionPort().lockForExecution(t, sessionId);
-                if (snapshotOpt.isEmpty() || !snapshotOpt.get().involves(characterId)) {
+                // Phiên còn PENDING_ACCEPT (người được mời chưa nhận lời) thì chưa có gì để xác nhận —
+                // chủ dự án chặn 2026-10-14 (README dòng 25(ii)); cùng outcome với "không có phiên đang
+                // mở" để không đổi protocol. SetTradeOffer vốn đã đòi OPEN.
+                if (snapshotOpt.isEmpty()
+                        || !snapshotOpt.get().involves(characterId)
+                        || snapshotOpt.get().status() != TradeStatus.OPEN) {
                     resultHolder.set(Result.NOT_FOUND);
                     return;
                 }

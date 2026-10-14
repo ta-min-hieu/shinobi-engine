@@ -144,6 +144,22 @@ class CreateCharacterUseCaseTest {
         assertThat(port.characters).hasSize(1);
     }
 
+    /**
+     * README dòng 42 (2026-10-14): tiếng Việt gõ dạng NFD (dấu tách rời) trước đó bị từ chối dù hiển thị
+     * y hệt tên hợp lệ. Nay được nhận và LƯU dạng NFC — nên hai cách gõ cùng một tên đụng nhau là trùng.
+     */
+    @Test
+    void shouldAcceptDecomposedVietnameseAndStoreItComposed() {
+        FakeCharacterPort port = new FakeCharacterPort();
+        CreateCharacterUseCase useCase = new CreateCharacterUseCase(port, DIRECT_TX);
+
+        Character character = useCase.execute(1L, "Kie\u0302n", "idem-1");
+
+        assertThat(character.name()).isEqualTo("Ki\u00EAn");
+        assertThatThrownBy(() -> useCase.execute(2L, "Ki\u00EAn", "idem-2"))
+                .isInstanceOf(DuplicateCharacterNameException.class);
+    }
+
     @Test
     void shouldRejectDuplicateName() {
         FakeCharacterPort port = new FakeCharacterPort();

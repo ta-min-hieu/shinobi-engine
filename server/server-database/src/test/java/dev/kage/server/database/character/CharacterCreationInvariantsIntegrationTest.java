@@ -221,6 +221,20 @@ class CharacterCreationInvariantsIntegrationTest {
         assertThat(countAllCharacters()).isEqualTo(charactersBefore);
     }
 
+    /**
+     * Tiếng Việt gõ dấu TÁCH RỜI (NFD) — từng nằm trong {@link #hostileNames()}; từ 2026-10-14 được nhận
+     * và LƯU dạng NFC (chủ dự án chọn, docs/README.md dòng 42).
+     */
+    @Test
+    void shouldStoreDecomposedVietnameseComposed() {
+        long accountId = createAccount();
+
+        createUseCase.execute(accountId, "Hoa\u0300ng", UUID.randomUUID().toString());
+
+        assertThat(adapter.listByAccount(accountId)).extracting(Character::name).containsExactly("Ho\u00E0ng");
+        assertThat(adapter.findByName("Ho\u00E0ng")).isPresent();
+    }
+
     /** Tên hợp lệ ở biên (tiếng Việt dựng sẵn, chữ Hán, ký tự ngoài BMP, đúng 16) phải lưu và đọc lại y nguyên. */
     @Test
     void shouldRoundTripValidEdgeNames_exactly() {
@@ -273,7 +287,6 @@ class CharacterCreationInvariantsIntegrationTest {
                 "Kage\u200EHero",
                 "Kage\u00A0Hero",
                 "Kage\u3000Hero",
-                "Hoa\u0300ng",
                 "Kage\uD800",
                 "\uD83D\uDE00\uD83D\uDE00",
                 "Kage-Hero",

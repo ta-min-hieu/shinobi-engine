@@ -15,7 +15,8 @@ public final class CreateGuildUseCase {
         this.port = port;
     }
 
-    public Result execute(long characterId, String name) {
+    public Result execute(long characterId, String requestedName) {
+        String name = GuildName.normalize(requestedName);
         // Quyết định chủ dự án 2026-09-29: cùng luật tên nhân vật (GuildName). Trước đó server không
         // kiểm gì — tên 33 ký tự nổ SQLException ở INSERT, tên có ký tự lạ vào thẳng DB.
         if (!GuildName.isValid(name)) {

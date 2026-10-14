@@ -2,6 +2,7 @@ package dev.kage.server.database;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -30,6 +31,15 @@ public final class JdbcTransactionRunner {
 
     private static final Logger LOG = LoggerFactory.getLogger(JdbcTransactionRunner.class);
 
+    /** SQLSTATE Postgres trả cho transaction bị chọn huỷ để phá deadlock. */
+    static final String DEADLOCK_SQL_STATE = "40P01";
+
+    /** Số lần chạy LẠI tối đa sau lần đầu — xem {@link #call}. */
+    static final int MAX_DEADLOCK_RETRIES = 3;
+
+    private static final long DEADLOCK_BACKOFF_MIN_MILLIS = 10L;
+    private static final long DEADLOCK_BACKOFF_MAX_MILLIS = 50L;
+
     // OBSERVABILITY.md §3.3 kage.db.transaction.failed — xem javadoc DbMetricsPort/JdbcOperations
     // cho lý do field tĩnh (cấu hình 1 LẦN lúc khởi động, mặc định NO_OP).
     private static volatile DbMetricsPort metricsPort = DbMetricsPort.NO_OP;
@@ -45,7 +55,50 @@ public final class JdbcTransactionRunner {
         metricsPort = port;
     }
 
+    /**
+     * Chạy {@code action} trong một transaction. Transaction bị Postgres huỷ vì DEADLOCK (SQLSTATE
+     * {@value #DEADLOCK_SQL_STATE}) thì chạy LẠI từ đầu, tối đa {@value #MAX_DEADLOCK_RETRIES} lần, mỗi lần
+     * chờ một khoảng ngẫu nhiên — xem {@link #call}.
+     */
+    // PMD AvoidCatchingGenericException: chỉ để SOI chuỗi nguyên nhân tìm SQLSTATE deadlock — không phải
+    // deadlock thì ném lại nguyên trạng (adapter có thể bọc SQLException trong kiểu runtime bất kỳ).
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     public static void run(DataSource dataSource, Consumer<Connection> action) {
+        for (int attempt = 0; ; attempt++) {
+            try {
+                runOnce(dataSource, action);
+                return;
+            } catch (RuntimeException e) {
+                rethrowUnlessRetryableDeadlock(e, attempt);
+            }
+        }
+    }
+
+    /**
+     * Bản trả giá trị của {@link #run}, cùng luật thử lại.
+     *
+     * <p><b>Vì sao thử lại deadlock</b> (chủ dự án chốt 2026-10-14, docs/README.md dòng 45(ii)): Postgres
+     * phá deadlock bằng cách huỷ MỘT trong hai transaction — bên bị chọn không làm gì sai, chỉ xui. Trước
+     * đó lỗi đó đi thẳng lên thành 500 cho người chơi. Rollback đã trả mọi thứ về như chưa chạy (kể cả vàng
+     * ghi tạm trong {@link GoldLedger} và khoá idempotency), nên chạy lại là an toàn — với điều kiện
+     * {@code action} chỉ làm việc với DB, đúng luật của mọi action đi qua đây. Ba lần và khoảng chờ
+     * {@value #DEADLOCK_BACKOFF_MIN_MILLIS}–{@value #DEADLOCK_BACKOFF_MAX_MILLIS} ms nhân số lần là con số
+     * tôi chọn: deadlock thật hiếm, và hết ba lần thì lỗi vẫn được ném như cũ.
+     */
+    // PMD AvoidCatchingGenericException: chỉ để SOI chuỗi nguyên nhân tìm SQLSTATE deadlock — không phải
+    // deadlock thì ném lại nguyên trạng (adapter có thể bọc SQLException trong kiểu runtime bất kỳ).
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    public static <T> T call(DataSource dataSource, Function<Connection, T> action) {
+        for (int attempt = 0; ; attempt++) {
+            try {
+                return callOnce(dataSource, action);
+            } catch (RuntimeException e) {
+                rethrowUnlessRetryableDeadlock(e, attempt);
+            }
+        }
+    }
+
+    private static void runOnce(DataSource dataSource, Consumer<Connection> action) {
         try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             runAction(connection, action);
@@ -54,13 +107,38 @@ public final class JdbcTransactionRunner {
         }
     }
 
-    public static <T> T call(DataSource dataSource, Function<Connection, T> action) {
+    private static <T> T callOnce(DataSource dataSource, Function<Connection, T> action) {
         try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             return callAction(connection, action);
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi transaction JDBC", e);
         }
+    }
+
+    private static void rethrowUnlessRetryableDeadlock(RuntimeException failure, int attempt) {
+        if (attempt >= MAX_DEADLOCK_RETRIES || !isDeadlock(failure)) {
+            throw failure;
+        }
+        LOG.warn("Transaction bị huỷ vì deadlock — chạy lại lần {}/{}", attempt + 1, MAX_DEADLOCK_RETRIES);
+        long backoffMillis = (attempt + 1L)
+                * ThreadLocalRandom.current().nextLong(DEADLOCK_BACKOFF_MIN_MILLIS, DEADLOCK_BACKOFF_MAX_MILLIS + 1);
+        try {
+            Thread.sleep(backoffMillis);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw failure;
+        }
+    }
+
+    /** Có {@link SQLException} mang SQLSTATE deadlock ở bất kỳ tầng nào của chuỗi nguyên nhân. */
+    static boolean isDeadlock(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SQLException sql && DEADLOCK_SQL_STATE.equals(sql.getSQLState())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // PMD AvoidCatchingGenericException: đúng ý — transaction PHẢI rollback khi action ném BẤT KỲ

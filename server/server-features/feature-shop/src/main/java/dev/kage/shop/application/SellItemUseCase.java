@@ -38,7 +38,7 @@ public final class SellItemUseCase {
         if (listing == null) {
             return SellResult.ITEM_NOT_SELLABLE;
         }
-        long totalCredit = listing.sellPrice() * quantity;
+        long totalCredit = listing.totalSellCredit(quantity);
 
         AtomicReference<SellResult> resultHolder = new AtomicReference<SellResult>();
         try {

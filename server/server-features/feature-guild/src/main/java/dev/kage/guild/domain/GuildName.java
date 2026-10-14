@@ -26,6 +26,14 @@ public final class GuildName {
 
     private GuildName() {}
 
+    /**
+     * Dạng lưu của tên bang MỚI: NFC — bản chép của {@code Character#normalizeNewName} (2026-10-14).
+     * Gọi TRƯỚC {@link #isValid}; {@code null} đi qua nguyên trạng.
+     */
+    public static String normalize(String name) {
+        return name == null ? null : Normalizer.normalize(name, Normalizer.Form.NFC);
+    }
+
     /** {@code true} nếu {@code name} dùng được làm tên bang MỚI; {@code null} là không hợp lệ. */
     public static boolean isValid(String name) {
         return name != null

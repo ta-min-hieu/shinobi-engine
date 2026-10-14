@@ -57,6 +57,21 @@ class GuildNameParityTest {
         }
     }
 
+    /**
+     * 2026-10-14 (README dòng 42): tên gõ dạng NFD được chuẩn hoá NFC trước khi kiểm, ở CẢ hai luật —
+     * cùng dạng lưu, cùng kết quả.
+     */
+    @Test
+    void bothRulesShouldNormalizeDecomposedVietnameseToTheSameAcceptedName() {
+        String decomposed = "Kie\u0302n_Tu\u031B"; // "Kiên_Tư" gõ dấu tách rời (NFD)
+        String composed = "Ki\u00EAn_T\u01B0";
+
+        assertThat(GuildName.normalize(decomposed)).isEqualTo(composed);
+        assertThat(Character.normalizeNewName(decomposed)).isEqualTo(composed);
+        assertThat(GuildName.isValid(GuildName.normalize(decomposed))).isTrue();
+        assertThat(characterNameAccepts(Character.normalizeNewName(decomposed))).isTrue();
+    }
+
     private static boolean characterNameAccepts(String name) {
         try {
             Character.validateNewName(name);

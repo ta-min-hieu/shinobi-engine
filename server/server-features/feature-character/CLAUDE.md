@@ -46,6 +46,9 @@ adapter thật nằm ở `server-database`, ArchUnit chặn JDBC/Redis theo pack
   Hệ quả (chạy thử regex 2026-10-06): tên toàn ký tự VÔ HÌNH (Hangul filler U+3164/U+115F/U+FFA0 là
   `\p{L}`), tên khổ toàn phần/chữ toán học/Cyrillic giả Latin đều được nhận; UNIQUE của cột `name`
   phân biệt hoa thường nên `Kage`/`kage` là hai nhân vật khác nhau. Đổi luật là việc của chủ dự án (đã đưa vào bảng câu hỏi).
+  **Đã đổi cho tên MỚI**: 2026-10-11 chặn ký tự vô hình + dạng tương thích (`validateNewName`);
+  2026-10-14 chuẩn hoá **NFC** trước khi kiểm và lưu dạng NFC (`normalizeNewName` trong
+  `CreateCharacterUseCase`) — tiếng Việt gõ dấu tách rời được nhận. Trùng hoa-thường vẫn mở.
 - **Thông điệp lỗi của `validateName` KHÔNG chép nguyên văn tên** (2026-10-06): gateway log nó ở mỗi
   lượt tạo sai; chỉ ghi độ dài + `U+XXXX` của ký tự sai đầu tiên (`CharacterTest`). Cùng luật cho
   `Account.validateUsername`.

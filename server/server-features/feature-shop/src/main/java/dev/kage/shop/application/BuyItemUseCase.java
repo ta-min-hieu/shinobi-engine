@@ -31,7 +31,7 @@ public final class BuyItemUseCase {
         if (listing == null) {
             return BuyResult.ITEM_NOT_IN_SHOP;
         }
-        long totalCost = listing.buyPrice() * quantity;
+        long totalCost = listing.totalBuyCost(quantity);
 
         AtomicReference<BuyResult> resultHolder = new AtomicReference<BuyResult>();
         try {

@@ -23,7 +23,8 @@ public final class CreateCharacterUseCase {
         this.transactionRunner = transactionRunner;
     }
 
-    public Character execute(long accountId, String name, String idempotencyKey) {
+    public Character execute(long accountId, String requestedName, String idempotencyKey) {
+        String name = Character.normalizeNewName(requestedName);
         Character.validateNewName(name);
 
         // Kiểm sớm, KHÔNG khoá — chỉ để account đã đầy khỏi mở transaction. Phép kiểm quyết định là

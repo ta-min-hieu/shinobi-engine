@@ -45,6 +45,18 @@ class CreateGuildUseCaseTest {
     }
 
     @Test
+    void shouldAcceptDecomposedVietnameseAndStoreItComposed() {
+        FakeGuildPort port = new FakeGuildPort();
+        CreateGuildUseCase useCase = new CreateGuildUseCase(port);
+
+        // "Kiếm_Tông" với dấu tách rời (NFD) — README dòng 42, 2026-10-14.
+        CreateGuildUseCase.Result result = useCase.execute(5, "Kie\u0302\u0301m_To\u0302ng");
+
+        assertThat(result.outcome()).isEqualTo(CreateGuildUseCase.Outcome.OK);
+        assertThat(result.guild().name()).isEqualTo("Ki\u1EBFm_T\u00F4ng");
+    }
+
+    @Test
     void shouldAcceptVietnameseDiacritics() {
         FakeGuildPort port = new FakeGuildPort();
 

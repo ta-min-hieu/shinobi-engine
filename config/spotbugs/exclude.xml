@@ -93,6 +93,13 @@
         <Bug pattern="PREDICTABLE_RANDOM"/>
     </Match>
 
+    <!-- Khoảng chờ ngẫu nhiên trước khi chạy lại transaction bị huỷ vì deadlock (2026-10-14) — chỉ để
+         hai bên đụng nhau không chạy lại đúng cùng lúc, không phải giá trị bảo mật. -->
+    <Match>
+        <Class name="dev.kage.server.database.JdbcTransactionRunner"/>
+        <Bug pattern="PREDICTABLE_RANDOM"/>
+    </Match>
+
     <!-- Kiểm rò bộ nhớ: màn world đã dispose phải được GC thu hồi (WeakReference) — gọi System.gc()
          là CÁCH DUY NHẤT để hỏi câu đó, không phải tối ưu hiệu năng. -->
     <Match>

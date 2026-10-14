@@ -125,6 +125,9 @@ class ContentReferenceIntegrationTest {
                 """))
                 .as("drop_table_id trỏ sang bảng của loài KHÁC — hai đường đọc nói hai câu khác nhau")
                 .isEmpty();
+        assertThat(readColumn("SELECT code FROM monster_template WHERE drop_table_id IS NULL"))
+                .as("drop_table_id NULL trong khi bảng cùng mã có thật — cột nói 'không có bảng rơi' (V53)")
+                .isEmpty();
     }
 
     @Test

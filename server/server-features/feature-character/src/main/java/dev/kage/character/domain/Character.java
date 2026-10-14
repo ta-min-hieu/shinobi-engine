@@ -84,11 +84,23 @@ public record Character(
      * khác hoa-thường — so trùng kiểu đó cần index mới ở DB.
      */
     public static void validateNewName(String name) {
+        // Gọi SAU normalizeNewName: chuỗi NFD tới đây đã thành NFC.
         validateName(name);
         if (!Normalizer.isNormalized(name, Normalizer.Form.NFKC)
                 || name.codePoints().anyMatch(Character::isInvisibleLetter)) {
             throw new IllegalArgumentException("tên nhân vật chứa ký tự vô hình hoặc dạng tương thích");
         }
+    }
+
+    /**
+     * Dạng lưu của một tên MỚI: chuẩn hoá Unicode NFC (chủ dự án chốt 2026-10-14, docs/README.md dòng 42).
+     * Bàn phím/IME có thể gửi tiếng Việt dạng NFD — "ê" thành "e" + dấu mũ rời (U+0302, nhóm {@code \p{M}}
+     * chứ không phải {@code \p{L}}) — và trước đó tên như vậy bị từ chối dù hiển thị y hệt tên hợp lệ.
+     * Chuẩn hoá trước khi kiểm và LƯU dạng NFC, để cùng một tên luôn là cùng một chuỗi byte (UNIQUE ở DB
+     * so theo byte). {@code null} đi qua nguyên trạng cho {@link #validateNewName} báo lỗi.
+     */
+    public static String normalizeNewName(String name) {
+        return name == null ? null : Normalizer.normalize(name, Normalizer.Form.NFC);
     }
 
     /**

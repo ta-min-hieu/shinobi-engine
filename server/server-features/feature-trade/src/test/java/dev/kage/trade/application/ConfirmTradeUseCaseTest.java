@@ -207,4 +207,26 @@ class ConfirmTradeUseCaseTest {
 
         assertThat(result).isEqualTo(ConfirmTradeUseCase.Result.NOT_FOUND);
     }
+
+    /** README dòng 25(ii), chủ dự án chặn 2026-10-14: người được mời chưa nhận lời thì chưa có gì để xác nhận. */
+    @Test
+    void shouldReturnNotFoundAndNotConfirm_whenSessionIsStillPendingAccept() {
+        FakeTradeSessionPort sessionPort = new FakeTradeSessionPort();
+        TradeSession session = sessionPort.createRequest(1, 5);
+        ConfirmTradeUseCase useCase = newUseCase(new TradePorts(
+                sessionPort,
+                new FakeTradeInventoryPort(),
+                new FakeTradeGoldPort(),
+                new FakeTradeAuditPort(),
+                new FakeIdempotencyPort()));
+
+        ConfirmTradeUseCase.Result requesterResult = useCase.execute(session.id(), 1, "key-1");
+        ConfirmTradeUseCase.Result targetResult = useCase.execute(session.id(), 5, "key-2");
+
+        assertThat(requesterResult).isEqualTo(ConfirmTradeUseCase.Result.NOT_FOUND);
+        assertThat(targetResult).isEqualTo(ConfirmTradeUseCase.Result.NOT_FOUND);
+        assertThat(sessionPort.findActiveSessionOfCharacter(1))
+                .as("phiên vẫn còn, chưa thi hành")
+                .isPresent();
+    }
 }

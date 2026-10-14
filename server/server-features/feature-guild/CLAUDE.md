@@ -72,6 +72,8 @@ Dialogue ở Phase 6).
 - **Luật bị CHÉP sang `GuildName`** (không gọi thẳng): module này cấm phụ thuộc feature-character,
   `shared-common` cấm business logic. `GuildNameParityTest` (server-gateway — module duy nhất thấy cả
   hai) so hai luật trên cùng một bộ mẫu ⇒ sửa một bên quên bên kia là build đỏ.
+- **Chuẩn hoá NFC trước khi kiểm và lưu** (2026-10-14, `GuildName.normalize` — bản chép của
+  `Character.normalizeNewName`, `GuildNameParityTest` giữ khớp).
 - **Chỉ kiểm lúc TẠO** (`CreateGuildUseCase`, trước mọi lời gọi Port ⇒ `Outcome.INVALID_NAME`), KHÔNG
   ở compact constructor của `Guild`: bang tạo trước ngày này có thể dài tới 32 ký tự/có dấu cách, dựng
   lại từ DB không được nổ. Xin gia nhập theo tên KHÔNG kiểm luật (tên sai thì chỉ là không tìm thấy).

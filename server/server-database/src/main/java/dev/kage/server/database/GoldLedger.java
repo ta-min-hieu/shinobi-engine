@@ -91,8 +91,10 @@ public final class GoldLedger {
      *
      * @return {@code true} nếu trừ được (đủ gold); {@code false} thì KHÔNG đổi gì và KHÔNG ghi tạm
      *     thay đổi nào — "không đủ tiền" không phải một lần vàng đổi.
+     * @throws IllegalArgumentException nếu {@code amount} âm — xem {@link #requireNonNegative}
      */
     public static boolean deduct(Connection connection, long characterId, long amount, String reasonKey) {
+        requireNonNegative(amount);
         return JdbcOperations.queryOne(
                         connection, DEDUCT_IF_ENOUGH, rs -> rs.getLong("gold"), amount, characterId, amount)
                 .map(newBalance -> {
@@ -107,8 +109,10 @@ public final class GoldLedger {
      *
      * @throws GoldCapExceededException nếu số dư sau khi cộng sẽ vượt trần — KHÔNG đổi gì; người gọi
      *     đang ở giữa một transaction và exception này làm nó rollback trọn
+     * @throws IllegalArgumentException nếu {@code amount} âm — xem {@link #requireNonNegative}
      */
     public static void credit(Connection connection, long characterId, long amount, String reasonKey) {
+        requireNonNegative(amount);
         // amount > MAX_GOLD ⇒ ngưỡng âm ⇒ không dòng nào khớp ⇒ đi xuống nhánh vượt trần, đúng ý.
         long highestBalanceThatStillFits = MAX_GOLD - amount;
         Optional<Long> newBalance = JdbcOperations.queryOne(
@@ -147,6 +151,17 @@ public final class GoldLedger {
     /** Transaction đã rollback — vứt thay đổi đi, KHÔNG báo cho ai (số dư đó chưa từng tồn tại). */
     static void discardPending(Connection connection) {
         PENDING.remove(connection);
+    }
+
+    /**
+     * Số âm đảo chiều tiền: {@code deduct(-100)} là CỘNG 100 vàng mà bỏ qua trần, {@code credit(-100)}
+     * là trừ mà bỏ qua điều kiện đủ tiền. Không đường hợp lệ nào gửi số âm (chủ dự án chặn 2026-10-14,
+     * README dòng 25(iv)); ném để transaction đang mở rollback trọn.
+     */
+    private static void requireNonNegative(long amount) {
+        if (amount < 0) {
+            throw new IllegalArgumentException("Số vàng âm: " + amount);
+        }
     }
 
     private static void stage(Connection connection, GoldChange change) {

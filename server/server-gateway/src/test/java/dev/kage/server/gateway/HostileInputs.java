@@ -50,7 +50,6 @@ final class HostileInputs {
                 "Kage\u200EHero",
                 "Kage\u00A0Hero",
                 "Kage\u3000Hero",
-                "Hoa\u0300ng",
                 "\uD83D\uDE00\uD83D\uDE00",
                 "Kage-Hero",
                 "<b>Kage</b>",
