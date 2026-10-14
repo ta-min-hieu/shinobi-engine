@@ -341,11 +341,14 @@ final class DuelController {
             ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_ALREADY_IN_DUEL, "duel.error.already_in_duel",
             ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_TARGET_ALREADY_IN_DUEL, "duel.error.target_already_in_duel",
             ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_TARGET_NOT_FOUND, "duel.error.target_not_found",
-            ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_TARGET_OFFLINE, "duel.error.target_offline");
+            ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_TARGET_OFFLINE, "duel.error.target_offline",
+            ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_IN_DUNGEON, "duel.error.in_dungeon",
+            ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_TARGET_IN_DUNGEON, "duel.error.target_in_dungeon");
 
     private static final Map<AcceptDuelOutcome, String> ACCEPT_MESSAGE_KEYS = Map.of(
             AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_OK, "duel.notice.accepted",
-            AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_NOT_FOUND, "duel.error.challenge_not_found");
+            AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_NOT_FOUND, "duel.error.challenge_not_found",
+            AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_IN_DUNGEON, "duel.error.duelist_in_dungeon");
 
     private static final Map<DeclineDuelOutcome, String> DECLINE_MESSAGE_KEYS = Map.of(
             DeclineDuelOutcome.DECLINE_DUEL_OUTCOME_OK, "duel.notice.rejected",

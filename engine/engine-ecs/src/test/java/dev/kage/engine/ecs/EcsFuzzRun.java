@@ -301,7 +301,13 @@ final class EcsFuzzRun {
         KEntity handle = stale.get(random.nextInt(stale.size()));
         ProbeComponent component = ProbeKinds.create(random.nextInt(ProbeKinds.COUNT));
         component.owner = -handle.id();
-        handle.add(component);
+        // Handle chết NÉM từ 2026-10-14 (KEntity#add); điều fuzz canh vẫn là không gì lọt sang entity khác.
+        try {
+            handle.add(component);
+        } catch (IllegalStateException expected) {
+            return;
+        }
+        throw new AssertionError("add qua handle chết " + handle.id() + " phải ném IllegalStateException");
     }
 
     private void clear() {

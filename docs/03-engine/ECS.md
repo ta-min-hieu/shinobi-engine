@@ -37,6 +37,8 @@ Family    = Bộ lọc entity theo Component
 
 ⚠️ **Vì sao không giữ tham chiếu Entity**: entity bị huỷ → tham chiếu treo → dùng object đã chết. Giữ ID + tra cứu → phát hiện được entity không còn tồn tại.
 
+**Handle chết fail-fast** (chủ dự án chốt 2026-10-14, README dòng 46): `KEntity` của entity đã gỡ (hoặc có từ trước `EcsWorld.clear()`) có `isAlive() == false`; `has`/`ComponentMapper.has` trả `false`, còn `add` và `ComponentMapper.get` ném `IllegalStateException` — trước đó là no-op im lặng, nên một tham chiếu treo làm mất dữ liệu mà không ai biết. Gỡ giữa lúc `update` lặp là gỡ HOÃN: handle còn sống tới hết System hiện tại. Cùng đợt: `TriggerZoneSystem.setZones` từ chối hai zone trùng `zoneId` (trạng thái "đang ở trong" nhớ theo id, trùng id thì báo vào/ra luân phiên mỗi tick).
+
 ⚠️ **Phát hiện thật khi triển khai Phase 1**: Ashley (từ ~1.4 trở đi, gồm 1.7.4 đang dùng) **không expose ID số nguyên trên `Entity`** nữa (khác các bản rất cũ ~1.3.x). `engine-ecs` phải tự cấp `id` (long, tăng dần) lúc `EcsWorld.createEntity()` — độc lập hoàn toàn với Ashley. Đây là lý do thật, cụ thể để không bao giờ dùng ID nội bộ của Ashley: **nó không tồn tại để dùng.**
 
 ---

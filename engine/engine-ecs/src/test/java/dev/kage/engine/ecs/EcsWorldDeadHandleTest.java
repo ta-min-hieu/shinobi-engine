@@ -1,6 +1,7 @@
 package dev.kage.engine.ecs;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +22,9 @@ import dev.kage.engine.ecs.system.MovementSystem;
  * khi entity gốc được cấp lại, đọc/ghi qua handle cũ là đọc/ghi thẳng vào entity mới.
  * {@code EcsWorldLifecycleTest} đã chặn {@code removeEntity} qua handle cũ; lớp này chặn nốt
  * {@code add}, {@code has} và {@code ComponentMapper}.
+ *
+ * <p>Từ 2026-10-14 (README dòng 46(i)) {@code add}/{@code ComponentMapper.get} trên handle chết NÉM
+ * thay vì im lặng — các ô dưới vẫn khẳng định bất biến gốc (không gì lọt sang entity khác) SAU cú ném.
  */
 class EcsWorldDeadHandleTest {
 
@@ -49,7 +53,8 @@ class EcsWorldDeadHandleTest {
         KEntity dead = world.createEntity().add(new PositionComponent());
         world.removeEntity(dead);
 
-        dead.add(new VelocityComponent()); // entity gốc đang nằm trong pool của Ashley
+        // entity gốc đang nằm trong pool của Ashley
+        assertThatThrownBy(() -> dead.add(new VelocityComponent())).isInstanceOf(IllegalStateException.class);
         KEntity fresh = world.createEntity(); // ...và được cấp lại ở đây
         world.update(1f);
 
@@ -69,7 +74,7 @@ class EcsWorldDeadHandleTest {
         VelocityComponent strayVelocity = new VelocityComponent();
         strayVelocity.x = 5f;
 
-        dead.add(strayVelocity).add(new PositionComponent());
+        assertThatThrownBy(() -> dead.add(strayVelocity)).isInstanceOf(IllegalStateException.class);
         world.update(1f);
 
         assertThat(POSITION.get(fresh)).isSameAs(freshPosition);
@@ -78,7 +83,7 @@ class EcsWorldDeadHandleTest {
     }
 
     @Test
-    void shouldLookEmpty_whenDeadHandleIsReadAfterRecycling() {
+    void shouldFailFastOnRead_butAnswerHasHonestly_whenDeadHandleIsReadAfterRecycling() {
         EcsWorld world = new EcsWorld();
         KEntity dead = world.createEntity().add(new PositionComponent());
         world.removeEntity(dead);
@@ -86,7 +91,8 @@ class EcsWorldDeadHandleTest {
 
         assertThat(dead.has(PositionComponent.class)).isFalse();
         assertThat(POSITION.has(dead)).isFalse();
-        assertThat(POSITION.get(dead)).isNull();
+        assertThat(dead.isAlive()).isFalse();
+        assertThatThrownBy(() -> POSITION.get(dead)).isInstanceOf(IllegalStateException.class);
         assertThat(VELOCITY.has(dead)).isFalse();
     }
 
@@ -98,10 +104,11 @@ class EcsWorldDeadHandleTest {
         PositionComponent nextPosition = new PositionComponent();
         KEntity nextSession = world.createEntity().add(nextPosition);
 
-        previousSession.add(new VelocityComponent());
+        assertThatThrownBy(() -> previousSession.add(new VelocityComponent()))
+                .isInstanceOf(IllegalStateException.class);
 
         assertThat(previousSession.has(PositionComponent.class)).isFalse();
-        assertThat(POSITION.get(previousSession)).isNull();
+        assertThat(previousSession.isAlive()).isFalse();
         assertThat(VELOCITY.has(nextSession)).isFalse();
         assertThat(POSITION.get(nextSession)).isSameAs(nextPosition);
     }
@@ -124,6 +131,7 @@ class EcsWorldDeadHandleTest {
 
         assertThat(readableDuringPass).containsExactly(true);
         assertThat(POSITION.has(entity)).isFalse();
+        assertThat(entity.isAlive()).isFalse();
         assertThat(world.entityCount()).isZero();
     }
 

@@ -139,19 +139,18 @@ final class ArenaInstanceRegistry {
     /**
      * Hỏi hầm ngục NGOÀI khoá (thứ tự khoá hầm ngục → đấu trường). Chỉ là câu trả lời sớm cho người
      * chơi: người thách vào hầm ngục SAU câu này thì {@link #acceptDuel} kiểm lại, nên không có khe hở.
-     * Protocol không có outcome "đang ở hầm ngục" — {@code ALREADY_IN_DUEL}/{@code TARGET_ALREADY_IN_DUEL}
-     * ("đang bận một instance") là gần nhất, cùng cách hầm ngục trả {@code ALREADY_IN_DUNGEON} cho người
-     * đang đấu.
+     * Trả outcome RIÊNG cho "đang ở hầm ngục" (2026-10-14, README dòng 27) — trước đó dùng tạm
+     * {@code ALREADY_IN_DUEL}/{@code TARGET_ALREADY_IN_DUEL} và người chơi đọc sai lý do.
      */
     ChallengeResult challengeDuel(long challengerCharacterId, long targetCharacterId) {
         if (challengerCharacterId == targetCharacterId) {
             return new ChallengeResult(ChallengeOutcome.CANNOT_CHALLENGE_SELF, 0);
         }
         if (inDungeon.test(challengerCharacterId)) {
-            return new ChallengeResult(ChallengeOutcome.ALREADY_IN_DUEL, 0);
+            return new ChallengeResult(ChallengeOutcome.IN_DUNGEON, 0);
         }
         if (inDungeon.test(targetCharacterId)) {
-            return new ChallengeResult(ChallengeOutcome.TARGET_ALREADY_IN_DUEL, 0);
+            return new ChallengeResult(ChallengeOutcome.TARGET_IN_DUNGEON, 0);
         }
         return registerChallenge(challengerCharacterId, targetCharacterId);
     }
@@ -184,7 +183,7 @@ final class ArenaInstanceRegistry {
             // ai vào nữa; ai đã vào TRƯỚC đó thì câu hỏi này thấy. Hỏi trước khi giữ chỗ thì một lượt kéo
             // cả nhóm lọt được vào giữa hai bước.
             if (inDungeon.test(challengerCharacterId) || inDungeon.test(characterId)) {
-                return new AcceptResult(AcceptOutcome.NOT_FOUND, 0);
+                return new AcceptResult(AcceptOutcome.IN_DUNGEON, 0);
             }
             // Đọc DB NGOÀI khoá — xem javadoc lớp.
             DuelEntrant challenger = loadEntrant(challengerCharacterId);
@@ -621,14 +620,17 @@ final class ArenaInstanceRegistry {
         CANNOT_CHALLENGE_SELF,
         ALREADY_IN_DUEL,
         TARGET_ALREADY_IN_DUEL,
-        TARGET_OFFLINE
+        TARGET_OFFLINE,
+        IN_DUNGEON,
+        TARGET_IN_DUNGEON
     }
 
     record ChallengeResult(ChallengeOutcome outcome, long challengeId) {}
 
     enum AcceptOutcome {
         OK,
-        NOT_FOUND
+        NOT_FOUND,
+        IN_DUNGEON
     }
 
     record AcceptResult(AcceptOutcome outcome, long challengerCharacterId) {}

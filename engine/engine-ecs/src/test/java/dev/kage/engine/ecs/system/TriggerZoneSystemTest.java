@@ -1,6 +1,7 @@
 package dev.kage.engine.ecs.system;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -104,5 +105,21 @@ class TriggerZoneSystemTest {
         world.update(1f);
 
         assertThat(entered).isEmpty();
+    }
+
+    /**
+     * Trạng thái "đang ở trong" nhớ theo {@code zoneId}: hai zone trùng id thì đứng trong một, ngoài cái
+     * kia là bị báo vào/ra luân phiên mỗi tick. Chặn lúc nạp (README dòng 46(ii), 2026-10-14).
+     */
+    @Test
+    void shouldRejectZones_whenTwoShareAZoneId() {
+        TriggerZoneSystem system = new TriggerZoneSystem();
+        List<NamedZone> duplicated = List.of(
+                new NamedZone("town_safe_area", new Aabb(0f, 0f, 10f, 10f)),
+                new NamedZone("town_safe_area", new Aabb(20f, 0f, 10f, 10f)));
+
+        assertThatThrownBy(() -> system.setZones(duplicated))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("town_safe_area");
     }
 }

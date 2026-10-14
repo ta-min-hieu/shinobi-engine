@@ -3015,7 +3015,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     ArenaInstanceRegistry.ChallengeOutcome.TARGET_ALREADY_IN_DUEL,
                     ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_TARGET_ALREADY_IN_DUEL,
                     ArenaInstanceRegistry.ChallengeOutcome.TARGET_OFFLINE,
-                    ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_TARGET_OFFLINE);
+                    ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_TARGET_OFFLINE,
+                    ArenaInstanceRegistry.ChallengeOutcome.IN_DUNGEON,
+                    ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_IN_DUNGEON,
+                    ArenaInstanceRegistry.ChallengeOutcome.TARGET_IN_DUNGEON,
+                    ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_TARGET_IN_DUNGEON);
 
     private static ChallengeDuelOutcome toProtoOutcome(ArenaInstanceRegistry.ChallengeOutcome outcome) {
         return CHALLENGE_DUEL_OUTCOME_MAPPING.get(outcome);
@@ -3037,9 +3041,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             ChannelHandlerContext ctx, int sequenceId, long characterId, AcceptDuelCommand command) {
         ArenaInstanceRegistry.AcceptResult result =
                 worldGateway.arenaInstanceRegistry().acceptDuel(characterId, command.getChallengeId());
-        AcceptDuelOutcome outcome = result.outcome() == ArenaInstanceRegistry.AcceptOutcome.OK
-                ? AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_OK
-                : AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_NOT_FOUND;
+        AcceptDuelOutcome outcome =
+                switch (result.outcome()) {
+                    case OK -> AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_OK;
+                    case NOT_FOUND -> AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_NOT_FOUND;
+                    case IN_DUNGEON -> AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_IN_DUNGEON;
+                };
         AcceptDuelResponse response =
                 AcceptDuelResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_ACCEPT_DUEL_RESPONSE_VALUE, sequenceId, response.toByteArray());

@@ -23,6 +23,11 @@ enum ChallengeDuelOutcome {
   CHALLENGE_DUEL_OUTCOME_TARGET_ALREADY_IN_DUEL = 4;
   CHALLENGE_DUEL_OUTCOME_TARGET_NOT_FOUND = 5; // tên không tồn tại (character)
   CHALLENGE_DUEL_OUTCOME_TARGET_OFFLINE = 6;
+  // Chỉ THÊM (2026-10-14, README dòng 27): trước đó người đang ở hầm ngục nhận ALREADY_IN_DUEL /
+  // TARGET_ALREADY_IN_DUEL và đọc "đang đấu" — sai lý do. protocolVersion KHÔNG tăng; client cũ gặp
+  // giá trị lạ thì rơi vào UNRECOGNIZED như mọi enum protobuf.
+  CHALLENGE_DUEL_OUTCOME_IN_DUNGEON = 7; // người thách đang ở hầm ngục
+  CHALLENGE_DUEL_OUTCOME_TARGET_IN_DUNGEON = 8; // người bị thách đang ở hầm ngục
 }
 
 message ChallengeDuelResponse {
@@ -38,6 +43,9 @@ enum AcceptDuelOutcome {
   ACCEPT_DUEL_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
   ACCEPT_DUEL_OUTCOME_OK = 1;
   ACCEPT_DUEL_OUTCOME_NOT_FOUND = 2;
+  // Chỉ THÊM (2026-10-14, README dòng 27): một trong hai người đã vào hầm ngục sau lúc thách — lời
+  // thách bị tiêu, trận không mở. Trước đó trả NOT_FOUND.
+  ACCEPT_DUEL_OUTCOME_IN_DUNGEON = 3;
 }
 
 message AcceptDuelResponse {

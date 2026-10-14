@@ -96,7 +96,7 @@ class DuelWhileInDungeonTest {
         enterDungeon();
 
         assertThat(arena.challengeDuel(LEADER_ID, OUTSIDER_ID).outcome())
-                .isEqualTo(ArenaInstanceRegistry.ChallengeOutcome.ALREADY_IN_DUEL);
+                .isEqualTo(ArenaInstanceRegistry.ChallengeOutcome.IN_DUNGEON);
     }
 
     @Test
@@ -104,7 +104,7 @@ class DuelWhileInDungeonTest {
         enterDungeon();
 
         assertThat(arena.challengeDuel(OUTSIDER_ID, LEADER_ID).outcome())
-                .isEqualTo(ArenaInstanceRegistry.ChallengeOutcome.TARGET_ALREADY_IN_DUEL);
+                .isEqualTo(ArenaInstanceRegistry.ChallengeOutcome.TARGET_IN_DUNGEON);
     }
 
     /** Lời thách gửi khi cả hai còn ở world chính, người THÁCH vào hầm ngục trước khi được chấp nhận. */
@@ -114,7 +114,7 @@ class DuelWhileInDungeonTest {
         enterDungeon();
 
         assertThat(arena.acceptDuel(OUTSIDER_ID, challengeId).outcome())
-                .isEqualTo(ArenaInstanceRegistry.AcceptOutcome.NOT_FOUND);
+                .isEqualTo(ArenaInstanceRegistry.AcceptOutcome.IN_DUNGEON);
 
         assertThat(arena.worldFacadeFor(LEADER_ID))
                 .as("người ở hầm ngục KHÔNG được gắn thêm vào đấu trường")
@@ -137,7 +137,7 @@ class DuelWhileInDungeonTest {
         enterDungeon(); // LEADER bấm, kéo theo MEMBER
 
         assertThat(arena.acceptDuel(MEMBER_ID, challengeId).outcome())
-                .isEqualTo(ArenaInstanceRegistry.AcceptOutcome.NOT_FOUND);
+                .isEqualTo(ArenaInstanceRegistry.AcceptOutcome.IN_DUNGEON);
 
         assertThat(arena.worldFacadeFor(MEMBER_ID)).isEmpty();
         assertThat(arena.worldFacadeFor(OUTSIDER_ID)).isEmpty();

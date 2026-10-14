@@ -11,12 +11,13 @@ package dev.kage.engine.ecs;
  * <p>Không giữ tham chiếu {@code KEntity} lâu dài xuyên nhiều tick nếu entity có thể bị huỷ giữa
  * chừng — luôn tra cứu lại theo ID khi cần (ECS.md §2, tránh tham chiếu treo).
  *
- * <p>Handle của entity đã gỡ (hoặc có từ trước {@link EcsWorld#clear}) là handle CHẾT: nó trông như
- * một entity rỗng mãi mãi — {@link #has} trả {@code false}, {@code ComponentMapper.get} không thấy
- * gì, {@link #add} là no-op. Phải thế vì {@code PooledEngine} của Ashley cấp lại đúng entity gốc đó
- * cho lần {@code createEntity()} kế tiếp: handle cũ còn trỏ vào entity gốc thì đọc ra component của
- * một entity MỚI hoàn toàn khác, và ghi qua nó là ghi vào entity đó (hoặc, lúc entity gốc còn nằm
- * trong pool, cài sẵn component cho entity chưa ra đời).
+ * <p>Handle của entity đã gỡ (hoặc có từ trước {@link EcsWorld#clear}) là handle CHẾT
+ * ({@link #isAlive} {@code false}): {@link #has} và {@code ComponentMapper.has} trả {@code false}, còn
+ * {@link #add} và {@code ComponentMapper.get} NÉM {@link IllegalStateException} (fail-fast từ 2026-10-14;
+ * trước đó là no-op im lặng). Handle phải tách khỏi entity gốc vì {@code PooledEngine} của Ashley
+ * cấp lại đúng entity gốc đó cho lần {@code createEntity()} kế tiếp: handle cũ còn trỏ vào entity
+ * gốc thì đọc ra component của một entity MỚI hoàn toàn khác, và ghi qua nó là ghi vào entity đó
+ * (hoặc, lúc entity gốc còn nằm trong pool, cài sẵn component cho entity chưa ra đời).
  */
 public final class KEntity {
 
@@ -45,12 +46,32 @@ public final class KEntity {
         return id;
     }
 
-    /** Gắn (hoặc ghi đè) component. No-op trên handle chết, cùng lệ với {@link EcsWorld#removeEntity}. */
+    /**
+     * {@code false} khi entity đã bị gỡ (hoặc có từ trước {@link EcsWorld#clear}) — handle chết. Entity
+     * đang chờ gỡ cuối System hiện tại (gỡ giữa lúc {@link EcsWorld#update}) vẫn còn sống.
+     */
+    public boolean isAlive() {
+        return !ashleyEntity.equals(DETACHED);
+    }
+
+    /**
+     * Gắn (hoặc ghi đè) component.
+     *
+     * @throws IllegalStateException trên handle chết — ghi vào entity đã gỡ luôn là lỗi của bên gọi
+     *     (quyết định chủ dự án 2026-10-14, README dòng 46(i)); trước đó là no-op im lặng, nên một
+     *     tham chiếu treo làm mất dữ liệu mà không ai biết
+     */
     public <T extends Component> KEntity add(T component) {
-        if (!ashleyEntity.equals(DETACHED)) {
-            ashleyEntity.add(component);
-        }
+        requireAlive();
+        ashleyEntity.add(component);
         return this;
+    }
+
+    /** Ném nếu handle đã chết — dùng ở mọi đường GHI/ĐỌC component; {@link #has} vẫn là câu hỏi hợp lệ. */
+    void requireAlive() {
+        if (!isAlive()) {
+            throw new IllegalStateException("Entity " + id + " đã bị gỡ khỏi world — handle chết (ECS.md §2)");
+        }
     }
 
     public boolean has(Class<? extends Component> type) {

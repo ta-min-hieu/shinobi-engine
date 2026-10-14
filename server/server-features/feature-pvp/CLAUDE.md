@@ -66,10 +66,10 @@ bản** (không phải Battlefield 5v5 hay Chiếm Lãnh Địa guild war — 2 
   hoàn toàn trong bộ nhớ (không bảng DB nào cho challenge, ephemeral như Trade session).
   Người đang ở HẦM NGỤC thì không thách, không bị thách, không vào trận được (2026-10-03,
   `DuelWhileInDungeonTest`) — chiều ngược của "hầm ngục bỏ qua người đang đấu"; cho qua là một nhân
-  vật có hai thực thể sống. Trên dây dùng lại outcome sẵn có (`ALREADY_IN_DUEL` /
-  `TARGET_ALREADY_IN_DUEL` khi thách, `NOT_FOUND` khi chấp nhận), không đổi protocol — câu chữ người
-  chơi thấy vì vậy nói "đang đấu" chứ không nói "đang ở hầm ngục"; giữ hay đổi đang chờ chủ dự án
-  (["🔴 ĐANG CHỜ CHỦ DỰ ÁN"](../../../docs/README.md)).
+  vật có hai thực thể sống. Trên dây có outcome RIÊNG (chủ dự án chọn 2026-10-14, README dòng 27;
+  chỉ THÊM enum, `protocolVersion` không tăng): `IN_DUNGEON` / `TARGET_IN_DUNGEON` khi thách,
+  `ACCEPT_DUEL_OUTCOME_IN_DUNGEON` khi chấp nhận (lời thách đã bị tiêu). Trước đó dùng tạm
+  `ALREADY_IN_DUEL` / `TARGET_ALREADY_IN_DUEL` / `NOT_FOUND`, nên người chơi đọc "đang đấu".
 - **Không giới hạn rating khi ghép trận** (không phải matchmaking tự động — người chơi tự chọn đối
   thủ qua tên) — MMR ở lát cắt này CHỈ là con số hiển thị/xếp hạng, chưa dùng để ghép trận tự động.
 

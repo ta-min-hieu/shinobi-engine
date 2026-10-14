@@ -1,6 +1,8 @@
 package dev.kage.engine.ecs.system;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.BiConsumer;
 
 import dev.kage.engine.ecs.ComponentMapper;
@@ -42,8 +44,21 @@ public final class TriggerZoneSystem extends IteratingKSystem {
         this.onZoneExited = onZoneExited;
     }
 
-    /** Thay toàn bộ zone hiện tại. Copy phòng thủ (Điều 43), giống {@link TerrainCollisionSystem#setObstacles}. */
+    /**
+     * Thay toàn bộ zone hiện tại. Copy phòng thủ (Điều 43), giống {@link TerrainCollisionSystem#setObstacles}.
+     *
+     * @throws IllegalArgumentException nếu hai zone trùng {@code zoneId} — trạng thái "đang ở trong"
+     *     được nhớ THEO {@code zoneId}, nên đứng trong một zone mà ngoài zone kia thì bị báo vào/ra
+     *     luân phiên MỖI TICK (quyết định chủ dự án 2026-10-14, README dòng 46(ii)); chặn lúc nạp, không
+     *     để chạy sai im lặng
+     */
     public void setZones(List<NamedZone> zones) {
+        Set<String> seen = new HashSet<>();
+        for (NamedZone zone : zones) {
+            if (!seen.add(zone.zoneId())) {
+                throw new IllegalArgumentException("Hai trigger zone trùng zoneId: " + zone.zoneId());
+            }
+        }
         this.zones = List.copyOf(zones);
     }
 

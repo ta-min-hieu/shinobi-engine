@@ -18,7 +18,14 @@ public final class ComponentMapper<T extends Component> {
         return new ComponentMapper<>(com.badlogic.ashley.core.ComponentMapper.getFor(type));
     }
 
+    /**
+     * Component của {@code entity}, {@code null} nếu entity sống mà không có component này.
+     *
+     * @throws IllegalStateException nếu {@code entity} là handle chết ({@link KEntity#isAlive}) — đọc
+     *     qua tham chiếu treo luôn là lỗi của bên gọi, không phải "không có component"
+     */
     public T get(KEntity entity) {
+        entity.requireAlive();
         return delegate.get(entity.raw());
     }
 

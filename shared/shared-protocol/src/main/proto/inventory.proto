@@ -52,10 +52,14 @@ message EquipItemResponse {
   // nên thanh máu kẹt ở giá trị lúc VÀO WORLD cho tới lần hồi sinh ĐẦU TIÊN. Playtest
   // 2026-09-05: mặc trọn bộ `novice_*` (+18 máu) mà HUD vẫn `100 / 100`.
   //
-  // Máu HIỆN TẠI đi kèm vì nó cũng đổi: server DỊCH máu hiện tại theo độ chênh của máu tối đa
-  // (mặc đồ +HP không phải nút hồi máu, gỡ đồ không được giết người chơi).
+  // `current_hp` KHÔNG ĐƯỢC ĐIỀN — luôn bằng 0 (quyết định chủ dự án 2026-10-14, README dòng 48).
+  // Server có DỊCH máu hiện tại theo độ chênh của máu tối đa (mặc đồ +HP không phải nút hồi máu,
+  // gỡ đồ không được giết người chơi), nhưng việc đó xảy ra trong tick World SAU khi response này đã
+  // đi (ADR-043 D5 cách (a), không chờ tick) — nên con số đúng tới bằng `HealthChangedEvent` (opcode
+  // 408, ADR-046), đường ống DUY NHẤT của máu hiện tại. Client phải bỏ qua field này; giữ số hiệu
+  // field vì không được xoá/tái dùng (NETWORK.md §6).
   //
-  // Chỉ có nghĩa khi thao tác THÀNH CÔNG; thất bại thì cả hai bằng 0 và client phải bỏ qua
+  // `max_hp` chỉ có nghĩa khi thao tác THÀNH CÔNG; thất bại thì bằng 0 và client phải bỏ qua
   // (`max_hp <= 0` ⇒ giữ nguyên giá trị đang có, không đoán — cùng khuôn server cũ chưa gửi field).
   int32 current_hp = 3;
   int32 max_hp = 4;
@@ -80,10 +84,14 @@ message UnequipItemResponse {
   // nên thanh máu kẹt ở giá trị lúc VÀO WORLD cho tới lần hồi sinh ĐẦU TIÊN. Playtest
   // 2026-09-05: mặc trọn bộ `novice_*` (+18 máu) mà HUD vẫn `100 / 100`.
   //
-  // Máu HIỆN TẠI đi kèm vì nó cũng đổi: server DỊCH máu hiện tại theo độ chênh của máu tối đa
-  // (mặc đồ +HP không phải nút hồi máu, gỡ đồ không được giết người chơi).
+  // `current_hp` KHÔNG ĐƯỢC ĐIỀN — luôn bằng 0 (quyết định chủ dự án 2026-10-14, README dòng 48).
+  // Server có DỊCH máu hiện tại theo độ chênh của máu tối đa (mặc đồ +HP không phải nút hồi máu,
+  // gỡ đồ không được giết người chơi), nhưng việc đó xảy ra trong tick World SAU khi response này đã
+  // đi (ADR-043 D5 cách (a), không chờ tick) — nên con số đúng tới bằng `HealthChangedEvent` (opcode
+  // 408, ADR-046), đường ống DUY NHẤT của máu hiện tại. Client phải bỏ qua field này; giữ số hiệu
+  // field vì không được xoá/tái dùng (NETWORK.md §6).
   //
-  // Chỉ có nghĩa khi thao tác THÀNH CÔNG; thất bại thì cả hai bằng 0 và client phải bỏ qua
+  // `max_hp` chỉ có nghĩa khi thao tác THÀNH CÔNG; thất bại thì bằng 0 và client phải bỏ qua
   // (`max_hp <= 0` ⇒ giữ nguyên giá trị đang có, không đoán — cùng khuôn server cũ chưa gửi field).
   int32 current_hp = 3;
   int32 max_hp = 4;
@@ -131,10 +139,14 @@ message EnhanceItemResponse {
   // nên thanh máu kẹt ở giá trị lúc VÀO WORLD cho tới lần hồi sinh ĐẦU TIÊN. Playtest
   // 2026-09-05: mặc trọn bộ `novice_*` (+18 máu) mà HUD vẫn `100 / 100`.
   //
-  // Máu HIỆN TẠI đi kèm vì nó cũng đổi: server DỊCH máu hiện tại theo độ chênh của máu tối đa
-  // (mặc đồ +HP không phải nút hồi máu, gỡ đồ không được giết người chơi).
+  // `current_hp` KHÔNG ĐƯỢC ĐIỀN — luôn bằng 0 (quyết định chủ dự án 2026-10-14, README dòng 48).
+  // Server có DỊCH máu hiện tại theo độ chênh của máu tối đa (mặc đồ +HP không phải nút hồi máu,
+  // gỡ đồ không được giết người chơi), nhưng việc đó xảy ra trong tick World SAU khi response này đã
+  // đi (ADR-043 D5 cách (a), không chờ tick) — nên con số đúng tới bằng `HealthChangedEvent` (opcode
+  // 408, ADR-046), đường ống DUY NHẤT của máu hiện tại. Client phải bỏ qua field này; giữ số hiệu
+  // field vì không được xoá/tái dùng (NETWORK.md §6).
   //
-  // Chỉ có nghĩa khi thao tác THÀNH CÔNG; thất bại thì cả hai bằng 0 và client phải bỏ qua
+  // `max_hp` chỉ có nghĩa khi thao tác THÀNH CÔNG; thất bại thì bằng 0 và client phải bỏ qua
   // (`max_hp <= 0` ⇒ giữ nguyên giá trị đang có, không đoán — cùng khuôn server cũ chưa gửi field).
   int32 current_hp = 2;
   int32 max_hp = 3;
