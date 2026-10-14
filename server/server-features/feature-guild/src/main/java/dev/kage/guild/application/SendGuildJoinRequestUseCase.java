@@ -5,6 +5,7 @@ import java.util.Optional;
 import dev.kage.guild.domain.DuplicateGuildJoinRequestException;
 import dev.kage.guild.domain.Guild;
 import dev.kage.guild.domain.GuildDisbandedException;
+import dev.kage.guild.domain.GuildName;
 import dev.kage.guild.domain.GuildPort;
 
 /**
@@ -30,7 +31,7 @@ public final class SendGuildJoinRequestUseCase {
         if (guildName.indexOf('\0') >= 0) {
             return Result.GUILD_NOT_FOUND;
         }
-        Optional<Guild> guild = port.findByName(guildName);
+        Optional<Guild> guild = findExactThenNormalized(guildName);
         if (guild.isEmpty()) {
             return Result.GUILD_NOT_FOUND;
         }
@@ -47,6 +48,19 @@ public final class SendGuildJoinRequestUseCase {
             return Result.GUILD_NOT_FOUND;
         }
         return Result.OK;
+    }
+
+    /**
+     * Nguyên văn trước, dạng NFC sau (2026-10-14, README dòng 42): bang mới lưu tên NFC
+     * ({@link GuildName#normalize}), còn bang tạo trước 2026-09-29 mang tên dạng nào cũng phải xin vào được.
+     */
+    private Optional<Guild> findExactThenNormalized(String guildName) {
+        Optional<Guild> exact = port.findByName(guildName);
+        if (exact.isPresent()) {
+            return exact;
+        }
+        String normalized = GuildName.normalize(guildName);
+        return normalized.equals(guildName) ? exact : port.findByName(normalized);
     }
 
     public enum Result {

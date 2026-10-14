@@ -91,7 +91,8 @@ class ConfirmTradeUseCaseTest {
         useCase.execute(session.id(), 1, "key-a");
         useCase.execute(session.id(), 5, "key-b");
 
-        String item = "{\"itemId\":" + requesterItemId + ",\"quantity\":2}";
+        // Loại + cấp cường hoá đọc từ dòng nguồn TRƯỚC khi chuyển (README dòng 25(iii), 2026-10-14).
+        String item = "{\"itemId\":" + requesterItemId + ",\"quantity\":2,\"itemTemplateId\":200,\"enhanceLevel\":0}";
         assertThat(auditPort.loggedDetails)
                 .containsExactly(
                         "{\"sessionId\":" + session.id() + ",\"counterpartId\":5,\"goldGiven\":20,"

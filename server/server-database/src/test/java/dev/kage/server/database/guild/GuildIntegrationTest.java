@@ -121,6 +121,19 @@ class GuildIntegrationTest {
         assertThat(adapter.findMembershipOf(leaderB)).isEmpty();
     }
 
+    /** V54 (2026-10-14, README dòng 42): tên bang chỉ khác hoa-thường cũng là trùng. */
+    @Test
+    void shouldRejectGuildName_thatDiffersOnlyInCase() {
+        long leaderA = createFreshCharacter("GuildLeaderCa");
+        long leaderB = createFreshCharacter("GuildLeaderCb");
+        PostgresGuildAdapter adapter = newAdapter();
+        adapter.createGuild("KonohaCase", leaderA);
+
+        assertThatThrownBy(() -> adapter.createGuild("konohacase", leaderB))
+                .isInstanceOf(DuplicateGuildNameException.class);
+        assertThat(adapter.findMembershipOf(leaderB)).isEmpty();
+    }
+
     @Test
     void shouldApproveJoinRequest_andAddMemberAtomically() {
         long leader = createFreshCharacter("GuildLeader4");

@@ -187,10 +187,9 @@ final class DungeonInstanceRegistry {
         if (!DUNGEON_CODE.equals(dungeonCode)) {
             return EnterOutcome.UNKNOWN_DUNGEON;
         }
-        // Người bấm đang ở đấu trường cũng "đã ở trong một instance" — protocol không có outcome riêng
-        // cho trường hợp này (2026-10-02, xem admitIntoInstance), và cho qua là gắn họ vào HAI World.
-        if (isInAnyInstance(requestingCharacterId)) {
-            return EnterOutcome.ALREADY_IN_DUNGEON;
+        Optional<EnterOutcome> busy = busyElsewhere(requestingCharacterId);
+        if (busy.isPresent()) {
+            return busy.get();
         }
         Optional<PartyFacade.MyPartyView> myParty = partyFacade.findMyParty(requestingCharacterId);
         if (myParty.isEmpty()) {
@@ -376,9 +375,17 @@ final class DungeonInstanceRegistry {
         }
     }
 
-    /** Đang ở hầm ngục HOẶC đấu trường — tách riêng để {@link #enterDungeon} dưới trần CyclomaticComplexity. */
-    private boolean isInAnyInstance(long characterId) {
-        return isInDungeon(characterId) || inDuel.test(characterId);
+    /**
+     * Người bấm đã ở trong một instance — tách khỏi {@link #enterDungeon} để giữ hàm đó dưới trần
+     * CyclomaticComplexity. Đang ở đấu trường mà cho qua là gắn họ vào HAI World (2026-10-02, xem
+     * admitIntoInstance); outcome riêng {@code IN_DUEL} từ 2026-10-14 (README dòng 36(iii)) — trước đó
+     * dùng tạm {@code ALREADY_IN_DUNGEON}, và client tin mình đã vào bí cảnh.
+     */
+    private Optional<EnterOutcome> busyElsewhere(long characterId) {
+        if (isInDungeon(characterId)) {
+            return Optional.of(EnterOutcome.ALREADY_IN_DUNGEON);
+        }
+        return inDuel.test(characterId) ? Optional.of(EnterOutcome.IN_DUEL) : Optional.empty();
     }
 
     /**
@@ -616,7 +623,8 @@ final class DungeonInstanceRegistry {
         NOT_IN_PARTY,
         PARTY_MEMBER_OFFLINE,
         ALREADY_IN_DUNGEON,
-        UNKNOWN_DUNGEON
+        UNKNOWN_DUNGEON,
+        IN_DUEL
     }
 
     enum ExitOutcome {

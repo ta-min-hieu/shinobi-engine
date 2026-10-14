@@ -124,8 +124,9 @@ yêu cầu, KHÔNG có thiết kế nào — mọi cơ chế bên dưới là qu
 ✅ Ghi audit (`TRADE_EXECUTED`) cho CẢ 2 bên khi thi hành thành công — từ 2026-10-03 (`85ac060`)
    mỗi dòng ghi `goldGiven`/`goldReceived` + `itemsGiven`/`itemsReceived` (`itemId` dòng NGUỒN +
    `quantity`). Phiên và lời chào bị xoá ngay sau thi hành nên dòng audit là dấu vết DUY NHẤT; bản cũ
-   chỉ có `sessionId`/`counterpartId`. Chưa ghi template/cấp cường hoá — câu hỏi mở, xem
-   ["🔴 ĐANG CHỜ CHỦ DỰ ÁN"](../../../docs/README.md)
+   chỉ có `sessionId`/`counterpartId`. Từ 2026-10-14 (chủ dự án chọn, README dòng 25(iii)) mỗi món
+   còn ghi `itemTemplateId` + `enhanceLevel`, đọc từ dòng nguồn TRONG transaction TRƯỚC khi chuyển
+   (`TradeInventoryPort#findItemById(Transaction, long)`) — sau chuyển dòng đó có thể đã bị xoá/gộp
 
 ❌ SQL/JDBC/Redis client trong module này (Điều 23 — enforce bằng ArchUnit)
 ❌ `domain/` biết PostgreSQL

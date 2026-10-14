@@ -23,6 +23,10 @@ enum EnterDungeonOutcome {
   ENTER_DUNGEON_OUTCOME_PARTY_MEMBER_OFFLINE = 3;
   ENTER_DUNGEON_OUTCOME_ALREADY_IN_DUNGEON = 4;
   ENTER_DUNGEON_OUTCOME_UNKNOWN_DUNGEON = 5;
+  // Chỉ THÊM (2026-10-14, README dòng 36(iii)): người bấm đang đấu Arena. Trước đó nhận
+  // ALREADY_IN_DUNGEON — đọc sai lý do, và client coi đó là "đã ở trong bí cảnh". protocolVersion
+  // KHÔNG tăng; chiều ngược là CHALLENGE_DUEL_OUTCOME_IN_DUNGEON (arena.proto).
+  ENTER_DUNGEON_OUTCOME_IN_DUEL = 6;
 }
 
 message EnterDungeonResponse {

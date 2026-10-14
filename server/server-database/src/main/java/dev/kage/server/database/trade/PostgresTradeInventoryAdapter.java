@@ -75,6 +75,12 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
     }
 
     @Override
+    public Optional<OwnedItemSnapshot> findItemById(Transaction tx, long itemId) {
+        return JdbcOperations.queryOne(
+                ((JdbcTransaction) tx).connection(), FIND_BY_ID, PostgresTradeInventoryAdapter::mapRow, itemId);
+    }
+
+    @Override
     public void lockInventories(Transaction tx, long characterIdA, long characterIdB) {
         CharacterInventoryLock.acquireBoth(((JdbcTransaction) tx).connection(), characterIdA, characterIdB);
     }

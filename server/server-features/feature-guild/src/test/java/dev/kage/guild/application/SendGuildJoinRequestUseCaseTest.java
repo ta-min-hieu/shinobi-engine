@@ -20,6 +20,18 @@ class SendGuildJoinRequestUseCaseTest {
         assertThat(port.findPendingRequestOfCharacter(5)).isPresent();
     }
 
+    /** README dòng 42 (2026-10-14): tên bang lưu NFC, người gõ dấu tách rời vẫn xin vào được. */
+    @Test
+    void shouldFindTheGuild_whenNameIsTypedWithCombiningMarks() {
+        FakeGuildPort port = new FakeGuildPort();
+        port.createGuild("T\u00F4ng", 1);
+        SendGuildJoinRequestUseCase useCase = new SendGuildJoinRequestUseCase(port);
+
+        SendGuildJoinRequestUseCase.Result result = useCase.execute(5, "To\u0302ng");
+
+        assertThat(result).isEqualTo(SendGuildJoinRequestUseCase.Result.OK);
+    }
+
     @Test
     void shouldReject_whenGuildNotFound() {
         SendGuildJoinRequestUseCase useCase = new SendGuildJoinRequestUseCase(new FakeGuildPort());

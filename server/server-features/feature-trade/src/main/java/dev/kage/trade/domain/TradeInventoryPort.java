@@ -14,6 +14,18 @@ public interface TradeInventoryPort {
     Optional<OwnedItemSnapshot> findItemById(long itemId);
 
     /**
+     * Đọc dòng TRONG {@code tx} — để ghi audit loại vật phẩm + cấp cường hoá của từng món đã chào
+     * (chủ dự án chốt 2026-10-14, docs/README.md dòng 25(iii)). Gọi TRƯỚC khi chuyển: sau chuyển, dòng
+     * nguồn có thể đã bị xoá hoặc gộp vào chồng của người nhận, nên id dòng nguồn một mình không đủ để
+     * điều tra. Không phải bước xác thực — {@link #transferItem} vẫn là chỗ duy nhất.
+     *
+     * <p>Mặc định đọc ngoài transaction CHỈ để fake ở test khỏi phải hiện thực — adapter thật PHẢI ghi đè.
+     */
+    default Optional<OwnedItemSnapshot> findItemById(Transaction tx, long itemId) {
+        return findItemById(itemId);
+    }
+
+    /**
      * Chuyển 1 item — khoá dòng FOR UPDATE, xác thực lại CÒN đúng chủ + đủ số lượng, tách stack
      * nếu {@code request.quantity()} nhỏ hơn số lượng hiện có (giữ nguyên dòng cũ, thêm dòng mới
      * cho người nhận — KHÔNG gộp vào stack có sẵn của người nhận, nhất quán với cách hệ thống

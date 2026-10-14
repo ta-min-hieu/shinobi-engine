@@ -107,7 +107,7 @@ class DungeonPullWhileDuelingTest {
         startDuel(OPPONENT_ID, LEADER_ID);
 
         assertThat(dungeons.enterDungeon(LEADER_ID, DUNGEON_CODE))
-                .isEqualTo(DungeonInstanceRegistry.EnterOutcome.ALREADY_IN_DUNGEON);
+                .isEqualTo(DungeonInstanceRegistry.EnterOutcome.IN_DUEL);
 
         assertThat(dungeons.worldFacadeFor(LEADER_ID)).isEmpty();
         assertThat(dungeons.worldFacadeFor(MEMBER_ID))

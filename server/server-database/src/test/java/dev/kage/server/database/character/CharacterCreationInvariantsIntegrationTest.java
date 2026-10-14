@@ -206,6 +206,21 @@ class CharacterCreationInvariantsIntegrationTest {
         }
     }
 
+    /**
+     * V54 (2026-10-14, README dòng 42): tên chỉ khác hoa-thường là trùng — qua đúng đường "tên trùng"
+     * như thường. Tra theo tên thì vẫn phân biệt hoa-thường.
+     */
+    @Test
+    void shouldRejectName_thatDiffersOnlyInCase() {
+        long accountId = createAccount();
+        createUseCase.execute(accountId, "CaseKage", UUID.randomUUID().toString());
+
+        assertThatThrownBy(() -> createUseCase.execute(
+                        createAccount(), "casekage", UUID.randomUUID().toString()))
+                .isInstanceOf(DuplicateCharacterNameException.class);
+        assertThat(adapter.findByName("casekage")).isEmpty();
+    }
+
     @Test
     void shouldRejectHostileNames_withoutWritingAnything() throws SQLException {
         long accountId = createAccount();

@@ -56,6 +56,10 @@ class DungeonControllerTest {
 
         controller.onEnterOutcome(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_UNKNOWN_DUNGEON);
         assertThat(controller.inDungeon()).isFalse();
+
+        // 2026-10-14: người đang đấu Arena — trước đó nhận ALREADY_IN_DUNGEON và tin mình đã vào.
+        controller.onEnterOutcome(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_IN_DUEL);
+        assertThat(controller.inDungeon()).isFalse();
     }
 
     @Test

@@ -55,7 +55,9 @@ final class DungeonController {
      * <p>{@code ALREADY_IN_DUNGEON} cũng ghi {@link #inDungeon} thành {@code true}: đó là server nói
      * thẳng ra "nhân vật này đang ở trong một instance". Trước ADR-047 nó là đường DUY NHẤT một máy
      * bị kéo vào theo nhóm có thể biết sự thật (bấm Vào hầm ngục lần nữa rồi đọc câu từ chối); nay
-     * chỉ còn là lưới đỡ, vì opcode 1504 báo thẳng.
+     * chỉ còn là lưới đỡ, vì opcode 1504 báo thẳng. Người đang đấu Arena nhận {@code IN_DUEL}
+     * (2026-10-14) — KHÔNG đổi {@link #inDungeon}; trước đó họ nhận {@code ALREADY_IN_DUNGEON} và máy
+     * này tin mình đã ở trong bí cảnh.
      */
     void onEnterOutcome(EnterDungeonOutcome outcome) {
         if (outcome == EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK
@@ -119,7 +121,9 @@ final class DungeonController {
             EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_ALREADY_IN_DUNGEON,
             "dungeon.error.already_in_dungeon",
             EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_UNKNOWN_DUNGEON,
-            "dungeon.error.unknown_dungeon");
+            "dungeon.error.unknown_dungeon",
+            EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_IN_DUEL,
+            "dungeon.error.in_duel");
 
     private static final Map<ExitDungeonOutcome, String> EXIT_MESSAGE_KEYS = Map.of(
             ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK, "dungeon.notice.exited",

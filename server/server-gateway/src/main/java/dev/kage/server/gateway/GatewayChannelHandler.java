@@ -2909,6 +2909,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     case PARTY_MEMBER_OFFLINE -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_PARTY_MEMBER_OFFLINE;
                     case ALREADY_IN_DUNGEON -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_ALREADY_IN_DUNGEON;
                     case UNKNOWN_DUNGEON -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_UNKNOWN_DUNGEON;
+                    case IN_DUEL -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_IN_DUEL;
                 };
         EnterDungeonResponse response =
                 EnterDungeonResponse.newBuilder().setOutcome(protoOutcome).build();

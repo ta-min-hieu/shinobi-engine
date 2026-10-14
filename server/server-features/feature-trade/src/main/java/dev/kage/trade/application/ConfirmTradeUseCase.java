@@ -1,11 +1,14 @@
 package dev.kage.trade.application;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.concurrent.atomic.AtomicReference;
 
 import dev.kage.trade.domain.IdempotencyKeyReusedException;
+import dev.kage.trade.domain.OwnedItemSnapshot;
 import dev.kage.trade.domain.TradeInventoryPort;
 import dev.kage.trade.domain.TradeInventoryPort.TransferOutcome;
 import dev.kage.trade.domain.TradeOfferItem;
@@ -57,8 +60,8 @@ public final class ConfirmTradeUseCase {
                     resultHolder.set(Result.OK);
                     return;
                 }
-                executeTransferOrAbort(t, snapshot);
-                logAudit(t, snapshot);
+                Map<Long, OwnedItemSnapshot> offeredRows = executeTransferOrAbort(t, snapshot);
+                logAudit(t, snapshot, offeredRows);
                 ports.sessionPort().deleteSession(t, sessionId);
                 resultHolder.set(Result.EXECUTED);
             });
@@ -70,12 +73,17 @@ public final class ConfirmTradeUseCase {
         return resultHolder.get();
     }
 
-    private void executeTransferOrAbort(Transaction t, TradeSessionSnapshot snapshot) {
+    /** @return dòng NGUỒN của từng món đã chào, đọc TRƯỚC khi chuyển — cho audit (README dòng 25(iii)) */
+    private Map<Long, OwnedItemSnapshot> executeTransferOrAbort(Transaction t, TradeSessionSnapshot snapshot) {
         long requesterId = snapshot.requesterCharacterId();
         long targetId = snapshot.targetCharacterId();
         // Khoá túi đồ CẢ HAI người trước vàng/vật phẩm — thứ tự khoá chung (DATABASE.md §5.1);
         // khoá phiên ở trên là ngoại lệ duy nhất được đứng trước, vì chỉ đọc phiên mới biết hai người.
         ports.inventoryPort().lockInventories(t, requesterId, targetId);
+        Map<Long, OwnedItemSnapshot> offeredRows = new HashMap<>();
+        for (TradeOfferItem item : snapshot.items()) {
+            ports.inventoryPort().findItemById(t, item.itemId()).ifPresent(row -> offeredRows.put(item.itemId(), row));
+        }
         transferGoldOrAbort(t, snapshot, requesterId, targetId);
         for (TradeOfferItem item : snapshot.itemsOffered(requesterId)) {
             transferOrAbort(
@@ -90,6 +98,7 @@ public final class ConfirmTradeUseCase {
                 || ports.inventoryPort().exceedsCapacity(t, targetId)) {
             throw new TradeExecutionAbortedException();
         }
+        return offeredRows;
     }
 
     /** Tách khỏi {@link #executeTransferOrAbort} chỉ để giữ độ phức tạp method dưới ngưỡng
@@ -122,11 +131,11 @@ public final class ConfirmTradeUseCase {
      * có {@code sessionId}/{@code counterpartId}, không trả lời được "giao dịch đó chuyển gì".
      * {@code itemId} là dòng NGUỒN lúc thi hành (gộp chồng/tách chồng có thể cấp id khác cho bên nhận).
      */
-    private void logAudit(Transaction t, TradeSessionSnapshot snapshot) {
+    private void logAudit(Transaction t, TradeSessionSnapshot snapshot, Map<Long, OwnedItemSnapshot> offeredRows) {
         long requesterId = snapshot.requesterCharacterId();
         long targetId = snapshot.targetCharacterId();
-        String requesterItems = itemsJson(snapshot.itemsOffered(requesterId));
-        String targetItems = itemsJson(snapshot.itemsOffered(targetId));
+        String requesterItems = itemsJson(snapshot.itemsOffered(requesterId), offeredRows);
+        String targetItems = itemsJson(snapshot.itemsOffered(targetId), offeredRows);
         ports.auditPort()
                 .log(
                         t,
@@ -165,10 +174,18 @@ public final class ConfirmTradeUseCase {
     }
 
     // Chỉ số nguyên do server tự đọc từ DB — không có chuỗi người dùng, không cần thoát ký tự.
-    private static String itemsJson(List<TradeOfferItem> items) {
+    // itemTemplateId + enhanceLevel (2026-10-14, README dòng 25(iii)) đọc từ dòng nguồn TRƯỚC khi
+    // chuyển; giao dịch chỉ tới được đây khi mọi món đã chuyển được, nên dòng nào cũng có mặt.
+    private static String itemsJson(List<TradeOfferItem> items, Map<Long, OwnedItemSnapshot> offeredRows) {
         StringJoiner joiner = new StringJoiner(",", "[", "]");
         for (TradeOfferItem item : items) {
-            joiner.add("{\"itemId\":%d,\"quantity\":%d}".formatted(item.itemId(), item.quantity()));
+            OwnedItemSnapshot row = offeredRows.get(item.itemId());
+            joiner.add("{\"itemId\":%d,\"quantity\":%d,\"itemTemplateId\":%d,\"enhanceLevel\":%d}"
+                    .formatted(
+                            item.itemId(),
+                            item.quantity(),
+                            row == null ? 0L : row.itemTemplateId(),
+                            row == null ? 0 : row.enhanceLevel()));
         }
         return joiner.toString();
     }

@@ -104,12 +104,24 @@ public final class CharacterFacade {
      * nhóm/bang, giao dịch, đấu trường...), và một tên chứa {@code U+0000} từng làm Postgres từ chối
      * câu SELECT — người chơi nhận 500 {@code error.server_internal} thay vì "không tìm thấy". Không
      * mất kết quả nào: mọi nhân vật đã lưu đều qua đúng luật này.
+     *
+     * <p>Không thấy nguyên văn thì thử dạng NFC (2026-10-14) — xem {@link Character#normalizeNewName}.
+     * Vẫn PHÂN BIỆT hoa-thường: chỉ việc TẠO tên trùng hoa-thường bị chặn (V54).
      */
     public Optional<Character> findByName(String name) {
-        if (!Character.isValidName(name)) {
+        // Nguyên văn trước, dạng NFC sau (2026-10-14, README dòng 42): tên mới lưu NFC, nên người gõ dấu
+        // tách rời vẫn tìm thấy — mà tên cũ lưu dạng nào cũng không bị mất.
+        if (Character.isValidName(name)) {
+            Optional<Character> exact = characterPort.findByName(name);
+            if (exact.isPresent()) {
+                return exact;
+            }
+        }
+        String normalized = Character.normalizeNewName(name);
+        if (normalized == null || normalized.equals(name) || !Character.isValidName(normalized)) {
             return Optional.empty();
         }
-        return characterPort.findByName(name);
+        return characterPort.findByName(normalized);
     }
 
     /** Tra nhân vật theo ID — dùng để hiển thị tên (danh sách bạn bè, người gửi thư/chat riêng). */
