@@ -157,13 +157,18 @@ public record ProbeConfig(
      * @param reloginUsername tên tài khoản của lần đăng nhập thứ hai (mặc định = {@code username})
      * @param chatChannel kênh chat ({@code world} / {@code area} / {@code party} / {@code guild})
      * @param chatBody nội dung chat gửi sau khi đi bộ; chuỗi {@code \n} thành xuống dòng thật; rỗng = không gửi
+     * @param selfBuffSkillCode chiêu TỰ BUFF (đích SELF) tung lại mỗi {@code selfBuffIntervalMillis} trong vòng
+     *     quan sát, xen giữa các đòn — đo luật chồng buff lên chỉ số gốc (vd trần chí mạng); rỗng = không tung
+     * @param selfBuffIntervalMillis nhịp tung lại — phải LỚN HƠN hồi chiêu server của chiêu đó
      */
     public record EdgePlan(
             List<String> unequipSlots,
             boolean reloginInWorld,
             String reloginUsername,
             String chatChannel,
-            String chatBody) {
+            String chatBody,
+            String selfBuffSkillCode,
+            int selfBuffIntervalMillis) {
 
         /** Danh sách ô bất biến — record không tự copy, mà lệnh gọi có thể truyền list sống. */
         public EdgePlan {
@@ -185,6 +190,8 @@ public record ProbeConfig(
     private static final int DEFAULT_DUEL_WAIT_SECONDS = 60;
     private static final int DEFAULT_PARTY_WAIT_SECONDS = 30;
     private static final String DEFAULT_CHAT_CHANNEL = "world";
+    // Hồi chiêu tự buff dài nhất hiện có là 10 s (phong_bao_kich/phong_gia_toc, SkillRegistry) + nửa giây đệm.
+    private static final int DEFAULT_SELF_BUFF_INTERVAL_MILLIS = 10_500;
 
     /**
      * Dựng cấu hình probe từ tham số dòng lệnh.
@@ -244,7 +251,9 @@ public record ProbeConfig(
                 raw.flag("reloginInWorld", false),
                 raw.text("reloginUsername", raw.text("username", DEFAULT_USERNAME)),
                 raw.text("chatChannel", DEFAULT_CHAT_CHANNEL),
-                raw.text("chatBody", ""));
+                raw.text("chatBody", ""),
+                raw.text("selfBuffSkillCode", ""),
+                raw.integer("selfBuffIntervalMillis", DEFAULT_SELF_BUFF_INTERVAL_MILLIS));
     }
 
     /** {@code true} khi người dùng muốn probe tự chọn con gần nhất trong AoI. */

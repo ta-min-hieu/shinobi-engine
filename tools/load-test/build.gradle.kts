@@ -46,6 +46,8 @@ application {
 //   --unequipSlots=weapon,armor    --reloginInWorld=true [--reloginUsername=<tài khoản>]
 //   --chatChannel=world --chatBody=dong1\ndong2    (chuỗi \n thành xuống dòng thật)
 //   --attackTarget=nearest --attackCode=<loài> --attackSkillCode=<mã chiêu> --attackIntervalMillis=5500
+//   --selfBuffSkillCode=phong_bao_kich --selfBuffIntervalMillis=10500
+//       (tung lại chiêu tự buff theo nhịp trong vòng quan sát, xen giữa các đòn; báo cáo ghi mốc "tự buff")
 //       (mỗi nhịp gửi UseSkillCommand thay đòn thường; nhịp đầu tới sau một interval — quãng đối chứng)
 tasks.register<JavaExec>("gameProbe") {
     group = "verification"

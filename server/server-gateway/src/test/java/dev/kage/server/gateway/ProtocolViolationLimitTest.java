@@ -2,6 +2,8 @@ package dev.kage.server.gateway;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import org.junit.jupiter.api.Test;
 
@@ -24,6 +26,12 @@ import dev.kage.protocol.wire.ProtocolVersion;
 class ProtocolViolationLimitTest {
 
     private static final int UNKNOWN_OPCODE = 65_000;
+
+    /** Trần tính cả tiền tố độ dài — xem {@link GatewayServer#MAX_FRAME_LENGTH}. */
+    private static final int MAX_FRAME_BODY = GatewayServer.MAX_FRAME_LENGTH - GatewayServer.LENGTH_FIELD_LENGTH;
+
+    /** opcode(2) + protocolVersion(1) + sequenceId(4) — header của mỗi khung (NETWORK.md §102). */
+    private static final int HEADER_BYTES = 7;
 
     /** Bắt đầu bằng một tag protobuf cắt cụt — không message nào parse nổi. */
     private static final byte[] GARBAGE_PAYLOAD = {(byte) 0xFF, (byte) 0xFF, (byte) 0xFF};
@@ -85,6 +93,36 @@ class ProtocolViolationLimitTest {
 
         assertThat(EconomyCommandShape.isWellFormed(oversized.build())).isFalse();
         assertThat(EconomyCommandShape.isWellFormed(atTheLimit)).isTrue();
+    }
+
+    /**
+     * Kiểm sống 2026-10-14: khung quá trần đóng kết nối đúng, nhưng mỗi khung để lại một log ERROR kèm
+     * stack trace — ai mở được kết nối là ghi được ERROR tuỳ ý. Lỗi giải mã là lỗi của client.
+     */
+    @Test
+    void shouldCloseWithoutAnErrorLog_whenAFrameDeclaresMoreThanTheCap() {
+        EmbeddedChannel channel = GatewayPipelineTest.newPipeline();
+        try (ErrorLogCapture errorLog = ErrorLogCapture.attach()) {
+            ByteBuf lengthOnly = Unpooled.buffer(GatewayServer.LENGTH_FIELD_LENGTH);
+            lengthOnly.writeInt(MAX_FRAME_BODY + 1);
+            channel.writeInbound(lengthOnly);
+
+            assertThat(channel.isOpen()).isFalse();
+            assertThat(errorLog.errorsSince(0)).isEmpty();
+        }
+    }
+
+    /** Biên trên: thân đúng bằng trần vẫn tới handler (payload rác ⇒ một vi phạm, kết nối còn sống). */
+    @Test
+    void shouldAcceptAFrameWhoseBodyIsExactlyTheCap() {
+        EmbeddedChannel channel = GatewayPipelineTest.newPipeline();
+
+        GatewayPipelineTest.writeInboundFrame(
+                channel,
+                new PacketHeader(Opcode.OPCODE_PING_VALUE, ProtocolVersion.CURRENT, 1),
+                new byte[MAX_FRAME_BODY - HEADER_BYTES]);
+
+        assertThat(channel.isOpen()).isTrue();
     }
 
     private static void sendGarbage(EmbeddedChannel channel, int sequenceId) {

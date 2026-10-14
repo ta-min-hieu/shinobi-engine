@@ -295,7 +295,9 @@ public final class GameProbe {
         AttackCadence cadence = new AttackCadence(config.attackIntervalMillis(), System.currentTimeMillis());
         // Đòn đã ra TRƯỚC mục tiêu hiện tại — AttackCadence đếm "nhát mở màn" theo TỪNG mục tiêu.
         int attacksBeforeCurrentTarget = observation.ownBasicAttacksResolved();
+        long nextSelfBuffAt = System.currentTimeMillis();
         while (System.currentTimeMillis() < endAt) {
+            nextSelfBuffAt = castSelfBuffIfDue(connection, config, session, nextSelfBuffAt);
             OptionalLong changed = selector.refresh(observation);
             if (changed.isPresent()) {
                 aimAt(connection, session, changed.getAsLong());
@@ -323,6 +325,26 @@ public final class GameProbe {
         // Trả lại cửa sổ đọc như trước vòng lặp: các bước SAU (uống thuốc, bỏ cuộc Arena) chờ phản
         // hồi bằng cửa sổ này, và 20ms của AttackCadence là quá hẹp cho họ.
         connection.setReadTimeoutMillis(OBSERVE_READ_TIMEOUT_MILLIS);
+    }
+
+    /**
+     * Tung chiêu tự buff ({@code --selfBuffSkillCode}) nếu đã tới hạn, ghi mốc vào báo cáo để tách các
+     * đòn trong/ngoài thời gian buff.
+     *
+     * @return hạn tung kế tiếp
+     */
+    private static long castSelfBuffIfDue(
+            GameConnection connection, ProbeConfig config, ProbeSession session, long dueAtMillis) throws IOException {
+        String skillCode = config.edge().selfBuffSkillCode();
+        long now = System.currentTimeMillis();
+        if (skillCode.isEmpty() || now < dueAtMillis) {
+            return dueAtMillis;
+        }
+        connection.send(
+                Opcode.OPCODE_USE_SKILL_COMMAND_VALUE,
+                UseSkillCommand.newBuilder().setSkillCode(skillCode).build().toByteArray());
+        session.note("tự buff: " + skillCode);
+        return now + config.edge().selfBuffIntervalMillis();
     }
 
     /** Một nhịp ra đòn: đánh thường, hoặc {@code UseSkillCommand} nếu có {@code --attackSkillCode}. */

@@ -17,6 +17,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.codec.DecoderException;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.opentelemetry.api.trace.Span;
@@ -322,6 +323,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * Trước đó không có trần: một kết nối bơm gói hỏng vô hạn, mỗi gói một câu trả lời và một dòng log.
      */
     static final int MAX_PROTOCOL_VIOLATIONS = 10;
+
+    /** Trần độ dài message của lỗi giải mã khi ghi log — đủ đọc ra loại lỗi và vài byte đầu. */
+    private static final int MAX_LOGGED_DECODER_MESSAGE = 200;
 
     // Ghi trên EventLoop của kết nối này (channelRead0); AtomicInteger vì test đọc từ luồng khác và nó
     // chỉ được chạm khi có gói hỏng — không nằm trên đường nóng.
@@ -4369,7 +4373,25 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // FutureReturnValueIgnored: ChannelFuture của close()/writeAndFlush() — lỗi đi qua pipeline Netty.
     @SuppressWarnings("FutureReturnValueIgnored")
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        LOG.error("Lỗi không mong đợi trên kết nối {}", ctx.channel().remoteAddress(), cause);
+        // Lỗi giải mã (khung khai quá trần, khung ngắn hơn header, bắt tay TLS hỏng) là CLIENT gửi rác,
+        // không phải server hỏng: một dòng WARN, không stack trace — cùng luật với gói hỏng (README
+        // dòng 44(i)). Trước đó mỗi khung quá cỡ là một ERROR kèm ~60 dòng stack trace (kiểm sống
+        // 2026-10-14), tức ai mở được kết nối là ghi được log ERROR tuỳ ý.
+        if (cause instanceof DecoderException) {
+            LOG.warn(
+                    "Đóng kết nối {}: khung không giải mã được ({})",
+                    ctx.channel().remoteAddress(),
+                    abbreviate(String.valueOf(cause.getMessage())));
+        } else {
+            LOG.error("Lỗi không mong đợi trên kết nối {}", ctx.channel().remoteAddress(), cause);
+        }
         ctx.close();
+    }
+
+    /** NotSslRecordException chép hex dump của MỌI byte nhận được vào message — client quyết độ dài. */
+    private static String abbreviate(String message) {
+        return message.length() <= MAX_LOGGED_DECODER_MESSAGE
+                ? message
+                : message.substring(0, MAX_LOGGED_DECODER_MESSAGE) + "…";
     }
 }

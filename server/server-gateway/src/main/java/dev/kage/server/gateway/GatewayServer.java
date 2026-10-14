@@ -44,8 +44,10 @@ public final class GatewayServer {
     // lớn nhất (thư 1024 ký tự kèm đính kèm, lời chào giao dịch 20 dòng) chỉ vài KiB — phần còn lại của
     // 1 MiB chỉ có lợi cho kẻ bơm khung lớn. Chiều server → client KHÔNG qua trần này (catalog vật phẩm
     // lớn hơn nhiều); client tự giữ trần đọc vào riêng của nó.
-    private static final int MAX_FRAME_LENGTH = 64 * 1024;
-    private static final int LENGTH_FIELD_LENGTH = 4;
+    // ⚠️ Trần này TÍNH CẢ 4 byte tiền tố độ dài (LengthFieldBasedFrameDecoder cộng lengthFieldEndOffset
+    // trước khi so) ⇒ thân khung lớn nhất là MAX_FRAME_LENGTH - LENGTH_FIELD_LENGTH = 65.532 byte.
+    static final int MAX_FRAME_LENGTH = 64 * 1024;
+    static final int LENGTH_FIELD_LENGTH = 4;
 
     // NETWORK.md §10: client ping mỗi ~15s; server không nhận gì trong ~45s ⇒ kết nối chết, dọn dẹp
     // ("bắt buộc — TCP có thể treo mà không báo lỗi"). Trước 2026-10-02 server KHÔNG có hạn này: một
