@@ -22,15 +22,11 @@ public final class FriendFacade {
     }
 
     public SendRequestResult sendRequest(long requesterId, long addresseeId) {
-        return switch (useCases.sendFriendRequestUseCase().execute(requesterId, addresseeId)) {
-            case OK -> SendRequestResult.OK;
-            case CANNOT_FRIEND_SELF -> SendRequestResult.CANNOT_FRIEND_SELF;
-            case ALREADY_FRIENDS -> SendRequestResult.ALREADY_FRIENDS;
-            case REQUEST_ALREADY_PENDING -> SendRequestResult.REQUEST_ALREADY_PENDING;
-            case FRIEND_LIST_FULL -> SendRequestResult.FRIEND_LIST_FULL;
-            case BECAME_FRIENDS -> SendRequestResult.BECAME_FRIENDS;
-            case OTHER_FRIEND_LIST_FULL -> SendRequestResult.OTHER_FRIEND_LIST_FULL;
-        };
+        // Hai enum cùng tên giá trị (use case ↔ facade) — đổi theo TÊN thay cho switch 10 nhánh (trần
+        // CyclomaticComplexity của PMD). Lệch tên là IllegalArgumentException ngay ở test đầu tiên gọi tới.
+        return SendRequestResult.valueOf(useCases.sendFriendRequestUseCase()
+                .execute(requesterId, addresseeId)
+                .name());
     }
 
     public AcceptResult accept(long friendshipId, long addresseeId) {
@@ -78,7 +74,11 @@ public final class FriendFacade {
         /** Người nhận đã mời mình từ trước — lời mời của họ vừa được chấp nhận thay mình. */
         BECAME_FRIENDS,
         /** Như {@link #BECAME_FRIENDS} nhưng danh sách của họ đã đầy — chưa kết bạn được. */
-        OTHER_FRIEND_LIST_FULL
+        OTHER_FRIEND_LIST_FULL,
+        /** Người nhận vừa từ chối lời mời của mình — phải chờ (2026-10-17). */
+        RECENTLY_REJECTED,
+        /** Người nhận đã có quá nhiều lời mời đang chờ (2026-10-17). */
+        TARGET_PENDING_FULL
     }
 
     public enum AcceptResult {

@@ -149,6 +149,10 @@ ENV PATH="${JAVA_HOME}/bin:${PATH}"
 RUN useradd -r -u 1001 kage
 WORKDIR /app
 COPY --from=builder --chown=kage:kage /build/server/server-gateway/build/install/server-gateway/ ./
+# JFR + GC log ra thư mục riêng (dòng 63(iii), 2026-10-17) — compose prod gắn volume vào đây để bản ghi
+# sống qua lần tạo lại container; trước đó nằm ở /tmp và mất đúng lúc cần đọc nhất (sau sự cố).
+# Volume có tên được khởi tạo từ nội dung image, nên chủ sở hữu kage đi theo.
+RUN mkdir -p /app/diagnostics && chown kage:kage /app/diagnostics
 USER kage
 EXPOSE 7777 9404
 # JVM.md §3 (production flag set, verified via ADR-019's real 2h14 soak test) — ZGC + container-aware
@@ -158,14 +162,19 @@ EXPOSE 7777 9404
 # line, nên đặt `simple` ở đây ghi đè đúng ý, không cần sửa gì ở build.gradle.kts (giữ nguyên default
 # dev cho `./gradlew run`). Không bật `-XX:NativeMemoryTracking` mặc định — JVM.md §3 để dành riêng
 # lúc điều tra leak (có overhead), không phải cấu hình thường trực.
-ENV JAVA_OPTS="-XX:+UseZGC -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError \
+# -XX:MaxDirectMemorySize (dòng 59, 2026-10-17): trước đó không đặt ⇒ mặc định bằng Xmx, off-heap của Netty
+# không có trần riêng. 512m là số TẠM — BENCHMARK §5.1 đo `Other`/DirectByteBuffer ~256→263MB ở
+# N=1000→2000, nên 512m gấp ~2 lần mức đo được; chưa đo lại ở cấu hình prod sau khi đặt trần.
+ENV JAVA_OPTS="-XX:+UseZGC -XX:MaxRAMPercentage=75.0 -XX:MaxDirectMemorySize=512m -XX:+ExitOnOutOfMemoryError \
 -Dio.netty.leakDetection.level=simple \
--XX:+FlightRecorder -XX:StartFlightRecording=disk=true,maxsize=1g,maxage=24h,dumponexit=true,filename=/tmp/kage.jfr \
--Xlog:gc*:file=/tmp/gc.log:time,uptime:filecount=5,filesize=10m"
-# /health/live không chạm DB (MetricsHttpServer, Phase 9 lát cắt 8) — đúng ngữ nghĩa "process còn
-# sống", không phải "sẵn sàng nhận traffic" (đó là /health/ready, orchestrator dùng riêng nếu cần).
+-XX:+FlightRecorder -XX:StartFlightRecording=disk=true,maxsize=1g,maxage=24h,dumponexit=true,filename=/app/diagnostics/kage.jfr \
+-Xlog:gc*:file=/app/diagnostics/gc.log:time,uptime:filecount=5,filesize=10m"
+# /health/ready (dòng 62(i), 2026-10-17 — trước đó /health/live, luôn 200 khi tiến trình còn sống): DB kết
+# nối được VÀ cổng game còn mở VÀ mọi event loop Netty còn chạy việc (GatewayServer#isServingGameTraffic).
+# Docker thuần KHÔNG tự restart container unhealthy (dòng 62(ii), chưa làm) — trạng thái này để người /
+# cảnh báo đọc, không phải để tự chữa. DB sập cũng làm unhealthy: đúng, khi đó không ai chơi được.
 # Dùng /dev/tcp của bash thay vì cài thêm curl/wget — image runtime không có sẵn 2 tool đó, thêm vào
 # chỉ để healthcheck không đáng (Điều 9).
 HEALTHCHECK --interval=15s --timeout=3s --start-period=30s --retries=3 \
-    CMD bash -c 'exec 3<>/dev/tcp/127.0.0.1/9404 && printf "GET /health/live HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3 && head -n 1 <&3 | grep -q "200 OK"' || exit 1
+    CMD bash -c 'exec 3<>/dev/tcp/127.0.0.1/9404 && printf "GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3 && head -n 1 <&3 | grep -q "200 OK"' || exit 1
 ENTRYPOINT ["./bin/server-gateway"]

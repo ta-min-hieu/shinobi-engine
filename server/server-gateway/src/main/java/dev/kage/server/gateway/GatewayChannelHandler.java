@@ -2106,6 +2106,15 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 sendError(ctx, sequenceId, 409, "error.friend_list_full_other");
                 return;
             }
+            // Hai trần chống làm phiền (dòng 71(b), 2026-10-17) — cùng đường ErrorResponse.
+            if (result == FriendFacade.SendRequestResult.RECENTLY_REJECTED) {
+                sendError(ctx, sequenceId, 429, "error.friend_request_cooldown");
+                return;
+            }
+            if (result == FriendFacade.SendRequestResult.TARGET_PENDING_FULL) {
+                sendError(ctx, sequenceId, 409, "error.friend_requests_full_other");
+                return;
+            }
             SendFriendRequestResponse response = SendFriendRequestResponse.newBuilder()
                     .setOutcome(toProtoOutcome(result))
                     .build();
@@ -3537,10 +3546,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // này, và ký quỹ vàng/vật phẩm trong SendMailUseCase luôn chạy. Đường "thư hệ thống miễn
         // ký quỹ" chỉ với tới được từ code server.
         MailFacade.SendOutcome outcome = mailFacade.sendMail(request);
-        if (outcome.result() == MailFacade.SendResult.INVALID_TEXT) {
-            // Không có SendMailOutcome nào khớp (thêm là đổi protocol) — đi đường ErrorResponse như
-            // mọi dữ liệu dây hỏng khác; client khớp theo sequenceId. Chưa có thư nào được tạo.
-            sendError(ctx, sequenceId, 400, "error.invalid_payload");
+        if (rejectSendMailAsError(ctx, sequenceId, outcome.result())) {
             return;
         }
         SendMailResponse response = SendMailResponse.newBuilder()
@@ -3559,6 +3565,25 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 .registry()
                 .sendToCharacterIfOnline(
                         recipient.get().id(), Opcode.OPCODE_NEW_MAIL_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    /**
+     * Hai kết quả gửi thư không có {@code SendMailOutcome} tương ứng (thêm là đổi protocol) — đi đường
+     * {@code ErrorResponse}, client khớp theo {@code sequenceId}. Chưa có thư nào được tạo.
+     *
+     * @return {@code true} nếu đã trả lời bằng lỗi (caller dừng lại)
+     */
+    private boolean rejectSendMailAsError(ChannelHandlerContext ctx, int sequenceId, MailFacade.SendResult result) {
+        if (result == MailFacade.SendResult.INVALID_TEXT) {
+            sendError(ctx, sequenceId, 400, "error.invalid_payload");
+            return true;
+        }
+        if (result == MailFacade.SendResult.MAILBOX_FULL) {
+            // Trần hộp thư (dòng 41(iv), 2026-10-17) — cùng khuôn error.friend_list_full.
+            sendError(ctx, sequenceId, 409, "error.mailbox_full");
+            return true;
+        }
+        return false;
     }
 
     private static final Map<MailFacade.SendResult, SendMailOutcome> SEND_MAIL_OUTCOME_MAPPING = Map.of(

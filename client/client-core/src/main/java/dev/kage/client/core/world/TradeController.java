@@ -74,9 +74,15 @@ final class TradeController {
      * Khoá idempotency của lệnh Xác nhận đang treo (ADR-025) — {@code ConfirmTradeCommand} là lệnh
      * DUY NHẤT ở feature-trade có thể chuyển vàng/vật phẩm thật (trade.proto).
      */
-    private long pendingConfirmSessionId;
+    private PendingConfirm pendingConfirm = PendingConfirm.NONE;
 
-    private String pendingConfirmKey = "";
+    /**
+     * Lệnh Xác nhận đang treo: phiên của nó + khoá idempotency. Một giá trị chứ không phải hai field rời —
+     * hai số này luôn đổi cùng nhau (và giữ lớp trong trần ≤10 field, dòng 58(d), 2026-10-17).
+     */
+    private record PendingConfirm(long sessionId, String idempotencyKey) {
+        static final PendingConfirm NONE = new PendingConfirm(0L, "");
+    }
 
     /** Nhận ảnh chụp trạng thái mới nhất — lối vào DUY NHẤT của mọi thứ hiển thị. */
     void onStatus(GetTradeStatusResponse response) {
@@ -209,11 +215,11 @@ final class TradeController {
      * mới khi sang phiên khác.
      */
     String beginConfirm(long forSessionId) {
-        if (pendingConfirmSessionId != forSessionId || pendingConfirmKey.isEmpty()) {
-            pendingConfirmSessionId = forSessionId;
-            pendingConfirmKey = UUID.randomUUID().toString();
+        if (pendingConfirm.sessionId() != forSessionId
+                || pendingConfirm.idempotencyKey().isEmpty()) {
+            pendingConfirm = new PendingConfirm(forSessionId, UUID.randomUUID().toString());
         }
-        return pendingConfirmKey;
+        return pendingConfirm.idempotencyKey();
     }
 
     /**
@@ -222,13 +228,12 @@ final class TradeController {
      * mới.
      */
     void onConfirmSettled() {
-        pendingConfirmSessionId = 0L;
-        pendingConfirmKey = "";
+        pendingConfirm = PendingConfirm.NONE;
     }
 
     /** Phiên của lệnh Xác nhận đang treo — 0 khi không có lệnh nào treo. Chỉ dùng để test. */
     long pendingConfirmSessionId() {
-        return pendingConfirmSessionId;
+        return pendingConfirm.sessionId();
     }
 
     /**

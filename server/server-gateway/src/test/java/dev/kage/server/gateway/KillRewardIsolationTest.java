@@ -69,8 +69,10 @@ class KillRewardIsolationTest {
             assertThat(new int[] {lootRolls.get(), questEvents.get(), experienceGrants.get()})
                     .as("cả ba việc đều phải được THỬ, dù %s ném", failing)
                     .containsExactly(1, 1, 1);
-            assertThat(errorLog.errorsSince(0))
-                    .as("phần thưởng mất phải để lại đúng một dòng ERROR nói rõ mất gì, của ai")
+            // WARN từ 2026-10-17 (dòng 78(d)) — mất một phần thưởng không phải sự cố đánh thức trực ban.
+            assertThat(errorLog.errorsSince(0)).as("không còn log ERROR").isEmpty();
+            assertThat(errorLog.warningsSince(0))
+                    .as("phần thưởng mất phải để lại đúng một dòng WARN nói rõ mất gì, của ai")
                     .singleElement()
                     .asString()
                     .contains("step=" + failing.name())
@@ -100,8 +102,8 @@ class KillRewardIsolationTest {
             registry.onMonsterKilled(KILLER_ID, MONSTER_CODE, EXP_REWARD);
             registry.stop();
 
-            assertThat(errorLog.errorsSince(0))
-                    .as("chỉ lượt rơi đồ hỏng để lại ERROR")
+            assertThat(errorLog.warningsSince(0))
+                    .as("chỉ lượt rơi đồ hỏng để lại WARN")
                     .hasSize(1);
         }
 

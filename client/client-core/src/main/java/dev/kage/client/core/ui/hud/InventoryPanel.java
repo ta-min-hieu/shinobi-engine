@@ -141,41 +141,48 @@ public final class InventoryPanel implements HudWindow {
     private final I18NBundle i18n;
     private final TextureAtlas iconAtlas;
     private final Table panel;
-    private final Label statusLabel;
-    private final Label goldLabel;
-    private final Label capacityLabel;
-    private final Table itemList;
-    private final Label detailLabel;
-    /**
-     * MỘT ô nút cho hành động chính của món đang chọn: "Mặc" với trang bị, "Dùng" với đan dược
-     * (ADR-046 D5). Dùng chung một ô chứ không thêm ô thứ sáu vì hàng hành động đã rộng 550px
-     * trong khung 560px — thêm một nút 84px là tràn ra ngoài nền, đúng lỗi đã bắt được ở
-     * {@code QuestLogPanel}. Và hai hành động này KHÔNG BAO GIỜ cùng có nghĩa: {@code ItemTemplate}
-     * cấm một món vừa mặc được vừa dùng được.
-     */
-    private final TextButton primaryButton;
 
-    private final TextButton sellButton;
-    private final TextButton offerButton;
-    private final TextButton enhanceButton;
-    private final TextButton protectionButton;
-    private final Table equipmentList;
+    // Bốn nhóm widget/trạng thái thay cho 25 field rời (dòng 58(d), chủ dự án duyệt 2026-10-17 — trần
+    // ≤10 field mỗi lớp). Mỗi nhóm là một vùng THẬT của cửa sổ, không phải gom cho đủ số.
+    private final Header header;
+    private final ListArea lists;
+    private final ActionRow actionRow;
+    private final Listeners listeners = new Listeners();
 
-    private LongConsumer onSelect;
-    private Runnable onEquipSelected;
-    private Runnable onUseSelected;
-    private Runnable onSellSelected;
-    private Runnable onOfferSelected;
-    private Runnable onEnhanceSelected;
-    private Runnable onToggleProtection;
-    private IntConsumer onUnequip;
-    private Runnable onOpened;
+    /** Dòng trạng thái + số vàng + sức chứa túi — đầu cửa sổ. */
+    private record Header(Label status, Label gold, Label capacity) {}
+
+    /** Danh sách vật phẩm, ô mô tả món đang chọn, và danh sách đồ đang mặc. */
+    private record ListArea(Table items, Label detail, Table equipment) {}
 
     /**
-     * Có được phép mở bằng phím I lúc này không. Mặc định là LUÔN được — panel không biết trên màn
-     * hình còn khung nào khác, xem {@link #setCanOpen}.
+     * Hàng nút hành động cho món đang chọn. {@code primary} là MỘT ô cho hành động chính: "Mặc" với
+     * trang bị, "Dùng" với đan dược (ADR-046 D5). Dùng chung một ô chứ không thêm ô thứ sáu vì hàng hành
+     * động đã rộng 550px trong khung 560px — thêm một nút 84px là tràn ra ngoài nền, đúng lỗi đã bắt được
+     * ở {@code QuestLogPanel}. Và hai hành động này KHÔNG BAO GIỜ cùng có nghĩa: {@code ItemTemplate} cấm
+     * một món vừa mặc được vừa dùng được.
      */
-    private BooleanSupplier canOpen = () -> true;
+    private record ActionRow(
+            TextButton primary, TextButton sell, TextButton offer, TextButton enhance, TextButton protection) {}
+
+    /** Mọi callback gắn từ ngoài vào — đặt qua các {@code setOn...}, đọc lúc người chơi bấm. */
+    private static final class Listeners {
+        private LongConsumer onSelect;
+        private Runnable onEquipSelected;
+        private Runnable onUseSelected;
+        private Runnable onSellSelected;
+        private Runnable onOfferSelected;
+        private Runnable onEnhanceSelected;
+        private Runnable onToggleProtection;
+        private IntConsumer onUnequip;
+        private Runnable onOpened;
+
+        /**
+         * Có được phép mở bằng phím I lúc này không. Mặc định là LUÔN được — panel không biết trên màn
+         * hình còn khung nào khác, xem {@link InventoryPanel#setCanOpen}.
+         */
+        private BooleanSupplier canOpen = () -> true;
+    }
 
     /** Nút chính đang mang nghĩa gì — xem {@link #showDetail}. */
     private PrimaryAction primaryAction = PrimaryAction.NONE;
@@ -190,20 +197,18 @@ public final class InventoryPanel implements HudWindow {
         this.stage = new Stage(new ScreenViewport(), new SpriteBatch());
         this.iconAtlas = loadIconAtlas();
 
-        this.statusLabel = wrappingLabel(SECTION_COLOR);
-        this.goldLabel = new Label("", skin.labelStyle);
+        Label goldLabel = new Label("", skin.labelStyle);
         goldLabel.setColor(SECTION_COLOR);
-        this.capacityLabel = new Label("", skin.labelStyle);
+        Label capacityLabel = new Label("", skin.labelStyle);
         capacityLabel.setColor(ROW_COLOR);
-
-        this.itemList = new Table();
-        this.detailLabel = wrappingLabel(ROW_COLOR);
-        this.primaryButton = actionButton("inventory.action.equip", this::firePrimaryAction);
-        this.sellButton = actionButton("inventory.action.sell", () -> fire(onSellSelected));
-        this.offerButton = actionButton("inventory.action.offer", () -> fire(onOfferSelected));
-        this.enhanceButton = actionButton("inventory.action.enhance", () -> fire(onEnhanceSelected));
-        this.protectionButton = actionButton("inventory.action.protection_off", () -> fire(onToggleProtection));
-        this.equipmentList = new Table();
+        this.header = new Header(wrappingLabel(SECTION_COLOR), goldLabel, capacityLabel);
+        this.lists = new ListArea(new Table(), wrappingLabel(ROW_COLOR), new Table());
+        this.actionRow = new ActionRow(
+                actionButton("inventory.action.equip", this::firePrimaryAction),
+                actionButton("inventory.action.sell", () -> fire(listeners.onSellSelected)),
+                actionButton("inventory.action.offer", () -> fire(listeners.onOfferSelected)),
+                actionButton("inventory.action.enhance", () -> fire(listeners.onEnhanceSelected)),
+                actionButton("inventory.action.protection_off", () -> fire(listeners.onToggleProtection)));
 
         this.panel = buildPanel();
 
@@ -224,27 +229,27 @@ public final class InventoryPanel implements HudWindow {
         table.setBackground(skin.panel);
         table.pad(PANEL_PAD_PX);
         table.add(titleRow()).width(PANEL_WIDTH_PX).left().row();
-        table.add(statusLabel).width(PANEL_WIDTH_PX).left().padTop(6f).row();
+        table.add(header.status()).width(PANEL_WIDTH_PX).left().padTop(6f).row();
         table.add(sectionTitle("inventory.section.items"))
                 .width(PANEL_WIDTH_PX)
                 .left()
                 .padTop(10f)
                 .row();
-        table.add(capacityLabel).width(PANEL_WIDTH_PX).left().row();
-        table.add(ScrollingList.wrap(itemList, skin))
+        table.add(header.capacity()).width(PANEL_WIDTH_PX).left().row();
+        table.add(ScrollingList.wrap(lists.items(), skin))
                 .width(PANEL_WIDTH_PX)
                 .height(ITEM_LIST_HEIGHT_PX)
                 .growX()
                 .padTop(4f)
                 .row();
-        table.add(detailLabel).width(PANEL_WIDTH_PX).left().padTop(10f).row();
+        table.add(lists.detail()).width(PANEL_WIDTH_PX).left().padTop(10f).row();
         table.add(buildActionRow()).width(PANEL_WIDTH_PX).growX().padTop(6f).row();
         table.add(sectionTitle("inventory.section.equipment"))
                 .width(PANEL_WIDTH_PX)
                 .left()
                 .padTop(10f)
                 .row();
-        table.add(ScrollingList.wrap(equipmentList, skin))
+        table.add(ScrollingList.wrap(lists.equipment(), skin))
                 .width(PANEL_WIDTH_PX)
                 .height(EQUIPMENT_LIST_HEIGHT_PX)
                 .growX()
@@ -278,7 +283,7 @@ public final class InventoryPanel implements HudWindow {
         Label title = new Label(text("inventory.title"), skin.labelStyle);
         title.setColor(SECTION_COLOR);
         row.add(title).left().padRight(10f);
-        row.add(goldLabel).left().expandX();
+        row.add(header.gold()).left().expandX();
         return row;
     }
 
@@ -297,17 +302,17 @@ public final class InventoryPanel implements HudWindow {
      */
     private Table buildActionRow() {
         Table row = new Table();
-        row.add(primaryButton).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
-        row.add(sellButton).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
-        row.add(offerButton).width(ACTION_BUTTON_WIDTH_PX).padRight(6f);
-        row.add(enhanceButton).width(ACTION_BUTTON_WIDTH_PX).padRight(6f);
-        row.add(protectionButton).width(PROTECTION_BUTTON_WIDTH_PX);
+        row.add(actionRow.primary()).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
+        row.add(actionRow.sell()).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
+        row.add(actionRow.offer()).width(ACTION_BUTTON_WIDTH_PX).padRight(6f);
+        row.add(actionRow.enhance()).width(ACTION_BUTTON_WIDTH_PX).padRight(6f);
+        row.add(actionRow.protection()).width(PROTECTION_BUTTON_WIDTH_PX);
         row.add().expandX(); // đẩy cả cụm về TRÁI, thẳng hàng với tên món ở dòng trên
-        primaryButton.setVisible(false);
-        sellButton.setVisible(false);
-        offerButton.setVisible(false);
-        enhanceButton.setVisible(false);
-        protectionButton.setVisible(false);
+        actionRow.primary().setVisible(false);
+        actionRow.sell().setVisible(false);
+        actionRow.offer().setVisible(false);
+        actionRow.enhance().setVisible(false);
+        actionRow.protection().setVisible(false);
         return row;
     }
 
@@ -316,7 +321,8 @@ public final class InventoryPanel implements HudWindow {
         Label hint = new Label(text("inventory.hint.close"), skin.labelStyle);
         hint.setColor(SECTION_COLOR);
         row.add(hint).left().expandX().padRight(6f);
-        row.add(actionButton("inventory.action.refresh", () -> fire(onOpened))).width(ACTION_BUTTON_WIDTH_PX);
+        row.add(actionButton("inventory.action.refresh", () -> fire(listeners.onOpened)))
+                .width(ACTION_BUTTON_WIDTH_PX);
         return row;
     }
 
@@ -355,7 +361,7 @@ public final class InventoryPanel implements HudWindow {
                 if (isOpen()) {
                     return true;
                 }
-                if (keycode != OPEN_KEY || !canOpen.getAsBoolean()) {
+                if (keycode != OPEN_KEY || !listeners.canOpen.getAsBoolean()) {
                     return false;
                 }
                 open();
@@ -387,7 +393,7 @@ public final class InventoryPanel implements HudWindow {
      */
     public void open() {
         panel.setVisible(true);
-        fire(onOpened);
+        fire(listeners.onOpened);
     }
 
     public void close() {
@@ -396,42 +402,42 @@ public final class InventoryPanel implements HudWindow {
 
     /** Gọi mỗi lần khung mở ra hoặc người chơi bấm Làm mới — chỗ nghe có nhiệm vụ hỏi lại server. */
     public void setOnRefresh(Runnable listener) {
-        this.onOpened = listener;
+        listeners.onOpened = listener;
     }
 
     /** Điều kiện để phím I được phép mở khung — cổng phím CHUNG của mọi cửa sổ, xem {@link MailPanel#setCanOpen}. */
     public void setCanOpen(BooleanSupplier condition) {
-        this.canOpen = condition;
+        listeners.canOpen = condition;
     }
 
     /** Id vật phẩm người chơi vừa bấm Chọn để xem chi tiết. */
     public void setOnSelect(LongConsumer listener) {
-        this.onSelect = listener;
+        listeners.onSelect = listener;
     }
 
     /** Người chơi bấm Mặc trên item ĐANG CHỌN — không mang id, coordinator tự biết đang chọn ai. */
     public void setOnEquipSelected(Runnable listener) {
-        this.onEquipSelected = listener;
+        listeners.onEquipSelected = listener;
     }
 
     /** Người chơi bấm Bán trên item đang chọn. */
     public void setOnSellSelected(Runnable listener) {
-        this.onSellSelected = listener;
+        listeners.onSellSelected = listener;
     }
 
     /** Số slot ({@code EquipmentSlot.getNumber()}) người chơi vừa bấm Gỡ. */
     public void setOnUnequip(IntConsumer listener) {
-        this.onUnequip = listener;
+        listeners.onUnequip = listener;
     }
 
     /** Dòng trạng thái dưới tiêu đề — chuỗi ĐÃ dịch. */
     public void setStatus(String text) {
-        statusLabel.setText(text);
+        header.status().setText(text);
     }
 
     /** Số vàng cạnh tiêu đề — chuỗi ĐÃ ghép sẵn ("—" khi chưa có gói vàng nào, xem coordinator). */
     public void setGold(String text) {
-        goldLabel.setText(text);
+        header.gold().setText(text);
     }
 
     /**
@@ -444,25 +450,35 @@ public final class InventoryPanel implements HudWindow {
      * @param overflowNotice chuỗi đã dịch cho phần bị cắt bớt hoặc túi rỗng, rỗng nếu không cần nói gì.
      */
     public void setItems(List<ItemRow> rows, String capacityText, String overflowNotice) {
-        capacityLabel.setText(capacityText);
-        itemList.clear();
+        header.capacity().setText(capacityText);
+        lists.items().clear();
         for (ItemRow row : rows) {
             addItemRow(row);
         }
         if (!overflowNotice.isEmpty()) {
-            itemList.add(rowLabel(overflowNotice)).colspan(3).growX().left().row();
+            lists.items()
+                    .add(rowLabel(overflowNotice))
+                    .colspan(3)
+                    .growX()
+                    .left()
+                    .row();
         }
     }
 
     private void addItemRow(ItemRow row) {
-        itemList.add(iconActor(row.iconCode())).size(ICON_SIZE_PX).padRight(6f).padBottom(ROW_PAD_PX);
+        lists.items()
+                .add(iconActor(row.iconCode()))
+                .size(ICON_SIZE_PX)
+                .padRight(6f)
+                .padBottom(ROW_PAD_PX);
         Label label = rowLabel(row.displayText());
         label.setEllipsis(true);
-        itemList.add(label).growX().minWidth(0f).left().padRight(6f).padBottom(ROW_PAD_PX);
-        itemList.add(actionButton("inventory.action.select", () -> emit(onSelect, row.itemId())))
+        lists.items().add(label).growX().minWidth(0f).left().padRight(6f).padBottom(ROW_PAD_PX);
+        lists.items()
+                .add(actionButton("inventory.action.select", () -> emit(listeners.onSelect, row.itemId())))
                 .width(ROW_BUTTON_WIDTH_PX)
                 .padBottom(ROW_PAD_PX);
-        itemList.row();
+        lists.items().row();
     }
 
     /**
@@ -491,22 +507,23 @@ public final class InventoryPanel implements HudWindow {
      * @param actions ba nút còn lại (Bán/Giao dịch/Cường hoá) — xem {@link Actions}.
      */
     public void showDetail(String detailText, PrimaryAction primary, Actions actions) {
-        detailLabel.setText(detailText);
+        lists.detail().setText(detailText);
         this.primaryAction = primary;
-        primaryButton.setVisible(primary != PrimaryAction.NONE);
+        actionRow.primary().setVisible(primary != PrimaryAction.NONE);
         if (primary != PrimaryAction.NONE) {
-            primaryButton.setText(
-                    text(primary == PrimaryAction.EQUIP ? "inventory.action.equip" : "inventory.action.use"));
+            actionRow
+                    .primary()
+                    .setText(text(primary == PrimaryAction.EQUIP ? "inventory.action.equip" : "inventory.action.use"));
         }
-        sellButton.setVisible(actions.canSell());
-        offerButton.setVisible(actions.canOffer());
-        enhanceButton.setVisible(actions.canEnhance());
-        protectionButton.setVisible(actions.canEnhance());
+        actionRow.sell().setVisible(actions.canSell());
+        actionRow.offer().setVisible(actions.canOffer());
+        actionRow.enhance().setVisible(actions.canEnhance());
+        actionRow.protection().setVisible(actions.canEnhance());
     }
 
     /**
      * Hành động chính của món đang chọn. Ba trạng thái loại trừ nhau — xem javadoc
-     * {@link #primaryButton} về lý do chúng dùng chung một ô nút.
+     * {@link ActionRow} về lý do chúng dùng chung một ô nút.
      */
     public enum PrimaryAction {
         /** Không chọn món nào, hoặc món không mặc được cũng không dùng được. */
@@ -516,7 +533,7 @@ public final class InventoryPanel implements HudWindow {
     }
 
     private void firePrimaryAction() {
-        fire(primaryAction == PrimaryAction.USE ? onUseSelected : onEquipSelected);
+        fire(primaryAction == PrimaryAction.USE ? listeners.onUseSelected : listeners.onEquipSelected);
     }
 
     /**
@@ -535,22 +552,22 @@ public final class InventoryPanel implements HudWindow {
 
     /** Người chơi bấm "Dùng" trên item đang chọn (ADR-046 D5 — đan dược). */
     public void setOnUseSelected(Runnable listener) {
-        this.onUseSelected = listener;
+        listeners.onUseSelected = listener;
     }
 
     /** Người chơi bấm Giao dịch trên item đang chọn — đưa món đó vào lời chào. */
     public void setOnOfferSelected(Runnable listener) {
-        this.onOfferSelected = listener;
+        listeners.onOfferSelected = listener;
     }
 
     /** Người chơi bấm Cường hoá trên item đang chọn. */
     public void setOnEnhanceSelected(Runnable listener) {
-        this.onEnhanceSelected = listener;
+        listeners.onEnhanceSelected = listener;
     }
 
     /** Người chơi gạt công tắc Bảo Vệ — panel KHÔNG tự giữ trạng thái, xem {@link #setProtection}. */
     public void setOnToggleProtection(Runnable listener) {
-        this.onToggleProtection = listener;
+        listeners.onToggleProtection = listener;
     }
 
     /**
@@ -558,7 +575,7 @@ public final class InventoryPanel implements HudWindow {
      * §4) — panel chỉ đổi chữ trên nút theo lời nó được bảo.
      */
     public void setProtection(boolean on) {
-        protectionButton.setText(text(on ? "inventory.action.protection_on" : "inventory.action.protection_off"));
+        actionRow.protection().setText(text(on ? "inventory.action.protection_on" : "inventory.action.protection_off"));
     }
 
     /**
@@ -566,9 +583,9 @@ public final class InventoryPanel implements HudWindow {
      * bớt: khác túi đồ, số slot trang bị CỐ ĐỊNH nên không cần trần hiển thị.
      */
     public void setEquipment(List<EquipmentRow> rows) {
-        equipmentList.clear();
+        lists.equipment().clear();
         for (EquipmentRow row : rows) {
-            equipmentList
+            lists.equipment()
                     .add(rowLabel(row.slotLabel()))
                     .width(SLOT_LABEL_WIDTH_PX)
                     .left()
@@ -581,16 +598,23 @@ public final class InventoryPanel implements HudWindow {
             // 550px. Trục ngang bị khoá nên không có thanh cuộn: bảng bị căn giữa và tràn ra CẢ HAI
             // mép — người chơi thấy "áp khí"/"o bào" thay vì "Pháp khí"/"Đạo bào", và nút Gỡ cụt.
             // Cho ô co được thì setEllipsis ở trên mới thật sự có việc để làm.
-            equipmentList.add(label).growX().minWidth(0f).left().padRight(6f).padBottom(ROW_PAD_PX);
+            lists.equipment()
+                    .add(label)
+                    .growX()
+                    .minWidth(0f)
+                    .left()
+                    .padRight(6f)
+                    .padBottom(ROW_PAD_PX);
             if (row.equipped()) {
-                equipmentList
-                        .add(actionButton("inventory.action.unequip", () -> emitInt(onUnequip, row.slotNumber())))
+                lists.equipment()
+                        .add(actionButton(
+                                "inventory.action.unequip", () -> emitInt(listeners.onUnequip, row.slotNumber())))
                         .width(ROW_BUTTON_WIDTH_PX)
                         .padBottom(ROW_PAD_PX);
             } else {
-                equipmentList.add().width(ROW_BUTTON_WIDTH_PX);
+                lists.equipment().add().width(ROW_BUTTON_WIDTH_PX);
             }
-            equipmentList.row();
+            lists.equipment().row();
         }
     }
 

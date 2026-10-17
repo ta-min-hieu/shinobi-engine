@@ -74,7 +74,10 @@ final class KillRewardDispatcher {
         try {
             work.run();
         } catch (RuntimeException e) {
-            LOG.error(
+            // WARN, không ERROR (dòng 78(d), chủ dự án duyệt 2026-10-17): một phần thưởng mất vì DB chập
+            // chờn là chuyện của MỘT người chơi, không phải sự cố cần đánh thức trực ban — cảnh báo theo
+            // TẦN SUẤT (nhiều dòng này trong một khoảng) mới là tín hiệu thật.
+            LOG.warn(
                     "Trao thưởng hạ quái thất bại — phần thưởng này MẤT, không thử lại:"
                             + " step={} characterId={} monsterCode={}",
                     step,

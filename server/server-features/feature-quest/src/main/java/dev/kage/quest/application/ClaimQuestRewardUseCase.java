@@ -1,7 +1,8 @@
 package dev.kage.quest.application;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,23 +85,10 @@ public final class ClaimQuestRewardUseCase {
         // trong transaction (DATABASE.md §5.1): khoá túi đồ ĐẦU TIÊN, hỏi "đủ chỗ" (chưa ghi gì),
         // rồi đổi COMPLETED -> CLAIMED có điều kiện — chỉ một giao dịch thắng, các giao dịch khác
         // nhận 0 dòng và không ghi gì cả.
-        AtomicBoolean bagHasRoom = new AtomicBoolean(true);
-        AtomicBoolean lostTheClaim = new AtomicBoolean(false);
+        AtomicReference<Refusal> refusal = new AtomicReference<>(Refusal.NONE);
+        AtomicReference<String> unknownItem = new AtomicReference<>("");
         try {
-            tx.inTransaction((Transaction t) -> {
-                rewardPorts.inventoryGrantPort().lockInventory(t, characterId);
-                if (!hasRoomForRewards(t, characterId, effects.itemGrants())) {
-                    bagHasRoom.set(false);
-                    return; // chưa ghi gì: quest vẫn COMPLETED, idempotency_key vẫn còn nguyên
-                }
-                if (!progressPort.markClaimedIfCompleted(t, characterId, request.questId())) {
-                    lostTheClaim.set(true);
-                    return;
-                }
-                rewardPorts.idempotencyPort().recordOrThrow(t, request.idempotencyKey());
-                grantRewards(t, characterId, effects);
-                rewardPorts.auditPort().log(t, characterId, "QUEST_CLAIM", detailJson(request.questCode(), effects));
-            });
+            tx.inTransaction((Transaction t) -> refusal.set(writeClaim(t, request, effects, unknownItem)));
         } catch (IdempotencyKeyReusedException e) {
             return ClaimResult.duplicateRequest();
         } catch (RewardGrantFailedException e) {
@@ -112,18 +100,60 @@ public final class ClaimQuestRewardUseCase {
                     e.getMessage());
             return ClaimResult.inventoryFull();
         }
-        if (!bagHasRoom.get()) {
-            return ClaimResult.inventoryFull();
-        }
-        if (lostTheClaim.get()) {
+        return switch (refusal.get()) {
+            case UNKNOWN_ITEM -> {
+                LOG.warn(
+                        "Script quest trao mã vật phẩm không tồn tại — từ chối lĩnh: characterId={}, quest={}, item={}",
+                        characterId,
+                        request.questCode(),
+                        unknownItem.get());
+                yield ClaimResult.scriptError();
+            }
+            case BAG_FULL -> ClaimResult.inventoryFull();
             // Đúng câu trả lời lệnh này sẽ nhận nếu tới chậm hơn một nhịp, sau khi lệnh thắng commit.
-            return ClaimResult.notCompletedYet();
-        }
+            case LOST_THE_CLAIM -> ClaimResult.notCompletedYet();
+            case NONE ->
+                ClaimResult.ok(
+                        effects.expGranted(),
+                        effects.itemGrants().stream()
+                                .map(g -> new ClaimResult.ItemReward(g.itemTemplateCode(), g.quantity()))
+                                .toList());
+        };
+    }
 
-        List<ClaimResult.ItemReward> items = effects.itemGrants().stream()
-                .map(g -> new ClaimResult.ItemReward(g.itemTemplateCode(), g.quantity()))
-                .toList();
-        return ClaimResult.ok(effects.expGranted(), items);
+    /** Lý do một lượt lĩnh dừng TRƯỚC khi ghi gì — {@link #NONE} là đã ghi trọn. */
+    private enum Refusal {
+        NONE,
+        /** Lỗi của script, không phải của túi (dòng 77(a)). */
+        UNKNOWN_ITEM,
+        /** Quest vẫn COMPLETED, idempotency_key vẫn còn nguyên. */
+        BAG_FULL,
+        LOST_THE_CLAIM
+    }
+
+    /** Thân transaction của {@link #claimInTransaction} — thứ tự giải thích ở đó. */
+    private Refusal writeClaim(
+            Transaction t,
+            ClaimRequest request,
+            QuestScriptRunner.HookEffects effects,
+            AtomicReference<String> unknown) {
+        long characterId = request.characterId();
+        rewardPorts.inventoryGrantPort().lockInventory(t, characterId);
+        Optional<String> unknownItem = firstUnknownItem(t, effects.itemGrants());
+        if (unknownItem.isPresent()) {
+            unknown.set(unknownItem.get());
+            return Refusal.UNKNOWN_ITEM;
+        }
+        if (!hasRoomForRewards(t, characterId, effects.itemGrants())) {
+            return Refusal.BAG_FULL;
+        }
+        if (!progressPort.markClaimedIfCompleted(t, characterId, request.questId())) {
+            return Refusal.LOST_THE_CLAIM;
+        }
+        rewardPorts.idempotencyPort().recordOrThrow(t, request.idempotencyKey());
+        grantRewards(t, characterId, effects);
+        rewardPorts.auditPort().log(t, characterId, "QUEST_CLAIM", detailJson(request.questCode(), effects));
+        return Refusal.NONE;
     }
 
     /** Định danh một lệnh lĩnh — gom lại để phần ghi không vượt trần tham số. */
@@ -160,6 +190,16 @@ public final class ClaimQuestRewardUseCase {
         }
     }
 
+    /** Mã đầu tiên trong lô thưởng không có trong {@code item_template} — rỗng nếu đủ cả. */
+    private Optional<String> firstUnknownItem(Transaction t, List<QuestScriptRunner.ItemGrant> itemGrants) {
+        for (QuestScriptRunner.ItemGrant grant : itemGrants) {
+            if (!rewardPorts.inventoryGrantPort().itemExists(t, grant.itemTemplateCode())) {
+                return Optional.of(grant.itemTemplateCode());
+            }
+        }
+        return Optional.empty();
+    }
+
     /**
      * Túi còn đủ ô cho trọn lô phần thưởng không — hỏi TRƯỚC khi ghi bất cứ thứ gì.
      *
@@ -185,8 +225,23 @@ public final class ClaimQuestRewardUseCase {
     }
 
     private static String detailJson(String questCode, QuestScriptRunner.HookEffects effects) {
-        return "{\"questCode\":\"%s\",\"expGranted\":%d,\"itemCount\":%d}"
-                .formatted(questCode, effects.expGranted(), effects.itemGrants().size());
+        // items (dòng 66(b), 2026-10-17): trước đó chỉ có itemCount — không dựng lại được vật phẩm NÀO
+        // đã vào game qua quest. Mã đã qua kiểm tồn tại trong item_template (firstUnknownItem) nhưng vẫn
+        // lọc về chữ/số/gạch dưới như GrantLootUseCase, để chuỗi JSON không bao giờ vỡ.
+        StringBuilder items = new StringBuilder("[");
+        for (QuestScriptRunner.ItemGrant grant : effects.itemGrants()) {
+            if (items.length() > 1) {
+                items.append(',');
+            }
+            items.append("{\"code\":\"")
+                    .append(grant.itemTemplateCode().replaceAll("[^A-Za-z0-9_]", "_"))
+                    .append("\",\"quantity\":")
+                    .append(grant.quantity())
+                    .append('}');
+        }
+        items.append(']');
+        return "{\"questCode\":\"%s\",\"expGranted\":%d,\"itemCount\":%d,\"items\":%s}"
+                .formatted(questCode, effects.expGranted(), effects.itemGrants().size(), items);
     }
 
     public record ClaimResult(Outcome outcome, long expGranted, List<ItemReward> itemsGranted) {

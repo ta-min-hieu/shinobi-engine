@@ -15,7 +15,8 @@ public final class ComponentMapper<T extends Component> {
     }
 
     public static <T extends Component> ComponentMapper<T> getFor(Class<T> type) {
-        return new ComponentMapper<>(com.badlogic.ashley.core.ComponentMapper.getFor(type));
+        // Ashley đăng ký kiểu vào sổ ComponentType tĩnh ở đây — đi qua cùng khoá với ComponentTypes/Family.
+        return new ComponentMapper<>(AshleyStatics.mapper(type));
     }
 
     /**

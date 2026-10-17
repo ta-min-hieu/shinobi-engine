@@ -178,7 +178,7 @@ final class QuestScriptRunner {
         String source = scriptSourceCache.computeIfAbsent(scriptRef, QuestScriptRunner::loadScript);
         MutableEffects effects = new MutableEffects();
 
-        HashMap<String, Object> ctx = buildContext(hookName, currentProgressJson, effects);
+        Map<String, Object> ctx = buildContext(hookName, currentProgressJson, effects);
 
         Map<String, Object> hostApi = Map.of("ctx", (Object) ctx, "event", (Object) (event == null ? Map.of() : event));
         String wrapped = "var quest = " + source + "; quest." + hookName + "(ctx, event);";
@@ -202,7 +202,7 @@ final class QuestScriptRunner {
     /**
      * Dựng {@code ctx} của MỘT lần chạy hook — callback ghi thẳng vào {@code effects}.
      */
-    private static HashMap<String, Object> buildContext(
+    private static Map<String, Object> buildContext(
             String hookName, String currentProgressJson, MutableEffects effects) {
         // Mỗi hàm chỉ có mặt ở hook mà hiệu ứng của nó được DÙNG (quyết định chủ dự án 2026-10-11). Trước
         // đó cả bốn hàm có ở mọi hook, và gọi sai chỗ bị bỏ qua im lặng: give_exp/give_item ở

@@ -56,8 +56,10 @@ public final class SellItemUseCase {
                     return;
                 }
                 ports.goldPort().creditGold(t, characterId, totalCredit);
-                String detail =
-                        "{\"itemId\":%d,\"quantity\":%d,\"goldEarned\":%d}".formatted(itemId, quantity, totalCredit);
+                // itemTemplateId (dòng 66(b), 2026-10-17): itemId là dòng túi đồ — dòng đó có thể đã biến
+                // mất khi bán hết, nên một mình nó không dựng lại được LOẠI vật phẩm rời khỏi game.
+                String detail = "{\"itemId\":%d,\"itemTemplateId\":%d,\"quantity\":%d,\"goldEarned\":%d}"
+                        .formatted(itemId, owned.itemTemplateId(), quantity, totalCredit);
                 ports.auditPort().log(t, characterId, "SHOP_SELL", detail);
                 resultHolder.set(SellResult.OK);
             });

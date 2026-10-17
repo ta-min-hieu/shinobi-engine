@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BooleanSupplier;
@@ -40,6 +42,9 @@ final class MetricsHttpServer {
      */
     private final ExecutorService executor;
 
+    /** Mọi điều kiện của {@code /health/ready} — phải ĐỀU đúng; xem {@link #addReadinessCheck}. */
+    private final List<BooleanSupplier> readinessChecks = new CopyOnWriteArrayList<>();
+
     /**
      * {@code readinessCheck} — OBSERVABILITY.md §7: "sẵn sàng nhận người chơi? (DB kết nối được?
      * script load xong?)". Script validation đã chạy fail-fast TRƯỚC lúc server nghe cổng
@@ -47,6 +52,7 @@ final class MetricsHttpServer {
      * {@code /health/ready} nếu bước đó thất bại), nên chỉ còn DB cần kiểm tra LIVE ở đây.
      */
     MetricsHttpServer(int port, PrometheusMeterRegistry registry, BooleanSupplier readinessCheck) {
+        readinessChecks.add(readinessCheck);
         try {
             httpServer = HttpServer.create(new InetSocketAddress(port), 0);
         } catch (IOException e) {
@@ -65,7 +71,7 @@ final class MetricsHttpServer {
         // không phải lý do restart process).
         httpServer.createContext(HEALTH_LIVE_PATH, exchange -> writePlainText(exchange, 200, "OK"));
         httpServer.createContext(HEALTH_READY_PATH, exchange -> {
-            boolean ready = readinessCheck.getAsBoolean();
+            boolean ready = isReady();
             writePlainText(exchange, ready ? 200 : 503, ready ? "READY" : "NOT_READY");
         });
         executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -80,6 +86,23 @@ final class MetricsHttpServer {
         try (OutputStream responseBody = exchange.getResponseBody()) {
             responseBody.write(bytes);
         }
+    }
+
+    /**
+     * Thêm một điều kiện cho {@code /health/ready} — dùng cho thứ dựng SAU lớp này, vd cổng game
+     * ({@link GatewayServer#isServingGameTraffic}, dòng 62(i) bảng chờ, 2026-10-17).
+     */
+    void addReadinessCheck(BooleanSupplier check) {
+        readinessChecks.add(check);
+    }
+
+    private boolean isReady() {
+        for (BooleanSupplier check : readinessChecks) {
+            if (!check.getAsBoolean()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     void start() {

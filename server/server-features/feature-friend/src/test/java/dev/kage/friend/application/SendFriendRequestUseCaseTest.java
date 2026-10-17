@@ -122,6 +122,57 @@ class SendFriendRequestUseCaseTest {
         assertThat(port.friendships.get(0).status()).isEqualTo(FriendshipStatus.PENDING);
     }
 
+    /** Dòng 71(b) (2026-10-17): bị từ chối thì 10 phút sau mới mời lại được. */
+    @Test
+    void shouldRefuse_whileTheRejectionCooldownRuns_thenAllowAgain() {
+        FakeFriendPort port = new FakeFriendPort();
+        java.util.concurrent.atomic.AtomicReference<Instant> now =
+                new java.util.concurrent.atomic.AtomicReference<>(Instant.parse("2026-10-17T00:00:00Z"));
+        java.time.Clock clock = new java.time.Clock() {
+            @Override
+            public java.time.ZoneId getZone() {
+                return java.time.ZoneOffset.UTC;
+            }
+
+            @Override
+            public java.time.Clock withZone(java.time.ZoneId zone) {
+                return this;
+            }
+
+            @Override
+            public Instant instant() {
+                return now.get();
+            }
+        };
+        FriendRequestCooldowns cooldowns = new FriendRequestCooldowns(clock);
+        SendFriendRequestUseCase send = new SendFriendRequestUseCase(port, cooldowns);
+        RejectFriendRequestUseCase reject = new RejectFriendRequestUseCase(port, cooldowns);
+        assertThat(send.execute(5, 7)).isEqualTo(SendFriendRequestUseCase.Result.OK);
+        long friendshipId = port.friendships.get(0).id();
+
+        assertThat(reject.execute(friendshipId, 7)).isEqualTo(RejectFriendRequestUseCase.Result.OK);
+
+        assertThat(send.execute(5, 7)).isEqualTo(SendFriendRequestUseCase.Result.RECENTLY_REJECTED);
+        assertThat(send.execute(7, 5))
+                .as("chiều ngược lại không bị chặn")
+                .isEqualTo(SendFriendRequestUseCase.Result.OK);
+        now.set(now.get().plus(FriendRequestCooldowns.COOLDOWN));
+        port.friendships.clear();
+        assertThat(send.execute(5, 7)).isEqualTo(SendFriendRequestUseCase.Result.OK);
+    }
+
+    /** Dòng 71(b) (2026-10-17): người nhận đã có 50 lời mời chờ thì không xếp thêm. */
+    @Test
+    void shouldRefuse_whenTheTargetAlreadyHasTooManyPendingRequests() {
+        FakeFriendPort port = new FakeFriendPort();
+        for (int i = 0; i < FriendListLimit.MAX_PENDING_INCOMING; i++) {
+            port.friendships.add(new Friendship(100 + i, 2000L + i, 7, FriendshipStatus.PENDING, Instant.now(), null));
+        }
+        SendFriendRequestUseCase useCase = new SendFriendRequestUseCase(port);
+
+        assertThat(useCase.execute(5, 7)).isEqualTo(SendFriendRequestUseCase.Result.TARGET_PENDING_FULL);
+    }
+
     /** Fake = implementation in-memory THẬT (TESTING.md §4), không Mockito. */
     static final class FakeFriendPort implements FriendPort {
         private final List<Friendship> friendships = new ArrayList<>();
@@ -169,7 +220,8 @@ class SendFriendRequestUseCaseTest {
 
         @Override
         public boolean reject(long friendshipId, long addresseeId) {
-            throw new UnsupportedOperationException("không dùng ở test này");
+            return friendships.removeIf(f ->
+                    f.id() == friendshipId && f.addresseeId() == addresseeId && f.status() == FriendshipStatus.PENDING);
         }
 
         @Override

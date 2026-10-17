@@ -16,9 +16,6 @@ package dev.kage.engine.ecs;
  */
 public final class Family {
 
-    /** Gác MỌI lần chạm builder tĩnh + bảng Family tĩnh của Ashley từ lớp này. */
-    private static final Object ASHLEY_FAMILY_STATICS = new Object();
-
     private final com.badlogic.ashley.core.Family ashleyFamily;
 
     private Family(com.badlogic.ashley.core.Family ashleyFamily) {
@@ -45,9 +42,7 @@ public final class Family {
         }
 
         public Family get() {
-            synchronized (ASHLEY_FAMILY_STATICS) {
-                return new Family(com.badlogic.ashley.core.Family.all(types).get());
-            }
+            return new Family(AshleyStatics.family(types));
         }
     }
 }

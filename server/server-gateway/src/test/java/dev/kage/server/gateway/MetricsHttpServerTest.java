@@ -150,7 +150,7 @@ class MetricsHttpServerTest {
         assertThat(stopped.isExecutorShutdown()).isTrue();
     }
 
-    private static int findFreePort() throws IOException {
+    static int findFreePort() throws IOException {
         try (ServerSocket socket = new ServerSocket(0)) {
             return socket.getLocalPort();
         }

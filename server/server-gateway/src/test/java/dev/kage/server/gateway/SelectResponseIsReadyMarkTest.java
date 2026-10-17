@@ -79,6 +79,8 @@ class SelectResponseIsReadyMarkTest {
     private static final class MoveOnSelectResponse extends ChannelOutboundHandlerAdapter {
         private boolean injected;
 
+        // FutureReturnValueIgnored: ctx.write chuyển tiếp promise của chính lời gọi — lỗi đi qua promise đó.
+        @SuppressWarnings("FutureReturnValueIgnored")
         @Override
         public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
             if (!injected && msg instanceof ByteBuf buf && isSelectResponse(buf)) {

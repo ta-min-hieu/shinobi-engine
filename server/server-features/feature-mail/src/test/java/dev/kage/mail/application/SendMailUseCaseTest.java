@@ -59,6 +59,37 @@ class SendMailUseCaseTest {
         assertThat(fixture.auditPort.loggedActions).containsExactly("MAIL_SEND");
     }
 
+    /** Dòng 41(iv) (2026-10-17): hộp người nhận đủ 100 thư ⇒ người chơi khác không gửi thêm được. */
+    @Test
+    void shouldRefuseAndChangeNothing_whenTheRecipientsMailboxIsFull() {
+        Fixture fixture = fixture();
+        fixture.goldPort.balances.put(SENDER_ID, 500L);
+        for (int i = 0; i < SendMailUseCase.MAILBOX_CAPACITY; i++) {
+            fixture.useCase().execute(draft(0, List.of()));
+        }
+
+        SendMailUseCase.SendResult result = fixture.useCase().execute(draft(100, List.of()));
+
+        assertThat(result.outcome()).isEqualTo(SendMailUseCase.SendOutcome.MAILBOX_FULL);
+        assertThat(fixture.goldPort.balances.get(SENDER_ID))
+                .as("không trừ vàng")
+                .isEqualTo(500L);
+        assertThat(fixture.repositoryPort.stored).hasSize(SendMailUseCase.MAILBOX_CAPACITY);
+    }
+
+    @Test
+    void systemMailShouldIgnoreTheMailboxCap_becauseItCarriesRewards() {
+        Fixture fixture = fixture();
+        for (int i = 0; i < SendMailUseCase.MAILBOX_CAPACITY; i++) {
+            fixture.useCase().execute(draft(0, List.of()));
+        }
+
+        SendMailUseCase.SendResult result =
+                fixture.useCase().execute(new MailDraft(null, RECIPIENT_ID, "Thưởng", "Nội dung", 50, List.of()));
+
+        assertThat(result.outcome()).isEqualTo(SendMailUseCase.SendOutcome.OK);
+    }
+
     @Test
     void shouldRejectAndChangeNothing_whenSenderCannotAffordAttachedGold() {
         Fixture fixture = fixture();
@@ -317,7 +348,9 @@ class SendMailUseCaseTest {
 
         @Override
         public List<Mail> listForRecipient(long recipientId) {
-            throw new UnsupportedOperationException("không dùng ở test này");
+            return stored.stream()
+                    .filter(mail -> mail.recipientId() == recipientId)
+                    .toList();
         }
 
         @Override

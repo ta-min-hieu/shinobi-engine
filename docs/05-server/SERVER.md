@@ -295,9 +295,9 @@ luồng lưu vị trí (`CharacterPositionPersister`) → máy chủ metrics →
 **Đếm ngược bảo trì là THẬT** (dòng 76(b), chủ dự án duyệt 2026-10-17). Trước đó bước 2 chỉ là lời hứa:
 code phát `ServerShuttingDownEvent` rồi đóng kết nối ngay. Nay sau lời báo, kết nối được giữ
 `KAGE_SHUTDOWN_NOTICE_SECONDS` giây (mặc định 30, dev đặt 0) — cổng đã đóng nên không ai vào thêm,
-người đang chơi vẫn được phục vụ bình thường. `stop_grace_period` của cả hai compose nới 60 → 90 s cho
-vừa. Gói không mang số giây (protocol đã chốt), câu báo client nói "khoảng 30 giây". Test:
-`GatewayServerIntegrationTest.shouldKeepServingPlayersDuringTheShutdownNotice_thenClose`.
+người đang chơi vẫn được phục vụ bình thường. `stop_grace_period` của cả hai compose nới 60 → 120 s cho
+vừa (dòng 76(c)). Gói không mang số giây (protocol đã chốt), câu báo client nói "khoảng 30 giây". Test:
+`GatewayServerIntegrationTest.shouldServeThroughTheShutdownNotice_thenSaveWhereTheRunningCharacterActuallyIs`.
 
 **`WorldFacade.stop()` chờ lần tick dở có trần 5 s** (dòng 56, 2026-10-17): một tick treo (vd script kẹt)
 từng kéo cả trình tự tắt treo theo tới SIGKILL. Quá trần thì đi tiếp kèm WARN.
@@ -329,7 +329,7 @@ quãng đi của một giây. Test: `ServerShutdownMidPlayDatabaseTest`, `Connec
 **Từ 2026-10-17 (dòng 76(a)) không mất gì nữa ở lúc ngắt kết nối/tắt server**: lệnh gỡ khỏi world chính
 mang `FinalPositionListener`, World báo vị trí thật đúng tick gỡ, gateway chờ mốc hàng đợi rồi lưu số
 đó (World đã dừng thì dùng mẫu 1 Hz). Mẫu 1 Hz vẫn là nguồn của lượt lưu định kỳ. Test:
-`GatewayServerIntegrationTest.shouldSaveWhereTheCharacterActuallyIs_whenServerShutsDownMidRun`.
+`GatewayServerIntegrationTest.shouldServeThroughTheShutdownNotice_thenSaveWhereTheRunningCharacterActuallyIs`.
 
 **`ArenaInstanceRegistry.stopAll()` dừng World NGOÀI khoá** (sửa 2026-10-10). Bản cũ gọi `stop()` —
 chờ lần tick dở — khi đang giữ monitor của registry, còn lần tick đó nếu vừa có người gục thì xin đúng

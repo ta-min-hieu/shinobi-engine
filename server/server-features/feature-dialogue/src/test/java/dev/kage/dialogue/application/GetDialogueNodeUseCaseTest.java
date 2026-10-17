@@ -115,4 +115,17 @@ class GetDialogueNodeUseCaseTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> useCase.execute("known_npc", "start"))
                 .isInstanceOf(IllegalStateException.class);
     }
+
+    /**
+     * Dòng 77(e) (2026-10-17): node thiếu/sai kiểu trường bắt buộc là lỗi SCRIPT — trả rỗng (gateway
+     * báo 404 như node không tồn tại) và ghi log, không ném NPE/ClassCastException ra thành lỗi 500.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"missing_text", "text_not_string", "options_missing", "option_missing_action"})
+    void shouldReturnEmpty_whenANodeIsMalformed(String nodeId) {
+        GetDialogueNodeUseCase useCase =
+                new GetDialogueNodeUseCase(new FakeNpcTemplatePort("/scripts/dialogue/test_fixture_malformed.js"));
+
+        assertThat(useCase.execute("known_npc", nodeId)).isEmpty();
+    }
 }

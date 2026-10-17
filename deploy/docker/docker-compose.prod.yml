@@ -84,8 +84,10 @@ services:
     # bảo trì 30s (KAGE_SHUTDOWN_NOTICE_SECONDS, dòng 76(b) 2026-10-17) + event loop ≤5s + auth/lưu vị
     # trí logout ≤10s + persister ≤5s + thưởng hạ quái ≤10s + Hikari đóng pool (≤10s, nó ABORT
     # connection còn mượn chứ không chờ). Hết hạn là SIGKILL — chính các lượt ghi đang chờ đó bị cắt.
-    # Đổi KAGE_SHUTDOWN_NOTICE_SECONDS thì đổi số này theo (giữ ≥ đếm ngược + 60s).
-    stop_grace_period: 90s
+    # Cộng đúng các trần xấu nhất (dòng 76(c), 2026-10-17): 30 đếm ngược + 5 event loop + 10 auth +
+    # 5 dừng World + 5 persister + 10 thưởng hạ quái + 10 Hikari = 75s, cộng biên cho JVM thoát ⇒ 120s.
+    # Đổi KAGE_SHUTDOWN_NOTICE_SECONDS thì đổi số này theo (giữ ≥ đếm ngược + 90s).
+    stop_grace_period: 120s
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
@@ -111,10 +113,10 @@ services:
       # `-Dlogback.configurationFile=logback-production.xml` (OBSERVABILITY.md §5.1 — JSON log, cách
       # kích hoạt đúng như comment trong chính file logback-production.xml).
       JAVA_OPTS: >-
-        -XX:+UseZGC -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError
+        -XX:+UseZGC -XX:MaxRAMPercentage=75.0 -XX:MaxDirectMemorySize=512m -XX:+ExitOnOutOfMemoryError
         -Dio.netty.leakDetection.level=simple
-        -XX:+FlightRecorder -XX:StartFlightRecording=disk=true,maxsize=1g,maxage=24h,dumponexit=true,filename=/tmp/kage.jfr
-        -Xlog:gc*:file=/tmp/gc.log:time,uptime:filecount=5,filesize=10m
+        -XX:+FlightRecorder -XX:StartFlightRecording=disk=true,maxsize=1g,maxage=24h,dumponexit=true,filename=/app/diagnostics/kage.jfr
+        -Xlog:gc*:file=/app/diagnostics/gc.log:time,uptime:filecount=5,filesize=10m
         -Dlogback.configurationFile=logback-production.xml
     ports:
       - "7777:7777" # game port — an toàn public SAU khi làm đủ 2 bước cert thật ở cảnh báo đầu file
@@ -126,6 +128,13 @@ services:
       # trong image") — bind-mount read-only từ VM. Đường dẫn HOST đọc từ .env.prod (ADR-027).
       - ${TLS_CERT_HOST_PATH:?set TLS_CERT_HOST_PATH trong .env.prod, xem canh bao TLS dau file}:/run/secrets/tls/cert.pem:ro
       - ${TLS_KEY_HOST_PATH:?set TLS_KEY_HOST_PATH trong .env.prod, xem canh bao TLS dau file}:/run/secrets/tls/key.pem:ro
+      # JFR + GC log sống qua lần tạo lại container (dòng 63(iii), 2026-10-17) — xem server.Dockerfile.
+      - server-diagnostics:/app/diagnostics
+    # Trần bộ nhớ (dòng 59, 2026-10-17). Không có trần thì MaxRAMPercentage=75 tính theo RAM của CẢ VM —
+    # VM dùng chung với Postgres/Redis/monitoring, JVM có thể đòi 75% máy rồi bị OOM-killer giết. 6g là
+    # số TẠM cho Closed Beta (heap 75% = 4,5g + direct 512m + metaspace/stack), CHƯA đo ở cấu hình prod;
+    # VM nhỏ hơn 8 GB thì hạ số này trước khi chạy.
+    mem_limit: 6g
     logging:
       driver: json-file
       options: { max-size: "100m", max-file: "5" }
@@ -189,6 +198,7 @@ services:
       options: { max-size: "50m", max-file: "5" }
 
 volumes:
+  server-diagnostics:
   pgdata:
   prometheus-data:
   grafana-data:

@@ -89,7 +89,7 @@ class ClaimQuestRewardUseCaseTest {
         }
     }
 
-    static final class FakeInventoryGrantPort implements QuestInventoryGrantPort {
+    static class FakeInventoryGrantPort implements QuestInventoryGrantPort {
         String grantedCode;
         int grantedQuantity;
 
@@ -298,6 +298,34 @@ class ClaimQuestRewardUseCaseTest {
                 .isFalse();
         assertThat(auditPort.loggedAction).as("không được ghi audit").isNull();
         assertThat(progressPort.saved).as("quest phải vẫn COMPLETED").isNull();
+    }
+
+    /**
+     * Dòng 77(a) (2026-10-17): script trao một mã KHÔNG tồn tại ⇒ {@code SCRIPT_ERROR} (lỗi của nội
+     * dung), không phải {@code INVENTORY_FULL} ("túi đầy" trong khi túi trống). Chưa ghi gì.
+     */
+    @Test
+    void shouldReportScriptError_notInventoryFull_whenTheScriptGrantsAnUnknownItemCode() {
+        QuestProgress progress = new QuestProgress(CHARACTER_ID, TEMPLATE_ID, QuestStatus.COMPLETED, "{\"counter\":2}");
+        FakeQuestProgressPort progressPort = new FakeQuestProgressPort(progress);
+        FakeExpPort expPort = new FakeExpPort();
+        FakeAuditPort auditPort = new FakeAuditPort();
+        FakeInventoryGrantPort noSuchItem = new FakeInventoryGrantPort() {
+            @Override
+            public boolean itemExists(Transaction tx, String itemTemplateCode) {
+                return false;
+            }
+        };
+        ClaimQuestRewardUseCase useCase = newUseCase(
+                progressPort, new QuestRewardPorts(expPort, noSuchItem, auditPort, new FakeIdempotencyPort()));
+
+        ClaimQuestRewardUseCase.ClaimResult result = useCase.execute(CHARACTER_ID, QUEST_CODE, IDEMPOTENCY_KEY);
+
+        assertThat(result.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.SCRIPT_ERROR);
+        assertThat(expPort.grantedAmount).as("không được trao EXP").isEqualTo(-1L);
+        assertThat(noSuchItem.grantedCode).as("không thử trao món nào").isNull();
+        assertThat(auditPort.loggedAction).isNull();
+        assertThat(progressPort.saved).as("quest vẫn COMPLETED").isNull();
     }
 
     /** Key CHƯA bị đốt ⇒ dọn túi xong lĩnh lại bằng ĐÚNG key cũ vẫn phải được — thứ bug cũ phá. */

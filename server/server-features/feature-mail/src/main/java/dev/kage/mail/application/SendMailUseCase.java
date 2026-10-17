@@ -4,6 +4,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import dev.kage.mail.domain.Mail;
+import dev.kage.mail.domain.MailAttachment;
 import dev.kage.mail.domain.MailAttachmentDraft;
 import dev.kage.mail.domain.MailContentViolation;
 import dev.kage.mail.domain.MailDraft;
@@ -37,6 +38,15 @@ import dev.kage.mail.domain.TransactionRunner;
  */
 public final class SendMailUseCase {
 
+    /**
+     * Trần số thư một hộp giữ được trước khi người chơi khác không gửi thêm được (dòng 41(iv), chủ dự án
+     * duyệt 2026-10-17). Trước đó không có trần: spam thư là đường quấy rối không tốn gì ngoài trần tần
+     * suất. Đếm MỌI thư còn trong hộp (đã lĩnh mà chưa xoá cũng tính). Thư HỆ THỐNG ({@code senderId}
+     * rỗng) không bị chặn — nó chở phần thưởng, chặn là mất thưởng. Trần mềm: hai người gửi cùng lúc vào
+     * hộp 99 thư có thể cùng lọt — không khoá hộp người nhận chỉ để giữ đúng con số 100.
+     */
+    public static final int MAILBOX_CAPACITY = 100;
+
     private final MailPorts ports;
     private final TransactionRunner tx;
 
@@ -55,6 +65,10 @@ public final class SendMailUseCase {
         Optional<MailContentViolation> violation = draft.validate();
         if (violation.isPresent()) {
             return SendResult.rejected(toOutcome(violation.get()));
+        }
+        if (draft.senderId() != null
+                && ports.repositoryPort().listForRecipient(draft.recipientId()).size() >= MAILBOX_CAPACITY) {
+            return SendResult.rejected(SendOutcome.MAILBOX_FULL);
         }
         NewMail newMail = draft.toNewMail();
         AtomicReference<Mail> resultHolder = new AtomicReference<Mail>();
@@ -104,12 +118,13 @@ public final class SendMailUseCase {
         if (draft.senderId() == null || !sent.hasReward()) {
             return;
         }
-        String detail = "{\"mailId\":%d,\"recipientId\":%d,\"goldAmount\":%d,\"itemCount\":%d}"
+        String detail = "{\"mailId\":%d,\"recipientId\":%d,\"goldAmount\":%d,\"itemCount\":%d,\"items\":%s}"
                 .formatted(
                         sent.id(),
                         sent.recipientId(),
                         sent.goldAmount(),
-                        sent.attachments().size());
+                        sent.attachments().size(),
+                        MailAttachment.auditJson(sent.attachments()));
         ports.auditPort().log(t, draft.senderId(), "MAIL_SEND", detail);
     }
 
@@ -142,6 +157,8 @@ public final class SendMailUseCase {
         SUBJECT_TOO_LONG,
         BODY_TOO_LONG,
         /** Tiêu đề/nội dung chứa ký tự không lưu được ({@code U+0000}). */
-        INVALID_TEXT
+        INVALID_TEXT,
+        /** Hộp thư người nhận đã có {@link #MAILBOX_CAPACITY} thư (2026-10-17). */
+        MAILBOX_FULL
     }
 }

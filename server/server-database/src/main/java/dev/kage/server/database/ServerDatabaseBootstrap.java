@@ -23,6 +23,7 @@ import dev.kage.dialogue.api.NpcPlacementFacade;
 import dev.kage.dialogue.application.GetDialogueNodeUseCase;
 import dev.kage.friend.api.FriendFacade;
 import dev.kage.friend.application.AcceptFriendRequestUseCase;
+import dev.kage.friend.application.FriendRequestCooldowns;
 import dev.kage.friend.application.FriendUseCases;
 import dev.kage.friend.application.ListFriendsUseCase;
 import dev.kage.friend.application.ListPendingFriendRequestsUseCase;
@@ -373,10 +374,12 @@ public final class ServerDatabaseBootstrap {
 
     public FriendFacade wireFriendFacade() {
         PostgresFriendAdapter friendPort = new PostgresFriendAdapter(dataSource);
+        // Một sổ chờ-sau-từ-chối dùng chung cho gửi và từ chối (dòng 71(b)) — xem FriendRequestCooldowns.
+        FriendRequestCooldowns cooldowns = new FriendRequestCooldowns();
         FriendUseCases useCases = new FriendUseCases(
-                new SendFriendRequestUseCase(friendPort),
+                new SendFriendRequestUseCase(friendPort, cooldowns),
                 new AcceptFriendRequestUseCase(friendPort),
-                new RejectFriendRequestUseCase(friendPort),
+                new RejectFriendRequestUseCase(friendPort, cooldowns),
                 new RemoveFriendUseCase(friendPort),
                 new ListFriendsUseCase(friendPort),
                 new ListPendingFriendRequestsUseCase(friendPort));

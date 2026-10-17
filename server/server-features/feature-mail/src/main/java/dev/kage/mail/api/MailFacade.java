@@ -54,17 +54,12 @@ public final class MailFacade {
                 toSendResult(result.outcome()), result.mail().map(Mail::id).orElse(0L));
     }
 
+    /**
+     * Hai enum cùng tên giá trị — đổi theo TÊN thay cho switch 10 nhánh (trần CyclomaticComplexity của
+     * PMD). Lệch tên là IllegalArgumentException ngay ở test đầu tiên gọi tới.
+     */
     private static SendResult toSendResult(SendMailUseCase.SendOutcome outcome) {
-        return switch (outcome) {
-            case OK -> SendResult.OK;
-            case INSUFFICIENT_GOLD -> SendResult.INSUFFICIENT_GOLD;
-            case ATTACHMENT_NOT_OWNED -> SendResult.ATTACHMENT_NOT_OWNED;
-            case INVALID_GOLD_AMOUNT -> SendResult.INVALID_GOLD_AMOUNT;
-            case INVALID_ATTACHMENT -> SendResult.INVALID_ATTACHMENT;
-            case SUBJECT_TOO_LONG -> SendResult.SUBJECT_TOO_LONG;
-            case BODY_TOO_LONG -> SendResult.BODY_TOO_LONG;
-            case INVALID_TEXT -> SendResult.INVALID_TEXT;
-        };
+        return SendResult.valueOf(outcome.name());
     }
 
     public List<MailView> listMail(long characterId) {
@@ -116,7 +111,9 @@ public final class MailFacade {
          * Tiêu đề/nội dung chứa {@code U+0000}. KHÔNG có giá trị {@code SendMailOutcome} tương ứng
          * (thêm là đổi protocol) — gateway trả {@code ErrorResponse} {@code error.invalid_payload}.
          */
-        INVALID_TEXT
+        INVALID_TEXT,
+        /** Hộp thư người nhận đã đầy — gateway trả {@code ErrorResponse} {@code error.mailbox_full}. */
+        MAILBOX_FULL
     }
 
     public enum ClaimResult {

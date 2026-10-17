@@ -30,6 +30,8 @@ public final class HandOverPartyLeadershipUseCase {
     }
 
     /**
+     * Chuyển quyền trưởng nhóm cho thành viên vào sớm nhất đang online.
+     *
      * @param isOnline nhân vật nào đang có kết nối
      * @return trưởng nhóm MỚI; rỗng nếu không có gì đổi — người gọi không phải trưởng nhóm, hoặc không
      *     thành viên nào khác đang online (khi đó nhóm giữ nguyên, chờ trưởng nhóm quay lại)

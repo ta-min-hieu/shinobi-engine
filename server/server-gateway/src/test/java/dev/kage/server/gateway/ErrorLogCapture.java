@@ -26,6 +26,7 @@ final class ErrorLogCapture extends AppenderBase<ILoggingEvent> implements AutoC
     private final Logger logger;
     private final boolean previousAdditive;
     private final List<String> errors = new ArrayList<>();
+    private final List<String> warnings = new ArrayList<>();
 
     private ErrorLogCapture(Logger logger) {
         this.logger = logger;
@@ -50,6 +51,11 @@ final class ErrorLogCapture extends AppenderBase<ILoggingEvent> implements AutoC
             synchronized (errors) {
                 errors.add(summary);
             }
+        } else if (event.getLevel() == Level.WARN) {
+            String summary = summarize(event);
+            synchronized (warnings) {
+                warnings.add(summary);
+            }
         }
     }
 
@@ -64,6 +70,13 @@ final class ErrorLogCapture extends AppenderBase<ILoggingEvent> implements AutoC
     List<String> errorsSince(int fromIndex) {
         synchronized (errors) {
             return List.copyOf(errors.subList(fromIndex, errors.size()));
+        }
+    }
+
+    /** Các dòng WARN (đúng mức WARN) bắt được từ mốc {@code fromIndex}. */
+    List<String> warningsSince(int fromIndex) {
+        synchronized (warnings) {
+            return List.copyOf(warnings.subList(fromIndex, warnings.size()));
         }
     }
 

@@ -19,9 +19,17 @@ public final class SendFriendRequestUseCase {
     /** Mời ngược chiều một lời mời đang chờ là CHẤP NHẬN nó — đi đúng đường kiểm trần của chấp nhận. */
     private final AcceptFriendRequestUseCase accept;
 
+    private final FriendRequestCooldowns cooldowns;
+
     public SendFriendRequestUseCase(FriendPort port) {
+        this(port, new FriendRequestCooldowns());
+    }
+
+    /** {@code cooldowns} dùng chung với {@link RejectFriendRequestUseCase} — xem {@link FriendRequestCooldowns}. */
+    public SendFriendRequestUseCase(FriendPort port, FriendRequestCooldowns cooldowns) {
         this.port = port;
         this.accept = new AcceptFriendRequestUseCase(port);
+        this.cooldowns = cooldowns;
     }
 
     public Result execute(long requesterId, long addresseeId) {
@@ -41,6 +49,14 @@ public final class SendFriendRequestUseCase {
         // Danh sách của NGƯỜI GỬI đã đầy thì không mời thêm; danh sách người nhận được kiểm lúc họ chấp nhận.
         if (FriendListLimit.isFull(port.listAccepted(requesterId).size())) {
             return Result.FRIEND_LIST_FULL;
+        }
+        // Hai trần chống làm phiền (dòng 71(b), 2026-10-17): vừa bị người này từ chối thì chờ; hộp lời mời
+        // của người nhận đầy thì không xếp thêm.
+        if (cooldowns.isCoolingDown(requesterId, addresseeId)) {
+            return Result.RECENTLY_REJECTED;
+        }
+        if (FriendListLimit.isPendingFull(port.listPendingIncoming(addresseeId).size())) {
+            return Result.TARGET_PENDING_FULL;
         }
         try {
             port.sendRequest(requesterId, addresseeId);
@@ -81,6 +97,10 @@ public final class SendFriendRequestUseCase {
         /** Mời ngược chiều một lời mời đang chờ ⇒ hai người vừa thành bạn (2026-10-17). */
         BECAME_FRIENDS,
         /** Mời ngược chiều nhưng danh sách của người mời trước đã đầy — lời mời của họ còn nguyên. */
-        OTHER_FRIEND_LIST_FULL
+        OTHER_FRIEND_LIST_FULL,
+        /** Người nhận vừa từ chối lời mời của người gửi — còn trong {@link FriendRequestCooldowns#COOLDOWN}. */
+        RECENTLY_REJECTED,
+        /** Người nhận đã có {@link FriendListLimit#MAX_PENDING_INCOMING} lời mời đang chờ. */
+        TARGET_PENDING_FULL
     }
 }

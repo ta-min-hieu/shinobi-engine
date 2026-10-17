@@ -203,6 +203,36 @@ public final class GatewayServer {
                 .build();
     }
 
+    /** Trần chờ một event loop chạy xong việc rỗng — xem {@link #isServingGameTraffic}. */
+    private static final long EVENT_LOOP_PROBE_TIMEOUT_MILLIS = 1000;
+
+    /**
+     * Cổng game còn phục vụ thật không (dòng 62(i), chủ dự án duyệt 2026-10-17): cổng còn mở VÀ mọi
+     * event loop worker của Netty chạy xong một việc rỗng trong {@value #EVENT_LOOP_PROBE_TIMEOUT_MILLIS}
+     * ms. Trước đó healthcheck chỉ gọi {@code /health/live} (luôn 200 khi tiến trình còn sống) — một
+     * event loop kẹt (handler treo) làm mọi người chơi trên nó đứng hình mà container vẫn "healthy".
+     *
+     * <p>Chạy trên luồng của {@code MetricsHttpServer}, không phải event loop — chờ ở đây không chặn ai.
+     */
+    boolean isServingGameTraffic() {
+        if (serverChannel == null || !serverChannel.isActive() || workerGroup == null) {
+            return false;
+        }
+        try {
+            for (io.netty.util.concurrent.EventExecutor loop : workerGroup) {
+                if (!loop.submit(() -> {}).await(EVENT_LOOP_PROBE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            return false; // event loop đang tắt
+        }
+    }
+
     /** Cổng thật đang lắng nghe — khác {@code requestedPort} nếu tạo bằng port 0. */
     public int port() {
         return ((InetSocketAddress) serverChannel.localAddress()).getPort();
@@ -230,8 +260,11 @@ public final class GatewayServer {
             // một kết nối mới vẫn có thể lọt vào giữa lúc broadcast và không nhận được thông báo.
             serverChannel.close().syncUninterruptibly();
         }
-        context.worldGateway().registry().broadcastShuttingDown();
-        waitOutShutdownNotice();
+        // context null chỉ ở test vòng đời cổng (không ai kết nối, không ai để báo).
+        if (context != null) {
+            context.worldGateway().registry().broadcastShuttingDown();
+            waitOutShutdownNotice();
+        }
         awaitGracefully(workerGroup);
         awaitGracefully(bossGroup);
         if (authExecutor != null) {

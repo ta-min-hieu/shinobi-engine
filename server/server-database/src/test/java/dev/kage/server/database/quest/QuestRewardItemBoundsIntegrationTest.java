@@ -187,8 +187,8 @@ class QuestRewardItemBoundsIntegrationTest {
     }
 
     /**
-     * Mã không tồn tại: hành vi HIỆN CÓ (từ 2026-10-02) là rollback + {@code INVENTORY_FULL}. Ghim lại
-     * phần quan trọng — không ghi gì, lĩnh lại được — chứ không khẳng định tên outcome là đúng.
+     * Mã không tồn tại: rollback + {@code SCRIPT_ERROR} (dòng 77(a), 2026-10-17 — trước đó
+     * {@code INVENTORY_FULL}, tức "túi đầy" trong khi túi trống). Không ghi gì, lĩnh lại được.
      */
     @Test
     void shouldRollBackTheWholeClaim_whenTheItemCodeDoesNotExist() {
@@ -197,7 +197,7 @@ class QuestRewardItemBoundsIntegrationTest {
 
         ClaimQuestRewardUseCase.ClaimResult result = claim(characterId);
 
-        assertThat(result.outcome()).isEqualTo(Outcome.INVENTORY_FULL);
+        assertThat(result.outcome()).isEqualTo(Outcome.SCRIPT_ERROR);
         assertNothingWasGranted(characterId, expBefore);
     }
 

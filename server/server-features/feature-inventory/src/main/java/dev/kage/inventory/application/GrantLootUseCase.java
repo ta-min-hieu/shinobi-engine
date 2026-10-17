@@ -124,7 +124,6 @@ public final class GrantLootUseCase {
         return List.copyOf(granted);
     }
 
-    /** Thiếu template (dữ liệu hỏng) ⇒ coi như KHÔNG xếp chồng — an toàn hơn là gộp nhầm. */
     /** {@code source} là mã bảng rơi (= mã loài quái) — dữ liệu server, nhưng vẫn lọc về chữ/số/gạch dưới. */
     private static String detailJson(String dropTableCode, ItemStack stack) {
         String source = dropTableCode.replaceAll("[^A-Za-z0-9_]", "_");
@@ -132,6 +131,7 @@ public final class GrantLootUseCase {
                 .formatted(source, stack.itemTemplateId(), stack.quantity());
     }
 
+    /** Thiếu template (dữ liệu hỏng) ⇒ coi như KHÔNG xếp chồng — an toàn hơn là gộp nhầm. */
     private int maxStackOf(ItemStack stack) {
         return itemTemplatePort
                 .findById(stack.itemTemplateId())

@@ -13,7 +13,9 @@ on:
 # Huỷ run cũ khi push mới lên cùng branch/PR
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Không huỷ run trên master (dòng 63(ii), 2026-10-17): job docker-build-push chỉ chạy ở đó, huỷ giữa
+  # chừng là image dở dang; các nhánh khác thì huỷ run cũ như trước.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 jobs:
   build-and-verify:

@@ -77,17 +77,41 @@ public final class GetDialogueNodeUseCase {
             return null;
         }
         Value node = root.getMember(nodeId);
-        String textKey = node.getMember("text_key").asString();
+        String textKey = requiredString(node, "text_key", nodeId);
         Value optionsValue = node.getMember("options");
+        if (optionsValue == null || !optionsValue.hasArrayElements()) {
+            throw malformed(nodeId, "options");
+        }
         ArrayList<DialogueOption> options = new ArrayList<DialogueOption>();
         long size = optionsValue.getArraySize();
         for (long i = 0; i < size; i++) {
             Value option = optionsValue.getArrayElement(i);
             options.add(new DialogueOption(
-                    option.getMember("label_key").asString(),
-                    option.getMember("action").asString()));
+                    requiredString(option, "label_key", nodeId), requiredString(option, "action", nodeId)));
         }
         return new DialogueNode(nodeId, textKey, options);
+    }
+
+    /**
+     * Trường chuỗi bắt buộc của một node — thiếu hoặc sai kiểu là lỗi SCRIPT (dòng 77(e), chủ dự án
+     * duyệt 2026-10-17). Trước đó {@code getMember(...).asString()} trần ném NPE/ClassCastException
+     * KHÔNG bọc: lọt khỏi {@code ScriptSandbox} (chỉ bọc lỗi polyglot) thành lỗi 500 ở gateway, thay vì
+     * dòng log "script dialogue lỗi" có tên NPC và đường dẫn script.
+     */
+    private static String requiredString(Value object, String member, String nodeId) {
+        if (object == null || !object.hasMember(member)) {
+            throw malformed(nodeId, member);
+        }
+        Value value = object.getMember(member);
+        if (value == null || !value.isString()) {
+            throw malformed(nodeId, member);
+        }
+        return value.asString();
+    }
+
+    private static ScriptExecutionException malformed(String nodeId, String member) {
+        return new ScriptExecutionException(
+                "Node hội thoại '" + nodeId + "' thiếu hoặc sai kiểu trường '" + member + "'", null);
     }
 
     private static boolean isOwnKey(Value root, String nodeId) {

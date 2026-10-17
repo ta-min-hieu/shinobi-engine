@@ -170,6 +170,14 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
     }
 
     @Override
+    public boolean itemExists(Transaction tx, String itemTemplateCode) {
+        Connection connection = ((JdbcTransaction) tx).connection();
+        return JdbcOperations.queryOne(
+                        connection, FIND_ITEM_TEMPLATE_ID_BY_CODE, rs -> rs.getLong("id"), itemTemplateCode)
+                .isPresent();
+    }
+
+    @Override
     public boolean grantItemByCode(Transaction tx, long characterId, String itemTemplateCode, int quantity) {
         requirePositiveQuantity(quantity);
         Connection connection = ((JdbcTransaction) tx).connection();

@@ -55,6 +55,17 @@ public interface QuestInventoryGrantPort {
         return true;
     }
 
+    /**
+     * Mã vật phẩm có trong {@code item_template} không (dòng 77(a), 2026-10-17). Trước đó mã sai đi
+     * thẳng vào {@link #grantItemByCode} — trả {@code false} y như túi đầy — nên người chơi đọc "túi
+     * đầy" trong khi túi trống; lỗi thật là của SCRIPT. Hỏi trước, trong cùng transaction lĩnh.
+     *
+     * <p>Mặc định {@code true} — cùng lý do {@link #hasRoomFor} là {@code default}.
+     */
+    default boolean itemExists(Transaction tx, String itemTemplateCode) {
+        return true;
+    }
+
     /** Một lời {@code give_item} của script — tách riêng để domain không phụ thuộc ngược vào application. */
     record ItemGrantRequest(String itemTemplateCode, int quantity) {}
 }

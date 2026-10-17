@@ -86,12 +86,6 @@ final class DialogueController {
     }
 
     /**
-     * Đóng hội thoại. Gọi khi {@code DialogueEndedResponse}, khi server rẽ sang luồng khác
-     * (nhận quest / mở cửa hàng), và khi lỗi — mọi nhánh KHÔNG phải {@code DialogueNodeResponse} đều
-     * kết thúc cuộc hội thoại, vì server không giữ state nào để nói tiếp
-     * ({@code GetDialogueNodeUseCase} không có phiên).
-     */
-    /**
      * Ghi lại lệnh hội thoại vừa gửi (bắt chuyện hoặc chọn một lựa chọn). Server từ chối bằng
      * {@code ErrorResponse} mang đúng {@code sequenceId} này — NPC không còn, hoặc đứng xa quá (từ
      * 2026-10-11 server kiểm khoảng cách tới NPC).
@@ -108,6 +102,12 @@ final class DialogueController {
         return isOpen() && pendingSequenceId != NO_PENDING_COMMAND && pendingSequenceId == relatedSequenceId;
     }
 
+    /**
+     * Đóng hội thoại. Gọi khi {@code DialogueEndedResponse}, khi server rẽ sang luồng khác
+     * (nhận quest / mở cửa hàng), và khi lỗi — mọi nhánh KHÔNG phải {@code DialogueNodeResponse} đều
+     * kết thúc cuộc hội thoại, vì server không giữ state nào để nói tiếp
+     * ({@code GetDialogueNodeUseCase} không có phiên).
+     */
     void close() {
         pendingSequenceId = NO_PENDING_COMMAND;
         npcCode = CLOSED;

@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import dev.kage.mail.domain.IdempotencyKeyReusedException;
 import dev.kage.mail.domain.Mail;
+import dev.kage.mail.domain.MailAttachment;
 import dev.kage.mail.domain.Transaction;
 import dev.kage.mail.domain.TransactionRunner;
 
@@ -60,9 +61,7 @@ public final class ClaimMailUseCase {
                     // thể xảy ra (FOR UPDATE khoá dòng), nhưng giữ nhánh phòng thủ thay vì giả định.
                     throw new MailTransactionAbortedException();
                 }
-                String detail = "{\"mailId\":%d,\"goldAmount\":%d,\"itemCount\":%d}"
-                        .formatted(mailId, mail.goldAmount(), mail.attachments().size());
-                ports.auditPort().log(t, recipientId, "MAIL_CLAIM", detail);
+                ports.auditPort().log(t, recipientId, "MAIL_CLAIM", auditDetail(mail));
                 resultHolder.set(ClaimOutcome.OK);
             });
         } catch (IdempotencyKeyReusedException e) {
@@ -71,6 +70,16 @@ public final class ClaimMailUseCase {
             return ClaimOutcome.INVENTORY_FULL;
         }
         return resultHolder.get();
+    }
+
+    /** {@code audit_log.detail} của một lần nhận thư — kèm mảng vật phẩm từ 2026-10-17 (dòng 66(b)). */
+    private static String auditDetail(Mail mail) {
+        return "{\"mailId\":%d,\"goldAmount\":%d,\"itemCount\":%d,\"items\":%s}"
+                .formatted(
+                        mail.id(),
+                        mail.goldAmount(),
+                        mail.attachments().size(),
+                        MailAttachment.auditJson(mail.attachments()));
     }
 
     public enum ClaimOutcome {

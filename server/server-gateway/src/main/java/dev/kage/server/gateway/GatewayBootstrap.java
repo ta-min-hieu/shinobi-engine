@@ -130,6 +130,8 @@ public final class GatewayBootstrap {
                 new GatewayServer.GatewayContext(instanceRegistries.worldGateway(), observability),
                 endpoints.tlsConfig());
         server.shutdownNotice(shutdownNoticeFromEnvironment());
+        // /health/ready còn đòi cổng game phục vụ được (dòng 62(i)) — server dựng SAU máy chủ metrics.
+        worldContext.metricsHttpServer().addReadinessCheck(server::isServingGameTraffic);
         Runnable shutdown = shutdownSequence(
                 new ShutdownContext(server, worldContext, instanceRegistries, characterRegistry),
                 positionPersister,

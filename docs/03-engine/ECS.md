@@ -126,6 +126,12 @@ public final class MovementSystem extends IteratingSystem {
 
 **System chỉ xử lý Entity thuộc Family của nó.**
 
+> ⚠️ **Trạng thái tĩnh của Ashley không an toàn đa luồng** (bảng `Family`, sổ `ComponentType`). Server
+> chạy nhiều World trên nhiều luồng, nên `engine-ecs` gác mọi lần chạm hai thứ đó bằng một khoá chung
+> (`AshleyStatics`), và server-world **đăng ký trước mọi kiểu Component** lúc nạp `WorldFacade`
+> (`WorldComponentTypes`, 2026-10-17). **Thêm Component mới cho server ⇒ thêm vào `WorldComponentTypes.ALL`**
+> — `WorldComponentTypesTest` đỏ nếu quên.
+
 | ❌ Cấm | Vì sao |
 |---|---|
 | Tự tìm Component (`entity.getComponent(...)` để lọc) | Family đã lọc rồi — làm lại là thừa và chậm |

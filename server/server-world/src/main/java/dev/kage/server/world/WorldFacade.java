@@ -70,6 +70,11 @@ public final class WorldFacade {
 
     private static final Logger LOG = LoggerFactory.getLogger(WorldFacade.class);
 
+    static {
+        // Trước MỌI World: sổ ComponentType tĩnh của Ashley chỉ còn ĐỌC từ đây (dòng 73(d)).
+        WorldComponentTypes.registerAll();
+    }
+
     /** Trần chờ lần tick dở dang lúc {@link #stop()} — xem {@link #awaitTickInProgress}. */
     private static final Duration STOP_TICK_WAIT = Duration.ofSeconds(5);
 

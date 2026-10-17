@@ -13,14 +13,12 @@ java {
 
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
-    // ⚠️ CHỦ ĐÍCH KHÔNG -Werror: dự án bọc thư viện thứ ba (Ashley/libGDX/Netty) — chúng phát
-    // sinh warning (VD varargs generic heap-pollution) không phải lỗi của code ta và không sửa
-    // được. -Werror chặn TOÀN BỘ build vì warning của người khác = "quá nghiêm → bị tắt hẳn"
-    // (STATIC-ANALYSIS.md §11). Vẫn giữ -Xlint:all để warning HIỂN THỊ, không ẩn đi.
-    // Enforcement thật nằm ở Checkstyle + PMD + ArchUnit (nhắm đúng code CỦA TA).
-    // Rà 2026-10-03 đề xuất bật -Werror (đo 0 warning trên 28 module) — CHỜ CHỦ DỰ ÁN, xem
-    // STATIC-ANALYSIS.md §8.1; quyết định này không tự đảo.
+    // -Werror BẬT từ 2026-10-17 (dòng 58(a), chủ dự án duyệt): rà 2026-10-03 đo 0 warning trên 28
+    // module, nên lo ngại cũ ("warning của thư viện thứ ba chặn cả build", STATIC-ANALYSIS.md §11)
+    // không xảy ra thật — warning của javac chỉ nói về code CỦA TA. Giữ mức 0 đó bằng máy thay vì
+    // bằng trí nhớ. Một warning không sửa được thì @SuppressWarnings tại chỗ, kèm lý do.
     options.compilerArgs.add("-Xlint:all")
+    options.compilerArgs.add("-Werror")
 }
 
 tasks.withType<Test>().configureEach {

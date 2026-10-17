@@ -72,7 +72,9 @@ class RejectFriendRequestUseCaseTest {
 
         @Override
         public List<Friendship> listPendingIncoming(long characterId) {
-            throw new UnsupportedOperationException("không dùng ở test này");
+            return friendships.stream()
+                    .filter(f -> f.addresseeId() == characterId && f.status() == FriendshipStatus.PENDING)
+                    .toList();
         }
     }
 }

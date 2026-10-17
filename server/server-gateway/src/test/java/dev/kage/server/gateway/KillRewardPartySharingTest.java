@@ -102,7 +102,9 @@ class KillRewardPartySharingTest {
 
             assertThat(experienceReceivers).containsExactly(KILLER_ID);
             assertThat(new int[] {lootRolls.get(), questEvents.get()}).containsExactly(1, 1);
-            assertThat(errorLog.errorsSince(0))
+            // WARN từ 2026-10-17 (dòng 78(d)).
+            assertThat(errorLog.errorsSince(0)).isEmpty();
+            assertThat(errorLog.warningsSince(0))
                     .singleElement()
                     .asString()
                     .contains("step=PARTY_SHARE")

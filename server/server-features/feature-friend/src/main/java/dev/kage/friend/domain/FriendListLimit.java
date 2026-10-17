@@ -13,7 +13,18 @@ public final class FriendListLimit {
     /** Số bạn bè (đã chấp nhận) tối đa của một nhân vật. */
     public static final int MAX_FRIENDS = 100;
 
+    /**
+     * Số lời mời ĐANG CHỜ tối đa một nhân vật nhận (dòng 71(b), 2026-10-17) — quá trần thì lời mời mới bị
+     * từ chối ở phía người gửi. Trần mềm như {@link #MAX_FRIENDS}.
+     */
+    public static final int MAX_PENDING_INCOMING = 50;
+
     private FriendListLimit() {}
+
+    /** {@code true} nếu {@code pendingCount} lời mời đang chờ đã chạm {@link #MAX_PENDING_INCOMING}. */
+    public static boolean isPendingFull(int pendingCount) {
+        return pendingCount >= MAX_PENDING_INCOMING;
+    }
 
     /** {@code true} nếu danh sách {@code acceptedCount} bạn đã chạm trần — không nhận thêm ai. */
     public static boolean isFull(int acceptedCount) {
