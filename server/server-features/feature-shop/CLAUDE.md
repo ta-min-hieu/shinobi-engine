@@ -80,6 +80,14 @@ túi đồ thật), đổi thì phải đổi cả 2 chỗ cho tới khi có ngu
   `error.invalid_payload`, không còn rơi vào lưới cuối thành 500. Kiểm trong use case (mục "Cứng")
   vẫn giữ — biên dây chỉ kiểm hình dạng.
 
+## Món chỉ-thu-mua (`buy_price = 0`, V55 — chủ dự án duyệt 2026-10-17)
+
+`ShopListing.soldByShop()` = `buyPrice > 0`. `BuyItemUseCase` từ chối món giá mua 0 bằng
+`ITEM_NOT_IN_SHOP` (không đổi shop.proto); bán vẫn như thường. Dùng cho vật quest rơi 100%
+(`outer_sect_tally`, `blood_sand_talisman`): có dòng `shop_item` mà không có luật này thì mua 2 thẻ
+bài là xong quest 6 không cần đánh. Client hiện "Mua: chỉ thu mua" và không gửi lệnh mua.
+`ContentReferenceIntegrationTest` chỉ tính món `buy_price > 0` là "kiếm được qua cửa hàng".
+
 ## Cứng
 
 ✅ Quy tắc validate (giá âm, quantity ≤ 0) ở `domain/`/đầu `UseCase`, không ở Facade

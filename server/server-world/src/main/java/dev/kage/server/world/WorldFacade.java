@@ -646,19 +646,16 @@ public final class WorldFacade {
 
     /**
      * Máu TỐI ĐA của một nhân vật với chỉ số trang bị đã cho — nguồn chân lý DUY NHẤT của con số
-     * này (ADR-036: {@code CHARACTER_MAX_HP} + {@code bonus_hp}, đã tính cường hoá).
+     * này ({@link CombatConstants#characterMaxHp}: nền theo cấp — dòng 65(d) — cộng {@code bonus_hp} của
+     * ADR-036, đã tính cường hoá).
      *
      * <p>Công khai vì {@code server-gateway} phải gửi con số đó cho client NGAY trong
      * {@code SelectCharacterResponse}: entity ECS mới chỉ được xếp hàng lúc đó, chưa tồn tại để hỏi.
      * Để gateway tự cộng {@code 100 + bonusHp} là tạo ra bản sao thứ hai của công thức, và bản sao
      * đó sẽ lệch trong im lặng ngay lần đầu GDD chốt công thức HP thật.
      */
-    public static int characterMaxHp(EquipmentBonusSnapshot bonus) {
-        return characterMaxHp(bonus.hp());
-    }
-
-    private static int characterMaxHp(int bonusHp) {
-        return Math.max(1, CombatConstants.CHARACTER_MAX_HP + bonusHp);
+    public static int characterMaxHp(int level, EquipmentBonusSnapshot bonus) {
+        return CombatConstants.characterMaxHp(level, bonus.hp());
     }
 
     /** GAMEPLAY.md §10 — chat kênh Khu vực, cần {@code aoiTracker} nên phải qua tick thread. */
@@ -958,7 +955,7 @@ public final class WorldFacade {
         entity.add(characterIdComponent);
 
         HealthComponent health = new HealthComponent();
-        health.current = CombatConstants.CHARACTER_MAX_HP; // placeholder — GDD chưa chốt công thức HP tối đa
+        health.current = CombatConstants.CHARACTER_MAX_HP; // nền Cấp 1 — applyBonusTo (sau khi gắn cấp) nâng lên
         health.max = CombatConstants.CHARACTER_MAX_HP;
         entity.add(health);
         entity.add(toComponent(CombatConstants.deriveCombatStats(entry.baseStats())));
@@ -1233,7 +1230,9 @@ public final class WorldFacade {
         if (level <= levelComponent.level) {
             return; // lệnh đến muộn — cấp không bao giờ lùi.
         }
+        int gained = CombatConstants.levelHpGain(levelComponent.level, level);
         levelComponent.level = level;
+        raiseMaxHpForLevel(characterId, entity, gained);
         baseStatsByCharacterId.put(
                 characterId,
                 new CharacterBaseStats(
@@ -1243,6 +1242,24 @@ public final class WorldFacade {
                         baseStats.vit(),
                         baseStats.element(),
                         level));
+    }
+
+    /**
+     * Dòng 65(d): lên cấp nâng máu tối đa thêm {@code gained} — và máu HIỆN TẠI cũng thêm đúng chừng
+     * đó, không theo tỉ lệ như mặc/gỡ đồ ({@link #applyMaxHpBonus}). Tỉ lệ ở đó là để gỡ-rồi-mặc không
+     * thành nút hồi máu; cấp thì chỉ tăng, nên không có vòng nào để lặp, và người vừa lên cấp không bị
+     * vạch máu tụt về phần trăm. Đang chết thì chỉ đổi máu tối đa — hồi sinh tự đọc nó.
+     */
+    private void raiseMaxHpForLevel(long characterId, KEntity entity, int gained) {
+        if (gained <= 0) {
+            return;
+        }
+        HealthComponent health = HEALTH.get(entity);
+        health.max += gained;
+        if (health.current > 0) {
+            health.current = Math.min(health.max, health.current + gained);
+        }
+        pendingHealthChanges.add(new HealthChange(characterId, health.current, health.max));
     }
 
     /**
@@ -1310,7 +1327,7 @@ public final class WorldFacade {
     private void applyMaxHpBonus(KEntity entity, int bonusHp) {
         HealthComponent health = HEALTH.get(entity);
         int oldMax = health.max;
-        int newMax = characterMaxHp(bonusHp);
+        int newMax = CombatConstants.characterMaxHp(LEVEL.get(entity).level, bonusHp);
         health.max = newMax;
         if (newMax != oldMax && health.current > 0) {
             long scaled = oldMax > 0 ? (long) health.current * newMax / oldMax : newMax;

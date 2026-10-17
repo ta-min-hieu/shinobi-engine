@@ -131,6 +131,17 @@ class ShopControllerTest {
     }
 
     @Test
+    @DisplayName("Món giá mua 0 (cửa hàng chỉ thu mua, V55): Mua bị từ chối, không gửi lệnh")
+    void attemptBuyRejectsBuyBackOnlyListing() {
+        controller.onListings(listings(listing(9L, 0L, 10L)));
+
+        ShopController.BuyAttempt attempt = controller.attemptBuy(9L);
+
+        assertThat(attempt).isEqualTo(new ShopController.BuyAttempt.Reject("shop.error.buy_back_only"));
+        assertThat(controller.pendingBuyItemTemplateId()).isZero();
+    }
+
+    @Test
     @DisplayName("ADR-025: bấm Mua lại CÙNG món + CÙNG số lượng khi lệnh chưa xong giữ NGUYÊN khoá")
     void reusesBuyKeyForTheSameAttempt() {
         controller.onListings(listings(listing(7L, 100L, 40L)));

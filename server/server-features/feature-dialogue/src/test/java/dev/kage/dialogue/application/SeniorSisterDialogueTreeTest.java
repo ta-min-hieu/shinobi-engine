@@ -2,6 +2,7 @@ package dev.kage.dialogue.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
@@ -131,6 +132,46 @@ class SeniorSisterDialogueTreeTest {
         assertThat(questOptions)
                 .as("mọi lựa chọn nhận quest phải nằm gọn trong nhánh giao việc — chỗ khác là mốc quest trôi đi")
                 .isEqualTo(3L);
+    }
+
+    /**
+     * Dòng 65(c): mở lời khi đang làm quest giao đồ mà túi chưa đủ thì cô NHẮC, thay vì chào như
+     * thường. Ngưỡng phải khớp {@code take_item} của script quest (2 thẻ bài, 1 lệnh phù) — đủ đồ thì
+     * chào như thường, vì ngay sau câu chào là thông báo quest xong.
+     */
+    @Test
+    @DisplayName("Đang làm quest giao đồ mà thiếu đồ: câu chào nhắc đúng món, options không đổi")
+    void greetingRemindsWhatIsStillMissing() {
+        assertThat(start(FixedDialogueFacts.questInProgress("recover_outer_sect_tallies", "outer_sect_tally", 1))
+                        .textKey())
+                .isEqualTo("dialogue.senior_sister.greeting_tallies_missing");
+        assertThat(start(FixedDialogueFacts.questInProgress("recover_outer_sect_tallies", "outer_sect_tally", 2))
+                        .textKey())
+                .isEqualTo("dialogue.senior_sister.greeting");
+        assertThat(start(FixedDialogueFacts.questInProgress("abandoned_cave", "blood_sand_talisman", 0))
+                        .textKey())
+                .isEqualTo("dialogue.senior_sister.greeting_talisman_missing");
+        assertThat(start(FixedDialogueFacts.questInProgress("abandoned_cave", "blood_sand_talisman", 1))
+                        .textKey())
+                .isEqualTo("dialogue.senior_sister.greeting");
+
+        DialogueNode reminding =
+                start(FixedDialogueFacts.questInProgress("recover_outer_sect_tallies", "outer_sect_tally", 0));
+        assertThat(reminding.options())
+                .isEqualTo(node(DialogueNode.START_NODE_ID).options());
+    }
+
+    @Test
+    @DisplayName("Quest đã xong (COMPLETED/CLAIMED) thì không nhắc nữa dù túi rỗng")
+    void finishedQuestIsNeverRemindedAgain() {
+        for (String status : new String[] {"COMPLETED", "CLAIMED"}) {
+            FixedDialogueFacts facts = new FixedDialogueFacts(Map.of("recover_outer_sect_tallies", status), Map.of());
+            assertThat(start(facts).textKey()).as(status).isEqualTo("dialogue.senior_sister.greeting");
+        }
+    }
+
+    private DialogueNode start(FixedDialogueFacts facts) {
+        return useCase.execute(NPC_CODE, DialogueNode.START_NODE_ID, facts).orElseThrow();
     }
 
     private DialogueNode node(String nodeId) {

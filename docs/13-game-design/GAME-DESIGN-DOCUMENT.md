@@ -425,18 +425,18 @@ so cấp suy từ `exp` với cột `level` đang lưu; kiểm sống lại: lĩ
    `trial_construct` (@−47) ở khoảng −41…−43 — vẫn trong leash 10 m của `archive_warden` @−33 vừa bị
    đánh động lúc đi ngang ⇒ 2/2 chết; lùi sâu tới −46 thì thắng thoải mái. `vein_raider` @47 y hệt với
    `wandering_bandit` @34 (đứng 45 chết, 50 thắng). Luật giãn spawn V29 (`|A−B| > aggroA+aggroB`)
-   không tính vế **leash** của con bị đánh động khi đi ngang.
+   không tính vế **leash** của con bị đánh động khi đi ngang. *(✅ 2026-10-17: với hai trận tay đôi này, luật nay tính cả leash lẫn tuần tra, V56 dời hai điểm spawn — README dòng 64(b); áp cho cả trục thì còn 16 cặp vi phạm, chờ chủ dự án.)*
 3. **Cấp 29 cầm bộ Cấp 30.** Quest 16 trao bộ Trúc Cơ (`required_level` 30) nhưng để người chơi ở
    Cấp 29 (40 990 EXP; Cấp 30 = 43 500), mà quest 17–20 cân bằng theo đúng bộ đó. Bộ Ngoại Môn đo
    được 1 chết + 1 sát nút ⇒ phải cày ~2 500 EXP ở chỗ khác (6 đàn chủ, ~5 phút) — không có quest/NPC
    nào nói điều này.
 4. **Túi 20 ô tính cả 7 món đang mặc** ⇒ người giữ lại bộ cũ bị từ chối lĩnh thưởng 6 món
    (`INVENTORY_FULL`; quest giữ `COMPLETED`, không mất gì). Kèm: `outer_sect_tally` vẫn rơi 100% từ tán tu
-   sau khi quest 9 xong và **không bán được** (cuối lượt còn 3 thẻ rác).
+   sau khi quest 9 xong và **không bán được** (cuối lượt còn 3 thẻ rác). *(✅ 2026-10-17: bán được, không mua được — V55.)*
 5. **Im lặng khi chưa đủ điều kiện**: nộp thiếu thẻ bài, hạ tán tu trước khi hỏi Chu Hoành — đúng
-   luật script nhưng người chơi không nhận một dòng phản hồi nào.
+   luật script nhưng người chơi không nhận một dòng phản hồi nào. *(✅ 2026-10-17: NPC nhắc khi thiếu đồ — README dòng 65(c).)*
 6. **Lên cấp không cộng chỉ số**: máu 100 từ Cấp 1 tới Cấp 5 tay không, sát thương chỉ đổi theo đồ ⇒
-   cấp chỉ là cổng mặc đồ. Ghi lại để xác nhận đây là chủ đích.
+   cấp chỉ là cổng mặc đồ. Ghi lại để xác nhận đây là chủ đích. *(✅ 2026-10-17: +2 máu tối đa mỗi cấp — README dòng 65(d).)*
 
 Nhân vật thử đã xoá khỏi DB dev sau khi đo (account `questrun1003`, nhân vật 8007/8008, cùng quest/túi/
 audit của chúng); bảng `idempotency_key` không gắn nhân vật nên còn lại vài khoá UUID của lượt đo.

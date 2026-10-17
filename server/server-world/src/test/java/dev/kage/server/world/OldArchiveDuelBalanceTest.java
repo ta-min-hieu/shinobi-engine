@@ -78,13 +78,13 @@ class OldArchiveDuelBalanceTest {
     }
 
     @Test
-    @DisplayName("Mặc trọn bộ Tạp Dịch THẮNG thạch vệ — 4 nhát so với 6")
+    @DisplayName("Mặc trọn bộ Tạp Dịch THẮNG thạch vệ — 4 nhát so với 7")
     void gearedNoviceShouldWinTheArchiveDuel() {
         CombatConstants.CombatStats player = novice();
 
         int playerAtk = player.atk() + NOVICE_SET_ATK;
         int playerDef = player.def() + NOVICE_SET_DEF;
-        int playerHp = CombatConstants.CHARACTER_MAX_HP + NOVICE_SET_HP;
+        int playerHp = CombatConstants.characterMaxHp(LEVEL_AT_QUEST_THREE, NOVICE_SET_HP);
 
         int playerHitsFor = hitsToKill(WARDEN_HP, hit(playerAtk, WARDEN_DEF));
         int wardenHitsFor = hitsToKill(playerHp, hit(WARDEN_ATK, playerDef));
@@ -92,7 +92,7 @@ class OldArchiveDuelBalanceTest {
         // Hai bên dùng CHUNG một nhịp đánh (CombatConstants.ATTACK_INTERVAL_SECONDS = 1 đòn/giây),
         // nên "ít nhát hơn" cũng chính là "chết sau" — không cần mô phỏng thời gian.
         assertThat(playerHitsFor).isEqualTo(4);
-        assertThat(wardenHitsFor).isEqualTo(6);
+        assertThat(wardenHitsFor).isEqualTo(7);
         assertThat(playerHitsFor).isLessThan(wardenHitsFor);
     }
 
@@ -102,7 +102,8 @@ class OldArchiveDuelBalanceTest {
         CombatConstants.CombatStats player = novice();
 
         int playerHitsFor = hitsToKill(WARDEN_HP, hit(player.atk(), WARDEN_DEF));
-        int wardenHitsFor = hitsToKill(CombatConstants.CHARACTER_MAX_HP, hit(WARDEN_ATK, player.def()));
+        int wardenHitsFor =
+                hitsToKill(CombatConstants.characterMaxHp(LEVEL_AT_QUEST_THREE, 0), hit(WARDEN_ATK, player.def()));
 
         // Cùng nhịp đánh mà cùng số nhát thì người chơi KHÔNG thắng — đây là ranh giới cố ý: quest 2
         // (4 so với 6 tay không) còn qua được tay không, quest 3 thì không.
@@ -134,19 +135,19 @@ class OldArchiveDuelBalanceTest {
      * không phải "đường chơi thường" của arc 1 theo bất kỳ nghĩa nào.
      */
     @Test
-    @DisplayName("Quỷ đá thì mặc trọn bộ Tạp Dịch vẫn THUA — 7 nhát so với 4, nên arc 1 không dùng nó")
+    @DisplayName("Quỷ đá thì mặc trọn bộ Tạp Dịch vẫn THUA — 7 nhát so với 5, nên arc 1 không dùng nó")
     void theStoneOgreWouldHaveBeenUnbeatableForThisArc() {
         CombatConstants.CombatStats player = novice();
 
         int playerAtk = player.atk() + NOVICE_SET_ATK;
         int playerDef = player.def() + NOVICE_SET_DEF;
-        int playerHp = CombatConstants.CHARACTER_MAX_HP + NOVICE_SET_HP;
+        int playerHp = CombatConstants.characterMaxHp(LEVEL_AT_QUEST_THREE, NOVICE_SET_HP);
 
         int playerHitsFor = hitsToKill(OGRE_HP, hit(playerAtk, OGRE_DEF));
         int ogreHitsFor = hitsToKill(playerHp, hit(OGRE_ATK, playerDef));
 
         assertThat(playerHitsFor).isEqualTo(7);
-        assertThat(ogreHitsFor).isEqualTo(4);
+        assertThat(ogreHitsFor).isEqualTo(5);
         assertThat(playerHitsFor).isGreaterThan(ogreHitsFor);
     }
 
@@ -191,19 +192,20 @@ class OldArchiveDuelBalanceTest {
      * đối chiếu với luật biên thật thay vì lặng lẽ giữ trận ở dưới ngưỡng.
      */
     @Test
-    @DisplayName("🔴 Luật biên thật: thạch vệ ĐANG vi phạm — biên thật −1, cần +2 (chờ chủ dự án)")
+    @DisplayName(
+            "🔴 Luật biên thật: thạch vệ ĐANG vi phạm — biên thật 0 (máu theo cấp; trước đó −1), cần +2 (chờ chủ dự án)")
     void theArchiveDuelViolatesTheRealMarginRule() {
         CombatConstants.CombatStats player = novice();
         DuelMargin duel = new DuelMargin(
                 player.atk() + NOVICE_SET_ATK,
                 player.def() + NOVICE_SET_DEF,
-                CombatConstants.CHARACTER_MAX_HP + NOVICE_SET_HP,
+                CombatConstants.characterMaxHp(LEVEL_AT_QUEST_THREE, NOVICE_SET_HP),
                 WARDEN_HP,
                 WARDEN_ATK,
                 WARDEN_DEF);
 
-        assertThat(duel.paperMargin()).isEqualTo(2);
-        assertThat(duel.realMargin()).isEqualTo(-1);
+        assertThat(duel.paperMargin()).isEqualTo(3);
+        assertThat(duel.realMargin()).isEqualTo(0);
         assertThat(duel.meetsRealMarginRule()).isFalse();
     }
 }

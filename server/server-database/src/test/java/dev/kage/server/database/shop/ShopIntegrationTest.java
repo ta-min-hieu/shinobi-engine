@@ -311,6 +311,27 @@ class ShopIntegrationTest {
     }
 
     @Test
+    void questDropIsSellableButNeverBuyable() {
+        long tallyTemplateId = findItemTemplateIdByCode("outer_sect_tally");
+        long characterId = createFreshCharacter("TallyBuyBack");
+        grantGold(characterId, 1_000_000);
+
+        BuyItemUseCase.BuyResult bought = newBuyUseCase().execute(characterId, tallyTemplateId, 2, newIdempotencyKey());
+
+        // V55: dòng `shop_item` giá mua 0 — mua được thì quest 6 xong mà không đánh trận nào.
+        assertThat(bought).isEqualTo(BuyItemUseCase.BuyResult.ITEM_NOT_IN_SHOP);
+        assertThat(readGold(characterId)).isEqualTo(1_000_000);
+        assertThat(countInventoryRows(characterId)).isZero();
+
+        long itemId = persistOneItem(characterId, tallyTemplateId, 2);
+        SellItemUseCase.SellResult sold = newSellUseCase().execute(characterId, itemId, 2, newIdempotencyKey());
+
+        assertThat(sold).isEqualTo(SellItemUseCase.SellResult.OK);
+        assertThat(readGold(characterId)).isEqualTo(1_000_000 + 2 * 10);
+        assertThat(countInventoryRows(characterId)).isZero();
+    }
+
+    @Test
     void shouldRollbackGold_whenBuyAndInventoryFull() {
         long characterId = createFreshCharacter("BuyFullBag");
         fillInventoryToCapacity(characterId);

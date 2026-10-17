@@ -142,6 +142,20 @@ class BuyItemUseCaseTest {
     }
 
     @Test
+    void shouldRejectBuy_whenShopOnlyBuysTheItemBack() {
+        FakeCatalogPort catalogPort = new FakeCatalogPort(new ShopListing(TEMPLATE_ID, 0, 10));
+        FakeGoldPort goldPort = new FakeGoldPort(true);
+        FakeInventoryGatewayPort inventoryGatewayPort = new FakeInventoryGatewayPort(true);
+        BuyItemUseCase useCase = newUseCase(catalogPort, goldPort, inventoryGatewayPort, new FakeAuditPort());
+
+        BuyItemUseCase.BuyResult result = useCase.execute(CHARACTER_ID, TEMPLATE_ID, 2, IDEMPOTENCY_KEY);
+
+        assertThat(result).isEqualTo(BuyItemUseCase.BuyResult.ITEM_NOT_IN_SHOP);
+        assertThat(goldPort.deductCalled).isFalse();
+        assertThat(inventoryGatewayPort.grantCalled).isFalse();
+    }
+
+    @Test
     void shouldRejectBuy_whenGoldPortRefusesDeduction() {
         FakeCatalogPort catalogPort = new FakeCatalogPort(new ShopListing(TEMPLATE_ID, 5, 2));
         FakeGoldPort goldPort = new FakeGoldPort(false);

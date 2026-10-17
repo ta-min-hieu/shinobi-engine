@@ -90,7 +90,7 @@ class SpiritVeinDuelBalanceTest {
      */
     private static int arrivalHp() {
         int playerDef = outerDisciple().def() + NOVICE_SET_DEF;
-        return CombatConstants.CHARACTER_MAX_HP + NOVICE_SET_HP - (2 * hit(BANDIT_ATK, playerDef));
+        return CombatConstants.characterMaxHp(LEVEL_AT_QUEST_TEN, NOVICE_SET_HP) - (2 * hit(BANDIT_ATK, playerDef));
     }
 
     /**
@@ -122,7 +122,7 @@ class SpiritVeinDuelBalanceTest {
     }
 
     @Test
-    @DisplayName("Tới linh mạch với 84 máu vẫn THẮNG — 4 nhát so với 6, biên 2 nhát")
+    @DisplayName("Tới linh mạch với 102 máu vẫn THẮNG — 4 nhát so với 8, biên 4 nhát")
     void gearedDiscipleShouldWinTheSpiritVeinDuel() {
         CombatConstants.CombatStats player = outerDisciple();
 
@@ -134,10 +134,10 @@ class SpiritVeinDuelBalanceTest {
 
         // Hai bên chung nhịp đánh (ATTACK_INTERVAL_SECONDS = 1 đòn/giây), nên "ít nhát hơn" cũng
         // chính là "chết sau" — không cần mô phỏng thời gian.
-        assertThat(arrivalHp()).isEqualTo(84);
+        assertThat(arrivalHp()).isEqualTo(102);
         assertThat(playerHitsFor).isEqualTo(4);
-        assertThat(raiderHitsFor).isEqualTo(6);
-        assertThat(raiderHitsFor - playerHitsFor).isEqualTo(2);
+        assertThat(raiderHitsFor).isEqualTo(8);
+        assertThat(raiderHitsFor - playerHitsFor).isEqualTo(4);
     }
 
     /**
@@ -199,7 +199,7 @@ class SpiritVeinDuelBalanceTest {
         int playerHitsNeeded = hitsToKill(RAIDER_HP, hit(playerAtk, RAIDER_DEF));
         int raiderHitsLeft = hitsToKill(hpAtFirstSwing(OPENING_HITS_AFTER_V46), hit(RAIDER_ATK, playerDef));
 
-        assertThat(hpAtFirstSwing(OPENING_HITS_AFTER_V46)).isEqualTo(70);
+        assertThat(hpAtFirstSwing(OPENING_HITS_AFTER_V46)).isEqualTo(88);
         assertThat(playerHitsNeeded).isEqualTo(4);
         assertThat(raiderHitsLeft).isGreaterThan(playerHitsNeeded);
     }
@@ -212,7 +212,7 @@ class SpiritVeinDuelBalanceTest {
      * người chơi; kết cục người chơi chết trong khi quái còn 31/130.
      */
     @Test
-    @DisplayName("Phủ đầu 2 nhát thì THUA — vì sao V46 phải hạ aggro 6 → 3")
+    @DisplayName("Phủ đầu 2 nhát: THUA trước máu theo cấp (lý do V46 hạ aggro 6 → 3), nay thắng")
     void twoOpeningHitsLoseTheDuel() {
         CombatConstants.CombatStats player = outerDisciple();
         int playerAtk = player.atk() + NOVICE_SET_ATK;
@@ -221,8 +221,10 @@ class SpiritVeinDuelBalanceTest {
         int playerHitsNeeded = hitsToKill(RAIDER_HP, hit(playerAtk, RAIDER_DEF));
         int raiderHitsLeft = hitsToKill(hpAtFirstSwing(2), hit(RAIDER_ATK, playerDef));
 
-        assertThat(hpAtFirstSwing(2)).isEqualTo(56);
-        assertThat(raiderHitsLeft).isLessThanOrEqualTo(playerHitsNeeded);
+        assertThat(hpAtFirstSwing(2)).isEqualTo(74);
+        // Lượt thua 2026-09-13 là với 100 máu nền; từ máu theo cấp (65(d), +2/cấp) Cấp
+        // 10 có thêm 18 máu.
+        assertThat(raiderHitsLeft).isEqualTo(playerHitsNeeded + 2);
     }
 
     /**
@@ -232,7 +234,7 @@ class SpiritVeinDuelBalanceTest {
      * đôi chỉ đúng khi người chơi thật sự đánh MỘT con.
      */
     @Test
-    @DisplayName("Linh mạch (47) đủ xa tán tu (34) và thám tử (66) theo CẢ HAI luật hình học")
+    @DisplayName("Linh mạch (50, V56) đủ xa tán tu (34) và thám tử (66) theo CẢ BA luật hình học")
     void theSpiritVeinIsAQuietPlaceToFightIn() {
         // V46 hạ `vein_raider` xuống aggro 3, nhưng hai HÀNG XÓM (tán tu @34, thám tử @66) vẫn giữ
         // aggro 6 mặc định V25 — và luật "đi ngang không kéo hai con" phụ thuộc con ĐAU NHẤT, nên
@@ -240,9 +242,11 @@ class SpiritVeinDuelBalanceTest {
         float neighbourAggroRadiusMeters = 6f;
         float leashRadiusMeters = 10f;
         float meleeAttackRangeMeters = 2f;
+        float patrolRadiusMeters = 3f; // mặc định V25
 
-        float toBandit = Math.abs(47f - 34f);
-        float toScout = Math.abs(66f - 47f);
+        // V56 dời 47 → 50: ở 47 tán tu cách 13m, vế tuần tra (64(b)) đòi > 15m.
+        float toBandit = Math.abs(50f - 34f);
+        float toScout = Math.abs(66f - 50f);
 
         // V29 — đi ngang không kéo được hai con cùng lúc.
         assertThat(toBandit).isGreaterThan(neighbourAggroRadiusMeters + neighbourAggroRadiusMeters);
@@ -250,6 +254,9 @@ class SpiritVeinDuelBalanceTest {
         // V32 — đứng lại đánh thì con bên cạnh không với tới nơi.
         assertThat(toBandit).isGreaterThan(leashRadiusMeters + meleeAttackRangeMeters);
         assertThat(toScout).isGreaterThan(leashRadiusMeters + meleeAttackRangeMeters);
+        // 64(b) — con đang bị đánh còn đi tuần, người chơi đánh theo nó.
+        assertThat(toBandit).isGreaterThan(patrolRadiusMeters + leashRadiusMeters + meleeAttackRangeMeters);
+        assertThat(toScout).isGreaterThan(patrolRadiusMeters + leashRadiusMeters + meleeAttackRangeMeters);
     }
 
     /**
@@ -265,7 +272,7 @@ class SpiritVeinDuelBalanceTest {
      * đối chiếu với luật biên thật thay vì lặng lẽ giữ trận ở dưới ngưỡng.
      */
     @Test
-    @DisplayName("🔴 Luật biên thật: đoạt mạch ĐANG vi phạm — biên thật −1, cần +2 (chờ chủ dự án)")
+    @DisplayName("🔴 Luật biên thật: đoạt mạch ĐANG vi phạm — biên thật +1 (trước máu theo cấp: −1), cần +2")
     void theSpiritVeinDuelViolatesTheRealMarginRule() {
         CombatConstants.CombatStats player = outerDisciple();
         DuelMargin duel = new DuelMargin(
@@ -276,8 +283,8 @@ class SpiritVeinDuelBalanceTest {
                 RAIDER_ATK,
                 RAIDER_DEF);
 
-        assertThat(duel.paperMargin()).isEqualTo(2);
-        assertThat(duel.realMargin()).isEqualTo(-1);
+        assertThat(duel.paperMargin()).isEqualTo(4);
+        assertThat(duel.realMargin()).isEqualTo(1);
         assertThat(duel.meetsRealMarginRule()).isFalse();
     }
 }

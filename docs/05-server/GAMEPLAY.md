@@ -218,7 +218,7 @@ Clean Architecture ([REPOSITORY-STRUCTURE.md §4](../01-architecture/REPOSITORY-
 | `bonus_atk` | ATK — damage đòn thường |
 | `bonus_def` | DEF — giảm damage đòn thường, `mitigation = 100/(100+DEF)` |
 | `bonus_res` | RES — giảm damage skill, cùng công thức |
-| `bonus_hp` | **MÁU TỐI ĐA**: `maxHp = CHARACTER_MAX_HP + bonus_hp` |
+| `bonus_hp` | **MÁU TỐI ĐA**: `maxHp = 100 + 2 × (cấp − 1) + bonus_hp` (vế cấp từ 2026-10-17, README dòng 65(d); `CombatConstants.characterMaxHp`) — lên cấp giữa phiên cộng phần tăng vào cả máu hiện tại |
 | `required_level` | cấp tối thiểu để MẶC được |
 
 Quy ước đặt số (V22): **vũ khí** cộng ATK và không cộng phòng thủ; **giáp/mũ/giày** cộng

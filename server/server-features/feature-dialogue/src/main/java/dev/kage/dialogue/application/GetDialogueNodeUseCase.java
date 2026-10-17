@@ -10,9 +10,11 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import dev.kage.dialogue.domain.DialogueFacts;
 import dev.kage.dialogue.domain.DialogueNode;
 import dev.kage.dialogue.domain.DialogueOption;
 import dev.kage.dialogue.domain.NpcTemplatePort;
@@ -46,7 +48,16 @@ public final class GetDialogueNodeUseCase {
         this.npcTemplatePort = npcTemplatePort;
     }
 
+    /** Như {@link #execute(String, String, DialogueFacts)} với {@link DialogueFacts#NONE}. */
     public Optional<DialogueNode> execute(String npcCode, String nodeId) {
+        return execute(npcCode, nodeId, DialogueFacts.NONE);
+    }
+
+    /**
+     * Trích node {@code nodeId} của cây hội thoại NPC {@code npcCode}; script đọc được {@code facts}
+     * qua {@code ctx.quest_status(code)}/{@code ctx.item_count(code)} (dòng 65(c)).
+     */
+    public Optional<DialogueNode> execute(String npcCode, String nodeId, DialogueFacts facts) {
         // npcCode đến thẳng từ packet. U+0000 không thể có trong npc_template.code — và Postgres từ
         // chối nó ngay cả ở câu SELECT, nên trước 2026-10-02 client nhận 500 thay vì 404.
         if (npcCode.indexOf('\0') >= 0) {
@@ -58,11 +69,32 @@ public final class GetDialogueNodeUseCase {
         }
         String source = scriptSourceCache.computeIfAbsent(scriptRef.get(), GetDialogueNodeUseCase::loadScript);
         try {
-            return Optional.ofNullable(scriptSandbox.eval(source, Map.of(), root -> extractNode(root, nodeId)));
+            return Optional.ofNullable(
+                    scriptSandbox.eval(source, Map.of("ctx", contextOf(facts)), root -> extractNode(root, nodeId)));
         } catch (ScriptExecutionException e) {
             LOG.error("Script dialogue lỗi lúc chạy: npcCode={}, scriptRef={}", npcCode, scriptRef.get(), e);
             return Optional.empty();
         }
+    }
+
+    /**
+     * {@code ctx} của script hội thoại — CHỈ ĐỌC, không một hàm nào đổi trạng thái (khác {@code ctx}
+     * của quest). Đối số không phải chuỗi có nội dung là lỗi script, cùng luật mã vật phẩm của quest:
+     * {@code asString()} trả {@code null} cho {@code undefined} thay vì ném, và một biến gõ sai tên
+     * không được thành câu "con chưa nhận việc" im lặng.
+     */
+    private static Map<String, Object> contextOf(DialogueFacts facts) {
+        return Map.of(
+                "quest_status", (ProxyExecutable) args -> facts.questStatus(requireCode("quest_status", args)),
+                "item_count", (ProxyExecutable) args -> facts.itemCount(requireCode("item_count", args)));
+    }
+
+    private static String requireCode(String function, Value... args) {
+        String code = args.length > 0 && args[0].isString() ? args[0].asString() : null;
+        if (code == null || code.isBlank() || code.indexOf('\0') >= 0) {
+            throw new IllegalArgumentException("ctx." + function + " cần một mã là chuỗi không rỗng");
+        }
+        return code;
     }
 
     /**

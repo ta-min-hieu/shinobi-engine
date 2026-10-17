@@ -79,6 +79,6 @@ record CharacterLoadout(CharacterBaseStats baseStats, EquipmentBonusSnapshot equ
 
     /** Máu tối đa hiệu lực — cũng là máu lúc vào World mới (attach luôn cho máu đầy). */
     int maxHp() {
-        return WorldFacade.characterMaxHp(equipmentBonus);
+        return WorldFacade.characterMaxHp(baseStats.level(), equipmentBonus);
     }
 }

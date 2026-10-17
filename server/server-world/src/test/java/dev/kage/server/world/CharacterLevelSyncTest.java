@@ -43,6 +43,7 @@ class CharacterLevelSyncTest {
     private static final class RecordingSink implements WorldOutboundSink {
         final List<Long> monsterIds = new CopyOnWriteArrayList<>();
         final List<String> castSkillCodes = new CopyOnWriteArrayList<>();
+        final List<WorldOutboundSink.HealthSnapshot> healthChanges = new CopyOnWriteArrayList<>();
 
         @Override
         public void onMonsterSpawned(long targetCharacterId, WorldOutboundSink.MonsterSnapshot monster) {
@@ -91,7 +92,11 @@ class CharacterLevelSyncTest {
         public void onCharacterAppearanceChanged(long targetCharacterId, long changedCharacterId) {}
 
         @Override
-        public void onHealthChanged(long targetCharacterId, WorldOutboundSink.HealthSnapshot health) {}
+        public void onHealthChanged(long targetCharacterId, WorldOutboundSink.HealthSnapshot health) {
+            if (targetCharacterId == CHARACTER_ID) {
+                healthChanges.add(health);
+            }
+        }
 
         @Override
         public void onCharacterDefeated(long defeatedCharacterId, long killerEntityId) {}
@@ -174,6 +179,37 @@ class CharacterLevelSyncTest {
         // World vẫn tick và vẫn nhận lệnh cho đúng nhân vật đó sau hai lệnh bị bỏ qua.
         world.enqueueCharacterLevel(CHARACTER_ID, SkillConstants.ULTIMATE_REQUIRED_LEVEL);
         assertThat(castUltimate(monsterId)).isTrue();
+    }
+
+    /**
+     * Dòng 65(d): máu tối đa theo cấp — lên cấp giữa phiên nâng cả máu tối đa lẫn máu hiện tại thêm
+     * đúng phần tăng, và báo ra ngoài (vạch máu client không tự tính).
+     */
+    @Test
+    void shouldRaiseMaxAndCurrentHealth_whenLevelIsRaisedMidSession() {
+        attachBesideMonster(1);
+
+        world.enqueueCharacterLevel(CHARACTER_ID, 11);
+
+        int expectedMax = CombatConstants.characterMaxHp(11, 0);
+        assertThat(expectedMax)
+                .isEqualTo(CombatConstants.CHARACTER_MAX_HP + 10 * CombatConstants.CHARACTER_HP_PER_LEVEL);
+        awaitTrue(() -> !sink.healthChanges.isEmpty());
+        WorldOutboundSink.HealthSnapshot last = sink.healthChanges.get(sink.healthChanges.size() - 1);
+        assertThat(last.maxHp()).isEqualTo(expectedMax);
+        assertThat(last.currentHp()).isEqualTo(expectedMax);
+    }
+
+    @Test
+    void shouldNotReportHealth_whenALateCommandDoesNotRaiseTheLevel() {
+        attachBesideMonster(5);
+
+        world.enqueueCharacterLevel(CHARACTER_ID, 5);
+        world.enqueueCharacterLevel(CHARACTER_ID, 3);
+        world.inboxBarrier().join();
+        world.inboxBarrier().join();
+
+        assertThat(sink.healthChanges).isEmpty();
     }
 
     private long attachBesideMonster(int level) {

@@ -69,6 +69,20 @@ kỳ script nào cần trả cấu trúc, không riêng dialogue) — xem `Scrip
   script từ đầu rồi trích đúng node cần dùng. Khác quest (lát cắt 3 sau) sẽ cần state thật
   (`progress_json`) xuyên nhiều lần gọi — dialogue không cần vì không có gì phải nhớ giữa các lượt.
 
+## `ctx` chỉ-đọc của script hội thoại (`DialogueFacts`, dòng 65(c) — 2026-10-17)
+
+Script hội thoại được bind một `ctx` với ĐÚNG hai hàm: `ctx.quest_status(code)` (`NOT_ACCEPTED` /
+`IN_PROGRESS` / `COMPLETED` / `CLAIMED`) và `ctx.item_count(code)`. Không hàm nào ghi gì. Gateway dựng
+bản thật (`CharacterDialogueFacts`, đọc lười, một bản mỗi lượt) từ `QuestFacade`/`InventoryFacade`
+theo nhân vật trong SESSION; module này chỉ biết interface (`domain/DialogueFacts`). Gọi không có
+facts = `DialogueFacts.NONE` (chưa nhận quest nào, túi rỗng).
+
+Dùng để NPC nhận đồ nhắc "con chưa mang đủ" (`senior_sister.js`, `town_elder.js`) thay vì chào như
+thường rồi để quest đứng im. ⚠️ Script chỉ được đổi `text_key` theo dữ kiện, KHÔNG đổi danh sách
+option — `optionIndex` là VỊ TRÍ và lượt chọn đánh giá lại cây. ⚠️ Tiến độ riêng của quest
+(`progress_json`, vd số quái đã hạ) KHÔNG lộ ra đây — ngưỡng vật phẩm trong script hội thoại phải
+khớp `take_item` của script quest bằng tay.
+
 ## `DialogueFacade.selectOption` — server-authoritative
 
 `optionIndex` là VỊ TRÍ trong node hiện tại, KHÔNG phải chuỗi `action` — server tự

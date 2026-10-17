@@ -294,6 +294,26 @@ class TownElderDialogueTreeTest {
                 .containsExactly("accept_quest:break_the_raider_band", "about_town", "end");
     }
 
+    /** Dòng 65(c): đang làm {@code foundation_pill_run} mà chưa đủ 3 viên đan thì ông nhắc. */
+    @Test
+    @DisplayName("Đang gom đan mà chưa đủ 3 viên: câu chào nhắc, đủ thì chào như thường")
+    void greetingRemindsAboutMissingPills() {
+        assertThat(useCase.execute(
+                                NPC_CODE,
+                                DialogueNode.START_NODE_ID,
+                                FixedDialogueFacts.questInProgress("foundation_pill_run", "minor_healing_pill", 2))
+                        .orElseThrow()
+                        .textKey())
+                .isEqualTo("dialogue.town_elder.greeting_pills_missing");
+        assertThat(useCase.execute(
+                                NPC_CODE,
+                                DialogueNode.START_NODE_ID,
+                                FixedDialogueFacts.questInProgress("foundation_pill_run", "minor_healing_pill", 3))
+                        .orElseThrow()
+                        .textKey())
+                .isEqualTo("dialogue.town_elder.greeting");
+    }
+
     private DialogueNode node(String nodeId) {
         Optional<DialogueNode> result = useCase.execute(NPC_CODE, nodeId);
         assertThat(result)

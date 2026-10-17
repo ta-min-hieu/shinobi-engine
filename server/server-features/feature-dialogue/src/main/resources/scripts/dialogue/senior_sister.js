@@ -29,9 +29,20 @@
 // ⚠️ Và cùng một cây thoại này còn là chỗ NỘP quest 6 (mục tiêu "mang vật X tới NPC Y"): người chơi
 // mở lời với cô lần nữa là đủ, KHÔNG phải bấm đúng một lựa chọn. Đừng thêm option "nộp thẻ bài" —
 // mốc nằm ở lúc mở lời, và một nút nộp riêng sẽ biến mục tiêu "mang về" thành "bấm đúng nút".
+//
+// CÂU CHÀO THEO VIỆC ĐANG DỞ (dòng 65(c), chủ dự án duyệt 2026-10-17). Mở lời mà chưa mang đủ đồ thì
+// quest không nhích và trước đây KHÔNG một lời nào nói ra — nay cô nhắc. `ctx` chỉ ĐỌC (DialogueFacts).
+// Số lượng ở đây phải khớp `take_item` của hai script quest; lệch thì cô nhắc sai — test gác ở
+// SeniorSisterDialogueTreeTest. Chỉ đổi text_key, KHÔNG đổi options (option_index là VỊ TRÍ).
+var greetingKey = "dialogue.senior_sister.greeting";
+if (ctx.quest_status("recover_outer_sect_tallies") === "IN_PROGRESS" && ctx.item_count("outer_sect_tally") < 2) {
+    greetingKey = "dialogue.senior_sister.greeting_tallies_missing";
+} else if (ctx.quest_status("abandoned_cave") === "IN_PROGRESS" && ctx.item_count("blood_sand_talisman") < 1) {
+    greetingKey = "dialogue.senior_sister.greeting_talisman_missing";
+}
 ({
     start: {
-        text_key: "dialogue.senior_sister.greeting",
+        text_key: greetingKey,
         options: [
             { label_key: "dialogue.option.ask_outer_sect_rank", action: "about_rank" },
             { label_key: "dialogue.option.ask_rival", action: "about_rival" },

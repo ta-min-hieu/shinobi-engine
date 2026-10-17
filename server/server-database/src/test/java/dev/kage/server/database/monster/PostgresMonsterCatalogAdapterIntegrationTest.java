@@ -7,9 +7,11 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.sql.DataSource;
 
@@ -265,7 +267,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         assertThat(spawns)
                 .extracting(MonsterSpawnPoint::posX)
                 .containsExactlyInAnyOrder(
-                        -47f,
+                        -49f, // V56 dời -47 → -49 (vế tuần tra, dòng 64(b))
                         -33f,
                         -20f,
                         -8f,
@@ -273,7 +275,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
                         14f,
                         21f,
                         34f,
-                        47f,
+                        50f, // V56 dời 47 → 50
                         66f,
                         93f,
                         // V47 — quãng Lv22–27 của arc 2: hai tế đồ Huyết Sa và một đàn chủ ở
@@ -306,41 +308,90 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
      * <p>Đã trả giá thật: V30 đặt thạch vệ ở x=60 trong khi quỷ đá spawn ở x=47 có leash 10 ⇒ nó
      * đuổi tới x=57 và <b>ra đòn kết liễu</b> trong lúc người chơi đánh thạch vệ. Luật cũ không
      * thấy gì vì 13m &gt; 12m tổng aggro.
+     *
      */
     @Test
     void shouldLeaveEveryAggroSpawnAQuietPlaceToFightIn() {
+        assertThat(quietFightViolations(false, null))
+                .as("cặp spawn vi phạm luật chỗ đánh yên tĩnh")
+                .isEmpty();
+    }
+
+    /**
+     * Vế TUẦN TRA (dòng 64(b), chủ dự án duyệt 2026-10-17, V56). Con đang bị đánh không đứng yên ở
+     * điểm spawn: nó đi tuần tới {@code patrolRadiusMeters} và người chơi đánh theo. Kiểm sống toàn chuỗi
+     * 2026-10-04 đo được: cỗ khảo hạch @−47 bị đánh ở −41…−43 thì thạch vệ @−33 (cách 14m &gt; 12m của
+     * luật trên) vẫn đuổi tới ⇒ 2/2 chết; đoạt mạch @47 với tán tu @34 y hệt. Luật ở đây là
+     * {@code |A−B| > patrol(A) + leash(B) + tầm đánh}.
+     *
+     * <p>⚠️ CHỈ áp cho {@link #QUEST_DUEL_CODES} — hai trận tay đôi BẮT BUỘC đã đo được chết vì đúng vế
+     * này. Áp cho mọi cặp thì 16 cặp trên trục chính vi phạm (trục dựng theo khe 13–14m của luật
+     * 12m), tức phải giãn lại cả trục — việc đó chờ chủ dự án (docs/README.md dòng 64(b)).
+     */
+    @Test
+    void shouldLeaveTheQuestDuelsRoomForPatrol() {
+        assertThat(quietFightViolations(true, QUEST_DUEL_CODES))
+                .as("trận tay đôi bắt buộc mà con bên cạnh đuổi tới được khi tính cả tuần tra")
+                .isEmpty();
+    }
+
+    /** Hai trận tay đôi bắt buộc mà V56 giãn theo vế tuần tra — quest 4 và quest 10. */
+    private static final Set<String> QUEST_DUEL_CODES = Set.of("trial_construct", "vein_raider");
+
+    /**
+     * Mọi cặp (đang đánh A, con bên cạnh B) mà B đuổi tới nơi được.
+     *
+     * @param countPatrol cộng {@code patrol(A)} vào tầm với của B
+     * @param standingCodes chỉ xét A thuộc tập này; {@code null} = mọi loài có aggro
+     */
+    private List<String> quietFightViolations(boolean countPatrol, Set<String> standingCodes) {
         PostgresMonsterCatalogAdapter adapter = new PostgresMonsterCatalogAdapter(dataSource);
-        Map<String, Float> leashByCode = new HashMap<>();
-        Map<String, Float> aggroByCode = new HashMap<>();
+        Map<String, MonsterTemplate> templateByCode = new HashMap<>();
         for (MonsterTemplate template : adapter.listTemplates()) {
-            leashByCode.put(template.code(), template.aiParams().leashRadiusMeters());
-            aggroByCode.put(template.code(), template.aiParams().aggroRadiusMeters());
+            templateByCode.put(template.code(), template);
         }
-
         List<MonsterSpawnPoint> aggressive = adapter.listSpawnPoints(MonsterSpawnPoint.MAIN_WORLD_CODE).stream()
-                .filter(spawn -> aggroByCode.getOrDefault(spawn.monsterCode(), 0f) > 0f)
+                .filter(spawn ->
+                        templateByCode.get(spawn.monsterCode()).aiParams().aggroRadiusMeters() > 0f)
                 .toList();
+        assertThat(aggressive).as("điểm spawn có aggro").isNotEmpty();
 
+        List<String> violations = new ArrayList<>();
+        int standingChecked = 0;
         for (int i = 0; i < aggressive.size(); i++) {
+            MonsterSpawnPoint standing = aggressive.get(i);
+            if (standingCodes != null && !standingCodes.contains(standing.monsterCode())) {
+                continue;
+            }
+            standingChecked++;
+            float patrol = countPatrol
+                    ? templateByCode.get(standing.monsterCode()).aiParams().patrolRadiusMeters()
+                    : 0f;
             for (int j = 0; j < aggressive.size(); j++) {
                 if (i == j) {
                     continue; // so bằng CHỈ SỐ, không bằng tham chiếu — hai điểm spawn có thể bằng nhau về giá trị
                 }
-                MonsterSpawnPoint standing = aggressive.get(i);
                 MonsterSpawnPoint neighbour = aggressive.get(j);
-                float reach = leashByCode.get(neighbour.monsterCode()) + MELEE_ATTACK_RANGE_METERS;
-                assertThat(Math.abs(standing.posX() - neighbour.posX()))
-                        .as(
-                                "đánh nhau ở %s@%.0f thì %s@%.0f đuổi tới nơi được (leash %.0f + tầm đánh %.0f)",
-                                standing.monsterCode(),
-                                standing.posX(),
-                                neighbour.monsterCode(),
-                                neighbour.posX(),
-                                leashByCode.get(neighbour.monsterCode()),
-                                MELEE_ATTACK_RANGE_METERS)
-                        .isGreaterThan(reach);
+                float leash =
+                        templateByCode.get(neighbour.monsterCode()).aiParams().leashRadiusMeters();
+                float distance = Math.abs(standing.posX() - neighbour.posX());
+                if (distance <= patrol + leash + MELEE_ATTACK_RANGE_METERS) {
+                    violations.add(
+                            "đánh %s@%.0f thì %s@%.0f đuổi tới (cách %.0f ≤ tuần tra %.0f + leash %.0f + tầm %.0f)"
+                                    .formatted(
+                                            standing.monsterCode(),
+                                            standing.posX(),
+                                            neighbour.monsterCode(),
+                                            neighbour.posX(),
+                                            distance,
+                                            patrol,
+                                            leash,
+                                            MELEE_ATTACK_RANGE_METERS));
+                }
             }
         }
+        assertThat(standingChecked).as("số điểm spawn đã soi").isPositive();
+        return violations;
     }
 
     /**

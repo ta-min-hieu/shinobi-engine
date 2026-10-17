@@ -48,7 +48,31 @@ final class CombatConstants {
      */
     record SkillDamage(double scriptRawDamage, float armorPiercePercent) {}
 
-    static final int CHARACTER_MAX_HP = 100; // placeholder — GDD chưa chốt công thức HP tối đa
+    /** Máu tối đa ở Cấp 1, chưa mặc gì — nền của {@link #characterMaxHp}. */
+    static final int CHARACTER_MAX_HP = 100;
+
+    /**
+     * Máu tối đa tăng thêm mỗi cấp — dòng 65(d), chủ dự án chọn 2026-10-17: trước đó lên cấp không
+     * cộng chỉ số nào, máu 100 từ Cấp 1 tới Cấp 100 (chỉ trang bị đổi được nó).
+     *
+     * <p>2 chứ không phải 5 của đề xuất ban đầu: đo bằng các test cân bằng, 5 làm Lv30 lên 351 máu
+     * (206 trước đó) và xoá cổng trang bị của arc 1–2 (bộ Tạp Dịch thắng đầu lĩnh đoạt mạch). 2 giữ
+     * mọi cổng dưới luật biên thật ({@code DuelMargin}) và chỉ nới đều mỗi trận một–hai nhát.
+     */
+    static final int CHARACTER_HP_PER_LEVEL = 2;
+
+    /**
+     * {@code maxHp = 100 + 2 × (cấp − 1) + bonus_hp} (dòng 65(d); phần {@code bonus_hp} từ ADR-036).
+     * Cấp &lt; 1 tính như Cấp 1; kết quả không bao giờ dưới 1.
+     */
+    static int characterMaxHp(int level, int bonusHp) {
+        return Math.max(1, CHARACTER_MAX_HP + levelHpGain(1, level) + bonusHp);
+    }
+
+    /** Máu tối đa có thêm khi đi từ cấp {@code from} lên cấp {@code to} (không âm, cấp &lt; 1 tính là 1). */
+    static int levelHpGain(int from, int to) {
+        return CHARACTER_HP_PER_LEVEL * Math.max(0, Math.max(1, to) - Math.max(1, from));
+    }
 
     // Hệ số derive GDD §5 — placeholder, chưa playtest.
     private static final float CRIT_DAMAGE_MULTIPLIER = 1.5f; // 150% cố định ở MVP

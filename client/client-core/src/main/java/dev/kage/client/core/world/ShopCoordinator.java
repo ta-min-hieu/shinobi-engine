@@ -199,7 +199,10 @@ final class ShopCoordinator implements WindowFlow {
 
     /** Một dòng danh mục: {@code Tên — Mua: X · Bán: Y}. */
     private String rowText(ShopController.Listing listing) {
-        return itemName(listing.itemTemplateId()) + " — " + format("shop.label.buy_price", listing.buyPrice()) + " · "
+        String buy = listing.soldByShop()
+                ? format("shop.label.buy_price", listing.buyPrice())
+                : text("shop.label.buy_back_only");
+        return itemName(listing.itemTemplateId()) + " — " + buy + " · "
                 + format("shop.label.sell_price", listing.sellPrice());
     }
 

@@ -61,7 +61,7 @@ class EquipmentAcrossWorldTransferTest {
     private static final int BONUS_ATK = 7;
     private static final int BONUS_HP = 1000;
     private static final int EFFECTIVE_MAX_HP =
-            WorldFacade.characterMaxHp(new dev.kage.server.world.EquipmentBonusSnapshot(BONUS_ATK, 0, 0, BONUS_HP));
+            WorldFacade.characterMaxHp(1, new dev.kage.server.world.EquipmentBonusSnapshot(BONUS_ATK, 0, 0, BONUS_HP));
 
     private static final Duration WAIT = Duration.ofSeconds(15);
     private static final long POLL_MILLIS = 20L;

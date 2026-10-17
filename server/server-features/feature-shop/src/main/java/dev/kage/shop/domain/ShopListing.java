@@ -16,6 +16,15 @@ public record ShopListing(long itemTemplateId, long buyPrice, long sellPrice) {
         }
     }
 
+    /**
+     * {@code false} khi {@code buyPrice == 0}: cửa hàng chỉ THU MUA món này, không bán ra (V55,
+     * chủ dự án duyệt 2026-10-17) — vật quest bán được cho đỡ rác túi mà không thành đường mua tắt
+     * qua quest.
+     */
+    public boolean soldByShop() {
+        return buyPrice > 0;
+    }
+
     /** Tổng tiền mua {@code quantity} món — bão hoà, xem {@link #saturatingTotal}. */
     public long totalBuyCost(int quantity) {
         return saturatingTotal(buyPrice, quantity);

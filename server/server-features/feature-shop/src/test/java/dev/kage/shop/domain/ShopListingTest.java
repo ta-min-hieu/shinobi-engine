@@ -25,6 +25,12 @@ class ShopListingTest {
     }
 
     @Test
+    void zeroBuyPriceMeansTheShopOnlyBuysItBack() {
+        assertThat(new ShopListing(1, 0, 10).soldByShop()).isFalse();
+        assertThat(new ShopListing(1, 5, 2).soldByShop()).isTrue();
+    }
+
+    @Test
     void shouldMultiplyPriceByQuantity() {
         ShopListing listing = new ShopListing(1, 80, 20);
 

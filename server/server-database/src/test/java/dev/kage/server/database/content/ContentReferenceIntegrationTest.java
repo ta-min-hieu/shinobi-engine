@@ -57,8 +57,11 @@ import dev.kage.server.database.dialogue.PostgresNpcTemplateAdapter;
  *       {@code PostgresDropTableAdapter} — quy ước V33: loài cố ý không rơi gì vẫn phải có một bảng
  *       RỖNG mang mã của nó.
  *   <li><b>Dòng bảng rơi</b> nằm trong biên: tỉ lệ 1–100, số lượng 1 ≤ min ≤ max ≤ {@code max_stack}.
- *   <li><b>Cửa hàng không in vàng:</b> {@code buy_price > 0} và {@code sell_price < buy_price} (mua
- *       rồi bán lại phải LỖ — V21 ghi bất biến này bằng chữ, đây là chỗ máy giữ nó).
+ *   <li><b>Cửa hàng không in vàng:</b> món cửa hàng BÁN RA ({@code buy_price > 0}) có
+ *       {@code sell_price < buy_price} (mua rồi bán lại phải LỖ — V21 ghi bất biến này bằng chữ, đây
+ *       là chỗ máy giữ nó). Món chỉ-thu-mua ({@code buy_price = 0}, V55) không có đường mua vào nên
+ *       không có vòng nào để lặp — nhưng phải bán được thật ({@code sell_price > 0}), không thì dòng
+ *       đó vô nghĩa.
  *   <li><b>Mọi {@code take_item} đòi một món KIẾM ĐƯỢC</b> (rơi từ loài có mặt ở thế giới chính, bán
  *       ở cửa hàng, hoặc là thưởng {@code give_item} của một quest) — nếu không quest đứng yên mãi.
  *   <li><b>Vùng an toàn</b> có diện tích thật (min &lt; max) và không chồng nhau trong cùng world.
@@ -155,9 +158,10 @@ class ContentReferenceIntegrationTest {
                 .isNotEmpty();
         assertThat(readColumn("""
                 SELECT i.code FROM shop_item s JOIN item_template i ON i.id = s.item_template_id
-                 WHERE s.buy_price <= 0 OR s.sell_price >= s.buy_price
+                 WHERE (s.buy_price > 0 AND s.sell_price >= s.buy_price)
+                    OR (s.buy_price = 0 AND s.sell_price <= 0)
                 """))
-                .as("giá mua ≤ 0 hoặc giá bán lại ≥ giá mua — mua rồi bán lại là in vàng vô hạn")
+                .as("giá bán lại ≥ giá mua (in vàng vô hạn) hoặc dòng chỉ-thu-mua mà bán ra 0")
                 .isEmpty();
     }
 
@@ -165,7 +169,7 @@ class ContentReferenceIntegrationTest {
     void everyItemAQuestTakesCanBeObtained() {
         Set<String> obtainable = readColumn("""
                 SELECT i.code FROM item_template i
-                 WHERE EXISTS (SELECT 1 FROM shop_item s WHERE s.item_template_id = i.id)
+                 WHERE EXISTS (SELECT 1 FROM shop_item s WHERE s.item_template_id = i.id AND s.buy_price > 0)
                     OR EXISTS (SELECT 1 FROM drop_table_entry e
                                  JOIN drop_table d ON d.id = e.drop_table_id
                                  JOIN monster_template m ON m.code = d.code

@@ -84,7 +84,7 @@ class RaiderBandBalanceTest {
     }
 
     private static int playerHp() {
-        return CombatConstants.CHARACTER_MAX_HP + OUTER_SECT_SET_HP;
+        return CombatConstants.characterMaxHp(LEVEL_AT_QUEST_TWELVE, OUTER_SECT_SET_HP);
     }
 
     /**
@@ -104,7 +104,7 @@ class RaiderBandBalanceTest {
     }
 
     @Test
-    @DisplayName("Mặc bộ Ngoại Môn, tới nơi với 111 máu vẫn THẮNG — 4 nhát so với 6, biên 2")
+    @DisplayName("Mặc bộ Ngoại Môn, tới nơi với 139 máu vẫn THẮNG — 4 nhát so với 7, biên 3")
     void gearedDiscipleShouldWinTheChieftainDuel() {
         int playerHitsFor = hitsToKill(CHIEFTAIN_HP, hit(playerAtk(), CHIEFTAIN_DEF));
         int chieftainHitsFor = hitsToKill(arrivalHp(), hit(CHIEFTAIN_ATK, playerDef()));
@@ -112,10 +112,10 @@ class RaiderBandBalanceTest {
         // 170 − 2×15 (tán tu) − 12 (đoạt mạch) − 17 (thám tử) = 111. Giáp 50 của bộ Ngoại Môn cắt
         // sát thương đường đi xuống gần một nửa so với bộ Tạp Dịch — đó là nửa còn lại của phần
         // thưởng quest 11, và là lý do quãng đường KHÔNG còn là thứ quyết định trận này.
-        assertThat(arrivalHp()).isEqualTo(111);
+        assertThat(arrivalHp()).isEqualTo(139);
         assertThat(playerHitsFor).isEqualTo(4);
-        assertThat(chieftainHitsFor).isEqualTo(6);
-        assertThat(chieftainHitsFor - playerHitsFor).isEqualTo(2);
+        assertThat(chieftainHitsFor).isEqualTo(7);
+        assertThat(chieftainHitsFor - playerHitsFor).isEqualTo(3);
     }
 
     /**
@@ -129,7 +129,7 @@ class RaiderBandBalanceTest {
     void theNoviceSetShouldNotBeEnoughForTheChieftain() {
         int noviceAtk = disciple().atk() + NOVICE_SET_ATK;
         int noviceDef = disciple().def() + NOVICE_SET_DEF;
-        int noviceHp = CombatConstants.CHARACTER_MAX_HP + NOVICE_SET_HP;
+        int noviceHp = CombatConstants.characterMaxHp(LEVEL_AT_QUEST_TWELVE, NOVICE_SET_HP);
 
         int playerHitsFor = hitsToKill(CHIEFTAIN_HP, hit(noviceAtk, CHIEFTAIN_DEF));
         int chieftainHitsFor = hitsToKill(noviceHp, hit(CHIEFTAIN_ATK, noviceDef));
@@ -150,7 +150,7 @@ class RaiderBandBalanceTest {
      * đã có số đo thật.
      */
     @Test
-    @DisplayName("Phủ đầu 1 nhát (sau V46) vẫn THẮNG; phủ đầu 2 nhát thì không")
+    @DisplayName("Phủ đầu 1 nhát (sau V46) vẫn THẮNG; từ khi máu theo cấp, 2 nhát cũng vẫn thắng")
     void openingHitsDecideTheChieftainDuelToo() {
         int hitTaken = hit(CHIEFTAIN_ATK, playerDef());
         int playerHitsNeeded = hitsToKill(CHIEFTAIN_HP, hit(playerAtk(), CHIEFTAIN_DEF));
@@ -162,8 +162,10 @@ class RaiderBandBalanceTest {
         assertThat(playerHitsNeeded).isEqualTo(4);
         // Phủ đầu 1: vẫn còn nhiều nhát hơn số người chơi cần ⇒ thắng.
         assertThat(hitsToKill(afterOneOpener, hitTaken)).isGreaterThan(playerHitsNeeded);
-        // Phủ đầu 2: hết biên ⇒ đúng thứ V46 sinh ra để chặn.
-        assertThat(hitsToKill(afterTwoOpeners, hitTaken)).isLessThanOrEqualTo(playerHitsNeeded);
+        // Phủ đầu 2: trước máu theo cấp (65(d), +2/cấp) thì hết biên — đúng thứ V46 sinh
+        // ra để chặn. Cấp 15 có thêm 28 máu
+        // nên nay còn dư đúng một nhát; V46 vẫn đúng (ít phủ đầu hơn = biên rộng hơn), chỉ không còn bắt buộc.
+        assertThat(hitsToKill(afterTwoOpeners, hitTaken)).isEqualTo(playerHitsNeeded + 1);
     }
 
     /** Đầu lĩnh phải là bậc thang thật trên đàn em của chính hắn, không phải bản phóng to đổi tên. */
@@ -237,13 +239,13 @@ class RaiderBandBalanceTest {
      * đối chiếu với luật biên thật thay vì lặng lẽ giữ trận ở dưới ngưỡng.
      */
     @Test
-    @DisplayName("🔴 Luật biên thật: đầu lĩnh đoạt mạch ĐANG vi phạm — biên thật −1, cần +2 (chờ chủ dự án)")
+    @DisplayName("🔴 Luật biên thật: đầu lĩnh đoạt mạch ĐANG vi phạm — biên thật 0 (trước máu theo cấp: −1), cần +2")
     void theChieftainDuelViolatesTheRealMarginRule() {
         DuelMargin duel =
                 new DuelMargin(playerAtk(), playerDef(), arrivalHp(), CHIEFTAIN_HP, CHIEFTAIN_ATK, CHIEFTAIN_DEF);
 
-        assertThat(duel.paperMargin()).isEqualTo(2);
-        assertThat(duel.realMargin()).isEqualTo(-1);
+        assertThat(duel.paperMargin()).isEqualTo(3);
+        assertThat(duel.realMargin()).isEqualTo(0);
         assertThat(duel.meetsRealMarginRule()).isFalse();
     }
 }

@@ -28,7 +28,7 @@ public final class BuyItemUseCase {
             throw new IllegalArgumentException("quantity phải > 0: " + quantity);
         }
         ShopListing listing = ports.catalogPort().findListing(itemTemplateId).orElse(null);
-        if (listing == null) {
+        if (listing == null || !listing.soldByShop()) {
             return BuyResult.ITEM_NOT_IN_SHOP;
         }
         long totalCost = listing.totalBuyCost(quantity);

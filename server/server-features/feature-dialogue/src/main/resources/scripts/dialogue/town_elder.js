@@ -23,9 +23,18 @@
 // ⚠️ Bốn lựa chọn của node `start` GIỮ NGUYÊN cả thứ tự lẫn action: `option_index` là VỊ TRÍ trong
 // node (dialogue.proto), nên chèn thêm một lựa chọn vào giữa là đổi ý nghĩa của mọi index phía sau.
 // Nội dung mới của arc 1 vì vậy mọc XUỐNG DƯỚI qua `about_town`, không chen ngang ở `start`.
+//
+// CÂU CHÀO THEO VIỆC ĐANG DỞ (dòng 65(c), chủ dự án duyệt 2026-10-17): mở lời khi `foundation_pill_run`
+// đang làm mà chưa đủ 3 viên đan (`take_item` của script quest) thì ông nhắc, thay vì chào như thường
+// rồi để quest đứng im. ⚠️ Ông KHÔNG biết người chơi đã hạ đủ 2 con thú chưa — đếm đó nằm trong
+// tiến độ RIÊNG của quest, và hội thoại chỉ được đọc trạng thái quest + túi đồ (DialogueFacts).
+var greetingKey = "dialogue.town_elder.greeting";
+if (ctx.quest_status("foundation_pill_run") === "IN_PROGRESS" && ctx.item_count("minor_healing_pill") < 3) {
+    greetingKey = "dialogue.town_elder.greeting_pills_missing";
+}
 ({
     start: {
-        text_key: "dialogue.town_elder.greeting",
+        text_key: greetingKey,
         options: [
             { label_key: "dialogue.option.ask_about_town", action: "about_town" },
             { label_key: "dialogue.option.accept_quest_kill_dummies", action: "accept_quest:kill_training_dummies" },

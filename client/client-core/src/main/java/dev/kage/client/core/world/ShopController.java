@@ -44,7 +44,13 @@ final class ShopController {
     static final int MAX_QUANTITY = 999;
 
     /** Một dòng danh mục — xem javadoc lớp về vì sao KHÔNG có tên. */
-    record Listing(long itemTemplateId, long buyPrice, long sellPrice) {}
+    record Listing(long itemTemplateId, long buyPrice, long sellPrice) {
+
+        /** {@code buyPrice == 0}: cửa hàng chỉ THU MUA món này (V55) — server cũng từ chối mua, đây chỉ để khỏi gửi. */
+        boolean soldByShop() {
+            return buyPrice > 0;
+        }
+    }
 
     /** Kết quả một lần bấm Mua, xem {@link #attemptBuy}. */
     sealed interface BuyAttempt {
@@ -155,8 +161,12 @@ final class ShopController {
      */
     BuyAttempt attemptBuy(long itemTemplateId) {
         select(itemTemplateId);
-        if (findListing(itemTemplateId).isEmpty()) {
+        Optional<Listing> listing = findListing(itemTemplateId);
+        if (listing.isEmpty()) {
             return new BuyAttempt.Reject("shop.error.item_not_in_shop");
+        }
+        if (!listing.get().soldByShop()) {
+            return new BuyAttempt.Reject("shop.error.buy_back_only");
         }
         return new BuyAttempt.Send(itemTemplateId, selectedQuantity, beginBuy(itemTemplateId, selectedQuantity));
     }

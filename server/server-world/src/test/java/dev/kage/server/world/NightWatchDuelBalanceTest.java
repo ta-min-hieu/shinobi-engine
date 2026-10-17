@@ -21,6 +21,9 @@ import org.junit.jupiter.api.Test;
  */
 class NightWatchDuelBalanceTest {
 
+    /** Cấp người chơi trong tay đôi canh đêm — cùng số 4 mà các trận dưới dựng chỉ số. */
+    private static final int NIGHT_WATCH_LEVEL = 4;
+
     /** Chỉ số nền của nhân vật mới: 10/10/10/10 (V-migration seed, giống mọi nhân vật vừa tạo). */
     private static final int BASE_STAT = 10;
 
@@ -46,14 +49,14 @@ class NightWatchDuelBalanceTest {
     }
 
     @Test
-    @DisplayName("Cấp 4 mặc trọn bộ Tạp Dịch THẮNG tán tu trong tay đôi — 3 nhát so với 7")
+    @DisplayName("Cấp 4 mặc trọn bộ Tạp Dịch THẮNG tán tu trong tay đôi — 3 nhát so với 8")
     void gearedNoviceShouldWinTheNightWatchDuel() {
         CombatConstants.CombatStats player = CombatConstants.deriveCombatStats(
-                new CharacterBaseStats(BASE_STAT, BASE_STAT, BASE_STAT, BASE_STAT, Element.HOA, 4));
+                new CharacterBaseStats(BASE_STAT, BASE_STAT, BASE_STAT, BASE_STAT, Element.HOA, NIGHT_WATCH_LEVEL));
 
         int playerAtk = player.atk() + NOVICE_SET_ATK;
         int playerDef = player.def() + NOVICE_SET_DEF;
-        int playerHp = CombatConstants.CHARACTER_MAX_HP + NOVICE_SET_HP;
+        int playerHp = CombatConstants.characterMaxHp(NIGHT_WATCH_LEVEL, NOVICE_SET_HP);
 
         int playerHitsFor = hitsToKill(BANDIT_HP, hit(playerAtk, BANDIT_DEF));
         int banditHitsFor = hitsToKill(playerHp, hit(BANDIT_ATK, playerDef));
@@ -61,7 +64,7 @@ class NightWatchDuelBalanceTest {
         // Hai bên dùng CHUNG một nhịp đánh (CombatConstants.ATTACK_INTERVAL_SECONDS = 1 đòn/giây),
         // nên "ít nhát hơn" cũng chính là "chết sau" — không cần mô phỏng thời gian.
         assertThat(playerHitsFor).isEqualTo(3);
-        assertThat(banditHitsFor).isEqualTo(7);
+        assertThat(banditHitsFor).isEqualTo(8);
         assertThat(playerHitsFor).isLessThan(banditHitsFor);
     }
 
@@ -69,10 +72,11 @@ class NightWatchDuelBalanceTest {
     @DisplayName("KHÔNG có đồ thì trận đấu gần như hoà — đúng chỗ người chơi phải đi sắm trang bị")
     void barehandedNoviceShouldBeAtTheEdge() {
         CombatConstants.CombatStats player = CombatConstants.deriveCombatStats(
-                new CharacterBaseStats(BASE_STAT, BASE_STAT, BASE_STAT, BASE_STAT, Element.HOA, 4));
+                new CharacterBaseStats(BASE_STAT, BASE_STAT, BASE_STAT, BASE_STAT, Element.HOA, NIGHT_WATCH_LEVEL));
 
         int playerHitsFor = hitsToKill(BANDIT_HP, hit(player.atk(), BANDIT_DEF));
-        int banditHitsFor = hitsToKill(CombatConstants.CHARACTER_MAX_HP, hit(BANDIT_ATK, player.def()));
+        int banditHitsFor =
+                hitsToKill(CombatConstants.characterMaxHp(NIGHT_WATCH_LEVEL, 0), hit(BANDIT_ATK, player.def()));
 
         // 4 so với 6: thắng được nhưng sát nút — đúng ý "đi sắm đồ trước" mà cửa hàng phục vụ.
         assertThat(playerHitsFor).isEqualTo(4);
@@ -126,20 +130,22 @@ class NightWatchDuelBalanceTest {
      * đối chiếu với luật biên thật thay vì lặng lẽ giữ trận ở dưới ngưỡng.
      */
     @Test
-    @DisplayName("🔴 Luật biên thật: tán tu ĐANG vi phạm — biên thật +1, cần +2 (chờ chủ dự án)")
+    @DisplayName("Luật biên thật: tán tu nay ĐẠT — biên thật +2 (máu theo cấp; trước đó +1)")
     void theBanditDuelViolatesTheRealMarginRule() {
         CombatConstants.CombatStats player = CombatConstants.deriveCombatStats(
-                new CharacterBaseStats(BASE_STAT, BASE_STAT, BASE_STAT, BASE_STAT, Element.HOA, 4));
+                new CharacterBaseStats(BASE_STAT, BASE_STAT, BASE_STAT, BASE_STAT, Element.HOA, NIGHT_WATCH_LEVEL));
         DuelMargin duel = new DuelMargin(
                 player.atk() + NOVICE_SET_ATK,
                 player.def() + NOVICE_SET_DEF,
-                CombatConstants.CHARACTER_MAX_HP + NOVICE_SET_HP,
+                CombatConstants.characterMaxHp(NIGHT_WATCH_LEVEL, NOVICE_SET_HP),
                 BANDIT_HP,
                 BANDIT_ATK,
                 BANDIT_DEF);
 
-        assertThat(duel.paperMargin()).isEqualTo(4);
-        assertThat(duel.realMargin()).isEqualTo(1);
-        assertThat(duel.meetsRealMarginRule()).isFalse();
+        assertThat(duel.paperMargin()).isEqualTo(5);
+        assertThat(duel.realMargin()).isEqualTo(2);
+        // Từ máu theo cấp (65(d), +2/cấp): Cấp 4 có thêm 6 máu, đủ một nhát ⇒ tán tu nay
+        // ĐẠT luật.
+        assertThat(duel.meetsRealMarginRule()).isTrue();
     }
 }

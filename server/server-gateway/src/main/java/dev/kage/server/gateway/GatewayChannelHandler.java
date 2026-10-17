@@ -1083,7 +1083,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private int applyEquipmentBonusAndComputeMaxHp(long characterId) {
         EquipmentBonusSnapshot bonus = currentEquipmentBonus(characterId);
         currentWorldFacadeIfPresent(characterId).ifPresent(facade -> facade.applyEquipmentBonus(characterId, bonus));
-        return WorldFacade.characterMaxHp(bonus);
+        // Máu tối đa nay theo cấp (dòng 65(d)) — đọc cấp đã ghi DB; đã ở Virtual Thread sau lời gọi DB.
+        int level = characterFacade.findById(characterId).map(Character::level).orElse(1);
+        return WorldFacade.characterMaxHp(level, bonus);
     }
 
     /**
@@ -1868,7 +1870,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleTalkToNpcBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, TalkToNpcCommand command) {
-        Optional<DialogueNode> node = dialogueFacade.startDialogue(command.getNpcCode());
+        Optional<DialogueNode> node = dialogueFacade.startDialogue(command.getNpcCode(), dialogueFactsOf(characterId));
         if (node.isEmpty()) {
             sendError(ctx, sequenceId, 404, "error.npc_not_found");
             return;
@@ -1884,6 +1886,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 sequenceId,
                 toResponse(node.get()).toByteArray());
         pushQuestProgressFromTalking(ctx, characterId, command.getNpcCode());
+    }
+
+    /** Dữ kiện chỉ-đọc cho script hội thoại (dòng 65(c)) — một bản mỗi lượt, xem {@link CharacterDialogueFacts}. */
+    private CharacterDialogueFacts dialogueFactsOf(long characterId) {
+        return new CharacterDialogueFacts(characterId, questFacade, inventoryFacade);
     }
 
     /**
@@ -1957,8 +1964,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         if (rejectIfFarFromNpc(ctx, sequenceId, characterId, command.getNpcCode())) {
             return;
         }
-        DialogueFacade.SelectOptionResult result =
-                dialogueFacade.selectOption(command.getNpcCode(), command.getCurrentNodeId(), command.getOptionIndex());
+        DialogueFacade.SelectOptionResult result = dialogueFacade.selectOption(
+                command.getNpcCode(),
+                command.getCurrentNodeId(),
+                command.getOptionIndex(),
+                dialogueFactsOf(characterId));
         switch (result) {
             case DialogueFacade.SelectOptionResult.Node r ->
                 send(

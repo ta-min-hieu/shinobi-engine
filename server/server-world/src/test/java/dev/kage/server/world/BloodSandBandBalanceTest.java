@@ -87,7 +87,7 @@ class BloodSandBandBalanceTest {
     }
 
     private static int playerMaxHp() {
-        return CombatConstants.CHARACTER_MAX_HP + OUTER_SECT_SET_HP;
+        return CombatConstants.characterMaxHp(LEVEL_AT_QUEST_THIRTEEN, OUTER_SECT_SET_HP);
     }
 
     /**
@@ -232,18 +232,19 @@ class BloodSandBandBalanceTest {
      * đối chiếu với luật biên thật thay vì lặng lẽ giữ trận ở dưới ngưỡng.
      */
     @Test
-    @DisplayName("🔴 Luật biên thật: tế đồ và đàn chủ Huyết Sa ĐANG vi phạm — biên thật −1, cần +2 (chờ chủ dự án)")
+    @DisplayName(
+            "🔴 Luật biên thật: tế đồ, đàn chủ Huyết Sa ĐANG vi phạm — biên thật +1 (trước máu theo cấp: −1), cần +2")
     void theBloodSandDuelsViolateTheRealMarginRule() {
         DuelMargin acolyte =
                 new DuelMargin(playerAtk(), playerDef(), arrivalHp(), ACOLYTE_HP, ACOLYTE_ATK, ACOLYTE_DEF);
         DuelMargin ringleader =
                 new DuelMargin(playerAtk(), playerDef(), arrivalHp(), RINGLEADER_HP, RINGLEADER_ATK, RINGLEADER_DEF);
 
-        assertThat(acolyte.paperMargin()).isEqualTo(2);
-        assertThat(acolyte.realMargin()).isEqualTo(-1);
+        assertThat(acolyte.paperMargin()).isEqualTo(4);
+        assertThat(acolyte.realMargin()).isEqualTo(1);
         assertThat(acolyte.meetsRealMarginRule()).isFalse();
-        assertThat(ringleader.paperMargin()).isEqualTo(2);
-        assertThat(ringleader.realMargin()).isEqualTo(-1);
+        assertThat(ringleader.paperMargin()).isEqualTo(4);
+        assertThat(ringleader.realMargin()).isEqualTo(1);
         assertThat(ringleader.meetsRealMarginRule()).isFalse();
     }
 }

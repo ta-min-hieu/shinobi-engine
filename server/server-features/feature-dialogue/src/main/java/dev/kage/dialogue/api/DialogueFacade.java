@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import dev.kage.dialogue.application.GetDialogueNodeUseCase;
+import dev.kage.dialogue.domain.DialogueFacts;
 import dev.kage.dialogue.domain.DialogueNode;
 import dev.kage.dialogue.domain.DialogueOption;
 
@@ -22,7 +23,15 @@ public final class DialogueFacade {
 
     /** Bắt đầu hội thoại — luôn node {@link DialogueNode#START_NODE_ID}. Rỗng nếu NPC không có dialogue. */
     public Optional<DialogueNode> startDialogue(String npcCode) {
-        return getDialogueNodeUseCase.execute(npcCode, DialogueNode.START_NODE_ID);
+        return startDialogue(npcCode, DialogueFacts.NONE);
+    }
+
+    /**
+     * Như {@link #startDialogue(String)}, nhưng script đọc được {@code facts} của người đang nói
+     * chuyện (dòng 65(c)) — gateway dựng nó từ nhân vật trong SESSION.
+     */
+    public Optional<DialogueNode> startDialogue(String npcCode, DialogueFacts facts) {
+        return getDialogueNodeUseCase.execute(npcCode, DialogueNode.START_NODE_ID, facts);
     }
 
     /**
@@ -31,7 +40,12 @@ public final class DialogueFacade {
      * script theo index, không tin client tự khai — Điều 24).
      */
     public SelectOptionResult selectOption(String npcCode, String currentNodeId, int optionIndex) {
-        Optional<DialogueNode> currentNode = getDialogueNodeUseCase.execute(npcCode, currentNodeId);
+        return selectOption(npcCode, currentNodeId, optionIndex, DialogueFacts.NONE);
+    }
+
+    /** Như {@link #selectOption(String, String, int)}, với {@code facts} của người đang nói chuyện. */
+    public SelectOptionResult selectOption(String npcCode, String currentNodeId, int optionIndex, DialogueFacts facts) {
+        Optional<DialogueNode> currentNode = getDialogueNodeUseCase.execute(npcCode, currentNodeId, facts);
         if (currentNode.isEmpty()) {
             return new SelectOptionResult.NotFound();
         }
@@ -39,10 +53,10 @@ public final class DialogueFacade {
         if (optionIndex < 0 || optionIndex >= options.size()) {
             return new SelectOptionResult.NotFound();
         }
-        return resolveAction(npcCode, options.get(optionIndex));
+        return resolveAction(npcCode, options.get(optionIndex), facts);
     }
 
-    private SelectOptionResult resolveAction(String npcCode, DialogueOption option) {
+    private SelectOptionResult resolveAction(String npcCode, DialogueOption option, DialogueFacts facts) {
         if (DialogueOption.ACTION_OPEN_SHOP.equals(option.action())) {
             return new SelectOptionResult.OpenShop();
         }
@@ -54,7 +68,7 @@ public final class DialogueFacade {
             return new SelectOptionResult.AcceptQuest(questCode);
         }
         return getDialogueNodeUseCase
-                .execute(npcCode, option.action())
+                .execute(npcCode, option.action(), facts)
                 .<SelectOptionResult>map(SelectOptionResult.Node::new)
                 .orElseGet(SelectOptionResult.NotFound::new);
     }

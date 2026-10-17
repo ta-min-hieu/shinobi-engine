@@ -86,7 +86,7 @@
 
 | Bảng | Cột chính | Ghi chú |
 |---|---|---|
-| `shop_item` | `item_template_id (PK, FK item_template), buy_price, sell_price` | **Tĩnh** — danh mục shop toàn cục (chưa gắn NPC/vị trí). `buy_price`/`sell_price` độc lập nhau, không phải % cố định. ✅ Migrate V8 (2026-07-23) |
+| `shop_item` | `item_template_id (PK, FK item_template), buy_price, sell_price` | **Tĩnh** — danh mục shop toàn cục (chưa gắn NPC/vị trí). `buy_price`/`sell_price` độc lập nhau, không phải % cố định. **`buy_price = 0` = cửa hàng chỉ THU MUA, không bán ra** (V55, 2026-10-17 — vật quest bán được mà không thành đường mua tắt qua quest). ✅ Migrate V8 (2026-07-23) |
 
 ### 2.9 NPC
 

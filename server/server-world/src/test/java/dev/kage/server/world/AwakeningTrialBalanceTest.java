@@ -111,12 +111,12 @@ class AwakeningTrialBalanceTest {
      * — và lời thoại của Chu Hoành nói thẳng điều đó với người chơi.
      */
     @Test
-    @DisplayName("Biên đủ rộng để hụt hai nhát vẫn thắng — khác hẳn trận sát nút của quest 3")
+    @DisplayName("Biên đủ rộng để hụt hai nhát vẫn thắng — không kém trận quest 3")
     void theTrialShouldNotBeACoinFlipTheWayTheArchiveDuelWas() {
         CombatConstants.CombatStats player = novice();
         int playerAtk = player.atk() + NOVICE_SET_ATK;
         int playerDef = player.def() + NOVICE_SET_DEF;
-        int playerHp = CombatConstants.CHARACTER_MAX_HP + NOVICE_SET_HP;
+        int playerHp = CombatConstants.characterMaxHp(LEVEL_AT_QUEST_FOUR, NOVICE_SET_HP);
 
         int trialMargin = hitsToKill(ARRIVAL_HP, hit(CONSTRUCT_ATK, playerDef))
                 - hitsToKill(CONSTRUCT_HP, hit(playerAtk, CONSTRUCT_DEF));
@@ -125,8 +125,10 @@ class AwakeningTrialBalanceTest {
                 hitsToKill(playerHp, hit(WARDEN_ATK, playerDef)) - hitsToKill(WARDEN_HP, hit(playerAtk, 14));
 
         assertThat(trialMargin).isEqualTo(3);
-        assertThat(archiveMargin).isEqualTo(2);
-        assertThat(trialMargin).isGreaterThan(archiveMargin);
+        assertThat(archiveMargin).isEqualTo(3);
+        // Trước máu theo cấp (65(d), +2/cấp) quest 4 rộng hơn hẳn quest 3; nay quest 3
+        // (Cấp 5) cũng được thêm 8 máu nên bằng nhau.
+        assertThat(trialMargin).isGreaterThanOrEqualTo(archiveMargin);
     }
 
     /**
@@ -135,19 +137,23 @@ class AwakeningTrialBalanceTest {
      * người chơi tay không cũng ăn nhiều sát thương hơn hẳn dọc đường (22/nhát thay vì 20).
      */
     @Test
-    @DisplayName("TAY KHÔNG thì hoà 5 với 5 — hoà nghĩa là chết, nên vẫn phải sắm đồ trước")
+    @DisplayName("TAY KHÔNG: thắng sát 1 nhát trên giấy, biên thật −2 — vẫn phải sắm đồ trước")
     void barehandedNoviceShouldStillFailTheTrial() {
         CombatConstants.CombatStats player = novice();
 
-        int barehandedArrivalHp =
-                CombatConstants.CHARACTER_MAX_HP - 2 * hit(WARDEN_ATK, player.def()); // 100 - 2×22 = 56
+        int barehandedArrivalHp = CombatConstants.characterMaxHp(LEVEL_AT_QUEST_FOUR, 0)
+                - 2 * hit(WARDEN_ATK, player.def()); // 114 - 2×22 = 70
         int playerHitsFor = hitsToKill(CONSTRUCT_HP, hit(player.atk(), CONSTRUCT_DEF));
         int constructHitsFor = hitsToKill(barehandedArrivalHp, hit(CONSTRUCT_ATK, player.def()));
 
-        assertThat(barehandedArrivalHp).isEqualTo(56);
+        assertThat(barehandedArrivalHp).isEqualTo(70);
         assertThat(playerHitsFor).isEqualTo(5);
-        assertThat(constructHitsFor).isEqualTo(5);
-        assertThat(playerHitsFor).isGreaterThanOrEqualTo(constructHitsFor);
+        assertThat(constructHitsFor).isEqualTo(6);
+        // Từ máu theo cấp (65(d), +2/cấp) tay không thắng 1 nhát TRÊN GIẤY — luật biên
+        // thật (DuelMargin) mới là trọng tài:
+        // 1 − phủ đầu 2 − hụt 1 = −2, nên bộ Tạp Dịch vẫn là điều kiện cần.
+        int realMargin = constructHitsFor - playerHitsFor - DuelMargin.OPENING_HITS - DuelMargin.DODGE_RESERVE;
+        assertThat(realMargin).isEqualTo(-2).isLessThan(DuelMargin.REQUIRED_REAL_MARGIN);
     }
 
     /**
@@ -171,21 +177,25 @@ class AwakeningTrialBalanceTest {
      * code); ô này giữ PHÉP TÍNH cạnh phép tính cân bằng, vì hai thứ đó phải đọc cùng nhau: trận
      * tay đôi chỉ đúng khi người chơi thật sự đánh MỘT con.
      *
-     * <p>Hai luật, cùng một cặp hàng xóm: sân khảo hạch @-47 và thạch vệ gần nhất @-33.
+     * <p>Ba luật, cùng một cặp hàng xóm: sân khảo hạch @-49 (V56 dời từ -47) và thạch vệ gần nhất @-33.
      */
     @Test
-    @DisplayName("Sân khảo hạch (-47) đủ xa thạch vệ (-33) theo CẢ HAI luật hình học")
+    @DisplayName("Sân khảo hạch (-49, V56) đủ xa thạch vệ (-33) theo CẢ BA luật hình học")
     void theTrialGroundIsAQuietPlaceToFightIn() {
         float aggroRadiusMeters = 6f; // mặc định V25, cả hai loài giữ nguyên
         float leashRadiusMeters = 10f;
         float meleeAttackRangeMeters = 2f;
-        float distanceToNearestWarden = Math.abs(-47f - -33f);
+        float patrolRadiusMeters = 3f; // mặc định V25
+        float distanceToNearestWarden = Math.abs(-49f - -33f);
 
-        assertThat(distanceToNearestWarden).isEqualTo(14f);
+        assertThat(distanceToNearestWarden).isEqualTo(16f);
         // V29 — đi ngang không kéo được hai con cùng lúc.
         assertThat(distanceToNearestWarden).isGreaterThan(aggroRadiusMeters + aggroRadiusMeters);
         // V32 — đứng lại đánh thì con bên cạnh không với tới nơi.
         assertThat(distanceToNearestWarden).isGreaterThan(leashRadiusMeters + meleeAttackRangeMeters);
+        // 64(b) — cỗ máy đi tuần 3m và người chơi đánh theo: ở -47 (14m) thạch vệ đuổi tới, 2/2 chết.
+        assertThat(distanceToNearestWarden)
+                .isGreaterThan(patrolRadiusMeters + leashRadiusMeters + meleeAttackRangeMeters);
     }
 
     /**

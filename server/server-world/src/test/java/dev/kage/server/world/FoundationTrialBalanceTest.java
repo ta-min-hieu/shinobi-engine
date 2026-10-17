@@ -107,7 +107,8 @@ class FoundationTrialBalanceTest {
     }
 
     private static int outerSectMaxHp() {
-        return CombatConstants.CHARACTER_MAX_HP + OUTER_SECT_SET_HP;
+        return CombatConstants.characterMaxHp(
+                LEVEL_AT_FOUNDATION_SET - 1, OUTER_SECT_SET_HP); // Cấp 29, trước bộ Trúc Cơ
     }
 
     private static int foundationAtk() {
@@ -119,7 +120,7 @@ class FoundationTrialBalanceTest {
     }
 
     private static int foundationMaxHp() {
-        return CombatConstants.CHARACTER_MAX_HP + FOUNDATION_SET_HP;
+        return CombatConstants.characterMaxHp(LEVEL_AT_FOUNDATION_SET, FOUNDATION_SET_HP);
     }
 
     /** Máu lúc TỚI NƠI = máu tối đa trừ ĐÚNG MỘT nhát phủ đầu — xem javadoc lớp. */
@@ -138,7 +139,7 @@ class FoundationTrialBalanceTest {
         // Và nó phải đổi được HAI con số mà cân bằng thật sự đọc.
         assertThat(foundationAtk()).isEqualTo(82);
         assertThat(foundationDef()).isEqualTo(65);
-        assertThat(foundationMaxHp()).isEqualTo(206);
+        assertThat(foundationMaxHp()).isEqualTo(264);
     }
 
     /**
@@ -157,44 +158,46 @@ class FoundationTrialBalanceTest {
      * đứng ở −2: không phải tung đồng xu, mà là thua.
      */
     @Test
-    @DisplayName("Mặc bộ NGOẠI MÔN đi đánh yêu thú Lv29 thì THUA — hoà 7–7 trên giấy, biên thật −2")
+    @DisplayName("Mặc bộ NGOẠI MÔN đi đánh yêu thú Lv29 thì KHÔNG ĐỦ — thắng 2 nhát trên giấy, biên thật 0")
     void outerSectGearLosesToTheWastelandBeast() {
         int playerHitsFor = hitsToKill(BEAST_HP, hit(outerSectAtk(), BEAST_DEF));
         int beastHitsFor =
                 hitsToKill(arrivalHp(outerSectMaxHp(), BEAST_ATK, outerSectDef()), hit(BEAST_ATK, outerSectDef()));
 
         assertThat(playerHitsFor).isEqualTo(7);
-        assertThat(beastHitsFor).isEqualTo(7);
-        // Hoà nghĩa là chết — cùng nhịp đánh mà không chết sau thì không thắng.
-        assertThat(beastHitsFor - playerHitsFor).isNotPositive();
+        assertThat(beastHitsFor).isEqualTo(9);
+        // Trước máu theo cấp (65(d), +2/cấp): hoà 7–7, hoà là chết. Nay Cấp 29 có thêm
+        // 56 máu nên thắng 2 nhát TRÊN GIẤY —
+        // luật biên thật bên dưới mới là trọng tài, và nó vẫn bác: bộ Ngoại Môn KHÔNG đủ.
+        assertThat(beastHitsFor - playerHitsFor).isEqualTo(2);
 
         DuelMargin outerSect =
                 new DuelMargin(outerSectAtk(), outerSectDef(), outerSectMaxHp(), BEAST_HP, BEAST_ATK, BEAST_DEF);
-        assertThat(outerSect.realMargin()).isEqualTo(-2);
+        assertThat(outerSect.realMargin()).isEqualTo(0);
         assertThat(outerSect.meetsRealMarginRule()).isFalse();
     }
 
     @Test
-    @DisplayName("Mặc bộ Trúc Cơ, thắng yêu thú rìa Hoang Vực — 5 nhát so với 9 sau một nhát phủ đầu")
+    @DisplayName("Mặc bộ Trúc Cơ, thắng yêu thú rìa Hoang Vực — 5 nhát so với 11 sau một nhát phủ đầu")
     void gearedDiscipleShouldWinAgainstTheWastelandBeast() {
         int playerHitsFor = hitsToKill(BEAST_HP, hit(foundationAtk(), BEAST_DEF));
         int beastHitsFor =
                 hitsToKill(arrivalHp(foundationMaxHp(), BEAST_ATK, foundationDef()), hit(BEAST_ATK, foundationDef()));
 
         assertThat(playerHitsFor).isEqualTo(5);
-        assertThat(beastHitsFor).isEqualTo(9);
+        assertThat(beastHitsFor).isEqualTo(11);
         assertThat(beastHitsFor - playerHitsFor).isGreaterThanOrEqualTo(2);
     }
 
     @Test
-    @DisplayName("Cỗ khảo hạch Trúc Cơ: 5 nhát so với 9 sau một nhát phủ đầu — nhịp ĐÓNG arc, trận cuối v1")
+    @DisplayName("Cỗ khảo hạch Trúc Cơ: 5 nhát so với 11 sau một nhát phủ đầu — nhịp ĐÓNG arc, trận cuối v1")
     void gearedDiscipleShouldWinTheFoundationTrial() {
         int playerHitsFor = hitsToKill(WARDEN_HP, hit(foundationAtk(), WARDEN_DEF));
         int wardenHitsFor =
                 hitsToKill(arrivalHp(foundationMaxHp(), WARDEN_ATK, foundationDef()), hit(WARDEN_ATK, foundationDef()));
 
         assertThat(playerHitsFor).isEqualTo(5);
-        assertThat(wardenHitsFor).isEqualTo(9);
+        assertThat(wardenHitsFor).isEqualTo(11);
         assertThat(wardenHitsFor - playerHitsFor).isGreaterThanOrEqualTo(2);
     }
 
@@ -209,18 +212,20 @@ class FoundationTrialBalanceTest {
      * cần 6 nhát và lại THẮNG.
      */
     @Test
-    @DisplayName("Luật biên thật: yêu thú Hoang Vực — biên giấy 5, biên thật +2 (V48 là 0)")
+    @DisplayName("Luật biên thật: yêu thú Hoang Vực — biên giấy 7, biên thật +4 (số V48 nay là +2)")
     void theWastelandBeastMeetsTheRealMarginRule() {
         DuelMargin beast =
                 new DuelMargin(foundationAtk(), foundationDef(), foundationMaxHp(), BEAST_HP, BEAST_ATK, BEAST_DEF);
         DuelMargin beforeV50 = new DuelMargin(foundationAtk(), foundationDef(), foundationMaxHp(), 280, 44, BEAST_DEF);
 
-        assertThat(beforeV50.paperMargin()).isEqualTo(3);
-        assertThat(beforeV50.realMargin()).isZero();
-        assertThat(beforeV50.meetsRealMarginRule()).isFalse();
+        assertThat(beforeV50.paperMargin()).isEqualTo(5);
+        assertThat(beforeV50.realMargin()).isEqualTo(2);
+        // Với máu theo cấp (65(d), +2/cấp) thì cả số V48 cũng đã đạt luật
+        // — V50 vẫn giữ biên rộng hơn.
+        assertThat(beforeV50.meetsRealMarginRule()).isTrue();
 
         assertThat(beast.playerHitsToKill()).isEqualTo(5);
-        assertThat(beast.monsterHitsToKill()).isEqualTo(10);
+        assertThat(beast.monsterHitsToKill()).isEqualTo(12);
         assertThat(beast.realMargin()).isGreaterThanOrEqualTo(DuelMargin.REQUIRED_REAL_MARGIN);
     }
 
@@ -233,17 +238,17 @@ class FoundationTrialBalanceTest {
      * thú — phá luật bậc thang. Còn atk phải &gt; 36 của yêu thú cũng vì luật đó.
      */
     @Test
-    @DisplayName("Luật biên thật: cỗ khảo hạch Trúc Cơ — biên giấy 5, biên thật +2 (V48 là 0)")
+    @DisplayName("Luật biên thật: cỗ khảo hạch Trúc Cơ — biên giấy 7, biên thật +4 (số V48 nay là +2)")
     void theFoundationWardenMeetsTheRealMarginRule() {
         DuelMargin warden =
                 new DuelMargin(foundationAtk(), foundationDef(), foundationMaxHp(), WARDEN_HP, WARDEN_ATK, WARDEN_DEF);
         DuelMargin beforeV50 =
                 new DuelMargin(foundationAtk(), foundationDef(), foundationMaxHp(), WARDEN_HP, 46, WARDEN_DEF);
 
-        assertThat(beforeV50.realMargin()).isZero();
+        assertThat(beforeV50.realMargin()).isEqualTo(2);
 
         assertThat(warden.playerHitsToKill()).isEqualTo(5);
-        assertThat(warden.monsterHitsToKill()).isEqualTo(10);
+        assertThat(warden.monsterHitsToKill()).isEqualTo(12);
         assertThat(warden.realMargin()).isGreaterThanOrEqualTo(DuelMargin.REQUIRED_REAL_MARGIN);
     }
 

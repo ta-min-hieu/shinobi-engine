@@ -2,6 +2,7 @@ package dev.kage.dialogue.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -127,5 +128,31 @@ class GetDialogueNodeUseCaseTest {
                 new GetDialogueNodeUseCase(new FakeNpcTemplatePort("/scripts/dialogue/test_fixture_malformed.js"));
 
         assertThat(useCase.execute("known_npc", nodeId)).isEmpty();
+    }
+
+    /** Dòng 65(c): script đọc được dữ kiện người chơi qua ctx chỉ-đọc. */
+    @Test
+    void shouldLetTheScriptReadDialogueFacts() {
+        GetDialogueNodeUseCase useCase =
+                new GetDialogueNodeUseCase(new FakeNpcTemplatePort("/scripts/dialogue/test_fixture_ctx.js"));
+        FixedDialogueFacts facts = new FixedDialogueFacts(Map.of("test_quest", "IN_PROGRESS"), Map.of("test_item", 1));
+
+        assertThat(useCase.execute("known_npc", "start", facts).orElseThrow().textKey())
+                .isEqualTo("dialogue.test.has_item");
+        assertThat(useCase.execute("known_npc", "status", facts).orElseThrow().textKey())
+                .isEqualTo("dialogue.test.status.IN_PROGRESS");
+        assertThat(useCase.execute("known_npc", "start").orElseThrow().textKey())
+                .as("không truyền facts = DialogueFacts.NONE: túi rỗng")
+                .isEqualTo("dialogue.test.greeting");
+        assertThat(useCase.execute("known_npc", "status").orElseThrow().textKey())
+                .isEqualTo("dialogue.test.status.NOT_ACCEPTED");
+    }
+
+    @Test
+    void shouldReturnEmpty_whenTheScriptPassesANonStringCodeToCtx() {
+        GetDialogueNodeUseCase useCase = new GetDialogueNodeUseCase(
+                new FakeNpcTemplatePort("/scripts/dialogue/test_fixture_ctx_bad_argument.js"));
+
+        assertThat(useCase.execute("known_npc", "start")).isEmpty();
     }
 }
