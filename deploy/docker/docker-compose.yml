@@ -84,7 +84,7 @@ services:
     # OBSERVABILITY.md §9-10 (Phase 9 lát cắt 9). Scrape CẢ container "server" (service ở trên) LẪN
     # server-gateway chạy NATIVE trên host qua host.docker.internal — xem prometheus.yml (Docker
     # Desktop Windows/Mac có sẵn; Linux cần extra_hosts bên dưới).
-    image: prom/prometheus:v3.8.1
+    image: prom/prometheus:v3.15.0
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
