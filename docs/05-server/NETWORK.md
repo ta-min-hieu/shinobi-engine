@@ -273,6 +273,10 @@ Vượt ngưỡng → drop packet + log. Vượt liên tục → ngắt kết n�
 
 **Thực tế đang chạy (2026-10-10)**: in-memory, single instance. Trần di chuyển/chiến đấu/lệnh chạm DB đếm theo **kết nối** (bảo vệ tài nguyên server trước một kết nối). Trần chat đếm theo **tài khoản** và sống qua các lần ngắt/nối lại (`ChatRateLimits`) — nó bảo vệ người chơi khác trước một người, đếm theo kết nối thì nối lại là có sổ trắng.
 
+**Trần theo IP (2026-10-17, dòng 71(a))** — `IpAdmission`: tối đa 16 kết nối mở cùng lúc mỗi IP (đóng ngay ở handler đầu tiên, trước bắt tay TLS) và 10 lần đăng nhập mỗi phút mỗi IP (`ErrorResponse` 429 `error.too_many_logins`). Lý do: đăng nhập tự tạo tài khoản, nên mọi trần theo tài khoản vượt được bằng một username mới — IP là trần duy nhất không trắng lại. Số chọn rộng tay cho quán net/NAT; loopback miễn (load test, `gameProbe`). Biến môi trường `KAGE_MAX_CONNECTIONS_PER_IP`, `KAGE_LOGINS_PER_IP_PER_MINUTE` (`0` = tắt). ⚠️ Sau proxy ngược hoặc userland-proxy của Docker, mọi kết nối có thể mang chung một IP nguồn — khi đó phải đặt cả hai về 0.
+
+**Chat giữ thứ tự theo kết nối (2026-10-17, dòng 71(f))**: tin của một kết nối chạy lần lượt (`SerialExecutor`), không còn đua nhau trên các Virtual Thread riêng.
+
 ---
 
 ## 14. Authentication Handshake

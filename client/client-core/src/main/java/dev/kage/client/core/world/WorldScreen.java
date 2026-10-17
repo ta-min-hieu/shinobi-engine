@@ -406,7 +406,7 @@ public final class WorldScreen implements GameScreen {
      */
     private DuelTargeting buildDuelTargeting() {
         combatHudController.bindCharacterPositions(remoteCharacters.characters());
-        return new DuelTargeting(combatHudController, remoteCharacters::isPresent, sender::setTarget);
+        return new DuelTargeting(combatHudController, remoteCharacters::isPresent, sender::setTarget, localCharacterId);
     }
 
     /** Tách khỏi constructor vì {@code MethodLength}; PHẢI gọi SAU {@link #buildDuelTargeting}. */

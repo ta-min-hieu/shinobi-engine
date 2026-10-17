@@ -92,6 +92,9 @@ final class WorldCommandSender implements SessionRecovery.Link {
 
     private final CommandLink connection;
 
+    /** Lệnh đang chờ trả lời — gói trả lời không khớp lệnh nào bị bỏ ở {@link #pollInbound()}. */
+    private final ReplyLedger replies = new ReplyLedger();
+
     WorldCommandSender(GameConnection connection) {
         this(CommandLink.of(connection));
     }
@@ -627,10 +630,27 @@ final class WorldCommandSender implements SessionRecovery.Link {
         send(Opcode.OPCODE_DELETE_MAIL_COMMAND_VALUE, command.toByteArray(), "DeleteMailCommand");
     }
 
-    /** Gói tin đến từ server — {@code null} khi hàng đợi rỗng (xem {@link GameConnection}). */
+    /**
+     * Gói tin đến từ server — {@code null} khi hàng đợi rỗng (xem {@link GameConnection}).
+     *
+     * <p>Gói trả lời không khớp lệnh nào đang chờ bị bỏ ngay ở đây (dòng 67(a), xem {@link ReplyLedger});
+     * {@code ErrorResponse} gạch lệnh nó từ chối khỏi sổ — header của nó mang đúng {@code sequenceId} đó.
+     */
     @Override
     public PacketCodec.Frame pollInbound() {
-        return connection.pollInbound();
+        PacketCodec.Frame frame = connection.pollInbound();
+        while (frame != null) {
+            int opcode = frame.header().opcode();
+            if (opcode == Opcode.OPCODE_ERROR_VALUE) {
+                replies.forget(frame.header().sequenceId());
+                return frame;
+            }
+            if (replies.admit(opcode, frame.header().sequenceId())) {
+                return frame;
+            }
+            frame = connection.pollInbound();
+        }
+        return null;
     }
 
     /** Uỷ nhiệm thẳng — xem {@code GameConnection#replayBeforeQueued} (2026-10-14, README dòng 73(c)). */
@@ -658,6 +678,7 @@ final class WorldCommandSender implements SessionRecovery.Link {
     @Override
     public int sendRequest(int opcode, byte[] payload) throws IOException {
         int sequenceId = connection.nextSequenceId();
+        replies.expect(opcode, sequenceId);
         connection.send(opcode, sequenceId, payload);
         return sequenceId;
     }
@@ -903,6 +924,7 @@ final class WorldCommandSender implements SessionRecovery.Link {
     }
 
     private void send(int opcode, int sequenceId, byte[] payload, String commandName) {
+        replies.expect(opcode, sequenceId);
         try {
             connection.send(opcode, sequenceId, payload);
         } catch (IOException e) {

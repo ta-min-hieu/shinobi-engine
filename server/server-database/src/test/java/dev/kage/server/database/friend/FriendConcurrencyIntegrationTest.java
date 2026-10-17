@@ -271,15 +271,24 @@ class FriendConcurrencyIntegrationTest {
         long actor = characters[random.nextInt(characters.length)];
         long other = characters[random.nextInt(characters.length)];
         switch (random.nextInt(OPERATION_KINDS)) {
-            case 0 -> ledger.sent.addAndGet(send(facade, actor, other));
+            case 0 -> send(facade, actor, other, ledger);
             case 1 -> ledger.accepted.addAndGet(acceptAllPending(facade, actor));
             case 2 -> ledger.rejected.addAndGet(rejectAllPending(facade, actor));
             default -> ledger.removed.addAndGet(removeFriend(facade, actor, other));
         }
     }
 
-    private static int send(FriendFacade facade, long actor, long other) {
-        return facade.sendRequest(actor, other) == FriendFacade.SendRequestResult.OK ? 1 : 0;
+    /**
+     * Gửi lời mời. Từ 2026-10-17 (dòng 71(c)) mời ngược chiều một lời mời đang chờ là CHẤP NHẬN nó
+     * ({@code BECAME_FRIENDS}) — vào sổ như một lệnh chấp nhận OK, không phải một lời mời mới.
+     */
+    private static void send(FriendFacade facade, long actor, long other, StormLedger ledger) {
+        FriendFacade.SendRequestResult result = facade.sendRequest(actor, other);
+        if (result == FriendFacade.SendRequestResult.OK) {
+            ledger.sent.incrementAndGet();
+        } else if (result == FriendFacade.SendRequestResult.BECAME_FRIENDS) {
+            ledger.accepted.incrementAndGet();
+        }
     }
 
     private static int acceptAllPending(FriendFacade facade, long actor) {

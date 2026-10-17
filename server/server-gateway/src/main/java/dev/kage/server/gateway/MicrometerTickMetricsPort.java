@@ -43,6 +43,7 @@ final class MicrometerTickMetricsPort implements TickMetricsPort {
         "MovementSystem",
         "VerticalMovementSystem",
         "TerrainCollisionSystem",
+        "MainWorldBoundsSystem",
         "TriggerZoneSystem",
         "CombatSystem",
         "SkillSystem",

@@ -16,4 +16,10 @@ import dev.kage.engine.ecs.Component;
  */
 public final class TriggerZoneMembershipComponent implements Component {
     public final Set<String> occupiedZoneIds = new HashSet<>();
+
+    /**
+     * Phiên bản danh sách vùng mà {@link #occupiedZoneIds} đã được đối chiếu lần cuối — để
+     * {@code TriggerZoneSystem} dọn mã của vùng đã bị gỡ đúng MỘT lần sau mỗi {@code setZones}.
+     */
+    public int zonesVersionSeen;
 }

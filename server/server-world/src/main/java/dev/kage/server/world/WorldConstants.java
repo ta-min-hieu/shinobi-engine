@@ -17,6 +17,18 @@ final class WorldConstants {
     /** Tốc độ di chuyển server SỞ HỮU — client chỉ gửi hướng, không gửi tốc độ (movement.proto). */
     static final float MOVE_SPEED_MPS = 5f;
 
+    /**
+     * Biên trục X của WORLD CHÍNH (dòng 67(c), chủ dự án duyệt 2026-10-17) — trùng dải nền đất client
+     * vẽ ({@code client-core DemoPlatforms.GROUND_MIN_X/GROUND_MAX_X}). Trước đó chỉ client biết dải
+     * này; server cho đi mãi về hai phía, và client sửa đổi được thì ra khỏi mọi nội dung, đứng giữa
+     * khoảng đen. ⚠️ Nới dải nền client thì nới ở đây CÙNG LÚC — không có gì nối hai nơi ngoài dòng này.
+     * Hầm ngục/đấu trường không có biên (không có nền vẽ, không có nội dung để đi lạc khỏi).
+     */
+    static final float MAIN_WORLD_MIN_X = -55f;
+
+    /** Xem {@link #MAIN_WORLD_MIN_X}. */
+    static final float MAIN_WORLD_MAX_X = 210f;
+
     /** Bán kính Area of Interest — placeholder, đo lại ở Phase 3/9 (SERVER.md §6, §11). */
     static final float AOI_RADIUS_METERS = 15f;
 

@@ -28,9 +28,10 @@ import dev.kage.protocol.wire.PacketCodec;
  *
  * <h2>Server tắt (SERVER_SHUTTING_DOWN_EVENT)</h2>
  *
- * Gói rỗng, server gửi NGAY TRƯỚC khi đóng kết nối lúc bảo trì có chủ đích (SERVER.md §10). Việc
- * duy nhất client làm được lúc này là nói cho người chơi biết đây là bảo trì chứ không phải mạng
- * hỏng — kết nối sẽ đứt ngay sau đó dù client có làm gì đi nữa.
+ * Gói rỗng, server gửi khi bắt đầu bảo trì có chủ đích (SERVER.md §10) — từ 2026-10-17 (dòng 76(b))
+ * là khoảng 30 giây TRƯỚC khi đóng kết nối, không còn là ngay trước. Gói không mang số giây (protocol
+ * đã chốt), nên câu báo nói "khoảng 30 giây" theo mặc định của server. Việc client làm là nói cho người
+ * chơi biết đây là bảo trì chứ không phải mạng hỏng, và còn thời gian tìm chỗ an toàn.
  *
  * <h2>Bị đá vì đăng nhập nơi khác ({@code error.logged_in_elsewhere})</h2>
  *

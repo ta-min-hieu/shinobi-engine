@@ -45,7 +45,7 @@ class DuelTargetingTest {
     void setUp() {
         combat = new CombatHudController(LOCAL_CHARACTER_ID, Faction.FACTION_HOA);
         combat.bindCharacterPositions(visible);
-        targeting = new DuelTargeting(combat, visible::containsKey, sentTargets::add);
+        targeting = new DuelTargeting(combat, visible::containsKey, sentTargets::add, LOCAL_CHARACTER_ID);
     }
 
     /** Vai {@code WorldScreen}: 308 dọn sạch thế giới cũ rồi mới báo cho luồng đấu. */
@@ -61,6 +61,21 @@ class DuelTargetingTest {
     }
 
     private record Point(float x, float y) implements PickablePoint {}
+
+    @Test
+    @DisplayName("Dòng 67(b): DuelStartedEvent báo đối thủ là chính mình ⇒ bỏ qua, không nhắm ai")
+    void duelStartedAgainstOneself_isIgnored() {
+        targeting.onDuelStarted(LOCAL_CHARACTER_ID, "Me");
+        worldChanged(WorldKind.WORLD_KIND_ARENA);
+        visible.put(LOCAL_CHARACTER_ID, new Point(1f, 0f));
+        targeting.onCharacterSpawned(LOCAL_CHARACTER_ID);
+
+        assertThat(sentTargets).isEmpty();
+
+        targeting.onDuelStarted(OPPONENT_ID, OPPONENT_NAME);
+        opponentSpawned(4f);
+        assertThat(sentTargets).as("gói đúng tới sau vẫn được nhắm").containsExactly(OPPONENT_ID);
+    }
 
     @Test
     @DisplayName("Vào Arena, bấm Đánh ⇒ lệnh Attack đi kèm mục tiêu server-side là ĐỐI THỦ")

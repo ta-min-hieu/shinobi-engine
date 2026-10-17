@@ -14,6 +14,7 @@ import java.util.concurrent.Executors;
 import io.micrometer.core.instrument.MeterRegistry;
 
 import dev.kage.server.world.CharacterEntry;
+import dev.kage.server.world.FinalPositionListener;
 import dev.kage.server.world.SkillCooldownLedger;
 import dev.kage.server.world.WorldContentCatalog;
 import dev.kage.server.world.WorldFacade;
@@ -214,11 +215,16 @@ final class MainWorldChannelRegistry {
     }
 
     synchronized void detachCharacter(long characterId) {
+        detachCharacter(characterId, FinalPositionListener.NONE);
+    }
+
+    /** {@link #detachCharacter(long)} kèm vị trí thật lúc gỡ — xem {@link FinalPositionListener}. */
+    synchronized void detachCharacter(long characterId, FinalPositionListener finalPosition) {
         Channel channel = channelByCharacterId.remove(characterId);
         if (channel == null) {
             return;
         }
-        channel.facade().detachCharacter(characterId);
+        channel.facade().detachCharacter(characterId, finalPosition);
         channel.characterIds().remove(characterId);
         closeIfEmptyOverflowChannel(channel);
     }

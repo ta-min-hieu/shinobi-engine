@@ -84,6 +84,44 @@ class SendFriendRequestUseCaseTest {
         assertThat(useCase.execute(5, 7)).isEqualTo(SendFriendRequestUseCase.Result.OK);
     }
 
+    /** Dòng 71(c) (2026-10-17): 7 đã mời 5, giờ 5 mời lại 7 ⇒ hai người thành bạn luôn. */
+    @Test
+    void shouldBecomeFriends_whenTheTargetHasAlreadyInvitedTheSender() {
+        FakeFriendPort port = new FakeFriendPort();
+        port.friendships.add(new Friendship(1, 7, 5, FriendshipStatus.PENDING, Instant.now(), null));
+        SendFriendRequestUseCase useCase = new SendFriendRequestUseCase(port);
+
+        SendFriendRequestUseCase.Result result = useCase.execute(5, 7);
+
+        assertThat(result).isEqualTo(SendFriendRequestUseCase.Result.BECAME_FRIENDS);
+        assertThat(port.friendships).as("không đẻ thêm dòng ngược chiều").hasSize(1);
+        assertThat(port.friendships.get(0).status()).isEqualTo(FriendshipStatus.ACCEPTED);
+    }
+
+    @Test
+    void shouldLeaveTheReverseRequestPending_whenTheOriginalInvitersListIsFull() {
+        FakeFriendPort port = new FakeFriendPort();
+        port.friendships.add(new Friendship(1, 7, 5, FriendshipStatus.PENDING, Instant.now(), null));
+        port.giveFriends(7, FriendListLimit.MAX_FRIENDS);
+        SendFriendRequestUseCase useCase = new SendFriendRequestUseCase(port);
+
+        SendFriendRequestUseCase.Result result = useCase.execute(5, 7);
+
+        assertThat(result).isEqualTo(SendFriendRequestUseCase.Result.OTHER_FRIEND_LIST_FULL);
+        assertThat(port.friendships.get(0).status()).isEqualTo(FriendshipStatus.PENDING);
+    }
+
+    @Test
+    void shouldRefuse_whenTheSendersOwnListIsFullEvenForAReverseRequest() {
+        FakeFriendPort port = new FakeFriendPort();
+        port.friendships.add(new Friendship(1, 7, 5, FriendshipStatus.PENDING, Instant.now(), null));
+        port.giveFriends(5, FriendListLimit.MAX_FRIENDS);
+        SendFriendRequestUseCase useCase = new SendFriendRequestUseCase(port);
+
+        assertThat(useCase.execute(5, 7)).isEqualTo(SendFriendRequestUseCase.Result.FRIEND_LIST_FULL);
+        assertThat(port.friendships.get(0).status()).isEqualTo(FriendshipStatus.PENDING);
+    }
+
     /** Fake = implementation in-memory THẬT (TESTING.md §4), không Mockito. */
     static final class FakeFriendPort implements FriendPort {
         private final List<Friendship> friendships = new ArrayList<>();
@@ -109,7 +147,24 @@ class SendFriendRequestUseCaseTest {
 
         @Override
         public boolean accept(long friendshipId, long addresseeId) {
-            throw new UnsupportedOperationException("không dùng ở test này");
+            for (int i = 0; i < friendships.size(); i++) {
+                Friendship f = friendships.get(i);
+                if (f.id() == friendshipId
+                        && f.addresseeId() == addresseeId
+                        && f.status() == FriendshipStatus.PENDING) {
+                    friendships.set(
+                            i,
+                            new Friendship(
+                                    f.id(),
+                                    f.requesterId(),
+                                    f.addresseeId(),
+                                    FriendshipStatus.ACCEPTED,
+                                    f.createdAt(),
+                                    Instant.now()));
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override

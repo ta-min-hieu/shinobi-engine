@@ -21,6 +21,7 @@ import dev.kage.protocol.RejectFriendRequestOutcome;
 import dev.kage.protocol.RejectFriendRequestResponse;
 import dev.kage.protocol.RemoveFriendOutcome;
 import dev.kage.protocol.RemoveFriendResponse;
+import dev.kage.protocol.SendFriendRequestOutcome;
 import dev.kage.protocol.SendFriendRequestResponse;
 import dev.kage.protocol.wire.PacketCodec;
 
@@ -133,7 +134,11 @@ final class FriendCoordinator implements WindowFlow {
     private boolean dispatchOutcome(int opcode, byte[] payload) throws InvalidProtocolBufferException {
         if (opcode == Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE) {
             SendFriendRequestResponse response = SendFriendRequestResponse.parseFrom(payload);
-            notice(FriendController.sendOutcomeMessageKey(response.getOutcome()));
+            // "Đã là bạn" cũng là câu server trả khi lời mời NGƯỢC CHIỀU vừa được chấp nhận thay mình
+            // (dòng 71(c), 2026-10-17) — danh sách trong tay khi đó đã cũ, nên hỏi lại.
+            settle(
+                    FriendController.sendOutcomeMessageKey(response.getOutcome()),
+                    response.getOutcome() == SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_ALREADY_FRIENDS);
             return true;
         }
         if (opcode == Opcode.OPCODE_ACCEPT_FRIEND_REQUEST_RESPONSE_VALUE) {

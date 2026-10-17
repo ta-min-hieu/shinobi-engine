@@ -21,6 +21,11 @@ import com.badlogic.ashley.utils.ImmutableArray;
  * gỡ system thứ nhất). Thay vào đó {@link #update} tự lặp qua
  * {@code ashleyEngine.getEntitiesFor(family)} cho MỖI system đã đăng ký — không phụ thuộc
  * {@code getClass()}, an toàn với bao nhiêu system cũng được.
+ *
+ * <p><b>Chỉ MỘT luồng</b> (dòng 72(e), 2026-10-17): mọi phương thức phải gọi từ đúng một luồng tick
+ * (server: tick thread của World — SERVER.md §2/§3; client: luồng render của libGDX). Lớp này KHÔNG an
+ * toàn đa luồng dù có một {@link AtomicLong} cấp id — field đó trông như hứa hẹn điều ngược lại, nhưng
+ * map handle, danh sách System và hàng chờ gỡ đều là collection thường, không khoá.
  */
 public final class EcsWorld {
 
@@ -100,9 +105,16 @@ public final class EcsWorld {
      * <p>Dành cho lúc rời hẳn một phiên chơi mà {@link EcsWorld} vẫn sống tiếp (client: engine giữ
      * một world duy nhất suốt đời ứng dụng, còn màn world thì đăng ký System của nó mỗi lần dựng —
      * bị đá về màn đăng nhập rồi vào lại mà không dọn thì System di chuyển chạy HAI lần mỗi tick).
-     * Không gọi giữa lúc {@link #update} đang lặp.
+     *
+     * @throws IllegalStateException nếu gọi giữa lúc {@link #update} đang lặp (dòng 72(d), chủ dự án
+     *     duyệt 2026-10-17) — từ trong một System. Trước đó lệnh này chạy được, xoá cả danh sách System
+     *     dưới chân vòng lặp, và System kế tiếp của chính tick đó bị bỏ qua im lặng.
      */
     public void clear() {
+        if (iteratingSystem != null) {
+            throw new IllegalStateException("EcsWorld.clear() gọi giữa lúc update đang lặp (System "
+                    + iteratingSystem.getClass().getSimpleName() + ") — gọi sau khi tick xong");
+        }
         ashleyEngine.removeAllEntities();
         for (KEntity handle : handles.values()) {
             handle.detach();

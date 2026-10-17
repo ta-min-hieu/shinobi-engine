@@ -26,8 +26,11 @@ sealed interface WorldCommand {
      */
     record AttachCharacterCommand(CharacterEntry entry) implements WorldCommand {}
 
-    /** Xoá entity ECS của {@code characterId} — gọi khi mất kết nối. */
-    record DetachCharacterCommand(long characterId) implements WorldCommand {}
+    /**
+     * Xoá entity ECS của {@code characterId} — gọi khi mất kết nối. {@code finalPosition} nhận vị trí
+     * thật ngay trước khi xoá (xem {@link FinalPositionListener}).
+     */
+    record DetachCharacterCommand(long characterId, FinalPositionListener finalPosition) implements WorldCommand {}
 
     /** Ý định di chuyển — {@code dirX/dirY} là hướng CHƯA chuẩn hoá, world tự clamp + nhân tốc độ. */
     record MoveIntentCommand(long characterId, int sequenceId, float dirX, float dirY) implements WorldCommand {}

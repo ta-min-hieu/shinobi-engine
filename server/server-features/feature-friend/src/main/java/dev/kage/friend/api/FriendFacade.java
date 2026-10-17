@@ -28,6 +28,8 @@ public final class FriendFacade {
             case ALREADY_FRIENDS -> SendRequestResult.ALREADY_FRIENDS;
             case REQUEST_ALREADY_PENDING -> SendRequestResult.REQUEST_ALREADY_PENDING;
             case FRIEND_LIST_FULL -> SendRequestResult.FRIEND_LIST_FULL;
+            case BECAME_FRIENDS -> SendRequestResult.BECAME_FRIENDS;
+            case OTHER_FRIEND_LIST_FULL -> SendRequestResult.OTHER_FRIEND_LIST_FULL;
         };
     }
 
@@ -72,7 +74,11 @@ public final class FriendFacade {
         CANNOT_FRIEND_SELF,
         ALREADY_FRIENDS,
         REQUEST_ALREADY_PENDING,
-        FRIEND_LIST_FULL
+        FRIEND_LIST_FULL,
+        /** Người nhận đã mời mình từ trước — lời mời của họ vừa được chấp nhận thay mình. */
+        BECAME_FRIENDS,
+        /** Như {@link #BECAME_FRIENDS} nhưng danh sách của họ đã đầy — chưa kết bạn được. */
+        OTHER_FRIEND_LIST_FULL
     }
 
     public enum AcceptResult {

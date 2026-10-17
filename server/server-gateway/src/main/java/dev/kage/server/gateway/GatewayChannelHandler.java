@@ -11,6 +11,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -365,6 +366,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final NpcProximity npcProximity;
     private final ItemUseCooldown itemUseCooldown = new ItemUseCooldown();
     private final Executor authExecutor;
+    // Tin chat của kết nối này chạy lần lượt (dòng 71(f)) — xem SerialExecutor.
+    private final Executor chatExecutor;
     private final GatewayNetworkMetrics networkMetrics;
     private final GatewayTracing tracing;
     // Per-connection (handler đã là state per-connection, xem javadoc lớp) — không cần đồng bộ
@@ -510,6 +513,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.npcProximity =
                 new NpcProximity(worldGateway.mainWorldChannels().worldContent().npcs(), this::mainWorldPositionOf);
         this.authExecutor = authExecutor;
+        this.chatExecutor = new SerialExecutor(authExecutor);
         this.networkMetrics = observability.networkMetrics();
         this.tracing = observability.tracing();
     }
@@ -615,6 +619,15 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // của tài khoản cũ — hai nửa của một phiên thuộc hai tài khoản khác nhau.
         if (boundCharacterId != null) {
             sendError(ctx, sequenceId, 409, "error.already_in_world");
+            return;
+        }
+        // Trần đăng nhập theo IP (dòng 71(a), 2026-10-17): đăng nhập tự tạo tài khoản, nên đây là trần
+        // duy nhất mà một username mới không làm trắng lại — xem IpAdmission.
+        if (!worldGateway.registry().ipAdmission().tryLogin(ctx.channel().remoteAddress())) {
+            LOG.warn(
+                    "Từ chối đăng nhập: IP {} vượt trần đăng nhập mỗi phút",
+                    ctx.channel().remoteAddress());
+            sendError(ctx, sequenceId, 429, "error.too_many_logins");
             return;
         }
 
@@ -2089,6 +2102,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 sendError(ctx, sequenceId, 409, "error.friend_list_full");
                 return;
             }
+            if (result == FriendFacade.SendRequestResult.OTHER_FRIEND_LIST_FULL) {
+                sendError(ctx, sequenceId, 409, "error.friend_list_full_other");
+                return;
+            }
             SendFriendRequestResponse response = SendFriendRequestResponse.newBuilder()
                     .setOutcome(toProtoOutcome(result))
                     .build();
@@ -2106,6 +2123,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     FriendFacade.SendRequestResult.CANNOT_FRIEND_SELF,
                     SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_CANNOT_FRIEND_SELF,
                     FriendFacade.SendRequestResult.ALREADY_FRIENDS,
+                    SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_ALREADY_FRIENDS,
+                    // Mời ngược chiều vừa kết bạn (dòng 71(c), 2026-10-17): không thêm giá trị outcome
+                    // (protocol đã chốt) — "đã là bạn" là câu ĐÚNG ngay lúc trả lời, và client hỏi lại
+                    // danh sách khi nhận nó (FriendCoordinator).
+                    FriendFacade.SendRequestResult.BECAME_FRIENDS,
                     SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_ALREADY_FRIENDS,
                     FriendFacade.SendRequestResult.REQUEST_ALREADY_PENDING,
                     SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_REQUEST_ALREADY_PENDING);
@@ -3689,7 +3711,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             }
             return;
         }
-        executeBlocking(ctx, sequenceId, () -> handleSendChatMessageBlocking(ctx, sequenceId, characterId, command));
+        // Tuần tự theo kết nối (dòng 71(f)) — xem SerialExecutor.
+        executeBlockingOn(
+                chatExecutor,
+                ctx,
+                sequenceId,
+                () -> handleSendChatMessageBlocking(ctx, sequenceId, characterId, command));
     }
 
     private void handleSendChatMessageBlocking(
@@ -3960,9 +3987,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      */
     // PMD AvoidCatchingGenericException: đúng ý — ranh giới I/O bất đồng bộ, PHẢI trả lời client dù
     // lỗi gì xảy ra (cùng lý do handleConnectBlocking).
+    private void executeBlocking(ChannelHandlerContext ctx, int sequenceId, Runnable handler) {
+        executeBlockingOn(authExecutor, ctx, sequenceId, handler);
+    }
+
+    /** {@link #executeBlocking} trên một executor chọn sẵn — chat dùng {@link #chatExecutor}. */
     // FutureReturnValueIgnored: ChannelFuture của close()/writeAndFlush() — lỗi đi qua pipeline Netty.
     @SuppressWarnings({"PMD.AvoidCatchingGenericException", "FutureReturnValueIgnored"})
-    private void executeBlocking(ChannelHandlerContext ctx, int sequenceId, Runnable handler) {
+    private void executeBlockingOn(Executor executor, ChannelHandlerContext ctx, int sequenceId, Runnable handler) {
         if (!dbCommandRateLimiter.tryAcquire()) {
             networkMetrics.recordRateLimitRejected("db");
             if (dbCommandRateLimiter.shouldDisconnect()) {
@@ -3973,7 +4005,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 429, "error.rate_limited");
             return;
         }
-        authExecutor.execute(() -> {
+        executor.execute(() -> {
             try {
                 handler.run();
             } catch (dev.kage.server.database.GoldCapExceededException e) {
@@ -4177,6 +4209,39 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         PositionSnapshot lastPosition = worldGateway.registry().lastKnownPosition(characterId);
         // CÓ ĐIỀU KIỆN theo kết nối: nếu nhân vật đã thuộc kết nối khác thì không đụng tới.
         worldGateway.registry().unregister(characterId, ctx);
+        Detached detached = detachAfterDisconnect(characterId);
+        boolean handledElsewhere = detached.handledElsewhere();
+        AtomicReference<PositionSnapshot> finalPosition = detached.finalPosition();
+        CompletableFuture<Void> worldDrained =
+                world.map(WorldFacade::inboxBarrier).orElseGet(() -> CompletableFuture.completedFuture(null));
+        // SERVER.md §8: logout là 1 trong 3 mốc bắt buộc ghi vị trí. savePosition chạm DB
+        // (blocking) — không được chạy trên EventLoop, đẩy sang authExecutor.
+        // join() trên Virtual Thread của authExecutor: chờ mốc hàng đợi (lệnh gỡ đã xử lý ⇒ finalPosition
+        // đã có, hoặc World đã dừng ⇒ dùng mẫu cũ), rồi chờ save() — nó chỉ XẾP lượt ghi vào luồng của
+        // persister (xem javadoc của nó về thứ tự với lượt định kỳ). Việc được NỘP ngay bây giờ chứ không
+        // nối sau mốc: lúc tắt server authExecutor đóng ngay sau event loop, một việc nộp muộn bị từ chối.
+        CompletableFuture<Void> positionSaved = lastPosition == null && handledElsewhere
+                ? CompletableFuture.completedFuture(null)
+                : CompletableFuture.runAsync(
+                        () -> saveFinalPosition(characterId, worldDrained, finalPosition, lastPosition), authExecutor);
+        // channelInactive chạy trên EventLoop — friendFacade.listFriends chạm DB (blocking),
+        // PHẢI đẩy sang authExecutor, không được gọi thẳng ở đây (server/CLAUDE.md: EventLoop
+        // cấm query DB), cùng lý do savePosition ở trên.
+        CompletableFuture<Void> friendsNotified =
+                CompletableFuture.runAsync(() -> notifyFriendsPresenceChanged(characterId, false), authExecutor);
+        handOverPartyLeadershipAfterDisconnect(characterId);
+        CompletableFuture.allOf(positionSaved, worldDrained, friendsNotified)
+                .whenComplete((ignored, error) -> finishRelease(bound, error));
+    }
+
+    /** Kết quả của {@link #detachAfterDisconnect}. */
+    private record Detached(boolean handledElsewhere, AtomicReference<PositionSnapshot> finalPosition) {}
+
+    /**
+     * Gỡ nhân vật vừa mất kết nối khỏi World nó đang đứng — tách khỏi {@link #releaseCharacter} vì
+     * Checkstyle {@code MethodLength}.
+     */
+    private Detached detachAfterDisconnect(long characterId) {
         // Phase 8 lát cắt 1 (ADR-026): nếu đang ở dungeon, detach khỏi ĐÚNG dungeon World +
         // dọn bookkeeping instance (dừng luôn World nếu rỗng) — KHÔNG re-attach world chính
         // (đã ngắt kết nối). Lát cắt 4: tương tự cho duel Arena — người mất kết nối tính THUA
@@ -4186,31 +4251,31 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         worldGateway.arenaInstanceRegistry().forgetChallengesOf(characterId);
         boolean handledElsewhere = worldGateway.dungeonInstanceRegistry().handleDisconnectIfInDungeon(characterId)
                 || worldGateway.arenaInstanceRegistry().handleDisconnectIfInDuel(characterId);
+        // Vị trí THẬT lúc World gỡ nhân vật (dòng 76(a), 2026-10-17) — mẫu 1 Hz ở lastPosition có thể cũ
+        // tới ~5 m nếu đang chạy. Chỉ world chính: hầm ngục/đấu trường vốn giữ chỗ đứng ở world chính.
+        AtomicReference<PositionSnapshot> finalPosition = new AtomicReference<>();
         if (!handledElsewhere) {
-            worldGateway.mainWorldChannels().detachCharacter(characterId);
+            worldGateway
+                    .mainWorldChannels()
+                    .detachCharacter(characterId, (x, y) -> finalPosition.set(new PositionSnapshot(x, y)));
         }
-        // SERVER.md §8: logout là 1 trong 3 mốc bắt buộc ghi vị trí. savePosition chạm DB
-        // (blocking) — không được chạy trên EventLoop, đẩy sang authExecutor.
-        // join() trên Virtual Thread của authExecutor: save() chỉ XẾP lượt ghi vào luồng của
-        // persister (xem javadoc của nó về thứ tự với lượt định kỳ) — chờ tới lúc ghi xong thật.
-        CompletableFuture<Void> positionSaved = lastPosition == null
-                ? CompletableFuture.completedFuture(null)
-                : CompletableFuture.runAsync(
-                        () -> worldGateway
-                                .positionPersister()
-                                .save(characterId, lastPosition.x(), lastPosition.y())
-                                .join(),
-                        authExecutor);
-        CompletableFuture<Void> worldDrained =
-                world.map(WorldFacade::inboxBarrier).orElseGet(() -> CompletableFuture.completedFuture(null));
-        // channelInactive chạy trên EventLoop — friendFacade.listFriends chạm DB (blocking),
-        // PHẢI đẩy sang authExecutor, không được gọi thẳng ở đây (server/CLAUDE.md: EventLoop
-        // cấm query DB), cùng lý do savePosition ở trên.
-        CompletableFuture<Void> friendsNotified =
-                CompletableFuture.runAsync(() -> notifyFriendsPresenceChanged(characterId, false), authExecutor);
-        handOverPartyLeadershipAfterDisconnect(characterId);
-        CompletableFuture.allOf(positionSaved, worldDrained, friendsNotified)
-                .whenComplete((ignored, error) -> finishRelease(bound, error));
+        return new Detached(handledElsewhere, finalPosition);
+    }
+
+    /** Thân việc lưu vị trí của {@link #releaseCharacter} — chạy trên {@code authExecutor}. */
+    private void saveFinalPosition(
+            long characterId,
+            CompletableFuture<Void> worldDrained,
+            AtomicReference<PositionSnapshot> finalPosition,
+            PositionSnapshot sampledPosition) {
+        worldDrained.join();
+        PositionSnapshot position = finalPosition.get() != null ? finalPosition.get() : sampledPosition;
+        if (position != null) {
+            worldGateway
+                    .positionPersister()
+                    .save(characterId, position.x(), position.y())
+                    .join();
+        }
     }
 
     /**

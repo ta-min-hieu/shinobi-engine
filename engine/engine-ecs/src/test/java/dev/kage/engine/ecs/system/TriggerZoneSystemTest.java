@@ -29,6 +29,47 @@ class TriggerZoneSystemTest {
         return entity;
     }
 
+    /**
+     * Dòng 72(b) (2026-10-17): vùng bị gỡ khỏi danh sách trong lúc có người đứng trong đó ⇒ người đó
+     * được báo "ra" và mã vùng không nằm lại — trước đó nằm lại mãi và chặn aggro vĩnh viễn.
+     */
+    @Test
+    void shouldExitAndForgetAZone_whenItIsRemovedWhileTheEntityStandsInside() {
+        EcsWorld world = new EcsWorld();
+        List<String> exited = new ArrayList<>();
+        TriggerZoneSystem system = new TriggerZoneSystem((e, zoneId) -> {}, (e, zoneId) -> exited.add(zoneId));
+        system.setZones(List.of(
+                new NamedZone("old_safe_area", new Aabb(0f, 0f, 10f, 10f)),
+                new NamedZone("kept_area", new Aabb(0f, 0f, 10f, 10f))));
+        world.addSystem(system);
+        KEntity entity = trackedEntity(world, 5f, 5f);
+        world.update(1f);
+
+        system.setZones(List.of(new NamedZone("kept_area", new Aabb(0f, 0f, 10f, 10f))));
+        world.update(1f);
+        world.update(1f);
+
+        assertThat(exited).as("báo ra đúng một lần").containsExactly("old_safe_area");
+        assertThat(MEMBERSHIP.get(entity).occupiedZoneIds).containsExactly("kept_area");
+    }
+
+    @Test
+    void shouldExitEveryZone_whenTheZoneListBecomesEmpty() {
+        EcsWorld world = new EcsWorld();
+        List<String> exited = new ArrayList<>();
+        TriggerZoneSystem system = new TriggerZoneSystem((e, zoneId) -> {}, (e, zoneId) -> exited.add(zoneId));
+        system.setZones(List.of(new NamedZone("town_safe_area", new Aabb(0f, 0f, 10f, 10f))));
+        world.addSystem(system);
+        KEntity entity = trackedEntity(world, 5f, 5f);
+        world.update(1f);
+
+        system.setZones(List.of());
+        world.update(1f);
+
+        assertThat(exited).containsExactly("town_safe_area");
+        assertThat(MEMBERSHIP.get(entity).occupiedZoneIds).isEmpty();
+    }
+
     @Test
     void shouldNotFireCallback_whenZoneListIsEmpty() {
         EcsWorld world = new EcsWorld();

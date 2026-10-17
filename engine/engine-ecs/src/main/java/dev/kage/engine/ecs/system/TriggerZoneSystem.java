@@ -31,6 +31,9 @@ public final class TriggerZoneSystem extends IteratingKSystem {
     private final BiConsumer<KEntity, String> onZoneEntered;
     private final BiConsumer<KEntity, String> onZoneExited;
     private List<NamedZone> zones = List.of();
+    private Set<String> zoneIds = Set.of();
+    // Tăng mỗi lần setZones — xem TriggerZoneMembershipComponent#zonesVersionSeen.
+    private int zonesVersion;
 
     public TriggerZoneSystem() {
         this((entity, zoneId) -> {}, (entity, zoneId) -> {});
@@ -60,15 +63,20 @@ public final class TriggerZoneSystem extends IteratingKSystem {
             }
         }
         this.zones = List.copyOf(zones);
+        this.zoneIds = Set.copyOf(seen);
+        zonesVersion++;
     }
 
     @Override
     protected void processEntity(KEntity entity, float deltaTime) {
+        TriggerZoneMembershipComponent membership = MEMBERSHIP.get(entity);
+        if (membership.zonesVersionSeen != zonesVersion) {
+            leaveRemovedZones(entity, membership);
+        }
         if (zones.isEmpty()) {
             return;
         }
         PositionComponent position = POSITION.get(entity);
-        TriggerZoneMembershipComponent membership = MEMBERSHIP.get(entity);
         // Index loop (không for-each) — tránh Iterator allocation trong game loop (Điều 31).
         for (int i = 0; i < zones.size(); i++) {
             NamedZone zone = zones.get(i);
@@ -82,5 +90,26 @@ public final class TriggerZoneSystem extends IteratingKSystem {
                 onZoneExited.accept(entity, zone.zoneId());
             }
         }
+    }
+
+    /**
+     * Mã của vùng không còn trong danh sách sau một {@link #setZones} — báo "ra" và xoá (dòng 72(b),
+     * chủ dự án duyệt 2026-10-17). Trước đó mã đó nằm lại mãi: vòng lặp chính chỉ duyệt vùng HIỆN CÓ,
+     * nên không bao giờ thấy entity "ra" khỏi một vùng đã bị gỡ — mà {@code AiSystem} đọc
+     * {@code occupiedZoneIds.isEmpty()} để chặn aggro, tức người đứng trong vùng an toàn bị gỡ được
+     * che chở VĨNH VIỄN. Chạy đúng một lần mỗi entity sau mỗi lần đổi danh sách — không chạy mỗi tick.
+     */
+    private void leaveRemovedZones(KEntity entity, TriggerZoneMembershipComponent membership) {
+        membership.zonesVersionSeen = zonesVersion;
+        if (membership.occupiedZoneIds.isEmpty()) {
+            return;
+        }
+        membership.occupiedZoneIds.removeIf(zoneId -> {
+            if (zoneIds.contains(zoneId)) {
+                return false;
+            }
+            onZoneExited.accept(entity, zoneId);
+            return true;
+        });
     }
 }

@@ -245,7 +245,7 @@ Bài toán: mỗi thay đổi (di chuyển, nhận exp) ghi DB ngay = giết DB.
 | Dữ liệu | Chiến lược |
 |---|---|
 | Vị trí nhân vật | **Không ghi liên tục** — ghi khi đổi map / đăng xuất / định kỳ 5 phút |
-| HP/Chi | Như trên |
+| HP/Chi | **Không lưu** — đăng nhập lại là đầy máu/Khí (sửa tài liệu theo code 2026-10-17, dòng 76(d) bảng chờ; trước đó dòng này ghi "như trên" nhưng không đường nào ghi máu) |
 | EXP/Level | Ghi khi thay đổi đáng kể hoặc định kỳ |
 | **Item, Gold, Trade** | ⚠️ **Ghi NGAY, trong transaction** — mất = mất tài sản thật của người chơi |
 | Quest progress | Ghi khi hoàn thành bước |
@@ -288,9 +288,19 @@ Không có bước này → mất toàn bộ dữ liệu chưa ghi ở §8.
 
 **Hiện thực** (`GatewayBootstrap.shutdownSequence`, chạy bởi shutdown hook `gateway-shutdown`):
 `ArenaInstanceRegistry.beginShutdown()` (từ đây rớt kết nối giữa trận là HUỶ trận, không ghi Elo —
-quyết định chủ dự án 2026-10-11) → `GatewayServer.stop()` (đóng cổng → `broadcastShuttingDown` → tắt
-Netty event loop, tức đóng mọi kết nối → tắt `authExecutor`) → `stopAll()` khu vực world chính → hầm ngục → Arena → registry nhân vật →
+quyết định chủ dự án 2026-10-11) → `GatewayServer.stop()` (đóng cổng → `broadcastShuttingDown` → **chờ
+30 s đếm ngược bảo trì** → tắt Netty event loop, tức đóng mọi kết nối → tắt `authExecutor`) → `stopAll()` khu vực world chính → hầm ngục → Arena → registry nhân vật →
 luồng lưu vị trí (`CharacterPositionPersister`) → máy chủ metrics → tracing → đóng DB.
+
+**Đếm ngược bảo trì là THẬT** (dòng 76(b), chủ dự án duyệt 2026-10-17). Trước đó bước 2 chỉ là lời hứa:
+code phát `ServerShuttingDownEvent` rồi đóng kết nối ngay. Nay sau lời báo, kết nối được giữ
+`KAGE_SHUTDOWN_NOTICE_SECONDS` giây (mặc định 30, dev đặt 0) — cổng đã đóng nên không ai vào thêm,
+người đang chơi vẫn được phục vụ bình thường. `stop_grace_period` của cả hai compose nới 60 → 90 s cho
+vừa. Gói không mang số giây (protocol đã chốt), câu báo client nói "khoảng 30 giây". Test:
+`GatewayServerIntegrationTest.shouldKeepServingPlayersDuringTheShutdownNotice_thenClose`.
+
+**`WorldFacade.stop()` chờ lần tick dở có trần 5 s** (dòng 56, 2026-10-17): một tick treo (vd script kẹt)
+từng kéo cả trình tự tắt treo theo tới SIGKILL. Quá trần thì đi tiếp kèm WARN.
 
 **Khởi động hỏng nay tắt sạch và THOÁT** (sửa 2026-10-03, `52bb46f`). Trước đó, mở cổng thất bại (cổng
 bị chiếm, chứng chỉ TLS hỏng) làm `main()` chết nhưng **JVM không bao giờ thoát**: luồng boss của Netty,
@@ -316,6 +326,10 @@ lần ghi vị trí (định kỳ, ngắt kết nối, tắt server) ghi chỗ n
 mỗi giây (`WorldOutboundSink.onCharacterPositionSampled`, `WorldConstants.POSITION_SAMPLE_RATE_HZ`);
 hầm ngục/đấu trường không báo (toạ độ instance không bao giờ thành vị trí thật). Còn mất nhiều nhất
 quãng đi của một giây. Test: `ServerShutdownMidPlayDatabaseTest`, `ConnectedCharacterRegistryPositionTest`.
+**Từ 2026-10-17 (dòng 76(a)) không mất gì nữa ở lúc ngắt kết nối/tắt server**: lệnh gỡ khỏi world chính
+mang `FinalPositionListener`, World báo vị trí thật đúng tick gỡ, gateway chờ mốc hàng đợi rồi lưu số
+đó (World đã dừng thì dùng mẫu 1 Hz). Mẫu 1 Hz vẫn là nguồn của lượt lưu định kỳ. Test:
+`GatewayServerIntegrationTest.shouldSaveWhereTheCharacterActuallyIs_whenServerShutsDownMidRun`.
 
 **`ArenaInstanceRegistry.stopAll()` dừng World NGOÀI khoá** (sửa 2026-10-10). Bản cũ gọi `stop()` —
 chờ lần tick dở — khi đang giữ monitor của registry, còn lần tick đó nếu vừa có người gục thì xin đúng

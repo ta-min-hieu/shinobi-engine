@@ -1,5 +1,6 @@
 package dev.kage.server.world;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -10,6 +11,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.random.RandomGenerator;
@@ -68,10 +70,14 @@ public final class WorldFacade {
 
     private static final Logger LOG = LoggerFactory.getLogger(WorldFacade.class);
 
+    /** Trần chờ lần tick dở dang lúc {@link #stop()} — xem {@link #awaitTickInProgress}. */
+    private static final Duration STOP_TICK_WAIT = Duration.ofSeconds(5);
+
     private static final ComponentMapper<PositionComponent> POSITION = ComponentMapper.getFor(PositionComponent.class);
     private static final ComponentMapper<VelocityComponent> VELOCITY = ComponentMapper.getFor(VelocityComponent.class);
     private static final ComponentMapper<TargetComponent> TARGET = ComponentMapper.getFor(TargetComponent.class);
     private static final ComponentMapper<MonsterComponent> MONSTER = ComponentMapper.getFor(MonsterComponent.class);
+    private static final ComponentMapper<BossAiComponent> BOSS_AI = ComponentMapper.getFor(BossAiComponent.class);
     private static final ComponentMapper<SkillCooldownComponent> SKILL_COOLDOWN =
             ComponentMapper.getFor(SkillCooldownComponent.class);
     private static final ComponentMapper<CombatStatsComponent> COMBAT_STATS =
@@ -256,6 +262,7 @@ public final class WorldFacade {
     // không bao giờ bị tranh chấp lúc chạy bình thường — chỉ dùng để stop() CHỜ ĐÚNG lần tick đang
     // chạy dở (nếu có) xong hẳn trước khi trả về, mirror lại đúng ngữ nghĩa "interrupt + join" cũ.
     private final Lock tickLock = new ReentrantLock();
+    private volatile Duration stopTickWait = STOP_TICK_WAIT;
     private boolean contentSpawned;
     private long fixedDtNanos;
     private final boolean spawnOverworldContent;
@@ -388,19 +395,7 @@ public final class WorldFacade {
         // Vận tốc nhân vật theo stun/slow/buff HIỆN HÀNH — phải trước MovementSystem (2026-10-02).
         ecsWorld.addSystem(new CharacterLocomotionSystem());
         ecsWorld.addSystem(new MovementSystem());
-        // Trục dọc (ADR-033) — chạy ngay sau MovementSystem (ngang), TRƯỚC TerrainCollisionSystem,
-        // cùng nhóm "áp chuyển động" của tick trước khi xử va chạm. World chính (spawnOverworldContent)
-        // nạp DEMO_PLATFORMS để chủ dự án tự test nhảy được — dungeon/arena vẫn RỖNG (chưa có map
-        // pilot thật, ADR-033 #7), no-op an toàn ở đó (mọi entity rơi về z=0 phẳng như trước).
-        VerticalMovementSystem verticalMovementSystem = new VerticalMovementSystem(WorldConstants.GRAVITY_MPS2);
-        if (spawnOverworldContent) {
-            verticalMovementSystem.setPlatforms(DEMO_PLATFORMS);
-        }
-        ecsWorld.addSystem(verticalMovementSystem);
-        // Obstacle mặc định RỖNG — chưa có map/asset thật (ADR-021). No-op an toàn cho tới khi có
-        // nguồn map thật gọi setObstacles(...); giữ đúng thứ tự PHYSICS.md §4 (sau MovementSystem).
-        ecsWorld.addSystem(new TerrainCollisionSystem());
-        ecsWorld.addSystem(newSafeZoneSystem(wiring.content().safeZones()));
+        addPositionSystems(wiring.content().safeZones());
         ecsWorld.addSystem(combatSystem);
         ecsWorld.addSystem(skillSystem);
         ecsWorld.addSystem(bossAiSystem);
@@ -414,6 +409,30 @@ public final class WorldFacade {
         ecsWorld.addSystem(healthRegenSystem);
     }
 
+    /**
+     * Nhóm System "áp chuyển động rồi xử vị trí" chạy ngay sau {@code MovementSystem} — tách khỏi
+     * constructor vì Checkstyle {@code MethodLength}. Thứ tự bên trong giữ nguyên PHYSICS.md §4.
+     */
+    private void addPositionSystems(SafeZoneCatalogSnapshot safeZones) {
+        // Trục dọc (ADR-033) — chạy ngay sau MovementSystem (ngang), TRƯỚC TerrainCollisionSystem,
+        // cùng nhóm "áp chuyển động" của tick trước khi xử va chạm. World chính (spawnOverworldContent)
+        // nạp DEMO_PLATFORMS để chủ dự án tự test nhảy được — dungeon/arena vẫn RỖNG (chưa có map
+        // pilot thật, ADR-033 #7), no-op an toàn ở đó (mọi entity rơi về z=0 phẳng như trước).
+        VerticalMovementSystem verticalMovementSystem = new VerticalMovementSystem(WorldConstants.GRAVITY_MPS2);
+        if (spawnOverworldContent) {
+            verticalMovementSystem.setPlatforms(DEMO_PLATFORMS);
+        }
+        ecsWorld.addSystem(verticalMovementSystem);
+        // Obstacle mặc định RỖNG — chưa có map/asset thật (ADR-021). No-op an toàn cho tới khi có
+        // nguồn map thật gọi setObstacles(...); giữ đúng thứ tự PHYSICS.md §4 (sau MovementSystem).
+        ecsWorld.addSystem(new TerrainCollisionSystem());
+        // Biên trục X chỉ ở world chính (dòng 67(c)) — sau mọi hệ áp chuyển động, trước mọi hệ đọc vị trí.
+        if (spawnOverworldContent) {
+            ecsWorld.addSystem(new MainWorldBoundsSystem());
+        }
+        ecsWorld.addSystem(newSafeZoneSystem(safeZones));
+    }
+
     /** Bắt đầu lịch tick trên {@link WorldTickScheduler} — gọi 1 lần lúc khởi động server. */
     public void start() {
         running = true;
@@ -422,23 +441,48 @@ public final class WorldFacade {
     }
 
     /** Dừng tick (SERVER.md §10 — graceful shutdown, không {@code kill -9}). */
-    // LockNotBeforeTry: lock() rồi unlock() NGAY là cố ý — không có đoạn găng nào để bọc try/finally,
-    // chỉ dùng khoá làm điểm CHỜ lần tick dở dang (xem comment trong thân hàm).
-    @SuppressWarnings("LockNotBeforeTry")
     public void stop() {
         stopRequested = true;
         running = false;
         if (tickFuture != null) {
             tickFuture.cancel(false);
-            // Khoá rồi nhả ngay: nếu 1 lần tick đang chạy dở (giữ tickLock trong tickTask), dòng
-            // này CHẶN tới khi lần đó xong hẳn — đảm bảo stop() chỉ trả về sau khi World đã dừng
-            // tick THẬT SỰ, đúng ngữ nghĩa đồng bộ mà ArenaInstanceRegistry/DungeonInstanceRegistry
-            // đang phụ thuộc (gọi stop() rồi coi World là đã ngừng hẳn ngay sau đó).
-            tickLock.lock();
-            tickLock.unlock();
+            awaitTickInProgress();
         }
         completePendingBarriers();
         stopped.complete(null);
+    }
+
+    /**
+     * Chờ lần tick đang chạy dở (nếu có) xong hẳn — đảm bảo {@link #stop()} chỉ trả về sau khi World
+     * đã dừng tick THẬT SỰ, đúng ngữ nghĩa đồng bộ mà ArenaInstanceRegistry/DungeonInstanceRegistry
+     * đang phụ thuộc (gọi stop() rồi coi World là đã ngừng hẳn ngay sau đó).
+     *
+     * <p><b>Có trần</b> (dòng 56, chủ dự án duyệt 2026-10-17): một tick treo — vd script kẹt — từng làm
+     * cả trình tự tắt treo theo tới khi Docker giết tiến trình sau {@code stop_grace_period}. Quá
+     * {@link #stopTickWait} thì đi tiếp kèm WARN: lần tick treo đó có thể còn phát gói muộn, nhưng
+     * phần còn lại của trình tự tắt (lưu vị trí, đóng DB) quan trọng hơn.
+     */
+    // LockNotBeforeTry: khoá rồi nhả NGAY là cố ý — không có đoạn găng nào để bọc try/finally, chỉ dùng
+    // khoá làm điểm CHỜ lần tick dở dang.
+    @SuppressWarnings("LockNotBeforeTry")
+    private void awaitTickInProgress() {
+        try {
+            if (tickLock.tryLock(stopTickWait.toNanos(), TimeUnit.NANOSECONDS)) {
+                tickLock.unlock();
+                return;
+            }
+            LOG.warn(
+                    "World.stop(): lần tick đang chạy chưa xong sau {}ms — dừng tiếp, không chờ nữa",
+                    stopTickWait.toMillis());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOG.warn("World.stop() bị ngắt khi chờ lần tick đang chạy — dừng tiếp, không chờ nữa", e);
+        }
+    }
+
+    /** Đổi trần chờ của {@link #awaitTickInProgress} — chỉ cho test (mặc định {@link #STOP_TICK_WAIT}). */
+    void stopTickWait(Duration wait) {
+        this.stopTickWait = wait;
     }
 
     /**
@@ -518,7 +562,15 @@ public final class WorldFacade {
     }
 
     public void detachCharacter(long characterId) {
-        inbox.add(new WorldCommand.DetachCharacterCommand(characterId));
+        detachCharacter(characterId, FinalPositionListener.NONE);
+    }
+
+    /**
+     * Gỡ nhân vật và báo vị trí thật của nó lúc gỡ cho {@code finalPosition} — gọi trên tick thread,
+     * xem {@link FinalPositionListener}. Gateway dùng khi ngắt kết nối để lưu đúng chỗ đang đứng.
+     */
+    public void detachCharacter(long characterId, FinalPositionListener finalPosition) {
+        inbox.add(new WorldCommand.DetachCharacterCommand(characterId, finalPosition));
     }
 
     public void enqueueMoveCommand(long characterId, int sequenceId, float dirX, float dirY) {
@@ -837,7 +889,7 @@ public final class WorldFacade {
         while ((command = inbox.poll()) != null) {
             switch (command) {
                 case WorldCommand.AttachCharacterCommand c -> handleAttach(c.entry());
-                case WorldCommand.DetachCharacterCommand c -> handleDetach(c.characterId());
+                case WorldCommand.DetachCharacterCommand c -> handleDetach(c.characterId(), c.finalPosition());
                 case WorldCommand.MoveIntentCommand c -> handleMoveIntent(c);
                 case WorldCommand.JumpIntentCommand c -> handleJumpIntent(c);
                 case WorldCommand.SetTargetCommand c -> handleSetTarget(c.characterId(), c.targetEntityId());
@@ -926,7 +978,7 @@ public final class WorldFacade {
         return skillCooldown;
     }
 
-    private void handleDetach(long characterId) {
+    private void handleDetach(long characterId, FinalPositionListener finalPosition) {
         // Máu đổi bởi lệnh xếp TRƯỚC lệnh rời này (đan dược, đổi trang bị) bình thường chỉ phát sau
         // ecsWorld.update(). Phát NGAY, theo đúng thứ tự lệnh (sửa 2026-10-04, WorldSimulationPropertyTest):
         // không thì người rời — mà gateway có thể đã đăng ký phiên mới ngay khi inboxBarrier xong — vẫn
@@ -937,6 +989,8 @@ public final class WorldFacade {
         if (entity == null) {
             return;
         }
+        PositionComponent position = POSITION.get(entity);
+        finalPosition.onFinalPosition(position.x, position.y);
         aoiTracker.onDetach(characterId);
         if (SKILL_COOLDOWN.has(entity)) {
             skillCooldownLedger.remember(characterId, SKILL_COOLDOWN.get(entity).remainingSeconds);
@@ -1766,12 +1820,7 @@ public final class WorldFacade {
     private void spawnBossEntity(String bossCode) {
         MonsterCatalogSnapshot.MonsterSpecies loai =
                 monsterCatalog.find(bossCode).orElse(null);
-        if (loai == null || !loai.isBoss()) {
-            LOG.error(
-                    "Không spawn được boss '{}': {} — kiểm monster_template.is_boss/ai_script_ref và"
-                            + " catalog truyền vào World này",
-                    bossCode,
-                    loai == null ? "không có trong catalog" : "loài này không phải boss");
+        if (bossSpawnRefused(bossCode, loai)) {
             return;
         }
         KEntity entity = ecsWorld.createEntity();
@@ -1807,6 +1856,37 @@ public final class WorldFacade {
         entitiesByMonsterId.put(monsterId, entity);
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
         // không cần thông báo thủ công (giống hệt spawnMonster).
+    }
+
+    /** Lệnh spawn boss phải bỏ không — mã sai/không phải boss, hoặc đã có một con sống (dòng 67(e)). */
+    private boolean bossSpawnRefused(String bossCode, MonsterCatalogSnapshot.MonsterSpecies loai) {
+        if (loai == null || !loai.isBoss()) {
+            LOG.error(
+                    "Không spawn được boss '{}': {} — kiểm monster_template.is_boss/ai_script_ref và"
+                            + " catalog truyền vào World này",
+                    bossCode,
+                    loai == null ? "không có trong catalog" : "loài này không phải boss");
+            return true;
+        }
+        if (isBossAlive(bossCode)) {
+            // Trần một con mỗi mã mỗi World (dòng 67(e), chủ dự án duyệt 2026-10-17) — bản chạy dài từng
+            // thấy 6 boss dồn một chỗ ở cùng điểm spawn, cộng dồn sát thương lên người vào sau.
+            LOG.warn("Bỏ lệnh spawn boss '{}': World này đã có một con còn sống", bossCode);
+            return true;
+        }
+        return false;
+    }
+
+    /** World này đang có một boss mã {@code bossCode} chưa chết không — xem {@link #spawnBossEntity}. */
+    private boolean isBossAlive(String bossCode) {
+        for (KEntity monster : entitiesByMonsterId.values()) {
+            if (BOSS_AI.has(monster)
+                    && bossCode.equals(MONSTER.get(monster).monsterCode)
+                    && !HEALTH.get(monster).isDead()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

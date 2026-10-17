@@ -49,11 +49,12 @@ services:
     build:
       context: ../..
       dockerfile: deploy/docker/server.Dockerfile
-    # Graceful shutdown (SERVER.md §10) cần nhiều hơn 10s mặc định của Docker trong ca xấu: event
-    # loop ≤5s + auth/lưu vị trí logout ≤10s + persister ≤5s + thưởng hạ quái ≤10s + Hikari đóng pool
-    # (≤10s, nó ABORT connection còn mượn chứ không chờ). Hết hạn là SIGKILL — chính các lượt ghi
-    # đang chờ đó bị cắt.
-    stop_grace_period: 60s
+    # Graceful shutdown (SERVER.md §10) cần nhiều hơn 10s mặc định của Docker trong ca xấu: đếm ngược
+    # bảo trì 30s (KAGE_SHUTDOWN_NOTICE_SECONDS, dòng 76(b) 2026-10-17) + event loop ≤5s + auth/lưu vị
+    # trí logout ≤10s + persister ≤5s + thưởng hạ quái ≤10s + Hikari đóng pool (≤10s, nó ABORT
+    # connection còn mượn chứ không chờ). Hết hạn là SIGKILL — chính các lượt ghi đang chờ đó bị cắt.
+    # Đổi KAGE_SHUTDOWN_NOTICE_SECONDS thì đổi số này theo (giữ ≥ đếm ngược + 60s).
+    stop_grace_period: 90s
     depends_on:
       postgres: { condition: service_healthy }
       cache:    { condition: service_healthy }

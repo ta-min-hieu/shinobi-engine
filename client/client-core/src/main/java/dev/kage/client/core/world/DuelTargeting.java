@@ -3,6 +3,9 @@ package dev.kage.client.core.world;
 import java.util.function.LongConsumer;
 import java.util.function.LongPredicate;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import dev.kage.protocol.WorldKind;
 
 /**
@@ -33,7 +36,12 @@ import dev.kage.protocol.WorldKind;
  */
 final class DuelTargeting implements DuelCoordinator.DuelListener {
 
+    private static final Logger LOG = LoggerFactory.getLogger(DuelTargeting.class);
+
     private static final long NO_OPPONENT = 0L;
+
+    /** Id thật của chính người chơi — để nhận ra một {@code DuelStartedEvent} báo đối thủ là mình. */
+    private final long localCharacterId;
 
     private final CombatHudController combat;
     private final LongPredicate characterVisible;
@@ -51,8 +59,14 @@ final class DuelTargeting implements DuelCoordinator.DuelListener {
      * @param combat nơi giữ mục tiêu hiện tại của HUD
      * @param characterVisible nhân vật đó có đang trên màn hình không ({@code RemoteCharacterPresenter#isPresent})
      * @param setTargetSender gửi {@code SetTargetCommand} ({@code WorldCommandSender#setTarget})
+     * @param localCharacterId id thật của chính người chơi
      */
-    DuelTargeting(CombatHudController combat, LongPredicate characterVisible, LongConsumer setTargetSender) {
+    DuelTargeting(
+            CombatHudController combat,
+            LongPredicate characterVisible,
+            LongConsumer setTargetSender,
+            long localCharacterId) {
+        this.localCharacterId = localCharacterId;
         this.combat = combat;
         this.characterVisible = characterVisible;
         this.setTargetSender = setTargetSender;
@@ -61,6 +75,14 @@ final class DuelTargeting implements DuelCoordinator.DuelListener {
     /** {@code DuelStartedEvent} — server vừa nói đối thủ là ai. */
     @Override
     public void onDuelStarted(long opponentCharacterId, String opponentDisplayName) {
+        if (opponentCharacterId == localCharacterId) {
+            // Server không bao giờ được ghép một người với chính họ — gói như vậy là lỗi phía server.
+            // Trước 2026-10-17 (dòng 67(b)) nó bị bỏ lặng lẽ: không nhắm ai, không dấu vết gì để lần ra.
+            LOG.warn(
+                    "DuelStartedEvent báo đối thủ là chính mình (characterId={}) — bỏ qua, không nhắm",
+                    opponentCharacterId);
+            return;
+        }
         this.opponentId = opponentCharacterId;
         this.opponentDisplayName = opponentDisplayName;
         targetOpponentIfReady();

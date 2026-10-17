@@ -1005,9 +1005,10 @@ class GatewayServerIntegrationTest {
             }
 
             private void upsert(long characterId, int newRating, int winsDelta, int lossesDelta) {
-                dev.kage.pvp.domain.PvpRating existing = ratingsByCharacterId.get(characterId);
-                int wins = (existing == null ? 0 : existing.wins()) + winsDelta;
-                int losses = (existing == null ? 0 : existing.losses()) + lossesDelta;
+                Optional<dev.kage.pvp.domain.PvpRating> existing =
+                        Optional.ofNullable(ratingsByCharacterId.get(characterId));
+                int wins = existing.map(dev.kage.pvp.domain.PvpRating::wins).orElse(0) + winsDelta;
+                int losses = existing.map(dev.kage.pvp.domain.PvpRating::losses).orElse(0) + lossesDelta;
                 ratingsByCharacterId.put(
                         characterId,
                         new dev.kage.pvp.domain.PvpRating(characterId, newRating, wins, losses, Instant.now()));
@@ -1054,6 +1055,53 @@ class GatewayServerIntegrationTest {
 
             PositionSnapshot savedPosition = characterPort.loadPosition(characterId);
             assertThat(savedPosition.x()).isEqualTo(stopResponse.getX());
+        }
+    }
+
+    /**
+     * Dòng 76(a) + 76(b) (2026-10-17), một kịch bản tắt server khi nhân vật ĐANG CHẠY:
+     * <ul>
+     *   <li>lời báo bảo trì đi TRƯỚC khi đóng kết nối một khoảng, trong lúc đó người chơi vẫn được phục
+     *       vụ (trước đó server báo rồi đóng ngay);
+     *   <li>vị trí lưu là chỗ nhân vật đứng lúc World gỡ nó — không phải chỗ bấm phím lần cuối, cũng
+     *       không phải mẫu 1 Hz gần nhất.
+     * </ul>
+     * Gộp một test vì lớp này đã sát trần độ phức tạp PMD tính cho cả lớp.
+     */
+    @Test
+    @Timeout(20)
+    void shouldServeThroughTheShutdownNotice_thenSaveWhereTheRunningCharacterActuallyIs() throws Exception {
+        server.shutdownNotice(Duration.ofMillis(800));
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
+            socket.setSoTimeout(5000);
+            DataInputStream in = new DataInputStream(socket.getInputStream());
+            long characterId = connectCreateAndSelect(socket, in, "noticetest");
+            MoveCommand moveCommand =
+                    MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
+            sendFrame(socket, Opcode.OPCODE_MOVE_COMMAND_VALUE, 10, moveCommand.toByteArray());
+            MoveResponse started = MoveResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_MOVE_RESPONSE_VALUE).payload());
+
+            Thread stopper = Thread.ofPlatform().start(server::stop);
+            readUntilOpcode(in, Opcode.OPCODE_SERVER_SHUTTING_DOWN_EVENT_VALUE);
+            long noticedAt = System.nanoTime();
+            sendPing(socket, 99, 7L);
+            PongResponse pong = PongResponse.parseFrom(
+                    readUntilOpcode(in, Opcode.OPCODE_PONG_VALUE).payload());
+            assertThat(pong.getClientTimestampMs())
+                    .as("vẫn được phục vụ sau lời báo")
+                    .isEqualTo(7L);
+
+            in.readAllBytes(); // tới khi server đóng kết nối
+            assertThat(Duration.ofNanos(System.nanoTime() - noticedAt).toMillis())
+                    .as("kết nối sống qua đếm ngược")
+                    .isGreaterThanOrEqualTo(600L);
+            stopper.join(Duration.ofSeconds(10));
+
+            PositionSnapshot savedPosition = characterPort.loadPosition(characterId);
+            assertThat(savedPosition.x())
+                    .as("vẫn giữ phím từ lần bấm ở x=%s tới lúc bị ngắt", started.getX())
+                    .isGreaterThan(started.getX() + 0.5f);
         }
     }
 
@@ -1774,8 +1822,9 @@ class GatewayServerIntegrationTest {
             assertThat(respawnedIds).containsExactlyInAnyOrder(characterA, characterB);
 
             long winnerCharacterId = resultForA.getWinnerCharacterId();
-            Socket winnerSocket = winnerCharacterId == characterA ? socketA : socketB;
-            DataInputStream winnerIn = winnerCharacterId == characterA ? inA : inB;
+            int winner = winnerCharacterId == characterA ? 0 : 1;
+            Socket winnerSocket = List.of(socketA, socketB).get(winner);
+            DataInputStream winnerIn = List.of(inA, inB).get(winner);
             GetPvpRatingRequest ratingRequest = GetPvpRatingRequest.newBuilder().build();
             sendFrame(winnerSocket, Opcode.OPCODE_GET_PVP_RATING_REQUEST_VALUE, 43, ratingRequest.toByteArray());
             GetPvpRatingResponse ratingResponse = GetPvpRatingResponse.parseFrom(

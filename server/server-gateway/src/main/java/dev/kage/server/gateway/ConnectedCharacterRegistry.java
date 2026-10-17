@@ -81,6 +81,8 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     private final CharacterSessionRegistry sessions = new CharacterSessionRegistry();
     // Trần chat theo tài khoản — ở đây cùng lý do với sessions: phải sống LÂU HƠN một kết nối.
     private final ChatRateLimits chatRateLimits = new ChatRateLimits();
+    // Trần kết nối/đăng nhập theo IP (dòng 71(a)) — cùng lý do: một IP sống lâu hơn mọi kết nối của nó.
+    private final IpAdmission ipAdmission = IpAdmission.fromEnvironment();
     // Cú lên cấp phải tới cả World nhân vật đang đứng — nối sau, khi các World đã dựng (GatewayBootstrap).
     private volatile CharacterLevelSync levelSync = CharacterLevelSync.unbound();
     // Đồng đội nào được chia một cú hạ quái — nối sau, cùng lý do với levelSync.
@@ -179,6 +181,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** Trần tần suất chat của mọi tài khoản — xem {@link ChatRateLimits}. */
     ChatRateLimits chatRateLimits() {
         return chatRateLimits;
+    }
+
+    /** Trần kết nối/đăng nhập theo IP — xem {@link IpAdmission}. */
+    IpAdmission ipAdmission() {
+        return ipAdmission;
     }
 
     /**

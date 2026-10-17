@@ -1,6 +1,8 @@
 package dev.kage.client.core.world;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.badlogic.gdx.Gdx;
@@ -43,6 +45,16 @@ final class NpcPresenter {
     private final WorldModelRenderer models;
     private final Map<Long, NpcState> npcs = new HashMap<>();
 
+    /**
+     * Cùng nội dung với {@link #npcs}, dạng danh sách duyệt bằng chỉ số — cho {@link #sync}/{@link #render}
+     * chạy MỖI KHUNG. Duyệt {@code HashMap} cấp một iterator mỗi lần (32 B/khung, dòng 57 — chủ dự án
+     * duyệt gỡ 2026-10-17); danh sách chỉ đổi lúc spawn/despawn.
+     */
+    private final List<Placed> placed = new ArrayList<>();
+
+    /** Một NPC đang hiển thị kèm id của nó — phần tử của {@link #placed}. */
+    private record Placed(long npcId, NpcState state) {}
+
     NpcPresenter(WorldModelRenderer models) {
         this.models = models;
     }
@@ -51,13 +63,21 @@ final class NpcPresenter {
         if (!MalformedPacket.accepts(event)) {
             return; // id sai không gian hoặc toạ độ NaN/vô cực — xem MalformedPacket.
         }
-        npcs.put(event.getNpcId(), new NpcState(event.getNpcCode(), event.getX(), event.getY()));
+        NpcState state = new NpcState(event.getNpcCode(), event.getX(), event.getY());
+        npcs.put(event.getNpcId(), state);
+        removePlaced(event.getNpcId());
+        placed.add(new Placed(event.getNpcId(), state));
         models.addMonsterOrNpc(event.getNpcId(), NpcModelKey.of(event.getNpcCode()));
     }
 
     void onDespawned(long npcId) {
         npcs.remove(npcId);
+        removePlaced(npcId);
         models.remove(npcId);
+    }
+
+    private void removePlaced(long npcId) {
+        placed.removeIf(entry -> entry.npcId() == npcId);
     }
 
     /**
@@ -70,6 +90,7 @@ final class NpcPresenter {
             models.remove(npcId);
         }
         npcs.clear();
+        placed.clear();
     }
 
     /** Kho NPC đang hiển thị — cho {@link WorldEntityPicker} bắt click, chỉ đọc. */
@@ -86,12 +107,13 @@ final class NpcPresenter {
      * khi người chơi đi vòng qua nó thì trông hỏng ngay.
      */
     void sync(float playerX) {
-        for (Map.Entry<Long, NpcState> entry : npcs.entrySet()) {
-            long npcId = entry.getKey();
+        // Index loop — không iterator, không đóng hộp id (xem placed).
+        for (int i = 0; i < placed.size(); i++) {
+            long npcId = placed.get(i).npcId();
             if (!models.hasModel(npcId)) {
                 continue;
             }
-            NpcState npc = entry.getValue();
+            NpcState npc = placed.get(i).state();
             models.setPosition(npcId, npc.x(), npc.y(), 0f);
             models.setFacingRight(npcId, playerX > npc.x());
         }
@@ -112,11 +134,11 @@ final class NpcPresenter {
         // Xanh ngọc, không đỏ như quái — màu là thứ đầu tiên người chơi đọc được ở khoảng cách xa, và
         // "đánh được hay nói chuyện được" là phân biệt đáng để đọc ngay.
         shapeRenderer.setColor(Color.TEAL);
-        for (Map.Entry<Long, NpcState> entry : npcs.entrySet()) {
-            if (models.hasModel(entry.getKey())) {
+        for (int i = 0; i < placed.size(); i++) {
+            if (models.hasModel(placed.get(i).npcId())) {
                 continue; // Đã có model 3D thật — vẽ thêm hộp là chồng một khối đặc lên chính nó.
             }
-            NpcState npc = entry.getValue();
+            NpcState npc = placed.get(i).state();
             shapeRenderer.box(
                     npc.x() - (BOX_WIDTH_UNITS / 2f),
                     npc.y() - (BOX_WIDTH_UNITS / 2f),

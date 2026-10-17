@@ -132,8 +132,12 @@ class FriendWireTest {
         }
     }
 
+    /**
+     * Mời ngược chiều một lời mời đang treo là CHẤP NHẬN nó (dòng 71(c), 2026-10-17) — trước đó Bob nhận
+     * {@code REQUEST_ALREADY_PENDING} và lời mời của Alice nằm lại. Không đẻ dòng thứ hai.
+     */
     @Test
-    void shouldRefuseSelfRequests_andKeepOnePendingRow_whenBothSidesInvite() throws InvalidProtocolBufferException {
+    void shouldRefuseSelfRequests_andMakeFriends_whenBothSidesInvite() throws InvalidProtocolBufferException {
         EmbeddedChannel alice = enterWorld("selfalice", "Alice");
         EmbeddedChannel bob = enterWorld("selfbob", "Bob");
 
@@ -143,11 +147,15 @@ class FriendWireTest {
         assertThat(sendRequest(alice, "Bob"))
                 .isEqualTo(SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_REQUEST_ALREADY_PENDING);
         assertThat(sendRequest(bob, "Alice"))
-                .as("mời ngược chiều khi đã có lời mời treo")
-                .isEqualTo(SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_REQUEST_ALREADY_PENDING);
+                .as("mời ngược chiều khi đã có lời mời treo ⇒ thành bạn")
+                .isEqualTo(SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_ALREADY_FRIENDS);
 
-        assertThat(listPending(bob).getRequestsList()).hasSize(1);
+        assertThat(listPending(bob).getRequestsList()).isEmpty();
         assertThat(listPending(alice).getRequestsList()).isEmpty();
+        assertThat(listFriends(alice).getFriendsList()).hasSize(1);
+        assertThat(listFriends(bob).getFriendsList()).hasSize(1);
+        assertThat(sendRequest(bob, "Alice"))
+                .isEqualTo(SendFriendRequestOutcome.SEND_FRIEND_REQUEST_OUTCOME_ALREADY_FRIENDS);
     }
 
     // Tên độc không bao giờ được tới tầng DB (Postgres nổ với U+0000) hay thành lỗi 500 — mọi tên

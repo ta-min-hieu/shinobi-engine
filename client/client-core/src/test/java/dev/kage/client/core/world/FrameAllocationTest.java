@@ -86,7 +86,7 @@ class FrameAllocationTest {
     /**
      * Trần cho đường còn phụ thuộc JIT — xem {@link #constantSmallAllocationPaths}. Đo thật
      * 2026-10-03: 0 (quái), 32 (NPC — iterator {@code HashMap}), 24 (HUD — một {@code Long} của
-     * {@code targetState()}).
+     * {@code targetState()}). NPC và HUD về 0 từ 2026-10-17 — xem {@link #npcSyncAndHudReads_areAllocationFree}.
      */
     private static final long JIT_DEPENDENT_LIMIT_BYTES = 64L;
 
@@ -171,10 +171,19 @@ class FrameAllocationTest {
         assertThat(measure("baseline (empty)", () -> {})).isZero();
         assertThat(measure("MonsterPresenter.sync", () -> monsterPresenter.sync(combatHud.monsters(), PLAYER_X)))
                 .isLessThanOrEqualTo(JIT_DEPENDENT_LIMIT_BYTES);
+    }
+
+    /**
+     * Dòng 57 (chủ dự án duyệt 2026-10-17): NPC duyệt danh sách bằng chỉ số thay vì iterator
+     * {@code HashMap} (từng 32 B), HUD tra mục tiêu bằng khoá đã đóng hộp sẵn thay vì đóng hộp một
+     * {@code Long} mỗi khung (từng 24 B) — cả hai nay không phụ thuộc JIT, nên ngưỡng là đúng 0.
+     */
+    @Test
+    void npcSyncAndHudReads_areAllocationFree() {
         assertThat(measure("NpcPresenter.sync", () -> npcPresenter.sync(PLAYER_X)))
-                .isLessThanOrEqualTo(JIT_DEPENDENT_LIMIT_BYTES);
+                .isZero();
         assertThat(measure("CombatHudController (tick + HUD reads)", this::combatHudFrame))
-                .isLessThanOrEqualTo(JIT_DEPENDENT_LIMIT_BYTES);
+                .isZero();
     }
 
     /**

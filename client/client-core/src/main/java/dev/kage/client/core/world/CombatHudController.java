@@ -90,6 +90,9 @@ final class CombatHudController {
      */
     private long currentTargetId;
 
+    /** {@link #currentTargetId} đã đóng hộp ({@code null} khi không nhắm ai) — xem {@link #targetState()}. */
+    private Long currentTargetKey;
+
     /** Nhân vật khác đang thấy — xem {@link #bindCharacterPositions}. Rỗng tới khi được nối. */
     private Map<Long, ? extends PickablePoint> characterPositions = Map.of();
 
@@ -143,7 +146,7 @@ final class CombatHudController {
      */
     void clearMonsters() {
         monsters.clear();
-        currentTargetId = 0L;
+        setCurrentTarget(0L);
     }
 
     /**
@@ -167,7 +170,7 @@ final class CombatHudController {
                         MalformedPacket.clampPoints(event.getCurrentHp(), event.getMaxHp()),
                         event.getMaxHp()));
         if (currentTargetId == 0L) {
-            currentTargetId = event.getMonsterId();
+            setCurrentTarget(event.getMonsterId());
             return currentTargetId;
         }
         return 0L;
@@ -185,14 +188,14 @@ final class CombatHudController {
         if (!monsters.containsKey(monsterId) || currentTargetId == monsterId) {
             return false;
         }
-        currentTargetId = monsterId;
+        setCurrentTarget(monsterId);
         return true;
     }
 
     void onMonsterDespawned(MonsterDespawnedEvent event) {
         monsters.remove(event.getMonsterId());
         if (currentTargetId == event.getMonsterId()) {
-            currentTargetId = 0L;
+            setCurrentTarget(0L);
         }
     }
 
@@ -289,7 +292,7 @@ final class CombatHudController {
         if (died) {
             monsters.remove(targetEntityId);
             if (currentTargetId == targetEntityId) {
-                currentTargetId = 0L;
+                setCurrentTarget(0L);
             }
             return;
         }
@@ -371,7 +374,7 @@ final class CombatHudController {
         playerChi = MalformedPacket.clampPoints(currentChi, CombatConstants.CHARACTER_MAX_CHI);
         // Khí vừa lấy THẲNG của server — lần bấm đang chờ (nếu có) không còn gì để trả lại.
         castAwaitingConfirmation = false;
-        currentTargetId = 0L;
+        setCurrentTarget(0L);
     }
 
     /**
@@ -454,7 +457,15 @@ final class CombatHudController {
     }
 
     MonsterState targetState() {
-        return monsters.get(currentTargetId);
+        // Tra bằng khoá đã đóng hộp sẵn — gọi MỖI KHUNG (TargetHudSync), và monsters.get(long) đóng hộp
+        // một Long mới mỗi lần (id quái âm, ngoài vùng cache của Long.valueOf): 24 B/khung (dòng 57).
+        return currentTargetKey == null ? null : monsters.get(currentTargetKey);
+    }
+
+    /** Đổi mục tiêu — giữ {@link #currentTargetKey} khớp {@link #currentTargetId}, đóng hộp đúng một lần. */
+    private void setCurrentTarget(long targetId) {
+        currentTargetId = targetId;
+        currentTargetKey = targetId == 0L ? null : Long.valueOf(targetId);
     }
 
     /**
@@ -497,7 +508,7 @@ final class CombatHudController {
                 || !characterPositions.containsKey(characterId)) {
             return false;
         }
-        currentTargetId = characterId;
+        setCurrentTarget(characterId);
         characterTargetName = displayName;
         characterTargetHp = UNKNOWN_HP;
         characterTargetMaxHp = UNKNOWN_HP;
@@ -512,7 +523,7 @@ final class CombatHudController {
     /** Bỏ mục tiêu nếu (và chỉ nếu) đang nhắm đúng nhân vật này — hết trận, đối thủ biến mất. */
     void clearCharacterTarget(long characterId) {
         if (characterId > 0L && currentTargetId == characterId) {
-            currentTargetId = 0L;
+            setCurrentTarget(0L);
         }
     }
 

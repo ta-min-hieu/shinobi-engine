@@ -101,9 +101,72 @@ class WorldInboxBarrierTest {
         }
     }
 
+    /**
+     * Dòng 56 (2026-10-17): một tick treo không được kéo cả trình tự tắt treo theo — quá trần chờ thì
+     * {@code stop()} đi tiếp, và mọi mốc chặn đang chờ vẫn xong.
+     */
+    @Test
+    void stopShouldGiveUpWaitingForAHungTick_afterItsLimit() throws Exception {
+        CountDownLatch tickBlocked = new CountDownLatch(1);
+        CountDownLatch releaseTick = new CountDownLatch(1);
+        WorldFacade world = new WorldFacade(new MoveRecordingSink(new CopyOnWriteArrayList<>(), () -> {
+            tickBlocked.countDown();
+            awaitQuietly(releaseTick);
+        }));
+        world.stopTickWait(java.time.Duration.ofMillis(200));
+        world.start();
+        world.attachCharacter(CHARACTER_ID, 0f, 0f, DEFAULT_STATS);
+        world.enqueueMoveCommand(CHARACTER_ID, 1, 1f, 0f);
+        assertThat(tickBlocked.await(5, TimeUnit.SECONDS)).isTrue();
+        try {
+            long start = System.nanoTime();
+            world.stop();
+            long waitedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+
+            assertThat(waitedMillis).as("chờ đúng trần rồi đi tiếp").isBetween(150L, 3_000L);
+            assertThat(world.inboxBarrier()).isDone();
+        } finally {
+            releaseTick.countDown();
+        }
+    }
+
+    /**
+     * Dòng 76(a) (2026-10-17): lệnh gỡ báo vị trí THẬT lúc gỡ — gateway lưu nó thay cho mẫu 1 Hz, nên
+     * rớt mạng giữa lúc chạy không còn lùi tới ~5 m.
+     */
+    @Test
+    void detachShouldReportTheCharactersActualPositionAtThatTick() throws Exception {
+        WorldFacade world = new WorldFacade(new MoveRecordingSink(new CopyOnWriteArrayList<>()));
+        world.start();
+        try {
+            world.attachCharacter(CHARACTER_ID, 3f, 0f, DEFAULT_STATS);
+            world.enqueueMoveCommand(CHARACTER_ID, 1, 1f, 0f);
+            Thread.sleep(300);
+            float[] reported = {Float.NaN, Float.NaN};
+            int[] calls = {0};
+            world.detachCharacter(CHARACTER_ID, (x, y) -> {
+                reported[0] = x;
+                reported[1] = y;
+                calls[0]++;
+            });
+            world.inboxBarrier().get(5, TimeUnit.SECONDS);
+
+            assertThat(calls[0]).isEqualTo(1);
+            assertThat(reported[0]).as("đã chạy sang phải từ x=3").isGreaterThan(3.5f);
+            assertThat(reported[1]).isEqualTo(0f);
+
+            world.detachCharacter(CHARACTER_ID, (x, y) -> calls[0]++);
+            world.inboxBarrier().get(5, TimeUnit.SECONDS);
+            assertThat(calls[0]).as("không còn trong World thì không báo gì").isEqualTo(1);
+        } finally {
+            world.stop();
+        }
+    }
+
     private static void waitUntilParked(Thread thread) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-        while (thread.getState() != Thread.State.WAITING) {
+        // TIMED_WAITING từ 2026-10-17: stop() chờ tickLock có trần (dòng 56).
+        while (thread.getState() != Thread.State.WAITING && thread.getState() != Thread.State.TIMED_WAITING) {
             assertThat(System.nanoTime()).as("stop() phải đang chờ tickLock").isLessThan(deadline);
             Thread.sleep(1);
         }

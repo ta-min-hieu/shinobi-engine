@@ -192,4 +192,34 @@ class EcsWorldLifecycleTest {
 
         assertThat(system.processedIds).containsExactly(nextSession.id());
     }
+
+    /**
+     * Dòng 72(d) (2026-10-17): {@code clear()} từ trong một System từng xoá danh sách System dưới chân
+     * vòng lặp và làm System kế tiếp của chính tick đó bị bỏ qua im lặng — nay ném rõ ràng, và world
+     * không bị đụng tới.
+     */
+    @Test
+    void clearShouldThrow_whenCalledFromInsideASystem_andLeaveTheWorldUntouched() {
+        EcsWorld world = new EcsWorld();
+        spawn(world);
+        world.addSystem(new RecordingSystem(world) {
+            @Override
+            protected void processEntity(KEntity entity, float deltaTime) {
+                world.clear();
+            }
+        });
+        RecordingSystem next = new RecordingSystem(world);
+        world.addSystem(next);
+
+        assertThatThrownBy(() -> world.update(1f))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("clear()");
+        assertThat(world.entityCount()).isEqualTo(1);
+        assertThat(next.processedIds)
+                .as("tick dừng ở lỗi, không chạy tiếp như chưa có gì")
+                .isEmpty();
+
+        world.clear(); // ngoài update thì vẫn dọn được
+        assertThat(world.entityCount()).isZero();
+    }
 }

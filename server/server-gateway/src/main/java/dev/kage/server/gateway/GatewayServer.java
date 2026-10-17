@@ -84,6 +84,14 @@ public final class GatewayServer {
      */
     public record GatewayContext(WorldGateway worldGateway, GatewayObservability observability) {}
 
+    /**
+     * Mặc định của {@link #shutdownNotice} khi chạy thật (SERVER.md §10 bước 2: "server bảo trì trong
+     * 30s"). Đổi bằng biến môi trường {@link #SHUTDOWN_NOTICE_ENV}, đọc ở {@link GatewayBootstrap}.
+     */
+    static final Duration DEFAULT_SHUTDOWN_NOTICE = Duration.ofSeconds(30);
+
+    static final String SHUTDOWN_NOTICE_ENV = "KAGE_SHUTDOWN_NOTICE_SECONDS";
+
     private final int requestedPort;
     private final GatewayFacades facades;
     private final GatewayContext context;
@@ -92,6 +100,8 @@ public final class GatewayServer {
     private EventLoopGroup workerGroup;
     private ExecutorService authExecutor;
     private Channel serverChannel;
+    // 0 cho test/lớp dựng trần — chỉ GatewayBootstrap bật đếm ngược thật, xem shutdownNotice(Duration).
+    private volatile Duration shutdownNotice = Duration.ZERO;
 
     /**
      * @param port 0 = để hệ điều hành tự cấp cổng trống (dùng trong test, xem {@link #port()}).
@@ -131,6 +141,11 @@ public final class GatewayServer {
         // channel tự có SslHandler RIÊNG qua sslContext.newHandler(alloc) bên dưới (state
         // handshake là per-channel, SslContext chỉ giữ cert/key dùng chung).
         SslContext sslContext = buildSslContext();
+        // context null chỉ ở test mở cổng hỏng (GatewayServerStartFailureTest) — không trần IP nào.
+        IpAdmissionHandler ipAdmission = new IpAdmissionHandler(
+                context == null
+                        ? IpAdmission.unlimited()
+                        : context.worldGateway().registry().ipAdmission());
 
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap
@@ -141,6 +156,8 @@ public final class GatewayServer {
                     @Override
                     protected void initChannel(SocketChannel ch) {
                         ChannelPipeline pipeline = ch.pipeline();
+                        // Trần kết nối theo IP đứng TRƯỚC TLS — xem IpAdmissionHandler.
+                        pipeline.addLast(ipAdmission);
                         // TLS PHẢI là handler ĐẦU TIÊN — mọi byte sau đó (framing, packet) đi qua
                         // lớp mã hoá trước khi tới các handler khác.
                         if (sslContext != null) {
@@ -214,11 +231,42 @@ public final class GatewayServer {
             serverChannel.close().syncUninterruptibly();
         }
         context.worldGateway().registry().broadcastShuttingDown();
+        waitOutShutdownNotice();
         awaitGracefully(workerGroup);
         awaitGracefully(bossGroup);
         if (authExecutor != null) {
             authExecutor.shutdown();
             awaitAuthExecutorTermination();
+        }
+    }
+
+    /**
+     * Thời gian người chơi được báo trước khi bị ngắt lúc bảo trì (dòng 76(b), chủ dự án duyệt
+     * 2026-10-17). Trước đó SERVER.md §10 hứa "bảo trì trong 30s" nhưng code báo rồi đóng kết nối NGAY
+     * — người đang đánh boss hay đang giữa giao dịch không có lấy một giây.
+     */
+    void shutdownNotice(Duration notice) {
+        if (notice.isNegative()) {
+            throw new IllegalArgumentException("thời gian báo trước không được âm: " + notice);
+        }
+        this.shutdownNotice = notice;
+    }
+
+    /**
+     * Giữ kết nối thêm {@link #shutdownNotice} sau lời báo bảo trì: cổng đã đóng nên không ai vào thêm,
+     * người đang chơi vẫn chơi được — tìm chỗ an toàn, xong giao dịch. Bị ngắt (tín hiệu tắt lần hai)
+     * thì thôi chờ, đi tiếp trình tự tắt.
+     */
+    private void waitOutShutdownNotice() {
+        if (shutdownNotice.isZero()) {
+            return;
+        }
+        LOG.info("Đã báo bảo trì — đóng kết nối sau {} giây", shutdownNotice.toSeconds());
+        try {
+            Thread.sleep(shutdownNotice);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOG.warn("Bị ngắt trong lúc đếm ngược bảo trì — đóng kết nối ngay", e);
         }
     }
 

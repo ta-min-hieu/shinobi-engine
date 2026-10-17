@@ -11,6 +11,8 @@ import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics;
 import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import dev.kage.account.api.AccountFacade;
 import dev.kage.character.api.CharacterFacade;
@@ -41,6 +43,8 @@ import dev.kage.trade.api.TradeFacade;
  * tiếp — xem javadoc {@link ServerDatabaseBootstrap}, Điều 23).
  */
 public final class GatewayBootstrap {
+
+    private static final Logger LOG = LoggerFactory.getLogger(GatewayBootstrap.class);
 
     private static final int PORT = 7777;
 
@@ -125,12 +129,35 @@ public final class GatewayBootstrap {
                 facades,
                 new GatewayServer.GatewayContext(instanceRegistries.worldGateway(), observability),
                 endpoints.tlsConfig());
+        server.shutdownNotice(shutdownNoticeFromEnvironment());
         Runnable shutdown = shutdownSequence(
                 new ShutdownContext(server, worldContext, instanceRegistries, characterRegistry),
                 positionPersister,
                 observability,
                 databaseBootstrap);
         return new Assembly(server, shutdown);
+    }
+
+    /**
+     * Đếm ngược bảo trì (dòng 76(b)): {@link GatewayServer#SHUTDOWN_NOTICE_ENV} giây, thiếu hoặc hỏng thì
+     * {@link GatewayServer#DEFAULT_SHUTDOWN_NOTICE}. Dev đặt 0 để Ctrl+C tắt ngay.
+     */
+    static Duration shutdownNoticeFromEnvironment() {
+        String raw = System.getenv(GatewayServer.SHUTDOWN_NOTICE_ENV);
+        if (raw == null || raw.isBlank()) {
+            return GatewayServer.DEFAULT_SHUTDOWN_NOTICE;
+        }
+        try {
+            long seconds = Long.parseLong(raw.strip());
+            if (seconds >= 0) {
+                return Duration.ofSeconds(seconds);
+            }
+        } catch (NumberFormatException e) {
+            LOG.warn("{}={} không phải số — dùng mặc định", GatewayServer.SHUTDOWN_NOTICE_ENV, raw, e);
+            return GatewayServer.DEFAULT_SHUTDOWN_NOTICE;
+        }
+        LOG.warn("{}={} âm — dùng mặc định", GatewayServer.SHUTDOWN_NOTICE_ENV, raw);
+        return GatewayServer.DEFAULT_SHUTDOWN_NOTICE;
     }
 
     /**

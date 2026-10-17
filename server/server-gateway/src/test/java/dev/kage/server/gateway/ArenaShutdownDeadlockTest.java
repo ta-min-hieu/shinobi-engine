@@ -103,7 +103,8 @@ class ArenaShutdownDeadlockTest {
         stopper.setDaemon(true);
         stopper.start();
         // stopAll đang chờ lần tick dở (đậu trên tickLock) — giờ mới cho tick báo có người gục.
-        waitUntil(() -> stopper.getState() == Thread.State.WAITING);
+        // TIMED_WAITING từ 2026-10-17: WorldFacade.stop() chờ tickLock có trần (dòng 56).
+        waitUntil(() -> stopper.getState() == Thread.State.WAITING || stopper.getState() == Thread.State.TIMED_WAITING);
         stopperIsWaiting.countDown();
 
         stopper.join(STOP_DEADLINE_MILLIS);

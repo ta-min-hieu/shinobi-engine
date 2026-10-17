@@ -33,9 +33,11 @@ public record ChatMessage(long senderId, ChatChannel channel, String body) {
     }
 
     /**
-     * Ép tin nhắn về MỘT dòng (quyết định chủ dự án 2026-10-11): mọi ký tự xuống dòng và ký tự điều
-     * khiển thành một dấu cách. Trước đó tin chứa xuống dòng hiện ra như hai dòng trong khung chat của
-     * người nhận — dòng thứ hai trông như một tin KHÁC, kể cả tin hệ thống ("[Hệ thống] ...").
+     * Ép tin nhắn về MỘT dòng (quyết định chủ dự án 2026-10-11): mọi ký tự xuống dòng, ký tự điều
+     * khiển và ký tự định dạng vô hình (từ 2026-10-17) thành một dấu cách.
+     *
+     * <p>Trước đó tin chứa xuống dòng hiện ra như hai dòng trong khung chat của người nhận. Dòng thứ
+     * hai trông như một tin KHÁC, kể cả tin hệ thống ("[Hệ thống] ...").
      *
      * <p>Gateway gọi hàm này TRƯỚC khi kiểm và phát: thứ được kiểm (độ dài, từ cấm) phải đúng là thứ
      * người khác nhận. Thay bằng dấu cách chứ không xoá, để hai từ hai bên chỗ ngắt không dính vào nhau.
@@ -49,10 +51,20 @@ public record ChatMessage(long senderId, ChatChannel channel, String body) {
         return line.toString();
     }
 
-    /** Ký tự điều khiển (gồm CR/LF/TAB) và hai dấu ngắt dòng/đoạn của Unicode (U+2028, U+2029). */
+    /**
+     * Ký tự điều khiển (gồm CR/LF/TAB), hai dấu ngắt dòng/đoạn của Unicode (U+2028, U+2029), và ký tự
+     * ĐỊNH DẠNG vô hình (lớp {@code Cf}, dòng 71(d) — chủ dự án duyệt 2026-10-17). Lớp thứ ba là đường
+     * giả mạo của client bên thứ ba: dấu đảo chiều văn bản ({@code U+202E}, {@code U+2066}–{@code U+2069})
+     * vẽ phần sau của câu NGƯỢC lại, nên một tin trông như bắt đầu bằng "[Hệ thống]" mà không cần xuống
+     * dòng; ký tự độ rộng 0 ({@code U+200B}) chèn giữa một từ để nó trông như từ khác. Client chính thức
+     * tự lọc được, client khác thì không — nên server lọc trước khi phát.
+     */
     private static boolean breaksTheLine(int codePoint) {
         int type = Character.getType(codePoint);
-        return type == Character.CONTROL || type == Character.LINE_SEPARATOR || type == Character.PARAGRAPH_SEPARATOR;
+        return type == Character.CONTROL
+                || type == Character.FORMAT
+                || type == Character.LINE_SEPARATOR
+                || type == Character.PARAGRAPH_SEPARATOR;
     }
 
     private static boolean isInvisible(int codePoint) {

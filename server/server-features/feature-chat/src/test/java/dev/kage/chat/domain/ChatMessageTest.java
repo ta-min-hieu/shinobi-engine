@@ -48,6 +48,23 @@ class ChatMessageTest {
                 .isEqualTo("a b c d");
     }
 
+    /**
+     * Dòng 71(d) (2026-10-17): dấu đảo chiều {@code U+202E} vẽ phần sau của câu ngược lại — giả được
+     * tin hệ thống mà không cần xuống dòng. Ký tự độ rộng 0 và các dấu cô lập chiều cũng bị thay.
+     */
+    @Test
+    void singleLineShouldTurnInvisibleFormatCharactersIntoASpace() {
+        String rightToLeftOverride = Character.toString(0x202E);
+        String zeroWidthSpace = Character.toString(0x200B);
+        String firstStrongIsolate = Character.toString(0x2068);
+        String popDirectionalIsolate = Character.toString(0x2069);
+
+        assertThat(ChatMessage.singleLine("a" + rightToLeftOverride + "b")).isEqualTo("a b");
+        assertThat(ChatMessage.singleLine("ad" + zeroWidthSpace + "min")).isEqualTo("ad min");
+        assertThat(ChatMessage.singleLine(firstStrongIsolate + "x" + popDirectionalIsolate))
+                .isEqualTo(" x ");
+    }
+
     @Test
     void singleLineShouldLeaveAnOrdinaryMessageUntouched() {
         String ordinary = "Nguyên Anh kỳ — đi hầm ngục không? 🐉";
