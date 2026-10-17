@@ -130,11 +130,11 @@ class SecurityIntegrationTest {
         dev.kage.dialogue.api.DialogueFacade dialogueFacade = fakeDialogueFacade();
         dev.kage.quest.api.QuestFacade questFacade = fakeQuestFacade();
         dev.kage.friend.api.FriendFacade friendFacade = fakeFriendFacade();
-        dev.kage.mail.api.MailFacade mailFacade = fakeMailFacade();
+        dev.kage.mail.api.MailFacade mailFacade = GatewayPipelineTest.fakeMailFacade();
         dev.kage.chat.api.ChatFacade chatFacade = fakeChatFacade();
-        dev.kage.guild.api.GuildFacade guildFacade = fakeGuildFacade();
+        dev.kage.guild.api.GuildFacade guildFacade = GatewayPipelineTest.fakeGuildFacade();
         dev.kage.party.api.PartyFacade partyFacade = fakePartyFacade();
-        dev.kage.trade.api.TradeFacade tradeFacade = fakeTradeFacade();
+        dev.kage.trade.api.TradeFacade tradeFacade = GatewayPipelineTest.fakeTradeFacade();
         dev.kage.pvp.api.PvpFacade pvpFacade = fakePvpFacade();
         meterRegistry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
         GatewayNetworkMetrics networkMetrics = new GatewayNetworkMetrics(meterRegistry);
@@ -697,98 +697,7 @@ class SecurityIntegrationTest {
     // ============================================================================================
 
     private CharacterFacade fakeIdempotentCharacterFacade() {
-        CharacterPort characterPort = new CharacterPort() {
-            private final List<Character> characters = new ArrayList<Character>();
-            private final AtomicLong nextId = new AtomicLong(1);
-            private final Map<Long, PositionSnapshot> positions = new HashMap<Long, PositionSnapshot>();
-            private final Set<String> usedIdempotencyKeys = ConcurrentHashMap.newKeySet();
-
-            @Override
-            public PositionSnapshot loadPosition(long characterId) {
-                return positions.getOrDefault(characterId, new PositionSnapshot(0f, 0f));
-            }
-
-            @Override
-            public void savePosition(long characterId, float x, float y) {
-                positions.put(characterId, new PositionSnapshot(x, y));
-            }
-
-            @Override
-            public CharacterStats loadStats(long characterId) {
-                return new CharacterStats(10, 10, 10, 10);
-            }
-
-            @Override
-            public long loadGold(long characterId) {
-                return 0L; // test này không kiểm tra vàng — nhân vật mới vốn có 0 (V7 DEFAULT 0)
-            }
-
-            @Override
-            public List<Character> listByAccount(long accountId) {
-                return characters.stream()
-                        .filter(c -> c.accountId() == accountId)
-                        .toList();
-            }
-
-            @Override
-            public int countByAccount(long accountId) {
-                return listByAccount(accountId).size();
-            }
-
-            @Override
-            public int lockAccountAndCountCharacters(dev.kage.character.domain.Transaction tx, long accountId) {
-                return countByAccount(accountId);
-            }
-
-            @Override
-            public boolean existsByName(String name) {
-                return characters.stream().anyMatch(c -> c.name().equals(name));
-            }
-
-            @Override
-            public Optional<Character> findByName(String name) {
-                return characters.stream().filter(c -> c.name().equals(name)).findFirst();
-            }
-
-            @Override
-            public Optional<Character> findById(long characterId) {
-                return characters.stream().filter(c -> c.id() == characterId).findFirst();
-            }
-
-            @Override
-            public Character create(dev.kage.character.domain.Transaction tx, NewCharacter newCharacter) {
-                if (!usedIdempotencyKeys.add(newCharacter.idempotencyKey())) {
-                    throw new dev.kage.character.domain.IdempotencyKeyReusedException(newCharacter.idempotencyKey());
-                }
-                Character character = new Character(
-                        nextId.getAndIncrement(),
-                        newCharacter.accountId(),
-                        1,
-                        newCharacter.name(),
-                        newCharacter.faction(),
-                        1,
-                        0,
-                        0,
-                        Instant.now());
-                characters.add(character);
-                return character;
-            }
-
-            @Override
-            public long addExperience(long characterId, long amount) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public boolean saveLevel(long characterId, int level, long derivedFromExp) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public void updateFaction(long characterId, Faction faction) {
-                // Không dùng ở file này.
-            }
-        };
+        CharacterPort characterPort = new StubCharacterPort();
         CreateCharacterUseCase createUseCase = new CreateCharacterUseCase(characterPort, action -> action.accept(null));
         ListCharactersUseCase listUseCase = new ListCharactersUseCase(characterPort);
         SelectCharacterUseCase selectUseCase = new SelectCharacterUseCase(characterPort);
@@ -800,6 +709,97 @@ class SecurityIntegrationTest {
                 selectFactionUseCase,
                 new GrantExperienceUseCase(characterPort));
         return new CharacterFacade(useCases, characterPort);
+    }
+
+    private static final class StubCharacterPort implements CharacterPort {
+        private final List<Character> characters = new ArrayList<Character>();
+        private final AtomicLong nextId = new AtomicLong(1);
+        private final Map<Long, PositionSnapshot> positions = new HashMap<Long, PositionSnapshot>();
+        private final Set<String> usedIdempotencyKeys = ConcurrentHashMap.newKeySet();
+
+        @Override
+        public PositionSnapshot loadPosition(long characterId) {
+            return positions.getOrDefault(characterId, new PositionSnapshot(0f, 0f));
+        }
+
+        @Override
+        public void savePosition(long characterId, float x, float y) {
+            positions.put(characterId, new PositionSnapshot(x, y));
+        }
+
+        @Override
+        public CharacterStats loadStats(long characterId) {
+            return new CharacterStats(10, 10, 10, 10);
+        }
+
+        @Override
+        public long loadGold(long characterId) {
+            return 0L; // test này không kiểm tra vàng — nhân vật mới vốn có 0 (V7 DEFAULT 0)
+        }
+
+        @Override
+        public List<Character> listByAccount(long accountId) {
+            return characters.stream().filter(c -> c.accountId() == accountId).toList();
+        }
+
+        @Override
+        public int countByAccount(long accountId) {
+            return listByAccount(accountId).size();
+        }
+
+        @Override
+        public int lockAccountAndCountCharacters(dev.kage.character.domain.Transaction tx, long accountId) {
+            return countByAccount(accountId);
+        }
+
+        @Override
+        public boolean existsByName(String name) {
+            return characters.stream().anyMatch(c -> c.name().equals(name));
+        }
+
+        @Override
+        public Optional<Character> findByName(String name) {
+            return characters.stream().filter(c -> c.name().equals(name)).findFirst();
+        }
+
+        @Override
+        public Optional<Character> findById(long characterId) {
+            return characters.stream().filter(c -> c.id() == characterId).findFirst();
+        }
+
+        @Override
+        public Character create(dev.kage.character.domain.Transaction tx, NewCharacter newCharacter) {
+            if (!usedIdempotencyKeys.add(newCharacter.idempotencyKey())) {
+                throw new dev.kage.character.domain.IdempotencyKeyReusedException(newCharacter.idempotencyKey());
+            }
+            Character character = new Character(
+                    nextId.getAndIncrement(),
+                    newCharacter.accountId(),
+                    1,
+                    newCharacter.name(),
+                    newCharacter.faction(),
+                    1,
+                    0,
+                    0,
+                    Instant.now());
+            characters.add(character);
+            return character;
+        }
+
+        @Override
+        public long addExperience(long characterId, long amount) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public boolean saveLevel(long characterId, int level, long derivedFromExp) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public void updateFaction(long characterId, Faction faction) {
+            // Không dùng ở file này.
+        }
     }
 
     private static AccountFacade fakeAccountFacade() {
@@ -851,58 +851,9 @@ class SecurityIntegrationTest {
         shopGrantCallCount = new AtomicInteger();
         Set<String> usedShopIdempotencyKeys = ConcurrentHashMap.newKeySet();
 
-        dev.kage.shop.domain.ShopCatalogPort catalogPort = new dev.kage.shop.domain.ShopCatalogPort() {
-            @Override
-            public Optional<dev.kage.shop.domain.ShopListing> findListing(long itemTemplateId) {
-                if (itemTemplateId != SHOP_ITEM_TEMPLATE_ID) {
-                    return Optional.empty();
-                }
-                return Optional.of(new dev.kage.shop.domain.ShopListing(
-                        SHOP_ITEM_TEMPLATE_ID, SHOP_BUY_PRICE, SHOP_BUY_PRICE / 2));
-            }
-
-            @Override
-            public List<dev.kage.shop.domain.ShopListing> findAll() {
-                return List.of();
-            }
-        };
-        dev.kage.shop.domain.GoldPort goldPort = new dev.kage.shop.domain.GoldPort() {
-            @Override
-            public boolean deductGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {
-                shopDeductCallCount.incrementAndGet();
-                long balance = shopGoldBalances.computeIfAbsent(characterId, id -> SHOP_STARTING_GOLD);
-                if (balance < amount) {
-                    return false;
-                }
-                shopGoldBalances.put(characterId, balance - amount);
-                return true;
-            }
-
-            @Override
-            public void creditGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {
-                shopGoldBalances.merge(characterId, amount, Long::sum);
-            }
-        };
-        dev.kage.shop.domain.InventoryGatewayPort inventoryGatewayPort =
-                new dev.kage.shop.domain.InventoryGatewayPort() {
-                    @Override
-                    public Optional<dev.kage.shop.domain.OwnedItem> findItem(long characterId, long itemId) {
-                        return Optional.empty();
-                    }
-
-                    @Override
-                    public boolean grantItem(
-                            dev.kage.shop.domain.Transaction tx, long characterId, long itemTemplateId, int quantity) {
-                        shopGrantCallCount.incrementAndGet();
-                        return true;
-                    }
-
-                    @Override
-                    public boolean removeQuantity(
-                            dev.kage.shop.domain.Transaction tx, long characterId, long itemId, int quantity) {
-                        return true;
-                    }
-                };
+        dev.kage.shop.domain.ShopCatalogPort catalogPort = new StubCatalogPort();
+        dev.kage.shop.domain.GoldPort goldPort = new StubGoldPort();
+        dev.kage.shop.domain.InventoryGatewayPort inventoryGatewayPort = new StubInventoryGatewayPort();
         dev.kage.shop.domain.AuditPort shopAuditPort = (tx, characterId, action, detailJson) -> {};
         dev.kage.shop.domain.IdempotencyPort shopIdempotencyPort = (tx, idempotencyKey) -> {
             if (!usedShopIdempotencyKeys.add(idempotencyKey)) {
@@ -920,6 +871,60 @@ class SecurityIntegrationTest {
         return new dev.kage.shop.api.ShopFacade(listShopItemsUseCase, buyItemUseCase, sellItemUseCase);
     }
 
+    private static final class StubCatalogPort implements dev.kage.shop.domain.ShopCatalogPort {
+        @Override
+        public Optional<dev.kage.shop.domain.ShopListing> findListing(long itemTemplateId) {
+            if (itemTemplateId != SHOP_ITEM_TEMPLATE_ID) {
+                return Optional.empty();
+            }
+            return Optional.of(
+                    new dev.kage.shop.domain.ShopListing(SHOP_ITEM_TEMPLATE_ID, SHOP_BUY_PRICE, SHOP_BUY_PRICE / 2));
+        }
+
+        @Override
+        public List<dev.kage.shop.domain.ShopListing> findAll() {
+            return List.of();
+        }
+    }
+
+    private final class StubGoldPort implements dev.kage.shop.domain.GoldPort {
+        @Override
+        public boolean deductGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {
+            shopDeductCallCount.incrementAndGet();
+            long balance = shopGoldBalances.computeIfAbsent(characterId, id -> SHOP_STARTING_GOLD);
+            if (balance < amount) {
+                return false;
+            }
+            shopGoldBalances.put(characterId, balance - amount);
+            return true;
+        }
+
+        @Override
+        public void creditGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {
+            shopGoldBalances.merge(characterId, amount, Long::sum);
+        }
+    }
+
+    private final class StubInventoryGatewayPort implements dev.kage.shop.domain.InventoryGatewayPort {
+        @Override
+        public Optional<dev.kage.shop.domain.OwnedItem> findItem(long characterId, long itemId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean grantItem(
+                dev.kage.shop.domain.Transaction tx, long characterId, long itemTemplateId, int quantity) {
+            shopGrantCallCount.incrementAndGet();
+            return true;
+        }
+
+        @Override
+        public boolean removeQuantity(
+                dev.kage.shop.domain.Transaction tx, long characterId, long itemId, int quantity) {
+            return true;
+        }
+    }
+
     // ============================================================================================
     // Fake facade còn lại — KHÔNG dùng trực tiếp ở test nào trong file này (trừ ChatFacade, dùng
     // thật cho rate-limit chat), chỉ cần đủ để GatewayFacades/ContentFacades/SocialFacades compile
@@ -927,42 +932,14 @@ class SecurityIntegrationTest {
     // ============================================================================================
 
     private InventoryFacade fakeInventoryFacade() {
-        InventoryPort inventoryPort = new InventoryPort() {
-            @Override
-            public Optional<Inventory> findByCharacter(long characterId) {
-                return Optional.of(new Inventory(characterId, 20, List.of()));
-            }
-
-            @Override
-            public Inventory save(dev.kage.inventory.domain.Transaction tx, Inventory inventory) {
-                return inventory;
-            }
-        };
+        InventoryPort inventoryPort = new StubInventoryPort();
         DropTablePort dropTablePort = dropTableCode -> List.<DropTableEntry>of();
-        ItemTemplatePort itemTemplatePort = new ItemTemplatePort() {
-            @Override
-            public Optional<ItemTemplate> findById(long itemTemplateId) {
-                return Optional.empty();
-            }
-
-            @Override
-            public Optional<Long> findIdByCode(String code) {
-                return Optional.empty();
-            }
-        };
+        ItemTemplatePort itemTemplatePort = new StubItemTemplatePort();
         AddItemUseCase addItemUseCase =
                 new AddItemUseCase(inventoryPort, itemTemplatePort, action -> action.accept(null));
         GrantLootUseCase grantLootUseCase =
                 new GrantLootUseCase(dropTablePort, inventoryPort, itemTemplatePort, action -> action.accept(null));
-        EquipmentPort equipmentPort = new EquipmentPort() {
-            @Override
-            public Optional<Equipment> findByCharacter(long characterId) {
-                return Optional.of(new Equipment(characterId, Map.of()));
-            }
-
-            @Override
-            public void save(dev.kage.inventory.domain.Transaction tx, Equipment equipment) {}
-        };
+        EquipmentPort equipmentPort = new StubEquipmentPort();
         EquipItemUseCase equipItemUseCase =
                 new EquipItemUseCase(inventoryPort, itemTemplatePort, equipmentPort, action -> action.accept(null));
         UnequipItemUseCase unequipItemUseCase = new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
@@ -986,6 +963,40 @@ class SecurityIntegrationTest {
                 new dev.kage.inventory.api.InventoryQueryUseCases(
                         new dev.kage.inventory.application.ListInventoryUseCase(inventoryPort, equipmentPort),
                         new dev.kage.inventory.application.GetItemCatalogUseCase(itemTemplatePort)));
+    }
+
+    private static final class StubInventoryPort implements InventoryPort {
+        @Override
+        public Optional<Inventory> findByCharacter(long characterId) {
+            return Optional.of(new Inventory(characterId, 20, List.of()));
+        }
+
+        @Override
+        public Inventory save(dev.kage.inventory.domain.Transaction tx, Inventory inventory) {
+            return inventory;
+        }
+    }
+
+    private static final class StubItemTemplatePort implements ItemTemplatePort {
+        @Override
+        public Optional<ItemTemplate> findById(long itemTemplateId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<Long> findIdByCode(String code) {
+            return Optional.empty();
+        }
+    }
+
+    private static final class StubEquipmentPort implements EquipmentPort {
+        @Override
+        public Optional<Equipment> findByCharacter(long characterId) {
+            return Optional.of(new Equipment(characterId, Map.of()));
+        }
+
+        @Override
+        public void save(dev.kage.inventory.domain.Transaction tx, Equipment equipment) {}
     }
 
     private dev.kage.dialogue.api.DialogueFacade fakeDialogueFacade() {
@@ -1076,60 +1087,6 @@ class SecurityIntegrationTest {
         return new dev.kage.friend.api.FriendFacade(useCases);
     }
 
-    private dev.kage.mail.api.MailFacade fakeMailFacade() {
-        dev.kage.mail.domain.MailRepositoryPort mailRepositoryPort = new dev.kage.mail.domain.MailRepositoryPort() {
-            @Override
-            public dev.kage.mail.domain.Mail send(
-                    dev.kage.mail.domain.Transaction tx, dev.kage.mail.domain.NewMail newMail) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.mail.domain.Mail> findById(long mailId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.mail.domain.Mail> findByIdForUpdate(
-                    dev.kage.mail.domain.Transaction tx, long mailId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public List<dev.kage.mail.domain.Mail> listForRecipient(long recipientId) {
-                return List.of();
-            }
-
-            @Override
-            public boolean markClaimed(dev.kage.mail.domain.Transaction tx, long mailId, long recipientId) {
-                return false;
-            }
-
-            @Override
-            public boolean delete(long mailId, long recipientId) {
-                return false;
-            }
-        };
-        dev.kage.mail.domain.AuditPort mailAuditPort = (tx, characterId, action, detailJson) -> {};
-        dev.kage.mail.domain.IdempotencyPort mailIdempotencyPort = (tx, idempotencyKey) -> {};
-        dev.kage.mail.domain.TransactionRunner mailTx = action -> action.accept(null);
-        dev.kage.mail.application.ListMailUseCase listMailUseCase =
-                new dev.kage.mail.application.ListMailUseCase(mailRepositoryPort);
-        dev.kage.mail.application.MailPorts mailPorts = new dev.kage.mail.application.MailPorts(
-                mailRepositoryPort,
-                new FakeMailGoldPort(),
-                new FakeMailInventoryGatewayPort(),
-                mailAuditPort,
-                mailIdempotencyPort);
-        dev.kage.mail.application.SendMailUseCase sendMailUseCase =
-                new dev.kage.mail.application.SendMailUseCase(mailPorts, mailTx);
-        dev.kage.mail.application.ClaimMailUseCase claimMailUseCase =
-                new dev.kage.mail.application.ClaimMailUseCase(mailPorts, mailTx);
-        dev.kage.mail.application.DeleteMailUseCase deleteMailUseCase =
-                new dev.kage.mail.application.DeleteMailUseCase(mailRepositoryPort);
-        return new dev.kage.mail.api.MailFacade(sendMailUseCase, listMailUseCase, claimMailUseCase, deleteMailUseCase);
-    }
-
     // ChatFacade THẬT (không throw) — cần cho shouldRejectChatCommands_pastRateLimitThreshold...,
     // cùng cách GatewayServerIntegrationTest#fakeChatFacade().
     private dev.kage.chat.api.ChatFacade fakeChatFacade() {
@@ -1137,196 +1094,8 @@ class SecurityIntegrationTest {
         return new dev.kage.chat.api.ChatFacade(new dev.kage.chat.application.SendChatMessageUseCase(chatAuditPort));
     }
 
-    private dev.kage.guild.api.GuildFacade fakeGuildFacade() {
-        dev.kage.guild.domain.GuildPort guildPort = new dev.kage.guild.domain.GuildPort() {
-            @Override
-            public Optional<dev.kage.guild.domain.Guild> findByName(String name) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.guild.domain.Guild> findById(long guildId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.guild.domain.GuildMember> findMembershipOf(long characterId) {
-                return Optional.empty();
-            }
-
-            @Override
-            public List<dev.kage.guild.domain.GuildMember> listMembers(long guildId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public dev.kage.guild.domain.Guild createGuild(String name, long leaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean disbandGuild(long leaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean leaveGuild(long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.guild.domain.GuildJoinRequest> findPendingRequestOfCharacter(long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public List<dev.kage.guild.domain.GuildJoinRequest> listPendingRequests(long guildId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public dev.kage.guild.domain.GuildJoinRequest sendJoinRequest(long guildId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public ApproveResult approveJoinRequest(long requestId, long leaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean rejectJoinRequest(long requestId, long leaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-        };
-        dev.kage.guild.application.GuildUseCases useCases = new dev.kage.guild.application.GuildUseCases(
-                new dev.kage.guild.application.CreateGuildUseCase(guildPort),
-                new dev.kage.guild.application.SendGuildJoinRequestUseCase(guildPort),
-                new dev.kage.guild.application.ApproveGuildJoinRequestUseCase(guildPort),
-                new dev.kage.guild.application.RejectGuildJoinRequestUseCase(guildPort),
-                new dev.kage.guild.application.LeaveGuildUseCase(guildPort),
-                new dev.kage.guild.application.DisbandGuildUseCase(guildPort),
-                new dev.kage.guild.application.KickGuildMemberUseCase(guildPort),
-                new dev.kage.guild.application.ListGuildMembersUseCase(guildPort),
-                new dev.kage.guild.application.ListPendingGuildJoinRequestsUseCase(guildPort),
-                new dev.kage.guild.application.FindMyGuildUseCase(guildPort));
-        return new dev.kage.guild.api.GuildFacade(useCases);
-    }
-
     private dev.kage.party.api.PartyFacade fakePartyFacade() {
-        dev.kage.party.domain.PartyPort partyPort = new dev.kage.party.domain.PartyPort() {
-            private final Map<Long, dev.kage.party.domain.Party> partiesById =
-                    new HashMap<Long, dev.kage.party.domain.Party>();
-            private final Map<Long, List<dev.kage.party.domain.PartyMember>> membersByPartyId =
-                    new HashMap<Long, List<dev.kage.party.domain.PartyMember>>();
-            private final Map<Long, dev.kage.party.domain.PartyInvite> invitesById =
-                    new HashMap<Long, dev.kage.party.domain.PartyInvite>();
-            private final AtomicLong nextPartyId = new AtomicLong(1);
-            private final AtomicLong nextInviteId = new AtomicLong(1);
-
-            @Override
-            public Optional<dev.kage.party.domain.PartyMember> findMembershipOf(long characterId) {
-                return membersByPartyId.values().stream()
-                        .flatMap(List::stream)
-                        .filter(m -> m.characterId() == characterId)
-                        .findFirst();
-            }
-
-            @Override
-            public List<dev.kage.party.domain.PartyMember> listMembers(long partyId) {
-                return List.copyOf(membersByPartyId.getOrDefault(partyId, List.of()));
-            }
-
-            @Override
-            public dev.kage.party.domain.Party createParty(long leaderCharacterId) {
-                long partyId = nextPartyId.getAndIncrement();
-                dev.kage.party.domain.Party party =
-                        new dev.kage.party.domain.Party(partyId, leaderCharacterId, Instant.now());
-                partiesById.put(partyId, party);
-                dev.kage.party.domain.PartyMember leader = new dev.kage.party.domain.PartyMember(
-                        partyId, leaderCharacterId, dev.kage.party.domain.PartyRole.LEADER, Instant.now());
-                membersByPartyId.put(partyId, new ArrayList<dev.kage.party.domain.PartyMember>(List.of(leader)));
-                return party;
-            }
-
-            @Override
-            public Optional<dev.kage.party.domain.PartyInvite> findPendingInviteOfInvitee(long characterId) {
-                return invitesById.values().stream()
-                        .filter(i -> i.inviteeCharacterId() == characterId)
-                        .findFirst();
-            }
-
-            @Override
-            public List<dev.kage.party.domain.PartyInvite> listPendingInvitesOfInvitee(long characterId) {
-                return invitesById.values().stream()
-                        .filter(i -> i.inviteeCharacterId() == characterId)
-                        .toList();
-            }
-
-            @Override
-            public boolean transferLeadership(long leaderCharacterId, long newLeaderCharacterId) {
-                return false; // fake không có nhóm nào để chuyển quyền
-            }
-
-            @Override
-            public int deleteInvitesInvitedBefore(java.time.Instant cutoff) {
-                return 0; // fake không giữ lời mời nào để hết hạn
-            }
-
-            @Override
-            public dev.kage.party.domain.PartyInvite invite(long partyId, long inviteeCharacterId) {
-                long inviteId = nextInviteId.getAndIncrement();
-                dev.kage.party.domain.PartyInvite invite =
-                        new dev.kage.party.domain.PartyInvite(inviteId, partyId, inviteeCharacterId, Instant.now());
-                invitesById.put(inviteId, invite);
-                return invite;
-            }
-
-            @Override
-            public AcceptResult acceptInvite(long inviteId, long characterId) {
-                dev.kage.party.domain.PartyInvite invite = invitesById.get(inviteId);
-                if (invite == null || invite.inviteeCharacterId() != characterId) {
-                    return AcceptResult.NOT_FOUND;
-                }
-                invitesById.remove(inviteId);
-                dev.kage.party.domain.PartyMember member = new dev.kage.party.domain.PartyMember(
-                        invite.partyId(), characterId, dev.kage.party.domain.PartyRole.MEMBER, Instant.now());
-                membersByPartyId
-                        .computeIfAbsent(invite.partyId(), id -> new ArrayList<dev.kage.party.domain.PartyMember>())
-                        .add(member);
-                return AcceptResult.OK;
-            }
-
-            @Override
-            public boolean rejectInvite(long inviteId, long characterId) {
-                dev.kage.party.domain.PartyInvite invite = invitesById.get(inviteId);
-                if (invite == null || invite.inviteeCharacterId() != characterId) {
-                    return false;
-                }
-                invitesById.remove(inviteId);
-                return true;
-            }
-
-            @Override
-            public LeaveResult leaveParty(long characterId) {
-                Optional<dev.kage.party.domain.PartyMember> membership = findMembershipOf(characterId);
-                if (membership.isEmpty()) {
-                    return LeaveResult.NOT_IN_PARTY;
-                }
-                membersByPartyId.get(membership.get().partyId()).removeIf(m -> m.characterId() == characterId);
-                return LeaveResult.OK;
-            }
-
-            @Override
-            public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-        };
+        dev.kage.party.domain.PartyPort partyPort = new StubPartyPort();
         dev.kage.party.application.PartyUseCases useCases = new dev.kage.party.application.PartyUseCases(
                 new dev.kage.party.application.CreatePartyUseCase(partyPort),
                 new dev.kage.party.application.InvitePartyMemberUseCase(partyPort),
@@ -1341,92 +1110,113 @@ class SecurityIntegrationTest {
         return new dev.kage.party.api.PartyFacade(useCases);
     }
 
-    private dev.kage.trade.api.TradeFacade fakeTradeFacade() {
-        dev.kage.trade.domain.TradeSessionPort sessionPort = new dev.kage.trade.domain.TradeSessionPort() {
-            @Override
-            public Optional<dev.kage.trade.domain.TradeSession> findActiveSessionOfCharacter(long characterId) {
-                return Optional.empty();
-            }
+    private static final class StubPartyPort implements dev.kage.party.domain.PartyPort {
+        private final Map<Long, dev.kage.party.domain.Party> partiesById =
+                new HashMap<Long, dev.kage.party.domain.Party>();
+        private final Map<Long, List<dev.kage.party.domain.PartyMember>> membersByPartyId =
+                new HashMap<Long, List<dev.kage.party.domain.PartyMember>>();
+        private final Map<Long, dev.kage.party.domain.PartyInvite> invitesById =
+                new HashMap<Long, dev.kage.party.domain.PartyInvite>();
+        private final AtomicLong nextPartyId = new AtomicLong(1);
+        private final AtomicLong nextInviteId = new AtomicLong(1);
 
-            @Override
-            public dev.kage.trade.domain.TradeSession createRequest(long requesterCharacterId, long targetCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+        @Override
+        public Optional<dev.kage.party.domain.PartyMember> findMembershipOf(long characterId) {
+            return membersByPartyId.values().stream()
+                    .flatMap(List::stream)
+                    .filter(m -> m.characterId() == characterId)
+                    .findFirst();
+        }
 
-            @Override
-            public boolean acceptRequest(long sessionId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+        @Override
+        public List<dev.kage.party.domain.PartyMember> listMembers(long partyId) {
+            return List.copyOf(membersByPartyId.getOrDefault(partyId, List.of()));
+        }
 
-            @Override
-            public boolean deleteSessionIfParticipant(long sessionId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+        @Override
+        public dev.kage.party.domain.Party createParty(long leaderCharacterId) {
+            long partyId = nextPartyId.getAndIncrement();
+            dev.kage.party.domain.Party party =
+                    new dev.kage.party.domain.Party(partyId, leaderCharacterId, Instant.now());
+            partiesById.put(partyId, party);
+            dev.kage.party.domain.PartyMember leader = new dev.kage.party.domain.PartyMember(
+                    partyId, leaderCharacterId, dev.kage.party.domain.PartyRole.LEADER, Instant.now());
+            membersByPartyId.put(partyId, new ArrayList<dev.kage.party.domain.PartyMember>(List.of(leader)));
+            return party;
+        }
 
-            @Override
-            public boolean replaceOffer(
-                    long sessionId,
-                    long characterId,
-                    long goldAmount,
-                    List<dev.kage.trade.domain.OfferedItemInput> items) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+        @Override
+        public Optional<dev.kage.party.domain.PartyInvite> findPendingInviteOfInvitee(long characterId) {
+            return invitesById.values().stream()
+                    .filter(i -> i.inviteeCharacterId() == characterId)
+                    .findFirst();
+        }
 
-            @Override
-            public Optional<dev.kage.trade.domain.TradeSessionSnapshot> findSnapshot(long sessionId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+        @Override
+        public List<dev.kage.party.domain.PartyInvite> listPendingInvitesOfInvitee(long characterId) {
+            return invitesById.values().stream()
+                    .filter(i -> i.inviteeCharacterId() == characterId)
+                    .toList();
+        }
 
-            @Override
-            public Optional<dev.kage.trade.domain.TradeSessionSnapshot> lockForExecution(
-                    dev.kage.trade.domain.Transaction tx, long sessionId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+        @Override
+        public boolean transferLeadership(long leaderCharacterId, long newLeaderCharacterId) {
+            return false; // fake không có nhóm nào để chuyển quyền
+        }
 
-            @Override
-            public void setConfirmed(dev.kage.trade.domain.Transaction tx, long sessionId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+        @Override
+        public int deleteInvitesInvitedBefore(java.time.Instant cutoff) {
+            return 0; // fake không giữ lời mời nào để hết hạn
+        }
 
-            @Override
-            public void deleteSession(dev.kage.trade.domain.Transaction tx, long sessionId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-        };
-        dev.kage.trade.domain.TradeInventoryPort inventoryPort = new dev.kage.trade.domain.TradeInventoryPort() {
-            @Override
-            public Optional<dev.kage.trade.domain.OwnedItemSnapshot> findItemById(long itemId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+        @Override
+        public dev.kage.party.domain.PartyInvite invite(long partyId, long inviteeCharacterId) {
+            long inviteId = nextInviteId.getAndIncrement();
+            dev.kage.party.domain.PartyInvite invite =
+                    new dev.kage.party.domain.PartyInvite(inviteId, partyId, inviteeCharacterId, Instant.now());
+            invitesById.put(inviteId, invite);
+            return invite;
+        }
 
-            @Override
-            public TransferOutcome transferItem(dev.kage.trade.domain.Transaction tx, TransferRequest request) {
-                throw new UnsupportedOperationException("không dùng ở test này");
+        @Override
+        public AcceptResult acceptInvite(long inviteId, long characterId) {
+            dev.kage.party.domain.PartyInvite invite = invitesById.get(inviteId);
+            if (invite == null || invite.inviteeCharacterId() != characterId) {
+                return AcceptResult.NOT_FOUND;
             }
-        };
-        dev.kage.trade.domain.TradeGoldPort goldPort = new dev.kage.trade.domain.TradeGoldPort() {
-            @Override
-            public boolean deductGold(dev.kage.trade.domain.Transaction tx, long characterId, long amount) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+            invitesById.remove(inviteId);
+            dev.kage.party.domain.PartyMember member = new dev.kage.party.domain.PartyMember(
+                    invite.partyId(), characterId, dev.kage.party.domain.PartyRole.MEMBER, Instant.now());
+            membersByPartyId
+                    .computeIfAbsent(invite.partyId(), id -> new ArrayList<dev.kage.party.domain.PartyMember>())
+                    .add(member);
+            return AcceptResult.OK;
+        }
 
-            @Override
-            public void creditGold(dev.kage.trade.domain.Transaction tx, long characterId, long amount) {
-                throw new UnsupportedOperationException("không dùng ở test này");
+        @Override
+        public boolean rejectInvite(long inviteId, long characterId) {
+            dev.kage.party.domain.PartyInvite invite = invitesById.get(inviteId);
+            if (invite == null || invite.inviteeCharacterId() != characterId) {
+                return false;
             }
-        };
-        dev.kage.trade.domain.TradeAuditPort auditPort = (tx, characterId, action, detailJson) -> {};
-        dev.kage.trade.domain.IdempotencyPort idempotencyPort = (tx, idempotencyKey) -> {};
-        dev.kage.trade.application.TradePorts ports = new dev.kage.trade.application.TradePorts(
-                sessionPort, inventoryPort, goldPort, auditPort, idempotencyPort);
-        dev.kage.trade.application.TradeUseCases useCases = new dev.kage.trade.application.TradeUseCases(
-                new dev.kage.trade.application.RequestTradeUseCase(sessionPort),
-                new dev.kage.trade.application.AcceptTradeRequestUseCase(sessionPort),
-                new dev.kage.trade.application.CancelTradeUseCase(sessionPort),
-                new dev.kage.trade.application.SetTradeOfferUseCase(sessionPort),
-                new dev.kage.trade.application.ConfirmTradeUseCase(ports, action -> action.accept(null)),
-                new dev.kage.trade.application.GetTradeStatusUseCase(sessionPort, inventoryPort));
-        return new dev.kage.trade.api.TradeFacade(useCases);
+            invitesById.remove(inviteId);
+            return true;
+        }
+
+        @Override
+        public LeaveResult leaveParty(long characterId) {
+            Optional<dev.kage.party.domain.PartyMember> membership = findMembershipOf(characterId);
+            if (membership.isEmpty()) {
+                return LeaveResult.NOT_IN_PARTY;
+            }
+            membersByPartyId.get(membership.get().partyId()).removeIf(m -> m.characterId() == characterId);
+            return LeaveResult.OK;
+        }
+
+        @Override
+        public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
     }
 
     private dev.kage.pvp.api.PvpFacade fakePvpFacade() {
@@ -1532,33 +1322,5 @@ class SecurityIntegrationTest {
         byte[] bytes = new byte[length];
         in.readFully(bytes);
         return PacketCodec.decodeFrame(bytes);
-    }
-
-    /** Người gửi luôn "đủ tiền" — test này không kiểm nghiệp vụ ký quỹ (xem MailIntegrationTest). */
-    private static final class FakeMailGoldPort implements dev.kage.mail.domain.GoldPort {
-        @Override
-        public boolean deductGold(dev.kage.mail.domain.Transaction tx, long characterId, long amount) {
-            return true;
-        }
-
-        @Override
-        public void creditGold(dev.kage.mail.domain.Transaction tx, long characterId, long amount) {
-            // không cần ghi nhận gì ở test này
-        }
-    }
-
-    /** Túi đồ luôn "đủ chỗ và đủ món" — cùng lý do FakeMailGoldPort. */
-    private static final class FakeMailInventoryGatewayPort implements dev.kage.mail.domain.InventoryGatewayPort {
-        @Override
-        public boolean grantItem(
-                dev.kage.mail.domain.Transaction tx, long characterId, long itemTemplateId, int quantity) {
-            return true;
-        }
-
-        @Override
-        public boolean consumeItem(
-                dev.kage.mail.domain.Transaction tx, long characterId, long itemTemplateId, int quantity) {
-            return true;
-        }
     }
 }

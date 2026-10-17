@@ -230,87 +230,7 @@ class DungeonInstanceRegistryConcurrencyTest {
     /** @param storedLevel cấp "trong DB" lúc được đọc — cho test dựng một cú lên cấp giữa hai lần đọc */
     static CharacterFacade fakeCharacterFacade(
             java.util.function.LongConsumer onLoadStats, java.util.function.IntSupplier storedLevel) {
-        CharacterPort port = new CharacterPort() {
-            @Override
-            public Optional<Character> findById(long characterId) {
-                return Optional.of(new Character(
-                        characterId,
-                        1L,
-                        1,
-                        "Hero" + characterId,
-                        Faction.HOA,
-                        storedLevel.getAsInt(),
-                        0L,
-                        0,
-                        Instant.EPOCH));
-            }
-
-            @Override
-            public CharacterStats loadStats(long characterId) {
-                onLoadStats.accept(characterId);
-                return new CharacterStats(10, 10, 10, 10);
-            }
-
-            @Override
-            public PositionSnapshot loadPosition(long characterId) {
-                return new PositionSnapshot(0f, 0f);
-            }
-
-            @Override
-            public List<Character> listByAccount(long accountId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public int countByAccount(long accountId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public int lockAccountAndCountCharacters(dev.kage.character.domain.Transaction tx, long accountId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public boolean existsByName(String name) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public Optional<Character> findByName(String name) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public Character create(Transaction tx, NewCharacter newCharacter) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public void savePosition(long characterId, float x, float y) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public long loadGold(long characterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public long addExperience(long characterId, long amount) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public boolean saveLevel(long characterId, int level, long derivedFromExp) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public void updateFaction(long characterId, Faction faction) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-        };
+        CharacterPort port = new StubPort(onLoadStats, storedLevel);
         CharacterUseCases useCases = new CharacterUseCases(
                 new CreateCharacterUseCase(port, action -> action.accept(null)),
                 new ListCharactersUseCase(port),
@@ -320,6 +240,89 @@ class DungeonInstanceRegistryConcurrencyTest {
         return new CharacterFacade(useCases, port);
     }
 
+    private record StubPort(java.util.function.LongConsumer onLoadStats, java.util.function.IntSupplier storedLevel)
+            implements CharacterPort {
+        @Override
+        public Optional<Character> findById(long characterId) {
+            return Optional.of(new Character(
+                    characterId,
+                    1L,
+                    1,
+                    "Hero" + characterId,
+                    Faction.HOA,
+                    storedLevel.getAsInt(),
+                    0L,
+                    0,
+                    Instant.EPOCH));
+        }
+
+        @Override
+        public CharacterStats loadStats(long characterId) {
+            onLoadStats.accept(characterId);
+            return new CharacterStats(10, 10, 10, 10);
+        }
+
+        @Override
+        public PositionSnapshot loadPosition(long characterId) {
+            return new PositionSnapshot(0f, 0f);
+        }
+
+        @Override
+        public List<Character> listByAccount(long accountId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public int countByAccount(long accountId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public int lockAccountAndCountCharacters(dev.kage.character.domain.Transaction tx, long accountId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public boolean existsByName(String name) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public Optional<Character> findByName(String name) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public Character create(Transaction tx, NewCharacter newCharacter) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public void savePosition(long characterId, float x, float y) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public long loadGold(long characterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public long addExperience(long characterId, long amount) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public boolean saveLevel(long characterId, int level, long derivedFromExp) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public void updateFaction(long characterId, Faction faction) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+    }
+
     /**
      * Nhóm hai người {@link #LEADER_ID} + {@link #MEMBER_ID}.
      *
@@ -327,71 +330,7 @@ class DungeonInstanceRegistryConcurrencyTest {
      *     race; test khác truyền việc rỗng
      */
     static PartyFacade fakePartyFacade(Runnable beforeListMembers) {
-        PartyPort port = new PartyPort() {
-            @Override
-            public Optional<PartyMember> findMembershipOf(long characterId) {
-                PartyRole role = characterId == LEADER_ID ? PartyRole.LEADER : PartyRole.MEMBER;
-                return Optional.of(new PartyMember(PARTY_ID, characterId, role, Instant.EPOCH));
-            }
-
-            @Override
-            public List<PartyMember> listMembers(long partyId) {
-                beforeListMembers.run();
-                return List.of(
-                        new PartyMember(PARTY_ID, LEADER_ID, PartyRole.LEADER, Instant.EPOCH),
-                        new PartyMember(PARTY_ID, MEMBER_ID, PartyRole.MEMBER, Instant.EPOCH));
-            }
-
-            @Override
-            public Party createParty(long leaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public Optional<PartyInvite> findPendingInviteOfInvitee(long characterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public List<PartyInvite> listPendingInvitesOfInvitee(long characterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public boolean transferLeadership(long leaderCharacterId, long newLeaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public int deleteInvitesInvitedBefore(java.time.Instant cutoff) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public PartyInvite invite(long partyId, long inviteeCharacterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public AcceptResult acceptInvite(long inviteId, long characterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public boolean rejectInvite(long inviteId, long characterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public LeaveResult leaveParty(long characterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-        };
+        PartyPort port = new StubFakePartyPort(beforeListMembers);
         return new PartyFacade(new PartyUseCases(
                 new CreatePartyUseCase(port),
                 new InvitePartyMemberUseCase(port),
@@ -403,6 +342,72 @@ class DungeonInstanceRegistryConcurrencyTest {
                 new ListPendingPartyInvitesUseCase(port),
                 new FindMyPartyUseCase(port),
                 new dev.kage.party.application.HandOverPartyLeadershipUseCase(port)));
+    }
+
+    private record StubFakePartyPort(Runnable beforeListMembers) implements PartyPort {
+        @Override
+        public Optional<PartyMember> findMembershipOf(long characterId) {
+            PartyRole role = characterId == LEADER_ID ? PartyRole.LEADER : PartyRole.MEMBER;
+            return Optional.of(new PartyMember(PARTY_ID, characterId, role, Instant.EPOCH));
+        }
+
+        @Override
+        public List<PartyMember> listMembers(long partyId) {
+            beforeListMembers.run();
+            return List.of(
+                    new PartyMember(PARTY_ID, LEADER_ID, PartyRole.LEADER, Instant.EPOCH),
+                    new PartyMember(PARTY_ID, MEMBER_ID, PartyRole.MEMBER, Instant.EPOCH));
+        }
+
+        @Override
+        public Party createParty(long leaderCharacterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public Optional<PartyInvite> findPendingInviteOfInvitee(long characterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public List<PartyInvite> listPendingInvitesOfInvitee(long characterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public boolean transferLeadership(long leaderCharacterId, long newLeaderCharacterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public int deleteInvitesInvitedBefore(java.time.Instant cutoff) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public PartyInvite invite(long partyId, long inviteeCharacterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public AcceptResult acceptInvite(long inviteId, long characterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public boolean rejectInvite(long inviteId, long characterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public LeaveResult leaveParty(long characterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
     }
 
     private void awaitBarrier() {

@@ -478,44 +478,14 @@ class ConnectedCharacterRegistryTest {
 
     /** Như bản nhận tỉ lệ rơi, nhưng test tự đưa bảng rơi — để đếm lượt roll hoặc cho nó ném như DB lỗi. */
     static InventoryFacade fakeInventoryFacade(DropTablePort dropTablePort) {
-        InventoryPort inventoryPort = new InventoryPort() {
-            @Override
-            public Optional<Inventory> findByCharacter(long characterId) {
-                return Optional.of(new Inventory(characterId, 20, List.of()));
-            }
-
-            @Override
-            public Inventory save(dev.kage.inventory.domain.Transaction tx, Inventory inventory) {
-                // không cần verify save() ở test này — WorldFacadeTest/PostgresInventoryAdapter
-                // IntegrationTest đã phủ persistence, test này chỉ verify event gửi đúng.
-                return inventory;
-            }
-        };
-        ItemTemplatePort itemTemplatePort = new ItemTemplatePort() {
-            @Override
-            public Optional<ItemTemplate> findById(long itemTemplateId) {
-                return Optional.empty();
-            }
-
-            @Override
-            public Optional<Long> findIdByCode(String code) {
-                return Optional.empty();
-            }
-        };
+        InventoryPort inventoryPort = new StubInventoryPort();
+        ItemTemplatePort itemTemplatePort = new StubItemTemplatePort();
         AddItemUseCase addItemUseCase =
                 new AddItemUseCase(inventoryPort, itemTemplatePort, action -> action.accept(null));
         GrantLootUseCase grantLootUseCase =
                 new GrantLootUseCase(dropTablePort, inventoryPort, itemTemplatePort, action -> action.accept(null));
         // Equip/unequip không dùng trong test này (chỉ verify grantLoot) — fake tối thiểu để compile.
-        EquipmentPort equipmentPort = new EquipmentPort() {
-            @Override
-            public Optional<Equipment> findByCharacter(long characterId) {
-                return Optional.of(new Equipment(characterId, Map.of()));
-            }
-
-            @Override
-            public void save(Transaction tx, Equipment equipment) {}
-        };
+        EquipmentPort equipmentPort = new StubEquipmentPort();
         EquipItemUseCase equipItemUseCase =
                 new EquipItemUseCase(inventoryPort, itemTemplatePort, equipmentPort, action -> action.accept(null));
         UnequipItemUseCase unequipItemUseCase = new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
@@ -540,6 +510,42 @@ class ConnectedCharacterRegistryTest {
                 new dev.kage.inventory.api.InventoryQueryUseCases(
                         new dev.kage.inventory.application.ListInventoryUseCase(inventoryPort, equipmentPort),
                         new dev.kage.inventory.application.GetItemCatalogUseCase(itemTemplatePort)));
+    }
+
+    private static final class StubInventoryPort implements InventoryPort {
+        @Override
+        public Optional<Inventory> findByCharacter(long characterId) {
+            return Optional.of(new Inventory(characterId, 20, List.of()));
+        }
+
+        @Override
+        public Inventory save(dev.kage.inventory.domain.Transaction tx, Inventory inventory) {
+            // không cần verify save() ở test này — WorldFacadeTest/PostgresInventoryAdapter
+            // IntegrationTest đã phủ persistence, test này chỉ verify event gửi đúng.
+            return inventory;
+        }
+    }
+
+    private static final class StubItemTemplatePort implements ItemTemplatePort {
+        @Override
+        public Optional<ItemTemplate> findById(long itemTemplateId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<Long> findIdByCode(String code) {
+            return Optional.empty();
+        }
+    }
+
+    private static final class StubEquipmentPort implements EquipmentPort {
+        @Override
+        public Optional<Equipment> findByCharacter(long characterId) {
+            return Optional.of(new Equipment(characterId, Map.of()));
+        }
+
+        @Override
+        public void save(Transaction tx, Equipment equipment) {}
     }
 
     /**

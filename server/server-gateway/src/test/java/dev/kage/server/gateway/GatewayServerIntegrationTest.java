@@ -1,5 +1,20 @@
 package dev.kage.server.gateway;
 
+import static dev.kage.server.gateway.SocketWire.acceptDuel;
+import static dev.kage.server.gateway.SocketWire.challengeDuel;
+import static dev.kage.server.gateway.SocketWire.connectCreateAndSelect;
+import static dev.kage.server.gateway.SocketWire.connectCreateAndSelectNamed;
+import static dev.kage.server.gateway.SocketWire.enterDungeon;
+import static dev.kage.server.gateway.SocketWire.exitDungeon;
+import static dev.kage.server.gateway.SocketWire.openSocket;
+import static dev.kage.server.gateway.SocketWire.readDespawnedCharacterIds;
+import static dev.kage.server.gateway.SocketWire.readFrame;
+import static dev.kage.server.gateway.SocketWire.readSpawnedCharacterIds;
+import static dev.kage.server.gateway.SocketWire.readUntilOpcode;
+import static dev.kage.server.gateway.SocketWire.requestPvpRating;
+import static dev.kage.server.gateway.SocketWire.sendFrame;
+import static dev.kage.server.gateway.SocketWire.sendPing;
+import static dev.kage.server.gateway.SocketWire.startAttackSpammer;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.DataInputStream;
@@ -66,18 +81,11 @@ import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
-import dev.kage.protocol.AcceptDuelCommand;
 import dev.kage.protocol.AcceptDuelOutcome;
-import dev.kage.protocol.AcceptDuelResponse;
-import dev.kage.protocol.AttackCommand;
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.BuyItemResponse;
 import dev.kage.protocol.BuyOutcome;
-import dev.kage.protocol.ChallengeDuelCommand;
-import dev.kage.protocol.ChallengeDuelOutcome;
-import dev.kage.protocol.ChallengeDuelResponse;
-import dev.kage.protocol.CharacterDespawnedEvent;
 import dev.kage.protocol.CharacterMovedEvent;
 import dev.kage.protocol.CharacterSpawnedEvent;
 import dev.kage.protocol.ChatChannel;
@@ -88,10 +96,6 @@ import dev.kage.protocol.ClaimQuestRewardResponse;
 import dev.kage.protocol.ConfirmTradeCommand;
 import dev.kage.protocol.ConfirmTradeOutcome;
 import dev.kage.protocol.ConfirmTradeResponse;
-import dev.kage.protocol.ConnectRequest;
-import dev.kage.protocol.ConnectResponse;
-import dev.kage.protocol.CreateCharacterRequest;
-import dev.kage.protocol.CreateCharacterResponse;
 import dev.kage.protocol.DeclineDuelCommand;
 import dev.kage.protocol.DeclineDuelOutcome;
 import dev.kage.protocol.DeclineDuelResponse;
@@ -115,7 +119,6 @@ import dev.kage.protocol.ExitDuelResponse;
 import dev.kage.protocol.ExitDungeonCommand;
 import dev.kage.protocol.ExitDungeonOutcome;
 import dev.kage.protocol.ExitDungeonResponse;
-import dev.kage.protocol.GetPvpRatingRequest;
 import dev.kage.protocol.GetPvpRatingResponse;
 import dev.kage.protocol.JumpCommand;
 import dev.kage.protocol.ListShopItemsRequest;
@@ -126,7 +129,6 @@ import dev.kage.protocol.MoveResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
-import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.SellItemCommand;
 import dev.kage.protocol.SellItemResponse;
 import dev.kage.protocol.SellOutcome;
@@ -166,63 +168,99 @@ class GatewayServerIntegrationTest {
     private CharacterPort characterPort;
     private ConnectedCharacterRegistry characterRegistry;
     private dev.kage.party.api.PartyFacade partyFacade;
-    private dev.kage.pvp.api.PvpFacade pvpFacade;
 
     @BeforeEach
     void startServer() throws InterruptedException, javax.net.ssl.SSLException {
         // port 0 = OS tự cấp cổng trống — tránh đụng cổng khi nhiều test chạy song song.
-        // AccountFacade/CharacterFacade THẬT với Fake Port (không server-database thật) — test
-        // này chỉ verify ping/pong qua socket thật, không chạm Connect/Character, nhưng
-        // GatewayServer luôn cần cả 2 Facade để khởi tạo (xem GatewayServer).
+        // AccountFacade/CharacterFacade THẬT với Fake Port (không server-database thật). TlsConfig.disabled()
+        // — mọi test ở trên verify giao thức qua socket thuần, TLS thật verify riêng ở cuối file này
+        // (shouldReceivePong_overTlsSocket_withPinnedCert và 2 test cạnh nó, ADR-027) — tự start/stop server
+        // RIÊNG, không dùng field server này.
+        AssembledServer assembled = assembleServer(new ServerOptions(
+                TlsConfig.disabled(), GatewayTracing.disabled(), GatewayPipelineTest.fakeTradeFacade()));
+        server = assembled.server();
+        mainWorldChannels = assembled.mainWorldChannels();
+        characterRegistry = assembled.characterRegistry();
+        partyFacade = assembled.party();
+    }
+
+    /** Ba thứ khác nhau giữa các server test: TLS, tracing, và kiểu fake giao dịch. */
+    private record ServerOptions(TlsConfig tls, GatewayTracing tracing, dev.kage.trade.api.TradeFacade trade) {}
+
+    /** Server đã start, cùng các mảnh test cần đọc/dừng sau đó. */
+    private record AssembledServer(
+            GatewayServer server,
+            MainWorldChannelRegistry mainWorldChannels,
+            ConnectedCharacterRegistry characterRegistry,
+            dev.kage.party.api.PartyFacade party) {}
+
+    /**
+     * Dựng và start một gateway thật trên cổng do OS cấp — world chính tick thật, mọi Facade fake (Fake
+     * Port, không DB). Dùng chung cho server chính của mỗi test, server TLS và server tracing.
+     */
+    private AssembledServer assembleServer(ServerOptions options)
+            throws InterruptedException, javax.net.ssl.SSLException {
         CharacterFacade characterFacade = fakeCharacterFacade();
         InventoryFacade inventoryFacade = fakeInventoryFacade();
-        dev.kage.shop.api.ShopFacade shopFacade = fakeShopFacade();
-        dev.kage.dialogue.api.DialogueFacade dialogueFacade = fakeDialogueFacade();
         dev.kage.quest.api.QuestFacade questFacade = fakeQuestFacade();
-        dev.kage.friend.api.FriendFacade friendFacade = fakeFriendFacade();
-        dev.kage.mail.api.MailFacade mailFacade = fakeMailFacade();
-        dev.kage.chat.api.ChatFacade chatFacade = fakeChatFacade();
-        dev.kage.guild.api.GuildFacade guildFacade = fakeGuildFacade();
-        partyFacade = fakePartyFacade();
-        dev.kage.trade.api.TradeFacade tradeFacade = fakeTradeFacade();
-        pvpFacade = fakePvpFacade();
+        dev.kage.party.api.PartyFacade localPartyFacade = fakePartyFacade();
+        dev.kage.pvp.api.PvpFacade localPvpFacade = fakePvpFacade();
         io.micrometer.core.instrument.simple.SimpleMeterRegistry meterRegistry =
                 new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
         GatewayNetworkMetrics networkMetrics = new GatewayNetworkMetrics(meterRegistry);
-        GatewayObservability observability = new GatewayObservability(networkMetrics, GatewayTracing.disabled());
-        characterRegistry = new ConnectedCharacterRegistry(
+        GatewayObservability observability = new GatewayObservability(networkMetrics, options.tracing());
+        ConnectedCharacterRegistry localCharacterRegistry = new ConnectedCharacterRegistry(
                 inventoryFacade, questFacade, ExperienceGrantPort.disabled(), networkMetrics);
         WorldFacade firstChannelFacade = new WorldFacade(
-                characterRegistry, true, TickMetricsPort.NO_OP, TestWorldContents.trainingGroundWithElder());
+                localCharacterRegistry, true, TickMetricsPort.NO_OP, TestWorldContents.trainingGroundWithElder());
         firstChannelFacade.start();
-        mainWorldChannels = new MainWorldChannelRegistry(
-                characterRegistry, firstChannelFacade, meterRegistry, TestWorldContents.trainingGroundWithElder());
-        CharacterPositionPersister positionPersister =
-                new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
-        DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
-                characterRegistry,
-                new DungeonInstanceRegistry.DungeonFacades(characterFacade, partyFacade),
-                mainWorldChannels,
-                TestWorldContents.withBoss());
-        ArenaInstanceRegistry arenaInstanceRegistry =
-                new ArenaInstanceRegistry(characterRegistry, characterFacade, pvpFacade, mainWorldChannels);
+        MainWorldChannelRegistry localMainWorldChannels = new MainWorldChannelRegistry(
+                localCharacterRegistry, firstChannelFacade, meterRegistry, TestWorldContents.trainingGroundWithElder());
         WorldGateway worldGateway = new WorldGateway(
-                mainWorldChannels,
-                characterRegistry,
-                positionPersister,
-                dungeonInstanceRegistry,
-                arenaInstanceRegistry);
+                localMainWorldChannels,
+                localCharacterRegistry,
+                new CharacterPositionPersister(characterFacade, localCharacterRegistry, Duration.ofMinutes(5)),
+                new DungeonInstanceRegistry(
+                        localCharacterRegistry,
+                        new DungeonInstanceRegistry.DungeonFacades(characterFacade, localPartyFacade),
+                        localMainWorldChannels,
+                        TestWorldContents.withBoss()),
+                new ArenaInstanceRegistry(
+                        localCharacterRegistry, characterFacade, localPvpFacade, localMainWorldChannels));
+        GatewayFacades facades = gatewayFacades(
+                characterFacade,
+                inventoryFacade,
+                questFacade,
+                new PlayFacades(localPartyFacade, options.trade(), localPvpFacade));
+        GatewayServer started = new GatewayServer(
+                0, facades, new GatewayServer.GatewayContext(worldGateway, observability), options.tls());
+        started.start();
+        return new AssembledServer(started, localMainWorldChannels, localCharacterRegistry, localPartyFacade);
+    }
+
+    /** Ba Facade mà mỗi server test cần một bản RIÊNG (nhóm/đấu trường giữ trạng thái, giao dịch có hai kiểu). */
+    private record PlayFacades(
+            dev.kage.party.api.PartyFacade party,
+            dev.kage.trade.api.TradeFacade trade,
+            dev.kage.pvp.api.PvpFacade pvp) {}
+
+    /** Mọi Facade của server ở test này — fake, trừ ba cái trong {@code play}. */
+    private GatewayFacades gatewayFacades(
+            CharacterFacade characterFacade,
+            InventoryFacade inventoryFacade,
+            dev.kage.quest.api.QuestFacade questFacade,
+            PlayFacades play) {
         SocialFacades socialFacades = new SocialFacades(
-                friendFacade, mailFacade, chatFacade, guildFacade, partyFacade, tradeFacade, pvpFacade);
-        ContentFacades contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
-        GatewayFacades facades =
-                new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
-        // TlsConfig.disabled() — mọi test ở trên verify giao thức qua socket thuần, TLS thật
-        // verify riêng ở cuối file này (shouldReceivePong_overTlsSocket_withPinnedCert và 2 test
-        // cạnh nó, ADR-027) — tự start/stop server RIÊNG, không dùng field server này.
-        server = new GatewayServer(
-                0, facades, new GatewayServer.GatewayContext(worldGateway, observability), TlsConfig.disabled());
-        server.start();
+                fakeFriendFacade(),
+                GatewayPipelineTest.fakeMailFacade(),
+                fakeChatFacade(),
+                GatewayPipelineTest.fakeGuildFacade(),
+                play.party(),
+                play.trade(),
+                play.pvp());
+        ContentFacades contentFacades = new ContentFacades(
+                GatewayPipelineTest.fakeShopFacade(), fakeDialogueFacade(), questFacade, socialFacades);
+        return new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
     }
 
     private static AccountFacade fakeAccountFacade() {
@@ -262,135 +300,7 @@ class GatewayServerIntegrationTest {
     }
 
     private CharacterFacade fakeCharacterFacade() {
-        characterPort = new CharacterPort() {
-            private final List<Character> characters = new ArrayList<>();
-            private final AtomicLong nextId = new AtomicLong(1);
-            private final Map<Long, PositionSnapshot> positions = new HashMap<>();
-
-            @Override
-            public PositionSnapshot loadPosition(long characterId) {
-                return positions.getOrDefault(characterId, new PositionSnapshot(0f, 0f));
-            }
-
-            @Override
-            public void savePosition(long characterId, float x, float y) {
-                positions.put(characterId, new PositionSnapshot(x, y));
-            }
-
-            // Số liệu khởi điểm PLACEHOLDER (khớp PostgresCharacterAdapter.STARTING_STAT) — test
-            // socket thật ở file này verify pipeline combat, không verify số liệu chỉ số cụ thể.
-            @Override
-            public CharacterStats loadStats(long characterId) {
-                return new CharacterStats(10, 10, 10, 10);
-            }
-
-            @Override
-            public long loadGold(long characterId) {
-                return 0L; // test này không kiểm tra vàng — nhân vật mới vốn có 0 (V7 DEFAULT 0)
-            }
-
-            @Override
-            public List<Character> listByAccount(long accountId) {
-                return characters.stream()
-                        .filter(c -> c.accountId() == accountId)
-                        .toList();
-            }
-
-            @Override
-            public int countByAccount(long accountId) {
-                return listByAccount(accountId).size();
-            }
-
-            @Override
-            public int lockAccountAndCountCharacters(dev.kage.character.domain.Transaction tx, long accountId) {
-                return countByAccount(accountId);
-            }
-
-            @Override
-            public boolean existsByName(String name) {
-                return characters.stream().anyMatch(c -> c.name().equals(name));
-            }
-
-            @Override
-            public Optional<Character> findByName(String name) {
-                return characters.stream().filter(c -> c.name().equals(name)).findFirst();
-            }
-
-            @Override
-            public Optional<Character> findById(long characterId) {
-                return characters.stream().filter(c -> c.id() == characterId).findFirst();
-            }
-
-            @Override
-            public Character create(dev.kage.character.domain.Transaction tx, NewCharacter newCharacter) {
-                Character character = new Character(
-                        nextId.getAndIncrement(),
-                        newCharacter.accountId(),
-                        1,
-                        newCharacter.name(),
-                        newCharacter.faction(),
-                        1,
-                        0,
-                        0,
-                        Instant.now());
-                characters.add(character);
-                return character;
-            }
-
-            @Override
-            public long addExperience(long characterId, long amount) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            // Thi hành thật (không ném) từ ADR-045: test đổi hệ phái cần nhân vật đạt Lv10, và
-            // trong file này không có đường lên cấp nào khác — giết quái tới cấp 10 qua socket
-            // thật sẽ mất hàng chục giây cho một thứ không phải chủ đề của test.
-            @Override
-            public boolean saveLevel(long characterId, int level, long derivedFromExp) {
-                if (findById(characterId).map(Character::exp).orElse(-1L) != derivedFromExp) {
-                    return false;
-                }
-                replaceCharacter(
-                        characterId,
-                        c -> new Character(
-                                c.id(),
-                                c.accountId(),
-                                c.realmId(),
-                                c.name(),
-                                c.faction(),
-                                level,
-                                c.exp(),
-                                c.rebirthCount(),
-                                c.createdAt()));
-                return true;
-            }
-
-            @Override
-            public void updateFaction(long characterId, Faction faction) {
-                replaceCharacter(
-                        characterId,
-                        c -> new Character(
-                                c.id(),
-                                c.accountId(),
-                                c.realmId(),
-                                c.name(),
-                                faction,
-                                c.level(),
-                                c.exp(),
-                                c.rebirthCount(),
-                                c.createdAt()));
-            }
-
-            private void replaceCharacter(long characterId, UnaryOperator<Character> update) {
-                for (int i = 0; i < characters.size(); i++) {
-                    Character existing = characters.get(i);
-                    if (existing.id() == characterId) {
-                        characters.set(i, update.apply(existing));
-                        return;
-                    }
-                }
-            }
-        };
+        characterPort = new StubCharacterPort();
         CreateCharacterUseCase createUseCase = new CreateCharacterUseCase(characterPort, action -> action.accept(null));
         ListCharactersUseCase listUseCase = new ListCharactersUseCase(characterPort);
         SelectCharacterUseCase selectUseCase = new SelectCharacterUseCase(characterPort);
@@ -404,46 +314,146 @@ class GatewayServerIntegrationTest {
         return new CharacterFacade(useCases, characterPort);
     }
 
+    private static final class StubCharacterPort implements CharacterPort {
+        private final List<Character> characters = new ArrayList<>();
+        private final AtomicLong nextId = new AtomicLong(1);
+        private final Map<Long, PositionSnapshot> positions = new HashMap<>();
+
+        @Override
+        public PositionSnapshot loadPosition(long characterId) {
+            return positions.getOrDefault(characterId, new PositionSnapshot(0f, 0f));
+        }
+
+        @Override
+        public void savePosition(long characterId, float x, float y) {
+            positions.put(characterId, new PositionSnapshot(x, y));
+        }
+
+        // Số liệu khởi điểm PLACEHOLDER (khớp PostgresCharacterAdapter.STARTING_STAT) — test
+        // socket thật ở file này verify pipeline combat, không verify số liệu chỉ số cụ thể.
+        @Override
+        public CharacterStats loadStats(long characterId) {
+            return new CharacterStats(10, 10, 10, 10);
+        }
+
+        @Override
+        public long loadGold(long characterId) {
+            return 0L; // test này không kiểm tra vàng — nhân vật mới vốn có 0 (V7 DEFAULT 0)
+        }
+
+        @Override
+        public List<Character> listByAccount(long accountId) {
+            return characters.stream().filter(c -> c.accountId() == accountId).toList();
+        }
+
+        @Override
+        public int countByAccount(long accountId) {
+            return listByAccount(accountId).size();
+        }
+
+        @Override
+        public int lockAccountAndCountCharacters(dev.kage.character.domain.Transaction tx, long accountId) {
+            return countByAccount(accountId);
+        }
+
+        @Override
+        public boolean existsByName(String name) {
+            return characters.stream().anyMatch(c -> c.name().equals(name));
+        }
+
+        @Override
+        public Optional<Character> findByName(String name) {
+            return characters.stream().filter(c -> c.name().equals(name)).findFirst();
+        }
+
+        @Override
+        public Optional<Character> findById(long characterId) {
+            return characters.stream().filter(c -> c.id() == characterId).findFirst();
+        }
+
+        @Override
+        public Character create(dev.kage.character.domain.Transaction tx, NewCharacter newCharacter) {
+            Character character = new Character(
+                    nextId.getAndIncrement(),
+                    newCharacter.accountId(),
+                    1,
+                    newCharacter.name(),
+                    newCharacter.faction(),
+                    1,
+                    0,
+                    0,
+                    Instant.now());
+            characters.add(character);
+            return character;
+        }
+
+        @Override
+        public long addExperience(long characterId, long amount) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        // Thi hành thật (không ném) từ ADR-045: test đổi hệ phái cần nhân vật đạt Lv10, và
+        // trong file này không có đường lên cấp nào khác — giết quái tới cấp 10 qua socket
+        // thật sẽ mất hàng chục giây cho một thứ không phải chủ đề của test.
+        @Override
+        public boolean saveLevel(long characterId, int level, long derivedFromExp) {
+            if (findById(characterId).map(Character::exp).orElse(-1L) != derivedFromExp) {
+                return false;
+            }
+            replaceCharacter(
+                    characterId,
+                    c -> new Character(
+                            c.id(),
+                            c.accountId(),
+                            c.realmId(),
+                            c.name(),
+                            c.faction(),
+                            level,
+                            c.exp(),
+                            c.rebirthCount(),
+                            c.createdAt()));
+            return true;
+        }
+
+        @Override
+        public void updateFaction(long characterId, Faction faction) {
+            replaceCharacter(
+                    characterId,
+                    c -> new Character(
+                            c.id(),
+                            c.accountId(),
+                            c.realmId(),
+                            c.name(),
+                            faction,
+                            c.level(),
+                            c.exp(),
+                            c.rebirthCount(),
+                            c.createdAt()));
+        }
+
+        private void replaceCharacter(long characterId, UnaryOperator<Character> update) {
+            for (int i = 0; i < characters.size(); i++) {
+                Character existing = characters.get(i);
+                if (existing.id() == characterId) {
+                    characters.set(i, update.apply(existing));
+                    return;
+                }
+            }
+        }
+    }
+
     // worldFacade.start() chạy tick thật ở file này, nhưng không test nào hạ gục quái tới chết
     // (chỉ verify đòn đánh đầu tiên) — Fake rỗng vẫn đủ, không rơi vào nhánh grantLoot thật.
     private InventoryFacade fakeInventoryFacade() {
-        InventoryPort inventoryPort = new InventoryPort() {
-            @Override
-            public Optional<Inventory> findByCharacter(long characterId) {
-                return Optional.of(new Inventory(characterId, 20, List.of()));
-            }
-
-            @Override
-            public Inventory save(dev.kage.inventory.domain.Transaction tx, Inventory inventory) {
-                return inventory; // không dùng trong test này
-            }
-        };
+        InventoryPort inventoryPort = new StubInventoryPort();
         DropTablePort dropTablePort = dropTableCode -> List.<DropTableEntry>of();
-        ItemTemplatePort itemTemplatePort = new ItemTemplatePort() {
-            @Override
-            public Optional<ItemTemplate> findById(long itemTemplateId) {
-                return Optional.empty();
-            }
-
-            @Override
-            public Optional<Long> findIdByCode(String code) {
-                return Optional.empty();
-            }
-        };
+        ItemTemplatePort itemTemplatePort = new StubItemTemplatePort();
         AddItemUseCase addItemUseCase =
                 new AddItemUseCase(inventoryPort, itemTemplatePort, action -> action.accept(null));
         GrantLootUseCase grantLootUseCase =
                 new GrantLootUseCase(dropTablePort, inventoryPort, itemTemplatePort, action -> action.accept(null));
         // Equip/unequip không dùng trong test này — fake tối thiểu để compile.
-        EquipmentPort equipmentPort = new EquipmentPort() {
-            @Override
-            public Optional<Equipment> findByCharacter(long characterId) {
-                return Optional.of(new Equipment(characterId, Map.of()));
-            }
-
-            @Override
-            public void save(dev.kage.inventory.domain.Transaction tx, Equipment equipment) {}
-        };
+        EquipmentPort equipmentPort = new StubEquipmentPort();
         EquipItemUseCase equipItemUseCase =
                 new EquipItemUseCase(inventoryPort, itemTemplatePort, equipmentPort, action -> action.accept(null));
         UnequipItemUseCase unequipItemUseCase = new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
@@ -470,63 +480,42 @@ class GatewayServerIntegrationTest {
                         new dev.kage.inventory.application.GetItemCatalogUseCase(itemTemplatePort)));
     }
 
-    // Shop dùng trong 1 test socket thật (list rỗng) — catalog Fake trả rỗng, phần còn lại tối
-    // thiểu để compile, cùng convention fakeInventoryFacade().
-    private dev.kage.shop.api.ShopFacade fakeShopFacade() {
-        dev.kage.shop.domain.ShopCatalogPort catalogPort = new dev.kage.shop.domain.ShopCatalogPort() {
-            @Override
-            public Optional<dev.kage.shop.domain.ShopListing> findListing(long itemTemplateId) {
-                return Optional.empty();
-            }
+    private static final class StubInventoryPort implements InventoryPort {
+        @Override
+        public Optional<Inventory> findByCharacter(long characterId) {
+            return Optional.of(new Inventory(characterId, 20, List.of()));
+        }
 
-            @Override
-            public List<dev.kage.shop.domain.ShopListing> findAll() {
-                return List.of();
-            }
-        };
-        dev.kage.shop.domain.GoldPort shopGoldPort = new dev.kage.shop.domain.GoldPort() {
-            @Override
-            public boolean deductGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {
-                return true;
-            }
+        @Override
+        public Inventory save(dev.kage.inventory.domain.Transaction tx, Inventory inventory) {
+            return inventory; // không dùng trong test này
+        }
+    }
 
-            @Override
-            public void creditGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {}
-        };
-        dev.kage.shop.domain.InventoryGatewayPort inventoryGatewayPort =
-                new dev.kage.shop.domain.InventoryGatewayPort() {
-                    @Override
-                    public Optional<dev.kage.shop.domain.OwnedItem> findItem(long characterId, long itemId) {
-                        return Optional.empty();
-                    }
+    private static final class StubItemTemplatePort implements ItemTemplatePort {
+        @Override
+        public Optional<ItemTemplate> findById(long itemTemplateId) {
+            return Optional.empty();
+        }
 
-                    @Override
-                    public boolean grantItem(
-                            dev.kage.shop.domain.Transaction tx, long characterId, long itemTemplateId, int quantity) {
-                        return true;
-                    }
+        @Override
+        public Optional<Long> findIdByCode(String code) {
+            return Optional.empty();
+        }
+    }
 
-                    @Override
-                    public boolean removeQuantity(
-                            dev.kage.shop.domain.Transaction tx, long characterId, long itemId, int quantity) {
-                        return true;
-                    }
-                };
-        dev.kage.shop.domain.AuditPort shopAuditPort = (tx, characterId, action, detailJson) -> {};
-        dev.kage.shop.domain.IdempotencyPort shopIdempotencyPort = (tx, idempotencyKey) -> {};
-        dev.kage.shop.application.ShopPorts ports = new dev.kage.shop.application.ShopPorts(
-                catalogPort, shopGoldPort, inventoryGatewayPort, shopAuditPort, shopIdempotencyPort);
-        dev.kage.shop.application.ListShopItemsUseCase listShopItemsUseCase =
-                new dev.kage.shop.application.ListShopItemsUseCase(catalogPort);
-        dev.kage.shop.application.BuyItemUseCase buyItemUseCase =
-                new dev.kage.shop.application.BuyItemUseCase(ports, action -> action.accept(null));
-        dev.kage.shop.application.SellItemUseCase sellItemUseCase =
-                new dev.kage.shop.application.SellItemUseCase(ports, action -> action.accept(null));
-        return new dev.kage.shop.api.ShopFacade(listShopItemsUseCase, buyItemUseCase, sellItemUseCase);
+    private static final class StubEquipmentPort implements EquipmentPort {
+        @Override
+        public Optional<Equipment> findByCharacter(long characterId) {
+            return Optional.of(new Equipment(characterId, Map.of()));
+        }
+
+        @Override
+        public void save(dev.kage.inventory.domain.Transaction tx, Equipment equipment) {}
     }
 
     // Dialogue dùng trong 1 test socket thật (NPC không tồn tại) — Fake port luôn trả rỗng, phần
-    // còn lại tối thiểu để compile, cùng convention fakeShopFacade().
+    // còn lại tối thiểu để compile, cùng convention GatewayPipelineTest.fakeShopFacade().
     private dev.kage.dialogue.api.DialogueFacade fakeDialogueFacade() {
         dev.kage.dialogue.domain.NpcTemplatePort npcTemplatePort = npcCode -> Optional.empty();
         dev.kage.dialogue.application.GetDialogueNodeUseCase useCase =
@@ -617,147 +606,10 @@ class GatewayServerIntegrationTest {
         return new dev.kage.friend.api.FriendFacade(useCases);
     }
 
-    // Mail không dùng trong test này — fake tối thiểu để compile (cùng convention fakeFriendFacade).
-    private dev.kage.mail.api.MailFacade fakeMailFacade() {
-        dev.kage.mail.domain.MailRepositoryPort mailRepositoryPort = new dev.kage.mail.domain.MailRepositoryPort() {
-            @Override
-            public dev.kage.mail.domain.Mail send(
-                    dev.kage.mail.domain.Transaction tx, dev.kage.mail.domain.NewMail newMail) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.mail.domain.Mail> findById(long mailId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.mail.domain.Mail> findByIdForUpdate(
-                    dev.kage.mail.domain.Transaction tx, long mailId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public List<dev.kage.mail.domain.Mail> listForRecipient(long recipientId) {
-                return List.of();
-            }
-
-            @Override
-            public boolean markClaimed(dev.kage.mail.domain.Transaction tx, long mailId, long recipientId) {
-                return false;
-            }
-
-            @Override
-            public boolean delete(long mailId, long recipientId) {
-                return false;
-            }
-        };
-        dev.kage.mail.domain.AuditPort mailAuditPort = (tx, characterId, action, detailJson) -> {};
-        dev.kage.mail.domain.IdempotencyPort mailIdempotencyPort = (tx, idempotencyKey) -> {};
-        dev.kage.mail.domain.TransactionRunner mailTx = action -> action.accept(null);
-        dev.kage.mail.application.ListMailUseCase listMailUseCase =
-                new dev.kage.mail.application.ListMailUseCase(mailRepositoryPort);
-        dev.kage.mail.application.MailPorts mailPorts = new dev.kage.mail.application.MailPorts(
-                mailRepositoryPort,
-                new FakeMailGoldPort(),
-                new FakeMailInventoryGatewayPort(),
-                mailAuditPort,
-                mailIdempotencyPort);
-        dev.kage.mail.application.SendMailUseCase sendMailUseCase =
-                new dev.kage.mail.application.SendMailUseCase(mailPorts, mailTx);
-        dev.kage.mail.application.ClaimMailUseCase claimMailUseCase =
-                new dev.kage.mail.application.ClaimMailUseCase(mailPorts, mailTx);
-        dev.kage.mail.application.DeleteMailUseCase deleteMailUseCase =
-                new dev.kage.mail.application.DeleteMailUseCase(mailRepositoryPort);
-        return new dev.kage.mail.api.MailFacade(sendMailUseCase, listMailUseCase, claimMailUseCase, deleteMailUseCase);
-    }
-
     // Chat không dùng trong test này — fake tối thiểu để compile (cùng convention fakeMailFacade).
     private dev.kage.chat.api.ChatFacade fakeChatFacade() {
         dev.kage.chat.domain.ChatAuditPort chatAuditPort = (characterId, action, detailJson) -> {};
         return new dev.kage.chat.api.ChatFacade(new dev.kage.chat.application.SendChatMessageUseCase(chatAuditPort));
-    }
-
-    // Guild không dùng trong test này — fake tối thiểu để compile (cùng convention fakeChatFacade).
-    private dev.kage.guild.api.GuildFacade fakeGuildFacade() {
-        dev.kage.guild.domain.GuildPort guildPort = new dev.kage.guild.domain.GuildPort() {
-            @Override
-            public Optional<dev.kage.guild.domain.Guild> findByName(String name) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.guild.domain.Guild> findById(long guildId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.guild.domain.GuildMember> findMembershipOf(long characterId) {
-                return Optional.empty();
-            }
-
-            @Override
-            public List<dev.kage.guild.domain.GuildMember> listMembers(long guildId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public dev.kage.guild.domain.Guild createGuild(String name, long leaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean disbandGuild(long leaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean leaveGuild(long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.guild.domain.GuildJoinRequest> findPendingRequestOfCharacter(long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public List<dev.kage.guild.domain.GuildJoinRequest> listPendingRequests(long guildId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public dev.kage.guild.domain.GuildJoinRequest sendJoinRequest(long guildId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public ApproveResult approveJoinRequest(long requestId, long leaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean rejectJoinRequest(long requestId, long leaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-        };
-        dev.kage.guild.application.GuildUseCases useCases = new dev.kage.guild.application.GuildUseCases(
-                new dev.kage.guild.application.CreateGuildUseCase(guildPort),
-                new dev.kage.guild.application.SendGuildJoinRequestUseCase(guildPort),
-                new dev.kage.guild.application.ApproveGuildJoinRequestUseCase(guildPort),
-                new dev.kage.guild.application.RejectGuildJoinRequestUseCase(guildPort),
-                new dev.kage.guild.application.LeaveGuildUseCase(guildPort),
-                new dev.kage.guild.application.DisbandGuildUseCase(guildPort),
-                new dev.kage.guild.application.KickGuildMemberUseCase(guildPort),
-                new dev.kage.guild.application.ListGuildMembersUseCase(guildPort),
-                new dev.kage.guild.application.ListPendingGuildJoinRequestsUseCase(guildPort),
-                new dev.kage.guild.application.FindMyGuildUseCase(guildPort));
-        return new dev.kage.guild.api.GuildFacade(useCases);
     }
 
     // Party không dùng trong test này — fake tối thiểu để compile (cùng convention fakeGuildFacade).
@@ -768,111 +620,7 @@ class GatewayServerIntegrationTest {
      * {@code PostgresPartyAdapter} — test này single-thread, không có race thật cần chống.
      */
     private dev.kage.party.api.PartyFacade fakePartyFacade() {
-        dev.kage.party.domain.PartyPort partyPort = new dev.kage.party.domain.PartyPort() {
-            private final Map<Long, dev.kage.party.domain.Party> partiesById = new HashMap<>();
-            private final Map<Long, List<dev.kage.party.domain.PartyMember>> membersByPartyId = new HashMap<>();
-            private final Map<Long, dev.kage.party.domain.PartyInvite> invitesById = new HashMap<>();
-            private final AtomicLong nextPartyId = new AtomicLong(1);
-            private final AtomicLong nextInviteId = new AtomicLong(1);
-
-            @Override
-            public Optional<dev.kage.party.domain.PartyMember> findMembershipOf(long characterId) {
-                return membersByPartyId.values().stream()
-                        .flatMap(List::stream)
-                        .filter(m -> m.characterId() == characterId)
-                        .findFirst();
-            }
-
-            @Override
-            public List<dev.kage.party.domain.PartyMember> listMembers(long partyId) {
-                return List.copyOf(membersByPartyId.getOrDefault(partyId, List.of()));
-            }
-
-            @Override
-            public dev.kage.party.domain.Party createParty(long leaderCharacterId) {
-                long partyId = nextPartyId.getAndIncrement();
-                dev.kage.party.domain.Party party =
-                        new dev.kage.party.domain.Party(partyId, leaderCharacterId, Instant.now());
-                partiesById.put(partyId, party);
-                dev.kage.party.domain.PartyMember leader = new dev.kage.party.domain.PartyMember(
-                        partyId, leaderCharacterId, dev.kage.party.domain.PartyRole.LEADER, Instant.now());
-                membersByPartyId.put(partyId, new ArrayList<>(List.of(leader)));
-                return party;
-            }
-
-            @Override
-            public Optional<dev.kage.party.domain.PartyInvite> findPendingInviteOfInvitee(long characterId) {
-                return invitesById.values().stream()
-                        .filter(i -> i.inviteeCharacterId() == characterId)
-                        .findFirst();
-            }
-
-            @Override
-            public List<dev.kage.party.domain.PartyInvite> listPendingInvitesOfInvitee(long characterId) {
-                return invitesById.values().stream()
-                        .filter(i -> i.inviteeCharacterId() == characterId)
-                        .toList();
-            }
-
-            @Override
-            public boolean transferLeadership(long leaderCharacterId, long newLeaderCharacterId) {
-                return false; // fake không có nhóm nào để chuyển quyền
-            }
-
-            @Override
-            public int deleteInvitesInvitedBefore(java.time.Instant cutoff) {
-                return 0; // fake không giữ lời mời nào để hết hạn
-            }
-
-            @Override
-            public dev.kage.party.domain.PartyInvite invite(long partyId, long inviteeCharacterId) {
-                long inviteId = nextInviteId.getAndIncrement();
-                dev.kage.party.domain.PartyInvite invite =
-                        new dev.kage.party.domain.PartyInvite(inviteId, partyId, inviteeCharacterId, Instant.now());
-                invitesById.put(inviteId, invite);
-                return invite;
-            }
-
-            @Override
-            public AcceptResult acceptInvite(long inviteId, long characterId) {
-                dev.kage.party.domain.PartyInvite invite = invitesById.get(inviteId);
-                if (invite == null || invite.inviteeCharacterId() != characterId) {
-                    return AcceptResult.NOT_FOUND;
-                }
-                invitesById.remove(inviteId);
-                dev.kage.party.domain.PartyMember member = new dev.kage.party.domain.PartyMember(
-                        invite.partyId(), characterId, dev.kage.party.domain.PartyRole.MEMBER, Instant.now());
-                membersByPartyId
-                        .computeIfAbsent(invite.partyId(), id -> new ArrayList<>())
-                        .add(member);
-                return AcceptResult.OK;
-            }
-
-            @Override
-            public boolean rejectInvite(long inviteId, long characterId) {
-                dev.kage.party.domain.PartyInvite invite = invitesById.get(inviteId);
-                if (invite == null || invite.inviteeCharacterId() != characterId) {
-                    return false;
-                }
-                invitesById.remove(inviteId);
-                return true;
-            }
-
-            @Override
-            public LeaveResult leaveParty(long characterId) {
-                Optional<dev.kage.party.domain.PartyMember> membership = findMembershipOf(characterId);
-                if (membership.isEmpty()) {
-                    return LeaveResult.NOT_IN_PARTY;
-                }
-                membersByPartyId.get(membership.get().partyId()).removeIf(m -> m.characterId() == characterId);
-                return LeaveResult.OK;
-            }
-
-            @Override
-            public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-        };
+        dev.kage.party.domain.PartyPort partyPort = new StubPartyPort();
         dev.kage.party.application.PartyUseCases useCases = new dev.kage.party.application.PartyUseCases(
                 new dev.kage.party.application.CreatePartyUseCase(partyPort),
                 new dev.kage.party.application.InvitePartyMemberUseCase(partyPort),
@@ -887,93 +635,110 @@ class GatewayServerIntegrationTest {
         return new dev.kage.party.api.PartyFacade(useCases);
     }
 
-    // Trade không dùng trong test này — fake tối thiểu để compile (cùng convention fakePartyFacade).
-    private dev.kage.trade.api.TradeFacade fakeTradeFacade() {
-        dev.kage.trade.domain.TradeSessionPort sessionPort = new dev.kage.trade.domain.TradeSessionPort() {
-            @Override
-            public Optional<dev.kage.trade.domain.TradeSession> findActiveSessionOfCharacter(long characterId) {
-                return Optional.empty();
-            }
+    private static final class StubPartyPort implements dev.kage.party.domain.PartyPort {
+        private final Map<Long, dev.kage.party.domain.Party> partiesById = new HashMap<>();
+        private final Map<Long, List<dev.kage.party.domain.PartyMember>> membersByPartyId = new HashMap<>();
+        private final Map<Long, dev.kage.party.domain.PartyInvite> invitesById = new HashMap<>();
+        private final AtomicLong nextPartyId = new AtomicLong(1);
+        private final AtomicLong nextInviteId = new AtomicLong(1);
 
-            @Override
-            public dev.kage.trade.domain.TradeSession createRequest(long requesterCharacterId, long targetCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+        @Override
+        public Optional<dev.kage.party.domain.PartyMember> findMembershipOf(long characterId) {
+            return membersByPartyId.values().stream()
+                    .flatMap(List::stream)
+                    .filter(m -> m.characterId() == characterId)
+                    .findFirst();
+        }
 
-            @Override
-            public boolean acceptRequest(long sessionId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+        @Override
+        public List<dev.kage.party.domain.PartyMember> listMembers(long partyId) {
+            return List.copyOf(membersByPartyId.getOrDefault(partyId, List.of()));
+        }
 
-            @Override
-            public boolean deleteSessionIfParticipant(long sessionId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+        @Override
+        public dev.kage.party.domain.Party createParty(long leaderCharacterId) {
+            long partyId = nextPartyId.getAndIncrement();
+            dev.kage.party.domain.Party party =
+                    new dev.kage.party.domain.Party(partyId, leaderCharacterId, Instant.now());
+            partiesById.put(partyId, party);
+            dev.kage.party.domain.PartyMember leader = new dev.kage.party.domain.PartyMember(
+                    partyId, leaderCharacterId, dev.kage.party.domain.PartyRole.LEADER, Instant.now());
+            membersByPartyId.put(partyId, new ArrayList<>(List.of(leader)));
+            return party;
+        }
 
-            @Override
-            public boolean replaceOffer(
-                    long sessionId,
-                    long characterId,
-                    long goldAmount,
-                    List<dev.kage.trade.domain.OfferedItemInput> items) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+        @Override
+        public Optional<dev.kage.party.domain.PartyInvite> findPendingInviteOfInvitee(long characterId) {
+            return invitesById.values().stream()
+                    .filter(i -> i.inviteeCharacterId() == characterId)
+                    .findFirst();
+        }
 
-            @Override
-            public Optional<dev.kage.trade.domain.TradeSessionSnapshot> findSnapshot(long sessionId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+        @Override
+        public List<dev.kage.party.domain.PartyInvite> listPendingInvitesOfInvitee(long characterId) {
+            return invitesById.values().stream()
+                    .filter(i -> i.inviteeCharacterId() == characterId)
+                    .toList();
+        }
 
-            @Override
-            public Optional<dev.kage.trade.domain.TradeSessionSnapshot> lockForExecution(
-                    dev.kage.trade.domain.Transaction tx, long sessionId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+        @Override
+        public boolean transferLeadership(long leaderCharacterId, long newLeaderCharacterId) {
+            return false; // fake không có nhóm nào để chuyển quyền
+        }
 
-            @Override
-            public void setConfirmed(dev.kage.trade.domain.Transaction tx, long sessionId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+        @Override
+        public int deleteInvitesInvitedBefore(java.time.Instant cutoff) {
+            return 0; // fake không giữ lời mời nào để hết hạn
+        }
 
-            @Override
-            public void deleteSession(dev.kage.trade.domain.Transaction tx, long sessionId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-        };
-        dev.kage.trade.domain.TradeInventoryPort inventoryPort = new dev.kage.trade.domain.TradeInventoryPort() {
-            @Override
-            public Optional<dev.kage.trade.domain.OwnedItemSnapshot> findItemById(long itemId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+        @Override
+        public dev.kage.party.domain.PartyInvite invite(long partyId, long inviteeCharacterId) {
+            long inviteId = nextInviteId.getAndIncrement();
+            dev.kage.party.domain.PartyInvite invite =
+                    new dev.kage.party.domain.PartyInvite(inviteId, partyId, inviteeCharacterId, Instant.now());
+            invitesById.put(inviteId, invite);
+            return invite;
+        }
 
-            @Override
-            public TransferOutcome transferItem(dev.kage.trade.domain.Transaction tx, TransferRequest request) {
-                throw new UnsupportedOperationException("không dùng ở test này");
+        @Override
+        public AcceptResult acceptInvite(long inviteId, long characterId) {
+            dev.kage.party.domain.PartyInvite invite = invitesById.get(inviteId);
+            if (invite == null || invite.inviteeCharacterId() != characterId) {
+                return AcceptResult.NOT_FOUND;
             }
-        };
-        dev.kage.trade.domain.TradeGoldPort goldPort = new dev.kage.trade.domain.TradeGoldPort() {
-            @Override
-            public boolean deductGold(dev.kage.trade.domain.Transaction tx, long characterId, long amount) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
+            invitesById.remove(inviteId);
+            dev.kage.party.domain.PartyMember member = new dev.kage.party.domain.PartyMember(
+                    invite.partyId(), characterId, dev.kage.party.domain.PartyRole.MEMBER, Instant.now());
+            membersByPartyId
+                    .computeIfAbsent(invite.partyId(), id -> new ArrayList<>())
+                    .add(member);
+            return AcceptResult.OK;
+        }
 
-            @Override
-            public void creditGold(dev.kage.trade.domain.Transaction tx, long characterId, long amount) {
-                throw new UnsupportedOperationException("không dùng ở test này");
+        @Override
+        public boolean rejectInvite(long inviteId, long characterId) {
+            dev.kage.party.domain.PartyInvite invite = invitesById.get(inviteId);
+            if (invite == null || invite.inviteeCharacterId() != characterId) {
+                return false;
             }
-        };
-        dev.kage.trade.domain.TradeAuditPort auditPort = (tx, characterId, action, detailJson) -> {};
-        dev.kage.trade.domain.IdempotencyPort idempotencyPort = (tx, idempotencyKey) -> {};
-        dev.kage.trade.application.TradePorts ports = new dev.kage.trade.application.TradePorts(
-                sessionPort, inventoryPort, goldPort, auditPort, idempotencyPort);
-        dev.kage.trade.application.TradeUseCases useCases = new dev.kage.trade.application.TradeUseCases(
-                new dev.kage.trade.application.RequestTradeUseCase(sessionPort),
-                new dev.kage.trade.application.AcceptTradeRequestUseCase(sessionPort),
-                new dev.kage.trade.application.CancelTradeUseCase(sessionPort),
-                new dev.kage.trade.application.SetTradeOfferUseCase(sessionPort),
-                new dev.kage.trade.application.ConfirmTradeUseCase(ports, action -> action.accept(null)),
-                new dev.kage.trade.application.GetTradeStatusUseCase(sessionPort, inventoryPort));
-        return new dev.kage.trade.api.TradeFacade(useCases);
+            invitesById.remove(inviteId);
+            return true;
+        }
+
+        @Override
+        public LeaveResult leaveParty(long characterId) {
+            Optional<dev.kage.party.domain.PartyMember> membership = findMembershipOf(characterId);
+            if (membership.isEmpty()) {
+                return LeaveResult.NOT_IN_PARTY;
+            }
+            membersByPartyId.get(membership.get().partyId()).removeIf(m -> m.characterId() == characterId);
+            return LeaveResult.OK;
+        }
+
+        @Override
+        public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
     }
 
     // Fake THẬT (không throw) — test Arena ở file này verify trọn vẹn luồng thách đấu/rating thật
@@ -1156,10 +921,8 @@ class GatewayServerIntegrationTest {
         // Nửa trước (2026-08-29) chỉ vá cache ngoại hình nên chỉ người tới SAU mới thấy đúng; đây
         // là đường đi thật của nửa sau, qua chính giao thức dây: A đứng nhìn, B đổi hệ phái, A phải
         // nhận opcode 307 mang hệ phái MỚI mà không cần B rời rồi vào lại tầm nhìn.
-        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
-                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
-            socketA.setSoTimeout(5000);
-            socketB.setSoTimeout(5000);
+        try (Socket socketA = openSocket(server.port(), 5000);
+                Socket socketB = openSocket(server.port(), 5000)) {
             DataInputStream inA = new DataInputStream(socketA.getInputStream());
             DataInputStream inB = new DataInputStream(socketB.getInputStream());
 
@@ -1209,10 +972,8 @@ class GatewayServerIntegrationTest {
     void twoClientsShouldSeeEachOtherMove_overRealSockets() throws Exception {
         // Verify đúng Phase 3 Exit Criteria (ROADMAP.md): "2 client kết nối cùng server, thấy
         // nhau di chuyển" — qua chính giao thức dây (socket thật), không chỉ nội bộ WorldFacade.
-        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
-                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
-            socketA.setSoTimeout(5000);
-            socketB.setSoTimeout(5000);
+        try (Socket socketA = openSocket(server.port(), 5000);
+                Socket socketB = openSocket(server.port(), 5000)) {
             DataInputStream inA = new DataInputStream(socketA.getInputStream());
             DataInputStream inB = new DataInputStream(socketB.getInputStream());
 
@@ -1280,12 +1041,9 @@ class GatewayServerIntegrationTest {
     void partyShouldEnterAndExitDungeonAsSeparateWorld_overRealSockets() throws Exception {
         // Phase 8 lát cắt 1 (ADR-026): "cả party cùng vào 1 World riêng, tick độc lập world
         // chính" — verify qua chính giao thức dây, không chỉ nội bộ DungeonInstanceRegistry.
-        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
-                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port());
-                Socket socketC = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
-            socketA.setSoTimeout(5000);
-            socketB.setSoTimeout(5000);
-            socketC.setSoTimeout(5000);
+        try (Socket socketA = openSocket(server.port(), 5000);
+                Socket socketB = openSocket(server.port(), 5000);
+                Socket socketC = openSocket(server.port(), 5000)) {
             DataInputStream inA = new DataInputStream(socketA.getInputStream());
             DataInputStream inB = new DataInputStream(socketB.getInputStream());
             DataInputStream inC = new DataInputStream(socketC.getInputStream());
@@ -1300,93 +1058,69 @@ class GatewayServerIntegrationTest {
             // trước khi cho A/B rời world chính, nếu không assertion "C thấy A/B despawn" bên dưới
             // có thể đợi mãi: nếu sync() CHƯA từng chạy, {@code visibleTo} của A/B vẫn RỖNG lúc
             // detach nên KHÔNG có ai để báo despawn (không phải lỗi despawn, mà chưa từng "spawn").
-            java.util.HashSet<Long> spawnedSeenByC = new java.util.HashSet<Long>();
-            spawnedSeenByC.add(
-                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
-                                    .payload())
-                            .getCharacterId());
-            spawnedSeenByC.add(
-                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
-                                    .payload())
-                            .getCharacterId());
-            assertThat(spawnedSeenByC).containsExactlyInAnyOrder(characterA, characterB);
+            assertThat(readSpawnedCharacterIds(inC, 2)).containsExactlyInAnyOrder(characterA, characterB);
 
-            // Party A+B qua PartyFacade trực tiếp (đã có test riêng cho luồng mời/chấp nhận qua
-            // socket ở feature-party — test này chỉ cần TIỀN ĐIỀU KIỆN "A+B cùng party" để tập
-            // trung verify cơ chế dungeon). C KHÔNG vào party — ở lại world chính làm chứng nhân.
-            partyFacade.createParty(characterA);
-            partyFacade.invite(characterA, characterB);
-            long inviteId = partyFacade.listPendingInvites(characterB).get(0).inviteId();
-            partyFacade.acceptInvite(inviteId, characterB);
+            // Party A+B qua PartyFacade trực tiếp — test này chỉ cần TIỀN ĐIỀU KIỆN "A+B cùng party".
+            // C KHÔNG vào party — ở lại world chính làm chứng nhân.
+            formParty(characterA, characterB);
 
-            // A gửi EnterDungeonCommand — kéo THEO CẢ B (cùng party, đang online) vào CHUNG 1 instance.
-            EnterDungeonCommand enterCommand = EnterDungeonCommand.newBuilder()
-                    .setDungeonCode("sample_dungeon")
-                    .build();
-            sendFrame(socketA, Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, 20, enterCommand.toByteArray());
-            EnterDungeonResponse enterResponseA =
-                    EnterDungeonResponse.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE)
-                            .payload());
-            assertThat(enterResponseA.getOutcome()).isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
-
-            // B gửi lại CŨNG EnterDungeonCommand — đã bị A kéo vào sẵn, outcome phải là ALREADY_IN_DUNGEON.
-            sendFrame(socketB, Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, 20, enterCommand.toByteArray());
-            EnterDungeonResponse enterResponseB =
-                    EnterDungeonResponse.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE)
-                            .payload());
-            assertThat(enterResponseB.getOutcome())
+            // A vào — kéo THEO CẢ B vào CHUNG 1 instance; B gửi lại thì đã ở trong sẵn.
+            assertThat(enterDungeon(socketA, inA, 20)).isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
+            assertThat(enterDungeon(socketB, inB, 20))
                     .isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_ALREADY_IN_DUNGEON);
 
             // C (world chính) phải thấy CẢ A lẫn B despawn — chứng minh 2 người đã RỜI world chính
             // thật (không chỉ "coi như" rời), vì AoI world chính không còn giữ entity của họ nữa.
-            java.util.HashSet<Long> despawnedIds = new java.util.HashSet<Long>();
-            despawnedIds.add(CharacterDespawnedEvent.parseFrom(
-                            readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE)
-                                    .payload())
-                    .getCharacterId());
-            despawnedIds.add(CharacterDespawnedEvent.parseFrom(
-                            readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE)
-                                    .payload())
-                    .getCharacterId());
-            assertThat(despawnedIds).containsExactlyInAnyOrder(characterA, characterB);
+            assertThat(readDespawnedCharacterIds(inC, 2)).containsExactlyInAnyOrder(characterA, characterB);
 
-            // A di chuyển TRONG dungeon — B (cùng instance) phải thấy, chứng minh 2 người đang
-            // tick chung 1 World riêng (không phải world chính, đã verify despawn ở trên).
-            MoveCommand moveCommand =
-                    MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
-            sendFrame(socketA, Opcode.OPCODE_MOVE_COMMAND_VALUE, 21, moveCommand.toByteArray());
-            PacketCodec.Frame moveResponseFrame = readUntilOpcode(inA, Opcode.OPCODE_MOVE_RESPONSE_VALUE);
-            assertThat(moveResponseFrame.header().sequenceId()).isEqualTo(21);
-
-            CharacterMovedEvent movedSeenByB =
-                    CharacterMovedEvent.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE)
-                            .payload());
-            assertThat(movedSeenByB.getCharacterId()).isEqualTo(characterA);
-            assertThat(movedSeenByB.getX()).isGreaterThan(0f);
-
-            // A rời dungeon — về ĐÚNG vị trí thật trước khi vào (0,0), C (world chính) thấy A
-            // spawn lại — chứng minh A đã quay về world chính thành công.
-            ExitDungeonCommand exitCommand = ExitDungeonCommand.newBuilder().build();
-            sendFrame(socketA, Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE, 22, exitCommand.toByteArray());
-            ExitDungeonResponse exitResponseA =
-                    ExitDungeonResponse.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE)
-                            .payload());
-            assertThat(exitResponseA.getOutcome()).isEqualTo(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK);
-
-            CharacterSpawnedEvent spawnSeenByC =
-                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
-                            .payload());
-            assertThat(spawnSeenByC.getCharacterId()).isEqualTo(characterA);
-            assertThat(spawnSeenByC.getX()).isEqualTo(0f);
-            assertThat(spawnSeenByC.getY()).isEqualTo(0f);
-
-            // B rời nốt — dungeon instance rỗng, World của nó tự dừng (DungeonInstanceRegistry).
-            sendFrame(socketB, Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE, 22, exitCommand.toByteArray());
-            ExitDungeonResponse exitResponseB =
-                    ExitDungeonResponse.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE)
-                            .payload());
-            assertThat(exitResponseB.getOutcome()).isEqualTo(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK);
+            assertMovementSeenInsideDungeon(new DungeonPair(socketA, inA, characterA, inB));
+            assertLeavesTheDungeonBackToTheMainWorld(socketA, inA, characterA, inC);
+            assertThat(exitDungeon(socketB, inB, 22)).isEqualTo(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK);
         }
+    }
+
+    /** Người đi trong hầm ngục + luồng đọc của đồng đội cùng instance. */
+    private record DungeonPair(Socket moverSocket, DataInputStream moverIn, long moverId, DataInputStream mateIn) {}
+
+    /**
+     * Người đi di chuyển TRONG hầm ngục — đồng đội cùng instance phải thấy, chứng minh hai người đang
+     * tick chung một World riêng (không phải world chính: đã thấy họ despawn ở đó).
+     */
+    private static void assertMovementSeenInsideDungeon(DungeonPair pair) throws Exception {
+        MoveCommand moveCommand =
+                MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
+        sendFrame(pair.moverSocket(), Opcode.OPCODE_MOVE_COMMAND_VALUE, 21, moveCommand.toByteArray());
+        PacketCodec.Frame moveResponseFrame = readUntilOpcode(pair.moverIn(), Opcode.OPCODE_MOVE_RESPONSE_VALUE);
+        assertThat(moveResponseFrame.header().sequenceId()).isEqualTo(21);
+
+        CharacterMovedEvent movedSeenByMate =
+                CharacterMovedEvent.parseFrom(readUntilOpcode(pair.mateIn(), Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE)
+                        .payload());
+        assertThat(movedSeenByMate.getCharacterId()).isEqualTo(pair.moverId());
+        assertThat(movedSeenByMate.getX()).isGreaterThan(0f);
+    }
+
+    /**
+     * Rời hầm ngục — về ĐÚNG vị trí thật trước khi vào (0,0), và người ở world chính ({@code witnessIn})
+     * thấy họ spawn lại: chứng minh đã quay về world chính thành công.
+     */
+    private static void assertLeavesTheDungeonBackToTheMainWorld(
+            Socket leaverSocket, DataInputStream leaverIn, long leaverId, DataInputStream witnessIn) throws Exception {
+        assertThat(exitDungeon(leaverSocket, leaverIn, 22)).isEqualTo(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK);
+        CharacterSpawnedEvent spawnSeenByWitness =
+                CharacterSpawnedEvent.parseFrom(readUntilOpcode(witnessIn, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
+                        .payload());
+        assertThat(spawnSeenByWitness.getCharacterId()).isEqualTo(leaverId);
+        assertThat(spawnSeenByWitness.getX()).isEqualTo(0f);
+        assertThat(spawnSeenByWitness.getY()).isEqualTo(0f);
+    }
+
+    /** {@code leader} lập nhóm và kéo {@code member} vào — qua Facade, không qua dây. */
+    private void formParty(long leader, long member) {
+        partyFacade.createParty(leader);
+        partyFacade.invite(leader, member);
+        long inviteId = partyFacade.listPendingInvites(member).get(0).inviteId();
+        partyFacade.acceptInvite(inviteId, member);
     }
 
     @Test
@@ -1398,22 +1132,13 @@ class GatewayServerIntegrationTest {
         // (DungeonInstanceRegistry.createInstance gọi spawnBoss() sau start()). Verify qua chính
         // giao thức dây: boss xuất hiện, đánh xuyên nhiều pha (heavy_strike/enrage — SkillResultEvent
         // TÁI DÙNG, không opcode riêng), chết → MonsterDespawnedEvent.
-        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
-            socket.setSoTimeout(10000);
+        try (Socket socket = openSocket(server.port(), 10000)) {
             DataInputStream in = new DataInputStream(socket.getInputStream());
 
             long characterId = connectCreateAndSelect(
                     socket, in, "boss" + UUID.randomUUID().toString().substring(0, 6));
             partyFacade.createParty(characterId); // party 1 người — đủ điều kiện vào dungeon.
-
-            EnterDungeonCommand enterCommand = EnterDungeonCommand.newBuilder()
-                    .setDungeonCode("sample_dungeon")
-                    .build();
-            sendFrame(socket, Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, 30, enterCommand.toByteArray());
-            EnterDungeonResponse enterResponse =
-                    EnterDungeonResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE)
-                            .payload());
-            assertThat(enterResponse.getOutcome()).isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
+            assertThat(enterDungeon(socket, in, 30)).isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
 
             MonsterSpawnedEvent bossSpawned =
                     MonsterSpawnedEvent.parseFrom(readUntilOpcode(in, Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE)
@@ -1426,33 +1151,42 @@ class GatewayServerIntegrationTest {
             sendFrame(socket, Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, 31, setTarget.toByteArray());
             startAttackSpammer(socket); // đánh thường phải bấm tay từ 2026-08-09
 
-            // Boss phải dùng ÍT NHẤT 1 chiêu đặc biệt trước khi chết — đọc frame liên tục, phân
-            // loại theo opcode, dừng khi thấy 1 trong 2 (hoặc boss chết trước, coi như thất bại).
-            boolean sawSpecialAction = false;
-            boolean bossDied = false;
-            for (int i = 0; i < 5000 && !bossDied; i++) {
-                PacketCodec.Frame frame = readFrame(in);
-                if (frame.header().opcode() == Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE) {
-                    dev.kage.protocol.SkillResultEvent skillResult =
-                            dev.kage.protocol.SkillResultEvent.parseFrom(frame.payload());
-                    if (("heavy_strike".equals(skillResult.getSkillCode())
-                                    || "enrage".equals(skillResult.getSkillCode()))
-                            && skillResult.getAttackerEntityId() == bossId) {
-                        sawSpecialAction = true;
-                    }
-                } else if (frame.header().opcode() == Opcode.OPCODE_MONSTER_DESPAWNED_EVENT_VALUE) {
-                    dev.kage.protocol.MonsterDespawnedEvent despawned =
-                            dev.kage.protocol.MonsterDespawnedEvent.parseFrom(frame.payload());
-                    if (despawned.getMonsterId() == bossId) {
-                        bossDied = true;
-                    }
-                }
-            }
-            assertThat(bossDied).as("boss phải chết trong thời gian chờ").isTrue();
-            assertThat(sawSpecialAction)
+            BossFight fight = watchBossFight(in, bossId);
+            assertThat(fight.bossDied())
+                    .as("boss phải chết trong thời gian chờ")
+                    .isTrue();
+            assertThat(fight.sawSpecialAction())
                     .as("boss phải dùng heavy_strike hoặc enrage trước khi chết")
                     .isTrue();
         }
+    }
+
+    /** Điều đã thấy trong trận boss. */
+    private record BossFight(boolean sawSpecialAction, boolean bossDied) {}
+
+    /**
+     * Đọc frame liên tục, phân loại theo opcode: boss có dùng chiêu đặc biệt không, và có chết không
+     * (dừng khi chết, hoặc sau 5000 frame).
+     */
+    private static BossFight watchBossFight(DataInputStream in, long bossId) throws Exception {
+        boolean sawSpecialAction = false;
+        boolean bossDied = false;
+        for (int i = 0; i < 5000 && !bossDied; i++) {
+            PacketCodec.Frame frame = readFrame(in);
+            if (frame.header().opcode() == Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE) {
+                dev.kage.protocol.SkillResultEvent skillResult =
+                        dev.kage.protocol.SkillResultEvent.parseFrom(frame.payload());
+                if (("heavy_strike".equals(skillResult.getSkillCode()) || "enrage".equals(skillResult.getSkillCode()))
+                        && skillResult.getAttackerEntityId() == bossId) {
+                    sawSpecialAction = true;
+                }
+            } else if (frame.header().opcode() == Opcode.OPCODE_MONSTER_DESPAWNED_EVENT_VALUE) {
+                dev.kage.protocol.MonsterDespawnedEvent despawned =
+                        dev.kage.protocol.MonsterDespawnedEvent.parseFrom(frame.payload());
+                bossDied = despawned.getMonsterId() == bossId;
+            }
+        }
+        return new BossFight(sawSpecialAction, bossDied);
     }
 
     /**
@@ -1471,63 +1205,25 @@ class GatewayServerIntegrationTest {
     @Test
     @Timeout(20)
     void pulledPartyMemberShouldBeToldTheyEnteredDungeon_overRealSockets() throws Exception {
-        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
-                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
-            socketA.setSoTimeout(5000);
-            socketB.setSoTimeout(5000);
+        try (Socket socketA = openSocket(server.port(), 5000);
+                Socket socketB = openSocket(server.port(), 5000)) {
             DataInputStream inA = new DataInputStream(socketA.getInputStream());
             DataInputStream inB = new DataInputStream(socketB.getInputStream());
 
             String suffix = UUID.randomUUID().toString().substring(0, 8);
             long characterA = connectCreateAndSelect(socketA, inA, "pa" + suffix);
             long characterB = connectCreateAndSelect(socketB, inB, "pb" + suffix);
-            partyFacade.createParty(characterA);
-            partyFacade.invite(characterA, characterB);
-            long inviteId = partyFacade.listPendingInvites(characterB).get(0).inviteId();
-            partyFacade.acceptInvite(inviteId, characterB);
-
-            EnterDungeonCommand enterCommand = EnterDungeonCommand.newBuilder()
-                    .setDungeonCode("sample_dungeon")
-                    .build();
-            sendFrame(socketA, Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, 40, enterCommand.toByteArray());
-            EnterDungeonResponse enterResponseA =
-                    EnterDungeonResponse.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE)
-                            .payload());
-            assertThat(enterResponseA.getOutcome()).isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
+            formParty(characterA, characterB);
+            assertThat(enterDungeon(socketA, inA, 40)).isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
 
             // B không gửi gì. Đọc tới khi thấy boss — bằng chứng server ĐÃ dời B sang World hầm ngục
-            // (world chính không có boss) — và ghi lại mọi opcode B đã nhận trên đường đi.
-            // Không đặt trần số frame: @Timeout + socket timeout đã chặn trường hợp boss không bao giờ
-            // tới (và giữ lớp này dưới trần CyclomaticComplexity cấp lớp của PMD).
-            List<Integer> opcodesSeenByB = new ArrayList<>();
-            boolean bossSeenByB = false;
-            while (!bossSeenByB) {
-                PacketCodec.Frame frame = readFrame(inB);
-                opcodesSeenByB.add(frame.header().opcode());
-                bossSeenByB = frame.header().opcode() == Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE
-                        && "sample_boss"
-                                .equals(MonsterSpawnedEvent.parseFrom(frame.payload())
-                                        .getMonsterCode());
-            }
-            // Chốt lại những gì B nhận TRƯỚC (và tính cả) spawn của boss — đây là thứ khẳng định
-            // thứ tự ở cuối hỏi tới. Bản trước ADR-047 cố ý không hỏi, vì lúc đó chưa biết phương án
-            // nào được chọn.
+            // (world chính không có boss) — và ghi lại mọi opcode B đã nhận trên đường đi. Chốt lại
+            // những gì B nhận TRƯỚC (và tính cả) spawn của boss — thứ khẳng định thứ tự ở cuối hỏi tới.
+            List<Integer> opcodesSeenByB = readOpcodesUntilBossSpawns(inB);
             List<Integer> beforeBoss = List.copyOf(opcodesSeenByB);
-
             // Luồng auth (gửi báo) và luồng tick hầm ngục (gửi spawn) không hứa thứ tự với nhau —
-            // đọc thêm một quãng để lời báo tới SAU boss cũng được tính. Hết quãng, hoặc im lặng
-            // trọn quãng (socket timeout), đều là điều kiện dừng bình thường.
-            int graceMillis = 1500;
-            socketB.setSoTimeout(graceMillis);
-            long graceDeadline =
-                    System.nanoTime() + Duration.ofMillis(graceMillis).toNanos();
-            while (System.nanoTime() < graceDeadline) {
-                try {
-                    opcodesSeenByB.add(readFrame(inB).header().opcode());
-                } catch (java.net.SocketTimeoutException e) {
-                    break; // im lặng trọn quãng — không còn gì để ghi.
-                }
-            }
+            // đọc thêm một quãng để lời báo tới SAU boss cũng được tính.
+            readOpcodesForGrace(socketB, inB, opcodesSeenByB);
 
             // Dải opcode chia theo trăm (NETWORK.md §4): Dungeon = 1500-1599.
             int opcodeRangeWidth = 100;
@@ -1546,6 +1242,41 @@ class GatewayServerIntegrationTest {
     }
 
     /**
+     * Opcode của mọi gói đọc được cho tới (và tính cả) spawn của boss mẫu. Không đặt trần số frame:
+     * {@code @Timeout} + socket timeout đã chặn trường hợp boss không bao giờ tới.
+     */
+    private static List<Integer> readOpcodesUntilBossSpawns(DataInputStream in) throws Exception {
+        List<Integer> opcodes = new ArrayList<>();
+        boolean bossSeen = false;
+        while (!bossSeen) {
+            PacketCodec.Frame frame = readFrame(in);
+            opcodes.add(frame.header().opcode());
+            bossSeen = frame.header().opcode() == Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE
+                    && "sample_boss"
+                            .equals(MonsterSpawnedEvent.parseFrom(frame.payload())
+                                    .getMonsterCode());
+        }
+        return opcodes;
+    }
+
+    /**
+     * Đọc thêm 1,5 s, ghi opcode vào {@code opcodes}. Hết quãng, hoặc im lặng trọn quãng (socket
+     * timeout), đều là điều kiện dừng bình thường.
+     */
+    private static void readOpcodesForGrace(Socket socket, DataInputStream in, List<Integer> opcodes) throws Exception {
+        int graceMillis = 1500;
+        socket.setSoTimeout(graceMillis);
+        long graceDeadline = System.nanoTime() + Duration.ofMillis(graceMillis).toNanos();
+        while (System.nanoTime() < graceDeadline) {
+            try {
+                opcodes.add(readFrame(in).header().opcode());
+            } catch (java.net.SocketTimeoutException e) {
+                return; // im lặng trọn quãng — không còn gì để ghi.
+            }
+        }
+    }
+
+    /**
      * Đường rời hầm ngục thứ hai: một thành viên MẤT KẾT NỐI bên trong. Người ở lại không đổi World
      * nên không cần gói báo nào — nhưng họ phải thấy người kia biến mất, và instance phải còn sống
      * (World chỉ dừng khi RỖNG, {@code DungeonInstanceRegistry.leaveInstance}) để họ tự thoát được.
@@ -1554,62 +1285,27 @@ class GatewayServerIntegrationTest {
     @Timeout(20)
     void remainingMemberShouldSeeDespawnAndStillExit_whenPartyMemberDisconnectsInsideDungeon_overRealSockets()
             throws Exception {
-        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
-            socketA.setSoTimeout(5000);
+        try (Socket socketA = openSocket(server.port(), 5000)) {
             DataInputStream inA = new DataInputStream(socketA.getInputStream());
             String suffix = UUID.randomUUID().toString().substring(0, 8);
             long characterA = connectCreateAndSelect(socketA, inA, "ra" + suffix);
             long characterB;
-            try (Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
-                socketB.setSoTimeout(5000);
+            try (Socket socketB = openSocket(server.port(), 5000)) {
                 DataInputStream inB = new DataInputStream(socketB.getInputStream());
                 characterB = connectCreateAndSelect(socketB, inB, "rb" + suffix);
-                partyFacade.createParty(characterA);
-                partyFacade.invite(characterA, characterB);
-                long inviteId =
-                        partyFacade.listPendingInvites(characterB).get(0).inviteId();
-                partyFacade.acceptInvite(inviteId, characterB);
-
-                EnterDungeonCommand enterCommand = EnterDungeonCommand.newBuilder()
-                        .setDungeonCode("sample_dungeon")
-                        .build();
-                sendFrame(socketA, Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, 50, enterCommand.toByteArray());
-                assertThat(EnterDungeonResponse.parseFrom(
-                                        readUntilOpcode(inA, Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE)
-                                                .payload())
-                                .getOutcome())
-                        .isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
+                formParty(characterA, characterB);
+                assertThat(enterDungeon(socketA, inA, 50)).isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
 
                 // B đi sang phải TRONG hầm ngục, A phải thấy — bằng chứng A đang nhìn thấy B ở CHÍNH
-                // World hầm ngục (cùng cách partyShouldEnterAndExitDungeonAsSeparateWorld_...). Mỗi
-                // test dựng server riêng và chỉ B di chuyển, nên CharacterMovedEvent đầu tiên A nhận
-                // chính là của B — khẳng định id để sai thì đỏ to chứ không lặng lẽ đọc nhầm.
-                MoveCommand moveCommand =
-                        MoveCommand.newBuilder().setDirX(1f).setDirY(0f).build();
-                sendFrame(socketB, Opcode.OPCODE_MOVE_COMMAND_VALUE, 51, moveCommand.toByteArray());
-                CharacterMovedEvent movedSeenByA =
-                        CharacterMovedEvent.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_CHARACTER_MOVED_EVENT_VALUE)
-                                .payload());
-                assertThat(movedSeenByA.getCharacterId()).isEqualTo(characterB);
-                assertThat(movedSeenByA.getX()).isGreaterThan(0f);
+                // World hầm ngục. Mỗi test dựng server riêng và chỉ B di chuyển, nên CharacterMovedEvent
+                // đầu tiên A nhận chính là của B — khẳng định id để sai thì đỏ to chứ không đọc nhầm.
+                assertMovementSeenInsideDungeon(new DungeonPair(socketB, inB, characterB, inA));
             } // B đóng socket ⇒ channelInactive ⇒ handleDisconnectIfInDungeon.
 
             // A đã rời world chính trước B (cùng hộp thư, A xếp trước) nên world chính không báo A
             // despawn của B; despawn duy nhất A nhận là từ World hầm ngục.
-            CharacterDespawnedEvent despawnSeenByA = CharacterDespawnedEvent.parseFrom(
-                    readUntilOpcode(inA, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE)
-                            .payload());
-            assertThat(despawnSeenByA.getCharacterId()).isEqualTo(characterB);
-
-            sendFrame(
-                    socketA,
-                    Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE,
-                    52,
-                    ExitDungeonCommand.newBuilder().build().toByteArray());
-            assertThat(ExitDungeonResponse.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE)
-                                    .payload())
-                            .getOutcome())
-                    .isEqualTo(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK);
+            assertThat(readDespawnedCharacterIds(inA, 1)).containsExactly(characterB);
+            assertThat(exitDungeon(socketA, inA, 52)).isEqualTo(ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK);
         }
     }
 
@@ -1656,27 +1352,16 @@ class GatewayServerIntegrationTest {
     void shouldDeclineDuelChallenge_overRealSockets() throws Exception {
         // Phase 8 lát cắt 4 — challenger phải nhận DuelChallengeDeclinedEvent khi bị từ chối,
         // KHÔNG có DuelStartedEvent nào phát ra (không World riêng nào được tạo).
-        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
-                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
-            socketA.setSoTimeout(5000);
-            socketB.setSoTimeout(5000);
+        try (Socket socketA = openSocket(server.port(), 5000);
+                Socket socketB = openSocket(server.port(), 5000)) {
             DataInputStream inA = new DataInputStream(socketA.getInputStream());
             DataInputStream inB = new DataInputStream(socketB.getInputStream());
 
             String suffix = UUID.randomUUID().toString().substring(0, 8);
             connectCreateAndSelectNamed(socketA, inA, "duA" + suffix);
-            CreatedCharacter characterB = connectCreateAndSelectNamed(socketB, inB, "duB" + suffix);
+            SocketWire.CreatedCharacter characterB = connectCreateAndSelectNamed(socketB, inB, "duB" + suffix);
 
-            ChallengeDuelCommand challenge = ChallengeDuelCommand.newBuilder()
-                    .setTargetName(characterB.name())
-                    .build();
-            sendFrame(socketA, Opcode.OPCODE_CHALLENGE_DUEL_COMMAND_VALUE, 40, challenge.toByteArray());
-            ChallengeDuelResponse challengeResponse =
-                    ChallengeDuelResponse.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE)
-                            .payload());
-            assertThat(challengeResponse.getOutcome()).isEqualTo(ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_OK);
-            long challengeId = challengeResponse.getChallengeId();
-
+            long challengeId = challengeDuel(socketA, inA, characterB.name(), 40);
             DuelChallengeReceivedEvent received = DuelChallengeReceivedEvent.parseFrom(
                     readUntilOpcode(inB, Opcode.OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT_VALUE)
                             .payload());
@@ -1696,13 +1381,8 @@ class GatewayServerIntegrationTest {
             assertThat(declinedEvent.getChallengeId()).isEqualTo(challengeId);
 
             // Thách đấu cũ đã bị dọn — chấp nhận lại (challengeId cũ) phải NOT_FOUND.
-            AcceptDuelCommand lateAccept =
-                    AcceptDuelCommand.newBuilder().setChallengeId(challengeId).build();
-            sendFrame(socketB, Opcode.OPCODE_ACCEPT_DUEL_COMMAND_VALUE, 42, lateAccept.toByteArray());
-            AcceptDuelResponse lateAcceptResponse =
-                    AcceptDuelResponse.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_ACCEPT_DUEL_RESPONSE_VALUE)
-                            .payload());
-            assertThat(lateAcceptResponse.getOutcome()).isEqualTo(AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_NOT_FOUND);
+            assertThat(acceptDuel(socketB, inB, challengeId, 42))
+                    .isEqualTo(AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_NOT_FOUND);
         }
     }
 
@@ -1712,128 +1392,105 @@ class GatewayServerIntegrationTest {
         // Phase 8 lát cắt 4 — chấp nhận thách đấu đưa CẢ 2 vào 1 World riêng (ADR-026, giống
         // dungeon), đánh tới khi 1 người chết → DuelResultEvent cho CẢ 2 + rating cập nhật qua
         // GetPvpRatingRequest (Elo, K=32: thắng +16, thua -16 khi cùng rating khởi điểm 1000).
-        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
-                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port());
-                Socket socketC = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
-            socketA.setSoTimeout(10000);
-            socketB.setSoTimeout(10000);
-            socketC.setSoTimeout(10000);
+        try (Socket socketA = openSocket(server.port(), 10000);
+                Socket socketB = openSocket(server.port(), 10000);
+                Socket socketC = openSocket(server.port(), 10000)) {
             DataInputStream inA = new DataInputStream(socketA.getInputStream());
             DataInputStream inB = new DataInputStream(socketB.getInputStream());
             DataInputStream inC = new DataInputStream(socketC.getInputStream());
 
             String suffix = UUID.randomUUID().toString().substring(0, 8);
-            CreatedCharacter createdA = connectCreateAndSelectNamed(socketA, inA, "fdA" + suffix);
-            CreatedCharacter createdB = connectCreateAndSelectNamed(socketB, inB, "fdB" + suffix);
+            SocketWire.CreatedCharacter createdA = connectCreateAndSelectNamed(socketA, inA, "fdA" + suffix);
+            SocketWire.CreatedCharacter createdB = connectCreateAndSelectNamed(socketB, inB, "fdB" + suffix);
             long characterA = createdA.characterId();
             long characterB = createdB.characterId();
             // C KHÔNG tham gia trận — ở lại world chính làm chứng nhân (verify A/B đã RỜI world
             // chính thật, cùng cách partyShouldEnterAndExitDungeonAsSeparateWorld_overRealSockets).
             connectCreateAndSelect(socketC, inC, "fdC" + suffix);
-
             // AoI sync() 20Hz — đợi C thật sự THẤY A/B spawn trước khi để họ vào duel, cùng lý do
             // partyShouldEnterAndExitDungeonAsSeparateWorld_overRealSockets (xem comment ở đó).
-            java.util.HashSet<Long> spawnedSeenByC = new java.util.HashSet<Long>();
-            spawnedSeenByC.add(
-                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
-                                    .payload())
-                            .getCharacterId());
-            spawnedSeenByC.add(
-                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
-                                    .payload())
-                            .getCharacterId());
-            assertThat(spawnedSeenByC).containsExactlyInAnyOrder(characterA, characterB);
+            assertThat(readSpawnedCharacterIds(inC, 2)).containsExactlyInAnyOrder(characterA, characterB);
 
-            ChallengeDuelCommand challenge = ChallengeDuelCommand.newBuilder()
-                    .setTargetName(createdB.name())
-                    .build();
-            sendFrame(socketA, Opcode.OPCODE_CHALLENGE_DUEL_COMMAND_VALUE, 40, challenge.toByteArray());
-            ChallengeDuelResponse challengeResponse =
-                    ChallengeDuelResponse.parseFrom(readUntilOpcode(inA, Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE)
-                            .payload());
-            assertThat(challengeResponse.getOutcome()).isEqualTo(ChallengeDuelOutcome.CHALLENGE_DUEL_OUTCOME_OK);
-            long challengeId = challengeResponse.getChallengeId();
-            DuelChallengeReceivedEvent received = DuelChallengeReceivedEvent.parseFrom(
-                    readUntilOpcode(inB, Opcode.OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT_VALUE)
-                            .payload());
-            assertThat(received.getChallengerCharacterId()).isEqualTo(characterA);
-
-            AcceptDuelCommand accept =
-                    AcceptDuelCommand.newBuilder().setChallengeId(challengeId).build();
-            sendFrame(socketB, Opcode.OPCODE_ACCEPT_DUEL_COMMAND_VALUE, 41, accept.toByteArray());
-            AcceptDuelResponse acceptResponse =
-                    AcceptDuelResponse.parseFrom(readUntilOpcode(inB, Opcode.OPCODE_ACCEPT_DUEL_RESPONSE_VALUE)
-                            .payload());
-            assertThat(acceptResponse.getOutcome()).isEqualTo(AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_OK);
-
-            DuelStartedEvent startedForB = DuelStartedEvent.parseFrom(
-                    readUntilOpcode(inB, Opcode.OPCODE_DUEL_STARTED_EVENT_VALUE).payload());
-            assertThat(startedForB.getOpponentCharacterId()).isEqualTo(characterA);
-            DuelStartedEvent startedForA = DuelStartedEvent.parseFrom(
-                    readUntilOpcode(inA, Opcode.OPCODE_DUEL_STARTED_EVENT_VALUE).payload());
-            assertThat(startedForA.getOpponentCharacterId()).isEqualTo(characterB);
-
+            Duelist duelistA = new Duelist(socketA, inA, characterA);
+            Duelist duelistB = new Duelist(socketB, inB, characterB);
+            startAcceptedDuel(duelistA, duelistB, createdB.name());
             // C (world chính) phải thấy CẢ A lẫn B despawn — chứng minh cách ly instance thật.
-            java.util.HashSet<Long> despawnedIds = new java.util.HashSet<Long>();
-            despawnedIds.add(CharacterDespawnedEvent.parseFrom(
-                            readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE)
-                                    .payload())
-                    .getCharacterId());
-            despawnedIds.add(CharacterDespawnedEvent.parseFrom(
-                            readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_DESPAWNED_EVENT_VALUE)
-                                    .payload())
-                    .getCharacterId());
-            assertThat(despawnedIds).containsExactlyInAnyOrder(characterA, characterB);
+            assertThat(readDespawnedCharacterIds(inC, 2)).containsExactlyInAnyOrder(characterA, characterB);
 
-            // Cùng chỉ số nền — cả 2 tự đánh nhau tới khi 1 người chết (CombatConstants.CHARACTER_MAX_HP=100).
-            SetTargetCommand targetB =
-                    SetTargetCommand.newBuilder().setTargetEntityId(characterB).build();
-            sendFrame(socketA, Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, 42, targetB.toByteArray());
-            SetTargetCommand targetA =
-                    SetTargetCommand.newBuilder().setTargetEntityId(characterA).build();
-            sendFrame(socketB, Opcode.OPCODE_SET_TARGET_COMMAND_VALUE, 42, targetA.toByteArray());
-            // Cả 2 phía bấm đánh — nhân vật không tự đánh nữa (2026-08-09), kể cả trong duel.
-            Thread spammerA = startAttackSpammer(socketA);
-            Thread spammerB = startAttackSpammer(socketB);
-
-            DuelResultEvent resultForA = DuelResultEvent.parseFrom(
-                    readUntilOpcode(inA, Opcode.OPCODE_DUEL_RESULT_EVENT_VALUE).payload());
-            DuelResultEvent resultForB = DuelResultEvent.parseFrom(
-                    readUntilOpcode(inB, Opcode.OPCODE_DUEL_RESULT_EVENT_VALUE).payload());
-            spammerA.interrupt(); // trận xong — ngừng bấm trước khi test gửi tiếp GetPvpRatingRequest
-            spammerB.interrupt();
-            assertThat(resultForA).isEqualTo(resultForB);
-            assertThat(java.util.Set.of(resultForA.getWinnerCharacterId(), resultForA.getLoserCharacterId()))
+            DuelResultEvent result = fightToTheEnd(duelistA, duelistB);
+            assertThat(java.util.Set.of(result.getWinnerCharacterId(), result.getLoserCharacterId()))
                     .containsExactlyInAnyOrder(characterA, characterB);
             // Cùng rating khởi điểm 1000 — thắng +16, thua -16 (EloRating K=32, xem feature-pvp).
-            assertThat(resultForA.getWinnerNewRating()).isEqualTo(1016);
-            assertThat(resultForA.getLoserNewRating()).isEqualTo(984);
-
+            assertThat(result.getWinnerNewRating()).isEqualTo(1016);
+            assertThat(result.getLoserNewRating()).isEqualTo(984);
             // C phải thấy CẢ A lẫn B spawn lại — chứng minh cả 2 đã quay về world chính thật.
-            java.util.HashSet<Long> respawnedIds = new java.util.HashSet<Long>();
-            respawnedIds.add(
-                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
-                                    .payload())
-                            .getCharacterId());
-            respawnedIds.add(
-                    CharacterSpawnedEvent.parseFrom(readUntilOpcode(inC, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE)
-                                    .payload())
-                            .getCharacterId());
-            assertThat(respawnedIds).containsExactlyInAnyOrder(characterA, characterB);
+            assertThat(readSpawnedCharacterIds(inC, 2)).containsExactlyInAnyOrder(characterA, characterB);
 
-            long winnerCharacterId = resultForA.getWinnerCharacterId();
-            int winner = winnerCharacterId == characterA ? 0 : 1;
-            Socket winnerSocket = List.of(socketA, socketB).get(winner);
-            DataInputStream winnerIn = List.of(inA, inB).get(winner);
-            GetPvpRatingRequest ratingRequest = GetPvpRatingRequest.newBuilder().build();
-            sendFrame(winnerSocket, Opcode.OPCODE_GET_PVP_RATING_REQUEST_VALUE, 43, ratingRequest.toByteArray());
-            GetPvpRatingResponse ratingResponse = GetPvpRatingResponse.parseFrom(
-                    readUntilOpcode(winnerIn, Opcode.OPCODE_GET_PVP_RATING_RESPONSE_VALUE)
-                            .payload());
+            Duelist winner = result.getWinnerCharacterId() == characterA ? duelistA : duelistB;
+            GetPvpRatingResponse ratingResponse = requestPvpRating(winner.socket(), winner.in(), 43);
             assertThat(ratingResponse.getRating()).isEqualTo(1016);
             assertThat(ratingResponse.getWins()).isEqualTo(1);
             assertThat(ratingResponse.getLosses()).isZero();
         }
+    }
+
+    /** Một bên của trận Arena. */
+    private record Duelist(Socket socket, DataInputStream in, long characterId) {}
+
+    /**
+     * {@code challenger} thách, {@code target} nhận — khẳng định đường đi qua dây tới lúc CẢ HAI nhận
+     * {@code DuelStartedEvent} mang đúng đối thủ.
+     */
+    private static void startAcceptedDuel(Duelist challenger, Duelist target, String targetName) throws Exception {
+        long challengeId = challengeDuel(challenger.socket(), challenger.in(), targetName, 40);
+        DuelChallengeReceivedEvent received = DuelChallengeReceivedEvent.parseFrom(
+                readUntilOpcode(target.in(), Opcode.OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT_VALUE)
+                        .payload());
+        assertThat(received.getChallengerCharacterId()).isEqualTo(challenger.characterId());
+        assertThat(acceptDuel(target.socket(), target.in(), challengeId, 41))
+                .isEqualTo(AcceptDuelOutcome.ACCEPT_DUEL_OUTCOME_OK);
+
+        DuelStartedEvent startedForTarget =
+                DuelStartedEvent.parseFrom(readUntilOpcode(target.in(), Opcode.OPCODE_DUEL_STARTED_EVENT_VALUE)
+                        .payload());
+        assertThat(startedForTarget.getOpponentCharacterId()).isEqualTo(challenger.characterId());
+        DuelStartedEvent startedForChallenger =
+                DuelStartedEvent.parseFrom(readUntilOpcode(challenger.in(), Opcode.OPCODE_DUEL_STARTED_EVENT_VALUE)
+                        .payload());
+        assertThat(startedForChallenger.getOpponentCharacterId()).isEqualTo(target.characterId());
+    }
+
+    /**
+     * Cùng chỉ số nền — hai bên nhắm nhau và cùng bấm đánh (nhân vật không tự đánh, kể cả trong duel,
+     * 2026-08-09) tới khi một người chết. Cả hai phải nhận CÙNG một {@code DuelResultEvent}.
+     */
+    private static DuelResultEvent fightToTheEnd(Duelist a, Duelist b) throws Exception {
+        sendFrame(
+                a.socket(),
+                Opcode.OPCODE_SET_TARGET_COMMAND_VALUE,
+                42,
+                SetTargetCommand.newBuilder()
+                        .setTargetEntityId(b.characterId())
+                        .build()
+                        .toByteArray());
+        sendFrame(
+                b.socket(),
+                Opcode.OPCODE_SET_TARGET_COMMAND_VALUE,
+                42,
+                SetTargetCommand.newBuilder()
+                        .setTargetEntityId(a.characterId())
+                        .build()
+                        .toByteArray());
+        Thread spammerA = startAttackSpammer(a.socket());
+        Thread spammerB = startAttackSpammer(b.socket());
+        DuelResultEvent resultForA = DuelResultEvent.parseFrom(
+                readUntilOpcode(a.in(), Opcode.OPCODE_DUEL_RESULT_EVENT_VALUE).payload());
+        DuelResultEvent resultForB = DuelResultEvent.parseFrom(
+                readUntilOpcode(b.in(), Opcode.OPCODE_DUEL_RESULT_EVENT_VALUE).payload());
+        spammerA.interrupt(); // trận xong — ngừng bấm trước khi test gửi tiếp GetPvpRatingRequest
+        spammerB.interrupt();
+        assertThat(resultForA).isEqualTo(resultForB);
+        return resultForA;
     }
 
     @Test
@@ -1841,31 +1498,18 @@ class GatewayServerIntegrationTest {
     void shouldForfeitDuel_overRealSockets() throws Exception {
         // Phase 8 lát cắt 4 — bỏ cuộc giữa chừng tính THUA thật (khác ExitDungeonCommand), đối
         // phương thắng NGAY không cần hạ gục.
-        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
-                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
-            socketA.setSoTimeout(5000);
-            socketB.setSoTimeout(5000);
+        try (Socket socketA = openSocket(server.port(), 5000);
+                Socket socketB = openSocket(server.port(), 5000)) {
             DataInputStream inA = new DataInputStream(socketA.getInputStream());
             DataInputStream inB = new DataInputStream(socketB.getInputStream());
 
             String suffix = UUID.randomUUID().toString().substring(0, 8);
             long characterA = connectCreateAndSelect(socketA, inA, "foA" + suffix);
-            CreatedCharacter createdB = connectCreateAndSelectNamed(socketB, inB, "foB" + suffix);
+            SocketWire.CreatedCharacter createdB = connectCreateAndSelectNamed(socketB, inB, "foB" + suffix);
 
-            ChallengeDuelCommand challenge = ChallengeDuelCommand.newBuilder()
-                    .setTargetName(createdB.name())
-                    .build();
-            sendFrame(socketA, Opcode.OPCODE_CHALLENGE_DUEL_COMMAND_VALUE, 40, challenge.toByteArray());
-            long challengeId = ChallengeDuelResponse.parseFrom(
-                            readUntilOpcode(inA, Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE)
-                                    .payload())
-                    .getChallengeId();
+            long challengeId = challengeDuel(socketA, inA, createdB.name(), 40);
             readUntilOpcode(inB, Opcode.OPCODE_DUEL_CHALLENGE_RECEIVED_EVENT_VALUE);
-
-            AcceptDuelCommand accept =
-                    AcceptDuelCommand.newBuilder().setChallengeId(challengeId).build();
-            sendFrame(socketB, Opcode.OPCODE_ACCEPT_DUEL_COMMAND_VALUE, 41, accept.toByteArray());
-            readUntilOpcode(inB, Opcode.OPCODE_ACCEPT_DUEL_RESPONSE_VALUE);
+            acceptDuel(socketB, inB, challengeId, 41);
             readUntilOpcode(inA, Opcode.OPCODE_DUEL_STARTED_EVENT_VALUE);
             readUntilOpcode(inB, Opcode.OPCODE_DUEL_STARTED_EVENT_VALUE);
 
@@ -2052,7 +1696,7 @@ class GatewayServerIntegrationTest {
     @Test
     @Timeout(15)
     void clientShouldReceiveEmptyShopListing_overRealSockets() throws Exception {
-        // fakeShopFacade() luôn trả catalog RỖNG (Fake, không DB thật) — verify dây thật (opcode
+        // GatewayPipelineTest.fakeShopFacade() luôn trả catalog RỖNG (Fake, không DB thật) — verify dây thật (opcode
         // dispatch → decode → Virtual Thread → encode response), không phải nội dung catalog thật
         // (đã phủ ở ShopIntegrationTest tầng dưới).
         try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
@@ -2098,7 +1742,7 @@ class GatewayServerIntegrationTest {
     @Test
     @Timeout(15)
     void clientShouldReceiveSellItemResponse_overRealSockets() throws Exception {
-        // fakeShopFacade().findItem() luôn trả rỗng — verify đúng nhánh ITEM_NOT_FOUND.
+        // GatewayPipelineTest.fakeShopFacade().findItem() luôn trả rỗng — verify đúng nhánh ITEM_NOT_FOUND.
         try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
             socket.setSoTimeout(5000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
@@ -2214,7 +1858,7 @@ class GatewayServerIntegrationTest {
     void clientShouldReceiveSendMailResponse_overRealSockets() throws Exception {
         // Nhánh 1 — cùng lý do clientShouldReceiveSendFriendRequestResponse_overRealSockets: tên
         // người nhận bất kỳ chắc chắn không tồn tại ⇒ RECIPIENT_NOT_FOUND, KHÔNG chạm
-        // fakeMailFacade()'s MailRepositoryPort.
+        // GatewayPipelineTest.fakeMailFacade()'s MailRepositoryPort.
         // Nhánh 2 — người nhận CÓ thật nên đi tới MailRepositoryPort.send, mà fake luôn ném: đúng
         // hình dạng một lỗi DB thật. handleSendMailBlocking không tự bắt gì; trước lưới
         // executeBlocking (2026-09-24) client không nhận gì và treo tới hết @Timeout. Gộp chung một
@@ -2263,10 +1907,8 @@ class GatewayServerIntegrationTest {
         // World chat = broadcast toàn server, KHÔNG cần AoI/cùng vị trí — verify dây thật (opcode
         // dispatch → decode → Virtual Thread → ChatFacade.sendMessage → ConnectedCharacterRegistry
         // .broadcastToAll → encode) cho CẢ người gửi (tự thấy tin của mình) lẫn người khác.
-        try (Socket socketA = new Socket(InetAddress.getLoopbackAddress(), server.port());
-                Socket socketB = new Socket(InetAddress.getLoopbackAddress(), server.port())) {
-            socketA.setSoTimeout(5000);
-            socketB.setSoTimeout(5000);
+        try (Socket socketA = openSocket(server.port(), 5000);
+                Socket socketB = openSocket(server.port(), 5000)) {
             DataInputStream inA = new DataInputStream(socketA.getInputStream());
             DataInputStream inB = new DataInputStream(socketB.getInputStream());
             String suffix = UUID.randomUUID().toString().substring(0, 8);
@@ -2293,144 +1935,6 @@ class GatewayServerIntegrationTest {
         }
     }
 
-    /** Tên nhân vật THẬT (sinh ngẫu nhiên "Hero...") — KHÁC {@code username} tài khoản. */
-    private record CreatedCharacter(long characterId, String name) {}
-
-    /**
-     * Như {@link #connectCreateAndSelect} nhưng trả thêm tên nhân vật THẬT — cần cho
-     * {@code ChallengeDuelCommand.target_name} (server tra theo tên nhân vật, không phải username
-     * tài khoản, xem javadoc {@code CreatedCharacter}).
-     */
-    private static CreatedCharacter connectCreateAndSelectNamed(Socket socket, DataInputStream in, String username)
-            throws Exception {
-        ConnectRequest connectRequest =
-                ConnectRequest.newBuilder().setUsername(username).build();
-        sendFrame(socket, Opcode.OPCODE_CONNECT_REQUEST_VALUE, 1, connectRequest.toByteArray());
-        assertThat(ConnectResponse.parseFrom(readFrame(in).payload()).getSuccess())
-                .isTrue();
-
-        CreateCharacterRequest createRequest = CreateCharacterRequest.newBuilder()
-                .setName("Hero" + UUID.randomUUID().toString().replace("-", "").substring(0, 8))
-                .setIdempotencyKey(UUID.randomUUID().toString())
-                .build();
-        sendFrame(socket, Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, 2, createRequest.toByteArray());
-        CreateCharacterResponse createResponse =
-                CreateCharacterResponse.parseFrom(readFrame(in).payload());
-        long characterId = createResponse.getCharacter().getId();
-        String name = createResponse.getCharacter().getName();
-
-        SelectCharacterRequest selectRequest =
-                SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
-        sendFrame(socket, Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, 3, selectRequest.toByteArray());
-        readFrame(in); // SelectCharacterResponse — nội dung đã verify ở GatewayPipelineTest
-
-        return new CreatedCharacter(characterId, name);
-    }
-
-    private static long connectCreateAndSelect(Socket socket, DataInputStream in, String username) throws Exception {
-        ConnectRequest connectRequest =
-                ConnectRequest.newBuilder().setUsername(username).build();
-        sendFrame(socket, Opcode.OPCODE_CONNECT_REQUEST_VALUE, 1, connectRequest.toByteArray());
-        assertThat(ConnectResponse.parseFrom(readFrame(in).payload()).getSuccess())
-                .isTrue();
-
-        // Character.validateName: chỉ chữ/số, KHÔNG dấu gạch ngang (feature-character/CLAUDE.md).
-        CreateCharacterRequest createRequest = CreateCharacterRequest.newBuilder()
-                .setName("Hero" + UUID.randomUUID().toString().replace("-", "").substring(0, 8))
-                .setIdempotencyKey(UUID.randomUUID().toString())
-                .build();
-        sendFrame(socket, Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, 2, createRequest.toByteArray());
-        CreateCharacterResponse createResponse =
-                CreateCharacterResponse.parseFrom(readFrame(in).payload());
-        long characterId = createResponse.getCharacter().getId();
-
-        SelectCharacterRequest selectRequest =
-                SelectCharacterRequest.newBuilder().setCharacterId(characterId).build();
-        sendFrame(socket, Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, 3, selectRequest.toByteArray());
-        readFrame(in); // SelectCharacterResponse — nội dung đã verify ở GatewayPipelineTest
-
-        return characterId;
-    }
-
-    // synchronized trên chính socket: từ 2026-08-09 có luồng nền bấm đánh (startAttackSpammer) ghi
-    // song song với luồng test chính trên CÙNG socket — 2 lời gọi write() đan nhau sẽ cắt đôi một
-    // frame và hỏng cả dòng dữ liệu. Khoá ở đây thay vì bắt mọi chỗ gọi phải tự nhớ.
-    private static void sendFrame(Socket socket, int opcode, int sequenceId, byte[] payload) throws Exception {
-        synchronized (socket) {
-            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-            PacketHeader header = new PacketHeader(opcode, ProtocolVersion.CURRENT, sequenceId);
-            byte[] frame = PacketCodec.encodeFrame(header, payload);
-            out.writeInt(frame.length);
-            out.write(frame);
-            out.flush();
-        }
-    }
-
-    /**
-     * Bấm ĐÁNH nền — gửi {@code AttackCommand} đều đặn trên socket này tới khi bị {@code interrupt}
-     * hoặc socket đóng.
-     *
-     * <p>Cần từ 2026-08-09: đánh thường không còn tự động (chủ dự án quyết sau playtest, xem
-     * {@code CombatSystem}), mà các test này chờ ĐỌC frame nên không thể vừa đọc vừa bấm trên cùng
-     * một luồng. Nhịp 200ms dày hơn cooldown thật (1 đòn/giây) — lệnh thừa là no-op ở server.
-     */
-    // catch (Exception) là CỐ Ý: sendFrame khai báo `throws Exception`, và mọi lỗi ở luồng nền này
-    // đều có đúng một nghĩa — socket đã đóng vì test kết thúc. Không có gì để xử lý riêng, cũng
-    // không được để nó nổi lên làm hỏng test khác (cùng lý do WorldFacade.tickTask bọc Throwable).
-    @SuppressWarnings("PMD.AvoidCatchingGenericException")
-    private static Thread startAttackSpammer(Socket socket) {
-        byte[] payload = AttackCommand.getDefaultInstance().toByteArray();
-        Thread spammer = new Thread(
-                () -> {
-                    for (int sequenceId = 9000; !Thread.currentThread().isInterrupted(); sequenceId++) {
-                        try {
-                            sendFrame(socket, Opcode.OPCODE_ATTACK_COMMAND_VALUE, sequenceId, payload);
-                            Thread.sleep(200);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            return; // test đã xong — kết thúc bình thường, không phải lỗi
-                        } catch (Exception e) {
-                            return; // socket đóng lúc test kết thúc — cùng lý do trên
-                        }
-                    }
-                },
-                "attack-spammer");
-        spammer.setDaemon(true);
-        spammer.start();
-        return spammer;
-    }
-
-    /** AoI Event tới bất kỳ lúc nào giữa các Response khác — đọc tới khi thấy đúng opcode cần. */
-    private static PacketCodec.Frame readUntilOpcode(DataInputStream in, int expectedOpcode) throws Exception {
-        java.util.Map<Integer, Integer> seen = new java.util.HashMap<>();
-        for (int attempt = 0; attempt < 1000; attempt++) {
-            PacketCodec.Frame frame = readFrame(in);
-            if (frame.header().opcode() == expectedOpcode) {
-                return frame;
-            }
-            seen.merge(frame.header().opcode(), 1, Integer::sum);
-        }
-        throw new AssertionError("Không thấy opcode " + expectedOpcode + " sau 1000 frame, đã thấy: " + seen);
-    }
-
-    private static void sendPing(Socket socket, int sequenceId, long clientTimestampMs) throws Exception {
-        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-        PingCommand ping =
-                PingCommand.newBuilder().setClientTimestampMs(clientTimestampMs).build();
-        PacketHeader header = new PacketHeader(Opcode.OPCODE_PING_VALUE, ProtocolVersion.CURRENT, sequenceId);
-        byte[] frame = PacketCodec.encodeFrame(header, ping.toByteArray());
-        out.writeInt(frame.length);
-        out.write(frame);
-        out.flush();
-    }
-
-    private static PacketCodec.Frame readFrame(DataInputStream in) throws Exception {
-        int length = in.readInt();
-        byte[] bytes = new byte[length];
-        in.readFully(bytes);
-        return PacketCodec.decodeFrame(bytes);
-    }
-
     // ============================================================================================
     // ADR-027 — TLS thật qua socket (KHÔNG dùng field server/mainWorldChannels/characterRegistry
     // chính, tự start/stop RIÊNG qua try-with-resources — tránh @AfterEach dọn nhầm server TLS
@@ -2453,54 +1957,9 @@ class GatewayServerIntegrationTest {
     /** Bản sao độc lập của {@link #startServer()} — cùng cách wire facades, khác {@code tlsConfig}. */
     private TlsTestServer startServerWithTls(TlsConfig tlsConfig)
             throws InterruptedException, javax.net.ssl.SSLException {
-        CharacterFacade characterFacade = fakeCharacterFacade();
-        InventoryFacade inventoryFacade = fakeInventoryFacade();
-        dev.kage.shop.api.ShopFacade shopFacade = fakeShopFacade();
-        dev.kage.dialogue.api.DialogueFacade dialogueFacade = fakeDialogueFacade();
-        dev.kage.quest.api.QuestFacade questFacade = fakeQuestFacade();
-        dev.kage.friend.api.FriendFacade friendFacade = fakeFriendFacade();
-        dev.kage.mail.api.MailFacade mailFacade = fakeMailFacade();
-        dev.kage.chat.api.ChatFacade chatFacade = fakeChatFacade();
-        dev.kage.guild.api.GuildFacade guildFacade = fakeGuildFacade();
-        dev.kage.party.api.PartyFacade localPartyFacade = fakePartyFacade();
-        dev.kage.trade.api.TradeFacade tradeFacade = fakeTradeFacade();
-        dev.kage.pvp.api.PvpFacade localPvpFacade = fakePvpFacade();
-        io.micrometer.core.instrument.simple.SimpleMeterRegistry meterRegistry =
-                new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
-        GatewayNetworkMetrics networkMetrics = new GatewayNetworkMetrics(meterRegistry);
-        GatewayObservability observability = new GatewayObservability(networkMetrics, GatewayTracing.disabled());
-        ConnectedCharacterRegistry localCharacterRegistry = new ConnectedCharacterRegistry(
-                inventoryFacade, questFacade, ExperienceGrantPort.disabled(), networkMetrics);
-        WorldFacade firstChannelFacade = new WorldFacade(
-                localCharacterRegistry, true, TickMetricsPort.NO_OP, TestWorldContents.trainingGroundWithElder());
-        firstChannelFacade.start();
-        MainWorldChannelRegistry localMainWorldChannels = new MainWorldChannelRegistry(
-                localCharacterRegistry, firstChannelFacade, meterRegistry, TestWorldContents.trainingGroundWithElder());
-        CharacterPositionPersister positionPersister =
-                new CharacterPositionPersister(characterFacade, localCharacterRegistry, Duration.ofMinutes(5));
-        DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
-                localCharacterRegistry,
-                new DungeonInstanceRegistry.DungeonFacades(characterFacade, localPartyFacade),
-                localMainWorldChannels,
-                TestWorldContents.withBoss());
-        ArenaInstanceRegistry arenaInstanceRegistry = new ArenaInstanceRegistry(
-                localCharacterRegistry, characterFacade, localPvpFacade, localMainWorldChannels);
-        WorldGateway worldGateway = new WorldGateway(
-                localMainWorldChannels,
-                localCharacterRegistry,
-                positionPersister,
-                dungeonInstanceRegistry,
-                arenaInstanceRegistry);
-        SocialFacades socialFacades = new SocialFacades(
-                friendFacade, mailFacade, chatFacade, guildFacade, localPartyFacade, tradeFacade, localPvpFacade);
-        ContentFacades contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
-        GatewayFacades facades =
-                new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
-
-        GatewayServer tlsServer =
-                new GatewayServer(0, facades, new GatewayServer.GatewayContext(worldGateway, observability), tlsConfig);
-        tlsServer.start();
-        return new TlsTestServer(tlsServer, localMainWorldChannels, localCharacterRegistry);
+        AssembledServer assembled = assembleServer(
+                new ServerOptions(tlsConfig, GatewayTracing.disabled(), GatewayPipelineTest.fakeTradeFacade()));
+        return new TlsTestServer(assembled.server(), assembled.mainWorldChannels(), assembled.characterRegistry());
     }
 
     @Test
@@ -2614,136 +2073,19 @@ class GatewayServerIntegrationTest {
     /** Bản sao độc lập của {@link #startServer()} — khác {@code observability} (dùng tracing thật). */
     private TracingTestServer startServerWithTracing(GatewayTracing tracing)
             throws InterruptedException, javax.net.ssl.SSLException {
-        CharacterFacade characterFacade = fakeCharacterFacade();
-        InventoryFacade inventoryFacade = fakeInventoryFacade();
-        dev.kage.shop.api.ShopFacade shopFacade = fakeShopFacade();
-        dev.kage.dialogue.api.DialogueFacade dialogueFacade = fakeDialogueFacade();
-        dev.kage.quest.api.QuestFacade questFacade = fakeQuestFacade();
-        dev.kage.friend.api.FriendFacade friendFacade = fakeFriendFacade();
-        dev.kage.mail.api.MailFacade mailFacade = fakeMailFacade();
-        dev.kage.chat.api.ChatFacade chatFacade = fakeChatFacade();
-        dev.kage.guild.api.GuildFacade guildFacade = fakeGuildFacade();
-        dev.kage.party.api.PartyFacade localPartyFacade = fakePartyFacade();
-        // Khác fakeTradeFacade() dùng ở nơi khác của file này — lockForExecution trả rỗng SẠCH
-        // (NOT_FOUND) thay vì throw, vì test này THẬT SỰ gọi ConfirmTradeCommand tới hết luồng
-        // (khác các test khác chỉ cần compile, không gọi confirm).
-        dev.kage.trade.api.TradeFacade tradeFacade = fakeTradeFacadeAllowingConfirm();
-        dev.kage.pvp.api.PvpFacade localPvpFacade = fakePvpFacade();
-        io.micrometer.core.instrument.simple.SimpleMeterRegistry meterRegistry =
-                new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
-        GatewayNetworkMetrics networkMetrics = new GatewayNetworkMetrics(meterRegistry);
-        GatewayObservability observability = new GatewayObservability(networkMetrics, tracing);
-        ConnectedCharacterRegistry localCharacterRegistry = new ConnectedCharacterRegistry(
-                inventoryFacade, questFacade, ExperienceGrantPort.disabled(), networkMetrics);
-        WorldFacade firstChannelFacade = new WorldFacade(
-                localCharacterRegistry, true, TickMetricsPort.NO_OP, TestWorldContents.trainingGroundWithElder());
-        firstChannelFacade.start();
-        MainWorldChannelRegistry localMainWorldChannels = new MainWorldChannelRegistry(
-                localCharacterRegistry, firstChannelFacade, meterRegistry, TestWorldContents.trainingGroundWithElder());
-        CharacterPositionPersister positionPersister =
-                new CharacterPositionPersister(characterFacade, localCharacterRegistry, Duration.ofMinutes(5));
-        DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
-                localCharacterRegistry,
-                new DungeonInstanceRegistry.DungeonFacades(characterFacade, localPartyFacade),
-                localMainWorldChannels,
-                TestWorldContents.withBoss());
-        ArenaInstanceRegistry arenaInstanceRegistry = new ArenaInstanceRegistry(
-                localCharacterRegistry, characterFacade, localPvpFacade, localMainWorldChannels);
-        WorldGateway worldGateway = new WorldGateway(
-                localMainWorldChannels,
-                localCharacterRegistry,
-                positionPersister,
-                dungeonInstanceRegistry,
-                arenaInstanceRegistry);
-        SocialFacades socialFacades = new SocialFacades(
-                friendFacade, mailFacade, chatFacade, guildFacade, localPartyFacade, tradeFacade, localPvpFacade);
-        ContentFacades contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
-        GatewayFacades facades =
-                new GatewayFacades(fakeAccountFacade(), characterFacade, inventoryFacade, contentFacades);
-
-        GatewayServer tracingServer = new GatewayServer(
-                0, facades, new GatewayServer.GatewayContext(worldGateway, observability), TlsConfig.disabled());
-        tracingServer.start();
-        return new TracingTestServer(tracingServer, localMainWorldChannels, localCharacterRegistry);
+        // Khác GatewayPipelineTest.fakeTradeFacade() — lockForExecution trả rỗng SẠCH (NOT_FOUND) thay vì
+        // throw, vì test này THẬT SỰ gọi ConfirmTradeCommand tới hết luồng.
+        AssembledServer assembled =
+                assembleServer(new ServerOptions(TlsConfig.disabled(), tracing, fakeTradeFacadeAllowingConfirm()));
+        return new TracingTestServer(assembled.server(), assembled.mainWorldChannels(), assembled.characterRegistry());
     }
 
-    /** Cùng {@code fakeTradeFacade()} nhưng {@code lockForExecution} trả rỗng SẠCH (NOT_FOUND)
+    /** Cùng {@code GatewayPipelineTest.fakeTradeFacade()} nhưng {@code lockForExecution} trả rỗng SẠCH (NOT_FOUND)
      * thay vì throw — cho phép test gọi {@code ConfirmTradeCommand} hết luồng thật. */
     private dev.kage.trade.api.TradeFacade fakeTradeFacadeAllowingConfirm() {
-        dev.kage.trade.domain.TradeSessionPort sessionPort = new dev.kage.trade.domain.TradeSessionPort() {
-            @Override
-            public Optional<dev.kage.trade.domain.TradeSession> findActiveSessionOfCharacter(long characterId) {
-                return Optional.empty();
-            }
-
-            @Override
-            public dev.kage.trade.domain.TradeSession createRequest(long requesterCharacterId, long targetCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean acceptRequest(long sessionId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean deleteSessionIfParticipant(long sessionId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean replaceOffer(
-                    long sessionId,
-                    long characterId,
-                    long goldAmount,
-                    List<dev.kage.trade.domain.OfferedItemInput> items) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.trade.domain.TradeSessionSnapshot> findSnapshot(long sessionId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.trade.domain.TradeSessionSnapshot> lockForExecution(
-                    dev.kage.trade.domain.Transaction tx, long sessionId) {
-                // khác fakeTradeFacade() — cho phép confirm chạy hết luồng, trả NOT_FOUND SẠCH.
-                return Optional.empty();
-            }
-
-            @Override
-            public void setConfirmed(dev.kage.trade.domain.Transaction tx, long sessionId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public void deleteSession(dev.kage.trade.domain.Transaction tx, long sessionId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-        };
-        dev.kage.trade.domain.TradeInventoryPort inventoryPort = new dev.kage.trade.domain.TradeInventoryPort() {
-            @Override
-            public Optional<dev.kage.trade.domain.OwnedItemSnapshot> findItemById(long itemId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public TransferOutcome transferItem(dev.kage.trade.domain.Transaction tx, TransferRequest request) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-        };
-        dev.kage.trade.domain.TradeGoldPort goldPort = new dev.kage.trade.domain.TradeGoldPort() {
-            @Override
-            public boolean deductGold(dev.kage.trade.domain.Transaction tx, long characterId, long amount) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public void creditGold(dev.kage.trade.domain.Transaction tx, long characterId, long amount) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-        };
+        dev.kage.trade.domain.TradeSessionPort sessionPort = new StubSessionPort();
+        dev.kage.trade.domain.TradeInventoryPort inventoryPort = new StubFakeTradeAllowingConfirmInventoryPort();
+        dev.kage.trade.domain.TradeGoldPort goldPort = new StubGoldPort();
         dev.kage.trade.domain.TradeAuditPort auditPort = (tx, characterId, action, detailJson) -> {};
         dev.kage.trade.domain.IdempotencyPort idempotencyPort = (tx, idempotencyKey) -> {};
         dev.kage.trade.application.TradePorts ports = new dev.kage.trade.application.TradePorts(
@@ -2756,6 +2098,81 @@ class GatewayServerIntegrationTest {
                 new dev.kage.trade.application.ConfirmTradeUseCase(ports, action -> action.accept(null)),
                 new dev.kage.trade.application.GetTradeStatusUseCase(sessionPort, inventoryPort));
         return new dev.kage.trade.api.TradeFacade(useCases);
+    }
+
+    private static final class StubSessionPort implements dev.kage.trade.domain.TradeSessionPort {
+        @Override
+        public Optional<dev.kage.trade.domain.TradeSession> findActiveSessionOfCharacter(long characterId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public dev.kage.trade.domain.TradeSession createRequest(long requesterCharacterId, long targetCharacterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public boolean acceptRequest(long sessionId, long characterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public boolean deleteSessionIfParticipant(long sessionId, long characterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public boolean replaceOffer(
+                long sessionId, long characterId, long goldAmount, List<dev.kage.trade.domain.OfferedItemInput> items) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public Optional<dev.kage.trade.domain.TradeSessionSnapshot> findSnapshot(long sessionId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public Optional<dev.kage.trade.domain.TradeSessionSnapshot> lockForExecution(
+                dev.kage.trade.domain.Transaction tx, long sessionId) {
+            // khác GatewayPipelineTest.fakeTradeFacade() — cho phép confirm chạy hết luồng, trả NOT_FOUND SẠCH.
+            return Optional.empty();
+        }
+
+        @Override
+        public void setConfirmed(dev.kage.trade.domain.Transaction tx, long sessionId, long characterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public void deleteSession(dev.kage.trade.domain.Transaction tx, long sessionId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+    }
+
+    private static final class StubFakeTradeAllowingConfirmInventoryPort
+            implements dev.kage.trade.domain.TradeInventoryPort {
+        @Override
+        public Optional<dev.kage.trade.domain.OwnedItemSnapshot> findItemById(long itemId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public TransferOutcome transferItem(dev.kage.trade.domain.Transaction tx, TransferRequest request) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+    }
+
+    private static final class StubGoldPort implements dev.kage.trade.domain.TradeGoldPort {
+        @Override
+        public boolean deductGold(dev.kage.trade.domain.Transaction tx, long characterId, long amount) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public void creditGold(dev.kage.trade.domain.Transaction tx, long characterId, long amount) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
     }
 
     /** Chờ (poll ngắn, KHÔNG {@code Thread.sleep} dài) tới khi {@code exporter} có span tên {@code spanName} —
@@ -2776,38 +2193,8 @@ class GatewayServerIntegrationTest {
     void clientCommands_shouldEmitDeepChildSpans_forGoldAffectingCommands() throws Exception {
         RecordingSpanExporter exporter = new RecordingSpanExporter();
         try (TracingTestServer tracingServer = startServerWithTracing(GatewayTracing.forTesting(exporter))) {
-            try (Socket socket = new Socket(
-                    InetAddress.getLoopbackAddress(), tracingServer.server().port())) {
-                socket.setSoTimeout(5000);
-                DataInputStream in = new DataInputStream(socket.getInputStream());
-                connectCreateAndSelect(
-                        socket, in, "tracing" + UUID.randomUUID().toString().substring(0, 6));
-
-                BuyItemCommand buyCommand = BuyItemCommand.newBuilder()
-                        .setIdempotencyKey(UUID.randomUUID().toString())
-                        .setItemTemplateId(1L)
-                        .setQuantity(1)
-                        .build();
-                sendFrame(socket, Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, 20, buyCommand.toByteArray());
-                readUntilOpcode(in, Opcode.OPCODE_BUY_ITEM_RESPONSE_VALUE);
-
-                SellItemCommand sellCommand = SellItemCommand.newBuilder()
-                        .setIdempotencyKey(UUID.randomUUID().toString())
-                        .setItemId(1L)
-                        .setQuantity(1)
-                        .build();
-                sendFrame(socket, Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, 21, sellCommand.toByteArray());
-                readUntilOpcode(in, Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE);
-
-                ConfirmTradeCommand confirmCommand = ConfirmTradeCommand.newBuilder()
-                        .setIdempotencyKey(UUID.randomUUID().toString())
-                        .setSessionId(1L)
-                        .build();
-                sendFrame(socket, Opcode.OPCODE_CONFIRM_TRADE_COMMAND_VALUE, 22, confirmCommand.toByteArray());
-                ConfirmTradeResponse confirmResponse =
-                        ConfirmTradeResponse.parseFrom(readUntilOpcode(in, Opcode.OPCODE_CONFIRM_TRADE_RESPONSE_VALUE)
-                                .payload());
-                assertThat(confirmResponse.getOutcome()).isEqualTo(ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_NOT_FOUND);
+            try (Socket socket = openSocket(tracingServer.server().port(), 5000)) {
+                sendGoldAffectingCommands(socket);
             }
 
             awaitSpan(exporter, "feature.shop.buy");
@@ -2818,23 +2205,51 @@ class GatewayServerIntegrationTest {
                     .as("cả 3 span đều phải là CON của span gateway.command (khớp pattern feature.inventory.enhance)")
                     .filteredOn(s -> s.getName().startsWith("feature."))
                     .allSatisfy(s -> assertThat(s.getParentSpanId()).isNotEqualTo("0000000000000000"));
-
-            assertThat(exporter.exported())
-                    .filteredOn(s -> s.getName().equals("feature.shop.buy"))
-                    .singleElement()
-                    .satisfies(s -> assertThat(s.getAttributes().get(AttributeKey.stringKey("result")))
-                            .isEqualTo("ITEM_NOT_IN_SHOP"));
-            assertThat(exporter.exported())
-                    .filteredOn(s -> s.getName().equals("feature.shop.sell"))
-                    .singleElement()
-                    .satisfies(s -> assertThat(s.getAttributes().get(AttributeKey.stringKey("result")))
-                            .isEqualTo("ITEM_NOT_FOUND"));
-            assertThat(exporter.exported())
-                    .filteredOn(s -> s.getName().equals("feature.trade.confirm"))
-                    .singleElement()
-                    .satisfies(s -> assertThat(s.getAttributes().get(AttributeKey.stringKey("result")))
-                            .isEqualTo("NOT_FOUND"));
+            assertSpanResult(exporter, "feature.shop.buy", "ITEM_NOT_IN_SHOP");
+            assertSpanResult(exporter, "feature.shop.sell", "ITEM_NOT_FOUND");
+            assertSpanResult(exporter, "feature.trade.confirm", "NOT_FOUND");
         }
+    }
+
+    /** Vào world rồi gửi mua, bán và xác nhận giao dịch — ba lệnh chạm vàng có span con riêng. */
+    private static void sendGoldAffectingCommands(Socket socket) throws Exception {
+        DataInputStream in = new DataInputStream(socket.getInputStream());
+        connectCreateAndSelect(
+                socket, in, "tracing" + UUID.randomUUID().toString().substring(0, 6));
+
+        BuyItemCommand buyCommand = BuyItemCommand.newBuilder()
+                .setIdempotencyKey(UUID.randomUUID().toString())
+                .setItemTemplateId(1L)
+                .setQuantity(1)
+                .build();
+        sendFrame(socket, Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, 20, buyCommand.toByteArray());
+        readUntilOpcode(in, Opcode.OPCODE_BUY_ITEM_RESPONSE_VALUE);
+
+        SellItemCommand sellCommand = SellItemCommand.newBuilder()
+                .setIdempotencyKey(UUID.randomUUID().toString())
+                .setItemId(1L)
+                .setQuantity(1)
+                .build();
+        sendFrame(socket, Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, 21, sellCommand.toByteArray());
+        readUntilOpcode(in, Opcode.OPCODE_SELL_ITEM_RESPONSE_VALUE);
+
+        ConfirmTradeCommand confirmCommand = ConfirmTradeCommand.newBuilder()
+                .setIdempotencyKey(UUID.randomUUID().toString())
+                .setSessionId(1L)
+                .build();
+        sendFrame(socket, Opcode.OPCODE_CONFIRM_TRADE_COMMAND_VALUE, 22, confirmCommand.toByteArray());
+        ConfirmTradeResponse confirmResponse = ConfirmTradeResponse.parseFrom(
+                readUntilOpcode(in, Opcode.OPCODE_CONFIRM_TRADE_RESPONSE_VALUE).payload());
+        assertThat(confirmResponse.getOutcome()).isEqualTo(ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_NOT_FOUND);
+    }
+
+    /** Đúng một span tên {@code spanName}, mang thuộc tính {@code result} bằng {@code expectedResult}. */
+    private static void assertSpanResult(RecordingSpanExporter exporter, String spanName, String expectedResult) {
+        assertThat(exporter.exported())
+                .filteredOn(s -> s.getName().equals(spanName))
+                .singleElement()
+                .satisfies(s -> assertThat(s.getAttributes().get(AttributeKey.stringKey("result")))
+                        .isEqualTo(expectedResult));
     }
 
     private static java.io.File testResourceFile(String classpathPath) throws Exception {
@@ -2864,33 +2279,5 @@ class GatewayServerIntegrationTest {
         javax.net.ssl.SSLContext sslContext = javax.net.ssl.SSLContext.getInstance("TLS");
         sslContext.init(null, trustManagerFactory.getTrustManagers(), null);
         return sslContext.getSocketFactory();
-    }
-
-    /** Người gửi luôn "đủ tiền" — test này không kiểm nghiệp vụ ký quỹ (xem MailIntegrationTest). */
-    private static final class FakeMailGoldPort implements dev.kage.mail.domain.GoldPort {
-        @Override
-        public boolean deductGold(dev.kage.mail.domain.Transaction tx, long characterId, long amount) {
-            return true;
-        }
-
-        @Override
-        public void creditGold(dev.kage.mail.domain.Transaction tx, long characterId, long amount) {
-            // không cần ghi nhận gì ở test này
-        }
-    }
-
-    /** Túi đồ luôn "đủ chỗ và đủ món" — cùng lý do FakeMailGoldPort. */
-    private static final class FakeMailInventoryGatewayPort implements dev.kage.mail.domain.InventoryGatewayPort {
-        @Override
-        public boolean grantItem(
-                dev.kage.mail.domain.Transaction tx, long characterId, long itemTemplateId, int quantity) {
-            return true;
-        }
-
-        @Override
-        public boolean consumeItem(
-                dev.kage.mail.domain.Transaction tx, long characterId, long itemTemplateId, int quantity) {
-            return true;
-        }
     }
 }

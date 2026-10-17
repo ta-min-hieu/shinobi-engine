@@ -34,6 +34,13 @@
         <Bug pattern="UNENCRYPTED_SOCKET"/>
     </Match>
 
+    <!-- Cùng lý do: SocketWire là phần I/O socket tách khỏi GatewayServerIntegrationTest (README dòng
+         58(b), 2026-10-17) — nối tới GatewayServer dựng với TlsConfig.disabled() trên loopback. -->
+    <Match>
+        <Class name="dev.kage.server.gateway.SocketWire"/>
+        <Bug pattern="UNENCRYPTED_SOCKET"/>
+    </Match>
+
     <!-- findFreePort() chỉ mở ServerSocket(0) để LẤY SỐ CỔNG TRỐNG rồi đóng ngay — không bao giờ
          accept() hay truyền dữ liệu, TLS không liên quan. -->
     <Match>

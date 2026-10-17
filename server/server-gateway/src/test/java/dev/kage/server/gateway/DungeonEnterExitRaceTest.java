@@ -130,19 +130,7 @@ class DungeonEnterExitRaceTest {
         }
 
         // 3. Chặn tick hầm ngục ⇒ lượt rời sẽ kẹt ở "chờ World hầm ngục im", SAU khi đã xếp lệnh gỡ.
-        memberGate.arm();
-        dungeonWorld.enqueueAreaChatMessage(MEMBER_ID, "Member", "stall");
-        memberGate.awaitStalled();
-        AtomicReference<Thread> exitThread = new AtomicReference<>();
-        Future<DungeonInstanceRegistry.ExitOutcome> exit = executor.submit(() -> {
-            exitThread.set(Thread.currentThread());
-            return dungeons.exitDungeon(LEADER_ID);
-        });
-        // Lượt rời đã qua nửa đầu ⇔ luồng của nó đang chờ CÓ HẠN (mốc chặn hầm ngục, trần 1 giây) —
-        // chỗ chờ có hạn duy nhất trên đường rời.
-        while (exitThread.get() == null || exitThread.get().getState() != Thread.State.TIMED_WAITING) {
-            Thread.onSpinWait();
-        }
+        Future<DungeonInstanceRegistry.ExitOutcome> exit = startLeaderExitStalledInside(dungeonWorld);
 
         // 4. Thả world chính: lượt vào chạy nửa sau TRƯỚC lượt rời.
         leaderGate.release();
@@ -165,6 +153,26 @@ class DungeonEnterExitRaceTest {
         assertThat(netLeaderSightingsByMember())
                 .as("đồng đội trong hầm ngục không được còn thấy LEADER (bóng ma)")
                 .isZero();
+    }
+
+    /**
+     * Chặn tick hầm ngục rồi cho LEADER rời — trả về khi lượt rời đã qua nửa đầu, tức luồng của nó đang
+     * chờ CÓ HẠN (mốc chặn hầm ngục, trần 1 giây) — chỗ chờ có hạn duy nhất trên đường rời.
+     */
+    private Future<DungeonInstanceRegistry.ExitOutcome> startLeaderExitStalledInside(WorldFacade dungeonWorld)
+            throws InterruptedException {
+        memberGate.arm();
+        dungeonWorld.enqueueAreaChatMessage(MEMBER_ID, "Member", "stall");
+        memberGate.awaitStalled();
+        AtomicReference<Thread> exitThread = new AtomicReference<>();
+        Future<DungeonInstanceRegistry.ExitOutcome> exit = executor.submit(() -> {
+            exitThread.set(Thread.currentThread());
+            return dungeons.exitDungeon(LEADER_ID);
+        });
+        while (exitThread.get() == null || exitThread.get().getState() != Thread.State.TIMED_WAITING) {
+            Thread.onSpinWait();
+        }
+        return exit;
     }
 
     /** Lần xuất hiện trừ lần biến mất của LEADER trong mắt MEMBER, từ lúc dựng cảnh xong. */

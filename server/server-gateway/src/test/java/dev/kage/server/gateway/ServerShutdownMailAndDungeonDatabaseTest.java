@@ -173,20 +173,7 @@ class ServerShutdownMailAndDungeonDatabaseTest {
                     MAILS_IN_FLIGHT);
             sender.select(senderId);
 
-            for (int i = 0; i < MAILS_IN_FLIGHT; i++) {
-                sender.send(
-                        Opcode.OPCODE_SEND_MAIL_COMMAND_VALUE,
-                        SendMailCommand.newBuilder()
-                                .setRecipientName(recipientName)
-                                .setSubject("s" + i)
-                                .setBody("b")
-                                .setGoldAmount(GOLD_PER_MAIL)
-                                .addAttachments(MailAttachmentView.newBuilder()
-                                        .setItemTemplateId(templateId)
-                                        .setQuantity(1))
-                                .build()
-                                .toByteArray());
-            }
+            sendMailsWithoutWaiting(sender, recipientName, templateId);
             shutDown(server); // không chờ câu trả lời nào
 
             assertThat(errorLog.errorsSince(0))
@@ -194,6 +181,29 @@ class ServerShutdownMailAndDungeonDatabaseTest {
                     .isEmpty();
         }
 
+        assertMailConservation(senderId, templateId);
+    }
+
+    /** {@link #MAILS_IN_FLIGHT} lệnh gửi thư, mỗi thư {@link #GOLD_PER_MAIL} vàng + một món — không chờ trả lời. */
+    private static void sendMailsWithoutWaiting(Player sender, String recipientName, long templateId) throws Exception {
+        for (int i = 0; i < MAILS_IN_FLIGHT; i++) {
+            sender.send(
+                    Opcode.OPCODE_SEND_MAIL_COMMAND_VALUE,
+                    SendMailCommand.newBuilder()
+                            .setRecipientName(recipientName)
+                            .setSubject("s" + i)
+                            .setBody("b")
+                            .setGoldAmount(GOLD_PER_MAIL)
+                            .addAttachments(MailAttachmentView.newBuilder()
+                                    .setItemTemplateId(templateId)
+                                    .setQuantity(1))
+                            .build()
+                            .toByteArray());
+        }
+    }
+
+    /** Mỗi thư đã ghi là trọn vẹn, và vàng/vật phẩm chỉ đổi chỗ từ người gửi sang thư. */
+    private static void assertMailConservation(long senderId, long templateId) throws Exception {
         long mails = queryLong("SELECT count(*) FROM mail WHERE sender_id = ?", senderId);
         long goldInMails = queryLong("SELECT coalesce(sum(gold_amount), 0) FROM mail WHERE sender_id = ?", senderId);
         long itemsInMails = queryLong(
@@ -231,23 +241,7 @@ class ServerShutdownMailAndDungeonDatabaseTest {
             assertThat(player.select(characterId).getSpawnX())
                     .isCloseTo(MAIN_WORLD_X, Offset.offset(POSITION_TOLERANCE));
 
-            player.send(
-                    Opcode.OPCODE_CREATE_PARTY_COMMAND_VALUE,
-                    CreatePartyCommand.getDefaultInstance().toByteArray());
-            assertThat(CreatePartyResponse.parseFrom(player.await(Opcode.OPCODE_CREATE_PARTY_RESPONSE_VALUE)
-                                    .payload())
-                            .getOutcome())
-                    .isEqualTo(CreatePartyOutcome.CREATE_PARTY_OUTCOME_OK);
-            player.send(
-                    Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE,
-                    EnterDungeonCommand.newBuilder()
-                            .setDungeonCode(DUNGEON_CODE)
-                            .build()
-                            .toByteArray());
-            assertThat(EnterDungeonResponse.parseFrom(player.await(Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE)
-                                    .payload())
-                            .getOutcome())
-                    .isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
+            enterDungeonAlone(player);
 
             player.send(
                     Opcode.OPCODE_MOVE_COMMAND_VALUE,
@@ -271,6 +265,33 @@ class ServerShutdownMailAndDungeonDatabaseTest {
                 .as("DB phải giữ chỗ đứng ở WORLD CHÍNH, không phải toạ độ trong hầm ngục")
                 .isCloseTo(MAIN_WORLD_X, Offset.offset(RETURN_POSITION_TOLERANCE));
 
+        assertBackAtMainWorldSpotAfterRestart(username, characterId, savedX);
+    }
+
+    /** Lập nhóm một người rồi vào hầm ngục mẫu — khẳng định cả hai bước thành công. */
+    private static void enterDungeonAlone(Player player) throws Exception {
+        player.send(
+                Opcode.OPCODE_CREATE_PARTY_COMMAND_VALUE,
+                CreatePartyCommand.getDefaultInstance().toByteArray());
+        assertThat(CreatePartyResponse.parseFrom(player.await(Opcode.OPCODE_CREATE_PARTY_RESPONSE_VALUE)
+                                .payload())
+                        .getOutcome())
+                .isEqualTo(CreatePartyOutcome.CREATE_PARTY_OUTCOME_OK);
+        player.send(
+                Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE,
+                EnterDungeonCommand.newBuilder()
+                        .setDungeonCode(DUNGEON_CODE)
+                        .build()
+                        .toByteArray());
+        assertThat(EnterDungeonResponse.parseFrom(player.await(Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE)
+                                .payload())
+                        .getOutcome())
+                .isEqualTo(EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK);
+    }
+
+    /** Khởi động server mới: nhân vật xuất hiện ở {@code savedX} của world chính và còn điều khiển được. */
+    private void assertBackAtMainWorldSpotAfterRestart(String username, long characterId, float savedX)
+            throws Exception {
         GatewayBootstrap.Assembly second = startServer();
         try (Player player = Player.connect(second)) {
             player.logIn(username);

@@ -21,19 +21,11 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.embedded.EmbeddedChannel;
 import org.junit.jupiter.api.Test;
 
-import dev.kage.account.api.AccountFacade;
-import dev.kage.account.application.LoginOrCreateAccountUseCase;
 import dev.kage.account.domain.Account;
 import dev.kage.account.domain.AccountPort;
 import dev.kage.account.domain.SessionPort;
 import dev.kage.account.domain.Transaction;
 import dev.kage.character.api.CharacterFacade;
-import dev.kage.character.application.CharacterUseCases;
-import dev.kage.character.application.CreateCharacterUseCase;
-import dev.kage.character.application.GrantExperienceUseCase;
-import dev.kage.character.application.ListCharactersUseCase;
-import dev.kage.character.application.SelectCharacterUseCase;
-import dev.kage.character.application.SelectFactionUseCase;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.CharacterStats;
@@ -843,48 +835,15 @@ class GatewayPipelineTest {
             SeededInventory seeded, List<dev.kage.inventory.domain.ItemCatalogEntry> seededCatalog) {
         List<dev.kage.inventory.domain.ItemStack> seededItems = seeded.items();
         Map<dev.kage.inventory.domain.EquipmentSlotType, Long> seededEquipment = seeded.equipment();
-        InventoryPort inventoryPort = new InventoryPort() {
-            @Override
-            public Optional<Inventory> findByCharacter(long characterId) {
-                return Optional.of(new Inventory(characterId, 20, seededItems));
-            }
-
-            @Override
-            public Inventory save(dev.kage.inventory.domain.Transaction tx, Inventory inventory) {
-                return inventory; // không dùng trong test này
-            }
-        };
+        InventoryPort inventoryPort = new StubInventoryPort(seededItems);
         DropTablePort dropTablePort = dropTableCode -> List.<DropTableEntry>of();
-        ItemTemplatePort itemTemplatePort = new ItemTemplatePort() {
-            @Override
-            public Optional<ItemTemplate> findById(long itemTemplateId) {
-                return Optional.ofNullable(seeded.templates().get(itemTemplateId));
-            }
-
-            @Override
-            public Optional<Long> findIdByCode(String code) {
-                return Optional.empty();
-            }
-
-            @Override
-            public List<dev.kage.inventory.domain.ItemCatalogEntry> listCatalog() {
-                return List.copyOf(seededCatalog); // SpotBugs EI: Fake không được lộ list gốc ra ngoài
-            }
-        };
+        ItemTemplatePort itemTemplatePort = new StubItemTemplatePort(seeded, seededCatalog);
         AddItemUseCase addItemUseCase =
                 new AddItemUseCase(inventoryPort, itemTemplatePort, action -> action.accept(null));
         GrantLootUseCase grantLootUseCase =
                 new GrantLootUseCase(dropTablePort, inventoryPort, itemTemplatePort, action -> action.accept(null));
         // Equip/unequip không dùng trong test này — fake tối thiểu để compile.
-        EquipmentPort equipmentPort = new EquipmentPort() {
-            @Override
-            public Optional<Equipment> findByCharacter(long characterId) {
-                return Optional.of(new Equipment(characterId, seededEquipment));
-            }
-
-            @Override
-            public void save(dev.kage.inventory.domain.Transaction tx, Equipment equipment) {}
-        };
+        EquipmentPort equipmentPort = new StubEquipmentPort(seededEquipment);
         EquipItemUseCase equipItemUseCase =
                 new EquipItemUseCase(inventoryPort, itemTemplatePort, equipmentPort, action -> action.accept(null));
         UnequipItemUseCase unequipItemUseCase = new UnequipItemUseCase(equipmentPort, action -> action.accept(null));
@@ -911,47 +870,53 @@ class GatewayPipelineTest {
                         new dev.kage.inventory.application.GetItemCatalogUseCase(itemTemplatePort)));
     }
 
+    private record StubInventoryPort(List<dev.kage.inventory.domain.ItemStack> seededItems) implements InventoryPort {
+        @Override
+        public Optional<Inventory> findByCharacter(long characterId) {
+            return Optional.of(new Inventory(characterId, 20, seededItems));
+        }
+
+        @Override
+        public Inventory save(dev.kage.inventory.domain.Transaction tx, Inventory inventory) {
+            return inventory; // không dùng trong test này
+        }
+    }
+
+    private record StubItemTemplatePort(
+            SeededInventory seeded, List<dev.kage.inventory.domain.ItemCatalogEntry> seededCatalog)
+            implements ItemTemplatePort {
+        @Override
+        public Optional<ItemTemplate> findById(long itemTemplateId) {
+            return Optional.ofNullable(seeded.templates().get(itemTemplateId));
+        }
+
+        @Override
+        public Optional<Long> findIdByCode(String code) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<dev.kage.inventory.domain.ItemCatalogEntry> listCatalog() {
+            return List.copyOf(seededCatalog); // SpotBugs EI: Fake không được lộ list gốc ra ngoài
+        }
+    }
+
+    private record StubEquipmentPort(Map<dev.kage.inventory.domain.EquipmentSlotType, Long> seededEquipment)
+            implements EquipmentPort {
+        @Override
+        public Optional<Equipment> findByCharacter(long characterId) {
+            return Optional.of(new Equipment(characterId, seededEquipment));
+        }
+
+        @Override
+        public void save(dev.kage.inventory.domain.Transaction tx, Equipment equipment) {}
+    }
+
     // Shop không dùng trong test này — fake tối thiểu để compile (cùng convention fakeInventoryFacade).
     static dev.kage.shop.api.ShopFacade fakeShopFacade() {
-        dev.kage.shop.domain.ShopCatalogPort catalogPort = new dev.kage.shop.domain.ShopCatalogPort() {
-            @Override
-            public Optional<dev.kage.shop.domain.ShopListing> findListing(long itemTemplateId) {
-                return Optional.empty();
-            }
-
-            @Override
-            public List<dev.kage.shop.domain.ShopListing> findAll() {
-                return List.of();
-            }
-        };
-        dev.kage.shop.domain.GoldPort shopGoldPort = new dev.kage.shop.domain.GoldPort() {
-            @Override
-            public boolean deductGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {
-                return true;
-            }
-
-            @Override
-            public void creditGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {}
-        };
-        dev.kage.shop.domain.InventoryGatewayPort inventoryGatewayPort =
-                new dev.kage.shop.domain.InventoryGatewayPort() {
-                    @Override
-                    public Optional<dev.kage.shop.domain.OwnedItem> findItem(long characterId, long itemId) {
-                        return Optional.empty();
-                    }
-
-                    @Override
-                    public boolean grantItem(
-                            dev.kage.shop.domain.Transaction tx, long characterId, long itemTemplateId, int quantity) {
-                        return true;
-                    }
-
-                    @Override
-                    public boolean removeQuantity(
-                            dev.kage.shop.domain.Transaction tx, long characterId, long itemId, int quantity) {
-                        return true;
-                    }
-                };
+        dev.kage.shop.domain.ShopCatalogPort catalogPort = new StubCatalogPort();
+        dev.kage.shop.domain.GoldPort shopGoldPort = new StubShopGoldPort();
+        dev.kage.shop.domain.InventoryGatewayPort inventoryGatewayPort = new StubInventoryGatewayPort();
         dev.kage.shop.domain.AuditPort shopAuditPort = (tx, characterId, action, detailJson) -> {};
         dev.kage.shop.domain.IdempotencyPort shopIdempotencyPort = (tx, idempotencyKey) -> {};
         dev.kage.shop.application.ShopPorts ports = new dev.kage.shop.application.ShopPorts(
@@ -963,6 +928,47 @@ class GatewayPipelineTest {
         dev.kage.shop.application.SellItemUseCase sellItemUseCase =
                 new dev.kage.shop.application.SellItemUseCase(ports, action -> action.accept(null));
         return new dev.kage.shop.api.ShopFacade(listShopItemsUseCase, buyItemUseCase, sellItemUseCase);
+    }
+
+    private static final class StubCatalogPort implements dev.kage.shop.domain.ShopCatalogPort {
+        @Override
+        public Optional<dev.kage.shop.domain.ShopListing> findListing(long itemTemplateId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<dev.kage.shop.domain.ShopListing> findAll() {
+            return List.of();
+        }
+    }
+
+    private static final class StubShopGoldPort implements dev.kage.shop.domain.GoldPort {
+        @Override
+        public boolean deductGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {
+            return true;
+        }
+
+        @Override
+        public void creditGold(dev.kage.shop.domain.Transaction tx, long characterId, long amount) {}
+    }
+
+    private static final class StubInventoryGatewayPort implements dev.kage.shop.domain.InventoryGatewayPort {
+        @Override
+        public Optional<dev.kage.shop.domain.OwnedItem> findItem(long characterId, long itemId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean grantItem(
+                dev.kage.shop.domain.Transaction tx, long characterId, long itemTemplateId, int quantity) {
+            return true;
+        }
+
+        @Override
+        public boolean removeQuantity(
+                dev.kage.shop.domain.Transaction tx, long characterId, long itemId, int quantity) {
+            return true;
+        }
     }
 
     // Dialogue không dùng trong test này — fake tối thiểu để compile (cùng convention fakeShopFacade).
@@ -1185,39 +1191,7 @@ class GatewayPipelineTest {
 
     // Mail không dùng trong test này — fake tối thiểu để compile (cùng convention fakeFriendFacade).
     static dev.kage.mail.api.MailFacade fakeMailFacade() {
-        dev.kage.mail.domain.MailRepositoryPort mailRepositoryPort = new dev.kage.mail.domain.MailRepositoryPort() {
-            @Override
-            public dev.kage.mail.domain.Mail send(
-                    dev.kage.mail.domain.Transaction tx, dev.kage.mail.domain.NewMail newMail) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.mail.domain.Mail> findById(long mailId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.mail.domain.Mail> findByIdForUpdate(
-                    dev.kage.mail.domain.Transaction tx, long mailId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public List<dev.kage.mail.domain.Mail> listForRecipient(long recipientId) {
-                return List.of();
-            }
-
-            @Override
-            public boolean markClaimed(dev.kage.mail.domain.Transaction tx, long mailId, long recipientId) {
-                return false;
-            }
-
-            @Override
-            public boolean delete(long mailId, long recipientId) {
-                return false;
-            }
-        };
+        dev.kage.mail.domain.MailRepositoryPort mailRepositoryPort = new StubMailRepositoryPort();
         dev.kage.mail.domain.AuditPort mailAuditPort = (tx, characterId, action, detailJson) -> {};
         dev.kage.mail.domain.IdempotencyPort mailIdempotencyPort = (tx, idempotencyKey) -> {};
         dev.kage.mail.domain.TransactionRunner mailTx = action -> action.accept(null);
@@ -1238,6 +1212,39 @@ class GatewayPipelineTest {
         return new dev.kage.mail.api.MailFacade(sendMailUseCase, listMailUseCase, claimMailUseCase, deleteMailUseCase);
     }
 
+    private static final class StubMailRepositoryPort implements dev.kage.mail.domain.MailRepositoryPort {
+        @Override
+        public dev.kage.mail.domain.Mail send(
+                dev.kage.mail.domain.Transaction tx, dev.kage.mail.domain.NewMail newMail) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public Optional<dev.kage.mail.domain.Mail> findById(long mailId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public Optional<dev.kage.mail.domain.Mail> findByIdForUpdate(dev.kage.mail.domain.Transaction tx, long mailId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public List<dev.kage.mail.domain.Mail> listForRecipient(long recipientId) {
+            return List.of();
+        }
+
+        @Override
+        public boolean markClaimed(dev.kage.mail.domain.Transaction tx, long mailId, long recipientId) {
+            return false;
+        }
+
+        @Override
+        public boolean delete(long mailId, long recipientId) {
+            return false;
+        }
+    }
+
     // Chat không dùng trong test này — fake tối thiểu để compile (cùng convention fakeMailFacade).
     static dev.kage.chat.api.ChatFacade fakeChatFacade() {
         dev.kage.chat.domain.ChatAuditPort chatAuditPort = (characterId, action, detailJson) -> {};
@@ -1246,72 +1253,7 @@ class GatewayPipelineTest {
 
     // Guild không dùng trong test này — fake tối thiểu để compile (cùng convention fakeFriendFacade).
     static dev.kage.guild.api.GuildFacade fakeGuildFacade() {
-        dev.kage.guild.domain.GuildPort guildPort = new dev.kage.guild.domain.GuildPort() {
-            @Override
-            public Optional<dev.kage.guild.domain.Guild> findByName(String name) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.guild.domain.Guild> findById(long guildId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.guild.domain.GuildMember> findMembershipOf(long characterId) {
-                return Optional.empty();
-            }
-
-            @Override
-            public java.util.List<dev.kage.guild.domain.GuildMember> listMembers(long guildId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public dev.kage.guild.domain.Guild createGuild(String name, long leaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean disbandGuild(long leaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean leaveGuild(long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.guild.domain.GuildJoinRequest> findPendingRequestOfCharacter(long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public java.util.List<dev.kage.guild.domain.GuildJoinRequest> listPendingRequests(long guildId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public dev.kage.guild.domain.GuildJoinRequest sendJoinRequest(long guildId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public ApproveResult approveJoinRequest(long requestId, long leaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean rejectJoinRequest(long requestId, long leaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-        };
+        dev.kage.guild.domain.GuildPort guildPort = new StubGuildPort();
         dev.kage.guild.application.GuildUseCases useCases = new dev.kage.guild.application.GuildUseCases(
                 new dev.kage.guild.application.CreateGuildUseCase(guildPort),
                 new dev.kage.guild.application.SendGuildJoinRequestUseCase(guildPort),
@@ -1326,69 +1268,76 @@ class GatewayPipelineTest {
         return new dev.kage.guild.api.GuildFacade(useCases);
     }
 
+    private static final class StubGuildPort implements dev.kage.guild.domain.GuildPort {
+        @Override
+        public Optional<dev.kage.guild.domain.Guild> findByName(String name) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public Optional<dev.kage.guild.domain.Guild> findById(long guildId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public Optional<dev.kage.guild.domain.GuildMember> findMembershipOf(long characterId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public java.util.List<dev.kage.guild.domain.GuildMember> listMembers(long guildId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public dev.kage.guild.domain.Guild createGuild(String name, long leaderCharacterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public boolean disbandGuild(long leaderCharacterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public boolean leaveGuild(long characterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public Optional<dev.kage.guild.domain.GuildJoinRequest> findPendingRequestOfCharacter(long characterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public java.util.List<dev.kage.guild.domain.GuildJoinRequest> listPendingRequests(long guildId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public dev.kage.guild.domain.GuildJoinRequest sendJoinRequest(long guildId, long characterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public ApproveResult approveJoinRequest(long requestId, long leaderCharacterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public boolean rejectJoinRequest(long requestId, long leaderCharacterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+    }
+
     // Party không dùng trong test này — fake tối thiểu để compile (cùng convention fakeGuildFacade).
     static dev.kage.party.api.PartyFacade fakePartyFacade() {
-        dev.kage.party.domain.PartyPort partyPort = new dev.kage.party.domain.PartyPort() {
-            @Override
-            public Optional<dev.kage.party.domain.PartyMember> findMembershipOf(long characterId) {
-                return Optional.empty();
-            }
-
-            @Override
-            public java.util.List<dev.kage.party.domain.PartyMember> listMembers(long partyId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public dev.kage.party.domain.Party createParty(long leaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.party.domain.PartyInvite> findPendingInviteOfInvitee(long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public java.util.List<dev.kage.party.domain.PartyInvite> listPendingInvitesOfInvitee(long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean transferLeadership(long leaderCharacterId, long newLeaderCharacterId) {
-                return false; // fake không có nhóm nào để chuyển quyền
-            }
-
-            @Override
-            public int deleteInvitesInvitedBefore(java.time.Instant cutoff) {
-                return 0; // fake không giữ lời mời nào để hết hạn
-            }
-
-            @Override
-            public dev.kage.party.domain.PartyInvite invite(long partyId, long inviteeCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public AcceptResult acceptInvite(long inviteId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean rejectInvite(long inviteId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public LeaveResult leaveParty(long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-        };
+        dev.kage.party.domain.PartyPort partyPort = new StubPartyPort();
         dev.kage.party.application.PartyUseCases useCases = new dev.kage.party.application.PartyUseCases(
                 new dev.kage.party.application.CreatePartyUseCase(partyPort),
                 new dev.kage.party.application.InvitePartyMemberUseCase(partyPort),
@@ -1403,81 +1352,73 @@ class GatewayPipelineTest {
         return new dev.kage.party.api.PartyFacade(useCases);
     }
 
+    private static final class StubPartyPort implements dev.kage.party.domain.PartyPort {
+        @Override
+        public Optional<dev.kage.party.domain.PartyMember> findMembershipOf(long characterId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public java.util.List<dev.kage.party.domain.PartyMember> listMembers(long partyId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public dev.kage.party.domain.Party createParty(long leaderCharacterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public Optional<dev.kage.party.domain.PartyInvite> findPendingInviteOfInvitee(long characterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public java.util.List<dev.kage.party.domain.PartyInvite> listPendingInvitesOfInvitee(long characterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public boolean transferLeadership(long leaderCharacterId, long newLeaderCharacterId) {
+            return false; // fake không có nhóm nào để chuyển quyền
+        }
+
+        @Override
+        public int deleteInvitesInvitedBefore(java.time.Instant cutoff) {
+            return 0; // fake không giữ lời mời nào để hết hạn
+        }
+
+        @Override
+        public dev.kage.party.domain.PartyInvite invite(long partyId, long inviteeCharacterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public AcceptResult acceptInvite(long inviteId, long characterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public boolean rejectInvite(long inviteId, long characterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public LeaveResult leaveParty(long characterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+    }
+
     // Trade không dùng trong test này — fake tối thiểu để compile (cùng convention fakePartyFacade).
     static dev.kage.trade.api.TradeFacade fakeTradeFacade() {
-        dev.kage.trade.domain.TradeSessionPort sessionPort = new dev.kage.trade.domain.TradeSessionPort() {
-            @Override
-            public Optional<dev.kage.trade.domain.TradeSession> findActiveSessionOfCharacter(long characterId) {
-                return Optional.empty();
-            }
-
-            @Override
-            public dev.kage.trade.domain.TradeSession createRequest(long requesterCharacterId, long targetCharacterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean acceptRequest(long sessionId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean deleteSessionIfParticipant(long sessionId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public boolean replaceOffer(
-                    long sessionId,
-                    long characterId,
-                    long goldAmount,
-                    java.util.List<dev.kage.trade.domain.OfferedItemInput> items) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.trade.domain.TradeSessionSnapshot> findSnapshot(long sessionId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public Optional<dev.kage.trade.domain.TradeSessionSnapshot> lockForExecution(
-                    dev.kage.trade.domain.Transaction tx, long sessionId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public void setConfirmed(dev.kage.trade.domain.Transaction tx, long sessionId, long characterId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public void deleteSession(dev.kage.trade.domain.Transaction tx, long sessionId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-        };
-        dev.kage.trade.domain.TradeInventoryPort inventoryPort = new dev.kage.trade.domain.TradeInventoryPort() {
-            @Override
-            public Optional<dev.kage.trade.domain.OwnedItemSnapshot> findItemById(long itemId) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public TransferOutcome transferItem(dev.kage.trade.domain.Transaction tx, TransferRequest request) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-        };
-        dev.kage.trade.domain.TradeGoldPort goldPort = new dev.kage.trade.domain.TradeGoldPort() {
-            @Override
-            public boolean deductGold(dev.kage.trade.domain.Transaction tx, long characterId, long amount) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-
-            @Override
-            public void creditGold(dev.kage.trade.domain.Transaction tx, long characterId, long amount) {
-                throw new UnsupportedOperationException("không dùng ở test này");
-            }
-        };
+        dev.kage.trade.domain.TradeSessionPort sessionPort = new StubSessionPort();
+        dev.kage.trade.domain.TradeInventoryPort inventoryPort = new StubFakeTradeInventoryPort();
+        dev.kage.trade.domain.TradeGoldPort goldPort = new StubGoldPort();
         dev.kage.trade.domain.TradeAuditPort auditPort = (tx, characterId, action, detailJson) -> {};
         dev.kage.trade.domain.IdempotencyPort idempotencyPort = (tx, idempotencyKey) -> {};
         dev.kage.trade.application.TradePorts ports = new dev.kage.trade.application.TradePorts(
@@ -1490,6 +1431,82 @@ class GatewayPipelineTest {
                 new dev.kage.trade.application.ConfirmTradeUseCase(ports, action -> action.accept(null)),
                 new dev.kage.trade.application.GetTradeStatusUseCase(sessionPort, inventoryPort));
         return new dev.kage.trade.api.TradeFacade(useCases);
+    }
+
+    private static final class StubSessionPort implements dev.kage.trade.domain.TradeSessionPort {
+        @Override
+        public Optional<dev.kage.trade.domain.TradeSession> findActiveSessionOfCharacter(long characterId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public dev.kage.trade.domain.TradeSession createRequest(long requesterCharacterId, long targetCharacterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public boolean acceptRequest(long sessionId, long characterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public boolean deleteSessionIfParticipant(long sessionId, long characterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public boolean replaceOffer(
+                long sessionId,
+                long characterId,
+                long goldAmount,
+                java.util.List<dev.kage.trade.domain.OfferedItemInput> items) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public Optional<dev.kage.trade.domain.TradeSessionSnapshot> findSnapshot(long sessionId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public Optional<dev.kage.trade.domain.TradeSessionSnapshot> lockForExecution(
+                dev.kage.trade.domain.Transaction tx, long sessionId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public void setConfirmed(dev.kage.trade.domain.Transaction tx, long sessionId, long characterId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public void deleteSession(dev.kage.trade.domain.Transaction tx, long sessionId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+    }
+
+    private static final class StubFakeTradeInventoryPort implements dev.kage.trade.domain.TradeInventoryPort {
+        @Override
+        public Optional<dev.kage.trade.domain.OwnedItemSnapshot> findItemById(long itemId) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public TransferOutcome transferItem(dev.kage.trade.domain.Transaction tx, TransferRequest request) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+    }
+
+    private static final class StubGoldPort implements dev.kage.trade.domain.TradeGoldPort {
+        @Override
+        public boolean deductGold(dev.kage.trade.domain.Transaction tx, long characterId, long amount) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
+
+        @Override
+        public void creditGold(dev.kage.trade.domain.Transaction tx, long characterId, long amount) {
+            throw new UnsupportedOperationException("không dùng ở test này");
+        }
     }
 
     // Pvp không dùng trong test này — fake tối thiểu để compile (cùng convention fakeTradeFacade).
@@ -1530,96 +1547,44 @@ class GatewayPipelineTest {
             InventoryFacade seededInventoryFacade,
             dev.kage.quest.api.QuestFacade seededQuestFacade,
             dev.kage.dialogue.api.DialogueFacade seededDialogueFacade) {
-        // ⚠️ Phải khớp CHÍNH XÁC pipeline thật trong GatewayBootstrap — lệch ở đây là test giả.
-        // CỐ Ý bỏ qua SslHandler (ADR-027) — EmbeddedChannel không mô phỏng handshake TLS thật
-        // tiện lợi, và đây là test framing/handler logic ở tầng plaintext. TLS thật (handshake,
-        // từ chối kết nối không mã hoá) verify ở GatewayServerTlsIntegrationTest (socket thật).
-        // AccountFacade/CharacterFacade THẬT (không mock), chỉ Port bên dưới là Fake (TESTING.md
-        // §4) — cùng kiểu Fake với *UseCaseTest ở feature-account/feature-character. Executor
-        // chạy ĐỒNG BỘ (Runnable::run) — handler thật đẩy việc chạm DB sang authExecutor (Virtual
-        // Thread ở production, SERVER.md §2); test cần đồng bộ để readOutboundFrame không bị race.
-        // characterPort truyền vào từ ngoài để test seed sẵn dữ liệu (VD nhân vật account khác,
-        // xem shouldRejectSelectCharacter_whenBelongsToDifferentAccount).
-        LoginOrCreateAccountUseCase loginUseCase = new LoginOrCreateAccountUseCase(
-                new FakeAccountPort(), new FakeSessionPort(), action -> action.accept(null));
-        AccountFacade accountFacade = new AccountFacade(loginUseCase);
-
-        CreateCharacterUseCase createCharacterUseCase =
-                new CreateCharacterUseCase(characterPort, action -> action.accept(null));
-        ListCharactersUseCase listCharactersUseCase = new ListCharactersUseCase(characterPort);
-        SelectCharacterUseCase selectCharacterUseCase = new SelectCharacterUseCase(characterPort);
-        SelectFactionUseCase selectFactionUseCase = new SelectFactionUseCase(characterPort);
-        CharacterUseCases useCases = new CharacterUseCases(
-                createCharacterUseCase,
-                listCharactersUseCase,
-                selectCharacterUseCase,
-                selectFactionUseCase,
-                new GrantExperienceUseCase(characterPort));
-        CharacterFacade characterFacade = new CharacterFacade(useCases, characterPort);
-
-        // WorldFacade KHÔNG start() ở đây — test này không verify movement/AoI, chỉ cần
-        // attachCharacter() (gọi trong handleSelectCharacterBlocking) không ném lỗi khi enqueue
-        // vào hàng đợi chưa có ai drain (không tạo/rò rỉ thread tick cho mỗi test). Tương tự,
-        // positionPersister không start() — save() (nếu bị gọi) chạy trực tiếp, không cần scheduler.
-        InventoryFacade inventoryFacade = seededInventoryFacade;
-        dev.kage.shop.api.ShopFacade shopFacade = fakeShopFacade();
-        dev.kage.dialogue.api.DialogueFacade dialogueFacade = seededDialogueFacade;
-        dev.kage.quest.api.QuestFacade questFacade = seededQuestFacade;
-        dev.kage.friend.api.FriendFacade friendFacade = fakeFriendFacade();
-        dev.kage.mail.api.MailFacade mailFacade = fakeMailFacade();
-        dev.kage.chat.api.ChatFacade chatFacade = fakeChatFacade();
-        dev.kage.guild.api.GuildFacade guildFacade = fakeGuildFacade();
+        // ⚠️ Phải khớp CHÍNH XÁC pipeline thật trong GatewayBootstrap. CỐ Ý bỏ qua SslHandler (ADR-027 — TLS
+        // thật verify bằng socket thật). Facade THẬT, Port Fake (TESTING.md §4); executor ĐỒNG BỘ để
+        // readOutboundFrame không bị race; characterPort từ ngoài để test seed sẵn dữ liệu.
+        CharacterFacade characterFacade = LocalGatewayParts.characterFacadeOver(characterPort);
         dev.kage.party.api.PartyFacade partyFacade = fakePartyFacade();
-        dev.kage.trade.api.TradeFacade tradeFacade = fakeTradeFacade();
         dev.kage.pvp.api.PvpFacade pvpFacade = fakePvpFacade();
         io.micrometer.core.instrument.simple.SimpleMeterRegistry meterRegistry =
                 new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
         GatewayNetworkMetrics networkMetrics = new GatewayNetworkMetrics(meterRegistry);
         GatewayObservability observability = new GatewayObservability(networkMetrics, GatewayTracing.disabled());
         ConnectedCharacterRegistry characterRegistry = new ConnectedCharacterRegistry(
-                inventoryFacade, questFacade, characterFacade::grantExperience, networkMetrics);
-        WorldFacade firstChannelFacade = new WorldFacade(characterRegistry);
-        // NPC của test hội thoại được ĐẶT trong world chính, cạnh điểm xuất phát (0, 0): từ 2026-10-11
-        // server chỉ cho nói chuyện với NPC đứng trong tầm (NpcProximity). World này không start() nên
-        // việc đặt NPC không sinh gói spawn nào.
+                seededInventoryFacade, seededQuestFacade, characterFacade::grantExperience, networkMetrics);
+        // World/persister KHÔNG start() — không rò thread tick mỗi test. NPC hội thoại ĐẶT cạnh (0, 0): từ
+        // 2026-10-11 server chỉ cho nói chuyện với NPC trong tầm (NpcProximity).
         MainWorldChannelRegistry mainWorldChannels = new MainWorldChannelRegistry(
-                characterRegistry, firstChannelFacade, meterRegistry, TestWorldContents.onlyNpc(TALKABLE_NPC_CODE, 3f));
-        CharacterPositionPersister positionPersister =
-                new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5));
-        DungeonInstanceRegistry dungeonInstanceRegistry = new DungeonInstanceRegistry(
                 characterRegistry,
-                new DungeonInstanceRegistry.DungeonFacades(characterFacade, partyFacade),
-                mainWorldChannels,
-                TestWorldContents.withBoss());
-        ArenaInstanceRegistry arenaInstanceRegistry =
-                new ArenaInstanceRegistry(characterRegistry, characterFacade, pvpFacade, mainWorldChannels);
+                new WorldFacade(characterRegistry),
+                meterRegistry,
+                TestWorldContents.onlyNpc(TALKABLE_NPC_CODE, 3f));
         WorldGateway worldGateway = new WorldGateway(
                 mainWorldChannels,
                 characterRegistry,
-                positionPersister,
-                dungeonInstanceRegistry,
-                arenaInstanceRegistry);
+                new CharacterPositionPersister(characterFacade, characterRegistry, Duration.ofMinutes(5)),
+                new DungeonInstanceRegistry(
+                        characterRegistry,
+                        new DungeonInstanceRegistry.DungeonFacades(characterFacade, partyFacade),
+                        mainWorldChannels,
+                        TestWorldContents.withBoss()),
+                new ArenaInstanceRegistry(characterRegistry, characterFacade, pvpFacade, mainWorldChannels));
         characterPort.worldGateway = worldGateway;
 
         // Pipeline dựng bằng CHÍNH hàm của server (GatewayServer.addProtocolHandlers) thay vì chép
         // tay — bản chép tay từng thiếu IdleStateHandler mà không test nào thấy (2026-10-02).
+        ContentFacades contentFacades = new ContentFacades(
+                fakeShopFacade(), seededDialogueFacade, seededQuestFacade, fakeSocialFacades(partyFacade, pvpFacade));
         GatewayChannelHandler handler = new GatewayChannelHandler(
                 new GatewayFacades(
-                        accountFacade,
-                        characterFacade,
-                        inventoryFacade,
-                        new ContentFacades(
-                                shopFacade,
-                                dialogueFacade,
-                                questFacade,
-                                new SocialFacades(
-                                        friendFacade,
-                                        mailFacade,
-                                        chatFacade,
-                                        guildFacade,
-                                        partyFacade,
-                                        tradeFacade,
-                                        pvpFacade))),
+                        LocalGatewayParts.fakeAccountFacade(), characterFacade, seededInventoryFacade, contentFacades),
                 worldGateway,
                 Runnable::run,
                 observability);
@@ -1630,6 +1595,19 @@ class GatewayPipelineTest {
                 GatewayServer.addProtocolHandlers(ch.pipeline(), handler);
             }
         });
+    }
+
+    /** Facade xã hội fake — nhóm/đấu trường truyền vào vì world gateway cũng giữ chúng. */
+    private static SocialFacades fakeSocialFacades(
+            dev.kage.party.api.PartyFacade partyFacade, dev.kage.pvp.api.PvpFacade pvpFacade) {
+        return new SocialFacades(
+                fakeFriendFacade(),
+                fakeMailFacade(),
+                fakeChatFacade(),
+                fakeGuildFacade(),
+                partyFacade,
+                fakeTradeFacade(),
+                pvpFacade);
     }
 
     /** Fake = implementation in-memory THẬT (TESTING.md §4), không Mockito. */

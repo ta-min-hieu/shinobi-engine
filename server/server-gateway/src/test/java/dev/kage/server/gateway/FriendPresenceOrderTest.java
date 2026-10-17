@@ -34,14 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import dev.kage.account.api.AccountFacade;
-import dev.kage.account.application.LoginOrCreateAccountUseCase;
 import dev.kage.character.api.CharacterFacade;
-import dev.kage.character.application.CharacterUseCases;
-import dev.kage.character.application.CreateCharacterUseCase;
-import dev.kage.character.application.GrantExperienceUseCase;
-import dev.kage.character.application.ListCharactersUseCase;
-import dev.kage.character.application.SelectCharacterUseCase;
-import dev.kage.character.application.SelectFactionUseCase;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.friend.api.FriendFacade;
@@ -63,8 +56,6 @@ import dev.kage.protocol.SelectCharacterRequest;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
-import dev.kage.server.world.WorldContentCatalog;
-import dev.kage.server.world.WorldFacade;
 
 /**
  * Trạng thái online mà bạn bè nhìn thấy phải khớp sự thật SAU CÙNG — không được kẹt "online" cho một
@@ -109,18 +100,8 @@ class FriendPresenceOrderTest {
         eventLoops = new DefaultEventLoopGroup(4);
         authExecutor = Executors.newVirtualThreadPerTaskExecutor();
         characterPort = new GatewayPipelineTest.FakeCharacterPort();
-        characterFacade = new CharacterFacade(
-                new CharacterUseCases(
-                        new CreateCharacterUseCase(characterPort, action -> action.accept(null)),
-                        new ListCharactersUseCase(characterPort),
-                        new SelectCharacterUseCase(characterPort),
-                        new SelectFactionUseCase(characterPort),
-                        new GrantExperienceUseCase(characterPort)),
-                characterPort);
-        accountFacade = new AccountFacade(new LoginOrCreateAccountUseCase(
-                new GatewayPipelineTest.FakeAccountPort(),
-                new GatewayPipelineTest.FakeSessionPort(),
-                action -> action.accept(null)));
+        characterFacade = LocalGatewayParts.characterFacadeOver(characterPort);
+        accountFacade = LocalGatewayParts.fakeAccountFacade();
         accountId = accountFacade.login(USERNAME).accountId();
         walkerId = createCharacter("Walker");
         // Người bạn thuộc TÀI KHOẢN KHÁC: hai nhân vật của cùng tài khoản không online cùng lúc được
@@ -130,25 +111,7 @@ class FriendPresenceOrderTest {
         SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
         GatewayNetworkMetrics networkMetrics = new GatewayNetworkMetrics(meterRegistry);
         observability = new GatewayObservability(networkMetrics, GatewayTracing.disabled());
-        ConnectedCharacterRegistry registry = new ConnectedCharacterRegistry(
-                GatewayPipelineTest.fakeInventoryFacade(),
-                GatewayPipelineTest.fakeQuestFacade(),
-                characterFacade::grantExperience,
-                networkMetrics);
-        MainWorldChannelRegistry mainWorldChannels = new MainWorldChannelRegistry(
-                registry, new WorldFacade(registry), meterRegistry, WorldContentCatalog.EMPTY);
-        worldGateway = new WorldGateway(
-                mainWorldChannels,
-                registry,
-                new CharacterPositionPersister(characterFacade, registry, Duration.ofMinutes(5)),
-                new DungeonInstanceRegistry(
-                        registry,
-                        new DungeonInstanceRegistry.DungeonFacades(
-                                characterFacade, GatewayPipelineTest.fakePartyFacade()),
-                        mainWorldChannels,
-                        TestWorldContents.withBoss()),
-                new ArenaInstanceRegistry(
-                        registry, characterFacade, GatewayPipelineTest.fakePvpFacade(), mainWorldChannels));
+        worldGateway = LocalGatewayParts.worldGatewayFor(characterFacade, meterRegistry, networkMetrics);
 
         address = new LocalAddress("presence-" + UUID.randomUUID());
         serverChannel = new ServerBootstrap()

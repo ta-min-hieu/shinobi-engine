@@ -197,8 +197,10 @@ final class DisconnectFuzzScript {
                 new Step("area-chat", 3, actor -> send(actor, Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE, chat())));
         steps.add(new Step("attack-opponent", 3, this::attackOpponent));
         addPartySteps(steps);
+        addDungeonSteps(steps);
         addDuelSteps(steps);
         addTradeSteps(steps);
+        addTradeDealSteps(steps);
         // Bước GHÉP: đưa hai người vào giữa một việc chung (nhóm, trận đấu, phiên giao dịch) để các lần
         // ngắt kết nối sau đó rơi vào đúng lúc việc ấy đang dở — bước đơn lẻ hiếm khi tự nối được thành chuỗi.
         steps.add(new Step("pair-party-and-dungeon", 5, this::partyUpAndEnterDungeon));
@@ -249,6 +251,9 @@ final class DisconnectFuzzScript {
                         actor,
                         Opcode.OPCODE_LEAVE_PARTY_COMMAND_VALUE,
                         LeavePartyCommand.getDefaultInstance().toByteArray())));
+    }
+
+    private void addDungeonSteps(List<Step> steps) {
         steps.add(new Step(
                 "dungeon-enter",
                 8,
@@ -326,6 +331,10 @@ final class DisconnectFuzzScript {
                                 .setSessionId(actor.hints.tradeSessionId)
                                 .build()
                                 .toByteArray())));
+    }
+
+    /** Lời chào, xác nhận, huỷ — tách khỏi {@link #addTradeSteps} vì Checkstyle MethodLength. */
+    private void addTradeDealSteps(List<Step> steps) {
         steps.add(new Step(
                 "trade-offer", 6, actor -> send(actor, Opcode.OPCODE_SET_TRADE_OFFER_COMMAND_VALUE, offer(actor))));
         steps.add(new Step(

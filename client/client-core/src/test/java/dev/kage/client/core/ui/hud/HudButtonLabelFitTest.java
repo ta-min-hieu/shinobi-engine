@@ -42,114 +42,122 @@ class HudButtonLabelFitTest {
         meter.close();
     }
 
+    /** Mỗi dòng: một nhóm nút rộng CỐ ĐỊNH — bề rộng, cỡ chữ, và khoá i18n của mọi nhãn vẽ lên nó. */
+    private record FixedWidthButtons(String where, float widthPx, float fontScale, List<String> labelKeys) {}
+
+    private static final List<FixedWidthButtons> FIXED_WIDTH_BUTTONS = List.of(
+            new FixedWidthButtons(
+                    "ChatPanel kênh",
+                    ChatPanel.CHANNEL_BUTTON_WIDTH_PX,
+                    FULL_SCALE,
+                    List.of(
+                            "chat.channel.world",
+                            "chat.channel.area",
+                            "chat.channel.private",
+                            "chat.channel.guild",
+                            "chat.channel.party",
+                            "chat.channel.system")),
+            new FixedWidthButtons(
+                    "DuelPanel",
+                    DuelPanel.ACTION_BUTTON_WIDTH_PX,
+                    FULL_SCALE,
+                    List.of(
+                            "duel.action.challenge",
+                            "duel.action.accept",
+                            "duel.action.decline",
+                            "duel.action.forfeit",
+                            "duel.action.close")),
+            new FixedWidthButtons(
+                    "FactionPanel",
+                    FactionPanel.CHOICE_BUTTON_WIDTH_PX,
+                    FULL_SCALE,
+                    List.of("faction.hoa", "faction.thuy", "faction.phong", "faction.loi", "faction.tho")),
+            new FixedWidthButtons(
+                    "FriendPanel",
+                    FriendPanel.ACTION_BUTTON_WIDTH_PX,
+                    FULL_SCALE,
+                    List.of(
+                            "friend.action.add",
+                            "friend.action.close",
+                            "friend.action.remove",
+                            "friend.action.accept",
+                            "friend.action.reject")),
+            new FixedWidthButtons(
+                    "GuildPanel",
+                    GuildPanel.ROW_BUTTON_WIDTH_PX,
+                    FULL_SCALE,
+                    List.of(
+                            "guild.action.create",
+                            "guild.action.join",
+                            "guild.action.leave",
+                            "guild.action.disband",
+                            "guild.action.refresh",
+                            "guild.action.kick",
+                            "guild.action.approve",
+                            "guild.action.reject")),
+            new FixedWidthButtons(
+                    "InventoryPanel hàng",
+                    InventoryPanel.ROW_BUTTON_WIDTH_PX,
+                    FULL_SCALE,
+                    List.of(
+                            "inventory.action.equip",
+                            "inventory.action.use",
+                            "inventory.action.sell",
+                            "inventory.action.select",
+                            "inventory.action.unequip")),
+            new FixedWidthButtons(
+                    "InventoryPanel hành động",
+                    InventoryPanel.ACTION_BUTTON_WIDTH_PX,
+                    FULL_SCALE,
+                    List.of("inventory.action.offer", "inventory.action.enhance", "inventory.action.refresh")),
+            new FixedWidthButtons(
+                    "InventoryPanel hộ linh",
+                    InventoryPanel.PROTECTION_BUTTON_WIDTH_PX,
+                    FULL_SCALE,
+                    List.of("inventory.action.protection_on", "inventory.action.protection_off")),
+            new FixedWidthButtons(
+                    "MailPanel",
+                    MailPanel.ROW_BUTTON_WIDTH_PX,
+                    FULL_SCALE,
+                    List.of("mail.action.send", "mail.action.read", "mail.action.claim", "mail.action.delete")),
+            new FixedWidthButtons(
+                    "MailPanel làm mới", MailPanel.REFRESH_BUTTON_WIDTH_PX, FULL_SCALE, List.of("mail.action.refresh")),
+            new FixedWidthButtons("ShopPanel", ShopPanel.ROW_BUTTON_WIDTH_PX, FULL_SCALE, List.of("shop.action.buy")),
+            new FixedWidthButtons(
+                    "TradePanel",
+                    TradePanel.ACTION_BUTTON_WIDTH_PX,
+                    FULL_SCALE,
+                    List.of(
+                            "trade.action.request",
+                            "trade.action.accept",
+                            "trade.action.decline",
+                            "trade.action.confirm",
+                            "trade.action.cancel",
+                            "trade.action.refresh")),
+            new FixedWidthButtons(
+                    "TradePanel linh thạch",
+                    TradePanel.GOLD_BUTTON_WIDTH_PX,
+                    FULL_SCALE,
+                    List.of("trade.action.set_gold")),
+            new FixedWidthButtons(
+                    "CombatHud ô gợi ý phím",
+                    CombatHud.SLOT_SIZE,
+                    CombatHud.HINT_LABEL_SCALE,
+                    List.of(
+                            "hud.hint.left",
+                            "hud.hint.right",
+                            "hud.hint.jump",
+                            "hud.hint.target",
+                            "hud.hint.attack",
+                            "hud.hint.skill")));
+
     @Test
     void everyFixedWidthHudButtonFitsItsLabelInEveryLanguage() {
         List<String> problems = new ArrayList<>();
-        problems.addAll(meter.overflows(
-                "ChatPanel kênh",
-                ChatPanel.CHANNEL_BUTTON_WIDTH_PX,
-                FULL_SCALE,
-                List.of(
-                        "chat.channel.world",
-                        "chat.channel.area",
-                        "chat.channel.private",
-                        "chat.channel.guild",
-                        "chat.channel.party",
-                        "chat.channel.system")));
-        problems.addAll(meter.overflows(
-                "DuelPanel",
-                DuelPanel.ACTION_BUTTON_WIDTH_PX,
-                FULL_SCALE,
-                List.of(
-                        "duel.action.challenge",
-                        "duel.action.accept",
-                        "duel.action.decline",
-                        "duel.action.forfeit",
-                        "duel.action.close")));
-        problems.addAll(meter.overflows(
-                "FactionPanel",
-                FactionPanel.CHOICE_BUTTON_WIDTH_PX,
-                FULL_SCALE,
-                List.of("faction.hoa", "faction.thuy", "faction.phong", "faction.loi", "faction.tho")));
-        problems.addAll(meter.overflows(
-                "FriendPanel",
-                FriendPanel.ACTION_BUTTON_WIDTH_PX,
-                FULL_SCALE,
-                List.of(
-                        "friend.action.add",
-                        "friend.action.close",
-                        "friend.action.remove",
-                        "friend.action.accept",
-                        "friend.action.reject")));
-        problems.addAll(meter.overflows(
-                "GuildPanel",
-                GuildPanel.ROW_BUTTON_WIDTH_PX,
-                FULL_SCALE,
-                List.of(
-                        "guild.action.create",
-                        "guild.action.join",
-                        "guild.action.leave",
-                        "guild.action.disband",
-                        "guild.action.refresh",
-                        "guild.action.kick",
-                        "guild.action.approve",
-                        "guild.action.reject")));
-        problems.addAll(meter.overflows(
-                "InventoryPanel hàng",
-                InventoryPanel.ROW_BUTTON_WIDTH_PX,
-                FULL_SCALE,
-                List.of(
-                        "inventory.action.equip",
-                        "inventory.action.use",
-                        "inventory.action.sell",
-                        "inventory.action.select",
-                        "inventory.action.unequip")));
-        problems.addAll(meter.overflows(
-                "InventoryPanel hành động",
-                InventoryPanel.ACTION_BUTTON_WIDTH_PX,
-                FULL_SCALE,
-                List.of("inventory.action.offer", "inventory.action.enhance", "inventory.action.refresh")));
-        problems.addAll(meter.overflows(
-                "InventoryPanel hộ linh",
-                InventoryPanel.PROTECTION_BUTTON_WIDTH_PX,
-                FULL_SCALE,
-                List.of("inventory.action.protection_on", "inventory.action.protection_off")));
-        problems.addAll(meter.overflows(
-                "MailPanel",
-                MailPanel.ROW_BUTTON_WIDTH_PX,
-                FULL_SCALE,
-                List.of("mail.action.send", "mail.action.read", "mail.action.claim", "mail.action.delete")));
-        problems.addAll(meter.overflows(
-                "MailPanel làm mới", MailPanel.REFRESH_BUTTON_WIDTH_PX, FULL_SCALE, List.of("mail.action.refresh")));
-        problems.addAll(
-                meter.overflows("ShopPanel", ShopPanel.ROW_BUTTON_WIDTH_PX, FULL_SCALE, List.of("shop.action.buy")));
-        problems.addAll(meter.overflows(
-                "TradePanel",
-                TradePanel.ACTION_BUTTON_WIDTH_PX,
-                FULL_SCALE,
-                List.of(
-                        "trade.action.request",
-                        "trade.action.accept",
-                        "trade.action.decline",
-                        "trade.action.confirm",
-                        "trade.action.cancel",
-                        "trade.action.refresh")));
-        problems.addAll(meter.overflows(
-                "TradePanel linh thạch",
-                TradePanel.GOLD_BUTTON_WIDTH_PX,
-                FULL_SCALE,
-                List.of("trade.action.set_gold")));
-        problems.addAll(meter.overflows(
-                "CombatHud ô gợi ý phím",
-                CombatHud.SLOT_SIZE,
-                CombatHud.HINT_LABEL_SCALE,
-                List.of(
-                        "hud.hint.left",
-                        "hud.hint.right",
-                        "hud.hint.jump",
-                        "hud.hint.target",
-                        "hud.hint.attack",
-                        "hud.hint.skill")));
+        for (FixedWidthButtons buttons : FIXED_WIDTH_BUTTONS) {
+            problems.addAll(
+                    meter.overflows(buttons.where(), buttons.widthPx(), buttons.fontScale(), buttons.labelKeys()));
+        }
 
         assertThat(problems)
                 .as("Nhãn vẽ tràn ra ngoài nền nút rộng cố định — rút gọn chữ hoặc nới hằng bề rộng"

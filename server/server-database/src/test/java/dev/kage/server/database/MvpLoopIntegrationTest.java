@@ -230,6 +230,29 @@ class MvpLoopIntegrationTest {
         AcceptQuestUseCase.AcceptResult acceptResult = newAcceptQuestUseCase().execute(characterId, QUEST_CODE);
         assertThat(acceptResult).isEqualTo(AcceptQuestUseCase.AcceptResult.OK);
 
+        // 3–4. Đánh quái tới khi quest hoàn thành.
+        List<ItemStack> allLoot = killDummiesUntilTheQuestCompletes(characterId);
+        // 5. Nhặt đồ — training_dummy rơi kunai 50% mỗi lần (V4) cộng iron_scrap 30% / novice_wraps
+        // 5% (V21); riêng kunai qua 10 lần thử đã gần như chắc chắn rơi ít nhất 1 lần thật
+        // (không mock random).
+        assertThat(allLoot).isNotEmpty();
+
+        // 6–7. Mặc và cường hoá vũ khí.
+        equipAndEnhanceWoodenSword(characterId);
+
+        // 8. Nhận thưởng hoàn thành quest.
+        long expBefore = readExp(characterId);
+        ClaimQuestRewardUseCase.ClaimResult claimResult = newClaimQuestRewardUseCase()
+                .execute(characterId, QUEST_CODE, UUID.randomUUID().toString());
+        assertThat(claimResult.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
+        assertThat(readExp(characterId)).isEqualTo(expBefore + claimResult.expGranted());
+    }
+
+    /**
+     * Mỗi lần giết, production code gọi CẢ GrantLootUseCase lẫn ProcessQuestEventUseCase cạnh nhau (xem
+     * ConnectedCharacterRegistry.onMonsterKilled) — khẳng định quest đã COMPLETED, trả mọi món đã rơi.
+     */
+    private List<ItemStack> killDummiesUntilTheQuestCompletes(long characterId) {
         // 3. Đánh quái nhiều lần — mỗi lần giết, production code gọi CẢ GrantLootUseCase lẫn
         // ProcessQuestEventUseCase cạnh nhau (xem ConnectedCharacterRegistry.onMonsterKilled).
         // kill_training_dummies.js cần đúng 3 lần giết mới hoàn thành (QuestIntegrationTest).
@@ -244,15 +267,14 @@ class MvpLoopIntegrationTest {
             }
         }
 
-        // 4. Hoàn thành quest sau đủ số lần giết.
+        // Hoàn thành quest sau đủ số lần giết.
         assertThat(statusChange).isPresent();
         assertThat(statusChange.get().status()).isEqualTo(QuestStatus.COMPLETED);
+        return allLoot;
+    }
 
-        // 5. Nhặt đồ — training_dummy rơi kunai 50% mỗi lần (V4) cộng iron_scrap 30% / novice_wraps
-        // 5% (V21); riêng kunai qua 10 lần thử đã gần như chắc chắn rơi ít nhất 1 lần thật
-        // (không mock random).
-        assertThat(allLoot).isNotEmpty();
-
+    /** Grant {@code wooden_sword}, mặc nó, rồi cường hoá +0→+1 (thành hay hụt-không-rơi đều được). */
+    private void equipAndEnhanceWoodenSword(long characterId) {
         // 6. Mặc đồ — training_dummy KHÔNG rơi vũ khí (bảng rơi của nó không có món equip_slot =
         // WEAPON nào, kể cả sau V21), grant thẳng
         // wooden_sword để verify mặc đồ + cường hoá (đúng cách EnhanceItemUseCaseIntegrationTest
@@ -278,12 +300,5 @@ class MvpLoopIntegrationTest {
                 .execute(characterId, swordItemId, false, UUID.randomUUID().toString());
         assertThat(enhanceResult)
                 .isIn(EnhanceItemUseCase.EnhanceResult.SUCCESS, EnhanceItemUseCase.EnhanceResult.FAILED_NO_DROP);
-
-        // 8. Nhận thưởng hoàn thành quest.
-        long expBefore = readExp(characterId);
-        ClaimQuestRewardUseCase.ClaimResult claimResult = newClaimQuestRewardUseCase()
-                .execute(characterId, QUEST_CODE, UUID.randomUUID().toString());
-        assertThat(claimResult.outcome()).isEqualTo(ClaimQuestRewardUseCase.ClaimResult.Outcome.OK);
-        assertThat(readExp(characterId)).isEqualTo(expBefore + claimResult.expGranted());
     }
 }

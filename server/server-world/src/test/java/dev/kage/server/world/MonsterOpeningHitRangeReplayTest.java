@@ -76,8 +76,36 @@ class MonsterOpeningHitRangeReplayTest {
         EcsWorld world = new EcsWorld();
         KEntity player = buildWalkingPlayer(world);
         KEntity monster = buildPatrollingWasteland(world);
-        Map<Long, KEntity> byId = Map.of(CHARACTER_ID, player, MONSTER_ID, monster);
+        CombatSystem combat = addSystemsInServerOrder(world, player, monster);
 
+        OpeningHit opening = replayUntilTheOpeningHit(world, combat, player, monster);
+        TickSample hit = opening.hit();
+        TickSample probeViewAtHit = opening.probeView();
+
+        assertThat(hit)
+                .as("quái phải ra nhát mở màn trong lúc người chơi đi ngang")
+                .isNotNull();
+        assertThat(distance(hit))
+                .as("server: khoảng cách THẬT lúc ra đòn (vị trí sau di chuyển của chính tick đó)")
+                .isLessThanOrEqualTo(CombatConstants.ATTACK_RANGE_METERS);
+        assertThat(distance(probeViewAtHit))
+                .as("probe: gói vị trí cuối cùng nó có lúc nhận AttackResultEvent — cũ hơn tick ra đòn")
+                .isGreaterThan(CombatConstants.ATTACK_RANGE_METERS)
+                .isCloseTo(2.32, within(0.02));
+
+        // Bản dựng lại khớp nhật ký: người chơi giữa hai MoveResponse 170.67 và 171.00; quái đứng
+        // lại đúng chỗ MonsterMovedEvent 770ms báo (172.71; -0.88) sau khi đánh.
+        assertThat(hit.playerX()).isBetween(170.67f, 171.01f);
+        assertThat(hit.monsterX()).isCloseTo(172.71f, within(0.02f));
+        assertThat(hit.monsterY()).isCloseTo(-0.88f, within(0.02f));
+        assertThat(probeViewAtHit.playerX()).isCloseTo(170.67f, within(0.01f));
+        assertThat(probeViewAtHit.monsterX()).isCloseTo(172.80f, within(0.02f));
+        assertThat(probeViewAtHit.monsterY()).isCloseTo(-0.92f, within(0.02f));
+    }
+
+    /** AI → di chuyển → vùng kích hoạt → combat, đúng thứ tự World của server; trả System combat. */
+    private static CombatSystem addSystemsInServerOrder(EcsWorld world, KEntity player, KEntity monster) {
+        Map<Long, KEntity> byId = Map.of(CHARACTER_ID, player, MONSTER_ID, monster);
         CombatSystem combat = new CombatSystem(byId::get, () -> false);
         world.addSystem(new AiSystem(() -> List.of(player), byId::get));
         world.addSystem(new MovementSystem());
@@ -85,7 +113,15 @@ class MonsterOpeningHitRangeReplayTest {
         zones.setZones(List.of(new NamedZone("waypost_wasteland_gate", new Aabb(165.5f, -10f, 170.5f, 10f))));
         world.addSystem(zones);
         world.addSystem(combat);
+        return combat;
+    }
 
+    /** Nhát mở màn: chỗ thật lúc ra đòn, và thứ probe đang thấy (gói vị trí cuối nó nhận) lúc đó. */
+    private record OpeningHit(TickSample hit, TickSample probeView) {}
+
+    /** Chạy tick tới khi quái ra đòn đầu tiên (hoặc hết {@link #TICKS_TO_REPLAY}). */
+    private static OpeningHit replayUntilTheOpeningHit(
+            EcsWorld world, CombatSystem combat, KEntity player, KEntity monster) {
         TickSample lastMoveResponse = null; // vị trí người chơi TRƯỚC di chuyển, lúc drain lệnh
         TickSample lastAoiSync = null; // vị trí quái SAU di chuyển, mỗi AOI_SYNC_INTERVAL_TICKS
         TickSample hit = null;
@@ -110,26 +146,7 @@ class MonsterOpeningHitRangeReplayTest {
                 lastAoiSync = sample(tick, player, monster);
             }
         }
-
-        assertThat(hit)
-                .as("quái phải ra nhát mở màn trong lúc người chơi đi ngang")
-                .isNotNull();
-        assertThat(distance(hit))
-                .as("server: khoảng cách THẬT lúc ra đòn (vị trí sau di chuyển của chính tick đó)")
-                .isLessThanOrEqualTo(CombatConstants.ATTACK_RANGE_METERS);
-        assertThat(distance(probeViewAtHit))
-                .as("probe: gói vị trí cuối cùng nó có lúc nhận AttackResultEvent — cũ hơn tick ra đòn")
-                .isGreaterThan(CombatConstants.ATTACK_RANGE_METERS)
-                .isCloseTo(2.32, within(0.02));
-
-        // Bản dựng lại khớp nhật ký: người chơi giữa hai MoveResponse 170.67 và 171.00; quái đứng
-        // lại đúng chỗ MonsterMovedEvent 770ms báo (172.71; -0.88) sau khi đánh.
-        assertThat(hit.playerX()).isBetween(170.67f, 171.01f);
-        assertThat(hit.monsterX()).isCloseTo(172.71f, within(0.02f));
-        assertThat(hit.monsterY()).isCloseTo(-0.88f, within(0.02f));
-        assertThat(probeViewAtHit.playerX()).isCloseTo(170.67f, within(0.01f));
-        assertThat(probeViewAtHit.monsterX()).isCloseTo(172.80f, within(0.02f));
-        assertThat(probeViewAtHit.monsterY()).isCloseTo(-0.92f, within(0.02f));
+        return new OpeningHit(hit, probeViewAtHit);
     }
 
     private static TickSample sample(int tick, KEntity player, KEntity monster) {

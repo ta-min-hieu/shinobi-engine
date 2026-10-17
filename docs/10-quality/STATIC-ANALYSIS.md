@@ -84,7 +84,7 @@ Thực thi [CODING-STANDARDS.md](../02-coding-standards/CODING-STANDARDS.md):
 ⚠️ **Rà độ phủ 2026-10-03**: `checkstyle-test.xml` từ Phase 2 đã thiếu lặng lẽ rule hậu tố, MethodLength,
 ParameterNumber (dòng đầu file vẫn ghi "chỉ khác MethodName"); `quality:architecture-tests` không áp
 `kage.quality-conventions` nên không cổng tĩnh nào quét nó; Spotless chỉ nhắm `src/main` + `src/test`
-nên bỏ sót `src/jmh`. Đã sửa cả ba (trừ MethodLength cho test — xem bảng). Bài học: một rule "có trong
+nên bỏ sót `src/jmh`. Đã sửa cả ba (MethodLength cho test bật sau, 2026-10-17 — README dòng 58(b), sau khi tách 57 hàm test dài). Bài học: một rule "có trong
 config" chưa phải bằng chứng nó chạy — gài thử một vi phạm và nhìn cổng đỏ.
 
 ---

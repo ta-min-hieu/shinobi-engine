@@ -213,26 +213,7 @@ class FriendConcurrencyIntegrationTest {
             characters[i] = createFreshCharacter("FcStorm" + i);
         }
         StormLedger ledger = new StormLedger();
-        ExecutorService executor = Executors.newFixedThreadPool(STORM_THREADS);
-        try {
-            CyclicBarrier barrier = new CyclicBarrier(STORM_THREADS);
-            List<Future<Boolean>> futures = new ArrayList<Future<Boolean>>();
-            for (int thread = 0; thread < STORM_THREADS; thread++) {
-                SplittableRandom random = new SplittableRandom(20261010L + thread);
-                futures.add(executor.submit(() -> {
-                    barrier.await(30, TimeUnit.SECONDS);
-                    for (int i = 0; i < STORM_OPERATIONS_PER_THREAD; i++) {
-                        runRandomOperation(facade, characters, random, ledger);
-                    }
-                    return Boolean.TRUE;
-                }));
-            }
-            for (Future<Boolean> future : futures) {
-                assertThat(future.get(4, TimeUnit.MINUTES)).isTrue();
-            }
-        } finally {
-            executor.shutdownNow();
-        }
+        runStorm(facade, characters, ledger);
 
         long first = characters[0];
         long last = characters[STORM_CHARACTERS - 1];
@@ -264,6 +245,30 @@ class FriendConcurrencyIntegrationTest {
                 .as("gửi OK − từ chối OK − huỷ OK")
                 .isEqualTo(ledger.sent.get() - ledger.rejected.get() - ledger.removed.get());
         assertThat(acceptedRows).as("chấp nhận OK − huỷ OK").isEqualTo(ledger.accepted.get() - ledger.removed.get());
+    }
+
+    /** {@link #STORM_THREADS} luồng cùng xuất phát, mỗi luồng chạy {@link #STORM_OPERATIONS_PER_THREAD} thao tác. */
+    private static void runStorm(FriendFacade facade, long[] characters, StormLedger ledger) throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(STORM_THREADS);
+        try {
+            CyclicBarrier barrier = new CyclicBarrier(STORM_THREADS);
+            List<Future<Boolean>> futures = new ArrayList<Future<Boolean>>();
+            for (int thread = 0; thread < STORM_THREADS; thread++) {
+                SplittableRandom random = new SplittableRandom(20261010L + thread);
+                futures.add(executor.submit(() -> {
+                    barrier.await(30, TimeUnit.SECONDS);
+                    for (int i = 0; i < STORM_OPERATIONS_PER_THREAD; i++) {
+                        runRandomOperation(facade, characters, random, ledger);
+                    }
+                    return Boolean.TRUE;
+                }));
+            }
+            for (Future<Boolean> future : futures) {
+                assertThat(future.get(4, TimeUnit.MINUTES)).isTrue();
+            }
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     private static void runRandomOperation(

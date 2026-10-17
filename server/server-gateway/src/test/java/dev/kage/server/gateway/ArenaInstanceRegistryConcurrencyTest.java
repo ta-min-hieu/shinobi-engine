@@ -159,79 +159,7 @@ class ArenaInstanceRegistryConcurrencyTest {
     }
 
     private CharacterFacade fakeCharacterFacade() {
-        CharacterPort port = new CharacterPort() {
-            @Override
-            public Optional<Character> findById(long characterId) {
-                return Optional.of(
-                        new Character(characterId, 1L, 1, "Hero" + characterId, Faction.HOA, 1, 0L, 0, Instant.EPOCH));
-            }
-
-            @Override
-            public CharacterStats loadStats(long characterId) {
-                awaitLoadStatsBarrier();
-                return new CharacterStats(10, 10, 10, 10);
-            }
-
-            @Override
-            public PositionSnapshot loadPosition(long characterId) {
-                return new PositionSnapshot(0f, 0f);
-            }
-
-            @Override
-            public List<Character> listByAccount(long accountId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public int countByAccount(long accountId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public int lockAccountAndCountCharacters(dev.kage.character.domain.Transaction tx, long accountId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public boolean existsByName(String name) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public Optional<Character> findByName(String name) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public Character create(Transaction tx, NewCharacter newCharacter) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public void savePosition(long characterId, float x, float y) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public long loadGold(long characterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public long addExperience(long characterId, long amount) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public boolean saveLevel(long characterId, int level, long derivedFromExp) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public void updateFaction(long characterId, Faction faction) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-        };
+        CharacterPort port = new StubPort();
         CharacterUseCases useCases = new CharacterUseCases(
                 new CreateCharacterUseCase(port, action -> action.accept(null)),
                 new ListCharactersUseCase(port),
@@ -239,5 +167,79 @@ class ArenaInstanceRegistryConcurrencyTest {
                 new SelectFactionUseCase(port),
                 new GrantExperienceUseCase(port));
         return new CharacterFacade(useCases, port);
+    }
+
+    private final class StubPort implements CharacterPort {
+        @Override
+        public Optional<Character> findById(long characterId) {
+            return Optional.of(
+                    new Character(characterId, 1L, 1, "Hero" + characterId, Faction.HOA, 1, 0L, 0, Instant.EPOCH));
+        }
+
+        @Override
+        public CharacterStats loadStats(long characterId) {
+            awaitLoadStatsBarrier();
+            return new CharacterStats(10, 10, 10, 10);
+        }
+
+        @Override
+        public PositionSnapshot loadPosition(long characterId) {
+            return new PositionSnapshot(0f, 0f);
+        }
+
+        @Override
+        public List<Character> listByAccount(long accountId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public int countByAccount(long accountId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public int lockAccountAndCountCharacters(dev.kage.character.domain.Transaction tx, long accountId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public boolean existsByName(String name) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public Optional<Character> findByName(String name) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public Character create(Transaction tx, NewCharacter newCharacter) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public void savePosition(long characterId, float x, float y) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public long loadGold(long characterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public long addExperience(long characterId, long amount) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public boolean saveLevel(long characterId, int level, long derivedFromExp) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public void updateFaction(long characterId, Faction faction) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
     }
 }

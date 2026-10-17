@@ -78,6 +78,16 @@ public final class HudPreviewTool extends ApplicationAdapter {
         // -PkageLanguage=en: đo/chụp bằng bundle tiếng Anh (song ngữ, 2026-10-01). Phải trước mọi load().
         KageI18n.useLanguage(
                 ClientLanguage.fromCode(System.getProperty("kage.language")).orElse(ClientLanguage.DEFAULT));
+        buildHudPreview();
+        buildDialoguePreview();
+        buildChatPreview();
+        buildPartyPreview();
+        buildFriendAndGuildPreview();
+        buildInventoryPreview();
+    }
+
+    /** HUD chiến đấu với dữ liệu giả nhưng ĐÚNG dải giá trị thật. */
+    private void buildHudPreview() {
         hud = new CombatHud();
         hud.resize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
         // Dữ liệu giả nhưng ĐÚNG dải giá trị thật (HP/Khí tối đa 100 — CombatConstants) để bố cục
@@ -100,7 +110,10 @@ public final class HudPreviewTool extends ApplicationAdapter {
         // Độ trễ đường truyền (2026-08-29, opcode PONG) — con số 3 chữ số là trường hợp RỘNG nhất
         // mà cột phải phải chứa nổi, hẹp hơn thì không kiểm được gì.
         hud.setLatency(148L);
+    }
 
+    /** Khung hội thoại — đúng nội dung cây {@code town_elder.js}. */
+    private void buildDialoguePreview() {
         // Khung hội thoại (2026-08-09) — ĐÚNG nội dung cây town_elder.js, để bố cục phải chịu đúng
         // độ dài câu tiếng Việt thật chứ không phải chuỗi ngắn tự bịa.
         dialoguePanel = new DialoguePanel(hud.skin());
@@ -112,7 +125,10 @@ public final class HudPreviewTool extends ApplicationAdapter {
                         "dialogue.option.accept_quest_kill_dummies",
                         "dialogue.option.open_shop",
                         "dialogue.option.bye"));
+    }
 
+    /** Khung chat ở trạng thái CAO NHẤT: nhật ký đầy + ô nhập đang mở. */
+    private void buildChatPreview() {
         // Khung chat (2026-08-25) — nhật ký ĐẦY (8 dòng, trần thật của ChatController) + ô nhập
         // đang mở: hai thứ cùng lúc là trạng thái CAO NHẤT của khung này, tức là trạng thái duy
         // nhất đủ để thấy nó có đè lên thanh gợi ý phím hay nút Đánh hay không.
@@ -135,7 +151,10 @@ public final class HudPreviewTool extends ApplicationAdapter {
                         ChatPanel.LineKind.SYSTEM,
                         ChatPanel.LineKind.AREA));
         chatPanel.openComposer();
+    }
 
+    /** Cửa sổ Nhóm ở trạng thái đầy đủ nhất: trưởng nhóm + có lời mời chờ. */
+    private void buildPartyPreview() {
         // Cửa sổ Nhóm (2026-08-25) — trạng thái ĐẦY ĐỦ NHẤT: đang là trưởng nhóm (có nút Đuổi cạnh
         // mỗi thành viên) VÀ đang có lời mời chờ trả lời. Đó là trạng thái nhiều actor nhất, tức là
         // trạng thái duy nhất đủ để thấy bố cục có vỡ hay không.
@@ -151,7 +170,10 @@ public final class HudPreviewTool extends ApplicationAdapter {
                 java.util.List.of(new PartyPanel.InviteRow(77L, "Lời mời vào nhóm #5")));
         partyPanel.setActionsEnabled(true, true);
         partyPanel.openForPreview();
+    }
 
+    /** Bạn bè + Bang hội — để bố cục của chúng cũng bị nhìn bằng ảnh. */
+    private void buildFriendAndGuildPreview() {
         // Bạn bè + Bang hội (2026-08-25, làm ở luồng song song) — dựng ở đây để BỐ CỤC của chúng
         // cũng bị nhìn bằng ảnh chứ không chỉ bằng build xanh.
         friendPanel = new FriendPanel(hud.skin());
@@ -173,8 +195,6 @@ public final class HudPreviewTool extends ApplicationAdapter {
                         new GuildPanel.MemberRow("PhongVanTuyetNguyet", "PhongVanTuyetNguyet", true)),
                 "");
         guildPanel.setPendingRequests(java.util.List.of(new GuildPanel.RequestRow(12L, "LoiDien xin gia nhập")), "");
-
-        buildInventoryPreview();
     }
 
     /**

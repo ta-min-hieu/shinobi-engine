@@ -252,36 +252,7 @@ class PartyIntegrationTest {
         CountDownLatch proceedToDissolve = new CountDownLatch(1);
         ExecutorService dissolver = Executors.newSingleThreadExecutor();
         Future<?> dissolveTask = dissolver.submit(() -> {
-            try (Connection connection = dataSource.getConnection()) {
-                connection.setAutoCommit(false);
-                // Cùng SQL/thứ tự leaveParty dùng thật (LOCK_PARTY) — khoá dòng party mà acceptInvite
-                // cũng sẽ cố khoá.
-                try (PreparedStatement lock =
-                        connection.prepareStatement("SELECT id FROM party WHERE id = ? FOR UPDATE")) {
-                    lock.setLong(1, party.id());
-                    // Dòng phải TỒN TẠI: không có dòng thì FOR UPDATE chẳng khoá gì và phép đo vô nghĩa.
-                    try (ResultSet locked = lock.executeQuery()) {
-                        if (!locked.next()) {
-                            throw new IllegalStateException("không có dòng party nào để khoá");
-                        }
-                    }
-                }
-                lockAcquired.countDown();
-                if (!proceedToDissolve.await(10, TimeUnit.SECONDS)) {
-                    throw new IllegalStateException("test không cho phép giải tán kịp — xem lỗi ở luồng chính");
-                }
-                try (PreparedStatement deleteMember = connection.prepareStatement(
-                        "DELETE FROM party_member WHERE party_id = ? AND character_id = ?")) {
-                    deleteMember.setLong(1, party.id());
-                    deleteMember.setLong(2, leader);
-                    deleteMember.executeUpdate();
-                }
-                try (PreparedStatement deleteParty = connection.prepareStatement("DELETE FROM party WHERE id = ?")) {
-                    deleteParty.setLong(1, party.id());
-                    deleteParty.executeUpdate();
-                }
-                connection.commit();
-            }
+            holdPartyLockThenDissolve(new PartyRow(party.id(), leader), lockAcquired, proceedToDissolve);
             return null;
         });
         assertThat(lockAcquired.await(5, TimeUnit.SECONDS))
@@ -308,6 +279,46 @@ class PartyIntegrationTest {
                 .as("lời mời phải được dọn, không được treo lại mãi trong danh sách của invitee")
                 .isEmpty();
         assertThat(adapter.findMembershipOf(invitee)).isEmpty();
+    }
+
+    /** Dòng {@code party} và bang chủ duy nhất của nó. */
+    private record PartyRow(long partyId, long leaderId) {}
+
+    /**
+     * Khoá dòng {@code party} (FOR UPDATE, cùng SQL/thứ tự {@code leaveParty} dùng thật), báo
+     * {@code lockAcquired}, GIỮ khoá tới khi được {@code proceedToDissolve}, rồi xoá leader + party và commit.
+     */
+    private static void holdPartyLockThenDissolve(
+            PartyRow party, CountDownLatch lockAcquired, CountDownLatch proceedToDissolve) throws Exception {
+        try (Connection connection = dataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            // Cùng SQL/thứ tự leaveParty dùng thật (LOCK_PARTY) — khoá dòng party mà acceptInvite
+            // cũng sẽ cố khoá.
+            try (PreparedStatement lock = connection.prepareStatement("SELECT id FROM party WHERE id = ? FOR UPDATE")) {
+                lock.setLong(1, party.partyId());
+                // Dòng phải TỒN TẠI: không có dòng thì FOR UPDATE chẳng khoá gì và phép đo vô nghĩa.
+                try (ResultSet locked = lock.executeQuery()) {
+                    if (!locked.next()) {
+                        throw new IllegalStateException("không có dòng party nào để khoá");
+                    }
+                }
+            }
+            lockAcquired.countDown();
+            if (!proceedToDissolve.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("test không cho phép giải tán kịp — xem lỗi ở luồng chính");
+            }
+            try (PreparedStatement deleteMember =
+                    connection.prepareStatement("DELETE FROM party_member WHERE party_id = ? AND character_id = ?")) {
+                deleteMember.setLong(1, party.partyId());
+                deleteMember.setLong(2, party.leaderId());
+                deleteMember.executeUpdate();
+            }
+            try (PreparedStatement deleteParty = connection.prepareStatement("DELETE FROM party WHERE id = ?")) {
+                deleteParty.setLong(1, party.partyId());
+                deleteParty.executeUpdate();
+            }
+            connection.commit();
+        }
     }
 
     /**

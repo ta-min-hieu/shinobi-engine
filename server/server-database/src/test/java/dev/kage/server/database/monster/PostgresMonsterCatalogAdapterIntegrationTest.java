@@ -220,36 +220,48 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         assertThat(spawns).allSatisfy(spawn -> assertThat(spawn.posY()).isZero());
         assertThat(spawns)
                 .allSatisfy(spawn -> assertThat(spawn.respawnSeconds()).isPositive());
-        // V29 giãn ba điểm CÓ AGGRO ra xa nhau (21 / 34 / 47) — xem
-        // shouldKeepAggroSpawnsApartEnoughToPullOneAtATime. Hai cọc gỗ (aggro 0) giữ nguyên chỗ cũ.
-        // V30 thêm hai thạch vệ của quest 3; V32 dời chúng sang PHÍA TÂY (-33 / -20) sau khi
-        // playtest đo được đường đi phía đông tốn 65 máu — xem
-        // shouldLeaveEveryAggroSpawnAQuietPlaceToFightIn và ROADMAP mục 62/63. V33 thêm sân khảo
-        // hạch của quest 4 ở -47, xa hơn nữa về phía tây (cách thạch vệ gần nhất 14m > 12m, thoả
-        // cả hai luật hình học).
-        // KHÔNG khớp theo thứ tự: adapter trả về theo id (thứ tự chèn của các migration), không
-        // theo trục x — V32 dời hai thạch vệ sang âm nên hai thứ tự đó nay khác hẳn nhau.
-        // V40 thêm cửa hang bỏ hoang ở 66 và DỜI quỷ đá 47 → 80 (ra SAU hang). Dời vì playtest đo
-        // được: một mình quỷ đá lấy 31 máu mỗi lượt đi ngang, đủ để quest 8 thua chắc. Nó là loài
-        // duy nhất chưa quest nào dùng nên dời được mà không phá quest cũ nào. Đó là điểm spawn đầu tiên phải
-        // ĐỢI nền đất nới ra mới đặt được: đo bằng máy thì cả đoạn [-55, 60] cũ không còn khe nào
-        // hợp lệ cho một loài aggro 6, nên `DemoPlatforms.GROUND_MAX_X` đi 60 → 85 cùng đợt.
-        // V41 thêm chấp sự Hình Vân Sơn ở -8 (aggro 0, patrol 0 — hắn ĐỨNG YÊN).
-        //
-        // ⚠️ Bản đầu đặt hắn ở -12 và PLAYTEST BÁC (2026-09-12): thạch vệ @-20 đuổi tới tận đó và
-        // đánh chết người chơi trước khi chạm được vào boss. Lập luận sai là "vùng an toàn
-        // `sect_grounds` [-15, 5] chặn nó" — **vùng an toàn chỉ HỒI MÁU lúc bước vào (ADR-046 D3),
-        // nó KHÔNG chặn aggro**. Con số thật: thạch vệ spawn -20, patrol ±3 ⇒ mép đông -17;
-        // aggro 6 ⇒ phát hiện tới -11; leash 10 ⇒ đuổi tới -10. x=-8 cách mép phát hiện 3m.
-        //
-        // ⚠️ Và hai ô test hình học bên dưới KHÔNG gác điểm này (chúng chỉ soi loài có aggro > 0),
-        // nên nếu ngày nào đó hắn được cho aggro thì chúng vẫn im. Chỗ duy nhất ghi lại ràng buộc
-        // là đúng dòng toạ độ này.
-        // V45 thêm HAI điểm: đoạt mạch @47 (khe quỷ đá để lại khi V40 dời nó đi) và sào huyệt đầu
-        // lĩnh @93 (đất mới — `DemoPlatforms.GROUND_MAX_X` đi 85 → 115 cùng đợt). Và nó DỜI quỷ đá
-        // lần thứ hai, 80 → 106, cùng lý do V40 đã dời nó lần đầu: nó là con đánh đau nhất trục chơi
-        // (atk 40) và lần này nó nằm trên đường tới @93. Sau khi dời, x≈80 thành khe yên tĩnh để
-        // người chơi hồi máu trước trận cuối (ADR-046).
+    }
+
+    /**
+     * Toạ độ x của từng điểm spawn world chính — lịch sử mỗi lần dời, đọc trước khi đổi số:
+     *
+     * <p>V29 giãn ba điểm CÓ AGGRO ra xa nhau (21 / 34 / 47) — xem
+     * shouldKeepAggroSpawnsApartEnoughToPullOneAtATime. Hai cọc gỗ (aggro 0) giữ nguyên chỗ cũ.
+     * V30 thêm hai thạch vệ của quest 3; V32 dời chúng sang PHÍA TÂY (-33 / -20) sau khi
+     * playtest đo được đường đi phía đông tốn 65 máu — xem
+     * shouldLeaveEveryAggroSpawnAQuietPlaceToFightIn và ROADMAP mục 62/63. V33 thêm sân khảo
+     * hạch của quest 4 ở -47, xa hơn nữa về phía tây (cách thạch vệ gần nhất 14m > 12m, thoả
+     * cả hai luật hình học).
+     *
+     * <p>V40 thêm cửa hang bỏ hoang ở 66 và DỜI quỷ đá 47 → 80 (ra SAU hang). Dời vì playtest đo
+     * được: một mình quỷ đá lấy 31 máu mỗi lượt đi ngang, đủ để quest 8 thua chắc. Nó là loài
+     * duy nhất chưa quest nào dùng nên dời được mà không phá quest cũ nào. Đó là điểm spawn đầu tiên phải
+     * ĐỢI nền đất nới ra mới đặt được: đo bằng máy thì cả đoạn [-55, 60] cũ không còn khe nào
+     * hợp lệ cho một loài aggro 6, nên `DemoPlatforms.GROUND_MAX_X` đi 60 → 85 cùng đợt.
+     * V41 thêm chấp sự Hình Vân Sơn ở -8 (aggro 0, patrol 0 — hắn ĐỨNG YÊN).
+     *
+     * <p>⚠️ Bản đầu đặt hắn ở -12 và PLAYTEST BÁC (2026-09-12): thạch vệ @-20 đuổi tới tận đó và
+     * đánh chết người chơi trước khi chạm được vào boss. Lập luận sai là "vùng an toàn
+     * `sect_grounds` [-15, 5] chặn nó" — <b>vùng an toàn chỉ HỒI MÁU lúc bước vào (ADR-046 D3),
+     * nó KHÔNG chặn aggro</b>. Con số thật: thạch vệ spawn -20, patrol ±3 ⇒ mép đông -17;
+     * aggro 6 ⇒ phát hiện tới -11; leash 10 ⇒ đuổi tới -10. x=-8 cách mép phát hiện 3m.
+     *
+     * <p>⚠️ Và hai ô test hình học bên dưới KHÔNG gác điểm này (chúng chỉ soi loài có aggro > 0),
+     * nên nếu ngày nào đó hắn được cho aggro thì chúng vẫn im. Chỗ duy nhất ghi lại ràng buộc
+     * là đúng đoạn này.
+     *
+     * <p>V45 thêm HAI điểm: đoạt mạch @47 (khe quỷ đá để lại khi V40 dời nó đi) và sào huyệt đầu
+     * lĩnh @93 (đất mới — `DemoPlatforms.GROUND_MAX_X` đi 85 → 115 cùng đợt). Và nó DỜI quỷ đá
+     * lần thứ hai, 80 → 106, cùng lý do V40 đã dời nó lần đầu: nó là con đánh đau nhất trục chơi
+     * (atk 40) và lần này nó nằm trên đường tới @93. Sau khi dời, x≈80 thành khe yên tĩnh để
+     * người chơi hồi máu trước trận cuối (ADR-046).
+     */
+    @Test
+    void shouldPlaceMainWorldSpawnsAtTheirDocumentedX() {
+        List<MonsterSpawnPoint> spawns =
+                new PostgresMonsterCatalogAdapter(dataSource).listSpawnPoints(MonsterSpawnPoint.MAIN_WORLD_CODE);
+
+        // KHÔNG khớp theo thứ tự: adapter trả về theo id (thứ tự chèn của các migration), không theo trục x.
         assertThat(spawns)
                 .extracting(MonsterSpawnPoint::posX)
                 .containsExactlyInAnyOrder(

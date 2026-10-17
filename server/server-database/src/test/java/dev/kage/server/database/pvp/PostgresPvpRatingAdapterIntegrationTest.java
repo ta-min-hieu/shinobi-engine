@@ -148,33 +148,7 @@ class PostgresPvpRatingAdapterIntegrationTest {
         CountDownLatch proceedToCommit = new CountDownLatch(1);
         ExecutorService lockHolder = Executors.newSingleThreadExecutor();
         Future<?> lockHolderTask = lockHolder.submit(() -> {
-            try (Connection connection = dataSource.getConnection()) {
-                connection.setAutoCommit(false);
-                try (PreparedStatement lock = connection.prepareStatement(
-                        "SELECT rating FROM pvp_rating WHERE character_id = ? FOR UPDATE")) {
-                    lock.setLong(1, a);
-                    // ResultSet chỉ cần THỰC THI để khoá dòng — giá trị không dùng tới, nhưng vẫn
-                    // phải đóng qua try-with-resources (SpotBugs RV: bỏ qua giá trị trả về của
-                    // executeQuery() coi như rò tài nguyên). Dòng phải TỒN TẠI: không có dòng thì
-                    // FOR UPDATE chẳng khoá gì và cả phép đo race thành vô nghĩa.
-                    try (ResultSet locked = lock.executeQuery()) {
-                        if (!locked.next()) {
-                            throw new IllegalStateException("không có dòng pvp_rating nào để khoá");
-                        }
-                    }
-                }
-                lockAcquired.countDown();
-                if (!proceedToCommit.await(10, TimeUnit.SECONDS)) {
-                    throw new IllegalStateException("test không cho phép commit kịp — xem lỗi ở luồng chính");
-                }
-                try (PreparedStatement update =
-                        connection.prepareStatement("UPDATE pvp_rating SET rating = ? WHERE character_id = ?")) {
-                    update.setInt(1, concurrentlyCommittedRating);
-                    update.setLong(2, a);
-                    update.executeUpdate();
-                }
-                connection.commit();
-            }
+            holdRowLockThenCommit(a, concurrentlyCommittedRating, lockAcquired, proceedToCommit);
             return null;
         });
         assertThat(lockAcquired.await(5, TimeUnit.SECONDS))
@@ -201,6 +175,43 @@ class PostgresPvpRatingAdapterIntegrationTest {
         EloRating.Result expected = EloRating.computeNewRatings(concurrentlyCommittedRating, EloRating.DEFAULT_RATING);
         assertThat(result.newWinnerRating()).isEqualTo(expected.newWinnerRating());
         assertThat(adapter.findByCharacterId(a).orElseThrow().rating()).isEqualTo(expected.newWinnerRating());
+    }
+
+    /**
+     * Khoá dòng {@code pvp_rating} của {@code characterId} (FOR UPDATE), báo {@code lockAcquired}, GIỮ
+     * khoá tới khi được {@code proceedToCommit}, rồi ghi {@code newRating} và commit — mô phỏng chính
+     * xác "một trận khác của nhân vật này đang trong transaction, sắp ghi xong".
+     */
+    private static void holdRowLockThenCommit(
+            long characterId, int newRating, CountDownLatch lockAcquired, CountDownLatch proceedToCommit)
+            throws Exception {
+        try (Connection connection = dataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement lock =
+                    connection.prepareStatement("SELECT rating FROM pvp_rating WHERE character_id = ? FOR UPDATE")) {
+                lock.setLong(1, characterId);
+                // ResultSet chỉ cần THỰC THI để khoá dòng — giá trị không dùng tới, nhưng vẫn
+                // phải đóng qua try-with-resources (SpotBugs RV: bỏ qua giá trị trả về của
+                // executeQuery() coi như rò tài nguyên). Dòng phải TỒN TẠI: không có dòng thì
+                // FOR UPDATE chẳng khoá gì và cả phép đo race thành vô nghĩa.
+                try (ResultSet locked = lock.executeQuery()) {
+                    if (!locked.next()) {
+                        throw new IllegalStateException("không có dòng pvp_rating nào để khoá");
+                    }
+                }
+            }
+            lockAcquired.countDown();
+            if (!proceedToCommit.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("test không cho phép commit kịp — xem lỗi ở luồng chính");
+            }
+            try (PreparedStatement update =
+                    connection.prepareStatement("UPDATE pvp_rating SET rating = ? WHERE character_id = ?")) {
+                update.setInt(1, newRating);
+                update.setLong(2, characterId);
+                update.executeUpdate();
+            }
+            connection.commit();
+        }
     }
 
     /**

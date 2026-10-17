@@ -311,6 +311,11 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         putNpc(SISTER_ID, "senior_sister", SISTER_X);
         putNpc(UNDRAWN_NPC_ID, "shop_keeper", UNDRAWN_NPC_X);
         putNpc(WAYPOST_ID, "waypost_attendant", WAYPOST_X);
+        logWhichModelsLoaded();
+    }
+
+    /** Model nào đã nạp được — để đọc log là biết art nào còn thiếu, không cần nhìn ảnh. */
+    private void logWhichModelsLoaded() {
         LOG.info(
                 "model quái: training_dummy={} wandering_bandit={} blood_sand_scout={} "
                         + "wasteland_beast={} stone_ogre={} archive_warden={} trial_construct={} "

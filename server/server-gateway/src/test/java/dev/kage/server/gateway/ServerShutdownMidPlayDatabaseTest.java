@@ -258,21 +258,35 @@ class ServerShutdownMidPlayDatabaseTest {
      */
     @Test
     void tradeConfirmedDuringShutdownShouldBeAllOrNothing_andNeverLockPlayersOutAfterRestart() throws Exception {
+        long templateId = queryLong("SELECT id FROM item_template WHERE code = 'iron_scrap'");
+        TradeScene scene = confirmTradeWhileShuttingDown(templateId);
+        boolean sessionLeft = assertTradeIsAllOrNothing(scene);
+        assertNobodyLockedOutAfterRestart(scene, sessionLeft);
+    }
+
+    /** Những gì phần sau của test cần biết về cảnh giao dịch đã dựng. */
+    private record TradeScene(
+            String buyerName,
+            long buyerId,
+            long sellerId,
+            String sellerCharacterName,
+            long sessionId,
+            long templateId) {}
+
+    /**
+     * Người mua chào vàng, người bán chào vật phẩm, người mua xác nhận — rồi tắt server khi lệnh xác
+     * nhận THỨ HAI (của người bán) còn đang bay.
+     */
+    private TradeScene confirmTradeWhileShuttingDown(long templateId) throws Exception {
         GatewayBootstrap.Assembly first = startServer();
         String buyerName = "tb" + suffix();
-        String sellerName = "ts" + suffix();
-        long templateId = queryLong("SELECT id FROM item_template WHERE code = 'iron_scrap'");
-        long buyerId;
-        long sellerId;
-        String sellerCharacterName;
-        long sessionId;
         try (Player buyer = Player.connect(first);
                 Player seller = Player.connect(first)) {
             buyer.logIn(buyerName);
-            buyerId = buyer.createCharacter();
-            seller.logIn(sellerName);
-            sellerId = seller.createCharacter();
-            sellerCharacterName = queryString("SELECT name FROM character WHERE id = ?", sellerId);
+            long buyerId = buyer.createCharacter();
+            seller.logIn("ts" + suffix());
+            long sellerId = seller.createCharacter();
+            String sellerCharacterName = queryString("SELECT name FROM character WHERE id = ?", sellerId);
             update("UPDATE character_stat SET gold = ? WHERE character_id = ?", START_GOLD, buyerId);
             update(
                     "INSERT INTO inventory_item (character_id, item_template_id, quantity, enhance_level, slot_index)"
@@ -284,43 +298,7 @@ class ServerShutdownMidPlayDatabaseTest {
             buyer.select(buyerId);
             seller.select(sellerId);
 
-            buyer.send(
-                    Opcode.OPCODE_REQUEST_TRADE_COMMAND_VALUE,
-                    RequestTradeCommand.newBuilder()
-                            .setTargetName(sellerCharacterName)
-                            .build()
-                            .toByteArray());
-            RequestTradeResponse requested = RequestTradeResponse.parseFrom(
-                    buyer.await(Opcode.OPCODE_REQUEST_TRADE_RESPONSE_VALUE).payload());
-            assertThat(requested.getOutcome()).isEqualTo(RequestTradeOutcome.REQUEST_TRADE_OUTCOME_OK);
-            sessionId = TradeRequestedEvent.parseFrom(seller.await(Opcode.OPCODE_TRADE_REQUESTED_EVENT_VALUE)
-                            .payload())
-                    .getSessionId();
-            seller.send(
-                    Opcode.OPCODE_ACCEPT_TRADE_REQUEST_COMMAND_VALUE,
-                    AcceptTradeRequestCommand.newBuilder()
-                            .setSessionId(sessionId)
-                            .build()
-                            .toByteArray());
-            seller.await(Opcode.OPCODE_ACCEPT_TRADE_REQUEST_RESPONSE_VALUE);
-            buyer.send(
-                    Opcode.OPCODE_SET_TRADE_OFFER_COMMAND_VALUE,
-                    SetTradeOfferCommand.newBuilder()
-                            .setSessionId(sessionId)
-                            .setGoldAmount(TRADE_GOLD)
-                            .build()
-                            .toByteArray());
-            buyer.await(Opcode.OPCODE_SET_TRADE_OFFER_RESPONSE_VALUE);
-            seller.send(
-                    Opcode.OPCODE_SET_TRADE_OFFER_COMMAND_VALUE,
-                    SetTradeOfferCommand.newBuilder()
-                            .setSessionId(sessionId)
-                            .addItems(TradeOfferItemInput.newBuilder()
-                                    .setItemId(sellerItemId)
-                                    .setQuantity(TRADE_ITEM_QUANTITY))
-                            .build()
-                            .toByteArray());
-            seller.await(Opcode.OPCODE_SET_TRADE_OFFER_RESPONSE_VALUE);
+            long sessionId = openTradeWithBothOffers(buyer, seller, sellerCharacterName, sellerItemId);
             // Đối phương vừa sửa lời chào thì chưa xác nhận được (README dòng 25(i)(b)) — chờ hết khoảng chặn.
             Thread.sleep(TradeOfferChanges.BLOCK_WINDOW.toMillis() + OFFER_BLOCK_SLACK_MILLIS);
             buyer.send(Opcode.OPCODE_CONFIRM_TRADE_COMMAND_VALUE, confirm(sessionId));
@@ -328,13 +306,64 @@ class ServerShutdownMidPlayDatabaseTest {
 
             seller.send(Opcode.OPCODE_CONFIRM_TRADE_COMMAND_VALUE, confirm(sessionId));
             shutDown(first); // lệnh xác nhận thứ hai còn đang bay
+            return new TradeScene(buyerName, buyerId, sellerId, sellerCharacterName, sessionId, templateId);
         }
+    }
 
-        long buyerGold = queryLong("SELECT gold FROM character_stat WHERE character_id = ?", buyerId);
-        long sellerGold = queryLong("SELECT gold FROM character_stat WHERE character_id = ?", sellerId);
-        long buyerItems = itemQuantity(buyerId, templateId);
-        long sellerItems = itemQuantity(sellerId, templateId);
-        boolean sessionLeft = queryLong("SELECT count(*) FROM trade_session WHERE id = ?", sessionId) > 0;
+    /** Người mua mời, người bán nhận, mỗi bên đặt lời chào của mình — trả id phiên. */
+    private static long openTradeWithBothOffers(
+            Player buyer, Player seller, String sellerCharacterName, long sellerItemId) throws Exception {
+        buyer.send(
+                Opcode.OPCODE_REQUEST_TRADE_COMMAND_VALUE,
+                RequestTradeCommand.newBuilder()
+                        .setTargetName(sellerCharacterName)
+                        .build()
+                        .toByteArray());
+        RequestTradeResponse requested = RequestTradeResponse.parseFrom(
+                buyer.await(Opcode.OPCODE_REQUEST_TRADE_RESPONSE_VALUE).payload());
+        assertThat(requested.getOutcome()).isEqualTo(RequestTradeOutcome.REQUEST_TRADE_OUTCOME_OK);
+        long sessionId = TradeRequestedEvent.parseFrom(
+                        seller.await(Opcode.OPCODE_TRADE_REQUESTED_EVENT_VALUE).payload())
+                .getSessionId();
+        seller.send(
+                Opcode.OPCODE_ACCEPT_TRADE_REQUEST_COMMAND_VALUE,
+                AcceptTradeRequestCommand.newBuilder()
+                        .setSessionId(sessionId)
+                        .build()
+                        .toByteArray());
+        seller.await(Opcode.OPCODE_ACCEPT_TRADE_REQUEST_RESPONSE_VALUE);
+        buyer.send(
+                Opcode.OPCODE_SET_TRADE_OFFER_COMMAND_VALUE,
+                SetTradeOfferCommand.newBuilder()
+                        .setSessionId(sessionId)
+                        .setGoldAmount(TRADE_GOLD)
+                        .build()
+                        .toByteArray());
+        buyer.await(Opcode.OPCODE_SET_TRADE_OFFER_RESPONSE_VALUE);
+        seller.send(
+                Opcode.OPCODE_SET_TRADE_OFFER_COMMAND_VALUE,
+                SetTradeOfferCommand.newBuilder()
+                        .setSessionId(sessionId)
+                        .addItems(TradeOfferItemInput.newBuilder()
+                                .setItemId(sellerItemId)
+                                .setQuantity(TRADE_ITEM_QUANTITY))
+                        .build()
+                        .toByteArray());
+        seller.await(Opcode.OPCODE_SET_TRADE_OFFER_RESPONSE_VALUE);
+        return sessionId;
+    }
+
+    /**
+     * Vàng và vật phẩm bảo toàn, và giao dịch hoặc xảy ra trọn hoặc không xảy ra gì.
+     *
+     * @return phiên còn nằm trong DB không
+     */
+    private static boolean assertTradeIsAllOrNothing(TradeScene scene) throws Exception {
+        long buyerGold = queryLong("SELECT gold FROM character_stat WHERE character_id = ?", scene.buyerId());
+        long sellerGold = queryLong("SELECT gold FROM character_stat WHERE character_id = ?", scene.sellerId());
+        long buyerItems = itemQuantity(scene.buyerId(), scene.templateId());
+        long sellerItems = itemQuantity(scene.sellerId(), scene.templateId());
+        boolean sessionLeft = queryLong("SELECT count(*) FROM trade_session WHERE id = ?", scene.sessionId()) > 0;
         LOG.info("Tắt giữa lệnh xác nhận giao dịch thứ hai: phiên còn lại trong DB = {}", sessionLeft);
         assertThat(buyerGold + sellerGold).as("tổng vàng bảo toàn").isEqualTo(START_GOLD);
         assertThat(buyerItems + sellerItems).as("tổng vật phẩm bảo toàn").isEqualTo(START_ITEM_QUANTITY);
@@ -357,11 +386,15 @@ class ServerShutdownMidPlayDatabaseTest {
                             TRADE_ITEM_QUANTITY,
                             START_ITEM_QUANTITY - TRADE_ITEM_QUANTITY);
         }
+        return sessionLeft;
+    }
 
+    /** Server mới thấy đúng thứ DB còn giữ về phiên, và người mua không bị kẹt: huỷ được, mời lại được. */
+    private void assertNobodyLockedOutAfterRestart(TradeScene scene, boolean sessionLeft) throws Exception {
         GatewayBootstrap.Assembly second = startServer();
         try (Player buyer = Player.connect(second)) {
-            buyer.logIn(buyerName);
-            buyer.select(buyerId);
+            buyer.logIn(scene.buyerName());
+            buyer.select(scene.buyerId());
             buyer.send(
                     Opcode.OPCODE_GET_TRADE_STATUS_REQUEST_VALUE,
                     GetTradeStatusRequest.getDefaultInstance().toByteArray());
@@ -374,7 +407,7 @@ class ServerShutdownMidPlayDatabaseTest {
                 buyer.send(
                         Opcode.OPCODE_CANCEL_TRADE_COMMAND_VALUE,
                         CancelTradeCommand.newBuilder()
-                                .setSessionId(sessionId)
+                                .setSessionId(scene.sessionId())
                                 .build()
                                 .toByteArray());
                 assertThat(CancelTradeResponse.parseFrom(buyer.await(Opcode.OPCODE_CANCEL_TRADE_RESPONSE_VALUE)
@@ -386,7 +419,7 @@ class ServerShutdownMidPlayDatabaseTest {
             buyer.send(
                     Opcode.OPCODE_REQUEST_TRADE_COMMAND_VALUE,
                     RequestTradeCommand.newBuilder()
-                            .setTargetName(sellerCharacterName)
+                            .setTargetName(scene.sellerCharacterName())
                             .build()
                             .toByteArray());
             assertThat(RequestTradeResponse.parseFrom(buyer.await(Opcode.OPCODE_REQUEST_TRADE_RESPONSE_VALUE)

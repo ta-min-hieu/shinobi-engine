@@ -3,16 +3,15 @@
     "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
     "https://checkstyle.org/dtds/configuration_1_3.dtd">
 <!--
-  Checkstyle cho TEST SOURCE — giống checkstyle.xml, CHỈ khác HAI chỗ:
+  Checkstyle cho TEST SOURCE — giống checkstyle.xml, CHỈ khác MỘT chỗ:
   1. MethodName: cho phép dấu gạch dưới để mô tả hành vi (TESTING.md §10:
      "shouldRejectAttack_whenTargetOutOfRange" — chính tài liệu của dự án khuyến nghị quy ước này cho
      test, khác production code).
-  2. KHÔNG có MethodLength. Rà 2026-10-03: file này từ ngày đầu (Phase 2) đã thiếu LẶNG LẼ ba rule
-     (hậu tố Manager/Helper/Util/Info/Data, MethodLength, ParameterNumber) trong khi dòng đầu vẫn ghi
-     "chỉ khác MethodName". Hai rule kia bật lại không lộ vi phạm nào. MethodLength thì lộ 50 hàm test
-     dài hơn 50 dòng (server-gateway 42, server-database 4, client-core 3, server-world 1) — phần lớn là
-     fake*Facade dựng test double và kịch bản end-to-end qua socket thật. Tách nhỏ chúng là việc thật,
-     không cơ học, nên đang CHỜ CHỦ DỰ ÁN: giữ ngoại lệ này hay trả nợ rồi bật lại.
+  Lịch sử: rà 2026-10-03 thấy file này từ Phase 2 đã thiếu LẶNG LẼ ba rule (hậu tố
+  Manager/Helper/Util/Info/Data, MethodLength, ParameterNumber). MethodLength bật lại 2026-10-17
+  (README dòng 58(b)) sau khi tách 57 hàm test dài: fake*Facade chép giữa ba lớp test gateway được gộp
+  về một bản, lớp ẩn danh thành lớp lồng có tên, I/O socket ra SocketWire, dựng server ra
+  assembleServer / LocalGatewayParts, kịch bản dài chia theo pha có tên.
 -->
 <module name="Checker">
     <property name="charset" value="UTF-8"/>
@@ -57,7 +56,11 @@
             <property name="format" value="^dev\.kage(\.[a-z][a-z0-9]*)+$"/>
         </module>
 
-        <!-- MethodLength (≤50 dòng) KHÔNG áp cho test — xem ghi chú đầu file. -->
+        <!-- MethodLength ≤50 cho test cũng như production (README dòng 58(b), chủ dự án duyệt 2026-10-17) —
+             bật sau khi tách hết các hàm test dài. -->
+        <module name="MethodLength">
+            <property name="max" value="50"/>
+        </module>
         <module name="ParameterNumber">
             <property name="max" value="4"/>
             <property name="ignoreOverriddenMethods" value="true"/>

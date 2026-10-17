@@ -567,70 +567,7 @@ class WorldChangedEventOrderTest {
     }
 
     private static PartyFacade twoMemberParty() {
-        PartyPort port = new PartyPort() {
-            @Override
-            public Optional<PartyMember> findMembershipOf(long characterId) {
-                PartyRole role = characterId == LEADER_ID ? PartyRole.LEADER : PartyRole.MEMBER;
-                return Optional.of(new PartyMember(PARTY_ID, characterId, role, Instant.EPOCH));
-            }
-
-            @Override
-            public List<PartyMember> listMembers(long partyId) {
-                return List.of(
-                        new PartyMember(PARTY_ID, LEADER_ID, PartyRole.LEADER, Instant.EPOCH),
-                        new PartyMember(PARTY_ID, MEMBER_ID, PartyRole.MEMBER, Instant.EPOCH));
-            }
-
-            @Override
-            public Party createParty(long leaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public Optional<PartyInvite> findPendingInviteOfInvitee(long characterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public List<PartyInvite> listPendingInvitesOfInvitee(long characterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public boolean transferLeadership(long leaderCharacterId, long newLeaderCharacterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public int deleteInvitesInvitedBefore(java.time.Instant cutoff) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public PartyInvite invite(long partyId, long inviteeCharacterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public AcceptResult acceptInvite(long inviteId, long characterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public boolean rejectInvite(long inviteId, long characterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public LeaveResult leaveParty(long characterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-
-            @Override
-            public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
-                throw new UnsupportedOperationException("không dùng trong test này");
-            }
-        };
+        PartyPort port = new StubPort();
         return new PartyFacade(new PartyUseCases(
                 new CreatePartyUseCase(port),
                 new InvitePartyMemberUseCase(port),
@@ -642,5 +579,70 @@ class WorldChangedEventOrderTest {
                 new ListPendingPartyInvitesUseCase(port),
                 new FindMyPartyUseCase(port),
                 new dev.kage.party.application.HandOverPartyLeadershipUseCase(port)));
+    }
+
+    private static final class StubPort implements PartyPort {
+        @Override
+        public Optional<PartyMember> findMembershipOf(long characterId) {
+            PartyRole role = characterId == LEADER_ID ? PartyRole.LEADER : PartyRole.MEMBER;
+            return Optional.of(new PartyMember(PARTY_ID, characterId, role, Instant.EPOCH));
+        }
+
+        @Override
+        public List<PartyMember> listMembers(long partyId) {
+            return List.of(
+                    new PartyMember(PARTY_ID, LEADER_ID, PartyRole.LEADER, Instant.EPOCH),
+                    new PartyMember(PARTY_ID, MEMBER_ID, PartyRole.MEMBER, Instant.EPOCH));
+        }
+
+        @Override
+        public Party createParty(long leaderCharacterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public Optional<PartyInvite> findPendingInviteOfInvitee(long characterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public List<PartyInvite> listPendingInvitesOfInvitee(long characterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public boolean transferLeadership(long leaderCharacterId, long newLeaderCharacterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public int deleteInvitesInvitedBefore(java.time.Instant cutoff) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public PartyInvite invite(long partyId, long inviteeCharacterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public AcceptResult acceptInvite(long inviteId, long characterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public boolean rejectInvite(long inviteId, long characterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public LeaveResult leaveParty(long characterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
+
+        @Override
+        public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
+            throw new UnsupportedOperationException("không dùng trong test này");
+        }
     }
 }

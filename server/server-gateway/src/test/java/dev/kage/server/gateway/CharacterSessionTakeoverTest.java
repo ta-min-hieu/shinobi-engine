@@ -35,17 +35,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import dev.kage.account.api.AccountFacade;
-import dev.kage.account.application.LoginOrCreateAccountUseCase;
 import dev.kage.character.api.CharacterFacade;
-import dev.kage.character.application.CharacterUseCases;
-import dev.kage.character.application.CreateCharacterUseCase;
-import dev.kage.character.application.GrantExperienceUseCase;
-import dev.kage.character.application.ListCharactersUseCase;
-import dev.kage.character.application.SelectCharacterUseCase;
-import dev.kage.character.application.SelectFactionUseCase;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
-import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.Opcode;
@@ -54,9 +46,6 @@ import dev.kage.protocol.SelectCharacterResponse;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
-import dev.kage.quest.api.QuestFacade;
-import dev.kage.server.world.WorldContentCatalog;
-import dev.kage.server.world.WorldFacade;
 import dev.kage.server.world.WorldOutboundSink;
 
 /**
@@ -101,41 +90,14 @@ class CharacterSessionTakeoverTest {
         eventLoops = new DefaultEventLoopGroup(4);
         authExecutor = Executors.newVirtualThreadPerTaskExecutor();
         characterPort = new GatewayPipelineTest.FakeCharacterPort();
-        characterFacade = new CharacterFacade(
-                new CharacterUseCases(
-                        new CreateCharacterUseCase(characterPort, action -> action.accept(null)),
-                        new ListCharactersUseCase(characterPort),
-                        new SelectCharacterUseCase(characterPort),
-                        new SelectFactionUseCase(characterPort),
-                        new GrantExperienceUseCase(characterPort)),
-                characterPort);
-        accountFacade = new AccountFacade(new LoginOrCreateAccountUseCase(
-                new GatewayPipelineTest.FakeAccountPort(),
-                new GatewayPipelineTest.FakeSessionPort(),
-                action -> action.accept(null)));
+        characterFacade = LocalGatewayParts.characterFacadeOver(characterPort);
+        accountFacade = LocalGatewayParts.fakeAccountFacade();
         accountId = accountFacade.login(USERNAME).accountId();
 
         SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
         GatewayNetworkMetrics networkMetrics = new GatewayNetworkMetrics(meterRegistry);
         observability = new GatewayObservability(networkMetrics, GatewayTracing.disabled());
-        InventoryFacade inventoryFacade = GatewayPipelineTest.fakeInventoryFacade();
-        QuestFacade questFacade = GatewayPipelineTest.fakeQuestFacade();
-        ConnectedCharacterRegistry registry = new ConnectedCharacterRegistry(
-                inventoryFacade, questFacade, characterFacade::grantExperience, networkMetrics);
-        MainWorldChannelRegistry mainWorldChannels = new MainWorldChannelRegistry(
-                registry, new WorldFacade(registry), meterRegistry, WorldContentCatalog.EMPTY);
-        worldGateway = new WorldGateway(
-                mainWorldChannels,
-                registry,
-                new CharacterPositionPersister(characterFacade, registry, Duration.ofMinutes(5)),
-                new DungeonInstanceRegistry(
-                        registry,
-                        new DungeonInstanceRegistry.DungeonFacades(
-                                characterFacade, GatewayPipelineTest.fakePartyFacade()),
-                        mainWorldChannels,
-                        TestWorldContents.withBoss()),
-                new ArenaInstanceRegistry(
-                        registry, characterFacade, GatewayPipelineTest.fakePvpFacade(), mainWorldChannels));
+        worldGateway = LocalGatewayParts.worldGatewayFor(characterFacade, meterRegistry, networkMetrics);
 
         address = new LocalAddress("takeover-" + UUID.randomUUID());
         serverChannel = new ServerBootstrap()
