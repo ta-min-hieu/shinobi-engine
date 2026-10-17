@@ -104,7 +104,7 @@ services:
   grafana:
     # AGPLv3 (grafana/grafana) — chấp nhận được, cùng tiền lệ Redis AGPLv3 (ADR-005, dự án cá
     # nhân ưu tiên miễn phí hơn thuần OSI).
-    image: grafana/grafana:13.1.1
+    image: grafana/grafana:13.2.4
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD trong .env}
     volumes:
