@@ -13,6 +13,7 @@ import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.AcceptTradeRequestResponse;
 import dev.kage.protocol.CancelTradeResponse;
 import dev.kage.protocol.ConfirmTradeResponse;
+import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.GetTradeStatusResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.RequestTradeResponse;
@@ -47,6 +48,12 @@ final class TradeCoordinator implements WindowFlow {
     private final WorldCommandSender sender;
     private final ItemCatalogCoordinator itemCatalog;
     private final I18NBundle i18n = KageI18n.load();
+
+    /** Không có lệnh Xác nhận nào đang chờ trả lời — sequenceId thật luôn dương. */
+    private static final int NO_PENDING_CONFIRM = 0;
+
+    /** sequenceId của lệnh Xác nhận đang chờ — để nhận đúng {@code ErrorResponse} của nó. */
+    private int pendingConfirmSequenceId = NO_PENDING_CONFIRM;
 
     /** Đệm dựng sẵn cho {@link TradePanel#setItems} — chỉ đổi khi server vừa trả lời. */
     private final List<String> itemRows = new ArrayList<>();
@@ -120,6 +127,9 @@ final class TradeCoordinator implements WindowFlow {
 
     /** Tách nhóm gói trả lời lệnh THUẦN để hạ cyclomatic complexity dưới ngưỡng PMD (max 10). */
     private boolean dispatchCommandResponse(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+        if (opcode == Opcode.OPCODE_ERROR_VALUE) {
+            return onConfirmRejected(ErrorResponse.parseFrom(payload));
+        }
         if (opcode == Opcode.OPCODE_REQUEST_TRADE_RESPONSE_VALUE) {
             RequestTradeResponse response = RequestTradeResponse.parseFrom(payload);
             settle(TradeController.requestMessageKey(response.getOutcome()));
@@ -163,8 +173,26 @@ final class TradeCoordinator implements WindowFlow {
      * {@code TradeClosedEvent} của server, client không tự dọn trước.
      */
     private void onConfirmSettled(ConfirmTradeResponse response) {
+        pendingConfirmSequenceId = NO_PENDING_CONFIRM;
         controller.onConfirmSettled();
         settle(TradeController.confirmMessageKey(response.getOutcome()));
+    }
+
+    /**
+     * Server từ chối lệnh Xác nhận đang chờ bằng {@code ErrorResponse} — đối phương vừa đổi lời chào
+     * ({@code error.trade_offer_just_changed}, README dòng 25(i)(b)). Chỉ nhận đúng gói khớp
+     * {@code sequenceId} của lệnh đó, cùng luật {@code GuildCoordinator#onCreateRejected}. Hỏi lại
+     * trạng thái ({@link #settle}) chính là thứ người chơi cần: lời chào mới hiện ra trước khi họ bấm lại.
+     */
+    private boolean onConfirmRejected(ErrorResponse error) {
+        if (pendingConfirmSequenceId == NO_PENDING_CONFIRM
+                || error.getRelatedSequenceId() != pendingConfirmSequenceId) {
+            return false;
+        }
+        pendingConfirmSequenceId = NO_PENDING_CONFIRM;
+        controller.onConfirmSettled();
+        settle(TradeController.confirmErrorMessageKey(error.getErrorKey()));
+        return true;
     }
 
     private void onInvited(TradeRequestedEvent event) {
@@ -227,7 +255,8 @@ final class TradeCoordinator implements WindowFlow {
         if (!controller.inTrade()) {
             return;
         }
-        sender.confirmTrade(controller.sessionId(), controller.beginConfirm(controller.sessionId()));
+        pendingConfirmSequenceId =
+                sender.confirmTrade(controller.sessionId(), controller.beginConfirm(controller.sessionId()));
     }
 
     private void cancel() {

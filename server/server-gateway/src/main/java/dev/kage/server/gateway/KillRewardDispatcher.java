@@ -1,5 +1,7 @@
 package dev.kage.server.gateway;
 
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -42,8 +44,30 @@ final class KillRewardDispatcher {
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(KillRewardDispatcher.class);
+    private static final long MILLIS_PER_SECOND = 1_000L;
 
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+
+    /** Lượt trao thưởng đã xếp mà chưa xong — để lúc tắt quá trần nói được ai còn dở (dòng 78(b)). */
+    private final Set<Pending> pending = ConcurrentHashMap.newKeySet();
+
+    /** Một lượt đang dở. Đối tượng riêng mỗi lượt: hai lượt cùng nội dung vẫn là hai lượt. */
+    private static final class Pending {
+        private final Step step;
+        private final long characterId;
+        private final String monsterCode;
+
+        Pending(Step step, long characterId, String monsterCode) {
+            this.step = step;
+            this.characterId = characterId;
+            this.monsterCode = monsterCode;
+        }
+
+        @Override
+        public String toString() {
+            return "step=" + step + " characterId=" + characterId + " monsterCode=" + monsterCode;
+        }
+    }
 
     /**
      * Xếp một việc trao thưởng. Không bao giờ ném, không bao giờ chạy {@code work} trên luồng gọi.
@@ -53,9 +77,18 @@ final class KillRewardDispatcher {
      * DB đóng ngay sau {@code stop()} trong trình tự tắt.
      */
     void dispatch(Step step, long killerCharacterId, String monsterCode, Runnable work) {
+        Pending task = new Pending(step, killerCharacterId, monsterCode);
+        pending.add(task);
         try {
-            executor.execute(() -> runIsolated(step, killerCharacterId, monsterCode, work));
+            executor.execute(() -> {
+                try {
+                    runIsolated(step, killerCharacterId, monsterCode, work);
+                } finally {
+                    pending.remove(task);
+                }
+            });
         } catch (RejectedExecutionException e) {
+            pending.remove(task);
             LOG.warn(
                     "Bỏ lượt trao thưởng hạ quái vì server đang tắt: step={} characterId={} monsterCode={}",
                     step,
@@ -96,10 +129,27 @@ final class KillRewardDispatcher {
      * con quái vừa chết trước khi tắt bị cắt giữa chừng và mất vĩnh viễn — quái không được lưu, nên
      * không có gì để chạy lại lúc khởi động. Quá trần {@link ShutdownDrain#TIMEOUT_SECONDS} (DB treo)
      * thì vẫn đóng tiếp: thà mất vài phần thưởng còn hơn treo cả quá trình tắt (Docker SIGKILL sau
-     * {@code stop_grace_period}); mỗi lượt bị cắt khi đó tự để lại dòng ERROR của nó.
+     * {@code stop_grace_period}).
+     *
+     * <p><b>Cắt thì nói ai bị cắt (dòng 78(b), chủ dự án duyệt 2026-10-17).</b> Chấp nhận cắt, không nâng
+     * trần — nhưng một dòng WARN liệt kê từng lượt còn dở (bước, nhân vật, quái) để bù tay được. Lượt
+     * bị cắt khi pool đóng có thể còn để lại dòng WARN "thất bại" của riêng nó, hoặc không (bị cắt ngay
+     * giữa câu lệnh) — danh sách này là nguồn đáng tin.
      */
     void stop() {
+        stop(ShutdownDrain.TIMEOUT_SECONDS * MILLIS_PER_SECOND);
+    }
+
+    /** {@link #stop()} với trần tuỳ chọn — cho test. */
+    void stop(long timeoutMillis) {
         executor.shutdown();
-        ShutdownDrain.await(executor, "Trao thưởng hạ quái");
+        if (!ShutdownDrain.await(executor, "Trao thưởng hạ quái", timeoutMillis) && !pending.isEmpty()) {
+            LOG.warn("Tắt server cắt ngang {} lượt trao thưởng hạ quái — cần bù tay: {}", pending.size(), pending);
+        }
+    }
+
+    /** Số lượt đang dở — chỉ dùng để test. */
+    int pendingCount() {
+        return pending.size();
     }
 }

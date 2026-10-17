@@ -59,4 +59,11 @@ class ProfanityFilterTest {
 
         assertThat(ProfanityFilter.containsBannedWord(decomposed)).isTrue();
     }
+
+    /** Dòng 41(i): từ "nặng" viết dính chữ/số vẫn bị chặn — bản nguyên-từ làm lọt các kiểu này. */
+    @ParameterizedTest
+    @ValueSource(strings = {"thằngngu", "đồ thằngngu123", "THẰNGNGU", "chóchết", "đồchóchếtkia"})
+    void shouldDetectHeavyWordsGluedToOtherLetters(String message) {
+        assertThat(ProfanityFilter.containsBannedWord(message)).isTrue();
+    }
 }

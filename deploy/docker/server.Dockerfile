@@ -2,8 +2,14 @@
 # Build từ context = repo root (xem docker-compose.yml `build.context: ../..`), vì Gradle multi-module
 # cần toàn bộ cây module để resolve project(":...") — không build được chỉ từ server/server-gateway/.
 
+# Base image PIN theo digest (README dòng 61, chủ dự án duyệt 2026-10-17) — tag giữ lại chỉ để người đọc
+# biết dòng nào; digest mới là thứ được kéo. Đọc thật từ image đã kéo về máy dev ngày 2026-10-17
+# (`docker image inspect`): temurin JAVA_VERSION=jdk-25.0.3+9, dựng 2026-07-16; ubuntu 26.04 LTS
+# (resolute), dựng 2026-07-13. Dependabot (ecosystem `docker`, .github/dependabot.yml) mở PR khi digest mới
+# ra — ba dòng FROM phải đổi CÙNG nhau (jlink-builder và builder cùng JDK, runtime cùng glibc).
+
 # ---- Stage 1: build ----
-FROM eclipse-temurin:25-jdk AS builder
+FROM eclipse-temurin:25-jdk@sha256:201fbb8886b2d273218aa3a192f0afbf7b5ff65ee8cc6ef47f5dce2171f013ea AS builder
 WORKDIR /build
 COPY gradle/ gradle/
 COPY gradlew settings.gradle.kts build.gradle.kts ./
@@ -65,7 +71,7 @@ RUN ./gradlew :server:server-gateway:installDist --no-daemon
 # ---- Stage 2: jlink custom runtime (DOCKER.md §8 — "jlink custom runtime: thêm ~50MB tiết kiệm") ----
 # jdeps quét THẬT bộ jar server-gateway vừa build (không đoán module list tay) — build.gradle.kts
 # thêm/bớt dependency thì layer này tự tính lại module cần, Dockerfile không cần sửa theo.
-FROM eclipse-temurin:25-jdk AS jlink-builder
+FROM eclipse-temurin:25-jdk@sha256:201fbb8886b2d273218aa3a192f0afbf7b5ff65ee8cc6ef47f5dce2171f013ea AS jlink-builder
 WORKDIR /jlink
 COPY --from=builder /build/server/server-gateway/build/install/server-gateway/lib/ ./lib/
 # ⚠️ PHÁT HIỆN THẬT (verify bằng jdeps chạy thật, không suy đoán): server-gateway/lib chứa ~25 jar
@@ -132,7 +138,7 @@ RUN jlink \
 # Base OS: Ubuntu (KHÔNG Alpine — musl libc phá native lib Netty, DOCKER.md §8 đã reject) — CÙNG
 # distro với eclipse-temurin:25-jdk/-jre (xác nhận thật qua `/etc/os-release` cả 2 image: Ubuntu
 # 26.04) để runtime jlink build ở stage trên khớp glibc ABI, không phải suy đoán tương thích.
-FROM ubuntu:26.04 AS runtime
+FROM ubuntu:26.04@sha256:3131b4cc82a783df6c9df078f86e01819a13594b865c2cad47bd1bca2b7063bb AS runtime
 # ⚠️ PHÁT HIỆN THẬT (verify bằng `docker run ... locale`, không suy đoán): `eclipse-temurin:25-jre`
 # (base cũ) tự cấu hình sẵn `LANG=en_US.UTF-8`, nhưng `ubuntu:26.04` trần mặc định locale `POSIX`
 # (không UTF-8) — mọi log/exception tiếng Việt của server (khắp `server-world`/`server-database`...)
@@ -171,10 +177,17 @@ ENV JAVA_OPTS="-XX:+UseZGC -XX:MaxRAMPercentage=75.0 -XX:MaxDirectMemorySize=512
 -Xlog:gc*:file=/app/diagnostics/gc.log:time,uptime:filecount=5,filesize=10m"
 # /health/ready (dòng 62(i), 2026-10-17 — trước đó /health/live, luôn 200 khi tiến trình còn sống): DB kết
 # nối được VÀ cổng game còn mở VÀ mọi event loop Netty còn chạy việc (GatewayServer#isServingGameTraffic).
-# Docker thuần KHÔNG tự restart container unhealthy (dòng 62(ii), chưa làm) — trạng thái này để người /
-# cảnh báo đọc, không phải để tự chữa. DB sập cũng làm unhealthy: đúng, khi đó không ai chơi được.
+# Docker thuần KHÔNG tự restart container unhealthy — compose prod có sidecar `autoheal` làm việc đó
+# (dòng 62(ii), 2026-10-17). DB sập cũng làm unhealthy: đúng, khi đó không ai chơi được (autoheal sẽ
+# restart lặp lại tới khi DB về — vô hại, chỉ ồn log).
+# retries=9 (không phải 3): tắt server êm ĐÓNG cổng game ngay bước đầu ⇒ ready đỏ suốt quá trình tắt (đếm
+# ngược 30 s + các bước dọn, xấu nhất ~75 s, stop_grace_period 120 s). 3 × 15 s = 45 s là container thành
+# unhealthy GIỮA lúc đang tắt, và autoheal (đọc thẳng script của nó: lọc health=unhealthy, chỉ bỏ qua
+# trạng thái "restarting") gọi restart — một lệnh `docker stop` có chủ đích bị dựng dậy lại. 9 × 15 s =
+# 135 s > 120 s: container luôn thoát (hoặc bị SIGKILL) trước khi kịp unhealthy. Đổi một trong các số đó
+# thì giữ retries × interval > stop_grace_period. Đánh đổi: server treo thật bị phát hiện chậm ~2 phút.
 # Dùng /dev/tcp của bash thay vì cài thêm curl/wget — image runtime không có sẵn 2 tool đó, thêm vào
 # chỉ để healthcheck không đáng (Điều 9).
-HEALTHCHECK --interval=15s --timeout=3s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=15s --timeout=3s --start-period=30s --retries=9 \
     CMD bash -c 'exec 3<>/dev/tcp/127.0.0.1/9404 && printf "GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3 && head -n 1 <&3 | grep -q "200 OK"' || exit 1
 ENTRYPOINT ["./bin/server-gateway"]

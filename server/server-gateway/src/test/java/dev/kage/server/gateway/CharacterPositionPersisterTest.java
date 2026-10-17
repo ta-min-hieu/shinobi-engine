@@ -124,6 +124,25 @@ class CharacterPositionPersisterTest {
         assertThat(attempts).hasValue(CharacterPositionPersister.LOGOUT_SAVE_ATTEMPTS);
     }
 
+    /**
+     * Dòng 76(e): {@code stop()} chạy một vòng quét cuối — ai còn trong registry lúc tắt (lần dọn của họ
+     * hỏng/chưa chạy) vẫn được lưu chỗ đứng mới nhất, không phải đợi lượt định kỳ không bao giờ tới nữa.
+     */
+    @Test
+    void stopRunsOneFinalSweep_forCharactersStillConnected() {
+        List<PositionSnapshot> writes = new CopyOnWriteArrayList<PositionSnapshot>();
+        persister = new CharacterPositionPersister(
+                (characterId, x, y) -> writes.add(new PositionSnapshot(x, y)), registry, Duration.ofMinutes(5));
+        EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        registry.register(CHARACTER_ID, channel.pipeline().firstContext());
+        moveTo(LOGOUT_POSITION);
+        persister.start();
+
+        persister.stop();
+
+        assertThat(writes).containsExactly(LOGOUT_POSITION);
+    }
+
     private void moveTo(PositionSnapshot position) {
         registry.onMoveAccepted(
                 new WorldOutboundSink.MoveAcceptedSnapshot(CHARACTER_ID, 0, position.x(), position.y(), 0f, true));

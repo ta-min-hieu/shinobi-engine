@@ -271,7 +271,7 @@ không cần cài `locales` package/chạy `locale-gen` (server không cần d�
 |---|---|---|---|
 | 1 | Multi-stage build | Image 200MB thay 1.5GB | Accepted |
 | 2 | **Không chạy root** | Bảo mật | Accepted |
-| 3 | **Pin version base image**, không `latest` | Build tái lập được | Accepted |
+| 3 | **Pin version base image**, không `latest` — từ 2026-10-17 pin theo **digest** (`tag@sha256:…`), Dependabot ecosystem `docker`/`docker-compose` giữ digest không mục (README dòng 61) | Build tái lập được | Accepted |
 | 4 | **Không secret trong image** | Layer history đọc được vĩnh viễn | Accepted |
 | 5 | `MaxRAMPercentage=75` + `ExitOnOutOfMemoryError` | JVM không biết giới hạn container | Accepted |
 | 6 | **Không `-Xmx` cố định** | Image chạy nhiều cấu hình RAM | Accepted |
@@ -332,7 +332,7 @@ Không còn — ADR-019 (GC flags cho container, §7) đã Accepted 2026-07-28.
    (`logback-production.xml`, ghi đè `JAVA_OPTS` toàn bộ vì Compose `environment` thay thế chứ không
    cộng dồn với `ENV` của Dockerfile); (3) Postgres/Redis không publish cổng ra host, Prometheus/
    Alertmanager/Grafana/Jaeger UI chỉ bind `127.0.0.1` (SSH tunnel để xem) — chỉ 7777 (game) public;
-   (4) `restart: unless-stopped` + giới hạn log file (`json-file` driver, DOCKER.md §9). **CHƯA verify
+   (4) `restart: unless-stopped` (chỉ áp khi tiến trình THOÁT; container `unhealthy` do sidecar `autoheal` restart từ 2026-10-17 — README dòng 62(ii), kèm lý do HEALTHCHECK `retries=9` ở `server.Dockerfile`) + giới hạn log file (`json-file` driver, DOCKER.md §9). **CHƯA verify
    thật bằng chạy container thật trên VM** (chỉ viết theo tài liệu + đối chiếu `server.Dockerfile`/
    `ci.yml`/`docker-compose.yml` hiện có — chưa có VM Production thật để chạy `docker compose -f
    docker-compose.prod.yml up -d` kiểm tra, khác cách các mục 5-6 ở trên đã verify THẬT). ⚠️ **Phát

@@ -68,12 +68,24 @@ final class CharacterPositionPersister {
     /**
      * Dừng lịch định kỳ, nhưng vẫn chạy nốt mọi lượt ghi logout ĐÃ xếp hàng (mặc định của
      * {@code ScheduledThreadPoolExecutor}: task không trễ còn trong hàng vẫn chạy sau
-     * {@code shutdown()}), rồi chờ có giới hạn để lượt đang ghi dở kết thúc trước khi DB đóng.
+     * {@code shutdown()}), cộng MỘT vòng quét cuối xếp sau chúng, rồi chờ có giới hạn để lượt đang ghi
+     * dở kết thúc trước khi DB đóng.
+     *
+     * <p><b>Vòng quét cuối (dòng 76(e), chủ dự án duyệt 2026-10-17).</b> Lúc tắt server, mọi kết nối
+     * đóng trước bước này và lần dọn của từng người đã lưu vị trí thật (76(a)) — bình thường registry
+     * rỗng và vòng này không ghi gì. Nó là lưới cho người mà lần dọn chưa chạy/hỏng: không có nó, vị trí
+     * của họ chỉ là lượt định kỳ gần nhất, cũ tới một {@code interval}. Không đè được lần ghi logout:
+     * người đã logout đã rời registry, không còn trong ảnh chụp.
      */
     void stop() {
         ScheduledExecutorService current = scheduler;
         if (current == null) {
             return;
+        }
+        try {
+            current.execute(this::saveAllKnownPositions);
+        } catch (RejectedExecutionException e) {
+            LOG.debug("Persister đã dừng từ trước — bỏ vòng quét cuối", e);
         }
         current.shutdown();
         try {

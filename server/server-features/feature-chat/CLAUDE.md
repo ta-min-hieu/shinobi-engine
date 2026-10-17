@@ -22,6 +22,9 @@ Chiều: `api → application → domain`. **`domain/` không import gì bên ng
   2026-07-24) — cùng cơ chế, gateway gọi `PartyFacade.listMembers`.
 - **Không lưu lịch sử chat** — không có bảng riêng. Mỗi tin nhắn HỢP LỆ ghi 1 dòng `audit_log`
   (action `CHAT_MESSAGE`) làm dấu vết cho báo cáo (GAMEPLAY.md §10), KHÔNG xây UI xem báo cáo.
+  Từ 2026-10-17 (README dòng 71(e), chủ dự án duyệt) dòng đó chở kênh + `recipientId` (tin riêng) +
+  **nội dung tin** (thoát JSON ở `SendChatMessageUseCase.auditDetail`), và `RetentionJanitor`
+  (server-database) xoá dòng audit chat cũ hơn **30 ngày** — dữ liệu riêng tư, chỉ giữ đủ cho báo cáo.
 - **Định tuyến người nhận KHÔNG thuộc feature này** — World (toàn server), Riêng tư (1 người,
   resolve tên qua `CharacterFacade`), Khu vực (AoI) đều cần dữ liệu kết nối/world mà feature module
   không được biết (Điều 23: không Netty/không world tick). `server-gateway`/`server-world` tự định
@@ -41,7 +44,7 @@ Chiều: `api → application → domain`. **`domain/` không import gì bên ng
 
 ✅ Validate độ dài/rỗng/từ cấm ở `application/` + `domain/` (compact constructor `ChatMessage`)
 ✅ Port là interface trong `domain/`; Adapter implement ở `server-database`
-✅ Ghi audit cho MỌI tin nhắn hợp lệ, KHÔNG lưu nội dung ở bảng riêng
+✅ Ghi audit cho MỌI tin nhắn hợp lệ (có nội dung, hạn giữ 30 ngày), KHÔNG lưu nội dung ở bảng riêng
 
 ❌ SQL/JDBC/Redis client trong module này (Điều 23 — enforce bằng ArchUnit)
 ❌ `domain/` biết PostgreSQL

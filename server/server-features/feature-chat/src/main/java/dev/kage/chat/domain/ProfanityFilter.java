@@ -12,6 +12,9 @@ import java.util.Set;
  * (cảnh báo RIÊNG ở GAMEPLAY.md §10) — client tự hiển thị chat dạng text thuần, không render HTML,
  * nên không cần escape ở đây.
  *
+ * <p><b>Hai danh sách (2026-10-17, dòng 41(i)).</b> {@code BANNED_WORDS} so khớp nguyên từ như mô tả
+ * dưới; {@code BANNED_SUBSTRINGS} so khớp chuỗi con cho từ "nặng" không thể nằm trong chữ lành.
+ *
  * <p><b>So khớp NGUYÊN TỪ, không phải chuỗi con (sửa 2026-10-02).</b> Bản cũ dùng
  * {@code contains}, nên từ cấm "ngu" chặn mọi chữ bắt đầu bằng nó: cảnh giới "Nguyên Anh"
  * (ADR-038), họ "Nguyễn", "nguy hiểm", "nguyên liệu" — người chơi không gõ nổi tên cảnh giới của
@@ -22,12 +25,25 @@ import java.util.Set;
 public final class ProfanityFilter {
 
     // PLACEHOLDER — vài từ mẫu để chứng minh cơ chế hoạt động, KHÔNG phải danh sách sản phẩm thật.
-    private static final Set<String> BANNED_WORDS = Set.of("ngu", "chó chết");
+    /** Từ ngắn dễ trùng chữ lành ("ngu" trong "Nguyên Anh") — chỉ chặn khi đứng thành NGUYÊN TỪ. */
+    private static final Set<String> BANNED_WORDS = Set.of("ngu");
+
+    /**
+     * Từ "nặng" không thể là một phần của chữ lành — chặn ở BẤT KỲ đâu, kể cả dính liền chữ/số
+     * ("thằngngu", "chóchết123"). Dòng 41(i), chủ dự án duyệt 2026-10-17: bản nguyên-từ làm lọt các
+     * kiểu viết dính này. Thêm từ vào đây chỉ khi chắc chắn không có tên/từ hợp lệ nào chứa nó.
+     */
+    private static final Set<String> BANNED_SUBSTRINGS = Set.of("thằngngu", "chóchết", "chó chết");
 
     private ProfanityFilter() {}
 
     public static boolean containsBannedWord(String text) {
         String normalized = Normalizer.normalize(text, Normalizer.Form.NFC).toLowerCase(Locale.ROOT);
+        for (String bannedSubstring : BANNED_SUBSTRINGS) {
+            if (normalized.contains(Normalizer.normalize(bannedSubstring, Normalizer.Form.NFC))) {
+                return true;
+            }
+        }
         for (String bannedWord : BANNED_WORDS) {
             if (containsAsWholeWord(normalized, Normalizer.normalize(bannedWord, Normalizer.Form.NFC))) {
                 return true;

@@ -46,6 +46,9 @@ final class TradeController {
      */
     static final int SINGLE_ITEM = 1;
 
+    /** Khoá lỗi server trả khi đối phương vừa đổi lời chào (README dòng 25(i)(b)). */
+    private static final String TRADE_OFFER_JUST_CHANGED = "error.trade_offer_just_changed";
+
     /** Một món trong lời chào của một bên. */
     record OfferItem(long itemId, long itemTemplateId, int quantity, int enhanceLevel) {}
 
@@ -315,5 +318,13 @@ final class TradeController {
 
     static Optional<String> confirmMessageKey(ConfirmTradeOutcome outcome) {
         return messageKey(CONFIRM_MESSAGE_KEYS, outcome);
+    }
+
+    /**
+     * Khoá i18n cho một {@code ErrorResponse} trả về lệnh Xác nhận — chỉ khoá đã biết mới được nói
+     * nguyên văn, khoá lạ rơi về {@code trade.error.unknown} ở {@code TradeCoordinator#settle}.
+     */
+    static Optional<String> confirmErrorMessageKey(String serverErrorKey) {
+        return TRADE_OFFER_JUST_CHANGED.equals(serverErrorKey) ? Optional.of(serverErrorKey) : Optional.empty();
     }
 }

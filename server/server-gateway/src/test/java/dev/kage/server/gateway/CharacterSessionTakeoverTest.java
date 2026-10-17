@@ -81,6 +81,8 @@ class CharacterSessionTakeoverTest {
     private static final String USERNAME = "dualwielder";
     private static final Duration WAIT = Duration.ofSeconds(10);
     private static final int RACE_ROUNDS = 15;
+    /** Dài hơn trần chờ dọn phiên cũ 5 s ({@code GatewayChannelHandler.EVICTION_TIMEOUT}). */
+    private static final Duration STUCK_EVENT_LOOP = Duration.ofSeconds(6);
 
     private final List<Channel> serverSideChannels = new CopyOnWriteArrayList<>();
     private EventLoopGroup eventLoops;
@@ -230,6 +232,29 @@ class CharacterSessionTakeoverTest {
         assertThat(worldGateway.registry().isOnline(first)).isTrue();
         assertThat(worldGateway.registry().isOnline(second)).isFalse();
         assertThat(worldGateway.mainWorldChannels().playerCount()).isEqualTo(1);
+    }
+
+    /**
+     * Dòng 73(e): event loop của phiên cũ kẹt lâu hơn trần chờ 5 s, nên phiên mới vào world TRƯỚC khi
+     * lần dọn của phiên cũ chạy. Lần dọn muộn đó không được gỡ thực thể của phiên mới — bản cũ gỡ nó,
+     * để người chơi đứng trên một kết nối sống mà không còn ở World nào.
+     */
+    @Test
+    void shouldLeaveTheNewSessionInTheWorld_whenTheOldReleaseRunsAfterTheEvictionTimeout() throws InterruptedException {
+        long characterId = createCharacter("LateRelease");
+        TestClient old = login();
+        assertThat(select(old, characterId).getSuccess()).isTrue();
+        TestClient fresh = login();
+        Channel oldServerSide = serverSideOf(old);
+        assertThat(oldServerSide.eventLoop()).isNotSameAs(serverSideOf(fresh).eventLoop());
+
+        oldServerSide.eventLoop().execute(() -> sleepQuietly(STUCK_EVENT_LOOP));
+        assertThat(select(fresh, characterId).getSuccess()).isTrue();
+        awaitServerSideClosed(old);
+
+        assertThat(worldGateway.registry().isOnline(characterId)).isTrue();
+        assertThat(worldGateway.mainWorldChannels().playerCount()).isEqualTo(1);
+        assertOnlyReceiverOfPushIs(characterId, fresh, List.of(old));
     }
 
     @Test
@@ -467,11 +492,24 @@ class CharacterSessionTakeoverTest {
     }
 
     /** Phía SERVER của kết nối đã chạy xong {@code channelInactive} — tức lần dọn của nó đã xảy ra. */
-    private void awaitServerSideClosed(TestClient client) throws InterruptedException {
-        Channel serverSide = serverSideChannels.stream()
+    private Channel serverSideOf(TestClient client) {
+        return serverSideChannels.stream()
                 .filter(channel -> client.channel.localAddress().equals(channel.remoteAddress()))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    /** Giữ event loop bận — giả lập phiên cũ kẹt (dòng 73(e)). */
+    private static void sleepQuietly(Duration duration) {
+        try {
+            Thread.sleep(duration.toMillis());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void awaitServerSideClosed(TestClient client) throws InterruptedException {
+        Channel serverSide = serverSideOf(client);
         assertThat(serverSide.closeFuture().await(WAIT.toMillis())).isTrue();
         // closeFuture xong TRƯỚC khi channelInactive chạy xong trên event loop — xếp một việc rỗng sau
         // nó rồi chờ, để chắc lần dọn đã chạy hết.

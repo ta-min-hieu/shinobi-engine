@@ -168,6 +168,37 @@ final class MainWorldChannelRegistry {
     }
 
     /**
+     * Đăng ký kết nối ({@code registerConnection}) rồi gắn nhân vật — HAI bước trong CÙNG khoá này
+     * (dòng 73(f), chủ dự án duyệt 2026-10-17). Lượt vào world của chính nhân vật đó đi qua đây.
+     *
+     * <p><b>Khe nó đóng.</b> Hầm ngục/đấu trường nhận người bằng {@code registry.isOnline} rồi gỡ họ khỏi
+     * world chính qua {@link #detachCharacterAndDrain} (cùng khoá này). Đăng ký và gắn rời nhau thì một
+     * lượt kéo vào hầm ngục rơi đúng giữa hai bước thấy người đó online, gỡ khỏi world chính KHI CHƯA
+     * GẮN (không có gì để gỡ), dời họ vào hầm ngục — rồi lần gắn của lượt vào world mới chạy: hai thực
+     * thể. Nay ai thấy {@code isOnline} lúc đăng ký vừa xong cũng phải chờ khoá này tới khi đã gắn, nên
+     * lệnh gỡ của họ luôn xếp SAU lệnh gắn.
+     *
+     * <p>Cần khu vực mới thì nhả khoá, dựng World ngoài khoá (xem {@link #attachCharacter}) rồi thử lại
+     * — CHƯA đăng ký gì trước khi chắc chắn gắn được trong cùng lượt khoá.
+     */
+    WorldFacade registerAndAttach(Runnable registerConnection, CharacterEntry entry) {
+        Optional<WorldFacade> attached = tryRegisterAndAttach(registerConnection, entry);
+        while (attached.isEmpty()) {
+            adoptChannelIfStillNeeded(newChannelFacade());
+            attached = tryRegisterAndAttach(registerConnection, entry);
+        }
+        return attached.get();
+    }
+
+    private synchronized Optional<WorldFacade> tryRegisterAndAttach(Runnable registerConnection, CharacterEntry entry) {
+        if (!stopped && !channelByCharacterId.containsKey(entry.characterId()) && needsNewChannel()) {
+            return Optional.empty();
+        }
+        registerConnection.run();
+        return tryAttach(entry, Optional.empty());
+    }
+
+    /**
      * Mở sẵn khu vực mới (dựng World NGOÀI mọi khoá) nếu lượt {@link #attachCharacter} kế tiếp sẽ cần
      * nó. Dành cho caller đang chuẩn bị gắn nhân vật trong lúc giữ khoá của CHÍNH nó (vd. {@code
      * DungeonInstanceRegistry} đưa người về world chính) — không gọi trước thì chi phí dựng World rơi

@@ -222,9 +222,11 @@ public final class GatewayBootstrap {
             ServerDatabaseBootstrap databaseBootstrap) {
         return () -> {
             // Thứ tự SERVER.md §10: ngừng nhận kết nối mới trước (server.stop() đóng channel),
-            // rồi mới dừng world tick + đóng DB. positionPersister dừng SAU worldFacade — vòng
-            // quét định kỳ cuối cùng vẫn nên chạy trước khi tắt hẳn (không mất vị trí ai đó vừa
-            // logout đúng lúc server tắt). dungeonInstanceRegistry/arenaInstanceRegistry dừng CÙNG
+            // rồi mới dừng world tick + đóng DB. positionPersister dừng SAU worldFacade — stop() chạy
+            // nốt các lượt ghi logout đã xếp rồi MỘT vòng quét cuối cho ai còn trong registry (dòng
+            // 76(e)); lưu vị trí thật của từng người lúc tắt là việc của lần dọn kết nối (76(a)), chạy
+            // TRƯỚC cả bước dừng world vì server.stop() đóng mọi kết nối. dungeonInstanceRegistry/arenaInstanceRegistry
+            // dừng CÙNG
             // lúc worldFacade (mọi World, chính lẫn dungeon/duel, dừng trước khi đóng DB).
             // TRƯỚC khi đóng kết nối: từ đây rớt mạng giữa trận Arena là huỷ trận, không phải thua.
             ctx.instanceRegistries().arena().beginShutdown();

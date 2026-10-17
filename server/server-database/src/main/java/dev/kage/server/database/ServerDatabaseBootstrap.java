@@ -145,6 +145,7 @@ import dev.kage.trade.application.ConfirmTradeUseCase;
 import dev.kage.trade.application.GetTradeStatusUseCase;
 import dev.kage.trade.application.RequestTradeUseCase;
 import dev.kage.trade.application.SetTradeOfferUseCase;
+import dev.kage.trade.application.TradeOfferChanges;
 import dev.kage.trade.application.TradePorts;
 import dev.kage.trade.application.TradeUseCases;
 import dev.kage.world.api.WorldGeometryFacade;
@@ -160,7 +161,7 @@ public final class ServerDatabaseBootstrap {
 
     private final DataSource dataSource;
     private final RedisClient redisClient;
-    private final IdempotencyKeyJanitor idempotencyKeyJanitor;
+    private final RetentionJanitor retentionJanitor;
 
     public ServerDatabaseBootstrap() {
         this(DbMetricsPort.NO_OP);
@@ -189,8 +190,8 @@ public final class ServerDatabaseBootstrap {
         this.redisClient = RedisClientFactory.create(redisConfig);
         JdbcOperations.configureMetrics(metricsPort);
         JdbcTransactionRunner.configureMetrics(metricsPort);
-        this.idempotencyKeyJanitor = new IdempotencyKeyJanitor(dataSource);
-        idempotencyKeyJanitor.start();
+        this.retentionJanitor = new RetentionJanitor(dataSource);
+        retentionJanitor.start();
     }
 
     public AccountFacade wireAccountFacade() {
@@ -455,12 +456,14 @@ public final class ServerDatabaseBootstrap {
         PostgresTradeIdempotencyAdapter idempotencyPort = new PostgresTradeIdempotencyAdapter();
         JdbcTradeTransactionRunner transactionRunner = new JdbcTradeTransactionRunner(dataSource);
         TradePorts ports = new TradePorts(sessionPort, inventoryPort, goldPort, auditPort, idempotencyPort);
+        // Một sổ "lời chào vừa đổi" dùng chung cho sửa lời chào + xác nhận (dòng 25(i)(b)).
+        TradeOfferChanges offerChanges = new TradeOfferChanges();
         TradeUseCases useCases = new TradeUseCases(
                 new RequestTradeUseCase(sessionPort),
                 new AcceptTradeRequestUseCase(sessionPort),
                 new CancelTradeUseCase(sessionPort),
-                new SetTradeOfferUseCase(sessionPort),
-                new ConfirmTradeUseCase(ports, transactionRunner),
+                new SetTradeOfferUseCase(sessionPort, offerChanges),
+                new ConfirmTradeUseCase(ports, transactionRunner, offerChanges),
                 new GetTradeStatusUseCase(sessionPort, inventoryPort));
         return new TradeFacade(useCases);
     }
@@ -472,7 +475,7 @@ public final class ServerDatabaseBootstrap {
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */
     public void shutdown() {
-        idempotencyKeyJanitor.stop();
+        retentionJanitor.stop();
         redisClient.close();
         PostgresDataSourceFactory.close(dataSource);
     }

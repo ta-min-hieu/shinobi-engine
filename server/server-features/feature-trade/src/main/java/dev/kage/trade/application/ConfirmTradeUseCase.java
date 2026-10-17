@@ -30,13 +30,26 @@ public final class ConfirmTradeUseCase {
 
     private final TradePorts ports;
     private final TransactionRunner tx;
+    private final TradeOfferChanges offerChanges;
 
+    /** Sổ {@link TradeOfferChanges} riêng — chỉ dành cho test không quan tâm luật chặn xác nhận. */
     public ConfirmTradeUseCase(TradePorts ports, TransactionRunner tx) {
+        this(ports, tx, new TradeOfferChanges());
+    }
+
+    /** {@code offerChanges} dùng chung với {@link SetTradeOfferUseCase} — xem {@link TradeOfferChanges}. */
+    public ConfirmTradeUseCase(TradePorts ports, TransactionRunner tx, TradeOfferChanges offerChanges) {
         this.ports = ports;
         this.tx = tx;
+        this.offerChanges = offerChanges;
     }
 
     public Result execute(long sessionId, long characterId, String idempotencyKey) {
+        // Kiểm TRƯỚC transaction: bị chặn thì idempotencyKey chưa bị ghi, client gửi lại cùng khoá
+        // sau khi đã thấy lời chào mới vẫn được (README dòng 25(i)(b)).
+        if (offerChanges.counterpartJustChanged(sessionId, characterId)) {
+            return Result.OFFER_JUST_CHANGED;
+        }
         AtomicReference<Result> resultHolder = new AtomicReference<Result>();
         try {
             tx.inTransaction((Transaction t) -> {
@@ -195,6 +208,8 @@ public final class ConfirmTradeUseCase {
         EXECUTED,
         NOT_FOUND,
         OFFER_INVALID,
-        DUPLICATE_REQUEST
+        DUPLICATE_REQUEST,
+        /** Đối phương vừa sửa lời chào trong {@link TradeOfferChanges#BLOCK_WINDOW} — chưa xác nhận gì. */
+        OFFER_JUST_CHANGED
     }
 }

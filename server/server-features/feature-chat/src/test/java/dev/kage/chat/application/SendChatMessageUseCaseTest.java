@@ -23,6 +23,27 @@ class SendChatMessageUseCaseTest {
         assertThat(auditPort.loggedAction).isEqualTo("CHAT_MESSAGE");
     }
 
+    /** Dòng 71(e): audit có nội dung tin (đã thoát JSON) và người nhận tin riêng. */
+    @Test
+    void shouldAuditTheBodyAndTheRecipient_ofAPrivateMessage() {
+        FakeChatAuditPort auditPort = new FakeChatAuditPort();
+        SendChatMessageUseCase useCase = new SendChatMessageUseCase(auditPort);
+
+        useCase.execute(5, ChatChannel.PRIVATE, "nói \"nhỏ\" \\ thôi", java.util.OptionalLong.of(9));
+
+        assertThat(auditPort.loggedDetail)
+                .isEqualTo("{\"channel\":\"PRIVATE\",\"recipientId\":9,\"body\":\"nói \\\"nhỏ\\\" \\\\ thôi\"}");
+    }
+
+    @Test
+    void shouldAuditTheBodyWithoutRecipient_ofAWorldMessage() {
+        FakeChatAuditPort auditPort = new FakeChatAuditPort();
+
+        new SendChatMessageUseCase(auditPort).execute(5, ChatChannel.WORLD, "chào");
+
+        assertThat(auditPort.loggedDetail).isEqualTo("{\"channel\":\"WORLD\",\"body\":\"chào\"}");
+    }
+
     @Test
     void shouldReturnMessageBlank_whenBodyBlank() {
         SendChatMessageUseCase useCase = new SendChatMessageUseCase(new FakeChatAuditPort());
@@ -83,10 +104,12 @@ class SendChatMessageUseCaseTest {
 
     static final class FakeChatAuditPort implements ChatAuditPort {
         private String loggedAction;
+        private String loggedDetail;
 
         @Override
         public void log(long characterId, String action, String detailJson) {
             loggedAction = action;
+            loggedDetail = detailJson;
         }
     }
 }

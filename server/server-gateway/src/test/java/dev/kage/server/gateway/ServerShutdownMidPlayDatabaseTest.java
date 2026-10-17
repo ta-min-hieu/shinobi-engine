@@ -68,6 +68,7 @@ import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.PostgresDataSourceFactory;
 import dev.kage.server.database.ServerDatabaseBootstrap;
 import dev.kage.server.database.session.RedisConfig;
+import dev.kage.trade.application.TradeOfferChanges;
 
 /**
  * Tắt server GIỮA LÚC ĐANG CHƠI rồi khởi động lại (SERVER.md §10) — trên Postgres + Redis thật, bằng
@@ -88,6 +89,9 @@ class ServerShutdownMidPlayDatabaseTest {
     private static final int REDIS_PORT = 6379;
     private static final String REDIS_PASSWORD = "shutdown-audit-redis-password";
     private static final int SOCKET_TIMEOUT_MILLIS = 10_000;
+    /** Dư thêm ngoài khoảng chặn xác nhận, để đồng hồ hai luồng lệch nhau không làm test chập chờn. */
+    private static final long OFFER_BLOCK_SLACK_MILLIS = 200;
+
     private static final int FRAMES_BEFORE_GIVING_UP = 5_000;
 
     /** 5 m/s × 2,5 s ≈ 12,5 m thật; vị trí lấy mẫu mỗi giây ⇒ chỗ đã lưu cách điểm xuất phát hơn 5 m. */
@@ -317,6 +321,8 @@ class ServerShutdownMidPlayDatabaseTest {
                             .build()
                             .toByteArray());
             seller.await(Opcode.OPCODE_SET_TRADE_OFFER_RESPONSE_VALUE);
+            // Đối phương vừa sửa lời chào thì chưa xác nhận được (README dòng 25(i)(b)) — chờ hết khoảng chặn.
+            Thread.sleep(TradeOfferChanges.BLOCK_WINDOW.toMillis() + OFFER_BLOCK_SLACK_MILLIS);
             buyer.send(Opcode.OPCODE_CONFIRM_TRADE_COMMAND_VALUE, confirm(sessionId));
             buyer.await(Opcode.OPCODE_CONFIRM_TRADE_RESPONSE_VALUE);
 

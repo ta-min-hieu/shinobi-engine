@@ -70,6 +70,38 @@ class MainWorldChannelRegistryTest {
         assertThat(channels.worldFacadeFor(CHARACTER_ID)).containsSame(first);
     }
 
+    /**
+     * Dòng 73(f): lượt kéo vào hầm ngục/đấu trường thấy nhân vật online NGAY sau khi đăng ký thì lệnh
+     * gỡ của nó phải xếp SAU lệnh gắn — không thì gỡ trước khi có gì để gỡ, rồi lần gắn để lại một thực
+     * thể ở world chính trong khi nhân vật đã được dời đi.
+     */
+    @Test
+    void shouldOrderADetachSeenRightAfterRegistrationAfterTheAttach() throws InterruptedException {
+        java.util.concurrent.CountDownLatch registered = new java.util.concurrent.CountDownLatch(1);
+        Thread entering = Thread.ofPlatform()
+                .start(() -> channels.registerAndAttach(
+                        () -> {
+                            registered.countDown();
+                            pause(TICK_OBSERVATION_MILLIS); // cho lượt gỡ kịp chen vào nếu nó chen được
+                        },
+                        entry(CHARACTER_ID)));
+        registered.await();
+
+        channels.detachCharacterAndDrain(CHARACTER_ID).join();
+        entering.join();
+
+        assertThat(channels.worldFacadeFor(CHARACTER_ID)).isEmpty();
+        assertThat(channels.playerCount()).isZero();
+    }
+
+    private static void pause(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     @Test
     void shouldAttachAgain_afterCharacterWasDetached() {
         channels.attachCharacter(entry(CHARACTER_ID));

@@ -956,11 +956,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         SelectCharacterResponse response = enterWorldResponse(loadout, spawn);
         if (!isLiveOnThisConnection(characterId)) {
             // Đăng ký connection NÀY để world outbound (spawn/move/despawn — SERVER.md §6) tìm
-            // đúng channel; attachCharacter chỉ enqueue, entity ECS thật tạo ở tick kế tiếp.
+            // đúng channel; attachCharacter chỉ enqueue, entity ECS thật tạo ở tick kế tiếp. Hai bước
+            // trong một khoá — lượt kéo vào hầm ngục/đấu trường không chen được vào giữa (dòng 73(f)).
+            CharacterAppearance appearance = CharacterAppearance.of(toProtoFaction(character.faction()));
             worldGateway
-                    .registry()
-                    .register(characterId, ctx, CharacterAppearance.of(toProtoFaction(character.faction())));
-            worldGateway.mainWorldChannels().attachCharacter(loadout.entryAt(characterId, spawn));
+                    .mainWorldChannels()
+                    .registerAndAttach(
+                            () -> worldGateway.registry().register(characterId, ctx, appearance),
+                            loadout.entryAt(characterId, spawn));
         }
         boolean bound = bindOrReleaseIfClosed(ctx, characterId);
         if (bound) {
@@ -3395,6 +3398,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             TradeFacade.ConfirmResult result =
                     tradeFacade.confirm(command.getSessionId(), characterId, command.getIdempotencyKey());
             span.setAttribute("result", result.name());
+            if (result == TradeFacade.ConfirmResult.OFFER_JUST_CHANGED) {
+                // Không có outcome trên dây (protocol đã chốt) — cùng khuôn error.friend_request_cooldown.
+                sendError(ctx, request.sequenceId(), 409, "error.trade_offer_just_changed");
+                return;
+            }
             ConfirmTradeOutcome outcome =
                     switch (result) {
                         case OK -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_OK;
@@ -3402,6 +3410,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         case NOT_FOUND -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_NOT_FOUND;
                         case OFFER_INVALID -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_OFFER_INVALID;
                         case DUPLICATE_REQUEST -> ConfirmTradeOutcome.CONFIRM_TRADE_OUTCOME_DUPLICATE_REQUEST;
+                        case OFFER_JUST_CHANGED -> throw new IllegalStateException("đã trả lỗi ở trên");
                     };
             ConfirmTradeResponse response =
                     ConfirmTradeResponse.newBuilder().setOutcome(outcome).build();
@@ -3771,7 +3780,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // Một dòng duy nhất (quyết định chủ dự án 2026-10-11) — và từ đây chỉ dùng `body` này: thứ được
         // kiểm phải đúng là thứ được phát đi.
         String body = dev.kage.chat.domain.ChatMessage.singleLine(command.getBody());
-        ChatFacade.SendResult result = chatFacade.sendMessage(characterId, domainChannel, body);
+        java.util.OptionalLong recipientId =
+                target == null ? java.util.OptionalLong.empty() : java.util.OptionalLong.of(target.id());
+        ChatFacade.SendResult result = chatFacade.sendMessage(characterId, domainChannel, body, recipientId);
         sendChatOutcome(ctx, sequenceId, toProtoOutcome(result));
         if (result != ChatFacade.SendResult.OK) {
             return;
@@ -4233,7 +4244,15 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // vì lúc đó có thể đã bị unregister() xoá mất — xem javadoc CharacterPositionPersister#save).
         PositionSnapshot lastPosition = worldGateway.registry().lastKnownPosition(characterId);
         // CÓ ĐIỀU KIỆN theo kết nối: nếu nhân vật đã thuộc kết nối khác thì không đụng tới.
-        worldGateway.registry().unregister(characterId, ctx);
+        if (!worldGateway.registry().unregister(characterId, ctx)
+                && worldGateway.registry().isOnline(characterId)) {
+            // Phiên MỚI đã nhận nhân vật (dòng 73(e), chủ dự án duyệt 2026-10-17): lần dọn này tới muộn —
+            // phiên mới chỉ chờ nó tối đa EVICTION_TIMEOUT. Thực thể trong World, vị trí và trạng thái
+            // online giờ là của phiên mới: gỡ/lưu/báo offline ở đây là xoá nhân vật đang chơi khỏi world.
+            LOG.warn("Dọn phiên cũ tới sau khi phiên mới đã vào — bỏ phần gỡ world: characterId={}", characterId);
+            finishRelease(bound, null);
+            return;
+        }
         Detached detached = detachAfterDisconnect(characterId);
         boolean handledElsewhere = detached.handledElsewhere();
         AtomicReference<PositionSnapshot> finalPosition = detached.finalPosition();

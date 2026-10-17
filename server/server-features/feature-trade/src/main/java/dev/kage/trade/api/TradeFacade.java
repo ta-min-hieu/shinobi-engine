@@ -66,6 +66,7 @@ public final class TradeFacade {
             case ConfirmTradeUseCase.Result.NOT_FOUND -> ConfirmResult.NOT_FOUND;
             case ConfirmTradeUseCase.Result.OFFER_INVALID -> ConfirmResult.OFFER_INVALID;
             case ConfirmTradeUseCase.Result.DUPLICATE_REQUEST -> ConfirmResult.DUPLICATE_REQUEST;
+            case ConfirmTradeUseCase.Result.OFFER_JUST_CHANGED -> ConfirmResult.OFFER_JUST_CHANGED;
         };
     }
 
@@ -127,7 +128,12 @@ public final class TradeFacade {
         EXECUTED,
         NOT_FOUND,
         OFFER_INVALID,
-        DUPLICATE_REQUEST
+        DUPLICATE_REQUEST,
+        /**
+         * Đối phương vừa sửa lời chào (≤ 3 giây) — không xác nhận gì; không có outcome trên dây, gateway
+         * trả {@code ErrorResponse} {@code error.trade_offer_just_changed} (README dòng 25(i)(b)).
+         */
+        OFFER_JUST_CHANGED
     }
 
     public enum TradePhase {

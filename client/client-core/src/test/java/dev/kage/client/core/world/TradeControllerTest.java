@@ -184,6 +184,14 @@ class TradeControllerTest {
         }
     }
 
+    /** README dòng 25(i)(b): lỗi "đối phương vừa đổi lời chào" được nói nguyên văn; khoá lạ thì không. */
+    @Test
+    void shouldNameTheOfferJustChangedError_andNothingElse() {
+        assertThat(TradeController.confirmErrorMessageKey("error.trade_offer_just_changed"))
+                .contains("error.trade_offer_just_changed");
+        assertThat(TradeController.confirmErrorMessageKey("error.internal")).isEmpty();
+    }
+
     /**
      * {@code UNSPECIFIED} và {@code UNRECOGNIZED} KHÔNG phải kết quả thật (trade.proto) — chúng phải
      * rơi vào {@code Optional.empty()} để chỗ gọi dịch thành "không hiểu", chứ không được có khoá

@@ -22,17 +22,30 @@ final class ShutdownDrain {
     /** Cùng trần với {@code ConnectedCharacterRegistry} — nằm gọn trong {@code stop_grace_period} 60s. */
     static final long TIMEOUT_SECONDS = 10L;
 
+    private static final long MILLIS_PER_SECOND = 1_000L;
+
     private static final Logger LOG = LoggerFactory.getLogger(ShutdownDrain.class);
 
     private ShutdownDrain() {}
 
     static void await(ExecutorService executor, String what) {
+        await(executor, what, TIMEOUT_SECONDS * MILLIS_PER_SECOND);
+    }
+
+    /**
+     * Như {@link #await(ExecutorService, String)} với trần tuỳ chọn — cho test, không phải đợi 10 s.
+     *
+     * @return {@code true} nếu executor đã chạy xong trong trần
+     */
+    static boolean await(ExecutorService executor, String what, long timeoutMillis) {
         try {
-            if (!executor.awaitTermination(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                LOG.warn("{} chưa xong sau {}s lúc tắt server — vẫn đóng tiếp", what, TIMEOUT_SECONDS);
+            if (executor.awaitTermination(timeoutMillis, TimeUnit.MILLISECONDS)) {
+                return true;
             }
+            LOG.warn("{} chưa xong sau {}ms lúc tắt server — vẫn đóng tiếp", what, timeoutMillis);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+        return false;
     }
 }

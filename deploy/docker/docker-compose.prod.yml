@@ -89,6 +89,11 @@ services:
     # Đổi KAGE_SHUTDOWN_NOTICE_SECONDS thì đổi số này theo (giữ ≥ đếm ngược + 90s).
     stop_grace_period: 120s
     restart: unless-stopped
+    # Sidecar `autoheal` (dưới) restart container này khi HEALTHCHECK báo unhealthy (dòng 62(ii)). Trần chờ
+    # của lần restart đó = stop_grace_period, để lần tự chữa cũng tắt êm như `docker stop`.
+    labels:
+      autoheal: "true"
+      autoheal.stop.timeout: "120"
     depends_on:
       postgres: { condition: service_healthy }
       cache:    { condition: service_healthy }
@@ -138,6 +143,22 @@ services:
     logging:
       driver: json-file
       options: { max-size: "100m", max-file: "5" }
+
+  # Docker thuần không restart container `unhealthy` (`restart:` chỉ áp khi tiến trình THOÁT) — dòng 62(ii),
+  # chủ dự án duyệt 2026-10-17. autoheal chỉ đụng container mang nhãn `autoheal=true` (chỉ `server`).
+  # Pin theo digest, đọc thật bằng `docker pull` 2026-10-17. ⚠️ Mount docker.sock = quyền root trên VM:
+  # container này không publish cổng nào và không nhận đầu vào từ mạng — giữ nguyên như vậy.
+  autoheal:
+    image: willfarrell/autoheal:1.2.0@sha256:31f580ef0279eaced5b38d631b08c474d70d8403c1c2fdd6ddcf2e879d5f3f7c
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+      AUTOHEAL_INTERVAL: "5"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
 
   prometheus:
     image: prom/prometheus:v3.8.1

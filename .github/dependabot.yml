@@ -16,3 +16,15 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+
+  # Base image của server.Dockerfile đã pin theo digest (README dòng 61, 2026-10-17) — Dependabot giữ
+  # digest không mục. Compose (postgres/redis/prometheus...) cùng thư mục, ecosystem riêng.
+  - package-ecosystem: "docker"
+    directory: "/deploy/docker"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "docker-compose"
+    directory: "/deploy/docker"
+    schedule:
+      interval: "weekly"
