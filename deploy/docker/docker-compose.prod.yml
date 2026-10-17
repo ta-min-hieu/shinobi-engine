@@ -42,7 +42,7 @@
 # lệnh trên luôn chạy TAY bởi người, không có bước CI nào gọi tới `up -d` này.
 services:
   postgres:
-    image: postgres:17
+    image: postgres:18
     restart: unless-stopped
     environment:
       POSTGRES_DB: kage
