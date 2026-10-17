@@ -27,7 +27,7 @@ dependencies {
     implementation(project(":server:server-world"))
     implementation(project(":server:server-database"))
     implementation(project(":engine:engine-scripting"))
-    implementation("io.netty:netty-all:4.1.136.Final")
+    implementation("io.netty:netty-all:4.2.19.Final")
     implementation("org.slf4j:slf4j-api:2.0.18")
     // Metrics (ADR-015) — MODULE DUY NHẤT được import io.micrometer.* (server-world dùng qua
     // TickMetricsPort, cùng lý do chỉ gateway biết Netty).
