@@ -159,7 +159,7 @@ class OldArchiveDuelBalanceTest {
      * trận tay đôi chỉ đúng khi người chơi thật sự đánh MỘT con.
      */
     @Test
-    @DisplayName("Hai điểm spawn thạch vệ (-20, -33) đủ xa nhau và đủ xa mọi hàng xóm CÓ AGGRO")
+    @DisplayName("Hai điểm spawn thạch vệ (-20, -36 — V57) đủ xa nhau và đủ xa mọi hàng xóm CÓ AGGRO")
     void theNewArchiveSpawnsKeepTheDuelOneOnOne() {
         float aggroRadiusMeters = 6f; // mặc định V25, thạch vệ giữ nguyên
         float combinedReach = aggroRadiusMeters + aggroRadiusMeters;
@@ -170,10 +170,10 @@ class OldArchiveDuelBalanceTest {
         // Hoành vốn đã nói từ đầu. Test này giữ nguyên tên mà không đổi số suốt một ngày: nó VẪN
         // XANH vì ba phép trừ kia là số học thuần, chỉ có điều chúng không còn nói về thế giới thật.
         // Đó là dạng mục ruỗng khó thấy nhất — test xanh mô tả một bản đồ không còn tồn tại.
-        assertThat(Math.abs(-20f - -33f)).isGreaterThan(combinedReach);
+        assertThat(Math.abs(-20f - -36f)).isGreaterThan(combinedReach);
         // Hàng xóm CÓ AGGRO gần nhất về hai phía: sân khảo hạch @-47 (V33) và tán tu @21 (V29).
         // Mộc nhân @8/@14 không tính — aggro 0, chúng không bao giờ tự đánh ai.
-        assertThat(Math.abs(-33f - -47f)).isGreaterThan(combinedReach);
+        assertThat(Math.abs(-36f - -52f)).isGreaterThan(combinedReach);
         assertThat(Math.abs(-20f - 21f)).isGreaterThan(combinedReach);
     }
 

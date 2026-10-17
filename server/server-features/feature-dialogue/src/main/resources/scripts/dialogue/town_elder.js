@@ -26,11 +26,17 @@
 //
 // CÂU CHÀO THEO VIỆC ĐANG DỞ (dòng 65(c), chủ dự án duyệt 2026-10-17): mở lời khi `foundation_pill_run`
 // đang làm mà chưa đủ 3 viên đan (`take_item` của script quest) thì ông nhắc, thay vì chào như thường
-// rồi để quest đứng im. ⚠️ Ông KHÔNG biết người chơi đã hạ đủ 2 con thú chưa — đếm đó nằm trong
-// tiến độ RIÊNG của quest, và hội thoại chỉ được đọc trạng thái quest + túi đồ (DialogueFacts).
+// rồi để quest đứng im. Đủ đan mà chưa hạ đủ 2 Yêu Nhân thì ông nói đúng chỗ thiếu đó — đọc
+// `felled` từ tiến độ RIÊNG của script quest (`ctx.quest_progress`, chỉ đọc). Hình dạng
+// `{felled, delivered}` là của foundation_pill_run.js: đổi bên đó thì đổi cả đây.
 var greetingKey = "dialogue.town_elder.greeting";
-if (ctx.quest_status("foundation_pill_run") === "IN_PROGRESS" && ctx.item_count("minor_healing_pill") < 3) {
-    greetingKey = "dialogue.town_elder.greeting_pills_missing";
+if (ctx.quest_status("foundation_pill_run") === "IN_PROGRESS") {
+    var pillRun = JSON.parse(ctx.quest_progress("foundation_pill_run"));
+    if (ctx.item_count("minor_healing_pill") < 3) {
+        greetingKey = "dialogue.town_elder.greeting_pills_missing";
+    } else if ((pillRun.felled || 0) < 2) {
+        greetingKey = "dialogue.town_elder.greeting_beasts_missing";
+    }
 }
 ({
     start: {

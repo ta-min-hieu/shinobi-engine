@@ -270,7 +270,7 @@ class FoundationTrialBalanceTest {
      * khi người chơi thật sự đánh MỘT con.
      */
     @Test
-    @DisplayName("Ba điểm spawn mới (175/188/201) thoả cả hai luật giãn")
+    @DisplayName("Ba điểm spawn (184/200/216 — V57) thoả cả hai luật giãn")
     void theWastelandEdgeIsAQuietPlaceToFightIn() {
         // Hàng xóm phía tây là quỷ đá @161 — vẫn giữ aggro 6 mặc định V25, tức con KHÓ TÍNH nhất.
         float ogreAggroRadiusMeters = 6f;
@@ -279,12 +279,12 @@ class FoundationTrialBalanceTest {
         float meleeAttackRangeMeters = 2f;
         float leashReach = leashRadiusMeters + meleeAttackRangeMeters;
 
-        assertThat(Math.abs(175f - 161f)).isGreaterThan(ogreAggroRadiusMeters + newSpeciesAggroRadiusMeters);
-        assertThat(Math.abs(188f - 175f)).isGreaterThan(newSpeciesAggroRadiusMeters + newSpeciesAggroRadiusMeters);
-        assertThat(Math.abs(201f - 188f)).isGreaterThan(newSpeciesAggroRadiusMeters + newSpeciesAggroRadiusMeters);
+        assertThat(Math.abs(184f - 168f)).isGreaterThan(ogreAggroRadiusMeters + newSpeciesAggroRadiusMeters);
+        assertThat(Math.abs(200f - 184f)).isGreaterThan(newSpeciesAggroRadiusMeters + newSpeciesAggroRadiusMeters);
+        assertThat(Math.abs(216f - 200f)).isGreaterThan(newSpeciesAggroRadiusMeters + newSpeciesAggroRadiusMeters);
 
-        assertThat(Math.abs(175f - 161f)).isGreaterThan(leashReach);
-        assertThat(Math.abs(188f - 175f)).isGreaterThan(leashReach);
-        assertThat(Math.abs(201f - 188f)).isGreaterThan(leashReach);
+        assertThat(Math.abs(184f - 168f)).isGreaterThan(leashReach);
+        assertThat(Math.abs(200f - 184f)).isGreaterThan(leashReach);
+        assertThat(Math.abs(216f - 200f)).isGreaterThan(leashReach);
     }
 }

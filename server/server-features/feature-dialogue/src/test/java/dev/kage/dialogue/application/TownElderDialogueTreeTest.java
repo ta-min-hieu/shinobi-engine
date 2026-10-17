@@ -2,6 +2,7 @@ package dev.kage.dialogue.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
@@ -308,10 +309,38 @@ class TownElderDialogueTreeTest {
         assertThat(useCase.execute(
                                 NPC_CODE,
                                 DialogueNode.START_NODE_ID,
-                                FixedDialogueFacts.questInProgress("foundation_pill_run", "minor_healing_pill", 3))
+                                new FixedDialogueFacts.WithProgress(
+                                        FixedDialogueFacts.questInProgress(
+                                                "foundation_pill_run", "minor_healing_pill", 3),
+                                        Map.of("foundation_pill_run", "{\"felled\":2,\"delivered\":false}")))
                         .orElseThrow()
                         .textKey())
                 .isEqualTo("dialogue.town_elder.greeting");
+    }
+
+    /** Đủ đan nhưng tiến độ quest còn {@code felled < 2}: ông nhắc chuyện hạ thú, không nhắc đan. */
+    @Test
+    @DisplayName("Đủ 3 viên đan mà mới hạ 1 Yêu Nhân: câu chào nhắc chuyện hạ thú")
+    void greetingRemindsAboutTheBeastsOnceThePillsAreThere() {
+        FixedDialogueFacts pills = FixedDialogueFacts.questInProgress("foundation_pill_run", "minor_healing_pill", 3);
+
+        String oneFelled = useCase.execute(
+                        NPC_CODE,
+                        DialogueNode.START_NODE_ID,
+                        new FixedDialogueFacts.WithProgress(
+                                pills, Map.of("foundation_pill_run", "{\"felled\":1,\"delivered\":false}")))
+                .orElseThrow()
+                .textKey();
+        String twoFelled = useCase.execute(
+                        NPC_CODE,
+                        DialogueNode.START_NODE_ID,
+                        new FixedDialogueFacts.WithProgress(
+                                pills, Map.of("foundation_pill_run", "{\"felled\":2,\"delivered\":false}")))
+                .orElseThrow()
+                .textKey();
+
+        assertThat(oneFelled).isEqualTo("dialogue.town_elder.greeting_beasts_missing");
+        assertThat(twoFelled).isEqualTo("dialogue.town_elder.greeting");
     }
 
     private DialogueNode node(String nodeId) {

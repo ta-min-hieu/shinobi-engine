@@ -1,6 +1,8 @@
 package dev.kage.quest.application;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import dev.kage.quest.domain.QuestLogEntry;
 import dev.kage.quest.domain.QuestProgressPort;
@@ -25,5 +27,17 @@ public final class ListQuestsUseCase {
     /** GỒM CẢ quest đã {@code CLAIMED} — xem {@link QuestProgressPort#listLog} vì sao không lọc. */
     public List<QuestLogEntry> execute(long characterId) {
         return progressPort.listLog(characterId);
+    }
+
+    /**
+     * {@code questCode → progress_json} của mọi quest ĐANG LÀM (dòng 65(c) mở rộng, 2026-10-17) — cho
+     * script hội thoại đọc, CHỈ ĐỌC. Chuỗi vẫn đục với Java: không parse, không kiểm.
+     */
+    public Map<String, String> inProgressJson(long characterId) {
+        Map<String, String> progressByCode = new HashMap<>();
+        for (QuestProgressPort.ActiveQuest active : progressPort.listInProgress(characterId)) {
+            progressByCode.put(active.questCode(), active.progressJson());
+        }
+        return progressByCode;
     }
 }

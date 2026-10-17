@@ -11,7 +11,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import javax.sql.DataSource;
 
@@ -267,34 +266,34 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         assertThat(spawns)
                 .extracting(MonsterSpawnPoint::posX)
                 .containsExactlyInAnyOrder(
-                        -49f, // V56 dời -47 → -49 (vế tuần tra, dòng 64(b))
-                        -33f,
+                        -52f, // V56/V57 dời -47 → -52 (vế tuần tra, dòng 64(b))
+                        -36f, // V57 dời -33 → -36
                         -20f,
                         -8f,
                         8f,
                         14f,
                         21f,
-                        34f,
-                        50f, // V56 dời 47 → 50
-                        66f,
+                        37f, // V57 dời 34 → 37
+                        53f, // V56/V57 dời 47 → 53
+                        69f, // V57 dời 66 → 69
                         93f,
                         // V47 — quãng Lv22–27 của arc 2: hai tế đồ Huyết Sa và một đàn chủ ở
                         // vùng mạch chết phía đông. `DemoPlatforms.GROUND_MAX_X` đi 115 → 170
                         // cùng đợt.
                         120f,
-                        134f,
-                        148f,
+                        136f, // V57 dời 134 → 136
+                        152f, // V57 dời 148 → 152
                         // Và V47 dời quỷ đá LẦN THỨ BA, 106 → 161: playtest đo được nó lấy 27 máu
                         // mỗi lượt người chơi đi từ khe nghỉ @80 ra mạch chết @120, kéo biên trận
                         // tế đồ từ +2 xuống +1. Nay nó đứng SAU đàn chủ, vẫn săn được, không chắn
                         // đường ai. Cùng nước đi V40 (47→80) và V45 (80→106) đã làm.
-                        161f,
+                        168f, // V57 dời 161 → 168
                         // V48 — quãng Lv28–36, nhịp ĐÓNG arc 2 và là nội dung cuối của v1: hai yêu
                         // thú rìa Hoang Vực @175/@188 và cỗ khảo hạch Trúc Cơ @201.
                         // `DemoPlatforms.GROUND_MAX_X` đi 170 → 210 cùng đợt (lần thứ TƯ).
-                        175f,
-                        188f,
-                        201f);
+                        184f, // V57 dời 175 → 184
+                        200f, // V57 dời 188 → 200
+                        216f); // V57 dời 201 → 216 — GROUND_MAX_X 210 → 225
     }
 
     /**
@@ -309,42 +308,21 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
      * đuổi tới x=57 và <b>ra đòn kết liễu</b> trong lúc người chơi đánh thạch vệ. Luật cũ không
      * thấy gì vì 13m &gt; 12m tổng aggro.
      *
+     * <p><b>Vế TUẦN TRA (dòng 64(b), chủ dự án duyệt 2026-10-17).</b> Con đang bị đánh không đứng yên ở
+     * điểm spawn: nó đi tuần tới {@code patrolRadiusMeters} và người chơi đánh theo. Kiểm sống toàn chuỗi
+     * 2026-10-04 đo được: cỗ khảo hạch @−47 bị đánh ở −41…−43 thì thạch vệ @−33 (cách 14m &gt; 12m)
+     * vẫn đuổi tới ⇒ 2/2 chết. Luật nay là {@code |A−B| > patrol(A) + leash(B) + tầm đánh}; V56 sửa hai
+     * trận tay đôi bắt buộc, V57 giãn cả trục (16 cặp từng vi phạm).
      */
     @Test
     void shouldLeaveEveryAggroSpawnAQuietPlaceToFightIn() {
-        assertThat(quietFightViolations(false, null))
+        assertThat(quietFightViolations())
                 .as("cặp spawn vi phạm luật chỗ đánh yên tĩnh")
                 .isEmpty();
     }
 
-    /**
-     * Vế TUẦN TRA (dòng 64(b), chủ dự án duyệt 2026-10-17, V56). Con đang bị đánh không đứng yên ở
-     * điểm spawn: nó đi tuần tới {@code patrolRadiusMeters} và người chơi đánh theo. Kiểm sống toàn chuỗi
-     * 2026-10-04 đo được: cỗ khảo hạch @−47 bị đánh ở −41…−43 thì thạch vệ @−33 (cách 14m &gt; 12m của
-     * luật trên) vẫn đuổi tới ⇒ 2/2 chết; đoạt mạch @47 với tán tu @34 y hệt. Luật ở đây là
-     * {@code |A−B| > patrol(A) + leash(B) + tầm đánh}.
-     *
-     * <p>⚠️ CHỈ áp cho {@link #QUEST_DUEL_CODES} — hai trận tay đôi BẮT BUỘC đã đo được chết vì đúng vế
-     * này. Áp cho mọi cặp thì 16 cặp trên trục chính vi phạm (trục dựng theo khe 13–14m của luật
-     * 12m), tức phải giãn lại cả trục — việc đó chờ chủ dự án (docs/README.md dòng 64(b)).
-     */
-    @Test
-    void shouldLeaveTheQuestDuelsRoomForPatrol() {
-        assertThat(quietFightViolations(true, QUEST_DUEL_CODES))
-                .as("trận tay đôi bắt buộc mà con bên cạnh đuổi tới được khi tính cả tuần tra")
-                .isEmpty();
-    }
-
-    /** Hai trận tay đôi bắt buộc mà V56 giãn theo vế tuần tra — quest 4 và quest 10. */
-    private static final Set<String> QUEST_DUEL_CODES = Set.of("trial_construct", "vein_raider");
-
-    /**
-     * Mọi cặp (đang đánh A, con bên cạnh B) mà B đuổi tới nơi được.
-     *
-     * @param countPatrol cộng {@code patrol(A)} vào tầm với của B
-     * @param standingCodes chỉ xét A thuộc tập này; {@code null} = mọi loài có aggro
-     */
-    private List<String> quietFightViolations(boolean countPatrol, Set<String> standingCodes) {
+    /** Mọi cặp (đang đánh A, con bên cạnh B) mà B đuổi tới nơi được — xem javadoc ô test trên. */
+    private List<String> quietFightViolations() {
         PostgresMonsterCatalogAdapter adapter = new PostgresMonsterCatalogAdapter(dataSource);
         Map<String, MonsterTemplate> templateByCode = new HashMap<>();
         for (MonsterTemplate template : adapter.listTemplates()) {
@@ -357,16 +335,9 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         assertThat(aggressive).as("điểm spawn có aggro").isNotEmpty();
 
         List<String> violations = new ArrayList<>();
-        int standingChecked = 0;
         for (int i = 0; i < aggressive.size(); i++) {
             MonsterSpawnPoint standing = aggressive.get(i);
-            if (standingCodes != null && !standingCodes.contains(standing.monsterCode())) {
-                continue;
-            }
-            standingChecked++;
-            float patrol = countPatrol
-                    ? templateByCode.get(standing.monsterCode()).aiParams().patrolRadiusMeters()
-                    : 0f;
+            float patrol = templateByCode.get(standing.monsterCode()).aiParams().patrolRadiusMeters();
             for (int j = 0; j < aggressive.size(); j++) {
                 if (i == j) {
                     continue; // so bằng CHỈ SỐ, không bằng tham chiếu — hai điểm spawn có thể bằng nhau về giá trị
@@ -390,7 +361,6 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
                 }
             }
         }
-        assertThat(standingChecked).as("số điểm spawn đã soi").isPositive();
         return violations;
     }
 

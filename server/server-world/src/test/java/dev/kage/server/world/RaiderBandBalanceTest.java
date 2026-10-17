@@ -214,15 +214,15 @@ class RaiderBandBalanceTest {
 
         // Hàng xóm hai phía của sào huyệt: thám tử @66 và — sau khi V47 dời quỷ đá 106 → 161 —
         // tế đồ Huyết Sa @120. Vẫn soi theo cận trên 6 chứ không theo aggro 3 thật của tế đồ.
-        assertThat(Math.abs(93f - 66f)).isGreaterThan(combinedReach);
+        assertThat(Math.abs(93f - 69f)).isGreaterThan(combinedReach);
         assertThat(Math.abs(120f - 93f)).isGreaterThan(combinedReach);
-        assertThat(Math.abs(93f - 66f)).isGreaterThan(leashReach);
+        assertThat(Math.abs(93f - 69f)).isGreaterThan(leashReach);
         assertThat(Math.abs(120f - 93f)).isGreaterThan(leashReach);
 
         // Khe nghỉ ở x≈80: ngoài tầm aggro của CẢ thám tử lẫn đầu lĩnh, nên hồi máu được.
         // Vẫn soi theo 6 (thám tử) chứ không theo 3 của đầu lĩnh sau V46 — khe chỉ yên tĩnh khi
         // con KHÓ TÍNH nhất cũng không với tới.
-        assertThat(Math.abs(80f - 66f)).isGreaterThan(neighbourAggroRadiusMeters);
+        assertThat(Math.abs(80f - 69f)).isGreaterThan(neighbourAggroRadiusMeters);
         assertThat(Math.abs(93f - 80f)).isGreaterThan(neighbourAggroRadiusMeters);
     }
 

@@ -177,16 +177,16 @@ class AwakeningTrialBalanceTest {
      * code); ô này giữ PHÉP TÍNH cạnh phép tính cân bằng, vì hai thứ đó phải đọc cùng nhau: trận
      * tay đôi chỉ đúng khi người chơi thật sự đánh MỘT con.
      *
-     * <p>Ba luật, cùng một cặp hàng xóm: sân khảo hạch @-49 (V56 dời từ -47) và thạch vệ gần nhất @-33.
+     * <p>Ba luật, cùng một cặp hàng xóm: sân khảo hạch @-52 (V56/V57 dời từ -47) và thạch vệ gần nhất @-36.
      */
     @Test
-    @DisplayName("Sân khảo hạch (-49, V56) đủ xa thạch vệ (-33) theo CẢ BA luật hình học")
+    @DisplayName("Sân khảo hạch (-52, V57) đủ xa thạch vệ (-36) theo CẢ BA luật hình học")
     void theTrialGroundIsAQuietPlaceToFightIn() {
         float aggroRadiusMeters = 6f; // mặc định V25, cả hai loài giữ nguyên
         float leashRadiusMeters = 10f;
         float meleeAttackRangeMeters = 2f;
         float patrolRadiusMeters = 3f; // mặc định V25
-        float distanceToNearestWarden = Math.abs(-49f - -33f);
+        float distanceToNearestWarden = Math.abs(-52f - -36f);
 
         assertThat(distanceToNearestWarden).isEqualTo(16f);
         // V29 — đi ngang không kéo được hai con cùng lúc.

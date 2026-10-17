@@ -85,8 +85,12 @@ public final class GetDialogueNodeUseCase {
      */
     private static Map<String, Object> contextOf(DialogueFacts facts) {
         return Map.of(
-                "quest_status", (ProxyExecutable) args -> facts.questStatus(requireCode("quest_status", args)),
-                "item_count", (ProxyExecutable) args -> facts.itemCount(requireCode("item_count", args)));
+                "quest_status",
+                (ProxyExecutable) args -> facts.questStatus(requireCode("quest_status", args)),
+                "item_count",
+                (ProxyExecutable) args -> facts.itemCount(requireCode("item_count", args)),
+                "quest_progress",
+                (ProxyExecutable) args -> facts.questProgressJson(requireCode("quest_progress", args)));
     }
 
     private static String requireCode(String function, Value... args) {

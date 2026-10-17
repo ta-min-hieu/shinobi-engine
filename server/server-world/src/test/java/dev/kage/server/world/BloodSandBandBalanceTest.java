@@ -183,7 +183,7 @@ class BloodSandBandBalanceTest {
      * tính cạnh phép tính cân bằng, vì trận tay đôi chỉ đúng khi người chơi thật sự đánh MỘT con.
      */
     @Test
-    @DisplayName("Ba điểm mạch chết (120/134/148) thoả cả hai luật giãn")
+    @DisplayName("Ba điểm mạch chết (120/136/152 — V57) thoả cả hai luật giãn")
     void theDeadVeinIsAQuietPlaceToFightIn() {
         // Sau khi V47 dời quỷ đá 106 → 161, hàng xóm hai ĐẦU của vùng mạch chết đổi chỗ cho nhau:
         // phía tây là đầu lĩnh @93 (aggro 3 sau V46), phía đông là chính quỷ đá @161 (aggro 6).
@@ -194,25 +194,25 @@ class BloodSandBandBalanceTest {
         float leashReach = leashRadiusMeters + meleeAttackRangeMeters;
 
         assertThat(Math.abs(120f - 93f)).isGreaterThan(bandAggroRadiusMeters + bandAggroRadiusMeters);
-        assertThat(Math.abs(134f - 120f)).isGreaterThan(bandAggroRadiusMeters + bandAggroRadiusMeters);
-        assertThat(Math.abs(148f - 134f)).isGreaterThan(bandAggroRadiusMeters + bandAggroRadiusMeters);
-        assertThat(Math.abs(161f - 148f)).isGreaterThan(ogreAggroRadiusMeters + bandAggroRadiusMeters);
+        assertThat(Math.abs(136f - 120f)).isGreaterThan(bandAggroRadiusMeters + bandAggroRadiusMeters);
+        assertThat(Math.abs(152f - 136f)).isGreaterThan(bandAggroRadiusMeters + bandAggroRadiusMeters);
+        assertThat(Math.abs(168f - 152f)).isGreaterThan(ogreAggroRadiusMeters + bandAggroRadiusMeters);
 
         assertThat(Math.abs(120f - 93f)).isGreaterThan(leashReach);
-        assertThat(Math.abs(134f - 120f)).isGreaterThan(leashReach);
-        assertThat(Math.abs(148f - 134f)).isGreaterThan(leashReach);
-        assertThat(Math.abs(161f - 148f)).isGreaterThan(leashReach);
+        assertThat(Math.abs(136f - 120f)).isGreaterThan(leashReach);
+        assertThat(Math.abs(152f - 136f)).isGreaterThan(leashReach);
+        assertThat(Math.abs(168f - 152f)).isGreaterThan(leashReach);
     }
 
     /** Nền đất phải phủ hết điểm xa nhất — hằng số client, spawn ở DB, nên hai thứ đi cùng lượt. */
     @Test
-    @DisplayName("Nền đất nới 170 → 210 phủ hết cỗ khảo hạch @201 và còn biên 9m")
+    @DisplayName("Nền đất nới 210 → 225 (V57) phủ hết cỗ khảo hạch @216 và còn biên 9m")
     void theGroundStripShouldCoverTheFurthestSpawn() {
         // Điểm xa nhất đổi lần nữa: V48 đặt cỗ khảo hạch Trúc Cơ ở @201, vượt qua quỷ đá @161.
         // Ô này CỐ Ý soi điểm xa nhất TOÀN trục chứ không soi riêng lát cắt nào — luật "nền đất
         // phải phủ hết spawn" từng bị vi phạm trong im lặng hai lần trước khi có nó.
-        float groundMaxX = 210f;
-        float furthestSpawnX = 201f;
+        float groundMaxX = 225f;
+        float furthestSpawnX = 216f; // V57 dời 201 → 216
 
         assertThat(groundMaxX).isGreaterThan(furthestSpawnX);
         assertThat(groundMaxX - furthestSpawnX).isEqualTo(9f);

@@ -1,6 +1,7 @@
 package dev.kage.quest.api;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
@@ -152,6 +153,14 @@ public final class QuestFacade {
      */
     public List<QuestLogEntry> listQuests(long characterId) {
         return listQuestsUseCase.execute(characterId);
+    }
+
+    /**
+     * Tiến độ ĐỤC ({@code progress_json}) của các quest đang làm, theo mã quest — chỉ để script hội
+     * thoại đọc (gateway {@code CharacterDialogueFacts}). Quest không đang làm thì không có khoá.
+     */
+    public Map<String, String> inProgressJson(long characterId) {
+        return listQuestsUseCase.inProgressJson(characterId);
     }
 
     /** Kết quả nhận quest. */

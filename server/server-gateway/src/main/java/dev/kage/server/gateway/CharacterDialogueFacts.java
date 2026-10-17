@@ -27,6 +27,7 @@ final class CharacterDialogueFacts implements DialogueFacts {
 
     private Map<String, String> questStatuses;
     private Map<String, Integer> itemCounts;
+    private Map<String, String> questProgress;
 
     CharacterDialogueFacts(long characterId, QuestFacade questFacade, InventoryFacade inventoryFacade) {
         this.characterId = characterId;
@@ -51,6 +52,14 @@ final class CharacterDialogueFacts implements DialogueFacts {
             itemCounts = countByCode();
         }
         return itemCounts.getOrDefault(itemTemplateCode, 0);
+    }
+
+    @Override
+    public String questProgressJson(String questCode) {
+        if (questProgress == null) {
+            questProgress = questFacade.inProgressJson(characterId);
+        }
+        return questProgress.getOrDefault(questCode, NO_PROGRESS);
     }
 
     private Map<String, Integer> countByCode() {

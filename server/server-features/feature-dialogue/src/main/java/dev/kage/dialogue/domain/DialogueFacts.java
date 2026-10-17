@@ -28,7 +28,15 @@ public interface DialogueFacts {
         public int itemCount(String itemTemplateCode) {
             return 0;
         }
+
+        @Override
+        public String questProgressJson(String questCode) {
+            return NO_PROGRESS;
+        }
     };
+
+    /** Tiến độ của quest không đang làm — một object JSON rỗng, để {@code JSON.parse} không bao giờ ném. */
+    String NO_PROGRESS = "{}";
 
     /**
      * {@code ctx.quest_status(code)}: {@link #NOT_ACCEPTED}, hoặc tên một giá trị {@code QuestStatus}
@@ -38,4 +46,11 @@ public interface DialogueFacts {
 
     /** {@code ctx.item_count(code)}: tổng số lượng món mang mã này đang nằm trong túi. */
     int itemCount(String itemTemplateCode);
+
+    /**
+     * {@code ctx.quest_progress(code)}: chuỗi {@code progress_json} do script QUEST tự ghi, nếu quest đang
+     * làm; {@link #NO_PROGRESS} nếu không. Script hội thoại tự {@code JSON.parse} — và phải biết đúng hình
+     * dạng mà script quest kia ghi (vd {@code {felled: 1, delivered: false}}).
+     */
+    String questProgressJson(String questCode);
 }

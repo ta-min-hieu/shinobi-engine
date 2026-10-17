@@ -72,9 +72,9 @@ class SpawnGeometryIntegrationTest {
      * NHAU (xem {@code verifyDemoPlatformsMatch} trong {@code client-core/build.gradle.kts} cho vế
      * đó, nếu đã thêm).
      */
-    private static final float GROUND_MIN_X = -55f;
+    private static final float GROUND_MIN_X = -61f; // V57 nới -55 → -61
 
-    private static final float GROUND_MAX_X = 210f;
+    private static final float GROUND_MAX_X = 225f; // V57 nới 210 → 225
 
     @Container
     static final PostgreSQLContainer POSTGRES =
@@ -122,11 +122,11 @@ class SpawnGeometryIntegrationTest {
     /**
      * Dải nền đất minh hoạ ở client-core phải phủ hết mọi điểm spawn — một bất biến bị vi phạm
      * trong im lặng BỐN lần trước khi ai viết ra một test (xem javadoc {@code GROUND_MAX_X} ở
-     * {@code DemoPlatforms}). Không có gì trong DB hay compiler nối {@code [-55, 210]} với
+     * {@code DemoPlatforms}). Không có gì trong DB hay compiler nối {@code [-61, 225]} với
      * {@code monster_spawn}/{@code npc_spawn}; hàng rào duy nhất là ô này.
      */
     @Test
-    @DisplayName("Mọi điểm spawn (NPC lẫn quái) nằm trong dải nền đất minh hoạ [-55, 210]")
+    @DisplayName("Mọi điểm spawn (NPC lẫn quái) nằm trong dải nền đất minh hoạ [-61, 225]")
     void everySpawnFallsWithinTheGroundStrip() {
         List<Spawn> spawns = new ArrayList<Spawn>();
         spawns.addAll(readSpawns("SELECT t.code, s.pos_x FROM npc_spawn s"

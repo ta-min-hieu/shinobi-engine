@@ -63,7 +63,8 @@ final class DemoPlatforms {
      * và chủ dự án chọn nới về đông thay vì dựng hầm ngục thứ hai (hiện chỉ có MỘT hầm ngục
      * hardcode trong Java) — xem ROADMAP mục 73.
      */
-    private static final float GROUND_MIN_X = -55f;
+    // V57 (2026-10-17) nới -55 → -61: cỗ khảo hạch dời về -52 khi giãn cả trục theo vế tuần tra, biên 9m.
+    private static final float GROUND_MIN_X = -61f;
 
     /**
      * <b>Đầu đông nới 170 → 210 (2026-09-16, V48).</b> Lần thứ TƯ, và là lần cuối của v1: V48 mở
@@ -92,7 +93,8 @@ final class DemoPlatforms {
      * ở {@code x = 93} và DỜI quỷ đá {@code 80 → 106} để dọn đường đông (nó là con đánh đau nhất
      * trục chơi, atk 40, và V40 đã phải dời nó một lần rồi vì đúng chuyện đó).
      */
-    private static final float GROUND_MAX_X = 210f;
+    // V57 (2026-10-17) nới 210 → 225: cỗ khảo hạch Trúc Cơ dời 201 → 216, biên 9m (lần thứ NĂM — xem cảnh báo trên).
+    private static final float GROUND_MAX_X = 225f;
 
     private DemoPlatforms() {}
 

@@ -20,4 +20,29 @@ record FixedDialogueFacts(Map<String, String> questStatuses, Map<String, Integer
     public int itemCount(String itemTemplateCode) {
         return itemCounts.getOrDefault(itemTemplateCode, 0);
     }
+
+    /** Fixture chưa cần tiến độ thì trả như chưa làm; xem {@link WithProgress}. */
+    @Override
+    public String questProgressJson(String questCode) {
+        return NO_PROGRESS;
+    }
+
+    /** {@link FixedDialogueFacts} kèm tiến độ quest cố định. */
+    record WithProgress(FixedDialogueFacts base, Map<String, String> progressJsonByCode) implements DialogueFacts {
+
+        @Override
+        public String questStatus(String questCode) {
+            return base.questStatus(questCode);
+        }
+
+        @Override
+        public int itemCount(String itemTemplateCode) {
+            return base.itemCount(itemTemplateCode);
+        }
+
+        @Override
+        public String questProgressJson(String questCode) {
+            return progressJsonByCode.getOrDefault(questCode, NO_PROGRESS);
+        }
+    }
 }
