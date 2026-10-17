@@ -54,11 +54,11 @@ class AwakeningTrialBalanceTest {
     /** `monster_template` hàng `trial_construct` (seed V33) — nguồn duy nhất của ba số này. */
     private static final int CONSTRUCT_HP = 130;
 
-    private static final int CONSTRUCT_ATK = 15;
+    private static final int CONSTRUCT_ATK = 12; // V58: 15 → 12 (luật biên thật)
     private static final int CONSTRUCT_DEF = 10;
 
     /** `monster_template` hàng `archive_warden` (seed V30) — loài của quest 3, mốc so sánh. */
-    private static final int WARDEN_ATK = 26;
+    private static final int WARDEN_ATK = 19; // V58: 26 → 19
 
     private static final int WARDEN_HP = 120;
 
@@ -82,7 +82,7 @@ class AwakeningTrialBalanceTest {
     }
 
     @Test
-    @DisplayName("Tới nơi với 78 máu vẫn THẮNG — 4 nhát so với 7, biên 3 nhát")
+    @DisplayName("Tới nơi với 78 máu vẫn THẮNG — 4 nhát so với 9, biên 5 nhát (V58)")
     void gearedNoviceShouldWinTheTrialEvenAfterTheWalk() {
         CombatConstants.CombatStats player = novice();
 
@@ -95,7 +95,7 @@ class AwakeningTrialBalanceTest {
         // Hai bên chung nhịp đánh (CombatConstants.ATTACK_INTERVAL_SECONDS = 1 đòn/giây), nên "ít
         // nhát hơn" cũng chính là "chết sau".
         assertThat(playerHitsFor).isEqualTo(4);
-        assertThat(constructHitsFor).isEqualTo(7);
+        assertThat(constructHitsFor).isEqualTo(9);
     }
 
     /**
@@ -124,8 +124,8 @@ class AwakeningTrialBalanceTest {
         int archiveMargin =
                 hitsToKill(playerHp, hit(WARDEN_ATK, playerDef)) - hitsToKill(WARDEN_HP, hit(playerAtk, 14));
 
-        assertThat(trialMargin).isEqualTo(3);
-        assertThat(archiveMargin).isEqualTo(3);
+        assertThat(trialMargin).isEqualTo(5);
+        assertThat(archiveMargin).isEqualTo(5);
         // Trước máu theo cấp (65(d), +2/cấp) quest 4 rộng hơn hẳn quest 3; nay quest 3
         // (Cấp 5) cũng được thêm 8 máu nên bằng nhau.
         assertThat(trialMargin).isGreaterThanOrEqualTo(archiveMargin);
@@ -137,23 +137,23 @@ class AwakeningTrialBalanceTest {
      * người chơi tay không cũng ăn nhiều sát thương hơn hẳn dọc đường (22/nhát thay vì 20).
      */
     @Test
-    @DisplayName("TAY KHÔNG: thắng sát 1 nhát trên giấy, biên thật −2 — vẫn phải sắm đồ trước")
+    @DisplayName("TAY KHÔNG: thắng 4 nhát trên giấy, biên thật +1 — vẫn dưới luật, phải sắm đồ trước")
     void barehandedNoviceShouldStillFailTheTrial() {
         CombatConstants.CombatStats player = novice();
 
         int barehandedArrivalHp = CombatConstants.characterMaxHp(LEVEL_AT_QUEST_FOUR, 0)
-                - 2 * hit(WARDEN_ATK, player.def()); // 114 - 2×22 = 70
+                - 2 * hit(WARDEN_ATK, player.def()); // 114 - 2×16 = 82 (V58 thạch vệ atk 19)
         int playerHitsFor = hitsToKill(CONSTRUCT_HP, hit(player.atk(), CONSTRUCT_DEF));
         int constructHitsFor = hitsToKill(barehandedArrivalHp, hit(CONSTRUCT_ATK, player.def()));
 
-        assertThat(barehandedArrivalHp).isEqualTo(70);
+        assertThat(barehandedArrivalHp).isEqualTo(82);
         assertThat(playerHitsFor).isEqualTo(5);
-        assertThat(constructHitsFor).isEqualTo(6);
-        // Từ máu theo cấp (65(d), +2/cấp) tay không thắng 1 nhát TRÊN GIẤY — luật biên
-        // thật (DuelMargin) mới là trọng tài:
-        // 1 − phủ đầu 2 − hụt 1 = −2, nên bộ Tạp Dịch vẫn là điều kiện cần.
+        assertThat(constructHitsFor).isEqualTo(9);
+        // Từ máu theo cấp (lô 13) và V58 (lô 14) tay không thắng 4 nhát TRÊN GIẤY — luật biên thật
+        // (DuelMargin) là trọng tài: 4 − phủ đầu 2 − hụt 1 = +1 < +2, nên bộ Tạp Dịch vẫn là điều kiện
+        // cần. Biên chỉ còn đúng MỘT nhát: hạ atk cỗ khảo hạch thêm nữa là cổng này mất.
         int realMargin = constructHitsFor - playerHitsFor - DuelMargin.OPENING_HITS - DuelMargin.DODGE_RESERVE;
-        assertThat(realMargin).isEqualTo(-2).isLessThan(DuelMargin.REQUIRED_REAL_MARGIN);
+        assertThat(realMargin).isEqualTo(1).isLessThan(DuelMargin.REQUIRED_REAL_MARGIN);
     }
 
     /**
@@ -199,8 +199,8 @@ class AwakeningTrialBalanceTest {
     }
 
     /**
-     * 🔴 <b>VI PHẠM luật biên thật (chủ dự án chốt 2026-10-01, {@link DuelMargin}) — CHƯA chỉnh số,
-     * chờ chủ dự án.</b>
+     * ✅ <b>ĐẠT luật biên thật từ V58 (lô 14, chủ dự án duyệt 2026-10-17)</b> — hạ ATK quái, xem bảng ở
+     * đầu file migration. Đoạn dưới là LỊCH SỬ vì sao trước đó không có bộ chỉ số nào đạt.
      *
      * <p>Tới nơi 78 máu (đo thật), bộ Tạp Dịch vs cỗ khảo hạch 130/15/10: ta 4 nhát, nó 7 nhát ⇒
      * biên giấy 3, biên thật 0. Mọi bộ chỉ số đạt luật mà vẫn giữ
@@ -213,7 +213,7 @@ class AwakeningTrialBalanceTest {
      * đối chiếu với luật biên thật thay vì lặng lẽ giữ trận ở dưới ngưỡng.
      */
     @Test
-    @DisplayName("🔴 Luật biên thật: cỗ khảo hạch ĐANG vi phạm — biên thật 0, cần +2 (chờ chủ dự án)")
+    @DisplayName("Luật biên thật: cỗ khảo hạch ĐẠT — biên thật +2 (V58 atk 15 → 12; trước đó 0)")
     void theTrialViolatesTheRealMarginRule() {
         CombatConstants.CombatStats player = novice();
         DuelMargin duel = new DuelMargin(
@@ -224,8 +224,8 @@ class AwakeningTrialBalanceTest {
                 CONSTRUCT_ATK,
                 CONSTRUCT_DEF);
 
-        assertThat(duel.paperMargin()).isEqualTo(3);
-        assertThat(duel.realMargin()).isZero();
-        assertThat(duel.meetsRealMarginRule()).isFalse();
+        assertThat(duel.paperMargin()).isEqualTo(5);
+        assertThat(duel.realMargin()).isEqualTo(2);
+        assertThat(duel.meetsRealMarginRule()).isTrue();
     }
 }

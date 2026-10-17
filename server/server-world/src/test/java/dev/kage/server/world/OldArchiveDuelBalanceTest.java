@@ -43,7 +43,7 @@ class OldArchiveDuelBalanceTest {
     /** `monster_template` hàng `archive_warden` (seed V30) — nguồn duy nhất của ba số này. */
     private static final int WARDEN_HP = 120;
 
-    private static final int WARDEN_ATK = 26;
+    private static final int WARDEN_ATK = 19; // V58: 26 → 19 (luật biên thật)
     private static final int WARDEN_DEF = 14;
 
     /** `monster_template` hàng `wandering_bandit` (seed V23) — mốc so sánh của quest 2. */
@@ -78,7 +78,7 @@ class OldArchiveDuelBalanceTest {
     }
 
     @Test
-    @DisplayName("Mặc trọn bộ Tạp Dịch THẮNG thạch vệ — 4 nhát so với 7")
+    @DisplayName("Mặc trọn bộ Tạp Dịch THẮNG thạch vệ — 4 nhát so với 9 (V58)")
     void gearedNoviceShouldWinTheArchiveDuel() {
         CombatConstants.CombatStats player = novice();
 
@@ -92,12 +92,12 @@ class OldArchiveDuelBalanceTest {
         // Hai bên dùng CHUNG một nhịp đánh (CombatConstants.ATTACK_INTERVAL_SECONDS = 1 đòn/giây),
         // nên "ít nhát hơn" cũng chính là "chết sau" — không cần mô phỏng thời gian.
         assertThat(playerHitsFor).isEqualTo(4);
-        assertThat(wardenHitsFor).isEqualTo(7);
+        assertThat(wardenHitsFor).isEqualTo(9);
         assertThat(playerHitsFor).isLessThan(wardenHitsFor);
     }
 
     @Test
-    @DisplayName("TAY KHÔNG thì hoà 5 với 5 — hoà nghĩa là chết, nên phải sắm đồ trước")
+    @DisplayName("TAY KHÔNG: thắng 2 nhát trên giấy, biên thật −1 — vẫn phải sắm đồ trước")
     void barehandedNoviceShouldNotSurviveTheArchive() {
         CombatConstants.CombatStats player = novice();
 
@@ -108,8 +108,11 @@ class OldArchiveDuelBalanceTest {
         // Cùng nhịp đánh mà cùng số nhát thì người chơi KHÔNG thắng — đây là ranh giới cố ý: quest 2
         // (4 so với 6 tay không) còn qua được tay không, quest 3 thì không.
         assertThat(playerHitsFor).isEqualTo(5);
-        assertThat(wardenHitsFor).isEqualTo(5);
-        assertThat(playerHitsFor).isGreaterThanOrEqualTo(wardenHitsFor);
+        assertThat(wardenHitsFor).isEqualTo(7);
+        // Từ V58 (atk 26 → 19) tay không thắng 2 nhát TRÊN GIẤY; luật biên thật (DuelMargin) là trọng tài:
+        // 2 − phủ đầu 2 − hụt 1 = −1 < +2, nên bộ Tạp Dịch vẫn là điều kiện cần của quest 3.
+        int realMargin = wardenHitsFor - playerHitsFor - DuelMargin.OPENING_HITS - DuelMargin.DODGE_RESERVE;
+        assertThat(realMargin).isEqualTo(-1).isLessThan(DuelMargin.REQUIRED_REAL_MARGIN);
     }
 
     @Test
@@ -178,8 +181,8 @@ class OldArchiveDuelBalanceTest {
     }
 
     /**
-     * 🔴 <b>VI PHẠM luật biên thật (chủ dự án chốt 2026-10-01, {@link DuelMargin}) — CHƯA chỉnh số,
-     * chờ chủ dự án.</b>
+     * ✅ <b>ĐẠT luật biên thật từ V58 (lô 14, chủ dự án duyệt 2026-10-17)</b> — hạ ATK quái, xem bảng ở
+     * đầu file migration. Đoạn dưới là LỊCH SỬ vì sao trước đó không có bộ chỉ số nào đạt.
      *
      * <p>Bộ Tạp Dịch vs thạch vệ 120/26/14: ta 4 nhát, nó 6 nhát ⇒ biên giấy 2, biên thật −1.
      * Quét toàn bộ không gian chỉ số: mọi bộ cho biên thật ≥2 đều làm
@@ -192,8 +195,7 @@ class OldArchiveDuelBalanceTest {
      * đối chiếu với luật biên thật thay vì lặng lẽ giữ trận ở dưới ngưỡng.
      */
     @Test
-    @DisplayName(
-            "🔴 Luật biên thật: thạch vệ ĐANG vi phạm — biên thật 0 (máu theo cấp; trước đó −1), cần +2 (chờ chủ dự án)")
+    @DisplayName("Luật biên thật: thạch vệ ĐẠT — biên thật +2 (V58 atk 26 → 19; trước đó 0)")
     void theArchiveDuelViolatesTheRealMarginRule() {
         CombatConstants.CombatStats player = novice();
         DuelMargin duel = new DuelMargin(
@@ -204,8 +206,8 @@ class OldArchiveDuelBalanceTest {
                 WARDEN_ATK,
                 WARDEN_DEF);
 
-        assertThat(duel.paperMargin()).isEqualTo(3);
-        assertThat(duel.realMargin()).isEqualTo(0);
-        assertThat(duel.meetsRealMarginRule()).isFalse();
+        assertThat(duel.paperMargin()).isEqualTo(5);
+        assertThat(duel.realMargin()).isEqualTo(2);
+        assertThat(duel.meetsRealMarginRule()).isTrue();
     }
 }

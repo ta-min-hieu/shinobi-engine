@@ -47,13 +47,13 @@ class RaiderBandBalanceTest {
     /** `monster_template` hàng `raider_chieftain` (seed V45) — nguồn duy nhất của ba số này. */
     private static final int CHIEFTAIN_HP = 200;
 
-    private static final int CHIEFTAIN_ATK = 30;
+    private static final int CHIEFTAIN_ATK = 26; // V58: 30 → 26 (luật biên thật)
     private static final int CHIEFTAIN_DEF = 18;
 
     /** `monster_template` hàng `vein_raider` (seed V45) — đàn em của hắn, bậc thang ngay dưới. */
     private static final int RAIDER_HP = 130;
 
-    private static final int RAIDER_ATK = 18;
+    private static final int RAIDER_ATK = 15; // V58: 18 → 15
     private static final int RAIDER_DEF = 12;
 
     /** Ba loài đứng dọc đường đông; V45 dời quỷ đá 80 → 106, rồi V47 dời tiếp 106 → 161. */
@@ -104,7 +104,7 @@ class RaiderBandBalanceTest {
     }
 
     @Test
-    @DisplayName("Mặc bộ Ngoại Môn, tới nơi với 139 máu vẫn THẮNG — 4 nhát so với 7, biên 3")
+    @DisplayName("Mặc bộ Ngoại Môn, tới nơi với 141 máu vẫn THẮNG — 4 nhát so với 9, biên 5 (V58)")
     void gearedDiscipleShouldWinTheChieftainDuel() {
         int playerHitsFor = hitsToKill(CHIEFTAIN_HP, hit(playerAtk(), CHIEFTAIN_DEF));
         int chieftainHitsFor = hitsToKill(arrivalHp(), hit(CHIEFTAIN_ATK, playerDef()));
@@ -112,10 +112,10 @@ class RaiderBandBalanceTest {
         // 170 − 2×15 (tán tu) − 12 (đoạt mạch) − 17 (thám tử) = 111. Giáp 50 của bộ Ngoại Môn cắt
         // sát thương đường đi xuống gần một nửa so với bộ Tạp Dịch — đó là nửa còn lại của phần
         // thưởng quest 11, và là lý do quãng đường KHÔNG còn là thứ quyết định trận này.
-        assertThat(arrivalHp()).isEqualTo(139);
+        assertThat(arrivalHp()).isEqualTo(141);
         assertThat(playerHitsFor).isEqualTo(4);
-        assertThat(chieftainHitsFor).isEqualTo(7);
-        assertThat(chieftainHitsFor - playerHitsFor).isEqualTo(3);
+        assertThat(chieftainHitsFor).isEqualTo(9);
+        assertThat(chieftainHitsFor - playerHitsFor).isEqualTo(5);
     }
 
     /**
@@ -125,7 +125,7 @@ class RaiderBandBalanceTest {
      * phần thưởng quest 11 từ "một dòng chữ" thành "điều kiện cần".
      */
     @Test
-    @DisplayName("Mặc bộ Tạp Dịch đi đánh đầu lĩnh thì THUA — nên phần thưởng quest 11 là điều kiện cần")
+    @DisplayName("Bộ Tạp Dịch KHÔNG đủ cho đầu lĩnh — biên thật −2 cả ở máu đầy; thưởng quest 11 là điều kiện cần")
     void theNoviceSetShouldNotBeEnoughForTheChieftain() {
         int noviceAtk = disciple().atk() + NOVICE_SET_ATK;
         int noviceDef = disciple().def() + NOVICE_SET_DEF;
@@ -134,8 +134,10 @@ class RaiderBandBalanceTest {
         int playerHitsFor = hitsToKill(CHIEFTAIN_HP, hit(noviceAtk, CHIEFTAIN_DEF));
         int chieftainHitsFor = hitsToKill(noviceHp, hit(CHIEFTAIN_ATK, noviceDef));
 
-        // Ngay cả trên MÁU ĐẦY (cận trên rộng rãi nhất) người chơi vẫn không thắng nổi.
-        assertThat(playerHitsFor).isGreaterThanOrEqualTo(chieftainHitsFor);
+        // Ngay cả trên MÁU ĐẦY (cận trên rộng rãi nhất): từ V58 (atk 30 → 26) thắng 1 nhát TRÊN GIẤY, nhưng
+        // luật biên thật bác — 1 − phủ đầu 2 − hụt 1 = −2.
+        int realMargin = chieftainHitsFor - playerHitsFor - DuelMargin.OPENING_HITS - DuelMargin.DODGE_RESERVE;
+        assertThat(realMargin).isEqualTo(-2).isLessThan(DuelMargin.REQUIRED_REAL_MARGIN);
     }
 
     /**
@@ -158,14 +160,15 @@ class RaiderBandBalanceTest {
         int afterOneOpener = arrivalHp() - hitTaken;
         int afterTwoOpeners = arrivalHp() - (2 * hitTaken);
 
-        assertThat(hitTaken).isEqualTo(20);
+        assertThat(hitTaken).isEqualTo(17);
         assertThat(playerHitsNeeded).isEqualTo(4);
         // Phủ đầu 1: vẫn còn nhiều nhát hơn số người chơi cần ⇒ thắng.
         assertThat(hitsToKill(afterOneOpener, hitTaken)).isGreaterThan(playerHitsNeeded);
         // Phủ đầu 2: trước máu theo cấp (65(d), +2/cấp) thì hết biên — đúng thứ V46 sinh
         // ra để chặn. Cấp 15 có thêm 28 máu
         // nên nay còn dư đúng một nhát; V46 vẫn đúng (ít phủ đầu hơn = biên rộng hơn), chỉ không còn bắt buộc.
-        assertThat(hitsToKill(afterTwoOpeners, hitTaken)).isEqualTo(playerHitsNeeded + 1);
+        // V58 hạ atk 30 → 26 nên nay dư thêm nữa.
+        assertThat(hitsToKill(afterTwoOpeners, hitTaken)).isGreaterThan(playerHitsNeeded);
     }
 
     /** Đầu lĩnh phải là bậc thang thật trên đàn em của chính hắn, không phải bản phóng to đổi tên. */
@@ -227,8 +230,8 @@ class RaiderBandBalanceTest {
     }
 
     /**
-     * 🔴 <b>VI PHẠM luật biên thật (chủ dự án chốt 2026-10-01, {@link DuelMargin}) — CHƯA chỉnh số,
-     * chờ chủ dự án.</b>
+     * ✅ <b>ĐẠT luật biên thật từ V58 (lô 14, chủ dự án duyệt 2026-10-17)</b> — hạ ATK quái, xem bảng ở
+     * đầu file migration. Đoạn dưới là LỊCH SỬ vì sao trước đó không có bộ chỉ số nào đạt.
      *
      * <p>Tới sào huyệt 111 máu, bộ Ngoại Môn vs đầu lĩnh 200/30/18: ta 4 nhát, nó 6 nhát ⇒ biên giấy
      * 2, biên thật −1. Có bộ chỉ số đạt luật trên bậc thang (vd. hạ {@code atk 30 → 20}), nhưng MỌI
@@ -239,13 +242,13 @@ class RaiderBandBalanceTest {
      * đối chiếu với luật biên thật thay vì lặng lẽ giữ trận ở dưới ngưỡng.
      */
     @Test
-    @DisplayName("🔴 Luật biên thật: đầu lĩnh đoạt mạch ĐANG vi phạm — biên thật 0 (trước máu theo cấp: −1), cần +2")
+    @DisplayName("Luật biên thật: đầu lĩnh đoạt mạch ĐẠT — biên thật +2 (V58 atk 30 → 26; trước đó 0)")
     void theChieftainDuelViolatesTheRealMarginRule() {
         DuelMargin duel =
                 new DuelMargin(playerAtk(), playerDef(), arrivalHp(), CHIEFTAIN_HP, CHIEFTAIN_ATK, CHIEFTAIN_DEF);
 
-        assertThat(duel.paperMargin()).isEqualTo(3);
-        assertThat(duel.realMargin()).isEqualTo(0);
-        assertThat(duel.meetsRealMarginRule()).isFalse();
+        assertThat(duel.paperMargin()).isEqualTo(5);
+        assertThat(duel.realMargin()).isEqualTo(2);
+        assertThat(duel.meetsRealMarginRule()).isTrue();
     }
 }

@@ -44,7 +44,7 @@ class SpiritVeinDuelBalanceTest {
     /** `monster_template` hàng `vein_raider` (seed V45) — nguồn duy nhất của ba số này. */
     private static final int RAIDER_HP = 130;
 
-    private static final int RAIDER_ATK = 18;
+    private static final int RAIDER_ATK = 15; // V58: 18 → 15 (luật biên thật)
     private static final int RAIDER_DEF = 12;
 
     /** `monster_template` hàng `wandering_bandit` (seed V23) — loài đứng dọc đường tới linh mạch. */
@@ -53,7 +53,7 @@ class SpiritVeinDuelBalanceTest {
     /** `monster_template` hàng `trial_construct` (seed V33) — loài của quest 4, bậc thang ngay dưới. */
     private static final int CONSTRUCT_HP = 130;
 
-    private static final int CONSTRUCT_ATK = 15;
+    private static final int CONSTRUCT_ATK = 12; // V58: 15 → 12
     private static final int CONSTRUCT_DEF = 10;
 
     /** Giáp giảm sát thương kiểu LMHT/Liên Quân, đúng công thức {@code CombatConstants#resolveAttack}. */
@@ -122,7 +122,7 @@ class SpiritVeinDuelBalanceTest {
     }
 
     @Test
-    @DisplayName("Tới linh mạch với 102 máu vẫn THẮNG — 4 nhát so với 8, biên 4 nhát")
+    @DisplayName("Tới linh mạch với 102 máu vẫn THẮNG — 4 nhát so với 9, biên 5 nhát (V58)")
     void gearedDiscipleShouldWinTheSpiritVeinDuel() {
         CombatConstants.CombatStats player = outerDisciple();
 
@@ -136,8 +136,8 @@ class SpiritVeinDuelBalanceTest {
         // chính là "chết sau" — không cần mô phỏng thời gian.
         assertThat(arrivalHp()).isEqualTo(102);
         assertThat(playerHitsFor).isEqualTo(4);
-        assertThat(raiderHitsFor).isEqualTo(8);
-        assertThat(raiderHitsFor - playerHitsFor).isEqualTo(4);
+        assertThat(raiderHitsFor).isEqualTo(9);
+        assertThat(raiderHitsFor - playerHitsFor).isEqualTo(5);
     }
 
     /**
@@ -199,7 +199,7 @@ class SpiritVeinDuelBalanceTest {
         int playerHitsNeeded = hitsToKill(RAIDER_HP, hit(playerAtk, RAIDER_DEF));
         int raiderHitsLeft = hitsToKill(hpAtFirstSwing(OPENING_HITS_AFTER_V46), hit(RAIDER_ATK, playerDef));
 
-        assertThat(hpAtFirstSwing(OPENING_HITS_AFTER_V46)).isEqualTo(88);
+        assertThat(hpAtFirstSwing(OPENING_HITS_AFTER_V46)).isEqualTo(90);
         assertThat(playerHitsNeeded).isEqualTo(4);
         assertThat(raiderHitsLeft).isGreaterThan(playerHitsNeeded);
     }
@@ -221,10 +221,11 @@ class SpiritVeinDuelBalanceTest {
         int playerHitsNeeded = hitsToKill(RAIDER_HP, hit(playerAtk, RAIDER_DEF));
         int raiderHitsLeft = hitsToKill(hpAtFirstSwing(2), hit(RAIDER_ATK, playerDef));
 
-        assertThat(hpAtFirstSwing(2)).isEqualTo(74);
+        assertThat(hpAtFirstSwing(2)).isEqualTo(78);
         // Lượt thua 2026-09-13 là với 100 máu nền; từ máu theo cấp (65(d), +2/cấp) Cấp
         // 10 có thêm 18 máu.
-        assertThat(raiderHitsLeft).isEqualTo(playerHitsNeeded + 2);
+        // V58 hạ atk 18 → 15 nên nay dư thêm nữa.
+        assertThat(raiderHitsLeft).isGreaterThan(playerHitsNeeded);
     }
 
     /**
@@ -260,8 +261,8 @@ class SpiritVeinDuelBalanceTest {
     }
 
     /**
-     * 🔴 <b>VI PHẠM luật biên thật (chủ dự án chốt 2026-10-01, {@link DuelMargin}) — CHƯA chỉnh số,
-     * chờ chủ dự án.</b>
+     * ✅ <b>ĐẠT luật biên thật từ V58 (lô 14, chủ dự án duyệt 2026-10-17)</b> — hạ ATK quái, xem bảng ở
+     * đầu file migration. Đoạn dưới là LỊCH SỬ vì sao trước đó không có bộ chỉ số nào đạt.
      *
      * <p>Tới linh mạch 84 máu, bộ Tạp Dịch vs đoạt mạch 130/18/12: ta 4 nhát, nó 6 nhát ⇒ biên giấy
      * 2, biên thật −1. KHÔNG có bộ chỉ số nào đạt luật mà vẫn giữ
@@ -272,7 +273,7 @@ class SpiritVeinDuelBalanceTest {
      * đối chiếu với luật biên thật thay vì lặng lẽ giữ trận ở dưới ngưỡng.
      */
     @Test
-    @DisplayName("🔴 Luật biên thật: đoạt mạch ĐANG vi phạm — biên thật +1 (trước máu theo cấp: −1), cần +2")
+    @DisplayName("Luật biên thật: đoạt mạch ĐẠT — biên thật +2 (V58 atk 18 → 15; trước đó +1)")
     void theSpiritVeinDuelViolatesTheRealMarginRule() {
         CombatConstants.CombatStats player = outerDisciple();
         DuelMargin duel = new DuelMargin(
@@ -283,8 +284,8 @@ class SpiritVeinDuelBalanceTest {
                 RAIDER_ATK,
                 RAIDER_DEF);
 
-        assertThat(duel.paperMargin()).isEqualTo(4);
-        assertThat(duel.realMargin()).isEqualTo(1);
-        assertThat(duel.meetsRealMarginRule()).isFalse();
+        assertThat(duel.paperMargin()).isEqualTo(5);
+        assertThat(duel.realMargin()).isEqualTo(2);
+        assertThat(duel.meetsRealMarginRule()).isTrue();
     }
 }

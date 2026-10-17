@@ -116,8 +116,8 @@ class NightWatchDuelBalanceTest {
     }
 
     /**
-     * 🔴 <b>VI PHẠM luật biên thật (chủ dự án chốt 2026-10-01, {@link DuelMargin}) — CHƯA chỉnh số,
-     * chờ chủ dự án.</b>
+     * ✅ <b>ĐẠT luật biên thật từ khi máu theo cấp (+2/cấp, lô 13, 2026-10-17)</b> — không đổi chỉ số
+     * tán tu. Đoạn dưới là LỊCH SỬ.
      *
      * <p>Bộ Tạp Dịch (37/27/118) vs tán tu 90/22/10: ta 3 nhát, nó 7 nhát ⇒ biên giấy 4, biên thật
      * +1 (cần +2). Hạ {@code atk 22 → 20} là đủ cho riêng trận này và vẫn giữ

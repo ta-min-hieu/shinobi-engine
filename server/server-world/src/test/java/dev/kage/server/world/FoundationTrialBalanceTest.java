@@ -75,7 +75,7 @@ class FoundationTrialBalanceTest {
     /** Đỉnh thang quái TRƯỚC V48 — bậc mà hai loài mới phải vượt (V47). */
     private static final int RINGLEADER_HP = 240;
 
-    private static final int RINGLEADER_ATK = 35;
+    private static final int RINGLEADER_ATK = 32; // V58: 35 → 32
 
     private static final int RINGLEADER_DEF = 28;
 

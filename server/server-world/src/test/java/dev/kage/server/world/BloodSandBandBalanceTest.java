@@ -40,19 +40,19 @@ class BloodSandBandBalanceTest {
     /** `monster_template` hàng `blood_sand_acolyte` (seed V47) — nguồn duy nhất của ba số này. */
     private static final int ACOLYTE_HP = 220;
 
-    private static final int ACOLYTE_ATK = 34;
+    private static final int ACOLYTE_ATK = 31; // V58: 34 → 31
     private static final int ACOLYTE_DEF = 26;
 
     /** `monster_template` hàng `blood_sand_ringleader` (seed V47). */
     private static final int RINGLEADER_HP = 240;
 
-    private static final int RINGLEADER_ATK = 35;
+    private static final int RINGLEADER_ATK = 32; // V58: 35 → 32
     private static final int RINGLEADER_DEF = 28;
 
     /** `monster_template` hàng `raider_chieftain` (seed V45) — bậc thang ngay dưới, nhịp đóng arc 1. */
     private static final int CHIEFTAIN_HP = 200;
 
-    private static final int CHIEFTAIN_ATK = 30;
+    private static final int CHIEFTAIN_ATK = 26; // V58: 30 → 26
     private static final int CHIEFTAIN_DEF = 18;
 
     /** Giáp giảm sát thương kiểu LMHT/Liên Quân, đúng công thức {@code CombatConstants#resolveAttack}. */
@@ -129,7 +129,7 @@ class BloodSandBandBalanceTest {
     }
 
     @Test
-    @DisplayName("Tới mạch chết vẫn THẮNG tế đồ — 5 nhát so với 7, biên 2")
+    @DisplayName("Tới mạch chết vẫn THẮNG tế đồ — 5 nhát so với 10, biên 5 (V58)")
     void gearedDiscipleShouldWinAgainstAnAcolyte() {
         int playerHitsFor = hitsToKill(ACOLYTE_HP, hit(playerAtk(), ACOLYTE_DEF));
         int acolyteHitsFor = hitsToKill(arrivalHp(), hit(ACOLYTE_ATK, playerDef()));
@@ -219,8 +219,8 @@ class BloodSandBandBalanceTest {
     }
 
     /**
-     * 🔴 <b>VI PHẠM luật biên thật (chủ dự án chốt 2026-10-01, {@link DuelMargin}) — CHƯA chỉnh số,
-     * chờ chủ dự án.</b>
+     * ✅ <b>ĐẠT luật biên thật từ V58 (lô 14, chủ dự án duyệt 2026-10-17)</b> — hạ ATK quái, xem bảng ở
+     * đầu file migration. Đoạn dưới là LỊCH SỬ vì sao trước đó không có bộ chỉ số nào đạt.
      *
      * <p>Tới mạch chết 150 máu, bộ Ngoại Môn: tế đồ 220/34/26 và đàn chủ 240/35/28 đều 5 nhát so với
      * 7 ⇒ biên giấy 2, biên thật −1. Đây đúng là trần trang bị {@link
@@ -232,19 +232,18 @@ class BloodSandBandBalanceTest {
      * đối chiếu với luật biên thật thay vì lặng lẽ giữ trận ở dưới ngưỡng.
      */
     @Test
-    @DisplayName(
-            "🔴 Luật biên thật: tế đồ, đàn chủ Huyết Sa ĐANG vi phạm — biên thật +1 (trước máu theo cấp: −1), cần +2")
+    @DisplayName("Luật biên thật: tế đồ, đàn chủ Huyết Sa ĐẠT — biên thật +2 (V58; trước đó +1)")
     void theBloodSandDuelsViolateTheRealMarginRule() {
         DuelMargin acolyte =
                 new DuelMargin(playerAtk(), playerDef(), arrivalHp(), ACOLYTE_HP, ACOLYTE_ATK, ACOLYTE_DEF);
         DuelMargin ringleader =
                 new DuelMargin(playerAtk(), playerDef(), arrivalHp(), RINGLEADER_HP, RINGLEADER_ATK, RINGLEADER_DEF);
 
-        assertThat(acolyte.paperMargin()).isEqualTo(4);
-        assertThat(acolyte.realMargin()).isEqualTo(1);
-        assertThat(acolyte.meetsRealMarginRule()).isFalse();
-        assertThat(ringleader.paperMargin()).isEqualTo(4);
-        assertThat(ringleader.realMargin()).isEqualTo(1);
-        assertThat(ringleader.meetsRealMarginRule()).isFalse();
+        assertThat(acolyte.paperMargin()).isEqualTo(5);
+        assertThat(acolyte.realMargin()).isEqualTo(2);
+        assertThat(acolyte.meetsRealMarginRule()).isTrue();
+        assertThat(ringleader.paperMargin()).isEqualTo(5);
+        assertThat(ringleader.realMargin()).isEqualTo(2);
+        assertThat(ringleader.meetsRealMarginRule()).isTrue();
     }
 }

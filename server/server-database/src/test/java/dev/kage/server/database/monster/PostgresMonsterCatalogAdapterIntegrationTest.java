@@ -97,7 +97,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         MonsterTemplate warden = findByCode("archive_warden");
 
         assertThat(warden.stats().maxHp()).isEqualTo(120);
-        assertThat(warden.stats().atk()).isEqualTo(26);
+        assertThat(warden.stats().atk()).isEqualTo(19); // V58: 26 → 19
         assertThat(warden.stats().def()).isEqualTo(14);
         assertThat(warden.stats().res()).isEqualTo(10);
         assertThat(warden.expReward()).isEqualTo(55L);
@@ -112,7 +112,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         MonsterTemplate construct = findByCode("trial_construct");
 
         assertThat(construct.stats().maxHp()).isEqualTo(130); // DAI nhất arc 1
-        assertThat(construct.stats().atk()).isEqualTo(15); // mà đánh NHẸ nhất trong bốn loài biết đánh
+        assertThat(construct.stats().atk()).isEqualTo(12); // V58: 15 → 12 — vẫn đánh NHẸ nhất trong bốn loài biết đánh
         assertThat(construct.stats().def()).isEqualTo(10);
         assertThat(construct.stats().hitPercent()).isEqualTo(85); // thấp nhất — nó nương tay
         assertThat(construct.expReward()).isEqualTo(80L);
