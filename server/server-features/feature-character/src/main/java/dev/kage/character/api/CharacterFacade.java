@@ -31,6 +31,7 @@ public final class CharacterFacade {
     // UseCase còn lại có validate/orchestrate thật, đây thì không).
     private final CharacterPort characterPort;
 
+    /** Dựng ở composition root; {@code characterPort} cho các lời gọi đọc/ghi thuần không cần UseCase. */
     public CharacterFacade(CharacterUseCases useCases, CharacterPort characterPort) {
         this.createCharacterUseCase = useCases.createCharacterUseCase();
         this.listCharactersUseCase = useCases.listCharactersUseCase();
@@ -40,14 +41,28 @@ public final class CharacterFacade {
         this.characterPort = characterPort;
     }
 
+    /**
+     * Tạo nhân vật mới cho {@code accountId} — validate tên, trần số nhân vật mỗi tài khoản, idempotency
+     * (ADR-025: gửi lại cùng {@code idempotencyKey} không tạo thêm).
+     *
+     * @throws dev.kage.character.application.CharacterLimitExceededException tài khoản đã đủ số nhân vật
+     * @throws dev.kage.character.application.DuplicateCharacterNameException tên đã có người dùng
+     */
     public Character createCharacter(long accountId, String name, String idempotencyKey) {
         return createCharacterUseCase.execute(accountId, name, idempotencyKey);
     }
 
+    /** Mọi nhân vật của {@code accountId} — rỗng nếu chưa tạo nhân vật nào. */
     public List<Character> listCharacters(long accountId) {
         return listCharactersUseCase.execute(accountId);
     }
 
+    /**
+     * Nhân vật {@code characterId} — CHỈ khi nó thuộc {@code accountId} (chống IDOR, SECURITY.md §4).
+     *
+     * @throws dev.kage.character.application.CharacterNotFoundException không tồn tại HOẶC thuộc tài khoản khác
+     *     (cùng một lỗi — fail secure)
+     */
     public Character selectCharacter(long accountId, long characterId) {
         return selectCharacterUseCase.execute(accountId, characterId);
     }
@@ -75,14 +90,17 @@ public final class CharacterFacade {
         return grantExperienceUseCase.syncAfterExternalGrant(characterId);
     }
 
+    /** Vị trí đã lưu lần cuối (SERVER.md §8) — điểm xuất hiện khi vào world. */
     public PositionSnapshot loadPosition(long characterId) {
         return characterPort.loadPosition(characterId);
     }
 
+    /** Ghi đè vị trí đã lưu — gọi định kỳ và lúc thoát (SERVER.md §8), không mỗi tick. Blocking, chạm DB. */
     public void savePosition(long characterId, float x, float y) {
         characterPort.savePosition(characterId, x, y);
     }
 
+    /** Chỉ số nền — server-world dẫn xuất ATK/DEF/... lúc gắn nhân vật vào world (GDD §5). */
     public CharacterStats loadStats(long characterId) {
         return characterPort.loadStats(characterId);
     }

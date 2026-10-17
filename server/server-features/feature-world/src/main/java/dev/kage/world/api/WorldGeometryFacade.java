@@ -21,6 +21,7 @@ public final class WorldGeometryFacade {
 
     private final SafeZonePort safeZonePort;
 
+    /** Dựng ở composition root. */
     public WorldGeometryFacade(SafeZonePort safeZonePort) {
         this.safeZonePort = safeZonePort;
     }

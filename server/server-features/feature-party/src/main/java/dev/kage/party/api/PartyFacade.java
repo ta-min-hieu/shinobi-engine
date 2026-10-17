@@ -20,10 +20,12 @@ public final class PartyFacade {
 
     private final PartyUseCases useCases;
 
+    /** Dựng ở composition root. */
     public PartyFacade(PartyUseCases useCases) {
         this.useCases = useCases;
     }
 
+    /** Lập nhóm — người lập thành trưởng nhóm. */
     public CreateResult createParty(long characterId) {
         CreatePartyUseCase.Result result = useCases.createPartyUseCase().execute(characterId);
         CreateOutcome outcome = result.outcome() == dev.kage.party.application.CreatePartyUseCase.Outcome.OK
@@ -33,6 +35,7 @@ public final class PartyFacade {
         return new CreateResult(outcome, partyId);
     }
 
+    /** Trưởng nhóm mời {@code targetCharacterId}. */
     public InviteResult invite(long leaderCharacterId, long targetCharacterId) {
         return switch (useCases.invitePartyMemberUseCase().execute(leaderCharacterId, targetCharacterId)) {
             case OK -> InviteResult.OK;
@@ -44,6 +47,7 @@ public final class PartyFacade {
         };
     }
 
+    /** Người được mời chấp nhận lời mời {@code inviteId}. */
     public AcceptResult acceptInvite(long inviteId, long characterId) {
         return switch (useCases.acceptPartyInviteUseCase().execute(inviteId, characterId)) {
             case AcceptPartyInviteUseCase.Result.OK -> AcceptResult.OK;
@@ -53,18 +57,21 @@ public final class PartyFacade {
         };
     }
 
+    /** Người được mời từ chối lời mời {@code inviteId}. */
     public RejectResult rejectInvite(long inviteId, long characterId) {
         return useCases.rejectPartyInviteUseCase().execute(inviteId, characterId) == RejectPartyInviteUseCase.Result.OK
                 ? RejectResult.OK
                 : RejectResult.NOT_FOUND;
     }
 
+    /** Rời nhóm. */
     public LeaveResult leaveParty(long characterId) {
         return useCases.leavePartyUseCase().execute(characterId) == LeavePartyUseCase.Result.OK
                 ? LeaveResult.OK
                 : LeaveResult.NOT_IN_PARTY;
     }
 
+    /** Trưởng nhóm đuổi thành viên {@code targetCharacterId}. */
     public KickResult kickMember(long leaderCharacterId, long targetCharacterId) {
         return switch (useCases.kickPartyMemberUseCase().execute(leaderCharacterId, targetCharacterId)) {
             case KickPartyMemberUseCase.Result.OK -> KickResult.OK;
@@ -97,17 +104,20 @@ public final class PartyFacade {
         return useCases.handOverPartyLeadershipUseCase().execute(leaderCharacterId, isOnline);
     }
 
+    /** Nhóm của {@code characterId} — rỗng nếu chưa vào nhóm nào. */
     public Optional<MyPartyView> findMyParty(long characterId) {
         return useCases.findMyPartyUseCase()
                 .execute(characterId)
                 .map(r -> new MyPartyView(r.partyId(), r.myRole() == PartyRole.LEADER));
     }
 
+    /** Kết quả lập nhóm. */
     public enum CreateOutcome {
         OK,
         ALREADY_IN_PARTY
     }
 
+    /** Kết quả mời vào nhóm. */
     public enum InviteResult {
         OK,
         NOT_LEADER,
@@ -117,6 +127,7 @@ public final class PartyFacade {
         INVITE_ALREADY_PENDING
     }
 
+    /** Kết quả chấp nhận lời mời. */
     public enum AcceptResult {
         OK,
         NOT_FOUND,
@@ -124,27 +135,34 @@ public final class PartyFacade {
         PARTY_FULL
     }
 
+    /** Kết quả từ chối lời mời. */
     public enum RejectResult {
         OK,
         NOT_FOUND
     }
 
+    /** Kết quả rời nhóm. */
     public enum LeaveResult {
         OK,
         NOT_IN_PARTY
     }
 
+    /** Kết quả đuổi thành viên. */
     public enum KickResult {
         OK,
         CANNOT_KICK_SELF,
         NOT_FOUND
     }
 
+    /** Kết quả lập nhóm — {@code partyId} là {@code null} khi {@code outcome != OK}. */
     public record CreateResult(CreateOutcome outcome, Long partyId) {}
 
+    /** Một thành viên nhóm. */
     public record MemberView(long characterId, boolean isLeader) {}
 
+    /** Một lời mời vào nhóm đang chờ trả lời. */
     public record PendingInviteView(long inviteId, long partyId) {}
 
+    /** Nhóm của người hỏi và vai trò của họ trong đó. */
     public record MyPartyView(long partyId, boolean isLeader) {}
 }

@@ -17,6 +17,7 @@ public final class ShopFacade {
     private final BuyItemUseCase buyItemUseCase;
     private final SellItemUseCase sellItemUseCase;
 
+    /** Dựng ở composition root. */
     public ShopFacade(
             ListShopItemsUseCase listShopItemsUseCase, BuyItemUseCase buyItemUseCase, SellItemUseCase sellItemUseCase) {
         this.listShopItemsUseCase = listShopItemsUseCase;
@@ -55,6 +56,7 @@ public final class ShopFacade {
         };
     }
 
+    /** Kết quả mua. */
     public enum BuyResult {
         OK,
         ITEM_NOT_IN_SHOP,
@@ -63,6 +65,7 @@ public final class ShopFacade {
         DUPLICATE_REQUEST
     }
 
+    /** Kết quả bán — {@code ITEM_EQUIPPED}: món đang mặc phải gỡ trước. */
     public enum SellResult {
         OK,
         ITEM_NOT_FOUND,

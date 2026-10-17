@@ -18,10 +18,12 @@ public final class TradeFacade {
 
     private final TradeUseCases useCases;
 
+    /** Dựng ở composition root. */
     public TradeFacade(TradeUseCases useCases) {
         this.useCases = useCases;
     }
 
+    /** Mời {@code targetCharacterId} giao dịch — tạo phiên ở trạng thái chờ chấp nhận. */
     public RequestResult requestTrade(long characterId, long targetCharacterId) {
         RequestTradeUseCase.Result result = useCases.requestTradeUseCase().execute(characterId, targetCharacterId);
         RequestOutcome outcome =
@@ -35,6 +37,7 @@ public final class TradeFacade {
         return new RequestResult(outcome, sessionId);
     }
 
+    /** Người được mời chấp nhận — phiên chuyển sang mở, hai bên đặt lời chào được. */
     public AcceptResult acceptRequest(long sessionId, long characterId) {
         return switch (useCases.acceptTradeRequestUseCase().execute(sessionId, characterId)) {
             case dev.kage.trade.application.AcceptTradeRequestUseCase.Result.OK -> AcceptResult.OK;
@@ -42,6 +45,7 @@ public final class TradeFacade {
         };
     }
 
+    /** Một trong hai bên huỷ/từ chối — xoá phiên, không có gì để hoàn trả (không escrow). */
     public CancelResult cancel(long sessionId, long characterId) {
         return switch (useCases.cancelTradeUseCase().execute(sessionId, characterId)) {
             case dev.kage.trade.application.CancelTradeUseCase.Result.OK -> CancelResult.OK;
@@ -49,6 +53,10 @@ public final class TradeFacade {
         };
     }
 
+    /**
+     * Thay TOÀN BỘ lời chào của {@code characterId} — reset cờ xác nhận của cả hai bên. Chỉ lưu ý định:
+     * sở hữu được xác thực lại lúc thi hành ({@link #confirm}).
+     */
     public SetOfferResult setOffer(long sessionId, long characterId, long goldAmount, List<OfferItemInput> items) {
         List<OfferedItemInput> domainItems = items.stream()
                 .map(i -> new OfferedItemInput(i.itemId(), i.quantity()))
@@ -59,6 +67,10 @@ public final class TradeFacade {
         };
     }
 
+    /**
+     * Xác nhận lời chào hiện tại; khi CẢ HAI đã xác nhận thì thi hành nguyên tử (xác thực lại sở hữu,
+     * chuyển vàng/vật phẩm, ghi audit) — xem {@code ConfirmTradeUseCase}.
+     */
     public ConfirmResult confirm(long sessionId, long characterId, String idempotencyKey) {
         return switch (useCases.confirmTradeUseCase().execute(sessionId, characterId, idempotencyKey)) {
             case ConfirmTradeUseCase.Result.OK -> ConfirmResult.OK;
@@ -70,6 +82,7 @@ public final class TradeFacade {
         };
     }
 
+    /** Phiên đang hoạt động của {@code characterId}, nhìn từ phía họ — rỗng nếu không ở phiên nào. */
     public Optional<TradeStatusView> getStatus(long characterId) {
         return useCases.getTradeStatusUseCase().execute(characterId).map(r -> {
             boolean isRequester = r.requesterCharacterId() == characterId;
@@ -101,6 +114,7 @@ public final class TradeFacade {
         });
     }
 
+    /** Kết quả mời giao dịch. */
     public enum RequestOutcome {
         OK,
         CANNOT_TRADE_SELF,
@@ -108,21 +122,25 @@ public final class TradeFacade {
         TARGET_ALREADY_IN_TRADE
     }
 
+    /** Kết quả chấp nhận lời mời. */
     public enum AcceptResult {
         OK,
         NOT_FOUND
     }
 
+    /** Kết quả huỷ phiên. */
     public enum CancelResult {
         OK,
         NOT_FOUND
     }
 
+    /** Kết quả đặt lời chào. */
     public enum SetOfferResult {
         OK,
         NOT_FOUND
     }
 
+    /** Kết quả xác nhận — {@code OK} là đã xác nhận và đang chờ đối phương, {@code EXECUTED} là đã thi hành. */
     public enum ConfirmResult {
         OK,
         EXECUTED,
@@ -136,17 +154,22 @@ public final class TradeFacade {
         OFFER_JUST_CHANGED
     }
 
+    /** Giai đoạn của phiên. */
     public enum TradePhase {
         PENDING_ACCEPT,
         OPEN
     }
 
+    /** Kết quả mời — {@code sessionId} là {@code null} khi {@code outcome != OK}. */
     public record RequestResult(RequestOutcome outcome, Long sessionId) {}
 
+    /** Một dòng lời chào: {@code quantity} của dòng túi đồ {@code itemId} (có thể là một phần chồng). */
     public record OfferItemInput(long itemId, int quantity) {}
 
+    /** Một dòng lời chào để hiển thị — {@code itemTemplateId == 0}: món đã không còn thuộc người chào. */
     public record OfferItemView(long itemId, long itemTemplateId, int quantity, int enhanceLevel) {}
 
+    /** Trạng thái phiên nhìn từ phía người hỏi ({@code my*}) và đối phương ({@code their*}). */
     public record TradeStatusView(
             long sessionId,
             TradePhase phase,
@@ -158,6 +181,7 @@ public final class TradeFacade {
             List<OfferItemView> theirItems,
             boolean myConfirmed,
             boolean theirConfirmed) {
+        /** Chép phòng thủ hai danh sách lời chào. */
         public TradeStatusView {
             myItems = List.copyOf(myItems);
             theirItems = List.copyOf(theirItems);

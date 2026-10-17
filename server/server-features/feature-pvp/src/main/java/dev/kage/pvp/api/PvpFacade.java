@@ -15,6 +15,7 @@ public final class PvpFacade {
     private final RecordDuelResultUseCase recordDuelResultUseCase;
     private final GetPvpRatingUseCase getPvpRatingUseCase;
 
+    /** Dựng ở composition root. */
     public PvpFacade(PvpRatingPort port) {
         this.recordDuelResultUseCase = new RecordDuelResultUseCase(port);
         this.getPvpRatingUseCase = new GetPvpRatingUseCase(port);
@@ -25,6 +26,7 @@ public final class PvpFacade {
         return recordDuelResultUseCase.execute(winnerCharacterId, loserCharacterId);
     }
 
+    /** Elo + số trận thắng/thua — người chưa đấu trận nào nhận rating mặc định, 0 thắng 0 thua. */
     public GetPvpRatingUseCase.RatingView findRating(long characterId) {
         return getPvpRatingUseCase.execute(characterId);
     }

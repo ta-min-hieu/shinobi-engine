@@ -75,9 +75,29 @@
         <module name="SimplifyBooleanExpression"/>
         <module name="SimplifyBooleanReturn"/>
 
+        <!-- JavaDoc bắt buộc cho API công khai của module (CODING-STANDARDS §16, README dòng 58(c), chủ dự án
+             duyệt 2026-10-17): mọi type + method public trong package `api` (Facade + kiểu trả về của
+             nó — thứ module khác được phép gọi). Giới hạn vào `api/` bằng bộ lọc `ApiJavadoc` bên dưới.
+             Record/enum lồng nhau là kiểu public của API nên cũng phải có. -->
+        <module name="MissingJavadocType">
+            <property name="id" value="ApiJavadoc"/>
+            <property name="scope" value="public"/>
+        </module>
+        <module name="MissingJavadocMethod">
+            <property name="id" value="ApiJavadoc"/>
+            <property name="scope" value="public"/>
+            <property name="allowMissingPropertyJavadoc" value="true"/>
+            <property name="tokens" value="METHOD_DEF,CTOR_DEF,ANNOTATION_FIELD_DEF,COMPACT_CTOR_DEF"/>
+        </module>
+
         <!-- Cho phép suppress có lý do qua annotation -->
         <module name="SuppressWarningsHolder"/>
     </module>
 
     <module name="SuppressWarningsFilter"/>
+    <!-- Rule `ApiJavadoc` chỉ áp cho file nằm trong một package `api` — mọi file khác bị bỏ qua. -->
+    <module name="SuppressionSingleFilter">
+        <property name="id" value="ApiJavadoc"/>
+        <property name="files" value="^(?!.*[\\/]api[\\/][^\\/]+\.java$).*$"/>
+    </module>
 </module>

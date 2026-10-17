@@ -22,6 +22,7 @@ public final class MailFacade {
     private final ClaimMailUseCase claimMailUseCase;
     private final DeleteMailUseCase deleteMailUseCase;
 
+    /** Dựng ở composition root. */
     public MailFacade(
             SendMailUseCase sendMailUseCase,
             ListMailUseCase listMailUseCase,
@@ -62,6 +63,7 @@ public final class MailFacade {
         return SendResult.valueOf(outcome.name());
     }
 
+    /** Mọi thư trong hộp của {@code characterId}, kể cả thư đã lĩnh đồ đính kèm. */
     public List<MailView> listMail(long characterId) {
         return listMailUseCase.execute(characterId).stream()
                 .map(mail -> new MailView(
@@ -88,6 +90,7 @@ public final class MailFacade {
         };
     }
 
+    /** Xoá thư — thư còn đồ/vàng chưa lĩnh thì phải lĩnh trước. */
     public DeleteResult deleteMail(long mailId, long characterId) {
         return switch (deleteMailUseCase.execute(mailId, characterId)) {
             case OK -> DeleteResult.OK;
@@ -99,6 +102,7 @@ public final class MailFacade {
     /** {@code mailId == 0} khi {@code result != OK} — không có thư nào được tạo. */
     public record SendOutcome(SendResult result, long mailId) {}
 
+    /** Kết quả gửi thư. */
     public enum SendResult {
         OK,
         INSUFFICIENT_GOLD,
@@ -116,6 +120,7 @@ public final class MailFacade {
         MAILBOX_FULL
     }
 
+    /** Kết quả lĩnh đồ/vàng đính kèm. */
     public enum ClaimResult {
         OK,
         NOT_FOUND,
@@ -124,12 +129,14 @@ public final class MailFacade {
         DUPLICATE_REQUEST
     }
 
+    /** Kết quả xoá thư. */
     public enum DeleteResult {
         OK,
         NOT_FOUND,
         MUST_CLAIM_FIRST
     }
 
+    /** Một món đính kèm người gửi muốn gửi đi. */
     public record AttachmentRequest(long itemTemplateId, int quantity) {}
 
     /** Gộp tham số gửi thư — tránh {@link #sendMail} vượt 4 tham số (Checkstyle ParameterNumber). */
@@ -140,13 +147,16 @@ public final class MailFacade {
             String body,
             long goldAmount,
             List<AttachmentRequest> attachments) {
+        /** Chép phòng thủ danh sách đính kèm. */
         public SendMailRequest {
             attachments = List.copyOf(attachments);
         }
     }
 
+    /** Một món đính kèm trong thư đã nhận. */
     public record AttachmentView(long itemTemplateId, int quantity) {}
 
+    /** Một thư trong hộp — {@code senderId} {@code null} là thư hệ thống. */
     public record MailView(
             long mailId,
             Long senderId,
@@ -155,6 +165,7 @@ public final class MailFacade {
             long goldAmount,
             List<AttachmentView> attachments,
             boolean claimed) {
+        /** Chép phòng thủ danh sách đính kèm. */
         public MailView {
             attachments = List.copyOf(attachments);
         }

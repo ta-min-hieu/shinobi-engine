@@ -15,6 +15,7 @@ public final class DialogueFacade {
 
     private final GetDialogueNodeUseCase getDialogueNodeUseCase;
 
+    /** Dựng ở composition root. */
     public DialogueFacade(GetDialogueNodeUseCase getDialogueNodeUseCase) {
         this.getDialogueNodeUseCase = getDialogueNodeUseCase;
     }
@@ -65,14 +66,19 @@ public final class DialogueFacade {
      * tách biệt, cùng cách "open_shop" được gateway xử lý thay vì DialogueFacade tự gọi ShopFacade).
      */
     public sealed interface SelectOptionResult {
+        /** Lựa chọn dẫn tới node hội thoại khác — client vẽ {@code node}. */
         record Node(DialogueNode node) implements SelectOptionResult {}
 
+        /** Lựa chọn mở cửa hàng — gateway gọi {@code ShopFacade}, không phải feature này. */
         record OpenShop() implements SelectOptionResult {}
 
+        /** Lựa chọn kết thúc hội thoại. */
         record Ended() implements SelectOptionResult {}
 
+        /** Node hiện tại hoặc chỉ số lựa chọn không tồn tại — client gửi dữ liệu cũ/sai. */
         record NotFound() implements SelectOptionResult {}
 
+        /** Lựa chọn nhận quest {@code questCode} — gateway gọi {@code QuestFacade.acceptQuest}. */
         record AcceptQuest(String questCode) implements SelectOptionResult {}
     }
 }

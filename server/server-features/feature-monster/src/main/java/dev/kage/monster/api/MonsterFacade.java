@@ -18,6 +18,7 @@ public final class MonsterFacade {
 
     private final MonsterCatalogPort catalogPort;
 
+    /** Dựng ở composition root. */
     public MonsterFacade(MonsterCatalogPort catalogPort) {
         this.catalogPort = catalogPort;
     }

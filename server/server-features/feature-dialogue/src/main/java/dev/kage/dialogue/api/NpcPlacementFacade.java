@@ -27,6 +27,7 @@ public final class NpcPlacementFacade {
 
     private final NpcPlacementPort placementPort;
 
+    /** Dựng ở composition root. */
     public NpcPlacementFacade(NpcPlacementPort placementPort) {
         this.placementPort = placementPort;
     }

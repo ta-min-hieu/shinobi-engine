@@ -77,7 +77,7 @@ Thực thi [CODING-STANDARDS.md](../02-coding-standards/CODING-STANDARDS.md):
 | Tham số ≤ 4 | §4 | ✅ main + test + jmh |
 | Field ≤ 10/class | [CODE-REVIEW.md §5](../02-coding-standards/CODE-REVIEW.md) | ❌ **chưa có rule** — Checkstyle không có rule đếm field; PMD `TooManyFields(maxfields=10)` đo thử: 3 lớp vượt (`CombatHud`, `InventoryPanel`, `TradeController`) |
 | **Cấm tên `*Manager`, `*Helper`, `*Util`** | §2 — custom regex rule | ✅ main + test + jmh |
-| JavaDoc bắt buộc cho `api/` | §16 | ❌ **chưa có rule** — `MissingJavadocType/Method` giới hạn ở `api/` đo thử: 114 chỗ thiếu trên 15 feature module |
+| JavaDoc bắt buộc cho `api/` | §16 | ✅ **Checkstyle** `MissingJavadocType` + `MissingJavadocMethod` (id `ApiJavadoc`, scope public), giới hạn vào file trong package `api` bằng `SuppressionSingleFilter` regex phủ định — bật 2026-10-17 (README dòng 58(c)) sau khi viết đủ 114 chỗ thiếu ở 15 feature module. Chỉ đòi CÓ javadoc, không đòi `@param`/`@return` |
 
 ⚠️ Rule "cấm `*Manager/*Helper/*Util`" cần custom `TypeName` regex — đây là rule **đặc thù dự án**, giá trị cao vì nó bắt đúng thứ [CODING-STANDARDS.md §2](../02-coding-standards/CODING-STANDARDS.md) cấm.
 

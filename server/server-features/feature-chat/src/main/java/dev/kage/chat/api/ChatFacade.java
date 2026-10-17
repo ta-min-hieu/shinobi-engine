@@ -14,10 +14,12 @@ public final class ChatFacade {
 
     private final SendChatMessageUseCase sendChatMessageUseCase;
 
+    /** Dựng ở composition root. */
     public ChatFacade(SendChatMessageUseCase sendChatMessageUseCase) {
         this.sendChatMessageUseCase = sendChatMessageUseCase;
     }
 
+    /** Validate + ghi audit một tin không có người nhận riêng — gateway chỉ phát tin đi khi kết quả là {@code OK}. */
     public SendResult sendMessage(long senderId, ChatChannel channel, String body) {
         return sendMessage(senderId, channel, body, OptionalLong.empty());
     }
@@ -36,6 +38,7 @@ public final class ChatFacade {
         };
     }
 
+    /** Kết quả kiểm duyệt một tin; mọi giá trị khác {@code OK} nghĩa là tin KHÔNG được phát. */
     public enum SendResult {
         OK,
         MESSAGE_BLANK,

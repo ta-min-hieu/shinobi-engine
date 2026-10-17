@@ -91,6 +91,7 @@ public final class InventoryFacade {
     private final ListInventoryUseCase listInventoryUseCase;
     private final GetItemCatalogUseCase getItemCatalogUseCase;
 
+    /** Dựng ở composition root — bốn nhóm UseCase gộp để giữ constructor ≤ 4 tham số. */
     public InventoryFacade(
             ItemAcquisitionUseCases acquisitionUseCases,
             EquipmentUseCases equipmentUseCases,
@@ -209,11 +210,13 @@ public final class InventoryFacade {
         return getItemCatalogUseCase.execute();
     }
 
+    /** Kết quả thêm vật phẩm vào túi. */
     public enum Result {
         OK,
         FULL
     }
 
+    /** Kết quả mặc trang bị. */
     public enum EquipResult {
         OK,
         ITEM_NOT_FOUND,
@@ -222,6 +225,7 @@ public final class InventoryFacade {
         LEVEL_TOO_LOW
     }
 
+    /** Kết quả gỡ trang bị. */
     public enum UnequipResult {
         OK,
         NOT_EQUIPPED,
@@ -229,6 +233,7 @@ public final class InventoryFacade {
         INVENTORY_FULL
     }
 
+    /** Kết quả cường hoá — ba nhánh {@code FAILED_*} là thất bại theo xác suất, đã trừ vàng. */
     public enum EnhanceResult {
         SUCCESS,
         FAILED_NO_DROP,

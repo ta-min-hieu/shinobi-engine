@@ -17,10 +17,12 @@ public final class FriendFacade {
 
     private final FriendUseCases useCases;
 
+    /** Dựng ở composition root. */
     public FriendFacade(FriendUseCases useCases) {
         this.useCases = useCases;
     }
 
+    /** Gửi lời mời kết bạn — mời ngược chiều một lời mời đang chờ thì thành bạn luôn ({@code BECAME_FRIENDS}). */
     public SendRequestResult sendRequest(long requesterId, long addresseeId) {
         // Hai enum cùng tên giá trị (use case ↔ facade) — đổi theo TÊN thay cho switch 10 nhánh (trần
         // CyclomaticComplexity của PMD). Lệch tên là IllegalArgumentException ngay ở test đầu tiên gọi tới.
@@ -29,6 +31,7 @@ public final class FriendFacade {
                 .name());
     }
 
+    /** Chấp nhận lời mời {@code friendshipId} — chỉ người được mời ({@code addresseeId}) mới chấp nhận được. */
     public AcceptResult accept(long friendshipId, long addresseeId) {
         return switch (useCases.acceptFriendRequestUseCase().execute(friendshipId, addresseeId)) {
             case AcceptFriendRequestUseCase.Result.OK -> AcceptResult.OK;
@@ -39,6 +42,7 @@ public final class FriendFacade {
         };
     }
 
+    /** Từ chối lời mời — người mời phải chờ một khoảng mới mời lại được người này. */
     public RejectResult reject(long friendshipId, long addresseeId) {
         return switch (useCases.rejectFriendRequestUseCase().execute(friendshipId, addresseeId)) {
             case RejectFriendRequestUseCase.Result.OK -> RejectResult.OK;
@@ -46,6 +50,7 @@ public final class FriendFacade {
         };
     }
 
+    /** Huỷ kết bạn — xoá quan hệ ở cả hai phía. */
     public RemoveResult remove(long characterId, long friendCharacterId) {
         return switch (useCases.removeFriendUseCase().execute(characterId, friendCharacterId)) {
             case RemoveFriendUseCase.Result.OK -> RemoveResult.OK;
@@ -65,6 +70,7 @@ public final class FriendFacade {
                 .toList();
     }
 
+    /** Kết quả gửi lời mời kết bạn. */
     public enum SendRequestResult {
         OK,
         CANNOT_FRIEND_SELF,
@@ -81,6 +87,7 @@ public final class FriendFacade {
         TARGET_PENDING_FULL
     }
 
+    /** Kết quả chấp nhận lời mời — {@code *_FULL} là một trong hai danh sách bạn đã chạm trần. */
     public enum AcceptResult {
         OK,
         NOT_FOUND,
@@ -88,15 +95,18 @@ public final class FriendFacade {
         REQUESTER_FRIEND_LIST_FULL
     }
 
+    /** Kết quả từ chối lời mời. */
     public enum RejectResult {
         OK,
         NOT_FOUND
     }
 
+    /** Kết quả huỷ kết bạn. */
     public enum RemoveResult {
         OK,
         NOT_FOUND
     }
 
+    /** Một lời mời đang chờ — {@code friendshipId} là thứ lệnh chấp nhận/từ chối cần. */
     public record PendingRequestView(long friendshipId, long requesterId) {}
 }

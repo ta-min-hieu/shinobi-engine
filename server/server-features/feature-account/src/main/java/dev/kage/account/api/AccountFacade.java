@@ -11,6 +11,7 @@ public final class AccountFacade {
 
     private final LoginOrCreateAccountUseCase loginOrCreateAccountUseCase;
 
+    /** Dựng ở composition root ({@code ServerDatabaseBootstrap}). */
     public AccountFacade(LoginOrCreateAccountUseCase loginOrCreateAccountUseCase) {
         this.loginOrCreateAccountUseCase = loginOrCreateAccountUseCase;
     }

@@ -27,6 +27,7 @@ public final class QuestFacade {
     private final ListQuestsUseCase listQuestsUseCase;
     private final ConcurrentHashMap<Long, ReentrantLock> eventLocksByCharacterId = new ConcurrentHashMap<>();
 
+    /** Dựng ở composition root. */
     public QuestFacade(
             AcceptQuestUseCase acceptQuestUseCase,
             ProcessQuestEventUseCase processQuestEventUseCase,
@@ -38,6 +39,7 @@ public final class QuestFacade {
         this.listQuestsUseCase = listQuestsUseCase;
     }
 
+    /** Nhận quest {@code questCode} — kiểm quest tiên quyết (ADR-044) và chạy hook {@code on_accept}. */
     public AcceptResult acceptQuest(long characterId, String questCode) {
         return switch (acceptQuestUseCase.execute(characterId, questCode)) {
             case OK -> AcceptResult.OK;
@@ -152,6 +154,7 @@ public final class QuestFacade {
         return listQuestsUseCase.execute(characterId);
     }
 
+    /** Kết quả nhận quest. */
     public enum AcceptResult {
         OK,
         QUEST_NOT_FOUND,
@@ -162,6 +165,7 @@ public final class QuestFacade {
         SCRIPT_ERROR
     }
 
+    /** Kết quả lĩnh thưởng quest. */
     public enum ClaimOutcome {
         OK,
         QUEST_NOT_FOUND,
@@ -177,9 +181,12 @@ public final class QuestFacade {
     /** {@code status} chỉ bao giờ là COMPLETED ở lát cắt này (xem {@link #onMonsterKilled} javadoc). */
     public record QuestStatusChange(String questCode, QuestStatus status) {}
 
+    /** Một món thưởng đã trao. */
     public record ItemReward(String itemTemplateCode, int quantity) {}
 
+    /** Kết quả lĩnh thưởng — EXP và vật phẩm chỉ khác rỗng khi {@code outcome == OK}. */
     public record ClaimResult(ClaimOutcome outcome, long expGranted, List<ItemReward> itemsGranted) {
+        /** Chép phòng thủ danh sách vật phẩm. */
         public ClaimResult {
             itemsGranted = List.copyOf(itemsGranted);
         }

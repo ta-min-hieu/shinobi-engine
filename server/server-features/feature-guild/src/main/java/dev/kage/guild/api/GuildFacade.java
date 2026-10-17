@@ -22,10 +22,12 @@ public final class GuildFacade {
 
     private final GuildUseCases useCases;
 
+    /** Dựng ở composition root. */
     public GuildFacade(GuildUseCases useCases) {
         this.useCases = useCases;
     }
 
+    /** Lập bang — người lập thành bang chủ. */
     public CreateResult createGuild(long characterId, String name) {
         CreateGuildUseCase.Result result = useCases.createGuildUseCase().execute(characterId, name);
         CreateOutcome outcome =
@@ -39,6 +41,7 @@ public final class GuildFacade {
         return new CreateResult(outcome, guildId);
     }
 
+    /** Xin gia nhập bang {@code guildName} — chờ bang chủ duyệt. */
     public SendJoinRequestResult sendJoinRequest(long characterId, String guildName) {
         return switch (useCases.sendGuildJoinRequestUseCase().execute(characterId, guildName)) {
             case OK -> SendJoinRequestResult.OK;
@@ -48,6 +51,7 @@ public final class GuildFacade {
         };
     }
 
+    /** Bang chủ duyệt đơn {@code requestId}. */
     public ApproveResult approveJoinRequest(long requestId, long leaderCharacterId) {
         return switch (useCases.approveGuildJoinRequestUseCase().execute(requestId, leaderCharacterId)) {
             case ApproveGuildJoinRequestUseCase.Result.OK -> ApproveResult.OK;
@@ -57,6 +61,7 @@ public final class GuildFacade {
         };
     }
 
+    /** Bang chủ từ chối đơn {@code requestId}. */
     public RejectResult rejectJoinRequest(long requestId, long leaderCharacterId) {
         return useCases.rejectGuildJoinRequestUseCase().execute(requestId, leaderCharacterId)
                         == RejectGuildJoinRequestUseCase.Result.OK
@@ -64,6 +69,7 @@ public final class GuildFacade {
                 : RejectResult.NOT_FOUND;
     }
 
+    /** Rời bang — bang chủ không rời được (phải giải tán). */
     public LeaveResult leaveGuild(long characterId) {
         return switch (useCases.leaveGuildUseCase().execute(characterId)) {
             case LeaveGuildUseCase.Result.OK -> LeaveResult.OK;
@@ -72,12 +78,14 @@ public final class GuildFacade {
         };
     }
 
+    /** Giải tán bang — chỉ bang chủ. */
     public DisbandResult disbandGuild(long characterId) {
         return useCases.disbandGuildUseCase().execute(characterId) == DisbandGuildUseCase.Result.OK
                 ? DisbandResult.OK
                 : DisbandResult.NOT_LEADER;
     }
 
+    /** Bang chủ đuổi thành viên {@code targetCharacterId}. */
     public KickResult kickMember(long leaderCharacterId, long targetCharacterId) {
         return switch (useCases.kickGuildMemberUseCase().execute(leaderCharacterId, targetCharacterId)) {
             case KickGuildMemberUseCase.Result.OK -> KickResult.OK;
@@ -100,12 +108,14 @@ public final class GuildFacade {
                 .toList();
     }
 
+    /** Bang của {@code characterId} — rỗng nếu chưa vào bang nào. */
     public Optional<MyGuildView> findMyGuild(long characterId) {
         return useCases.findMyGuildUseCase()
                 .execute(characterId)
                 .map(r -> new MyGuildView(r.guildId(), r.guildName(), r.myRole() == GuildRole.LEADER));
     }
 
+    /** Kết quả lập bang. */
     public enum CreateOutcome {
         OK,
         ALREADY_IN_GUILD,
@@ -117,6 +127,7 @@ public final class GuildFacade {
         INVALID_NAME
     }
 
+    /** Kết quả xin gia nhập. */
     public enum SendJoinRequestResult {
         OK,
         ALREADY_IN_GUILD,
@@ -124,6 +135,7 @@ public final class GuildFacade {
         REQUEST_ALREADY_PENDING
     }
 
+    /** Kết quả duyệt đơn gia nhập. */
     public enum ApproveResult {
         OK,
         NOT_FOUND,
@@ -131,33 +143,41 @@ public final class GuildFacade {
         GUILD_FULL
     }
 
+    /** Kết quả từ chối đơn gia nhập. */
     public enum RejectResult {
         OK,
         NOT_FOUND
     }
 
+    /** Kết quả rời bang. */
     public enum LeaveResult {
         OK,
         NOT_IN_GUILD,
         LEADER_CANNOT_LEAVE
     }
 
+    /** Kết quả giải tán bang. */
     public enum DisbandResult {
         OK,
         NOT_LEADER
     }
 
+    /** Kết quả đuổi thành viên. */
     public enum KickResult {
         OK,
         CANNOT_KICK_SELF,
         NOT_FOUND
     }
 
+    /** Kết quả lập bang — {@code guildId} là {@code null} khi {@code outcome != OK}. */
     public record CreateResult(CreateOutcome outcome, Long guildId) {}
 
+    /** Một thành viên bang. */
     public record MemberView(long characterId, boolean isLeader) {}
 
+    /** Một đơn xin gia nhập đang chờ duyệt. */
     public record PendingJoinRequestView(long requestId, long characterId) {}
 
+    /** Bang của người hỏi và vai trò của họ trong đó. */
     public record MyGuildView(long guildId, String guildName, boolean isLeader) {}
 }
