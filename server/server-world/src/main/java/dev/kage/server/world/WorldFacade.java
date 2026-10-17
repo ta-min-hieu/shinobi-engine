@@ -249,6 +249,9 @@ public final class WorldFacade {
         return countdowns;
     }
 
+    /** Có thực thể mới (hoặc tới nhịp) chưa được đồng bộ AoI — chỉ tick thread đọc/ghi. */
+    private boolean aoiDirty;
+
     // AoI sync chạy chậm hơn tick loop (WorldConstants.AOI_SYNC_INTERVAL_TICKS) — chỉ đếm tick,
     // KHÔNG dùng đồng hồ thật (đơn giản, không trôi lệch tích luỹ như Timer/Duration).
     private long tickCounter;
@@ -816,6 +819,7 @@ public final class WorldFacade {
      */
     private void simulateTick() {
         drainInbox();
+        syncAoiIfDirty(); // người vừa vào World được thấy/được thấy TRƯỚC lượt mô phỏng đầu tiên của họ
         ecsWorld.update(WorldConstants.FIXED_DT, systemTimingListener);
         tickMetricsPort.recordEntityCount(ecsWorld.entityCount());
         handleCombatResults(combatSystem.drainResults());
@@ -830,11 +834,26 @@ public final class WorldFacade {
         // result ở trên KHÔNG bị ảnh hưởng — vẫn phát ngay mỗi tick qua observersOf().
         tickCounter++;
         if (tickCounter % WorldConstants.AOI_SYNC_INTERVAL_TICKS == 0) {
-            aoiTracker.sync(entitiesByCharacterId, entitiesByMonsterId, entitiesByNpcId);
+            aoiDirty = true;
         }
+        syncAoiIfDirty(); // nhịp 20Hz, hoặc quái vừa hồi sinh ở tickMonsterRespawn ngay trên
         if (tickCounter % WorldConstants.POSITION_SAMPLE_INTERVAL_TICKS == 0) {
             samplePositions();
         }
+    }
+
+    /**
+     * Đồng bộ AoI nếu có thực thể MỚI kể từ lần sync trước, hoặc tới nhịp 20Hz (README dòng 67(d),
+     * chủ dự án duyệt 2026-10-17). Trước đó thực thể mới chỉ được ai đó "thấy" ở nhịp kế tiếp (≤ 2 tick):
+     * quái vừa hồi sinh hay người vừa vào ra/nhận đòn trong khe đó thì người quan sát nhận kết quả từ
+     * một thực thể client chưa biết. Sync thêm chỉ khi có thực thể mới — không đổi chi phí tick thường.
+     */
+    private void syncAoiIfDirty() {
+        if (!aoiDirty) {
+            return;
+        }
+        aoiDirty = false;
+        aoiTracker.sync(entitiesByCharacterId, entitiesByMonsterId, entitiesByNpcId);
     }
 
     /** Báo vị trí thật của mọi nhân vật — xem {@link WorldOutboundSink#onCharacterPositionSampled}. */
@@ -923,11 +942,10 @@ public final class WorldFacade {
 
         PositionComponent position = new PositionComponent();
         position.x = finiteSpawnX(entry.spawnX());
-        // ADR-033 — KÉO VỀ ĐƯỜNG CHƠI: di chuyển giờ khoá vào đúng trục X, không lệnh nào đổi được
-        // Y nữa. Nhân vật có `pos_y` đã lưu khác 0 (từ thời đi tự do 4 hướng, DB vẫn giữ nguyên) sẽ
-        // kẹt VĨNH VIỄN ngoài đường chơi — không bao giờ chạm được bệ/địa hình nào vốn đều định
-        // nghĩa quanh y=0. Bỏ qua `spawnY` là hệ quả bắt buộc của việc thu trục, không phải mất dữ
-        // liệu tuỳ tiện: giá trị cũ không còn ý nghĩa gameplay nào trong mô hình mới.
+        // ADR-033 — KÉO VỀ ĐƯỜNG CHƠI: di chuyển khoá vào trục X, không lệnh nào đổi được Y. Nhân vật có
+        // `pos_y` đã lưu khác 0 (thời đi tự do 4 hướng) sẽ kẹt VĨNH VIỄN ngoài đường chơi, không chạm được
+        // bệ/địa hình nào (đều quanh y=0). Bỏ qua `spawnY` là hệ quả bắt buộc của việc thu trục, không
+        // phải mất dữ liệu tuỳ tiện: giá trị cũ không còn ý nghĩa gameplay nào trong mô hình mới.
         position.y = CHARACTER_PLAY_LINE_Y;
         position.prevX = position.x;
         position.prevY = position.y;
@@ -960,6 +978,7 @@ public final class WorldFacade {
         addRecoveryComponents(entity);
 
         entitiesByCharacterId.put(entry.characterId(), entity);
+        aoiDirty = true; // thực thể mới — xem syncAoiIfDirty
         baseStatsByCharacterId.put(entry.characterId(), entry.baseStats());
         // TRƯỚC onAttach: entity không được có một tick nào vừa nhìn thấy được vừa mang chỉ số nền.
         applyBonusTo(entity, entry.baseStats(), entry.bonus());
@@ -1720,6 +1739,7 @@ public final class WorldFacade {
         addBossAiIfBoss(entity, loai);
 
         entitiesByMonsterId.put(monsterId, entity);
+        aoiDirty = true; // thực thể mới — xem syncAoiIfDirty
         spawnIndexByMonsterId.put(monsterId, spawnIndex);
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
         // không cần thông báo thủ công (giống hệt attach nhân vật, xem AreaOfInterestTracker).
@@ -1859,6 +1879,7 @@ public final class WorldFacade {
         entity.add(newBossAi(loai.boss()));
 
         entitiesByMonsterId.put(monsterId, entity);
+        aoiDirty = true; // thực thể mới — xem syncAoiIfDirty
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
         // không cần thông báo thủ công (giống hệt spawnMonster).
     }
@@ -1918,6 +1939,7 @@ public final class WorldFacade {
         entity.add(npc);
 
         entitiesByNpcId.put(npcId, entity);
+        aoiDirty = true; // thực thể mới — xem syncAoiIfDirty
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi NpcSpawnedEvent —
         // không cần thông báo thủ công (giống hệt quái/nhân vật, xem AreaOfInterestTracker).
     }

@@ -20,6 +20,26 @@ class ChatControllerTest {
     private final ChatController controller = new ChatController();
 
     @Test
+    @DisplayName("Tự đăng nhập lại: nhật ký mang sang màn mới giữ nguyên thứ tự, vẫn chịu trần MAX_LINES")
+    void restoresCarriedOverHistory_keepingOnlyTheNewestLines() {
+        ChatController previous = new ChatController();
+        for (int i = 0; i < ChatController.MAX_LINES; i++) {
+            previous.appendSystem("dòng " + i);
+        }
+        List<ChatController.Line> carried = new ChatHistory(previous.lines()).lines();
+        controller.appendSystem("gợi ý của màn mới");
+
+        controller.restoreLines(carried);
+        assertThat(controller.lines()).containsExactlyElementsOf(previous.lines());
+
+        List<ChatController.Line> tooMany = new java.util.ArrayList<>(carried);
+        tooMany.add(new ChatController.Line(ChatChannel.CHAT_CHANNEL_UNSPECIFIED, "", "dòng mới nhất"));
+        controller.restoreLines(tooMany);
+        assertThat(controller.lines()).hasSize(ChatController.MAX_LINES);
+        assertThat(controller.lines().get(ChatController.MAX_LINES - 1).body()).isEqualTo("dòng mới nhất");
+    }
+
+    @Test
     @DisplayName("Dòng thường đi theo kênh đang chọn, mặc định là Thế giới")
     void composesOnCurrentChannel() {
         ChatController.ComposeResult result = controller.compose("chào cả nhà");

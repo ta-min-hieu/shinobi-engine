@@ -19,6 +19,8 @@ public final class AccountFacade {
     /**
      * Đăng nhập bằng username, tự tạo account nếu chưa có. Trả về session token
      * (ADR-017) để gọi các Command tiếp theo.
+     *
+     * @throws dev.kage.account.domain.AccountBlockedException tài khoản bị khoá/tạm khoá (README dòng 68(e))
      */
     public LoginResult login(String username) {
         return loginOrCreateAccountUseCase.execute(username);

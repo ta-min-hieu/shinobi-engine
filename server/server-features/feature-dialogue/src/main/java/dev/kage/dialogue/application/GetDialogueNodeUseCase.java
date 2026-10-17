@@ -35,7 +35,9 @@ public final class GetDialogueNodeUseCase {
     private static final long SCRIPT_MAX_STATEMENTS = 10_000L; // cùng độ lớn SkillConstants (server-world)
 
     private final NpcTemplatePort npcTemplatePort;
-    private final ScriptSandbox scriptSandbox = new ScriptSandbox(SCRIPT_MAX_STATEMENTS);
+    // Không chạy trên tick ⇒ trần chống treo rộng (README dòng 70) — xem ScriptSandbox.OFF_TICK_TIMEOUT.
+    private final ScriptSandbox scriptSandbox =
+            new ScriptSandbox(SCRIPT_MAX_STATEMENTS, ScriptSandbox.OFF_TICK_TIMEOUT);
     // Script không đổi lúc chạy (chỉ đổi khi deploy lại + restart server) — cache theo
     // scriptRef tránh đọc lại classpath resource mỗi lần người chơi nói chuyện với NPC.
     private final Map<String, String> scriptSourceCache = new ConcurrentHashMap<>();

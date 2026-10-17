@@ -10,9 +10,13 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import dev.kage.account.domain.Account;
+import dev.kage.account.domain.AccountBlockedException;
 import dev.kage.account.domain.AccountPort;
+import dev.kage.account.domain.AccountStatus;
 import dev.kage.account.domain.SessionPort;
 import dev.kage.account.domain.Transaction;
 import dev.kage.account.domain.TransactionRunner;
@@ -65,6 +69,31 @@ class LoginOrCreateAccountUseCaseTest {
         assertThat(result.accountId()).isPositive();
         assertThat(result.sessionToken()).isNotBlank();
         assertThat(sessionPort.validateAndRenew(result.sessionToken())).contains(result.accountId());
+    }
+
+    /** README dòng 68(e): tài khoản bị khoá/tạm khoá không đăng nhập được, và không để lại token nào. */
+    @ParameterizedTest
+    @EnumSource(
+            value = AccountStatus.class,
+            names = {"BANNED", "SUSPENDED"})
+    void shouldRefuseLoginAndIssueNoToken_whenAccountIsBlocked(AccountStatus status) {
+        FakeAccountPort accountPort = new FakeAccountPort();
+        accountPort.byUsername.put("banned_one", new Account(7, "banned_one", Instant.now(), status));
+        FakeSessionPort sessionPort = new FakeSessionPort();
+        LoginOrCreateAccountUseCase useCase = new LoginOrCreateAccountUseCase(accountPort, sessionPort, DIRECT_TX);
+
+        assertThatThrownBy(() -> useCase.execute("banned_one"))
+                .isInstanceOf(AccountBlockedException.class)
+                .extracting(e -> ((AccountBlockedException) e).status())
+                .isEqualTo(status);
+        assertThat(sessionPort.tokens).isEmpty();
+    }
+
+    @Test
+    void shouldTreatAnUnknownStatusValueAsBlocked() {
+        assertThat(AccountStatus.fromColumn("ACTIVE").allowsLogin()).isTrue();
+        assertThat(AccountStatus.fromColumn("BANED").allowsLogin()).isFalse();
+        assertThat(AccountStatus.fromColumn(null).allowsLogin()).isFalse();
     }
 
     @Test

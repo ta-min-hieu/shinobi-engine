@@ -62,9 +62,20 @@ final class WorldFuzzRun {
         SKILL_CODES.add("no_such_skill");
     }
 
+    /** Mỗi nhân vật trung bình một cú lên cấp mỗi ngần này tick (~2 lần mỗi 2 phút mô phỏng). */
+    private static final int LEVEL_UP_ONE_IN_TICKS = 3_600;
+
+    private static final long LEVEL_STREAM_SALT = 0x1E7E1L;
+
     private final long seed;
     private final WorldFuzzScenario scenario;
     private final SplittableRandom random;
+    /**
+     * Nguồn RIÊNG cho lệnh lên cấp giữa phiên (README dòng 79(d), 2026-10-17) — không lấy từ
+     * {@link #random} nên chuỗi lệnh gốc của mọi seed đã ghi nhận giữ nguyên.
+     */
+    private final SplittableRandom levelRandom;
+
     private final InvariantCheckingSink sink = new InvariantCheckingSink();
     private final WorldFacade world;
     private final WorldStateInvariants stateInvariants;
@@ -80,6 +91,7 @@ final class WorldFuzzRun {
         this.seed = seed;
         this.scenario = scenario;
         this.random = new SplittableRandom(seed);
+        this.levelRandom = new SplittableRandom(seed ^ LEVEL_STREAM_SALT);
         // Nhánh random RIÊNG cho World (tách từ seed): kết quả trận đấu theo seed, nhưng không ăn
         // vào chuỗi lệnh — thêm một lần gọi random trong server không làm lệch lệnh của bộ kiểm.
         this.world = scenario.newWorld(sink, random.split());
@@ -193,6 +205,7 @@ final class WorldFuzzRun {
             maybeReturn(id);
             return;
         }
+        maybeRaiseLevel(id);
         Long focused = focus.get(id);
         if (focused != null && random.nextDouble() < FOCUS_CHANCE_PER_TICK) {
             pursue(id, focused);
@@ -201,6 +214,16 @@ final class WorldFuzzRun {
         if (random.nextDouble() < ACTION_CHANCE_PER_TICK) {
             actCommonly(id, random.nextInt(100));
         }
+    }
+
+    /** Thỉnh thoảng một cú lên cấp, kể cả số lạ (≤ 0, > 100): World chỉ được NÂNG cấp, không bao giờ ném. */
+    private void maybeRaiseLevel(long id) {
+        if (levelRandom.nextInt(LEVEL_UP_ONE_IN_TICKS) != 0) {
+            return;
+        }
+        int level = levelRandom.nextInt(-1, 102);
+        log(id, "level(" + level + ")");
+        world.enqueueCharacterLevel(id, level);
     }
 
     private void actCommonly(long id, int roll) {

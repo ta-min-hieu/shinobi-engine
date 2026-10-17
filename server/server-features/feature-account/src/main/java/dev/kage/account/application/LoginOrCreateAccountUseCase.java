@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import dev.kage.account.domain.Account;
+import dev.kage.account.domain.AccountBlockedException;
 import dev.kage.account.domain.AccountPort;
 import dev.kage.account.domain.SessionPort;
 import dev.kage.account.domain.SessionUnavailableException;
@@ -34,6 +35,12 @@ public final class LoginOrCreateAccountUseCase {
         this.transactionManager = transactionManager;
     }
 
+    /**
+     * Đăng nhập (tự tạo tài khoản nếu chưa có) rồi phát session token.
+     *
+     * @throws IllegalArgumentException username sai luật
+     * @throws AccountBlockedException tài khoản bị khoá/tạm khoá — không phát token
+     */
     public LoginResult execute(String username) {
         // Kiểm TRƯỚC khi chạm DB — xem javadoc Account#validateUsername.
         Account.validateUsername(username);
@@ -41,6 +48,10 @@ public final class LoginOrCreateAccountUseCase {
         transactionManager.inTransaction(tx -> accountHolder.set(accountPort.findOrCreate(tx, username)));
 
         Account account = accountHolder.get();
+        // Chặn TRƯỚC khi phát token (README dòng 68(e)): tài khoản bị khoá không được để lại phiên nào.
+        if (!account.status().allowsLogin()) {
+            throw new AccountBlockedException(account.id(), account.status());
+        }
         return new LoginResult(account.id(), account.username(), issueSessionOrNone(account.id()));
     }
 

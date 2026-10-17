@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
  * §6): mọi {@code Account} tồn tại trong hệ thống, kể cả đọc lại từ DB, đều hợp lệ theo quy tắc
  * này — không cần validate lại ở nơi dùng.
  */
-public record Account(long id, String username, Instant createdAt) {
+public record Account(long id, String username, Instant createdAt, AccountStatus status) {
 
     private static final int USERNAME_MIN_LENGTH = 3;
     private static final int USERNAME_MAX_LENGTH = 20;
@@ -17,7 +17,13 @@ public record Account(long id, String username, Instant createdAt) {
 
     public Account {
         Objects.requireNonNull(createdAt, "createdAt");
+        Objects.requireNonNull(status, "status");
         validateUsername(username);
+    }
+
+    /** Tài khoản đang hoạt động — dùng khi tạo mới và ở test không quan tâm trạng thái. */
+    public Account(long id, String username, Instant createdAt) {
+        this(id, username, createdAt, AccountStatus.ACTIVE);
     }
 
     /**

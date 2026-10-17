@@ -23,7 +23,8 @@ import dev.kage.server.world.WorldFacade;
 import dev.kage.server.world.WorldOutboundSink;
 
 /**
- * {@link CharacterLevelSync} báo cú lên cấp cho ĐÚNG World — và không báo cho World đấu trường.
+ * {@link CharacterLevelSync} báo cú lên cấp cho ĐÚNG World nhân vật đang đứng — kể cả World đấu trường
+ * (README dòng 79(a), 2026-10-17).
  *
  * <p>Đo bằng luật thật: mỗi World ở đây là một {@link WorldFacade} đang tick với một nhân vật Lv49
  * đứng cạnh quái mẫu; "World đã nhận cấp mới" nghĩa là Tuyệt Kỹ (cổng Lv50) tung được ở World đó.
@@ -77,16 +78,16 @@ class CharacterLevelSyncRoutingTest {
         assertThat(main.castsUltimate()).isFalse();
     }
 
-    /** Cấp trong trận đấu giữ nguyên như lúc vào trận — xem javadoc {@link CharacterLevelSync}. */
+    /** Lên cấp giữa trận Arena có hiệu lực NGAY trong trận (chủ dự án chốt 2026-10-17, README dòng 79(a)). */
     @Test
-    void shouldLeaveLevelAlone_whileCharacterIsInADuel() {
+    void shouldRaiseLevelInsideTheDuel_notTheMainWorld_whileCharacterIsInADuel() {
         LiveWorld duel = startWorldWithCharacter();
         LiveWorld main = startWorldWithCharacter();
         CharacterLevelSync sync = syncOver(Optional.of(duel), Optional.empty(), Optional.of(main));
 
         sync.onExperienceGranted(CHARACTER_ID, LEVELED_UP_TO_GATE);
 
-        assertThat(duel.castsUltimate()).isFalse();
+        assertThat(duel.castsUltimate()).isTrue();
         assertThat(main.castsUltimate()).isFalse();
     }
 
@@ -144,10 +145,10 @@ class CharacterLevelSyncRoutingTest {
 
     private static CharacterLevelSync syncOver(
             Optional<LiveWorld> duel, Optional<LiveWorld> dungeon, Optional<LiveWorld> main) {
-        return new CharacterLevelSync(
+        return new CharacterLevelSync(new WorldRouteLookup(List.of(
                 id -> duel.map(world -> world.facade),
-                new WorldRouteLookup(
-                        List.of(id -> dungeon.map(world -> world.facade), id -> main.map(world -> world.facade))));
+                id -> dungeon.map(world -> world.facade),
+                id -> main.map(world -> world.facade))));
     }
 
     private LiveWorld startWorldWithCharacter() {

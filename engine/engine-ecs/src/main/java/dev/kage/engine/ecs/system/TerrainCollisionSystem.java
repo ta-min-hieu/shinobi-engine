@@ -62,14 +62,26 @@ public final class TerrainCollisionSystem extends IteratingKSystem {
      * Chặn khi điểm cuối nằm trong vật chặn (hành vi cũ) HOẶC đoạn đi trong tick QUÉT QUA nó từ bên
      * ngoài. Chỉ kiểm điểm cuối thì một tick dời entity qua hẳn bức tường mỏng hơn quãng đi được
      * (5 m/s ở 60Hz = 8,3cm/tick; nhanh hơn — lướt, đẩy lùi — còn dài hơn) mà cả hai đầu đều ở
-     * ngoài: xuyên tường. Điểm đầu đã ở TRONG thì không xét đoạn quét, để entity lỡ nằm trong vật
-     * chặn còn đi ra được thay vì kẹt vĩnh viễn.
+     * ngoài: xuyên tường.
+     *
+     * <p><b>Điểm đầu đã ở TRONG vật chặn</b> (spawn/lưu lỡ nằm trong tường, bị đẩy lùi vào): bước nào
+     * làm entity NÔNG hơn — gần mép gần nhất hơn — thì được đi, bước đi sâu thêm hoặc đứng nguyên độ sâu
+     * thì bị chặn (README dòng 72(c), chủ dự án duyệt 2026-10-17). Bản cũ chặn mọi bước có điểm cuối
+     * nằm trong, nên entity nằm sâu hơn một bước đi (8,3 cm ở 5 m/s) kẹt vĩnh viễn.
      */
     private static boolean blocks(Aabb obstacle, PositionComponent position) {
-        if (obstacle.contains(position.x, position.y)) {
-            return true;
+        boolean startsInside = obstacle.contains(position.prevX, position.prevY);
+        if (startsInside) {
+            return obstacle.contains(position.x, position.y)
+                    && depthInside(obstacle, position.x, position.y)
+                            >= depthInside(obstacle, position.prevX, position.prevY);
         }
-        return !obstacle.contains(position.prevX, position.prevY)
-                && obstacle.intersectsSegment(position.prevX, position.prevY, position.x, position.y);
+        return obstacle.contains(position.x, position.y)
+                || obstacle.intersectsSegment(position.prevX, position.prevY, position.x, position.y);
+    }
+
+    /** Khoảng cách từ một điểm BÊN TRONG {@code box} tới mép gần nhất của nó. */
+    private static float depthInside(Aabb box, float x, float y) {
+        return Math.min(Math.min(x - box.minX(), box.maxX() - x), Math.min(y - box.minY(), box.maxY() - y));
     }
 }

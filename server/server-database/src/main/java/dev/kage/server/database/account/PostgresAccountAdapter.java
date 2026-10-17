@@ -9,6 +9,7 @@ import java.util.List;
 
 import dev.kage.account.domain.Account;
 import dev.kage.account.domain.AccountPort;
+import dev.kage.account.domain.AccountStatus;
 import dev.kage.account.domain.Transaction;
 import dev.kage.server.database.JdbcOperations;
 
@@ -25,11 +26,11 @@ public final class PostgresAccountAdapter implements AccountPort {
             INSERT INTO account (username, created_at)
             VALUES (?, ?)
             ON CONFLICT (username) DO NOTHING
-            RETURNING id, username, created_at
+            RETURNING id, username, created_at, status
             """;
 
     private static final String FIND_BY_USERNAME = """
-            SELECT id, username, created_at FROM account WHERE username = ?
+            SELECT id, username, created_at, status FROM account WHERE username = ?
             """;
 
     @Override
@@ -48,6 +49,7 @@ public final class PostgresAccountAdapter implements AccountPort {
         return new Account(
                 rs.getLong("id"),
                 rs.getString("username"),
-                rs.getTimestamp("created_at").toInstant());
+                rs.getTimestamp("created_at").toInstant(),
+                AccountStatus.fromColumn(rs.getString("status")));
     }
 }

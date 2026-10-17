@@ -57,6 +57,41 @@ class TerrainCollisionSystemTest {
         assertThat(POSITION.get(entity).y).isEqualTo(0f);
     }
 
+    /**
+     * README dòng 72(c): entity nằm SÂU trong vật chặn (sâu hơn một bước đi) được bước ra dần về phía mép
+     * gần nhất — trước đây nó kẹt vĩnh viễn vì mọi bước có điểm cuối còn nằm trong đều bị lùi lại.
+     */
+    @Test
+    void shouldLetAnEntityDeepInsideStepOutTowardsTheNearestEdge() {
+        EcsWorld world = new EcsWorld();
+        world.addSystem(new MovementSystem());
+        TerrainCollisionSystem terrain = new TerrainCollisionSystem();
+        terrain.setObstacles(List.of(new Aabb(0f, -10f, 10f, 10f)));
+        world.addSystem(terrain);
+        KEntity entity = movingEntity(world, 7f, 0f, 1f); // mép phải gần nhất (cách 3)
+
+        for (int tick = 0; tick < 4; tick++) {
+            world.update(1f);
+        }
+
+        assertThat(POSITION.get(entity).x).isEqualTo(11f);
+    }
+
+    /** Ngược lại: đi SÂU thêm vào trong vẫn bị chặn, không trượt sâu hơn được. */
+    @Test
+    void shouldStillBlockAnEntityInsideFromGoingDeeper() {
+        EcsWorld world = new EcsWorld();
+        world.addSystem(new MovementSystem());
+        TerrainCollisionSystem terrain = new TerrainCollisionSystem();
+        terrain.setObstacles(List.of(new Aabb(0f, -10f, 10f, 10f)));
+        world.addSystem(terrain);
+        KEntity entity = movingEntity(world, 7f, 0f, -1f); // đi về phía tâm
+
+        world.update(1f);
+
+        assertThat(POSITION.get(entity).x).isEqualTo(7f);
+    }
+
     @Test
     void shouldAllowMovement_whenDestinationOutsideAnyObstacle() {
         EcsWorld world = new EcsWorld();

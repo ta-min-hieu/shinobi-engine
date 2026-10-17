@@ -572,6 +572,19 @@ public final class WorldScreen implements GameScreen {
     }
 
     /**
+     * Nhật ký chat lúc này — người dựng màn kế tiếp mang nó sang khi TỰ đăng nhập lại (README dòng 40(v)).
+     * Gọi TRƯỚC khi màn này bị thay: rời màn hình là dọn sạch nhật ký ({@link #hide()}).
+     */
+    public ChatHistory chatHistory() {
+        return chat.history();
+    }
+
+    /** Nhận nhật ký từ màn world trước — xem {@link #chatHistory()}. */
+    public void restoreChatHistory(ChatHistory history) {
+        chat.restoreHistory(history);
+    }
+
+    /**
      * Bật tự đăng nhập lại khi đường truyền đứt thật (quyết định chủ dự án 2026-09-29): nối lại,
      * đăng nhập bằng {@code username}, chọn lại ĐÚNG nhân vật này rồi giao gói vào world cho
      * {@code onResumed} dựng một màn world mới. Hỏng hẳn (hết lượt, hoặc server từ chối) thì đi
@@ -955,9 +968,9 @@ public final class WorldScreen implements GameScreen {
 
     /** Nhánh 3D (ADR-031) — model glTF qua camera orthographic khoá góc. */
     private void renderModels(float alpha) {
-        float localX = interpolatedX(localPlayer, alpha);
-        float localY = interpolatedY(localPlayer, alpha);
-        float localZ = interpolatedZ(localPlayer, alpha);
+        float localX = InterpolatedPosition.x(localPlayer, alpha);
+        float localY = InterpolatedPosition.y(localPlayer, alpha);
+        float localZ = InterpolatedPosition.z(localPlayer, alpha);
         models.setPosition(WorldConstants.LOCAL_CHARACTER_ID, localX, localY, localZ);
         models.setMoving(WorldConstants.LOCAL_CHARACTER_ID, isLocalPlayerMoving());
         // ADR-033 — grounded là trạng thái dự đoán cục bộ/xác nhận qua MoveResponse, KHÔNG nội suy
@@ -997,26 +1010,10 @@ public final class WorldScreen implements GameScreen {
         shapeRenderer.end();
     }
 
-    private static float interpolatedX(KEntity entity, float alpha) {
-        PositionComponent pos = POSITION.get(entity);
-        return pos.prevX + ((pos.x - pos.prevX) * alpha);
-    }
-
-    private static float interpolatedY(KEntity entity, float alpha) {
-        PositionComponent pos = POSITION.get(entity);
-        return pos.prevY + ((pos.y - pos.prevY) * alpha);
-    }
-
-    /** ADR-033 — nội suy trục dọc giống hệt {@link #interpolatedX}/{@link #interpolatedY}. */
-    private static float interpolatedZ(KEntity entity, float alpha) {
-        PositionComponent pos = POSITION.get(entity);
-        return pos.prevZ + ((pos.z - pos.prevZ) * alpha);
-    }
-
     private void drawInterpolated(KEntity entity, float alpha) {
         shapeRenderer.rect(
-                interpolatedX(entity, alpha) - (WorldConstants.BOX_SIZE / 2f),
-                interpolatedY(entity, alpha) - (WorldConstants.BOX_SIZE / 2f),
+                InterpolatedPosition.x(entity, alpha) - (WorldConstants.BOX_SIZE / 2f),
+                InterpolatedPosition.y(entity, alpha) - (WorldConstants.BOX_SIZE / 2f),
                 WorldConstants.BOX_SIZE,
                 WorldConstants.BOX_SIZE);
     }

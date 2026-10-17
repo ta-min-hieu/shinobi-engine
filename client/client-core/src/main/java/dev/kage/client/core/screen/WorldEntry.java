@@ -1,6 +1,7 @@
 package dev.kage.client.core.screen;
 
 import dev.kage.client.core.net.GameConnection;
+import dev.kage.client.core.world.ChatHistory;
 import dev.kage.client.core.world.PlayContext;
 import dev.kage.client.core.world.WorldScreen;
 import dev.kage.engine.core.KageEngine;
@@ -36,16 +37,26 @@ final class WorldEntry {
         this.username = username;
     }
 
-    /** Dựng màn world cho {@code character} rồi chuyển sang nó. */
+    /** Dựng màn world cho {@code character} rồi chuyển sang nó — lần vào đầu tiên, nhật ký chat trắng. */
     void open(CharacterSummary character, SelectCharacterResponse enterWorld) {
+        open(character, enterWorld, ChatHistory.EMPTY);
+    }
+
+    /**
+     * Như trên, mang theo nhật ký chat của màn world trước (tự đăng nhập lại — README dòng 40(v)).
+     */
+    private void open(CharacterSummary character, SelectCharacterResponse enterWorld, ChatHistory chatHistory) {
         WorldScreen worldScreen = new WorldScreen(context, connection, character, enterWorld);
+        worldScreen.restoreChatHistory(chatHistory);
         // Màn world đã tự dừng kết nối trước khi gọi tới đây.
         worldScreen.setOnSessionEnded(errorKey -> {
             LoginScreen login = new LoginScreen(engine, context, username);
             login.showSessionEndedReason(errorKey);
             engine.setScreen(login);
         });
-        worldScreen.enableAutoRelog(username, this::open);
+        // Chụp nhật ký NGAY lúc vào lại được, trước khi màn cũ bị thay (rời màn hình là dọn sạch).
+        worldScreen.enableAutoRelog(
+                username, (resumed, resumedEntry) -> open(resumed, resumedEntry, worldScreen.chatHistory()));
         engine.setScreen(worldScreen);
     }
 }

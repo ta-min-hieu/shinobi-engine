@@ -6,12 +6,15 @@ import java.io.OutputStream;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.EnvironmentAccess;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.PolyglotAccess;
@@ -64,7 +67,13 @@ import org.graalvm.polyglot.proxy.ProxyObject;
  * </ul>
  *
  * <p>Mỗi {@link #eval} tạo một {@link Context} MỚI — không tái sử dụng giữa các lần gọi, tránh state
- * rò rỉ giữa hai script (VD hai quest khác nhau, hai người chơi khác nhau). {@code hostApi} được
+ * rò rỉ giữa hai script (VD hai quest khác nhau, hai người chơi khác nhau). Context gắn vào một
+ * {@link Engine} DÙNG CHUNG (README dòng 70(c), 2026-10-17): đo bằng {@code ScriptContextBenchmark},
+ * một lần eval script sát thương cỡ thật tốn ~363 µs khi mỗi Context tự dựng Engine ngầm, ~88 µs trên
+ * Engine dùng chung. Trạng thái JS vẫn nằm trong Context nên không rò giữa hai lần eval; Engine chỉ
+ * giữ phần dùng lại được (khởi tạo ngôn ngữ, cache code). Mỗi trần câu lệnh một Engine (cùng một
+ * {@link ResourceLimits}) và sống cả đời JVM — sandbox không có vòng đời đóng, mà World dựng/huỷ liên
+ * tục (hầm ngục, đấu trường) nên một Engine mỗi sandbox sẽ rò. {@code hostApi} được
  * bọc CHỈ ĐỌC: script không ghi được vào {@code Map} của caller, kể cả khi caller lỡ truyền một map
  * sống lâu.
  */
@@ -79,6 +88,14 @@ public final class ScriptSandbox {
     public static final Duration DEFAULT_TIMEOUT = Duration.ofMillis(500);
 
     /**
+     * Trần cho script KHÔNG chạy trên tick (hội thoại, quest — chạy trên Virtual Thread của gateway;
+     * chạy thử skill lúc dựng World): 5 s, chủ dự án chốt 2026-10-11 cho skill và 2026-10-17 cho hội
+     * thoại/quest (README dòng 70). 500 ms từng cắt nhầm script hợp lệ khi máy tải nặng — trên server
+     * nghẽn CPU/GC dài nghĩa là từ chối người chơi nói chuyện NPC hay nhận quest. Vẫn là chốt chống treo.
+     */
+    public static final Duration OFF_TICK_TIMEOUT = Duration.ofSeconds(5);
+
+    /**
      * Độ sâu frame JS tối đa. Script nội dung hiện tại sâu chưa tới 5 frame; stack JS tự nhiên của
      * GraalJS ở chế độ interpreter cạn ở khoảng 850 frame trên luồng 1MB (đo thật) — trần phải nằm
      * DƯỚI mức đó thì mới là lỗi cạn tài nguyên không bắt được thay vì {@code RangeError} bắt được.
@@ -87,8 +104,14 @@ public final class ScriptSandbox {
 
     private static final ScheduledThreadPoolExecutor WATCHDOG = createWatchdog();
 
+    /** Engine + ResourceLimits dùng chung theo trần câu lệnh — xem javadoc lớp. */
+    private static final ConcurrentMap<Long, SharedEngine> ENGINES = new ConcurrentHashMap<>();
+
     private final long maxStatements;
     private final Duration timeout;
+
+    /** Một Engine GraalJS và đúng một cấu hình giới hạn cho mọi Context của nó. */
+    private record SharedEngine(Engine engine, ResourceLimits limits) {}
 
     public ScriptSandbox(long maxStatements) {
         this(maxStatements, DEFAULT_TIMEOUT);
@@ -173,7 +196,9 @@ public final class ScriptSandbox {
     }
 
     private Context buildContext() {
+        SharedEngine shared = ENGINES.computeIfAbsent(maxStatements, ScriptSandbox::newSharedEngine);
         return Context.newBuilder("js")
+                .engine(shared.engine())
                 // GraalVM tự kiểm mọi dòng dưới đây khớp CONSTRAINED, lệch là ném lúc build().
                 .sandbox(SandboxPolicy.CONSTRAINED)
                 // Không member/class Java nào, và không ánh xạ ngược object JS thành Map/List Java
@@ -192,10 +217,21 @@ public final class ScriptSandbox {
                 .err(OutputStream.nullOutputStream())
                 .in(InputStream.nullInputStream())
                 .option("sandbox.MaxStackFrames", Integer.toString(MAX_STACK_FRAMES))
-                .resourceLimits(ResourceLimits.newBuilder()
-                        .statementLimit(maxStatements, null)
-                        .build())
+                .resourceLimits(shared.limits())
                 .build();
+    }
+
+    /** Engine cũng phải khai CONSTRAINED và nuốt stdout/stderr — GraalVM kiểm cả Engine lẫn Context. */
+    private static SharedEngine newSharedEngine(long statementLimit) {
+        Engine engine = Engine.newBuilder("js")
+                .sandbox(SandboxPolicy.CONSTRAINED)
+                .out(OutputStream.nullOutputStream())
+                .err(OutputStream.nullOutputStream())
+                .in(InputStream.nullInputStream())
+                .build();
+        ResourceLimits limits =
+                ResourceLimits.newBuilder().statementLimit(statementLimit, null).build();
+        return new SharedEngine(engine, limits);
     }
 
     @SuppressWarnings("unchecked")

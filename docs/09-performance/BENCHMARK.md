@@ -1115,6 +1115,27 @@ frame time — chỉ là áp lực cấp phát.
 
 ---
 
+### 5.12 Một lần eval GraalJS — Engine riêng hay Engine dùng chung (2026-10-17, README dòng 70(c))
+
+**Câu hỏi.** `ScriptSandbox.eval` dựng một `Context` MỚI mỗi lần (không rò trạng thái giữa hai script).
+Context không gắn Engine thì GraalJS dựng ngầm một Engine riêng cho nó — tốn bao nhiêu, và gắn vào một
+Engine dùng chung có rẻ hơn rõ không?
+
+**Đo.** `engine/engine-scripting/src/jmh/.../ScriptContextBenchmark` (JMH, `./gradlew :engine:engine-scripting:jmh`,
+fork 2, warmup 5×1 s, đo 10×1 s, máy dev, JDK 25), script sát thương cỡ script skill thật, cấu hình
+Context đúng như `ScriptSandbox.buildContext()` (CONSTRAINED):
+
+| Cách | µs/lần eval |
+|---|---|
+| Context tự dựng Engine ngầm (cách cũ) | 348 ± 28 |
+| Context trên Engine dùng chung (chép tay) | 88 ± 3 |
+| `ScriptSandbox.eval` sau khi đổi | 94 ± 2 |
+
+**Kết luận.** Nhanh ~3,7 lần ⇒ đã đổi: mỗi trần câu lệnh một Engine + một `ResourceLimits`, sống cả đời
+JVM. Lưu ý jmh: uber jar của plugin làm mất `Multi-Release: true` mà Truffle cần — `engine-scripting`
+tự thêm lại vào manifest của `jmhJar`. ⚠️ Con số "5–20 ms mỗi eval" ghi ở README dòng 70(c) trước đó là
+đo thô lúc JVM chưa ấm, không phải trạng thái ổn định.
+
 ## 6. Khi nào chạy
 
 | Loại | Ở PR? | Khi nào |

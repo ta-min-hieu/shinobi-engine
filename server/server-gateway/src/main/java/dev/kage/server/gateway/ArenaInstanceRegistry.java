@@ -199,9 +199,16 @@ final class ArenaInstanceRegistry {
                 releaseReservation(challengerCharacterId, characterId);
             }
         }
-        return started
-                ? new AcceptResult(AcceptOutcome.OK, challengerCharacterId)
-                : new AcceptResult(AcceptOutcome.NOT_FOUND, 0);
+        if (!started) {
+            return new AcceptResult(AcceptOutcome.NOT_FOUND, 0);
+        }
+        // Lên cấp giữa trận có hiệu lực ngay (README dòng 79(a)) ⇒ cú lên cấp rơi đúng lúc đang dời vào
+        // trận cũng không được mất: đọc lại cấp sau khi dời, ngoài khoá — xem CharacterLevelResync.
+        for (long entrant : new long[] {challengerCharacterId, characterId}) {
+            worldFacadeFor(entrant)
+                    .ifPresent(world -> CharacterLevelResync.afterMoveInto(world, characterFacade, entrant));
+        }
+        return new AcceptResult(AcceptOutcome.OK, challengerCharacterId);
     }
 
     /**

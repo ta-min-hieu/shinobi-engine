@@ -35,7 +35,9 @@ final class QuestScriptRunner {
     private static final Logger LOG = LoggerFactory.getLogger(QuestScriptRunner.class);
     private static final long SCRIPT_MAX_STATEMENTS = 10_000L; // cùng độ lớn SkillConstants/GetDialogueNodeUseCase
 
-    private final ScriptSandbox scriptSandbox = new ScriptSandbox(SCRIPT_MAX_STATEMENTS);
+    // Không chạy trên tick ⇒ trần chống treo rộng (README dòng 70) — xem ScriptSandbox.OFF_TICK_TIMEOUT.
+    private final ScriptSandbox scriptSandbox =
+            new ScriptSandbox(SCRIPT_MAX_STATEMENTS, ScriptSandbox.OFF_TICK_TIMEOUT);
     // Script không đổi lúc chạy — cache theo scriptRef, cùng lý do GetDialogueNodeUseCase.
     private final Map<String, String> scriptSourceCache = new ConcurrentHashMap<>();
 

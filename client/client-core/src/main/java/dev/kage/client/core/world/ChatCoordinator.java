@@ -193,6 +193,20 @@ final class ChatCoordinator implements WindowFlow {
         return KageI18n.textOrKey(i18n, key);
     }
 
+    /** Nhật ký hiện có, để mang sang màn world mới khi tự đăng nhập lại — xem {@link ChatHistory}. */
+    ChatHistory history() {
+        return new ChatHistory(controller.lines());
+    }
+
+    /** Nhận nhật ký từ màn world cũ — thay dòng gợi ý mặc định của màn mới. Rỗng thì không đổi gì. */
+    void restoreHistory(ChatHistory history) {
+        if (history.lines().isEmpty()) {
+            return;
+        }
+        controller.restoreLines(history.lines());
+        refreshLines();
+    }
+
     /** Rời màn hình/mất kết nối — nhật ký của một phiên chơi không được sống sót sang phiên sau. */
     @Override
     public void reset() {

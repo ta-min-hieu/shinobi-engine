@@ -33,6 +33,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import dev.kage.account.application.LoginOrCreateAccountUseCase;
 import dev.kage.account.application.LoginResult;
+import dev.kage.account.domain.AccountBlockedException;
 import dev.kage.account.domain.SessionPort;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
@@ -132,6 +133,38 @@ class LoginInvariantsIntegrationTest {
 
         assertThat(countAllAccounts()).as("không username độc nào được ghi").isEqualTo(accountsBefore);
         assertThat(sessions.issuedCount()).as("không token nào được phát").isZero();
+    }
+
+    /**
+     * README dòng 68(e): cột {@code account.status} (có từ V1) nay được đăng nhập đọc — khoá bằng SQL là
+     * lần đăng nhập kế bị từ chối, không phát token; mở khoá là vào lại được.
+     */
+    @Test
+    void shouldRefuseLogin_whileTheAccountRowIsMarkedBanned() throws SQLException {
+        CountingSessionPort sessions = new CountingSessionPort();
+        LoginOrCreateAccountUseCase useCase = new LoginOrCreateAccountUseCase(
+                new PostgresAccountAdapter(), sessions, new JdbcAccountTransactionRunner(dataSource));
+        long accountId = useCase.execute("ban_target").accountId();
+        long issuedBefore = sessions.issuedCount();
+
+        setStatus(accountId, "BANNED");
+        assertThatThrownBy(() -> useCase.execute("ban_target")).isInstanceOf(AccountBlockedException.class);
+        assertThat(sessions.issuedCount())
+                .as("không phát token cho tài khoản bị khoá")
+                .isEqualTo(issuedBefore);
+
+        setStatus(accountId, "ACTIVE");
+        assertThat(useCase.execute("ban_target").accountId()).isEqualTo(accountId);
+    }
+
+    private static void setStatus(long accountId, String status) throws SQLException {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
+                        connection.prepareStatement("UPDATE account SET status = ? WHERE id = ?")) {
+            statement.setString(1, status);
+            statement.setLong(2, accountId);
+            statement.executeUpdate();
+        }
     }
 
     static List<String> hostileUsernames() {

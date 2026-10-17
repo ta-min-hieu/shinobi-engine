@@ -1,8 +1,6 @@
 package dev.kage.server.gateway;
 
 import java.util.List;
-import java.util.Optional;
-import java.util.function.LongFunction;
 
 import dev.kage.character.application.GrantExperienceUseCase;
 import dev.kage.server.world.WorldFacade;
@@ -18,11 +16,10 @@ import dev.kage.server.world.WorldFacade;
  * thưởng quest — đều đi qua {@code sendExperience}, nên đó là ĐIỂM DUY NHẤT gọi vào đây; không đường
  * cộng EXP nào phải tự nhớ mà báo world.
  *
- * <p><b>World nào nhận.</b> World chính và hầm ngục: cả hai đều là nơi EXP hạ quái sinh ra, cùng một
- * {@code SkillSystem}. <b>Đấu trường thì KHÔNG</b>: cấp trong trận giữ nguyên như lúc vào trận (hành
- * vi trước bản sửa này), vì chưa tài liệu nào chốt việc mở khoá Tuyệt Kỹ GIỮA một trận đấu người với
- * người — đường về world chính sau trận đọc lại cấp từ DB ({@link CharacterLoadout#load}) nên cấp mới
- * có hiệu lực ngay khi trận xong, không cần đăng nhập lại.
+ * <p><b>World nào nhận.</b> World nhân vật ĐANG ĐỨNG — đấu trường, hầm ngục hay world chính, tra theo
+ * thứ tự đó (định tuyến ưu tiên giống {@code GatewayChannelHandler.currentWorldFacade}). Đấu trường
+ * từng bị loại trừ (cấp trong trận đứng yên tới hết trận); từ 2026-10-17 chủ dự án chốt lên cấp giữa
+ * trận Arena có hiệu lực NGAY như ở hầm ngục (README dòng 79(a)).
  *
  * <p><b>Lên cấp ĐÚNG lúc đang được dời World</b> (vào/ra hầm ngục, về từ đấu trường): lệnh của lớp
  * này có thể tới World cũ hoặc tới World mới khi thực thể chưa được gắn, và bị bỏ qua. Từ 2026-10-11
@@ -34,25 +31,19 @@ import dev.kage.server.world.WorldFacade;
  */
 final class CharacterLevelSync {
 
-    private final LongFunction<Optional<WorldFacade>> duelWorldOf;
     private final WorldRouteLookup worldsFollowingLevel;
 
-    /**
-     * @param duelWorldOf World đấu trường nhân vật đang ở, rỗng nếu không trong trận
-     * @param worldsFollowingLevel các World có cấp đi theo cú lên cấp giữa phiên
-     */
-    CharacterLevelSync(LongFunction<Optional<WorldFacade>> duelWorldOf, WorldRouteLookup worldsFollowingLevel) {
-        this.duelWorldOf = duelWorldOf;
+    /** @param worldsFollowingLevel các World có cấp đi theo cú lên cấp giữa phiên, theo thứ tự ưu tiên */
+    CharacterLevelSync(WorldRouteLookup worldsFollowingLevel) {
         this.worldsFollowingLevel = worldsFollowingLevel;
     }
 
     /** Định tuyến production — xem "World nào nhận" ở javadoc lớp. */
     static CharacterLevelSync of(WorldGateway worldGateway) {
-        return new CharacterLevelSync(
+        return new CharacterLevelSync(new WorldRouteLookup(List.of(
                 worldGateway.arenaInstanceRegistry()::worldFacadeFor,
-                new WorldRouteLookup(List.of(
-                        worldGateway.dungeonInstanceRegistry()::worldFacadeFor,
-                        worldGateway.mainWorldChannels()::worldFacadeFor)));
+                worldGateway.dungeonInstanceRegistry()::worldFacadeFor,
+                worldGateway.mainWorldChannels()::worldFacadeFor)));
     }
 
     /**
@@ -60,11 +51,7 @@ final class CharacterLevelSync {
      * {@code GatewayBootstrap} nối bản thật, và của test không dựng World.
      */
     static CharacterLevelSync unbound() {
-        return new CharacterLevelSync(CharacterLevelSync::noWorld, new WorldRouteLookup(List.of()));
-    }
-
-    private static Optional<WorldFacade> noWorld(long characterId) {
-        return Optional.empty();
+        return new CharacterLevelSync(new WorldRouteLookup(List.of()));
     }
 
     /**
@@ -73,7 +60,7 @@ final class CharacterLevelSync {
      * attach kế đọc lại.
      */
     void onExperienceGranted(long characterId, GrantExperienceUseCase.Result result) {
-        if (!result.leveledUp() || duelWorldOf.apply(characterId).isPresent()) {
+        if (!result.leveledUp()) {
             return;
         }
         int level = result.progress().level();

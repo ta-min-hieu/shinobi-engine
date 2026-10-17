@@ -201,6 +201,17 @@ final class ChatController {
         return List.copyOf(lines);
     }
 
+    /**
+     * Thay nhật ký bằng {@code restored} (cũ trước mới sau) — vẫn giữ trần {@link #MAX_LINES}: chỉ giữ
+     * những dòng MỚI nhất nếu bản mang sang dài hơn.
+     */
+    void restoreLines(List<Line> restored) {
+        lines.clear();
+        for (Line line : restored) {
+            append(line);
+        }
+    }
+
     void clear() {
         lines.clear();
         channel = DEFAULT_CHANNEL;

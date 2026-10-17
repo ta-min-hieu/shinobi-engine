@@ -2,6 +2,8 @@ package dev.kage.server.world;
 
 import java.time.Duration;
 
+import dev.kage.engine.scripting.ScriptSandbox;
+
 /**
  * Tham số skill — TOÀN BỘ hằng số ở đây là PLACEHOLDER, chưa cân bằng qua playtest (cùng tinh
  * thần {@link CombatConstants}). Theo GAMEPLAY.md §4, {@code cooldown_ms}/{@code chi_cost} đúng ra
@@ -34,7 +36,7 @@ final class SkillConstants {
      * hoặc GC dừng lâu là TỪ CHỐI người chơi vào phó bản/đấu trường. Vẫn là chốt chống treo — một
      * script treo thật bị cắt sau ngần này. Cast lúc chơi (trên tick) giữ nguyên 500ms.
      */
-    static final Duration SCRIPT_VALIDATION_TIMEOUT = Duration.ofSeconds(5);
+    static final Duration SCRIPT_VALIDATION_TIMEOUT = ScriptSandbox.OFF_TICK_TIMEOUT;
 
     // GDD §5 "Tuyệt Kỹ Lv50" — gate ở SkillSystem.tryCast qua CharacterLevelComponent.
     static final int ULTIMATE_REQUIRED_LEVEL = 50;

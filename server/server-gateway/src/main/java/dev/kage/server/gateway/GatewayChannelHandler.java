@@ -658,6 +658,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .build();
             send(ctx, Opcode.OPCODE_CONNECT_RESPONSE_VALUE, sequenceId, response.toByteArray());
             networkMetrics.recordLoginSuccess();
+        } catch (dev.kage.account.domain.AccountBlockedException e) {
+            // Tài khoản bị khoá (README dòng 68(e)) — một dòng INFO, không stack trace: đây là luật chạy
+            // đúng, không phải sự cố.
+            networkMetrics.recordLoginFailed();
+            LOG.info("Đăng nhập bị từ chối: {}", e.getMessage());
+            sendError(ctx, sequenceId, 403, "error.account_banned");
         } catch (IllegalArgumentException e) {
             networkMetrics.recordLoginFailed();
             LOG.warn("Đăng nhập thất bại: username không hợp lệ", e);
