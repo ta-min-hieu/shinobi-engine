@@ -94,6 +94,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-060](ADR-060-Daily-Check-In.md) | Điểm danh hằng ngày — chu kỳ 7 ngày, quà qua thư hệ thống (V62, module `feature-checkin`) | ✅ **Accepted** *(2026-10-18, lô 16)* — thi hành cùng ngày | Không có lý do quay lại mỗi ngày ngoài nhiệm vụ ngày |
 | [ADR-061](ADR-061-Sect-Storage.md) | Kho đồ tông môn — 40 dòng/nhân vật, gửi/rút ở Tô Vân Nhi (V63, opcode 514–519) | ✅ **Accepted** *(2026-10-18, lô 16)* — thi hành cùng ngày | Túi 20 ô chật từ khi có bộ đồ theo arc + quà hằng ngày |
 | [ADR-062](ADR-062-Achievements-And-Titles.md) | Thành tựu + danh hiệu — 9 mốc (V64), danh hiệu trong chat, dải opcode MỚI 1700–1704, module `feature-achievement` | ✅ **Accepted** *(2026-10-18, lô 16)* — thi hành cùng ngày | Ngoài cấp/Lực Chiến không có mục tiêu dài hạn nhìn thấy được |
+| [ADR-063](ADR-063-Market.md) | Phường thị — treo bán món chưa cường hoá, giá cố định, phí 5% (sink), hết hạn 48h trả qua thư (V65, opcode 1006–1014, module `feature-market`) | ✅ **Accepted** *(2026-10-18, lô 16)* — thi hành cùng ngày | Bán đồ cho người lạ phải cùng online + giao dịch trực tiếp; GDD §10 đòi phí đấu giá làm gold sink |
 ---
 
 ## ADR cần tạo (chưa viết)

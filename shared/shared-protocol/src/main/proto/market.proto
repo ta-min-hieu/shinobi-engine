@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// ADR-063 — phường thị (dải Shop/Auction 1006–1014). characterId luôn lấy từ session (SECURITY.md §4).
+// Chỉ món CHƯA cường hoá được treo (D2) nên dòng treo không có cấp cường hoá.
+
+message MarketListingView {
+  int64 listing_id = 1;
+  int64 seller_id = 2;
+  string seller_name = 3;
+  int64 item_template_id = 4;
+  int32 quantity = 5;
+  int64 price = 6;          // giá TỔNG cả dòng
+  int64 expires_at_epoch_seconds = 7;
+}
+
+// Request: Client -> Server (OPCODE_LIST_MARKET_REQUEST = 1006). item_template_id = 0 ⇒ mọi loại.
+message ListMarketRequest {
+  int64 item_template_id = 1;
+}
+
+// Response: Server -> Client (OPCODE_LIST_MARKET_RESPONSE = 1007). `listings` = tối đa 50 dòng mới nhất
+// (không gồm dòng của chính người hỏi); `mine` = mọi dòng người hỏi đang treo.
+message ListMarketResponse {
+  repeated MarketListingView listings = 1;
+  repeated MarketListingView mine = 2;
+  int32 max_active_listings = 3;
+  int32 fee_percent = 4;
+}
+
+enum MarketResult {
+  MARKET_RESULT_UNSPECIFIED = 0;
+  MARKET_RESULT_OK = 1;
+  MARKET_RESULT_NOT_FOUND = 2;            // dòng/món không còn (đã bán, đã huỷ, hết hạn, không phải của mình)
+  MARKET_RESULT_INVALID_QUANTITY = 3;
+  MARKET_RESULT_INVALID_PRICE = 4;
+  MARKET_RESULT_EQUIPPED = 5;
+  MARKET_RESULT_ENHANCED_NOT_ALLOWED = 6;
+  MARKET_RESULT_ITEM_IN_TRADE = 7;
+  MARKET_RESULT_TOO_MANY_LISTINGS = 8;
+  MARKET_RESULT_OWN_LISTING = 9;
+  MARKET_RESULT_INSUFFICIENT_GOLD = 10;
+  MARKET_RESULT_BAG_FULL = 11;
+  MARKET_RESULT_DUPLICATE_REQUEST = 12;   // ADR-025 — đã xử lý trước đó, coi như xong
+}
+
+// Command: Client -> Server (OPCODE_CREATE_LISTING_COMMAND = 1008).
+message CreateListingCommand {
+  int64 inventory_item_id = 1;
+  int32 quantity = 2;
+  int64 price = 3;
+  string idempotency_key = 4;
+}
+
+// Response: Server -> Client (OPCODE_CREATE_LISTING_RESPONSE = 1009).
+message CreateListingResponse {
+  MarketResult outcome = 1;
+}
+
+// Command: Client -> Server (OPCODE_BUY_LISTING_COMMAND = 1010). Mua CẢ dòng.
+message BuyListingCommand {
+  int64 listing_id = 1;
+  string idempotency_key = 2;
+}
+
+// Response: Server -> Client (OPCODE_BUY_LISTING_RESPONSE = 1011).
+message BuyListingResponse {
+  MarketResult outcome = 1;
+}
+
+// Command: Client -> Server (OPCODE_CANCEL_LISTING_COMMAND = 1012). Trạng thái tuyệt đối — không cần khoá.
+message CancelListingCommand {
+  int64 listing_id = 1;
+}
+
+// Response: Server -> Client (OPCODE_CANCEL_LISTING_RESPONSE = 1013).
+message CancelListingResponse {
+  MarketResult outcome = 1;
+}
+
+// Event: Server -> Client (OPCODE_LISTING_SOLD_EVENT = 1014). Gửi cho NGƯỜI BÁN đang online khi dòng của
+// họ vừa bán; vàng mới tới riêng bằng GoldChangedEvent (209).
+message ListingSoldEvent {
+  int64 listing_id = 1;
+  int64 item_template_id = 2;
+  int32 quantity = 3;
+  int64 proceeds = 4;       // đã trừ phí
+}

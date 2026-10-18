@@ -26,6 +26,7 @@ dependencies {
     implementation(project(":server:server-features:feature-world"))
     implementation(project(":server:server-features:feature-achievement"))
     implementation(project(":server:server-features:feature-checkin"))
+    implementation(project(":server:server-features:feature-market"))
     implementation(project(":server:server-features:feature-gm"))
     implementation(project(":server:server-world"))
     implementation(project(":server:server-database"))

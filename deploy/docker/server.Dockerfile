@@ -62,6 +62,7 @@ COPY server/server-features/feature-monster/build.gradle.kts server/server-featu
 COPY server/server-features/feature-world/build.gradle.kts server/server-features/feature-world/
 COPY server/server-features/feature-achievement/build.gradle.kts server/server-features/feature-achievement/
 COPY server/server-features/feature-checkin/build.gradle.kts server/server-features/feature-checkin/
+COPY server/server-features/feature-market/build.gradle.kts server/server-features/feature-market/
 COPY server/server-features/feature-gm/build.gradle.kts server/server-features/feature-gm/
 COPY quality/architecture-tests/build.gradle.kts quality/architecture-tests/
 COPY tools/asset-pipeline/build.gradle.kts tools/asset-pipeline/

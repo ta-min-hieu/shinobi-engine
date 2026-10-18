@@ -132,8 +132,13 @@ public final class GatewayBootstrap {
         server.shutdownNotice(shutdownNoticeFromEnvironment());
         // /health/ready còn đòi cổng game phục vụ được (dòng 62(i)) — server dựng SAU máy chủ metrics.
         worldContext.metricsHttpServer().addReadinessCheck(server::isServingGameTraffic);
+        MarketExpiryJanitor marketExpiry = new MarketExpiryJanitor(
+                facades.progression().marketFacade(),
+                facades.contentFacades().socialFacades().mailFacade(),
+                characterRegistry);
+        marketExpiry.start();
         Runnable shutdown = shutdownSequence(
-                new ShutdownContext(server, worldContext, instanceRegistries, characterRegistry),
+                new ShutdownContext(server, worldContext, instanceRegistries, characterRegistry, marketExpiry),
                 positionPersister,
                 observability,
                 databaseBootstrap);
@@ -236,6 +241,8 @@ public final class GatewayBootstrap {
             ctx.instanceRegistries().arena().stopAll();
             ctx.characterRegistry().stop();
             positionPersister.stop();
+            // Hết hạn phường thị ghi DB + gửi thư — dừng TRƯỚC khi đóng pool (ADR-063 D4).
+            ctx.marketExpiry().stop();
             ctx.worldContext().metricsHttpServer().stop();
             observability.tracing().shutdown();
             databaseBootstrap.shutdown();
@@ -250,7 +257,8 @@ public final class GatewayBootstrap {
             GatewayServer server,
             WorldContext worldContext,
             InstanceRegistries instanceRegistries,
-            ConnectedCharacterRegistry characterRegistry) {}
+            ConnectedCharacterRegistry characterRegistry,
+            MarketExpiryJanitor marketExpiry) {}
 
     /**
      * Gộp {@link MainWorldChannelRegistry} + {@link MetricsHttpServer} — cả hai sinh ra CÙNG lúc
@@ -407,7 +415,8 @@ public final class GatewayBootstrap {
         ContentFacades contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
         ProgressionFacades progression = new ProgressionFacades(
                 databaseBootstrap.wireCheckInFacade(new CheckInMailSender(mailFacade, inventoryFacade)),
-                databaseBootstrap.wireAchievementFacade());
+                databaseBootstrap.wireAchievementFacade(),
+                databaseBootstrap.wireMarketFacade());
         return new GatewayFacades(
                 accountFacade,
                 characterFacade,

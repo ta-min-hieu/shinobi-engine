@@ -14,11 +14,13 @@ import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.scenes.scene2d.ui.TextField;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.I18NBundle;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
+import dev.kage.client.core.render.FontFactory;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.client.core.ui.theme.KageSkin;
 
@@ -38,6 +40,7 @@ public final class ReportPanel implements HudWindow {
     private static final float BUTTON_MIN_WIDTH_PX = 96f;
     private static final float BUTTON_TEXT_PAD_PX = 14f;
     private static final float LIST_MAX_HEIGHT_PX = 364f;
+    private static final float INPUT_WIDTH_PX = 180f;
 
     private static final Color SECTION_COLOR = Color.valueOf("E0B860");
     private static final Color ROW_COLOR = Color.valueOf("F2F2F2");
@@ -65,6 +68,11 @@ public final class ReportPanel implements HudWindow {
     private final int openKey;
     private final Table panel;
     private final Label statusLabel;
+
+    /** Hàng ô nhập tuỳ chọn (phường thị: giá) — rỗng tới khi {@link #enableInput}; bảng rỗng không chiếm chỗ. */
+    private final Table inputRow = new Table();
+
+    private TextField input;
     private final Table rowList;
     private final Table tabRow = new Table();
     private final List<String> tabKeys;
@@ -107,6 +115,7 @@ public final class ReportPanel implements HudWindow {
             panel.add(tabRow).left().padTop(6f).row();
         }
         panel.add(statusLabel).width(PANEL_WIDTH_PX).left().padTop(6f).row();
+        panel.add(inputRow).width(PANEL_WIDTH_PX).left().padTop(4f).row();
         panel.add(ScrollingList.wrap(rowList, skin))
                 .width(PANEL_WIDTH_PX)
                 .maxHeight(LIST_MAX_HEIGHT_PX)
@@ -214,6 +223,26 @@ public final class ReportPanel implements HudWindow {
 
     public void setCanOpen(BooleanSupplier condition) {
         this.canOpen = condition;
+    }
+
+    /**
+     * Bật một ô nhập một dòng dưới dòng trạng thái (phường thị — giá treo bán). Gọi một lần lúc dựng.
+     * Chỉ nhận ký tự font vẽ được, cùng luật ô chat.
+     *
+     * @param labelKey khoá i18n nhãn đứng trước ô
+     */
+    public void enableInput(String labelKey) {
+        input = new TextField("", skin.textFieldStyle);
+        input.setTextFieldFilter((field, character) -> FontFactory.canRender(character));
+        Label label = new Label(text(labelKey), skin.labelStyle);
+        label.setColor(SECTION_COLOR);
+        inputRow.add(label).left().padRight(8f);
+        inputRow.add(input).width(INPUT_WIDTH_PX).left();
+    }
+
+    /** Nội dung ô nhập; rỗng nếu chưa {@link #enableInput}. */
+    public String inputText() {
+        return input == null ? "" : input.getText();
     }
 
     /** Dòng trạng thái dưới tiêu đề/tab — chuỗi ĐÃ dịch. */

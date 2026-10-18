@@ -70,6 +70,8 @@ import dev.kage.mail.application.DeleteMailUseCase;
 import dev.kage.mail.application.ListMailUseCase;
 import dev.kage.mail.application.MailPorts;
 import dev.kage.mail.application.SendMailUseCase;
+import dev.kage.market.api.MarketFacade;
+import dev.kage.market.application.MarketUseCase;
 import dev.kage.monster.api.MonsterFacade;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.party.application.AcceptPartyInviteUseCase;
@@ -120,6 +122,11 @@ import dev.kage.server.database.mail.PostgresMailGoldAdapter;
 import dev.kage.server.database.mail.PostgresMailIdempotencyAdapter;
 import dev.kage.server.database.mail.PostgresMailInventoryGatewayAdapter;
 import dev.kage.server.database.mail.PostgresMailRepositoryAdapter;
+import dev.kage.server.database.market.JdbcMarketTransactionRunner;
+import dev.kage.server.database.market.PostgresMarketAdapter;
+import dev.kage.server.database.market.PostgresMarketGoldAdapter;
+import dev.kage.server.database.market.PostgresMarketInventoryAdapter;
+import dev.kage.server.database.market.PostgresMarketRecordAdapter;
 import dev.kage.server.database.monster.PostgresMonsterCatalogAdapter;
 import dev.kage.server.database.party.PostgresPartyAdapter;
 import dev.kage.server.database.pvp.PostgresPvpRatingAdapter;
@@ -513,6 +520,18 @@ public final class ServerDatabaseBootstrap {
     /** ADR-052 — quyền GM (chỉ đọc) + sổ audit write-ahead. */
     public GmFacade wireGmFacade() {
         return new GmFacade(new PostgresGmRoleAdapter(dataSource), new PostgresGmAuditAdapter(dataSource));
+    }
+
+    /** Phường thị (ADR-063) — mọi port trong CÙNG transaction (túi đồ, vàng, dòng treo, khoá, audit). */
+    public MarketFacade wireMarketFacade() {
+        return new MarketFacade(new MarketUseCase(
+                new MarketUseCase.Ports(
+                        new PostgresMarketAdapter(dataSource),
+                        new PostgresMarketInventoryAdapter(),
+                        new PostgresMarketGoldAdapter(),
+                        new PostgresMarketRecordAdapter()),
+                new JdbcMarketTransactionRunner(dataSource),
+                java.time.Clock.systemUTC()));
     }
 
     /** Thành tựu + danh hiệu (ADR-062). */

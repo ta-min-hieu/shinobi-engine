@@ -77,7 +77,9 @@ import dev.kage.protocol.ApproveGuildJoinRequestResponse;
 import dev.kage.protocol.AttackCommand;
 import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.BuyItemResponse;
+import dev.kage.protocol.BuyListingCommand;
 import dev.kage.protocol.BuyOutcome;
+import dev.kage.protocol.CancelListingCommand;
 import dev.kage.protocol.CancelTradeCommand;
 import dev.kage.protocol.CancelTradeOutcome;
 import dev.kage.protocol.CancelTradeResponse;
@@ -103,6 +105,7 @@ import dev.kage.protocol.CreateCharacterResponse;
 import dev.kage.protocol.CreateGuildCommand;
 import dev.kage.protocol.CreateGuildOutcome;
 import dev.kage.protocol.CreateGuildResponse;
+import dev.kage.protocol.CreateListingCommand;
 import dev.kage.protocol.CreatePartyCommand;
 import dev.kage.protocol.CreatePartyOutcome;
 import dev.kage.protocol.CreatePartyResponse;
@@ -189,6 +192,7 @@ import dev.kage.protocol.ListInventoryRequest;
 import dev.kage.protocol.ListInventoryResponse;
 import dev.kage.protocol.ListMailRequest;
 import dev.kage.protocol.ListMailResponse;
+import dev.kage.protocol.ListMarketRequest;
 import dev.kage.protocol.ListPartyMembersRequest;
 import dev.kage.protocol.ListPartyMembersResponse;
 import dev.kage.protocol.ListPendingFriendRequestsRequest;
@@ -384,6 +388,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final WorldRouteLookup worldRoutes;
     private final NpcProximity npcProximity;
     private final SectStorageCommands storage;
+    private final MarketCommands market;
     private final ItemUseCooldown itemUseCooldown = new ItemUseCooldown();
     private final Executor authExecutor;
     // Tin chat của kết nối này chạy lần lượt (dòng 71(f)) — xem SerialExecutor.
@@ -464,6 +469,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_LIST_INVENTORY_REQUEST_VALUE, this::handleListInventoryRequest),
             Map.entry(Opcode.OPCODE_LIST_STORAGE_REQUEST_VALUE, this::handleListStorageRequest),
             Map.entry(Opcode.OPCODE_LIST_ACHIEVEMENTS_REQUEST_VALUE, this::handleListAchievementsRequest),
+            Map.entry(Opcode.OPCODE_LIST_MARKET_REQUEST_VALUE, this::handleListMarketRequest),
+            Map.entry(Opcode.OPCODE_CREATE_LISTING_COMMAND_VALUE, this::handleCreateListingCommand),
+            Map.entry(Opcode.OPCODE_BUY_LISTING_COMMAND_VALUE, this::handleBuyListingCommand),
+            Map.entry(Opcode.OPCODE_CANCEL_LISTING_COMMAND_VALUE, this::handleCancelListingCommand),
             Map.entry(Opcode.OPCODE_SET_ACTIVE_TITLE_COMMAND_VALUE, this::handleSetActiveTitleCommand),
             Map.entry(Opcode.OPCODE_DEPOSIT_ITEM_COMMAND_VALUE, this::handleDepositItemCommand),
             Map.entry(Opcode.OPCODE_WITHDRAW_ITEM_COMMAND_VALUE, this::handleWithdrawItemCommand),
@@ -553,6 +562,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.npcProximity =
                 new NpcProximity(worldGateway.mainWorldChannels().worldContent().npcs(), this::mainWorldPositionOf);
         this.storage = new SectStorageCommands(inventoryFacade, npcProximity);
+        this.market = new MarketCommands(facades.progression().marketFacade(), worldGateway.registry());
         this.authExecutor = authExecutor;
         this.chatExecutor = new SerialExecutor(authExecutor);
         this.networkMetrics = observability.networkMetrics();
@@ -1683,6 +1693,53 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 characterId -> storage.withdraw(characterId, command));
     }
 
+    /** ADR-063 — bảng tin phường thị. */
+    private void handleListMarketRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ListMarketRequest request = ListMarketRequest.parseFrom(payload);
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_LIST_MARKET_RESPONSE_VALUE,
+                characterId -> market.list(characterId, request));
+    }
+
+    private void handleCreateListingCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        CreateListingCommand command = CreateListingCommand.parseFrom(payload);
+        if (rejectMalformedIdempotencyKey(ctx, header.sequenceId(), command.getIdempotencyKey())) {
+            return;
+        }
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_CREATE_LISTING_RESPONSE_VALUE,
+                characterId -> market.create(characterId, command));
+    }
+
+    private void handleBuyListingCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        BuyListingCommand command = BuyListingCommand.parseFrom(payload);
+        if (rejectMalformedIdempotencyKey(ctx, header.sequenceId(), command.getIdempotencyKey())) {
+            return;
+        }
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_BUY_LISTING_RESPONSE_VALUE,
+                characterId -> market.buy(characterId, command));
+    }
+
+    private void handleCancelListingCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        CancelListingCommand command = CancelListingCommand.parseFrom(payload);
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_CANCEL_LISTING_RESPONSE_VALUE,
+                characterId -> market.cancel(characterId, command));
+    }
+
     /** ADR-062 — cửa sổ thành tựu. Cấp đọc từ DB (mốc cấp so thẳng với cấp, không có bộ đếm). */
     private void handleListAchievementsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
@@ -1716,7 +1773,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         worldGateway.registry().achievements.facade().activeTitleCode(characterId)));
     }
 
-    /** Khuôn chung ba lệnh kho: cần đăng nhập, chạy trên Virtual Thread, trả đúng một response. */
+    /**
+     * Khuôn chung các lệnh một-response chạm DB (kho, thành tựu, phường thị): cần đăng nhập, chạy trên
+     * Virtual Thread.
+     */
     private void runStorage(
             ChannelHandlerContext ctx,
             int sequenceId,
