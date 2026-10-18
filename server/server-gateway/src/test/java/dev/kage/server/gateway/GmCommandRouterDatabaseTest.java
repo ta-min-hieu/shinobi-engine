@@ -67,6 +67,7 @@ class GmCommandRouterDatabaseTest {
             .withCommand("redis-server", "--requirepass", REDIS_PASSWORD);
 
     private static final AtomicInteger NEXT = new AtomicInteger();
+    private static final List<long[]> RELOCATIONS = new java.util.concurrent.CopyOnWriteArrayList<>();
     private static GatewayFacades facades;
     private static GmCommandRouter.Deps deps;
 
@@ -95,7 +96,11 @@ class GmCommandRouterDatabaseTest {
                 facades.inventoryFacade(),
                 registry,
                 id -> Optional.empty(),
-                id -> 100);
+                id -> 100,
+                (mover, anchor) -> {
+                    RELOCATIONS.add(new long[] {mover, anchor});
+                    return MainWorldRelocation.Outcome.OK;
+                });
     }
 
     @Test
@@ -171,6 +176,24 @@ class GmCommandRouterDatabaseTest {
                 .singleElement()
                 .asString()
                 .startsWith("id=" + gm.id());
+    }
+
+    /** goto dời CHÍNH GM tới mục tiêu, summon dời MỤC TIÊU tới GM — đúng chiều, và có dòng audit OK. */
+    @Test
+    void gotoAndSummonShouldMoveInOppositeDirections() {
+        Character gm = newCharacter();
+        Character player = newCharacter();
+        grant(gm.accountId(), "GM");
+
+        router(true).execute(actor(gm, LOOPBACK), "/gm goto " + player.name());
+        router(true).execute(actor(gm, LOOPBACK), "/gm summon " + player.name());
+        List<String> self = router(true).execute(actor(gm, LOOPBACK), "/gm summon " + gm.name());
+
+        assertThat(RELOCATIONS)
+                .filteredOn(move -> move[0] == gm.id() || move[0] == player.id())
+                .containsExactly(new long[] {gm.id(), player.id()}, new long[] {player.id(), gm.id()});
+        assertThat(self).singleElement().asString().startsWith("Already there");
+        assertThat(count(COUNT_AUDIT_OUTCOME, gm.accountId(), "OK")).isEqualTo(2L);
     }
 
     private static GmCommandRouter router(boolean enabled) {

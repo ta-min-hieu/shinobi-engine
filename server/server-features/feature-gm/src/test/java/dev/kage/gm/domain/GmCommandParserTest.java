@@ -30,6 +30,8 @@ class GmCommandParserTest {
         assertThat(ok("/gm gold A 1000000")).isEqualTo(new GmCommand.Gold("A", 1_000_000L));
         assertThat(ok("/gm announce Bảo trì lúc 22h")).isEqualTo(new GmCommand.Announce("Bảo trì lúc 22h"));
         assertThat(ok("/gm heal A")).isEqualTo(new GmCommand.Heal("A"));
+        assertThat(ok("/gm goto A")).isEqualTo(new GmCommand.Goto("A"));
+        assertThat(ok("/gm SUMMON A")).isEqualTo(new GmCommand.Summon("A"));
     }
 
     @ParameterizedTest
@@ -46,6 +48,8 @@ class GmCommandParserTest {
                 "/gm gold A -5",
                 "/gm kick",
                 "/gm kick A B",
+                "/gm summon",
+                "/gm goto A B",
                 "/gm teleport A",
                 "/gm setlevel A 99",
                 "/gm announce"

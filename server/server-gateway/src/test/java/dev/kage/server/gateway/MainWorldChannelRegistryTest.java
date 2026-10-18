@@ -102,6 +102,56 @@ class MainWorldChannelRegistryTest {
         }
     }
 
+    /**
+     * ADR-052 goto/summon: người dời sang ĐÚNG khu vực của người neo (world chính chia khu vực — gắn
+     * thường sẽ chọn khu còn chỗ, có thể khác khu người neo), không nhân đôi, không mất ai.
+     */
+    @Test
+    void relocationShouldMoveIntoTheAnchorsChannel_evenAcrossChannels() {
+        // Khu #1 nhận tới khi ĐẦY (khu #2 mở sẵn từ ngưỡng 80% nhưng chỉ nhận người thứ 21 trở đi).
+        long anchor = MainWorldChannelRegistry.DEFAULT_CAPACITY + 1L;
+        for (long id = 1; id <= anchor; id++) {
+            channels.attachCharacter(entry(id));
+        }
+        WorldFacade anchorWorld = channels.worldFacadeFor(anchor).orElseThrow();
+        assertThat(channels.worldFacadeFor(1L).orElseThrow())
+                .as("người dời bắt đầu ở khu khác")
+                .isNotSameAs(anchorWorld);
+        int before = channels.playerCount();
+        AtomicInteger transfers = new AtomicInteger();
+
+        MainWorldChannelRegistry.PendingRelocation pending =
+                channels.beginRelocation(1L, anchor).orElseThrow();
+        pending.oldWorldSilent().join();
+        boolean moved = channels.finishRelocation(1L, pending, entry(1L), attach -> {
+            transfers.incrementAndGet();
+            attach.run();
+        });
+
+        assertThat(moved).isTrue();
+        assertThat(transfers).hasValue(1);
+        assertThat(channels.worldFacadeFor(1L)).containsSame(anchorWorld);
+        assertThat(channels.playerCount()).isEqualTo(before);
+    }
+
+    /** Rời world chính trong lúc chờ (rớt mạng) ⇒ nửa sau không gắn lại, không báo 308. */
+    @Test
+    void relocationShouldBeDropped_whenTheMoverLeftWhileWaiting() {
+        channels.attachCharacter(entry(1L));
+        channels.attachCharacter(entry(2L));
+        MainWorldChannelRegistry.PendingRelocation pending =
+                channels.beginRelocation(1L, 2L).orElseThrow();
+        channels.detachCharacter(1L);
+
+        boolean moved = channels.finishRelocation(1L, pending, entry(1L), attach -> attach.run());
+
+        assertThat(moved).isFalse();
+        assertThat(channels.worldFacadeFor(1L)).isEmpty();
+        assertThat(channels.beginRelocation(3L, 2L))
+                .as("người ngoài world chính")
+                .isEmpty();
+    }
+
     @Test
     void shouldAttachAgain_afterCharacterWasDetached() {
         channels.attachCharacter(entry(CHARACTER_ID));

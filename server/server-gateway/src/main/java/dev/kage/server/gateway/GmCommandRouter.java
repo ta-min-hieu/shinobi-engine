@@ -63,7 +63,14 @@ final class GmCommandRouter {
             InventoryFacade inventory,
             ConnectedCharacterRegistry registry,
             LongFunction<Optional<WorldFacade>> worldOf,
-            LongToIntFunction maxHpOf) {}
+            LongToIntFunction maxHpOf,
+            Relocator relocator) {}
+
+    /** Dời một nhân vật tới chỗ người khác đứng trong world chính — {@link MainWorldRelocation#move}. */
+    @FunctionalInterface
+    interface Relocator {
+        MainWorldRelocation.Outcome move(long moverId, long anchorId);
+    }
 
     /** Người ra lệnh — từ SESSION, không từ gói (SECURITY.md §4). */
     record Actor(long accountId, long characterId, SocketAddress remote) {}
@@ -114,7 +121,7 @@ final class GmCommandRouter {
             return audited(
                     new Request(actor, role, command.name(), line),
                     OptionalLong.empty(),
-                    ticket -> run(command, Optional.empty(), ticket));
+                    ticket -> run(actor, command, Optional.empty(), ticket));
         }
         Optional<Character> target = deps.characters().findByName(command.targetName());
         if (target.isEmpty()) {
@@ -132,7 +139,9 @@ final class GmCommandRouter {
             });
         }
         return audited(
-                new Request(actor, role, command.name(), line), targetId, ticket -> run(command, target, ticket));
+                new Request(actor, role, command.name(), line),
+                targetId,
+                ticket -> run(actor, command, target, ticket));
     }
 
     /** D4 — không tác động lên người có cấp ≥ mình (chặn GM bị chiếm quay sang khoá người thu hồi nó). */
@@ -176,7 +185,7 @@ final class GmCommandRouter {
         String run(GmFacade.AuditTicket ticket);
     }
 
-    private String run(GmCommand command, Optional<Character> target, GmFacade.AuditTicket ticket) {
+    private String run(Actor actor, GmCommand command, Optional<Character> target, GmFacade.AuditTicket ticket) {
         return switch (command) {
             case GmCommand.Help _ -> help(ticket);
             case GmCommand.Who _ -> who(target.orElseThrow(), ticket);
@@ -185,6 +194,9 @@ final class GmCommandRouter {
             case GmCommand.Unmute _ -> unmute(target.orElseThrow(), ticket);
             case GmCommand.Announce announce -> announce(announce.text(), ticket);
             case GmCommand.Heal _ -> heal(target.orElseThrow(), ticket);
+            case GmCommand.Goto _ ->
+                relocate(actor.characterId(), target.orElseThrow().id(), ticket);
+            case GmCommand.Summon _ -> relocate(target.orElseThrow().id(), actor.characterId(), ticket);
             case GmCommand.Give give -> give(target.orElseThrow(), give.itemCode(), give.quantity(), ticket);
             case GmCommand.Gold gold -> gold(target.orElseThrow(), gold.amount(), ticket);
         };
@@ -192,7 +204,7 @@ final class GmCommandRouter {
 
     private static String help(GmFacade.AuditTicket ticket) {
         ticket.finish(GmOutcome.OK, "{}");
-        return "GM: help who kick mute unmute announce heal | ADMIN: give gold";
+        return "GM: help who kick mute unmute announce heal goto summon | ADMIN: give gold";
     }
 
     private String who(Character target, GmFacade.AuditTicket ticket) {
@@ -261,6 +273,23 @@ final class GmCommandRouter {
         world.get().enqueueHealCharacter(target.id(), deps.maxHpOf().applyAsInt(target.id()));
         ticket.finish(GmOutcome.OK, "{}");
         return "Healed " + target.id();
+    }
+
+    /** goto/summon (D4): chỉ trong world chính; dời chính mình tới chỗ mình là không làm gì. */
+    private String relocate(long moverId, long anchorId, GmFacade.AuditTicket ticket) {
+        if (moverId == anchorId) {
+            ticket.finish(GmOutcome.REJECTED, "{}");
+            return "Already there";
+        }
+        MainWorldRelocation.Outcome outcome = deps.relocator().move(moverId, anchorId);
+        ticket.finish(
+                outcome == MainWorldRelocation.Outcome.OK ? GmOutcome.OK : GmOutcome.REJECTED,
+                "{\"result\":\"" + outcome + "\"}");
+        return switch (outcome) {
+            case OK -> "Moved " + moverId + " to " + anchorId;
+            case NOT_IN_MAIN_WORLD -> "Both characters must be online in the main world";
+            case NO_POSITION -> "Position of " + anchorId + " not known yet, try again";
+        };
     }
 
     private String give(Character target, String itemCode, int quantity, GmFacade.AuditTicket ticket) {

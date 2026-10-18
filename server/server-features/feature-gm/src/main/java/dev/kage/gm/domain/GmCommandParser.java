@@ -62,6 +62,8 @@ public final class GmCommandParser {
             "kick", words -> oneTarget(words, "kick <name>", GmCommand.Kick::new),
             "unmute", words -> oneTarget(words, "unmute <name>", GmCommand.Unmute::new),
             "heal", words -> oneTarget(words, "heal <name>", GmCommand.Heal::new),
+            "goto", words -> oneTarget(words, "goto <name>", GmCommand.Goto::new),
+            "summon", words -> oneTarget(words, "summon <name>", GmCommand.Summon::new),
             "mute", GmCommandParser::mute,
             "give", GmCommandParser::give,
             "gold", GmCommandParser::gold);

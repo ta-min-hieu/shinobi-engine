@@ -60,6 +60,9 @@ final class DungeonCoordinator implements WindowFlow {
         controller.onWorldChanged(event.getWorldKind());
         if (event.getReason() == WorldChangeReason.WORLD_CHANGE_REASON_DEFEATED) {
             announce(Optional.of("dungeon.notice.defeated"));
+        } else if (event.getReason() == WorldChangeReason.WORLD_CHANGE_REASON_GM_MOVED) {
+            // ADR-052 — bị GM dời (summon/goto): không Response nào nói thay, người chơi phải biết vì sao.
+            announce(Optional.of("world.notice.gm_moved"));
         }
         refreshBanner();
     }

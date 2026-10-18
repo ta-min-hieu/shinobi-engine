@@ -1859,7 +1859,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         worldGateway.registry(),
                         this::currentWorldFacadeIfPresent,
                         targetId -> CharacterLoadout.load(characterFacade, worldGateway.registry(), targetId)
-                                .maxHp()),
+                                .maxHp(),
+                        new MainWorldRelocation(
+                                worldGateway.mainWorldChannels(), worldGateway.registry(), characterFacade)::move),
                 GmConfig.current(),
                 java.time.Clock.systemUTC());
     }

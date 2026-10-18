@@ -101,6 +101,32 @@ public sealed interface GmCommand {
         }
     }
 
+    /** Dời CHÍNH GM tới chỗ mục tiêu đang đứng — chỉ trong world chính (D4). */
+    record Goto(String targetName) implements GmCommand {
+        @Override
+        public String name() {
+            return "goto";
+        }
+
+        @Override
+        public GmRole requiredRole() {
+            return GmRole.GM;
+        }
+    }
+
+    /** Dời MỤC TIÊU tới chỗ GM đang đứng — gỡ người kẹt địa hình, chỉ trong world chính (D4). */
+    record Summon(String targetName) implements GmCommand {
+        @Override
+        public String name() {
+            return "summon";
+        }
+
+        @Override
+        public GmRole requiredRole() {
+            return GmRole.GM;
+        }
+    }
+
     /** Tạo tài sản từ không khí ⇒ ADMIN (D4). Đi thư hệ thống. */
     record Give(String targetName, String itemCode, int quantity) implements GmCommand {
         @Override

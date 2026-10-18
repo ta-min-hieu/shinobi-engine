@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 import io.micrometer.core.instrument.MeterRegistry;
 
@@ -279,6 +280,52 @@ final class MainWorldChannelRegistry {
     }
 
     /**
+     * Nửa đầu một lượt dời TRONG world chính (lệnh GM {@code goto}/{@code summon}, ADR-052 D4/D6): gỡ
+     * {@code moverId} khỏi World đang đứng nhưng GIỮ định tuyến — gói tới giữa chừng đi vào World cũ (vô
+     * hại, thực thể đã gỡ) thay vì làm {@code WorldRouteLookup} trả rỗng và đóng kết nối, cùng cách hầm
+     * ngục giữ định tuyến trong lúc rời.
+     *
+     * @return rỗng nếu một trong hai người không ở world chính (hầm ngục, đấu trường, offline)
+     */
+    synchronized Optional<PendingRelocation> beginRelocation(long moverId, long anchorId) {
+        Channel from = channelByCharacterId.get(moverId);
+        Channel to = channelByCharacterId.get(anchorId);
+        if (stopped || from == null || to == null) {
+            return Optional.empty();
+        }
+        from.facade().detachCharacter(moverId);
+        return Optional.of(new PendingRelocation(from, to, from.facade().inboxBarrier()));
+    }
+
+    /**
+     * Nửa sau của {@link #beginRelocation}, khi World cũ đã im với người dời: ghi định tuyến mới rồi gắn
+     * vào khu vực của người neo — kể cả khi khu vực đó đã đủ người (lệnh GM, một người, vượt trần một
+     * chút có chủ ý). Khu vực neo đã đóng trong lúc chờ (người neo rời, khu phụ rỗng) ⇒ gắn lại vào khu
+     * cũ, vẫn đúng toạ độ đích (mọi khu vực là CÙNG một map).
+     *
+     * @param transfer nhận lệnh gắn và phải chạy nó SAU khi ghi {@code WorldChangedEvent} — {@code
+     *     WorldTransfer#move}
+     * @return {@code false} nếu trong lúc chờ người dời đã rời world chính (rớt mạng, bị kéo vào hầm
+     *     ngục): không gắn, không báo gì
+     */
+    synchronized boolean finishRelocation(
+            long moverId, PendingRelocation pending, CharacterEntry entry, Consumer<Runnable> transfer) {
+        if (!pending.from().equals(channelByCharacterId.get(moverId))) {
+            return false;
+        }
+        Channel to = channels.contains(pending.to()) ? pending.to() : pending.from();
+        transfer.accept(() -> to.facade().attachCharacter(entry));
+        pending.from().characterIds().remove(moverId);
+        to.characterIds().add(moverId);
+        channelByCharacterId.put(moverId, to);
+        closeIfEmptyOverflowChannel(pending.from());
+        return true;
+    }
+
+    /** Một lượt dời đang chờ World cũ im — xem {@link #beginRelocation}. */
+    record PendingRelocation(Channel from, Channel to, CompletableFuture<Void> oldWorldSilent) {}
+
+    /**
      * Khu vực nhân vật này ĐANG ở, rỗng nếu không online qua registry này (vd. đang ở dungeon/duel
      * — {@code GatewayChannelHandler.currentWorldFacade} tự ưu tiên trước).
      */
@@ -389,7 +436,7 @@ final class MainWorldChannelRegistry {
     }
 
     /** 1 khu vực (channel) đang chạy — {@code characterIds} mutable (người vào/ra liên tục). */
-    private record Channel(WorldFacade facade, int capacity, Set<Long> characterIds) {
+    record Channel(WorldFacade facade, int capacity, Set<Long> characterIds) {
         private Channel(WorldFacade facade, int capacity) {
             this(facade, capacity, new HashSet<>());
         }

@@ -37,11 +37,14 @@ không nhận gì (server không xác nhận lệnh tồn tại). Trần 5 lện
 | `/gm unmute <tên>` | GM | Mở khoá |
 | `/gm announce <nội dung ≤200>` | GM | Dòng hệ thống tới mọi người online (qua lọc từ cấm) |
 | `/gm heal <tên>` | GM | Hồi đầy máu (đang ở trong một World) |
+| `/gm goto <tên>` | GM | Dời CHÍNH mình tới chỗ người đó đang đứng (có thể đổi khu vực) |
+| `/gm summon <tên>` | GM | Kéo người đó tới chỗ mình đang đứng — gỡ người kẹt địa hình; họ thấy dòng báo "ban quản lý dời" |
 | `/gm give <tên> <mã_vật_phẩm> <1-99>` | **ADMIN** | Thư hệ thống kèm vật phẩm |
 | `/gm gold <tên> <1-1000000>` | **ADMIN** | Thư hệ thống kèm vàng |
 
-Không tác động lên người có cấp ≥ mình (trừ `who`/`heal` chính mình). `goto`/`summon` (D4) **chưa có**:
-World chưa có cơ chế dịch chuyển nhân vật tại chỗ — cần detach + attach có vị trí, việc riêng.
+Không tác động lên người có cấp ≥ mình (trừ `who`/`heal` chính mình). `goto`/`summon` chỉ chạy khi CẢ HAI
+người đang ở world chính (không ở bí cảnh/đấu trường); người bị dời vào chỗ mới với máu đầy (mọi lần đổi
+World đều vậy — ADR-051) và có thể vượt trần người của khu vực đích đúng một người.
 
 **Audit**: mọi lệnh của người có quyền ghi `gm_audit_log` TRƯỚC khi có hiệu lực (`PENDING`), chốt một lần
 (`OK`/`REJECTED`/`DENIED`/`FAILED`). Không bao giờ xoá bảng này. Truy vấn mẫu:

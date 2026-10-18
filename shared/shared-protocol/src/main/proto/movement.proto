@@ -127,6 +127,7 @@ enum WorldChangeReason {
   WORLD_CHANGE_REASON_PULLED_BY_PARTY = 2; // bị bạn cùng nhóm kéo vào hầm ngục
   WORLD_CHANGE_REASON_DEFEATED = 3;        // gục trong hầm ngục ⇒ đưa về world chính
   WORLD_CHANGE_REASON_DUEL_ENDED = 4;      // trận đấu chốt xong ⇒ về world chính
+  WORLD_CHANGE_REASON_GM_MOVED = 5;        // ADR-052 — lệnh GM goto/summon dời người này trong world chính
 }
 
 // Event: Server -> Client (OPCODE_WORLD_CHANGED_EVENT, ADR-051). CHÍNH nhân vật nhận gói vừa được
