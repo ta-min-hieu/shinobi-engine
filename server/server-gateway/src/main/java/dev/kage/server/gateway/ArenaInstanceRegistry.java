@@ -556,6 +556,7 @@ final class ArenaInstanceRegistry {
         byte[] payload = event.toByteArray();
         registry.sendToCharacterIfOnline(winnerCharacterId, Opcode.OPCODE_DUEL_RESULT_EVENT_VALUE, 0, payload);
         registry.sendToCharacterIfOnline(loserCharacterId, Opcode.OPCODE_DUEL_RESULT_EVENT_VALUE, 0, payload);
+        registry.achievements.onDuelWon(settlement.winnerCharacterId());
     }
 
     /**

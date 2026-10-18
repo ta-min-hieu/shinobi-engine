@@ -60,10 +60,19 @@ final class CharacterLevelSync {
      * attach kế đọc lại.
      */
     void onExperienceGranted(long characterId, GrantExperienceUseCase.Result result) {
+        onExperienceGranted(characterId, result, AchievementHooks.unbound());
+    }
+
+    /**
+     * Như {@link #onExperienceGranted(long, GrantExperienceUseCase.Result)} và báo luôn cấp mới cho thành
+     * tựu cấp (ADR-062) — cùng một chỗ biết "đây là cú lên cấp".
+     */
+    void onExperienceGranted(long characterId, GrantExperienceUseCase.Result result, AchievementHooks achievements) {
         if (!result.leveledUp()) {
             return;
         }
         int level = result.progress().level();
         worldsFollowingLevel.find(characterId).ifPresent(world -> world.enqueueCharacterLevel(characterId, level));
+        achievements.onLevelReached(characterId, level);
     }
 }

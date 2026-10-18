@@ -53,4 +53,6 @@ message ChatMessageEvent {
   int64 sender_id = 2;
   string sender_name = 3;
   string body = 4;
+  // ADR-062 — khoá i18n danh hiệu người gửi đang đeo; rỗng = không đeo (và mọi tin hệ thống).
+  string sender_title_key = 5;
 }

@@ -31,6 +31,7 @@ option java_multiple_files = true;
 //   1400–1499 Trade                                     ← Phase 7
 //   1500–1599 Dungeon                                   ← Phase 8
 //   1600–1699 Arena (PvP 1v1)                           ← Phase 8
+//   1700–1799 Achievement / Title                       ← ADR-062 (2026-10-18)
 enum Opcode {
   OPCODE_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho packet thật.
 
@@ -263,4 +264,11 @@ enum Opcode {
   OPCODE_DUEL_CHALLENGE_DECLINED_EVENT = 1609;
   OPCODE_DUEL_STARTED_EVENT = 1610;
   OPCODE_DUEL_RESULT_EVENT = 1611;
+
+  // --- Achievement / Title (1700-1799) — ADR-062 (Accepted 2026-10-18) ---
+  OPCODE_LIST_ACHIEVEMENTS_REQUEST = 1700;
+  OPCODE_LIST_ACHIEVEMENTS_RESPONSE = 1701;
+  OPCODE_SET_ACTIVE_TITLE_COMMAND = 1702;
+  OPCODE_SET_ACTIVE_TITLE_RESPONSE = 1703;
+  OPCODE_ACHIEVEMENT_UNLOCKED_EVENT = 1704;
 }

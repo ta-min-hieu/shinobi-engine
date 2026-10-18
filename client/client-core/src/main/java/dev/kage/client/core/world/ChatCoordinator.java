@@ -93,7 +93,7 @@ final class ChatCoordinator implements WindowFlow {
 
     private boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
         if (opcode == Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE) {
-            controller.onMessage(ChatMessageEvent.parseFrom(payload));
+            controller.onMessage(withTitle(ChatMessageEvent.parseFrom(payload)));
             refreshLines();
             return true;
         }
@@ -102,6 +102,21 @@ final class ChatCoordinator implements WindowFlow {
             return true;
         }
         return false;
+    }
+
+    /**
+     * ADR-062 D3 — người gửi đang đeo danh hiệu thì tên hiện thành {@code [Danh hiệu] Tên}. Danh hiệu là
+     * khoá i18n (server không gửi chữ); khoá lạ (client cũ hơn server) thì bỏ qua, không hiện mã thô.
+     */
+    private ChatMessageEvent withTitle(ChatMessageEvent event) {
+        String titleKey = event.getSenderTitleKey();
+        String title = titleKey.isEmpty() ? "" : text(titleKey);
+        if (title.isEmpty() || title.equals(titleKey)) {
+            return event; // textOrKey trả lại chính khoá khi bundle thiếu nó
+        }
+        return event.toBuilder()
+                .setSenderName("[" + title + "] " + event.getSenderName())
+                .build();
     }
 
     /**

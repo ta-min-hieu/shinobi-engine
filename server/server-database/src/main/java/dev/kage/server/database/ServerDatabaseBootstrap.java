@@ -9,6 +9,8 @@ import redis.clients.jedis.RedisClient;
 
 import dev.kage.account.api.AccountFacade;
 import dev.kage.account.application.LoginOrCreateAccountUseCase;
+import dev.kage.achievement.api.AchievementFacade;
+import dev.kage.achievement.application.AchievementUseCase;
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.application.CharacterUseCases;
 import dev.kage.character.application.CreateCharacterUseCase;
@@ -90,6 +92,7 @@ import dev.kage.quest.application.ProcessQuestEventUseCase;
 import dev.kage.quest.application.QuestRewardPorts;
 import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
+import dev.kage.server.database.achievement.PostgresAchievementAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
 import dev.kage.server.database.chat.PostgresChatAuditAdapter;
@@ -510,6 +513,11 @@ public final class ServerDatabaseBootstrap {
     /** ADR-052 — quyền GM (chỉ đọc) + sổ audit write-ahead. */
     public GmFacade wireGmFacade() {
         return new GmFacade(new PostgresGmRoleAdapter(dataSource), new PostgresGmAuditAdapter(dataSource));
+    }
+
+    /** Thành tựu + danh hiệu (ADR-062). */
+    public AchievementFacade wireAchievementFacade() {
+        return new AchievementFacade(new AchievementUseCase(new PostgresAchievementAdapter(dataSource)));
     }
 
     /**

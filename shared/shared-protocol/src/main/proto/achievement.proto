@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+// ADR-062 — thành tựu + danh hiệu (dải 1700–1799). characterId luôn lấy từ session (SECURITY.md §4).
+// Tên thành tựu/danh hiệu là KHOÁ i18n — server không gửi chữ hiển thị.
+
+// 1 dòng cửa sổ thành tựu.
+message AchievementView {
+  string code = 1;
+  string name_key = 2;
+  string title_key = 3;
+  int64 progress = 4; // bộ đếm (hoặc cấp hiện tại với mốc cấp)
+  int64 target = 5;
+  bool unlocked = 6;
+}
+
+// Request: Client -> Server (OPCODE_LIST_ACHIEVEMENTS_REQUEST = 1700). Không field.
+message ListAchievementsRequest {
+}
+
+// Response: Server -> Client (OPCODE_LIST_ACHIEVEMENTS_RESPONSE = 1701).
+message ListAchievementsResponse {
+  repeated AchievementView achievements = 1;
+  string active_title_code = 2; // rỗng = không đeo danh hiệu nào
+}
+
+// Command: Client -> Server (OPCODE_SET_ACTIVE_TITLE_COMMAND = 1702). achievement_code rỗng = bỏ danh hiệu.
+// Đổi trạng thái tuyệt đối (gửi lặp cho cùng kết quả) nên không cần idempotency_key.
+message SetActiveTitleCommand {
+  string achievement_code = 1;
+}
+
+enum SetActiveTitleOutcome {
+  SET_ACTIVE_TITLE_OUTCOME_UNSPECIFIED = 0;
+  SET_ACTIVE_TITLE_OUTCOME_OK = 1;
+  SET_ACTIVE_TITLE_OUTCOME_NOT_UNLOCKED = 2; // chưa mở (hoặc không có thành tựu đó)
+}
+
+// Response: Server -> Client (OPCODE_SET_ACTIVE_TITLE_RESPONSE = 1703).
+message SetActiveTitleResponse {
+  SetActiveTitleOutcome outcome = 1;
+  string active_title_code = 2;
+}
+
+// Event: Server -> Client (OPCODE_ACHIEVEMENT_UNLOCKED_EVENT = 1704). Chính nhân vật nhận gói vừa mở
+// một thành tựu (mỗi thành tựu đúng một lần — ON CONFLICT DO NOTHING phía server).
+message AchievementUnlockedEvent {
+  string code = 1;
+  string name_key = 2;
+  string title_key = 3;
+}

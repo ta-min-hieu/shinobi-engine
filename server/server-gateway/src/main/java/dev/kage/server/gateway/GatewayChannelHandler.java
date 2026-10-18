@@ -178,6 +178,7 @@ import dev.kage.protocol.LeaveGuildResponse;
 import dev.kage.protocol.LeavePartyCommand;
 import dev.kage.protocol.LeavePartyOutcome;
 import dev.kage.protocol.LeavePartyResponse;
+import dev.kage.protocol.ListAchievementsRequest;
 import dev.kage.protocol.ListCharactersRequest;
 import dev.kage.protocol.ListCharactersResponse;
 import dev.kage.protocol.ListFriendsRequest;
@@ -248,6 +249,7 @@ import dev.kage.protocol.SendGuildJoinRequestResponse;
 import dev.kage.protocol.SendMailCommand;
 import dev.kage.protocol.SendMailOutcome;
 import dev.kage.protocol.SendMailResponse;
+import dev.kage.protocol.SetActiveTitleCommand;
 import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.SetTradeOfferCommand;
 import dev.kage.protocol.SetTradeOfferOutcome;
@@ -461,6 +463,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_USE_ITEM_COMMAND_VALUE, this::handleUseItemCommand),
             Map.entry(Opcode.OPCODE_LIST_INVENTORY_REQUEST_VALUE, this::handleListInventoryRequest),
             Map.entry(Opcode.OPCODE_LIST_STORAGE_REQUEST_VALUE, this::handleListStorageRequest),
+            Map.entry(Opcode.OPCODE_LIST_ACHIEVEMENTS_REQUEST_VALUE, this::handleListAchievementsRequest),
+            Map.entry(Opcode.OPCODE_SET_ACTIVE_TITLE_COMMAND_VALUE, this::handleSetActiveTitleCommand),
             Map.entry(Opcode.OPCODE_DEPOSIT_ITEM_COMMAND_VALUE, this::handleDepositItemCommand),
             Map.entry(Opcode.OPCODE_WITHDRAW_ITEM_COMMAND_VALUE, this::handleWithdrawItemCommand),
             Map.entry(Opcode.OPCODE_GET_ITEM_CATALOG_REQUEST_VALUE, this::handleGetItemCatalogRequest),
@@ -823,6 +827,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendInitialSelfState(characterId);
             announceOnlineToFriends(characterId);
             claimDailyCheckIn(characterId);
+            // ADR-062 D4 — mở bù mốc đã đạt + nạp danh hiệu cho chat; việc phụ, lỗi dừng bên trong.
+            worldGateway.registry().achievements.onEnteredWorld(characterId, character.level());
         } catch (CharacterNotFoundException e) {
             // Cùng lỗi dù nhân vật không tồn tại hay thuộc account khác (fail secure — SECURITY.md §4).
             LOG.warn("Chọn nhân vật thất bại: không tìm thấy", e);
@@ -877,6 +883,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                         .setMailId(claimed.mailId())
                                         .build()
                                         .toByteArray());
+                worldGateway.registry().achievements.onCheckedIn(characterId);
             }
         } catch (RuntimeException e) {
             LOG.error("Điểm danh lỗi: characterId={}", characterId, e);
@@ -1676,6 +1683,39 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 characterId -> storage.withdraw(characterId, command));
     }
 
+    /** ADR-062 — cửa sổ thành tựu. Cấp đọc từ DB (mốc cấp so thẳng với cấp, không có bộ đếm). */
+    private void handleListAchievementsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ListAchievementsRequest.parser().parseFrom(payload);
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_LIST_ACHIEVEMENTS_RESPONSE_VALUE,
+                characterId -> AchievementViews.sheet(worldGateway
+                        .registry()
+                        .achievements
+                        .facade()
+                        .sheet(
+                                characterId,
+                                characterFacade
+                                        .findById(characterId)
+                                        .map(Character::level)
+                                        .orElse(1))));
+    }
+
+    /** ADR-062 D2 — đeo/bỏ danh hiệu; chỉ đeo được cái đã mở (server kiểm trong câu SQL). */
+    private void handleSetActiveTitleCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        SetActiveTitleCommand command = SetActiveTitleCommand.parseFrom(payload);
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_SET_ACTIVE_TITLE_RESPONSE_VALUE,
+                characterId -> AchievementViews.titleResponse(
+                        worldGateway.registry().achievements.wearTitle(characterId, command.getAchievementCode()),
+                        worldGateway.registry().achievements.facade().activeTitleCode(characterId)));
+    }
+
     /** Khuôn chung ba lệnh kho: cần đăng nhập, chạy trên Virtual Thread, trả đúng một response. */
     private void runStorage(
             ChannelHandlerContext ctx,
@@ -2356,6 +2396,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             worldGateway
                     .registry()
                     .sendExperience(characterId, characterFacade.syncExperienceAfterQuestReward(characterId));
+            worldGateway.registry().achievements.onQuestRewardClaimed(characterId);
         }
     }
 
@@ -4186,27 +4227,20 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * {@code handleSendChatMessageBlocking} để giữ method đó dưới giới hạn Checkstyle MethodLength. */
     private void routeChatMessage(dev.kage.chat.domain.ChatChannel domainChannel, ChatRouteContext ctx) {
         switch (domainChannel) {
-            case WORLD -> {
-                ChatMessageEvent event = ChatMessageEvent.newBuilder()
-                        .setChannel(ChatChannel.CHAT_CHANNEL_WORLD)
-                        .setSenderId(ctx.characterId())
-                        .setSenderName(ctx.senderName())
-                        .setBody(ctx.body())
-                        .build();
-                worldGateway.registry().broadcastToAll(Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, event.toByteArray());
-            }
-            case PRIVATE -> {
-                ChatMessageEvent event = ChatMessageEvent.newBuilder()
-                        .setChannel(ChatChannel.CHAT_CHANNEL_PRIVATE)
-                        .setSenderId(ctx.characterId())
-                        .setSenderName(ctx.senderName())
-                        .setBody(ctx.body())
-                        .build();
+            case WORLD ->
+                worldGateway
+                        .registry()
+                        .broadcastToAll(
+                                Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE,
+                                chatEvent(ChatChannel.CHAT_CHANNEL_WORLD, ctx).toByteArray());
+            case PRIVATE ->
                 worldGateway
                         .registry()
                         .sendToCharacterIfOnline(
-                                ctx.target().id(), Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
-            }
+                                ctx.target().id(),
+                                Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE,
+                                0,
+                                chatEvent(ChatChannel.CHAT_CHANNEL_PRIVATE, ctx).toByteArray());
             // RỖNG nếu người gửi vừa rớt mạng trong lúc tin còn đang qua kiểm duyệt (2026-10-10) — không
             // còn đứng ở đâu để ai "gần đó" nghe thấy; bỏ tin, không ném (xem applyEquipmentBonusAndComputeMaxHp).
             case AREA ->
@@ -4234,13 +4268,24 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
     }
 
-    private void broadcastToGroup(ChatChannel protoChannel, ChatRouteContext ctx, List<Long> memberCharacterIds) {
-        ChatMessageEvent event = ChatMessageEvent.newBuilder()
+    /** ADR-062 D3 — danh hiệu đang đeo của người gửi, từ bộ nhớ (không DB mỗi tin chat). */
+    private String titleKeyOf(long characterId) {
+        return worldGateway.registry().achievements.titleKeyOf(characterId);
+    }
+
+    /** Một tin chat của người chơi, kèm danh hiệu đang đeo (ADR-062 D3). */
+    private ChatMessageEvent chatEvent(ChatChannel protoChannel, ChatRouteContext ctx) {
+        return ChatMessageEvent.newBuilder()
                 .setChannel(protoChannel)
                 .setSenderId(ctx.characterId())
                 .setSenderName(ctx.senderName())
+                .setSenderTitleKey(titleKeyOf(ctx.characterId()))
                 .setBody(ctx.body())
                 .build();
+    }
+
+    private void broadcastToGroup(ChatChannel protoChannel, ChatRouteContext ctx, List<Long> memberCharacterIds) {
+        ChatMessageEvent event = chatEvent(protoChannel, ctx);
         for (long memberCharacterId : memberCharacterIds) {
             worldGateway
                     .registry()
@@ -4610,6 +4655,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // đọc ở đây trên EventLoop, rẻ, không phải I/O, không tra lại sau trên authExecutor
         // vì lúc đó có thể đã bị unregister() xoá mất — xem javadoc CharacterPositionPersister#save).
         PositionSnapshot lastPosition = worldGateway.registry().lastKnownPosition(characterId);
+        worldGateway.registry().achievements.onLeftWorld(characterId);
         // CÓ ĐIỀU KIỆN theo kết nối: nếu nhân vật đã thuộc kết nối khác thì không đụng tới.
         if (!worldGateway.registry().unregister(characterId, ctx)
                 && worldGateway.registry().isOnline(characterId)) {

@@ -93,6 +93,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-059](ADR-059-Party-And-Guild-Changed-Events.md) | Event "nhóm/bang vừa đổi" — `PartyChangedEvent` (1318) + `GuildChangedEvent` (720) | ✅ **Accepted** *(2026-10-18, lô 15)* — thi hành cùng ngày | Dòng 40(iii): bị kick / bang giải tán / đổi trưởng nhóm không ai được báo |
 | [ADR-060](ADR-060-Daily-Check-In.md) | Điểm danh hằng ngày — chu kỳ 7 ngày, quà qua thư hệ thống (V62, module `feature-checkin`) | ✅ **Accepted** *(2026-10-18, lô 16)* — thi hành cùng ngày | Không có lý do quay lại mỗi ngày ngoài nhiệm vụ ngày |
 | [ADR-061](ADR-061-Sect-Storage.md) | Kho đồ tông môn — 40 dòng/nhân vật, gửi/rút ở Tô Vân Nhi (V63, opcode 514–519) | ✅ **Accepted** *(2026-10-18, lô 16)* — thi hành cùng ngày | Túi 20 ô chật từ khi có bộ đồ theo arc + quà hằng ngày |
+| [ADR-062](ADR-062-Achievements-And-Titles.md) | Thành tựu + danh hiệu — 9 mốc (V64), danh hiệu trong chat, dải opcode MỚI 1700–1704, module `feature-achievement` | ✅ **Accepted** *(2026-10-18, lô 16)* — thi hành cùng ngày | Ngoài cấp/Lực Chiến không có mục tiêu dài hạn nhìn thấy được |
 ---
 
 ## ADR cần tạo (chưa viết)

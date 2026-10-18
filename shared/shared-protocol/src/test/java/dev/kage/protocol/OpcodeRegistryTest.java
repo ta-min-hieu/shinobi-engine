@@ -35,8 +35,8 @@ class OpcodeRegistryTest {
 
     private static final Path PROTO_DIR = Path.of("src", "main", "proto");
 
-    /** Dải 1700+ là "dự trữ" (NETWORK.md §4) — dùng khi chưa cập nhật bảng dải là sai luật. */
-    private static final int FIRST_RESERVED_OPCODE = 1700;
+    /** Dải 1800+ là "dự trữ" (NETWORK.md §4) — dùng khi chưa cập nhật bảng dải là sai luật. */
+    private static final int FIRST_RESERVED_OPCODE = 1800;
 
     /** Giữ chỗ cho {@code ITEM_REMOVED_EVENT} (ADR-035 Revisit Trigger #3) — opcode_registry.proto. */
     private static final int HELD_FOR_ITEM_REMOVED_EVENT = 511;

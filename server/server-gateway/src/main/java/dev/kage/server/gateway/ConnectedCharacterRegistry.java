@@ -87,6 +87,15 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     private volatile CharacterLevelSync levelSync = CharacterLevelSync.unbound();
     // Đồng đội nào được chia một cú hạ quái — nối sau, cùng lý do với levelSync.
     private volatile KillRewardSharing rewardSharing = KillRewardSharing.none();
+    // Thành tựu (ADR-062) — nối sau, cùng lý do với levelSync: gửi gói mở thành tựu qua chính registry này.
+    /**
+     * Móc thành tựu (ADR-062) — các đường sự kiện ngoài registry (lĩnh thưởng quest, chốt trận, điểm danh)
+     * gọi qua đây; {@code GatewayBootstrap} {@link AchievementHooks#bind nối} bản thật sau khi DB đã dựng.
+     *
+     * <p>TRƯỜNG package-private chứ không getter/setter: lớp này chạm trần độ phức tạp PMD (80, tính theo
+     * SỐ HÀM). Tham chiếu không bao giờ đổi — {@code bind} đổi nội dung bên trong.
+     */
+    final AchievementHooks achievements = AchievementHooks.unbound();
 
     ConnectedCharacterRegistry(
             InventoryFacade inventoryFacade,
@@ -489,6 +498,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 .setChannel(ChatChannel.CHAT_CHANNEL_AREA)
                 .setSenderId(senderCharacterId)
                 .setSenderName(senderName)
+                .setSenderTitleKey(achievements.titleKeyOf(senderCharacterId))
                 .setBody(body)
                 .build();
         send(ctx, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
@@ -569,6 +579,12 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 killerCharacterId,
                 monsterCode,
                 () -> grantExperienceBlocking(killerCharacterId, expReward));
+        // Thành tựu "hạ N quái" (ADR-062) — việc PHỤ, bước riêng: hỏng thì ba phần thưởng trên không suy suyển.
+        lootExecutor.dispatch(
+                KillRewardDispatcher.Step.ACHIEVEMENT,
+                killerCharacterId,
+                monsterCode,
+                () -> achievements.onMonsterKilled(killerCharacterId));
         // Phần của ĐỒNG ĐỘI (2026-10-11) — một việc RIÊNG, sau ba việc của người hạ: tra nhóm chạm DB,
         // và nó hỏng thì phần của người ra đòn cuối ở trên không được suy suyển.
         lootExecutor.dispatch(
@@ -613,7 +629,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
      * xét kết nối: luật trong world không phụ thuộc việc gói hiển thị có gửi được hay không.
      */
     void sendExperience(long characterId, GrantExperienceUseCase.Result result) {
-        levelSync.onExperienceGranted(characterId, result);
+        levelSync.onExperienceGranted(characterId, result, achievements);
         ChannelHandlerContext ctx = contextsByCharacterId.get(characterId);
         if (ctx == null) {
             return;

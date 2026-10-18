@@ -40,7 +40,9 @@ final class KillRewardDispatcher {
         QUEST_PROGRESS,
         EXPERIENCE,
         /** Tra xem đồng đội nào được chia phần — hỏng thì KHÔNG đồng đội nào được gì, người hạ vẫn đủ. */
-        PARTY_SHARE
+        PARTY_SHARE,
+        /** Bộ đếm thành tựu "hạ N quái" (ADR-062) — việc phụ. */
+        ACHIEVEMENT
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(KillRewardDispatcher.class);

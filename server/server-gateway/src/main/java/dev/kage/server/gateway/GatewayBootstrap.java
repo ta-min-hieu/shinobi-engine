@@ -303,6 +303,9 @@ public final class GatewayBootstrap {
         // Cùng lý do: "đồng đội cùng World" chỉ tra được khi mọi bảng định tuyến đã có.
         characterRegistry.shareKillRewardsThrough(
                 KillRewardSharing.of(facades.contentFacades().socialFacades().partyFacade(), worldGateway));
+        characterRegistry.achievements.bind(
+                facades.progression().achievementFacade(),
+                (id, opcode, payload) -> characterRegistry.sendToCharacterIfOnline(id, opcode, 0, payload));
         return new InstanceRegistries(dungeonInstanceRegistry, arenaInstanceRegistry, worldGateway);
     }
 
@@ -403,7 +406,8 @@ public final class GatewayBootstrap {
                 friendFacade, mailFacade, chatFacade, guildFacade, partyFacade, tradeFacade, pvpFacade);
         ContentFacades contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
         ProgressionFacades progression = new ProgressionFacades(
-                databaseBootstrap.wireCheckInFacade(new CheckInMailSender(mailFacade, inventoryFacade)));
+                databaseBootstrap.wireCheckInFacade(new CheckInMailSender(mailFacade, inventoryFacade)),
+                databaseBootstrap.wireAchievementFacade());
         return new GatewayFacades(
                 accountFacade,
                 characterFacade,
