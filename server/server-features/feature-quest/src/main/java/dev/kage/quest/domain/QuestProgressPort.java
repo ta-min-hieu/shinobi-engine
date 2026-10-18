@@ -68,6 +68,19 @@ public interface QuestProgressPort {
     }
 
     /**
+     * Xoá dòng tiến độ CHỈ KHI nó còn {@code IN_PROGRESS} — compare-and-delete cho
+     * {@code AbandonQuestUseCase} (ADR-054). Một câu SQL là trọng tài: lần bỏ chạy đua với lần
+     * hoàn thành thì đúng một bên thắng.
+     *
+     * @return {@code progress_json} của dòng vừa xoá (để ghi audit), hoặc rỗng nếu không có dòng
+     *     {@code IN_PROGRESS} nào — khi đó KHÔNG xoá gì
+     */
+    default Optional<String> deleteIfInProgress(Transaction tx, long characterId, long questTemplateId) {
+        // Cùng lý do saveIfUnchanged: một lần GHI không có mặc định "vô hại".
+        throw new UnsupportedOperationException("deleteIfInProgress chưa được hiện thực ở " + getClass());
+    }
+
+    /**
      * MỌI dòng nhật ký của nhân vật, GỒM CẢ {@code CLAIMED} (ADR-035 Decision-4) — lọc phía server
      * thì client không phân biệt được "chưa từng nhận" với "đã trả xong". Trả {@code questCode}
      * (adapter tự join {@code quest_template}), không phải {@code questTemplateId}.

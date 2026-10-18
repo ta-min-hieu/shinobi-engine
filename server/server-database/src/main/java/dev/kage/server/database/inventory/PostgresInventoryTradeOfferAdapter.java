@@ -14,23 +14,19 @@ import dev.kage.server.database.JdbcOperations;
  * <p>Đọc thuần, KHÔNG khoá dòng phiên: khoá dòng {@code trade_session} khi đã giữ khoá túi đồ là
  * đảo thứ tự khoá của DATABASE.md §5.1 (giao dịch khoá phiên TRƯỚC túi đồ). Cũng không cần: đặt lời
  * chào lấy khoá túi đồ của người chào, nên lúc câu này chạy mọi lời chào của nhân vật này hoặc đã
- * commit, hoặc chưa bắt đầu.
+ * commit, hoặc chưa bắt đầu. Biểu thức dùng chung ở {@link TradeOfferedQuantity}.
  */
 public final class PostgresInventoryTradeOfferAdapter implements TradeOfferPort {
 
     // Phiên thi hành/huỷ bị XOÁ (V16, ON DELETE CASCADE sang trade_offer_item) — còn dòng là còn mở.
-    // Lọc thêm status cho rõ ý: lời chào chỉ đặt được khi phiên OPEN.
-    private static final String IS_OFFERED = """
-            SELECT 1 FROM trade_offer_item o
-              JOIN trade_session s ON s.id = o.session_id
-             WHERE o.offering_character_id = ? AND o.item_id = ? AND s.status = 'OPEN'
-             LIMIT 1
-            """;
+    // Dòng túi đồ không tồn tại / không thuộc characterId ⇒ không có dòng nào ⇒ 0.
+    private static final String OFFERED_QUANTITY = "SELECT " + TradeOfferedQuantity.OF_II
+            + " AS offered FROM inventory_item ii WHERE ii.id = ? AND ii.character_id = ?";
 
     @Override
-    public boolean isOfferedInActiveTrade(Transaction tx, long characterId, long itemId) {
+    public int offeredQuantity(Transaction tx, long characterId, long itemId) {
         Connection connection = ((JdbcTransaction) tx).connection();
-        return JdbcOperations.queryOne(connection, IS_OFFERED, rs -> Boolean.TRUE, characterId, itemId)
-                .isPresent();
+        return JdbcOperations.queryOne(connection, OFFERED_QUANTITY, rs -> rs.getInt("offered"), itemId, characterId)
+                .orElse(0);
     }
 }

@@ -59,6 +59,9 @@ enum SellOutcome {
   SELL_OUTCOME_ITEM_NOT_SELLABLE = 3;
   SELL_OUTCOME_INSUFFICIENT_QUANTITY = 4;
   SELL_OUTCOME_DUPLICATE_REQUEST = 5; // ADR-025: idempotency_key đã dùng trước đó (client tự retry)
+  // THÊM 2026-10-18 (dòng 80, chủ dự án duyệt; chỉ thêm, protocolVersion không tăng): phần muốn bán
+  // đang được chào trong một phiên giao dịch còn mở — rút khỏi giao dịch rồi bán.
+  SELL_OUTCOME_ITEM_IN_TRADE = 6;
 }
 
 // Command: Client -> Server (OPCODE_SELL_ITEM_COMMAND). item_id là inventory_item.id THẬT (không

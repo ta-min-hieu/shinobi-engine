@@ -49,10 +49,7 @@ public final class SellItemUseCase {
                 RemoveItemOutcome removed =
                         ports.inventoryGatewayPort().removeUnequippedQuantity(t, characterId, itemId, quantity);
                 if (removed != RemoveItemOutcome.OK) {
-                    resultHolder.set(
-                            removed == RemoveItemOutcome.ITEM_EQUIPPED
-                                    ? SellResult.ITEM_EQUIPPED
-                                    : SellResult.INSUFFICIENT_QUANTITY);
+                    resultHolder.set(toSellResult(removed));
                     return;
                 }
                 ports.goldPort().creditGold(t, characterId, totalCredit);
@@ -69,6 +66,15 @@ public final class SellItemUseCase {
         return resultHolder.get();
     }
 
+    private static SellResult toSellResult(RemoveItemOutcome removed) {
+        return switch (removed) {
+            case OK -> SellResult.OK;
+            case INSUFFICIENT_QUANTITY -> SellResult.INSUFFICIENT_QUANTITY;
+            case ITEM_EQUIPPED -> SellResult.ITEM_EQUIPPED;
+            case ITEM_IN_TRADE -> SellResult.ITEM_IN_TRADE;
+        };
+    }
+
     public enum SellResult {
         OK,
         ITEM_NOT_FOUND,
@@ -76,6 +82,8 @@ public final class SellItemUseCase {
         INSUFFICIENT_QUANTITY,
         DUPLICATE_REQUEST,
         /** Đang mặc — phải gỡ ra trước (quyết định chủ dự án 2026-09-24). */
-        ITEM_EQUIPPED
+        ITEM_EQUIPPED,
+        /** Phần muốn bán đụng vào chỗ đang chào trong giao dịch (dòng 80, chủ dự án duyệt 2026-10-18). */
+        ITEM_IN_TRADE
     }
 }

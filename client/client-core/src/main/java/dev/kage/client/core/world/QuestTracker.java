@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import dev.kage.client.core.ui.hud.QuestLogPanel;
+import dev.kage.protocol.AbandonQuestOutcome;
 import dev.kage.protocol.ClaimQuestRewardOutcome;
 import dev.kage.protocol.ListQuestsResponse;
 import dev.kage.protocol.QuestLogEntry;
@@ -179,6 +180,21 @@ final class QuestTracker {
         }
     }
 
+    /**
+     * Server vừa xác nhận bỏ nhiệm vụ {@code questCode} (ADR-054) — gỡ khỏi nhật ký, và nếu HUD góc màn
+     * hình đang theo dõi đúng nó thì nhận một nhiệm vụ khác lên (hoặc để trống). Không đợi lần hỏi lại
+     * danh sách: {@link #onQuestsListed} chỉ đồng bộ ô đang theo dõi khi mã của nó CÒN trong nhật ký,
+     * nên một nhiệm vụ đã bỏ sẽ đứng mãi ở góc màn hình.
+     */
+    void onAbandoned(String abandonedQuestCode) {
+        log.remove(abandonedQuestCode);
+        if (questCode.equals(abandonedQuestCode)) {
+            questCode = "";
+            status = QuestStatus.QUEST_STATUS_UNSPECIFIED;
+            adoptFromLog();
+        }
+    }
+
     boolean isTracking() {
         return !questCode.isEmpty();
     }
@@ -286,6 +302,11 @@ final class QuestTracker {
             QuestStatus.QUEST_STATUS_COMPLETED, "quest.status.completed",
             QuestStatus.QUEST_STATUS_CLAIMED, "quest.status.claimed");
 
+    private static final Map<AbandonQuestOutcome, String> ABANDON_OUTCOME_MESSAGE_KEYS = Map.of(
+            AbandonQuestOutcome.ABANDON_QUEST_OUTCOME_OK, "quest.abandon_outcome.ok",
+            AbandonQuestOutcome.ABANDON_QUEST_OUTCOME_QUEST_NOT_FOUND, "quest.abandon_outcome.quest_not_found",
+            AbandonQuestOutcome.ABANDON_QUEST_OUTCOME_NOT_IN_PROGRESS, "quest.abandon_outcome.not_in_progress");
+
     private static final Map<ClaimQuestRewardOutcome, String> CLAIM_OUTCOME_MESSAGE_KEYS = Map.of(
             ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_UNSPECIFIED, "quest.claim_outcome.unspecified",
             ClaimQuestRewardOutcome.CLAIM_QUEST_REWARD_OUTCOME_OK, "quest.claim_outcome.ok",
@@ -309,6 +330,11 @@ final class QuestTracker {
      */
     static Optional<String> claimOutcomeMessageKey(ClaimQuestRewardOutcome outcome) {
         return Optional.ofNullable(CLAIM_OUTCOME_MESSAGE_KEYS.get(outcome));
+    }
+
+    /** Khoá i18n cho kết quả bỏ nhiệm vụ (ADR-054); outcome lạ (server mới hơn) ⇒ rỗng. */
+    static Optional<String> abandonOutcomeMessageKey(AbandonQuestOutcome outcome) {
+        return Optional.ofNullable(ABANDON_OUTCOME_MESSAGE_KEYS.get(outcome));
     }
 
     /**

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | 📝 **Proposed** (2026-10-01) — chờ chủ dự án duyệt D1–D10 và trả lời các câu hỏi ở "Việc cần làm tiếp theo" mục 1. AI không tự Accept. |
+| Status | ✅ **Accepted** (2026-10-18) — chủ dự án chọn Accept trong lượt hỏi lô 15 (AskUserQuestion, câu hỏi "ADR đang Proposed từ lâu — Accept để tôi thi hành?"). Các câu hỏi mở được trả lời theo đúng KHUYẾN NGHỊ ghi trong ADR — xem mục "Việc cần làm tiếp theo". _(Proposed 2026-10-01.)_ |
 | Date | 2026-10-01 |
 | Deciders | Chủ dự án quyết hướng (2026-10-01: **lệnh trong game + HAI cấp quyền GM/ADMIN + nhúng trong server, không tách service + mọi lệnh đều audit**); AI soạn phần thi hành |
 | Related | [ADMIN.md](../../12-devtools/ADMIN.md) (stub đang chờ đúng quyết định này) · [SECURITY.md §3, §4, §7, §9](../../08-security/SECURITY.md) · [DATABASE.md §2.7, §5, §9, §10](../../05-server/DATABASE.md) · [ADR-009](ADR-009-Why-No-Spring-Boot.md) (không Spring MVC) · [ADR-017](ADR-017-Auth-Token.md) (đăng nhập username-only) · [ADR-051](ADR-051-World-Changed-Event.md) (`WorldChangedEvent` — Revisit Trigger đã nhắc trước "GM kéo") · [ADR-046](ADR-046-Health-Recovery.md) (`enqueueHealCharacter`) · [ADR-013](ADR-013-Flyway-vs-Liquibase.md) (migration) |

@@ -1106,10 +1106,34 @@ public final class WorldFacade {
         if (entity == null) {
             return;
         }
-        if (targetEntityId == characterId || lookupEntity(targetEntityId) == null) {
+        KEntity target = lookupEntity(targetEntityId);
+        if (targetEntityId == characterId || target == null) {
             return; // không tự nhắm chính mình; mục tiêu không tồn tại — bỏ qua an toàn.
         }
         TARGET.get(entity).targetEntityId = targetEntityId;
+        announceTargetHealth(characterId, targetEntityId, target);
+    }
+
+    /**
+     * Nhắm một NHÂN VẬT khác ⇒ gửi ngay máu hiện tại/tối đa của người đó cho người nhắm (dòng 32,
+     * chủ dự án duyệt 2026-10-18).
+     *
+     * <p>Máu tối đa của người khác chỉ đi trên {@code HealthChangedEvent}; đòn đánh/skill chỉ mang máu
+     * còn lại. Trong đấu trường không có hồi máu (dòng 36(iv)) nên gói đó không bao giờ tới, và HUD
+     * mục tiêu đứng ở "máu / ?" suốt trận. Dùng lại đúng đường ống 408 — không đổi protocol. Quái thì
+     * không cần: {@code MonsterSpawnedEvent} đã mang máu tối đa.
+     *
+     * <p>Chỉ khi người nhắm ĐANG THẤY mục tiêu (AoI): gói về một thực thể đã despawn khỏi máy họ là vi
+     * phạm bất biến luồng sự kiện — {@code WorldSimulationPropertyTest} bắt được đúng chỗ này ở bản đầu
+     * (nhắm một id còn trong World nhưng đã ra khỏi tầm nhìn).
+     */
+    private void announceTargetHealth(long characterId, long targetEntityId, KEntity target) {
+        HealthComponent health = HEALTH.get(target);
+        if (targetEntityId <= 0L || health == null || !aoiTracker.sees(characterId, targetEntityId)) {
+            return;
+        }
+        outboundSink.onHealthChanged(
+                characterId, new WorldOutboundSink.HealthSnapshot(targetEntityId, health.current, health.max));
     }
 
     /**

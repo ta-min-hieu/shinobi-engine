@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import dev.kage.client.core.net.GameConnection;
+import dev.kage.protocol.AbandonQuestCommand;
 import dev.kage.protocol.AcceptDuelCommand;
 import dev.kage.protocol.AcceptFriendRequestCommand;
 import dev.kage.protocol.AcceptPartyInviteCommand;
@@ -172,6 +173,14 @@ final class WorldCommandSender implements SessionRecovery.Link {
                 command.toByteArray(),
                 "SelectDialogueOptionCommand");
         return sequenceId;
+    }
+
+    /** Bỏ nhiệm vụ đang làm (opcode 612, ADR-054) — chỉ ý định; server tự kiểm trạng thái. */
+    void abandonQuest(String questCode) {
+        send(
+                Opcode.OPCODE_ABANDON_QUEST_COMMAND_VALUE,
+                AbandonQuestCommand.newBuilder().setQuestCode(questCode).build().toByteArray(),
+                "AbandonQuestCommand");
     }
 
     /**

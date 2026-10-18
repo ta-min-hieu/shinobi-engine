@@ -54,6 +54,9 @@ import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.ItemUseEffect;
 import dev.kage.mail.api.MailFacade;
 import dev.kage.party.api.PartyFacade;
+import dev.kage.protocol.AbandonQuestCommand;
+import dev.kage.protocol.AbandonQuestOutcome;
+import dev.kage.protocol.AbandonQuestResponse;
 import dev.kage.protocol.AcceptDuelCommand;
 import dev.kage.protocol.AcceptDuelOutcome;
 import dev.kage.protocol.AcceptDuelResponse;
@@ -434,6 +437,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_LIST_INVENTORY_REQUEST_VALUE, this::handleListInventoryRequest),
             Map.entry(Opcode.OPCODE_GET_ITEM_CATALOG_REQUEST_VALUE, this::handleGetItemCatalogRequest),
             Map.entry(Opcode.OPCODE_LIST_QUESTS_REQUEST_VALUE, this::handleListQuestsRequest),
+            Map.entry(Opcode.OPCODE_ABANDON_QUEST_COMMAND_VALUE, this::handleAbandonQuestCommand),
             Map.entry(Opcode.OPCODE_LIST_SHOP_ITEMS_REQUEST_VALUE, this::handleListShopItemsRequest),
             Map.entry(Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, this::handleBuyItemCommand),
             Map.entry(Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, this::handleSellItemCommand),
@@ -1558,6 +1562,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case OK -> "";
             case ITEM_NOT_FOUND -> "error.item_not_found";
             case NOT_USABLE -> "error.item_not_usable";
+            case ITEM_IN_TRADE -> "error.item_offered_in_trade";
         };
     }
 
@@ -1699,6 +1704,31 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 Opcode.OPCODE_LIST_QUESTS_RESPONSE_VALUE,
                 sequenceId,
                 response.build().toByteArray());
+    }
+
+    /** ADR-054 — bỏ quest đang làm; chạm DB nên chạy trên authExecutor. */
+    private void handleAbandonQuestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        AbandonQuestCommand command = AbandonQuestCommand.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        executeBlocking(ctx, sequenceId, () -> {
+            QuestFacade.AbandonResult result = questFacade.abandonQuest(characterId, command.getQuestCode());
+            AbandonQuestResponse response = AbandonQuestResponse.newBuilder()
+                    .setOutcome(
+                            switch (result) {
+                                case OK -> AbandonQuestOutcome.ABANDON_QUEST_OUTCOME_OK;
+                                case QUEST_NOT_FOUND -> AbandonQuestOutcome.ABANDON_QUEST_OUTCOME_QUEST_NOT_FOUND;
+                                case NOT_IN_PROGRESS -> AbandonQuestOutcome.ABANDON_QUEST_OUTCOME_NOT_IN_PROGRESS;
+                            })
+                    .setQuestCode(command.getQuestCode())
+                    .build();
+            send(ctx, Opcode.OPCODE_ABANDON_QUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        });
     }
 
     private static final Map<dev.kage.quest.domain.QuestStatus, dev.kage.protocol.QuestStatus> QUEST_STATUS_MAPPING =
@@ -1850,7 +1880,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             ShopFacade.SellResult.DUPLICATE_REQUEST, SellOutcome.SELL_OUTCOME_DUPLICATE_REQUEST,
             // Không thêm giá trị mới vào shop.proto: ITEM_NOT_SELLABLE là đúng ở trạng thái hiện
             // tại, và câu chữ phía client (shop.error.item_not_sellable) đã nhắc "đang mặc thì gỡ ra".
-            ShopFacade.SellResult.ITEM_EQUIPPED, SellOutcome.SELL_OUTCOME_ITEM_NOT_SELLABLE);
+            ShopFacade.SellResult.ITEM_EQUIPPED, SellOutcome.SELL_OUTCOME_ITEM_NOT_SELLABLE,
+            ShopFacade.SellResult.ITEM_IN_TRADE, SellOutcome.SELL_OUTCOME_ITEM_IN_TRADE);
 
     private static SellOutcome toProtoOutcome(ShopFacade.SellResult result) {
         return SELL_OUTCOME_MAPPING.get(result);

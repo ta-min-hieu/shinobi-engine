@@ -6,6 +6,7 @@ import dev.kage.character.application.GrantExperienceUseCase;
 import dev.kage.dialogue.api.DialogueFacade;
 import dev.kage.dialogue.application.GetDialogueNodeUseCase;
 import dev.kage.quest.api.QuestFacade;
+import dev.kage.quest.application.AbandonQuestUseCase;
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
 import dev.kage.quest.application.ListQuestsUseCase;
@@ -48,7 +49,9 @@ record QuestFuzzSystem(QuestFacade quest, DialogueFacade dialogue, GrantExperien
                 new ProcessQuestEventUseCase(
                         progressPort, new PostgresQuestItemTakeAdapter(), auditPort, transactionRunner),
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, transactionRunner),
-                new ListQuestsUseCase(progressPort));
+                new dev.kage.quest.api.QuestLogUseCases(
+                        new ListQuestsUseCase(progressPort),
+                        new AbandonQuestUseCase(progressPort, templatePort, auditPort, transactionRunner)));
         DialogueFacade dialogueFacade =
                 new DialogueFacade(new GetDialogueNodeUseCase(new PostgresNpcTemplateAdapter(dataSource)));
         return new QuestFuzzSystem(

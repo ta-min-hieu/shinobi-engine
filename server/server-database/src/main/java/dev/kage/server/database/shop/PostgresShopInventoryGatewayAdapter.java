@@ -8,6 +8,7 @@ import javax.sql.DataSource;
 import dev.kage.server.database.JdbcOperations;
 import dev.kage.server.database.inventory.CharacterInventoryLock;
 import dev.kage.server.database.inventory.InventoryStackMerge;
+import dev.kage.server.database.inventory.TradeOfferedQuantity;
 import dev.kage.shop.domain.InventoryGatewayPort;
 import dev.kage.shop.domain.OwnedItem;
 import dev.kage.shop.domain.RemoveItemOutcome;
@@ -26,10 +27,13 @@ public final class PostgresShopInventoryGatewayAdapter implements InventoryGatew
             """;
 
     // equipped: equipment_slot.inventory_item_id là cách DUY NHẤT biết một dòng đang mặc (V5). Đọc
-    // cùng câu với FOR UPDATE nên phép kiểm nằm SAU khoá dòng, trong cùng transaction.
+    // cùng câu với FOR UPDATE nên phép kiểm nằm SAU khoá dòng, trong cùng transaction. offered: phần
+    // đang chào trong giao dịch còn mở (dòng 80) — xem TradeOfferedQuantity.
     private static final String SELECT_FOR_UPDATE = """
             SELECT quantity,
-                   EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = inventory_item.id) AS equipped
+                   EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = inventory_item.id) AS equipped,
+            """ + TradeOfferedQuantity.OF_INVENTORY_ITEM + """
+                    AS offered
               FROM inventory_item
              WHERE id = ? AND character_id = ?
                FOR UPDATE
@@ -88,7 +92,7 @@ public final class PostgresShopInventoryGatewayAdapter implements InventoryGatew
         Optional<LockedRow> row = JdbcOperations.queryOne(
                 connection,
                 SELECT_FOR_UPDATE,
-                rs -> new LockedRow(rs.getInt("quantity"), rs.getBoolean("equipped")),
+                rs -> new LockedRow(rs.getInt("quantity"), rs.getBoolean("equipped"), rs.getInt("offered")),
                 itemId,
                 characterId);
         if (row.isEmpty() || row.get().quantity() < quantity) {
@@ -96,6 +100,9 @@ public final class PostgresShopInventoryGatewayAdapter implements InventoryGatew
         }
         if (row.get().equipped()) {
             return RemoveItemOutcome.ITEM_EQUIPPED;
+        }
+        if (row.get().quantity() - row.get().offered() < quantity) {
+            return RemoveItemOutcome.ITEM_IN_TRADE;
         }
         if (row.get().quantity() == quantity) {
             JdbcOperations.update(connection, DELETE_ITEM, itemId);
@@ -106,5 +113,5 @@ public final class PostgresShopInventoryGatewayAdapter implements InventoryGatew
     }
 
     /** Dòng {@code inventory_item} đã khoá — các cột cần để quyết có bớt được không. */
-    private record LockedRow(int quantity, boolean equipped) {}
+    private record LockedRow(int quantity, boolean equipped, int offered) {}
 }

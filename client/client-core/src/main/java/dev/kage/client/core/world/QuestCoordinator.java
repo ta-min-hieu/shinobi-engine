@@ -11,6 +11,8 @@ import dev.kage.client.core.ui.hud.CombatHud;
 import dev.kage.client.core.ui.hud.QuestLogPanel;
 import dev.kage.client.core.ui.hud.ScrollingList;
 import dev.kage.client.core.ui.theme.KageI18n;
+import dev.kage.protocol.AbandonQuestOutcome;
+import dev.kage.protocol.AbandonQuestResponse;
 import dev.kage.protocol.AcceptQuestOutcome;
 import dev.kage.protocol.AcceptQuestResponse;
 import dev.kage.protocol.ClaimQuestRewardOutcome;
@@ -83,6 +85,7 @@ final class QuestCoordinator implements WindowFlow {
         hud.setOnClaimQuestClicked(this::claimReward);
         panel.setOnRefresh(this::onLogOpened);
         panel.setOnClaim(this::claimFromLog);
+        panel.setOnAbandon(sender::abandonQuest);
         panel.setStatus(text("questlog.hint.open"));
     }
 
@@ -154,6 +157,10 @@ final class QuestCoordinator implements WindowFlow {
             onQuestsListed(ListQuestsResponse.parseFrom(payload));
             return true;
         }
+        if (opcode == Opcode.OPCODE_ABANDON_QUEST_RESPONSE_VALUE) {
+            onAbandonResponse(AbandonQuestResponse.parseFrom(payload));
+            return true;
+        }
         return false;
     }
 
@@ -214,6 +221,22 @@ final class QuestCoordinator implements WindowFlow {
         tracker.onQuestsListed(response);
         syncHud();
         refreshLogView();
+    }
+
+    /**
+     * Kết quả lệnh bỏ nhiệm vụ (ADR-054). Thành công thì gỡ ngay khỏi nhật ký + HUD góc màn hình rồi
+     * vẫn hỏi lại server — cùng luật "hỏi lại sau MỌI lệnh đổi trạng thái" của {@link #onClaimResponse}.
+     */
+    private void onAbandonResponse(AbandonQuestResponse response) {
+        boolean abandoned = response.getOutcome() == AbandonQuestOutcome.ABANDON_QUEST_OUTCOME_OK;
+        if (abandoned) {
+            tracker.onAbandoned(response.getQuestCode());
+            syncHud();
+            refreshLogView();
+        }
+        panel.setStatus(text(
+                QuestTracker.abandonOutcomeMessageKey(response.getOutcome()).orElse("quest.abandon_outcome.unknown")));
+        sender.listQuests();
     }
 
     /** Bấm nút Nhận thưởng trên HUD góc màn hình — luôn là nhiệm vụ ĐANG THEO DÕI trong phiên chơi. */
@@ -302,7 +325,11 @@ final class QuestCoordinator implements WindowFlow {
         questRows.clear();
         for (int index = 0; index < shown; index++) {
             QuestTracker.LoggedQuest entry = all.get(index);
-            questRows.add(new QuestLogPanel.QuestRow(entry.questCode(), rowText(entry), rowClaimable(entry)));
+            questRows.add(new QuestLogPanel.QuestRow(
+                    entry.questCode(),
+                    rowText(entry),
+                    rowClaimable(entry),
+                    entry.status() == QuestStatus.QUEST_STATUS_IN_PROGRESS));
         }
         panel.setQuests(questRows, listNotice(all.size(), all.size() - shown));
     }

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | 📝 **Proposed** (2026-10-01) — chờ chủ dự án duyệt D1–D8 và trả lời Q1–Q7 ở "Việc cần làm tiếp theo" mục 1. AI không tự Accept. |
+| Status | ✅ **Accepted** (2026-10-18) — chủ dự án chọn Accept trong lượt hỏi lô 15 (AskUserQuestion, câu hỏi "ADR đang Proposed từ lâu — Accept để tôi thi hành?"). Các câu hỏi mở được trả lời theo đúng KHUYẾN NGHỊ ghi trong ADR — xem mục "Việc cần làm tiếp theo". _(Proposed 2026-10-01.)_ |
 | Date | 2026-10-01 |
 | Deciders | Chủ dự án quyết HƯỚNG (2026-10-01: **cho Closed Beta, client desktop đóng gói KÈM JRE 25 để ghim JDK của người chơi**); AI soạn phần cách làm |
 | Related | [ROADMAP.md — v1 Exit Criteria, mục "Bản cài client mang theo asset" + rủi ro LWJGL](../../11-process/ROADMAP.md) · [ADR-001](ADR-001-Why-Java25.md) (Java 25 + Temurin) · [ADR-023](ADR-023-Desktop-First-Input.md) (desktop-first) · [ADR-024](ADR-024-Asset-Distribution-Strategy.md) / [ADR-028](ADR-028-Graphics-Tier-Asset-Delivery.md) (asset đóng trong bản cài, chưa patch) · [ADR-032](ADR-032-JitPack-Dependency-Defence.md) (luật thêm dependency) · [DOCKER.md §8](../../07-infrastructure/DOCKER.md) (jlink của image server — tiền lệ) · [LAUNCHER.md](../../12-devtools/LAUNCHER.md) (stub auto-update) · `client/client-desktop/build.gradle.kts` |

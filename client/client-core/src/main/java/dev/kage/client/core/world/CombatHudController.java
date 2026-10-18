@@ -545,7 +545,9 @@ final class CombatHudController {
     /**
      * Máu tối đa của nhân vật đang nhắm, hoặc {@link #UNKNOWN_HP}. Chỉ {@code HealthChangedEvent}
      * mang con số này cho người KHÁC — {@code AttackResultEvent}/{@code SkillResultEvent} chỉ mang
-     * máu còn lại, {@code CharacterSpawnedEvent} không mang máu (khoảng trống giao thức, xem CLIENT.md).
+     * máu còn lại, {@code CharacterSpawnedEvent} không mang máu. Từ 2026-10-18 (dòng 32) server gửi
+     * một gói đó cho người nhắm ngay khi nhận {@code SetTargetCommand} vào một nhân vật, nên con số
+     * này có ngay sau một vòng mạng — trước đó HUD đấu trường đứng ở "máu / ?" cả trận.
      */
     int characterTargetMaxHp() {
         return characterTargetMaxHp;

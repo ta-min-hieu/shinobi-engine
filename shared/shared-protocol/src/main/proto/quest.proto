@@ -124,3 +124,27 @@ message QuestLogEntry {
 message ListQuestsResponse {
   repeated QuestLogEntry quests = 1;
 }
+
+// -----------------------------------------------------------------------------------------------
+// ADR-054 (Accepted 2026-10-18) — bỏ nhiệm vụ. CHỈ THÊM (NETWORK.md §6), protocolVersion không tăng.
+// -----------------------------------------------------------------------------------------------
+
+// Command: Client -> Server (OPCODE_ABANDON_QUEST_COMMAND = 612). Chỉ bỏ được quest IN_PROGRESS; bỏ
+// xong là xoá tiến độ, nhận lại được từ đầu. Đồ đã giao cho quest KHÔNG được trả lại.
+message AbandonQuestCommand {
+  string quest_code = 1;
+}
+
+enum AbandonQuestOutcome {
+  ABANDON_QUEST_OUTCOME_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho kết quả thật.
+  ABANDON_QUEST_OUTCOME_OK = 1;
+  ABANDON_QUEST_OUTCOME_QUEST_NOT_FOUND = 2;
+  ABANDON_QUEST_OUTCOME_NOT_IN_PROGRESS = 3; // chưa nhận, đã hoàn thành (chờ lĩnh), hoặc đã lĩnh
+}
+
+// Response: Server -> Client (OPCODE_ABANDON_QUEST_RESPONSE = 613). quest_code lặp lại để client
+// không phải nhớ lệnh nào đang treo.
+message AbandonQuestResponse {
+  AbandonQuestOutcome outcome = 1;
+  string quest_code = 2;
+}

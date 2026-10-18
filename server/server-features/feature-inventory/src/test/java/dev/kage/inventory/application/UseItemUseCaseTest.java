@@ -83,7 +83,8 @@ class UseItemUseCaseTest {
                 new FakeInventoryPort(inventoryWith(new ItemStack(PILL_ITEM_ID, PILL_TEMPLATE_ID, 3, 0)));
         List<String> audited = new ArrayList<>();
         AuditPort auditPort = (tx, characterId, action, detailJson) -> audited.add(action);
-        UseItemUseCase useCase = new UseItemUseCase(inventoryPort, catalogPort(), auditPort, DIRECT_TX);
+        UseItemUseCase useCase = new UseItemUseCase(
+                new UseItemUseCase.Ports(inventoryPort, catalogPort(), auditPort, (tx, c, i) -> 0), DIRECT_TX);
 
         UseItemUseCase.UseItemResult result = useCase.execute(CHARACTER_ID, PILL_ITEM_ID);
 
@@ -101,7 +102,9 @@ class UseItemUseCaseTest {
     void shouldRemoveTheStack_whenTheLastOneIsUsed() {
         FakeInventoryPort inventoryPort =
                 new FakeInventoryPort(inventoryWith(new ItemStack(PILL_ITEM_ID, PILL_TEMPLATE_ID, 1, 0)));
-        UseItemUseCase useCase = new UseItemUseCase(inventoryPort, catalogPort(), (tx, c, a, d) -> {}, DIRECT_TX);
+        UseItemUseCase useCase = new UseItemUseCase(
+                new UseItemUseCase.Ports(inventoryPort, catalogPort(), (tx, c, a, d) -> {}, (tx, c, i) -> 0),
+                DIRECT_TX);
 
         UseItemUseCase.UseItemResult result = useCase.execute(CHARACTER_ID, PILL_ITEM_ID);
 
@@ -118,7 +121,9 @@ class UseItemUseCaseTest {
     @Test
     void shouldRejectAnItemThatIsNotInTheSendersBag() {
         FakeInventoryPort inventoryPort = new FakeInventoryPort(inventoryWith());
-        UseItemUseCase useCase = new UseItemUseCase(inventoryPort, catalogPort(), (tx, c, a, d) -> {}, DIRECT_TX);
+        UseItemUseCase useCase = new UseItemUseCase(
+                new UseItemUseCase.Ports(inventoryPort, catalogPort(), (tx, c, a, d) -> {}, (tx, c, i) -> 0),
+                DIRECT_TX);
 
         UseItemUseCase.UseItemResult result = useCase.execute(CHARACTER_ID, PILL_ITEM_ID);
 
@@ -130,7 +135,9 @@ class UseItemUseCaseTest {
     void shouldRejectAnItemWithNoUseEffect_withoutConsumingIt() {
         FakeInventoryPort inventoryPort =
                 new FakeInventoryPort(inventoryWith(new ItemStack(55L, SWORD_TEMPLATE_ID, 1, 0)));
-        UseItemUseCase useCase = new UseItemUseCase(inventoryPort, catalogPort(), (tx, c, a, d) -> {}, DIRECT_TX);
+        UseItemUseCase useCase = new UseItemUseCase(
+                new UseItemUseCase.Ports(inventoryPort, catalogPort(), (tx, c, a, d) -> {}, (tx, c, i) -> 0),
+                DIRECT_TX);
 
         UseItemUseCase.UseItemResult result = useCase.execute(CHARACTER_ID, 55L);
 
@@ -145,7 +152,9 @@ class UseItemUseCaseTest {
     @Test
     void shouldRejectSilently_whenTheTemplateIsMissing() {
         FakeInventoryPort inventoryPort = new FakeInventoryPort(inventoryWith(new ItemStack(66L, 12345L, 1, 0)));
-        UseItemUseCase useCase = new UseItemUseCase(inventoryPort, catalogPort(), (tx, c, a, d) -> {}, DIRECT_TX);
+        UseItemUseCase useCase = new UseItemUseCase(
+                new UseItemUseCase.Ports(inventoryPort, catalogPort(), (tx, c, a, d) -> {}, (tx, c, i) -> 0),
+                DIRECT_TX);
 
         UseItemUseCase.UseItemResult result = useCase.execute(CHARACTER_ID, 66L);
 

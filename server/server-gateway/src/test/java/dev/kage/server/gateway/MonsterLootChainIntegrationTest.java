@@ -423,7 +423,12 @@ class MonsterLootChainIntegrationTest {
                 new dev.kage.inventory.api.ItemActionUseCases(
                         new EnhanceItemUseCase(enhancePorts, transactionRunner),
                         new dev.kage.inventory.application.UseItemUseCase(
-                                inventoryPort, itemTemplatePort, new PostgresAuditAdapter(), transactionRunner)),
+                                new dev.kage.inventory.application.UseItemUseCase.Ports(
+                                        inventoryPort,
+                                        itemTemplatePort,
+                                        new PostgresAuditAdapter(),
+                                        new dev.kage.server.database.inventory.PostgresInventoryTradeOfferAdapter()),
+                                transactionRunner)),
                 new InventoryQueryUseCases(
                         new ListInventoryUseCase(inventoryPort, equipmentPort),
                         new GetItemCatalogUseCase(itemTemplatePort)));
@@ -451,7 +456,10 @@ class MonsterLootChainIntegrationTest {
                         new PostgresQuestAuditAdapter(),
                         transactionRunner),
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, transactionRunner),
-                new ListQuestsUseCase(progressPort));
+                new dev.kage.quest.api.QuestLogUseCases(
+                        new ListQuestsUseCase(progressPort),
+                        new dev.kage.quest.application.AbandonQuestUseCase(
+                                progressPort, templatePort, new PostgresQuestAuditAdapter(), transactionRunner)));
     }
 
     // -------------------------------------------------------------------------- truy vấn test-only

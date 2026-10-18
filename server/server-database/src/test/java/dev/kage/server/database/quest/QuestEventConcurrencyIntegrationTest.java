@@ -31,6 +31,7 @@ import dev.kage.character.domain.Character;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.quest.api.QuestFacade;
+import dev.kage.quest.application.AbandonQuestUseCase;
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
 import dev.kage.quest.application.ListQuestsUseCase;
@@ -131,7 +132,9 @@ class QuestEventConcurrencyIntegrationTest {
                 new AcceptQuestUseCase(progressPort, templatePort, tx),
                 new ProcessQuestEventUseCase(progressPort, new PostgresQuestItemTakeAdapter(), auditPort, tx),
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx),
-                new ListQuestsUseCase(progressPort));
+                new dev.kage.quest.api.QuestLogUseCases(
+                        new ListQuestsUseCase(progressPort),
+                        new AbandonQuestUseCase(progressPort, templatePort, auditPort, tx)));
     }
 
     /** Nhân vật mới, quest đang làm với tiến độ khởi điểm đúng như {@code on_accept} của script ghi. */

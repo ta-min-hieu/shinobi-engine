@@ -334,9 +334,11 @@ class EconomyConcurrencyIntegrationTest {
         long characterId = newCharacter();
         long stackId = insertItem(characterId, pillTemplateId, PILL_STACK);
         UseItemUseCase useItem = new UseItemUseCase(
-                new PostgresInventoryAdapter(dataSource),
-                new PostgresItemTemplateAdapter(dataSource),
-                new PostgresAuditAdapter(),
+                new UseItemUseCase.Ports(
+                        new PostgresInventoryAdapter(dataSource),
+                        new PostgresItemTemplateAdapter(dataSource),
+                        new PostgresAuditAdapter(),
+                        new PostgresInventoryTradeOfferAdapter()),
                 new JdbcInventoryTransactionRunner(dataSource));
 
         List<Object> results = runConcurrently(() -> useItem.execute(characterId, stackId));

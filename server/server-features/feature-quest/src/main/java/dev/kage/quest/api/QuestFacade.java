@@ -6,6 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
+import dev.kage.quest.application.AbandonQuestUseCase;
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
 import dev.kage.quest.application.ListQuestsUseCase;
@@ -26,6 +27,7 @@ public final class QuestFacade {
     private final ProcessQuestEventUseCase processQuestEventUseCase;
     private final ClaimQuestRewardUseCase claimQuestRewardUseCase;
     private final ListQuestsUseCase listQuestsUseCase;
+    private final AbandonQuestUseCase abandonQuestUseCase;
     private final ConcurrentHashMap<Long, ReentrantLock> eventLocksByCharacterId = new ConcurrentHashMap<>();
 
     /** Dựng ở composition root. */
@@ -33,11 +35,12 @@ public final class QuestFacade {
             AcceptQuestUseCase acceptQuestUseCase,
             ProcessQuestEventUseCase processQuestEventUseCase,
             ClaimQuestRewardUseCase claimQuestRewardUseCase,
-            ListQuestsUseCase listQuestsUseCase) {
+            QuestLogUseCases questLogUseCases) {
         this.acceptQuestUseCase = acceptQuestUseCase;
         this.processQuestEventUseCase = processQuestEventUseCase;
         this.claimQuestRewardUseCase = claimQuestRewardUseCase;
-        this.listQuestsUseCase = listQuestsUseCase;
+        this.listQuestsUseCase = questLogUseCases.list();
+        this.abandonQuestUseCase = questLogUseCases.abandon();
     }
 
     /** Nhận quest {@code questCode} — kiểm quest tiên quyết (ADR-044) và chạy hook {@code on_accept}. */
@@ -85,7 +88,7 @@ public final class QuestFacade {
      * <p>Nhận/lĩnh quest KHÔNG đi qua khoá này: chúng không đọc-rồi-ghi tiến độ bằng script, và đã có
      * trọng tài riêng trong DB ({@code insertIfAbsent}, {@code markClaimedIfCompleted}).
      */
-    private List<QuestStatusChange> withEventLock(long characterId, Supplier<List<QuestStatusChange>> event) {
+    private <T> T withEventLock(long characterId, Supplier<T> event) {
         ReentrantLock lock = eventLocksByCharacterId.computeIfAbsent(characterId, id -> new ReentrantLock());
         lock.lock();
         try {
@@ -115,6 +118,19 @@ public final class QuestFacade {
     public List<QuestStatusChange> onNpcTalked(long characterId, String npcCode) {
         return withEventLock(
                 characterId, () -> toStatusChanges(processQuestEventUseCase.npcTalked(characterId, npcCode)));
+    }
+
+    /**
+     * Bỏ quest đang làm (ADR-054) — xoá tiến độ, nhận lại được từ đầu. Đi qua CÙNG khoá sự kiện của
+     * nhân vật: không chen giữa một lần {@code on_event} đang chạy (lần ghi compare-and-set tới sau
+     * thua vì dòng đã mất — đúng ý).
+     */
+    public AbandonResult abandonQuest(long characterId, String questCode) {
+        return withEventLock(characterId, () -> switch (abandonQuestUseCase.execute(characterId, questCode)) {
+            case OK -> AbandonResult.OK;
+            case QUEST_NOT_FOUND -> AbandonResult.QUEST_NOT_FOUND;
+            case NOT_IN_PROGRESS -> AbandonResult.NOT_IN_PROGRESS;
+        });
     }
 
     private static List<QuestStatusChange> toStatusChanges(List<ProcessQuestEventUseCase.QuestStatusChange> changes) {
@@ -161,6 +177,14 @@ public final class QuestFacade {
      */
     public Map<String, String> inProgressJson(long characterId) {
         return listQuestsUseCase.inProgressJson(characterId);
+    }
+
+    /** Kết quả bỏ quest (ADR-054). */
+    public enum AbandonResult {
+        OK,
+        QUEST_NOT_FOUND,
+        /** Chưa nhận, đã hoàn thành (chờ lĩnh), hoặc đã lĩnh. */
+        NOT_IN_PROGRESS
     }
 
     /** Kết quả nhận quest. */

@@ -120,6 +120,9 @@ enum Opcode {
   // ADR-035 — nhật ký nhiệm vụ; gỡ bế tắc "nhận quest rồi relog là mất thưởng vĩnh viễn".
   OPCODE_LIST_QUESTS_REQUEST = 610;
   OPCODE_LIST_QUESTS_RESPONSE = 611;
+  // ADR-054 (Accepted 2026-10-18) — bỏ nhiệm vụ đang làm. Chỉ thêm, protocolVersion không tăng.
+  OPCODE_ABANDON_QUEST_COMMAND = 612;
+  OPCODE_ABANDON_QUEST_RESPONSE = 613;
 
   // --- Guild (700-799) ---
   OPCODE_CREATE_GUILD_COMMAND = 700;

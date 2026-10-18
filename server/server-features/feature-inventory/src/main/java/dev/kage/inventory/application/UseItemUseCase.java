@@ -10,6 +10,7 @@ import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
 import dev.kage.inventory.domain.ItemUseEffect;
+import dev.kage.inventory.domain.TradeOfferPort;
 import dev.kage.inventory.domain.Transaction;
 import dev.kage.inventory.domain.TransactionRunner;
 
@@ -45,19 +46,35 @@ public final class UseItemUseCase {
         /** Không có món đó trong túi CỦA NGƯỜI GỬI — gộp "không tồn tại" với "của người khác" (SECURITY.md). */
         ITEM_NOT_FOUND,
         /** Món có thật nhưng {@code item_template.use_effect} là NULL (trang bị, nguyên liệu...). */
-        NOT_USABLE
+        NOT_USABLE,
+        /**
+         * Mọi cái của dòng đó đang được chào trong một phiên giao dịch còn mở (dòng 80, chủ dự án
+         * duyệt 2026-10-18). Chồng 5 viên chào 2 thì vẫn uống được 3 viên kia.
+         */
+        ITEM_IN_TRADE
     }
+
+    /**
+     * Gom port — CODING-STANDARDS {@code ParameterNumber} max=4, cùng cách {@link EnhancePorts}. Port
+     * thứ năm ({@link TradeOfferPort}, dòng 80, 2026-10-18) là thứ đẩy constructor qua trần.
+     */
+    public record Ports(
+            InventoryPort inventoryPort,
+            ItemTemplatePort itemTemplatePort,
+            AuditPort auditPort,
+            TradeOfferPort tradeOfferPort) {}
 
     private final InventoryPort inventoryPort;
     private final ItemTemplatePort itemTemplatePort;
     private final AuditPort auditPort;
+    private final TradeOfferPort tradeOfferPort;
     private final TransactionRunner tx;
 
-    public UseItemUseCase(
-            InventoryPort inventoryPort, ItemTemplatePort itemTemplatePort, AuditPort auditPort, TransactionRunner tx) {
-        this.inventoryPort = inventoryPort;
-        this.itemTemplatePort = itemTemplatePort;
-        this.auditPort = auditPort;
+    public UseItemUseCase(Ports ports, TransactionRunner tx) {
+        this.inventoryPort = ports.inventoryPort();
+        this.itemTemplatePort = ports.itemTemplatePort();
+        this.auditPort = ports.auditPort();
+        this.tradeOfferPort = ports.tradeOfferPort();
         this.tx = tx;
     }
 
@@ -81,6 +98,11 @@ public final class UseItemUseCase {
         Optional<ItemTemplate> template = itemTemplatePort.findById(item.itemTemplateId());
         if (template.isEmpty() || !template.get().isUsable()) {
             return UseItemResult.failed(Outcome.NOT_USABLE);
+        }
+        // Hỏi SAU khoá túi đồ (findByCharacterForUpdate): đặt lời chào cũng lấy khoá này nên hai bên
+        // xếp hàng — xem TradeOfferPort.
+        if (item.quantity() - tradeOfferPort.offeredQuantity(t, characterId, inventoryItemId) < 1) {
+            return UseItemResult.failed(Outcome.ITEM_IN_TRADE);
         }
 
         inventory.consumeOne(inventoryItemId);

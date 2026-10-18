@@ -121,6 +121,15 @@ final class AreaOfInterestTracker {
         }
     }
 
+    /**
+     * {@code observerId} có đang thấy {@code entityId} không — rẻ hơn {@link #observersOf} khi chỉ hỏi
+     * về MỘT người nhận (gửi gói riêng cho một người, vd máu của mục tiêu vừa nhắm).
+     */
+    boolean sees(long observerId, long entityId) {
+        Set<Long> visible = visibleTo.get(observerId);
+        return visible != null && visible.contains(entityId);
+    }
+
     /** Nhân vật hiện đang thấy {@code entityId} (nhân vật hoặc quái) — dùng để phát AttackResultEvent đúng người. */
     Set<Long> observersOf(long entityId) {
         HashSet<Long> observers = new HashSet<Long>();

@@ -59,6 +59,13 @@ public final class PostgresQuestProgressAdapter implements QuestProgressPort {
                AND status = 'IN_PROGRESS' AND progress_json = ?
             """;
 
+    // Bỏ quest (ADR-054): compare-and-delete — chỉ dòng còn IN_PROGRESS; RETURNING để ghi audit.
+    private static final String DELETE_IF_IN_PROGRESS = """
+            DELETE FROM character_quest_progress
+             WHERE character_id = ? AND quest_template_id = ? AND status = 'IN_PROGRESS'
+            RETURNING progress_json
+            """;
+
     // JOIN quest_template để trả quest_code (khoá client dùng) thay vì quest_template_id —
     // ClaimQuestRewardCommand nhận code. KHÔNG select progress_json: chuỗi đục do script tự quản,
     // cố ý không đi qua dây (ADR-035 Decision-4).
@@ -157,6 +164,13 @@ public final class PostgresQuestProgressAdapter implements QuestProgressPort {
         int updated = JdbcOperations.update(
                 connection, MARK_CLAIMED_IF_COMPLETED, Timestamp.from(Instant.now()), characterId, questTemplateId);
         return updated == 1;
+    }
+
+    @Override
+    public Optional<String> deleteIfInProgress(Transaction tx, long characterId, long questTemplateId) {
+        Connection connection = ((JdbcTransaction) tx).connection();
+        return JdbcOperations.queryOne(
+                connection, DELETE_IF_IN_PROGRESS, rs -> rs.getString("progress_json"), characterId, questTemplateId);
     }
 
     @Override

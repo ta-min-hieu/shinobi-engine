@@ -109,8 +109,10 @@ public final class QuestLogPanel implements HudWindow {
      *     cửa sổ này khôi phục lại được — xem javadoc lớp).
      * @param displayText chuỗi ĐÃ ghép sẵn (tên nhiệm vụ + trạng thái), panel không tự ghép.
      * @param claimable có bày nút Lĩnh thưởng cho dòng này không.
+     * @param abandonable có bày nút Bỏ cho dòng này không (ADR-054 — chỉ nhiệm vụ đang làm). Một dòng
+     *     không bao giờ vừa lĩnh được vừa bỏ được, nên hai nút dùng chung MỘT ô.
      */
-    public record QuestRow(String questCode, String displayText, boolean claimable) {}
+    public record QuestRow(String questCode, String displayText, boolean claimable, boolean abandonable) {}
 
     private final Stage stage;
     private final KageSkin skin;
@@ -120,7 +122,20 @@ public final class QuestLogPanel implements HudWindow {
     private final Table questList;
 
     private Consumer<String> onClaim;
+    private Consumer<String> onAbandon;
     private Runnable onOpened;
+
+    /**
+     * Mã nhiệm vụ đang chờ bấm XÁC NHẬN bỏ (bấm Bỏ lần một), rỗng nếu không có. Xác nhận dựng ngay
+     * trong cửa sổ: bỏ nhiệm vụ xoá tiến độ và không trả đồ đã giao, một cú bấm nhầm không được đủ.
+     * Chỉ là trạng thái HIỂN THỊ — server vẫn tự kiểm mọi thứ (Điều 15).
+     */
+    private String armedAbandonQuestCode = "";
+
+    /** Bản sao các dòng đang vẽ — để vẽ lại khi bấm Bỏ lần một đổi nhãn nút. */
+    private List<QuestRow> shownRows = List.of();
+
+    private String shownNotice = "";
 
     /**
      * Có được phép mở bằng phím J lúc này không. Mặc định là LUÔN được — panel không biết trên màn
@@ -260,6 +275,7 @@ public final class QuestLogPanel implements HudWindow {
 
     public void close() {
         panel.setVisible(false);
+        armedAbandonQuestCode = "";
     }
 
     /** Gọi mỗi lần khung mở ra hoặc người chơi bấm Làm mới — chỗ nghe có nhiệm vụ hỏi lại server. */
@@ -273,6 +289,11 @@ public final class QuestLogPanel implements HudWindow {
      */
     public void setCanOpen(BooleanSupplier condition) {
         this.canOpen = condition;
+    }
+
+    /** Mã nhiệm vụ người chơi vừa XÁC NHẬN bỏ (bấm Bỏ hai lần, ADR-054). */
+    public void setOnAbandon(Consumer<String> listener) {
+        this.onAbandon = listener;
     }
 
     /** Mã nhiệm vụ của dòng người chơi vừa bấm Lĩnh thưởng — khoá idempotency sinh ở coordinator. */
@@ -295,6 +316,11 @@ public final class QuestLogPanel implements HudWindow {
      *     không có gì phải nói thêm.
      */
     public void setQuests(List<QuestRow> rows, String emptyOrOverflowNotice) {
+        shownRows = List.copyOf(rows);
+        shownNotice = emptyOrOverflowNotice;
+        if (rows.stream().noneMatch(row -> row.abandonable() && row.questCode().equals(armedAbandonQuestCode))) {
+            armedAbandonQuestCode = ""; // dòng đang chờ xác nhận đã biến mất / đổi trạng thái
+        }
         questList.clear();
         for (QuestRow row : rows) {
             addQuestRow(row);
@@ -318,10 +344,32 @@ public final class QuestLogPanel implements HudWindow {
                     .add(actionButton("questlog.action.claim", () -> emit(row.questCode())))
                     .minWidth(ROW_BUTTON_MIN_WIDTH_PX)
                     .padBottom(ROW_PAD_PX);
+        } else if (row.abandonable()) {
+            boolean armed = row.questCode().equals(armedAbandonQuestCode);
+            questList
+                    .add(actionButton(
+                            armed ? "questlog.action.abandon_confirm" : "questlog.action.abandon",
+                            () -> onAbandonClicked(row.questCode())))
+                    .minWidth(ROW_BUTTON_MIN_WIDTH_PX)
+                    .padBottom(ROW_PAD_PX);
         } else {
             questList.add().minWidth(ROW_BUTTON_MIN_WIDTH_PX).padBottom(ROW_PAD_PX);
         }
         questList.row();
+    }
+
+    /** Lần một: đổi nhãn thành "bấm lần nữa"; lần hai trên CÙNG dòng: báo ra ngoài. */
+    private void onAbandonClicked(String questCode) {
+        if (!questCode.equals(armedAbandonQuestCode)) {
+            armedAbandonQuestCode = questCode;
+            setQuests(shownRows, shownNotice);
+            return;
+        }
+        armedAbandonQuestCode = "";
+        setQuests(shownRows, shownNotice);
+        if (onAbandon != null) {
+            onAbandon.accept(questCode);
+        }
     }
 
     private void emit(String questCode) {

@@ -77,6 +77,7 @@ import dev.kage.party.application.PartyUseCases;
 import dev.kage.party.application.RejectPartyInviteUseCase;
 import dev.kage.pvp.api.PvpFacade;
 import dev.kage.quest.api.QuestFacade;
+import dev.kage.quest.application.AbandonQuestUseCase;
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
 import dev.kage.quest.application.ListQuestsUseCase;
@@ -248,8 +249,10 @@ public final class ServerDatabaseBootstrap {
                 idempotencyPort,
                 new PostgresInventoryTradeOfferAdapter());
         EnhanceItemUseCase enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, transactionRunner);
-        UseItemUseCase useItemUseCase =
-                new UseItemUseCase(inventoryPort, itemTemplatePort, auditPort, transactionRunner);
+        UseItemUseCase useItemUseCase = new UseItemUseCase(
+                new UseItemUseCase.Ports(
+                        inventoryPort, itemTemplatePort, auditPort, new PostgresInventoryTradeOfferAdapter()),
+                transactionRunner);
         InventoryQueryUseCases queryUseCases = new InventoryQueryUseCases(
                 new ListInventoryUseCase(inventoryPort, equipmentPort), new GetItemCatalogUseCase(itemTemplatePort));
         return new InventoryFacade(
@@ -370,7 +373,9 @@ public final class ServerDatabaseBootstrap {
                 acceptQuestUseCase,
                 processQuestEventUseCase,
                 claimQuestRewardUseCase,
-                new ListQuestsUseCase(progressPort));
+                new dev.kage.quest.api.QuestLogUseCases(
+                        new ListQuestsUseCase(progressPort),
+                        new AbandonQuestUseCase(progressPort, templatePort, auditPort, transactionRunner)));
     }
 
     public FriendFacade wireFriendFacade() {

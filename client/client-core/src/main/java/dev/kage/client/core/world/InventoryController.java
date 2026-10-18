@@ -61,6 +61,9 @@ final class InventoryController {
             // Dùng vật phẩm khi còn hồi chiêu (quyết định chủ dự án 2026-10-11) — tới trong
             // UseItemResponse.error_key.
             "error.item_on_cooldown",
+            // Dùng phần đang chào trong giao dịch (dòng 80, chủ dự án duyệt 2026-10-18) — tới trong
+            // UseItemResponse.error_key.
+            "error.item_offered_in_trade",
             // Gỡ đồ khi túi đã đầy (quyết định chủ dự án 2026-10-11) — tới trong UnequipItemResponse.error_key.
             "error.inventory_full");
 

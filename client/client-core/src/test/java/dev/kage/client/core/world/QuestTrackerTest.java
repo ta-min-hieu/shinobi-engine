@@ -376,4 +376,36 @@ class QuestTrackerTest {
     private static boolean isRealEnumValue(String name) {
         return !"UNRECOGNIZED".equals(name);
     }
+
+    @Test
+    @DisplayName("Bỏ nhiệm vụ đang theo dõi (ADR-054) ⇒ góc màn hình nhận nhiệm vụ khác, nhật ký mất dòng đó")
+    void abandoningTheTrackedQuestAdoptsAnotherOne() {
+        tracker.onQuestsListed(ListQuestsResponse.newBuilder()
+                .addQuests(QuestLogEntry.newBuilder()
+                        .setQuestCode("kill_training_dummies")
+                        .setStatus(QuestStatus.QUEST_STATUS_IN_PROGRESS))
+                .addQuests(QuestLogEntry.newBuilder()
+                        .setQuestCode("night_watch_bandit")
+                        .setStatus(QuestStatus.QUEST_STATUS_IN_PROGRESS))
+                .build());
+        String tracked = tracker.questCode();
+
+        tracker.onAbandoned(tracked);
+
+        assertThat(tracker.isTracking()).isTrue();
+        assertThat(tracker.questCode()).isNotEqualTo(tracked);
+        assertThat(tracker.questLog())
+                .extracting(QuestTracker.LoggedQuest::questCode)
+                .doesNotContain(tracked);
+    }
+
+    @Test
+    @DisplayName("Bỏ nhiệm vụ cuối cùng ⇒ góc màn hình trống, không đứng mãi với nhiệm vụ đã bỏ")
+    void abandoningTheOnlyQuestClearsTheTracker() {
+        tracker.onAccepted("kill_training_dummies");
+
+        tracker.onAbandoned("kill_training_dummies");
+
+        assertThat(tracker.isTracking()).isFalse();
+    }
 }

@@ -111,7 +111,7 @@ class EnhanceItemUseCaseTest {
     }
 
     private static final dev.kage.inventory.domain.TransactionRunner DIRECT_TX = action -> action.accept(null);
-    private static final dev.kage.inventory.domain.TradeOfferPort NOT_IN_TRADE = (tx, characterId, itemId) -> false;
+    private static final dev.kage.inventory.domain.TradeOfferPort NOT_IN_TRADE = (tx, characterId, itemId) -> 0;
     private static final String IDEMPOTENCY_KEY = "key-1";
 
     private static EnhanceItemUseCase newUseCase(
@@ -160,7 +160,7 @@ class EnhanceItemUseCaseTest {
                 auditPort,
                 new FakeItemTemplatePort(false),
                 idempotencyPort,
-                (tx, characterId, itemId) -> inTrade[0] && characterId == CHARACTER_ID && itemId == ITEM_ID));
+                (tx, characterId, itemId) -> inTrade[0] && characterId == CHARACTER_ID && itemId == ITEM_ID ? 1 : 0));
 
         EnhanceItemUseCase.EnhanceResult result = useCase.execute(CHARACTER_ID, ITEM_ID, false, IDEMPOTENCY_KEY);
 

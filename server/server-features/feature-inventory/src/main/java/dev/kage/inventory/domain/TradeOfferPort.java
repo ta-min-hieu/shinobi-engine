@@ -2,7 +2,8 @@ package dev.kage.inventory.domain;
 
 /**
  * Hỏi "món này có đang nằm trong lời chào của một phiên giao dịch còn mở không" — để
- * {@code EnhanceItemUseCase} từ chối cường hoá món đang chào (quyết định chủ dự án 2026-09-29).
+ * {@code EnhanceItemUseCase} từ chối cường hoá món đang chào (quyết định chủ dự án 2026-09-29), và
+ * {@code UseItemUseCase} không cho dùng phần đang chào (dòng 80, chủ dự án duyệt 2026-10-18).
  *
  * <p>Bản khai riêng của feature-inventory, KHÔNG phụ thuộc Gradle vào feature-trade — cùng cách
  * feature-trade tự khai {@code TradeInventoryPort} để đọc {@code inventory_item}: adapter thật ở
@@ -16,10 +17,18 @@ package dev.kage.inventory.domain;
 public interface TradeOfferPort {
 
     /**
-     * Kiểm món {@code itemId} của {@code characterId} có đang được chào trong giao dịch không.
+     * Số cái của dòng {@code itemId} mà {@code characterId} đang chào trong các phiên giao dịch
+     * chưa kết thúc (phiên đã thi hành/huỷ bị xoá hẳn nên không còn lời chào nào).
      *
-     * @return {@code true} nếu {@code characterId} đang chào {@code itemId} trong một phiên giao
-     *     dịch chưa kết thúc (phiên đã thi hành/huỷ bị xoá hẳn nên không còn lời chào nào)
+     * <p>Trả SỐ LƯỢNG chứ không chỉ có/không (dòng 80, 2026-10-18): chào 1 phi đao trong chồng 99
+     * thì 98 cái còn lại vẫn dùng được — chỉ phần đang chào bị giữ.
+     *
+     * @return {@code 0} nếu dòng đó không nằm trong lời chào nào
      */
-    boolean isOfferedInActiveTrade(Transaction tx, long characterId, long itemId);
+    int offeredQuantity(Transaction tx, long characterId, long itemId);
+
+    /** {@code true} nếu ít nhất một cái của dòng {@code itemId} đang được chào — xem {@link #offeredQuantity}. */
+    default boolean isOfferedInActiveTrade(Transaction tx, long characterId, long itemId) {
+        return offeredQuantity(tx, characterId, itemId) > 0;
+    }
 }

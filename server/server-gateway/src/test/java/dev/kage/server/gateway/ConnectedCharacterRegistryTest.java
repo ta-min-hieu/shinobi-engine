@@ -108,7 +108,9 @@ class ConnectedCharacterRegistryTest {
                 acceptQuestUseCase,
                 processQuestEventUseCase,
                 claimQuestRewardUseCase,
-                new dev.kage.quest.application.ListQuestsUseCase(progressPort));
+                new dev.kage.quest.api.QuestLogUseCases(
+                        new dev.kage.quest.application.ListQuestsUseCase(progressPort),
+                        new dev.kage.quest.application.AbandonQuestUseCase(progressPort, templatePort, auditPort, tx)));
     }
 
     @AfterEach
@@ -498,7 +500,7 @@ class ConnectedCharacterRegistryTest {
         AuditPort auditPort = (tx, characterId, action, detailJson) -> {};
         dev.kage.inventory.domain.IdempotencyPort idempotencyPort = (tx, idempotencyKey) -> {};
         EnhancePorts enhancePorts = new EnhancePorts(
-                inventoryPort, goldPort, auditPort, itemTemplatePort, idempotencyPort, (tx, c, i) -> false);
+                inventoryPort, goldPort, auditPort, itemTemplatePort, idempotencyPort, (tx, c, i) -> 0);
         EnhanceItemUseCase enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, action -> action.accept(null));
         return new InventoryFacade(
                 new dev.kage.inventory.api.ItemAcquisitionUseCases(addItemUseCase, grantLootUseCase),
@@ -506,7 +508,9 @@ class ConnectedCharacterRegistryTest {
                 new dev.kage.inventory.api.ItemActionUseCases(
                         enhanceItemUseCase,
                         new dev.kage.inventory.application.UseItemUseCase(
-                                inventoryPort, itemTemplatePort, auditPort, action -> action.accept(null))),
+                                new dev.kage.inventory.application.UseItemUseCase.Ports(
+                                        inventoryPort, itemTemplatePort, auditPort, (t, c, i) -> 0),
+                                action -> action.accept(null))),
                 new dev.kage.inventory.api.InventoryQueryUseCases(
                         new dev.kage.inventory.application.ListInventoryUseCase(inventoryPort, equipmentPort),
                         new dev.kage.inventory.application.GetItemCatalogUseCase(itemTemplatePort)));

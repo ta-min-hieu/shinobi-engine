@@ -7,6 +7,7 @@ import dev.kage.quest.domain.QuestItemTakePort;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.server.database.JdbcOperations;
 import dev.kage.server.database.inventory.CharacterInventoryLock;
+import dev.kage.server.database.inventory.TradeOfferedQuantity;
 
 /**
  * Hiện thực {@link QuestItemTakePort} trên PostgreSQL — chiều ngược của
@@ -26,10 +27,13 @@ public final class PostgresQuestItemTakeAdapter implements QuestItemTakePort {
     /**
      * Chỉ những dòng người chơi không coi là "đồ đang dùng": KHÔNG đang mặc, CHƯA cường hoá (xem
      * javadoc {@link QuestItemTakePort}). {@code equipment_slot.inventory_item_id} là cách DUY NHẤT
-     * biết một dòng đang mặc — V5, dòng đang mặc vẫn nằm trong {@code inventory_item}.
+     * biết một dòng đang mặc — V5, dòng đang mặc vẫn nằm trong {@code inventory_item}. Cột
+     * {@code offered}: phần đang chào trong giao dịch còn mở cũng KHÔNG lấy được (dòng 80, chủ dự án
+     * duyệt 2026-10-18) — xem {@link TradeOfferedQuantity}.
      */
-    private static final String LOCK_TAKEABLE_STACKS = """
-            SELECT ii.id, ii.quantity
+    private static final String LOCK_TAKEABLE_STACKS =
+            "SELECT ii.id, ii.quantity, " + TradeOfferedQuantity.OF_II + " AS offered" + """
+
               FROM inventory_item ii
               JOIN item_template it ON it.id = ii.item_template_id
              WHERE ii.character_id = ?
@@ -48,7 +52,8 @@ public final class PostgresQuestItemTakeAdapter implements QuestItemTakePort {
             UPDATE inventory_item SET quantity = quantity - ? WHERE id = ?
             """;
 
-    private record TakeableStack(long id, int quantity) {}
+    /** {@code takeable}: số cái lấy được — tổng dòng trừ phần đang chào giao dịch. */
+    private record TakeableStack(long id, int quantity, int takeable) {}
 
     @Override
     public void lockInventory(Transaction tx, long characterId) {
@@ -61,12 +66,15 @@ public final class PostgresQuestItemTakeAdapter implements QuestItemTakePort {
         List<TakeableStack> stacks = JdbcOperations.query(
                 connection,
                 LOCK_TAKEABLE_STACKS,
-                rs -> new TakeableStack(rs.getLong("id"), rs.getInt("quantity")),
+                rs -> new TakeableStack(
+                        rs.getLong("id"),
+                        rs.getInt("quantity"),
+                        Math.max(0, rs.getInt("quantity") - rs.getInt("offered"))),
                 characterId,
                 itemTemplateCode);
         long available = 0L;
         for (TakeableStack stack : stacks) {
-            available += stack.quantity();
+            available += stack.takeable();
         }
         // Mã không tồn tại cũng rơi vào đây (không dòng nào khớp) — và chưa ghi gì cả.
         if (available < quantity) {
@@ -77,13 +85,16 @@ public final class PostgresQuestItemTakeAdapter implements QuestItemTakePort {
             if (remaining == 0) {
                 break;
             }
-            if (stack.quantity() <= remaining) {
-                JdbcOperations.update(connection, DELETE_ITEM, stack.id());
-                remaining -= stack.quantity();
-            } else {
-                JdbcOperations.update(connection, DECREMENT_QUANTITY, remaining, stack.id());
-                remaining = 0;
+            int taken = Math.min(stack.takeable(), remaining);
+            if (taken == 0) {
+                continue;
             }
+            if (taken == stack.quantity()) {
+                JdbcOperations.update(connection, DELETE_ITEM, stack.id());
+            } else {
+                JdbcOperations.update(connection, DECREMENT_QUANTITY, taken, stack.id());
+            }
+            remaining -= taken;
         }
         return true;
     }

@@ -53,6 +53,7 @@ public final class ShopFacade {
             case INSUFFICIENT_QUANTITY -> SellResult.INSUFFICIENT_QUANTITY;
             case DUPLICATE_REQUEST -> SellResult.DUPLICATE_REQUEST;
             case ITEM_EQUIPPED -> SellResult.ITEM_EQUIPPED;
+            case ITEM_IN_TRADE -> SellResult.ITEM_IN_TRADE;
         };
     }
 
@@ -65,13 +66,17 @@ public final class ShopFacade {
         DUPLICATE_REQUEST
     }
 
-    /** Kết quả bán — {@code ITEM_EQUIPPED}: món đang mặc phải gỡ trước. */
+    /**
+     * Kết quả bán — {@code ITEM_EQUIPPED}: món đang mặc phải gỡ trước; {@code ITEM_IN_TRADE}: phần muốn
+     * bán đang được chào trong giao dịch.
+     */
     public enum SellResult {
         OK,
         ITEM_NOT_FOUND,
         ITEM_NOT_SELLABLE,
         INSUFFICIENT_QUANTITY,
         DUPLICATE_REQUEST,
-        ITEM_EQUIPPED
+        ITEM_EQUIPPED,
+        ITEM_IN_TRADE
     }
 }

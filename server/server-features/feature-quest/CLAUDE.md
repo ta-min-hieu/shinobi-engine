@@ -342,3 +342,12 @@ Gác bởi `QuestScriptRunnerBoundaryTest` (fixture `test_fixture_boundary.js`, 
 `progress_json`) và `server-database/.../quest/QuestRewardItemBoundsIntegrationTest`.
 
 ⚠️ Thêm hàm `ctx.*` mới thì thêm nhánh biên vào fixture đó TRƯỚC khi nối nó xuống một adapter.
+
+
+## Bỏ nhiệm vụ (ADR-054, 2026-10-18)
+
+`AbandonQuestUseCase` — chỉ quest `IN_PROGRESS`; `QuestProgressPort.deleteIfInProgress` (compare-and-delete,
+`RETURNING progress_json` để ghi audit `QUEST_ABANDON`). Đi qua `QuestFacade.withEventLock` như sự kiện,
+nên không chen giữa một lần `on_event`. Đồ đã `take_item` KHÔNG hoàn. Mã quest từ client được kiểm dạng
+(`[a-z0-9_]{1,32}`) TRƯỚC khi chạm DB — fuzz opcode thấy U+0000 làm Postgres ném 500.
+`QuestFacade` nay nhận `QuestLogUseCases(list, abandon)` để giữ constructor 4 tham số.

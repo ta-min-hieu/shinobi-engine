@@ -11,6 +11,7 @@ import dev.kage.mail.domain.Transaction;
 import dev.kage.server.database.JdbcOperations;
 import dev.kage.server.database.inventory.CharacterInventoryLock;
 import dev.kage.server.database.inventory.InventoryStackMerge;
+import dev.kage.server.database.inventory.TradeOfferedQuantity;
 
 /**
  * Hiện thực {@link InventoryGatewayPort} trên PostgreSQL — SQL riêng cho {@code inventory_item},
@@ -25,10 +26,13 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
 
     // ORDER BY id: hai transaction gửi thư song song khoá các dòng theo CÙNG thứ tự nên không
     // deadlock nhau. enhance_level = 0: xem javadoc #consumeItem. Cột equipped để LOẠI dòng đang
-    // mặc khỏi phần được trừ (vẫn khoá nó như cũ — KHÔNG đổi thứ tự khoá).
+    // mặc khỏi phần được trừ (vẫn khoá nó như cũ — KHÔNG đổi thứ tự khoá). Cột offered: phần đang chào
+    // trong giao dịch còn mở cũng không được trừ (dòng 80) — xem TradeOfferedQuantity.
     private static final String SELECT_STACKS_FOR_UPDATE = """
             SELECT id, quantity,
-                   EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = inventory_item.id) AS equipped
+                   EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = inventory_item.id) AS equipped,
+            """ + TradeOfferedQuantity.OF_INVENTORY_ITEM + """
+                    AS offered
               FROM inventory_item
              WHERE character_id = ? AND item_template_id = ? AND enhance_level = 0
              ORDER BY id
@@ -118,6 +122,11 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
      * ({@code ATTACHMENT_NOT_OWNED}), cùng luật với bán hàng và giao dịch. Lấy nó đi thì ô trang bị
      * rơi về NULL mà World vẫn giữ chỉ số tới lần đăng nhập sau.
      *
+     * <p><b>Không trừ phần ĐANG CHÀO trong giao dịch</b> (dòng 80, chủ dự án duyệt 2026-10-18): chồng 10
+     * phi đao chào 4 thì gửi thư được tối đa 6. Trước đó thư lấy luôn phần đang chào và giao dịch
+     * thất bại lúc xác nhận mà người kia không biết vì sao. Thiếu vì lý do này vẫn là
+     * {@code ATTACHMENT_NOT_OWNED} — cùng cách dòng đang mặc được đối xử.
+     *
      * <p>Đếm ĐỦ trước rồi mới trừ: transaction ngoài cùng vẫn rollback nếu trả {@code false},
      * nhưng "không đủ" là kết quả bình thường của nghiệp vụ, không nên để nó phụ thuộc vào việc ai
      * đó nhớ rollback đúng.
@@ -128,12 +137,13 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
         List<Stack> stacks = JdbcOperations.query(
                 connection,
                 SELECT_STACKS_FOR_UPDATE,
-                rs -> new Stack(rs.getLong("id"), rs.getInt("quantity"), rs.getBoolean("equipped")),
+                rs -> new Stack(
+                        rs.getLong("id"), rs.getInt("quantity"), rs.getBoolean("equipped"), rs.getInt("offered")),
                 characterId,
                 itemTemplateId);
         List<Stack> consumeOrder =
-                stacks.stream().filter(stack -> !stack.equipped()).toList();
-        long available = consumeOrder.stream().mapToLong(Stack::quantity).sum();
+                stacks.stream().filter(stack -> stack.takeable() > 0).toList();
+        long available = consumeOrder.stream().mapToLong(Stack::takeable).sum();
         if (available < quantity) {
             return false;
         }
@@ -142,7 +152,7 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
             if (remaining == 0) {
                 break;
             }
-            int taken = Math.min(stack.quantity(), remaining);
+            int taken = Math.min(stack.takeable(), remaining);
             if (taken == stack.quantity()) {
                 JdbcOperations.update(connection, DELETE_ITEM, stack.id());
             } else {
@@ -154,5 +164,11 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
     }
 
     /** Một dòng {@code inventory_item} đã khoá — các cột cần cho việc trừ. */
-    private record Stack(long id, int quantity, boolean equipped) {}
+    private record Stack(long id, int quantity, boolean equipped, int offered) {
+
+        /** Số cái được phép trừ: dòng đang mặc thì 0, còn lại trừ phần đang chào giao dịch. */
+        int takeable() {
+            return equipped ? 0 : Math.max(0, quantity - offered);
+        }
+    }
 }

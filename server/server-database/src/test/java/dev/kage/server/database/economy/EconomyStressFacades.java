@@ -24,6 +24,7 @@ import dev.kage.mail.application.ListMailUseCase;
 import dev.kage.mail.application.MailPorts;
 import dev.kage.mail.application.SendMailUseCase;
 import dev.kage.quest.api.QuestFacade;
+import dev.kage.quest.application.AbandonQuestUseCase;
 import dev.kage.quest.application.AcceptQuestUseCase;
 import dev.kage.quest.application.ClaimQuestRewardUseCase;
 import dev.kage.quest.application.ListQuestsUseCase;
@@ -122,7 +123,10 @@ record EconomyStressFacades(
                 new PostgresInventoryTradeOfferAdapter());
         ItemActionUseCases actionUseCases = new ItemActionUseCases(
                 new EnhanceItemUseCase(enhancePorts, transactionRunner),
-                new UseItemUseCase(inventoryPort, itemTemplatePort, auditPort, transactionRunner));
+                new UseItemUseCase(
+                        new UseItemUseCase.Ports(
+                                inventoryPort, itemTemplatePort, auditPort, new PostgresInventoryTradeOfferAdapter()),
+                        transactionRunner));
         InventoryQueryUseCases queryUseCases = new InventoryQueryUseCases(
                 new ListInventoryUseCase(inventoryPort, equipmentPort), new GetItemCatalogUseCase(itemTemplatePort));
         return new InventoryFacade(
@@ -196,6 +200,8 @@ record EconomyStressFacades(
                 new ProcessQuestEventUseCase(
                         progressPort, new PostgresQuestItemTakeAdapter(), auditPort, transactionRunner),
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, transactionRunner),
-                new ListQuestsUseCase(progressPort));
+                new dev.kage.quest.api.QuestLogUseCases(
+                        new ListQuestsUseCase(progressPort),
+                        new AbandonQuestUseCase(progressPort, templatePort, auditPort, transactionRunner)));
     }
 }

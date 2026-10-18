@@ -266,7 +266,8 @@ final class ShopController {
             SellOutcome.SELL_OUTCOME_ITEM_NOT_FOUND, "shop.error.item_not_found",
             SellOutcome.SELL_OUTCOME_ITEM_NOT_SELLABLE, "shop.error.item_not_sellable",
             SellOutcome.SELL_OUTCOME_INSUFFICIENT_QUANTITY, "shop.error.insufficient_quantity",
-            SellOutcome.SELL_OUTCOME_DUPLICATE_REQUEST, "shop.error.duplicate_request");
+            SellOutcome.SELL_OUTCOME_DUPLICATE_REQUEST, "shop.error.duplicate_request",
+            SellOutcome.SELL_OUTCOME_ITEM_IN_TRADE, "shop.error.item_in_trade");
 
     private static <T> Optional<String> messageKey(Map<T, String> table, T outcome) {
         return Optional.ofNullable(table.get(outcome));

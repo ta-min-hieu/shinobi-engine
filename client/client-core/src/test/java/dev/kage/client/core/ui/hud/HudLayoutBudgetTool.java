@@ -325,7 +325,8 @@ public final class HudLayoutBudgetTool extends ApplicationAdapter {
         panel.setStatus("Đã nhận thưởng nhiệm vụ — EXP và vật phẩm đã về túi.");
         List<QuestLogPanel.QuestRow> quests = new ArrayList<>();
         for (int index = 0; index < rows; index++) {
-            quests.add(new QuestLogPanel.QuestRow("awakening_trial", "Khảo Hạch Thức Tỉnh — Đã hoàn thành", true));
+            quests.add(
+                    new QuestLogPanel.QuestRow("awakening_trial", "Khảo Hạch Thức Tỉnh — Đã hoàn thành", true, false));
         }
         panel.setQuests(quests, "... còn 2 nhiệm vụ nữa chưa hiện.");
         panel.open();
