@@ -17,7 +17,8 @@ record GatewayFacades(
         CharacterFacade characterFacade,
         InventoryFacade inventoryFacade,
         ContentFacades contentFacades,
-        GmFacade gmFacade) {
+        GmFacade gmFacade,
+        ProgressionFacades progression) {
 
     /** Composition không có GM (test) — không ai có quyền (ADR-052). */
     GatewayFacades(
@@ -25,6 +26,12 @@ record GatewayFacades(
             CharacterFacade characterFacade,
             InventoryFacade inventoryFacade,
             ContentFacades contentFacades) {
-        this(accountFacade, characterFacade, inventoryFacade, contentFacades, GmFacade.DISABLED);
+        this(
+                accountFacade,
+                characterFacade,
+                inventoryFacade,
+                contentFacades,
+                GmFacade.DISABLED,
+                ProgressionFacades.DISABLED);
     }
 }

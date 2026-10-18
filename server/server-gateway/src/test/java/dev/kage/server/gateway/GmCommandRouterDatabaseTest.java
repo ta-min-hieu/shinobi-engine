@@ -172,6 +172,10 @@ class GmCommandRouterDatabaseTest {
                 .singleElement()
                 .asString()
                 .startsWith("No character");
+        assertThat(router(true).execute(actor(gm, LOOPBACK), "/gm inspect " + gm.name()))
+                .singleElement()
+                .asString()
+                .startsWith("items=");
         assertThat(router(true).execute(actor(gm, LOOPBACK), "/gm who " + gm.name()))
                 .singleElement()
                 .asString()

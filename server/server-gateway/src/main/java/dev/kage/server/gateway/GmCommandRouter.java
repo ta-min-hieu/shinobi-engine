@@ -4,9 +4,13 @@ import java.net.SocketAddress;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.function.LongFunction;
 import java.util.function.LongToIntFunction;
 
@@ -25,7 +29,9 @@ import dev.kage.gm.domain.GmCommandParser;
 import dev.kage.gm.domain.GmOutcome;
 import dev.kage.gm.domain.GmRole;
 import dev.kage.inventory.api.InventoryFacade;
+import dev.kage.inventory.domain.InventorySnapshot;
 import dev.kage.inventory.domain.ItemCatalogEntry;
+import dev.kage.inventory.domain.ItemStack;
 import dev.kage.mail.api.MailFacade;
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ChatMessageEvent;
@@ -52,6 +58,10 @@ final class GmCommandRouter {
     static final String KICKED_BY_GM_KEY = "error.kicked_by_gm";
 
     private static final String GIFT_SUBJECT = "GM";
+
+    /** Trần một dòng trả lời — {@code inspect} của túi đầy đồ có thể dài. */
+    private static final int MAX_REPLY_LENGTH = 400;
+
     private static final String GIFT_BODY = "Quà từ ban quản lý. / A gift from the game staff.";
 
     /** Những gì router cần — gom để constructor không vượt trần tham số. */
@@ -194,6 +204,7 @@ final class GmCommandRouter {
             case GmCommand.Unmute _ -> unmute(target.orElseThrow(), ticket);
             case GmCommand.Announce announce -> announce(announce.text(), ticket);
             case GmCommand.Heal _ -> heal(target.orElseThrow(), ticket);
+            case GmCommand.Inspect _ -> inspect(target.orElseThrow(), ticket);
             case GmCommand.Goto _ ->
                 relocate(actor.characterId(), target.orElseThrow().id(), ticket);
             case GmCommand.Summon _ -> relocate(target.orElseThrow().id(), actor.characterId(), ticket);
@@ -204,7 +215,7 @@ final class GmCommandRouter {
 
     private static String help(GmFacade.AuditTicket ticket) {
         ticket.finish(GmOutcome.OK, "{}");
-        return "GM: help who kick mute unmute announce heal goto summon | ADMIN: give gold";
+        return "GM: help who inspect kick mute unmute announce heal goto summon | ADMIN: give gold";
     }
 
     private String who(Character target, GmFacade.AuditTicket ticket) {
@@ -273,6 +284,35 @@ final class GmCommandRouter {
         world.get().enqueueHealCharacter(target.id(), deps.maxHpOf().applyAsInt(target.id()));
         ticket.finish(GmOutcome.OK, "{}");
         return "Healed " + target.id();
+    }
+
+    /**
+     * Túi + đồ đang mặc, một dòng: {@code mã xSố +cường hoá}, món đang mặc đánh dấu {@code *}. Chỉ đọc
+     * qua {@link InventoryFacade#listInventory} — không đụng gì của người bị xem.
+     */
+    private String inspect(Character target, GmFacade.AuditTicket ticket) {
+        InventorySnapshot snapshot = deps.inventory().listInventory(target.id());
+        Map<Long, String> codes = new HashMap<>();
+        for (ItemCatalogEntry entry : deps.inventory().itemCatalog().entries()) {
+            codes.put(entry.id(), entry.code());
+        }
+        Set<Long> equipped = new HashSet<>(snapshot.equipment().slots().values());
+        StringBuilder line = new StringBuilder("items=")
+                .append(snapshot.inventory().items().size())
+                .append(':');
+        for (ItemStack stack : snapshot.inventory().items()) {
+            line.append(' ')
+                    .append(equipped.contains(stack.id()) ? "*" : "")
+                    .append(codes.getOrDefault(stack.itemTemplateId(), "#" + stack.itemTemplateId()));
+            if (stack.quantity() > 1) {
+                line.append('x').append(stack.quantity());
+            }
+            if (stack.enhanceLevel() > 0) {
+                line.append('+').append(stack.enhanceLevel());
+            }
+        }
+        ticket.finish(GmOutcome.OK, "{}");
+        return line.length() <= MAX_REPLY_LENGTH ? line.toString() : line.substring(0, MAX_REPLY_LENGTH - 3) + "...";
     }
 
     /** goto/summon (D4): chỉ trong world chính; dời chính mình tới chỗ mình là không làm gì. */

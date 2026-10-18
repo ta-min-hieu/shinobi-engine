@@ -14,8 +14,8 @@ import dev.kage.protocol.WorldKind;
  * <p><b>Vì sao cần.</b> Client chỉ từng đặt mục tiêu là QUÁI (tự chọn lúc quái spawn, hoặc click
  * quái); click vào người chơi khác là CHỌN để thách đấu ({@link DuelCoordinator#onCharacterPicked}).
  * Đấu trường không có quái ⇒ không bao giờ có mục tiêu ⇒ bấm Đánh báo "chưa chọn mục tiêu", nút
- * skill xám — vào được trận mà không đánh được ai. Phương án (b) — click người chơi để nhắm khi đang
- * trong trận — CHƯA làm, UX chưa chốt.
+ * skill xám — vào được trận mà không đánh được ai. Phương án (b) — click đối thủ để nhắm lại khi đang
+ * trong trận — thêm 2026-10-18 (lô 16, chủ dự án duyệt): {@link #onCharacterClicked}.
  *
  * <p><b>Không đổi protocol, không quyết gameplay.</b> Lớp này chỉ gửi {@code SetTargetCommand} với
  * đúng id mà server đã báo ở {@code DuelStartedEvent.opponent_character_id}; server tự kiểm lại
@@ -102,6 +102,23 @@ final class DuelTargeting implements DuelCoordinator.DuelListener {
         if (characterId == opponentId) {
             targetOpponentIfReady();
         }
+    }
+
+    /**
+     * Click vào một nhân vật (dòng 32(b)). Trong World đấu trường, click vào ĐỐI THỦ là nhắm lại họ —
+     * không phải mở lời thách đấu như ở world chính (đang đấu thì thách ai cũng vô nghĩa).
+     *
+     * @return {@code true} nếu click đã được xử lý ở đây (đang ở đấu trường và trúng một nhân vật) —
+     *     caller không chuyển tiếp sang luồng thách đấu
+     */
+    boolean onCharacterClicked(long characterId) {
+        if (!inArena || characterId == NO_OPPONENT) {
+            return false;
+        }
+        if (characterId == opponentId && combat.selectCharacterTarget(opponentId, opponentDisplayName)) {
+            setTargetSender.accept(opponentId);
+        }
+        return true;
     }
 
     /** {@code DuelResultEvent} — trận đã chốt, thôi nhắm đối thủ cũ. */

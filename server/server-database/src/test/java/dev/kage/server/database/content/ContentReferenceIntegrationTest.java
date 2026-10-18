@@ -292,6 +292,7 @@ class ContentReferenceIntegrationTest {
     private static boolean isNavigation(DialogueOption option) {
         return !DialogueOption.ACTION_END.equals(option.action())
                 && !DialogueOption.ACTION_OPEN_SHOP.equals(option.action())
+                && !DialogueOption.ACTION_OPEN_STORAGE.equals(option.action())
                 && !option.action().startsWith(DialogueOption.ACTION_ACCEPT_QUEST_PREFIX);
     }
 

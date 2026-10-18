@@ -242,7 +242,7 @@ public final class WorldScreen implements GameScreen {
     /** Vòng đời nhiệm vụ: nhận → hoàn thành → lĩnh thưởng — xem {@link QuestCoordinator}. */
     private final QuestCoordinator quests;
 
-    /** Bảng nhân vật (phím C, ADR-056) + Bia Anh Danh (phím L, ADR-057) — xem {@link ReportWindows}. */
+    /** Bảng nhân vật (C, ADR-056), Bia Anh Danh (L, ADR-057), kho đồ (ADR-061) — xem {@link ReportWindows}. */
     private final ReportWindows reports;
 
     /**
@@ -320,7 +320,6 @@ public final class WorldScreen implements GameScreen {
 
         // SAU combatFeedback: quests mượn nó để báo khi hoàn thành/lĩnh thưởng.
         this.quests = new QuestCoordinator(combatHud, questLogPanel, sender, combatFeedback);
-        this.reports = ReportWindows.create(combatHud.skin(), sender, localCharacterId);
         this.dialogue = new DialogueCoordinator(dialoguePanel, sender, quests);
         this.chat = new ChatCoordinator(chatPanel, sender);
         // SAU chat: cả ba coordinator dưới đây mượn nhật ký chat/chữ nổi làm chỗ báo lý do thất bại.
@@ -337,6 +336,7 @@ public final class WorldScreen implements GameScreen {
                 combatFeedback,
                 new LocalCharacterAppearance(models, combatHudController, WorldConstants.LOCAL_CHARACTER_ID));
         this.itemCatalog = new ItemCatalogCoordinator(sender);
+        this.reports = ReportWindows.create(combatHud.skin(), sender, localCharacterId, itemCatalog);
         this.mail = new MailCoordinator(mailPanel, sender, combatFeedback, panels::noneOpen);
         this.inventory = buildInventory();
         this.shop = buildShop();
@@ -475,6 +475,7 @@ public final class WorldScreen implements GameScreen {
         panels.register(questLogPanel, quests);
         panels.register(reports.characterSheetPanel(), reports.characterSheet());
         panels.register(reports.leaderboardPanel(), reports.leaderboard());
+        panels.register(reports.storagePanel(), reports.storage());
         panels.register(dialoguePanel, dialogue);
         panels.register(partyPanel, party);
         panels.register(friendPanel, friends);
@@ -912,9 +913,12 @@ public final class WorldScreen implements GameScreen {
         // Người chơi khác đứng CUỐI trong ba loại: quái và NPC là thứ click cả ngày, còn thách đấu
         // là việc hiếm. Click chọn chỉ CHỌN chứ không gửi lời thách đấu nào, và id 0 (click vào chỗ
         // trống) được xử lý bên trong coordinator — xem {@link DuelCoordinator#onCharacterPicked}.
-        return talkToNpcAt(screenX, glScreenY, projector)
-                || duel.onCharacterPicked(
-                        entityPicker.pick(remoteCharacters.characters(), screenX, glScreenY, projector));
+        if (talkToNpcAt(screenX, glScreenY, projector)) {
+            return true;
+        }
+        long characterId = entityPicker.pick(remoteCharacters.characters(), screenX, glScreenY, projector);
+        // Đang trong trận: click đối thủ là NHẮM họ (dòng 32(b)), không phải thách đấu.
+        return duelTargeting.onCharacterClicked(characterId) || duel.onCharacterPicked(characterId);
     }
 
     private boolean talkToNpcAt(float screenX, float glScreenY, WorldToScreen projector) {

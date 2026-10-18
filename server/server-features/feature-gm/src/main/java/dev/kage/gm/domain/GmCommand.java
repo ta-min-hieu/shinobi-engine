@@ -101,6 +101,19 @@ public sealed interface GmCommand {
         }
     }
 
+    /** Xem túi + đồ đang mặc của mục tiêu — CHỈ ĐỌC (lô 16, chủ dự án duyệt 2026-10-18). */
+    record Inspect(String targetName) implements GmCommand {
+        @Override
+        public String name() {
+            return "inspect";
+        }
+
+        @Override
+        public GmRole requiredRole() {
+            return GmRole.GM;
+        }
+    }
+
     /** Dời CHÍNH GM tới chỗ mục tiêu đang đứng — chỉ trong world chính (D4). */
     record Goto(String targetName) implements GmCommand {
         @Override

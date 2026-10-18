@@ -106,6 +106,13 @@ enum Opcode {
   // dưới đây. Số 511 GIỮ NGUYÊN chỗ trống của nó.
   OPCODE_USE_ITEM_COMMAND = 512;
   OPCODE_USE_ITEM_RESPONSE = 513;
+  // ADR-061 (Accepted 2026-10-18) — kho đồ tông môn. Chỉ thêm, protocolVersion không tăng.
+  OPCODE_LIST_STORAGE_REQUEST = 514;
+  OPCODE_LIST_STORAGE_RESPONSE = 515;
+  OPCODE_DEPOSIT_ITEM_COMMAND = 516;
+  OPCODE_DEPOSIT_ITEM_RESPONSE = 517;
+  OPCODE_WITHDRAW_ITEM_COMMAND = 518;
+  OPCODE_WITHDRAW_ITEM_RESPONSE = 519;
   // 511 để TRỐNG CÓ CHỦ Ý — dành sẵn cho ITEM_REMOVED_EVENT (ADR-035 Revisit Trigger #3, chỉ
   // thêm khi ĐO thấy việc hỏi lại toàn bộ túi sau mỗi hành động tốn thật). ĐỪNG cấp cho packet khác.
 

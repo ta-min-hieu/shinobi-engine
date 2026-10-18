@@ -45,7 +45,7 @@ class SeniorSisterDialogueTreeTest {
         assertThat(start.textKey()).isEqualTo("dialogue.senior_sister.greeting");
         assertThat(start.options())
                 .extracting(DialogueOption::action)
-                .containsExactly("about_rank", "about_rival", "about_herself", "about_work", "end");
+                .containsExactly("about_rank", "about_rival", "about_herself", "about_work", "open_storage", "end");
     }
 
     /**

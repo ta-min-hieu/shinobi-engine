@@ -1,6 +1,7 @@
 package dev.kage.inventory.api;
 
 import dev.kage.inventory.application.EnhanceItemUseCase;
+import dev.kage.inventory.application.StorageUseCase;
 import dev.kage.inventory.application.UseItemUseCase;
 
 /**
@@ -10,4 +11,11 @@ import dev.kage.inventory.application.UseItemUseCase;
  * tham số (CODING-STANDARDS §4, Checkstyle {@code ParameterNumber}) từ Phase 5, nên UseCase mới của
  * ADR-046 D5 phải vào chung một record với {@code EnhanceItemUseCase} thay vì thêm tham số thứ 5.
  */
-public record ItemActionUseCases(EnhanceItemUseCase enhanceItemUseCase, UseItemUseCase useItemUseCase) {}
+public record ItemActionUseCases(
+        EnhanceItemUseCase enhanceItemUseCase, UseItemUseCase useItemUseCase, StorageUseCase storageUseCase) {
+
+    /** Composition không có kho đồ (test) — gọi tới kho là lỗi lập trình. */
+    public ItemActionUseCases(EnhanceItemUseCase enhanceItemUseCase, UseItemUseCase useItemUseCase) {
+        this(enhanceItemUseCase, useItemUseCase, StorageUseCase.unavailable());
+    }
+}

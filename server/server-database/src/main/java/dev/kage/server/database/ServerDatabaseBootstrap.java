@@ -18,6 +18,9 @@ import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.character.application.SelectFactionUseCase;
 import dev.kage.chat.api.ChatFacade;
 import dev.kage.chat.application.SendChatMessageUseCase;
+import dev.kage.checkin.api.CheckInFacade;
+import dev.kage.checkin.application.ClaimDailyCheckInUseCase;
+import dev.kage.checkin.domain.CheckInRewardSender;
 import dev.kage.dialogue.api.DialogueFacade;
 import dev.kage.dialogue.api.NpcPlacementFacade;
 import dev.kage.dialogue.application.GetDialogueNodeUseCase;
@@ -56,6 +59,7 @@ import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GetItemCatalogUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.inventory.application.ListInventoryUseCase;
+import dev.kage.inventory.application.StorageUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
 import dev.kage.inventory.application.UseItemUseCase;
 import dev.kage.mail.api.MailFacade;
@@ -90,6 +94,7 @@ import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
 import dev.kage.server.database.chat.PostgresChatAuditAdapter;
 import dev.kage.server.database.chat.PostgresChatMuteAdapter;
+import dev.kage.server.database.checkin.PostgresCheckInAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcPlacementAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcTemplateAdapter;
 import dev.kage.server.database.friend.PostgresFriendAdapter;
@@ -105,6 +110,7 @@ import dev.kage.server.database.inventory.PostgresInventoryAdapter;
 import dev.kage.server.database.inventory.PostgresInventoryIdempotencyAdapter;
 import dev.kage.server.database.inventory.PostgresInventoryTradeOfferAdapter;
 import dev.kage.server.database.inventory.PostgresItemTemplateAdapter;
+import dev.kage.server.database.inventory.PostgresStorageAdapter;
 import dev.kage.server.database.mail.JdbcMailTransactionRunner;
 import dev.kage.server.database.mail.PostgresMailAuditAdapter;
 import dev.kage.server.database.mail.PostgresMailGoldAdapter;
@@ -263,8 +269,25 @@ public final class ServerDatabaseBootstrap {
         return new InventoryFacade(
                 new ItemAcquisitionUseCases(addItemUseCase, grantLootUseCase),
                 equipmentUseCases,
-                new ItemActionUseCases(enhanceItemUseCase, useItemUseCase),
+                new ItemActionUseCases(
+                        enhanceItemUseCase,
+                        useItemUseCase,
+                        storageUseCase(inventoryPort, equipmentPort, itemTemplatePort, transactionRunner)),
                 queryUseCases);
+    }
+
+    /** Kho đồ tông môn (ADR-061) — tách khỏi {@link #wireInventoryFacade} vì trần {@code MethodLength}. */
+    private StorageUseCase storageUseCase(
+            PostgresInventoryAdapter inventoryPort,
+            PostgresEquipmentAdapter equipmentPort,
+            PostgresItemTemplateAdapter itemTemplatePort,
+            JdbcInventoryTransactionRunner tx) {
+        return new StorageUseCase(
+                new StorageUseCase.Ports(
+                        inventoryPort, equipmentPort, itemTemplatePort, new PostgresInventoryTradeOfferAdapter()),
+                new PostgresStorageAdapter(dataSource),
+                new PostgresAuditAdapter(),
+                tx);
     }
 
     /**
@@ -487,6 +510,15 @@ public final class ServerDatabaseBootstrap {
     /** ADR-052 — quyền GM (chỉ đọc) + sổ audit write-ahead. */
     public GmFacade wireGmFacade() {
         return new GmFacade(new PostgresGmRoleAdapter(dataSource), new PostgresGmAuditAdapter(dataSource));
+    }
+
+    /**
+     * Điểm danh hằng ngày (ADR-060). {@code sender} do gateway dựng (thư hệ thống) — feature-checkin không
+     * biết feature thư.
+     */
+    public CheckInFacade wireCheckInFacade(CheckInRewardSender sender) {
+        return new CheckInFacade(new ClaimDailyCheckInUseCase(
+                new PostgresCheckInAdapter(dataSource), sender, java.time.Clock.systemUTC()));
     }
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */

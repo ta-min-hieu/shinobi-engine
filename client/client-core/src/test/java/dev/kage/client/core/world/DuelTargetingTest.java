@@ -63,6 +63,28 @@ class DuelTargetingTest {
     private record Point(float x, float y) implements PickablePoint {}
 
     @Test
+    @DisplayName("Dòng 32(b): trong trận, click đối thủ là nhắm lại họ; ở world chính click không bị nuốt")
+    void clickingTheOpponentInsideTheArena_retargetsThem() {
+        assertThat(targeting.onCharacterClicked(OPPONENT_ID))
+                .as("world chính: để luồng thách đấu xử lý")
+                .isFalse();
+        targeting.onDuelStarted(OPPONENT_ID, OPPONENT_NAME);
+        worldChanged(WorldKind.WORLD_KIND_ARENA);
+        opponentSpawned(4f);
+        combat.clearCharacterTarget(OPPONENT_ID);
+
+        boolean handled = targeting.onCharacterClicked(OPPONENT_ID);
+
+        assertThat(handled).isTrue();
+        assertThat(sentTargets).containsExactly(OPPONENT_ID, OPPONENT_ID);
+        assertThat(targeting.onCharacterClicked(OPPONENT_ID))
+                .as("đang nhắm sẵn: không gửi gói thừa nhưng vẫn không mở thách đấu")
+                .isTrue();
+        assertThat(sentTargets).hasSize(2);
+        assertThat(targeting.onCharacterClicked(0L)).as("click chỗ trống").isFalse();
+    }
+
+    @Test
     @DisplayName("Dòng 67(b): DuelStartedEvent báo đối thủ là chính mình ⇒ bỏ qua, không nhắm ai")
     void duelStartedAgainstOneself_isIgnored() {
         targeting.onDuelStarted(LOCAL_CHARACTER_ID, "Me");

@@ -269,3 +269,63 @@ message UseItemResponse {
   string error_key = 2; // rỗng nếu success=true (NETWORK.md §107)
   int32 remaining_quantity = 3; // số cái CÒN LẠI trong ô túi sau khi dùng; 0 = ô đã biến mất
 }
+
+// ===== ADR-061 — kho đồ tông môn (gửi/rút chỉ khi đứng gần Tô Vân Nhi, server kiểm) =====
+
+// 1 dòng kho. stored_item_id là storage_item.id THẬT — thứ WithdrawItemCommand cần. Id ĐỔI mỗi lần
+// chuyển túi ↔ kho (dòng mới), cấp cường hoá giữ nguyên.
+message StoredItemView {
+  int64 stored_item_id = 1;
+  int64 item_template_id = 2;
+  int32 quantity = 3;
+  int32 enhance_level = 4;
+}
+
+// Command: Client -> Server (OPCODE_LIST_STORAGE_REQUEST = 514). Không field — characterId từ session.
+// Server cũng tự gửi ListStorageResponse khi lựa chọn hội thoại có action "open_storage".
+message ListStorageRequest {
+}
+
+// Response: Server -> Client (OPCODE_LIST_STORAGE_RESPONSE = 515).
+message ListStorageResponse {
+  repeated StoredItemView items = 1;
+  int32 capacity = 2; // hằng số StoragePolicy.CAPACITY, gửi kèm để client không đoán
+}
+
+enum StorageOutcome {
+  STORAGE_OUTCOME_UNSPECIFIED = 0;
+  STORAGE_OUTCOME_OK = 1;
+  STORAGE_OUTCOME_NOT_FOUND = 2;        // món/dòng không thuộc về người gửi
+  STORAGE_OUTCOME_INVALID_QUANTITY = 3;
+  STORAGE_OUTCOME_EQUIPPED = 4;         // đang mặc — gỡ ra trước
+  STORAGE_OUTCOME_ITEM_IN_TRADE = 5;    // phần muốn gửi đang chào trong giao dịch
+  STORAGE_OUTCOME_STORAGE_FULL = 6;
+  STORAGE_OUTCOME_BAG_FULL = 7;
+  STORAGE_OUTCOME_TOO_FAR = 8;          // không đứng gần người giữ kho
+}
+
+// Command: Client -> Server (OPCODE_DEPOSIT_ITEM_COMMAND = 516). inventory_item_id là id THẬT trong túi.
+message DepositItemCommand {
+  int64 inventory_item_id = 1;
+  int32 quantity = 2;
+}
+
+// Response: Server -> Client (OPCODE_DEPOSIT_ITEM_RESPONSE = 517). Mang kho SAU lệnh; túi đồ client tự hỏi lại.
+message DepositItemResponse {
+  StorageOutcome outcome = 1;
+  repeated StoredItemView items = 2;
+  int32 capacity = 3;
+}
+
+// Command: Client -> Server (OPCODE_WITHDRAW_ITEM_COMMAND = 518).
+message WithdrawItemCommand {
+  int64 stored_item_id = 1;
+  int32 quantity = 2;
+}
+
+// Response: Server -> Client (OPCODE_WITHDRAW_ITEM_RESPONSE = 519).
+message WithdrawItemResponse {
+  StorageOutcome outcome = 1;
+  repeated StoredItemView items = 2;
+  int32 capacity = 3;
+}

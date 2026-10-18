@@ -11,6 +11,10 @@ package dev.kage.dialogue.domain;
 public record DialogueOption(String labelKey, String action) {
 
     public static final String ACTION_OPEN_SHOP = "open_shop";
+
+    /** Mở kho đồ tông môn (ADR-061) — gateway gửi danh sách kho, như {@link #ACTION_OPEN_SHOP}. */
+    public static final String ACTION_OPEN_STORAGE = "open_storage";
+
     public static final String ACTION_END = "end";
     public static final String ACTION_ACCEPT_QUEST_PREFIX = "accept_quest:";
 

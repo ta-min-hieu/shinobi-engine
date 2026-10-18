@@ -49,8 +49,15 @@ public final class ReportPanel implements HudWindow {
      *
      * @param text chuỗi ĐÃ dịch
      * @param highlighted vẽ nổi bật (vd dòng của chính mình) — người gọi tự thêm dấu chữ nếu cần
+     * @param actionKey khoá i18n của nút hành động cuối dòng (kho đồ: "Rút"); rỗng = không nút
      */
-    public record Row(String text, boolean highlighted) {}
+    public record Row(String text, boolean highlighted, String actionKey) {
+
+        /** Dòng chỉ đọc, không nút. */
+        public Row(String text, boolean highlighted) {
+            this(text, highlighted, "");
+        }
+    }
 
     private final Stage stage;
     private final KageSkin skin;
@@ -64,6 +71,7 @@ public final class ReportPanel implements HudWindow {
 
     private Runnable onRefresh;
     private IntConsumer onTabSelected = index -> {};
+    private IntConsumer onRowAction = index -> {};
     private BooleanSupplier canOpen = () -> true;
 
     /**
@@ -182,12 +190,26 @@ public final class ReportPanel implements HudWindow {
         panel.setVisible(false);
     }
 
+    /**
+     * Hiện mà KHÔNG hỏi lại server — cho dữ liệu server tự đẩy tới (kho đồ mở qua hội thoại). Gọi
+     * {@link #open()} ở đó là vòng lặp vô tận: hỏi lại → trả lời → mở lại → hỏi lại (bẫy đã gặp ở
+     * {@code ShopCoordinator#onListings}).
+     */
+    public void show() {
+        panel.setVisible(true);
+    }
+
     public void setOnRefresh(Runnable listener) {
         this.onRefresh = listener;
     }
 
     public void setOnTabSelected(IntConsumer listener) {
         this.onTabSelected = listener;
+    }
+
+    /** Bấm nút cuối dòng thứ {@code index} (chỉ số trong danh sách vừa {@link #setRows}). */
+    public void setOnRowAction(IntConsumer listener) {
+        this.onRowAction = listener;
     }
 
     public void setCanOpen(BooleanSupplier condition) {
@@ -202,15 +224,28 @@ public final class ReportPanel implements HudWindow {
     /** Vẽ lại danh sách — chỉ gọi khi server vừa trả lời, không mỗi khung. */
     public void setRows(List<Row> rows) {
         rowList.clear();
-        for (Row row : rows) {
+        for (int i = 0; i < rows.size(); i++) {
+            Row row = rows.get(i);
             Label label = new Label(row.text(), skin.labelStyle);
             label.setColor(row.highlighted() ? HIGHLIGHT_COLOR : ROW_COLOR);
             label.setEllipsis(true);
-            rowList.add(label)
-                    .width(PANEL_WIDTH_PX - 24f)
-                    .left()
-                    .padBottom(ROW_PAD_PX)
-                    .row();
+            if (row.actionKey().isEmpty()) {
+                rowList.add(label)
+                        .width(PANEL_WIDTH_PX - 24f)
+                        .left()
+                        .padBottom(ROW_PAD_PX)
+                        .row();
+                continue;
+            }
+            int index = i;
+            Table line = new Table();
+            line.add(label)
+                    .width(PANEL_WIDTH_PX - 24f - BUTTON_MIN_WIDTH_PX - 6f)
+                    .left();
+            line.add(button(row.actionKey(), () -> onRowAction.accept(index)))
+                    .minWidth(BUTTON_MIN_WIDTH_PX)
+                    .padLeft(6f);
+            rowList.add(line).left().padBottom(ROW_PAD_PX).row();
         }
     }
 

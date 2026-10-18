@@ -65,6 +65,7 @@ shinobi-engine/
 │       ├── feature-trade/
 │       ├── feature-pvp/
 │       ├── feature-monster/        # ADR-037 — monster_template + monster_spawn
+│       ├── feature-checkin/        # ADR-060 — điểm danh hằng ngày (chu kỳ 7 ngày, quà qua thư hệ thống)
 │       └── feature-gm/             # ADR-052 — quyền GM (gm_role) + audit (gm_audit_log) + parser /gm
 │
 ├── quality/

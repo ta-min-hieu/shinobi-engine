@@ -31,6 +31,7 @@ class GmCommandParserTest {
         assertThat(ok("/gm announce Bảo trì lúc 22h")).isEqualTo(new GmCommand.Announce("Bảo trì lúc 22h"));
         assertThat(ok("/gm heal A")).isEqualTo(new GmCommand.Heal("A"));
         assertThat(ok("/gm goto A")).isEqualTo(new GmCommand.Goto("A"));
+        assertThat(ok("/gm inspect A")).isEqualTo(new GmCommand.Inspect("A"));
         assertThat(ok("/gm SUMMON A")).isEqualTo(new GmCommand.Summon("A"));
     }
 

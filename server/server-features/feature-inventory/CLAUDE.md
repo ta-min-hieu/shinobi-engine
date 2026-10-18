@@ -299,3 +299,16 @@ những gì ảnh hưởng tới cách viết code trong module này:
 - **`InventoryFacade.enhanceItem`** đổi switch sang bảng tra (nhánh thứ 9 chạm trần
   `CyclomaticComplexity`); `InventoryFacadeEnhanceResultTest` khoá bảng phủ hết enum thay cho compiler.
 - Tuần tự hoá với đặt lời chào: xem feature-trade/CLAUDE.md và DATABASE.md §5.1.
+
+### ADR-061 (Accepted 2026-10-18, lô 16): kho đồ tông môn
+
+- **Bảng RIÊNG `storage_item`** (V63) — không cột vị trí trong `inventory_item`, nên mọi câu đếm/khoá túi
+  hiện có không đổi. `StoragePort` (domain) + `PostgresStorageAdapter` (server-database, dùng chung
+  `JdbcTransaction` với túi đồ).
+- **`StorageUseCase`** nằm trong `ItemActionUseCases` (thành phần thứ ba; ctor 2 tham số cũ = kho
+  `unavailable()` cho test) — `InventoryFacade` vẫn đúng 4 tham số.
+- Khoá: túi đồ (`findByCharacterForUpdate`) TRƯỚC, rồi `storage_item ... FOR UPDATE`. Gộp chồng trong kho
+  cùng luật `Inventory.add` (`StoredItem#canMerge`). Món đang mặc / đang chào giao dịch không gửi được.
+- Đứng gần `senior_sister` là việc của gateway (`SectStorageCommands` + `NpcProximity`), module này không
+  biết vị trí. Không idempotency key (chỉ dời đồ của chính mình — cùng lý do `UseItemUseCase`).
+

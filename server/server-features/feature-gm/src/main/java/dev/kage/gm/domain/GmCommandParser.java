@@ -56,17 +56,18 @@ public final class GmCommandParser {
     }
 
     // Bảng tra thay switch (trần CyclomaticComplexity của PMD) — đây cũng chính là WHITELIST của D8.
-    private static final Map<String, Function<String[], Parsed>> COMMANDS = Map.of(
-            "help", words -> new Parsed.Ok(new GmCommand.Help()),
-            "who", words -> oneTarget(words, "who <name>", GmCommand.Who::new),
-            "kick", words -> oneTarget(words, "kick <name>", GmCommand.Kick::new),
-            "unmute", words -> oneTarget(words, "unmute <name>", GmCommand.Unmute::new),
-            "heal", words -> oneTarget(words, "heal <name>", GmCommand.Heal::new),
-            "goto", words -> oneTarget(words, "goto <name>", GmCommand.Goto::new),
-            "summon", words -> oneTarget(words, "summon <name>", GmCommand.Summon::new),
-            "mute", GmCommandParser::mute,
-            "give", GmCommandParser::give,
-            "gold", GmCommandParser::gold);
+    private static final Map<String, Function<String[], Parsed>> COMMANDS = Map.ofEntries(
+            Map.entry("help", words -> new Parsed.Ok(new GmCommand.Help())),
+            Map.entry("who", words -> oneTarget(words, "who <name>", GmCommand.Who::new)),
+            Map.entry("kick", words -> oneTarget(words, "kick <name>", GmCommand.Kick::new)),
+            Map.entry("unmute", words -> oneTarget(words, "unmute <name>", GmCommand.Unmute::new)),
+            Map.entry("heal", words -> oneTarget(words, "heal <name>", GmCommand.Heal::new)),
+            Map.entry("goto", words -> oneTarget(words, "goto <name>", GmCommand.Goto::new)),
+            Map.entry("summon", words -> oneTarget(words, "summon <name>", GmCommand.Summon::new)),
+            Map.entry("mute", GmCommandParser::mute),
+            Map.entry("give", GmCommandParser::give),
+            Map.entry("gold", GmCommandParser::gold),
+            Map.entry("inspect", words -> oneTarget(words, "inspect <name>", GmCommand.Inspect::new)));
 
     private static Parsed oneTarget(String[] words, String usage, Function<String, GmCommand> make) {
         return words.length == 2 ? new Parsed.Ok(make.apply(words[1])) : invalid(usage);

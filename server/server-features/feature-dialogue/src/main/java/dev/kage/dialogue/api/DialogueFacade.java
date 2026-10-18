@@ -60,6 +60,9 @@ public final class DialogueFacade {
         if (DialogueOption.ACTION_OPEN_SHOP.equals(option.action())) {
             return new SelectOptionResult.OpenShop();
         }
+        if (DialogueOption.ACTION_OPEN_STORAGE.equals(option.action())) {
+            return new SelectOptionResult.OpenStorage();
+        }
         if (DialogueOption.ACTION_END.equals(option.action())) {
             return new SelectOptionResult.Ended();
         }
@@ -85,6 +88,9 @@ public final class DialogueFacade {
 
         /** Lựa chọn mở cửa hàng — gateway gọi {@code ShopFacade}, không phải feature này. */
         record OpenShop() implements SelectOptionResult {}
+
+        /** Lựa chọn mở kho đồ (ADR-061) — gateway gọi {@code InventoryFacade}, không phải feature này. */
+        record OpenStorage() implements SelectOptionResult {}
 
         /** Lựa chọn kết thúc hội thoại. */
         record Ended() implements SelectOptionResult {}

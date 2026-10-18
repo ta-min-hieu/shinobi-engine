@@ -13,6 +13,7 @@ import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GetItemCatalogUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.inventory.application.ListInventoryUseCase;
+import dev.kage.inventory.application.StorageUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
 import dev.kage.inventory.application.UseItemUseCase;
 import dev.kage.inventory.domain.EquipmentBonus;
@@ -20,6 +21,7 @@ import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.InventorySnapshot;
 import dev.kage.inventory.domain.ItemCatalog;
 import dev.kage.inventory.domain.ItemStack;
+import dev.kage.inventory.domain.StoredItem;
 
 /**
  * API công khai của {@code feature-inventory} — module khác (server-gateway) CHỈ gọi qua đây,
@@ -88,6 +90,7 @@ public final class InventoryFacade {
     private final ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase;
     private final EnhanceItemUseCase enhanceItemUseCase;
     private final UseItemUseCase useItemUseCase;
+    private final StorageUseCase storageUseCase;
     private final ListInventoryUseCase listInventoryUseCase;
     private final GetItemCatalogUseCase getItemCatalogUseCase;
 
@@ -104,6 +107,7 @@ public final class InventoryFacade {
         this.computeEquipmentBonusUseCase = equipmentUseCases.computeEquipmentBonusUseCase();
         this.enhanceItemUseCase = actionUseCases.enhanceItemUseCase();
         this.useItemUseCase = actionUseCases.useItemUseCase();
+        this.storageUseCase = actionUseCases.storageUseCase();
         this.listInventoryUseCase = queryUseCases.listInventoryUseCase();
         this.getItemCatalogUseCase = queryUseCases.getItemCatalogUseCase();
     }
@@ -189,6 +193,21 @@ public final class InventoryFacade {
      */
     public UseItemUseCase.UseItemResult useItem(long characterId, long inventoryItemId) {
         return withCharacterLock(characterId, () -> useItemUseCase.execute(characterId, inventoryItemId));
+    }
+
+    /** Kho đồ tông môn (ADR-061) — chỉ đọc. */
+    public List<StoredItem> listStorage(long characterId) {
+        return storageUseCase.list(characterId);
+    }
+
+    /** Gửi vào kho (ADR-061) — gateway đã kiểm đứng gần NPC giữ kho. */
+    public StorageUseCase.Result depositToStorage(long characterId, long inventoryItemId, int quantity) {
+        return withCharacterLock(characterId, () -> storageUseCase.deposit(characterId, inventoryItemId, quantity));
+    }
+
+    /** Rút từ kho về túi (ADR-061) — gateway đã kiểm đứng gần NPC giữ kho. */
+    public StorageUseCase.Result withdrawFromStorage(long characterId, long storedItemId, int quantity) {
+        return withCharacterLock(characterId, () -> storageUseCase.withdraw(characterId, storedItemId, quantity));
     }
 
     /**

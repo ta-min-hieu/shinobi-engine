@@ -112,6 +112,7 @@ import dev.kage.protocol.DeclineDuelResponse;
 import dev.kage.protocol.DeleteMailCommand;
 import dev.kage.protocol.DeleteMailOutcome;
 import dev.kage.protocol.DeleteMailResponse;
+import dev.kage.protocol.DepositItemCommand;
 import dev.kage.protocol.DialogueEndedResponse;
 import dev.kage.protocol.DialogueNodeResponse;
 import dev.kage.protocol.DialogueOptionView;
@@ -199,6 +200,7 @@ import dev.kage.protocol.ListQuestsRequest;
 import dev.kage.protocol.ListQuestsResponse;
 import dev.kage.protocol.ListShopItemsRequest;
 import dev.kage.protocol.ListShopItemsResponse;
+import dev.kage.protocol.ListStorageRequest;
 import dev.kage.protocol.MailAttachmentView;
 import dev.kage.protocol.MailView;
 import dev.kage.protocol.MoveCommand;
@@ -263,6 +265,7 @@ import dev.kage.protocol.UnequipItemResponse;
 import dev.kage.protocol.UseItemCommand;
 import dev.kage.protocol.UseItemResponse;
 import dev.kage.protocol.UseSkillCommand;
+import dev.kage.protocol.WithdrawItemCommand;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.protocol.wire.PacketHeader;
 import dev.kage.protocol.wire.ProtocolVersion;
@@ -362,6 +365,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final CharacterFacade characterFacade;
     // ADR-052 — quyền + audit GM; trần lệnh GM riêng theo kết nối (D8: 5 lệnh / 10 giây).
     private final dev.kage.gm.api.GmFacade gmFacade;
+    private final dev.kage.checkin.api.CheckInFacade checkInFacade;
     private final RateLimiter gmRateLimiter = new RateLimiter(5, java.time.Duration.ofSeconds(10));
     private final InventoryFacade inventoryFacade;
     private final ShopFacade shopFacade;
@@ -377,6 +381,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final WorldGateway worldGateway;
     private final WorldRouteLookup worldRoutes;
     private final NpcProximity npcProximity;
+    private final SectStorageCommands storage;
     private final ItemUseCooldown itemUseCooldown = new ItemUseCooldown();
     private final Executor authExecutor;
     // Tin chat của kết nối này chạy lần lượt (dòng 71(f)) — xem SerialExecutor.
@@ -455,6 +460,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_ENHANCE_ITEM_COMMAND_VALUE, this::handleEnhanceItemCommand),
             Map.entry(Opcode.OPCODE_USE_ITEM_COMMAND_VALUE, this::handleUseItemCommand),
             Map.entry(Opcode.OPCODE_LIST_INVENTORY_REQUEST_VALUE, this::handleListInventoryRequest),
+            Map.entry(Opcode.OPCODE_LIST_STORAGE_REQUEST_VALUE, this::handleListStorageRequest),
+            Map.entry(Opcode.OPCODE_DEPOSIT_ITEM_COMMAND_VALUE, this::handleDepositItemCommand),
+            Map.entry(Opcode.OPCODE_WITHDRAW_ITEM_COMMAND_VALUE, this::handleWithdrawItemCommand),
             Map.entry(Opcode.OPCODE_GET_ITEM_CATALOG_REQUEST_VALUE, this::handleGetItemCatalogRequest),
             Map.entry(Opcode.OPCODE_LIST_QUESTS_REQUEST_VALUE, this::handleListQuestsRequest),
             Map.entry(Opcode.OPCODE_ABANDON_QUEST_COMMAND_VALUE, this::handleAbandonQuestCommand),
@@ -524,6 +532,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.accountFacade = facades.accountFacade();
         this.characterFacade = facades.characterFacade();
         this.gmFacade = facades.gmFacade();
+        this.checkInFacade = facades.progression().checkInFacade();
         this.inventoryFacade = facades.inventoryFacade();
         this.shopFacade = facades.contentFacades().shopFacade();
         this.dialogueFacade = facades.contentFacades().dialogueFacade();
@@ -539,6 +548,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.worldRoutes = WorldRouteLookup.of(worldGateway);
         this.npcProximity =
                 new NpcProximity(worldGateway.mainWorldChannels().worldContent().npcs(), this::mainWorldPositionOf);
+        this.storage = new SectStorageCommands(inventoryFacade, npcProximity);
         this.authExecutor = authExecutor;
         this.chatExecutor = new SerialExecutor(authExecutor);
         this.networkMetrics = observability.networkMetrics();
@@ -812,6 +822,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             }
             sendInitialSelfState(characterId);
             announceOnlineToFriends(characterId);
+            claimDailyCheckIn(characterId);
         } catch (CharacterNotFoundException e) {
             // Cùng lỗi dù nhân vật không tồn tại hay thuộc account khác (fail secure — SECURITY.md §4).
             LOG.warn("Chọn nhân vật thất bại: không tìm thấy", e);
@@ -841,6 +852,34 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             correctStaleOnlineAnnouncement(characterId);
         } catch (RuntimeException e) {
             LOG.error("Không báo được trạng thái online cho bạn bè: characterId={}", characterId, e);
+        }
+    }
+
+    /**
+     * Điểm danh hôm nay (ADR-060) — việc PHỤ của lần vào world, cùng luật với {@link
+     * #announceOnlineToFriends}: lỗi dừng ở đây, không thành "chọn nhân vật thất bại". Quà vừa gửi thì
+     * báo thư mới như mọi thư khác; lỗi thì lần vào world sau thử lại (trạng thái chưa đổi).
+     */
+    // PMD AvoidCatchingGenericException: đúng ý — mọi lỗi của việc phụ này đều dừng ở đây.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private void claimDailyCheckIn(long characterId) {
+        try {
+            if (checkInFacade.claimToday(characterId)
+                            instanceof dev.kage.checkin.application.ClaimDailyCheckInUseCase.Result.Claimed claimed
+                    && claimed.mailId() != 0L) {
+                worldGateway
+                        .registry()
+                        .sendToCharacterIfOnline(
+                                characterId,
+                                Opcode.OPCODE_NEW_MAIL_EVENT_VALUE,
+                                0,
+                                NewMailEvent.newBuilder()
+                                        .setMailId(claimed.mailId())
+                                        .build()
+                                        .toByteArray());
+            }
+        } catch (RuntimeException e) {
+            LOG.error("Điểm danh lỗi: characterId={}", characterId, e);
         }
     }
 
@@ -1610,6 +1649,51 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     // characterId LUÔN lấy từ boundCharacterId (session), KHÔNG bao giờ từ payload: 2 trong 3 packet
     // này cố ý không có field nào (SECURITY.md §4, chống IDOR).
 
+    /** ADR-061 — liệt kê kho đồ. Mở bằng phím không có; client hỏi lại sau khi đã mở qua hội thoại. */
+    private void handleListStorageRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ListStorageRequest.parser().parseFrom(payload);
+        runStorage(ctx, header.sequenceId(), Opcode.OPCODE_LIST_STORAGE_RESPONSE_VALUE, storage::list);
+    }
+
+    private void handleDepositItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        DepositItemCommand command = DepositItemCommand.parseFrom(payload);
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_DEPOSIT_ITEM_RESPONSE_VALUE,
+                characterId -> storage.deposit(characterId, command));
+    }
+
+    private void handleWithdrawItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        WithdrawItemCommand command = WithdrawItemCommand.parseFrom(payload);
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_WITHDRAW_ITEM_RESPONSE_VALUE,
+                characterId -> storage.withdraw(characterId, command));
+    }
+
+    /** Khuôn chung ba lệnh kho: cần đăng nhập, chạy trên Virtual Thread, trả đúng một response. */
+    private void runStorage(
+            ChannelHandlerContext ctx,
+            int sequenceId,
+            int responseOpcode,
+            java.util.function.LongFunction<com.google.protobuf.MessageLite> work) {
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        executeBlocking(
+                ctx,
+                sequenceId,
+                () -> send(
+                        ctx, responseOpcode, sequenceId, work.apply(characterId).toByteArray()));
+    }
+
     private void handleListInventoryRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         ListInventoryRequest.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
@@ -2186,6 +2270,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE,
                         sequenceId,
                         buildShopListingsResponse().toByteArray());
+            case DialogueFacade.SelectOptionResult.OpenStorage ignored ->
+                send(
+                        ctx,
+                        Opcode.OPCODE_LIST_STORAGE_RESPONSE_VALUE,
+                        sequenceId,
+                        storage.list(characterId).toByteArray());
             case DialogueFacade.SelectOptionResult.Ended ignored ->
                 send(
                         ctx,

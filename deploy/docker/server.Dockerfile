@@ -60,6 +60,7 @@ COPY server/server-features/feature-pvp/build.gradle.kts server/server-features/
 # module vào settings.gradle.kts thì PHẢI thêm 1 dòng COPY ở đây.
 COPY server/server-features/feature-monster/build.gradle.kts server/server-features/feature-monster/
 COPY server/server-features/feature-world/build.gradle.kts server/server-features/feature-world/
+COPY server/server-features/feature-checkin/build.gradle.kts server/server-features/feature-checkin/
 COPY server/server-features/feature-gm/build.gradle.kts server/server-features/feature-gm/
 COPY quality/architecture-tests/build.gradle.kts quality/architecture-tests/
 COPY tools/asset-pipeline/build.gradle.kts tools/asset-pipeline/

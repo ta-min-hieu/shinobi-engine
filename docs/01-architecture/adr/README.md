@@ -91,6 +91,8 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-057](ADR-057-Leaderboards.md) | Bảng xếp hạng (Bia Anh Danh) — 3 bảng top 50, opcode 1202/1203, cache 60 s | ✅ **Accepted** *(2026-10-18, lô 15)* — thi hành cùng ngày | GDD §7 "Xếp hạng"; dải opcode Ranking để trống từ Phase 0 |
 | [ADR-058](ADR-058-Send-Mail-Idempotency.md) | `SendMailCommand` mang `idempotency_key` — gửi lại không trừ vàng/đồ hai lần | ✅ **Accepted** *(2026-10-18, lô 15)* — thi hành cùng ngày | Dòng 74(c). Khoá rỗng = client cũ, gửi như trước; outcome mới `DUPLICATE_REQUEST` (9) |
 | [ADR-059](ADR-059-Party-And-Guild-Changed-Events.md) | Event "nhóm/bang vừa đổi" — `PartyChangedEvent` (1318) + `GuildChangedEvent` (720) | ✅ **Accepted** *(2026-10-18, lô 15)* — thi hành cùng ngày | Dòng 40(iii): bị kick / bang giải tán / đổi trưởng nhóm không ai được báo |
+| [ADR-060](ADR-060-Daily-Check-In.md) | Điểm danh hằng ngày — chu kỳ 7 ngày, quà qua thư hệ thống (V62, module `feature-checkin`) | ✅ **Accepted** *(2026-10-18, lô 16)* — thi hành cùng ngày | Không có lý do quay lại mỗi ngày ngoài nhiệm vụ ngày |
+| [ADR-061](ADR-061-Sect-Storage.md) | Kho đồ tông môn — 40 dòng/nhân vật, gửi/rút ở Tô Vân Nhi (V63, opcode 514–519) | ✅ **Accepted** *(2026-10-18, lô 16)* — thi hành cùng ngày | Túi 20 ô chật từ khi có bộ đồ theo arc + quà hằng ngày |
 ---
 
 ## ADR cần tạo (chưa viết)

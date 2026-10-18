@@ -37,6 +37,7 @@ không nhận gì (server không xác nhận lệnh tồn tại). Trần 5 lện
 | `/gm unmute <tên>` | GM | Mở khoá |
 | `/gm announce <nội dung ≤200>` | GM | Dòng hệ thống tới mọi người online (qua lọc từ cấm) |
 | `/gm heal <tên>` | GM | Hồi đầy máu (đang ở trong một World) |
+| `/gm inspect <tên>` | GM | Một dòng: mọi món trong túi (`mã`, `xSố`, `+cường hoá`), món đang mặc có `*` — chỉ đọc |
 | `/gm goto <tên>` | GM | Dời CHÍNH mình tới chỗ người đó đang đứng (có thể đổi khu vực) |
 | `/gm summon <tên>` | GM | Kéo người đó tới chỗ mình đang đứng — gỡ người kẹt địa hình; họ thấy dòng báo "ban quản lý dời" |
 | `/gm give <tên> <mã_vật_phẩm> <1-99>` | **ADMIN** | Thư hệ thống kèm vật phẩm |

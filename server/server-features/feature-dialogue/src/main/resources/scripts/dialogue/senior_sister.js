@@ -18,8 +18,8 @@
 //   · và tuyệt đối không một câu nào úp mở về việc chính cô là tai mắt bị ép buộc (twist arc 5).
 //     Ở arc 2 cô che chở đàn em một cách THẬT LÒNG; viết cô thành kẻ đang diễn là hỏng cả cú twist.
 //
-// text_key/label_key là khoá i18n. action: tên node khác (điều hướng), "end" (kết thúc), hoặc
-// "accept_quest:<code>" (nhận quest — GAMEPLAY.md §9.3).
+// text_key/label_key là khoá i18n. action: tên node khác (điều hướng), "end" (kết thúc),
+// "open_storage" (mở kho đồ — ADR-061), hoặc "accept_quest:<code>" (nhận quest — GAMEPLAY.md §9.3).
 //
 // Quest `report_to_outer_sect` KHÔNG nhận ở đây: nó nhận từ Chu Hoành và hoàn thành bằng chính việc
 // MỞ LỜI với cô (mục tiêu `npc_talked`), không phải bằng một lựa chọn thoại — xem javadoc
@@ -48,6 +48,8 @@ if (ctx.quest_status("recover_outer_sect_tallies") === "IN_PROGRESS" && ctx.item
             { label_key: "dialogue.option.ask_rival", action: "about_rival" },
             { label_key: "dialogue.option.ask_senior_sister", action: "about_herself" },
             { label_key: "dialogue.option.ask_outer_sect_work", action: "about_work" },
+            // ADR-061 — kho đồ tông môn: cô giữ đồ hộ đàn em (đúng tính "che chở đàn em", §5).
+            { label_key: "dialogue.option.open_storage", action: "open_storage" },
             { label_key: "dialogue.option.bye_senior_sister", action: "end" }
         ]
     },

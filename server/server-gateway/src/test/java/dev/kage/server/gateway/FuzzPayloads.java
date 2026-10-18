@@ -111,6 +111,7 @@ final class FuzzPayloads {
         "accept_quest:nonexistent",
         "accept_quest:kill_training_dummies",
         "open_shop",
+        "open_storage",
         "senior_sister",
         "town_elder",
         "kill_training_dummies",
