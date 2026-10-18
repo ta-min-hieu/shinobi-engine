@@ -402,6 +402,7 @@ public final class GatewayBootstrap {
         SocialFacades socialFacades = new SocialFacades(
                 friendFacade, mailFacade, chatFacade, guildFacade, partyFacade, tradeFacade, pvpFacade);
         ContentFacades contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
-        return new GatewayFacades(accountFacade, characterFacade, inventoryFacade, contentFacades);
+        return new GatewayFacades(
+                accountFacade, characterFacade, inventoryFacade, contentFacades, databaseBootstrap.wireGmFacade());
     }
 }

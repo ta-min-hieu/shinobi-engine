@@ -236,7 +236,8 @@ final class ChatController {
             SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_TARGET_OFFLINE, "chat.error.target_offline",
             SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_RATE_LIMITED, "chat.error.rate_limited",
             SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_GUILD, "chat.error.not_in_guild",
-            SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_PARTY, "chat.error.not_in_party");
+            SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_PARTY, "chat.error.not_in_party",
+            SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_MUTED, "chat.error.muted");
 
     /**
      * Câu giải thích một kết quả gửi, hoặc rỗng khi không có gì để nói.

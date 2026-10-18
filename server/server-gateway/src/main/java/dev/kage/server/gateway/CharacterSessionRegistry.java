@@ -39,6 +39,14 @@ final class CharacterSessionRegistry {
          *     mọi lệnh cũ của phiên này. Phiên mới chỉ được đọc vị trí và vào world sau mốc đó.
          */
         CompletableFuture<Void> evict(long characterId);
+
+        /**
+         * Như {@link #evict(long)} nhưng nói cho client đúng LÝ DO (ADR-052: {@code error.kicked_by_gm}).
+         * Mặc định = lý do "đăng nhập nơi khác".
+         */
+        default CompletableFuture<Void> evict(long characterId, String errorKey) {
+            return evict(characterId);
+        }
     }
 
     private static final int LOCK_STRIPES = 64;
@@ -63,6 +71,11 @@ final class CharacterSessionRegistry {
             locks[i] = new ReentrantLock();
             accountLocks[i] = new ReentrantLock();
         }
+    }
+
+    /** Phiên đang giữ {@code characterId}, nếu có — cho lệnh GM kick (ADR-052). */
+    Optional<Session> ownerOf(long characterId) {
+        return Optional.ofNullable(ownerByCharacterId.get(characterId));
     }
 
     /**

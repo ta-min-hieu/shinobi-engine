@@ -53,6 +53,9 @@ final class ConnectionCoordinator implements WindowFlow {
     /** Khoá server gửi cho phiên bị đá — cùng chuỗi với {@code GatewayChannelHandler}. */
     static final String LOGGED_IN_ELSEWHERE_KEY = "error.logged_in_elsewhere";
 
+    /** ADR-052 — phiên bị GM đá. */
+    static final String KICKED_BY_GM_KEY = "error.kicked_by_gm";
+
     private final CombatHud hud;
     private final ChatCoordinator notices;
     private final java.util.function.Consumer<String> onSessionEnded;
@@ -109,7 +112,8 @@ final class ConnectionCoordinator implements WindowFlow {
      * @param errorKey khoá trong {@code ErrorResponse}, có thể {@code null}/rỗng
      */
     static boolean endsSession(String errorKey) {
-        return LOGGED_IN_ELSEWHERE_KEY.equals(errorKey);
+        // ADR-052 D7 — bị GM đá cũng là KẾT THÚC phiên: tự đăng nhập lại thì kick vô hiệu.
+        return LOGGED_IN_ELSEWHERE_KEY.equals(errorKey) || KICKED_BY_GM_KEY.equals(errorKey);
     }
 
     /** Một nhịp heartbeat vừa về — bỏ qua gói không tin được, xem {@link #plausibleRoundTrip}. */

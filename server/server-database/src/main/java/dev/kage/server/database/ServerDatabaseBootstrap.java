@@ -30,6 +30,7 @@ import dev.kage.friend.application.ListPendingFriendRequestsUseCase;
 import dev.kage.friend.application.RejectFriendRequestUseCase;
 import dev.kage.friend.application.RemoveFriendUseCase;
 import dev.kage.friend.application.SendFriendRequestUseCase;
+import dev.kage.gm.api.GmFacade;
 import dev.kage.guild.api.GuildFacade;
 import dev.kage.guild.application.ApproveGuildJoinRequestUseCase;
 import dev.kage.guild.application.CreateGuildUseCase;
@@ -88,9 +89,12 @@ import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
 import dev.kage.server.database.chat.PostgresChatAuditAdapter;
+import dev.kage.server.database.chat.PostgresChatMuteAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcPlacementAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcTemplateAdapter;
 import dev.kage.server.database.friend.PostgresFriendAdapter;
+import dev.kage.server.database.gm.PostgresGmAuditAdapter;
+import dev.kage.server.database.gm.PostgresGmRoleAdapter;
 import dev.kage.server.database.guild.PostgresGuildAdapter;
 import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
 import dev.kage.server.database.inventory.PostgresAuditAdapter;
@@ -477,7 +481,12 @@ public final class ServerDatabaseBootstrap {
 
     public ChatFacade wireChatFacade() {
         PostgresChatAuditAdapter auditPort = new PostgresChatAuditAdapter(dataSource);
-        return new ChatFacade(new SendChatMessageUseCase(auditPort));
+        return new ChatFacade(new SendChatMessageUseCase(auditPort), new PostgresChatMuteAdapter(dataSource));
+    }
+
+    /** ADR-052 — quyền GM (chỉ đọc) + sổ audit write-ahead. */
+    public GmFacade wireGmFacade() {
+        return new GmFacade(new PostgresGmRoleAdapter(dataSource), new PostgresGmAuditAdapter(dataSource));
     }
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */

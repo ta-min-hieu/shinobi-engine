@@ -64,7 +64,8 @@ shinobi-engine/
 │       ├── feature-party/
 │       ├── feature-trade/
 │       ├── feature-pvp/
-│       └── feature-monster/        # ADR-037 — monster_template + monster_spawn
+│       ├── feature-monster/        # ADR-037 — monster_template + monster_spawn
+│       └── feature-gm/             # ADR-052 — quyền GM (gm_role) + audit (gm_audit_log) + parser /gm
 │
 ├── quality/
 │   └── architecture-tests/         # ArchUnit (ADR-011) — enforce dependency rule

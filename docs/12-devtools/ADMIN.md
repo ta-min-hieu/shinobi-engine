@@ -2,9 +2,50 @@
 
 | | |
 |---|---|
-| Status | 🚧 **STUB — CÓ CHỦ ĐÍCH** |
-| Blocked by | **3 câu hỏi thiết kế chưa có lời đáp** (xem "Câu hỏi trước khi viết" bên dưới) — chủ dự án quyết, không phải AI |
-| Sẽ viết khi | Có câu trả lời cho 3 câu hỏi đó |
+| Status | ✅ **Lệnh GM trong game đã có** (ADR-052, Accept + thi hành 2026-10-18). Phần "chưa viết" bên dưới giữ làm lịch sử. |
+
+---
+
+## Lệnh GM trong game — cách dùng (ADR-052)
+
+**Bật** (mặc định TẮT): `KAGE_GM_ENABLED=true` và (tuỳ chọn) `KAGE_GM_ALLOWED_CIDRS=127.0.0.1/32,::1/128,<IP nhà>/32`.
+Giá trị lạ của `KAGE_GM_ENABLED` ⇒ server từ chối khởi động. Chạy trong Docker có NAT thì địa chỉ nguồn
+có thể là IP gateway của Docker — kiểm trước khi mở rộng CIDR.
+
+**Cấp quyền** — CHỈ bằng SQL tay, cùng transaction với một dòng audit (không lệnh nào trong game đổi quyền):
+
+```sql
+BEGIN;
+INSERT INTO gm_role (account_id, role, granted_at, note) VALUES (<account_id>, 'GM', now(), '<ai cấp, vì sao>');
+INSERT INTO gm_audit_log (actor_account_id, actor_role, command, command_line, outcome, created_at, completed_at)
+     VALUES (<account_id người cấp>, 'ADMIN', 'role_grant', 'SQL tay: cấp GM cho <account_id>', 'OK', now(), now());
+COMMIT;
+-- Thu quyền: DELETE FROM gm_role WHERE account_id = <id>; + một dòng 'role_revoke' như trên.
+```
+
+Quyền đọc lại MỖI lệnh — thu quyền có hiệu lực ngay lệnh kế tiếp.
+
+**Lệnh** (gõ trong ô chat, mọi kênh; dòng `/gm` không bao giờ được phát đi). Người không có quyền gõ `/gm`
+không nhận gì (server không xác nhận lệnh tồn tại). Trần 5 lệnh / 10 giây mỗi kết nối.
+
+| Lệnh | Cấp | Làm gì |
+|---|---|---|
+| `/gm help` | GM | Danh sách lệnh |
+| `/gm who <tên>` | GM | id, tài khoản, cấp, vàng, online? |
+| `/gm kick <tên>` | GM | Đá phiên — client nhận `error.kicked_by_gm`, KHÔNG tự đăng nhập lại |
+| `/gm mute <tên> <phút 1-10080>` | GM | Khoá chat theo TÀI KHOẢN (`chat_mute`); người bị khoá nhận outcome `MUTED` |
+| `/gm unmute <tên>` | GM | Mở khoá |
+| `/gm announce <nội dung ≤200>` | GM | Dòng hệ thống tới mọi người online (qua lọc từ cấm) |
+| `/gm heal <tên>` | GM | Hồi đầy máu (đang ở trong một World) |
+| `/gm give <tên> <mã_vật_phẩm> <1-99>` | **ADMIN** | Thư hệ thống kèm vật phẩm |
+| `/gm gold <tên> <1-1000000>` | **ADMIN** | Thư hệ thống kèm vàng |
+
+Không tác động lên người có cấp ≥ mình (trừ `who`/`heal` chính mình). `goto`/`summon` (D4) **chưa có**:
+World chưa có cơ chế dịch chuyển nhân vật tại chỗ — cần detach + attach có vị trí, việc riêng.
+
+**Audit**: mọi lệnh của người có quyền ghi `gm_audit_log` TRƯỚC khi có hiệu lực (`PENDING`), chốt một lần
+(`OK`/`REJECTED`/`DENIED`/`FAILED`). Không bao giờ xoá bảng này. Truy vấn mẫu:
+`SELECT created_at, command_line, outcome, outcome_detail FROM gm_audit_log ORDER BY id DESC LIMIT 50;`
 
 ---
 

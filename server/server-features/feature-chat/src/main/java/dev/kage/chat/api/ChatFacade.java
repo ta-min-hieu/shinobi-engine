@@ -1,9 +1,11 @@
 package dev.kage.chat.api;
 
+import java.time.Instant;
 import java.util.OptionalLong;
 
 import dev.kage.chat.application.SendChatMessageUseCase;
 import dev.kage.chat.domain.ChatChannel;
+import dev.kage.chat.domain.ChatMutePort;
 
 /**
  * API công khai của {@code feature-chat} — module khác (server-gateway) CHỈ gọi qua đây. Facade
@@ -13,10 +15,32 @@ import dev.kage.chat.domain.ChatChannel;
 public final class ChatFacade {
 
     private final SendChatMessageUseCase sendChatMessageUseCase;
+    private final ChatMutePort mutePort;
 
-    /** Dựng ở composition root. */
+    /** Dựng ở composition root — không khoá chat (test cũ). */
     public ChatFacade(SendChatMessageUseCase sendChatMessageUseCase) {
+        this(sendChatMessageUseCase, ChatMutePort.NONE);
+    }
+
+    /** {@code mutePort}: khoá chat của GM (ADR-052 D4). */
+    public ChatFacade(SendChatMessageUseCase sendChatMessageUseCase, ChatMutePort mutePort) {
         this.sendChatMessageUseCase = sendChatMessageUseCase;
+        this.mutePort = mutePort;
+    }
+
+    /** Tài khoản đang bị khoá chat tại thời điểm {@code now} không (dòng hết hạn = không). */
+    public boolean isMuted(long accountId, Instant now) {
+        return mutePort.mutedUntil(accountId).map(until -> until.isAfter(now)).orElse(false);
+    }
+
+    /** Khoá chat tài khoản tới {@code until} (ADR-052 — chỉ GmCommandRouter gọi). */
+    public void mute(long accountId, Instant until, long gmAuditLogId) {
+        mutePort.mute(accountId, until, gmAuditLogId);
+    }
+
+    /** Mở khoá chat; trả {@code true} nếu tài khoản đã bị khoá và nay được mở. */
+    public boolean unmute(long accountId) {
+        return mutePort.unmute(accountId);
     }
 
     /** Validate + ghi audit một tin không có người nhận riêng — gateway chỉ phát tin đi khi kết quả là {@code OK}. */

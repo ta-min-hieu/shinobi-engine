@@ -360,6 +360,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private final AccountFacade accountFacade;
     private final CharacterFacade characterFacade;
+    // ADR-052 — quyền + audit GM; trần lệnh GM riêng theo kết nối (D8: 5 lệnh / 10 giây).
+    private final dev.kage.gm.api.GmFacade gmFacade;
+    private final RateLimiter gmRateLimiter = new RateLimiter(5, java.time.Duration.ofSeconds(10));
     private final InventoryFacade inventoryFacade;
     private final ShopFacade shopFacade;
     private final DialogueFacade dialogueFacade;
@@ -417,7 +420,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     // Danh tính của kết nối này trong CharacterSessionRegistry — MỘT đối tượng cố định, vì sổ so
     // chủ phiên bằng danh tính (method reference tạo mới mỗi lần sẽ không bao giờ bằng nhau).
-    private final CharacterSessionRegistry.Session session = this::evictCharacter;
+    private final CharacterSessionRegistry.Session session = new CharacterSessionRegistry.Session() {
+        @Override
+        public CompletableFuture<Void> evict(long characterId) {
+            return evictCharacter(characterId, ERROR_LOGGED_IN_ELSEWHERE);
+        }
+
+        @Override
+        public CompletableFuture<Void> evict(long characterId, String errorKey) {
+            return evictCharacter(characterId, errorKey);
+        }
+    };
 
     // Gán cùng boundCharacterId — cần để đá kết nối này từ luồng của kết nối KHÁC.
     private volatile ChannelHandlerContext boundContext;
@@ -510,6 +523,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             GatewayObservability observability) {
         this.accountFacade = facades.accountFacade();
         this.characterFacade = facades.characterFacade();
+        this.gmFacade = facades.gmFacade();
         this.inventoryFacade = facades.inventoryFacade();
         this.shopFacade = facades.contentFacades().shopFacade();
         this.dialogueFacade = facades.contentFacades().dialogueFacade();
@@ -1810,6 +1824,44 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case ARENA -> LeaderboardKind.LEADERBOARD_KIND_ARENA;
             case COMBAT_POWER -> LeaderboardKind.LEADERBOARD_KIND_COMBAT_POWER;
         };
+    }
+
+    /**
+     * ADR-052 — một dòng {@code /gm}: trả OK như một tin chat bình thường (không xác nhận lệnh GM tồn tại),
+     * rồi chạy router trên Virtual Thread; phản hồi (nếu có quyền) là dòng HỆ THỐNG chỉ gửi cho người ra lệnh.
+     */
+    private void handleGmLine(ChannelHandlerContext ctx, int sequenceId, GmCommandRouter.Actor actor, String line) {
+        sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_OK);
+        if (!gmRateLimiter.tryAcquire()) {
+            LOG.warn("Lệnh GM vượt trần 5/10s — bỏ: accountId={}", actor.accountId());
+            return;
+        }
+        executeBlocking(ctx, sequenceId, () -> {
+            for (String reply : gmRouter().execute(actor, line)) {
+                ChatMessageEvent event = ChatMessageEvent.newBuilder()
+                        .setChannel(ChatChannel.CHAT_CHANNEL_UNSPECIFIED)
+                        .setSenderName("")
+                        .setBody(reply)
+                        .build();
+                send(ctx, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event.toByteArray());
+            }
+        });
+    }
+
+    private GmCommandRouter gmRouter() {
+        return new GmCommandRouter(
+                new GmCommandRouter.Deps(
+                        gmFacade,
+                        characterFacade,
+                        chatFacade,
+                        mailFacade,
+                        inventoryFacade,
+                        worldGateway.registry(),
+                        this::currentWorldFacadeIfPresent,
+                        targetId -> CharacterLoadout.load(characterFacade, worldGateway.registry(), targetId)
+                                .maxHp()),
+                GmConfig.current(),
+                java.time.Clock.systemUTC());
     }
 
     /** ADR-059 — người nhận event nhóm/bang; dựng mỗi lần (rẻ, không trạng thái). */
@@ -3936,6 +3988,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
+        // ADR-052 D1 — dòng "/gm ..." KHÔNG BAO GIỜ đi đường chat: không phát, không ghi CHAT_MESSAGE, không
+        // ăn vào hạn mức chat; có trần riêng theo kết nối (D8).
+        if (dev.kage.gm.domain.GmCommandParser.isGmLine(command.getBody())) {
+            handleGmLine(
+                    ctx,
+                    sequenceId,
+                    new GmCommandRouter.Actor(
+                            accountId, characterId, ctx.channel().remoteAddress()),
+                    command.getBody());
+            return;
+        }
         ChatRateLimits.Verdict verdict =
                 worldGateway.registry().chatRateLimits().acquire(accountId, command.getChannel());
         if (verdict != ChatRateLimits.Verdict.ALLOWED) {
@@ -3988,6 +4051,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         String body = dev.kage.chat.domain.ChatMessage.singleLine(command.getBody());
         java.util.OptionalLong recipientId =
                 target == null ? java.util.OptionalLong.empty() : java.util.OptionalLong.of(target.id());
+        Long accountId = boundAccountId;
+        if (accountId != null && chatFacade.isMuted(accountId, java.time.Instant.now())) {
+            // ADR-052 D4/D7 — khoá chat của GM; outcome MUTED (chỉ thêm, protocolVersion không tăng).
+            sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_MUTED);
+            return;
+        }
         ChatFacade.SendResult result = chatFacade.sendMessage(characterId, domainChannel, body, recipientId);
         sendChatOutcome(ctx, sequenceId, toProtoOutcome(result));
         if (result != ChatFacade.SendResult.OK) {
@@ -4369,7 +4438,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * di chuyển đang dở trên EventLoop vẫn có thể xếp vào world SAU lệnh detach — tức điều khiển
      * được thực thể của phiên mới.
      */
-    private CompletableFuture<Void> evictCharacter(long characterId) {
+    private CompletableFuture<Void> evictCharacter(long characterId, String errorKey) {
         ChannelHandlerContext ctx = boundContext;
         CharacterBinding bound = binding;
         if (ctx == null || bound == null || bound.characterId() != characterId) {
@@ -4382,7 +4451,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // Đã/đang dọn (kết nối vừa chết) — chỉ cần chờ lần dọn đó, không cần đá.
             return bound.completed();
         }
-        runOnEventLoop(ctx, () -> kick(ctx, bound));
+        runOnEventLoop(ctx, () -> kick(ctx, bound, errorKey));
         return bound.completed();
     }
 
@@ -4405,7 +4474,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     /** Lượt đá, trên EventLoop của kết nối bị đá — xem {@link #evictCharacter}. */
-    private void kick(ChannelHandlerContext ctx, CharacterBinding bound) {
+    private void kick(ChannelHandlerContext ctx, CharacterBinding bound, String errorKey) {
         long characterId = bound.characterId();
         LOG.info("Nhân vật đăng nhập từ kết nối khác — đá phiên cũ: characterId={}", characterId);
         if (!unbindAndRelease(ctx, bound)) {
@@ -4414,7 +4483,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         ErrorResponse error = ErrorResponse.newBuilder()
                 .setErrorCode(ERROR_CODE_SESSION_CONFLICT)
-                .setErrorKey(ERROR_LOGGED_IN_ELSEWHERE)
+                .setErrorKey(errorKey)
                 .build();
         byte[] payload = error.toByteArray();
         networkMetrics.recordPacketSent(Opcode.OPCODE_ERROR_VALUE, payload.length);

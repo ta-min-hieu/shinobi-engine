@@ -38,6 +38,7 @@ enum SendChatMessageOutcome {
   SEND_CHAT_MESSAGE_OUTCOME_RATE_LIMITED = 7;
   SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_GUILD = 8; // GUILD: người gửi chưa vào bang nào
   SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_PARTY = 9; // PARTY: người gửi chưa vào party nào
+  SEND_CHAT_MESSAGE_OUTCOME_MUTED = 10; // ADR-052 (2026-10-18, chỉ thêm): tài khoản đang bị GM khoá chat
 }
 
 // Response: Server -> Client (OPCODE_SEND_CHAT_MESSAGE_RESPONSE).

@@ -2,6 +2,7 @@ package dev.kage.server.gateway;
 
 import dev.kage.account.api.AccountFacade;
 import dev.kage.character.api.CharacterFacade;
+import dev.kage.gm.api.GmFacade;
 import dev.kage.inventory.api.InventoryFacade;
 
 /**
@@ -15,4 +16,15 @@ record GatewayFacades(
         AccountFacade accountFacade,
         CharacterFacade characterFacade,
         InventoryFacade inventoryFacade,
-        ContentFacades contentFacades) {}
+        ContentFacades contentFacades,
+        GmFacade gmFacade) {
+
+    /** Composition không có GM (test) — không ai có quyền (ADR-052). */
+    GatewayFacades(
+            AccountFacade accountFacade,
+            CharacterFacade characterFacade,
+            InventoryFacade inventoryFacade,
+            ContentFacades contentFacades) {
+        this(accountFacade, characterFacade, inventoryFacade, contentFacades, GmFacade.DISABLED);
+    }
+}
