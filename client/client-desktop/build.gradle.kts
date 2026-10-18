@@ -117,3 +117,121 @@ tasks.named<JavaExec>("run") {
         workingDir.mkdirs()
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// ADR-053 (Accepted 2026-10-18) — GÓI WINDOWS MANG THEO RUNTIME JAVA 25: jlink + `jpackage --type
+// app-image` + zip, task Exec trực tiếp, KHÔNG plugin. Ghim JDK của người chơi: rủi ro JNI của LWJGL
+// trên JDK 28+ và việc JDK sau cấm `System::load` không còn chạm tới bản phát hành.
+//
+// Dựng (trên Windows, cần một JDK 25 ĐẦY ĐỦ — JBR của IntelliJ không có jlink/jpackage):
+//   ./gradlew :client:client-desktop:packageWindowsClient -PkageBundleAssets -PkagePackagingJdk=<JDK 25>
+// Ra: build/distributions/kage-client-<kageClientVersion>-windows-x64.zip
+//
+// Tách khỏi build/check (D5): chỉ chạy khi gọi tên. `installDist` + `.bat` giữ nguyên cho dev.
+// ---------------------------------------------------------------------------------------------
+
+// D2 — module KHAI TƯỜNG MINH. jdeps chỉ là cổng kiểm: nó KHÔNG thấy `jdk.localedata` (đo 2026-10-01:
+// thiếu module này thì số tiếng Việt thành `1,234,567.5`), nên không lấy thẳng output của nó.
+val clientRuntimeModules = listOf("java.base", "java.desktop", "java.logging", "jdk.unsupported", "jdk.localedata")
+val clientLocales = "en,vi" // theo ClientLanguage; thêm ngôn ngữ thứ ba thì sửa ở đây
+val packagingJdkPath = providers.gradleProperty("kagePackagingJdk")
+// D7 — repo không khai `version` (đổi nó là đổi tên mọi jar), nên phiên bản gói đi riêng.
+val clientVersion = providers.gradleProperty("kageClientVersion").orElse("0.10.0")
+val windowsExe = if (System.getProperty("os.name").lowercase().contains("win")) ".exe" else ""
+
+/** D4 — JDK đóng gói được CHỈ ĐỊNH, không đoán; thiếu gì thì nói rõ cần gì. */
+fun packagingJdk(): File {
+    val path = packagingJdkPath.orNull
+        ?: throw GradleException(
+            "Thiếu -PkagePackagingJdk=<đường dẫn JDK 25 đầy đủ> (ADR-053 D4). JBR của IntelliJ không có jlink/jpackage.")
+    val jdk = file(path)
+    for (tool in listOf("jlink", "jpackage", "jdeps")) {
+        if (!jdk.resolve("bin/$tool$windowsExe").isFile) {
+            throw GradleException("JDK đóng gói $path không có bin/$tool$windowsExe (ADR-053 D4).")
+        }
+    }
+    val release = jdk.resolve("release")
+    if (!release.isFile || !release.readText().contains("JAVA_VERSION=\"25")) {
+        throw GradleException("JDK đóng gói $path không phải Java 25 (đọc file release) — ADR-053 D4.")
+    }
+    return jdk
+}
+
+val packagingInput = layout.buildDirectory.dir("jpackage-input")
+val clientRuntimeDir = layout.buildDirectory.dir("jlink/runtime")
+val appImageDir = layout.buildDirectory.dir("jpackage")
+
+// Q7 — chỉ Windows x64 (D8): bỏ jar native LWJGL của nền tảng khác (~7 MB). gdx-platform/freetype
+// gói mọi nền tảng trong MỘT jar nên giữ nguyên.
+val prepareClientPackagingInput = tasks.register<Sync>("prepareClientPackagingInput") {
+    dependsOn("installDist")
+    from(layout.buildDirectory.dir("install/client-desktop/lib"))
+    exclude("*natives-linux*", "*natives-macos*", "*natives-windows-x86*", "*natives-windows-arm64*", "*natives-freebsd*")
+    into(packagingInput)
+}
+
+// D2 — cổng: jdeps báo module nào KHÔNG có trong danh sách ⇒ đỏ (dependency mới kéo module mới).
+val checkClientRuntimeModules = tasks.register("checkClientRuntimeModules") {
+    dependsOn(prepareClientPackagingInput)
+    doLast {
+        val jdeps = packagingJdk().resolve("bin/jdeps$windowsExe")
+        val inputDir = packagingInput.get().asFile
+        val process = ProcessBuilder(
+                jdeps.path, "--ignore-missing-deps", "--multi-release", "25", "--recursive",
+                "--print-module-deps", "--class-path", inputDir.resolve("*").path,
+                inputDir.resolve("client-desktop.jar").path)
+            .redirectErrorStream(true)
+            .start()
+        val text = process.inputStream.bufferedReader().readText()
+        if (process.waitFor() != 0) {
+            throw GradleException("jdeps lỗi (exit ${process.exitValue()}): $text")
+        }
+        val found = text.trim().lines().last().split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        val missing = found.filterNot { it in clientRuntimeModules }
+        if (missing.isNotEmpty()) {
+            throw GradleException(
+                "jdeps thấy module không có trong clientRuntimeModules: $missing — thêm vào danh sách (ADR-053 D2).")
+        }
+    }
+}
+
+val clientRuntime = tasks.register<Exec>("clientRuntime") {
+    dependsOn(checkClientRuntimeModules)
+    doFirst {
+        delete(clientRuntimeDir) // jlink từ chối thư mục đã tồn tại
+        executable = packagingJdk().resolve("bin/jlink$windowsExe").path
+        args(
+            "--add-modules", clientRuntimeModules.joinToString(","),
+            "--include-locales=$clientLocales",
+            "--strip-debug", "--no-header-files", "--no-man-pages", "--compress=zip-9",
+            "--output", clientRuntimeDir.get().asFile.path)
+    }
+}
+
+val clientAppImage = tasks.register<Exec>("clientAppImage") {
+    dependsOn(clientRuntime)
+    doFirst {
+        delete(appImageDir)
+        executable = packagingJdk().resolve("bin/jpackage$windowsExe").path
+        args(
+            "--type", "app-image",
+            "--name", "KageClient",
+            "--app-version", clientVersion.get(),
+            "--input", packagingInput.get().asFile.path,
+            "--main-jar", "client-desktop.jar",
+            "--main-class", "dev.kage.client.desktop.DesktopLauncher",
+            // D3 — giữ đúng cờ của script hôm nay; KHÔNG ghim JNINativeInterfaceSize (runtime là 25).
+            "--java-options", "--enable-native-access=ALL-UNNAMED",
+            "--runtime-image", clientRuntimeDir.get().asFile.path,
+            "--dest", appImageDir.get().asFile.path)
+    }
+}
+
+tasks.register<Zip>("packageWindowsClient") {
+    group = "distribution"
+    description = "Gói Windows x64 mang theo runtime Java 25 (ADR-053): KageClient.exe + app/ + runtime/, zip."
+    dependsOn(clientAppImage)
+    archiveFileName.set(clientVersion.map { "kage-client-$it-windows-x64.zip" })
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+    from(appImageDir)
+}

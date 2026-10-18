@@ -291,8 +291,8 @@ Không. (Ký số mã và installer WiX, nếu tới, là quyết định chi ph
    - **Q5.** Log: D6(a) `--win-console` hay D6(b) file log trong `%LOCALAPPDATA%`? Khuyến nghị (b).
    - **Q6.** Closed Beta có người chơi macOS/Linux không? Nếu không, giữ D8 (chỉ Windows x64).
    - **Q7.** Bỏ native nền tảng khác (~7 MB) khỏi gói Windows?
-2. Sau khi Accept: viết task `packageWindowsClient` theo D2/D4/D5/D7 (+ D6 theo Q5), có cổng jdeps.
-3. Kiểm sống trên **máy không cài Java** (hoặc user Windows sạch): giải nén zip → `KageClient.exe` →
+2. ✅ **ĐÃ THI HÀNH 2026-10-18 (lô 15)** — chủ dự án Accept, Q1–Q7 theo khuyến nghị: **Q1** A (`.exe` app-image) · **Q2** Temurin · **Q3** dựng tay trên máy chủ dự án · **Q4** chấp nhận SmartScreen cho Closed Beta · **Q5** D6(b) `logback.xml` ghi `%LOCALAPPDATA%\Kage\logs\client.log` (giữ console) · **Q6** chỉ Windows x64 · **Q7** bỏ jar native LWJGL của nền tảng khác. Task `packageWindowsClient` (+ `prepareClientPackagingInput`, cổng `checkClientRuntimeModules`, `clientRuntime`, `clientAppImage`) ở `client/client-desktop/build.gradle.kts`; phiên bản gói lấy từ `-PkageClientVersion` (mặc định 0.10.0) vì repo không khai `version`. **Đo thật** với Temurin 25.0.4.1+1 (không `jmods/`, jlink từ runtime image): zip **48,7 MB** chưa asset; `runtime/bin/java --list-modules` = 8 module (5 khai + `java.datatransfer`/`java.prefs`/`java.xml` kéo theo); `KageClient.exe` chạy từ thư mục ngoài repo **sống 20 s**, tạo `client.log`; `NumberFormat` vi trên runtime đã link ra **`1.234.567,5`**. Dựng: `./gradlew :client:client-desktop:packageWindowsClient -PkageBundleAssets -PkagePackagingJdk=<JDK 25>`.
+3. ⏳ Kiểm sống trên **máy không cài Java** (hoặc user Windows sạch): giải nén zip → `KageClient.exe` →
    đăng nhập TLS → vào world → asset từ jar vẽ đúng → số vàng hiển thị `1.234` kiểu Việt. Ghi phạm vi đã
    chứng minh như ROADMAP đã làm cho `installDist`.
 4. Cập nhật ROADMAP v1 Exit Criteria (rủi ro (2) "bản cài KHÔNG kèm JRE" đóng khi mục 3 xong) và

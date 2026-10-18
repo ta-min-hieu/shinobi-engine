@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Log của CLIENT (ADR-053 D6(b), chủ dự án chọn theo khuyến nghị 2026-10-18).
+
+  Bản đóng gói chạy bằng KageClient.exe — launcher GUI của jpackage, KHÔNG có cửa sổ console — nên log
+  chỉ ra console thì người chơi bấm đúp là mọi dòng biến mất (đúng bài học playtest 2026-08-30). Ghi
+  thêm ra file trong thư mục dữ liệu của người dùng để người chơi Closed Beta gửi lại được:
+    Windows: %LOCALAPPDATA%\Kage\logs\client.log   (máy khác: ~/Kage/logs/client.log)
+  Giữ 7 file, mỗi ngày một file, tối đa 50 MB tổng.
+-->
+<configuration>
+    <!-- Không dùng <if>: nó cần thư viện Janino (dependency mới). Giá trị mặc định ${A:-B} là đủ. -->
+    <property name="KAGE_LOG_DIR" value="${LOCALAPPDATA:-${user.home}}/Kage/logs"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${KAGE_LOG_DIR}/client.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${KAGE_LOG_DIR}/client.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>50MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>
