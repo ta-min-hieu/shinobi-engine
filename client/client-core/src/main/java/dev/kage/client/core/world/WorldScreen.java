@@ -334,8 +334,8 @@ public final class WorldScreen implements GameScreen {
                 combatFeedback,
                 new LocalCharacterAppearance(models, combatHudController, WorldConstants.LOCAL_CHARACTER_ID));
         this.itemCatalog = new ItemCatalogCoordinator(sender);
-        this.reports = ReportWindows.create(
-                combatHud.skin(), sender, localCharacterId, new ReportWindows.Feeds(itemCatalog, chat));
+        ReportWindows.Feeds feeds = new ReportWindows.Feeds(itemCatalog, chat, combatHudController::onOwnMaxHpChanged);
+        this.reports = ReportWindows.create(combatHud.skin(), sender, localCharacterId, feeds);
         this.mail = new MailCoordinator(mailPanel, sender, combatFeedback, panels::noneOpen);
         this.inventory = buildInventory();
         this.shop = buildShop();
@@ -477,6 +477,7 @@ public final class WorldScreen implements GameScreen {
         panels.register(reports.storagePanel(), reports.storage());
         panels.register(reports.achievementPanel(), reports.achievements());
         panels.register(reports.marketPanel(), reports.market());
+        panels.register(reports.gemPanel(), reports.gems());
         panels.register(dialoguePanel, dialogue);
         panels.register(partyPanel, party);
         panels.register(friendPanel, friends);

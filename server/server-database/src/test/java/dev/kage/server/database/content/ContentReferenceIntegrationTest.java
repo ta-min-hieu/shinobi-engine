@@ -89,7 +89,14 @@ class ContentReferenceIntegrationTest {
      * phải lỗi dữ liệu (2026-10-03). Danh sách được GHIM hai chiều: thêm vật phẩm mới thiếu icon thì
      * đỏ, mà vẽ xong icon cho một món ở đây cũng đỏ — để danh sách không bao giờ nói dối.
      */
-    private static final Set<String> ITEMS_KNOWN_TO_LACK_AN_ICON = Set.of("outer_sect_tally", "blood_sand_talisman");
+    private static final Set<String> ITEMS_KNOWN_TO_LACK_AN_ICON = Set.of(
+            "outer_sect_tally",
+            "blood_sand_talisman",
+            // ADR-064 (2026-10-18) — bốn Linh Ngọc lên trước art; icon dựng từ .blend là việc riêng.
+            "spirit_jade_fire",
+            "spirit_jade_earth",
+            "spirit_jade_water",
+            "spirit_jade_wood");
 
     @Container
     static final PostgreSQLContainer POSTGRES =

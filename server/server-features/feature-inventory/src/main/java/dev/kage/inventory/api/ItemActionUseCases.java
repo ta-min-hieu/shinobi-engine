@@ -1,6 +1,7 @@
 package dev.kage.inventory.api;
 
 import dev.kage.inventory.application.EnhanceItemUseCase;
+import dev.kage.inventory.application.SocketGemUseCase;
 import dev.kage.inventory.application.StorageUseCase;
 import dev.kage.inventory.application.UseItemUseCase;
 
@@ -12,10 +13,13 @@ import dev.kage.inventory.application.UseItemUseCase;
  * ADR-046 D5 phải vào chung một record với {@code EnhanceItemUseCase} thay vì thêm tham số thứ 5.
  */
 public record ItemActionUseCases(
-        EnhanceItemUseCase enhanceItemUseCase, UseItemUseCase useItemUseCase, StorageUseCase storageUseCase) {
+        EnhanceItemUseCase enhanceItemUseCase,
+        UseItemUseCase useItemUseCase,
+        StorageUseCase storageUseCase,
+        SocketGemUseCase socketGemUseCase) {
 
-    /** Composition không có kho đồ (test) — gọi tới kho là lỗi lập trình. */
+    /** Composition không có kho đồ lẫn Linh Ngọc (test). */
     public ItemActionUseCases(EnhanceItemUseCase enhanceItemUseCase, UseItemUseCase useItemUseCase) {
-        this(enhanceItemUseCase, useItemUseCase, StorageUseCase.unavailable());
+        this(enhanceItemUseCase, useItemUseCase, StorageUseCase.unavailable(), SocketGemUseCase.unavailable());
     }
 }

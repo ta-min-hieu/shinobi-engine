@@ -114,6 +114,9 @@ enum Opcode {
   OPCODE_DEPOSIT_ITEM_RESPONSE = 517;
   OPCODE_WITHDRAW_ITEM_COMMAND = 518;
   OPCODE_WITHDRAW_ITEM_RESPONSE = 519;
+  // ADR-064 (Accepted 2026-10-18) — khảm Linh Ngọc.
+  OPCODE_SOCKET_GEM_COMMAND = 520;
+  OPCODE_SOCKET_GEM_RESPONSE = 521;
   // 511 để TRỐNG CÓ CHỦ Ý — dành sẵn cho ITEM_REMOVED_EVENT (ADR-035 Revisit Trigger #3, chỉ
   // thêm khi ĐO thấy việc hỏi lại toàn bộ túi sau mỗi hành động tốn thật). ĐỪNG cấp cho packet khác.
 

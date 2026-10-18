@@ -1,9 +1,12 @@
 package dev.kage.inventory.application;
 
+import java.util.Map;
+
 import dev.kage.inventory.domain.EnhancementTable;
 import dev.kage.inventory.domain.Equipment;
 import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.EquipmentPort;
+import dev.kage.inventory.domain.GemPort;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.inventory.domain.ItemStack;
@@ -21,12 +24,23 @@ public final class ComputeEquipmentBonusUseCase {
     private final EquipmentPort equipmentPort;
     private final InventoryPort inventoryPort;
     private final ItemTemplatePort itemTemplatePort;
+    private final GemPort gemPort;
 
     public ComputeEquipmentBonusUseCase(
             EquipmentPort equipmentPort, InventoryPort inventoryPort, ItemTemplatePort itemTemplatePort) {
+        this(equipmentPort, inventoryPort, itemTemplatePort, GemPort.NONE);
+    }
+
+    /** Kèm Linh Ngọc (ADR-064 D4): ngọc cộng PHẲNG vào món đang khảm, không nhân theo cường hoá. */
+    public ComputeEquipmentBonusUseCase(
+            EquipmentPort equipmentPort,
+            InventoryPort inventoryPort,
+            ItemTemplatePort itemTemplatePort,
+            GemPort gemPort) {
         this.equipmentPort = equipmentPort;
         this.inventoryPort = inventoryPort;
         this.itemTemplatePort = itemTemplatePort;
+        this.gemPort = gemPort;
     }
 
     public EquipmentBonus execute(long characterId) {
@@ -60,6 +74,34 @@ public final class ComputeEquipmentBonusUseCase {
             totalBonusRes += EnhancementTable.enhancedBonus(template.bonusRes(), enhanceLevel);
             totalBonusHp += EnhancementTable.enhancedBonus(template.bonusHp(), enhanceLevel);
         }
-        return new EquipmentBonus(totalBonusAtk, totalBonusDef, totalBonusRes, totalBonusHp);
+        EquipmentBonus gems = gemBonusOf(characterId, equipment);
+        return new EquipmentBonus(
+                totalBonusAtk + gems.bonusAtk(),
+                totalBonusDef + gems.bonusDef(),
+                totalBonusRes + gems.bonusRes(),
+                totalBonusHp + gems.bonusHp());
+    }
+
+    /** Tổng chỉ số ngọc trên các món ĐANG MẶC. */
+    private EquipmentBonus gemBonusOf(long characterId, Equipment equipment) {
+        Map<Long, Long> sockets = gemPort.socketsOf(characterId);
+        if (sockets.isEmpty()) {
+            return new EquipmentBonus(0, 0, 0, 0);
+        }
+        Map<Long, EquipmentBonus> bonuses = gemPort.gemBonuses();
+        int atk = 0;
+        int def = 0;
+        int res = 0;
+        int hp = 0;
+        for (long itemId : equipment.slots().values()) {
+            EquipmentBonus gem = bonuses.get(sockets.get(itemId));
+            if (gem != null) {
+                atk += gem.bonusAtk();
+                def += gem.bonusDef();
+                res += gem.bonusRes();
+                hp += gem.bonusHp();
+            }
+        }
+        return new EquipmentBonus(atk, def, res, hp);
     }
 }

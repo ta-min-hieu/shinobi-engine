@@ -35,6 +35,7 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
                     AS offered
               FROM inventory_item
              WHERE character_id = ? AND item_template_id = ? AND enhance_level = 0
+               AND NOT EXISTS (SELECT 1 FROM item_socket s WHERE s.inventory_item_id = inventory_item.id)
              ORDER BY id
                FOR UPDATE
             """;

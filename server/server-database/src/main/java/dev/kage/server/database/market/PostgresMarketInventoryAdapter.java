@@ -20,7 +20,8 @@ public final class PostgresMarketInventoryAdapter implements MarketInventoryPort
     /** Dòng của CHÍNH người bán, kèm phần đang chào giao dịch và cờ đang mặc — khoá dòng. */
     private static final String SELECT_FOR_UPDATE = "SELECT ii.item_template_id, ii.quantity, ii.enhance_level, "
             + TradeOfferedQuantity.OF_II
-            + " AS offered, EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = ii.id) AS equipped"
+            + " AS offered, EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = ii.id) AS equipped,"
+            + " EXISTS (SELECT 1 FROM item_socket s WHERE s.inventory_item_id = ii.id) AS socketed"
             + " FROM inventory_item ii WHERE ii.id = ? AND ii.character_id = ? FOR UPDATE OF ii";
 
     private static final String DECREMENT = "UPDATE inventory_item SET quantity = quantity - ? WHERE id = ?";
@@ -28,6 +29,11 @@ public final class PostgresMarketInventoryAdapter implements MarketInventoryPort
 
     /** Ảnh chụp dòng túi vừa khoá. */
     private record Row(long itemTemplateId, int quantity, int enhanceLevel, int offered, boolean equipped) {}
+
+    /** Đã khảm Linh Ngọc thì coi như đã cường hoá: thư trả món hết hạn không chở được ngọc (ADR-064 D5). */
+    private static int effectiveEnhance(int enhanceLevel, boolean socketed) {
+        return socketed ? Math.max(1, enhanceLevel) : enhanceLevel;
+    }
 
     @Override
     public void lock(Transaction tx, long characterId) {
@@ -43,7 +49,7 @@ public final class PostgresMarketInventoryAdapter implements MarketInventoryPort
                 rs -> new Row(
                         rs.getLong("item_template_id"),
                         rs.getInt("quantity"),
-                        rs.getInt("enhance_level"),
+                        effectiveEnhance(rs.getInt("enhance_level"), rs.getBoolean("socketed")),
                         rs.getInt("offered"),
                         rs.getBoolean("equipped")),
                 inventoryItemId,

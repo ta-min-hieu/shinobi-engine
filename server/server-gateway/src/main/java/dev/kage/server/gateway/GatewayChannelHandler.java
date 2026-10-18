@@ -46,8 +46,10 @@ import dev.kage.dialogue.domain.DialogueOption;
 import dev.kage.friend.api.FriendFacade;
 import dev.kage.guild.api.GuildFacade;
 import dev.kage.inventory.api.InventoryFacade;
+import dev.kage.inventory.application.SocketGemUseCase;
 import dev.kage.inventory.application.UseItemUseCase;
 import dev.kage.inventory.domain.EquipmentSlotType;
+import dev.kage.inventory.domain.GemPolicy;
 import dev.kage.inventory.domain.InventorySnapshot;
 import dev.kage.inventory.domain.ItemCatalog;
 import dev.kage.inventory.domain.ItemStack;
@@ -259,6 +261,9 @@ import dev.kage.protocol.SetTradeOfferCommand;
 import dev.kage.protocol.SetTradeOfferOutcome;
 import dev.kage.protocol.SetTradeOfferResponse;
 import dev.kage.protocol.ShopListingView;
+import dev.kage.protocol.SocketGemCommand;
+import dev.kage.protocol.SocketGemOutcome;
+import dev.kage.protocol.SocketGemResponse;
 import dev.kage.protocol.TalkToNpcCommand;
 import dev.kage.protocol.TradeCloseReason;
 import dev.kage.protocol.TradeClosedEvent;
@@ -470,6 +475,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_LIST_STORAGE_REQUEST_VALUE, this::handleListStorageRequest),
             Map.entry(Opcode.OPCODE_LIST_ACHIEVEMENTS_REQUEST_VALUE, this::handleListAchievementsRequest),
             Map.entry(Opcode.OPCODE_LIST_MARKET_REQUEST_VALUE, this::handleListMarketRequest),
+            Map.entry(Opcode.OPCODE_SOCKET_GEM_COMMAND_VALUE, this::handleSocketGemCommand),
             Map.entry(Opcode.OPCODE_CREATE_LISTING_COMMAND_VALUE, this::handleCreateListingCommand),
             Map.entry(Opcode.OPCODE_BUY_LISTING_COMMAND_VALUE, this::handleBuyListingCommand),
             Map.entry(Opcode.OPCODE_CANCEL_LISTING_COMMAND_VALUE, this::handleCancelListingCommand),
@@ -1693,6 +1699,37 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 characterId -> storage.withdraw(characterId, command));
     }
 
+    /** ADR-064 — khảm Linh Ngọc. Trừ vàng + random ⇒ khoá chống trùng bắt buộc. */
+    private void handleSocketGemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        SocketGemCommand command = SocketGemCommand.parseFrom(payload);
+        if (rejectMalformedIdempotencyKey(ctx, header.sequenceId(), command.getIdempotencyKey())) {
+            return;
+        }
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_SOCKET_GEM_RESPONSE_VALUE,
+                characterId -> socketGem(characterId, command));
+    }
+
+    /**
+     * Thành công thì tính lại chỉ số trang bị + máu tối đa (ADR-064 D4) — món đích có thể đang mặc; tính lại
+     * khi nó nằm trong túi thì chỉ số không đổi, vô hại. Cùng đường cường hoá (ADR-043).
+     */
+    private SocketGemResponse socketGem(long characterId, SocketGemCommand command) {
+        SocketGemUseCase.Result result = inventoryFacade.socketGem(
+                characterId, command.getTargetItemId(), command.getGemItemId(), command.getIdempotencyKey());
+        boolean success = result.outcome() == SocketGemUseCase.Outcome.SUCCESS;
+        return SocketGemResponse.newBuilder()
+                .setOutcome(SocketGemOutcome.valueOf(
+                        "SOCKET_GEM_OUTCOME_" + result.outcome().name()))
+                .setFailuresInARow(result.failuresAfter())
+                .setPityAfter(GemPolicy.PITY_AFTER_FAILURES)
+                .setMaxHp(success ? applyEquipmentBonusAndComputeMaxHp(characterId) : 0)
+                .build();
+    }
+
     /** ADR-063 — bảng tin phường thị. */
     private void handleListMarketRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
@@ -1808,6 +1845,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleListInventoryBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
         InventorySnapshot snapshot = inventoryFacade.listInventory(characterId);
+        Map<Long, Long> sockets = inventoryFacade.socketsOf(characterId);
         ListInventoryResponse.Builder response = ListInventoryResponse.newBuilder()
                 .setCapacity(snapshot.inventory().capacity());
         List<ItemStack> items = snapshot.inventory().items();
@@ -1821,6 +1859,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setQuantity(stack.quantity())
                     .setEnhanceLevel(stack.enhanceLevel())
                     .setSlotIndex(slotIndex)
+                    .setSocketGemTemplateId(sockets.getOrDefault(stack.id(), 0L))
                     .build());
         }
         snapshot.equipment()

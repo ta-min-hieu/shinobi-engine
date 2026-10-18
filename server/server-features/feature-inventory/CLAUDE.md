@@ -312,3 +312,11 @@ những gì ảnh hưởng tới cách viết code trong module này:
 - Đứng gần `senior_sister` là việc của gateway (`SectStorageCommands` + `NpcProximity`), module này không
   biết vị trí. Không idempotency key (chỉ dời đồ của chính mình — cùng lý do `UseItemUseCase`).
 
+### ADR-064 (Accepted 2026-10-18, lô 16): Linh Ngọc khảm nạm
+
+- `GemPort` + `GemPolicy` (domain), `SocketGemUseCase` (thành phần thứ tư của `ItemActionUseCases`),
+  adapter `PostgresGemAdapter`. Random tiêm qua `RandomGenerator` (test cố định được kết quả).
+- `ComputeEquipmentBonusUseCase` có ctor 4 tham số kèm `GemPort` — ngọc cộng PHẲNG, không nhân cường hoá.
+- `InventoryPort#isSocketed`: đường dời đồ bằng xoá/tạo dòng (kho) phải từ chối món đã khảm; thư và phường
+  thị chặn thẳng trong SQL của adapter (`NOT EXISTS item_socket`). Giao dịch dời nguyên dòng nên giữ ngọc.
+

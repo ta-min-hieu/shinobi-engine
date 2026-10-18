@@ -145,6 +145,12 @@
         <Bug pattern="PREDICTABLE_RANDOM"/>
     </Match>
 
+    <!-- Roll thành/hỏng khảm Linh Ngọc (ADR-064 D3) — gameplay như cường hoá/rơi đồ, KHÔNG bảo mật. -->
+    <Match>
+        <Class name="dev.kage.server.database.inventory.ThreadLocalGemRoll"/>
+        <Bug pattern="PREDICTABLE_RANDOM"/>
+    </Match>
+
     <!-- ⚠️ KHÔNG PHẢI false positive — TLS THẬT SỰ CHƯA ĐƯỢC IMPLEMENT ở đây (2026-07-30, phát
          hiện lần đầu khi bật SpotBugs/find-sec-bugs). NETWORK.md liệt "TLS bắt buộc ở Production"
          là Technical Decision Accepted, nhưng chưa có dòng code SslContext/SSLSocket nào trong

@@ -61,6 +61,7 @@ import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GetItemCatalogUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.inventory.application.ListInventoryUseCase;
+import dev.kage.inventory.application.SocketGemUseCase;
 import dev.kage.inventory.application.StorageUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
 import dev.kage.inventory.application.UseItemUseCase;
@@ -110,12 +111,14 @@ import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
 import dev.kage.server.database.inventory.PostgresAuditAdapter;
 import dev.kage.server.database.inventory.PostgresDropTableAdapter;
 import dev.kage.server.database.inventory.PostgresEquipmentAdapter;
+import dev.kage.server.database.inventory.PostgresGemAdapter;
 import dev.kage.server.database.inventory.PostgresGoldAdapter;
 import dev.kage.server.database.inventory.PostgresInventoryAdapter;
 import dev.kage.server.database.inventory.PostgresInventoryIdempotencyAdapter;
 import dev.kage.server.database.inventory.PostgresInventoryTradeOfferAdapter;
 import dev.kage.server.database.inventory.PostgresItemTemplateAdapter;
 import dev.kage.server.database.inventory.PostgresStorageAdapter;
+import dev.kage.server.database.inventory.ThreadLocalGemRoll;
 import dev.kage.server.database.mail.JdbcMailTransactionRunner;
 import dev.kage.server.database.mail.PostgresMailAuditAdapter;
 import dev.kage.server.database.mail.PostgresMailGoldAdapter;
@@ -258,8 +261,9 @@ public final class ServerDatabaseBootstrap {
                 new EquipItemUseCase(inventoryPort, itemTemplatePort, equipmentPort, transactionRunner);
         UnequipItemUseCase unequipItemUseCase =
                 new UnequipItemUseCase(equipmentPort, transactionRunner).guardedBy(inventoryPort);
+        PostgresGemAdapter gemPort = new PostgresGemAdapter(dataSource);
         ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase =
-                new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort);
+                new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort, gemPort);
         EquipmentUseCases equipmentUseCases =
                 new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
         EnhancePorts enhancePorts = new EnhancePorts(
@@ -282,7 +286,12 @@ public final class ServerDatabaseBootstrap {
                 new ItemActionUseCases(
                         enhanceItemUseCase,
                         useItemUseCase,
-                        storageUseCase(inventoryPort, equipmentPort, itemTemplatePort, transactionRunner)),
+                        storageUseCase(inventoryPort, equipmentPort, itemTemplatePort, transactionRunner),
+                        new SocketGemUseCase(
+                                new SocketGemUseCase.Ports(inventoryPort, itemTemplatePort, gemPort, goldPort),
+                                new SocketGemUseCase.Records(idempotencyPort, auditPort),
+                                transactionRunner,
+                                ThreadLocalGemRoll.INSTANCE)),
                 queryUseCases);
     }
 

@@ -51,6 +51,7 @@ final class StorageCoordinator implements WindowFlow {
         OUTCOME_KEYS.put(StorageOutcome.STORAGE_OUTCOME_STORAGE_FULL, "storage.error.storage_full");
         OUTCOME_KEYS.put(StorageOutcome.STORAGE_OUTCOME_BAG_FULL, "storage.error.bag_full");
         OUTCOME_KEYS.put(StorageOutcome.STORAGE_OUTCOME_TOO_FAR, "storage.error.too_far");
+        OUTCOME_KEYS.put(StorageOutcome.STORAGE_OUTCOME_SOCKETED, "storage.error.socketed");
     }
 
     /** Một dòng có nút: rút một dòng kho, hoặc gửi một dòng túi. */

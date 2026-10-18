@@ -38,6 +38,8 @@ public final class StorageUseCase {
         EQUIPPED,
         /** Phần muốn gửi đang được chào trong một phiên giao dịch (dòng 80). */
         ITEM_IN_TRADE,
+        /** Món đang khảm Linh Ngọc — kho chưa chở được ngọc (ADR-064 D5). */
+        SOCKETED,
         STORAGE_FULL,
         BAG_FULL
     }
@@ -144,6 +146,9 @@ public final class StorageUseCase {
         }
         if (isEquipped(characterId, item.id())) {
             return Optional.of(Outcome.EQUIPPED);
+        }
+        if (ports.inventoryPort().isSocketed(t, item.id())) {
+            return Optional.of(Outcome.SOCKETED);
         }
         if (item.quantity() - ports.tradeOfferPort().offeredQuantity(t, characterId, item.id()) < quantity) {
             return Optional.of(Outcome.ITEM_IN_TRADE);

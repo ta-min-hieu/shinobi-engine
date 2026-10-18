@@ -95,6 +95,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-061](ADR-061-Sect-Storage.md) | Kho đồ tông môn — 40 dòng/nhân vật, gửi/rút ở Tô Vân Nhi (V63, opcode 514–519) | ✅ **Accepted** *(2026-10-18, lô 16)* — thi hành cùng ngày | Túi 20 ô chật từ khi có bộ đồ theo arc + quà hằng ngày |
 | [ADR-062](ADR-062-Achievements-And-Titles.md) | Thành tựu + danh hiệu — 9 mốc (V64), danh hiệu trong chat, dải opcode MỚI 1700–1704, module `feature-achievement` | ✅ **Accepted** *(2026-10-18, lô 16)* — thi hành cùng ngày | Ngoài cấp/Lực Chiến không có mục tiêu dài hạn nhìn thấy được |
 | [ADR-063](ADR-063-Market.md) | Phường thị — treo bán món chưa cường hoá, giá cố định, phí 5% (sink), hết hạn 48h trả qua thư (V65, opcode 1006–1014, module `feature-market`) | ✅ **Accepted** *(2026-10-18, lô 16)* — thi hành cùng ngày | Bán đồ cho người lạ phải cùng online + giao dịch trực tiếp; GDD §10 đòi phí đấu giá làm gold sink |
+| [ADR-064](ADR-064-Spirit-Jade-Sockets.md) | Linh Ngọc khảm nạm — 4 loại ngọc, 1 ô/trang bị, 50% + bảo hiểm sau 3 lần hỏng, phí 200 (V66, opcode 520/521) | ✅ **Accepted** *(2026-10-18, lô 16)* — thi hành cùng ngày | GDD hứa "bonus phụ có pity" + gold sink khảm nạm |
 ---
 
 ## ADR cần tạo (chưa viết)

@@ -64,4 +64,9 @@ public interface InventoryPort {
     default Optional<ItemStack> findOwnedItemForUpdate(Transaction tx, long characterId, long itemId) {
         return findByCharacter(characterId).flatMap(inventory -> inventory.findItem(itemId));
     }
+
+    /** Món này có đang khảm Linh Ngọc không (ADR-064 D5) — đường dời đồ bằng xoá/tạo dòng phải từ chối. */
+    default boolean isSocketed(Transaction tx, long itemId) {
+        return false;
+    }
 }

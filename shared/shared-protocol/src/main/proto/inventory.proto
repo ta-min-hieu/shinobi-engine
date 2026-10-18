@@ -171,6 +171,7 @@ message InventoryItemView {
   int32 quantity = 3;
   int32 enhance_level = 4;
   int32 slot_index = 5;
+  int64 socket_gem_template_id = 6; // ADR-064 — item_template.id của Linh Ngọc đang khảm; 0 = chưa khảm
 }
 
 // Response: Server -> Client (OPCODE_LIST_INVENTORY_RESPONSE = 508). Ảnh chụp TOÀN BỘ túi tại thời
@@ -302,6 +303,7 @@ enum StorageOutcome {
   STORAGE_OUTCOME_STORAGE_FULL = 6;
   STORAGE_OUTCOME_BAG_FULL = 7;
   STORAGE_OUTCOME_TOO_FAR = 8;          // không đứng gần người giữ kho
+  STORAGE_OUTCOME_SOCKETED = 9;         // ADR-064 — món đang khảm Linh Ngọc, kho chưa chở được ngọc
 }
 
 // Command: Client -> Server (OPCODE_DEPOSIT_ITEM_COMMAND = 516). inventory_item_id là id THẬT trong túi.
@@ -328,4 +330,34 @@ message WithdrawItemResponse {
   StorageOutcome outcome = 1;
   repeated StoredItemView items = 2;
   int32 capacity = 3;
+}
+
+// ===== ADR-064 — khảm Linh Ngọc =====
+
+// Command: Client -> Server (OPCODE_SOCKET_GEM_COMMAND = 520). Cả hai id là inventory_item.id THẬT trong
+// túi người gửi (món đích có thể đang mặc). Trừ vàng + random ⇒ bắt buộc idempotency_key (ADR-025).
+message SocketGemCommand {
+  int64 target_item_id = 1;
+  int64 gem_item_id = 2;
+  string idempotency_key = 3;
+}
+
+enum SocketGemOutcome {
+  SOCKET_GEM_OUTCOME_UNSPECIFIED = 0;
+  SOCKET_GEM_OUTCOME_SUCCESS = 1;
+  SOCKET_GEM_OUTCOME_FAILED = 2;            // mất ngọc + phí, ô giữ nguyên; bảo hiểm +1
+  SOCKET_GEM_OUTCOME_NOT_FOUND = 3;
+  SOCKET_GEM_OUTCOME_NOT_EQUIPMENT = 4;
+  SOCKET_GEM_OUTCOME_NOT_A_GEM = 5;
+  SOCKET_GEM_OUTCOME_INSUFFICIENT_GOLD = 6;
+  SOCKET_GEM_OUTCOME_DUPLICATE_REQUEST = 7;
+}
+
+// Response: Server -> Client (OPCODE_SOCKET_GEM_RESPONSE = 521). max_hp > 0 khi món đích đang mặc và chỉ số
+// vừa đổi (cùng quy ước EnhanceItemResponse.max_hp); túi đồ client tự hỏi lại.
+message SocketGemResponse {
+  SocketGemOutcome outcome = 1;
+  int32 failures_in_a_row = 2;   // số lần hỏng liên tiếp hiện tại
+  int32 pity_after = 3;          // hỏng tới mốc này thì lần kế chắc chắn thành công
+  int32 max_hp = 4;
 }

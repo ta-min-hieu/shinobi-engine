@@ -13,6 +13,7 @@ import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.GetItemCatalogUseCase;
 import dev.kage.inventory.application.GrantLootUseCase;
 import dev.kage.inventory.application.ListInventoryUseCase;
+import dev.kage.inventory.application.SocketGemUseCase;
 import dev.kage.inventory.application.StorageUseCase;
 import dev.kage.inventory.application.UnequipItemUseCase;
 import dev.kage.inventory.application.UseItemUseCase;
@@ -91,6 +92,7 @@ public final class InventoryFacade {
     private final EnhanceItemUseCase enhanceItemUseCase;
     private final UseItemUseCase useItemUseCase;
     private final StorageUseCase storageUseCase;
+    private final SocketGemUseCase socketGemUseCase;
     private final ListInventoryUseCase listInventoryUseCase;
     private final GetItemCatalogUseCase getItemCatalogUseCase;
 
@@ -108,6 +110,7 @@ public final class InventoryFacade {
         this.enhanceItemUseCase = actionUseCases.enhanceItemUseCase();
         this.useItemUseCase = actionUseCases.useItemUseCase();
         this.storageUseCase = actionUseCases.storageUseCase();
+        this.socketGemUseCase = actionUseCases.socketGemUseCase();
         this.listInventoryUseCase = queryUseCases.listInventoryUseCase();
         this.getItemCatalogUseCase = queryUseCases.getItemCatalogUseCase();
     }
@@ -193,6 +196,17 @@ public final class InventoryFacade {
      */
     public UseItemUseCase.UseItemResult useItem(long characterId, long inventoryItemId) {
         return withCharacterLock(characterId, () -> useItemUseCase.execute(characterId, inventoryItemId));
+    }
+
+    /** Khảm Linh Ngọc (ADR-064) — gateway tính lại chỉ số nếu món đang mặc. */
+    public SocketGemUseCase.Result socketGem(long characterId, long targetItemId, long gemItemId, String key) {
+        return withCharacterLock(
+                characterId, () -> socketGemUseCase.execute(characterId, targetItemId, gemItemId, key));
+    }
+
+    /** Ô khảm trong túi: {@code inventory_item.id → item_template.id} của ngọc (ADR-064). */
+    public Map<Long, Long> socketsOf(long characterId) {
+        return socketGemUseCase.socketsOf(characterId);
     }
 
     /** Kho đồ tông môn (ADR-061) — chỉ đọc. */
